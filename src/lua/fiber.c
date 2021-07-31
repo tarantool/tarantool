@@ -88,27 +88,26 @@ luaL_testcancel(struct lua_State *L)
 static const char *fiberlib_name = "fiber";
 
 /**
- * @pre: stack top contains a table
- * @post: sets table field specified by name of the table on top
- * of the stack to a weak kv table and pops that weak table.
+ * Trigger invoked when the fiber has stopped execution of its
+ * current request. Only purpose - delete storage.lua.fid_ref and
+ * storage.lua.storage_ref keeping a reference of Lua
+ * fiber and fiber.storage objects. Unlike Lua stack,
+ * Lua fiber storage may be created not only for fibers born from
+ * Lua land. For example, an IProto request may execute a Lua
+ * function, which can create the storage. Trigger guarantees,
+ * that even for non-Lua fibers the Lua storage is destroyed.
  */
-static void
-lbox_create_weak_table(struct lua_State *L, const char *name)
+static int
+lbox_fiber_on_stop(struct trigger *trigger, void *event)
 {
-	lua_newtable(L);
-	/* and a metatable */
-	lua_newtable(L);
-	/* weak keys and values */
-	lua_pushstring(L, "kv");
-	/* pops 'kv' */
-	lua_setfield(L, -2, "__mode");
-	/* pops the metatable */
-	lua_setmetatable(L, -2);
-	/* assigns and pops table */
-	lua_setfield(L, -2, name);
-	/* gets memoize back. */
-	lua_getfield(L, -1, name);
-	assert(! lua_isnil(L, -1));
+	struct fiber *f = event;
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, f->storage.lua.storage_ref);
+	f->storage.lua.storage_ref = FIBER_LUA_NOREF;
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, f->storage.lua.fid_ref);
+	f->storage.lua.fid_ref = FIBER_LUA_NOREF;
+	trigger_clear(trigger);
+	free(trigger);
+	return 0;
 }
 
 /**
@@ -117,42 +116,26 @@ lbox_create_weak_table(struct lua_State *L, const char *name)
 static void
 lbox_pushfiber(struct lua_State *L, struct fiber *f)
 {
-	/*
-	 * Use 'memoize'  pattern and keep a single userdata for
-	 * the given fiber. This is important to not run __gc
-	 * twice for a copy of an attached fiber -- __gc should
-	 * not remove attached fiber's coro prematurely.
-	 */
-	luaL_getmetatable(L, fiberlib_name);
-	lua_getfield(L, -1, "memoize");
-	if (lua_isnil(L, -1)) {
-		/* first access - instantiate memoize */
-		/* pop the nil */
-		lua_pop(L, 1);
-		/* create memoize table */
-		lbox_create_weak_table(L, "memoize");
-	}
-	/* Find out whether the fiber is  already in the memoize table. */
-	uint64_t fid = f->fid;
-	luaL_pushuint64(L, fid);
-	lua_gettable(L, -2);
-	if (lua_isnil(L, -1)) {
-		/* no userdata for fiber created so far */
-		/* pop the nil */
-		lua_pop(L, 1);
-		/* push the key back */
-		luaL_pushuint64(L, fid);
+	int fid_ref = f->storage.lua.fid_ref;
+	if (fid_ref == FIBER_LUA_NOREF) {
+		struct trigger *t = malloc(sizeof(*t));
+		if (t == NULL) {
+			diag_set(OutOfMemory, sizeof(*t), "malloc", "t");
+			luaT_error(L);
+		}
+		trigger_create(t, lbox_fiber_on_stop, NULL, (trigger_f0)free);
+		trigger_add(&f->on_stop, t);
+
+		uint64_t fid = f->fid;
 		/* create a new userdata */
 		uint64_t *ptr = lua_newuserdata(L, sizeof(*ptr));
 		*ptr = fid;
 		luaL_getmetatable(L, fiberlib_name);
 		lua_setmetatable(L, -2);
-		/* memoize it */
-		lua_settable(L, -3);
-		luaL_pushuint64(L, fid);
-		/* get it back */
-		lua_gettable(L, -2);
+		fid_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+		f->storage.lua.fid_ref = fid_ref;
 	}
+	lua_rawgeti(L, LUA_REGISTRYINDEX, fid_ref);
 }
 
 static struct fiber *
@@ -670,41 +653,12 @@ lbox_fiber_name(struct lua_State *L)
 	}
 }
 
-/**
- * Trigger invoked when the fiber has stopped execution of its
- * current request. Only purpose - delete storage.lua.storage_ref keeping
- * a reference of Lua fiber.storage object. Unlike Lua stack,
- * Lua fiber storage may be created not only for fibers born from
- * Lua land. For example, an IProto request may execute a Lua
- * function, which can create the storage. Trigger guarantees,
- * that even for non-Lua fibers the Lua storage is destroyed.
- */
-static int
-lbox_fiber_on_stop(struct trigger *trigger, void *event)
-{
-	struct fiber *f = (struct fiber *) event;
-	int storage_ref = f->storage.lua.storage_ref;
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, storage_ref);
-	f->storage.lua.storage_ref = FIBER_LUA_NOREF;
-	trigger_clear(trigger);
-	free(trigger);
-	return 0;
-}
-
 static int
 lbox_fiber_storage(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
 	int storage_ref = f->storage.lua.storage_ref;
 	if (storage_ref == FIBER_LUA_NOREF) {
-		struct trigger *t = (struct trigger *)
-			malloc(sizeof(*t));
-		if (t == NULL) {
-			diag_set(OutOfMemory, sizeof(*t), "malloc", "t");
-			return luaT_error(L);
-		}
-		trigger_create(t, lbox_fiber_on_stop, NULL, (trigger_f0) free);
-		trigger_add(&f->on_stop, t);
 		lua_newtable(L); /* create local storage on demand */
 		storage_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 		f->storage.lua.storage_ref = storage_ref;
