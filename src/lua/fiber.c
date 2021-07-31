@@ -670,7 +670,7 @@ lbox_fiber_name(struct lua_State *L)
 
 /**
  * Trigger invoked when the fiber has stopped execution of its
- * current request. Only purpose - delete storage.lua.ref keeping
+ * current request. Only purpose - delete storage.lua.storage_ref keeping
  * a reference of Lua fiber.storage object. Unlike Lua stack,
  * Lua fiber storage may be created not only for fibers born from
  * Lua land. For example, an IProto request may execute a Lua
@@ -681,10 +681,10 @@ static int
 lbox_fiber_on_stop(struct trigger *trigger, void *event)
 {
 	struct fiber *f = (struct fiber *) event;
-	int storage_ref = f->storage.lua.ref;
+	int storage_ref = f->storage.lua.storage_ref;
 	assert(storage_ref > 0);
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, storage_ref);
-	f->storage.lua.ref = LUA_NOREF;
+	f->storage.lua.storage_ref = LUA_NOREF;
 	trigger_clear(trigger);
 	free(trigger);
 	return 0;
@@ -694,7 +694,7 @@ static int
 lbox_fiber_storage(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
-	int storage_ref = f->storage.lua.ref;
+	int storage_ref = f->storage.lua.storage_ref;
 	if (storage_ref <= 0) {
 		struct trigger *t = (struct trigger *)
 			malloc(sizeof(*t));
@@ -706,7 +706,7 @@ lbox_fiber_storage(struct lua_State *L)
 		trigger_add(&f->on_stop, t);
 		lua_newtable(L); /* create local storage on demand */
 		storage_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-		f->storage.lua.ref = storage_ref;
+		f->storage.lua.storage_ref = storage_ref;
 	}
 	lua_rawgeti(L, LUA_REGISTRYINDEX, storage_ref);
 	return 1;
