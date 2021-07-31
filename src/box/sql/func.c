@@ -2768,55 +2768,6 @@ sql_built_in_functions_cache_free(void)
 	mh_strnptr_delete(built_in_functions);
 }
 
-struct func *
-func_sql_builtin_new(struct func_def *def)
-{
-	assert(def->language == FUNC_LANGUAGE_SQL_BUILTIN);
-	/** Binary search for corresponding builtin entry. */
-	int idx = -1, left = 0, right = nelem(sql_builtins) - 1;
-	while (left <= right) {
-		uint32_t mid = (left + right) / 2;
-		int rc = strcmp(def->name, sql_builtins[mid].name);
-		if (rc == 0) {
-			idx = mid;
-			break;
-		}
-		if (rc < 0)
-			right = mid - 1;
-		else
-			left = mid + 1;
-	}
-	/*
-	 * All SQL built-in(s) (stubs) are defined in a snapshot.
-	 * Implementation-specific metadata is defined in
-	 * sql_builtins list. When a definition were not found
-	 * above, the function name is invalid, i.e. it is
-	 * not built-in function.
-	 */
-	if (idx == -1) {
-		diag_set(ClientError, ER_CREATE_FUNCTION, def->name,
-			 "given built-in is not predefined");
-		return NULL;
-	}
-	struct func_sql_builtin *func =
-		(struct func_sql_builtin *) calloc(1, sizeof(*func));
-	if (func == NULL) {
-		diag_set(OutOfMemory, sizeof(*func), "malloc", "func");
-		return NULL;
-	}
-	func->base.def = def;
-	func->base.vtab = &func_sql_builtin_vtab;
-	func->flags = sql_builtins[idx].flags;
-	func->call = sql_builtins[idx].call;
-	func->finalize = sql_builtins[idx].finalize;
-	def->param_count = sql_builtins[idx].param_count;
-	def->is_deterministic = sql_builtins[idx].is_deterministic;
-	def->returns = sql_builtins[idx].returns;
-	def->aggregate = sql_builtins[idx].aggregate;
-	def->exports.sql = sql_builtins[idx].export_to_sql;
-	return &func->base;
-}
-
 static void
 func_sql_builtin_destroy(struct func *func)
 {

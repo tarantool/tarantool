@@ -116,14 +116,6 @@ func_def_check(struct func_def *def)
 			return -1;
 		}
 		break;
-	case FUNC_LANGUAGE_SQL_BUILTIN:
-		if (def->body != NULL || def->is_sandboxed) {
-			diag_set(ClientError, ER_CREATE_FUNCTION, def->name,
-				 "body and is_sandboxed options are not compatible "
-				 "with SQL language");
-			return -1;
-		}
-		break;
 	default:
 		break;
 	}
