@@ -114,7 +114,7 @@ lbox_create_weak_table(struct lua_State *L, const char *name)
  * Push a userdata for the given fiber onto Lua stack.
  */
 static void
-lbox_pushfiber(struct lua_State *L, uint64_t fid)
+lbox_pushfiber(struct lua_State *L, struct fiber *f)
 {
 	/*
 	 * Use 'memoize'  pattern and keep a single userdata for
@@ -132,6 +132,7 @@ lbox_pushfiber(struct lua_State *L, uint64_t fid)
 		lbox_create_weak_table(L, "memoize");
 	}
 	/* Find out whether the fiber is  already in the memoize table. */
+	uint64_t fid = f->fid;
 	luaL_pushuint64(L, fid);
 	lua_gettable(L, -2);
 	if (lua_isnil(L, -1)) {
@@ -501,7 +502,7 @@ fiber_create(struct lua_State *L)
 	/* Move the arguments to the new coro */
 	lua_xmove(L, child_L, lua_gettop(L));
 	/* XXX: 'fiber' is leaked if this throws a Lua error. */
-	lbox_pushfiber(L, f->fid);
+	lbox_pushfiber(L, f);
 	/* Pass coro_ref via lua stack so that we don't have to pass it
 	 * as an argument of fiber_run function.
 	 * No function will work with child_L until the function is called.
@@ -755,7 +756,7 @@ lbox_fiber_yield(struct lua_State *L)
 static int
 lbox_fiber_self(struct lua_State *L)
 {
-	lbox_pushfiber(L, fiber()->fid);
+	lbox_pushfiber(L, fiber());
 	return 1;
 }
 
@@ -767,7 +768,7 @@ lbox_fiber_find(struct lua_State *L)
 	uint64_t fid = luaL_touint64(L, -1);
 	struct fiber *f = fiber_find(fid);
 	if (f)
-		lbox_pushfiber(L, f->fid);
+		lbox_pushfiber(L, f);
 	else
 		lua_pushnil(L);
 	return 1;
