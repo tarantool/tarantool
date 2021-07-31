@@ -626,7 +626,7 @@ struct fiber {
 			/**
 			 * Optional fiber.storage Lua reference.
 			 */
-			int ref;
+			int storage_ref;
 		} lua;
 		/**
 		 * Iproto sync.
