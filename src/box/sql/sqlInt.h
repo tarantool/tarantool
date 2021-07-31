@@ -4337,17 +4337,9 @@ sql_func_flag_is_set(struct func *func, uint16_t flag)
 	return (((struct func_sql_builtin *)func)->flags & flag) != 0;
 }
 
-/**
- * A SQL method to find a function in a hash by its name and
- * count of arguments. Only functions that have 'SQL' engine
- * export field set true and have exactly the same signature
- * are returned.
- *
- * Returns not NULL function pointer when a valid and exported
- * to SQL engine function is found and NULL otherwise.
- */
+/** Return a function that matches the parameters described in given expr. */
 struct func *
-sql_func_by_signature(const char *name, int argc);
+sql_func_find(struct Expr *expr);
 
 /**
  * Return the parameters of the function with the given name. If the function

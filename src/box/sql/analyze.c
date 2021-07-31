@@ -719,6 +719,10 @@ callStatGet(Vdbe * v, int regStat4, int iParam, int regOut)
 {
 	assert(regOut != regStat4 && regOut != regStat4 + 1);
 	sqlVdbeAddOp2(v, OP_Integer, iParam, regStat4 + 1);
+	/*
+	 * Function sql_func_by_signature() was removed, so after enabling this
+	 * part should be changed.
+	 */
 	struct func *func = sql_func_by_signature("_sql_stat_get", 2);
 	assert(func != NULL);
 	sqlVdbeAddOp4(v, OP_BuiltinFunction0, 0, regStat4, regOut,
@@ -858,6 +862,10 @@ vdbe_emit_analyze_space(struct Parse *parse, struct space *space)
 		sqlVdbeAddOp2(v, OP_Count, idx_cursor, stat4_reg + 3);
 		sqlVdbeAddOp2(v, OP_Integer, part_count, stat4_reg + 1);
 		sqlVdbeAddOp2(v, OP_Integer, part_count, stat4_reg + 2);
+		/*
+		 * Function sql_func_by_signature() was removed, so after
+		 * enabling this part should be changed.
+		 */
 		struct func *init_func =
 			sql_func_by_signature("_sql_stat_init", 3);
 		assert(init_func != NULL);
@@ -959,6 +967,10 @@ vdbe_emit_analyze_space(struct Parse *parse, struct space *space)
 		sqlVdbeAddOp3(v, OP_MakeRecord, stat_key_reg,
 				  pk_part_count, key_reg);
 		assert(chng_reg == (stat4_reg + 1));
+		/*
+		 * Function sql_func_by_signature() was removed, so after
+		 * enabling this part should be changed.
+		 */
 		struct func *push_func =
 			sql_func_by_signature("_sql_stat_push", 3);
 		assert(push_func != NULL);

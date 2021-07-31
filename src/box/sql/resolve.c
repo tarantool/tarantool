@@ -598,28 +598,8 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			assert(!ExprHasProperty(pExpr, EP_xIsSelect));
 			zId = pExpr->u.zToken;
 			nId = sqlStrlen30(zId);
-			struct func *func = func_by_name(zId, nId);
+			struct func *func = sql_func_find(pExpr);
 			if (func == NULL) {
-				diag_set(ClientError, ER_NO_SUCH_FUNCTION, zId);
-				pParse->is_aborted = true;
-				pNC->nErr++;
-				return WRC_Abort;
-			}
-			if (!func->def->exports.sql) {
-				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
-					 tt_sprintf("function %.*s() is not "
-						    "available in SQL",
-						     nId, zId));
-				pParse->is_aborted = true;
-				pNC->nErr++;
-				return WRC_Abort;
-			}
-			if (func->def->param_count != -1 &&
-			    func->def->param_count != n) {
-				uint32_t argc = func->def->param_count;
-				const char *err = tt_sprintf("%d", argc);
-				diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT,
-					 func->def->name, err, n);
 				pParse->is_aborted = true;
 				pNC->nErr++;
 				return WRC_Abort;

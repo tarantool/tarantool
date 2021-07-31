@@ -3922,7 +3922,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_FUNCTION:{
 			ExprList *pFarg;	/* List of function arguments */
 			int nFarg;	/* Number of function arguments */
-			const char *zId;	/* The function name */
 			u32 constMask = 0;	/* Mask of function arguments that are constant */
 			int i;	/* Loop counter */
 			struct coll *coll = NULL;
@@ -3935,11 +3934,8 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			}
 			nFarg = pFarg ? pFarg->nExpr : 0;
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
-			zId = pExpr->u.zToken;
-			struct func *func = sql_func_by_signature(zId, nFarg);
+			struct func *func = sql_func_find(pExpr);
 			if (func == NULL) {
-				diag_set(ClientError, ER_NO_SUCH_FUNCTION,
-					 zId);
 				pParse->is_aborted = true;
 				break;
 			}
@@ -5396,14 +5392,8 @@ analyzeAggregate(Walker * pWalker, Expr * pExpr)
 						pItem->iMem = ++pParse->nMem;
 						assert(!ExprHasProperty
 						       (pExpr, EP_IntValue));
-						const char *name =
-							pExpr->u.zToken;
-						uint32_t argc =
-							pExpr->x.pList != NULL ?
-							pExpr->x.pList->nExpr : 0;
 						pItem->func =
-							sql_func_by_signature(
-								name, argc);
+							sql_func_find(pExpr);
 						assert(pItem->func != NULL);
 						assert(pItem->func->def->
 						       language ==

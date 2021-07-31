@@ -148,7 +148,7 @@ valueFromFunction(sql * db,	/* The database connection */
 	pList = p->x.pList;
 	if (pList)
 		nVal = pList->nExpr;
-	struct func *func = sql_func_by_signature(p->u.zToken, nVal);
+	struct func *func = sql_func_find(p);
 	if (func == NULL || func->def->language != FUNC_LANGUAGE_SQL_BUILTIN ||
 	    !func->def->is_deterministic ||
 	    sql_func_flag_is_set(func, SQL_FUNC_NEEDCOLL))

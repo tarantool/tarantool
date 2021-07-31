@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(25)
+test:plan(27)
 
 --!./tcltestrunner.lua
 -- 2010 August 27
@@ -315,5 +315,37 @@ test:do_catchsql_test(
 
 box.func.COUNTER1:drop()
 box.func.COUNTER2:drop()
+
+--
+-- Make sure the correct error is displayed if the function throws an error when
+-- setting the default value.
+--
+local body = 'function(x) return 1 end'
+box.schema.func.create('F1', {language = 'Lua', returns = 'number', body = body,
+                       param_list = {}, exports = {'LUA'}});
+box.execute([[CREATE TABLE t01(i INT PRIMARY KEY, a INT DEFAULT(f1(1)));]])
+test:do_catchsql_test(
+    "func-7.1",
+    [[
+        INSERT INTO t01(i) VALUES(1);
+    ]], {
+        1, "function F1() is not available in SQL"
+    })
+
+box.schema.func.create('F2', {language = 'Lua', returns = 'number', body = body,
+                       exports = {'LUA', 'SQL'}});
+box.execute([[CREATE TABLE t02(i INT PRIMARY KEY, a INT DEFAULT(f2(1)));]])
+test:do_catchsql_test(
+    "func-7.2",
+    [[
+        INSERT INTO t02(i) VALUES(1);
+    ]], {
+        1, "Wrong number of arguments is passed to F2(): expected 0, got 1"
+    })
+
+box.func.F1:drop()
+box.func.F2:drop()
+box.space.T01:drop()
+box.space.T02:drop()
 
 test:finish_test()

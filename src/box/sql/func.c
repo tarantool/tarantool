@@ -1913,22 +1913,10 @@ sql_is_like_func(struct Expr *expr)
 	    expr->x.pList->nExpr != 2)
 		return 0;
 	assert(!ExprHasProperty(expr, EP_xIsSelect));
-	struct func *func = sql_func_by_signature(expr->u.zToken, 2);
+	struct func *func = sql_func_find(expr);
 	if (func == NULL || !sql_func_flag_is_set(func, SQL_FUNC_LIKE))
 		return 0;
 	return 1;
-}
-
-struct func *
-sql_func_by_signature(const char *name, int argc)
-{
-	struct func *base = func_by_name(name, strlen(name));
-	if (base == NULL || !base->def->exports.sql)
-		return NULL;
-
-	if (base->def->param_count != -1 && base->def->param_count != argc)
-		return NULL;
-	return base;
 }
 
 static int
@@ -2633,6 +2621,30 @@ static struct {
 	 .finalize = NULL,
 	},
 };
+
+struct func *
+sql_func_find(struct Expr *expr)
+{
+	const char *name = expr->u.zToken;
+	struct func *func = func_by_name(name, strlen(name));
+	if (func == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_FUNCTION, name);
+		return NULL;
+	}
+	if (!func->def->exports.sql) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 tt_sprintf("function %s() is not available in SQL",
+				     name));
+		return NULL;
+	}
+	int n = expr->x.pList != NULL ? expr->x.pList->nExpr : 0;
+	if (func->def->param_count != -1 && func->def->param_count != n) {
+		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, name,
+			 tt_sprintf("%d", func->def->param_count), n);
+		return NULL;
+	}
+	return func;
+}
 
 uint32_t
 sql_func_flags(const char *name)
