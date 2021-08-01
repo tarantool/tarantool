@@ -719,9 +719,23 @@ local function load_cfg(cfg)
             __call = locked(reload_cfg),
         })
 
+    -- Check schema version of the snapshot we're about to recover, if any.
+    -- Some schema versions (below 1.7.5) are incompatible with Tarantool 2.x
+    -- When recovering from such an old snapshot, special recovery triggers on
+    -- system spaces are needed in order to be able to recover and upgrade
+    -- the schema then.
+    local snap_dir = box.cfg.memtx_dir
+    local snap_version = private.get_snapshot_version(snap_dir)
+    if snap_version then
+        private.set_recovery_triggers(snap_version)
+    end
+
     -- This call either succeeds or calls panic() / exit().
     private.cfg_load()
 
+    if snap_version then
+        private.clear_recovery_triggers()
+    end
     -- This block does not raise an error: all necessary checks
     -- already performed in private.cfg_check(). See <dynamic_cfg>
     -- comment.
