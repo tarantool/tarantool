@@ -56,4 +56,8 @@ end
 box.schema.func.create('someotherfunc')
 box.schema.user.grant('someuser', 'execute', 'function', 'someotherfunc')
 box.schema.user.grant('someuser', 'read,write', 'space', 'temporary')
+
+box.schema.upgrade()
+box.snapshot()
+
 os.exit(0)
