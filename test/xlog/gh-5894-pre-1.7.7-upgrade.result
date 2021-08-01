@@ -1,0 +1,400 @@
+-- test-run result file version 2
+test_run = require('test_run').new()
+ | ---
+ | ...
+
+-- Upgrade from 1.6.8.
+test_run:cmd('create server upgrade with script="xlog/upgrade.lua", \
+             workdir="xlog/upgrade/1.6.8/gh-5894-pre-1.7.7-upgrade"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server upgrade')
+ | ---
+ | - true
+ | ...
+test_run:switch('upgrade')
+ | ---
+ | - true
+ | ...
+
+assert(not box.internal.schema_needs_upgrade())
+ | ---
+ | - true
+ | ...
+box.space.distro:select{}
+ | ---
+ | - - ['debian', 'sarge', 31, 1118059200]
+ |   - ['debian', 'etch', 40, 1176033600]
+ |   - ['ubuntu', 'trusty', 1404, 1397736000]
+ |   - ['ubuntu', 'vivid', 1504, 1429790400]
+ |   - ['ubuntu', 'wily', 1510, 1445515200]
+ |   - ['debian', 'wheezy', 70, 1367668800]
+ |   - ['debian', 'squeeze', 60, 1296907200]
+ |   - ['debian', 'lenny', 50, 1234612800]
+ |   - ['debian', 'jessie', 80, 1430049600]
+ |   - ['ubuntu', 'precise', 1510, 1335441600]
+ |   - ['debian', 'woody', 30, 1027080000]
+ | ...
+box.space._index:select{box.space.distro.id}
+ | ---
+ | - - [512, 0, 'primary', 'hash', {'unique': true}, [[0, 'string'], [1, 'string'], [
+ |         2, 'unsigned']]]
+ |   - [512, 1, 'codename', 'hash', {'unique': true}, [[1, 'string']]]
+ |   - [512, 2, 'time', 'tree', {'unique': false}, [[3, 'unsigned']]]
+ | ...
+box.space._space:format()
+ | ---
+ | - [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner', 'type': 'unsigned'}, {'name': 'name',
+ |     'type': 'string'}, {'name': 'engine', 'type': 'string'}, {'name': 'field_count',
+ |     'type': 'unsigned'}, {'name': 'flags', 'type': 'map'}, {'name': 'format', 'type': 'array'}]
+ | ...
+box.schema.user.info('admin')
+ | ---
+ | - - - read,write,execute,session,usage,create,drop,alter,reference,trigger,insert,update,delete
+ |     - universe
+ |     - 
+ | ...
+box.schema.user.info('guest')
+ | ---
+ | - - - execute
+ |     - role
+ |     - public
+ |   - - session,usage
+ |     - universe
+ |     - 
+ | ...
+box.schema.user.info('someuser')
+ | ---
+ | - - - execute
+ |     - function
+ |     - someotherfunc
+ |   - - execute
+ |     - role
+ |     - public
+ |   - - execute
+ |     - role
+ |     - somerole
+ |   - - read,write,drop,alter
+ |     - space
+ |     - temporary
+ |   - - session,usage
+ |     - universe
+ |     - 
+ | ...
+box.schema.role.info('somerole')
+ | ---
+ | - - - read,write,drop,alter
+ |     - space
+ |     - distro
+ | ...
+
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+test_run:cmd('stop server upgrade')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server upgrade')
+ | ---
+ | - true
+ | ...
+
+-- Upgrade from 1.7.1.
+test_run:cmd('create server upgrade with script="xlog/upgrade.lua", \
+             workdir="xlog/upgrade/1.7.1/gh-5894-pre-1.7.7-upgrade"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server upgrade')
+ | ---
+ | - true
+ | ...
+test_run:switch('upgrade')
+ | ---
+ | - true
+ | ...
+
+assert(not box.internal.schema_needs_upgrade())
+ | ---
+ | - true
+ | ...
+box.space.distro:select{}
+ | ---
+ | - - ['debian', 'etch', 40, 1176033600]
+ |   - ['debian', 'sarge', 31, 1118059200]
+ |   - ['ubuntu', 'wily', 1510, 1445515200]
+ |   - ['ubuntu', 'trusty', 1404, 1397736000]
+ |   - ['ubuntu', 'vivid', 1504, 1429790400]
+ |   - ['debian', 'wheezy', 70, 1367668800]
+ |   - ['debian', 'squeeze', 60, 1296907200]
+ |   - ['debian', 'lenny', 50, 1234612800]
+ |   - ['debian', 'jessie', 80, 1430049600]
+ |   - ['ubuntu', 'precise', 1510, 1335441600]
+ |   - ['debian', 'woody', 30, 1027080000]
+ | ...
+box.space._index:select{box.space.distro.id}
+ | ---
+ | - - [512, 0, 'primary', 'hash', {'unique': true}, [[0, 'string'], [1, 'string'], [
+ |         2, 'unsigned']]]
+ |   - [512, 1, 'codename', 'hash', {'unique': true}, [[1, 'string']]]
+ |   - [512, 2, 'time', 'tree', {'unique': false}, [[3, 'unsigned']]]
+ | ...
+box.space._space:format()
+ | ---
+ | - [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner', 'type': 'unsigned'}, {'name': 'name',
+ |     'type': 'string'}, {'name': 'engine', 'type': 'string'}, {'name': 'field_count',
+ |     'type': 'unsigned'}, {'name': 'flags', 'type': 'map'}, {'name': 'format', 'type': 'array'}]
+ | ...
+box.schema.user.info('admin')
+ | ---
+ | - - - read,write,execute,session,usage,create,drop,alter,reference,trigger,insert,update,delete
+ |     - universe
+ |     - 
+ | ...
+box.schema.user.info('guest')
+ | ---
+ | - - - execute
+ |     - role
+ |     - public
+ |   - - session,usage
+ |     - universe
+ |     - 
+ | ...
+box.schema.user.info('someuser')
+ | ---
+ | - - - execute
+ |     - function
+ |     - someotherfunc
+ |   - - execute
+ |     - role
+ |     - public
+ |   - - execute
+ |     - role
+ |     - somerole
+ |   - - read,write,drop,alter
+ |     - space
+ |     - temporary
+ |   - - session,usage
+ |     - universe
+ |     - 
+ | ...
+box.schema.role.info('somerole')
+ | ---
+ | - - - read,write,drop,alter
+ |     - space
+ |     - distro
+ | ...
+
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+test_run:cmd('stop server upgrade')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server upgrade')
+ | ---
+ | - true
+ | ...
+
+-- Upgrade from 1.7.2.
+test_run:cmd('create server upgrade with script="xlog/upgrade.lua", \
+             workdir="xlog/upgrade/1.7.2/gh-5894-pre-1.7.7-upgrade"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server upgrade')
+ | ---
+ | - true
+ | ...
+test_run:switch('upgrade')
+ | ---
+ | - true
+ | ...
+
+assert(not box.internal.schema_needs_upgrade())
+ | ---
+ | - true
+ | ...
+box.space.distro:select{}
+ | ---
+ | - - ['debian', 'sarge', 31, 1118059200]
+ |   - ['debian', 'etch', 40, 1176033600]
+ |   - ['ubuntu', 'trusty', 1404, 1397736000]
+ |   - ['ubuntu', 'vivid', 1504, 1429790400]
+ |   - ['debian', 'lenny', 50, 1234612800]
+ |   - ['debian', 'wheezy', 70, 1367668800]
+ |   - ['debian', 'squeeze', 60, 1296907200]
+ |   - ['ubuntu', 'wily', 1510, 1445515200]
+ |   - ['debian', 'jessie', 80, 1430049600]
+ |   - ['ubuntu', 'precise', 1510, 1335441600]
+ |   - ['debian', 'woody', 30, 1027080000]
+ | ...
+box.space._index:select{box.space.distro.id}
+ | ---
+ | - - [512, 0, 'primary', 'hash', {'unique': true}, [[0, 'string'], [1, 'string'], [
+ |         2, 'unsigned']]]
+ |   - [512, 1, 'codename', 'hash', {'unique': true}, [[1, 'string']]]
+ |   - [512, 2, 'time', 'tree', {'unique': false}, [[3, 'unsigned']]]
+ | ...
+box.space._space:format()
+ | ---
+ | - [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner', 'type': 'unsigned'}, {'name': 'name',
+ |     'type': 'string'}, {'name': 'engine', 'type': 'string'}, {'name': 'field_count',
+ |     'type': 'unsigned'}, {'name': 'flags', 'type': 'map'}, {'name': 'format', 'type': 'array'}]
+ | ...
+box.schema.user.info('admin')
+ | ---
+ | - - - read,write,execute,session,usage,create,drop,alter,reference,trigger,insert,update,delete
+ |     - universe
+ |     - 
+ | ...
+box.schema.user.info('guest')
+ | ---
+ | - - - execute
+ |     - role
+ |     - public
+ |   - - session,usage
+ |     - universe
+ |     - 
+ | ...
+box.schema.user.info('someuser')
+ | ---
+ | - - - execute
+ |     - function
+ |     - someotherfunc
+ |   - - execute
+ |     - role
+ |     - public
+ |   - - execute
+ |     - role
+ |     - somerole
+ |   - - read,write,drop,alter
+ |     - space
+ |     - temporary
+ |   - - session,usage
+ |     - universe
+ |     - 
+ | ...
+box.schema.role.info('somerole')
+ | ---
+ | - - - read,write,drop,alter
+ |     - space
+ |     - distro
+ | ...
+
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+test_run:cmd('stop server upgrade')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server upgrade')
+ | ---
+ | - true
+ | ...
+
+-- Upgrade from 1.7.5.
+test_run:cmd('create server upgrade with script="xlog/upgrade.lua", \
+             workdir="xlog/upgrade/1.7.5/gh-5894-pre-1.7.7-upgrade"')
+ | ---
+ | - true
+ | ...
+test_run:cmd('start server upgrade')
+ | ---
+ | - true
+ | ...
+test_run:switch('upgrade')
+ | ---
+ | - true
+ | ...
+
+assert(not box.internal.schema_needs_upgrade())
+ | ---
+ | - true
+ | ...
+box.space.distro:select{}
+ | ---
+ | - - ['debian', 'etch', 40, 1176033600]
+ |   - ['debian', 'sarge', 31, 1118059200]
+ |   - ['debian', 'lenny', 50, 1234612800]
+ |   - ['ubuntu', 'trusty', 1404, 1397736000]
+ |   - ['ubuntu', 'vivid', 1504, 1429790400]
+ |   - ['debian', 'wheezy', 70, 1367668800]
+ |   - ['debian', 'squeeze', 60, 1296907200]
+ |   - ['ubuntu', 'wily', 1510, 1445515200]
+ |   - ['debian', 'jessie', 80, 1430049600]
+ |   - ['ubuntu', 'precise', 1510, 1335441600]
+ |   - ['debian', 'woody', 30, 1027080000]
+ | ...
+box.space._index:select{box.space.distro.id}
+ | ---
+ | - - [512, 0, 'primary', 'hash', {'unique': true}, [[0, 'string'], [1, 'string'], [
+ |         2, 'unsigned']]]
+ |   - [512, 1, 'codename', 'hash', {'unique': true}, [[1, 'string']]]
+ |   - [512, 2, 'time', 'tree', {'unique': false}, [[3, 'unsigned']]]
+ | ...
+box.space._space:format()
+ | ---
+ | - [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner', 'type': 'unsigned'}, {'name': 'name',
+ |     'type': 'string'}, {'name': 'engine', 'type': 'string'}, {'name': 'field_count',
+ |     'type': 'unsigned'}, {'name': 'flags', 'type': 'map'}, {'name': 'format', 'type': 'array'}]
+ | ...
+box.schema.user.info('admin')
+ | ---
+ | - - - read,write,execute,session,usage,create,drop,alter,reference,trigger,insert,update,delete
+ |     - universe
+ |     - 
+ | ...
+box.schema.user.info('guest')
+ | ---
+ | - - - execute
+ |     - role
+ |     - public
+ |   - - session,usage
+ |     - universe
+ |     - 
+ | ...
+box.schema.user.info('someuser')
+ | ---
+ | - - - execute
+ |     - function
+ |     - someotherfunc
+ |   - - execute
+ |     - role
+ |     - public
+ |   - - execute
+ |     - role
+ |     - somerole
+ |   - - read,write,drop,alter
+ |     - space
+ |     - temporary
+ |   - - session,usage
+ |     - universe
+ |     - 
+ | ...
+box.schema.role.info('somerole')
+ | ---
+ | - - - read,write,drop,alter
+ |     - space
+ |     - distro
+ | ...
+
+test_run:switch('default')
+ | ---
+ | - true
+ | ...
+test_run:cmd('stop server upgrade')
+ | ---
+ | - true
+ | ...
+test_run:cmd('delete server upgrade')
+ | ---
+ | - true
+ | ...

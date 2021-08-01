@@ -1,6 +1,8 @@
 local log = require('log')
 local bit = require('bit')
 local json = require('json')
+local fio = require('fio')
+local xlog = require('xlog')
 
 -- Guest user id - the default user
 local GUEST = 0
@@ -86,6 +88,51 @@ local function set_system_triggers(val)
     foreach_system_space(function(s) s:run_triggers(val) end)
 end
 
+local function version_from_tuple(tuple)
+    local major, minor, patch = tuple:unpack(2, 4)
+    patch = patch or 0
+    if major and minor and type(major) == 'number' and
+       type(minor) == 'number' and type(patch) == 'number' then
+        return mkversion(major, minor, patch)
+    end
+    return nil
+end
+
+-- Get schema version, stored in _schema system space, by reading the latest
+-- snapshot file from the snap_dir. Useful to define schema_version before
+-- recovering the snapshot, because some schema versions are too old and cannot
+-- be recovered normally.
+local function get_snapshot_version(snap_dir)
+    local snap_pattern = fio.pathjoin(snap_dir,
+                                      string.rep('[0-9]', 20)..'.snap')
+    local snap_list = fio.glob(snap_pattern)
+    table.sort(snap_list)
+    local snap = snap_list[#snap_list]
+    if not snap then
+        return nil
+    end
+    local version = nil
+    for _, row in xlog.pairs(snap) do
+        local sid = row.BODY and row.BODY.space_id
+        if sid == box.schema.SCHEMA_ID then
+            local tuple = row.BODY.tuple
+            if tuple and tuple[1] == 'version' then
+                version = version_from_tuple(tuple)
+                if not version then
+                    log.error("Corrupted version tuple in space '_schema' "..
+                              "in snapshot '%s': %s ", snap, tuple)
+                end
+                break
+            end
+        elseif sid and sid > box.schema.SCHEMA_ID then
+            -- Exit early if version wasn't found in _schema space.
+            -- Snapshot rows are ordered by space id.
+            break
+        end
+    end
+    return version
+end
+
 --------------------------------------------------------------------------------
 -- Bootstrap
 --------------------------------------------------------------------------------
@@ -129,6 +176,144 @@ local function create_sysview(source_id, target_id)
         log.info("grant read access to 'public' role for %s view", def[3])
         box.space._priv:insert({1, PUBLIC, 'space', target_id, box.priv.R})
     end
+end
+
+--------------------------------------------------------------------------------
+-- Tarantool 1.7.1
+--------------------------------------------------------------------------------
+local function user_trig_1_7_1(_, tuple)
+    if tuple and tuple[3] == 'guest' and not tuple[5] then
+        local auth_method_list = {}
+        auth_method_list["chap-sha1"] = box.schema.user.password("")
+        tuple = tuple:update{{'=', 5, auth_method_list}}
+        log.info("Set empty password to user 'guest'")
+    end
+    return tuple
+end
+
+--------------------------------------------------------------------------------
+-- Tarantool 1.7.2
+--------------------------------------------------------------------------------
+local function index_trig_1_7_2(_, tuple)
+    local field_types_v16 = {
+        num = 'unsigned',
+        int = 'integer',
+        str = 'string',
+    }
+    if not tuple then
+        return tuple
+    end
+    local parts = tuple[6]
+    local changed = false
+    for _, part in pairs(parts) do
+        local field_type = part[2]:lower()
+        if field_types_v16[field_type] ~= nil then
+            part[2] = field_types_v16[field_type]
+            changed = true
+        end
+    end
+    if changed then
+        log.info("Update index '%s' on space '%s': set parts to %s", tuple[3],
+                 box.space[tuple[1]].name, json.encode(parts))
+        tuple = tuple:update{{'=', 6, parts}}
+    end
+    return tuple
+end
+
+--------------------------------------------------------------------------------
+-- Tarantool 1.7.5
+--------------------------------------------------------------------------------
+local function create_truncate_space()
+    local _truncate = box.space[box.schema.TRUNCATE_ID]
+
+    log.info("create space _truncate")
+    box.space._space:insert{
+        _truncate.id, ADMIN, '_truncate', 'memtx', 0, setmap({}),
+        {{name = 'id', type = 'unsigned'}, {name = 'count', type = 'unsigned'}}
+    }
+
+    log.info("create index primary on _truncate")
+    box.space._index:insert{
+        _truncate.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}
+    }
+
+    local _priv = box.space[box.schema.PRIV_ID]
+    _priv:insert{ADMIN, PUBLIC, 'space', _truncate.id, box.priv.W}
+end
+
+local function upgrade_to_1_7_5()
+    create_truncate_space()
+end
+
+local function user_trig_1_7_5(_, tuple)
+    if tuple and not tuple[5] then
+        tuple = tuple:update{{'=', 5, setmap({})}}
+        log.info("Set empty password to %s '%s'", tuple[4], tuple[3])
+    end
+    return tuple
+end
+
+local space_formats_1_7_5 = {
+    _schema = {
+        {name = 'key', type = 'string'},
+    },
+    _space = {
+        {name = 'id', type = 'unsigned'},
+        {name = 'owner', type = 'unsigned'},
+        {name = 'name', type = 'string'},
+        {name = 'engine', type = 'string'},
+        {name = 'field_count', type = 'unsigned'},
+        {name = 'flags', type = 'map'},
+        {name = 'format', type = 'array'},
+    },
+    _index = {
+        {name = 'id', type = 'unsigned'},
+        {name = 'iid', type = 'unsigned'},
+        {name = 'name', type = 'string'},
+        {name = 'type', type = 'string'},
+        {name = 'opts', type = 'map'},
+        {name = 'parts', type = 'array'},
+    },
+    _func = {
+        {name = 'id', type = 'unsigned'},
+        {name = 'owner', type = 'unsigned'},
+        {name = 'name', type = 'string'},
+        {name = 'setuid', type = 'unsigned'},
+    },
+    _user = {
+        {name = 'id', type = 'unsigned'},
+        {name = 'owner', type = 'unsigned'},
+        {name = 'name', type = 'string'},
+        {name = 'type', type = 'string'},
+        {name = 'auth', type = 'map'},
+    },
+    _priv = {
+        {name = 'grantor', type = 'unsigned'},
+        {name = 'grantee', type = 'unsigned'},
+        {name = 'object_type', type = 'string'},
+        {name = 'object_id', type = 'unsigned'},
+        {name = 'privilege', type = 'unsigned'},
+    },
+    _cluster = {
+        {name = 'id', type = 'unsigned'},
+        {name = 'uuid', type = 'string'},
+    },
+}
+
+space_formats_1_7_5._vspace = space_formats_1_7_5._space
+space_formats_1_7_5._vindex = space_formats_1_7_5._index
+space_formats_1_7_5._vfunc = space_formats_1_7_5._func
+space_formats_1_7_5._vuser = space_formats_1_7_5._user
+space_formats_1_7_5._vpriv = space_formats_1_7_5._priv
+
+local function space_trig_1_7_5(_, tuple)
+    if tuple and space_formats_1_7_5[tuple[3]] and
+       not table.equals(space_formats_1_7_5[tuple[3]], tuple[7]) then
+        tuple = tuple:update{{'=', 7, space_formats_1_7_5[tuple[3]]}}
+        log.info("Update space '%s' format: new format %s", tuple[3],
+                 json.encode(tuple[7]))
+    end
+    return tuple
 end
 
 local function initial_1_7_5()
@@ -450,6 +635,15 @@ local function upgrade_to_1_7_7()
     --
     _user:replace{SUPER, ADMIN, 'super', 'role', setmap({})}
     _priv:replace({ADMIN, SUPER, 'universe', 0, 4294967295})
+end
+
+local function priv_trig_1_7_7(_, tuple)
+    if tuple and tuple[2] == ADMIN and tuple[3] == 'universe' and
+       tuple[5] ~= box.priv.ALL then
+        tuple = tuple:update{{'=', 5, box.priv.ALL}}
+        log.info("Grant all privileges to user 'admin'")
+    end
+    return tuple
 end
 
 --------------------------------------------------------------------------------
@@ -1021,6 +1215,7 @@ end
 --------------------------------------------------------------------------------
 
 local handlers = {
+    {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5, auto=true},
     {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6, auto = true},
     {version = mkversion(1, 7, 7), func = upgrade_to_1_7_7, auto = true},
     {version = mkversion(1, 10, 0), func = upgrade_to_1_10_0, auto = true},
@@ -1061,13 +1256,96 @@ local function schema_needs_upgrade()
     return false
 end
 
+local trig_oldest_version = nil
+
+-- Some schema changes before version 1.7.7 make it impossible to recover from
+-- older snapshot. The table below consists of before_replace triggers on system
+-- spaces, which make old snapshot schema compatible with current Tarantool
+-- (version 2.x). The triggers replace old format tuples with new ones
+-- in-memory, thus making it possible to recover from a rather old snapshot
+-- (up to schema version 1.6.8). Once the snapshot is recovered, a normal
+-- upgrade procedure may set schema version to the latest one.
+--
+-- The triggers mostly repeat the corresponding upgrade_to_1_7_x functions,
+-- which were used when pre-1.7.x snapshot schema was still recoverable.
+--
+-- When the triggers are used (i.e. when snapshot schema version is below 1.7.5,
+-- the upgrade procedure works as follows:
+-- * first the snapshot is recovered and 1.7.5-compatible schema is applied to
+--   it in-memory with the help of triggers.
+-- * then usual upgrade_to_X_X_X() handlers may be fired to turn schema into the
+--   latest one.
+local recovery_triggers = {
+    {version = mkversion(1, 7, 1), tbl = {
+        _user   = user_trig_1_7_1,
+    }},
+    {version = mkversion(1, 7, 2), tbl = {
+        _index = index_trig_1_7_2,
+    }},
+    {version = mkversion(1, 7, 5), tbl = {
+        _space = space_trig_1_7_5,
+        _user  = user_trig_1_7_5,
+    }},
+    {version = mkversion(1, 7, 7), tbl = {
+        _priv   = priv_trig_1_7_7,
+    }},
+}
+
+-- Once newer schema version is recovered (say, from an xlog following the old
+-- snapshot), the triggers helping recover the old schema should be removed.
+local function schema_trig_last(_, tuple)
+    if tuple and tuple[1] == 'version' then
+        local version = version_from_tuple(tuple)
+        if version then
+            log.info("Recovery trigger: recovered schema version %s. "..
+                     "Removing outdated recovery triggers.", version)
+            box.internal.clear_recovery_triggers(version)
+            trig_oldest_version = version
+        end
+    end
+    return tuple
+end
+
+recovery_triggers[#recovery_triggers].tbl['_schema'] = schema_trig_last
+
+local function on_init_set_recovery_triggers()
+    log.info("Recovering snapshot with schema version %s", trig_oldest_version)
+    for _, trig_tbl in ipairs(recovery_triggers) do
+        if trig_tbl.version > trig_oldest_version then
+            for space, trig in pairs(trig_tbl.tbl) do
+                box.space[space]:before_replace(trig)
+                log.info("Set recovery trigger on space '%s' to comply with "..
+                         "version %s format", space, trig_tbl.version)
+            end
+        end
+    end
+end
+
+local function set_recovery_triggers(version)
+    trig_oldest_version = version
+    box.ctl.on_schema_init(on_init_set_recovery_triggers)
+end
+
+local function clear_recovery_triggers(version)
+    for _, trig_tbl in ipairs(recovery_triggers) do
+        if trig_tbl.version > trig_oldest_version and
+           (not version or trig_tbl.version <= version) then
+            for space, trig in pairs(trig_tbl.tbl) do
+                box.space[space]:before_replace(nil, trig)
+                log.info("Remove recovery trigger on space '%s' for version %s",
+                         space, trig_tbl.version)
+            end
+        end
+    end
+end
+
 local function upgrade(options)
     options = options or {}
     setmetatable(options, {__index = {auto = false}})
 
     local version = get_version()
-    if version < mkversion(1, 7, 5) then
-        log.warn('can upgrade from 1.7.5 only')
+    if version < mkversion(1, 6, 8) then
+        log.warn('can upgrade from 1.6.8 only')
         return
     end
 
@@ -1110,3 +1388,6 @@ end
 box.schema.upgrade = upgrade;
 box.internal.bootstrap = bootstrap;
 box.internal.schema_needs_upgrade = schema_needs_upgrade;
+box.internal.get_snapshot_version = get_snapshot_version;
+box.internal.set_recovery_triggers = set_recovery_triggers;
+box.internal.clear_recovery_triggers = clear_recovery_triggers;
