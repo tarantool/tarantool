@@ -543,8 +543,8 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
 }
 
 void
-iproto_write_error(int fd, const struct error *e, uint32_t schema_version,
-		   uint64_t sync)
+iproto_do_write_error(int fd, const struct error *e, uint32_t schema_version,
+		      uint64_t sync)
 {
 	bool is_error = false;
 	struct mpstream stream;

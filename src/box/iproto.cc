@@ -32,6 +32,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <fcntl.h>
 
 #include <msgpuck.h>
 #include <small/ibuf.h>
@@ -556,6 +557,20 @@ struct iproto_connection
 	/** Iproto connection thread */
 	struct iproto_thread *iproto_thread;
 };
+
+#ifdef NDEBUG
+#define iproto_write_error(fd, e, schema_version, sync)                         \
+	iproto_do_write_error(fd, e, schema_version, sync);
+#else
+#define iproto_write_error(fd, e, schema_version, sync) do {                    \
+	int flags = fcntl(fd, F_GETFL, 0);                                      \
+	if (flags >= 0)                                                         \
+		fcntl(fd, F_SETFL, flags & (~O_NONBLOCK));                      \
+	iproto_do_write_error(fd, e, schema_version, sync);                     \
+	if (flags >= 0)                                                         \
+		fcntl(fd, F_SETFL, flags);                                      \
+} while (0);
+#endif
 
 /**
  * Return true if we have not enough spare messages
