@@ -1205,6 +1205,30 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 	return 0;
 }
 
+/**
+ * Check that replaced tuples in space's indexes does not violate common
+ * replace rules. See memtx_space_replace_all_keys comment.
+ * Call check_dup_clean or check_dup_dirty depending on situation.
+ * @return 0 on success or -1 on fail.
+ */
+static int
+check_dup_common(struct txn_stmt *stmt, struct tuple *new_tuple,
+		 struct tuple **directly_replaced, struct tuple **old_tuple,
+		 enum dup_replace_mode mode,
+		 struct memtx_tx_conflict **collected_conflicts,
+		 struct region *region)
+{
+	struct tuple *replaced = directly_replaced[0];
+	if (replaced == NULL || !replaced->is_dirty)
+		return check_dup_clean(stmt, new_tuple, directly_replaced,
+				       old_tuple, mode,
+				       collected_conflicts, region);
+	else
+		return check_dup_dirty(stmt, new_tuple, directly_replaced,
+				       old_tuple, mode,
+				       collected_conflicts, region);
+}
+
 static struct gap_item *
 memtx_tx_gap_item_new(struct txn *txn, enum iterator_type type,
 		      const char *key, uint32_t part_count);
@@ -1333,15 +1357,9 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	struct tuple *replaced = directly_replaced[0];
 
 	/* Check overwritten tuple */
-	int rc;
-	if (replaced == NULL || !replaced->is_dirty)
-		rc = check_dup_clean(stmt, new_tuple, directly_replaced,
-				     &old_tuple, mode,
-				     &collected_conflicts, region);
-	else
-		rc = check_dup_dirty(stmt, new_tuple, directly_replaced,
-				     &old_tuple, mode,
-				     &collected_conflicts, region);
+	int rc = check_dup_common(stmt, new_tuple, directly_replaced,
+				  &old_tuple, mode,
+				  &collected_conflicts, region);
 	if (rc != 0)
 		goto fail;
 
