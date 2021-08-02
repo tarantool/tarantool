@@ -141,6 +141,28 @@ s:truncate()
 
 s:drop()
 
+-- Excess conflict
+s = box.schema.create_space('test')
+pk = s:create_index('pk', {parts={{1, 'uint'},{2, 'uint'}}})
+s:replace{2, 2, 2}
+tx1:begin()
+tx1('s:select{2}')
+s:replace{3, 3, 3}
+tx1('s:replace{6, 6, 6}')
+tx1:commit()
+s:drop()
+
+-- Excess conflict (reverse)
+s = box.schema.create_space('test')
+pk = s:create_index('pk', {parts={{1, 'uint'},{2, 'uint'}}})
+s:replace{2, 2, 2}
+tx1:begin()
+tx1('s:select({2}, {iterator=\'REQ\'})')
+s:replace{1, 1, 1}
+tx1('s:replace{6, 6, 6}')
+tx1:commit()
+s:drop()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
