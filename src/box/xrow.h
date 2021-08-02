@@ -719,8 +719,8 @@ iproto_reply_chunk(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 
 /** Write error directly to a socket. */
 void
-iproto_write_error(int fd, const struct error *e, uint32_t schema_version,
-		   uint64_t sync);
+iproto_do_write_error(int fd, const struct error *e, uint32_t schema_version,
+		      uint64_t sync);
 
 enum {
 	/* Maximal length of protocol name in handshake */
