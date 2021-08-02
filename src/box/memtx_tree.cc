@@ -385,9 +385,13 @@ tree_iterator_next_equal_base(struct iterator *iterator, struct tuple **ret)
 	}
 	struct index *idx = iterator->index;
 	struct space *space = space_by_id(iterator->space_id);
-	if (res != NULL && *ret == NULL) {
-		/** Got end of key. */
-		memtx_tx_track_gap(in_txn(), space, idx, *ret, ITER_EQ,
+	if (*ret == NULL) {
+		/*
+		 * Got end of key. Store gap from the previous tuple to the
+		 * key boundary in nearby tuple.
+		 */
+		struct tuple *nearby_tuple = res == NULL ? NULL : res->tuple;
+		memtx_tx_track_gap(in_txn(), space, idx, nearby_tuple, ITER_EQ,
 				   it->key_data.key, it->key_data.part_count);
 	} else {
 		/*
@@ -435,8 +439,11 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 	}
 	struct index *idx = iterator->index;
 	struct space *space = space_by_id(iterator->space_id);
-	if (res != NULL && *ret == NULL) {
-		/** Got end of key. */
+	if (*ret == NULL) {
+		/*
+		 * Got end of key. Store gap from the key boundary to the
+		 * previous tuple in nearby tuple.
+		 */
 		memtx_tx_track_gap(in_txn(), space, idx, successor, ITER_REQ,
 				   it->key_data.key, it->key_data.part_count);
 	} else {
