@@ -36,18 +36,6 @@ fio.copyfile(cert_file1, cert_file2)
 
 ----- Helpers
 
-local function cert_dir_paths_mockable()
-    return pcall(function()
-        return ffi.C.tnt_default_cert_dir_paths
-    end)
-end
-
-local function cert_file_paths_mockable()
-    return pcall(function()
-        return ffi.C.tnt_default_cert_file_paths
-    end)
-end
-
 local function mock_cert_paths_by_addr(addr, paths)
     -- insert NULL to the end of array as flag of end
     local paths = table.copy(paths)
@@ -90,75 +78,58 @@ end
 
 ----- Tests
 
-if not cert_dir_paths_mockable() then
-    -- Because of LTO (especially on macOS) symbol tnt_default_cert_dir_paths
-    -- may become local and unavailable through ffi, so there is no
-    -- chance to mock tests
-    test:skip("Default cert dir paths would set")
-    test:skip("Invalid dir paths won't set")
-else
-    test:test("Default cert dir paths would set", function(t)
-        t:plan(2)
+test:test("Default cert dir paths would set", function(t)
+    t:plan(2)
 
-        mock_cert_dir_paths(t, {temp_dir})
-        t:is(
-            os.getenv(CERT_DIR_ENV), temp_dir, "One cert dir path was set"
-        )
+    mock_cert_dir_paths(t, {temp_dir})
+    t:is(
+        os.getenv(CERT_DIR_ENV), temp_dir, "One cert dir path was set"
+    )
 
-        local dir_paths = {temp_dir, temp_dir}
-        mock_cert_dir_paths(t, dir_paths)
-        t:is(
-            os.getenv(CERT_DIR_ENV),
-            table.concat(dir_paths, ":"),
-            "Multiple cert dir paths (like unix $PATH) was set"
-        )
-    end)
+    local dir_paths = {temp_dir, temp_dir}
+    mock_cert_dir_paths(t, dir_paths)
+    t:is(
+        os.getenv(CERT_DIR_ENV),
+        table.concat(dir_paths, ":"),
+        "Multiple cert dir paths (like unix $PATH) was set"
+    )
+end)
 
-    test:test("Invalid dir paths won't set", function(t)
-        t:plan(2)
+test:test("Invalid dir paths won't set", function(t)
+    t:plan(2)
 
-        -- Cleanup env
-        os.setenv(CERT_DIR_ENV, nil)
+    -- Cleanup env
+    os.setenv(CERT_DIR_ENV, nil)
 
-        mock_cert_dir_paths(t, {"/not/existing_dir"})
-        t:is(os.getenv(CERT_DIR_ENV), nil, "Not existing cert dir wasn't set")
+    mock_cert_dir_paths(t, {"/not/existing_dir"})
+    t:is(os.getenv(CERT_DIR_ENV), nil, "Not existing cert dir wasn't set")
 
-        local empty_dir_name = fio.pathjoin(temp_dir, "empty")
-        fio.mkdir(empty_dir_name)
+    local empty_dir_name = fio.pathjoin(temp_dir, "empty")
+    fio.mkdir(empty_dir_name)
 
-        mock_cert_dir_paths(t, {empty_dir_name})
-        t:is(os.getenv(CERT_DIR_ENV), nil, "Empty cert dir wasn't set")
-    end)
-end
+    mock_cert_dir_paths(t, {empty_dir_name})
+    t:is(os.getenv(CERT_DIR_ENV), nil, "Empty cert dir wasn't set")
+end)
 
+test:test("Default cert file path would set", function(t)
+    t:plan(2)
 
-if not cert_file_paths_mockable() then
-    -- Because of LTO (especially on macOS) symbol tnt_default_cert_file_paths
-    -- may become local and unavailable through ffi, so there is no
-    -- chance to mock tests
-    test:skip("Default cert file path would set")
-    test:skip("Invalid cert file won't set")
-else
-    test:test("Default cert file path would set", function(t)
-        t:plan(2)
+    mock_cert_file_paths(t, {cert_file1})
+    t:is(os.getenv(CERT_FILE_ENV), cert_file1, "Cert file was set")
 
-        mock_cert_file_paths(t, {cert_file1})
-        t:is(os.getenv(CERT_FILE_ENV), cert_file1, "Cert file was set")
+    mock_cert_file_paths(t, {cert_file2, cert_file1})
+    t:is(os.getenv(CERT_FILE_ENV), cert_file2, "Only one (first) existing default cert file was set")
+end)
 
-        mock_cert_file_paths(t, {cert_file2, cert_file1})
-        t:is(os.getenv(CERT_FILE_ENV), cert_file2, "Only one (first) existing default cert file was set")
-    end)
+test:test("Invalid cert file won't set", function(t)
+    t:plan(1)
 
-    test:test("Invalid cert file won't set", function(t)
-        t:plan(1)
+    -- Cleanup
+    os.setenv(CERT_FILE_ENV, nil)
 
-        -- Cleanup
-        os.setenv(CERT_FILE_ENV, nil)
-
-        mock_cert_file_paths(t, {"/not/existing_dir/cert1"})
-        t:is(os.getenv(CERT_FILE_ENV), nil, "Not existing cert file wasn't set")
-    end)
-end
+    mock_cert_file_paths(t, {"/not/existing_dir/cert1"})
+    t:is(os.getenv(CERT_FILE_ENV), nil, "Not existing cert file wasn't set")
+end)
 
 test:test("User defined cert dir won't be overridden", function(t)
     t:plan(2)
