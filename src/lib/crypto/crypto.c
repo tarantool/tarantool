@@ -444,3 +444,15 @@ crypto_HMAC_Final(HMAC_CTX *ctx, unsigned char *md, unsigned int *len)
 {
 	return HMAC_Final(ctx, md, len);
 }
+
+const char *
+crypto_X509_get_default_cert_dir_env(void)
+{
+	return X509_get_default_cert_dir_env();
+}
+
+const char *
+crypto_X509_get_default_cert_file_env(void)
+{
+	return X509_get_default_cert_file_env();
+}

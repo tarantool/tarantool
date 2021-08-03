@@ -45,7 +45,7 @@ extern "C" {
  * defined OpenSSL env variables won't be overwritten.
  * @return 0 on success
  */
-int ssl_cert_paths_discover(int overwrite);
+int tnt_ssl_cert_paths_discover(int overwrite);
 
 #if defined(__cplusplus)
 } /* extern "C" */

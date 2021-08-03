@@ -706,7 +706,7 @@ main(int argc, char **argv)
 	systemd_init();
 
 	const int override_cert_paths_env_vars = 0;
-	int res = ssl_cert_paths_discover(override_cert_paths_env_vars);
+	int res = tnt_ssl_cert_paths_discover(override_cert_paths_env_vars);
 	if (res != 0)
 		say_warn("No enough memory for setup ssl certificates paths");
 
