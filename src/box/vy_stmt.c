@@ -202,6 +202,7 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t data_offset, uint32_t bsize)
 	vy_stmt_set_lsn(tuple, 0);
 	vy_stmt_set_type(tuple, 0);
 	vy_stmt_set_flags(tuple, 0);
+	vy_stmt_set_n_upserts(tuple, 0);
 	return tuple;
 }
 
@@ -228,30 +229,18 @@ struct tuple *
 vy_stmt_dup_lsregion(struct tuple *stmt, struct lsregion *lsregion,
 		     int64_t alloc_id)
 {
-	enum iproto_type type = vy_stmt_type(stmt);
 	size_t size = tuple_size(stmt);
-	size_t alloc_size = size;
 	struct tuple *mem_stmt;
 	const size_t align = alignof(struct vy_stmt);
-
-	/* Reserve one byte for UPSERT counter. */
-	if (type == IPROTO_UPSERT)
-		alloc_size += align;
-
-	mem_stmt = lsregion_aligned_alloc(lsregion, alloc_size, align,
-					  alloc_id);
+	mem_stmt = lsregion_aligned_alloc(lsregion, size, align, alloc_id);
 	if (mem_stmt == NULL) {
-		diag_set(OutOfMemory, alloc_size, "lsregion_aligned_alloc",
+		diag_set(OutOfMemory, size, "lsregion_aligned_alloc",
 			 "mem_stmt");
 		return NULL;
 	}
 
-	if (type == IPROTO_UPSERT) {
-		memset(mem_stmt, 0, align);
-		mem_stmt = (struct tuple *)((uint8_t *)mem_stmt + align);
-	}
-
 	memcpy(mem_stmt, stmt, size);
+
 	/*
 	 * Region allocated statements can't be referenced or unreferenced
 	 * because they are located in monolithic memory region. Referencing has
@@ -261,6 +250,14 @@ vy_stmt_dup_lsregion(struct tuple *stmt, struct lsregion *lsregion,
 	 */
 	mem_stmt->refs = 0;
 	return mem_stmt;
+
+	/*
+	 * Since n_upserts is only used in statements allocated by lsregion,
+	 * we should initialize it here. But since n_upserts is zero
+	 * by default it must be already set to zero by `memcpy` above.
+	 */
+	assert(vy_stmt_type(stmt) != IPROTO_UPSERT ||
+	       vy_stmt_n_upserts(mem_stmt) == 0);
 }
 
 struct tuple *

@@ -173,6 +173,12 @@ struct vy_stmt {
 	struct tuple base;
 	uint8_t type; /* IPROTO_INSERT/REPLACE/UPSERT/DELETE */
 	uint8_t flags;
+	/**
+	 * Upserts count of the vinyl statement.
+	 * Only used for UPSERT statements allocated on lsregion, but always in
+	 * present in structure since it costs nothing.
+	 */
+	uint8_t n_upserts;
 	int64_t lsn;
 	/**
 	 * Offsets array concatenated with MessagePack fields
@@ -234,19 +240,19 @@ vy_stmt_n_upserts(struct tuple *stmt)
 {
 	assert(stmt->refs == 0);
 	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
-	return *((uint8_t *)stmt - 1);
+	return ((struct vy_stmt *)stmt)->n_upserts;
 }
 
 /**
  * Set upserts count of the vinyl statement.
- * Only for UPSERT statements allocated on lsregion.
+ * Only for UPSERT statements allocated on lsregion or for raw initialization,
+ * when all fields one by one are set to zeros.
  */
 static inline void
 vy_stmt_set_n_upserts(struct tuple *stmt, uint8_t n)
 {
-	assert(stmt->refs == 0);
-	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
-	*((uint8_t *)stmt - 1) = n;
+	assert(vy_stmt_type(stmt) == IPROTO_UPSERT || n == 0);
+	((struct vy_stmt *)stmt)->n_upserts = n;
 }
 
 /** Return true if the given format is a key format. */
