@@ -396,7 +396,6 @@ PMurHash32_Process
 PMurHash32_Result
 port_destroy
 random_bytes
-rl_get_screen_size
 say_logger_init
 say_logger_initialized
 say_logrotate
@@ -449,6 +448,7 @@ title_update
 tnt_iconv
 tnt_iconv_close
 tnt_iconv_open
+tnt_rl_get_screen_size
 tnt_XXH32
 tnt_XXH32_copyState
 tnt_XXH32_digest

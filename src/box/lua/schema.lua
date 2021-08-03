@@ -1648,9 +1648,9 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
     -- Screen size autodetection.
     local function detect_width()
         local ffi = require('ffi')
-        ffi.cdef('void rl_get_screen_size(int *rows, int *cols);')
+        ffi.cdef('void tnt_rl_get_screen_size(int *rows, int *cols);')
         local colsp = ffi.new('int[1]')
-        ffi.C.rl_get_screen_size(nil, colsp)
+        ffi.C.tnt_rl_get_screen_size(nil, colsp)
         return colsp[0]
     end
     if max_width == 0 then
