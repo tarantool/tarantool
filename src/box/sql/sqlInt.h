@@ -1186,6 +1186,8 @@ struct type_def {
  *     SQL_FUNC_LENGTH    ==  OPFLAG_LENGTHARG
  *     SQL_FUNC_TYPEOF    ==  OPFLAG_TYPEOFARG
  */
+/** Function is one of aggregate functions. */
+#define SQL_FUNC_AGG      0x0001
 #define SQL_FUNC_LIKE     0x0004	/* Candidate for the LIKE optimization */
 #define SQL_FUNC_NEEDCOLL 0x0020	/* sqlGetFuncCollSeq() might be called.
 					 * The flag is set when the collation
@@ -4346,6 +4348,14 @@ sql_func_flag_is_set(struct func *func, uint16_t flag)
  */
 struct func *
 sql_func_by_signature(const char *name, int argc);
+
+/**
+ * Return the parameters of the function with the given name. If the function
+ * with the given name does not exist, or the function is not a built-in SQL
+ * function, 0 is returned, which means no parameters have been set.
+ */
+uint32_t
+sql_func_flags(const char *name);
 
 /**
  * Generate VDBE code to halt execution with correct error if

@@ -2634,6 +2634,18 @@ static struct {
 	},
 };
 
+uint32_t
+sql_func_flags(const char *name)
+{
+	struct func *func = func_by_name(name, strlen(name));
+	if (func == NULL || func->def->language != FUNC_LANGUAGE_SQL_BUILTIN)
+		return 0;
+	uint32_t flags = ((struct func_sql_builtin *)func)->flags;
+	if (func->def->aggregate == FUNC_AGGREGATE_GROUP)
+		flags |= SQL_FUNC_AGG;
+	return flags;
+}
+
 static struct func_vtab func_sql_builtin_vtab;
 
 struct func *

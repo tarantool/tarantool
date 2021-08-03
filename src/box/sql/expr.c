@@ -328,11 +328,8 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 		if (op == TK_FUNCTION) {
 			uint32_t arg_count = p->x.pList == NULL ? 0 :
 					     p->x.pList->nExpr;
-			struct func *func =
-				sql_func_by_signature(p->u.zToken, arg_count);
-			if (func == NULL)
-				break;
-			if (sql_func_flag_is_set(func, SQL_FUNC_DERIVEDCOLL) &&
+			uint32_t flags = sql_func_flags(p->u.zToken);
+			if (((flags & SQL_FUNC_DERIVEDCOLL) != 0) &&
 			    arg_count > 0) {
 				/*
 				 * Now we use quite straightforward
@@ -342,7 +339,7 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 				 * built-in functions: trim, upper,
 				 * lower, replace, substr.
 				 */
-				assert(func->def->returns == FIELD_TYPE_STRING);
+				assert(p->type == FIELD_TYPE_STRING);
 				p = p->x.pList->a->pExpr;
 				continue;
 			}
