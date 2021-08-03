@@ -139,6 +139,8 @@ crypto_stream_begin
 crypto_stream_commit
 crypto_stream_delete
 crypto_stream_new
+crypto_X509_get_default_cert_dir_env
+crypto_X509_get_default_cert_file_env
 csv_create
 csv_destroy
 csv_escape_field
@@ -406,7 +408,6 @@ SHA1internal
 space_bsize
 space_by_id
 space_run_triggers
-ssl_cert_paths_discover
 string_strip_helper
 swim_add_member
 swim_broadcast
@@ -445,10 +446,13 @@ title_set_interpretor_name
 title_set_script_name
 title_set_status
 title_update
+tnt_default_cert_dir_paths
+tnt_default_cert_file_paths
 tnt_iconv
 tnt_iconv_close
 tnt_iconv_open
 tnt_rl_get_screen_size
+tnt_ssl_cert_paths_discover
 tnt_XXH32
 tnt_XXH32_copyState
 tnt_XXH32_digest
@@ -470,6 +474,4 @@ uri_format
 uri_parse
 uuid_nil
 uuid_unpack
-X509_get_default_cert_dir_env
-X509_get_default_cert_file_env
 _say

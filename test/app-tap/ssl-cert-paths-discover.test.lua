@@ -15,15 +15,15 @@ test:plan(6)
 ----- Init test env
 
 ffi.cdef([[
-    const char* X509_get_default_cert_dir_env();
-    const char* X509_get_default_cert_file_env();
-    void ssl_cert_paths_discover(int overwrite);
-    const char *default_cert_dir_paths[];
-    const char *default_cert_file_paths[];
+    const char* crypto_X509_get_default_cert_dir_env();
+    const char* crypto_X509_get_default_cert_file_env();
+    void tnt_ssl_cert_paths_discover(int overwrite);
+    const char *tnt_default_cert_dir_paths[];
+    const char *tnt_default_cert_file_paths[];
 ]])
 
-local CERT_DIR_ENV = ffi.string(ffi.C.X509_get_default_cert_dir_env())
-local CERT_FILE_ENV = ffi.string(ffi.C.X509_get_default_cert_file_env())
+local CERT_DIR_ENV = ffi.string(ffi.C.crypto_X509_get_default_cert_dir_env())
+local CERT_FILE_ENV = ffi.string(ffi.C.crypto_X509_get_default_cert_file_env())
 
 local temp_dir = fio.tempdir()
 local cert_file1 = fio.pathjoin(temp_dir, "cert1.pem")
@@ -38,13 +38,13 @@ fio.copyfile(cert_file1, cert_file2)
 
 local function cert_dir_paths_mockable()
     return pcall(function()
-        return ffi.C.default_cert_dir_paths
+        return ffi.C.tnt_default_cert_dir_paths
     end)
 end
 
 local function cert_file_paths_mockable()
     return pcall(function()
-        return ffi.C.default_cert_file_paths
+        return ffi.C.tnt_default_cert_file_paths
     end)
 end
 
@@ -55,17 +55,17 @@ local function mock_cert_paths_by_addr(addr, paths)
 
     local mock_paths = ffi.new(("const char*[%s]"):format(#paths), paths)
     ffi.copy(addr, mock_paths, ffi.sizeof(mock_paths))
-    ffi.C.ssl_cert_paths_discover(1)
+    ffi.C.tnt_ssl_cert_paths_discover(1)
 end
 
 local function mock_cert_dir_paths(t, dir_paths)
-    local dir_paths_addr = ffi.C.default_cert_dir_paths;
+    local dir_paths_addr = ffi.C.tnt_default_cert_dir_paths;
     t:diag("Mock cert dir paths: %s", table.concat(dir_paths, ";"))
     mock_cert_paths_by_addr(dir_paths_addr, dir_paths)
 end
 
 local function mock_cert_file_paths(t, file_paths)
-    local file_paths_addr = ffi.C.default_cert_file_paths
+    local file_paths_addr = ffi.C.tnt_default_cert_file_paths
     t:diag("Mock cert file paths: %s", table.concat(file_paths, ";"))
     mock_cert_paths_by_addr(file_paths_addr, file_paths)
 end
@@ -91,7 +91,7 @@ end
 ----- Tests
 
 if not cert_dir_paths_mockable() then
-    -- Because of LTO (especially on macOS) symbol default_cert_dir_paths
+    -- Because of LTO (especially on macOS) symbol tnt_default_cert_dir_paths
     -- may become local and unavailable through ffi, so there is no
     -- chance to mock tests
     test:skip("Default cert dir paths would set")
@@ -133,7 +133,7 @@ end
 
 
 if not cert_file_paths_mockable() then
-    -- Because of LTO (especially on macOS) symbol default_cert_file_paths
+    -- Because of LTO (especially on macOS) symbol tnt_default_cert_file_paths
     -- may become local and unavailable through ffi, so there is no
     -- chance to mock tests
     test:skip("Default cert file path would set")

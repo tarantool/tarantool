@@ -60,7 +60,7 @@ is_dir_empty(const char *dir_path)
  * Default paths of directory where stores OpenSSL certificates
  * for different systems
  */
-const char *default_cert_dir_paths[] = {
+const char *tnt_default_cert_dir_paths[] = {
 	/* Fedora/RHEL/Centos */
 	"/etc/pki/tls/certs",
 	/* Debian/Ubuntu/Gentoo etc. (OpenSuse) */
@@ -80,7 +80,7 @@ const char *default_cert_dir_paths[] = {
 /**
  * Default paths of OpenSSL certificates file for different systems
  */
-const char *default_cert_file_paths[] = {
+const char *tnt_default_cert_file_paths[] = {
 	/* Fedora/RHEL 6 */
 	"/etc/pki/tls/certs/ca-bundle.crt",
 	/* CentOS/RHEL 7/8 */
@@ -99,7 +99,7 @@ const char *default_cert_file_paths[] = {
 };
 
 int
-ssl_cert_paths_discover(int overwrite)
+tnt_ssl_cert_paths_discover(int overwrite)
 {
 	int rc = -1;
 	struct stat sb;
@@ -111,7 +111,7 @@ ssl_cert_paths_discover(int overwrite)
 	if (dir_buf == NULL)
 		goto fail;
 
-	for (const char **path = default_cert_dir_paths; *path != NULL; path++) {
+	for (const char **path = tnt_default_cert_dir_paths; *path != NULL; path++) {
 		if ((stat(*path, &sb) != 0) ||
 		    (!S_ISDIR(sb.st_mode)) ||
 		    (is_dir_empty(*path) != 0))
@@ -135,7 +135,7 @@ ssl_cert_paths_discover(int overwrite)
 	}
 
 	const char *cert_file = NULL;
-	for (const char **path = default_cert_file_paths; *path != NULL; path++) {
+	for (const char **path = tnt_default_cert_file_paths; *path != NULL; path++) {
 		if (stat(*path, &sb) == 0) {
 			cert_file = *path;
 			break;
