@@ -171,15 +171,17 @@ enum {
  */
 struct vy_stmt {
 	struct tuple base;
-	int64_t lsn;
-	uint8_t  type; /* IPROTO_INSERT/REPLACE/UPSERT/DELETE */
+	uint8_t type; /* IPROTO_INSERT/REPLACE/UPSERT/DELETE */
 	uint8_t flags;
+	int64_t lsn;
 	/**
 	 * Offsets array concatenated with MessagePack fields
 	 * array.
 	 * char raw[0];
 	 */
 };
+
+static_assert(sizeof(struct vy_stmt) == 24, "Just to be sure");
 
 /** Get LSN of the vinyl statement. */
 static inline int64_t
