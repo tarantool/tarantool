@@ -45,6 +45,7 @@
 #include "lua/decimal.h"
 #include "mp_decimal.h"
 #include "mp_uuid.h"
+#include "mp_datetime.h"
 
 #define CMP_OLD_NEW(a, b, type) (((a) > (type)(b)) - ((a) < (type)(b)))
 
@@ -76,6 +77,7 @@ enum mem_class {
 	MEM_CLASS_STR,
 	MEM_CLASS_BIN,
 	MEM_CLASS_UUID,
+	MEM_CLASS_DATETIME,
 	mem_class_max,
 };
 
@@ -98,6 +100,8 @@ mem_type_class(enum mem_type type)
 		return MEM_CLASS_BOOL;
 	case MEM_TYPE_UUID:
 		return MEM_CLASS_UUID;
+	case MEM_TYPE_DATETIME:
+		return MEM_CLASS_DATETIME;
 	default:
 		break;
 	}
@@ -152,6 +156,9 @@ mem_snprintf(char *buf, uint32_t size, const struct Mem *mem)
 		break;
 	case MEM_TYPE_BOOL:
 		res = snprintf(buf, size, mem->u.b ? "TRUE" : "FALSE");
+		break;
+	case MEM_TYPE_DATETIME:
+		res = datetime_to_string(&mem->u.date, buf, size);
 		break;
 	default:
 		unreachable();
@@ -226,6 +233,8 @@ mem_type_class_to_str(const struct Mem *mem)
 		return "array";
 	case MEM_TYPE_MAP:
 		return "map";
+	case MEM_TYPE_DATETIME:
+		return "datetime";
 	default:
 		break;
 	}
@@ -333,6 +342,15 @@ mem_set_uuid(struct Mem *mem, const struct tt_uuid *uuid)
 	mem_clear(mem);
 	mem->u.uuid = *uuid;
 	mem->type = MEM_TYPE_UUID;
+	assert(mem->flags == 0);
+}
+
+void
+mem_set_date(struct Mem *mem, const struct datetime *date)
+{
+	mem_clear(mem);
+	mem->u.date = *date;
+	mem->type = MEM_TYPE_DATETIME;
 	assert(mem->flags == 0);
 }
 
@@ -1210,6 +1228,15 @@ uuid_to_bin(struct Mem *mem)
 	return mem_copy_bin(mem, (char *)&mem->u.uuid, UUID_LEN);
 }
 
+
+static inline int
+datetime_to_str0(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_DATETIME);
+	char buf[DT_TO_STRING_BUFSIZE];
+	return datetime_to_string(&mem->u.date, buf, DT_TO_STRING_BUFSIZE);
+}
+
 int
 mem_to_int(struct Mem *mem)
 {
@@ -1299,6 +1326,8 @@ mem_to_str(struct Mem *mem)
 		return uuid_to_str0(mem);
 	case MEM_TYPE_DEC:
 		return dec_to_str0(mem);
+	case MEM_TYPE_DATETIME:
+		return datetime_to_str0(mem);
 	default:
 		return -1;
 	}
@@ -1387,6 +1416,11 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 		if (mem->type != MEM_TYPE_MAP)
 			return -1;
 		mem->flags &= ~MEM_Any;
+		return 0;
+	case FIELD_TYPE_DATETIME:
+		if (mem->type != MEM_TYPE_DATETIME)
+			return -1;
+		mem->flags = 0;
 		return 0;
 	case FIELD_TYPE_SCALAR:
 		if ((mem->type & (MEM_TYPE_MAP | MEM_TYPE_ARRAY)) != 0)
@@ -1510,6 +1544,11 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 		return 0;
 	case FIELD_TYPE_UUID:
 		if (mem->type != MEM_TYPE_UUID)
+			return -1;
+		mem->flags = 0;
+		return 0;
+	case FIELD_TYPE_DATETIME:
+		if (mem->type != MEM_TYPE_DATETIME)
 			return -1;
 		mem->flags = 0;
 		return 0;
@@ -2342,6 +2381,13 @@ mem_cmp_uuid(const struct Mem *a, const struct Mem *b)
 	return memcmp(&a->u.uuid, &b->u.uuid, UUID_LEN);
 }
 
+static int
+mem_cmp_datetime(const struct Mem *a, const struct Mem *b)
+{
+	assert((a->type & b->type & MEM_TYPE_DATETIME) != 0);
+	return datetime_compare(&a->u.date, &b->u.date);
+}
+
 int
 mem_cmp_scalar(const struct Mem *a, const struct Mem *b,
 	       const struct coll *coll)
@@ -2363,6 +2409,8 @@ mem_cmp_scalar(const struct Mem *a, const struct Mem *b,
 		return mem_cmp_bin(a, b);
 	case MEM_CLASS_UUID:
 		return mem_cmp_uuid(a, b);
+	case MEM_CLASS_DATETIME:
+		return mem_cmp_datetime(a, b);
 	default:
 		unreachable();
 	}
@@ -2433,6 +2481,11 @@ mem_cmp_msgpack(const struct Mem *a, const char **b, int *result,
 			if (decimal_unpack(b, len, &mem.u.d) == 0)
 				return -1;
 			break;
+		} else if (type == MP_DATETIME) {
+			mem.type = MEM_TYPE_DATETIME;
+			if (datetime_unpack(b, len, &mem.u.date) == NULL)
+				return -1;
+			break;
 		}
 		*b += len;
 		mem.type = MEM_TYPE_BIN;
@@ -2491,6 +2544,9 @@ mem_cmp(const struct Mem *a, const struct Mem *b, int *result,
 	case MEM_CLASS_UUID:
 		*result = mem_cmp_uuid(a, b);
 		break;
+	case MEM_CLASS_DATETIME:
+		*result = mem_cmp_datetime(a, b);
+		break;
 	default:
 		unreachable();
 	}
@@ -2529,6 +2585,8 @@ mem_type_to_str(const struct Mem *p)
 		return "uuid";
 	case MEM_TYPE_DEC:
 		return "decimal";
+	case MEM_TYPE_DATETIME:
+		return "datetime";
 	default:
 		unreachable();
 	}
@@ -2559,6 +2617,7 @@ mem_mp_type(const struct Mem *mem)
 		return MP_DOUBLE;
 	case MEM_TYPE_DEC:
 	case MEM_TYPE_UUID:
+	case MEM_TYPE_DATETIME:
 		return MP_EXT;
 	default:
 		unreachable();
@@ -2787,6 +2846,13 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 			mem->type = MEM_TYPE_DEC;
 			mem->flags = 0;
 			break;
+		} else if (type == MP_DATETIME) {
+			buf = svp;
+			if (mp_decode_datetime(&buf, &mem->u.date) == NULL)
+				return -1;
+			mem->type = MEM_TYPE_DATETIME;
+			mem->flags = 0;
+			break;
 		}
 		buf += size;
 		mem->z = (char *)svp;
@@ -2916,6 +2982,9 @@ mem_to_mpstream(const struct Mem *var, struct mpstream *stream)
 	case MEM_TYPE_DEC:
 		mpstream_encode_decimal(stream, &var->u.d);
 		return;
+	case MEM_TYPE_DATETIME:
+		mpstream_encode_datetime(stream, &var->u.date);
+		return;
 	default:
 		unreachable();
 	}
@@ -3012,6 +3081,9 @@ port_vdbemem_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 			break;
 		case MEM_TYPE_DEC:
 			*lua_pushdecimal(L) = mem->u.d;
+			break;
+		case MEM_TYPE_DATETIME:
+			*luaT_pushdatetime(L) = mem->u.date;
 			break;
 		default:
 			unreachable();
@@ -3169,6 +3241,8 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 				mem_set_uuid(&val[i], field.uuidval);
 			} else if (field.ext_type == MP_DECIMAL) {
 				mem_set_dec(&val[i], field.decval);
+			} else if (field.ext_type == MP_DATETIME) {
+				mem_set_date(&val[i], field.dateval);
 			} else {
 				diag_set(ClientError, ER_SQL_EXECUTE,
 					 "Unsupported type passed from Lua");
@@ -3287,6 +3361,17 @@ port_c_get_vdbemem(struct port *base, uint32_t *size)
 					goto error;
 				}
 				val[i].type = MEM_TYPE_DEC;
+				break;
+			} else if (type == MP_DATETIME) {
+				struct datetime *date = &val[i].u.date;
+				data = str;
+				if (mp_decode_datetime(&data, date) == NULL) {
+					diag_set(ClientError,
+						 ER_INVALID_MSGPACK, "Invalid "
+						 "MP_DATETIME MsgPack format");
+					goto error;
+				}
+				val[i].type = MEM_TYPE_DATETIME;
 				break;
 			}
 			data += len;
