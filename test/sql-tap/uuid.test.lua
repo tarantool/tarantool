@@ -1290,7 +1290,7 @@ test:do_catchsql_test(
     [[
         SELECT uuid(4, 5);
     ]], {
-        1, "Wrong number of arguments is passed to UUID(): expected one or zero, got 2"
+        1, "Wrong number of arguments is passed to UUID(): expected from 0 to 1, got 2"
     })
 
 -- Make sure the uuid() function generates a new UUID each time when called.

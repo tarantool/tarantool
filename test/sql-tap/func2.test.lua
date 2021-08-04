@@ -50,7 +50,7 @@ test:do_catchsql_test(
         SELECT SUBSTR()
     ]], {
         -- <func2-1.2.1>
-        1, "Wrong number of arguments is passed to SUBSTR(): expected 1 or 2, got 0"
+        1, "Wrong number of arguments is passed to SUBSTR(): expected from 2 to 3, got 0"
         -- </func2-1.2.1>
     })
 
@@ -60,7 +60,7 @@ test:do_catchsql_test(
         SELECT SUBSTR('Supercalifragilisticexpialidocious')
     ]], {
         -- <func2-1.2.2>
-        1, "Wrong number of arguments is passed to SUBSTR(): expected 1 or 2, got 1"
+        1, "Wrong number of arguments is passed to SUBSTR(): expected from 2 to 3, got 1"
         -- </func2-1.2.2>
     })
 
@@ -70,7 +70,7 @@ test:do_catchsql_test(
         SELECT SUBSTR('Supercalifragilisticexpialidocious', 1,1,1)
     ]], {
         -- <func2-1.2.3>
-        1, "Wrong number of arguments is passed to SUBSTR(): expected 1 or 2, got 4"
+        1, "Wrong number of arguments is passed to SUBSTR(): expected from 2 to 3, got 4"
         -- </func2-1.2.3>
     })
 
@@ -673,7 +673,7 @@ if ("ሴ" ~= "u1234")
             SELECT SUBSTR()
         ]], {
             -- <func2-2.1.2>
-            1, "Wrong number of arguments is passed to SUBSTR(): expected 1 or 2, got 0"
+            1, "Wrong number of arguments is passed to SUBSTR(): expected from 2 to 3, got 0"
             -- </func2-2.1.2>
         })
 
@@ -683,7 +683,7 @@ if ("ሴ" ~= "u1234")
             SELECT SUBSTR('hiሴho')
         ]], {
             -- <func2-2.1.3>
-            1, "Wrong number of arguments is passed to SUBSTR(): expected 1 or 2, got 1"
+            1, "Wrong number of arguments is passed to SUBSTR(): expected from 2 to 3, got 1"
             -- </func2-2.1.3>
         })
 
@@ -693,7 +693,7 @@ if ("ሴ" ~= "u1234")
             SELECT SUBSTR('hiሴho', 1,1,1)
         ]], {
             -- <func2-2.1.4>
-            1, "Wrong number of arguments is passed to SUBSTR(): expected 1 or 2, got 4"
+            1, "Wrong number of arguments is passed to SUBSTR(): expected from 2 to 3, got 4"
             -- </func2-2.1.4>
         })
 
@@ -1038,7 +1038,7 @@ test:do_catchsql_test(
         SELECT SUBSTR()
     ]], {
         -- <func2-3.1.2>
-        1, "Wrong number of arguments is passed to SUBSTR(): expected 1 or 2, got 0"
+        1, "Wrong number of arguments is passed to SUBSTR(): expected from 2 to 3, got 0"
         -- </func2-3.1.2>
     })
 
@@ -1048,7 +1048,7 @@ test:do_catchsql_test(
         SELECT SUBSTR(x'1234')
     ]], {
         -- <func2-3.1.3>
-        1, "Wrong number of arguments is passed to SUBSTR(): expected 1 or 2, got 1"
+        1, "Wrong number of arguments is passed to SUBSTR(): expected from 2 to 3, got 1"
         -- </func2-3.1.3>
     })
 
@@ -1058,7 +1058,7 @@ test:do_catchsql_test(
         SELECT SUBSTR(x'1234', 1,1,1)
     ]], {
         -- <func2-3.1.4>
-        1, "Wrong number of arguments is passed to SUBSTR(): expected 1 or 2, got 4"
+        1, "Wrong number of arguments is passed to SUBSTR(): expected from 2 to 3, got 4"
         -- </func2-3.1.4>
     })
 

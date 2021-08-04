@@ -2095,13 +2095,24 @@ find_built_in_func(struct Expr *expr, struct sql_func_dictionary *dict)
 {
 	const char *name = expr->u.zToken;
 	int n = expr->x.pList != NULL ? expr->x.pList->nExpr : 0;
-	struct func *func = &dict->functions[0]->base;
-	assert(func->def->exports.sql);
-	int param_count = func->def->param_count;
-	if (param_count != -1 && param_count != n) {
-		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, name,
-			 tt_sprintf("%d", func->def->param_count), n);
+	int argc_min = dict->argc_min;
+	int argc_max = dict->argc_max;
+	if (n < argc_min || n > argc_max) {
+		const char *str;
+		if (argc_min == argc_max)
+			str = tt_sprintf("%d", argc_min);
+		else if (argc_max == SQL_MAX_FUNCTION_ARG && n < argc_min)
+			str = tt_sprintf("at least %d", argc_min);
+		else
+			str = tt_sprintf("from %d to %d", argc_min, argc_max);
+		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, name, str, n);
 		return NULL;
+	}
+	struct func *func = NULL;
+	for (uint32_t i = 0; i < dict->count; ++i) {
+		func = &dict->functions[i]->base;
+		if (func->def->param_count == n)
+			break;
 	}
 	return func;
 }

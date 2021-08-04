@@ -276,19 +276,19 @@ test:do_catchsql_test(
     "func-5-5.1",
     [[
         SELECT LEAST(false);
-    ]], { 1, "Wrong number of arguments is passed to LEAST(): expected at least two, got 1" } )
+    ]], { 1, "Wrong number of arguments is passed to LEAST(): expected at least 2, got 1" } )
 
 test:do_catchsql_test(
     "func-5-5.2",
     [[
         SELECT GREATEST('abc');
-    ]], { 1, "Wrong number of arguments is passed to GREATEST(): expected at least two, got 1" } )
+    ]], { 1, "Wrong number of arguments is passed to GREATEST(): expected at least 2, got 1" } )
 
 test:do_catchsql_test(
     "func-5-5.3",
     [[
         SELECT LEAST();
-    ]], { 1, "Wrong number of arguments is passed to LEAST(): expected at least two, got 0" } )
+    ]], { 1, "Wrong number of arguments is passed to LEAST(): expected at least 2, got 0" } )
 
 -- Make sure that ifnull() returns type of corresponding (i.e. first
 -- non-null) argument.

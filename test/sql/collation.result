@@ -298,7 +298,7 @@ box.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = c COLLATE \"unicode\";
 box.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = substr();")
 ---
 - null
-- 'Wrong number of arguments is passed to SUBSTR(): expected 1 or 2, got 0'
+- 'Wrong number of arguments is passed to SUBSTR(): expected from 2 to 3, got 0'
 ...
 -- Compound queries perform implicit comparisons between values.
 -- Hence, rules for collations compatibilities are the same.
