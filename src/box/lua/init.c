@@ -75,7 +75,11 @@ extern char session_lua[],
 	tuple_lua[],
 	key_def_lua[],
 	schema_lua[],
+#if ENABLE_TARANTOOL_EE_BUILD
+	normalize_uri_ee_lua[],
+#else
 	normalize_uri_lua[],
+#endif
 	load_cfg_lua[],
 	xlog_lua[],
 #if ENABLE_FEEDBACK_DAEMON
@@ -101,7 +105,11 @@ static const char *lua_sources[] = {
 	"box/upgrade", upgrade_lua,
 	"box/net_box", net_box_lua,
 	"box/console", console_lua,
+#if ENABLE_TARANTOOL_EE_BUILD
+	"box/normalize_uri_ee", normalize_uri_ee_lua,
+#else
 	"box/notmalize_uri", normalize_uri_lua,
+#endif
 	"box/load_cfg", load_cfg_lua,
 	"box/xlog", xlog_lua,
 	"box/key_def", key_def_lua,

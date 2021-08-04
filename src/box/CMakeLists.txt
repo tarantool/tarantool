@@ -6,6 +6,9 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/box/sql)
 # daemon from the build completely.
 option(ENABLE_FEEDBACK_DAEMON "Feedback daemon which reports debug data to the Tarantool team" ON)
 
+# By default it is open source build
+option(ENABLE_TARANTOOL_EE_BUILD "Tarantool enterprise build is enabled" OFF)
+
 set(lua_sources)
 lua_source(lua_sources lua/load_cfg.lua)
 lua_source(lua_sources lua/schema.lua)
@@ -23,11 +26,17 @@ lua_source(lua_sources lua/merger.lua)
 set(bin_sources)
 bin_source(bin_sources bootstrap.snap bootstrap.h)
 
-
-set(listen_sources
-    cfg_uri.c
-    iproto_service.cc)
-lua_source(lua_sources lua/normalize_uri.lua)
+if (ENABLE_TARANTOOL_EE_BUILD)
+    set(listen_sources
+        cfg_uri_ee.c
+        iproto_service_ee.cc)
+    lua_source(lua_sources lua/normalize_uri_ee.lua)
+else ()
+    set(listen_sources
+        cfg_uri.c
+        iproto_service.cc)
+    lua_source(lua_sources lua/normalize_uri.lua)
+endif()
 
 set(sql_sources
     sql/opcodes.c

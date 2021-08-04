@@ -260,6 +260,8 @@
 
 #cmakedefine EXPORT_LIBCURL_SYMBOLS 1
 
+#cmakedefine ENABLE_TARANTOOL_EE_BUILD 1
+
 /*
  * vim: syntax=c
  */
