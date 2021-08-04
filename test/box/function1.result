@@ -372,7 +372,7 @@ c:close()
 box.schema.func.create('WAITFOR', {language = 'SQL_BUILTIN', \
 	param_list = {'integer'}, returns = 'integer',exports = {'SQL'}})
 ---
-- error: 'Failed to create function ''WAITFOR'': given built-in is not predefined'
+- error: Unsupported language 'SQL_BUILTIN' specified for function 'WAITFOR'
 ...
 test_run:cmd("setopt delimiter ';'")
 ---
@@ -1077,4 +1077,9 @@ box.func['test'].is_multikey == true
 ...
 box.func['test']:drop()
 ---
+...
+-- gh-6106: Check that user-defined functions cannot have SQL_BUILTIN engine.
+box.schema.func.create("ABS", {language = 'SQL_BUILTIN', returns = 'integer'})
+---
+- error: Unsupported language 'SQL_BUILTIN' specified for function 'ABS'
 ...

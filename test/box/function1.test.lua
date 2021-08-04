@@ -389,3 +389,6 @@ box.func.LUA:call({"return 1 + 1"})
 box.schema.func.create('test', {body = "function(tuple) return tuple end", is_deterministic = true, opts = {is_multikey = true}})
 box.func['test'].is_multikey == true
 box.func['test']:drop()
+
+-- gh-6106: Check that user-defined functions cannot have SQL_BUILTIN engine.
+box.schema.func.create("ABS", {language = 'SQL_BUILTIN', returns = 'integer'})

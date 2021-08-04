@@ -3214,6 +3214,36 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 }
 
 /**
+ * Check if the version of the data dictionary is lower than 2.9.0 and return
+ * new func def if it is the case. If it is the case, then it is possible to
+ * insert values with the "SQL_BUILTIN" language into _func, otherwise it is
+ * prohibited. This is for upgradeability from 2.1.3 to 2.3.0. Since all we need
+ * is to allow such inserts, we set func def to its default values.
+ */
+static int
+func_def_create_sql_built_in(struct func_def *def)
+{
+	if (dd_version_id >= version_id(2, 9, 0)) {
+		diag_set(ClientError, ER_FUNCTION_LANGUAGE, "SQL_BUILTIN",
+			 def->name);
+		return -1;
+	}
+	def->body = NULL;
+	def->comment = NULL;
+	def->setuid = 1;
+	def->is_deterministic = false;
+	def->is_sandboxed = false;
+	def->param_count = 0;
+	def->returns = FIELD_TYPE_ANY;
+	def->aggregate = FUNC_AGGREGATE_NONE;
+	def->language = FUNC_LANGUAGE_LUA;
+	def->exports.lua = true;
+	def->exports.sql = true;
+	func_opts_create(&def->opts);
+	return 0;
+}
+
+/**
  * Get function identifiers from a tuple.
  *
  * @param tuple Tuple to get ids from.
@@ -3343,6 +3373,14 @@ func_def_new_from_tuple(struct tuple *tuple)
 			diag_set(ClientError, ER_FUNCTION_LANGUAGE,
 				  language, def->name);
 			return NULL;
+		}
+		if (def->language == FUNC_LANGUAGE_SQL_BUILTIN) {
+			if (func_def_create_sql_built_in(def) != 0)
+				return NULL;
+			if (func_def_check(def) != 0)
+				return NULL;
+			def_guard.is_active = false;
+			return def;
 		}
 	} else {
 		/* Lua is the default. */
