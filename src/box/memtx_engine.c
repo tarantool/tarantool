@@ -1300,7 +1300,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 		goto end;
 	}
 	tuple = &memtx_tuple->base;
-	tuple->refs = 0;
+	tuple_ref_init(tuple, 0);
 	memtx_tuple->version = memtx->snapshot_version;
 	assert(tuple_len <= UINT32_MAX); /* bsize is UINT32_MAX */
 	tuple->bsize = tuple_len;
@@ -1322,7 +1322,7 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
 	say_debug("%s(%p)", __func__, tuple);
-	assert(tuple->refs == 0);
+	assert(tuple_is_unreferenced(tuple));
 	struct memtx_tuple *memtx_tuple =
 		container_of(tuple, struct memtx_tuple, base);
 	size_t total = tuple_size(tuple) + offsetof(struct memtx_tuple, base);

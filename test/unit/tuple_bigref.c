@@ -5,13 +5,74 @@
 #include <stdio.h>
 
 enum {
-	BIGREF_DIFF = 10,
-	BIGREF_COUNT = 70003,
-	BIGREF_CAPACITY = 107,
+	FEW_REFS = 10,
+	MANY_REFS = 1000,
+	TEST_MAX_TUPLE_COUNT = 1024,
+	RAND_TEST_ROUNDS = 1024 * 1024,
 };
 
 static char tuple_buf[64];
 static char *tuple_end = tuple_buf;
+
+size_t tuple_count = 0;
+size_t tuple_delete_error_count = 0;
+static struct tuple *allocated_tuples[TEST_MAX_TUPLE_COUNT];
+
+static struct tuple_format *patched_format;
+static struct tuple * (*save_tuple_new)(struct tuple_format *format,
+					const char *data, const char *end);
+static void (*save_tuple_delete)(struct tuple_format *format,
+				 struct tuple *tuple);
+
+static void patch_format();
+static void restore_format();
+
+static struct tuple *
+test_tuple_new(struct tuple_format *format,
+	       const char *data, const char *end)
+{
+	assert(format == patched_format);
+	assert(tuple_count < TEST_MAX_TUPLE_COUNT);
+	restore_format();
+	struct tuple *tuple = save_tuple_new(format, data, end);
+	patch_format();
+	allocated_tuples[tuple_count++] = tuple;
+	return tuple;
+}
+
+static void
+test_tuple_delete(struct tuple_format *format, struct tuple *tuple)
+{
+	assert(format == patched_format);
+	assert(tuple_count > 0);
+	size_t pos = 0;
+	while (pos < tuple_count && allocated_tuples[pos] != tuple)
+		pos++;
+	/* If the tuple was not found there's no reason to continue. */
+	fail_unless(pos < tuple_count);
+	allocated_tuples[pos] = allocated_tuples[--tuple_count];
+	restore_format();
+	save_tuple_delete(format, tuple);
+	patch_format();
+}
+
+static void
+patch_format()
+{
+	patched_format = box_tuple_format_default();
+	save_tuple_new = patched_format->vtab.tuple_new;
+	save_tuple_delete = patched_format->vtab.tuple_delete;
+	patched_format->vtab.tuple_new = test_tuple_new;
+	patched_format->vtab.tuple_delete = test_tuple_delete;
+}
+
+static void
+restore_format()
+{
+	assert(patched_format == box_tuple_format_default());
+	patched_format->vtab.tuple_new = save_tuple_new;
+	patched_format->vtab.tuple_delete =save_tuple_delete;
+}
 
 /**
  * This function creates new tuple with refs == 1.
@@ -26,111 +87,170 @@ create_tuple()
 }
 
 /**
- * This test performs overall check of bigrefs.
- * What it checks:
- * 1) Till refs <= TUPLE_REF_MAX it shows number of refs
- * of tuple and it isn't a bigref.
- * 2) When refs > TUPLE_REF_MAX first 15 bits of it becomes
- * index of bigref and the last bit becomes true which
- * shows that it is bigref.
- * 3) Each of tuple has its own number of refs, but all
- * these numbers more than it is needed for getting a bigref.
- * 4) Indexes of bigrefs are given sequentially.
- * 5) After some tuples are sequentially deleted all of
- * others bigrefs are fine. In this test BIGREF_CAPACITY
- * tuples created and each of their ref counter increased
- * to (BIGREF_COUNT - index of tuple). Tuples are created
- * consistently.
+ * The test references one tuple different amount of times and checks that
+ * after corresponding amount of dereferences the tuple is deleted.
  */
 static void
-test_bigrefs_overall()
+test_one()
 {
 	header();
-	plan(3);
-	uint16_t counter = 0;
-	struct tuple **tuples = (struct tuple **) malloc(BIGREF_CAPACITY *
-							 sizeof(*tuples));
-	for(int i = 0; i < BIGREF_CAPACITY; ++i)
-		tuples[i] = create_tuple();
-	for(int i = 0; i < BIGREF_CAPACITY; ++i)
-		counter += tuples[i]->refs == 1;
-	is(counter, BIGREF_CAPACITY, "All tuples have refs == 1.");
-	for(int i = 0; i < BIGREF_CAPACITY; ++i) {
-		for(int j = 1; j < TUPLE_REF_MAX; ++j)
-			tuple_ref(tuples[i]);
-		tuple_ref(tuples[i]);
-		for(int j = TUPLE_REF_MAX + 1; j < BIGREF_COUNT - i; ++j)
-			tuple_ref(tuples[i]);
-	}
-	counter = 0;
-	for(int i = 0; i < BIGREF_CAPACITY; ++i)
-		counter += tuples[i]->is_bigref == true;
-	is(counter, BIGREF_CAPACITY, "All tuples have bigrefs.");
-	counter = 0;
-	for(int i = 0; i < BIGREF_CAPACITY; ++i) {
-		for(int j = 1; j < BIGREF_COUNT - i; ++j)
-			tuple_unref(tuples[i]);
-		counter += tuples[i]->refs == 1;
-		tuple_unref(tuples[i]);
-	}
-	is(counter, BIGREF_CAPACITY, "All tuples were deleted.");
-	free(tuples);
+	plan(12);
+
+	struct tuple *tuple;
+
+	/* one ref */
+	tuple = create_tuple();
+
+	is(tuple_count, 1, "allocated");
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+
+	tuple_unref(tuple);
+
+	is(tuple_count, 0, "deallocated");
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+
+	/* few refs */
+	tuple = create_tuple();
+	for (size_t j = 1; j < FEW_REFS; j++)
+		tuple_ref(tuple);
+
+	is(tuple_count, 1, "allocated");
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+
+	for (size_t j = 0; j < FEW_REFS; j++)
+		tuple_unref(tuple);
+
+	is(tuple_count, 0, "deallocated");
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+
+	/* many refs */
+	tuple = create_tuple();
+	for (size_t j = 1; j < MANY_REFS; j++)
+		tuple_ref(tuple);
+
+	is(tuple_count, 1, "allocated");
+	is(tuple_bigref_tuple_count(), 1, "bigrefs")
+
+	for (size_t j = 0; j < MANY_REFS; j++)
+		tuple_unref(tuple);
+
+	is(tuple_count, 0, "all deallocated");
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+
 	footer();
 	check_plan();
 }
 
 /**
- * This test checks that indexes are given as
- * intended.
+ * The test references a bunch of tuples different amount of times and checks
+ * that after corresponding amount of dereferences the tuples are deleted.
  */
 static void
-test_bigrefs_non_consistent()
+test_batch()
 {
 	header();
-	plan(3);
-	uint16_t counter = 0;
-	uint16_t max_index = BIGREF_CAPACITY / BIGREF_DIFF;
-	struct tuple **tuples = (struct tuple **) malloc(BIGREF_CAPACITY *
-							 sizeof(*tuples));
-	uint16_t *indexes = (uint16_t *) malloc(sizeof(*indexes) *
-						(max_index + 1));
-	for(int i = 0; i < BIGREF_CAPACITY; ++i)
+	plan(12);
+
+	struct tuple *tuples[TEST_MAX_TUPLE_COUNT];
+
+	/* one ref */
+	for (size_t i = 0; i < TEST_MAX_TUPLE_COUNT; i++)
 		tuples[i] = create_tuple();
-	for(int i = 0; i < BIGREF_CAPACITY; ++i) {
-		for(int j = 1; j < BIGREF_COUNT; ++j)
+
+	is(tuple_count, TEST_MAX_TUPLE_COUNT, "all allocated");
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+
+	for (size_t i = 0; i < TEST_MAX_TUPLE_COUNT; i++)
+		tuple_unref(tuples[i]);
+
+	is(tuple_count, 0, "all deallocated");
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+
+	/* few refs */
+	for (size_t i = 0; i < TEST_MAX_TUPLE_COUNT; i++)
+		tuples[i] = create_tuple();
+	for (size_t i = 0; i < TEST_MAX_TUPLE_COUNT; i++)
+		for (size_t j = 1; j < FEW_REFS; j++)
 			tuple_ref(tuples[i]);
-		counter += tuples[i]->is_bigref == true;
-	}
-	is(counter, BIGREF_CAPACITY, "All tuples have bigrefs.");
-	counter = 0;
-	uint16_t index = 0;
-	for(int i = 0; i < BIGREF_CAPACITY; i += BIGREF_DIFF) {
-		indexes[index] = tuples[i]->ref_index;
-		for(int j = 1; j < BIGREF_COUNT; ++j)
+
+	is(tuple_count, TEST_MAX_TUPLE_COUNT, "all allocated");
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+
+	for (size_t i = 0; i < TEST_MAX_TUPLE_COUNT; i++)
+		for (size_t j = 0; j < FEW_REFS; j++)
 			tuple_unref(tuples[i]);
-		index++;
-		counter += tuples[i]->is_bigref == false;
-	}
-	is(counter, max_index + 1, "%d tuples don't have bigrefs "\
-	   "and all other tuples have", max_index + 1);
-	counter = 0;
-	index = 0;
-	for(int i = 0; i < BIGREF_CAPACITY; i += BIGREF_DIFF) {
-		bool check_refs = tuples[i]->refs == 1;
-		for(int j = 1; j < BIGREF_COUNT; ++j)
+
+	is(tuple_count, 0, "all deallocated");
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+
+	/* many refs */
+	for (size_t i = 0; i < TEST_MAX_TUPLE_COUNT; i++)
+		tuples[i] = create_tuple();
+	for (size_t i = 0; i < TEST_MAX_TUPLE_COUNT; i++) {
+		for (size_t j = 1; j < MANY_REFS; j++)
 			tuple_ref(tuples[i]);
-		counter += check_refs && tuples[i]->is_bigref &&
-			   tuples[i]->ref_index == indexes[max_index - index];
-		index++;
 	}
-	is(counter, max_index + 1, "All tuples have bigrefs and "\
-	   "their indexes are in right order.");
-	for (int i = 0; i < BIGREF_CAPACITY; ++i) {
-		for (int j = 0; j < BIGREF_COUNT; ++j)
+
+	is(tuple_count, TEST_MAX_TUPLE_COUNT, "all allocated");
+	is(tuple_bigref_tuple_count(), TEST_MAX_TUPLE_COUNT, "all bigrefs")
+
+	for (size_t i = 0; i < TEST_MAX_TUPLE_COUNT; i++) {
+		for (size_t j = 0; j < MANY_REFS; j++)
 			tuple_unref(tuples[i]);
 	}
-	free(indexes);
-	free(tuples);
+
+	is(tuple_count, 0, "all deallocated");
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+
+	footer();
+	check_plan();
+}
+
+/**
+ * The test performs lots of random reference/dereference operations on
+ * random tuples and checks that all tuples are deleted at right moment.
+ */
+static void
+test_random()
+{
+	header();
+	plan(2);
+
+	struct tuple *tuples[TEST_MAX_TUPLE_COUNT];
+	size_t ref_count[TEST_MAX_TUPLE_COUNT];
+
+	for (size_t i = 0; i < TEST_MAX_TUPLE_COUNT; i++) {
+		tuples[i] = create_tuple();
+		ref_count[i] = 1;
+	}
+	size_t expected_tuple_count = TEST_MAX_TUPLE_COUNT;
+
+	bool no_erros = true;
+	for (size_t i = 0; i < RAND_TEST_ROUNDS; i++) {
+		size_t pos = rand() % TEST_MAX_TUPLE_COUNT;
+		if (ref_count[pos] == 0)
+			continue;
+		size_t action = rand() % 4;
+		if (action == 0) {
+			tuple_unref(tuples[pos]);
+			ref_count[pos]--;
+			if (ref_count[pos] == 0)
+				expected_tuple_count--;
+		} else {
+			tuple_ref(tuples[pos]);
+			ref_count[pos]++;
+		}
+		assert(expected_tuple_count == tuple_count);
+		if (expected_tuple_count != tuple_count)
+			no_erros = false;
+	}
+
+	while (tuple_count != 0)
+		tuple_unref(allocated_tuples[0]);
+
+	ok(no_erros, "no errors");
+	is(tuple_bigref_tuple_count(), 0, "no bigrefs")
+
 	footer();
 	check_plan();
 }
@@ -139,18 +259,21 @@ int
 main()
 {
 	header();
-	plan(2);
+	plan(3);
 
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	tuple_init(NULL);
+	patch_format();
 
 	tuple_end = mp_encode_array(tuple_end, 1);
 	tuple_end = mp_encode_uint(tuple_end, 2);
 
-	test_bigrefs_overall();
-	test_bigrefs_non_consistent();
+	test_one();
+	test_batch();
+	test_random();
 
+	restore_format();
 	tuple_free();
 	fiber_free();
 	memory_free();

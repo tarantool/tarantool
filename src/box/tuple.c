@@ -46,6 +46,37 @@ enum {
 	OBJSIZE_MIN = 16,
 };
 
+/**
+ * Storage for additional reference counter of a tuple.
+ */
+struct tuple_uploaded_refs {
+	struct tuple *tuple;
+	uint32_t refs;
+};
+
+static uint32_t
+tuple_pointer_hash(const struct tuple *a)
+{
+	uintptr_t u = (uintptr_t)a;
+	if (sizeof(uintptr_t) <= sizeof(uint32_t))
+		return u;
+	else
+		return u ^ (u >> 32);
+}
+
+#define mh_name _tuple_uploaded_refs
+#define mh_key_t struct tuple *
+#define mh_node_t struct tuple_uploaded_refs
+#define mh_arg_t int
+#define mh_hash(a, arg) (tuple_pointer_hash((a)->tuple))
+#define mh_hash_key(a, arg) (tuple_pointer_hash(a))
+#define mh_cmp(a, b, arg) ((a)->tuple != (b)->tuple)
+#define mh_cmp_key(a, b, arg) ((a) != (b)->tuple)
+#define MH_SOURCE 1
+#include "salad/mhash.h"
+
+static struct mh_tuple_uploaded_refs_t *tuple_uploaded_refs;
+
 static const double ALLOC_FACTOR = 1.05;
 
 /**
@@ -100,7 +131,7 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 		goto end;
 	}
 
-	tuple->refs = 0;
+	tuple_ref_init(tuple, 0);
 	tuple->bsize = data_len;
 	tuple->format_id = tuple_format_id(format);
 	tuple_format_ref(format);
@@ -120,7 +151,8 @@ runtime_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
 	assert(format->vtab.tuple_delete == tuple_format_runtime_vtab.tuple_delete);
 	say_debug("%s(%p)", __func__, tuple);
-	assert(tuple->refs == 0);
+	assert(tuple->local_refs == 0);
+	assert(!tuple->has_uploaded_refs);
 	size_t total = tuple_size(tuple);
 	tuple_format_unref(format);
 	smfree(&runtime_alloc, tuple, total);
@@ -177,122 +209,87 @@ tuple_next(struct tuple_iterator *it)
 	return NULL;
 }
 
-/** {{{ Bigref - allow tuple reference counter to be > 2^16 */
-
-enum {
-	BIGREF_FACTOR = 2,
-	BIGREF_MAX = UINT32_MAX,
-	BIGREF_MIN_CAPACITY = 16,
-	/**
-	 * Only 15 bits are available for bigref list index in
-	 * struct tuple.
-	 */
-	BIGREF_MAX_CAPACITY = UINT16_MAX >> 1
-};
-
 /**
- * Container for big reference counters. Contains array of big
- * reference counters, size of this array and number of non-zero
- * big reference counters. When reference counter of tuple becomes
- * more than 32767, field refs of this tuple becomes index of big
- * reference counter in big reference counter array and field
- * is_bigref is set true. The moment big reference becomes equal
- * 32767 it is set to 0, refs of the tuple becomes 32767 and
- * is_bigref becomes false. Big reference counter can be equal to
- * 0 or be more than 32767.
+ * Reference count portion that is uploaded or acquired to/from external
+ * storage in one iteration.
+ * Upload/acquire is relatively long operation and should be executed more
+ * seldom as possible. The optimal portion should set local ref counter to the
+ * farthest value from 0 and TUPLE_LOCAL_REF_MAX and thus should be close to
+ * half of TUPLE_LOCAL_REF_MAX.
  */
-static struct bigref_list {
-	/** Free-list of big reference counters. */
-	uint32_t *refs;
-	/** Capacity of the array. */
-	uint16_t capacity;
-	/** Index of first free element. */
-	uint16_t vacant_index;
-} bigref_list;
+enum { TUPLE_UPLOAD_REFS = TUPLE_LOCAL_REF_MAX / 2 + 1 };
 
-/** Initialize big references container. */
-static inline void
-bigref_list_create(void)
+/** Convenient helper for hash table. */
+static uint32_t
+tuple_ref_get_uploaded_refs(struct tuple *tuple)
 {
-	memset(&bigref_list, 0, sizeof(bigref_list));
+	if (!tuple->has_uploaded_refs)
+		return 0;
+	mh_int_t pos = mh_tuple_uploaded_refs_find(tuple_uploaded_refs, tuple,
+						   0);
+	assert(pos != mh_end(tuple_uploaded_refs));
+	struct tuple_uploaded_refs *uploaded =
+		mh_tuple_uploaded_refs_node(tuple_uploaded_refs, pos);
+	assert(uploaded->tuple == tuple);
+	assert(uploaded->refs >= TUPLE_UPLOAD_REFS);
+	assert(uploaded->refs % TUPLE_UPLOAD_REFS == 0);
+	return uploaded->refs;
 }
 
-/** Destroy big references and free memory that was allocated. */
-static inline void
-bigref_list_destroy(void)
+/** Convenient helper for hash table. */
+static void
+tuple_ref_set_uploaded_refs(struct tuple *tuple, uint32_t refs)
 {
-	free(bigref_list.refs);
+	struct tuple_uploaded_refs put;
+	put.tuple = tuple;
+	put.refs = refs;
+	mh_int_t pos = mh_tuple_uploaded_refs_put(tuple_uploaded_refs, &put,
+						  NULL, 0);
+	if (pos == mh_end(tuple_uploaded_refs))
+		panic("Failed to allocate storage for tuple refs");
 }
 
-/**
- * Increase capacity of bigref_list.
- */
-static inline void
-bigref_list_increase_capacity(void)
+/** Convenient helper for hash table. */
+static void
+tuple_ref_drop_uploaded_refs(struct tuple *tuple)
 {
-	assert(bigref_list.capacity == bigref_list.vacant_index);
-	uint32_t *refs = bigref_list.refs;
-	uint16_t capacity = bigref_list.capacity;
-	if (capacity == 0)
-		capacity = BIGREF_MIN_CAPACITY;
-	else if (capacity < BIGREF_MAX_CAPACITY)
-		capacity = MIN(capacity * BIGREF_FACTOR, BIGREF_MAX_CAPACITY);
-	else
-		panic("Too many big references");
-	refs = (uint32_t *) realloc(refs, capacity * sizeof(*refs));
-	if (refs == NULL) {
-		panic("failed to reallocate %zu bytes: Cannot allocate "\
-		      "memory.", capacity * sizeof(*refs));
-	}
-	for (uint16_t i = bigref_list.capacity; i < capacity; ++i)
-		refs[i] = i + 1;
-	bigref_list.refs = refs;
-	bigref_list.capacity = capacity;
-}
-
-/**
- * Return index for new big reference counter and allocate memory
- * if needed.
- * @retval index for new big reference counter.
- */
-static inline uint16_t
-bigref_list_new_index(void)
-{
-	if (bigref_list.vacant_index == bigref_list.capacity)
-		bigref_list_increase_capacity();
-	uint16_t vacant_index = bigref_list.vacant_index;
-	bigref_list.vacant_index = bigref_list.refs[vacant_index];
-	return vacant_index;
+	assert(tuple->has_uploaded_refs);
+	mh_int_t pos = mh_tuple_uploaded_refs_find(tuple_uploaded_refs, tuple,
+						   0);
+	assert(pos != mh_end(tuple_uploaded_refs));
+	mh_tuple_uploaded_refs_del(tuple_uploaded_refs, pos, 0);
 }
 
 void
-tuple_ref_slow(struct tuple *tuple)
+tuple_upload_refs(struct tuple *tuple)
 {
-	assert(tuple->is_bigref || tuple->refs == TUPLE_REF_MAX);
-	if (! tuple->is_bigref) {
-		tuple->ref_index = bigref_list_new_index();
-		tuple->is_bigref = true;
-		bigref_list.refs[tuple->ref_index] = TUPLE_REF_MAX;
-	} else if (bigref_list.refs[tuple->ref_index] == BIGREF_MAX) {
-		panic("Tuple big reference counter overflow");
-	}
-	bigref_list.refs[tuple->ref_index]++;
+	assert(tuple->local_refs == TUPLE_LOCAL_REF_MAX);
+	uint32_t refs = tuple_ref_get_uploaded_refs(tuple);
+	tuple_ref_set_uploaded_refs(tuple, refs + TUPLE_UPLOAD_REFS);
+	tuple->has_uploaded_refs = true;
+	tuple->local_refs -= TUPLE_UPLOAD_REFS;
 }
 
 void
-tuple_unref_slow(struct tuple *tuple)
+tuple_acquire_refs(struct tuple *tuple)
 {
-	assert(tuple->is_bigref &&
-	       bigref_list.refs[tuple->ref_index] > TUPLE_REF_MAX);
-	if(--bigref_list.refs[tuple->ref_index] == TUPLE_REF_MAX) {
-		bigref_list.refs[tuple->ref_index] = bigref_list.vacant_index;
-		bigref_list.vacant_index = tuple->ref_index;
-		tuple->ref_index = TUPLE_REF_MAX;
-		tuple->is_bigref = false;
+	assert(tuple->local_refs == 0);
+	assert(tuple->has_uploaded_refs);
+	uint32_t refs = tuple_ref_get_uploaded_refs(tuple);
+	if (refs == TUPLE_UPLOAD_REFS) {
+		tuple_ref_drop_uploaded_refs(tuple);
+		tuple->has_uploaded_refs = false;
+	} else {
+		tuple_ref_set_uploaded_refs(tuple, refs - TUPLE_UPLOAD_REFS);
 	}
+	tuple->local_refs += TUPLE_UPLOAD_REFS;
 }
 
-/* }}} Bigref */
+size_t
+tuple_bigref_tuple_count()
+{
+	return tuple_uploaded_refs->size;
+}
 
 int
 tuple_init(field_name_hash_f hash)
@@ -323,7 +320,7 @@ tuple_init(field_name_hash_f hash)
 
 	box_tuple_last = NULL;
 
-	bigref_list_create();
+	tuple_uploaded_refs = mh_tuple_uploaded_refs_new();
 
 	if (coll_id_cache_init() != 0)
 		return -1;
@@ -389,7 +386,7 @@ tuple_free(void)
 
 	coll_id_cache_destroy();
 
-	bigref_list_destroy();
+	mh_tuple_uploaded_refs_delete(tuple_uploaded_refs);
 }
 
 /* {{{ tuple_field_* getters */
