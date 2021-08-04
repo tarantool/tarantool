@@ -18,7 +18,8 @@ local check_index_arg     = box.internal.check_index_arg
 local check_space_arg     = box.internal.check_space_arg
 local check_primary_index = box.internal.check_primary_index
 
-local decode_greeting = internal.decode_greeting
+local perform_request_impl          = internal.perform_request
+local perform_async_request_impl    = internal.perform_async_request
 
 local TIMEOUT_INFINITY = 500 * 365 * 86400
 local VSPACE_ID        = 281
@@ -79,7 +80,7 @@ local function establish_connection(host, port, timeout)
         s:close()
         return nil, err
     end
-    local greeting, err = decode_greeting(msg)
+    local greeting, err = internal.decode_greeting(msg)
     if not greeting then
         s:close()
         return nil, err
@@ -279,9 +280,9 @@ local function create_transport(host, port, user, password, callback,
         if err then
             return nil, err
         end
-        return internal.perform_async_request(requests, send_buf, buffer,
-                                              skip_header, method, on_push,
-                                              on_push_ctx, format, ...)
+        return perform_async_request_impl(requests, send_buf, buffer,
+                                          skip_header, method, on_push,
+                                          on_push_ctx, format, ...)
     end
 
     --
@@ -295,9 +296,9 @@ local function create_transport(host, port, user, password, callback,
         if err then
             return nil, err
         end
-        return internal.perform_request(timeout, requests, send_buf, buffer,
-                                        skip_header, method, on_push,
-                                        on_push_ctx, format, ...)
+        return perform_request_impl(timeout, requests, send_buf, buffer,
+                                    skip_header, method, on_push, on_push_ctx,
+                                    format, ...)
     end
 
     -- PROTOCOL STATE MACHINE (WORKER FIBER) --
