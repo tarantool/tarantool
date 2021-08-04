@@ -4356,6 +4356,15 @@ struct func_sql_builtin {
 	/** A bitmask of SQL flags. */
 	uint16_t flags;
 	/**
+	 * Description of the types of implementation arguments. Up to three
+	 * arguments are described, but this should be sufficient, since all
+	 * built-in SQL functions either have up to three arguments, or the
+	 * number of their arguments is not limited here (but limited globally).
+	 * If a function has an unlimited number of arguments, all arguments are
+	 * of the same type.
+	 */
+	enum field_type *param_list;
+	/**
 	 * A VDBE-memory-compatible call method.
 	 * SQL built-ins don't use func base class "call"
 	 * method to provide a best performance for SQL requests.

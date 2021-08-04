@@ -598,19 +598,9 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			assert(!ExprHasProperty(pExpr, EP_xIsSelect));
 			zId = pExpr->u.zToken;
 			nId = sqlStrlen30(zId);
-			struct func *func = sql_func_find(pExpr);
-			if (func == NULL) {
-				pParse->is_aborted = true;
-				pNC->nErr++;
-				return WRC_Abort;
-			}
-			bool is_agg = func->def->aggregate ==
-				      FUNC_AGGREGATE_GROUP;
-			assert(!is_agg || func->def->language ==
-					  FUNC_LANGUAGE_SQL_BUILTIN);
-			pExpr->type = func->def->returns;
-			if (sql_func_flag_is_set(func, SQL_FUNC_UNLIKELY) &&
-			    n == 2) {
+			uint32_t flags = sql_func_flags(zId);
+			bool is_agg = (flags & SQL_FUNC_AGG) != 0;
+			if ((flags & SQL_FUNC_UNLIKELY) != 0 && n == 2) {
 				ExprSetProperty(pExpr, EP_Unlikely | EP_Skip);
 				pExpr->iTable =
 					exprProbability(pList->a[1].pExpr);
@@ -623,20 +613,15 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 					pNC->nErr++;
 					return WRC_Abort;
 				}
-			} else if (sql_func_flag_is_set(func,
-							SQL_FUNC_UNLIKELY)) {
+			} else if ((flags & SQL_FUNC_UNLIKELY) != 0) {
 				ExprSetProperty(pExpr, EP_Unlikely | EP_Skip);
 				/*
 				 * unlikely() probability is
 				 * 0.0625, likely() is 0.9375
 				 */
-				pExpr->iTable = func->def->name[0] == 'u' ?
+				pExpr->iTable = zId[0] == 'u' ?
 						8388608 : 125829120;
 			}
-			assert(!func->def->is_deterministic ||
-			       (pNC->ncFlags & NC_IdxExpr) == 0);
-			if (func->def->is_deterministic)
-				ExprSetProperty(pExpr, EP_ConstFunc);
 			if (is_agg && (pNC->ncFlags & NC_AllowAgg) == 0) {
 				const char *err =
 					tt_sprintf("misuse of aggregate "\
@@ -649,6 +634,8 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			if (is_agg)
 				pNC->ncFlags &= ~NC_AllowAgg;
 			sqlWalkExprList(pWalker, pList);
+			if (pParse->is_aborted)
+				break;
 			if (is_agg) {
 				NameContext *pNC2 = pNC;
 				pExpr->op = TK_AGG_FUNCTION;
@@ -661,16 +648,25 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 					pExpr->op2++;
 					pNC2 = pNC2->pNext;
 				}
-				assert(func != NULL);
 				if (pNC2) {
 					pNC2->ncFlags |= NC_HasAgg;
-					if (sql_func_flag_is_set(func,
-							         SQL_FUNC_MIN |
-								 SQL_FUNC_MAX))
+					if ((flags & (SQL_FUNC_MIN |
+						      SQL_FUNC_MAX)) != 0)
 						pNC2->ncFlags |= NC_MinMaxAgg;
 				}
 				pNC->ncFlags |= NC_AllowAgg;
 			}
+			struct func *func = sql_func_find(pExpr);
+			if (func == NULL) {
+				pParse->is_aborted = true;
+				pNC->nErr++;
+				return WRC_Abort;
+			}
+			pExpr->type = func->def->returns;
+			assert(!func->def->is_deterministic ||
+			       (pNC->ncFlags & NC_IdxExpr) == 0);
+			if (func->def->is_deterministic)
+				ExprSetProperty(pExpr, EP_ConstFunc);
 			return WRC_Prune;
 		}
 	case TK_SELECT:
