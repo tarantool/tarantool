@@ -238,7 +238,7 @@ vy_stmt_set_flags(struct tuple *stmt, uint8_t flags)
 static inline uint8_t
 vy_stmt_n_upserts(struct tuple *stmt)
 {
-	assert(stmt->refs == 0);
+	assert(tuple_is_unreferenced(stmt));
 	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
 	return ((struct vy_stmt *)stmt)->n_upserts;
 }
@@ -342,7 +342,7 @@ vy_stmt_dup_lsregion(struct tuple *stmt, struct lsregion *lsregion,
 static inline bool
 vy_stmt_is_refable(struct tuple *stmt)
 {
-	return stmt->refs > 0;
+	return !tuple_is_unreferenced(stmt);
 }
 
 /**

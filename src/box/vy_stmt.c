@@ -99,7 +99,7 @@ static void
 vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
 	say_debug("%s(%p)", __func__, tuple);
-	assert(tuple->refs == 0);
+	assert(tuple_is_unreferenced(tuple));
 	/*
 	 * Turn off formats referencing in worker threads to avoid
 	 * multithread unsafe modifications of a reference
@@ -192,7 +192,7 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t data_offset, uint32_t bsize)
 	}
 	say_debug("vy_stmt_alloc(format = %d data_offset = %u, bsize = %u) = %p",
 		  format->id, data_offset, bsize, tuple);
-	tuple->refs = 1;
+	tuple_ref_init(tuple, 1);
 	tuple->format_id = tuple_format_id(format);
 	if (cord_is_main())
 		tuple_format_ref(format);
@@ -221,7 +221,7 @@ vy_stmt_dup(struct tuple *stmt)
 	assert(tuple_size(res) == tuple_size(stmt));
 	assert(res->data_offset == stmt->data_offset);
 	memcpy(res, stmt, tuple_size(stmt));
-	res->refs = 1;
+	tuple_ref_init(res, 1);
 	return res;
 }
 
@@ -248,7 +248,7 @@ vy_stmt_dup_lsregion(struct tuple *stmt, struct lsregion *lsregion,
 	 * The reference count here is set to 0 for an assertion if somebody
 	 * will try to unreference this statement.
 	 */
-	mem_stmt->refs = 0;
+	tuple_ref_init(mem_stmt, 0);
 	return mem_stmt;
 
 	/*

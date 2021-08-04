@@ -310,16 +310,21 @@ box_tuple_validate(box_tuple_t *tuple, box_tuple_format_t *format);
  */
 struct PACKED tuple
 {
-	union {
-		/** Reference counter. */
-		uint16_t refs;
-		struct {
-			/** Index of big reference counter. */
-			uint16_t ref_index : 15;
-			/** Big reference flag. */
-			bool is_bigref : 1;
-		};
-	};
+	/**
+	 * Local reference counter. After hitting the limit a part of this
+	 * counter is uploaded to external storage that is acquired back
+	 * when the counter falls back to zero.
+	 * Is always nonzero in normal reference counted tuples.
+	 * Must not be accessed directly, use @sa tuple_ref_init,
+	 * tuple_ref, tuple_unref instead.
+	 */
+	uint8_t local_refs;
+	/**
+	 * Flag that shows that the tuple has more references in separate
+	 * external storage, see @sa tuple_upload_refs and tuple_acquire_refs.
+	 * For private use only.
+	 */
+	bool has_uploaded_refs : 1;
 	/** Format identifier. */
 	uint16_t format_id;
 	/**
@@ -343,6 +348,50 @@ struct PACKED tuple
 	 * char raw[0];
 	 */
 };
+
+static_assert(sizeof(struct tuple) == 10, "Just to be sure");
+
+enum {
+	/** Maximal value of tuple::local_refs. */
+	TUPLE_LOCAL_REF_MAX = UINT8_MAX,
+};
+
+/**
+ * Initialize tuple reference counter to a given value.
+ * Should only be called for newly created uninitialized tuples.
+ *
+ * @param tuple Tuple to reference
+ * @param refs initial reference count to set.
+ */
+static inline void
+tuple_ref_init(struct tuple *tuple, uint8_t refs)
+{
+	tuple->local_refs = refs;
+	tuple->has_uploaded_refs = false;
+}
+
+/**
+ * Check that the tuple has zero references (i.e. has zero reference count).
+ * Note that direct (manual) modification of refs is prohibited, and internally
+ * tuples are immediately deleted after hitting zero reference count. Thus
+ * zero reference count can mean the following:
+ * 1. The tuple was created with zero count and haven't been referenced yet.
+ * 2. The tuple is designed not to be referenced, for example it is allocated
+ *  on different kind of allocator.
+ * 3. We are in tuple deallocation procedure that is started after reference
+ *  count became zero.
+ */
+static inline bool
+tuple_is_unreferenced(struct tuple *tuple)
+{
+	/*
+	 * There's no need to look at external storage of reference counts,
+	 * because by design when local_refs falls to zero the storage is
+	 * checked immediately and the tuple is either deleted or local_refs
+	 * is set to nonzero value (TUPLE_UPLOAD_REFS).
+	 */
+	return tuple->local_refs == 0;
+}
 
 /** Size of the tuple including size of struct tuple. */
 static inline size_t
@@ -459,7 +508,9 @@ static inline void
 tuple_delete(struct tuple *tuple)
 {
 	say_debug("%s(%p)", __func__, tuple);
-	assert(tuple->refs == 0);
+	assert(tuple->local_refs == 0);
+	assert(!tuple->has_uploaded_refs);
+	assert(!tuple->is_dirty);
 	struct tuple_format *format = tuple_format(tuple);
 	format->vtab.tuple_delete(format, tuple);
 }
@@ -1109,14 +1160,20 @@ tuple_field_uuid(struct tuple *tuple, int fieldno, struct tt_uuid *out)
 	return 0;
 }
 
-enum { TUPLE_REF_MAX = UINT16_MAX >> 1 };
-
 /**
- * Increase tuple big reference counter.
- * @param tuple Tuple to reference.
+ * Move a portion of reference counter from local_refs to external storage.
+ * Must be called when local_refs need to be incremented, but it is already
+ * at its storage limit (UINT8_MAX aka TUPLE_LOCAL_REF_MAX).
  */
 void
-tuple_ref_slow(struct tuple *tuple);
+tuple_upload_refs(struct tuple *tuple);
+
+/**
+ * Move a portion of reference counter from external storage to local_refs.
+ * Must be called when local_refs becomes zero after decrement.
+ */
+void
+tuple_acquire_refs(struct tuple *tuple);
 
 /**
  * Increment tuple reference counter.
@@ -1125,18 +1182,10 @@ tuple_ref_slow(struct tuple *tuple);
 static inline void
 tuple_ref(struct tuple *tuple)
 {
-	if (unlikely(tuple->refs >= TUPLE_REF_MAX))
-		tuple_ref_slow(tuple);
-	else
-		tuple->refs++;
+	if (unlikely(tuple->local_refs >= TUPLE_LOCAL_REF_MAX))
+		tuple_upload_refs(tuple);
+	tuple->local_refs++;
 }
-
-/**
- * Decrease tuple big reference counter.
- * @param tuple Tuple to reference.
- */
-void
-tuple_unref_slow(struct tuple *tuple);
 
 /**
  * Decrement tuple reference counter. If it has reached zero, free the tuple.
@@ -1146,14 +1195,20 @@ tuple_unref_slow(struct tuple *tuple);
 static inline void
 tuple_unref(struct tuple *tuple)
 {
-	assert(tuple->refs - 1 >= 0);
-	if (unlikely(tuple->is_bigref))
-		tuple_unref_slow(tuple);
-	else if (--tuple->refs == 0) {
-		assert(!tuple->is_dirty);
-		tuple_delete(tuple);
+	assert(tuple->local_refs >= 1);
+	if (--tuple->local_refs == 0) {
+		if (unlikely(tuple->has_uploaded_refs))
+			tuple_acquire_refs(tuple);
+		else
+			tuple_delete(tuple);
 	}
 }
+
+/**
+ * Get number of tuples that have uploaded references.
+ */
+size_t
+tuple_bigref_tuple_count();
 
 extern struct tuple *box_tuple_last;
 
