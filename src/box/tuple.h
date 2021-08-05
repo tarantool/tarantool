@@ -325,6 +325,12 @@ struct PACKED tuple
 	 * For private use only.
 	 */
 	bool has_uploaded_refs : 1;
+	/**
+	 * The tuple (if it's found in index for example) could be invisible
+	 * for current transactions. The flag means that the tuple must
+	 * be clarified by transaction engine.
+	 */
+	bool is_dirty : 1;
 	/** Format identifier. */
 	uint16_t format_id;
 	/**
@@ -335,13 +341,7 @@ struct PACKED tuple
 	/**
 	 * Offset to the MessagePack from the begin of the tuple.
 	 */
-	uint16_t data_offset : 15;
-	/**
-	 * The tuple (if it's found in index for example) could be invisible
-	 * for current transactions. The flag means that the tuple must
-	 * be clarified by transaction engine.
-	 */
-	bool is_dirty : 1;
+	uint16_t data_offset;
 	/**
 	 * Engine specific fields and offsets array concatenated
 	 * with MessagePack fields array.
