@@ -1489,14 +1489,14 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt)
 	size_t res = 0;
 	if (stmt->add_story != NULL) {
 		assert(stmt->add_story->add_stmt == stmt);
-		res += stmt->add_story->tuple->bsize;
+		res += tuple_bsize(stmt->add_story->tuple);
 		stmt->add_story->add_stmt = NULL;
 		stmt->add_story = NULL;
 	}
 	if (stmt->del_story != NULL) {
 		assert(stmt->del_story->del_stmt == stmt);
 		assert(stmt->next_in_del_list == NULL);
-		res -= stmt->del_story->tuple->bsize;
+		res -= tuple_bsize(stmt->del_story->tuple);
 		stmt->del_story->del_stmt = NULL;
 		stmt->del_story = NULL;
 	}

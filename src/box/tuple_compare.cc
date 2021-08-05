@@ -874,7 +874,7 @@ tuple_compare_with_key_sequential(struct tuple *tuple, hint_t tuple_hint,
 		 * Key's and tuple's first field_count fields are
 		 * equal, and their bsize too.
 		 */
-		key += tuple->bsize - mp_sizeof_array(field_count);
+		key += tuple_bsize(tuple) - mp_sizeof_array(field_count);
 		for (uint32_t i = field_count; i < part_count;
 		     ++i, mp_next(&key)) {
 			if (mp_typeof(*key) != MP_NIL)
