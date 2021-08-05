@@ -2,6 +2,7 @@
 #include "module.h"
 #include "uuid/mp_uuid.h"
 #include "mp_decimal.h"
+#include "lua/tnt_msgpuck.h"
 
 enum {
 	BUF_SIZE = 512,
@@ -29,7 +30,7 @@ ret_uuid(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	memset(&uuid, 0x11, sizeof(uuid));
 	char res[BUF_SIZE];
 	memset(res, '\0', BUF_SIZE);
-	char *end = mp_encode_uuid(res, &uuid);
+	char *end = tnt_mp_encode_uuid(res, &uuid);
 	box_return_mp(ctx, res, end);
 	return 0;
 }
@@ -43,7 +44,7 @@ ret_decimal(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	decimal_from_string(&dec, "9999999999999999999.9999999999999999999");
 	char res[BUF_SIZE];
 	memset(res, '\0', BUF_SIZE);
-	char *end = mp_encode_decimal(res, &dec);
+	char *end = tnt_mp_encode_decimal(res, &dec);
 	box_return_mp(ctx, res, end);
 	return 0;
 }
