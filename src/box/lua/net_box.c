@@ -436,7 +436,7 @@ netbox_decode_greeting(lua_State *L)
 }
 
 /**
- * communicate(fd, send_buf, recv_buf, limit_or_boundary, timeout)
+ * communicate(fd, send_buf, recv_buf, limit_or_boundary)
  *  -> errno, error
  *  -> nil, limit/boundary_pos
  *
@@ -467,15 +467,6 @@ netbox_communicate(lua_State *L)
 	else
 		limit = lua_tonumber(L, 4);
 
-	/* timeout */
-	ev_tstamp timeout = TIMEOUT_INFINITY;
-	if (lua_type(L, 5) == LUA_TNUMBER)
-		timeout = lua_tonumber(L, 5);
-	if (timeout < 0) {
-		lua_pushinteger(L, ER_TIMEOUT);
-		lua_pushstring(L, "Timeout exceeded");
-		return 2;
-	}
 	int revents = COIO_READ;
 	while (true) {
 		/* reader serviced first */
@@ -526,18 +517,10 @@ check_limit:
 				goto handle_error;
 		}
 
-		ev_tstamp deadline = ev_monotonic_now(loop()) + timeout;
 		ERROR_INJECT_YIELD(ERRINJ_NETBOX_IO_DELAY);
 		revents = coio_wait(fd, EV_READ | (ibuf_used(send_buf) != 0 ?
-				EV_WRITE : 0), timeout);
+				EV_WRITE : 0), TIMEOUT_INFINITY);
 		luaL_testcancel(L);
-		timeout = deadline - ev_monotonic_now(loop());
-		timeout = MAX(0.0, timeout);
-		if (revents == 0 && timeout == 0.0) {
-			lua_pushinteger(L, ER_TIMEOUT);
-			lua_pushstring(L, "Timeout exceeded");
-			return 2;
-		}
 	}
 handle_error:
 	lua_pushinteger(L, ER_NO_CONNECTION);

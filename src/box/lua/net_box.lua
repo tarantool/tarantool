@@ -581,12 +581,12 @@ local function create_transport(host, port, user, password, callback,
     end
 
     -- IO (WORKER FIBER) --
-    local function send_and_recv(limit_or_boundary, timeout)
+    local function send_and_recv(limit_or_boundary)
         return communicate(connection:fd(), send_buf, recv_buf,
-                           limit_or_boundary, timeout)
+                           limit_or_boundary)
     end
 
-    local function send_and_recv_iproto(timeout)
+    local function send_and_recv_iproto()
         local data_len = recv_buf.wpos - recv_buf.rpos
         local required
         if data_len < 5 then
@@ -603,17 +603,16 @@ local function create_transport(host, port, user, password, callback,
                 return nil, hdr, body_rpos, body_end
             end
         end
-        local deadline = fiber_clock() + (timeout or TIMEOUT_INFINITY)
-        local err, extra = send_and_recv(required, timeout)
+        local err, extra = send_and_recv(required)
         if err then
             return err, extra
         end
-        return send_and_recv_iproto(max(0, deadline - fiber_clock()))
+        return send_and_recv_iproto()
     end
 
-    local function send_and_recv_console(timeout)
+    local function send_and_recv_console()
         local delim = '\n...\n'
-        local err, delim_pos = send_and_recv(delim, timeout)
+        local err, delim_pos = send_and_recv(delim)
         if err then
             return err, delim_pos
         else
