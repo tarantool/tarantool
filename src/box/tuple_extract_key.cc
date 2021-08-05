@@ -95,7 +95,7 @@ tuple_extract_key_sequential(struct tuple *tuple, struct key_def *key_def,
 	assert(!has_optional_parts || key_def->is_nullable);
 	assert(has_optional_parts == key_def->has_optional_parts);
 	const char *data = tuple_data(tuple);
-	const char *data_end = data + tuple->bsize;
+	const char *data_end = data + tuple_bsize(tuple);
 	return tuple_extract_key_sequential_raw<has_optional_parts>(data,
 								    data_end,
 								    key_def,
@@ -127,7 +127,7 @@ tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
 	uint32_t bsize = mp_sizeof_array(part_count);
 	struct tuple_format *format = tuple_format(tuple);
 	const uint32_t *field_map = tuple_field_map(tuple);
-	const char *tuple_end = data + tuple->bsize;
+	const char *tuple_end = data + tuple_bsize(tuple);
 
 	/* Calculate the key size. */
 	for (uint32_t i = 0; i < part_count; ++i) {

@@ -1268,14 +1268,11 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	 * tuple is not the first field of the memtx_tuple.
 	 */
 	uint32_t data_offset = sizeof(struct tuple) + field_map_size;
-	if (data_offset > INT16_MAX) {
-		/** tuple->data_offset is 15 bits */
-		diag_set(ClientError, ER_TUPLE_METADATA_IS_TOO_BIG,
-			 data_offset);
+	if (tuple_check_data_offset(data_offset) != 0)
 		goto end;
-	}
 
 	size_t tuple_len = end - data;
+	assert(tuple_len <= UINT32_MAX); /* bsize is UINT32_MAX */
 	size_t total = sizeof(struct memtx_tuple) + field_map_size + tuple_len;
 
 	ERROR_INJECT(ERRINJ_TUPLE_ALLOC, {
@@ -1300,15 +1297,11 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 		goto end;
 	}
 	tuple = &memtx_tuple->base;
-	tuple_ref_init(tuple, 0);
+	tuple_create(tuple, 0, tuple_format_id(format),
+		     data_offset, tuple_len);
 	memtx_tuple->version = memtx->snapshot_version;
-	assert(tuple_len <= UINT32_MAX); /* bsize is UINT32_MAX */
-	tuple->bsize = tuple_len;
-	tuple->format_id = tuple_format_id(format);
 	tuple_format_ref(format);
-	tuple->data_offset = data_offset;
-	tuple->is_dirty = false;
-	char *raw = (char *) tuple + tuple->data_offset;
+	char *raw = (char *) tuple + data_offset;
 	field_map_build(&builder, raw - field_map_size);
 	memcpy(raw, data, tuple_len);
 	say_debug("%s(%zu) = %p", __func__, tuple_len, memtx_tuple);

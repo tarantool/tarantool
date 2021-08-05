@@ -315,8 +315,8 @@ struct PACKED tuple
 	 * counter is uploaded to external storage that is acquired back
 	 * when the counter falls back to zero.
 	 * Is always nonzero in normal reference counted tuples.
-	 * Must not be accessed directly, use @sa tuple_ref_init,
-	 * tuple_ref, tuple_unref instead.
+	 * Must not be accessed directly, use @sa tuple_create,
+	 * tuple_ref_init, tuple_ref, tuple_unref instead.
 	 */
 	uint8_t local_refs;
 	/**
@@ -334,12 +334,13 @@ struct PACKED tuple
 	/** Format identifier. */
 	uint16_t format_id;
 	/**
-	 * Length of the MessagePack data in raw part of the
-	 * tuple.
+	 * Length of the MessagePack data in raw part of the tuple.
+	 * Must be set in tuple_create and accessed by tuple_bsize etc.
 	 */
 	uint32_t bsize;
 	/**
 	 * Offset to the MessagePack from the begin of the tuple.
+	 * Must be set in tuple_init_default and accessed by tuple_data_offset.
 	 */
 	uint16_t data_offset;
 	/**
@@ -357,8 +358,54 @@ enum {
 };
 
 /**
+ * Check that data_offset is valid and can be stored in tuple.
+ * @param data_offset - see member description in struct tuple.
+ *
+ * @return 0 on success, -1 otherwise (diag is set).
+ */
+static inline int
+tuple_check_data_offset(uint32_t data_offset)
+{
+	if (data_offset > INT16_MAX) {
+		/** tuple->data_offset is 15 bits */
+		diag_set(ClientError, ER_TUPLE_METADATA_IS_TOO_BIG,
+			 data_offset);
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Initialize a tuple. Must be called right after allocation of a new tuple.
+ * Should only be called for newly created uninitialized tuples.
+ * If the tuple copied from another tuple and only initialization of reference
+ * count is needed, it's better to call tuple_ref_init.
+ * tuple_check_data_offset should be called before to ensure args are correct.
+ *
+ * @param tuple - Tuple to initialize.
+ * @param refs - initial reference count to set.
+ * @param format_id - see member description in struct tuple.
+ * @param data_offset - see member description in struct tuple.
+ * @param bsize - see member description in struct tuple.
+ * @return 0 on success, -1 on error (diag is set).
+ */
+static inline void
+tuple_create(struct tuple *tuple, uint8_t refs, uint16_t format_id,
+	     uint16_t data_offset, uint32_t bsize)
+{
+	assert(data_offset <= INT16_MAX);
+	tuple->local_refs = refs;
+	tuple->has_uploaded_refs = false;
+	tuple->is_dirty = false;
+	tuple->format_id = format_id;
+	tuple->data_offset = data_offset;
+	tuple->bsize = bsize;
+}
+
+/**
  * Initialize tuple reference counter to a given value.
  * Should only be called for newly created uninitialized tuples.
+ * For initialization of brand new tuples it's better to use tuple_create.
  *
  * @param tuple Tuple to reference
  * @param refs initial reference count to set.
@@ -393,12 +440,26 @@ tuple_is_unreferenced(struct tuple *tuple)
 	return tuple->local_refs == 0;
 }
 
+/** Offset to the MessagePack from the beginning of the tuple. */
+static inline uint16_t
+tuple_data_offset(struct tuple *tuple)
+{
+	return tuple->data_offset;
+}
+
+/** Size of MessagePack data of the tuple. */
+static inline size_t
+tuple_bsize(struct tuple *tuple)
+{
+	return tuple->bsize;
+}
+
 /** Size of the tuple including size of struct tuple. */
 static inline size_t
 tuple_size(struct tuple *tuple)
 {
 	/* data_offset includes sizeof(struct tuple). */
-	return tuple->data_offset + tuple->bsize;
+	return tuple_data_offset(tuple) + tuple_bsize(tuple);
 }
 
 /**
@@ -409,7 +470,7 @@ tuple_size(struct tuple *tuple)
 static inline const char *
 tuple_data(struct tuple *tuple)
 {
-	return (const char *) tuple + tuple->data_offset;
+	return (const char *) tuple + tuple_data_offset(tuple);
 }
 
 /**
@@ -430,8 +491,8 @@ tuple_data_or_null(struct tuple *tuple)
 static inline const char *
 tuple_data_range(struct tuple *tuple, uint32_t *p_size)
 {
-	*p_size = tuple->bsize;
-	return (const char *) tuple + tuple->data_offset;
+	*p_size = tuple_bsize(tuple);
+	return (const char *) tuple + tuple_data_offset(tuple);
 }
 
 /**
@@ -586,7 +647,7 @@ tuple_validate(struct tuple_format *format, struct tuple *tuple)
 static inline const uint32_t *
 tuple_field_map(struct tuple *tuple)
 {
-	return (const uint32_t *) ((const char *) tuple + tuple->data_offset);
+	return (const uint32_t *) tuple_data(tuple);
 }
 
 /**
