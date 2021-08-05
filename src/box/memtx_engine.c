@@ -1275,6 +1275,12 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	assert(tuple_len <= UINT32_MAX); /* bsize is UINT32_MAX */
 	size_t total = sizeof(struct memtx_tuple) + field_map_size + tuple_len;
 
+	bool make_compact = tuple_can_be_compact(data_offset, tuple_len);
+	if (make_compact) {
+		data_offset -= TUPLE_COMPACT_SAVINGS;
+		total -= TUPLE_COMPACT_SAVINGS;
+	}
+
 	ERROR_INJECT(ERRINJ_TUPLE_ALLOC, {
 		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
 		goto end;
@@ -1298,7 +1304,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	}
 	tuple = &memtx_tuple->base;
 	tuple_create(tuple, 0, tuple_format_id(format),
-		     data_offset, tuple_len);
+		     data_offset, tuple_len, make_compact);
 	memtx_tuple->version = memtx->snapshot_version;
 	tuple_format_ref(format);
 	char *raw = (char *) tuple + data_offset;

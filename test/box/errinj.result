@@ -462,7 +462,7 @@ errinj.set("ERRINJ_TUPLE_ALLOC", true)
 ...
 s:auto_increment{}
 ---
-- error: Failed to allocate 16 bytes in slab allocator for memtx_tuple
+- error: Failed to allocate 12 bytes in slab allocator for memtx_tuple
 ...
 s:select{}
 ---
@@ -470,7 +470,7 @@ s:select{}
 ...
 s:auto_increment{}
 ---
-- error: Failed to allocate 16 bytes in slab allocator for memtx_tuple
+- error: Failed to allocate 12 bytes in slab allocator for memtx_tuple
 ...
 s:select{}
 ---
@@ -478,7 +478,7 @@ s:select{}
 ...
 s:auto_increment{}
 ---
-- error: Failed to allocate 16 bytes in slab allocator for memtx_tuple
+- error: Failed to allocate 12 bytes in slab allocator for memtx_tuple
 ...
 s:select{}
 ---
@@ -492,7 +492,7 @@ box.begin()
     s:insert{1}
 box.commit();
 ---
-- error: Failed to allocate 16 bytes in slab allocator for memtx_tuple
+- error: Failed to allocate 12 bytes in slab allocator for memtx_tuple
 ...
 box.rollback();
 ---
@@ -506,7 +506,7 @@ box.begin()
     s:insert{2}
 box.commit();
 ---
-- error: Failed to allocate 16 bytes in slab allocator for memtx_tuple
+- error: Failed to allocate 12 bytes in slab allocator for memtx_tuple
 ...
 s:select{};
 ---
@@ -520,7 +520,7 @@ box.begin()
     s:insert{2}
 box.commit();
 ---
-- error: Failed to allocate 16 bytes in slab allocator for memtx_tuple
+- error: Failed to allocate 12 bytes in slab allocator for memtx_tuple
 ...
 s:select{};
 ---
@@ -539,7 +539,7 @@ box.begin()
     s:insert{2}
 box.commit();
 ---
-- error: Failed to allocate 16 bytes in slab allocator for memtx_tuple
+- error: Failed to allocate 12 bytes in slab allocator for memtx_tuple
 ...
 errinj.set("ERRINJ_TUPLE_ALLOC", false);
 ---
@@ -801,7 +801,7 @@ errinj.set("ERRINJ_TUPLE_ALLOC", true)
 ...
 s:replace{1, "test"}
 ---
-- error: Failed to allocate 21 bytes in slab allocator for memtx_tuple
+- error: Failed to allocate 17 bytes in slab allocator for memtx_tuple
 ...
 s:bsize()
 ---
@@ -813,7 +813,7 @@ utils.space_bsize(s)
 ...
 s:update({1}, {{'=', 3, '!'}})
 ---
-- error: Failed to allocate 20 bytes in slab allocator for memtx_tuple
+- error: Failed to allocate 16 bytes in slab allocator for memtx_tuple
 ...
 s:bsize()
 ---

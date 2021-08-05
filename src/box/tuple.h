@@ -334,19 +334,26 @@ struct PACKED tuple
 	/** Format identifier. */
 	uint16_t format_id;
 	/**
-	 * Length of the MessagePack data in raw part of the tuple.
-	 * Must be set in tuple_create and accessed by tuple_bsize etc.
+	 * A pair of fields for storing data offset and data bsize:
+	 * Data offset - to the MessagePack from the begin of the tuple.
+	 * Data bsize - length of the MessagePack data in raw part of the tuple.
+	 * These two values can be stored in bulky and compact modes.
+	 * In bulky mode offset is simple stored in data_offset_bsize_raw
+	 * member while bsize is stored in bsize_bulky.
+	 * In compact mode bsize_bulky is not used and both values are combined
+	 * in data_offset_bsize_raw: offset in high byte, bsize in low byte,
+	 * and the highest bit is set to 1 as a flag of compact mode.
+	 * They're for internal use only, must be set in tuple_create and
+	 * accessed by tuple_data_offset, tuple_bsize etc.
 	 */
-	uint32_t bsize;
-	/**
-	 * Offset to the MessagePack from the begin of the tuple.
-	 * Must be set in tuple_init_default and accessed by tuple_data_offset.
-	 */
-	uint16_t data_offset;
+	uint16_t data_offset_bsize_raw;
+	uint32_t bsize_bulky;
 	/**
 	 * Engine specific fields and offsets array concatenated
 	 * with MessagePack fields array.
 	 * char raw[0];
+	 * Note that in compact mode bsize_bulky is no used and dynamic data
+	 * can be written starting from bsize_bulky member.
 	 */
 };
 
@@ -355,6 +362,8 @@ static_assert(sizeof(struct tuple) == 10, "Just to be sure");
 enum {
 	/** Maximal value of tuple::local_refs. */
 	TUPLE_LOCAL_REF_MAX = UINT8_MAX,
+	/** The size that is unused in struct tuple in compact mode. */
+	TUPLE_COMPACT_SAVINGS = sizeof(((struct tuple *)(NULL))->bsize_bulky),
 };
 
 /**
@@ -376,6 +385,22 @@ tuple_check_data_offset(uint32_t data_offset)
 }
 
 /**
+ * Test whether the tuple can be stored compactly.
+ * @param data_offset - see member description in struct tuple.
+ * @param bsize - see member description in struct tuple.
+ * @return
+ */
+static inline bool
+tuple_can_be_compact(uint16_t data_offset, uint32_t bsize)
+{
+	/*
+	 * Compact mode requires data_offset to be 7 bits max and bsize
+	 * to be 8 bits max; see tuple::data_offset_bsize_raw for explanation.
+	 */
+	return data_offset <= INT8_MAX && bsize <= UINT8_MAX;
+}
+
+/**
  * Initialize a tuple. Must be called right after allocation of a new tuple.
  * Should only be called for newly created uninitialized tuples.
  * If the tuple copied from another tuple and only initialization of reference
@@ -387,19 +412,28 @@ tuple_check_data_offset(uint32_t data_offset)
  * @param format_id - see member description in struct tuple.
  * @param data_offset - see member description in struct tuple.
  * @param bsize - see member description in struct tuple.
+ * @param make_compact - construct compact tuple, see description in tuple.
  * @return 0 on success, -1 on error (diag is set).
  */
 static inline void
 tuple_create(struct tuple *tuple, uint8_t refs, uint16_t format_id,
-	     uint16_t data_offset, uint32_t bsize)
+	     uint16_t data_offset, uint32_t bsize, bool make_compact)
 {
 	assert(data_offset <= INT16_MAX);
 	tuple->local_refs = refs;
 	tuple->has_uploaded_refs = false;
 	tuple->is_dirty = false;
 	tuple->format_id = format_id;
-	tuple->data_offset = data_offset;
-	tuple->bsize = bsize;
+	if (make_compact) {
+		assert(tuple_can_be_compact(data_offset, bsize));
+		uint16_t combined = 0x8000;
+		combined |= data_offset << 8;
+		combined |= bsize;
+		tuple->data_offset_bsize_raw = combined;
+	} else {
+		tuple->data_offset_bsize_raw = data_offset;
+		tuple->bsize_bulky = bsize;
+	}
 }
 
 /**
@@ -440,18 +474,52 @@ tuple_is_unreferenced(struct tuple *tuple)
 	return tuple->local_refs == 0;
 }
 
+/** Check that the tuple is in compact mode. */
+static inline bool
+tuple_is_compact(struct tuple *tuple)
+{
+	return tuple->data_offset_bsize_raw & 0x8000;
+}
+
 /** Offset to the MessagePack from the beginning of the tuple. */
 static inline uint16_t
 tuple_data_offset(struct tuple *tuple)
 {
-	return tuple->data_offset;
+	uint16_t res = tuple->data_offset_bsize_raw;
+	/*
+	 * We have two variants depending on high bit of res (res & 0x8000):
+	 * 1) nonzero, compact mode, the result is in high byte, excluding
+	 *  high bit: (res & 0x7fff) >> 8.
+	 * 2) zero, bulky mode, the result is just res.
+	 * We could make `if` statement here, but it would cost too much.
+	 * We can make branchless code instead. We can rewrite the result:
+	 * 1) In compact mode: (res & 0x7fff) >> 8
+	 * 2) In bulky mode:   (res & 0x7fff) >> 0
+	 * Or, simply:
+	 * In any case mode: (res & 0x7fff) >> (8 * (is_compact ? 1 : 0)).
+	 * On the other hand the compact 0/1 bit can be simply acquired
+	 * by shifting res >> 15.
+	 */
+	uint16_t is_compact_bit = res >> 15;
+	res = (res & 0x7fff) >> (is_compact_bit * 8);
+#ifndef NDEBUG
+	uint16_t simple = (tuple->data_offset_bsize_raw & 0x8000) ?
+			  (tuple->data_offset_bsize_raw >> 8) & 0x7f :
+			  tuple->data_offset_bsize_raw;
+	assert(res == simple);
+#endif
+	return res;
 }
 
 /** Size of MessagePack data of the tuple. */
-static inline size_t
+static inline uint32_t
 tuple_bsize(struct tuple *tuple)
 {
-	return tuple->bsize;
+	if (tuple->data_offset_bsize_raw & 0x8000) {
+		return tuple->data_offset_bsize_raw & 0xff;
+	} else {
+		return tuple->bsize_bulky;
+	}
 }
 
 /** Size of the tuple including size of struct tuple. */

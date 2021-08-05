@@ -189,7 +189,7 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t data_offset, uint32_t bsize)
 	say_debug("vy_stmt_alloc(format = %d data_offset = %u, bsize = %u) = %p",
 		  format->id, data_offset, bsize, tuple);
 	tuple_create(tuple, 1, tuple_format_id(format),
-		     data_offset, bsize);
+		     data_offset, bsize, false);
 	if (cord_is_main())
 		tuple_format_ref(format);
 	vy_stmt_set_lsn(tuple, 0);
