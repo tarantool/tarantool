@@ -1192,6 +1192,11 @@ applier_subscribe(struct applier *applier)
 	struct vclock vclock;
 	vclock_create(&vclock);
 	vclock_copy(&vclock, &replicaset.vclock);
+
+	ERROR_INJECT(ERRINJ_REPLICASET_VCLOCK, {
+		vclock_create(&vclock);
+	});
+
 	/*
 	 * Stop accepting local rows coming from a remote
 	 * instance as soon as local WAL starts accepting writes.
