@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(28)
+test:plan(24)
 
 --
 -- Make sure that bit-wise operations can only accept UNSIGNED and posivite
@@ -54,15 +54,6 @@ test:do_catchsql_test(
         1, "Type mismatch: can not convert boolean(TRUE) to unsigned"
     })
 
-test:do_catchsql_test(
-    "gh-5364-1.7",
-    [[
-        SELECT 9 >> CAST('11111111-1111-1111-1111-111111111111' AS UUID);
-    ]], {
-        1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to unsigned"
-    })
-
 test:do_execsql_test(
     "gh-5364-2.1",
     [[
@@ -109,15 +100,6 @@ test:do_catchsql_test(
         SELECT 9 << true;
     ]], {
         1, "Type mismatch: can not convert boolean(TRUE) to unsigned"
-    })
-
-test:do_catchsql_test(
-    "gh-5364-2.7",
-    [[
-        SELECT 9 << CAST('11111111-1111-1111-1111-111111111111' AS UUID);
-    ]], {
-        1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to unsigned"
     })
 
 test:do_execsql_test(
@@ -168,15 +150,6 @@ test:do_catchsql_test(
         1, "Type mismatch: can not convert boolean(TRUE) to unsigned"
     })
 
-test:do_catchsql_test(
-    "gh-5364-3.7",
-    [[
-        SELECT 9 & CAST('11111111-1111-1111-1111-111111111111' AS UUID);
-    ]], {
-        1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to unsigned"
-    })
-
 test:do_execsql_test(
     "gh-5364-4.1",
     [[
@@ -223,15 +196,6 @@ test:do_catchsql_test(
         SELECT 9 | true;
     ]], {
         1, "Type mismatch: can not convert boolean(TRUE) to unsigned"
-    })
-
-test:do_catchsql_test(
-    "gh-5364-4.7",
-    [[
-        SELECT 9 | CAST('11111111-1111-1111-1111-111111111111' AS UUID);
-    ]], {
-        1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to unsigned"
     })
 
 test:finish_test()
