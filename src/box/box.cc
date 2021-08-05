@@ -3561,6 +3561,13 @@ box_cfg_xc(void)
 		bootstrap(&instance_uuid, &replicaset_uuid,
 			  &is_bootstrap_leader);
 	}
+
+	/*
+	 * replicaset.applier.vclock is filled with real
+	 * value where local restore has already completed
+	 */
+	vclock_copy(&replicaset.applier.vclock, &replicaset.vclock);
+
 	fiber_gc();
 
 	/*
