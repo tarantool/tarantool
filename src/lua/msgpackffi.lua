@@ -15,27 +15,27 @@ local cord_ibuf_drop = buffer.internal.cord_ibuf_drop
 
 ffi.cdef([[
 char *
-mp_encode_float(char *data, float num);
+tnt_mp_encode_float(char *data, float num);
 char *
-mp_encode_double(char *data, double num);
+tnt_mp_encode_double(char *data, double num);
 char *
-mp_encode_decimal(char *data, decimal_t *dec);
+tnt_mp_encode_decimal(char *data, decimal_t *dec);
 uint32_t
-mp_sizeof_decimal(const decimal_t *dec);
+tnt_mp_sizeof_decimal(const decimal_t *dec);
 char *
-mp_encode_uuid(char *data, const struct tt_uuid *uuid);
+tnt_mp_encode_uuid(char *data, const struct tt_uuid *uuid);
 uint32_t
-mp_sizeof_uuid();
+tnt_mp_sizeof_uuid();
 uint32_t
-mp_sizeof_error(const struct error *error);
+tnt_mp_sizeof_error(const struct error *error);
 char *
-mp_encode_error(char *data, const struct error *error);
+tnt_mp_encode_error(char *data, const struct error *error);
 float
-mp_decode_float(const char **data);
+tnt_mp_decode_float(const char **data);
 double
-mp_decode_double(const char **data);
+tnt_mp_decode_double(const char **data);
 uint32_t
-mp_decode_extl(const char **data, int8_t *type);
+tnt_mp_decode_extl(const char **data, int8_t *type);
 decimal_t *
 decimal_unpack(const char **data, uint32_t len, decimal_t *dec);
 struct tt_uuid *
@@ -132,22 +132,22 @@ end
 
 local function encode_float(buf, num)
     local p = buf:alloc(5)
-    builtin.mp_encode_float(p, num)
+    builtin.tnt_mp_encode_float(p, num)
 end
 
 local function encode_double(buf, num)
     local p = buf:alloc(9)
-    builtin.mp_encode_double(p, num)
+    builtin.tnt_mp_encode_double(p, num)
 end
 
 local function encode_decimal(buf, num)
-    local p = buf:alloc(builtin.mp_sizeof_decimal(num))
-    builtin.mp_encode_decimal(p, num)
+    local p = buf:alloc(builtin.tnt_mp_sizeof_decimal(num))
+    builtin.tnt_mp_encode_decimal(p, num)
 end
 
 local function encode_uuid(buf, uuid)
-    local p = buf:alloc(builtin.mp_sizeof_uuid())
-    builtin.mp_encode_uuid(p, uuid)
+    local p = buf:alloc(builtin.tnt_mp_sizeof_uuid())
+    builtin.tnt_mp_encode_uuid(p, uuid)
 end
 
 local function encode_int(buf, num)
@@ -229,8 +229,8 @@ end
 
 local function encode_error(buf, err)
     if msgpack.cfg.encode_error_as_ext then
-        local p = buf:alloc(builtin.mp_sizeof_error(err))
-        builtin.mp_encode_error(p, err)
+        local p = buf:alloc(builtin.tnt_mp_sizeof_error(err))
+        builtin.tnt_mp_encode_error(p, err)
     else
         encode_str(buf, err.message)
     end
@@ -479,13 +479,13 @@ else
 end
 
 local function decode_float(data)
-    data[0] = data[0] - 1 -- mp_decode_float need type code
-    return tonumber(builtin.mp_decode_float(data))
+    data[0] = data[0] - 1 -- tnt_mp_decode_float need type code
+    return tonumber(builtin.tnt_mp_decode_float(data))
 end
 
 local function decode_double(data)
-    data[0] = data[0] - 1 -- mp_decode_double need type code
-    return tonumber(builtin.mp_decode_double(data))
+    data[0] = data[0] - 1 -- tnt_mp_decode_double need type code
+    return tonumber(builtin.tnt_mp_decode_double(data))
 end
 
 local function decode_str(data, size)
@@ -549,10 +549,10 @@ local ext_decoder = {
 
 local function decode_ext(data)
     local t = ffi.new("int8_t[1]")
-    -- mp_decode_extl and mp_decode_decimal
+    -- tnt_mp_decode_extl and tnt_mp_decode_decimal
     -- need type code
     data[0] = data[0] - 1
-    local len = builtin.mp_decode_extl(data, t)
+    local len = builtin.tnt_mp_decode_extl(data, t)
     local fun = ext_decoder[t[0]]
     if type(fun) == 'function' then
         return fun(data, len)

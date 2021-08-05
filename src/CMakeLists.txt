@@ -125,6 +125,7 @@ set (server_sources
      lua/serializer.c
      lua/errno.c
      lua/tnt_iconv.c
+     lua/tnt_msgpuck.c
      lua/tnt_readline.c
      lua/error.c
      lua/socket.c

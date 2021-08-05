@@ -2,6 +2,7 @@
 #include "module.h"
 #include "mp_decimal.h"
 #include "mp_extension_types.h"
+#include "lua/tnt_msgpuck.h"
 
 enum {
 	BUF_SIZE = 512,
@@ -42,7 +43,7 @@ ret_dec(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	decimal_from_string(&dec, "111");
 	char res[BUF_SIZE];
 	memset(res, '\0', BUF_SIZE);
-	char *end = mp_encode_decimal(res, &dec);
+	char *end = tnt_mp_encode_decimal(res, &dec);
 	box_return_mp(ctx, res, end);
 	return 0;
 }
