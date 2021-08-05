@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(35)
+test:plan(30)
 
 --
 -- Make sure that arithmetic operations can only accept numeric values. Also,
@@ -54,15 +54,6 @@ test:do_catchsql_test(
         1, "Type mismatch: can not convert boolean(TRUE) to number"
     })
 
-test:do_catchsql_test(
-    "gh-5756-1.7",
-    [[
-        SELECT 9 + CAST('11111111-1111-1111-1111-111111111111' AS UUID);
-    ]], {
-        1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to number"
-    })
-
 test:do_execsql_test(
     "gh-5756-2.1",
     [[
@@ -109,15 +100,6 @@ test:do_catchsql_test(
         SELECT 9 - true;
     ]], {
         1, "Type mismatch: can not convert boolean(TRUE) to number"
-    })
-
-test:do_catchsql_test(
-    "gh-5756-2.7",
-    [[
-        SELECT 9 - CAST('11111111-1111-1111-1111-111111111111' AS UUID);
-    ]], {
-        1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to number"
     })
 
 test:do_execsql_test(
@@ -168,15 +150,6 @@ test:do_catchsql_test(
         1, "Type mismatch: can not convert boolean(TRUE) to number"
     })
 
-test:do_catchsql_test(
-    "gh-5756-3.7",
-    [[
-        SELECT 9 * CAST('11111111-1111-1111-1111-111111111111' AS UUID);
-    ]], {
-        1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to number"
-    })
-
 test:do_execsql_test(
     "gh-5756-4.1",
     [[
@@ -225,15 +198,6 @@ test:do_catchsql_test(
         1, "Type mismatch: can not convert boolean(TRUE) to number"
     })
 
-test:do_catchsql_test(
-    "gh-5756-4.7",
-    [[
-        SELECT 9 / CAST('11111111-1111-1111-1111-111111111111' AS UUID);
-    ]], {
-        1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to number"
-    })
-
 test:do_execsql_test(
     "gh-5756-5.1",
     [[
@@ -280,15 +244,6 @@ test:do_catchsql_test(
         SELECT 9 % true;
     ]], {
         1, "Type mismatch: can not convert boolean(TRUE) to integer"
-    })
-
-test:do_catchsql_test(
-    "gh-5756-5.7",
-    [[
-        SELECT 9 % CAST('11111111-1111-1111-1111-111111111111' AS UUID);
-    ]], {
-        1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to integer"
     })
 
 test:finish_test()
