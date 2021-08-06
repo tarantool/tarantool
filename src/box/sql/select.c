@@ -5617,6 +5617,10 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 			vdbe_insert_distinct(pParse, pF->iDistinct, pF->reg_eph,
 					     addrNext, 1, regAgg);
 		}
+		if (sql_emit_args_types(v, regAgg, pF->func, nArg) != 0) {
+			pParse->is_aborted = true;
+			return;
+		}
 		if (sql_func_flag_is_set(pF->func, SQL_FUNC_NEEDCOLL)) {
 			struct coll *coll = NULL;
 			struct ExprList_item *pItem;

@@ -137,6 +137,29 @@ sql_expr_type(struct Expr *pExpr)
 	return pExpr->type;
 }
 
+int
+sql_emit_args_types(struct Vdbe *v, int reg, struct func *base, uint32_t argc)
+{
+	if (argc == 0 || base->def->language != FUNC_LANGUAGE_SQL_BUILTIN)
+		return 0;
+	struct func_sql_builtin *func = (struct func_sql_builtin *)base;
+	if (func->base.def->param_count > 0) {
+		sqlVdbeAddOp4(v, OP_ApplyType, reg, argc, 0,
+			      (char *)func->param_list, P4_STATIC);
+		return 0;
+	}
+	assert(func->base.def->param_count == -1);
+	uint32_t size = argc * sizeof(enum field_type);
+	enum field_type *types = sqlDbMallocRawNN(sql_get(), size);
+	if (types == NULL)
+		return -1;
+	enum field_type type = func->param_list[0];
+	for (uint32_t i = 0; i < argc; ++i)
+		types[i] = type;
+	sqlVdbeAddOp4(v, OP_ApplyType, reg, argc, 0, (char *)types, P4_DYNAMIC);
+	return 0;
+}
+
 enum field_type *
 field_type_sequence_dup(struct Parse *parse, enum field_type *types,
 			uint32_t len)
@@ -4075,6 +4098,10 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				sqlExprCachePop(pParse);	/* Ticket 2ea2425d34be */
 			} else {
 				r1 = 0;
+			}
+			if (sql_emit_args_types(v, r1, func, nFarg) != 0) {
+				pParse->is_aborted = true;
+				return 0;
 			}
 			if (sql_func_flag_is_set(func, SQL_FUNC_NEEDCOLL)) {
 				sqlVdbeAddOp4(v, OP_CollSeq, 0, 0, 0,
