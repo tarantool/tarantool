@@ -25,7 +25,7 @@ test:do_test(
     "badutf-1.1",
     function()
         --test:execsql "PRAGMA encoding='UTF8'"
-        return test:execsql2("SELECT hex('\x80') AS x")
+        return test:execsql2("SELECT hex(x'80') AS x")
     end, {
         -- <badutf-1.1>
         "X", "80"
@@ -35,7 +35,7 @@ test:do_test(
 test:do_test(
     "badutf-1.2",
     function()
-        return test:execsql2("SELECT hex('\x81') AS x")
+        return test:execsql2("SELECT hex(x'81') AS x")
     end, {
         -- <badutf-1.2>
         "X", "81"
@@ -45,7 +45,7 @@ test:do_test(
 test:do_test(
     "badutf-1.3",
     function()
-        return test:execsql2("SELECT hex('\xbf') AS x")
+        return test:execsql2("SELECT hex(x'bf') AS x")
     end, {
         -- <badutf-1.3>
         "X", "BF"
@@ -55,7 +55,7 @@ test:do_test(
 test:do_test(
     "badutf-1.4",
     function()
-        return test:execsql2("SELECT hex('\xc0') AS x")
+        return test:execsql2("SELECT hex(x'c0') AS x")
     end, {
         -- <badutf-1.4>
         "X", "C0"
@@ -65,7 +65,7 @@ test:do_test(
 test:do_test(
     "badutf-1.5",
     function()
-        return test:execsql2("SELECT hex('\xe0') AS x")
+        return test:execsql2("SELECT hex(x'e0') AS x")
     end, {
         -- <badutf-1.5>
         "X", "E0"
@@ -75,7 +75,7 @@ test:do_test(
 test:do_test(
     "badutf-1.6",
     function()
-        return test:execsql2("SELECT hex('\xf0') AS x")
+        return test:execsql2("SELECT hex(x'f0') AS x")
     end, {
         -- <badutf-1.6>
         "X", "F0"
@@ -85,7 +85,7 @@ test:do_test(
 test:do_test(
     "badutf-1.7",
     function()
-        return test:execsql2("SELECT hex('\xff') AS x")
+        return test:execsql2("SELECT hex(x'ff') AS x")
     end, {
         -- <badutf-1.7>
         "X", "FF"
@@ -304,7 +304,7 @@ test:do_test(
 test:do_test(
     "badutf-4.1",
     function()
-        return test:execsql2("SELECT hex(TRIM('\x80\xff' FROM '\x80\x80\x80\xf0\x80\x80\x80\xff')) AS x")
+        return test:execsql2([[SELECT hex(CAST(TRIM(x'80ff' FROM x'808080f0808080ff') AS VARBINARY)) AS x]])
     end, {
         -- <badutf-4.1>
         "X", "F0"
@@ -314,7 +314,8 @@ test:do_test(
 test:do_test(
     "badutf-4.2",
     function()
-        return test:execsql2("SELECT hex(TRIM(LEADING '\x80\xff' FROM '\x80\x80\x80\xf0\x80\x80\x80\xff')) AS x")
+        return test:execsql2([[SELECT hex(CAST(TRIM(LEADING x'80ff' FROM ]]..
+                             [[x'808080f0808080ff') AS VARBINARY)) AS x]])
     end, {
         -- <badutf-4.2>
         "X", "F0808080FF"
@@ -324,7 +325,8 @@ test:do_test(
 test:do_test(
     "badutf-4.3",
     function()
-        return test:execsql2("SELECT hex(TRIM(TRAILING '\x80\xff' FROM '\x80\x80\x80\xf0\x80\x80\x80\xff')) AS x")
+        return test:execsql2([[SELECT hex(CAST(TRIM(TRAILING x'80ff' FROM ]]..
+                             [[x'808080f0808080ff') AS VARBINARY)) AS x]])
     end, {
         -- <badutf-4.3>
         "X", "808080F0"
@@ -334,7 +336,8 @@ test:do_test(
 test:do_test(
     "badutf-4.4",
     function()
-        return test:execsql2("SELECT hex(TRIM('\xff\x80' FROM '\x80\x80\x80\xf0\x80\x80\x80\xff')) AS x")
+        return test:execsql2([[SELECT hex(CAST(TRIM(x'ff80' FROM ]]..
+                             [[x'808080f0808080ff') AS VARBINARY)) AS x]])
     end, {
         -- <badutf-4.4>
         "X", "808080F0808080FF"
@@ -344,7 +347,8 @@ test:do_test(
 test:do_test(
     "badutf-4.5",
     function()
-        return test:execsql2("SELECT hex(TRIM('\xff\x80' FROM '\xff\x80\x80\xf0\x80\x80\x80\xff')) AS x")
+        return test:execsql2([[SELECT hex(CAST(TRIM(x'ff80' FROM ]]..
+                             [[x'ff8080f0808080ff') AS VARBINARY)) AS x]])
     end, {
         -- <badutf-4.5>
         "X", "80F0808080FF"
@@ -354,7 +358,8 @@ test:do_test(
 test:do_test(
     "badutf-4.6",
     function()
-        return test:execsql2("SELECT hex(TRIM('\xff\x80' FROM '\xff\x80\xf0\x80\x80\x80\xff')) AS x")
+        return test:execsql2([[SELECT hex(CAST(TRIM(x'ff80' FROM ]]..
+                             [[x'ff80f0808080ff') AS VARBINARY)) AS x]])
     end, {
         -- <badutf-4.6>
         "X", "F0808080FF"
@@ -364,7 +369,8 @@ test:do_test(
 test:do_test(
     "badutf-4.7",
     function()
-        return test:execsql2("SELECT hex(TRIM('\xff\x80\x80' FROM '\xff\x80\xf0\x80\x80\x80\xff')) AS x")
+        return test:execsql2([[SELECT hex(CAST(TRIM(x'ff8080' FROM ]]..
+                             [[x'ff80f0808080ff') AS VARBINARY)) AS x]])
     end, {
         -- <badutf-4.7>
         "X", "FF80F0808080FF"

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(14694)
+test:plan(14686)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -94,7 +94,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-1.4",
     [[
-        SELECT coalesce(length(a),-1) FROM t2
+        SELECT coalesce(length(CAST(a AS STRING)),-1) FROM t2
     ]], {
         -- <func-1.4>
         1, -1, 3, -1, 5
@@ -356,7 +356,7 @@ test:do_test(
     "func-4.1",
     function()
         test:execsql([[
-            CREATE TABLE t1(id integer primary key, a INT,b NUMBER,c NUMBER);
+            CREATE TABLE t1(id integer primary key, a INT,b DOUBLE,c DOUBLE);
             INSERT INTO t1(id, a,b,c) VALUES(1, 1,2,3);
             INSERT INTO t1(id, a,b,c) VALUES(2, 2,1.2345678901234,-12345.67890);
             INSERT INTO t1(id, a,b,c) VALUES(3, 3,-2,-5);
@@ -411,13 +411,13 @@ test:do_execsql_test(
         -- </func-4.4.1>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "func-4.4.2",
     [[
         SELECT abs(t1) FROM tbl1
     ]], {
         -- <func-4.4.2>
-        0.0, 0.0, 0.0, 0.0, 0.0
+        1, "Failed to execute SQL statement: wrong arguments for function ABS()"
         -- </func-4.4.2>
     })
 
@@ -501,13 +501,13 @@ test:do_execsql_test(
         -- </func-4.12>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "func-4.13",
     [[
         SELECT round(t1,2) FROM tbl1
     ]], {
         -- <func-4.13>
-        0.0, 0.0, 0.0, 0.0, 0.0
+        1, "Failed to execute SQL statement: wrong arguments for function ROUND()"
         -- </func-4.13>
     })
 
@@ -759,16 +759,6 @@ test:do_execsql_test(
         -- </func-5.2>
     })
 
-test:do_execsql_test(
-    "func-5.3",
-    [[
-        SELECT upper(a), lower(a) FROM t2
-    ]], {
-        -- <func-5.3>
-        "1","1","","","345","345","","","67890","67890"
-        -- </func-5.3>
-    })
-
 
 
 test:do_catchsql_test(
@@ -791,16 +781,6 @@ test:do_execsql_test(
         -- <func-6.1>
         1, "xyz", 345, "xyz", 67890
         -- </func-6.1>
-    })
-
-test:do_execsql_test(
-    "func-6.2",
-    [[
-        SELECT coalesce(upper(a),'nil') FROM t2
-    ]], {
-        -- <func-6.2>
-        "1","nil","345","nil","67890"
-        -- </func-6.2>
     })
 
 test:do_execsql_test(
@@ -1013,7 +993,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-9.11-utf8",
     [[
-        SELECT hex(replace('abcdefg','ef','12'))
+        SELECT HEX(CAST(replace('abcdefg','ef','12') AS VARBINARY))
     ]], {
     -- <func-9.11-utf8>
     "61626364313267"
@@ -1023,7 +1003,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-9.12-utf8",
     [[
-        SELECT hex(replace('abcdefg','','12'))
+        SELECT HEX(CAST(replace('abcdefg','','12') AS VARBINARY))
     ]], {
     -- <func-9.12-utf8>
     "61626364656667"
@@ -1033,7 +1013,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-9.13-utf8",
     [[
-        SELECT hex(replace('aabcdefg','a','aaa'))
+        SELECT HEX(CAST(replace('aabcdefg','a','aaa') AS VARBINARY))
     ]], {
     -- <func-9.13-utf8>
     "616161616161626364656667"
@@ -2018,37 +1998,6 @@ test:do_execsql_test(
         -- </func-22.13>
     })
 
---if X(1091, "X!cmd", "[\"expr\",\"[db one {PRAGMA encoding}]==\\\"UTF-8\\\"\"]") then
-test:do_execsql_test(
-    "func-22.14",
-    [[
-        SELECT hex(TRIM(x'6162e1bfbfc280' FROM x'c280e1bfbff48fbfbf6869'))
-    ]], {
-        -- <func-22.14>
-        "F48FBFBF6869"
-        -- </func-22.14>
-    })
-
-test:do_execsql_test(
-    "func-22.15",
-    [[SELECT hex(TRIM(x'6162e1bfbfc280f48fbfbf'
-                      FROM x'6869c280e1bfbff48fbfbf61'))]], {
-        -- <func-22.15>
-        "6869"
-        -- </func-22.15>
-    })
-
-test:do_execsql_test(
-    "func-22.16",
-    [[
-        SELECT hex(TRIM(x'ceb1' FROM x'ceb1ceb2ceb3'));
-    ]], {
-        -- <func-22.16>
-        "CEB2CEB3"
-        -- </func-22.16>
-    })
-
---end
 test:do_execsql_test(
     "func-22.20",
     [[
@@ -2243,24 +2192,6 @@ test:do_catchsql_test(
         1, "Syntax error at line 1 near 'FROM'"
         -- </func-22.38>
     })
-
-test:do_execsql_test(
-    "func-22.39",
-    [[
-        SELECT HEX(TRIM(X'004420'))
-    ]], { "4420"  })
-
-test:do_execsql_test(
-    "func-22.40",
-    [[
-        SELECT HEX(TRIM(X'00442000'))
-    ]], { "4420"  })
-
-test:do_execsql_test(
-    "func-22.41",
-    [[
-        SELECT HEX(TRIM(X'442000'))
-    ]], { "4420"  })
 
 -- This is to test the deprecated sql_aggregate_count() API.
 --
@@ -2870,7 +2801,7 @@ test:do_execsql_test(
 -- HEX
 test:do_execsql_test(
     "func-68",
-    "SELECT HEX(CHAR(00,65,00,65,00));",
+    "SELECT HEX(CAST(CHAR(00,65,00,65,00) AS VARBINARY));",
     {'0041004100'})
 
 -- TRIM
@@ -2931,7 +2862,7 @@ test:do_catchsql_test(
         SELECT ROUND(X'FF')
     ]], {
         -- <func-76.1>
-        1, "Type mismatch: can not convert varbinary(x'FF') to number"
+        1, "Failed to execute SQL statement: wrong arguments for function ROUND()"
         -- </func-76.1>
     })
 
@@ -2941,7 +2872,7 @@ test:do_catchsql_test(
         SELECT RANDOMBLOB(X'FF')
     ]], {
         -- <func-76.2>
-        1, "Type mismatch: can not convert varbinary(x'FF') to number"
+        1, "Failed to execute SQL statement: wrong arguments for function RANDOMBLOB()"
         -- </func-76.2>
     })
 
@@ -2951,7 +2882,7 @@ test:do_catchsql_test(
         SELECT SOUNDEX(X'FF')
     ]], {
         -- <func-76.3>
-        1, "Type mismatch: can not convert varbinary(x'FF') to string"
+        1, "Failed to execute SQL statement: wrong arguments for function SOUNDEX()"
         -- </func-76.3>
     })
 

@@ -229,7 +229,7 @@ test:do_catchsql_test(
     [[
         SELECT ABS(u) from t2;
     ]], {
-        1, "Inconsistent types: expected number got uuid('11111111-1111-1111-1111-111111111111')"
+        1, "Failed to execute SQL statement: wrong arguments for function ABS()"
     })
 
 test:do_catchsql_test(
@@ -240,28 +240,28 @@ test:do_catchsql_test(
         1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to number"
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-6.1.3",
     [[
         SELECT CHAR(u) from t2;
     ]], {
-        "\0", "\0", "\0"
+        1, "Failed to execute SQL statement: wrong arguments for function CHAR()"
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-6.1.4",
     [[
         SELECT CHARACTER_LENGTH(u) from t2;
     ]], {
-        36, 36, 36
+        1, "Failed to execute SQL statement: wrong arguments for function CHARACTER_LENGTH()"
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-6.1.5",
     [[
         SELECT CHAR_LENGTH(u) from t2;
     ]], {
-        36, 36, 36
+        1, "Failed to execute SQL statement: wrong arguments for function CHAR_LENGTH()"
     })
 
 test:do_execsql_test(
@@ -298,14 +298,12 @@ test:do_execsql_test(
         "22222222-1111-1111-1111-111111111111"
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-6.1.10",
     [[
         SELECT HEX(u) from t2;
     ]], {
-        "11111111111111111111111111111111",
-        "11111111333311111111111111111111",
-        "22222222111111111111111111111111"
+        1, "Failed to execute SQL statement: wrong arguments for function HEX()"
     })
 
 test:do_execsql_test(
@@ -324,12 +322,12 @@ test:do_execsql_test(
         uuid1
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-6.1.13",
     [[
         SELECT LENGTH(u) from t2;
     ]], {
-        36, 36, 36
+        1, "Failed to execute SQL statement: wrong arguments for function LENGTH()"
     })
 
 test:do_catchsql_test(
@@ -337,7 +335,7 @@ test:do_catchsql_test(
     [[
         SELECT u LIKE 'a' from t2;
     ]], {
-        1, "Inconsistent types: expected string got uuid('11111111-1111-1111-1111-111111111111')"
+        1, "Failed to execute SQL statement: wrong arguments for function LIKE()"
     })
 
 test:do_execsql_test(
@@ -356,14 +354,12 @@ test:do_execsql_test(
         uuid1, uuid3, uuid2
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-6.1.17",
     [[
         SELECT LOWER(u) from t2;
     ]], {
-        "11111111-1111-1111-1111-111111111111",
-        "11111111-3333-1111-1111-111111111111",
-        "22222222-1111-1111-1111-111111111111"
+        1, "Failed to execute SQL statement: wrong arguments for function LOWER()"
     })
 
 test:do_execsql_test(
@@ -395,15 +391,15 @@ test:do_catchsql_test(
     [[
         SELECT POSITION(u, '1') from t2;
     ]], {
-        1, "Inconsistent types: expected string or varbinary got uuid('11111111-1111-1111-1111-111111111111')"
+        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-6.1.22",
     [[
         SELECT RANDOMBLOB(u) from t2;
     ]], {
-        "", "", ""
+        1, "Failed to execute SQL statement: wrong arguments for function RANDOMBLOB()"
     })
 
 test:do_execsql_test(
@@ -421,15 +417,15 @@ test:do_catchsql_test(
     [[
         SELECT ROUND(u) from t2;
     ]], {
-        1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to number"
+        1, "Failed to execute SQL statement: wrong arguments for function ROUND()"
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-6.1.25",
     [[
         SELECT SOUNDEX(u) from t2;
     ]], {
-        "?000", "?000", "?000"
+        1, "Failed to execute SQL statement: wrong arguments for function SOUNDEX()"
     })
 
 test:do_execsql_test(
@@ -474,12 +470,12 @@ test:do_execsql_test(
         "uuid", "uuid", "uuid"
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-6.1.31",
     [[
         SELECT UNICODE(u) from t2;
     ]], {
-        49, 49, 50
+        1, "Failed to execute SQL statement: wrong arguments for function UNICODE()"
     })
 
 test:do_execsql_test(
@@ -490,14 +486,12 @@ test:do_execsql_test(
         uuid1, uuid3, uuid2
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-6.1.33",
     [[
         SELECT UPPER(u) from t2;
     ]], {
-        "11111111-1111-1111-1111-111111111111",
-        "11111111-3333-1111-1111-111111111111",
-        "22222222-1111-1111-1111-111111111111"
+        1, "Failed to execute SQL statement: wrong arguments for function UPPER()"
     })
 
 test:do_catchsql_test(
@@ -1282,7 +1276,7 @@ test:do_catchsql_test(
     [[
         SELECT uuid('asd');
     ]], {
-        1, "Type mismatch: can not convert string('asd') to integer"
+        1, "Failed to execute SQL statement: wrong arguments for function UUID()"
     })
 
 test:do_catchsql_test(

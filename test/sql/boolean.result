@@ -282,29 +282,17 @@ SELECT is_boolean('true');
 SELECT abs(a) FROM t0;
  | ---
  | - null
- | - 'Inconsistent types: expected number got boolean(FALSE)'
+ | - 'Failed to execute SQL statement: wrong arguments for function ABS()'
  | ...
 SELECT lower(a) FROM t0;
  | ---
- | - metadata:
- |   - name: COLUMN_1
- |     type: string
- |   rows:
- |   - ['false']
- |   - ['true']
- |   - [null]
- |   - [null]
+ | - null
+ | - 'Failed to execute SQL statement: wrong arguments for function LOWER()'
  | ...
 SELECT upper(a) FROM t0;
  | ---
- | - metadata:
- |   - name: COLUMN_1
- |     type: string
- |   rows:
- |   - ['FALSE']
- |   - ['TRUE']
- |   - [null]
- |   - [null]
+ | - null
+ | - 'Failed to execute SQL statement: wrong arguments for function UPPER()'
  | ...
 SELECT quote(a) FROM t0;
  | ---
@@ -320,14 +308,8 @@ SELECT quote(a) FROM t0;
 -- gh-4462: LENGTH didn't take BOOLEAN arguments.
 SELECT length(a) FROM t0;
  | ---
- | - metadata:
- |   - name: COLUMN_1
- |     type: integer
- |   rows:
- |   - [5]
- |   - [4]
- |   - [null]
- |   - [null]
+ | - null
+ | - 'Failed to execute SQL statement: wrong arguments for function LENGTH()'
  | ...
 SELECT typeof(a) FROM t0;
  | ---

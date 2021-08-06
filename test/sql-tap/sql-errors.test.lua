@@ -869,7 +869,7 @@ test:do_catchsql_test(
 	[[
 		SELECT POSITION('abc', 2);
 	]], {
-		1, "Inconsistent types: expected string or varbinary got integer(2)"
+		1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
 	})
 
 test:finish_test()

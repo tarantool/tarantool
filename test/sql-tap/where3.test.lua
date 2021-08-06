@@ -401,9 +401,9 @@ if 0
     test:do_execsql_test(
         "where3-4.0",
         [[
-            CREATE TABLE t400(a INTEGER PRIMARY KEY, b INT , c INT );
-            CREATE TABLE t401(p INTEGER PRIMARY KEY, q INT , r INT );
-            CREATE TABLE t402(x INTEGER PRIMARY KEY, y INT , z INT );
+            CREATE TABLE t400(a INTEGER PRIMARY KEY, b INT , c STRING );
+            CREATE TABLE t401(p INTEGER PRIMARY KEY, q INT , r STRING );
+            CREATE TABLE t402(x INTEGER PRIMARY KEY, y INT , z STRING );
             EXPLAIN QUERY PLAN
             SELECT * FROM t400, t401, t402 WHERE t402.z LIKE 'abc%';
         ]], {

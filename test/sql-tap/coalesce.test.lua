@@ -103,7 +103,7 @@ test:do_test(
     "coalesce-1.6",
     function()
         return test:execsql [[
-            SELECT coalesce(b,NOT b,-b,abs(b),lower(b),length(b),LEAST(b,5),b*123,c)
+            SELECT coalesce(b, NOT b, -b, abs(b), LEAST(b, 5), b * 123, c)
               FROM t1 ORDER BY a;
         ]]
     end, {

@@ -56,12 +56,14 @@ local function subblob_test(id, hex, i1, i2, hexresult)
     test:execsql(sql)
     test:do_execsql_test(
         "substr-"..id..".1",
-        string.format("SELECT hex(substr(b, %s, %s)) FROM t1", i1, i2),
+        string.format(
+            "SELECT HEX(CAST(substr(b, %s, %s) AS VARBINARY)) FROM t1", i1, i2),
         {hexresult})
     --local qstr = string.gsub("' '", string)--"string","map","' ''",["string"]]]=]).."'"
     test:do_execsql_test(
         "substr-"..id..".2",
-        string.format("SELECT hex(substr(x'%s', %s, %s))",hex, i1, i2),
+        string.format("SELECT HEX(CAST(substr(x'%s', %s, %s) AS VARBINARY))",
+                      hex, i1, i2),
         {hexresult})
 end
 

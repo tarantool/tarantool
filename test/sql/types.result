@@ -215,25 +215,22 @@ box.execute("INSERT INTO t1 VALUES (randomblob(5));")
 box.execute("SELECT * FROM t1 WHERE s LIKE 'blob';")
 ---
 - null
-- 'Inconsistent types: expected string got scalar(x''91A0FEE366'')'
+- 'Failed to execute SQL statement: wrong arguments for function LIKE()'
 ...
 box.execute("SELECT * FROM t1 WHERE 'blob' LIKE s;")
 ---
 - null
-- 'Inconsistent types: expected string got scalar(x''91A0FEE366'')'
+- 'Failed to execute SQL statement: wrong arguments for function LIKE()'
 ...
 box.execute("SELECT * FROM t1 WHERE 'blob' LIKE x'0000';")
 ---
 - null
-- 'Inconsistent types: expected string got varbinary(x''0000'')'
+- 'Failed to execute SQL statement: wrong arguments for function LIKE()'
 ...
 box.execute("SELECT s LIKE NULL FROM t1;")
 ---
-- metadata:
-  - name: COLUMN_1
-    type: integer
-  rows:
-  - [null]
+- null
+- 'Failed to execute SQL statement: wrong arguments for function LIKE()'
 ...
 box.execute("DELETE FROM t1;")
 ---
@@ -246,20 +243,17 @@ box.execute("INSERT INTO t1 VALUES (1);")
 box.execute("SELECT * FROM t1 WHERE s LIKE 'int';")
 ---
 - null
-- 'Inconsistent types: expected string got scalar(1)'
+- 'Failed to execute SQL statement: wrong arguments for function LIKE()'
 ...
 box.execute("SELECT * FROM t1 WHERE 'int' LIKE 4;")
 ---
 - null
-- 'Inconsistent types: expected string got integer(4)'
+- 'Failed to execute SQL statement: wrong arguments for function LIKE()'
 ...
 box.execute("SELECT NULL LIKE s FROM t1;")
 ---
-- metadata:
-  - name: COLUMN_1
-    type: integer
-  rows:
-  - [null]
+- null
+- 'Failed to execute SQL statement: wrong arguments for function LIKE()'
 ...
 box.space.T1:drop()
 ---
@@ -825,25 +819,19 @@ box.execute("DELETE FROM t WHERE i < 18446744073709551613;")
 ...
 box.execute("SELECT lower(i) FROM t;")
 ---
-- metadata:
-  - name: COLUMN_1
-    type: string
-  rows:
-  - ['18446744073709551613']
+- null
+- 'Failed to execute SQL statement: wrong arguments for function LOWER()'
 ...
 box.execute("SELECT upper(i) FROM t;")
 ---
-- metadata:
-  - name: COLUMN_1
-    type: string
-  rows:
-  - ['18446744073709551613']
+- null
+- 'Failed to execute SQL statement: wrong arguments for function UPPER()'
 ...
 box.execute("SELECT abs(i) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: number
+    type: integer
   rows:
   - [18446744073709551613]
 ...
@@ -1298,17 +1286,17 @@ box.execute("SELECT group_concat(v) FROM t;")
 box.execute("SELECT lower(v) FROM t;")
 ---
 - null
-- 'Inconsistent types: expected string got varbinary(x''616263'')'
+- 'Failed to execute SQL statement: wrong arguments for function LOWER()'
 ...
 box.execute("SELECT upper(v) FROM t;")
 ---
 - null
-- 'Inconsistent types: expected string got varbinary(x''616263'')'
+- 'Failed to execute SQL statement: wrong arguments for function UPPER()'
 ...
 box.execute("SELECT abs(v) FROM t;")
 ---
 - null
-- 'Inconsistent types: expected number got varbinary(x''616263'')'
+- 'Failed to execute SQL statement: wrong arguments for function ABS()'
 ...
 box.execute("SELECT typeof(v) FROM t;")
 ---
@@ -1861,31 +1849,19 @@ box.execute("SELECT group_concat(d) FROM t;")
 ...
 box.execute("SELECT lower(d) FROM t;")
 ---
-- metadata:
-  - name: COLUMN_1
-    type: string
-  rows:
-  - ['10.0']
-  - ['-2.0']
-  - ['3.3']
-  - ['1.8e+19']
+- null
+- 'Failed to execute SQL statement: wrong arguments for function LOWER()'
 ...
 box.execute("SELECT upper(d) FROM t;")
 ---
-- metadata:
-  - name: COLUMN_1
-    type: string
-  rows:
-  - ['10.0']
-  - ['-2.0']
-  - ['3.3']
-  - ['1.8E+19']
+- null
+- 'Failed to execute SQL statement: wrong arguments for function UPPER()'
 ...
 box.execute("SELECT abs(d) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: number
+    type: double
   rows:
   - [10]
   - [2]

@@ -432,7 +432,7 @@ execute(s.stmt_id)
  |   - name: COLUMN_3
  |     type: scalar
  |   - name: COLUMN_4
- |     type: number
+ |     type: integer
  |   rows:
  |   - [1, 1, '3', 1]
  | ...
@@ -446,7 +446,7 @@ execute(s.stmt_id)
  |   - name: COLUMN_3
  |     type: scalar
  |   - name: COLUMN_4
- |     type: number
+ |     type: integer
  |   rows:
  |   - [1, 1, '3', 1]
  | ...
