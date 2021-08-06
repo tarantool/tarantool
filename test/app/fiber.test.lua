@@ -1,4 +1,5 @@
 fiber = require('fiber')
+log = require('log')
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 env = require('test_run')
@@ -343,6 +344,7 @@ info = fiber.info()
 -- if compiled without libunwind support, need to return mock object here
 -- to skip this test, see gh-3824
 backtrace = info[f1:id()].backtrace or {{L = 'sf1'}, {L = 'loop'}, {L = 'sf3'}}
+log.info("backtrace=%s", require('yaml').encode(backtrace))
 bt_str = ''
 for _, b in pairs(backtrace) do bt_str = bt_str .. (b['L'] or '') end
 bt_str:find('sf1') ~= nil
