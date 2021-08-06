@@ -74,19 +74,29 @@ backtrace_proc_cache_clear(void)
 	proc_cache = NULL;
 }
 
-const char *
-get_proc_name(unw_cursor_t *unw_cur, unw_word_t *offset, bool skip_cache)
+static int
+backtrace_proc_cache_find(unw_word_t ip, const char **name, unw_word_t *offset)
 {
-	static __thread char proc_name[BACKTRACE_NAME_MAX];
-	unw_word_t ip;
-	unw_get_reg(unw_cur, UNW_REG_IP, &ip);
+	struct proc_cache_entry *entry;
+	mh_int_t k;
 
-	if (skip_cache) {
-		unw_get_proc_name(unw_cur, proc_name, sizeof(proc_name),
-				  offset);
-		return proc_name;
+	if (proc_cache != NULL) {
+		k = mh_i64ptr_find(proc_cache, ip, NULL);
+		if (k != mh_end(proc_cache)) {
+			entry = (struct proc_cache_entry *)
+				mh_i64ptr_node(proc_cache, k)->val;
+			*offset = entry->offset;
+			*name = entry->name;
+			return 0;
+		}
 	}
 
+	return -1;
+}
+
+static int
+backtrace_proc_cache_put(unw_word_t ip, const char *name, unw_word_t offset)
+{
 	struct proc_cache_entry *entry;
 	struct mh_i64ptr_node_t node;
 	mh_int_t k;
@@ -96,27 +106,47 @@ get_proc_name(unw_cursor_t *unw_cur, unw_word_t *offset, bool skip_cache)
 		proc_cache = mh_i64ptr_new();
 	}
 
-	k  = mh_i64ptr_find(proc_cache, ip, NULL);
-	if (k != mh_end(proc_cache)) {
-		entry = (struct proc_cache_entry *)
-			mh_i64ptr_node(proc_cache, k)->val;
-		snprintf(proc_name, BACKTRACE_NAME_MAX, "%s", entry->name);
-		*offset = entry->offset;
-	}  else {
+	size_t size;
+	entry = region_alloc_object(&cache_region, typeof(*entry), &size);
+	if (entry == NULL)
+		return -1;
+
+	node.key = ip;
+	node.val = entry;
+	entry->offset = offset;
+	snprintf(entry->name, BACKTRACE_NAME_MAX - 1, "%s", name);
+	entry->name[BACKTRACE_NAME_MAX - 1] = 0;
+
+	k = mh_i64ptr_put(proc_cache, &node, NULL, NULL);
+	if (k == mh_end(proc_cache)) {
+		size_t used = region_used(&cache_region);
+		region_truncate(&cache_region, used - size);
+		return -1;
+	}
+
+	return 0;
+}
+
+const char *
+get_proc_name(unw_cursor_t *unw_cur, unw_word_t *offset, bool skip_cache)
+{
+	static __thread char proc_name[BACKTRACE_NAME_MAX];
+	const char *cache_name;
+	unw_word_t ip;
+
+	if (skip_cache) {
 		unw_get_proc_name(unw_cur, proc_name, sizeof(proc_name),
 				  offset);
-		size_t size;
-		entry = region_alloc_object(&cache_region, typeof(*entry),
-					    &size);
-		if (entry == NULL)
-			goto error;
-		node.key = ip;
-		node.val = entry;
-		snprintf(entry->name, BACKTRACE_NAME_MAX, "%s", proc_name);
-		entry->offset = *offset;
-		mh_i64ptr_put(proc_cache, &node, NULL, NULL);
+		return proc_name;
 	}
-error:
+
+	unw_get_reg(unw_cur, UNW_REG_IP, &ip);
+	if (backtrace_proc_cache_find(ip, &cache_name, offset) == 0) {
+		return cache_name;
+	}
+
+	unw_get_proc_name(unw_cur, proc_name, sizeof(proc_name), offset);
+	backtrace_proc_cache_put(ip, proc_name, *offset);
 	return proc_name;
 }
 
