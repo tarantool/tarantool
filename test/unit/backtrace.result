@@ -1,0 +1,32 @@
+	*** test_equal ***
+# Calling baz()
+# Calling baz()
+# Calling baz()
+# Calling baz()
+# Calling baz()
+# Calling baz()
+# Calling baz()
+# Calling baz()
+# Calling baz()
+# Calling baz()
+# Calling baz()
+# Calling bar()
+# Calling foo()
+# Collecting backtrace...
+# ok
+# Resolving entries...
+# ok
+# Comparing entries...
+# #0 foo
+# #1 bar
+# #2 baz
+# #3 baz
+# #4 baz
+# #5 baz
+# #6 baz
+# #7 baz
+# #8 baz
+# #9 baz
+# #10 baz
+# ok
+	*** test_equal: done ***

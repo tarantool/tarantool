@@ -39,6 +39,16 @@
 #include <lua.h>
 #include <lauxlib.h>
 
+#if ENABLE_BACKTRACE
+/**
+ * This is the declaration of the lua stack entry function.
+ * The declaration doesn't match actual lj_BC_FUNCC's interface
+ * and has the only aim to provide lj_BC_FUNCC's address to the
+ * backtrace subsystem.
+ */
+extern void lj_BC_FUNCC();
+#endif /* ENABLE_BACKTRACE */
+
 static_assert(FIBER_LUA_NOREF == LUA_NOREF, "FIBER_LUA_NOREF is ok");
 
 void
@@ -291,8 +301,7 @@ lbox_fiber_statof_map(struct fiber *f, void *cb_ctx, bool backtrace)
 		tb_ctx.tb_frame = 0;
 		lua_pushstring(L, "backtrace");
 		lua_newtable(L);
-		backtrace_foreach(fiber_backtrace_cb,
-				  f != fiber() ? &f->ctx : NULL, &tb_ctx);
+		backtrace_foreach_current(fiber_backtrace_cb, NULL, f, &tb_ctx);
 		lua_settable(L, -3);
 #endif /* ENABLE_BACKTRACE */
 	}
@@ -918,6 +927,9 @@ static const struct luaL_Reg fiberlib[] = {
 void
 tarantool_lua_fiber_init(struct lua_State *L)
 {
+#if ENABLE_BACKTRACE
+	backtrace_init(lj_BC_FUNCC, NULL);
+#endif /* ENABLE_BACKTRACE */
 	luaL_register_module(L, fiberlib_name, fiberlib);
 	lua_pop(L, 1);
 	luaL_register_type(L, fiberlib_name, lbox_fiber_meta);
