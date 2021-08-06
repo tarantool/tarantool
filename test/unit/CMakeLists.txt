@@ -13,6 +13,7 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_BINARY_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/src/box)
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
+include_directories(${CMAKE_SOURCE_DIR}/third_party/coro)
 include_directories(${ICU_INCLUDE_DIRS})
 include_directories(${CURL_INCLUDE_DIRS})
 
