@@ -89,7 +89,7 @@ sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 	} else {
 		sqlRunParser(&sParse, zSql);
 	}
-	assert(0 == sParse.nQueryLoop);
+	assert(0 == sParse.nQueryLoop || sParse.is_aborted);
 
 	if (db->mallocFailed)
 		sParse.is_aborted = true;

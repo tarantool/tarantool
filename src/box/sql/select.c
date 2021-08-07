@@ -6279,7 +6279,7 @@ sqlSelect(Parse * pParse,		/* The parser context */
 			sNC.ncFlags &= ~NC_InAggFunc;
 		}
 		sAggInfo.mxReg = pParse->nMem;
-		if (db->mallocFailed)
+		if (pParse->is_aborted)
 			goto select_end;
 
 		/* Processing for aggregates with GROUP BY is very different and
@@ -6488,6 +6488,8 @@ sqlSelect(Parse * pParse,		/* The parser context */
 			 */
 			sqlVdbeJumpHere(v, addr1);
 			updateAccumulator(pParse, &sAggInfo);
+			if (pParse->is_aborted)
+				goto select_end;
 			sqlVdbeAddOp2(v, OP_Integer, 1, iUseFlag);
 			VdbeComment((v, "indicate data in accumulator"));
 
@@ -6651,6 +6653,8 @@ sqlSelect(Parse * pParse,		/* The parser context */
 					goto select_end;
 				}
 				updateAccumulator(pParse, &sAggInfo);
+				if (pParse->is_aborted)
+					goto select_end;
 				assert(pMinMax == 0 || pMinMax->nExpr == 1);
 				if (sqlWhereIsOrdered(pWInfo) > 0) {
 					sqlVdbeGoto(v,

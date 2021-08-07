@@ -2090,6 +2090,106 @@ built_in_func_put(struct sql_func_dictionary *dict)
 	}
 }
 
+/**
+ * Check if there is no need to cast argument to accepted type. Also, in some
+ * cases operation 'op' may be important, for example when given argument is
+ * NULL or is variable.
+ *
+ * Returns TRUE when:
+ *  - when operation is NULL;
+ *  - when accepted type and argument type are equal;
+ *  - when accepted type is ANY;
+ *  - when accepted type is INTEGER and argument type is UNSIGNED.
+ */
+static inline bool
+is_exact(int op, enum field_type a, enum field_type b)
+{
+	return op == TK_NULL || a == b || a == FIELD_TYPE_ANY ||
+	       (a == FIELD_TYPE_INTEGER && b == FIELD_TYPE_UNSIGNED);
+}
+
+/**
+ * Check if the argument MEM type will not change during cast. It means that
+ * either is_exact() returns TRUE or accepted type is metatype that includes
+ * argument type.
+ *
+ * Returns TRUE when:
+ *  - is_exact() returns TRUE;
+ *  - when accepted type is NUMBER and argument type is numeric type;
+ *  - when accepted type is SCALAR and argument type is not MAP or ARRAY.
+ */
+static inline bool
+is_upcast(int op, enum field_type a, enum field_type b)
+{
+	return is_exact(op, a, b) ||
+	       (a == FIELD_TYPE_NUMBER && sql_type_is_numeric(b)) ||
+	       (a == FIELD_TYPE_SCALAR && b != FIELD_TYPE_MAP &&
+		b != FIELD_TYPE_ARRAY);
+}
+
+/**
+ * Check if there is a chance that the argument can be cast to accepted type
+ * according to implicit cast rules.
+ *
+ * Returns TRUE when:
+ *  - is_upcast() returns TRUE;
+ *  - when accepted type and argument type are numeric types;
+ *  - when argument is binded value;
+ *  - when argument type is ANY, which means that is was not resolved.
+ */
+static inline bool
+is_castable(int op, enum field_type a, enum field_type b)
+{
+	return is_upcast(op, a, b) || op == TK_VARIABLE ||
+	       (sql_type_is_numeric(a) && sql_type_is_numeric(b)) ||
+	       b == FIELD_TYPE_ANY;
+}
+
+enum check_type {
+	CHECK_TYPE_EXACT,
+	CHECK_TYPE_UPCAST,
+	CHECK_TYPE_CASTABLE,
+};
+
+static struct func *
+find_compatible(struct Expr *expr, struct sql_func_dictionary *dict,
+		enum check_type check)
+{
+	int n = expr->x.pList != NULL ? expr->x.pList->nExpr : 0;
+	for (uint32_t i = 0; i < dict->count; ++i) {
+		struct func_sql_builtin *func = dict->functions[i];
+		int argc = func->base.def->param_count;
+		if (argc != n && argc != -1)
+			continue;
+		if (n == 0)
+			return &func->base;
+
+		enum field_type *types = func->param_list;
+		bool is_match = true;
+		for (int j = 0; j < n && is_match; ++j) {
+			struct Expr *e = expr->x.pList->a[j].pExpr;
+			enum field_type a = types[argc != -1 ? j : 0];
+			enum field_type b = sql_expr_type(e);
+			switch (check) {
+			case CHECK_TYPE_EXACT:
+				is_match = is_exact(e->op, a, b);
+				break;
+			case CHECK_TYPE_UPCAST:
+				is_match = is_upcast(e->op, a, b);
+				break;
+			case CHECK_TYPE_CASTABLE:
+				is_match = is_castable(e->op, a, b);
+				break;
+			default:
+				unreachable();
+			}
+		}
+		if (is_match)
+			return &func->base;
+	}
+	return NULL;
+}
+
 static struct func *
 find_built_in_func(struct Expr *expr, struct sql_func_dictionary *dict)
 {
@@ -2108,13 +2208,18 @@ find_built_in_func(struct Expr *expr, struct sql_func_dictionary *dict)
 		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, name, str, n);
 		return NULL;
 	}
-	struct func *func = NULL;
-	for (uint32_t i = 0; i < dict->count; ++i) {
-		func = &dict->functions[i]->base;
-		if (func->def->param_count == n)
-			break;
-	}
-	return func;
+	struct func *func = find_compatible(expr, dict, CHECK_TYPE_EXACT);
+	if (func != NULL)
+		return func;
+	func = find_compatible(expr, dict, CHECK_TYPE_UPCAST);
+	if (func != NULL)
+		return func;
+	func = find_compatible(expr, dict, CHECK_TYPE_CASTABLE);
+	if (func != NULL)
+		return func;
+	diag_set(ClientError, ER_SQL_EXECUTE,
+		 tt_sprintf("wrong arguments for function %s()", name));
+	return NULL;
 }
 
 struct func *
