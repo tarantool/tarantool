@@ -3923,6 +3923,8 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		return -1;
 	}
 	const char *name = schema_find_name(priv->object_type, priv->object_id);
+	if (name == NULL)
+		return -1;
 	if (access_check_ddl(name, priv->object_id, grantor->def->uid,
 			     priv->object_type, priv_type) != 0)
 		return -1;

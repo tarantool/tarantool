@@ -698,36 +698,51 @@ schema_find_name(enum schema_object_type type, uint32_t object_id)
 	case SC_SPACE:
 		{
 			struct space *space = space_by_id(object_id);
-			if (space == NULL)
-				break;
-			return space->def->name;
+			if (space != NULL)
+				return space->def->name;
+			diag_set(ClientError, ER_NO_SUCH_SPACE,
+				 tt_sprintf("%d", object_id));
+			break;
 		}
 	case SC_FUNCTION:
 		{
 			struct func *func = func_by_id(object_id);
-			if (func == NULL)
-				break;
-			return func->def->name;
+			if (func != NULL)
+				return func->def->name;
+			diag_set(ClientError, ER_NO_SUCH_FUNCTION,
+				 tt_sprintf("%d", object_id));
+			break;
 		}
 	case SC_SEQUENCE:
 		{
 			struct sequence *seq = sequence_by_id(object_id);
-			if (seq == NULL)
-				break;
-			return seq->def->name;
+			if (seq != NULL)
+				return seq->def->name;
+			diag_set(ClientError, ER_NO_SUCH_SEQUENCE,
+				 tt_sprintf("%d", object_id));
+			break;
 		}
 	case SC_ROLE:
-	case SC_USER:
 		{
 			struct user *role = user_by_id(object_id);
-			if (role == NULL)
-				break;
-			return role->def->name;
+			if (role != NULL)
+				return role->def->name;
+			diag_set(ClientError, ER_NO_SUCH_ROLE,
+				 tt_sprintf("%d", object_id));
+			break;
+		}
+	case SC_USER:
+		{
+			struct user *user = user_by_id(object_id);
+			if (user != NULL)
+				return user->def->name;
+			diag_set(ClientError, ER_NO_SUCH_USER,
+				 tt_sprintf("%d", object_id));
+			break;
 		}
 	default:
-		break;
+		unreachable();
 	}
-	assert(false);
-	return "(nil)";
+	return NULL;
 }
 
