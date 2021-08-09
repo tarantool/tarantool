@@ -163,7 +163,7 @@ struct request {
 	/*
 	 * Either log row, or network header, or NULL, depending
 	 * on where this packet originated from: the write ahead
-	 * log/snapshot, client request, or a Lua request.
+	 * log/snapshot, repliation, or a client request.
 	 */
 	struct xrow_header *header;
 	/**

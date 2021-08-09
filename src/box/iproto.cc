@@ -1264,6 +1264,12 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 		if (xrow_decode_dml(&msg->header, &msg->dml,
 				    dml_request_key_map(type)))
 			goto error;
+		/*
+		 * In contrast to replication requests, for a client request
+		 * the xrow header is set by WAL, which generates LSNs and sets
+		 * replica id. Ignore the header received over network.
+		 */
+		msg->dml.header = NULL;
 		assert(type < sizeof(iproto_thread->dml_route) /
 		              sizeof(*(iproto_thread->dml_route)));
 		cmsg_init(&msg->base, iproto_thread->dml_route[type]);
