@@ -50,7 +50,7 @@ assert(box.info.election.state == 'leader')
  | ---
  | - true
  | ...
-assert(not box.info.ro)
+test_run:wait_cond(function() return not box.info.ro end)
  | ---
  | - true
  | ...
@@ -86,7 +86,7 @@ assert(box.info.election.state == 'leader')
  | ---
  | - true
  | ...
-assert(not box.info.ro)
+test_run:wait_cond(function() return not box.info.ro end)
  | ---
  | - true
  | ...
