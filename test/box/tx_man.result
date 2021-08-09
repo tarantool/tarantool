@@ -2513,8 +2513,7 @@ s:replace{0, 0, 0}
 -- Hit dirty {0, 0, 0} in pk and conflict clean {1, 1, 1}.
 s:replace{0, 1, 0}
  | ---
- | - error: Duplicate key exists in unique index "sk" in space "test" with old tuple
- |     - [1, 1, 1] and new tuple - [0, 1, 0]
+ | - error: Duplicate key exists in unique index 'sk' in space 'test'
  | ...
 
 s:drop()
