@@ -24,7 +24,7 @@ assert(box.info.election.state == 'follower')
 term = box.info.election.term
 box.ctl.promote()
 assert(box.info.election.state == 'leader')
-assert(not box.info.ro)
+test_run:wait_cond(function() return not box.info.ro end)
 assert(box.info.election.term > term)
 
 -- Test promote when there's a live leader.
@@ -35,7 +35,7 @@ assert(box.info.ro)
 assert(box.info.election.leader ~= 0)
 box.ctl.promote()
 assert(box.info.election.state == 'leader')
-assert(not box.info.ro)
+test_run:wait_cond(function() return not box.info.ro end)
 assert(box.info.election.term > term)
 
 -- Cleanup.
