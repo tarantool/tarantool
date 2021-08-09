@@ -304,8 +304,6 @@ xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
  * CALL/EVAL request.
  */
 struct call_request {
-	/** Request header */
-	const struct xrow_header *header;
 	/** Function name for CALL request. MessagePack String. */
 	const char *name;
 	/** Expression for EVAL request. MessagePack String. */
