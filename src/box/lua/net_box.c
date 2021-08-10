@@ -125,6 +125,15 @@ struct netbox_request {
 	int on_push_ref;
 	int on_push_ctx_ref;
 	/**
+	 * Lua reference to a table with user-defined fields.
+	 * We allow the user to attach extra information to a future object,
+	 * e.g. a reference to a connection or the invoked method name/args.
+	 * All the information is stored in this table, which is created
+	 * lazily, on the first __newindex invocation. Until then, it's
+	 * LUA_NOREF.
+	 */
+	int index_ref;
+	/**
 	 * Lua reference to the request result or LUA_NOREF if the response
 	 * hasn't been received yet. If the response was decoded to a
 	 * user-provided buffer (see buffer_ref), result_ref stores a Lua
@@ -167,6 +176,7 @@ netbox_request_destroy(struct netbox_request *request)
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, request->on_push_ref);
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, request->on_push_ctx_ref);
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, request->result_ref);
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, request->index_ref);
 	if (request->error != NULL)
 		error_unref(request->error);
 }
@@ -1422,6 +1432,48 @@ luaT_netbox_request_gc(struct lua_State *L)
 	return 0;
 }
 
+static int
+luaT_netbox_request_index(struct lua_State *L)
+{
+	struct netbox_request *request = luaT_check_netbox_request(L, 1);
+	if (request->index_ref != LUA_NOREF) {
+		lua_rawgeti(L, LUA_REGISTRYINDEX, request->index_ref);
+		/*
+		 * Copy the key (2nd argument) to the top. Note, we don't move
+		 * it with lua_insert, like we do in __newindex, because we want
+		 * to save it for the fallback path below.
+		 */
+		lua_pushvalue(L, 2);
+		lua_rawget(L, -2);
+		if (lua_type(L, -1) != LUA_TNIL)
+			return 1;
+		/* Pop nil and the index table. */
+		lua_pop(L, 2);
+	}
+	/* Fall back on metatable methods. */
+	lua_getmetatable(L, 1);
+	/* Move the metatable before the key (2nd argument). */
+	lua_insert(L, 2);
+	lua_rawget(L, 2);
+	return 1;
+}
+
+static int
+luaT_netbox_request_newindex(struct lua_State *L)
+{
+	struct netbox_request *request = luaT_check_netbox_request(L, 1);
+	if (request->index_ref == LUA_NOREF) {
+		/* Lazily create the index table on the first invocation. */
+		lua_newtable(L);
+		request->index_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	}
+	lua_rawgeti(L, LUA_REGISTRYINDEX, request->index_ref);
+	/* Move the index table before the key (2nd argument). */
+	lua_insert(L, 2);
+	lua_rawset(L, 2);
+	return 0;
+}
+
 /**
  * Returns true if the response was received for the given request.
  */
@@ -1666,6 +1718,7 @@ netbox_make_request(struct lua_State *L, int idx,
 		request->format = tuple_format_runtime;
 	tuple_format_ref(request->format);
 	fiber_cond_create(&request->cond);
+	request->index_ref = LUA_NOREF;
 	request->result_ref = LUA_NOREF;
 	request->error = NULL;
 	if (netbox_request_register(request, registry) != 0) {
@@ -2054,6 +2107,8 @@ luaopen_net_box(struct lua_State *L)
 
 	static const struct luaL_Reg netbox_request_meta[] = {
 		{ "__gc",           luaT_netbox_request_gc },
+		{ "__index",        luaT_netbox_request_index },
+		{ "__newindex",     luaT_netbox_request_newindex },
 		{ "is_ready",       luaT_netbox_request_is_ready },
 		{ "result",         luaT_netbox_request_result },
 		{ "wait_result",    luaT_netbox_request_wait_result },

@@ -5,8 +5,7 @@ net = require('net.box')
 -- gh-3107: fiber-async netbox.
 --
 cond = nil
-box.schema.func.create('long_function')
-box.schema.user.grant('guest', 'execute', 'function', 'long_function')
+box.schema.user.grant('guest', 'execute', 'universe')
 function long_function(...) cond = fiber.cond() cond:wait() return ... end
 function finalize_long() while not cond do fiber.sleep(0.01) end cond:signal() cond = nil end
 s = box.schema.create_space('test')
@@ -56,7 +55,41 @@ assert_no_csw(future.is_ready, future)
 assert_no_csw(future.result, future)
 assert_no_csw(future.wait_result, future)
 
-box.schema.func.drop('long_function')
+-- Storing user data in future object.
+future = c:eval('return 123', {}, {is_async = true})
+future.abc -- nil
+future.abc = nil    -- delete a key that has never been set
+future.abc -- nil
+future.abc = 'abc'  -- set a value for a key
+future.abc -- abc
+future.abc = nil    -- delete a value for a key
+future.abc -- nil
+future.abc = nil    -- delete a key with no value
+future.abc -- nil
+future:wait_result() -- 123
+
+-- Garbage collection of stored user data.
+future = c:eval('return 123', {}, {is_async = true})
+future.data1 = {1}
+future.data2 = {2}
+future.data3 = {3}
+gc = setmetatable({}, {__mode = 'v'})
+gc.data1 = future.data1
+gc.data2 = future.data2
+gc.data3 = future.data3
+future.data1 = nil
+_ = collectgarbage('collect')
+gc.data1 == nil
+future.data2 = 123
+_ = collectgarbage('collect')
+gc.data2 == nil
+future:wait_result() -- 123
+future = nil
+_ = collectgarbage('collect')
+_ = collectgarbage('collect')
+gc.data3 == nil
+
+box.schema.user.revoke('guest', 'execute', 'universe')
 
 c:close()
 s:drop()
