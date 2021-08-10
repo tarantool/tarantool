@@ -231,6 +231,61 @@ struct luaL_field {
 };
 
 /**
+ * Find references and self-references to tables. Keep references
+ * in cache table with @a anchortable_index.
+ *
+ * The structure of the cache table is following:
+ *
+ * +------------+-------+
+ * | key        | value |
+ * +------------+-------+
+ * | table addr | false |
+ * +------------+-------+
+ * | table addr | true  |
+ * +------------+-------+
+ * | ...        | ...   |
+ * +------------+-------+
+ *
+ * "value" is false if table is faced once in serialized
+ * structure."value" is true if table is faced twice or more
+ * (self-referenced).
+ *
+ * Processed table must be on the top of the Lua stack before
+ * call.
+ *
+ * @param L Lua stack.
+ * @param anchortable_index Index of anchor table on stack.
+ */
+void
+luaL_find_references(struct lua_State *L, int anchortable_index);
+
+enum get_anchor_ret_code
+{
+	/* Table has no references. */
+	GET_ANCHOR_NOT_REFERNCED = 0,
+	/* Table is self-referenced, but isn't named yet. */
+	GET_ANCHOR_NOT_NAMED,
+	/* Table is self-referenced and alredy named. */
+	GET_ANCHOR_NAMED,
+};
+
+/**
+ * Generate aliases and anchor numbers for self-referenced tables.
+ *
+ * Processed table must be on the top of the Lua stack before
+ * call.
+ *
+ * @param L Lua stack.
+ * @param anchortable_index Index of anchor table on stack.
+ * @param[out] anchor_number Ptr to the number anchors in a
+               structure being under dumping.
+ * @param[out] anchor Ptr to anchor string.
+ */
+int
+luaL_get_anchor(struct lua_State *L, int anchortable_index,
+		unsigned int *anchor_number, const char **anchor);
+
+/**
  * @brief Convert a value from the Lua stack to a lua_field structure.
  * This function is designed for use with Lua bindings and data
  * serialization functions (YAML, MsgPack, JSON, etc.).

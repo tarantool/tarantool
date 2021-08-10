@@ -340,41 +340,17 @@ emit_node(struct lua_dumper *d, struct node *nd, int indent,
 static const char *
 get_lua_anchor(struct lua_dumper *d)
 {
-	const char *s = "";
-
-	lua_pushvalue(d->L, -1);
-	lua_rawget(d->L, d->anchortable_index);
-	if (!lua_toboolean(d->L, -1)) {
-		lua_pop(d->L, 1);
-		return NULL;
-	}
-
-	if (lua_isboolean(d->L, -1)) {
+	const char *anchor = NULL;
+	int code = luaL_get_anchor(d->L, d->anchortable_index,
+				   &d->anchor_number, &anchor);
+	trace_anchor(anchor, code == GET_ANCHOR_NAMED);
+	if (code == GET_ANCHOR_NAMED)
 		/*
-		 * This element is referenced more
-		 * than once but has not been named.
+		 * Return emtpy string to distinguish the case
+		 * when the table is already named.
 		 */
-		char buf[32];
-		snprintf(buf, sizeof(buf), "%u", d->anchor_number++);
-		lua_pop(d->L, 1);
-		lua_pushvalue(d->L, -1);
-		lua_pushstring(d->L, buf);
-		s = lua_tostring(d->L, -1);
-		lua_rawset(d->L, d->anchortable_index);
-		trace_anchor(s, false);
-	} else {
-		/*
-		 * An aliased element.
-		 *
-		 * FIXME: Need an example to use.
-		 *
-		 * const char *str = lua_tostring(d->L, -1);
-		 */
-		const char *str = lua_tostring(d->L, -1);
-		trace_anchor(str, true);
-		lua_pop(d->L, 1);
-	}
-	return s;
+		return "";
+	return anchor;
 }
 
 static void
@@ -883,49 +859,6 @@ dump_node(struct lua_dumper *d, struct node *nd, int indent)
 }
 
 /**
- * Find references to tables, we use it
- * to find self references in tables.
- */
-static void
-find_references(struct lua_dumper *d)
-{
-	int newval;
-
-	if (lua_type(d->L, -1) != LUA_TTABLE)
-		return;
-
-	/* Copy of a table for self refs */
-	lua_pushvalue(d->L, -1);
-	lua_rawget(d->L, d->anchortable_index);
-	if (lua_isnil(d->L, -1))
-		newval = 0;
-	else if (!lua_toboolean(d->L, -1))
-		newval = 1;
-	else
-		newval = -1;
-	lua_pop(d->L, 1);
-
-	if (newval != -1) {
-		lua_pushvalue(d->L, -1);
-		lua_pushboolean(d->L, newval);
-		lua_rawset(d->L, d->anchortable_index);
-	}
-
-	if (newval != 0)
-		return;
-
-	/*
-	 * Other values and keys in the table
-	 */
-	lua_pushnil(d->L);
-	while (lua_next(d->L, -2) != 0) {
-		find_references(d);
-		lua_pop(d->L, 1);
-		find_references(d);
-	}
-}
-
-/**
  * Dump recursively from the root node.
  */
 static int
@@ -985,7 +918,7 @@ lua_encode(lua_State *L, struct luaL_serializer *serializer,
 
 	/* Push copy of arg we're processing */
 	lua_pushvalue(L, 1);
-	find_references(&dumper);
+	luaL_find_references(dumper.L, dumper.anchortable_index);
 
 	if (dump_root(&dumper) != 0)
 		goto out;

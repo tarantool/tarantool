@@ -281,6 +281,80 @@ lua_field_inspect_ucdata(struct lua_State *L, struct luaL_serializer *cfg,
 	lua_settop(L, top); /* remove temporary objects */
 }
 
+void
+luaL_find_references(struct lua_State *L, int anchortable_index)
+{
+	int newval;
+
+	if (lua_type(L, -1) != LUA_TTABLE)
+		return;
+
+	/* Copy of a table for self references. */
+	lua_pushvalue(L, -1);
+	lua_rawget(L, anchortable_index);
+	if (lua_isnil(L, -1))
+		newval = 0;
+	else if (!lua_toboolean(L, -1))
+		newval = 1;
+	else
+		newval = -1;
+	lua_pop(L, 1);
+
+	if (newval != -1) {
+		lua_pushvalue(L, -1);
+		lua_pushboolean(L, newval);
+		lua_rawset(L, anchortable_index);
+	}
+
+	if (newval != 0)
+		return;
+
+	/* Other values and keys in the table. */
+	lua_pushnil(L);
+	while (lua_next(L, -2) != 0) {
+		luaL_find_references(L, anchortable_index);
+		lua_pop(L, 1);
+		luaL_find_references(L, anchortable_index);
+	}
+}
+
+int
+luaL_get_anchor(struct lua_State *L, int anchortable_index,
+		unsigned int *anchor_number, const char **anchor)
+{
+	lua_pushvalue(L, -1);
+	lua_rawget(L, anchortable_index);
+	if (lua_toboolean(L, -1) == 0) {
+		/* This element is not referenced. */
+		lua_pop(L, 1);
+		*anchor = NULL;
+		return GET_ANCHOR_NOT_REFERNCED;
+	}
+
+	if (lua_isboolean(L, -1) != 0) {
+		/*
+		 * This element is referenced more than once, but
+		 * has not been named.
+		 */
+		char buf[32];
+		snprintf(buf, sizeof(buf), "%u", (*anchor_number)++);
+		lua_pop(L, 1);
+		/* Generate a string anchor and push to table. */
+		lua_pushvalue(L, -1);
+		lua_pushstring(L, buf);
+		*anchor = lua_tostring(L, -1);
+		lua_rawset(L, anchortable_index);
+		return GET_ANCHOR_NOT_NAMED;
+	} else {
+		/* This is an aliased element. */
+		*anchor = lua_tostring(L, -1);
+		assert(anchor != NULL);
+		lua_pop(L, 1);
+		return GET_ANCHOR_NAMED;
+	}
+	return GET_ANCHOR_NOT_REFERNCED;
+}
+
 /**
  * Call __serialize method of a table object by index
  * if the former exists.
