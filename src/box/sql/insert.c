@@ -60,6 +60,27 @@ sql_emit_table_types(struct Vdbe *v, struct space_def *def, int reg)
 			  (char *)colls_type, P4_DYNAMIC);
 }
 
+static struct sql_space_info *
+sql_space_info_new_from_id_list(const struct space_def *def, int len,
+				const struct IdList *list)
+{
+	struct sql_space_info *info = sql_space_info_new(len + 1, 1);
+	if (info == NULL)
+		return NULL;
+	assert(len > 0 && len <= (int)def->field_count);
+	struct field_def *fields = def->fields;
+	for (int i = 0; i < len; ++i) {
+		int j = list == NULL ? i : list->a[i].idx;
+		info->types[i] =  fields[j].type;
+		info->coll_ids[i] =  fields[j].coll_id;
+	}
+	/* Add one more field for rowid. */
+	info->types[len] = FIELD_TYPE_INTEGER;
+	/* Set rowid as the only part of primary index. */
+	info->parts[0] = len;
+	return info;
+}
+
 /**
  * In SQL table can be created with AUTOINCREMENT.
  * In Tarantool it can be detected as primary key which consists
@@ -442,34 +463,30 @@ sqlInsert(Parse * pParse,	/* Parser context */
 			reg_eph = ++pParse->nMem;
 			regRec = sqlGetTempReg(pParse);
 			regCopy = sqlGetTempRange(pParse, nColumn + 1);
-			sqlVdbeAddOp2(v, OP_OpenTEphemeral, reg_eph,
-					  nColumn + 1);
 			/*
-			 * This key_info is used to show that
-			 * rowid should be the first part of PK in
-			 * case we used AUTOINCREMENT feature.
-			 * This way we will save initial order of
-			 * the inserted values. The order is
-			 * important if we use the AUTOINCREMENT
-			 * feature, since changing the order can
-			 * change the number inserted instead of
-			 * NULL.
+			 * Order of inserted values is important since it is
+			 * possible, that NULL will be inserted in field with
+			 * AUTOINCREMENT. So, the first part of key should be
+			 * rowid. Since each rowid is unique, we do not need any
+			 * other parts.
 			 */
-			if (space->sequence != NULL) {
-				struct sql_key_info *key_info =
-					sql_key_info_new(pParse->db,
-							 nColumn + 1);
-				key_info->parts[nColumn].type =
-					FIELD_TYPE_UNSIGNED;
-				key_info->is_pk_rowid = true;
-				sqlVdbeChangeP4(v, -1, (void *)key_info,
-					        P4_KEYINFO);
+			struct sql_space_info *info =
+				sql_space_info_new_from_id_list(space_def,
+								nColumn,
+								pColumn);
+			if (info == NULL) {
+				pParse->is_aborted = true;
+				goto insert_cleanup;
 			}
+			sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph, 0, 0,
+				      (char *)info, P4_DYNAMIC);
 			addrL = sqlVdbeAddOp1(v, OP_Yield, dest.iSDParm);
 			VdbeCoverage(v);
 			sqlVdbeAddOp2(v, OP_NextIdEphemeral, reg_eph,
 					  regCopy + nColumn);
 			sqlVdbeAddOp3(v, OP_Copy, regFromSelect, regCopy, nColumn-1);
+			sqlVdbeAddOp4(v, OP_ApplyType, regCopy, nColumn + 1, 0,
+				      (char *)info->types, P4_STATIC);
 			sqlVdbeAddOp3(v, OP_MakeRecord, regCopy,
 					  nColumn + 1, regRec);
 			/* Set flag to save memory allocating one by malloc. */

@@ -243,114 +243,161 @@ tarantoolsqlCount(struct BtCursor *pCur)
 	return index_count(pCur->index, pCur->iter_type, NULL, 0);
 }
 
-struct space *
-sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
+struct sql_space_info *
+sql_space_info_new(uint32_t field_count, uint32_t part_count)
 {
-	struct key_def *def = NULL;
-	uint32_t part_count = field_count;
-	if (key_info != NULL) {
-		def = sql_key_info_to_key_def(key_info);
-		if (def == NULL)
-			return NULL;
-		/*
-		 * In case is_pk_rowid is true we can use rowid
-		 * as the only part of the key.
-		 */
-		if (key_info->is_pk_rowid)
-			part_count = 1;
+	assert(field_count > 0);
+	uint32_t info_size = sizeof(struct sql_space_info);
+	uint32_t field_size = field_count * sizeof(enum field_type);
+	uint32_t colls_size = field_count * sizeof(uint32_t);
+	uint32_t parts_size = part_count * sizeof(uint32_t);
+	uint32_t sort_orders_size = part_count * sizeof(enum sort_order);
+	uint32_t size = info_size + field_size + colls_size + parts_size +
+			sort_orders_size;
+
+	struct sql_space_info *info = sqlDbMallocRawNN(sql_get(), size);
+	if (info == NULL) {
+		diag_set(OutOfMemory, size, "sqlDbMallocRawNN", "info");
+		return NULL;
 	}
+	info->types = (enum field_type *)((char *)info + info_size);
+	info->coll_ids = (uint32_t *)((char *)info->types + field_size);
+	info->parts = part_count == 0 ? NULL :
+		      (uint32_t *)((char *)info->coll_ids + colls_size);
+	info->sort_orders = part_count == 0 ? NULL :
+			    (uint32_t *)((char *)info->parts + parts_size);
+	info->field_count = field_count;
+	info->part_count = part_count;
+
+	for (uint32_t i = 0; i < field_count; ++i) {
+		info->types[i] = FIELD_TYPE_SCALAR;
+		info->coll_ids[i] = COLL_NONE;
+	}
+	for (uint32_t i = 0; i < part_count; ++i) {
+		info->parts[i] = i;
+		info->sort_orders[i] = SORT_ORDER_ASC;
+
+	}
+	return info;
+}
+
+struct sql_space_info *
+sql_space_info_new_from_space_def(const struct space_def *def)
+{
+	uint32_t field_count = def->field_count + 1;
+	struct sql_space_info *info = sql_space_info_new(field_count, 0);
+	if (info == NULL)
+		return NULL;
+	for (uint32_t i = 0; i < def->field_count; ++i) {
+		info->types[i] = def->fields[i].type;
+		info->coll_ids[i] = def->fields[i].coll_id;
+	}
+	/* Add one more field for rowid. */
+	info->types[def->field_count] = FIELD_TYPE_INTEGER;
+	return info;
+}
+
+struct sql_space_info *
+sql_space_info_new_from_index_def(const struct index_def *def, bool has_rowid)
+{
+	uint32_t field_count = def->key_def->part_count;
+	if (has_rowid)
+		++field_count;
+	struct sql_space_info *info = sql_space_info_new(field_count, 0);
+	if (info == NULL)
+		return NULL;
+	for (uint32_t i = 0; i < def->key_def->part_count; ++i) {
+		info->types[i] = def->key_def->parts[i].type;
+		info->coll_ids[i] = def->key_def->parts[i].coll_id;
+	}
+	if (has_rowid)
+		info->types[def->key_def->part_count] = FIELD_TYPE_INTEGER;
+	return info;
+}
+
+struct space *
+sql_ephemeral_space_new(const struct sql_space_info *info)
+{
+	uint32_t field_count = info->field_count;
+	uint32_t part_count = info->parts == NULL ? field_count :
+			      info->part_count;
+	uint32_t parts_indent = field_count * sizeof(struct field_def);
+	uint32_t names_indent = part_count * sizeof(struct key_part_def) +
+				parts_indent;
+	/*
+	 * Name of the fields will be "_COLUMN_1", "_COLUMN_2" and so on. Due to
+	 * this, length of each name is no more than 19 == strlen("_COLUMN_")
+	 * plus length of UINT32_MAX turned to string, which is 10 and plus 1
+	 * for '\0'.
+	 */
+	uint32_t size = names_indent + field_count * 19;
 
 	struct region *region = &fiber()->gc;
-	/*
-	 * Name of the fields will be "_COLUMN_1", "_COLUMN_2"
-	 * and so on. Due to this, length of each name is no more
-	 * than strlen("_COLUMN_") plus length of UINT32_MAX
-	 * turned to string, which is 10 and plus 1 for \0.
-	 */
-	uint32_t name_len = strlen("_COLUMN_") + 11;
-	uint32_t size = field_count * (sizeof(struct field_def) + name_len) +
-			part_count * sizeof(struct key_part_def);
+	size_t svp = region_used(region);
 	struct field_def *fields = region_aligned_alloc(region, size,
 							alignof(fields[0]));
 	if (fields == NULL) {
 		diag_set(OutOfMemory, size, "region_aligned_alloc", "fields");
 		return NULL;
 	}
-	struct key_part_def *ephemer_key_parts =
-		(void *)fields + field_count * sizeof(struct field_def);
-	static_assert(alignof(*fields) == alignof(*ephemer_key_parts),
-		      "allocated in one block, and should have the same "
-		      "alignment");
-	char *names = (char *)ephemer_key_parts +
-		       part_count * sizeof(struct key_part_def);
-	for (uint32_t i = 0; i < field_count; ++i) {
-		struct field_def *field = &fields[i];
-		field->name = names;
-		names += name_len;
-		sprintf(field->name, "_COLUMN_%d", i);
-		field->is_nullable = true;
-		field->nullable_action = ON_CONFLICT_ACTION_NONE;
-		field->default_value = NULL;
-		field->default_value_expr = NULL;
-		if (def != NULL && i < def->part_count) {
-			assert(def->parts[i].type < field_type_MAX);
-			field->type = def->parts[i].type;
-			field->coll_id = def->parts[i].coll_id;
-		} else {
-			field->coll_id = COLL_NONE;
-			field->type = FIELD_TYPE_SCALAR;
-		}
+	struct key_part_def *parts = (struct key_part_def *)((char *)fields +
+							     parts_indent);
+	static_assert(alignof(*fields) == alignof(*parts), "allocated in one "
+		      "block, and should have the same alignment");
+	char *names = (char *)fields + names_indent;
+
+	for (uint32_t i = 0; i < info->field_count; ++i) {
+		fields[i].name = names;
+		sprintf(names, "_COLUMN_%d", i);
+		names += strlen(fields[i].name) + 1;
+		fields[i].is_nullable = true;
+		fields[i].nullable_action = ON_CONFLICT_ACTION_NONE;
+		fields[i].default_value = NULL;
+		fields[i].default_value_expr = NULL;
+		fields[i].type = info->types[i];
+		fields[i].coll_id = info->coll_ids[i];
+	}
+	for (uint32_t i = 0; i < part_count; ++i) {
+		uint32_t j = info->parts == NULL ? i : info->parts[i];
+		parts[i].fieldno = j;
+		parts[i].nullable_action = ON_CONFLICT_ACTION_NONE;
+		parts[i].is_nullable = true;
+		parts[i].exclude_null = false;
+		parts[i].sort_order = SORT_ORDER_ASC;
+		parts[i].path = NULL;
+		parts[i].type = info->types[j];
+		parts[i].coll_id = info->coll_ids[j];
 	}
 
-	for (uint32_t i = 0; i < part_count; ++i) {
-		struct key_part_def *part = &ephemer_key_parts[i];
-		/*
-		 * In case we need to save initial order of
-		 * inserted into ephemeral space rows we use rowid
-		 * as the only part of PK. If ephemeral space has
-		 * a rowid, it is always the last column.
-		 */
-		uint32_t j = i;
-		if (key_info != NULL && key_info->is_pk_rowid)
-			j = field_count - 1;
-		part->fieldno = j;
-		part->nullable_action = ON_CONFLICT_ACTION_NONE;
-		part->is_nullable = true;
-		part->exclude_null = false;
-		part->sort_order = SORT_ORDER_ASC;
-		part->path = NULL;
-		part->type = fields[j].type;
-		part->coll_id = fields[j].coll_id;
-	}
-	struct key_def *ephemer_key_def = key_def_new(ephemer_key_parts,
-						      part_count, false);
-	if (ephemer_key_def == NULL)
+	struct key_def *key_def = key_def_new(parts, part_count, false);
+	if (key_def == NULL)
 		return NULL;
 
-	struct index_def *ephemer_index_def =
-		index_def_new(0, 0, "ephemer_idx", strlen("ephemer_idx"), TREE,
-			      &index_opts_default, ephemer_key_def, NULL);
-	key_def_delete(ephemer_key_def);
-	if (ephemer_index_def == NULL)
+	const char *name = "ephemer_idx";
+	struct index_def *index_def = index_def_new(0, 0, name, strlen(name),
+						    TREE, &index_opts_default,
+						    key_def, NULL);
+	key_def_delete(key_def);
+	if (index_def == NULL)
 		return NULL;
 
 	struct rlist key_list;
 	rlist_create(&key_list);
-	rlist_add_entry(&key_list, ephemer_index_def, link);
+	rlist_add_entry(&key_list, index_def, link);
 
-	struct space_def *ephemer_space_def =
-		space_def_new_ephemeral(field_count, fields);
-	if (ephemer_space_def == NULL) {
-		index_def_delete(ephemer_index_def);
+	struct space_def *space_def = space_def_new_ephemeral(field_count,
+							      fields);
+	if (space_def == NULL) {
+		index_def_delete(index_def);
 		return NULL;
 	}
 
-	struct space *ephemer_new_space = space_new_ephemeral(ephemer_space_def,
-							      &key_list);
-	index_def_delete(ephemer_index_def);
-	space_def_delete(ephemer_space_def);
+	struct space *space = space_new_ephemeral(space_def, &key_list);
+	index_def_delete(index_def);
+	space_def_delete(space_def);
+	region_truncate(region, svp);
 
-	return ephemer_new_space;
+	return space;
 }
 
 int tarantoolsqlEphemeralInsert(struct space *space, const char *tuple,

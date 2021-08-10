@@ -919,15 +919,15 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 	/* Create the automatic index */
 	assert(pLevel->iIdxCur >= 0);
 	pLevel->iIdxCur = pParse->nTab++;
-	struct sql_key_info *pk_info =
-		sql_key_info_new_from_key_def(pParse->db, idx_def->key_def);
-	if (pk_info == NULL) {
+	struct sql_space_info *info = sql_space_info_new_from_index_def(idx_def,
+									true);
+	if (info == NULL) {
 		pParse->is_aborted = true;
 		return;
 	}
 	int reg_eph = sqlGetTempReg(pParse);
-	sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph, nKeyCol + 1, 0,
-		      (char *)pk_info, P4_KEYINFO);
+	sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph, 0, 0, (char *)info,
+		      P4_DYNAMIC);
 	sqlVdbeAddOp3(v, OP_IteratorOpen, pLevel->iIdxCur, 0, reg_eph);
 	VdbeComment((v, "for %s", space->def->name));
 

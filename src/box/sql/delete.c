@@ -224,12 +224,13 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		 * is held in ephemeral table, there is no PK for
 		 * it, so columns should be loaded manually.
 		 */
-		struct sql_key_info *pk_info = NULL;
 		int reg_eph = ++parse->nMem;
 		int reg_pk = parse->nMem + 1;
-		int pk_len;
+		int pk_len = is_view ? space->def->field_count + 1 :
+			     space->index[0]->def->key_def->part_count;
 		int eph_cursor = parse->nTab++;
 		int addr_eph_open = sqlVdbeCurrentAddr(v);
+		struct sql_space_info *info;
 		if (is_view) {
 			/*
 			 * At this stage SELECT is already materialized
@@ -249,22 +250,20 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			 * account that id field as well. That's why pk_len
 			 * has one field more than view format.
 			 */
-			pk_len = space->def->field_count + 1;
-			parse->nMem += pk_len;
-			sqlVdbeAddOp2(v, OP_OpenTEphemeral, reg_eph,
-					  pk_len);
+			info = sql_space_info_new_from_space_def(space->def);
 		} else {
                         assert(space->index_count > 0);
-                        pk_info = sql_key_info_new_from_key_def(db,
-					space->index[0]->def->key_def);
-                        if (pk_info == NULL)
-                                goto delete_from_cleanup;
-                        pk_len = pk_info->part_count;
-                        parse->nMem += pk_len;
-			sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph,
-					  pk_len, 0,
-					  (char *)pk_info, P4_KEYINFO);
+			struct index_def *index_def = space->index[0]->def;
+			info = sql_space_info_new_from_index_def(index_def,
+								 false);
 		}
+		if (info == NULL) {
+			parse->is_aborted = true;
+			goto delete_from_cleanup;
+		}
+		parse->nMem += pk_len;
+		sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph, 0, 0, (char *)info,
+			      P4_DYNAMIC);
 
 		/* Construct a query to find the primary key for
 		 * every row to be deleted, based on the WHERE
@@ -295,8 +294,9 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 
 		/* Extract the primary key for the current row */
 		if (!is_view) {
-			struct key_part_def *part = pk_info->parts;
-			for (int i = 0; i < pk_len; i++, part++) {
+			struct key_def *def = space->index[0]->def->key_def;
+			for (int i = 0; i < pk_len; i++) {
+				struct key_part *part = &def->parts[i];
 				sqlVdbeAddOp3(v, OP_Column, tab_cursor,
 					      part->fieldno, reg_pk + i);
 			}
@@ -373,7 +373,6 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		if (one_pass != ONEPASS_OFF) {
 			/* OP_Found will use an unpacked key. */
 			assert(key_len == pk_len);
-			assert(pk_info != NULL || space->def->opts.is_view);
 			sqlVdbeAddOp4Int(v, OP_NotFound, tab_cursor,
 					     addr_bypass, reg_key, key_len);
 

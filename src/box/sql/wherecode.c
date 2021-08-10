@@ -1134,11 +1134,19 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 		if ((pWInfo->wctrlFlags & WHERE_DUPLICATES_OK) == 0) {
 			cur_row_set = pParse->nTab++;
 			reg_row_set = ++pParse->nMem;
-			sqlVdbeAddOp2(v, OP_OpenTEphemeral,
-					  reg_row_set, pk_part_count);
+			struct index_def *index_def = space->index[0]->def;
+			struct sql_space_info *info =
+				sql_space_info_new_from_index_def(index_def,
+								  false);
+			if (info == NULL) {
+				pParse->is_aborted = true;
+				return notReady;
+			}
+			sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_row_set,
+				      pk_part_count, 0, (char *)info,
+				      P4_DYNAMIC);
 			sqlVdbeAddOp3(v, OP_IteratorOpen, cur_row_set, 0,
 					  reg_row_set);
-			sql_vdbe_set_p4_key_def(pParse, pk_key_def);
 			regPk = ++pParse->nMem;
 		}
 		iRetInit = sqlVdbeAddOp2(v, OP_Integer, 0, regReturn);

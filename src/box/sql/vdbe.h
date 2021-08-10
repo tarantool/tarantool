@@ -93,6 +93,10 @@ struct VdbeOp {
 		 * doing a cast.
 		 */
 		enum field_type *types;
+		/**
+		 * Information about ephemeral space field types and key parts.
+		 */
+		struct sql_space_info *space_info;
 	} p4;
 #ifdef SQL_ENABLE_EXPLAIN_COMMENTS
 	char *zComment;		/* Comment to improve readability */
@@ -209,15 +213,6 @@ int sqlVdbeChangeToNoop(Vdbe *, int addr);
 int sqlVdbeDeletePriorOpcode(Vdbe *, u8 op);
 void sqlVdbeChangeP4(Vdbe *, int addr, const char *zP4, int N);
 void sqlVdbeAppendP4(Vdbe *, void *pP4, int p4type);
-
-/**
- * Set the P4 on the most recently added opcode to the key_def for the
- * index given.
- * @param Parse context, for error reporting.
- * @param key_def Definition of a key to set.
- */
-void
-sql_vdbe_set_p4_key_def(struct Parse *parse, struct key_def *key_def);
 
 VdbeOp *sqlVdbeGetOp(Vdbe *, int);
 int sqlVdbeMakeLabel(Vdbe *);

@@ -226,9 +226,20 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	iEph = pParse->nTab++;
 	sqlVdbeAddOp2(v, OP_Null, 0, iPk);
 
+	struct sql_space_info *info;
+	assert(space->index_count > 0 || is_view);
+	if (is_view)
+		info = sql_space_info_new_from_space_def(def);
+	else
+		info = sql_space_info_new_from_index_def(pPk->def, false);
+	if (info == NULL) {
+		pParse->is_aborted = true;
+		goto update_cleanup;
+	}
 	/* Address of the OpenEphemeral instruction. */
-	int addrOpen = sqlVdbeAddOp2(v, OP_OpenTEphemeral, reg_eph,
-					 pk_part_count);
+	int addrOpen = sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph, 0, 0,
+				     (char *)info, P4_DYNAMIC);
+
 	pWInfo = sqlWhereBegin(pParse, pTabList, pWhere, 0, 0,
 				   WHERE_ONEPASS_DESIRED, pk_cursor);
 	if (pWInfo == 0)

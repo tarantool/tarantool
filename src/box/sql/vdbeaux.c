@@ -787,18 +787,6 @@ sqlVdbeAppendP4(Vdbe * p, void *pP4, int n)
 	}
 }
 
-void
-sql_vdbe_set_p4_key_def(struct Parse *parse, struct key_def *key_def)
-{
-	struct Vdbe *v = parse->pVdbe;
-	assert(v != NULL);
-	assert(key_def != NULL);
-	struct sql_key_info *key_info =
-		sql_key_info_new_from_key_def(parse->db, key_def);
-	if (key_info != NULL)
-		sqlVdbeAppendP4(v, key_info, P4_KEYINFO);
-}
-
 #ifdef SQL_ENABLE_EXPLAIN_COMMENTS
 /*
  * Change the comment on the most recently coded instruction.  Or

@@ -62,21 +62,6 @@ int tarantoolsqlRenameTrigger(const char *zTriggerName,
 				  const char *zOldName, const char *zNewName);
 
 /**
- * Create ephemeral space. Features of ephemeral spaces: id == 0,
- * name == "ephemeral", memtx engine (in future it can be changed,
- * but now only memtx engine is supported), primary index which
- * covers all fields and no secondary indexes, given field number
- * and collation sequence. All fields are scalar and nullable.
- *
- * @param field_count Number of fields in ephemeral space.
- * @param key_info Keys description for new ephemeral space.
- *
- * @retval Pointer to created space, NULL if error.
- */
-struct space *
-sql_ephemeral_space_create(uint32_t filed_count, struct sql_key_info *key_info);
-
-/**
  * Insert tuple into ephemeral space.
  * In contrast to ordinary spaces, there is no need to create and
  * fill request or handle transaction routine.

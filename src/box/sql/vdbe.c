@@ -2033,10 +2033,9 @@ case OP_Fetch: {
 case OP_ApplyType: {
 	enum field_type *types = pOp->p4.types;
 	assert(types != NULL);
-	assert(types[pOp->p2] == field_type_MAX);
 	pIn1 = &aMem[pOp->p1];
-	enum field_type type;
-	while((type = *(types++)) != field_type_MAX) {
+	for (int i = 0; i < pOp->p2; ++i, ++pIn1) {
+		enum field_type type = types[i];
 		assert(pIn1 <= &p->aMem[(p->nMem+1 - p->nCursor)]);
 		assert(memIsValid(pIn1));
 		if (mem_cast_implicit(pIn1, type) != 0) {
@@ -2044,7 +2043,6 @@ case OP_ApplyType: {
 				 mem_str(pIn1), field_type_strs[type]);
 			goto abort_due_to_error;
 		}
-		pIn1++;
 	}
 	break;
 }
@@ -2380,10 +2378,9 @@ open_cursor_set_hints:
 }
 
 /**
- * Opcode: OpenTEphemeral P1 P2 * P4 *
+ * Opcode: OpenTEphemeral P1 * * P4 *
  * Synopsis:
  * @param P1 register, where pointer to new space is stored.
- * @param P2 number of columns in a new table.
  * @param P4 key def for new table, NULL is allowed.
  *
  * This opcode creates Tarantool's ephemeral table and stores pointer
@@ -2391,11 +2388,11 @@ open_cursor_set_hints:
  */
 case OP_OpenTEphemeral: {
 	assert(pOp->p1 >= 0);
-	assert(pOp->p2 > 0);
-	assert(pOp->p4type != P4_KEYINFO || pOp->p4.key_info != NULL);
 
-	struct space *space = sql_ephemeral_space_create(pOp->p2,
-							 pOp->p4.key_info);
+	assert(pOp->p4type == P4_DYNAMIC || pOp->p4type == P4_STATIC);
+	struct sql_space_info *info = pOp->p4.space_info;
+	assert(info != NULL);
+	struct space *space = sql_ephemeral_space_new(info);
 
 	if (space == NULL)
 		goto abort_due_to_error;

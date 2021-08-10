@@ -2740,7 +2740,6 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 
 	switch (pExpr->op) {
 	case TK_IN:{
-			int addr;	/* Address of OP_OpenEphemeral instruction */
 			Expr *pLeft = pExpr->pLeft;	/* the LHS of the IN operator */
 			int nVal;	/* Size of vector pLeft */
 
@@ -2761,13 +2760,14 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 			 */
 			pExpr->iTable = pParse->nTab++;
 			int reg_eph = ++pParse->nMem;
-			addr = sqlVdbeAddOp2(v, OP_OpenTEphemeral,
-						 reg_eph, nVal);
+			struct sql_space_info *info =
+				sql_space_info_new(nVal, 0);
+			if (info == NULL)
+				return 0;
+			sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph, 0, 0,
+				      (char *)info, P4_DYNAMIC);
 			sqlVdbeAddOp3(v, OP_IteratorOpen, pExpr->iTable, 0,
 					  reg_eph);
-			struct sql_key_info *key_info = sql_key_info_new(pParse->db, nVal);
-			if (key_info == NULL)
-				return 0;
 
 			if (ExprHasProperty(pExpr, EP_xIsSelect)) {
 				/* Case 1:     expr IN (SELECT ...)
@@ -2797,7 +2797,6 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 					    (pParse, pSelect, &dest)) {
 						sqlDbFree(pParse->db,
 							      dest.dest_type);
-						sql_key_info_unref(key_info);
 						return 0;
 					}
 					sqlDbFree(pParse->db,
@@ -2809,7 +2808,7 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 						    sqlVectorFieldSubexpr
 						    (pLeft, i);
 						if (sql_binary_compare_coll_seq(pParse, p, pEList->a[i].pExpr,
-										&key_info->parts[i].coll_id) != 0)
+										&info->coll_ids[i]) != 0)
 							return 0;
 					}
 				}
@@ -2829,7 +2828,7 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 				bool unused;
 				struct coll *unused_coll;
 				if (sql_expr_coll(pParse, pExpr->pLeft, &unused,
-						  &key_info->parts[0].coll_id,
+						  &info->coll_ids[0],
 						  &unused_coll) != 0)
 					return 0;
 
@@ -2861,8 +2860,6 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 				sqlReleaseTempReg(pParse, r1);
 				sqlReleaseTempReg(pParse, r2);
 			}
-			sqlVdbeChangeP4(v, addr, (void *)key_info,
-					    P4_KEYINFO);
 			break;
 		}
 
