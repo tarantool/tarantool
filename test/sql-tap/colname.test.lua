@@ -673,7 +673,7 @@ test:do_execsql2_test(
 test:do_execsql2_test(
     "colname-12.5",
     [[
-        CREATE TABLE j (s1 SCALAR PRIMARY KEY);
+        CREATE TABLE j (s1 INTEGER PRIMARY KEY);
         INSERT INTO j VALUES(1);
     ]], {})
 
@@ -750,7 +750,7 @@ test:do_execsql2_test(
 test:do_execsql2_test(
     "colname-12.14",
     [[
-        CREATE TABLE j_1 (column_1 SCALAR PRIMARY KEY, column_2 SCALAR);
+        CREATE TABLE j_1 (column_1 INTEGER PRIMARY KEY, column_2 SCALAR);
         INSERT INTO j_1 VALUES(1, 1);
     ]], {})
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(31)
+test:plan(26)
 
 --!./tcltestrunner.lua
 -- 2013 March 20
@@ -143,62 +143,6 @@ test:do_catchsql_test(
     ]], {
         1, "Type mismatch: can not convert double(2.1) to integer"
     })
-
---
--- gh-4233: Make sure that NUMBER can contain UNSIGNED, INTEGER
--- and DOUBLE and is not automatically converted to DOUBLE.
---
-test:do_execsql_test(
-    "numcast-3.3",
-    [[
-        SELECT CAST('11111111111111111111' AS NUMBER);
-    ]], {
-        11111111111111111111ULL
-    })
-
-test:do_execsql_test(
-    "numcast-3.4",
-    [[
-        SELECT CAST('101' AS NUMBER) / 10, CAST('101.' AS NUMBER) / 10;
-    ]], {
-        10, 10.1
-    })
-
-test:do_execsql_test(
-    "numcast-3.5",
-    [[
-        SELECT CAST('101     ' AS NUMBER) / 10, CAST('      101' AS NUMBER) / 10;
-    ]], {
-        10, 10
-    })
-
-test:do_execsql_test(
-    "numcast-3.6",
-    [[
-        CREATE TABLE t1 (id INT PRIMARY KEY, n NUMBER);
-        INSERT INTO t1 VALUES (1, 9223372036854775807);
-        INSERT INTO t1 VALUES (2, -9223372036854775807);
-        INSERT INTO t1 VALUES (3, 9007199254740992.0);
-        SELECT n, n/100 FROM t1;
-    ]], {
-        9223372036854775807ULL, 92233720368547758ULL,
-        -9223372036854775807LL, -92233720368547758LL,
-        9007199254740992, 90071992547409.92
-    })
-
-test:do_execsql_test(
-    "numcast-3.7",
-    [[
-        CREATE TABLE t2(a NUMBER primary key);
-        INSERT INTO t2 VALUES(-56);
-        INSERT INTO t2 VALUES(44.0);
-        INSERT INTO t2 VALUES(46);
-        INSERT INTO t2 VALUES(56.0);
-        SELECT (a + 25) / 50 FROM t2;
-    ]], {
-        0,1.38,1,1.62
-})
-
 
 test:do_execsql_test(
     "numcast-3.8",

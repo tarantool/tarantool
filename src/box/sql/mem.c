@@ -1590,6 +1590,22 @@ mem_concat(struct Mem *a, struct Mem *b, struct Mem *result)
 	return 0;
 }
 
+static inline int
+check_types_numeric_arithmetic(const struct Mem *a, const struct Mem *b)
+{
+	if (!mem_is_num(a) || mem_is_metatype(a)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(a),
+			 "integer, unsigned or double");
+		return -1;
+	}
+	if (!mem_is_num(b) || mem_is_metatype(b)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(b),
+			 "integer, unsigned or double");
+		return -1;
+	}
+	return 0;
+}
+
 int
 mem_add(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
@@ -1597,16 +1613,8 @@ mem_add(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		mem_set_null(result);
 		return 0;
 	}
-	if (!mem_is_num(right)) {
-		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
-			 "number");
+	if (check_types_numeric_arithmetic(right, left) != 0)
 		return -1;
-	}
-	if (!mem_is_num(left)) {
-		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
-			 "number");
-		return -1;
-	}
 	if (((left->type | right->type) & MEM_TYPE_DOUBLE) != 0) {
 		double a;
 		double b;
@@ -1633,16 +1641,8 @@ mem_sub(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		mem_set_null(result);
 		return 0;
 	}
-	if (!mem_is_num(right)) {
-		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
-			 "number");
+	if (check_types_numeric_arithmetic(right, left) != 0)
 		return -1;
-	}
-	if (!mem_is_num(left)) {
-		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
-			 "number");
-		return -1;
-	}
 	if (((left->type | right->type) & MEM_TYPE_DOUBLE) != 0) {
 		double a;
 		double b;
@@ -1669,16 +1669,8 @@ mem_mul(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		mem_set_null(result);
 		return 0;
 	}
-	if (!mem_is_num(right)) {
-		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
-			 "number");
+	if (check_types_numeric_arithmetic(right, left) != 0)
 		return -1;
-	}
-	if (!mem_is_num(left)) {
-		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
-			 "number");
-		return -1;
-	}
 	if (((left->type | right->type) & MEM_TYPE_DOUBLE) != 0) {
 		double a;
 		double b;
@@ -1705,16 +1697,8 @@ mem_div(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		mem_set_null(result);
 		return 0;
 	}
-	if (!mem_is_num(right)) {
-		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
-			 "number");
+	if (check_types_numeric_arithmetic(right, left) != 0)
 		return -1;
-	}
-	if (!mem_is_num(left)) {
-		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
-			 "number");
-		return -1;
-	}
 	if (((left->type | right->type) & MEM_TYPE_DOUBLE) != 0) {
 		double a;
 		double b;
@@ -1750,12 +1734,12 @@ mem_rem(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		mem_set_null(result);
 		return 0;
 	}
-	if (!mem_is_int(right)) {
+	if (!mem_is_int(right) || mem_is_metatype(right)) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
 			 "integer");
 		return -1;
 	}
-	if (!mem_is_int(left)) {
+	if (!mem_is_int(left) || mem_is_metatype(left)) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
 			 "integer");
 		return -1;

@@ -35,7 +35,7 @@ test:do_catchsql_test(
     [[
         SELECT 9 + '2';
     ]], {
-        1, "Type mismatch: can not convert string('2') to number"
+        1, "Type mismatch: can not convert string('2') to integer, unsigned or double"
     })
 
 test:do_catchsql_test(
@@ -43,7 +43,7 @@ test:do_catchsql_test(
     [[
         SELECT 9 + x'32';
     ]], {
-        1, "Type mismatch: can not convert varbinary(x'32') to number"
+        1, "Type mismatch: can not convert varbinary(x'32') to integer, unsigned or double"
     })
 
 test:do_catchsql_test(
@@ -51,7 +51,7 @@ test:do_catchsql_test(
     [[
         SELECT 9 + true;
     ]], {
-        1, "Type mismatch: can not convert boolean(TRUE) to number"
+        1, "Type mismatch: can not convert boolean(TRUE) to integer, unsigned or double"
     })
 
 test:do_catchsql_test(
@@ -60,7 +60,7 @@ test:do_catchsql_test(
         SELECT 9 + CAST('11111111-1111-1111-1111-111111111111' AS UUID);
     ]], {
         1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to number"
+           "uuid('11111111-1111-1111-1111-111111111111') to integer, unsigned or double"
     })
 
 test:do_execsql_test(
@@ -92,7 +92,7 @@ test:do_catchsql_test(
     [[
         SELECT 9 - '2';
     ]], {
-        1, "Type mismatch: can not convert string('2') to number"
+        1, "Type mismatch: can not convert string('2') to integer, unsigned or double"
     })
 
 test:do_catchsql_test(
@@ -100,7 +100,7 @@ test:do_catchsql_test(
     [[
         SELECT 9 - x'32';
     ]], {
-        1, "Type mismatch: can not convert varbinary(x'32') to number"
+        1, "Type mismatch: can not convert varbinary(x'32') to integer, unsigned or double"
     })
 
 test:do_catchsql_test(
@@ -108,7 +108,7 @@ test:do_catchsql_test(
     [[
         SELECT 9 - true;
     ]], {
-        1, "Type mismatch: can not convert boolean(TRUE) to number"
+        1, "Type mismatch: can not convert boolean(TRUE) to integer, unsigned or double"
     })
 
 test:do_catchsql_test(
@@ -117,7 +117,7 @@ test:do_catchsql_test(
         SELECT 9 - CAST('11111111-1111-1111-1111-111111111111' AS UUID);
     ]], {
         1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to number"
+           "uuid('11111111-1111-1111-1111-111111111111') to integer, unsigned or double"
     })
 
 test:do_execsql_test(
@@ -149,7 +149,7 @@ test:do_catchsql_test(
     [[
         SELECT 9 * '2';
     ]], {
-        1, "Type mismatch: can not convert string('2') to number"
+        1, "Type mismatch: can not convert string('2') to integer, unsigned or double"
     })
 
 test:do_catchsql_test(
@@ -157,7 +157,7 @@ test:do_catchsql_test(
     [[
         SELECT 9 * x'32';
     ]], {
-        1, "Type mismatch: can not convert varbinary(x'32') to number"
+        1, "Type mismatch: can not convert varbinary(x'32') to integer, unsigned or double"
     })
 
 test:do_catchsql_test(
@@ -165,7 +165,7 @@ test:do_catchsql_test(
     [[
         SELECT 9 * true;
     ]], {
-        1, "Type mismatch: can not convert boolean(TRUE) to number"
+        1, "Type mismatch: can not convert boolean(TRUE) to integer, unsigned or double"
     })
 
 test:do_catchsql_test(
@@ -174,7 +174,7 @@ test:do_catchsql_test(
         SELECT 9 * CAST('11111111-1111-1111-1111-111111111111' AS UUID);
     ]], {
         1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to number"
+           "uuid('11111111-1111-1111-1111-111111111111') to integer, unsigned or double"
     })
 
 test:do_execsql_test(
@@ -206,7 +206,7 @@ test:do_catchsql_test(
     [[
         SELECT 9 / '2';
     ]], {
-        1, "Type mismatch: can not convert string('2') to number"
+        1, "Type mismatch: can not convert string('2') to integer, unsigned or double"
     })
 
 test:do_catchsql_test(
@@ -214,7 +214,7 @@ test:do_catchsql_test(
     [[
         SELECT 9 / x'32';
     ]], {
-        1, "Type mismatch: can not convert varbinary(x'32') to number"
+        1, "Type mismatch: can not convert varbinary(x'32') to integer, unsigned or double"
     })
 
 test:do_catchsql_test(
@@ -222,7 +222,7 @@ test:do_catchsql_test(
     [[
         SELECT 9 / true;
     ]], {
-        1, "Type mismatch: can not convert boolean(TRUE) to number"
+        1, "Type mismatch: can not convert boolean(TRUE) to integer, unsigned or double"
     })
 
 test:do_catchsql_test(
@@ -231,7 +231,7 @@ test:do_catchsql_test(
         SELECT 9 / CAST('11111111-1111-1111-1111-111111111111' AS UUID);
     ]], {
         1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to number"
+           "uuid('11111111-1111-1111-1111-111111111111') to integer, unsigned or double"
     })
 
 test:do_execsql_test(

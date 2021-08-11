@@ -155,7 +155,7 @@ end;
 test_run:cmd("setopt delimiter ''");
 unprepare(s.stmt_id)
 
-s = prepare("SELECT count(*), count(a - 3), max(b), abs(id) FROM test WHERE b = '3';")
+s = prepare("SELECT count(*), count(id - 3), max(b), abs(id) FROM test WHERE b = '3';")
 execute(s.stmt_id)
 execute(s.stmt_id)
 unprepare(s.stmt_id)

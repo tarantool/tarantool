@@ -756,9 +756,9 @@ test:drop_all_tables()
 test:do_execsql_test(
     "e_select-4.0",
     [[
-        CREATE TABLE z1(id  INT primary key, a NUMBER, b NUMBER, c TEXT);
-        CREATE TABLE z2(id  INT primary key, d NUMBER, e NUMBER);
-        CREATE TABLE z3(id  INT primary key, a NUMBER, b NUMBER);
+        CREATE TABLE z1(id  INT primary key, a DOUBLE, b DOUBLE, c TEXT);
+        CREATE TABLE z2(id  INT primary key, d DOUBLE, e DOUBLE);
+        CREATE TABLE z3(id  INT primary key, a DOUBLE, b DOUBLE);
 
         INSERT INTO z1 VALUES(1, 51.65, -59.58, 'belfries');
         INSERT INTO z1 VALUES(2, -5, NULL, '75');

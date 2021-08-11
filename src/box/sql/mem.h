@@ -142,6 +142,12 @@ mem_is_num(const struct Mem *mem)
 }
 
 static inline bool
+mem_is_metatype(const struct Mem *mem)
+{
+	return (mem->flags & (MEM_Number | MEM_Scalar)) != 0;
+}
+
+static inline bool
 mem_is_double(const struct Mem *mem)
 {
 	return mem->type == MEM_TYPE_DOUBLE;

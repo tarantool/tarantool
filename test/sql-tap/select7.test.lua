@@ -187,7 +187,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "select7-7.1",
     [[
-        CREATE TABLE t3(a NUMBER primary key);
+        CREATE TABLE t3(a DOUBLE primary key);
         INSERT INTO t3 VALUES(44.0);
         INSERT INTO t3 VALUES(56.0);
     ]], {
@@ -210,7 +210,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select7-7.3",
     [[
-        CREATE TABLE t4(a NUMBER primary key);
+        CREATE TABLE t4(a DOUBLE primary key);
         INSERT INTO t4 VALUES( 2.0 );
         INSERT INTO t4 VALUES( 3.0 );
     ]], {
@@ -235,7 +235,7 @@ test:do_execsql_test(
         SELECT a=0, typeof(a) FROM t4
     ]], {
         -- <select7-7.5>
-        false, "number", false, "number"
+        false, "double", false, "double"
         -- </select7-7.5>
     })
 
@@ -245,7 +245,7 @@ test:do_execsql_test(
         SELECT a=0, typeof(a) FROM t4 GROUP BY a
     ]], {
         -- <select7-7.6>
-        false, "number", false, "number"
+        false, "double", false, "double"
         -- </select7-7.6>
     })
 

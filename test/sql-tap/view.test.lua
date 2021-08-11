@@ -623,7 +623,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "view-8.6",
     [[
-        SELECT mx+10, pqr FROM v6, v8 WHERE xyz=2;
+        SELECT CAST(mx AS INTEGER) + 10, pqr FROM v6, v8 WHERE xyz = 2;
     ]], {
         -- <view-8.6>
         13, 7
@@ -633,7 +633,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "view-8.7",
     [[
-        SELECT mx+10, pqr FROM v6, v8 WHERE xyz>2;
+        SELECT CAST(mx AS INTEGER) + 10, pqr FROM v6, v8 WHERE xyz > 2;
     ]], {
         -- <view-8.7>
         13, 13, 13, 19, 13, 27
