@@ -5,6 +5,22 @@ test_run:cmd("start server tx_man")
 test_run:cmd("switch tx_man")
 
 txn_proxy = require('txn_proxy')
+tx1 = txn_proxy.new()
+tx2 = txn_proxy.new()
+tx3 = txn_proxy.new()
+
+-- https://github.com/tarantool/tarantool/issues/6274
+-- This test is very short, but fragile : it depends on amount of garbage
+-- in both memtx index's GC and transactional manager's GC.
+-- That's why it is placed in the beginning of the file - without this commit
+-- it would fail every time.
+sp = box.schema.space.create('test')
+_ = sp:create_index('test1', {parts={1}})
+_ = sp:create_index('test2', {parts={2}})
+sp:replace{1, 1}
+sp:delete{1}
+sp:drop()
+collectgarbage()
 
 s = box.schema.space.create('test')
 i1 = s:create_index('pk', {parts={{1, 'uint'}}})
@@ -13,10 +29,6 @@ i2 = s:create_index('sec', {parts={{2, 'uint'}}})
 s2 = box.schema.space.create('test2')
 i21 = s2:create_index('pk', {parts={{1, 'uint'}}})
 i22 = s2:create_index('sec', {parts={{2, 'uint'}}})
-
-tx1 = txn_proxy.new()
-tx2 = txn_proxy.new()
-tx3 = txn_proxy.new()
 
 -- Simple read/write conflicts.
 s:replace{1, 0}
