@@ -233,8 +233,8 @@ xrow_encode_dml(const struct request *request, struct region *region,
  */
 struct synchro_request {
 	/**
-	 * Operation type - either IPROTO_ROLLBACK or IPROTO_CONFIRM or
-	 * IPROTO_PROMOTE
+	 * Operation type - either IPROTO_RAFT_ROLLBACK or IPROTO_RAFT_CONFIRM
+	 * or IPROTO_RAFT_PROMOTE
 	 */
 	uint16_t type;
 	/**

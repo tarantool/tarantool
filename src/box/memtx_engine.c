@@ -229,7 +229,7 @@ memtx_engine_recover_raft(const struct xrow_header *row)
 static int
 memtx_engine_recover_synchro(const struct xrow_header *row)
 {
-	assert(row->type == IPROTO_PROMOTE);
+	assert(row->type == IPROTO_RAFT_PROMOTE);
 	struct synchro_request req;
 	if (xrow_decode_synchro(row, &req) != 0)
 		return -1;
@@ -250,7 +250,7 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 	if (row->type != IPROTO_INSERT) {
 		if (row->type == IPROTO_RAFT)
 			return memtx_engine_recover_raft(row);
-		if (row->type == IPROTO_PROMOTE)
+		if (row->type == IPROTO_RAFT_PROMOTE)
 			return memtx_engine_recover_synchro(row);
 		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE,
 			 (uint32_t) row->type);
