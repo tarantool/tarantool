@@ -1,6 +1,6 @@
 #! /bin/sh
-# $1 - in  file
-# $2 - out file(s)
+# $1 - in  file(s)
+# $2 - out file
 # $3 - os
 # $4 - export templates
 if [ "x$3x" = xDarwinx ]; then
