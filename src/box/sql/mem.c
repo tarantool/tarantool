@@ -116,21 +116,22 @@ const char *
 mem_str(const struct Mem *mem)
 {
 	char buf[STR_VALUE_MAX_LEN];
+	const char *type = mem_type_to_str(mem);
 	switch (mem->type) {
 	case MEM_TYPE_NULL:
 		return "NULL";
 	case MEM_TYPE_STR:
 		if (mem->n <= STR_VALUE_MAX_LEN)
-			return tt_sprintf("string('%.*s')", mem->n, mem->z);
-		return tt_sprintf("string('%.*s...)", STR_VALUE_MAX_LEN,
+			return tt_sprintf("%s('%.*s')", type, mem->n, mem->z);
+		return tt_sprintf("%s('%.*s...)", type, STR_VALUE_MAX_LEN,
 				  mem->z);
 	case MEM_TYPE_INT:
-		return tt_sprintf("integer(%lld)", mem->u.i);
+		return tt_sprintf("%s(%lld)", type, mem->u.i);
 	case MEM_TYPE_UINT:
-		return tt_sprintf("integer(%llu)", mem->u.u);
+		return tt_sprintf("%s(%llu)", type, mem->u.u);
 	case MEM_TYPE_DOUBLE:
 		sql_snprintf(STR_VALUE_MAX_LEN, buf, "%!.15g", mem->u.r);
-		return tt_sprintf("double(%s)", buf);
+		return tt_sprintf("%s(%s)", type, buf);
 	case MEM_TYPE_BIN: {
 		int len = MIN(mem->n, STR_VALUE_MAX_LEN / 2);
 		for (int i = 0; i < len; ++i) {
@@ -140,13 +141,12 @@ mem_str(const struct Mem *mem)
 			buf[2 * i + 1] = n < 10 ? ('0' + n) : ('A' + n - 10);
 		}
 		if (mem->n > len)
-			return tt_sprintf("varbinary(x'%.*s...)", len * 2, buf);
-		return tt_sprintf("varbinary(x'%.*s')", len * 2, buf);
+			return tt_sprintf("%s(x'%.*s...)", type, len * 2, buf);
+		return tt_sprintf("%s(x'%.*s')", type, len * 2, buf);
 	}
 	case MEM_TYPE_MAP:
 	case MEM_TYPE_ARRAY: {
 		const char *str = mp_str(mem->z);
-		const char *type = mem_type_to_str(mem);
 		uint32_t len = strlen(str);
 		uint32_t minlen = MIN(STR_VALUE_MAX_LEN, len);
 		memcpy(buf, str, minlen);
@@ -156,9 +156,9 @@ mem_str(const struct Mem *mem)
 	}
 	case MEM_TYPE_UUID:
 		tt_uuid_to_string(&mem->u.uuid, buf);
-		return tt_sprintf("uuid('%s')", buf);
+		return tt_sprintf("%s('%s')", type, buf);
 	case MEM_TYPE_BOOL:
-		return mem->u.b ? "boolean(TRUE)" : "boolean(FALSE)";
+		return tt_sprintf("%s(%s)", type, mem->u.b ? "TRUE" : "FALSE");
 	default:
 		return "unknown";
 	}
@@ -626,7 +626,7 @@ int_to_double(struct Mem *mem)
 		d = (double)mem->u.i;
 	mem->u.r = d;
 	mem->type = MEM_TYPE_DOUBLE;
-	assert(mem->flags == 0);
+	mem->flags = 0;
 	return 0;
 }
 
@@ -640,6 +640,7 @@ int_to_double_precise(struct Mem *mem)
 		return -1;
 	mem->u.r = d;
 	mem->type = MEM_TYPE_DOUBLE;
+	mem->flags = 0;
 	return 0;
 }
 
@@ -656,6 +657,7 @@ int_to_double_forced(struct Mem *mem)
 	double d = (double)i;
 	mem->u.r = d;
 	mem->type = MEM_TYPE_DOUBLE;
+	mem->flags = 0;
 	return CMP_OLD_NEW(i, d, int64_t);
 }
 
@@ -668,6 +670,7 @@ uint_to_double_precise(struct Mem *mem)
 	if (mem->u.u != (uint64_t)d)
 		return -1;
 	mem->u.r = d;
+	mem->flags = 0;
 	mem->type = MEM_TYPE_DOUBLE;
 	return 0;
 }
@@ -684,6 +687,7 @@ uint_to_double_forced(struct Mem *mem)
 	uint64_t u = mem->u.u;
 	double d = (double)u;
 	mem->u.r = d;
+	mem->flags = 0;
 	mem->type = MEM_TYPE_DOUBLE;
 	return CMP_OLD_NEW(u, d, uint64_t);
 }
@@ -708,6 +712,7 @@ str_to_str0(struct Mem *mem)
 		return -1;
 	mem->z[mem->n] = '\0';
 	mem->flags |= MEM_Term;
+	mem->flags &= ~MEM_Scalar;
 	return 0;
 }
 
@@ -716,7 +721,7 @@ str_to_bin(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_STR);
 	mem->type = MEM_TYPE_BIN;
-	mem->flags &= ~MEM_Term;
+	mem->flags &= ~(MEM_Term | MEM_Scalar);
 	return 0;
 }
 
@@ -765,6 +770,7 @@ bin_to_str(struct Mem *mem)
 	if (ExpandBlob(mem) != 0)
 		return -1;
 	mem->type = MEM_TYPE_STR;
+	mem->flags &= ~MEM_Scalar;
 	return 0;
 }
 
@@ -840,13 +846,13 @@ double_to_int(struct Mem *mem)
 	if (d <= -1.0 && d >= (double)INT64_MIN) {
 		mem->u.i = (int64_t)d;
 		mem->type = MEM_TYPE_INT;
-		assert(mem->flags == 0);
+		mem->flags = 0;
 		return 0;
 	}
 	if (d > -1.0 && d < (double)UINT64_MAX) {
 		mem->u.u = (uint64_t)d;
 		mem->type = MEM_TYPE_UINT;
-		assert(mem->flags == 0);
+		mem->flags = 0;
 		return 0;
 	}
 	return -1;
@@ -860,13 +866,13 @@ double_to_int_precise(struct Mem *mem)
 	if (d <= -1.0 && d >= (double)INT64_MIN && (double)(int64_t)d == d) {
 		mem->u.i = (int64_t)d;
 		mem->type = MEM_TYPE_INT;
-		assert(mem->flags == 0);
+		mem->flags = 0;
 		return 0;
 	}
 	if (d > -1.0 && d < (double)UINT64_MAX && (double)(uint64_t)d == d) {
 		mem->u.u = (uint64_t)d;
 		mem->type = MEM_TYPE_UINT;
-		assert(mem->flags == 0);
+		mem->flags = 0;
 		return 0;
 	}
 	return -1;
@@ -905,6 +911,7 @@ double_to_int_forced(struct Mem *mem)
 	}
 	mem->u.i = i;
 	mem->type = type;
+	mem->flags = 0;
 	return res;
 }
 
@@ -916,7 +923,7 @@ double_to_uint(struct Mem *mem)
 	if (d > -1.0 && d < (double)UINT64_MAX) {
 		mem->u.u = (uint64_t)d;
 		mem->type = MEM_TYPE_UINT;
-		assert(mem->flags == 0);
+		mem->flags = 0;
 		return 0;
 	}
 	return -1;
@@ -930,7 +937,7 @@ double_to_uint_precise(struct Mem *mem)
 	if (d > -1.0 && d < (double)UINT64_MAX && (double)(uint64_t)d == d) {
 		mem->u.u = (uint64_t)d;
 		mem->type = MEM_TYPE_UINT;
-		assert(mem->flags == 0);
+		mem->flags = 0;
 		return 0;
 	}
 	return -1;
@@ -960,6 +967,7 @@ double_to_uint_forced(struct Mem *mem)
 	}
 	mem->u.u = u;
 	mem->type = MEM_TYPE_UINT;
+	mem->flags = 0;
 	return res;
 }
 
@@ -1020,8 +1028,10 @@ int
 mem_to_int(struct Mem *mem)
 {
 	assert(mem->type < MEM_TYPE_INVALID);
-	if ((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0)
+	if ((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0) {
+		mem->flags = 0;
 		return 0;
+	}
 	if (mem->type == MEM_TYPE_STR)
 		return str_to_int(mem);
 	if (mem->type == MEM_TYPE_DOUBLE)
@@ -1033,8 +1043,10 @@ int
 mem_to_int_precise(struct Mem *mem)
 {
 	assert(mem->type < MEM_TYPE_INVALID);
-	if ((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0)
+	if ((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0) {
+		mem->flags = 0;
 		return 0;
+	}
 	if (mem->type == MEM_TYPE_STR)
 		return str_to_int(mem);
 	if (mem->type == MEM_TYPE_DOUBLE)
@@ -1046,8 +1058,10 @@ int
 mem_to_double(struct Mem *mem)
 {
 	assert(mem->type < MEM_TYPE_INVALID);
-	if (mem->type == MEM_TYPE_DOUBLE)
+	if (mem->type == MEM_TYPE_DOUBLE) {
+		mem->flags = 0;
 		return 0;
+	}
 	if ((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0)
 		return int_to_double(mem);
 	if (mem->type == MEM_TYPE_STR)
@@ -1059,12 +1073,15 @@ int
 mem_to_number(struct Mem *mem)
 {
 	assert(mem->type < MEM_TYPE_INVALID);
-	if (mem_is_num(mem))
+	if (mem_is_num(mem)) {
+		mem->flags = MEM_Number;
 		return 0;
+	}
 	if (mem->type == MEM_TYPE_STR) {
-		if (str_to_int(mem) == 0)
-			return 0;
-		return str_to_double(mem);
+		if (str_to_int(mem) != 0 && str_to_double(mem) != 0)
+			return -1;
+		mem->flags = MEM_Number;
+		return 0;
 	}
 	return -1;
 }
@@ -1075,8 +1092,10 @@ mem_to_str0(struct Mem *mem)
 	assert(mem->type < MEM_TYPE_INVALID);
 	switch (mem->type) {
 	case MEM_TYPE_STR:
-		if ((mem->flags & MEM_Term) != 0)
+		if ((mem->flags & MEM_Term) != 0) {
+			mem->flags &= ~MEM_Scalar;
 			return 0;
+		}
 		return str_to_str0(mem);
 	case MEM_TYPE_INT:
 	case MEM_TYPE_UINT:
@@ -1104,6 +1123,7 @@ mem_to_str(struct Mem *mem)
 	assert(mem->type < MEM_TYPE_INVALID);
 	switch (mem->type) {
 	case MEM_TYPE_STR:
+		mem->flags &= ~MEM_Scalar;
 		return 0;
 	case MEM_TYPE_INT:
 	case MEM_TYPE_UINT:
@@ -1134,6 +1154,7 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 	case FIELD_TYPE_UNSIGNED:
 		switch (mem->type) {
 		case MEM_TYPE_UINT:
+			mem->flags = 0;
 			return 0;
 		case MEM_TYPE_STR:
 			return str_to_uint(mem);
@@ -1151,6 +1172,7 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 	case FIELD_TYPE_BOOLEAN:
 		switch (mem->type) {
 		case MEM_TYPE_BOOL:
+			mem->flags = 0;
 			return 0;
 		case MEM_TYPE_STR:
 			return str_to_bool(mem);
@@ -1160,16 +1182,20 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 	case FIELD_TYPE_VARBINARY:
 		if (mem->type == MEM_TYPE_STR)
 			return str_to_bin(mem);
-		if (mem_is_bytes(mem))
+		if (mem_is_bytes(mem)) {
+			mem->flags &= ~MEM_Scalar;
 			return 0;
+		}
 		if (mem->type == MEM_TYPE_UUID)
 			return uuid_to_bin(mem);
 		return -1;
 	case FIELD_TYPE_NUMBER:
 		return mem_to_number(mem);
 	case FIELD_TYPE_UUID:
-		if (mem->type == MEM_TYPE_UUID)
+		if (mem->type == MEM_TYPE_UUID) {
+			mem->flags = 0;
 			return 0;
+		}
 		if (mem->type == MEM_TYPE_STR)
 			return str_to_uuid(mem);
 		if (mem->type == MEM_TYPE_BIN)
@@ -1178,6 +1204,8 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 	case FIELD_TYPE_SCALAR:
 		if ((mem->type & (MEM_TYPE_MAP | MEM_TYPE_ARRAY)) != 0)
 			return -1;
+		mem->flags |= MEM_Scalar;
+		mem->flags &= ~MEM_Number;
 		return 0;
 	default:
 		break;
@@ -1192,42 +1220,55 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 		return 0;
 	switch (type) {
 	case FIELD_TYPE_UNSIGNED:
-		if (mem->type == MEM_TYPE_UINT)
+		if (mem->type == MEM_TYPE_UINT) {
+			mem->flags = 0;
 			return 0;
+		}
 		if (mem->type == MEM_TYPE_DOUBLE)
 			return double_to_uint_precise(mem);
 		return -1;
 	case FIELD_TYPE_STRING:
-		if (mem->type == MEM_TYPE_STR)
+		if (mem->type == MEM_TYPE_STR) {
+			mem->flags &= ~MEM_Scalar;
 			return 0;
+		}
 		return -1;
 	case FIELD_TYPE_DOUBLE:
-		if (mem->type == MEM_TYPE_DOUBLE)
+		if (mem->type == MEM_TYPE_DOUBLE) {
+			mem->flags = 0;
 			return 0;
+		}
 		if (mem->type == MEM_TYPE_INT)
 			return int_to_double_precise(mem);
 		if (mem->type == MEM_TYPE_UINT)
 			return uint_to_double_precise(mem);
 		return -1;
 	case FIELD_TYPE_INTEGER:
-		if ((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0)
+		if ((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0) {
+			mem->flags = 0;
 			return 0;
+		}
 		if (mem->type == MEM_TYPE_DOUBLE)
 			return double_to_int_precise(mem);
 		return -1;
 	case FIELD_TYPE_BOOLEAN:
-		if (mem->type == MEM_TYPE_BOOL)
+		if (mem->type == MEM_TYPE_BOOL) {
+			mem->flags = 0;
 			return 0;
+		}
 		return -1;
 	case FIELD_TYPE_VARBINARY:
 		if ((mem->type & (MEM_TYPE_BIN | MEM_TYPE_MAP |
-				  MEM_TYPE_ARRAY)) != 0)
+				  MEM_TYPE_ARRAY)) != 0) {
+			mem->flags &= ~MEM_Scalar;
 			return 0;
+		}
 		return -1;
 	case FIELD_TYPE_NUMBER:
-		if (mem_is_num(mem))
-			return 0;
-		return -1;
+		if (!mem_is_num(mem))
+			return -1;
+		mem->flags = MEM_Number;
+		return 0;
 	case FIELD_TYPE_MAP:
 		if (mem->type == MEM_TYPE_MAP)
 			return 0;
@@ -1239,11 +1280,14 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 	case FIELD_TYPE_SCALAR:
 		if ((mem->type & (MEM_TYPE_MAP | MEM_TYPE_ARRAY)) != 0)
 			return -1;
+		mem->flags |= MEM_Scalar;
+		mem->flags &= ~MEM_Number;
 		return 0;
 	case FIELD_TYPE_UUID:
-		if (mem->type == MEM_TYPE_UUID)
-			return 0;
-		return -1;
+		if (mem->type != MEM_TYPE_UUID)
+			return -1;
+		mem->flags = 0;
+		return 0;
 	case FIELD_TYPE_ANY:
 		return 0;
 	default:
@@ -1260,9 +1304,11 @@ mem_cast_implicit_number(struct Mem *mem, enum field_type type)
 	case FIELD_TYPE_UNSIGNED:
 		switch (mem->type) {
 		case MEM_TYPE_UINT:
+			mem->flags = 0;
 			return 0;
 		case MEM_TYPE_INT:
 			mem->u.u = 0;
+			mem->flags = 0;
 			mem->type = MEM_TYPE_UINT;
 			return -1;
 		case MEM_TYPE_DOUBLE:
@@ -1278,6 +1324,7 @@ mem_cast_implicit_number(struct Mem *mem, enum field_type type)
 		case MEM_TYPE_UINT:
 			return uint_to_double_forced(mem);
 		case MEM_TYPE_DOUBLE:
+			mem->flags = 0;
 			return 0;
 		default:
 			unreachable();
@@ -1287,6 +1334,7 @@ mem_cast_implicit_number(struct Mem *mem, enum field_type type)
 		switch (mem->type) {
 		case MEM_TYPE_UINT:
 		case MEM_TYPE_INT:
+			mem->flags = 0;
 			return 0;
 		case MEM_TYPE_DOUBLE:
 			return double_to_int_forced(mem);
@@ -2070,15 +2118,18 @@ char *
 mem_type_to_str(const struct Mem *p)
 {
 	assert(p != NULL);
+	if ((p->flags & MEM_Scalar) != 0)
+		return "scalar";
+	if ((p->flags & MEM_Number) != 0)
+		return "number";
 	switch (p->type) {
 	case MEM_TYPE_NULL:
 		return "NULL";
 	case MEM_TYPE_STR:
 		return "string";
 	case MEM_TYPE_INT:
-		return "integer";
 	case MEM_TYPE_UINT:
-		return "unsigned";
+		return "integer";
 	case MEM_TYPE_DOUBLE:
 		return "double";
 	case MEM_TYPE_ARRAY:

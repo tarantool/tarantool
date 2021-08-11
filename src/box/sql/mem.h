@@ -93,6 +93,10 @@ struct Mem {
 #endif
 };
 
+/** MEM is of NUMBER meta-type. */
+#define MEM_Number    0x0001
+/** MEM is of SCALAR meta-type. */
+#define MEM_Scalar    0x0002
 #define MEM_Cleared   0x0200	/* NULL set by OP_Null, not from data */
 
 /* Whenever Mem contains a valid string or blob representation, one of

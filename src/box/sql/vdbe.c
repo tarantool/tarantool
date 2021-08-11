@@ -1982,6 +1982,16 @@ case OP_Column: {
 	    default_val_mem != NULL) {
 		mem_copy_as_ephemeral(pDest, default_val_mem);
 	}
+	if (pDest->type == MEM_TYPE_NULL)
+		goto op_column_out;
+	enum field_type field_type = field_type_MAX;
+	/* Currently PSEUDO cursor does not have info about field types. */
+	if (pC->eCurType == CURTYPE_TARANTOOL)
+		field_type = pC->uc.pCursor->space->def->fields[p2].type;
+	if (field_type == FIELD_TYPE_SCALAR)
+		pDest->flags |= MEM_Scalar;
+	else if (field_type == FIELD_TYPE_NUMBER)
+		pDest->flags |= MEM_Number;
 op_column_out:
 	REGISTER_TRACE(p, pOp->p3, pDest);
 	break;

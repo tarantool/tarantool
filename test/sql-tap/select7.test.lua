@@ -235,7 +235,7 @@ test:do_execsql_test(
         SELECT a=0, typeof(a) FROM t4
     ]], {
         -- <select7-7.5>
-        false, "double", false, "double"
+        false, "number", false, "number"
         -- </select7-7.5>
     })
 
@@ -245,7 +245,7 @@ test:do_execsql_test(
         SELECT a=0, typeof(a) FROM t4 GROUP BY a
     ]], {
         -- <select7-7.6>
-        false, "double", false, "double"
+        false, "number", false, "number"
         -- </select7-7.6>
     })
 

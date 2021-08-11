@@ -4023,7 +4023,7 @@ SELECT a2, 2.3 OR a2 FROM t6
 SELECT c, true AND c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, false AND c FROM t8;
  | ---
@@ -4038,17 +4038,17 @@ SELECT c, false AND c FROM t8;
 SELECT c, true OR c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, false OR c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, c AND true FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, c AND false FROM t8;
  | ---
@@ -4063,53 +4063,53 @@ SELECT c, c AND false FROM t8;
 SELECT c, c OR true FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, c OR false FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 
 SELECT a1, c, a1 AND c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a1, c, a1 OR c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a1, c, c AND a1 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a1, c, c OR a1 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a2, c, a2 AND c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a2, c, a2 OR c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a2, c, c AND a2 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a2, c, c OR a2 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 
 SELECT true + 2.3;
@@ -4357,12 +4357,12 @@ SELECT c, false / c FROM t8;
 SELECT c, true % c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to integer'
+ | - 'Type mismatch: can not convert number(4.56) to integer'
  | ...
 SELECT c, false % c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to integer'
+ | - 'Type mismatch: can not convert number(4.56) to integer'
  | ...
 SELECT c, c + true FROM t8;
  | ---
@@ -4438,7 +4438,7 @@ SELECT a1, c, a1 / c FROM t6, t8;
 SELECT a1, c, a1 % c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to integer'
+ | - 'Type mismatch: can not convert number(4.56) to integer'
  | ...
 SELECT a1, c, c + a1 FROM t6, t8;
  | ---
@@ -4488,7 +4488,7 @@ SELECT a2, c, a2 / c FROM t6, t8;
 SELECT a2, c, a2 % c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to integer'
+ | - 'Type mismatch: can not convert number(4.56) to integer'
  | ...
 SELECT a2, c, c + a2 FROM t6, t8;
  | ---
@@ -4601,22 +4601,22 @@ SELECT a2, 2.3 < a2 FROM t6
 SELECT c, true > c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, false > c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, true < c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, false < c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, c > true FROM t8;
  | ---
@@ -4642,12 +4642,12 @@ SELECT c, c < false FROM t8;
 SELECT a1, c, a1 > c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a1, c, a1 < c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a1, c, c > a1 FROM t6, t8;
  | ---
@@ -4662,12 +4662,12 @@ SELECT a1, c, c < a1 FROM t6, t8;
 SELECT a2, c, a2 > c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a2, c, a2 < c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a2, c, c > a2 FROM t6, t8;
  | ---
@@ -4765,22 +4765,22 @@ SELECT a2, 2.3 <= a2 FROM t6
 SELECT c, true >= c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, false >= c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, true <= c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, false <= c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, c >= true FROM t8;
  | ---
@@ -4806,12 +4806,12 @@ SELECT c, c <= false FROM t8;
 SELECT a1, c, a1 >= c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a1, c, a1 <= c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a1, c, c >= a1 FROM t6, t8;
  | ---
@@ -4826,12 +4826,12 @@ SELECT a1, c, c <= a1 FROM t6, t8;
 SELECT a2, c, a2 >= c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a2, c, a2 <= c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a2, c, c >= a2 FROM t6, t8;
  | ---
@@ -4929,22 +4929,22 @@ SELECT a2, 2.3 != a2 FROM t6
 SELECT c, true == c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, false == c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, true != c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, false != c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT c, c == true FROM t8;
  | ---
@@ -4970,12 +4970,12 @@ SELECT c, c != false FROM t8;
 SELECT a1, c, a1 == c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a1, c, a1 != c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a1, c, c == a1 FROM t6, t8;
  | ---
@@ -4990,12 +4990,12 @@ SELECT a1, c, c != a1 FROM t6, t8;
 SELECT a2, c, a2 == c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a2, c, a2 != c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to boolean'
+ | - 'Type mismatch: can not convert number(4.56) to boolean'
  | ...
 SELECT a2, c, c == a2 FROM t6, t8;
  | ---

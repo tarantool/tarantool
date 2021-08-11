@@ -1225,7 +1225,7 @@ test:do_execsql_test(
         INSERT INTO t14 VALUES ('11111111-1111-1111-1111-111111111111');
         SELECT typeof(s) FROM t14;
     ]], {
-        "boolean", "integer", "integer", "double", "string", "varbinary", "uuid"
+        "scalar", "scalar", "scalar", "scalar", "scalar", "scalar", "scalar"
     })
 
 local s = box.schema.space.create('T15', {format={{'I', 'integer'}, {'M', 'map'}, {'A', 'array'}}})

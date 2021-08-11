@@ -215,12 +215,12 @@ box.execute("INSERT INTO t1 VALUES (randomblob(5));")
 box.execute("SELECT * FROM t1 WHERE s LIKE 'blob';")
 ---
 - null
-- 'Inconsistent types: expected string got varbinary(x''91A0FEE366'')'
+- 'Inconsistent types: expected string got scalar(x''91A0FEE366'')'
 ...
 box.execute("SELECT * FROM t1 WHERE 'blob' LIKE s;")
 ---
 - null
-- 'Inconsistent types: expected string got varbinary(x''91A0FEE366'')'
+- 'Inconsistent types: expected string got scalar(x''91A0FEE366'')'
 ...
 box.execute("SELECT * FROM t1 WHERE 'blob' LIKE x'0000';")
 ---
@@ -246,7 +246,7 @@ box.execute("INSERT INTO t1 VALUES (1);")
 box.execute("SELECT * FROM t1 WHERE s LIKE 'int';")
 ---
 - null
-- 'Inconsistent types: expected string got integer(1)'
+- 'Inconsistent types: expected string got scalar(1)'
 ...
 box.execute("SELECT * FROM t1 WHERE 'int' LIKE 4;")
 ---
@@ -1480,7 +1480,7 @@ box.execute("SELECT typeof(a), typeof(s) FROM t;")
   - name: COLUMN_2
     type: string
   rows:
-  - ['integer', 'integer']
+  - ['integer', 'scalar']
   - ['NULL', 'NULL']
 ...
 box.execute('CREATE TABLE t1 (id INTEGER PRIMARY KEY, a INTEGER, b INTEGER)')

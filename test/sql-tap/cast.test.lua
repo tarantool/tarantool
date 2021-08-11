@@ -90,7 +90,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(x'616263' AS SCALAR))
     ]], {
         -- <cast-1.8>
-        "varbinary"
+        "scalar"
         -- </cast-1.8>
     })
 
@@ -280,7 +280,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(123 AS SCALAR))
     ]], {
         -- <cast-1.28>
-        "integer"
+        "scalar"
         -- </cast-1.28>
     })
 
@@ -380,7 +380,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(123.456 AS SCALAR))
     ]], {
         -- <cast-1.38>
-        "double"
+        "scalar"
         -- </cast-1.38>
     })
 
@@ -460,7 +460,7 @@ test:do_execsql_test(
         SELECT typeof(CAST('123abc' AS SCALAR))
     ]], {
         -- <cast-1.48>
-        "string"
+        "scalar"
         -- </cast-1.48>
     })
 
@@ -531,7 +531,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(1 AS NUMBER))
     ]], {
         -- <case-1.63>
-        "integer"
+        "number"
         -- </case-1.63>
     })
 
@@ -551,7 +551,7 @@ test:do_execsql_test(
         SELECT typeof(CAST('1' AS NUMBER))
     ]], {
         -- <case-1.65>
-        "integer"
+        "number"
         -- </case-1.65>
     })
 
@@ -972,7 +972,7 @@ test:do_catchsql_test(
     [[
         SELECT CAST(CAST(1 AS NUMBER) AS BOOLEAN);
     ]], {
-        1, "Type mismatch: can not convert integer(1) to boolean"
+        1, "Type mismatch: can not convert number(1) to boolean"
     })
 
 -- Make sure that explicit cast from VARBINARY to numeric types throws an error.

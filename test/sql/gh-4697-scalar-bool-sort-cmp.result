@@ -34,9 +34,9 @@ SELECT s2, typeof(s2) FROM test ORDER BY s2;
  |     type: string
  |   rows:
  |   - [null, 'NULL']
- |   - [true, 'boolean']
- |   - [1, 'integer']
- |   - [1.1, 'double']
+ |   - [true, 'scalar']
+ |   - [1, 'scalar']
+ |   - [1.1, 'scalar']
  | ...
 SELECT s3, typeof(s3) FROM test ORDER BY s3;
  | ---
@@ -47,7 +47,7 @@ SELECT s3, typeof(s3) FROM test ORDER BY s3;
  |     type: string
  |   rows:
  |   - [null, 'NULL']
- |   - [true, 'boolean']
- |   - [1, 'integer']
- |   - [1.1, 'double']
+ |   - [true, 'scalar']
+ |   - [1, 'scalar']
+ |   - [1.1, 'scalar']
  | ...

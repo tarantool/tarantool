@@ -162,6 +162,10 @@ typeofFunc(sql_context * context, int NotUsed, sql_value ** argv)
 {
 	const char *z = 0;
 	UNUSED_PARAMETER(NotUsed);
+	if ((argv[0]->flags & MEM_Number) != 0)
+		return mem_set_str0_static(context->pOut, "number");
+	if ((argv[0]->flags & MEM_Scalar) != 0)
+		return mem_set_str0_static(context->pOut, "scalar");
 	switch (argv[0]->type) {
 	case MEM_TYPE_INT:
 	case MEM_TYPE_UINT:
