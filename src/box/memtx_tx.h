@@ -336,6 +336,33 @@ memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
 }
 
 /**
+ * Helper of memtx_tx_track_full_scan.
+ */
+int
+memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index);
+
+/**
+ * Record in TX manager that a transaction @a txn have read full @ a index
+ * from @a space.
+ * This function must be used for unordered indexes, such as HASH, for queries
+ * when interation type is ALL.
+ * @return 0 on success, -1 on memory error.
+ */
+static inline int
+memtx_tx_track_full_scan(struct txn *txn, struct space *space,
+			 struct index *index)
+{
+	if (!memtx_tx_manager_use_mvcc_engine)
+		return 0;
+	if (txn == NULL)
+		return 0;
+	/* Skip ephemeral spaces. */
+	if (space == NULL || space->def->id == 0)
+		return 0;
+	return memtx_tx_track_full_scan_slow(txn, index);
+}
+
+/**
  * Clean a tuple if it's dirty - finds a visible tuple in history.
  * @param txn - current transactions.
  * @param space - space in which the tuple was found.

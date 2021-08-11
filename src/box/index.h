@@ -475,11 +475,14 @@ struct index {
 	/** Compact ID - index in space->index array. */
 	uint32_t dense_id;
 	/**
-	 * List of gap read in the index with NULL successor. Those gap
-	 * reads happen when reading from empty index, or when reading
-	 * from rightmost part of ordered index (TREE).
+	 * List of gap_item's describing gap reads in the index with NULL
+	 * successor. Those gap reads happen when reading from empty index,
+	 * or when reading from rightmost part of ordered index (TREE).
+	 * @sa struct gap_item.
 	 */
 	struct rlist nearby_gaps;
+	/** List of full scans of the index. @sa struct full_scan_item. */
+	struct rlist full_scans;
 };
 
 /**
