@@ -3309,6 +3309,80 @@ s:drop()
  | ---
  | ...
 
+-- https://github.com/tarantool/tarantool/issues/6274
+-- The code below must not crash.
+for j = 1,100 do                                                     \
+    s = box.schema.create_space('test')                              \
+    primary = s:create_index('pk', {parts={1, 'uint'}})              \
+    secondary = s:create_index('sk', {parts={2, 'uint'}})            \
+    for i = 1,100 do s:replace{i,i} s:delete{i} end                  \
+    s:drop()                                                         \
+end
+ | ---
+ | ...
+
+-- https://github.com/tarantool/tarantool/issues/6234
+s = box.schema.create_space('test')
+ | ---
+ | ...
+primary = s:create_index('pk', {parts={1, 'uint'}})
+ | ---
+ | ...
+secondary = s:create_index('sk', {parts={2, 'uint'}})
+ | ---
+ | ...
+
+-- Make a big transaction to make lots of garbage at once
+tx1:begin()
+ | ---
+ | - 
+ | ...
+for i = 1,10 do tx1('s:replace{i+100,i+100}') tx1('s:delete{i+100}') end
+ | ---
+ | ...
+tx1:commit()
+ | ---
+ | - 
+ | ...
+
+tx1:begin()
+ | ---
+ | - 
+ | ...
+tx1("s:replace{1, 2, 'magic'}")
+ | ---
+ | - - [1, 2, 'magic']
+ | ...
+s:replace{1, 1, 'magic'} -- now {1, 2 ,'magic'} overwrites {1, 1, 'magic'}
+ | ---
+ | - [1, 1, 'magic']
+ | ...
+tx1('s:delete{1}')
+ | ---
+ | - - [1, 2, 'magic']
+ | ...
+tx1:commit() -- succeeds
+ | ---
+ | - 
+ | ...
+
+-- Make lost of changes to cause GC to run
+for i = 11,50 do s:replace{i+100,i+100} s:delete{i+100} end
+ | ---
+ | ...
+
+secondary:select{1} -- must be empty since we deleted {1}
+ | ---
+ | - []
+ | ...
+s:replace{3, 1, 'magic'} -- must be OK.
+ | ---
+ | - [3, 1, 'magic']
+ | ...
+s:drop()
+ | ---
+ | ...
+
 test_run:cmd("switch default")
  | ---
  | - true
