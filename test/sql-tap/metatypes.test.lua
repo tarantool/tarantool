@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(12)
+test:plan(13)
 
 -- Check that SCALAR and NUMBER meta-types works as intended.
 box.execute([[CREATE TABLE t (i INT PRIMARY KEY, s SCALAR, n NUMBER);]])
@@ -122,6 +122,15 @@ test:do_catchsql_test(
         SELECT CAST(1 AS SCALAR) >> 1;
     ]], {
         1, "Type mismatch: can not convert scalar(1) to unsigned"
+    })
+
+-- Check that concatination is prohibited for SCALAR values.
+test:do_catchsql_test(
+    "metatypes-5",
+    [[
+        SELECT CAST('asd' AS SCALAR) || 'dsa';
+    ]], {
+        1, "Inconsistent types: expected string or varbinary got scalar('asd')"
     })
 
 box.execute([[DROP TABLE t;]])

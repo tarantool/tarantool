@@ -1552,12 +1552,14 @@ mem_concat(struct Mem *a, struct Mem *b, struct Mem *result)
 		return 0;
 	}
 	/* Concatenation operation can be applied only to strings and blobs. */
-	if (((b->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) == 0)) {
+	if (((b->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) == 0) ||
+	    mem_is_metatype(b)) {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES,
 			 "string or varbinary", mem_str(b));
 		return -1;
 	}
-	if (((a->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) == 0)) {
+	if (((a->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) == 0) ||
+	    mem_is_metatype(a)) {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES,
 			 "string or varbinary", mem_str(a));
 		return -1;
