@@ -2062,6 +2062,10 @@ mem_cmp(const struct Mem *a, const struct Mem *b, int *result,
 			*result = 1;
 		return 0;
 	}
+	if (((a->flags | b->flags) & MEM_Scalar) != 0) {
+		*result = mem_cmp_scalar(a, b, coll);
+		return 0;
+	}
 	if (class_a != class_b) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(b),
 			 mem_type_class_to_str(a));

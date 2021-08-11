@@ -1157,12 +1157,12 @@ test:do_execsql_test(
     })
 
 -- Make sure that there is no unnecessary implicit casts in IN operator.
-test:do_catchsql_test(
+test:do_execsql_test(
     "cast-12",
     [[
         SELECT 1 IN (SELECT '1');
     ]], {
-        1, "Type mismatch: can not convert integer(1) to string"
+        false
     })
 
 test:finish_test()

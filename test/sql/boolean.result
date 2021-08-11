@@ -137,13 +137,19 @@ INSERT INTO ts(s) VALUES ('abc'), (12.5);
  | ...
 SELECT s FROM ts WHERE s = true;
  | ---
- | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to string'
+ | - metadata:
+ |   - name: S
+ |     type: scalar
+ |   rows:
+ |   - [true]
  | ...
 SELECT s FROM ts WHERE s < true;
  | ---
- | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to string'
+ | - metadata:
+ |   - name: S
+ |     type: scalar
+ |   rows:
+ |   - [false]
  | ...
 SELECT s FROM ts WHERE s IN (true, 1, 'abcd');
  | ---

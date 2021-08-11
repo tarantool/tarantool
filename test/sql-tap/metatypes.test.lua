@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(13)
+test:plan(19)
 
 -- Check that SCALAR and NUMBER meta-types works as intended.
 box.execute([[CREATE TABLE t (i INT PRIMARY KEY, s SCALAR, n NUMBER);]])
@@ -131,6 +131,55 @@ test:do_catchsql_test(
         SELECT CAST('asd' AS SCALAR) || 'dsa';
     ]], {
         1, "Inconsistent types: expected string or varbinary got scalar('asd')"
+    })
+
+-- Check that SCALAR values can be compared to values of any other scalar type.
+test:do_execsql_test(
+    "metatypes-6.1",
+    [[
+        SELECT s > false FROM t;
+    ]], {
+        true, true, true, true, true, true
+    })
+
+test:do_execsql_test(
+    "metatypes-6.2",
+    [[
+        SELECT s = 1 FROM t;
+    ]], {
+        true, false, false, false, false, false
+    })
+
+test:do_execsql_test(
+    "metatypes-6.3",
+    [[
+        SELECT s != 1.5 FROM t;
+    ]], {
+        true, true, true, true, true, true
+    })
+
+test:do_execsql_test(
+    "metatypes-6.4",
+    [[
+        SELECT s <= 'abc' FROM t;
+    ]], {
+        true, true, true, true, false, false
+    })
+
+test:do_execsql_test(
+    "metatypes-6.5",
+    [[
+        SELECT s < x'10' FROM t;
+    ]], {
+        true, true, true, true, false, false
+    })
+
+test:do_execsql_test(
+    "metatypes-6.6",
+    [[
+        SELECT s > CAST('11111111-1111-1111-1111-111111111110' AS UUID) FROM t;
+    ]], {
+        false, false, false, false, false, true
     })
 
 box.execute([[DROP TABLE t;]])
