@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(3)
+test:plan(8)
 
 -- Check that SCALAR and NUMBER meta-types works as intended.
 box.execute([[CREATE TABLE t (i INT PRIMARY KEY, s SCALAR, n NUMBER);]])
@@ -44,6 +44,50 @@ test:do_execsql_test(
         SELECT typeof(n) FROM t;
     ]], {
         "number","number","NULL","NULL","NULL","NULL"
+    })
+
+--
+-- Check that implicit cast from NUMBER to numeric types and from SCALAR to
+-- scalar types is prohibited.
+--
+test:do_catchsql_test(
+    "metatypes-2.1",
+    [[
+        INSERT INTO t(i) VALUES(CAST(7 AS SCALAR));
+    ]], {
+        1, "Type mismatch: can not convert scalar(7) to integer"
+    })
+
+test:do_catchsql_test(
+    "metatypes-2.2",
+    [[
+        INSERT INTO t(i, n) VALUES(8, CAST(1.5 AS SCALAR));
+    ]], {
+        1, "Type mismatch: can not convert scalar(1.5) to number"
+    })
+
+test:do_catchsql_test(
+    "metatypes-2.3",
+    [[
+        INSERT INTO t(i) VALUES(CAST(9 AS NUMBER));
+    ]], {
+        1, "Type mismatch: can not convert number(9) to integer"
+    })
+
+test:do_catchsql_test(
+    "metatypes-2.4",
+    [[
+        UPDATE t SET i = CAST(10 AS SCALAR);
+    ]], {
+        1, "Type mismatch: can not convert scalar(10) to integer"
+    })
+
+test:do_catchsql_test(
+    "metatypes-2.5",
+    [[
+        UPDATE t SET i = CAST(11 AS NUMBER);
+    ]], {
+        1, "Type mismatch: can not convert number(11) to integer"
     })
 
 box.execute([[DROP TABLE t;]])

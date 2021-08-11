@@ -390,7 +390,7 @@ test:do_execsql_test(
     "trigger9-3.6",
     [[
         CREATE VIEW v1 AS
-          SELECT sum(a) AS a, max(b) AS b FROM t3 GROUP BY t3.a HAVING b>'two';
+          SELECT CAST(sum(a) AS INTEGER) AS a, max(b) AS b FROM t3 GROUP BY t3.a HAVING b>'two';
         DROP TRIGGER IF EXISTS trig1;
         CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 FOR EACH ROW BEGIN
           INSERT INTO t2 VALUES(old.a);

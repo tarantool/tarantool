@@ -67,14 +67,14 @@ if (1 > 0)
             DELETE FROM t3
         ]])
 
-    test:do_execsql_test(
+    test:do_catchsql_test(
         1.4,
         [[
             INSERT INTO t3(t3_a) SELECT 1 UNION SELECT 2 UNION SELECT 3;
             SELECT * FROM t3;
         ]], {
             -- <1.4>
-            1, "I", 2, "II", 3, "III"
+            1, "Type mismatch: can not convert scalar(1) to integer"
             -- </1.4>
         })
 

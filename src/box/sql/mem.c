@@ -1218,6 +1218,11 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 {
 	if (mem->type == MEM_TYPE_NULL)
 		return 0;
+	if ((mem->flags & MEM_Scalar) != 0 && type != FIELD_TYPE_SCALAR)
+		return -1;
+	if ((mem->flags & MEM_Number) != 0 && type != FIELD_TYPE_SCALAR &&
+	    type != FIELD_TYPE_NUMBER)
+		return -1;
 	switch (type) {
 	case FIELD_TYPE_UNSIGNED:
 		if (mem->type == MEM_TYPE_UINT) {
