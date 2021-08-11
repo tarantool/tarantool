@@ -90,6 +90,11 @@ struct memtx_story_link {
 	struct memtx_story *older_story;
 	/** List of interval items @sa gap_item. */
 	struct rlist nearby_gaps;
+	/**
+	 * If the tuple of story is physically in index, here the pointer
+	 * to that index is stored.
+	 */
+	struct index *in_index;
 };
 
 /**
