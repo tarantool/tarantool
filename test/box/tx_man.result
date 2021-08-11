@@ -1291,6 +1291,44 @@ s:drop()
  | ---
  | ...
 
+-- Repeatable read for hash index (issue gh-6040)
+s = box.schema.space.create('test')
+ | ---
+ | ...
+i1 = s:create_index('pk', {type='hash'})
+ | ---
+ | ...
+i2 = s:create_index('sk', {type='hash'})
+ | ---
+ | ...
+tx1:begin()
+ | ---
+ | - 
+ | ...
+tx1('s:select{}')
+ | ---
+ | - - []
+ | ...
+s:replace{1, 1}
+ | ---
+ | - [1, 1]
+ | ...
+tx1('s:select{}')
+ | ---
+ | - - []
+ | ...
+tx1:commit()
+ | ---
+ | - 
+ | ...
+s:select{}
+ | ---
+ | - - [1, 1]
+ | ...
+s:drop()
+ | ---
+ | ...
+
 --TREE
 -- One select
 s = box.schema.space.create('test')
