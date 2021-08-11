@@ -390,6 +390,7 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	for (uint32_t i = 0; i < index_count; i++) {
 		story->link[i].newer_story = story->link[i].older_story = NULL;
 		rlist_create(&story->link[i].nearby_gaps);
+		story->link[i].in_index = space->index[i];
 	}
 	return story;
 }
@@ -602,6 +603,8 @@ memtx_tx_story_link_top(struct memtx_story *new_top,
 
 	/* Make the change in index. */
 	struct index *index = new_top->space->index[idx];
+	assert(old_top->link[idx].in_index == index);
+	assert(new_top->link[idx].in_index == NULL);
 	struct tuple *removed, *unused;
 	if (index_replace(index, old_top->tuple, new_top->tuple,
 			  DUP_REPLACE, &removed, &unused) != 0) {
@@ -610,6 +613,8 @@ memtx_tx_story_link_top(struct memtx_story *new_top,
 		panic("failed to rebind story in index");
 	}
 	assert(old_top->tuple == removed);
+	old_top->link[idx].in_index = NULL;
+	new_top->link[idx].in_index = index;
 
 	/*
 	 * A space holds references to all his tuples.
@@ -671,6 +676,8 @@ memtx_tx_story_unlink_top(struct memtx_story *story, uint32_t idx)
 	struct index *index = story->space->index[idx];
 
 	struct memtx_story *old_story = link->older_story;
+	assert(story->link[idx].in_index == index);
+	assert(old_story == NULL || old_story->link[idx].in_index == NULL);
 	struct tuple *old_tuple = old_story == NULL ? NULL : old_story->tuple;
 	struct tuple *removed, *unused;
 	if (index_replace(index, story->tuple, old_tuple,
@@ -680,6 +687,9 @@ memtx_tx_story_unlink_top(struct memtx_story *story, uint32_t idx)
 		panic("failed to rebind story in index");
 	}
 	assert(story->tuple == removed);
+	story->link[idx].in_index = NULL;
+	if (old_story != NULL)
+		old_story->link[idx].in_index = index;
 
 	/*
 	 * A space holds references to all his tuples.
@@ -777,7 +787,7 @@ memtx_tx_story_full_unlink(struct memtx_story *story)
 			 * index.
 			 */
 			if (story->del_psn > 0 && story->space != NULL) {
-				struct index *index = story->space->index[i];
+				struct index *index = link->in_index;
 				struct tuple *removed, *unused;
 				if (index_replace(index, story->tuple, NULL,
 						  DUP_INSERT,
@@ -787,6 +797,7 @@ memtx_tx_story_full_unlink(struct memtx_story *story)
 					panic("failed to rollback change");
 				}
 				assert(story->tuple == removed);
+				link->in_index = NULL;
 				/*
 				 * All tuples in pk are referenced.
 				 * Once removed it must be unreferenced.
@@ -1420,6 +1431,8 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		collected_conflicts = collected_conflicts->next;
 	}
 
+	if (replaced_story != NULL)
+		replaced_story->link[0].in_index = NULL;
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		if (directly_replaced[i] == NULL) {
 			memtx_tx_handle_gap_write(stmt->txn, space,
@@ -1431,6 +1444,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		struct memtx_story *secondary_replaced =
 			memtx_tx_story_get(directly_replaced[i]);
 		memtx_tx_story_link_top_light(add_story, secondary_replaced, i);
+		secondary_replaced->link[i].in_index = NULL;
 	}
 
 	if (old_tuple != NULL) {
