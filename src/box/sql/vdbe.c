@@ -277,7 +277,6 @@ vdbe_prepare_null_out(struct Vdbe *v, int n)
 	struct Mem *out = &v->aMem[n];
 	memAboutToChange(v, out);
 	mem_set_null(out);
-	out->field_type = field_type_MAX;
 	return out;
 }
 
@@ -1354,7 +1353,7 @@ case OP_BitAnd: {               /* same as TK_BITAND, in1, in2, out3 */
 	pOut = &aMem[pOp->p3];
 	if (mem_bit_and(pIn2, pIn1, pOut) != 0)
 		goto abort_due_to_error;
-	assert(pOut->field_type == FIELD_TYPE_UNSIGNED);
+	assert(pOut->type == MEM_TYPE_UINT || pOut->type == MEM_TYPE_NULL);
 	break;
 }
 
@@ -1371,7 +1370,7 @@ case OP_BitOr: {                /* same as TK_BITOR, in1, in2, out3 */
 	pOut = &aMem[pOp->p3];
 	if (mem_bit_or(pIn2, pIn1, pOut) != 0)
 		goto abort_due_to_error;
-	assert(pOut->field_type == FIELD_TYPE_UNSIGNED);
+	assert(pOut->type == MEM_TYPE_UINT || pOut->type == MEM_TYPE_NULL);
 	break;
 }
 
@@ -1389,7 +1388,7 @@ case OP_ShiftLeft: {            /* same as TK_LSHIFT, in1, in2, out3 */
 	pOut = &aMem[pOp->p3];
 	if (mem_shift_left(pIn2, pIn1, pOut) != 0)
 		goto abort_due_to_error;
-	assert(pOut->field_type == FIELD_TYPE_UNSIGNED);
+	assert(pOut->type == MEM_TYPE_UINT || pOut->type == MEM_TYPE_NULL);
 	break;
 }
 
@@ -1407,7 +1406,7 @@ case OP_ShiftRight: {           /* same as TK_RSHIFT, in1, in2, out3 */
 	pOut = &aMem[pOp->p3];
 	if (mem_shift_right(pIn2, pIn1, pOut) != 0)
 		goto abort_due_to_error;
-	assert(pOut->field_type == FIELD_TYPE_UNSIGNED);
+	assert(pOut->type == MEM_TYPE_UINT || pOut->type == MEM_TYPE_NULL);
 	break;
 }
 
@@ -1465,13 +1464,6 @@ case OP_Cast: {                  /* in1 */
 	if (ExpandBlob(pIn1) != 0)
 		goto abort_due_to_error;
 	rc = mem_cast_explicit(pIn1, pOp->p2);
-	/*
-	 * SCALAR is not type itself, but rather an aggregation
-	 * of types. Hence, cast to this type shouldn't change
-	 * original type of argument.
-	 */
-	if (pOp->p2 != FIELD_TYPE_SCALAR)
-		pIn1->field_type = pOp->p2;
 	UPDATE_MAX_BLOBSIZE(pIn1);
 	if (rc == 0)
 		break;
@@ -1809,7 +1801,6 @@ case OP_Or: {             /* same as TK_OR, in1, in2, out3 */
 case OP_Not: {                /* same as TK_NOT, in1, out2 */
 	pIn1 = &aMem[pOp->p1];
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
-	pOut->field_type = FIELD_TYPE_BOOLEAN;
 	if (!mem_is_null(pIn1)) {
 		if (!mem_is_bool(pIn1)) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
@@ -1979,11 +1970,8 @@ case OP_Column: {
 		}
 		pC->cacheStatus = p->cacheCtr;
 	}
-	enum field_type field_type = field_type_MAX;
-	if (pC->eCurType == CURTYPE_TARANTOOL)
-		field_type = pC->uc.pCursor->space->def->fields[p2].type;
-	else if (pC->eCurType == CURTYPE_SORTER)
-		field_type = vdbe_sorter_get_field_type(pC->uc.pSorter, p2);
+	assert(pC->eCurType == CURTYPE_TARANTOOL ||
+	       pC->eCurType == CURTYPE_PSEUDO);
 	struct Mem *default_val_mem =
 		pOp->p4type == P4_MEM ? pOp->p4.pMem : NULL;
 	if (vdbe_field_ref_fetch(&pC->field_ref, p2, pDest) != 0)
@@ -1994,7 +1982,6 @@ case OP_Column: {
 	    default_val_mem != NULL) {
 		mem_copy_as_ephemeral(pDest, default_val_mem);
 	}
-	pDest->field_type = field_type;
 op_column_out:
 	REGISTER_TRACE(p, pOp->p3, pDest);
 	break;

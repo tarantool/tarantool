@@ -331,8 +331,8 @@ SELECT typeof(a) FROM t0;
  |   rows:
  |   - ['boolean']
  |   - ['boolean']
- |   - ['boolean']
- |   - ['boolean']
+ |   - ['NULL']
+ |   - ['NULL']
  | ...
 
 -- Check BOOLEAN as argument of aggregate function.

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(29)
+test:plan(38)
 
 --!./tcltestrunner.lua
 -- 2010 August 27
@@ -369,6 +369,79 @@ test:do_execsql_test(
         SELECT ABS(-111);
     ]], {
         111
+    })
+
+-- gh-5956: typeof(NULL) now returns 'NULL'.
+test:do_execsql_test(
+    "func-8.1",
+    [[
+        SELECT typeof(CAST(NULL AS UUID));
+    ]], {
+        'NULL'
+    })
+
+test:do_execsql_test(
+    "func-8.2",
+    [[
+        SELECT typeof(CAST(NULL AS SCALAR));
+    ]], {
+        'NULL'
+    })
+
+test:do_execsql_test(
+    "func-8.3",
+    [[
+        SELECT typeof(CAST(NULL AS BOOLEAN));
+    ]], {
+        'NULL'
+    })
+
+test:do_execsql_test(
+    "func-8.4",
+    [[
+        SELECT typeof(CAST(NULL AS INTEGER));
+    ]], {
+        'NULL'
+    })
+
+test:do_execsql_test(
+    "func-8.5",
+    [[
+        SELECT typeof(CAST(NULL AS UNSIGNED));
+    ]], {
+        'NULL'
+    })
+
+test:do_execsql_test(
+    "func-8.6",
+    [[
+        SELECT typeof(CAST(NULL AS DOUBLE));
+    ]], {
+        'NULL'
+    })
+
+test:do_execsql_test(
+    "func-8.7",
+    [[
+        SELECT typeof(CAST(NULL AS NUMBER));
+    ]], {
+        'NULL'
+    })
+
+test:do_execsql_test(
+    "func-8.8",
+    [[
+        SELECT typeof(CAST(NULL AS STRING));
+    ]], {
+        'NULL'
+    })
+
+test:do_execsql_test(
+    "func-8.9",
+    [[
+        SELECT typeof(CAST(NULL AS VARBINARY));
+    ]], {
+        'NULL'
     })
 
 test:finish_test()

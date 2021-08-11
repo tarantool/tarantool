@@ -193,7 +193,6 @@ mem_create(struct Mem *mem)
 {
 	mem->type = MEM_TYPE_NULL;
 	mem->flags = 0;
-	mem->field_type = field_type_MAX;
 	mem->n = 0;
 	mem->z = NULL;
 	mem->zMalloc = NULL;
@@ -226,7 +225,6 @@ mem_clear(struct Mem *mem)
 	}
 	mem->type = MEM_TYPE_NULL;
 	mem->flags = 0;
-	mem->field_type = field_type_MAX;
 }
 
 void
@@ -255,7 +253,6 @@ mem_set_int(struct Mem *mem, int64_t value, bool is_neg)
 	mem->u.i = value;
 	mem->type = is_neg ? MEM_TYPE_INT : MEM_TYPE_UINT;
 	assert(mem->flags == 0);
-	mem->field_type = FIELD_TYPE_INTEGER;
 }
 
 void
@@ -265,7 +262,6 @@ mem_set_uint(struct Mem *mem, uint64_t value)
 	mem->u.u = value;
 	mem->type = MEM_TYPE_UINT;
 	assert(mem->flags == 0);
-	mem->field_type = FIELD_TYPE_UNSIGNED;
 }
 
 void
@@ -275,14 +271,12 @@ mem_set_bool(struct Mem *mem, bool value)
 	mem->u.b = value;
 	mem->type = MEM_TYPE_BOOL;
 	assert(mem->flags == 0);
-	mem->field_type = FIELD_TYPE_BOOLEAN;
 }
 
 void
 mem_set_double(struct Mem *mem, double value)
 {
 	mem_clear(mem);
-	mem->field_type = FIELD_TYPE_DOUBLE;
 	assert(mem->flags == 0);
 	if (sqlIsNaN(value))
 		return;
@@ -294,7 +288,6 @@ void
 mem_set_uuid(struct Mem *mem, const struct tt_uuid *uuid)
 {
 	mem_clear(mem);
-	mem->field_type = FIELD_TYPE_UUID;
 	mem->u.uuid = *uuid;
 	mem->type = MEM_TYPE_UUID;
 	assert(mem->flags == 0);
@@ -309,7 +302,6 @@ set_str_const(struct Mem *mem, char *value, uint32_t len, int alloc_type)
 	mem->n = len;
 	mem->type = MEM_TYPE_STR;
 	mem->flags = alloc_type;
-	mem->field_type = FIELD_TYPE_STRING;
 }
 
 static inline void
@@ -323,7 +315,6 @@ set_str_dynamic(struct Mem *mem, char *value, uint32_t len, int alloc_type)
 	mem->n = len;
 	mem->type = MEM_TYPE_STR;
 	mem->flags = alloc_type;
-	mem->field_type = FIELD_TYPE_STRING;
 	if (alloc_type == MEM_Dyn) {
 		mem->xDel = sql_free;
 	} else {
@@ -395,7 +386,6 @@ mem_copy_str(struct Mem *mem, const char *value, uint32_t len)
 			return -1;
 		mem->type = MEM_TYPE_STR;
 		mem->flags = 0;
-		mem->field_type = FIELD_TYPE_STRING;
 		return 0;
 	}
 	mem_clear(mem);
@@ -405,7 +395,6 @@ mem_copy_str(struct Mem *mem, const char *value, uint32_t len)
 	mem->n = len;
 	mem->type = MEM_TYPE_STR;
 	assert(mem->flags == 0);
-	mem->field_type = FIELD_TYPE_STRING;
 	return 0;
 }
 
@@ -429,7 +418,6 @@ set_bin_const(struct Mem *mem, char *value, uint32_t size, int alloc_type)
 	mem->n = size;
 	mem->type = MEM_TYPE_BIN;
 	mem->flags = alloc_type;
-	mem->field_type = FIELD_TYPE_VARBINARY;
 }
 
 static inline void
@@ -443,7 +431,6 @@ set_bin_dynamic(struct Mem *mem, char *value, uint32_t size, int alloc_type)
 	mem->n = size;
 	mem->type = MEM_TYPE_BIN;
 	mem->flags = alloc_type;
-	mem->field_type = FIELD_TYPE_VARBINARY;
 	if (alloc_type == MEM_Dyn) {
 		mem->xDel = sql_free;
 	} else {
@@ -487,7 +474,6 @@ mem_copy_bin(struct Mem *mem, const char *value, uint32_t size)
 			return -1;
 		mem->type = MEM_TYPE_BIN;
 		mem->flags = 0;
-		mem->field_type = FIELD_TYPE_VARBINARY;
 		return 0;
 	}
 	mem_clear(mem);
@@ -497,7 +483,6 @@ mem_copy_bin(struct Mem *mem, const char *value, uint32_t size)
 	mem->n = size;
 	mem->type = MEM_TYPE_BIN;
 	assert(mem->flags == 0);
-	mem->field_type = FIELD_TYPE_VARBINARY;
 	return 0;
 }
 
@@ -512,76 +497,73 @@ mem_set_zerobin(struct Mem *mem, int n)
 	mem->n = 0;
 	mem->type = MEM_TYPE_BIN;
 	mem->flags = MEM_Zero;
-	mem->field_type = FIELD_TYPE_VARBINARY;
 }
 
 static inline void
 set_msgpack_value(struct Mem *mem, char *value, uint32_t size, int alloc_type,
-		  enum field_type type)
+		  enum mem_type type)
 {
-	assert(type == FIELD_TYPE_MAP || type == FIELD_TYPE_ARRAY);
 	if (alloc_type == MEM_Ephem || alloc_type == MEM_Static)
 		set_bin_const(mem, value, size, alloc_type);
 	else
 		set_bin_dynamic(mem, value, size, alloc_type);
-	mem->type = type == FIELD_TYPE_MAP ? MEM_TYPE_MAP : MEM_TYPE_ARRAY;
-	mem->field_type = type;
+	mem->type = type;
 }
 
 void
 mem_set_map_ephemeral(struct Mem *mem, char *value, uint32_t size)
 {
 	assert(mp_typeof(*value) == MP_MAP);
-	set_msgpack_value(mem, value, size, MEM_Ephem, FIELD_TYPE_MAP);
+	set_msgpack_value(mem, value, size, MEM_Ephem, MEM_TYPE_MAP);
 }
 
 void
 mem_set_map_static(struct Mem *mem, char *value, uint32_t size)
 {
 	assert(mp_typeof(*value) == MP_MAP);
-	set_msgpack_value(mem, value, size, MEM_Static, FIELD_TYPE_MAP);
+	set_msgpack_value(mem, value, size, MEM_Static, MEM_TYPE_MAP);
 }
 
 void
 mem_set_map_dynamic(struct Mem *mem, char *value, uint32_t size)
 {
 	assert(mp_typeof(*value) == MP_MAP);
-	set_msgpack_value(mem, value, size, MEM_Dyn, FIELD_TYPE_MAP);
+	set_msgpack_value(mem, value, size, MEM_Dyn, MEM_TYPE_MAP);
 }
 
 void
 mem_set_map_allocated(struct Mem *mem, char *value, uint32_t size)
 {
 	assert(mp_typeof(*value) == MP_MAP);
-	set_msgpack_value(mem, value, size, 0, FIELD_TYPE_MAP);
+	set_msgpack_value(mem, value, size, 0, MEM_TYPE_MAP);
 }
 
 void
 mem_set_array_ephemeral(struct Mem *mem, char *value, uint32_t size)
 {
 	assert(mp_typeof(*value) == MP_ARRAY);
-	set_msgpack_value(mem, value, size, MEM_Ephem, FIELD_TYPE_ARRAY);
+	set_msgpack_value(mem, value, size, MEM_Ephem, MEM_TYPE_ARRAY);
 }
 
 void
 mem_set_array_static(struct Mem *mem, char *value, uint32_t size)
 {
 	assert(mp_typeof(*value) == MP_ARRAY);
-	set_msgpack_value(mem, value, size, MEM_Static, FIELD_TYPE_ARRAY);
+	set_msgpack_value(mem, value, size, MEM_Static, MEM_TYPE_ARRAY);
 }
 
 void
 mem_set_array_dynamic(struct Mem *mem, char *value, uint32_t size)
 {
 	assert(mp_typeof(*value) == MP_ARRAY);
-	set_msgpack_value(mem, value, size, MEM_Dyn, FIELD_TYPE_ARRAY);
+	set_msgpack_value(mem, value, size, MEM_Dyn, MEM_TYPE_ARRAY);
 }
 
 void
 mem_set_array_allocated(struct Mem *mem, char *value, uint32_t size)
 {
 	assert(mp_typeof(*value) == MP_ARRAY);
-	set_msgpack_value(mem, value, size, 0, FIELD_TYPE_ARRAY);
+	set_msgpack_value(mem, value, size, 0, MEM_TYPE_ARRAY);
 }
 
 void
@@ -623,7 +605,6 @@ mem_set_agg(struct Mem *mem, struct func *func, int size)
 	mem->type = MEM_TYPE_AGG;
 	assert(mem->flags == 0);
 	mem->u.func = func;
-	mem->field_type = field_type_MAX;
 	return 0;
 }
 
@@ -646,7 +627,6 @@ int_to_double(struct Mem *mem)
 	mem->u.r = d;
 	mem->type = MEM_TYPE_DOUBLE;
 	assert(mem->flags == 0);
-	mem->field_type = FIELD_TYPE_DOUBLE;
 	return 0;
 }
 
@@ -660,7 +640,6 @@ int_to_double_precise(struct Mem *mem)
 		return -1;
 	mem->u.r = d;
 	mem->type = MEM_TYPE_DOUBLE;
-	mem->field_type = FIELD_TYPE_DOUBLE;
 	return 0;
 }
 
@@ -677,7 +656,6 @@ int_to_double_forced(struct Mem *mem)
 	double d = (double)i;
 	mem->u.r = d;
 	mem->type = MEM_TYPE_DOUBLE;
-	mem->field_type = FIELD_TYPE_DOUBLE;
 	return CMP_OLD_NEW(i, d, int64_t);
 }
 
@@ -691,7 +669,6 @@ uint_to_double_precise(struct Mem *mem)
 		return -1;
 	mem->u.r = d;
 	mem->type = MEM_TYPE_DOUBLE;
-	mem->field_type = FIELD_TYPE_DOUBLE;
 	return 0;
 }
 
@@ -708,7 +685,6 @@ uint_to_double_forced(struct Mem *mem)
 	double d = (double)u;
 	mem->u.r = d;
 	mem->type = MEM_TYPE_DOUBLE;
-	mem->field_type = FIELD_TYPE_DOUBLE;
 	return CMP_OLD_NEW(u, d, uint64_t);
 }
 
@@ -732,7 +708,6 @@ str_to_str0(struct Mem *mem)
 		return -1;
 	mem->z[mem->n] = '\0';
 	mem->flags |= MEM_Term;
-	mem->field_type = FIELD_TYPE_STRING;
 	return 0;
 }
 
@@ -742,7 +717,6 @@ str_to_bin(struct Mem *mem)
 	assert(mem->type == MEM_TYPE_STR);
 	mem->type = MEM_TYPE_BIN;
 	mem->flags &= ~MEM_Term;
-	mem->field_type = FIELD_TYPE_VARBINARY;
 	return 0;
 }
 
@@ -791,7 +765,6 @@ bin_to_str(struct Mem *mem)
 	if (ExpandBlob(mem) != 0)
 		return -1;
 	mem->type = MEM_TYPE_STR;
-	mem->field_type = FIELD_TYPE_STRING;
 	return 0;
 }
 
@@ -806,7 +779,6 @@ bin_to_str0(struct Mem *mem)
 	mem->z[mem->n] = '\0';
 	mem->type = MEM_TYPE_STR;
 	mem->flags = MEM_Term;
-	mem->field_type = FIELD_TYPE_STRING;
 	return 0;
 }
 
@@ -869,14 +841,12 @@ double_to_int(struct Mem *mem)
 		mem->u.i = (int64_t)d;
 		mem->type = MEM_TYPE_INT;
 		assert(mem->flags == 0);
-		mem->field_type = FIELD_TYPE_INTEGER;
 		return 0;
 	}
 	if (d > -1.0 && d < (double)UINT64_MAX) {
 		mem->u.u = (uint64_t)d;
 		mem->type = MEM_TYPE_UINT;
 		assert(mem->flags == 0);
-		mem->field_type = FIELD_TYPE_UNSIGNED;
 		return 0;
 	}
 	return -1;
@@ -891,14 +861,12 @@ double_to_int_precise(struct Mem *mem)
 		mem->u.i = (int64_t)d;
 		mem->type = MEM_TYPE_INT;
 		assert(mem->flags == 0);
-		mem->field_type = FIELD_TYPE_INTEGER;
 		return 0;
 	}
 	if (d > -1.0 && d < (double)UINT64_MAX && (double)(uint64_t)d == d) {
 		mem->u.u = (uint64_t)d;
 		mem->type = MEM_TYPE_UINT;
 		assert(mem->flags == 0);
-		mem->field_type = FIELD_TYPE_UNSIGNED;
 		return 0;
 	}
 	return -1;
@@ -937,7 +905,6 @@ double_to_int_forced(struct Mem *mem)
 	}
 	mem->u.i = i;
 	mem->type = type;
-	mem->field_type = FIELD_TYPE_INTEGER;
 	return res;
 }
 
@@ -950,7 +917,6 @@ double_to_uint(struct Mem *mem)
 		mem->u.u = (uint64_t)d;
 		mem->type = MEM_TYPE_UINT;
 		assert(mem->flags == 0);
-		mem->field_type = FIELD_TYPE_UNSIGNED;
 		return 0;
 	}
 	return -1;
@@ -965,7 +931,6 @@ double_to_uint_precise(struct Mem *mem)
 		mem->u.u = (uint64_t)d;
 		mem->type = MEM_TYPE_UINT;
 		assert(mem->flags == 0);
-		mem->field_type = FIELD_TYPE_UNSIGNED;
 		return 0;
 	}
 	return -1;
@@ -995,7 +960,6 @@ double_to_uint_forced(struct Mem *mem)
 	}
 	mem->u.u = u;
 	mem->type = MEM_TYPE_UINT;
-	mem->field_type = FIELD_TYPE_UNSIGNED;
 	return res;
 }
 
@@ -1009,7 +973,6 @@ double_to_str0(struct Mem *mem)
 	mem->n = strlen(mem->z);
 	mem->type = MEM_TYPE_STR;
 	mem->flags = MEM_Term;
-	mem->field_type = FIELD_TYPE_STRING;
 	return 0;
 }
 
@@ -1165,10 +1128,8 @@ mem_to_str(struct Mem *mem)
 int
 mem_cast_explicit(struct Mem *mem, enum field_type type)
 {
-	if (mem->type == MEM_TYPE_NULL) {
-		mem->field_type = type;
+	if (mem->type == MEM_TYPE_NULL)
 		return 0;
-	}
 	switch (type) {
 	case FIELD_TYPE_UNSIGNED:
 		switch (mem->type) {
@@ -1227,10 +1188,8 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 int
 mem_cast_implicit(struct Mem *mem, enum field_type type)
 {
-	if (mem->type == MEM_TYPE_NULL) {
-		mem->field_type = type;
+	if (mem->type == MEM_TYPE_NULL)
 		return 0;
-	}
 	switch (type) {
 	case FIELD_TYPE_UNSIGNED:
 		if (mem->type == MEM_TYPE_UINT)
@@ -1301,12 +1260,10 @@ mem_cast_implicit_number(struct Mem *mem, enum field_type type)
 	case FIELD_TYPE_UNSIGNED:
 		switch (mem->type) {
 		case MEM_TYPE_UINT:
-			mem->field_type = FIELD_TYPE_UNSIGNED;
 			return 0;
 		case MEM_TYPE_INT:
 			mem->u.u = 0;
 			mem->type = MEM_TYPE_UINT;
-			mem->field_type = FIELD_TYPE_UNSIGNED;
 			return -1;
 		case MEM_TYPE_DOUBLE:
 			return double_to_uint_forced(mem);
@@ -1330,7 +1287,6 @@ mem_cast_implicit_number(struct Mem *mem, enum field_type type)
 		switch (mem->type) {
 		case MEM_TYPE_UINT:
 		case MEM_TYPE_INT:
-			mem->field_type = FIELD_TYPE_INTEGER;
 			return 0;
 		case MEM_TYPE_DOUBLE:
 			return double_to_int_forced(mem);
@@ -1487,7 +1443,6 @@ mem_copy(struct Mem *to, const struct Mem *from)
 	to->u = from->u;
 	to->type = from->type;
 	to->flags = from->flags;
-	to->field_type = from->field_type;
 	to->n = from->n;
 	to->z = from->z;
 	if (!mem_is_bytes(to))
@@ -1514,7 +1469,6 @@ mem_copy_as_ephemeral(struct Mem *to, const struct Mem *from)
 	to->u = from->u;
 	to->type = from->type;
 	to->flags = from->flags;
-	to->field_type = from->field_type;
 	to->n = from->n;
 	to->z = from->z;
 	if (!mem_is_bytes(to))
@@ -1537,30 +1491,13 @@ mem_move(struct Mem *to, struct Mem *from)
 	from->zMalloc = NULL;
 }
 
-static bool
-try_return_null(const struct Mem *a, const struct Mem *b, struct Mem *result,
-		enum field_type type)
-{
-	mem_clear(result);
-	result->field_type = type;
-	return ((a->type | b->type) & MEM_TYPE_NULL) != 0;
-}
-
 int
 mem_concat(struct Mem *a, struct Mem *b, struct Mem *result)
 {
-	assert(result != b);
-	if (a != result) {
-		if (try_return_null(a, b, result, FIELD_TYPE_STRING))
-			return 0;
-	} else {
-		if (((a->type | b->type) & MEM_TYPE_NULL) != 0) {
-			mem_clear(a);
-			result->field_type = FIELD_TYPE_STRING;
-			return 0;
-		}
+	if (mem_is_any_null(a, b)) {
+		mem_set_null(result);
+		return 0;
 	}
-
 	/* Concatenation operation can be applied only to strings and blobs. */
 	if (((b->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) == 0)) {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES,
@@ -1593,8 +1530,6 @@ mem_concat(struct Mem *a, struct Mem *b, struct Mem *result)
 
 	result->type = a->type;
 	result->flags = 0;
-	if (result->type == MEM_TYPE_BIN)
-		result->field_type = FIELD_TYPE_VARBINARY;
 	if (result != a)
 		memcpy(result->z, a->z, a->n);
 	memcpy(&result->z[a->n], b->z, b->n);
@@ -1607,7 +1542,6 @@ mem_add(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
 	if (mem_is_any_null(left, right)) {
 		mem_set_null(result);
-		result->field_type = FIELD_TYPE_NUMBER;
 		return 0;
 	}
 	if (!mem_is_num(right)) {
@@ -1644,7 +1578,6 @@ mem_sub(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
 	if (mem_is_any_null(left, right)) {
 		mem_set_null(result);
-		result->field_type = FIELD_TYPE_NUMBER;
 		return 0;
 	}
 	if (!mem_is_num(right)) {
@@ -1681,7 +1614,6 @@ mem_mul(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
 	if (mem_is_any_null(left, right)) {
 		mem_set_null(result);
-		result->field_type = FIELD_TYPE_NUMBER;
 		return 0;
 	}
 	if (!mem_is_num(right)) {
@@ -1718,7 +1650,6 @@ mem_div(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
 	if (mem_is_any_null(left, right)) {
 		mem_set_null(result);
-		result->field_type = FIELD_TYPE_NUMBER;
 		return 0;
 	}
 	if (!mem_is_num(right)) {
@@ -1764,7 +1695,6 @@ mem_rem(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
 	if (mem_is_any_null(left, right)) {
 		mem_set_null(result);
-		result->field_type = FIELD_TYPE_INTEGER;
 		return 0;
 	}
 	if (!mem_is_int(right)) {
@@ -1797,7 +1727,6 @@ mem_bit_and(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
 	if (mem_is_any_null(left, right)) {
 		mem_set_null(result);
-		result->field_type = FIELD_TYPE_UNSIGNED;
 		return 0;
 	}
 	if (right->type != MEM_TYPE_UINT) {
@@ -1819,7 +1748,6 @@ mem_bit_or(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
 	if (mem_is_any_null(left, right)) {
 		mem_set_null(result);
-		result->field_type = FIELD_TYPE_UNSIGNED;
 		return 0;
 	}
 	if (right->type != MEM_TYPE_UINT) {
@@ -1842,7 +1770,6 @@ mem_shift_left(const struct Mem *left, const struct Mem *right,
 {
 	if (mem_is_any_null(left, right)) {
 		mem_set_null(result);
-		result->field_type = FIELD_TYPE_UNSIGNED;
 		return 0;
 	}
 	if (right->type != MEM_TYPE_UINT) {
@@ -1865,7 +1792,6 @@ mem_shift_right(const struct Mem *left, const struct Mem *right,
 {
 	if (mem_is_any_null(left, right)) {
 		mem_set_null(result);
-		result->field_type = FIELD_TYPE_UNSIGNED;
 		return 0;
 	}
 	if (right->type != MEM_TYPE_UINT) {
@@ -1887,7 +1813,6 @@ mem_bit_not(const struct Mem *mem, struct Mem *result)
 {
 	if (mem_is_null(mem)) {
 		mem_set_null(result);
-		result->field_type = FIELD_TYPE_UNSIGNED;
 		return 0;
 	}
 	if (mem->type != MEM_TYPE_UINT) {
@@ -2557,7 +2482,6 @@ sql_vdbemem_finalize(struct Mem *mem, struct func *func)
 	t.type = MEM_TYPE_NULL;
 	assert(t.flags == 0);
 	t.db = mem->db;
-	t.field_type = field_type_MAX;
 	ctx.pOut = &t;
 	ctx.pMem = mem;
 	ctx.func = func;
@@ -2604,7 +2528,6 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 		mem->n = buf - mem->z;
 		mem->type = MEM_TYPE_ARRAY;
 		mem->flags = MEM_Ephem;
-		mem->field_type = FIELD_TYPE_ARRAY;
 		break;
 	}
 	case MP_MAP: {
@@ -2613,7 +2536,6 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 		mem->n = buf - mem->z;
 		mem->type = MEM_TYPE_MAP;
 		mem->flags = MEM_Ephem;
-		mem->field_type = FIELD_TYPE_MAP;
 		break;
 	}
 	case MP_EXT: {
@@ -2630,7 +2552,6 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 			}
 			mem->type = MEM_TYPE_UUID;
 			mem->flags = 0;
-			mem->field_type = FIELD_TYPE_UUID;
 			break;
 		}
 		buf += size;
@@ -2638,21 +2559,18 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 		mem->n = buf - svp;
 		mem->type = MEM_TYPE_BIN;
 		mem->flags = MEM_Ephem;
-		mem->field_type = FIELD_TYPE_VARBINARY;
 		break;
 	}
 	case MP_NIL: {
 		mp_decode_nil(&buf);
 		mem->type = MEM_TYPE_NULL;
 		mem->flags = 0;
-		mem->field_type = field_type_MAX;
 		break;
 	}
 	case MP_BOOL: {
 		mem->u.b = mp_decode_bool(&buf);
 		mem->type = MEM_TYPE_BOOL;
 		mem->flags = 0;
-		mem->field_type = FIELD_TYPE_BOOLEAN;
 		break;
 	}
 	case MP_UINT: {
@@ -2660,14 +2578,12 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 		mem->u.u = v;
 		mem->type = MEM_TYPE_UINT;
 		mem->flags = 0;
-		mem->field_type = FIELD_TYPE_INTEGER;
 		break;
 	}
 	case MP_INT: {
 		mem->u.i = mp_decode_int(&buf);
 		mem->type = MEM_TYPE_INT;
 		mem->flags = 0;
-		mem->field_type = FIELD_TYPE_INTEGER;
 		break;
 	}
 	case MP_STR: {
@@ -2675,7 +2591,6 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 		mem->n = (int) mp_decode_strl(&buf);
 		mem->type = MEM_TYPE_STR;
 		mem->flags = MEM_Ephem;
-		mem->field_type = FIELD_TYPE_STRING;
 install_blob:
 		mem->z = (char *)buf;
 		buf += mem->n;
@@ -2686,7 +2601,6 @@ install_blob:
 		mem->n = (int) mp_decode_binl(&buf);
 		mem->type = MEM_TYPE_BIN;
 		mem->flags = MEM_Ephem;
-		mem->field_type = FIELD_TYPE_VARBINARY;
 		goto install_blob;
 	}
 	case MP_FLOAT: {
@@ -2694,11 +2608,9 @@ install_blob:
 		if (sqlIsNaN(mem->u.r)) {
 			mem->type = MEM_TYPE_NULL;
 			mem->flags = 0;
-			mem->field_type = FIELD_TYPE_DOUBLE;
 		} else {
 			mem->type = MEM_TYPE_DOUBLE;
 			mem->flags = 0;
-			mem->field_type = FIELD_TYPE_DOUBLE;
 		}
 		break;
 	}
@@ -2707,11 +2619,9 @@ install_blob:
 		if (sqlIsNaN(mem->u.r)) {
 			mem->type = MEM_TYPE_NULL;
 			mem->flags = 0;
-			mem->field_type = FIELD_TYPE_DOUBLE;
 		} else {
 			mem->type = MEM_TYPE_DOUBLE;
 			mem->flags = 0;
-			mem->field_type = FIELD_TYPE_DOUBLE;
 		}
 		break;
 	}

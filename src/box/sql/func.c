@@ -162,17 +162,6 @@ typeofFunc(sql_context * context, int NotUsed, sql_value ** argv)
 {
 	const char *z = 0;
 	UNUSED_PARAMETER(NotUsed);
-	enum field_type f_t = argv[0]->field_type;
-	/*
-	 * SCALAR is not a basic type, but rather an aggregation of
-	 * types. Thus, ignore SCALAR field type and return msgpack
-	 * format type.
-	 */
-	if (f_t != field_type_MAX && f_t != FIELD_TYPE_SCALAR) {
-		sql_result_text(context, field_type_strs[argv[0]->field_type],
-				-1, SQL_STATIC);
-		return;
-	}
 	switch (argv[0]->type) {
 	case MEM_TYPE_INT:
 	case MEM_TYPE_UINT:
@@ -190,8 +179,10 @@ typeofFunc(sql_context * context, int NotUsed, sql_value ** argv)
 		z = "varbinary";
 		break;
 	case MEM_TYPE_BOOL:
-	case MEM_TYPE_NULL:
 		z = "boolean";
+		break;
+	case MEM_TYPE_NULL:
+		z = "NULL";
 		break;
 	case MEM_TYPE_UUID:
 		z = "uuid";

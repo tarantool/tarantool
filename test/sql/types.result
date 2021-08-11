@@ -1481,7 +1481,7 @@ box.execute("SELECT typeof(a), typeof(s) FROM t;")
     type: string
   rows:
   - ['integer', 'integer']
-  - ['integer', 'boolean']
+  - ['NULL', 'NULL']
 ...
 box.execute('CREATE TABLE t1 (id INTEGER PRIMARY KEY, a INTEGER, b INTEGER)')
 ---
@@ -1497,7 +1497,7 @@ box.execute('SELECT typeof(a & b) FROM t1;')
   - name: COLUMN_1
     type: string
   rows:
-  - ['unsigned']
+  - ['NULL']
 ...
 box.execute('SELECT typeof(a), typeof(b), typeof(a & b) FROM t1')
 ---
@@ -1509,7 +1509,7 @@ box.execute('SELECT typeof(a), typeof(b), typeof(a & b) FROM t1')
   - name: COLUMN_3
     type: string
   rows:
-  - ['integer', 'integer', 'unsigned']
+  - ['NULL', 'NULL', 'NULL']
 ...
 box.execute("SELECT typeof(CAST(0 AS UNSIGNED));")
 ---
@@ -1517,7 +1517,7 @@ box.execute("SELECT typeof(CAST(0 AS UNSIGNED));")
   - name: COLUMN_1
     type: string
   rows:
-  - ['unsigned']
+  - ['integer']
 ...
 box.space.T:drop()
 ---

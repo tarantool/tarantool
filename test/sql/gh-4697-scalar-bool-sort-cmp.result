@@ -33,7 +33,7 @@ SELECT s2, typeof(s2) FROM test ORDER BY s2;
  |   - name: COLUMN_1
  |     type: string
  |   rows:
- |   - [null, 'boolean']
+ |   - [null, 'NULL']
  |   - [true, 'boolean']
  |   - [1, 'integer']
  |   - [1.1, 'double']
@@ -46,7 +46,7 @@ SELECT s3, typeof(s3) FROM test ORDER BY s3;
  |   - name: COLUMN_1
  |     type: string
  |   rows:
- |   - [null, 'boolean']
+ |   - [null, 'NULL']
  |   - [true, 'boolean']
  |   - [1, 'integer']
  |   - [1.1, 'double']

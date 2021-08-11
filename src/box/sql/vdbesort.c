@@ -969,12 +969,6 @@ sqlVdbeSorterReset(sql * db, VdbeSorter * pSorter)
 	pSorter->pUnpacked = 0;
 }
 
-enum field_type
-vdbe_sorter_get_field_type(struct VdbeSorter *sorter, uint32_t field_no)
-{
-	return sorter->key_def->parts[field_no].type;
-}
-
 /*
  * Free any cursor components allocated by sqlVdbeSorterXXX routines.
  */

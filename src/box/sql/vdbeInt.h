@@ -341,9 +341,6 @@ int sqlVdbeFrameRestore(VdbeFrame *);
 int sqlVdbeSorterInit(struct sql *db, struct VdbeCursor *cursor);
 void sqlVdbeSorterReset(sql *, VdbeSorter *);
 
-enum field_type
-vdbe_sorter_get_field_type(struct VdbeSorter *sorter, uint32_t field_no);
-
 void sqlVdbeSorterClose(sql *, VdbeCursor *);
 int sqlVdbeSorterRowkey(const VdbeCursor *, Mem *);
 int sqlVdbeSorterNext(sql *, const VdbeCursor *, int *);

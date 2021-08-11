@@ -120,7 +120,7 @@ test:do_execsql_test(
         SELECT typeof(NULL)
     ]], {
         -- <cast-1.12>
-        "boolean"
+        "NULL"
         -- </cast-1.12>
     })
 
@@ -140,7 +140,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(NULL AS text))
     ]], {
         -- <cast-1.14>
-        "string"
+        "NULL"
         -- </cast-1.14>
     })
 
@@ -160,7 +160,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(NULL AS NUMBER))
     ]], {
         -- <cast-1.16>
-        "number"
+        "NULL"
         -- </cast-1.16>
     })
 
@@ -180,7 +180,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(NULL AS SCALAR))
     ]], {
         -- <cast-1.18>
-        "boolean"
+        "NULL"
         -- </cast-1.18>
     })
 
@@ -200,7 +200,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(NULL AS integer))
     ]], {
         -- <cast-1.20>
-        "integer"
+        "NULL"
         -- </cast-1.20>
     })
 
@@ -511,7 +511,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(null AS NUMBER))
     ]], {
         -- <case-1.61>
-        "number"
+        "NULL"
         -- </case-1.61>
     })
 
@@ -531,7 +531,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(1 AS NUMBER))
     ]], {
         -- <case-1.63>
-        "number"
+        "integer"
         -- </case-1.63>
     })
 
@@ -551,7 +551,7 @@ test:do_execsql_test(
         SELECT typeof(CAST('1' AS NUMBER))
     ]], {
         -- <case-1.65>
-        "number"
+        "integer"
         -- </case-1.65>
     })
 
