@@ -242,14 +242,14 @@ enum iproto_type {
 
 	IPROTO_RAFT = 30,
 	/** PROMOTE request. */
-	IPROTO_PROMOTE = 31,
+	IPROTO_RAFT_PROMOTE = 31,
 	/** DEMOTE request. */
-	IPROTO_DEMOTE = 32,
+	IPROTO_RAFT_DEMOTE = 32,
 
 	/** A confirmation message for synchronous transactions. */
-	IPROTO_CONFIRM = 40,
+	IPROTO_RAFT_CONFIRM = 40,
 	/** A rollback message for synchronous transactions. */
-	IPROTO_ROLLBACK = 41,
+	IPROTO_RAFT_ROLLBACK = 41,
 
 	/** PING request */
 	IPROTO_PING = 64,
@@ -314,13 +314,13 @@ iproto_type_name(uint16_t type)
 	switch (type) {
 	case IPROTO_RAFT:
 		return "RAFT";
-	case IPROTO_PROMOTE:
+	case IPROTO_RAFT_PROMOTE:
 		return "PROMOTE";
-	case IPROTO_DEMOTE:
+	case IPROTO_RAFT_DEMOTE:
 		return "DEMOTE";
-	case IPROTO_CONFIRM:
+	case IPROTO_RAFT_CONFIRM:
 		return "CONFIRM";
-	case IPROTO_ROLLBACK:
+	case IPROTO_RAFT_ROLLBACK:
 		return "ROLLBACK";
 	case VY_INDEX_RUN_INFO:
 		return "RUNINFO";
@@ -371,15 +371,15 @@ dml_request_key_map(uint16_t type)
 static inline bool
 iproto_type_is_synchro_request(uint16_t type)
 {
-	return type == IPROTO_CONFIRM || type == IPROTO_ROLLBACK ||
-	       type == IPROTO_PROMOTE || type == IPROTO_DEMOTE;
+	return type == IPROTO_RAFT_CONFIRM || type == IPROTO_RAFT_ROLLBACK ||
+	       type == IPROTO_RAFT_PROMOTE || type == IPROTO_RAFT_DEMOTE;
 }
 
 /** PROMOTE/DEMOTE entry (synchronous replication and leader elections). */
 static inline bool
 iproto_type_is_promote_request(uint32_t type)
 {
-       return type == IPROTO_PROMOTE || type == IPROTO_DEMOTE;
+       return type == IPROTO_RAFT_PROMOTE || type == IPROTO_RAFT_DEMOTE;
 }
 
 static inline bool

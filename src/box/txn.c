@@ -407,7 +407,7 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	/*
 	 * Create WAL record for the write requests in
 	 * non-temporary spaces. stmt->space can be NULL for
-	 * IRPOTO_NOP or IPROTO_CONFIRM.
+	 * IRPOTO_NOP or IPROTO_RAFT_CONFIRM.
 	 */
 	if (stmt->space == NULL || !space_is_temporary(stmt->space)) {
 		if (txn_add_redo(txn, stmt, request) != 0)

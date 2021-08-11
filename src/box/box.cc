@@ -1669,7 +1669,7 @@ box_issue_promote(uint32_t prev_leader_id, int64_t promote_lsn)
 	txn_limbo_write_promote(&txn_limbo, promote_lsn,
 				raft->term);
 	struct synchro_request req = {
-		.type = IPROTO_PROMOTE,
+		.type = IPROTO_RAFT_PROMOTE,
 		.replica_id = prev_leader_id,
 		.origin_id = instance_id,
 		.lsn = promote_lsn,
@@ -1691,7 +1691,7 @@ box_issue_demote(uint32_t prev_leader_id, int64_t promote_lsn)
 	txn_limbo_write_demote(&txn_limbo, promote_lsn,
 				box_raft()->term);
 	struct synchro_request req = {
-		.type = IPROTO_DEMOTE,
+		.type = IPROTO_RAFT_DEMOTE,
 		.replica_id = prev_leader_id,
 		.origin_id = instance_id,
 		.lsn = promote_lsn,
