@@ -632,30 +632,39 @@ fiber.join(fiber.self())
 sum = 0
 
 -- gh-2694 fiber.top()
-fiber.top_enable()
+-- The following checks for `is_fiber_top` and default phony values
+-- are a workaround for the problems of diff-based test in case of build
+-- without fiber.top.
+-- FIXME: fiber.top and backtraces require not diff-based tests.
+is_fiber_top = fiber.top ~= nil
+if is_fiber_top then fiber.top_enable() end
 
 
 -- Wait till a full event loop iteration passes, so that
 -- top() contains meaningful results. On the ev loop iteration
 -- following fiber.top_enable() results will be zero.
-while fiber.top().cpu["1/sched"].instant == 0 do fiber.yield() end
+if is_fiber_top then\
+    while fiber.top().cpu["1/sched"].instant == 0 do fiber.yield() end\
+end
 
-a = fiber.top()
-type(a)
+a = is_fiber_top and fiber.top() or {cpu = {["1/sched"] = {}}, cpu_misses = 0}
+type(a) == 'table'
 -- scheduler is present in fiber.top()
 -- and is indexed by name
 a.cpu["1/sched"] ~= nil
 type(a.cpu_misses) == 'number'
 sum_inst = 0
-sum_avg = 0
+sum_avg = is_fiber_top and 0 or 100
 
 -- update table to make sure
 -- a full event loop iteration
 -- has ended
-a = fiber.top().cpu
-for k, v in pairs(a) do\
-    sum_inst = sum_inst + v["instant"]\
-    sum_avg = sum_avg + v["average"]\
+if is_fiber_top then\
+    a = fiber.top().cpu\
+    for k, v in pairs(a) do\
+        sum_inst = sum_inst + v["instant"]\
+        sum_avg = sum_avg + v["average"]\
+    end\
 end
 
 -- when a fiber dies, its impact on the thread moving average
@@ -670,23 +679,25 @@ end
 sum_avg <= 100.1 or sum_avg
 -- not exact due to accumulated integer division errors
 --sum_avg > 99 and sum_avg <= 100.1 or sum_avg
-tbl = nil
-f = fiber.new(function()\
-    local fiber_key = fiber.self().id()..'/'..fiber.self().name()\
-    tbl = fiber.top().cpu[fiber_key]\
-    while tbl.time == 0 do\
-        for i = 1,1000 do end\
-        fiber.yield()\
+tbl = is_fiber_top and {} or {average = 1, instant = 1, time = 1}
+if is_fiber_top then\
+    f = fiber.new(function()\
+        local fiber_key = fiber.self().id()..'/'..fiber.self().name()\
         tbl = fiber.top().cpu[fiber_key]\
-    end\
-end)
-while f:status() ~= 'dead' do fiber.yield() end
+        while tbl.time == 0 do\
+            for i = 1,1000 do end\
+            fiber.yield()\
+            tbl = fiber.top().cpu[fiber_key]\
+        end\
+    end)\
+    while f:status() ~= 'dead' do fiber.yield() end\
+end
 tbl.average > 0
 tbl.instant > 0
 tbl.time > 0
 
-fiber.top_disable()
-fiber.top()
+if is_fiber_top then fiber.top_disable() end
+pcall(fiber.top) == false
 
 --
 -- fiber._internal.schedule_task() - API for internal usage for
