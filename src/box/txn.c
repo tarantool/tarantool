@@ -202,6 +202,7 @@ txn_new(void)
 	rlist_create(&txn->read_set);
 	rlist_create(&txn->point_holes_list);
 	rlist_create(&txn->gap_list);
+	rlist_create(&txn->full_scan_list);
 	rlist_create(&txn->conflict_list);
 	rlist_create(&txn->conflicted_by_list);
 	rlist_create(&txn->in_read_view_txs);

@@ -107,6 +107,19 @@ struct gap_item {
 };
 
 /**
+ * An element that stores the fact that some transaction have read
+ * a full index.
+ */
+struct full_scan_item {
+	/** A link in index::full_scans. */
+	struct rlist in_full_scans;
+	/** Link in txn->full_scan_list. */
+	struct rlist in_full_scan_list;
+	/** The transaction that read it. */
+	struct txn *txn;
+};
+
+/**
  * Helper structure for searching for point_hole_item in the hash table,
  * @sa point_hole_item_pool.
  */
@@ -190,6 +203,8 @@ struct tx_manager
 	size_t point_holes_size;
 	/** Mempool for gap_item objects. */
 	struct mempool gap_item_mempoool;
+	/** Mempool for full_scan_item objects. */
+	struct mempool full_scan_item_mempool;
 	/** List of all memtx_story objects. */
 	struct rlist all_stories;
 	/** Iterator that sequentially traverses all memtx_story objects. */
@@ -235,6 +250,8 @@ memtx_tx_manager_init()
 		panic("mh_history_new()");
 	mempool_create(&txm.gap_item_mempoool,
 		       cord_slab_cache(), sizeof(struct gap_item));
+	mempool_create(&txm.full_scan_item_mempool,
+		       cord_slab_cache(), sizeof(struct full_scan_item));
 	txm.point_holes_size = 0;
 	rlist_create(&txm.all_stories);
 	rlist_create(&txm.all_txs);
@@ -251,6 +268,7 @@ memtx_tx_manager_free()
 	mempool_destroy(&txm.point_hole_item_pool);
 	mh_point_holes_delete(txm.point_holes);
 	mempool_destroy(&txm.gap_item_mempoool);
+	mempool_destroy(&txm.full_scan_item_mempool);
 }
 
 void
@@ -1243,9 +1261,16 @@ memtx_tx_handle_gap_write(struct txn *txn, struct space *space,
 			  struct memtx_story *story, struct tuple *tuple,
 			  struct tuple *successor, uint32_t ind)
 {
+	struct index *index = space->index[ind];
+	struct full_scan_item *fsc_item, *fsc_tmp;
+	struct rlist *fsc_list = &index->full_scans;
+	rlist_foreach_entry_safe(fsc_item, fsc_list, in_full_scans, fsc_tmp) {
+		if (memtx_tx_cause_conflict(txn, fsc_item->txn) != 0)
+			return -1;
+	}
 	if (successor != NULL && !successor->is_dirty)
 		return 0; /* no gap records */
-	struct index *index = space->index[ind];
+
 	struct rlist *list = &index->nearby_gaps;
 	if (successor != NULL) {
 		assert(successor->is_dirty);
@@ -1881,6 +1906,14 @@ memtx_tx_delete_gap(struct gap_item *item)
 	mempool_free(&txm.gap_item_mempoool, item);
 }
 
+static void
+memtx_tx_full_scan_item_delete(struct full_scan_item *item)
+{
+	rlist_del(&item->in_full_scan_list);
+	rlist_del(&item->in_full_scans);
+	mempool_free(&txm.full_scan_item_mempool, item);
+}
+
 void
 memtx_tx_on_index_delete(struct index *index)
 {
@@ -1890,6 +1923,13 @@ memtx_tx_on_index_delete(struct index *index)
 					  struct gap_item,
 					  in_nearby_gaps);
 		memtx_tx_delete_gap(item);
+	}
+	while (!rlist_empty(&index->full_scans)) {
+		struct full_scan_item *item =
+			rlist_first_entry(&index->full_scans,
+					  struct full_scan_item,
+					  in_full_scans);
+		memtx_tx_full_scan_item_delete(item);
 	}
 }
 
@@ -2233,6 +2273,43 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 	return 0;
 }
 
+static struct full_scan_item *
+memtx_tx_full_scan_item_new(struct txn *txn)
+{
+	struct full_scan_item *item = (struct full_scan_item *)
+		mempool_alloc(&txm.full_scan_item_mempool);
+	if (item == NULL) {
+		diag_set(OutOfMemory, sizeof(*item), "mempool_alloc",
+			 "full_scan_item");
+		return NULL;
+	}
+
+	item->txn = txn;
+	rlist_add(&txn->full_scan_list, &item->in_full_scan_list);
+	return item;
+}
+
+/**
+ * Record in TX manager that a transaction @a txn have read full @ a index.
+ * This function must be used for unordered indexes, such as HASH, for queries
+ * when interation type is ALL.
+ * @return 0 on success, -1 on memory error.
+ */
+int
+memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index)
+{
+	if (txn->status != TXN_INPROGRESS)
+		return 0;
+
+	struct full_scan_item *item = memtx_tx_full_scan_item_new(txn);
+	if (item == NULL)
+		return -1;
+
+	rlist_add(&index->full_scans, &item->in_full_scans);
+	memtx_tx_story_gc();
+	return 0;
+}
+
 /**
  * Clean memtx_tx part of @a txm.
  */
@@ -2252,6 +2329,13 @@ memtx_tx_clean_txn(struct txn *txn)
 					  struct gap_item,
 					  in_gap_list);
 		memtx_tx_delete_gap(item);
+	}
+	while (!rlist_empty(&txn->full_scan_list)) {
+		struct full_scan_item *item =
+			rlist_first_entry(&txn->full_scan_list,
+					  struct full_scan_item,
+					  in_full_scan_list);
+		memtx_tx_full_scan_item_delete(item);
 	}
 }
 
