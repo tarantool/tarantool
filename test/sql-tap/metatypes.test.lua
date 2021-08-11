@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(10)
+test:plan(12)
 
 -- Check that SCALAR and NUMBER meta-types works as intended.
 box.execute([[CREATE TABLE t (i INT PRIMARY KEY, s SCALAR, n NUMBER);]])
@@ -105,6 +105,23 @@ test:do_catchsql_test(
         SELECT CAST(1 AS SCALAR) * 1;
     ]], {
         1, "Type mismatch: can not convert scalar(1) to integer, unsigned or double"
+    })
+
+-- Check that bitwise operations are prohibited for NUMBER and SCALAR values.
+test:do_catchsql_test(
+    "metatypes-4.1",
+    [[
+        SELECT 1 & CAST(1 AS NUMBER);
+    ]], {
+        1, "Type mismatch: can not convert number(1) to unsigned"
+    })
+
+test:do_catchsql_test(
+    "metatypes-4.2",
+    [[
+        SELECT CAST(1 AS SCALAR) >> 1;
+    ]], {
+        1, "Type mismatch: can not convert scalar(1) to unsigned"
     })
 
 box.execute([[DROP TABLE t;]])
