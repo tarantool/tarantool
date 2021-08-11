@@ -786,7 +786,7 @@ memtx_tx_story_full_unlink(struct memtx_story *story)
 			 * actually deletes the tuple, it must be deleted from
 			 * index.
 			 */
-			if (story->del_psn > 0 && story->space != NULL) {
+			if (story->del_psn > 0 && link->in_index != NULL) {
 				struct index *index = link->in_index;
 				struct tuple *removed, *unused;
 				if (index_replace(index, story->tuple, NULL,
@@ -805,15 +805,6 @@ memtx_tx_story_full_unlink(struct memtx_story *story)
 				if (i == 0)
 					tuple_unref(story->tuple);
 			}
-			/*
-			 * If there is older story, we must unlink it, and
-			 * it will become at the top of chain. On the other
-			 * hand we have just handled top of chain removal and
-			 * must not repeat this actions. We can do it by
-			 * clearing the space.
-			 */
-			if (link->older_story != NULL)
-				link->older_story->space = NULL;
 
 			memtx_tx_story_unlink(story, link->older_story, i);
 		} else {
