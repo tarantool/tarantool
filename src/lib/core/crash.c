@@ -481,7 +481,7 @@ crash_report_stderr(struct crash_info *cinfo)
 
 	fprintf(stderr, "Current time: %u\n", (unsigned)time(0));
 	fprintf(stderr, "Please file a bug at "
-		"http://github.com/tarantool/tarantool/issues\n");
+		"https://github.com/tarantool/tarantool/issues\n");
 
 #ifdef ENABLE_BACKTRACE
 	fprintf(stderr, "Attempting backtrace... Note: since the server has "

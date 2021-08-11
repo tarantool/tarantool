@@ -627,7 +627,7 @@ print_help(const char *program)
 	puts("  --\t\t\t\tstop handling options");
 	puts("  -\t\t\t\texecute stdin and stop handling options");
 	puts("");
-	puts("Please visit project home page at http://tarantool.org");
+	puts("Please visit project home page at https://tarantool.org");
 	puts("to see online documentation, submit bugs or contribute a patch.");
 }
 
