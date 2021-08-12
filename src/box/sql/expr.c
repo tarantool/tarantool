@@ -353,7 +353,7 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 					     p->x.pList->nExpr;
 			uint32_t flags = sql_func_flags(p->u.zToken);
 			if (((flags & SQL_FUNC_DERIVEDCOLL) != 0) &&
-			    arg_count > 0) {
+			    arg_count > 0 && p->type == FIELD_TYPE_STRING) {
 				/*
 				 * Now we use quite straightforward
 				 * approach assuming that resulting
@@ -362,7 +362,6 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 				 * built-in functions: trim, upper,
 				 * lower, replace, substr.
 				 */
-				assert(p->type == FIELD_TYPE_STRING);
 				p = p->x.pList->a->pExpr;
 				continue;
 			}

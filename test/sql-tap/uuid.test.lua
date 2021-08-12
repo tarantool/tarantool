@@ -288,14 +288,12 @@ test:do_execsql_test(
         uuid3
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-6.1.9",
     [[
         SELECT GROUP_CONCAT(u) from t2;
     ]], {
-        "11111111-1111-1111-1111-111111111111,"..
-        "11111111-3333-1111-1111-111111111111,"..
-        "22222222-1111-1111-1111-111111111111"
+        1, "Failed to execute SQL statement: wrong arguments for function GROUP_CONCAT()"
     })
 
 test:do_catchsql_test(
@@ -402,14 +400,12 @@ test:do_catchsql_test(
         1, "Failed to execute SQL statement: wrong arguments for function RANDOMBLOB()"
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-6.1.23",
     [[
         SELECT REPLACE(u, '1', '2') from t2;
     ]], {
-        "22222222-2222-2222-2222-222222222222",
-        "22222222-3333-2222-2222-222222222222",
-        "22222222-2222-2222-2222-222222222222"
+        1, "Failed to execute SQL statement: wrong arguments for function REPLACE()"
     })
 
 test:do_catchsql_test(
@@ -428,12 +424,12 @@ test:do_catchsql_test(
         1, "Failed to execute SQL statement: wrong arguments for function SOUNDEX()"
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-6.1.26",
     [[
         SELECT SUBSTR(u, 3, 3) from t2;
     ]], {
-        "111", "111", "222"
+        1, "Failed to execute SQL statement: wrong arguments for function SUBSTR()"
     })
 
 test:do_catchsql_test(
@@ -452,14 +448,12 @@ test:do_catchsql_test(
         1, "Failed to execute SQL statement: wrong arguments for function TOTAL()"
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "uuid-6.1.29",
     [[
         SELECT TRIM(u) from t2;
     ]], {
-        "11111111-1111-1111-1111-111111111111",
-        "11111111-3333-1111-1111-111111111111",
-        "22222222-1111-1111-1111-111111111111"
+        1, "Failed to execute SQL statement: wrong arguments for function TRIM()"
     })
 
 test:do_execsql_test(

@@ -807,11 +807,8 @@ box.execute("SELECT count(i) FROM t;")
 ...
 box.execute("SELECT group_concat(i) FROM t;")
 ---
-- metadata:
-  - name: COLUMN_1
-    type: string
-  rows:
-  - ['1,-1,18446744073709551613']
+- null
+- 'Failed to execute SQL statement: wrong arguments for function GROUP_CONCAT()'
 ...
 box.execute("DELETE FROM t WHERE i < 18446744073709551613;")
 ---
@@ -1279,7 +1276,7 @@ box.execute("SELECT group_concat(v) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: string
+    type: varbinary
   rows:
   - ['abc']
 ...
@@ -1841,11 +1838,8 @@ box.execute("SELECT count(d) FROM t;")
 ...
 box.execute("SELECT group_concat(d) FROM t;")
 ---
-- metadata:
-  - name: COLUMN_1
-    type: string
-  rows:
-  - ['10.0,-2.0,3.3,1.8e+19']
+- null
+- 'Failed to execute SQL statement: wrong arguments for function GROUP_CONCAT()'
 ...
 box.execute("SELECT lower(d) FROM t;")
 ---

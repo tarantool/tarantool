@@ -365,11 +365,8 @@ SELECT TOTAL(a) FROM t0;
  | ...
 SELECT GROUP_CONCAT(a, ' +++ ') FROM t0;
  | ---
- | - metadata:
- |   - name: COLUMN_1
- |     type: string
- |   rows:
- |   - ['FALSE +++ TRUE']
+ | - null
+ | - 'Failed to execute SQL statement: wrong arguments for function GROUP_CONCAT()'
  | ...
 
 -- Check BOOLEAN as binding parameter.

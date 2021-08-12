@@ -176,7 +176,7 @@ s = prepare([[WITH RECURSIVE \
                       a(t) AS ( \
                           SELECT group_concat( substr(' .+*#', 1+LEAST(iter/7,4), 1), '') \
                               FROM m2 GROUP BY cy) \
-                  SELECT group_concat(TRIM(TRAILING FROM t),x'0a') FROM a;]])
+                  SELECT group_concat(CAST(TRIM(TRAILING FROM t) AS VARBINARY), x'0a') FROM a;]])
 
 res = execute(s.stmt_id)
 res.metadata

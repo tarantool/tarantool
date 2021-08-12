@@ -82,7 +82,8 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "distinctagg-2.2",
     [[
-        SELECT group_concat(distinct a,b) FROM t1;
+        SELECT group_concat(distinct CAST(a AS STRING), CAST(b AS STRING))
+        FROM t1;
     ]], {
         -- <distinctagg-2.2>
         1, "DISTINCT aggregates must have exactly one argument"

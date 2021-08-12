@@ -551,16 +551,14 @@ substrFunc(sql_context * context, int argc, sql_value ** argv)
 			cnt++;
 		}
 		z2 += i;
-		sql_result_text64(context, (char *)z, z2 - z,
-				      SQL_TRANSIENT);
+		mem_copy_str(context->pOut, (char *)z, z2 - z);
 	} else {
 		if (p1 + p2 > len) {
 			p2 = len - p1;
 			if (p2 < 0)
 				p2 = 0;
 		}
-		sql_result_blob64(context, (char *)&z[p1], (u64) p2,
-				      SQL_TRANSIENT);
+		mem_copy_bin(context->pOut, (char *)&z[p1], p2);
 	}
 }
 
@@ -1367,7 +1365,10 @@ replaceFunc(sql_context * context, int argc, sql_value ** argv)
 	j += nStr - i;
 	assert(j <= nOut);
 	zOut[j] = 0;
-	sql_result_text(context, (char *)zOut, j, sql_free);
+	if (context->func->def->returns == FIELD_TYPE_STRING)
+		mem_set_str_dynamic(context->pOut, (char *)zOut, j);
+	else
+		mem_set_bin_dynamic(context->pOut, (char *)zOut, j);
 }
 
 /**
@@ -1422,8 +1423,10 @@ trim_procedure(struct sql_context *context, enum trim_side_mask flags,
 		}
 	}
 finish:
-	sql_result_text(context, (char *)input_str, input_str_sz,
-			SQL_TRANSIENT);
+	if (context->func->def->returns == FIELD_TYPE_STRING)
+		mem_copy_str(context->pOut, (char *)input_str, input_str_sz);
+	else
+		mem_copy_bin(context->pOut, (char *)input_str, input_str_sz);
 }
 
 /**
@@ -1846,9 +1849,13 @@ groupConcatFinalize(sql_context * context)
 		} else if (pAccum->accError == STRACCUM_NOMEM) {
 			context->is_aborted = true;
 		} else {
-			sql_result_text(context,
-					    sqlStrAccumFinish(pAccum),
-					    pAccum->nChar, sql_free);
+			char *str = sqlStrAccumFinish(pAccum);
+			int len = pAccum->nChar;
+			assert(len >= 0);
+			if (context->func->def->returns == FIELD_TYPE_STRING)
+				mem_set_str_dynamic(context->pOut, str, len);
+			else
+				mem_set_bin_dynamic(context->pOut, str, len);
 		}
 	}
 }
@@ -2018,8 +2025,15 @@ static struct sql_func_definition definitions[] = {
 	{"GREATEST", -1, {FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR, minmaxFunc,
 	 NULL},
 
-	{"GROUP_CONCAT", -1, {FIELD_TYPE_ANY, FIELD_TYPE_ANY},
+	{"GROUP_CONCAT", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING,
+	 groupConcatStep, groupConcatFinalize},
+	{"GROUP_CONCAT", 2, {FIELD_TYPE_STRING, FIELD_TYPE_STRING},
 	 FIELD_TYPE_STRING, groupConcatStep, groupConcatFinalize},
+	{"GROUP_CONCAT", 1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_VARBINARY,
+	 groupConcatStep, groupConcatFinalize},
+	{"GROUP_CONCAT", 2, {FIELD_TYPE_VARBINARY, FIELD_TYPE_VARBINARY},
+	 FIELD_TYPE_VARBINARY, groupConcatStep, groupConcatFinalize},
+
 	{"HEX", 1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_STRING, hexFunc, NULL},
 	{"IFNULL", 2, {FIELD_TYPE_ANY, FIELD_TYPE_ANY}, FIELD_TYPE_SCALAR,
 	 sql_builtin_stub, NULL},
@@ -2089,24 +2103,45 @@ static struct sql_func_definition definitions[] = {
 	{"RANDOM", 0, {}, FIELD_TYPE_INTEGER, randomFunc, NULL},
 	{"RANDOMBLOB", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_VARBINARY,
 	 randomBlob, NULL},
-	{"REPLACE", 3, {FIELD_TYPE_ANY, FIELD_TYPE_ANY, FIELD_TYPE_ANY},
+	{"REPLACE", 3,
+	 {FIELD_TYPE_STRING, FIELD_TYPE_STRING, FIELD_TYPE_STRING},
 	 FIELD_TYPE_STRING, replaceFunc, NULL},
+	{"REPLACE", 3,
+	 {FIELD_TYPE_VARBINARY, FIELD_TYPE_VARBINARY, FIELD_TYPE_VARBINARY},
+	 FIELD_TYPE_VARBINARY, replaceFunc, NULL},
 	{"ROUND", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, roundFunc, NULL},
 	{"ROUND", 2, {FIELD_TYPE_DOUBLE, FIELD_TYPE_INTEGER}, FIELD_TYPE_DOUBLE,
 	 roundFunc, NULL},
 	{"ROW_COUNT", 0, {}, FIELD_TYPE_INTEGER, sql_row_count, NULL},
 	{"SOUNDEX", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, soundexFunc,
 	 NULL},
-	{"SUBSTR", -1, {FIELD_TYPE_ANY, FIELD_TYPE_ANY, FIELD_TYPE_ANY},
+	{"SUBSTR", 2, {FIELD_TYPE_STRING, FIELD_TYPE_INTEGER},
 	 FIELD_TYPE_STRING, substrFunc, NULL},
+	{"SUBSTR", 3,
+	 {FIELD_TYPE_STRING, FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER},
+	 FIELD_TYPE_STRING, substrFunc, NULL},
+	{"SUBSTR", 2, {FIELD_TYPE_VARBINARY, FIELD_TYPE_INTEGER},
+	 FIELD_TYPE_VARBINARY, substrFunc, NULL},
+	{"SUBSTR", 3,
+	 {FIELD_TYPE_VARBINARY, FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER},
+	 FIELD_TYPE_VARBINARY, substrFunc, NULL},
 	{"SUM", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, sum_step, sumFinalize},
 	{"SUM", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, sum_step, sumFinalize},
 	{"TOTAL", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_DOUBLE, sum_step,
 	 totalFinalize},
 	{"TOTAL", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, sum_step,
 	 totalFinalize},
-	{"TRIM", -1, {FIELD_TYPE_ANY, FIELD_TYPE_ANY, FIELD_TYPE_ANY},
+
+	{"TRIM", 2, {FIELD_TYPE_STRING, FIELD_TYPE_INTEGER},
 	 FIELD_TYPE_STRING, trim_func, NULL},
+	{"TRIM", 3, {FIELD_TYPE_STRING, FIELD_TYPE_INTEGER, FIELD_TYPE_STRING},
+	 FIELD_TYPE_STRING, trim_func, NULL},
+	{"TRIM", 2, {FIELD_TYPE_VARBINARY, FIELD_TYPE_INTEGER},
+	 FIELD_TYPE_VARBINARY, trim_func, NULL},
+	{"TRIM", 3,
+	 {FIELD_TYPE_VARBINARY, FIELD_TYPE_INTEGER, FIELD_TYPE_VARBINARY},
+	 FIELD_TYPE_VARBINARY, trim_func, NULL},
+
 	{"TYPEOF", 1, {FIELD_TYPE_ANY}, FIELD_TYPE_STRING, typeofFunc, NULL},
 	{"UNICODE", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_INTEGER, unicodeFunc,
 	 NULL},

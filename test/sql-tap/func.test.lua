@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(14682)
+test:plan(14680)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -191,26 +191,6 @@ test:do_execsql_test(
         -- <func-2.8>
         "this", "software", "free", "program", "is"
         -- </func-2.8>
-    })
-
-test:do_execsql_test(
-    "func-2.9",
-    [[
-        SELECT substr(a,1,1) FROM t2
-    ]], {
-        -- <func-2.9>
-        "1", "", "3", "", "6"
-        -- </func-2.9>
-    })
-
-test:do_execsql_test(
-    "func-2.10",
-    [[
-        SELECT substr(a,2,2) FROM t2
-    ]], {
-        -- <func-2.10>
-        "", "", "45", "", "78"
-        -- </func-2.10>
     })
 
 -- Only do the following tests if TCL has UTF-8 capabilities
@@ -2256,7 +2236,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-24.10",
     [[
-        SELECT group_concat(CASE t1 WHEN 'this' THEN null ELSE t1 END) FROM tbl1
+        SELECT group_concat(CAST(CASE t1 WHEN 'this' THEN null ELSE t1 END
+                            AS STRING)) FROM tbl1
     ]], {
         -- <func-24.10>
         "program,is,free,software"
@@ -2266,7 +2247,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-24.11",
     [[
-        SELECT group_concat(CASE WHEN t1!='software' THEN null ELSE t1 END) FROM tbl1
+        SELECT group_concat(CAST(CASE WHEN t1!='software' THEN null ELSE t1 END
+                            AS STRING)) FROM tbl1
     ]], {
         -- <func-24.11>
         "software"
@@ -2276,8 +2258,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-24.12",
     [[
-        SELECT group_concat(CASE t1 WHEN 'this' THEN ''
-                              WHEN 'program' THEN null ELSE t1 END) FROM tbl1
+        SELECT group_concat(CAST(CASE t1 WHEN 'this' THEN '' WHEN 'program' THEN
+                            null ELSE t1 END AS STRING)) FROM tbl1
     ]], {
         -- <func-24.12>
         ",is,free,software"
