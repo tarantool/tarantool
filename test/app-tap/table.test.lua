@@ -8,7 +8,7 @@ yaml.cfg{
     encode_invalid_as_nil  = true,
 }
 local test = require('tap').test('table')
-test:plan(31)
+test:plan(44)
 
 do -- check basic table.copy (deepcopy)
     local example_table = {
@@ -221,6 +221,53 @@ do -- check usage of not __copy metamethod on second level + shallow
         another_self[1].a,
         "checking that we've called __copy + shallow and object val is the same"
     )
+end
+
+do -- check table.equals
+    test:ok(table.equals({}, {}), "table.equals for empty tables")
+    test:is(table.equals({}, {1}), false, "table.equals with one empty table")
+    test:is(table.equals({1}, {}), false, "table.equals with one empty table")
+    test:is(table.equals({key = box.NULL}, {key = nil}), false,
+            "table.equals for box.NULL and nil")
+    test:is(table.equals({key = nil}, {key = box.NULL}), false,
+            "table.equals for box.NULL and nil")
+    local tbl_a = {
+        first = {
+            1,
+            2,
+            {},
+        },
+        second = {
+            a = {
+                {'something'},
+            },
+            b = 'something else',
+        },
+        [3] = 'some value',
+    }
+    local tbl_b = table.deepcopy(tbl_a)
+    local tbl_c = table.copy(tbl_a)
+    test:ok(table.equals(tbl_a, tbl_b), "table.equals for complex tables")
+    test:ok(table.equals(tbl_a, tbl_c),
+            "table.equals for shallow copied tables")
+    tbl_c.second.a = 'other thing'
+    test:ok(table.equals(tbl_a, tbl_c),
+            "table.equals for shallow copied tables after modification")
+    test:is(table.equals(tbl_a, tbl_b), false, "table.equals does a deep check")
+    local mt = {
+        __eq = function(a, b) -- luacheck: no unused args
+            return true
+        end}
+    local tbl_d = setmetatable({a = 15}, mt)
+    local tbl_e = setmetatable({b = 2, c = 3}, mt)
+    test:ok(table.equals(tbl_d, tbl_e), "table.equals respects __eq")
+    test:is(table.equals(tbl_d, {a = 15}), false,
+            "table.equals when metatables don't match")
+    test:is(table.equals({a = 15}, tbl_d), false,
+            "table.equals when metatables don't match")
+    local tbl_f = setmetatable({a = 15}, {__eq = function() return true end})
+    test:is(table.equals(tbl_d, tbl_f), false,
+            "table.equals when metatables don't match")
 end
 
 os.exit(test:check() == true and 0 or 1)
