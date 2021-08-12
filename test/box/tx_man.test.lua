@@ -1105,6 +1105,31 @@ tx2:commit() -- MUST BE OK
 
 s:drop()
 
+-- A pair of test that was created during #5999 investigation.
+s=box.schema.space.create("s", {engine="memtx"})
+ti=s:create_index("ti", {type="tree"})
+tx1:begin()
+tx2:begin()
+tx1('s:replace{1, 1}')
+tx2('s:replace{1, 2}')
+rc1 = tx1('s:select{1}')
+rc2 = tx2('s:select{1}')
+tx1:commit() -- Must not fail
+tx2:commit() -- Must not fail
+s:drop()
+
+s=box.schema.space.create("s", {engine="memtx"})
+ti=s:create_index("ti", {type="tree"})
+tx1:begin()
+tx2:begin()
+tx1('s:replace{1, 1}')
+tx2('s:replace{1, 2}')
+rc1 = tx1('s:select{1}')
+rc2 = tx2('s:select{1}')
+tx2:commit() -- Must not fail
+tx1:commit() -- Must not fail
+s:drop()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
