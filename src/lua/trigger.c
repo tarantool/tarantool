@@ -58,7 +58,9 @@ lbox_trigger_destroy(struct trigger *ptr)
 	if (tarantool_L) {
 		struct lbox_trigger *trigger = (struct lbox_trigger *) ptr;
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, trigger->ref);
+		TRASH(trigger);
 	}
+	TRASH(ptr);
 	free(ptr);
 }
 
@@ -88,13 +90,25 @@ lbox_trigger_run(struct trigger *ptr, void *event)
 	int top = lua_gettop(L);
 	lua_rawgeti(L, LUA_REGISTRYINDEX, trigger->ref);
 	int nargs = trigger->push_event(L, event);
+	/*
+	 * There are two cases why we can't access `trigger` after
+	 * calling it's function:
+	 * - trigger can be unregistered and destroyed
+	 *   directly in its function.
+	 * - trigger function may yield and someone destroy trigger
+	 *   at this moment.
+	 * So we keep 'trigger->pop_event' in local variable for
+	 * further use.
+	 */
+	lbox_pop_event_f pop_event = trigger->pop_event;
+	trigger = NULL;
 	if (luaT_call(L, nargs, LUA_MULTRET)) {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 		diag_raise();
 	}
 	int nret = lua_gettop(L) - top;
-	if (trigger->pop_event != NULL &&
-	    trigger->pop_event(L, nret, event) != 0) {
+	if (pop_event != NULL &&
+	    pop_event(L, nret, event) != 0) {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 		diag_raise();
 	}
@@ -207,6 +221,7 @@ lbox_trigger_reset(struct lua_State *L, int top, struct rlist *list,
 
 	} else if (trg) {
 		trigger_clear(&trg->base);
+		TRASH(trg);
 		free(trg);
 	}
 	return 0;
