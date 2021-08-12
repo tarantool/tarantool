@@ -57,6 +57,34 @@ local function table_shallowcopy(orig)
     return copy
 end
 
+--- Compare two lua tables
+-- Supports __eq metamethod for comparing custom tables with metatables
+-- @function equals
+-- @return true when the two tables are equal (false otherwise).
+local function table_equals(a, b)
+    if type(a) ~= 'table' or type(b) ~= 'table' then
+        return type(a) == type(b) and a == b
+    end
+    local mta = getmetatable(a)
+    local mtb = getmetatable(b)
+    -- Let Lua decide what should happen when at least one of the tables has a
+    -- metatable.
+    if mta and mta.__eq or mtb and mtb.__eq then
+        return a == b
+    end
+    for k, v in pairs(a) do
+        if not table_equals(v, b[k]) then
+            return false
+        end
+    end
+    for k, _ in pairs(b) do
+        if not a[k] then
+            return false
+        end
+    end
+    return true
+end
+
 -- table library extension
 local table = require('table')
 -- require modifies global "table" module and adds "clear" function to it.
@@ -65,3 +93,4 @@ require('table.clear')
 
 table.copy     = table_shallowcopy
 table.deepcopy = table_deepcopy
+table.equals   = table_equals
