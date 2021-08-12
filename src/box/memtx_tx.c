@@ -1856,6 +1856,7 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 {
 	assert(tuple->is_dirty);
 	struct memtx_story *story = memtx_tx_story_get(tuple);
+	struct memtx_story *last_checked_story = story;
 	bool own_change = false;
 	struct tuple *result = NULL;
 
@@ -1864,17 +1865,12 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 					      is_prepared_ok, &own_change)) {
 			break;
 		}
-		/*
-		 * If somebody have added a tuple that we don't see, then
-		 * when he commits we must go to read view or conflicted.
-		 */
-		if (story->add_stmt != NULL && txn != NULL)
-			memtx_tx_cause_conflict(story->add_stmt->txn, txn);
 		story = story->link[index->dense_id].older_story;
 		if (story == NULL)
 			break;
+		last_checked_story = story;
 	}
-	if (!own_change && story != NULL) {
+	if (!own_change) {
 		/*
 		 * If the result tuple exists (is visible) - it is visible in
 		 * every index. But if we found a story of deleted tuple - we
@@ -1883,7 +1879,7 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 		 */
 		int shift = index->dense_id & 63;
 		uint64_t mask = result == NULL ? 1ull << shift : UINT64_MAX;
-		memtx_tx_track_read_story(txn, space, story, mask);
+		memtx_tx_track_read_story(txn, space, last_checked_story, mask);
 	}
 	if (mk_index != 0) {
 		assert(false); /* TODO: multiindex */
