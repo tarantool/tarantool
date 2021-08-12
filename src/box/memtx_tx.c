@@ -1254,6 +1254,10 @@ static struct gap_item *
 memtx_tx_gap_item_new(struct txn *txn, enum iterator_type type,
 		      const char *key, uint32_t part_count);
 
+static int
+memtx_tx_track_read_story(struct txn *txn, struct space *space,
+			  struct memtx_story *story, uint64_t index_mask);
+
 /**
  * Handle insertion to a new place in index. There can be readers which
  * have read from this gap and thus must be sent to read view or conflicted.
@@ -1281,11 +1285,13 @@ memtx_tx_handle_gap_write(struct txn *txn, struct space *space,
 		list = &succ_story->link[ind].nearby_gaps;
 		assert(list->next != NULL && list->prev != NULL);
 	}
+	uint64_t index_mask = 1ull << (ind & 63);
 	struct gap_item *item, *tmp;
 	rlist_foreach_entry_safe(item, list, in_nearby_gaps, tmp) {
 		bool is_split = false;
 		if (item->key == NULL) {
-			if (memtx_tx_cause_conflict(txn, item->txn) != 0)
+			if (memtx_tx_track_read_story(item->txn, space, story,
+						      index_mask) != 0)
 				return -1;
 			is_split = true;
 		} else {
@@ -1301,12 +1307,16 @@ memtx_tx_handle_gap_write(struct txn *txn, struct space *space,
 					 item->type == ITER_REQ ||
 					 item->type == ITER_GE ||
 					 item->type == ITER_LE)) {
-				if (memtx_tx_cause_conflict(txn, item->txn) != 0)
+				if (memtx_tx_track_read_story(item->txn, space,
+							      story,
+							      index_mask) != 0)
 					return -1;
 			}
 			if (cmp * dir > 0 &&
 			    item->type != ITER_EQ && item->type != ITER_REQ) {
-				if (memtx_tx_cause_conflict(txn, item->txn) != 0)
+				if (memtx_tx_track_read_story(item->txn, space,
+							      story,
+							      index_mask) != 0)
 					return -1;
 				is_split = true;
 			}
@@ -1744,6 +1754,24 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			memtx_tx_handle_conflict(stmt->txn, tracker->reader);
 		}
 	}
+
+	for (uint32_t i = 0; i < index_count; i++) {
+		for (struct memtx_story *read_story = story;
+		     read_story != NULL;
+		     read_story = read_story->link[i].newer_story) {
+			struct tx_read_tracker *tracker;
+			rlist_foreach_entry(tracker, &read_story->reader_list,
+					    in_reader_list) {
+				if (tracker->reader == stmt->txn)
+					continue;
+				uint64_t index_mask = 1ull << (i & 63);
+				if ((tracker->index_mask & index_mask) == 0)
+					continue;
+				memtx_tx_handle_conflict(stmt->txn,
+							 tracker->reader);
+			}
+		}
+	}
 }
 
 /**
@@ -1820,10 +1848,6 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt)
 	}
 	return res;
 }
-
-static int
-memtx_tx_track_read_story(struct txn *txn, struct space *space,
-			  struct memtx_story *story, uint64_t index_max);
 
 struct tuple *
 memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,

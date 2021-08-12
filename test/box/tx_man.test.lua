@@ -1087,6 +1087,24 @@ secondary:select{1} -- must be empty since we deleted {1}
 s:replace{3, 1, 'magic'} -- must be OK.
 s:drop()
 
+-- Found by https://github.com/tarantool/tarantool/issues/5999
+s=box.schema.space.create("s", {engine="memtx"})
+ti=s:create_index("ti", {type="tree"})
+
+tx1 = txn_proxy.new()
+tx2 = txn_proxy.new()
+
+tx1:begin() -- MUST BE OK
+tx1("s:replace{6,'c'}") -- RES [[6,"c"]]
+tx1("s:select{}") -- RES [[[6,"c"]]]
+tx2:begin() -- MUST BE OK
+tx2("s:replace{10,'cb'}") -- RES [[10,"cb"]]
+s:insert{10, 'aaa'}
+tx1:commit() -- MUST FAIL
+tx2:commit() -- MUST BE OK
+
+s:drop()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
