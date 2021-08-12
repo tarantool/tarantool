@@ -54,8 +54,6 @@ jobs:
       - name: test
         env:
           CMAKE_BUILD_TYPE: Debug
-          # FIXME: disabled '-Wtype-limits' flag till #6143 is fixed.
-          CMAKE_EXTRA_PARAMS: '-DCMAKE_C_FLAGS="-Wno-type-limits "'
         run: ${CI_MAKE} test_odroid_arm64
       - name: call action to send Telegram message on failure
         env:
