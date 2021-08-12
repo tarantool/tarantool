@@ -1130,6 +1130,23 @@ tx2:commit() -- Must not fail
 tx1:commit() -- Must not fail
 s:drop()
 
+-- Found by https://github.com/tarantool/tarantool/issues/5999
+s=box.schema.space.create("s", {engine="memtx"})
+ti=s:create_index("ti", {type="tree"})
+hi=s:create_index("hi", {parts={2}, type="hash"})
+
+s:replace{1, 1, "original"}
+tx2:begin()
+tx2('s:replace{2, 1, "replace"}') -- fails like ordinal replace
+tx1:begin()
+tx1('s:insert{1, 2, "inserted"}') -- fails like ordinal insert
+s:delete{1}
+tx1('s:replace{10, 10}') -- make an op to become RW
+tx1:commit() -- must fail since it actually saw {1, 1, "original"}
+tx2('s:replace{11, 11}') -- make an op to become RW
+tx2:commit() -- must fail since it actually saw {1, 1, "original"}
+s:drop()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
