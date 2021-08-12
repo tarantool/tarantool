@@ -271,7 +271,7 @@ test:do_execsql_test("select3-5.1", [[
 test:do_execsql_test("select3-5.2", [[
   SELECT log, count(*), avg(n), max(n+log*2) FROM t1
   GROUP BY log
-  ORDER BY max(n+log*2)+0, GREATEST(log,avg(n))+0
+  ORDER BY max(n+log*2)+0, CAST(GREATEST(log,avg(n)) AS DOUBLE)+0
 ]], {
   -- <select3-5.2>
   0, 1, 1.0, 1, 1, 1, 2.0, 4, 2, 2, 3.5, 8, 3, 4, 6.5, 14, 4, 8, 12.5, 24, 5, 15, 24.0, 41

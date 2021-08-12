@@ -761,7 +761,7 @@ cn:execute("SELECT LEAST(1, 2, 3);")
 ---
 - metadata:
   - name: COLUMN_1
-    type: scalar
+    type: integer
   rows:
   - [1]
 ...
@@ -769,7 +769,7 @@ cn:execute("SELECT GREATEST(1, 2, 3);")
 ---
 - metadata:
   - name: COLUMN_1
-    type: scalar
+    type: integer
   rows:
   - [3]
 ...

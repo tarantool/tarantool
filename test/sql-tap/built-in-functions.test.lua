@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(42)
+test:plan(46)
 
 --
 -- Make sure that number of arguments check is checked properly for SQL built-in
@@ -436,6 +436,53 @@ test:do_test(
         return {tostring(res[3])}
     end, {
         "Type mismatch: can not convert string('1') to integer"
+    })
+
+--
+-- Make sure that the type of result of MAX() and MIN() is the same as the type
+-- of the argument.
+--
+test:do_execsql_test(
+    "builtins-3.1",
+    [[
+        SELECT TYPEOF(1), TYPEOF(MAX(1)), TYPEOF(MIN(1));
+    ]],
+    {
+        'integer', 'integer', 'integer'
+    }
+)
+
+test:do_test(
+    "builtins-3.2",
+    function()
+        return box.execute([[SELECT 1, MAX(1), MIN(1);]]).metadata
+    end, {
+        {name = "COLUMN_1", type = "integer"},
+        {name = "COLUMN_2", type = "integer"},
+        {name = "COLUMN_3", type = "integer"}
+    })
+
+--
+-- Make sure that the type of result of GREATEST() and LEAST() depends on type
+-- of arguments.
+--
+test:do_execsql_test(
+    "builtins-3.3",
+    [[
+        SELECT TYPEOF(GREATEST('1', 1)), TYPEOF(LEAST('1', 1));
+    ]],
+    {
+        'scalar', 'scalar'
+    }
+)
+
+test:do_test(
+    "builtins-3.4",
+    function()
+        return box.execute([[SELECT GREATEST('1', 1), LEAST('1', 1);]]).metadata
+    end, {
+        {name = "COLUMN_1", type = "scalar"},
+        {name = "COLUMN_2", type = "scalar"},
     })
 
 test:finish_test()

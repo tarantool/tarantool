@@ -785,7 +785,7 @@ box.execute("SELECT min(i) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: scalar
+    type: integer
   rows:
   - [-1]
 ...
@@ -793,7 +793,7 @@ box.execute("SELECT max(i) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: scalar
+    type: integer
   rows:
   - [18446744073709551613]
 ...
@@ -855,7 +855,7 @@ box.execute("SELECT LEAST(-1, i) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: scalar
+    type: integer
   rows:
   - [-1]
 ...
@@ -1255,7 +1255,7 @@ box.execute("SELECT min(v) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: scalar
+    type: varbinary
   rows:
   - ['abc']
 ...
@@ -1263,7 +1263,7 @@ box.execute("SELECT max(v) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: scalar
+    type: varbinary
   rows:
   - ['abc']
 ...
@@ -1318,7 +1318,7 @@ box.execute("SELECT LEAST(v, x'') FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: scalar
+    type: varbinary
   rows:
   - ['']
 ...
@@ -1819,7 +1819,7 @@ box.execute("SELECT min(d) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: scalar
+    type: double
   rows:
   - [-2]
 ...
@@ -1827,7 +1827,7 @@ box.execute("SELECT max(d) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: scalar
+    type: double
   rows:
   - [18000000000000000000]
 ...
@@ -1894,7 +1894,7 @@ box.execute("SELECT LEAST(d, 0) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: scalar
+    type: number
   rows:
   - [0]
   - [-2]

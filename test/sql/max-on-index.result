@@ -49,7 +49,7 @@ box.execute("SELECT MAX(f1) FROM test1")
 ---
 - metadata:
   - name: COLUMN_1
-    type: scalar
+    type: integer
   rows:
   - [4]
 ...
@@ -57,7 +57,7 @@ box.execute("SELECT MAX(f2) FROM test1")
 ---
 - metadata:
   - name: COLUMN_1
-    type: scalar
+    type: integer
   rows:
   - [3]
 ...
@@ -65,7 +65,7 @@ box.execute("SELECT MAX(f1) FROM test2")
 ---
 - metadata:
   - name: COLUMN_1
-    type: scalar
+    type: integer
   rows:
   - [1]
 ...
