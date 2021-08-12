@@ -3516,6 +3516,61 @@ s:drop()
  | ---
  | ...
 
+-- Found by https://github.com/tarantool/tarantool/issues/5999
+s=box.schema.space.create("s", {engine="memtx"})
+ | ---
+ | ...
+ti=s:create_index("ti", {type="tree"})
+ | ---
+ | ...
+hi=s:create_index("hi", {parts={2}, type="hash"})
+ | ---
+ | ...
+
+s:replace{1, 1, "original"}
+ | ---
+ | - [1, 1, 'original']
+ | ...
+tx2:begin()
+ | ---
+ | - 
+ | ...
+tx2('s:replace{2, 1, "replace"}') -- fails like ordinal replace
+ | ---
+ | - - {'error': 'Duplicate key exists in unique index ''hi'' in space ''s'''}
+ | ...
+tx1:begin()
+ | ---
+ | - 
+ | ...
+tx1('s:insert{1, 2, "inserted"}') -- fails like ordinal insert
+ | ---
+ | - - {'error': 'Duplicate key exists in unique index ''ti'' in space ''s'''}
+ | ...
+s:delete{1}
+ | ---
+ | - [1, 1, 'original']
+ | ...
+tx1('s:replace{10, 10}') -- make an op to become RW
+ | ---
+ | - - [10, 10]
+ | ...
+tx1:commit() -- must fail since it actually saw {1, 1, "original"}
+ | ---
+ | - - {'error': 'Transaction has been aborted by conflict'}
+ | ...
+tx2('s:replace{11, 11}') -- make an op to become RW
+ | ---
+ | - - [11, 11]
+ | ...
+tx2:commit() -- must fail since it actually saw {1, 1, "original"}
+ | ---
+ | - - {'error': 'Transaction has been aborted by conflict'}
+ | ...
+s:drop()
+ | ---
+ | ...
+
 test_run:cmd("switch default")
  | ---
  | - true
