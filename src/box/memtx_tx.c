@@ -1097,10 +1097,14 @@ check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
 {
 	assert(replaced[0] == NULL || !replaced[0]->is_dirty);
 	struct space *space = stmt->space;
+	struct txn *txn = stmt->txn;
 
 	if (memtx_tx_check_dup(new_tuple, *old_tuple, replaced[0],
-			       mode, space->index[0], space) != 0)
+			       mode, space->index[0], space) != 0) {
+		if (replaced[0] != NULL)
+			memtx_tx_track_read(txn, space, replaced[0]);
 		return -1;
+	}
 
 	if (replaced[0] == NULL)
 		check_hole(space, 0, new_tuple, stmt->txn,
@@ -1121,8 +1125,10 @@ check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
 			/* Check like there's no mvcc. */
 			if (memtx_tx_check_dup(new_tuple, replaced[0],
 					       replaced[i], DUP_INSERT,
-					       space->index[i], space) != 0)
+					       space->index[i], space) != 0) {
+				memtx_tx_track_read(txn, space, replaced[i]);
 				return -1;
+			}
 			continue;
 		}
 
@@ -1139,8 +1145,10 @@ check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
 			return -1;
 
 		if (memtx_tx_check_dup(new_tuple, replaced[0], check_visible,
-				       DUP_INSERT, space->index[i], space) != 0)
+				       DUP_INSERT, space->index[i], space) != 0) {
+			memtx_tx_track_read(txn, space, check_visible);
 			return -1;
+		}
 
 		if (check_visible == NULL)
 			check_hole(space, i, new_tuple, stmt->txn,
@@ -1166,6 +1174,7 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 {
 	assert(replaced[0] != NULL && replaced[0]->is_dirty);
 	struct space *space = stmt->space;
+	struct txn *txn = stmt->txn;
 
 	struct memtx_story *old_story = memtx_tx_story_get(replaced[0]);
 	struct tuple *visible_replaced;
@@ -1174,8 +1183,10 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 		return -1;
 
 	if (memtx_tx_check_dup(new_tuple, *old_tuple, visible_replaced,
-			       mode, space->index[0], space) != 0)
+			       mode, space->index[0], space) != 0) {
+		memtx_tx_track_read(txn, space, visible_replaced);
 		return -1;
+	}
 
 	if (visible_replaced == NULL)
 		check_hole(space, 0, new_tuple, stmt->txn,
@@ -1214,8 +1225,10 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 
 		if (memtx_tx_check_dup(new_tuple, visible_replaced,
 				       check_visible, DUP_INSERT,
-				       space->index[i], space) != 0)
+				       space->index[i], space) != 0) {
+			memtx_tx_track_read(txn, space, visible_replaced);
 			return -1;
+		}
 
 		if (check_visible == NULL)
 			check_hole(space, i, new_tuple, stmt->txn,
@@ -1369,7 +1382,6 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	struct memtx_story *add_story = NULL;
 	struct memtx_story *created_story = NULL, *replaced_story = NULL;
 	struct region *region = &stmt->txn->region;
-	size_t region_svp = region_used(region);
 
 	/*
 	 * List of transactions that will conflict us once one of them
@@ -1509,7 +1521,6 @@ fail:
 		}
 	}
 
-	region_truncate(region, region_svp);
 	return -1;
 }
 
