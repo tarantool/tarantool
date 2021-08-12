@@ -466,7 +466,7 @@ test:do_execsql_test(
                              HAVING avg(a.y) > avg(b.y));
     ]], {
         -- <subquery-3.4.1>
-        107, 4.0
+        106, 4, 107, 4
         -- </subquery-3.4.1>
     })
 
@@ -482,7 +482,7 @@ test:do_execsql_test(
                              HAVING avg1 > avg2);
     ]], {
         -- <subquery-3.4.2>
-        107, 4.0
+        106, 4, 107, 4
         -- </subquery-3.4.2>
     })
 
@@ -505,7 +505,7 @@ test:do_execsql_test(
          ORDER BY a.x;
     ]], {
         -- <subquery-3.4.3>
-        106, 4.5, false, true, 107, 4.0, true, false
+        106, 4, true, false, 107, 4, true, false
         -- </subquery-3.4.3>
     })
 
@@ -517,7 +517,7 @@ test:do_execsql_test(
         SELECT max((SELECT avg(y) FROM t35b)) FROM t35a;
     ]], {
         -- <subquery-3.5.1>
-        98.5
+        98
         -- </subquery-3.5.1>
     })
 

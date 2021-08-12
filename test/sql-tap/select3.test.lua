@@ -69,7 +69,7 @@ test:do_execsql_test("select3-1.3", [[
   SELECT max(n)/avg(n), max(log)/avg(log) FROM t1
 ]], {
   -- <select3-1.3>
-  1.9375, 1.25
+  1, 1
   -- </select3-1.3>
 })
 
@@ -95,7 +95,7 @@ test:do_execsql_test("select3-2.3.1", [[
   SELECT log, avg(n) FROM t1 GROUP BY log ORDER BY log
 ]], {
   -- <select3-2.3.1>
-  0, 1.0, 1, 2.0, 2, 3.5, 3, 6.5, 4, 12.5, 5, 24.0
+  0, 1, 1, 2, 2, 3, 3, 6, 4, 12, 5, 24
   -- </select3-2.3.1>
 })
 
@@ -103,7 +103,7 @@ test:do_execsql_test("select3-2.3.2", [[
   SELECT log, avg(n)+1 FROM t1 GROUP BY log ORDER BY log
 ]], {
   -- <select3-2.3.2>
-  0, 2.0, 1, 3.0, 2, 4.5, 3, 7.5, 4, 13.5, 5, 25.0
+  0, 2, 1, 3, 2, 4, 3, 7, 4, 13, 5, 25
   -- </select3-2.3.2>
 })
 
@@ -111,7 +111,7 @@ test:do_execsql_test("select3-2.4", [[
   SELECT log, avg(n)-min(n) FROM t1 GROUP BY log ORDER BY log
 ]], {
   -- <select3-2.4>
-  0, 0.0, 1, 0.0, 2, 0.5, 3, 1.5, 4, 3.5, 5, 7.0
+  0, 0, 1, 0, 2, 0, 3, 1, 4, 3, 5, 7
   -- </select3-2.4>
 })
 
@@ -119,7 +119,7 @@ test:do_execsql_test("select3-2.5", [[
   SELECT log*2+1, avg(n)-min(n) FROM t1 GROUP BY log ORDER BY log
 ]], {
   -- <select3-2.5>
-  1, 0.0, 3, 0.0, 5, 0.5, 7, 1.5, 9, 3.5, 11, 7.0
+  1, 0, 3, 0, 5, 0, 7, 1, 9, 3, 11, 7
   -- </select3-2.5>
 })
 
@@ -264,7 +264,7 @@ test:do_execsql_test("select3-5.1", [[
   ORDER BY max(n+log*2)+0, avg(n)+0
 ]], {
   -- <select3-5.1>
-  0, 1, 1.0, 1, 1, 1, 2.0, 4, 2, 2, 3.5, 8, 3, 4, 6.5, 14, 4, 8, 12.5, 24, 5, 15, 24.0, 41
+  0, 1, 1, 1, 1, 1, 2, 4, 2, 2, 3, 8, 3, 4, 6, 14, 4, 8, 12, 24, 5, 15, 24, 41
   -- </select3-5.1>
 })
 
@@ -274,7 +274,7 @@ test:do_execsql_test("select3-5.2", [[
   ORDER BY max(n+log*2)+0, CAST(GREATEST(log,avg(n)) AS DOUBLE)+0
 ]], {
   -- <select3-5.2>
-  0, 1, 1.0, 1, 1, 1, 2.0, 4, 2, 2, 3.5, 8, 3, 4, 6.5, 14, 4, 8, 12.5, 24, 5, 15, 24.0, 41
+  0, 1, 1, 1, 1, 1, 2, 4, 2, 2, 3, 8, 3, 4, 6, 14, 4, 8, 12, 24, 5, 15, 24, 41
   -- </select3-5.2>
 })
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(14686)
+test:plan(14682)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -831,7 +831,7 @@ test:do_test(
         ]])
     end, {
         -- <func-8.1>
-        68236, 3, 22745.33, 1, 67890, 5
+        68236, 3, 22745, 1, 67890, 5
         -- </func-8.1>
     })
 
@@ -848,76 +848,6 @@ test:do_execsql_test(
         "z+67890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP"
         -- </func-8.2>
     })
-
--- ifcapable tempdb {
---   do_test func-8.3 {
---     execsql {
---       CREATE TEMP TABLE t3 AS SELECT a FROM t2 ORDER BY a DESC;
---       SELECT min('z+'||a||'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP') FROM t3;
---     }
---   } {z+1abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP}
--- } else {
---   do_test func-8.3 {
---     execsql {
---       CREATE TABLE t3 AS SELECT a FROM t2 ORDER BY a DESC;
---       SELECT min('z+'||a||'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP') FROM t3;
---     }
---   } {z+1abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP}
--- }
--- do_test func-8.4 {
---   execsql {
---     SELECT max('z+'||a||'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP') FROM t3;
---   }
--- } {z+67890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP}
-test:do_execsql_test(
-    "func-8.5",
-    [[
-        SELECT sum(x) FROM (SELECT '9223372036' || '854775807' AS x
-                            UNION ALL SELECT -9223372036854775807)
-    ]], {
-        -- <func-8.5>
-        0
-        -- </func-8.5>
-    })
-
-test:do_execsql_test(
-    "func-8.6",
-    [[
-        SELECT typeof(sum(x)) FROM (SELECT '9223372036' || '854775807' AS x
-                            UNION ALL SELECT -9223372036854775807)
-    ]], {
-        -- <func-8.6>
-        "integer"
-        -- </func-8.6>
-    })
-
-test:do_execsql_test(
-    "func-8.7",
-    [[
-        SELECT typeof(sum(x)) FROM (SELECT '9223372036' || '854775808' AS x
-                            UNION ALL SELECT -9223372036854775807)
-    ]], {
-        -- <func-8.7>
-        "integer"
-        -- </func-8.7>
-    })
-
-test:do_execsql_test(
-    "func-8.8",
-    [[
-        SELECT sum(x)>0.0 FROM (SELECT '9223372036' || '854775808' AS x
-                            UNION ALL SELECT -9223372036850000000)
-    ]], {
-        -- <func-8.8>
-        true
-        -- </func-8.8>
-    })
-
-
-
-
-
-
 
 -- How do you test the random() function in a meaningful, deterministic way?
 --
@@ -1657,7 +1587,7 @@ test:do_catchsql_test(
             UNION ALL SELECT 10 AS x);
     ]], {
     -- <func-18.15.2>
-    1, "Failed to execute SQL statement: integer overflow"
+    1, "Failed to execute SQL statement: integer is overflowed"
     -- </func-18.15.2>
 })
 
@@ -1669,7 +1599,7 @@ test:do_catchsql_test(
             SELECT -10 AS x);
     ]], {
         -- <func-18.18>
-        1, "Failed to execute SQL statement: integer overflow"
+        1, "Failed to execute SQL statement: integer is overflowed"
         -- </func-18.18>
     })
 
@@ -2892,7 +2822,7 @@ test:do_catchsql_test(
         SELECT SUM(X'FF')
     ]], {
         -- <func-76.4>
-        1, "Type mismatch: can not convert varbinary(x'FF') to number"
+        1, "Failed to execute SQL statement: wrong arguments for function SUM()"
         -- </func-76.4>
     })
 

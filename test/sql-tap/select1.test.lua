@@ -515,7 +515,7 @@ test:do_catchsql_test(
         SELECT sum(a) FROM t3
     ]], {
         -- <select1-2.17.1>
-        1, "Type mismatch: can not convert string('abc') to number"
+        1, "Failed to execute SQL statement: wrong arguments for function SUM()"
         -- </select1-2.17.1>
     })
 

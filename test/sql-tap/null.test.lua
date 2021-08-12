@@ -157,7 +157,7 @@ test:do_execsql_test(
                avg(b), avg(c), min(b), max(b) from t1;
     ]], {
         -- <null-3.1>
-        7, 4, 6, 2, 3, 0.5, 0.5, 0, 1
+        7, 4, 6, 2, 3, 0, 0, 0, 1
         -- </null-3.1>
     })
 

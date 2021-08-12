@@ -327,7 +327,7 @@ SELECT typeof(a) FROM t0;
 SELECT AVG(a) FROM t0;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to number'
+ | - 'Failed to execute SQL statement: wrong arguments for function AVG()'
  | ...
 SELECT MIN(a) FROM t0;
  | ---
@@ -348,7 +348,7 @@ SELECT MAX(a) FROM t0;
 SELECT SUM(a) FROM t0;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to number'
+ | - 'Failed to execute SQL statement: wrong arguments for function SUM()'
  | ...
 SELECT COUNT(a) FROM t0;
  | ---
@@ -361,7 +361,7 @@ SELECT COUNT(a) FROM t0;
 SELECT TOTAL(a) FROM t0;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to number'
+ | - 'Failed to execute SQL statement: wrong arguments for function TOTAL()'
  | ...
 SELECT GROUP_CONCAT(a, ' +++ ') FROM t0;
  | ---

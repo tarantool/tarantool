@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(46)
+test:plan(52)
 
 --
 -- Make sure that number of arguments check is checked properly for SQL built-in
@@ -433,6 +433,66 @@ test:do_test(
     "builtins-2.32",
     function()
         local res = {pcall(box.execute, [[SELECT UUID(?);]], {'1'})}
+        return {tostring(res[3])}
+    end, {
+        "Type mismatch: can not convert string('1') to integer"
+    })
+
+test:do_catchsql_test(
+    "builtins-2.33",
+    [[
+        SELECT SUM('1');
+    ]],
+    {
+        1, [[Failed to execute SQL statement: ]]..
+           [[wrong arguments for function SUM()]]
+    }
+)
+
+test:do_test(
+    "builtins-2.34",
+    function()
+        local res = {pcall(box.execute, [[SELECT SUM(?);]], {'1'})}
+        return {tostring(res[3])}
+    end, {
+        "Type mismatch: can not convert string('1') to integer"
+    })
+
+test:do_catchsql_test(
+    "builtins-2.35",
+    [[
+        SELECT AVG('1');
+    ]],
+    {
+        1, [[Failed to execute SQL statement: ]]..
+           [[wrong arguments for function AVG()]]
+    }
+)
+
+test:do_test(
+    "builtins-2.36",
+    function()
+        local res = {pcall(box.execute, [[SELECT AVG(?);]], {'1'})}
+        return {tostring(res[3])}
+    end, {
+        "Type mismatch: can not convert string('1') to integer"
+    })
+
+test:do_catchsql_test(
+    "builtins-2.37",
+    [[
+        SELECT TOTAL('1');
+    ]],
+    {
+        1, [[Failed to execute SQL statement: ]]..
+           [[wrong arguments for function TOTAL()]]
+    }
+)
+
+test:do_test(
+    "builtins-2.38",
+    function()
+        local res = {pcall(box.execute, [[SELECT TOTAL(?);]], {'1'})}
         return {tostring(res[3])}
     end, {
         "Type mismatch: can not convert string('1') to integer"

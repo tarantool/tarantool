@@ -1181,7 +1181,7 @@ test:do_select_tests(
         {"2", "SELECT sum(j), max(j) FROM c2 GROUP BY (i%3)", {54, 36, 27, 21, 39, 28}},
         {"3", "SELECT sum(j), max(j) FROM c2 GROUP BY (j%2)", {80, 36, 40, 21}},
         {"4", "SELECT 1+sum(j), max(j)+1 FROM c2 GROUP BY (j%2)", {81, 37, 41, 22}},
-        {"5", "SELECT count(*), round(avg(i),2) FROM c1, c2 ON (i=down) GROUP BY j%2", {3, 4.33, 1, 2.0}},
+        {"5", "SELECT count(*), round(avg(i),2) FROM c1, c2 ON (i=down) GROUP BY j%2", {3, 4, 1, 2.0}},
     })
 
 -- EVIDENCE-OF: R-62913-19830 Otherwise, it is evaluated against a single

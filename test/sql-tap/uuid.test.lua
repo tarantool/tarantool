@@ -237,7 +237,7 @@ test:do_catchsql_test(
     [[
         SELECT AVG(u) from t2;
     ]], {
-        1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to number"
+        1, "Failed to execute SQL statement: wrong arguments for function AVG()"
     })
 
 test:do_catchsql_test(
@@ -441,7 +441,7 @@ test:do_catchsql_test(
     [[
         SELECT SUM(u) from t2;
     ]], {
-        1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to number"
+        1, "Failed to execute SQL statement: wrong arguments for function SUM()"
     })
 
 test:do_catchsql_test(
@@ -449,7 +449,7 @@ test:do_catchsql_test(
     [[
         SELECT TOTAL(u) from t2;
     ]], {
-        1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to number"
+        1, "Failed to execute SQL statement: wrong arguments for function TOTAL()"
     })
 
 test:do_execsql_test(

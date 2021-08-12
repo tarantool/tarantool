@@ -761,7 +761,7 @@ box.execute("SELECT sum(i) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: number
+    type: integer
   rows:
   - [18446744073709551613]
 ...
@@ -769,15 +769,15 @@ box.execute("SELECT avg(i) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: number
+    type: integer
   rows:
-  - [6148914691236516864]
+  - [6148914691236517204]
 ...
 box.execute("SELECT total(i) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: number
+    type: double
   rows:
   - [1.844674407371e+19]
 ...
@@ -1239,17 +1239,17 @@ box.execute("SELECT * FROM t WHERE v = x'616263'")
 box.execute("SELECT sum(v) FROM t;")
 ---
 - null
-- 'Type mismatch: can not convert varbinary(x''616263'') to number'
+- 'Failed to execute SQL statement: wrong arguments for function SUM()'
 ...
 box.execute("SELECT avg(v) FROM t;")
 ---
 - null
-- 'Type mismatch: can not convert varbinary(x''616263'') to number'
+- 'Failed to execute SQL statement: wrong arguments for function AVG()'
 ...
 box.execute("SELECT total(v) FROM t;")
 ---
 - null
-- 'Type mismatch: can not convert varbinary(x''616263'') to number'
+- 'Failed to execute SQL statement: wrong arguments for function TOTAL()'
 ...
 box.execute("SELECT min(v) FROM t;")
 ---
@@ -1795,7 +1795,7 @@ box.execute("SELECT sum(d) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: number
+    type: double
   rows:
   - [18000000000000000000]
 ...
@@ -1803,7 +1803,7 @@ box.execute("SELECT avg(d) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: number
+    type: double
   rows:
   - [4500000000000000000]
 ...
@@ -1811,7 +1811,7 @@ box.execute("SELECT total(d) FROM t;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: number
+    type: double
   rows:
   - [18000000000000000000]
 ...

@@ -290,7 +290,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax2-4.2",
     [[
-        SELECT y, coalesce(sum(x),0) FROM
+        SELECT y, coalesce(sum(CAST(x AS INTEGER)),0) FROM
           (SELECT null AS x, y+1 AS y FROM t1 UNION SELECT x, y FROM t1)
         GROUP BY y ORDER BY y;
     ]], {
