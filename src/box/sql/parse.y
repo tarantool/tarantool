@@ -1132,32 +1132,34 @@ expr(A) ::= TRIM(X) LP trim_operands(Y) RP(E). {
 %type trim_operands {struct ExprList *}
 %destructor trim_operands {sql_expr_list_delete(pParse->db, $$);}
 
-trim_operands(A) ::= trim_from_clause(F) expr(Y). {
-  A = sql_expr_list_append(pParse->db, F, Y.pExpr);
+trim_operands(A) ::= trim_specification(N) expr(Z) FROM expr(Y). {
+  A = sql_expr_list_append(pParse->db, NULL, Y.pExpr);
+  struct Expr *p = sql_expr_new_dequoted(pParse->db, TK_INTEGER,
+                                         &sqlIntTokens[N]);
+  A = sql_expr_list_append(pParse->db, A, p);
+  A = sql_expr_list_append(pParse->db, A, Z.pExpr);
+}
+
+trim_operands(A) ::= trim_specification(N) FROM expr(Y). {
+  A = sql_expr_list_append(pParse->db, NULL, Y.pExpr);
+  struct Expr *p = sql_expr_new_dequoted(pParse->db, TK_INTEGER,
+                                         &sqlIntTokens[N]);
+  A = sql_expr_list_append(pParse->db, A, p);
+}
+
+trim_operands(A) ::= expr(Z) FROM expr(Y). {
+  A = sql_expr_list_append(pParse->db, NULL, Y.pExpr);
+  struct Expr *p = sql_expr_new_dequoted(pParse->db, TK_INTEGER,
+                                         &sqlIntTokens[TRIM_BOTH]);
+  A = sql_expr_list_append(pParse->db, A, p);
+  A = sql_expr_list_append(pParse->db, A, Z.pExpr);
 }
 
 trim_operands(A) ::= expr(Y). {
   A = sql_expr_list_append(pParse->db, NULL, Y.pExpr);
-}
-
-%type trim_from_clause {struct ExprList *}
-%destructor trim_from_clause {sql_expr_list_delete(pParse->db, $$);}
-
-/*
- * The following two rules cover three cases of keyword
- * (LEADING/TRAILING/BOTH) and <trim_character_set> combination.
- * The case when both of them are absent is disallowed.
- */
-trim_from_clause(A) ::= expr(Y) FROM. {
-  A = sql_expr_list_append(pParse->db, NULL, Y.pExpr);
-}
-
-trim_from_clause(A) ::= trim_specification(N) expr_optional(Y) FROM. {
   struct Expr *p = sql_expr_new_dequoted(pParse->db, TK_INTEGER,
-                                         &sqlIntTokens[N]);
-  A = sql_expr_list_append(pParse->db, NULL, p);
-  if (Y != NULL)
-    A = sql_expr_list_append(pParse->db, A, Y);
+                                         &sqlIntTokens[TRIM_BOTH]);
+  A = sql_expr_list_append(pParse->db, A, p);
 }
 
 %type expr_optional {struct Expr *}

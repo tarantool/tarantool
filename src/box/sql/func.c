@@ -1467,37 +1467,11 @@ trim_prepare_char_len(struct sql_context *context,
 }
 
 /**
- * Normalize args from @a argv input array when it has one arg
- * only.
+ * Normalize args from @a argv input array when it has two args.
  *
  * Case: TRIM(<str>)
  * Call trimming procedure with TRIM_BOTH as the flags and " " as
  * the trimming set.
- */
-static void
-trim_func_one_arg(struct sql_context *context, sql_value *arg)
-{
-	/* In case of VARBINARY type default trim octet is X'00'. */
-	const unsigned char *default_trim;
-	if (mem_is_null(arg))
-		return;
-	if (mem_is_bin(arg))
-		default_trim = (const unsigned char *) "\0";
-	else
-		default_trim = (const unsigned char *) " ";
-	const unsigned char *input_str = mem_as_ustr(arg);
-	int input_str_sz = mem_len_unsafe(arg);
-	uint8_t trim_char_len[1] = { 1 };
-	trim_procedure(context, TRIM_BOTH, default_trim, trim_char_len, 1,
-		       input_str, input_str_sz);
-}
-
-/**
- * Normalize args from @a argv input array when it has two args.
- *
- * Case: TRIM(<character_set> FROM <str>)
- * If user has specified <character_set> only, call trimming
- * procedure with TRIM_BOTH as the flags and that trimming set.
  *
  * Case: TRIM(LEADING/TRAILING/BOTH FROM <str>)
  * If user has specified side keyword only, then call trimming
@@ -1507,31 +1481,28 @@ static void
 trim_func_two_args(struct sql_context *context, sql_value *arg1,
 		   sql_value *arg2)
 {
-	const unsigned char *input_str, *trim_set;
-	if ((input_str = mem_as_ustr(arg2)) == NULL)
+	const unsigned char *trim_set;
+	if (mem_is_bin(arg1))
+		trim_set = (const unsigned char *)"\0";
+	else
+		trim_set = (const unsigned char *)" ";
+	const unsigned char *input_str;
+	if ((input_str = mem_as_ustr(arg1)) == NULL)
 		return;
 
-	int input_str_sz = mem_len_unsafe(arg2);
-	if (sql_value_type(arg1) == MP_INT || sql_value_type(arg1) == MP_UINT) {
-		uint8_t len_one = 1;
-		trim_procedure(context, mem_get_int_unsafe(arg1),
-			       (const unsigned char *) " ", &len_one, 1,
-			       input_str, input_str_sz);
-	} else if ((trim_set = mem_as_ustr(arg1)) != NULL) {
-		int trim_set_sz = mem_len_unsafe(arg1);
-		uint8_t *char_len;
-		int char_cnt = trim_prepare_char_len(context, trim_set,
-						     trim_set_sz, &char_len);
-		if (char_cnt == -1)
-			return;
-		trim_procedure(context, TRIM_BOTH, trim_set, char_len, char_cnt,
-			       input_str, input_str_sz);
-		sql_free(char_len);
-	}
+	int input_str_sz = mem_len_unsafe(arg1);
+	assert(arg2->type == MEM_TYPE_UINT);
+	uint8_t len_one = 1;
+	trim_procedure(context, arg2->u.u, trim_set,
+		       &len_one, 1, input_str, input_str_sz);
 }
 
 /**
  * Normalize args from @a argv input array when it has three args.
+ *
+ * Case: TRIM(<character_set> FROM <str>)
+ * If user has specified <character_set> only, call trimming procedure with
+ * TRIM_BOTH as the flags and that trimming set.
  *
  * Case: TRIM(LEADING/TRAILING/BOTH <character_set> FROM <str>)
  * If user has specified side keyword and <character_set>, then
@@ -1541,20 +1512,20 @@ static void
 trim_func_three_args(struct sql_context *context, sql_value *arg1,
 		     sql_value *arg2, sql_value *arg3)
 {
-	assert(sql_value_type(arg1) == MP_INT || sql_value_type(arg1) == MP_UINT);
+	assert(arg2->type == MEM_TYPE_UINT);
 	const unsigned char *input_str, *trim_set;
-	if ((input_str = mem_as_ustr(arg3)) == NULL ||
-	    (trim_set = mem_as_ustr(arg2)) == NULL)
+	if ((input_str = mem_as_ustr(arg1)) == NULL ||
+	    (trim_set = mem_as_ustr(arg3)) == NULL)
 		return;
 
-	int trim_set_sz = mem_len_unsafe(arg2);
-	int input_str_sz = mem_len_unsafe(arg3);
+	int trim_set_sz = mem_len_unsafe(arg3);
+	int input_str_sz = mem_len_unsafe(arg1);
 	uint8_t *char_len;
 	int char_cnt = trim_prepare_char_len(context, trim_set, trim_set_sz,
 					     &char_len);
 	if (char_cnt == -1)
 		return;
-	trim_procedure(context, mem_get_int_unsafe(arg1), trim_set, char_len,
+	trim_procedure(context, arg2->u.u, trim_set, char_len,
 		       char_cnt, input_str, input_str_sz);
 	sql_free(char_len);
 }
@@ -1570,9 +1541,6 @@ static void
 trim_func(struct sql_context *context, int argc, sql_value **argv)
 {
 	switch (argc) {
-	case 1:
-		trim_func_one_arg(context, argv[0]);
-		break;
 	case 2:
 		trim_func_two_args(context, argv[0], argv[1]);
 		break;
@@ -1581,7 +1549,7 @@ trim_func(struct sql_context *context, int argc, sql_value **argv)
 		break;
 	default:
 		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, "TRIM",
-			 "1 or 2 or 3", argc);
+			"2 or 3", argc);
 		context->is_aborted = true;
 	}
 }
