@@ -1431,9 +1431,11 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		replaced_story = memtx_tx_story_get(replaced);
 		memtx_tx_story_link_top_light(add_story, replaced_story, 0);
 	} else {
-		memtx_tx_handle_gap_write(stmt->txn, space,
-					  add_story, new_tuple,
-					  direct_successor[0], 0);
+		rc = memtx_tx_handle_gap_write(stmt->txn, space,
+					       add_story, new_tuple,
+					       direct_successor[0], 0);
+		if (rc != 0)
+			goto fail;
 	}
 
 	/* Purge found conflicts. */
@@ -1448,9 +1450,11 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		replaced_story->link[0].in_index = NULL;
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		if (directly_replaced[i] == NULL) {
-			memtx_tx_handle_gap_write(stmt->txn, space,
-						  add_story, new_tuple,
-						  direct_successor[i], i);
+			rc = memtx_tx_handle_gap_write(stmt->txn, space,
+						       add_story, new_tuple,
+						       direct_successor[i], i);
+			if (rc != 0)
+				goto fail;
 			continue;
 		}
 		assert(directly_replaced[i]->is_dirty);
