@@ -31,7 +31,8 @@ test:do_execsql_test(
           INSERT INTO Undo VALUES
              ((SELECT coalesce(max(id),0) + 1 FROM Undo),
               (SELECT 'INSERT INTO Item (a,b,c) VALUES (' || CAST(coalesce(old.a,'NULL') AS TEXT)
-                  || ',' || quote(old.b) || ',' || CAST(old.c AS TEXT) || ');'));
+                  || ',' || CAST(quote(old.b) AS STRING) || ',' ||
+                  CAST(old.c AS TEXT) || ');'));
         END;
         DELETE FROM Item WHERE a = 1;
         SELECT * FROM Undo;
