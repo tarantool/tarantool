@@ -653,7 +653,8 @@ applier_read_tx_row(struct applier *applier, double timeout)
 
 	coio_read_xrow_timeout_xc(coio, ibuf, row, timeout);
 
-	applier->lag = ev_now(loop()) - row->tm;
+	if (row->tm > 0)
+		applier->lag = ev_now(loop()) - row->tm;
 	applier->last_row_time = ev_monotonic_now(loop());
 	return tx_row;
 }

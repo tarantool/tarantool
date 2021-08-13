@@ -130,7 +130,10 @@ test_run:cmd("switch replica")
 while box.info.replication[1].upstream.status ~= 'follow' do fiber.sleep(0.0001) end
 box.info.replication[1].upstream.status
 box.info.replication[1].upstream.lag > 0
-box.info.replication[1].upstream.lag < 1
+-- Upstream lag is huge until the first row is received.
+test_run:wait_cond(function()\
+    return box.info.replication[1].upstream.lag < 1\
+end)
 -- wait for ack timeout
 test_run:wait_upstream(1, {status='disconnected', message_re='unexpected EOF'})
 
