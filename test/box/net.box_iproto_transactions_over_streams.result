@@ -2712,128 +2712,33 @@ monster_ddl_is_clean()
 ---
 ...
 -- Both DDL and cleanup in one txn in stream.
-ddl_res = nil
+ddl_res = monster_ddl(stream)
 ---
 ...
 stream:execute('START TRANSACTION')
 ---
 - row_count: 0
-...
-ddl_res = monster_ddl(stream)
----
-...
-monster_ddl_clear(stream)
----
-...
-stream:call('monster_ddl_is_clean')
----
-- true
-...
-stream:execute('COMMIT')
----
-- row_count: 0
-...
-monster_ddl_cmp_res(ddl_res, true_ddl_res)
----
-- true
-...
--- DDL in txn, cleanup is not.
-stream:execute('START TRANSACTION')
----
-- row_count: 0
-...
-ddl_res = monster_ddl(stream)
----
-...
-stream:execute('COMMIT')
----
-- row_count: 0
-...
-monster_ddl_cmp_res(ddl_res, true_ddl_res)
----
-- true
 ...
 check_res = monster_ddl_check(stream)
 ---
 ...
-monster_ddl_cmp_res(check_res, true_check_res)
+stream:execute('COMMIT')
 ---
-- true
+- row_count: 0
 ...
 monster_ddl_clear(stream)
 ---
 ...
-stream:call('monster_ddl_is_clean')
----
-- true
-...
--- DDL is not in txn, cleanup is.
-ddl_res = monster_ddl(stream)
+monster_ddl_is_clean()
 ---
 ...
 monster_ddl_cmp_res(ddl_res, true_ddl_res)
 ---
 - true
 ...
-check_res = monster_ddl_check(stream)
----
-...
 monster_ddl_cmp_res(check_res, true_check_res)
 ---
 - true
-...
-stream:execute('START TRANSACTION')
----
-- row_count: 0
-...
-monster_ddl_clear(stream)
----
-...
-stream:call('monster_ddl_is_clean')
----
-- true
-...
-stream:execute('COMMIT')
----
-- row_count: 0
-...
--- DDL and cleanup in separate txns.
-stream:execute('START TRANSACTION')
----
-- row_count: 0
-...
-ddl_res = monster_ddl(stream)
----
-...
-stream:execute('COMMIT')
----
-- row_count: 0
-...
-monster_ddl_cmp_res(ddl_res, true_ddl_res)
----
-- true
-...
-check_res = monster_ddl_check(stream)
----
-...
-monster_ddl_cmp_res(check_res, true_check_res)
----
-- true
-...
-stream:execute('START TRANSACTION')
----
-- row_count: 0
-...
-monster_ddl_clear(stream)
----
-...
-stream:call('monster_ddl_is_clean')
----
-- true
-...
-stream:execute('COMMIT')
----
-- row_count: 0
 ...
 test_run:switch("test")
 ---

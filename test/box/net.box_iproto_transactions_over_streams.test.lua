@@ -1141,51 +1141,15 @@ monster_ddl_clear()
 monster_ddl_is_clean()
 
 -- Both DDL and cleanup in one txn in stream.
-ddl_res = nil
-stream:execute('START TRANSACTION')
 ddl_res = monster_ddl(stream)
-monster_ddl_clear(stream)
-stream:call('monster_ddl_is_clean')
-stream:execute('COMMIT')
-monster_ddl_cmp_res(ddl_res, true_ddl_res)
-
--- DDL in txn, cleanup is not.
 stream:execute('START TRANSACTION')
-ddl_res = monster_ddl(stream)
-stream:execute('COMMIT')
-monster_ddl_cmp_res(ddl_res, true_ddl_res)
-
 check_res = monster_ddl_check(stream)
-monster_ddl_cmp_res(check_res, true_check_res)
-
+stream:execute('COMMIT')
 monster_ddl_clear(stream)
-stream:call('monster_ddl_is_clean')
+monster_ddl_is_clean()
 
--- DDL is not in txn, cleanup is.
-ddl_res = monster_ddl(stream)
 monster_ddl_cmp_res(ddl_res, true_ddl_res)
-
-check_res = monster_ddl_check(stream)
 monster_ddl_cmp_res(check_res, true_check_res)
-
-stream:execute('START TRANSACTION')
-monster_ddl_clear(stream)
-stream:call('monster_ddl_is_clean')
-stream:execute('COMMIT')
-
--- DDL and cleanup in separate txns.
-stream:execute('START TRANSACTION')
-ddl_res = monster_ddl(stream)
-stream:execute('COMMIT')
-monster_ddl_cmp_res(ddl_res, true_ddl_res)
-
-check_res = monster_ddl_check(stream)
-monster_ddl_cmp_res(check_res, true_check_res)
-
-stream:execute('START TRANSACTION')
-monster_ddl_clear(stream)
-stream:call('monster_ddl_is_clean')
-stream:execute('COMMIT')
 
 test_run:switch("test")
 -- All messages was processed, so stream object was immediately
