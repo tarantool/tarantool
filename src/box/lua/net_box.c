@@ -235,6 +235,8 @@ netbox_request_complete(struct netbox_request *request)
 static inline bool
 netbox_request_wait(struct netbox_request *request, double *timeout)
 {
+	if (*timeout == 0)
+		return false;
 	double ts = ev_monotonic_now(loop());
 	int rc = fiber_cond_wait_timeout(&request->cond, *timeout);
 	*timeout -= ev_monotonic_now(loop()) - ts;

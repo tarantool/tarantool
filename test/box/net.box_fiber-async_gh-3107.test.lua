@@ -36,6 +36,26 @@ err:find('Usage') ~= nil
 _, err = pcall(future.wait_result, future, '100')
 err:find('Usage') ~= nil
 
+--
+-- Check that there's no unexpected yields.
+--
+function assert_no_csw(func, ...)               \
+    local csw1 = fiber.info()[fiber.id()].csw   \
+    local ret = {func(...)}                     \
+    local csw2 = fiber.info()[fiber.id()].csw   \
+    assert(csw2 - csw1 == 0)                    \
+    return unpack(ret)                          \
+end
+future = c:call('long_function', {1, 2, 3}, {is_async = true})
+assert_no_csw(future.is_ready, future)
+assert_no_csw(future.result, future)
+assert_no_csw(future.wait_result, future, 0)
+finalize_long()
+future:wait_result()
+assert_no_csw(future.is_ready, future)
+assert_no_csw(future.result, future)
+assert_no_csw(future.wait_result, future)
+
 box.schema.func.drop('long_function')
 
 c:close()
