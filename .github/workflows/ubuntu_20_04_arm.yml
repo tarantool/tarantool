@@ -6,6 +6,10 @@ on:
   repository_dispatch:
     types: [backend_automation]
   workflow_dispatch:
+    inputs:
+      commit:
+        description: "Commit id"
+        required: false
 
 jobs:
   ubuntu_20_04_arm:
@@ -31,6 +35,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+          ref: ${{ github.event.inputs.commit }}
       - uses: ./.github/actions/environment
       - name: packaging
         env:
