@@ -1909,10 +1909,10 @@ box.execute("SELECT quote(d) FROM t;")
   - name: COLUMN_1
     type: string
   rows:
-  - ['10.0']
-  - ['-2.0']
-  - ['3.3']
-  - ['1.8e+19']
+  - [10]
+  - [-2]
+  - [3.3]
+  - [18000000000000000000]
 ...
 box.execute("SELECT LEAST(d, 0) FROM t;")
 ---

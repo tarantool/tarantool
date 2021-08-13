@@ -1094,26 +1094,13 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
 	switch (argv[0]->type) {
-	case MEM_TYPE_DOUBLE:{
-			double r1, r2;
-			char zBuf[50];
-			r1 = mem_get_double_unsafe(argv[0]);
-			sql_snprintf(sizeof(zBuf), zBuf, "%!.15g", r1);
-			sqlAtoF(zBuf, &r2, 20);
-			if (r1 != r2) {
-				sql_snprintf(sizeof(zBuf), zBuf, "%!.20e",
-						 r1);
-			}
-			sql_result_text(context, zBuf, -1,
-					    SQL_TRANSIENT);
-			break;
-		}
 	case MEM_TYPE_UUID: {
 		char buf[UUID_STR_LEN + 1];
 		tt_uuid_to_string(&argv[0]->u.uuid, &buf[0]);
 		sql_result_text(context, buf, UUID_STR_LEN, SQL_TRANSIENT);
 		break;
 	}
+	case MEM_TYPE_DOUBLE:
 	case MEM_TYPE_DEC:
 	case MEM_TYPE_UINT:
 	case MEM_TYPE_INT: {
