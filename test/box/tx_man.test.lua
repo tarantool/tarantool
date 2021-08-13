@@ -1147,6 +1147,40 @@ tx2('s:replace{11, 11}') -- make an op to become RW
 tx2:commit() -- must fail since it actually saw {1, 1, "original"}
 s:drop()
 
+-- https://github.com/tarantool/tarantool/issues/5801
+-- flaw #1
+box.execute([[CREATE TABLE k1 (s1 INT PRIMARY KEY);]])
+box.execute([[CREATE TABLE k2 (s1 INT PRIMARY KEY, s2 INT REFERENCES k1);]])
+box.execute([[CREATE TABLE k3 (c INTEGER PRIMARY KEY AUTOINCREMENT);]])
+box.execute([[CREATE TABLE k4 (s1 INT PRIMARY KEY);]])
+box.schema.user.grant('guest', 'read,write', 'space', 'K1', nil, {if_not_exists=true})
+box.schema.user.grant('guest', 'read,write', 'space', 'K2', nil, {if_not_exists=true})
+
+net_box = require('net.box')
+conn = net_box.connect(box.cfg.listen)
+
+box.execute([[INSERT INTO k1 VALUES (1);]])
+box.execute([[START TRANSACTION;]])
+box.execute([[INSERT INTO k2 VALUES (99,1);]])
+
+conn:execute([[DELETE FROM K1;]])
+box.execute([[COMMIT;]])
+
+-- flaw #2
+box.execute([[DELETE FROM k2;]])
+box.execute([[DELETE FROM k1;]])
+tx1:begin()
+tx1('box.execute([[SELECT COUNT() from k1]])')
+box.execute([[INSERT INTO k1 VALUES (1);]])
+tx1('box.execute([[SELECT COUNT() from k1]])')
+tx1:commit()
+
+box.execute([[DROP TABLE k4;]])
+box.execute([[DROP TABLE k3;]])
+box.execute([[DROP TABLE k2;]])
+box.execute([[DROP TABLE k1;]])
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
+
