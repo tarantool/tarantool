@@ -89,6 +89,18 @@ _ = collectgarbage('collect')
 _ = collectgarbage('collect')
 gc.data3 == nil
 
+--
+-- __tostring and __serialize future methods
+--
+future = c:eval('return 123', {}, {is_async = true})
+tostring(future)
+future
+future.abc = 123
+future.xyz = 'abc'
+tostring(future)
+future
+future:wait_result()
+
 box.schema.user.revoke('guest', 'execute', 'universe')
 
 c:close()

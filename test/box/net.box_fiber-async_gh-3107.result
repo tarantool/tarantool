@@ -251,6 +251,39 @@ gc.data3 == nil
 ---
 - true
 ...
+--
+-- __tostring and __serialize future methods
+--
+future = c:eval('return 123', {}, {is_async = true})
+---
+...
+tostring(future)
+---
+- net.box.request
+...
+future
+---
+- []
+...
+future.abc = 123
+---
+...
+future.xyz = 'abc'
+---
+...
+tostring(future)
+---
+- net.box.request
+...
+future
+---
+- xyz: abc
+  abc: 123
+...
+future:wait_result()
+---
+- [123]
+...
 box.schema.user.revoke('guest', 'execute', 'universe')
 ---
 ...

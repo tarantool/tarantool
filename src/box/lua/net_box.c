@@ -1433,6 +1433,25 @@ luaT_netbox_request_gc(struct lua_State *L)
 }
 
 static int
+luaT_netbox_request_tostring(struct lua_State *L)
+{
+	lua_pushstring(L, netbox_request_typename);
+	return 1;
+}
+
+static int
+luaT_netbox_request_serialize(struct lua_State *L)
+{
+	struct netbox_request *request = luaT_check_netbox_request(L, 1);
+	if (request->index_ref != LUA_NOREF) {
+		lua_rawgeti(L, LUA_REGISTRYINDEX, request->index_ref);
+	} else {
+		lua_newtable(L);
+	}
+	return 1;
+}
+
+static int
 luaT_netbox_request_index(struct lua_State *L)
 {
 	struct netbox_request *request = luaT_check_netbox_request(L, 1);
@@ -2107,6 +2126,8 @@ luaopen_net_box(struct lua_State *L)
 
 	static const struct luaL_Reg netbox_request_meta[] = {
 		{ "__gc",           luaT_netbox_request_gc },
+		{ "__tostring",     luaT_netbox_request_tostring },
+		{ "__serialize",    luaT_netbox_request_serialize },
 		{ "__index",        luaT_netbox_request_index },
 		{ "__newindex",     luaT_netbox_request_newindex },
 		{ "is_ready",       luaT_netbox_request_is_ready },
