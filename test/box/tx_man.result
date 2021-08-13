@@ -3574,6 +3574,108 @@ s:drop()
  | ---
  | ...
 
+-- https://github.com/tarantool/tarantool/issues/5801
+-- flaw #1
+box.execute([[CREATE TABLE k1 (s1 INT PRIMARY KEY);]])
+ | ---
+ | - row_count: 1
+ | ...
+box.execute([[CREATE TABLE k2 (s1 INT PRIMARY KEY, s2 INT REFERENCES k1);]])
+ | ---
+ | - row_count: 1
+ | ...
+box.execute([[CREATE TABLE k3 (c INTEGER PRIMARY KEY AUTOINCREMENT);]])
+ | ---
+ | - row_count: 1
+ | ...
+box.execute([[CREATE TABLE k4 (s1 INT PRIMARY KEY);]])
+ | ---
+ | - row_count: 1
+ | ...
+box.schema.user.grant('guest', 'read,write', 'space', 'K1', nil, {if_not_exists=true})
+ | ---
+ | ...
+box.schema.user.grant('guest', 'read,write', 'space', 'K2', nil, {if_not_exists=true})
+ | ---
+ | ...
+
+net_box = require('net.box')
+ | ---
+ | ...
+conn = net_box.connect(box.cfg.listen)
+ | ---
+ | ...
+
+box.execute([[INSERT INTO k1 VALUES (1);]])
+ | ---
+ | - row_count: 1
+ | ...
+box.execute([[START TRANSACTION;]])
+ | ---
+ | - row_count: 0
+ | ...
+box.execute([[INSERT INTO k2 VALUES (99,1);]])
+ | ---
+ | - row_count: 1
+ | ...
+
+conn:execute([[DELETE FROM K1;]])
+ | ---
+ | - row_count: 1
+ | ...
+box.execute([[COMMIT;]])
+ | ---
+ | - null
+ | - Transaction has been aborted by conflict
+ | ...
+
+-- flaw #2
+box.execute([[DELETE FROM k2;]])
+ | ---
+ | - row_count: 0
+ | ...
+box.execute([[DELETE FROM k1;]])
+ | ---
+ | - row_count: 0
+ | ...
+tx1:begin()
+ | ---
+ | - 
+ | ...
+tx1('box.execute([[SELECT COUNT() from k1]])')
+ | ---
+ | - - {'rows': [[0]], 'metadata': [{'type': 'integer', 'name': 'COLUMN_1'}]}
+ | ...
+box.execute([[INSERT INTO k1 VALUES (1);]])
+ | ---
+ | - row_count: 1
+ | ...
+tx1('box.execute([[SELECT COUNT() from k1]])')
+ | ---
+ | - - {'rows': [[0]], 'metadata': [{'type': 'integer', 'name': 'COLUMN_1'}]}
+ | ...
+tx1:commit()
+ | ---
+ | - 
+ | ...
+
+box.execute([[DROP TABLE k4;]])
+ | ---
+ | - row_count: 1
+ | ...
+box.execute([[DROP TABLE k3;]])
+ | ---
+ | - row_count: 1
+ | ...
+box.execute([[DROP TABLE k2;]])
+ | ---
+ | - row_count: 1
+ | ...
+box.execute([[DROP TABLE k1;]])
+ | ---
+ | - row_count: 1
+ | ...
+
 test_run:cmd("switch default")
  | ---
  | - true
@@ -3586,3 +3688,4 @@ test_run:cmd("cleanup server tx_man")
  | ---
  | - true
  | ...
+
