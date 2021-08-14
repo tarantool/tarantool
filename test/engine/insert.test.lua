@@ -141,9 +141,9 @@ s:insert({3, -3.0009})
 -- Integers of Lua type NUMBER and CDATA of type int64 or uint64
 -- cannot be inserted into this field.
 --
-s:insert({4, 1})
-s:insert({5, -9223372036854775800ULL})
-s:insert({6, 18000000000000000000ULL})
+s:insert({4, 3})
+s:insert({5, -9223372036854775800LL})
+s:insert({6, 17000000000000000000ULL})
 
 --
 -- To insert an integer, we must cast it to a CDATA of type DOUBLE
