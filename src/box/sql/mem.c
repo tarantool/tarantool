@@ -679,6 +679,17 @@ int_to_double_forced(struct Mem *mem)
 }
 
 static inline int
+int_to_dec(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_INT);
+	int64_t i = mem->u.i;
+	decimal_from_int64(&mem->u.d, i);
+	mem->type = MEM_TYPE_DEC;
+	mem->flags = 0;
+	return 0;
+}
+
+static inline int
 uint_to_double_precise(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_UINT);
@@ -707,6 +718,17 @@ uint_to_double_forced(struct Mem *mem)
 	mem->flags = 0;
 	mem->type = MEM_TYPE_DOUBLE;
 	return CMP_OLD_NEW(u, d, uint64_t);
+}
+
+static inline int
+uint_to_dec(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_UINT);
+	int64_t u = mem->u.u;
+	decimal_from_uint64(&mem->u.d, u);
+	mem->type = MEM_TYPE_DEC;
+	mem->flags = 0;
+	return 0;
 }
 
 static inline int
@@ -856,6 +878,19 @@ str_to_double(struct Mem *mem)
 }
 
 static inline int
+str_to_dec(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_STR);
+	decimal_t dec;
+	decimal_t *d;
+	d = decimal_from_string(&dec, mem->z);
+	if (d == NULL)
+		return -1;
+	mem_set_dec(mem, &dec);
+	return 0;
+}
+
+static inline int
 double_to_int(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_DOUBLE);
@@ -989,6 +1024,68 @@ double_to_uint_forced(struct Mem *mem)
 }
 
 static inline int
+double_to_dec(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_DOUBLE);
+	double d = mem->u.r;
+	decimal_t dec;
+	if (decimal_from_double(&dec, d) == NULL)
+		return -1;
+	mem->u.d = dec;
+	mem->type = MEM_TYPE_DEC;
+	mem->flags = 0;
+	return 0;
+}
+
+static inline int
+double_to_dec_precise(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_DOUBLE);
+	double d = mem->u.r;
+	decimal_t dec;
+	if (decimal_from_double(&dec, d) == NULL ||
+	    atof(decimal_str(&dec)) != d)
+		return -1;
+	mem->u.d = dec;
+	mem->type = MEM_TYPE_DEC;
+	mem->flags = 0;
+	return 0;
+}
+
+/**
+ * Cast MEM with DOUBLE to DECIMAL. Doesn't fail. The return value is < 0 if
+ * the original value is less than the result, > 0 if the original value is
+ * greater than the result, and 0 if the cast is precise.
+ */
+static inline int
+double_to_dec_forced(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_DOUBLE);
+	double d = mem->u.r;
+	mem->type = MEM_TYPE_DEC;
+	mem->flags = 0;
+	if (d >= 1e38) {
+		const char *val = "99999999999999999999999999999999999999";
+		assert(strlen(val) == 38);
+		decimal_from_string(&mem->u.d, val);
+		return 1;
+	}
+	if (d <= -1e38) {
+		const char *val = "-99999999999999999999999999999999999999";
+		assert(strlen(val) == 39);
+		decimal_from_string(&mem->u.d, val);
+		return -1;
+	}
+	decimal_from_double(&mem->u.d, d);
+	double tmp = atof(decimal_str(&mem->u.d));
+	if (d > tmp)
+		return 1;
+	if (d < tmp)
+		return -1;
+	return 0;
+}
+
+static inline int
 double_to_str0(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_DOUBLE);
@@ -999,6 +1096,174 @@ double_to_str0(struct Mem *mem)
 	mem->type = MEM_TYPE_STR;
 	mem->flags = MEM_Term;
 	return 0;
+}
+
+static inline int
+dec_to_int(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_DEC);
+	if (decimal_is_neg(&mem->u.d)) {
+		int64_t i;
+		if (decimal_to_int64(&mem->u.d, &i) == NULL)
+			return -1;
+		assert(i < 0);
+		mem->u.i = i;
+		mem->type = MEM_TYPE_INT;
+		mem->flags = 0;
+		return 0;
+	}
+	uint64_t u;
+	if (decimal_to_uint64(&mem->u.d, &u) == NULL)
+		return -1;
+	mem->u.u = u;
+	mem->type = MEM_TYPE_UINT;
+	mem->flags = 0;
+	return 0;
+}
+
+static inline int
+dec_to_int_precise(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_DEC);
+	if (!decimal_is_int(&mem->u.d))
+		return -1;
+	return dec_to_int(mem);
+}
+
+static inline int
+dec_to_int_forced(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_DEC);
+	if (decimal_is_neg(&mem->u.d)) {
+		int64_t i;
+		mem->type = MEM_TYPE_INT;
+		mem->flags = 0;
+		if (decimal_to_int64(&mem->u.d, &i) == NULL) {
+			mem->u.i = INT64_MIN;
+			return -1;
+		}
+		assert(i < 0);
+		mem->u.i = i;
+		/*
+		 * Decimal is floored when cast to int, which means that after
+		 * cast it becomes bigger if it was not integer.
+		 */
+		return decimal_is_int(&mem->u.d) ? 0 : -1;
+	}
+	uint64_t u;
+	mem->type = MEM_TYPE_UINT;
+	mem->flags = 0;
+	if (decimal_to_uint64(&mem->u.d, &u) == NULL) {
+		mem->u.u = UINT64_MAX;
+		return 1;
+	}
+	mem->u.u = u;
+	/*
+	 * Decimal is floored when cast to uint, which means that after cast it
+	 * becomes less if it was not integer.
+	 */
+	return decimal_is_int(&mem->u.d) ? 0 : 1;
+}
+
+static inline int
+dec_to_uint(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_DEC);
+	uint64_t u;
+	if (decimal_to_uint64(&mem->u.d, &u) == NULL)
+		return -1;
+	mem->u.u = u;
+	mem->type = MEM_TYPE_UINT;
+	mem->flags = 0;
+	return 0;
+}
+
+static inline int
+dec_to_uint_precise(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_DEC);
+	if (!decimal_is_int(&mem->u.d))
+		return -1;
+	return dec_to_uint(mem);
+}
+
+static inline int
+dec_to_uint_forced(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_DEC);
+	uint64_t u;
+	mem->type = MEM_TYPE_UINT;
+	mem->flags = 0;
+	if (decimal_to_uint64(&mem->u.d, &u) == NULL) {
+		if (decimal_is_neg(&mem->u.d)) {
+			mem->u.u = 0;
+			return -1;
+		}
+		mem->u.u = UINT64_MAX;
+		return 1;
+	}
+	mem->u.u = u;
+	/*
+	 * Decimal is floored when cast to uint, which means that after cast if
+	 * it was not integer it becomes less if it was positive, and move if it
+	 * was negative. For example, DECIMAL value -1.5 becomes -1 after cast
+	 * to INTEGER and DECIMAL value 1.5 becomes 1 after cast to INTEGER.
+	 */
+	if (decimal_is_int(&mem->u.d))
+		return 0;
+	return decimal_is_neg(&mem->u.d) ? -1 : 1;
+}
+
+static inline int
+dec_to_double(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_DEC);
+	double r = atof(decimal_str(&mem->u.d));
+	mem->u.r = r;
+	mem->type = MEM_TYPE_DOUBLE;
+	mem->flags = 0;
+	return 0;
+}
+
+static inline int
+dec_to_double_precise(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_DEC);
+	double r = atof(decimal_str(&mem->u.d));
+	decimal_t d;
+	decimal_t *dec = decimal_from_double(&d, r);
+	if (dec == NULL || decimal_compare(dec, &mem->u.d) != 0)
+		return -1;
+	mem->u.r = r;
+	mem->type = MEM_TYPE_DOUBLE;
+	mem->flags = 0;
+	return 0;
+}
+
+static inline int
+dec_to_double_forced(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_DEC);
+	mem->type = MEM_TYPE_DOUBLE;
+	mem->flags = 0;
+	double r = atof(decimal_str(&mem->u.d));
+	int res;
+	decimal_t d;
+	if (r <= -1e38)
+		res = 1;
+	else if (r >= 1e38)
+		res = -1;
+	else
+		res = decimal_compare(&mem->u.d, decimal_from_double(&d, r));
+	mem->u.r = r;
+	return res;
+}
+
+static inline int
+dec_to_str0(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_DEC);
+	return mem_copy_str0(mem, decimal_str(&mem->u.d));
 }
 
 static inline int
@@ -1053,6 +1318,8 @@ mem_to_int(struct Mem *mem)
 		return str_to_int(mem);
 	if (mem->type == MEM_TYPE_DOUBLE)
 		return double_to_int(mem);
+	if (mem->type == MEM_TYPE_DEC)
+		return dec_to_int(mem);
 	return -1;
 }
 
@@ -1068,6 +1335,8 @@ mem_to_int_precise(struct Mem *mem)
 		return str_to_int(mem);
 	if (mem->type == MEM_TYPE_DOUBLE)
 		return double_to_int_precise(mem);
+	if (mem->type == MEM_TYPE_DEC)
+		return dec_to_int(mem);
 	return -1;
 }
 
@@ -1083,6 +1352,8 @@ mem_to_double(struct Mem *mem)
 		return int_to_double(mem);
 	if (mem->type == MEM_TYPE_STR)
 		return str_to_double(mem);
+	if (mem->type == MEM_TYPE_DEC)
+		return dec_to_double(mem);
 	return -1;
 }
 
@@ -1129,6 +1400,8 @@ mem_to_str0(struct Mem *mem)
 		return array_to_str0(mem);
 	case MEM_TYPE_UUID:
 		return uuid_to_str0(mem);
+	case MEM_TYPE_DEC:
+		return dec_to_str0(mem);
 	default:
 		return -1;
 	}
@@ -1157,6 +1430,8 @@ mem_to_str(struct Mem *mem)
 		return array_to_str0(mem);
 	case MEM_TYPE_UUID:
 		return uuid_to_str0(mem);
+	case MEM_TYPE_DEC:
+		return dec_to_str0(mem);
 	default:
 		return -1;
 	}
@@ -1177,6 +1452,8 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 			return str_to_uint(mem);
 		case MEM_TYPE_DOUBLE:
 			return double_to_uint(mem);
+		case MEM_TYPE_DEC:
+			return dec_to_uint(mem);
 		default:
 			return -1;
 		}
@@ -1209,9 +1486,21 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 	case FIELD_TYPE_NUMBER:
 		return mem_to_number(mem);
 	case FIELD_TYPE_DECIMAL:
-		if (mem->type == MEM_TYPE_DEC)
+		switch (mem->type) {
+		case MEM_TYPE_INT:
+			return int_to_dec(mem);
+		case MEM_TYPE_UINT:
+			return uint_to_dec(mem);
+		case MEM_TYPE_STR:
+			return str_to_dec(mem);
+		case MEM_TYPE_DOUBLE:
+			return double_to_dec(mem);
+		case MEM_TYPE_DEC:
+			mem->flags = 0;
 			return 0;
-		return -1;
+		default:
+			return -1;
+		}
 	case FIELD_TYPE_UUID:
 		if (mem->type == MEM_TYPE_UUID) {
 			mem->flags = 0;
@@ -1252,6 +1541,8 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 		}
 		if (mem->type == MEM_TYPE_DOUBLE)
 			return double_to_uint_precise(mem);
+		if (mem->type == MEM_TYPE_DEC)
+			return dec_to_uint_precise(mem);
 		return -1;
 	case FIELD_TYPE_STRING:
 		if (mem->type == MEM_TYPE_STR) {
@@ -1268,6 +1559,8 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 			return int_to_double_precise(mem);
 		if (mem->type == MEM_TYPE_UINT)
 			return uint_to_double_precise(mem);
+		if (mem->type == MEM_TYPE_DEC)
+			return dec_to_double_precise(mem);
 		return -1;
 	case FIELD_TYPE_INTEGER:
 		if ((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0) {
@@ -1276,6 +1569,8 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 		}
 		if (mem->type == MEM_TYPE_DOUBLE)
 			return double_to_int_precise(mem);
+		if (mem->type == MEM_TYPE_DEC)
+			return dec_to_int_precise(mem);
 		return -1;
 	case FIELD_TYPE_BOOLEAN:
 		if (mem->type == MEM_TYPE_BOOL) {
@@ -1296,9 +1591,19 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 		mem->flags = MEM_Number;
 		return 0;
 	case FIELD_TYPE_DECIMAL:
-		if (mem->type == MEM_TYPE_DEC)
+		switch (mem->type) {
+		case MEM_TYPE_INT:
+			return int_to_dec(mem);
+		case MEM_TYPE_UINT:
+			return uint_to_dec(mem);
+		case MEM_TYPE_DOUBLE:
+			return double_to_dec_precise(mem);
+		case MEM_TYPE_DEC:
+			mem->flags = 0;
 			return 0;
-		return -1;
+		default:
+			return -1;
+		}
 	case FIELD_TYPE_MAP:
 		if (mem->type == MEM_TYPE_MAP)
 			return 0;
@@ -1343,6 +1648,8 @@ mem_cast_implicit_number(struct Mem *mem, enum field_type type)
 			return -1;
 		case MEM_TYPE_DOUBLE:
 			return double_to_uint_forced(mem);
+		case MEM_TYPE_DEC:
+			return dec_to_uint_forced(mem);
 		default:
 			unreachable();
 		}
@@ -1353,6 +1660,8 @@ mem_cast_implicit_number(struct Mem *mem, enum field_type type)
 			return int_to_double_forced(mem);
 		case MEM_TYPE_UINT:
 			return uint_to_double_forced(mem);
+		case MEM_TYPE_DEC:
+			return dec_to_double_forced(mem);
 		case MEM_TYPE_DOUBLE:
 			mem->flags = 0;
 			return 0;
@@ -1368,6 +1677,23 @@ mem_cast_implicit_number(struct Mem *mem, enum field_type type)
 			return 0;
 		case MEM_TYPE_DOUBLE:
 			return double_to_int_forced(mem);
+		case MEM_TYPE_DEC:
+			return dec_to_int_forced(mem);
+		default:
+			unreachable();
+		}
+		break;
+	case FIELD_TYPE_DECIMAL:
+		switch (mem->type) {
+		case MEM_TYPE_INT:
+			return int_to_dec(mem);
+		case MEM_TYPE_UINT:
+			return uint_to_dec(mem);
+		case MEM_TYPE_DEC:
+			mem->flags = 0;
+			return 0;
+		case MEM_TYPE_DOUBLE:
+			return double_to_dec_forced(mem);
 		default:
 			unreachable();
 		}

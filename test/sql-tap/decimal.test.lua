@@ -3,7 +3,7 @@ local build_path = os.getenv("BUILDDIR")
 package.cpath = build_path..'/test/sql-tap/?.so;'..build_path..'/test/sql-tap/?.dylib;'..package.cpath
 
 local test = require("sqltester")
-test:plan(43)
+test:plan(84)
 
 local dec = require("decimal")
 local dec1 = dec.new("111")
@@ -433,6 +433,370 @@ test:do_catchsql_test(
         SELECT u = x'31' FROM t2;
     ]], {
         1, "Type mismatch: can not convert varbinary(x'31') to number"
+    })
+
+-- Check that explicit cast from DECIMAL to another types works as intended.
+test:do_execsql_test(
+    "dec-10.1.1",
+    [[
+        SELECT cast(u AS UNSIGNED) FROM t2;
+    ]], {
+        111, 3333, 55555
+    })
+
+test:do_execsql_test(
+    "dec-10.1.2",
+    [[
+        SELECT cast(u AS STRING) FROM t2;
+    ]], {
+        "111", "3333", "55555"
+    })
+
+test:do_execsql_test(
+    "dec-10.1.3",
+    [[
+        SELECT cast(u AS NUMBER) FROM t2;
+    ]], {
+        dec1, dec3, dec2
+    })
+
+test:do_execsql_test(
+    "dec-10.1.4",
+    [[
+        SELECT cast(u AS DOUBLE) FROM t2;
+    ]], {
+        111, 3333, 55555
+    })
+
+test:do_execsql_test(
+    "dec-10.1.5",
+    [[
+        SELECT cast(u AS INTEGER) FROM t2;
+    ]], {
+        111, 3333, 55555
+    })
+
+test:do_catchsql_test(
+    "dec-10.1.6",
+    [[
+        SELECT cast(u AS BOOLEAN) FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to boolean"
+    })
+
+test:do_catchsql_test(
+    "dec-10.1.7",
+    [[
+        SELECT hex(cast(u AS VARBINARY)) FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to varbinary"
+    })
+
+test:do_execsql_test(
+    "dec-10.1.8",
+    [[
+        SELECT cast(u AS SCALAR) FROM t2;
+    ]], {
+        dec1, dec3, dec2
+    })
+
+test:do_catchsql_test(
+    "dec-10.1.9",
+    [[
+        SELECT cast(u AS UUID) FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to uuid"
+    })
+
+-- Check that explicit cast from another types to DECIMAL works as intended.
+test:do_execsql_test(
+    "dec-10.2.1",
+    [[
+        SELECT cast(111 AS DECIMAL);
+    ]], {
+        dec1
+    })
+
+test:do_catchsql_test(
+    "dec-10.2.2",
+    [[
+        SELECT cast(x'1234567890abcdef' AS DECIMAL) FROM t2 LIMIT 1;
+    ]], {
+        1, "Type mismatch: can not convert varbinary(x'1234567890ABCDEF') to decimal"
+    })
+
+test:do_execsql_test(
+    "dec-10.2.3",
+    [[
+        SELECT cast('111' AS DECIMAL);
+    ]], {
+        dec1
+    })
+
+test:do_execsql_test(
+    "dec-10.2.4",
+    [[
+        SELECT cast(111.0 AS DECIMAL);
+    ]], {
+        dec1
+    })
+
+test:do_execsql_test(
+    "dec-10.2.5",
+    [[
+        SELECT cast(-1 AS DECIMAL);
+    ]], {
+        dec.new(-1)
+    })
+
+test:do_catchsql_test(
+    "dec-10.2.6",
+    [[
+        SELECT cast(true AS DECIMAL);
+    ]], {
+        1, "Type mismatch: can not convert boolean(TRUE) to decimal"
+    })
+
+test:do_catchsql_test(
+    "dec-10.2.7",
+    [[
+        SELECT cast(cast(x'11111111111111111111111111111111' AS UUID) AS DECIMAL);
+    ]], {
+        1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to decimal"
+    })
+
+test:execsql([[
+    CREATE TABLE tu (id INT PRIMARY KEY AUTOINCREMENT, u UNSIGNED);
+    CREATE TABLE ts (id INT PRIMARY KEY AUTOINCREMENT, s STRING);
+    CREATE TABLE tn (id INT PRIMARY KEY AUTOINCREMENT, n NUMBER);
+    CREATE TABLE td (id INT PRIMARY KEY AUTOINCREMENT, d DOUBLE);
+    CREATE TABLE ti (id INT PRIMARY KEY AUTOINCREMENT, i INTEGER);
+    CREATE TABLE tb (id INT PRIMARY KEY AUTOINCREMENT, b BOOLEAN);
+    CREATE TABLE tv (id INT PRIMARY KEY AUTOINCREMENT, v VARBINARY);
+    CREATE TABLE tsc (id INT PRIMARY KEY AUTOINCREMENT, sc SCALAR);
+    CREATE TABLE tuu (id INT PRIMARY KEY AUTOINCREMENT, uu UUID);
+    CREATE TABLE tsu (s STRING PRIMARY KEY, u UUID);
+]])
+
+-- Check that implcit cast from DECIMAL to another types works as intended.
+test:do_execsql_test(
+    "dec-11.1.1",
+    [[
+        INSERT INTO tu(u) SELECT u FROM t2;
+        SELECT * FROM tu;
+    ]], {
+        1, 111, 2, 3333, 3, 55555
+    })
+
+test:do_catchsql_test(
+    "dec-11.1.2",
+    [[
+        INSERT INTO ts(s) SELECT u FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to string"
+    })
+
+test:do_execsql_test(
+    "dec-11.1.3",
+    [[
+        INSERT INTO tn(n) SELECT u FROM t2;
+        SELECT * FROM tn;
+    ]], {
+        1, dec1, 2, dec3, 3, dec2
+    })
+
+test:do_execsql_test(
+    "dec-11.1.4",
+    [[
+        INSERT INTO td(d) SELECT u FROM t2;
+        SELECT * FROM td;
+    ]], {
+        1, 111, 2, 3333, 3, 55555
+    })
+
+test:do_execsql_test(
+    "dec-11.1.5",
+    [[
+        INSERT INTO ti(i) SELECT u FROM t2;
+        SELECT * FROM ti;
+    ]], {
+        1, 111, 2, 3333, 3, 55555
+    })
+
+test:do_catchsql_test(
+    "dec-11.1.6",
+    [[
+        INSERT INTO tb(b) SELECT u FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to boolean"
+    })
+
+test:do_catchsql_test(
+    "dec-11.1.7",
+    [[
+        INSERT INTO tv(v) SELECT u FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to varbinary"
+    })
+
+test:do_execsql_test(
+    "dec-11.1.8",
+    [[
+        INSERT INTO tsc(sc) SELECT u FROM t2;
+        SELECT * FROM tsc;
+    ]], {
+        1, dec1, 2, dec3, 3, dec2
+    })
+
+test:do_catchsql_test(
+    "dec-11.1.9",
+    [[
+        INSERT INTO tuu(uu) SELECT u FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to uuid"
+    })
+
+-- Check that implicit cast from another types to DECIMAL works as intended.
+test:do_catchsql_test(
+    "dec-11.2.1",
+    [[
+        INSERT INTO tsu VALUES ('1_unsigned', 1);
+    ]], {
+        1, "Type mismatch: can not convert integer(1) to uuid"
+    })
+
+test:do_catchsql_test(
+    "dec-11.2.2",
+    [[
+        INSERT INTO tsu VALUES ('2_string_right', '11111111-1111-1111-1111-111111111111');
+    ]], {
+        1, "Type mismatch: can not convert string('11111111-1111-1111-1111-111111111111') to uuid"
+    })
+
+test:do_catchsql_test(
+    "dec-11.2.3",
+    [[
+        INSERT INTO tsu VALUES ('3_string_wrong', '1');
+    ]], {
+        1, "Type mismatch: can not convert string('1') to uuid"
+    })
+
+test:do_catchsql_test(
+    "dec-11.2.4",
+    [[
+        INSERT INTO tsu VALUES ('4_double', 1.5);
+    ]], {
+        1, "Type mismatch: can not convert double(1.5) to uuid"
+    })
+
+test:do_catchsql_test(
+    "dec-11.2.5",
+    [[
+        INSERT INTO tsu VALUES ('5_integer', -1);
+    ]], {
+        1, "Type mismatch: can not convert integer(-1) to uuid"
+    })
+
+test:do_catchsql_test(
+    "dec-11.2.6",
+    [[
+        INSERT INTO tsu VALUES ('6_boolean', true);
+    ]], {
+        1, "Type mismatch: can not convert boolean(TRUE) to uuid"
+    })
+
+test:do_catchsql_test(
+    "dec-11.2.7",
+    [[
+        INSERT INTO tsu SELECT '7_varbinary', x'11111111111111111111111111111111' FROM t2 LIMIT 1;
+    ]], {
+        1, "Type mismatch: can not convert varbinary(x'11111111111111111111111111111111') to uuid"
+    })
+
+test:do_catchsql_test(
+    "dec-11.2.8",
+    [[
+        INSERT INTO tsu VALUES ('8_varbinary', x'1234567890abcdef');
+    ]], {
+        1, "Type mismatch: can not convert varbinary(x'1234567890ABCDEF') to uuid"
+    })
+
+-- Check that LIMIT accepts DECIMAL as argument.
+test:do_execsql_test(
+    "dec-12.1",
+    [[
+        SELECT 1 LIMIT (SELECT u FROM t1 LIMIT 1);
+    ]], {
+        1
+    })
+
+-- Check that OFFSET accepts DECIMAL as argument.
+test:do_execsql_test(
+    "dec-12.2",
+    [[
+        SELECT 1 LIMIT 1 OFFSET (SELECT u FROM t1 LIMIT 1);
+    ]], {
+    })
+
+-- Check that other numeric values could be used to search in DECIMAL index.
+test:do_execsql_test(
+    "dec-13.1.1",
+    [[
+        SELECT * FROM t2 WHERE u > 123;
+    ]], {
+        dec3, dec2
+    })
+
+test:do_execsql_test(
+    "dec-13.1.2",
+    [[
+        SELECT * FROM t2 WHERE u < 123.5;
+    ]], {
+        dec1
+    })
+
+test:execsql([[
+    CREATE TABLE t13i (i INTEGER PRIMARY KEY);
+    CREATE TABLE t13u (u UNSIGNED PRIMARY KEY);
+    CREATE TABLE t13d (d DOUBLE PRIMARY KEY);
+    CREATE TABLE t13n (n NUMBER PRIMARY KEY);
+    INSERT INTO t13i VALUES (1), (1000);
+    INSERT INTO t13u VALUES (1), (1000);
+    INSERT INTO t13d VALUES (1), (1000);
+    INSERT INTO t13n VALUES (1), (1000);
+]])
+
+-- Check that DECIMAL values could be used to search in other numeric indexes.
+test:do_execsql_test(
+    "dec-13.2.1",
+    [[
+        SELECT * FROM t13i WHERE CAST(111 AS DECIMAL) > i;
+    ]], {
+        1
+    })
+
+test:do_execsql_test(
+    "dec-13.2.2",
+    [[
+        SELECT * FROM t13u WHERE CAST(111 AS DECIMAL) < u;
+    ]], {
+        1000
+    })
+
+test:do_execsql_test(
+    "dec-13.2.3",
+    [[
+        SELECT * FROM t13d WHERE CAST(111 AS DECIMAL) > d;
+    ]], {
+        1
+    })
+
+test:do_execsql_test(
+    "dec-13.2.4",
+    [[
+        SELECT * FROM t13n WHERE CAST(111 AS DECIMAL) < n;
+    ]], {
+        1000
     })
 
 test:execsql([[
