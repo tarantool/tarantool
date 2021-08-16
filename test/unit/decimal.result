@@ -1,4 +1,4 @@
-1..304
+1..312
 ok 1 - decimal(314)
 ok 2 - decimal(271)
 ok 3 - decimal(314) + decimal(271)
@@ -747,3 +747,11 @@ ok 301 - decimal_from_string(1.0000)
 ok 302 - decimal_is_int(1.0000) - expected true
 ok 303 - decimal_from_string(1.0000001)
 ok 304 - decimal_is_int(1.0000001) - expected false
+ok 305 - decimal_from_string(1)
+ok 306 - decimal_is_neg(1) - expected false
+ok 307 - decimal_from_string(-1)
+ok 308 - decimal_is_neg(-1) - expected true
+ok 309 - decimal_from_string(0)
+ok 310 - decimal_is_neg(0) - expected false
+ok 311 - decimal_from_string(-0)
+ok 312 - decimal_is_neg(-0) - expected false

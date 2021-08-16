@@ -81,6 +81,10 @@ decimal_zero(decimal_t *dec);
 bool
 decimal_is_int(decimal_t *dec);
 
+/** @return true if the decimal is negative, false otherwise. */
+bool
+decimal_is_neg(const decimal_t *dec);
+
 /**
  * Initialize a decimal with a value from the string.
  *

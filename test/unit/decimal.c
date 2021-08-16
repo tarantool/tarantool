@@ -336,7 +336,7 @@ test_mp_print(void)
 int
 main(void)
 {
-	plan(304);
+	plan(312);
 
 	dectest(314, 271, uint64, uint64_t);
 	dectest(65535, 23456, uint64, uint64_t);
@@ -415,6 +415,11 @@ main(void)
 	dectest_is(is_int, 1, true);
 	dectest_is(is_int, 1.0000, true);
 	dectest_is(is_int, 1.0000001, false);
+
+	dectest_is(is_neg, 1, false);
+	dectest_is(is_neg, -1, true);
+	dectest_is(is_neg, 0, false);
+	dectest_is(is_neg, -0, false);
 
 	return check_plan();
 }
