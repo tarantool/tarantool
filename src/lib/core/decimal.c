@@ -115,6 +115,12 @@ decimal_is_int(decimal_t *dec)
 	return decNumberIsInt(dec);
 }
 
+bool
+decimal_is_neg(const decimal_t *dec)
+{
+	return decNumberIsNegative(dec) && !decNumberIsZero(dec);
+}
+
 decimal_t *
 decimal_from_string(decimal_t *dec, const char *str)
 {
