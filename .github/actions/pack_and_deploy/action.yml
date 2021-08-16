@@ -8,6 +8,11 @@ runs:
         # reap orphan processes. At least the following test leans
         # on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
         echo PACKPACK_EXTRA_DOCKER_RUN_PARAMS='--init' | tee -a $GITHUB_ENV
+        # There are packages like tzdata or postfix, whose configuration
+        # is interactive by default. The environment variable below
+        # fordibs interactive configuration phase. Otherwise the CI stucks
+        # from time to time on `apt-get update`.
+        export DEBIAN_FRONTEND=noninteractive
         # create packages
         make -f .gitlab.mk package
         # deploy packages
