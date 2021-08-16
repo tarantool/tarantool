@@ -27,7 +27,7 @@ test:do_catchsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x+0 AND y=='1';
     ]], {
         -- <1.0>
-        1, "Type mismatch: can not convert string('1') to integer, unsigned or double"
+        1, "Type mismatch: can not convert string('1') to integer, decimal or double"
         -- </1.0>
     })
 
@@ -37,7 +37,7 @@ test:do_catchsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x-0 AND y=='1';
     ]], {
         -- <1.1>
-        1, "Type mismatch: can not convert string('1') to integer, unsigned or double"
+        1, "Type mismatch: can not convert string('1') to integer, decimal or double"
         -- </1.1>
     })
 
@@ -47,7 +47,7 @@ test:do_catchsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x*1 AND y=='1';
     ]], {
         -- <1.2>
-        1, "Type mismatch: can not convert string('1') to integer, unsigned or double"
+        1, "Type mismatch: can not convert string('1') to integer, decimal or double"
         -- </1.2>
     })
 
@@ -57,7 +57,7 @@ test:do_catchsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x/1 AND y=='1';
     ]], {
         -- <1.3>
-        1, "Type mismatch: can not convert string('1') to integer, unsigned or double"
+        1, "Type mismatch: can not convert string('1') to integer, decimal or double"
         -- </1.3>
     })
 
@@ -78,7 +78,7 @@ test:do_catchsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x+0 AND y=='1';
     ]], {
         -- <3.0>
-        1, "Type mismatch: can not convert string('1.0') to integer, unsigned or double"
+        1, "Type mismatch: can not convert string('1.0') to integer, decimal or double"
         -- </3.0>
     })
 
@@ -88,7 +88,7 @@ test:do_catchsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x-0 AND y=='1';
     ]], {
         -- <3.1>
-        1, "Type mismatch: can not convert string('1.0') to integer, unsigned or double"
+        1, "Type mismatch: can not convert string('1.0') to integer, decimal or double"
         -- </3.1>
     })
 
@@ -98,7 +98,7 @@ test:do_catchsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x*1 AND y=='1';
     ]], {
         -- <3.2>
-        1, "Type mismatch: can not convert string('1.0') to integer, unsigned or double"
+        1, "Type mismatch: can not convert string('1.0') to integer, decimal or double"
         -- </3.2>
     })
 
@@ -108,7 +108,7 @@ test:do_catchsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x/1 AND y=='1';
     ]], {
         -- <3.3>
-        1, "Type mismatch: can not convert string('1.0') to integer, unsigned or double"
+        1, "Type mismatch: can not convert string('1.0') to integer, decimal or double"
         -- </3.3>
     })
 
@@ -138,7 +138,7 @@ test:do_catchsql_test(
         SELECT '1.23e64'/'1.0000e+62';
     ]], {
         -- <4.1>
-        1, "Type mismatch: can not convert string('1.0000e+62') to integer, unsigned or double"
+        1, "Type mismatch: can not convert string('1.0000e+62') to integer, decimal or double"
         -- </4.1>
     })
 

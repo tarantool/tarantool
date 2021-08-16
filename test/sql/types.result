@@ -311,7 +311,7 @@ box.execute('SELECT 1 + 1.1;')
 box.execute('SELECT \'9223372036854\' + 1;')
 ---
 - null
-- 'Type mismatch: can not convert string(''9223372036854'') to integer, unsigned or
+- 'Type mismatch: can not convert string(''9223372036854'') to integer, decimal or
   double'
 ...
 -- Fix BOOLEAN bindings.

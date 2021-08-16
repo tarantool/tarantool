@@ -96,7 +96,7 @@ test:do_catchsql_test(
     [[
         SELECT 1 + CAST(1 AS NUMBER);
     ]], {
-        1, "Type mismatch: can not convert number(1) to integer, unsigned or double"
+        1, "Type mismatch: can not convert number(1) to integer, decimal or double"
     })
 
 test:do_catchsql_test(
@@ -104,7 +104,7 @@ test:do_catchsql_test(
     [[
         SELECT CAST(1 AS SCALAR) * 1;
     ]], {
-        1, "Type mismatch: can not convert scalar(1) to integer, unsigned or double"
+        1, "Type mismatch: can not convert scalar(1) to integer, decimal or double"
     })
 
 -- Check that bitwise operations are prohibited for NUMBER and SCALAR values.
