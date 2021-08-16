@@ -31,6 +31,7 @@
  */
 #include "box/field_def.h"
 #include "uuid/tt_uuid.h"
+#include "decimal.h"
 
 struct sql;
 struct Vdbe;
@@ -49,10 +50,11 @@ enum mem_type {
 	MEM_TYPE_BOOL		= 1 << 7,
 	MEM_TYPE_DOUBLE		= 1 << 8,
 	MEM_TYPE_UUID		= 1 << 9,
-	MEM_TYPE_INVALID	= 1 << 10,
-	MEM_TYPE_FRAME		= 1 << 11,
-	MEM_TYPE_PTR		= 1 << 12,
-	MEM_TYPE_AGG		= 1 << 13,
+	MEM_TYPE_DEC		= 1 << 10,
+	MEM_TYPE_INVALID	= 1 << 11,
+	MEM_TYPE_FRAME		= 1 << 12,
+	MEM_TYPE_PTR		= 1 << 13,
+	MEM_TYPE_AGG		= 1 << 14,
 };
 
 /*
@@ -75,6 +77,7 @@ struct Mem {
 		struct func *func;
 		struct VdbeFrame *pFrame;	/* Used when flags==MEM_Frame */
 		struct tt_uuid uuid;
+		decimal_t d;
 	} u;
 	/** Type of the value this MEM contains. */
 	enum mem_type type;
@@ -138,7 +141,8 @@ static inline bool
 mem_is_num(const struct Mem *mem)
 {
 	enum mem_type type = mem->type;
-	return (type & (MEM_TYPE_UINT | MEM_TYPE_INT | MEM_TYPE_DOUBLE)) != 0;
+	return (type & (MEM_TYPE_UINT | MEM_TYPE_INT | MEM_TYPE_DOUBLE |
+			MEM_TYPE_DEC)) != 0;
 }
 
 static inline bool
@@ -305,6 +309,10 @@ mem_set_double(struct Mem *mem, double value);
 /** Clear MEM and set it to UUID. */
 void
 mem_set_uuid(struct Mem *mem, const struct tt_uuid *uuid);
+
+/** Clear MEM and set it to DECIMAL. */
+void
+mem_set_dec(struct Mem *mem, decimal_t *dec);
 
 /** Clear MEM and set it to STRING. The string belongs to another object. */
 void

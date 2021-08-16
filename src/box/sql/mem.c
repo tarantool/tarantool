@@ -42,6 +42,7 @@
 #include "lua/utils.h"
 #include "lua/serializer.h"
 #include "lua/msgpack.h"
+#include "lua/decimal.h"
 #include "uuid/mp_uuid.h"
 #include "mp_decimal.h"
 
@@ -86,6 +87,7 @@ mem_type_class(enum mem_type type)
 		return MEM_CLASS_NULL;
 	case MEM_TYPE_UINT:
 	case MEM_TYPE_INT:
+	case MEM_TYPE_DEC:
 	case MEM_TYPE_DOUBLE:
 		return MEM_CLASS_NUMBER;
 	case MEM_TYPE_STR:
@@ -107,6 +109,8 @@ mem_is_field_compatible(const struct Mem *mem, enum field_type type)
 {
 	if (mem->type == MEM_TYPE_UUID)
 		return (field_ext_type[type] & (1U << MP_UUID)) != 0;
+	if (mem->type == MEM_TYPE_DEC)
+		return (field_ext_type[type] & (1U << MP_DECIMAL)) != 0;
 	enum mp_type mp_type = mem_mp_type(mem);
 	assert(mp_type != MP_EXT);
 	return field_mp_plain_type_is_compatible(type, mp_type, true);
@@ -131,6 +135,9 @@ mem_str(const struct Mem *mem)
 		return tt_sprintf("%s(%llu)", type, mem->u.u);
 	case MEM_TYPE_DOUBLE:
 		sql_snprintf(STR_VALUE_MAX_LEN, buf, "%!.15g", mem->u.r);
+		return tt_sprintf("%s(%s)", type, buf);
+	case MEM_TYPE_DEC:
+		decimal_to_string(&mem->u.d, buf);
 		return tt_sprintf("%s(%s)", type, buf);
 	case MEM_TYPE_BIN: {
 		int len = MIN(mem->n, STR_VALUE_MAX_LEN / 2);
@@ -172,6 +179,7 @@ mem_type_class_to_str(const struct Mem *mem)
 		return "NULL";
 	case MEM_TYPE_UINT:
 	case MEM_TYPE_INT:
+	case MEM_TYPE_DEC:
 	case MEM_TYPE_DOUBLE:
 		return "number";
 	case MEM_TYPE_STR:
@@ -282,6 +290,15 @@ mem_set_double(struct Mem *mem, double value)
 		return;
 	mem->u.r = value;
 	mem->type = MEM_TYPE_DOUBLE;
+}
+
+void
+mem_set_dec(struct Mem *mem, decimal_t *d)
+{
+	mem_clear(mem);
+	mem->u.d = *d;
+	mem->type = MEM_TYPE_DEC;
+	assert(mem->flags == 0);
 }
 
 void
@@ -1191,6 +1208,10 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 		return -1;
 	case FIELD_TYPE_NUMBER:
 		return mem_to_number(mem);
+	case FIELD_TYPE_DECIMAL:
+		if (mem->type == MEM_TYPE_DEC)
+			return 0;
+		return -1;
 	case FIELD_TYPE_UUID:
 		if (mem->type == MEM_TYPE_UUID) {
 			mem->flags = 0;
@@ -1274,6 +1295,10 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 			return -1;
 		mem->flags = MEM_Number;
 		return 0;
+	case FIELD_TYPE_DECIMAL:
+		if (mem->type == MEM_TYPE_DEC)
+			return 0;
+		return -1;
 	case FIELD_TYPE_MAP:
 		if (mem->type == MEM_TYPE_MAP)
 			return 0;
@@ -1595,12 +1620,12 @@ mem_concat(struct Mem *a, struct Mem *b, struct Mem *result)
 static inline int
 check_types_numeric_arithmetic(const struct Mem *a, const struct Mem *b)
 {
-	if (!mem_is_num(a) || mem_is_metatype(a)) {
+	if (!mem_is_num(a) || mem_is_metatype(a) || a->type == MEM_TYPE_DEC) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(a),
 			 "integer, unsigned or double");
 		return -1;
 	}
-	if (!mem_is_num(b) || mem_is_metatype(b)) {
+	if (!mem_is_num(b) || mem_is_metatype(b) || b->type == MEM_TYPE_DEC) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(b),
 			 "integer, unsigned or double");
 		return -1;
@@ -1916,19 +1941,84 @@ mem_cmp_num(const struct Mem *a, const struct Mem *b)
 			return -1;
 		return 0;
 	}
-	if (a->type == MEM_TYPE_DOUBLE) {
-		if (b->type == MEM_TYPE_INT)
-			return double_compare_nint64(a->u.r, b->u.i, 1);
-		return double_compare_uint64(a->u.r, b->u.u, 1);
-	}
-	if (b->type == MEM_TYPE_DOUBLE) {
-		if (a->type == MEM_TYPE_INT)
+	if ((a->type & b->type & MEM_TYPE_DEC) != 0)
+		return decimal_compare(&a->u.d, &b->u.d);
+	switch (a->type) {
+	case MEM_TYPE_INT:
+		switch (b->type) {
+		case MEM_TYPE_UINT:
+			return -1;
+		case MEM_TYPE_DOUBLE:
 			return double_compare_nint64(b->u.r, a->u.i, -1);
-		return double_compare_uint64(b->u.r, a->u.u, -1);
+		case MEM_TYPE_DEC: {
+			decimal_t dec;
+			decimal_from_int64(&dec, a->u.i);
+			return decimal_compare(&dec, &b->u.d);
+		}
+		default:
+			unreachable();
+		}
+	case MEM_TYPE_UINT:
+		switch (b->type) {
+		case MEM_TYPE_INT:
+			return 1;
+		case MEM_TYPE_DOUBLE:
+			return double_compare_uint64(b->u.r, a->u.u, -1);
+		case MEM_TYPE_DEC: {
+			decimal_t dec;
+			decimal_from_uint64(&dec, a->u.u);
+			return decimal_compare(&dec, &b->u.d);
+		}
+		default:
+			unreachable();
+		}
+	case MEM_TYPE_DOUBLE:
+		switch (b->type) {
+		case MEM_TYPE_INT:
+			return double_compare_nint64(a->u.r, b->u.i, 1);
+		case MEM_TYPE_UINT:
+			return double_compare_uint64(a->u.r, b->u.u, 1);
+		case MEM_TYPE_DEC: {
+			if (a->u.r >= 1e38)
+				return 1;
+			if (a->u.r <= -1e38)
+				return -1;
+			decimal_t dec;
+			decimal_t *d = decimal_from_double(&dec, a->u.r);
+			assert(d != NULL && d == &dec);
+			return decimal_compare(d, &b->u.d);
+		}
+		default:
+			unreachable();
+		}
+	case MEM_TYPE_DEC:
+		switch (b->type) {
+		case MEM_TYPE_INT: {
+			decimal_t dec;
+			decimal_from_int64(&dec, b->u.i);
+			return decimal_compare(&a->u.d, &dec);
+		}
+		case MEM_TYPE_UINT: {
+			decimal_t dec;
+			decimal_from_uint64(&dec, b->u.u);
+			return decimal_compare(&a->u.d, &dec);
+		}
+		case MEM_TYPE_DOUBLE: {
+			if (b->u.r >= 1e38)
+				return 1;
+			if (b->u.r <= -1e38)
+				return -1;
+			decimal_t dec;
+			decimal_t *d = decimal_from_double(&dec, b->u.r);
+			assert(d != NULL && d == &dec);
+			return decimal_compare(&a->u.d, d);
+		}
+		default:
+			unreachable();
+		}
+	default:
+		unreachable();
 	}
-	if (a->type == MEM_TYPE_INT)
-		return -1;
-	assert(a->type == MEM_TYPE_UINT && b->type == MEM_TYPE_INT);
 	return 1;
 }
 
@@ -2035,6 +2125,11 @@ mem_cmp_msgpack(const struct Mem *a, const char **b, int *result,
 			if (uuid_unpack(b, len, &mem.u.uuid) == NULL)
 				return -1;
 			break;
+		} else if (type == MP_DECIMAL) {
+			mem.type = MEM_TYPE_DEC;
+			if (decimal_unpack(b, len, &mem.u.d) == 0)
+				return -1;
+			break;
 		}
 		*b += len;
 		mem.type = MEM_TYPE_BIN;
@@ -2121,6 +2216,8 @@ mem_type_to_str(const struct Mem *p)
 		return "boolean";
 	case MEM_TYPE_UUID:
 		return "uuid";
+	case MEM_TYPE_DEC:
+		return "decimal";
 	default:
 		unreachable();
 	}
@@ -2149,6 +2246,7 @@ mem_mp_type(const struct Mem *mem)
 		return MP_BOOL;
 	case MEM_TYPE_DOUBLE:
 		return MP_DOUBLE;
+	case MEM_TYPE_DEC:
 	case MEM_TYPE_UUID:
 		return MP_EXT;
 	default:
@@ -2318,6 +2416,9 @@ memTracePrint(Mem *p)
 		return;
 	case MEM_TYPE_UUID:
 		printf(" uuid:%s", tt_uuid_str(&p->u.uuid));
+		return;
+	case MEM_TYPE_DEC:
+		printf(" decimal:%s", decimal_str(&p->u.d));
 		return;
 	default: {
 		char zBuf[200];
@@ -2583,6 +2684,13 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 			mem->type = MEM_TYPE_UUID;
 			mem->flags = 0;
 			break;
+		} else if (type == MP_DECIMAL) {
+			buf = svp;
+			if (mp_decode_decimal(&buf, &mem->u.d) == NULL)
+				return -1;
+			mem->type = MEM_TYPE_DEC;
+			mem->flags = 0;
+			break;
 		}
 		buf += size;
 		mem->z = (char *)svp;
@@ -2715,6 +2823,9 @@ mpstream_encode_vdbe_mem(struct mpstream *stream, struct Mem *var)
 	case MEM_TYPE_UUID:
 		mpstream_encode_uuid(stream, &var->u.uuid);
 		return;
+	case MEM_TYPE_DEC:
+		mpstream_encode_decimal(stream, &var->u.d);
+		return;
 	default:
 		unreachable();
 	}
@@ -2803,6 +2914,9 @@ port_vdbemem_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 			break;
 		case MEM_TYPE_UUID:
 			*luaL_pushuuid(L) = mem->u.uuid;
+			break;
+		case MEM_TYPE_DEC:
+			*lua_pushdecimal(L) = mem->u.d;
 			break;
 		default:
 			unreachable();
@@ -2926,26 +3040,10 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 		case MP_EXT: {
 			assert(field.ext_type == MP_UUID ||
 			       field.ext_type == MP_DECIMAL);
-			char *buf;
-			uint32_t size;
-			uint32_t svp = region_used(&fiber()->gc);
-			if (field.ext_type == MP_UUID) {
+			if (field.ext_type == MP_UUID)
 				mem_set_uuid(&val[i], field.uuidval);
-				break;
-			} else {
-				size = mp_sizeof_decimal(field.decval);
-				buf = region_alloc(&fiber()->gc, size);
-				if (buf == NULL) {
-					diag_set(OutOfMemory, size,
-						 "region_alloc", "buf");
-					goto error;
-				}
-				mp_encode_decimal(buf, field.decval);
-			}
-			int rc = mem_copy_bin(&val[i], buf, size);
-			region_truncate(&fiber()->gc, svp);
-			if (rc != 0)
-				goto error;
+			else
+				mem_set_dec(&val[i], field.decval);
 			break;
 		}
 		case MP_NIL:
@@ -3048,6 +3146,17 @@ port_c_get_vdbemem(struct port *base, uint32_t *size)
 					goto error;
 				}
 				val[i].type = MEM_TYPE_UUID;
+				break;
+			} else if (type == MP_DECIMAL) {
+				decimal_t *d = &val[i].u.d;
+				data = str;
+				if (mp_decode_decimal(&data, d) == NULL) {
+					diag_set(ClientError,
+						 ER_INVALID_MSGPACK, "Invalid "
+						 "MP_DECIMAL MsgPack format");
+					goto error;
+				}
+				val[i].type = MEM_TYPE_DEC;
 				break;
 			}
 			data += len;
