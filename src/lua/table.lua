@@ -87,9 +87,10 @@ end
 
 -- table library extension
 local table = require('table')
--- require modifies global "table" module and adds "clear" function to it.
--- Lua applications like Cartridge relies on it.
+-- require modifies global "table" module and adds functions "clear" and "new".
+-- Lua applications like Cartridge rely on it.
 require('table.clear')
+require('table.new')
 
 table.copy     = table_shallowcopy
 table.deepcopy = table_deepcopy
