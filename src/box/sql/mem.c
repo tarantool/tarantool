@@ -1733,6 +1733,18 @@ mem_get_int(const struct Mem *mem, int64_t *i, bool *is_neg)
 		}
 		return -1;
 	}
+	if (mem->type == MEM_TYPE_DEC) {
+		if (decimal_is_neg(&mem->u.d)) {
+			if (decimal_to_int64(&mem->u.d, i) == NULL)
+				return -1;
+			*is_neg = *i < 0;
+			return 0;
+		}
+		if (decimal_to_uint64(&mem->u.d, (uint64_t *)i) == NULL)
+			return -1;
+		*is_neg = false;
+		return 0;
+	}
 	return -1;
 }
 
@@ -1760,6 +1772,19 @@ mem_get_uint(const struct Mem *mem, uint64_t *u)
 		}
 		return -1;
 	}
+	if (mem->type == MEM_TYPE_DEC) {
+		if (decimal_is_neg(&mem->u.d)) {
+			int64_t i;
+			if (decimal_to_int64(&mem->u.d, &i) == NULL || i < 0)
+				return -1;
+			assert(i == 0);
+			*u = 0;
+			return 0;
+		}
+		if (decimal_to_uint64(&mem->u.d, u) == NULL)
+			return -1;
+		return 0;
+	}
 	return -1;
 }
 
@@ -1778,8 +1803,40 @@ mem_get_double(const struct Mem *mem, double *d)
 		*d = (double)mem->u.u;
 		return 0;
 	}
+	if (mem->type == MEM_TYPE_DEC) {
+		*d = atof(decimal_str(&mem->u.d));
+		return 0;
+	}
 	if (mem->type == MEM_TYPE_STR) {
 		if (sqlAtoF(mem->z, d, mem->n) == 0)
+			return -1;
+		return 0;
+	}
+	return -1;
+}
+
+int
+mem_get_dec(const struct Mem *mem, decimal_t *d)
+{
+	if (mem->type == MEM_TYPE_DOUBLE) {
+		if (decimal_from_double(d, mem->u.r) == NULL)
+			return -1;
+		return 0;
+	}
+	if (mem->type == MEM_TYPE_INT) {
+		decimal_from_int64(d, mem->u.r);
+		return 0;
+	}
+	if (mem->type == MEM_TYPE_UINT) {
+		decimal_from_int64(d, mem->u.u);
+		return 0;
+	}
+	if (mem->type == MEM_TYPE_DEC) {
+		*d = mem->u.d;
+		return 0;
+	}
+	if (mem->type == MEM_TYPE_STR) {
+		if (decimal_from_string(d, tt_cstr(mem->z, mem->n)) == NULL)
 			return -1;
 		return 0;
 	}
@@ -1946,14 +2003,14 @@ mem_concat(struct Mem *a, struct Mem *b, struct Mem *result)
 static inline int
 check_types_numeric_arithmetic(const struct Mem *a, const struct Mem *b)
 {
-	if (!mem_is_num(a) || mem_is_metatype(a) || a->type == MEM_TYPE_DEC) {
+	if (!mem_is_num(a) || mem_is_metatype(a)) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(a),
-			 "integer, unsigned or double");
+			 "integer, decimal or double");
 		return -1;
 	}
-	if (!mem_is_num(b) || mem_is_metatype(b) || b->type == MEM_TYPE_DEC) {
+	if (!mem_is_num(b) || mem_is_metatype(b)) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(b),
-			 "integer, unsigned or double");
+			 "integer, decimal or double");
 		return -1;
 	}
 	return 0;
@@ -1974,6 +2031,20 @@ mem_add(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		mem_get_double(left, &a);
 		mem_get_double(right, &b);
 		mem_set_double(result, a + b);
+		return 0;
+	}
+	if (((left->type | right->type) & MEM_TYPE_DEC) != 0) {
+		decimal_t a;
+		decimal_t b;
+		decimal_t res;
+		mem_get_dec(left, &a);
+		mem_get_dec(right, &b);
+		if (decimal_add(&res, &a, &b) == NULL) {
+			diag_set(ClientError, ER_SQL_EXECUTE,
+				 "decimal is overflowed");
+			return -1;
+		}
+		mem_set_dec(result, &res);
 		return 0;
 	}
 	int64_t res;
@@ -2004,6 +2075,20 @@ mem_sub(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		mem_set_double(result, a - b);
 		return 0;
 	}
+	if (((left->type | right->type) & MEM_TYPE_DEC) != 0) {
+		decimal_t a;
+		decimal_t b;
+		decimal_t res;
+		mem_get_dec(left, &a);
+		mem_get_dec(right, &b);
+		if (decimal_sub(&res, &a, &b) == NULL) {
+			diag_set(ClientError, ER_SQL_EXECUTE,
+				 "decimal is overflowed");
+			return -1;
+		}
+		mem_set_dec(result, &res);
+		return 0;
+	}
 	int64_t res;
 	bool is_neg;
 	if (sql_sub_int(left->u.i, left->type == MEM_TYPE_INT, right->u.i,
@@ -2030,6 +2115,20 @@ mem_mul(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		mem_get_double(left, &a);
 		mem_get_double(right, &b);
 		mem_set_double(result, a * b);
+		return 0;
+	}
+	if (((left->type | right->type) & MEM_TYPE_DEC) != 0) {
+		decimal_t a;
+		decimal_t b;
+		decimal_t res;
+		mem_get_dec(left, &a);
+		mem_get_dec(right, &b);
+		if (decimal_mul(&res, &a, &b) == NULL) {
+			diag_set(ClientError, ER_SQL_EXECUTE,
+				 "decimal is overflowed");
+			return -1;
+		}
+		mem_set_dec(result, &res);
 		return 0;
 	}
 	int64_t res;
@@ -2063,6 +2162,27 @@ mem_div(const struct Mem *left, const struct Mem *right, struct Mem *result)
 			return -1;
 		}
 		mem_set_double(result, a / b);
+		return 0;
+	}
+	if (((left->type | right->type) & MEM_TYPE_DEC) != 0) {
+		decimal_t a;
+		decimal_t b;
+		decimal_t zero;
+		decimal_t res;
+		mem_get_dec(left, &a);
+		mem_get_dec(right, &b);
+		decimal_zero(&zero);
+		if (decimal_compare(&b, &zero) == 0) {
+			diag_set(ClientError, ER_SQL_EXECUTE,
+				 "division by zero");
+			return -1;
+		}
+		if (decimal_div(&res, &a, &b) == NULL) {
+			diag_set(ClientError, ER_SQL_EXECUTE,
+				 "decimal is overflowed");
+			return -1;
+		}
+		mem_set_dec(result, &res);
 		return 0;
 	}
 	if (right->u.u == 0) {

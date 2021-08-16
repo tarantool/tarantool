@@ -3,7 +3,7 @@ local build_path = os.getenv("BUILDDIR")
 package.cpath = build_path..'/test/sql-tap/?.so;'..build_path..'/test/sql-tap/?.dylib;'..package.cpath
 
 local test = require("sqltester")
-test:plan(84)
+test:plan(101)
 
 local dec = require("decimal")
 local dec1 = dec.new("111")
@@ -797,6 +797,145 @@ test:do_execsql_test(
         SELECT * FROM t13n WHERE CAST(111 AS DECIMAL) < n;
     ]], {
         1000
+    })
+
+-- Check that arithmetic operations work with UUIDs as intended.
+test:do_execsql_test(
+    "dec-14.1.1",
+    [[
+        SELECT -u FROM t2;
+    ]], {
+        dec.new(-111), dec.new(-3333), dec.new(-55555)
+    })
+
+test:do_execsql_test(
+    "dec-14.1.2",
+    [[
+        SELECT u + 0 FROM t2;
+    ]], {
+        dec1, dec3, dec2
+    })
+
+test:do_execsql_test(
+    "dec-14.1.3",
+    [[
+        SELECT u - 0.5 FROM t2;
+    ]], {
+        110.5, 3332.5, 55554.5
+    })
+
+test:do_execsql_test(
+    "dec-14.1.4",
+    [[
+        SELECT u * 1 FROM t2;
+    ]], {
+        dec1, dec3, dec2
+    })
+
+test:do_execsql_test(
+    "dec-14.1.5",
+    [[
+        SELECT u / 1.0 FROM t2;
+    ]], {
+        111, 3333, 55555
+    })
+
+test:do_catchsql_test(
+    "dec-14.1.6",
+    [[
+        SELECT u % 1 FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to integer"
+    })
+
+-- Check that bitwise operations work with UUIDs as intended.
+test:do_catchsql_test(
+    "dec-14.2.1",
+    [[
+        SELECT ~u FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to unsigned"
+    })
+
+test:do_catchsql_test(
+    "dec-14.2.2",
+    [[
+        SELECT u >> 1 FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to unsigned"
+    })
+
+test:do_catchsql_test(
+    "dec-14.2.3",
+    [[
+        SELECT u << 1 FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to unsigned"
+    })
+
+test:do_catchsql_test(
+    "dec-14.2.4",
+    [[
+        SELECT u | 1 FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to unsigned"
+    })
+
+test:do_catchsql_test(
+    "dec-14.2.5",
+    [[
+        SELECT u & 1 FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to unsigned"
+    })
+
+-- Check that logical operations work with UUIDs as intended.
+test:do_catchsql_test(
+    "dec-14.3.1",
+    [[
+        SELECT NOT u FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to boolean"
+    })
+
+test:do_catchsql_test(
+    "dec-14.3.2",
+    [[
+        SELECT u AND true FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to boolean"
+    })
+
+test:do_catchsql_test(
+    "dec-14.3.3",
+    [[
+        SELECT u OR true FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to boolean"
+    })
+
+test:do_catchsql_test(
+    "dec-14.3.4",
+    [[
+        SELECT true AND u FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to boolean"
+    })
+
+test:do_catchsql_test(
+    "dec-14.3.5",
+    [[
+        SELECT true OR u FROM t2;
+    ]], {
+        1, "Type mismatch: can not convert decimal(111) to boolean"
+    })
+
+test:do_catchsql_test(
+    "dec-15",
+    [[
+        SELECT u || u from t2;
+    ]], {
+        1, "Inconsistent types: expected string or varbinary got decimal(111)"
     })
 
 test:execsql([[
