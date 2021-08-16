@@ -225,7 +225,7 @@ sqlStartTable(Parse *pParse, Token *pName)
 	if (sqlCheckIdentifierName(pParse, zName) != 0)
 		goto cleanup;
 
-	new_space = sql_ephemeral_space_new(pParse, zName);
+	new_space = sql_template_space_new(pParse, zName);
 	if (new_space == NULL)
 		goto cleanup;
 
@@ -300,7 +300,7 @@ static struct space *
 sql_shallow_space_copy(struct Parse *parse, struct space *space)
 {
 	assert(space->def != NULL);
-	struct space *ret = sql_ephemeral_space_new(parse, space->def->name);
+	struct space *ret = sql_template_space_new(parse, space->def->name);
 	if (ret == NULL)
 		goto error;
 	ret->index_count = space->index_count;

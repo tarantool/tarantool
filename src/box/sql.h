@@ -221,14 +221,14 @@ void
 sql_expr_delete(struct sql *db, struct Expr *expr, bool extern_alloc);
 
 /**
- * Create and initialize a new ephemeral space object.
+ * Create and initialize a new template space object.
  * @param parser SQL Parser object.
  * @param name Name of space to be created.
  * @retval NULL on memory allocation error, Parser state changed.
  * @retval not NULL on success.
  */
 struct space *
-sql_ephemeral_space_new(struct Parse *parser, const char *name);
+sql_template_space_new(struct Parse *parser, const char *name);
 
 /**
  * Duplicate Expr list.

@@ -1161,14 +1161,14 @@ space_column_default_expr(uint32_t space_id, uint32_t fieldno)
 }
 
 /**
- * Create and initialize a new ephemeral space_def object.
+ * Create and initialize a new template space_def object.
  * @param parser SQL Parser object.
  * @param name Name of space to be created.
  * @retval NULL on memory allocation error, Parser state changed.
  * @retval not NULL on success.
  */
 static struct space_def *
-sql_ephemeral_space_def_new(struct Parse *parser, const char *name)
+sql_template_space_def_new(struct Parse *parser, const char *name)
 {
 	struct space_def *def = NULL;
 	size_t name_len = name != NULL ? strlen(name) : 0;
@@ -1178,8 +1178,7 @@ sql_ephemeral_space_def_new(struct Parse *parser, const char *name)
 	def = (struct space_def *)region_aligned_alloc(&parser->region, size,
 						       alignof(*def));
 	if (def == NULL) {
-		diag_set(OutOfMemory, size, "region_aligned_alloc",
-			 "sql_ephemeral_space_def_new");
+		diag_set(OutOfMemory, size, "region_aligned_alloc", "def");
 		parser->is_aborted = true;
 		return NULL;
 	}
@@ -1192,7 +1191,7 @@ sql_ephemeral_space_def_new(struct Parse *parser, const char *name)
 }
 
 struct space *
-sql_ephemeral_space_new(Parse *parser, const char *name)
+sql_template_space_new(Parse *parser, const char *name)
 {
 	size_t sz;
 	struct space *space = region_alloc_object(&parser->region,
@@ -1204,7 +1203,7 @@ sql_ephemeral_space_new(Parse *parser, const char *name)
 	}
 
 	memset(space, 0, sz);
-	space->def = sql_ephemeral_space_def_new(parser, name);
+	space->def = sql_template_space_def_new(parser, name);
 	if (space->def == NULL)
 		return NULL;
 

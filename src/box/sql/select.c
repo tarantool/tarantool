@@ -2061,7 +2061,7 @@ sqlResultSetOfSelect(Parse * pParse, Select * pSelect)
 	while (pSelect->pPrior)
 		pSelect = pSelect->pPrior;
 	pParse->sql_flags = saved_flags;
-	struct space *space = sql_ephemeral_space_new(pParse, NULL);
+	struct space *space = sql_template_space_new(pParse, NULL);
 	if (space == NULL)
 		return NULL;
 	/* The sqlResultSetOfSelect() is only used in contexts where lookaside
@@ -4688,7 +4688,7 @@ withExpand(Walker * pWalker, struct SrcList_item *pFrom)
 		}
 
 		assert(pFrom->space == NULL);
-		pFrom->space = sql_ephemeral_space_new(pParse, pCte->zName);
+		pFrom->space = sql_template_space_new(pParse, pCte->zName);
 		if (pFrom->space == NULL)
 			return WRC_Abort;
 		pFrom->pSelect = sqlSelectDup(db, pCte->pSelect, 0);
@@ -4888,8 +4888,8 @@ selectExpander(Walker * pWalker, Select * p)
 			 */
 			const char *name = "sql_sq_DEADBEAFDEADBEAF";
 			struct space *space =
-				sql_ephemeral_space_new(sqlParseToplevel(pParse),
-							name);
+				sql_template_space_new(sqlParseToplevel(pParse),
+						       name);
 			if (space == NULL)
 				return WRC_Abort;
 			pFrom->space = space;
