@@ -95,6 +95,12 @@ test_run:wait_cond(function() return box.info.election.state == 'leader' end)
  | ---
  | - true
  | ...
+test_run:wait_cond(function()\
+    return box.info.synchro.queue.owner == box.info.id\
+end)
+ | ---
+ | - true
+ | ...
 assert(box.info.election.term > term)
  | ---
  | - true

@@ -35,6 +35,9 @@ assert(box.info.election.leader == 0)
 box.cfg{election_timeout = 1000}
 box.cfg{election_mode = 'candidate'}
 test_run:wait_cond(function() return box.info.election.state == 'leader' end)
+test_run:wait_cond(function()\
+    return box.info.synchro.queue.owner == box.info.id\
+end)
 assert(box.info.election.term > term)
 assert(box.info.election.vote == box.info.id)
 assert(box.info.election.leader == box.info.id)
