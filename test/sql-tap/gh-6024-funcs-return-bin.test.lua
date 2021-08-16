@@ -38,7 +38,7 @@ test:do_execsql_test(
 box.schema.func.create("gh-6024-funcs-return-bin.ret_decimal", {
     language = "C",
     param_list = {},
-    returns = "varbinary",
+    returns = "decimal",
     exports = {"SQL"},
 })
 
@@ -47,7 +47,7 @@ test:do_execsql_test(
     [[
         SELECT typeof("gh-6024-funcs-return-bin.ret_decimal"());
     ]], {
-        "varbinary"
+        "decimal"
     })
 
 box.schema.func.create("get_uuid", {
@@ -69,7 +69,7 @@ test:do_execsql_test(
 box.schema.func.create("get_decimal", {
     language = "LUA",
     param_list = {},
-    returns = "varbinary",
+    returns = "decimal",
     body = "function(x) return require('decimal').new('9999999999999999999.9999999999999999999') end",
     exports = {"SQL"},
 })
@@ -79,7 +79,7 @@ test:do_execsql_test(
     [[
         SELECT typeof("get_decimal"()), "get_decimal"() == "gh-6024-funcs-return-bin.ret_decimal"();
     ]], {
-        "varbinary", true
+        "decimal", true
     })
 
 box.schema.func.drop("gh-6024-funcs-return-bin.ret_bin")

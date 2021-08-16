@@ -1236,6 +1236,7 @@ enum trim_side_mask {
 #define sql_type_is_numeric(X)  ((X) == FIELD_TYPE_INTEGER || \
 				 (X) == FIELD_TYPE_NUMBER || \
 				 (X) == FIELD_TYPE_UNSIGNED || \
+				 (X) == FIELD_TYPE_DECIMAL || \
 				 (X) == FIELD_TYPE_DOUBLE)
 
 /*

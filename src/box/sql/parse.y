@@ -1863,6 +1863,7 @@ number_typedef(A) ::= NUMBER . { A.type = FIELD_TYPE_NUMBER; }
 number_typedef(A) ::= DOUBLE . { A.type = FIELD_TYPE_DOUBLE; }
 number_typedef(A) ::= INT|INTEGER_KW . { A.type = FIELD_TYPE_INTEGER; }
 number_typedef(A) ::= UNSIGNED . { A.type = FIELD_TYPE_UNSIGNED; }
+number_typedef(A) ::= DECIMAL . { A.type = FIELD_TYPE_DECIMAL; }
 
 /**
  * NUMERIC type is temporary disabled. To be enabled when
