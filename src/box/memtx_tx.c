@@ -291,6 +291,9 @@ memtx_tx_abort_all_for_ddl(struct txn *ddl_owner)
 	rlist_foreach_entry(to_be_aborted, &txm.all_txs, in_all_txs) {
 		if (to_be_aborted == ddl_owner)
 			continue;
+		if (to_be_aborted->status != TXN_INPROGRESS &&
+		    to_be_aborted->status != TXN_IN_READ_VIEW)
+			continue;
 		to_be_aborted->status = TXN_CONFLICTED;
 		say_warn("Transaction committing DDL (id=%lld) has aborted "
 			 "another TX (id=%lld)", (long long) ddl_owner->id,
