@@ -524,6 +524,7 @@ s2:select()
 test_run:switch("default")
 test_run:wait_cond(function () return get_current_connection_count() == 0 end)
 
+-- Disabled until #6338 will be implemented!
 -- Same test, but now we check that if `commit` was received
 -- by server before connection closed, we processed it successful.
 conn = net_box.connect(server_addr)
@@ -561,12 +562,13 @@ test_run:wait_cond(function ()
     return errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0
 end);
 test_run:cmd("setopt delimiter ''");
+-- Disabled until #6338 will be implemented!
 -- Select return tuples from [1] to [100],
 -- transaction was commit
 rc1 = s1:select()
 rc2 = s2:select()
-assert(#rc1)
-assert(#rc2)
+--assert(#rc1)
+--assert(#rc2)
 s1:truncate()
 s2:truncate()
 test_run:switch("default")
