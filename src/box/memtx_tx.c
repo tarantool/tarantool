@@ -730,6 +730,10 @@ memtx_tx_story_unlink_top(struct memtx_story *story, uint32_t idx)
 	memtx_tx_story_unlink_top_light(story, idx);
 }
 
+static int
+memtx_tx_track_read_story_slow(struct txn *txn, struct memtx_story *story,
+			       uint64_t index_mask);
+
 /**
  * Unlink a @a story from history chain in @a index in both directions.
  * If the story was in the top of history chain - unlink from top.
@@ -750,6 +754,21 @@ memtx_tx_story_unlink_both(struct memtx_story *story, uint32_t idx)
 		memtx_tx_story_unlink(newer_story, story, idx);
 		memtx_tx_story_unlink(story, older_story, idx);
 		memtx_tx_story_link(newer_story, older_story, idx);
+
+		/*
+		 * Rebind read trackers in order to conflict
+		 * readers in case of rollback of this txn.
+		 */
+		struct tx_read_tracker *tracker, *tmp;
+		uint64_t index_mask = 1ull << (idx & 63);
+		rlist_foreach_entry_safe(tracker, &story->reader_list,
+					 in_reader_list, tmp) {
+			if ((tracker->index_mask & index_mask) != 0) {
+				memtx_tx_track_read_story_slow(tracker->reader,
+							       newer_story,
+							       index_mask);
+			}
+		}
 	}
 }
 
@@ -2046,15 +2065,9 @@ tx_read_tracker_new(struct txn *reader, struct memtx_story *story,
 }
 
 static int
-memtx_tx_track_read_story(struct txn *txn, struct space *space,
-			  struct memtx_story *story, uint64_t index_mask)
+memtx_tx_track_read_story_slow(struct txn *txn, struct memtx_story *story,
+			       uint64_t index_mask)
 {
-	if (txn == NULL)
-		return 0;
-	if (space == NULL)
-		return 0;
-	if (space->def->opts.is_ephemeral)
-		return 0;
 	assert(story != NULL);
 	struct tx_read_tracker *tracker = NULL;
 
@@ -2089,6 +2102,19 @@ memtx_tx_track_read_story(struct txn *txn, struct space *space,
 	rlist_add(&txn->read_set, &tracker->in_read_set);
 	memtx_tx_story_gc();
 	return 0;
+}
+
+static int
+memtx_tx_track_read_story(struct txn *txn, struct space *space,
+			  struct memtx_story *story, uint64_t index_mask)
+{
+	if (txn == NULL)
+		return 0;
+	if (space == NULL)
+		return 0;
+	if (space->def->opts.is_ephemeral)
+		return 0;
+	return memtx_tx_track_read_story_slow(txn, story, index_mask);
 }
 
 int
