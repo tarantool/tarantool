@@ -3531,10 +3531,10 @@ box.execute([[CREATE TABLE k4 (s1 INT PRIMARY KEY);]])
  | ---
  | - row_count: 1
  | ...
-box.schema.user.grant('guest', 'read,write', 'space', 'K1', nil, {if_not_exists=true})
+box.schema.user.grant('guest', 'read,write', 'space', 'K1', {if_not_exists=true})
  | ---
  | ...
-box.schema.user.grant('guest', 'read,write', 'space', 'K2', nil, {if_not_exists=true})
+box.schema.user.grant('guest', 'read,write', 'space', 'K2', {if_not_exists=true})
  | ---
  | ...
 
