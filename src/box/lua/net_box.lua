@@ -155,10 +155,10 @@ local function create_transport(host, port, user, password, callback,
     if user ~= nil and password == nil then password = '' end
 
     -- Current state machine's state.
-    local state            = 'initial'
+    local state             = 'initial'
     local last_errno
     local last_error
-    local state_cond       = fiber.cond() -- signaled when the state changes
+    local state_cond        = fiber.cond() -- signaled when the state changes
 
     -- The registry stores requests that are currently 'in flight'
     -- for this connection.
@@ -167,11 +167,15 @@ local function create_transport(host, port, user, password, callback,
     -- response anymore.
     -- Sync requests are implemented as async call + immediate
     -- wait for a result.
-    local requests         = internal.new_registry()
+    local requests          = internal.new_registry()
 
     local worker_fiber
-    local send_buf         = buffer.ibuf(buffer.READAHEAD)
-    local recv_buf         = buffer.ibuf(buffer.READAHEAD)
+    local send_buf          = buffer.ibuf(buffer.READAHEAD)
+    local recv_buf          = buffer.ibuf(buffer.READAHEAD)
+    -- Flag indicates that connection is closing and waits until
+    -- send buf became empty.
+    local is_closing        = false
+    local on_send_buf_empty = fiber.cond() -- signaled when send_buf:size() == 0
 
     -- STATE SWITCHING --
     local function set_state(new_state, new_errno, new_error)
@@ -243,13 +247,26 @@ local function create_transport(host, port, user, password, callback,
     ::stop::
             send_buf:recycle()
             recv_buf:recycle()
+            on_send_buf_empty:broadcast()
             worker_fiber = nil
         end)
     end
 
     local function stop()
         if not is_final_state[state] then
-            set_state('closed', E_NO_CONNECTION, 'Connection closed')
+            is_closing = true
+            -- Here we are waiting until send buf became empty:
+            -- it is necessary to ensure that all requests are
+            -- sent before the connection is closed.
+            while (send_buf:size() ~= 0) do
+                on_send_buf_empty:wait()
+            end
+            is_closing = false
+            -- While we were waiting for the send buffer to be
+            -- empty, the state could change.
+            if not is_final_state[state] then
+                set_state('closed', E_NO_CONNECTION, 'Connection closed')
+            end
         end
         if worker_fiber then
             worker_fiber:cancel()
@@ -263,6 +280,11 @@ local function create_transport(host, port, user, password, callback,
             local msg = last_error or
                 string.format('Connection is not established, state is "%s"',
                               state)
+            return box.error.new({code = code, reason = msg})
+        end
+        if is_closing then
+            local code = E_NO_CONNECTION
+            local msg = string.format("Connection is closing")
             return box.error.new({code = code, reason = msg})
         end
         -- alert worker to notify it of the queued outgoing data;
@@ -343,7 +365,8 @@ local function create_transport(host, port, user, password, callback,
     console_setup_sm = function()
         log.warn("Netbox text protocol support is deprecated since 1.10, "..
                  "please use require('console').connect() instead")
-        local err = internal.console_setup(connection:fd(), send_buf, recv_buf)
+        local err = internal.console_setup(connection:fd(), send_buf,
+                                           on_send_buf_empty, recv_buf)
         if err then
             return error_sm(err.code, err.message)
         end
@@ -353,7 +376,8 @@ local function create_transport(host, port, user, password, callback,
 
     console_sm = function()
         local err = internal.console_loop(requests, connection:fd(),
-                                          send_buf, recv_buf)
+                                          send_buf, on_send_buf_empty,
+                                          recv_buf)
         return error_sm(err.code, err.message)
     end
 
@@ -364,7 +388,8 @@ local function create_transport(host, port, user, password, callback,
             return iproto_schema_sm()
         end
         local schema_version, err = internal.iproto_auth(
-            user, password, salt, requests, connection:fd(), send_buf, recv_buf)
+            user, password, salt, requests, connection:fd(),
+            send_buf, on_send_buf_empty, recv_buf)
         if not schema_version then
             return error_sm(err.code, err.message)
         end
@@ -378,7 +403,8 @@ local function create_transport(host, port, user, password, callback,
             return iproto_sm(schema_version)
         end
         local schema_version, schema = internal.iproto_schema(
-            greeting.version_id, requests, connection:fd(), send_buf, recv_buf)
+            greeting.version_id, requests, connection:fd(), send_buf,
+            on_send_buf_empty, recv_buf)
         if not schema_version then
             local err = schema
             return error_sm(err.code, err.message)
@@ -391,7 +417,8 @@ local function create_transport(host, port, user, password, callback,
 
     iproto_sm = function(schema_version)
         local schema_version, err = internal.iproto_loop(
-            schema_version, requests, connection:fd(), send_buf, recv_buf)
+            schema_version, requests, connection:fd(),
+            send_buf, on_send_buf_empty, recv_buf)
         if not schema_version then
             return error_sm(err.code, err.message)
         end
@@ -405,6 +432,7 @@ local function create_transport(host, port, user, password, callback,
         if connection then connection:close(); connection = nil end
         send_buf:recycle()
         recv_buf:recycle()
+        on_send_buf_empty:broadcast()
         if state ~= 'closed' then
             if callback('reconnect_timeout') then
                 set_state('error_reconnect', err, msg)
