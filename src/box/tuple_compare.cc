@@ -37,6 +37,7 @@
 #include "mp_decimal.h"
 #include "mp_extension_types.h"
 #include "mp_uuid.h"
+#include "mp_datetime.h"
 
 /* {{{ tuple_compare */
 
@@ -76,6 +77,7 @@ enum mp_class {
 	MP_CLASS_STR,
 	MP_CLASS_BIN,
 	MP_CLASS_UUID,
+	MP_CLASS_DATETIME,
 	MP_CLASS_ARRAY,
 	MP_CLASS_MAP,
 	mp_class_max,
@@ -99,6 +101,8 @@ static enum mp_class mp_ext_classes[] = {
 	/* .MP_UNKNOWN_EXTENSION = */ mp_class_max, /* unsupported */
 	/* .MP_DECIMAL		 = */ MP_CLASS_NUMBER,
 	/* .MP_UUID		 = */ MP_CLASS_UUID,
+	/* .MP_ERROR		 = */ mp_class_max,
+	/* .MP_DATETIME		 = */ MP_CLASS_DATETIME,
 };
 
 static enum mp_class
@@ -390,6 +394,19 @@ mp_compare_uuid(const char *field_a, const char *field_b)
 	return memcmp(field_a + 2, field_b + 2, UUID_PACKED_LEN);
 }
 
+static int
+mp_compare_datetime(const char *lhs, const char *rhs)
+{
+	struct datetime lhs_dt, rhs_dt;
+	struct datetime *ret;
+	ret = mp_decode_datetime(&lhs, &lhs_dt);
+	assert(ret != NULL);
+	ret = mp_decode_datetime(&rhs, &rhs_dt);
+	assert(ret != NULL);
+	(void)ret;
+	return datetime_compare(&lhs_dt, &rhs_dt);
+}
+
 typedef int (*mp_compare_f)(const char *, const char *);
 static mp_compare_f mp_class_comparators[] = {
 	/* .MP_CLASS_NIL    = */ NULL,
@@ -398,6 +415,7 @@ static mp_compare_f mp_class_comparators[] = {
 	/* .MP_CLASS_STR    = */ mp_compare_str,
 	/* .MP_CLASS_BIN    = */ mp_compare_bin,
 	/* .MP_CLASS_UUID   = */ mp_compare_uuid,
+	/* .MP_CLASS_DATETIME=*/ mp_compare_datetime,
 	/* .MP_CLASS_ARRAY  = */ NULL,
 	/* .MP_CLASS_MAP    = */ NULL,
 };
@@ -478,6 +496,8 @@ tuple_compare_field(const char *field_a, const char *field_b,
 		return mp_compare_decimal(field_a, field_b);
 	case FIELD_TYPE_UUID:
 		return mp_compare_uuid(field_a, field_b);
+	case FIELD_TYPE_DATETIME:
+		return mp_compare_datetime(field_a, field_b);
 	default:
 		unreachable();
 		return 0;
@@ -518,6 +538,8 @@ tuple_compare_field_with_type(const char *field_a, enum mp_type a_type,
 						   field_b, b_type);
 	case FIELD_TYPE_UUID:
 		return mp_compare_uuid(field_a, field_b);
+	case FIELD_TYPE_DATETIME:
+		return mp_compare_datetime(field_a, field_b);
 	default:
 		unreachable();
 		return 0;
@@ -1518,6 +1540,21 @@ func_index_compare_with_key(struct tuple *tuple, hint_t tuple_hint,
 #define HINT_VALUE_DOUBLE_MAX	(exp2(HINT_VALUE_BITS - 1) - 1)
 #define HINT_VALUE_DOUBLE_MIN	(-exp2(HINT_VALUE_BITS - 1))
 
+/**
+ * We need to squeeze 64 bits of seconds and 32 bits of nanoseconds
+ * into 60 bits of hint value. The idea is to represent wide enough
+ * years range, and leave the rest of bits occupied from nanoseconds part:
+ * - 36 bits is enough for time range of [-208-05-13..6325-04-08]
+ * - for nanoseconds there is left 24 bits, which are MSB part of
+ *   32-bit value
+ */
+#define HINT_VALUE_SECS_BITS	36
+#define HINT_VALUE_NSEC_BITS	(HINT_VALUE_BITS - HINT_VALUE_SECS_BITS)
+#define HINT_VALUE_SECS_MAX	((1LL << (HINT_VALUE_SECS_BITS - 1)) - 1)
+#define HINT_VALUE_SECS_MIN	(-(1LL << (HINT_VALUE_SECS_BITS - 1)))
+#define HINT_VALUE_NSEC_SHIFT	(sizeof(int32_t) * CHAR_BIT - HINT_VALUE_NSEC_BITS)
+#define HINT_VALUE_NSEC_MAX	((1ULL << HINT_VALUE_NSEC_BITS) - 1)
+
 /*
  * HINT_CLASS_BITS should be big enough to store any mp_class value.
  * Note, ((1 << HINT_CLASS_BITS) - 1) is reserved for HINT_NONE.
@@ -1608,6 +1645,38 @@ hint_uuid_raw(const char *data)
 	/* Make space for class representation. */
 	val >>= HINT_CLASS_BITS;
 	return hint_create(MP_CLASS_UUID, val);
+}
+
+static inline hint_t
+hint_datetime(struct datetime *date)
+{
+	/*
+	 * Use at most HINT_VALUE_SECS_BITS from datetime
+	 * seconds field as a hint value, and at MSB part
+	 * of HINT_VALUE_NSEC_BITS from nanoseconds.
+	 */
+	int64_t secs = date->epoch;
+	/*
+	 * Both overflow and underflow
+	 */
+	bool is_overflow = false;
+	uint64_t val;
+	if (secs < HINT_VALUE_SECS_MIN) {
+		is_overflow = true;
+		val = 0;
+	} else {
+		val = secs - HINT_VALUE_SECS_MIN;
+	}
+	if (val > HINT_VALUE_SECS_MAX) {
+		is_overflow = true;
+		val = HINT_VALUE_SECS_MAX;
+	}
+	val <<= HINT_VALUE_NSEC_BITS;
+	if (is_overflow == false) {
+		val |= (date->nsec >> HINT_VALUE_NSEC_SHIFT) &
+			HINT_VALUE_NSEC_MAX;
+	}
+	return hint_create(MP_CLASS_DATETIME, val);
 }
 
 static inline uint64_t
@@ -1742,6 +1811,17 @@ field_hint_uuid(const char *field)
 }
 
 static inline hint_t
+field_hint_datetime(const char *field)
+{
+	assert(mp_typeof(*field) == MP_EXT);
+	int8_t ext_type;
+	uint32_t len = mp_decode_extl(&field, &ext_type);
+	assert(ext_type == MP_DATETIME);
+	struct datetime date;
+	return hint_datetime(datetime_unpack(&field, len, &date));
+}
+
+static inline hint_t
 field_hint_string(const char *field, struct coll *coll)
 {
 	assert(mp_typeof(*field) == MP_STR);
@@ -1792,6 +1872,11 @@ field_hint_scalar(const char *field, struct coll *coll)
 		}
 		case MP_UUID:
 			return hint_uuid_raw(field);
+		case MP_DATETIME:
+		{
+			struct datetime date;
+			return hint_datetime(datetime_unpack(&field, len, &date));
+		}
 		default:
 			unreachable();
 		}
@@ -1829,6 +1914,8 @@ field_hint(const char *field, struct coll *coll)
 		return field_hint_decimal(field);
 	case FIELD_TYPE_UUID:
 		return field_hint_uuid(field);
+	case FIELD_TYPE_DATETIME:
+		return field_hint_datetime(field);
 	default:
 		unreachable();
 	}
@@ -1942,6 +2029,9 @@ key_def_set_hint_func(struct key_def *def)
 		break;
 	case FIELD_TYPE_UUID:
 		key_def_set_hint_func<FIELD_TYPE_UUID>(def);
+		break;
+	case FIELD_TYPE_DATETIME:
+		key_def_set_hint_func<FIELD_TYPE_DATETIME>(def);
 		break;
 	default:
 		/* Invalid key definition. */
