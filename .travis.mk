@@ -396,7 +396,7 @@ test_osx_no_deps: build_osx
 # FIXME: Temporary target with reduced number of tests.
 # Use test_osx_no_deps target, when all M1 issues are resolved.
 test_osx_arm64_no_deps: build_osx
-	make PUC-Rio-Lua-5.1-tests lua-Harness-tests tarantool-tests
+	make LuaJIT-test
 
 test_osx: deps_osx test_osx_no_deps
 
