@@ -51,6 +51,7 @@
 #include "fiber_cond.h"
 #include "box/errcode.h"
 #include "lua/fiber.h"
+#include "lua/fiber_cond.h"
 #include "mpstream/mpstream.h"
 #include "misc.h" /* lbox_check_tuple_format() */
 #include "version.h"
@@ -732,6 +733,11 @@ netbox_decode_greeting(lua_State *L)
  * Returns 0 and sets *size to limit or boundary position on success.
  * On error returns -1 and sets diag.
  *
+ * If the connection is closing, then the fiber in which the 'close' function
+ * is called waits on the `on_send_buf_empty` conditional variable until all
+ * data is sent. When all data is sent this variable is signaled and wakeup
+ * appropriate waiting fiber.
+ *
  * The need for this function arises from not wanting to
  * have more than one watcher for a single fd, and thus issue
  * redundant epoll_ctl(EPOLLCTL_ADD) for it when doing both
@@ -742,8 +748,10 @@ netbox_decode_greeting(lua_State *L)
  * interaction.
  */
 static int
-netbox_communicate(int fd, struct ibuf *send_buf, struct ibuf *recv_buf,
-		   size_t limit, const void *boundary, size_t boundary_len,
+netbox_communicate(int fd, struct ibuf *send_buf,
+		   struct fiber_cond *on_send_buf_empty,
+		   struct ibuf *recv_buf, size_t limit,
+		   const void *boundary, size_t boundary_len,
 		   size_t *size)
 {
 	const int NETBOX_READAHEAD = 16320;
@@ -789,15 +797,21 @@ check_limit:
 		while ((revents & COIO_WRITE) && ibuf_used(send_buf) != 0) {
 			ssize_t rc = send(
 				fd, send_buf->rpos, ibuf_used(send_buf), 0);
-			if (rc >= 0)
+			if (rc >= 0) {
 				send_buf->rpos += rc;
-			else if (errno == EAGAIN || errno == EWOULDBLOCK)
+				if (ibuf_used(send_buf) == 0)
+					fiber_cond_broadcast(on_send_buf_empty);
+			} else if (errno == EAGAIN || errno == EWOULDBLOCK)
 				revents &= ~COIO_WRITE;
 			else if (errno != EINTR)
 				goto handle_error;
 		}
 
 		ERROR_INJECT_YIELD(ERRINJ_NETBOX_IO_DELAY);
+		ERROR_INJECT(ERRINJ_NETBOX_IO_ERROR, {
+			box_error_raise(ER_NO_CONNECTION, "Error injection");
+			return -1;
+		});
 		revents = coio_wait(fd, EV_READ | (ibuf_used(send_buf) != 0 ?
 				EV_WRITE : 0), TIMEOUT_INFINITY);
 		if (fiber_is_cancelled()) {
@@ -815,8 +829,9 @@ handle_error:
  * Returns 0 and a decoded response header on success.
  * On error returns -1.
  */
-int
+static int
 netbox_send_and_recv_iproto(int fd, struct ibuf *send_buf,
+			    struct fiber_cond *on_send_buf_empty,
 			    struct ibuf *recv_buf, struct xrow_header *hdr)
 {
 	while (true) {
@@ -839,9 +854,10 @@ netbox_send_and_recv_iproto(int fd, struct ibuf *send_buf,
 			}
 		}
 		size_t unused;
-		if (netbox_communicate(fd, send_buf, recv_buf,
-				       /*limit=*/required, /*boundary=*/NULL,
-				       /*boundary_len=*/0, &unused) != 0) {
+		if (netbox_communicate(fd, send_buf, on_send_buf_empty,
+				       recv_buf, /*limit=*/required,
+				       /*boundary=*/NULL, /*boundary_len=*/0,
+				       &unused) != 0) {
 			return -1;
 		}
 	}
@@ -854,13 +870,15 @@ netbox_send_and_recv_iproto(int fd, struct ibuf *send_buf,
  */
 static const char *
 netbox_send_and_recv_console(int fd, struct ibuf *send_buf,
+			     struct fiber_cond *on_send_buf_empty,
 			     struct ibuf *recv_buf, size_t *response_len)
 {
 	const char delim[] = "\n...\n";
 	size_t delim_len = sizeof(delim) - 1;
 	size_t delim_pos;
-	if (netbox_communicate(fd, send_buf, recv_buf, /*limit=*/SIZE_MAX,
-			       delim, delim_len, &delim_pos) != 0) {
+	if (netbox_communicate(fd, send_buf, on_send_buf_empty, recv_buf,
+			       /*limit=*/SIZE_MAX, delim, delim_len,
+			       &delim_pos) != 0) {
 		return NULL;
 	}
 	const char *response = recv_buf->rpos;
@@ -1891,13 +1909,15 @@ netbox_iproto_auth(struct lua_State *L)
 	struct netbox_registry *registry = luaT_check_netbox_registry(L, 4);
 	int fd = lua_tointeger(L, 5);
 	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 6);
-	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 7);
+	struct fiber_cond *on_send_buf_empty = luaT_checkfibercond(L, 7);
+	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 8);
 	if (netbox_encode_auth(send_buf, registry->next_sync++, user, user_len,
 			       password, password_len, salt) != 0) {
 		goto error;
 	}
 	struct xrow_header hdr;
-	if (netbox_send_and_recv_iproto(fd, send_buf, recv_buf, &hdr) != 0) {
+	if (netbox_send_and_recv_iproto(fd, send_buf, on_send_buf_empty,
+					recv_buf, &hdr) != 0) {
 		goto error;
 	}
 	if (hdr.type != IPROTO_OK) {
@@ -1928,7 +1948,8 @@ netbox_iproto_schema(struct lua_State *L)
 	struct netbox_registry *registry = luaT_check_netbox_registry(L, 2);
 	int fd = lua_tointeger(L, 3);
 	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 4);
-	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 5);
+	struct fiber_cond *on_send_buf_empty = luaT_checkfibercond(L, 5);
+	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 6);
 	/* _vcollation view was added in 2.2.0-389-g3e3ef182f */
 	bool peer_has_vcollation = peer_version_id >= version_id(2, 2, 1);
 restart:
@@ -1955,8 +1976,9 @@ restart:
 	uint32_t schema_version = 0;
 	do {
 		struct xrow_header hdr;
-		if (netbox_send_and_recv_iproto(fd, send_buf, recv_buf,
-						&hdr) != 0) {
+		if (netbox_send_and_recv_iproto(fd, send_buf,
+						on_send_buf_empty,
+						recv_buf, &hdr) != 0) {
 			luaL_testcancel(L);
 			return luaT_push_nil_and_error(L);
 		}
@@ -2029,11 +2051,13 @@ netbox_iproto_loop(struct lua_State *L)
 	struct netbox_registry *registry = luaT_check_netbox_registry(L, 2);
 	int fd = lua_tointeger(L, 3);
 	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 4);
-	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 5);
+	struct fiber_cond *on_send_buf_empty = luaT_checkfibercond(L, 5);
+	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 6);
 	while (true) {
 		struct xrow_header hdr;
-		if (netbox_send_and_recv_iproto(fd, send_buf, recv_buf,
-						&hdr) != 0) {
+		if (netbox_send_and_recv_iproto(fd, send_buf,
+						on_send_buf_empty,
+						recv_buf, &hdr) != 0) {
 			luaL_testcancel(L);
 			return luaT_push_nil_and_error(L);
 		}
@@ -2061,14 +2085,15 @@ netbox_console_setup(struct lua_State *L)
 	const size_t ok_response_len = strlen(ok_response);
 	int fd = lua_tointeger(L, 1);
 	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 2);
-	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 3);
+	struct fiber_cond *on_send_buf_empty = luaT_checkfibercond(L, 3);
+	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 4);
 	void *wpos = ibuf_alloc(send_buf, setup_delimiter_cmd_len);
 	if (wpos == NULL)
 		return luaL_error(L, "out of memory");
 	memcpy(wpos, setup_delimiter_cmd, setup_delimiter_cmd_len);
 	size_t response_len;
 	const char *response = netbox_send_and_recv_console(
-		fd, send_buf, recv_buf, &response_len);
+		fd, send_buf, on_send_buf_empty, recv_buf, &response_len);
 	if (response == NULL) {
 		luaL_testcancel(L);
 		goto error;
@@ -2095,12 +2120,14 @@ netbox_console_loop(struct lua_State *L)
 	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
 	int fd = lua_tointeger(L, 2);
 	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 3);
-	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 4);
+	struct fiber_cond *on_send_buf_empty = luaT_checkfibercond(L, 4);
+	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 5);
 	uint64_t sync = registry->next_sync;
 	while (true) {
 		size_t response_len;
 		const char *response = netbox_send_and_recv_console(
-			fd, send_buf, recv_buf, &response_len);
+			fd, send_buf, on_send_buf_empty,
+			recv_buf, &response_len);
 		if (response == NULL) {
 			luaL_testcancel(L);
 			luaT_pusherror(L, box_error_last());
