@@ -373,75 +373,92 @@ ok 1 - subtests
     ok 14 - string '2013-10-28T17:51:56Z' expected, received '2013-10-28T17:51:56Z'
     ok 15 - string '9999-12-31T23:59:59Z' expected, received '9999-12-31T23:59:59Z'
 ok 2 - subtests
-    1..68
+    1..85
     ok 1 - len 18, expected len 18
     ok 2 - tnt_mp_sizeof_datetime(18) == encoded length 18
     ok 3 - mp_decode_datetime() return code
     ok 4 - data1 == end (0)
-    ok 5 - len 18, expected len 18
-    ok 6 - tnt_mp_sizeof_datetime(18) == encoded length 18
-    ok 7 - mp_decode_datetime() return code
-    ok 8 - data1 == end (0)
-    ok 9 - len 18, expected len 18
-    ok 10 - tnt_mp_sizeof_datetime(18) == encoded length 18
-    ok 11 - mp_decode_datetime() return code
-    ok 12 - data1 == end (0)
-    ok 13 - len 18, expected len 18
-    ok 14 - tnt_mp_sizeof_datetime(18) == encoded length 18
-    ok 15 - mp_decode_datetime() return code
-    ok 16 - data1 == end (0)
-    ok 17 - len 10, expected len 10
-    ok 18 - tnt_mp_sizeof_datetime(10) == encoded length 10
-    ok 19 - mp_decode_datetime() return code
-    ok 20 - data1 == end (0)
-    ok 21 - len 18, expected len 18
-    ok 22 - tnt_mp_sizeof_datetime(18) == encoded length 18
+    ok 5 - datetime_compare(&date, &ret)
+    ok 6 - len 18, expected len 18
+    ok 7 - tnt_mp_sizeof_datetime(18) == encoded length 18
+    ok 8 - mp_decode_datetime() return code
+    ok 9 - data1 == end (0)
+    ok 10 - datetime_compare(&date, &ret)
+    ok 11 - len 18, expected len 18
+    ok 12 - tnt_mp_sizeof_datetime(18) == encoded length 18
+    ok 13 - mp_decode_datetime() return code
+    ok 14 - data1 == end (0)
+    ok 15 - datetime_compare(&date, &ret)
+    ok 16 - len 18, expected len 18
+    ok 17 - tnt_mp_sizeof_datetime(18) == encoded length 18
+    ok 18 - mp_decode_datetime() return code
+    ok 19 - data1 == end (0)
+    ok 20 - datetime_compare(&date, &ret)
+    ok 21 - len 10, expected len 10
+    ok 22 - tnt_mp_sizeof_datetime(10) == encoded length 10
     ok 23 - mp_decode_datetime() return code
     ok 24 - data1 == end (0)
-    ok 25 - len 18, expected len 18
-    ok 26 - tnt_mp_sizeof_datetime(18) == encoded length 18
-    ok 27 - mp_decode_datetime() return code
-    ok 28 - data1 == end (0)
-    ok 29 - len 18, expected len 18
-    ok 30 - tnt_mp_sizeof_datetime(18) == encoded length 18
-    ok 31 - mp_decode_datetime() return code
-    ok 32 - data1 == end (0)
-    ok 33 - len 18, expected len 18
-    ok 34 - tnt_mp_sizeof_datetime(18) == encoded length 18
-    ok 35 - mp_decode_datetime() return code
-    ok 36 - data1 == end (0)
-    ok 37 - len 18, expected len 18
-    ok 38 - tnt_mp_sizeof_datetime(18) == encoded length 18
-    ok 39 - mp_decode_datetime() return code
-    ok 40 - data1 == end (0)
+    ok 25 - datetime_compare(&date, &ret)
+    ok 26 - len 18, expected len 18
+    ok 27 - tnt_mp_sizeof_datetime(18) == encoded length 18
+    ok 28 - mp_decode_datetime() return code
+    ok 29 - data1 == end (0)
+    ok 30 - datetime_compare(&date, &ret)
+    ok 31 - len 18, expected len 18
+    ok 32 - tnt_mp_sizeof_datetime(18) == encoded length 18
+    ok 33 - mp_decode_datetime() return code
+    ok 34 - data1 == end (0)
+    ok 35 - datetime_compare(&date, &ret)
+    ok 36 - len 18, expected len 18
+    ok 37 - tnt_mp_sizeof_datetime(18) == encoded length 18
+    ok 38 - mp_decode_datetime() return code
+    ok 39 - data1 == end (0)
+    ok 40 - datetime_compare(&date, &ret)
     ok 41 - len 18, expected len 18
     ok 42 - tnt_mp_sizeof_datetime(18) == encoded length 18
     ok 43 - mp_decode_datetime() return code
     ok 44 - data1 == end (0)
-    ok 45 - len 18, expected len 18
-    ok 46 - tnt_mp_sizeof_datetime(18) == encoded length 18
-    ok 47 - mp_decode_datetime() return code
-    ok 48 - data1 == end (0)
-    ok 49 - len 10, expected len 10
-    ok 50 - tnt_mp_sizeof_datetime(10) == encoded length 10
-    ok 51 - mp_decode_datetime() return code
-    ok 52 - data1 == end (0)
-    ok 53 - len 10, expected len 10
-    ok 54 - tnt_mp_sizeof_datetime(10) == encoded length 10
-    ok 55 - mp_decode_datetime() return code
-    ok 56 - data1 == end (0)
-    ok 57 - len 10, expected len 10
-    ok 58 - tnt_mp_sizeof_datetime(10) == encoded length 10
-    ok 59 - mp_decode_datetime() return code
-    ok 60 - data1 == end (0)
-    ok 61 - len 18, expected len 18
-    ok 62 - tnt_mp_sizeof_datetime(18) == encoded length 18
+    ok 45 - datetime_compare(&date, &ret)
+    ok 46 - len 18, expected len 18
+    ok 47 - tnt_mp_sizeof_datetime(18) == encoded length 18
+    ok 48 - mp_decode_datetime() return code
+    ok 49 - data1 == end (0)
+    ok 50 - datetime_compare(&date, &ret)
+    ok 51 - len 18, expected len 18
+    ok 52 - tnt_mp_sizeof_datetime(18) == encoded length 18
+    ok 53 - mp_decode_datetime() return code
+    ok 54 - data1 == end (0)
+    ok 55 - datetime_compare(&date, &ret)
+    ok 56 - len 18, expected len 18
+    ok 57 - tnt_mp_sizeof_datetime(18) == encoded length 18
+    ok 58 - mp_decode_datetime() return code
+    ok 59 - data1 == end (0)
+    ok 60 - datetime_compare(&date, &ret)
+    ok 61 - len 10, expected len 10
+    ok 62 - tnt_mp_sizeof_datetime(10) == encoded length 10
     ok 63 - mp_decode_datetime() return code
     ok 64 - data1 == end (0)
-    ok 65 - len 18, expected len 18
-    ok 66 - tnt_mp_sizeof_datetime(18) == encoded length 18
-    ok 67 - mp_decode_datetime() return code
-    ok 68 - data1 == end (0)
+    ok 65 - datetime_compare(&date, &ret)
+    ok 66 - len 10, expected len 10
+    ok 67 - tnt_mp_sizeof_datetime(10) == encoded length 10
+    ok 68 - mp_decode_datetime() return code
+    ok 69 - data1 == end (0)
+    ok 70 - datetime_compare(&date, &ret)
+    ok 71 - len 10, expected len 10
+    ok 72 - tnt_mp_sizeof_datetime(10) == encoded length 10
+    ok 73 - mp_decode_datetime() return code
+    ok 74 - data1 == end (0)
+    ok 75 - datetime_compare(&date, &ret)
+    ok 76 - len 18, expected len 18
+    ok 77 - tnt_mp_sizeof_datetime(18) == encoded length 18
+    ok 78 - mp_decode_datetime() return code
+    ok 79 - data1 == end (0)
+    ok 80 - datetime_compare(&date, &ret)
+    ok 81 - len 18, expected len 18
+    ok 82 - tnt_mp_sizeof_datetime(18) == encoded length 18
+    ok 83 - mp_decode_datetime() return code
+    ok 84 - data1 == end (0)
+    ok 85 - datetime_compare(&date, &ret)
 ok 3 - subtests
     1..5
 	*** mp_print_test ***
