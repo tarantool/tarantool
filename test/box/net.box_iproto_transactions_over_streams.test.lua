@@ -16,6 +16,20 @@ function get_current_connection_count()
     assert(connection_stat_table)
     return connection_stat_table.current
 end;
+function get_current_stream_count()
+    local name = "\"ERRINJ_IPROTO_STREAM_COUNT\""
+    local stream_count = test_run:cmd(
+        string.format("eval test 'return box.error.injection.get(%s)'", name
+    ))[1]
+    return stream_count
+end;
+function get_current_stream_msg_count()
+    local name = "\"ERRINJ_IPROTO_STREAM_MSG_COUNT\""
+    local stream_msg_count = test_run:cmd(
+        string.format("eval test 'return box.error.injection.get(%s)'", name
+    ))[1]
+    return stream_msg_count
+end;
 function wait_and_return_results(futures)
     local results = {}
     for name, future in pairs(futures) do
@@ -26,6 +40,35 @@ function wait_and_return_results(futures)
         end
     end
     return results
+end;
+function create_remote_space()
+    test_run:eval('test', "s = box.schema.space.create('test')")
+    test_run:eval('test', "s:create_index('primary')")
+end;
+function drop_remote_space()
+    test_run:eval('test', "s:drop()")
+end;
+function start_server_and_init(mvcc_is_enable)
+    test_run:cmd(
+        string.format("start server test with args='10, %s'", mvcc_is_enable)
+    )
+    local server_addr =
+        test_run:cmd("eval test 'return box.cfg.listen'")[1]
+    local net_msg_max =
+        test_run:cmd("eval test 'return box.cfg.net_msg_max'")[1]
+    create_remote_space()
+    local conn = net_box.connect(server_addr)
+    local stream_1 = conn:new_stream()
+    local stream_2 = conn:new_stream()
+    local space_1_1 = stream_1.space.test
+    local space_1_2 = stream_2.space.test
+    return conn, stream_1, space_1_1, stream_2, space_1_2, net_msg_max
+end;
+function cleanup_and_stop_server(connection)
+    drop_remote_space()
+    connection:close()
+    test_run:wait_cond(function () return get_current_connection_count() == 0 end)
+    test_run:cmd("stop server test")
 end;
 test_run:cmd("setopt delimiter ''");
 
@@ -94,26 +137,12 @@ test_run:cmd("stop server test")
 -- Second argument (false is a value for memtx_use_mvcc_engine option)
 -- Server start without active transaction manager, so all transaction
 -- fails because of yeild!
-test_run:cmd("start server test with args='10, false'")
-server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
-
-test_run:switch("test")
-s = box.schema.space.create('test', { engine = 'memtx' })
-_ = s:create_index('primary')
-test_run:switch('default')
-
-conn = net_box.connect(server_addr)
-assert(conn:ping())
-stream = conn:new_stream()
-space = stream.space.test
+conn, stream, space = start_server_and_init(false)
 
 -- Check syncronious stream txn requests for memtx
 -- with memtx_use_mvcc_engine = false
 stream:begin()
-test_run:switch('test')
-errinj = box.error.injection
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 1)
-test_run:switch('default')
+test_run:wait_cond(function () return get_current_stream_count() == 1 end)
 space:replace({1})
 -- Empty select, transaction was not commited and
 -- is not visible from requests not belonging to the
@@ -165,119 +194,59 @@ test_run:switch('default')
 stream:execute('COMMIT')
 -- Select is empty, transaction was aborted
 space:select{}
-
-test_run:switch('test')
-s:drop()
 -- Check that there are no streams and messages, which
 -- was not deleted
-errinj = box.error.injection
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0)
-assert(errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0)
-test_run:switch('default')
-stream:close()
-test_run:wait_cond(function () return get_current_connection_count() == 0 end)
-test_run:cmd("stop server test")
+test_run:wait_cond(function() return get_current_stream_count() == 0 end)
+test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
 
--- Next we check transactions only for memtx with
--- memtx_use_mvcc_engine = true and for vinyl, because
--- if memtx_use_mvcc_engine = false all transactions fails,
--- as we can see before!
+cleanup_and_stop_server(stream)
+
+-- Next we check transactions only for memtx with memtx_use_mvcc_engine = true,
+-- because if memtx_use_mvcc_engine == false all transactions fails, as we can
+-- see before!
 
 -- Second argument (true is a value for memtx_use_mvcc_engine option)
 -- Same test case as previous but server start with active transaction
--- manager. Also check vinyl, because it's behaviour is same.
-test_run:cmd("start server test with args='10, true'")
-server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
-
-test_run:switch("test")
-s1 = box.schema.space.create('test_1', { engine = 'memtx' })
-s2 = box.schema.space.create('test_2', { engine = 'vinyl' })
-_ = s1:create_index('primary')
-_ = s2:create_index('primary')
-test_run:switch('default')
-
-conn = net_box.connect(server_addr)
-assert(conn:ping())
-stream_1 = conn:new_stream()
-stream_2 = conn:new_stream()
-space_1 = stream_1.space.test_1
-space_2 = stream_2.space.test_2
+-- manager.
+conn, stream, space = start_server_and_init(true)
 -- Spaces getting from connection, not from stream has no stream_id
 -- and not belongs to stream
-space_1_no_stream = conn.space.test_1
-space_2_no_stream = conn.space.test_2
--- Check syncronious stream txn requests for memtx
--- with memtx_use_mvcc_engine = true and to vinyl:
--- behaviour is same!
-stream_1:begin()
-space_1:replace({1})
-stream_2:begin()
-space_2:replace({1})
-test_run:switch('test')
-errinj = box.error.injection
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 2)
-test_run:switch('default')
+space_no_stream = conn.space.test
+
+stream:begin()
+space:replace({1})
+test_run:wait_cond(function() return get_current_stream_count() == 1 end)
 -- Empty select, transaction was not commited and
 -- is not visible from requests not belonging to the
 -- transaction.
-space_1_no_stream:select{}
-space_2_no_stream:select{}
+space_no_stream:select{}
 -- Select return tuple, which was previously inserted,
 -- because this select belongs to transaction.
-space_1:select({})
-space_2:select({})
+space:select({})
 test_run:switch("test")
 -- Select is empty, transaction was not commited
-s1:select()
-s2:select()
+s:select()
 test_run:switch('default')
 -- Commit was successful, transaction can yeild with
--- memtx_use_mvcc_engine = true. Vinyl transactions
--- can yeild also.
-stream_1:commit()
-stream_2:commit()
-test_run:switch("test")
--- Check that there are no streams and messages, which
--- was not deleted after commit
-errinj = box.error.injection
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0)
-assert(errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0)
-test_run:switch("default")
+-- memtx_use_mvcc_engine = true.
+stream:commit()
+test_run:wait_cond(function() return get_current_stream_count() == 0 end)
+test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
 
 -- Select return tuple, which was previously inserted,
 -- because transaction was successful
-space_1:select{}
-space_2:select{}
+space:select{}
 test_run:switch("test")
 -- Select return tuple, which was previously inserted,
 -- because transaction was successful
-s1:select()
-s2:select()
-s1:drop()
-s2:drop()
+s:select()
 test_run:switch('default')
-conn:close()
-test_run:wait_cond(function () return get_current_connection_count() == 0 end)
-test_run:cmd("stop server test")
+cleanup_and_stop_server(conn)
+
 
 -- Check conflict resolution in stream transactions,
-test_run:cmd("start server test with args='10, true'")
-server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
+conn, stream_1, space_1_1, stream_2, space_1_2 = start_server_and_init(true)
 
-test_run:switch("test")
-s1 = box.schema.space.create('test_1', { engine = 'memtx' })
-_ = s1:create_index('primary')
-s2 = box.schema.space.create('test_2', { engine = 'vinyl' })
-_ = s2:create_index('primary')
-test_run:switch('default')
-
-conn = net_box.connect(server_addr)
-stream_1 = conn:new_stream()
-stream_2 = conn:new_stream()
-space_1_1 = stream_1.space.test_1
-space_1_2 = stream_2.space.test_1
-space_2_1 = stream_1.space.test_2
-space_2_2 = stream_2.space.test_2
 stream_1:begin()
 stream_2:begin()
 
@@ -289,317 +258,131 @@ space_1_2:replace({1, 2})
 stream_1:commit()
 -- This transaction fails, because of conflict
 stream_2:commit()
-test_run:switch("test")
--- Check that there are no streams and messages, which
--- was not deleted after commit
-errinj = box.error.injection
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0)
-assert(errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0)
-test_run:switch("default")
+test_run:wait_cond(function() return get_current_stream_count() == 0 end)
+test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+
 -- Here we must accept [1, 1]
 space_1_1:select({})
 space_1_2:select({})
 
--- Same test for vinyl sapce
-stream_1:begin()
-stream_2:begin()
-space_2_1:select({1})
-space_2_2:select({1})
-space_2_1:replace({1, 1})
-space_2_2:replace({1, 2})
-stream_1:commit()
--- This transaction fails, because of conflict
-stream_2:commit()
-test_run:switch("test")
--- Check that there are no streams and messages, which
--- was not deleted after commit
-errinj = box.error.injection
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0)
-assert(errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0)
-test_run:switch("default")
--- Here we must accept [1, 1]
-space_2_1:select({})
-space_2_2:select({})
-
 test_run:switch('test')
 -- Both select return tuple [1, 1], transaction commited
-s1:select()
-s2:select()
-s1:drop()
-s2:drop()
+s:select()
 test_run:switch('default')
-conn:close()
-test_run:wait_cond(function () return get_current_connection_count() == 0 end)
-test_run:cmd("stop server test")
+cleanup_and_stop_server(conn)
 
--- Check rollback as a command for memtx and vinyl spaces
-test_run:cmd("start server test with args='10, true'")
-server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
-
-test_run:switch("test")
-s1 = box.schema.space.create('test_1', { engine = 'memtx' })
-_ = s1:create_index('primary')
-s2 = box.schema.space.create('test_2', { engine = 'vinyl' })
-_ = s2:create_index('primary')
-test_run:switch('default')
-
-conn = net_box.connect(server_addr)
-stream_1 = conn:new_stream()
-stream_2 = conn:new_stream()
-space_1 = stream_1.space.test_1
-space_2 = stream_2.space.test_2
-stream_1:begin()
-stream_2:begin()
+-- Check rollback as a command
+conn, stream, space = start_server_and_init(true)
+stream:begin()
 
 -- Test rollback for memtx space
-space_1:replace({1})
+space:replace({1})
 -- Select return tuple, which was previously inserted,
 -- because this select belongs to transaction.
-space_1:select({})
-stream_1:rollback()
+space:select({})
+stream:rollback()
 -- Select is empty, transaction rollback
-space_1:select({})
+space:select({})
 
--- Test rollback for vinyl space
-space_2:replace({1})
--- Select return tuple, which was previously inserted,
--- because this select belongs to transaction.
-space_2:select({})
-stream_2:rollback()
--- Select is empty, transaction rollback
-space_2:select({})
-
-test_run:switch("test")
--- Check that there are no streams and messages, which
--- was not deleted after rollback
-errinj = box.error.injection
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0)
-assert(errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0)
-test_run:switch("default")
+test_run:wait_cond(function() return get_current_stream_count() == 0 end)
+test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
 
 -- This is simple test is necessary because i have a bug
 -- with halting stream after rollback
-stream_1:begin()
-stream_1:commit()
-stream_2:begin()
-stream_2:commit()
+stream:begin()
+stream:commit()
 conn:close()
 
 test_run:switch('test')
 -- Both select are empty, because transaction rollback
-s1:select()
-s2:select()
-s1:drop()
-s2:drop()
+s:select()
 test_run:switch('default')
-conn:close()
-test_run:wait_cond(function () return get_current_connection_count() == 0 end)
-test_run:cmd("stop server test")
+cleanup_and_stop_server(conn)
 
 -- Check rollback on disconnect
-test_run:cmd("start server test with args='10, true'")
-server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
+conn, stream, space = start_server_and_init(true)
+stream:begin()
 
-test_run:switch("test")
-s1 = box.schema.space.create('test_1', { engine = 'memtx' })
-_ = s1:create_index('primary')
-s2 = box.schema.space.create('test_2', { engine = 'vinyl' })
-_ = s2:create_index('primary')
-test_run:switch('default')
-
-conn = net_box.connect(server_addr)
-stream_1 = conn:new_stream()
-stream_2 = conn:new_stream()
-space_1 = stream_1.space.test_1
-space_2 = stream_2.space.test_2
-stream_1:begin()
-stream_2:begin()
-
-space_1:replace({1})
-space_1:replace({2})
+space:replace({1})
+space:replace({2})
 -- Select return two previously inserted tuples
-space_1:select({})
-
-space_2:replace({1})
-space_2:replace({2})
--- Select return two previously inserted tuples
-space_2:select({})
+space:select({})
 conn:close()
 
-test_run:switch("test")
--- Empty selects, transaction was rollback
-s1:select()
-s2:select()
 -- Check that there are no streams and messages, which
 -- was not deleted after connection close
-errinj = box.error.injection
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0)
-assert(errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0)
-test_run:switch("default")
+test_run:wait_cond(function() return get_current_stream_count() == 0 end)
+test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
 test_run:wait_cond(function () return get_current_connection_count() == 0 end)
-
--- Reconnect
-conn = net_box.connect(server_addr)
-stream_1 = conn:new_stream()
-stream_2 = conn:new_stream()
-space_1 = stream_1.space.test_1
-space_2 = stream_2.space.test_2
--- We can begin new transactions with same stream_id, because
--- previous one was rollbacked and destroyed.
-stream_1:begin()
-stream_2:begin()
--- Two empty selects
-space_1:select({})
-space_2:select({})
-stream_1:commit()
-stream_2:commit()
-
-test_run:switch('test')
--- Both select are empty, because transaction rollback
-s1:select()
-s2:select()
-s1:drop()
-s2:drop()
-test_run:switch('default')
-conn:close()
-test_run:wait_cond(function () return get_current_connection_count() == 0 end)
-test_run:cmd("stop server test")
-
--- Check rollback on disconnect with big count of async requests
-test_run:cmd("start server test with args='10, true'")
-server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
 
 test_run:switch("test")
-s1 = box.schema.space.create('test_1', { engine = 'memtx' })
-_ = s1:create_index('primary')
-s2 = box.schema.space.create('test_2', { engine = 'vinyl' })
-_ = s2:create_index('primary')
-test_run:switch('default')
+-- Empty select, transaction was rollback
+s:select()
+test_run:switch("default")
+cleanup_and_stop_server(conn)
 
-conn = net_box.connect(server_addr)
-stream_1 = conn:new_stream()
-stream_2 = conn:new_stream()
-space_1 = stream_1.space.test_1
-space_2 = stream_2.space.test_2
-stream_1:begin()
-stream_2:begin()
+-- Check rollback on disconnect with big count of async requests
+conn, stream, space, _, _, net_msg_max = start_server_and_init(true)
+stream:begin()
 
-space_1:replace({1})
-space_1:replace({2})
+space:replace({1})
+space:replace({2})
 -- Select return two previously inserted tuples
-space_1:select({})
+space:select({})
 
-space_2:replace({1})
-space_2:replace({2})
--- Select return two previously inserted tuples
-space_2:select({})
 -- We send a large number of asynchronous requests,
 -- their result is not important to us, it is important
 -- that they will be in the stream queue at the time of
 -- the disconnect.
 test_run:cmd("setopt delimiter ';'")
-for i = 1, 1000 do
-    space_1:replace({i}, {is_async = true})
-    space_2:replace({i}, {is_async = true})
+for i = 1, net_msg_max * 2 do
+    space:replace({i}, {is_async = true})
 end;
 test_run:cmd("setopt delimiter ''");
-fiber.sleep(0)
 conn:close()
 
-test_run:switch("test")
 -- Check that there are no streams and messages, which
 -- was not deleted after connection close
-errinj = box.error.injection
-test_run:cmd("setopt delimiter ';'")
-test_run:wait_cond(function ()
-    return errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0
-end);
-test_run:wait_cond(function ()
-    return errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0
-end);
-test_run:cmd("setopt delimiter ''");
--- Select was empty, transaction rollbacked
-s1:select()
-s2:select()
-test_run:switch("default")
+test_run:wait_cond(function() return get_current_stream_count() == 0 end)
+test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
 test_run:wait_cond(function () return get_current_connection_count() == 0 end)
 
--- Disabled until #6338 will be implemented!
+
+test_run:switch("test")
+-- Select was empty, transaction rollbacked
+s:select()
+test_run:switch("default")
+
 -- Same test, but now we check that if `commit` was received
 -- by server before connection closed, we processed it successful.
 conn = net_box.connect(server_addr)
-stream_1 = conn:new_stream()
-stream_2 = conn:new_stream()
-space_1 = stream_1.space.test_1
-space_2 = stream_2.space.test_2
-stream_1:begin()
-stream_2:begin()
+stream = conn:new_stream()
+space = stream.space.test
+stream:begin()
 test_run:cmd("setopt delimiter ';'")
 -- Here, for a large number of messages, we cannot guarantee their processing,
 -- since if the net_msg_max limit is reached, we will stop processing incoming
--- requests, and after close, we will discard all raw data. '100' is the number
--- of messages that we can process without reaching net_msg_max. We will not try
--- any more, so as not to make a test flaky.
-for i = 1, 100 do
-    space_1:replace({i}, {is_async = true})
-    space_2:replace({i}, {is_async = true})
-end;
+-- requests, and after close, we will discard all raw data.
+for i = 1, net_msg_max - 3 do
+    space:replace({i}, {is_async = true})
+end
+_ = stream:commit({is_async = true})
 test_run:cmd("setopt delimiter ''");
-_ = stream_1:commit({is_async = true})
-_ = stream_2:commit({is_async = true})
-fiber.sleep(0)
 conn:close()
 
-test_run:switch("test")
 -- Check that there are no streams and messages, which
 -- was not deleted after connection close
-errinj = box.error.injection
-test_run:cmd("setopt delimiter ';'")
-test_run:wait_cond(function ()
-    return errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0
-end);
-test_run:wait_cond(function ()
-    return errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0
-end);
-test_run:cmd("setopt delimiter ''");
--- Disabled until #6338 will be implemented!
+test_run:wait_cond(function() return get_current_stream_count() == 0 end)
+test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+test_run:wait_cond(function () return get_current_connection_count() == 0 end)
+
+test_run:switch("test")
 -- Select return tuples from [1] to [100],
 -- transaction was commit
-rc1 = s1:select()
-rc2 = s2:select()
---assert(#rc1)
---assert(#rc2)
-s1:truncate()
-s2:truncate()
+rc = s:select()
+assert(#rc)
 test_run:switch("default")
-test_run:wait_cond(function () return get_current_connection_count() == 0 end)
-
--- Reconnect
-conn = net_box.connect(server_addr)
-stream_1 = conn:new_stream()
-stream_2 = conn:new_stream()
-space_1 = stream_1.space.test_1
-space_2 = stream_2.space.test_2
--- We can begin new transactions with same stream_id, because
--- previous one was rollbacked and destroyed.
-stream_1:begin()
-stream_2:begin()
--- Two empty selects
-space_1:select({})
-space_2:select({})
-stream_1:commit()
-stream_2:commit()
-
-test_run:switch('test')
--- Both select are empty, because transaction rollback
-s1:select()
-s2:select()
-s1:drop()
-s2:drop()
-test_run:switch('default')
-conn:close()
-test_run:wait_cond(function () return get_current_connection_count() == 0 end)
-test_run:cmd("stop server test")
+cleanup_and_stop_server(conn)
 
 -- Check that all requests between `begin` and `commit`
 -- have correct lsn and tsn values. During my work on the
@@ -608,41 +391,21 @@ test_run:cmd("stop server test")
 -- in stream we should set this value to false, otherwise
 -- during recovering `wal_stream_apply_dml_row` fails, because
 -- of LSN/TSN mismatch. Here is a special test case for it.
-test_run:cmd("start server test with args='10, true'")
-server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
+conn, stream, space = start_server_and_init(true)
 
-test_run:switch("test")
-s1 = box.schema.space.create('test_1', { engine = 'memtx' })
-_ = s1:create_index('primary')
-s2 = box.schema.space.create('test_2', { engine = 'memtx' })
-_ = s2:create_index('primary')
-test_run:switch('default')
+stream:begin()
+space:replace({1})
+space:replace({2})
+stream:commit()
 
-conn = net_box.connect(server_addr)
-stream_1 = conn:new_stream()
-stream_2 = conn:new_stream()
-space_1 = stream_1.space.test_1
-space_2 = stream_2.space.test_2
-
-stream_1:begin()
-stream_2:begin()
-space_1:replace({1})
-space_1:replace({2})
-space_2:replace({1})
-space_2:replace({2})
-stream_1:commit()
-stream_2:commit()
+-- Check that there are no streams and messages, which
+-- was not deleted
+test_run:wait_cond(function() return get_current_stream_count() == 0 end)
+test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
 
 test_run:switch('test')
 -- Here we get two tuples, commit was successful
-s1:select{}
--- Here we get two tuples, commit was successful
-s2:select{}
--- Check that there are no streams and messages, which
--- was not deleted after connection close
-errinj = box.error.injection
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0)
-assert(errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0)
+s:select{}
 test_run:switch('default')
 conn:close()
 test_run:wait_cond(function () return get_current_connection_count() == 0 end)
@@ -651,208 +414,104 @@ test_run:cmd("stop server test")
 test_run:cmd("start server test with args='1, true'")
 test_run:switch('test')
 -- Here we get two tuples, commit was successful
-box.space.test_1:select{}
--- Here we get two tuples, commit was successful
-box.space.test_2:select{}
-box.space.test_1:drop()
-box.space.test_2:drop()
+box.space.test:select{}
+box.space.test:drop()
 test_run:switch('default')
 test_run:cmd("stop server test")
 
 -- Same transactions checks for async mode
-test_run:cmd("start server test with args='10, true'")
-server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
+conn, stream, space = start_server_and_init(true)
 
-test_run:switch("test")
-s1 = box.schema.space.create('test_1', { engine = 'memtx' })
-_ = s1:create_index('primary')
-s2 = box.schema.space.create('test_2', { engine = 'vinyl' })
-_ = s2:create_index('primary')
-test_run:switch('default')
-
-conn = net_box.connect(server_addr)
-assert(conn:ping())
-stream_1 = conn:new_stream()
-space_1 = stream_1.space.test_1
-stream_2 = conn:new_stream()
-space_2 = stream_2.space.test_2
-
-memtx_futures = {}
-memtx_futures["begin"] = stream_1:begin({is_async = true})
-memtx_futures["replace"] = space_1:replace({1}, {is_async = true})
-memtx_futures["insert"] = space_1:insert({2}, {is_async = true})
-memtx_futures["select"] = space_1:select({}, {is_async = true})
-
-vinyl_futures = {}
-vinyl_futures["begin"] = stream_2:begin({is_async = true})
-vinyl_futures["replace"] = space_2:replace({1}, {is_async = true})
-vinyl_futures["insert"] = space_2:insert({2}, {is_async = true})
-vinyl_futures["select"] = space_2:select({}, {is_async = true})
+futures = {}
+futures["begin"] = stream:begin({is_async = true})
+futures["replace"] = space:replace({1}, {is_async = true})
+futures["insert"] = space:insert({2}, {is_async = true})
+futures["select"] = space:select({}, {is_async = true})
 
 test_run:switch("test")
 -- Select is empty, transaction was not commited
-s1:select()
-s2:select()
+s:select()
 test_run:switch('default')
-memtx_futures["commit"] = stream_1:commit({is_async = true})
-vinyl_futures["commit"] = stream_2:commit({is_async = true})
+futures["commit"] = stream:commit({is_async = true})
 
-memtx_results = wait_and_return_results(memtx_futures)
-vinyl_results = wait_and_return_results(vinyl_futures)
+results = wait_and_return_results(futures)
 -- If begin was successful it return nil
-assert(not memtx_results["begin"])
-assert(not vinyl_results["begin"])
+assert(not results["begin"])
 -- [1]
-assert(memtx_results["replace"])
-assert(vinyl_results["replace"])
+assert(results["replace"])
 -- [2]
-assert(memtx_results["insert"])
-assert(vinyl_results["insert"])
+assert(results["insert"])
 -- [1] [2]
-assert(memtx_results["select"])
-assert(vinyl_results["select"])
+assert(results["select"])
 -- If commit was successful it return nil
-assert(not memtx_results["commit"])
-assert(not vinyl_results["commit"])
+assert(not results["commit"])
+
+test_run:wait_cond(function() return get_current_stream_count() == 0 end)
+test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
 
 test_run:switch("test")
--- Select return tuple, which was previously inserted,
+-- Select return tuples, which was previously inserted,
 -- because transaction was successful
-s1:select()
-s2:select()
-s1:drop()
-s2:drop()
-errinj = box.error.injection
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0)
-assert(errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0)
+s:select()
 test_run:switch('default')
-conn:close()
-test_run:wait_cond(function () return get_current_connection_count() == 0 end)
-test_run:cmd("stop server test")
+cleanup_and_stop_server(conn)
 
 -- Check conflict resolution in stream transactions,
-test_run:cmd("start server test with args='10, true'")
-server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
-
-test_run:switch("test")
-s1 = box.schema.space.create('test_1', { engine = 'memtx' })
-_ = s1:create_index('primary')
-s2 = box.schema.space.create('test_2', { engine = 'vinyl' })
-_ = s2:create_index('primary')
-test_run:switch('default')
-
-conn = net_box.connect(server_addr)
-stream_1 = conn:new_stream()
-stream_2 = conn:new_stream()
-space_1_1 = stream_1.space.test_1
-space_1_2 = stream_2.space.test_1
-space_2_1 = stream_1.space.test_2
-space_2_2 = stream_2.space.test_2
-
-futures_1 = {}
+conn, stream_1, space_1_1, stream_2, space_1_2 = start_server_and_init(true)
+futures = {}
 -- Simple read/write conflict.
-futures_1["begin_1"] = stream_1:begin({is_async = true})
-futures_1["begin_2"] = stream_2:begin({is_async = true})
-futures_1["select_1_1"] = space_1_1:select({1}, {is_async = true})
-futures_1["select_1_2"] = space_1_2:select({1}, {is_async = true})
-futures_1["replace_1_1"] = space_1_1:replace({1, 1}, {is_async = true})
-futures_1["replace_1_2"] = space_1_2:replace({1, 2}, {is_async = true})
-futures_1["commit_1"] = stream_1:commit({is_async = true})
-futures_1["commit_2"] = stream_2:commit({is_async = true})
-futures_1["select_1_1_A"] = space_1_1:select({}, {is_async = true})
-futures_1["select_1_2_A"] = space_1_2:select({}, {is_async = true})
+futures["begin_1"] = stream_1:begin({is_async = true})
+futures["begin_2"] = stream_2:begin({is_async = true})
+futures["select_1_1"] = space_1_1:select({1}, {is_async = true})
+futures["select_1_2"] = space_1_2:select({1}, {is_async = true})
+futures["replace_1_1"] = space_1_1:replace({1, 1}, {is_async = true})
+futures["replace_1_2"] = space_1_2:replace({1, 2}, {is_async = true})
+futures["commit_1"] = stream_1:commit({is_async = true})
+futures["commit_2"] = stream_2:commit({is_async = true})
+futures["select_1_1_A"] = space_1_1:select({}, {is_async = true})
+futures["select_1_2_A"] = space_1_2:select({}, {is_async = true})
 
-results_1 = wait_and_return_results(futures_1)
+results = wait_and_return_results(futures)
 -- Successful begin return nil
-assert(not results_1["begin_1"])
-assert(not results_1["begin_2"])
+assert(not results["begin_1"])
+assert(not results["begin_2"])
 -- []
-assert(not results_1["select_1_1"][1])
-assert(not results_1["select_1_2"][1])
+assert(not results["select_1_1"][1])
+assert(not results["select_1_2"][1])
 -- [1]
-assert(results_1["replace_1_1"][1])
+assert(results["replace_1_1"][1])
 -- [1]
-assert(results_1["replace_1_1"][2])
+assert(results["replace_1_1"][2])
 -- [1]
-assert(results_1["replace_1_2"][1])
+assert(results["replace_1_2"][1])
 -- [2]
-assert(results_1["replace_1_2"][2])
+assert(results["replace_1_2"][2])
 -- Successful commit return nil
-assert(not results_1["commit_1"])
+assert(not results["commit_1"])
 -- Error because of transaction conflict
-assert(results_1["commit_2"])
+assert(results["commit_2"])
 -- [1, 1]
-assert(results_1["select_1_1_A"][1])
+assert(results["select_1_1_A"][1])
 -- commit_1 could have ended before commit_2, so
 -- here we can get both empty select and [1, 1]
 -- for results_1["select_1_2_A"][1]
 
-futures_2 = {}
--- Simple read/write conflict.
-futures_2["begin_1"] = stream_1:begin({is_async = true})
-futures_2["begin_2"] = stream_2:begin({is_async = true})
-futures_2["select_2_1"] = space_2_1:select({1}, {is_async = true})
-futures_2["select_2_2"] = space_2_2:select({1}, {is_async = true})
-futures_2["replace_2_1"] = space_2_1:replace({1, 1}, {is_async = true})
-futures_2["replace_2_2"] = space_2_2:replace({1, 2}, {is_async = true})
-futures_2["commit_1"] = stream_1:commit({is_async = true})
-futures_2["commit_2"] = stream_2:commit({is_async = true})
-futures_2["select_2_1_A"] = space_2_1:select({}, {is_async = true})
-futures_2["select_2_2_A"] = space_2_2:select({}, {is_async = true})
-
-results_2 = wait_and_return_results(futures_2)
--- Successful begin return nil
-assert(not results_2["begin_1"])
-assert(not results_2["begin_2"])
--- []
-assert(not results_2["select_2_1"][1])
-assert(not results_2["select_2_2"][1])
--- [1]
-assert(results_2["replace_2_1"][1])
--- [1]
-assert(results_2["replace_2_1"][2])
--- [1]
-assert(results_2["replace_2_2"][1])
--- [2]
-assert(results_2["replace_2_2"][2])
--- Successful commit return nil
-assert(not results_2["commit_1"])
--- Error because of transaction conflict
-assert(results_2["commit_2"])
--- [1, 1]
-assert(results_2["select_2_1_A"][1])
--- commit_1 could have ended before commit_2, so
--- here we can get both empty select and [1, 1]
--- for results_1["select_2_2_A"][1]
+test_run:wait_cond(function() return get_current_stream_count() == 0 end)
+test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
 
 test_run:switch('test')
--- Both select return tuple [1, 1], transaction commited
-s1:select()
-s2:select()
-s1:drop()
-s2:drop()
-errinj = box.error.injection
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0)
-assert(errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0)
+-- Select return tuple [1, 1], transaction commited
+s:select()
 test_run:switch('default')
-conn:close()
-test_run:wait_cond(function () return get_current_connection_count() == 0 end)
-test_run:cmd("stop server test")
+cleanup_and_stop_server(conn)
 
 -- Checks for iproto call/eval/execute in stream
-test_run:cmd("start server test with args='10, true'")
-server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
+conn, stream, space = start_server_and_init(true)
+space_no_stream = conn.space.test
+
 test_run:switch("test")
-s = box.schema.space.create('test', { engine = 'memtx' })
-_ = s:create_index('primary')
 function ping() return "pong" end
 test_run:switch('default')
-
-conn = net_box.connect(server_addr)
-assert(conn:ping())
-stream = conn:new_stream()
-space = stream.space.test
-space_no_stream = conn.space.test
 
 -- successful begin using stream:call
 stream:call('box.begin')
@@ -913,45 +572,26 @@ stream:call('box.rollback')
 -- Empty selects transaction rollbacked
 space:select({})
 space_no_stream:select{}
+
+test_run:wait_cond(function() return get_current_stream_count() == 0 end)
+test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+
 test_run:switch("test")
 -- Empty select transaction rollbacked
 s:select()
-s:drop()
-errinj = box.error.injection
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0)
-assert(errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0)
 test_run:switch('default')
-conn:close()
-test_run:wait_cond(function () return get_current_connection_count() == 0 end)
-test_run:cmd("stop server test")
+cleanup_and_stop_server(conn)
 
 -- Simple test which demostrates that stream immediately
 -- destroyed, when no processing messages in stream and
 -- no active transaction.
-
-test_run:cmd("start server test with args='10, true'")
-server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
-test_run:switch("test")
-s = box.schema.space.create('test', { engine = 'memtx' })
-_ = s:create_index('primary')
-test_run:switch('default')
-
-conn = net_box.connect(server_addr)
-assert(conn:ping())
-stream = conn:new_stream()
-space = stream.space.test
+conn, stream, space = start_server_and_init(true)
 for i = 1, 10 do space:replace{i} end
-test_run:switch("test")
 -- All messages was processed, so stream object was immediately
 -- deleted, because no active transaction started.
-errinj = box.error.injection
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0)
-assert(errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0)
-s:drop()
-test_run:switch('default')
-conn:close()
-test_run:wait_cond(function () return get_current_connection_count() == 0 end)
-test_run:cmd("stop server test")
+test_run:wait_cond(function() return get_current_stream_count() == 0 end)
+test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+cleanup_and_stop_server(conn)
 
 -- Transaction tests for sql iproto requests.
 -- All this functions are copy-paste from sql/ddl.test.lua,
@@ -1153,13 +793,10 @@ monster_ddl_is_clean()
 monster_ddl_cmp_res(ddl_res, true_ddl_res)
 monster_ddl_cmp_res(check_res, true_check_res)
 
-test_run:switch("test")
 -- All messages was processed, so stream object was immediately
 -- deleted, because no active transaction started.
-errinj = box.error.injection
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0)
-assert(errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0)
-test_run:switch('default')
+test_run:wait_cond(function() return get_current_stream_count() == 0 end)
+test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
 conn:close()
 test_run:wait_cond(function () return get_current_connection_count() == 0 end)
 
