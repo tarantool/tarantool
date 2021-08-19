@@ -136,7 +136,7 @@ deploy:
 	refs/tags/*-alpha*|refs/tags/*-beta*|refs/tags/*-rc*) \
 	    ./tools/update_repo.sh -o=${OS} -d=${DIST}            \
 			-b="${PRERELEASE_REPO_S3_DIR}/${BUCKET}" build ; \
-	        ;;
+	        ;;                                                    \
 	refs/tags/*)                                                  \
 		./tools/update_repo.sh -o=${OS} -d=${DIST}            \
 			-b="${RELEASE_REPO_S3_DIR}/${BUCKET}" build ; \
