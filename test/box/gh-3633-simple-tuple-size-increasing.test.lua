@@ -1,6 +1,6 @@
 env = require('test_run')
 test_run = env.new()
-test_run:cmd("create server test with script='box/gh-3633-simple-tuple-size-increasing.lua'")
+test_run:cmd("create server test with script='box/simple-tuple-size-increasing.lua'")
 test_run:cmd("start server test")
 test_run:cmd("switch test")
 
