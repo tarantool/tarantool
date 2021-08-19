@@ -115,16 +115,24 @@ vms_shutdown:
 # ######
 
 GIT_DESCRIBE=$(shell git describe HEAD)
+GIT_TAG=$(shell git tag --points-at HEAD)
 MAJOR_VERSION=$(word 1,$(subst ., ,$(GIT_DESCRIBE)))
 BUCKET="series-$(MAJOR_VERSION)"
 S3_BUCKET_URL="s3://tarantool_repo/sources"
 
 deploy_prepare:
-	[ -d packpack ] || \
-		git clone https://github.com/packpack/packpack.git packpack
+	rm -rf packpack
+	git clone https://github.com/packpack/packpack.git packpack
+	(cd packpack && patch -p1 < ../extra/packpack-dont-decline-custom-version.patch)
 	rm -rf build
 
 package: deploy_prepare
+	if [ -n "$(GIT_TAG)" ]; then                                                                                    \
+		export VERSION="$$(echo $(GIT_TAG) | sed 's/-/~/')";                                                    \
+	else                                                                                                            \
+		export VERSION="$$(echo $(GIT_DESCRIBE) | sed 's/-\([0-9]\+\)-g[0-9a-f]\+$$/.\1/' | sed 's/-/~/').dev"; \
+	fi;                                                                                                             \
+	echo VERSION=$$VERSION;                                                                                         \
 	PACKPACK_EXTRA_DOCKER_RUN_PARAMS="--network=host ${PACKPACK_EXTRA_DOCKER_RUN_PARAMS}" ./packpack/packpack
 
 # found that libcreaterepo_c.so installed in local lib path
@@ -144,6 +152,12 @@ deploy:
 	esac
 
 source: deploy_prepare
+	if [ -n "$(GIT_TAG)" ]; then                                                                     \
+		export VERSION=$(GIT_TAG);                                                               \
+	else                                                                                             \
+		export VERSION="$$(echo $(GIT_DESCRIBE) | sed 's/-\([0-9]\+\)-g[0-9a-f]\+$$/.\1/').dev"; \
+	fi;                                                                                              \
+	echo VERSION=$$VERSION;                                                                          \
 	TARBALL_COMPRESSOR=gz packpack/packpack tarball
 
 source_deploy: source

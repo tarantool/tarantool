@@ -1,0 +1,18 @@
+diff --git a/pack/config.mk b/pack/config.mk
+index 2ceb36d..6f8dfaa 100644
+--- a/pack/config.mk
++++ b/pack/config.mk
+@@ -42,10 +42,12 @@ DESCRIBE := $(shell git describe --long --always)
+ # Sic: please follow Semantic Versioning (http://semver.org),
+ # Debian policies and Fedora guidelines then planning your releases.
+ #
+-VERSION ?= $(shell echo $(DESCRIBE) | sed -n 's/^\([0-9\.]*\)-\([0-9]*\)-\([a-z0-9]*\)/\1.\2/p')
++ifeq ($(VERSION),)
++VERSION = $(shell echo $(DESCRIBE) | sed -n 's/^\([0-9\.]*\)-\([0-9]*\)-\([a-z0-9]*\)/\1.\2/p')
+ ifeq ($(VERSION),) # Fallback
+ VERSION := 0.0.1
+ endif
++endif
+ 
+ # The number of times this version of the software has been packaged.
+ # This feature is not implemented yet, therefore value is always set to 1.
