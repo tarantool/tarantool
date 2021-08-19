@@ -11,7 +11,12 @@ runs:
         # create packages
         make -f .gitlab.mk package
         # deploy packages
+        #
+        # The automatic deployment is disabled for arm64, because
+        # the necessary changes for the update_repos.sh tool are
+        # not ready now.
         if ${{ github.event_name == 'push' &&
+          ! endsWith(github.workflow, '_arm') &&
           ( github.ref == 'refs/heads/master' ||
             github.ref == 'refs/heads/1.10' ||
             startsWith(github.ref, 'refs/heads/2.') ||
