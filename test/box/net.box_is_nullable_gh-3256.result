@@ -72,11 +72,7 @@ parts[1].is_nullable == false
 ---
 - true
 ...
-if _TARANTOOL >= '2.2.1' then                    \
-    return parts[1].collation == 'test'          \
-else                                             \
-    return parts[1].collation_id == collation_id \
-end
+parts[1].collation == 'test'
 ---
 - true
 ...
