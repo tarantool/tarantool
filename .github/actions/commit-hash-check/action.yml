@@ -1,0 +1,13 @@
+name: 'Check Commit SHA'
+description: 'Checks if commit sha exist in repo'
+inputs:
+  commit:
+    description: 'Commit ID'
+    required: false
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Check Commit SHA'
+      run: |
+        git checkout ${{ inputs.commit }}
+      shell: bash

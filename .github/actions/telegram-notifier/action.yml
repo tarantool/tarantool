@@ -1,0 +1,23 @@
+# every action has a name
+name: 'Send Telegram Message'
+# description
+description: 'This action sends telegram message'
+# input parameters to be taken from user
+inputs:
+  token: # it will be available in workflow as environment variable with name INPUT_TOKEN
+    required: true
+    description: 'Token for the bot'
+  to: # token variable available in workflow as env var named INPUT_TOKEN
+    required: true
+    description: 'Token of the bot that sends message'
+  message: # message variable available in workflow as env var named INPUT_MESSAGE
+    required: true
+    description: 'Message that bot will send'
+  disable_web_page_preview:
+    required: false
+    description: 'Preview web page if False, else disable preview'
+
+# definition how we want our action
+runs:
+  using: docker # we are saying this action will run on docker
+  image: 'Dockerfile' # we will use our own Dockerfile to build an image and run it.
