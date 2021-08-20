@@ -1,4 +1,4 @@
-# bugfix/core
+## bugfix/core
 
 * Now tarantool yields when scanning `.xlog` files for the latest applied vclock
   and when finding the right place in `.xlog`s to start recovering. This means

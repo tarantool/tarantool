@@ -1,4 +1,4 @@
-## core/bugfix
+## bugfix/core
 
  * Fixed error, related to the fact, that if user changed listen address,
    all iproto threads closed same socket multiple times.

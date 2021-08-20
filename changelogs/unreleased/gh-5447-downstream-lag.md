@@ -1,4 +1,4 @@
-#feature/replication
+## feature/replication
 
  * Introduced `box.info.replication[n].downstream.lag` field to monitor
    state of replication. This member represents a lag between the main
