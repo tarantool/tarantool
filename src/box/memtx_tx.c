@@ -652,6 +652,10 @@ memtx_tx_story_link_top(struct memtx_story *new_top,
 	}
 }
 
+static int
+memtx_tx_track_read_story_slow(struct txn *txn, struct memtx_story *story,
+			       uint64_t index_mask);
+
 /**
  * Unlink a @a story from history chain in @a index (in both directions),
  * where old_top was at the top of chain (that means that index itself
@@ -677,8 +681,30 @@ memtx_tx_story_unlink_top_light(struct memtx_story *story, uint32_t idx)
 		/* Rebind gap records to the new top of the list */
 		struct memtx_story_link *old_link = &old_story->link[idx];
 		rlist_splice(&old_link->nearby_gaps, &link->nearby_gaps);
+
+		/*
+		 * Rebind read trackers in order to conflict
+		 * readers in case of rollback of this txn.
+		 */
+		struct tx_read_tracker *tracker;
+		uint64_t index_mask = 1ull << (idx & 63);
+		rlist_foreach_entry(tracker, &story->reader_list,
+				    in_reader_list) {
+			if ((tracker->index_mask & index_mask) != 0 &&
+			    memtx_tx_track_read_story_slow(tracker->reader,
+							   old_story,
+							   index_mask) != 0) {
+				diag_log();
+				unreachable();
+				panic("failed to rebind read tracker");
+			}
+		}
 	}
 }
+
+int
+memtx_tx_track_point_slow(struct txn *txn, struct index *index,
+			  const char *key);
 
 /**
  * Unlink a @a story from history chain in @a index (in both directions),
@@ -712,8 +738,41 @@ memtx_tx_story_unlink_top(struct memtx_story *story, uint32_t idx)
 	}
 	assert(story->tuple == removed);
 	story->link[idx].in_index = NULL;
-	if (old_story != NULL)
+	if (old_story != NULL) {
 		old_story->link[idx].in_index = index;
+	} else {
+		/*
+		 * Convert read trackers to point holes in order to conflict
+		 * readers in case of rollback of this txn.
+		 */
+		struct tx_read_tracker *tracker;
+		/* Alloc key on fiber gc (doesn't matter in case of rollback) */
+		const char *key = tuple_extract_key(story->tuple,
+						    index->def->key_def,
+						    MULTIKEY_NONE, NULL);
+		if (key == NULL) {
+			diag_log();
+			unreachable();
+			panic("failed to extract and allocate key from tuple");
+		}
+		uint32_t part_count = mp_decode_array(&key);
+		assert(part_count == index->def->key_def->part_count);
+		/* Suppress "unused variable" in release */
+		(void)part_count;
+
+		uint64_t index_mask = 1ull << (idx & 63);
+		rlist_foreach_entry(tracker, &story->reader_list,
+				    in_reader_list) {
+			if ((tracker->index_mask & index_mask) != 0 &&
+			    memtx_tx_track_point_slow(tracker->reader, index,
+						      key) != 0) {
+				diag_log();
+				unreachable();
+				panic("failed to convert read tracker"
+				      " to point hole");
+			}
+		}
+	}
 
 	/*
 	 * A space holds references to all his tuples.
@@ -729,10 +788,6 @@ memtx_tx_story_unlink_top(struct memtx_story *story, uint32_t idx)
 
 	memtx_tx_story_unlink_top_light(story, idx);
 }
-
-static int
-memtx_tx_track_read_story_slow(struct txn *txn, struct memtx_story *story,
-			       uint64_t index_mask);
 
 /**
  * Unlink a @a story from history chain in @a index in both directions.
@@ -759,14 +814,17 @@ memtx_tx_story_unlink_both(struct memtx_story *story, uint32_t idx)
 		 * Rebind read trackers in order to conflict
 		 * readers in case of rollback of this txn.
 		 */
-		struct tx_read_tracker *tracker, *tmp;
+		struct tx_read_tracker *tracker;
 		uint64_t index_mask = 1ull << (idx & 63);
-		rlist_foreach_entry_safe(tracker, &story->reader_list,
-					 in_reader_list, tmp) {
-			if ((tracker->index_mask & index_mask) != 0) {
-				memtx_tx_track_read_story_slow(tracker->reader,
-							       newer_story,
-							       index_mask);
+		rlist_foreach_entry(tracker, &story->reader_list,
+				    in_reader_list) {
+			if ((tracker->index_mask & index_mask) != 0 &&
+			    memtx_tx_track_read_story_slow(tracker->reader,
+							   newer_story,
+							   index_mask) != 0) {
+				diag_log();
+				unreachable();
+				panic("failed to rebind read tracker");
 			}
 		}
 	}
