@@ -30,13 +30,16 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct lua_State;
 void tarantool_lua_fiber_cond_init(struct lua_State *L);
+
+struct fiber_cond;
+struct fiber_cond *
+luaT_checkfibercond(struct lua_State *L, int idx);
 
 #if defined(__cplusplus)
 } /* extern "C" */
