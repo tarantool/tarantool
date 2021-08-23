@@ -2452,9 +2452,9 @@ mem_cmp_num(const struct Mem *a, const struct Mem *b)
 		}
 		case MEM_TYPE_DOUBLE: {
 			if (b->u.r >= 1e38)
-				return 1;
-			if (b->u.r <= -1e38)
 				return -1;
+			if (b->u.r <= -1e38)
+				return 1;
 			decimal_t dec;
 			decimal_t *d = decimal_from_double(&dec, b->u.r);
 			assert(d != NULL && d == &dec);
