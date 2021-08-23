@@ -232,7 +232,8 @@ sql_result_text64(sql_context * pCtx,
 void
 sql_result_value(sql_context * pCtx, sql_value * pValue)
 {
-	mem_copy(pCtx->pOut, pValue);
+	if (mem_copy(pCtx->pOut, pValue) != 0)
+		pCtx->is_aborted = true;
 }
 
 void

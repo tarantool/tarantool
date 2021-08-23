@@ -1785,13 +1785,15 @@ minmaxStep(sql_context * context, int NotUsed, sql_value ** argv)
 		bool is_max = (func->flags & SQL_FUNC_MAX) != 0;
 		cmp = sqlMemCompare(pBest, pArg, pColl);
 		if ((is_max && cmp < 0) || (!is_max && cmp > 0)) {
-			mem_copy(pBest, pArg);
+			if (mem_copy(pBest, pArg) != 0)
+				context->is_aborted = true;
 		} else {
 			sqlSkipAccumulatorLoad(context);
 		}
 	} else {
 		pBest->db = sql_context_db_handle(context);
-		mem_copy(pBest, pArg);
+		if (mem_copy(pBest, pArg) != 0)
+			context->is_aborted = true;
 	}
 }
 

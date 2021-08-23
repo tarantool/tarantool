@@ -2330,10 +2330,13 @@ sqlVdbeGetBoundValue(Vdbe * v, int iVar, u8 aff)
 		Mem *pMem = &v->aVar[iVar - 1];
 		if (!mem_is_null(pMem)) {
 			sql_value *pRet = sqlValueNew(v->db);
-			if (pRet) {
-				mem_copy(pRet, pMem);
-				mem_cast_implicit_old(pRet, aff);
+			if (pRet == NULL)
+				return NULL;
+			if (mem_copy(pRet, pMem) != 0) {
+				sqlValueFree(pRet);
+				return NULL;
 			}
+			mem_cast_implicit_old(pRet, aff);
 			return pRet;
 		}
 	}
