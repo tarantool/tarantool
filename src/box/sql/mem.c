@@ -3484,12 +3484,15 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 				goto error;
 			break;
 		case MP_EXT: {
-			assert(field.ext_type == MP_UUID ||
-			       field.ext_type == MP_DECIMAL);
-			if (field.ext_type == MP_UUID)
+			if (field.ext_type == MP_UUID) {
 				mem_set_uuid(&val[i], field.uuidval);
-			else
+			} else if (field.ext_type == MP_DECIMAL) {
 				mem_set_dec(&val[i], field.decval);
+			} else {
+				diag_set(ClientError, ER_SQL_EXECUTE,
+					 "Unsupported type passed from Lua");
+				goto error;
+			}
 			break;
 		}
 		case MP_NIL:
