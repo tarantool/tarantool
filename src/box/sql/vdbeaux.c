@@ -2318,8 +2318,12 @@ sqlVdbeGetBoundValue(struct Vdbe *v, int iVar)
 		Mem *pMem = &v->aVar[iVar - 1];
 		if (!mem_is_null(pMem)) {
 			sql_value *pRet = sqlValueNew(v->db);
-			if (pRet != NULL)
-				mem_copy(pRet, pMem);
+			if (pRet == NULL)
+				return NULL;
+			if (mem_copy(pRet, pMem) != 0) {
+				sqlValueFree(pRet);
+				return NULL;
+			}
 			return pRet;
 		}
 	}

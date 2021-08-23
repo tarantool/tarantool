@@ -1913,7 +1913,8 @@ mem_copy(struct Mem *to, const struct Mem *from)
 	assert((to->flags & MEM_Zero) == 0 || to->type == MEM_TYPE_BIN);
 	if ((to->flags & MEM_Zero) != 0)
 		return sqlVdbeMemExpandBlob(to);
-	to->zMalloc = sqlDbReallocOrFree(to->db, to->zMalloc, to->n);
+	to->zMalloc = sqlDbRealloc(to->db, to->zMalloc, MAX(32, to->n));
+	assert(to->zMalloc != NULL || sql_get()->mallocFailed != 0);
 	if (to->zMalloc == NULL)
 		return -1;
 	to->szMalloc = sqlDbMallocSize(to->db, to->zMalloc);

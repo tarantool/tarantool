@@ -978,7 +978,8 @@ case OP_Copy: {
 	pOut = &aMem[pOp->p2];
 	assert(pOut!=pIn1);
 	while( 1) {
-		mem_copy(pOut, pIn1);
+		if (mem_copy(pOut, pIn1) != 0)
+			goto abort_due_to_error;
 		REGISTER_TRACE(p, pOp->p2+pOp->p3-n, pOut);
 		if ((n--)==0) break;
 		pOut++;
