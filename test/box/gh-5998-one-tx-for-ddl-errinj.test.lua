@@ -9,8 +9,11 @@ s2 = box.schema.space.create('s2')
 _ = s1:create_index('pk')
 _ = s2:create_index('pk')
 
+-- Insert into the second space a bit more tuples in oder to make
+-- secondary index build of the first space faster.
+--
 for i = 0, 10 do s1:replace{i} end
-for i = 0, 10 do s2:replace{i} end
+for i = 0, 100 do s2:replace{i} end
 
 errinj = box.error.injection
 fiber = require('fiber')
@@ -24,23 +27,21 @@ function create_sk_in_tx(space, name, channel)
     box.begin()
     errinj.set('ERRINJ_BUILD_INDEX_DELAY', true)
     space:create_index(name)
-    channel:get()
-    box.commit()
+    _ = pcall(box.commit)
+    assert(channel:is_full() == false)
     channel:put(true)
 end
 _ = test_run:cmd("setopt delimiter ''");
 
-f1 = fiber.new(create_sk_in_tx, box.space.s1, "sk1", channel1)
-f2 = fiber.new(create_sk_in_tx, box.space.s2, "sk2", channel2)
-fiber.sleep(0)
+f1 = fiber.create(create_sk_in_tx, box.space.s1, "sk1", channel1)
+f2 = fiber.create(create_sk_in_tx, box.space.s2, "sk2", channel2)
 
 errinj.set('ERRINJ_BUILD_INDEX_DELAY', false);
-channel1:put(true)
-fiber.sleep(0.01)
 channel1:get()
+channel2:get()
 
-assert(box.space.s2.index[1] == nil)
 assert(box.space.s1.index[1] ~= nil)
+assert(box.space.s2.index[1] == nil)
 
 box.space.s1:drop()
 box.space.s2:drop()
