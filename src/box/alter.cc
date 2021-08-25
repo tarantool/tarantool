@@ -4236,8 +4236,10 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 		if (new_tuple != NULL) {
 			uint32_t major, minor, patch;
 			if (tuple_field_u32(new_tuple, 1, &major) != 0 ||
-			    tuple_field_u32(new_tuple, 2, &minor) != 0)
-				tnt_raise(ClientError, ER_WRONG_DD_VERSION);
+			    tuple_field_u32(new_tuple, 2, &minor) != 0) {
+				diag_set(ClientError, ER_WRONG_DD_VERSION);
+				return -1;
+			}
 			/* Version can be major.minor with no patch. */
 			if (tuple_field_u32(new_tuple, 3, &patch) != 0)
 				patch = 0;
