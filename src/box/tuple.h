@@ -1102,7 +1102,7 @@ static inline int
 tuple_field_uuid(struct tuple *tuple, int fieldno, struct tt_uuid *out)
 {
 	const char *value = tuple_field_cstr(tuple, fieldno);
-	if (tt_uuid_from_string(value, out) != 0) {
+	if (value == NULL || tt_uuid_from_string(value, out) != 0) {
 		diag_set(ClientError, ER_INVALID_UUID, value);
 		return -1;
 	}
