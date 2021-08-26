@@ -375,6 +375,10 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 			bind->uuid = *field.uuidval;
 			break;
 		}
+		if (field.ext_type == MP_DECIMAL) {
+			bind->dec = *field.decval;
+			break;
+		}
 		diag_set(ClientError, ER_SQL_BIND_TYPE, "USERDATA",
 			 sql_bind_name(bind));
 		return -1;

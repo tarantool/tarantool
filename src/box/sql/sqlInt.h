@@ -76,6 +76,8 @@
 #include "box/txn.h"
 #include "trivia/util.h"
 
+#include "decimal.h"
+
 /*
  * These #defines should enable >2GB file support on POSIX if the
  * underlying operating system supports it.  If the OS lacks
@@ -638,6 +640,9 @@ sql_bind_zeroblob64(sql_stmt *, int,
 
 int
 sql_bind_uuid(struct sql_stmt *stmt, int i, const struct tt_uuid *uuid);
+
+int
+sql_bind_dec(struct sql_stmt *stmt, int i, const decimal_t *dec);
 
 /**
  * Return the number of wildcards that should be bound to.

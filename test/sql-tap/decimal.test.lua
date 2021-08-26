@@ -3,7 +3,7 @@ local build_path = os.getenv("BUILDDIR")
 package.cpath = build_path..'/test/sql-tap/?.so;'..build_path..'/test/sql-tap/?.dylib;'..package.cpath
 
 local test = require("sqltester")
-test:plan(101)
+test:plan(104)
 
 local dec = require("decimal")
 local dec1 = dec.new("111")
@@ -937,6 +937,27 @@ test:do_catchsql_test(
     ]], {
         1, "Inconsistent types: expected string or varbinary got decimal(111)"
     })
+
+-- Make sure that DECIMAL value can be bound.
+test:do_test(
+    "dec-16-1",
+    function()
+        return box.execute([[SELECT ?;]], {dec1}).rows[1][1]
+    end,
+    dec1)
+test:do_test(
+    "dec-16-2",
+    function()
+        return box.execute([[SELECT $2;]], {123, dec2}).rows[1][1]
+    end,
+    dec2)
+
+test:do_test(
+    "dec-16-3",
+    function()
+        return box.execute([[SELECT :two;]], {{[":two"] = dec3}}).rows[1][1]
+    end,
+    dec3)
 
 test:execsql([[
     DROP TRIGGER t;

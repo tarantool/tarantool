@@ -192,8 +192,10 @@ sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
 		return sql_bind_blob64(stmt, pos, (const void *) p->s, p->bytes,
 				       SQL_STATIC);
 	case MP_EXT:
-		assert(p->ext_type == MP_UUID);
-		return sql_bind_uuid(stmt, pos, &p->uuid);
+		assert(p->ext_type == MP_UUID || p->ext_type == MP_DECIMAL);
+		if (p->ext_type == MP_UUID)
+			return sql_bind_uuid(stmt, pos, &p->uuid);
+		return sql_bind_dec(stmt, pos, &p->dec);
 	default:
 		unreachable();
 	}

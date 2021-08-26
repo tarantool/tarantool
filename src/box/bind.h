@@ -40,6 +40,7 @@ extern "C" {
 #include <stdlib.h>
 
 #include "msgpuck.h"
+#include "decimal.h"
 #include "uuid/tt_uuid.h"
 #include "mp_extension_types.h"
 
@@ -72,6 +73,7 @@ struct sql_bind {
 		/** For string or blob. */
 		const char *s;
 		struct tt_uuid uuid;
+		decimal_t dec;
 	};
 };
 

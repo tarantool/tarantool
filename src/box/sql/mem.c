@@ -293,7 +293,7 @@ mem_set_double(struct Mem *mem, double value)
 }
 
 void
-mem_set_dec(struct Mem *mem, decimal_t *d)
+mem_set_dec(struct Mem *mem, const decimal_t *d)
 {
 	mem_clear(mem);
 	mem->u.d = *d;

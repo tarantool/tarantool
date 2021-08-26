@@ -312,7 +312,7 @@ mem_set_uuid(struct Mem *mem, const struct tt_uuid *uuid);
 
 /** Clear MEM and set it to DECIMAL. */
 void
-mem_set_dec(struct Mem *mem, decimal_t *dec);
+mem_set_dec(struct Mem *mem, const decimal_t *dec);
 
 /** Clear MEM and set it to STRING. The string belongs to another object. */
 void
