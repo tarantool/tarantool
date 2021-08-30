@@ -1289,7 +1289,6 @@ applier_subscribe(struct applier *applier)
 		 * the replica, and replica has to check whether
 		 * its and master's cluster ids match.
 		 */
-		vclock_create(&applier->remote_vclock_at_subscribe);
 		xrow_decode_subscribe_response_xc(&row, &cluster_id,
 					&applier->remote_vclock_at_subscribe);
 		applier->instance_id = row.replica_id;

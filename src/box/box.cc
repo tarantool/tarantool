@@ -2610,7 +2610,7 @@ box_process_register(struct ev_io *io, struct xrow_header *header)
 {
 	assert(header->type == IPROTO_REGISTER);
 
-	struct tt_uuid instance_uuid = uuid_nil;
+	struct tt_uuid instance_uuid;
 	struct vclock replica_vclock;
 	uint32_t replica_version_id;
 	xrow_decode_register_xc(header, &instance_uuid, &replica_vclock,
@@ -2738,8 +2738,8 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	assert(header->type == IPROTO_JOIN);
 
 	/* Decode JOIN request */
-	struct tt_uuid instance_uuid = uuid_nil;
-	uint32_t replica_version_id = 0;
+	struct tt_uuid instance_uuid;
+	uint32_t replica_version_id;
 	xrow_decode_join_xc(header, &instance_uuid, &replica_version_id);
 
 	/* Check that bootstrap has been finished */
@@ -2845,11 +2845,10 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	if (!is_box_configured)
 		tnt_raise(ClientError, ER_LOADING);
 
-	struct tt_uuid replica_uuid = uuid_nil;
-	struct tt_uuid peer_replicaset_uuid = uuid_nil;
+	struct tt_uuid replica_uuid;
+	struct tt_uuid peer_replicaset_uuid;
 	struct vclock replica_clock;
 	uint32_t replica_version_id;
-	vclock_create(&replica_clock);
 	bool anon;
 	uint32_t id_filter;
 	xrow_decode_subscribe_xc(header, &peer_replicaset_uuid, &replica_uuid,

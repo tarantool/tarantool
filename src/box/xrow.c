@@ -1561,10 +1561,19 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		return -1;
 	}
 
-	if (anon)
+	if (replicaset_uuid != NULL)
+		*replicaset_uuid = uuid_nil;
+	if (instance_uuid != NULL)
+		*instance_uuid = uuid_nil;
+	if (vclock != NULL)
+		vclock_create(vclock);
+	if (version_id != NULL)
+		*version_id = 0;
+	if (anon != NULL)
 		*anon = false;
-	if (id_filter)
+	if (id_filter != NULL)
 		*id_filter = 0;
+
 	d = data;
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
