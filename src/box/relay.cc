@@ -654,8 +654,6 @@ relay_reader_f(va_list ap)
 			struct xrow_header xrow;
 			coio_read_xrow_timeout_xc(&io, &ibuf, &xrow,
 					replication_disconnect_timeout());
-			/* vclock is followed while decoding, zeroing it. */
-			vclock_create(&relay->recv_vclock);
 			xrow_decode_vclock_xc(&xrow, &relay->recv_vclock);
 			fiber_cond_signal(&relay->reader_cond);
 		}
