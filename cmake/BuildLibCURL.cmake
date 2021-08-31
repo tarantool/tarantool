@@ -144,6 +144,11 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_IMAP=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_SMTP=OFF")
 
+    # We need PIC at least to enable build for Fedora on
+    # ARM64 CPU. Without it configuration with Fedora
+    # link hardening fails.
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
+
     include(ExternalProject)
     ExternalProject_Add(
         bundled-libcurl-project
