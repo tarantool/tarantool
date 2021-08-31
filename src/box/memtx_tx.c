@@ -687,10 +687,16 @@ memtx_tx_story_unlink_top(struct memtx_story *story, uint32_t idx)
 	struct memtx_story_link *link = &story->link[idx];
 
 	assert(link->newer_story == NULL);
-	struct index *index = story->space->index[idx];
+	/*
+	 * Note that link[idx].in_index may not be the same as
+	 * story->space->index[idx] in case space is going to be deleted
+	 * in memtx_tx_on_space_delete(): during space alter operation we
+	 * swap all indexes to the new space object and instead use dummy
+	 * structs.
+	 */
+	struct index *index = story->link[idx].in_index;
 
 	struct memtx_story *old_story = link->older_story;
-	assert(story->link[idx].in_index == index);
 	assert(old_story == NULL || old_story->link[idx].in_index == NULL);
 	struct tuple *old_tuple = old_story == NULL ? NULL : old_story->tuple;
 	struct tuple *removed, *unused;
@@ -2014,20 +2020,19 @@ memtx_tx_on_space_delete(struct space *space)
 			= rlist_first_entry(&space->memtx_stories,
 					    struct memtx_story,
 					    in_space_stories);
+		/*
+		 * Space is to be altered (not necessarily dropped). Since
+		 * this operation is considered to be DDL, all other
+		 * transactions will be aborted anyway. We can't postpone
+		 * rollback till actual call of commit/rollback since stories
+		 * should be destroyed immediately.
+		 */
+		if (story->add_stmt != NULL)
+			memtx_tx_history_rollback_stmt(story->add_stmt);
+		if (story->del_stmt != NULL)
+			memtx_tx_history_rollback_stmt(story->del_stmt);
 		rlist_del(&story->in_space_stories);
 		memtx_tx_story_full_unlink(story);
-		if (story->add_stmt != NULL) {
-			story->add_stmt->add_story = NULL;
-			story->add_stmt->space = NULL;
-			story->add_stmt = NULL;
-		}
-		while (story->del_stmt != NULL) {
-			struct txn_stmt *stmt = story->del_stmt;
-			stmt->del_story = NULL;
-			story->del_stmt = stmt->next_in_del_list;
-			stmt->next_in_del_list = NULL;
-			stmt->space = NULL;
-		}
 		memtx_tx_story_delete(story);
 	}
 }
