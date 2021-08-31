@@ -1182,6 +1182,51 @@ box.execute([[DROP TABLE k3;]])
 box.execute([[DROP TABLE k2;]])
 box.execute([[DROP TABLE k1;]])
 
+-- gh-6318: make sure that space alter does not result in dirty read.
+--
+s3 = box.schema.space.create('test', { engine = 'memtx' })
+_ = s3:create_index('primary')
+
+format = {{name = 'field1', type = 'unsigned'}}
+tx1:begin()
+tx1('s3:replace{2}')
+s3:select()
+s3:alter({format = format})
+s3:select{}
+-- Alter operation aborts transaction, so results of tx1 should be rolled back.
+--
+tx1:commit()
+s3:select()
+s3:drop()
+
+--gh-6263: basically the same as previous version but involves index creation.
+--
+s = box.schema.space.create('test')
+_ = s:create_index('pk')
+
+ch1 = fiber.channel()
+ch2 = fiber.channel()
+
+_ = test_run:cmd("setopt delimiter ';'")
+fiber.create(function()
+    box.begin()
+    s:insert{1, 1}
+    ch1:get()
+    _ = pcall(box.commit)
+    ch2:put(true)
+end)
+_ = test_run:cmd("setopt delimiter ''");
+
+s:create_index('sk', {parts = {{2, 'unsigned'}}})
+
+ch1:put(true)
+ch2:get()
+
+s.index.pk:select()
+s.index.sk:select()
+
+s:drop()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
