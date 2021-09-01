@@ -548,6 +548,12 @@ struct iproto_connection
 	enum iproto_connection_state state;
 	struct rlist in_stop_list;
 	/**
+	 * Flag indicates, that client sent SHUT_RDWR or connection
+	 * is closed from client side. When it is set to false, we
+	 * should not write to the socket.
+	 */
+	bool can_write;
+	/**
 	 * Hash table that holds all streams for this connection.
 	 * This field is accesable only from iproto thread.
 	 */
@@ -1253,6 +1259,11 @@ iproto_flush(struct iproto_connection *con)
 		/* Nothing to do. */
 		return 1;
 	}
+	if (!con->can_write) {
+		/* Receiving end was closed. Discard the output. */
+		*begin = *end;
+		return 0;
+	}
 	assert(begin->used < end->used);
 	struct iovec iov[SMALL_OBUF_IOV_MAX+1];
 	struct iovec *src = obuf->iov;
@@ -1282,8 +1293,18 @@ iproto_flush(struct iproto_connection *con)
 		begin->iov_len = advance == 0 ? begin->iov_len + offset: offset;
 		begin->pos += advance;
 		assert(begin->pos <= end->pos);
+		return -1;
 	} else if (nwr < 0 && ! sio_wouldblock(errno)) {
-		diag_raise();
+		/*
+		 * Don't close the connection on write error. Log the error and
+		 * don't write to the socket anymore. Continue processing
+		 * requests as usual, because the client might have closed the
+		 * socket, but still expect pending requests to complete.
+		 */
+		diag_log();
+		con->can_write = false;
+		*begin = *end;
+		return 0;
 	}
 	return -1;
 }
@@ -1294,24 +1315,19 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 {
 	struct iproto_connection *con = (struct iproto_connection *) watcher->data;
 
-	try {
-		int rc;
-		while ((rc = iproto_flush(con)) <= 0) {
-			if (rc != 0) {
-				ev_io_start(loop, &con->output);
-				return;
-			}
-			if (! ev_is_active(&con->input) &&
-			    rlist_empty(&con->in_stop_list)) {
-				ev_feed_event(loop, &con->input, EV_READ);
-			}
+	int rc;
+	while ((rc = iproto_flush(con)) <= 0) {
+		if (rc != 0) {
+			ev_io_start(loop, &con->output);
+			return;
 		}
-		if (ev_is_active(&con->output))
-			ev_io_stop(con->loop, &con->output);
-	} catch (Exception *e) {
-		e->log();
-		iproto_connection_close(con);
+		if (!ev_is_active(&con->input) &&
+		    rlist_empty(&con->in_stop_list)) {
+			ev_feed_event(loop, &con->input, EV_READ);
+		}
 	}
+	if (ev_is_active(&con->output))
+		ev_io_stop(con->loop, &con->output);
 }
 
 static struct iproto_connection *
@@ -1346,6 +1362,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread, int fd)
 	iproto_wpos_create(&con->wpos, con->tx.p_obuf);
 	iproto_wpos_create(&con->wend, con->tx.p_obuf);
 	con->parse_size = 0;
+	con->can_write = true;
 	con->long_poll_count = 0;
 	con->session = NULL;
 	rlist_create(&con->in_stop_list);
