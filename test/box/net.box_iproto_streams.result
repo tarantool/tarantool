@@ -26,6 +26,26 @@ function get_current_connection_count()
 end;
 ---
 ...
+function get_current_stream_count()
+    local total_net_stat_table =
+        test_run:cmd(string.format("eval test 'return box.stat.net()'"))[1]
+    assert(total_net_stat_table)
+    local stream_stat_table = total_net_stat_table.STREAMS
+    assert(stream_stat_table)
+    return stream_stat_table.current
+end;
+---
+...
+function get_current_msg_count()
+    local total_net_stat_table =
+        test_run:cmd(string.format("eval test 'return box.stat.net()'"))[1]
+    assert(total_net_stat_table)
+    local request_stat_table = total_net_stat_table.REQUESTS
+    assert(request_stat_table)
+    return request_stat_table.current
+end;
+---
+...
 function wait_and_return_results(futures)
     local results = {}
     for name, future in pairs(futures) do
@@ -340,6 +360,14 @@ assert(results["select_with_yeild_for_connection"])
   - [3]
   - [4]
 ...
+test_run:wait_cond(function () return get_current_stream_count() == 0 end)
+---
+- true
+...
+test_run:wait_cond(function () return get_current_msg_count() == 0 end)
+---
+- true
+...
 test_run:switch("test")
 ---
 - true
@@ -352,17 +380,6 @@ s:select()
   - [3]
   - [4]
   - [5]
-...
-errinj = box.error.injection
----
-...
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0)
----
-- true
-...
-assert(errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0)
----
-- true
 ...
 test_run:switch('default')
 ---
@@ -407,6 +424,14 @@ fiber.sleep(0)
 conn:close()
 ---
 ...
+test_run:wait_cond(function () return get_current_stream_count() == 0 end)
+---
+- true
+...
+test_run:wait_cond(function () return get_current_msg_count() == 0 end)
+---
+- true
+...
 test_run:wait_cond(function () return get_current_connection_count() == 0 end)
 ---
 - true
@@ -443,17 +468,6 @@ s:select{}
 ...
 s:drop()
 ---
-...
-errinj = box.error.injection
----
-...
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0)
----
-- true
-...
-assert(errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0)
----
-- true
 ...
 test_run:switch("default")
 ---

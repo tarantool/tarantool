@@ -251,7 +251,7 @@ box.space.features_sync:drop()
 
 local function check_stats(stat)
     local sub = test:test('feedback operation stats')
-    sub:plan(21)
+    sub:plan(23)
     local box_stat = box.stat()
     local net_stat = box.stat.net()
     for op, val in pairs(box_stat) do

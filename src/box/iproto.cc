@@ -364,6 +364,7 @@ enum rmean_net_name {
 	IPROTO_RECEIVED,
 	IPROTO_CONNECTIONS,
 	IPROTO_REQUESTS,
+	IPROTO_STREAMS,
 	IPROTO_LAST,
 };
 
@@ -372,6 +373,7 @@ const char *rmean_net_strings[IPROTO_LAST] = {
 	"RECEIVED",
 	"CONNECTIONS",
 	"REQUESTS",
+	"STREAMS",
 };
 
 static void
@@ -617,30 +619,6 @@ struct iproto_connection
 } while (0);
 #endif
 
-/*
- * TODO(gh-6293): Implement necessary statistic for iproto streams
- * and remove it from errinj.
- */
-static inline void
-errinj_stream_count_add(MAYBE_UNUSED int val)
-{
-#ifndef NDEBUG
-	struct errinj *inj =
-		errinj(ERRINJ_IPROTO_STREAM_COUNT, ERRINJ_INT);
-	__atomic_add_fetch(&inj->iparam, val, __ATOMIC_SEQ_CST);
-#endif
-}
-
-static inline void
-errinj_stream_msg_count_add(MAYBE_UNUSED int val)
-{
-#ifndef NDEBUG
-	struct errinj *inj =
-		errinj(ERRINJ_IPROTO_STREAM_MSG_COUNT, ERRINJ_INT);
-	__atomic_add_fetch(&inj->iparam, val, __ATOMIC_SEQ_CST);
-#endif
-}
-
 static struct iproto_stream *
 iproto_stream_new(struct iproto_connection *connection, uint64_t stream_id)
 {
@@ -652,7 +630,7 @@ iproto_stream_new(struct iproto_connection *connection, uint64_t stream_id)
 			 "mempool_alloc", "stream");
 		return NULL;
 	}
-	errinj_stream_count_add(1);
+	rmean_collect(connection->iproto_thread->rmean, IPROTO_STREAMS, 1);
 	stream->txn = NULL;
 	stailq_create(&stream->pending_requests);
 	stream->id = stream_id;
@@ -695,7 +673,6 @@ iproto_stream_delete(struct iproto_stream *stream)
 {
 	assert(stailq_empty(&stream->pending_requests));
 	assert(stream->txn == NULL);
-	errinj_stream_count_add(-1);
 	mempool_free(&stream->connection->iproto_thread->iproto_stream_pool, stream);
 }
 
@@ -1010,14 +987,6 @@ iproto_msg_start_processing_in_stream(struct iproto_msg *msg)
 			return -1;
 		}
 	}
-	/*
-	 * Not all messages belongs to stream. We can't determine which
-	 * messages belong to stream in `iproto_msg_new`, so we increment
-	 * ERRINJ_IPROTO_STREAM_MSG_COUNT here, when we already know it.
-	 * In `iproto_msg_delete` we decrement ERRINJ_IPROTO_STREAM_MSG_COUNT
-	 * only if msg->stream != NULL.
-	 */
-	errinj_stream_msg_count_add(1);
 	stream = (struct iproto_stream *)mh_i64ptr_node(con->streams, pos)->val;
 	assert(stream != NULL);
 	msg->stream = stream;
@@ -2281,7 +2250,6 @@ iproto_msg_finish_processing_in_stream(struct iproto_msg *msg)
 				   struct iproto_msg, in_stream);
 	assert(tmp == msg);
 	(void)tmp;
-	errinj_stream_msg_count_add(-1);
 
 	if (stailq_empty(&stream->pending_requests)) {
 		/*
@@ -2833,6 +2801,7 @@ struct iproto_cfg_msg: public cbus_call_msg
 			size_t mem_used;
 			size_t connections;
 			size_t requests;
+			size_t streams;
 		};
 		/** Pointer to evio_service, used for bind */
 		struct evio_service *binary;
@@ -2872,6 +2841,8 @@ iproto_fill_stat(struct iproto_thread *iproto_thread,
 		mempool_count(&iproto_thread->iproto_connection_pool);
 	cfg_msg->requests =
 		mempool_count(&iproto_thread->iproto_msg_pool);
+	cfg_msg->streams =
+		mempool_count(&iproto_thread->iproto_stream_pool);
 }
 
 static int
@@ -3007,6 +2978,29 @@ iproto_thread_connection_count(int thread_id)
 	assert(thread_id >= 0 && thread_id < iproto_threads_count);
 	iproto_do_cfg(&iproto_threads[thread_id], &cfg_msg);
 	return cfg_msg.connections;
+}
+
+size_t
+iproto_stream_count(void)
+{
+	struct iproto_cfg_msg cfg_msg;
+	size_t count = 0;
+	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_STAT);
+	for (int i = 0; i < iproto_threads_count; i++) {
+		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
+		count += cfg_msg.streams;
+	}
+	return count;
+}
+
+size_t
+iproto_thread_stream_count(int thread_id)
+{
+	struct iproto_cfg_msg cfg_msg;
+	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_STAT);
+	assert(thread_id >= 0 && thread_id < iproto_threads_count);
+	iproto_do_cfg(&iproto_threads[thread_id], &cfg_msg);
+	return cfg_msg.streams;
 }
 
 size_t
