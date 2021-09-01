@@ -17,18 +17,20 @@ function get_current_connection_count()
     return connection_stat_table.current
 end;
 function get_current_stream_count()
-    local name = "\"ERRINJ_IPROTO_STREAM_COUNT\""
-    local stream_count = test_run:cmd(
-        string.format("eval test 'return box.error.injection.get(%s)'", name
-    ))[1]
-    return stream_count
+    local total_net_stat_table =
+        test_run:cmd(string.format("eval test 'return box.stat.net()'"))[1]
+    assert(total_net_stat_table)
+    local stream_stat_table = total_net_stat_table.STREAMS
+    assert(stream_stat_table)
+    return stream_stat_table.current
 end;
-function get_current_stream_msg_count()
-    local name = "\"ERRINJ_IPROTO_STREAM_MSG_COUNT\""
-    local stream_msg_count = test_run:cmd(
-        string.format("eval test 'return box.error.injection.get(%s)'", name
-    ))[1]
-    return stream_msg_count
+function get_current_msg_count()
+    local total_net_stat_table =
+        test_run:cmd(string.format("eval test 'return box.stat.net()'"))[1]
+    assert(total_net_stat_table)
+    local request_stat_table = total_net_stat_table.REQUESTS
+    assert(request_stat_table)
+    return request_stat_table.current
 end;
 function wait_and_return_results(futures)
     local results = {}
@@ -197,7 +199,7 @@ space:select{}
 -- Check that there are no streams and messages, which
 -- was not deleted
 test_run:wait_cond(function() return get_current_stream_count() == 0 end)
-test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+test_run:wait_cond(function() return get_current_msg_count() == 0 end)
 
 cleanup_and_stop_server(stream)
 
@@ -231,7 +233,7 @@ test_run:switch('default')
 -- memtx_use_mvcc_engine = true.
 stream:commit()
 test_run:wait_cond(function() return get_current_stream_count() == 0 end)
-test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+test_run:wait_cond(function() return get_current_msg_count() == 0 end)
 
 -- Select return tuple, which was previously inserted,
 -- because transaction was successful
@@ -259,7 +261,7 @@ stream_1:commit()
 -- This transaction fails, because of conflict
 stream_2:commit()
 test_run:wait_cond(function() return get_current_stream_count() == 0 end)
-test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+test_run:wait_cond(function() return get_current_msg_count() == 0 end)
 
 -- Here we must accept [1, 1]
 space_1_1:select({})
@@ -285,7 +287,7 @@ stream:rollback()
 space:select({})
 
 test_run:wait_cond(function() return get_current_stream_count() == 0 end)
-test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+test_run:wait_cond(function() return get_current_msg_count() == 0 end)
 
 -- This is simple test is necessary because i have a bug
 -- with halting stream after rollback
@@ -312,7 +314,7 @@ conn:close()
 -- Check that there are no streams and messages, which
 -- was not deleted after connection close
 test_run:wait_cond(function() return get_current_stream_count() == 0 end)
-test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+test_run:wait_cond(function() return get_current_msg_count() == 0 end)
 test_run:wait_cond(function () return get_current_connection_count() == 0 end)
 
 test_run:switch("test")
@@ -344,7 +346,7 @@ conn:close()
 -- Check that there are no streams and messages, which
 -- was not deleted after connection close
 test_run:wait_cond(function() return get_current_stream_count() == 0 end)
-test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+test_run:wait_cond(function() return get_current_msg_count() == 0 end)
 test_run:wait_cond(function () return get_current_connection_count() == 0 end)
 
 
@@ -373,7 +375,7 @@ conn:close()
 -- Check that there are no streams and messages, which
 -- was not deleted after connection close
 test_run:wait_cond(function() return get_current_stream_count() == 0 end)
-test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+test_run:wait_cond(function() return get_current_msg_count() == 0 end)
 test_run:wait_cond(function () return get_current_connection_count() == 0 end)
 
 test_run:switch("test")
@@ -401,7 +403,7 @@ stream:commit()
 -- Check that there are no streams and messages, which
 -- was not deleted
 test_run:wait_cond(function() return get_current_stream_count() == 0 end)
-test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+test_run:wait_cond(function() return get_current_msg_count() == 0 end)
 
 test_run:switch('test')
 -- Here we get two tuples, commit was successful
@@ -447,7 +449,7 @@ assert(results["select"])
 assert(not results["commit"])
 
 test_run:wait_cond(function() return get_current_stream_count() == 0 end)
-test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+test_run:wait_cond(function() return get_current_msg_count() == 0 end)
 
 test_run:switch("test")
 -- Select return tuples, which was previously inserted,
@@ -497,7 +499,7 @@ assert(results["select_1_1_A"][1])
 -- for results_1["select_1_2_A"][1]
 
 test_run:wait_cond(function() return get_current_stream_count() == 0 end)
-test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+test_run:wait_cond(function() return get_current_msg_count() == 0 end)
 
 test_run:switch('test')
 -- Select return tuple [1, 1], transaction commited
@@ -574,7 +576,7 @@ space:select({})
 space_no_stream:select{}
 
 test_run:wait_cond(function() return get_current_stream_count() == 0 end)
-test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+test_run:wait_cond(function() return get_current_msg_count() == 0 end)
 
 test_run:switch("test")
 -- Empty select transaction rollbacked
@@ -590,7 +592,7 @@ for i = 1, 10 do space:replace{i} end
 -- All messages was processed, so stream object was immediately
 -- deleted, because no active transaction started.
 test_run:wait_cond(function() return get_current_stream_count() == 0 end)
-test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+test_run:wait_cond(function() return get_current_msg_count() == 0 end)
 cleanup_and_stop_server(conn)
 
 -- Transaction tests for sql iproto requests.
@@ -796,7 +798,7 @@ monster_ddl_cmp_res(check_res, true_check_res)
 -- All messages was processed, so stream object was immediately
 -- deleted, because no active transaction started.
 test_run:wait_cond(function() return get_current_stream_count() == 0 end)
-test_run:wait_cond(function() return get_current_stream_msg_count() == 0 end)
+test_run:wait_cond(function() return get_current_msg_count() == 0 end)
 conn:close()
 test_run:wait_cond(function () return get_current_connection_count() == 0 end)
 

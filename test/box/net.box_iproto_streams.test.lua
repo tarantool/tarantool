@@ -14,6 +14,22 @@ function get_current_connection_count()
     assert(connection_stat_table)
     return connection_stat_table.current
 end;
+function get_current_stream_count()
+    local total_net_stat_table =
+        test_run:cmd(string.format("eval test 'return box.stat.net()'"))[1]
+    assert(total_net_stat_table)
+    local stream_stat_table = total_net_stat_table.STREAMS
+    assert(stream_stat_table)
+    return stream_stat_table.current
+end;
+function get_current_msg_count()
+    local total_net_stat_table =
+        test_run:cmd(string.format("eval test 'return box.stat.net()'"))[1]
+    assert(total_net_stat_table)
+    local request_stat_table = total_net_stat_table.REQUESTS
+    assert(request_stat_table)
+    return request_stat_table.current
+end;
 function wait_and_return_results(futures)
     local results = {}
     for name, future in pairs(futures) do
@@ -141,12 +157,11 @@ results = wait_and_return_results(futures)
 -- Select will be processed earlier because of
 -- yeild in `replace_with_yeild` function
 assert(results["select_with_yeild_for_connection"])
+test_run:wait_cond(function () return get_current_stream_count() == 0 end)
+test_run:wait_cond(function () return get_current_msg_count() == 0 end)
 test_run:switch("test")
 -- [1] [2] [3] [4] [5]
 s:select()
-errinj = box.error.injection
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0)
-assert(errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0)
 test_run:switch('default')
 conn:close()
 test_run:wait_cond(function () return get_current_connection_count() == 0 end)
@@ -165,6 +180,8 @@ test_run:cmd("setopt delimiter ''");
 -- Give time to send
 fiber.sleep(0)
 conn:close()
+test_run:wait_cond(function () return get_current_stream_count() == 0 end)
+test_run:wait_cond(function () return get_current_msg_count() == 0 end)
 test_run:wait_cond(function () return get_current_connection_count() == 0 end)
 test_run:switch("test")
 -- select return tuples from [1] to [20]
@@ -172,9 +189,6 @@ test_run:switch("test")
 -- connection closed
 s:select{}
 s:drop()
-errinj = box.error.injection
-assert(errinj.get('ERRINJ_IPROTO_STREAM_COUNT') == 0)
-assert(errinj.get('ERRINJ_IPROTO_STREAM_MSG_COUNT') == 0)
 test_run:switch("default")
 test_run:cmd("stop server test")
 

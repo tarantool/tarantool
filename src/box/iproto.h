@@ -79,6 +79,19 @@ size_t
 iproto_thread_connection_count(int thread_id);
 
 /**
+ * Return the number of active iproto streams.
+ */
+size_t
+iproto_stream_count(void);
+
+/**
+ * Return the number of active iproto streams
+ * for the thread with the given id.
+ */
+size_t
+iproto_thread_stream_count(int thread_id);
+
+/**
  * Return the number of iproto requests in flight.
  */
 size_t

@@ -173,6 +173,10 @@ lbox_stat_net_index(struct lua_State *L)
 		lua_pushstring(L, "current");
 		lua_pushnumber(L, iproto_request_count());
 		lua_rawset(L, -3);
+	} else if (strcmp(key, "STREAMS") == 0) {
+		lua_pushstring(L, "current");
+		lua_pushnumber(L, iproto_stream_count());
+		lua_rawset(L, -3);
 	}
 	return 1;
 }
@@ -200,6 +204,7 @@ lbox_stat_net_call(struct lua_State *L)
 	iproto_rmean_foreach(set_stat_item, L);
 	inject_current_stat(L, "CONNECTIONS", iproto_connection_count());
 	inject_current_stat(L, "REQUESTS", iproto_request_count());
+	inject_current_stat(L, "STREAMS", iproto_stream_count());
 	return 1;
 }
 
@@ -217,6 +222,8 @@ lbox_stat_net_thread_index(struct lua_State *L)
 	inject_current_stat(L, "CONNECTIONS", value);
 	value = iproto_thread_request_count(thread_id);
 	inject_current_stat(L, "REQUESTS", value);
+	value = iproto_thread_stream_count(thread_id);
+	inject_current_stat(L, "STREAMS", value);
 	return 1;
 }
 
@@ -232,6 +239,8 @@ lbox_stat_net_thread_call(struct lua_State *L)
 		inject_current_stat(L, "CONNECTIONS", value);
 		value = iproto_thread_request_count(thread_id);
 		inject_current_stat(L, "REQUESTS", value);
+		value = iproto_thread_stream_count(thread_id);
+		inject_current_stat(L, "STREAMS", value);
 		lua_rawseti(L, -2, thread_id + 1);
 	}
 	return 1;
