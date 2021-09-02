@@ -337,6 +337,9 @@ schema_object_type(const char *name);
 const char *
 schema_object_name(enum schema_object_type type);
 
+const char *
+schema_entity_name(enum schema_object_type type);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

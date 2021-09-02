@@ -841,3 +841,19 @@ _ = box.schema.func.call("LUA", "return box.space._space:count()")
 _ = box.schema.func.call("box.schema.user.info", 0)
 _ = box.schema.func.call("box.schema.user.info", 1)
 session.su('admin')
+
+-- gh-5389: make sure that granting privileges from guest does not lead
+-- to crash or assertion fault.
+--
+box.schema.user.grant('guest','read,write,create','universe')
+box.session.su('guest')
+box.schema.user.create("optimizer")
+box.schema.user.grant("optimizer", "alter", "space")
+box.schema.user.grant("optimizer", "alter", "sequence")
+box.schema.user.grant("optimizer", "create", "function")
+box.schema.user.grant("optimizer", "drop", "user")
+box.schema.user.grant("optimizer", "create", "role")
+box.schema.user.grant("optimizer", "create", "function")
+session.su('admin')
+box.schema.user.revoke('guest', 'read,write,create', 'universe')
+box.schema.user.drop("optimizer")

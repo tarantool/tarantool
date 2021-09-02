@@ -91,3 +91,9 @@ schema_object_name(enum schema_object_type type)
 	assert((int) type < (int) schema_object_type_MAX);
 	return object_type_strs[type];
 }
+
+const char *
+schema_entity_name(enum schema_object_type type)
+{
+	return object_type_strs[schema_entity_type_to_object(type)];
+}
