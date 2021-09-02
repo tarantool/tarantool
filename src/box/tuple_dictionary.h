@@ -71,6 +71,19 @@ struct tuple_dictionary *
 tuple_dictionary_new(const struct field_def *fields, uint32_t field_count);
 
 /**
+ * Compute a tuple dictionary hash with PMurHash32_Process and return
+ * the size of data processed.
+ */
+uint32_t
+tuple_dictionary_hash_process(const struct tuple_dictionary *dict,
+			      uint32_t *ph, uint32_t *pcarry);
+
+/** Compare two tuple dictionaries. */
+int
+tuple_dictionary_cmp(const struct tuple_dictionary *a,
+		     const struct tuple_dictionary *b);
+
+/**
  * Swap content of two dictionaries. Reference counters are not
  * swaped.
  */
