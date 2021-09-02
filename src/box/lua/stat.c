@@ -51,6 +51,22 @@ extern struct rmean *rmean_box;
 extern struct rmean *rmean_error;
 extern struct rmean *rmean_tx_wal_bus;
 
+/**
+ * Function gets table by it's @name from the table which located
+ * at the top of the lua stack. Then adds 'current' field to this
+ * table.
+ */
+static void
+inject_current_stat(struct lua_State *L, const char *name, size_t val)
+{
+	lua_pushstring(L, name);
+	lua_rawget(L, -2);
+	lua_pushstring(L, "current");
+	lua_pushnumber(L, val);
+	lua_rawset(L, -3);
+	lua_pop(L, 1);
+}
+
 static void
 fill_stat_item(struct lua_State *L, int rps, int64_t total)
 {
@@ -182,21 +198,42 @@ lbox_stat_net_call(struct lua_State *L)
 {
 	lua_newtable(L);
 	iproto_rmean_foreach(set_stat_item, L);
+	inject_current_stat(L, "CONNECTIONS", iproto_connection_count());
+	inject_current_stat(L, "REQUESTS", iproto_request_count());
+	return 1;
+}
 
-	lua_pushstring(L, "CONNECTIONS");
-	lua_rawget(L, -2);
-	lua_pushstring(L, "current");
-	lua_pushnumber(L, iproto_connection_count());
-	lua_rawset(L, -3);
-	lua_pop(L, 1);
+static int
+lbox_stat_net_thread_index(struct lua_State *L)
+{
+	size_t value;
+	const int thread_id = luaL_checkinteger(L, -1) - 1;
+	if (thread_id < 0 || thread_id > iproto_threads_count)
+		return 0;
 
-	lua_pushstring(L, "REQUESTS");
-	lua_rawget(L, -2);
-	lua_pushstring(L, "current");
-	lua_pushnumber(L, iproto_request_count());
-	lua_rawset(L, -3);
-	lua_pop(L, 1);
+	lua_newtable(L);
+	iproto_thread_rmean_foreach(thread_id, set_stat_item, L);
+	value = iproto_thread_connection_count(thread_id);
+	inject_current_stat(L, "CONNECTIONS", value);
+	value = iproto_thread_request_count(thread_id);
+	inject_current_stat(L, "REQUESTS", value);
+	return 1;
+}
 
+static int
+lbox_stat_net_thread_call(struct lua_State *L)
+{
+	size_t value;
+	lua_newtable(L);
+	for (int thread_id = 0; thread_id < iproto_threads_count; thread_id++) {
+		lua_newtable(L);
+		iproto_thread_rmean_foreach(thread_id, set_stat_item, L);
+		value = iproto_thread_connection_count(thread_id);
+		inject_current_stat(L, "CONNECTIONS", value);
+		value = iproto_thread_request_count(thread_id);
+		inject_current_stat(L, "REQUESTS", value);
+		lua_rawseti(L, -2, thread_id + 1);
+	}
 	return 1;
 }
 
@@ -218,6 +255,12 @@ static const struct luaL_Reg lbox_stat_meta [] = {
 static const struct luaL_Reg lbox_stat_net_meta [] = {
 	{"__index", lbox_stat_net_index},
 	{"__call",  lbox_stat_net_call},
+	{NULL, NULL}
+};
+
+static const struct luaL_Reg lbox_stat_net_thread_meta [] = {
+	{"__index", lbox_stat_net_thread_index},
+	{"__call",  lbox_stat_net_thread_call},
 	{NULL, NULL}
 };
 
@@ -247,6 +290,13 @@ box_lua_stat_init(struct lua_State *L)
 
 	lua_newtable(L);
 	luaL_register(L, NULL, lbox_stat_net_meta);
+	lua_setmetatable(L, -2);
+	lua_pop(L, 1); /* stat net module */
+
+	luaL_register_module(L, "box.stat.net.thread", netstatlib);
+
+	lua_newtable(L);
+	luaL_register(L, NULL, lbox_stat_net_thread_meta);
 	lua_setmetatable(L, -2);
 	lua_pop(L, 1); /* stat net module */
 }
