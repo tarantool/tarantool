@@ -3860,6 +3860,7 @@ priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 	if (object_type == NULL)
 		return -1;
 	priv->object_type = schema_object_type(object_type);
+	assert(priv->object_type < schema_object_type_MAX);
 
 	const char *data = tuple_field(tuple, BOX_PRIV_FIELD_OBJECT_ID);
 	if (data == NULL) {
@@ -4043,7 +4044,7 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		/* Only admin may grant privileges on an entire entity. */
 		if (grantor->def->uid != ADMIN) {
 			diag_set(AccessDeniedError, priv_name(priv_type),
-				  schema_object_name(priv->object_type), name,
+				 schema_entity_name(priv->object_type), name,
 				  grantor->def->name);
 			return -1;
 		}
