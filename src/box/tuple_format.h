@@ -189,10 +189,13 @@ struct tuple_format {
 	 */
 	bool is_temporary;
 	/**
-	 * This format belongs to ephemeral space and thus might
-	 * be shared with other ephemeral spaces.
+	 * True if this format may be reused instead of creating a new format.
+	 * Not all formats are reusable: a typical space format is mutable,
+	 * because its dictionary may be updated by space alter, and therefore
+	 * can't be reused. We can reuse formats of ephemeral spaces, because
+	 * those are never altered. We can also reuse formats exported to Lua.
 	 */
-	bool is_ephemeral;
+	bool is_reusable;
 	/**
 	 * Size of minimal field map of tuple where each indexed
 	 * field has own offset slot (in bytes). The real tuple
@@ -331,7 +334,7 @@ tuple_format_unref(struct tuple_format *format)
  * @param space_field_count Length of @a space_fields.
  * @param exact_field_count Exact field count for format.
  * @param is_temporary Set if format belongs to temporary space.
- * @param is_ephemeral Set if format belongs to ephemeral space.
+ * @param is_reusable Set if format may be reused.
  *
  * @retval not NULL Tuple format.
  * @retval     NULL Memory error.
@@ -342,7 +345,7 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 		 const struct field_def *space_fields,
 		 uint32_t space_field_count, uint32_t exact_field_count,
 		 struct tuple_dictionary *dict, bool is_temporary,
-		 bool is_ephemeral);
+		 bool is_reusable);
 
 /**
  * Check, if @a format1 can store any tuples of @a format2. For
