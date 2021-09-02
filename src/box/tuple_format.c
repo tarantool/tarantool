@@ -703,17 +703,7 @@ tuple_format_destroy(struct tuple_format *format)
 }
 
 /**
- * Try to reuse given format. This is only possible for formats
- * of ephemeral spaces, since we need to be sure that shared
- * dictionary will never be altered. If it can, then alter can
- * affect another space, which shares a format with one which is
- * altered.
- *
- * The only way to change the format of the space is to recreate
- * space with the new format inside of BOX. Since there is no
- * mechanism for recreating the ephemeral space, we need not worry
- * about changing the format of the ephemeral space.
- *
+ * Try to reuse given format. The format must be reusable.
  * @param p_format Double pointer to format. It is updated with
  * 		   hashed value, if corresponding format was found
  * 		   in hash table
@@ -725,8 +715,7 @@ static bool
 tuple_format_reuse(struct tuple_format **p_format)
 {
 	struct tuple_format *format = *p_format;
-	assert(format->is_ephemeral);
-	assert(format->is_temporary);
+	assert(format->is_reusable);
 	mh_int_t key = mh_tuple_format_find(tuple_formats_hash, format,
 					    NULL);
 	if (key != mh_end(tuple_formats_hash)) {
@@ -741,16 +730,13 @@ tuple_format_reuse(struct tuple_format **p_format)
 }
 
 /**
- * See justification, why ephemeral space's formats are
- * only feasible for hasing.
- * @retval 0 on success, even if format wasn't added to hash
- * 	   -1 in case of error.
+ * Insert a reusable format into the hash table.
+ * @retval 0 on success, -1 in case of error.
  */
 static int
 tuple_format_add_to_hash(struct tuple_format *format)
 {
-	assert(format->is_ephemeral);
-	assert(format->is_temporary);
+	assert(format->is_reusable);
 	mh_int_t key = mh_tuple_format_put(tuple_formats_hash,
 					   (const struct tuple_format **)&format,
 					   NULL, NULL);
@@ -785,7 +771,7 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 		 const struct field_def *space_fields,
 		 uint32_t space_field_count, uint32_t exact_field_count,
 		 struct tuple_dictionary *dict, bool is_temporary,
-		 bool is_ephemeral)
+		 bool is_reusable)
 {
 	struct tuple_format *format =
 		tuple_format_alloc(keys, key_count, space_field_count, dict);
@@ -797,17 +783,17 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 		memset(&format->vtab, 0, sizeof(format->vtab));
 	format->engine = engine;
 	format->is_temporary = is_temporary;
-	format->is_ephemeral = is_ephemeral;
+	format->is_reusable = is_reusable;
 	format->exact_field_count = exact_field_count;
 	format->epoch = ++formats_epoch;
 	if (tuple_format_create(format, keys, key_count, space_fields,
 				space_field_count) < 0)
 		goto err;
-	if (is_ephemeral && tuple_format_reuse(&format))
+	if (is_reusable && tuple_format_reuse(&format))
 		return format;
 	if (tuple_format_register(format) < 0)
 		goto err;
-	if (is_ephemeral && tuple_format_add_to_hash(format) < 0) {
+	if (is_reusable && tuple_format_add_to_hash(format) < 0) {
 		tuple_format_deregister(format);
 		goto err;
 	}
