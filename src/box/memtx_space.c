@@ -1027,11 +1027,16 @@ memtx_build_on_replace(struct trigger *trigger, void *event)
 		return 0;
 	}
 	/*
-	 * All tuples stored in a memtx space must be
-	 * referenced by the primary index.
+	 * All tuples stored in a memtx space are
+	 * referenced by the primary index. That is
+	 * why we need to ref new tuple and unref old tuple.
 	 */
-	if (state->index->def->iid == 0 && stmt->new_tuple != NULL)
-		tuple_ref(stmt->new_tuple);
+	if (state->index->def->iid == 0) {
+		if (stmt->new_tuple != NULL)
+			tuple_ref(stmt->new_tuple);
+		if (stmt->old_tuple != NULL)
+			tuple_unref(stmt->old_tuple);
+	}
 	return 0;
 }
 
