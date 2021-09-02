@@ -2183,3 +2183,48 @@ _ = box.schema.func.call("box.schema.user.info", 1)
 session.su('admin')
 ---
 ...
+-- gh-5389: make sure that granting privileges from guest does not lead
+-- to crash or assertion fault.
+--
+box.schema.user.grant('guest','read,write,create','universe')
+---
+...
+box.session.su('guest')
+---
+...
+box.schema.user.create("optimizer")
+---
+...
+box.schema.user.grant("optimizer", "alter", "space")
+---
+- error: Grant access to space '' is denied for user 'guest'
+...
+box.schema.user.grant("optimizer", "alter", "sequence")
+---
+- error: Grant access to sequence '' is denied for user 'guest'
+...
+box.schema.user.grant("optimizer", "create", "function")
+---
+- error: Grant access to function '' is denied for user 'guest'
+...
+box.schema.user.grant("optimizer", "drop", "user")
+---
+- error: Grant access to user '' is denied for user 'guest'
+...
+box.schema.user.grant("optimizer", "create", "role")
+---
+- error: Grant access to role '' is denied for user 'guest'
+...
+box.schema.user.grant("optimizer", "create", "function")
+---
+- error: Grant access to function '' is denied for user 'guest'
+...
+session.su('admin')
+---
+...
+box.schema.user.revoke('guest', 'read,write,create', 'universe')
+---
+...
+box.schema.user.drop("optimizer")
+---
+...
