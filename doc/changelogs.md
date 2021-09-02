@@ -151,3 +151,37 @@ will be most convenient for our users.
 [gfm]: https://guides.github.com/features/mastering-markdown/
 [keep_a_changelog]: https://keepachangelog.com/en/1.0.0/
 [gitlab_changelog]: https://docs.gitlab.com/ee/development/changelog.html
+
+## Alternatives considered
+
+Prior to stick with current process we considered several alternatives. In
+short:
+
+* Collect titles of commits.
+* Collect titles of closed issues.
+* Write changelog entries in a cover letter / pull request and manually move to
+  a release notes draft on GitHub.
+* Single file changelog.
+
+See the previous section for reasons why we didn't pick up something from this
+list.
+
+More alternatives are below.
+
+### Store a changelog entry in a commit message
+
+This process is [used in librepo][librepo_changelog_process]. We'd avoid using
+this approach due to the following drawbacks:
+
+* A developer should remember about the changelog when writing a commit
+  message.
+* There is no ability to modify a changelog entry if a mistake is found later
+  (till the moment of construction of the final release notes).
+* So, if we'll modify a final release notes for one release, we should
+  **manually** backport all those changes to appropriate release branches. Not
+  so easy as just cherry-pick.
+
+To sum up: no way to modify an entry till the moment of a release and so no
+simple way to backport such modification.
+
+[librepo_changelog_process]: https://github.com/rpm-software-management/librepo/commit/9e08de498f501651987333b8da3055a08745d20c
