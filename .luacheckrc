@@ -76,12 +76,6 @@ files["test/box/box.lua"] = {
         "iproto_request",
     }
 }
-files["test/box/gh-5645-several-iproto-threads.lua"] = {
-    globals = {
-        "errinj_set",
-        "ping",
-    },
-}
 files["test/box-tap/session.test.lua"] = {
     globals = {
         "session",

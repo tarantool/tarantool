@@ -52,9 +52,12 @@ enum {
 	 * processing stops until some new fibers are freed up.
 	 */
 	IPROTO_FIBER_POOL_SIZE_FACTOR = 5,
+	/** Maximum count of iproto threads */
+	IPROTO_THREADS_MAX = 1000,
 };
 
 extern unsigned iproto_readahead;
+extern int iproto_threads_count;
 
 /**
  * Return size of memory used for storing network buffers.
@@ -69,10 +72,24 @@ size_t
 iproto_connection_count(void);
 
 /**
+ * Return the number of active iproto connections
+ * for the thread with the given id.
+ */
+size_t
+iproto_thread_connection_count(int thread_id);
+
+/**
  * Return the number of iproto requests in flight.
  */
 size_t
 iproto_request_count(void);
+
+/**
+ * Return the number of iproto requests in flight
+ * for the thread with the given id.
+ */
+size_t
+iproto_thread_request_count(int thread_id);
 
 /**
  * Reset network statistics.
@@ -89,6 +106,13 @@ iproto_bound_address(char *buf);
 
 int
 iproto_rmean_foreach(void *cb, void *cb_ctx);
+
+/**
+ * Same as iproto_rmean_foreach, but reports stats
+ * only for the thread with the given id.
+ */
+int
+iproto_thread_rmean_foreach(int thread_id, void *cb, void *cb_ctx);
 
 #if defined(__cplusplus)
 } /* extern "C" */

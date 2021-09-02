@@ -84,10 +84,6 @@
 #include "trivia/util.h"
 #include "version.h"
 
-enum {
-	IPROTO_THREADS_MAX = 1000,
-};
-
 static char status[64] = "unknown";
 
 /** box.stat rmean */

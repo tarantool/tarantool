@@ -1,25 +1,24 @@
--- test-run result file version 2
 env = require('test_run')
- | ---
- | ...
+---
+...
 net_box = require('net.box')
- | ---
- | ...
+---
+...
 fiber = require('fiber')
- | ---
- | ...
+---
+...
 test_run = env.new()
- | ---
- | ...
-test_run:cmd("create server test with script='box/gh-5645-several-iproto-threads.lua'")
- | ---
- | - true
- | ...
-
+---
+...
+test_run:cmd("create server test with script=\
+              'box/gh-5645-several-iproto-threads.lua'")
+---
+- true
+...
 test_run:cmd("setopt delimiter ';'")
- | ---
- | - true
- | ...
+---
+- true
+...
 function iproto_call(server_addr, fibers_count)
     local fibers = {}
     for i = 1, fibers_count do
@@ -36,159 +35,250 @@ function iproto_call(server_addr, fibers_count)
         f:join()
     end
 end;
- | ---
- | ...
-function get_network_stat()
-    local total_net_stat_table = test_run:cmd(string.format("eval test 'return box.stat.net()'"))[1]
-    assert(total_net_stat_table ~= nil)
-    local connections = 0
-    local requests = 0
-    local sent = 0
-    local received = 0
-    for name, net_stat_table in pairs(total_net_stat_table) do
-        assert(net_stat_table ~= nil)
-        if name == "CONNECTIONS" then
-            for name, val in pairs(net_stat_table) do
-                if name == "total" then
-                    connections = val
-                end
-            end
-        elseif name == "REQUESTS" then
-           for name, val in pairs(net_stat_table) do
-                if name == "total" then
-                    requests = val
-                end
-            end
-        elseif name == "SENT" then
-            for name, val in pairs(net_stat_table) do
-                if name == "total" then
-                    sent = val
-                end
-            end
-        elseif name == "RECEIVED" then
-            for name, val in pairs(net_stat_table) do
-                if name == "total" then
-                    received = val
-                end
-            end
-        else
-            assert(false)
-        end
-    end
+---
+...
+function get_network_stat_using_call()
+    local net_stat_table = test_run:cmd(
+        string.format("eval test 'return box.stat.net()'")
+    )[1]
+    assert(net_stat_table ~= nil)
+    local connections = net_stat_table.CONNECTIONS.total
+    local requests = net_stat_table.REQUESTS.total
+    local sent = net_stat_table.SENT.total
+    local received = net_stat_table.RECEIVED.total
     return connections, requests, sent, received
-end
+end;
+---
+...
+function get_network_stat_for_thread_using_call(thread_id)
+    local net_stat_table = test_run:cmd(
+        string.format("eval test 'return box.stat.net.thread()'")
+    )[1]
+    assert(net_stat_table ~= nil)
+    local connections = net_stat_table[thread_id].CONNECTIONS.total
+    local requests = net_stat_table[thread_id].REQUESTS.total
+    local sent = net_stat_table[thread_id].SENT.total
+    local received = net_stat_table[thread_id].RECEIVED.total
+    return connections, requests, sent, received
+end;
+---
+...
+function get_network_stat_using_index()
+    local connections = test_run:cmd(string.format(
+        "eval test 'return box.stat.net.%s.total'",
+        "CONNECTIONS"
+    ))[1]
+    local requests = test_run:cmd(string.format(
+        "eval test 'return box.stat.net.%s.total'",
+        "REQUESTS"
+    ))[1]
+    local sent = test_run:cmd(string.format(
+        "eval test 'return box.stat.net.%s.total'",
+        "SENT"
+    ))[1]
+    local received = test_run:cmd(string.format(
+        "eval test 'return box.stat.net.%s.total'",
+        "RECEIVED"
+    ))[1]
+    return connections, requests, sent, received
+end;
+---
+...
+function get_network_stat_for_thread_using_index(thread_id)
+    local connections = test_run:cmd(string.format(
+        "eval test 'return box.stat.net.thread[%d].%s.total'",
+        thread_id, "CONNECTIONS"
+    ))[1]
+    local requests = test_run:cmd(string.format(
+        "eval test 'return box.stat.net.thread[%d].%s.total'",
+        thread_id, "REQUESTS"
+    ))[1]
+    local sent = test_run:cmd(string.format(
+        "eval test 'return box.stat.net.thread[%d].%s.total'",
+        thread_id, "SENT"
+    ))[1]
+    local received = test_run:cmd(string.format(
+        "eval test 'return box.stat.net.thread[%d].%s.total'",
+        thread_id, "RECEIVED"
+    ))[1]
+    return connections, requests, sent, received
+end;
+---
+...
 test_run:cmd("setopt delimiter ''");
- | ---
- | ...
-
+---
+- true
+...
 -- Check that we can't start server with iproto threads count <= 0 or > 1000
 -- We can't pass '-1' or another negative number as argument, so we pass string
 opts = {}
- | ---
- | ...
+---
+...
 opts.filename = 'gh-5645-several-iproto-threads.log'
- | ---
- | ...
+---
+...
 test_run:cmd("start server test with args='negative' with crash_expected=True")
- | ---
- | - false
- | ...
-assert(test_run:grep_log("test", "Incorrect value for option 'iproto_threads'", nil, opts) ~= nil)
- | ---
- | - true
- | ...
+---
+- false
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+assert(test_run:grep_log(
+    "test", "Incorrect value for option 'iproto_threads'", nil, opts) ~= nil
+);
+---
+- true
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 test_run:cmd("start server test with args='0' with crash_expected=True")
- | ---
- | - false
- | ...
-assert(test_run:grep_log("test", "Incorrect value for option 'iproto_threads'", nil, opts) ~= nil)
- | ---
- | - true
- | ...
+---
+- false
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+assert(test_run:grep_log(
+    "test", "Incorrect value for option 'iproto_threads'", nil, opts) ~= nil
+);
+---
+- true
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 test_run:cmd("start server test with args='1001' with crash_expected=True")
- | ---
- | - false
- | ...
-assert(test_run:grep_log("test", "Incorrect value for option 'iproto_threads'", nil, opts) ~= nil)
- | ---
- | - true
- | ...
-
+---
+- false
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+assert(test_run:grep_log(
+    "test", "Incorrect value for option 'iproto_threads'", nil, opts) ~= nil
+);
+---
+- true
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 -- We check that statistics gathered per each thread in sum is equal to
 -- statistics gathered from all threads.
 thread_count = 2
- | ---
- | ...
+---
+...
 fibers_count = 100
- | ---
- | ...
+---
+...
 test_run:cmd(string.format("start server test with args=\"%s\"", thread_count))
- | ---
- | - true
- | ...
+---
+- true
+...
+test_run:switch("test")
+---
+- true
+...
+function ping() return "pong" end
+---
+...
+test_run:switch("default")
+---
+- true
+...
 server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
- | ---
- | ...
+---
+...
 iproto_call(server_addr, fibers_count)
- | ---
- | ...
+---
+...
 -- Total statistics from all threads.
-conn_t, req_t, sent_t, rec_t = get_network_stat()
- | ---
- | ...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+conn_t_call, req_t_call, sent_t_call, rec_t_call =
+    get_network_stat_using_call();
+---
+...
+conn_t_index, req_t_index, sent_t_index, rec_t_index =
+    get_network_stat_using_index();
+---
+...
+assert(conn_t_call == conn_t_index and req_t_call == req_t_index and
+       sent_t_call == sent_t_index and rec_t_call == rec_t_index);
+---
+- true
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 -- Statistics per thread.
 conn, req, sent, rec = 0, 0, 0, 0
- | ---
- | ...
-assert(conn_t == fibers_count)
- | ---
- | - true
- | ...
-
+---
+...
+assert(conn_t_call == fibers_count)
+---
+- true
+...
 test_run:cmd("setopt delimiter ';'")
- | ---
- | - true
- | ...
+---
+- true
+...
 for thread_id = 1, thread_count do
-    test_run:eval("test", string.format("errinj_set(%d)", thread_id - 1))
-    local conn_c, req_c, sent_c, rec_c = get_network_stat()
-    conn = conn + conn_c
-    req = req + req_c
-    sent = sent + sent_c
-    rec = rec + rec_c
+    local conn_thd_t_call, req_thd_t_call, sent_thd_t_call, rec_thd_t_call =
+        get_network_stat_for_thread_using_call(thread_id)
+    local conn_thd_t_index, req_thd_t_index, sent_thd_t_index, rec_thd_t_index =
+        get_network_stat_for_thread_using_index(thread_id)
+    assert(conn_thd_t_call == conn_thd_t_index and
+           req_thd_t_call == req_thd_t_index and
+           sent_thd_t_call == sent_thd_t_index and
+           rec_thd_t_call == rec_thd_t_index)
+    conn = conn + conn_thd_t_call
+    req = req + req_thd_t_call
+    sent = sent + sent_thd_t_call
+    rec = rec + rec_thd_t_call
 end;
- | ---
- | ...
+---
+...
 test_run:cmd("setopt delimiter ''");
- | ---
- | - true
- | ...
-assert(conn_t == conn)
- | ---
- | - true
- | ...
-assert(req_t == req)
- | ---
- | - true
- | ...
-assert(sent_t == sent)
- | ---
- | - true
- | ...
-assert(rec_t == rec)
- | ---
- | - true
- | ...
-
+---
+- true
+...
+assert(conn_t_call == conn)
+---
+- true
+...
+assert(req_t_call == req)
+---
+- true
+...
+assert(sent_t_call == sent)
+---
+- true
+...
+assert(rec_t_call == rec)
+---
+- true
+...
 test_run:cmd("stop server test")
- | ---
- | - true
- | ...
+---
+- true
+...
 test_run:cmd("cleanup server test")
- | ---
- | - true
- | ...
+---
+- true
+...
 test_run:cmd("delete server test")
- | ---
- | - true
- | ...
+---
+- true
+...
