@@ -140,7 +140,7 @@ including an upcoming release), we'll get a conflict at almost any cherry-pick:
 as from a developer branch to master as well as from master to a release
 branch.
 
-The [solution][github_changelog] was suggested by the GitLab folks: just split
+The [solution][gitlab_changelog] was suggested by the GitLab folks: just split
 changelog entries across files and squash them before a release.
 
 We follow the spirit of the [Keep a Changelog][keep_a_changelog] idea, but we
