@@ -32,6 +32,8 @@
 #include "error.h"
 #include "diag.h"
 
+#include "PMurHash.h"
+
 field_name_hash_f field_name_hash;
 
 #define mh_name _strnu32
@@ -173,6 +175,33 @@ err_hash:
 err_memory:
 	free(dict);
 	return NULL;
+}
+
+uint32_t
+tuple_dictionary_hash_process(const struct tuple_dictionary *dict,
+			      uint32_t *ph, uint32_t *pcarry)
+{
+	uint32_t size = 0;
+	for (uint32_t i = 0; i < dict->name_count; ++i) {
+		uint32_t name_len = strlen(dict->names[i]);
+		PMurHash32_Process(ph, pcarry, dict->names[i], name_len);
+		size += name_len;
+	}
+	return size;
+}
+
+int
+tuple_dictionary_cmp(const struct tuple_dictionary *a,
+		     const struct tuple_dictionary *b)
+{
+	if (a->name_count != b->name_count)
+		return a->name_count > b->name_count ? 1 : -1;
+	for (uint32_t i = 0; i < a->name_count; ++i) {
+		int ret = strcmp(a->names[i], b->names[i]);
+		if (ret != 0)
+			return ret;
+	}
+	return 0;
 }
 
 void

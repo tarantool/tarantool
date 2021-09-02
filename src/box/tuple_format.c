@@ -99,7 +99,7 @@ tuple_format_cmp(const struct tuple_format *format1,
 				(int)field_b->is_key_part;
 	}
 
-	return 0;
+	return tuple_dictionary_cmp(format1->dict, format2->dict);
 }
 
 static uint32_t
@@ -122,6 +122,7 @@ tuple_format_hash(struct tuple_format *format)
 		TUPLE_FIELD_MEMBER_HASH(f, is_key_part, h, carry, size)
 	}
 #undef TUPLE_FIELD_MEMBER_HASH
+	size += tuple_dictionary_hash_process(format->dict, &h, &carry);
 	return PMurHash32_Result(h, carry, size);
 }
 
@@ -441,7 +442,7 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 					     field_count);
 	if (tuple_format_field_count(format) == 0) {
 		format->field_map_size = 0;
-		return 0;
+		goto out;
 	}
 	/* Initialize defined fields */
 	for (uint32_t i = 0; i < field_count; ++i) {
@@ -547,6 +548,7 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 		    !tuple_field_is_nullable(field))
 			bit_set(required_fields, field->id);
 	}
+out:
 	format->hash = tuple_format_hash(format);
 	return 0;
 }
