@@ -46,6 +46,16 @@
 #include <coro/coro.h>
 
 /*
+ * This constant is the same as LUA_NOREF. It should be used
+ * to initialize all Lua references in struct fiber.
+ * Since this module is independent on Lua the constant is
+ * defined directly. Value should be checked with
+ * static_assert in appropriate places to catch possible
+ * LUA_NOREF value changes in future.
+ */
+#define FIBER_LUA_NOREF (-2)
+
+/*
  * Fiber top doesn't work on ARM processors at the moment,
  * because we haven't chosen an alternative to rdtsc.
  */
