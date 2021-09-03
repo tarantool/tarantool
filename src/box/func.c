@@ -241,14 +241,29 @@ module_load(const char *package, const char *package_end)
 	module->package[package_len] = 0;
 	rlist_create(&module->funcs);
 	module->calls = 0;
-	char dir_name[] = "/tmp/tntXXXXXX";
-	if (mkdtemp(dir_name) == NULL) {
-		diag_set(SystemError, "failed to create unique dir name");
+
+	const char *tmpdir = getenv("TMPDIR");
+	if (tmpdir == NULL)
+		tmpdir = "/tmp";
+	char dir_name[PATH_MAX];
+	int rc = snprintf(dir_name, sizeof(dir_name), "%s/tntXXXXXX", tmpdir);
+	if (rc < 0 || (size_t) rc >= sizeof(dir_name)) {
+		diag_set(SystemError, "failed to generate path to tmp dir");
 		goto error;
 	}
-	char load_name[PATH_MAX + 1];
-	snprintf(load_name, sizeof(load_name), "%s/%.*s." TARANTOOL_LIBEXT,
-		 dir_name, package_len, package);
+
+	if (mkdtemp(dir_name) == NULL) {
+		diag_set(SystemError, "failed to create unique dir name: %s",
+			 dir_name);
+		goto error;
+	}
+	char load_name[PATH_MAX];
+	rc = snprintf(load_name, sizeof(load_name), "%s/%.*s." TARANTOOL_LIBEXT,
+		      dir_name, package_len, package);
+	if (rc < 0 || (size_t) rc >= sizeof(dir_name)) {
+		diag_set(SystemError, "failed to generate path to DSO");
+		goto error;
+	}
 
 	struct stat st;
 	if (stat(path, &st) < 0) {
@@ -271,22 +286,14 @@ module_load(const char *package, const char *package_end)
 		goto error;
 	}
 
-	off_t pos, left;
-	for (left = st.st_size, pos = 0; left > 0;) {
-		off_t ret = eio_sendfile_sync(dest_fd, source_fd, pos,
-					      st.st_size);
-		if (ret < 0) {
-			diag_set(SystemError, "failed to copy DSO %s to %s",
-				 path, load_name);
-			close(source_fd);
-			close(dest_fd);
-			goto error;
-		}
-		pos += ret;
-		left -= ret;
-	}
+	off_t ret = eio_sendfile_sync(dest_fd, source_fd, 0, st.st_size);
 	close(source_fd);
 	close(dest_fd);
+	if (ret != st.st_size) {
+		diag_set(SystemError, "failed to copy DSO %s to %s",
+			 path, load_name);
+		goto error;
+	}
 
 	module->handle = dlopen(load_name, RTLD_NOW | RTLD_LOCAL);
 	if (unlink(load_name) != 0)
