@@ -38,7 +38,8 @@
 
 #include <lua.h>
 #include <lauxlib.h>
-#include <lualib.h>
+
+static_assert(FIBER_LUA_NOREF == LUA_NOREF, "FIBER_LUA_NOREF is ok");
 
 void
 luaL_testcancel(struct lua_State *L)
@@ -683,9 +684,8 @@ lbox_fiber_on_stop(struct trigger *trigger, void *event)
 {
 	struct fiber *f = (struct fiber *) event;
 	int storage_ref = f->storage.lua.storage_ref;
-	assert(storage_ref > 0);
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, storage_ref);
-	f->storage.lua.storage_ref = LUA_NOREF;
+	f->storage.lua.storage_ref = FIBER_LUA_NOREF;
 	trigger_clear(trigger);
 	free(trigger);
 	return 0;
@@ -696,7 +696,7 @@ lbox_fiber_storage(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
 	int storage_ref = f->storage.lua.storage_ref;
-	if (storage_ref <= 0) {
+	if (storage_ref == FIBER_LUA_NOREF) {
 		struct trigger *t = (struct trigger *)
 			malloc(sizeof(*t));
 		if (t == NULL) {
