@@ -37,6 +37,7 @@
 
 #include "uuid/tt_uuid.h"
 #include "diag.h"
+#include "iproto_features.h"
 #include "vclock/vclock.h"
 
 #if defined(__cplusplus)
@@ -226,6 +227,26 @@ xrow_decode_dml(struct xrow_header *xrow, struct request *request,
 int
 xrow_encode_dml(const struct request *request, struct region *region,
 		struct iovec *iov);
+
+/**
+ * IPROTO_ID request/response.
+ */
+struct id_request {
+	/** IPROTO protocol version. */
+	uint64_t version;
+	/** IPROTO protocol features. */
+	struct iproto_features features;
+};
+
+/**
+ * Decode IPROTO_ID request from a given MessagePack map.
+ * @param row request header.
+ * @param[out] request IPROTO_ID request to decode to.
+ * @retval 0 on success
+ * @retval -1 on error
+ */
+int
+xrow_decode_id(const struct xrow_header *xrow, struct id_request *request);
 
 /**
  * Synchronous replication request - confirmation or rollback of
@@ -648,6 +669,19 @@ int
 iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version);
 
 /**
+ * Encode iproto header with IPROTO_OK response code and protocol features
+ * in the body.
+ * @param out Encode to.
+ * @param sync Request sync.
+ * @param schema_version.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
+ */
+int
+iproto_reply_id(struct obuf *out, uint64_t sync, uint32_t schema_version);
+
+/**
  * Encode iproto header with IPROTO_OK response code and vclock
  * in the body.
  * @param out Encode to.
@@ -1034,6 +1068,14 @@ static inline void
 iproto_reply_ok_xc(struct obuf *out, uint64_t sync, uint32_t schema_version)
 {
 	if (iproto_reply_ok(out, sync, schema_version) != 0)
+		diag_raise();
+}
+
+/** @copydoc iproto_reply_id. */
+static inline void
+iproto_reply_id_xc(struct obuf *out, uint64_t sync, uint32_t schema_version)
+{
+	if (iproto_reply_id(out, sync, schema_version) != 0)
 		diag_raise();
 }
 

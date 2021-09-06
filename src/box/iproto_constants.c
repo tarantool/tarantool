@@ -147,6 +147,8 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x51 */	MP_ARRAY, /* IPROTO_ID_FILTER */
 	/* 0x52 */	MP_MAP, /* IPROTO_ERROR */
 	/* 0x53 */	MP_UINT, /* IPROTO_TERM */
+	/* 0x54 */	MP_UINT, /* IPROTO_VERSION */
+	/* 0x55 */	MP_ARRAY, /* IPROTO_FEATURES */
 	/* }}} */
 };
 
@@ -278,6 +280,8 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"id filter",        /* 0x51 */
 	"error",            /* 0x52 */
 	"term",             /* 0x53 */
+	"version",          /* 0x54 */
+	"features",         /* 0x55 */
 };
 
 const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX] = {

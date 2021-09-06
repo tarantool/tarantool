@@ -198,3 +198,16 @@ box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 space:drop()
 ---
 ...
+
+#
+# gh-6253 IPROTO_ID
+#
+
+# Invalid version
+Invalid MsgPack - request body
+# Invalid features
+Invalid MsgPack - request body
+# Empty request body
+version=1, features=[0, 1]
+# Unknown version and features
+version=1, features=[0, 1]

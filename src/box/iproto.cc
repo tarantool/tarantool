@@ -60,6 +60,7 @@
 #include "schema.h" /* schema_version */
 #include "replication.h" /* instance_uuid */
 #include "iproto_constants.h"
+#include "iproto_features.h"
 #include "rmean.h"
 #include "execute.h"
 #include "errinj.h"
@@ -297,6 +298,8 @@ struct iproto_msg
 		struct call_request call;
 		/** Authentication request. */
 		struct auth_request auth;
+		/** Features request. */
+		struct id_request id;
 		/* SQL request, if this is the EXECUTE/PREPARE request. */
 		struct sql_request sql;
 		/** In case of iproto parse error, saved diagnostics. */
@@ -1525,6 +1528,11 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 	case IPROTO_PING:
 		cmsg_init(&msg->base, iproto_thread->misc_route);
 		break;
+	case IPROTO_ID:
+		if (xrow_decode_id(&msg->header, &msg->id) != 0)
+			goto error;
+		cmsg_init(&msg->base, iproto_thread->misc_route);
+		break;
 	case IPROTO_JOIN:
 	case IPROTO_FETCH_SNAPSHOT:
 	case IPROTO_REGISTER:
@@ -2079,6 +2087,10 @@ tx_process_misc(struct cmsg *m)
 			break;
 		case IPROTO_PING:
 			iproto_reply_ok_xc(out, msg->header.sync,
+					   ::schema_version);
+			break;
+		case IPROTO_ID:
+			iproto_reply_id_xc(out, msg->header.sync,
 					   ::schema_version);
 			break;
 		case IPROTO_VOTE_DEPRECATED:
@@ -2728,6 +2740,8 @@ iproto_thread_init(struct iproto_thread *iproto_thread)
 void
 iproto_init(int threads_count)
 {
+	iproto_features_init();
+
 	iproto_threads_count = 0;
 	struct session_vtab iproto_session_vtab = {
 		/* .push = */ iproto_session_push,

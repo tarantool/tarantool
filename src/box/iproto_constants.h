@@ -139,6 +139,10 @@ enum iproto_key {
 	 * both iproto (e.g. REPLICA_ID) and raft (RAFT_TERM) keys.
 	 */
 	IPROTO_TERM = 0x53,
+	/** Protocol version. */
+	IPROTO_VERSION = 0x54,
+	/** Protocol features. */
+	IPROTO_FEATURES = 0x55,
 	/*
 	 * Be careful to not extend iproto_key values over 0x7f.
 	 * iproto_keys are encoded in msgpack as positive fixnum, which ends at
@@ -273,6 +277,8 @@ enum iproto_type {
 	IPROTO_REGISTER = 70,
 	IPROTO_JOIN_META = 71,
 	IPROTO_JOIN_SNAPSHOT = 72,
+	/** Protocol features request. */
+	IPROTO_ID = 73,
 
 	/** Vinyl run info stored in .index file */
 	VY_INDEX_RUN_INFO = 100,
