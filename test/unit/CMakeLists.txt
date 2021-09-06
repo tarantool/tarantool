@@ -48,6 +48,8 @@ add_executable(base64.test base64.c)
 target_link_libraries(base64.test misc unit)
 add_executable(uuid.test uuid.c core_test_utils.c)
 target_link_libraries(uuid.test uuid unit)
+add_executable(xmalloc.test xmalloc.c core_test_utils.c)
+target_link_libraries(xmalloc.test core unit)
 
 add_executable(bps_tree.test bps_tree.cc)
 target_link_libraries(bps_tree.test small misc)
