@@ -1294,14 +1294,9 @@ sqlVdbeList(Vdbe * p)
 					if (mem_copy_bin(pSub, bin, size) != 0)
 						return -1;
 				} else if (j == nSub) {
-					struct Mem tmp;
-					mem_create(&tmp);
-					uint32_t size = sizeof(SubProgram *);
 					char *bin = (char *)&pOp->p4.pProgram;
-					mem_set_bin_ephemeral(&tmp, bin, size);
-					int rc = mem_concat(pSub, &tmp, pSub);
-					mem_destroy(&tmp);
-					if (rc != 0)
+					uint32_t size = sizeof(SubProgram *);
+					if (mem_append(pSub, bin, size) != 0)
 						return -1;
 				}
 			}

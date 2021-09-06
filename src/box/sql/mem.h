@@ -583,6 +583,14 @@ void
 mem_move(struct Mem *to, struct Mem *from);
 
 /**
+ * Append the given string to the end of the STRING or VARBINARY contained in
+ * MEM. In case MEM needs to increase the size of allocated memory, additional
+ * memory is allocated in an attempt to reduce the total number of allocations.
+ */
+int
+mem_append(struct Mem *mem, const char *value, uint32_t len);
+
+/**
  * Concatenate strings or binaries from the first and the second MEMs and write
  * to the result MEM. In case the first MEM or the second MEM is NULL, the
  * result MEM is set to NULL even if the result MEM is actually the first MEM.
