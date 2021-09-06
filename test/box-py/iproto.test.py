@@ -11,6 +11,12 @@ from tarantool.request import Request, RequestInsert, RequestSelect, RequestUpda
 from tarantool.response import Response
 from lib.tarantool_connection import TarantoolConnection
 
+# FIXME: Remove after the new constants are added to the Python connector.
+if not 'REQUEST_TYPE_ID' in locals():
+    REQUEST_TYPE_ID = 73
+    IPROTO_VERSION = 0x54
+    IPROTO_FEATURES = 0x55
+
 admin("box.schema.user.grant('guest', 'read,write,execute', 'universe')")
 
 print("""
@@ -446,3 +452,28 @@ admin("box.schema.user.revoke('guest', 'read,write,execute', 'universe')")
 
 admin("space:drop()")
 
+print("""
+#
+# gh-6253 IPROTO_ID
+#
+""")
+c = Connection("localhost", server.iproto.port)
+c.connect()
+s = c._socket
+header = { IPROTO_CODE: REQUEST_TYPE_ID }
+print("# Invalid version")
+resp = test_request(header, { IPROTO_VERSION: "abc" })
+print(str(resp["body"][IPROTO_ERROR].decode("utf-8")))
+print("# Invalid features")
+resp = test_request(header, { IPROTO_FEATURES: ["abc"] })
+print(str(resp["body"][IPROTO_ERROR].decode("utf-8")))
+print("# Empty request body")
+resp = test_request(header, {})
+print("version={}, features={}".format(
+    resp["body"][IPROTO_VERSION], resp["body"][IPROTO_FEATURES]))
+print("# Unknown version and features")
+resp = test_request(header, { IPROTO_VERSION: 99999999,
+                              IPROTO_FEATURES: [99999999] })
+print("version={}, features={}".format(
+    resp["body"][IPROTO_VERSION], resp["body"][IPROTO_FEATURES]))
+c.close()

@@ -82,7 +82,7 @@ include_directories(${CMAKE_BINARY_DIR}/src/box)
 add_library(box_error STATIC error.cc errcode.c mp_error.cc)
 target_link_libraries(box_error core stat mpstream vclock)
 
-add_library(xrow STATIC xrow.c iproto_constants.c)
+add_library(xrow STATIC xrow.c iproto_constants.c iproto_features.c)
 target_link_libraries(xrow server core small vclock misc box_error
                       scramble ${MSGPUCK_LIBRARIES})
 

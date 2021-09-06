@@ -42,6 +42,7 @@
 #include "mp_error.h"
 #include "scramble.h"
 #include "iproto_constants.h"
+#include "iproto_features.h"
 #include "mpstream/mpstream.h"
 #include "errinj.h"
 
@@ -420,6 +421,35 @@ iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version)
 	}
 	iproto_header_encode(buf, IPROTO_OK, sync, schema_version, 1);
 	buf[IPROTO_HEADER_LEN] = 0x80; /* empty MessagePack Map */
+	return 0;
+}
+
+int
+iproto_reply_id(struct obuf *out, uint64_t sync, uint32_t schema_version)
+{
+	size_t size = IPROTO_HEADER_LEN;
+	size += mp_sizeof_map(2);
+	size += mp_sizeof_uint(IPROTO_VERSION);
+	size += mp_sizeof_uint(IPROTO_CURRENT_VERSION);
+	size += mp_sizeof_uint(IPROTO_FEATURES);
+	size += mp_sizeof_iproto_features(&IPROTO_CURRENT_FEATURES);
+
+	char *buf = obuf_alloc(out, size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, size, "obuf_alloc", "buf");
+		return -1;
+	}
+
+	char *data = buf + IPROTO_HEADER_LEN;
+	data = mp_encode_map(data, 2);
+	data = mp_encode_uint(data, IPROTO_VERSION);
+	data = mp_encode_uint(data, IPROTO_CURRENT_VERSION);
+	data = mp_encode_uint(data, IPROTO_FEATURES);
+	data = mp_encode_iproto_features(data, &IPROTO_CURRENT_FEATURES);
+	assert(size == (size_t)(data - buf));
+
+	iproto_header_encode(buf, IPROTO_OK, sync, schema_version,
+			     size - IPROTO_HEADER_LEN);
 	return 0;
 }
 
@@ -901,6 +931,53 @@ xrow_encode_dml(const struct request *request, struct region *region,
 	iov[0].iov_len = pos - begin;
 
 	return iovcnt;
+}
+
+int
+xrow_decode_id(const struct xrow_header *row, struct id_request *request)
+{
+	if (row->bodycnt == 0) {
+		diag_set(ClientError, ER_INVALID_MSGPACK, "request body");
+		return -1;
+	}
+
+	assert(row->bodycnt == 1);
+	const char *data = (const char *)row->body[0].iov_base;
+	const char *end = data + row->body[0].iov_len;
+	const char *p = data;
+	if (mp_check(&p, end) != 0 || mp_typeof(*data) != MP_MAP)
+		goto error;
+
+	request->version = 0;
+	iproto_features_create(&request->features);
+
+	p = data;
+	uint32_t map_size = mp_decode_map(&p);
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(*p) != MP_UINT)
+			goto error;
+		uint64_t key = mp_decode_uint(&p);
+		if (key >= IPROTO_KEY_MAX ||
+		    iproto_key_type[key] != mp_typeof(*p))
+			goto error;
+		switch (key) {
+		case IPROTO_VERSION:
+			request->version = mp_decode_uint(&p);
+			break;
+		case IPROTO_FEATURES:
+			if (mp_decode_iproto_features(
+					&p, &request->features) != 0)
+				goto error;
+			break;
+		default:
+			/* Ignore unknown keys for forward compatibility. */
+			mp_next(&p);
+		}
+	}
+	return 0;
+error:
+	xrow_on_decode_err(data, end, ER_INVALID_MSGPACK, "request body");
+	return -1;
 }
 
 void
