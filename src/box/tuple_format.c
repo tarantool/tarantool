@@ -500,7 +500,7 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 	}
 	format->field_map_size = field_map_size;
 
-	size_t required_fields_sz = bitmap_size(format->total_field_count);
+	size_t required_fields_sz = BITMAP_SIZE(format->total_field_count);
 	format->required_fields = calloc(1, required_fields_sz);
 	if (format->required_fields == NULL) {
 		diag_set(OutOfMemory, required_fields_sz,
@@ -873,7 +873,7 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 				  tuple_format_field_count(format));
 
 	void *required_fields = NULL;
-	uint32_t required_fields_sz = bitmap_size(format->total_field_count);
+	uint32_t required_fields_sz = BITMAP_SIZE(format->total_field_count);
 
 	if (unlikely(defined_field_count == 0)) {
 		required_fields = format->required_fields;
@@ -1054,7 +1054,7 @@ tuple_format_iterator_create(struct tuple_format_iterator *it,
 
 	uint32_t frames_sz = format->fields_depth * sizeof(struct mp_frame);
 	if (validate)
-		it->required_fields_sz = bitmap_size(format->total_field_count);
+		it->required_fields_sz = BITMAP_SIZE(format->total_field_count);
 	uint32_t total_sz = frames_sz + 2 * it->required_fields_sz;
 	struct mp_frame *frames = region_aligned_alloc(region, total_sz,
 						       alignof(frames[0]));
