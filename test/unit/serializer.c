@@ -385,11 +385,11 @@ test_luaL_field_basic(struct lua_State *L)
 		int top = lua_gettop(L);
 		struct luaL_field field;
 		if (cases[i].invoke_checkfield) {
-			luaL_checkfield(L, &cfg, -1, &field);
+			luaL_checkfield(L, &cfg, 0, -1, &field);
 			ok(true, "# skip; %s: luaL_checkfield() has no retval",
 			   description);
 		} else {
-			int rc = luaL_tofield(L, &cfg, NULL, -1, &field);
+			int rc = luaL_tofield(L, &cfg, NULL, 0, -1, &field);
 			is(rc, 0, "%s: luaL_tofield retval", description);
 		}
 

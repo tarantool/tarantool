@@ -253,7 +253,7 @@ lua_gettable_wrapper(lua_State *L)
 
 static void
 lua_field_inspect_ucdata(struct lua_State *L, struct luaL_serializer *cfg,
-			int idx, struct luaL_field *field)
+			int cache_index, int idx, struct luaL_field *field)
 {
 	if (!cfg->encode_load_metatables)
 		return;
@@ -275,10 +275,80 @@ lua_field_inspect_ucdata(struct lua_State *L, struct luaL_serializer *cfg,
 		lua_pcall(L, 1, 1, 0);
 		/* replace obj with the unpacked value */
 		lua_replace(L, idx);
-		if (luaL_tofield(L, cfg, NULL, idx, field) < 0)
+		if (luaL_tofield(L, cfg, NULL, cache_index, idx, field) < 0)
 			luaT_error(L);
 	} /* else ignore lua_gettable exceptions */
 	lua_settop(L, top); /* remove temporary objects */
+}
+
+static const char *assigned_nil = "__assigned_nil";
+
+int
+luaL_pre_serialize(struct lua_State *L, int cache_index, int i)
+{
+	if (lua_type(L, -1) != LUA_TTABLE)
+		return 0;
+
+	int idx = lua_gettop(L);
+	if (luaL_getmetafield(L, -1, LUAL_SERIALIZE) != 0) {
+		if (lua_isfunction(L, -1)) {
+			lua_pushvalue(L, idx);
+			lua_rawget(L, cache_index);
+			if (!lua_isnil(L, -1)) {
+				lua_replace(L, idx);
+				lua_pop(L, 1);
+				return 0;
+			}
+			lua_pop(L, 1);
+
+			/*
+			 * Push copy of processed table on top of
+			 * stack to use it as an argument of
+			 * serializing function.
+			 */
+			lua_pushvalue(L, idx);
+			if (lua_pcall(L, 1, 1, 0) != LUA_OK) {
+				diag_set(LuajitError, lua_tostring(L, -1));
+				return -1;
+			}
+
+			if (lua_isnil(L, -1)) {
+				/*
+				 * Process the special case, when
+				 * "__serialize" function returns
+				 * nil.
+				 */
+				lua_pushstring(L, assigned_nil);
+				lua_replace(L, -2);
+			}
+
+			/* Create an entry in cache table. */
+			lua_pushvalue(L, idx);
+			lua_pushvalue(L, -2);
+			lua_rawset(L, cache_index);
+
+
+			lua_replace(L, idx);
+			if (lua_type(L, -1) != LUA_TTABLE)
+				return 0;
+		} else {
+			lua_pop(L, 1);
+			return 0;
+		}
+	}
+
+	/* Process other values and keys in the table. */
+	lua_pushnil(L);
+	while (lua_next(L, -2) != 0) {
+		if (luaL_pre_serialize(L, cache_index, i) != 0)
+			return -1;
+		lua_pop(L, 1);
+		lua_pushvalue(L, -1);
+		if (luaL_pre_serialize(L, cache_index, i) != 0)
+			return -1;
+		lua_pop(L, 1);
+	}
+	return 0;
 }
 
 void
@@ -289,8 +359,23 @@ luaL_find_references(struct lua_State *L, int anchortable_index)
 	if (lua_type(L, -1) != LUA_TTABLE)
 		return;
 
-	/* Copy of a table for self references. */
+	/*
+	 * Check if pocessed table has serialization result. If it
+	 * is, replace the table with the result.
+	 * "anchortable_index + 1" is index of cache table.
+	 */
 	lua_pushvalue(L, -1);
+	lua_rawget(L, anchortable_index + 1);
+	if (lua_type(L, -1) != LUA_TTABLE) {
+		bool is_nil = lua_isnil(L, -1);
+		lua_pop(L, 1);
+		if (!is_nil)
+			return;
+	} else {
+		lua_replace(L, -2);
+	}
+	lua_pushvalue(L, -1);
+
 	lua_rawget(L, anchortable_index);
 	if (lua_isnil(L, -1))
 		newval = 0;
@@ -309,7 +394,7 @@ luaL_find_references(struct lua_State *L, int anchortable_index)
 	if (newval != 0)
 		return;
 
-	/* Other values and keys in the table. */
+	/* Process other values and keys in the table. */
 	lua_pushnil(L);
 	while (lua_next(L, -2) != 0) {
 		luaL_find_references(L, anchortable_index);
@@ -379,22 +464,66 @@ luaL_get_anchor(struct lua_State *L, int anchortable_index,
  *      the result value is put in the origin slot,
  *      encoding is finished.
  *  1 - __serialize field is not available in the metatable,
- *      proceed with default table encoding.
+ *      proceed with default table encoding or available and
+ *      result (table) is taken from cache table.
  */
 static int
 lua_field_try_serialize(struct lua_State *L, struct luaL_serializer *cfg,
-			int idx, struct luaL_field *field)
+			int cache_index, int idx, struct luaL_field *field)
 {
 	if (luaL_getmetafield(L, idx, LUAL_SERIALIZE) == 0)
 		return 1;
 	if (lua_isfunction(L, -1)) {
-		/* copy object itself */
-		lua_pushvalue(L, idx);
-		if (lua_pcall(L, 1, 1, 0) != 0) {
-			diag_set(LuajitError, lua_tostring(L, -1));
-			return -1;
+		if (cache_index != 0) {
+			/*
+			 * Pop the __serialize function for the
+			 * current node. It was already called in
+			 * find_references_and_serialize().
+			 */
+			lua_pop(L, 1);
+			/*
+			 * Get the result of serialization from
+			 * the cache.
+			 */
+			lua_pushvalue(L, idx);
+			lua_rawget(L, cache_index);
+			assert(lua_isnil(L, -1) == 0);
+
+			if (lua_type(L, -1) == LUA_TSTRING) {
+				/*
+				 * Process the special case, when
+				 * "__serialize" function returns
+				 * nil.
+				 */
+				const char *val = lua_tolstring(L , -1, NULL);
+				if (strcmp(val, assigned_nil) == 0) {
+					lua_pop(L, 1);
+					lua_pushnil(L);
+				}
+			}
+
+			if (lua_type(L, -1) == LUA_TTABLE) {
+				/*
+				 * Replace the serialized node
+				 * with a new result, if it is a
+				 * table.
+				 */
+				lua_replace(L, idx);
+				return 1;
+			}
+		} else {
+			/*
+			 * Serializer don't use map with
+			 * serialized objects. Copy object itself
+			 * and call __serialize for it.
+			 */
+			lua_pushvalue(L, idx);
+			if (lua_pcall(L, 1, 1, 0) != LUA_OK) {
+				diag_set(LuajitError, lua_tostring(L, -1));
+				return -1;
+			}
 		}
-		if (luaL_tofield(L, cfg, NULL, -1, field) != 0)
+		if (luaL_tofield(L, cfg, NULL, cache_index, -1, field) != 0)
 			return -1;
 		lua_replace(L, idx);
 		return 0;
@@ -428,7 +557,7 @@ lua_field_try_serialize(struct lua_State *L, struct luaL_serializer *cfg,
 
 static int
 lua_field_inspect_table(struct lua_State *L, struct luaL_serializer *cfg,
-			int idx, struct luaL_field *field)
+			int cache_index, int idx, struct luaL_field *field)
 {
 	assert(lua_type(L, idx) == LUA_TTABLE);
 	uint32_t size = 0;
@@ -436,7 +565,7 @@ lua_field_inspect_table(struct lua_State *L, struct luaL_serializer *cfg,
 
 	if (cfg->encode_load_metatables) {
 		int top = lua_gettop(L);
-		int res = lua_field_try_serialize(L, cfg, idx, field);
+		int res = lua_field_try_serialize(L, cfg, cache_index, idx, field);
 		if (res == -1)
 			return -1;
 		assert(lua_gettop(L) == top);
@@ -489,8 +618,8 @@ lua_field_inspect_table(struct lua_State *L, struct luaL_serializer *cfg,
 }
 
 static void
-lua_field_tostring(struct lua_State *L, struct luaL_serializer *cfg, int idx,
-		   struct luaL_field *field)
+lua_field_tostring(struct lua_State *L, struct luaL_serializer *cfg,
+		   int cache_index, int idx, struct luaL_field *field)
 {
 	int top = lua_gettop(L);
 	lua_getglobal(L, "tostring");
@@ -498,13 +627,13 @@ lua_field_tostring(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 	lua_call(L, 1, 1);
 	lua_replace(L, idx);
 	lua_settop(L, top);
-	if (luaL_tofield(L, cfg, NULL, idx, field) < 0)
+	if (luaL_tofield(L, cfg, NULL, cache_index, idx, field) < 0)
 		luaT_error(L);
 }
 
 int
 luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg,
-	     const struct serializer_opts *opts, int index,
+	     const struct serializer_opts *opts, int cache_index, int index,
 	     struct luaL_field *field)
 {
 	if (index < 0)
@@ -639,7 +768,8 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg,
 	case LUA_TTABLE:
 	{
 		field->compact = false;
-		return lua_field_inspect_table(L, cfg, index, field);
+		return lua_field_inspect_table(L, cfg, cache_index, index,
+					       field);
 	}
 	case LUA_TLIGHTUSERDATA:
 	case LUA_TUSERDATA:
@@ -659,8 +789,8 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg,
 }
 
 void
-luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
-		  struct luaL_field *field)
+luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int cache_index,
+		  int idx, struct luaL_field *field)
 {
 	if (idx < 0)
 		idx = lua_gettop(L) + idx + 1;
@@ -675,15 +805,15 @@ luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 			 */
 			GCcdata *cd = cdataV(L->base + idx - 1);
 			if (cd->ctypeid > CTID_CTYPEID)
-				lua_field_inspect_ucdata(L, cfg, idx, field);
+				lua_field_inspect_ucdata(L, cfg, cache_index, idx, field);
 		} else if (type == LUA_TUSERDATA) {
-			lua_field_inspect_ucdata(L, cfg, idx, field);
+			lua_field_inspect_ucdata(L, cfg, cache_index, idx, field);
 		}
 	}
 
 	if (field->type == MP_EXT && field->ext_type == MP_UNKNOWN_EXTENSION &&
 	    cfg->encode_use_tostring)
-		lua_field_tostring(L, cfg, idx, field);
+		lua_field_tostring(L, cfg, 0, idx, field);
 
 	if (field->type != MP_EXT || field->ext_type != MP_UNKNOWN_EXTENSION)
 		return;

@@ -231,6 +231,29 @@ struct luaL_field {
 };
 
 /**
+ * Traverse the table by @idx index and collect serialization
+ * results for subtables.
+ *
+ * The structure of the cache table is following:
+ *
+ * +------------+----------------------+
+ * | key        | value                |
+ * +------------+----------------------+
+ * | table addr | serialization result |
+ * +------------+----------------------+
+ * | ...        | ...                  |
+ * +------------+----------------------+
+ *
+ * Processed table must be on the top of the Lua stack before
+ * call.
+ *
+ * @param L Lua stack.
+ * @param cache_index Index of table with serialization results.
+ */
+int
+luaL_pre_serialize(struct lua_State *L, int cache_index, int i);
+
+/**
  * Find references and self-references to tables. Keep references
  * in cache table with @a anchortable_index.
  *
@@ -328,7 +351,7 @@ luaL_get_anchor(struct lua_State *L, int anchortable_index,
  */
 int
 luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg,
-	     const struct serializer_opts *opts, int index,
+	     const struct serializer_opts *opts, int cache_index, int index,
 	     struct luaL_field *field);
 
 /**
@@ -341,8 +364,8 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg,
  * @param field conversion result
  */
 void
-luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
-		  struct luaL_field *field);
+luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg,
+		  int cache_index, int idx, struct luaL_field *field);
 
 /**
  * @brief A wrapper for luaL_tofield() and luaL_convertfield() that
@@ -364,14 +387,14 @@ luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
  * (tostring) -> (nil) -> exception
  */
 static inline void
-luaL_checkfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
-		struct luaL_field *field)
+luaL_checkfield(struct lua_State *L, struct luaL_serializer *cfg,
+		int cache_index, int idx, struct luaL_field *field)
 {
-	if (luaL_tofield(L, cfg, NULL, idx, field) < 0)
+	if (luaL_tofield(L, cfg, NULL, cache_index, idx, field) < 0)
 		luaT_error(L);
 	if (field->type != MP_EXT || field->ext_type != MP_UNKNOWN_EXTENSION)
 		return;
-	luaL_convertfield(L, cfg, idx, field);
+	luaL_convertfield(L, cfg, cache_index, idx, field);
 }
 
 /* }}} Fill luaL_field */

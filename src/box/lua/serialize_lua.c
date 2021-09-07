@@ -117,6 +117,9 @@ struct lua_dumper {
 	int anchortable_index;
 	unsigned int anchor_number;
 
+	/** Table with srialized tables. */
+	int cache_index;
+
 	/** Error message buffer */
 	char err_msg[256];
 	int err;
@@ -216,7 +219,7 @@ trace_node(struct lua_dumper *d)
 	struct luaL_field field;
 
 	memset(&field, 0, sizeof(field));
-	luaL_checkfield(d->L, d->cfg, lua_gettop(d->L), &field);
+	luaL_checkfield(d->L, d->cfg, d->cache_index, lua_gettop(d->L), &field);
 
 	if (field.type < lengthof(mp_type_names)) {
 		if (field.type == MP_EXT) {
@@ -235,7 +238,7 @@ trace_node(struct lua_dumper *d)
 
 	memset(&field, 0, sizeof(field));
 
-	luaL_checkfield(d->L, d->cfg, top, &field);
+	luaL_checkfield(d->L, d->cfg, d->cache_index, top, &field);
 	say_info("serializer-trace: node    :\tfield type %s (%d)",
 		 type_str, field.type);
 }
@@ -760,7 +763,7 @@ dump_node(struct lua_dumper *d, struct node *nd, int indent)
 		return -1;
 
 	memset(field, 0, sizeof(*field));
-	luaL_checkfield(d->L, d->cfg, lua_gettop(d->L), field);
+	luaL_checkfield(d->L, d->cfg, d->cache_index, lua_gettop(d->L), field);
 
 	switch (field->type) {
 	case MP_NIL:
@@ -869,7 +872,8 @@ dump_root(struct lua_dumper *d)
 	};
 	int ret;
 
-	luaL_checkfield(d->L, d->cfg, lua_gettop(d->L), &nd.field);
+	luaL_checkfield(d->L, d->cfg, d->cache_index, lua_gettop(d->L),
+			&nd.field);
 
 	if (nd.field.type != MP_ARRAY || nd.field.size != 1) {
 		d->err = EINVAL;
@@ -916,8 +920,14 @@ lua_encode(lua_State *L, struct luaL_serializer *serializer,
 	dumper.anchortable_index = lua_gettop(L);
 	dumper.anchor_number = 0;
 
+	lua_newtable(L);
+
+	dumper.cache_index = lua_gettop(L);
+
 	/* Push copy of arg we're processing */
 	lua_pushvalue(L, 1);
+	if (luaL_pre_serialize(dumper.L, dumper.cache_index, 0) != 0)
+		goto out;
 	luaL_find_references(dumper.L, dumper.anchortable_index);
 
 	if (dump_root(&dumper) != 0)
