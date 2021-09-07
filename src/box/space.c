@@ -161,7 +161,7 @@ space_create(struct space *space, struct engine *engine,
 		goto fail;
 	}
 	space->index = space->index_map + index_id_max + 1;
-	size_t size = bitmap_size(index_id_max + 1);
+	size_t size = BITMAP_SIZE(index_id_max + 1);
 	space->check_unique_constraint_map = calloc(size, 1);
 	if (space->check_unique_constraint_map == NULL) {
 		diag_set(OutOfMemory, size, "malloc",

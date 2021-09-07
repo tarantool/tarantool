@@ -183,12 +183,8 @@ store_bool(void *p, bool b)
  * @param bit_count number of bits in the bitmap
  * @retval bitmap size, in bytes
  */
-static inline size_t
-bitmap_size(size_t bit_count)
-{
-	size_t word_count = DIV_ROUND_UP(bit_count, CHAR_BIT * sizeof(long));
-	return word_count * sizeof(long);
-}
+#define BITMAP_SIZE(bit_count) \
+	(DIV_ROUND_UP((bit_count), CHAR_BIT * sizeof(long)) * sizeof(long))
 
 /**
  * @brief Test bit \a pos in memory chunk \a data

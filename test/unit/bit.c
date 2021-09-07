@@ -210,13 +210,13 @@ static void
 test_bitmap_size(void)
 {
 	header();
-	fail_unless(bitmap_size(1) == sizeof(long));
-	fail_unless(bitmap_size(10) == sizeof(long));
-	fail_unless(bitmap_size(sizeof(long) * CHAR_BIT) == sizeof(long));
-	fail_unless(bitmap_size(sizeof(long) * CHAR_BIT + 1) == sizeof(long) * 2);
-	fail_unless(bitmap_size(sizeof(long) * CHAR_BIT * 4) == sizeof(long) * 4);
-	fail_unless(bitmap_size(sizeof(long) * CHAR_BIT * 4 - 1) == sizeof(long) * 4);
-	fail_unless(bitmap_size(sizeof(long) * CHAR_BIT * 9 / 2) == sizeof(long) * 5);
+	fail_unless(BITMAP_SIZE(1) == sizeof(long));
+	fail_unless(BITMAP_SIZE(10) == sizeof(long));
+	fail_unless(BITMAP_SIZE(sizeof(long) * CHAR_BIT) == sizeof(long));
+	fail_unless(BITMAP_SIZE(sizeof(long) * CHAR_BIT + 1) == sizeof(long) * 2);
+	fail_unless(BITMAP_SIZE(sizeof(long) * CHAR_BIT * 4) == sizeof(long) * 4);
+	fail_unless(BITMAP_SIZE(sizeof(long) * CHAR_BIT * 4 - 1) == sizeof(long) * 4);
+	fail_unless(BITMAP_SIZE(sizeof(long) * CHAR_BIT * 9 / 2) == sizeof(long) * 5);
 	footer();
 }
 
