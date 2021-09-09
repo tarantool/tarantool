@@ -219,7 +219,7 @@ IPROTO_AUTH               = 7
 IPROTO_STREAM_ID          = 0x0a
 ---
 ...
-next_request_id           = 9
+next_request_id           = 10
 ---
 ...
 test_run:cmd("setopt delimiter ';'")

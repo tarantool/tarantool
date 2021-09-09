@@ -36,6 +36,7 @@
 #include "scramble.h"
 
 #include "box/iproto_constants.h"
+#include "box/iproto_features.h"
 #include "box/lua/tuple.h" /* luamp_convert_tuple() / luamp_convert_key() */
 #include "box/xrow.h"
 #include "box/tuple.h"
@@ -57,6 +58,18 @@
 #include "version.h"
 
 #define cfg luaL_msgpack_default
+
+enum {
+	/**
+	 * IPROTO protocol version supported by the netbox connector.
+	 */
+	NETBOX_IPROTO_VERSION = 0,
+};
+
+/**
+ * IPROTO protocol features supported by the netbox connector.
+ */
+static struct iproto_features NETBOX_IPROTO_FEATURES;
 
 enum netbox_method {
 	NETBOX_PING        = 0,
@@ -406,6 +419,28 @@ netbox_encode_ping(lua_State *L, int idx, struct mpstream *stream,
 	(void)idx;
 	size_t svp = netbox_begin_encode(stream, sync, IPROTO_PING, stream_id);
 	netbox_end_encode(stream, svp);
+}
+
+static int
+netbox_encode_id(struct ibuf *ibuf, uint64_t sync)
+{
+	bool is_error = false;
+	struct mpstream stream;
+	mpstream_init(&stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
+		      mpstream_error_handler, &is_error);
+	size_t svp = netbox_begin_encode(&stream, sync, IPROTO_ID, 0);
+
+	mpstream_encode_map(&stream, 2);
+	mpstream_encode_uint(&stream, IPROTO_VERSION);
+	mpstream_encode_uint(&stream, NETBOX_IPROTO_VERSION);
+	mpstream_encode_uint(&stream, IPROTO_FEATURES);
+	size_t size = mp_sizeof_iproto_features(&NETBOX_IPROTO_FEATURES);
+	char *data = mpstream_reserve(&stream, size);
+	mp_encode_iproto_features(data, &NETBOX_IPROTO_FEATURES);
+	mpstream_advance(&stream, size);
+
+	netbox_end_encode(&stream, svp);
+	return is_error ? -1 : 0;
 }
 
 /**
@@ -1890,6 +1925,61 @@ netbox_dispatch_response_console(struct lua_State *L,
 }
 
 /**
+ * Performs a features request for an iproto connection.
+ * Takes peer_version_id, request registry, socket fd, send_buf (ibuf),
+ * on_send_buf_empty (cond), recv_buf (ibuf).
+ * Returns server version and features array on success.
+ * If the server doesn't support IPROTO_ID, returns 0 and an empty array.
+ * On failure returns nil, error.
+ */
+static int
+netbox_iproto_id(struct lua_State *L)
+{
+	uint32_t peer_version_id = lua_tointeger(L, 1);
+	struct netbox_registry *registry = luaT_check_netbox_registry(L, 2);
+	int fd = lua_tointeger(L, 3);
+	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 4);
+	struct fiber_cond *on_send_buf_empty = luaT_checkfibercond(L, 5);
+	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 6);
+	struct id_request id;
+	id.version = 0;
+	iproto_features_create(&id.features);
+	if (peer_version_id < version_id(2, 10, 0))
+		goto unsupported;
+	if (netbox_encode_id(send_buf, registry->next_sync++) != 0)
+		goto error;
+	struct xrow_header hdr;
+	if (netbox_send_and_recv_iproto(fd, send_buf, on_send_buf_empty,
+					recv_buf, &hdr) != 0) {
+		goto error;
+	}
+	if (hdr.type != IPROTO_OK) {
+		uint32_t errcode = hdr.type & (IPROTO_TYPE_ERROR - 1);
+		if (errcode == ER_UNKNOWN_REQUEST_TYPE)
+			goto unsupported;
+		xrow_decode_error(&hdr);
+		goto error;
+	}
+	if (xrow_decode_id(&hdr, &id) != 0)
+		goto error;
+out:
+	lua_pushinteger(L, id.version);
+	lua_newtable(L);
+	int i = 1;
+	iproto_features_foreach(&id.features, feature_id) {
+		lua_pushinteger(L, feature_id);
+		lua_rawseti(L, -2, i++);
+	}
+	return 2;
+unsupported:
+	say_verbose("IPROTO_ID command is not supported by net.box connection "
+		    "at fd %d", fd);
+	goto out;
+error:
+	return luaT_push_nil_and_error(L);
+}
+
+/**
  * Performs an authorization request for an iproto connection.
  * Takes user, password, salt, request registry, socket fd,
  * send_buf (ibuf), recv_buf (ibuf).
@@ -2141,6 +2231,12 @@ netbox_console_loop(struct lua_State *L)
 int
 luaopen_net_box(struct lua_State *L)
 {
+	iproto_features_create(&NETBOX_IPROTO_FEATURES);
+	iproto_features_set(&NETBOX_IPROTO_FEATURES,
+			    IPROTO_FEATURE_STREAMS);
+	iproto_features_set(&NETBOX_IPROTO_FEATURES,
+			    IPROTO_FEATURE_TRANSACTIONS);
+
 	lua_pushcfunction(L, luaT_netbox_request_iterator_next);
 	luaT_netbox_request_iterator_next_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
@@ -2171,6 +2267,7 @@ luaopen_net_box(struct lua_State *L)
 		{ "new_registry",   netbox_new_registry },
 		{ "perform_async_request", netbox_perform_async_request },
 		{ "perform_request",netbox_perform_request },
+		{ "iproto_id",      netbox_iproto_id },
 		{ "iproto_auth",    netbox_iproto_auth },
 		{ "iproto_schema",  netbox_iproto_schema },
 		{ "iproto_loop",    netbox_iproto_loop },

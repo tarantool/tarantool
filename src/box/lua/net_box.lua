@@ -60,6 +60,40 @@ local M_INJECT      = 20
 -- utility tables
 local is_final_state         = {closed = 1, error = 1}
 
+-- IPROTO feature id -> name
+local IPROTO_FEATURE_NAMES = {
+    [0]     = 'streams',
+    [1]     = 'transactions',
+}
+
+-- Given an array of IPROTO feature ids, returns a map {feature_name: bool}.
+local function iproto_features_resolve(feature_ids)
+    local features = {}
+    for _, feature_name in pairs(IPROTO_FEATURE_NAMES) do
+        features[feature_name] = false
+    end
+    for _, feature_id in ipairs(feature_ids) do
+        local feature_name = IPROTO_FEATURE_NAMES[feature_id]
+        assert(feature_name ~= nil)
+        features[feature_name] = true
+    end
+    return features
+end
+
+-- Check if all required features (array) are set in the features map.
+-- Returns the status and an array of missing features.
+local function iproto_features_check(features, required)
+    local ok = true
+    local missing = {}
+    for _, feature_name in ipairs(required) do
+        if not features[feature_name] then
+            table.insert(missing, feature_name)
+            ok = false
+        end
+    end
+    return ok, missing
+end
+
 --
 -- Connect to a remote server, do handshake.
 -- @param host Hostname.
@@ -333,8 +367,8 @@ local function create_transport(host, port, user, password, callback,
     -- tail-recursive calls to each other. Yep, Lua optimizes
     -- such calls, and yep, this is the canonical way to implement
     -- a state machine in Lua.
-    local console_setup_sm, console_sm, iproto_auth_sm, iproto_schema_sm,
-        iproto_sm, error_sm
+    local console_setup_sm, console_sm, iproto_setup_sm, iproto_auth_sm,
+        iproto_schema_sm, iproto_sm, error_sm
 
     --
     -- Protocol_sm is a core function of netbox. It calls all
@@ -355,7 +389,7 @@ local function create_transport(host, port, user, password, callback,
         if greeting.protocol == 'Lua console' then
             return console_setup_sm()
         elseif greeting.protocol == 'Binary' then
-            return iproto_auth_sm(greeting.salt)
+            return iproto_setup_sm()
         else
             return error_sm(E_NO_CONNECTION,
                             'Unknown protocol: '..greeting.protocol)
@@ -379,6 +413,21 @@ local function create_transport(host, port, user, password, callback,
                                           send_buf, on_send_buf_empty,
                                           recv_buf)
         return error_sm(err.code, err.message)
+    end
+
+    iproto_setup_sm = function()
+        local version, features = internal.iproto_id(
+            greeting.version_id, requests, connection:fd(), send_buf,
+            on_send_buf_empty, recv_buf)
+        if not version then
+            local err = features
+            return error_sm(err.code, err.message)
+        end
+        local err, msg = callback('id', version, features)
+        if err then
+            return error_sm(err, msg)
+        end
+        return iproto_auth_sm(greeting.salt)
     end
 
     iproto_auth_sm = function(salt)
@@ -515,7 +564,9 @@ local function remote_serialize(self)
         protocol = self.protocol,
         schema_version = self.schema_version,
         peer_uuid = self.peer_uuid,
-        peer_version_id = self.peer_version_id
+        peer_version_id = self.peer_version_id,
+        peer_protocol_version = self.peer_protocol_version,
+        peer_protocol_features = self.peer_protocol_features,
     }
 end
 
@@ -675,6 +726,26 @@ local function new_sm(host, port, opts, connection, greeting)
             remote.protocol = greeting.protocol
             remote.peer_uuid = greeting.uuid
             remote.peer_version_id = greeting.version_id
+        elseif what == 'id' then
+            local version, features = ...
+            features = iproto_features_resolve(features)
+            remote.peer_protocol_version = version
+            remote.peer_protocol_features = features
+            if opts.required_protocol_version and
+               opts.required_protocol_version > version then
+                return E_NO_CONNECTION,
+                       string.format('Protocol version (%d) < required (%d)',
+                                     version, opts.required_protocol_version)
+            end
+            if opts.required_protocol_features then
+                local ok, missing = iproto_features_check(
+                    features, opts.required_protocol_features)
+                if not ok then
+                    return E_NO_CONNECTION,
+                           'Missing required protocol features: ' ..
+                           table.concat(missing, ', ')
+                end
+            end
         elseif what == 'will_fetch_schema' then
             return not opts.console
         elseif what == 'fetch_connect_timeout' then

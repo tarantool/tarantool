@@ -427,12 +427,33 @@ iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version)
 int
 iproto_reply_id(struct obuf *out, uint64_t sync, uint32_t schema_version)
 {
+	unsigned version = IPROTO_CURRENT_VERSION;
+	struct iproto_features *features = &IPROTO_CURRENT_FEATURES;
+
+#ifndef NDEBUG
+	struct errinj *errinj;
+	errinj = errinj(ERRINJ_IPROTO_SET_VERSION, ERRINJ_INT);
+	if (errinj->iparam >= 0)
+		version = errinj->iparam;
+	struct iproto_features features_value;
+	errinj = errinj(ERRINJ_IPROTO_FLIP_FEATURE, ERRINJ_INT);
+	if (errinj->iparam >= 0 && errinj->iparam < iproto_feature_id_MAX) {
+		int feature_id = errinj->iparam;
+		features_value = *features;
+		features = &features_value;
+		if (iproto_features_test(features, feature_id))
+			iproto_features_clear(features, feature_id);
+		else
+			iproto_features_set(features, feature_id);
+	}
+#endif
+
 	size_t size = IPROTO_HEADER_LEN;
 	size += mp_sizeof_map(2);
 	size += mp_sizeof_uint(IPROTO_VERSION);
-	size += mp_sizeof_uint(IPROTO_CURRENT_VERSION);
+	size += mp_sizeof_uint(version);
 	size += mp_sizeof_uint(IPROTO_FEATURES);
-	size += mp_sizeof_iproto_features(&IPROTO_CURRENT_FEATURES);
+	size += mp_sizeof_iproto_features(features);
 
 	char *buf = obuf_alloc(out, size);
 	if (buf == NULL) {
@@ -443,9 +464,9 @@ iproto_reply_id(struct obuf *out, uint64_t sync, uint32_t schema_version)
 	char *data = buf + IPROTO_HEADER_LEN;
 	data = mp_encode_map(data, 2);
 	data = mp_encode_uint(data, IPROTO_VERSION);
-	data = mp_encode_uint(data, IPROTO_CURRENT_VERSION);
+	data = mp_encode_uint(data, version);
 	data = mp_encode_uint(data, IPROTO_FEATURES);
-	data = mp_encode_iproto_features(data, &IPROTO_CURRENT_FEATURES);
+	data = mp_encode_iproto_features(data, features);
 	assert(size == (size_t)(data - buf));
 
 	iproto_header_encode(buf, IPROTO_OK, sync, schema_version,
