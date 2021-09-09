@@ -416,6 +416,7 @@ title_set_script_name
 title_set_status
 title_update
 tnt_datetime_now
+tnt_datetime_parse_full
 tnt_datetime_strftime
 tnt_datetime_to_string
 tnt_datetime_unpack
@@ -429,6 +430,8 @@ tnt_dt_doy
 tnt_dt_from_rdn
 tnt_dt_from_ymd
 tnt_dt_month
+tnt_dt_parse_iso_date
+tnt_dt_parse_iso_time
 tnt_dt_parse_iso_zone_lenient
 tnt_dt_to_ymd
 tnt_dt_year

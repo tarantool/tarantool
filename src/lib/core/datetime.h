@@ -113,6 +113,24 @@ datetime_now(struct datetime *now);
 void
 datetime_to_tm(const struct datetime *date, struct tnt_tm *tm);
 
+/**
+ * Parse datetime text in ISO-8601 given format, and construct output
+ * datetime value
+ * @param date output datetime value
+ * @param str input text in relaxed ISO-8601 format (0-terminated)
+ * @param len length of str buffer
+ * @param offset timezone offset, if you need to interpret
+ *        date/time value as local. Pass 0 if you need to interpret it as UTC,
+ *        or apply offset from string.
+ * @retval Upon successful completion returns length of accepted
+ *         prefix substring. It's ok if there is some unaccepted trailer.
+ *         Returns 0 only if text is not recognizable as date/time string.
+ * @sa datetime_strptime()
+ */
+size_t
+datetime_parse_full(struct datetime *date, const char *str, size_t len,
+		    int32_t offset);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
