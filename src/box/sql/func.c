@@ -151,6 +151,29 @@ fin_avg(struct sql_context *ctx)
 		ctx->is_aborted = true;
 }
 
+/** Implementation of the COUNT() function. */
+static void
+step_count(struct sql_context *ctx, int argc, struct Mem **argv)
+{
+	assert(argc == 0 || argc == 1);
+	if (mem_is_null(ctx->pMem))
+		mem_set_uint(ctx->pMem, 0);
+	if (argc == 1 && mem_is_null(argv[0]))
+		return;
+	assert(mem_is_uint(ctx->pMem));
+	++ctx->pMem->u.u;
+}
+
+/** Finalizer for the COUNT() function. */
+static void
+fin_count(struct sql_context *ctx)
+{
+	assert(mem_is_null(ctx->pMem) || mem_is_uint(ctx->pMem));
+	if (mem_is_null(ctx->pMem))
+		return mem_set_uint(ctx->pOut, 0);
+	mem_copy_as_ephemeral(ctx->pOut, ctx->pMem);
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -1713,41 +1736,6 @@ soundexFunc(sql_context * context, int argc, sql_value ** argv)
 }
 
 /*
- * The following structure keeps track of state information for the
- * count() aggregate function.
- */
-typedef struct CountCtx CountCtx;
-struct CountCtx {
-	i64 n;
-};
-
-/*
- * Routines to implement the count() aggregate function.
- */
-static void
-countStep(sql_context * context, int argc, sql_value ** argv)
-{
-	CountCtx *p;
-	if (argc != 0 && argc != 1) {
-		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT,
-			 "COUNT", "0 or 1", argc);
-		context->is_aborted = true;
-		return;
-	}
-	p = sql_aggregate_context(context, sizeof(*p));
-	if ((argc == 0 || !mem_is_null(argv[0])) && p != NULL)
-		p->n++;
-}
-
-static void
-countFinalize(sql_context * context)
-{
-	CountCtx *p;
-	p = sql_aggregate_context(context, 0);
-	sql_result_uint(context, p ? p->n : 0);
-}
-
-/*
  * Routines to implement min() and max() aggregate functions.
  */
 static void
@@ -2015,9 +2003,9 @@ static struct sql_func_definition definitions[] = {
 	 NULL},
 	{"COALESCE", -1, {FIELD_TYPE_ANY}, FIELD_TYPE_SCALAR, sql_builtin_stub,
 	 NULL},
-	{"COUNT", 0, {}, FIELD_TYPE_INTEGER, countStep, countFinalize},
-	{"COUNT", 1, {FIELD_TYPE_ANY}, FIELD_TYPE_INTEGER, countStep,
-	 countFinalize},
+	{"COUNT", 0, {}, FIELD_TYPE_INTEGER, step_count, fin_count},
+	{"COUNT", 1, {FIELD_TYPE_ANY}, FIELD_TYPE_INTEGER, step_count,
+	 fin_count},
 
 	{"GREATEST", -1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, minmaxFunc,
 	 NULL},
