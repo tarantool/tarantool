@@ -13,10 +13,10 @@ ev_clear_pending
 ev_default_loop
 ev_default_loop_ptr
 ev_depth
+ev_embeddable_backends
 ev_embed_start
 ev_embed_stop
 ev_embed_sweep
-ev_embeddable_backends
 ev_feed_event
 ev_feed_fd_event
 ev_feed_signal
