@@ -1159,23 +1159,13 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 	break;
 }
 
-/* Opcode: CollSeq P1 * * P4
- *
- * P4 is a pointer to a CollSeq struct. If the next call to a user function
- * or aggregate calls sqlGetFuncCollSeq(), this collation sequence will
- * be returned. This is used by the built-in min(), max() and nullif()
- * functions.
+/* Opcode: SkipLoad P1 * * * *
  *
  * If P1 is not zero, then it is a register that a subsequent min() or
  * max() aggregate will set to true if the current row is not the minimum or
  * maximum.  The P1 register is initialized to false by this instruction.
- *
- * The interface used by the implementation of the aforementioned functions
- * to retrieve the collation sequence set by this opcode is not available
- * publicly.  Only built-in functions have access to this feature.
  */
-case OP_CollSeq: {
-	assert(pOp->p4type==P4_COLLSEQ || pOp->p4.pColl == NULL);
+case OP_SkipLoad: {
 	if (pOp->p1) {
 		mem_set_bool(&aMem[pOp->p1], false);
 	}
@@ -1199,7 +1189,6 @@ case OP_BuiltinFunction: {
 
 	assert(pOp->p4type==P4_FUNCCTX);
 	pCtx = pOp->p4.pCtx;
-	pCtx->iOp = (int)(pOp - aOp);
 
 	/* If this function is inside of a trigger, the register array in aMem[]
 	 * might change from one evaluation to the next.  The next block of code
@@ -4152,7 +4141,6 @@ case OP_AggStep: {
 
 	assert(pOp->p4type==P4_FUNCCTX);
 	pCtx = pOp->p4.pCtx;
-	pCtx->iOp = (int)(pOp - aOp);
 	pMem = &aMem[pOp->p3];
 
 	/* If this function is inside of a trigger, the register array in aMem[]
@@ -4187,7 +4175,7 @@ case OP_AggStep: {
 	}
 	assert(mem_is_null(&t));
 	if (pCtx->skipFlag) {
-		assert(pOp[-1].opcode==OP_CollSeq);
+		assert(pOp[-1].opcode == OP_SkipLoad);
 		i = pOp[-1].p1;
 		if (i) mem_set_bool(&aMem[i], true);
 	}

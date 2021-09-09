@@ -331,33 +331,6 @@ sql_context_db_handle(sql_context * p)
 }
 
 /*
- * Return the current time for a statement.  If the current time
- * is requested more than once within the same run of a single prepared
- * statement, the exact same time is returned for each invocation regardless
- * of the amount of time that elapses between invocations.  In other words,
- * the time returned is always the time of the first call.
- */
-sql_int64
-sqlStmtCurrentTime(sql_context * p)
-{
-	int rc;
-#ifndef SQL_ENABLE_OR_STAT4
-	sql_int64 *piTime = &p->pVdbe->iCurrentTime;
-	assert(p->pVdbe != 0);
-#else
-	sql_int64 iTime = 0;
-	sql_int64 *piTime =
-	    p->pVdbe != 0 ? &p->pVdbe->iCurrentTime : &iTime;
-#endif
-	if (*piTime == 0) {
-		rc = sqlOsCurrentTimeInt64(p->pOut->db->pVfs, piTime);
-		if (rc)
-			*piTime = 0;
-	}
-	return *piTime;
-}
-
-/*
  * Allocate or return the aggregate context for a user function.  A new
  * context is allocated on the first call.  Subsequent calls return the
  * same context that was returned on prior calls.

@@ -4102,13 +4102,9 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				pParse->is_aborted = true;
 				return 0;
 			}
-			if (sql_func_flag_is_set(func, SQL_FUNC_NEEDCOLL)) {
-				sqlVdbeAddOp4(v, OP_CollSeq, 0, 0, 0,
-						  (char *)coll, P4_COLLSEQ);
-			}
 			if (func->def->language == FUNC_LANGUAGE_SQL_BUILTIN) {
 				struct sql_context *ctx =
-					sql_context_new(v, func, nFarg);
+					sql_context_new(func, nFarg, coll);
 				if (ctx == NULL) {
 					pParse->is_aborted = true;
 					return -1;

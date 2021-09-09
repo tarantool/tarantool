@@ -5621,8 +5621,8 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 			pParse->is_aborted = true;
 			return;
 		}
+		struct coll *coll = NULL;
 		if (sql_func_flag_is_set(pF->func, SQL_FUNC_NEEDCOLL)) {
-			struct coll *coll = NULL;
 			struct ExprList_item *pItem;
 			int j;
 			assert(pList != 0);	/* pList!=0 if pF->pFunc has NEEDCOLL */
@@ -5636,10 +5636,9 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 			}
 			if (regHit == 0 && pAggInfo->nAccumulator)
 				regHit = ++pParse->nMem;
-			sqlVdbeAddOp4(v, OP_CollSeq, regHit, 0, 0,
-					  (char *)coll, P4_COLLSEQ);
+			sqlVdbeAddOp1(v, OP_SkipLoad, regHit);
 		}
-		struct sql_context *ctx = sql_context_new(v, pF->func, nArg);
+		struct sql_context *ctx = sql_context_new(pF->func, nArg, coll);
 		if (ctx == NULL) {
 			pParse->is_aborted = true;
 			return;
@@ -6751,7 +6750,7 @@ sql_expr_extract_select(struct Parse *parser, struct Select *select)
 }
 
 struct sql_context *
-sql_context_new(struct Vdbe *vdbe, struct func *func, uint32_t argc)
+sql_context_new(struct func *func, uint32_t argc, struct coll *coll)
 {
 	uint32_t size = sizeof(struct sql_context);
 	if (argc > 1)
@@ -6763,8 +6762,7 @@ sql_context_new(struct Vdbe *vdbe, struct func *func, uint32_t argc)
 	ctx->func = func;
 	ctx->is_aborted = false;
 	ctx->skipFlag = 0;
-	ctx->pVdbe = vdbe;
-	ctx->iOp = 0;
+	ctx->coll = coll;
 	return ctx;
 }
 

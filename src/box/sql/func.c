@@ -101,20 +101,6 @@ sql_func_uuid(struct sql_context *ctx, int argc, struct Mem **argv)
 }
 
 /*
- * Return the collating function associated with a function.
- */
-static struct coll *
-sqlGetFuncCollSeq(sql_context * context)
-{
-	VdbeOp *pOp;
-	assert(context->pVdbe != 0);
-	pOp = &context->pVdbe->aOp[context->iOp - 1];
-	assert(pOp->opcode == OP_CollSeq);
-	assert(pOp->p4type == P4_COLLSEQ || pOp->p4.pColl == NULL);
-	return pOp->p4.pColl;
-}
-
-/*
  * Indicate that the accumulator load should be skipped on this
  * iteration of the aggregate loop.
  */
@@ -141,7 +127,7 @@ minmaxFunc(sql_context * context, int argc, sql_value ** argv)
 		context->is_aborted = true;
 		return;
 	}
-	pColl = sqlGetFuncCollSeq(context);
+	pColl = context->coll;
 	assert(mask == -1 || mask == 0);
 	iBest = 0;
 	if (mem_is_null(argv[0]))
@@ -402,7 +388,7 @@ position_func(struct sql_context *context, int argc, struct Mem **argv)
 					       n_haystack_bytes);
 			}
 			int beg_offset = 0;
-			struct coll *coll = sqlGetFuncCollSeq(context);
+			struct coll *coll = context->coll;
 			int c;
 			for (c = 0; c + n_needle_chars <= n_haystack_chars; c++) {
 				if (coll->cmp((const char *) haystack_str + beg_offset,
@@ -667,7 +653,7 @@ case_type##ICUFunc(sql_context *context, int argc, sql_value **argv)   \
 		return;                                                        \
 	}                                                                      \
 	UErrorCode status = U_ZERO_ERROR;                                      \
-	struct coll *coll = sqlGetFuncCollSeq(context);                    \
+	struct coll *coll = context->coll;                                     \
 	const char *locale = NULL;                                             \
 	if (coll != NULL && coll->type == COLL_TYPE_ICU) {                     \
 		locale = ucol_getLocaleByType(coll->collator,                  \
@@ -1029,7 +1015,7 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 	if (!zA || !zB)
 		return;
 	int res;
-	struct coll *coll = sqlGetFuncCollSeq(context);
+	struct coll *coll = context->coll;
 	assert(coll != NULL);
 	res = sql_utf8_pattern_compare(zB, zA, zB_end, zA_end, coll, escape);
 
@@ -1050,7 +1036,7 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 static void
 nullifFunc(sql_context * context, int NotUsed, sql_value ** argv)
 {
-	struct coll *pColl = sqlGetFuncCollSeq(context);
+	struct coll *pColl = context->coll;
 	UNUSED_PARAMETER(NotUsed);
 	if (mem_cmp_scalar(argv[0], argv[1], pColl) != 0)
 		sql_result_value(context, argv[0]);
@@ -1768,7 +1754,7 @@ minmaxStep(sql_context * context, int NotUsed, sql_value ** argv)
 		if (!mem_is_null(pBest))
 			sqlSkipAccumulatorLoad(context);
 	} else if (!mem_is_null(pBest)) {
-		struct coll *pColl = sqlGetFuncCollSeq(context);
+		struct coll *pColl = context->coll;
 		/*
 		 * This step function is used for both the min()
 		 * and max() aggregates, the only difference
