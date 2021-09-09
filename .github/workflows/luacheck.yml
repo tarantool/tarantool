@@ -37,8 +37,11 @@ jobs:
       - name: test
         run: ${CI_MAKE} test_debian_luacheck
       - name: call action to send Telegram message on failure
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
-          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
-        uses: ./.github/actions/send-telegram-notify
+        uses: ./.github/actions/typescript-telegram-notifier
         if: failure()
+        with:
+          token: ${{ secrets.TELEGRAM_CORE_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_CORE_TO }}
+          parse_mode: MarkdownV2
+          disable_web_page_preview: true
