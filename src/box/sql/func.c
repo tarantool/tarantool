@@ -174,6 +174,46 @@ fin_count(struct sql_context *ctx)
 	mem_copy_as_ephemeral(ctx->pOut, ctx->pMem);
 }
 
+/** Implementation of the MIN() and MAX() functions. */
+static void
+step_minmax(struct sql_context *ctx, int argc, struct Mem **argv)
+{
+	assert(argc == 1);
+	(void)argc;
+	if (mem_is_null(argv[0])) {
+		if (!mem_is_null(ctx->pMem))
+			ctx->skipFlag = 1;
+		return;
+	}
+	if (mem_is_null(ctx->pMem)) {
+		if (mem_copy(ctx->pMem, argv[0]) != 0)
+			ctx->is_aborted = true;
+		return;
+	}
+
+	uint32_t flags = ((struct func_sql_builtin *)ctx->func)->flags;
+	bool is_max = (flags & SQL_FUNC_MAX) != 0;
+	/*
+	 * This step function is used for both the min() and max() aggregates,
+	 * the only difference between the two being that the sense of the
+	 * comparison is inverted.
+	 */
+	int cmp = mem_cmp_scalar(ctx->pMem, argv[0], ctx->coll);
+	if ((is_max && cmp < 0) || (!is_max && cmp > 0)) {
+		if (mem_copy(ctx->pMem, argv[0]) != 0)
+			ctx->is_aborted = true;
+		return;
+	}
+	ctx->skipFlag = 1;
+}
+
+/** Finalizer for the MIN() and MAX() functions. */
+static void
+fin_minmax(struct sql_context *ctx)
+{
+	mem_copy(ctx->pOut, ctx->pMem);
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -219,16 +259,6 @@ sql_func_uuid(struct sql_context *ctx, int argc, struct Mem **argv)
 	struct tt_uuid uuid;
 	tt_uuid_create(&uuid);
 	mem_set_uuid(ctx->pOut, &uuid);
-}
-
-/*
- * Indicate that the accumulator load should be skipped on this
- * iteration of the aggregate loop.
- */
-static void
-sqlSkipAccumulatorLoad(sql_context * context)
-{
-	context->skipFlag = 1;
 }
 
 /*
@@ -1736,60 +1766,6 @@ soundexFunc(sql_context * context, int argc, sql_value ** argv)
 }
 
 /*
- * Routines to implement min() and max() aggregate functions.
- */
-static void
-minmaxStep(sql_context * context, int NotUsed, sql_value ** argv)
-{
-	Mem *pArg = (Mem *) argv[0];
-	Mem *pBest;
-	UNUSED_PARAMETER(NotUsed);
-
-	struct func_sql_builtin *func =
-		(struct func_sql_builtin *)context->func;
-	pBest = sql_context_agg_mem(context);
-	if (!pBest)
-		return;
-
-	if (mem_is_null(argv[0])) {
-		if (!mem_is_null(pBest))
-			sqlSkipAccumulatorLoad(context);
-	} else if (!mem_is_null(pBest)) {
-		struct coll *pColl = context->coll;
-		/*
-		 * This step function is used for both the min()
-		 * and max() aggregates, the only difference
-		 * between the two being that the sense of the
-		 * comparison is inverted.
-		 */
-		bool is_max = (func->flags & SQL_FUNC_MAX) != 0;
-		int cmp = mem_cmp_scalar(pBest, pArg, pColl);
-		if ((is_max && cmp < 0) || (!is_max && cmp > 0)) {
-			if (mem_copy(pBest, pArg) != 0)
-				context->is_aborted = true;
-		} else {
-			sqlSkipAccumulatorLoad(context);
-		}
-	} else {
-		pBest->db = sql_context_db_handle(context);
-		if (mem_copy(pBest, pArg) != 0)
-			context->is_aborted = true;
-	}
-}
-
-static void
-minMaxFinalize(sql_context * context)
-{
-	struct Mem *mem = context->pMem;
-	struct Mem *res;
-	if (mem_get_agg(mem, (void **)&res) != 0)
-		return;
-	if (!mem_is_null(res))
-		sql_result_value(context, res);
-	mem_destroy(res);
-}
-
-/*
  * group_concat(EXPR, ?SEPARATOR?)
  */
 static void
@@ -2059,35 +2035,35 @@ static struct sql_func_definition definitions[] = {
 	{"LOWER", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, LowerICUFunc,
 	 NULL},
 
-	{"MAX", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, minmaxStep,
-	 minMaxFinalize},
-	{"MAX", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, minmaxStep,
-	 minMaxFinalize},
-	{"MAX", 1, {FIELD_TYPE_NUMBER}, FIELD_TYPE_NUMBER, minmaxStep,
-	 minMaxFinalize},
-	{"MAX", 1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_VARBINARY, minmaxStep,
-	 minMaxFinalize},
-	{"MAX", 1, {FIELD_TYPE_UUID}, FIELD_TYPE_UUID, minmaxStep,
-	 minMaxFinalize},
-	{"MAX", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, minmaxStep,
-	 minMaxFinalize},
-	{"MAX", 1, {FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR, minmaxStep,
-	 minMaxFinalize},
+	{"MAX", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, step_minmax,
+	 fin_minmax},
+	{"MAX", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, step_minmax,
+	 fin_minmax},
+	{"MAX", 1, {FIELD_TYPE_NUMBER}, FIELD_TYPE_NUMBER, step_minmax,
+	 fin_minmax},
+	{"MAX", 1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_VARBINARY, step_minmax,
+	 fin_minmax},
+	{"MAX", 1, {FIELD_TYPE_UUID}, FIELD_TYPE_UUID, step_minmax,
+	 fin_minmax},
+	{"MAX", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, step_minmax,
+	 fin_minmax},
+	{"MAX", 1, {FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR, step_minmax,
+	 fin_minmax},
 
-	{"MIN", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, minmaxStep,
-	 minMaxFinalize},
-	{"MIN", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, minmaxStep,
-	 minMaxFinalize},
-	{"MIN", 1, {FIELD_TYPE_NUMBER}, FIELD_TYPE_NUMBER, minmaxStep,
-	 minMaxFinalize},
-	{"MIN", 1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_VARBINARY, minmaxStep,
-	 minMaxFinalize},
-	{"MIN", 1, {FIELD_TYPE_UUID}, FIELD_TYPE_UUID, minmaxStep,
-	 minMaxFinalize},
-	{"MIN", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, minmaxStep,
-	 minMaxFinalize},
-	{"MIN", 1, {FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR, minmaxStep,
-	 minMaxFinalize},
+	{"MIN", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, step_minmax,
+	 fin_minmax},
+	{"MIN", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, step_minmax,
+	 fin_minmax},
+	{"MIN", 1, {FIELD_TYPE_NUMBER}, FIELD_TYPE_NUMBER, step_minmax,
+	 fin_minmax},
+	{"MIN", 1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_VARBINARY, step_minmax,
+	 fin_minmax},
+	{"MIN", 1, {FIELD_TYPE_UUID}, FIELD_TYPE_UUID, step_minmax,
+	 fin_minmax},
+	{"MIN", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, step_minmax,
+	 fin_minmax},
+	{"MIN", 1, {FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR, step_minmax,
+	 fin_minmax},
 
 	{"NULLIF", 2, {FIELD_TYPE_ANY, FIELD_TYPE_ANY}, FIELD_TYPE_SCALAR,
 	 nullifFunc, NULL},

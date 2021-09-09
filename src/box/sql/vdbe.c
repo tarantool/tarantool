@@ -4161,7 +4161,6 @@ case OP_AggStep: {
 	}
 #endif
 
-	pMem->n++;
 	mem_create(&t);
 	pCtx->pOut = &t;
 	pCtx->is_aborted = false;
