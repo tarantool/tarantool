@@ -520,18 +520,9 @@ local function remote_serialize(self)
 end
 
 local function stream_serialize(self)
-    return {
-        host = self._conn.host,
-        port = self._conn.port,
-        opts = next(self._conn.opts) and self._conn.opts,
-        state = self._conn.state,
-        error = self._conn.error,
-        protocol = self._conn.protocol,
-        schema_version = self._conn.schema_version,
-        peer_uuid = self._conn.peer_uuid,
-        peer_version_id = self._conn.peer_version_id,
-        stream_id = self._stream_id
-    }
+    local t = remote_serialize(self._conn)
+    t.stream_id = self._stream_id
+    return t
 end
 
 local function stream_spaces_serialize(self)
