@@ -331,45 +331,6 @@ sql_context_db_handle(sql_context * p)
 }
 
 /*
- * Allocate or return the aggregate context for a user function.  A new
- * context is allocated on the first call.  Subsequent calls return the
- * same context that was returned on prior calls.
- */
-void *
-sql_aggregate_context(sql_context * p, int nByte)
-{
-	assert(p != NULL && p->func != NULL);
-	assert(p->func->def->language == FUNC_LANGUAGE_SQL_BUILTIN);
-	assert(p->func->def->aggregate == FUNC_AGGREGATE_GROUP);
-	if (!mem_is_agg(p->pMem) && mem_set_agg(p->pMem, p->func, nByte) != 0)
-		return NULL;
-	void *accum;
-	if (mem_get_agg(p->pMem, &accum) != 0)
-		return NULL;
-	return accum;
-}
-
-struct Mem *
-sql_context_agg_mem(struct sql_context *ctx)
-{
-	assert(ctx != NULL && ctx->func != NULL);
-	assert(ctx->func->def->language == FUNC_LANGUAGE_SQL_BUILTIN);
-	assert(ctx->func->def->aggregate == FUNC_AGGREGATE_GROUP);
-	struct Mem *mem;
-	if (!mem_is_agg(ctx->pMem)) {
-		if (mem_set_agg(ctx->pMem, ctx->func, sizeof(*mem)) != 0)
-			return NULL;
-		if (mem_get_agg(ctx->pMem, (void **)&mem) != 0)
-			return NULL;
-		mem_create(mem);
-		return mem;
-	}
-	if (mem_get_agg(ctx->pMem, (void **)&mem) != 0)
-		return NULL;
-	return mem;
-}
-
-/*
  * Return the number of columns in the result set for the statement pStmt.
  */
 int

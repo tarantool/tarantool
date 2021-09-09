@@ -172,7 +172,6 @@ struct sql_context {
 	Mem *pOut;		/* The return value is stored here */
 	/* A pointer to function implementation. */
 	struct func *func;
-	Mem *pMem;		/* Memory cell used to store aggregate context */
 	struct coll *coll;
 	/*
 	 * True, if an error occurred during the execution of the
