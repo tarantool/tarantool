@@ -214,6 +214,48 @@ fin_minmax(struct sql_context *ctx)
 	mem_copy(ctx->pOut, ctx->pMem);
 }
 
+/** Implementation of the GROUP_CONCAT() function. */
+static void
+step_group_concat(struct sql_context *ctx, int argc, struct Mem **argv)
+{
+	assert(argc == 1 || argc == 2);
+	(void)argc;
+	if (mem_is_null(argv[0]))
+		return;
+	assert(mem_is_str(argv[0]) || mem_is_bin(argv[0]));
+	if (mem_is_null(ctx->pMem)) {
+		if (mem_copy(ctx->pMem, argv[0]) != 0)
+			ctx->is_aborted = true;
+		return;
+	}
+	const char *sep = NULL;
+	int sep_len = 0;
+	if (argc == 1) {
+		sep = ",";
+		sep_len = 1;
+	} else if (mem_is_null(argv[1])) {
+		sep = "";
+		sep_len = 0;
+	} else {
+		assert(mem_is_same_type(argv[0], argv[1]));
+		sep = argv[1]->z;
+		sep_len = argv[1]->n;
+	}
+	if (mem_append(ctx->pMem, sep, sep_len) != 0) {
+		ctx->is_aborted = true;
+		return;
+	}
+	if (mem_append(ctx->pMem, argv[0]->z, argv[0]->n) != 0)
+		ctx->is_aborted = true;
+}
+
+/** Finalizer for the GROUP_CONCAT() function. */
+static void
+fin_group_concat(struct sql_context *ctx)
+{
+	mem_copy(ctx->pOut, ctx->pMem);
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -1765,73 +1807,6 @@ soundexFunc(sql_context * context, int argc, sql_value ** argv)
 	}
 }
 
-/*
- * group_concat(EXPR, ?SEPARATOR?)
- */
-static void
-groupConcatStep(sql_context * context, int argc, sql_value ** argv)
-{
-	const char *zVal;
-	StrAccum *pAccum;
-	const char *zSep;
-	int nVal, nSep;
-	if (argc != 1 && argc != 2) {
-		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT,
-			 "GROUP_CONCAT", "1 or 2", argc);
-		context->is_aborted = true;
-		return;
-	}
-	if (mem_is_null(argv[0]))
-		return;
-	pAccum =
-	    (StrAccum *) sql_aggregate_context(context, sizeof(*pAccum));
-
-	if (pAccum) {
-		sql *db = sql_context_db_handle(context);
-		int firstTerm = pAccum->mxAlloc == 0;
-		pAccum->mxAlloc = db->aLimit[SQL_LIMIT_LENGTH];
-		if (!firstTerm) {
-			if (argc == 2) {
-				zSep = mem_as_str0(argv[1]);
-				nSep = mem_len_unsafe(argv[1]);
-			} else {
-				zSep = ",";
-				nSep = 1;
-			}
-			if (zSep)
-				sqlStrAccumAppend(pAccum, zSep, nSep);
-		}
-		zVal = mem_as_str0(argv[0]);
-		nVal = mem_len_unsafe(argv[0]);
-		if (zVal)
-			sqlStrAccumAppend(pAccum, zVal, nVal);
-	}
-}
-
-static void
-groupConcatFinalize(sql_context * context)
-{
-	StrAccum *pAccum;
-	pAccum = sql_aggregate_context(context, 0);
-	if (pAccum) {
-		if (pAccum->accError == STRACCUM_TOOBIG) {
-			diag_set(ClientError, ER_SQL_EXECUTE, "string or binary"\
-				 "string is too big");
-			context->is_aborted = true;
-		} else if (pAccum->accError == STRACCUM_NOMEM) {
-			context->is_aborted = true;
-		} else {
-			char *str = sqlStrAccumFinish(pAccum);
-			int len = pAccum->nChar;
-			assert(len >= 0);
-			if (context->func->def->returns == FIELD_TYPE_STRING)
-				mem_set_str_dynamic(context->pOut, str, len);
-			else
-				mem_set_bin_dynamic(context->pOut, str, len);
-		}
-	}
-}
-
 int
 sql_is_like_func(struct Expr *expr)
 {
@@ -1998,13 +1973,13 @@ static struct sql_func_definition definitions[] = {
 	 NULL},
 
 	{"GROUP_CONCAT", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING,
-	 groupConcatStep, groupConcatFinalize},
+	 step_group_concat, fin_group_concat},
 	{"GROUP_CONCAT", 2, {FIELD_TYPE_STRING, FIELD_TYPE_STRING},
-	 FIELD_TYPE_STRING, groupConcatStep, groupConcatFinalize},
+	 FIELD_TYPE_STRING, step_group_concat, fin_group_concat},
 	{"GROUP_CONCAT", 1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_VARBINARY,
-	 groupConcatStep, groupConcatFinalize},
+	 step_group_concat, fin_group_concat},
 	{"GROUP_CONCAT", 2, {FIELD_TYPE_VARBINARY, FIELD_TYPE_VARBINARY},
-	 FIELD_TYPE_VARBINARY, groupConcatStep, groupConcatFinalize},
+	 FIELD_TYPE_VARBINARY, step_group_concat, fin_group_concat},
 
 	{"HEX", 1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_STRING, hexFunc, NULL},
 	{"IFNULL", 2, {FIELD_TYPE_ANY, FIELD_TYPE_ANY}, FIELD_TYPE_SCALAR,
