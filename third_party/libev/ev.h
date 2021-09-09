@@ -772,7 +772,7 @@ EV_API_DECL void ev_io_stop        (EV_P_ ev_io *w) EV_THROW;
  * prior to close().
  * Note: if fd was reused and added again it just works.
  */
-EV_API_DECL void ev_io_closing     (EV_P_ int fd, int revents) EV_THROW;
+EV_API_DECL void ev_io_closing     (EV_P_ int fd) EV_THROW;
 
 EV_API_DECL void ev_timer_start    (EV_P_ ev_timer *w) EV_THROW;
 EV_API_DECL void ev_timer_stop     (EV_P_ ev_timer *w) EV_THROW;
