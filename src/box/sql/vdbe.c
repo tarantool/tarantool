@@ -4196,16 +4196,29 @@ case OP_AggStep: {
  * the step function was not previously called.
  */
 case OP_AggFinal: {
-	Mem *pMem;
 	assert(pOp->p1>0 && pOp->p1<=(p->nMem+1 - p->nCursor));
-	pMem = &aMem[pOp->p1];
-	assert(mem_is_null(pMem) || mem_is_agg(pMem));
-	if (sql_vdbemem_finalize(pMem, pOp->p4.func) != 0)
+	struct func_sql_builtin *func = (struct func_sql_builtin *)pOp->p4.func;
+	struct Mem *pIn1 = &aMem[pOp->p1];
+	assert(mem_is_null(pIn1) || mem_is_agg(pIn1));
+
+	struct sql_context ctx;
+	memset(&ctx, 0, sizeof(ctx));
+	struct Mem t;
+	mem_create(&t);
+	ctx.pOut = &t;
+	ctx.pMem = pIn1;
+	ctx.func = pOp->p4.func;
+	func->finalize(&ctx);
+	assert((pIn1->flags & MEM_Dyn) == 0);
+	if (pIn1->szMalloc > 0)
+		sqlDbFree(pIn1->db, pIn1->zMalloc);
+	memcpy(pIn1, &t, sizeof(t));
+
+	if (ctx.is_aborted)
 		goto abort_due_to_error;
-	UPDATE_MAX_BLOBSIZE(pMem);
-	if (sqlVdbeMemTooBig(pMem)) {
+	UPDATE_MAX_BLOBSIZE(pIn1);
+	if (sqlVdbeMemTooBig(pIn1) != 0)
 		goto too_big;
-	}
 	break;
 }
 

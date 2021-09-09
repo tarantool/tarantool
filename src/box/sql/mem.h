@@ -949,18 +949,6 @@ int sqlVdbeMemTooBig(Mem *);
 #define VdbeMemDynamic(X) (((X)->flags & MEM_Dyn) != 0 ||\
 			   ((X)->type & (MEM_TYPE_AGG | MEM_TYPE_FRAME)) != 0)
 
-/** MEM manipulate functions. */
-
-/**
- * Memory cell mem contains the context of an aggregate function.
- * This routine calls the finalize method for that function. The
- * result of the aggregate is stored back into mem.
- *
- * Returns -1 if the finalizer reports an error. 0 otherwise.
- */
-int
-sql_vdbemem_finalize(struct Mem *mem, struct func *func);
-
 /**
  * Perform comparison of two tuples: unpacked (key1) and packed (key2)
  *
