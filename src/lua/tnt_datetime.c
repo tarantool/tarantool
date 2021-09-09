@@ -26,6 +26,13 @@ tnt_datetime_to_string(const struct datetime *date, char *buf, ssize_t len)
 	return datetime_to_string(date, buf, len);
 }
 
+size_t
+tnt_datetime_parse_full(struct datetime *date, const char *str, size_t len,
+			int32_t offset)
+{
+	return datetime_parse_full(date, str, len, offset);
+}
+
 struct datetime *
 tnt_datetime_unpack(const char **data, uint32_t len, struct datetime *date)
 {

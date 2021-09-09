@@ -1,5 +1,6 @@
 #include "dt.h"
 #include <assert.h>
+#include <inttypes.h>
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
@@ -95,72 +96,22 @@ struct {
 };
 #undef S
 
-static int
-parse_datetime(const char *str, size_t len, int64_t *secs_p,
-	       int32_t *nanosecs_p, int32_t *offset_p)
-{
-	size_t n;
-	dt_t dt;
-	char c;
-	int sec_of_day = 0, nanosecond = 0, offset = 0;
-
-	n = dt_parse_iso_date(str, len, &dt);
-	if (!n)
-		return 1;
-	if (n == len)
-		goto exit;
-
-	c = str[n++];
-	if (!(c == 'T' || c == 't' || c == ' '))
-		return 1;
-
-	str += n;
-	len -= n;
-
-	n = dt_parse_iso_time(str, len, &sec_of_day, &nanosecond);
-	if (!n)
-		return 1;
-	if (n == len)
-		goto exit;
-
-	if (str[n] == ' ')
-		n++;
-
-	str += n;
-	len -= n;
-
-	n = dt_parse_iso_zone_lenient(str, len, &offset);
-	if (!n || n != len)
-		return 1;
-
-exit:
-	*secs_p = ((int64_t)dt_rdn(dt) - DT_EPOCH_1970_OFFSET) * SECS_PER_DAY +
-		  sec_of_day - offset * 60;
-	*nanosecs_p = nanosecond;
-	*offset_p = offset;
-
-	return 0;
-}
-
 static void
 datetime_test(void)
 {
 	size_t index;
-	int64_t secs_expected;
-	int32_t nanosecs;
-	int32_t offset;
+	struct datetime date_expected;
 
 	plan(355);
-	parse_datetime(sample, sizeof(sample) - 1, &secs_expected, &nanosecs,
-		       &offset);
+	datetime_parse_full(&date_expected, sample, sizeof(sample) - 1, 0);
 
 	for (index = 0; index < lengthof(tests); index++) {
-		int64_t secs;
-		int rc = parse_datetime(tests[index].str, tests[index].len,
-					&secs, &nanosecs, &offset);
-		is(rc, 0, "correct parse_datetime return value for '%s'",
+		struct datetime date;
+		size_t len = datetime_parse_full(&date, tests[index].str,
+					         tests[index].len, 0);
+		is(len > 0, true, "correct parse_datetime return value for '%s'",
 		   tests[index].str);
-		is(secs, secs_expected,
+		is(date.epoch, date_expected.epoch,
 		   "correct parse_datetime output "
 		   "seconds for '%s",
 		   tests[index].str);
@@ -169,18 +120,15 @@ datetime_test(void)
 		 * check that stringized literal produces the same date
 		 * time fields
 		 */
-		static char buff[40];
-		struct datetime dt = { secs, nanosecs, offset, 0 };
+		static char buff[DT_TO_STRING_BUFSIZE];
 		struct tnt_tm tm = { .tm_sec = 0 };
-		datetime_to_tm(&dt, &tm);
-		size_t len = tnt_strftime(buff, sizeof(buff), "%F %T%z", &tm);
+		len = datetime_strftime(&date, buff, sizeof(buff), "%F %T%z");
 		ok(len > 0, "strftime");
-		int64_t parsed_secs;
-		int32_t parsed_nsecs, parsed_ofs;
-		rc = parse_datetime(buff, len, &parsed_secs, &parsed_nsecs,
-				    &parsed_ofs);
-		is(rc, 0, "correct parse_datetime return value for '%s'", buff);
-		is(secs, parsed_secs,
+		struct datetime date_parsed;
+		len = datetime_parse_full(&date_parsed, buff, len, 0);
+		is(len > 0, true, "correct parse_datetime return value for '%s'",
+		   buff);
+		is(date.epoch, date_parsed.epoch,
 		   "reversible seconds via strftime for '%s'", buff);
 	}
 	check_plan();
@@ -226,6 +174,93 @@ tostring_datetime_test(void)
 		is(strcmp(buf, tests[index].string), 0,
 		   "string '%s' expected, received '%s'",
 		   tests[index].string, buf);
+	}
+	check_plan();
+}
+
+static int64_t
+_dt_to_epoch(dt_t dt)
+{
+	return ((int64_t)dt_rdn(dt) - DT_EPOCH_1970_OFFSET) * SECS_PER_DAY;
+}
+
+static void
+parse_date_test(void)
+{
+	plan(59);
+
+	static struct {
+		int64_t epoch;
+		const char *string;
+		size_t len; /* expected parsed length, may be not full */
+	} valid_tests[] = {
+		{ 1356307200, "20121224", 8 },
+		{ 1356307200, "20121224  Foo bar", 8 },
+		{ 1356307200, "2012-12-24", 10 },
+		{ 1356307200, "2012-12-24 23:59:59", 10 },
+		{ 1356307200, "2012-12-24T00:00:00+00:00", 10 },
+		{ 1356307200, "2012359", 7 },
+		{ 1356307200, "2012359T235959+0130", 7 },
+		{ 1356307200, "2012-359", 8 },
+		{ 1356307200, "2012W521", 8 },
+		{ 1356307200, "2012-W52-1", 10 },
+		{ 1356307200, "2012Q485", 8 },
+		{ 1356307200, "2012-Q4-85", 10 },
+		{ -62135596800, "0001-Q1-01", 10 },
+		{ -62135596800, "0001-W01-1", 10 },
+		{ -62135596800, "0001-01-01", 10 },
+		{ -62135596800, "0001-001", 8 },
+	};
+	size_t index;
+
+	for (index = 0; index < lengthof(valid_tests); index++) {
+		dt_t dt = 0;
+		const char *str = valid_tests[index].string;
+		size_t expected_len = valid_tests[index].len;
+		int64_t expected_epoch = valid_tests[index].epoch;
+		size_t len = tnt_dt_parse_iso_date(str, expected_len, &dt);
+		int64_t epoch = _dt_to_epoch(dt);
+		is(len, expected_len, "string '%s' parse failed, len %lu", str,
+		   len);
+		is(epoch, expected_epoch,
+		   "string '%s' parse failed, epoch %" PRId64, str, epoch);
+	}
+
+	const char * invalid_tests[] = {
+		"20121232",    /* Invalid day of month */
+		"2012-12-310", /* Invalid day of month */
+		"2012-13-24",  /* Invalid month */
+		"2012367",     /* Invalid day of year */
+		"2012-000",    /* Invalid day of year */
+		"2012W533",    /* Invalid week of year */
+		"2012-W52-8",  /* Invalid day of week */
+		"2012Q495",    /* Invalid day of quarter */
+		"2012-Q5-85",  /* Invalid quarter */
+		"20123670",    /* Trailing digit */
+		"201212320",   /* Trailing digit */
+		"2012-12",     /* Reduced accuracy */
+		"2012-Q4",     /* Reduced accuracy */
+		"2012-Q42",    /* Invalid */
+		"2012-Q1-1",   /* Invalid day of quarter */
+		"2012Q/* 420", /* Invalid */
+		"2012-Q-420",  /* Invalid */
+		"2012Q11",     /* Incomplete */
+		"2012Q1234",   /* Trailing digit */
+		"2012W12",     /* Incomplete */
+		"2012W1234",   /* Trailing digit */
+		"2012W-123",   /* Invalid */
+		"2012-W12",    /* Incomplete */
+		"2012-W12-12", /* Trailing digit */
+		"2012U1234",   /* Invalid */
+		"2012-1234",   /* Invalid */
+		"2012-X1234",  /* Invalid */
+	};
+	for (index = 0; index < lengthof(invalid_tests); index++) {
+		dt_t dt = 0;
+		const char *str = invalid_tests[index];
+		size_t len = tnt_dt_parse_iso_date(str, strlen(str), &dt);
+		is(len, 0, "expected failure of string '%s' parse, len %lu",
+		   str, len);
 	}
 	check_plan();
 }
@@ -354,9 +389,10 @@ mp_print_test(void)
 int
 main(void)
 {
-	plan(4);
+	plan(5);
 	datetime_test();
 	tostring_datetime_test();
+	parse_date_test();
 	mp_datetime_test();
 	mp_print_test();
 
