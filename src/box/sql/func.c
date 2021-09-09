@@ -102,6 +102,55 @@ fin_total(struct sql_context *ctx)
 		mem_copy_as_ephemeral(ctx->pOut, ctx->pMem);
 }
 
+/** Implementation of the AVG() function. */
+static void
+step_avg(struct sql_context *ctx, int argc, struct Mem **argv)
+{
+	assert(argc == 1);
+	(void)argc;
+	assert(mem_is_null(ctx->pMem) || mem_is_bin(ctx->pMem));
+	if (mem_is_null(argv[0]))
+		return;
+	struct Mem *mem;
+	uint32_t *count;
+	if (mem_is_null(ctx->pMem)) {
+		uint32_t size = sizeof(struct Mem) + sizeof(uint32_t);
+		mem = sqlDbMallocRawNN(sql_get(), size);
+		if (mem == NULL) {
+			ctx->is_aborted = true;
+			return;
+		}
+		count = (uint32_t *)(mem + 1);
+		mem_create(mem);
+		*count = 1;
+		mem_copy_as_ephemeral(mem, argv[0]);
+		mem_set_bin_allocated(ctx->pMem, (char *)mem, size);
+		return;
+	}
+	mem = (struct Mem *)ctx->pMem->z;
+	count = (uint32_t *)(mem + 1);
+	++*count;
+	if (mem_add(mem, argv[0], mem) != 0)
+		ctx->is_aborted = true;
+}
+
+/** Finalizer for the AVG() function. */
+static void
+fin_avg(struct sql_context *ctx)
+{
+	assert(mem_is_null(ctx->pMem) || mem_is_bin(ctx->pMem));
+	if (mem_is_null(ctx->pMem))
+		return mem_set_null(ctx->pOut);
+	struct Mem *sum = (struct Mem *)ctx->pMem->z;
+	uint32_t *count_val = (uint32_t *)(sum + 1);
+	assert(mem_is_trivial(sum));
+	struct Mem count;
+	mem_create(&count);
+	mem_set_uint(&count, *count_val);
+	if (mem_div(sum, &count, ctx->pOut) != 0)
+		ctx->is_aborted = true;
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -1664,69 +1713,6 @@ soundexFunc(sql_context * context, int argc, sql_value ** argv)
 }
 
 /*
- * An instance of the following structure holds the context of a
- * sum() or avg() aggregate computation.
- */
-typedef struct SumCtx SumCtx;
-struct SumCtx {
-	struct Mem mem;
-	uint32_t count;
-};
-
-/*
- * Routines used to compute the sum, average, and total.
- *
- * The SUM() function follows the (broken) SQL standard which means
- * that it returns NULL if it sums over no inputs.  TOTAL returns
- * 0.0 in that case.  In addition, TOTAL always returns a float where
- * SUM might return an integer if it never encounters a floating point
- * value.  TOTAL never fails, but SUM might through an exception if
- * it overflows an integer.
- */
-static void
-sum_step(struct sql_context *context, int argc, sql_value **argv)
-{
-	assert(argc == 1);
-	UNUSED_PARAMETER(argc);
-	struct SumCtx *p = sql_aggregate_context(context, sizeof(*p));
-	if (p == NULL) {
-		context->is_aborted = true;
-		return;
-	}
-	if (p->count == 0) {
-		mem_create(&p->mem);
-		assert(context->func->def->returns == FIELD_TYPE_INTEGER ||
-		       context->func->def->returns == FIELD_TYPE_DOUBLE);
-		if (context->func->def->returns == FIELD_TYPE_INTEGER)
-			mem_set_uint(&p->mem, 0);
-		else
-			mem_set_double(&p->mem, 0.0);
-	}
-	if (argv[0]->type == MEM_TYPE_NULL)
-		return;
-	++p->count;
-	assert(mem_is_num(argv[0]));
-	if (mem_add(&p->mem, argv[0], &p->mem) != 0)
-		context->is_aborted = true;
-}
-
-static void
-avgFinalize(sql_context * context)
-{
-	SumCtx *p;
-	p = sql_aggregate_context(context, 0);
-	if (p == NULL || p->count == 0) {
-		mem_set_null(context->pOut);
-		return;
-	}
-	struct Mem mem;
-	mem_create(&mem);
-	mem_set_uint(&mem, p->count);
-	if (mem_div(&p->mem, &mem, context->pOut) != 0)
-		context->is_aborted = true;
-}
-
-/*
  * The following structure keeps track of state information for the
  * count() aggregate function.
  */
@@ -2022,8 +2008,8 @@ struct sql_func_definition {
 static struct sql_func_definition definitions[] = {
 	{"ABS", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, absFunc, NULL},
 	{"ABS", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, absFunc, NULL},
-	{"AVG", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, sum_step, avgFinalize},
-	{"AVG", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, sum_step, avgFinalize},
+	{"AVG", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, step_avg, fin_avg},
+	{"AVG", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, step_avg, fin_avg},
 	{"CHAR", -1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_STRING, charFunc, NULL},
 	{"CHAR_LENGTH", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_INTEGER, lengthFunc,
 	 NULL},

@@ -237,6 +237,14 @@ mem_is_allocated(const struct Mem *mem)
 	return mem_is_bytes(mem) && mem->z == mem->zMalloc;
 }
 
+/** Return TRUE if MEM does not need to be freed or destroyed. */
+static inline bool
+mem_is_trivial(const struct Mem *mem)
+{
+	return mem->szMalloc == 0 && (mem->flags & MEM_Dyn) == 0 &&
+	       (mem->type & (MEM_TYPE_FRAME | MEM_TYPE_AGG)) == 0;
+}
+
 static inline bool
 mem_is_cleared(const struct Mem *mem)
 {
