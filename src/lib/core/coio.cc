@@ -776,7 +776,7 @@ coio_wait(int fd, int events, double timeout)
 API_EXPORT int
 coio_close(int fd)
 {
-	ev_io_closing(loop(), fd, EV_CUSTOM);
+	ev_io_closing(loop(), fd);
 	return close(fd);
 }
 

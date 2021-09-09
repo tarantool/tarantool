@@ -3948,18 +3948,15 @@ ev_io_stop (EV_P_ ev_io *w) EV_THROW
  * Since every watcher is stopped, the select/poll/epoll/whatever
  * backend is properly updated.
  */
-void noinline
-ev_io_closing (EV_P_ int fd, int revents) EV_THROW
+noinline
+void
+ev_io_closing (EV_P_ int fd) EV_THROW
 {
   ev_io *w;
   if (fd < 0 || fd >= anfdmax)
     return;
 
-  while ((w = (ev_io *)anfds [fd].head))
-    {
-      ev_io_stop (EV_A_ w);
-      ev_feed_event (EV_A_ (W)w, revents);
-    }
+  fd_kill(EV_A_ fd);
 }
 
 noinline
