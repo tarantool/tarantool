@@ -54,7 +54,6 @@ enum mem_type {
 	MEM_TYPE_INVALID	= 1 << 11,
 	MEM_TYPE_FRAME		= 1 << 12,
 	MEM_TYPE_PTR		= 1 << 13,
-	MEM_TYPE_AGG		= 1 << 14,
 };
 
 /*
@@ -186,12 +185,6 @@ mem_is_array(const struct Mem *mem)
 }
 
 static inline bool
-mem_is_agg(const struct Mem *mem)
-{
-	return mem->type == MEM_TYPE_AGG;
-}
-
-static inline bool
 mem_is_bytes(const struct Mem *mem)
 {
 	return (mem->type & (MEM_TYPE_BIN | MEM_TYPE_STR |
@@ -242,7 +235,7 @@ static inline bool
 mem_is_trivial(const struct Mem *mem)
 {
 	return mem->szMalloc == 0 && (mem->flags & MEM_Dyn) == 0 &&
-	       (mem->type & (MEM_TYPE_FRAME | MEM_TYPE_AGG)) == 0;
+	       mem->type != MEM_TYPE_FRAME;
 }
 
 static inline bool
@@ -955,7 +948,7 @@ int sqlVdbeMemTooBig(Mem *);
  * that needs to be deallocated to avoid a leak.
  */
 #define VdbeMemDynamic(X) (((X)->flags & MEM_Dyn) != 0 ||\
-			   ((X)->type & (MEM_TYPE_AGG | MEM_TYPE_FRAME)) != 0)
+			   ((X)->type & MEM_TYPE_FRAME) != 0)
 
 /**
  * Perform comparison of two tuples: unpacked (key1) and packed (key2)

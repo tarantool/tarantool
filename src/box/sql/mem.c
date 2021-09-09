@@ -592,22 +592,6 @@ mem_set_frame(struct Mem *mem, struct VdbeFrame *frame)
 	mem->u.pFrame = frame;
 }
 
-int
-mem_set_agg(struct Mem *mem, struct func *func, int size)
-{
-	mem_clear(mem);
-	if (size <= 0)
-		return 0;
-	if (sqlVdbeMemGrow(mem, size, 0) != 0)
-		return -1;
-	memset(mem->z, 0, size);
-	mem->n = size;
-	mem->type = MEM_TYPE_AGG;
-	assert(mem->flags == 0);
-	mem->u.func = func;
-	return 0;
-}
-
 void
 mem_set_null_clear(struct Mem *mem)
 {
@@ -1860,15 +1844,6 @@ mem_len(const struct Mem *mem, uint32_t *len)
 	if (!mem_is_bytes(mem))
 		return -1;
 	*len = mem->n;
-	return 0;
-}
-
-int
-mem_get_agg(const struct Mem *mem, void **accum)
-{
-	if (mem->type != MEM_TYPE_AGG)
-		return -1;
-	*accum = mem->z;
 	return 0;
 }
 
