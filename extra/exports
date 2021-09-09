@@ -420,6 +420,7 @@ tnt_datetime_strftime
 tnt_datetime_to_string
 tnt_default_cert_dir_paths
 tnt_default_cert_file_paths
+tnt_dt_add_months
 tnt_dt_days_in_month
 tnt_dt_dom
 tnt_dt_dow
