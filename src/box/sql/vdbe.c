@@ -4199,7 +4199,6 @@ case OP_AggFinal: {
 	assert(pOp->p1>0 && pOp->p1<=(p->nMem+1 - p->nCursor));
 	struct func_sql_builtin *func = (struct func_sql_builtin *)pOp->p4.func;
 	struct Mem *pIn1 = &aMem[pOp->p1];
-	assert(mem_is_null(pIn1) || mem_is_agg(pIn1));
 
 	struct sql_context ctx;
 	memset(&ctx, 0, sizeof(ctx));
