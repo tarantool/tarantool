@@ -1,0 +1,22 @@
+name: 'Send Telegram Message'
+description: 'This action sends telegram message'
+# input parameters to be taken from user
+inputs:
+  token:
+    required: true
+    description: 'Token for the bot'
+  to:
+    required: true
+    description: 'Token of the bot that sends message'
+  github_token:
+    required: true
+    description: 'Interacting with GitHub API'
+  disable_web_page_preview:
+    required: false
+    description: 'Preview web page if False, else disable preview'
+  parse_mode:
+    required: false
+    description: 'Way of styling message (MarkdownV2, HTML)'
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
