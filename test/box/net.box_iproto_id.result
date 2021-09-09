@@ -1,0 +1,276 @@
+-- test-run result file version 2
+test_run = require('test_run').new()
+ | ---
+ | ...
+net = require('net.box')
+ | ---
+ | ...
+errinj = box.error.injection
+ | ---
+ | ...
+
+-- actual version and feautures
+c = net.connect(box.cfg.listen)
+ | ---
+ | ...
+c.peer_protocol_version
+ | ---
+ | - 1
+ | ...
+c.peer_protocol_features
+ | ---
+ | - transactions: true
+ |   streams: true
+ | ...
+c:close()
+ | ---
+ | ...
+
+-- no IPROTO_ID => assume no features
+errinj.set('ERRINJ_IPROTO_DISABLE_ID', true)
+ | ---
+ | - ok
+ | ...
+c = net.connect(box.cfg.listen)
+ | ---
+ | ...
+c.error -- none
+ | ---
+ | - null
+ | ...
+c.peer_protocol_version
+ | ---
+ | - 0
+ | ...
+c.peer_protocol_features
+ | ---
+ | - transactions: false
+ |   streams: false
+ | ...
+errinj.set('ERRINJ_IPROTO_DISABLE_ID', false)
+ | ---
+ | - ok
+ | ...
+
+-- required version
+errinj.set('ERRINJ_IPROTO_SET_VERSION', 9000)
+ | ---
+ | - ok
+ | ...
+c = net.connect(box.cfg.listen, {required_protocol_version = 8999})
+ | ---
+ | ...
+c.error -- none
+ | ---
+ | - null
+ | ...
+c:close()
+ | ---
+ | ...
+c = net.connect(box.cfg.listen, {required_protocol_version = 9000})
+ | ---
+ | ...
+c.error -- none
+ | ---
+ | - null
+ | ...
+c:close()
+ | ---
+ | ...
+c = net.connect(box.cfg.listen, {required_protocol_version = 9001})
+ | ---
+ | ...
+c.error -- error
+ | ---
+ | - Protocol version (9000) < required (9001)
+ | ...
+c.peer_protocol_version
+ | ---
+ | - 9000
+ | ...
+c.peer_protocol_features
+ | ---
+ | - transactions: true
+ |   streams: true
+ | ...
+c:close()
+ | ---
+ | ...
+errinj.set('ERRINJ_IPROTO_SET_VERSION', -1)
+ | ---
+ | - ok
+ | ...
+
+-- required features
+c = net.connect(box.cfg.listen, {required_protocol_features = {}})
+ | ---
+ | ...
+c.error -- none
+ | ---
+ | - null
+ | ...
+c:close()
+ | ---
+ | ...
+c = net.connect(box.cfg.listen,                                             \
+                {required_protocol_features = {'streams', 'transactions'}})
+ | ---
+ | ...
+c.error -- none
+ | ---
+ | - null
+ | ...
+c:close()
+ | ---
+ | ...
+errinj.set('ERRINJ_IPROTO_FLIP_FEATURE', 1) -- clear transactions feature
+ | ---
+ | - ok
+ | ...
+c = net.connect(box.cfg.listen,                                             \
+                {required_protocol_features = {'streams', 'transactions'}})
+ | ---
+ | ...
+c.error -- error
+ | ---
+ | - 'Missing required protocol features: transactions'
+ | ...
+c.peer_protocol_version
+ | ---
+ | - 1
+ | ...
+c.peer_protocol_features
+ | ---
+ | - transactions: false
+ |   streams: true
+ | ...
+c:close()
+ | ---
+ | ...
+errinj.set('ERRINJ_IPROTO_FLIP_FEATURE', -1)
+ | ---
+ | - ok
+ | ...
+c = net.connect(box.cfg.listen,                                             \
+                {required_protocol_features = {'foo', 'transactions', 'bar'}})
+ | ---
+ | ...
+c.error -- error
+ | ---
+ | - 'Missing required protocol features: foo, bar'
+ | ...
+c.peer_protocol_version
+ | ---
+ | - 1
+ | ...
+c.peer_protocol_features
+ | ---
+ | - transactions: true
+ |   streams: true
+ | ...
+c:close()
+ | ---
+ | ...
+
+-- required features and version are checked on reconnect
+timeout = 0.001
+ | ---
+ | ...
+c = net.connect(box.cfg.listen, {                                           \
+    reconnect_after = timeout,                                              \
+    required_protocol_version = 1,                                          \
+    required_protocol_features = {'streams'},                               \
+})
+ | ---
+ | ...
+c.error -- none
+ | ---
+ | - null
+ | ...
+errinj.set('ERRINJ_NETBOX_IO_ERROR', true)
+ | ---
+ | - ok
+ | ...
+c:ping{timeout = timeout} -- false
+ | ---
+ | - false
+ | ...
+err = c.error
+ | ---
+ | ...
+err -- injection
+ | ---
+ | - Error injection
+ | ...
+errinj.set('ERRINJ_NETBOX_IO_ERROR', false)
+ | ---
+ | - ok
+ | ...
+c:ping() -- true
+ | ---
+ | - true
+ | ...
+errinj.set('ERRINJ_NETBOX_IO_ERROR', true)
+ | ---
+ | - ok
+ | ...
+c:ping{timeout = timeout} -- false
+ | ---
+ | - false
+ | ...
+err = c.error
+ | ---
+ | ...
+err -- injection
+ | ---
+ | - Error injection
+ | ...
+errinj.set('ERRINJ_IPROTO_SET_VERSION', 0)
+ | ---
+ | - ok
+ | ...
+errinj.set('ERRINJ_NETBOX_IO_ERROR', false)
+ | ---
+ | - ok
+ | ...
+test_run:wait_cond(function() return c.error ~= err end)
+ | ---
+ | - true
+ | ...
+err = c.error
+ | ---
+ | ...
+err -- old version
+ | ---
+ | - Protocol version (0) < required (1)
+ | ...
+errinj.set('ERRINJ_IPROTO_FLIP_FEATURE', 0) -- clear streams feature
+ | ---
+ | - ok
+ | ...
+errinj.set('ERRINJ_IPROTO_SET_VERSION', -1)
+ | ---
+ | - ok
+ | ...
+test_run:wait_cond(function() return c.error ~= err end)
+ | ---
+ | - true
+ | ...
+err = c.error
+ | ---
+ | ...
+err -- missing features
+ | ---
+ | - 'Missing required protocol features: streams'
+ | ...
+errinj.set('ERRINJ_IPROTO_FLIP_FEATURE', -1)
+ | ---
+ | - ok
+ | ...
+c:ping() -- true
+ | ---
+ | - true
+ | ...
+c:close()
+ | ---
+ | ...

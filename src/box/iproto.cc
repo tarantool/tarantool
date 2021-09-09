@@ -1529,6 +1529,11 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 		cmsg_init(&msg->base, iproto_thread->misc_route);
 		break;
 	case IPROTO_ID:
+		ERROR_INJECT(ERRINJ_IPROTO_DISABLE_ID, {
+			diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+				 (uint32_t)type);
+			goto error;
+		});
 		if (xrow_decode_id(&msg->header, &msg->id) != 0)
 			goto error;
 		cmsg_init(&msg->base, iproto_thread->misc_route);

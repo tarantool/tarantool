@@ -71,6 +71,16 @@ iproto_features_set(struct iproto_features *features, int id)
 }
 
 /**
+ * Clears a bit in a IPROTO protocol feature bit map.
+ */
+static inline void
+iproto_features_clear(struct iproto_features *features, int id)
+{
+	assert(id >= 0 && id < iproto_feature_id_MAX);
+	bit_clear(features->bits, id);
+}
+
+/**
  * Returns true if a feature is set in a IPROTO protocol feature bit map.
  */
 static inline bool
