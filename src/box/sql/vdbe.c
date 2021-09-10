@@ -1182,16 +1182,6 @@ case OP_CollSeq: {
 	break;
 }
 
-/* Opcode: BuiltinFunction0 P1 P2 P3 P4 *
- * Synopsis: r[P3]=func(r[P2@P1])
- *
- * Invoke a user function (P4 is a pointer to a FuncDef object that
- * defines the function) with P1 arguments taken from register P2 and
- * successors.  The result of the function is stored in register P3.
- * Register P3 must not be one of the function inputs.
- *
- * See also: BuiltinFunction, AggStep, AggFinal
- */
 /* Opcode: BuiltinFunction P1 P2 P3 P4 *
  * Synopsis: r[P3]=func(r[P2@P1])
  *
@@ -1200,37 +1190,8 @@ case OP_CollSeq: {
  * from register P2 and successors.  The result of the function is stored
  * in register P3.  Register P3 must not be one of the function inputs.
  *
- * SQL functions are initially coded as OP_BuiltinFunction0 with
- * P4 pointing to a FuncDef object.  But on first evaluation,
- * the P4 operand is automatically converted into an sql_context
- * object and the operation changed to this OP_BuiltinFunction
- * opcode.  In this way, the initialization of the sql_context
- * object occurs only once, rather than once for each evaluation
- * of the function.
- *
- * See also: BuiltinFunction0, AggStep, AggFinal
+ * See also: AggStep, AggFinal
  */
-case OP_BuiltinFunction0: {
-	int n;
-	sql_context *pCtx;
-
-	assert(pOp->p4type == P4_FUNC);
-	n = pOp->p1;
-	assert(pOp->p3>0 && pOp->p3<=(p->nMem+1 - p->nCursor));
-	assert(n==0 || (pOp->p2>0 && pOp->p2+n<=(p->nMem+1 - p->nCursor)+1));
-	assert(pOp->p3<pOp->p2 || pOp->p3>=pOp->p2+n);
-	pCtx = sqlDbMallocRawNN(db, sizeof(*pCtx) + (n-1)*sizeof(sql_value*));
-	if (pCtx==0) goto no_mem;
-	pCtx->pOut = 0;
-	pCtx->func = pOp->p4.func;
-	pCtx->iOp = (int)(pOp - aOp);
-	pCtx->pVdbe = p;
-	pOp->p4type = P4_FUNCCTX;
-	pOp->p4.pCtx = pCtx;
-	pOp->opcode = OP_BuiltinFunction;
-	/* Fall through into OP_BuiltinFunction */
-	FALLTHROUGH;
-}
 case OP_BuiltinFunction: {
 	int i;
 	int argc = pOp->p1;
@@ -1238,6 +1199,7 @@ case OP_BuiltinFunction: {
 
 	assert(pOp->p4type==P4_FUNCCTX);
 	pCtx = pOp->p4.pCtx;
+	pCtx->iOp = (int)(pOp - aOp);
 
 	/* If this function is inside of a trigger, the register array in aMem[]
 	 * might change from one evaluation to the next.  The next block of code
@@ -4170,17 +4132,6 @@ case OP_DecrJumpZero: {      /* jump, in1 */
 }
 
 
-/* Opcode: AggStep0 P1 P2 P3 P4 *
- * Synopsis: accum=r[P3] step(r[P2@P1])
- *
- * Execute the step function for an aggregate.  The
- * function has P1 arguments.   P4 is a pointer to the FuncDef
- * structure that specifies the function.  Register P3 is the
- * accumulator.
- *
- * The P1 arguments are taken from register P2 and its
- * successors.
- */
 /* Opcode: AggStep P1 P2 P3 P4 *
  * Synopsis: accum=r[P3] step(r[P2@P1])
  *
@@ -4191,34 +4142,7 @@ case OP_DecrJumpZero: {      /* jump, in1 */
  *
  * The P1 arguments are taken from register P2 and its
  * successors.
- *
- * This opcode is initially coded as OP_AggStep0.  On first evaluation,
- * the FuncDef stored in P4 is converted into an sql_context and
- * the opcode is changed.  In this way, the initialization of the
- * sql_context only happens once, instead of on each call to the
- * step function.
  */
-case OP_AggStep0: {
-	int n;
-	sql_context *pCtx;
-
-	assert(pOp->p4type == P4_FUNC);
-	n = pOp->p5;
-	assert(pOp->p3>0 && pOp->p3<=(p->nMem+1 - p->nCursor));
-	assert(n==0 || (pOp->p2>0 && pOp->p2+n<=(p->nMem+1 - p->nCursor)+1));
-	assert(pOp->p3<pOp->p2 || pOp->p3>=pOp->p2+n);
-	pCtx = sqlDbMallocRawNN(db, sizeof(*pCtx) + (n-1)*sizeof(sql_value*));
-	if (pCtx==0) goto no_mem;
-	pCtx->pMem = 0;
-	pCtx->func = pOp->p4.func;
-	pCtx->iOp = (int)(pOp - aOp);
-	pCtx->pVdbe = p;
-	pOp->p4type = P4_FUNCCTX;
-	pOp->p4.pCtx = pCtx;
-	pOp->opcode = OP_AggStep;
-	/* Fall through into OP_AggStep */
-	FALLTHROUGH;
-}
 case OP_AggStep: {
 	int i;
 	int argc = pOp->p1;
@@ -4228,6 +4152,7 @@ case OP_AggStep: {
 
 	assert(pOp->p4type==P4_FUNCCTX);
 	pCtx = pOp->p4.pCtx;
+	pCtx->iOp = (int)(pOp - aOp);
 	pMem = &aMem[pOp->p3];
 
 	/* If this function is inside of a trigger, the register array in aMem[]

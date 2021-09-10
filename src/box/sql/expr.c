@@ -4107,9 +4107,15 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 						  (char *)coll, P4_COLLSEQ);
 			}
 			if (func->def->language == FUNC_LANGUAGE_SQL_BUILTIN) {
-				sqlVdbeAddOp4(v, OP_BuiltinFunction0, nFarg,
-					      r1, target, (char *)func,
-					      P4_FUNC);
+				struct sql_context *ctx =
+					sql_context_new(v, func, nFarg);
+				if (ctx == NULL) {
+					pParse->is_aborted = true;
+					return -1;
+				}
+				sqlVdbeAddOp4(v, OP_BuiltinFunction, nFarg,
+					      r1, target, (char *)ctx,
+					      P4_FUNCCTX);
 			} else {
 				sqlVdbeAddOp4(v, OP_FunctionByName, nFarg,
 					      r1, target,

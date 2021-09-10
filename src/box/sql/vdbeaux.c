@@ -590,19 +590,13 @@ sqlVdbeJumpHere(Vdbe * p, int addr)
 
 static void vdbeFreeOpArray(sql *, Op *, int);
 
-static SQL_NOINLINE void
-freeP4FuncCtx(sql * db, sql_context * p)
-{
-	sqlDbFree(db, p);
-}
-
 static void
 freeP4(sql * db, int p4type, void *p4)
 {
 	assert(db);
 	switch (p4type) {
 	case P4_FUNCCTX:{
-			freeP4FuncCtx(db, (sql_context *) p4);
+			sql_context_delete(p4);
 			break;
 		}
 	case P4_REAL:
@@ -1068,14 +1062,12 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 				   func->def->param_count);
 			break;
 		}
-#if defined(SQL_DEBUG) || defined(VDBE_PROFILE)
 	case P4_FUNCCTX:{
-			struct func *func = pOp->p4.func;
+			struct func *func = pOp->p4.pCtx->func;
 			sqlXPrintf(&x, "%s(%d)", func->def->name,
 				   func->def->param_count);
 			break;
 		}
-#endif
 	case P4_BOOL:
 			sqlXPrintf(&x, "%d", pOp->p4.b);
 			break;

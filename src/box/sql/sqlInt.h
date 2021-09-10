@@ -4127,6 +4127,12 @@ char *sqlStrAccumFinish(StrAccum *);
 void sqlStrAccumReset(StrAccum *);
 void sqlSelectDestInit(SelectDest *, int, int, int);
 
+struct sql_context *
+sql_context_new(struct Vdbe *vdbe, struct func *func, uint32_t argc);
+
+void
+sql_context_delete(struct sql_context *ctx);
+
 /*
  * Create an expression to load @a column from datasource
  * @a src_idx in @a src_list.

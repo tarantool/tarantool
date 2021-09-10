@@ -5639,8 +5639,13 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 			sqlVdbeAddOp4(v, OP_CollSeq, regHit, 0, 0,
 					  (char *)coll, P4_COLLSEQ);
 		}
-		sqlVdbeAddOp3(v, OP_AggStep0, nArg, regAgg, pF->iMem);
-		sqlVdbeAppendP4(v, pF->func, P4_FUNC);
+		struct sql_context *ctx = sql_context_new(v, pF->func, nArg);
+		if (ctx == NULL) {
+			pParse->is_aborted = true;
+			return;
+		}
+		sqlVdbeAddOp3(v, OP_AggStep, nArg, regAgg, pF->iMem);
+		sqlVdbeAppendP4(v, ctx, P4_FUNCCTX);
 		sql_expr_type_cache_change(pParse, regAgg, nArg);
 		sqlReleaseTempRange(pParse, regAgg, nArg);
 		if (addrNext) {
@@ -6743,4 +6748,28 @@ sql_expr_extract_select(struct Parse *parser, struct Select *select)
 	 */
 	parser->parsed_ast.expr =
 		sqlExprDup(parser->db, expr_list->a->pExpr, 0);
+}
+
+struct sql_context *
+sql_context_new(struct Vdbe *vdbe, struct func *func, uint32_t argc)
+{
+	uint32_t size = sizeof(struct sql_context);
+	if (argc > 1)
+		size += (argc - 1) * sizeof(struct Mem *);
+	struct sql_context *ctx = sqlDbMallocRawNN(sql_get(), size);
+	if (ctx == NULL)
+		return NULL;
+	ctx->pOut = NULL;
+	ctx->func = func;
+	ctx->is_aborted = false;
+	ctx->skipFlag = 0;
+	ctx->pVdbe = vdbe;
+	ctx->iOp = 0;
+	return ctx;
+}
+
+void
+sql_context_delete(struct sql_context *ctx)
+{
+	sqlDbFree(sql_get(), ctx);
 }
