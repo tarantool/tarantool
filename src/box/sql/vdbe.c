@@ -1182,31 +1182,23 @@ case OP_CollSeq: {
 	break;
 }
 
-/* Opcode: BuiltinFunction0 P1 P2 P3 P4 P5
- * Synopsis: r[P3]=func(r[P2@P5])
+/* Opcode: BuiltinFunction0 P1 P2 P3 P4 *
+ * Synopsis: r[P3]=func(r[P2@P1])
  *
  * Invoke a user function (P4 is a pointer to a FuncDef object that
- * defines the function) with P5 arguments taken from register P2 and
+ * defines the function) with P1 arguments taken from register P2 and
  * successors.  The result of the function is stored in register P3.
  * Register P3 must not be one of the function inputs.
  *
- * P1 is a 32-bit bitmask indicating whether or not each argument to the
- * function was determined to be constant at compile time. If the first
- * argument was constant then bit 0 of P1 is set.
- *
  * See also: BuiltinFunction, AggStep, AggFinal
  */
-/* Opcode: BuiltinFunction P1 P2 P3 P4 P5
- * Synopsis: r[P3]=func(r[P2@P5])
+/* Opcode: BuiltinFunction P1 P2 P3 P4 *
+ * Synopsis: r[P3]=func(r[P2@P1])
  *
  * Invoke a user function (P4 is a pointer to an sql_context object that
- * contains a pointer to the function to be run) with P5 arguments taken
+ * contains a pointer to the function to be run) with P1 arguments taken
  * from register P2 and successors.  The result of the function is stored
  * in register P3.  Register P3 must not be one of the function inputs.
- *
- * P1 is a 32-bit bitmask indicating whether or not each argument to the
- * function was determined to be constant at compile time. If the first
- * argument was constant then bit 0 of P1 is set.
  *
  * SQL functions are initially coded as OP_BuiltinFunction0 with
  * P4 pointing to a FuncDef object.  But on first evaluation,
@@ -1223,7 +1215,7 @@ case OP_BuiltinFunction0: {
 	sql_context *pCtx;
 
 	assert(pOp->p4type == P4_FUNC);
-	n = pOp->p5;
+	n = pOp->p1;
 	assert(pOp->p3>0 && pOp->p3<=(p->nMem+1 - p->nCursor));
 	assert(n==0 || (pOp->p2>0 && pOp->p2+n<=(p->nMem+1 - p->nCursor)+1));
 	assert(pOp->p3<pOp->p2 || pOp->p3>=pOp->p2+n);
@@ -1233,7 +1225,6 @@ case OP_BuiltinFunction0: {
 	pCtx->func = pOp->p4.func;
 	pCtx->iOp = (int)(pOp - aOp);
 	pCtx->pVdbe = p;
-	pCtx->argc = n;
 	pOp->p4type = P4_FUNCCTX;
 	pOp->p4.pCtx = pCtx;
 	pOp->opcode = OP_BuiltinFunction;
@@ -1242,6 +1233,7 @@ case OP_BuiltinFunction0: {
 }
 case OP_BuiltinFunction: {
 	int i;
+	int argc = pOp->p1;
 	sql_context *pCtx;
 
 	assert(pOp->p4type==P4_FUNCCTX);
@@ -1255,11 +1247,12 @@ case OP_BuiltinFunction: {
 	pOut = vdbe_prepare_null_out(p, pOp->p3);
 	if (pCtx->pOut != pOut) {
 		pCtx->pOut = pOut;
-		for(i=pCtx->argc-1; i>=0; i--) pCtx->argv[i] = &aMem[pOp->p2+i];
+		for(i = 0; i < argc; ++i)
+			pCtx->argv[i] = &aMem[pOp->p2 + i];
 	}
 
 #ifdef SQL_DEBUG
-	for(i=0; i<pCtx->argc; i++) {
+	for(i = 0; i < argc; i++) {
 		assert(memIsValid(pCtx->argv[i]));
 		REGISTER_TRACE(p, pOp->p2+i, pCtx->argv[i]);
 	}
@@ -1267,7 +1260,7 @@ case OP_BuiltinFunction: {
 	pCtx->is_aborted = false;
 	assert(pCtx->func->def->language == FUNC_LANGUAGE_SQL_BUILTIN);
 	struct func_sql_builtin *func = (struct func_sql_builtin *)pCtx->func;
-	func->call(pCtx, pCtx->argc, pCtx->argv);
+	func->call(pCtx, argc, pCtx->argv);
 
 	/* If the function returned an error, throw an exception */
 	if (pCtx->is_aborted)
@@ -1283,11 +1276,11 @@ case OP_BuiltinFunction: {
 	break;
 }
 
-/* Opcode: FunctionByName * P2 P3 P4 P5
- * Synopsis: r[P3]=func(r[P2@P5])
+/* Opcode: FunctionByName P1 P2 P3 P4 *
+ * Synopsis: r[P3]=func(r[P2@P1])
  *
  * Invoke a user function (P4 is a pointer to a function object
- * that defines the function) with P5 arguments taken from
+ * that defines the function) with P1 arguments taken from
  * register P2 and successors. The result of the function is
  * stored in register P3.
  */
@@ -1303,7 +1296,7 @@ case OP_FunctionByName: {
 	 * turn out to be invalid after call.
 	 */
 	enum field_type returns = func->def->returns;
-	int argc = pOp->p5;
+	int argc = pOp->p1;
 	struct Mem *argv = &aMem[pOp->p2];
 	struct port args, ret;
 
@@ -4177,26 +4170,26 @@ case OP_DecrJumpZero: {      /* jump, in1 */
 }
 
 
-/* Opcode: AggStep0 * P2 P3 P4 P5
- * Synopsis: accum=r[P3] step(r[P2@P5])
+/* Opcode: AggStep0 P1 P2 P3 P4 *
+ * Synopsis: accum=r[P3] step(r[P2@P1])
  *
  * Execute the step function for an aggregate.  The
- * function has P5 arguments.   P4 is a pointer to the FuncDef
+ * function has P1 arguments.   P4 is a pointer to the FuncDef
  * structure that specifies the function.  Register P3 is the
  * accumulator.
  *
- * The P5 arguments are taken from register P2 and its
+ * The P1 arguments are taken from register P2 and its
  * successors.
  */
-/* Opcode: AggStep * P2 P3 P4 P5
- * Synopsis: accum=r[P3] step(r[P2@P5])
+/* Opcode: AggStep P1 P2 P3 P4 *
+ * Synopsis: accum=r[P3] step(r[P2@P1])
  *
  * Execute the step function for an aggregate.  The
- * function has P5 arguments.   P4 is a pointer to an sql_context
+ * function has P1 arguments.   P4 is a pointer to an sql_context
  * object that is used to run the function.  Register P3 is
  * as the accumulator.
  *
- * The P5 arguments are taken from register P2 and its
+ * The P1 arguments are taken from register P2 and its
  * successors.
  *
  * This opcode is initially coded as OP_AggStep0.  On first evaluation,
@@ -4220,7 +4213,6 @@ case OP_AggStep0: {
 	pCtx->func = pOp->p4.func;
 	pCtx->iOp = (int)(pOp - aOp);
 	pCtx->pVdbe = p;
-	pCtx->argc = n;
 	pOp->p4type = P4_FUNCCTX;
 	pOp->p4.pCtx = pCtx;
 	pOp->opcode = OP_AggStep;
@@ -4229,6 +4221,7 @@ case OP_AggStep0: {
 }
 case OP_AggStep: {
 	int i;
+	int argc = pOp->p1;
 	sql_context *pCtx;
 	Mem *pMem;
 	Mem t;
@@ -4244,11 +4237,12 @@ case OP_AggStep: {
 	 */
 	if (pCtx->pMem != pMem) {
 		pCtx->pMem = pMem;
-		for(i=pCtx->argc-1; i>=0; i--) pCtx->argv[i] = &aMem[pOp->p2+i];
+		for(i = 0; i < argc; ++i)
+			pCtx->argv[i] = &aMem[pOp->p2 + i];
 	}
 
 #ifdef SQL_DEBUG
-	for(i=0; i<pCtx->argc; i++) {
+	for(i = 0; i < argc; i++) {
 		assert(memIsValid(pCtx->argv[i]));
 		REGISTER_TRACE(p, pOp->p2+i, pCtx->argv[i]);
 	}
@@ -4261,7 +4255,7 @@ case OP_AggStep: {
 	pCtx->skipFlag = 0;
 	assert(pCtx->func->def->language == FUNC_LANGUAGE_SQL_BUILTIN);
 	struct func_sql_builtin *func = (struct func_sql_builtin *)pCtx->func;
-	func->call(pCtx, pCtx->argc, pCtx->argv);
+	func->call(pCtx, argc, pCtx->argv);
 	if (pCtx->is_aborted) {
 		mem_destroy(&t);
 		goto abort_due_to_error;

@@ -4107,18 +4107,17 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 						  (char *)coll, P4_COLLSEQ);
 			}
 			if (func->def->language == FUNC_LANGUAGE_SQL_BUILTIN) {
-				sqlVdbeAddOp4(v, OP_BuiltinFunction0, constMask,
+				sqlVdbeAddOp4(v, OP_BuiltinFunction0, nFarg,
 					      r1, target, (char *)func,
 					      P4_FUNC);
 			} else {
-				sqlVdbeAddOp4(v, OP_FunctionByName, constMask,
+				sqlVdbeAddOp4(v, OP_FunctionByName, nFarg,
 					      r1, target,
 					      sqlDbStrNDup(pParse->db,
 							   func->def->name,
 							   func->def->name_len),
 					      P4_DYNAMIC);
 			}
-			sqlVdbeChangeP5(v, (u8) nFarg);
 			if (nFarg && constMask == 0) {
 				sqlReleaseTempRange(pParse, r1, nFarg);
 			}
