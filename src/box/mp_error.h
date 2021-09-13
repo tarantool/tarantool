@@ -72,6 +72,23 @@ error_unpack(const char **data, uint32_t len)
 }
 
 /**
+ * @brief Calculate the exact buffer size needed to encode an error in MsgPack.
+ * @param error The error.
+ * @return the size.
+ */
+uint32_t
+mp_sizeof_error(const struct error *error);
+
+/**
+ * @brief Encode an error in MsgPack.
+ * @param data Pointer to the buffer to write the result to.
+ * @param error The error.
+ * @return @a data + mp_sizeof_error(@a error).
+ */
+char *
+mp_encode_error(char *data, const struct error *error);
+
+/**
  * Print error's string representation into a given buffer.
  * @param buf Target buffer to write string to.
  * @param size Buffer size.

@@ -1,4 +1,5 @@
 local ffi = require('ffi')
+local msgpack = require('msgpack')
 
 local function rt(test, s, x, t)
     local buf1 = s.encode(x)
@@ -492,6 +493,34 @@ local function test_decode_buffer(test, s)
     end
 end
 
+local function test_error(test, s)
+    test:plan(4)
+    local err = box.error.new(box.error.ILLEGAL_PARAMS, 'test')
+    err:set_prev(box.error.new(box.error.UNKNOWN))
+    local encode_error_as_ext = msgpack.cfg.encode_error_as_ext
+    local encode_load_metatables = msgpack.cfg.encode_load_metatables
+    msgpack.cfg{encode_error_as_ext = true}
+    local err2 = s.decode(s.encode(err))
+    test:ok(ffi.istype(err2, err), 'encode/decode error as ext - type')
+    local t = err:unpack()
+    t.prev = t.prev and t.prev:unpack()
+    local t2 = err2:unpack()
+    t2.prev = t2.prev and t2.prev:unpack()
+    test:is_deeply(t, t2, 'encode/decode error as ext - value')
+    msgpack.cfg{
+        encode_error_as_ext = false,
+        encode_load_metatables = true,
+    }
+    local err2 = s.decode(s.encode(err))
+    test:is(type(err2), 'string', 'encode/decode error as str - type')
+    test:is(err2, 'Illegal parameters, test',
+            'encode/decode error as str - value')
+    msgpack.cfg{
+        encode_error_as_ext = encode_error_as_ext,
+        encode_load_metatables = encode_load_metatables,
+    }
+end
+
 return {
     test_unsigned = test_unsigned;
     test_signed = test_signed;
@@ -505,4 +534,5 @@ return {
     test_uuid = test_uuid;
     test_depth = test_depth;
     test_decode_buffer = test_decode_buffer;
+    test_error = test_error;
 }

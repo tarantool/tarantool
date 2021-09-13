@@ -26,6 +26,10 @@ char *
 mp_encode_uuid(char *data, const struct tt_uuid *uuid);
 uint32_t
 mp_sizeof_uuid();
+uint32_t
+mp_sizeof_error(const struct error *error);
+char *
+mp_encode_error(char *data, const struct error *error);
 float
 mp_decode_float(const char **data);
 double
@@ -223,6 +227,15 @@ local function encode_nil(buf)
     p[0] = 0xc0
 end
 
+local function encode_error(buf, err)
+    if msgpack.cfg.encode_error_as_ext then
+        local p = buf:alloc(builtin.mp_sizeof_error(err))
+        builtin.mp_encode_error(p, err)
+    else
+        encode_str(buf, err.message)
+    end
+end
+
 local function encode_r(buf, obj, level)
 ::restart::
     if type(obj) == "number" then
@@ -324,6 +337,7 @@ on_encode(ffi.typeof('float'), encode_float)
 on_encode(ffi.typeof('double'), encode_double)
 on_encode(ffi.typeof('decimal_t'), encode_decimal)
 on_encode(ffi.typeof('struct tt_uuid'), encode_uuid)
+on_encode(ffi.typeof('const struct error &'), encode_error)
 
 --------------------------------------------------------------------------------
 -- Decoder
