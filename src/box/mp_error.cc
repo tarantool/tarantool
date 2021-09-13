@@ -191,8 +191,8 @@ mp_encode_str0(char *data, const char *str)
 	return mp_encode_str(data, str, strlen(str));
 }
 
-static void
-mp_encode_error_one(const struct error *error, char **data)
+static char *
+mp_encode_error_one(char *data, const struct error *error)
 {
 	uint32_t errcode = box_error_code(error);
 
@@ -209,36 +209,37 @@ mp_encode_error_one(const struct error *error, char **data)
 	if (is_access_denied || is_custom)
 		++details_num;
 
-	*data = mp_encode_map(*data, details_num);
-	*data = mp_encode_uint(*data, MP_ERROR_TYPE);
-	*data = mp_encode_str0(*data, error->type->name);
-	*data = mp_encode_uint(*data, MP_ERROR_LINE);
-	*data = mp_encode_uint(*data, error->line);
-	*data = mp_encode_uint(*data, MP_ERROR_FILE);
-	*data = mp_encode_str0(*data, error->file);
-	*data = mp_encode_uint(*data, MP_ERROR_MESSAGE);
-	*data = mp_encode_str0(*data, error->errmsg);
-	*data = mp_encode_uint(*data, MP_ERROR_ERRNO);
-	*data = mp_encode_uint(*data, error->saved_errno);
-	*data = mp_encode_uint(*data, MP_ERROR_CODE);
-	*data = mp_encode_uint(*data, errcode);
+	data = mp_encode_map(data, details_num);
+	data = mp_encode_uint(data, MP_ERROR_TYPE);
+	data = mp_encode_str0(data, error->type->name);
+	data = mp_encode_uint(data, MP_ERROR_LINE);
+	data = mp_encode_uint(data, error->line);
+	data = mp_encode_uint(data, MP_ERROR_FILE);
+	data = mp_encode_str0(data, error->file);
+	data = mp_encode_uint(data, MP_ERROR_MESSAGE);
+	data = mp_encode_str0(data, error->errmsg);
+	data = mp_encode_uint(data, MP_ERROR_ERRNO);
+	data = mp_encode_uint(data, error->saved_errno);
+	data = mp_encode_uint(data, MP_ERROR_CODE);
+	data = mp_encode_uint(data, errcode);
 
 	if (is_access_denied) {
-		*data = mp_encode_uint(*data, MP_ERROR_FIELDS);
-		*data = mp_encode_map(*data, 3);
+		data = mp_encode_uint(data, MP_ERROR_FIELDS);
+		data = mp_encode_map(data, 3);
 		AccessDeniedError *ad_err = type_cast(AccessDeniedError, error);
-		*data = mp_encode_str0(*data, "object_type");
-		*data = mp_encode_str0(*data, ad_err->object_type());
-		*data = mp_encode_str0(*data, "object_name");
-		*data = mp_encode_str0(*data, ad_err->object_name());
-		*data = mp_encode_str0(*data, "access_type");
-		*data = mp_encode_str0(*data, ad_err->access_type());
+		data = mp_encode_str0(data, "object_type");
+		data = mp_encode_str0(data, ad_err->object_type());
+		data = mp_encode_str0(data, "object_name");
+		data = mp_encode_str0(data, ad_err->object_name());
+		data = mp_encode_str0(data, "access_type");
+		data = mp_encode_str0(data, ad_err->access_type());
 	} else if (is_custom) {
-		*data = mp_encode_uint(*data, MP_ERROR_FIELDS);
-		*data = mp_encode_map(*data, 1);
-		*data = mp_encode_str0(*data, "custom_type");
-		*data = mp_encode_str0(*data, box_error_custom_type(error));
+		data = mp_encode_uint(data, MP_ERROR_FIELDS);
+		data = mp_encode_map(data, 1);
+		data = mp_encode_str0(data, "custom_type");
+		data = mp_encode_str0(data, box_error_custom_type(error));
 	}
+	return data;
 }
 
 static struct error *
@@ -488,7 +489,7 @@ error_to_mpstream_noext(const struct error *error, struct mpstream *stream)
 	data = mp_encode_uint(data, MP_ERROR_STACK);
 	data = mp_encode_array(data, err_cnt);
 	for (const struct error *it = error; it != NULL; it = it->cause) {
-		mp_encode_error_one(it, &data);
+		data = mp_encode_error_one(data, it);
 	}
 
 	assert(data == ptr + data_size);
@@ -515,7 +516,7 @@ error_to_mpstream(const struct error *error, struct mpstream *stream)
 	data = mp_encode_uint(data, MP_ERROR_STACK);
 	data = mp_encode_array(data, err_cnt);
 	for (const struct error *it = error; it != NULL; it = it->cause) {
-		mp_encode_error_one(it, &data);
+		data = mp_encode_error_one(data, it);
 	}
 
 	assert(data == ptr + data_size_ext);
