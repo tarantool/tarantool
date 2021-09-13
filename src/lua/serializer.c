@@ -43,7 +43,6 @@
 
 #include "trivia/util.h"
 #include "diag.h"
-#include "serializer_opts.h"
 #include "lua/utils.h"
 
 int luaL_map_metatable_ref = LUA_REFNIL;
@@ -433,6 +432,8 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg,
 	     const struct serializer_opts *opts, int index,
 	     struct luaL_field *field)
 {
+	(void)opts;
+
 	if (index < 0)
 		index = lua_gettop(L) + index + 1;
 
@@ -540,10 +541,9 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg,
 			} else if (cd->ctypeid == CTID_UUID) {
 				field->ext_type = MP_UUID;
 				field->uuidval = (struct tt_uuid *) cdata;
-			} else if (cd->ctypeid == CTID_CONST_STRUCT_ERROR_REF &&
-				   opts != NULL &&
-				   opts->error_marshaling_enabled) {
+			} else if (cd->ctypeid == CTID_CONST_STRUCT_ERROR_REF) {
 				field->ext_type = MP_ERROR;
+				field->errorval = *(struct error **)cdata;
 			} else {
 				field->ext_type = MP_UNKNOWN_EXTENSION;
 			}
