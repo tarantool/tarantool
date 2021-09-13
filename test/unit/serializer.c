@@ -389,7 +389,7 @@ test_luaL_field_basic(struct lua_State *L)
 			ok(true, "# skip; %s: luaL_checkfield() has no retval",
 			   description);
 		} else {
-			int rc = luaL_tofield(L, &cfg, NULL, -1, &field);
+			int rc = luaL_tofield(L, &cfg, -1, &field);
 			is(rc, 0, "%s: luaL_tofield retval", description);
 		}
 

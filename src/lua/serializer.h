@@ -56,7 +56,6 @@ extern "C" {
 #include "lib/core/mp_extension_types.h"
 #include "lua/error.h"
 
-struct serializer_opts;
 struct lua_State;
 struct tt_uuid;
 
@@ -265,7 +264,6 @@ struct luaL_field {
  *
  * @param L stack
  * @param cfg configuration
- * @param opts the Lua serializer additional options.
  * @param index stack index
  * @param field conversion result
  *
@@ -273,8 +271,7 @@ struct luaL_field {
  * @retval -1 Error.
  */
 int
-luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg,
-	     const struct serializer_opts *opts, int index,
+luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 	     struct luaL_field *field);
 
 /**
@@ -313,7 +310,7 @@ static inline void
 luaL_checkfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 		struct luaL_field *field)
 {
-	if (luaL_tofield(L, cfg, NULL, idx, field) < 0)
+	if (luaL_tofield(L, cfg, idx, field) < 0)
 		luaT_error(L);
 	if (field->type != MP_EXT || field->ext_type != MP_UNKNOWN_EXTENSION)
 		return;

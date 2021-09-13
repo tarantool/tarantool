@@ -274,7 +274,7 @@ lua_field_inspect_ucdata(struct lua_State *L, struct luaL_serializer *cfg,
 		lua_pcall(L, 1, 1, 0);
 		/* replace obj with the unpacked value */
 		lua_replace(L, idx);
-		if (luaL_tofield(L, cfg, NULL, idx, field) < 0)
+		if (luaL_tofield(L, cfg, idx, field) < 0)
 			luaT_error(L);
 	} /* else ignore lua_gettable exceptions */
 	lua_settop(L, top); /* remove temporary objects */
@@ -319,7 +319,7 @@ lua_field_try_serialize(struct lua_State *L, struct luaL_serializer *cfg,
 			diag_set(LuajitError, lua_tostring(L, -1));
 			return -1;
 		}
-		if (luaL_tofield(L, cfg, NULL, -1, field) != 0)
+		if (luaL_tofield(L, cfg, -1, field) != 0)
 			return -1;
 		lua_replace(L, idx);
 		return 0;
@@ -423,17 +423,14 @@ lua_field_tostring(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 	lua_call(L, 1, 1);
 	lua_replace(L, idx);
 	lua_settop(L, top);
-	if (luaL_tofield(L, cfg, NULL, idx, field) < 0)
+	if (luaL_tofield(L, cfg, idx, field) < 0)
 		luaT_error(L);
 }
 
 int
-luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg,
-	     const struct serializer_opts *opts, int index,
+luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 	     struct luaL_field *field)
 {
-	(void)opts;
-
 	if (index < 0)
 		index = lua_gettop(L) + index + 1;
 
