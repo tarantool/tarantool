@@ -223,6 +223,7 @@ struct luaL_field {
 		uint32_t size;
 		decimal_t *decval;
 		struct tt_uuid *uuidval;
+		struct error *errorval;
 	};
 	enum mp_type type;
 	/* subtypes of MP_EXT */

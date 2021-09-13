@@ -1,0 +1,57 @@
+-- test-run result file version 2
+json = require('json')
+ | ---
+ | ...
+msgpack = require('msgpack')
+ | ---
+ | ...
+yaml = require('yaml')
+ | ---
+ | ...
+
+error_marshaling_enabled = box.session.settings.error_marshaling_enabled
+ | ---
+ | ...
+box.session.settings.error_marshaling_enabled = true
+ | ---
+ | ...
+
+e = box.error.new(box.error.ILLEGAL_PARAMS, 'test')
+ | ---
+ | ...
+v = {123, e, 'abc'}
+ | ---
+ | ...
+box.tuple.new(v)
+ | ---
+ | - [123, 'Illegal parameters, test', 'abc']
+ | ...
+t = msgpack.decode(msgpack.encode(v))
+ | ---
+ | ...
+t
+ | ---
+ | - [123, 'Illegal parameters, test', 'abc']
+ | ...
+json.encode(v)
+ | ---
+ | - '[123,"Illegal parameters, test","abc"]'
+ | ...
+yaml.encode(v)
+ | ---
+ | - '---
+ | 
+ |   - 123
+ | 
+ |   - Illegal parameters, test
+ | 
+ |   - abc
+ | 
+ |   ...
+ | 
+ |   '
+ | ...
+
+box.session.settings.error_marshaling_enabled = error_marshaling_enabled
+ | ---
+ | ...

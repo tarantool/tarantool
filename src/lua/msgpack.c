@@ -32,6 +32,7 @@
 #include "mpstream/mpstream.h"
 #include "lua/utils.h"
 #include "lua/serializer.h"
+#include "serializer_opts.h"
 
 #if defined(LUAJIT)
 #include <lj_ctype.h>
@@ -199,12 +200,17 @@ restart: /* used by MP_EXT of unidentified subtype */
 			mpstream_encode_uuid(stream, field->uuidval);
 			break;
 		case MP_ERROR:
+			if (opts == NULL || !opts->error_marshaling_enabled) {
+				field->ext_type = MP_UNKNOWN_EXTENSION;
+				goto convert;
+			}
 			return luamp_encode_extension(L, top, stream);
 		default:
 			/* Run trigger if type can't be encoded */
 			type = luamp_encode_extension(L, top, stream);
 			if (type != MP_EXT)
 				return type; /* Value has been packed by the trigger */
+convert:
 			/* Try to convert value to serializable type */
 			luaL_convertfield(L, cfg, top, field);
 			/* handled by luaL_convertfield */
