@@ -471,8 +471,12 @@ error:
 	goto finish;
 }
 
-void
-error_to_mpstream_noext(const struct error *error, struct mpstream *stream)
+/**
+ * Returns the exact buffer size needed to encode an error in MsgPack without
+ * the MP_EXT header.
+ */
+static uint32_t
+mp_sizeof_error_noext(const struct error *error)
 {
 	uint32_t err_cnt = 0;
 	uint32_t data_size = mp_sizeof_map(1);
@@ -481,45 +485,49 @@ error_to_mpstream_noext(const struct error *error, struct mpstream *stream)
 		err_cnt++;
 		data_size += mp_sizeof_error_one(it);
 	}
-
 	data_size += mp_sizeof_array(err_cnt);
-	char *ptr = mpstream_reserve(stream, data_size);
-	char *data = ptr;
+	return data_size;
+}
+
+/**
+ * Encodes an error in MsgPack without the MP_EXT header.
+ */
+static char *
+mp_encode_error_noext(char *data, const struct error *error)
+{
+	uint32_t err_cnt = 0;
+	for (const struct error *it = error; it != NULL; it = it->cause)
+		err_cnt++;
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, MP_ERROR_STACK);
 	data = mp_encode_array(data, err_cnt);
-	for (const struct error *it = error; it != NULL; it = it->cause) {
+	for (const struct error *it = error; it != NULL; it = it->cause)
 		data = mp_encode_error_one(data, it);
-	}
+	return data;
+}
 
+void
+error_to_mpstream_noext(const struct error *error, struct mpstream *stream)
+{
+	uint32_t data_size = mp_sizeof_error_noext(error);
+	char *ptr = mpstream_reserve(stream, data_size);
+	char *data = mp_encode_error_noext(ptr, error);
 	assert(data == ptr + data_size);
+	(void)data;
 	mpstream_advance(stream, data_size);
 }
 
 void
 error_to_mpstream(const struct error *error, struct mpstream *stream)
 {
-	uint32_t err_cnt = 0;
-	uint32_t data_size = mp_sizeof_map(1);
-	data_size += mp_sizeof_uint(MP_ERROR_STACK);
-	for (const struct error *it = error; it != NULL; it = it->cause) {
-		err_cnt++;
-		data_size += mp_sizeof_error_one(it);
-	}
-
-	data_size += mp_sizeof_array(err_cnt);
+	uint32_t data_size = mp_sizeof_error_noext(error);
 	uint32_t data_size_ext = mp_sizeof_ext(data_size);
 	char *ptr = mpstream_reserve(stream, data_size_ext);
 	char *data = ptr;
 	data = mp_encode_extl(data, MP_ERROR, data_size);
-	data = mp_encode_map(data, 1);
-	data = mp_encode_uint(data, MP_ERROR_STACK);
-	data = mp_encode_array(data, err_cnt);
-	for (const struct error *it = error; it != NULL; it = it->cause) {
-		data = mp_encode_error_one(data, it);
-	}
-
+	data = mp_encode_error_noext(data, error);
 	assert(data == ptr + data_size_ext);
+	(void)data;
 	mpstream_advance(stream, data_size_ext);
 }
 
