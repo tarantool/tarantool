@@ -131,7 +131,7 @@ mp_error_create(struct mp_error *mp_error)
 }
 
 static uint32_t
-mp_sizeof_error(const struct error *error)
+mp_sizeof_error_one(const struct error *error)
 {
 	uint32_t errcode = box_error_code(error);
 
@@ -479,7 +479,7 @@ error_to_mpstream_noext(const struct error *error, struct mpstream *stream)
 	data_size += mp_sizeof_uint(MP_ERROR_STACK);
 	for (const struct error *it = error; it != NULL; it = it->cause) {
 		err_cnt++;
-		data_size += mp_sizeof_error(it);
+		data_size += mp_sizeof_error_one(it);
 	}
 
 	data_size += mp_sizeof_array(err_cnt);
@@ -504,7 +504,7 @@ error_to_mpstream(const struct error *error, struct mpstream *stream)
 	data_size += mp_sizeof_uint(MP_ERROR_STACK);
 	for (const struct error *it = error; it != NULL; it = it->cause) {
 		err_cnt++;
-		data_size += mp_sizeof_error(it);
+		data_size += mp_sizeof_error_one(it);
 	}
 
 	data_size += mp_sizeof_array(err_cnt);
