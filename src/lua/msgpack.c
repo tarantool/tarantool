@@ -200,7 +200,8 @@ restart: /* used by MP_EXT of unidentified subtype */
 			mpstream_encode_uuid(stream, field->uuidval);
 			break;
 		case MP_ERROR:
-			if (opts == NULL || !opts->error_marshaling_enabled) {
+			if (!cfg->encode_error_as_ext ||
+			    (opts != NULL && !opts->error_marshaling_enabled)) {
 				field->ext_type = MP_UNKNOWN_EXTENSION;
 				goto convert;
 			}

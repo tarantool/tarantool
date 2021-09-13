@@ -132,6 +132,8 @@ struct luaL_serializer {
 	int encode_use_tostring;
 	/** Use NULL for all unrecognizable types */
 	int encode_invalid_as_nil;
+	/** Encode error object as MP_ERROR extension (MsgPack only). */
+	int encode_error_as_ext;
 
 	/** Enables decoding NaN and Inf numbers */
 	int decode_invalid_numbers;

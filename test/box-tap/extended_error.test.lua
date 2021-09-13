@@ -3,6 +3,7 @@
 local netbox = require('net.box')
 local os = require('os')
 local tap = require('tap')
+local msgpack = require('msgpack')
 
 box.cfg{
     listen = os.getenv('LISTEN')
@@ -31,7 +32,7 @@ box.schema.func.drop('forbidden_function')
 box.session.su(user)
 
 local test = tap.test('Error marshaling')
-test:plan(19)
+test:plan(21)
 
 function error_new(...)
     return box.error.new(...)
@@ -77,6 +78,15 @@ end
 box.schema.user.grant('guest', 'super')
 local c = netbox.connect(box.cfg.listen)
 c:eval('box.session.settings.error_marshaling_enabled = true')
+
+local encode_error_as_ext = msgpack.cfg.encode_error_as_ext
+test:is(encode_error_as_ext, true, 'encode_error_as_ext is true by default')
+msgpack.cfg{encode_error_as_ext = false}
+local err = c:eval('return box.error.new(box.error.ILLEGAL_PARAMS, "test")')
+test:is(err, 'Illegal parameters, test',
+        'error is encoded as string if encode_error_as_ext is false')
+msgpack.cfg{encode_error_as_ext = encode_error_as_ext}
+
 local args = {{code = 1000, reason = 'Reason'}}
 local err = c:call('error_new', args)
 local checks = {

@@ -489,6 +489,12 @@ mp_sizeof_error_noext(const struct error *error)
 	return data_size;
 }
 
+uint32_t
+mp_sizeof_error(const struct error *error)
+{
+	return mp_sizeof_ext(mp_sizeof_error_noext(error));
+}
+
 /**
  * Encodes an error in MsgPack without the MP_EXT header.
  */
@@ -503,6 +509,18 @@ mp_encode_error_noext(char *data, const struct error *error)
 	data = mp_encode_array(data, err_cnt);
 	for (const struct error *it = error; it != NULL; it = it->cause)
 		data = mp_encode_error_one(data, it);
+	return data;
+}
+
+char *
+mp_encode_error(char *data, const struct error *error)
+{
+	uint32_t data_size = mp_sizeof_error_noext(error);
+	char *ptr = data;
+	data = mp_encode_extl(data, MP_ERROR, data_size);
+	data = mp_encode_error_noext(data, error);
+	assert(data == ptr + mp_sizeof_ext(data_size));
+	(void)ptr;
 	return data;
 }
 
