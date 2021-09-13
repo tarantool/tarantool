@@ -682,7 +682,7 @@ uint_to_double_precise(struct Mem *mem)
 	assert(mem->type == MEM_TYPE_UINT);
 	double d;
 	d = (double)mem->u.u;
-	if (mem->u.u != (uint64_t)d)
+	if (d == (double)UINT64_MAX || mem->u.u != (uint64_t)d)
 		return -1;
 	mem->u.r = d;
 	mem->flags = 0;
