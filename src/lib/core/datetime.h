@@ -12,6 +12,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct tnt_tm;
+
 /**
  * We count dates since so called "Rata Die" date
  * January 1, 0001, Monday (as Day 1).
@@ -75,6 +77,12 @@ tnt_datetime_strftime(const struct datetime *date, char *buf, size_t len,
 
 void
 tnt_datetime_now(struct datetime *now);
+
+/**
+ * Convert @sa datetime to @sa dt_tm
+ */
+void
+datetime_to_tm(const struct datetime *date, struct tnt_tm *tm);
 
 #if defined(__cplusplus)
 } /* extern "C" */

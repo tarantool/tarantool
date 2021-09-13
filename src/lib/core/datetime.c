@@ -10,8 +10,9 @@
 #include <time.h>
 
 #include "c-dt/dt.h"
-#include "trivia/util.h"
 #include "datetime.h"
+#include "trivia/util.h"
+#include "tzcode/tzcode.h"
 
 /**
  * Given the seconds from Epoch (1970-01-01) we calculate date
@@ -30,16 +31,23 @@ local_secs(const struct datetime *date)
 	return (int64_t)date->epoch + date->tzoffset * 60;
 }
 
-static void
-datetime_to_tm(const struct datetime *date, struct tm *tm)
+void
+datetime_to_tm(const struct datetime *date, struct tnt_tm *tm)
 {
-	memset(tm, 0, sizeof(*tm));
-	int64_t local_epoch = local_secs(date);
-	dt_to_struct_tm(local_dt(local_epoch), tm);
+	struct tm t;
+	memset(&t, 0, sizeof(t));
+	tm->tm_epoch = local_secs(date);
+	dt_to_struct_tm(local_dt(tm->tm_epoch), &t);
+	tm->tm_year = t.tm_year;
+	tm->tm_mon = t.tm_mon;
+	tm->tm_mday = t.tm_mday;
+	tm->tm_wday = t.tm_wday;
+	tm->tm_yday = t.tm_yday;
 
 	tm->tm_gmtoff = date->tzoffset * 60;
+	tm->tm_nsec = date->nsec;
 
-	int seconds_of_day = local_epoch % SECS_PER_DAY;
+	int seconds_of_day = tm->tm_epoch % SECS_PER_DAY;
 	tm->tm_hour = (seconds_of_day / 3600) % 24;
 	tm->tm_min = (seconds_of_day / 60) % 60;
 	tm->tm_sec = seconds_of_day % 60;
@@ -49,9 +57,9 @@ size_t
 tnt_datetime_strftime(const struct datetime *date, char *buf, size_t len,
 		      const char *fmt)
 {
-	struct tm tm;
+	struct tnt_tm tm;
 	datetime_to_tm(date, &tm);
-	return strftime(buf, len, fmt, &tm);
+	return tnt_strftime(buf, len, fmt, &tm);
 }
 
 void
