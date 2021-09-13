@@ -77,6 +77,7 @@ local DAYS_EPOCH_OFFSET = 719163
 local SECS_PER_DAY      = 86400
 local SECS_EPOCH_OFFSET = DAYS_EPOCH_OFFSET * SECS_PER_DAY
 local TOSTRING_BUFSIZE  = 48
+local STRFTIME_BUFSIZE  = 128
 
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
@@ -91,6 +92,11 @@ local date_tostr_stash =
     buffer.ffi_stash_new(string.format('char[%s]', TOSTRING_BUFSIZE))
 local date_tostr_stash_take = date_tostr_stash.take
 local date_tostr_stash_put = date_tostr_stash.put
+
+local date_strf_stash =
+    buffer.ffi_stash_new(string.format('char[%s]', STRFTIME_BUFSIZE))
+local date_strf_stash_take = date_strf_stash.take
+local date_strf_stash_put = date_strf_stash.put
 
 local datetime_t = ffi.typeof('struct datetime')
 
@@ -611,10 +617,18 @@ local function datetime_set(self, obj)
 end
 
 local function datetime_strftime(self, fmt)
-    local strfmt_sz = 128
-    local buff = ffi.new('char[?]', strfmt_sz)
     check_str(fmt, "datetime.strftime()")
-    builtin.tnt_datetime_strftime(self, buff, strfmt_sz, fmt)
+    local buff = date_strf_stash_take()
+    local len = builtin.tnt_datetime_strftime(self, buff, STRFTIME_BUFSIZE, fmt)
+    if len < STRFTIME_BUFSIZE then
+        local s = ffi.string(buff)
+        date_strf_stash_put(buff)
+        return s
+    end
+    -- slow path - reallocate for a fuller size, and then restart strftime
+    date_strf_stash_put(buff)
+    buff = ffi.new('char[?]', len + 1)
+    builtin.tnt_datetime_strftime(self, buff, len + 1, fmt)
     return ffi.string(buff)
 end
 

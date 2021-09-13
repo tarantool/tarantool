@@ -191,12 +191,12 @@ set_source_files_compile_flags(${server_sources})
 add_library(server STATIC ${server_sources})
 add_dependencies(server build_bundled_libs)
 target_link_libraries(server core coll http_parser bit uri uuid swim swim_udp
-                      swim_ev crypto mpstream crc32)
+                      swim_ev crypto mpstream crc32 tzcode)
 
 # Rule of thumb: if exporting a symbol from a static library, list the
 # library here.
 set (reexport_libraries server core misc bitset csv swim swim_udp swim_ev
-     shutdown ${LUAJIT_LIBRARIES} ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES}
+     shutdown tzcode ${LUAJIT_LIBRARIES} ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES}
      ${CURL_LIBRARIES} ${XXHASH_LIBRARIES} ${LIBCDT_LIBRARIES})
 
 set (common_libraries
