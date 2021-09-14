@@ -28,6 +28,18 @@ enum iproto_feature_id {
 	 * IPROTO_BEGIN, IPROTO_COMMIT, IPROTO_ROLLBACK commands.
 	 */
 	IPROTO_FEATURE_TRANSACTIONS = 1,
+	/**
+	 * MP_ERROR MsgPack extension support.
+	 *
+	 * If a client doesn't set this feature bit, then errors returned by
+	 * CALL/EVAL commands will be encoded according to the serialization
+	 * rules for generic cdata/userdata Lua objects irrespective of the
+	 * value of the msgpack.cfg.encode_errors_as_ext flag (by default
+	 * converted to a string error message). If the feature bit is set and
+	 * encode_errors_as_ext is true, errors will be encoded as MP_ERROR
+	 * MsgPack extension.
+	 */
+	IPROTO_FEATURE_ERROR_EXTENSION = 2,
 	iproto_feature_id_MAX,
 };
 
@@ -43,7 +55,7 @@ struct iproto_features {
  * It should be incremented every time a new feature is added or removed.
  */
 enum {
-	IPROTO_CURRENT_VERSION = 1,
+	IPROTO_CURRENT_VERSION = 2,
 };
 
 /**

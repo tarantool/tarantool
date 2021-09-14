@@ -64,6 +64,7 @@ local is_final_state         = {closed = 1, error = 1}
 local IPROTO_FEATURE_NAMES = {
     [0]     = 'streams',
     [1]     = 'transactions',
+    [2]     = 'error_extension',
 }
 
 -- Given an array of IPROTO feature ids, returns a map {feature_name: bool}.

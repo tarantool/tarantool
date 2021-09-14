@@ -424,6 +424,20 @@ netbox_encode_ping(lua_State *L, int idx, struct mpstream *stream,
 static int
 netbox_encode_id(struct ibuf *ibuf, uint64_t sync)
 {
+	struct iproto_features *features = &NETBOX_IPROTO_FEATURES;
+#ifndef NDEBUG
+	struct iproto_features features_value;
+	struct errinj *errinj = errinj(ERRINJ_NETBOX_FLIP_FEATURE, ERRINJ_INT);
+	if (errinj->iparam >= 0 && errinj->iparam < iproto_feature_id_MAX) {
+		int feature_id = errinj->iparam;
+		features_value = *features;
+		features = &features_value;
+		if (iproto_features_test(features, feature_id))
+			iproto_features_clear(features, feature_id);
+		else
+			iproto_features_set(features, feature_id);
+	}
+#endif
 	bool is_error = false;
 	struct mpstream stream;
 	mpstream_init(&stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
@@ -434,9 +448,9 @@ netbox_encode_id(struct ibuf *ibuf, uint64_t sync)
 	mpstream_encode_uint(&stream, IPROTO_VERSION);
 	mpstream_encode_uint(&stream, NETBOX_IPROTO_VERSION);
 	mpstream_encode_uint(&stream, IPROTO_FEATURES);
-	size_t size = mp_sizeof_iproto_features(&NETBOX_IPROTO_FEATURES);
+	size_t size = mp_sizeof_iproto_features(features);
 	char *data = mpstream_reserve(&stream, size);
-	mp_encode_iproto_features(data, &NETBOX_IPROTO_FEATURES);
+	mp_encode_iproto_features(data, features);
 	mpstream_advance(&stream, size);
 
 	netbox_end_encode(&stream, svp);
@@ -1944,6 +1958,7 @@ netbox_iproto_id(struct lua_State *L)
 	struct id_request id;
 	id.version = 0;
 	iproto_features_create(&id.features);
+	ERROR_INJECT(ERRINJ_NETBOX_DISABLE_ID, goto out);
 	if (peer_version_id < version_id(2, 10, 0))
 		goto unsupported;
 	if (netbox_encode_id(send_buf, registry->next_sync++) != 0)
@@ -2236,6 +2251,8 @@ luaopen_net_box(struct lua_State *L)
 			    IPROTO_FEATURE_STREAMS);
 	iproto_features_set(&NETBOX_IPROTO_FEATURES,
 			    IPROTO_FEATURE_TRANSACTIONS);
+	iproto_features_set(&NETBOX_IPROTO_FEATURES,
+			    IPROTO_FEATURE_ERROR_EXTENSION);
 
 	lua_pushcfunction(L, luaT_netbox_request_iterator_next);
 	luaT_netbox_request_iterator_next_ref = luaL_ref(L, LUA_REGISTRYINDEX);
