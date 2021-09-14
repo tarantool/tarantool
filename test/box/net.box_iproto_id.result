@@ -15,11 +15,12 @@ c = net.connect(box.cfg.listen)
  | ...
 c.peer_protocol_version
  | ---
- | - 1
+ | - 2
  | ...
 c.peer_protocol_features
  | ---
  | - transactions: true
+ |   error_extension: true
  |   streams: true
  | ...
 c:close()
@@ -45,6 +46,7 @@ c.peer_protocol_version
 c.peer_protocol_features
  | ---
  | - transactions: false
+ |   error_extension: false
  |   streams: false
  | ...
 errinj.set('ERRINJ_IPROTO_DISABLE_ID', false)
@@ -91,6 +93,7 @@ c.peer_protocol_version
 c.peer_protocol_features
  | ---
  | - transactions: true
+ |   error_extension: true
  |   streams: true
  | ...
 c:close()
@@ -137,11 +140,12 @@ c.error -- error
  | ...
 c.peer_protocol_version
  | ---
- | - 1
+ | - 2
  | ...
 c.peer_protocol_features
  | ---
  | - transactions: false
+ |   error_extension: true
  |   streams: true
  | ...
 c:close()
@@ -161,11 +165,12 @@ c.error -- error
  | ...
 c.peer_protocol_version
  | ---
- | - 1
+ | - 2
  | ...
 c.peer_protocol_features
  | ---
  | - transactions: true
+ |   error_extension: true
  |   streams: true
  | ...
 c:close()

@@ -2095,9 +2095,16 @@ tx_process_misc(struct cmsg *m)
 					   ::schema_version);
 			break;
 		case IPROTO_ID:
+		{
+			struct serializer_opts *opts =
+				&con->session->meta.serializer_opts;
+			opts->error_marshaling_enabled = iproto_features_test(
+				&msg->id.features,
+				IPROTO_FEATURE_ERROR_EXTENSION);
 			iproto_reply_id_xc(out, msg->header.sync,
 					   ::schema_version);
 			break;
+		}
 		case IPROTO_VOTE_DEPRECATED:
 			iproto_reply_vclock_xc(out, &replicaset.vclock,
 					       msg->header.sync,

@@ -77,7 +77,6 @@ end
 
 box.schema.user.grant('guest', 'super')
 local c = netbox.connect(box.cfg.listen)
-c:eval('box.session.settings.error_marshaling_enabled = true')
 
 local encode_error_as_ext = msgpack.cfg.encode_error_as_ext
 test:is(encode_error_as_ext, true, 'encode_error_as_ext is true by default')
