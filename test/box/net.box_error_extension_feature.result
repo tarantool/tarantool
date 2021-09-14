@@ -1,6 +1,9 @@
 net = require('net.box')
 ---
 ...
+msgpack = require('msgpack')
+---
+...
 errinj = box.error.injection
 ---
 ...
@@ -45,6 +48,29 @@ c = net.connect(box.cfg.listen)
 type(c:eval('return box.error.new(box.error.UNKNOWN)')) -- string
 ---
 - string
+...
+-- msgpack.cfg options are applied to CALL result
+encode_load_metatables = msgpack.cfg.encode_load_metatables
+---
+...
+encode_use_tostring = msgpack.cfg.encode_use_tostring
+---
+...
+msgpack.cfg{                                                                \
+    encode_load_metatables = false,                                         \
+    encode_use_tostring = false,                                            \
+}
+---
+...
+type(c:eval('return box.error.new(box.error.UNKNOWN)')) -- error
+---
+- error: unsupported Lua type 'cdata'
+...
+msgpack.cfg{                                                                \
+    encode_load_metatables = encode_load_metatables,                        \
+    encode_use_tostring = encode_use_tostring,                              \
+}
+---
 ...
 c:close()
 ---
