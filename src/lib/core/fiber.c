@@ -925,8 +925,11 @@ fiber_loop(MAYBE_UNUSED void *data)
 			 * of the caller to deal with the error.
 			 */
 			if (!(fiber->flags & FIBER_IS_JOINABLE)) {
-				if (!(fiber->flags & FIBER_IS_CANCELLED))
-					error_log(e);
+				if (!(fiber->flags & FIBER_IS_CANCELLED)) {
+					struct error *e2 = BuildLuajitError(__FILE__, __LINE__, "");
+					error_format_msg(e2, "Fiber is dying: %s", e->errmsg);
+					error_log(e2);
+				}
 				diag_clear(&fiber()->diag);
 			}
 		} else {
