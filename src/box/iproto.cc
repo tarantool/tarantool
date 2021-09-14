@@ -2095,16 +2095,10 @@ tx_process_misc(struct cmsg *m)
 					   ::schema_version);
 			break;
 		case IPROTO_ID:
-		{
-			struct serializer_opts *opts =
-				&con->session->meta.serializer_opts;
-			opts->error_marshaling_enabled = iproto_features_test(
-				&msg->id.features,
-				IPROTO_FEATURE_ERROR_EXTENSION);
+			con->session->meta.features = msg->id.features;
 			iproto_reply_id_xc(out, msg->header.sync,
 					   ::schema_version);
 			break;
-		}
 		case IPROTO_VOTE_DEPRECATED:
 			iproto_reply_vclock_xc(out, &replicaset.vclock,
 					       msg->header.sync,
@@ -2414,6 +2408,7 @@ tx_process_connect(struct cmsg *m)
 		if (con->session == NULL)
 			diag_raise();
 		con->session->meta.connection = con;
+		iproto_features_create(&con->session->meta.features);
 		tx_fiber_init(con->session, 0);
 		char *greeting = (char *) static_alloc(IPROTO_GREETING_SIZE);
 		/* TODO: dirty read from tx thread */

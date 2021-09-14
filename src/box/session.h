@@ -36,7 +36,7 @@
 #include "fiber.h"
 #include "user.h"
 #include "authentication.h"
-#include "serializer_opts.h"
+#include "iproto_features.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -89,8 +89,8 @@ struct session_meta {
 	};
 	/** Console output format. */
 	enum output_format output_format;
-	/** Session-specific serialization options. */
-	struct serializer_opts serializer_opts;
+	/** IPROTO client features. */
+	struct iproto_features features;
 };
 
 /**

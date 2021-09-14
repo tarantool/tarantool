@@ -48,6 +48,8 @@
 #include "trivia/util.h"
 #include "mpstream/mpstream.h"
 #include "box/session.h"
+#include "box/iproto_features.h"
+#include "serializer_opts.h"
 
 /**
  * Handlers identifiers to obtain lua_Cfunction reference from
@@ -431,11 +433,14 @@ encode_lua_call(lua_State *L)
 	 * TODO: forbid explicit yield from __serialize or __index here
 	 */
 	struct luaL_serializer *cfg = luaL_msgpack_default;
-	const struct serializer_opts *opts =
-		&current_session()->meta.serializer_opts;
+	struct serializer_opts opts = { .error_marshaling_enabled = true };
+	if (!iproto_features_test(&current_session()->meta.features,
+				  IPROTO_FEATURE_ERROR_EXTENSION)) {
+		opts.error_marshaling_enabled = false;
+	}
 	const int size = lua_gettop(L);
 	for (int i = 1; i <= size; ++i)
-		luamp_encode(L, cfg, opts, ctx->stream, i);
+		luamp_encode(L, cfg, &opts, ctx->stream, i);
 	ctx->port->size = size;
 	mpstream_flush(ctx->stream);
 	return 0;
