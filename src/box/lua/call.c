@@ -209,7 +209,6 @@ static inline uint32_t
 luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 		     struct mpstream *stream)
 {
-	const struct serializer_opts *opts = NULL;
 	int nrets = lua_gettop(L);
 	if (nrets == 0) {
 		return 0;
@@ -234,11 +233,11 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 				 */
 				lua_pushvalue(L, i);
 				mpstream_encode_array(stream, 1);
-				luamp_encode_r(L, cfg, opts, stream, &field, 0);
+				luamp_encode_r(L, cfg, stream, &field, 0);
 				lua_pop(L, 1);
 			} else {
 				/* `return ..., array, ...` */
-				luamp_encode(L, cfg, opts, stream, i);
+				luamp_encode(L, cfg, stream, i);
 			}
 		}
 		return nrets;
@@ -263,7 +262,7 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 		 */
 		mpstream_encode_array(stream, 1);
 		assert(lua_gettop(L) == 1);
-		luamp_encode_r(L, cfg, opts, stream, &root, 0);
+		luamp_encode_r(L, cfg, stream, &root, 0);
 		return 1;
 	}
 
@@ -295,13 +294,13 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 				 * Encode the first field of tuple using
 				 * existing information from luaL_tofield
 				 */
-				luamp_encode_r(L, cfg, opts, stream, &field, 0);
+				luamp_encode_r(L, cfg, stream, &field, 0);
 				lua_pop(L, 1);
 				assert(lua_gettop(L) == 1);
 				/* Encode remaining fields as usual */
 				for (uint32_t f = 2; f <= root.size; f++) {
 					lua_rawgeti(L, 1, f);
-					luamp_encode(L, cfg, opts, stream, -1);
+					luamp_encode(L, cfg, stream, -1);
 					lua_pop(L, 1);
 				}
 				return 1;
@@ -311,10 +310,10 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 			 *         { tuple/array, ..., { scalar }, ... }`
 			 */
 			mpstream_encode_array(stream, 1);
-			luamp_encode_r(L, cfg, opts, stream, &field, 0);
+			luamp_encode_r(L, cfg, stream, &field, 0);
 		} else {
 			/* `return { tuple/array, ..., tuple/array, ... }` */
-			luamp_encode_r(L, cfg, opts, stream, &field, 0);
+			luamp_encode_r(L, cfg, stream, &field, 0);
 		}
 		lua_pop(L, 1);
 		assert(lua_gettop(L) == 1);
@@ -455,7 +454,7 @@ encode_lua_call(lua_State *L)
 	struct luaL_serializer *cfg = get_call_serializer();
 	const int size = lua_gettop(L);
 	for (int i = 1; i <= size; ++i)
-		luamp_encode(L, cfg, NULL, ctx->stream, i);
+		luamp_encode(L, cfg, ctx->stream, i);
 	ctx->port->size = size;
 	mpstream_flush(ctx->stream);
 	return 0;
