@@ -49,7 +49,6 @@
 #include "mpstream/mpstream.h"
 #include "box/session.h"
 #include "box/iproto_features.h"
-#include "serializer_opts.h"
 
 /**
  * Handlers identifiers to obtain lua_Cfunction reference from
@@ -70,6 +69,28 @@ enum handlers {
 };
 
 static int execute_lua_refs[HANDLER_MAX];
+
+/**
+ * A copy of the default serializer with encode_error_as_ext option disabled.
+ * Changes to the default serializer are propagated via an update trigger.
+ * It is used for returning errors in the legacy format to clients that do
+ * not support the MP_ERROR MsgPack extension.
+ */
+static struct luaL_serializer call_serializer_no_error_ext;
+
+/**
+ * Returns a serializer that should be used for encoding CALL/EVAL result.
+ */
+static struct luaL_serializer *
+get_call_serializer(void)
+{
+	if (!iproto_features_test(&current_session()->meta.features,
+				  IPROTO_FEATURE_ERROR_EXTENSION)) {
+		return &call_serializer_no_error_ext;
+	} else {
+		return luaL_msgpack_default;
+	}
+}
 
 /**
  * A helper to find a Lua function by name and put it
@@ -188,8 +209,7 @@ static inline uint32_t
 luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 		     struct mpstream *stream)
 {
-	const struct serializer_opts *opts =
-		&current_session()->meta.serializer_opts;
+	const struct serializer_opts *opts = NULL;
 	int nrets = lua_gettop(L);
 	if (nrets == 0) {
 		return 0;
@@ -432,15 +452,10 @@ encode_lua_call(lua_State *L)
 	 *
 	 * TODO: forbid explicit yield from __serialize or __index here
 	 */
-	struct luaL_serializer *cfg = luaL_msgpack_default;
-	struct serializer_opts opts = { .error_marshaling_enabled = true };
-	if (!iproto_features_test(&current_session()->meta.features,
-				  IPROTO_FEATURE_ERROR_EXTENSION)) {
-		opts.error_marshaling_enabled = false;
-	}
+	struct luaL_serializer *cfg = get_call_serializer();
 	const int size = lua_gettop(L);
 	for (int i = 1; i <= size; ++i)
-		luamp_encode(L, cfg, &opts, ctx->stream, i);
+		luamp_encode(L, cfg, NULL, ctx->stream, i);
 	ctx->port->size = size;
 	mpstream_flush(ctx->stream);
 	return 0;
@@ -471,7 +486,7 @@ encode_lua_call_16(lua_State *L)
 	 *
 	 * TODO: forbid explicit yield from __serialize or __index here
 	 */
-	struct luaL_serializer *cfg = luaL_msgpack_default;
+	struct luaL_serializer *cfg = get_call_serializer();
 	ctx->port->size = luamp_encode_call_16(L, cfg, ctx->stream);
 	mpstream_flush(ctx->stream);
 	return 0;
@@ -1069,6 +1084,23 @@ lbox_func_new_or_delete(struct trigger *trigger, void *event)
 	return 0;
 }
 
+static void
+call_serializer_update_options(void)
+{
+	luaL_serializer_copy_options(&call_serializer_no_error_ext,
+				     luaL_msgpack_default);
+	call_serializer_no_error_ext.encode_error_as_ext = 0;
+}
+
+static int
+on_msgpack_serializer_update(struct trigger *trigger, void *event)
+{
+	(void)trigger;
+	(void)event;
+	call_serializer_update_options();
+	return 0;
+}
+
 static struct trigger on_alter_func_in_lua = {
 	RLIST_LINK_INITIALIZER, lbox_func_new_or_delete, NULL, NULL
 };
@@ -1083,6 +1115,12 @@ static const struct luaL_Reg boxlib_internal[] = {
 void
 box_lua_call_init(struct lua_State *L)
 {
+	call_serializer_update_options();
+	trigger_create(&call_serializer_no_error_ext.update_trigger,
+		       on_msgpack_serializer_update, NULL, NULL);
+	trigger_add(&luaL_msgpack_default->on_update,
+		    &call_serializer_no_error_ext.update_trigger);
+
 	luaL_register(L, "box.internal", boxlib_internal);
 	lua_pop(L, 1);
 	/*

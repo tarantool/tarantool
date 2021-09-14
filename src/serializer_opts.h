@@ -35,10 +35,4 @@
  * something in scope of one session.
  */
 struct serializer_opts {
-	/**
-	 * When enabled, error objects get their own MP_EXT
-	 * MessagePack type and therefore can be type-safely
-	 * transmitted over the network.
-	 */
-	bool error_marshaling_enabled;
 };
