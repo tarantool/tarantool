@@ -186,6 +186,8 @@ static inline uint32_t
 luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 		     struct mpstream *stream)
 {
+	const struct serializer_opts *opts =
+		&current_session()->meta.serializer_opts;
 	int nrets = lua_gettop(L);
 	if (nrets == 0) {
 		return 0;
@@ -210,11 +212,11 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 				 */
 				lua_pushvalue(L, i);
 				mpstream_encode_array(stream, 1);
-				luamp_encode_r(L, cfg, NULL, stream, &field, 0);
+				luamp_encode_r(L, cfg, opts, stream, &field, 0);
 				lua_pop(L, 1);
 			} else {
 				/* `return ..., array, ...` */
-				luamp_encode(L, cfg, NULL, stream, i);
+				luamp_encode(L, cfg, opts, stream, i);
 			}
 		}
 		return nrets;
@@ -239,7 +241,7 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 		 */
 		mpstream_encode_array(stream, 1);
 		assert(lua_gettop(L) == 1);
-		luamp_encode_r(L, cfg, NULL, stream, &root, 0);
+		luamp_encode_r(L, cfg, opts, stream, &root, 0);
 		return 1;
 	}
 
@@ -271,13 +273,13 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 				 * Encode the first field of tuple using
 				 * existing information from luaL_tofield
 				 */
-				luamp_encode_r(L, cfg, NULL, stream, &field, 0);
+				luamp_encode_r(L, cfg, opts, stream, &field, 0);
 				lua_pop(L, 1);
 				assert(lua_gettop(L) == 1);
 				/* Encode remaining fields as usual */
 				for (uint32_t f = 2; f <= root.size; f++) {
 					lua_rawgeti(L, 1, f);
-					luamp_encode(L, cfg, NULL, stream, -1);
+					luamp_encode(L, cfg, opts, stream, -1);
 					lua_pop(L, 1);
 				}
 				return 1;
@@ -287,10 +289,10 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 			 *         { tuple/array, ..., { scalar }, ... }`
 			 */
 			mpstream_encode_array(stream, 1);
-			luamp_encode_r(L, cfg, NULL, stream, &field, 0);
+			luamp_encode_r(L, cfg, opts, stream, &field, 0);
 		} else {
 			/* `return { tuple/array, ..., tuple/array, ... }` */
-			luamp_encode_r(L, cfg, NULL, stream, &field, 0);
+			luamp_encode_r(L, cfg, opts, stream, &field, 0);
 		}
 		lua_pop(L, 1);
 		assert(lua_gettop(L) == 1);
