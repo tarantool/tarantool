@@ -71,8 +71,8 @@ static void
 inject_iproto_stats(struct lua_State *L, struct iproto_stats *stats)
 {
 	inject_current_stat(L, "CONNECTIONS", stats->connections);
-	inject_current_stat(L, "REQUESTS", stats->requests);
 	inject_current_stat(L, "STREAMS", stats->streams);
+	inject_current_stat(L, "REQUESTS", stats->requests);
 }
 
 static void
@@ -179,13 +179,13 @@ lbox_stat_net_index(struct lua_State *L)
 		lua_pushstring(L, "current");
 		lua_pushnumber(L, stats.connections);
 		lua_rawset(L, -3);
-	} else if (strcmp(key, "REQUESTS") == 0) {
-		lua_pushstring(L, "current");
-		lua_pushnumber(L, stats.requests);
-		lua_rawset(L, -3);
 	} else if (strcmp(key, "STREAMS") == 0) {
 		lua_pushstring(L, "current");
 		lua_pushnumber(L, stats.streams);
+		lua_rawset(L, -3);
+	} else if (strcmp(key, "REQUESTS") == 0) {
+		lua_pushstring(L, "current");
+		lua_pushnumber(L, stats.requests);
 		lua_rawset(L, -3);
 	}
 	return 1;
@@ -198,7 +198,9 @@ lbox_stat_net_index(struct lua_State *L)
  *
  * - SENT (packets): total, rps;
  * - RECEIVED (packets): total, rps;
- * - CONNECTIONS: current.
+ * - CONNECTIONS: total, rps, current;
+ * - STREAMS: total, rps, current;
+ * - REQUESTS: total, rps, current.
  *
  * These fields have the following meaning:
  *
@@ -218,6 +220,9 @@ lbox_stat_net_call(struct lua_State *L)
 	return 1;
 }
 
+/**
+ * Same as `lbox_stat_net_index` but for thread with given id.
+ */
 static int
 lbox_stat_net_thread_index(struct lua_State *L)
 {
@@ -233,6 +238,9 @@ lbox_stat_net_thread_index(struct lua_State *L)
 	return 1;
 }
 
+/**
+ * Same as `lbox_stat_net_call` but for thread with given id.
+ */
 static int
 lbox_stat_net_thread_call(struct lua_State *L)
 {

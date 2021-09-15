@@ -2719,10 +2719,10 @@ iproto_thread_init(struct iproto_thread *iproto_thread)
 	if (iproto_thread->rmean == NULL) {
 		slab_cache_destroy(&iproto_thread->net_slabc);
 		diag_set(OutOfMemory, sizeof(struct rmean),
-			  "rmean_new", "struct rmean");
+			 "rmean_new", "struct rmean");
 		return -1;
 	}
-
+	rlist_create(&iproto_thread->stopped_connections);
 	return 0;
 }
 
@@ -2763,9 +2763,6 @@ iproto_init(int threads_count)
 			goto fail;
 		}
 		/* Create a pipe to "net" thread. */
-		iproto_thread->stopped_connections =
-			RLIST_HEAD_INITIALIZER(iproto_thread->
-					       stopped_connections);
 		char endpoint_name[ENDPOINT_NAME_MAX];
 		snprintf(endpoint_name, ENDPOINT_NAME_MAX, "net%u",
 			 iproto_thread->id);
