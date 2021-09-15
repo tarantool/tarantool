@@ -2824,13 +2824,8 @@ struct iproto_cfg_msg: public cbus_call_msg
 	/** Operation to execute in iproto thread. */
 	enum iproto_cfg_op op;
 	union {
-		/** statistic stucture */
-		struct {
-			size_t mem_used;
-			size_t connections;
-			size_t requests;
-			size_t streams;
-		};
+		/** Pointer to the statistic stucture. */
+		struct iproto_stats *stats;
 		/** Pointer to evio_service, used for bind */
 		struct evio_service *binary;
 
@@ -2862,15 +2857,16 @@ static void
 iproto_fill_stat(struct iproto_thread *iproto_thread,
 		 struct iproto_cfg_msg *cfg_msg)
 {
-	cfg_msg->mem_used =
+	assert(cfg_msg->stats != NULL);
+	cfg_msg->stats->mem_used =
 		slab_cache_used(&iproto_thread->net_cord.slabc) +
 		slab_cache_used(&iproto_thread->net_slabc);
-	cfg_msg->connections =
+	cfg_msg->stats->connections =
 		mempool_count(&iproto_thread->iproto_connection_pool);
-	cfg_msg->requests =
-		mempool_count(&iproto_thread->iproto_msg_pool);
-	cfg_msg->streams =
+	cfg_msg->stats->streams =
 		mempool_count(&iproto_thread->iproto_stream_pool);
+	cfg_msg->stats->requests =
+		mempool_count(&iproto_thread->iproto_msg_pool);
 }
 
 static int
@@ -2972,86 +2968,36 @@ iproto_listen(const char *uri)
 	return 0;
 }
 
-size_t
-iproto_mem_used(void)
+static void
+iproto_stats_add(struct iproto_stats *total_stats,
+		 struct iproto_stats *thread_stats)
 {
-	struct iproto_cfg_msg cfg_msg;
-	size_t mem = 0;
-	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_STAT);
-	for (int i = 0; i < iproto_threads_count; i++) {
-		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
-		mem += cfg_msg.mem_used;
-	}
-	return mem;
+	total_stats->mem_used += thread_stats->mem_used;
+	total_stats->connections += thread_stats->connections;
+	total_stats->streams += thread_stats->streams;
+	total_stats->requests += thread_stats->requests;
 }
 
-size_t
-iproto_connection_count(void)
+void
+iproto_stats_get(struct iproto_stats *stats)
 {
-	struct iproto_cfg_msg cfg_msg;
-	size_t count = 0;
-	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_STAT);
+	struct iproto_stats thread_stats;
+	memset(stats, 0, sizeof(iproto_stats));
 	for (int i = 0; i < iproto_threads_count; i++) {
-		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
-		count += cfg_msg.connections;
+		iproto_thread_stats_get(&thread_stats, i);
+		iproto_stats_add(stats, &thread_stats);
 	}
-	return count;
 }
 
-size_t
-iproto_thread_connection_count(int thread_id)
+void
+iproto_thread_stats_get(struct iproto_stats *stats, int thread_id)
 {
+	memset(stats, 0, sizeof(iproto_stats));
 	struct iproto_cfg_msg cfg_msg;
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_STAT);
 	assert(thread_id >= 0 && thread_id < iproto_threads_count);
+	cfg_msg.stats = stats;
 	iproto_do_cfg(&iproto_threads[thread_id], &cfg_msg);
-	return cfg_msg.connections;
-}
-
-size_t
-iproto_stream_count(void)
-{
-	struct iproto_cfg_msg cfg_msg;
-	size_t count = 0;
-	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_STAT);
-	for (int i = 0; i < iproto_threads_count; i++) {
-		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
-		count += cfg_msg.streams;
-	}
-	return count;
-}
-
-size_t
-iproto_thread_stream_count(int thread_id)
-{
-	struct iproto_cfg_msg cfg_msg;
-	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_STAT);
-	assert(thread_id >= 0 && thread_id < iproto_threads_count);
-	iproto_do_cfg(&iproto_threads[thread_id], &cfg_msg);
-	return cfg_msg.streams;
-}
-
-size_t
-iproto_request_count(void)
-{
-	struct iproto_cfg_msg cfg_msg;
-	size_t count = 0;
-	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_STAT);
-	for (int i = 0; i < iproto_threads_count; i++) {
-		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
-		count += cfg_msg.requests;
-	}
-	return count;
-}
-
-size_t
-iproto_thread_request_count(int thread_id)
-{
-	struct iproto_cfg_msg cfg_msg;
-	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_STAT);
-	assert(thread_id >= 0 && thread_id < iproto_threads_count);
-	iproto_do_cfg(&iproto_threads[thread_id], &cfg_msg);
-	return cfg_msg.requests;
 }
 
 void

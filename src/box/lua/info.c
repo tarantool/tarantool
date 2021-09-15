@@ -405,8 +405,10 @@ lbox_info_memory_call(struct lua_State *L)
 	luaL_pushuint64(L, stat.tx);
 	lua_settable(L, -3);
 
+	struct iproto_stats stats;
+	iproto_stats_get(&stats);
 	lua_pushstring(L, "net");
-	luaL_pushuint64(L, iproto_mem_used());
+	luaL_pushuint64(L, stats.mem_used);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "lua");

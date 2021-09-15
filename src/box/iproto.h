@@ -56,53 +56,32 @@ enum {
 	IPROTO_THREADS_MAX = 1000,
 };
 
+struct iproto_stats {
+	/** Size of memory used for storing network buffers. */
+	size_t mem_used;
+	/** Number of active iproto connections. */
+	size_t connections;
+	/** Number of active iproto streams. */
+	size_t streams;
+	/** Number of iproto requests in flight. */
+	size_t requests;
+};
+
 extern unsigned iproto_readahead;
 extern int iproto_threads_count;
 
 /**
- * Return size of memory used for storing network buffers.
+ * Return total iproto statistic.
  */
-size_t
-iproto_mem_used(void);
+void
+iproto_stats_get(struct iproto_stats *stats);
 
 /**
- * Return the number of active iproto connections.
+ * Return total iproto statistic for
+ * the thread with the given id.
  */
-size_t
-iproto_connection_count(void);
-
-/**
- * Return the number of active iproto connections
- * for the thread with the given id.
- */
-size_t
-iproto_thread_connection_count(int thread_id);
-
-/**
- * Return the number of active iproto streams.
- */
-size_t
-iproto_stream_count(void);
-
-/**
- * Return the number of active iproto streams
- * for the thread with the given id.
- */
-size_t
-iproto_thread_stream_count(int thread_id);
-
-/**
- * Return the number of iproto requests in flight.
- */
-size_t
-iproto_request_count(void);
-
-/**
- * Return the number of iproto requests in flight
- * for the thread with the given id.
- */
-size_t
-iproto_thread_request_count(int thread_id);
+void
+iproto_thread_stats_get(struct iproto_stats *stats, int thread_id);
 
 /**
  * Reset network statistics.
