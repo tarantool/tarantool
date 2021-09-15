@@ -65,6 +65,10 @@ struct iproto_stats {
 	size_t streams;
 	/** Number of iproto requests in flight. */
 	size_t requests;
+	/** Count of requests currently processing in tx thread. */
+	size_t requests_in_progress;
+	/** Count of requests currently pending in stream queue. */
+	size_t requests_in_stream_queue;
 };
 
 extern unsigned iproto_readahead;
