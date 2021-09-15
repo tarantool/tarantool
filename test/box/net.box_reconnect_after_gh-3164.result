@@ -10,6 +10,13 @@ test_run = require('test_run').new()
 net = require('net.box')
 ---
 ...
+-- TODO(gh-5081): Remove this once the bug is fixed.
+jit_enabled = jit.status()
+---
+...
+if jit_enabled then jit.off() end
+---
+...
 test_run:cmd("push filter 'peer_uuid: .*' to 'peer_uuid: <UUID>'")
 ---
 - true
@@ -131,4 +138,7 @@ collectgarbage('collect')
 weak.c
 ---
 - null
+...
+if jit_enabled then jit.on() end
+---
 ...
