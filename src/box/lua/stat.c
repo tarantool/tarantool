@@ -73,6 +73,10 @@ inject_iproto_stats(struct lua_State *L, struct iproto_stats *stats)
 	inject_current_stat(L, "CONNECTIONS", stats->connections);
 	inject_current_stat(L, "STREAMS", stats->streams);
 	inject_current_stat(L, "REQUESTS", stats->requests);
+	inject_current_stat(L, "REQUESTS_IN_PROGRESS",
+			    stats->requests_in_progress);
+	inject_current_stat(L, "REQUESTS_IN_STREAM_QUEUE",
+			    stats->requests_in_stream_queue);
 }
 
 static void
@@ -187,6 +191,14 @@ lbox_stat_net_index(struct lua_State *L)
 		lua_pushstring(L, "current");
 		lua_pushnumber(L, stats.requests);
 		lua_rawset(L, -3);
+	} else if (strcmp(key, "REQUESTS_IN_PROGRESS") == 0) {
+		lua_pushstring(L, "current");
+		lua_pushnumber(L, stats.requests_in_progress);
+		lua_rawset(L, -3);
+	} else if (strcmp(key, "REQUESTS_IN_STREAM_QUEUE") == 0) {
+		lua_pushstring(L, "current");
+		lua_pushnumber(L, stats.requests_in_stream_queue);
+		lua_rawset(L, -3);
 	}
 	return 1;
 }
@@ -200,7 +212,9 @@ lbox_stat_net_index(struct lua_State *L)
  * - RECEIVED (packets): total, rps;
  * - CONNECTIONS: total, rps, current;
  * - STREAMS: total, rps, current;
- * - REQUESTS: total, rps, current.
+ * - REQUESTS: total, rps, current;
+ * - REQUESTS_IN_PROGRESS: total, rps, current;
+ * - REQUESTS_IN_STREAM_QUEUE: total, rps, current.
  *
  * These fields have the following meaning:
  *
