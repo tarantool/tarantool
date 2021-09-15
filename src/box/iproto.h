@@ -52,7 +52,7 @@ enum {
 	 * processing stops until some new fibers are freed up.
 	 */
 	IPROTO_FIBER_POOL_SIZE_FACTOR = 5,
-	/** Maximum count of iproto threads */
+	/** Maximum count of iproto threads. */
 	IPROTO_THREADS_MAX = 1000,
 };
 
