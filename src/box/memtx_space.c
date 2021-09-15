@@ -1161,21 +1161,36 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
 	if (it == NULL)
 		return -1;
+	/*
+	 * If we insert a tuple during index being built, new tuple will or
+	 * will not be inserted in index depending on result of lexicographical
+	 * comparison with tuple which was inserted into new index last.
+	 * The problem is HASH index is unordered, so background
+	 * build will not work properly if primary key is HASH index.
+	 */
+	bool can_yield = pk->def->type != HASH;
 
 	if (txn_check_singlestatement(txn, "index build") != 0)
 		return -1;
 
 	struct memtx_engine *memtx = (struct memtx_engine *)src_space->engine;
 	struct memtx_ddl_state state;
-	state.index = new_index;
-	state.format = new_format;
-	state.cmp_def = pk->def->key_def;
-	state.rc = 0;
-	diag_create(&state.diag);
-
 	struct trigger on_replace;
-	trigger_create(&on_replace, memtx_build_on_replace, &state, NULL);
-	trigger_add(&src_space->on_replace, &on_replace);
+	/*
+	 * Create trigger and initialize ddl state
+	 * if build in background is enabled.
+	 */
+	if (can_yield) {
+		state.index = new_index;
+		state.format = new_format;
+		state.cmp_def = pk->def->key_def;
+		state.rc = 0;
+		diag_create(&state.diag);
+
+		trigger_create(&on_replace, memtx_build_on_replace, &state,
+			       NULL);
+		trigger_add(&src_space->on_replace, &on_replace);
+	}
 
 	/*
 	 * The index has to be built tuple by tuple, since
@@ -1214,6 +1229,12 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 		if (new_index->def->iid == 0)
 			tuple_ref(tuple);
 		/*
+		 * Do not build index in background
+		 * if the feature is disabled.
+		 */
+		if (!can_yield)
+			continue;
+		/*
 		 * Remember the latest inserted tuple to
 		 * avoid processing yet to be added tuples
 		 * in on_replace triggers.
@@ -1240,8 +1261,10 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 		}
 	}
 	iterator_delete(it);
-	diag_destroy(&state.diag);
-	trigger_clear(&on_replace);
+	if (can_yield) {
+		diag_destroy(&state.diag);
+		trigger_clear(&on_replace);
+	}
 	return rc;
 }
 
