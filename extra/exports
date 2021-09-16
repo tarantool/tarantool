@@ -152,6 +152,7 @@ decimal_from_string
 decimal_unpack
 error_ref
 error_set_prev
+error_unpack_unsafe
 error_unref
 exception_get_int
 exception_get_string

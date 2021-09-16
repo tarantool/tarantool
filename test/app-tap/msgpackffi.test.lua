@@ -115,9 +115,20 @@ local function test_other(test, s)
                  encode_max_depth = max_depth})
 end
 
+local function test_error(test, s)
+    test:plan(2)
+    local m = require('yaml').decode(
+        '!!binary x1gDgQCRhgCrQ2xpZW50RXJyb3ICAQHZL1tzdH' ..
+        'JpbmcgInMgPSBtc2dwYWNrLmVuY29kZShib3guZXJyb3Iub' ..
+        'mV3KDApKSJdA61Vbmtub3duIGVycm9yBAAFAA==')
+    local e = s.decode(m)
+    test:is(type(e), 'cdata', 'error type')
+    test:is(e.message, 'Unknown error', 'error message')
+end
+
 tap.test("msgpackffi", function(test)
     local serializer = require('msgpackffi')
-    test:plan(12)
+    test:plan(13)
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
     test:test("double", common.test_double, serializer)
@@ -132,4 +143,5 @@ tap.test("msgpackffi", function(test)
     test:test("offsets", test_offsets, serializer)
     test:test("other", test_other, serializer)
     test:test("decode_buffer", common.test_decode_buffer, serializer)
+    test:test("error", test_error, serializer)
 end)

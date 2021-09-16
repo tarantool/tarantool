@@ -36,6 +36,10 @@ decimal_t *
 decimal_unpack(const char **data, uint32_t len, decimal_t *dec);
 struct tt_uuid *
 uuid_unpack(const char **data, uint32_t len, struct tt_uuid *uuid);
+struct error *
+error_unpack_unsafe(const char **data);
+void
+error_unref(struct error *e);
 ]])
 
 local strict_alignment = (jit.arch == 'arm')
@@ -512,6 +516,20 @@ local ext_decoder = {
         local uuid = ffi.new("struct tt_uuid")
         builtin.uuid_unpack(data, len, uuid)
         return uuid
+    end,
+    -- MP_ERROR
+    [3] = function(data)
+        local err = builtin.error_unpack_unsafe(data)
+        if err ~= nil then
+            err._refs = err._refs + 1
+            -- From FFI it is returned as 'struct error *', which is
+            -- not considered equal to 'const struct error &', and is
+            -- is not accepted by functions like box.error(). Need to
+            -- cast explicitly.
+            err = ffi.cast('const struct error &', err)
+            err = ffi.gc(err, builtin.error_unref)
+        end
+        return err
     end,
 }
 
