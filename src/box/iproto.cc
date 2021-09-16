@@ -374,10 +374,10 @@ enum rmean_net_name {
 	IPROTO_CONNECTIONS,
 	IPROTO_REQUESTS,
 	IPROTO_STREAMS,
-	IPROTO_LAST,
+	RMEAN_NET_LAST,
 };
 
-const char *rmean_net_strings[IPROTO_LAST] = {
+const char *rmean_net_strings[RMEAN_NET_LAST] = {
 	"SENT",
 	"RECEIVED",
 	"CONNECTIONS",
@@ -2722,7 +2722,7 @@ iproto_thread_init(struct iproto_thread *iproto_thread)
 	iproto_thread_init_routes(iproto_thread);
 	slab_cache_create(&iproto_thread->net_slabc, &runtime);
 	/* Init statistics counter */
-	iproto_thread->rmean = rmean_new(rmean_net_strings, IPROTO_LAST);
+	iproto_thread->rmean = rmean_new(rmean_net_strings, RMEAN_NET_LAST);
 	if (iproto_thread->rmean == NULL) {
 		slab_cache_destroy(&iproto_thread->net_slabc);
 		diag_set(OutOfMemory, sizeof(struct rmean),
@@ -3050,7 +3050,7 @@ iproto_free(void)
 int
 iproto_rmean_foreach(void *cb, void *cb_ctx)
 {
-	for (size_t i = 0; i < IPROTO_LAST; i++) {
+	for (size_t i = 0; i < RMEAN_NET_LAST; i++) {
 		int64_t mean = 0;
 		int64_t total = 0;
 		for (int j = 0; j < iproto_threads_count; j++)  {
@@ -3071,7 +3071,7 @@ iproto_thread_rmean_foreach(int thread_id, void *cb, void *cb_ctx)
 	assert(thread_id >= 0 && thread_id < iproto_threads_count);
 
 	int rc = 0;
-	for (size_t i = 0; i < IPROTO_LAST; i++) {
+	for (size_t i = 0; i < RMEAN_NET_LAST; i++) {
 		int64_t mean = rmean_mean(iproto_threads[thread_id].rmean, i);
 		int64_t total = rmean_total(iproto_threads[thread_id].rmean, i);
 		if (((rmean_cb)cb)(rmean_net_strings[i], mean,
