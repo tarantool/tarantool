@@ -38,6 +38,7 @@
 #include "diag.h"
 #include "error.h"
 #include "errcode.h"
+#include "errinj.h"
 #include "fiber.h"
 #include "say.h"
 #include "trivia/util.h"
@@ -312,6 +313,10 @@ vy_quota_use(struct vy_quota *q, enum vy_quota_consumer_type type,
 		diag_set(OutOfMemory, size, "lsregion", "vinyl transaction");
 		return -1;
 	}
+
+	q->n_blocked++;
+	ERROR_INJECT_YIELD(ERRINJ_VY_QUOTA_DELAY);
+	q->n_blocked--;
 
 	/*
 	 * Proceed only if there is enough quota available *and*
