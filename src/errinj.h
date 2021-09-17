@@ -114,6 +114,7 @@ struct errinj {
 	_(ERRINJ_VY_LOG_FLUSH, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_LOG_FLUSH_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_POINT_ITER_WAIT, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_QUOTA_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_READ_PAGE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_READ_PAGE_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_READ_PAGE_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \

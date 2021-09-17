@@ -49,6 +49,7 @@ extern "C" {
 
 struct fiber;
 struct vy_lsm;
+struct vy_quota;
 struct vy_run_env;
 struct vy_worker;
 struct vy_scheduler;
@@ -152,6 +153,11 @@ struct vy_scheduler {
 	struct rlist *read_views;
 	/** Context needed for writing runs. */
 	struct vy_run_env *run_env;
+	/**
+	 * Memory quota. Used for accounting deferred DELETE statements
+	 * written to memory during compaction.
+	 */
+	struct vy_quota *quota;
 };
 
 /**
@@ -172,7 +178,8 @@ vy_scheduler_dump_in_progress(struct vy_scheduler *scheduler)
 void
 vy_scheduler_create(struct vy_scheduler *scheduler, int write_threads,
 		    vy_scheduler_dump_complete_f dump_complete_cb,
-		    struct vy_run_env *run_env, struct rlist *read_views);
+		    struct vy_run_env *run_env, struct rlist *read_views,
+		    struct vy_quota *quota);
 
 /**
  * Start a scheduler fiber.

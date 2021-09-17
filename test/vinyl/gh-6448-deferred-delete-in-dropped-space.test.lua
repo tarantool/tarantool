@@ -1,0 +1,42 @@
+test_run = require('test_run').new()
+
+test_run:cmd("setopt delimiter ';'")
+function create_space()
+    box.schema.space.create('test', {engine = 'vinyl', id = 9000})
+    box.space.test:create_index('pk', {run_count_per_level = 1})
+    box.space.test:create_index('sk', {parts = {2, 'unsigned'}, unique = false})
+end;
+function trigger_compaction()
+    box.space.test:replace{1, 1}
+    box.snapshot()
+    box.space.test:replace{1, 1000}
+    box.error.injection.set('ERRINJ_VY_QUOTA_DELAY', true)
+    box.snapshot()
+    test_run:wait_cond(function()
+        return box.stat.vinyl().regulator.blocked_writers > 0
+    end)
+end;
+function complete_compaction()
+    box.error.injection.set('ERRINJ_VY_QUOTA_DELAY', false)
+    test_run:wait_cond(function()
+        return box.stat.vinyl().scheduler.tasks_inprogress == 0
+    end)
+end;
+test_run:cmd("setopt delimiter ''");
+
+-- Drop the space while compaction is in progress. This must not crash.
+create_space()
+trigger_compaction()
+box.space.test:drop()
+complete_compaction()
+
+-- Drop the space and create a new one with the same id while compaction
+-- is in progress. Check that deferred DELETE statements generated for
+-- the dropped space do not spill out to the new space.
+create_space()
+trigger_compaction()
+box.space.test:drop()
+create_space()
+complete_compaction()
+box.space.test.index.sk:stat().memory.rows -- 0
+box.space.test:drop()

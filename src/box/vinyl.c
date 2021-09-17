@@ -2551,7 +2551,8 @@ vy_env_new(const char *path, size_t memory,
 	vy_mem_env_create(&e->mem_env, memory);
 	vy_scheduler_create(&e->scheduler, write_threads,
 			    vy_env_dump_complete_cb,
-			    &e->run_env, &e->xm->read_views);
+			    &e->run_env, &e->xm->read_views,
+			    &e->quota);
 
 	if (vy_lsm_env_create(&e->lsm_env, e->path,
 			      &e->scheduler.generation,
@@ -4463,13 +4464,6 @@ vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
 	 */
 	if (space->index_count <= 1)
 		return;
-	/*
-	 * Wait for memory quota if necessary before starting to
-	 * process the batch (we can't yield between statements).
-	 */
-	struct vy_env *env = vy_env(space->engine);
-	if (is_first_statement)
-		vy_quota_wait(&env->quota, VY_QUOTA_CONSUMER_COMPACTION);
 
 	/* Create the deferred DELETE statement. */
 	struct vy_lsm *pk = vy_lsm(space->index[0]);
@@ -4493,6 +4487,7 @@ vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
 
 	/* Insert the deferred DELETE into secondary indexes. */
 	int rc = 0;
+	struct vy_env *env = vy_env(space->engine);
 	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
 	const struct tuple *region_stmt = NULL;
 	for (uint32_t i = 1; i < space->index_count; i++) {

@@ -54,6 +54,7 @@
 #include "vy_lsm.h"
 #include "vy_log.h"
 #include "vy_mem.h"
+#include "vy_quota.h"
 #include "vy_range.h"
 #include "vy_run.h"
 #include "vy_write_iterator.h"
@@ -424,13 +425,15 @@ vy_worker_pool_put(struct vy_worker *worker)
 void
 vy_scheduler_create(struct vy_scheduler *scheduler, int write_threads,
 		    vy_scheduler_dump_complete_f dump_complete_cb,
-		    struct vy_run_env *run_env, struct rlist *read_views)
+		    struct vy_run_env *run_env, struct rlist *read_views,
+		    struct vy_quota *quota)
 {
 	memset(scheduler, 0, sizeof(*scheduler));
 
 	scheduler->dump_complete_cb = dump_complete_cb;
 	scheduler->read_views = read_views;
 	scheduler->run_env = run_env;
+	scheduler->quota = quota;
 
 	scheduler->scheduler_fiber = fiber_new("vinyl.scheduler",
 					       vy_scheduler_f);
@@ -870,8 +873,13 @@ vy_deferred_delete_batch_process_f(struct cmsg *cmsg)
 	struct vy_deferred_delete_batch *batch = container_of(cmsg,
 				struct vy_deferred_delete_batch, cmsg);
 	struct vy_task *task = batch->task;
-	struct vy_lsm *pk = task->lsm;
+	/*
+	 * Wait for memory quota if necessary before starting to
+	 * process the batch (we can't yield between statements).
+	 */
+	vy_quota_wait(task->scheduler->quota, VY_QUOTA_CONSUMER_COMPACTION);
 
+	struct vy_lsm *pk = task->lsm;
 	assert(pk->index_id == 0);
 	/*
 	 * A space can be dropped while a compaction task
