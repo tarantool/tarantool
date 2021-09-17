@@ -103,6 +103,7 @@ t
   - space
   - stat
   - tuple
+  - txn_id
   - unprepare
 ...
 t = nil

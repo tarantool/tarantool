@@ -1227,6 +1227,17 @@ s.index.sk:select()
 
 s:drop()
 
+-- https://github.com/tarantool/tarantool/issues/6396
+
+tx1:begin()
+tx1("tx1_id = box.txn_id()")
+tx2:begin()
+tx2("tx2_id = box.txn_id()")
+assert(tx1_id ~= tx2_id)
+tx2:commit()
+tx1("assert(tx1_id  == box.txn_id())")
+tx1:commit()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")

@@ -228,3 +228,26 @@ box.begin() box.on_commit(on_commit) box.commit()
 stmts
 
 s:drop()
+
+-- https://github.com/tarantool/tarantool/issues/6396
+
+assert(not box.txn_id())
+box.begin()
+tx1_id = box.txn_id()
+assert(type(tx1_id) == "number")
+assert(tx1_id == box.txn_id())
+box.commit()
+box.begin()
+tx2_id = box.txn_id()
+assert(type(tx2_id) == "number")
+assert(tx1_id ~= tx2_id)
+box.commit()
+box.begin()
+tx3_id = box.txn_id()
+assert(type(tx2_id) == "number")
+assert(tx3_id ~= tx1_id)
+assert(tx3_id ~= tx2_id)
+assert(tx3_id == box.txn_id())
+box.commit()
+assert(not box.txn_id())
+
