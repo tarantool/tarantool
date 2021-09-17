@@ -336,6 +336,14 @@ end
 
 box.is_in_txn = builtin.box_txn
 
+box.txn_id = function()
+    local id = builtin.box_txn_id()
+    if -1 == id then
+        return nil
+    end
+    return tonumber(id)
+end
+
 box.savepoint = function()
     local csavepoint = builtin.box_txn_savepoint()
     if csavepoint == nil then
