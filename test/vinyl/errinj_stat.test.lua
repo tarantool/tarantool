@@ -132,3 +132,37 @@ test_run:cmd("clear filter")
 test_run:cmd('switch default')
 test_run:cmd('stop server test')
 test_run:cmd('cleanup server test')
+test_run:cmd('delete server test')
+
+test_run:cmd("create server test with script='vinyl/low_quota.lua'")
+test_run:cmd("start server test with args='1048576'")
+test_run:cmd('switch test')
+
+fiber = require('fiber')
+errinj = box.error.injection
+
+--
+-- Check regulator.blocked_writers stat.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+box.stat.vinyl().regulator.blocked_writers == 0
+
+errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', true)
+pad = string.rep('x', box.cfg.vinyl_memory * 9 / 10)
+_ = s:insert{0, pad}
+pad = string.rep('x', box.cfg.vinyl_memory * 2 / 10)
+for i = 1, 5 do fiber.create(function() s:insert{i, pad} end) end
+box.stat.vinyl().regulator.blocked_writers == 5
+
+errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
+test_run:wait_cond(function()                                               \
+    return box.stat.vinyl().regulator.blocked_writers == 0                  \
+end)
+
+s:drop()
+
+test_run:cmd('switch default')
+test_run:cmd("stop server test")
+test_run:cmd("cleanup server test")
+test_run:cmd('delete server test')

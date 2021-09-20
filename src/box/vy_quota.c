@@ -224,6 +224,7 @@ vy_quota_create(struct vy_quota *q, size_t limit,
 		vy_quota_exceeded_f quota_exceeded_cb)
 {
 	q->is_enabled = false;
+	q->n_blocked = 0;
 	q->limit = limit;
 	q->used = 0;
 	q->too_long_threshold = TIMEOUT_INFINITY;
@@ -331,7 +332,9 @@ vy_quota_use(struct vy_quota *q, enum vy_quota_consumer_type type,
 		.ticket = ++q->wait_ticket,
 	};
 	rlist_add_tail_entry(&q->wait_queue[type], &wait_node, in_wait_queue);
+	q->n_blocked++;
 	bool timed_out = fiber_yield_timeout(timeout);
+	q->n_blocked--;
 	rlist_del_entry(&wait_node, in_wait_queue);
 
 	if (timed_out) {
