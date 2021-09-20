@@ -177,6 +177,8 @@ struct vy_quota_wait_node {
 struct vy_quota {
 	/** Set if the quota was enabled. */
 	bool is_enabled;
+	/** Number of consumers waiting for quota. */
+	int n_blocked;
 	/**
 	 * Memory limit. Once hit, new transactions are
 	 * throttled until memory is reclaimed.
