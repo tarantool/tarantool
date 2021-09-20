@@ -307,7 +307,8 @@ txn_begin(void)
 	memtx_tx_register_tx(txn);
 	txn->fiber = NULL;
 	fiber_set_txn(fiber(), txn);
-	/* fiber_on_yield is initialized by engine on demand */
+	trigger_create(&txn->fiber_on_yield, txn_on_yield, NULL, NULL);
+	trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
 	trigger_create(&txn->fiber_on_stop, txn_on_stop, NULL, NULL);
 	trigger_add(&fiber()->on_stop, &txn->fiber_on_stop);
 	/*
@@ -757,8 +758,7 @@ txn_prepare(struct txn *txn)
 	assert(rlist_empty(&txn->conflicted_by_list));
 
 	trigger_clear(&txn->fiber_on_stop);
-	if (!txn_has_flag(txn, TXN_CAN_YIELD))
-		trigger_clear(&txn->fiber_on_yield);
+	trigger_clear(&txn->fiber_on_yield);
 
 	txn->start_tm = ev_monotonic_now(loop());
 	txn->status = TXN_PREPARED;
@@ -986,8 +986,7 @@ txn_rollback(struct txn *txn)
 	assert(txn->signature != TXN_SIGNATURE_UNKNOWN);
 	txn->status = TXN_ABORTED;
 	trigger_clear(&txn->fiber_on_stop);
-	if (!txn_has_flag(txn, TXN_CAN_YIELD))
-		trigger_clear(&txn->fiber_on_yield);
+	trigger_clear(&txn->fiber_on_yield);
 	txn_complete_fail(txn);
 	fiber_set_txn(fiber(), NULL);
 }
@@ -1016,13 +1015,10 @@ txn_can_yield(struct txn *txn, bool set)
 {
 	assert(txn == in_txn());
 	bool could = txn_has_flag(txn, TXN_CAN_YIELD);
-	if (set && !could) {
+	if (set) {
 		txn_set_flags(txn, TXN_CAN_YIELD);
-		trigger_clear(&txn->fiber_on_yield);
-	} else if (!set && could) {
+	} else {
 		txn_clear_flags(txn, TXN_CAN_YIELD);
-		trigger_create(&txn->fiber_on_yield, txn_on_yield, NULL, NULL);
-		trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
 	}
 	return could;
 }
@@ -1255,9 +1251,10 @@ txn_on_yield(struct trigger *trigger, void *event)
 	(void) event;
 	struct txn *txn = in_txn();
 	assert(txn != NULL);
-	assert(!txn_has_flag(txn, TXN_CAN_YIELD));
-	txn_rollback_to_svp(txn, NULL);
-	txn_set_flags(txn, TXN_IS_ABORTED_BY_YIELD);
+	if (!txn_has_flag(txn, TXN_CAN_YIELD)) {
+		txn_rollback_to_svp(txn, NULL);
+		txn_set_flags(txn, TXN_IS_ABORTED_BY_YIELD);
+	}
 	return 0;
 }
 
@@ -1267,10 +1264,8 @@ txn_detach(void)
 	struct txn *txn = in_txn();
 	if (txn == NULL)
 		return NULL;
-	if (!txn_has_flag(txn, TXN_CAN_YIELD)) {
-		txn_on_yield(NULL, NULL);
-		trigger_clear(&txn->fiber_on_yield);
-	}
+	txn_on_yield(NULL, NULL);
+	trigger_clear(&txn->fiber_on_yield);
 	trigger_clear(&txn->fiber_on_stop);
 	fiber_set_txn(fiber(), NULL);
 	return txn;
@@ -1282,4 +1277,6 @@ txn_attach(struct txn *txn)
 	assert(txn != NULL);
 	assert(!in_txn());
 	fiber_set_txn(fiber(), txn);
+	trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
+	trigger_add(&fiber()->on_stop, &txn->fiber_on_stop);
 }
