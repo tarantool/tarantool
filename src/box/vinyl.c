@@ -261,6 +261,7 @@ vy_info_append_regulator(struct vy_env *env, struct info_handler *h)
 	info_append_int(h, "dump_watermark", r->dump_watermark);
 	info_append_int(h, "rate_limit", vy_quota_get_rate_limit(r->quota,
 							VY_QUOTA_CONSUMER_TX));
+	info_append_int(h, "blocked_writers", r->quota->n_blocked);
 	info_table_end(h); /* regulator */
 }
 
