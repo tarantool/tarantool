@@ -4104,7 +4104,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			}
 			if (func->def->language == FUNC_LANGUAGE_SQL_BUILTIN) {
 				struct sql_context *ctx =
-					sql_context_new(func, nFarg, coll);
+					sql_context_new(func, coll);
 				if (ctx == NULL) {
 					pParse->is_aborted = true;
 					return -1;

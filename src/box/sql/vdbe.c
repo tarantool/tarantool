@@ -1183,35 +1183,26 @@ case OP_SkipLoad: {
  * See also: AggStep, AggFinal
  */
 case OP_BuiltinFunction: {
-	int i;
 	int argc = pOp->p1;
 	sql_context *pCtx;
 
 	assert(pOp->p4type==P4_FUNCCTX);
 	pCtx = pOp->p4.pCtx;
 
-	/* If this function is inside of a trigger, the register array in aMem[]
-	 * might change from one evaluation to the next.  The next block of code
-	 * checks to see if the register array has changed, and if so it
-	 * reinitializes the relavant parts of the sql_context object
-	 */
 	pOut = vdbe_prepare_null_out(p, pOp->p3);
-	if (pCtx->pOut != pOut) {
+	if (pCtx->pOut != pOut)
 		pCtx->pOut = pOut;
-		for(i = 0; i < argc; ++i)
-			pCtx->argv[i] = &aMem[pOp->p2 + i];
-	}
 
 #ifdef SQL_DEBUG
-	for(i = 0; i < argc; i++) {
-		assert(memIsValid(pCtx->argv[i]));
-		REGISTER_TRACE(p, pOp->p2+i, pCtx->argv[i]);
+	for(int i = 0; i < argc; i++) {
+		assert(memIsValid(&aMem[pOp->p2 + i]));
+		REGISTER_TRACE(p, pOp->p2 + i, &aMem[pOp->p2 + i]);
 	}
 #endif
 	pCtx->is_aborted = false;
 	assert(pCtx->func->def->language == FUNC_LANGUAGE_SQL_BUILTIN);
 	struct func_sql_builtin *func = (struct func_sql_builtin *)pCtx->func;
-	func->call(pCtx, argc, pCtx->argv);
+	func->call(pCtx, argc, &aMem[pOp->p2]);
 
 	/* If the function returned an error, throw an exception */
 	if (pCtx->is_aborted)
@@ -4133,7 +4124,6 @@ case OP_DecrJumpZero: {      /* jump, in1 */
  * successors.
  */
 case OP_AggStep: {
-	int i;
 	int argc = pOp->p1;
 	sql_context *pCtx;
 	Mem *pMem;
@@ -4142,33 +4132,25 @@ case OP_AggStep: {
 	pCtx = pOp->p4.pCtx;
 	pMem = &aMem[pOp->p3];
 
-	/* If this function is inside of a trigger, the register array in aMem[]
-	 * might change from one evaluation to the next.  The next block of code
-	 * checks to see if the register array has changed, and if so it
-	 * reinitializes the relavant parts of the sql_context object
-	 */
-	if (pCtx->pOut != pMem) {
+	if (pCtx->pOut != pMem)
 		pCtx->pOut = pMem;
-		for(i = 0; i < argc; ++i)
-			pCtx->argv[i] = &aMem[pOp->p2 + i];
-	}
 
 #ifdef SQL_DEBUG
-	for(i = 0; i < argc; i++) {
-		assert(memIsValid(pCtx->argv[i]));
-		REGISTER_TRACE(p, pOp->p2+i, pCtx->argv[i]);
+	for(int i = 0; i < argc; i++) {
+		assert(memIsValid(&aMem[pOp->p2 + i]));
+		REGISTER_TRACE(p, pOp->p2 + i, &aMem[pOp->p2 + i]);
 	}
 #endif
 
 	pCtx->skipFlag = 0;
 	assert(pCtx->func->def->language == FUNC_LANGUAGE_SQL_BUILTIN);
 	struct func_sql_builtin *func = (struct func_sql_builtin *)pCtx->func;
-	func->call(pCtx, argc, pCtx->argv);
+	func->call(pCtx, argc, &aMem[pOp->p2]);
 	if (pCtx->is_aborted)
 		goto abort_due_to_error;
 	if (pCtx->skipFlag) {
 		assert(pOp[-1].opcode == OP_SkipLoad);
-		i = pOp[-1].p1;
+		int i = pOp[-1].p1;
 		if (i) mem_set_bool(&aMem[i], true);
 	}
 	break;

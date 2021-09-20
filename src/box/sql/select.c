@@ -5638,7 +5638,7 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 				regHit = ++pParse->nMem;
 			sqlVdbeAddOp1(v, OP_SkipLoad, regHit);
 		}
-		struct sql_context *ctx = sql_context_new(pF->func, nArg, coll);
+		struct sql_context *ctx = sql_context_new(pF->func, coll);
 		if (ctx == NULL) {
 			pParse->is_aborted = true;
 			return;
@@ -6750,12 +6750,9 @@ sql_expr_extract_select(struct Parse *parser, struct Select *select)
 }
 
 struct sql_context *
-sql_context_new(struct func *func, uint32_t argc, struct coll *coll)
+sql_context_new(struct func *func, struct coll *coll)
 {
-	uint32_t size = sizeof(struct sql_context);
-	if (argc > 1)
-		size += (argc - 1) * sizeof(struct Mem *);
-	struct sql_context *ctx = sqlDbMallocRawNN(sql_get(), size);
+	struct sql_context *ctx = sqlDbMallocRawNN(sql_get(), sizeof(*ctx));
 	if (ctx == NULL)
 		return NULL;
 	ctx->pOut = NULL;

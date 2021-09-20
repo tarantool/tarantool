@@ -474,8 +474,7 @@ sql_randomness(int N, void *P);
  * Return the number of affected rows in the last SQL statement.
  */
 void
-sql_row_count(struct sql_context *context, MAYBE_UNUSED int unused1,
-	      MAYBE_UNUSED sql_value **unused2);
+sql_row_count(struct sql_context *context, int argc, struct Mem *argv);
 
 int
 sql_column_count(sql_stmt * pStmt);
@@ -4116,7 +4115,7 @@ void sqlStrAccumReset(StrAccum *);
 void sqlSelectDestInit(SelectDest *, int, int, int);
 
 struct sql_context *
-sql_context_new(struct func *func, uint32_t argc, struct coll *coll);
+sql_context_new(struct func *func, struct coll *coll);
 
 void
 sql_context_delete(struct sql_context *ctx);
@@ -4355,7 +4354,7 @@ struct func_sql_builtin {
 	 * Access checks are redundant, because all SQL built-ins
 	 * are predefined and are executed on SQL privilege level.
 	 */
-	void (*call)(sql_context *ctx, int argc, sql_value **argv);
+	void (*call)(struct sql_context *ctx, int argc, struct Mem *argv);
 	/**
 	 * A VDBE-memory-compatible finalize method
 	 * (is valid only for aggregate function).
