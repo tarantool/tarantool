@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(19)
+test:plan(20)
 
 --!./tcltestrunner.lua
 -- 2007 May 15
@@ -296,46 +296,61 @@ test:do_test(
 test:do_test(
     "badutf-4.4",
     function()
-        return test:execsql2([[SELECT hex(CAST(TRIM(x'ff80' FROM ]]..
-                             [[x'808080f0808080ff') AS VARBINARY)) AS x]])
+        return test:execsql2([[
+            SELECT hex(TRIM(x'ff80' FROM x'808080f0808080ff')) AS x;
+        ]])
     end, {
         -- <badutf-4.4>
-        "X", "808080F0808080FF"
+        "X", "F0"
         -- </badutf-4.4>
     })
 
 test:do_test(
     "badutf-4.5",
     function()
-        return test:execsql2([[SELECT hex(CAST(TRIM(x'ff80' FROM ]]..
-                             [[x'ff8080f0808080ff') AS VARBINARY)) AS x]])
+        return test:execsql2([[
+            SELECT hex(TRIM(x'ff80' FROM x'ff8080f0808080ff')) AS x;
+        ]])
     end, {
         -- <badutf-4.5>
-        "X", "80F0808080FF"
+        "X", "F0"
         -- </badutf-4.5>
     })
 
 test:do_test(
     "badutf-4.6",
     function()
-        return test:execsql2([[SELECT hex(CAST(TRIM(x'ff80' FROM ]]..
-                             [[x'ff80f0808080ff') AS VARBINARY)) AS x]])
+        return test:execsql2([[
+            SELECT hex(TRIM(x'ff80' FROM x'ff80f0808080ff')) AS x;
+        ]])
     end, {
         -- <badutf-4.6>
-        "X", "F0808080FF"
+        "X", "F0"
         -- </badutf-4.6>
     })
 
 test:do_test(
     "badutf-4.7",
     function()
-        return test:execsql2([[SELECT hex(CAST(TRIM(x'ff8080' FROM ]]..
-                             [[x'ff80f0808080ff') AS VARBINARY)) AS x]])
+        return test:execsql2([[
+            SELECT hex(TRIM(x'ff8080' FROM x'ff80f0808080ff')) AS x;
+        ]])
     end, {
         -- <badutf-4.7>
-        "X", "FF80F0808080FF"
+        "X", "F0"
         -- </badutf-4.7>
     })
+
+-- gh-4145: Make sure that TRIM() properly work with VARBINARY.
+test:do_execsql_test(
+    "badutf-5",
+    [[
+        SELECT HEX(TRIM(x'ff1234' from x'1234125678123412'));
+    ]],
+    {
+        '5678'
+    }
+)
 
 --db2("close")
 
