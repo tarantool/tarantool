@@ -331,6 +331,18 @@ func_lower_upper(struct sql_context *ctx, int argc, struct Mem *argv)
 	mem_set_str_allocated(ctx->pOut, res, new_len);
 }
 
+/** Implementation of the NULLIF() function. */
+static void
+func_nullif(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	assert(argc == 2);
+	(void)argc;
+	if (mem_cmp_scalar(&argv[0], &argv[1], ctx->coll) == 0)
+		return;
+	if (mem_copy(ctx->pOut, &argv[0]) != 0)
+		ctx->is_aborted = true;
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -1193,20 +1205,6 @@ likeFunc(sql_context *context, int argc, struct Mem *argv)
 	sql_result_bool(context, res == MATCH);
 }
 
-/*
- * Implementation of the NULLIF(x,y) function.  The result is the first
- * argument if the arguments are different.  The result is NULL if the
- * arguments are equal to each other.
- */
-static void
-nullifFunc(struct sql_context *context, int argc, struct Mem *argv)
-{
-	(void)argc;
-	struct coll *pColl = context->coll;
-	if (mem_cmp_scalar(&argv[0], &argv[1], pColl) != 0)
-		sql_result_value(context, &argv[0]);
-}
-
 /**
  * Implementation of the version() function.  The result is the
  * version of the Tarantool that is running.
@@ -2003,7 +2001,7 @@ static struct sql_func_definition definitions[] = {
 	{"MIN", 1, {FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR, step_minmax, NULL},
 
 	{"NULLIF", 2, {FIELD_TYPE_ANY, FIELD_TYPE_ANY}, FIELD_TYPE_SCALAR,
-	 nullifFunc, NULL},
+	 func_nullif, NULL},
 	{"POSITION", 2, {FIELD_TYPE_STRING, FIELD_TYPE_STRING},
 	 FIELD_TYPE_INTEGER, position_func, NULL},
 	{"PRINTF", -1, {FIELD_TYPE_ANY}, FIELD_TYPE_STRING, printfFunc, 
