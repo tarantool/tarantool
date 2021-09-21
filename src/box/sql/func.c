@@ -232,6 +232,32 @@ step_group_concat(struct sql_context *ctx, int argc, struct Mem *argv)
 		ctx->is_aborted = true;
 }
 
+/** Implementations of the ABS() function. */
+static void
+func_abs_int(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	assert(argc == 1);
+	(void)argc;
+	struct Mem *arg = &argv[0];
+	if (mem_is_null(arg))
+		return;
+	assert(mem_is_int(arg));
+	uint64_t u = mem_is_uint(arg) ? arg->u.u : (uint64_t)-arg->u.i;
+	mem_set_uint(ctx->pOut, u);
+}
+
+static void
+func_abs_double(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	assert(argc == 1);
+	(void)argc;
+	struct Mem *arg = &argv[0];
+	if (mem_is_null(arg))
+		return;
+	assert(mem_is_double(arg));
+	mem_set_double(ctx->pOut, arg->u.r < 0 ? -arg->u.r : arg->u.r);
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -390,57 +416,6 @@ lengthFunc(struct sql_context *context, int argc, struct Mem *argv)
 		}
 	default:{
 			sql_result_null(context);
-			break;
-		}
-	}
-}
-
-/*
- * Implementation of the abs() function.
- *
- * IMP: R-23979-26855 The abs(X) function returns the absolute value of
- * the numeric argument X.
- */
-static void
-absFunc(struct sql_context *context, int argc, struct Mem *argv)
-{
-	assert(argc == 1);
-	UNUSED_PARAMETER(argc);
-	switch (sql_value_type(&argv[0])) {
-	case MP_UINT: {
-		sql_result_uint(context, mem_get_uint_unsafe(&argv[0]));
-		break;
-	}
-	case MP_INT: {
-		int64_t value = mem_get_int_unsafe(&argv[0]);
-		assert(value < 0);
-		sql_result_uint(context, -value);
-		break;
-	}
-	case MP_NIL:{
-			/* IMP: R-37434-19929 Abs(X) returns NULL if X is NULL. */
-			sql_result_null(context);
-			break;
-		}
-	case MP_BOOL:
-	case MP_BIN:
-	case MP_EXT:
-	case MP_ARRAY:
-	case MP_MAP: {
-		diag_set(ClientError, ER_INCONSISTENT_TYPES, "number",
-			 mem_str(&argv[0]));
-		context->is_aborted = true;
-		return;
-	}
-	default:{
-			/*
-			 * Abs(X) returns 0.0 if X is a string or blob
-			 * that cannot be converted to a numeric value.
-			 */
-			double rVal = mem_get_double_unsafe(&argv[0]);
-			if (rVal < 0)
-				rVal = -rVal;
-			sql_result_double(context, rVal);
 			break;
 		}
 	}
@@ -1930,8 +1905,10 @@ struct sql_func_definition {
  * function should be defined in succession.
  */
 static struct sql_func_definition definitions[] = {
-	{"ABS", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, absFunc, NULL},
-	{"ABS", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, absFunc, NULL},
+	{"ABS", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, func_abs_int,
+	 NULL},
+	{"ABS", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, func_abs_double,
+	 NULL},
 	{"AVG", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, step_avg, fin_avg},
 	{"AVG", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, step_avg, fin_avg},
 	{"CHAR", -1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_STRING, charFunc, NULL},
