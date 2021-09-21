@@ -278,6 +278,59 @@ func_char_length(struct sql_context *ctx, int argc, struct Mem *argv)
 	mem_set_uint(ctx->pOut, len);
 }
 
+/** Implementation of the UPPER() and LOWER() functions. */
+static void
+func_lower_upper(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	assert(argc == 1);
+	(void)argc;
+	struct Mem *arg = &argv[0];
+	if (mem_is_null(arg))
+		return;
+	assert(mem_is_str(arg) && arg->n >= 0);
+	if (arg->n == 0)
+		return mem_set_str0_static(ctx->pOut, "");
+	const char *str = arg->z;
+	int32_t len = arg->n;
+	struct sql *db = sql_get();
+	char *res = sqlDbMallocRawNN(db, len);
+	if (res == NULL) {
+		ctx->is_aborted = true;
+		return;
+	}
+	int32_t size = sqlDbMallocSize(db, res);
+	assert(size >= len);
+	UErrorCode status = U_ZERO_ERROR;
+	const char *locale = NULL;
+	if (ctx->coll != NULL && ctx->coll->type == COLL_TYPE_ICU) {
+		locale = ucol_getLocaleByType(ctx->coll->collator,
+					      ULOC_VALID_LOCALE, &status);
+	}
+	UCaseMap *cm = ucasemap_open(locale, 0, &status);
+	assert(cm != NULL);
+	assert(ctx->func->def->name[0] == 'U' ||
+	       ctx->func->def->name[0] == 'L');
+	bool is_upper = ctx->func->def->name[0] == 'U';
+	int32_t new_len =
+		is_upper ?
+		ucasemap_utf8ToUpper(cm, res, size, str, len, &status) :
+		ucasemap_utf8ToLower(cm, res, size, str, len, &status);
+	if (new_len > size) {
+		res = sqlDbRealloc(db, res, new_len);
+		if (db->mallocFailed != 0) {
+			ctx->is_aborted = true;
+			return;
+		}
+		status = U_ZERO_ERROR;
+		if (is_upper)
+			ucasemap_utf8ToUpper(cm, res, size, str, len, &status);
+		else
+			ucasemap_utf8ToLower(cm, res, size, str, len, &status);
+	}
+	ucasemap_close(cm);
+	mem_set_str_allocated(ctx->pOut, res, new_len);
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -790,67 +843,6 @@ contextMalloc(struct sql_context *context, i64 nByte)
 	}
 	return z;
 }
-
-/*
- * Implementation of the upper() and lower() SQL functions.
- */
-
-#define ICU_CASE_CONVERT(case_type)                                            \
-static void                                                                    \
-case_type##ICUFunc(sql_context *context, int argc, struct Mem *argv)           \
-{                                                                              \
-	char *z1;                                                              \
-	const char *z2;                                                        \
-	int n;                                                                 \
-	UNUSED_PARAMETER(argc);                                                \
-	if (mem_is_bin(&argv[0]) || mem_is_map(&argv[0]) ||                    \
-	    mem_is_array(&argv[0])) {                                          \
-		diag_set(ClientError, ER_INCONSISTENT_TYPES, "string",         \
-			 mem_str(&argv[0]));                                   \
-		context->is_aborted = true;                                    \
-		return;                                                        \
-	}                                                                      \
-	z2 = mem_as_str0(&argv[0]);                                            \
-	n = mem_len_unsafe(&argv[0]);                                          \
-	/*                                                                     \
-	 * Verify that the call to _bytes()                                    \
-	 * does not invalidate the _text() pointer.                            \
-	 */                                                                    \
-	assert(z2 == mem_as_str0(&argv[0]));                                   \
-	if (!z2)                                                               \
-		return;                                                        \
-	z1 = contextMalloc(context, ((i64) n) + 1);                            \
-	if (z1 == NULL) {                                                      \
-		context->is_aborted = true;                                    \
-		return;                                                        \
-	}                                                                      \
-	UErrorCode status = U_ZERO_ERROR;                                      \
-	struct coll *coll = context->coll;                                     \
-	const char *locale = NULL;                                             \
-	if (coll != NULL && coll->type == COLL_TYPE_ICU) {                     \
-		locale = ucol_getLocaleByType(coll->collator,                  \
-					      ULOC_VALID_LOCALE, &status);     \
-	}                                                                      \
-	UCaseMap *case_map = ucasemap_open(locale, 0, &status);                \
-	assert(case_map != NULL);                                              \
-	int len = ucasemap_utf8To##case_type(case_map, z1, n, z2, n, &status); \
-	if (len > n) {                                                         \
-		status = U_ZERO_ERROR;                                         \
-		sql_free(z1);                                              \
-		z1 = contextMalloc(context, ((i64) len) + 1);                  \
-		if (z1 == NULL) {                                              \
-			context->is_aborted = true;                            \
-			return;                                                \
-		}                                                              \
-		ucasemap_utf8To##case_type(case_map, z1, len, z2, n, &status); \
-	}                                                                      \
-	ucasemap_close(case_map);                                              \
-	sql_result_text(context, z1, len, sql_free);                   \
-}                                                                              \
-
-ICU_CASE_CONVERT(Lower);
-ICU_CASE_CONVERT(Upper);
-
 
 /*
  * Some functions like COALESCE() and IFNULL() and UNLIKELY() are implemented
@@ -1989,7 +1981,7 @@ static struct sql_func_definition definitions[] = {
 	 FIELD_TYPE_BOOLEAN, sql_builtin_stub, NULL},
 	{"LIKELY", 1, {FIELD_TYPE_ANY}, FIELD_TYPE_BOOLEAN, sql_builtin_stub,
 	 NULL},
-	{"LOWER", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, LowerICUFunc,
+	{"LOWER", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, func_lower_upper,
 	 NULL},
 
 	{"MAX", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, step_minmax, NULL},
@@ -2064,7 +2056,7 @@ static struct sql_func_definition definitions[] = {
 	 NULL},
 	{"UNLIKELY", 1, {FIELD_TYPE_ANY}, FIELD_TYPE_BOOLEAN, sql_builtin_stub,
 	 NULL},
-	{"UPPER", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, UpperICUFunc,
+	{"UPPER", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, func_lower_upper,
 	 NULL},
 	{"UUID", 0, {}, FIELD_TYPE_UUID, sql_func_uuid, NULL},
 	{"UUID", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_UUID, sql_func_uuid, NULL},
