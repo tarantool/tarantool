@@ -509,6 +509,70 @@ func_trim_str(struct sql_context *ctx, int argc, struct Mem *argv)
 		ctx->is_aborted = true;
 }
 
+/** Implementation of the POSITION() function. */
+static void
+func_position_octets(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	assert(argc == 2);
+	(void)argc;
+	if (mem_is_any_null(&argv[0], &argv[1]))
+		return;
+	assert(mem_is_bytes(&argv[0]) && mem_is_bytes(&argv[1]));
+
+	const char *key = argv[0].z;
+	const char *str = argv[1].z;
+	int key_size = argv[0].n;
+	int str_size = argv[1].n;
+	if (key_size <= 0)
+		return mem_set_uint(ctx->pOut, 1);
+	const char *pos = memmem(str, str_size, key, key_size);
+	return mem_set_uint(ctx->pOut, pos == NULL ? 0 : pos - str + 1);
+}
+
+static void
+func_position_characters(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	assert(argc == 2);
+	(void)argc;
+	if (mem_is_any_null(&argv[0], &argv[1]))
+		return;
+	assert(mem_is_str(&argv[0]) && mem_is_str(&argv[1]));
+
+	const char *key = argv[0].z;
+	const char *str = argv[1].z;
+	int key_size = argv[0].n;
+	int str_size = argv[1].n;
+	if (key_size <= 0)
+		return mem_set_uint(ctx->pOut, 1);
+
+	int key_end = 0;
+	int str_end = 0;
+	while (key_end < key_size && str_end < str_size) {
+		UChar32 c;
+		U8_NEXT((uint8_t *)key, key_end, key_size, c);
+		U8_NEXT((uint8_t *)str, str_end, str_size, c);
+	}
+	if (key_end < key_size)
+		return mem_set_uint(ctx->pOut, 0);
+
+	struct coll *coll = ctx->coll;
+	if (coll->cmp(key, key_size, str, str_end, coll) == 0)
+		return mem_set_uint(ctx->pOut, 1);
+
+	int i = 2;
+	int str_pos = 0;
+	while (str_end < str_size) {
+		UChar32 c;
+		U8_NEXT((uint8_t *)str, str_pos, str_size, c);
+		U8_NEXT((uint8_t *)str, str_end, str_size, c);
+		const char *s = str + str_pos;
+		if (coll->cmp(key, key_size, s, str_end - str_pos, coll) == 0)
+			return mem_set_uint(ctx->pOut, i);
+		++i;
+	}
+	return mem_set_uint(ctx->pOut, 0);
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -670,141 +734,6 @@ lengthFunc(struct sql_context *context, int argc, struct Mem *argv)
 			break;
 		}
 	}
-}
-
-/**
- * Implementation of the position() function.
- *
- * position(needle, haystack) finds the first occurrence of needle
- * in haystack and returns the number of previous characters
- * plus 1, or 0 if needle does not occur within haystack.
- *
- * If both haystack and needle are BLOBs, then the result is one
- * more than the number of bytes in haystack prior to the first
- * occurrence of needle, or 0 if needle never occurs in haystack.
- */
-static void
-position_func(struct sql_context *context, int argc, struct Mem *argv)
-{
-	UNUSED_PARAMETER(argc);
-	struct Mem *needle = &argv[0];
-	struct Mem *haystack = &argv[1];
-	enum mp_type needle_type = sql_value_type(needle);
-	enum mp_type haystack_type = sql_value_type(haystack);
-
-	if (haystack_type == MP_NIL || needle_type == MP_NIL)
-		return;
-	/*
-	 * Position function can be called only with string
-	 * or blob params.
-	 */
-	struct Mem *inconsistent_type_arg = NULL;
-	if (needle_type != MP_STR && needle_type != MP_BIN)
-		inconsistent_type_arg = needle;
-	if (haystack_type != MP_STR && haystack_type != MP_BIN)
-		inconsistent_type_arg = haystack;
-	if (inconsistent_type_arg != NULL) {
-		diag_set(ClientError, ER_INCONSISTENT_TYPES,
-			 "string or varbinary", mem_str(inconsistent_type_arg));
-		context->is_aborted = true;
-		return;
-	}
-	/*
-	 * Both params of Position function must be of the same
-	 * type.
-	 */
-	if (haystack_type != needle_type) {
-		diag_set(ClientError, ER_INCONSISTENT_TYPES,
-			 mem_type_to_str(needle), mem_str(haystack));
-		context->is_aborted = true;
-		return;
-	}
-
-	int n_needle_bytes = mem_len_unsafe(needle);
-	int n_haystack_bytes = mem_len_unsafe(haystack);
-	int position = 1;
-	if (n_needle_bytes > 0) {
-		const unsigned char *haystack_str;
-		const unsigned char *needle_str;
-		if (haystack_type == MP_BIN) {
-			needle_str = mem_as_bin(needle);
-			haystack_str = mem_as_bin(haystack);
-			assert(needle_str != NULL);
-			assert(haystack_str != NULL || n_haystack_bytes == 0);
-			/*
-			 * Naive implementation of substring
-			 * searching: matching time O(n * m).
-			 * Can be improved.
-			 */
-			while (n_needle_bytes <= n_haystack_bytes &&
-			       memcmp(haystack_str, needle_str, n_needle_bytes) != 0) {
-				position++;
-				n_haystack_bytes--;
-				haystack_str++;
-			}
-			if (n_needle_bytes > n_haystack_bytes)
-				position = 0;
-		} else {
-			/*
-			 * Code below handles not only simple
-			 * cases like position('a', 'bca'), but
-			 * also more complex ones:
-			 * position('a', 'bcá' COLLATE "unicode_ci")
-			 * To do so, we need to use comparison
-			 * window, which has constant character
-			 * size, but variable byte size.
-			 * Character size is equal to
-			 * needle char size.
-			 */
-			haystack_str = mem_as_ustr(haystack);
-			needle_str = mem_as_ustr(needle);
-
-			int n_needle_chars =
-				sql_utf8_char_count(needle_str, n_needle_bytes);
-			int n_haystack_chars =
-				sql_utf8_char_count(haystack_str,
-						    n_haystack_bytes);
-
-			if (n_haystack_chars < n_needle_chars) {
-				position = 0;
-				goto finish;
-			}
-			/*
-			 * Comparison window is determined by
-			 * beg_offset and end_offset. beg_offset
-			 * is offset in bytes from haystack
-			 * beginning to window beginning.
-			 * end_offset is offset in bytes from
-			 * haystack beginning to window end.
-			 */
-			int end_offset = 0;
-			for (int c = 0; c < n_needle_chars; c++) {
-				SQL_UTF8_FWD_1(haystack_str, end_offset,
-					       n_haystack_bytes);
-			}
-			int beg_offset = 0;
-			struct coll *coll = context->coll;
-			int c;
-			for (c = 0; c + n_needle_chars <= n_haystack_chars; c++) {
-				if (coll->cmp((const char *) haystack_str + beg_offset,
-					      end_offset - beg_offset,
-					      (const char *) needle_str,
-					      n_needle_bytes, coll) == 0)
-					goto finish;
-				position++;
-				/* Update offsets. */
-				SQL_UTF8_FWD_1(haystack_str, beg_offset,
-					       n_haystack_bytes);
-				SQL_UTF8_FWD_1(haystack_str, end_offset,
-					       n_haystack_bytes);
-			}
-			/* Needle was not found in the haystack. */
-			position = 0;
-		}
-	}
-finish:
-	assert(position >= 0);
-	sql_result_uint(context, position);
 }
 
 /*
@@ -1982,7 +1911,9 @@ static struct sql_func_definition definitions[] = {
 	{"NULLIF", 2, {FIELD_TYPE_ANY, FIELD_TYPE_ANY}, FIELD_TYPE_SCALAR,
 	 func_nullif, NULL},
 	{"POSITION", 2, {FIELD_TYPE_STRING, FIELD_TYPE_STRING},
-	 FIELD_TYPE_INTEGER, position_func, NULL},
+	 FIELD_TYPE_INTEGER, func_position_characters, NULL},
+	{"POSITION", 2, {FIELD_TYPE_VARBINARY, FIELD_TYPE_VARBINARY},
+	 FIELD_TYPE_INTEGER, func_position_octets, NULL},
 	{"PRINTF", -1, {FIELD_TYPE_ANY}, FIELD_TYPE_STRING, printfFunc, 
 	 NULL},
 	{"QUOTE", 1, {FIELD_TYPE_ANY}, FIELD_TYPE_STRING, quoteFunc, NULL},

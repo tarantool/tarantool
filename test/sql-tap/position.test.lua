@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(80)
+test:plan(81)
 
 test:do_test(
     "position-1.1",
@@ -305,130 +305,130 @@ test:do_test(
 test:do_test(
     "position-1.31",
     function()
-        return test:catchsql "SELECT position(x'01', x'0102030405');"
+        return test:execsql "SELECT position(x'01', x'0102030405');"
     end, {
         -- <position-1.31>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        1
         -- </position-1.31>
     })
 
 test:do_test(
     "position-1.32",
     function()
-        return test:catchsql "SELECT position(x'02', x'0102030405');"
+        return test:execsql "SELECT position(x'02', x'0102030405');"
     end, {
         -- <position-1.32>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        2
         -- </position-1.32>
     })
 
 test:do_test(
     "position-1.33",
     function()
-        return test:catchsql "SELECT position(x'03', x'0102030405');"
+        return test:execsql "SELECT position(x'03', x'0102030405');"
     end, {
         -- <position-1.33>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        3
         -- </position-1.33>
     })
 
 test:do_test(
     "position-1.34",
     function()
-        return test:catchsql "SELECT position(x'04', x'0102030405');"
+        return test:execsql "SELECT position(x'04', x'0102030405');"
     end, {
         -- <position-1.34>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        4
         -- </position-1.34>
     })
 
 test:do_test(
     "position-1.35",
     function()
-        return test:catchsql "SELECT position(x'05', x'0102030405');"
+        return test:execsql "SELECT position(x'05', x'0102030405');"
     end, {
         -- <position-1.35>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        5
         -- </position-1.35>
     })
 
 test:do_test(
     "position-1.36",
     function()
-        return test:catchsql "SELECT position(x'06', x'0102030405');"
+        return test:execsql "SELECT position(x'06', x'0102030405');"
     end, {
         -- <position-1.36>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        0
         -- </position-1.36>
     })
 
 test:do_test(
     "position-1.37",
     function()
-        return test:catchsql "SELECT position(x'0102030405', x'0102030405');"
+        return test:execsql "SELECT position(x'0102030405', x'0102030405');"
     end, {
         -- <position-1.37>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        1
         -- </position-1.37>
     })
 
 test:do_test(
     "position-1.38",
     function()
-        return test:catchsql "SELECT position(x'02030405', x'0102030405');"
+        return test:execsql "SELECT position(x'02030405', x'0102030405');"
     end, {
         -- <position-1.38>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        2
         -- </position-1.38>
     })
 
 test:do_test(
     "position-1.39",
     function()
-        return test:catchsql "SELECT position(x'030405', x'0102030405');"
+        return test:execsql "SELECT position(x'030405', x'0102030405');"
     end, {
         -- <position-1.39>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        3
         -- </position-1.39>
     })
 
 test:do_test(
     "position-1.40",
     function()
-        return test:catchsql "SELECT position(x'0405', x'0102030405');"
+        return test:execsql "SELECT position(x'0405', x'0102030405');"
     end, {
         -- <position-1.40>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        4
         -- </position-1.40>
     })
 
 test:do_test(
     "position-1.41",
     function()
-        return test:catchsql "SELECT position(x'0506', x'0102030405');"
+        return test:execsql "SELECT position(x'0506', x'0102030405');"
     end, {
         -- <position-1.41>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        0
         -- </position-1.41>
     })
 
 test:do_test(
     "position-1.42",
     function()
-        return test:catchsql "SELECT position(x'', x'0102030405');"
+        return test:execsql "SELECT position(x'', x'0102030405');"
     end, {
         -- <position-1.42>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        1
         -- </position-1.42>
     })
 
 test:do_test(
     "position-1.43",
     function()
-        return test:catchsql "SELECT position(x'', x'');"
+        return test:execsql "SELECT position(x'', x'');"
     end, {
         -- <position-1.43>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        1
         -- </position-1.43>
     })
 
@@ -571,40 +571,40 @@ test:do_test(
 test:do_test(
     "position-1.56.1",
     function()
-        return test:catchsql "SELECT position(x'79', x'78c3a4e282ac79');"
+        return test:execsql "SELECT position(x'79', x'78c3a4e282ac79');"
     end, {
         -- <position-1.56.1>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        7
         -- </position-1.56.1>
     })
 
 test:do_test(
     "position-1.56.2",
     function()
-        return test:catchsql "SELECT position(x'7a', x'78c3a4e282ac79');"
+        return test:execsql "SELECT position(x'7a', x'78c3a4e282ac79');"
     end, {
         -- <position-1.56.2>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        0
         -- </position-1.56.2>
     })
 
 test:do_test(
     "position-1.56.3",
     function()
-        return test:catchsql "SELECT position(x'78', x'78c3a4e282ac79');"
+        return test:execsql "SELECT position(x'78', x'78c3a4e282ac79');"
     end, {
         -- <position-1.56.3>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        1
         -- </position-1.56.3>
     })
 
 test:do_test(
     "position-1.56.3",
     function()
-        return test:catchsql "SELECT position(x'a4', x'78c3a4e282ac79');"
+        return test:execsql "SELECT position(x'a4', x'78c3a4e282ac79');"
     end, {
         -- <position-1.56.3>
-        1, "Failed to execute SQL statement: wrong arguments for function POSITION()"
+        3
         -- </position-1.56.3>
     })
 
@@ -855,6 +855,16 @@ test:do_catchsql_test(
         SELECT POSITION('Y' COLLATE "unicode_ci", s1 COLLATE "unicode") FROM test1;
     ]], {
         1, "Illegal mix of collations"
+    }
+)
+
+-- gh-4145: Make sure POSITION() can work with VARBINARY.
+test:do_execsql_test(
+    "position-2",
+    [[
+        SELECT POSITION(x'313233', x'30313231323334353132333435');
+    ]], {
+        4
     }
 )
 
