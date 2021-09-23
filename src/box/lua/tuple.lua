@@ -79,8 +79,13 @@ local tuple_encode = function(tmpbuf, obj)
     elseif is_tuple(obj) then
         encode_r(tmpbuf, obj, 1)
     elseif type(obj) == "table" then
-        encode_array(tmpbuf, #obj)
-        for i = 1, #obj, 1 do
+        local obj_size = #obj
+        if obj_size == 0 and not rawequal(next(obj), nil) then
+            -- dictionary cannot represent a tuple
+            return box.error(box.error.TUPLE_NOT_ARRAY)
+        end
+        encode_array(tmpbuf, obj_size)
+        for i = 1, obj_size, 1 do
             encode_r(tmpbuf, obj[i], 1)
         end
     else
