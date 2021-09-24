@@ -1,7 +1,6 @@
 -- net_box.lua (internal file)
 local log      = require('log')
 local ffi      = require('ffi')
-local buffer   = require('buffer')
 local socket   = require('socket')
 local fiber    = require('fiber')
 local msgpack  = require('msgpack')
@@ -205,12 +204,9 @@ local function create_transport(host, port, user, password, callback,
     local transport         = internal.new_transport()
 
     local worker_fiber
-    local send_buf          = buffer.ibuf(buffer.READAHEAD)
-    local recv_buf          = buffer.ibuf(buffer.READAHEAD)
     -- Flag indicates that connection is closing and waits until
     -- send buf became empty.
     local is_closing        = false
-    local on_send_buf_empty = fiber.cond() -- signaled when send_buf:size() == 0
 
     -- STATE SWITCHING --
     local function set_state(new_state, new_errno, new_error)
@@ -221,9 +217,6 @@ local function create_transport(host, port, user, password, callback,
         state_cond:broadcast()
         if state == 'error' or state == 'error_reconnect' or
            state == 'closed' then
-            send_buf:recycle()
-            recv_buf:recycle()
-            on_send_buf_empty:broadcast()
             transport:reset(box.error.new({code = new_errno,
                                            reason = new_error}))
         end
@@ -293,9 +286,7 @@ local function create_transport(host, port, user, password, callback,
             -- Here we are waiting until send buf became empty:
             -- it is necessary to ensure that all requests are
             -- sent before the connection is closed.
-            while (send_buf:size() ~= 0) do
-                on_send_buf_empty:wait()
-            end
+            transport:wait_all_sent()
             is_closing = false
             -- While we were waiting for the send buffer to be
             -- empty, the state could change.
@@ -337,9 +328,9 @@ local function create_transport(host, port, user, password, callback,
         if err then
             return nil, err
         end
-        return perform_async_request_impl(transport, send_buf, buffer,
-                                          skip_header, method, on_push,
-                                          on_push_ctx, format, stream_id, ...)
+        return perform_async_request_impl(transport, buffer, skip_header,
+                                          method, on_push, on_push_ctx, format,
+                                          stream_id, ...)
     end
 
     --
@@ -354,9 +345,9 @@ local function create_transport(host, port, user, password, callback,
         if err then
             return nil, err
         end
-        return perform_request_impl(timeout, transport, send_buf, buffer,
-                                    skip_header, method, on_push, on_push_ctx,
-                                    format, stream_id, ...)
+        return perform_request_impl(timeout, transport, buffer, skip_header,
+                                    method, on_push, on_push_ctx, format,
+                                    stream_id, ...)
     end
 
     -- PROTOCOL STATE MACHINE (WORKER FIBER) --
@@ -397,8 +388,7 @@ local function create_transport(host, port, user, password, callback,
     console_setup_sm = function()
         log.warn("Netbox text protocol support is deprecated since 1.10, "..
                  "please use require('console').connect() instead")
-        local err = internal.console_setup(sock:fd(), send_buf,
-                                           on_send_buf_empty, recv_buf)
+        local err = internal.console_setup(transport, sock:fd())
         if err then
             return error_sm(err.code, err.message)
         end
@@ -407,16 +397,13 @@ local function create_transport(host, port, user, password, callback,
     end
 
     console_sm = function()
-        local err = internal.console_loop(transport, sock:fd(),
-                                          send_buf, on_send_buf_empty,
-                                          recv_buf)
+        local err = internal.console_loop(transport, sock:fd())
         return error_sm(err.code, err.message)
     end
 
     iproto_setup_sm = function()
-        local version, features = internal.iproto_id(
-            greeting.version_id, transport, sock:fd(), send_buf,
-            on_send_buf_empty, recv_buf)
+        local version, features = internal.iproto_id(greeting.version_id,
+                                                     transport, sock:fd())
         if not version then
             local err = features
             return error_sm(err.code, err.message)
@@ -434,9 +421,8 @@ local function create_transport(host, port, user, password, callback,
             set_state('fetch_schema')
             return iproto_schema_sm()
         end
-        local schema_version, err = internal.iproto_auth(
-            user, password, salt, transport, sock:fd(),
-            send_buf, on_send_buf_empty, recv_buf)
+        local schema_version, err = internal.iproto_auth(user, password, salt,
+                                                         transport, sock:fd())
         if not schema_version then
             return error_sm(err.code, err.message)
         end
@@ -450,8 +436,7 @@ local function create_transport(host, port, user, password, callback,
             return iproto_sm(schema_version)
         end
         local schema_version, schema = internal.iproto_schema(
-            greeting.version_id, transport, sock:fd(), send_buf,
-            on_send_buf_empty, recv_buf)
+            greeting.version_id, transport, sock:fd())
         if not schema_version then
             local err = schema
             return error_sm(err.code, err.message)
@@ -463,9 +448,8 @@ local function create_transport(host, port, user, password, callback,
     end
 
     iproto_sm = function(schema_version)
-        local schema_version, err = internal.iproto_loop(
-            schema_version, transport, sock:fd(),
-            send_buf, on_send_buf_empty, recv_buf)
+        local schema_version, err = internal.iproto_loop(schema_version,
+                                                         transport, sock:fd())
         if not schema_version then
             return error_sm(err.code, err.message)
         end
