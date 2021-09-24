@@ -195,14 +195,14 @@ local function create_transport(host, port, user, password, callback,
     local last_error
     local state_cond        = fiber.cond() -- signaled when the state changes
 
-    -- The registry stores requests that are currently 'in flight'
+    -- The transport stores requests that are currently 'in flight'
     -- for this connection.
     -- Async request can not be timed out completely. Instead a
     -- user must decide when he does not want to wait for
     -- response anymore.
     -- Sync requests are implemented as async call + immediate
     -- wait for a result.
-    local requests          = internal.new_registry()
+    local transport         = internal.new_transport()
 
     local worker_fiber
     local send_buf          = buffer.ibuf(buffer.READAHEAD)
@@ -221,8 +221,8 @@ local function create_transport(host, port, user, password, callback,
         state_cond:broadcast()
         if state == 'error' or state == 'error_reconnect' or
            state == 'closed' then
-            requests:reset(box.error.new({code = new_errno,
-                                          reason = new_error}))
+            transport:reset(box.error.new({code = new_errno,
+                                           reason = new_error}))
         end
     end
 
@@ -340,7 +340,7 @@ local function create_transport(host, port, user, password, callback,
         if err then
             return nil, err
         end
-        return perform_async_request_impl(requests, send_buf, buffer,
+        return perform_async_request_impl(transport, send_buf, buffer,
                                           skip_header, method, on_push,
                                           on_push_ctx, format, stream_id, ...)
     end
@@ -357,7 +357,7 @@ local function create_transport(host, port, user, password, callback,
         if err then
             return nil, err
         end
-        return perform_request_impl(timeout, requests, send_buf, buffer,
+        return perform_request_impl(timeout, transport, send_buf, buffer,
                                     skip_header, method, on_push, on_push_ctx,
                                     format, stream_id, ...)
     end
@@ -410,7 +410,7 @@ local function create_transport(host, port, user, password, callback,
     end
 
     console_sm = function()
-        local err = internal.console_loop(requests, sock:fd(),
+        local err = internal.console_loop(transport, sock:fd(),
                                           send_buf, on_send_buf_empty,
                                           recv_buf)
         return error_sm(err.code, err.message)
@@ -418,7 +418,7 @@ local function create_transport(host, port, user, password, callback,
 
     iproto_setup_sm = function()
         local version, features = internal.iproto_id(
-            greeting.version_id, requests, sock:fd(), send_buf,
+            greeting.version_id, transport, sock:fd(), send_buf,
             on_send_buf_empty, recv_buf)
         if not version then
             local err = features
@@ -438,7 +438,7 @@ local function create_transport(host, port, user, password, callback,
             return iproto_schema_sm()
         end
         local schema_version, err = internal.iproto_auth(
-            user, password, salt, requests, sock:fd(),
+            user, password, salt, transport, sock:fd(),
             send_buf, on_send_buf_empty, recv_buf)
         if not schema_version then
             return error_sm(err.code, err.message)
@@ -453,7 +453,7 @@ local function create_transport(host, port, user, password, callback,
             return iproto_sm(schema_version)
         end
         local schema_version, schema = internal.iproto_schema(
-            greeting.version_id, requests, sock:fd(), send_buf,
+            greeting.version_id, transport, sock:fd(), send_buf,
             on_send_buf_empty, recv_buf)
         if not schema_version then
             local err = schema
@@ -467,7 +467,7 @@ local function create_transport(host, port, user, password, callback,
 
     iproto_sm = function(schema_version)
         local schema_version, err = internal.iproto_loop(
-            schema_version, requests, sock:fd(),
+            schema_version, transport, sock:fd(),
             send_buf, on_send_buf_empty, recv_buf)
         if not schema_version then
             return error_sm(err.code, err.message)

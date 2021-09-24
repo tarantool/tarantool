@@ -96,7 +96,7 @@ enum netbox_method {
 	netbox_method_MAX
 };
 
-struct netbox_registry {
+struct netbox_transport {
 	/** Next request id. */
 	uint64_t next_sync;
 	/** sync -> netbox_request */
@@ -107,14 +107,14 @@ struct netbox_request {
 	enum netbox_method method;
 	/**
 	 * Unique identifier needed for matching the request with its response.
-	 * Used as a key in the registry.
+	 * Used as a key in netbox_transport::requests.
 	 */
 	uint64_t sync;
 	/**
-	 * The registry this request belongs to or NULL if the request has been
-	 * completed.
+	 * The transport this request belongs to or NULL if the request has
+	 * been completed.
 	 */
-	struct netbox_registry *registry;
+	struct netbox_transport *transport;
 	/** Format used for decoding the response (ref incremented). */
 	struct tuple_format *format;
 	/** Signaled when the response is received. */
@@ -162,7 +162,7 @@ struct netbox_request {
 	struct error *error;
 };
 
-static const char netbox_registry_typename[] = "net.box.registry";
+static const char netbox_transport_typename[] = "net.box.transport";
 static const char netbox_request_typename[] = "net.box.request";
 
 /**
@@ -182,7 +182,7 @@ mpstream_error_handler(void *error_ctx)
 static void
 netbox_request_destroy(struct netbox_request *request)
 {
-	assert(request->registry == NULL);
+	assert(request->transport == NULL);
 	if (request->format != NULL)
 		tuple_format_unref(request->format);
 	fiber_cond_destroy(&request->cond);
@@ -196,22 +196,22 @@ netbox_request_destroy(struct netbox_request *request)
 }
 
 /**
- * Adds a request to a registry. There must not be a request with the same id
- * (sync) in the registry. Returns -1 if out of memory.
+ * Adds a request to a transport. There must not be a request with the same id
+ * (sync) in the transport. Returns -1 if out of memory.
  */
 static int
 netbox_request_register(struct netbox_request *request,
-			struct netbox_registry *registry)
+			struct netbox_transport *transport)
 {
-	struct mh_i64ptr_t *h = registry->requests;
+	struct mh_i64ptr_t *h = transport->requests;
 	struct mh_i64ptr_node_t node = { request->sync, request };
 	struct mh_i64ptr_node_t *old_node = NULL;
 	if (mh_i64ptr_put(h, &node, &old_node, NULL) == mh_end(h)) {
-		diag_set(OutOfMemory, 0, "mhash", "netbox_registry");
+		diag_set(OutOfMemory, 0, "mhash", "netbox_transport");
 		return -1;
 	}
 	assert(old_node == NULL);
-	request->registry = registry;
+	request->transport = transport;
 	return 0;
 }
 
@@ -222,11 +222,11 @@ netbox_request_register(struct netbox_request *request,
 static void
 netbox_request_unregister(struct netbox_request *request)
 {
-	struct netbox_registry *registry = request->registry;
-	if (registry == NULL)
+	struct netbox_transport *transport = request->transport;
+	if (transport == NULL)
 		return;
-	request->registry = NULL;
-	struct mh_i64ptr_t *h = registry->requests;
+	request->transport = NULL;
+	struct mh_i64ptr_t *h = transport->requests;
 	mh_int_t k = mh_i64ptr_find(h, request->sync, NULL);
 	assert(k != mh_end(h));
 	assert(mh_i64ptr_node(h, k)->val == request);
@@ -236,7 +236,7 @@ netbox_request_unregister(struct netbox_request *request)
 static inline bool
 netbox_request_is_ready(const struct netbox_request *request)
 {
-	return request->registry == NULL;
+	return request->transport == NULL;
 }
 
 static inline void
@@ -305,21 +305,21 @@ netbox_request_push_result(struct netbox_request *request, struct lua_State *L)
 }
 
 static int
-netbox_registry_create(struct netbox_registry *registry)
+netbox_transport_create(struct netbox_transport *transport)
 {
-	registry->next_sync = 1;
-	registry->requests = mh_i64ptr_new();
-	if (registry->requests == NULL) {
-		diag_set(OutOfMemory, 0, "mhash", "netbox_registry");
+	transport->next_sync = 1;
+	transport->requests = mh_i64ptr_new();
+	if (transport->requests == NULL) {
+		diag_set(OutOfMemory, 0, "mhash", "netbox_transport");
 		return -1;
 	}
 	return 0;
 }
 
 static void
-netbox_registry_destroy(struct netbox_registry *registry)
+netbox_transport_destroy(struct netbox_transport *transport)
 {
-	struct mh_i64ptr_t *h = registry->requests;
+	struct mh_i64ptr_t *h = transport->requests;
 	assert(mh_size(h) == 0);
 	mh_i64ptr_delete(h);
 }
@@ -328,9 +328,10 @@ netbox_registry_destroy(struct netbox_registry *registry)
  * Looks up a request by id (sync). Returns NULL if not found.
  */
 static inline struct netbox_request *
-netbox_registry_lookup(struct netbox_registry *registry, uint64_t sync)
+netbox_transport_lookup_request(struct netbox_transport *transport,
+				uint64_t sync)
 {
-	struct mh_i64ptr_t *h = registry->requests;
+	struct mh_i64ptr_t *h = transport->requests;
 	mh_int_t k = mh_i64ptr_find(h, sync, NULL);
 	if (k == mh_end(h))
 		return NULL;
@@ -338,17 +339,17 @@ netbox_registry_lookup(struct netbox_registry *registry, uint64_t sync)
 }
 
 /**
- * Completes all requests in the registry with the given error and cleans up
+ * Completes all requests in the transport with the given error and cleans up
  * the hash. Called when the associated connection is closed.
  */
 static void
-netbox_registry_reset(struct netbox_registry *registry, struct error *error)
+netbox_transport_reset(struct netbox_transport *transport, struct error *error)
 {
-	struct mh_i64ptr_t *h = registry->requests;
+	struct mh_i64ptr_t *h = transport->requests;
 	mh_int_t k;
 	mh_foreach(h, k) {
 		struct netbox_request *request = mh_i64ptr_node(h, k)->val;
-		request->registry = NULL;
+		request->transport = NULL;
 		netbox_request_set_error(request, error);
 		netbox_request_signal(request);
 	}
@@ -1461,26 +1462,26 @@ netbox_decode_method(struct lua_State *L, enum netbox_method method,
 	method_decoder[method](L, data, data_end, format);
 }
 
-static inline struct netbox_registry *
-luaT_check_netbox_registry(struct lua_State *L, int idx)
+static inline struct netbox_transport *
+luaT_check_netbox_transport(struct lua_State *L, int idx)
 {
-	return luaL_checkudata(L, idx, netbox_registry_typename);
+	return luaL_checkudata(L, idx, netbox_transport_typename);
 }
 
 static int
-luaT_netbox_registry_gc(struct lua_State *L)
+luaT_netbox_transport_gc(struct lua_State *L)
 {
-	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
-	netbox_registry_destroy(registry);
+	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
+	netbox_transport_destroy(transport);
 	return 0;
 }
 
 static int
-luaT_netbox_registry_reset(struct lua_State *L)
+luaT_netbox_transport_reset(struct lua_State *L)
 {
-	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
+	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
 	struct error *error = luaL_checkerror(L, 2);
-	netbox_registry_reset(registry, error);
+	netbox_transport_reset(transport, error);
 	return 0;
 }
 
@@ -1614,7 +1615,7 @@ luaT_netbox_request_wait_result(struct lua_State *L)
 
 /**
  * Makes the connection forget about the given request. When the response is
- * received, it will be ignored. It reduces the size of the request registry
+ * received, it will be ignored. It reduces the size of the requests hash table
  * speeding up other requests.
  */
 static int
@@ -1744,16 +1745,16 @@ luaT_netbox_request_pairs(struct lua_State *L)
 }
 
 /**
- * Creates a request registry object (userdata) and pushes it to Lua stack.
+ * Creates a netbox transport object (userdata) and pushes it to Lua stack.
  */
 static int
-netbox_new_registry(struct lua_State *L)
+netbox_new_transport(struct lua_State *L)
 {
-	struct netbox_registry *registry = lua_newuserdata(
-		L, sizeof(*registry));
-	if (netbox_registry_create(registry) != 0)
+	struct netbox_transport *transport = lua_newuserdata(
+		L, sizeof(*transport));
+	if (netbox_transport_create(transport) != 0)
 		luaT_error(L);
-	luaL_getmetatable(L, netbox_registry_typename);
+	luaL_getmetatable(L, netbox_transport_typename);
 	lua_setmetatable(L, -2);
 	return 1;
 }
@@ -1763,7 +1764,7 @@ netbox_new_registry(struct lua_State *L)
  * ('future') that can be used for waiting for a response.
  *
  * Takes the following values from Lua stack starting at index idx:
- *  - requests: registry to register the new request with
+ *  - transport: transport to register the new request with
  *  - send_buf: buffer (ibuf) to write the encoded request to
  *  - buffer: buffer (ibuf) to write the result to or nil
  *  - skip_header: whether to skip header when writing the result to the buffer
@@ -1779,11 +1780,12 @@ netbox_make_request(struct lua_State *L, int idx,
 		    struct netbox_request *request)
 {
 	/* Encode and write the request to the send buffer. */
-	struct netbox_registry *registry = luaT_check_netbox_registry(L, idx);
+	struct netbox_transport *transport =
+		luaT_check_netbox_transport(L, idx);
 	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, idx + 1);
 	enum netbox_method method = lua_tointeger(L, idx + 4);
 	assert(method < netbox_method_MAX);
-	uint64_t sync = registry->next_sync++;
+	uint64_t sync = transport->next_sync++;
 	uint64_t stream_id = luaL_touint64(L, idx + 8);
 	netbox_encode_method(L, idx + 9, method, send_buf, sync, stream_id);
 
@@ -1807,7 +1809,7 @@ netbox_make_request(struct lua_State *L, int idx,
 	request->index_ref = LUA_NOREF;
 	request->result_ref = LUA_NOREF;
 	request->error = NULL;
-	if (netbox_request_register(request, registry) != 0) {
+	if (netbox_request_register(request, transport) != 0) {
 		netbox_request_destroy(request);
 		luaT_error(L);
 	}
@@ -1845,7 +1847,7 @@ netbox_perform_request(struct lua_State *L)
 }
 
 /**
- * Given a request registry and a response header, decodes the response and
+ * Given a netbox transport and a response header, decodes the response and
  * either completes the request or invokes the on-push trigger, depending on
  * the status.
  *
@@ -1854,11 +1856,11 @@ netbox_perform_request(struct lua_State *L)
  */
 static void
 netbox_dispatch_response_iproto(struct lua_State *L,
-				struct netbox_registry *registry,
+				struct netbox_transport *transport,
 				struct xrow_header *hdr)
 {
-	struct netbox_request *request = netbox_registry_lookup(registry,
-								hdr->sync);
+	struct netbox_request *request =
+		netbox_transport_lookup_request(transport, hdr->sync);
 	if (request == NULL) {
 		/* Nobody is waiting for the response. */
 		return;
@@ -1899,7 +1901,7 @@ netbox_dispatch_response_iproto(struct lua_State *L,
 		/*
 		 * We received the final response and pushed it to Lua stack.
 		 * Store a reference to it in the request, remove the request
-		 * from the registry, and wake up waiters.
+		 * from the hash table, and wake up waiters.
 		 */
 		netbox_request_set_result(request,
 					  luaL_ref(L, LUA_REGISTRYINDEX));
@@ -1916,7 +1918,7 @@ netbox_dispatch_response_iproto(struct lua_State *L,
 }
 
 /**
- * Given a request registry, request id (sync), and a response string, assigns
+ * Given a netbox transport, request id (sync), and a response string, assigns
  * the response to the request and completes it.
  *
  * Lua stack is used for temporarily storing the response string before getting
@@ -1924,11 +1926,12 @@ netbox_dispatch_response_iproto(struct lua_State *L,
  */
 static void
 netbox_dispatch_response_console(struct lua_State *L,
-				 struct netbox_registry *registry,
+				 struct netbox_transport *transport,
 				 uint64_t sync, const char *response,
 				 size_t response_len)
 {
-	struct netbox_request *request = netbox_registry_lookup(registry, sync);
+	struct netbox_request *request =
+		netbox_transport_lookup_request(transport, sync);
 	if (request == NULL) {
 		/* Nobody is waiting for the response. */
 		return;
@@ -1940,7 +1943,7 @@ netbox_dispatch_response_console(struct lua_State *L,
 
 /**
  * Performs a features request for an iproto connection.
- * Takes peer_version_id, request registry, socket fd, send_buf (ibuf),
+ * Takes peer_version_id, netbox transport, socket fd, send_buf (ibuf),
  * on_send_buf_empty (cond), recv_buf (ibuf).
  * Returns server version and features array on success.
  * If the server doesn't support IPROTO_ID, returns 0 and an empty array.
@@ -1950,7 +1953,7 @@ static int
 netbox_iproto_id(struct lua_State *L)
 {
 	uint32_t peer_version_id = lua_tointeger(L, 1);
-	struct netbox_registry *registry = luaT_check_netbox_registry(L, 2);
+	struct netbox_transport *transport = luaT_check_netbox_transport(L, 2);
 	int fd = lua_tointeger(L, 3);
 	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 4);
 	struct fiber_cond *on_send_buf_empty = luaT_checkfibercond(L, 5);
@@ -1961,7 +1964,7 @@ netbox_iproto_id(struct lua_State *L)
 	ERROR_INJECT(ERRINJ_NETBOX_DISABLE_ID, goto out);
 	if (peer_version_id < version_id(2, 10, 0))
 		goto unsupported;
-	if (netbox_encode_id(send_buf, registry->next_sync++) != 0)
+	if (netbox_encode_id(send_buf, transport->next_sync++) != 0)
 		goto error;
 	struct xrow_header hdr;
 	if (netbox_send_and_recv_iproto(fd, send_buf, on_send_buf_empty,
@@ -1996,7 +1999,7 @@ error:
 
 /**
  * Performs an authorization request for an iproto connection.
- * Takes user, password, salt, request registry, socket fd,
+ * Takes user, password, salt, netbox transport, socket fd,
  * send_buf (ibuf), recv_buf (ibuf).
  * Returns schema_version on success, nil and error on failure.
  */
@@ -2011,12 +2014,12 @@ netbox_iproto_auth(struct lua_State *L)
 	const char *salt = lua_tolstring(L, 3, &salt_len);
 	if (salt_len < SCRAMBLE_SIZE)
 		return luaL_error(L, "Invalid salt");
-	struct netbox_registry *registry = luaT_check_netbox_registry(L, 4);
+	struct netbox_transport *transport = luaT_check_netbox_transport(L, 4);
 	int fd = lua_tointeger(L, 5);
 	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 6);
 	struct fiber_cond *on_send_buf_empty = luaT_checkfibercond(L, 7);
 	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 8);
-	if (netbox_encode_auth(send_buf, registry->next_sync++, user, user_len,
+	if (netbox_encode_auth(send_buf, transport->next_sync++, user, user_len,
 			       password, password_len, salt) != 0) {
 		goto error;
 	}
@@ -2038,7 +2041,7 @@ error:
 /**
  * Fetches schema over an iproto connection. While waiting for the schema,
  * processes other requests in a loop, like netbox_iproto_loop().
- * Takes peer_version_id, request registry, socket fd, send_buf (ibuf),
+ * Takes peer_version_id, netbox transport, socket fd, send_buf (ibuf),
  * recv_buf (ibuf).
  * Returns schema_version and a table with the following fields:
  *   [VSPACE_ID] = <spaces>
@@ -2050,7 +2053,7 @@ static int
 netbox_iproto_schema(struct lua_State *L)
 {
 	uint32_t peer_version_id = lua_tointeger(L, 1);
-	struct netbox_registry *registry = luaT_check_netbox_registry(L, 2);
+	struct netbox_transport *transport = luaT_check_netbox_transport(L, 2);
 	int fd = lua_tointeger(L, 3);
 	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 4);
 	struct fiber_cond *on_send_buf_empty = luaT_checkfibercond(L, 5);
@@ -2059,17 +2062,17 @@ netbox_iproto_schema(struct lua_State *L)
 	bool peer_has_vcollation = peer_version_id >= version_id(2, 2, 1);
 restart:
 	lua_newtable(L);
-	uint64_t vspace_sync = registry->next_sync++;
+	uint64_t vspace_sync = transport->next_sync++;
 	if (netbox_encode_select_all(send_buf, vspace_sync,
 				     BOX_VSPACE_ID) != 0) {
 		return luaT_error(L);
 	}
-	uint64_t vindex_sync = registry->next_sync++;
+	uint64_t vindex_sync = transport->next_sync++;
 	if (netbox_encode_select_all(send_buf, vindex_sync,
 				     BOX_VINDEX_ID) != 0) {
 		return luaT_error(L);
 	}
-	uint64_t vcollation_sync = registry->next_sync++;
+	uint64_t vcollation_sync = transport->next_sync++;
 	if (peer_has_vcollation &&
 	    netbox_encode_select_all(send_buf, vcollation_sync,
 				     BOX_VCOLLATION_ID) != 0) {
@@ -2087,7 +2090,7 @@ restart:
 			luaL_testcancel(L);
 			return luaT_push_nil_and_error(L);
 		}
-		netbox_dispatch_response_iproto(L, registry, &hdr);
+		netbox_dispatch_response_iproto(L, transport, &hdr);
 		if (hdr.sync != vspace_sync &&
 		    hdr.sync != vindex_sync &&
 		    hdr.sync != vcollation_sync) {
@@ -2144,7 +2147,7 @@ restart:
 
 /**
  * Processes iproto requests in a loop until an error or a schema change.
- * Takes schema_version, request registry, socket fd, send_buf (ibuf),
+ * Takes schema_version, netbox transport, socket fd, send_buf (ibuf),
  * recv_buf (ibuf).
  * Returns schema_version if the loop was broken because of a schema change.
  * If the loop was broken by an error, returns nil and the error.
@@ -2153,7 +2156,7 @@ static int
 netbox_iproto_loop(struct lua_State *L)
 {
 	uint32_t schema_version = lua_tointeger(L, 1);
-	struct netbox_registry *registry = luaT_check_netbox_registry(L, 2);
+	struct netbox_transport *transport = luaT_check_netbox_transport(L, 2);
 	int fd = lua_tointeger(L, 3);
 	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 4);
 	struct fiber_cond *on_send_buf_empty = luaT_checkfibercond(L, 5);
@@ -2166,7 +2169,7 @@ netbox_iproto_loop(struct lua_State *L)
 			luaL_testcancel(L);
 			return luaT_push_nil_and_error(L);
 		}
-		netbox_dispatch_response_iproto(L, registry, &hdr);
+		netbox_dispatch_response_iproto(L, transport, &hdr);
 		if (hdr.schema_version > 0 &&
 		    hdr.schema_version != schema_version) {
 			lua_pushinteger(L, hdr.schema_version);
@@ -2216,18 +2219,18 @@ error:
 
 /**
  * Processes console requests in a loop until an error.
- * Takes request registry, socket fd, send_buf (ibuf), recv_buf (ibuf).
+ * Takes netbox transport, socket fd, send_buf (ibuf), recv_buf (ibuf).
  * Returns the error that broke the loop.
  */
 static int
 netbox_console_loop(struct lua_State *L)
 {
-	struct netbox_registry *registry = luaT_check_netbox_registry(L, 1);
+	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
 	int fd = lua_tointeger(L, 2);
 	struct ibuf *send_buf = (struct ibuf *)lua_topointer(L, 3);
 	struct fiber_cond *on_send_buf_empty = luaT_checkfibercond(L, 4);
 	struct ibuf *recv_buf = (struct ibuf *)lua_topointer(L, 5);
-	uint64_t sync = registry->next_sync;
+	uint64_t sync = transport->next_sync;
 	while (true) {
 		size_t response_len;
 		const char *response = netbox_send_and_recv_console(
@@ -2238,7 +2241,7 @@ netbox_console_loop(struct lua_State *L)
 			luaT_pusherror(L, box_error_last());
 			return 1;
 		}
-		netbox_dispatch_response_console(L, registry, sync++,
+		netbox_dispatch_response_console(L, transport, sync++,
 						 response, response_len);
 	}
 }
@@ -2257,12 +2260,12 @@ luaopen_net_box(struct lua_State *L)
 	lua_pushcfunction(L, luaT_netbox_request_iterator_next);
 	luaT_netbox_request_iterator_next_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
-	static const struct luaL_Reg netbox_registry_meta[] = {
-		{ "__gc",           luaT_netbox_registry_gc },
-		{ "reset",          luaT_netbox_registry_reset },
+	static const struct luaL_Reg netbox_transport_meta[] = {
+		{ "__gc",           luaT_netbox_transport_gc },
+		{ "reset",          luaT_netbox_transport_reset },
 		{ NULL, NULL }
 	};
-	luaL_register_type(L, netbox_registry_typename, netbox_registry_meta);
+	luaL_register_type(L, netbox_transport_typename, netbox_transport_meta);
 
 	static const struct luaL_Reg netbox_request_meta[] = {
 		{ "__gc",           luaT_netbox_request_gc },
@@ -2281,7 +2284,7 @@ luaopen_net_box(struct lua_State *L)
 
 	static const luaL_Reg net_box_lib[] = {
 		{ "decode_greeting",netbox_decode_greeting },
-		{ "new_registry",   netbox_new_registry },
+		{ "new_transport",   netbox_new_transport },
 		{ "perform_async_request", netbox_perform_async_request },
 		{ "perform_request",netbox_perform_request },
 		{ "iproto_id",      netbox_iproto_id },
