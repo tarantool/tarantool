@@ -221,6 +221,9 @@ local function create_transport(host, port, user, password, callback,
         state_cond:broadcast()
         if state == 'error' or state == 'error_reconnect' or
            state == 'closed' then
+            send_buf:recycle()
+            recv_buf:recycle()
+            on_send_buf_empty:broadcast()
             transport:reset(box.error.new({code = new_errno,
                                            reason = new_error}))
         end
@@ -280,9 +283,6 @@ local function create_transport(host, port, user, password, callback,
             set_state('error_reconnect', E_NO_CONNECTION, greeting)
             goto do_reconnect
     ::stop::
-            send_buf:recycle()
-            recv_buf:recycle()
-            on_send_buf_empty:broadcast()
             worker_fiber = nil
         end)
     end
@@ -480,9 +480,6 @@ local function create_transport(host, port, user, password, callback,
 
     error_sm = function(err, msg)
         if sock then sock:close(); sock = nil end
-        send_buf:recycle()
-        recv_buf:recycle()
-        on_send_buf_empty:broadcast()
         if state ~= 'closed' then
             if callback('reconnect_timeout') then
                 set_state('error_reconnect', err, msg)
