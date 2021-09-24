@@ -2663,7 +2663,7 @@ func_mt.call = function(func, args)
     if type(args) ~= 'table' then
         error('Use func:call(table)')
     end
-    return box.schema.func.call(func.name, unpack(args))
+    return box.schema.func.call(func.name, unpack(args, 1, table.maxn(args)))
 end
 
 function box.schema.func.bless(func)
