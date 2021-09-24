@@ -322,11 +322,8 @@ local function create_transport(host, port, user, password, callback,
             local msg = string.format("Connection is closing")
             return box.error.new({code = code, reason = msg})
         end
-        -- alert worker to notify it of the queued outgoing data;
-        -- if the buffer wasn't empty, assume the worker was already alerted
-        if send_buf:size() == 0 then
-            worker_fiber:wakeup()
-        end
+        -- Alert worker to notify it of the queued outgoing data.
+        worker_fiber:wakeup()
     end
 
     --
