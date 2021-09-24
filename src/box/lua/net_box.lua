@@ -182,7 +182,7 @@ local function on_push_sync_default() end
 -- reconnect.
 --
 local function create_transport(host, port, user, password, callback,
-                                connection, greeting)
+                                sock, greeting)
     -- check / normalize credentials
     if user == nil and password ~= nil then
         box.error(E_PROC_LUA, 'net.box: user is not defined')
@@ -244,7 +244,7 @@ local function create_transport(host, port, user, password, callback,
             local ok, err, timeout
             worker_fiber = fiber_self()
             fiber.name(string.format('%s:%s (net.box)', host, port), {truncate=true})
-            if not connection then
+            if not sock then
                 goto do_connect
             end
     ::handle_connection::
@@ -252,9 +252,9 @@ local function create_transport(host, port, user, password, callback,
             if not (ok or is_final_state[state]) then
                 set_state('error', E_UNKNOWN, err)
             end
-            if connection then
-                connection:close()
-                connection = nil
+            if sock then
+                sock:close()
+                sock = nil
             end
             timeout = callback('reconnect_timeout')
     ::do_reconnect::
@@ -267,9 +267,9 @@ local function create_transport(host, port, user, password, callback,
                 goto stop
             end
     ::do_connect::
-            connection, greeting =
+            sock, greeting =
                 establish_connection(host, port, callback('fetch_connect_timeout'))
-            if connection then
+            if sock then
                 goto handle_connection
             end
             timeout = callback('reconnect_timeout')
@@ -380,7 +380,7 @@ local function create_transport(host, port, user, password, callback,
     -- in this function, a connection could not be deleted.
     --
     protocol_sm = function()
-        assert(connection)
+        assert(sock)
         assert(greeting)
         local err, msg = callback('handshake', greeting)
         if err then
@@ -400,7 +400,7 @@ local function create_transport(host, port, user, password, callback,
     console_setup_sm = function()
         log.warn("Netbox text protocol support is deprecated since 1.10, "..
                  "please use require('console').connect() instead")
-        local err = internal.console_setup(connection:fd(), send_buf,
+        local err = internal.console_setup(sock:fd(), send_buf,
                                            on_send_buf_empty, recv_buf)
         if err then
             return error_sm(err.code, err.message)
@@ -410,7 +410,7 @@ local function create_transport(host, port, user, password, callback,
     end
 
     console_sm = function()
-        local err = internal.console_loop(requests, connection:fd(),
+        local err = internal.console_loop(requests, sock:fd(),
                                           send_buf, on_send_buf_empty,
                                           recv_buf)
         return error_sm(err.code, err.message)
@@ -418,7 +418,7 @@ local function create_transport(host, port, user, password, callback,
 
     iproto_setup_sm = function()
         local version, features = internal.iproto_id(
-            greeting.version_id, requests, connection:fd(), send_buf,
+            greeting.version_id, requests, sock:fd(), send_buf,
             on_send_buf_empty, recv_buf)
         if not version then
             local err = features
@@ -438,7 +438,7 @@ local function create_transport(host, port, user, password, callback,
             return iproto_schema_sm()
         end
         local schema_version, err = internal.iproto_auth(
-            user, password, salt, requests, connection:fd(),
+            user, password, salt, requests, sock:fd(),
             send_buf, on_send_buf_empty, recv_buf)
         if not schema_version then
             return error_sm(err.code, err.message)
@@ -453,7 +453,7 @@ local function create_transport(host, port, user, password, callback,
             return iproto_sm(schema_version)
         end
         local schema_version, schema = internal.iproto_schema(
-            greeting.version_id, requests, connection:fd(), send_buf,
+            greeting.version_id, requests, sock:fd(), send_buf,
             on_send_buf_empty, recv_buf)
         if not schema_version then
             local err = schema
@@ -467,7 +467,7 @@ local function create_transport(host, port, user, password, callback,
 
     iproto_sm = function(schema_version)
         local schema_version, err = internal.iproto_loop(
-            schema_version, requests, connection:fd(),
+            schema_version, requests, sock:fd(),
             send_buf, on_send_buf_empty, recv_buf)
         if not schema_version then
             return error_sm(err.code, err.message)
@@ -479,7 +479,7 @@ local function create_transport(host, port, user, password, callback,
     end
 
     error_sm = function(err, msg)
-        if connection then connection:close(); connection = nil end
+        if sock then sock:close(); sock = nil end
         send_buf:recycle()
         recv_buf:recycle()
         on_send_buf_empty:broadcast()
@@ -512,14 +512,14 @@ end
 -- it is GC-ed prematurely. We wrap stop() method, stashing the
 -- ref in an upvalue (stop() performance doesn't matter much.)
 local create_transport = function(host, port, user, password, callback,
-                                  connection, greeting)
+                                  sock, greeting)
     local weak_refs = setmetatable({callback = callback}, {__mode = 'v'})
     local function weak_callback(...)
         local callback = weak_refs.callback
         if callback then return callback(...) end
     end
     local transport = create_transport(host, port, user, password,
-                                       weak_callback, connection, greeting)
+                                       weak_callback, sock, greeting)
     local transport_stop = transport.stop
     local gc_hook = ffi.gc(ffi.new('char[1]'), function()
         pcall(transport_stop)
@@ -687,7 +687,7 @@ local stream_spaces_mt = {
 
 local space_metatable, index_metatable
 
-local function new_sm(host, port, opts, connection, greeting)
+local function new_sm(host, port, opts, sock, greeting)
     local user, password = opts.user, opts.password; opts.password = nil
     local last_reconnect_error
     local remote = {host = host, port = port, opts = opts, state = 'initial'}
@@ -779,7 +779,7 @@ local function new_sm(host, port, opts, connection, greeting)
     remote._on_connect = trigger.new("on_connect")
     remote._is_connected = false
     remote._transport = create_transport(host, port, user, password, callback,
-                                         connection, greeting)
+                                         sock, greeting)
     remote._transport.start()
     if opts.wait_connected ~= false then
         remote._transport.wait_state('active', tonumber(opts.wait_connected))
@@ -791,7 +791,7 @@ end
 
 --
 -- Wrap an existing connection into net.box API.
--- @param connection Connected socket.
+-- @param sock Connected socket.
 -- @param greeting Decoded greeting, received from a server.
 -- @param host Hostname to which @a connection is established.
 -- @param port TCP port to which @a connection is established.
@@ -800,12 +800,12 @@ end
 --
 -- @retval Net.box object.
 --
-local function wrap(connection, greeting, host, port, opts)
-    if connection == nil or type(greeting) ~= 'table' then
+local function wrap(sock, greeting, host, port, opts)
+    if sock == nil or type(greeting) ~= 'table' then
         error('Usage: netbox.wrap(socket, greeting, [opts])')
     end
     opts = opts or {}
-    return new_sm(host, port, opts, connection, greeting)
+    return new_sm(host, port, opts, sock, greeting)
 end
 
 --
