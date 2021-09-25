@@ -343,7 +343,7 @@ sql_token(const char *z, int *type, bool *is_reserved)
 		if (z[i] == '.') {
 			while (sqlIsdigit(z[++i])) {
 			}
-			*type = TK_FLOAT;
+			*type = TK_DECIMAL;
 		}
 		if ((z[i] == 'e' || z[i] == 'E') &&
 		    (sqlIsdigit(z[i + 1])

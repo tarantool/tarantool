@@ -14,7 +14,7 @@ test:do_execsql_test(
     "metatypes-1.1",
     [[
         INSERT INTO t VALUES(1, 1, 1);
-        INSERT INTO t VALUES(2, 2.0, 2.0);
+        INSERT INTO t VALUES(2, 2e0, 2e0);
         INSERT INTO t(i, s) VALUES(3, '3');
         INSERT INTO t(i, s) VALUES(4, true);
         INSERT INTO t(i, s) VALUES(5, x'35');

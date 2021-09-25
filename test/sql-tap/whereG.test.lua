@@ -103,7 +103,7 @@ test:do_eqp_test(
     [[
         SELECT DISTINCT aname
           FROM album, composer, track
-         WHERE likelihood(cname LIKE '%bach%', 0.5)
+         WHERE likelihood(cname LIKE '%bach%', 0.5e0)
            AND composer.cid=track.cid
            AND album.aid=track.aid;
     ]], {
@@ -117,7 +117,7 @@ test:do_execsql_test(
     [[
         SELECT DISTINCT aname
           FROM album, composer, track
-         WHERE likelihood(cname LIKE '%bach%' COLLATE "unicode_ci", 0.5)
+         WHERE likelihood(cname LIKE '%bach%' COLLATE "unicode_ci", 0.5e0)
            AND composer.cid=track.cid
            AND album.aid=track.aid;
     ]], {
@@ -187,7 +187,7 @@ test:do_catchsql_test(
     [[
         SELECT DISTINCT aname
           FROM album, composer, track
-         WHERE likelihood(cname LIKE '%bach%', -0.01)
+         WHERE likelihood(cname LIKE '%bach%', -0.1e0)
            AND composer.cid=track.cid
            AND album.aid=track.aid;
     ]], {
@@ -201,7 +201,7 @@ test:do_catchsql_test(
     [[
         SELECT DISTINCT aname
           FROM album, composer, track
-         WHERE likelihood(cname LIKE '%bach%', 1.01)
+         WHERE likelihood(cname LIKE '%bach%', 1.01e0)
            AND composer.cid=track.cid
            AND album.aid=track.aid;
     ]], {
@@ -370,7 +370,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "7.2",
     [[
-        SELECT likelihood(a,0.5), x FROM t1, t2 ORDER BY 1, 2;
+        SELECT likelihood(a, 0.5e0), x FROM t1, t2 ORDER BY 1, 2;
     ]], {
         -- <7.2>
         1, 3, 1, 4, 9, 3, 9, 4

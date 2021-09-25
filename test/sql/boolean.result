@@ -546,12 +546,12 @@ SELECT cast(0 AS BOOLEAN);
 SELECT cast(0.123 AS BOOLEAN);
  | ---
  | - null
- | - 'Type mismatch: can not convert double(0.123) to boolean'
+ | - 'Type mismatch: can not convert decimal(0.123) to boolean'
  | ...
 SELECT cast(0.0 AS BOOLEAN);
  | ---
  | - null
- | - 'Type mismatch: can not convert double(0.0) to boolean'
+ | - 'Type mismatch: can not convert decimal(0.0) to boolean'
  | ...
 SELECT cast('true' AS BOOLEAN), cast('false' AS BOOLEAN);
  | ---
@@ -3920,7 +3920,7 @@ INSERT INTO t8 VALUES (4.56);
 SELECT true AND 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT false AND 2.3;
  | ---
@@ -3933,17 +3933,17 @@ SELECT false AND 2.3;
 SELECT true OR 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT false OR 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT 2.3 AND true;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT 2.3 AND false;
  | ---
@@ -3956,53 +3956,53 @@ SELECT 2.3 AND false;
 SELECT 2.3 OR true;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT 2.3 OR false;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 
 SELECT a1, a1 AND 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a1, a1 OR 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a1, 2.3 AND a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a1, 2.3 OR a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a2, a2 AND 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a2, a2 OR 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a2, 2.3 AND a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a2, 2.3 OR a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 
 SELECT c, true AND c FROM t8;
@@ -4140,12 +4140,12 @@ SELECT false / 2.3;
 SELECT true % 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to integer'
+ | - 'Type mismatch: can not convert decimal(2.3) to integer'
  | ...
 SELECT false % 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to integer'
+ | - 'Type mismatch: can not convert decimal(2.3) to integer'
  | ...
 SELECT 2.3 + true;
  | ---
@@ -4221,7 +4221,7 @@ SELECT a1, a1 / 2.3 FROM t6
 SELECT a1, a1 % 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to integer'
+ | - 'Type mismatch: can not convert decimal(2.3) to integer'
  | ...
 SELECT a1, 2.3 + a1 FROM t6
  | ---
@@ -4271,7 +4271,7 @@ SELECT a2, a2 / 2.3 FROM t6
 SELECT a2, a2 % 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to integer'
+ | - 'Type mismatch: can not convert decimal(2.3) to integer'
  | ...
 SELECT a2, 2.3 + a2 FROM t6
  | ---
@@ -4504,22 +4504,22 @@ SELECT a2, c, c % a2 FROM t6, t8;
 SELECT true > 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT false > 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT true < 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT false < 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT 2.3 > true;
  | ---
@@ -4545,12 +4545,12 @@ SELECT 2.3 < false;
 SELECT a1, a1 > 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a1, a1 < 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a1, 2.3 > a1 FROM t6
  | ---
@@ -4565,12 +4565,12 @@ SELECT a1, 2.3 < a1 FROM t6
 SELECT a2, a2 > 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a2, a2 < 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a2, 2.3 > a2 FROM t6
  | ---
@@ -4668,22 +4668,22 @@ SELECT a2, c, c < a2 FROM t6, t8;
 SELECT true >= 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT false >= 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT true <= 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT false <= 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT 2.3 >= true;
  | ---
@@ -4709,12 +4709,12 @@ SELECT 2.3 <= false;
 SELECT a1, a1 >= 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a1, a1 <= 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a1, 2.3 >= a1 FROM t6
  | ---
@@ -4729,12 +4729,12 @@ SELECT a1, 2.3 <= a1 FROM t6
 SELECT a2, a2 >= 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a2, a2 <= 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a2, 2.3 >= a2 FROM t6
  | ---
@@ -4832,22 +4832,22 @@ SELECT a2, c, c <= a2 FROM t6, t8;
 SELECT true == 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT false == 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT true != 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT false != 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT 2.3 == true;
  | ---
@@ -4873,12 +4873,12 @@ SELECT 2.3 != false;
 SELECT a1, a1 == 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a1, a1 != 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a1, 2.3 == a1 FROM t6
  | ---
@@ -4893,12 +4893,12 @@ SELECT a1, 2.3 != a1 FROM t6
 SELECT a2, a2 == 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a2, a2 != 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert double(2.3) to boolean'
+ | - 'Type mismatch: can not convert decimal(2.3) to boolean'
  | ...
 SELECT a2, 2.3 == a2 FROM t6
  | ---
@@ -5049,22 +5049,22 @@ SELECT a2 IN (SELECT c FROM t8) FROM t6 LIMIT 1;
 SELECT true BETWEEN 0.1 and 9.9;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(0.1) to boolean'
+ | - 'Type mismatch: can not convert decimal(0.1) to boolean'
  | ...
 SELECT false BETWEEN 0.1 and 9.9;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(0.1) to boolean'
+ | - 'Type mismatch: can not convert decimal(0.1) to boolean'
  | ...
 SELECT a1, a1 BETWEEN 0.1 and 9.9 FROM t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(0.1) to boolean'
+ | - 'Type mismatch: can not convert decimal(0.1) to boolean'
  | ...
 SELECT a2, a2 BETWEEN 0.1 and 9.9 FROM t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(0.1) to boolean'
+ | - 'Type mismatch: can not convert decimal(0.1) to boolean'
  | ...
 
 -- Check interaction of BOOLEAN and TEXT.

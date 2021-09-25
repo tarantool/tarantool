@@ -339,7 +339,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "uuid-6.1.15",
     [[
-        SELECT LIKELIHOOD(u, 0.5) from t2;
+        SELECT LIKELIHOOD(u, 0.5e0) from t2;
     ]], {
         uuid1, uuid3, uuid2
     })
@@ -651,7 +651,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "uuid-7.2.4",
     [[
-        SELECT cast(1.5 AS UUID);
+        SELECT cast(1.5e0 AS UUID);
     ]], {
         1, "Type mismatch: can not convert double(1.5) to uuid"
     })
@@ -804,7 +804,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "uuid-8.2.4",
     [[
-        INSERT INTO tsu VALUES ('4_double', 1.5);
+        INSERT INTO tsu VALUES ('4_double', 1.5e0);
     ]], {
         1, "Type mismatch: can not convert double(1.5) to uuid"
     })
@@ -1098,7 +1098,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "uuid-13.1.4",
     [[
-        SELECT u > 1.5 FROM t2;
+        SELECT u > 1.5e0 FROM t2;
     ]], {
         1, "Type mismatch: can not convert double(1.5) to uuid"
     })
@@ -1162,7 +1162,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "uuid-13.2.4",
     [[
-        SELECT u = 1.5 FROM t2;
+        SELECT u = 1.5e0 FROM t2;
     ]], {
         1, "Type mismatch: can not convert double(1.5) to uuid"
     })

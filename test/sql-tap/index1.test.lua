@@ -598,7 +598,7 @@ end
 test:do_execsql_test(
     "index-12.1",
     [[
-        CREATE TABLE t4(id  INT primary key, a NUMBER,b INT );
+        CREATE TABLE t4(id INT primary key, a DOUBLE, b INT );
         INSERT INTO t4 VALUES(1, 0.0, 1);
         INSERT INTO t4 VALUES(2, 0.00, 2);
         INSERT INTO t4 VALUES(4, -1.0, 4);

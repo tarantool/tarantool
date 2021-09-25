@@ -2,6 +2,8 @@
 local test = require("sqltester")
 test:plan(26)
 
+local dec = require('decimal')
+
 --!./tcltestrunner.lua
 -- 2013 March 20
 --
@@ -33,11 +35,11 @@ for _, enc in ipairs({"utf8"}) do
             return x
         end, enc)
     local data = {
-        {"1", "12345.0", 12345.0, 12345},
+        {"1", "12345.0", dec.new(12345.0), 12345},
         {"2", "12345.0e0", 12345.0, 12345},
         {"3", "-12345.0e0", -12345.0, -12345},
-        {"4", "-12345.25", -12345.25, -12345},
-        {"5", "-12345.0", -12345.0, -12345},
+        {"4", "-12345.25", dec.new(-12345.25), -12345},
+        {"5", "-12345.0", dec.new(-12345.0), -12345},
     }
     for _, val in ipairs(data) do
         local idx = val[1]
@@ -71,7 +73,7 @@ end
 test:do_execsql_test(
     "cast-2.1",
     [[
-        SELECT CAST((9223372036854775297.01) AS INTEGER);
+        SELECT CAST((9223372036854775297.01e0) AS INTEGER);
     ]], {
         9223372036854775808ULL
     })
@@ -79,7 +81,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-2.2",
     [[
-        SELECT CAST((18000000000000000000.) AS INTEGER);
+        SELECT CAST((18000000000000000000e0) AS INTEGER);
     ]], {
         18000000000000000000ULL
     })
@@ -87,7 +89,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-2.3",
     [[
-        SELECT CAST((9223372036854775297.01) AS UNSIGNED);
+        SELECT CAST((9223372036854775297.01e0) AS UNSIGNED);
     ]], {
         9223372036854775808ULL
     })
@@ -95,7 +97,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-2.4",
     [[
-        SELECT CAST((18000000000000000000.) AS UNSIGNED);
+        SELECT CAST((18000000000000000000e0) AS UNSIGNED);
     ]], {
         18000000000000000000ULL
     })
@@ -103,7 +105,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "cast-2.5",
     [[
-        SELECT CAST((20000000000000000000.) AS UNSIGNED);
+        SELECT CAST((20000000000000000000e0) AS UNSIGNED);
     ]], {
         1,"Type mismatch: can not convert double(2.0e+19) to unsigned"
     })
@@ -112,7 +114,7 @@ test:do_execsql_test(
     "cast-2.6",
     [[
         CREATE TABLE t (i INTEGER PRIMARY KEY);
-        INSERT INTO t VALUES(9223372036854775297.01);
+        INSERT INTO t VALUES(9223372036854775297.01e0);
         SELECT * FROM t;
     ]], {
         9223372036854775808ULL
@@ -121,7 +123,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-2.7",
     [[
-        INSERT INTO t VALUES(18000000000000000000.01);
+        INSERT INTO t VALUES(18000000000000000000.01e0);
         SELECT * FROM t;
     ]], {
         9223372036854775808ULL,18000000000000000000ULL
@@ -130,7 +132,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "cast-2.8",
     [[
-        INSERT INTO t VALUES(20000000000000000000.01);
+        INSERT INTO t VALUES(20000000000000000000.01e0);
         SELECT * FROM t;
     ]], {
         1,"Type mismatch: can not convert double(2.0e+19) to integer"
@@ -139,7 +141,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "cast-2.9",
     [[
-        INSERT INTO t VALUES(2.1);
+        INSERT INTO t VALUES(2.1e0);
     ]], {
         1, "Type mismatch: can not convert double(2.1) to integer"
     })
@@ -147,7 +149,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "numcast-3.8",
     [[
-        SELECT (1 + 0) / 3, (1 + 0.) / 3, (1 + 0) / 3.;
+        SELECT (1 + 0) / 3, (1 + 0e0) / 3, (1 + 0) / 3e0;
     ]], {
         0, 0.33333333333333, 0.33333333333333
 })
@@ -155,7 +157,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "numcast-3.9",
     [[
-        SELECT (1 - 0) / 3, (1 - 0.) / 3, (1 - 0) / 3.;
+        SELECT (1 - 0) / 3, (1 - 0e0) / 3, (1 - 0) / 3e0;
     ]], {
         0, 0.33333333333333, 0.33333333333333
 })
@@ -163,7 +165,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "numcast-3.10",
     [[
-        SELECT (1 * 1) / 3, (1 * 1.) / 3, (1 * 1) / 3.;
+        SELECT (1 * 1) / 3, (1 * 1e0) / 3, (1 * 1) / 3e0;
     ]], {
         0, 0.33333333333333, 0.33333333333333
 })
@@ -171,7 +173,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "numcast-3.11",
     [[
-        SELECT (1 / 1) / 3, (1 / 1.) / 3, (1 / 1) / 3.;
+        SELECT (1 / 1) / 3, (1 / 1e0) / 3, (1 / 1) / 3e0;
     ]], {
         0 , 0.33333333333333, 0.33333333333333
 })
@@ -183,7 +185,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "numcast-4",
     [[
-        SELECT CAST(-2.5 AS UNSIGNED);
+        SELECT CAST(-2.5e0 AS UNSIGNED);
     ]], {
         1, "Type mismatch: can not convert double(-2.5) to unsigned"
 })
@@ -195,7 +197,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "numcast-5",
     [[
-        SELECT CAST(-0.999 AS INTEGER), CAST(-0.111 AS UNSIGNED);
+        SELECT CAST(-0.999e0 AS INTEGER), CAST(-0.111e0 AS UNSIGNED);
     ]], {
         0, 0
 })

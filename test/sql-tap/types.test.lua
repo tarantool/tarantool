@@ -165,7 +165,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "types-2.2.1",
     [[
-        CREATE TABLE t2(id  INT primary key, a NUMBER);
+        CREATE TABLE t2(id  INT primary key, a DOUBLE);
         INSERT INTO t2 VALUES(1, 0.0);
         INSERT INTO t2 VALUES(2, 12345.678);
         INSERT INTO t2 VALUES(3, -12345.678);

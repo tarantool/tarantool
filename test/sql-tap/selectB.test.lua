@@ -443,7 +443,7 @@ for ii = 3, 6, 1 do
             SELECT x, y FROM (
               SELECT a AS x, b AS y FROM t1
               UNION ALL
-              SELECT a*10 + 0.1, f*10 + 0.1 FROM t1 JOIN t2 ON (c=d)
+              SELECT a*10 + 0.1e0, f*10 + 0.1e0 FROM t1 JOIN t2 ON (c=d)
               UNION ALL
               SELECT a*100, b*100 FROM t1
             ) ORDER BY 1;
@@ -457,7 +457,7 @@ for ii = 3, 6, 1 do
             SELECT x, y FROM (
               SELECT a AS x, b AS y FROM t1
               UNION ALL
-              SELECT a*10 + 0.1, f*10 + 0.1 FROM t1 LEFT JOIN t2 ON (c=d)
+              SELECT a*10 + 0.1e0, f*10 + 0.1e0 FROM t1 LEFT JOIN t2 ON (c=d)
               UNION ALL
               SELECT a*100, b*100 FROM t1
             ) ORDER BY 1;
@@ -471,7 +471,7 @@ for ii = 3, 6, 1 do
             SELECT x+y FROM (
               SELECT a AS x, b AS y FROM t1
               UNION ALL
-              SELECT a*10 + 0.1, f*10 + 0.1 FROM t1 LEFT JOIN t2 ON (c=d)
+              SELECT a*10 + 0.1e0, f*10 + 0.1e0 FROM t1 LEFT JOIN t2 ON (c=d)
               UNION ALL
               SELECT a*100, b*100 FROM t1
             ) WHERE y+x IS NOT NULL ORDER BY 1;

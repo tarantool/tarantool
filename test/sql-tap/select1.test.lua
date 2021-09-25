@@ -1157,7 +1157,7 @@ test:do_test(
     function()
         set_full_column_names(true)
         return test:execsql2 [[
-            SELECT 123.45;
+            SELECT 123.45e0;
         ]]
     end, {
         -- <select1-6.9.5>
@@ -1481,7 +1481,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "select1-8.1",
     [[
-        SELECT f1 FROM test1 WHERE 4.3+2.4 OR 1 ORDER BY f1
+        SELECT f1 FROM test1 WHERE 4.3e0+2.4e0 OR 1 ORDER BY f1
     ]], {
         -- <select1-8.1>
         1, 'Type mismatch: can not convert double(6.7) to boolean'

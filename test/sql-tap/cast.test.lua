@@ -307,7 +307,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.31",
     [[
-        SELECT 123.456
+        SELECT 123.456e0
     ]], {
         -- <cast-1.31>
         123.456
@@ -317,7 +317,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.32",
     [[
-        SELECT typeof(123.456)
+        SELECT typeof(123.456e0)
     ]], {
         -- <cast-1.32>
         "double"
@@ -337,7 +337,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.34",
     [[
-        SELECT typeof(CAST(123.456 AS text))
+        SELECT typeof(CAST(123.456e0 AS text))
     ]], {
         -- <cast-1.34>
         "string"
@@ -347,7 +347,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.35",
     [[
-        SELECT CAST(123.456 AS NUMBER)
+        SELECT CAST(123.456e0 AS NUMBER)
     ]], {
         -- <cast-1.35>
         123.456
@@ -357,7 +357,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.36",
     [[
-        SELECT typeof(CAST(123.456 AS DOUBLE))
+        SELECT typeof(CAST(123.456e0 AS DOUBLE))
     ]], {
         -- <cast-1.36>
         "double"
@@ -367,7 +367,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.37",
     [[
-        SELECT CAST(123.456 AS SCALAR)
+        SELECT CAST(123.456e0 AS SCALAR)
     ]], {
         -- <cast-1.37>
         123.456
@@ -377,7 +377,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.38",
     [[
-        SELECT typeof(CAST(123.456 AS SCALAR))
+        SELECT typeof(CAST(123.456e0 AS SCALAR))
     ]], {
         -- <cast-1.38>
         "scalar"
@@ -387,7 +387,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.39",
     [[
-        SELECT CAST(123.456 AS integer)
+        SELECT CAST(123.456e0 AS integer)
     ]], {
         -- <cast-1.39>
         123
@@ -397,7 +397,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.38",
     [[
-        SELECT typeof(CAST(123.456 AS integer))
+        SELECT typeof(CAST(123.456e0 AS integer))
     ]], {
         -- <cast-1.38>
         "integer"
@@ -962,7 +962,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "cast-6.2.3",
     [[
-        SELECT CAST(1.5 AS BOOLEAN);
+        SELECT CAST(1.5e0 AS BOOLEAN);
     ]], {
         1, "Type mismatch: can not convert double(1.5) to boolean"
     })
@@ -1139,7 +1139,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "cast-10.4",
     [[
-        SELECT '1' < 2.5;
+        SELECT '1' < 2.5e0;
     ]], {
         1, "Type mismatch: can not convert double(2.5) to string"
     })

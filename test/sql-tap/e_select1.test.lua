@@ -327,7 +327,7 @@ test:do_execsql_test(
     "e_select-1.4.0",
     [[
         CREATE TABLE x1(id  INT primary key, a TEXT , b TEXT );
-        CREATE TABLE x2(id  INT primary key, c NUMBER , d NUMBER , e NUMBER );
+        CREATE TABLE x2(id  INT primary key, c DOUBLE, d DOUBLE, e DOUBLE);
         CREATE TABLE x3(id  INT primary key, f TEXT , g TEXT , h TEXT , i TEXT );
 
         -- x1: 3 rows, 2 columns
@@ -1482,8 +1482,8 @@ test:drop_all_tables()
 test:do_execsql_test(
     "e_select-7.4.0",
     [[
-        CREATE TABLE q1(id  INT primary key, a TEXT, b NUMBER, c NUMBER);
-        CREATE TABLE q2(id  INT primary key, d TEXT, e NUMBER);
+        CREATE TABLE q1(id  INT primary key, a TEXT, b DOUBLE, c DOUBLE);
+        CREATE TABLE q2(id  INT primary key, d TEXT, e DOUBLE);
         CREATE TABLE q3(id  INT primary key, f TEXT, g INT);
 
         INSERT INTO q1 VALUES(1, '16', -87.66, NULL);
@@ -1632,7 +1632,7 @@ test:drop_all_tables()
 test:do_execsql_test(
     "e_select-7.10.0",
     [[
-        CREATE TABLE w1(a TEXT PRIMARY KEY, b NUMBER);
+        CREATE TABLE w1(a TEXT PRIMARY KEY, b DOUBLE);
         CREATE TABLE w2(a  INT PRIMARY KEY, b TEXT);
 
         INSERT INTO w1 VALUES('1', 4.1);
@@ -1908,7 +1908,7 @@ test:do_select_tests(
 test:do_execsql_test(
     "e_select-8.8.0",
     [[
-        CREATE TABLE d3(id  INT primary key, a NUMBER);
+        CREATE TABLE d3(id  INT primary key, a DOUBLE);
         INSERT INTO d3 VALUES(1, 0);
         INSERT INTO d3 VALUES(2, 14.1);
         INSERT INTO d3 VALUES(3, 13);
@@ -2193,7 +2193,7 @@ for _, val in ipairs({
     {"1", "SELECT b FROM f1 ORDER BY a LIMIT 'hello' "},
     {"2", "SELECT b FROM f1 ORDER BY a LIMIT NULL "},
     {"3", "SELECT b FROM f1 ORDER BY a LIMIT X'ABCD' "},
-    {"4", "SELECT b FROM f1 ORDER BY a LIMIT 5.1 "},
+    {"4", "SELECT b FROM f1 ORDER BY a LIMIT 5.1e0 "},
     {"5", "SELECT b FROM f1 ORDER BY a LIMIT (SELECT group_concat(b) FROM f1)"}}) do
     local tn = val[1]
     local select = val[2]
@@ -2248,7 +2248,7 @@ for _, val in ipairs({
     {1, "SELECT b FROM f1 ORDER BY a LIMIT 2 OFFSET 'hello'"},
     {2, "SELECT b FROM f1 ORDER BY a LIMIT 2 OFFSET NULL"},
     {3, "SELECT b FROM f1 ORDER BY a LIMIT 2 OFFSET X'ABCD'"},
-    {4, "SELECT b FROM f1 ORDER BY a LIMIT 2 OFFSET 5.1"},
+    {4, "SELECT b FROM f1 ORDER BY a LIMIT 2 OFFSET 51e-1"},
     {5, "SELECT b FROM f1 ORDER BY a LIMIT 2 OFFSET (SELECT group_concat(b) FROM f1)"}}) do
     local tn = val[1]
     local select = val[2]

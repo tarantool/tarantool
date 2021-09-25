@@ -207,7 +207,7 @@ test:do_execsql_test(
         CREATE TABLE t2(
           id  INT primary key,
           x SCALAR CONSTRAINT one CHECK( typeof(coalesce(x,0))=='integer'),
-          y DOUBLE CONSTRAINT two CHECK( typeof(coalesce(y,0.1))=='double' ),
+          y DOUBLE CONSTRAINT two CHECK( typeof(coalesce(y,0.1e0))=='double' ),
           z SCALAR CONSTRAINT three CHECK( typeof(coalesce(z,''))=='string' )
         );
     ]], {

@@ -163,7 +163,7 @@ box.execute("SELECT 'abc' || 1;")
 box.execute("SELECT 'abc' || 1.123;")
 ---
 - null
-- 'Inconsistent types: expected string or varbinary got double(1.123)'
+- 'Inconsistent types: expected string or varbinary got decimal(1.123)'
 ...
 box.execute("SELECT 1 || 'abc';")
 ---
@@ -173,7 +173,7 @@ box.execute("SELECT 1 || 'abc';")
 box.execute("SELECT 1.123 || 'abc';")
 ---
 - null
-- 'Inconsistent types: expected string or varbinary got double(1.123)'
+- 'Inconsistent types: expected string or varbinary got decimal(1.123)'
 ...
 box.execute("SELECt 'a' || 'b' || 1;")
 ---
@@ -298,7 +298,7 @@ box.execute('SELECT 1 + 1.1;')
 ---
 - metadata:
   - name: COLUMN_1
-    type: double
+    type: decimal
   rows:
   - [2.1]
 ...
@@ -346,7 +346,7 @@ box.execute("SELECT * FROM tboolean WHERE s1 = 1;")
 box.execute("SELECT * FROM tboolean WHERE s1 = 1.123;")
 ---
 - null
-- 'Type mismatch: can not convert double(1.123) to boolean'
+- 'Type mismatch: can not convert decimal(1.123) to boolean'
 ...
 box.space.TBOOLEAN:drop()
 ---
@@ -463,7 +463,8 @@ box.execute("SELECT a FROM t1 WHERE a IN (1.1, 2.1);")
 - metadata:
   - name: A
     type: unsigned
-  rows: []
+  rows:
+  - [1]
 ...
 s:drop()
 ---
@@ -582,7 +583,7 @@ box.execute("SELECT 18446744073709551615 = null;")
   rows:
   - [null]
 ...
-box.execute("SELECT 18446744073709551615 = 18446744073709551615.0;")
+box.execute("SELECT 18446744073709551615 = 18446744073709551615e0;")
 ---
 - metadata:
   - name: COLUMN_1
@@ -590,7 +591,7 @@ box.execute("SELECT 18446744073709551615 = 18446744073709551615.0;")
   rows:
   - [false]
 ...
-box.execute("SELECT 18446744073709551615.0 > 18446744073709551615")
+box.execute("SELECT 18446744073709551615e0 > 18446744073709551615")
 ---
 - metadata:
   - name: COLUMN_1
@@ -598,7 +599,7 @@ box.execute("SELECT 18446744073709551615.0 > 18446744073709551615")
   rows:
   - [true]
 ...
-box.execute("SELECT 18446744073709551615 IN ('18446744073709551615', 18446744073709551615.0)")
+box.execute("SELECT 18446744073709551615 IN ('18446744073709551615', 18446744073709551615e0)")
 ---
 - null
 - 'Type mismatch: can not convert integer(18446744073709551615) to string'
@@ -1075,7 +1076,7 @@ box.execute("SELECT CAST(1.5 AS UNSIGNED);")
 box.execute("SELECT CAST(-1.5 AS UNSIGNED);")
 ---
 - null
-- 'Type mismatch: can not convert double(-1.5) to unsigned'
+- 'Type mismatch: can not convert decimal(-1.5) to unsigned'
 ...
 box.execute("SELECT CAST(true AS UNSIGNED);")
 ---
@@ -1192,7 +1193,7 @@ box.execute("INSERT INTO t VALUES(1, 1);")
 box.execute("INSERT INTO t VALUES(1, 1.123);")
 ---
 - null
-- 'Type mismatch: can not convert double(1.123) to varbinary'
+- 'Type mismatch: can not convert decimal(1.123) to varbinary'
 ...
 box.execute("INSERT INTO t VALUES(1, true);")
 ---
@@ -1216,7 +1217,7 @@ box.execute("SELECT * FROM t WHERE v = 1")
 box.execute("SELECT * FROM t WHERE v = 1.123")
 ---
 - null
-- 'Type mismatch: can not convert double(1.123) to varbinary'
+- 'Type mismatch: can not convert decimal(1.123) to varbinary'
 ...
 box.execute("SELECT * FROM t WHERE v = 'str'")
 ---
@@ -1424,7 +1425,7 @@ box.execute("SELECT CAST(1 AS VARBINARY);")
 box.execute("SELECT CAST(1.123 AS VARBINARY);")
 ---
 - null
-- 'Type mismatch: can not convert double(1.123) to varbinary'
+- 'Type mismatch: can not convert decimal(1.123) to varbinary'
 ...
 box.execute("SELECT CAST(true AS VARBINARY);")
 ---
@@ -1657,15 +1658,15 @@ box.execute("SELECT 1.0;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: double
+    type: decimal
   rows:
-  - [1]
+  - [1.0]
 ...
 box.execute("SELECT .01;")
 ---
 - metadata:
   - name: COLUMN_1
-    type: double
+    type: decimal
   rows:
   - [0.01]
 ...
@@ -2031,11 +2032,11 @@ box.execute("SELECT 1.0, typeof(1.0);")
 ---
 - metadata:
   - name: COLUMN_1
-    type: double
+    type: decimal
   - name: COLUMN_2
     type: string
   rows:
-  - [1, 'double']
+  - [1.0, 'decimal']
 ...
 box.execute("SELECT CAST(2 AS DOUBLE), typeof(CAST(2 AS DOUBLE));")
 ---
@@ -2146,7 +2147,7 @@ box.execute([[INSERT INTO ti(i) VALUES (11);]])
   - 2
   row_count: 1
 ...
-box.execute([[INSERT INTO ti(i) VALUES (100000000000000000000000000000000.1);]])
+box.execute([[INSERT INTO ti(i) VALUES (100000000000000000000000000000000.1e0);]])
 ---
 - null
 - 'Type mismatch: can not convert double(1.0e+32) to integer'
@@ -2248,7 +2249,7 @@ box.execute([[INSERT INTO tb(b) VALUES (11);]])
 box.execute([[INSERT INTO tb(b) VALUES (22.2);]])
 ---
 - null
-- 'Type mismatch: can not convert double(22.2) to boolean'
+- 'Type mismatch: can not convert decimal(22.2) to boolean'
 ...
 box.execute([[INSERT INTO tb(b) VALUES (true);]])
 ---
@@ -2291,7 +2292,7 @@ box.execute([[INSERT INTO tt(t) VALUES (11);]])
 box.execute([[INSERT INTO tt(t) VALUES (22.2);]])
 ---
 - null
-- 'Type mismatch: can not convert double(22.2) to string'
+- 'Type mismatch: can not convert decimal(22.2) to string'
 ...
 box.execute([[INSERT INTO tt(t) VALUES (true);]])
 ---
@@ -2334,7 +2335,7 @@ box.execute([[INSERT INTO tv(v) VALUES (11);]])
 box.execute([[INSERT INTO tv(v) VALUES (22.2);]])
 ---
 - null
-- 'Type mismatch: can not convert double(22.2) to varbinary'
+- 'Type mismatch: can not convert decimal(22.2) to varbinary'
 ...
 box.execute([[INSERT INTO tv(v) VALUES (true);]])
 ---
@@ -2501,7 +2502,7 @@ box.execute([[UPDATE ti SET i = 11 WHERE a = 1;]])
 ---
 - row_count: 1
 ...
-box.execute([[UPDATE ti SET i = 100000000000000000000000000000000.1 WHERE a = 1;]])
+box.execute([[UPDATE ti SET i = 100000000000000000000000000000000.1e0 WHERE a = 1;]])
 ---
 - null
 - 'Type mismatch: can not convert double(1.0e+32) to integer'
@@ -2589,7 +2590,7 @@ box.execute([[UPDATE tb SET b = 11 WHERE a = 1;]])
 box.execute([[UPDATE tb SET b = 22.2 WHERE a = 1;]])
 ---
 - null
-- 'Type mismatch: can not convert double(22.2) to boolean'
+- 'Type mismatch: can not convert decimal(22.2) to boolean'
 ...
 box.execute([[UPDATE tb SET b = true WHERE a = 1;]])
 ---
@@ -2627,7 +2628,7 @@ box.execute([[UPDATE tt SET t = 11 WHERE a = 1;]])
 box.execute([[UPDATE tt SET t = 22.2 WHERE a = 1;]])
 ---
 - null
-- 'Type mismatch: can not convert double(22.2) to string'
+- 'Type mismatch: can not convert decimal(22.2) to string'
 ...
 box.execute([[UPDATE tt SET t = true WHERE a = 1;]])
 ---
@@ -2665,7 +2666,7 @@ box.execute([[UPDATE tv SET v = 11 WHERE a = 1;]])
 box.execute([[UPDATE tv SET v = 22.2 WHERE a = 1;]])
 ---
 - null
-- 'Type mismatch: can not convert double(22.2) to varbinary'
+- 'Type mismatch: can not convert decimal(22.2) to varbinary'
 ...
 box.execute([[UPDATE tv SET v = true WHERE a = 1;]])
 ---

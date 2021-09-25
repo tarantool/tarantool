@@ -632,7 +632,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "sort-8.1",
     [[
-        CREATE TABLE t5(a NUMBER, b text PRIMARY KEY);
+        CREATE TABLE t5(a DOUBLE, b text PRIMARY KEY);
         INSERT INTO t5 VALUES(100,'A1');
         INSERT INTO t5 VALUES(100.0,'A2');
         SELECT * FROM t5 ORDER BY a, b;

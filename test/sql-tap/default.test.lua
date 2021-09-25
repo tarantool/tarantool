@@ -105,11 +105,11 @@ test:do_execsql_test(
 	b INT DEFAULT 12345 UNIQUE NOT NULL CHECK( b>=0 AND b<99999 ),
 	c VARCHAR(123) DEFAULT 'hello' NOT NULL,
 	d NUMBER,
-	e NUMBER DEFAULT 4.36,
+	e NUMBER DEFAULT 4.36e0,
 	f VARCHAR(15), --COLLATE RTRIM,
 	g INTEGER DEFAULT( 3600*12 )
 	);
-	INSERT INTO t3 VALUES(null, 5, 'row1', 5.25, 8.67, '321', 432);
+	INSERT INTO t3 VALUES(null, 5, 'row1', 5.25e0, 8.67e0, '321', 432);
 	SELECT a, typeof(a), b, typeof(b), c, typeof(c),
 	d, typeof(d), e, typeof(e), f, typeof(f),
 	g, typeof(g) FROM t3;

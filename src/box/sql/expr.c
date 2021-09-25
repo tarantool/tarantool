@@ -3286,6 +3286,30 @@ codeReal(Vdbe * v, const char *z, int negateFlag, int iMem)
 	}
 }
 
+static void
+expr_code_dec(struct Parse *parser, struct Expr *expr, bool is_neg, int reg)
+{
+	const char *str = expr->u.zToken;
+	assert(str != NULL);
+	decimal_t *value = sqlDbMallocRawNN(sql_get(), sizeof(*value));
+	if (value == NULL)
+		goto error;
+	if (is_neg) {
+		decimal_t dec;
+		if (decimal_from_string(&dec, str) == NULL)
+			goto error;
+		decimal_minus(value, &dec);
+	} else if (decimal_from_string(value, str) == NULL) {
+		goto error;
+	}
+	sqlVdbeAddOp4(parser->pVdbe, OP_Decimal, 0, reg, 0, (char *)value,
+		      P4_DEC);
+	return;
+error:
+	sqlDbFree(sql_get(), value);
+	parser->is_aborted = true;
+}
+
 /**
  * Generate an instruction that will put the integer describe by
  * text z[0..n-1] into register iMem.
@@ -3725,6 +3749,10 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sqlVdbeAddOp2(v, OP_Bool, op == TK_TRUE, target);
 			return target;
 		}
+	case TK_DECIMAL:{
+			expr_code_dec(pParse, pExpr, false, target);
+			return target;
+		}
 	case TK_FLOAT:{
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			codeReal(v, pExpr->u.zToken, 0, target);
@@ -3883,6 +3911,9 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			} else if (pLeft->op == TK_FLOAT) {
 				assert(!ExprHasProperty(pExpr, EP_IntValue));
 				codeReal(v, pLeft->u.zToken, 1, target);
+				return target;
+			} else if (pLeft->op == TK_DECIMAL) {
+				expr_code_dec(pParse, pLeft, true, target);
 				return target;
 			} else {
 				tempX.op = TK_INTEGER;

@@ -534,10 +534,10 @@ test:do_catchsql_test(7.6, [[
 --
 test:do_execsql_test("8.1-mandelbrot", [[
   WITH RECURSIVE
-    xaxis(x) AS (VALUES(-2.0) UNION ALL SELECT x+0.05 FROM xaxis WHERE x<1.2),
-    yaxis(y) AS (VALUES(-1.0) UNION ALL SELECT y+0.1 FROM yaxis WHERE y<1.0),
+    xaxis(x) AS (VALUES(-2e0) UNION ALL SELECT x + 0.05e0 FROM xaxis WHERE x < 1.2e0),
+    yaxis(y) AS (VALUES(-1e0) UNION ALL SELECT y + 0.1e0 FROM yaxis WHERE y < 1.0e0),
     m(iter, cx, cy, x, y) AS (
-      SELECT 0, x, y, 0.0, 0.0 FROM xaxis, yaxis
+      SELECT 0, x, y, 0e0, 0e0 FROM xaxis, yaxis
       UNION ALL
       SELECT iter+1, cx, cy, x*x-y*y + cx, 2.0*x*y + cy FROM m
        WHERE (x*x + y*y) < 4.0 AND iter<28

@@ -3,7 +3,7 @@ local build_path = os.getenv("BUILDDIR")
 package.cpath = build_path..'/test/sql-tap/?.so;'..build_path..'/test/sql-tap/?.dylib;'..package.cpath
 
 local test = require("sqltester")
-test:plan(104)
+test:plan(109)
 
 local dec = require("decimal")
 local dec1 = dec.new("111")
@@ -684,7 +684,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "dec-11.2.4",
     [[
-        INSERT INTO tsu VALUES ('4_double', 1.5);
+        INSERT INTO tsu VALUES ('4_double', 1.5e0);
     ]], {
         1, "Type mismatch: can not convert double(1.5) to uuid"
     })
@@ -819,7 +819,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "dec-14.1.3",
     [[
-        SELECT u - 0.5 FROM t2;
+        SELECT u - 0.5e0 FROM t2;
     ]], {
         110.5, 3332.5, 55554.5
     })
@@ -835,7 +835,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "dec-14.1.5",
     [[
-        SELECT u / 1.0 FROM t2;
+        SELECT u / 1e0 FROM t2;
     ]], {
         111, 3333, 55555
     })
@@ -971,5 +971,51 @@ test:execsql([[
     DROP TABLE t2;
     DROP TABLE t1;
 ]])
+
+--
+-- gh-6356: Make sure that numeric literals with a decimal point and no exponent
+-- are treated as DECIMAL.
+--
+test:do_execsql_test(
+    "dec-17.1",
+    [[
+        SELECT 1.0, typeof(1.0);
+    ]], {
+        dec.new(1), 'decimal'
+    })
+
+test:do_test(
+    "dec-17.2",
+    function()
+        return box.execute([[SELECT 1.0;]]).metadata
+    end, {
+        {name = "COLUMN_1", type = "decimal"}
+    })
+
+test:do_execsql_test(
+    "dec-17.3",
+    [[
+        SELECT typeof(1), typeof(1e0), typeof(1.0);
+    ]], {
+        "integer", "double", "decimal"
+    })
+
+test:do_execsql_test(
+    "dec-17.4",
+    [[
+        SELECT 999999999999999999999999999999999999.9;
+    ]], {
+        dec.new('999999999999999999999999999999999999.9')
+    })
+
+-- Make sure that large number without a decimal point is not parsed as DECIMAL.
+test:do_catchsql_test(
+    "dec-17.5",
+    [[
+        SELECT 999999999999999999999999999999999999;
+    ]], {
+        1, [[Integer literal 999999999999999999999999999999999999 exceeds ]]..
+           "the supported range [-9223372036854775808, 18446744073709551615]"
+    })
 
 test:finish_test()

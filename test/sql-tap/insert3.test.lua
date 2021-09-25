@@ -236,7 +236,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "insert3-3.7",
     [[
-            CREATE TABLE t6(id INTEGER PRIMARY KEY AUTOINCREMENT, x INT ,y NUMBER DEFAULT 4.3, z TEXT DEFAULT 'hi');
+            CREATE TABLE t6(id INTEGER PRIMARY KEY AUTOINCREMENT, x INT,
+                            y DOUBLE DEFAULT 4.3, z TEXT DEFAULT 'hi');
             INSERT INTO t6 DEFAULT VALUES;
             SELECT * FROM t6;
     ]], {

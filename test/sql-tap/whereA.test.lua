@@ -23,7 +23,7 @@ test:do_test(
     "whereA-1.1",
     function()
         return test:execsql [[
-            CREATE TABLE t1(a INTEGER PRIMARY KEY, b NUMBER UNIQUE, c TEXT);
+            CREATE TABLE t1(a INTEGER PRIMARY KEY, b DOUBLE UNIQUE, c TEXT);
             INSERT INTO t1 VALUES(1,2,'3');
             INSERT INTO t1 values(2,55,'world');
             INSERT INTO t1 VALUES(3,4.53,NULL);

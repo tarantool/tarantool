@@ -804,6 +804,18 @@ case OP_Real: {            /* same as TK_FLOAT, out2 */
 	break;
 }
 
+/**
+ * Opcode: Decimal * P2 * P4 *
+ * Synopsis: r[P2]=P4
+ *
+ * P4 is a pointer to a DECIMAL value. Write that value into register P2.
+ */
+case OP_Decimal: {            /* same as TK_DECIMAL, out2 */
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
+	mem_set_dec(pOut, pOp->p4.dec);
+	break;
+}
+
 /* Opcode: String8 * P2 * P4 *
  * Synopsis: r[P2]='P4'
  *

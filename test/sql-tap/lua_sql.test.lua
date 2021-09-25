@@ -39,8 +39,8 @@ test:do_catchsql_test(
 for _, val in ipairs({
         {1, "'val'", "val"},
         {2, 1, 1},
-        {3, "1.0", 1},
-        {4, 1.5, 1.5},
+        {3, "1.0e0", 1},
+        {4, 1.5, require('decimal').new(1.5)},
     }) do
     local tn = val[1]
     local param = val[2]

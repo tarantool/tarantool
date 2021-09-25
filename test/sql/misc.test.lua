@@ -24,6 +24,8 @@ box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b TEXT CONSTRAINT c1 COL
 box.execute('SELECT 1;')
 box.execute('SELECT 1.5;')
 box.execute('SELECT 1.0;')
+box.execute('SELECT 1.5e0;')
+box.execute('SELECT 1e0;')
 box.execute('SELECT \'abc\';')
 box.execute('SELECT X\'4D6564766564\'')
 

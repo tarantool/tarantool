@@ -25,7 +25,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "gh-5364-1.3",
     [[
-        SELECT 9 >> 2.0;
+        SELECT 9 >> 2e0;
     ]], {
         1, "Type mismatch: can not convert double(2.0) to unsigned"
     })
@@ -82,7 +82,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "gh-5364-2.3",
     [[
-        SELECT 9 << 2.0;
+        SELECT 9 << 2e0;
     ]], {
         1, "Type mismatch: can not convert double(2.0) to unsigned"
     })
@@ -139,7 +139,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "gh-5364-3.3",
     [[
-        SELECT 9 & 2.0;
+        SELECT 9 & 2e0;
     ]], {
         1, "Type mismatch: can not convert double(2.0) to unsigned"
     })
@@ -196,7 +196,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "gh-5364-4.3",
     [[
-        SELECT 9 | 2.0;
+        SELECT 9 | 2e0;
     ]], {
         1, "Type mismatch: can not convert double(2.0) to unsigned"
     })

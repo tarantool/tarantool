@@ -46,7 +46,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     1.3,
     [[
-        CREATE TABLE t3(x NUMBER primary key);
+        CREATE TABLE t3(x DOUBLE primary key);
         INSERT INTO t3 VALUES(1.0);
     ]], {
         -- <1.3>
@@ -57,7 +57,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     1.4,
     [[
-        CREATE TABLE t4(x NUMBER primary key);
+        CREATE TABLE t4(x DOUBLE primary key);
         INSERT INTO t4 VALUES(1.11);
     ]], {
         -- <1.4>
@@ -92,7 +92,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     2.2,
     [[
-        SELECT x FROM t1 WHERE x IN (1.0);
+        SELECT x FROM t1 WHERE x IN (1e0);
     ]], {
         -- <2.2>
         1, "Type mismatch: can not convert double(1.0) to string"
@@ -132,7 +132,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     2.6,
     [[
-        SELECT x FROM t1 WHERE 1.0 IN (x);
+        SELECT x FROM t1 WHERE 1e0 IN (x);
     ]], {
         -- <2.6>
         1, "Type mismatch: can not convert double(1.0) to string"
@@ -225,7 +225,7 @@ test:do_catchsql_test(
         SELECT x FROM t3 WHERE x IN ('1');
     ]], {
         -- <4.3>
-        1, "Type mismatch: can not convert string('1') to number"
+        1, "Type mismatch: can not convert string('1') to double"
         -- </4.3>
     })
 
@@ -235,7 +235,7 @@ test:do_catchsql_test(
         SELECT x FROM t3 WHERE x IN ('1.0');
     ]], {
         -- <4.4>
-        1, "Type mismatch: can not convert string('1.0') to number"
+        1, "Type mismatch: can not convert string('1.0') to double"
         -- </4.4>
     })
 
@@ -265,7 +265,7 @@ test:do_catchsql_test(
         SELECT x FROM t3 WHERE '1' IN (x);
     ]], {
         -- <4.7>
-        1, "Type mismatch: can not convert string('1') to number"
+        1, "Type mismatch: can not convert string('1') to double"
         -- </4.7>
     })
 
@@ -275,7 +275,7 @@ test:do_catchsql_test(
         SELECT x FROM t3 WHERE '1.0' IN (x);
     ]], {
         -- <4.8>
-        1, "Type mismatch: can not convert string('1.0') to number"
+        1, "Type mismatch: can not convert string('1.0') to double"
         -- </4.8>
     })
 
@@ -305,7 +305,7 @@ test:do_catchsql_test(
         SELECT x FROM t4 WHERE x IN ('1');
     ]], {
         -- <5.3>
-        1, "Type mismatch: can not convert string('1') to number"
+        1, "Type mismatch: can not convert string('1') to double"
         -- </5.3>
     })
 
@@ -315,7 +315,7 @@ test:do_catchsql_test(
         SELECT x FROM t4 WHERE x IN ('1.0');
     ]], {
         -- <5.4>
-        1, "Type mismatch: can not convert string('1.0') to number"
+        1, "Type mismatch: can not convert string('1.0') to double"
         -- </5.4>
     })
 
@@ -335,7 +335,7 @@ test:do_catchsql_test(
         SELECT x FROM t4 WHERE x IN ('1.11');
     ]], {
         -- <5.6>
-        1, "Type mismatch: can not convert string('1.11') to number"
+        1, "Type mismatch: can not convert string('1.11') to double"
         -- </5.6>
     })
 
@@ -365,7 +365,7 @@ test:do_catchsql_test(
         SELECT x FROM t4 WHERE '1' IN (x);
     ]], {
         -- <5.9>
-        1, "Type mismatch: can not convert string('1') to number"
+        1, "Type mismatch: can not convert string('1') to double"
         -- </5.9>
     })
 
@@ -375,7 +375,7 @@ test:do_catchsql_test(
         SELECT x FROM t4 WHERE '1.0' IN (x);
     ]], {
         -- <5.10>
-        1, "Type mismatch: can not convert string('1.0') to number"
+        1, "Type mismatch: can not convert string('1.0') to double"
         -- </5.10>
     })
 
@@ -395,7 +395,7 @@ test:do_catchsql_test(
         SELECT x FROM t4 WHERE '1.11' IN (x);
     ]], {
         -- <5.12>
-        1, "Type mismatch: can not convert string('1.11') to number"
+        1, "Type mismatch: can not convert string('1.11') to double"
         -- </5.12>
     })
 

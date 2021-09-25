@@ -125,7 +125,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     4.0,
     [[
-        SELECT 1+1.;
+        SELECT 1+1e0;
     ]], {
         -- <4.0>
         2.0

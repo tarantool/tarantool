@@ -759,7 +759,7 @@ test:do_test(
     "select4-8.1",
     function()
         test:execsql [[
-            CREATE TABLE t3(a text primary key, b NUMBER, c text);
+            CREATE TABLE t3(a text primary key, b DOUBLE, c text);
             START TRANSACTION;
             INSERT INTO t3 VALUES('1', 1.1, '1.1');
             INSERT INTO t3 VALUES('2', 1.10, '1.10');

@@ -114,7 +114,7 @@ box.execute('SELECT CAST(\'18446744073709551616\' AS INTEGER);')
 -- float 18446744073709551600 -> int (18446744073709551616),
 -- with error due to conversion = 16.
 --
-box.execute('SELECT CAST(18446744073709551600. AS INTEGER);')
+box.execute('SELECT CAST(18446744073709551600e0 AS INTEGER);')
 ---
 - null
 - 'Type mismatch: can not convert double(1.84467440737096e+19) to integer'

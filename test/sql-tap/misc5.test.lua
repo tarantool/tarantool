@@ -217,7 +217,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc5-5.1",
     [[
-        SELECT .1
+        SELECT 0.1e0
     ]], {
         -- <misc5-5.1>
         0.1
@@ -227,7 +227,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc5-5.2",
     [[
-        SELECT 2.
+        SELECT 2e0
     ]], {
         -- <misc5-5.2>
         2.0

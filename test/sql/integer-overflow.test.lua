@@ -32,7 +32,7 @@ box.execute('SELECT CAST(\'18446744073709551616\' AS INTEGER);')
 -- float 18446744073709551600 -> int (18446744073709551616),
 -- with error due to conversion = 16.
 --
-box.execute('SELECT CAST(18446744073709551600. AS INTEGER);')
+box.execute('SELECT CAST(18446744073709551600e0 AS INTEGER);')
 -- gh-3810: make sure that if space contains integers in range
 -- [INT64_MAX, UINT64_MAX], they are handled inside SQL in a
 -- proper way, which now means that an error is raised.

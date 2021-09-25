@@ -6,7 +6,7 @@ test:plan(1)
 test:do_execsql_test(
     "gh-6239",
     [[
-        SELECT QUOTE(1.5), TYPEOF(QUOTE(1.5));
+        SELECT QUOTE(1.5e0), TYPEOF(QUOTE(1.5e0));
     ]], {
         1.5, "double"
     })
