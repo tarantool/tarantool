@@ -230,7 +230,7 @@ test_static_docker_build:
 # OSX #
 #######
 
-OSX_PKGS=openssl readline curl icu4c libiconv zlib autoconf automake libtool \
+OSX_PKGS=openssl@1.1 readline curl icu4c libiconv zlib autoconf automake libtool \
 	cmake python3
 
 deps_osx:
