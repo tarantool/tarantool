@@ -150,12 +150,7 @@ tuple_dictionary_new(const struct field_def *fields, uint32_t field_count)
 			 "mh_strnu32_new", "dict->hash");
 		goto err_hash;
 	}
-	if (mh_strnu32_reserve(dict->hash, field_count, NULL) != 0) {
-		diag_set(OutOfMemory, field_count *
-			 sizeof(struct mh_strnu32_node_t), "mh_strnu32_reserve",
-			 "dict->hash");
-		goto err_name;
-	}
+	mh_strnu32_reserve(dict->hash, field_count, NULL);
 	char *pos = (char *) dict->names + names_offset;
 	for (uint32_t i = 0; i < field_count; ++i) {
 		int len = strlen(fields[i].name);
