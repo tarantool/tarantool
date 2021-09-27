@@ -61,6 +61,7 @@
 #define MH_INCREMENTAL_RESIZE 1
 #endif
 
+#include <assert.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <math.h>
@@ -157,13 +158,12 @@ struct _mh(t) {
 #define MH_DENSITY 0.7
 
 struct _mh(t) * _mh(new)();
-int _mh(clear)(struct _mh(t) *h);
+void _mh(clear)(struct _mh(t) *h);
 void _mh(delete)(struct _mh(t) *h);
 void _mh(resize)(struct _mh(t) *h, mh_arg_t arg);
-int _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
-		      mh_arg_t arg);
-int _mh(reserve)(struct _mh(t) *h, mh_int_t size,
-		  mh_arg_t arg);
+void _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
+		       mh_arg_t arg);
+void _mh(reserve)(struct _mh(t) *h, mh_int_t size, mh_arg_t arg);
 void NOINLINE _mh(del_resize)(struct _mh(t) *h, mh_int_t x,
 					       mh_arg_t arg);
 size_t _mh(memsize)(struct _mh(t) *h);
@@ -300,7 +300,6 @@ _mh(put_slot)(struct _mh(t) *h, const mh_node_t *node, int *exist,
  *
  * @retval != mh_end()   pos of the new node, ret is either NULL
  *                       or copy of the old node
- * @retval  mh_end()     out of memory, ret is unchanged.
  */
 static inline mh_int_t
 _mh(put)(struct _mh(t) *h, const mh_node_t *node, mh_node_t **ret,
@@ -308,24 +307,20 @@ _mh(put)(struct _mh(t) *h, const mh_node_t *node, mh_node_t **ret,
 {
 	mh_int_t x = mh_end(h);
 	int exist;
-	if (h->size == h->n_buckets)
-		/* no one free elements in the hash table */
-		goto put_done;
+
+	assert(h->size < h->n_buckets);
 
 #if MH_INCREMENTAL_RESIZE
 	if (mh_unlikely(h->resize_position > 0))
 		_mh(resize)(h, arg);
 	else if (mh_unlikely(h->n_dirty >= h->upper_bound)) {
-		if (_mh(start_resize)(h, h->n_buckets + 1, 0, arg))
-			goto put_done;
+		_mh(start_resize)(h, h->n_buckets + 1, 0, arg);
 	}
 	if (h->resize_position)
 		_mh(put)(h->shadow, node, NULL, arg);
 #else
 	if (mh_unlikely(h->n_dirty >= h->upper_bound)) {
-		if (_mh(start_resize)(h, h->n_buckets + 1, h->size,
-				      arg))
-			goto put_done;
+		_mh(start_resize)(h, h->n_buckets + 1, h->size, arg);
 	}
 #endif
 
@@ -338,8 +333,6 @@ _mh(put)(struct _mh(t) *h, const mh_node_t *node, mh_node_t **ret,
 			*ret = NULL;
 	}
 	memcpy(&(h->p[x]), node, sizeof(mh_node_t));
-
-put_done:
 	return x;
 }
 
@@ -399,50 +392,30 @@ _mh(del_resize)(struct _mh(t) *h, mh_int_t x,
 struct _mh(t) *
 _mh(new)()
 {
-	struct _mh(t) *h = (struct _mh(t) *)calloc(1, sizeof(*h));
-	if (h == NULL)
-		return NULL;
-	h->shadow = (struct _mh(t) *)calloc(1, sizeof(*h));
-	if (h->shadow == NULL)
-		goto fail;
+	struct _mh(t) *h = (struct _mh(t) *)xcalloc(1, sizeof(*h));
+	h->shadow = (struct _mh(t) *)xcalloc(1, sizeof(*h));
 	h->prime = 0;
 	h->n_buckets = __ac_prime_list[h->prime];
-	h->p = (mh_node_t *)calloc(h->n_buckets, sizeof(mh_node_t));
-	if (h->p == NULL)
-		goto fail;
+	h->p = (mh_node_t *)xcalloc(h->n_buckets, sizeof(mh_node_t));
 #if !mh_bytemap
-	h->b = (uint32_t *)calloc(h->n_buckets / 16 + 1, sizeof(uint32_t));
+	h->b = (uint32_t *)xcalloc(h->n_buckets / 16 + 1, sizeof(uint32_t));
 #else
-	h->b = (uint8_t *)calloc(h->n_buckets, sizeof(uint8_t));
+	h->b = (uint8_t *)xcalloc(h->n_buckets, sizeof(uint8_t));
 #endif
-	if (h->b == NULL)
-		goto fail;
 	h->upper_bound = h->n_buckets * MH_DENSITY;
 	return h;
-
-fail:
-	free(h->p);
-	free(h->shadow);
-	free(h);
-	return NULL;
 }
 
-int
+void
 _mh(clear)(struct _mh(t) *h)
 {
 	mh_int_t n_buckets = __ac_prime_list[h->prime];
-	mh_node_t *p = (mh_node_t *)calloc(n_buckets, sizeof(mh_node_t));
-	if (p == NULL)
-		return -1;
+	mh_node_t *p = (mh_node_t *)xcalloc(n_buckets, sizeof(mh_node_t));
 #if !mh_bytemap
-	uint32_t *b = (uint32_t *)calloc(n_buckets / 16 + 1, sizeof(uint32_t));
+	uint32_t *b = (uint32_t *)xcalloc(n_buckets / 16 + 1, sizeof(uint32_t));
 #else
-	uint8_t *b = (uint8_t *)calloc(n_buckets, sizeof(uint8_t));
+	uint8_t *b = (uint8_t *)xcalloc(n_buckets, sizeof(uint8_t));
 #endif
-	if (b == NULL) {
-		free(p);
-		return -1;
-	}
 	if (h->shadow->p) {
 		free(h->shadow->p);
 		free(h->shadow->b);
@@ -456,7 +429,6 @@ _mh(clear)(struct _mh(t) *h)
 	h->b = b;
 	h->size = 0;
 	h->upper_bound = h->n_buckets * MH_DENSITY;
-	return 0;
 }
 
 void
@@ -498,8 +470,7 @@ _mh(memsize)(struct _mh(t) *h)
 }
 
 void
-_mh(resize)(struct _mh(t) *h,
-	    mh_arg_t arg)
+_mh(resize)(struct _mh(t) *h, mh_arg_t arg)
 {
 	struct _mh(t) *s = h->shadow;
 	int exist;
@@ -527,17 +498,17 @@ _mh(resize)(struct _mh(t) *h,
 	memset(s, 0, sizeof(*s));
 }
 
-int
+void
 _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 		  mh_arg_t arg)
 {
 	if (h->resize_position) {
 		/* resize has already been started */
-		return 0;
+		return;
 	}
 	if (buckets < h->n_buckets) {
 		/* hash size is already greater than requested */
-		return 0;
+		return;
 	}
 	mh_int_t new_prime = h->prime;
 	while (new_prime < __ac_HASH_PRIME_SIZE - 1) {
@@ -556,19 +527,12 @@ _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 	}
 
 	mh_int_t n_buckets = __ac_prime_list[new_prime];
-	mh_node_t *p = (mh_node_t *)malloc(n_buckets * sizeof(mh_node_t));
-	if (p == NULL)
-		return -1;
+	mh_node_t *p = (mh_node_t *)xmalloc(n_buckets * sizeof(mh_node_t));
 #if !mh_bytemap
-	uint32_t *b = (uint32_t *)calloc(n_buckets / 16 + 1, sizeof(uint32_t));
+	uint32_t *b = (uint32_t *)xcalloc(n_buckets / 16 + 1, sizeof(uint32_t));
 #else
-	uint8_t *b = (uint8_t *)calloc(n_buckets, sizeof(uint8_t));
+	uint8_t *b = (uint8_t *)xcalloc(n_buckets, sizeof(uint8_t));
 #endif
-	if (b == NULL) {
-		free(p);
-		return -1;
-	}
-
 	h->prime = new_prime;
 	h->batch = new_batch;
 	struct _mh(t) *s = h->shadow;
@@ -581,15 +545,13 @@ _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 	s->p = p;
 	s->b = b;
 	_mh(resize)(h, arg);
-
-	return 0;
 }
 
-int
+void
 _mh(reserve)(struct _mh(t) *h, mh_int_t size,
 	     mh_arg_t arg)
 {
-	return _mh(start_resize)(h, size/MH_DENSITY, h->size, arg);
+	_mh(start_resize)(h, size/MH_DENSITY, h->size, arg);
 }
 
 #ifndef mh_stat
