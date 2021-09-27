@@ -94,11 +94,6 @@ get_proc_name(unw_cursor_t *unw_cur, unw_word_t *offset, bool skip_cache)
 	if (proc_cache == NULL) {
 		region_create(&cache_region, &cord()->slabc);
 		proc_cache = mh_i64ptr_new();
-		if (proc_cache == NULL) {
-			unw_get_proc_name(unw_cur, proc_name, sizeof(proc_name),
-					  offset);
-			goto error;
-		}
 	}
 
 	k  = mh_i64ptr_find(proc_cache, ip, NULL);

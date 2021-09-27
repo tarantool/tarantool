@@ -1907,12 +1907,6 @@ swim_new(uint64_t generation)
 	}
 	swim->initial_generation = generation;
 	swim->members = mh_swim_table_new();
-	if (swim->members == NULL) {
-		free(swim);
-		diag_set(OutOfMemory, sizeof(*swim->members),
-			 "mh_swim_table_new", "members");
-		return NULL;
-	}
 	rlist_create(&swim->round_queue);
 	swim_ev_timer_init(&swim->round_tick, swim_begin_step,
 			   0, HEARTBEAT_RATE_DEFAULT);

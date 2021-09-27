@@ -423,8 +423,7 @@ coll_init(void)
 	coll_cache = mh_coll_new();
 	icu_ucase_default_map = ucasemap_open("", 0, &err);
 	icu_utf8_conv = ucnv_open("utf8", &err);
-	if (coll_cache == NULL || icu_ucase_default_map == NULL ||
-	    icu_utf8_conv == NULL)
+	if (icu_ucase_default_map == NULL || icu_utf8_conv == NULL)
 		panic("Can not create system collations cache");
 }
 

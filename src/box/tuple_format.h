@@ -434,9 +434,8 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
 
 /**
  * Initialize tuple format subsystem.
- * @retval 0 on success, -1 otherwise.
  */
-int
+void
 tuple_format_init();
 
 

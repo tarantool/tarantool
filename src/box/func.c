@@ -109,16 +109,10 @@ func_split_name(const char *str, struct func_name *name)
 /** Schema modules hash. */
 static struct mh_strnptr_t *modules = NULL;
 
-int
+void
 schema_module_init(void)
 {
 	modules = mh_strnptr_new();
-	if (modules == NULL) {
-		diag_set(OutOfMemory, sizeof(*modules), "malloc",
-			  "modules hash table");
-		return -1;
-	}
-	return 0;
 }
 
 void

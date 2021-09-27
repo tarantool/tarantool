@@ -42,8 +42,6 @@ void
 sql_stmt_cache_init(void)
 {
 	sql_stmt_cache.hash = mh_i32ptr_new();
-	if (sql_stmt_cache.hash == NULL)
-		panic("out of memory");
 	sql_stmt_cache.mem_quota = 0;
 	sql_stmt_cache.mem_used = 0;
 	rlist_create(&sql_stmt_cache.gc_queue);

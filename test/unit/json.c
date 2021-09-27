@@ -219,8 +219,7 @@ test_tree()
 	plan(65);
 
 	struct json_tree tree;
-	int rc = json_tree_create(&tree);
-	fail_if(rc != 0);
+	json_tree_create(&tree);
 
 	struct test_struct records[7];
 	for (int i = 0; i < 6; i++)
@@ -519,8 +518,7 @@ test_path_snprint()
 	plan(9);
 
 	struct json_tree tree;
-	int rc = json_tree_create(&tree);
-	fail_if(rc != 0);
+	json_tree_create(&tree);
 	struct test_struct records[6];
 	const char *path = "[1][*][20][\"file\"][8]";
 	int path_len = strlen(path);
@@ -533,7 +531,7 @@ test_path_snprint()
 	char buf[64];
 	int bufsz = sizeof(buf);
 
-	rc = json_tree_snprint_path(buf, bufsz, &node->node, INDEX_BASE);
+	int rc = json_tree_snprint_path(buf, bufsz, &node->node, INDEX_BASE);
 	is(rc, path_len, "full path - retval");
 	is(buf[path_len], '\0', "full path - terminating nul");
 	is(memcmp(buf, path, path_len), 0, "full path - output");

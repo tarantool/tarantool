@@ -241,13 +241,9 @@ memtx_tx_manager_init()
 			       cord_slab_cache(), item_size);
 	}
 	txm.history = mh_history_new();
-	if (txm.history == NULL)
-		panic("mh_history_new()");
 	mempool_create(&txm.point_hole_item_pool,
 		       cord_slab_cache(), sizeof(struct point_hole_item));
 	txm.point_holes = mh_point_holes_new();
-	if (txm.point_holes == NULL)
-		panic("mh_history_new()");
 	mempool_create(&txm.gap_item_mempoool,
 		       cord_slab_cache(), sizeof(struct gap_item));
 	mempool_create(&txm.full_scan_item_mempool,
@@ -2464,13 +2460,6 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 	if (space == NULL || rlist_empty(&space->memtx_stories))
 		return 0;
 	struct mh_snapshot_cleaner_t *ht = mh_snapshot_cleaner_new();
-	if (ht == NULL) {
-		diag_set(OutOfMemory, sizeof(*ht),
-			 index_name, "snapshot cleaner");
-		free(ht);
-		return -1;
-	}
-
 	struct memtx_story *story;
 	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories) {
 		struct tuple *tuple = story->tuple;

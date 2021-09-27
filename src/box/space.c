@@ -207,11 +207,6 @@ space_create(struct space *space, struct engine *engine,
 		}
 	}
 	space->constraint_ids = mh_strnptr_new();
-	if (space->constraint_ids == NULL) {
-		diag_set(OutOfMemory, sizeof(*space->constraint_ids), "malloc",
-			 "constraint_ids");
-		goto fail;
-	}
 	rlist_create(&space->memtx_stories);
 	return 0;
 

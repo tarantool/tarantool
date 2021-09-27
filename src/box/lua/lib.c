@@ -586,8 +586,6 @@ void
 box_lua_lib_init(struct lua_State *L)
 {
 	func_hash = mh_strnptr_new();
-	if (func_hash == NULL)
-		panic("box.lib: Can't allocate func hash table");
 
 	static const struct luaL_Reg top_methods[] = {
 		{ "load",		lbox_module_load	},

@@ -649,12 +649,7 @@ tuple_format_alloc(struct key_def * const *keys, uint16_t key_count,
 			 "tuple format");
 		return NULL;
 	}
-	if (json_tree_create(&format->fields) != 0) {
-		diag_set(OutOfMemory, 0, "json_lexer_create",
-			 "tuple field tree");
-		free(format);
-		return NULL;
-	}
+	json_tree_create(&format->fields);
 	for (uint32_t fieldno = 0; fieldno < field_count; fieldno++) {
 		struct tuple_field *field = tuple_field_new();
 		if (field == NULL)
@@ -981,16 +976,10 @@ tuple_format_min_field_count(struct key_def * const *keys, uint16_t key_count,
 	return min_field_count;
 }
 
-int
+void
 tuple_format_init()
 {
 	tuple_formats_hash = mh_tuple_format_new();
-	if (tuple_formats_hash == NULL) {
-		diag_set(OutOfMemory, sizeof(struct mh_tuple_format_t), "malloc",
-			 "tuple format hash");
-		return -1;
-	}
-	return 0;
 }
 
 /** Destroy tuple format subsystem and free resourses */

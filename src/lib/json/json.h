@@ -330,10 +330,8 @@ json_tree_snprint_path(char *buf, int size, const struct json_token *token,
 
 /**
  * Initialize a new empty JSON tree.
- *
- * Returns 0 on success, -1 on memory allocation error.
  */
-int
+void
 json_tree_create(struct json_tree *tree);
 
 /**

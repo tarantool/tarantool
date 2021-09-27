@@ -2358,8 +2358,6 @@ void
 sql_built_in_functions_cache_init(void)
 {
 	built_in_functions = mh_strnptr_new();
-	if (built_in_functions == NULL)
-		panic("Out of memory on creating SQL built-in functions hash");
 	for (uint32_t i = 0; i < nelem(dictionaries); ++i)
 		built_in_func_put(&dictionaries[i]);
 

@@ -145,11 +145,6 @@ tuple_dictionary_new(const struct field_def *fields, uint32_t field_count)
 		goto err_memory;
 	}
 	dict->hash = mh_strnu32_new();
-	if (dict->hash == NULL) {
-		diag_set(OutOfMemory, sizeof(*dict->hash),
-			 "mh_strnu32_new", "dict->hash");
-		goto err_hash;
-	}
 	mh_strnu32_reserve(dict->hash, field_count, NULL);
 	char *pos = (char *) dict->names + names_offset;
 	for (uint32_t i = 0; i < field_count; ++i) {
@@ -165,7 +160,6 @@ tuple_dictionary_new(const struct field_def *fields, uint32_t field_count)
 
 err_name:
 	tuple_dictionary_delete_hash(dict->hash);
-err_hash:
 	free(dict->names);
 err_memory:
 	free(dict);
