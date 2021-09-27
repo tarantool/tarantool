@@ -1271,63 +1271,46 @@ likeFunc(sql_context *context, int argc, struct Mem *argv)
 {
 	u32 escape = SQL_END_OF_STRING;
 	int nPat;
-	if (argc != 2 && argc != 3) {
-		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT,
-			 "LIKE", "2 or 3", argc);
-		context->is_aborted = true;
+	assert(argc == 2 || argc == 3);
+	if (mem_is_any_null(&argv[0], &argv[1]))
 		return;
-	}
-	sql *db = sql_context_db_handle(context);
-	int rhs_type = sql_value_type(&argv[0]);
-	int lhs_type = sql_value_type(&argv[1]);
-
-	if (lhs_type != MP_STR || rhs_type != MP_STR) {
-		if (lhs_type == MP_NIL || rhs_type == MP_NIL)
-			return;
-		const char *str = rhs_type != MP_STR ?
-				  mem_str(&argv[0]) : mem_str(&argv[1]);
-		diag_set(ClientError, ER_INCONSISTENT_TYPES, "string", str);
-		context->is_aborted = true;
-		return;
-	}
-	const char *zB = mem_as_str0(&argv[0]);
-	const char *zA = mem_as_str0(&argv[1]);
-	const char *zB_end = zB + mem_len_unsafe(&argv[0]);
-	const char *zA_end = zA + mem_len_unsafe(&argv[1]);
+	assert(mem_is_str(&argv[0]) && mem_is_str(&argv[1]));
+	const char *zB = argv[0].z;
+	const char *zA = argv[1].z;
+	const char *zB_end = zB + argv[0].n;
+	const char *zA_end = zA + argv[1].n;
 
 	/*
 	 * Limit the length of the LIKE pattern to avoid problems
 	 * of deep recursion and N*N behavior in
 	 * sql_utf8_pattern_compare().
 	 */
-	nPat = mem_len_unsafe(&argv[0]);
-	testcase(nPat == db->aLimit[SQL_LIMIT_LIKE_PATTERN_LENGTH]);
-	testcase(nPat == db->aLimit[SQL_LIMIT_LIKE_PATTERN_LENGTH] + 1);
-	if (nPat > db->aLimit[SQL_LIMIT_LIKE_PATTERN_LENGTH]) {
+	nPat = argv[0].n;
+	if (nPat > sql_get()->aLimit[SQL_LIMIT_LIKE_PATTERN_LENGTH]) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "LIKE pattern is too "\
 			 "complex");
 		context->is_aborted = true;
 		return;
 	}
-	/* Encoding did not change */
-	assert(zB == mem_as_str0(&argv[0]));
 
 	if (argc == 3) {
+		if (mem_is_null(&argv[2]))
+			return;
 		/*
 		 * The escape character string must consist of a
 		 * single UTF-8 character. Otherwise, return an
 		 * error.
 		 */
-		const unsigned char *zEsc = mem_as_ustr(&argv[2]);
-		if (zEsc == 0)
-			return;
-		if (sql_utf8_char_count(zEsc, mem_len_unsafe(&argv[2])) != 1) {
+		const char *str = argv[2].z;
+		int pos = 0;
+		int end = argv[2].n;
+		U8_NEXT((uint8_t *)str, pos, end, escape);
+		if (pos != end || end == 0) {
 			diag_set(ClientError, ER_SQL_EXECUTE, "ESCAPE "\
 				 "expression must be a single character");
 			context->is_aborted = true;
 			return;
 		}
-		escape = sqlUtf8Read(&zEsc);
 	}
 	if (!zA || !zB)
 		return;
@@ -1342,7 +1325,7 @@ likeFunc(sql_context *context, int argc, struct Mem *argv)
 		context->is_aborted = true;
 		return;
 	}
-	sql_result_bool(context, res == MATCH);
+	mem_set_bool(context->pOut, res == MATCH);
 }
 
 /**
