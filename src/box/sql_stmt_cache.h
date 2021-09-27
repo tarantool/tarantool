@@ -111,7 +111,7 @@ sql_session_stmt_hash_erase(struct mh_i32ptr_t *hash);
  * to session-local hash and increase its ref counter.
  * @hash is assumed to be member of struct session @sql_stmts.
  */
-int
+void
 sql_session_stmt_hash_add_id(struct mh_i32ptr_t *hash, uint32_t stmt_id);
 
 /**

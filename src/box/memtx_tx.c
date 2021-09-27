@@ -388,13 +388,7 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	const struct memtx_story **put_story =
 		(const struct memtx_story **) &story;
 	struct memtx_story **empty = NULL;
-	mh_int_t pos = mh_history_put(txm.history, put_story, &empty, 0);
-	if (pos == mh_end(txm.history)) {
-		mempool_free(pool, story);
-		diag_set(OutOfMemory, pos + 1, "mh_history_put",
-			 "mh_history_node");
-		return NULL;
-	}
+	mh_history_put(txm.history, put_story, &empty, 0);
 	tuple->is_dirty = true;
 	tuple_ref(tuple);
 
@@ -2186,14 +2180,7 @@ point_hole_storage_new(struct index *index, const char *key,
 		(const struct point_hole_item **) &object;
 	struct point_hole_item *replaced = NULL;
 	struct point_hole_item **preplaced = &replaced;
-	mh_int_t pos = mh_point_holes_put(txm.point_holes, put,
-					    &preplaced, 0);
-	if (pos == mh_end(txm.point_holes)) {
-		mempool_free(pool, object);
-		diag_set(OutOfMemory, pos + 1, "mh_holes_storage_put",
-			 "mh_holes_storage_node");
-		return -1;
-	}
+	mh_point_holes_put(txm.point_holes, put, &preplaced, 0);
 	if (preplaced != NULL) {
 		/*
 		 * The item in hash table was overwitten. It's OK, but
@@ -2233,9 +2220,7 @@ point_hole_storage_delete(struct point_hole_item *object)
 			(const struct point_hole_item **) &another;
 		struct point_hole_item *replaced = NULL;
 		struct point_hole_item **preplaced = &replaced;
-		mh_int_t pos = mh_point_holes_put(txm.point_holes, put,
-						    &preplaced, 0);
-		assert(pos != mh_end(txm.point_holes)); (void)pos;
+		mh_point_holes_put(txm.point_holes, put, &preplaced, 0);
 		assert(replaced == object);
 		rlist_del(&object->ring);
 		another->is_head = true;
@@ -2250,7 +2235,6 @@ point_hole_storage_delete(struct point_hole_item *object)
 		mh_int_t pos = mh_point_holes_put_slot(txm.point_holes, put,
 						       &exist, 0);
 		assert(exist);
-		assert(pos != mh_end(txm.point_holes));
 		mh_point_holes_del(txm.point_holes, pos, 0);
 		txm.point_holes_size--;
 	}
@@ -2452,13 +2436,13 @@ struct memtx_tx_snapshot_cleaner_entry
 #define MH_SOURCE
 #include "salad/mhash.h"
 
-int
+void
 memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
-				 struct space *space, const char *index_name)
+				 struct space *space)
 {
 	cleaner->ht = NULL;
 	if (space == NULL || rlist_empty(&space->memtx_stories))
-		return 0;
+		return;
 	struct mh_snapshot_cleaner_t *ht = mh_snapshot_cleaner_new();
 	struct memtx_story *story;
 	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories) {
@@ -2472,17 +2456,10 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 		struct memtx_tx_snapshot_cleaner_entry entry;
 		entry.from = tuple;
 		entry.to = clean;
-		mh_int_t res =  mh_snapshot_cleaner_put(ht,  &entry, NULL, 0);
-		if (res == mh_end(ht)) {
-			diag_set(OutOfMemory, sizeof(entry),
-				 index_name, "snapshot rollback entry");
-			mh_snapshot_cleaner_delete(ht);
-			return -1;
-		}
+		mh_snapshot_cleaner_put(ht,  &entry, NULL, 0);
 	}
 
 	cleaner->ht = ht;
-	return 0;
 }
 
 struct tuple *

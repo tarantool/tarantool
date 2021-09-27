@@ -241,10 +241,7 @@ tuple_ref_set_uploaded_refs(struct tuple *tuple, uint32_t refs)
 	struct tuple_uploaded_refs put;
 	put.tuple = tuple;
 	put.refs = refs;
-	mh_int_t pos = mh_tuple_uploaded_refs_put(tuple_uploaded_refs, &put,
-						  NULL, 0);
-	if (pos == mh_end(tuple_uploaded_refs))
-		panic("Failed to allocate storage for tuple refs");
+	mh_tuple_uploaded_refs_put(tuple_uploaded_refs, &put, NULL, 0);
 }
 
 /** Convenient helper for hash table. */

@@ -453,12 +453,10 @@ memtx_tx_on_space_delete(struct space *space);
  * Create a snapshot cleaner.
  * @param cleaner - cleaner to create.
  * @param space - space for which the cleaner must be created.
- * @param index_name - name of index for diag in case of memory error.
- * @return 0 on success, -1 on memory erorr.
  */
-int
+void
 memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
-				 struct space *space, const char *index_name);
+				 struct space *space);
 
 /** Helper of txm_snapshot_clafify. */
 struct tuple *

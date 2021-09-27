@@ -989,12 +989,6 @@ iproto_msg_start_processing_in_stream(struct iproto_msg *msg)
 		node.key = stream_id;
 		node.val = stream;
 		pos = mh_i64ptr_put(con->streams, &node, NULL, NULL);
-		if (pos == mh_end(con->streams)) {
-			iproto_stream_delete(stream);
-			diag_set(OutOfMemory, pos + 1, "mh_streams_put",
-				 "mh_streams_node");
-			return -1;
-		}
 	}
 	stream = (struct iproto_stream *)mh_i64ptr_node(con->streams, pos)->val;
 	assert(stream != NULL);

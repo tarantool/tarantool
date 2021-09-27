@@ -288,7 +288,7 @@ bool
 session_check_stmt_id(struct session *session, uint32_t stmt_id);
 
 /** Add prepared statement ID to the session hash. */
-int
+void
 session_add_stmt_id(struct session *session, uint32_t stmt_id);
 
 /** Remove prepared statement ID from the session hash. */

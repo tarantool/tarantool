@@ -1620,11 +1620,7 @@ memtx_tree_index_create_snapshot_iterator(struct index *base)
 	}
 
 	struct space *space = space_cache_find(base->def->space_id);
-	if (memtx_tx_snapshot_cleaner_create(&it->cleaner, space,
-					     "memtx_tree_index") != 0) {
-		free(it);
-		return NULL;
-	}
+	memtx_tx_snapshot_cleaner_create(&it->cleaner, space);
 
 	it->base.free = tree_snapshot_iterator_free<USE_HINT>;
 	it->base.next = tree_snapshot_iterator_next<USE_HINT>;

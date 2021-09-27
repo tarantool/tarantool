@@ -148,14 +148,7 @@ session_create(enum session_type type)
 	struct mh_i64ptr_node_t node;
 	node.key = session->id;
 	node.val = session;
-
-	mh_int_t k = mh_i64ptr_put(session_registry, &node, NULL, NULL);
-
-	if (k == mh_end(session_registry)) {
-		mempool_free(&session_pool, session);
-		diag_set(OutOfMemory, 0, "session hash", "new session");
-		return NULL;
-	}
+	mh_i64ptr_put(session_registry, &node, NULL, NULL);
 	return session;
 }
 
@@ -188,13 +181,13 @@ session_check_stmt_id(struct session *session, uint32_t stmt_id)
 	return i != mh_end(session->sql_stmts);
 }
 
-int
+void
 session_add_stmt_id(struct session *session, uint32_t id)
 {
 	if (session->sql_stmts == NULL) {
 		session->sql_stmts = mh_i32ptr_new();
 	}
-	return sql_session_stmt_hash_add_id(session->sql_stmts, id);
+	sql_session_stmt_hash_add_id(session->sql_stmts, id);
 }
 
 void

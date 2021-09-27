@@ -137,7 +137,7 @@ cache_find(const char *name, const char *name_end)
 /**
  * Save a module to the modules cache.
  */
-static int
+static void
 cache_put(struct schema_module *module)
 {
 	const char *str = module->base->package;
@@ -152,18 +152,12 @@ cache_put(struct schema_module *module)
 
 	struct mh_strnptr_node_t prev;
 	struct mh_strnptr_node_t *prev_ptr = &prev;
-
-	if (mh_strnptr_put(modules, &strnode, &prev_ptr, NULL) == mh_end(modules)) {
-		diag_set(OutOfMemory, sizeof(strnode), "malloc", "modules");
-		return -1;
-	}
-
+	mh_strnptr_put(modules, &strnode, &prev_ptr, NULL);
 	/*
 	 * Just to make sure we haven't replaced something, the
 	 * entries must be explicitly deleted.
 	 */
 	assert(prev_ptr == NULL);
-	return 0;
 }
 
 /**
@@ -463,10 +457,7 @@ func_c_load(struct func_c *func)
 		module = schema_module_load(name.package, name.package_end);
 		if (module == NULL)
 			return -1;
-		if (cache_put(module)) {
-			schema_module_unref(module);
-			return -1;
-		}
+		cache_put(module);
 	} else {
 		module = cached;
 		schema_module_ref(module);

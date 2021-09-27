@@ -393,11 +393,7 @@ coll_new(const struct coll_def *def)
 	}
 
 	struct mh_coll_node_t node = { fingerprint_len, hash, coll };
-	if (mh_coll_put(coll_cache, &node, NULL, NULL) == mh_end(coll_cache)) {
-		diag_set(OutOfMemory, sizeof(node), "malloc", "coll_cache");
-		coll_unref(coll);
-		return NULL;
-	}
+	mh_coll_put(coll_cache, &node, NULL, NULL);
 	return coll;
 }
 

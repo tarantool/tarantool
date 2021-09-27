@@ -207,22 +207,18 @@ netbox_request_destroy(struct netbox_request *request)
 
 /**
  * Adds a request to a transport. There must not be a request with the same id
- * (sync) in the transport. Returns -1 if out of memory.
+ * (sync) in the transport.
  */
-static int
+static void
 netbox_request_register(struct netbox_request *request,
 			struct netbox_transport *transport)
 {
 	struct mh_i64ptr_t *h = transport->requests;
 	struct mh_i64ptr_node_t node = { request->sync, request };
 	struct mh_i64ptr_node_t *old_node = NULL;
-	if (mh_i64ptr_put(h, &node, &old_node, NULL) == mh_end(h)) {
-		diag_set(OutOfMemory, 0, "mhash", "netbox_transport");
-		return -1;
-	}
+	mh_i64ptr_put(h, &node, &old_node, NULL);
 	assert(old_node == NULL);
 	request->transport = transport;
-	return 0;
 }
 
 /**
@@ -1824,10 +1820,7 @@ netbox_make_request(struct lua_State *L, int idx,
 	request->index_ref = LUA_NOREF;
 	request->result_ref = LUA_NOREF;
 	request->error = NULL;
-	if (netbox_request_register(request, transport) != 0) {
-		netbox_request_destroy(request);
-		luaT_error(L);
-	}
+	netbox_request_register(request, transport);
 }
 
 static int

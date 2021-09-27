@@ -193,20 +193,15 @@ sql_session_stmt_hash_erase(struct mh_i32ptr_t *hash)
 	mh_i32ptr_delete(hash);
 }
 
-int
+void
 sql_session_stmt_hash_add_id(struct mh_i32ptr_t *hash, uint32_t stmt_id)
 {
 	struct stmt_cache_entry *entry = stmt_cache_find_entry(stmt_id);
 	const struct mh_i32ptr_node_t id_node = { stmt_id, entry };
 	struct mh_i32ptr_node_t *old_node = NULL;
-	mh_int_t i = mh_i32ptr_put(hash, &id_node, &old_node, NULL);
-	if (i == mh_end(hash)) {
-		diag_set(OutOfMemory, 0, "mh_i32ptr_put", "mh_i32ptr_node");
-		return -1;
-	}
+	mh_i32ptr_put(hash, &id_node, &old_node, NULL);
 	assert(old_node == NULL);
 	entry->refs++;
-	return 0;
 }
 
 uint32_t
@@ -262,12 +257,7 @@ sql_stmt_cache_insert(struct sql_stmt *stmt)
 	assert(sql_stmt_cache_find(stmt_id) == NULL);
 	const struct mh_i32ptr_node_t id_node = { stmt_id, entry };
 	struct mh_i32ptr_node_t *old_node = NULL;
-	mh_int_t i = mh_i32ptr_put(hash, &id_node, &old_node, NULL);
-	if (i == mh_end(hash)) {
-		sql_cache_entry_delete(entry);
-		diag_set(OutOfMemory, 0, "mh_i32ptr_put", "mh_i32ptr_node");
-		return -1;
-	}
+	mh_i32ptr_put(hash, &id_node, &old_node, NULL);
 	assert(old_node == NULL);
 	sql_stmt_cache.mem_used += sql_cache_entry_sizeof(stmt);
 	return 0;

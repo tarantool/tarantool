@@ -2177,11 +2177,7 @@ built_in_func_put(struct sql_func_dictionary *dict)
 
 	uint32_t hash = mh_strn_hash(name, len);
 	const struct mh_strnptr_node_t strnode = {name, len, hash, dict};
-	mh_int_t k = mh_strnptr_put(built_in_functions, &strnode, NULL, NULL);
-	if (k == mh_end(built_in_functions)) {
-		panic("Out of memory on insertion into SQL built-in functions "
-		      "hash");
-	}
+	mh_strnptr_put(built_in_functions, &strnode, NULL, NULL);
 }
 
 /**
