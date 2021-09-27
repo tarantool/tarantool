@@ -321,7 +321,7 @@ test_oos_build:
 # OSX #
 #######
 
-OSX_PKGS=openssl readline curl icu4c libiconv zlib cmake python3
+OSX_PKGS=openssl@1.1 readline curl icu4c libiconv zlib cmake python3
 
 deps_osx:
 	# install brew using command from Homebrew repository instructions:
