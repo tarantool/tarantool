@@ -57,7 +57,7 @@ target_link_libraries(uuid.test uuid unit)
 add_executable(random.test random.c core_test_utils.c)
 target_link_libraries(random.test core unit)
 add_executable(xmalloc.test xmalloc.c core_test_utils.c)
-target_link_libraries(xmalloc.test core unit)
+target_link_libraries(xmalloc.test unit)
 
 add_executable(bps_tree.test bps_tree.cc)
 target_link_libraries(bps_tree.test small misc)

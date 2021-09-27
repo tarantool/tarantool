@@ -1,5 +1,5 @@
 #include "unit.h"
-#include "xmalloc.h"
+#include "trivia/util.h"
 
 #include <stddef.h>
 #include <string.h>
