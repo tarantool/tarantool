@@ -114,10 +114,7 @@ tuple_dictionary_set_name(struct tuple_dictionary *dict, const char *name,
 	struct mh_strnu32_node_t name_node = {
 		name, name_len, name_hash, fieldno
 	};
-	rc = mh_strnu32_put(dict->hash, &name_node, NULL, NULL);
-	/* Memory was reserved in new(). */
-	assert(rc != mh_end(dict->hash));
-	(void) rc;
+	mh_strnu32_put(dict->hash, &name_node, NULL, NULL);
 	return 0;
 }
 

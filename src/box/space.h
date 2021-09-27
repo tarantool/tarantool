@@ -553,7 +553,7 @@ space_find_constraint_id(struct space *space, const char *name);
  * constraints. That is used to prevent existence of constraints
  * with equal names.
  */
-int
+void
 space_add_constraint_id(struct space *space, struct constraint_id *id);
 
 /**

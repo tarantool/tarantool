@@ -201,11 +201,7 @@ space_cache_replace(struct space *old_space, struct space *new_space)
 		const struct mh_i32ptr_node_t node_p = { space_id(new_space),
 							 new_space };
 		struct mh_i32ptr_node_t old, *p_old = &old;
-		mh_int_t k = mh_i32ptr_put(spaces, &node_p, &p_old, NULL);
-		if (k == mh_end(spaces)) {
-			panic_syserror("Out of memory for the data "
-				       "dictionary cache.");
-		}
+		mh_i32ptr_put(spaces, &node_p, &p_old, NULL);
 		struct space *old_space_by_id = p_old != NULL ?
 				(struct space *)p_old->val : NULL;
 		assert(old_space_by_id == old_space);
@@ -219,11 +215,7 @@ space_cache_replace(struct space *old_space, struct space *new_space)
 		const struct mh_strnptr_node_t node_s = { name, name_len,
 							  name_hash, new_space };
 		struct mh_strnptr_node_t old_s, *p_old_s = &old_s;
-		k = mh_strnptr_put(spaces_by_name, &node_s, &p_old_s, NULL);
-		if (k == mh_end(spaces_by_name)) {
-			panic_syserror("Out of memory for the data "
-				       "dictionary cache.");
-		}
+		mh_strnptr_put(spaces_by_name, &node_s, &p_old_s, NULL);
 		if (old_space_by_name == NULL && p_old_s != NULL)
 			old_space_by_name = (struct space *)p_old_s->val;
 		assert(old_space_by_name == old_space);
@@ -564,21 +556,12 @@ func_cache_insert(struct func *func)
 	assert(func_by_id(func->def->fid) == NULL);
 	assert(func_by_name(func->def->name, strlen(func->def->name)) == NULL);
 	const struct mh_i32ptr_node_t node = { func->def->fid, func };
-	mh_int_t k1 = mh_i32ptr_put(funcs, &node, NULL, NULL);
-	if (k1 == mh_end(funcs)) {
-error:
-		panic_syserror("Out of memory for the data "
-			       "dictionary cache (stored function).");
-	}
+	mh_i32ptr_put(funcs, &node, NULL, NULL);
 	size_t def_name_len = strlen(func->def->name);
 	uint32_t name_hash = mh_strn_hash(func->def->name, def_name_len);
 	const struct mh_strnptr_node_t strnode = {
 		func->def->name, def_name_len, name_hash, func };
-	mh_int_t k2 = mh_strnptr_put(funcs_by_name, &strnode, NULL, NULL);
-	if (k2 == mh_end(funcs_by_name)) {
-		mh_i32ptr_del(funcs, k1, NULL);
-		goto error;
-	}
+	mh_strnptr_put(funcs_by_name, &strnode, NULL, NULL);
 }
 
 void
@@ -672,11 +655,7 @@ sequence_cache_insert(struct sequence *seq)
 	assert(sequence_by_id(seq->def->id) == NULL);
 
 	struct mh_i32ptr_node_t node = { seq->def->id, seq };
-	mh_int_t k = mh_i32ptr_put(sequences, &node, NULL, NULL);
-	if (k == mh_end(sequences)) {
-		panic_syserror("Out of memory for the data "
-			       "dictionary cache (sequence).");
-	}
+	mh_i32ptr_put(sequences, &node, NULL, NULL);
 }
 
 void

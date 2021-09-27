@@ -221,9 +221,7 @@ fakeev_timer_event_new(struct ev_watcher *watcher, double delay)
 	e->watcher = watcher;
 	assert(fakeev_event_by_ev(watcher) == NULL);
 	struct mh_i64ptr_node_t node = {(uint64_t) watcher, e};
-	mh_int_t rc = mh_i64ptr_put(events_hash, &node, NULL, NULL);
-	(void) rc;
-	assert(rc != mh_end(events_hash));
+	mh_i64ptr_put(events_hash, &node, NULL, NULL);
 }
 
 /**

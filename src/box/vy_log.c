@@ -1544,12 +1544,7 @@ vy_recovery_do_create_lsm(struct vy_recovery *recovery, int64_t id,
 	struct mh_i64ptr_t *h = recovery->lsm_hash;
 	struct mh_i64ptr_node_t node = { id, lsm };
 	struct mh_i64ptr_node_t *old_node = NULL;
-	if (mh_i64ptr_put(h, &node, &old_node, NULL) == mh_end(h)) {
-		diag_set(OutOfMemory, 0, "mh_i64ptr_put", "mh_i64ptr_node_t");
-		free(lsm->key_parts);
-		free(lsm);
-		return NULL;
-	}
+	mh_i64ptr_put(h, &node, &old_node, NULL);
 	assert(old_node == NULL);
 	lsm->id = id;
 	lsm->space_id = space_id;
@@ -1786,11 +1781,7 @@ vy_recovery_do_create_run(struct vy_recovery *recovery, int64_t run_id)
 	struct mh_i64ptr_t *h = recovery->run_hash;
 	struct mh_i64ptr_node_t node = { run_id, run };
 	struct mh_i64ptr_node_t *old_node = NULL;
-	if (mh_i64ptr_put(h, &node, &old_node, NULL) == mh_end(h)) {
-		diag_set(OutOfMemory, 0, "mh_i64ptr_put", "mh_i64ptr_node_t");
-		free(run);
-		return NULL;
-	}
+	mh_i64ptr_put(h, &node, &old_node, NULL);
 	assert(old_node == NULL);
 	run->id = run_id;
 	run->dump_lsn = -1;
@@ -1982,11 +1973,7 @@ vy_recovery_insert_range(struct vy_recovery *recovery, int64_t lsm_id,
 	}
 	struct mh_i64ptr_t *h = recovery->range_hash;
 	struct mh_i64ptr_node_t node = { range_id, range };
-	if (mh_i64ptr_put(h, &node, NULL, NULL) == mh_end(h)) {
-		diag_set(OutOfMemory, 0, "mh_i64ptr_put", "mh_i64ptr_node_t");
-		free(range);
-		return -1;
-	}
+	mh_i64ptr_put(h, &node, NULL, NULL);
 	range->id = range_id;
 	if (begin != NULL) {
 		range->begin = (void *)range + sizeof(*range);
@@ -2093,11 +2080,7 @@ vy_recovery_insert_slice(struct vy_recovery *recovery, int64_t range_id,
 	}
 	struct mh_i64ptr_t *h = recovery->slice_hash;
 	struct mh_i64ptr_node_t node = { slice_id, slice };
-	if (mh_i64ptr_put(h, &node, NULL, NULL) == mh_end(h)) {
-		diag_set(OutOfMemory, 0, "mh_i64ptr_put", "mh_i64ptr_node_t");
-		free(slice);
-		return -1;
-	}
+	mh_i64ptr_put(h, &node, NULL, NULL);
 	slice->id = slice_id;
 	slice->run = run;
 	if (begin != NULL) {
@@ -2332,11 +2315,7 @@ vy_recovery_build_index_id_hash(struct vy_recovery *recovery)
 			struct mh_i64ptr_node_t node;
 			node.key = vy_recovery_index_id_hash(space_id, index_id);
 			node.val = lsm;
-			if (mh_i64ptr_put(h, &node, NULL, NULL) == mh_end(h)) {
-				diag_set(OutOfMemory, 0, "mh_i64ptr_put",
-					 "mh_i64ptr_node_t");
-				return -1;
-			}
+			mh_i64ptr_put(h, &node, NULL, NULL);
 			continue;
 		}
 		/*

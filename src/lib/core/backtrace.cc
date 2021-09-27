@@ -114,12 +114,7 @@ get_proc_name(unw_cursor_t *unw_cur, unw_word_t *offset, bool skip_cache)
 		node.val = entry;
 		snprintf(entry->name, BACKTRACE_NAME_MAX, "%s", proc_name);
 		entry->offset = *offset;
-
-		k = mh_i64ptr_put(proc_cache, &node, NULL, NULL);
-		if (k == mh_end(proc_cache)) {
-			free(entry);
-			goto error;
-		}
+		mh_i64ptr_put(proc_cache, &node, NULL, NULL);
 	}
 error:
 	return proc_name;

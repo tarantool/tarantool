@@ -88,7 +88,7 @@ cache_find(const char *str, size_t len)
 	return mh_strnptr_node(func_hash, e)->val;
 }
 
-static int
+static void
 cache_put(struct box_module_func *cf)
 {
 	const struct mh_strnptr_node_t nd = {
@@ -100,20 +100,12 @@ cache_put(struct box_module_func *cf)
 
 	struct mh_strnptr_node_t prev;
 	struct mh_strnptr_node_t *prev_ptr = &prev;
-
-	mh_int_t e = mh_strnptr_put(func_hash, &nd, &prev_ptr, NULL);
-	if (e == mh_end(func_hash)) {
-		diag_set(OutOfMemory, sizeof(nd), "malloc",
-			 "box.lib: hash node");
-		return -1;
-	}
-
+	mh_strnptr_put(func_hash, &nd, &prev_ptr, NULL);
 	/*
 	 * Just to make sure we haven't replaced something,
 	 * the entries must be explicitly deleted.
 	 */
 	assert(prev_ptr == NULL);
-	return 0;
 }
 
 static void
@@ -340,12 +332,7 @@ box_module_func_new(struct module *m, const char *key, size_t len, size_t sym_le
 		return NULL;
 	}
 
-	if (cache_put(cf) != 0) {
-		module_func_unload(&cf->base);
-		box_module_func_delete(cf);
-		return NULL;
-	}
-
+	cache_put(cf);
 	/*
 	 * Each new function depends on module presence.
 	 * Module will reside even if been unload

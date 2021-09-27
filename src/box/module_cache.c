@@ -53,7 +53,7 @@ cache_update(struct module *m)
 	mh_strnptr_node(module_cache, e)->val = m;
 }
 
-static int
+static void
 cache_put(struct module *m)
 {
 	const struct mh_strnptr_node_t nd = {
@@ -65,20 +65,12 @@ cache_put(struct module *m)
 
 	struct mh_strnptr_node_t prev;
 	struct mh_strnptr_node_t *prev_ptr = &prev;
-
-	mh_int_t e = mh_strnptr_put(module_cache, &nd, &prev_ptr, NULL);
-	if (e == mh_end(module_cache)) {
-		diag_set(OutOfMemory, sizeof(nd), "malloc",
-			 "module_cache node");
-		return -1;
-	}
-
+	mh_strnptr_put(module_cache, &nd, &prev_ptr, NULL);
 	/*
 	 * Just to make sure we haven't replaced something, the
 	 * entries must be explicitly deleted.
 	 */
 	assert(prev_ptr == NULL);
-	return 0;
 }
 
 static void
@@ -404,10 +396,7 @@ module_load_force(const char *package, size_t package_len)
 	if (c != NULL) {
 		cache_update(m);
 	} else {
-		if (cache_put(m) != 0) {
-			module_unload(m);
-			return NULL;
-		}
+		cache_put(m);
 	}
 
 	return m;
@@ -452,10 +441,8 @@ module_load(const char *package, size_t package_len)
 			cache_update(m);
 	} else {
 		m = module_new(package, package_len, path);
-		if (m != NULL && cache_put(m) != 0) {
-			module_unload(m);
-			return NULL;
-		}
+		if (m != NULL)
+			cache_put(m);
 	}
 
 	return m;

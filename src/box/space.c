@@ -629,7 +629,7 @@ space_find_constraint_id(struct space *space, const char *name)
 	return (struct constraint_id *) mh_strnptr_node(ids, pos)->val;
 }
 
-int
+void
 space_add_constraint_id(struct space *space, struct constraint_id *id)
 {
 	assert(space_find_constraint_id(space, id->name) == NULL);
@@ -637,11 +637,7 @@ space_add_constraint_id(struct space *space, struct constraint_id *id)
 	uint32_t len = strlen(id->name);
 	uint32_t hash = mh_strn_hash(id->name, len);
 	const struct mh_strnptr_node_t name_node = {id->name, len, hash, id};
-	if (mh_strnptr_put(ids, &name_node, NULL, NULL) == mh_end(ids)) {
-		diag_set(OutOfMemory, sizeof(name_node), "malloc", "node");
-		return -1;
-	}
-	return 0;
+	mh_strnptr_put(ids, &name_node, NULL, NULL);
 }
 
 struct constraint_id *

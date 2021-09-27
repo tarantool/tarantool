@@ -957,9 +957,7 @@ public:
 				  space_name(alter->old_space),
 				  "the space is already being modified");
 		}
-		mh_int_t k = mh_i32_put(registry, &space_id, NULL, NULL);
-		if (k == mh_end(registry))
-			tnt_raise(OutOfMemory, 0, "mh_i32_put", "alter lock");
+		mh_i32_put(registry, &space_id, NULL, NULL);
 	}
 	~AlterSpaceLock() {
 		mh_int_t k = mh_i32_find(registry, space_id, NULL);
@@ -1830,10 +1828,7 @@ space_insert_constraint_id(struct space *space, enum constraint_type type,
 	struct constraint_id *id = constraint_id_new(type, name);
 	if (id == NULL)
 		return -1;
-	if (space_add_constraint_id(space, id) != 0) {
-		constraint_id_delete(id);
-		return -1;
-	}
+	space_add_constraint_id(space, id);
 	return 0;
 }
 
@@ -1874,9 +1869,7 @@ CreateConstraintID::prepare(struct alter_space *alter)
 void
 CreateConstraintID::alter(struct alter_space *alter)
 {
-	/* Alter() can't fail, so can't just throw an error. */
-	if (space_add_constraint_id(alter->old_space, new_id) != 0)
-		panic("Can't add a new constraint id, out of memory");
+	space_add_constraint_id(alter->old_space, new_id);
 }
 
 void
@@ -1935,10 +1928,7 @@ DropConstraintID::commit(struct alter_space *alter, int64_t signature)
 void
 DropConstraintID::rollback(struct alter_space *alter)
 {
-	if (space_add_constraint_id(alter->new_space, old_id) != 0) {
-		panic("Can't recover after constraint drop rollback (out of "
-		      "memory)");
-	}
+	space_add_constraint_id(alter->new_space, old_id);
 }
 
 /* }}} */

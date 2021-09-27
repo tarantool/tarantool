@@ -920,14 +920,8 @@ swim_new_member(struct swim *swim, const struct sockaddr_in *addr,
 	if (member == NULL)
 		return NULL;
 	assert(swim_find_member(swim, uuid) == NULL);
-	mh_int_t rc = mh_swim_table_put(swim->members,
-					(const struct swim_member **) &member,
-					NULL, NULL);
-	if (rc == mh_end(swim->members)) {
-		swim_member_delete(member);
-		diag_set(OutOfMemory, sizeof(mh_int_t), "malloc", "node");
-		return NULL;
-	}
+	mh_swim_table_put(swim->members, (const struct swim_member **)&member,
+			  NULL, NULL);
 	if (mh_size(swim->members) > 1)
 		swim_ev_timer_again(swim_loop(), &swim->round_tick);
 

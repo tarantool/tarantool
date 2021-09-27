@@ -728,21 +728,13 @@ tuple_format_reuse(struct tuple_format **p_format)
 
 /**
  * Insert a reusable format into the hash table.
- * @retval 0 on success, -1 in case of error.
  */
-static int
+static void
 tuple_format_add_to_hash(struct tuple_format *format)
 {
 	assert(format->is_reusable);
-	mh_int_t key = mh_tuple_format_put(tuple_formats_hash,
-					   (const struct tuple_format **)&format,
-					   NULL, NULL);
-	if (key == mh_end(tuple_formats_hash)) {
-		diag_set(OutOfMemory, 0, "tuple_format_add_to_hash",
-			 "tuple formats hash entry");
-		return -1;
-	}
-	return 0;
+	mh_tuple_format_put(tuple_formats_hash,
+			    (const struct tuple_format **)&format, NULL, NULL);
 }
 
 static void
@@ -790,10 +782,8 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 		return format;
 	if (tuple_format_register(format) < 0)
 		goto err;
-	if (is_reusable && tuple_format_add_to_hash(format) < 0) {
-		tuple_format_deregister(format);
-		goto err;
-	}
+	if (is_reusable)
+		tuple_format_add_to_hash(format);
 	return format;
 err:
 	tuple_format_destroy(format);
