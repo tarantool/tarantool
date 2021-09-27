@@ -132,7 +132,7 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
         endif()
 
         # Detecting OpenSSL
-        execute_process(COMMAND ${HOMEBREW_EXECUTABLE} --prefix openssl
+        execute_process(COMMAND ${HOMEBREW_EXECUTABLE} --prefix openssl@1.1
                         OUTPUT_VARIABLE HOMEBREW_OPENSSL
                         OUTPUT_STRIP_TRAILING_WHITESPACE)
         if (DEFINED HOMEBREW_OPENSSL)

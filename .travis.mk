@@ -340,7 +340,7 @@ test_odroid_arm64: deps_odroid_arm64 test_odroid_arm64_no_deps
 # FIXME: Temporary pinned python3 to specific version (i.e. python@3.8) to
 # avoid gevent package installation failure described in gevent/gevent#1721.
 # Revert this back when the issue is resolved.
-OSX_PKGS=openssl readline curl icu4c libiconv zlib cmake python@3.8
+OSX_PKGS=openssl@1.1 readline curl icu4c libiconv zlib cmake python@3.8
 
 deps_osx:
 	# install brew using command from Homebrew repository instructions:
