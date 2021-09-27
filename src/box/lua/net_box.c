@@ -314,7 +314,7 @@ netbox_request_push_result(struct netbox_request *request, struct lua_State *L)
 	return 1;
 }
 
-static int
+static void
 netbox_transport_create(struct netbox_transport *transport)
 {
 	ibuf_create(&transport->send_buf, &cord()->slabc, NETBOX_READAHEAD);
@@ -322,11 +322,6 @@ netbox_transport_create(struct netbox_transport *transport)
 	fiber_cond_create(&transport->on_send_buf_empty);
 	transport->next_sync = 1;
 	transport->requests = mh_i64ptr_new();
-	if (transport->requests == NULL) {
-		diag_set(OutOfMemory, 0, "mhash", "netbox_transport");
-		return -1;
-	}
-	return 0;
 }
 
 static void
@@ -1774,8 +1769,7 @@ netbox_new_transport(struct lua_State *L)
 {
 	struct netbox_transport *transport = lua_newuserdata(
 		L, sizeof(*transport));
-	if (netbox_transport_create(transport) != 0)
-		luaT_error(L);
+	netbox_transport_create(transport);
 	luaL_getmetatable(L, netbox_transport_typename);
 	lua_setmetatable(L, -2);
 	return 1;

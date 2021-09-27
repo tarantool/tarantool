@@ -3467,9 +3467,7 @@ box_init(void)
 	 * as a default session user when running triggers.
 	 */
 	session_init();
-
-	if (schema_module_init() != 0)
-		diag_raise();
+	schema_module_init();
 
 	if (tuple_init(lua_hash) != 0)
 		diag_raise();

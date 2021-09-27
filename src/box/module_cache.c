@@ -474,14 +474,8 @@ module_free(void)
 	module_cache = NULL;
 }
 
-int
+void
 module_init(void)
 {
 	module_cache = mh_strnptr_new();
-	if (module_cache == NULL) {
-		diag_set(OutOfMemory, sizeof(*module_cache),
-			 "malloc", "module_cache");
-		return -1;
-	}
-	return 0;
 }

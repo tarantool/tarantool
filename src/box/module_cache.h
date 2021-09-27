@@ -193,7 +193,7 @@ void
 module_unref(struct module *m);
 
 /** Initialize modules subsystem. */
-int
+void
 module_init(void);
 
 /** Free modules subsystem. */

@@ -74,7 +74,7 @@ struct func {
 /**
  * Initialize schema modules subsystem.
  */
-int
+void
 schema_module_init(void);
 
 /**

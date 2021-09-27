@@ -2397,14 +2397,6 @@ vy_recovery_new_f(va_list ap)
 	recovery->range_hash = mh_i64ptr_new();
 	recovery->run_hash = mh_i64ptr_new();
 	recovery->slice_hash = mh_i64ptr_new();
-	if (recovery->index_id_hash == NULL ||
-	    recovery->lsm_hash == NULL ||
-	    recovery->range_hash == NULL ||
-	    recovery->run_hash == NULL ||
-	    recovery->slice_hash == NULL) {
-		diag_set(OutOfMemory, 0, "mh_i64ptr_new", "mh_i64ptr_t");
-		goto fail_free;
-	}
 
 	/*
 	 * We don't create a log file if there are no objects to

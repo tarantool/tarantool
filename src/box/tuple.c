@@ -292,9 +292,7 @@ tuple_bigref_tuple_count()
 int
 tuple_init(field_name_hash_f hash)
 {
-	if (tuple_format_init() != 0)
-		return -1;
-
+	tuple_format_init();
 	field_name_hash = hash;
 	/*
 	 * Create a format for runtime tuples
@@ -320,9 +318,7 @@ tuple_init(field_name_hash_f hash)
 
 	tuple_uploaded_refs = mh_tuple_uploaded_refs_new();
 
-	if (coll_id_cache_init() != 0)
-		return -1;
-
+	coll_id_cache_init();
 	return 0;
 }
 

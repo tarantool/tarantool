@@ -950,10 +950,6 @@ public:
 	AlterSpaceLock(struct alter_space *alter) {
 		if (registry == NULL) {
 			registry = mh_i32_new();
-			if (registry == NULL) {
-				tnt_raise(OutOfMemory, 0, "mh_i32_new",
-					  "alter lock registry");
-			}
 		}
 		space_id = alter->old_space->def->id;
 		if (mh_i32_find(registry, space_id, NULL) != mh_end(registry)) {

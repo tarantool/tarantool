@@ -446,7 +446,7 @@ json_token_hash(struct json_token *token)
 	return PMurHash32_Result(h, carry, data_size);
 }
 
-int
+void
 json_tree_create(struct json_tree *tree)
 {
 	memset(tree, 0, sizeof(struct json_tree));
@@ -455,7 +455,6 @@ json_tree_create(struct json_tree *tree)
 	tree->root.max_child_idx = -1;
 	tree->root.sibling_idx = -1;
 	tree->hash = mh_json_new();
-	return tree->hash == NULL ? -1 : 0;
 }
 
 static void

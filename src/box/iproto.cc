@@ -1343,12 +1343,6 @@ iproto_connection_new(struct iproto_thread *iproto_thread, int fd)
 		return NULL;
 	}
 	con->streams = mh_i64ptr_new();
-	if (con->streams == NULL) {
-		diag_set(OutOfMemory, sizeof(*(con->streams)),
-			 "mh_streams_new", "streams");
-		mempool_free(&con->iproto_thread->iproto_connection_pool, con);
-		return NULL;
-	}
 	con->iproto_thread = iproto_thread;
 	con->input.data = con->output.data = con;
 	con->loop = loop();

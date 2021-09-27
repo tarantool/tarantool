@@ -40,9 +40,8 @@ struct coll_id;
 
 /**
  * Create global hash tables.
- * @return - 0 on success, -1 on memory error.
  */
-int
+void
 coll_id_cache_init(void);
 
 /** Delete global hash tables. */

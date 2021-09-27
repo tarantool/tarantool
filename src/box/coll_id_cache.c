@@ -38,23 +38,11 @@ static struct mh_strnptr_t *coll_cache_name = NULL;
 /** mhash table (id -> collation) */
 static struct mh_i32ptr_t *coll_id_cache = NULL;
 
-int
+void
 coll_id_cache_init(void)
 {
 	coll_id_cache = mh_i32ptr_new();
-	if (coll_id_cache == NULL) {
-		diag_set(OutOfMemory, sizeof(*coll_id_cache), "malloc",
-			 "coll_id_cache");
-		return -1;
-	}
 	coll_cache_name = mh_strnptr_new();
-	if (coll_cache_name == NULL) {
-		diag_set(OutOfMemory, sizeof(*coll_cache_name), "malloc",
-			 "coll_cache_name");
-		mh_i32ptr_delete(coll_id_cache);
-		return -1;
-	}
-	return 0;
 }
 
 void

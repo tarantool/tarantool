@@ -193,11 +193,6 @@ session_add_stmt_id(struct session *session, uint32_t id)
 {
 	if (session->sql_stmts == NULL) {
 		session->sql_stmts = mh_i32ptr_new();
-		if (session->sql_stmts == NULL) {
-			diag_set(OutOfMemory, 0, "mh_i32ptr_new",
-				 "session stmt hash");
-			return -1;
-		}
 	}
 	return sql_session_stmt_hash_add_id(session->sql_stmts, id);
 }
@@ -281,8 +276,6 @@ void
 session_init(void)
 {
 	session_registry = mh_i64ptr_new();
-	if (session_registry == NULL)
-		panic("out of memory");
 	mempool_create(&session_pool, &cord()->slabc, sizeof(struct session));
 	credentials_create(&admin_credentials, admin_user);
 	session_settings_init();
