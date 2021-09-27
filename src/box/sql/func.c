@@ -573,6 +573,161 @@ func_position_characters(struct sql_context *ctx, int argc, struct Mem *argv)
 	return mem_set_uint(ctx->pOut, 0);
 }
 
+/** Implementation of the SUBSTR() function. */
+int
+substr_normalize(int64_t base_start, bool is_start_neg, uint64_t base_length,
+		 uint64_t *start, uint64_t *length)
+{
+	if (!is_start_neg && base_start > 0) {
+		*start = (uint64_t)base_start - 1;
+		*length = base_length;
+		return 0;
+	}
+	*start = 0;
+	if (base_length == 0) {
+		*length = 0;
+		return 0;
+	}
+	/*
+	 * We are subtracting 1 from base_length instead of subtracting from
+	 * base_start, since base_start can be INT64_MIN. At the same time,
+	 * base_length is not less than 1.
+	 */
+	int64_t a = base_start;
+	int64_t b = (int64_t)(base_length - 1);
+	int64_t res;
+	bool is_neg;
+	/*
+	 * Integer cannot overflow since non-positive value is added to positive
+	 * value.
+	 */
+	if (sql_add_int(a, a != 0, b, false, &res, &is_neg) != 0) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
+		return -1;
+	}
+	*length = is_neg ? 0 : (uint64_t)res;
+	return 0;
+}
+
+static void
+func_substr_octets(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	assert(argc == 2 || argc == 3);
+	if (mem_is_any_null(&argv[0], &argv[1]))
+		return;
+	assert(mem_is_bytes(&argv[0]) && mem_is_int(&argv[1]));
+
+	bool is_str = mem_is_str(&argv[0]);
+	uint64_t size = argv[0].n;
+
+	if (argc == 2) {
+		uint64_t start = mem_is_uint(&argv[1]) && argv[1].u.u > 1 ?
+				 argv[1].u.u - 1 : 0;
+		if (start >= size) {
+			if (is_str)
+				return mem_set_str0_static(ctx->pOut, "");
+			else
+				return mem_set_bin_static(ctx->pOut, "", 0);
+		}
+		char *s = &argv[0].z[start];
+		uint64_t n = size - start;
+		ctx->is_aborted = is_str ? mem_copy_str(ctx->pOut, s, n) != 0 :
+				  mem_copy_bin(ctx->pOut, s, n) != 0;
+		return;
+	}
+
+	assert(argc == 3);
+	if (mem_is_null(&argv[2]))
+		return;
+	assert(mem_is_int(&argv[2]));
+	if (!mem_is_uint(&argv[2])) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "Length of the result "
+			 "cannot be less than 0");
+		ctx->is_aborted = true;
+		return;
+	}
+	uint64_t start;
+	uint64_t length;
+	if (substr_normalize(argv[1].u.i, !mem_is_uint(&argv[1]), argv[2].u.u,
+			     &start, &length) != 0) {
+		ctx->is_aborted = true;
+		return;
+	}
+	if (start >= size || length == 0) {
+		if (is_str)
+			return mem_set_str0_static(ctx->pOut, "");
+		else
+			return mem_set_bin_static(ctx->pOut, "", 0);
+	}
+	char *str = &argv[0].z[start];
+	uint64_t len = MIN(size - start, length);
+	ctx->is_aborted = is_str ? mem_copy_str(ctx->pOut, str, len) != 0 :
+			  mem_copy_bin(ctx->pOut, str, len) != 0;
+}
+
+static void
+func_substr_characters(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	assert(argc == 2 || argc == 3);
+	(void)argc;
+	if (mem_is_any_null(&argv[0], &argv[1]))
+		return;
+	assert(mem_is_str(&argv[0]) && mem_is_int(&argv[1]));
+
+	const char *str = argv[0].z;
+	int pos = 0;
+	int end = argv[0].n;
+	if (argc == 2) {
+		uint64_t start = mem_is_uint(&argv[1]) && argv[1].u.u > 1 ?
+				 argv[1].u.u - 1 : 0;
+		for (uint64_t i = 0; i < start && pos < end; ++i) {
+			UChar32 c;
+			U8_NEXT((uint8_t *)str, pos, end, c);
+		}
+		if (pos == end)
+			return mem_set_str_static(ctx->pOut, "", 0);
+		if (mem_copy_str(ctx->pOut, str + pos, end - pos) != 0)
+			ctx->is_aborted = true;
+		return;
+	}
+
+	assert(argc == 3);
+	if (mem_is_null(&argv[2]))
+		return;
+	assert(mem_is_int(&argv[2]));
+	if (!mem_is_uint(&argv[2])) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "Length of the result "
+			 "cannot be less than 0");
+		ctx->is_aborted = true;
+		return;
+	}
+	uint64_t start;
+	uint64_t length;
+	if (substr_normalize(argv[1].u.i, !mem_is_uint(&argv[1]), argv[2].u.u,
+			     &start, &length) != 0) {
+		ctx->is_aborted = true;
+		return;
+	}
+	if (length == 0)
+		return mem_set_str_static(ctx->pOut, "", 0);
+
+	for (uint64_t i = 0; i < start && pos < end; ++i) {
+		UChar32 c;
+		U8_NEXT((uint8_t *)str, pos, end, c);
+	}
+	if (pos == end)
+		return mem_set_str_static(ctx->pOut, "", 0);
+
+	int cur = pos;
+	for (uint64_t i = 0; i < length && cur < end; ++i) {
+		UChar32 c;
+		U8_NEXT((uint8_t *)str, cur, end, c);
+	}
+	assert(cur > pos);
+	if (mem_copy_str(ctx->pOut, str + pos, cur - pos) != 0)
+		ctx->is_aborted = true;
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -767,116 +922,6 @@ printfFunc(struct sql_context *context, int argc, struct Mem *argv)
 		n = str.nChar;
 		sql_result_text(context, sqlStrAccumFinish(&str), n,
 				    SQL_DYNAMIC);
-	}
-}
-
-/*
- * Implementation of the substr() function.
- *
- * substr(x,p1,p2)  returns p2 characters of x[] beginning with p1.
- * p1 is 1-indexed.  So substr(x,1,1) returns the first character
- * of x.  If x is text, then we actually count UTF-8 characters.
- * If x is a blob, then we count bytes.
- *
- * If p1 is negative, then we begin abs(p1) from the end of x[].
- *
- * If p2 is negative, return the p2 characters preceding p1.
- */
-static void
-substrFunc(struct sql_context *context, int argc, struct Mem *argv)
-{
-	const unsigned char *z;
-	const unsigned char *z2;
-	int len;
-	int p0type;
-	int64_t p1, p2;
-	int negP2 = 0;
-
-	if (argc != 2 && argc != 3) {
-		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, "SUBSTR",
-			 "1 or 2", argc);
-		context->is_aborted = true;
-		return;
-	}
-	if (mem_is_null(&argv[1]) || (argc == 3 && mem_is_null(&argv[2])))
-		return;
-	p0type = sql_value_type(&argv[0]);
-	p1 = mem_get_int_unsafe(&argv[1]);
-	if (p0type == MP_BIN) {
-		z = mem_as_bin(&argv[0]);
-		len = mem_len_unsafe(&argv[0]);
-		if (z == 0)
-			return;
-		assert(len == mem_len_unsafe(&argv[0]));
-	} else {
-		z = mem_as_ustr(&argv[0]);
-		if (z == 0)
-			return;
-		len = 0;
-		if (p1 < 0)
-			len = sql_utf8_char_count(z, mem_len_unsafe(&argv[0]));
-	}
-	if (argc == 3) {
-		p2 = mem_get_int_unsafe(&argv[2]);
-		if (p2 < 0) {
-			p2 = -p2;
-			negP2 = 1;
-		}
-	} else {
-		p2 = sql_context_db_handle(context)->
-		    aLimit[SQL_LIMIT_LENGTH];
-	}
-	if (p1 < 0) {
-		p1 += len;
-		if (p1 < 0) {
-			p2 += p1;
-			if (p2 < 0)
-				p2 = 0;
-			p1 = 0;
-		}
-	} else if (p1 > 0) {
-		p1--;
-	} else if (p2 > 0) {
-		p2--;
-	}
-	if (negP2) {
-		p1 -= p2;
-		if (p1 < 0) {
-			p2 += p1;
-			p1 = 0;
-		}
-	}
-	assert(p1 >= 0 && p2 >= 0);
-	if (p0type != MP_BIN) {
-		/*
-		 * In the code below 'cnt' and 'n_chars' is
-		 * used because '\0' is not supposed to be
-		 * end-of-string symbol.
-		 */
-		int byte_size = mem_len_unsafe(&argv[0]);
-		int n_chars = sql_utf8_char_count(z, byte_size);
-		int cnt = 0;
-		int i = 0;
-		while (cnt < n_chars && p1) {
-			SQL_UTF8_FWD_1(z, i, byte_size);
-			cnt++;
-			p1--;
-		}
-		z += i;
-		i = 0;
-		for (z2 = z; cnt < n_chars && p2; p2--) {
-			SQL_UTF8_FWD_1(z2, i, byte_size);
-			cnt++;
-		}
-		z2 += i;
-		mem_copy_str(context->pOut, (char *)z, z2 - z);
-	} else {
-		if (p1 + p2 > len) {
-			p2 = len - p1;
-			if (p2 < 0)
-				p2 = 0;
-		}
-		mem_copy_bin(context->pOut, (char *)&z[p1], p2);
 	}
 }
 
@@ -1933,15 +1978,15 @@ static struct sql_func_definition definitions[] = {
 	{"SOUNDEX", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, soundexFunc,
 	 NULL},
 	{"SUBSTR", 2, {FIELD_TYPE_STRING, FIELD_TYPE_INTEGER},
-	 FIELD_TYPE_STRING, substrFunc, NULL},
+	 FIELD_TYPE_STRING, func_substr_characters, NULL},
 	{"SUBSTR", 3,
 	 {FIELD_TYPE_STRING, FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER},
-	 FIELD_TYPE_STRING, substrFunc, NULL},
+	 FIELD_TYPE_STRING, func_substr_characters, NULL},
 	{"SUBSTR", 2, {FIELD_TYPE_VARBINARY, FIELD_TYPE_INTEGER},
-	 FIELD_TYPE_VARBINARY, substrFunc, NULL},
+	 FIELD_TYPE_VARBINARY, func_substr_octets, NULL},
 	{"SUBSTR", 3,
 	 {FIELD_TYPE_VARBINARY, FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER},
-	 FIELD_TYPE_VARBINARY, substrFunc, NULL},
+	 FIELD_TYPE_VARBINARY, func_substr_octets, NULL},
 	{"SUM", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, step_sum, NULL},
 	{"SUM", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, step_sum, NULL},
 	{"TOTAL", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_DOUBLE, step_total,
