@@ -678,7 +678,7 @@ cfg_get_replication(int *p_count)
  * don't start appliers.
  */
 static void
-box_sync_replication(bool connect_quorum)
+box_sync_replication(bool do_quorum, bool do_reuse)
 {
 	int count = 0;
 	struct applier **appliers = cfg_get_replication(&count);
@@ -689,10 +689,25 @@ box_sync_replication(bool connect_quorum)
 		for (int i = 0; i < count; i++)
 			applier_delete(appliers[i]); /* doesn't affect diag */
 	});
-
-	replicaset_connect(appliers, count, connect_quorum);
+	replicaset_connect(appliers, count, do_quorum, do_reuse);
 
 	guard.is_active = false;
+}
+
+static inline void
+box_restart_replication(void)
+{
+	const bool do_quorum = true;
+	const bool do_reuse = false;
+	box_sync_replication(do_quorum, do_reuse);
+}
+
+static inline void
+box_update_replication(void)
+{
+	const bool do_quorum = false;
+	const bool do_reuse = true;
+	box_sync_replication(do_quorum, do_reuse);
 }
 
 void
@@ -713,7 +728,7 @@ box_set_replication(void)
 	 * Stay in orphan mode in case we fail to connect to at least
 	 * 'replication_connect_quorum' remote instances.
 	 */
-	box_sync_replication(false);
+	box_update_replication();
 	/* Follow replica */
 	replicaset_follow();
 	/* Wait until appliers are in sync */
@@ -1909,7 +1924,7 @@ bootstrap(const struct tt_uuid *instance_uuid,
 	 * with connecting to 'replication_connect_quorum' masters.
 	 * If this also fails, throw an error.
 	 */
-	box_sync_replication(true);
+	box_restart_replication();
 
 	/* Use the first replica by URI as a bootstrap leader */
 	struct replica *master = replicaset_leader();
@@ -1982,7 +1997,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 
 	if (wal_dir_lock >= 0) {
 		box_listen();
-		box_sync_replication(false);
+		box_update_replication();
 
 		struct replica *master;
 		if (replicaset_needs_rejoin(&master)) {
@@ -2045,7 +2060,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 		 */
 		vclock_copy(&replicaset.vclock, &recovery->vclock);
 		box_listen();
-		box_sync_replication(false);
+		box_update_replication();
 	}
 	recovery_finalize(recovery);
 
