@@ -1234,7 +1234,7 @@ cfg_get_replication(int *p_count)
  * don't start appliers.
  */
 static void
-box_sync_replication(bool connect_quorum)
+box_sync_replication(bool do_quorum, bool do_reuse)
 {
 	int count = 0;
 	struct applier **appliers = cfg_get_replication(&count);
@@ -1245,10 +1245,25 @@ box_sync_replication(bool connect_quorum)
 		for (int i = 0; i < count; i++)
 			applier_delete(appliers[i]); /* doesn't affect diag */
 	});
-
-	replicaset_connect(appliers, count, connect_quorum);
+	replicaset_connect(appliers, count, do_quorum, do_reuse);
 
 	guard.is_active = false;
+}
+
+static inline void
+box_restart_replication(void)
+{
+	const bool do_quorum = true;
+	const bool do_reuse = false;
+	box_sync_replication(do_quorum, do_reuse);
+}
+
+static inline void
+box_update_replication(void)
+{
+	const bool do_quorum = false;
+	const bool do_reuse = true;
+	box_sync_replication(do_quorum, do_reuse);
 }
 
 void
@@ -1269,7 +1284,7 @@ box_set_replication(void)
 	 * Stay in orphan mode in case we fail to connect to at least
 	 * 'replication_connect_quorum' remote instances.
 	 */
-	box_sync_replication(false);
+	box_update_replication();
 	/* Follow replica */
 	replicaset_follow();
 	/* Wait until appliers are in sync */
@@ -1389,7 +1404,7 @@ box_set_replication_anon(void)
 		 * them can register and others resend a
 		 * non-anonymous subscribe.
 		 */
-		box_sync_replication(true);
+		box_restart_replication();
 		/*
 		 * Wait until the master has registered this
 		 * instance.
@@ -3240,7 +3255,7 @@ bootstrap(const struct tt_uuid *instance_uuid,
 	 * with connecting to 'replication_connect_quorum' masters.
 	 * If this also fails, throw an error.
 	 */
-	box_sync_replication(true);
+	box_restart_replication();
 
 	struct replica *master = replicaset_find_join_master();
 	assert(master == NULL || master->applier != NULL);
@@ -3317,7 +3332,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	if (wal_dir_lock >= 0) {
 		if (box_listen() != 0)
 			diag_raise();
-		box_sync_replication(false);
+		box_update_replication();
 
 		struct replica *master;
 		if (replicaset_needs_rejoin(&master)) {
@@ -3396,7 +3411,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 		vclock_copy(&replicaset.vclock, &recovery->vclock);
 		if (box_listen() != 0)
 			diag_raise();
-		box_sync_replication(false);
+		box_update_replication();
 	}
 	stream_guard.is_active = false;
 	recovery_finalize(recovery);
