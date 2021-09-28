@@ -439,10 +439,12 @@ replicaset_add_anon(const struct tt_uuid *replica_uuid);
  * \param connect_quorum if this flag is set, fail unless at
  *                       least replication_connect_quorum
  *                       appliers have successfully connected.
+ * \param keep_connect   if this flag is set do not force a reconnect if the
+ *                       old connection to the replica is fine.
  */
 void
 replicaset_connect(struct applier **appliers, int count,
-		   bool connect_quorum);
+		   bool connect_quorum, bool keep_connect);
 
 /**
  * Check if the current instance fell too much behind its
