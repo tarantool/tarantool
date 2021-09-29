@@ -809,13 +809,20 @@ lbox_fiber_join(struct lua_State *L)
 
 	if (!(fiber->flags & FIBER_IS_JOINABLE))
 		luaL_error(L, "the fiber is not joinable");
-	fiber_join(fiber);
+	double timeout = TIMEOUT_INFINITY;
+	if (!lua_isnoneornil(L, 2)) {
+		if (!lua_isnumber(L, 2) ||
+		    (timeout = lua_tonumber(L, 2)) < .0) {
+			luaL_error(L, "fiber:join(timeout): bad arguments");
+		}
+	}
+	int rc = fiber_join_timeout(fiber, timeout);
 
 	if (child_L != NULL) {
 		coro_ref = lua_tointeger(child_L, -1);
 		lua_pop(child_L, 1);
 	}
-	if (fiber->f_ret != 0) {
+	if (rc != 0) {
 		/*
 		 * After fiber_join the error of fiber being joined was moved to
 		 * current fiber diag so we have to get it from there.
