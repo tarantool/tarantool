@@ -46,25 +46,30 @@ static const char *object_type_strs[] = {
 	/* [SC_COLLATION]       = */ "collation",
 };
 
+/** Given object type @type, return corresponding entity type. */
+static enum schema_object_type
+schema_object_type_to_entity(enum schema_object_type type)
+{
+	assert(type >= SC_SPACE);
+	assert((int) type < (int) schema_object_type_MAX);
+	return type + schema_object_type_MAX - 1;
+}
+
+/** Given entity type @type, return corresponding object type. */
+static enum schema_object_type
+schema_entity_type_to_object(enum schema_object_type type)
+{
+	assert((int) type > (int) schema_object_type_MAX);
+	assert((int) type < (int) schema_entity_type_MAX);
+	return (type % (schema_object_type_MAX)) + 1;
+}
+
 enum schema_object_type
 schema_entity_type(enum schema_object_type type)
 {
-	switch (type) {
-	case SC_SPACE:
-		return SC_ENTITY_SPACE;
-	case SC_FUNCTION:
-		return SC_ENTITY_FUNCTION;
-	case SC_USER:
-		return SC_ENTITY_USER;
-	case SC_ROLE:
-		return SC_ENTITY_ROLE;
-	case SC_SEQUENCE:
-		return SC_ENTITY_SEQUENCE;
-	case SC_COLLATION:
-		return SC_ENTITY_COLLATION;
-	default:
+	if (type <= SC_UNIVERSE || type >= schema_object_type_MAX)
 		return SC_UNKNOWN;
-	}
+	return schema_object_type_to_entity(type);
 }
 
 enum schema_object_type
