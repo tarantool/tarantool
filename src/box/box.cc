@@ -1416,7 +1416,7 @@ box_set_replication_anon(void)
 		 * them can register and others resend a
 		 * non-anonymous subscribe.
 		 */
-		box_sync_replication(false);
+		box_sync_replication(true);
 		/*
 		 * Wait until the master has registered this
 		 * instance.
