@@ -394,13 +394,6 @@ void
 sql_result_value(sql_context *,
 		     sql_value *);
 
-void
-sql_result_zeroblob(sql_context *, int n);
-
-int
-sql_result_zeroblob64(sql_context *,
-			  sql_uint64 n);
-
 char *
 sql_mprintf(const char *, ...);
 char *
@@ -630,13 +623,6 @@ sql_bind_null(sql_stmt *, int);
 int
 sql_bind_text64(sql_stmt *, int, const char *,
 		    sql_uint64, void (*)(void *));
-
-int
-sql_bind_zeroblob(sql_stmt *, int, int n);
-
-int
-sql_bind_zeroblob64(sql_stmt *, int,
-			sql_uint64);
 
 int
 sql_bind_uuid(struct sql_stmt *stmt, int i, const struct tt_uuid *uuid);

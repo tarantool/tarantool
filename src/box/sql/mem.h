@@ -68,7 +68,6 @@ struct Mem {
 		i64 i;		/* Integer value used when MEM_Int is set in flags */
 		uint64_t u;	/* Unsigned integer used when MEM_UInt is set. */
 		bool b;         /* Boolean value used when MEM_Bool is set in flags */
-		int nZero;	/* Used when bit MEM_Zero is set in flags */
 		void *p;	/* Generic pointer */
 		/**
 		 * A pointer to function implementation.
@@ -111,7 +110,6 @@ struct Mem {
 #define MEM_Dyn       0x0800	/* Need to call Mem.xDel() on Mem.z */
 #define MEM_Static    0x1000	/* Mem.z points to a static string */
 #define MEM_Ephem     0x2000	/* Mem.z points to an ephemeral string */
-#define MEM_Zero      0x8000	/* Mem.i contains count of 0s appended to blob */
 
 static inline bool
 mem_is_null(const struct Mem *mem)
@@ -244,13 +242,6 @@ mem_is_cleared(const struct Mem *mem)
 {
 	assert((mem->flags & MEM_Cleared) == 0 || mem->type == MEM_TYPE_NULL);
 	return (mem->flags & MEM_Cleared) != 0;
-}
-
-static inline bool
-mem_is_zerobin(const struct Mem *mem)
-{
-	assert((mem->flags & MEM_Zero) == 0 || mem->type == MEM_TYPE_BIN);
-	return (mem->flags & MEM_Zero) != 0;
 }
 
 static inline bool
@@ -475,12 +466,6 @@ mem_set_binl(struct Mem *mem, char *value, uint32_t size,
 }
 
 /**
- * Clear MEM and set it to VARBINARY. The binary value consist of n zero bytes.
- */
-void
-mem_set_zerobin(struct Mem *mem, int n);
-
-/**
  * Copy binary value to a newly allocated memory. The MEM type becomes
  * VARBINARY.
  */
@@ -603,7 +588,7 @@ mem_move(struct Mem *to, struct Mem *from);
  * result MEM is set to NULL even if the result MEM is actually the first MEM.
  */
 int
-mem_concat(struct Mem *left, struct Mem *right, struct Mem *result);
+mem_concat(const struct Mem *a, const struct Mem *b, struct Mem *result);
 
 /**
  * Add the first MEM to the second MEM and write the result to the third MEM.
@@ -934,11 +919,6 @@ registerTrace(int iReg, Mem *p);
  */
 #define memIsValid(M)  ((M)->type != MEM_TYPE_INVALID)
 #endif
-
-int sqlVdbeMemExpandBlob(struct Mem *);
-#define ExpandBlob(P) (((P)->flags&MEM_Zero)?sqlVdbeMemExpandBlob(P):0)
-
-/** Setters = Change MEM value. */
 
 int sqlVdbeMemClearAndResize(struct Mem * pMem, int n);
 

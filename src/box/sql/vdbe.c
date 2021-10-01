@@ -1462,8 +1462,6 @@ case OP_MustBeInt: {            /* jump, in1 */
  */
 case OP_Cast: {                  /* in1 */
 	pIn1 = &aMem[pOp->p1];
-	if (ExpandBlob(pIn1) != 0)
-		goto abort_due_to_error;
 	rc = mem_cast_explicit(pIn1, pOp->p2);
 	UPDATE_MAX_BLOBSIZE(pIn1);
 	if (rc == 0)
@@ -2772,8 +2770,6 @@ case OP_Found: {        /* jump, in3 */
 #ifdef SQL_DEBUG
 		for(ii=0; ii<r.nField; ii++) {
 			assert(memIsValid(&r.aMem[ii]));
-			assert(!mem_is_zerobin(&r.aMem[ii]) ||
-			       r.aMem[ii].n == 0);
 			if (ii != 0)
 				REGISTER_TRACE(p, pOp->p3+ii, &r.aMem[ii]);
 		}
@@ -2784,7 +2780,6 @@ case OP_Found: {        /* jump, in3 */
 		pFree = pIdxKey = sqlVdbeAllocUnpackedRecord(db, pC->key_def);
 		if (pIdxKey==0) goto no_mem;
 		assert(mem_is_bin(pIn3));
-		(void)ExpandBlob(pIn3);
 		sqlVdbeRecordUnpackMsgpack(pC->key_def,
 					       pIn3->z, pIdxKey);
 	}
@@ -3411,8 +3406,7 @@ case OP_SorterInsert: {      /* in2 */
 	assert(isSorter(cursor));
 	pIn2 = &aMem[pOp->p2];
 	assert(mem_is_bin(pIn2));
-	if (ExpandBlob(pIn2) != 0 ||
-	    sqlVdbeSorterWrite(cursor, pIn2) != 0)
+	if (sqlVdbeSorterWrite(cursor, pIn2) != 0)
 		goto abort_due_to_error;
 	break;
 }
@@ -3445,8 +3439,6 @@ case OP_IdxReplace:
 case OP_IdxInsert: {
 	pIn2 = &aMem[pOp->p1];
 	assert(mem_is_bin(pIn2));
-	if (ExpandBlob(pIn2) != 0)
-		goto abort_due_to_error;
 	struct space *space;
 	if (pOp->p4type == P4_SPACEPTR)
 		space = pOp->p4.space;

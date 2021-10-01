@@ -236,25 +236,6 @@ sql_result_value(sql_context * pCtx, sql_value * pValue)
 		pCtx->is_aborted = true;
 }
 
-void
-sql_result_zeroblob(sql_context * pCtx, int n)
-{
-	mem_set_zerobin(pCtx->pOut, n);
-}
-
-int
-sql_result_zeroblob64(sql_context * pCtx, u64 n)
-{
-	Mem *pOut = pCtx->pOut;
-	if (n > (u64) pOut->db->aLimit[SQL_LIMIT_LENGTH]) {
-		diag_set(ClientError, ER_SQL_EXECUTE, "string or binary string"\
-			 "is too big");
-		return -1;
-	}
-	mem_set_zerobin(pCtx->pOut, (int)n);
-	return 0;
-}
-
 /*
  * Execute the statement pStmt, either until a row of data is ready, the
  * statement is completely executed or an error occurs.
@@ -816,29 +797,6 @@ sql_bind_text64(sql_stmt * pStmt,
 	} else {
 		return bindText(pStmt, i, zData, (int)nData, xDel);
 	}
-}
-
-int
-sql_bind_zeroblob(sql_stmt * pStmt, int i, int n)
-{
-	Vdbe *p = (Vdbe *) pStmt;
-	if (vdbeUnbind(p, i) != 0)
-		return -1;
-	mem_set_zerobin(&p->aVar[i - 1], n);
-	return 0;
-}
-
-int
-sql_bind_zeroblob64(sql_stmt * pStmt, int i, sql_uint64 n)
-{
-	Vdbe *p = (Vdbe *) pStmt;
-	if (n > (u64) p->db->aLimit[SQL_LIMIT_LENGTH]) {
-		diag_set(ClientError, ER_SQL_EXECUTE, "string or binary string"\
-			 "is too big");
-		return -1;
-	}
-	assert((n & 0x7FFFFFFF) == n);
-	return sql_bind_zeroblob(pStmt, i, n);
 }
 
 int

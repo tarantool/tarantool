@@ -503,19 +503,6 @@ mem_copy_bin(struct Mem *mem, const char *value, uint32_t size)
 	return 0;
 }
 
-void
-mem_set_zerobin(struct Mem *mem, int n)
-{
-	mem_destroy(mem);
-	if (n < 0)
-		n = 0;
-	mem->u.nZero = n;
-	mem->z = NULL;
-	mem->n = 0;
-	mem->type = MEM_TYPE_BIN;
-	mem->flags = MEM_Zero;
-}
-
 static inline void
 set_msgpack_value(struct Mem *mem, char *value, uint32_t size, int alloc_type,
 		  enum mem_type type)
@@ -806,8 +793,6 @@ static inline int
 bin_to_str(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_BIN);
-	if (ExpandBlob(mem) != 0)
-		return -1;
 	mem->type = MEM_TYPE_STR;
 	mem->flags &= ~MEM_Scalar;
 	return 0;
@@ -817,8 +802,6 @@ static inline int
 bin_to_str0(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_BIN);
-	if (ExpandBlob(mem) != 0)
-		return -1;
 	if (sqlVdbeMemGrow(mem, mem->n + 1, 1) != 0)
 		return -1;
 	mem->z[mem->n] = '\0';
@@ -831,8 +814,6 @@ static inline int
 bin_to_uuid(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_BIN);
-	if (ExpandBlob(mem) != 0)
-		return -1;
 	if (mem->n != UUID_LEN ||
 	    tt_uuid_validate((struct tt_uuid *)mem->z) != 0)
 		return -1;
@@ -1871,7 +1852,7 @@ mem_get_bin(const struct Mem *mem, const char **s)
 		*s = mem->n > 0 ? mem->z : NULL;
 		return 0;
 	}
-	if (mem->type != MEM_TYPE_BIN || (mem->flags & MEM_Zero) != 0)
+	if (mem->type != MEM_TYPE_BIN)
 		return -1;
 	*s = mem->z;
 	return 0;
@@ -1882,11 +1863,7 @@ mem_len(const struct Mem *mem, uint32_t *len)
 {
 	if (!mem_is_bytes(mem))
 		return -1;
-	assert((mem->flags & MEM_Zero) == 0 || mem->type == MEM_TYPE_BIN);
-	if ((mem->flags & MEM_Zero) != 0)
-		*len = mem->n + mem->u.nZero;
-	else
-		*len = mem->n;
+	*len = mem->n;
 	return 0;
 }
 
@@ -1912,9 +1889,6 @@ mem_copy(struct Mem *to, const struct Mem *from)
 		return 0;
 	if ((to->flags & MEM_Static) != 0)
 		return 0;
-	assert((to->flags & MEM_Zero) == 0 || to->type == MEM_TYPE_BIN);
-	if ((to->flags & MEM_Zero) != 0)
-		return sqlVdbeMemExpandBlob(to);
 	to->zMalloc = sqlDbRealloc(to->db, to->zMalloc, MAX(32, to->n));
 	assert(to->zMalloc != NULL || sql_get()->mallocFailed != 0);
 	if (to->zMalloc == NULL)
@@ -1939,7 +1913,7 @@ mem_copy_as_ephemeral(struct Mem *to, const struct Mem *from)
 		return;
 	if ((to->flags & (MEM_Static | MEM_Ephem)) != 0)
 		return;
-	to->flags &= MEM_Term | MEM_Zero;
+	to->flags &= MEM_Term;
 	to->flags |= MEM_Ephem;
 	return;
 }
@@ -1956,7 +1930,7 @@ mem_move(struct Mem *to, struct Mem *from)
 }
 
 int
-mem_concat(struct Mem *a, struct Mem *b, struct Mem *result)
+mem_concat(const struct Mem *a, const struct Mem *b, struct Mem *result)
 {
 	if (mem_is_any_null(a, b)) {
 		mem_set_null(result);
@@ -1982,9 +1956,6 @@ mem_concat(struct Mem *a, struct Mem *b, struct Mem *result)
 			 mem_type_to_str(a), mem_str(b));
 		return -1;
 	}
-
-	if (ExpandBlob(a) != 0 || ExpandBlob(b) != 0)
-		return -1;
 
 	uint32_t size = a->n + b->n;
 	if ((int)size > sql_get()->aLimit[SQL_LIMIT_LENGTH]) {
@@ -2332,37 +2303,8 @@ static int
 mem_cmp_bin(const struct Mem *a, const struct Mem *b)
 {
 	assert((a->type & b->type & MEM_TYPE_BIN) != 0);
-	int an = a->n;
-	int bn = b->n;
-	int minlen = MIN(an, bn);
-
-	/*
-	 * It is possible to have a Blob value that has some non-zero content
-	 * followed by zero content.  But that only comes up for Blobs formed
-	 * by the OP_MakeRecord opcode, and such Blobs never get passed into
-	 * mem_compare().
-	 */
-	assert((a->flags & MEM_Zero) == 0 || an == 0);
-	assert((b->flags & MEM_Zero) == 0 || bn == 0);
-
-	if ((a->flags & b->flags & MEM_Zero) != 0)
-		return a->u.nZero - b->u.nZero;
-	if ((a->flags & MEM_Zero) != 0) {
-		for (int i = 0; i < minlen; ++i) {
-			if (b->z[i] != 0)
-				return -1;
-		}
-		return a->u.nZero - bn;
-	}
-	if ((b->flags & MEM_Zero) != 0) {
-		for (int i = 0; i < minlen; ++i) {
-			if (a->z[i] != 0)
-				return 1;
-		}
-		return b->u.nZero - an;
-	}
-	int res = memcmp(a->z, b->z, minlen);
-	return res != 0 ? res : an - bn;
+	int res = memcmp(a->z, b->z, MIN(a->n, b->n));
+	return res != 0 ? res : a->n - b->n;
 }
 
 static int
@@ -2799,10 +2741,6 @@ sqlVdbeMemPrettyPrint(Mem *pMem, char *zBuf)
 		}
 		sql_snprintf(100, zCsr, "]%s", "(8)");
 		zCsr += sqlStrlen30(zCsr);
-		if (f & MEM_Zero) {
-			sql_snprintf(100, zCsr,"+%dz",pMem->u.nZero);
-			zCsr += sqlStrlen30(zCsr);
-		}
 		*zCsr = '\0';
 	} else if (pMem->type == MEM_TYPE_STR) {
 		int j, k;
@@ -2887,32 +2825,6 @@ registerTrace(int iReg, Mem *p) {
 	printf("\n");
 }
 #endif
-
-/*
- * If the given Mem* has a zero-filled tail, turn it into an ordinary
- * blob stored in dynamically allocated space.
- */
-int
-sqlVdbeMemExpandBlob(Mem * pMem)
-{
-	int nByte;
-	assert(pMem->flags & MEM_Zero);
-	assert(pMem->type == MEM_TYPE_BIN);
-
-	/* Set nByte to the number of bytes required to store the expanded blob. */
-	nByte = pMem->n + pMem->u.nZero;
-	if (nByte <= 0) {
-		nByte = 1;
-	}
-	if (sqlVdbeMemGrow(pMem, nByte, 1)) {
-		return -1;
-	}
-
-	memset(&pMem->z[pMem->n], 0, pMem->u.nZero);
-	pMem->n += pMem->u.nZero;
-	pMem->flags &= ~(MEM_Zero | MEM_Term);
-	return 0;
-}
 
 static int
 sqlVdbeMemGrow(struct Mem *pMem, int n, int bPreserve)
@@ -3038,13 +2950,8 @@ int
 sqlVdbeMemTooBig(Mem * p)
 {
 	assert(p->db != 0);
-	if (mem_is_bytes(p)) {
-		int n = p->n;
-		if (p->flags & MEM_Zero) {
-			n += p->u.nZero;
-		}
-		return n > p->db->aLimit[SQL_LIMIT_LENGTH];
-	}
+	if (mem_is_bytes(p))
+		return p->n > p->db->aLimit[SQL_LIMIT_LENGTH];
 	return 0;
 }
 
@@ -3253,14 +3160,8 @@ mpstream_encode_vdbe_mem(struct mpstream *stream, struct Mem *var)
 		mpstream_encode_double(stream, var->u.r);
 		return;
 	case MEM_TYPE_BIN:
-		if ((var->flags & MEM_Zero) != 0) {
-			mpstream_encode_binl(stream, var->n + var->u.nZero);
-			mpstream_memcpy(stream, var->z, var->n);
-			mpstream_memset(stream, 0, var->u.nZero);
-		} else {
-			mpstream_encode_binl(stream, var->n);
-			mpstream_memcpy(stream, var->z, var->n);
-		}
+		mpstream_encode_binl(stream, var->n);
+		mpstream_memcpy(stream, var->z, var->n);
 		return;
 	case MEM_TYPE_ARRAY:
 	case MEM_TYPE_MAP:
