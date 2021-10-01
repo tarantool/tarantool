@@ -109,6 +109,7 @@ local default_cfg = {
     feedback_interval     = 3600,
     net_msg_max           = 768,
     sql_cache_size        = 5 * 1024 * 1024,
+    txn_timeout           = 365 * 100 * 86400,
 }
 
 -- cfg variables which are covered by modules
@@ -215,6 +216,7 @@ local template_cfg = {
     feedback_interval     = ifdef_feedback('number'),
     net_msg_max           = 'number',
     sql_cache_size        = 'number',
+    txn_timeout           = 'number',
 }
 
 local function normalize_uri(port)
@@ -335,6 +337,7 @@ local dynamic_cfg = {
     replicaset_uuid         = check_replicaset_uuid,
     net_msg_max             = private.cfg_set_net_msg_max,
     sql_cache_size          = private.cfg_set_sql_cache_size,
+    txn_timeout             = private.cfg_set_txn_timeout,
 }
 
 -- dynamically settable options, which should be reverted in case

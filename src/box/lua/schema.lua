@@ -71,6 +71,8 @@ ffi.cdef[[
     box_txn_id();
     int
     box_txn_begin();
+    int
+    box_txn_set_timeout(double timeout);
     /** \endcond public */
     /** \cond public */
     int
@@ -328,9 +330,21 @@ local function feedback_save_event(event)
     end
 end
 
-box.begin = function()
+box.begin = function(options)
+    local timeout
+    if options then
+        check_param(options, 'options', 'table')
+        timeout = options.timeout
+        if timeout and (type(timeout) ~= "number" or timeout <= 0) then
+            box.error(box.error.ILLEGAL_PARAMS,
+                      "timeout must be a number greater than 0")
+        end
+    end
     if builtin.box_txn_begin() == -1 then
         box.error()
+    end
+    if timeout then
+        assert(builtin.box_txn_set_timeout(timeout) == 0)
     end
 end
 

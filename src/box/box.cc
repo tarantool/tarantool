@@ -91,6 +91,8 @@ struct rmean *rmean_box;
 
 double on_shutdown_trigger_timeout = 3.0;
 
+double txn_timeout_default;
+
 struct rlist box_on_shutdown_trigger_list =
 	RLIST_HEAD_INITIALIZER(box_on_shutdown_trigger_list);
 
@@ -1141,6 +1143,18 @@ box_check_iproto_options(void)
 	return 0;
 }
 
+static double
+box_check_txn_timeout(void)
+{
+	double timeout = cfg_getd_default("txn_timeout", TIMEOUT_INFINITY);
+	if (timeout <= 0) {
+		diag_set(ClientError, ER_CFG, "txn_timeout",
+			 "the value must be greather than 0");
+		return -1;
+	}
+	return timeout;
+}
+
 void
 box_check_config(void)
 {
@@ -1182,6 +1196,8 @@ box_check_config(void)
 	if (box_check_iproto_options() != 0)
 		diag_raise();
 	if (box_check_sql_cache_size(cfg_geti("sql_cache_size")) != 0)
+		diag_raise();
+	if (box_check_txn_timeout() < 0)
 		diag_raise();
 }
 
@@ -2033,6 +2049,16 @@ box_set_crash(void)
 	}
 
 	crash_cfg(host, is_enabled_1 && is_enabled_2);
+	return 0;
+}
+
+int
+box_set_txn_timeout(void)
+{
+	double timeout = box_check_txn_timeout();
+	if (timeout < 0)
+		return -1;
+	txn_timeout_default = timeout;
 	return 0;
 }
 
