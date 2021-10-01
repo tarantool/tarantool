@@ -70,6 +70,12 @@ extern double on_shutdown_trigger_timeout;
 /** Invoked on box shutdown. */
 extern struct rlist box_on_shutdown_trigger_list;
 
+/**
+ * Timeout during which the transaction must complete,
+ * otherwise it will be rolled back.
+ */
+extern double txn_timeout_default;
+
 /*
  * Initialize box library
  * @throws C++ exception
@@ -264,6 +270,7 @@ void box_set_replication_skip_conflict(void);
 void box_set_replication_anon(void);
 void box_set_net_msg_max(void);
 int box_set_crash(void);
+int box_set_txn_timeout(void);
 
 int
 box_set_prepared_stmt_cache_size(void);

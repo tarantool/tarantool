@@ -97,6 +97,8 @@ cfg_filter(box.cfg)
  |     - true
  |   - - too_long_threshold
  |     - 0.5
+ |   - - txn_timeout
+ |     - 3153600000
  |   - - vinyl_bloom_fpr
  |     - 0.05
  |   - - vinyl_cache
@@ -222,6 +224,8 @@ cfg_filter(box.cfg)
  |     - true
  |   - - too_long_threshold
  |     - 0.5
+ |   - - txn_timeout
+ |     - 3153600000
  |   - - vinyl_bloom_fpr
  |     - 0.05
  |   - - vinyl_cache

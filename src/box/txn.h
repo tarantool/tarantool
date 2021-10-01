@@ -96,6 +96,11 @@ enum txn_flag {
 	 * committed due to conflict.
 	 */
 	TXN_IS_CONFLICTED = 0x80,
+	/*
+	 * Transaction has been aborted by timeout so should be
+	 * rolled back at commit.
+	 */
+	TXN_IS_ABORTED_BY_TIMEOUT = 0x100,
 };
 
 enum {
@@ -433,6 +438,13 @@ struct txn {
 	struct rlist in_all_txs;
 	/** True in case transaction provides any DDL change. */
 	bool is_schema_changed;
+	/** Timeout for transaction, or TIMEOUT_INFINITY if not set. */
+	double timeout;
+	/**
+	 * Timer that is alarmed if the transaction did not have time
+	 * to complete within the timeout specified when it was created.
+	 */
+	struct ev_timer *rollback_timer;
 };
 
 static inline bool
@@ -830,6 +842,18 @@ box_txn_rollback(void);
  */
 API_EXPORT void *
 box_txn_alloc(size_t size);
+
+/**
+ * Set @a timeout for transaction, when it expires, transaction
+ * will be rolled back.
+ *
+ * @retval 0 if success
+ * @retval -1 if timeout is less than or equal to 0, there is
+ *            no current transaction or rollback timer for
+ *            current transaction is already started.
+ */
+API_EXPORT int
+box_txn_set_timeout(double timeout);
 
 /** \endcond public */
 

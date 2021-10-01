@@ -1,0 +1,219 @@
+test_run = require("test_run").new()
+---
+...
+fiber = require("fiber")
+---
+...
+test_run:cmd("create server test with script='box/tx_man.lua'")
+---
+- true
+...
+test_run:cmd("start server test")
+---
+- true
+...
+-- Checks for local transactions
+test_run:switch("test")
+---
+- true
+...
+fiber = require("fiber")
+---
+...
+ffi = require("ffi")
+---
+...
+ffi.cdef("int box_txn_set_timeout(double timeout);")
+---
+...
+-- Check error when we try to set timeout, when
+-- there is no active transaction
+assert(ffi.C.box_txn_set_timeout(5) == -1)
+---
+- true
+...
+-- No active transaction
+box.error.last()
+---
+- No active transaction
+...
+-- Check error when try to set timeout, when
+-- transaction rollback timer is already running
+box.begin({timeout = 100})
+---
+...
+fiber.yield()
+---
+...
+assert(ffi.C.box_txn_set_timeout(5) == -1)
+---
+- true
+...
+-- Operation is not permitted if timer is already running
+box.error.last()
+---
+- Operation is not permitted if timer is already running
+...
+box.commit()
+---
+...
+-- Check arguments for 'box.begin'
+box.begin(1)
+---
+- error: Illegal parameters, options should be a table
+...
+box.begin({timeout = 0})
+---
+- error: Illegal parameters, timeout must be a number greater than 0
+...
+box.begin({timeout = -1})
+---
+- error: Illegal parameters, timeout must be a number greater than 0
+...
+box.begin({timeout = "5"})
+---
+- error: Illegal parameters, timeout must be a number greater than 0
+...
+-- Check new configuration option 'txn_timeout'
+box.cfg({txn_timeout = 0})
+---
+- error: 'Incorrect value for option ''txn_timeout'': the value must be greather than
+    0'
+...
+box.cfg({txn_timeout = -1})
+---
+- error: 'Incorrect value for option ''txn_timeout'': the value must be greather than
+    0'
+...
+box.cfg({txn_timeout = "5"})
+---
+- error: 'Incorrect value for option ''txn_timeout'': should be of type number'
+...
+s = box.schema.space.create("test")
+---
+...
+_ = s:create_index("pk")
+---
+...
+txn_timeout = 0.1
+---
+...
+box.cfg({ txn_timeout = txn_timeout })
+---
+...
+-- Check that transaction aborted by timeout, which
+-- was set by the change of box.cfg.txn_timeout
+box.begin()
+---
+...
+s:replace({1})
+---
+- [1]
+...
+s:select({}) -- [1]
+---
+- - [1]
+...
+fiber.sleep(txn_timeout + 0.1)
+---
+...
+s:select({}) --[]
+---
+- []
+...
+s:replace({2})
+---
+- error: Transaction has been aborted by timeout
+...
+fiber.yield()
+---
+...
+s:select({}) -- []
+---
+- []
+...
+box.commit() -- Transaction has been aborted by timeout
+---
+- error: Transaction has been aborted by timeout
+...
+-- Check that transaction aborted by timeout, which
+-- was set by appropriate option in box.begin
+box.begin({timeout = txn_timeout})
+---
+...
+s:replace({1})
+---
+- [1]
+...
+s:select({}) -- [1]
+---
+- - [1]
+...
+fiber.sleep(txn_timeout  / 2 + 0.1)
+---
+...
+s:select({}) --[]
+---
+- []
+...
+s:replace({2})
+---
+- error: Transaction has been aborted by timeout
+...
+fiber.yield()
+---
+...
+s:select({}) -- []
+---
+- []
+...
+box.commit() -- Transaction has been aborted by timeout
+---
+- error: Transaction has been aborted by timeout
+...
+-- Check that transaction is not rollback until timeout expired.
+box.begin({timeout = 1000})
+---
+...
+s:replace({1})
+---
+- [1]
+...
+s:select({1}) -- [1]
+---
+- - [1]
+...
+fiber.sleep(0.1)
+---
+...
+-- timeout is not expired
+s:select({}) -- [1]
+---
+- - [1]
+...
+box.commit() -- Success
+---
+...
+s:select({}) -- [1]
+---
+- - [1]
+...
+s:drop()
+---
+...
+test_run:switch("default")
+---
+- true
+...
+test_run:cmd("stop server test")
+---
+- true
+...
+test_run:cmd("cleanup server test")
+---
+- true
+...
+test_run:cmd("delete server test")
+---
+- true
+...

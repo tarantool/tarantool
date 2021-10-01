@@ -44,6 +44,7 @@ slab_alloc_granularity:8
 sql_cache_size:5242880
 strip_core:true
 too_long_threshold:0.5
+txn_timeout:3153600000
 vinyl_bloom_fpr:0.05
 vinyl_cache:134217728
 vinyl_dir:.
