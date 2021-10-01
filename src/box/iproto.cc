@@ -2129,6 +2129,15 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 				evio_service_stop(&binary);
 			if (cfg_msg->uri != NULL) {
 				evio_service_bind(&binary, cfg_msg->uri);
+				struct errinj *inj =
+					errinj(ERRINJ_IPROTO_CFG_LISTEN,
+					       ERRINJ_INT);
+				if (inj != NULL && inj->iparam > 0) {
+					inj->iparam--;
+					diag_set(ClientError, ER_INJECTION,
+						 "iproto listen");
+					diag_raise();
+				}
 				evio_service_listen(&binary);
 			}
 			break;
