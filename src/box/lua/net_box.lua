@@ -826,10 +826,21 @@ local function stream_new_stream(stream)
     return stream._conn:new_stream()
 end
 
-local function stream_begin(stream, opts)
+local function stream_begin(stream, txn_opts, netbox_opts)
     check_remote_arg(stream, 'begin')
-    local res = stream:_request(M_BEGIN, opts, nil, stream._stream_id)
-    if opts and opts.is_async then
+    local timeout
+    if txn_opts then
+        if type(txn_opts) ~= 'table' then
+            error("txn_opts should be a table")
+        end
+        timeout = txn_opts.timeout
+        if timeout and (type(timeout) ~= "number" or timeout <= 0) then
+            error("timeout must be a number greater than 0")
+        end
+    end
+    local res = stream:_request(M_BEGIN, netbox_opts, nil,
+                                stream._stream_id, timeout)
+    if netbox_opts and netbox_opts.is_async then
         return res
     end
 end

@@ -149,6 +149,7 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x53 */	MP_UINT, /* IPROTO_TERM */
 	/* 0x54 */	MP_UINT, /* IPROTO_VERSION */
 	/* 0x55 */	MP_ARRAY, /* IPROTO_FEATURES */
+	/* 0x56 */	MP_DOUBLE, /* IPROTO_TIMEOUT */
 	/* }}} */
 };
 
@@ -282,6 +283,7 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"term",             /* 0x53 */
 	"version",          /* 0x54 */
 	"features",         /* 0x55 */
+	"timeout",          /* 0x56 */
 };
 
 const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX] = {

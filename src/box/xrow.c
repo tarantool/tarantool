@@ -1416,6 +1416,44 @@ error:
 	box_error_set(__FILE__, __LINE__, code, error);
 }
 
+int
+xrow_decode_begin(const struct xrow_header *row, struct begin_request *request)
+{
+	assert(row->type == IPROTO_BEGIN);
+	memset(request, 0, sizeof(*request));
+
+	/** Request without extra options. */
+	if (row->bodycnt == 0)
+		return 0;
+
+	const char *d = row->body[0].iov_base;
+	if (mp_typeof(*d) != MP_MAP)
+		goto bad_msgpack;
+
+	uint32_t map_size = mp_decode_map(&d);
+	for (uint32_t i = 0; i < map_size; ++i) {
+		if (mp_typeof(*d) != MP_UINT)
+			goto bad_msgpack;
+		uint64_t key = mp_decode_uint(&d);
+		if (key >= IPROTO_KEY_MAX ||
+		    mp_typeof(*d) != iproto_key_type[key])
+			goto bad_msgpack;
+		switch (key) {
+		case IPROTO_TIMEOUT:
+			request->timeout = mp_decode_double(&d);
+			break;
+		default:
+			mp_next(&d);
+			break;
+		}
+	}
+	return 0;
+
+bad_msgpack:
+	xrow_on_decode_err(row, ER_INVALID_MSGPACK, "request body");
+	return -1;
+}
+
 void
 xrow_encode_vote(struct xrow_header *row)
 {
