@@ -2457,21 +2457,29 @@ static inline int
 iproto_do_cfg(struct iproto_thread *iproto_thread, struct iproto_cfg_msg *msg)
 {
 	msg->iproto_thread = iproto_thread;
-	if (cbus_call(&iproto_thread->net_pipe, &iproto_thread->tx_pipe, msg,
-		      iproto_do_cfg_f, NULL, TIMEOUT_INFINITY) != 0)
-		return -1;
-	return 0;
+	bool prev = fiber_set_cancellable(false);
+	int rc = cbus_call(&iproto_thread->net_pipe, &iproto_thread->tx_pipe,
+			   msg, iproto_do_cfg_f, NULL, TIMEOUT_INFINITY);
+	fiber_set_cancellable(prev);
+	return rc;
 }
 
-static inline int
+static inline void
+iproto_do_cfg_crit(struct iproto_thread *iproto_thread,
+		   struct iproto_cfg_msg *cfg_msg)
+{
+	int rc = iproto_do_cfg(iproto_thread, cfg_msg);
+	(void)rc;
+	assert(rc == 0);
+}
+
+static inline void
 iproto_send_stop_msg(void)
 {
 	struct iproto_cfg_msg cfg_msg;
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_STOP);
 	for (int i = 0; i < iproto_threads_count; i++)
-		if (iproto_do_cfg(&iproto_threads[i], &cfg_msg) != 0)
-			return -1;
-	return 0;
+		iproto_do_cfg_crit(&iproto_threads[i], &cfg_msg);
 }
 
 static inline int
@@ -2489,8 +2497,7 @@ iproto_send_listen_msg(struct evio_service *binary)
 int
 iproto_listen(const char *uri)
 {
-	if (iproto_send_stop_msg() != 0)
-		return -1;
+	iproto_send_stop_msg();
 	evio_service_stop(&tx_binary);
 	if (uri == NULL) {
 		tx_binary.addr_len = 0;
@@ -2519,12 +2526,12 @@ iproto_mem_used(void)
 	struct errinj *inj =
 		errinj(ERRINJ_IPROTO_SINGLE_THREAD_STAT, ERRINJ_INT);
 	if (inj->iparam >= 0 && inj->iparam < iproto_threads_count) {
-		iproto_do_cfg(&iproto_threads[inj->iparam], &cfg_msg);
+		iproto_do_cfg_crit(&iproto_threads[inj->iparam], &cfg_msg);
 		return cfg_msg.mem_used;
 	}
 #endif
 	for (int i = 0; i < iproto_threads_count; i++) {
-		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
+		iproto_do_cfg_crit(&iproto_threads[i], &cfg_msg);
 		mem += cfg_msg.mem_used;
 	}
 	return mem;
@@ -2540,12 +2547,12 @@ iproto_connection_count(void)
 	struct errinj *inj =
 		errinj(ERRINJ_IPROTO_SINGLE_THREAD_STAT, ERRINJ_INT);
 	if (inj->iparam >= 0 && inj->iparam < iproto_threads_count) {
-		iproto_do_cfg(&iproto_threads[inj->iparam], &cfg_msg);
+		iproto_do_cfg_crit(&iproto_threads[inj->iparam], &cfg_msg);
 		return cfg_msg.connections;
 	}
 #endif
 	for (int i = 0; i < iproto_threads_count; i++) {
-		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
+		iproto_do_cfg_crit(&iproto_threads[i], &cfg_msg);
 		count += cfg_msg.connections;
 	}
 	return count;
@@ -2561,12 +2568,12 @@ iproto_request_count(void)
 	struct errinj *inj =
 		errinj(ERRINJ_IPROTO_SINGLE_THREAD_STAT, ERRINJ_INT);
 	if (inj->iparam >= 0 && inj->iparam < iproto_threads_count) {
-		iproto_do_cfg(&iproto_threads[inj->iparam], &cfg_msg);
+		iproto_do_cfg_crit(&iproto_threads[inj->iparam], &cfg_msg);
 		return cfg_msg.requests;
 	}
 #endif
 	for (int i = 0; i < iproto_threads_count; i++) {
-		iproto_do_cfg(&iproto_threads[i], &cfg_msg);
+		iproto_do_cfg_crit(&iproto_threads[i], &cfg_msg);
 		count += cfg_msg.requests;
 	}
 	return count;
@@ -2591,8 +2598,7 @@ iproto_set_msg_max(int new_iproto_msg_max)
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_MSG_MAX);
 	cfg_msg.iproto_msg_max = new_iproto_msg_max;
 	for (int i = 0; i < iproto_threads_count; i++) {
-		if (iproto_do_cfg(&iproto_threads[i], &cfg_msg) != 0)
-			diag_raise();
+		iproto_do_cfg_crit(&iproto_threads[i], &cfg_msg);
 		cpipe_set_max_input(&iproto_threads[i].net_pipe,
 				    new_iproto_msg_max / 2);
 	}
