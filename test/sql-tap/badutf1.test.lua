@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(23)
+test:plan(19)
 
 --!./tcltestrunner.lua
 -- 2007 May 15
@@ -254,51 +254,11 @@ test:do_test(
 test:do_test(
     "badutf-3.5",
     function()
-        return test:execsql2("SELECT length('\x61\xc0\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80') AS x")
-    end, {
-        -- <badutf-3.5>
-        "X", 12
-        -- </badutf-3.5>
-    })
-
-test:do_test(
-    "badutf-3.6",
-    function()
-        return test:execsql2("SELECT length('\xc0\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80') AS x")
-    end, {
-        -- <badutf-3.6>
-        "X", 11
-        -- </badutf-3.6>
-    })
-
-test:do_test(
-    "badutf-3.7",
-    function()
         return test:execsql2("SELECT length('\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80') AS x")
     end, {
         -- <badutf-3.7>
         "X", 10
         -- </badutf-3.7>
-    })
-
-test:do_test(
-    "badutf-3.8",
-    function()
-        return test:execsql2("SELECT length('\x80\x80\x80\x80\x80\xf0\x80\x80\x80\x80') AS x")
-    end, {
-        -- <badutf-3.8>
-        "X", 7
-        -- </badutf-3.8>
-    })
-
-test:do_test(
-    "badutf-3.9",
-    function()
-        return test:execsql2("SELECT length('\x80\x80\x80\x80\x80\xf0\x80\x80\x80\xff') AS x")
-    end, {
-        -- <badutf-3.9>
-        "X", 7
-        -- </badutf-3.9>
     })
 
 test:do_test(
