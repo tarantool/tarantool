@@ -335,6 +335,22 @@ local dynamic_cfg = {
     sql_cache_size          = private.cfg_set_sql_cache_size,
 }
 
+-- dynamically settable options, which should be reverted in case
+-- there change fails.
+local dynamic_cfg_revert = {
+    listen                  = private.cfg_set_listen,
+}
+
+-- Values of dynamically settable options, the revert to which cannot fail.
+-- If trying to change the value of dynamically settable option fails, we
+-- try to rollback to previous value of this option. If rollback is also fails
+-- we rollback to the value, which contains here. This table should contain
+-- such values, that rollback for them can't fails. It's necessary to prevent
+-- inconsistent state.
+local default_cfg_on_revert = {
+    listen                  = nil,
+}
+
 ifdef_feedback = nil -- luacheck: ignore
 ifdef_feedback_set_params = nil -- luacheck: ignore
 
@@ -611,8 +627,23 @@ local function reload_cfg(oldcfg, cfg)
         local oldval = oldcfg[key]
         if not compare_cfg(val, oldval) then
             rawset(oldcfg, key, val)
-            if not pcall(dynamic_cfg[key]) then
+            local result, err = pcall(dynamic_cfg[key])
+            if not result then
+                local save_err = err
                 rawset(oldcfg, key, oldval) -- revert the old value
+                if dynamic_cfg_revert[key] then
+                    result, err = pcall(dynamic_cfg_revert[key])
+                    if not result then
+                        log.error("failed to revert '%s' " ..
+                                  "configuration option: %s",
+                                  key, err)
+                        -- We set the value from special table, rollback to
+                        -- which cannot fail.
+                        rawset(oldcfg, key, default_cfg_on_revert[key])
+                        assert(pcall(dynamic_cfg_revert[key]))
+                    end
+                end
+                box.error.set(save_err)
                 return box.error() -- re-throw
             end
             if log_cfg_option[key] ~= nil then
