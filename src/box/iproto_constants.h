@@ -143,6 +143,8 @@ enum iproto_key {
 	IPROTO_VERSION = 0x54,
 	/** Protocol features. */
 	IPROTO_FEATURES = 0x55,
+	/** Operation timeout. Specific to request type. */
+	IPROTO_TIMEOUT = 0x56,
 	/*
 	 * Be careful to not extend iproto_key values over 0x7f.
 	 * iproto_keys are encoded in msgpack as positive fixnum, which ends at

@@ -321,6 +321,8 @@ struct iproto_msg
 		struct id_request id;
 		/* SQL request, if this is the EXECUTE/PREPARE request. */
 		struct sql_request sql;
+		/* BEGIN request */
+		struct begin_request begin;
 		/** In case of iproto parse error, saved diagnostics. */
 		struct diag diag;
 	};
@@ -1522,6 +1524,8 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 		cmsg_init(&msg->base, iproto_thread->dml_route[type]);
 		break;
 	case IPROTO_BEGIN:
+		if (xrow_decode_begin(&msg->header, &msg->begin) != 0)
+			goto error;
 		cmsg_init(&msg->base, iproto_thread->begin_route);
 		break;
 	case IPROTO_COMMIT:
@@ -1876,6 +1880,13 @@ tx_process_begin(struct cmsg *m)
 	if (box_txn_begin() != 0)
 		goto error;
 
+	if (msg->begin.timeout != 0 &&
+	    box_txn_set_timeout(msg->begin.timeout) != 0) {
+		int rc = box_txn_rollback();
+		assert(rc == 0);
+		(void)rc;
+		goto error;
+	}
 	out = msg->connection->tx.p_obuf;
 	iproto_reply_ok(out, msg->header.sync, ::schema_version);
 	iproto_wpos_create(&msg->wpos, out);

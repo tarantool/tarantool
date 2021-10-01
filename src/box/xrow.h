@@ -846,6 +846,28 @@ void
 xrow_decode_error(struct xrow_header *row);
 
 /**
+ * BEGIN request.
+ */
+struct begin_request {
+	/**
+	 * Timeout for transaction. If timeout expired, transaction
+	 * will be rolled back. Must be greater than zero.
+	 */
+	double timeout;
+};
+
+/**
+ * Parse the BEGIN request.
+ * @param row Encoded data.
+ * @param[out] request Request to decode to.
+ *
+ * @retval  0 Sucess.
+ * @retval -1 Format error.
+ */
+int
+xrow_decode_begin(const struct xrow_header *row, struct begin_request *request);
+
+/**
  * Update vclock with the next LSN value for given replica id.
  * The function will cause panic if the next LSN happens to be
  * out of order. The details of provided row are included into
