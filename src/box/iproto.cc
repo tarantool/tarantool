@@ -2914,6 +2914,7 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 	struct iproto_cfg_msg *cfg_msg = (struct iproto_cfg_msg *) m;
 	int old;
 	struct iproto_thread *iproto_thread = cfg_msg->iproto_thread;
+	struct errinj *inj;
 
 	try {
 		switch (cfg_msg->op) {
@@ -2926,6 +2927,13 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 				iproto_resume(iproto_thread);
 			break;
 		case IPROTO_CFG_LISTEN:
+			inj = errinj(ERRINJ_IPROTO_CFG_LISTEN, ERRINJ_INT);
+			if (inj != NULL && inj->iparam > 0) {
+				inj->iparam--;
+				diag_set(ClientError, ER_INJECTION,
+					 "iproto listen");
+				diag_raise();
+			}
 			if (evio_service_is_active(&iproto_thread->binary)) {
 				diag_set(ClientError, ER_UNSUPPORTED, "Iproto",
 					 "listen if service already active");
