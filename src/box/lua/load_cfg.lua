@@ -249,6 +249,22 @@ local dynamic_cfg = {
     net_msg_max             = private.cfg_set_net_msg_max,
 }
 
+-- dynamically settable options, which should be reverted in case
+-- there change fails.
+local dynamic_cfg_revert = {
+    listen                  = private.cfg_set_listen,
+}
+
+-- Values of dynamically settable options, the revert to which cannot fail.
+-- If trying to change the value of dynamically settable option fails, we
+-- try to rollback to previous value of this option. If rollback is also fails
+-- we rollback to the value, which contains here. This table should contain
+-- such values, that rollback for them can't fails. It's necessary to prevent
+-- inconsistent state.
+local default_cfg_on_revert = {
+    listen                  = nil,
+}
+
 --
 -- For some options it is important in which order they are set.
 -- For example, setting 'replication', including self, before
@@ -470,9 +486,23 @@ local function reload_cfg(oldcfg, cfg)
         local oldval = oldcfg[key]
         if not compare_cfg(val, oldval) then
             rawset(oldcfg, key, val)
-            if not pcall(dynamic_cfg[key]) then
+            local result, err = pcall(dynamic_cfg[key])
+            if not result then
+                local save_err = err
                 rawset(oldcfg, key, oldval) -- revert the old value
-                return box.error() -- re-throw
+                if dynamic_cfg_revert[key] then
+                    result, err = pcall(dynamic_cfg_revert[key])
+                    if not result then
+                        log.error("failed to revert '%s' " ..
+                                  "configuration option: %s",
+                                  key, err)
+                        -- We set the value from special table, rollback to
+                        -- which cannot fail.
+                        rawset(oldcfg, key, default_cfg_on_revert[key])
+                        assert(pcall(dynamic_cfg_revert[key]))
+                    end
+                end
+                return box.error(save_err) -- re-throw
             end
             if log_cfg_option[key] ~= nil then
                 val = log_cfg_option[key](val)
