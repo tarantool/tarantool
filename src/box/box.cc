@@ -81,6 +81,7 @@
 #include "sql_stmt_cache.h"
 #include "msgpack.h"
 #include "raft.h"
+#include "watcher.h"
 #include "trivia/util.h"
 #include "version.h"
 
@@ -3085,6 +3086,7 @@ box_free(void)
 		tuple_free();
 		port_free();
 #endif
+		box_watcher_free();
 		box_raft_free();
 		iproto_free();
 		replication_free();
@@ -3518,6 +3520,7 @@ box_init(void)
 	txn_limbo_init();
 	sequence_init();
 	box_raft_init();
+	box_watcher_init();
 }
 
 bool

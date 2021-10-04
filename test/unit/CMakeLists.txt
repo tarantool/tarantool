@@ -282,3 +282,6 @@ target_link_libraries(popen.test misc unit core)
 
 add_executable(serializer.test serializer.c)
 target_link_libraries(serializer.test unit box ${LUAJIT_LIBRARIES})
+
+add_executable(watcher.test watcher.c core_test_utils.c)
+target_link_libraries(watcher.test unit core box)

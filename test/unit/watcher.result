@@ -1,0 +1,101 @@
+	*** main_f ***
+1..8
+	*** test_basic ***
+    1..22
+    ok 1 - watcher run count
+    ok 2 - watcher key
+    ok 3 - watcher data
+    ok 4 - watcher run count
+    ok 5 - watcher key
+    ok 6 - watcher data
+    ok 7 - watcher run count
+    ok 8 - watcher key
+    ok 9 - watcher data
+    ok 10 - watcher run count
+    ok 11 - watcher key
+    ok 12 - watcher data
+    ok 13 - watcher run count
+    ok 14 - watcher run count
+    ok 15 - watcher run count
+    ok 16 - watcher key
+    ok 17 - watcher data
+    ok 18 - watcher run count
+    ok 19 - watcher run count
+    ok 20 - watcher destroy count
+    ok 21 - watcher destroy count
+    ok 22 - watcher destroy count
+ok 1 - subtests
+	*** test_basic: done ***
+	*** test_async ***
+    1..5
+    ok 1 - watcher run count
+    ok 2 - watcher run count
+    ok 3 - watcher run count
+    ok 4 - watcher destroy count
+    ok 5 - watcher destroy count
+ok 2 - subtests
+	*** test_async: done ***
+	*** test_update_running ***
+    1..3
+    ok 1 - watcher run count
+    ok 2 - watcher run count
+    ok 3 - watcher destroy count
+ok 3 - subtests
+	*** test_update_running: done ***
+	*** test_unregister_running ***
+    1..4
+    ok 1 - watcher run count
+    ok 2 - watcher destroy count
+    ok 3 - watcher destroy count
+    ok 4 - watcher run count
+ok 4 - subtests
+	*** test_unregister_running: done ***
+	*** test_ack ***
+    1..15
+    ok 1 - watcher run count
+    ok 2 - watcher run count
+    ok 3 - watcher run count
+    ok 4 - watcher run count
+    ok 5 - watcher run count
+    ok 6 - watcher run count
+    ok 7 - watcher run count
+    ok 8 - watcher run count
+    ok 9 - watcher run count
+    ok 10 - watcher run count
+    ok 11 - watcher run count
+    ok 12 - watcher run count
+    ok 13 - watcher destroy count
+    ok 14 - watcher destroy count
+    ok 15 - watcher destroy count
+ok 5 - subtests
+	*** test_ack: done ***
+	*** test_ack_unregistered ***
+    1..4
+    ok 1 - watcher run count
+    ok 2 - watcher destroy count
+    ok 3 - watcher destroy count
+    ok 4 - watcher run count
+ok 6 - subtests
+	*** test_ack_unregistered: done ***
+	*** test_parallel ***
+    1..6
+    ok 1 - watcher run count
+    ok 2 - watcher run count
+    ok 3 - callback is running
+    ok 4 - watcher run count
+    ok 5 - callback is running
+    ok 6 - watcher destroy count
+ok 7 - subtests
+	*** test_parallel: done ***
+	*** test_free ***
+    1..7
+    ok 1 - watcher run count
+    ok 2 - watcher run count
+    ok 3 - watcher run count
+    ok 4 - watcher destroy count
+    ok 5 - watcher destroy count
+    ok 6 - watcher destroy count
+    ok 7 - watcher destroy count
+ok 8 - subtests
+	*** test_free: done ***
+	*** main_f: done ***
