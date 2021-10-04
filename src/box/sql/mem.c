@@ -1106,9 +1106,9 @@ dec_to_int(struct Mem *mem)
 		int64_t i;
 		if (decimal_to_int64(&mem->u.d, &i) == NULL)
 			return -1;
-		assert(i < 0);
+		assert(i <= 0);
 		mem->u.i = i;
-		mem->type = MEM_TYPE_INT;
+		mem->type = i == 0 ? MEM_TYPE_UINT : MEM_TYPE_INT;
 		mem->flags = 0;
 		return 0;
 	}
@@ -1137,14 +1137,15 @@ dec_to_int_forced(struct Mem *mem)
 	bool is_dec_int = decimal_is_int(&mem->u.d);
 	if (decimal_is_neg(&mem->u.d)) {
 		int64_t i;
-		mem->type = MEM_TYPE_INT;
 		mem->flags = 0;
 		if (decimal_to_int64(&mem->u.d, &i) == NULL) {
 			mem->u.i = INT64_MIN;
+			mem->type = MEM_TYPE_INT;
 			return -1;
 		}
-		assert(i < 0);
+		assert(i <= 0);
 		mem->u.i = i;
+		mem->type = i == 0 ? MEM_TYPE_UINT : MEM_TYPE_INT;
 		/*
 		 * Decimal is floored when cast to int, which means that after
 		 * cast it becomes bigger if it was not integer.
