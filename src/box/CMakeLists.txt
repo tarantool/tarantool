@@ -194,6 +194,7 @@ add_library(box STATIC
     call.c
     merger.c
     ibuf.c
+    watcher.c
     ${sql_sources}
     ${lua_sources}
     lua/init.c
