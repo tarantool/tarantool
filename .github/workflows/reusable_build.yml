@@ -1,0 +1,70 @@
+name: reusable_build
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: |
+          The tarantool branch, tag, or commit SHA to checkout for build
+        default: master
+        required: false
+        type: string
+      os:
+        description: 'The name of the OS to build tarantool packages for'
+        default: ubuntu
+        required: false
+        type: string
+      dist:
+        description: 'The version of the OS'
+        default: focal
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    env:
+      OS: ${{ inputs.os }}
+      DIST: ${{ inputs.dist }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ inputs.ref }}
+          # Fetch the entire history for all branches and tags.
+          fetch-depth: 0
+          # Enable recursive submodules checkout.
+          submodules: recursive
+      - name: 'Get the commit SHA'
+        id: get_sha
+        run: echo "::set-output name=sha::$(git log -1 --format='%H')"
+      - uses: ./.github/actions/environment
+      - name: 'Build tarantool packages for ${{ env.OS }}(${{ env.DIST }})'
+        id: run_build
+        env:
+          # Our testing expects that the init process (PID 1) will
+          # reap orphan processes. At least the following test leans
+          # on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
+          PACKPACK_EXTRA_DOCKER_RUN_PARAMS: --init
+          # There are packages like tzdata or postfix, whose configuration
+          # is interactive by default. The environment variable below
+          # forbids interactive configuration phase. Otherwise the CI gets
+          # stuck from time to time on `apt-get update`.
+          DEBIAN_FRONTEND: noninteractive
+        run: make -f .gitlab.mk package
+      - name: 'Upload build artifacts'
+        uses: actions/upload-artifact@v2
+        with:
+          name: tarantool-${{ env.OS }}-${{ env.DIST }}-${{ steps.get_sha.outputs.sha }}
+          retention-days: 21
+          path: |
+            build/tarantool*.deb
+            build/tarantool*.rpm
+          if-no-files-found: error
+      - name: 'Upload logs if the build failed'
+        if: failure() && steps.run_build.conclusion == 'failure'
+        uses: actions/upload-artifact@v2
+        with:
+          name: tarantool-build-log-${{ env.OS }}-${{ env.DIST }}-${{ steps.get_sha.outputs.sha }}
+          retention-days: 21
+          path: build/*build*
+          if-no-files-found: error
