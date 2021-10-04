@@ -1,0 +1,24 @@
+name: integration
+
+on:
+  push:
+    branches:
+      - 'master'
+      - '[0-9].[0-9]+'  # release branches
+    tags:
+      - '*'
+  workflow_dispatch:
+
+jobs:
+  tarantool:
+    uses: tarantool/tarantool/.github/workflows/reusable_build.yml@master
+    with:
+      ref: ${{ github.ref }}
+      os: ubuntu
+      dist: focal
+
+  vshard:
+    needs: tarantool
+    uses: tarantool/vshard/.github/workflows/reusable_testing.yml@master
+    with:
+      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
