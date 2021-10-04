@@ -1338,7 +1338,7 @@ mem_to_int_precise(struct Mem *mem)
 	if (mem->type == MEM_TYPE_DOUBLE)
 		return double_to_int_precise(mem);
 	if (mem->type == MEM_TYPE_DEC)
-		return dec_to_int(mem);
+		return dec_to_int_precise(mem);
 	return -1;
 }
 

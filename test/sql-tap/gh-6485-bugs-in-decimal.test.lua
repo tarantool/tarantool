@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(3)
+test:plan(5)
 
 -- Make sure DECIMAL is not truncated when used in an index.
 test:do_execsql_test(
@@ -33,6 +33,25 @@ test:do_execsql_test(
         SELECT i FROM t WHERE i IN (CAST(-0.1 AS DECIMAL), CAST(2 AS DECIMAL));
         DROP TABLE t;
     ]], {
+    })
+
+-- Make sure DECIMAL is not truncated when used in LIMIT and OFFSET.
+test:do_catchsql_test(
+    "gh-6485-4",
+    [[
+        SELECT 1 LIMIT CAST(1.5 AS DECIMAL);
+    ]], {
+        1, [[Failed to execute SQL statement: ]]..
+        [[Only positive integers are allowed in the LIMIT clause]]
+    })
+
+test:do_catchsql_test(
+    "gh-6485-5",
+    [[
+        SELECT 1 LIMIT 1 OFFSET CAST(1.5 AS DECIMAL);
+    ]], {
+        1, [[Failed to execute SQL statement: ]]..
+        [[Only positive integers are allowed in the OFFSET clause]]
     })
 
 test:finish_test()
