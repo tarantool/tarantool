@@ -927,6 +927,32 @@ func_randomblob(struct sql_context *ctx, int argc, struct Mem *argv)
 	mem_set_bin_allocated(ctx->pOut, res, len);
 }
 
+/**
+ * Implementation of the ZEROBLOB() function.
+ *
+ * This function returns a zero-filled VARBINARY value. The size of this value
+ * is specified as an argument of the function.
+ */
+static void
+func_zeroblob(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	assert(argc == 1);
+	(void)argc;
+	struct Mem *arg = &argv[0];
+	assert(mem_is_null(arg) || mem_is_int(arg));
+	if (mem_is_null(arg) || !mem_is_uint(arg))
+		return;
+	if (arg->u.u == 0)
+		return mem_set_bin_static(ctx->pOut, "", 0);
+	uint64_t len = arg->u.u;
+	char *res = sqlDbMallocZero(sql_get(), len);
+	if (res == NULL) {
+		ctx->is_aborted = true;
+		return;
+	}
+	mem_set_bin_allocated(ctx->pOut, res, len);
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -1499,32 +1525,6 @@ unicodeFunc(struct sql_context *context, int argc, struct Mem *argv)
 }
 
 /*
- * The zeroblob(N) function returns a zero-filled blob of size N bytes.
- */
-static void
-zeroblobFunc(struct sql_context *context, int argc, struct Mem *argv)
-{
-	int64_t n;
-	assert(argc == 1);
-	UNUSED_PARAMETER(argc);
-	n = mem_get_int_unsafe(&argv[0]);
-	if (n < 0)
-		n = 0;
-	if (n > sql_get()->aLimit[SQL_LIMIT_LENGTH]) {
-		diag_set(ClientError, ER_SQL_EXECUTE, "string or binary string"\
-			 "is too big");
-		context->is_aborted = true;
-		return;
-	}
-	char *str = sqlDbMallocZero(sql_get(), n);
-	if (str == NULL) {
-		context->is_aborted = true;
-		return;
-	}
-	mem_set_bin_allocated(context->pOut, str, n);
-}
-
-/*
  * The replace() function.  Three arguments are all strings: call
  * them A, B, and C. The result is also a string which is derived
  * from A by replacing every occurrence of B with C.  The match
@@ -1967,7 +1967,7 @@ static struct sql_func_definition definitions[] = {
 	{"UUID", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_UUID, sql_func_uuid, NULL},
 	{"VERSION", 0, {}, FIELD_TYPE_STRING, sql_func_version, NULL},
 	{"ZEROBLOB", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_VARBINARY,
-	 zeroblobFunc, NULL},
+	 func_zeroblob, NULL},
 };
 
 static struct sql_func_dictionary *
