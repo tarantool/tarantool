@@ -23,6 +23,12 @@ lua_source(lua_sources lua/merger.lua)
 set(bin_sources)
 bin_source(bin_sources bootstrap.snap bootstrap.h)
 
+
+set(listen_sources
+    cfg_uri.c
+    iproto_service.cc)
+lua_source(lua_sources lua/normalize_uri.lua)
+
 set(sql_sources
     sql/opcodes.c
     sql/parse.c
@@ -218,7 +224,8 @@ add_library(box STATIC
     lua/execute.c
     lua/key_def.c
     lua/merger.c
-    ${bin_sources})
+    ${bin_sources}
+    ${listen_sources})
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_definitions(-DSQL_DEBUG=1)

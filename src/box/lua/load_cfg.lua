@@ -143,7 +143,7 @@ local module_cfg_type = {
 -- forget to update it when add a new type or a combination of
 -- types here.
 local template_cfg = {
-    listen              = 'string, number',
+    listen              = box.internal.cfg_get_listen_type(),
     memtx_memory        = 'number',
     strip_core          = 'boolean',
     memtx_min_tuple_size  = 'number',

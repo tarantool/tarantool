@@ -32,6 +32,10 @@
  */
 
 #include <stddef.h>
+#include <stdint.h>
+
+#include "sio.h"
+#include "cfg_uri.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -117,7 +121,7 @@ void
 iproto_init(int threads_count);
 
 int
-iproto_listen(const char *uri);
+iproto_listen(struct cfg_uri_array *uri_array);
 
 void
 iproto_set_msg_max(int iproto_msg_max);

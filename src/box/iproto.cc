@@ -68,6 +68,7 @@
 #include "salad/stailq.h"
 #include "assoc.h"
 #include "txn.h"
+#include "iproto_service.h"
 
 enum {
 	IPROTO_SALT_SIZE = 32,
@@ -185,10 +186,8 @@ struct iproto_thread {
 	 * Iproto thread id
 	 */
 	uint32_t id;
-	/*
-	 * Iproto binary listener
-	 */
-	struct evio_service binary;
+	/** Array of iproto binary listeners */
+	struct iproto_service_array *service_array;
 	/** Requests count currently pending in stream queue. */
 	size_t requests_in_stream_queue;
 	/**
@@ -207,13 +206,13 @@ struct iproto_thread {
 static struct iproto_thread *iproto_threads;
 int iproto_threads_count;
 /**
- * This binary contains all bind socket properties, like
+ * This service array contains all bind socket properties, like
  * address the iproto listens for. Is kept in TX to be
  * shown in box.info. It should be global, because it contains
  * properties, and should be accessible from differnent functions
  * in tx thread.
  */
-static struct evio_service tx_binary;
+static struct iproto_service_array *tx_service_array;
 
 /**
  * In Greek mythology, Kharon is the ferryman who carries souls
@@ -260,12 +259,7 @@ static int iproto_msg_max = IPROTO_MSG_MAX_MIN;
 const char *
 iproto_bound_address(char *buf)
 {
-	if (tx_binary.addr_len == 0)
-		return NULL;
-	sio_addr_snprintf(buf, SERVICE_NAME_MAXLEN,
-			  (struct sockaddr *)&tx_binary.addrstorage,
-			  tx_binary.addr_len);
-	return buf;
+	return iproto_service_array_fill_listen_info(tx_service_array, buf);
 }
 
 /**
@@ -2540,8 +2534,8 @@ net_cord_f(va_list  ap)
 	mempool_create(&iproto_thread->iproto_stream_pool, &cord()->slabc,
 		       sizeof(struct iproto_stream));
 
-	evio_service_init(loop(), &iproto_thread->binary, "binary",
-			  iproto_on_accept, iproto_thread);
+	iproto_service_array_init(iproto_thread->service_array,
+				  iproto_on_accept, iproto_thread);
 
 	char endpoint_name[ENDPOINT_NAME_MAX];
 	snprintf(endpoint_name, ENDPOINT_NAME_MAX, "net%u",
@@ -2564,7 +2558,7 @@ net_cord_f(va_list  ap)
 	 * will take care of creating events for incoming
 	 * connections.
 	 */
-	evio_service_detach(&iproto_thread->binary);
+	iproto_service_array_detach(iproto_thread->service_array);
 	return 0;
 }
 
@@ -2752,6 +2746,7 @@ iproto_thread_init(struct iproto_thread *iproto_thread)
 {
 	iproto_thread_init_routes(iproto_thread);
 	slab_cache_create(&iproto_thread->net_slabc, &runtime);
+	iproto_thread->service_array = iproto_service_array_new();
 	/* Init statistics counter */
 	iproto_thread->rmean = rmean_new(rmean_net_strings, RMEAN_NET_LAST);
 	if (iproto_thread->rmean == NULL)
@@ -2784,19 +2779,15 @@ iproto_init(int threads_count)
 		/* .fd = */ iproto_session_fd,
 		/* .sync = */ iproto_session_sync,
 	};
+	tx_service_array = iproto_service_array_new();
 	/*
-	 * We use this tx_binary only for bind, not for listen, so
+	 * We use this tx_service_array only for bind, not for listen, so
 	 * we don't need any accept functions.
 	 */
-	evio_service_init(loop(), &tx_binary, "tx_binary", NULL, NULL);
+	iproto_service_array_init(tx_service_array, NULL, NULL);
 
 	iproto_threads = (struct iproto_thread *)
-		calloc(threads_count, sizeof(struct iproto_thread));
-	if (iproto_threads == NULL) {
-		tnt_raise(OutOfMemory, threads_count *
-			  sizeof(struct iproto_thread), "calloc",
-			  "struct iproto_thread");
-	}
+		xcalloc(threads_count, sizeof(struct iproto_thread));
 
 	for (int i = 0; i < threads_count; i++, iproto_threads_count++) {
 		struct iproto_thread *iproto_thread = &iproto_threads[i];
@@ -2863,25 +2854,13 @@ struct iproto_cfg_msg: public cbus_call_msg
 	union {
 		/** Pointer to the statistic stucture. */
 		struct iproto_stats *stats;
-		/** Pointer to evio_service, used for bind */
-		struct evio_service *binary;
-
+		/** Pointer to service_array, used for bind */
+		struct iproto_service_array *array;
 		/** New iproto max message count. */
 		int iproto_msg_max;
 	};
 	struct iproto_thread *iproto_thread;
 };
-
-static inline void
-iproto_thread_fill_binary(struct iproto_thread *iproto_thread,
-			  struct evio_service *binary)
-{
-	strcpy(iproto_thread->binary.host, binary->host);
-	strcpy(iproto_thread->binary.serv, binary->serv);
-	iproto_thread->binary.addrstorage = binary->addrstorage;
-	iproto_thread->binary.addr_len = binary->addr_len;
-	ev_io_set(&iproto_thread->binary.ev, binary->ev.fd, EV_READ);
-}
 
 static inline void
 iproto_cfg_msg_create(struct iproto_cfg_msg *msg, enum iproto_cfg_op op)
@@ -2914,6 +2893,7 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 	struct iproto_cfg_msg *cfg_msg = (struct iproto_cfg_msg *) m;
 	int old;
 	struct iproto_thread *iproto_thread = cfg_msg->iproto_thread;
+	struct iproto_service_array *array = iproto_thread->service_array;
 
 	try {
 		switch (cfg_msg->op) {
@@ -2926,17 +2906,12 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 				iproto_resume(iproto_thread);
 			break;
 		case IPROTO_CFG_LISTEN:
-			if (evio_service_is_active(&iproto_thread->binary)) {
-				diag_set(ClientError, ER_UNSUPPORTED, "Iproto",
-					 "listen if service already active");
-				diag_raise();
-			}
-			iproto_thread_fill_binary(iproto_thread, cfg_msg->binary);
-			if (evio_service_listen(&iproto_thread->binary) != 0)
-				diag_raise();
+			iproto_service_array_check_listen(array);
+			iproto_service_array_attach(array, cfg_msg->array);
+			iproto_service_array_start_listen(array);
 			break;
 		case IPROTO_CFG_STOP:
-			evio_service_detach(&iproto_thread->binary);
+			iproto_service_array_detach(array);
 			break;
 		case IPROTO_CFG_STAT:
 			iproto_fill_stat(iproto_thread, cfg_msg);
@@ -2973,38 +2948,48 @@ iproto_send_stop_msg(void)
 }
 
 static inline int
-iproto_send_listen_msg(struct evio_service *binary)
+iproto_send_listen_msg(struct iproto_service_array *array)
 {
 	struct iproto_cfg_msg cfg_msg;
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_LISTEN);
-	cfg_msg.binary = binary;
+	cfg_msg.array = array;
 	for (int i = 0; i < iproto_threads_count; i++)
 		if (iproto_do_cfg(&iproto_threads[i], &cfg_msg) != 0)
 			return -1;
 	return 0;
 }
 
-int
-iproto_listen(const char *uri)
+static int
+iproto_stop_listen()
 {
 	if (iproto_send_stop_msg() != 0)
 		return -1;
-	evio_service_stop(&tx_binary);
-	if (uri == NULL) {
-		tx_binary.addr_len = 0;
+	iproto_service_array_stop_listen(tx_service_array);
+	iproto_service_array_init(tx_service_array, NULL, NULL);
+	return 0;
+}
+
+int
+iproto_listen(struct cfg_uri_array *uri_array)
+{
+	if (iproto_stop_listen() != 0)
+		return -1;
+	if (cfg_uri_array_size(uri_array) == 0)
 		return 0;
-	}
 	/*
-	 * Please note, we bind socket in main thread, and then
-	 * listen this socket in all iproto threads! With this
+	 * Please note, we bind sockets in main thread, and then
+	 * listen this sockets in all iproto threads! With this
 	 * implementation, we rely on the Linux kernel to distribute
 	 * incoming connections across iproto threads.
 	 */
-	if (evio_service_bind(&tx_binary, uri) != 0)
-		return -1;
-	if (iproto_send_listen_msg(&tx_binary) != 0)
-		return -1;
+	if (iproto_service_array_bind(tx_service_array, uri_array) != 0)
+		goto error;
+	if (iproto_send_listen_msg(tx_service_array) != 0)
+		goto error;
 	return 0;
+error:
+	iproto_stop_listen();
+	return -1;
 }
 
 static void
@@ -3084,18 +3069,20 @@ iproto_free(void)
 		 * failing to bind in case it tries to bind before socket
 		 * is closed by OS.
 		 */
-		evio_service_detach(&iproto_threads[i].binary);
+		iproto_service_array_detach(iproto_threads[i].service_array);
 		rmean_delete(iproto_threads[i].rmean);
 		rmean_delete(iproto_threads[i].tx.rmean);
+		iproto_service_array_delete(iproto_threads[i].service_array);
 		slab_cache_destroy(&iproto_threads[i].net_slabc);
 	}
 	free(iproto_threads);
 
 	/*
-	 * Here we close socket and unlink unix socket path.
-	 * in case it's unix socket.
+	 * Here we close sockets and unlink all unix socket pathes.
+	 * in case it's unix sockets.
 	 */
-	evio_service_stop(&tx_binary);
+	iproto_service_array_stop_listen(tx_service_array);
+	iproto_service_array_delete(tx_service_array);
 }
 
 static int
