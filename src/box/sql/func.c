@@ -782,6 +782,34 @@ func_char(struct sql_context *ctx, int argc, struct Mem *argv)
 	mem_set_str_allocated(ctx->pOut, str, len);
 }
 
+/**
+ * Implementation of the GREATEST() and LEAST() functions.
+ *
+ * The GREATEST() function returns the largest of the given arguments.
+ * The LEAST() function returns the smallest of the given arguments.
+ */
+static void
+func_greatest_least(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	assert(argc > 1);
+	int mask = ctx->func->def->name[0] == 'G' ? -1 : 0;
+	assert(ctx->func->def->name[0] == 'G' ||
+	       ctx->func->def->name[0] == 'L');
+
+	if (mem_is_null(&argv[0]))
+		return;
+	int best = 0;
+	for (int i = 1; i < argc; ++i) {
+		if (mem_is_null(&argv[i]))
+			return;
+		int cmp = mem_cmp_scalar(&argv[best], &argv[i], ctx->coll);
+		if ((cmp ^ mask) >= 0)
+			best = i;
+	}
+	if (mem_copy(ctx->pOut, &argv[best]) != 0)
+		ctx->is_aborted = true;
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -827,37 +855,6 @@ sql_func_uuid(struct sql_context *ctx, int argc, struct Mem *argv)
 	struct tt_uuid uuid;
 	tt_uuid_create(&uuid);
 	mem_set_uuid(ctx->pOut, &uuid);
-}
-
-/*
- * Implementation of the non-aggregate min() and max() functions
- */
-static void
-minmaxFunc(struct sql_context *context, int argc, struct Mem *argv)
-{
-	int i;
-	int iBest;
-	struct coll *pColl;
-	struct func *func = context->func;
-	int mask = sql_func_flag_is_set(func, SQL_FUNC_MAX) ? -1 : 0;
-	if (argc < 2) {
-		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT,
-		mask ? "GREATEST" : "LEAST", "at least two", argc);
-		context->is_aborted = true;
-		return;
-	}
-	pColl = context->coll;
-	assert(mask == -1 || mask == 0);
-	iBest = 0;
-	if (mem_is_null(&argv[0]))
-		return;
-	for (i = 1; i < argc; i++) {
-		if (mem_is_null(&argv[i]))
-			return;
-		if ((mem_cmp_scalar(&argv[iBest], &argv[i], pColl) ^ mask) >= 0)
-			iBest = i;
-	}
-	sql_result_value(context, &argv[iBest]);
 }
 
 /*
@@ -1788,13 +1785,11 @@ static struct sql_func_dictionary dictionaries[] = {
 	{"CHAR_LENGTH", 1, 1, 0, true, 0, NULL},
 	{"COALESCE", 2, SQL_MAX_FUNCTION_ARG, SQL_FUNC_COALESCE, true, 0, NULL},
 	{"COUNT", 0, 1, SQL_FUNC_AGG, false, 0, NULL},
-	{"GREATEST", 2, SQL_MAX_FUNCTION_ARG, SQL_FUNC_MAX | SQL_FUNC_NEEDCOLL,
-	 true, 0, NULL},
+	{"GREATEST", 2, SQL_MAX_FUNCTION_ARG, SQL_FUNC_NEEDCOLL, true, 0, NULL},
 	{"GROUP_CONCAT", 1, 2, SQL_FUNC_AGG, false, 0, NULL},
 	{"HEX", 1, 1, 0, true, 0, NULL},
 	{"IFNULL", 2, 2, SQL_FUNC_COALESCE, true, 0, NULL},
-	{"LEAST", 2, SQL_MAX_FUNCTION_ARG, SQL_FUNC_MIN | SQL_FUNC_NEEDCOLL,
-	 true, 0, NULL},
+	{"LEAST", 2, SQL_MAX_FUNCTION_ARG, SQL_FUNC_NEEDCOLL, true, 0, NULL},
 	{"LENGTH", 1, 1, SQL_FUNC_LENGTH, true, 0, NULL},
 	{"LIKE", 2, 3, SQL_FUNC_LIKE | SQL_FUNC_NEEDCOLL, true, 0, NULL},
 	{"LIKELIHOOD", 2, 2, SQL_FUNC_UNLIKELY, true, 0, NULL},
@@ -1876,19 +1871,20 @@ static struct sql_func_definition definitions[] = {
 	{"COUNT", 1, {FIELD_TYPE_ANY}, FIELD_TYPE_INTEGER, step_count,
 	 fin_count},
 
-	{"GREATEST", -1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, minmaxFunc,
-	 NULL},
-	{"GREATEST", -1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, minmaxFunc,
-	 NULL},
-	{"GREATEST", -1, {FIELD_TYPE_NUMBER}, FIELD_TYPE_NUMBER, minmaxFunc,
-	 NULL},
+	{"GREATEST", -1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER,
+	 func_greatest_least, NULL},
+	{"GREATEST", -1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE,
+	 func_greatest_least, NULL},
+	{"GREATEST", -1, {FIELD_TYPE_NUMBER}, FIELD_TYPE_NUMBER,
+	 func_greatest_least, NULL},
 	{"GREATEST", -1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_VARBINARY,
-	 minmaxFunc, NULL},
-	{"GREATEST", -1, {FIELD_TYPE_UUID}, FIELD_TYPE_UUID, minmaxFunc, NULL},
-	{"GREATEST", -1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, minmaxFunc,
-	 NULL},
-	{"GREATEST", -1, {FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR, minmaxFunc,
-	 NULL},
+	 func_greatest_least, NULL},
+	{"GREATEST", -1, {FIELD_TYPE_UUID}, FIELD_TYPE_UUID,
+	 func_greatest_least, NULL},
+	{"GREATEST", -1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING,
+	 func_greatest_least, NULL},
+	{"GREATEST", -1, {FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR,
+	 func_greatest_least, NULL},
 
 	{"GROUP_CONCAT", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING,
 	 step_group_concat, NULL},
@@ -1903,15 +1899,20 @@ static struct sql_func_definition definitions[] = {
 	{"IFNULL", 2, {FIELD_TYPE_ANY, FIELD_TYPE_ANY}, FIELD_TYPE_SCALAR,
 	 sql_builtin_stub, NULL},
 
-	{"LEAST", -1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, minmaxFunc,
-	 NULL},
-	{"LEAST", -1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, minmaxFunc, NULL},
-	{"LEAST", -1, {FIELD_TYPE_NUMBER}, FIELD_TYPE_NUMBER, minmaxFunc, NULL},
-	{"LEAST", -1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_VARBINARY, minmaxFunc,
-	 NULL},
-	{"LEAST", -1, {FIELD_TYPE_UUID}, FIELD_TYPE_UUID, minmaxFunc, NULL},
-	{"LEAST", -1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, minmaxFunc, NULL},
-	{"LEAST", -1, {FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR, minmaxFunc, NULL},
+	{"LEAST", -1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER,
+	 func_greatest_least, NULL},
+	{"LEAST", -1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE,
+	 func_greatest_least, NULL},
+	{"LEAST", -1, {FIELD_TYPE_NUMBER}, FIELD_TYPE_NUMBER,
+	 func_greatest_least, NULL},
+	{"LEAST", -1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_VARBINARY,
+	 func_greatest_least, NULL},
+	{"LEAST", -1, {FIELD_TYPE_UUID}, FIELD_TYPE_UUID,
+	 func_greatest_least, NULL},
+	{"LEAST", -1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING,
+	 func_greatest_least, NULL},
+	{"LEAST", -1, {FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR,
+	 func_greatest_least, NULL},
 
 	{"LENGTH", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_INTEGER, func_char_length,
 	 NULL},
