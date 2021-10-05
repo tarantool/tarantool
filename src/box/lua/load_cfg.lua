@@ -671,7 +671,9 @@ local box_cfg_guard_whitelist = {
     session = true;
     tuple = true;
     runtime = true;
-    ctl = true,
+    ctl = true;
+    watch = true;
+    broadcast = true;
     NULL = true;
 };
 

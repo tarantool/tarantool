@@ -219,6 +219,7 @@ add_library(box STATIC
     lua/execute.c
     lua/key_def.c
     lua/merger.c
+    lua/watcher.c
     ${bin_sources})
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
