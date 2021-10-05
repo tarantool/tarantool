@@ -2545,8 +2545,8 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "func-36",
-    [[VALUES (LENGTH(RANDOMBLOB(0)))]],
-    {""})
+    [[VALUES (RANDOMBLOB(0))]],
+    {''})
 
 -- gh-3542
 -- In SQL '\0' is NOT a end-of-string signal. Tests below ensures
