@@ -810,6 +810,43 @@ func_greatest_least(struct sql_context *ctx, int argc, struct Mem *argv)
 		ctx->is_aborted = true;
 }
 
+/**
+ * Implementation of the HEX() function.
+ *
+ * The HEX() function returns the hexadecimal representation of the argument.
+ */
+static const char hexdigits[] = {
+	'0', '1', '2', '3', '4', '5', '6', '7',
+	'8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+};
+
+static void
+func_hex(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	assert(argc == 1);
+	(void)argc;
+	struct Mem *arg = &argv[0];
+	if (mem_is_null(arg))
+		return;
+
+	assert(mem_is_bin(arg) && arg->n >= 0);
+	if (arg->n == 0)
+		return mem_set_str0_static(ctx->pOut, "");
+
+	uint32_t size = 2 * arg->n;
+	char *str = sqlDbMallocRawNN(sql_get(), size);
+	if (str == NULL) {
+		ctx->is_aborted = true;
+		return;
+	}
+	for (int i = 0; i < arg->n; ++i) {
+		char c = arg->z[i];
+		str[2 * i] = hexdigits[(c >> 4) & 0xf];
+		str[2 * i + 1] = hexdigits[c & 0xf];
+	}
+	mem_set_str_allocated(ctx->pOut, str, size);
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -1395,14 +1432,6 @@ sql_func_version(struct sql_context *context, int argc, struct Mem *argv)
 	sql_result_text(context, tarantool_version(), -1, SQL_STATIC);
 }
 
-/* Array for converting from half-bytes (nybbles) into ASCII hex
- * digits.
- */
-static const char hexdigits[] = {
-	'0', '1', '2', '3', '4', '5', '6', '7',
-	'8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
-};
-
 /*
  * Implementation of the QUOTE() function.  This function takes a single
  * argument.  If the argument is numeric, the return value is the same as
@@ -1510,33 +1539,6 @@ unicodeFunc(struct sql_context *context, int argc, struct Mem *argv)
 	(void)argc;
 	if (z && z[0])
 		sql_result_uint(context, sqlUtf8Read(&z));
-}
-
-/*
- * The hex() function.  Interpret the argument as a blob.  Return
- * a hexadecimal rendering as text.
- */
-static void
-hexFunc(struct sql_context *context, int argc, struct Mem *argv)
-{
-	int i, n;
-	const unsigned char *pBlob;
-	char *zHex, *z;
-	assert(argc == 1);
-	UNUSED_PARAMETER(argc);
-	pBlob = mem_as_bin(&argv[0]);
-	n = mem_len_unsafe(&argv[0]);
-	assert(pBlob == mem_as_bin(&argv[0]));	/* No encoding change */
-	z = zHex = contextMalloc(context, ((i64) n) * 2 + 1);
-	if (zHex) {
-		for (i = 0; i < n; i++, pBlob++) {
-			unsigned char c = *pBlob;
-			*(z++) = hexdigits[(c >> 4) & 0xf];
-			*(z++) = hexdigits[c & 0xf];
-		}
-		*z = 0;
-		sql_result_text(context, zHex, n * 2, sql_free);
-	}
 }
 
 /*
@@ -1895,7 +1897,7 @@ static struct sql_func_definition definitions[] = {
 	{"GROUP_CONCAT", 2, {FIELD_TYPE_VARBINARY, FIELD_TYPE_VARBINARY},
 	 FIELD_TYPE_VARBINARY, step_group_concat, NULL},
 
-	{"HEX", 1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_STRING, hexFunc, NULL},
+	{"HEX", 1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_STRING, func_hex, NULL},
 	{"IFNULL", 2, {FIELD_TYPE_ANY, FIELD_TYPE_ANY}, FIELD_TYPE_SCALAR,
 	 sql_builtin_stub, NULL},
 
