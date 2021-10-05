@@ -2511,7 +2511,8 @@ int sqlIsNaN(double);
 struct PrintfArguments {
 	int nArg;		/* Total number of arguments */
 	int nUsed;		/* Number of arguments used so far */
-	sql_value **apArg;	/* The argument values */
+	/** The argument values. */
+	struct Mem *apArg;
 };
 
 void sqlVXPrintf(StrAccum *, const char *, va_list);

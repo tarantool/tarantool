@@ -860,6 +860,31 @@ func_octet_length(struct sql_context *ctx, int argc, struct Mem *argv)
 	mem_set_uint(ctx->pOut, arg->n);
 }
 
+/** Implementation of the PRINTF() function. */
+static void
+func_printf(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	if (argc < 1 || mem_is_null(&argv[0]))
+		return;
+	if (argc == 1 || !mem_is_str(&argv[0])) {
+		struct Mem *mem = ctx->pOut;
+		if (mem_copy(mem, &argv[0]) != 0 || mem_to_str(mem) != 0)
+			ctx->is_aborted = true;
+		return;
+	}
+	struct PrintfArguments pargs;
+	struct StrAccum acc;
+	char *format = argv[0].z;
+	pargs.nArg = argc - 1;
+	pargs.nUsed = 0;
+	pargs.apArg = argv + 1;
+	struct sql *db = sql_get();
+	sqlStrAccumInit(&acc, db, 0, 0, db->aLimit[SQL_LIMIT_LENGTH]);
+	acc.printfFlags = SQL_PRINTF_SQLFUNC;
+	sqlXPrintf(&acc, format, &pargs);
+	mem_set_str_allocated(ctx->pOut, sqlStrAccumFinish(&acc), acc.nChar);
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -952,40 +977,6 @@ typeofFunc(struct sql_context *context, int argc, struct Mem *argv)
 		break;
 	}
 	sql_result_text(context, z, -1, SQL_STATIC);
-}
-
-/*
- * Implementation of the printf() function.
- */
-static void
-printfFunc(struct sql_context *context, int argc, struct Mem *argv)
-{
-	PrintfArguments x;
-	StrAccum str;
-	const char *zFormat;
-	int n;
-	sql *db = sql_context_db_handle(context);
-
-	if (argc >= 1 && (zFormat = mem_as_str0(&argv[0])) != NULL) {
-		x.nArg = argc - 1;
-		x.nUsed = 0;
-		x.apArg = sqlDbMallocRawNN(sql_get(),
-					   (argc - 1) * sizeof(*x.apArg));
-		if (x.apArg == NULL) {
-			context->is_aborted = true;
-			return;
-		}
-		for (int i = 1; i < argc; ++i)
-			x.apArg[i - 1] = &argv[i];
-		sqlStrAccumInit(&str, db, 0, 0,
-				    db->aLimit[SQL_LIMIT_LENGTH]);
-		str.printfFlags = SQL_PRINTF_SQLFUNC;
-		sqlXPrintf(&str, zFormat, &x);
-		sqlDbFree(sql_get(), x.apArg);
-		n = str.nChar;
-		sql_result_text(context, sqlStrAccumFinish(&str), n,
-				    SQL_DYNAMIC);
-	}
 }
 
 /*
@@ -1930,8 +1921,7 @@ static struct sql_func_definition definitions[] = {
 	 FIELD_TYPE_INTEGER, func_position_characters, NULL},
 	{"POSITION", 2, {FIELD_TYPE_VARBINARY, FIELD_TYPE_VARBINARY},
 	 FIELD_TYPE_INTEGER, func_position_octets, NULL},
-	{"PRINTF", -1, {FIELD_TYPE_ANY}, FIELD_TYPE_STRING, printfFunc, 
-	 NULL},
+	{"PRINTF", -1, {FIELD_TYPE_ANY}, FIELD_TYPE_STRING, func_printf, NULL},
 	{"QUOTE", 1, {FIELD_TYPE_ANY}, FIELD_TYPE_STRING, quoteFunc, NULL},
 	{"RANDOM", 0, {}, FIELD_TYPE_INTEGER, randomFunc, NULL},
 	{"RANDOMBLOB", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_VARBINARY,
