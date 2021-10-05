@@ -847,6 +847,19 @@ func_hex(struct sql_context *ctx, int argc, struct Mem *argv)
 	mem_set_str_allocated(ctx->pOut, str, size);
 }
 
+/** Implementation of the OCTET_LENGTH() function. */
+static void
+func_octet_length(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	assert(argc == 1);
+	(void)argc;
+	struct Mem *arg = &argv[0];
+	if (mem_is_null(arg))
+		return;
+	assert(mem_is_bytes(arg) && arg->n >= 0);
+	mem_set_uint(ctx->pOut, arg->n);
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -939,44 +952,6 @@ typeofFunc(struct sql_context *context, int argc, struct Mem *argv)
 		break;
 	}
 	sql_result_text(context, z, -1, SQL_STATIC);
-}
-
-/*
- * Implementation of the length() function
- */
-static void
-lengthFunc(struct sql_context *context, int argc, struct Mem *argv)
-{
-	int len;
-
-	assert(argc == 1);
-	UNUSED_PARAMETER(argc);
-	switch (sql_value_type(&argv[0])) {
-	case MP_BIN:
-	case MP_ARRAY:
-	case MP_MAP:
-	case MP_INT:
-	case MP_UINT:
-	case MP_BOOL:
-	case MP_DOUBLE:{
-			mem_as_bin(&argv[0]);
-			sql_result_uint(context, mem_len_unsafe(&argv[0]));
-			break;
-		}
-	case MP_EXT:
-	case MP_STR:{
-			const unsigned char *z = mem_as_ustr(&argv[0]);
-			if (z == 0)
-				return;
-			len = sql_utf8_char_count(z, mem_len_unsafe(&argv[0]));
-			sql_result_uint(context, len);
-			break;
-		}
-	default:{
-			sql_result_null(context);
-			break;
-		}
-	}
 }
 
 /*
@@ -1918,8 +1893,8 @@ static struct sql_func_definition definitions[] = {
 
 	{"LENGTH", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_INTEGER, func_char_length,
 	 NULL},
-	{"LENGTH", 1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_INTEGER, lengthFunc,
-	 NULL},
+	{"LENGTH", 1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_INTEGER,
+	 func_octet_length, NULL},
 	{"LIKE", 2, {FIELD_TYPE_STRING, FIELD_TYPE_STRING},
 	 FIELD_TYPE_BOOLEAN, likeFunc, NULL},
 	{"LIKE", 3, {FIELD_TYPE_STRING, FIELD_TYPE_STRING, FIELD_TYPE_STRING},
