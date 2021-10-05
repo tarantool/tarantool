@@ -885,6 +885,21 @@ func_printf(struct sql_context *ctx, int argc, struct Mem *argv)
 	mem_set_str_allocated(ctx->pOut, sqlStrAccumFinish(&acc), acc.nChar);
 }
 
+/**
+ * Implementation of the RANDOM() function.
+ *
+ * This function returns a random INT64 value.
+ */
+static void
+func_random(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	(void)argc;
+	(void)argv;
+	int64_t r;
+	sql_randomness(sizeof(r), &r);
+	mem_set_int(ctx->pOut, r, r < 0);
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -1048,29 +1063,6 @@ contextMalloc(struct sql_context *context, i64 nByte)
 			context->is_aborted = true;
 	}
 	return z;
-}
-
-/*
- * Some functions like COALESCE() and IFNULL() and UNLIKELY() are implemented
- * as VDBE code so that unused argument values do not have to be computed.
- * However, we still need some kind of function implementation for this
- * routines in the function table.  The noopFunc macro provides this.
- * noopFunc will never be called so it doesn't matter what the implementation
- * is.  We might as well use the "version()" function as a substitute.
- */
-#define noopFunc sql_func_version /* Substitute function - never called */
-
-/*
- * Implementation of random().  Return a random integer.
- */
-static void
-randomFunc(struct sql_context *context, int argc, struct Mem *argv)
-{
-	(void)argc;
-	(void)argv;
-	int64_t r;
-	sql_randomness(sizeof(r), &r);
-	sql_result_int(context, r);
 }
 
 /*
@@ -1923,7 +1915,7 @@ static struct sql_func_definition definitions[] = {
 	 FIELD_TYPE_INTEGER, func_position_octets, NULL},
 	{"PRINTF", -1, {FIELD_TYPE_ANY}, FIELD_TYPE_STRING, func_printf, NULL},
 	{"QUOTE", 1, {FIELD_TYPE_ANY}, FIELD_TYPE_STRING, quoteFunc, NULL},
-	{"RANDOM", 0, {}, FIELD_TYPE_INTEGER, randomFunc, NULL},
+	{"RANDOM", 0, {}, FIELD_TYPE_INTEGER, func_random, NULL},
 	{"RANDOMBLOB", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_VARBINARY,
 	 randomBlob, NULL},
 	{"REPLACE", 3,
