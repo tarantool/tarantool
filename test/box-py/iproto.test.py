@@ -17,6 +17,13 @@ if not 'REQUEST_TYPE_ID' in locals():
     IPROTO_VERSION = 0x54
     IPROTO_FEATURES = 0x55
 
+if not 'REQUEST_TYPE_WATCH' in locals():
+    REQUEST_TYPE_WATCH = 74
+    REQUEST_TYPE_UNWATCH = 75
+    REQUEST_TYPE_EVENT = 76
+    IPROTO_EVENT_KEY = 0x57
+    IPROTO_EVENT_DATA = 0x58
+
 admin("box.schema.user.grant('guest', 'read,write,execute', 'universe')")
 
 print("""
@@ -250,23 +257,32 @@ def receive_response():
         unpacker.feed(resp_headerbody)
         resp_header = unpacker.unpack()
         resp_body = unpacker.unpack()
-    except OSError as e:
+    except (OSError, socket.timeout) as e:
         print("   => ", "Failed to recv response")
     res = {}
     res["header"] = resp_header
     res["body"] = resp_body
     return res
 
-def test_request(req_header, req_body):
+def send_request(req_header, req_body):
     query_header = msgpack.dumps(req_header)
     query_body = msgpack.dumps(req_body)
     packet_len = len(query_header) + len(query_body)
     query = msgpack.dumps(packet_len) + query_header + query_body
     try:
         s.send(query)
-    except OSError as e:
+    except (OSError, socket.timeout) as e:
         print("   => ", "Failed to send request")
+
+def test_request(req_header, req_body):
+    send_request(req_header, req_body)
     return receive_response()
+
+def resp_status(resp):
+    if resp["header"][IPROTO_CODE] == REQUEST_TYPE_OK:
+        return "ok"
+    else:
+        return "error: {}".format(resp["body"][IPROTO_ERROR].decode("utf-8"))
 
 header = { IPROTO_CODE : REQUEST_TYPE_SELECT}
 body = { IPROTO_SPACE_ID: space_id,
@@ -477,3 +493,82 @@ resp = test_request(header, { IPROTO_VERSION: 99999999,
 print("version={}, features={}".format(
     resp["body"][IPROTO_VERSION], resp["body"][IPROTO_FEATURES]))
 c.close()
+
+print("""
+#
+# gh-6257 Watchers
+#
+""")
+def watch(key):
+    print("# Watch key '{}'".format(key))
+    send_request({IPROTO_CODE: REQUEST_TYPE_WATCH}, {IPROTO_EVENT_KEY: key})
+
+def unwatch(key):
+    print("# Unwatch key '{}'".format(key))
+    send_request({IPROTO_CODE: REQUEST_TYPE_UNWATCH}, {IPROTO_EVENT_KEY: key})
+
+def receive_event():
+    print("# Recieve event")
+    resp = receive_response()
+    code = resp["header"].get(IPROTO_CODE)
+    if code is None:
+        print("<no event received>")
+        return
+    if code == REQUEST_TYPE_EVENT:
+        print("key='{}', value={}".format(
+            resp["body"].get(IPROTO_EVENT_KEY, '').decode('utf-8'),
+            resp["body"].get(IPROTO_EVENT_DATA)))
+    else:
+        print("Unexpected packet: {}".format(resp))
+
+def check_no_event():
+    s.settimeout(0.01)
+    receive_event()
+    s.settimeout(None)
+
+c = Connection("localhost", server.iproto.port)
+c.connect()
+s = c._socket
+
+print("# Missing key")
+resp = test_request({IPROTO_CODE: REQUEST_TYPE_WATCH}, {})
+print(resp_status(resp))
+
+print("# Invalid key type")
+resp = test_request({IPROTO_CODE: REQUEST_TYPE_WATCH},
+                    {IPROTO_EVENT_KEY: 123})
+print(resp_status(resp))
+
+# Register a watcher
+watch("foo")
+receive_event()
+
+# Register a watcher for another key
+watch("bar")
+receive_event()
+
+# Unregister and register watcher
+unwatch("bar")
+watch("bar")
+receive_event()
+
+# No notification without ack
+admin("box.broadcast('foo', {1, 2, 3})")
+check_no_event()
+
+# Notification after ack
+watch("foo")
+receive_event()
+watch("bar")
+admin("box.broadcast('bar', 123)")
+receive_event()
+
+# No notification after unregister
+admin("box.broadcast('bar', 456)")
+unwatch("bar")
+check_no_event()
+
+# Cleanup
+c.close()
+admin("box.broadcast('foo', nil)")
+admin("box.broadcast('bar', nil)")

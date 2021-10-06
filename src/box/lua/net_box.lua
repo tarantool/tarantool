@@ -64,6 +64,7 @@ local IPROTO_FEATURE_NAMES = {
     [0]     = 'streams',
     [1]     = 'transactions',
     [2]     = 'error_extension',
+    [3]     = 'watchers',
 }
 
 -- Given an array of IPROTO feature ids, returns a map {feature_name: bool}.

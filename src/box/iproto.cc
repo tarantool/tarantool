@@ -315,6 +315,8 @@ struct iproto_msg
 		struct request dml;
 		/** Box request, if this is a call or eval. */
 		struct call_request call;
+		/** Watch request. */
+		struct watch_request watch;
 		/** Authentication request. */
 		struct auth_request auth;
 		/** Features request. */
@@ -1541,6 +1543,12 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 			goto error;
 		cmsg_init(&msg->base, iproto_thread->call_route);
 		break;
+	case IPROTO_WATCH:
+	case IPROTO_UNWATCH:
+		if (xrow_decode_watch(&msg->header, &msg->watch) != 0)
+			goto error;
+		cmsg_init(&msg->base, iproto_thread->misc_route);
+		break;
 	case IPROTO_EXECUTE:
 	case IPROTO_PREPARE:
 		if (xrow_decode_sql(&msg->header, &msg->sql) != 0)
@@ -2113,6 +2121,11 @@ error:
 }
 
 static void
+iproto_session_notify(struct session *session,
+		      const char *key, size_t key_len,
+		      const char *data, const char *data_end);
+
+static void
 tx_process_misc(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
@@ -2148,6 +2161,17 @@ tx_process_misc(struct cmsg *m)
 			box_process_vote(&ballot);
 			iproto_reply_vote_xc(out, &ballot, msg->header.sync,
 					     ::schema_version);
+			break;
+		case IPROTO_WATCH:
+			session_watch(con->session, msg->watch.key,
+				      msg->watch.key_len,
+				      iproto_session_notify);
+			/* Sic: no reply. */
+			break;
+		case IPROTO_UNWATCH:
+			session_unwatch(con->session, msg->watch.key,
+					msg->watch.key_len);
+			/* Sic: no reply. */
 			break;
 		default:
 			unreachable();
@@ -2644,6 +2668,15 @@ tx_end_push(struct cmsg *m)
 		tx_begin_push(con);
 }
 
+static void
+tx_push(struct iproto_connection *con)
+{
+	if (!con->tx.is_push_sent)
+		tx_begin_push(con);
+	else
+		con->tx.is_push_pending = true;
+}
+
 /**
  * Push a message from @a port to a remote client.
  * @param session iproto session.
@@ -2668,11 +2701,29 @@ iproto_session_push(struct session *session, struct port *port)
 	}
 	iproto_reply_chunk(con->tx.p_obuf, &svp, iproto_session_sync(session),
 			   ::schema_version);
-	if (! con->tx.is_push_sent)
-		tx_begin_push(con);
-	else
-		con->tx.is_push_pending = true;
+	tx_push(con);
 	return 0;
+}
+
+/**
+ * Sends a notification to a remote watcher when a key is updated.
+ * Uses IPROTO_PUSH (kharon) infrastructure to signal the iproto thread
+ * about new data.
+ */
+static void
+iproto_session_notify(struct session *session,
+		      const char *key, size_t key_len,
+		      const char *data, const char *data_end)
+{
+	struct iproto_connection *con =
+		(struct iproto_connection *)session->meta.connection;
+	if (iproto_send_event(con->tx.p_obuf, key, key_len,
+			      data, data_end) != 0) {
+		/* Nothing we can do on error but log the error. */
+		diag_log();
+		return;
+	}
+	tx_push(con);
 }
 
 /** }}} */

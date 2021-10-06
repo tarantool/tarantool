@@ -145,6 +145,9 @@ enum iproto_key {
 	IPROTO_FEATURES = 0x55,
 	/** Operation timeout. Specific to request type. */
 	IPROTO_TIMEOUT = 0x56,
+	/** Key name and data sent to a remote watcher. */
+	IPROTO_EVENT_KEY = 0x57,
+	IPROTO_EVENT_DATA = 0x58,
 	/*
 	 * Be careful to not extend iproto_key values over 0x7f.
 	 * iproto_keys are encoded in msgpack as positive fixnum, which ends at
@@ -257,6 +260,28 @@ enum iproto_type {
 	IPROTO_JOIN_SNAPSHOT = 72,
 	/** Protocol features request. */
 	IPROTO_ID = 73,
+	/**
+	 * The following three request types are used by the remote watcher
+	 * protocol (box.watch over network), which operates as follows:
+	 *
+	 *  1. The client sends an IPROTO_WATCH packet to subscribe to changes
+	 *     of a specified key defined on the server.
+	 *  2. The server sends an IPROTO_EVENT packet to the subscribed client
+	 *     with the key name and its current value unconditionally after
+	 *     registration and then every time the key value is updated
+	 *     provided the last notification was acknowledged (see below).
+	 *  3. Upon receiving a notification, the client sends an IPROTO_WATCH
+	 *     packet to acknowledge the notification.
+	 *  4. When the client doesn't want to receive any more notifications,
+	 *     it unsubscribes by sending an IPROTO_UNWATCH packet.
+	 *
+	 * All the three request types are fully asynchronous - a receiving end
+	 * doesn't send a packet in reply to any of them (therefore neither of
+	 * them has a sync number).
+	 */
+	IPROTO_WATCH = 74,
+	IPROTO_UNWATCH = 75,
+	IPROTO_EVENT = 76,
 
 	/** Vinyl run info stored in .index file */
 	VY_INDEX_RUN_INFO = 100,

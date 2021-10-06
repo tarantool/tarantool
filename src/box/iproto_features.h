@@ -40,6 +40,11 @@ enum iproto_feature_id {
 	 * MsgPack extension.
 	 */
 	IPROTO_FEATURE_ERROR_EXTENSION = 2,
+	/**
+	 * Remote watchers support:
+	 * IPROTO_WATCH, IPROTO_UNWATCH, IPROTO_EVENT commands.
+	 */
+	IPROTO_FEATURE_WATCHERS = 3,
 	iproto_feature_id_MAX,
 };
 
@@ -55,7 +60,7 @@ struct iproto_features {
  * It should be incremented every time a new feature is added or removed.
  */
 enum {
-	IPROTO_CURRENT_VERSION = 2,
+	IPROTO_CURRENT_VERSION = 3,
 };
 
 /**
