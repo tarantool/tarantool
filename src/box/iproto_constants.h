@@ -176,30 +176,6 @@ enum iproto_ballot_key {
 	IPROTO_BALLOT_CAN_LEAD = 0x07,
 };
 
-#define bit(c) (1ULL<<IPROTO_##c)
-
-#define IPROTO_HEAD_BMAP (bit(REQUEST_TYPE) | bit(SYNC) | bit(REPLICA_ID) |\
-			  bit(LSN) | bit(SCHEMA_VERSION))
-#define IPROTO_DML_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
-			      bit(OFFSET) | bit(ITERATOR) | bit(INDEX_BASE) |\
-			      bit(KEY) | bit(TUPLE) | bit(OPS) | bit(TUPLE_META))
-
-static inline bool
-xrow_header_has_key(const char *pos, const char *end)
-{
-	unsigned char key = pos < end ? *pos : (unsigned char) IPROTO_KEY_MAX;
-	return key < IPROTO_KEY_MAX && IPROTO_HEAD_BMAP & (1ULL<<key);
-}
-
-static inline bool
-iproto_dml_body_has_key(const char *pos, const char *end)
-{
-	unsigned char key = pos < end ? *pos : (unsigned char) IPROTO_KEY_MAX;
-	return key < IPROTO_KEY_MAX && IPROTO_DML_BODY_BMAP & (1ULL<<key);
-}
-
-#undef bit
-
 static inline uint64_t
 iproto_key_bit(unsigned char key)
 {
