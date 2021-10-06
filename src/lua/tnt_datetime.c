@@ -14,6 +14,12 @@ tnt_datetime_strftime(const struct datetime *date, char *buf, size_t len,
 	return datetime_strftime(date, buf, len, fmt);
 }
 
+size_t
+tnt_datetime_strptime(struct datetime *date, const char *buf, const char *fmt)
+{
+	return datetime_strptime(date, buf, fmt);
+}
+
 void
 tnt_datetime_now(struct datetime *now)
 {

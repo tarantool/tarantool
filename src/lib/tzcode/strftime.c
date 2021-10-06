@@ -36,67 +36,12 @@
 #include "private.h"
 #include "trivia/util.h"
 #include "tzcode.h"
+#include "timelocal.h"
 
 #include <assert.h>
 #include <locale.h>
 #include <stdbool.h>
 #include <stdio.h>
-
-struct lc_time_T {
-	const char *mon[MONTHSPERYEAR];
-	const char *month[MONTHSPERYEAR];
-	const char *wday[DAYSPERWEEK];
-	const char *weekday[DAYSPERWEEK];
-	const char *X_fmt;
-	const char *x_fmt;
-	const char *c_fmt;
-	const char *am;
-	const char *pm;
-	const char *date_fmt;
-};
-
-#define Locale (&C_time_locale)
-
-static const struct lc_time_T C_time_locale = {
-	{"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-	 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"},
-	{"January", "February", "March", "April", "May", "June",
-	 "July", "August", "September", "October", "November", "December"},
-	{"Sun", "Mon", "Tue", "Wed",
-	 "Thu", "Fri", "Sat"},
-	{"Sunday", "Monday", "Tuesday", "Wednesday",
-	 "Thursday", "Friday", "Saturday"},
-
-	/* X_fmt */
-	"%H:%M:%S",
-
-	/*
-	 ** x_fmt
-	 ** C99 and later require this format.
-	 ** Using just numbers (as here) makes Quakers happier;
-	 ** it's also compatible with SVR4.
-	 */
-	"%m/%d/%y",
-
-	/*
-	 ** c_fmt
-	 ** C99 and later require this format.
-	 ** Previously this code used "%D %X", but we now conform to C99.
-	 ** Note that
-	 ** "%a %b %d %H:%M:%S %Y"
-	 ** is used by Solaris 2.3.
-	 */
-	"%a %b %e %T %Y",
-
-	/* am */
-	"AM",
-
-	/* pm */
-	"PM",
-
-	/* date_fmt */
-	"%a %b %e %H:%M:%S %Z %Y"
-};
 
 static int pow10[] = { 1,      10,	100,	  1000,	     10000,
 		       100000, 1000000, 10000000, 100000000, 1000000000 };
