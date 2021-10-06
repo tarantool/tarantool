@@ -683,8 +683,7 @@ xrow_decode_sql(const struct xrow_header *row, struct sql_request *request)
 	const char *end = data + row->body[0].iov_len;
 	assert((end - data) > 0);
 
-	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
-error:
+	if (mp_typeof(*data) != MP_MAP) {
 		xrow_on_decode_err(row->body[0].iov_base, end, ER_INVALID_MSGPACK,
 				   "packet body");
 		return -1;
@@ -698,13 +697,12 @@ error:
 		uint8_t key = *data;
 		if (key != IPROTO_SQL_BIND && key != IPROTO_SQL_TEXT &&
 		    key != IPROTO_STMT_ID) {
-			mp_check(&data, end);   /* skip the key */
-			mp_check(&data, end);   /* skip the value */
+			mp_next(&data);         /* skip the key */
+			mp_next(&data);         /* skip the value */
 			continue;
 		}
 		const char *value = ++data;     /* skip the key */
-		if (mp_check(&data, end) != 0)  /* check the value */
-			goto error;
+		mp_next(&data);                 /* skip the value */
 		if (key == IPROTO_SQL_BIND)
 			request->bind = value;
 		else if (key == IPROTO_SQL_TEXT)
@@ -726,8 +724,6 @@ error:
 					      iproto_key_name(IPROTO_STMT_ID)));
 		return -1;
 	}
-	if (data != end)
-		goto error;
 	return 0;
 }
 
@@ -771,7 +767,7 @@ xrow_decode_dml(struct xrow_header *row, struct request *request,
 	end = data + row->body[0].iov_len;
 	assert((end - data) > 0);
 
-	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
+	if (mp_typeof(*data) != MP_MAP) {
 error:
 		xrow_on_decode_err(row->body[0].iov_base, end, ER_INVALID_MSGPACK,
 				   "packet body");
@@ -781,15 +777,14 @@ error:
 	uint32_t size = mp_decode_map(&data);
 	for (uint32_t i = 0; i < size; i++) {
 		if (! iproto_dml_body_has_key(data, end)) {
-			if (mp_check(&data, end) != 0 ||
-			    mp_check(&data, end) != 0)
-				goto error;
+			mp_next(&data);
+			mp_next(&data);
 			continue;
 		}
 		uint64_t key = mp_decode_uint(&data);
 		const char *value = data;
-		if (mp_check(&data, end) ||
-		    key >= IPROTO_KEY_MAX ||
+		mp_next(&data);
+		if (key >= IPROTO_KEY_MAX ||
 		    iproto_key_type[key] != mp_typeof(*value))
 			goto error;
 		key_map &= ~iproto_key_bit(key);
@@ -831,11 +826,6 @@ error:
 		default:
 			break;
 		}
-	}
-	if (data != end) {
-		xrow_on_decode_err(row->body[0].iov_base, end, ER_INVALID_MSGPACK,
-				   "packet end");
-		return -1;
 	}
 done:
 	if (key_map) {
@@ -965,14 +955,13 @@ xrow_decode_id(const struct xrow_header *row, struct id_request *request)
 	assert(row->bodycnt == 1);
 	const char *data = (const char *)row->body[0].iov_base;
 	const char *end = data + row->body[0].iov_len;
-	const char *p = data;
-	if (mp_check(&p, end) != 0 || mp_typeof(*data) != MP_MAP)
+	if (mp_typeof(*data) != MP_MAP)
 		goto error;
 
 	request->version = 0;
 	iproto_features_create(&request->features);
 
-	p = data;
+	const char *p = data;
 	uint32_t map_size = mp_decode_map(&p);
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(*p) != MP_UINT)
@@ -1044,15 +1033,14 @@ xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
 
 	const char * const data = (const char *)row->body[0].iov_base;
 	const char * const end = data + row->body[0].iov_len;
-	const char *d = data;
-	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP) {
+	if (mp_typeof(*data) != MP_MAP) {
 		xrow_on_decode_err(data, end, ER_INVALID_MSGPACK,
 				   "request body");
 		return -1;
 	}
 
 	memset(req, 0, sizeof(*req));
-	d = data;
+	const char *d = data;
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
 		enum mp_type type = mp_typeof(*d);
@@ -1237,7 +1225,7 @@ xrow_decode_call(const struct xrow_header *row, struct call_request *request)
 	const char *end = data + row->body[0].iov_len;
 	assert((end - data) > 0);
 
-	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
+	if (mp_typeof(*data) != MP_MAP) {
 error:
 		xrow_on_decode_err(row->body[0].iov_base, end, ER_INVALID_MSGPACK,
 				   "packet body");
@@ -1248,13 +1236,12 @@ error:
 
 	uint32_t map_size = mp_decode_map(&data);
 	for (uint32_t i = 0; i < map_size; ++i) {
-		if ((end - data) < 1 || mp_typeof(*data) != MP_UINT)
+		if (mp_typeof(*data) != MP_UINT)
 			goto error;
 
 		uint64_t key = mp_decode_uint(&data);
 		const char *value = data;
-		if (mp_check(&data, end) != 0)
-			goto error;
+		mp_next(&data);
 
 		switch (key) {
 		case IPROTO_FUNCTION_NAME:
@@ -1276,11 +1263,6 @@ error:
 		default:
 			continue; /* unknown key */
 		}
-	}
-	if (data != end) {
-		xrow_on_decode_err(row->body[0].iov_base, end, ER_INVALID_MSGPACK,
-				   "packet end");
-		return -1;
 	}
 	if (row->type == IPROTO_EVAL) {
 		if (request->expr == NULL) {
@@ -1317,7 +1299,7 @@ xrow_decode_auth(const struct xrow_header *row, struct auth_request *request)
 	const char *end = data + row->body[0].iov_len;
 	assert((end - data) > 0);
 
-	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
+	if (mp_typeof(*data) != MP_MAP) {
 error:
 		xrow_on_decode_err(row->body[0].iov_base, end, ER_INVALID_MSGPACK,
 				   "packet body");
@@ -1328,13 +1310,12 @@ error:
 
 	uint32_t map_size = mp_decode_map(&data);
 	for (uint32_t i = 0; i < map_size; ++i) {
-		if ((end - data) < 1 || mp_typeof(*data) != MP_UINT)
+		if (mp_typeof(*data) != MP_UINT)
 			goto error;
 
 		uint64_t key = mp_decode_uint(&data);
 		const char *value = data;
-		if (mp_check(&data, end) != 0)
-			goto error;
+		mp_next(&data);
 
 		switch (key) {
 		case IPROTO_USER_NAME:
@@ -1350,11 +1331,6 @@ error:
 		default:
 			continue; /* unknown key */
 		}
-	}
-	if (data != end) {
-		xrow_on_decode_err(row->body[0].iov_base, end, ER_INVALID_MSGPACK,
-				   "packet end");
-		return -1;
 	}
 	if (request->user_name == NULL) {
 		xrow_on_decode_err(row->body[0].iov_base, end, ER_MISSING_REQUEST_FIELD,
@@ -1417,9 +1393,6 @@ xrow_decode_error(struct xrow_header *row)
 	uint32_t map_size;
 
 	if (row->bodycnt == 0)
-		goto error;
-	pos = (char *) row->body[0].iov_base;
-	if (mp_check(&pos, pos + row->body[0].iov_len))
 		goto error;
 
 	pos = (char *) row->body[0].iov_base;
@@ -1489,8 +1462,7 @@ xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
 
 	const char *data = start = (const char *) row->body[0].iov_base;
 	end = data + row->body[0].iov_len;
-	const char *tmp = data;
-	if (mp_check(&tmp, end) != 0 || mp_typeof(*data) != MP_MAP)
+	if (mp_typeof(*data) != MP_MAP)
 		goto err;
 
 	/* Find BALLOT key. */
@@ -1652,8 +1624,7 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 	assert(row->bodycnt == 1);
 	const char * const data = (const char *) row->body[0].iov_base;
 	const char *end = data + row->body[0].iov_len;
-	const char *d = data;
-	if (mp_check(&d, end) != 0 || mp_typeof(*data) != MP_MAP) {
+	if (mp_typeof(*data) != MP_MAP) {
 		xrow_on_decode_err(data, end, ER_INVALID_MSGPACK,
 				   "request body");
 		return -1;
@@ -1672,7 +1643,7 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 	if (id_filter != NULL)
 		*id_filter = 0;
 
-	d = data;
+	const char *d = data;
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(*d) != MP_UINT) {
