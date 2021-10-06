@@ -776,7 +776,7 @@ error:
 
 	uint32_t size = mp_decode_map(&data);
 	for (uint32_t i = 0; i < size; i++) {
-		if (! iproto_dml_body_has_key(data, end)) {
+		if (mp_typeof(*data) != MP_UINT) {
 			mp_next(&data);
 			mp_next(&data);
 			continue;
