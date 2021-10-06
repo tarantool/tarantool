@@ -105,7 +105,8 @@ mp_decode_vclock_ignore0(const char **data, struct vclock *vclock)
  *
  * The format is similar to the xxd utility.
  */
-void dump_row_hex(const char *start, const char *end) {
+static void
+dump_row_hex(const char *start, const char *end) {
 	if (!say_log_level_is_enabled(S_VERBOSE))
 		return;
 
@@ -126,10 +127,16 @@ void dump_row_hex(const char *start, const char *end) {
 	}
 }
 
-#define xrow_on_decode_err(start, end, what, desc_str) do {\
+/**
+ * Sets diag and dumps the row body if present.
+ */
+#define xrow_on_decode_err(row, what, desc_str) do {\
 	diag_set(ClientError, what, desc_str);\
-	dump_row_hex(start, end);\
-} while (0);
+	if (row->bodycnt > 0) {\
+		dump_row_hex(row->body[0].iov_base,\
+			     row->body[0].iov_base + row->body[0].iov_len);\
+	}\
+} while (0)
 
 int
 xrow_header_decode(struct xrow_header *header, const char **pos,
@@ -138,25 +145,21 @@ xrow_header_decode(struct xrow_header *header, const char **pos,
 	memset(header, 0, sizeof(struct xrow_header));
 	const char *tmp = *pos;
 	const char * const start = *pos;
-	if (mp_check(&tmp, end) != 0) {
-error:
-		xrow_on_decode_err(start, end, ER_INVALID_MSGPACK, "packet header");
-		return -1;
-	}
-
+	if (mp_check(&tmp, end) != 0)
+		goto bad_header;
 	if (mp_typeof(**pos) != MP_MAP)
-		goto error;
+		goto bad_header;
 	bool has_tsn = false;
 	uint32_t flags = 0;
 
 	uint32_t size = mp_decode_map(pos);
 	for (uint32_t i = 0; i < size; i++) {
 		if (mp_typeof(**pos) != MP_UINT)
-			goto error;
+			goto bad_header;
 		uint64_t key = mp_decode_uint(pos);
 		if (key >= IPROTO_KEY_MAX ||
 		    iproto_key_type[key] != mp_typeof(**pos))
-			goto error;
+			goto bad_header;
 		switch (key) {
 		case IPROTO_REQUEST_TYPE:
 			header->type = mp_decode_uint(pos);
@@ -209,19 +212,23 @@ error:
 	/* Nop requests aren't supposed to have a body. */
 	if (*pos < end && header->type != IPROTO_NOP) {
 		const char *body = *pos;
-		if (mp_check(pos, end)) {
-			xrow_on_decode_err(start, end, ER_INVALID_MSGPACK, "packet body");
-			return -1;
-		}
+		if (mp_check(pos, end))
+			goto bad_body;
 		header->bodycnt = 1;
 		header->body[0].iov_base = (void *) body;
 		header->body[0].iov_len = *pos - body;
 	}
-	if (end_is_exact && *pos < end) {
-		xrow_on_decode_err(start,end, ER_INVALID_MSGPACK, "packet body");
-		return -1;
-	}
+	if (end_is_exact && *pos < end)
+		goto bad_body;
 	return 0;
+bad_header:
+	diag_set(ClientError, ER_INVALID_MSGPACK, "packet header");
+	goto dump;
+bad_body:
+	diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
+dump:
+	dump_row_hex(start, end);
+	return -1;
 }
 
 /**
@@ -680,12 +687,8 @@ xrow_decode_sql(const struct xrow_header *row, struct sql_request *request)
 	}
 	assert(row->bodycnt == 1);
 	const char *data = (const char *) row->body[0].iov_base;
-	const char *end = data + row->body[0].iov_len;
-	assert((end - data) > 0);
-
 	if (mp_typeof(*data) != MP_MAP) {
-		xrow_on_decode_err(row->body[0].iov_base, end, ER_INVALID_MSGPACK,
-				   "packet body");
+		xrow_on_decode_err(row, ER_INVALID_MSGPACK, "packet body");
 		return -1;
 	}
 
@@ -711,14 +714,13 @@ xrow_decode_sql(const struct xrow_header *row, struct sql_request *request)
 			request->stmt_id = value;
 	}
 	if (request->sql_text != NULL && request->stmt_id != NULL) {
-		xrow_on_decode_err(row->body[0].iov_base, end, ER_INVALID_MSGPACK,
-				   "SQL text and statement id are incompatible "\
+		xrow_on_decode_err(row, ER_INVALID_MSGPACK,
+				   "SQL text and statement id are incompatible "
 				   "options in one request: choose one");
 		return -1;
 	}
 	if (request->sql_text == NULL && request->stmt_id == NULL) {
-		xrow_on_decode_err(row->body[0].iov_base, end,
-				   ER_MISSING_REQUEST_FIELD,
+		xrow_on_decode_err(row, ER_MISSING_REQUEST_FIELD,
 				   tt_sprintf("%s or %s",
 					      iproto_key_name(IPROTO_SQL_TEXT),
 					      iproto_key_name(IPROTO_STMT_ID)));
@@ -756,21 +758,14 @@ xrow_decode_dml(struct xrow_header *row, struct request *request,
 	request->header = row;
 	request->type = row->type;
 
-	const char *start = NULL;
-	const char *end = NULL;
-
 	if (row->bodycnt == 0)
 		goto done;
 
 	assert(row->bodycnt == 1);
-	const char *data = start = (const char *) row->body[0].iov_base;
-	end = data + row->body[0].iov_len;
-	assert((end - data) > 0);
-
+	const char *data = (const char *) row->body[0].iov_base;
 	if (mp_typeof(*data) != MP_MAP) {
 error:
-		xrow_on_decode_err(row->body[0].iov_base, end, ER_INVALID_MSGPACK,
-				   "packet body");
+		xrow_on_decode_err(row, ER_INVALID_MSGPACK, "packet body");
 		return -1;
 	}
 
@@ -830,7 +825,7 @@ error:
 done:
 	if (key_map) {
 		enum iproto_key key = (enum iproto_key) bit_ctz_u64(key_map);
-		xrow_on_decode_err(start, end, ER_MISSING_REQUEST_FIELD,
+		xrow_on_decode_err(row, ER_MISSING_REQUEST_FIELD,
 				   iproto_key_name(key));
 		return -1;
 	}
@@ -953,15 +948,13 @@ xrow_decode_id(const struct xrow_header *row, struct id_request *request)
 	}
 
 	assert(row->bodycnt == 1);
-	const char *data = (const char *)row->body[0].iov_base;
-	const char *end = data + row->body[0].iov_len;
-	if (mp_typeof(*data) != MP_MAP)
+	const char *p = (const char *)row->body[0].iov_base;
+	if (mp_typeof(*p) != MP_MAP)
 		goto error;
 
 	request->version = 0;
 	iproto_features_create(&request->features);
 
-	const char *p = data;
 	uint32_t map_size = mp_decode_map(&p);
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(*p) != MP_UINT)
@@ -986,7 +979,7 @@ xrow_decode_id(const struct xrow_header *row, struct id_request *request)
 	}
 	return 0;
 error:
-	xrow_on_decode_err(data, end, ER_INVALID_MSGPACK, "request body");
+	xrow_on_decode_err(row, ER_INVALID_MSGPACK, "request body");
 	return -1;
 }
 
@@ -1031,16 +1024,13 @@ xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
 
 	assert(row->bodycnt == 1);
 
-	const char * const data = (const char *)row->body[0].iov_base;
-	const char * const end = data + row->body[0].iov_len;
-	if (mp_typeof(*data) != MP_MAP) {
-		xrow_on_decode_err(data, end, ER_INVALID_MSGPACK,
-				   "request body");
+	const char *d = (const char *)row->body[0].iov_base;
+	if (mp_typeof(*d) != MP_MAP) {
+		xrow_on_decode_err(row, ER_INVALID_MSGPACK, "request body");
 		return -1;
 	}
 
 	memset(req, 0, sizeof(*req));
-	const char *d = data;
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
 		enum mp_type type = mp_typeof(*d);
@@ -1051,7 +1041,7 @@ xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
 		}
 		uint8_t key = mp_decode_uint(&d);
 		if (key >= IPROTO_KEY_MAX || iproto_key_type[key] != type) {
-			xrow_on_decode_err(data, end, ER_INVALID_MSGPACK,
+			xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 					   "request body");
 			return -1;
 		}
@@ -1147,9 +1137,7 @@ xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
 	}
 	memset(r, 0, sizeof(*r));
 
-	const char *begin = row->body[0].iov_base;
-	const char *end = begin + row->body[0].iov_len;
-	const char *pos = begin;
+	const char *pos = row->body[0].iov_base;
 	uint32_t map_size = mp_decode_map(&pos);
 	for (uint32_t i = 0; i < map_size; ++i)
 	{
@@ -1187,7 +1175,7 @@ xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
 	return 0;
 
 bad_msgpack:
-	xrow_on_decode_err(begin, end, ER_INVALID_MSGPACK, "raft body");
+	xrow_on_decode_err(row, ER_INVALID_MSGPACK, "raft body");
 	return -1;
 }
 
@@ -1222,13 +1210,9 @@ xrow_decode_call(const struct xrow_header *row, struct call_request *request)
 
 	assert(row->bodycnt == 1);
 	const char *data = (const char *) row->body[0].iov_base;
-	const char *end = data + row->body[0].iov_len;
-	assert((end - data) > 0);
-
 	if (mp_typeof(*data) != MP_MAP) {
 error:
-		xrow_on_decode_err(row->body[0].iov_base, end, ER_INVALID_MSGPACK,
-				   "packet body");
+		xrow_on_decode_err(row, ER_INVALID_MSGPACK, "packet body");
 		return -1;
 	}
 
@@ -1266,14 +1250,14 @@ error:
 	}
 	if (row->type == IPROTO_EVAL) {
 		if (request->expr == NULL) {
-			xrow_on_decode_err(row->body[0].iov_base, end, ER_MISSING_REQUEST_FIELD,
+			xrow_on_decode_err(row, ER_MISSING_REQUEST_FIELD,
 					   iproto_key_name(IPROTO_EXPR));
 			return -1;
 		}
 	} else if (request->name == NULL) {
 		assert(row->type == IPROTO_CALL_16 ||
 		       row->type == IPROTO_CALL);
-		xrow_on_decode_err(row->body[0].iov_base, end, ER_MISSING_REQUEST_FIELD,
+		xrow_on_decode_err(row, ER_MISSING_REQUEST_FIELD,
 				   iproto_key_name(IPROTO_FUNCTION_NAME));
 		return -1;
 	}
@@ -1296,13 +1280,9 @@ xrow_decode_auth(const struct xrow_header *row, struct auth_request *request)
 
 	assert(row->bodycnt == 1);
 	const char *data = (const char *) row->body[0].iov_base;
-	const char *end = data + row->body[0].iov_len;
-	assert((end - data) > 0);
-
 	if (mp_typeof(*data) != MP_MAP) {
 error:
-		xrow_on_decode_err(row->body[0].iov_base, end, ER_INVALID_MSGPACK,
-				   "packet body");
+		xrow_on_decode_err(row, ER_INVALID_MSGPACK, "packet body");
 		return -1;
 	}
 
@@ -1333,12 +1313,12 @@ error:
 		}
 	}
 	if (request->user_name == NULL) {
-		xrow_on_decode_err(row->body[0].iov_base, end, ER_MISSING_REQUEST_FIELD,
+		xrow_on_decode_err(row, ER_MISSING_REQUEST_FIELD,
 				   iproto_key_name(IPROTO_USER_NAME));
 		return -1;
 	}
 	if (request->scramble == NULL) {
-		xrow_on_decode_err(row->body[0].iov_base, end, ER_MISSING_REQUEST_FIELD,
+		xrow_on_decode_err(row, ER_MISSING_REQUEST_FIELD,
 				   iproto_key_name(IPROTO_TUPLE));
 		return -1;
 	}
@@ -1453,15 +1433,12 @@ xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
 	ballot->is_booted = true;
 	vclock_create(&ballot->vclock);
 
-	const char *start = NULL;
-	const char *end = NULL;
-
 	if (row->bodycnt == 0)
 		goto err;
 	assert(row->bodycnt == 1);
 
-	const char *data = start = (const char *) row->body[0].iov_base;
-	end = data + row->body[0].iov_len;
+	const char *data = (const char *)row->body[0].iov_base;
+	const char *end = data + row->body[0].iov_len;
 	if (mp_typeof(*data) != MP_MAP)
 		goto err;
 
@@ -1530,7 +1507,7 @@ xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
 	}
 	return 0;
 err:
-	xrow_on_decode_err(start, end, ER_INVALID_MSGPACK, "packet body");
+	xrow_on_decode_err(row, ER_INVALID_MSGPACK, "packet body");
 	return -1;
 }
 
@@ -1622,11 +1599,9 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		return -1;
 	}
 	assert(row->bodycnt == 1);
-	const char * const data = (const char *) row->body[0].iov_base;
-	const char *end = data + row->body[0].iov_len;
-	if (mp_typeof(*data) != MP_MAP) {
-		xrow_on_decode_err(data, end, ER_INVALID_MSGPACK,
-				   "request body");
+	const char *d = (const char *)row->body[0].iov_base;
+	if (mp_typeof(*d) != MP_MAP) {
+		xrow_on_decode_err(row, ER_INVALID_MSGPACK, "request body");
 		return -1;
 	}
 
@@ -1643,7 +1618,6 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 	if (id_filter != NULL)
 		*id_filter = 0;
 
-	const char *d = data;
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(*d) != MP_UINT) {
@@ -1657,7 +1631,7 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 			if (replicaset_uuid == NULL)
 				goto skip;
 			if (xrow_decode_uuid(&d, replicaset_uuid) != 0) {
-				xrow_on_decode_err(data, end, ER_INVALID_MSGPACK,
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 						   "UUID");
 				return -1;
 			}
@@ -1666,7 +1640,7 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 			if (instance_uuid == NULL)
 				goto skip;
 			if (xrow_decode_uuid(&d, instance_uuid) != 0) {
-				xrow_on_decode_err(data, end, ER_INVALID_MSGPACK,
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 						   "UUID");
 				return -1;
 			}
@@ -1675,7 +1649,7 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 			if (vclock == NULL)
 				goto skip;
 			if (mp_decode_vclock_ignore0(&d, vclock) != 0) {
-				xrow_on_decode_err(data, end, ER_INVALID_MSGPACK,
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 						   "invalid VCLOCK");
 				return -1;
 			}
@@ -1684,7 +1658,7 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 			if (version_id == NULL)
 				goto skip;
 			if (mp_typeof(*d) != MP_UINT) {
-				xrow_on_decode_err(data, end, ER_INVALID_MSGPACK,
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 						   "invalid VERSION");
 				return -1;
 			}
@@ -1694,7 +1668,7 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 			if (anon == NULL)
 				goto skip;
 			if (mp_typeof(*d) != MP_BOOL) {
-				xrow_on_decode_err(data, end, ER_INVALID_MSGPACK,
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 						   "invalid REPLICA_ANON flag");
 				return -1;
 			}
@@ -1704,7 +1678,7 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 			if (id_filter == NULL)
 				goto skip;
 			if (mp_typeof(*d) != MP_ARRAY) {
-id_filter_decode_err:		xrow_on_decode_err(data, end, ER_INVALID_MSGPACK,
+id_filter_decode_err:		xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 						   "invalid ID_FILTER");
 				return -1;
 			}
