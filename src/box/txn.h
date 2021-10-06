@@ -91,6 +91,11 @@ enum txn_flag {
 	 * example, when applier receives snapshot from master.
 	 */
 	TXN_FORCE_ASYNC = 0x40,
+	/**
+	 * Transaction was aborted when other transaction was
+	 * committed due to conflict.
+	 */
+	TXN_IS_CONFLICTED = 0x80,
 };
 
 enum {
@@ -435,6 +440,12 @@ txn_has_flag(struct txn *txn, enum txn_flag flag)
 {
 	assert((flag & (flag - 1)) == 0);
 	return (txn->flags & flag) != 0;
+}
+
+static inline bool
+txn_has_any_of_flags(struct txn *txn, enum txn_flag flags)
+{
+	return (txn->flags & flags) != 0;
 }
 
 static inline void
