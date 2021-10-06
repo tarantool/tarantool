@@ -31,13 +31,12 @@ VCS-Git: git://github.com/tarantool/tarantool.git
 Package: tarantool-common
 Architecture: all
 Priority: optional
-Conflicts: tarantool-common (<< 1.5.3),
+Conflicts: tarantool-common (<< 2.2.1),
  tarantool-lts-modules,
  tarantool-lts-client,
  tarantool-lts-postgresql-module,
  tarantool-lts-mysql-module,
  tarantool-dbg (<< 1.5.2),
- tarantool-common (<< 1.6~),
  tarantool-client (<< 1.6~),
  tarantool-client-dbg (<< 1.6~),
  tarantool-plugins (<< 1.6~),
@@ -47,7 +46,7 @@ Conflicts: tarantool-common (<< 1.5.3),
  tarantool-mysql-module,
  tarantool-postgresql-module,
  libtarantool-dev (<< 1.6~)
-Replaces: tarantool-common (<< 1.5.3), tarantool-lts-common
+Replaces: tarantool-common (<< 2.2.1), tarantool-lts-common
 Depends: ${misc:Depends}, adduser, lsb-base,
 # Deps for built-in package manager
 # https://github.com/tarantool/tarantool/issues/2612
@@ -62,7 +61,7 @@ Package: tarantool
 Architecture: i386 amd64 armhf arm64
 Priority: optional
 Depends: ${shlibs:Depends}, ${misc:Depends}, netbase, binutils, libgomp1,
-  openssl, tarantool-common (>= 1.7.5.46),
+  openssl, tarantool-common (>= 2.2.1),
 # libcurl dependencies (except ones we have already)
  zlib1g
 Replaces: tarantool-lts
@@ -71,7 +70,7 @@ Conflicts: tarantool-lts-modules,
  tarantool-lts-mysql-module,
  tarantool-lts-client,
  tarantool-dbg (<< 1.5.2),
- tarantool-common (<< 1.6~),
+ tarantool-common (<< 2.2.1),
  tarantool-client (<< 1.6~),
  tarantool-client-dbg (<< 1.6~),
  tarantool-plugins (<< 1.6~),
@@ -105,7 +104,7 @@ Conflicts: tarantool-lts-dev,
  tarantool-lts-mysql-module,
  tarantool-lts-client,
  tarantool-dbg (<< 1.5.2),
- tarantool-common (<< 1.6~),
+ tarantool-common (<< 2.2.1),
  tarantool-client (<< 1.6~),
  tarantool-client-dbg (<< 1.6~),
  tarantool-plugins (<< 1.6~),
