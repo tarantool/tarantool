@@ -11,7 +11,7 @@ local ffi = require('ffi')
 --]]
 if jit.arch == 'arm64' then jit.off() end
 
-test:plan(28)
+test:plan(30)
 
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
@@ -476,14 +476,14 @@ test:test("Multiple tests for parser (with nanoseconds)", function(test)
     end
 end)
 
-local function couldnt_parse(txt)
-    return ("could not parse '%s'"):format(txt)
-end
-
 local function create_date_string(date)
     local year, month, day = date.year or 1970, date.month or 1, date.day or 1
     local hour, min, sec = date.hour or 0, date.min or 0, date.sec or 0
     return ('%04d-%02d-%02dT%02d:%02d:%02dZ'):format(year, month, day, hour, min, sec)
+end
+
+local function couldnt_parse(txt)
+    return ("could not parse '%s'"):format(txt)
 end
 
 test:test("Check parsing of dates with invalid attributes", function(test)
@@ -574,94 +574,110 @@ test:test("Datetime formatting of huge dates", function(test)
     check_variant_formats(test, base, variants)
 end)
 
+local strftime_formats = {
+    { '%A',                      1, 'Thursday' },
+    { '%a',                      1, 'Thu' },
+    { '%B',                      1, 'January' },
+    { '%b',                      1, 'Jan' },
+    { '%h',                      1, 'Jan' },
+    { '%C',                      0, '19' },
+    { '%c',                      1, 'Thu Jan  1 03:00:00 1970' },
+    { '%D',                      1, '01/01/70' },
+    { '%m/%d/%y',                1, '01/01/70' },
+    { '%d',                      1, '01' },
+    { '%Ec',                     1, 'Thu Jan  1 03:00:00 1970' },
+    { '%EC',                     0, '19' },
+    { '%Ex',                     1, '01/01/70' },
+    { '%EX',                     1, '03:00:00' },
+    { '%Ey',                     1, '70' },
+    { '%EY',                     1, '1970' },
+    { '%Od',                     1, '01' },
+    { '%oe',                     0, 'oe' },
+    { '%OH',                     1, '03' },
+    { '%OI',                     1, '03' },
+    { '%Om',                     1, '01' },
+    { '%OM',                     1, '00' },
+    { '%OS',                     1, '00' },
+    { '%Ou',                     1, '4' },
+    { '%OU',                     1, '00' },
+    { '%OV',                     0, '01' },
+    { '%Ow',                     1, '4' },
+    { '%OW',                     1, '00' },
+    { '%Oy',                     1, '70' },
+    { '%e',                      1, ' 1' },
+    { '%F',                      1, '1970-01-01' },
+    { '%Y-%m-%d',                1, '1970-01-01' },
+    { '%H',                      1, '03' },
+    { '%I',                      1, '03' },
+    { '%j',                      1, '001' },
+    { '%k',                      1, ' 3' },
+    { '%l',                      1, ' 3' },
+    { '%M',                      1, '00' },
+    { '%m',                      1, '01' },
+    { '%n',                      1, '\n' },
+    { '%p',                      1, 'AM' },
+    { '%R',                      1, '03:00' },
+    { '%H:%M',                   1, '03:00' },
+    { '%r',                      1, '03:00:00 AM' },
+    { '%I:%M:%S %p',             1, '03:00:00 AM' },
+    { '%S',                      1, '00' },
+    { '%s',                      1, '10800' },
+    { '%f',                      1, '125' },
+    { '%3f',                     0, '125' },
+    { '%6f',                     0, '125000' },
+    { '%6d',                     0, '6d' },
+    { '%3D',                     0, '3D' },
+    { '%T',                      1, '03:00:00' },
+    { '%H:%M:%S',                1, '03:00:00' },
+    { '%t',                      1, '\t' },
+    { '%U',                      1, '00' },
+    { '%u',                      1, '4' },
+    { '%V',                      0, '01' },
+    { '%G',                      1, '1970' },
+    { '%g',                      1, '70' },
+    { '%v',                      1, ' 1-Jan-1970' },
+    { '%e-%b-%Y',                1, ' 1-Jan-1970' },
+    { '%W',                      1, '00' },
+    { '%w',                      1, '4' },
+    { '%X',                      1, '03:00:00' },
+    { '%x',                      1, '01/01/70' },
+    { '%y',                      1, '70' },
+    { '%Y',                      1, '1970' },
+    { '%z',                      1, '+0300' },
+    { '%%',                      1, '%' },
+    { '%Y-%m-%dT%H:%M:%S.%9f%z', 1, '1970-01-01T03:00:00.125000000+0300' },
+    { '%Y-%m-%dT%H:%M:%S.%f%z',  1, '1970-01-01T03:00:00.125+0300' },
+    { '%Y-%m-%dT%H:%M:%S.%f',    1, '1970-01-01T03:00:00.125' },
+    { '%FT%T.%f',                1, '1970-01-01T03:00:00.125' },
+    { '%FT%T.%f%z',              1, '1970-01-01T03:00:00.125+0300' },
+    { '%FT%T.%9f%z',             1, '1970-01-01T03:00:00.125000000+0300' },
+}
+
 test:test("Datetime string formatting detailed", function(test)
     test:plan(77)
     local T = date.new{ timestamp = 0.125 }
     T:set{ tzoffset = 180 }
     test:is(tostring(T), '1970-01-01T03:00:00.125+0300', 'tostring()')
 
-    local formats = {
-        { '%A',                         'Thursday' },
-        { '%a',                         'Thu' },
-        { '%B',                         'January' },
-        { '%b',                         'Jan' },
-        { '%h',                         'Jan' },
-        { '%C',                         '19' },
-        { '%c',                         'Thu Jan  1 03:00:00 1970' },
-        { '%D',                         '01/01/70' },
-        { '%m/%d/%y',                   '01/01/70' },
-        { '%d',                         '01' },
-        { '%Ec',                        'Thu Jan  1 03:00:00 1970' },
-        { '%EC',                        '19' },
-        { '%Ex',                        '01/01/70' },
-        { '%EX',                        '03:00:00' },
-        { '%Ey',                        '70' },
-        { '%EY',                        '1970' },
-        { '%Od',                        '01' },
-        { '%oe',                        'oe' },
-        { '%OH',                        '03' },
-        { '%OI',                        '03' },
-        { '%Om',                        '01' },
-        { '%OM',                        '00' },
-        { '%OS',                        '00' },
-        { '%Ou',                        '4' },
-        { '%OU',                        '00' },
-        { '%OV',                        '01' },
-        { '%Ow',                        '4' },
-        { '%OW',                        '00' },
-        { '%Oy',                        '70' },
-        { '%e',                         ' 1' },
-        { '%F',                         '1970-01-01' },
-        { '%Y-%m-%d',                   '1970-01-01' },
-        { '%H',                         '03' },
-        { '%I',                         '03' },
-        { '%j',                         '001' },
-        { '%k',                         ' 3' },
-        { '%l',                         ' 3' },
-        { '%M',                         '00' },
-        { '%m',                         '01' },
-        { '%n',                         '\n' },
-        { '%p',                         'AM' },
-        { '%R',                         '03:00' },
-        { '%H:%M',                      '03:00' },
-        { '%r',                         '03:00:00 AM' },
-        { '%I:%M:%S %p',                '03:00:00 AM' },
-        { '%S',                         '00' },
-        { '%s',                         '10800' },
-        { '%f',                         '125' },
-        { '%3f',                        '125' },
-        { '%6f',                        '125000' },
-        { '%6d',                        '6d' },
-        { '%3D',                        '3D' },
-        { '%T',                         '03:00:00' },
-        { '%H:%M:%S',                   '03:00:00' },
-        { '%t',                         '\t' },
-        { '%U',                         '00' },
-        { '%u',                         '4' },
-        { '%V',                         '01' },
-        { '%G',                         '1970' },
-        { '%g',                         '70' },
-        { '%v',                         ' 1-Jan-1970' },
-        { '%e-%b-%Y',                   ' 1-Jan-1970' },
-        { '%W',                         '00' },
-        { '%w',                         '4' },
-        { '%X',                         '03:00:00' },
-        { '%x',                         '01/01/70' },
-        { '%y',                         '70' },
-        { '%Y',                         '1970' },
-        { '%z',                         '+0300' },
-        { '%%',                         '%' },
-        { '%Y-%m-%dT%H:%M:%S.%9f%z',    '1970-01-01T03:00:00.125000000+0300' },
-        { '%Y-%m-%dT%H:%M:%S.%f%z',     '1970-01-01T03:00:00.125+0300' },
-        { '%Y-%m-%dT%H:%M:%S.%f',       '1970-01-01T03:00:00.125' },
-        { '%FT%T.%f',                   '1970-01-01T03:00:00.125' },
-        { '%FT%T.%f%z',                 '1970-01-01T03:00:00.125+0300' },
-        { '%FT%T.%9f%z',                '1970-01-01T03:00:00.125000000+0300' },
-    }
-    for _, row in pairs(formats) do
-        local fmt, value = unpack(row)
+    for _, row in pairs(strftime_formats) do
+        local fmt, _, value = unpack(row)
         test:is(T:format(fmt), value,
                 ('format %s, expected %s'):format(fmt, value))
+    end
+end)
+
+test:test("Datetime string parsing by format (detailed)", function(test)
+    test:plan(68)
+    local T = date.new{ timestamp = 0.125 }
+    T:set{ tzoffset = 180 }
+    test:is(tostring(T), '1970-01-01T03:00:00.125+0300', 'tostring()')
+
+    for _, row in pairs(strftime_formats) do
+        local fmt, check, value = unpack(row)
+        if check > 0 then
+            local res = date.parse(value, {format = fmt})
+            test:is(res ~= nil, true, ('parse of %s'):format(fmt))
+        end
     end
 end)
 
@@ -1337,6 +1353,42 @@ test:test("Parse tiny date into seconds and other parts", function(test)
     test:is(tiny.nsec, 528000000, ("nsec of '%s'"):format(str))
     test:is(tiny.sec, 30, "sec")
     test:is(tiny.timestamp, 30.528, "timestamp")
+end)
+
+test:test("Parse strptime format", function(test)
+    test:plan(16)
+    local formats = {
+        {'Thu Jan  1 03:00:00 1970',    '%c',       '1970-01-01T03:00:00Z'},
+        {'01/01/70',                    '%D',       '1970-01-01T00:00:00Z'},
+        {'01/01/70',                    '%m/%d/%y', '1970-01-01T00:00:00Z' },
+        {'Thu Jan  1 03:00:00 1970',    '%Ec',      '1970-01-01T03:00:00Z' },
+        {'1970-01-01',                  '%F',       '1970-01-01T00:00:00Z' },
+        {'1970-01-01',                  '%Y-%m-%d', '1970-01-01T00:00:00Z' },
+        -- {' 1-Jan-1970',                 '%v' },
+        {' 1-Jan-1970',                 '%e-%b-%Y', '1970-01-01T00:00:00Z' },
+        {'01/01/70',                    '%x',       '1970-01-01T00:00:00Z' },
+        {'1970-01-01T0300+0300',        '%Y-%m-%dT%H%M%z',
+            '1970-01-01T03:00:00+0300' },
+        {'1970-01-01T03:00:00+0300',    '%Y-%m-%dT%H:%M:%S%z',
+            '1970-01-01T03:00:00+0300' },
+        {'1970-01-01T03:00:00.125000000+0300',  '%Y-%m-%dT%H:%M:%S.%f%z',
+            '1970-01-01T03:00:00.125+0300' },
+        {'1970-01-01T03:00:00.125+0300',        '%Y-%m-%dT%H:%M:%S.%f%z',
+            '1970-01-01T03:00:00.125+0300' },
+        {'1970-01-01T03:00:00.125',             '%Y-%m-%dT%H:%M:%S.%f',
+            '1970-01-01T03:00:00.125Z' },
+        {'1970-01-01T03:00:00.125',             '%FT%T.%f',
+            '1970-01-01T03:00:00.125Z' },
+        {'1970-01-01T03:00:00.125+0300',        '%FT%T.%f%z',
+            '1970-01-01T03:00:00.125+0300' },
+        {'1970-01-01T03:00:00.125000000+0300',  '%FT%T.%f%z',
+            '1970-01-01T03:00:00.125+0300' },
+    }
+    for _, row in pairs(formats) do
+        local str, fmt, exp = unpack(row)
+        local dt = date.parse(str, {format = fmt})
+        test:is(tostring(dt), exp, ('parse %s via %s'):format(str, fmt))
+    end
 end)
 
 test:test("totable{}", function(test)

@@ -69,6 +69,53 @@ datetime_strftime(const struct datetime *date, char *buf, size_t len,
 }
 
 void
+tm_to_datetime(struct tnt_tm *tm, struct datetime *date)
+{
+	assert(tm != NULL);
+	assert(date != NULL);
+	int year = tm->tm_year;
+	int mon = tm->tm_mon;
+	int mday = tm->tm_mday;
+	int yday = tm->tm_yday;
+	int wday = tm->tm_wday;
+	dt_t dt = 0;
+
+	if ((year | mon | mday) == 0) {
+		if (yday != 0) {
+			dt = yday - 1 + DT_EPOCH_1970_OFFSET;
+		} else if (wday != 0) {
+			/* 1970-01-01 was Thursday */
+			dt = ((wday - 4) % 7) + DT_EPOCH_1970_OFFSET;
+		}
+	} else {
+		assert(mday >= 0 && mday < 32);
+		assert(mon >= 0 && mon <= 11);
+		dt = dt_from_ymd(year + 1900, mon + 1, mday);
+	}
+	int64_t local_secs =
+		(int64_t)dt * SECS_PER_DAY - SECS_EPOCH_1970_OFFSET;
+	local_secs += tm->tm_hour * 3600 + tm->tm_min * 60 + tm->tm_sec;
+	date->epoch = local_secs - tm->tm_gmtoff;
+	date->nsec = tm->tm_nsec;
+	date->tzindex = 0;
+	date->tzoffset = tm->tm_gmtoff / 60;
+}
+
+size_t
+datetime_strptime(struct datetime *date, const char *buf, const char *fmt)
+{
+	assert(date != NULL);
+	assert(fmt != NULL);
+	assert(buf != NULL);
+	struct tnt_tm t = { .tm_epoch = 0 };
+	char * ret = tnt_strptime(buf, fmt, &t);
+	if (ret == NULL)
+		return 0;
+	tm_to_datetime(&t, date);
+	return ret - buf;
+}
+
+void
 datetime_now(struct datetime *now)
 {
 	struct timeval tv;

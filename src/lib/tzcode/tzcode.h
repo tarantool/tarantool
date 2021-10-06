@@ -56,6 +56,16 @@ size_t
 tnt_strftime(char *s, size_t maxsize, const char *format,
 	     const struct tnt_tm *tm);
 
+/**
+ * tnt_strptime is a Tarantool version of POSIX strptime()
+ * which has been extened with %f (fractions of second)
+ * flag support.
+ * @sa strptime()
+ */
+char *
+tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
+	     struct tnt_tm *__restrict tm);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
