@@ -53,6 +53,27 @@ txn_on_stop(struct trigger *trigger, void *event);
 static int
 txn_on_yield(struct trigger *trigger, void *event);
 
+static inline enum box_error_code
+txn_flags_to_error_code(struct txn *txn)
+{
+	if (txn_has_flag(txn, TXN_IS_CONFLICTED))
+		return ER_TRANSACTION_CONFLICT;
+	else if (txn_has_flag(txn, TXN_IS_ABORTED_BY_YIELD))
+		return ER_TRANSACTION_YIELD;
+	return ER_UNKNOWN;
+}
+
+static inline int
+txn_check_can_continue(struct txn *txn)
+{
+	enum txn_flag flags = TXN_IS_CONFLICTED | TXN_IS_ABORTED_BY_YIELD;
+	if (txn_has_any_of_flags(txn, flags)) {
+		diag_set(ClientError, txn_flags_to_error_code(txn));
+		return -1;
+	}
+	return 0;
+}
+
 static int
 txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 {
@@ -349,13 +370,8 @@ txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
 		return -1;
 	}
 
-	/*
-	 * A conflict have happened; there is no reason to continue the TX.
-	 */
-	if (txn->status == TXN_CONFLICTED) {
-		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+	if (txn_check_can_continue(txn) != 0)
 		return -1;
-	}
 
 	struct txn_stmt *stmt = txn_stmt_new(&txn->region);
 	if (stmt == NULL)
@@ -703,12 +719,8 @@ txn_prepare(struct txn *txn)
 {
 	txn->psn = ++txn_last_psn;
 
-	if (txn_has_flag(txn, TXN_IS_ABORTED_BY_YIELD)) {
-		assert(!txn_has_flag(txn, TXN_CAN_YIELD));
-		diag_set(ClientError, ER_TRANSACTION_YIELD);
-		diag_log();
+	if (txn_check_can_continue(txn) != 0)
 		return -1;
-	}
 	/*
 	 * If transaction has been started in SQL, deferred
 	 * foreign key constraints must not be violated.
@@ -723,8 +735,7 @@ txn_prepare(struct txn *txn)
 	 * Somebody else has written some value that we have read.
 	 * The RW transaction is not possible.
 	 */
-	if (txn->status == TXN_CONFLICTED ||
-	    (txn->status == TXN_IN_READ_VIEW && !stailq_empty(&txn->stmts))) {
+	if (txn->status == TXN_IN_READ_VIEW && !stailq_empty(&txn->stmts)) {
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;
 	}
@@ -1251,9 +1262,11 @@ txn_on_yield(struct trigger *trigger, void *event)
 	(void) event;
 	struct txn *txn = in_txn();
 	assert(txn != NULL);
-	if (!txn_has_flag(txn, TXN_CAN_YIELD)) {
+	enum txn_flag flags = TXN_CAN_YIELD | TXN_IS_ABORTED_BY_YIELD;
+	if (!txn_has_any_of_flags(txn, flags)) {
 		txn_rollback_to_svp(txn, NULL);
 		txn_set_flags(txn, TXN_IS_ABORTED_BY_YIELD);
+		say_warn("Transaction has been aborted by a fiber yield");
 	}
 	return 0;
 }
