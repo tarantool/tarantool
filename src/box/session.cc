@@ -37,6 +37,7 @@
 #include "error.h"
 #include "tt_static.h"
 #include "sql_stmt_cache.h"
+#include "watcher.h"
 
 const char *session_type_strs[] = {
 	"background",
@@ -95,6 +96,95 @@ session_on_stop(struct trigger *trigger, void * /* event */)
 	return 0;
 }
 
+/**
+ * Watcher registered for a session. Unregistered when the session is closed.
+ */
+struct session_watcher {
+	struct watcher base;
+	struct session *session;
+	session_notify_f cb;
+};
+
+static void
+session_watcher_run_f(struct watcher *base)
+{
+	struct session_watcher *watcher = (struct session_watcher *)base;
+	size_t key_len;
+	const char *key = watcher_key(base, &key_len);
+	const char *data_end;
+	const char *data = watcher_data(base, &data_end);
+	watcher->cb(watcher->session, key, key_len, data, data_end);
+}
+
+void
+session_watch(struct session *session, const char *key,
+	      size_t key_len, session_notify_f cb)
+{
+	/* Look up a watcher for the specified key in this session. */
+	struct mh_strnptr_t *h = session->watchers;
+	if (h == NULL)
+		h = session->watchers = mh_strnptr_new();
+	uint32_t key_hash = mh_strn_hash(key, key_len);
+	struct mh_strnptr_key_t k = {key, key_len, key_hash};
+	mh_int_t i = mh_strnptr_find(h, &k, NULL);
+	/* If a watcher is already registered, acknowledge a notification. */
+	if (i != mh_end(h)) {
+		struct session_watcher *watcher =
+			(struct session_watcher *)mh_strnptr_node(h, i)->val;
+		watcher_ack(&watcher->base);
+		return;
+	}
+	/* Otherwise register a new watcher. */
+	struct session_watcher *watcher =
+		(struct session_watcher *)xmalloc(sizeof(*watcher));
+	watcher->session = session;
+	watcher->cb = cb;
+	box_register_watcher(key, key_len, session_watcher_run_f,
+			     (watcher_destroy_f)free, WATCHER_EXPLICIT_ACK,
+			     &watcher->base);
+	key = watcher_key(&watcher->base, &key_len);
+	struct mh_strnptr_node_t n = {
+		key, key_len, key_hash, watcher
+	};
+	mh_strnptr_put(h, &n, NULL, NULL);
+}
+
+void
+session_unwatch(struct session *session, const char *key,
+		size_t key_len)
+{
+	struct mh_strnptr_t *h = session->watchers;
+	if (h == NULL)
+		return;
+	mh_int_t i = mh_strnptr_find_inp(h, key, key_len);
+	if (i == mh_end(h))
+		return;
+	struct session_watcher *watcher =
+		(struct session_watcher *)mh_strnptr_node(h, i)->val;
+	mh_strnptr_del(h, i, NULL);
+	watcher_unregister(&watcher->base);
+}
+
+/**
+ * Unregisters all watchers registered in this session.
+ * Called when the session is closed.
+ */
+static void
+session_unregister_all_watchers(struct session *session)
+{
+	struct mh_strnptr_t *h = session->watchers;
+	if (h == NULL)
+		return;
+	mh_int_t i;
+	mh_foreach(h, i) {
+		struct session_watcher *watcher =
+			(struct session_watcher *)mh_strnptr_node(h, i)->val;
+		watcher_unregister(&watcher->base);
+	}
+	mh_strnptr_delete(h);
+	session->watchers = NULL;
+}
+
 static int
 closed_session_push(struct session *session, struct port *port)
 {
@@ -114,6 +204,7 @@ void
 session_close(struct session *session)
 {
 	session->vtab = &closed_session_vtab;
+	session_unregister_all_watchers(session);
 }
 
 void
@@ -142,6 +233,7 @@ session_create(enum session_type type)
 	session->sql_flags = default_flags;
 	session->sql_default_engine = SQL_STORAGE_ENGINE_MEMTX;
 	session->sql_stmts = NULL;
+	session->watchers = NULL;
 
 	/* For on_connect triggers. */
 	credentials_create(&session->credentials, guest_user);
@@ -244,6 +336,8 @@ session_run_on_auth_triggers(const struct on_auth_trigger_ctx *result)
 void
 session_destroy(struct session *session)
 {
+	/* Watchers are unregistered in session_close(). */
+	assert(session->watchers == NULL);
 	session_storage_cleanup(session->id);
 	struct mh_i64ptr_node_t node = { session->id, NULL };
 	mh_i64ptr_remove(session_registry, &node, NULL);

@@ -351,6 +351,26 @@ int
 xrow_decode_call(const struct xrow_header *row, struct call_request *request);
 
 /**
+ * WATCH/UNWATCH request.
+ */
+struct watch_request {
+	/** Notification key name. String, not null-terminated. */
+	const char *key;
+	/** Length of the notification key name string. */
+	uint32_t key_len;
+};
+
+/**
+ * Decode WATCH/UNWATCH request from MessagePack.
+ * @param row Request header.
+ * @param[out] request Request to decode to.
+ * @retval  0 on success
+ * @retval -1 on error
+ */
+int
+xrow_decode_watch(const struct xrow_header *row, struct watch_request *request);
+
+/**
  * AUTH request
  */
 struct auth_request {
@@ -761,6 +781,21 @@ iproto_reply_sql(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 void
 iproto_reply_chunk(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 		   uint32_t schema_version);
+
+/**
+ * Encode IPROTO_EVENT packet.
+ * @param out Encode to.
+ * @param key Notification key name.
+ * @param key_len Length of the notification key name.
+ * @param data Notification data (MsgPack).
+ * @param data_end End of notification data.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
+ */
+int
+iproto_send_event(struct obuf *out, const char *key, size_t key_len,
+		  const char *data, const char *data_end);
 
 /** Write error directly to a socket. */
 void

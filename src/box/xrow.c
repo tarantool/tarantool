@@ -751,6 +751,53 @@ iproto_reply_chunk(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 }
 
 int
+iproto_send_event(struct obuf *out, const char *key, size_t key_len,
+		  const char *data, const char *data_end)
+{
+	/* Calculate the packet size. */
+	size_t size = 5;
+	/* Packet header. Note: no sync and schema version. */
+	size += mp_sizeof_map(1);
+	size += mp_sizeof_uint(IPROTO_REQUEST_TYPE);
+	size += mp_sizeof_uint(IPROTO_EVENT);
+	/* Packet body. */
+	size += mp_sizeof_map(data != NULL ? 2 : 1);
+	size += mp_sizeof_uint(IPROTO_EVENT_KEY);
+	size += mp_sizeof_str(key_len);
+	if (data != NULL) {
+		size += mp_sizeof_uint(IPROTO_EVENT_DATA);
+		size += data_end - data;
+	}
+	/* Encode the packet. */
+	char *buf = obuf_alloc(out, size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, size, "obuf_alloc", "buf");
+		return -1;
+	}
+	char *p = buf;
+	/* Fix header. */
+	*(p++) = 0xce;
+	mp_store_u32(p, size - 5);
+	p += 4;
+	/* Packet header. */
+	p = mp_encode_map(p, 1);
+	p = mp_encode_uint(p, IPROTO_REQUEST_TYPE);
+	p = mp_encode_uint(p, IPROTO_EVENT);
+	/* Packet body. */
+	p = mp_encode_map(p, data != NULL ? 2 : 1);
+	p = mp_encode_uint(p, IPROTO_EVENT_KEY);
+	p = mp_encode_str(p, key, key_len);
+	if (data != NULL) {
+		p = mp_encode_uint(p, IPROTO_EVENT_DATA);
+		memcpy(p, data, data_end - data);
+		p += data_end - data;
+	}
+	assert(size == (size_t)(p - buf));
+	(void)p;
+	return 0;
+}
+
+int
 xrow_decode_dml(struct xrow_header *row, struct request *request,
 		uint64_t key_map)
 {
@@ -1265,6 +1312,47 @@ error:
 		static const char empty_args[] = { (char)0x90 };
 		request->args = empty_args;
 		request->args_end = empty_args + sizeof(empty_args);
+	}
+	return 0;
+}
+
+int
+xrow_decode_watch(const struct xrow_header *row, struct watch_request *request)
+{
+	if (row->bodycnt == 0) {
+		diag_set(ClientError, ER_INVALID_MSGPACK,
+			 "missing request body");
+		return -1;
+	}
+	assert(row->bodycnt == 1);
+	const char *data = (const char *)row->body[0].iov_base;
+	if (mp_typeof(*data) != MP_MAP) {
+error:
+		xrow_on_decode_err(row, ER_INVALID_MSGPACK, "packet body");
+		return -1;
+	}
+	memset(request, 0, sizeof(*request));
+	uint32_t map_size = mp_decode_map(&data);
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(*data) != MP_UINT)
+			goto error;
+		uint64_t key = mp_decode_uint(&data);
+		if (key < IPROTO_KEY_MAX &&
+		    iproto_key_type[key] != mp_typeof(*data))
+			goto error;
+		switch (key) {
+		case IPROTO_EVENT_KEY:
+			request->key = mp_decode_str(&data, &request->key_len);
+			break;
+		default:
+			mp_next(&data);
+			break;
+		}
+	}
+	if (request->key == NULL) {
+		xrow_on_decode_err(row, ER_MISSING_REQUEST_FIELD,
+				   iproto_key_name(IPROTO_EVENT_KEY));
+		return -1;
 	}
 	return 0;
 }

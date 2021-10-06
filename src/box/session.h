@@ -115,6 +115,11 @@ struct session {
 	/** Session metadata. */
 	struct session_meta meta;
 	/**
+	 * Watchers registered for this session (key -> session_watcher).
+	 * Allocated on demand.
+	 */
+	struct mh_strnptr_t *watchers;
+	/**
 	 * ID of statements prepared in current session.
 	 * This map is allocated on demand.
 	 */
@@ -318,6 +323,29 @@ session_run_on_disconnect_triggers(struct session *session);
 /** Run auth triggers */
 int
 session_run_on_auth_triggers(const struct on_auth_trigger_ctx *result);
+
+typedef void
+(*session_notify_f)(struct session *session, const char *key, size_t key_len,
+		    const char *data, const char *data_end);
+
+/**
+ * If there's no watcher registered for the specified key in the given session,
+ * this function registers one, otherwise it acknowledges a notification.
+ *
+ * The callback will be called unconditionally right after registration and
+ * then every time the key is updated provided the last notification was
+ * acknowledged.
+ */
+void
+session_watch(struct session *session, const char *key, size_t key_len,
+	      session_notify_f cb);
+
+/**
+ * Unregisters a watcher registered for the given session and notification key.
+ * Does nothing if there's no watcher registered
+ */
+void
+session_unwatch(struct session *session, const char *key, size_t key_len);
 
 /**
  * Check whether or not the current user is authorized to connect

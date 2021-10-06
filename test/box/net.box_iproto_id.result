@@ -15,11 +15,12 @@ c = net.connect(box.cfg.listen)
  | ...
 c.peer_protocol_version
  | ---
- | - 2
+ | - 3
  | ...
 c.peer_protocol_features
  | ---
  | - transactions: true
+ |   watchers: true
  |   error_extension: true
  |   streams: true
  | ...
@@ -46,6 +47,7 @@ c.peer_protocol_version
 c.peer_protocol_features
  | ---
  | - transactions: false
+ |   watchers: false
  |   error_extension: false
  |   streams: false
  | ...
@@ -93,6 +95,7 @@ c.peer_protocol_version
 c.peer_protocol_features
  | ---
  | - transactions: true
+ |   watchers: true
  |   error_extension: true
  |   streams: true
  | ...
@@ -140,11 +143,12 @@ c.error -- error
  | ...
 c.peer_protocol_version
  | ---
- | - 2
+ | - 3
  | ...
 c.peer_protocol_features
  | ---
  | - transactions: false
+ |   watchers: true
  |   error_extension: true
  |   streams: true
  | ...
@@ -165,11 +169,12 @@ c.error -- error
  | ...
 c.peer_protocol_version
  | ---
- | - 2
+ | - 3
  | ...
 c.peer_protocol_features
  | ---
  | - transactions: true
+ |   watchers: true
  |   error_extension: true
  |   streams: true
  | ...
