@@ -346,21 +346,18 @@ void
 mem_set_str0_ephemeral(struct Mem *mem, char *value)
 {
 	set_str_const(mem, value, strlen(value), MEM_Ephem);
-	mem->flags |= MEM_Term;
 }
 
 void
 mem_set_str0_static(struct Mem *mem, char *value)
 {
 	set_str_const(mem, value, strlen(value), MEM_Static);
-	mem->flags |= MEM_Term;
 }
 
 void
 mem_set_str0_allocated(struct Mem *mem, char *value)
 {
 	set_str_dynamic(mem, value, strlen(value), 0);
-	mem->flags |= MEM_Term;
 }
 
 int
@@ -392,7 +389,6 @@ mem_copy_str0(struct Mem *mem, const char *value)
 	if (mem_copy_str(mem, value, len + 1) != 0)
 		return -1;
 	mem->n = len;
-	mem->flags |= MEM_Term;
 	return 0;
 }
 
@@ -658,23 +654,11 @@ int_to_str0(struct Mem *mem)
 }
 
 static inline int
-str_to_str0(struct Mem *mem)
-{
-	assert(mem->type == MEM_TYPE_STR);
-	if (sqlVdbeMemGrow(mem, mem->n + 1, 1) != 0)
-		return -1;
-	mem->z[mem->n] = '\0';
-	mem->flags |= MEM_Term;
-	mem->flags &= ~MEM_Scalar;
-	return 0;
-}
-
-static inline int
 str_to_bin(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_STR);
 	mem->type = MEM_TYPE_BIN;
-	mem->flags &= ~(MEM_Term | MEM_Scalar);
+	mem->flags &= ~MEM_Scalar;
 	return 0;
 }
 
@@ -722,18 +706,6 @@ bin_to_str(struct Mem *mem)
 	assert(mem->type == MEM_TYPE_BIN);
 	mem->type = MEM_TYPE_STR;
 	mem->flags &= ~MEM_Scalar;
-	return 0;
-}
-
-static inline int
-bin_to_str0(struct Mem *mem)
-{
-	assert(mem->type == MEM_TYPE_BIN);
-	if (sqlVdbeMemGrow(mem, mem->n + 1, 1) != 0)
-		return -1;
-	mem->z[mem->n] = '\0';
-	mem->type = MEM_TYPE_STR;
-	mem->flags = MEM_Term;
 	return 0;
 }
 
@@ -1002,7 +974,7 @@ double_to_str0(struct Mem *mem)
 	sql_snprintf(BUF_SIZE, mem->z, "%!.15g", mem->u.r);
 	mem->n = strlen(mem->z);
 	mem->type = MEM_TYPE_STR;
-	mem->flags = MEM_Term;
+	mem->flags = 0;
 	return 0;
 }
 
@@ -1282,39 +1254,6 @@ mem_to_number(struct Mem *mem)
 		return 0;
 	}
 	return -1;
-}
-
-int
-mem_to_str0(struct Mem *mem)
-{
-	assert(mem->type < MEM_TYPE_INVALID);
-	switch (mem->type) {
-	case MEM_TYPE_STR:
-		if ((mem->flags & MEM_Term) != 0) {
-			mem->flags &= ~MEM_Scalar;
-			return 0;
-		}
-		return str_to_str0(mem);
-	case MEM_TYPE_INT:
-	case MEM_TYPE_UINT:
-		return int_to_str0(mem);
-	case MEM_TYPE_DOUBLE:
-		return double_to_str0(mem);
-	case MEM_TYPE_BOOL:
-		return bool_to_str0(mem);
-	case MEM_TYPE_BIN:
-		return bin_to_str0(mem);
-	case MEM_TYPE_MAP:
-		return map_to_str0(mem);
-	case MEM_TYPE_ARRAY:
-		return array_to_str0(mem);
-	case MEM_TYPE_UUID:
-		return uuid_to_str0(mem);
-	case MEM_TYPE_DEC:
-		return dec_to_str0(mem);
-	default:
-		return -1;
-	}
 }
 
 int
@@ -1764,15 +1703,6 @@ mem_get_bool(const struct Mem *mem, bool *b)
 }
 
 int
-mem_get_str0(const struct Mem *mem, const char **s)
-{
-	if (mem->type != MEM_TYPE_STR || (mem->flags & MEM_Term) == 0)
-		return -1;
-	*s = mem->z;
-	return 0;
-}
-
-int
 mem_get_bin(const struct Mem *mem, const char **s)
 {
 	if (mem->type == MEM_TYPE_STR) {
@@ -1814,7 +1744,7 @@ mem_copy(struct Mem *to, const struct Mem *from)
 	to->szMalloc = sqlDbMallocSize(to->db, to->zMalloc);
 	memcpy(to->zMalloc, to->z, to->n);
 	to->z = to->zMalloc;
-	to->flags &= MEM_Term;
+	to->flags = 0;
 	return 0;
 }
 
@@ -1831,7 +1761,7 @@ mem_copy_as_ephemeral(struct Mem *to, const struct Mem *from)
 		return;
 	if ((to->flags & (MEM_Static | MEM_Ephem)) != 0)
 		return;
-	to->flags &= MEM_Term;
+	to->flags = 0;
 	to->flags |= MEM_Ephem;
 	return;
 }

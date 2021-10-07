@@ -2285,31 +2285,12 @@ sqlVdbeDb(Vdbe * v)
 	return v->db;
 }
 
-/*
- * Return a pointer to an sql_value structure containing the value bound
- * parameter iVar of VM v. Except, if the value is an SQL NULL, return
- * 0 instead. Unless it is NULL, apply type to the value before returning it.
- *
- * The returned value must be freed by the caller using sqlValueFree().
- */
-sql_value *
-sqlVdbeGetBoundValue(struct Vdbe *v, int iVar)
+const struct Mem *
+vdbe_get_bound_value(struct Vdbe *vdbe, int id)
 {
-	assert(iVar > 0);
-	if (v) {
-		Mem *pMem = &v->aVar[iVar - 1];
-		if (!mem_is_null(pMem)) {
-			sql_value *pRet = sqlValueNew(v->db);
-			if (pRet == NULL)
-				return NULL;
-			if (mem_copy(pRet, pMem) != 0) {
-				sqlValueFree(pRet);
-				return NULL;
-			}
-			return pRet;
-		}
-	}
-	return 0;
+	if (vdbe == NULL || id < 0 || id >= vdbe->nVar)
+		return NULL;
+	return &vdbe->aVar[id];
 }
 
 void

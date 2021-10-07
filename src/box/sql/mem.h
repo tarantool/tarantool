@@ -98,13 +98,6 @@ struct Mem {
 /** MEM is of SCALAR meta-type. */
 #define MEM_Scalar    0x0002
 #define MEM_Cleared   0x0200	/* NULL set by OP_Null, not from data */
-
-/* Whenever Mem contains a valid string or blob representation, one of
- * the following flags must be set to determine the memory management
- * policy for Mem.z.  The MEM_Term flag tells us whether or not the
- * string is \000 or \u0000 terminated
- */
-#define MEM_Term      0x0400	/* String rep is nul terminated */
 #define MEM_Static    0x1000	/* Mem.z points to a static string */
 #define MEM_Ephem     0x2000	/* Mem.z points to an ephemeral string */
 
@@ -610,14 +603,6 @@ mem_to_number(struct Mem *mem);
 int
 mem_to_str(struct Mem *mem);
 
-/**
- * Convert the given MEM to STRING. This function and the function above define
- * the rules that are used to convert values of all other types to STRING. In
- * this function, the string received after convertion is NULL-terminated.
- */
-int
-mem_to_str0(struct Mem *mem);
-
 /** Convert the given MEM to given type according to explicit cast rules. */
 int
 mem_cast_explicit(struct Mem *mem, enum field_type type);
@@ -720,27 +705,6 @@ mem_get_bool_unsafe(const struct Mem *mem)
 	if (mem_get_bool(mem, &b) != 0)
 		return false;
 	return b;
-}
-
-/**
- * Return value for MEM of STRING type if MEM contains a NULL-terminated string.
- * Otherwise convert value of the MEM to NULL-terminated string if possible and
- * return converted value. Original MEM is not changed.
- */
-int
-mem_get_str0(const struct Mem *mem, const char **s);
-
-/**
- * Return value for MEM of STRING type if MEM contains NULL-terminated string.
- * Otherwise convert MEM to MEM of string type that contains NULL-terminated
- * string and return its value. Return NULL if conversion is impossible.
- */
-static inline const char *
-mem_as_str0(struct Mem *mem)
-{
-	if (mem_to_str0(mem) != 0)
-		return NULL;
-	return mem->z;
 }
 
 /**

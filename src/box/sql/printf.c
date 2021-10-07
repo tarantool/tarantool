@@ -160,8 +160,20 @@ getTextArg(PrintfArguments * p)
 {
 	if (p->nArg <= p->nUsed)
 		return 0;
-	struct Mem *mem = &p->apArg[p->nUsed++];
-	return (char *)mem_as_str0(mem);
+	struct Mem mem;
+	mem_create(&mem);
+	mem_copy_as_ephemeral(&mem, &p->apArg[p->nUsed++]);
+	if (mem_to_str(&mem) != 0) {
+		mem_destroy(&mem);
+		return NULL;
+	}
+	char *str = sqlDbMallocRawNN(sql_get(), mem.n + 1);
+	if (str == NULL)
+		return NULL;
+	memcpy(str, mem.z, mem.n);
+	str[mem.n] = '\0';
+	mem_destroy(&mem);
+	return str;
 }
 
 /*
@@ -677,6 +689,7 @@ sqlVXPrintf(StrAccum * pAccum,	/* Accumulate results here */
 			if (bArgList) {
 				bufpt = getTextArg(pArgList);
 				c = bufpt ? bufpt[0] : 0;
+				zExtra = bufpt;
 			} else {
 				c = va_arg(ap, int);
 			}
@@ -697,7 +710,7 @@ sqlVXPrintf(StrAccum * pAccum,	/* Accumulate results here */
 		case etDYNSTRING:
 			if (bArgList) {
 				bufpt = getTextArg(pArgList);
-				xtype = etSTRING;
+				xtype = etDYNSTRING;
 			} else {
 				bufpt = va_arg(ap, char *);
 			}
@@ -727,6 +740,7 @@ sqlVXPrintf(StrAccum * pAccum,	/* Accumulate results here */
 
 				if (bArgList) {
 					escarg = getTextArg(pArgList);
+					zExtra = escarg;
 				} else {
 					escarg = va_arg(ap, char *);
 				}
