@@ -87,7 +87,6 @@ struct Mem {
 	int szMalloc;		/* Size of the zMalloc allocation */
 	u32 uTemp;		/* Transient storage for serial_type in OP_MakeRecord */
 	sql *db;		/* The associated database connection */
-	void (*xDel) (void *);	/* Destructor for Mem.z - only valid if MEM_Dyn */
 #ifdef SQL_DEBUG
 	Mem *pScopyFrom;	/* This Mem is a shallow copy of pScopyFrom */
 	void *pFiller;		/* So that sizeof(Mem) is a multiple of 8 */
@@ -106,7 +105,6 @@ struct Mem {
  * string is \000 or \u0000 terminated
  */
 #define MEM_Term      0x0400	/* String rep is nul terminated */
-#define MEM_Dyn       0x0800	/* Need to call Mem.xDel() on Mem.z */
 #define MEM_Static    0x1000	/* Mem.z points to a static string */
 #define MEM_Ephem     0x2000	/* Mem.z points to an ephemeral string */
 
@@ -218,13 +216,6 @@ mem_is_ephemeral(const struct Mem *mem)
 }
 
 static inline bool
-mem_is_dynamic(const struct Mem *mem)
-{
-	assert(mem_is_bytes(mem));
-	return (mem->flags & MEM_Dyn) != 0;
-}
-
-static inline bool
 mem_is_allocated(const struct Mem *mem)
 {
 	return mem_is_bytes(mem) && mem->z == mem->zMalloc;
@@ -234,8 +225,7 @@ mem_is_allocated(const struct Mem *mem)
 static inline bool
 mem_is_trivial(const struct Mem *mem)
 {
-	return mem->szMalloc == 0 && (mem->flags & MEM_Dyn) == 0 &&
-	       mem->type != MEM_TYPE_FRAME;
+	return mem->szMalloc == 0 && mem->type != MEM_TYPE_FRAME;
 }
 
 static inline bool
@@ -316,14 +306,6 @@ mem_set_str_static(struct Mem *mem, char *value, uint32_t len);
 
 /**
  * Clear MEM and set it to STRING. The string was allocated by another object
- * and passed to MEM. MEMs with this allocation type must free given memory
- * whenever the MEM changes.
- */
-void
-mem_set_str_dynamic(struct Mem *mem, char *value, uint32_t len);
-
-/**
- * Clear MEM and set it to STRING. The string was allocated by another object
  * and passed to MEM. MEMs with this allocation type only deallocate the string
  * on destruction. Also, the memory may be reallocated if MEM is set to a
  * different value of this allocation type.
@@ -341,14 +323,6 @@ mem_set_str0_ephemeral(struct Mem *mem, char *value);
 /** Clear MEM and set it to NULL-terminated STRING. The string is static. */
 void
 mem_set_str0_static(struct Mem *mem, char *value);
-
-/**
- * Clear MEM and set it to NULL-terminated STRING. The string was allocated by
- * another object and passed to MEM. MEMs with this allocation type must free
- * given memory whenever the MEM changes.
- */
-void
-mem_set_str0_dynamic(struct Mem *mem, char *value);
 
 /**
  * Clear MEM and set it to NULL-terminated STRING. The string was allocated by
@@ -383,14 +357,6 @@ mem_set_bin_static(struct Mem *mem, char *value, uint32_t size);
 
 /**
  * Clear MEM and set it to VARBINARY. The binary value was allocated by another
- * object and passed to MEM. MEMs with this allocation type must free given
- * memory whenever the MEM changes.
- */
-void
-mem_set_bin_dynamic(struct Mem *mem, char *value, uint32_t size);
-
-/**
- * Clear MEM and set it to VARBINARY. The binary value was allocated by another
  * object and passed to MEM. MEMs with this allocation type only deallocate the
  * string on destruction. Also, the memory may be reallocated if MEM is set to a
  * different value of this allocation type.
@@ -422,14 +388,6 @@ mem_set_map_static(struct Mem *mem, char *value, uint32_t size);
 /**
  * Clear MEM and set it to MAP. The binary value was allocated by another object
  * and passed to MEM. The binary value must be msgpack of MAP type. MEMs with
- * this allocation type must free given memory whenever the MEM changes.
- */
-void
-mem_set_map_dynamic(struct Mem *mem, char *value, uint32_t size);
-
-/**
- * Clear MEM and set it to MAP. The binary value was allocated by another object
- * and passed to MEM. The binary value must be msgpack of MAP type. MEMs with
  * this allocation type only deallocate the string on destruction. Also, the
  * memory may be reallocated if MEM is set to a different value of this
  * allocation type.
@@ -450,15 +408,6 @@ mem_set_array_ephemeral(struct Mem *mem, char *value, uint32_t size);
  */
 void
 mem_set_array_static(struct Mem *mem, char *value, uint32_t size);
-
-/**
- * Clear MEM and set it to ARRAY. The binary value was allocated by another
- * object and passed to MEM. The binary value must be msgpack of ARRAY type.
- * MEMs with this allocation type must free given memory whenever the MEM
- * changes.
- */
-void
-mem_set_array_dynamic(struct Mem *mem, char *value, uint32_t size);
 
 /**
  * Clear MEM and set it to ARRAY. The binary value was allocated by another
@@ -869,8 +818,7 @@ int sqlVdbeMemTooBig(Mem *);
 /* Return TRUE if Mem X contains dynamically allocated content - anything
  * that needs to be deallocated to avoid a leak.
  */
-#define VdbeMemDynamic(X) (((X)->flags & MEM_Dyn) != 0 ||\
-			   ((X)->type & MEM_TYPE_FRAME) != 0)
+#define VdbeMemDynamic(X) (((X)->type & MEM_TYPE_FRAME) != 0)
 
 /**
  * Perform comparison of two tuples: unpacked (key1) and packed (key2)

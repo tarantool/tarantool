@@ -370,10 +370,6 @@ sql_vsnprintf(int, char *, const char *, va_list);
 #define MATCH_ONE_WILDCARD '_'
 #define MATCH_ALL_WILDCARD '%'
 
-typedef void (*sql_destructor_type) (void *);
-#define SQL_STATIC      ((sql_destructor_type)0)
-#define SQL_TRANSIENT   ((sql_destructor_type)-1)
-
 /**
  * Compile the UTF-8 encoded SQL statement into
  * a statement handle (struct Vdbe).
@@ -872,16 +868,6 @@ typedef u64 uptr;
  * Determine if the argument is a power of two
  */
 #define IsPowerOfTwo(X) (((X)&((X)-1))==0)
-
-/*
- * The following value as a destructor means to use sqlDbFree().
- * The sqlDbFree() routine requires two parameters instead of the
- * one parameter that destructors normally want.  So we have to introduce
- * this magic value that the code knows to handle differently.  Any
- * pointer will work here as long as it is distinct from sql_STATIC
- * and sql_TRANSIENT.
- */
-#define SQL_DYNAMIC   ((sql_destructor_type)sqlMallocSize)
 
 /*
  * The usual case where Writable Static Data (WSD) is supported,

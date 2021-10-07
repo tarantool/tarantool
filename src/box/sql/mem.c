@@ -207,7 +207,6 @@ mem_create(struct Mem *mem)
 	mem->szMalloc = 0;
 	mem->uTemp = 0;
 	mem->db = sql_get();
-	mem->xDel = NULL;
 #ifdef SQL_DEBUG
 	mem->pScopyFrom = NULL;
 	mem->pFiller = NULL;
@@ -217,15 +216,10 @@ mem_create(struct Mem *mem)
 static inline void
 mem_clear(struct Mem *mem)
 {
-	if (mem->type == MEM_TYPE_FRAME || (mem->flags & MEM_Dyn) != 0) {
-		if ((mem->flags & MEM_Dyn) != 0) {
-			assert(mem->xDel != SQL_DYNAMIC && mem->xDel != NULL);
-			mem->xDel((void *)mem->z);
-		} else {
-			struct VdbeFrame *frame = mem->u.pFrame;
-			frame->pParent = frame->v->pDelFrame;
-			frame->v->pDelFrame = frame;
-		}
+	if (mem->type == MEM_TYPE_FRAME) {
+		struct VdbeFrame *frame = mem->u.pFrame;
+		frame->pParent = frame->v->pDelFrame;
+		frame->v->pDelFrame = frame;
 	}
 	mem->type = MEM_TYPE_NULL;
 	mem->flags = 0;
@@ -320,21 +314,14 @@ set_str_const(struct Mem *mem, char *value, uint32_t len, int alloc_type)
 static inline void
 set_str_dynamic(struct Mem *mem, char *value, uint32_t len, int alloc_type)
 {
-	assert((mem->flags & MEM_Dyn) == 0 || value != mem->z);
 	assert(mem->szMalloc == 0 || value != mem->zMalloc);
-	assert(alloc_type == MEM_Dyn || alloc_type == 0);
 	mem_destroy(mem);
 	mem->z = value;
 	mem->n = len;
 	mem->type = MEM_TYPE_STR;
 	mem->flags = alloc_type;
-	if (alloc_type == MEM_Dyn) {
-		mem->xDel = sql_free;
-	} else {
-		mem->xDel = NULL;
-		mem->zMalloc = mem->z;
-		mem->szMalloc = sqlDbMallocSize(mem->db, mem->zMalloc);
-	}
+	mem->zMalloc = mem->z;
+	mem->szMalloc = sqlDbMallocSize(mem->db, mem->zMalloc);
 }
 
 void
@@ -347,12 +334,6 @@ void
 mem_set_str_static(struct Mem *mem, char *value, uint32_t len)
 {
 	set_str_const(mem, value, len, MEM_Static);
-}
-
-void
-mem_set_str_dynamic(struct Mem *mem, char *value, uint32_t len)
-{
-	set_str_dynamic(mem, value, len, MEM_Dyn);
 }
 
 void
@@ -372,13 +353,6 @@ void
 mem_set_str0_static(struct Mem *mem, char *value)
 {
 	set_str_const(mem, value, strlen(value), MEM_Static);
-	mem->flags |= MEM_Term;
-}
-
-void
-mem_set_str0_dynamic(struct Mem *mem, char *value)
-{
-	set_str_dynamic(mem, value, strlen(value), MEM_Dyn);
 	mem->flags |= MEM_Term;
 }
 
@@ -436,21 +410,14 @@ set_bin_const(struct Mem *mem, char *value, uint32_t size, int alloc_type)
 static inline void
 set_bin_dynamic(struct Mem *mem, char *value, uint32_t size, int alloc_type)
 {
-	assert((mem->flags & MEM_Dyn) == 0 || value != mem->z);
 	assert(mem->szMalloc == 0 || value != mem->zMalloc);
-	assert(alloc_type == MEM_Dyn || alloc_type == 0);
 	mem_destroy(mem);
 	mem->z = value;
 	mem->n = size;
 	mem->type = MEM_TYPE_BIN;
 	mem->flags = alloc_type;
-	if (alloc_type == MEM_Dyn) {
-		mem->xDel = sql_free;
-	} else {
-		mem->xDel = NULL;
-		mem->zMalloc = mem->z;
-		mem->szMalloc = sqlDbMallocSize(mem->db, mem->zMalloc);
-	}
+	mem->zMalloc = mem->z;
+	mem->szMalloc = sqlDbMallocSize(mem->db, mem->zMalloc);
 }
 
 void
@@ -463,12 +430,6 @@ void
 mem_set_bin_static(struct Mem *mem, char *value, uint32_t size)
 {
 	set_bin_const(mem, value, size, MEM_Static);
-}
-
-void
-mem_set_bin_dynamic(struct Mem *mem, char *value, uint32_t size)
-{
-	set_bin_dynamic(mem, value, size, MEM_Dyn);
 }
 
 void
@@ -525,13 +486,6 @@ mem_set_map_static(struct Mem *mem, char *value, uint32_t size)
 }
 
 void
-mem_set_map_dynamic(struct Mem *mem, char *value, uint32_t size)
-{
-	assert(mp_typeof(*value) == MP_MAP);
-	set_msgpack_value(mem, value, size, MEM_Dyn, MEM_TYPE_MAP);
-}
-
-void
 mem_set_map_allocated(struct Mem *mem, char *value, uint32_t size)
 {
 	assert(mp_typeof(*value) == MP_MAP);
@@ -550,13 +504,6 @@ mem_set_array_static(struct Mem *mem, char *value, uint32_t size)
 {
 	assert(mp_typeof(*value) == MP_ARRAY);
 	set_msgpack_value(mem, value, size, MEM_Static, MEM_TYPE_ARRAY);
-}
-
-void
-mem_set_array_dynamic(struct Mem *mem, char *value, uint32_t size)
-{
-	assert(mp_typeof(*value) == MP_ARRAY);
-	set_msgpack_value(mem, value, size, MEM_Dyn, MEM_TYPE_ARRAY);
 }
 
 void
@@ -1907,7 +1854,7 @@ mem_append(struct Mem *mem, const char *value, uint32_t len)
 	if (len == 0)
 		return 0;
 	int new_size = mem->n + len;
-	if (((mem->flags & (MEM_Static | MEM_Dyn | MEM_Ephem)) != 0) ||
+	if (((mem->flags & (MEM_Static | MEM_Ephem)) != 0) ||
 	    mem->szMalloc < new_size) {
 		/*
 		 * Force exponential buffer size growth to avoid having to call
@@ -2648,18 +2595,6 @@ mem_mp_type(const struct Mem *mem)
 int
 sqlVdbeCheckMemInvariants(Mem * p)
 {
-	/* If MEM_Dyn is set then Mem.xDel!=0.
-	 * Mem.xDel is might not be initialized if MEM_Dyn is clear.
-	 */
-	assert((p->flags & MEM_Dyn) == 0 || p->xDel != 0);
-
-	/* MEM_Dyn may only be set if Mem.szMalloc==0.  In this way we
-	 * ensure that if Mem.szMalloc>0 then it is safe to do
-	 * Mem.z = Mem.zMalloc without having to check Mem.flags&MEM_Dyn.
-	 * That saves a few cycles in inner loops.
-	 */
-	assert((p->flags & MEM_Dyn) == 0 || p->szMalloc == 0);
-
 	/* The szMalloc field holds the correct memory allocation size */
 	assert(p->szMalloc == 0 ||
 	       p->szMalloc == sqlDbMallocSize(p->db, p->zMalloc));
@@ -2674,7 +2609,6 @@ sqlVdbeCheckMemInvariants(Mem * p)
 	 */
 	if ((p->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) != 0 && p->n > 0) {
 		assert(((p->szMalloc > 0 && p->z == p->zMalloc) ? 1 : 0) +
-		       ((p->flags & MEM_Dyn) != 0 ? 1 : 0) +
 		       ((p->flags & MEM_Ephem) != 0 ? 1 : 0) +
 		       ((p->flags & MEM_Static) != 0 ? 1 : 0) == 1);
 	}
@@ -2694,15 +2628,12 @@ sqlVdbeMemPrettyPrint(Mem *pMem, char *zBuf)
 	if (pMem->type == MEM_TYPE_BIN) {
 		int i;
 		char c;
-		if (f & MEM_Dyn) {
-			c = 'z';
-			assert((f & (MEM_Static|MEM_Ephem))==0);
-		} else if (f & MEM_Static) {
+		if ((f & MEM_Static) != 0) {
 			c = 't';
-			assert((f & (MEM_Dyn|MEM_Ephem))==0);
+			assert((f & MEM_Ephem) == 0);
 		} else if (f & MEM_Ephem) {
 			c = 'e';
-			assert((f & (MEM_Static|MEM_Dyn))==0);
+			assert((f & MEM_Static) == 0);
 		} else {
 			c = 's';
 		}
@@ -2726,15 +2657,12 @@ sqlVdbeMemPrettyPrint(Mem *pMem, char *zBuf)
 	} else if (pMem->type == MEM_TYPE_STR) {
 		int j, k;
 		zBuf[0] = ' ';
-		if (f & MEM_Dyn) {
-			zBuf[1] = 'z';
-			assert((f & (MEM_Static|MEM_Ephem))==0);
-		} else if (f & MEM_Static) {
+		if ((f & MEM_Static) != 0) {
 			zBuf[1] = 't';
-			assert((f & (MEM_Dyn|MEM_Ephem))==0);
+			assert((f & MEM_Ephem) == 0);
 		} else if (f & MEM_Ephem) {
 			zBuf[1] = 'e';
-			assert((f & (MEM_Static|MEM_Dyn))==0);
+			assert((f & MEM_Static) == 0);
 		} else {
 			zBuf[1] = 's';
 		}
@@ -2847,13 +2775,9 @@ sqlVdbeMemGrow(struct Mem *pMem, int n, int bPreserve)
 	if (bPreserve && pMem->z && pMem->z != pMem->zMalloc) {
 		memcpy(pMem->zMalloc, pMem->z, pMem->n);
 	}
-	if ((pMem->flags & MEM_Dyn) != 0) {
-		assert(pMem->xDel != 0 && pMem->xDel != SQL_DYNAMIC);
-		pMem->xDel((void *)(pMem->z));
-	}
 
 	pMem->z = pMem->zMalloc;
-	pMem->flags &= ~(MEM_Dyn | MEM_Ephem | MEM_Static);
+	pMem->flags &= ~(MEM_Ephem | MEM_Static);
 	return 0;
 }
 
@@ -2872,11 +2796,9 @@ int
 sqlVdbeMemClearAndResize(Mem * pMem, int szNew)
 {
 	assert(szNew > 0);
-	assert((pMem->flags & MEM_Dyn) == 0 || pMem->szMalloc == 0);
 	if (pMem->szMalloc < szNew) {
 		return sqlVdbeMemGrow(pMem, szNew, 0);
 	}
-	assert((pMem->flags & MEM_Dyn) == 0);
 	pMem->z = pMem->zMalloc;
 	return 0;
 }
