@@ -1030,6 +1030,30 @@ func_version(struct sql_context *ctx, int argc, struct Mem *argv)
 	return mem_set_str0_static(ctx->pOut, (char *)tarantool_version());
 }
 
+/**
+ * Implementation of the UNICODE() function.
+ *
+ * Return the Unicode code point value for the first character of the input
+ * string.
+ */
+static void
+func_unicode(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	assert(argc == 1);
+	(void)argc;
+	struct Mem *arg = &argv[0];
+	if (mem_is_null(arg))
+		return;
+	assert(mem_is_str(arg));
+	if (arg->n == 0)
+		return mem_set_uint(ctx->pOut, 0);
+	int pos = 0;
+	UChar32 c;
+	U8_NEXT((uint8_t *)arg->z, pos, arg->n, c);
+	(void)pos;
+	mem_set_uint(ctx->pOut, (uint64_t)c);
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -1449,19 +1473,6 @@ quoteFunc(struct sql_context *context, int argc, struct Mem *argv)
 			break;
 		}
 	}
-}
-
-/*
- * The unicode() function.  Return the integer unicode code-point value
- * for the first character of the input string.
- */
-static void
-unicodeFunc(struct sql_context *context, int argc, struct Mem *argv)
-{
-	const unsigned char *z = mem_as_ustr(&argv[0]);
-	(void)argc;
-	if (z && z[0])
-		sql_result_uint(context, sqlUtf8Read(&z));
 }
 
 /*
@@ -1897,7 +1908,7 @@ static struct sql_func_definition definitions[] = {
 	 FIELD_TYPE_VARBINARY, func_trim_bin, NULL},
 
 	{"TYPEOF", 1, {FIELD_TYPE_ANY}, FIELD_TYPE_STRING, func_typeof, NULL},
-	{"UNICODE", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_INTEGER, unicodeFunc,
+	{"UNICODE", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_INTEGER, func_unicode,
 	 NULL},
 	{"UNLIKELY", 1, {FIELD_TYPE_ANY}, FIELD_TYPE_BOOLEAN, sql_builtin_stub,
 	 NULL},
