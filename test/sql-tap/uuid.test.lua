@@ -3,7 +3,7 @@ local build_path = os.getenv("BUILDDIR")
 package.cpath = build_path..'/test/sql-tap/?.so;'..build_path..'/test/sql-tap/?.dylib;'..package.cpath
 
 local test = require("sqltester")
-test:plan(146)
+test:plan(147)
 
 local uuid = require("uuid")
 local uuid1 = uuid.fromstr("11111111-1111-1111-1111-111111111111")
@@ -1286,6 +1286,15 @@ test:do_execsql_test(
     "uuid-16.6",
     [[
         SELECT uuid() != uuid();
+    ]], {
+        true
+    })
+
+-- Make sure the uuid(NULL) returns NULL.
+test:do_execsql_test(
+    "uuid-16.7",
+    [[
+        SELECT uuid(NULL) IS NULL;
     ]], {
         true
     })
