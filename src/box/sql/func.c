@@ -1054,50 +1054,6 @@ func_unicode(struct sql_context *ctx, int argc, struct Mem *argv)
 	mem_set_uint(ctx->pOut, (uint64_t)c);
 }
 
-static const unsigned char *
-mem_as_ustr(struct Mem *mem)
-{
-	return (const unsigned char *)mem_as_str0(mem);
-}
-
-static const void *
-mem_as_bin(struct Mem *mem)
-{
-	const char *s;
-	if (mem_cast_explicit(mem, FIELD_TYPE_VARBINARY) != 0 &&
-	    mem_to_str(mem) != 0)
-		return NULL;
-	if (mem_get_bin(mem, &s) != 0)
-		return NULL;
-	return s;
-}
-
-/*
- * Allocate nByte bytes of space using sqlMalloc(). If the
- * allocation fails, return NULL. If nByte is larger than the
- * maximum string or blob length, then raise an error and return
- * NULL.
- */
-static void *
-contextMalloc(struct sql_context *context, i64 nByte)
-{
-	char *z;
-	sql *db = sql_context_db_handle(context);
-	assert(nByte > 0);
-	testcase(nByte == db->aLimit[SQL_LIMIT_LENGTH]);
-	testcase(nByte == db->aLimit[SQL_LIMIT_LENGTH] + 1);
-	if (nByte > db->aLimit[SQL_LIMIT_LENGTH]) {
-		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
-		context->is_aborted = true;
-		z = 0;
-	} else {
-		z = sqlMalloc(nByte);
-		if (z == NULL)
-			context->is_aborted = true;
-	}
-	return z;
-}
-
 #define Utf8Read(s, e) \
 	ucnv_getNextUChar(icu_utf8_conv, &(s), (e), &status)
 
@@ -1395,83 +1351,73 @@ quoteFunc(struct sql_context *context, int argc, struct Mem *argv)
 	case MEM_TYPE_UUID: {
 		char buf[UUID_STR_LEN + 1];
 		tt_uuid_to_string(&argv[0].u.uuid, &buf[0]);
-		sql_result_text(context, buf, UUID_STR_LEN, SQL_TRANSIENT);
+		if (mem_copy_str(context->pOut, buf, UUID_STR_LEN) != 0)
+			context->is_aborted = true;
 		break;
 	}
 	case MEM_TYPE_DOUBLE:
 	case MEM_TYPE_DEC:
 	case MEM_TYPE_UINT:
 	case MEM_TYPE_INT: {
-			sql_result_value(context, &argv[0]);
-			break;
-		}
+		if (mem_copy(context->pOut, &argv[0]) != 0)
+			context->is_aborted = true;
+		break;
+	}
 	case MEM_TYPE_BIN:
 	case MEM_TYPE_ARRAY:
 	case MEM_TYPE_MAP: {
-			char *zText = 0;
-			char const *zBlob = mem_as_bin(&argv[0]);
-			int nBlob = mem_len_unsafe(&argv[0]);
-			assert(zBlob == mem_as_bin(&argv[0]));	/* No encoding change */
-			zText =
-			    (char *)contextMalloc(context,
-						  (2 * (i64) nBlob) + 4);
-			if (zText) {
-				int i;
-				for (i = 0; i < nBlob; i++) {
-					zText[(i * 2) + 2] =
-					    hexdigits[(zBlob[i] >> 4) & 0x0F];
-					zText[(i * 2) + 3] =
-					    hexdigits[(zBlob[i]) & 0x0F];
-				}
-				zText[(nBlob * 2) + 2] = '\'';
-				zText[(nBlob * 2) + 3] = '\0';
-				zText[0] = 'X';
-				zText[1] = '\'';
-				sql_result_text(context, zText, -1,
-						    SQL_TRANSIENT);
-				sql_free(zText);
-			}
-			break;
+		const char *zBlob = argv[0].z;
+		int nBlob = argv[0].n;
+		uint32_t size = 2 * nBlob + 3;
+		char *zText = zText = sqlDbMallocRawNN(sql_get(), size);
+		if (zText == NULL) {
+			context->is_aborted = true;
+			return;
 		}
+		for (int i = 0; i < nBlob; i++) {
+			zText[(i * 2) + 2] = hexdigits[(zBlob[i] >> 4) & 0x0F];
+			zText[(i * 2) + 3] = hexdigits[(zBlob[i]) & 0x0F];
+		}
+		zText[(nBlob * 2) + 2] = '\'';
+		zText[0] = 'X';
+		zText[1] = '\'';
+		mem_set_str_allocated(context->pOut, zText, size);
+		break;
+	}
 	case MEM_TYPE_STR: {
-			int i, j;
-			u64 n;
-			const unsigned char *zArg = mem_as_ustr(&argv[0]);
-			char *z;
-
-			if (zArg == 0)
-				return;
-			for (i = 0, n = 0; zArg[i]; i++) {
-				if (zArg[i] == '\'')
-					n++;
-			}
-			z = contextMalloc(context, ((i64) i) + ((i64) n) + 3);
-			if (z) {
-				z[0] = '\'';
-				for (i = 0, j = 1; zArg[i]; i++) {
-					z[j++] = zArg[i];
-					if (zArg[i] == '\'') {
-						z[j++] = '\'';
-					}
-				}
-				z[j++] = '\'';
-				z[j] = 0;
-				sql_result_text(context, z, j,
-						    sql_free);
-			}
-			break;
+		const char *str = argv[0].z;
+		uint32_t len = argv[0].n;
+		uint32_t count = 0;
+		for (uint32_t i = 0; i < len; ++i) {
+			if (str[i] == '\'')
+				++count;
 		}
+		uint32_t size = len + count + 2;
+
+		char *res = sqlDbMallocRawNN(sql_get(), size);
+		if (res == NULL) {
+			context->is_aborted = true;
+			return;
+		}
+		res[0] = '\'';
+		for (uint32_t i = 0, j = 1; i < len; ++i) {
+			res[j++] = str[i];
+			if (str[i] == '\'')
+				res[j++] = '\'';
+		}
+		res[size - 1] = '\'';
+		mem_set_str_allocated(context->pOut, res, size);
+		break;
+	}
 	case MEM_TYPE_BOOL: {
-		sql_result_text(context,
-				SQL_TOKEN_BOOLEAN(argv[0].u.b),
-				-1, SQL_TRANSIENT);
+		mem_set_str0_static(context->pOut,
+				    SQL_TOKEN_BOOLEAN(argv[0].u.b));
 		break;
 	}
 	default:{
-			assert(mem_is_null(&argv[0]));
-			sql_result_text(context, "NULL", 4, SQL_STATIC);
-			break;
-		}
+		assert(mem_is_null(&argv[0]));
+		mem_set_str0_static(context->pOut, "NULL");
+	}
 	}
 }
 
