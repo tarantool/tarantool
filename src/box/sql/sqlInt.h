@@ -470,12 +470,6 @@ enum sql_subtype {
 void
 sql_randomness(int N, void *P);
 
-/**
- * Return the number of affected rows in the last SQL statement.
- */
-void
-sql_row_count(struct sql_context *context, int argc, struct Mem *argv);
-
 int
 sql_column_count(sql_stmt * pStmt);
 
@@ -1065,7 +1059,7 @@ struct sql {
 	u8 dfltLockMode;	/* Default locking-mode for attached dbs */
 	u8 mTrace;		/* zero or more sql_TRACE flags */
 	u32 magic;		/* Magic number for detect library misuse */
-	/** Value returned by sql_row_count(). */
+	/** Value returned by ROW_COUNT(). */
 	int nChange;
 	int aLimit[SQL_N_LIMIT];	/* Limits */
 	int nMaxSorterMmap;	/* Maximum size of regions mapped by sorter */

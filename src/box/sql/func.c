@@ -988,6 +988,16 @@ func_round(struct sql_context *ctx, int argc, struct Mem *argv)
 	return mem_set_double(res, (double)(int64_t)(d + delta));
 }
 
+/** Implementation of the ROW_COUNT() function. */
+static void
+func_row_count(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	(void)argc;
+	(void)argv;
+	assert(sql_get()->nChange >= 0);
+	return mem_set_uint(ctx->pOut, sql_get()->nChange);
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -1869,7 +1879,7 @@ static struct sql_func_definition definitions[] = {
 	{"ROUND", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, func_round, NULL},
 	{"ROUND", 2, {FIELD_TYPE_DOUBLE, FIELD_TYPE_INTEGER}, FIELD_TYPE_DOUBLE,
 	 func_round, NULL},
-	{"ROW_COUNT", 0, {}, FIELD_TYPE_INTEGER, sql_row_count, NULL},
+	{"ROW_COUNT", 0, {}, FIELD_TYPE_INTEGER, func_row_count, NULL},
 	{"SOUNDEX", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, soundexFunc,
 	 NULL},
 	{"SUBSTR", 2, {FIELD_TYPE_STRING, FIELD_TYPE_INTEGER},
