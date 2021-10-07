@@ -1591,16 +1591,11 @@ soundexFunc(struct sql_context *context, int argc, struct Mem *argv)
 		1, 2, 6, 2, 3, 0, 1, 0, 2, 0, 2, 0, 0, 0, 0, 0,
 	};
 	assert(argc == 1);
-	if (mem_is_bin(&argv[0]) || mem_is_map(&argv[0]) ||
-	    mem_is_array(&argv[0])) {
-		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 mem_str(&argv[0]), "string");
-		context->is_aborted = true;
-		return;
-	}
-	zIn = (u8 *) mem_as_ustr(&argv[0]);
-	if (zIn == 0)
+	assert(mem_is_null(&argv[0]) || mem_is_str(&argv[0]));
+	if (mem_is_null(&argv[0]) || argv[0].n == 0)
 		zIn = (u8 *) "";
+	else
+		zIn = (unsigned char *)argv[0].z;
 	for (i = 0; zIn[i] && !sqlIsalpha(zIn[i]); i++) {
 	}
 	if (zIn[i]) {
@@ -1621,12 +1616,10 @@ soundexFunc(struct sql_context *context, int argc, struct Mem *argv)
 			zResult[j++] = '0';
 		}
 		zResult[j] = 0;
-		sql_result_text(context, zResult, 4, SQL_TRANSIENT);
+		if (mem_copy_str(context->pOut, zResult, 4) != 0)
+			context->is_aborted = true;
 	} else {
-		/* IMP: R-64894-50321 The string "?000" is returned if the argument
-		 * is NULL or contains no ASCII alphabetic characters.
-		 */
-		sql_result_text(context, "?000", 4, SQL_STATIC);
+		mem_set_str_static(context->pOut, "?000", 4);
 	}
 }
 
