@@ -359,54 +359,6 @@ mem_set_str0_dynamic(struct Mem *mem, char *value);
 void
 mem_set_str0_allocated(struct Mem *mem, char *value);
 
-static inline void
-mem_set_strl_ephemeral(struct Mem *mem, char *value, int len_hint)
-{
-	if (len_hint < 0)
-		mem_set_str0_ephemeral(mem, value);
-	else
-		mem_set_str_ephemeral(mem, value, len_hint);
-}
-
-static inline void
-mem_set_strl_static(struct Mem *mem, char *value, int len_hint)
-{
-	if (len_hint < 0)
-		mem_set_str0_static(mem, value);
-	else
-		mem_set_str_static(mem, value, len_hint);
-}
-
-static inline void
-mem_set_strl_dynamic(struct Mem *mem, char *value, int len_hint)
-{
-	if (len_hint < 0)
-		mem_set_str0_dynamic(mem, value);
-	else
-		mem_set_str_dynamic(mem, value, len_hint);
-}
-
-static inline void
-mem_set_strl_allocated(struct Mem *mem, char *value, int len_hint)
-{
-	if (len_hint < 0)
-		mem_set_str0_allocated(mem, value);
-	else
-		mem_set_str_allocated(mem, value, len_hint);
-}
-
-static inline void
-mem_set_strl(struct Mem *mem, char *value, int len_hint,
-	     void (*custom_free)(void *))
-{
-	if (custom_free == SQL_STATIC)
-		return mem_set_strl_static(mem, value, len_hint);
-	if (custom_free == SQL_DYNAMIC)
-		return mem_set_strl_allocated(mem, value, len_hint);
-	if (custom_free != SQL_TRANSIENT)
-		return mem_set_strl_dynamic(mem, value, len_hint);
-}
-
 /** Copy string to a newly allocated memory. The MEM type becomes STRING. */
 int
 mem_copy_str(struct Mem *mem, const char *value, uint32_t len);
@@ -417,14 +369,6 @@ mem_copy_str(struct Mem *mem, const char *value, uint32_t len);
  */
 int
 mem_copy_str0(struct Mem *mem, const char *value);
-
-static inline int
-mem_copy_strl(struct Mem *mem, const char *value, int len_hint)
-{
-	if (len_hint < 0)
-		return mem_copy_str0(mem, value);
-	return mem_copy_str(mem, value, len_hint);
-}
 
 /**
  * Clear MEM and set it to VARBINARY. The binary value belongs to another
@@ -453,18 +397,6 @@ mem_set_bin_dynamic(struct Mem *mem, char *value, uint32_t size);
  */
 void
 mem_set_bin_allocated(struct Mem *mem, char *value, uint32_t size);
-
-static inline void
-mem_set_binl(struct Mem *mem, char *value, uint32_t size,
-	     void (*custom_free)(void *))
-{
-	if (custom_free == SQL_STATIC)
-		return mem_set_bin_static(mem, value, size);
-	if (custom_free == SQL_DYNAMIC)
-		return mem_set_bin_allocated(mem, value, size);
-	if (custom_free != SQL_TRANSIENT)
-		return mem_set_bin_dynamic(mem, value, size);
-}
 
 /**
  * Copy binary value to a newly allocated memory. The MEM type becomes
@@ -892,13 +824,6 @@ mem_len_unsafe(const struct Mem *mem)
 }
 
 /**
- * Return address of memory allocated for accumulation structure of the
- * aggregate function.
- */
-int
-mem_get_agg(const struct Mem *mem, void **accum);
-
-/**
  * Simple type to str convertor. It is used to simplify
  * error reporting.
  */
@@ -912,9 +837,6 @@ mem_type_to_str(const struct Mem *p);
  */
 enum mp_type
 mem_mp_type(const struct Mem *mem);
-
-enum mp_type
-sql_value_type(struct Mem *);
 
 #ifdef SQL_DEBUG
 int sqlVdbeCheckMemInvariants(struct Mem *);

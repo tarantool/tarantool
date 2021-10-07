@@ -447,21 +447,17 @@ sqlVdbeRunOnlyOnce(Vdbe * p)
  * (1) For each jump instruction with a negative P2 value (a label)
  *     resolve the P2 value to an actual address.
  *
- * (2) Compute the maximum number of arguments used by any SQL function
- *     and store that value in *pMaxFuncArgs.
+ * (2) Initialize the p4.xAdvance pointer on opcodes that use it.
  *
- * (3) Initialize the p4.xAdvance pointer on opcodes that use it.
- *
- * (4) Reclaim the memory allocated for storing labels.
+ * (3) Reclaim the memory allocated for storing labels.
  *
  * This routine will only function correctly if the mkopcodeh.sh generator
  * script numbers the opcodes correctly.  Changes to this routine must be
  * coordinated with changes to mkopcodeh.sh.
  */
 static void
-resolveP2Values(Vdbe * p, int *pMaxFuncArgs)
+resolveP2Values(Vdbe * p)
 {
-	int nMaxArgs = *pMaxFuncArgs;
 	Op *pOp;
 	Parse *pParse = p->pParse;
 	int *aLabel = pParse->aLabel;
@@ -506,7 +502,6 @@ resolveP2Values(Vdbe * p, int *pMaxFuncArgs)
 	sqlDbFree(p->db, pParse->aLabel);
 	pParse->aLabel = 0;
 	pParse->nLabel = 0;
-	*pMaxFuncArgs = nMaxArgs;
 }
 
 /*
@@ -526,17 +521,15 @@ sqlVdbeCurrentAddr(Vdbe * p)
  * vdbeFreeOpArray() function.
  *
  * Before returning, *pnOp is set to the number of entries in the returned
- * array. Also, *pnMaxArg is set to the larger of its current value and
- * the number of entries in the Vdbe.apArg[] array required to execute the
- * returned program.
+ * array.
  */
-VdbeOp *
-sqlVdbeTakeOpArray(Vdbe * p, int *pnOp, int *pnMaxArg)
+struct VdbeOp *
+sqlVdbeTakeOpArray(struct Vdbe *p, int *pnOp)
 {
 	VdbeOp *aOp = p->aOp;
 	assert(aOp && !p->db->mallocFailed);
 
-	resolveP2Values(p, pnMaxArg);
+	resolveP2Values(p);
 	*pnOp = p->nOp;
 	p->aOp = 0;
 	return aOp;
@@ -1490,7 +1483,6 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 	int nVar;		/* Number of parameters */
 	int nMem;		/* Number of VM memory registers */
 	int nCursor;		/* Number of cursors required */
-	int nArg;		/* Number of arguments in subprograms */
 	int n;			/* Loop counter */
 	struct ReusableSpace x;	/* Reusable bulk memory */
 
@@ -1504,7 +1496,6 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 	nVar = pParse->nVar;
 	nMem = pParse->nMem;
 	nCursor = pParse->nTab;
-	nArg = pParse->nMaxArg;
 
 	/* Each cursor uses a memory cell.  The first cursor (cursor 0) can
 	 * use aMem[0] which is not otherwise used by the VDBE program.  Allocate
@@ -1526,7 +1517,7 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 	assert(x.nFree >= 0);
 	assert(EIGHT_BYTE_ALIGNMENT(&x.pSpace[x.nFree]));
 
-	resolveP2Values(p, &nArg);
+	resolveP2Values(p);
 	if (pParse->explain && nMem < 10) {
 		nMem = 10;
 	}
@@ -1546,7 +1537,6 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 		x.nNeeded = 0;
 		p->aMem = allocSpace(&x, p->aMem, nMem * sizeof(Mem));
 		p->aVar = allocSpace(&x, p->aVar, nVar * sizeof(Mem));
-		p->apArg = allocSpace(&x, p->apArg, nArg * sizeof(Mem *));
 		p->apCsr =
 		    allocSpace(&x, p->apCsr, nCursor * sizeof(VdbeCursor *));
 		if (x.nNeeded == 0)

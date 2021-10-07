@@ -805,11 +805,8 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 
 		if (!parser->is_aborted)
 			parser->is_aborted = pSubParse->is_aborted;
-		if (db->mallocFailed == 0) {
-			pProgram->aOp =
-			    sqlVdbeTakeOpArray(v, &pProgram->nOp,
-						   &pTop->nMaxArg);
-		}
+		if (db->mallocFailed == 0)
+			pProgram->aOp = sqlVdbeTakeOpArray(v, &pProgram->nOp);
 		pProgram->nMem = pSubParse->nMem;
 		pProgram->nCsr = pSubParse->nTab;
 		pProgram->token = (void *)trigger;

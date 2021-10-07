@@ -185,12 +185,11 @@ sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
 		 * there is no need to copy the packet and we can
 		 * use SQL_STATIC.
 		 */
-		return sql_bind_text64(stmt, pos, p->s, p->bytes, SQL_STATIC);
+		return sql_bind_str_static(stmt, pos, p->s, p->bytes);
 	case MP_NIL:
 		return sql_bind_null(stmt, pos);
 	case MP_BIN:
-		return sql_bind_blob64(stmt, pos, (const void *) p->s, p->bytes,
-				       SQL_STATIC);
+		return sql_bind_bin_static(stmt, pos, p->s, p->bytes);
 	case MP_EXT:
 		assert(p->ext_type == MP_UUID || p->ext_type == MP_DECIMAL);
 		if (p->ext_type == MP_UUID)

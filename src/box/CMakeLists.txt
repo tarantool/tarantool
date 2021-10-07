@@ -55,7 +55,6 @@ set(sql_sources
     sql/tokenize.c
     sql/treeview.c
     sql/trigger.c
-    sql/utf.c
     sql/update.c
     sql/util.c
     sql/vdbe.c

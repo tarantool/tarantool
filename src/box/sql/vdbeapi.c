@@ -107,135 +107,6 @@ sql_metadata_is_full()
 	return current_session()->sql_flags & SQL_FullMetadata;
 }
 
-/**************************** sql_result_  ******************************
- * The following routines are used by user-defined functions to specify
- * the function result.
- *
- * The setStrOrError() function sets the result as a string or blob but
- * if the string or blob is too large, it then sets the error code.
- *
- * The invokeValueDestructor(P,X) routine invokes destructor function X()
- * on value P is not going to be used and need to be destroyed.
- */
-static void
-setResultStrOrError(sql_context * pCtx,	/* Function context */
-		    const char *z,	/* String pointer */
-		    int n,	/* Bytes in string, or negative */
-		    void (*xDel) (void *)	/* Destructor function */
-    )
-{
-	if (xDel != SQL_TRANSIENT)
-		return mem_set_strl(pCtx->pOut, (char *)z, n, xDel);
-	if (mem_copy_strl(pCtx->pOut, z, n) != 0)
-		pCtx->is_aborted = true;
-}
-
-static int
-invokeValueDestructor(const void *p,	/* Value to destroy */
-		      void (*xDel) (void *),	/* The destructor */
-		      sql_context *pCtx	/* Set an error if no NULL */
-    )
-{
-	assert(xDel != SQL_DYNAMIC);
-	if (xDel == 0) {
-		/* noop */
-	} else if (xDel == SQL_TRANSIENT) {
-		/* noop */
-	} else {
-		xDel((void *)p);
-	}
-	if (pCtx) {
-		diag_set(ClientError, ER_SQL_EXECUTE, "string or binary string"\
-			 "is too big");
-		pCtx->is_aborted = true;
-	}
-	return -1;
-}
-
-void
-sql_result_blob(sql_context * pCtx,
-		    const void *z, int n, void (*xDel) (void *)
-    )
-{
-	assert(n >= 0);
-	if (xDel != SQL_TRANSIENT)
-		mem_set_binl(pCtx->pOut, (char *)z, n, xDel);
-	else if (mem_copy_bin(pCtx->pOut, z, n) != 0)
-		pCtx->is_aborted = true;
-}
-
-void
-sql_result_blob64(sql_context * pCtx,
-		      const void *z, sql_uint64 n, void (*xDel) (void *)
-    )
-{
-	assert(xDel != SQL_DYNAMIC);
-	if (n > 0x7fffffff) {
-		(void)invokeValueDestructor(z, xDel, pCtx);
-	} else {
-		setResultStrOrError(pCtx, z, (int)n, xDel);
-	}
-}
-
-void
-sql_result_double(sql_context * pCtx, double rVal)
-{
-	mem_set_double(pCtx->pOut, rVal);
-}
-
-void
-sql_result_uint(sql_context *ctx, uint64_t u_val)
-{
-	mem_set_uint(ctx->pOut, u_val);
-}
-
-void
-sql_result_int(sql_context *ctx, int64_t val)
-{
-	mem_set_int(ctx->pOut, val, val < 0);
-}
-
-void
-sql_result_bool(struct sql_context *ctx, bool value)
-{
-	mem_set_bool(ctx->pOut, value);
-}
-
-void
-sql_result_null(sql_context * pCtx)
-{
-	mem_set_null(pCtx->pOut);
-}
-
-void
-sql_result_text(sql_context * pCtx,
-		    const char *z, int n, void (*xDel) (void *)
-    )
-{
-	setResultStrOrError(pCtx, z, n, xDel);
-}
-
-void
-sql_result_text64(sql_context * pCtx,
-		      const char *z,
-		      sql_uint64 n,
-		      void (*xDel) (void *))
-{
-	assert(xDel != SQL_DYNAMIC);
-	if (n > 0x7fffffff) {
-		(void)invokeValueDestructor(z, xDel, pCtx);
-	} else {
-		setResultStrOrError(pCtx, z, (int)n, xDel);
-	}
-}
-
-void
-sql_result_value(sql_context * pCtx, sql_value * pValue)
-{
-	if (mem_copy(pCtx->pOut, pValue) != 0)
-		pCtx->is_aborted = true;
-}
-
 /*
  * Execute the statement pStmt, either until a row of data is ready, the
  * statement is completely executed or an error occurs.
@@ -311,23 +182,6 @@ sql_step(sql_stmt * pStmt)
 	Vdbe *v = (Vdbe *) pStmt;	/* the prepared statement */
 	assert(v != NULL);
 	return sqlStep(v);
-}
-
-/*
- * Extract the user data from a sql_context structure and return a
- * pointer to it.
- *
- * IMPLEMENTATION-OF: R-46798-50301 The sql_context_db_handle() interface
- * returns a copy of the pointer to the database connection (the 1st
- * parameter) of the sql_create_function() and
- * sql_create_function16() routines that originally registered the
- * application defined function.
- */
-sql *
-sql_context_db_handle(sql_context * p)
-{
-	assert(p && p->pOut);
-	return p->pOut->db;
 }
 
 /*
@@ -582,73 +436,6 @@ sql_unbind(struct sql_stmt *stmt)
 	}
 }
 
-/*
- * Bind a text or BLOB value.
- */
-static int
-bindText(sql_stmt * pStmt,	/* The statement to bind against */
-	 int i,			/* Index of the parameter to bind */
-	 const void *zData,	/* Pointer to the data to be bound */
-	 int nData,		/* Number of bytes of data to be bound */
-	 void (*xDel) (void *)	/* Destructor for the data */
-    )
-{
-	Vdbe *p = (Vdbe *) pStmt;
-	Mem *pVar;
-	if (vdbeUnbind(p, i) != 0) {
-		if (xDel != SQL_STATIC && xDel != SQL_TRANSIENT)
-			xDel((void *)zData);
-		return -1;
-	}
-	if (zData == NULL)
-		return 0;
-	pVar = &p->aVar[i - 1];
-	if (xDel != SQL_TRANSIENT)
-		mem_set_strl(pVar, (char *)zData, nData, xDel);
-	else if (mem_copy_strl(pVar, zData, nData) != 0)
-		return -1;
-	return sql_bind_type(p, i, "text");
-}
-
-/*
- * Bind a blob value to an SQL statement variable.
- */
-int
-sql_bind_blob(sql_stmt * pStmt,
-		  int i, const void *zData, int nData, void (*xDel) (void *)
-    )
-{
-	struct Vdbe *p = (Vdbe *) pStmt;
-	if (vdbeUnbind(p, i) != 0) {
-		if (xDel != SQL_STATIC && xDel != SQL_TRANSIENT)
-			xDel((void *)zData);
-		return -1;
-	}
-	if (zData == NULL)
-		return 0;
-	struct Mem *var = &p->aVar[i - 1];
-	if (xDel != SQL_TRANSIENT)
-		mem_set_binl(var, (char *)zData, nData, xDel);
-	else if (mem_copy_bin(var, zData, nData) != 0)
-		return -1;
-	return sql_bind_type(p, i, "varbinary");
-}
-
-int
-sql_bind_blob64(sql_stmt * pStmt,
-		    int i,
-		    const void *zData,
-		    sql_uint64 nData, void (*xDel) (void *)
-    )
-{
-	assert(xDel != SQL_DYNAMIC);
-	if (nData > 0x7fffffff) {
-		return invokeValueDestructor(zData, xDel, 0);
-	} else {
-		return sql_bind_blob(pStmt, i, zData, (int)nData, xDel);
-	}
-}
-
 int
 sql_bind_double(sql_stmt * pStmt, int i, double rValue)
 {
@@ -722,18 +509,19 @@ sql_bind_ptr(struct sql_stmt *stmt, int i, void *ptr)
 }
 
 int
-sql_bind_text64(sql_stmt * pStmt,
-		    int i,
-		    const char *zData,
-		    sql_uint64 nData,
-		    void (*xDel) (void *))
+sql_bind_str_static(sql_stmt *stmt, int i, const char *str, uint32_t len)
 {
-	assert(xDel != SQL_DYNAMIC);
-	if (nData > 0x7fffffff) {
-		return invokeValueDestructor(zData, xDel, 0);
-	} else {
-		return bindText(pStmt, i, zData, (int)nData, xDel);
-	}
+	struct Vdbe *vdbe = (struct Vdbe *)stmt;
+	mem_set_str_static(&vdbe->aVar[i - 1], (char *)str, len);
+	return sql_bind_type(vdbe, i, "text");
+}
+
+int
+sql_bind_bin_static(sql_stmt *stmt, int i, const char *str, uint32_t size)
+{
+	struct Vdbe *vdbe = (struct Vdbe *)stmt;
+	mem_set_bin_static(&vdbe->aVar[i - 1], (char *)str, size);
+	return sql_bind_type(vdbe, i, "text");
 }
 
 int

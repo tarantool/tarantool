@@ -2638,17 +2638,6 @@ mem_mp_type(const struct Mem *mem)
 	return MP_NIL;
 }
 
-/* EVIDENCE-OF: R-12793-43283 Every value in sql has one of five
- * fundamental datatypes: 64-bit signed integer 64-bit IEEE floating
- * point number string BLOB NULL
- */
-enum mp_type
-sql_value_type(sql_value *pVal)
-{
-	struct Mem *mem = (struct Mem *) pVal;
-	return mem_mp_type(mem);
-}
-
 #ifdef SQL_DEBUG
 /*
  * Check invariants on a Mem object.

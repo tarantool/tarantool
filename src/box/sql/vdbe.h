@@ -264,7 +264,10 @@ void sqlVdbeCountChanges(Vdbe *);
 sql *sqlVdbeDb(Vdbe *);
 void sqlVdbeSetSql(Vdbe *, const char *z, int n);
 void sqlVdbeSwap(Vdbe *, Vdbe *);
-VdbeOp *sqlVdbeTakeOpArray(Vdbe *, int *, int *);
+
+struct VdbeOp *
+sqlVdbeTakeOpArray(struct Vdbe *p, int *pnOp);
+
 sql_value *sqlVdbeGetBoundValue(Vdbe *, int);
 char *sqlVdbeExpandSql(Vdbe *, const char *);
 
