@@ -1496,34 +1496,27 @@ replaceFunc(struct sql_context *context, int argc, struct Mem *argv)
 	int i, j;		/* Loop counters */
 
 	assert(argc == 3);
-	UNUSED_PARAMETER(argc);
-	zStr = mem_as_ustr(&argv[0]);
-	if (zStr == 0)
+	(void)argc;
+	if (mem_is_any_null(&argv[0], &argv[1]) || mem_is_null(&argv[2]))
 		return;
-	nStr = mem_len_unsafe(&argv[0]);
-	assert(zStr == mem_as_ustr(&argv[0]));	/* No encoding change */
-	zPattern = mem_as_ustr(&argv[1]);
-	if (zPattern == 0) {
-		assert(mem_is_null(&argv[1])
-		       || sql_context_db_handle(context)->mallocFailed);
-		return;
-	}
-	nPattern = mem_len_unsafe(&argv[1]);
+	assert(mem_is_bytes(&argv[0]) && mem_is_bytes(&argv[1]) &&
+	       mem_is_bytes(&argv[2]));
+	zStr = (const unsigned char *)argv[0].z;
+	nStr = argv[0].n;
+	zPattern = (const unsigned char *)argv[1].z;
+	nPattern = argv[1].n;
 	if (nPattern == 0) {
-		assert(!mem_is_null(&argv[1]));
-		sql_result_value(context, &argv[0]);
+		if (mem_copy(context->pOut, &argv[0]) != 0)
+			context->is_aborted = true;
 		return;
 	}
-	assert(zPattern == mem_as_ustr(&argv[1]));	/* No encoding change */
-	zRep = mem_as_ustr(&argv[2]);
-	if (zRep == 0)
-		return;
-	nRep = mem_len_unsafe(&argv[2]);
-	assert(zRep == mem_as_ustr(&argv[2]));
+	zRep = (const unsigned char *)argv[2].z;
+	nRep = argv[2].n;
 	nOut = nStr + 1;
-	assert(nOut < SQL_MAX_LENGTH);
-	zOut = contextMalloc(context, (i64) nOut);
-	if (zOut == 0) {
+	struct sql *db = sql_get();
+	zOut = sqlDbMallocRawNN(db, nOut);
+	if (zOut == NULL) {
+		context->is_aborted = true;
 		return;
 	}
 	loopLimit = nStr - nPattern;
@@ -1533,22 +1526,12 @@ replaceFunc(struct sql_context *context, int argc, struct Mem *argv)
 			zOut[j++] = zStr[i];
 		} else {
 			u8 *zOld;
-			sql *db = sql_context_db_handle(context);
 			nOut += nRep - nPattern;
-			testcase(nOut - 1 == db->aLimit[SQL_LIMIT_LENGTH]);
-			testcase(nOut - 2 == db->aLimit[SQL_LIMIT_LENGTH]);
-			if (nOut - 1 > db->aLimit[SQL_LIMIT_LENGTH]) {
-				diag_set(ClientError, ER_SQL_EXECUTE, "string "\
-					 "or binary string is too big");
-				context->is_aborted = true;
-				sql_free(zOut);
-				return;
-			}
 			zOld = zOut;
-			zOut = sql_realloc64(zOut, (int)nOut);
-			if (zOut == 0) {
+			zOut = sqlDbRealloc(db, zOut, nOut);
+			if (zOut == NULL) {
 				context->is_aborted = true;
-				sql_free(zOld);
+				sqlDbFree(db, zOld);
 				return;
 			}
 			memcpy(&zOut[j], zRep, nRep);
@@ -1562,9 +1545,9 @@ replaceFunc(struct sql_context *context, int argc, struct Mem *argv)
 	assert(j <= nOut);
 	zOut[j] = 0;
 	if (context->func->def->returns == FIELD_TYPE_STRING)
-		mem_set_str_dynamic(context->pOut, (char *)zOut, j);
+		mem_set_str_allocated(context->pOut, (char *)zOut, j);
 	else
-		mem_set_bin_dynamic(context->pOut, (char *)zOut, j);
+		mem_set_bin_allocated(context->pOut, (char *)zOut, j);
 }
 
 /*
