@@ -962,6 +962,32 @@ func_typeof(struct sql_context *ctx, int argc, struct Mem *argv)
 	return mem_set_str0_static(ctx->pOut, mem_type_to_str(&argv[0]));
 }
 
+/** Implementation of the ROUND() function. */
+static void
+func_round(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	assert(argc == 1 || argc == 2);
+	if (mem_is_null(&argv[0]) || (argc == 2 && mem_is_null(&argv[1])))
+		return;
+	assert(mem_is_double(&argv[0]));
+	assert(argc == 1 || mem_is_int(&argv[1]));
+	uint64_t n = (argc == 2 && mem_is_uint(&argv[1])) ? argv[1].u.u : 0;
+
+	double d = argv[0].u.r;
+	struct Mem *res = ctx->pOut;
+	if (n != 0)
+		return mem_set_double(res, atof(tt_sprintf("%.*f", n, d)));
+	/*
+	 * DOUBLE values greater than 2^53 or less than -2^53 have no digits
+	 * after the decimal point.
+	 */
+	assert(9007199254740992 == (int64_t)1 << 53);
+	if (d <= -9007199254740992.0 || d >= 9007199254740992.0)
+		return mem_set_double(res, d);
+	double delta = d < 0 ? -0.5 : 0.5;
+	return mem_set_double(res, (double)(int64_t)(d + delta));
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -1007,51 +1033,6 @@ sql_func_uuid(struct sql_context *ctx, int argc, struct Mem *argv)
 	struct tt_uuid uuid;
 	tt_uuid_create(&uuid);
 	mem_set_uuid(ctx->pOut, &uuid);
-}
-
-/*
- * Implementation of the round() function
- */
-static void
-roundFunc(struct sql_context *context, int argc, struct Mem *argv)
-{
-	int64_t n = 0;
-	double r;
-	if (argc != 1 && argc != 2) {
-		diag_set(ClientError, ER_FUNC_WRONG_ARG_COUNT, "ROUND",
-			 "1 or 2", argc);
-		context->is_aborted = true;
-		return;
-	}
-	if (argc == 2) {
-		if (mem_is_null(&argv[1]))
-			return;
-		n = mem_get_int_unsafe(&argv[1]);
-		if (n < 0)
-			n = 0;
-	}
-	if (mem_is_null(&argv[0]))
-		return;
-	if (!mem_is_num(&argv[0]) && !mem_is_str(&argv[0])) {
-		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-			 mem_str(&argv[0]), "number");
-		context->is_aborted = true;
-		return;
-	}
-	r = mem_get_double_unsafe(&argv[0]);
-	/* If Y==0 and X will fit in a 64-bit int,
-	 * handle the rounding directly,
-	 * otherwise use printf.
-	 */
-	if (n == 0 && r >= 0 && r < (double)(LARGEST_INT64 - 1)) {
-		r = (double)((sql_int64) (r + 0.5));
-	} else if (n == 0 && r < 0 && (-r) < (double)(LARGEST_INT64 - 1)) {
-		r = -(double)((sql_int64) ((-r) + 0.5));
-	} else {
-		const char *rounded_value = tt_sprintf("%.*f", n, r);
-		sqlAtoF(rounded_value, &r, sqlStrlen30(rounded_value));
-	}
-	sql_result_double(context, r);
 }
 
 /*
@@ -1885,9 +1866,9 @@ static struct sql_func_definition definitions[] = {
 	{"REPLACE", 3,
 	 {FIELD_TYPE_VARBINARY, FIELD_TYPE_VARBINARY, FIELD_TYPE_VARBINARY},
 	 FIELD_TYPE_VARBINARY, replaceFunc, NULL},
-	{"ROUND", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, roundFunc, NULL},
+	{"ROUND", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, func_round, NULL},
 	{"ROUND", 2, {FIELD_TYPE_DOUBLE, FIELD_TYPE_INTEGER}, FIELD_TYPE_DOUBLE,
-	 roundFunc, NULL},
+	 func_round, NULL},
 	{"ROW_COUNT", 0, {}, FIELD_TYPE_INTEGER, sql_row_count, NULL},
 	{"SOUNDEX", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, soundexFunc,
 	 NULL},
