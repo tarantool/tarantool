@@ -1021,6 +1021,15 @@ func_uuid(struct sql_context *ctx, int argc, struct Mem *argv)
 	mem_set_uuid(ctx->pOut, &uuid);
 }
 
+/** Implementation of the VERSION() function. */
+static void
+func_version(struct sql_context *ctx, int argc, struct Mem *argv)
+{
+	(void)argc;
+	(void)argv;
+	return mem_set_str0_static(ctx->pOut, (char *)tarantool_version());
+}
+
 static const unsigned char *
 mem_as_ustr(struct Mem *mem)
 {
@@ -1344,22 +1353,6 @@ likeFunc(sql_context *context, int argc, struct Mem *argv)
 		return;
 	}
 	mem_set_bool(context->pOut, res == MATCH);
-}
-
-/**
- * Implementation of the version() function.  The result is the
- * version of the Tarantool that is running.
- *
- * @param context Context being used.
- * @param unused1 Unused.
- * @param unused2 Unused.
- */
-static void
-sql_func_version(struct sql_context *context, int argc, struct Mem *argv)
-{
-	(void)argc;
-	(void)argv;
-	sql_result_text(context, tarantool_version(), -1, SQL_STATIC);
 }
 
 /*
@@ -1912,7 +1905,7 @@ static struct sql_func_definition definitions[] = {
 	 NULL},
 	{"UUID", 0, {}, FIELD_TYPE_UUID, func_uuid, NULL},
 	{"UUID", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_UUID, func_uuid, NULL},
-	{"VERSION", 0, {}, FIELD_TYPE_STRING, sql_func_version, NULL},
+	{"VERSION", 0, {}, FIELD_TYPE_STRING, func_version, NULL},
 	{"ZEROBLOB", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_VARBINARY,
 	 func_zeroblob, NULL},
 };
