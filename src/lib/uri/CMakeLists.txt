@@ -1,5 +1,5 @@
 add_custom_target(ragel
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
     COMMAND ragel -G2 src/lib/uri/uri.rl -o src/lib/uri/uri.c)
 
 if (CC_HAS_WNO_IMPLICIT_FALLTHROUGH)

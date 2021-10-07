@@ -46,11 +46,11 @@ endif()
 function(update_submodules)
     message(STATUS "Updating submodules")
     execute_process(COMMAND ${GIT} submodule update --init --recursive
-                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+                    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 endfunction()
 
-if(NOT EXISTS ${CMAKE_SOURCE_DIR}/src/lib/small/CMakeLists.txt)
-    if (EXISTS "${CMAKE_SOURCE_DIR}/.git" AND GIT)
+if(NOT EXISTS ${PROJECT_SOURCE_DIR}/src/lib/small/CMakeLists.txt)
+    if (EXISTS "${PROJECT_SOURCE_DIR}/.git" AND GIT)
         update_submodules()
     else()
         message(FATAL_ERROR "Failed to find submodules")
@@ -152,7 +152,7 @@ list(APPEND tagsExclude "--exclude=.git/*")
 list(APPEND tagsExclude "--exclude=.pc/*")
 list(APPEND tagsExclude "--exclude=patches/*")
 add_custom_target(tags COMMAND ${CTAGS} -R ${tagsExclude} -f tags
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 add_custom_target(ctags DEPENDS tags)
 
 #
@@ -239,11 +239,11 @@ endif()
 # avoids git to search .git repository in parent
 # directories.
 #
-if (EXISTS "${CMAKE_SOURCE_DIR}/.git" AND GIT)
+if (EXISTS "${PROJECT_SOURCE_DIR}/.git" AND GIT)
     execute_process (COMMAND ${GIT} describe --long HEAD
         OUTPUT_VARIABLE TARANTOOL_GIT_VERSION
         OUTPUT_STRIP_TRAILING_WHITESPACE
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
     if (NOT ("${TARANTOOL_GIT_VERSION}" STREQUAL "${TARANTOOL_VERSION}"))
         set(TARANTOOL_VERSION "${TARANTOOL_GIT_VERSION}")

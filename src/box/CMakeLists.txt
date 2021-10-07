@@ -1,5 +1,5 @@
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/box/lua)
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/src/box/sql)
+file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/src/box/lua)
+file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/src/box/sql)
 
 # Sometimes 'spying' code is not acceptable even if it would be
 # disabled by default. That option allows to remove the feedback
@@ -71,13 +71,13 @@ set(sql_sources
 )
 
 add_custom_target(box_generate_lua_sources
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/src/box
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/src/box
     DEPENDS ${lua_sources})
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
 include_directories(${ZSTD_INCLUDE_DIRS})
-include_directories(${CMAKE_BINARY_DIR}/src/box/sql)
-include_directories(${CMAKE_BINARY_DIR}/src/box)
+include_directories(${PROJECT_BINARY_DIR}/src/box/sql)
+include_directories(${PROJECT_BINARY_DIR}/src/box)
 
 add_library(box_error STATIC error.cc errcode.c mp_error.cc)
 target_link_libraries(box_error core stat mpstream vclock)
@@ -225,10 +225,10 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 add_definitions(-DSQL_TEST=1)
 
-set(EXT_SRC_DIR ${CMAKE_SOURCE_DIR}/extra)
-set(EXT_BIN_DIR ${CMAKE_BINARY_DIR}/extra)
-set(SQL_SRC_DIR ${CMAKE_SOURCE_DIR}/src/box/sql)
-set(SQL_BIN_DIR ${CMAKE_BINARY_DIR}/src/box/sql)
+set(EXT_SRC_DIR ${PROJECT_SOURCE_DIR}/extra)
+set(EXT_BIN_DIR ${PROJECT_BINARY_DIR}/extra)
+set(SQL_SRC_DIR ${PROJECT_SOURCE_DIR}/src/box/sql)
+set(SQL_BIN_DIR ${PROJECT_BINARY_DIR}/src/box/sql)
 
 include_directories(${SQL_SRC_DIR})
 include_directories(${SQL_BIN_DIR})

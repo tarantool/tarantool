@@ -12,7 +12,7 @@ endif()
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_BINARY_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/src/box)
-include_directories(${CMAKE_SOURCE_DIR}/third_party)
+include_directories(${PROJECT_SOURCE_DIR}/third_party)
 include_directories(${ICU_INCLUDE_DIRS})
 include_directories(${CURL_INCLUDE_DIRS})
 
@@ -144,13 +144,13 @@ add_executable(crc32.test crc32.c)
 target_link_libraries(crc32.test unit crc32)
 
 add_executable(find_path.test find_path.c
-    ${CMAKE_SOURCE_DIR}/src/find_path.c
+    ${PROJECT_SOURCE_DIR}/src/find_path.c
 )
 
 add_executable(reflection_c.test reflection_c.c unit.c
-    ${CMAKE_SOURCE_DIR}/src/lib/core/reflection.c)
+    ${PROJECT_SOURCE_DIR}/src/lib/core/reflection.c)
 add_executable(reflection_cxx.test reflection_cxx.cc unit.c
-    ${CMAKE_SOURCE_DIR}/src/lib/core/reflection.c)
+    ${PROJECT_SOURCE_DIR}/src/lib/core/reflection.c)
 add_executable(csv.test csv.c)
 target_link_libraries(csv.test csv)
 

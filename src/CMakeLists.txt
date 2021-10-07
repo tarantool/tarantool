@@ -15,7 +15,7 @@ include_directories(${ICU_INCLUDE_DIRS})
 include_directories(${ICONV_INCLUDE_DIRS})
 include_directories(${DECNUMBER_INCLUDE_DIR})
 
-set(LIBUTIL_FREEBSD_SRC ${CMAKE_SOURCE_DIR}/third_party/libutil_freebsd)
+set(LIBUTIL_FREEBSD_SRC ${PROJECT_SOURCE_DIR}/third_party/libutil_freebsd)
 include_directories(${LIBUTIL_FREEBSD_SRC})
 
 # Compile src/lua/*.lua files into src/lua/*.lua.c sources
@@ -71,7 +71,7 @@ lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/utils/bufread.lua)
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/tools/utils/symtab.lua)
 
 add_custom_target(generate_lua_sources
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/src/box
+    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/src/box
     DEPENDS ${lua_sources})
 set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
@@ -146,34 +146,34 @@ set (server_sources
 )
 
 set(api_headers
-    ${CMAKE_BINARY_DIR}/src/trivia/config.h
-    ${CMAKE_SOURCE_DIR}/src/trivia/util.h
-    ${CMAKE_SOURCE_DIR}/src/on_shutdown.h
-    ${CMAKE_SOURCE_DIR}/src/lib/core/say.h
-    ${CMAKE_SOURCE_DIR}/src/lib/core/fiber.h
-    ${CMAKE_SOURCE_DIR}/src/lib/core/fiber_cond.h
-    ${CMAKE_SOURCE_DIR}/src/lib/core/coio.h
-    ${CMAKE_SOURCE_DIR}/src/lib/core/coio_task.h
-    ${CMAKE_SOURCE_DIR}/src/box/ibuf.h
-    ${CMAKE_SOURCE_DIR}/src/lua/utils.h
-    ${CMAKE_SOURCE_DIR}/src/lua/error.h
-    ${CMAKE_SOURCE_DIR}/src/lua/string.h
-    ${CMAKE_SOURCE_DIR}/src/box/txn.h
-    ${CMAKE_SOURCE_DIR}/src/box/tuple.h
-    ${CMAKE_SOURCE_DIR}/src/box/key_def.h
-    ${CMAKE_SOURCE_DIR}/src/box/lua/key_def.h
-    ${CMAKE_SOURCE_DIR}/src/box/field_def.h
-    ${CMAKE_SOURCE_DIR}/src/box/tuple_format.h
-    ${CMAKE_SOURCE_DIR}/src/box/tuple_extract_key.h
-    ${CMAKE_SOURCE_DIR}/src/box/schema_def.h
-    ${CMAKE_SOURCE_DIR}/src/box/box.h
-    ${CMAKE_SOURCE_DIR}/src/box/index.h
-    ${CMAKE_SOURCE_DIR}/src/box/iterator_type.h
-    ${CMAKE_SOURCE_DIR}/src/box/error.h
-    ${CMAKE_SOURCE_DIR}/src/box/lua/call.h
-    ${CMAKE_SOURCE_DIR}/src/box/lua/tuple.h
-    ${CMAKE_SOURCE_DIR}/src/lib/core/latch.h
-    ${CMAKE_SOURCE_DIR}/src/lib/core/clock.h
+    ${PROJECT_BINARY_DIR}/src/trivia/config.h
+    ${PROJECT_SOURCE_DIR}/src/trivia/util.h
+    ${PROJECT_SOURCE_DIR}/src/on_shutdown.h
+    ${PROJECT_SOURCE_DIR}/src/lib/core/say.h
+    ${PROJECT_SOURCE_DIR}/src/lib/core/fiber.h
+    ${PROJECT_SOURCE_DIR}/src/lib/core/fiber_cond.h
+    ${PROJECT_SOURCE_DIR}/src/lib/core/coio.h
+    ${PROJECT_SOURCE_DIR}/src/lib/core/coio_task.h
+    ${PROJECT_SOURCE_DIR}/src/box/ibuf.h
+    ${PROJECT_SOURCE_DIR}/src/lua/utils.h
+    ${PROJECT_SOURCE_DIR}/src/lua/error.h
+    ${PROJECT_SOURCE_DIR}/src/lua/string.h
+    ${PROJECT_SOURCE_DIR}/src/box/txn.h
+    ${PROJECT_SOURCE_DIR}/src/box/tuple.h
+    ${PROJECT_SOURCE_DIR}/src/box/key_def.h
+    ${PROJECT_SOURCE_DIR}/src/box/lua/key_def.h
+    ${PROJECT_SOURCE_DIR}/src/box/field_def.h
+    ${PROJECT_SOURCE_DIR}/src/box/tuple_format.h
+    ${PROJECT_SOURCE_DIR}/src/box/tuple_extract_key.h
+    ${PROJECT_SOURCE_DIR}/src/box/schema_def.h
+    ${PROJECT_SOURCE_DIR}/src/box/box.h
+    ${PROJECT_SOURCE_DIR}/src/box/index.h
+    ${PROJECT_SOURCE_DIR}/src/box/iterator_type.h
+    ${PROJECT_SOURCE_DIR}/src/box/error.h
+    ${PROJECT_SOURCE_DIR}/src/box/lua/call.h
+    ${PROJECT_SOURCE_DIR}/src/box/lua/tuple.h
+    ${PROJECT_SOURCE_DIR}/src/lib/core/latch.h
+    ${PROJECT_SOURCE_DIR}/src/lib/core/clock.h
 )
 rebuild_module_api(${api_headers})
 
@@ -262,21 +262,21 @@ if(BUILD_STATIC)
     endif()
 endif()
 
-set(exports_file_sources ${CMAKE_SOURCE_DIR}/extra/exports)
+set(exports_file_sources ${PROJECT_SOURCE_DIR}/extra/exports)
 if (EXPORT_LIBCURL_SYMBOLS)
     set(exports_file_sources ${exports_file_sources}
-        ${CMAKE_SOURCE_DIR}/extra/exports_libcurl)
+        ${PROJECT_SOURCE_DIR}/extra/exports_libcurl)
 endif()
 string(REPLACE ";" " " exports_file_sources_str "${exports_file_sources}")
 
 # Exports syntax is toolchain-dependent, preprocessing is necessary
-set(exports_file ${CMAKE_BINARY_DIR}/extra/exports.${CMAKE_SYSTEM_NAME})
+set(exports_file ${PROJECT_BINARY_DIR}/extra/exports.${CMAKE_SYSTEM_NAME})
 add_custom_target(preprocess_exports
                   DEPENDS ${exports_file})
 add_custom_command(
     OUTPUT  ${exports_file}
     DEPENDS ${exports_file_sources}
-    COMMAND ${CMAKE_SOURCE_DIR}/extra/mkexports
+    COMMAND ${PROJECT_SOURCE_DIR}/extra/mkexports
             ${exports_file_sources_str}
             ${exports_file} ${CMAKE_SYSTEM_NAME}
             ${EXPORT_LIST}
@@ -287,7 +287,7 @@ add_executable(
     ${LIBUTIL_FREEBSD_SRC}/flopen.c
     ${LIBUTIL_FREEBSD_SRC}/pidfile.c)
 
-add_dependencies(tarantool build_bundled_libs preprocess_exports)
+add_dependencies(tarantool build_bundled_libs preprocess_exports api)
 
 # Re-link if exports changed
 set_target_properties(tarantool PROPERTIES LINK_DEPENDS ${exports_file})
