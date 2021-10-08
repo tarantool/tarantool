@@ -6,6 +6,7 @@ old_election_timeout = box.cfg.election_timeout
 old_replication_synchro_timeout = box.cfg.replication_synchro_timeout
 old_replication_timeout = box.cfg.replication_timeout
 old_replication = box.cfg.replication
+old_synchro_quorum = box.cfg.replication_synchro_quorum
 
 test_run:cmd('create server replica with rpl_master=default,\
               script="replication/replica.lua"')
@@ -57,6 +58,7 @@ test_run:wait_lsn('default', 'replica')
 
 test_run:switch('default')
 test_run:cmd('stop server replica')
+test_run:cmd('delete server replica')
 -- Will fail - the node is not a leader.
 ok, err = pcall(box.space.test.replace, box.space.test, {2})
 assert(not ok)
@@ -75,6 +77,7 @@ box.cfg{                                                                        
     election_mode = 'candidate',                                                \
     election_timeout = 1000000,                                                 \
     replication_timeout = 0.01,                                                 \
+    replication_synchro_quorum = 1,                                             \
 }
 
 box.ctl.wait_rw()
@@ -83,13 +86,13 @@ _ = box.space.test:replace{2}
 box.space.test:select{}
 box.space.test:drop()
 
-test_run:cmd('delete server replica')
 box.cfg{                                                                        \
     election_mode = old_election_mode,                                          \
     election_timeout = old_election_timeout,                                    \
     replication_timeout = old_replication_timeout,                              \
     replication = old_replication,                                              \
     replication_synchro_timeout = old_replication_synchro_timeout,              \
+    replication_synchro_quorum = old_synchro_quorum,                            \
 }
 box.ctl.demote()
 box.schema.user.revoke('guest', 'super')

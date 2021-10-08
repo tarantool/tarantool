@@ -3,6 +3,7 @@ box.schema.user.grant('guest', 'super')
 
 old_election_mode = box.cfg.election_mode
 old_replication_timeout = box.cfg.replication_timeout
+old_synchro_quorum = box.cfg.replication_synchro_quorum
 
 test_run:cmd('create server replica with rpl_master=default,\
               script="replication/replica.lua"')
@@ -15,6 +16,7 @@ test_run:cmd('start server replica with wait=True, wait_load=True')
 box.cfg{                                                                        \
     replication_timeout = 0.1,                                                  \
     election_mode = 'candidate',                                                \
+    replication_synchro_quorum = 1,                                             \
 }
 
 -- First crash could happen when the election was disabled on the non-leader
@@ -68,6 +70,7 @@ test_run:cmd('delete server replica')
 box.cfg{                                                                        \
     election_mode = old_election_mode,                                          \
     replication_timeout = old_replication_timeout,                              \
+    replication_synchro_quorum = old_synchro_quorum,                            \
 }
 box.ctl.demote()
 box.schema.user.revoke('guest', 'super')

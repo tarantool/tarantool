@@ -1,6 +1,10 @@
 test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 fiber = require('fiber')
+
+old_synchro_quorum = box.cfg.replication_synchro_quorum
+old_synchro_timeout = box.cfg.replication_synchro_timeout
+
 --
 -- gh-5144: qsync should not write duplicate confirms for the same LSN. That
 -- could happen when first CONFIRM write is in progress, and more ACKs arrive.
@@ -72,3 +76,7 @@ test_run:cmd('delete server replica2')
 
 box.ctl.demote()
 box.schema.user.revoke('guest', 'super')
+box.cfg{                                                                        \
+    replication_synchro_quorum = old_synchro_quorum,                            \
+    replication_synchro_timeout = old_synchro_timeout,                          \
+}

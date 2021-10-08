@@ -76,7 +76,7 @@ test_run:wait_lsn('replica', 'default')
 -- Normal DML is blocked - the limbo is not empty and does not belong to the
 -- replica. But promote also does a WAL write, and propagates LSN
 -- of the instance.
-box.cfg{replication_synchro_timeout = 0.001}
+box.cfg{replication_synchro_timeout = 0.001, replication_synchro_quorum = 1}
  | ---
  | ...
 box.ctl.promote()

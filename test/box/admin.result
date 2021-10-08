@@ -96,7 +96,7 @@ cfg_filter(box.cfg)
   - - replication_sync_timeout
     - <hidden>
   - - replication_synchro_quorum
-    - 1
+    - N / 2 + 1
   - - replication_synchro_timeout
     - 5
   - - replication_timeout
