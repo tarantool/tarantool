@@ -2447,7 +2447,7 @@ struct PrintfArguments {
 	int nArg;		/* Total number of arguments */
 	int nUsed;		/* Number of arguments used so far */
 	/** The argument values. */
-	struct Mem *apArg;
+	const struct Mem *apArg;
 };
 
 void sqlVXPrintf(StrAccum *, const char *, va_list);
@@ -4270,7 +4270,7 @@ struct func_sql_builtin {
 	 * Access checks are redundant, because all SQL built-ins
 	 * are predefined and are executed on SQL privilege level.
 	 */
-	void (*call)(struct sql_context *ctx, int argc, struct Mem *argv);
+	void (*call)(struct sql_context *ctx, int argc, const struct Mem *argv);
 	/**
 	 * A VDBE-memory-compatible finalize method
 	 * (is valid only for aggregate function).
