@@ -2,6 +2,7 @@ test_run = require('test_run').new()
 
 old_election_mode = box.cfg.election_mode
 old_replication_timeout = box.cfg.replication_timeout
+old_synchro_quorum = box.cfg.replication_synchro_quorum
 
 --
 -- gh-5506: Raft state machine crashed in case there was a WAL write in
@@ -45,7 +46,11 @@ box.cfg{election_mode = 'voter'}
 box.error.injection.set("ERRINJ_WAL_DELAY_COUNTDOWN", 0)
 
 test_run:switch('default')
-box.cfg{election_mode = 'candidate'}
+--
+-- Set quorum to 1, since the replica's WAL is blocked and it can't vote for the
+-- master.
+--
+box.cfg{election_mode = 'candidate', replication_synchro_quorum = 1}
 test_run:wait_cond(function()                                                   \
     return box.info.election.state == 'leader'                                  \
 end)
@@ -65,5 +70,6 @@ box.schema.user.revoke('guest', 'super')
 box.cfg{                                                                        \
     election_mode = old_election_mode,                                          \
     replication_timeout = old_replication_timeout,                              \
+    replication_synchro_quorum = old_synchro_quorum,                            \
 }
 box.ctl.demote()
