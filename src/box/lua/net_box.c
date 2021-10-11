@@ -67,7 +67,7 @@ enum {
 	/**
 	 * IPROTO protocol version supported by the netbox connector.
 	 */
-	NETBOX_IPROTO_VERSION = 0,
+	NETBOX_IPROTO_VERSION = 3,
 };
 
 /**
@@ -107,6 +107,12 @@ struct netbox_transport {
 	struct ibuf recv_buf;
 	/** Signalled when send_buf becomes empty. */
 	struct fiber_cond on_send_buf_empty;
+	/**
+	 * Lua reference to a callback invoked when an IPROTO_EVENT packet is
+	 * received from the remote host. The callback is passed two arguments:
+	 * notification key (string) and data (can be of any type).
+	 */
+	int on_event_ref;
 	/** Next request id. */
 	uint64_t next_sync;
 	/** sync -> netbox_request */
@@ -176,11 +182,11 @@ static const char netbox_transport_typename[] = "net.box.transport";
 static const char netbox_request_typename[] = "net.box.request";
 
 /**
- * Instead of pushing luaT_netbox_request_iterator_next with lua_pushcclosure
- * in luaT_netbox_request_pairs, we get it by reference, because it works
- * faster.
+ * We keep a reference to each C function that is frequently called with
+ * lua_call so as not to create a new Lua object each time we call it.
  */
-static int luaT_netbox_request_iterator_next_ref;
+static int netbox_on_event_lua_ref = LUA_NOREF;
+static int luaT_netbox_request_iterator_next_ref = LUA_NOREF;
 
 /** Passed to mpstream_init() to set a boolean flag on error. */
 static void
@@ -311,11 +317,13 @@ netbox_request_push_result(struct netbox_request *request, struct lua_State *L)
 }
 
 static void
-netbox_transport_create(struct netbox_transport *transport)
+netbox_transport_create(struct netbox_transport *transport,
+			int on_event_ref)
 {
 	ibuf_create(&transport->send_buf, &cord()->slabc, NETBOX_READAHEAD);
 	ibuf_create(&transport->recv_buf, &cord()->slabc, NETBOX_READAHEAD);
 	fiber_cond_create(&transport->on_send_buf_empty);
+	transport->on_event_ref = on_event_ref;
 	transport->next_sync = 1;
 	transport->requests = mh_i64ptr_new();
 }
@@ -323,6 +331,8 @@ netbox_transport_create(struct netbox_transport *transport)
 static void
 netbox_transport_destroy(struct netbox_transport *transport)
 {
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX,
+		   transport->on_event_ref);
 	struct mh_i64ptr_t *h = transport->requests;
 	assert(mh_size(h) == 0);
 	mh_i64ptr_delete(h);
@@ -379,10 +389,12 @@ netbox_begin_encode(struct mpstream *stream, uint64_t sync,
 	mpstream_advance(stream, fixheader_size);
 
 	/* encode header */
-	mpstream_encode_map(stream, stream_id != 0 ? 3 : 2);
+	mpstream_encode_map(stream, 1 + (sync != 0) + (stream_id != 0));
 
-	mpstream_encode_uint(stream, IPROTO_SYNC);
-	mpstream_encode_uint(stream, sync);
+	if (sync != 0) {
+		mpstream_encode_uint(stream, IPROTO_SYNC);
+		mpstream_encode_uint(stream, sync);
+	}
 
 	mpstream_encode_uint(stream, IPROTO_REQUEST_TYPE);
 	mpstream_encode_uint(stream, type);
@@ -1764,13 +1776,15 @@ luaT_netbox_request_pairs(struct lua_State *L)
 
 /**
  * Creates a netbox transport object (userdata) and pushes it to Lua stack.
+ * Takes the on_event callback.
  */
 static int
 netbox_new_transport(struct lua_State *L)
 {
+	int on_event_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	struct netbox_transport *transport = lua_newuserdata(
 		L, sizeof(*transport));
-	netbox_transport_create(transport);
+	netbox_transport_create(transport, on_event_ref);
 	luaL_getmetatable(L, netbox_transport_typename);
 	lua_setmetatable(L, -2);
 	return 1;
@@ -1860,6 +1874,82 @@ netbox_perform_request(struct lua_State *L)
 }
 
 /**
+ * Encodes a WATCH/UNWATCH request and writes it to the send buffer.
+ * Takes the name of the notification key to acknowledge.
+ */
+static void
+netbox_watch_or_unwatch(struct lua_State *L, enum iproto_type type)
+{
+	assert(type == IPROTO_WATCH || type == IPROTO_UNWATCH);
+	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
+	size_t key_len;
+	const char *key = lua_tolstring(L, 2, &key_len);
+	struct mpstream stream;
+	mpstream_init(&stream, &transport->send_buf, ibuf_reserve_cb,
+		      ibuf_alloc_cb, luamp_error, L);
+	size_t svp = netbox_begin_encode(&stream, 0, type, 0);
+	mpstream_encode_map(&stream, 1);
+	mpstream_encode_uint(&stream, IPROTO_EVENT_KEY);
+	mpstream_encode_strn(&stream, key, key_len);
+	netbox_end_encode(&stream, svp);
+}
+
+static int
+netbox_watch(struct lua_State *L)
+{
+	netbox_watch_or_unwatch(L, IPROTO_WATCH);
+	return 0;
+}
+
+static int
+netbox_unwatch(struct lua_State *L)
+{
+	netbox_watch_or_unwatch(L, IPROTO_UNWATCH);
+	return 0;
+}
+
+/** Passed to pcall by netbox_on_event. */
+static int
+netbox_on_event_lua(struct lua_State *L)
+{
+	void **args = lua_touserdata(L, 1);
+	struct netbox_transport *transport = args[0];
+	struct watch_request *watch = args[1];
+	lua_rawgeti(L, LUA_REGISTRYINDEX, transport->on_event_ref);
+	lua_pushlstring(L, watch->key, watch->key_len);
+	if (watch->data != NULL) {
+		const char *data = watch->data;
+		luamp_decode(L, luaL_msgpack_default, &data);
+		assert(data == watch->data_end);
+	}
+	lua_call(L, watch->data != NULL ? 2 : 1, 0);
+	return 0;
+}
+
+/**
+ * Handles an IPROTO_EVENT packet received from the remote host.
+ *
+ * Note, decoding msgpack may throw a Lua error so we wrap it along with
+ * the callback in a pcall so as not to break the connection in this case.
+ */
+static void
+netbox_on_event(struct lua_State *L, struct netbox_transport *transport,
+		struct xrow_header *hdr)
+{
+	assert(hdr->type == IPROTO_EVENT);
+	struct watch_request watch;
+	if (xrow_decode_watch(hdr, &watch) != 0) {
+		diag_log();
+		return;
+	}
+	lua_rawgeti(L, LUA_REGISTRYINDEX, netbox_on_event_lua_ref);
+	void *args[] = {transport, &watch};
+	lua_pushlightuserdata(L, args);
+	if (luaT_call(L, 1, 0) != 0)
+		diag_log();
+}
+
+/**
  * Given a netbox transport and a response header, decodes the response and
  * either completes the request or invokes the on-push trigger, depending on
  * the status.
@@ -1872,13 +1962,17 @@ netbox_dispatch_response_iproto(struct lua_State *L,
 				struct netbox_transport *transport,
 				struct xrow_header *hdr)
 {
+	enum iproto_type status = hdr->type;
+	if (status == IPROTO_EVENT) {
+		netbox_on_event(L, transport, hdr);
+		return;
+	}
 	struct netbox_request *request =
 		netbox_transport_lookup_request(transport, hdr->sync);
 	if (request == NULL) {
 		/* Nobody is waiting for the response. */
 		return;
 	}
-	enum iproto_type status = hdr->type;
 	if (status > IPROTO_CHUNK) {
 		/* Handle errors. */
 		xrow_decode_error(hdr);
@@ -2242,9 +2336,13 @@ luaopen_net_box(struct lua_State *L)
 			    IPROTO_FEATURE_TRANSACTIONS);
 	iproto_features_set(&NETBOX_IPROTO_FEATURES,
 			    IPROTO_FEATURE_ERROR_EXTENSION);
+	iproto_features_set(&NETBOX_IPROTO_FEATURES,
+			    IPROTO_FEATURE_WATCHERS);
 
 	lua_pushcfunction(L, luaT_netbox_request_iterator_next);
 	luaT_netbox_request_iterator_next_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	lua_pushcfunction(L, netbox_on_event_lua);
+	netbox_on_event_lua_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
 	static const struct luaL_Reg netbox_transport_meta[] = {
 		{ "__gc",           luaT_netbox_transport_gc },
@@ -2274,6 +2372,8 @@ luaopen_net_box(struct lua_State *L)
 		{ "new_transport",   netbox_new_transport },
 		{ "perform_async_request", netbox_perform_async_request },
 		{ "perform_request",netbox_perform_request },
+		{ "watch",          netbox_watch },
+		{ "unwatch",        netbox_unwatch },
 		{ "iproto_id",      netbox_iproto_id },
 		{ "iproto_auth",    netbox_iproto_auth },
 		{ "iproto_schema",  netbox_iproto_schema },

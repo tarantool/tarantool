@@ -1338,11 +1338,17 @@ error:
 			goto error;
 		uint64_t key = mp_decode_uint(&data);
 		if (key < IPROTO_KEY_MAX &&
+		    iproto_key_type[key] != MP_NIL &&
 		    iproto_key_type[key] != mp_typeof(*data))
 			goto error;
 		switch (key) {
 		case IPROTO_EVENT_KEY:
 			request->key = mp_decode_str(&data, &request->key_len);
+			break;
+		case IPROTO_EVENT_DATA:
+			request->data = data;
+			mp_next(&data);
+			request->data_end = data;
 			break;
 		default:
 			mp_next(&data);
