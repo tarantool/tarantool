@@ -351,13 +351,17 @@ int
 xrow_decode_call(const struct xrow_header *row, struct call_request *request);
 
 /**
- * WATCH/UNWATCH request.
+ * WATCH/UNWATCH/NOTIFY request.
  */
 struct watch_request {
 	/** Notification key name. String, not null-terminated. */
 	const char *key;
 	/** Length of the notification key name string. */
 	uint32_t key_len;
+	/** Notification data. Any MessagePack. */
+	const char *data;
+	/** End of the data. */
+	const char *data_end;
 };
 
 /**

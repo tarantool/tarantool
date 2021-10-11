@@ -19,6 +19,8 @@ local check_primary_index = box.internal.check_primary_index
 
 local perform_request_impl          = internal.perform_request
 local perform_async_request_impl    = internal.perform_async_request
+local watch_impl                    = internal.watch
+local unwatch_impl                  = internal.unwatch
 
 local TIMEOUT_INFINITY = 500 * 365 * 86400
 local VSPACE_ID        = 281
@@ -195,6 +197,10 @@ local function create_transport(host, port, user, password, callback,
     local last_error
     local state_cond        = fiber.cond() -- signaled when the state changes
 
+    local function on_event(key, value)
+        callback('event', key, value)
+    end
+
     -- The transport stores requests that are currently 'in flight'
     -- for this connection.
     -- Async request can not be timed out completely. Instead a
@@ -202,7 +208,7 @@ local function create_transport(host, port, user, password, callback,
     -- response anymore.
     -- Sync requests are implemented as async call + immediate
     -- wait for a result.
-    local transport         = internal.new_transport()
+    local transport         = internal.new_transport(on_event)
 
     local worker_fiber
     -- Flag indicates that connection is closing and waits until
@@ -351,6 +357,24 @@ local function create_transport(host, port, user, password, callback,
                                     stream_id, ...)
     end
 
+    -- Send a WATCH request. No-op if the connection is inactive or closing.
+    local function watch(key)
+        if not is_closing and
+           (state == 'active' or state == 'fetch_schema') then
+            watch_impl(transport, key)
+            worker_fiber:wakeup()
+        end
+    end
+
+    -- Send an UNWATCH request. No-op if the connection is inactive or closing.
+    local function unwatch(key)
+        if not is_closing and
+           (state == 'active' or state == 'fetch_schema') then
+            unwatch_impl(transport, key)
+            worker_fiber:wakeup()
+        end
+    end
+
     -- PROTOCOL STATE MACHINE (WORKER FIBER) --
     --
     -- The sm is implemented as a collection of functions performing
@@ -477,6 +501,8 @@ local function create_transport(host, port, user, password, callback,
         wait_state      = wait_state,
         perform_request = perform_request,
         perform_async_request = perform_async_request,
+        watch           = watch,
+        unwatch         = unwatch,
     }
 end
 
@@ -737,6 +763,20 @@ local function new_sm(host, port, opts, sock, greeting)
                opts.reconnect_after > 0 then
                 return opts.reconnect_after
             end
+        elseif what == 'event' then
+            local key, value = ...
+            local state = remote._watchers and remote._watchers[key]
+            if state then
+                state.value = value
+                state.has_value = true
+                state.version = state.version + 1
+                state.is_acknowledged = false
+                while state.idle do
+                    local watcher = state.idle
+                    state.idle = watcher._next
+                    watcher:_run_async()
+                end
+            end
         end
     end
     -- @deprecated since 1.10
@@ -880,6 +920,150 @@ function remote_methods:new_stream()
     }, { __index = self, __serialize = stream_serialize })
     stream.space._stream = stream
     return stream
+end
+
+local watcher_methods = {}
+local watcher_mt = {
+    __index = watcher_methods,
+    __tostring = function()
+        return 'net.box.watcher'
+    end,
+}
+watcher_mt.__serialize = watcher_mt.__tostring
+
+function watcher_methods:_run()
+    local state = self._state
+    assert(state ~= nil)
+    assert(state.has_value)
+    self._version = state.version
+    local status, err = pcall(self._func, state.key, state.value)
+    if not status then
+        log.error(err)
+    end
+    if not self._state then
+        -- The watcher was unregistered while the callback was running.
+        return
+    end
+    assert(state == self._state)
+    if self._version == state.version then
+        -- The value was not updated while this watcher was running.
+        -- Append it to the list of ready watchers and send an ack to
+        -- the server unless we've already sent it.
+        self._next = state.idle
+        state.idle = self
+        if not state.is_acknowledged then
+            self._conn._transport.watch(state.key)
+            state.is_acknowledged = true
+        end
+    else
+        -- The value was updated while this watcher was running.
+        -- Rerun it with the new value.
+        assert(self._version < state.version)
+        return self:_run()
+    end
+end
+
+function watcher_methods:_run_async()
+    fiber.new(self._run, self)
+end
+
+function watcher_methods:unregister()
+    if type(self) ~= 'table' then
+        box.error(E_PROC_LUA,
+                  'Use watcher:unregister() instead of watcher.unregister()')
+    end
+    local state = self._state
+    if not self._state then
+        box.error(E_PROC_LUA, 'Watcher is already unregistered')
+    end
+    self._state = nil
+    local conn = self._conn
+    assert(conn._watchers ~= nil)
+    assert(conn._watchers[state.key] == state)
+    if state.idle then
+        -- Remove the watcher from the idle list.
+        if state.idle == self then
+            state.idle = self._next
+        else
+            local watcher = state.idle
+            while watcher._next do
+                if watcher._next == self then
+                    watcher._next = self._next
+                    break
+                end
+                watcher = watcher._next
+            end
+        end
+    end
+    assert(state.watcher_count > 0)
+    state.watcher_count = state.watcher_count - 1
+    if state.watcher_count == 0 then
+        -- No watchers left. Unsubscribe and drop the state.
+        conn._transport.unwatch(state.key)
+        conn._watchers[state.key] = nil
+    end
+end
+
+function remote_methods:watch(key, func)
+    check_remote_arg(self, 'watch')
+    if type(key) ~= 'string' then
+        box.error(E_PROC_LUA, 'key must be a string')
+    end
+    if type(func) ~= 'function' then
+        box.error(E_PROC_LUA, 'func must be a function')
+    end
+    if not self._watchers then
+        self._watchers = {}
+        -- Install a trigger to resubscribe registered watchers on reconnect.
+        self._on_connect(function(conn)
+            for key, _ in pairs(conn._watchers) do
+                conn._transport.watch(key)
+            end
+        end)
+    end
+    local state = self._watchers[key]
+    if not state then
+        state = {}
+        state.key = key
+        state.value = nil
+        -- Set when the first value is received for the state. We can't rely
+        -- on the value being non-nil, because a state can actually have nil
+        -- value so we need a separate flag.
+        state.has_value = false
+        -- Incremented every time a new value is received for this state.
+        -- We use to reschedule a watcher that was already running when a new
+        -- value was received.
+        state.version = 0
+        -- Set to true if the last received value has been acknowledged
+        -- (that is we sent a WATCH packet after receiving it).
+        state.is_acknowledged = false
+        -- Number of watchers registered for this key. We delete a state when
+        -- nobody uses it.
+        state.watcher_count = 0
+        -- Singly-linked (by ._next) list of watchers ready to be notified
+        -- (i.e. registered and not currently running).
+        state.idle = nil
+        -- We don't care whether the connection is active or not, because if
+        -- the connection fails, we will resubscribe all registered watchers
+        -- from the on_connect trigger.
+        self._transport.watch(key)
+        self._watchers[key] = state
+    end
+    local watcher = setmetatable({
+        _conn = self,
+        _func = func,
+        _state = state,
+        _version = 0,
+        _next = nil,
+    }, watcher_mt)
+    state.watcher_count = state.watcher_count + 1
+    if state.has_value then
+        watcher:_run_async()
+    else
+        watcher._next = state.idle
+        state.idle = watcher
+    end
+    return watcher
 end
 
 function remote_methods:close()
