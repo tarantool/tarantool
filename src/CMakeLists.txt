@@ -174,6 +174,11 @@ set(api_headers
     ${PROJECT_SOURCE_DIR}/src/box/lua/tuple.h
     ${PROJECT_SOURCE_DIR}/src/lib/core/latch.h
     ${PROJECT_SOURCE_DIR}/src/lib/core/clock.h
+    ${PROJECT_SOURCE_DIR}/src/box/error.h
+    ${PROJECT_SOURCE_DIR}/src/lib/core/sio.h
+    ${PROJECT_SOURCE_DIR}/src/lib/core/diag.h
+    ${PROJECT_SOURCE_DIR}/src/lib/core/evio.h
+    ${PROJECT_SOURCE_DIR}/src/tarantool_ee.h
 )
 rebuild_module_api(${api_headers})
 

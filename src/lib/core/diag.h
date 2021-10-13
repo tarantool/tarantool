@@ -35,12 +35,14 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <assert.h>
 #include "say.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+/** \cond public */
+#include <assert.h>
 
 enum {
 	DIAG_ERRMSG_MAX = 512,
@@ -360,6 +362,8 @@ BuildSocketError(const char *file, unsigned line, const char *socketname,
 
 #define diag_set(...)							\
 	diag_set_detailed(__FILE__, __LINE__, __VA_ARGS__)
+
+/** \endcond public */
 
 #define diag_add(class, ...) do {					\
 	int save_errno = errno;						\

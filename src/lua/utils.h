@@ -306,6 +306,19 @@ luaL_iscallable(lua_State *L, int idx);
 LUA_API box_ibuf_t *
 luaT_toibuf(struct lua_State *L, int idx);
 
+/**
+ * Loads and runs the given string.
+ */
+LUA_API int
+luaT_dostring(struct lua_State *L, const char *str);
+
+/**
+ * Loads a buffer as a Lua chunk.
+ */
+LUA_API int
+luaT_loadbuffer(struct lua_State *L, const char *buff,
+		size_t sz, const char *name);
+
 /** \endcond public */
 
 /**

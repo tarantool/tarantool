@@ -38,8 +38,12 @@ extern "C" {
 
 struct vclock;
 
+/** \cond public */
+
 struct error *
 BuildClientError(const char *file, unsigned line, uint32_t errcode, ...);
+
+/** \endcond public */
 
 struct error *
 BuildAccessDeniedError(const char *file, unsigned int line,

@@ -52,6 +52,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+/** \cond public */
+
 enum {
 	/**
 	 * - Unix socket path is 108 bytes max;
@@ -62,6 +64,8 @@ enum {
 	 */
 	SERVICE_NAME_MAXLEN = 200,
 };
+
+/** \endcond public */
 
 /**
  * Check if an errno, returned from a sio function, means a

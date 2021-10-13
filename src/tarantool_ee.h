@@ -36,6 +36,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+/** \cond public */
+
 enum {
 	MAX_OPT_NAME_LEN = 256,
 	/** Maximum count of listening sockets */
@@ -100,6 +102,8 @@ TARANTOOL_EE_FUNCTION(void, iproto_service_array_stop_listen,
 TARANTOOL_EE_FUNCTION(int, iproto_service_array_bind,
 		      struct evio_service *array, size_t *size,
 		      const struct  cfg_uri_array *uri_array)
+
+/** \endcond public */
 
 #if defined(__cplusplus)
 } /* extern "C" */

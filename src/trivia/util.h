@@ -105,6 +105,8 @@ strnindex(const char **haystack, const char *needle, uint32_t len, uint32_t hmax
 #define lengthof(array) (sizeof (array) / sizeof ((array)[0]))
 #endif
 
+/** \cond public */
+
 /**
  * An x* variant of a memory allocation function calls the original function
  * and panics if it fails (i.e. it should never return NULL).
@@ -125,8 +127,6 @@ strnindex(const char **haystack, const char *needle, uint32_t len, uint32_t hmax
 #define xrealloc(ptr, size)	xalloc_impl((size), realloc, (ptr), (size))
 #define xstrdup(s)		xalloc_impl(strlen((s)) + 1, strdup, (s))
 #define xstrndup(s, n)		xalloc_impl((n) + 1, strndup, (s), (n))
-
-/** \cond public */
 
 /**
  * Feature test macroses for -std=c11 / -std=c++11

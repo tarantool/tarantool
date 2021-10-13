@@ -555,6 +555,19 @@ luaT_toibuf(struct lua_State *L, int idx)
 	return NULL;
 }
 
+ int
+luaT_dostring(struct lua_State *L, const char *str)
+{
+	return luaL_dostring(L, str);
+}
+
+int
+luaT_loadbuffer(struct lua_State *L, const char *buff,
+		size_t sz, const char *name)
+{
+	return luaL_loadbuffer(L, buff, sz, name);
+}
+
 int
 luaL_checkconstchar(struct lua_State *L, int idx, const char **res,
 		    uint32_t *cdata_type_p)

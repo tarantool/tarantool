@@ -43,6 +43,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+/** \cond public */
+
 /**
  * A way to add a listening socket to the event loop. Callbacks
  * are invoked on bind and accept events.
@@ -67,10 +69,13 @@ extern "C" {
  * If a service is not started, but only initialized, no
  * dedicated cleanup/destruction is necessary.
  */
+#include <sys/socket.h>
 struct evio_service;
+struct ev_loop;
 
 typedef int (*evio_accept_f)(struct evio_service *, int, struct sockaddr *,
 			      socklen_t);
+/** \endcond public */
 
 struct evio_service
 {
@@ -97,13 +102,16 @@ struct evio_service
 
 	/** libev io object for the acceptor socket. */
 	struct ev_io ev;
-	ev_loop *loop;
+	struct ev_loop *loop;
 };
+
+/** \cond public */
 
 /** Initialize the service. Don't bind to the port yet. */
 void
-evio_service_init(ev_loop *loop, struct evio_service *service, const char *name,
-		  evio_accept_f on_accept, void *on_accept_param);
+evio_service_init(struct ev_loop *loop, struct evio_service *service,
+		  const char *name, evio_accept_f on_accept,
+		  void *on_accept_param);
 
 /** Bind service to specified uri */
 int
@@ -140,11 +148,13 @@ evio_service_is_active(struct evio_service *service);
 struct evio_service *
 evio_service_by_index(struct evio_service *service, int idx);
 
+/** \endcond public */
+
 int
 evio_socket(struct ev_io *coio, int domain, int type, int protocol);
 
 void
-evio_close(ev_loop *loop, struct ev_io *evio);
+evio_close(struct ev_loop *loop, struct ev_io *evio);
 
 static inline bool
 evio_has_fd(struct ev_io *ev)
@@ -153,7 +163,7 @@ evio_has_fd(struct ev_io *ev)
 }
 
 static inline void
-evio_timeout_init(ev_loop *loop, ev_tstamp *start, ev_tstamp *delay,
+evio_timeout_init(struct ev_loop *loop, ev_tstamp *start, ev_tstamp *delay,
 		  ev_tstamp timeout)
 {
 	*start = ev_monotonic_now(loop);
@@ -161,7 +171,7 @@ evio_timeout_init(ev_loop *loop, ev_tstamp *start, ev_tstamp *delay,
 }
 
 static inline void
-evio_timeout_update(ev_loop *loop, ev_tstamp *start, ev_tstamp *delay)
+evio_timeout_update(struct ev_loop *loop, ev_tstamp *start, ev_tstamp *delay)
 {
 	ev_tstamp elapsed = ev_monotonic_now(loop) - *start;
 	*start += elapsed;
