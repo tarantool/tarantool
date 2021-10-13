@@ -54,6 +54,8 @@ tarball: clean
 		--exclude=test-run/lib/tarantool-python/debian \
 		--exclude=third_party/luafun/debian \
 		--exclude=FreeBSD \
+		--exclude="*.exe" \
+		--exclude="*.dll" \
 		--transform='s,^\.,tarantool_$(UVERSION),S' \
 		-czf ../tarantool_$(UVERSION).orig.tar.gz .
 
