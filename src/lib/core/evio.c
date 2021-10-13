@@ -433,3 +433,40 @@ evio_service_detach(struct evio_service *service)
 	}
 	ev_io_set(&service->ev, -1, 0);
 }
+
+void
+evio_service_attach(struct evio_service *dst, const struct evio_service *src)
+{
+	strcpy(dst->host, src->host);
+	strcpy(dst->serv, src->serv);
+	dst->addrstorage = src->addrstorage;
+	dst->addr_len = src->addr_len;
+	ev_io_set(&dst->ev, src->ev.fd, EV_READ);
+}
+
+struct evio_service *
+evio_service_alloc(size_t count)
+{
+	return xcalloc(count, sizeof(struct evio_service));
+}
+
+int
+evio_service_bound_address(char *buf, struct evio_service *service)
+{
+	return sio_addr_snprintf(buf, SERVICE_NAME_MAXLEN,
+				 (struct sockaddr *)&service->addrstorage,
+				 service->addr_len);
+}
+
+bool
+evio_service_is_active(struct evio_service *service)
+{
+	return service->ev.fd >= 0;
+}
+
+struct evio_service *
+evio_service_by_index(struct evio_service *service, int idx)
+{
+	assert(idx >= 0);
+	return &service[idx];
+}

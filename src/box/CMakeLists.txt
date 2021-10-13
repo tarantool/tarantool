@@ -194,6 +194,8 @@ add_library(box STATIC
     call.c
     merger.c
     ibuf.c
+    cfg_uri.c
+    iproto_service.c
     ${sql_sources}
     ${lua_sources}
     lua/init.c

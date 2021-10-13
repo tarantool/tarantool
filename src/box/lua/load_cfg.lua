@@ -905,3 +905,8 @@ box.internal.cfg = setmetatable({}, {
 -- package.cpath = package.cpath:gsub(
 --     '?.so', '?.' .. format
 -- ):gsub('loadall.so', 'loadall.' .. format)
+
+box.internal.cfg_get_listen = function() return box.cfg.listen end
+box.internal.change_template_cfg = function(key, val)
+    template_cfg[key] = val
+end
