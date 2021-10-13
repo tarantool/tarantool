@@ -28,7 +28,7 @@ DEB_DH_SYSTEMD_START_ARGS_tarantool-common  := --no-restart-on-upgrade tarantool
 
 # Needed for proper backtraces in fiber.info()
 DEB_DH_STRIP_ARGS	        := -X/usr/bin/tarantool
-export DEB_BUILD_MAINT_OPTIONS = hardening=-stackprotector,-pie
+export DEB_BUILD_MAINT_OPTIONS = hardening=-stackprotector
 DPKG_EXPORT_BUILDFLAGS = 1
 
 include /usr/share/dpkg/buildflags.mk
