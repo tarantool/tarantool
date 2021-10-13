@@ -720,6 +720,7 @@ main(int argc, char **argv)
 	try {
 		box_init();
 		box_lua_init(tarantool_L);
+		box_plugins_init();
 		/*
 		 * Reserve a fiber to run on_shutdown triggers.
 		 * Make sure the fiber is non-cancellable so that

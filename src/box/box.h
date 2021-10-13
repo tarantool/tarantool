@@ -285,6 +285,9 @@ box_demote(void);
 int
 box_promote_qsync(void);
 
+void
+box_plugins_init(void);
+
 /* box_select is private and used only by FFI */
 API_EXPORT int
 box_select(uint32_t space_id, uint32_t index_id,

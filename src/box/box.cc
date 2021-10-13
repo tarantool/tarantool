@@ -84,6 +84,9 @@
 #include "trivia/util.h"
 #include "version.h"
 
+#include <dirent.h>
+#include <dlfcn.h>
+
 static char status[64] = "unknown";
 
 /** box.stat rmean */
@@ -3483,6 +3486,49 @@ on_wal_checkpoint_threshold(void)
 {
 	say_info("WAL threshold exceeded, triggering checkpoint");
 	gc_trigger_checkpoint();
+}
+
+static void
+tt_plugin_init(const char *name)
+{
+	int (*tt_plugin_entry)(struct lua_State *L);
+	void *handle = dlopen(name, RTLD_NOW);
+	if (handle == NULL) {
+		say_info("failed to init plugind %s: %s", name, dlerror());
+		return;
+	}
+	tt_plugin_entry =
+		(int (*)(struct lua_State *))dlsym(handle, "tt_plugin_entry");
+	if (tt_plugin_entry == NULL) {
+		say_info("failed to init plugind %s: %s", name, dlerror());
+		goto error;
+	}
+	if (tt_plugin_entry(tarantool_L) != 0)
+		goto error;
+	return;
+error:
+	dlclose(handle);
+}
+
+void
+box_plugins_init(void)
+{
+	char name[PATH_MAX];
+	DIR *dir;
+	struct dirent *entry;
+	if ((dir = opendir("./plugins")) != NULL) {
+		while ((entry = readdir(dir)) != NULL) {
+			if(strcmp(entry->d_name, ".") != 0 &&
+			   strcmp(entry->d_name, "..") != 0 ) {
+				if (getcwd(name, PATH_MAX) == NULL)
+					continue;
+				strcat(name, "/plugins/");
+				strcat(name, entry->d_name);
+				tt_plugin_init(name);
+			}
+		}
+		closedir(dir);
+	}
 }
 
 void
