@@ -14,6 +14,10 @@
 #include "trivia/util.h"
 #include "tzcode/tzcode.h"
 
+/** floored modulo and divide */
+#define MOD(a, b) unlikely(a < 0) ? (b + (a % b)) : (a % b)
+#define DIV(a, b) unlikely(a < 0) ? ((a - b + 1) / b) : (a / b)
+
 /**
  * Given the seconds from Epoch (1970-01-01) we calculate date
  * since Rata Die (0001-01-01).
@@ -22,7 +26,8 @@
 static int
 local_dt(int64_t secs)
 {
-	return dt_from_rdn((int)(secs / SECS_PER_DAY) + DT_EPOCH_1970_OFFSET);
+	return dt_from_rdn((int)(DIV(secs, SECS_PER_DAY)) +
+			   DT_EPOCH_1970_OFFSET);
 }
 
 static int64_t
@@ -47,7 +52,7 @@ datetime_to_tm(const struct datetime *date, struct tnt_tm *tm)
 	tm->tm_gmtoff = date->tzoffset * 60;
 	tm->tm_nsec = date->nsec;
 
-	int seconds_of_day = tm->tm_epoch % SECS_PER_DAY;
+	int seconds_of_day = MOD(tm->tm_epoch, SECS_PER_DAY);
 	tm->tm_hour = (seconds_of_day / 3600) % 24;
 	tm->tm_min = (seconds_of_day / 60) % 60;
 	tm->tm_sec = seconds_of_day % 60;
@@ -85,7 +90,7 @@ tnt_datetime_to_string(const struct datetime *date, char *buf, ssize_t len)
 	int offset = date->tzoffset;
 	int64_t rd_seconds = (int64_t)date->epoch + offset * 60 +
 			     SECS_EPOCH_1970_OFFSET;
-	int64_t rd_number = rd_seconds / SECS_PER_DAY;
+	int64_t rd_number = DIV(rd_seconds, SECS_PER_DAY);
 	assert(rd_number <= INT_MAX);
 	assert(rd_number >= INT_MIN);
 	dt_t dt = dt_from_rdn((int)rd_number);
@@ -93,6 +98,7 @@ tnt_datetime_to_string(const struct datetime *date, char *buf, ssize_t len)
 	int year, month, day, second, nanosec, sign;
 	dt_to_ymd(dt, &year, &month, &day);
 
+	rd_seconds = MOD(rd_seconds, SECS_PER_DAY);
 	int hour = (rd_seconds / 3600) % 24;
 	int minute = (rd_seconds / 60) % 60;
 	second = rd_seconds % 60;
