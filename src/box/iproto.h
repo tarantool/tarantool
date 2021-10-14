@@ -33,6 +33,8 @@
 
 #include <stddef.h>
 
+#include "cfg_uri.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -54,6 +56,14 @@ enum {
 	IPROTO_FIBER_POOL_SIZE_FACTOR = 5,
 	/** Maximum count of iproto threads. */
 	IPROTO_THREADS_MAX = 1000,
+	/** Maximum count of listening sockets */
+	IPROTO_LISTEN_SOCKET_MAX = 20,
+	/**
+	 * We need `SERVICE_NAME_MAXLEN` bytes for each listen
+	 * address and two bytes for delimiter `,` between them.
+	 */
+	IPROTO_LISTEN_INFO_MAXLEN =
+		(SERVICE_NAME_MAXLEN + 2) * IPROTO_LISTEN_SOCKET_MAX,
 };
 
 struct iproto_stats {
@@ -117,7 +127,8 @@ void
 iproto_init(int threads_count);
 
 int
-iproto_listen(const char *uri);
+iproto_listen(struct cfg_uri_array *uri_array,
+	      const struct cfg_uri_array_vtab *vtab);
 
 void
 iproto_set_msg_max(int iproto_msg_max);

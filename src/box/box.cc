@@ -678,6 +678,20 @@ box_check_uri(const char *source, const char *option_name)
 	return 0;
 }
 
+static int
+box_check_listen(void)
+{
+	const struct cfg_uri_array_vtab *vtab = cfg_uri_array_vtab_ptr;
+	struct cfg_uri_array *uri_array =
+		vtab->cfg_uri_array_new(tarantool_L, "listen");
+	if (uri_array == NULL)
+		return -1;
+	int rc = vtab->cfg_uri_array_check_uri(uri_array, box_check_uri,
+					       "listen");
+	vtab->cfg_uri_array_delete(uri_array);
+	return rc;
+}
+
 static enum election_mode
 box_check_election_mode(void)
 {
@@ -1146,7 +1160,7 @@ box_check_config(void)
 {
 	struct tt_uuid uuid;
 	box_check_say();
-	if (box_check_uri(cfg_gets("listen"), "listen") != 0)
+	if (box_check_listen() != 0)
 		diag_raise();
 	box_check_instance_uuid(&uuid);
 	box_check_replicaset_uuid(&uuid);
@@ -1833,10 +1847,19 @@ box_demote(void)
 int
 box_listen(void)
 {
-	const char *uri = cfg_gets("listen");
-	if (box_check_uri(uri, "listen") != 0 || iproto_listen(uri) != 0)
+	const struct cfg_uri_array_vtab *vtab = cfg_uri_array_vtab_ptr;
+	struct cfg_uri_array *uri_array =
+		vtab->cfg_uri_array_new(tarantool_L, "listen");
+	if (uri_array == NULL)
 		return -1;
-	return 0;
+	int rc = vtab->cfg_uri_array_check_uri(uri_array, box_check_uri,
+					       "listen");
+	if (rc != 0)
+		goto end;
+	rc = iproto_listen(uri_array, vtab);
+end:
+	vtab->cfg_uri_array_delete(uri_array);
+	return rc;
 }
 
 void

@@ -118,6 +118,7 @@ add_library(box STATIC
     memtx_allocator.cc
     msgpack.c
     iproto.cc
+    cfg_uri.c
     xrow_io.cc
     tuple_convert.c
     identifier.c

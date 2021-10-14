@@ -584,8 +584,8 @@ lbox_info_sql(struct lua_State *L)
 static int
 lbox_info_listen(struct lua_State *L)
 {
-	/* NULL is ok, no need to check. */
-	char addrbuf[SERVICE_NAME_MAXLEN];
+	/** NULL is ok, no need to check. */
+	char addrbuf[IPROTO_LISTEN_INFO_MAXLEN];
 	lua_pushstring(L, iproto_bound_address(addrbuf));
 	return 1;
 }
