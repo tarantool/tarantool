@@ -102,6 +102,8 @@ box_txn_rollback_to_savepoint
 box_txn_savepoint
 box_update
 box_upsert
+cfg_get_uri_array
+cfg_uri_array_register
 clock_monotonic
 clock_monotonic64
 clock_process

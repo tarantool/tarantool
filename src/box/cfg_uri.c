@@ -44,7 +44,7 @@ struct cfg_uri_array {
 	const char *uri;
 };
 
-static int
+int
 cfg_get_uri_array(struct lua_State *L, const char *param)
 {
 	const char *buf =
@@ -106,3 +106,9 @@ static struct cfg_uri_array_vtab default_cfg_uri_array_vtab = {
 	/* .cfg_uri_array_check_uri = */ cfg_uri_array_check_uri,
 };
 struct cfg_uri_array_vtab *cfg_uri_array_vtab_ptr = &default_cfg_uri_array_vtab;
+
+API_EXPORT void
+cfg_uri_array_register(struct cfg_uri_array_vtab *vtab)
+{
+	cfg_uri_array_vtab_ptr = vtab;
+}

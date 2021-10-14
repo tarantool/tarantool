@@ -30,13 +30,18 @@
  * SUCH DAMAGE.
  */
 #include "sio.h"
+#include "trivia/util.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+/** \cond public */
+
 struct cfg_uri_array;
 struct lua_State;
+struct cfg_uri_array_vtab;
+TT_PLUGIN_REGISTER(cfg_uri_array);
 
 struct cfg_uri_array_vtab {
 	struct cfg_uri_array *
@@ -53,6 +58,11 @@ struct cfg_uri_array_vtab {
 				   int (*check_uri)(const char *, const char *),
 				   const char *option_name);
 };
+
+API_EXPORT int
+cfg_get_uri_array(struct lua_State *L, const char *param);
+
+/** \endcond public */
 
 extern struct cfg_uri_array_vtab *cfg_uri_array_vtab_ptr;
 

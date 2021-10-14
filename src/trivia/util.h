@@ -99,6 +99,8 @@ strindex(const char **haystack, const char *needle, uint32_t hmax);
 uint32_t
 strnindex(const char **haystack, const char *needle, uint32_t len, uint32_t hmax);
 
+/** \cond public */
+
 #define nelem(x)     (sizeof((x))/sizeof((x)[0]))
 #define field_sizeof(compound_type, field) sizeof(((compound_type *)NULL)->field)
 #ifndef lengthof
@@ -125,8 +127,6 @@ strnindex(const char **haystack, const char *needle, uint32_t len, uint32_t hmax
 #define xrealloc(ptr, size)	xalloc_impl((size), realloc, (ptr), (size))
 #define xstrdup(s)		xalloc_impl(strlen((s)) + 1, strdup, (s))
 #define xstrndup(s, n)		xalloc_impl((n) + 1, strndup, (s), (n))
-
-/** \cond public */
 
 /**
  * Feature test macroses for -std=c11 / -std=c++11
@@ -411,6 +411,10 @@ strnindex(const char **haystack, const char *needle, uint32_t len, uint32_t hmax
 #endif
 
 /** Statement Attributes }}} */
+
+#define TT_PLUGIN_REGISTER(plugname, ...) \
+API_EXPORT void \
+plugname##_##register(struct plugname##_##vtab *vtab)
 
 /** \endcond public */
 
