@@ -1555,6 +1555,10 @@ static struct rule *Rule_sort(struct rule *rp){
       rp = Rule_merge(x[i], rp);
       x[i] = 0;
     }
+    if ( i==32 ){
+      rp->next = pNext;
+      return 0;
+    }
     x[i] = rp;
     rp = pNext;
   }
@@ -1673,6 +1677,10 @@ int main(int argc, char **argv)
   }
   lem.startRule = lem.rule;
   lem.rule = Rule_sort(lem.rule);
+  if ( lem.rule==0 ){
+    fprintf(stderr,"Invalid file containing rules, too many rules.\n");
+    exit(1);
+  }
 
   /* Generate a reprint of the grammar, if requested on the command line */
   if( rpflag ){
