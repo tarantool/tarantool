@@ -252,9 +252,10 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 		if (++stream->row_count % WAL_ROWS_PER_YIELD == 0) {
 			xstream_yield(stream);
 		}
-		if (stream->row_count % 100000 == 0)
-			say_info("%.1fM rows processed",
-				 stream->row_count / 1000000.);
+		if (stream->row_count % 100000 == 0) {
+			say_info_ratelimited("%.1fM rows processed",
+					     stream->row_count / 1e6);
+		}
 		/*
 		 * Read the next row from xlog file.
 		 *
