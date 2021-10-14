@@ -481,8 +481,10 @@ applier_wait_snapshot(struct applier *applier)
 		if (iproto_type_is_dml(row.type)) {
 			if (apply_snapshot_row(&row) != 0)
 				diag_raise();
-			if (++row_count % ROWS_PER_LOG == 0)
-				say_info("%.1fM rows received", row_count / 1e6);
+			if (++row_count % ROWS_PER_LOG == 0) {
+				say_info_ratelimited("%.1fM rows received",
+						     row_count / 1e6);
+			}
 		} else if (row.type == IPROTO_OK) {
 			if (applier->version_id < version_id(1, 7, 0)) {
 				/*
@@ -560,7 +562,8 @@ applier_wait_register(struct applier *applier, uint64_t row_count)
 		struct stailq rows;
 		row_count += applier_read_tx(applier, &rows, TIMEOUT_INFINITY);
 		while (row_count >= next_log_cnt) {
-			say_info("%.1fM rows received", next_log_cnt / 1e6);
+			say_info_ratelimited("%.1fM rows received",
+					     next_log_cnt / 1e6);
 			next_log_cnt += ROWS_PER_LOG;
 		}
 		struct xrow_header *first_row =

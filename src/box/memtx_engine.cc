@@ -190,8 +190,8 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 		}
 		++row_count;
 		if (row_count % 100000 == 0) {
-			say_info("%.1fM rows processed",
-				 row_count / 1000000.);
+			say_info_ratelimited("%.1fM rows processed",
+					     row_count / 1e6);
 			fiber_yield_timeout(0);
 		}
 	}
@@ -522,8 +522,10 @@ checkpoint_write_row(struct xlog *l, struct xrow_header *row)
 	if (written < 0)
 		return -1;
 
-	if ((l->rows + l->tx_rows) % 100000 == 0)
-		say_crit("%.1fM rows written", (l->rows + l->tx_rows) / 1000000.0);
+	if ((l->rows + l->tx_rows) % 100000 == 0) {
+		say_crit_ratelimited("%.1fM rows written",
+				     (l->rows + l->tx_rows) / 1e6);
+	}
 	return 0;
 
 }
