@@ -22,3 +22,9 @@ jobs:
     uses: tarantool/vshard/.github/workflows/reusable_testing.yml@master
     with:
       artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+
+  cartridge:
+    needs: tarantool
+    uses: tarantool/cartridge/.github/workflows/reusable-backend-test.yml@master
+    with:
+      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
