@@ -13,7 +13,7 @@ jobs:
   tarantool:
     uses: tarantool/tarantool/.github/workflows/reusable_build.yml@master
     with:
-      ref: ${{ github.ref }}
+      ref: ${{ github.sha }}
       os: ubuntu
       dist: focal
 
