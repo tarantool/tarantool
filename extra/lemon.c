@@ -1555,6 +1555,7 @@ static struct rule *Rule_sort(struct rule *rp){
       rp = Rule_merge(x[i], rp);
       x[i] = 0;
     }
+    /* coverity[overrun-local] */
     x[i] = rp;
     rp = pNext;
   }
