@@ -1,0 +1,20 @@
+test_run = require('test_run').new()
+net = require('net.box')
+--
+-- gh-6520: race between box.session.push and closing connection
+-- leads to a crash.
+--
+box.schema.user.grant('guest', 'super')
+test_run:cmd("setopt delimiter ';'")
+function test()
+    for i = 1, 10 do
+        box.session.push(i)
+    end
+end;
+for i = 1, 100 do
+    local c = net.connect(box.cfg.listen)
+    c:call('test', {}, {is_async = true})
+    c:close()
+end;
+test_run:cmd("setopt delimiter ''");
+box.schema.user.revoke('guest', 'super')
