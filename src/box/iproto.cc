@@ -1652,6 +1652,13 @@ tx_process_disconnect(struct cmsg *m)
 		container_of(m, struct iproto_connection, disconnect_msg);
 	if (con->session != NULL) {
 		session_close(con->session);
+		/*
+		 * When kharon returns, it should not go back - the socket is
+		 * already dead anyway, and soon the connection itself will be
+		 * deleted. More pushes can't come, because after the session is
+		 * closed, its push() method is replaced with a stub.
+		 */
+		con->tx.is_push_pending = false;
 		if (! rlist_empty(&session_on_disconnect)) {
 			tx_fiber_init(con->session, 0);
 			session_run_on_disconnect_triggers(con->session);
