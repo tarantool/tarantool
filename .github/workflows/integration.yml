@@ -28,3 +28,9 @@ jobs:
     uses: tarantool/cartridge/.github/workflows/reusable-backend-test.yml@master
     with:
       artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+
+  smtp:
+    needs: tarantool
+    uses: tarantool/smtp/.github/workflows/reusable_testing.yml@master
+    with:
+      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
