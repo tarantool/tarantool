@@ -27,6 +27,10 @@ jobs:
       OS: ${{ inputs.os }}
       DIST: ${{ inputs.dist }}
     steps:
+      # Permissions correction is needed for self-host runners,
+      # where work path is saved between different workflows runs.
+      - name: 'Correct file permissions in the workspace'
+        run: sudo chown -R $(id -u):$(id -g) .
       - uses: actions/checkout@v2
         with:
           ref: ${{ inputs.ref }}
