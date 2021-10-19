@@ -2148,12 +2148,14 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 	return 0;
 }
 
-static inline void
+static inline int
 iproto_do_cfg(struct iproto_cfg_msg *msg)
 {
-	if (cbus_call(&net_pipe, &tx_pipe, msg, iproto_do_cfg_f,
-		      NULL, TIMEOUT_INFINITY) != 0)
-		diag_raise();
+	bool prev = fiber_set_cancellable(false);
+	int rc = cbus_call(&net_pipe, &tx_pipe, msg, iproto_do_cfg_f,
+			   NULL, TIMEOUT_INFINITY);
+	fiber_set_cancellable(prev);
+	return rc;
 }
 
 void
@@ -2162,7 +2164,8 @@ iproto_listen(const char *uri)
 	struct iproto_cfg_msg cfg_msg;
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_LISTEN);
 	cfg_msg.uri = uri;
-	iproto_do_cfg(&cfg_msg);
+	if (iproto_do_cfg(&cfg_msg) != 0)
+		diag_raise();
 }
 
 size_t
@@ -2200,7 +2203,9 @@ iproto_set_msg_max(int new_iproto_msg_max)
 	struct iproto_cfg_msg cfg_msg;
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_MSG_MAX);
 	cfg_msg.iproto_msg_max = new_iproto_msg_max;
-	iproto_do_cfg(&cfg_msg);
+	int rc = iproto_do_cfg(&cfg_msg);
+	(void)rc;
+	assert(rc == 0);
 	cpipe_set_max_input(&net_pipe, new_iproto_msg_max / 2);
 }
 
