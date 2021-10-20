@@ -3102,6 +3102,7 @@ iproto_listen(const char *uri)
 {
 	iproto_send_stop_msg();
 	evio_service_stop(&tx_binary);
+	evio_service_init(loop(), &tx_binary, "tx_binary", NULL, NULL);
 	if (uri == NULL) {
 		tx_binary.addr_len = 0;
 		return 0;
