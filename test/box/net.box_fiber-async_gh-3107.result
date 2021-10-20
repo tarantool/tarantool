@@ -62,7 +62,7 @@ future:is_ready()
 future:wait_result(0.01) -- Must fail on timeout.
 ---
 - null
-- Timeout exceeded
+- timed out
 ...
 finalize_long()
 ---
@@ -128,7 +128,7 @@ assert_no_csw(future.result, future)
 assert_no_csw(future.wait_result, future, 0)
 ---
 - null
-- Timeout exceeded
+- timed out
 ...
 finalize_long()
 ---

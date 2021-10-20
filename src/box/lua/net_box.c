@@ -1841,7 +1841,7 @@ luaT_netbox_request_wait_result(struct lua_State *L)
 	while (!netbox_request_is_ready(request)) {
 		if (!netbox_request_wait(request, &timeout)) {
 			luaL_testcancel(L);
-			diag_set(ClientError, ER_TIMEOUT);
+			diag_set(TimedOut);
 			return luaT_push_nil_and_error(L);
 		}
 	}
@@ -1931,7 +1931,7 @@ retry:
 	do {
 		if (!netbox_request_wait(request, &timeout)) {
 			luaL_testcancel(L);
-			diag_set(ClientError, ER_TIMEOUT);
+			diag_set(TimedOut);
 			luaT_push_nil_and_error(L);
 			goto error;
 		}
@@ -2132,7 +2132,7 @@ luaT_netbox_transport_perform_request(struct lua_State *L)
 			netbox_request_unregister(&request);
 			netbox_request_destroy(&request);
 			luaL_testcancel(L);
-			diag_set(ClientError, ER_TIMEOUT);
+			diag_set(TimedOut);
 			return luaT_push_nil_and_error(L);
 		}
 	}

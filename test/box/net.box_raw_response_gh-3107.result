@@ -68,7 +68,7 @@ for i = 1, 10 do fiber.create(function() ret[i] = future:wait_result(1000) count
 future:wait_result(0.01) -- Must fail on timeout.
 ---
 - null
-- Timeout exceeded
+- timed out
 ...
 finalize_long()
 ---

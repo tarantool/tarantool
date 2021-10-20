@@ -120,7 +120,7 @@ remote_space:insert({0}, { timeout = 1.00 })
 ...
 remote_space:insert({1}, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_space:insert({2})
 ---
@@ -128,7 +128,7 @@ remote_space:insert({2})
 ...
 remote_space:replace({0}, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_space:replace({1})
 ---
@@ -140,7 +140,7 @@ remote_space:replace({2}, { timeout = 1.00 })
 ...
 remote_space:upsert({3}, {}, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_space:upsert({4}, {})
 ---
@@ -153,7 +153,7 @@ remote_space:upsert({3}, {})
 ...
 remote_space:update({3}, {}, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_space:update({4}, {})
 ---
@@ -169,7 +169,7 @@ remote_space:update({3}, {})
 ...
 remote_pk:update({5}, {}, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_pk:update({4}, {})
 ---
@@ -193,11 +193,11 @@ remote_space:get({1}, { timeout = 1.00 })
 ...
 remote_space:get({2}, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_pk:get({3}, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_pk:get({4})
 ---
@@ -209,7 +209,7 @@ remote_pk:get({5}, { timeout = 1.00 })
 ...
 remote_space:select({2}, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_space:select({2}, { timeout = 1.00 })
 ---
@@ -225,7 +225,7 @@ remote_pk:select({2}, { timeout = 1.00 })
 ...
 remote_pk:select({2}, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_pk:select({2})
 ---
@@ -249,7 +249,7 @@ remote_space:select({5}, { iterator = 'LE', limit = 5})
 ...
 remote_space:select({5}, { timeout = 1e-9, iterator = 'LE', limit = 5 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_pk:select({2}, { timeout = 1.00, iterator = 'LE', limit = 5 })
 ---
@@ -265,7 +265,7 @@ remote_pk:select({2}, { iterator = 'LE', limit = 5})
 ...
 remote_pk:select({2}, { timeout = 1e-9, iterator = 'LE', limit = 5 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_pk:count({2}, { timeout = 1.00})
 ---
@@ -273,7 +273,7 @@ remote_pk:count({2}, { timeout = 1.00})
 ...
 remote_pk:count({2}, { timeout = 1e-9})
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_pk:count({2})
 ---
@@ -289,7 +289,7 @@ remote_pk:count({2}, { iterator = 'LE'})
 ...
 remote_pk:count({2}, { timeout = 1e-9, iterator = 'LE' })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_pk:min(nil, { timeout = 1.00 })
 ---
@@ -297,7 +297,7 @@ remote_pk:min(nil, { timeout = 1.00 })
 ...
 remote_pk:min(nil, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_pk:min(nil)
 ---
@@ -305,7 +305,7 @@ remote_pk:min(nil)
 ...
 remote_pk:min({0}, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_pk:min({1})
 ---
@@ -321,7 +321,7 @@ remote_pk:max(nil)
 ...
 remote_pk:max(nil, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_pk:max(nil, { timeout = 1.00 })
 ---
@@ -333,7 +333,7 @@ remote_pk:max({0}, { timeout = 1.00 })
 ...
 remote_pk:max({1}, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 remote_pk:max({2})
 ---
@@ -371,7 +371,7 @@ test_run:cmd("setopt delimiter ''");
 ...
 _ = remote_space:delete({0}, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 _ = remote_pk:delete({0}, { timeout = 1.00 })
 ---
@@ -381,11 +381,11 @@ _ = remote_space:delete({1}, { timeout = 1.00 })
 ...
 _ = remote_pk:delete({1}, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 _ = remote_space:delete({2}, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 _ = remote_pk:delete({2})
 ---
@@ -417,7 +417,7 @@ cn:call('ret_after', {0.01}, { timeout = 1.00 })
 ...
 cn:call('ret_after', {1.00}, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 cn:eval('return ret_after(...)', {0.01}, { timeout = 1.00 })
 ---
@@ -425,7 +425,7 @@ cn:eval('return ret_after(...)', {0.01}, { timeout = 1.00 })
 ...
 cn:eval('return ret_after(...)', {1.00}, { timeout = 1e-9 })
 ---
-- error: Timeout exceeded
+- error: timed out
 ...
 cn:close()
 ---

@@ -89,7 +89,7 @@ future:result()
 future:wait_result(0.01) -- Must fail on timeout.
  | ---
  | - null
- | - Timeout exceeded
+ | - timed out
  | ...
 finalize_long()
  | ---
