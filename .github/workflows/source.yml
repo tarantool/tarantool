@@ -18,7 +18,7 @@ jobs:
         startsWith(github.ref, 'refs/tags') ) &&
         ! endsWith(github.ref, '-notest')
 
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04-self-hosted
 
     strategy:
       fail-fast: false
