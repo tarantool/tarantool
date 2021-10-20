@@ -15,7 +15,7 @@ jobs:
         github.event.pull_request.head.repo.full_name != github.repository ) &&
         ! endsWith(github.ref, '-notest')
 
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-20.04-self-hosted
 
     strategy:
       fail-fast: false
