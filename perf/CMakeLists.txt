@@ -12,3 +12,6 @@ include_directories(${CMAKE_SOURCE_DIR}/third_party)
 
 add_executable(tuple.perftest tuple.cc)
 target_link_libraries(tuple.perftest core box tuple benchmark::benchmark)
+
+add_executable(mp_datetime.perftest mp_datetime.cc)
+target_link_libraries(mp_datetime.perftest msgpuck benchmark::benchmark)
