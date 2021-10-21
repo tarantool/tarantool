@@ -309,6 +309,32 @@ test_fiber(lua_State *L)
 }
 
 static int
+fiber_set_ctx_test_func(va_list va)
+{
+	(void)va;
+	char *data = fiber_get_ctx(fiber_self());
+	data[0] = 'o';
+	data[1] = 'k';
+	data[2] = 0;
+	fiber_set_cancellable(true);
+	fiber_sleep(0.01);
+	return 0;
+}
+
+static int
+test_fiber_set_ctx(lua_State *L)
+{
+	struct fiber *fiber = fiber_new("test fiber", fiber_set_ctx_test_func);
+	fiber_set_joinable(fiber, true);
+	char data[3] = { '?', '!', '\0' };
+	fiber_set_ctx(fiber, &data);
+	fiber_wakeup(fiber);
+	int ret = fiber_join(fiber);
+	lua_pushboolean(L, (int)(ret == 0 && (strcmp(&data[0], "ok") == 0)));
+	return 1;
+}
+
+static int
 test_cord(lua_State *L)
 {
 	struct slab_cache *slabc = cord_slab_cache();
@@ -2972,6 +2998,7 @@ luaopen_module_api(lua_State *L)
 		{"test_touint64", test_touint64 },
 		{"test_toint64", test_toint64 },
 		{"test_fiber", test_fiber },
+		{"test_fiber_set_ctx", test_fiber_set_ctx },
 		{"test_cord", test_cord },
 		{"pushcdata", test_pushcdata },
 		{"checkcdata", test_checkcdata },

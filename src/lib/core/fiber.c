@@ -492,6 +492,18 @@ fiber_make_ready(struct fiber *f)
 }
 
 void
+fiber_set_ctx(struct fiber *f, void *f_arg)
+{
+	f->f_arg = f_arg;
+}
+
+void *
+fiber_get_ctx(struct fiber *f)
+{
+	return f->f_arg;
+}
+
+void
 fiber_wakeup(struct fiber *f)
 {
 	/*

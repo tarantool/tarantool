@@ -284,6 +284,27 @@ API_EXPORT void
 fiber_start(struct fiber *callee, ...);
 
 /**
+ * Set a pointer to context for the fiber. Can be used to avoid calling
+ * fiber_start which means no yields.
+ *
+ * \param f     fiber to set the context for
+ * \param f_arg context for the fiber function
+ */
+API_EXPORT void
+fiber_set_ctx(struct fiber *f, void *f_arg);
+
+/**
+ * Get the context for the fiber which was set via the fiber_set_ctx
+ * function. Can be used to avoid calling fiber_start which means no yields.
+ *
+ * \retval      context for the fiber function set by fiber_set_ctx function
+ *
+ * \sa fiber_set_ctx
+ */
+API_EXPORT void *
+fiber_get_ctx(struct fiber *f);
+
+/**
  * Interrupt a synchronous wait of a fiber. Nop for the currently running fiber.
  *
  * \param f fiber to be woken up

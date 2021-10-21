@@ -206,6 +206,7 @@ fiber_cond_new
 fiber_cond_signal
 fiber_cond_wait
 fiber_cond_wait_timeout
+fiber_get_ctx
 fiber_is_cancelled
 fiber_join
 fiber_join_timeout
@@ -214,6 +215,7 @@ fiber_new_ex
 fiber_reschedule
 fiber_self
 fiber_set_cancellable
+fiber_set_ctx
 fiber_set_joinable
 fiber_sleep
 fiber_start
