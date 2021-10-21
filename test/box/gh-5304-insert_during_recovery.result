@@ -8,7 +8,7 @@ test_run = env.new()
  | ---
  | ...
 
-test_run:cmd('create server test with script="box/gh-5304-insert_during_recovery.lua"')
+test_run:cmd('create server test with script="box/insert_during_recovery.lua"')
  | ---
  | - true
  | ...

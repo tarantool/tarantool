@@ -3,7 +3,7 @@
 env = require('test_run')
 test_run = env.new()
 
-test_run:cmd('create server test with script="box/gh-5304-insert_during_recovery.lua"')
+test_run:cmd('create server test with script="box/insert_during_recovery.lua"')
 test_run:cmd('start server test with args="none"')
 test_run:cmd('switch test')
 s1 = box.schema.space.create('temp', {temporary=true})
