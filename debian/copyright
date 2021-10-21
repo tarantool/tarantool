@@ -4,7 +4,7 @@ Upstream-Contact: dev@tarantool.org
 Source: https://github.com/tarantool/tarantool
 
 Files: *
-Copyright: 2010-2015 Tarantool AUTHORS:
+Copyright: 2010-2021 Tarantool AUTHORS:
     Aleksandr Lyapunov, Aleksey Demakov, Aleksey Mashanov,
     Alexandre Kalendarev, Andrey Drozdov, Anton Barabanov,
     Damien Lefortier,  Dmitry E. Oboukhov, Dmitry Simonenko,
@@ -38,7 +38,7 @@ Files: third_party/coro/conftest.c
 Copyright: 1999-2001 Ralf S. Engelschall <rse@engelschall.com>
 License: LGPL-2.1+
 
-Files: third_party/crc32.c
+Files: third_party/crc32_impl.c
 Copyright: 1986 Gary S. Brown
            2004-2006 Intel Corporation
 License: BSD-3-Clause
@@ -72,12 +72,12 @@ License: BSD-2-Clause-NetBSD
  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  POSSIBILITY OF SUCH DAMAGE.
 
-Files: third_party/pmatomic.h src/lib/small/pmatomic/*
+Files: src/lib/small/third_party/pmatomic.h src/lib/small/pmatomic/*
 Copyright: 2011 Ed Schouten <ed@FreeBSD.org>
                 David Chisnall <theraven@FreeBSD.org>
 License: BSD-2-Clause
 
-Files: third_party/src/lj_alloc.c
+Files: third_party/luajit/src/lj_alloc.c
 Copyright: Doug Lea <dl@cs.oswego.edu>
 License: public-domain
   The person or persons who have associated work with this document (the
@@ -109,8 +109,8 @@ License: public-domain
   invented or conceived.
 
 Files: third_party/luajit/*
-Copyright: 2005-2011 Mike Pall. All rights reserved.
-           1994-2011 Lua.org, PUC-Rio.
+Copyright: 2005-2017 Mike Pall. All rights reserved.
+           1994-2012 Lua.org, PUC-Rio.
 License: Expat
 
 Files: third_party/libutil_freebsd/*
@@ -133,14 +133,51 @@ Files: test-run/lib/msgpack-python/*
 Copyright: 2008-2011, INADA Naoki <songofacandy@gmail.com>
 License: Apache-2.0
 
+Files: test-run/lib/checks/*
+Copyright: 2010-2018 Google, Inc
+License: MIT
+
+Files: test-run/lib/luatest/*
+Copyright: 2019-2020 Tarantool AUTHORS
+License: BSD-2-Clause
+  Based on luaunit. Copyright 2005-2018,
+  Philippe Fremy <phil at freehackers dot org>
+  Ryu, Gwang (http://www.gpgstudy.com/gpgiki/LuaUnit)
+  .
+  Redistribution and use in source and binary forms, with or
+  without modification, are permitted provided that the following
+  conditions are met:
+  .
+  1. Redistributions of source code must retain the above
+     copyright notice, this list of conditions and the
+     following disclaimer.
+  .
+  2. Redistributions in binary form must reproduce the above
+     copyright notice, this list of conditions and the following
+     disclaimer in the documentation and/or other materials
+     provided with the distribution.
+  .
+  THIS SOFTWARE IS PROVIDED BY AUTHORS ``AS IS'' AND
+  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+  TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+  AUTHORS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+  BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+  THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+  SUCH DAMAGE.
+
 Files: test-run/lib/msgpack-python/msgpack/*
 Copyright: 2008-2010, FURUHASHI Sadayuki
 License: Apache-2.0
 
-Files: test-run/lib/yapps/*
-Copyright: 1999-2003 Amit J. Patel <amitp@cs.stanford.edu>
-           2003-2004 by Matthias Urlichs <smurf@debian.org>
-License: Expat
+Files: test-run/lib/pytap13.py
+Copyright: 2013, Red Hat, Inc
+License: GPL
 
 Files: third_party/qsort_arg.c
     third_party/qsort_arg_mt.c
@@ -181,8 +218,8 @@ License: GPL
  On Debian systems, the complete text of the GNU General
  Public License can be found in '/usr/share/common-licenses/GPL'.
 
-Files: third_party/valgrind/*
-Copyright: 2000-2010 Julian Seward.
+Files: src/lib/small/third_party/valgrind/*
+Copyright: 2000-2015 Julian Seward.
 License: BSD-4-Clause
  All rights reserved.
  .
@@ -222,7 +259,7 @@ Copyright: 2010 Mail.RU
            2010 Teodor Sigaev
 License: BSD-2-Clause
 
-Files: third_party/proctitle.c
+Files: src/proc_title.[ch]
 Copyright: 2000-2010 PostgreSQL Global Development Group
 License: BSD-2-Clause
 
@@ -262,13 +299,82 @@ Copyright: Steve Reid <steve@edmweb.com>
 License: Public-Domain
  Public Domain.
 
-Files: third_party/open_memstream.*
-Copyright: 2013 Advanced Computing Technologies LLC,
- Written by: John H. Baldwin <jhb@FreeBSD.org>
-License: BSD-2-Clause
-
 Files: third_party/zstd/*
 Copyright: 2014-2015, Yann Collet
+License: BSD-2-Clause
+
+Files: third_party/c-ares/*
+Copyright: 2007-2018, Daniel Stenberg <daniel@haxx.se> with contributors
+License: MIT
+  Permission to use, copy, modify, and distribute this software and
+  its documentation for any purpose and without fee is hereby granted,
+  provided that the above copyright notice appear in all copies and
+  that both that copyright notice and this permission notice appear
+  in supporting documentation, and that the name of M.I.T. not be used
+  in advertising or publicity pertaining to distribution of the software
+  without specific, written prior permission. M.I.T. makes no
+  representations about the suitability of this software for any purpose.
+  It is provided "as is" without express or implied warranty.
+
+Files: third_party/c-dt/*
+Copyright: 2012-2015 Christian Hansen <chansen@cpan.org>
+License: BSD-2-Clause
+
+Files: third_party/curl/*
+Copyright: 1996-2021, Daniel Stenberg, <daniel@haxx.se>, and contributors
+License: curl license
+  All rights reserved.
+  .
+  Permission to use, copy, modify, and distribute this software for any purpose
+  with or without fee is hereby granted, provided that the above copyright
+  notice and this permission notice appear in all copies.
+  .
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF THIRD PARTY RIGHTS. IN
+  NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+  OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+  OR OTHER DEALINGS IN THE SOFTWARE.
+  .
+  Except as contained in this notice, the name of a copyright holder shall not
+  be used in advertising or otherwise to promote the sale, use or other dealings
+  in this Software without prior written authorization of the copyright holder.
+
+Files: third_party/decNumber/*
+Copyright: 1995-2005 International Business Machines Corporation and others
+License: Expat
+  Permission is hereby granted, free of charge, to any person obtaining a
+  copy of this software and associated documentation files (the
+  "Software"), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish,
+  distribute, and/or sell copies of the Software, and to permit persons
+  to whom the Software is furnished to do so, provided that the above
+  copyright notice(s) and this permission notice appear in all copies of
+  the Software and that both the above copyright notice(s) and this
+  permission notice appear in supporting documentation.
+  .
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+  OF THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+  HOLDERS INCLUDED IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL
+  INDIRECT OR CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING
+  FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+  NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
+  WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  .
+  Except as contained in this notice, the name of a copyright holder
+  shall not be used in advertising or otherwise to promote the sale, use
+  or other dealings in this Software without prior written authorization
+  of the copyright holder.
+
+Files: third_party/luarocks/*
+Copyright: 2007-2018 Kepler Project
+License: MIT
+
+Files: third_party/xxHash/*
+Copyright: 2012-2020 Yann Collet
 License: BSD-2-Clause
 
 Files: src/proc_title.c
@@ -378,3 +484,22 @@ License: LGPL-2.1+
  .
  On Debian systems, the complete text of version 2.1 of the GNU Lesser
  General Public License can be found in `/usr/share/common-licenses/LGPL-2.1'.
+
+License: MIT
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+  .
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+  .
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
