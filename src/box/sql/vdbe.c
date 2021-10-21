@@ -253,7 +253,8 @@ allocateCursor(
 
 #ifdef SQL_DEBUG
 #  define REGISTER_TRACE(P,R,M)					\
-	if(P->sql_flags&SQL_VdbeTrace) registerTrace(R,M);
+	if ((P->sql_flags & SQL_VdbeTrace) != 0)		\
+		printf("REG[%d] = %s\n", R, mem_str(M));
 #else
 #  define REGISTER_TRACE(P,R,M)
 #endif
@@ -4412,11 +4413,13 @@ default: {          /* This is really OP_Noop and OP_Explain */
 		if ((p->sql_flags & SQL_VdbeTrace) != 0) {
 			u8 opProperty = sqlOpcodeProperty[pOrigOp->opcode];
 			if (rc!=0) printf("rc=%d\n",rc);
-			if (opProperty & (OPFLG_OUT2)) {
-				registerTrace(pOrigOp->p2, &aMem[pOrigOp->p2]);
+			if ((opProperty & OPFLG_OUT2) != 0) {
+				REGISTER_TRACE(p, pOrigOp->p2,
+					       &aMem[pOrigOp->p2]);
 			}
-			if (opProperty & OPFLG_OUT3) {
-				registerTrace(pOrigOp->p3, &aMem[pOrigOp->p3]);
+			if ((opProperty & OPFLG_OUT3) != 0) {
+				REGISTER_TRACE(p, pOrigOp->p3,
+					       &aMem[pOrigOp->p3]);
 			}
 		}
 #endif  /* SQL_DEBUG */

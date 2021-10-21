@@ -784,9 +784,6 @@ mem_mp_type(const struct Mem *mem);
 
 #ifdef SQL_DEBUG
 int sqlVdbeCheckMemInvariants(struct Mem *);
-void sqlVdbeMemPrettyPrint(Mem * pMem, char *zBuf);
-void
-registerTrace(int iReg, Mem *p);
 
 /*
  * Return true if a memory cell is not marked as invalid.  This macro
