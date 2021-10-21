@@ -273,6 +273,277 @@ fi
 %{_includedir}/tarantool/curl
 
 %changelog
+* Thu Aug 19 2021 Kirill Yukhin <kyukhin@tarantool.org> 1.10.11.0-1
+- Introduced support for LJ_DUALNUM mode in luajit-gdb.py.
+- fiber.wakeup() in Lua and fiber_wakeup() in C became
+- NOP on the currently running fiber.
+- Fixed memory leak on each box.on_commit() and box.on_rollback().
+- Fixed invalid results produced by json module's encode function when it
+  was used from the Lua garbage collector.
+- Fixed a bug when iterators became invalid after schema change.
+- Fixed crash in case of reloading a compiled module when the
+  new module lacks some of functions which were present in the
+  former code.
+- Fixed console client connection breakage if request times out.
+- Added missing broadcast to net.box.future:discard() so that now
+  fibers waiting for a request result are woken up when the request
+  is discarded.
+- Fix possible keys divergence during secondary index build which might
+  lead to missing tuples in it.
+- Fix crash which may occur while switching read_only mode due to
+  duplicating transaction in tx writer list.
+- Fixed a race between Vinyl garbage collection and compaction
+  resulting in broken vylog and recovery.
+- Fix replication stopping occasionally with ER_INVALID_MSGPACK when
+  replica is under high load.
+- Fixed optimization for single-char strings in IR_BUFPUT
+  assembly routine.
+- Fixed slots alignment in lj-stack command output when
+  LJ_GC64 is enabled.
+- Fixed dummy frame unwinding in lj-stack command.
+- Fixed detection of inconsistent renames even in the presence
+  of sunk values.
+- Fixed the order VM registers are allocated by LuaJIT frontend
+  in case of BC_ISGE and BC_ISGT.
+- When error is raised during encoding call results,
+  auxiliary lightuserdata value is not removed from the main
+  Lua coroutine stack.
+- Fixed Lua C API misuse, when the error is raised during call results
+  encoding on unprotected coroutine and expected to be catched
+  on the different one, that is protected.
+- Fixed possibility crash in case when trigger removes itself.
+- Fixed possibility crash in case when someone destroy trigger,
+  when it's yield.
+
+* Wed Apr 21 2021 Kirill Yukhin <kyukhin@tarantool.org> 1.10.10.0-1
+- Updated CMake minimum required version in Tarantool
+  build infrastructure to 3.1.
+- Stop publishing new binary packages for Debian Jessie.
+- Backported -DENABLE_LTO=ON/OFF cmake option.
+- Bump built-in zstd version from v1.3.3 to v1.4.8.
+- libcurl symbols in the case of bundled libcurl are now exported.
+- Enable smtp and smtps protocols in bundled libcurl.
+- Ship libcurl headers to system path "${PREFIX}/include/tarantool"
+  in the case of libcurl included as bundled library or static build.
+- Extensive usage of uri and uuid modules with debug log level could lead to
+  a crash or corrupted result of the functions from these modules.
+  The same could happen with some functions from the modules fio,
+  box.tuple, iconv.
+- Fixed -e option, when tarantool always entered interactive mode
+  when stdin is a tty.
+- Make recovering with force_recovery option delete newer than
+  snapshot vylog files.
+
+* Wed Dec 30 2020 Kirill Yukhin <kyukhin@tarantool.org> 1.10.9.0-1
+- Deploy packages for Debian Bullseye.
+- Don't start an 'example' instance after installing tarantool.
+- fiber.cond:wait() now correctly throws an error when
+  a fiber is cancelled.
+- Fixed a memory corruption issue.
+- A dynamic module now gets correctly unloaded from memory in case
+  of an attempt to load a non-existing function from it.
+- The fiber region (the box region) won't be invalidated on
+  a read-only transaction.
+- Dispatching __call metamethod no longer causes address clashing.
+- Fixed a false positive panic when yielding in debug hook.
+- An attempt to use a net.box connection which is not established yet
+  now results in a correctly reported error.
+- Fixed a hang which occured when tarantool ran a user script with
+  the -e option and this script exited with an error.
+
+* Thu Oct 22 2020 Kirill Yukhin <kyukhin@tarantool.org> 1.10.8.0-1
+- Exposed the box region, key_def and several other functions in order
+  to implement external tuple.keydef and tuple.merger modules
+  on top of them.
+- Fixed fibers switch-over to prevent JIT machinery misbehavior.
+- Fixed fibers switch-over to prevent implicit GC disabling.
+- Fixed unhandled Lua error that might lead to memory leaks and
+  inconsistencies in <space_object>:frommap(), <key_def_object>:compare(),
+  <merge_source>:select().
+- Fixed the error occurring on loading luajit-gdb.py with Python2.
+- Fixed potential lag on boot up procedure when system's password
+  database is slow in access.
+- Get rid of typedef redefinitions for compatibility with C99.
+
+* Fri Jul 17 2020 Kirill Yukhin <kyukhin@tarantool.org> 1.10.7.0-1
+- Fixed a bug in C module reloading.
+- Fixed races and corner cases in box (re)configuration.
+- Fixed check of index field map size which led to crash.
+- Fixed wrong mpsgpack extension type in an error message at decoding.
+- Fixed error while closing socket.tcp_server socket.
+- Don't ruin rock name when freshly installing *.all.rock
+- with dependencies.
+- Fixed crash during compaction due to tuples with size exceeding
+  vinyl_max_tuple_size setting.
+- Fixed crash during recovery of vinyl index due to the lack of file
+  descriptor.
+- Fixed crash during executing upsert changing primary key
+  in debug mode.
+- Fixed crash due to triggered dump process during secondary index
+  creation.
+- Fixed crash/deadlock (depending on build type) during dump process
+  scheduling and concurrent DDL operation.
+- Fixed crash during read of prepared but still not yet
+  not committed statement.
+- Fixed squashing set and arithmetic upsert operations.
+- Create missing folders for vinyl spaces and indexes if needed
+  to avoid confusing fails of tarantool started from backup.
+- Fixed crash during squash of many (more than 4000) upserts modifying
+  the same key.
+
+* Mon Apr 20 2020 Kirill Yukhin <kyukhin@tarantool.org> 1.10.6.0-1
+- fiber.storage is cleaned between requests.
+- tuple/space/index:update()/upsert() were fixed not to turn a value
+  into an infinity when a float value was added to or subtracted from
+  a float column and exceeded the float value range.
+- Make RTREE indexes handle the out of memory error.
+- Add cancellation guard to avoid WAL thread stuck.
+- Fix the rebootstrap procedure not working if the replica itself
+  is listed in box.cfg.replication.
+- Fix possible user password leaking via replication logs.
+- Local space operations are now counted in 0th vclock component.
+- Gc consumers are now ordered by their vclocks and not by vclock
+  signatures.
+- json: :decode() doesn't spoil instance's options with per-call ones.
+- os.environ() is now changed when os.setenv() is called.
+- netbox.self:call/eval() now returns the same types as
+  netbox_connection:call/eval.
+- __pairs/__ipairs metamethods handling is removed.
+- Introduce luajit-gdb.py extension with commands for inspecting
+  LuaJIT internals.
+- Fix string to number conversion.
+- "FFI sandwich" detection is introduced.
+- luaJIT_setmode call is prohibited while mcode execution and leads
+  to the platform panic.
+- Fix assertion fault due to triggered dump process during secondary
+  index build.
+- Fix crashes at attempts to use -e and -l command line options
+  concatenated with their values.
+- Update libopenssl version to 1.1.1f.
+
+* Tue Jan 14 2020 Kirill Yukhin <kyukhin@tarantool.org> 1.10.5.0-1
+- Exit gracefully when a main script throws an error.
+- Enable __pairs and __ipairs metamethods from Lua 5.2.
+- A lof of bugfixes, see GitHub release notes:
+  https://github.com/tarantool/tarantool/releases/tag/1.10.5
+
+* Thu Sep 26 2019 Kirill Yukhin <kyukhin@tarantool.org> 1.10.4.0-1
+- Improve dump start/stop logging.
+- Look up key in reader thread.
+- Improve box.stat.net.
+- Add idle to downstream status in box.info.
+- Deprecate rows_per_wal in favor of wal_max_size.
+- Print corrupted rows on decoding error.
+- Add type of operation to space trigger parameters.
+- Add debug.sourcefile() and debug.sourcedir() helpers to determine
+  the location of a current Lua source file.
+- Add max_total_connections option in addition to total_connection
+  to allow more fine-grained tuning of libcurl connection cache.
+- A lof of bugfixes, see GitHub release notes:
+  https://github.com/tarantool/tarantool/releases/tag/1.10.4
+
+* Mon Apr 1 2019 Kirill Yukhin <kyukhin@tarantool.org> 1.10.3.0-1
+- Randomize vinyl index compaction.
+- Throttle tx thread if compaction doesn't keep up with dumps.
+- Do not apply run_count_per_level to the last level.
+- Report the number of active iproto connections.
+- Never keep a dead replica around if running out of disk space.
+- Report join progress to the replica log.
+- Expose snapshot status in box.info.gc().
+- Show names of Lua functions in backtraces in fiber.info().
+- Check if transaction opened.
+- A lof of bugfixes, see GitHub release notes:
+  https://github.com/tarantool/tarantool/releases/tag/1.10.3
+
+* Sat Oct 13 2018 Kirill Yukhin <kyukhin@tarantool.org> 1.10.2.0-1
+- Configurable syslog destination.
+- Allow different nullability in indexes and format.
+- Allow to back up any checkpoint.
+- A way to detect that a Tarantool process was started or
+  restarted by tarantoolctl.
+- `TARANTOOLCTL` and `TARANTOOL_RESTARTED` env vars.
+- New configuration parameter net_msg_max to restrict
+  the number of allocated fibers;
+- Automatic replication rebootstrap.
+- Replica-local space.
+- Display the connection status if the downstream gets
+  disconnected from the upstream.
+- New option replication_skip_conflict.
+- Remove old snapshots which are not needed by replicas.
+- New function fiber.join().
+- New option `names_only` in tuple:tomap().
+- Support custom rock servers in tarantoolctl. 
+- Expose on_commit/on_rollback triggers to Lua.
+- New function box.is_in_txn() to check if a transaction is open.
+- Tuple field access via a json path.
+- New function space:frommap() to convert a map to a tuple instance
+  or to a table.
+- New module utf8 that implements libicu's bindings for use in Lua.
+- Support ALTER for non-empty vinyl spaces.
+- Tuples stored in the vinyl cache are not shared among the indexes
+  of the same space.
+- Keep a stack of UPSERTS in `vy_read_iterator`.
+- New function `box.ctl.reset_stat()` to reset vinyl statistics.
+- A lof of bugfixes, see GitHub release notes:
+  https://github.com/tarantool/tarantool/releases/tag/1.10.2
+
+* Wed Sep 05 2018 Kirill Yukhin <kyukhin@tarantool.org> 1.9.2.0-1
+- Dozens of bugfixes, see GitHub release notes:
+  https://github.com/tarantool/tarantool/releases/tag/1.9.1
+  https://github.com/tarantool/tarantool/releases/tag/1.9.2
+
+* Mon Feb 26 2018 Konstantin Osipov <kostja@tarantool.org> 1.9.0.4-1
+- It is now possible to block/unblock users.
+- New function `box.session.euid()` to return effective user.
+- New 'super' role, with superuser access.
+- `on_auth` trigger is now fired in case of both successful and
+  failed authentication.
+- New replication configuration algorithm.
+- After replication connect at startup, the server
+  does not start processing write requests before syncing up
+  with all connected peers.
+- It is now possible to explicitly set instance and replica set
+  uuid via database configuration.
+- `box.once()` no longer fails on a read-only replica but waits.
+- `force_recovery` can now skip a corrupted xlog file.
+- Improved replication monitoring.
+- New 'BEFORE' triggers which can be used for conflict resolution
+  in master-master replication.
+- http client now correctly parses cookies and supports
+  http+unix:// paths.
+- `fio` rock now supports `file_exists()`, `rename()` works across
+  filesystems, and `read()` without arguments reads the whole file.
+- `fio` rock errors now follow Tarantool function call conventions
+  and always return an error message in addition to the error flag.
+- `digest` rock now supports pbkdf2 password hashing algorithm,
+  useful in PCI/DSS compliant applications.
+- `box.info.memory()` provides a high-level overview of
+  server memory usage, including networking, Lua, transaction
+  and index memory.
+- It is now possible to add missing tuple fields to an index.
+- Lots of improvements in field type support when creating or
+  altering spaces and indexes.
+- It is now possible to turn on `is_nullable` property on a field
+  even if the space is not empty.
+- Several logging improvements. 
+- It is now possible to make a unique vinyl index non-unique
+  without index rebuild.
+- Improved vynil UPDATE, REPLACE and recovery performance in presence of
+  secondary keys.
+- `space:len()` and `space:bsize()` now work for vinyl.
+- Vinyl recovery speed has improved in presence of secondary keys.
+
+* Tue Nov 07 2017 Roman Tsisyk <roman@tarantool.org> 1.7.6.0-1
+- Hybrid schema-less + schema-full data model.
+- Collation and Unicode Support.
+- NULL values in unique and non-unique indexes.
+- Sequences and a new implementation of auto_increment().
+- Add gap locks in Vinyl transaction manager.
+- on_connect/on_disconnect triggers for net.box.
+- Structured logging in JSON format.
+- Several Lua features and various bugfixes, see GitHub release notes
+  for details: https://github.com/tarantool/tarantool/releases/tag/1.7.6
+
 * Tue Sep 12 2017 Roman Tsisyk <roman@tarantool.org> 1.7.5.46-1
 - Stabilization of Vinyl storage engine.
 - Improved MemTX TREE iterators.
