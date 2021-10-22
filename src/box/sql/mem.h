@@ -253,6 +253,21 @@ bool
 mem_is_field_compatible(const struct Mem *mem, enum field_type type);
 
 /**
+ * Write a NULL-terminated string representation of a MEM to buf. Returns the
+ * number of bytes required to write the value, excluding '\0'. If the return
+ * value is equal to or greater than size, then the value has been truncated.
+ */
+int
+mem_snprintf(char *buf, uint32_t size, const struct Mem *mem);
+
+/**
+ * Returns a NULL-terminated string representation of a MEM. Memory for the
+ * result was allocated using sqlDbMallocRawNN() and should be freed.
+ */
+char *
+mem_strdup(const struct Mem *mem);
+
+/**
  * Return a string that contains description of type and value of MEM. String is
  * either allocated using static_alloc() of just a static variable. This
  * function should only be used for debugging or displaying MEM values in

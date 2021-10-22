@@ -812,7 +812,8 @@ test:do_catchsql_test(
 	"SELECT CAST(a AS UNSIGNED) from test;", {
 		1, 'Type mismatch: can not convert array(["aaaaaaaaaaaaaaaaaa'..
 		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'..
-		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...) to unsigned'
+		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...) to '..
+		'unsigned'
 	})
 
 test:do_catchsql_test(
@@ -820,7 +821,7 @@ test:do_catchsql_test(
 	"SELECT CAST(m AS UNSIGNED) from test;", {
 		1, 'Type mismatch: can not convert map({"a": 1, "b": "aaaaaaa'..
 		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'..
-		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...) to unsigned'
+		'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...) to unsigned'
 	})
 
 test:execsql('DROP TABLE test;')

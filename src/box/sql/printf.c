@@ -160,20 +160,7 @@ getTextArg(PrintfArguments * p)
 {
 	if (p->nArg <= p->nUsed)
 		return 0;
-	struct Mem mem;
-	mem_create(&mem);
-	mem_copy_as_ephemeral(&mem, &p->apArg[p->nUsed++]);
-	if (mem_to_str(&mem) != 0) {
-		mem_destroy(&mem);
-		return NULL;
-	}
-	char *str = sqlDbMallocRawNN(sql_get(), mem.n + 1);
-	if (str == NULL)
-		return NULL;
-	memcpy(str, mem.z, mem.n);
-	str[mem.n] = '\0';
-	mem_destroy(&mem);
-	return str;
+	return mem_strdup(&p->apArg[p->nUsed++]);
 }
 
 /*

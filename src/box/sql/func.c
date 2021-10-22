@@ -882,9 +882,11 @@ func_printf(struct sql_context *ctx, int argc, const struct Mem *argv)
 	if (argc < 1 || mem_is_null(&argv[0]))
 		return;
 	if (argc == 1 || !mem_is_str(&argv[0])) {
-		struct Mem *mem = ctx->pOut;
-		if (mem_copy(mem, &argv[0]) != 0 || mem_to_str(mem) != 0)
+		char *str = mem_strdup(&argv[0]);
+		if (str == NULL)
 			ctx->is_aborted = true;
+		else
+			mem_set_str0_allocated(ctx->pOut, str);
 		return;
 	}
 	struct PrintfArguments pargs;
