@@ -93,7 +93,7 @@ box.cfg{memtx_dir="dynamic"}
 ...
 box.cfg{log="new logger"}
 ---
-- error: 'Incorrect value for option ''log'': can''t be set dynamically'
+- error: Can't set option 'log' dynamically
 ...
 -- bad1
 box.cfg{memtx_memory=53687091}
