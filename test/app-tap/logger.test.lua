@@ -107,7 +107,8 @@ box.cfg{
 
 -- Now try to change a static field.
 _, err = pcall(box.cfg, {log_level = 5, log = "2.txt"})
-test:ok(tostring(err):find("can\'t be set dynamically") ~= nil)
+test:ok(tostring(err):find("Can't set option 'log' dynamically") ~= nil,
+        "box.cfg.log cannot be set dynamically")
 test:ok(box.cfg.log == filename, "filename match")
 test:ok(box.cfg.log_level == 6, "loglevel match")
 verify_keys("box.cfg static error")

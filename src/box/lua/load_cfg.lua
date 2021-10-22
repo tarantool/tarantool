@@ -502,6 +502,24 @@ local function upgrade_cfg(cfg, translate_cfg)
     return result_cfg
 end
 
+local function update_module_cfg(cfg, module_cfg)
+    local module_cfg_backup = {}
+    for field, api in pairs(module_cfg) do
+        if cfg[field] ~= nil then
+            module_cfg_backup[field] = api.cfg_get(field) or box.NULL
+
+            local ok, msg = api.cfg_set(cfg, field, cfg[field])
+            if not ok then
+                -- restore back the old values for modules
+                for k, v in pairs(module_cfg_backup) do
+                    module_cfg[k].cfg_set(cfg, k, v)
+                end
+                box.error(box.error.CFG, field, msg)
+            end
+        end
+    end
+end
+
 local function prepare_cfg(cfg, default_cfg, template_cfg,
                            module_cfg, modify_cfg, prefix)
     if cfg == nil then
@@ -519,7 +537,6 @@ local function prepare_cfg(cfg, default_cfg, template_cfg,
         readable_prefix = prefix .. '.'
     end
     local new_cfg = {}
-    local module_cfg_backup = {}
     for k,v in pairs(cfg) do
         local readable_name = readable_prefix .. k;
         if template_cfg[k] == nil then
@@ -535,25 +552,14 @@ local function prepare_cfg(cfg, default_cfg, template_cfg,
             end
             v = prepare_cfg(v, default_cfg[k], template_cfg[k],
                             module_cfg[k], modify_cfg[k], readable_name)
-        elseif template_cfg[k] == 'module' then
-            local old_value = module_cfg[k].cfg_get(k, v)
-            module_cfg_backup[k] = old_value or box.NULL
-
-            local ok, msg = module_cfg[k].cfg_set(cfg, k, v)
-            if not ok then
-                -- restore back the old values for modules
-                for module_k, module_v in pairs(module_cfg_backup) do
-                    module_cfg[module_k].cfg_set(nil, module_k, module_v)
-                end
-                box.error(box.error.CFG, readable_name, msg)
-            end
-        elseif (string.find(template_cfg[k], ',') == nil) then
+        elseif template_cfg[k] ~= 'module' and
+               (string.find(template_cfg[k], ',') == nil) then
             -- one type
             if type(v) ~= template_cfg[k] then
                 box.error(box.error.CFG, readable_name, "should be of type "..
                     template_cfg[k])
             end
-        else
+        elseif template_cfg[k] ~= 'module' then
             local good_types = string.gsub(template_cfg[k], ' ', '');
             if (string.find(',' .. good_types .. ',', ',' .. type(v) .. ',') == nil) then
                 box.error(box.error.CFG, readable_name, "should be one of types "..
@@ -726,9 +732,11 @@ local function load_cfg(cfg)
     apply_default_cfg(cfg, default_cfg, module_cfg);
     -- Save new box.cfg
     box.cfg = cfg
-    if not pcall(private.cfg_check)  then
+    if not pcall(private.cfg_check) or
+       not pcall(update_module_cfg, cfg, module_cfg)  then
         box.cfg = locked(load_cfg) -- restore original box.cfg
-        return box.error() -- re-throw exception from check_cfg()
+        -- re-throw exception from check_cfg() or update_module_cfg()
+        return box.error()
     end
 
     -- NB: After this point the function should not raise an
