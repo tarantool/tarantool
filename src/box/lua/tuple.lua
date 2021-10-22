@@ -98,7 +98,14 @@ local tuple_bless = function(tuple)
     -- overflow checked by tuple_bless() in C
     builtin.box_tuple_ref(tuple)
     -- must never fail:
-    return ffi.gc(ffi.cast(const_tuple_ref_t, tuple), tuple_gc)
+    -- XXX: If we use tail call (instead of creating a new frame
+    -- for a call just use the top one) here, then JIT tries to
+    -- compile return from `ffi.gc()` to the frame below. This
+    -- aborts the trace recording with the error "NYI: return to
+    -- lower frame". So avoid tail call and use additional stack
+    -- slots (for the local variable and the frame).
+    local tuple_ref = ffi.gc(ffi.cast(const_tuple_ref_t, tuple), tuple_gc)
+    return tuple_ref
 end
 
 local tuple_check = function(tuple, usage)
