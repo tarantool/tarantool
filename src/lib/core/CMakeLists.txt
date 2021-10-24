@@ -20,6 +20,7 @@ set(core_sources
     fio.c
     exception.cc
     errinj.c
+    error_payload.c
     reflection.c
     assoc.c
     util.c
