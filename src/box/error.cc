@@ -76,7 +76,7 @@ box_error_set(const char *file, unsigned line, uint32_t code,
 	struct error *e = BuildClientError(file, line, ER_UNKNOWN);
 	ClientError *client_error = type_cast(ClientError, e);
 	if (client_error) {
-		client_error->m_errcode = code;
+		client_error->code = code;
 		va_list ap;
 		va_start(ap, fmt);
 		error_vformat_msg(e, fmt, ap);
@@ -94,7 +94,7 @@ box_error_new_va(const char *file, unsigned line, uint32_t code,
 		struct error *e = BuildClientError(file, line, ER_UNKNOWN);
 		ClientError *client_error = type_cast(ClientError, e);
 		if (client_error != NULL) {
-			client_error->m_errcode = code;
+			client_error->code = code;
 			error_vformat_msg(e, fmt, ap);
 		}
 		return e;
@@ -170,7 +170,7 @@ ClientError::ClientError(const type_info *type, const char *file, unsigned line,
 			 uint32_t errcode)
 	:Exception(type, file, line)
 {
-	m_errcode = errcode;
+	code = errcode;
 	if (rmean_error)
 		rmean_collect(rmean_error, RMEAN_ERROR, 1);
 }
@@ -181,7 +181,7 @@ ClientError::ClientError(const char *file, unsigned line,
 {
 	va_list ap;
 	va_start(ap, errcode);
-	error_vformat_msg(this, tnt_errcode_desc(m_errcode), ap);
+	error_vformat_msg(this, tnt_errcode_desc(errcode), ap);
 	va_end(ap);
 }
 
@@ -194,7 +194,7 @@ BuildClientError(const char *file, unsigned line, uint32_t errcode, ...)
 		va_start(ap, errcode);
 		error_vformat_msg(e, tnt_errcode_desc(errcode), ap);
 		va_end(ap);
-		e->m_errcode = errcode;
+		e->code = errcode;
 		return e;
 	} catch (OutOfMemory *e) {
 		return e;
@@ -204,8 +204,7 @@ BuildClientError(const char *file, unsigned line, uint32_t errcode, ...)
 void
 ClientError::log() const
 {
-	say_file_line(S_ERROR, file, line, errmsg, "%s",
-		      tnt_errcode_str(m_errcode));
+	say_file_line(S_ERROR, file, line, errmsg, "%s", tnt_errcode_str(code));
 }
 
 
@@ -296,7 +295,7 @@ AccessDeniedError::AccessDeniedError(const char *file, unsigned int line,
 				     bool run_trigers)
 	:ClientError(&type_AccessDeniedError, file, line, ER_ACCESS_DENIED)
 {
-	error_format_msg(this, tnt_errcode_desc(m_errcode),
+	error_format_msg(this, tnt_errcode_desc(code),
 			 access_type, object_type, object_name, user_name);
 
 	struct on_access_denied_ctx ctx = {access_type, object_type, object_name};

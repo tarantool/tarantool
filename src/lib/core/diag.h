@@ -87,6 +87,8 @@ struct error {
 	 * to the standard library, then it is 0.
 	 */
 	int saved_errno;
+	/** Error code. Shortest possible description of error's reason. */
+	int code;
 	/** Line number. */
 	unsigned line;
 	/* Source file name. */

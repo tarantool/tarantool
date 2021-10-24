@@ -292,7 +292,8 @@ e = e.prev
  | ...
 e:unpack()
  | ---
- | - base_type: LuajitError
+ | - code: 0
+ |   base_type: LuajitError
  |   type: LuajitError
  |   message: '[string "return function(tuple)                 local ..."]:1: attempt
  |     to call global ''require'' (a nil value)'
