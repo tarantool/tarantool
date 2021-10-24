@@ -116,6 +116,7 @@ error_create(struct error *e,
 	e->type = type;
 	e->refs = 0;
 	e->saved_errno = 0;
+	e->code = 0;
 	if (file != NULL) {
 		snprintf(e->file, sizeof(e->file), "%s", file);
 		e->line = line;

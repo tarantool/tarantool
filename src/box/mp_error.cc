@@ -261,10 +261,8 @@ missing_fields:
 	}
 
 	if (strcmp(mp_error->type, "ClientError") == 0) {
-		ClientError *e = new ClientError(mp_error->file, mp_error->line,
-						 ER_UNKNOWN);
-		e->m_errcode = mp_error->code;
-		err = e;
+		err = new ClientError(mp_error->file, mp_error->line,
+				      ER_UNKNOWN);
 	} else if (strcmp(mp_error->type, "CustomError") == 0) {
 		if (mp_error->custom_type == NULL)
 			goto missing_fields;
@@ -320,6 +318,7 @@ missing_fields:
 		err = new ClientError(mp_error->file, mp_error->line,
 				      ER_UNKNOWN);
 	}
+	err->code = mp_error->code;
 	err->saved_errno = mp_error->saved_errno;
 	error_format_msg(err, "%s", mp_error->message);
 	return err;

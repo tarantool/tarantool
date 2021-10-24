@@ -208,14 +208,12 @@ public:
 	int
 	errcode() const
 	{
-		return m_errcode;
+		return code;
 	}
 
 	ClientError(const char *file, unsigned line, uint32_t errcode, ...);
 
 	static uint32_t get_errcode(const struct error *e);
-	/* client errno code */
-	int m_errcode;
 protected:
 	ClientError(const type_info *type, const char *file, unsigned line,
 		    uint32_t errcode);

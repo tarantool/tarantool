@@ -349,7 +349,7 @@ test_decode_unknown_type()
 	const char *pos = buffer;
 	struct error *unpacked = error_unpack(&pos, len);
 	error_ref(unpacked);
-	err.code = 0;
+	err.code = 1;
 	err.type = "ClientError";
 	ok(error_is_eq_mp_error(unpacked, &err), "check SomeNewError");
 	error_unref(unpacked);

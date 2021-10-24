@@ -18,6 +18,7 @@ struct error {
     const struct type_info *_type;
     int64_t _refs;
     int _saved_errno;
+    int code;
     /** Line number. */
     unsigned _line;
     /* Source file name. */
@@ -158,7 +159,7 @@ local function error_unpack(err)
     if not ffi.istype('struct error', err) then
         error("Usage: error:unpack()")
     end
-    local result = {}
+    local result = {code = err.code}
     for key, getter in pairs(error_fields)  do
         result[key] = getter(err)
     end
