@@ -1,0 +1,161 @@
+	*** main ***
+1..9
+	*** test_payload_field_str ***
+    1..15
+    ok 1 - no fields in the beginning
+    ok 2 - get_str() empty
+    ok 3 - ++count
+    ok 4 - get_str() finds
+    ok 5 - ++count
+    ok 6 - get_str() finds old
+    ok 7 - get_str() finds new
+    ok 8 - size does not include terminating zero
+    ok 9 - field count is same
+    ok 10 - get_str() finds new value
+    ok 11 - get_str() finds other key old value
+    ok 12 - --count
+    ok 13 - get_str() finds new value
+    ok 14 - get_str() can't find deleted value
+    ok 15 - wrong type
+ok 1 - subtests
+	*** test_payload_field_str: done ***
+	*** test_payload_field_uint ***
+    1..17
+    ok 1 - get_uint() empty
+    ok 2 - ++count
+    ok 3 - get_uint() finds
+    ok 4 - value match
+    ok 5 - get_uint() fails
+    ok 6 - value is default
+    ok 7 - small number size
+    ok 8 - get_uint() 32 bit
+    ok 9 - value match
+    ok 10 - middle number size
+    ok 11 - field count is same
+    ok 12 - value 1
+    ok 13 - value 2
+    ok 14 - --count
+    ok 15 - remained value
+    ok 16 - deleted value
+    ok 17 - wrong type
+ok 2 - subtests
+	*** test_payload_field_uint: done ***
+	*** test_payload_field_int ***
+    1..20
+    ok 1 - get_int() empty
+    ok 2 - ++count
+    ok 3 - get_int() finds
+    ok 4 - value match
+    ok 5 - get_int() fails
+    ok 6 - value is default
+    ok 7 - small number size
+    ok 8 - get_int() 32 bit
+    ok 9 - value match
+    ok 10 - middle number size
+    ok 11 - field count is same
+    ok 12 - value 1
+    ok 13 - value 2
+    ok 14 - --count
+    ok 15 - remained value
+    ok 16 - deleted value
+    ok 17 - wrong type
+    ok 18 - overflow
+    ok 19 - conversion
+    ok 20 - min value
+ok 3 - subtests
+	*** test_payload_field_int: done ***
+	*** test_payload_field_double ***
+    1..14
+    ok 1 - get_double() empty
+    ok 2 - ++count
+    ok 3 - get_double() finds
+    ok 4 - value match
+    ok 5 - get_double() fails
+    ok 6 - value is default
+    ok 7 - size
+    ok 8 - value 1
+    ok 9 - value 2
+    ok 10 - --count
+    ok 11 - remained value
+    ok 12 - deleted value
+    ok 13 - wrong type
+    ok 14 - float 0.5
+ok 4 - subtests
+	*** test_payload_field_double: done ***
+	*** test_payload_field_bool ***
+    1..13
+    ok 1 - get_bool() empty
+    ok 2 - ++count
+    ok 3 - get_bool() finds
+    ok 4 - value match
+    ok 5 - get_bool() fails
+    ok 6 - value is default
+    ok 7 - get_bool() finds
+    ok 8 - value match
+    ok 9 - size
+    ok 10 - --count
+    ok 11 - remained value
+    ok 12 - deleted value
+    ok 13 - wrong type
+ok 5 - subtests
+	*** test_payload_field_bool: done ***
+	*** test_payload_field_uuid ***
+    1..17
+    ok 1 - get_uuid() empty
+    ok 2 - default value
+    ok 3 - ++count
+    ok 4 - get_uuid() finds
+    ok 5 - value match
+    ok 6 - get_uuid() fails
+    ok 7 - value is default
+    ok 8 - get_uuid() finds
+    ok 9 - value match
+    ok 10 - size
+    ok 11 - --count
+    ok 12 - remained value
+    ok 13 - value match
+    ok 14 - deleted value
+    ok 15 - value match
+    ok 16 - wrong type
+    ok 17 - value match
+ok 6 - subtests
+	*** test_payload_field_uuid: done ***
+	*** test_payload_field_mp ***
+    1..6
+    ok 1 - mp str
+    ok 2 - mp str cmp
+    ok 3 - mp uint
+    ok 4 - mp uint cmp
+    ok 5 - mp array
+    ok 6 - mp uint from array
+ok 7 - subtests
+	*** test_payload_field_mp: done ***
+	*** test_payload_clear ***
+    1..13
+    ok 1 - clear last, count
+    ok 2 - clear last, key
+    ok 3 - clear first, count
+    ok 4 - clear first, key
+    ok 5 - check key2
+    ok 6 - check key3
+    ok 7 - check key4
+    ok 8 - deletion is cyclic
+    ok 9 - clear middle, count
+    ok 10 - clear middle, key
+    ok 11 - check key3
+    ok 12 - check key4
+    ok 13 - clear all
+ok 8 - subtests
+	*** test_payload_clear: done ***
+	*** test_payload_move ***
+    1..7
+    ok 1 - empty
+    ok 2 - emptied on move
+    ok 3 - got 2 fields
+    ok 4 - got 2 fields
+    ok 5 - key1
+    ok 6 - key2
+    ok 7 - key
+ok 9 - subtests
+	*** test_payload_move: done ***
+	*** main: done ***
