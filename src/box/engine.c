@@ -114,6 +114,17 @@ engine_begin_final_recovery(void)
 }
 
 int
+engine_begin_hot_standby(void)
+{
+	struct engine *engine;
+	engine_foreach(engine) {
+		if (engine->vtab->begin_hot_standby(engine) != 0)
+			return -1;
+	}
+	return 0;
+}
+
+int
 engine_end_recovery(void)
 {
 	/*
@@ -343,6 +354,13 @@ generic_engine_begin_initial_recovery(struct engine *engine,
 
 int
 generic_engine_begin_final_recovery(struct engine *engine)
+{
+	(void)engine;
+	return 0;
+}
+
+int
+generic_engine_begin_hot_standby(struct engine *engine)
 {
 	(void)engine;
 	return 0;

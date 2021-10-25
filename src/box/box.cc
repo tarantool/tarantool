@@ -3362,7 +3362,6 @@ local_recovery(const struct tt_uuid *instance_uuid,
 			diag_raise();
 		diag_log();
 	}
-	engine_end_recovery_xc();
 	/*
 	 * Leave hot standby mode, if any, only after
 	 * acquiring the lock.
@@ -3370,6 +3369,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	if (wal_dir_lock < 0) {
 		title("hot_standby");
 		say_info("Entering hot standby mode");
+		engine_begin_hot_standby_xc();
 		recovery_follow_local(recovery, &wal_stream.base, "hot_standby",
 				      cfg_getd("wal_dir_rescan_delay"));
 		while (true) {
@@ -3409,6 +3409,8 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	 */
 	if (wal_enable() != 0)
 		diag_raise();
+
+	engine_end_recovery_xc();
 
 	/* Check replica set UUID. */
 	if (!tt_uuid_is_nil(replicaset_uuid) &&

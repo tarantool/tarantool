@@ -4521,6 +4521,7 @@ static const struct engine_vtab vinyl_engine_vtab = {
 	/* .bootstrap = */ vinyl_engine_bootstrap,
 	/* .begin_initial_recovery = */ vinyl_engine_begin_initial_recovery,
 	/* .begin_final_recovery = */ vinyl_engine_begin_final_recovery,
+	/* .begin_hot_standby = */ generic_engine_begin_hot_standby,
 	/* .end_recovery = */ vinyl_engine_end_recovery,
 	/* .begin_checkpoint = */ vinyl_engine_begin_checkpoint,
 	/* .wait_checkpoint = */ vinyl_engine_wait_checkpoint,

@@ -131,6 +131,7 @@ evals
   - ERRINJ_XLOG_GARBAGE: false
   - ERRINJ_XLOG_META: false
   - ERRINJ_XLOG_READ: -1
+  - ERRINJ_XLOG_RENAME_DELAY: false
 ...
 errinj.set("some-injection", true)
 ---
