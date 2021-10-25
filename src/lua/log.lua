@@ -59,6 +59,7 @@ ffi.cdef[[
     say_parse_logger_type(const char **str, enum say_logger_type *type);
 ]]
 
+local S_CRIT = ffi.C.S_CRIT
 local S_WARN = ffi.C.S_WARN
 local S_INFO = ffi.C.S_INFO
 local S_VERBOSE = ffi.C.S_VERBOSE
@@ -575,6 +576,7 @@ local compat_v16 = {
 }
 
 local log = {
+    crit = say_closure(S_CRIT),
     warn = say_closure(S_WARN),
     info = say_closure(S_INFO),
     verbose = say_closure(S_VERBOSE),
