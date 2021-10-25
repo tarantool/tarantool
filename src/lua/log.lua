@@ -59,6 +59,7 @@ ffi.cdef[[
     say_parse_logger_type(const char **str, enum say_logger_type *type);
 ]]
 
+local S_CRIT = ffi.C.S_CRIT
 local S_WARN = ffi.C.S_WARN
 local S_INFO = ffi.C.S_INFO
 local S_VERBOSE = ffi.C.S_VERBOSE
@@ -395,6 +396,63 @@ local function log_pid()
     return tonumber(ffi.C.log_pid)
 end
 
+local Ratelimit = {
+    interval = 60,
+    burst = 10,
+    emitted = 0,
+    suppressed = 0,
+    start = 0,
+}
+
+function Ratelimit:new(object)
+    object = object or {}
+    setmetatable(object, self)
+    self.__index = self
+    return object
+end
+
+function Ratelimit:check()
+    local clock = require('clock')
+
+    local now = clock.monotonic()
+    local saved_suppressed = 0
+    if now > self.start + self.interval then
+        saved_suppressed = self.suppressed
+        self.suppressed = 0
+        self.emitted = 0
+        self.start = now
+    end
+
+    if self.emitted < self.burst then
+        self.emitted = self.emitted + 1
+        return saved_suppressed, true
+    end
+    self.suppressed = self.suppressed + 1
+    return saved_suppressed, false
+end
+
+function Ratelimit:log_check(lvl)
+    local suppressed, ok = self:check()
+    if lvl >= S_WARN and suppressed > 0 then
+        say(S_WARN, '%d messages suppressed due to rate limiting', suppressed)
+    end
+    return ok
+end
+
+function Ratelimit:log(lvl, fmt, ...)
+    if self:log_check(lvl) then
+        say(lvl, fmt, ...)
+    end
+end
+
+local function log_ratelimited_closure(lvl)
+    return function(self, fmt, ...)
+        self:log(lvl, fmt, ...)
+    end
+end
+
+Ratelimit.log_crit = log_ratelimited_closure(S_CRIT)
+
 -- Fetch a value from log to box.cfg{}.
 local function box_api_cfg_get(key)
     return log_cfg[box2log_keys[key]]
@@ -591,6 +649,9 @@ local log = {
         cfg_set_log_level = box_api_cfg_set_log_level,
         cfg_set_log_format = box_api_set_log_format,
     },
+    internal = {
+        ratelimit = Ratelimit
+    }
 }
 
 setmetatable(log, {
