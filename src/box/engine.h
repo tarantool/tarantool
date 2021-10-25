@@ -148,6 +148,11 @@ struct engine_vtab {
 	 */
 	int (*begin_final_recovery)(struct engine *);
 	/**
+	 * Notify the engine that the instance is about to enter
+	 * the hot standby mode to complete recovery from WALs.
+	 */
+	int (*begin_hot_standby)(struct engine *);
+	/**
 	 * Inform the engine about the end of recovery from the
 	 * binary log.
 	 */
@@ -338,8 +343,13 @@ int
 engine_begin_final_recovery(void);
 
 /**
+ * Called before entering the hot standby mode.
+ */
+int
+engine_begin_hot_standby(void);
+
+/**
  * Called at the end of recovery.
- * Build secondary keys in all spaces.
  */
 int
 engine_end_recovery(void);
@@ -395,6 +405,7 @@ int generic_engine_bootstrap(struct engine *);
 int generic_engine_begin_initial_recovery(struct engine *,
 					  const struct vclock *);
 int generic_engine_begin_final_recovery(struct engine *);
+int generic_engine_begin_hot_standby(struct engine *);
 int generic_engine_end_recovery(struct engine *);
 int generic_engine_begin_checkpoint(struct engine *, bool);
 int generic_engine_wait_checkpoint(struct engine *, const struct vclock *);
@@ -475,6 +486,13 @@ static inline void
 engine_begin_final_recovery_xc(void)
 {
 	if (engine_begin_final_recovery() != 0)
+		diag_raise();
+}
+
+static inline void
+engine_begin_hot_standby_xc(void)
+{
+	if (engine_begin_hot_standby() != 0)
 		diag_raise();
 }
 
