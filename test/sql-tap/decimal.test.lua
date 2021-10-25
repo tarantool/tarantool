@@ -3,7 +3,7 @@ local build_path = os.getenv("BUILDDIR")
 package.cpath = build_path..'/test/sql-tap/?.so;'..build_path..'/test/sql-tap/?.dylib;'..package.cpath
 
 local test = require("sqltester")
-test:plan(109)
+test:plan(117)
 
 local dec = require("decimal")
 local dec1 = dec.new("111")
@@ -1017,5 +1017,84 @@ test:do_catchsql_test(
         1, [[Integer literal 999999999999999999999999999999999999 exceeds ]]..
            "the supported range [-9223372036854775808, 18446744073709551615]"
     })
+
+
+-- gh-6355: Make sure the SQL built-in functions work properly with DECIMAL.
+test:execsql([[
+    CREATE TABLE t18 (i INT PRIMARY KEY AUTOINCREMENT, d DECIMAL);
+    INSERT INTO t18(d) VALUES(123), (-0.7), (9999999999999999999999.0);
+]])
+
+test:do_execsql_test(
+    "dec-18.1",
+    [[
+        SELECT typeof(ABS(d)), ABS(d) FROM t18;
+    ]], {
+        "decimal", dec.new(123),
+        "decimal", dec.new(0.7),
+        "decimal", dec.new('9999999999999999999999')
+    })
+
+test:do_execsql_test(
+    "dec-18.2",
+    [[
+        SELECT typeof(AVG(d)), AVG(d) FROM t18;
+    ]], {
+        "decimal", dec.new('3333333333333333333373.7666666666666667')
+    })
+
+test:do_execsql_test(
+    "dec-18.3",
+    [[
+        SELECT typeof(GREATEST(d, d * 0 + i)), GREATEST(d, d * 0 + i) FROM t18;
+    ]], {
+        "decimal", dec.new(123),
+        "decimal", dec.new(2),
+        "decimal", dec.new('9999999999999999999999')
+    })
+
+test:do_execsql_test(
+    "dec-18.4",
+    [[
+        SELECT typeof(LEAST(d, d * 0 + i)), LEAST(d, d * 0 + i) FROM t18;
+    ]], {
+        "decimal", dec.new(1),
+        "decimal", dec.new(-0.7),
+        "decimal", dec.new(3)
+    })
+
+test:do_execsql_test(
+    "dec-18.5",
+    [[
+        SELECT typeof(MAX(d)), MAX(d) FROM t18;
+    ]], {
+        "decimal", dec.new('9999999999999999999999')
+    })
+
+test:do_execsql_test(
+    "dec-18.6",
+    [[
+        SELECT typeof(MIN(d)), MIN(d) FROM t18;
+    ]], {
+        "decimal", dec.new(-0.7),
+    })
+
+test:do_execsql_test(
+    "dec-18.7",
+    [[
+        SELECT typeof(SUM(d)), SUM(d) FROM t18;
+    ]], {
+        "decimal", dec.new('10000000000000000000121.3')
+    })
+
+test:do_execsql_test(
+    "dec-18.8",
+    [[
+        SELECT typeof(TOTAL(d)), TOTAL(d) FROM t18;
+    ]], {
+        "double", 1e+22
+    })
+
+test:execsql([[DROP TABLE t18;]])
 
 test:finish_test()

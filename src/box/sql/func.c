@@ -258,6 +258,19 @@ func_abs_double(struct sql_context *ctx, int argc, const struct Mem *argv)
 	mem_set_double(ctx->pOut, arg->u.r < 0 ? -arg->u.r : arg->u.r);
 }
 
+static void
+func_abs_dec(struct sql_context *ctx, int argc, const struct Mem *argv)
+{
+	assert(argc == 1);
+	(void)argc;
+	const struct Mem *arg = &argv[0];
+	if (mem_is_null(arg))
+		return;
+	assert(mem_is_dec(arg));
+	mem_set_dec(ctx->pOut, &arg->u.d);
+	decimal_abs(&ctx->pOut->u.d, &ctx->pOut->u.d);
+}
+
 /** Implementation of the CHAR_LENGTH() function. */
 static void
 func_char_length(struct sql_context *ctx, int argc, const struct Mem *argv)
@@ -1694,8 +1707,11 @@ static struct sql_func_definition definitions[] = {
 	 NULL},
 	{"ABS", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, func_abs_double,
 	 NULL},
+	{"ABS", 1, {FIELD_TYPE_DECIMAL}, FIELD_TYPE_DECIMAL, func_abs_dec,
+	 NULL},
 	{"AVG", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, step_avg, fin_avg},
 	{"AVG", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, step_avg, fin_avg},
+	{"AVG", 1, {FIELD_TYPE_DECIMAL}, FIELD_TYPE_DECIMAL, step_avg, fin_avg},
 	{"CHAR", -1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_STRING, func_char, NULL},
 	{"CHAR_LENGTH", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_INTEGER,
 	 func_char_length, NULL},
@@ -1708,6 +1724,8 @@ static struct sql_func_definition definitions[] = {
 	{"GREATEST", -1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER,
 	 func_greatest_least, NULL},
 	{"GREATEST", -1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE,
+	 func_greatest_least, NULL},
+	{"GREATEST", -1, {FIELD_TYPE_DECIMAL}, FIELD_TYPE_DECIMAL,
 	 func_greatest_least, NULL},
 	{"GREATEST", -1, {FIELD_TYPE_NUMBER}, FIELD_TYPE_NUMBER,
 	 func_greatest_least, NULL},
@@ -1737,6 +1755,8 @@ static struct sql_func_definition definitions[] = {
 	 func_greatest_least, NULL},
 	{"LEAST", -1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE,
 	 func_greatest_least, NULL},
+	{"LEAST", -1, {FIELD_TYPE_DECIMAL}, FIELD_TYPE_DECIMAL,
+	 func_greatest_least, NULL},
 	{"LEAST", -1, {FIELD_TYPE_NUMBER}, FIELD_TYPE_NUMBER,
 	 func_greatest_least, NULL},
 	{"LEAST", -1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_VARBINARY,
@@ -1765,6 +1785,7 @@ static struct sql_func_definition definitions[] = {
 
 	{"MAX", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, step_minmax, NULL},
 	{"MAX", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, step_minmax, NULL},
+	{"MAX", 1, {FIELD_TYPE_DECIMAL}, FIELD_TYPE_DECIMAL, step_minmax, NULL},
 	{"MAX", 1, {FIELD_TYPE_NUMBER}, FIELD_TYPE_NUMBER, step_minmax, NULL},
 	{"MAX", 1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_VARBINARY, step_minmax,
 	 NULL},
@@ -1774,6 +1795,7 @@ static struct sql_func_definition definitions[] = {
 
 	{"MIN", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, step_minmax, NULL},
 	{"MIN", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, step_minmax, NULL},
+	{"MIN", 1, {FIELD_TYPE_DECIMAL}, FIELD_TYPE_DECIMAL, step_minmax, NULL},
 	{"MIN", 1, {FIELD_TYPE_NUMBER}, FIELD_TYPE_NUMBER, step_minmax, NULL},
 	{"MIN", 1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_VARBINARY, step_minmax,
 	 NULL},
@@ -1816,9 +1838,12 @@ static struct sql_func_definition definitions[] = {
 	 FIELD_TYPE_VARBINARY, func_substr_octets, NULL},
 	{"SUM", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, step_sum, NULL},
 	{"SUM", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, step_sum, NULL},
+	{"SUM", 1, {FIELD_TYPE_DECIMAL}, FIELD_TYPE_DECIMAL, step_sum, NULL},
 	{"TOTAL", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_DOUBLE, step_total,
 	 fin_total},
 	{"TOTAL", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, step_total,
+	 fin_total},
+	{"TOTAL", 1, {FIELD_TYPE_DECIMAL}, FIELD_TYPE_DOUBLE, step_total,
 	 fin_total},
 
 	{"TRIM", 2, {FIELD_TYPE_STRING, FIELD_TYPE_INTEGER},

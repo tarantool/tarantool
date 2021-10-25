@@ -148,6 +148,12 @@ mem_is_double(const struct Mem *mem)
 }
 
 static inline bool
+mem_is_dec(const struct Mem *mem)
+{
+	return mem->type == MEM_TYPE_DEC;
+}
+
+static inline bool
 mem_is_int(const struct Mem *mem)
 {
 	return (mem->type & (MEM_TYPE_UINT | MEM_TYPE_INT)) != 0;
