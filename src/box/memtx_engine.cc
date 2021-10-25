@@ -357,14 +357,13 @@ memtx_engine_begin_final_recovery(struct engine *engine)
 }
 
 static int
-memtx_engine_end_recovery(struct engine *engine)
+memtx_engine_begin_hot_standby(struct engine *engine)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 	/*
-	 * Recovery is started with enabled keys when:
-	 * - either of force_recovery
-	 *   is false
-	 * - it's a replication join
+	 * Build secondary indexes before entering the hot standby mode
+	 * to quickly switch to the hot standby instance after the master
+	 * instance exits.
 	 */
 	if (memtx->state != MEMTX_OK) {
 		assert(memtx->state == MEMTX_FINAL_RECOVERY);
@@ -372,6 +371,26 @@ memtx_engine_end_recovery(struct engine *engine)
 		if (space_foreach(memtx_build_secondary_keys, memtx) != 0)
 			return -1;
 	}
+	return 0;
+}
+
+static int
+memtx_engine_end_recovery(struct engine *engine)
+{
+	struct memtx_engine *memtx = (struct memtx_engine *)engine;
+	/*
+	 * Secondary keys have already been built in the following cases:
+	 * - force_recovery is set
+	 * - it's a replication join
+	 * - instance was in the hot standby mode
+	 */
+	if (memtx->state != MEMTX_OK) {
+		assert(memtx->state == MEMTX_FINAL_RECOVERY);
+		memtx->state = MEMTX_OK;
+		if (space_foreach(memtx_build_secondary_keys, memtx) != 0)
+			return -1;
+	}
+	xdir_collect_inprogress(&memtx->snap_dir);
 	return 0;
 }
 
@@ -864,7 +883,6 @@ memtx_engine_collect_garbage(struct engine *engine, const struct vclock *vclock)
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 	xdir_collect_garbage(&memtx->snap_dir, vclock_sum(vclock),
 			     XDIR_GC_ASYNC);
-	xdir_collect_inprogress(&memtx->snap_dir);
 }
 
 static int
@@ -1044,6 +1062,7 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .bootstrap = */ memtx_engine_bootstrap,
 	/* .begin_initial_recovery = */ memtx_engine_begin_initial_recovery,
 	/* .begin_final_recovery = */ memtx_engine_begin_final_recovery,
+	/* .begin_hot_standby = */ memtx_engine_begin_hot_standby,
 	/* .end_recovery = */ memtx_engine_end_recovery,
 	/* .begin_checkpoint = */ memtx_engine_begin_checkpoint,
 	/* .wait_checkpoint = */ memtx_engine_wait_checkpoint,

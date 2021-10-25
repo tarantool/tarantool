@@ -117,7 +117,6 @@ gc_init(void)
 	gc_tree_new(&gc.consumers);
 	fiber_cond_create(&gc.cleanup_cond);
 	checkpoint_schedule_cfg(&gc.checkpoint_schedule, 0, 0);
-	engine_collect_garbage(&gc.vclock);
 
 	gc.cleanup_fiber = fiber_new("gc", gc_cleanup_fiber_f);
 	if (gc.cleanup_fiber == NULL)

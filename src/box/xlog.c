@@ -771,6 +771,8 @@ xlog_rename(struct xlog *l)
 	memcpy(new_filename, filename, suffix - filename);
 	new_filename[suffix - filename] = '\0';
 
+	ERROR_INJECT_SLEEP(ERRINJ_XLOG_RENAME_DELAY);
+
 	if (rename(filename, new_filename) != 0) {
 		say_syserror("can't rename %s to %s", filename, new_filename);
 		diag_set(SystemError, "failed to rename '%s' file",

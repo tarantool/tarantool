@@ -188,6 +188,7 @@ static const struct engine_vtab blackhole_engine_vtab = {
 	/* .bootstrap = */ generic_engine_bootstrap,
 	/* .begin_initial_recovery = */ generic_engine_begin_initial_recovery,
 	/* .begin_final_recovery = */ generic_engine_begin_final_recovery,
+	/* .begin_hot_standby = */ generic_engine_begin_hot_standby,
 	/* .end_recovery = */ generic_engine_end_recovery,
 	/* .begin_checkpoint = */ generic_engine_begin_checkpoint,
 	/* .wait_checkpoint = */ generic_engine_wait_checkpoint,
