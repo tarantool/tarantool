@@ -35,7 +35,7 @@
 
 enum { MAX_OPT_NAME_LEN = 256, MAX_OPT_VAL_LEN = 256 };
 
-static void
+void
 cfg_get(const char *param)
 {
 	const char *buf =

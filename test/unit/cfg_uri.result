@@ -1,0 +1,384 @@
+1..5
+    1..14
+    ok 1 - /path_to_unix_socket_1: parsed successfully
+        1..4
+        ok 1 - count of URIs is valid
+        ok 2 - URI is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+            ok 3 - missing URI options are zeroed
+        ok 3 - subtests
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+            ok 3 - missing URI options are zeroed
+        ok 4 - subtests
+    ok 2 - subtests
+    ok 3 - /path_to_unix_socket_1?backlog=10: parsed successfully
+        1..4
+        ok 1 - count of URIs is valid
+        ok 2 - URI is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+                1..2
+                ok 1 - 'backlog' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+            ok 3 - subtests
+        ok 3 - subtests
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+            ok 3 - missing URI options are zeroed
+        ok 4 - subtests
+    ok 4 - subtests
+    ok 5 - /path_to_unix_socket_1?backlog=10;20: parsed successfully
+        1..4
+        ok 1 - count of URIs is valid
+        ok 2 - URI is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+                1..3
+                ok 1 - 'backlog' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+            ok 3 - subtests
+        ok 3 - subtests
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+            ok 3 - missing URI options are zeroed
+        ok 4 - subtests
+    ok 6 - subtests
+    ok 7 - /path_to_unix_socket_1?backlog=10&backlog=20: parsed successfully
+        1..4
+        ok 1 - count of URIs is valid
+        ok 2 - URI is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+                1..3
+                ok 1 - 'backlog' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+            ok 3 - subtests
+        ok 3 - subtests
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+            ok 3 - missing URI options are zeroed
+        ok 4 - subtests
+    ok 8 - subtests
+    ok 9 - /path_to_unix_socket_1?backlog=10;20&backlog=40;80: parsed successfully
+        1..4
+        ok 1 - count of URIs is valid
+        ok 2 - URI is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+                1..5
+                ok 1 - 'backlog' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 3 - subtests
+        ok 3 - subtests
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+            ok 3 - missing URI options are zeroed
+        ok 4 - subtests
+    ok 10 - subtests
+    ok 11 - /path_to_unix_socket_1?backlog=2048;4096&backlog=8192;16384&readahead=2048;4096&readahead=8192;16384: parsed successfully
+        1..4
+        ok 1 - count of URIs is valid
+        ok 2 - URI is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+                1..5
+                ok 1 - 'backlog' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 2 - subtests
+                1..5
+                ok 1 - 'readahead' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 3 - subtests
+        ok 3 - subtests
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+            ok 3 - missing URI options are zeroed
+        ok 4 - subtests
+    ok 12 - subtests
+    ok 13 - /path_to_unix_socket_1?backlog=2048;4096&backlog=8192;16384&readahead=2048;4096&readahead=8192;16384, /path_to_unix_socket_2?backlog=2048;4096&backlog=8192;16384&readahead=2048;4096&readahead=8192;16384: parsed successfully
+        1..6
+        ok 1 - count of URIs is valid
+        ok 2 - URI is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+                1..5
+                ok 1 - 'backlog' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 2 - subtests
+                1..5
+                ok 1 - 'readahead' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 3 - subtests
+        ok 3 - subtests
+        ok 4 - URI is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+                1..5
+                ok 1 - 'backlog' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 2 - subtests
+                1..5
+                ok 1 - 'readahead' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 3 - subtests
+        ok 5 - subtests
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+            ok 3 - missing URI options are zeroed
+        ok 6 - subtests
+    ok 14 - subtests
+ok 1 - subtests
+    1..13
+    ok 1 - Incorrect value for option 'listen': not found query for URI after '?'
+    ok 2 - Incorrect value for option 'listen': not found option value for URI
+    ok 3 - Incorrect value for option 'listen': not found option for URI after '&'
+    ok 4 - Incorrect value for option 'listen': not found option for URI after '&'
+    ok 5 - Incorrect value for option 'listen': not found option for URI after '&'
+    ok 6 - Incorrect value for option 'listen': not found option value for URI
+    ok 7 - Incorrect value for option 'listen': not found option value for URI
+    ok 8 - Incorrect value for option 'listen': not found option value for URI after '='
+    ok 9 - Incorrect value for option 'listen': not found option value for URI after '='
+    ok 10 - Incorrect value for option 'listen': invalid option name for URI
+    ok 11 - Incorrect value for option 'listen': not found option value for URI
+    ok 12 - Incorrect value for option 'listen': not found option value for URI
+    ok 13 - Incorrect value for option 'listen': not found option value for URI
+ok 2 - subtests
+    1..21
+    ok 1 - backlog=10: parsed successfully
+        1..2
+        ok 1 - count of URIs is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+                1..2
+                ok 1 - 'backlog' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+            ok 3 - subtests
+        ok 2 - subtests
+    ok 2 - subtests
+    ok 3 - backlog=10;20: parsed successfully
+        1..2
+        ok 1 - count of URIs is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+                1..3
+                ok 1 - 'backlog' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+            ok 3 - subtests
+        ok 2 - subtests
+    ok 4 - subtests
+    ok 5 - backlog=10&backlog=20: parsed successfully
+        1..2
+        ok 1 - count of URIs is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+                1..3
+                ok 1 - 'backlog' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+            ok 3 - subtests
+        ok 2 - subtests
+    ok 6 - subtests
+    ok 7 - backlog=10;20&backlog=40;80: parsed successfully
+        1..2
+        ok 1 - count of URIs is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+                1..5
+                ok 1 - 'backlog' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 3 - subtests
+        ok 2 - subtests
+    ok 8 - subtests
+    ok 9 - backlog=2048;4096&backlog=8192;16384&readahead=2048;4096&readahead=8192;16384: parsed successfully
+        1..2
+        ok 1 - count of URIs is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+                1..5
+                ok 1 - 'backlog' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 2 - subtests
+                1..5
+                ok 1 - 'readahead' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 3 - subtests
+        ok 2 - subtests
+    ok 10 - subtests
+    ok 11 - Incorrect value for option 'listen': not found option for URI after '&'
+    ok 12 - Incorrect value for option 'listen': not found option for URI after '&'
+    ok 13 - Incorrect value for option 'listen': not found option for URI after '&'
+    ok 14 - Incorrect value for option 'listen': not found option value for URI
+    ok 15 - Incorrect value for option 'listen': not found option value for URI
+    ok 16 - Incorrect value for option 'listen': not found option value for URI after '='
+    ok 17 - Incorrect value for option 'listen': not found option value for URI after '='
+    ok 18 - Incorrect value for option 'listen': invalid option name for URI
+    ok 19 - Incorrect value for option 'listen': not found option value for URI
+    ok 20 - Incorrect value for option 'listen': not found option value for URI
+    ok 21 - Incorrect value for option 'listen': not found option value for URI
+ok 3 - subtests
+    1..6
+    ok 1 - 10: parsed successfully
+        1..2
+        ok 1 - count of URIs is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+                1..2
+                ok 1 - '(null)' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+            ok 3 - subtests
+        ok 2 - subtests
+    ok 2 - subtests
+    ok 3 - 10;20;40;80: parsed successfully
+        1..2
+        ok 1 - count of URIs is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+                1..5
+                ok 1 - '(null)' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 3 - subtests
+        ok 2 - subtests
+    ok 4 - subtests
+    ok 5 - Incorrect value for option 'listen': not found option value for URI
+    ok 6 - Incorrect value for option 'listen': not found option value for URI
+ok 4 - subtests
+    1..3
+    ok 1 - string URI array: parsed successfully
+        1..10
+        ok 1 - count of URIs is valid
+        ok 2 - URI is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+                1..5
+                ok 1 - 'backlog' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 2 - subtests
+                1..5
+                ok 1 - 'readahead' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 3 - subtests
+        ok 3 - subtests
+        ok 4 - URI is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+                1..5
+                ok 1 - 'backlog' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 2 - subtests
+                1..5
+                ok 1 - 'readahead' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 3 - subtests
+        ok 5 - subtests
+        ok 6 - URI is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+                1..5
+                ok 1 - 'backlog' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 2 - subtests
+                1..5
+                ok 1 - 'readahead' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 3 - subtests
+        ok 7 - subtests
+        ok 8 - URI is valid
+            1..3
+            ok 1 - missing URI options are zeroed
+                1..5
+                ok 1 - 'backlog' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 2 - subtests
+                1..5
+                ok 1 - 'readahead' count of values of the URI option is valid
+                ok 2 - value of URI option is valid
+                ok 3 - value of URI option is valid
+                ok 4 - value of URI option is valid
+                ok 5 - value of URI option is valid
+            ok 3 - subtests
+        ok 9 - subtests
+            1..3
+            ok 1 - missing URI options are zeroed
+            ok 2 - missing URI options are zeroed
+            ok 3 - missing URI options are zeroed
+        ok 10 - subtests
+    ok 2 - subtests
+    ok 3 - Incorrect value for option 'listen': not found query for URI after '?'
+ok 5 - subtests

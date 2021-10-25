@@ -83,6 +83,7 @@
 #include "raft.h"
 #include "trivia/util.h"
 #include "version.h"
+#include "cfg_uri.h"
 
 static char status[64] = "unknown";
 
@@ -724,6 +725,26 @@ box_check_replication(void)
 	}
 }
 
+static int
+box_check_listen(void)
+{
+	cfg_get("listen");
+	struct cfg_uri_array uri_array;
+	if (cfg_uri_array_create(&uri_array, tarantool_L, "listen") != 0) {
+		lua_pop(tarantool_L, 1);
+		return -1;
+	}
+	int rc = 0;
+	for (int i = 0; i < uri_array.size; i++) {
+		assert(uri_array.uris[i].uri != NULL);
+		if ((rc = box_check_uri(uri_array.uris[i].uri, "listen")) != 0)
+			break;
+	}
+	cfg_uri_array_destroy(&uri_array);
+	lua_pop(tarantool_L, 1);
+	return rc;
+}
+
 static double
 box_check_replication_timeout(void)
 {
@@ -1146,7 +1167,7 @@ box_check_config(void)
 {
 	struct tt_uuid uuid;
 	box_check_say();
-	if (box_check_uri(cfg_gets("listen"), "listen") != 0)
+	if (box_check_listen() != 0)
 		diag_raise();
 	box_check_instance_uuid(&uuid);
 	box_check_replicaset_uuid(&uuid);
@@ -1833,10 +1854,18 @@ box_demote(void)
 int
 box_listen(void)
 {
-	const char *uri = cfg_gets("listen");
-	if (box_check_uri(uri, "listen") != 0 || iproto_listen(uri) != 0)
+	if (box_check_listen() != 0)
 		return -1;
-	return 0;
+	cfg_get("listen");
+	struct cfg_uri_array array;
+	if (cfg_uri_array_create(&array, tarantool_L, "listen") != 0) {
+		lua_pop(tarantool_L, 1);
+		return -1;
+	}
+	int rc = iproto_listen(array.size ? array.uris[0].uri : NULL);
+	cfg_uri_array_destroy(&array);
+	lua_pop(tarantool_L, 1);
+	return rc;
 }
 
 void

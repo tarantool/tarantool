@@ -189,6 +189,13 @@ set(ITERATOR_TEST_LIBS core tuple xrow unit)
 add_executable(vy_mem.test vy_mem.c ${ITERATOR_TEST_SOURCES} core_test_utils.c)
 target_link_libraries(vy_mem.test ${ITERATOR_TEST_LIBS} ${LIB_DL})
 
+add_executable(cfg_uri.test
+    cfg_uri.c
+    unit.c
+    ${PROJECT_SOURCE_DIR}/src/box/cfg_uri.c
+)
+target_link_libraries(cfg_uri.test box core unit)
+
 add_executable(vy_point_lookup.test
     vy_point_lookup.c
     vy_iterators_helper.c
