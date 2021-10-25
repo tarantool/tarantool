@@ -1866,9 +1866,18 @@ base_index_mt.random_luac = function(index, rnd)
     rnd = rnd or math.random()
     return internal.random(index.space_id, index.id, rnd);
 end
+
+local function check_select_pairs_args(method, index, key, opts)
+    if index.space_id >= 512 and key == nil and opts == nil then
+        log.crit('empty or nil :%s call on user space with id=%d:\n' ..
+                 '%s', method, index.space_id, debug.traceback())
+    end
+end
+
 -- iteration
 base_index_mt.pairs_ffi = function(index, key, opts)
     check_index_arg(index, 'pairs')
+    check_select_pairs_args('pairs', index, key, opts)
     local ibuf = cord_ibuf_take()
     local pkey, pkey_end = tuple_encode(ibuf, key)
     local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
@@ -1886,6 +1895,7 @@ base_index_mt.pairs_ffi = function(index, key, opts)
 end
 base_index_mt.pairs_luac = function(index, key, opts)
     check_index_arg(index, 'pairs')
+    check_select_pairs_args('pairs', index, key, opts)
     key = keify(key)
     local itype = check_iterator_type(opts, #key == 0);
     local keymp = msgpack.encode(key)
@@ -1954,6 +1964,7 @@ end
 
 base_index_mt.select_ffi = function(index, key, opts)
     check_index_arg(index, 'select')
+    check_select_pairs_args('select', index, key, opts)
     local ibuf = cord_ibuf_take()
     local key, key_end = tuple_encode(ibuf, key)
     local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
@@ -1978,6 +1989,7 @@ end
 
 base_index_mt.select_luac = function(index, key, opts)
     check_index_arg(index, 'select')
+    check_select_pairs_args('select', index, key, opts)
     local key = keify(key)
     local iterator, offset, limit = check_select_opts(opts, #key == 0)
     return internal.select(index.space_id, index.id, iterator,
