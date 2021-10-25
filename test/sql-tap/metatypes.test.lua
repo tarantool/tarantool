@@ -406,7 +406,7 @@ test:do_catchsql_test(
     [[
         SELECT ABS(a) FROM t;
     ]], {
-        1, "Type mismatch: can not convert any(1) to integer"
+        1, "Type mismatch: can not convert any(1) to decimal"
     })
 
 test:do_catchsql_test(
@@ -414,7 +414,7 @@ test:do_catchsql_test(
     [[
         SELECT AVG(a) FROM t;
     ]], {
-        1, "Type mismatch: can not convert any(1) to integer"
+        1, "Type mismatch: can not convert any(1) to decimal"
     })
 
 test:do_catchsql_test(
@@ -635,7 +635,7 @@ test:do_catchsql_test(
     [[
         SELECT SUM(a) FROM t;
     ]], {
-        1, "Type mismatch: can not convert any(1) to integer"
+        1, "Type mismatch: can not convert any(1) to decimal"
     })
 
 test:do_catchsql_test(
@@ -643,7 +643,7 @@ test:do_catchsql_test(
     [[
         SELECT TOTAL(a) FROM t;
     ]], {
-        1, "Type mismatch: can not convert any(1) to integer"
+        1, "Type mismatch: can not convert any(1) to decimal"
     })
 
 test:do_catchsql_test(

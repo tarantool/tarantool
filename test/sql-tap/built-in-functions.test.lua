@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(52)
+test:plan(66)
 
 --
 -- Make sure that number of arguments check is checked properly for SQL built-in
@@ -395,7 +395,7 @@ test:do_test(
         local res = {pcall(box.execute, [[SELECT ABS(?);]], {'1'})}
         return {tostring(res[3])}
     end, {
-        "Type mismatch: can not convert string('1') to integer"
+        "Type mismatch: can not convert string('1') to decimal"
     })
 
 test:do_catchsql_test(
@@ -455,7 +455,7 @@ test:do_test(
         local res = {pcall(box.execute, [[SELECT SUM(?);]], {'1'})}
         return {tostring(res[3])}
     end, {
-        "Type mismatch: can not convert string('1') to integer"
+        "Type mismatch: can not convert string('1') to decimal"
     })
 
 test:do_catchsql_test(
@@ -475,7 +475,7 @@ test:do_test(
         local res = {pcall(box.execute, [[SELECT AVG(?);]], {'1'})}
         return {tostring(res[3])}
     end, {
-        "Type mismatch: can not convert string('1') to integer"
+        "Type mismatch: can not convert string('1') to decimal"
     })
 
 test:do_catchsql_test(
@@ -495,7 +495,7 @@ test:do_test(
         local res = {pcall(box.execute, [[SELECT TOTAL(?);]], {'1'})}
         return {tostring(res[3])}
     end, {
-        "Type mismatch: can not convert string('1') to integer"
+        "Type mismatch: can not convert string('1') to decimal"
     })
 
 --
@@ -543,6 +543,123 @@ test:do_test(
     end, {
         {name = "COLUMN_1", type = "scalar"},
         {name = "COLUMN_2", type = "scalar"},
+    })
+
+-- gh-6483: Make sure functions have correct default type.
+test:do_test(
+    "builtins-4.1",
+    function()
+        return box.execute([[SELECT ABS(?);]], {1}).metadata[1]
+    end, {
+        name = "COLUMN_1", type = 'decimal'
+    })
+
+test:do_test(
+    "builtins-4.2",
+    function()
+        return box.execute([[SELECT AVG(?);]], {1}).metadata[1]
+    end, {
+        name = "COLUMN_1", type = 'decimal'
+    })
+
+test:do_test(
+    "builtins-4.3",
+    function()
+        return box.execute([[SELECT GREATEST(?, 1);]], {1}).metadata[1]
+    end, {
+        name = "COLUMN_1", type = 'scalar'
+    })
+
+test:do_test(
+    "builtins-4.4",
+    function()
+        return box.execute([[SELECT GROUP_CONCAT(?);]], {'a'}).metadata[1]
+    end, {
+        name = "COLUMN_1", type = 'string'
+    })
+
+test:do_test(
+    "builtins-4.5",
+    function()
+        return box.execute([[SELECT LEAST(?, 1);]], {1}).metadata[1]
+    end, {
+        name = "COLUMN_1", type = 'scalar'
+    })
+
+test:do_test(
+    "builtins-4.6",
+    function()
+        local res = {pcall(box.execute, [[SELECT LENGTH(?);]], {1})}
+        return {tostring(res[3])}
+    end, {
+        "Type mismatch: can not convert integer(1) to string"
+    })
+
+test:do_test(
+    "builtins-4.7",
+    function()
+        return box.execute([[SELECT MAX(?);]], {1}).metadata[1]
+    end, {
+        name = "COLUMN_1", type = 'scalar'
+    })
+
+test:do_test(
+    "builtins-4.8",
+    function()
+        return box.execute([[SELECT MIN(?);]], {1}).metadata[1]
+    end, {
+        name = "COLUMN_1", type = 'scalar'
+    })
+
+test:do_test(
+    "builtins-4.9",
+    function()
+        local res = {pcall(box.execute, [[SELECT POSITION(?, ?);]], {1, 1})}
+        return {tostring(res[3])}
+    end, {
+        "Type mismatch: can not convert integer(1) to string"
+    })
+
+test:do_test(
+    "builtins-4.10",
+    function()
+        return box.execute([[SELECT REPLACE(@1, @1, @1);]], {'a'}).metadata[1]
+    end, {
+        name = "COLUMN_1", type = 'string'
+    })
+
+test:do_test(
+    "builtins-4.11",
+    function()
+        return box.execute([[SELECT SUBSTR(?, 1, 2);]], {'asd'}).metadata[1]
+    end, {
+        name = "COLUMN_1", type = 'string'
+    })
+
+test:do_test(
+    "builtins-4.12",
+    function()
+        return box.execute([[SELECT SUM(?);]], {1}).metadata[1]
+    end, {
+        name = "COLUMN_1", type = 'decimal'
+    })
+
+test:do_test(
+    "builtins-4.13",
+    function()
+        local res = {pcall(box.execute, [[SELECT TOTAL(?);]], {'a'})}
+        return {tostring(res[3])}
+    end, {
+        "Type mismatch: can not convert string('a') to decimal"
+    })
+
+test:do_test(
+    "builtins-4.14",
+    function()
+        local res = {pcall(box.execute, [[SELECT TRIM(?);]], {1})}
+        return {tostring(res[3])}
+    end, {
+        "Type mismatch: can not convert integer(1) to string"
     })
 
 test:finish_test()
