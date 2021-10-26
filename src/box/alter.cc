@@ -2914,6 +2914,11 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	if (space_is_temporary(old_space) ||
 	    space_group_id(old_space) == GROUP_LOCAL) {
 		stmt->row->group_id = GROUP_LOCAL;
+		/*
+		 * The trigger is invoked after txn->n_local_rows
+		 * is counted, so don't forget to update it here.
+		 */
+		++txn->n_local_rows;
 	}
 
 	try {
