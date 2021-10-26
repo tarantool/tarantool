@@ -46,3 +46,9 @@ jobs:
     uses: tarantool/avro-schema/.github/workflows/reusable_testing.yml@master
     with:
       artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+
+  queue:
+    needs: tarantool
+    uses: tarantool/queue/.github/workflows/reusable_testing.yml@master
+    with:
+      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
