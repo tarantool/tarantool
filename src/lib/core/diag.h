@@ -208,6 +208,9 @@ error_move_payload(struct error *e, struct error_payload *src)
 	error_payload_move(&e->payload, src);
 }
 
+const struct error_field *
+error_find_field(const struct error *e, const char *name);
+
 /**
  * Unlink error from its effect. For instance:
  * e1 -> e2 -> e3 -> e4 (e1:set_prev(e2); e2:set_prev(e3) ...)

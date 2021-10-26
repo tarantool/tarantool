@@ -85,13 +85,7 @@ exception_get_int(struct error *e, const struct method_info *method)
 static OutOfMemory out_of_memory(__FILE__, __LINE__,
 				 sizeof(OutOfMemory), "malloc", "exception");
 
-static const struct method_info exception_methods[] = {
-	make_method(&type_Exception, "message", &Exception::get_errmsg),
-	make_method(&type_Exception, "log", &Exception::log),
-	METHODS_SENTINEL
-};
-const struct type_info type_Exception = make_type("Exception", NULL,
-	exception_methods);
+const struct type_info type_Exception = make_type("Exception", NULL);
 
 void *
 Exception::operator new(size_t size)

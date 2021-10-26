@@ -61,6 +61,12 @@ error_unref(struct error *e)
 	}
 }
 
+const struct error_field *
+error_find_field(const struct error *e, const char *name)
+{
+	return error_payload_find(&e->payload, name);
+}
+
 int
 error_set_prev(struct error *e, struct error *prev)
 {

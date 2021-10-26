@@ -158,13 +158,8 @@ const char *rmean_error_strings[RMEAN_ERROR_LAST] = {
 	"ERROR"
 };
 
-static struct method_info clienterror_methods[] = {
-	make_method(&type_ClientError, "code", &ClientError::errcode),
-	METHODS_SENTINEL
-};
-
 const struct type_info type_ClientError =
-	make_type("ClientError", &type_Exception, clienterror_methods);
+	make_type("ClientError", &type_Exception);
 
 ClientError::ClientError(const type_info *type, const char *file, unsigned line,
 			 uint32_t errcode)
@@ -269,16 +264,8 @@ BuildXlogGapError(const char *file, unsigned line,
 
 struct rlist on_access_denied = RLIST_HEAD_INITIALIZER(on_access_denied);
 
-static struct method_info accessdeniederror_methods[] = {
-	make_method(&type_AccessDeniedError, "access_type", &AccessDeniedError::access_type),
-	make_method(&type_AccessDeniedError, "object_type", &AccessDeniedError::object_type),
-	make_method(&type_AccessDeniedError, "object_name", &AccessDeniedError::object_name),
-	METHODS_SENTINEL
-};
-
 const struct type_info type_AccessDeniedError =
-	make_type("AccessDeniedError", &type_ClientError,
-		  accessdeniederror_methods);
+	make_type("AccessDeniedError", &type_ClientError);
 
 AccessDeniedError::AccessDeniedError(const char *file, unsigned int line,
 				     const char *access_type,
@@ -318,13 +305,8 @@ BuildAccessDeniedError(const char *file, unsigned int line,
 	}
 }
 
-static struct method_info customerror_methods[] = {
-	make_method(&type_CustomError, "custom_type", &CustomError::custom_type),
-	METHODS_SENTINEL
-};
-
 const struct type_info type_CustomError =
-	make_type("CustomError", &type_ClientError, customerror_methods);
+	make_type("CustomError", &type_ClientError);
 
 CustomError::CustomError(const char *file, unsigned int line,
 			 const char *custom_type, uint32_t errcode)
