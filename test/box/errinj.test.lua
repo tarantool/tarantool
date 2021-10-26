@@ -296,9 +296,9 @@ box.schema.user.revoke('guest', 'read', 'space', '_space')
 run()
 ch:get()
 
-box.space.test:select()
+box.space.test:select{}
 test_run:cmd('restart server default')
-box.space.test:select()
+box.space.test:select{}
 box.space.test:drop()
 
 errinj = box.error.injection
@@ -394,7 +394,7 @@ c = net_box.connect(box.cfg.listen)
 ch = fiber.channel(200)
 errinj.set("ERRINJ_IPROTO_TX_DELAY", true)
 for i = 1, 100 do fiber.create(function() for j = 1, 10 do c.space.test:replace{1} end ch:put(true) end) end
-for i = 1, 100 do fiber.create(function() for j = 1, 10 do c.space.test:select() end ch:put(true) end) end
+for i = 1, 100 do fiber.create(function() for j = 1, 10 do c.space.test:select{} end ch:put(true) end) end
 for i = 1, 200 do ch:get() end
 errinj.set("ERRINJ_IPROTO_TX_DELAY", false)
 
@@ -492,7 +492,7 @@ s:drop()
 s:truncate()
 errinj.set('ERRINJ_WAL_IO', false)
 for i = 1, 10 do s:replace{i + 10} end
-s:select()
+s:select{}
 s:drop()
 
 --
@@ -609,7 +609,7 @@ box.error.injection.set('ERRINJ_WAL_IO', true)
 box.schema.user.grant('testg', 'read,write', 'space', 'testg')
 -- switch user and check they couldn't select
 box.session.su('testg')
-box.space.testg:select()
+box.space.testg:select{}
 box.session.su('admin')
 box.error.injection.set('ERRINJ_WAL_IO', false)
 box.schema.user.drop('testg')

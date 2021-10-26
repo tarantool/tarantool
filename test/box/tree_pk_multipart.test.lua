@@ -182,7 +182,7 @@ end;
 local pk = space.index[0]
 while pk:len() > 0 do
     local state, t
-    for state, t in pk:pairs() do
+    for state, t in pk:pairs{} do
         local key = {}
         for _k2, parts in ipairs(pk.parts) do
             table.insert(key, t[parts.fieldno])

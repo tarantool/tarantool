@@ -10,7 +10,7 @@ s = box.schema.create_space('test', {engine = engine})
 _ = s:create_index('pk')
 _ = s:insert{123}
 box.begin() s:truncate() box.commit()
-s:select()
+s:select{}
 s:drop()
 
 --
@@ -20,9 +20,9 @@ s:drop()
 _ = box.space._space:insert{512, 1, 'test', engine, 0, {temporary = false}, {}}
 _ = box.space._index:insert{512, 0, 'pk', 'tree', {unique = true}, {{0, 'unsigned'}}}
 _ = box.space.test:insert{123}
-box.space.test:select()
+box.space.test:select{}
 box.space.test:truncate()
-box.space.test:select()
+box.space.test:select{}
 box.space.test:drop()
 
 --
@@ -54,7 +54,7 @@ s:drop()
 s = box.schema.create_space('test', {engine = engine})
 _ = s:create_index('pk')
 s:truncate()
-s:select()
+s:select{}
 s:drop()
 
 --
@@ -68,15 +68,15 @@ _ = s:insert{1, 3, 'a'}
 _ = s:insert{2, 2, 'b'}
 _ = s:insert{3, 1, 'c'}
 s:truncate()
-s.index.i1:select()
-s.index.i2:select()
-s.index.i3:select()
+s.index.i1:select{}
+s.index.i2:select{}
+s.index.i3:select{}
 _ = s:insert{10, 30, 'x'}
 _ = s:insert{20, 20, 'y'}
 _ = s:insert{30, 10, 'z'}
-s.index.i1:select()
-s.index.i2:select()
-s.index.i3:select()
+s.index.i1:select{}
+s.index.i2:select{}
+s.index.i3:select{}
 s:drop()
 
 --
@@ -139,14 +139,14 @@ s1 = box.space.test1
 s2 = box.space.test2
 s3 = box.space.test3
 s4 = box.space.test4
-s1.index.i1:select()
-s1.index.i2:select()
-s2.index.i1:select()
-s2.index.i2:select()
-s3.index.i1:select()
-s3.index.i2:select()
-s4.index.i1:select()
-s4.index.i2:select()
+s1.index.i1:select{}
+s1.index.i2:select{}
+s2.index.i1:select{}
+s2.index.i2:select{}
+s3.index.i1:select{}
+s3.index.i2:select{}
+s4.index.i1:select{}
+s4.index.i2:select{}
 s1:drop()
 s2:drop()
 s3:drop()
@@ -162,10 +162,10 @@ box.schema.user.grant('guest', 'execute', 'universe')
 box.schema.user.grant('guest', 'read', 'space', 'access_truncate')
 con = require('net.box').connect(box.cfg.listen)
 con:eval([[box.space.access_truncate:truncate()]])
-con.space.access_truncate:select()
+con.space.access_truncate:select{}
 box.schema.user.grant('guest', 'write', 'space', 'access_truncate')
 con:eval([[box.space.access_truncate:truncate()]])
-con.space.access_truncate:select()
+con.space.access_truncate:select{}
 con:close()
 box.schema.user.revoke('guest', 'execute', 'universe')
 box.schema.user.revoke('guest', 'read,write', 'space', 'access_truncate')

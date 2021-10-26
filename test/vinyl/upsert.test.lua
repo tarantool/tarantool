@@ -358,11 +358,11 @@ box.snapshot()
 s:upsert({1, 0}, {{'=', 2, 2}})
 s:upsert({1, 0}, {{'-', 2, 1}})
 box.snapshot()
-s:select()
+s:select{}
 
 for i = 0, 11 do if i%2 == 0 then s:upsert({1, 0}, {{'=', 2, i}}) else s:upsert({1, 0}, {{'+', 2, i}}) end end
 box.snapshot()
-s:select()
+s:select{}
 
 -- Operations won't squash (owing to incompatible types), so
 -- during applying resulting upsert on the top of replace
@@ -372,7 +372,7 @@ s:select()
 s:upsert({1, 0}, {{'=', 2, 'abc'}})
 s:upsert({1, 0}, {{'-', 2, 1}})
 box.snapshot()
-s:select()
+s:select{}
 
 s:drop()
 
@@ -389,7 +389,7 @@ box.snapshot()
 s:upsert({1}, {{'=', 3, 100}})
 s:upsert({1}, {{'=', -1, 200}})
 box.snapshot()
-s:select() -- {1, 1, 200}
+s:select{} -- {1, 1, 200}
 
 s:delete({1})
 s:insert({1, 1, 1})
@@ -401,7 +401,7 @@ box.snapshot()
 -- gh-5105: Two upserts are NOT squashed into one, so only one (first one)
 -- is skipped, meanwhile second one is applied.
 --
-s:select() -- {1, 1, 1}
+s:select{} -- {1, 1, 1}
 
 s:delete({1})
 box.snapshot()
@@ -412,7 +412,7 @@ s:upsert({1}, {{'-', 2, 100}}) -- {1, 1}
 s:upsert({1}, {{'+', -1, 200}}) -- {1, 201}
 s:upsert({1}, {{'-', 2, 200}}) -- {1, 1}
 box.snapshot()
-s:select() -- {1, 1}
+s:select{} -- {1, 1}
 
 s:delete({1})
 box.snapshot()
@@ -423,7 +423,7 @@ s:upsert({1}, {{'=', -1, 100}}) -- {1, 101, 100}
 s:upsert({1}, {{'+', -1, 200}}) -- {1, 101, 300}
 s:upsert({1}, {{'-', -2, 100}}) -- {1, 1, 300}
 box.snapshot()
-s:select()
+s:select{}
 
 s:drop()
 
@@ -502,7 +502,7 @@ s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'=', 4, 4}})
 s:upsert({2, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 2, 5}})
 s:upsert({2, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 2, 5.5}})
 box.snapshot()
-s:select()
+s:select{}
 -- Integer overflow check.
 --
 s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 3, 9223372036854775808}})
@@ -512,7 +512,7 @@ s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 3, 9223372036854775808}})
 s:upsert({2, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 2, 2}})
 s:upsert({2, 1, 1, 2.5, decimal.new(1.1)}, {{'-', 2, 10}})
 box.snapshot()
-s:select()
+s:select{}
 -- Decimals do not fit into numerics and vice versa.
 --
 s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 5, 2}})
@@ -520,7 +520,7 @@ s:upsert({1, 1, 1, 2.5, decimal.new(1.1)}, {{'-', 5, 1}})
 s:upsert({2, 1, 1, 2.5, decimal.new(1.1)}, {{'+', 2, decimal.new(2.1)}})
 s:upsert({2, 1, 1, 2.5, decimal.new(1.1)}, {{'-', 2, decimal.new(1.2)}})
 box.snapshot()
-s:select()
+s:select{}
 
 s:drop()
 
@@ -539,7 +539,7 @@ s:upsert({1, 0}, {{'+', 2, 1}})
 s:upsert({1, 0}, {{'+', 2, 1}})
 s:upsert({1, 0}, {{'+', 2, 1}})
 box.snapshot()
-s:select()
+s:select{}
 
 s:delete{1}
 s:replace{1, uint_max - 2, 0}
@@ -550,7 +550,7 @@ s:upsert({1, 0, 0}, {{'+', 2, 1}})
 s:upsert({1, 0, 0}, {{'+', 2, 0.5}})
 s:upsert({1, 0, 0}, {{'+', 2, 1}})
 box.snapshot()
-s:select()
+s:select{}
 s:drop()
 
 -- Make sure upserts satisfy associativity rule.
@@ -584,7 +584,7 @@ box.snapshot()
 s:upsert({1, 1}, {{'=', 2, 2}})
 s:upsert({1, 1}, {{'=', 1, 0}})
 box.snapshot()
-s:select()
+s:select{}
 
 s:drop()
 
@@ -596,6 +596,6 @@ box.snapshot()
 s:upsert({1, 1}, {{'=', 2, 2}})
 s:upsert({1, 1}, {{'=', 1, 0}})
 box.snapshot()
-s:select()
+s:select{}
 
 s:drop()

@@ -5,8 +5,8 @@
 s = box.schema.create_space('test', {engine = 'vinyl'})
 pk = s:create_index('pk')
 s:insert{1, 1}
-s:select()
+s:select{}
 s:upsert({1}, {{'+', 1, 1}})
-s:select()
+s:select{}
 
 s:drop()

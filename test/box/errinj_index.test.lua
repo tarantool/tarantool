@@ -10,7 +10,7 @@ res = {}
 for i = 1,10 do table.insert(res, s:get{i}) end
 res
 res = {}
-for _, t in s.index[0]:pairs() do table.insert(res, t) end
+for _, t in s.index[0]:pairs{} do table.insert(res, t) end
 res
 
 errinj.set("ERRINJ_INDEX_ALLOC", true)
@@ -19,7 +19,7 @@ res = {}
 for i = 1,10 do table.insert(res, s:get{i}) end
 res
 res = {}
-for _, t in s.index[0]:pairs() do table.insert(res, t) end
+for _, t in s.index[0]:pairs{} do table.insert(res, t) end
 res
 
 for i = 501,2500 do s:insert{i, i} end
@@ -33,7 +33,7 @@ for i = 501,510 do table.insert(res, (s:get{i})) end
 res
 
 --count must be exactly 10
-function check_iter_and_size() local count = 0 for _, t in s.index[0]:pairs() do count = count + 1 end return count == 10 and "ok" or "fail" end
+function check_iter_and_size() local count = 0 for _, t in s.index[0]:pairs{} do count = count + 1 end return count == 10 and "ok" or "fail" end
 check_iter_and_size()
 
 for i = 2501,3500 do s:insert{i, i} end
@@ -70,7 +70,7 @@ res = {}
 for i = 1,10 do table.insert(res, s:get{i}) end
 res
 res = {}
-for _, t in s.index[0]:pairs() do table.insert(res, t) end
+for _, t in s.index[0]:pairs{} do table.insert(res, t) end
 res
 
 errinj.set("ERRINJ_INDEX_ALLOC", true)
@@ -79,7 +79,7 @@ res = {}
 for i = 1,10 do table.insert(res, s:get{i}) end
 res
 res = {}
-for _, t in s.index[0]:pairs() do table.insert(res, t) end
+for _, t in s.index[0]:pairs{} do table.insert(res, t) end
 res
 
 for i = 501,2500 do s:insert{i, i} end

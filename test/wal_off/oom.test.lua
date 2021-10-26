@@ -34,7 +34,7 @@ space.index['primary']:get{15}
 i = 0
 t = {}
 test_run:cmd("setopt delimiter ';'")
-for state, v in space:pairs() do
+for state, v in space:pairs{} do
     table.insert(t, v)
     i = i + 1
     if i == 50 then
@@ -104,4 +104,3 @@ index:count()
 
 space:drop()
 str = nil
-

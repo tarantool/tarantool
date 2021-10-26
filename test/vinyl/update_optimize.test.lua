@@ -257,6 +257,6 @@ box.snapshot()
 s.index.sk:stat().rows
 
 s:insert{1, 20}
-s.index.sk:select()
+s.index.sk:select{}
 
 s:drop()

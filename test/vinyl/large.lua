@@ -28,7 +28,7 @@ end
 
 local function check_test()
     local i = 0
-    for _, tuple in box.space.large_s1:pairs() do
+    for _, tuple in box.space.large_s1:pairs{} do
         if TUPLE_SIZE ~= tuple[2]:len() then
             error('Large tuple has incorect length')
         end

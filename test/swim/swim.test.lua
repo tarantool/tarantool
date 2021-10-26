@@ -260,11 +260,11 @@ s2:delete()
 --
 -- Iterators.
 --
-function iterate() local t = {} for k, v in s:pairs() do table.insert(t, {k, v}) end return t end
+function iterate() local t = {} for k, v in s:pairs{} do table.insert(t, {k, v}) end return t end
 s = swim.new({generation = 0})
 iterate()
 s:cfg({uuid = uuid(1), uri = uri(), gc_mode = 'off'})
-s.pairs()
+s.pairs{}
 iterate()
 s:add_member({uuid = uuid(2), uri = uri()})
 iterate()

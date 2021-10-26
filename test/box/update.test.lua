@@ -495,7 +495,7 @@ vy_s:upsert({1, 1}, {{'+', 'field2.c.f[1]', 1}})
 vy_s:upsert({1, 1}, {{'+', '[3][3][1][1]', 1}})
 box.commit()
 
-vy_s:select()
+vy_s:select{}
 vy_s:drop()
 
 --

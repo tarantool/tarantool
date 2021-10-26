@@ -156,7 +156,7 @@ s:insert({10, ffi.cast('double', tonumber64('18000000000000000000'))})
 s:insert({11, ffi.cast('double', 1.1)})
 s:insert({12, ffi.cast('double', -3.0009)})
 
-s:select()
+s:select{}
 
 -- The same rules apply to the key of this field:
 dd = s:create_index('dd', {unique = false, parts = {{2, 'double'}}})
@@ -207,6 +207,6 @@ s:get(200)
 ddd:update(ffi.cast('double', 1), {{'=', 3, 7}})
 ddd:delete(ffi.cast('double', 123))
 
-s:select()
+s:select{}
 
 s:drop()

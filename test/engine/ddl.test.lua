@@ -200,23 +200,23 @@ _ = s:insert{3, 2, 1}
 
 i1:alter{parts = {1, 'integer'}}
 _ = s:insert{-1, 2, 2}
-i1:select()
-i2:select()
-i3:select()
+i1:select{}
+i2:select{}
+i3:select{}
 
 i2:alter{parts = {2, 'integer'}}
 i3:alter{parts = {3, 'integer'}}
 _ = s:replace{-1, -1, -1}
-i1:select()
-i2:select()
-i3:select()
+i1:select{}
+i2:select{}
+i3:select{}
 
 box.snapshot()
 _ = s:replace{-1, -2, -3}
 _ = s:replace{-3, -2, -1}
-i1:select()
-i2:select()
-i3:select()
+i1:select{}
+i2:select{}
+i3:select{}
 
 s:drop()
 
@@ -596,7 +596,7 @@ s:format()
 format[1].type = 'unsigned'
 s:format(format)
 s:format()
-s:select()
+s:select{}
 s:drop()
 
 --
@@ -810,7 +810,7 @@ _ = s:upsert({3, '3', '3', -3}, {{'=', 5, 'ggg'}})
 _ = s:insert{5, 'xxx', 'eee', 555, 'hhh'}
 _ = s:replace{6, 'yyy', box.NULL, -444}
 
-s:select()
+s:select{}
 
 s:create_index('sk', {parts = {2, 'string'}}) -- error: unique constraint
 s:create_index('sk', {parts = {3, 'string'}}) -- error: nullability constraint
@@ -821,9 +821,9 @@ i1 = s:create_index('i1', {parts = {2, 'string'}, unique = false})
 i2 = s:create_index('i2', {parts = {{3, 'string', is_nullable = true}}})
 i3 = s:create_index('i3', {parts = {4, 'integer'}})
 
-i1:select()
-i2:select()
-i3:select()
+i1:select{}
+i2:select{}
+i3:select{}
 
 i1:alter{unique = true} -- error: unique contraint
 i2:alter{parts = {3, 'string'}} -- error: nullability contraint
@@ -831,7 +831,7 @@ i3:alter{parts = {4, 'unsigned'}} -- error: field type
 i3:alter{parts = {4, 'integer', 5, 'string'}} -- error: field missing
 
 i3:alter{parts = {2, 'string', 4, 'integer'}} -- ok
-i3:select()
+i3:select{}
 
 --
 -- gh-4350: crash while trying to drop a multi-index space created
@@ -852,9 +852,9 @@ inspector = test_run.new()
 engine = inspector:get_cfg('engine')
 
 s = box.space.test
-s.index.i1:select()
-s.index.i2:select()
-s.index.i3:select()
+s.index.i1:select{}
+s.index.i2:select{}
+s.index.i3:select{}
 
 -- gh-4350: see above.
 box.space.test_crash:drop()
@@ -864,7 +864,7 @@ box.space.test_crash:drop()
 --
 s.index.i1:drop()
 _ = s:create_index('i1', {parts = {2, 'string'}, unique = false})
-s.index.i1:select()
+s.index.i1:select{}
 
 box.snapshot()
 
@@ -900,7 +900,7 @@ s:replace({3});
 box.begin()
 s:truncate()
 box.commit();
-s:select();
+s:select{};
 
 box.begin()
 box.schema.user.grant('guest', 'write', 'space', 'ddl_test')

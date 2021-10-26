@@ -29,7 +29,7 @@ s:insert{7, 7, {town = 'London', FIO = {fname = 'James', sname = 'Bond'}}, 4, 5}
 s:insert{7, 7, {town = 'London', FIO = {fname = 'James', sname = 'Bond'}}, 4, 5}
 s:insert{7, 7, {town = 'London', FIO = {fname = 'James', sname = 'Bond', data = "extra"}}, 4, 5}
 s:insert{7, 7, {town = 'Moscow', FIO = {fname = 'Max', sname = 'Isaev', data = "extra"}}, 4, 5}
-idx:select()
+idx:select{}
 idx:min()
 idx:max()
 s:drop()
@@ -90,7 +90,7 @@ s:create_index('test2', {parts = {{3, 'number'}, {4, 'number', path = '["FIO"]["
 idx2 = s:create_index('test2', {parts = {{3, 'number'}, {4, 'str', path = '["FIO"]["fname"]'}}})
 idx2 ~= nil
 t = s:insert{5, 5, 7, {town = 'Matrix', FIO = {fname = 'Agent', sname = 'Smith'}}, 4, 5}
-idx:select()
+idx:select{}
 idx:min()
 idx:max()
 idx:drop()
@@ -121,7 +121,7 @@ parts[1] = {1, 'unsigned', path='[3][2].b'}
 num_idx = s:create_index('numeric', {parts =  parts})
 s:insert{{1, 2, {3, {a = 'str3', b = 9}}}, {'c', {d = {'e', 'f'}, e = 'g'}}, 6, {0}}
 num_idx:get(2)
-num_idx:select()
+num_idx:select{}
 num_idx:max()
 num_idx:min()
 crosspart_idx:max() == num_idx:max()
@@ -138,9 +138,9 @@ idx = s:create_index('idx', {parts = {{2, 'integer', path = 'a'}}})
 s:insert{31, {a = 1, aa = -1}}
 s:insert{22, {a = 2, aa = -2}}
 s:insert{13, {a = 3, aa = -3}}
-idx:select()
+idx:select{}
 idx:alter({parts = {{2, 'integer', path = 'aa'}}})
-idx:select()
+idx:select{}
 s:drop()
 
 -- Incompatible format change.
@@ -189,9 +189,9 @@ town:select({'Berlin'})
 s:update({1, 'Berlin'}, {{"+", 2, 45}})
 box.snapshot()
 s:upsert({1, 90, {town = 'Berlin', FIO = {fname = 'X', sname = 'Y'}}}, {{'+', 2, 1}})
-town:select()
+town:select{}
 name:drop()
-town:select()
+town:select{}
 s:drop()
 
 -- Check replace with tuple with map having numeric keys that
@@ -227,7 +227,7 @@ s:insert{9} -- ok
 s:insert{10, {}} -- ok
 s:insert{11, {{b = 1}}} -- ok
 s:insert{12, {{a = box.NULL}}} -- ok
-s.index.sk:select()
+s.index.sk:select{}
 s:drop()
 
 --

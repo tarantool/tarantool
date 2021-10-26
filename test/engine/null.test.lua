@@ -218,11 +218,11 @@ _ = s:auto_increment{'888', 8.88, box.NULL, true, 8.88}
 _ = s:auto_increment{'999', 9.99, -999, box.NULL, false}
 _ = s:auto_increment{'000', 0.00, -000, true, box.NULL}
 
-s.index.i1:select()
-s.index.i2:select()
-s.index.i3:select()
-s.index.i4:select()
-s.index.i5:select()
+s.index.i1:select{}
+s.index.i2:select{}
+s.index.i3:select{}
+s.index.i4:select{}
+s.index.i5:select{}
 
 s:drop()
 

@@ -179,7 +179,7 @@ space:insert{31234567, 'part1_a', 'part2'}
 space:insert{41234567, 'part1_a', 'part2_a'}
 
 l = {}
-for state, v in s:pairs() do table.insert(l, v) end
+for state, v in s:pairs{} do table.insert(l, v) end
 l
 
 space:select{1234567}

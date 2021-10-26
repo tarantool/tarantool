@@ -71,19 +71,19 @@ box.space.test4.is_local
 box.space.test4.temporary
 box.space.test5.is_local
 box.space.test5.temporary
-box.space.test1:select()
-box.space.test2:select()
-box.space.test3:select()
-box.space.test4:select()
-box.space.test5:select()
+box.space.test1:select{}
+box.space.test2:select{}
+box.space.test3:select{}
+box.space.test4:select{}
+box.space.test5:select{}
 
 -- To check truncation fill replica's copy with 2 entries
 _=box.space.test4:insert{4}
 _=box.space.test4:insert{5}
 _=box.space.test5:insert{4}
 _=box.space.test5:insert{5}
-box.space.test4:select()
-box.space.test5:select()
+box.space.test4:select{}
+box.space.test5:select{}
 
 -- truncate temp & local space on master
 test_run:cmd("switch default")
@@ -99,8 +99,8 @@ test_run:cmd("switch replica")
 box.space._truncate:count()
 
 -- the affected space must be unchanged
-box.space.test4:select()
-box.space.test5:select()
+box.space.test4:select{}
+box.space.test5:select{}
 
 
 box.cfg{read_only = true} -- local spaces ignore read_only
@@ -118,13 +118,13 @@ vclock[0] = nil
 _ = test_run:wait_vclock('replica', vclock)
 
 test_run:cmd("switch replica")
-box.space.test1:select()
-box.space.test2:select()
-box.space.test3:select()
+box.space.test1:select{}
+box.space.test2:select{}
+box.space.test3:select{}
 test_run:cmd("restart server replica")
-box.space.test1:select()
-box.space.test2:select()
-box.space.test3:select()
+box.space.test1:select{}
+box.space.test2:select{}
+box.space.test3:select{}
 
 test_run:cmd("switch default")
 test_run:cmd("stop server replica")
@@ -133,9 +133,9 @@ test_run:cmd("delete server replica")
 test_run:cleanup_cluster()
 box.schema.user.revoke('guest', 'replication')
 
-s1:select()
-s2:select()
-s3:select()
+s1:select{}
+s2:select{}
+s3:select{}
 
 s1:drop()
 s2:drop()

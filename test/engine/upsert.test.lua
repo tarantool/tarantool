@@ -431,7 +431,7 @@ s:replace({1, 1, 1})
 box.snapshot()
 s:upsert({1, 1}, {{'+', 2, 2}})
 s:upsert({1, 1}, {{'+', 3, 4}})
-s:select()
+s:select{}
 
 s:drop()
 

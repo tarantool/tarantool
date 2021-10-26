@@ -42,7 +42,7 @@ _ = s:insert{3, 'z'}
 test_run:cmd('restart server default')
 
 s = box.space.test
-s:select()
+s:select{}
 s:drop()
 
 --
@@ -87,8 +87,8 @@ test_run:cmd('restart server default')
 
 s1 = box.space.test1
 s2 = box.space.test2
-s1:select()
-s2:select()
+s1:select{}
+s2:select{}
 s1:drop()
 s2:drop()
 
@@ -133,8 +133,8 @@ s2 = box.space.test2
 _ = s1:insert{444, 'ddd'}
 _ = s2:insert{555, 'eee'}
 
-s1:select()
-s2:select()
+s1:select{}
+s2:select{}
 
 box.snapshot()
 
@@ -142,8 +142,8 @@ test_run:cmd('restart server default')
 
 s1 = box.space.test1
 s2 = box.space.test2
-s1:select()
-s2:select()
+s1:select{}
+s2:select{}
 s1:drop()
 s2:drop()
 
@@ -171,8 +171,8 @@ ch:get()
 test_run:cmd('restart server default')
 
 s = box.space.test
-s.index.pk:select()
-s.index.sk:select()
+s.index.pk:select{}
+s.index.sk:select{}
 
 s:drop()
 

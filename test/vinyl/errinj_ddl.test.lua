@@ -37,7 +37,7 @@ _ = s:upsert({7, -7}, {{'=', 2, -7}})
 errinj.set("ERRINJ_VY_RUN_WRITE_DELAY", false)
 ch:get()
 
-s.index.sk:select()
+s.index.sk:select{}
 s.index.sk:stat().memory.rows
 
 test_run:cmd('restart server default')
@@ -47,12 +47,12 @@ errinj = box.error.injection
 
 s = box.space.test
 
-s.index.sk:select()
+s.index.sk:select{}
 s.index.sk:stat().memory.rows
 
 box.snapshot()
 
-s.index.sk:select()
+s.index.sk:select{}
 s.index.sk:stat().memory.rows
 
 s:drop()
@@ -163,7 +163,7 @@ _ = fiber.create(function() fiber.sleep(0.01) errinj.set('ERRINJ_WAL_DELAY', fal
 
 fiber.sleep(0)
 s:format{{'key', 'unsigned'}, {'value', 'unsigned'}} -- must fail
-s:select()
+s:select{}
 s:truncate()
 
 errinj.set('ERRINJ_WAL_DELAY', true)
@@ -172,7 +172,7 @@ _ = fiber.create(function() fiber.sleep(0.01) errinj.set('ERRINJ_WAL_DELAY', fal
 
 fiber.sleep(0)
 s:create_index('sk', {parts = {2, 'unsigned'}})
-s:select()
+s:select{}
 s:drop()
 
 --
@@ -261,7 +261,7 @@ ch1:get()
 ch2:get()
 ch3:get()
 ch4:get()
-s:select()
+s:select{}
 s:drop()
 
 --
@@ -302,8 +302,8 @@ box.error.injection.set('ERRINJ_VY_READ_PAGE_DELAY', false);
 ch:get();
 test_run:cmd("setopt delimiter ''");
 
-s.index.primary:select()
-s.index.secondary:select()
+s.index.primary:select{}
+s.index.secondary:select{}
 s:drop()
 
 --

@@ -13,7 +13,7 @@ space0:insert({2, "AAAA"})
 space0:insert({3, "AAAA"})
 space0:insert({4, "AAAA"})
 
-index0:select()
+index0:select{}
 index0:max(2)
 index0:min(2)
 index0:count(2)
@@ -25,7 +25,7 @@ space0:insert({20, "AAAA"})
 space0:insert({30, "AAAA"})
 space0:insert({40, "AAAA"})
 
-index0:select()
+index0:select{}
 index0:max(15)
 index0:min(15)
 index0:count(15)
@@ -37,7 +37,7 @@ space0:insert({-2, "AAAA"})
 space0:insert({-3, "AAAA"})
 space0:insert({-4, "AAAA"})
 
-index0:select()
+index0:select{}
 index0:max(0)
 index0:min(0)
 index0:count(0)
@@ -57,7 +57,7 @@ space1:insert({2, "AAAA"})
 space1:insert({3, "AAAA"})
 space1:insert({4, "AAAA"})
 
-index1:select()
+index1:select{}
 index1:max(2)
 index1:min(2)
 index1:count(2)
@@ -69,7 +69,7 @@ space1:insert({20, "AAAA"})
 space1:insert({30, "AAAA"})
 space1:insert({40, "AAAA"})
 
-index1:select()
+index1:select{}
 index1:max(15)
 index1:min(15)
 index1:count(15)
@@ -81,7 +81,7 @@ space1:insert({-2, "AAAA"})
 space1:insert({-3, "AAAA"})
 space1:insert({-4, "AAAA"})
 
-index1:select()
+index1:select{}
 index1:max(0)
 index1:min(0)
 index1:count(0)
@@ -94,7 +94,7 @@ space1:insert({2.5, "AAAA"})
 space1:insert({3.5, "AAAA"})
 space1:insert({4.5, "AAAA"})
 
-index1:select()
+index1:select{}
 index1:max(1)
 index1:min(1)
 index1:count(1)
@@ -113,7 +113,7 @@ space2:insert({'2', "AAAA"})
 space2:insert({'3', "AAAA"})
 space2:insert({'4', "AAAA"})
 
-index2:select()
+index2:select{}
 index2:max('2')
 index2:min('2')
 index2:count('2')
@@ -125,7 +125,7 @@ space2:insert({'20', "AAAA"})
 space2:insert({'30', "AAAA"})
 space2:insert({'40', "AAAA"})
 
-index2:select()
+index2:select{}
 index2:max('15')
 index2:min('15')
 index2:count('15')
@@ -137,7 +137,7 @@ space2:insert({'-2', "AAAA"})
 space2:insert({'-3', "AAAA"})
 space2:insert({'-4', "AAAA"})
 
-index2:select()
+index2:select{}
 index2:max('0')
 index2:min('0')
 index2:count('0')
@@ -156,7 +156,7 @@ space3:insert({2, "AAAA"})
 space3:insert({3, "AAAA"})
 space3:insert({4, "AAAA"})
 
-index3:select()
+index3:select{}
 index3:max(2)
 index3:min(2)
 index3:count(2)
@@ -168,7 +168,7 @@ space3:insert({20, "AAAA"})
 space3:insert({30, "AAAA"})
 space3:insert({40, "AAAA"})
 
-index3:select()
+index3:select{}
 index3:max(15)
 index3:min(15)
 index3:count(15)
@@ -187,7 +187,7 @@ space4:insert({2, "AAAA"})
 space4:insert({3, "AAAA"})
 space4:insert({4, "AAAA"})
 
-index4:select()
+index4:select{}
 index4:max(2)
 index4:min(2)
 index4:count(2)
@@ -199,7 +199,7 @@ space4:insert({20, "AAAA"})
 space4:insert({30, "AAAA"})
 space4:insert({40, "AAAA"})
 
-index4:select()
+index4:select{}
 index4:max(15)
 index4:min(15)
 index4:count(15)
@@ -211,7 +211,7 @@ space4:insert({'2', "AAAA"})
 space4:insert({'3', "AAAA"})
 space4:insert({'4', "AAAA"})
 
-index4:select()
+index4:select{}
 index4:max('2')
 index4:min('2')
 index4:count('2')
@@ -223,7 +223,7 @@ space4:insert({'20', "AAAA"})
 space4:insert({'30', "AAAA"})
 space4:insert({'40', "AAAA"})
 
-index4:select()
+index4:select{}
 index4:max('15')
 index4:min('15')
 index4:count('15')
@@ -235,7 +235,7 @@ space4:insert({'-2', "AAAA"})
 space4:insert({'-3', "AAAA"})
 space4:insert({'-4', "AAAA"})
 
-index4:select()
+index4:select{}
 index4:max('0')
 index4:min('0')
 index4:count('0')
@@ -247,7 +247,7 @@ space4:insert({-2, "AAAA"})
 space4:insert({-3, "AAAA"})
 space4:insert({-4, "AAAA"})
 
-index4:select()
+index4:select{}
 index4:max(0)
 index4:min(0)
 index4:count(0)
@@ -268,7 +268,7 @@ space5:insert({1, 2})
 space5:insert({1, 3})
 space5:insert({1, -4})
 
-index5:select()
+index5:select{}
 index5:max({1})
 index5:min({1})
 index5:count({1})
@@ -284,7 +284,7 @@ space5:insert({2, 2})
 space5:insert({2, 3})
 space5:insert({2, -4})
 
-index5:select()
+index5:select{}
 index5:max({2})
 index5:min({2})
 index5:count({2})
@@ -306,7 +306,7 @@ space6:insert({1, '2'})
 space6:insert({1, '3'})
 space6:insert({1, '-4'})
 
-index6:select()
+index6:select{}
 index6:max({1})
 index6:min({1})
 index6:count({1})
@@ -322,7 +322,7 @@ space6:insert({2, '2'})
 space6:insert({2, '3'})
 space6:insert({2, '-4'})
 
-index6:select()
+index6:select{}
 index6:max({2})
 index6:min({2})
 index6:count({2})

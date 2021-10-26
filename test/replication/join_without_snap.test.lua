@@ -19,7 +19,7 @@ test_run:cmd('create server replica with rpl_master=default, script="replication
 test_run:cmd('start server replica')
 test_run:cmd('switch replica')
 
-box.space.test:select()
+box.space.test:select{}
 
 test_run:cmd('switch default')
 test_run:cmd('stop server replica')

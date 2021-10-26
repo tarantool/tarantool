@@ -9,7 +9,7 @@ box.schema.func.create('CORRUPT_SELECT', {
     returns = 'integer',
     body = [[
         function()
-            box.space.T:select()
+            box.space.T:select{}
             return 1
         end]],
     exports = {'LUA', 'SQL'},

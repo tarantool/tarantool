@@ -23,7 +23,7 @@ vclock[0] = nil
 _ = test_run:wait_vclock("replica", vclock)
 test_run:cmd("switch replica")
 test_run:wait_upstream(1, {status = 'follow', message_re = box.NULL})
-box.space.test:select()
+box.space.test:select{}
 
 test_run:cmd("switch default")
 box.info.status

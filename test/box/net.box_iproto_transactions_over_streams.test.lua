@@ -154,7 +154,7 @@ space:select{}
 space:select({})
 test_run:switch("test")
 -- Select is empty, transaction was not commited
-s:select()
+s:select{}
 test_run:switch('default')
 -- Commit fails, transaction yeild with memtx_use_mvcc_engine = false
 stream:commit()
@@ -174,7 +174,7 @@ space:select({})
 stream:call('s:select', {})
 test_run:switch("test")
 -- Select is empty, transaction was not commited
-s:select()
+s:select{}
 test_run:switch('default')
 -- Commit fails, transaction yeild with memtx_use_mvcc_engine = false
 stream:eval('box.commit()')
@@ -190,7 +190,7 @@ space:select({})
 stream:call('s:select', {})
 test_run:switch("test")
 -- Select is empty, transaction was not commited
-s:select()
+s:select{}
 test_run:switch('default')
 -- Commit fails, transaction yeild with memtx_use_mvcc_engine = false
 stream:execute('COMMIT')
@@ -227,7 +227,7 @@ space_no_stream:select{}
 space:select({})
 test_run:switch("test")
 -- Select is empty, transaction was not commited
-s:select()
+s:select{}
 test_run:switch('default')
 -- Commit was successful, transaction can yeild with
 -- memtx_use_mvcc_engine = true.
@@ -241,7 +241,7 @@ space:select{}
 test_run:switch("test")
 -- Select return tuple, which was previously inserted,
 -- because transaction was successful
-s:select()
+s:select{}
 test_run:switch('default')
 cleanup_and_stop_server(conn)
 
@@ -269,7 +269,7 @@ space_1_2:select({})
 
 test_run:switch('test')
 -- Both select return tuple [1, 1], transaction commited
-s:select()
+s:select{}
 test_run:switch('default')
 cleanup_and_stop_server(conn)
 
@@ -297,7 +297,7 @@ conn:close()
 
 test_run:switch('test')
 -- Both select are empty, because transaction rollback
-s:select()
+s:select{}
 test_run:switch('default')
 cleanup_and_stop_server(conn)
 
@@ -319,7 +319,7 @@ test_run:wait_cond(function () return get_current_connection_count() == 0 end)
 
 test_run:switch("test")
 -- Empty select, transaction was rollback
-s:select()
+s:select{}
 test_run:switch("default")
 cleanup_and_stop_server(conn)
 
@@ -352,7 +352,7 @@ test_run:wait_cond(function () return get_current_connection_count() == 0 end)
 
 test_run:switch("test")
 -- Select was empty, transaction rollbacked
-s:select()
+s:select{}
 test_run:switch("default")
 
 -- Same test, but now we check that if `commit` was received
@@ -381,7 +381,7 @@ test_run:wait_cond(function () return get_current_connection_count() == 0 end)
 test_run:switch("test")
 -- Select return tuples from [1] to [100],
 -- transaction was commit
-rc = s:select()
+rc = s:select{}
 assert(#rc)
 test_run:switch("default")
 cleanup_and_stop_server(conn)
@@ -432,7 +432,7 @@ futures["select"] = space:select({}, {is_async = true})
 
 test_run:switch("test")
 -- Select is empty, transaction was not commited
-s:select()
+s:select{}
 test_run:switch('default')
 futures["commit"] = stream:commit({is_async = true})
 
@@ -454,7 +454,7 @@ test_run:wait_cond(function() return get_current_msg_count() == 0 end)
 test_run:switch("test")
 -- Select return tuples, which was previously inserted,
 -- because transaction was successful
-s:select()
+s:select{}
 test_run:switch('default')
 cleanup_and_stop_server(conn)
 
@@ -503,7 +503,7 @@ test_run:wait_cond(function() return get_current_msg_count() == 0 end)
 
 test_run:switch('test')
 -- Select return tuple [1, 1], transaction commited
-s:select()
+s:select{}
 test_run:switch('default')
 cleanup_and_stop_server(conn)
 
@@ -543,7 +543,7 @@ space_no_stream:select{}
 space:select({})
 test_run:switch("test")
 -- Select is empty, transaction was not commited
-s:select()
+s:select{}
 test_run:switch('default')
 --Successful commit using stream:execute
 stream:execute('COMMIT')
@@ -552,7 +552,7 @@ stream:execute('COMMIT')
 space_no_stream:select{}
 test_run:switch("test")
 -- Select return tuple, because transaction was successful
-s:select()
+s:select{}
 s:delete{1}
 test_run:switch('default')
 -- Check rollback using stream:call
@@ -567,7 +567,7 @@ space_no_stream:select{}
 space:select({})
 test_run:switch("test")
 -- Select is empty, transaction was not commited
-s:select()
+s:select{}
 test_run:switch('default')
 --Successful rollback using stream:call
 stream:call('box.rollback')
@@ -580,7 +580,7 @@ test_run:wait_cond(function() return get_current_msg_count() == 0 end)
 
 test_run:switch("test")
 -- Empty select transaction rollbacked
-s:select()
+s:select{}
 test_run:switch('default')
 cleanup_and_stop_server(conn)
 
@@ -815,9 +815,9 @@ space = stream.space.TEST
 assert(space ~= nil)
 stream:execute('START TRANSACTION')
 space:replace{1, 2, '3'}
-space:select()
+space:select{}
 -- select is empty, because transaction was not commited
-conn.space.TEST:select()
+conn.space.TEST:select{}
 stream_pr = stream:prepare("SELECT * FROM test WHERE id = ? AND a = ?;")
 conn_pr = conn:prepare("SELECT * FROM test WHERE id = ? AND a = ?;")
 assert(stream_pr.stmt_id == conn_pr.stmt_id)
@@ -834,7 +834,7 @@ stream:unprepare(stream_pr.stmt_id)
 conn:close()
 test_run:switch('test')
 -- [ 1, 2, '3' ]
-box.space.TEST:select()
+box.space.TEST:select{}
 box.space.TEST:drop()
 test_run:switch('default')
 test_run:cmd("stop server test")

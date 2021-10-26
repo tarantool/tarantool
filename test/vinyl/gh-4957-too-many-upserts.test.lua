@@ -20,7 +20,7 @@ box.commit()
 -- second test.
 --
 box.snapshot()
-s:select()
+s:select{}
 
 s:drop()
 
@@ -36,7 +36,7 @@ box.begin()
 for k = 2, ups_cnt do s:upsert({1}, {{'+', k, 1}}) end
 box.commit()
 box.snapshot()
-s:select()[1][ups_cnt]
+s:select{}[1][ups_cnt]
 
 s:drop()
 
@@ -49,12 +49,10 @@ pk = s:create_index('pk')
 ups_ops = {}
 for k = 2, ups_cnt do ups_ops[k] = {'+', k, 1} end
 s:upsert({1}, ups_ops)
-s:select()
+s:select{}
 s:drop()
 
 -- restart the current server to resolve the issue #5141
 -- which reproduced in test:
 --   vinyl/gh-5141-invalid-vylog-file.test.lua
 test_run:cmd("restart server default with cleanup=True")
-
-

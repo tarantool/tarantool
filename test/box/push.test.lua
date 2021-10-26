@@ -210,7 +210,7 @@ future:result()
 -- Even if pushes are ignored, they still are available via pairs.
 messages = {}
 keys = {}
-for i, message in future:pairs() do table.insert(messages, message) table.insert(keys, i) end
+for i, message in future:pairs{} do table.insert(messages, message) table.insert(keys, i) end
 messages
 keys
 
@@ -228,7 +228,7 @@ future = c:call('do_push_and_duplicate', {}, {is_async = true})
 future:wait_result(1000)
 messages = {}
 keys = {}
-for i, message in future:pairs() do table.insert(messages, message) table.insert(keys, i) end
+for i, message in future:pairs{} do table.insert(messages, message) table.insert(keys, i) end
 messages
 keys
 

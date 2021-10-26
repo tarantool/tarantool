@@ -19,9 +19,9 @@ _ = s:insert{1}
 _ = s:insert{3}
 
 c:begin()
-c("s:select()") -- {1}, {3}
+c("s:select{}") -- {1}, {3}
 _ = s:insert{2} -- send c to read view
-c("s:select()") -- {1}, {3}
+c("s:select{}") -- {1}, {3}
 c:commit()
 
 s:truncate()
@@ -30,9 +30,9 @@ _ = s:insert{1}
 _ = s:insert{2}
 
 c:begin()
-c("s:select()") -- {1}, {2}
+c("s:select{}") -- {1}, {2}
 _ = s:insert{3} -- send c to read view
-c("s:select()") -- {1}, {2}
+c("s:select{}") -- {1}, {2}
 c:commit()
 
 s:truncate()
@@ -41,9 +41,9 @@ _ = s:insert{2}
 _ = s:insert{3}
 
 c:begin()
-c("s:select()") -- {2}, {3}
+c("s:select{}") -- {2}, {3}
 _ = s:insert{1} -- send c to read view
-c("s:select()") -- {2}, {3}
+c("s:select{}") -- {2}, {3}
 c:commit()
 
 s:truncate()
@@ -393,7 +393,7 @@ _ = s.index.sk:select({}, {limit = 50})
 gap_lock_count() -- 51
 for i = 1, 100 do s.index.sk:get(i) end
 gap_lock_count() -- 151
-_ = s.index.sk:select()
+_ = s.index.sk:select{}
 gap_lock_count() -- 101
 box.commit()
 gap_lock_count() -- 0

@@ -186,7 +186,7 @@ s:insert{sq1:next(), sq2:next()}
 box.commit();
 test_run:cmd("setopt delimiter ''");
 
-s:select() -- [4, -4], [5, -5], [6, -6]
+s:select{} -- [4, -4], [5, -5], [6, -6]
 
 sq1:drop()
 sq2:drop()
@@ -409,7 +409,7 @@ s:insert{nil, 'e'} -- 103
 s:insert{nil, 'f'} -- 104
 box.commit()
 
-s:select() -- {1, 'a'}, {100, 'b'}, {103, 'e'}, {104, 'f'}
+s:select{} -- {1, 'a'}, {100, 'b'}, {103, 'e'}, {104, 'f'}
 s:drop()
 
 --

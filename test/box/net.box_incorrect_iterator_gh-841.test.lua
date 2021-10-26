@@ -84,7 +84,7 @@ cn.space.net_box_test_space:delete{10}
 
 cn.space.net_box_test_space:select({}, { iterator = 'ALL' })
 -- gh-841: net.box uses incorrect iterator type for select with no arguments
-cn.space.net_box_test_space:select()
+cn.space.net_box_test_space:select{}
 
 cn.space.net_box_test_space.index.primary:min()
 cn.space.net_box_test_space.index.primary:min(354)

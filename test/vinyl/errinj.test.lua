@@ -65,20 +65,20 @@ s = box.schema.space.create('test', {engine='vinyl'})
 _ = s:create_index('pk')
 for i = 1, 10 do s:insert({i, 'test str' .. tostring(i)}) end
 box.snapshot()
-s:select()
+s:select{}
 errinj.set("ERRINJ_VY_READ_PAGE", true)
-s:select()
+s:select{}
 errinj.set("ERRINJ_VY_READ_PAGE", false)
-s:select()
+s:select{}
 
 errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
-function test_cancel_read () k = s:select() return #k end
+function test_cancel_read () k = s:select{} return #k end
 f1 = fiber.create(test_cancel_read)
 fiber.cancel(f1)
 -- task should be done
 fiber.sleep(0.1)
 errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
-s:select()
+s:select{}
 
 -- error after timeout for canceled fiber
 errinj.set("ERRINJ_VY_READ_PAGE", true)
@@ -88,7 +88,7 @@ fiber.cancel(f1)
 fiber.sleep(0.1)
 errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
 errinj.set("ERRINJ_VY_READ_PAGE", false);
-s:select()
+s:select{}
 
 -- index is dropped while a read task is in progress
 errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
@@ -141,7 +141,7 @@ box.snapshot()
 for i=1,256 do s:upsert({0, 0}, {{'+', 2, 1}}) end
 box.snapshot() -- in-memory tree is gone
 fiber.sleep(0.05)
-s:select()
+s:select{}
 s:replace{0, 0}
 box.snapshot()
 for i=1,256 do s:upsert({0, 0}, {{'+', 2, 1}}) end
@@ -215,12 +215,12 @@ _ = s:create_index('i1', {parts = {1, 'unsigned'}})
 for i = 0, 9 do s:replace({i, i + 1}) end
 box.snapshot()
 errinj.set("ERRINJ_XLOG_GARBAGE", true)
-s:select()
+s:select{}
 errinj.set("ERRINJ_XLOG_GARBAGE", false)
 errinj.set("ERRINJ_VYRUN_DATA_READ", true)
-s:select()
+s:select{}
 errinj.set("ERRINJ_VYRUN_DATA_READ", false)
-s:select()
+s:select{}
 s:drop()
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
@@ -231,7 +231,7 @@ box.snapshot()
 for i = 10, 19 do s:replace({i, i + 1}) end
 errinj.set("ERRINJ_XLOG_GARBAGE", false)
 box.snapshot()
-s:select()
+s:select{}
 
 s:drop()
 

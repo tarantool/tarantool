@@ -38,7 +38,7 @@ test_run:cmd("setopt delimiter ''");
 
 bintuple_insert(s, {0xDE, 0xAD, 0xBE, 0xAF})
 bintuple_insert(s, {0xFE, 0xED, 0xFA, 0xCE})
-s:select()
+s:select{}
 box.execute("SELECT * FROM \"withdata\" WHERE \"b\" < x'FEEDFACE';")
 pk:alter({parts = {1, "scalar"}})
 s:format({{"b", "scalar"}})
@@ -46,7 +46,7 @@ s:insert({11})
 s:insert({22})
 s:insert({"11"})
 s:insert({"22"})
-s:select()
+s:select{}
 box.execute("SELECT * FROM \"withdata\" WHERE \"b\" <= x'DEADBEAF';")
 pk:alter({parts = {1, "varbinary"}})
 s:delete({11})
@@ -55,7 +55,7 @@ s:delete({"11"})
 s:delete({"22"})
 bintuple_insert(s, {0xFA, 0xDE, 0xDE, 0xAD})
 pk:alter({parts = {1, "varbinary"}})
-s:select()
+s:select{}
 
 --
 -- gh-5071: bitset index for binary fields

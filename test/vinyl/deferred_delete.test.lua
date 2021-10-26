@@ -35,13 +35,13 @@ i2:stat().rows -- ditto
 -- Although there are only 5 tuples in the space, we have to look up
 -- overwritten tuples in the primary index hence 15 lookups per SELECT
 -- in a secondary index.
-i1:select()
+i1:select{}
 i1:stat().get.rows -- 5
 i1:stat().skip.rows -- 10
 pk:stat().lookup -- 15
 pk:stat().get.rows -- 5
 pk:stat().skip.rows -- 5
-i2:select()
+i2:select{}
 i2:stat().get.rows -- 5
 i2:stat().skip.rows -- 10
 pk:stat().lookup -- 30
@@ -51,13 +51,13 @@ pk:stat().skip.rows -- 10
 -- Overwritten/deleted tuples are not stored in the cache so calling
 -- SELECT for a second time does only 5 lookups.
 box.stat.reset()
-i1:select()
+i1:select{}
 i1:stat().get.rows -- 5
 i1:stat().skip.rows -- 0
 pk:stat().lookup -- 5
 pk:stat().get.rows -- 5
 pk:stat().skip.rows -- 0
-i2:select()
+i2:select{}
 i2:stat().get.rows -- 5
 i2:stat().skip.rows -- 0
 pk:stat().lookup -- 10
@@ -81,13 +81,13 @@ i2:stat().rows -- ditto
 -- they may break the read iterator invariant, so they don't reduce
 -- the number of lookups.
 box.stat.reset()
-i1:select()
+i1:select{}
 i1:stat().get.rows -- 5
 i1:stat().skip.rows -- 10
 pk:stat().lookup -- 15
 pk:stat().get.rows -- 5
 pk:stat().skip.rows -- 5
-i2:select()
+i2:select{}
 i2:stat().get.rows -- 5
 i2:stat().skip.rows -- 10
 pk:stat().lookup -- 30
@@ -114,10 +114,10 @@ while i2:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 i1:stat().rows -- 5 new REPLACEs
 i2:stat().rows -- ditto
 box.stat.reset()
-i1:select()
+i1:select{}
 i1:stat().get.rows -- 5
 pk:stat().lookup -- 5
-i2:select()
+i2:select{}
 i2:stat().get.rows -- 5
 pk:stat().lookup -- 10
 
@@ -163,7 +163,7 @@ pk:stat().memory.iterator.lookup -- 10
 pk:stat().memory.iterator.get.rows -- 10
 sk:stat().rows -- 25 old REPLACEs + 25 DELETEs
 
-sk:select()
+sk:select{}
 pk:stat().lookup -- 0
 
 -- Check that the global tx memory counter doesn't underflow when
@@ -263,9 +263,9 @@ box.snapshot()
 pk:compact()
 while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 
-sk:select() -- [1, 10, 'c']
+sk:select{} -- [1, 10, 'c']
 box.snapshot()
-sk:select() -- ditto
+sk:select{} -- ditto
 s:drop()
 
 --
@@ -290,8 +290,8 @@ sk:stat().rows -- 3: INSERT{1,1} + INSERT{2,2} + DELETE{1,1}
 box.snapshot()
 pk:stat().rows -- 1: INSERT{2,2,3}
 sk:stat().rows -- 1: INSERT{2,2}
-pk:select()
-sk:select()
+pk:select{}
+sk:select{}
 s:drop()
 
 --
@@ -311,8 +311,8 @@ box.commit()
 box.snapshot()
 pk:stat().rows -- 2: REPLACE{1, 12} + REPLACE{2, 22}
 sk:stat().rows -- ditto
-pk:select()
-sk:select()
+pk:select{}
+sk:select{}
 s:drop()
 
 box.cfg{vinyl_cache = vinyl_cache}

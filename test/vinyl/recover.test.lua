@@ -52,14 +52,14 @@ s5 = box.space.test5
 var = box.space.var
 
 -- Check space contents.
-s1:select()
-s2:select()
-s3.index.primary:select()
-s3.index.secondary:select()
-s4.index.i1:select()
-s4.index.i2:select()
-s5.index.i1:select()
-s5.index.i2:select()
+s1:select{}
+s2:select{}
+s3.index.primary:select{}
+s3.index.secondary:select{}
+s4.index.i1:select{}
+s4.index.i2:select{}
+s5.index.i1:select{}
+s5.index.i2:select{}
 
 -- Check that stats didn't change after recovery.
 vyinfo1 = var:get('vyinfo')[2]
@@ -134,8 +134,8 @@ new_info.disk.pages == old_info.disk.pages
 new_info.run_count == old_info.run_count
 new_info.range_count == old_info.range_count
 
-box.space.test2:select()
-box.space.test2.index.sec:select()
+box.space.test2:select{}
+box.space.test2.index.sec:select{}
 test_run:cmd('switch default')
 test_run:cmd('stop server force_recovery')
 test_run:cmd('delete server force_recovery')

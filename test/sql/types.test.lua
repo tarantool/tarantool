@@ -221,7 +221,7 @@ box.space.T1:drop()
 
 box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT DEFAULT 18446744073709551615);")
 box.execute("INSERT INTO t1 (id) VALUES (1);")
-box.space.T1:select()
+box.space.T1:select{}
 box.space.T1:drop()
 
 -- Test that autoincrement accepts only max 2^63 - 1 .
@@ -326,7 +326,7 @@ box.space.T1:drop()
 
 box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a VARBINARY DEFAULT x'616263');")
 box.execute("INSERT INTO t1 (id) VALUES (1);")
-box.space.T1:select()
+box.space.T1:select{}
 box.space.T1:drop()
 
 box.execute("SELECT CAST(1 AS VARBINARY);")
@@ -366,7 +366,7 @@ s = box.schema.space.create('T', {format = format})
 ii = s:create_index('ii')
 s:insert({1, true, {1, 2}, {a = 3}, 'asd'})
 box.execute('UPDATE t SET b = false WHERE i = 1;')
-s:select()
+s:select{}
 s:drop()
 
 --

@@ -161,7 +161,7 @@ test_run:wait_cond(function () return get_current_stream_count() == 0 end)
 test_run:wait_cond(function () return get_current_msg_count() == 0 end)
 test_run:switch("test")
 -- [1] [2] [3] [4] [5]
-s:select()
+s:select{}
 test_run:switch('default')
 conn:close()
 test_run:wait_cond(function () return get_current_connection_count() == 0 end)

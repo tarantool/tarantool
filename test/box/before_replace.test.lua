@@ -18,7 +18,7 @@ function ret_update_pk(old, new) return box.tuple.update(new, {{'+', 1, 1}}) end
 -- Exception in trigger.
 s:before_replace(fail) == fail
 s:insert{1, 1}
-s:select()
+s:select{}
 s:before_replace(nil, fail)
 
 -- Check 'old' and 'new' trigger arguments.
@@ -35,21 +35,21 @@ s:upsert({1, 1}, {{'=', 2, 1}})
 old_tuple, new_tuple
 s:upsert({2, 2}, {{'=', 2, 2}})
 old_tuple, new_tuple
-s:select()
+s:select{}
 s:delete(1)
 old_tuple, new_tuple
 s:delete(2)
 old_tuple, new_tuple
-s:select()
+s:select{}
 s:before_replace(nil, save)
 
 -- Returning 'new' from trigger doesn't affect statement.
 s:before_replace(ret_new) == ret_new
 s:insert{1, 1}
 s:update(1, {{'+', 2, 1}})
-s:select()
+s:select{}
 s:delete(1)
-s:select()
+s:select{}
 s:before_replace(nil, ret_new)
 
 -- Returning 'old' from trigger skips statement.
@@ -58,7 +58,7 @@ s:before_replace(ret_old) == ret_old
 s:insert{2, 2}
 s:update(1, {{'+', 2, 1}})
 s:delete(1)
-s:select()
+s:select{}
 s:before_replace(nil, ret_old)
 s:delete(1)
 
@@ -66,14 +66,14 @@ s:delete(1)
 s:insert{1, 1}
 s:before_replace(ret_nil) == ret_nil
 s:replace{1, 2}
-s:select()
+s:select{}
 s:before_replace(nil, ret_nil)
 
 -- Returning box.NULL from trigger turns statement into DELETE.
 s:insert{1, 1}
 s:before_replace(ret_null) == ret_null
 s:replace{1, 2}
-s:select()
+s:select{}
 s:before_replace(nil, ret_null)
 
 -- Returning nothing doesn't affect the operation.
@@ -83,7 +83,7 @@ s:before_replace(ret_none) == ret_none
 s:replace{1, 2}
 s:update(1, {{'+', 2, 1}})
 s:delete(2)
-s:select()
+s:select{}
 s:before_replace(nil, ret_none)
 s:delete(1)
 
@@ -91,14 +91,14 @@ s:delete(1)
 s:before_replace(ret_update) == ret_update
 s:insert{1, 1, 1}
 s:update(1, {{'+', 2, 1}})
-s:select()
+s:select{}
 s:before_replace(nil, ret_update)
 s:delete(1)
 
 -- Invalid return value.
 s:before_replace(ret_invalid) == ret_invalid
 s:insert{1, 1}
-s:select()
+s:select{}
 s:before_replace(nil, ret_invalid)
 
 -- Update of the primary key from trigger is forbidden.
@@ -115,7 +115,7 @@ _ = s2:create_index('sk', {unique = true, parts = {2, 'unsigned'}})
 s2:insert{1, 1, 1, 1}
 s2:before_replace(ret_update) == ret_update
 s2.index.sk:update(1, {{'+', 4, 1}})
-s2:select()
+s2:select{}
 s2:drop()
 
 -- Stacking triggers.
@@ -139,8 +139,8 @@ s:insert{1, 1}
 i = 2
 s:replace{1, 2}
 s:replace{1, 3} -- error: conflict in s2
-s:select()
-s2:select()
+s:select{}
+s2:select{}
 
 -- DML done from space:before_replace is undone
 -- if space:on_replace fails.
@@ -148,8 +148,8 @@ s:truncate()
 s2:truncate()
 s:on_replace(fail) == fail
 s:replace{1, 3}
-s:select()
-s2:select()
+s:select{}
+s2:select{}
 s:on_replace(nil, fail)
 s:before_replace(nil, cb)
 s2:drop()
@@ -167,7 +167,7 @@ s:delete(1)
 old_tuple, new_tuple
 s:insert{2, 2}
 old_tuple, new_tuple
-s:select()
+s:select{}
 s:before_replace(nil, ret_old)
 s:on_replace(nil, save)
 s:delete(1)
@@ -182,7 +182,7 @@ s:insert{1, 1, 1}
 old_tuple, new_tuple
 s:replace{1, 2, 2}
 old_tuple, new_tuple
-s:select()
+s:select{}
 s:before_replace(nil, ret_update)
 s:on_replace(nil, save)
 s:delete(1)
@@ -191,7 +191,7 @@ s:delete(1)
 cb = function(old, new) s:insert{1, 1} end
 s:before_replace(cb) == cb
 s:insert{1, 1} -- error
-s:select()
+s:select{}
 s:before_replace(nil, cb)
 
 -- Nesting limit: space.before_replace + space.on_replace
@@ -199,7 +199,7 @@ cb = function(old, new) s:delete(1) end
 s:before_replace(cb) == cb
 s:on_replace(cb) == cb
 s:insert{1, 1} -- error
-s:select()
+s:select{}
 s:before_replace(nil, cb)
 s:on_replace(nil, cb)
 
@@ -212,7 +212,7 @@ box.begin() s:replace{10, 10} s:before_replace(nil, f) s:replace{10, 100} box.co
 test_run:cmd('restart server default')
 
 s = box.space.test
-s:select() -- [10, 100]
+s:select{} -- [10, 100]
 
 -- Check that IPROTO_NOP is actually written to xlog.
 fio = require('fio')

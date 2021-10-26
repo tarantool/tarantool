@@ -1677,7 +1677,7 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
     local json = require('json')
     for _,t in index:pairs(key, opts) do
         local row = { }
-        for _,f in t:pairs() do
+        for _,f in t:pairs{} do
             table.insert(row, json.encode(f))
         end
         table.insert(tab, row)

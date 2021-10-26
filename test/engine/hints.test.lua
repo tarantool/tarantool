@@ -25,13 +25,13 @@ inspector:cmd("setopt delimiter ''");
 s = box.schema.space.create('test', {engine = engine})
 i1 = s:create_index('i1', {parts = {1, 'unsigned'}})
 insert_values('uint64_t')
-s:select()
+s:select{}
 i1:alter{parts = {1, 'integer'}}
 insert_values('int64_t')
-s:select()
+s:select{}
 i1:alter{parts = {1, 'number'}}
 insert_values('double')
-s:select()
+s:select{}
 s:drop()
 
 -- Test that the use of hint(s) does not violate alter between
@@ -43,7 +43,7 @@ s:insert({"ccc"})
 i1:alter{parts = {1, 'scalar'}}
 s:insert({"aaa"})
 s:insert({"ddd"})
-s:select()
+s:select{}
 s:drop()
 
 -- Test that hints does not violate the correct order of
@@ -58,5 +58,5 @@ s:insert({-33.33})
 i1:alter{parts = {1, 'scalar'}}
 s:insert({44.44})
 s:insert({"Hello world"})
-s:select()
+s:select{}
 s:drop()

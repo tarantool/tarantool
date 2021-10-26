@@ -224,7 +224,7 @@ errinj.set('ERRINJ_WAL_WRITE', false)
 -- Must fail.
 itr.next()
 c('s:get(1)')
-c('s:select()')
+c('s:select{}')
 c('s:replace{1}')
 c:commit()
 

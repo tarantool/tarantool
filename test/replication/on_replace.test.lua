@@ -69,12 +69,12 @@ while (box.info.replication[3 - box.info.id].downstream.status ~= 'stopped') do 
 test_run:cmd('switch on_replace2')
 while (box.info.replication[3 - box.info.id].upstream.status ~= 'stopped') do fiber.sleep(0.00001) end
 box.info.replication[3 - box.info.id].upstream.message
-box.space.s1:select()
-box.space.s2:select()
+box.space.s1:select{}
+box.space.s2:select{}
 
 test_run:cmd('switch on_replace1')
-box.space.s1:select()
-box.space.s2:select()
+box.space.s1:select{}
+box.space.s2:select{}
 
 -- gh-2798 on_replace on slave server with local data change is allowed
 test_run:cmd('switch on_replace2')
@@ -86,7 +86,7 @@ replication = box.cfg.replication
 box.cfg{replication = {}}
 box.cfg{replication = replication}
 
-s3:select()
+s3:select{}
 
 _ = test_run:cmd('switch default')
 test_run:drop_cluster(SERVERS)

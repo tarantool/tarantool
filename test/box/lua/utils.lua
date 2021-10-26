@@ -163,7 +163,7 @@ local function check_space(space, N)
         end
     end
 
-    local count = #space:select()
+    local count = #space:select{}
     -- :len() doesn't work on vinyl
     if count ~= 0 then
         table.insert(errors, {'invalid count after delete', count})
@@ -174,7 +174,7 @@ end
 
 local function space_bsize(s)
     local bsize = 0
-    for _, t in s:pairs() do
+    for _, t in s:pairs{} do
         bsize = bsize + t:bsize()
     end
 

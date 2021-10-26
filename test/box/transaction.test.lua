@@ -250,7 +250,7 @@ space:auto_increment{box.space._vindex:get{space.id, index.id}}
 box.commit();
 test_run:cmd("setopt delimiter ''");
 
-space:select()
+space:select{}
 space:drop()
 
 -- In order to implement a transactional applier, we  lifted a

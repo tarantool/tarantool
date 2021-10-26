@@ -210,12 +210,12 @@ s2 = box.space.operations
 
 total_sum = 0
 t1 = {}
-for k,v in s1:pairs() do t1[ v[1] ] = v[2] total_sum = total_sum + v[2] end
+for k,v in s1:pairs{} do t1[ v[1] ] = v[2] total_sum = total_sum + v[2] end
 if total_sum ~= 0 then log.info('error: total sum mismatch') os.execute("rm -r " .. new_snap_dir) os.exit(-1) end
 
 t2 = {}
 function acc_inc(n1, v) t2[n1] = (t2[n1] and t2[n1] or 0) + v end
-for k,v in s2:pairs() do acc_inc(v[2], v[4]) acc_inc(v[3], -v[4]) end
+for k,v in s2:pairs{} do acc_inc(v[2], v[4]) acc_inc(v[3], -v[4]) end
 
 bad = false
 for k,v in pairs(t1) do if (t2[k] and t2[k] or 0) ~= v then bad = true end end
@@ -261,5 +261,3 @@ snapshot_check_failed;
 log.info('Part II: checking snapshot done');
 
 test_run:cmd("setopt delimiter ''");
-
-

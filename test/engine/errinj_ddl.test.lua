@@ -186,7 +186,7 @@ for i = 1, 5 do s:insert{i, i * 10} end
 errinj.set("ERRINJ_SNAP_WRITE_DELAY", false)
 ch:get()
 
-s:select()
+s:select{}
 s:drop()
 
 --
@@ -223,7 +223,7 @@ s2:drop()
 errinj.set("ERRINJ_BUILD_INDEX_DELAY", false)
 ch:get()
 
-s1.index.pk:select()
+s1.index.pk:select{}
 -- gh-5998: first DDL operation to be committed wins and aborts all other
 -- transactions. So index creation should fail.
 --

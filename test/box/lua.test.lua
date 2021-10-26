@@ -108,14 +108,14 @@ space:auto_increment{'c'}
 space.index.primary:drop()
 space:auto_increment{'a'}
 space:get({1})
-space:select()
+space:select{}
 space:update({1}, {})
 space:upsert({1}, {})
 space:delete({1})
 space:bsize()
 space:count()
 space:len()
-space:pairs():totable()
+space:pairs{}:totable()
 space:drop()
 
 --

@@ -486,7 +486,7 @@ local function run_merger(test, schema, tuple_count, source_count, opts)
     -- Run merger and prepare output for compare.
     if opts.output_type == 'table' then
         -- Table output.
-        res = merger_inst:select()
+        res = merger_inst:select{}
     elseif opts.output_type == 'buffer' then
         -- Buffer output.
         local output_buffer = buffer.ibuf()
@@ -495,7 +495,7 @@ local function run_merger(test, schema, tuple_count, source_count, opts)
     else
         -- Tuple output.
         assert(opts.output_type == 'tuple')
-        res = merger_inst:pairs():totable()
+        res = merger_inst:pairs{}:totable()
     end
 
     -- A bit more postprocessing to compare.
@@ -571,7 +571,7 @@ for _, case in ipairs(bad_chunks) do
         return state, case.chunk
     end, {}, {})
     local ok, err = pcall(function()
-        return source:pairs():take(1):totable()
+        return source:pairs{}:take(1):totable()
     end)
     test:ok(ok == false and err:match(case.exp_err), case[1])
 end
@@ -607,8 +607,8 @@ test:test('use a source in two mergers', function(test)
 
     local data = {{'a'}, {'b'}, {'c'}}
     local source = merger.new_source_fromtable(data)
-    local i1 = merger.new(key_def, {source}):pairs()
-    local i2 = merger.new(key_def, {source}):pairs()
+    local i1 = merger.new(key_def, {source}):pairs{}
+    local i2 = merger.new(key_def, {source}):pairs{}
 
     local t1 = i1:head():totable()
     test:is_deeply(t1, data[1], 'tuple 1 from merger 1')
@@ -644,15 +644,15 @@ local function verify_reusable_source(test, source)
     test:plan(3)
 
     local exp = {{1}, {2}}
-    local res = source:pairs():map(box.tuple.totable):totable()
+    local res = source:pairs{}:map(box.tuple.totable):totable()
     test:is_deeply(res, exp, '1st use')
 
     local exp = {{3}, {4}, {5}}
-    local res = source:pairs():map(box.tuple.totable):totable()
+    local res = source:pairs{}:map(box.tuple.totable):totable()
     test:is_deeply(res, exp, '2nd use')
 
     local exp = {}
-    local res = source:pairs():map(box.tuple.totable):totable()
+    local res = source:pairs{}:map(box.tuple.totable):totable()
     test:is_deeply(res, exp, 'end')
 end
 
@@ -727,7 +727,7 @@ test:test('cascade mergers', function(test)
     local m1 = merger.new(key_def, {source})
     local m2 = merger.new(key_def, {m1})
 
-    local res = m2:pairs():map(box.tuple.totable):totable()
+    local res = m2:pairs{}:map(box.tuple.totable):totable()
     test:is_deeply(res, data, 'same key_def')
 
     local key_def_unicode = key_def_lib.new({{
@@ -740,7 +740,7 @@ test:test('cascade mergers', function(test)
     local m1 = merger.new(key_def, {source})
     local m2 = merger.new(key_def_unicode, {m1})
 
-    local res = m2:pairs():map(box.tuple.totable):totable()
+    local res = m2:pairs{}:map(box.tuple.totable):totable()
     test:is_deeply(res, data, 'different key_defs')
 end)
 

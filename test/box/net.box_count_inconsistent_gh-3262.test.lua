@@ -122,7 +122,7 @@ function do_count_test(min, it)
     return r1 == r2 and r2 == r3
 end;
 
-data = remote_pk:select();
+data = remote_pk:select{};
 
 for _, v in pairs(data) do
     local itrs = {'GE', 'GT', 'LE', 'LT' }

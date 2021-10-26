@@ -41,7 +41,7 @@ INDEX_COUNT = box.cfg.vinyl_write_threads * 3
 assert(INDEX_COUNT < 100)
 
 s = box.space.test
-s:select()
+s:select{}
 
 bad_index = -1
 test_run:cmd("setopt delimiter ';'")
@@ -49,13 +49,13 @@ for i = 1, INDEX_COUNT - 1 do
     if s:count() ~= s.index[i]:count() then
         bad_index = i
     end
-    for _, v in s.index[i]:pairs() do
+    for _, v in s.index[i]:pairs{} do
         if v ~= s:get(v[1]) then
             bad_index = i
         end
     end
 end
 test_run:cmd("setopt delimiter ''");
-bad_index < 0 or {bad_index, s.index[bad_index]:select()}
+bad_index < 0 or {bad_index, s.index[bad_index]:select{}}
 
 s:drop()

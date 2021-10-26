@@ -77,9 +77,9 @@ test_run:cmd('restart server default')
 async = box.space.async
 sync = box.space.sync
 loc = box.space.loc
-async:select()
-sync:select()
-loc:select()
+async:select{}
+sync:select{}
+loc:select{}
 async:drop()
 sync:drop()
 loc:drop()

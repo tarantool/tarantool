@@ -108,7 +108,7 @@ test_run:cmd("setopt delimiter ';'")
 if remote then
 	execute("CREATE TABLE t(a VARBINARY PRIMARY KEY);")
 	execute("INSERT INTO t VALUES (X'00');")
-	res = execute("SELECT typeof(?);", box.space.T:select()[1])
+	res = execute("SELECT typeof(?);", box.space.T:select{}[1])
 	assert(res['rows'][1][1] == "varbinary")
 	execute("DROP TABLE t;")
 end;

@@ -147,20 +147,20 @@ t:next(t:next())
 -- test tuple:pairs
 --------------------------------------------------------------------------------
 
-ta = {} for k, v in t:pairs() do table.insert(ta, v) end
+ta = {} for k, v in t:pairs{} do table.insert(ta, v) end
 ta
 t=space:replace{1953719668, 'another field'}
-ta = {} for k, v in t:pairs() do table.insert(ta, v) end
+ta = {} for k, v in t:pairs{} do table.insert(ta, v) end
 ta
 t=space:replace{1953719668, 'another field', 'one more'}
-ta = {} for k, v in t:pairs() do table.insert(ta, v) end
+ta = {} for k, v in t:pairs{} do table.insert(ta, v) end
 ta
 t=box.tuple.new({'a', 'b', 'c', 'd'})
-ta = {} for it,field in t:pairs() do table.insert(ta, field); end
+ta = {} for it,field in t:pairs{} do table.insert(ta, field); end
 ta
 
 t = box.tuple.new({'a', 'b', 'c'})
-gen, init, state = t:pairs()
+gen, init, state = t:pairs{}
 gen, init, state
 state, val = gen(init, state)
 state, val
@@ -172,11 +172,11 @@ state, val = gen(init, state)
 state, val
 
 r = {}
-for _state, val in t:pairs() do table.insert(r, val) end
+for _state, val in t:pairs{} do table.insert(r, val) end
 r
 
 r = {}
-for _state, val in t:pairs() do table.insert(r, val) end
+for _state, val in t:pairs{} do table.insert(r, val) end
 r
 
 r = {}
@@ -192,10 +192,10 @@ for _state, val in t:pairs(10) do table.insert(r, val) end
 r
 
 r = {}
-for _state, val in t:pairs(nil) do table.insert(r, val) end
+for _state, val in t:pairs{} do table.insert(r, val) end
 r
 
-t:pairs(nil)
+t:pairs{}
 t:pairs("fdsaf")
 
 --------------------------------------------------------------------------------

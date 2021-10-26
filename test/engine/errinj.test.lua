@@ -11,5 +11,5 @@ for i = 1, 10 do s:replace({i, i}) end
 errinj.set('ERRINJ_WAL_IO', true)
 s:truncate()
 errinj.set('ERRINJ_WAL_IO', false)
-s:select()
+s:select{}
 s:drop()

@@ -159,7 +159,7 @@ box.execute('ALTER TABLE tc ADD CONSTRAINT fk1 FOREIGN KEY (id) REFERENCES tp(id
 -- Test that ADD/DROP CONSTRAINT return correct row_count value.
 --
 box.execute('SELECT row_count();')
-box.space._fk_constraint:select{}
+box.space._fk_constraint:select()
 box.execute('ALTER TABLE tc DROP CONSTRAINT fk1;')
 box.execute('SELECT row_count();')
 box.execute('DROP TABLE tc')
@@ -204,7 +204,7 @@ box.space.T:insert({'abc', 1})
 box.space.S:insert({'abc', 1})
 box.execute("CREATE INDEX i ON s (t_id);")
 box.execute("DELETE FROM t WHERE id = 'abc';")
-box.space.T:select()
+box.space.T:select{}
 
 box.space.S:drop()
 box.space.T:drop()

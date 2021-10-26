@@ -45,11 +45,11 @@ vclock_diff(vclock1, vclock2)
 -- Check result
 --
 _ = test_run:cmd("switch autobootstrap1")
-box.space.test:select()
+box.space.test:select{}
 _ = test_run:cmd("switch autobootstrap2")
-box.space.test:select()
+box.space.test:select{}
 _ = test_run:cmd("switch autobootstrap3")
-box.space.test:select()
+box.space.test:select{}
 _ = test_run:cmd("switch default")
 
 
@@ -64,7 +64,7 @@ box.session.su('test_u')
 _ = box.schema.space.create('test_u'):create_index('pk')
 box.session.su('admin')
 _ = box.space.test_u:replace({1, 2, 3, 4})
-box.space.test_u:select()
+box.space.test_u:select{}
 
 box.schema.user.revoke('test_u', 'read', 'space', '_space_sequence')
 box.schema.user.revoke('test_u', 'write', 'space', '_index')
@@ -79,9 +79,9 @@ _ = test_run:wait_vclock("autobootstrap2", vclock)
 _ = test_run:wait_vclock("autobootstrap3", vclock)
 
 _ = test_run:cmd("switch autobootstrap2")
-box.space.test_u:select()
+box.space.test_u:select{}
 _ = test_run:cmd("switch autobootstrap3")
-box.space.test_u:select()
+box.space.test_u:select{}
 
 --
 -- Rebootstrap one node and check that others follow.
@@ -90,7 +90,7 @@ _ = test_run:cmd("switch autobootstrap1")
 _ = test_run:cmd("restart server autobootstrap1 with cleanup=1, args ='0.1'")
 
 _ = box.space.test_u:replace({5, 6, 7, 8})
-box.space.test_u:select()
+box.space.test_u:select{}
 
 _ = test_run:cmd("switch default")
 test_run:wait_fullmesh(SERVERS)
@@ -101,9 +101,9 @@ _ = test_run:wait_vclock("autobootstrap2", vclock)
 _ = test_run:wait_vclock("autobootstrap3", vclock)
 
 _ = test_run:cmd("switch autobootstrap2")
-box.space.test_u:select()
+box.space.test_u:select{}
 _ = test_run:cmd("switch autobootstrap3")
-box.space.test_u:select()
+box.space.test_u:select{}
 
 _ = test_run:cmd("switch default")
 

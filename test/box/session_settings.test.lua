@@ -24,11 +24,11 @@ s:replace({'sql_defer_foreign_keys', true})
 -- the same way as an ordinary space with an index of the type
 -- "TREE".
 --
-s:select()
+s:select{}
 
 t = box.schema.space.create('settings', {format = s:format()})
 _ = t:create_index('primary')
-for _,value in s:pairs() do t:insert(value) end
+for _,value in s:pairs{} do t:insert(value) end
 
 test_run:cmd('setopt delimiter ";"')
 function check_sorting(ss, ts, key)
@@ -65,7 +65,7 @@ s:get({'abcd'})
 
 -- Check pairs() method of session_settings space.
 t = {}
-for key, value in s:pairs() do table.insert(t, {key, value}) end
+for key, value in s:pairs{} do table.insert(t, {key, value}) end
 #t == s:count()
 
 -- Check update() method of session_settings space.

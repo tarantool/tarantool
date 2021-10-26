@@ -17,10 +17,10 @@ test_run:cmd("create server replica with rpl_master=default, script='replication
 test_run:cmd("start server replica")
 test_run:wait_lsn('replica', 'default')
 test_run:cmd('switch replica')
-box.space.test:select()
-box.space.test.index.secondary:select()
-box.space.test2:select()
-box.space.test3:select()
+box.space.test:select{}
+box.space.test.index.secondary:select{}
+box.space.test2:select{}
+box.space.test3:select{}
 test_run:cmd('switch default')
 test_run:cmd("stop server replica")
 _ = test_run:cmd("cleanup server replica")
@@ -44,10 +44,10 @@ test_run:cmd("deploy server replica")
 test_run:cmd("start server replica")
 test_run:wait_lsn('replica', 'default')
 test_run:cmd('switch replica')
-box.space.test:select()
-box.space.test.index.secondary:select()
-box.space.test2:select()
-box.space.test3:select()
+box.space.test:select{}
+box.space.test.index.secondary:select{}
+box.space.test2:select{}
+box.space.test3:select{}
 test_run:cmd('switch default')
 test_run:cmd("stop server replica")
 _ = test_run:cmd("cleanup server replica")
@@ -60,10 +60,10 @@ test_run:cmd("deploy server replica")
 test_run:cmd("start server replica")
 test_run:wait_lsn('replica', 'default')
 test_run:cmd('switch replica')
-box.space.test:select()
-box.space.test.index.secondary:select()
-box.space.test2:select()
-box.space.test3:select()
+box.space.test:select{}
+box.space.test.index.secondary:select{}
+box.space.test2:select{}
+box.space.test3:select{}
 test_run:cmd('switch default')
 test_run:cmd("stop server replica")
 _ = test_run:cmd("cleanup server replica")
@@ -86,10 +86,10 @@ test_run:cmd("deploy server replica")
 test_run:cmd("start server replica")
 test_run:wait_lsn('replica', 'default')
 test_run:cmd('switch replica')
-box.space.test:select()
-box.space.test.index.secondary:select()
-box.space.test2:select()
-box.space.test3:select()
+box.space.test:select{}
+box.space.test.index.secondary:select{}
+box.space.test2:select{}
+box.space.test3:select{}
 test_run:cmd('switch default')
 test_run:cmd("stop server replica")
 _ = test_run:cmd("cleanup server replica")
@@ -108,9 +108,9 @@ test_run:cmd("start server replica")
 test_run:wait_lsn('replica', 'default')
 test_run:cmd('switch replica')
 box.space.test.id
-box.space.test:select()
-box.space.test2:select()
-box.space.test3:select()
+box.space.test:select{}
+box.space.test2:select{}
+box.space.test3:select{}
 test_run:cmd('switch default')
 test_run:cmd("stop server replica")
 _ = test_run:cmd("cleanup server replica")
@@ -128,7 +128,7 @@ test_run:cmd("start server replica")
 test_run:wait_lsn('replica', 'default')
 test_run:cmd('restart server replica')
 test_run:cmd('switch replica')
-box.space.test:select()
+box.space.test:select{}
 test_run:cmd('switch default')
 test_run:cmd("stop server replica")
 _ = test_run:cmd("cleanup server replica")

@@ -64,18 +64,18 @@ vclock2 = test_run:wait_cluster_vclock(SERVERS, vclock)
 -- Check that all replicas converged to the same data
 -- and the state persists after restart.
 test_run:cmd("switch autobootstrap1")
-box.space.test:select()
+box.space.test:select{}
 test_run:cmd('restart server autobootstrap1 with args="0.1"')
-box.space.test:select()
+box.space.test:select{}
 test_run:cmd("switch autobootstrap2")
-box.space.test:select()
+box.space.test:select{}
 test_run:cmd('restart server autobootstrap2 with args="0.1"')
-box.space.test:select()
+box.space.test:select{}
 test_run:cmd("switch autobootstrap3")
-box.space.test:select()
+box.space.test:select{}
 push_err
 test_run:cmd('restart server autobootstrap3 with args="0.1"')
-box.space.test:select()
+box.space.test:select{}
 
 -- Cleanup.
 test_run:cmd("switch default")
@@ -108,13 +108,13 @@ _ = test_run:wait_vclock('replica', vclock)
 -- Check that replace{1, 2} coming from the master was suppressed
 -- by the before_replace trigger on the replica.
 test_run:cmd("switch replica")
-box.space.test:select() -- [1, 2]
+box.space.test:select{} -- [1, 2]
 
 -- Check that master's component of replica's vclock was bumped
 -- so that the replica doesn't apply replace{1, 2} after restart
 -- while syncing with the master.
 test_run:cmd("restart server replica")
-box.space.test:select() -- [1, 2]
+box.space.test:select{} -- [1, 2]
 
 test_run:cmd("switch default")
 test_run:cmd("stop server replica")

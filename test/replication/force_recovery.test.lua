@@ -30,7 +30,7 @@ box.cfg{force_recovery = true}
 test_run:cmd("start server test with wait=False")
 test_run:cmd("switch test")
 test_run:wait_upstream(1, {message_re = 'Missing %.xlog file', status = 'loading'})
-box.space.test:select()
+box.space.test:select{}
 test_run:cmd("switch default")
 box.cfg{force_recovery = false}
 

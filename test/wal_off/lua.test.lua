@@ -14,7 +14,7 @@ for i = 1, 1000 do
         space:insert{tostring(j), os.time(), 1}
     end
     count = 0
-    for state, v in space.index[1]:pairs() do
+    for state, v in space.index[1]:pairs{} do
         count = count + 1
     end
     if count ~= 30 then
@@ -29,7 +29,7 @@ space:truncate()
 -- 5.4
 --
 for i = 1, 100000, 1 do space:insert{tostring(i), i} end
-local t1 = space.index['secondary']:select()
+local t1 = space.index['secondary']:select{}
 space:drop()
 
 --

@@ -35,7 +35,7 @@ s:insert{1, 1, 1}
 box.snapshot()
 s:delete(1)
 box.snapshot()
-s:select()
+s:select{}
 s:drop()
 
 --
@@ -145,7 +145,7 @@ end);
 ch2 = fiber.channel(1);
 _ = fiber.create(function()
     box.begin()
-    s:select()
+    s:select{}
     ch2:get()
     local status, err = pcall(s.select, s)
     ch2:put(status or err)
@@ -165,7 +165,7 @@ ch2:get()
 ch2:get()
 -- Cleanup.
 box.cfg{read_only = false}
-s:select()
+s:select{}
 s:drop()
 
 --

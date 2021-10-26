@@ -34,7 +34,7 @@ test_run:cmd('start server autobootstrap1 with args="0.1"')
 test_run:cmd("switch autobootstrap1")
 for i = 10, 19 do box.space.test:insert{i, 'test' .. i} end
 fiber = require('fiber')
-box.space.test:select()
+box.space.test:select{}
 
 -- Cleanup.
 test_run:cmd('switch default')

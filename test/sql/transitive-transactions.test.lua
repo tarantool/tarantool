@@ -25,7 +25,7 @@ fk_violation_1 = function()
     end
 end;
 fk_violation_1();
-box.space.CHILD:select();
+box.space.CHILD:select{};
 
 fk_violation_2 = function()
     box.execute('START TRANSACTION;')
@@ -33,7 +33,7 @@ fk_violation_2 = function()
     box.commit()
 end;
 fk_violation_2();
-box.space.CHILD:select();
+box.space.CHILD:select{};
 
 fk_violation_3 = function()
     box.begin()
@@ -42,8 +42,8 @@ fk_violation_3 = function()
     box.commit()
 end;
 fk_violation_3();
-box.space.CHILD:select();
-box.space.PARENT:select();
+box.space.CHILD:select{};
+box.space.PARENT:select{};
 
 -- Make sure that setting 'defer_foreign_keys' works.
 --
@@ -60,13 +60,13 @@ fk_defer = function()
     box.commit()
 end;
 fk_defer();
-box.space.CHILD:select();
-box.space.PARENT:select();
+box.space.CHILD:select{};
+box.space.PARENT:select{};
 box.space._session_settings:update('sql_defer_foreign_keys', {{'=', 2, true}})
 box.rollback()
 fk_defer();
-box.space.CHILD:select();
-box.space.PARENT:select();
+box.space.CHILD:select{};
+box.space.PARENT:select{};
 box.space._session_settings:update('sql_defer_foreign_keys', {{'=', 2, false}})
 
 -- Cleanup
@@ -85,5 +85,5 @@ box.execute('INSERT INTO t VALUES (null);')
 box.execute('ROLLBACK TO sp;')
 box.execute('INSERT INTO t VALUES (null);')
 box.commit();
-box.space.T:select();
+box.space.T:select{};
 box.space.T:drop();

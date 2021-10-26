@@ -373,7 +373,7 @@ box.cfg{vinyl_cache = 0}
 box.stat.vinyl().memory.tuple_cache
 -- Make sure cache is not populated if box.cfg.vinyl_cache is set to 0
 st1 = s.index.pk:stat().cache
-#s:select()
+#s:select{}
 for i = 1, 100 do s:get{i} end
 st2 = s.index.pk:stat().cache
 st2.put.rows - st1.put.rows

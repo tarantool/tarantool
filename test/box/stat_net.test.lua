@@ -24,7 +24,7 @@ cn1 = remote.connect(LISTEN.host, LISTEN.service)
 cn2 = remote.connect(LISTEN.host, LISTEN.service)
 cn3 = remote.connect(LISTEN.host, LISTEN.service)
 
-cn.space.tweedledum:select() --small request
+cn.space.tweedledum:select{} --small request
 
 box.stat.net.SENT.total > 0
 box.stat.net.RECEIVED.total > 0

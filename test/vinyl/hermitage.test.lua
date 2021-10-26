@@ -157,10 +157,10 @@ t:replace{2, 20}
 
 c1:begin()
 c2:begin()
-c1("t:select()") -- {1, 10}, {2, 20}
+c1("t:select{}") -- {1, 10}, {2, 20}
 c2("t:replace{3, 30}")
 c2:commit() -- ok
-c1("t:select()") -- still {1, 10}, {2, 20}
+c1("t:select{}") -- still {1, 10}, {2, 20}
 c1:commit() -- ok
 
 -- teardown
@@ -283,8 +283,8 @@ t:replace{2, 20}
 c1:begin()
 c2:begin()
 -- select * from test where value % 3 = 0
-c1("t:select()") -- {1, 10}, {2, 20}
-c2("t:select()") -- {1, 10}, {2, 20}
+c1("t:select{}") -- {1, 10}, {2, 20}
+c2("t:select{}") -- {1, 10}, {2, 20}
 c1("t:replace{3, 30}")
 c2("t:replace{4, 42}")
 c1:commit() -- ok

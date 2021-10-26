@@ -29,12 +29,12 @@ fun.iter(box.tuple.new({1, 2, 3}):pairs()):totable()
 function pred(t) return t[1] % 2 == 0 end
 fun.iter(space):totable()
 fun.iter(space:pairs()):totable()
-space:pairs():filter(pred):drop(2):take(3):totable()
+space:pairs{}:filter(pred):drop(2):take(3):totable()
 
 -- iter on index (using __ipairs)
 fun.iter(space.index[0]):totable()
 fun.iter(space.index[0]:pairs()):totable()
-space.index[0]:pairs():drop(2):take(3):totable()
+space.index[0]:pairs{}:drop(2):take(3):totable()
 
 -- test global functions
 test_run:cmd("setopt delimiter ';'")

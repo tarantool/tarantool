@@ -24,7 +24,7 @@ test_run:cmd("setopt delimiter ';'")
 function select_all()
     local result = {}
     local tuple, v
-    for tuple, v in hash:pairs() do
+    for tuple, v in hash:pairs{} do
         table.insert(result, v)
     end
     return result

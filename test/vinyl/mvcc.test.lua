@@ -1491,11 +1491,11 @@ c1("t:select{}")
 --
 c1:begin()
 c1("t:select{1}")
-c1("for k, v in box.space.test:pairs() do box.commit() end")
+c1("for k, v in box.space.test:pairs{} do box.commit() end")
 c1:rollback()
 c1:begin()
 c1("t:select{1}")
-c1("for k, v in box.space.test:pairs() do box.rollback() end")
+c1("for k, v in box.space.test:pairs{} do box.rollback() end")
 c1:rollback()
 t:truncate()
 
@@ -1548,7 +1548,7 @@ c1("t:select({}, {limit = 1})") -- {1, 'new'}
 c2:begin()
 c2("t:replace{2, 'new'}")
 c2:commit()
-c1("t:select()") -- {1, 'new'}, {2, 'new'}
+c1("t:select{}") -- {1, 'new'}, {2, 'new'}
 c1:commit()
 t:truncate()
 
@@ -1562,7 +1562,7 @@ c1("t:insert{1, 2}")
 c2("t:insert{2, 2}")
 c1:commit()
 c2:commit() -- rollback
-t:select() -- {1, 2}
+t:select{} -- {1, 2}
 t:truncate()
 t.index.sk:drop()
 

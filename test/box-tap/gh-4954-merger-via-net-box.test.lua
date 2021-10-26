@@ -32,7 +32,7 @@ end
 
 local function use_table_source(tuples)
     local source = merger_lib.new_source_fromtable(tuples)
-    return source:select()
+    return source:select{}
 end
 _G.use_table_source = use_table_source
 
@@ -40,13 +40,13 @@ local function use_buffer_source(tuples)
     local buf = buffer.ibuf()
     msgpack.encode(tuples, buf)
     local source = merger_lib.new_source_frombuffer(buf)
-    return source:select()
+    return source:select{}
 end
 _G.use_buffer_source = use_buffer_source
 
 local function use_tuple_source(tuples)
     local source = merger_lib.new_tuple_source(array_next, tuples)
-    return source:select()
+    return source:select{}
 end
 _G.use_tuple_source = use_tuple_source
 
@@ -56,7 +56,7 @@ local function use_table_source_yield(tuples)
         chunks[i] = {t}
     end
     local source = merger_lib.new_table_source(array_yield_next, chunks)
-    return source:select()
+    return source:select{}
 end
 _G.use_table_source_yield = use_table_source_yield
 
@@ -67,13 +67,13 @@ local function use_buffer_source_yield(tuples)
         msgpack.encode({t}, buffers[i])
     end
     local source = merger_lib.new_buffer_source(array_yield_next, buffers)
-    return source:select()
+    return source:select{}
 end
 _G.use_buffer_source_yield = use_buffer_source_yield
 
 local function use_tuple_source_yield(tuples)
     local source = merger_lib.new_tuple_source(array_yield_next, tuples)
-    return source:select()
+    return source:select{}
 end
 _G.use_tuple_source_yield = use_tuple_source_yield
 

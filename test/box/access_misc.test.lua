@@ -80,7 +80,7 @@ box.schema.func.create('guest_func')
 session.su('admin')
 box.schema.user.revoke("guest", "read", "universe")
 
-s:select()
+s:select{}
 --
 -- Create user with universe read&write grants
 -- and create this user session
@@ -114,7 +114,7 @@ box.schema.user.drop('uniuser_testus')
 --
 -- Check access system and any spaces
 --
-box.space.admin_space:select()
+box.space.admin_space:select{}
 box.space._user:select(1)
 box.space._space:select(280)
 
@@ -200,7 +200,7 @@ for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v)
 t
 t = {}
 session.su('testuser')
-s:select()
+s:select{}
 for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end
 t
 t = {}
@@ -208,26 +208,26 @@ session.su('admin')
 box.schema.user.revoke('testuser', 'read', 'space', 'glade')
 box.schema.user.grant('testuser', 'write', 'space', 'glade')
 session.su('testuser')
-s:select()
+s:select{}
 for key, v in s.index.primary:pairs(1, {iterator = 'GE'}) do table.insert (t, v) end
 t
 t = {}
 session.su('admin')
 box.schema.user.grant('testuser', 'read, write, execute', 'space', 'glade')
 session.su('testuser')
-s:select()
+s:select{}
 for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end
 t
 t = {}
 
 session.su('guest')
-s:select()
+s:select{}
 for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end
 t
 t = {}
 
 session.su('guest')
-s:select()
+s:select{}
 for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end
 t
 
@@ -238,14 +238,14 @@ session.su('admin')
 _ = s:create_index('secondary', {unique = false, parts = {2, 'string'}})
 
 session.su('testuser')
-s:select()
+s:select{}
 
 session.su('admin')
 s:truncate()
 s:insert({1234, 'ABCD'})
 
 session.su('testuser')
-s:select()
+s:select{}
 
 session.su('admin')
 box.schema.user.drop('testuser')

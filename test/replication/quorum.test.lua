@@ -112,7 +112,7 @@ test_run:cmd("create server replica with rpl_master=default, script='replication
 test_run:cmd("start server replica")
 test_run:cmd("switch replica")
 box.info.status -- running
-box.space.test:select()
+box.space.test:select{}
 test_run:cmd("switch default")
 test_run:cmd("stop server replica")
 listen = box.cfg.listen
@@ -129,7 +129,7 @@ vclock[0] = nil
 _ = test_run:wait_vclock("replica", vclock)
 test_run:cmd("switch replica")
 box.info.status -- running
-box.space.test:select()
+box.space.test:select{}
 test_run:cmd("switch default")
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
@@ -149,7 +149,7 @@ vclock = test_run:get_vclock("master_quorum1")
 vclock[0] = nil
 _ = test_run:wait_vclock("master_quorum2", vclock)
 test_run:cmd("switch master_quorum2")
-box.space.test:select()
+box.space.test:select{}
 test_run:cmd("switch default")
 -- Cleanup.
 test_run:drop_cluster(SERVERS)

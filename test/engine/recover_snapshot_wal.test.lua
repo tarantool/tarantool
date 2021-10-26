@@ -39,7 +39,7 @@ space = box.space['test']
 index = space.index['primary']
 i = 0
 err = nil
-for _, t in space:pairs() do                                    \
+for _, t in space:pairs{} do                                    \
     if t[1] ~= i then                                           \
         err = {i, t}                                            \
         break                                                   \

@@ -1079,7 +1079,7 @@ test:do_execsql_test(
 
 local inject_stat_error_func = function (space_name)
     local space = box.space[space_name]
-    local stats = space:select()
+    local stats = space:select{}
     for _, stat in pairs(stats) do
         space:delete(get_pk(space, stat))
         local new_tuple = {"no such tbl"}

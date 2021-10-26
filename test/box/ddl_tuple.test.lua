@@ -20,9 +20,9 @@ test_run:cmd("setopt delimiter ''");
 _ = {fiber.create(insert_tuple, {1, 2, 'a'}), fiber.create(add_index), fiber.create(insert_tuple, {2, '3', 'b'})}
 {ch:get(), ch:get(), ch:get()}
 
-box.space.test:select()
+box.space.test:select{}
 
 test_run:cmd('restart server default')
 
-box.space.test:select()
+box.space.test:select{}
 box.space.test:drop()

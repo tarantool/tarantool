@@ -54,7 +54,7 @@ end
 local function truncate(space)
     local pk = space.index[0]
     while pk:len() > 0 do
-        for _, t in pk:pairs() do
+        for _, t in pk:pairs{} do
             local key = {}
             for _, parts in ipairs(pk.parts) do
                 table.insert(key, t[parts.fieldno])
@@ -608,7 +608,7 @@ local function upgrade_to_1_7_7()
     --
     -- grant 'session' and 'usage' to all existing users
     --
-    for _, v in _user:pairs() do
+    for _, v in _user:pairs{} do
         if v[4] ~= "role" then
             _priv:upsert({ADMIN, v[1], "universe", 0, box.priv.S + box.priv.U},
                                                 {{"|", 5, box.priv.S + box.priv.U}})
@@ -711,7 +711,7 @@ local function upgrade_priv_to_2_1_0()
     -- objects, since it has no effect. We also skip grants for
     -- sequences since they were added after the new privileges
     -- and compatibility mode was always off for them.
-    for _, user in _user:pairs() do
+    for _, user in _user:pairs{} do
         if user[0] ~= ADMIN and user[0] ~= SUPER then
             for _, priv in _priv:pairs(user[0]) do
                 if priv[3] ~= 'sequence' and
@@ -790,7 +790,7 @@ end
 
 local function upgrade_to_2_1_1()
     local _index = box.space[box.schema.INDEX_ID]
-    for _, index in _index:pairs() do
+    for _, index in _index:pairs{} do
         local opts = index.opts
         if opts['sql'] ~= nil then
             opts['sql'] = nil
@@ -806,7 +806,7 @@ end
 
 local function update_collation_strength_field()
     local _collation = box.space[box.schema.COLLATION_ID]
-    for _, collation in _collation:pairs() do
+    for _, collation in _collation:pairs{} do
         if collation.type == 'ICU' and collation.opts.strength == nil then
             local new_collation = collation:totable()
             new_collation[6].strength = 'tertiary'
@@ -949,7 +949,7 @@ local function upgrade_sequence_to_2_2_1()
     log.info("add sequence field to space _space_sequence")
     local _index = box.space[box.schema.INDEX_ID]
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
-    for _, v in _space_sequence:pairs() do
+    for _, v in _space_sequence:pairs{} do
         if #v > 3 then
             -- Must be a sequence created after upgrade.
             -- It doesn't need to get updated.
@@ -994,7 +994,7 @@ local function upgrade_ck_constraint_to_2_2_1()
     _index:insert{_ck_constraint.id, 0, 'primary', 'tree',
                   {unique = true}, {{0, 'unsigned'}, {1, 'string'}}}
 
-    for _, space in _space:pairs() do
+    for _, space in _space:pairs{} do
         local flags = space.flags
         if flags.checks then
             for i, check in pairs(flags.checks) do
@@ -1125,7 +1125,7 @@ local function upgrade_to_2_3_0()
 
     log.info("Extend _ck_constraint space format with is_enabled field")
     local _ck_constraint = box.space._ck_constraint
-    for _, tuple in _ck_constraint:pairs() do
+    for _, tuple in _ck_constraint:pairs{} do
         _ck_constraint:update({tuple[1], tuple[2]}, {{'=', 6, true}})
     end
     local format = {{name='space_id', type='unsigned'},
@@ -1200,7 +1200,7 @@ end
 local function remove_sql_builtin_functions_from_func()
     local _func = box.space._func
     local _priv = box.space._priv
-    for _, v in _func:pairs() do
+    for _, v in _func:pairs{} do
         if v.language == "SQL_BUILTIN" then
             _priv:delete({2, 'function', v.id})
             _func:delete({v.id})

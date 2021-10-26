@@ -63,7 +63,7 @@ test:is_deeply(exp_body, body, 'verify response body')
 
 -- Verify space data.
 local exp_res = {{1}}
-local res = box.space.T:pairs():map(box.tuple.totable):totable()
+local res = box.space.T:pairs{}:map(box.tuple.totable):totable()
 test:is_deeply(res, exp_res, 'verify inserted data')
 
 box.execute('drop table T')

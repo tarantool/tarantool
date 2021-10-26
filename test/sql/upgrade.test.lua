@@ -36,8 +36,8 @@ assert(t1t.space_id == t2t.space_id)
 assert(t1t.space_id == box.space.T.id)
 
 box.execute("INSERT INTO T VALUES(1);")
-box.space.T:select()
-box.space.T_OUT:select()
+box.space.T:select{}
+box.space.T_OUT:select{}
 box.execute("SELECT * FROM T")
 box.execute("SELECT * FROM T")
 

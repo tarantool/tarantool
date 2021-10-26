@@ -58,13 +58,13 @@ test_run = env.new()
 test_run:cmd("setopt delimiter ';'")
 function crossjoin(space0, space1, limit)
     local result = {}
-    for state, v0 in space0:pairs() do
-        for state, v1 in space1:pairs() do
+    for state, v0 in space0:pairs{} do
+        for state, v1 in space1:pairs{} do
             if limit <= 0 then
                 return result
             end
             local newtuple = v0:totable()
-            for _, v in v1:pairs() do
+            for _, v in v1:pairs{} do
                 table.insert(newtuple, v)
             end
             table.insert(result, box.tuple.new(newtuple))

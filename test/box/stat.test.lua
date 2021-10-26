@@ -35,7 +35,7 @@ space:select(5)
 box.stat.SELECT.total
 space:select(15)
 box.stat.SELECT.total
-for _ in space:pairs() do end
+for _ in space:pairs{} do end
 box.stat.SELECT.total
 
 -- reset

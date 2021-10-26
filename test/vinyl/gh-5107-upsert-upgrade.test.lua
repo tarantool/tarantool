@@ -16,7 +16,7 @@ test_run:switch('upgrade')
 -- place, only internal format of :upserts have been changed.
 -- box.schema.upgrade()
 
-box.space.test:select()
+box.space.test:select{}
 
 test_run:switch('default')
 test_run:cmd('stop server upgrade')

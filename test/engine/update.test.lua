@@ -131,8 +131,8 @@ pk = s:create_index('pk')
 sk = s:create_index('sk', {parts = {2, 'unsigned'}})
 s:insert{1, 1, 1}
 box.begin() s:update(1, {{'=', 2, 2}}) s:update(1, {{'=', 3, 2}}) box.commit()
-pk:select()
-sk:select()
+pk:select{}
+sk:select{}
 s:drop()
 
 --

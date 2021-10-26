@@ -43,7 +43,7 @@ pk:alter{parts = {2, 'unsigned'}} -- success: space is empty now
 space:replace{1, 2}
 -- gh-3508 - Altering primary index of a vinyl space doesn't work as expected
 space:replace{2, 2}
-space:select()
+space:select{}
 space:drop()
 
 --
@@ -241,7 +241,7 @@ box.snapshot()
 s:replace{1, 1}
 s:delete{2}
 _ = s:create_index('secondary', {parts = {2, 'unsigned'}})
-s:select()
+s:select{}
 s:drop()
 
 --

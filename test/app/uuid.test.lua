@@ -180,7 +180,7 @@ box.execute([[INSERT INTO "s" VALUES (x'303030')]])
 -- Make sure that comparison is right. Comparison in SCALAR field:
 -- bool < number < string < varbinary < uuid.
 --
-s:select()
+s:select{}
 s:select({}, {iterator='LE'})
 s:drop()
 

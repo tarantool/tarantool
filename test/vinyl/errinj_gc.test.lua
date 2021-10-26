@@ -83,7 +83,7 @@ function gc() temp:auto_increment{} box.snapshot() end
 
 file_count()
 
-s:select()
+s:select{}
 
 s:drop()
 gc()

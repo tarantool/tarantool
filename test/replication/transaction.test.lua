@@ -28,7 +28,7 @@ box.begin() s:insert({5, 'm'}) s:insert({6, 'm'}) s:insert({7, 'm'}) box.commit(
 test_run:cmd("switch replica")
 -- nothing was applied
 v1[1] == box.info.vclock[1]
-box.space.test:select()
+box.space.test:select{}
 -- check replication status
 box.info.replication[1].upstream.status
 box.info.replication[1].upstream.message
@@ -43,7 +43,7 @@ box.cfg{replication = replication}
 -- flush wal
 box.space.l_space:replace({1})
 v1[1] + 2 == box.info.vclock[1]
-box.space.test:select()
+box.space.test:select{}
 -- check replication status
 box.info.replication[1].upstream.status
 box.info.replication[1].upstream.message
@@ -53,14 +53,14 @@ test_run:cmd("switch default")
 test_run:cmd("restart server replica")
 test_run:cmd("switch replica")
 
-box.space.test:select()
+box.space.test:select{}
 -- set skip conflict rows and check that non-conflicting were applied
 replication = box.cfg.replication
 box.cfg{replication = {}, replication_skip_conflict = true}
 box.cfg{replication = replication}
 
 -- check last transaction applied without conflicting row
-box.space.test:select()
+box.space.test:select{}
 box.info.replication[1].upstream.status
 
 -- make some new conflicting rows with skip-conflicts
@@ -73,14 +73,14 @@ box.begin() s:insert({8, 'm'}) s:insert({9, 'm'}) box.commit()
 
 test_run:cmd("switch replica")
 -- vclock should be increased but rows skipped
-box.space.test:select()
+box.space.test:select{}
 
 -- check restart does not change something
 test_run:cmd("switch default")
 test_run:cmd("restart server replica")
 test_run:cmd("switch replica")
 
-box.space.test:select()
+box.space.test:select{}
 test_run:wait_upstream(1, {status = 'follow'})
 
 test_run:cmd("switch default")

@@ -150,9 +150,9 @@ s2:drop()
 s = box.schema.create_space('test', {engine = 'vinyl'})
 _ = s:create_index('test', {type = 'tree', parts = {1, 'unsigned', 2, 'string'}})
 s:put({1, 'test', 3, 4})
-s:select()
+s:select{}
 s:upsert({1, 'test', 'failed'}, {{'=', 3, 33}, {'=', 4, nil}})
-s:select()
+s:select{}
 s:drop()
 
 --
@@ -325,5 +325,5 @@ box.begin()
 s:update(1, {{'+', 3, 1}})
 s:delete(1)
 box.commit()
-s:select()
+s:select{}
 s:drop()

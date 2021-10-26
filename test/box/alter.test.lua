@@ -99,7 +99,7 @@ box.space[1000]
 space = box.schema.space.create('gh197')
 space:len()
 space:truncate()
-space:pairs():totable()
+space:pairs{}:totable()
 space:drop()
 
 --------------------------------------------------------------------------------

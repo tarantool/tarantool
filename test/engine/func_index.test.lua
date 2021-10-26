@@ -123,7 +123,7 @@ idx = s:create_index('idx', {unique = true, func = 'extr', parts = {{1, 'integer
 s:insert({2, 1})
 idx:get(3)
 idx:delete(3)
-s:select()
+s:select{}
 s:insert({2, 1})
 idx:get(3)
 s:drop()
@@ -138,7 +138,7 @@ idx = s:create_index('idx', {unique = true, func = box.func.extr.id, parts = {{1
 s:insert({1, 2})
 s:insert({3, 5})
 s:insert({5, 3})
-idx:select()
+idx:select{}
 idx:get(8)
 idx:get(3)
 idx:get(1)
@@ -222,7 +222,7 @@ s:insert({1})
 s:insert({2})
 s:insert({3})
 s:insert({4})
-idx:select()
+idx:select{}
 s:drop()
 box.schema.func.drop('extr')
 

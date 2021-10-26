@@ -44,11 +44,11 @@ vclock_diff(vclock1, vclock2)
 -- Check result
 --
 _ = test_run:cmd("switch autobootstrap_guest1")
-box.space.test:select()
+box.space.test:select{}
 _ = test_run:cmd("switch autobootstrap_guest2")
-box.space.test:select()
+box.space.test:select{}
 _ = test_run:cmd("switch autobootstrap_guest3")
-box.space.test:select()
+box.space.test:select{}
 _ = test_run:cmd("switch default")
 
 --

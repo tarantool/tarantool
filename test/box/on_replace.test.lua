@@ -71,8 +71,8 @@ trigger_id = first:on_replace(function()
 end);
 test_run:cmd("setopt delimiter ''");
 first:replace({1, "hello"})
-first:select()
-second:select()
+first:select{}
+second:select{}
 first:on_replace(nil, trigger_id)
 first:delete(1)
 second:delete(1)
@@ -86,8 +86,8 @@ trigger_id = first:on_replace(function()
 end);
 test_run:cmd("setopt delimiter ''");
 first:replace({1, "multistatement tx"})
-first:select()
-second:select()
+first:select{}
+second:select{}
 first:on_replace(nil, trigger_id)
 first:delete(1)
 second:delete(1)
@@ -102,8 +102,8 @@ trigger_id = first:on_replace(function()
 end);
 test_run:cmd("setopt delimiter ''");
 first:replace({1, "rollback"})
-first:select()
-second:select()
+first:select{}
+second:select{}
 first:on_replace(nil, trigger_id)
 
 -- max recursion depth
@@ -115,8 +115,8 @@ trigger_id = first:on_replace(function()
 end);
 test_run:cmd("setopt delimiter ''");
 first:replace({1, "recursive"})
-first:select()
-second:select()
+first:select{}
+second:select{}
 RECURSION_LIMIT
 first:on_replace(nil, trigger_id)
 
@@ -132,8 +132,8 @@ trigger_id = first:on_replace(function()
 end);
 test_run:cmd("setopt delimiter ''");
 first:replace({0, "initial"})
-first:select()
-second:select()
+first:select{}
+second:select{}
 RECURSION_LIMIT
 first:on_replace(nil, trigger_id)
 first:truncate()
@@ -148,8 +148,8 @@ trigger_id = first:on_replace(function()
 end);
 test_run:cmd("setopt delimiter ''");
 first:replace({0, "initial"})
-first:select()
-second:select()
+first:select{}
+second:select{}
 first:on_replace(nil, trigger_id)
 
 test_run:cmd("setopt delimiter ';'");
@@ -159,8 +159,8 @@ trigger_id = first:on_replace(function()
 end);
 test_run:cmd("setopt delimiter ''");
 first:replace({0, "initial"})
-first:select()
-second:select()
+first:select{}
+second:select{}
 first:on_replace(nil, trigger_id)
 
 test_run:cmd("setopt delimiter ';'");
@@ -172,8 +172,8 @@ end);
 
 test_run:cmd("setopt delimiter ''");
 first:replace({0, "initial"})
-first:select()
-second:select()
+first:select{}
+second:select{}
 first:on_replace(nil, trigger_id)
 
 first:drop()
@@ -200,7 +200,7 @@ t = s:on_replace(function () s:rename('newname') end, t)
 s:replace({8, 9})
 t = s:on_replace(function () s.index.pk:rename('newname') end, t)
 s:replace({9, 10})
-s:select()
+s:select{}
 s:drop() -- test_on_repl_ddl
 
 --
@@ -246,9 +246,9 @@ box.commit();
 
 test_run:cmd("setopt delimiter ''");
 
-s1:select()
-s2:select()
-s3:select()
+s1:select{}
+s2:select{}
+s3:select{}
 
 s1:drop()
 s2:drop()
@@ -271,9 +271,9 @@ _ = s1:on_replace(function(old, new) s3:insert(new:update{{'!', 2, x}}) x = x + 
 
 box.begin() s1:insert{1} s1:insert{2} s1:insert{3} box.commit()
 
-s1:select()
-s2:select()
-s3:select()
+s1:select{}
+s2:select{}
+s3:select{}
 
 s1:drop()
 s2:drop()

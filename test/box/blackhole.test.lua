@@ -44,11 +44,11 @@ s:replace{2}
 memtx:replace{2}
 box.commit();
 test_run:cmd("setopt delimiter ''");
-memtx:select()
+memtx:select{}
 f = s:on_replace(function(old, new) memtx:replace(new) end)
 s:replace{3}
 s:replace{4}
-memtx:select()
+memtx:select{}
 s:on_replace(nil, f)
 memtx:drop()
 

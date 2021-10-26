@@ -29,7 +29,7 @@ test_run:cmd("create server replica with rpl_master=master, script='replication/
 test_run:cmd("start server replica")
 test_run:cmd("switch replica")
 box.info.replication[1].upstream.status == 'follow' or log.error(box.info)
-box.space.test:select()
+box.space.test:select{}
 test_run:cmd("switch master")
 test_run:cmd("stop server replica")
 
@@ -59,7 +59,7 @@ test_run:cmd("start server replica")
 box.info.replication[2].downstream.vclock ~= nil or log.error(box.info)
 test_run:cmd("switch replica")
 box.info.replication[1].upstream.status == 'follow' or log.error(box.info)
-box.space.test:select()
+box.space.test:select{}
 test_run:cmd("switch master")
 
 -- Make sure the replica follows new changes.
@@ -68,12 +68,12 @@ vclock = test_run:get_vclock('master')
 vclock[0] = nil
 _ = test_run:wait_vclock('replica', vclock)
 test_run:cmd("switch replica")
-box.space.test:select()
+box.space.test:select{}
 
 -- Check that restart works as usual.
 test_run:cmd("restart server replica with args='true'")
 box.info.replication[1].upstream.status == 'follow' or log.error(box.info)
-box.space.test:select()
+box.space.test:select{}
 
 -- Check that rebootstrap is NOT initiated unless the replica
 -- is strictly behind the master.
@@ -93,7 +93,7 @@ box.cfg{checkpoint_count = checkpoint_count}
 test_run:cmd("start server replica with wait=False")
 test_run:cmd("switch replica")
 test_run:wait_upstream(1, {message_re = 'Missing %.xlog file', status = 'loading'})
-box.space.test:select()
+box.space.test:select{}
 
 --
 -- gh-3740: rebootstrap crashes if the master has rows originating
@@ -144,7 +144,7 @@ vclock[0] = nil
 _ = test_run:wait_vclock('master', vclock)
 -- Restart the replica. It should successfully rebootstrap.
 test_run:cmd("restart server replica with args='true'")
-box.space.test:select()
+box.space.test:select{}
 box.snapshot()
 box.space.test:replace{2}
 

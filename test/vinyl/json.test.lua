@@ -8,7 +8,7 @@ s = box.schema.space.create('test', {engine = 'vinyl'})
 pk = s:create_index('pk', {parts = { {'[1].a', 'unsigned'}, {'[1].b', 'unsigned'}, {'[1].c', 'unsigned'} }})
 sk = s:create_index('sk', {unique = false, parts = {2, 'unsigned'}})
 s:replace{{a = 1, b = 2, c = 3}, 10}
-sk:select()
+sk:select{}
 s:drop()
 
 --

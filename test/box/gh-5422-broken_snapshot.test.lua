@@ -38,7 +38,7 @@ function write_garbage_with_restore_or_save(filename, offset, count, restore)
 end;
 function check_count_valid_snapshot_data(count)
     local cnt = 0
-    local val = test_run:eval('test', "box.space.test:select()")[1]
+    local val = test_run:eval('test', "box.space.test:select{}")[1]
     for i = 1, count do
         if val[i] ~= nil then
             cnt = cnt + 1

@@ -196,7 +196,7 @@ for i = 1, 100 do put(i) end
 box.begin()
 for i = 1, 100, 2 do put(i) end
 st = istat()
-#s:select()
+#s:select{}
 stat_diff(istat(), st)
 box.rollback()
 
@@ -298,7 +298,7 @@ ch2 = fiber.channel(1)
 test_run:cmd("setopt delimiter ';'")
 _ = fiber.create(function()
     box.begin()
-    s:select()
+    s:select{}
     ch1:put(true)
     ch2:get()
     pcall(box.commit)

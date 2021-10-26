@@ -78,8 +78,8 @@ files = box.backup.start(1) -- error: checkpoint not found
 _ = test_run:cmd(string.format("create server copy1 with script='box/backup_test.lua', workdir='%s'", BACKUP_DIR))
 _ = test_run:cmd("start server copy1")
 _ = test_run:cmd('switch copy1')
-box.space.memtx:select()
-box.space.vinyl:select()
+box.space.memtx:select{}
+box.space.vinyl:select{}
 _ = test_run:cmd('switch default')
 _ = test_run:cmd("stop server copy1")
 _ = test_run:cmd("cleanup server copy1")
@@ -97,8 +97,8 @@ box.backup.stop()
 _ = test_run:cmd(string.format("create server copy2 with script='box/backup_test.lua', workdir='%s'", BACKUP_DIR))
 _ = test_run:cmd("start server copy2")
 _ = test_run:cmd('switch copy2')
-box.space.memtx:select()
-box.space.vinyl:select()
+box.space.memtx:select{}
+box.space.vinyl:select{}
 _ = test_run:cmd('switch default')
 _ = test_run:cmd("stop server copy2")
 _ = test_run:cmd("cleanup server copy2")
@@ -111,8 +111,8 @@ box.backup.stop()
 _ = test_run:cmd(string.format("create server copy3 with script='box/backup_test.lua', workdir='%s'", BACKUP_DIR))
 _ = test_run:cmd("start server copy3")
 _ = test_run:cmd('switch copy3')
-box.space.memtx:select()
-box.space.vinyl:select()
+box.space.memtx:select{}
+box.space.vinyl:select{}
 _ = test_run:cmd('switch default')
 _ = test_run:cmd("stop server copy3")
 _ = test_run:cmd("cleanup server copy3")
