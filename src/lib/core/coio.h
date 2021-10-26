@@ -201,16 +201,6 @@ coio_writev(struct ev_io *coio, struct iovec *iov, int iovcnt, size_t size)
 	return coio_writev_timeout(coio, iov, iovcnt, size, TIMEOUT_INFINITY);
 }
 
-ssize_t
-coio_sendto_timeout(struct ev_io *coio, const void *buf, size_t sz, int flags,
-		    const struct sockaddr *dest_addr, socklen_t addrlen,
-		    ev_tstamp timeout);
-
-ssize_t
-coio_recvfrom_timeout(struct ev_io *coio, void *buf, size_t sz, int flags,
-		      struct sockaddr *src_addr, socklen_t addrlen,
-		      ev_tstamp timeout);
-
 void
 coio_service_init(struct coio_service *service, const char *name,
 		  fiber_func handler, void *handler_param);
