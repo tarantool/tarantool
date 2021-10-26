@@ -68,6 +68,12 @@ jobs:
     with:
       artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
 
+  memcached:
+    needs: tarantool
+    uses: tarantool/memcached/.github/workflows/reusable_testing.yml@master
+    with:
+      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+
   metrics:
     needs: tarantool
     uses: tarantool/metrics/.github/workflows/reusable-test.yml@master
