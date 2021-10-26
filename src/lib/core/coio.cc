@@ -70,20 +70,20 @@ coio_fiber_yield_timeout(struct ev_io *coio, ev_tstamp delay)
 
 /**
  * Connect to a host with a specified timeout.
- * @retval -1 timeout
- * @retval 0 connected
+ * @retval socket fd
  */
 static int
-coio_connect_addr(struct ev_io *coio, struct sockaddr *addr,
-		  socklen_t len, ev_tstamp timeout)
+coio_connect_addr(struct sockaddr *addr, socklen_t len, ev_tstamp timeout)
 {
-	ev_loop *loop = loop();
-	if (evio_socket(coio, addr->sa_family, SOCK_STREAM, 0) != 0)
+	int fd = sio_socket(addr->sa_family, SOCK_STREAM, 0);
+	if (fd < 0)
 		diag_raise();
-	auto coio_guard = make_scoped_guard([=]{ evio_close(loop, coio); });
-	if (sio_connect(coio->fd, addr, len) == 0) {
-		coio_guard.is_active = false;
-		return 0;
+	auto fd_guard = make_scoped_guard([=]{ close(fd); });
+	if (evio_setsockopt_client(fd, addr->sa_family, SOCK_STREAM) != 0)
+		diag_raise();
+	if (sio_connect(fd, addr, len) == 0) {
+		fd_guard.is_active = false;
+		return fd;
 	}
 	if (errno != EINPROGRESS)
 		diag_raise();
@@ -91,24 +91,20 @@ coio_connect_addr(struct ev_io *coio, struct sockaddr *addr,
 	 * Wait until socket is ready for writing or
 	 * timed out.
 	 */
-	ev_io_set(coio, coio->fd, EV_WRITE);
-	ev_io_start(loop, coio);
-	bool is_timedout = coio_fiber_yield_timeout(coio, timeout);
-	ev_io_stop(loop, coio);
+	int revents = coio_wait(fd, EV_WRITE, timeout);
 	fiber_testcancel();
-	if (is_timedout)
+	if (revents == 0)
 		tnt_raise(TimedOut);
 	int error = EINPROGRESS;
 	socklen_t sz = sizeof(error);
-	if (sio_getsockopt(coio->fd, SOL_SOCKET, SO_ERROR,
-		       &error, &sz))
+	if (sio_getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &sz))
 		diag_raise();
 	if (error != 0) {
 		errno = error;
-		tnt_raise(SocketError, sio_socketname(coio->fd), "connect");
+		tnt_raise(SocketError, sio_socketname(fd), "connect");
 	}
-	coio_guard.is_active = false;
-	return 0;
+	fd_guard.is_active = false;
+	return fd;
 }
 
 void
@@ -152,13 +148,13 @@ coio_fill_addrinfo(struct addrinfo *ai_local, const char *host,
  * This function also supports UNIX domain sockets if uri->path is not NULL and
  * uri->service is NULL.
  *
- * @retval -1 timeout
- * @retval 0 connected
+ * @retval socket fd
  */
 int
-coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
+coio_connect_timeout(struct uri *uri, struct sockaddr *addr,
 		     socklen_t *addr_len, ev_tstamp timeout)
 {
+	int fd = -1;
 	char host[URI_MAXHOST] = { '\0' };
 	if (uri->host) {
 		snprintf(host, sizeof(host), "%.*s", (int) uri->host_len,
@@ -177,15 +173,14 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 		struct sockaddr_un un;
 		snprintf(un.sun_path, sizeof(un.sun_path), "%s", service);
 		un.sun_family = AF_UNIX;
-		if (coio_connect_addr(coio, (struct sockaddr *) &un, sizeof(un),
-				      delay) != 0)
-			return -1;
+		fd = coio_connect_addr((struct sockaddr *)&un, sizeof(un),
+				       delay);
 		if (addr != NULL) {
 			assert(addr_len != NULL);
 			*addr_len = MIN(sizeof(un), *addr_len);
 			memcpy(addr, &un, *addr_len);
 		}
-		return 0;
+		return fd;
 	}
 
 	struct addrinfo *ai = NULL;
@@ -213,18 +208,16 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 	evio_timeout_update(loop(), &start, &delay);
 
 	coio_timeout_init(&start, &delay, timeout);
-	assert(! evio_has_fd(coio));
 	while (ai) {
 		try {
-			if (coio_connect_addr(coio, ai->ai_addr,
-					      ai->ai_addrlen, delay))
-				return -1;
+			fd = coio_connect_addr(ai->ai_addr, ai->ai_addrlen,
+					       delay);
 			if (addr != NULL) {
 				assert(addr_len != NULL);
 				*addr_len = MIN(ai->ai_addrlen, *addr_len);
 				memcpy(addr, ai->ai_addr, *addr_len);
 			}
-			return 0; /* connected */
+			return fd; /* connected */
 		} catch (SocketError *e) {
 			if (ai->ai_next == NULL)
 				throw;
@@ -235,7 +228,7 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 		coio_timeout_update(&start, &delay);
 	}
 
-	tnt_raise(SocketError, sio_socketname(coio->fd), "connection failed");
+	tnt_raise(SocketError, sio_socketname(fd), "connection failed");
 }
 
 /**

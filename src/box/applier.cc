@@ -338,7 +338,7 @@ applier_connect(struct applier *applier)
 	 */
 	applier->addr_len = sizeof(applier->addrstorage);
 	applier_set_state(applier, APPLIER_CONNECT);
-	coio_connect(coio, uri, &applier->addr, &applier->addr_len);
+	coio->fd = coio_connect(uri, &applier->addr, &applier->addr_len);
 	assert(coio->fd >= 0);
 	coio_readn(coio, greetingbuf, IPROTO_GREETING_SIZE);
 	applier->last_row_time = ev_monotonic_now(loop());
