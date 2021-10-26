@@ -17,7 +17,6 @@ set(core_sources
     coio_task.c
     coio_file.c
     popen.c
-    coio_buf.cc
     fio.c
     exception.cc
     errinj.c
