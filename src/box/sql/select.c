@@ -3566,6 +3566,7 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 				}
 				pNew->flags |= EP_IntValue;
 				pNew->u.iValue = i;
+				pNew->type = FIELD_TYPE_INTEGER;
 				pOrderBy = sql_expr_list_append(pParse->db,
 								pOrderBy, pNew);
 				if (pOrderBy)

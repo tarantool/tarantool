@@ -928,6 +928,7 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 				}
 				pNew->flags |= EP_IntValue;
 				pNew->u.iValue = iCol;
+				pNew->type = FIELD_TYPE_INTEGER;
 				if (pItem->pExpr == pE) {
 					pItem->pExpr = pNew;
 				} else {

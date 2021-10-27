@@ -1010,6 +1010,7 @@ sql_expr_new_int(struct sql *db, int value)
 {
 	struct Expr *e = sql_expr_new_empty(db, TK_INTEGER, 0);
 	if (e != NULL) {
+		e->type = FIELD_TYPE_INTEGER;
 		e->flags |= EP_IntValue;
 		e->u.iValue = value;
 	}
@@ -3917,6 +3918,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				return target;
 			} else {
 				tempX.op = TK_INTEGER;
+				tempX.type = FIELD_TYPE_INTEGER;
 				tempX.flags = EP_IntValue | EP_TokenOnly;
 				tempX.u.iValue = 0;
 				r1 = sqlExprCodeTemp(pParse, &tempX,
