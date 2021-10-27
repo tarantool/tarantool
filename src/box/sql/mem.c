@@ -1375,7 +1375,7 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 int
 mem_cast_implicit(struct Mem *mem, enum field_type type)
 {
-	if (mem->type == MEM_TYPE_NULL || type == FIELD_TYPE_ANY)
+	if (mem->type == MEM_TYPE_NULL || type == field_type_MAX)
 		return 0;
 	if ((mem->flags & MEM_Scalar) != 0 && type != FIELD_TYPE_SCALAR)
 		return -1;

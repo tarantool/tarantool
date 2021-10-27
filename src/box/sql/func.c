@@ -1699,10 +1699,10 @@ static struct sql_func_definition definitions[] = {
 	{"CHAR", -1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_STRING, func_char, NULL},
 	{"CHAR_LENGTH", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_INTEGER,
 	 func_char_length, NULL},
-	{"COALESCE", -1, {FIELD_TYPE_ANY}, FIELD_TYPE_SCALAR, sql_builtin_stub,
+	{"COALESCE", -1, {field_type_MAX}, FIELD_TYPE_SCALAR, sql_builtin_stub,
 	 NULL},
 	{"COUNT", 0, {}, FIELD_TYPE_INTEGER, step_count, fin_count},
-	{"COUNT", 1, {FIELD_TYPE_ANY}, FIELD_TYPE_INTEGER, step_count,
+	{"COUNT", 1, {field_type_MAX}, FIELD_TYPE_INTEGER, step_count,
 	 fin_count},
 
 	{"GREATEST", -1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER,
@@ -1730,7 +1730,7 @@ static struct sql_func_definition definitions[] = {
 	 FIELD_TYPE_VARBINARY, step_group_concat, NULL},
 
 	{"HEX", 1, {FIELD_TYPE_VARBINARY}, FIELD_TYPE_STRING, func_hex, NULL},
-	{"IFNULL", 2, {FIELD_TYPE_ANY, FIELD_TYPE_ANY}, FIELD_TYPE_SCALAR,
+	{"IFNULL", 2, {field_type_MAX, field_type_MAX}, FIELD_TYPE_SCALAR,
 	 sql_builtin_stub, NULL},
 
 	{"LEAST", -1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER,
@@ -1756,9 +1756,9 @@ static struct sql_func_definition definitions[] = {
 	 FIELD_TYPE_BOOLEAN, likeFunc, NULL},
 	{"LIKE", 3, {FIELD_TYPE_STRING, FIELD_TYPE_STRING, FIELD_TYPE_STRING},
 	 FIELD_TYPE_BOOLEAN, likeFunc, NULL},
-	{"LIKELIHOOD", 2, {FIELD_TYPE_ANY, FIELD_TYPE_DOUBLE},
+	{"LIKELIHOOD", 2, {field_type_MAX, FIELD_TYPE_DOUBLE},
 	 FIELD_TYPE_BOOLEAN, sql_builtin_stub, NULL},
-	{"LIKELY", 1, {FIELD_TYPE_ANY}, FIELD_TYPE_BOOLEAN, sql_builtin_stub,
+	{"LIKELY", 1, {field_type_MAX}, FIELD_TYPE_BOOLEAN, sql_builtin_stub,
 	 NULL},
 	{"LOWER", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, func_lower_upper,
 	 NULL},
@@ -1781,14 +1781,14 @@ static struct sql_func_definition definitions[] = {
 	{"MIN", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, step_minmax, NULL},
 	{"MIN", 1, {FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR, step_minmax, NULL},
 
-	{"NULLIF", 2, {FIELD_TYPE_ANY, FIELD_TYPE_ANY}, FIELD_TYPE_SCALAR,
+	{"NULLIF", 2, {field_type_MAX, field_type_MAX}, FIELD_TYPE_SCALAR,
 	 func_nullif, NULL},
 	{"POSITION", 2, {FIELD_TYPE_STRING, FIELD_TYPE_STRING},
 	 FIELD_TYPE_INTEGER, func_position_characters, NULL},
 	{"POSITION", 2, {FIELD_TYPE_VARBINARY, FIELD_TYPE_VARBINARY},
 	 FIELD_TYPE_INTEGER, func_position_octets, NULL},
-	{"PRINTF", -1, {FIELD_TYPE_ANY}, FIELD_TYPE_STRING, func_printf, NULL},
-	{"QUOTE", 1, {FIELD_TYPE_ANY}, FIELD_TYPE_STRING, quoteFunc, NULL},
+	{"PRINTF", -1, {field_type_MAX}, FIELD_TYPE_STRING, func_printf, NULL},
+	{"QUOTE", 1, {field_type_MAX}, FIELD_TYPE_STRING, quoteFunc, NULL},
 	{"RANDOM", 0, {}, FIELD_TYPE_INTEGER, func_random, NULL},
 	{"RANDOMBLOB", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_VARBINARY,
 	 func_randomblob, NULL},
@@ -1831,10 +1831,10 @@ static struct sql_func_definition definitions[] = {
 	 {FIELD_TYPE_VARBINARY, FIELD_TYPE_INTEGER, FIELD_TYPE_VARBINARY},
 	 FIELD_TYPE_VARBINARY, func_trim_bin, NULL},
 
-	{"TYPEOF", 1, {FIELD_TYPE_ANY}, FIELD_TYPE_STRING, func_typeof, NULL},
+	{"TYPEOF", 1, {field_type_MAX}, FIELD_TYPE_STRING, func_typeof, NULL},
 	{"UNICODE", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_INTEGER, func_unicode,
 	 NULL},
-	{"UNLIKELY", 1, {FIELD_TYPE_ANY}, FIELD_TYPE_BOOLEAN, sql_builtin_stub,
+	{"UNLIKELY", 1, {field_type_MAX}, FIELD_TYPE_BOOLEAN, sql_builtin_stub,
 	 NULL},
 	{"UPPER", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, func_lower_upper,
 	 NULL},
@@ -1881,7 +1881,7 @@ built_in_func_put(struct sql_func_dictionary *dict)
 static inline bool
 is_exact(int op, enum field_type a, enum field_type b)
 {
-	return op == TK_NULL || a == b || a == FIELD_TYPE_ANY ||
+	return op == TK_NULL || a == b || a == field_type_MAX ||
 	       (a == FIELD_TYPE_INTEGER && b == FIELD_TYPE_UNSIGNED);
 }
 
