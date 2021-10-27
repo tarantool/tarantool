@@ -270,7 +270,7 @@ columnlist ::= tcons.
   QUERY KEY OFFSET RAISE RELEASE REPLACE RESTRICT
   RENAME CTIME_KW IF ENABLE DISABLE UUID
   .
-%wildcard ANY.
+%wildcard WILDCARD.
 
 
 // And "ids" is an identifer-or-string.
@@ -1841,6 +1841,7 @@ typedef(A) ::= BOOL . { A.type = FIELD_TYPE_BOOLEAN; }
 typedef(A) ::= BOOLEAN . { A.type = FIELD_TYPE_BOOLEAN; }
 typedef(A) ::= VARBINARY . { A.type = FIELD_TYPE_VARBINARY; }
 typedef(A) ::= UUID . { A.type = FIELD_TYPE_UUID; }
+typedef(A) ::= ANY . { A.type = FIELD_TYPE_ANY; }
 
 /**
  * Time-like types are temporary disabled, until they are

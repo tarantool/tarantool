@@ -1934,7 +1934,9 @@ case OP_Column: {
 	/* Currently PSEUDO cursor does not have info about field types. */
 	if (pC->eCurType == CURTYPE_TARANTOOL)
 		field_type = pC->uc.pCursor->space->def->fields[p2].type;
-	if (field_type == FIELD_TYPE_SCALAR)
+	if (field_type == FIELD_TYPE_ANY)
+		pDest->flags |= MEM_Any;
+	else if (field_type == FIELD_TYPE_SCALAR)
 		pDest->flags |= MEM_Scalar;
 	else if (field_type == FIELD_TYPE_NUMBER)
 		pDest->flags |= MEM_Number;

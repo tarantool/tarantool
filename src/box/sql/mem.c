@@ -658,7 +658,7 @@ str_to_bin(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_STR);
 	mem->type = MEM_TYPE_BIN;
-	mem->flags &= ~MEM_Scalar;
+	mem->flags &= ~(MEM_Scalar | MEM_Any);
 	return 0;
 }
 
@@ -705,7 +705,7 @@ bin_to_str(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_BIN);
 	mem->type = MEM_TYPE_STR;
-	mem->flags &= ~MEM_Scalar;
+	mem->flags &= ~(MEM_Scalar | MEM_Any);
 	return 0;
 }
 
@@ -1262,7 +1262,7 @@ mem_to_str(struct Mem *mem)
 	assert(mem->type < MEM_TYPE_INVALID);
 	switch (mem->type) {
 	case MEM_TYPE_STR:
-		mem->flags &= ~MEM_Scalar;
+		mem->flags &= ~(MEM_Scalar | MEM_Any);
 		return 0;
 	case MEM_TYPE_INT:
 	case MEM_TYPE_UINT:
@@ -1326,7 +1326,7 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 		if (mem->type == MEM_TYPE_STR)
 			return str_to_bin(mem);
 		if (mem_is_bytes(mem)) {
-			mem->flags &= ~MEM_Scalar;
+			mem->flags &= ~(MEM_Scalar | MEM_Any);
 			return 0;
 		}
 		if (mem->type == MEM_TYPE_UUID)
@@ -1364,7 +1364,11 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 		if ((mem->type & (MEM_TYPE_MAP | MEM_TYPE_ARRAY)) != 0)
 			return -1;
 		mem->flags |= MEM_Scalar;
-		mem->flags &= ~MEM_Number;
+		mem->flags &= ~(MEM_Number | MEM_Any);
+		return 0;
+	case FIELD_TYPE_ANY:
+		mem->flags |= MEM_Any;
+		mem->flags &= ~(MEM_Number | MEM_Scalar);
 		return 0;
 	default:
 		break;
@@ -1377,11 +1381,21 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 {
 	if (mem->type == MEM_TYPE_NULL || type == field_type_MAX)
 		return 0;
-	if ((mem->flags & MEM_Scalar) != 0 && type != FIELD_TYPE_SCALAR)
-		return -1;
-	if ((mem->flags & MEM_Number) != 0 && type != FIELD_TYPE_SCALAR &&
-	    type != FIELD_TYPE_NUMBER)
-		return -1;
+	if (mem_is_metatype(mem) && type != FIELD_TYPE_ANY) {
+		if ((mem->flags & MEM_Number) != 0) {
+			if (type != FIELD_TYPE_NUMBER &&
+			    type != FIELD_TYPE_SCALAR &&
+			    type != FIELD_TYPE_ANY)
+				return -1;
+		} else if ((mem->flags & MEM_Scalar) != 0) {
+			if (type != FIELD_TYPE_SCALAR &&
+			    type != FIELD_TYPE_ANY)
+				return -1;
+		} else {
+			if (type != FIELD_TYPE_ANY)
+				return -1;
+		}
+	}
 	switch (type) {
 	case FIELD_TYPE_UNSIGNED:
 		if (mem->type == MEM_TYPE_UINT) {
@@ -1395,7 +1409,7 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 		return -1;
 	case FIELD_TYPE_STRING:
 		if (mem->type == MEM_TYPE_STR) {
-			mem->flags &= ~MEM_Scalar;
+			mem->flags &= ~(MEM_Scalar | MEM_Any);
 			return 0;
 		}
 		return -1;
@@ -1430,7 +1444,7 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 	case FIELD_TYPE_VARBINARY:
 		if ((mem->type & (MEM_TYPE_BIN | MEM_TYPE_MAP |
 				  MEM_TYPE_ARRAY)) != 0) {
-			mem->flags &= ~MEM_Scalar;
+			mem->flags &= ~(MEM_Scalar | MEM_Any);
 			return 0;
 		}
 		return -1;
@@ -1465,7 +1479,7 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 		if ((mem->type & (MEM_TYPE_MAP | MEM_TYPE_ARRAY)) != 0)
 			return -1;
 		mem->flags |= MEM_Scalar;
-		mem->flags &= ~MEM_Number;
+		mem->flags &= ~(MEM_Number | MEM_Any);
 		return 0;
 	case FIELD_TYPE_UUID:
 		if (mem->type != MEM_TYPE_UUID)
@@ -1473,6 +1487,8 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 		mem->flags = 0;
 		return 0;
 	case FIELD_TYPE_ANY:
+		mem->flags |= MEM_Any;
+		mem->flags &= ~(MEM_Number | MEM_Scalar);
 		return 0;
 	default:
 		break;
@@ -2417,6 +2433,11 @@ mem_cmp(const struct Mem *a, const struct Mem *b, int *result,
 			*result = 1;
 		return 0;
 	}
+	if (((a->flags | b->flags) & MEM_Any) != 0) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(a),
+			 "comparable type");
+		return -1;
+	}
 	if (((a->flags | b->flags) & MEM_Scalar) != 0) {
 		*result = mem_cmp_scalar(a, b, coll);
 		return 0;
@@ -2452,6 +2473,8 @@ char *
 mem_type_to_str(const struct Mem *p)
 {
 	assert(p != NULL);
+	if ((p->flags & MEM_Any) != 0)
+		return "any";
 	if ((p->flags & MEM_Scalar) != 0)
 		return "scalar";
 	if ((p->flags & MEM_Number) != 0)

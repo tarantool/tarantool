@@ -97,6 +97,8 @@ struct Mem {
 #define MEM_Number    0x0001
 /** MEM is of SCALAR meta-type. */
 #define MEM_Scalar    0x0002
+/** MEM is of ANY meta-type. */
+#define MEM_Any       0x0004
 #define MEM_Cleared   0x0200	/* NULL set by OP_Null, not from data */
 #define MEM_Static    0x1000	/* Mem.z points to a static string */
 #define MEM_Ephem     0x2000	/* Mem.z points to an ephemeral string */
@@ -136,7 +138,7 @@ mem_is_num(const struct Mem *mem)
 static inline bool
 mem_is_metatype(const struct Mem *mem)
 {
-	return (mem->flags & (MEM_Number | MEM_Scalar)) != 0;
+	return (mem->flags & (MEM_Number | MEM_Scalar | MEM_Any)) != 0;
 }
 
 static inline bool

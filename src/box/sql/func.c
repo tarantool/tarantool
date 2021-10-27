@@ -1781,7 +1781,7 @@ static struct sql_func_definition definitions[] = {
 	{"MIN", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, step_minmax, NULL},
 	{"MIN", 1, {FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR, step_minmax, NULL},
 
-	{"NULLIF", 2, {field_type_MAX, field_type_MAX}, FIELD_TYPE_SCALAR,
+	{"NULLIF", 2, {FIELD_TYPE_SCALAR, FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR,
 	 func_nullif, NULL},
 	{"POSITION", 2, {FIELD_TYPE_STRING, FIELD_TYPE_STRING},
 	 FIELD_TYPE_INTEGER, func_position_characters, NULL},
