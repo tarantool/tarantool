@@ -93,7 +93,6 @@ BuildRequires: libunwind-devel
 %endif
 
 # Set dependences for tests.
-%ifnarch aarch64
 BuildRequires: python3
 BuildRequires: python3-six
 BuildRequires: python3-gevent
@@ -101,7 +100,6 @@ BuildRequires: python3-gevent
 BuildRequires: python3-PyYAML
 %else
 BuildRequires: python3-pyyaml
-%endif
 %endif
 
 # Install prove to run LuaJIT tests.
@@ -202,10 +200,8 @@ make %{?_smp_mflags}
 # %%doc and %%license macroses are used instead
 rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
 
-%ifnarch aarch64
 %check
 make test-force
-%endif
 
 %pre
 /usr/sbin/groupadd -r tarantool > /dev/null 2>&1 || :
