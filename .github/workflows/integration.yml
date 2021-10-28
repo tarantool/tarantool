@@ -58,3 +58,9 @@ jobs:
     uses: tarantool/checks/.github/workflows/reusable_testing.yml@master
     with:
       artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+
+  mysql:
+    needs: tarantool
+    uses: tarantool/mysql/.github/workflows/reusable_testing.yml@master
+    with:
+      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
