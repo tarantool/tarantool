@@ -545,6 +545,7 @@ tx_status_update(struct cmsg *msg)
 	struct replication_ack ack;
 	ack.source = status->relay->replica->id;
 	ack.vclock = &status->vclock;
+	bool anon = status->relay->replica->anon;
 	/*
 	 * Let pending synchronous transactions know, which of
 	 * them were successfully sent to the replica. Acks are
@@ -552,7 +553,7 @@ tx_status_update(struct cmsg *msg)
 	 * the single master in 100% so far). Other instances wait
 	 * for master's CONFIRM message instead.
 	 */
-	if (txn_limbo.owner_id == instance_id) {
+	if (txn_limbo.owner_id == instance_id && !anon) {
 		txn_limbo_ack(&txn_limbo, ack.source,
 			      vclock_get(ack.vclock, instance_id));
 	}
