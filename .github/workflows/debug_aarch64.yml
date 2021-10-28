@@ -1,4 +1,4 @@
-name: odroid_arm64
+name: debug_aarch64
 
 on:
   push:
@@ -11,14 +11,14 @@ env:
   CI_MAKE: make -f .travis.mk
 
 jobs:
-  odroid_arm64:
+  debug_aarch64:
     # We want to run on external PRs, but not on our own internal PRs
     # as they'll be run by the push to the branch.
     if: ( github.event_name == 'push' ||
         github.event.pull_request.head.repo.full_name != github.repository ) &&
         ! endsWith(github.ref, '-notest')
 
-    runs-on: odroid-arm64
+    runs-on: graviton
 
     strategy:
       fail-fast: false
@@ -28,7 +28,9 @@ jobs:
       - uses: ./.github/actions/environment
       - name: test
         env:
-          CMAKE_BUILD_TYPE: RelWithDebInfo
+          CMAKE_BUILD_TYPE: Debug
+          # FIXME: disabled '-Wtype-limits' flag till #6143 is fixed.
+          CMAKE_EXTRA_PARAMS: '-DCMAKE_C_FLAGS="-Wno-type-limits "'
         run: ${CI_MAKE} test_odroid_arm64
       - name: call action to send Telegram message on failure
         env:
@@ -40,6 +42,6 @@ jobs:
         uses: actions/upload-artifact@v2
         if: failure()
         with:
-          name: odroid_arm64
+          name: odroid_debug_arm64
           retention-days: 21
           path: /tmp/tnt/artifacts

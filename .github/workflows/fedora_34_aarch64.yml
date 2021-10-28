@@ -1,4 +1,4 @@
-name: ubuntu_20_04_arm
+name: fedora_34_aarch64
 
 on:
   push:
@@ -8,14 +8,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  ubuntu_20_04_arm:
+  fedora_34_aarch64:
     # We want to run on external PRs, but not on our own internal PRs
     # as they'll be run by the push to the branch.
     if: ( github.event_name == 'push' ||
         github.event.pull_request.head.repo.full_name != github.repository ) &&
         ! endsWith(github.ref, '-notest')
 
-    runs-on: odroid-arm64
+    runs-on: graviton
 
     strategy:
       fail-fast: false
@@ -41,8 +41,8 @@ jobs:
           RELEASE_REPO_S3_DIR: ${{ secrets.RELEASE_REPO_S3_DIR }}
           GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
           GPG_SIGN_KEY: ${{ secrets.GPG_SIGN_KEY }}
-          OS: 'ubuntu'
-          DIST: 'focal'
+          OS: 'fedora'
+          DIST: '34'
         uses: ./.github/actions/pack_and_deploy
       - name: call action to send Telegram message on failure
         env:
@@ -54,6 +54,6 @@ jobs:
         uses: actions/upload-artifact@v2
         if: failure()
         with:
-          name: ubuntu-focal
+          name: fedora-34
           retention-days: 21
           path: build/usr/src/*/tarantool-*/test/var/artifacts
