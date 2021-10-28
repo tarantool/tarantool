@@ -11,9 +11,11 @@ jobs:
   centos_7_aarch64:
     # We want to run on external PRs, but not on our own internal PRs
     # as they'll be run by the push to the branch.
-    if: ( github.event_name == 'push' ||
-        github.event.pull_request.head.repo.full_name != github.repository ) &&
-        ! endsWith(github.ref, '-notest')
+    # FIXME: Testing and deploy for aarch64 is disabled temporarily.
+    if: (0 &&
+         (github.event_name == 'push' ||
+           github.event.pull_request.head.repo.full_name != github.repository ) &&
+           ! endsWith(github.ref, '-notest'))
 
     runs-on: graviton
 
