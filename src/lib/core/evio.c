@@ -39,33 +39,6 @@
 #include <trivia/util.h>
 #include "exception.h"
 
-/** Note: this function does not throw. */
-void
-evio_close(ev_loop *loop, struct ev_io *evio)
-{
-	/* Stop I/O events. Safe to do even if not started. */
-	ev_io_stop(loop, evio);
-	/* Close the socket. */
-	close(evio->fd);
-	/* Make sure evio_has_fd() returns a proper value. */
-	evio->fd = -1;
-}
-
-/**
- * Create an endpoint for communication.
- * Set socket as non-block and apply protocol specific options.
- */
-int
-evio_socket(struct ev_io *coio, int domain, int type, int protocol)
-{
-	assert(coio->fd == -1);
-	/* Don't leak fd if setsockopt fails. */
-	coio->fd = sio_socket(domain, type, protocol);
-	if (coio->fd < 0)
-		return -1;
-	return evio_setsockopt_client(coio->fd, domain, type);
-}
-
 static int
 evio_setsockopt_keepalive(int fd)
 {

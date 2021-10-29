@@ -125,12 +125,6 @@ evio_service_detach(struct evio_service *service);
 void
 evio_service_stop(struct evio_service *service);
 
-int
-evio_socket(struct ev_io *coio, int domain, int type, int protocol);
-
-void
-evio_close(ev_loop *loop, struct ev_io *evio);
-
 static inline bool
 evio_service_is_active(struct evio_service *service)
 {
