@@ -1213,6 +1213,19 @@ local function upgrade_to_2_9_1()
 end
 
 --------------------------------------------------------------------------------
+-- Tarantool 2.10.1
+--------------------------------------------------------------------------------
+local function grant_rw_access_on__session_settings_to_role_public()
+    local _priv = box.space[box.schema.PRIV_ID]
+    log.info("grant read,write access on _session_settings space to public role")
+    _priv:insert({ADMIN, PUBLIC, 'space', box.schema.SESSION_SETTINGS_ID,
+                  box.priv.R + box.priv.W})
+end
+
+local function upgrade_to_2_10_1()
+    grant_rw_access_on__session_settings_to_role_public()
+end
+--------------------------------------------------------------------------------
 
 local handlers = {
     {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5, auto=true},
@@ -1229,6 +1242,7 @@ local handlers = {
     {version = mkversion(2, 3, 1), func = upgrade_to_2_3_1, auto = true},
     {version = mkversion(2, 7, 1), func = upgrade_to_2_7_1, auto = true},
     {version = mkversion(2, 9, 1), func = upgrade_to_2_9_1, auto = true},
+    {version = mkversion(2, 10, 1), func = upgrade_to_2_10_1, auto = true},
 }
 
 -- Schema version of the snapshot.
