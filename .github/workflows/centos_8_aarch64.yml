@@ -2,18 +2,20 @@ name: centos_8_aarch64
 
 on:
   push:
-  pull_request:
+    branches:
+      - 'master'
+      - '[0-9].[0-9]+'
+      - '**-full-ci'
+    tags:
+      - '**'
   repository_dispatch:
     types: [backend_automation]
   workflow_dispatch:
 
 jobs:
   centos_8_aarch64:
-    # We want to run on external PRs, but not on our own internal PRs
-    # as they'll be run by the push to the branch.
-    if: ( github.event_name == 'push' ||
-        github.event.pull_request.head.repo.full_name != github.repository ) &&
-        ! endsWith(github.ref, '-notest')
+    # The job works on our own runners, forks do not have them.
+    if: github.repository == 'tarantool/tarantool'
 
     runs-on: graviton
 
