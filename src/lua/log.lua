@@ -427,7 +427,7 @@ local function box_api_cfg_set_log_level()
 
     local ok, msg = verify_option(log_key, v)
     if not ok then
-        return false, msg
+        box.error(box.error.CFG, 'log_level', msg)
     end
 
     if type(v) == 'string' then
@@ -435,7 +435,6 @@ local function box_api_cfg_set_log_level()
     end
 
     set_log_level(v, false)
-    return true
 end
 
 -- Set logging format from reloading box.cfg{}
@@ -445,11 +444,10 @@ local function box_api_set_log_format()
 
     local ok, msg = verify_option(log_key, v)
     if not ok then
-        return false, msg
+        box.error(box.error.CFG, 'log_format', msg)
     end
 
     set_log_format(v, false)
-    return true
 end
 
 -- Reload dynamic options.
