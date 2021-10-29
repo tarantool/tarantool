@@ -39,6 +39,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct iostream;
 struct sockaddr;
 struct uri;
 
@@ -69,22 +70,9 @@ int
 coio_accept(int sfd, struct sockaddr *addr, socklen_t addrlen,
 	    ev_tstamp timeout);
 
-void
-coio_create(struct ev_io *coio, int fd);
-
-/*
- * Due to name conflict with coio_close in API_EXPORT
- * we have to use coio_close_io() instead of plain coio_close().
- */
-static inline void
-coio_close_io(ev_loop *loop, struct ev_io *coio)
-{
-	return evio_close(loop, coio);
-}
-
 ssize_t
-coio_read_ahead_timeout(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz,
-		        ev_tstamp timeout);
+coio_read_ahead_timeout(struct iostream *io, void *buf, size_t sz,
+			size_t bufsiz, ev_tstamp timeout);
 
 static inline void
 coio_timeout_init(ev_tstamp *start, ev_tstamp *delay,
@@ -105,24 +93,24 @@ coio_timeout_update(ev_tstamp *start, ev_tstamp *delay)
  * Returns 0 in case of EOF.
  */
 static inline ssize_t
-coio_read_ahead(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz)
+coio_read_ahead(struct iostream *io, void *buf, size_t sz, size_t bufsiz)
 {
-	return coio_read_ahead_timeout(coio, buf, sz, bufsiz, TIMEOUT_INFINITY);
+	return coio_read_ahead_timeout(io, buf, sz, bufsiz, TIMEOUT_INFINITY);
 }
 
 ssize_t
-coio_readn_ahead(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz);
+coio_readn_ahead(struct iostream *io, void *buf, size_t sz, size_t bufsiz);
 
 static inline ssize_t
-coio_read(struct ev_io *coio, void *buf, size_t sz)
+coio_read(struct iostream *io, void *buf, size_t sz)
 {
-	return coio_read_ahead(coio, buf, sz, sz);
+	return coio_read_ahead(io, buf, sz, sz);
 }
 
 static inline ssize_t
-coio_read_timeout(struct ev_io *coio, void *buf, size_t sz, ev_tstamp timeout)
+coio_read_timeout(struct iostream *io, void *buf, size_t sz, ev_tstamp timeout)
 {
-	return coio_read_ahead_timeout(coio, buf, sz, sz, timeout);
+	return coio_read_ahead_timeout(io, buf, sz, sz, timeout);
 }
 
 /**
@@ -145,21 +133,21 @@ coio_read_timeout(struct ev_io *coio, void *buf, size_t sz, ev_tstamp timeout)
  * - FiberIsCancelled: cancelled by an outside code.
  */
 ssize_t
-coio_read_ahead_timeout_noxc(struct ev_io *coio, void *buf, size_t sz,
+coio_read_ahead_timeout_noxc(struct iostream *io, void *buf, size_t sz,
 			     size_t bufsiz, ev_tstamp timeout);
 
 static inline ssize_t
-coio_readn(struct ev_io *coio, void *buf, size_t sz)
+coio_readn(struct iostream *io, void *buf, size_t sz)
 {
-	return coio_readn_ahead(coio, buf, sz, sz);
+	return coio_readn_ahead(io, buf, sz, sz);
 }
 
 ssize_t
-coio_readn_ahead_timeout(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz,
-		         ev_tstamp timeout);
+coio_readn_ahead_timeout(struct iostream *io, void *buf, size_t sz,
+			 size_t bufsiz, ev_tstamp timeout);
 
 ssize_t
-coio_write_timeout(struct ev_io *coio, const void *buf, size_t sz,
+coio_write_timeout(struct iostream *io, const void *buf, size_t sz,
 		   ev_tstamp timeout);
 
 /**
@@ -177,23 +165,23 @@ coio_write_timeout(struct ev_io *coio, const void *buf, size_t sz,
  * - FiberIsCancelled: cancelled by an outside code.
  */
 ssize_t
-coio_write_timeout_noxc(struct ev_io *coio, const void *buf, size_t sz,
+coio_write_timeout_noxc(struct iostream *io, const void *buf, size_t sz,
 			ev_tstamp timeout);
 
 static inline void
-coio_write(struct ev_io *coio, const void *buf, size_t sz)
+coio_write(struct iostream *io, const void *buf, size_t sz)
 {
-	coio_write_timeout(coio, buf, sz, TIMEOUT_INFINITY);
+	coio_write_timeout(io, buf, sz, TIMEOUT_INFINITY);
 }
 
 ssize_t
-coio_writev_timeout(struct ev_io *coio, struct iovec *iov, int iovcnt,
+coio_writev_timeout(struct iostream *io, struct iovec *iov, int iovcnt,
 		    size_t size, ev_tstamp timeout);
 
 static inline ssize_t
-coio_writev(struct ev_io *coio, struct iovec *iov, int iovcnt, size_t size)
+coio_writev(struct iostream *io, struct iovec *iov, int iovcnt, size_t size)
 {
-	return coio_writev_timeout(coio, iov, iovcnt, size, TIMEOUT_INFINITY);
+	return coio_writev_timeout(io, iov, iovcnt, size, TIMEOUT_INFINITY);
 }
 
 void

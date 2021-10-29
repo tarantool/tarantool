@@ -34,19 +34,19 @@
 extern "C" {
 #endif
 
-struct ev_io;
 struct ibuf;
+struct iostream;
 struct xrow_header;
 
 void
-coio_read_xrow(struct ev_io *coio, struct ibuf *in, struct xrow_header *row);
+coio_read_xrow(struct iostream *io, struct ibuf *in, struct xrow_header *row);
 
 void
-coio_read_xrow_timeout_xc(struct ev_io *coio, struct ibuf *in,
+coio_read_xrow_timeout_xc(struct iostream *io, struct ibuf *in,
 			  struct xrow_header *row, double timeout);
 
 void
-coio_write_xrow(struct ev_io *coio, const struct xrow_header *row);
+coio_write_xrow(struct iostream *io, const struct xrow_header *row);
 
 
 #if defined(__cplusplus)

@@ -12,8 +12,8 @@ extern "C" {
 
 #include <small/rlist.h>
 
+#include "iostream.h"
 #include "trivia/util.h"
-#include <tarantool_ev.h>
 
 /**
  * Describes popen object creation. This is API with Lua.
@@ -134,7 +134,7 @@ struct popen_handle {
 	ev_child		ev_sigchld;
 	struct rlist		list;
 	unsigned int		flags;
-	struct ev_io		ios[POPEN_FLAG_FD_STDEND_BIT];
+	struct iostream		ios[POPEN_FLAG_FD_STDEND_BIT];
 };
 
 /**

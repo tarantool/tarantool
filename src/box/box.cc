@@ -2612,7 +2612,7 @@ box_process_auth(struct auth_request *request, const char *salt)
 }
 
 void
-box_process_fetch_snapshot(struct ev_io *io, struct xrow_header *header)
+box_process_fetch_snapshot(struct iostream *io, struct xrow_header *header)
 {
 	assert(header->type == IPROTO_FETCH_SNAPSHOT);
 
@@ -2648,7 +2648,7 @@ box_process_fetch_snapshot(struct ev_io *io, struct xrow_header *header)
 }
 
 void
-box_process_register(struct ev_io *io, struct xrow_header *header)
+box_process_register(struct iostream *io, struct xrow_header *header)
 {
 	assert(header->type == IPROTO_REGISTER);
 
@@ -2733,7 +2733,7 @@ box_process_register(struct ev_io *io, struct xrow_header *header)
 }
 
 void
-box_process_join(struct ev_io *io, struct xrow_header *header)
+box_process_join(struct iostream *io, struct xrow_header *header)
 {
 	/*
 	 * Tarantool 1.7 JOIN protocol diagram (gh-1113)
@@ -2879,7 +2879,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 }
 
 void
-box_process_subscribe(struct ev_io *io, struct xrow_header *header)
+box_process_subscribe(struct iostream *io, struct xrow_header *header)
 {
 	assert(header->type == IPROTO_SUBSCRIBE);
 

@@ -35,6 +35,7 @@
 #include "xlog.h"
 #include "fiber.h"
 #include "fiber_cond.h"
+#include "iostream.h"
 #include "coio.h"
 #include "coio_buf.h"
 #include "wal.h"
@@ -160,8 +161,8 @@ static int
 applier_writer_f(va_list ap)
 {
 	struct applier *applier = va_arg(ap, struct applier *);
-	struct ev_io io;
-	coio_create(&io, applier->io.fd);
+	struct iostream io;
+	iostream_create(&io, applier->io.fd);
 
 	/* ID is permanent while applier is alive */
 	uint32_t replica_id = applier->instance_id;
@@ -239,6 +240,7 @@ applier_writer_f(va_list ap)
 		}
 		fiber_gc();
 	}
+	iostream_destroy(&io);
 	return 0;
 }
 
@@ -320,9 +322,9 @@ apply_row(struct xrow_header *row)
 void
 applier_connect(struct applier *applier)
 {
-	struct ev_io *io = &applier->io;
+	struct iostream *io = &applier->io;
 	struct ibuf *ibuf = &applier->ibuf;
-	if (io->fd >= 0)
+	if (iostream_is_initialized(io))
 		return;
 	char greetingbuf[IPROTO_GREETING_SIZE];
 	struct xrow_header row;
@@ -338,8 +340,8 @@ applier_connect(struct applier *applier)
 	 */
 	applier->addr_len = sizeof(applier->addrstorage);
 	applier_set_state(applier, APPLIER_CONNECT);
-	io->fd = coio_connect(uri, &applier->addr, &applier->addr_len);
-	assert(io->fd >= 0);
+	int fd = coio_connect(uri, &applier->addr, &applier->addr_len);
+	iostream_create(io, fd);
 	coio_readn(io, greetingbuf, IPROTO_GREETING_SIZE);
 	applier->last_row_time = ev_monotonic_now(loop());
 
@@ -421,7 +423,7 @@ done:
 static uint64_t
 applier_wait_snapshot(struct applier *applier)
 {
-	struct ev_io *io = &applier->io;
+	struct iostream *io = &applier->io;
 	struct ibuf *ibuf = &applier->ibuf;
 	struct xrow_header row;
 
@@ -511,7 +513,7 @@ static void
 applier_fetch_snapshot(struct applier *applier)
 {
 	/* Send FETCH SNAPSHOT request */
-	struct ev_io *io = &applier->io;
+	struct iostream *io = &applier->io;
 	struct xrow_header row;
 
 	memset(&row, 0, sizeof(row));
@@ -584,7 +586,7 @@ static void
 applier_register(struct applier *applier, bool was_anon)
 {
 	/* Send REGISTER request */
-	struct ev_io *io = &applier->io;
+	struct iostream *io = &applier->io;
 	struct xrow_header row;
 
 	memset(&row, 0, sizeof(row));
@@ -616,7 +618,7 @@ static void
 applier_join(struct applier *applier)
 {
 	/* Send JOIN request */
-	struct ev_io *io = &applier->io;
+	struct iostream *io = &applier->io;
 	struct xrow_header row;
 	uint64_t row_count;
 
@@ -649,7 +651,7 @@ applier_join(struct applier *applier)
 static struct applier_tx_row *
 applier_read_tx_row(struct applier *applier, double timeout)
 {
-	struct ev_io *io = &applier->io;
+	struct iostream *io = &applier->io;
 	struct ibuf *ibuf = &applier->ibuf;
 	size_t size;
 	struct applier_tx_row *tx_row =
@@ -1250,7 +1252,7 @@ static void
 applier_subscribe(struct applier *applier)
 {
 	/* Send SUBSCRIBE request */
-	struct ev_io *io = &applier->io;
+	struct iostream *io = &applier->io;
 	struct ibuf *ibuf = &applier->ibuf;
 	struct xrow_header row;
 	struct tt_uuid cluster_id = uuid_nil;
@@ -1434,8 +1436,8 @@ applier_disconnect(struct applier *applier, enum applier_state state)
 		fiber_join(applier->writer);
 		applier->writer = NULL;
 	}
-
-	coio_close_io(loop(), &applier->io);
+	if (iostream_is_initialized(&applier->io))
+		iostream_close(&applier->io);
 	/* Clear all unparsed input. */
 	ibuf_reinit(&applier->ibuf);
 	fiber_gc();
@@ -1653,7 +1655,7 @@ applier_new(const char *uri)
 			 "struct applier");
 		return NULL;
 	}
-	coio_create(&applier->io, -1);
+	iostream_clear(&applier->io);
 	ibuf_create(&applier->ibuf, &cord()->slabc, 1024);
 
 	/* uri_parse() sets pointers to applier->source buffer */
@@ -1676,8 +1678,8 @@ void
 applier_delete(struct applier *applier)
 {
 	assert(applier->reader == NULL && applier->writer == NULL);
+	assert(!iostream_is_initialized(&applier->io));
 	ibuf_destroy(&applier->ibuf);
-	assert(applier->io.fd == -1);
 	trigger_destroy(&applier->on_state);
 	diag_destroy(&applier->diag);
 	free(applier);

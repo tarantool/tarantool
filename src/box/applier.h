@@ -38,6 +38,7 @@
 #include <small/ibuf.h>
 
 #include "fiber_cond.h"
+#include "iostream.h"
 #include "trigger.h"
 #include "trivia/util.h"
 #include "uuid/tt_uuid.h"
@@ -114,8 +115,8 @@ struct applier {
 	};
 	/** Length of addr */
 	socklen_t addr_len;
-	/** EV watcher for I/O */
-	struct ev_io io;
+	/** I/O stream */
+	struct iostream io;
 	/** Input buffer */
 	struct ibuf ibuf;
 	/** Triggers invoked on state change */
