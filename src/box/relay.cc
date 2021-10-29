@@ -680,13 +680,11 @@ relay_reader_f(va_list ap)
 	struct fiber *relay_f = va_arg(ap, struct fiber *);
 
 	struct ibuf ibuf;
-	struct iostream io;
-	iostream_create(&io, relay->io.fd);
 	ibuf_create(&ibuf, &cord()->slabc, 1024);
 	try {
 		while (!fiber_is_cancelled()) {
 			struct xrow_header xrow;
-			coio_read_xrow_timeout_xc(&io, &ibuf, &xrow,
+			coio_read_xrow_timeout_xc(&relay->io, &ibuf, &xrow,
 					replication_disconnect_timeout());
 			xrow_decode_vclock_xc(&xrow, &relay->recv_vclock);
 			/*
@@ -707,7 +705,6 @@ relay_reader_f(va_list ap)
 		fiber_cancel(relay_f);
 	}
 	ibuf_destroy(&ibuf);
-	iostream_destroy(&io);
 	return 0;
 }
 
