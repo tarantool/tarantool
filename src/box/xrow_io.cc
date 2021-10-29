@@ -36,7 +36,7 @@
 #include "msgpuck/msgpuck.h"
 
 void
-coio_read_xrow(struct ev_io *io, struct ibuf *in, struct xrow_header *row)
+coio_read_xrow(struct iostream *io, struct ibuf *in, struct xrow_header *row)
 {
 	/* Read fixed header */
 	if (ibuf_used(in) < 1)
@@ -63,7 +63,7 @@ coio_read_xrow(struct ev_io *io, struct ibuf *in, struct xrow_header *row)
 }
 
 void
-coio_read_xrow_timeout_xc(struct ev_io *io, struct ibuf *in,
+coio_read_xrow_timeout_xc(struct iostream *io, struct ibuf *in,
 			  struct xrow_header *row, ev_tstamp timeout)
 {
 	ev_tstamp start, delay;
@@ -96,7 +96,7 @@ coio_read_xrow_timeout_xc(struct ev_io *io, struct ibuf *in,
 
 
 void
-coio_write_xrow(struct ev_io *io, const struct xrow_header *row)
+coio_write_xrow(struct iostream *io, const struct xrow_header *row)
 {
 	struct iovec iov[XROW_IOVMAX];
 	int iovcnt = xrow_to_iovec_xc(row, iov);

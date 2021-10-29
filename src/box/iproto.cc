@@ -2290,8 +2290,8 @@ tx_process_replication(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct iproto_connection *con = msg->connection;
-	struct ev_io io;
-	coio_create(&io, con->input.fd);
+	struct iostream io;
+	iostream_create(&io, con->input.fd);
 	assert(!in_txn());
 	try {
 		switch (msg->header.type) {
@@ -2332,6 +2332,7 @@ tx_process_replication(struct cmsg *m)
 		iproto_write_error(con->input.fd, e, ::schema_version,
 				   msg->header.sync);
 	}
+	iostream_destroy(&io);
 	tx_end_msg(msg);
 }
 

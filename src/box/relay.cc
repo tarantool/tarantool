@@ -43,6 +43,7 @@
 #include "coio_task.h"
 #include "engine.h"
 #include "gc.h"
+#include "iostream.h"
 #include "iproto_constants.h"
 #include "recovery.h"
 #include "replication.h"
@@ -106,7 +107,7 @@ struct relay {
 	/** The thread in which we relay data to the replica. */
 	struct cord cord;
 	/** Replica connection */
-	struct ev_io io;
+	struct iostream io;
 	/** Request sync */
 	uint64_t sync;
 	/** Recovery instance to read xlog from the disk */
@@ -272,6 +273,7 @@ relay_new(struct replica *replica)
 	assert(relay != NULL);
 
 	memset(relay, 0, sizeof(struct relay));
+	iostream_clear(&relay->io);
 	relay->replica = replica;
 	relay->last_row_time = ev_monotonic_now(loop());
 	fiber_cond_create(&relay->reader_cond);
@@ -300,7 +302,8 @@ relay_start(struct relay *relay, int fd, uint64_t sync,
 	 * box.info.replication.
 	 */
 	diag_clear(&relay->diag);
-	coio_create(&relay->io, fd);
+	assert(!iostream_is_initialized(&relay->io));
+	iostream_create(&relay->io, fd);
 	relay->sync = sync;
 	relay->state = RELAY_FOLLOW;
 	relay->row_count = 0;
@@ -347,6 +350,7 @@ relay_stop(struct relay *relay)
 		free(gc_msg);
 	}
 	stailq_create(&relay->pending_gc);
+	iostream_destroy(&relay->io);
 	if (relay->r != NULL)
 		recovery_delete(relay->r);
 	relay->r = NULL;
@@ -370,6 +374,7 @@ relay_delete(struct relay *relay)
 {
 	if (relay->state == RELAY_FOLLOW)
 		relay_stop(relay);
+	assert(!iostream_is_initialized(&relay->io));
 	fiber_cond_destroy(&relay->reader_cond);
 	diag_destroy(&relay->diag);
 	TRASH(relay);
@@ -675,8 +680,8 @@ relay_reader_f(va_list ap)
 	struct fiber *relay_f = va_arg(ap, struct fiber *);
 
 	struct ibuf ibuf;
-	struct ev_io io;
-	coio_create(&io, relay->io.fd);
+	struct iostream io;
+	iostream_create(&io, relay->io.fd);
 	ibuf_create(&ibuf, &cord()->slabc, 1024);
 	try {
 		while (!fiber_is_cancelled()) {
@@ -702,6 +707,7 @@ relay_reader_f(va_list ap)
 		fiber_cancel(relay_f);
 	}
 	ibuf_destroy(&ibuf);
+	iostream_destroy(&io);
 	return 0;
 }
 

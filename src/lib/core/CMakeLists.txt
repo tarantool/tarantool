@@ -30,6 +30,7 @@ set(core_sources
     mp_decimal.c
     cord_buf.c
     datetime.c
+    iostream.c
 )
 
 if (TARGET_OS_NETBSD)
