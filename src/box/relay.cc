@@ -107,7 +107,7 @@ struct relay {
 	/** The thread in which we relay data to the replica. */
 	struct cord cord;
 	/** Replica connection */
-	struct iostream io;
+	struct iostream *io;
 	/** Request sync */
 	uint64_t sync;
 	/** Recovery instance to read xlog from the disk */
@@ -273,7 +273,6 @@ relay_new(struct replica *replica)
 	assert(relay != NULL);
 
 	memset(relay, 0, sizeof(struct relay));
-	iostream_clear(&relay->io);
 	relay->replica = replica;
 	relay->last_row_time = ev_monotonic_now(loop());
 	fiber_cond_create(&relay->reader_cond);
@@ -292,7 +291,7 @@ relay_yield(struct xstream *stream)
 }
 
 static void
-relay_start(struct relay *relay, int fd, uint64_t sync,
+relay_start(struct relay *relay, struct iostream *io, uint64_t sync,
 	     void (*stream_write)(struct xstream *, struct xrow_header *))
 {
 	xstream_create(&relay->stream, stream_write, relay_yield);
@@ -302,8 +301,7 @@ relay_start(struct relay *relay, int fd, uint64_t sync,
 	 * box.info.replication.
 	 */
 	diag_clear(&relay->diag);
-	assert(!iostream_is_initialized(&relay->io));
-	iostream_create(&relay->io, fd);
+	relay->io = io;
 	relay->sync = sync;
 	relay->state = RELAY_FOLLOW;
 	relay->row_count = 0;
@@ -350,7 +348,7 @@ relay_stop(struct relay *relay)
 		free(gc_msg);
 	}
 	stailq_create(&relay->pending_gc);
-	iostream_destroy(&relay->io);
+	relay->io = NULL;
 	if (relay->r != NULL)
 		recovery_delete(relay->r);
 	relay->r = NULL;
@@ -374,7 +372,6 @@ relay_delete(struct relay *relay)
 {
 	if (relay->state == RELAY_FOLLOW)
 		relay_stop(relay);
-	assert(!iostream_is_initialized(&relay->io));
 	fiber_cond_destroy(&relay->reader_cond);
 	diag_destroy(&relay->diag);
 	TRASH(relay);
@@ -397,14 +394,14 @@ relay_set_cord_name(int fd)
 }
 
 void
-relay_initial_join(int fd, uint64_t sync, struct vclock *vclock,
+relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 		   uint32_t replica_version_id)
 {
 	struct relay *relay = relay_new(NULL);
 	if (relay == NULL)
 		diag_raise();
 
-	relay_start(relay, fd, sync, relay_send_initial_join_row);
+	relay_start(relay, io, sync, relay_send_initial_join_row);
 	auto relay_guard = make_scoped_guard([=] {
 		relay_stop(relay);
 		relay_delete(relay);
@@ -441,7 +438,7 @@ relay_initial_join(int fd, uint64_t sync, struct vclock *vclock,
 	struct xrow_header row;
 	xrow_encode_vclock_xc(&row, vclock);
 	row.sync = sync;
-	coio_write_xrow(&relay->io, &row);
+	coio_write_xrow(relay->io, &row);
 
 	/*
 	 * Version is present starting with 2.7.3, 2.8.2, 2.9.1
@@ -476,7 +473,7 @@ relay_final_join_f(va_list ap)
 	auto guard = make_scoped_guard([=] { relay_exit(relay); });
 
 	coio_enable();
-	relay_set_cord_name(relay->io.fd);
+	relay_set_cord_name(relay->io->fd);
 
 	/* Send all WALs until stop_vclock */
 	assert(relay->stream.write != NULL);
@@ -487,14 +484,14 @@ relay_final_join_f(va_list ap)
 }
 
 void
-relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
-		 struct vclock *stop_vclock)
+relay_final_join(struct iostream *io, uint64_t sync,
+		 struct vclock *start_vclock, struct vclock *stop_vclock)
 {
 	struct relay *relay = relay_new(NULL);
 	if (relay == NULL)
 		diag_raise();
 
-	relay_start(relay, fd, sync, relay_send_row);
+	relay_start(relay, io, sync, relay_send_row);
 	auto relay_guard = make_scoped_guard([=] {
 		relay_stop(relay);
 		relay_delete(relay);
@@ -684,7 +681,7 @@ relay_reader_f(va_list ap)
 	try {
 		while (!fiber_is_cancelled()) {
 			struct xrow_header xrow;
-			coio_read_xrow_timeout_xc(&relay->io, &ibuf, &xrow,
+			coio_read_xrow_timeout_xc(relay->io, &ibuf, &xrow,
 					replication_disconnect_timeout());
 			xrow_decode_vclock_xc(&xrow, &relay->recv_vclock);
 			/*
@@ -820,7 +817,7 @@ relay_subscribe_f(va_list ap)
 	struct relay *relay = va_arg(ap, struct relay *);
 
 	coio_enable();
-	relay_set_cord_name(relay->io.fd);
+	relay_set_cord_name(relay->io->fd);
 
 	/* Create cpipe to tx for propagating vclock. */
 	cbus_endpoint_create(&relay->endpoint, tt_sprintf("relay_%p", relay),
@@ -948,7 +945,7 @@ relay_subscribe_f(va_list ap)
 
 /** Replication acceptor fiber handler. */
 void
-relay_subscribe(struct replica *replica, int fd, uint64_t sync,
+relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 		struct vclock *replica_clock, uint32_t replica_version_id,
 		uint32_t replica_id_filter)
 {
@@ -968,7 +965,7 @@ relay_subscribe(struct replica *replica, int fd, uint64_t sync,
 		gc_delay_unref();
 	}
 
-	relay_start(relay, fd, sync, relay_send_row);
+	relay_start(relay, io, sync, relay_send_row);
 	auto relay_guard = make_scoped_guard([=] {
 		relay_stop(relay);
 		replica_on_relay_stop(replica);
@@ -1002,7 +999,7 @@ relay_send(struct relay *relay, struct xrow_header *packet)
 
 	packet->sync = relay->sync;
 	relay->last_row_time = ev_monotonic_now(loop());
-	coio_write_xrow(&relay->io, packet);
+	coio_write_xrow(relay->io, packet);
 	fiber_gc();
 
 	struct errinj *inj = errinj(ERRINJ_RELAY_TIMEOUT, ERRINJ_DOUBLE);
