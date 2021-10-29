@@ -38,6 +38,7 @@
 #include "lua/fiber.h"
 #include "fiber.h"
 #include "coio.h"
+#include "iostream.h"
 #include "lua/msgpack.h"
 #include "lua-yaml/lyaml.h"
 #include "serialize_lua.h"
@@ -573,8 +574,12 @@ console_session_push(struct session *session, struct port *port)
 	const char *text = port_dump_plain(port, &text_len);
 	if (text == NULL)
 		return -1;
-	return coio_write_fd_timeout(session_fd(session), text, text_len,
-				     TIMEOUT_INFINITY);
+	struct iostream io;
+	iostream_create(&io, session_fd(session));
+	int ret = coio_write_timeout_noxc(&io, text, text_len,
+					  TIMEOUT_INFINITY);
+	iostream_destroy(&io);
+	return ret >= 0 ? 0 : -1;
 }
 
 void
