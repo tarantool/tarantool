@@ -161,8 +161,6 @@ static int
 applier_writer_f(va_list ap)
 {
 	struct applier *applier = va_arg(ap, struct applier *);
-	struct iostream io;
-	iostream_create(&io, applier->io.fd);
 
 	/* ID is permanent while applier is alive */
 	uint32_t replica_id = applier->instance_id;
@@ -207,7 +205,7 @@ applier_writer_f(va_list ap)
 			struct replica *r = replica_by_id(replica_id);
 			if (likely(r != NULL))
 				xrow.tm = r->applier_txn_last_tm;
-			coio_write_xrow(&io, &xrow);
+			coio_write_xrow(&applier->io, &xrow);
 			ERROR_INJECT(ERRINJ_APPLIER_SLOW_ACK, {
 				fiber_sleep(0.01);
 			});
@@ -240,7 +238,6 @@ applier_writer_f(va_list ap)
 		}
 		fiber_gc();
 	}
-	iostream_destroy(&io);
 	return 0;
 }
 
