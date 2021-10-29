@@ -36,11 +36,11 @@
 #include "msgpuck/msgpuck.h"
 
 void
-coio_read_xrow(struct ev_io *coio, struct ibuf *in, struct xrow_header *row)
+coio_read_xrow(struct ev_io *io, struct ibuf *in, struct xrow_header *row)
 {
 	/* Read fixed header */
 	if (ibuf_used(in) < 1)
-		coio_breadn(coio, in, 1);
+		coio_breadn(io, in, 1);
 
 	/* Read length */
 	if (mp_typeof(*in->rpos) != MP_UINT) {
@@ -49,28 +49,28 @@ coio_read_xrow(struct ev_io *coio, struct ibuf *in, struct xrow_header *row)
 	}
 	ssize_t to_read = mp_check_uint(in->rpos, in->wpos);
 	if (to_read > 0)
-		coio_breadn(coio, in, to_read);
+		coio_breadn(io, in, to_read);
 
 	uint32_t len = mp_decode_uint((const char **) &in->rpos);
 
 	/* Read header and body */
 	to_read = len - ibuf_used(in);
 	if (to_read > 0)
-		coio_breadn(coio, in, to_read);
+		coio_breadn(io, in, to_read);
 
 	xrow_header_decode_xc(row, (const char **) &in->rpos, in->rpos + len,
 			      true);
 }
 
 void
-coio_read_xrow_timeout_xc(struct ev_io *coio, struct ibuf *in,
+coio_read_xrow_timeout_xc(struct ev_io *io, struct ibuf *in,
 			  struct xrow_header *row, ev_tstamp timeout)
 {
 	ev_tstamp start, delay;
 	coio_timeout_init(&start, &delay, timeout);
 	/* Read fixed header */
 	if (ibuf_used(in) < 1)
-		coio_breadn_timeout(coio, in, 1, delay);
+		coio_breadn_timeout(io, in, 1, delay);
 	coio_timeout_update(&start, &delay);
 
 	/* Read length */
@@ -80,7 +80,7 @@ coio_read_xrow_timeout_xc(struct ev_io *coio, struct ibuf *in,
 	}
 	ssize_t to_read = mp_check_uint(in->rpos, in->wpos);
 	if (to_read > 0)
-		coio_breadn_timeout(coio, in, to_read, delay);
+		coio_breadn_timeout(io, in, to_read, delay);
 	coio_timeout_update(&start, &delay);
 
 	uint32_t len = mp_decode_uint((const char **) &in->rpos);
@@ -88,7 +88,7 @@ coio_read_xrow_timeout_xc(struct ev_io *coio, struct ibuf *in,
 	/* Read header and body */
 	to_read = len - ibuf_used(in);
 	if (to_read > 0)
-		coio_breadn_timeout(coio, in, to_read, delay);
+		coio_breadn_timeout(io, in, to_read, delay);
 
 	xrow_header_decode_xc(row, (const char **) &in->rpos, in->rpos + len,
 			      true);
@@ -96,10 +96,10 @@ coio_read_xrow_timeout_xc(struct ev_io *coio, struct ibuf *in,
 
 
 void
-coio_write_xrow(struct ev_io *coio, const struct xrow_header *row)
+coio_write_xrow(struct ev_io *io, const struct xrow_header *row)
 {
 	struct iovec iov[XROW_IOVMAX];
 	int iovcnt = xrow_to_iovec_xc(row, iov);
-	coio_writev(coio, iov, iovcnt, 0);
+	coio_writev(io, iov, iovcnt, 0);
 }
 
