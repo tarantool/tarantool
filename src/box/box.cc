@@ -2633,7 +2633,7 @@ box_process_fetch_snapshot(struct iostream *io, struct xrow_header *header)
 
 	/* Send the snapshot data to the instance. */
 	struct vclock start_vclock;
-	relay_initial_join(io->fd, header->sync, &start_vclock, 0);
+	relay_initial_join(io, header->sync, &start_vclock, 0);
 	say_info("read-view sent.");
 
 	/* Remember master's vclock after the last request */
@@ -2710,7 +2710,7 @@ box_process_register(struct iostream *io, struct xrow_header *header)
 	 * (replica_vclock, stop_vclock) so that it gets its
 	 * registration.
 	 */
-	relay_final_join(io->fd, header->sync, &replica_vclock, &stop_vclock);
+	relay_final_join(io, header->sync, &replica_vclock, &stop_vclock);
 	say_info("final data sent.");
 
 	struct xrow_header row;
@@ -2831,7 +2831,7 @@ box_process_join(struct iostream *io, struct xrow_header *header)
 	 * Initial stream: feed replica with dirty data from engines.
 	 */
 	struct vclock start_vclock;
-	relay_initial_join(io->fd, header->sync, &start_vclock,
+	relay_initial_join(io, header->sync, &start_vclock,
 			   replica_version_id);
 	say_info("initial data sent.");
 
@@ -2858,7 +2858,7 @@ box_process_join(struct iostream *io, struct xrow_header *header)
 	 * Final stage: feed replica with WALs in range
 	 * (start_vclock, stop_vclock).
 	 */
-	relay_final_join(io->fd, header->sync, &start_vclock, &stop_vclock);
+	relay_final_join(io, header->sync, &start_vclock, &stop_vclock);
 	say_info("final data sent.");
 
 	/* Send end of WAL stream marker */
@@ -3036,7 +3036,7 @@ box_process_subscribe(struct iostream *io, struct xrow_header *header)
 	 * a stall in updates (in this case replica may hang
 	 * indefinitely).
 	 */
-	relay_subscribe(replica, io->fd, header->sync, &replica_clock,
+	relay_subscribe(replica, io, header->sync, &replica_clock,
 			replica_version_id, id_filter);
 }
 

@@ -37,6 +37,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct iostream;
 struct relay;
 struct replica;
 struct tt_uuid;
@@ -113,24 +114,24 @@ relay_push_raft(struct relay *relay, const struct raft_request *req);
 /**
  * Send initial JOIN rows to the replica
  *
- * @param fd        client connection
+ * @param io        client connection
  * @param sync      sync from incoming JOIN request
  * @param vclock[out] vclock of the read view sent to the replica
  * @param replica_version_id peer's version
  */
 void
-relay_initial_join(int fd, uint64_t sync, struct vclock *vclock,
+relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 		   uint32_t replica_version_id);
 
 /**
  * Send final JOIN rows to the replica.
  *
- * @param fd        client connection
+ * @param io        client connection
  * @param sync      sync from incoming JOIN request
  */
 void
-relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
-		 struct vclock *stop_vclock);
+relay_final_join(struct iostream *io, uint64_t sync,
+		 struct vclock *start_vclock, struct vclock *stop_vclock);
 
 /**
  * Subscribe a replica to updates.
@@ -138,7 +139,7 @@ relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
  * @return none.
  */
 void
-relay_subscribe(struct replica *replica, int fd, uint64_t sync,
+relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 		struct vclock *replica_vclock, uint32_t replica_version_id,
 		uint32_t replica_id_filter);
 
