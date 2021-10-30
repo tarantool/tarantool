@@ -117,13 +117,32 @@ runs:
             ! startsWith(github.ref, 'refs/heads/2.') &&
             ! startsWith(github.ref, 'refs/tags') }} ; then
           send_to=${send_to}_${{ github.actor }}
+          ignore_fail=1
           echo "Sending message to '$send_to' developer's chat"
         fi
         # Use MarkdownV2 while Markdown is legacy
         # https://core.telegram.org/bots/api#markdownv2-style
+        set +e
         python3 -c "from urllib import request, parse ; \\
           url = 'https://api.telegram.org/bot%s/sendMessage' % ('$TELEGRAM_TOKEN') ; \\
           data = parse.urlencode({'chat_id' : '$send_to', 'parse_mode' : 'MarkdownV2', 'disable_web_page_preview' : 'true', 'text' : '$msg'}).encode('ascii') ; \\
           response = request.urlopen(url=url, data=data, timeout=10) ; \\
           print(response.read())"
+        rc=$?
+        set -e
+        if [ "${rc}" != 0 ]; then
+          if [ "${ignore_fail}" = 1 ]; then
+            echo "WARN: Sending the Telegram message to '$send_to' fails"
+            echo "WARN:"
+            echo "WARN: The Telegram notification action cannot send a personal"
+            echo "WARN: notification if a developer does not create a Telegram"
+            echo "WARN: chat that corresponds to its GitHub username. See [1]"
+            echo "WARN: for details."
+            echo "WARN:"
+            echo "WARN: [1]: https://github.com/tarantool/tarantool/blob/master/.github/actions/send-telegram-notify/README.md"
+          else
+            echo "ERROR: Sending the Telegram message to '$send_to' fails"
+            false
+          fi
+        fi
       shell: bash
