@@ -899,13 +899,13 @@ e:unpack()
  |   - file: '[string "e = box.error.new({type = ''TestType''}) "]'
  |     line: 1
  | ...
--- Try too long type name.
+-- Try long type name.
 e = box.error.new({type = string.rep('a', 128)})
  | ---
  | ...
 #e.type
  | ---
- | - 63
+ | - 128
  | ...
 
 -- gh-4887: accessing 'prev' member also refs it so that after

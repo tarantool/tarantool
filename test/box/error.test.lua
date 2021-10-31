@@ -241,7 +241,7 @@ e:unpack()
 -- Try to omit message.
 e = box.error.new({type = 'TestType'})
 e:unpack()
--- Try too long type name.
+-- Try long type name.
 e = box.error.new({type = string.rep('a', 128)})
 #e.type
 

@@ -305,9 +305,9 @@ AccessDeniedError::AccessDeniedError(const char *file, unsigned int line,
 	 */
 	if (run_trigers)
 		trigger_run(&on_access_denied, (void *) &ctx);
-	m_object_type = strdup(object_type);
-	m_access_type = strdup(access_type);
-	m_object_name = strdup(object_name);
+	error_set_str(this, "object_type", object_type);
+	error_set_str(this, "object_name", object_name);
+	error_set_str(this, "access_type", access_type);
 }
 
 struct error *
@@ -337,15 +337,14 @@ CustomError::CustomError(const char *file, unsigned int line,
 			 const char *custom_type, uint32_t errcode)
 	:ClientError(&type_CustomError, file, line, errcode)
 {
-	strncpy(m_custom_type, custom_type, sizeof(m_custom_type) - 1);
-	m_custom_type[sizeof(m_custom_type) - 1] = '\0';
+	error_set_str(this, "custom_type", custom_type);
 }
 
 void
 CustomError::log() const
 {
 	say_file_line(S_ERROR, file, line, errmsg,
-		      "Custom type %s", m_custom_type);
+		      "Custom type %s", custom_type());
 }
 
 struct error *

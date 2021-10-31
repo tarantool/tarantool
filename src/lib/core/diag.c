@@ -53,6 +53,7 @@ error_unref(struct error *e)
 			to_delete->cause->effect = NULL;
 			to_delete->cause = NULL;
 		}
+		error_payload_destroy(&to_delete->payload);
 		to_delete->destroy(to_delete);
 		if (cause == NULL)
 			return;
@@ -117,6 +118,7 @@ error_create(struct error *e,
 	e->refs = 0;
 	e->saved_errno = 0;
 	e->code = 0;
+	error_payload_create(&e->payload);
 	if (file != NULL) {
 		snprintf(e->file, sizeof(e->file), "%s", file);
 		e->line = line;
