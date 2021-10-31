@@ -202,6 +202,12 @@ error_clear_field(struct error *e, const char *name)
 	error_payload_clear(&e->payload, name);
 }
 
+static inline void
+error_move_payload(struct error *e, struct error_payload *src)
+{
+	error_payload_move(&e->payload, src);
+}
+
 /**
  * Unlink error from its effect. For instance:
  * e1 -> e2 -> e3 -> e4 (e1:set_prev(e2); e2:set_prev(e3) ...)
@@ -254,6 +260,9 @@ error_create(struct error *e,
 	     error_f create, error_f raise, error_f log,
 	     const struct type_info *type, const char *file,
 	     unsigned line);
+
+void
+error_set_location(struct error *e, const char *file, int line);
 
 void
 error_format_msg(struct error *e, const char *format, ...);
