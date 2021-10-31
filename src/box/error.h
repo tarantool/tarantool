@@ -243,38 +243,23 @@ public:
 			  const char *object_name, const char *user_name,
 			  bool run_trigers = true);
 
-	~AccessDeniedError()
+	const char *
+	object_type() const
 	{
-		free(m_object_name);
-		free(m_object_type);
-		free(m_access_type);
+		return error_get_str(this, "object_type");
 	}
 
 	const char *
-	object_type()
+	object_name() const
 	{
-		return m_object_type;
+		return error_get_str(this, "object_name");
 	}
 
 	const char *
-	object_name()
+	access_type() const
 	{
-		return m_object_name?:"(nil)";
+		return error_get_str(this, "access_type");
 	}
-
-	const char *
-	access_type()
-	{
-		return m_access_type;
-	}
-
-private:
-	/** Type of object the required access was denied to */
-	char *m_object_type;
-	/** Name of object the required access was denied to */
-	char *m_object_name;
-	/** Type of declined access */
-	char *m_access_type;
 };
 
 /**
@@ -319,13 +304,10 @@ public:
 	virtual void log() const;
 
 	const char*
-	custom_type()
+	custom_type() const
 	{
-		return m_custom_type;
+		return error_get_str(this, "custom_type");
 	}
-private:
-	/** Custom type name. */
-	char m_custom_type[64];
 };
 
 #endif /* defined(__cplusplus) */

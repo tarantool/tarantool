@@ -11,6 +11,17 @@ enum {
 
 typedef void (*error_f)(struct error *e);
 
+struct error_field {
+    char *_data;
+    uint32_t _size;
+    char _name[1];
+};
+
+struct error_payload {
+    int _count;
+    struct error_field **_fields;
+};
+
 struct error {
     error_f _destroy;
     error_f _raise;
@@ -19,6 +30,7 @@ struct error {
     int64_t _refs;
     int _saved_errno;
     int code;
+    struct error_payload _payload;
     /** Line number. */
     unsigned _line;
     /* Source file name. */
