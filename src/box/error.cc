@@ -256,13 +256,6 @@ XlogGapError::XlogGapError(const char *file, unsigned line,
 		 (long long) vclock_sum(to), s_to ? s_to : "");
 }
 
-XlogGapError::XlogGapError(const char *file, unsigned line,
-			   const char *msg)
-		: XlogError(&type_XlogGapError, file, line)
-{
-	error_format_msg(this, "%s", msg);
-}
-
 struct error *
 BuildXlogGapError(const char *file, unsigned line,
 		  const struct vclock *from, const struct vclock *to)

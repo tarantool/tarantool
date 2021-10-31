@@ -119,16 +119,19 @@ error_create(struct error *e,
 	e->saved_errno = 0;
 	e->code = 0;
 	error_payload_create(&e->payload);
-	if (file != NULL) {
-		snprintf(e->file, sizeof(e->file), "%s", file);
-		e->line = line;
-	} else {
-		e->file[0] = '\0';
-		e->line = 0;
-	}
+	if (file == NULL)
+		file = "";
+	error_set_location(e, file, line);
 	e->errmsg[0] = '\0';
 	e->cause = NULL;
 	e->effect = NULL;
+}
+
+void
+error_set_location(struct error *e, const char *file, int line)
+{
+	snprintf(e->file, sizeof(e->file), "%s", file);
+	e->line = line;
 }
 
 struct diag *

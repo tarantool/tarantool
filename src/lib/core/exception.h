@@ -91,6 +91,12 @@ public:
 
 	SystemError(const char *file, unsigned line,
 		    const char *format, ...);
+
+	SystemError()
+		:Exception(&type_SystemError, NULL, 0)
+	{
+	}
+
 protected:
 	SystemError(const struct type_info *type, const char *file, unsigned line);
 };
@@ -100,6 +106,12 @@ class SocketError: public SystemError {
 public:
 	SocketError(const char *file, unsigned line, const char *socketname,
 		    const char *format, ...);
+
+	SocketError()
+		:SystemError(&type_SocketError, NULL, 0)
+	{
+	}
+
 	virtual void raise()
 	{
 		throw this;
@@ -111,18 +123,36 @@ public:
 	OutOfMemory(const char *file, unsigned line,
 		    size_t amount, const char *allocator,
 		    const char *object);
+
+	OutOfMemory()
+		:SystemError(&type_OutOfMemory, NULL, 0)
+	{
+	}
+
 	virtual void raise() { throw this; }
 };
 
 class TimedOut: public SystemError {
 public:
 	TimedOut(const char *file, unsigned line);
+
+	TimedOut()
+		:SystemError(&type_TimedOut, NULL, 0)
+	{
+	}
+
 	virtual void raise() { throw this; }
 };
 
 class ChannelIsClosed: public Exception {
 public:
 	ChannelIsClosed(const char *file, unsigned line);
+
+	ChannelIsClosed()
+		:Exception(&type_ChannelIsClosed, NULL, 0)
+	{
+	}
+
 	virtual void raise() { throw this; }
 };
 
@@ -133,6 +163,12 @@ public:
 class FiberIsCancelled: public Exception {
 public:
 	FiberIsCancelled(const char *file, unsigned line);
+
+	FiberIsCancelled()
+		:Exception(&type_FiberIsCancelled, NULL, 0)
+	{
+	}
+
 	virtual void log() const;
 	virtual void raise() { throw this; }
 };
@@ -141,12 +177,24 @@ class LuajitError: public Exception {
 public:
 	LuajitError(const char *file, unsigned line,
 		    const char *msg);
+
+	LuajitError()
+		:Exception(&type_LuajitError, NULL, 0)
+	{
+	}
+
 	virtual void raise() { throw this; }
 };
 
 class IllegalParams: public Exception {
 public:
 	IllegalParams(const char *file, unsigned line, const char *format, ...);
+
+	IllegalParams()
+		:Exception(&type_IllegalParams, NULL, 0)
+	{
+	}
+
 	virtual void raise() { throw this; }
 };
 
@@ -154,18 +202,36 @@ class CollationError: public Exception {
 public:
 	CollationError(const char *file, unsigned line, const char *format,
 		       ...);
+
+	CollationError()
+		:Exception(&type_CollationError, NULL, 0)
+	{
+	}
+
 	virtual void raise() { throw this; }
 };
 
 class SwimError: public Exception {
 public:
 	SwimError(const char *file, unsigned line, const char *format, ...);
+
+	SwimError()
+		:Exception(&type_SwimError, NULL, 0)
+	{
+	}
+
 	virtual void raise() { throw this; }
 };
 
 class CryptoError: public Exception {
 public:
 	CryptoError(const char *file, unsigned line, const char *format, ...);
+
+	CryptoError()
+		:Exception(&type_CryptoError, NULL, 0)
+	{
+	}
+
 	virtual void raise() { throw this; }
 };
 

@@ -1,5 +1,5 @@
 	*** main ***
-1..6
+1..7
 	*** test_stack_error_decode ***
     1..17
     ok 1 - check CustomError
@@ -27,9 +27,11 @@ ok 1 - subtests
 ok 2 - subtests
 	*** test_decode_unknown_type: done ***
 	*** test_fail_not_enough_fields ***
-    1..2
-    ok 1 - check not enough additional fields
-    ok 2 - error about parsing problem is set
+    1..4
+    ok 1 - check lack of fields
+    ok 2 - object type
+    ok 3 - access type
+    ok 4 - object name
 ok 3 - subtests
 	*** test_fail_not_enough_fields: done ***
 	*** test_unknown_fields ***
@@ -41,6 +43,21 @@ ok 4 - subtests
     ok 1 - check unknown additional field
 ok 5 - subtests
 	*** test_unknown_additional_fields: done ***
+	*** test_payload ***
+    1..11
+    ok 1 - code
+    ok 2 - errno
+    ok 3 - msg
+    ok 4 - line
+    ok 5 - file
+    ok 6 - key str
+    ok 7 - key uint
+    ok 8 - key int
+    ok 9 - key double
+    ok 10 - key bool
+    ok 11 - key uuid
+ok 6 - subtests
+	*** test_payload: done ***
 	*** test_mp_print ***
     1..60
     # zero depth, normal error
@@ -109,6 +126,6 @@ ok 5 - subtests
     ok 58 - mp_fprint depth 0 correct length
     ok 59 - mp_fprint depth 0 correct prefix and suffix
     ok 60 - mp_fprint depth 0 correct object in the middle
-ok 6 - subtests
+ok 7 - subtests
 	*** test_mp_print: done ***
 	*** main: done ***

@@ -213,6 +213,11 @@ public:
 
 	ClientError(const char *file, unsigned line, uint32_t errcode, ...);
 
+	ClientError()
+		:Exception(&type_ClientError, NULL, 0)
+	{
+	}
+
 	static uint32_t get_errcode(const struct error *e);
 protected:
 	ClientError(const type_info *type, const char *file, unsigned line,
@@ -242,6 +247,11 @@ public:
 			  const char *access_type, const char *object_type,
 			  const char *object_name, const char *user_name,
 			  bool run_trigers = true);
+
+	AccessDeniedError()
+		:ClientError(&type_AccessDeniedError, NULL, 0, 0)
+	{
+	}
 
 	const char *
 	object_type() const
@@ -276,6 +286,12 @@ struct XlogError: public Exception
 	{
 		error_vformat_msg(this, format, ap);
 	}
+
+	XlogError()
+		:Exception(&type_XlogError, NULL, 0)
+	{
+	}
+
 	XlogError(const struct type_info *type, const char *file,
 		  unsigned line)
 		:Exception(type, file, line)
@@ -289,8 +305,11 @@ struct XlogGapError: public XlogError
 {
 	XlogGapError(const char *file, unsigned line,
 		     const struct vclock *from, const struct vclock *to);
-	XlogGapError(const char *file, unsigned line,
-		     const char *msg);
+
+	XlogGapError()
+		:XlogError(&type_XlogGapError, NULL, 0)
+	{
+	}
 
 	virtual void raise() { throw this; }
 };
@@ -300,6 +319,11 @@ class CustomError: public ClientError
 public:
 	CustomError(const char *file, unsigned int line,
 		    const char *custom_type, uint32_t errcode);
+
+	CustomError()
+		:ClientError(&type_CustomError, NULL, 0, 0)
+	{
+	}
 
 	virtual void log() const;
 
