@@ -222,6 +222,8 @@ mem_type_class_to_str(const struct Mem *mem)
 		return "boolean";
 	case MEM_TYPE_UUID:
 		return "uuid";
+	case MEM_TYPE_ARRAY:
+		return "array";
 	default:
 		break;
 	}
@@ -392,26 +394,32 @@ mem_set_str0_allocated(struct Mem *mem, char *value)
 	set_str_dynamic(mem, value, strlen(value), 0);
 }
 
-int
-mem_copy_str(struct Mem *mem, const char *value, uint32_t len)
+static int
+mem_copy_bytes(struct Mem *mem, const char *value, uint32_t size,
+	       enum mem_type type)
 {
-	if (((mem->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) != 0) &&
-	    mem->z == value) {
+	if (mem_is_bytes(mem) && mem->z == value) {
 		/* Own value, but might be ephemeral. Make it own if so. */
-		if (sqlVdbeMemGrow(mem, len, 1) != 0)
+		if (sqlVdbeMemGrow(mem, size, 1) != 0)
 			return -1;
-		mem->type = MEM_TYPE_STR;
+		mem->type = type;
 		mem->flags = 0;
 		return 0;
 	}
 	mem_clear(mem);
-	if (sqlVdbeMemGrow(mem, len, 0) != 0)
+	if (sqlVdbeMemGrow(mem, size, 0) != 0)
 		return -1;
-	memcpy(mem->z, value, len);
-	mem->n = len;
-	mem->type = MEM_TYPE_STR;
+	memcpy(mem->z, value, size);
+	mem->n = size;
+	mem->type = type;
 	assert(mem->flags == 0);
 	return 0;
+}
+
+int
+mem_copy_str(struct Mem *mem, const char *value, uint32_t len)
+{
+	return mem_copy_bytes(mem, value, len, MEM_TYPE_STR);
 }
 
 int
@@ -469,23 +477,7 @@ mem_set_bin_allocated(struct Mem *mem, char *value, uint32_t size)
 int
 mem_copy_bin(struct Mem *mem, const char *value, uint32_t size)
 {
-	if (((mem->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) != 0) &&
-	    mem->z == value) {
-		/* Own value, but might be ephemeral. Make it own if so. */
-		if (sqlVdbeMemGrow(mem, size, 1) != 0)
-			return -1;
-		mem->type = MEM_TYPE_BIN;
-		mem->flags = 0;
-		return 0;
-	}
-	mem_clear(mem);
-	if (sqlVdbeMemGrow(mem, size, 0) != 0)
-		return -1;
-	memcpy(mem->z, value, size);
-	mem->n = size;
-	mem->type = MEM_TYPE_BIN;
-	assert(mem->flags == 0);
-	return 0;
+	return mem_copy_bytes(mem, value, size, MEM_TYPE_BIN);
 }
 
 static inline void
@@ -539,6 +531,12 @@ mem_set_array_allocated(struct Mem *mem, char *value, uint32_t size)
 {
 	assert(mp_typeof(*value) == MP_ARRAY);
 	set_msgpack_value(mem, value, size, 0, MEM_TYPE_ARRAY);
+}
+
+int
+mem_copy_array(struct Mem *mem, const char *value, uint32_t size)
+{
+	return mem_copy_bytes(mem, value, size, MEM_TYPE_ARRAY);
 }
 
 void
@@ -1189,14 +1187,6 @@ bool_to_str0(struct Mem *mem)
 }
 
 static inline int
-array_to_str0(struct Mem *mem)
-{
-	assert(mem->type == MEM_TYPE_ARRAY);
-	const char *str = mp_str(mem->z);
-	return mem_copy_str0(mem, str);
-}
-
-static inline int
 map_to_str0(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_MAP);
@@ -1307,8 +1297,6 @@ mem_to_str(struct Mem *mem)
 		return bin_to_str(mem);
 	case MEM_TYPE_MAP:
 		return map_to_str0(mem);
-	case MEM_TYPE_ARRAY:
-		return array_to_str0(mem);
 	case MEM_TYPE_UUID:
 		return uuid_to_str0(mem);
 	case MEM_TYPE_DEC:
@@ -1357,7 +1345,7 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 	case FIELD_TYPE_VARBINARY:
 		if (mem->type == MEM_TYPE_STR)
 			return str_to_bin(mem);
-		if (mem_is_bytes(mem)) {
+		if (mem_is_bin(mem)) {
 			mem->flags &= ~(MEM_Scalar | MEM_Any);
 			return 0;
 		}
@@ -1392,6 +1380,11 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 		if (mem->type == MEM_TYPE_BIN)
 			return bin_to_uuid(mem);
 		return -1;
+	case FIELD_TYPE_ARRAY:
+		if (mem->type != MEM_TYPE_ARRAY)
+			return -1;
+		mem->flags &= ~MEM_Any;
+		return 0;
 	case FIELD_TYPE_SCALAR:
 		if ((mem->type & (MEM_TYPE_MAP | MEM_TYPE_ARRAY)) != 0)
 			return -1;
@@ -1474,8 +1467,7 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 		}
 		return -1;
 	case FIELD_TYPE_VARBINARY:
-		if ((mem->type & (MEM_TYPE_BIN | MEM_TYPE_MAP |
-				  MEM_TYPE_ARRAY)) != 0) {
+		if (mem->type == MEM_TYPE_BIN) {
 			mem->flags &= ~(MEM_Scalar | MEM_Any);
 			return 0;
 		}
@@ -2465,7 +2457,8 @@ mem_cmp(const struct Mem *a, const struct Mem *b, int *result,
 			*result = 1;
 		return 0;
 	}
-	if (((a->flags | b->flags) & MEM_Any) != 0) {
+	if (((a->flags | b->flags) & MEM_Any) != 0 ||
+	    ((a->type | b->type) & (MEM_TYPE_ARRAY | MEM_TYPE_MAP)) != 0) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(a),
 			 "comparable type");
 		return -1;
@@ -3116,8 +3109,11 @@ port_vdbemem_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 		case MEM_TYPE_STR:
 		case MEM_TYPE_BIN:
 		case MEM_TYPE_MAP:
-		case MEM_TYPE_ARRAY:
 			lua_pushlstring(L, mem->z, mem->n);
+			break;
+		case MEM_TYPE_ARRAY:
+			luamp_decode(L, luaL_msgpack_default,
+				     (const char **)&mem->z);
 			break;
 		case MEM_TYPE_NULL:
 			lua_pushnil(L);
@@ -3214,7 +3210,8 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 		return NULL;
 	for (int i = 0; i < argc; i++) {
 		struct luaL_field field;
-		if (luaL_tofield(L, luaL_msgpack_default, -1 - i, &field) < 0)
+		int index = -1 - i;
+		if (luaL_tofield(L, luaL_msgpack_default, index, &field) < 0)
 			goto error;
 		mem_clear(&val[i]);
 		switch (field.type) {
@@ -3248,6 +3245,35 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 					 field.sval.len) != 0)
 				goto error;
 			break;
+		case MP_ARRAY: {
+			size_t used = region_used(region);
+			struct mpstream stream;
+			bool is_error = false;
+			mpstream_init(&stream, region, region_reserve_cb,
+				      region_alloc_cb, set_encode_error,
+				      &is_error);
+			lua_pushvalue(L, index);
+			luamp_encode_r(L, luaL_msgpack_default, &stream,
+				       &field, 0);
+			lua_pop(L, 1);
+			mpstream_flush(&stream);
+			if (is_error) {
+				diag_set(OutOfMemory, stream.pos - stream.buf,
+					 "mpstream_flush", "stream");
+				return NULL;
+			}
+			uint32_t size = region_used(region) - used;
+			char *raw = region_join(region, size);
+			if (raw == NULL) {
+				diag_set(OutOfMemory, size, "region_join",
+					 "raw");
+				goto error;
+			}
+			if (mem_copy_array(&val[i], raw, size) != 0)
+				goto error;
+			region_truncate(region, used);
+			break;
+		}
 		case MP_EXT: {
 			if (field.ext_type == MP_UUID) {
 				mem_set_uuid(&val[i], field.uuidval);

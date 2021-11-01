@@ -14,9 +14,7 @@ local function flatten(arr)
 
     local function flatten(arr)
         for _, v in ipairs(arr) do
-            if type(v) == "table" then
-                flatten(v)
-            elseif box.tuple.is(v) then
+            if box.tuple.is(v) then
                 flatten(v:totable())
             else
                 table.insert(result, v)

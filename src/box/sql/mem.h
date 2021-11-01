@@ -435,6 +435,10 @@ mem_set_array_static(struct Mem *mem, char *value, uint32_t size);
 void
 mem_set_array_allocated(struct Mem *mem, char *value, uint32_t size);
 
+/** Copy ARRAY value to a newly allocated memory. The MEM type becomes ARRAY. */
+int
+mem_copy_array(struct Mem *mem, const char *value, uint32_t size);
+
 /** Clear MEM and set it to invalid state. */
 void
 mem_set_invalid(struct Mem *mem);

@@ -61,6 +61,7 @@ static Keyword aKeywordTable[] = {
   { "ALTER",                  "TK_ALTER",       true  },
   { "ANALYZE",                "TK_STANDARD",    true  },
   { "AND",                    "TK_AND",         true  },
+  { "ARRAY",                  "TK_ARRAY",       true  },
   { "AS",                     "TK_AS",          true  },
   { "ASC",                    "TK_ASC",         true  },
   { "AUTOINCREMENT",          "TK_AUTOINCR",    false },

@@ -1380,8 +1380,20 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 			context->is_aborted = true;
 		break;
 	}
+	case MEM_TYPE_ARRAY: {
+		char *buf = NULL;
+		int size = mp_snprint(buf, 0, argv[0].z) + 1;
+		assert(size > 0);
+		buf = sqlDbMallocRawNN(sql_get(), size);
+		if (buf == NULL) {
+			context->is_aborted = true;
+			return;
+		}
+		mp_snprint(buf, size, argv[0].z);
+		mem_set_str0_allocated(context->pOut, buf);
+		break;
+	}
 	case MEM_TYPE_BIN:
-	case MEM_TYPE_ARRAY:
 	case MEM_TYPE_MAP: {
 		const char *zBlob = argv[0].z;
 		int nBlob = argv[0].n;
