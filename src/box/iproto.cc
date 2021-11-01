@@ -648,6 +648,13 @@ struct iproto_connection
 	struct iproto_thread *iproto_thread;
 };
 
+/** Returns a string suitable for logging. */
+static inline const char *
+iproto_connection_name(const struct iproto_connection *con)
+{
+	return sio_socketname(con->input.fd);
+}
+
 #ifdef NDEBUG
 #define iproto_write_error(fd, e, schema_version, sync)                         \
 	iproto_do_write_error(fd, e, schema_version, sync);
@@ -734,7 +741,7 @@ iproto_msg_new(struct iproto_connection *con)
 	if (msg == NULL) {
 		diag_set(OutOfMemory, sizeof(*msg), "mempool_alloc", "msg");
 		say_warn("can not allocate memory for a new message, "
-			 "connection %s", sio_socketname(con->input.fd));
+			 "connection %s", iproto_connection_name(con));
 		return NULL;
 	}
 	msg->close_connection = false;
@@ -785,7 +792,7 @@ iproto_connection_stop_readahead_limit(struct iproto_connection *con)
 {
 	say_warn_ratelimited("stopping input on connection %s, "
 			     "readahead limit is reached",
-			     sio_socketname(con->input.fd));
+			     iproto_connection_name(con));
 	assert(rlist_empty(&con->in_stop_list));
 	ev_io_stop(con->loop, &con->input);
 }
@@ -797,7 +804,7 @@ iproto_connection_stop_msg_max_limit(struct iproto_connection *con)
 
 	say_warn_ratelimited("stopping input on connection %s, "
 			     "net_msg_max limit is reached",
-			     sio_socketname(con->input.fd));
+			     iproto_connection_name(con));
 	ev_io_stop(con->loop, &con->input);
 	/*
 	 * Important to add to tail and fetch from head to ensure
