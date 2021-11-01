@@ -748,10 +748,6 @@ iproto_msg_new(struct iproto_connection *con)
  * A connection is idle when the client is gone
  * and there are no outstanding msgs in the msg queue.
  * An idle connection can be safely garbage collected.
- * Note: a connection only becomes idle after iproto_connection_close(),
- * which closes the fd.  This is why here the check is for
- * evio_has_fd(), not ev_is_active()  (false if event is not
- * started).
  *
  * ibuf_size() provides an effective reference counter
  * on connection use in the tx request queue. Any request
@@ -848,13 +844,15 @@ iproto_connection_try_to_start_destroy(struct iproto_connection *con)
 static inline void
 iproto_connection_close(struct iproto_connection *con)
 {
-	if (evio_has_fd(&con->input)) {
+	if (con->state == IPROTO_CONNECTION_ALIVE) {
 		/* Clears all pending events. */
 		ev_io_stop(con->loop, &con->input);
 		ev_io_stop(con->loop, &con->output);
-
 		int fd = con->input.fd;
-		/* Make evio_has_fd() happy */
+		/*
+		 * Invalidate fd to prevent undefined behavior in case
+		 * we mistakenly try to use it after this point.
+		 */
 		con->input.fd = con->output.fd = -1;
 		close(fd);
 		/*
@@ -1214,7 +1212,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 	struct iproto_connection *con =
 		(struct iproto_connection *) watcher->data;
 	int fd = con->input.fd;
-	assert(fd >= 0);
+	assert(con->state == IPROTO_CONNECTION_ALIVE);
 	assert(rlist_empty(&con->in_stop_list));
 	assert(loop == con->loop);
 	/*
@@ -1345,7 +1343,7 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 			    int /* revents */)
 {
 	struct iproto_connection *con = (struct iproto_connection *) watcher->data;
-
+	assert(con->state == IPROTO_CONNECTION_ALIVE);
 	int rc;
 	while ((rc = iproto_flush(con)) <= 0) {
 		if (rc != 0) {
@@ -1406,8 +1404,6 @@ static inline void
 iproto_connection_delete(struct iproto_connection *con)
 {
 	assert(iproto_connection_is_idle(con));
-	assert(!evio_has_fd(&con->output));
-	assert(!evio_has_fd(&con->input));
 	assert(con->session == NULL);
 	assert(con->state == IPROTO_CONNECTION_DESTROYED);
 	/*
@@ -1652,7 +1648,7 @@ net_finish_rollback_on_disconnect(struct cmsg *m)
 	struct mh_i64ptr_node_t node = { stream->id, NULL };
 	mh_i64ptr_remove(con->streams, &node, 0);
 	iproto_stream_delete(stream);
-	assert(!evio_has_fd(&con->input));
+	assert(con->state != IPROTO_CONNECTION_ALIVE);
 	if (con->state == IPROTO_CONNECTION_PENDING_DESTROY)
 		iproto_connection_try_to_start_destroy(con);
 }
@@ -1742,8 +1738,8 @@ net_discard_input(struct cmsg *m)
 	msg->p_ibuf->rpos += msg->len;
 	msg->len = 0;
 	con->long_poll_count++;
-	if (evio_has_fd(&con->input) && !ev_is_active(&con->input) &&
-	    rlist_empty(&con->in_stop_list))
+	if (con->state == IPROTO_CONNECTION_ALIVE &&
+	    !ev_is_active(&con->input) && rlist_empty(&con->in_stop_list))
 		ev_feed_event(con->loop, &con->input, EV_READ);
 }
 
@@ -2357,7 +2353,7 @@ iproto_msg_finish_processing_in_stream(struct iproto_msg *msg)
 			struct mh_i64ptr_node_t node = { stream->id, NULL };
 			mh_i64ptr_remove(con->streams, &node, 0);
 			iproto_stream_delete(stream);
-		} else if (!evio_has_fd(&con->input)) {
+		} else if (con->state != IPROTO_CONNECTION_ALIVE) {
 			/*
 			 * Here we are in case when connection was closed,
 			 * there is no messages in stream queue, but there
@@ -2402,7 +2398,7 @@ net_send_msg(struct cmsg *m)
 	}
 	con->wend = msg->wpos;
 
-	if (evio_has_fd(&con->output)) {
+	if (con->state == IPROTO_CONNECTION_ALIVE) {
 		if (! ev_is_active(&con->output))
 			ev_feed_event(con->loop, &con->output, EV_WRITE);
 	} else if (iproto_connection_is_idle(con)) {
@@ -2524,7 +2520,7 @@ net_send_greeting(struct cmsg *m)
 	 * messing up with the connection while it was in
 	 * progress.
 	 */
-	assert(evio_has_fd(&con->output));
+	assert(con->state == IPROTO_CONNECTION_ALIVE);
 	/* Handshake OK, start reading input. */
 	ev_feed_event(con->loop, &con->output, EV_WRITE);
 	iproto_msg_delete(msg);
@@ -2637,7 +2633,8 @@ iproto_process_push(struct cmsg *m)
 		container_of(kharon, struct iproto_connection, kharon);
 	con->wend = kharon->wpos;
 	kharon->wpos = con->wpos;
-	if (evio_has_fd(&con->output) && !ev_is_active(&con->output))
+	if (con->state == IPROTO_CONNECTION_ALIVE &&
+	    !ev_is_active(&con->output))
 		ev_feed_event(con->loop, &con->output, EV_WRITE);
 }
 
