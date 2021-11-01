@@ -28,6 +28,7 @@ resource "openstack_compute_instance_v2" "instance" {
   provisioner "remote-exec" {
     inline = [
       "set -o errexit",
+      "sudo cloud-init status --wait",
       "sudo hostnamectl set-hostname n${count.index + 1}",
       "sudo apt-get -o Debug::Acquire::http=true -o Debug::pkgAcquire::Worker=1 update"
     ]
