@@ -131,12 +131,6 @@ evio_service_is_active(struct evio_service *service)
 	return service->ev.fd >= 0;
 }
 
-static inline bool
-evio_has_fd(struct ev_io *ev)
-{
-	return ev->fd >= 0;
-}
-
 static inline void
 evio_timeout_init(ev_loop *loop, ev_tstamp *start, ev_tstamp *delay,
 		  ev_tstamp timeout)
