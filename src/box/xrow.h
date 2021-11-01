@@ -56,6 +56,7 @@ enum {
 	IPROTO_SELECT_HEADER_LEN = IPROTO_HEADER_LEN + 7,
 };
 
+struct iostream;
 struct region;
 
 struct xrow_header {
@@ -803,8 +804,8 @@ iproto_send_event(struct obuf *out, const char *key, size_t key_len,
 
 /** Write error directly to a socket. */
 void
-iproto_do_write_error(int fd, const struct error *e, uint32_t schema_version,
-		      uint64_t sync);
+iproto_do_write_error(struct iostream *io, const struct error *e,
+		      uint32_t schema_version, uint64_t sync);
 
 enum {
 	/* Maximal length of protocol name in handshake */

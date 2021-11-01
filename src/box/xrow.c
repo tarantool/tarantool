@@ -36,6 +36,7 @@
 #include <base64.h>
 
 #include "fiber.h"
+#include "iostream.h"
 #include "version.h"
 #include "tt_static.h"
 #include "error.h"
@@ -609,8 +610,8 @@ iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
 }
 
 void
-iproto_do_write_error(int fd, const struct error *e, uint32_t schema_version,
-		      uint64_t sync)
+iproto_do_write_error(struct iostream *io, const struct error *e,
+		      uint32_t schema_version, uint64_t sync)
 {
 	bool is_error = false;
 	struct mpstream stream;
@@ -637,8 +638,8 @@ iproto_do_write_error(int fd, const struct error *e, uint32_t schema_version,
 	ssize_t unused;
 
 	ERROR_INJECT_YIELD(ERRINJ_IPROTO_WRITE_ERROR_DELAY);
-	unused = write(fd, header, sizeof(header));
-	unused = write(fd, payload, payload_size);
+	unused = iostream_write(io, header, sizeof(header));
+	unused = iostream_write(io, payload, payload_size);
 	(void) unused;
 cleanup:
 	region_truncate(region, region_svp);
