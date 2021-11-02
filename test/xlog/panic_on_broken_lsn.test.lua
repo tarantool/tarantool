@@ -46,12 +46,24 @@ lsn = -1
 box.error.injection.set("ERRINJ_REPLICA_JOIN_DELAY", true)
 
 fiber = require('fiber')
+-- Asynchronously run a function that will:
+-- 1. Wait for the replica join to start.
+-- 2. Make sure that the record about the new replica written to
+--    the _cluster space hits the WAL by writing a row to the test
+--    space. This is important, because at the next step we need
+--    to compute the LSN of the row that is going to be written to
+--    the WAL next so we don't want to race with in-progress WAL
+--    writes.
+-- 3. Inject an error into replication of the next WAL row and write
+--    a row to the test space. This row should break replication.
+-- 4. Resume the replica join.
 test_run:cmd("setopt delimiter ';'")
 _ = fiber.create(function()
     test_run:wait_cond(function() return box.info.replication[2] ~= nil end)
+    box.space.test:auto_increment{'v1'}
     lsn = box.info.vclock[1]
     box.error.injection.set("ERRINJ_RELAY_BREAK_LSN", lsn + 1)
-    box.space.test:auto_increment{'v1'}
+    box.space.test:auto_increment{'v2'}
     box.error.injection.set("ERRINJ_REPLICA_JOIN_DELAY", false)
 end);
 test_run:cmd("setopt delimiter ''");
