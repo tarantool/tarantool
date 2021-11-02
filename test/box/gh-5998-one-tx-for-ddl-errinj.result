@@ -91,11 +91,7 @@ channel2:get()
  | - true
  | ...
 
-assert(box.space.s1.index[1] ~= nil)
- | ---
- | - true
- | ...
-assert(box.space.s2.index[1] == nil)
+assert((s1.index[1] == nil) ~= (s2.index[1] == nil))
  | ---
  | - true
  | ...
