@@ -40,8 +40,7 @@ errinj.set('ERRINJ_BUILD_INDEX_DELAY', false);
 channel1:get()
 channel2:get()
 
-assert(box.space.s1.index[1] ~= nil)
-assert(box.space.s2.index[1] == nil)
+assert((s1.index[1] == nil) ~= (s2.index[1] == nil))
 
 box.space.s1:drop()
 box.space.s2:drop()
