@@ -244,22 +244,22 @@ index_opts_decode(struct index_opts *opts, const char *map,
 }
 
 /**
- * Helper routine for functional index function verification:
- * only a deterministic persistent Lua function may be used in
- * functional index for now.
+ * Let's consider UDF to be normalized if:
+ *  - it is written in Lua;
+ *  - it has body;
+ *  - it is deterministic;
+ *  - it is sandboxed.
+ * We use only normalized functions in functional indexes and
+ * upgrade operations.
  */
-static int
-func_index_check_func(struct func *func) {
+static bool
+func_is_normalized(struct func *func) {
 	assert(func != NULL);
 	if (func->def->language != FUNC_LANGUAGE_LUA ||
 	    func->def->body == NULL || !func->def->is_deterministic ||
-	    !func->def->is_sandboxed) {
-		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS, 0,
-			  "referenced function doesn't satisfy "
-			  "functional index function constraints");
-		return -1;
-	}
-	return 0;
+	    !func->def->is_sandboxed)
+		return false;
+	return true;
 }
 
 /**
@@ -360,8 +360,12 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	 */
 	struct func *func = NULL;
 	if (for_func_index && (func = func_by_id(opts.func_id)) != NULL) {
-		if (func_index_check_func(func) != 0)
+		if (!func_is_normalized(func)) {
+			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS, 0,
+				 "referenced function doesn't satisfy "
+				 "functional index function constraints");
 			return NULL;
+		}
 		index_def_set_func(index_def, func);
 	}
 	if (index_def->iid == 0 && space->sequence != NULL)
@@ -5896,8 +5900,12 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 			diag_set(ClientError, ER_NO_SUCH_FUNCTION, int2str(fid));
 			return -1;
 		}
-		if (func_index_check_func(func) != 0)
+		if (!func_is_normalized(func)) {
+			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS, 0,
+				 "referenced function doesn't satisfy "
+				 "functional index function constraints");
 			return -1;
+		}
 		if (index->def->opts.func_id != func->def->fid) {
 			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS, 0,
 				  "Function ids defined in _index and "
