@@ -1,6 +1,4 @@
 test_run = require('test_run').new()
-test_run:cmd("push filter 'Invalid VYLOG file: Slice [0-9]+ deleted but not registered'" .. \
-             "to 'Invalid VYLOG file: Slice <NUM> deleted but not registered'")
 
 s = box.schema.create_space('test', {engine = 'vinyl'})
 pk = s:create_index('pk')
