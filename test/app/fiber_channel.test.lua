@@ -49,7 +49,8 @@ test_run:cmd("setopt delimiter ''");
 t
 ch:has_readers()
 ch:has_writers()
-fiber.cancel(tfbr)
+tfbr:cancel()
+test_run:wait_cond(function() return tfbr:status() == 'dead' end)
 
 ch:has_readers()
 ch:has_writers()
@@ -97,9 +98,13 @@ ch:put(5)
 t = {}
 for i = 35, 45 do table.insert(t, ch:put(i)) end
 t
-while #buffer < 15 do fiber.sleep(0.001) end
+test_run:wait_cond(function() return #buffer >= 16 end)
 table.sort(buffer)
 buffer
+tfbr:cancel()
+test_run:wait_cond(function() return tfbr:status() == 'dead' end)
+tfbr2:cancel()
+test_run:wait_cond(function() return tfbr2:status() == 'dead' end)
 
 ch = fiber.channel(1)
 ch:is_closed()
@@ -167,7 +172,7 @@ for i = 1, 10 do
     )
 end;
 
-for i = 1, 100 do fiber.sleep(0.01) if count > 2000 then break end end;
+test_run:wait_cond(function() return count > 2000 end);
 
 count > 2000, #test_res, test_res;
 for _, fiber in ipairs(fibers) do
