@@ -153,7 +153,9 @@ uri_parse(struct uri *uri, const char *p)
 			%{ uri->login = login; uri->login_len = login_len; };
 
 		# Non-standard: use service instead of port here + support unix
-		authority = (userinfo "@")? ((host (":" service)?) | (unix  ":"));
+		authority = (userinfo "@")? ((host (":" service)?) |
+					     (unix  ":") |
+					     (("" %{ s = p;} socket_path) %unix ":"));
 
 		scheme = alpha > { s = p; }
 			 (alpha | digit | "+" | "-" | ".")*
@@ -189,7 +191,7 @@ uri_parse(struct uri *uri, const char *p)
 
 		PATH = ((userinfo "@")? %{ s = p; } path_absolute %unix);
 
-		URI = ((scheme ":" hier_part) | hier_part_noscheme)
+		URI = ((scheme ":" hier_part) | hier_part_noscheme | (socket_path %unix))
 			("?" >{ s = p; } query)? ("#" >{ s = p; } fragment)?;
 
 		# Non-RFC: support port and absolute path

@@ -1,4 +1,4 @@
-1..63
+1..67
     1..19
     ok 1 - host: parse
     ok 2 - host: scheme
@@ -1301,7 +1301,91 @@ ok 61 - subtests
     ok 18 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: query
     ok 19 - https://www.google.com/search?safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl: fragment
 ok 62 - subtests
+    1..19
+    ok 1 - /tmp/unix.sock?q1=v1&q2=v2#fragment: parse
+    ok 2 - /tmp/unix.sock?q1=v1&q2=v2#fragment: scheme
+    ok 3 - /tmp/unix.sock?q1=v1&q2=v2#fragment: login
+    ok 4 - /tmp/unix.sock?q1=v1&q2=v2#fragment: password
+    ok 5 - /tmp/unix.sock?q1=v1&q2=v2#fragment: host
+    ok 6 - /tmp/unix.sock?q1=v1&q2=v2#fragment: service
+    ok 7 - /tmp/unix.sock?q1=v1&q2=v2#fragment: path
+    ok 8 - /tmp/unix.sock?q1=v1&q2=v2#fragment: query
+    ok 9 - /tmp/unix.sock?q1=v1&q2=v2#fragment: fragment
+    ok 10 - /tmp/unix.sock?q1=v1&q2=v2#fragment: host_hint
+    ok 11 - /tmp/unix.sock?q1=v1&q2=v2#fragment: parse
+    ok 12 - /tmp/unix.sock?q1=v1&q2=v2#fragment: scheme
+    ok 13 - /tmp/unix.sock?q1=v1&q2=v2#fragment: login
+    ok 14 - /tmp/unix.sock?q1=v1&q2=v2#fragment: password
+    ok 15 - /tmp/unix.sock?q1=v1&q2=v2#fragment: host
+    ok 16 - /tmp/unix.sock?q1=v1&q2=v2#fragment: service
+    ok 17 - /tmp/unix.sock?q1=v1&q2=v2#fragment: path
+    ok 18 - /tmp/unix.sock?q1=v1&q2=v2#fragment: query
+    ok 19 - /tmp/unix.sock?q1=v1&q2=v2#fragment: fragment
+ok 63 - subtests
+    1..19
+    ok 1 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: parse
+    ok 2 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: scheme
+    ok 3 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: login
+    ok 4 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: password
+    ok 5 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: host
+    ok 6 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: service
+    ok 7 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: path
+    ok 8 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: query
+    ok 9 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: fragment
+    ok 10 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: host_hint
+    ok 11 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: parse
+    ok 12 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: scheme
+    ok 13 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: login
+    ok 14 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: password
+    ok 15 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: host
+    ok 16 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: service
+    ok 17 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: path
+    ok 18 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: query
+    ok 19 - /tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment: fragment
+ok 64 - subtests
+    1..19
+    ok 1 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: parse
+    ok 2 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: scheme
+    ok 3 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: login
+    ok 4 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: password
+    ok 5 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: host
+    ok 6 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: service
+    ok 7 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: path
+    ok 8 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: query
+    ok 9 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: fragment
+    ok 10 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: host_hint
+    ok 11 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: parse
+    ok 12 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: scheme
+    ok 13 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: login
+    ok 14 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: password
+    ok 15 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: host
+    ok 16 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: service
+    ok 17 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: path
+    ok 18 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: query
+    ok 19 - login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment: fragment
+ok 65 - subtests
+    1..19
+    ok 1 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: parse
+    ok 2 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: scheme
+    ok 3 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: login
+    ok 4 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: password
+    ok 5 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: host
+    ok 6 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: service
+    ok 7 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: path
+    ok 8 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: query
+    ok 9 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: fragment
+    ok 10 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: host_hint
+    ok 11 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: parse
+    ok 12 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: scheme
+    ok 13 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: login
+    ok 14 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: password
+    ok 15 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: host
+    ok 16 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: service
+    ok 17 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: path
+    ok 18 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: query
+    ok 19 - scheme://login:password@/tmp/unix.sock:/path1/path2/path3: fragment
+ok 66 - subtests
     1..2
     ok 1 - empty is invalid
     ok 2 - :// is invalid
-ok 63 - subtests
+ok 67 - subtests

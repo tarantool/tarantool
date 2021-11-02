@@ -62,7 +62,7 @@ test_invalid()
 int
 main(void)
 {
-	plan(63);
+	plan(67);
 
 	/* General */
 	test("host", NULL, NULL, NULL, "host", NULL, NULL, NULL, NULL, 0);
@@ -231,6 +231,21 @@ main(void)
 	     "safe=off&site=&tbm=isch&source=hp&biw=1918&bih=1109&q=Tarantool"
 	     "&oq=Tarantool&gs_l=img.3..0i24l3j0i10i24j0i24&gws_rd=ssl",
 	     NULL, 0);
+
+	test("/tmp/unix.sock?q1=v1&q2=v2#fragment", NULL, NULL, NULL, "unix/",
+	     "/tmp/unix.sock", NULL, "q1=v1&q2=v2", "fragment", 3);
+
+	test("/tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment", NULL, NULL,
+	     NULL, "unix/", "/tmp/unix.sock", "/path1/path2/path3", "q1=v1&q2=v2",
+	     "fragment", 3);
+
+	test("login:password@/tmp/unix.sock:/path1/path2/path3?q1=v1#fragment",
+	     NULL, "login", "password", "unix/", "/tmp/unix.sock",
+	     "/path1/path2/path3", "q1=v1", "fragment", 3);
+
+	test("scheme://login:password@/tmp/unix.sock:/path1/path2/path3",
+	     "scheme", "login", "password", "unix/", "/tmp/unix.sock",
+	     "/path1/path2/path3", NULL, NULL, 3);
 
 	test_invalid();
 
