@@ -179,8 +179,12 @@ ch:has_writers()
 ---
 - false
 ...
-fiber.cancel(tfbr)
+tfbr:cancel()
 ---
+...
+test_run:wait_cond(function() return tfbr:status() == 'dead' end)
+---
+- true
 ...
 ch:has_readers()
 ---
@@ -323,8 +327,9 @@ t
   - true
   - true
 ...
-while #buffer < 15 do fiber.sleep(0.001) end
+test_run:wait_cond(function() return #buffer >= 16 end)
 ---
+- true
 ...
 table.sort(buffer)
 ---
@@ -347,6 +352,20 @@ buffer
   - 43
   - 44
   - 45
+...
+tfbr:cancel()
+---
+...
+test_run:wait_cond(function() return tfbr:status() == 'dead' end)
+---
+- true
+...
+tfbr2:cancel()
+---
+...
+test_run:wait_cond(function() return tfbr2:status() == 'dead' end)
+---
+- true
 ...
 ch = fiber.channel(1)
 ---
@@ -482,8 +501,9 @@ for i = 1, 10 do
 end;
 ---
 ...
-for i = 1, 100 do fiber.sleep(0.01) if count > 2000 then break end end;
+test_run:wait_cond(function() return count > 2000 end);
 ---
+- true
 ...
 count > 2000, #test_res, test_res;
 ---
