@@ -24,16 +24,20 @@ local function shell_command(case, i)
         i)
 end
 
+local listen_sock = fio.pathjoin(fio.cwd(), 'listen.sock')
+local repl1_sock = fio.pathjoin(fio.cwd(), 'repl1.sock')
+local repl2_sock = fio.pathjoin(fio.cwd(), 'repl2.sock')
+
 local cases = {
     ('%s %s %s %s %s'):format(
-        'TT_LISTEN=3301',
+        string.format('TT_LISTEN=%s', listen_sock),
         'TT_READAHEAD=10000',
         'TT_STRIP_CORE=false',
         'TT_LOG_FORMAT=json',
         'TT_LOG_NONBLOCK=false'),
     ('%s %s %s %s'):format(
-        'TT_LISTEN=3301',
-        'TT_REPLICATION=0.0.0.0:12345,1.1.1.1:12345',
+        string.format('TT_LISTEN=%s', listen_sock),
+        string.format('TT_REPLICATION=%s,%s', repl1_sock,repl2_sock),
         'TT_REPLICATION_CONNECT_TIMEOUT=0.01',
         'TT_REPLICATION_SYNCHRO_QUORUM=\'4 + 1\''),
     'TT_BACKGROUND=true TT_VINYL_TIMEOUT=60.1',
@@ -45,9 +49,6 @@ test:plan(1)
 local exit_status_list = {}
 local exit_status_list_exp = {}
 for i, case in ipairs(cases) do
-    local tmpdir = fio.tempdir()
-    local new_path = fio.pathjoin(tmpdir, script_name)
-    fio.copyfile(path_to_script, new_path)
     exit_status_list[i] = os.execute(shell_command(case, i))
     exit_status_list_exp[i] = 0
 end
