@@ -6,7 +6,7 @@ local uri = require('uri')
 local function test_parse(test)
     -- Tests for uri.parse() Lua bindings.
     -- Parser itself is tested by test/unit/uri unit test.
-    test:plan(28)
+    test:plan(54)
 
     local u
 
@@ -49,6 +49,41 @@ local function test_parse(test)
     test:is(u.host, 'unix/', 'host')
     test:is(u.service, '/tmp/unix.sock', 'service')
     test:is(u.unix, '/tmp/unix.sock', 'unix')
+
+    u = uri.parse("/tmp/unix.sock?q1=v1&q2=v2#fragment")
+    test:is(u.host, 'unix/', 'host')
+    test:is(u.service, '/tmp/unix.sock', 'service')
+    test:is(u.unix, '/tmp/unix.sock', 'unix')
+    test:is(u.query, 'q1=v1&q2=v2', 'query')
+    test:is(u.fragment, 'fragment', 'fragment')
+
+    u = uri.parse("/tmp/unix.sock:/path1/path2/path3?q1=v1&q2=v2#fragment")
+    test:is(u.host, 'unix/', 'host')
+    test:is(u.service, '/tmp/unix.sock', 'service')
+    test:is(u.unix, '/tmp/unix.sock', 'unix')
+    test:is(u.path, '/path1/path2/path3', 'path')
+    test:is(u.query, 'q1=v1&q2=v2', 'query')
+    test:is(u.fragment, 'fragment', 'fragment')
+
+    u = uri.parse("login:password@/tmp/unix.sock:" ..
+                  "/path1/path2/path3?q1=v1#fragment")
+    test:is(u.login, 'login', 'login')
+    test:is(u.password, 'password', 'password')
+    test:is(u.host, 'unix/', 'host')
+    test:is(u.service, '/tmp/unix.sock', 'service')
+    test:is(u.unix, '/tmp/unix.sock', 'unix')
+    test:is(u.path, '/path1/path2/path3', 'path')
+    test:is(u.query, 'q1=v1', 'query')
+    test:is(u.fragment, 'fragment', 'fragment')
+
+    u = uri.parse("scheme://login:password@/tmp/unix.sock:/path1/path2/path3")
+    test:is(u.scheme, 'scheme', 'scheme')
+    test:is(u.login, 'login', 'login')
+    test:is(u.password, 'password', 'password')
+    test:is(u.host, 'unix/', 'host')
+    test:is(u.service, '/tmp/unix.sock', 'service')
+    test:is(u.unix, '/tmp/unix.sock', 'unix')
+    test:is(u.path, '/path1/path2/path3', 'path')
 
     u = uri.parse("")
     test:isnil(u, "invalid uri", u)
