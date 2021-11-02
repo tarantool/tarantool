@@ -1,8 +1,5 @@
 test_run = require('test_run').new()
 
-test_run:cmd("push filter 'Invalid VYLOG file: Slice [0-9]+ deleted but not registered'" .. \
-             " to 'Invalid VYLOG file: Slice <NUM> deleted but not registered'")
-
 -- gh-1671 upsert is broken in a transaction
 
 -- upsert after upsert
