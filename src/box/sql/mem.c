@@ -224,6 +224,8 @@ mem_type_class_to_str(const struct Mem *mem)
 		return "uuid";
 	case MEM_TYPE_ARRAY:
 		return "array";
+	case MEM_TYPE_MAP:
+		return "map";
 	default:
 		break;
 	}
@@ -510,6 +512,12 @@ mem_set_map_allocated(struct Mem *mem, char *value, uint32_t size)
 {
 	assert(mp_typeof(*value) == MP_MAP);
 	set_msgpack_value(mem, value, size, 0, MEM_TYPE_MAP);
+}
+
+int
+mem_copy_map(struct Mem *mem, const char *value, uint32_t size)
+{
+	return mem_copy_bytes(mem, value, size, MEM_TYPE_MAP);
 }
 
 void
@@ -1187,14 +1195,6 @@ bool_to_str0(struct Mem *mem)
 }
 
 static inline int
-map_to_str0(struct Mem *mem)
-{
-	assert(mem->type == MEM_TYPE_MAP);
-	const char *str = mp_str(mem->z);
-	return mem_copy_str0(mem, str);
-}
-
-static inline int
 uuid_to_str0(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_UUID);
@@ -1295,8 +1295,6 @@ mem_to_str(struct Mem *mem)
 		return bool_to_str0(mem);
 	case MEM_TYPE_BIN:
 		return bin_to_str(mem);
-	case MEM_TYPE_MAP:
-		return map_to_str0(mem);
 	case MEM_TYPE_UUID:
 		return uuid_to_str0(mem);
 	case MEM_TYPE_DEC:
@@ -1382,6 +1380,11 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 		return -1;
 	case FIELD_TYPE_ARRAY:
 		if (mem->type != MEM_TYPE_ARRAY)
+			return -1;
+		mem->flags &= ~MEM_Any;
+		return 0;
+	case FIELD_TYPE_MAP:
+		if (mem->type != MEM_TYPE_MAP)
 			return -1;
 		mem->flags &= ~MEM_Any;
 		return 0;
@@ -3108,9 +3111,9 @@ port_vdbemem_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 			break;
 		case MEM_TYPE_STR:
 		case MEM_TYPE_BIN:
-		case MEM_TYPE_MAP:
 			lua_pushlstring(L, mem->z, mem->n);
 			break;
+		case MEM_TYPE_MAP:
 		case MEM_TYPE_ARRAY:
 			luamp_decode(L, luaL_msgpack_default,
 				     (const char **)&mem->z);
@@ -3245,8 +3248,10 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 					 field.sval.len) != 0)
 				goto error;
 			break;
+		case MP_MAP:
 		case MP_ARRAY: {
 			size_t used = region_used(region);
+			bool is_map = field.type == MP_MAP;
 			struct mpstream stream;
 			bool is_error = false;
 			mpstream_init(&stream, region, region_reserve_cb,
@@ -3269,7 +3274,9 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 					 "raw");
 				goto error;
 			}
-			if (mem_copy_array(&val[i], raw, size) != 0)
+			int rc = is_map ? mem_copy_map(&val[i], raw, size) :
+				 mem_copy_array(&val[i], raw, size);
+			if (rc != 0)
 				goto error;
 			region_truncate(region, used);
 			break;

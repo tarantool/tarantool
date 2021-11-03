@@ -524,11 +524,6 @@ box.execute('SELECT lua(\'return 1 + 1\')')
   rows:
   - [2]
 ...
-box.execute('SELECT lua(\'return box.cfg\')')
----
-- null
-- 'Failed to execute SQL statement: Unsupported type passed from Lua'
-...
 box.execute('SELECT lua(\'return box.cfg()\')')
 ---
 - null

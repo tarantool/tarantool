@@ -187,7 +187,6 @@ box.func.SUMMARIZE:drop()
 -- gh-4113: Valid method to use Lua from SQL
 --
 box.execute('SELECT lua(\'return 1 + 1\')')
-box.execute('SELECT lua(\'return box.cfg\')')
 box.execute('SELECT lua(\'return box.cfg()\')')
 box.execute('SELECT lua(\'return box.cfg.memtx_memory\')')
 

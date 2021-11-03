@@ -411,6 +411,10 @@ mem_set_map_static(struct Mem *mem, char *value, uint32_t size);
 void
 mem_set_map_allocated(struct Mem *mem, char *value, uint32_t size);
 
+/** Copy MAP value to a newly allocated memory. The MEM type becomes MAP. */
+int
+mem_copy_map(struct Mem *mem, const char *value, uint32_t size);
+
 /**
  * Clear MEM and set it to ARRAY. The binary value belongs to another object.
  * The binary value must be msgpack of ARRAY type.

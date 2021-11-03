@@ -125,6 +125,7 @@ static Keyword aKeywordTable[] = {
   { "LEFT",                   "TK_JOIN_KW",     true  },
   { "LIKE",                   "TK_LIKE_KW",     true  },
   { "LIMIT",                  "TK_LIMIT",       false },
+  { "MAP",                    "TK_MAP",         true  },
   { "MATCH",                  "TK_MATCH",       true  },
   { "NATURAL",                "TK_JOIN_KW",     true  },
   { "NO",                     "TK_NO",          false },

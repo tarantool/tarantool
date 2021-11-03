@@ -1843,6 +1843,7 @@ typedef(A) ::= VARBINARY . { A.type = FIELD_TYPE_VARBINARY; }
 typedef(A) ::= UUID . { A.type = FIELD_TYPE_UUID; }
 typedef(A) ::= ANY . { A.type = FIELD_TYPE_ANY; }
 typedef(A) ::= ARRAY . { A.type = FIELD_TYPE_ARRAY; }
+typedef(A) ::= MAP . { A.type = FIELD_TYPE_MAP; }
 
 /**
  * Time-like types are temporary disabled, until they are
