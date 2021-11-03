@@ -7,14 +7,12 @@
 
 #include <stddef.h>
 #include <stdbool.h>
-#include <netdb.h> /* NI_MAXHOST, NI_MAXSERV */
-#include <limits.h> /* _POSIX_PATH_MAX */
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct uri {
+struct uri_raw {
 	const char *scheme;
 	size_t scheme_len;
 	const char *login;
@@ -34,15 +32,8 @@ struct uri {
 	int host_hint;
 };
 
-#define URI_HOST_UNIX "unix/"
-#define URI_MAXHOST NI_MAXHOST
-#define URI_MAXSERVICE _POSIX_PATH_MAX /* _POSIX_PATH_MAX always > NI_MAXSERV */
-
 int
-uri_parse(struct uri *uri, const char *str);
-
-int
-uri_format(char *str, int len, const struct uri *uri, bool write_password);
+uri_raw_parse(struct uri_raw *uri, const char *str);
 
 #if defined(__cplusplus)
 } /* extern "C" */

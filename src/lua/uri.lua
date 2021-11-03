@@ -4,28 +4,30 @@ local ffi = require('ffi')
 local buffer = require('buffer')
 
 ffi.cdef[[
+/**
+ * We define all strings inside the `struct uri` as const, despite
+ * the fact that they are not constant in the C structure. This is
+ * necessary for the `uri_format` function work: there we cannot
+ * assign lua strings to a non-constant pointer. It's not a problem
+ * since uri_format doesn't change something in `struct uri`.
+ */
 struct uri {
     const char *scheme;
-    size_t scheme_len;
     const char *login;
-    size_t login_len;
     const char *password;
-    size_t password_len;
     const char *host;
-    size_t host_len;
     const char *service;
-    size_t service_len;
     const char *path;
-    size_t path_len;
     const char *query;
-    size_t query_len;
     const char *fragment;
-    size_t fragment_len;
     int host_hint;
 };
 
 int
-uri_parse(struct uri *uri, const char *str);
+uri_create(struct uri *uri, const char *str);
+
+void
+uri_destroy(struct uri *uri);
 
 int
 uri_format(char *str, size_t len, struct uri *uri, bool write_password);
@@ -43,7 +45,7 @@ local function parse(str)
         error("Usage: uri.parse(string)")
     end
     local uribuf = uri_stash_take()
-    if builtin.uri_parse(uribuf, str) ~= 0 then
+    if builtin.uri_create(uribuf, str) ~= 0 then
         uri_stash_put(uribuf)
         return nil
     end
@@ -51,7 +53,7 @@ local function parse(str)
     for _, k in ipairs({ 'scheme', 'login', 'password', 'host', 'service',
         'path', 'query', 'fragment'}) do
         if uribuf[k] ~= nil then
-            result[k] = ffi.string(uribuf[k], uribuf[k..'_len'])
+            result[k] = ffi.string(uribuf[k])
         end
     end
     if uribuf.host_hint == 1 then
@@ -61,6 +63,7 @@ local function parse(str)
     elseif uribuf.host_hint == 3 then
         result.unix = result.service
     end
+    builtin.uri_destroy(uribuf)
     uri_stash_put(uribuf)
     return result
 end
@@ -68,21 +71,13 @@ end
 local function format(uri, write_password)
     local uribuf = uri_stash_take()
     uribuf.scheme = uri.scheme
-    uribuf.scheme_len = string.len(uri.scheme or '')
     uribuf.login = uri.login
-    uribuf.login_len = string.len(uri.login or '')
     uribuf.password = uri.password
-    uribuf.password_len = string.len(uri.password or '')
     uribuf.host = uri.host
-    uribuf.host_len = string.len(uri.host or '')
     uribuf.service = uri.service
-    uribuf.service_len = string.len(uri.service or '')
     uribuf.path = uri.path
-    uribuf.path_len = string.len(uri.path or '')
     uribuf.query = uri.query
-    uribuf.query_len = string.len(uri.query or '')
     uribuf.fragment = uri.fragment
-    uribuf.fragment_len = string.len(uri.fragment or '')
     local ibuf = cord_ibuf_take()
     local str = ibuf:alloc(1024)
     local len = builtin.uri_format(str, 1024, uribuf, write_password and 1 or 0)

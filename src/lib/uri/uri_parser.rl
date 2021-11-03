@@ -28,12 +28,13 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "uri_parser.h"
 #include "uri.h"
 #include <trivia/util.h> /* SNPRINT */
 #include <string.h>
 #include <stdio.h> /* snprintf */
 int
-uri_parse(struct uri *uri, const char *p)
+uri_raw_parse(struct uri_raw *uri, const char *p)
 {
 	const char *pe = p + strlen(p);
 	const char *eof = pe;
@@ -216,47 +217,6 @@ uri_parse(struct uri *uri, const char *p)
 	(void)eof;
 
 	return cs >= uri_first_final ? 0 : -1;
-}
-
-int
-uri_format(char *str, int len, const struct uri *uri, bool write_password)
-{
-	int total = 0;
-	if (uri->scheme_len > 0) {
-		SNPRINT(total, snprintf, str, len, "%.*s://",
-			 (int)uri->scheme_len, uri->scheme);
-	}
-	if (uri->host_len > 0) {
-		if (uri->login_len > 0) {
-			SNPRINT(total, snprintf, str, len, "%.*s",
-				(int)uri->login_len, uri->login);
-			if (uri->password_len > 0 && write_password) {
-				SNPRINT(total, snprintf, str, len, ":%.*s",
-				        (int)uri->password_len,
-					uri->password);
-			}
-			SNPRINT(total, snprintf, str, len, "@");
-		}
-		SNPRINT(total, snprintf, str, len, "%.*s",
-			 (int)uri->host_len, uri->host);
-		if (uri->service_len > 0) {
-			SNPRINT(total, snprintf, str, len, ":%.*s",
-				(int)uri->service_len, uri->service);
-		}
-	}
-	if (uri->path_len > 0) {
-		SNPRINT(total, snprintf, str, len, "%.*s",
-			(int)uri->path_len, uri->path);
-	}
-	if (uri->query_len > 0) {
-		SNPRINT(total, snprintf, str, len, "?%.*s",
-			(int)uri->query_len, uri->query);
-	}
-	if (uri->fragment_len > 0) {
-		SNPRINT(total, snprintf, str, len, "#%.*s",
-			(int)uri->fragment_len, uri->fragment);
-	}
-	return total;
 }
 
 /* vim: set ft=ragel: */

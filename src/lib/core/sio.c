@@ -368,26 +368,25 @@ int
 sio_uri_to_addr(const char *uri, struct sockaddr *addr, bool *is_host_empty)
 {
 	struct uri u;
-	if (uri_parse(&u, uri) != 0 || u.service == NULL)
+	if (uri_create(&u, uri) != 0 || u.service == NULL)
 		goto invalid_uri;
-	*is_host_empty = u.host_len == 0;
-	if (u.host_len == strlen(URI_HOST_UNIX) &&
-	    memcmp(u.host, URI_HOST_UNIX, u.host_len) == 0) {
+	*is_host_empty = u.host == NULL;
+	if (u.host != NULL && strcmp(u.host, URI_HOST_UNIX) == 0) {
 		struct sockaddr_un *un = (struct sockaddr_un *) addr;
-		if (u.service_len + 1 > sizeof(un->sun_path))
+		if (strlen(u.service) + 1 > sizeof(un->sun_path))
 			goto invalid_uri;
-		memcpy(un->sun_path, u.service, u.service_len);
-		un->sun_path[u.service_len] = 0;
+		strcpy(un->sun_path, u.service);
 		un->sun_family = AF_UNIX;
+		uri_destroy(&u);
 		return 0;
 	}
 	in_addr_t iaddr;
-	if (u.host_len == 0) {
+	if (u.host == NULL) {
 		iaddr = htonl(INADDR_ANY);
-	} else if (u.host_len == 9 && memcmp("localhost", u.host, 9) == 0) {
+	} else if (strcmp("localhost", u.host) == 0) {
 		iaddr = htonl(INADDR_LOOPBACK);
 	} else {
-		iaddr = inet_addr(tt_cstr(u.host, u.host_len));
+		iaddr = inet_addr(u.host);
 		if (iaddr == (in_addr_t) -1)
 			goto invalid_uri;
 	}
@@ -397,9 +396,11 @@ sio_uri_to_addr(const char *uri, struct sockaddr *addr, bool *is_host_empty)
 	in->sin_family = AF_INET;
 	in->sin_addr.s_addr = iaddr;
 	in->sin_port = port;
+	uri_destroy(&u);
 	return 0;
 
 invalid_uri:
+	uri_destroy(&u);
 	diag_set(SocketError, sio_socketname(-1), "invalid uri \"%s\"", uri);
 	return -1;
 }
