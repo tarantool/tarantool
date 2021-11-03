@@ -46,6 +46,10 @@
 
 #include "xrow.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 enum { APPLIER_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
 
 #define applier_STATE(_)                                             \
@@ -100,8 +104,6 @@ struct applier {
 	uint32_t instance_id;
 	/** Remote instance UUID */
 	struct tt_uuid uuid;
-	/** Remote URI (string) */
-	char source[APPLIER_SOURCE_MAXLEN];
 	/** Remote URI (parsed) */
 	struct uri uri;
 	/** Remote version encoded as a number, see version_id() macro */
@@ -194,5 +196,17 @@ applier_resume(struct applier *applier);
  */
 void
 applier_pause(struct applier *applier);
+
+/**
+ * Return string, which represent remote URI for this
+ * @a applier. This function uses `tt_static_buf` to
+ * store the result.
+ */
+const char *
+applier_uri_str(const struct applier *applier);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_APPLIER_H_INCLUDED */

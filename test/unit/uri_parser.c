@@ -10,13 +10,12 @@ test(const char *s, const char *scheme, const char *login, const char *password,
 	plan(19);
 
 	struct uri uri;
-	is(uri_parse(&uri, s), 0, "%s: parse", s);
+	is(uri_create(&uri, s), 0, "%s: parse", s);
 	/* fprintf(stdout, #key ": %p %d %.*s\n", uri.key,
 	   (int) uri.key ## _len, (int) uri.key ## _len, uri.key); */
 
 #define chk(key) do { \
-	ok((key && uri.key && strlen(key) == uri.key ## _len && \
-	   memcmp(key, uri.key, uri.key ## _len) == 0) || \
+	ok((key && uri.key && strcmp(key, uri.key) == 0) || \
 	   (!key && !uri.key), "%s: " #key, s); } while (0);
 
 	chk(scheme);
@@ -31,7 +30,8 @@ test(const char *s, const char *scheme, const char *login, const char *password,
 
 	char str1[1024];
 	uri_format(str1, sizeof(str1), &uri, true);
-	is(uri_parse(&uri, s), 0, "%s: parse", s);
+	uri_destroy(&uri);
+	is(uri_create(&uri, s), 0, "%s: parse", s);
 	chk(scheme);
 	chk(login);
 	chk(password);
@@ -40,7 +40,7 @@ test(const char *s, const char *scheme, const char *login, const char *password,
 	chk(path);
 	chk(query);
 	chk(fragment);
-
+	uri_destroy(&uri);
 #undef chk
 
 	return check_plan();
@@ -53,9 +53,10 @@ test_invalid()
 
 	/* Invalid */
 	struct uri u;
-	isnt(uri_parse(&u, ""), 0 , "empty is invalid");
-	isnt(uri_parse(&u, "://"), 0 , ":// is invalid");
-
+	isnt(uri_create(&u, ""), 0 , "empty is invalid");
+	uri_destroy(&u);
+	isnt(uri_create(&u, "://"), 0 , ":// is invalid");
+	uri_destroy(&u);
 	return check_plan();
 }
 

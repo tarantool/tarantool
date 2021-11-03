@@ -355,8 +355,9 @@ replica_on_applier_connect(struct replica *replica)
 	if (orig != NULL && orig->applier != NULL) {
 		say_error("duplicate connection to the same replica: "
 			  "instance uuid %s, addr1 %s, addr2 %s",
-			  tt_uuid_str(&orig->uuid), applier->source,
-			  orig->applier->source);
+			  tt_uuid_str(&orig->uuid),
+			  applier_uri_str(applier),
+			  applier_uri_str(orig->applier));
 		fiber_cancel(fiber());
 		/*
 		 * Raise an exception to force the applier

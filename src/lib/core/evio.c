@@ -208,17 +208,21 @@ static int
 evio_service_entry_reuse_addr(const char *uri)
 {
 	struct uri u;
-	if (uri_parse(&u, uri) || u.service == NULL) {
+	if (uri_create(&u, uri) != 0 || u.service == NULL) {
+		uri_destroy(&u);
 		diag_set(IllegalParams, "invalid uri for bind: %s", uri);
 		return -1;
 	}
-	if (strncmp(u.host, URI_HOST_UNIX, u.host_len) != 0)
+	if (u.host != NULL && strcmp(u.host, URI_HOST_UNIX) != 0) {
+		uri_destroy(&u);
 		return 0;
+	}
 
-	struct sockaddr_un un;
-	snprintf(un.sun_path, sizeof(un.sun_path), "%.*s",
-		 (int)u.service_len, u.service);
+	struct sockaddr_un un = { 0 };
+	assert(u.service != NULL);
+	strlcpy(un.sun_path, u.service, sizeof(un.sun_path));
 	un.sun_family = AF_UNIX;
+	uri_destroy(&u);
 
 	int cl_fd = sio_socket(un.sun_family, SOCK_STREAM, 0);
 	if (cl_fd < 0)
@@ -323,26 +327,24 @@ static int
 evio_service_entry_bind(struct evio_service_entry *entry, const char *uri)
 {
 	struct uri u;
-	if (uri_parse(&u, uri) || u.service == NULL) {
+	if (uri_create(&u, uri) != 0 || u.service == NULL) {
+		uri_destroy(&u);
 		diag_set(IllegalParams, "invalid uri for bind: %s", uri);
 		return -1;
 	}
-
-	snprintf(entry->serv, sizeof(entry->serv), "%.*s",
-		 (int) u.service_len, u.service);
-	if (u.host != NULL && strncmp(u.host, "*", u.host_len) != 0) {
-		snprintf(entry->host, sizeof(entry->host), "%.*s",
-			 (int) u.host_len, u.host);
-	} /* else { entry->host[0] = '\0'; } */
-
+	entry->serv[0] = entry->host[0] = '\0';
+	assert(u.service != NULL);
+	strlcpy(entry->serv, u.service, sizeof(entry->serv));
+	if (u.host != NULL && strcmp(u.host, "*") != 0)
+		strlcpy(entry->host, u.host, sizeof(entry->host));
+	uri_destroy(&u);
 	assert(! ev_is_active(&entry->ev));
 
 	if (strcmp(entry->host, URI_HOST_UNIX) == 0) {
 		/* UNIX domain socket */
 		struct sockaddr_un *un = (struct sockaddr_un *) &entry->addr;
 		entry->addr_len = sizeof(*un);
-		snprintf(un->sun_path, sizeof(un->sun_path), "%s",
-			 entry->serv);
+		strlcpy(un->sun_path, entry->serv, sizeof(un->sun_path));
 		un->sun_family = AF_UNIX;
 		return evio_service_entry_bind_addr(entry);
 	}

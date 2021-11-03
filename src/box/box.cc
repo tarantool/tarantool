@@ -738,11 +738,13 @@ box_check_uri(const char *source, const char *option_name)
 	struct uri uri;
 
 	/* URI format is [host:]service */
-	if (uri_parse(&uri, source) || !uri.service) {
+	if (uri_create(&uri, source) != 0 || !uri.service) {
+		uri_destroy(&uri);
 		diag_set(ClientError, ER_CFG, option_name,
 			 "expected host:service or /unix.socket");
 		return -1;
 	}
+	uri_destroy(&uri);
 	return 0;
 }
 

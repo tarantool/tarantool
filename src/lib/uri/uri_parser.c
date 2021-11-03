@@ -30,12 +30,13 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "uri_parser.h"
 #include "uri.h"
 #include <trivia/util.h> /* SNPRINT */
 #include <string.h>
 #include <stdio.h> /* snprintf */
 int
-uri_parse(struct uri *uri, const char *p)
+uri_raw_parse(struct uri_raw *uri, const char *p)
 {
 	const char *pe = p + strlen(p);
 	const char *eof = pe;
@@ -49,7 +50,7 @@ uri_parse(struct uri *uri, const char *p)
 	size_t login_len = 0, scheme_len = 0;
 
 	
-#line 53 "src/lib/uri/uri_parser.c"
+#line 54 "src/lib/uri/uri_parser.c"
 static const int uri_start = 149;
 static const int uri_first_final = 149;
 static const int uri_error = 0;
@@ -57,12 +58,12 @@ static const int uri_error = 0;
 static const int uri_en_main = 149;
 
 
-#line 61 "src/lib/uri/uri_parser.c"
+#line 62 "src/lib/uri/uri_parser.c"
 	{
 	cs = uri_start;
 	}
 
-#line 66 "src/lib/uri/uri_parser.c"
+#line 67 "src/lib/uri/uri_parser.c"
 	{
 	if ( p == pe )
 		goto _test_eof;
@@ -100,16 +101,16 @@ st0:
 cs = 0;
 	goto _out;
 tr156:
-#line 144 "src/lib/uri/uri_parser.rl"
+#line 145 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st150;
 st150:
 	if ( ++p == pe )
 		goto _test_eof150;
 case 150:
-#line 113 "src/lib/uri/uri_parser.c"
+#line 114 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st150;
 		case 35: goto tr166;
@@ -132,80 +133,80 @@ case 150:
 		goto st150;
 	goto st0;
 tr157:
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st151;
 tr166:
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st151;
 tr177:
-#line 71 "src/lib/uri/uri_parser.rl"
-	{ s = p; }
 #line 72 "src/lib/uri/uri_parser.rl"
+	{ s = p; }
+#line 73 "src/lib/uri/uri_parser.rl"
 	{ uri->query = s; uri->query_len = p - s; }
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st151;
 tr179:
-#line 72 "src/lib/uri/uri_parser.rl"
+#line 73 "src/lib/uri/uri_parser.rl"
 	{ uri->query = s; uri->query_len = p - s; }
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st151;
 tr182:
-#line 138 "src/lib/uri/uri_parser.rl"
-	{ s = p; }
 #line 139 "src/lib/uri/uri_parser.rl"
-	{ uri->service = s; uri->service_len = p - s; }
-#line 171 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 140 "src/lib/uri/uri_parser.rl"
+	{ uri->service = s; uri->service_len = p - s; }
+#line 172 "src/lib/uri/uri_parser.rl"
+	{ s = p; }
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st151;
 tr193:
-#line 139 "src/lib/uri/uri_parser.rl"
+#line 140 "src/lib/uri/uri_parser.rl"
 	{ uri->service = s; uri->service_len = p - s; }
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st151;
 tr202:
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st151;
 tr220:
-#line 108 "src/lib/uri/uri_parser.rl"
+#line 109 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;
 			   uri->host_hint = 1; }
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st151;
 tr239:
-#line 119 "src/lib/uri/uri_parser.rl"
+#line 120 "src/lib/uri/uri_parser.rl"
 	{
 			/*
 			 * This action is also called for path_* terms.
@@ -221,17 +222,17 @@ tr239:
 				uri->path_len = 0;
 			};
 		}
-#line 170 "src/lib/uri/uri_parser.rl"
+#line 171 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st151;
 tr245:
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 119 "src/lib/uri/uri_parser.rl"
+#line 120 "src/lib/uri/uri_parser.rl"
 	{
 			/*
 			 * This action is also called for path_* terms.
@@ -247,14 +248,14 @@ tr245:
 				uri->path_len = 0;
 			};
 		}
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st151;
 st151:
 	if ( ++p == pe )
 		goto _test_eof151;
 case 151:
-#line 258 "src/lib/uri/uri_parser.c"
+#line 259 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto tr172;
 		case 37: goto tr173;
@@ -273,14 +274,14 @@ case 151:
 		goto tr172;
 	goto st0;
 tr172:
-#line 75 "src/lib/uri/uri_parser.rl"
+#line 76 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st152;
 st152:
 	if ( ++p == pe )
 		goto _test_eof152;
 case 152:
-#line 284 "src/lib/uri/uri_parser.c"
+#line 285 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st152;
 		case 37: goto st1;
@@ -299,14 +300,14 @@ case 152:
 		goto st152;
 	goto st0;
 tr173:
-#line 75 "src/lib/uri/uri_parser.rl"
+#line 76 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st1;
 st1:
 	if ( ++p == pe )
 		goto _test_eof1;
 case 1:
-#line 310 "src/lib/uri/uri_parser.c"
+#line 311 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 37: goto st152;
 		case 117: goto st2;
@@ -373,16 +374,16 @@ case 5:
 		goto st152;
 	goto st0;
 tr158:
-#line 144 "src/lib/uri/uri_parser.rl"
+#line 145 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st6;
 st6:
 	if ( ++p == pe )
 		goto _test_eof6;
 case 6:
-#line 386 "src/lib/uri/uri_parser.c"
+#line 387 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 37: goto st150;
 		case 117: goto st7;
@@ -449,43 +450,43 @@ case 10:
 		goto st150;
 	goto st0;
 tr168:
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st153;
 tr184:
-#line 138 "src/lib/uri/uri_parser.rl"
-	{ s = p; }
 #line 139 "src/lib/uri/uri_parser.rl"
+	{ s = p; }
+#line 140 "src/lib/uri/uri_parser.rl"
 	{ uri->service = s; uri->service_len = p - s; }
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st153;
 tr194:
-#line 139 "src/lib/uri/uri_parser.rl"
+#line 140 "src/lib/uri/uri_parser.rl"
 	{ uri->service = s; uri->service_len = p - s; }
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st153;
 tr203:
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st153;
 tr221:
-#line 108 "src/lib/uri/uri_parser.rl"
+#line 109 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;
 			   uri->host_hint = 1; }
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st153;
 st153:
 	if ( ++p == pe )
 		goto _test_eof153;
 case 153:
-#line 489 "src/lib/uri/uri_parser.c"
+#line 490 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st153;
 		case 35: goto tr157;
@@ -575,66 +576,66 @@ case 15:
 		goto st153;
 	goto st0;
 tr162:
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st154;
 tr170:
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st154;
 tr186:
-#line 138 "src/lib/uri/uri_parser.rl"
-	{ s = p; }
 #line 139 "src/lib/uri/uri_parser.rl"
-	{ uri->service = s; uri->service_len = p - s; }
-#line 171 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 140 "src/lib/uri/uri_parser.rl"
+	{ uri->service = s; uri->service_len = p - s; }
+#line 172 "src/lib/uri/uri_parser.rl"
+	{ s = p; }
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st154;
 tr196:
-#line 139 "src/lib/uri/uri_parser.rl"
+#line 140 "src/lib/uri/uri_parser.rl"
 	{ uri->service = s; uri->service_len = p - s; }
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st154;
 tr204:
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st154;
 tr224:
-#line 108 "src/lib/uri/uri_parser.rl"
+#line 109 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;
 			   uri->host_hint = 1; }
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st154;
 tr240:
-#line 119 "src/lib/uri/uri_parser.rl"
+#line 120 "src/lib/uri/uri_parser.rl"
 	{
 			/*
 			 * This action is also called for path_* terms.
@@ -650,17 +651,17 @@ tr240:
 				uri->path_len = 0;
 			};
 		}
-#line 170 "src/lib/uri/uri_parser.rl"
+#line 171 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st154;
 tr247:
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 119 "src/lib/uri/uri_parser.rl"
+#line 120 "src/lib/uri/uri_parser.rl"
 	{
 			/*
 			 * This action is also called for path_* terms.
@@ -676,14 +677,14 @@ tr247:
 				uri->path_len = 0;
 			};
 		}
-#line 195 "src/lib/uri/uri_parser.rl"
+#line 196 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st154;
 st154:
 	if ( ++p == pe )
 		goto _test_eof154;
 case 154:
-#line 687 "src/lib/uri/uri_parser.c"
+#line 688 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto tr176;
 		case 35: goto tr177;
@@ -703,14 +704,14 @@ case 154:
 		goto tr176;
 	goto st0;
 tr176:
-#line 71 "src/lib/uri/uri_parser.rl"
+#line 72 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st155;
 st155:
 	if ( ++p == pe )
 		goto _test_eof155;
 case 155:
-#line 714 "src/lib/uri/uri_parser.c"
+#line 715 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st155;
 		case 35: goto tr179;
@@ -730,14 +731,14 @@ case 155:
 		goto st155;
 	goto st0;
 tr178:
-#line 71 "src/lib/uri/uri_parser.rl"
+#line 72 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st16;
 st16:
 	if ( ++p == pe )
 		goto _test_eof16;
 case 16:
-#line 741 "src/lib/uri/uri_parser.c"
+#line 742 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 37: goto st155;
 		case 117: goto st17;
@@ -804,25 +805,25 @@ case 20:
 		goto st155;
 	goto st0;
 tr169:
-#line 145 "src/lib/uri/uri_parser.rl"
+#line 146 "src/lib/uri/uri_parser.rl"
 	{ login = s; login_len = p - s; }
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st156;
 tr261:
-#line 145 "src/lib/uri/uri_parser.rl"
+#line 146 "src/lib/uri/uri_parser.rl"
 	{ login = s; login_len = p - s; }
-#line 108 "src/lib/uri/uri_parser.rl"
+#line 109 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;
 			   uri->host_hint = 1; }
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st156;
 st156:
 	if ( ++p == pe )
 		goto _test_eof156;
 case 156:
-#line 826 "src/lib/uri/uri_parser.c"
+#line 827 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto tr181;
 		case 35: goto tr182;
@@ -848,14 +849,14 @@ case 156:
 		goto tr185;
 	goto st0;
 tr181:
-#line 148 "src/lib/uri/uri_parser.rl"
+#line 149 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st21;
 st21:
 	if ( ++p == pe )
 		goto _test_eof21;
 case 21:
-#line 859 "src/lib/uri/uri_parser.c"
+#line 860 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st21;
 		case 37: goto st22;
@@ -878,14 +879,14 @@ case 21:
 		goto st21;
 	goto st0;
 tr183:
-#line 148 "src/lib/uri/uri_parser.rl"
+#line 149 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st22;
 st22:
 	if ( ++p == pe )
 		goto _test_eof22;
 case 22:
-#line 889 "src/lib/uri/uri_parser.c"
+#line 890 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 37: goto st21;
 		case 117: goto st23;
@@ -952,30 +953,30 @@ case 26:
 		goto st21;
 	goto st0;
 tr23:
-#line 149 "src/lib/uri/uri_parser.rl"
+#line 150 "src/lib/uri/uri_parser.rl"
 	{ uri->password = s; uri->password_len = p - s; }
-#line 153 "src/lib/uri/uri_parser.rl"
+#line 154 "src/lib/uri/uri_parser.rl"
 	{ uri->login = login; uri->login_len = login_len; }
 	goto st27;
 tr171:
-#line 145 "src/lib/uri/uri_parser.rl"
+#line 146 "src/lib/uri/uri_parser.rl"
 	{ login = s; login_len = p - s; }
-#line 153 "src/lib/uri/uri_parser.rl"
+#line 154 "src/lib/uri/uri_parser.rl"
 	{ uri->login = login; uri->login_len = login_len; }
 	goto st27;
 tr187:
-#line 148 "src/lib/uri/uri_parser.rl"
-	{ s = p; }
 #line 149 "src/lib/uri/uri_parser.rl"
+	{ s = p; }
+#line 150 "src/lib/uri/uri_parser.rl"
 	{ uri->password = s; uri->password_len = p - s; }
-#line 153 "src/lib/uri/uri_parser.rl"
+#line 154 "src/lib/uri/uri_parser.rl"
 	{ uri->login = login; uri->login_len = login_len; }
 	goto st27;
 st27:
 	if ( ++p == pe )
 		goto _test_eof27;
 case 27:
-#line 979 "src/lib/uri/uri_parser.c"
+#line 980 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto tr28;
 		case 37: goto tr29;
@@ -1001,14 +1002,14 @@ case 27:
 		goto tr32;
 	goto st0;
 tr28:
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st157;
 st157:
 	if ( ++p == pe )
 		goto _test_eof157;
 case 157:
-#line 1012 "src/lib/uri/uri_parser.c"
+#line 1013 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st157;
 		case 35: goto tr166;
@@ -1030,14 +1031,14 @@ case 157:
 		goto st157;
 	goto st0;
 tr29:
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st28;
 st28:
 	if ( ++p == pe )
 		goto _test_eof28;
 case 28:
-#line 1041 "src/lib/uri/uri_parser.c"
+#line 1042 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 37: goto st157;
 		case 117: goto st29;
@@ -1104,21 +1105,21 @@ case 32:
 		goto st157;
 	goto st0;
 tr190:
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st158;
 tr223:
-#line 108 "src/lib/uri/uri_parser.rl"
+#line 109 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;
 			   uri->host_hint = 1; }
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st158;
 st158:
 	if ( ++p == pe )
 		goto _test_eof158;
 case 158:
-#line 1122 "src/lib/uri/uri_parser.c"
+#line 1123 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 35: goto tr182;
 		case 47: goto tr184;
@@ -1134,14 +1135,14 @@ case 158:
 		goto tr192;
 	goto st0;
 tr191:
-#line 138 "src/lib/uri/uri_parser.rl"
+#line 139 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st159;
 st159:
 	if ( ++p == pe )
 		goto _test_eof159;
 case 159:
-#line 1145 "src/lib/uri/uri_parser.c"
+#line 1146 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 35: goto tr193;
 		case 47: goto tr194;
@@ -1151,14 +1152,14 @@ case 159:
 		goto st159;
 	goto st0;
 tr192:
-#line 138 "src/lib/uri/uri_parser.rl"
+#line 139 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st160;
 st160:
 	if ( ++p == pe )
 		goto _test_eof160;
 case 160:
-#line 1162 "src/lib/uri/uri_parser.c"
+#line 1163 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 35: goto tr193;
 		case 47: goto tr194;
@@ -1171,16 +1172,16 @@ case 160:
 		goto st160;
 	goto st0;
 tr30:
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 158 "src/lib/uri/uri_parser.rl"
+#line 159 "src/lib/uri/uri_parser.rl"
 	{ s = p;}
 	goto st161;
 st161:
 	if ( ++p == pe )
 		goto _test_eof161;
 case 161:
-#line 1184 "src/lib/uri/uri_parser.c"
+#line 1185 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st157;
 		case 35: goto tr166;
@@ -1202,20 +1203,20 @@ case 161:
 		goto st157;
 	goto st0;
 tr198:
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st162;
 tr274:
-#line 158 "src/lib/uri/uri_parser.rl"
+#line 159 "src/lib/uri/uri_parser.rl"
 	{ s = p;}
 	goto st162;
 st162:
 	if ( ++p == pe )
 		goto _test_eof162;
 case 162:
-#line 1219 "src/lib/uri/uri_parser.c"
+#line 1220 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st163;
 		case 35: goto tr157;
@@ -1332,7 +1333,7 @@ case 37:
 		goto st163;
 	goto st0;
 tr201:
-#line 119 "src/lib/uri/uri_parser.rl"
+#line 120 "src/lib/uri/uri_parser.rl"
 	{
 			/*
 			 * This action is also called for path_* terms.
@@ -1353,7 +1354,7 @@ st164:
 	if ( ++p == pe )
 		goto _test_eof164;
 case 164:
-#line 1357 "src/lib/uri/uri_parser.c"
+#line 1358 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st153;
 		case 35: goto tr202;
@@ -1375,16 +1376,16 @@ case 164:
 		goto st153;
 	goto st0;
 tr31:
-#line 158 "src/lib/uri/uri_parser.rl"
+#line 159 "src/lib/uri/uri_parser.rl"
 	{ s = p;}
-#line 192 "src/lib/uri/uri_parser.rl"
+#line 193 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st165;
 st165:
 	if ( ++p == pe )
 		goto _test_eof165;
 case 165:
-#line 1388 "src/lib/uri/uri_parser.c"
+#line 1389 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st166;
 		case 37: goto st38;
@@ -1612,7 +1613,7 @@ case 47:
 		goto st168;
 	goto st0;
 tr207:
-#line 119 "src/lib/uri/uri_parser.rl"
+#line 120 "src/lib/uri/uri_parser.rl"
 	{
 			/*
 			 * This action is also called for path_* terms.
@@ -1633,7 +1634,7 @@ st169:
 	if ( ++p == pe )
 		goto _test_eof169;
 case 169:
-#line 1637 "src/lib/uri/uri_parser.c"
+#line 1638 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st168;
 		case 35: goto tr202;
@@ -1655,14 +1656,14 @@ case 169:
 		goto st168;
 	goto st0;
 tr209:
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st170;
 st170:
 	if ( ++p == pe )
 		goto _test_eof170;
 case 170:
-#line 1666 "src/lib/uri/uri_parser.c"
+#line 1667 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st170;
 		case 35: goto tr157;
@@ -1752,16 +1753,16 @@ case 52:
 		goto st170;
 	goto st0;
 tr32:
-#line 107 "src/lib/uri/uri_parser.rl"
+#line 108 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st171;
 st171:
 	if ( ++p == pe )
 		goto _test_eof171;
 case 171:
-#line 1765 "src/lib/uri/uri_parser.c"
+#line 1766 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st157;
 		case 35: goto tr166;
@@ -2184,14 +2185,14 @@ case 53:
 		goto tr60;
 	goto st0;
 tr60:
-#line 114 "src/lib/uri/uri_parser.rl"
+#line 115 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st54;
 st54:
 	if ( ++p == pe )
 		goto _test_eof54;
 case 54:
-#line 2195 "src/lib/uri/uri_parser.c"
+#line 2196 "src/lib/uri/uri_parser.c"
 	if ( (*p) == 58 )
 		goto st58;
 	if ( (*p) > 57 ) {
@@ -2742,7 +2743,7 @@ case 97:
 		goto tr68;
 	goto st0;
 tr68:
-#line 115 "src/lib/uri/uri_parser.rl"
+#line 116 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;
 				   uri->host_hint = 2; }
 	goto st186;
@@ -2750,7 +2751,7 @@ st186:
 	if ( ++p == pe )
 		goto _test_eof186;
 case 186:
-#line 2754 "src/lib/uri/uri_parser.c"
+#line 2755 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 35: goto tr202;
 		case 47: goto tr203;
@@ -2759,14 +2760,14 @@ case 186:
 	}
 	goto st0;
 tr61:
-#line 114 "src/lib/uri/uri_parser.rl"
+#line 115 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st98;
 st98:
 	if ( ++p == pe )
 		goto _test_eof98;
 case 98:
-#line 2770 "src/lib/uri/uri_parser.c"
+#line 2771 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 58: goto st99;
 		case 93: goto tr68;
@@ -2995,14 +2996,14 @@ case 118:
 		goto st72;
 	goto st0;
 tr34:
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st187;
 st187:
 	if ( ++p == pe )
 		goto _test_eof187;
 case 187:
-#line 3006 "src/lib/uri/uri_parser.c"
+#line 3007 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st157;
 		case 35: goto tr166;
@@ -3099,16 +3100,16 @@ case 190:
 		goto st157;
 	goto st0;
 tr233:
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st191;
 st191:
 	if ( ++p == pe )
 		goto _test_eof191;
 case 191:
-#line 3112 "src/lib/uri/uri_parser.c"
+#line 3113 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st153;
 		case 35: goto tr157;
@@ -3155,14 +3156,14 @@ case 192:
 		goto st153;
 	goto st0;
 tr235:
-#line 135 "src/lib/uri/uri_parser.rl"
+#line 136 "src/lib/uri/uri_parser.rl"
 	{ s = p;}
 	goto st193;
 st193:
 	if ( ++p == pe )
 		goto _test_eof193;
 case 193:
-#line 3166 "src/lib/uri/uri_parser.c"
+#line 3167 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st153;
 		case 35: goto tr157;
@@ -3184,14 +3185,14 @@ case 193:
 		goto st153;
 	goto st0;
 tr236:
-#line 135 "src/lib/uri/uri_parser.rl"
+#line 136 "src/lib/uri/uri_parser.rl"
 	{ s = p;}
 	goto st194;
 st194:
 	if ( ++p == pe )
 		goto _test_eof194;
 case 194:
-#line 3195 "src/lib/uri/uri_parser.c"
+#line 3196 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st195;
 		case 35: goto tr157;
@@ -3308,16 +3309,16 @@ case 123:
 		goto st195;
 	goto st0;
 tr185:
-#line 148 "src/lib/uri/uri_parser.rl"
+#line 149 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 138 "src/lib/uri/uri_parser.rl"
+#line 139 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st196;
 st196:
 	if ( ++p == pe )
 		goto _test_eof196;
 case 196:
-#line 3321 "src/lib/uri/uri_parser.c"
+#line 3322 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st21;
 		case 35: goto tr193;
@@ -3343,16 +3344,16 @@ case 196:
 		goto st196;
 	goto st0;
 tr188:
-#line 148 "src/lib/uri/uri_parser.rl"
+#line 149 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 138 "src/lib/uri/uri_parser.rl"
+#line 139 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st197;
 st197:
 	if ( ++p == pe )
 		goto _test_eof197;
 case 197:
-#line 3356 "src/lib/uri/uri_parser.c"
+#line 3357 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st21;
 		case 35: goto tr193;
@@ -3375,18 +3376,18 @@ case 197:
 		goto st197;
 	goto st0;
 tr159:
-#line 144 "src/lib/uri/uri_parser.rl"
+#line 145 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 158 "src/lib/uri/uri_parser.rl"
+#line 159 "src/lib/uri/uri_parser.rl"
 	{ s = p;}
 	goto st198;
 st198:
 	if ( ++p == pe )
 		goto _test_eof198;
 case 198:
-#line 3390 "src/lib/uri/uri_parser.c"
+#line 3391 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st150;
 		case 35: goto tr166;
@@ -3409,20 +3410,20 @@ case 198:
 		goto st150;
 	goto st0;
 tr243:
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st199;
 tr339:
-#line 135 "src/lib/uri/uri_parser.rl"
+#line 136 "src/lib/uri/uri_parser.rl"
 	{ s = p;}
 	goto st199;
 st199:
 	if ( ++p == pe )
 		goto _test_eof199;
 case 199:
-#line 3426 "src/lib/uri/uri_parser.c"
+#line 3427 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st200;
 		case 35: goto tr157;
@@ -3539,16 +3540,16 @@ case 128:
 		goto st200;
 	goto st0;
 tr160:
-#line 158 "src/lib/uri/uri_parser.rl"
+#line 159 "src/lib/uri/uri_parser.rl"
 	{ s = p;}
-#line 192 "src/lib/uri/uri_parser.rl"
+#line 193 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st201;
 st201:
 	if ( ++p == pe )
 		goto _test_eof201;
 case 201:
-#line 3552 "src/lib/uri/uri_parser.c"
+#line 3553 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st202;
 		case 35: goto tr157;
@@ -3692,7 +3693,7 @@ case 203:
 		goto st202;
 	goto st0;
 tr250:
-#line 119 "src/lib/uri/uri_parser.rl"
+#line 120 "src/lib/uri/uri_parser.rl"
 	{
 			/*
 			 * This action is also called for path_* terms.
@@ -3713,7 +3714,7 @@ st204:
 	if ( ++p == pe )
 		goto _test_eof204;
 case 204:
-#line 3717 "src/lib/uri/uri_parser.c"
+#line 3718 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st170;
 		case 35: goto tr202;
@@ -3735,20 +3736,20 @@ case 204:
 		goto st170;
 	goto st0;
 tr161:
-#line 144 "src/lib/uri/uri_parser.rl"
+#line 145 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 107 "src/lib/uri/uri_parser.rl"
+#line 108 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 188 "src/lib/uri/uri_parser.rl"
+#line 189 "src/lib/uri/uri_parser.rl"
 	{ uri->service = p; }
 	goto st205;
 st205:
 	if ( ++p == pe )
 		goto _test_eof205;
 case 205:
-#line 3752 "src/lib/uri/uri_parser.c"
+#line 3753 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st150;
 		case 35: goto tr166;
@@ -4217,18 +4218,18 @@ case 221:
 	}
 	goto st0;
 tr164:
-#line 160 "src/lib/uri/uri_parser.rl"
+#line 161 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 144 "src/lib/uri/uri_parser.rl"
+#line 145 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st222;
 st222:
 	if ( ++p == pe )
 		goto _test_eof222;
 case 222:
-#line 4232 "src/lib/uri/uri_parser.c"
+#line 4233 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st150;
 		case 35: goto tr166;
@@ -4256,18 +4257,18 @@ case 222:
 		goto st222;
 	goto st0;
 tr268:
-#line 162 "src/lib/uri/uri_parser.rl"
+#line 163 "src/lib/uri/uri_parser.rl"
 	{scheme = s; scheme_len = p - s; }
-#line 145 "src/lib/uri/uri_parser.rl"
+#line 146 "src/lib/uri/uri_parser.rl"
 	{ login = s; login_len = p - s; }
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st223;
 st223:
 	if ( ++p == pe )
 		goto _test_eof223;
 case 223:
-#line 4271 "src/lib/uri/uri_parser.c"
+#line 4272 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto tr181;
 		case 35: goto tr182;
@@ -4293,20 +4294,20 @@ case 223:
 		goto tr185;
 	goto st0;
 tr269:
-#line 179 "src/lib/uri/uri_parser.rl"
+#line 180 "src/lib/uri/uri_parser.rl"
 	{ uri->scheme = scheme; uri->scheme_len = scheme_len;}
-#line 138 "src/lib/uri/uri_parser.rl"
-	{ s = p; }
 #line 139 "src/lib/uri/uri_parser.rl"
+	{ s = p; }
+#line 140 "src/lib/uri/uri_parser.rl"
 	{ uri->service = s; uri->service_len = p - s; }
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st224;
 st224:
 	if ( ++p == pe )
 		goto _test_eof224;
 case 224:
-#line 4310 "src/lib/uri/uri_parser.c"
+#line 4311 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st153;
 		case 35: goto tr157;
@@ -4361,16 +4362,16 @@ case 225:
 		goto tr275;
 	goto st0;
 tr271:
-#line 144 "src/lib/uri/uri_parser.rl"
+#line 145 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st226;
 st226:
 	if ( ++p == pe )
 		goto _test_eof226;
 case 226:
-#line 4374 "src/lib/uri/uri_parser.c"
+#line 4375 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st226;
 		case 35: goto tr166;
@@ -4394,16 +4395,16 @@ case 226:
 		goto st226;
 	goto st0;
 tr272:
-#line 144 "src/lib/uri/uri_parser.rl"
+#line 145 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st134;
 st134:
 	if ( ++p == pe )
 		goto _test_eof134;
 case 134:
-#line 4407 "src/lib/uri/uri_parser.c"
+#line 4408 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 37: goto st226;
 		case 117: goto st135;
@@ -4470,25 +4471,25 @@ case 138:
 		goto st226;
 	goto st0;
 tr278:
-#line 145 "src/lib/uri/uri_parser.rl"
+#line 146 "src/lib/uri/uri_parser.rl"
 	{ login = s; login_len = p - s; }
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st227;
 tr328:
-#line 145 "src/lib/uri/uri_parser.rl"
+#line 146 "src/lib/uri/uri_parser.rl"
 	{ login = s; login_len = p - s; }
-#line 108 "src/lib/uri/uri_parser.rl"
+#line 109 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;
 			   uri->host_hint = 1; }
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st227;
 st227:
 	if ( ++p == pe )
 		goto _test_eof227;
 case 227:
-#line 4492 "src/lib/uri/uri_parser.c"
+#line 4493 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto tr280;
 		case 35: goto tr182;
@@ -4516,14 +4517,14 @@ case 227:
 		goto tr282;
 	goto st0;
 tr280:
-#line 148 "src/lib/uri/uri_parser.rl"
+#line 149 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st228;
 st228:
 	if ( ++p == pe )
 		goto _test_eof228;
 case 228:
-#line 4527 "src/lib/uri/uri_parser.c"
+#line 4528 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st228;
 		case 35: goto tr157;
@@ -4547,14 +4548,14 @@ case 228:
 		goto st228;
 	goto st0;
 tr281:
-#line 148 "src/lib/uri/uri_parser.rl"
+#line 149 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st139;
 st139:
 	if ( ++p == pe )
 		goto _test_eof139;
 case 139:
-#line 4558 "src/lib/uri/uri_parser.c"
+#line 4559 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 37: goto st228;
 		case 117: goto st140;
@@ -4621,30 +4622,30 @@ case 143:
 		goto st228;
 	goto st0;
 tr286:
-#line 149 "src/lib/uri/uri_parser.rl"
+#line 150 "src/lib/uri/uri_parser.rl"
 	{ uri->password = s; uri->password_len = p - s; }
-#line 153 "src/lib/uri/uri_parser.rl"
+#line 154 "src/lib/uri/uri_parser.rl"
 	{ uri->login = login; uri->login_len = login_len; }
 	goto st229;
 tr279:
-#line 145 "src/lib/uri/uri_parser.rl"
+#line 146 "src/lib/uri/uri_parser.rl"
 	{ login = s; login_len = p - s; }
-#line 153 "src/lib/uri/uri_parser.rl"
+#line 154 "src/lib/uri/uri_parser.rl"
 	{ uri->login = login; uri->login_len = login_len; }
 	goto st229;
 tr283:
-#line 148 "src/lib/uri/uri_parser.rl"
-	{ s = p; }
 #line 149 "src/lib/uri/uri_parser.rl"
+	{ s = p; }
+#line 150 "src/lib/uri/uri_parser.rl"
 	{ uri->password = s; uri->password_len = p - s; }
-#line 153 "src/lib/uri/uri_parser.rl"
+#line 154 "src/lib/uri/uri_parser.rl"
 	{ uri->login = login; uri->login_len = login_len; }
 	goto st229;
 st229:
 	if ( ++p == pe )
 		goto _test_eof229;
 case 229:
-#line 4648 "src/lib/uri/uri_parser.c"
+#line 4649 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto tr287;
 		case 35: goto tr157;
@@ -4675,14 +4676,14 @@ case 229:
 		goto tr290;
 	goto st0;
 tr287:
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st230;
 st230:
 	if ( ++p == pe )
 		goto _test_eof230;
 case 230:
-#line 4686 "src/lib/uri/uri_parser.c"
+#line 4687 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st230;
 		case 35: goto tr166;
@@ -4706,14 +4707,14 @@ case 230:
 		goto st230;
 	goto st0;
 tr288:
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st144;
 st144:
 	if ( ++p == pe )
 		goto _test_eof144;
 case 144:
-#line 4717 "src/lib/uri/uri_parser.c"
+#line 4718 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 37: goto st230;
 		case 117: goto st145;
@@ -4780,21 +4781,21 @@ case 148:
 		goto st230;
 	goto st0;
 tr293:
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st231;
 tr308:
-#line 108 "src/lib/uri/uri_parser.rl"
+#line 109 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;
 			   uri->host_hint = 1; }
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
 	goto st231;
 st231:
 	if ( ++p == pe )
 		goto _test_eof231;
 case 231:
-#line 4798 "src/lib/uri/uri_parser.c"
+#line 4799 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st153;
 		case 35: goto tr182;
@@ -4823,14 +4824,14 @@ case 231:
 		goto st153;
 	goto st0;
 tr294:
-#line 138 "src/lib/uri/uri_parser.rl"
+#line 139 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st232;
 st232:
 	if ( ++p == pe )
 		goto _test_eof232;
 case 232:
-#line 4834 "src/lib/uri/uri_parser.c"
+#line 4835 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st153;
 		case 35: goto tr193;
@@ -4858,14 +4859,14 @@ case 232:
 		goto st153;
 	goto st0;
 tr295:
-#line 138 "src/lib/uri/uri_parser.rl"
+#line 139 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st233;
 st233:
 	if ( ++p == pe )
 		goto _test_eof233;
 case 233:
-#line 4869 "src/lib/uri/uri_parser.c"
+#line 4870 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st153;
 		case 35: goto tr193;
@@ -4888,16 +4889,16 @@ case 233:
 		goto st233;
 	goto st0;
 tr289:
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 158 "src/lib/uri/uri_parser.rl"
+#line 159 "src/lib/uri/uri_parser.rl"
 	{ s = p;}
 	goto st234;
 st234:
 	if ( ++p == pe )
 		goto _test_eof234;
 case 234:
-#line 4901 "src/lib/uri/uri_parser.c"
+#line 4902 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st230;
 		case 35: goto tr166;
@@ -4921,16 +4922,16 @@ case 234:
 		goto st230;
 	goto st0;
 tr290:
-#line 107 "src/lib/uri/uri_parser.rl"
+#line 108 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st235;
 st235:
 	if ( ++p == pe )
 		goto _test_eof235;
 case 235:
-#line 4934 "src/lib/uri/uri_parser.c"
+#line 4935 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st230;
 		case 35: goto tr166;
@@ -5371,14 +5372,14 @@ case 249:
 		goto st230;
 	goto st0;
 tr291:
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st250;
 st250:
 	if ( ++p == pe )
 		goto _test_eof250;
 case 250:
-#line 5382 "src/lib/uri/uri_parser.c"
+#line 5383 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st230;
 		case 35: goto tr166;
@@ -5483,16 +5484,16 @@ case 253:
 		goto st230;
 	goto st0;
 tr282:
-#line 148 "src/lib/uri/uri_parser.rl"
+#line 149 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 138 "src/lib/uri/uri_parser.rl"
+#line 139 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st254;
 st254:
 	if ( ++p == pe )
 		goto _test_eof254;
 case 254:
-#line 5496 "src/lib/uri/uri_parser.c"
+#line 5497 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st228;
 		case 35: goto tr193;
@@ -5520,16 +5521,16 @@ case 254:
 		goto st254;
 	goto st0;
 tr284:
-#line 148 "src/lib/uri/uri_parser.rl"
+#line 149 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 138 "src/lib/uri/uri_parser.rl"
+#line 139 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st255;
 st255:
 	if ( ++p == pe )
 		goto _test_eof255;
 case 255:
-#line 5533 "src/lib/uri/uri_parser.c"
+#line 5534 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st228;
 		case 35: goto tr193;
@@ -5553,18 +5554,18 @@ case 255:
 		goto st255;
 	goto st0;
 tr273:
-#line 144 "src/lib/uri/uri_parser.rl"
+#line 145 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 158 "src/lib/uri/uri_parser.rl"
+#line 159 "src/lib/uri/uri_parser.rl"
 	{ s = p;}
 	goto st256;
 st256:
 	if ( ++p == pe )
 		goto _test_eof256;
 case 256:
-#line 5568 "src/lib/uri/uri_parser.c"
+#line 5569 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st226;
 		case 35: goto tr166;
@@ -5588,18 +5589,18 @@ case 256:
 		goto st226;
 	goto st0;
 tr275:
-#line 144 "src/lib/uri/uri_parser.rl"
+#line 145 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 107 "src/lib/uri/uri_parser.rl"
+#line 108 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st257;
 st257:
 	if ( ++p == pe )
 		goto _test_eof257;
 case 257:
-#line 5603 "src/lib/uri/uri_parser.c"
+#line 5604 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st226;
 		case 35: goto tr166;
@@ -6040,16 +6041,16 @@ case 271:
 		goto st226;
 	goto st0;
 tr276:
-#line 144 "src/lib/uri/uri_parser.rl"
+#line 145 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st272;
 st272:
 	if ( ++p == pe )
 		goto _test_eof272;
 case 272:
-#line 6053 "src/lib/uri/uri_parser.c"
+#line 6054 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st226;
 		case 35: goto tr166;
@@ -6154,16 +6155,16 @@ case 275:
 		goto st226;
 	goto st0;
 tr336:
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st276;
 st276:
 	if ( ++p == pe )
 		goto _test_eof276;
 case 276:
-#line 6167 "src/lib/uri/uri_parser.c"
+#line 6168 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st153;
 		case 35: goto tr157;
@@ -6210,14 +6211,14 @@ case 277:
 		goto st153;
 	goto st0;
 tr338:
-#line 135 "src/lib/uri/uri_parser.rl"
+#line 136 "src/lib/uri/uri_parser.rl"
 	{ s = p;}
 	goto st278;
 st278:
 	if ( ++p == pe )
 		goto _test_eof278;
 case 278:
-#line 6221 "src/lib/uri/uri_parser.c"
+#line 6222 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st153;
 		case 35: goto tr157;
@@ -6239,18 +6240,18 @@ case 278:
 		goto st153;
 	goto st0;
 tr165:
-#line 160 "src/lib/uri/uri_parser.rl"
+#line 161 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 144 "src/lib/uri/uri_parser.rl"
+#line 145 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 100 "src/lib/uri/uri_parser.rl"
+#line 101 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
 	goto st279;
 st279:
 	if ( ++p == pe )
 		goto _test_eof279;
 case 279:
-#line 6254 "src/lib/uri/uri_parser.c"
+#line 6255 "src/lib/uri/uri_parser.c"
 	switch( (*p) ) {
 		case 33: goto st150;
 		case 35: goto tr166;
@@ -6658,18 +6659,18 @@ case 282:
 	{
 	switch ( cs ) {
 	case 155: 
-#line 72 "src/lib/uri/uri_parser.rl"
+#line 73 "src/lib/uri/uri_parser.rl"
 	{ uri->query = s; uri->query_len = p - s; }
 	break;
 	case 152: 
-#line 76 "src/lib/uri/uri_parser.rl"
+#line 77 "src/lib/uri/uri_parser.rl"
 	{ uri->fragment = s; uri->fragment_len = p - s; }
 	break;
 	case 165: 
 	case 166: 
 	case 167: 
 	case 168: 
-#line 119 "src/lib/uri/uri_parser.rl"
+#line 120 "src/lib/uri/uri_parser.rl"
 	{
 			/*
 			 * This action is also called for path_* terms.
@@ -6703,26 +6704,26 @@ case 282:
 	case 276: 
 	case 277: 
 	case 278: 
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
 	break;
 	case 154: 
-#line 71 "src/lib/uri/uri_parser.rl"
-	{ s = p; }
 #line 72 "src/lib/uri/uri_parser.rl"
+	{ s = p; }
+#line 73 "src/lib/uri/uri_parser.rl"
 	{ uri->query = s; uri->query_len = p - s; }
 	break;
 	case 151: 
-#line 75 "src/lib/uri/uri_parser.rl"
-	{ s = p; }
 #line 76 "src/lib/uri/uri_parser.rl"
+	{ s = p; }
+#line 77 "src/lib/uri/uri_parser.rl"
 	{ uri->fragment = s; uri->fragment_len = p - s; }
 	break;
 	case 164: 
 	case 186: 
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
 	break;
 	case 170: 
@@ -6730,9 +6731,9 @@ case 282:
 	case 201: 
 	case 202: 
 	case 203: 
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 119 "src/lib/uri/uri_parser.rl"
+#line 120 "src/lib/uri/uri_parser.rl"
 	{
 			/*
 			 * This action is also called for path_* terms.
@@ -6819,15 +6820,15 @@ case 282:
 	case 280: 
 	case 281: 
 	case 282: 
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
 	break;
 	case 195: 
-#line 119 "src/lib/uri/uri_parser.rl"
+#line 120 "src/lib/uri/uri_parser.rl"
 	{
 			/*
 			 * This action is also called for path_* terms.
@@ -6843,9 +6844,9 @@ case 282:
 				uri->path_len = 0;
 			};
 		}
-#line 170 "src/lib/uri/uri_parser.rl"
+#line 171 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
 	break;
 	case 159: 
@@ -6856,20 +6857,20 @@ case 282:
 	case 233: 
 	case 254: 
 	case 255: 
-#line 139 "src/lib/uri/uri_parser.rl"
+#line 140 "src/lib/uri/uri_parser.rl"
 	{ uri->service = s; uri->service_len = p - s; }
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
 	break;
 	case 169: 
 	case 204: 
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 119 "src/lib/uri/uri_parser.rl"
+#line 120 "src/lib/uri/uri_parser.rl"
 	{
 			/*
 			 * This action is also called for path_* terms.
@@ -6890,13 +6891,13 @@ case 282:
 	case 218: 
 	case 219: 
 	case 220: 
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
-#line 189 "src/lib/uri/uri_parser.rl"
+#line 190 "src/lib/uri/uri_parser.rl"
 	{ uri->service_len = p - uri->service;
 			   uri->host = NULL; uri->host_len = 0; }
 	break;
@@ -6912,14 +6913,14 @@ case 282:
 	case 263: 
 	case 264: 
 	case 265: 
-#line 108 "src/lib/uri/uri_parser.rl"
+#line 109 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;
 			   uri->host_hint = 1; }
-#line 101 "src/lib/uri/uri_parser.rl"
+#line 102 "src/lib/uri/uri_parser.rl"
 	{ uri->host = s; uri->host_len = p - s;}
-#line 171 "src/lib/uri/uri_parser.rl"
+#line 172 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
 	break;
 	case 156: 
@@ -6927,23 +6928,23 @@ case 282:
 	case 223: 
 	case 227: 
 	case 231: 
-#line 138 "src/lib/uri/uri_parser.rl"
-	{ s = p; }
 #line 139 "src/lib/uri/uri_parser.rl"
-	{ uri->service = s; uri->service_len = p - s; }
-#line 171 "src/lib/uri/uri_parser.rl"
 	{ s = p; }
-#line 175 "src/lib/uri/uri_parser.rl"
+#line 140 "src/lib/uri/uri_parser.rl"
+	{ uri->service = s; uri->service_len = p - s; }
+#line 172 "src/lib/uri/uri_parser.rl"
+	{ s = p; }
+#line 176 "src/lib/uri/uri_parser.rl"
 	{ uri->path = s; uri->path_len = p - s; }
 	break;
-#line 6940 "src/lib/uri/uri_parser.c"
+#line 6941 "src/lib/uri/uri_parser.c"
 	}
 	}
 
 	_out: {}
 	}
 
-#line 202 "src/lib/uri/uri_parser.rl"
+#line 203 "src/lib/uri/uri_parser.rl"
 
 
 	if (uri->path_len == 0)
@@ -6961,47 +6962,6 @@ case 282:
 	(void)eof;
 
 	return cs >= uri_first_final ? 0 : -1;
-}
-
-int
-uri_format(char *str, int len, const struct uri *uri, bool write_password)
-{
-	int total = 0;
-	if (uri->scheme_len > 0) {
-		SNPRINT(total, snprintf, str, len, "%.*s://",
-			 (int)uri->scheme_len, uri->scheme);
-	}
-	if (uri->host_len > 0) {
-		if (uri->login_len > 0) {
-			SNPRINT(total, snprintf, str, len, "%.*s",
-				(int)uri->login_len, uri->login);
-			if (uri->password_len > 0 && write_password) {
-				SNPRINT(total, snprintf, str, len, ":%.*s",
-				        (int)uri->password_len,
-					uri->password);
-			}
-			SNPRINT(total, snprintf, str, len, "@");
-		}
-		SNPRINT(total, snprintf, str, len, "%.*s",
-			 (int)uri->host_len, uri->host);
-		if (uri->service_len > 0) {
-			SNPRINT(total, snprintf, str, len, ":%.*s",
-				(int)uri->service_len, uri->service);
-		}
-	}
-	if (uri->path_len > 0) {
-		SNPRINT(total, snprintf, str, len, "%.*s",
-			(int)uri->path_len, uri->path);
-	}
-	if (uri->query_len > 0) {
-		SNPRINT(total, snprintf, str, len, "?%.*s",
-			(int)uri->query_len, uri->query);
-	}
-	if (uri->fragment_len > 0) {
-		SNPRINT(total, snprintf, str, len, "#%.*s",
-			(int)uri->fragment_len, uri->fragment);
-	}
-	return total;
 }
 
 /* vim: set ft=ragel: */

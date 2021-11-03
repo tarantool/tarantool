@@ -655,8 +655,9 @@ swim_test_broadcast(void)
 	struct swim *s1 = swim_cluster_member(cluster, 1);
 	const char *s1_uri = swim_member_uri(swim_self(s1));
 	struct uri u;
-	fail_if(uri_parse(&u, s1_uri) != 0 || u.service == NULL);
+	fail_if(uri_create(&u, s1_uri) != 0 || u.service == NULL);
 	int port = atoi(u.service);
+	uri_destroy(&u);
 	is(swim_broadcast(s0, port), 0, "S1 chooses to broadcast with port %d",
 	   port);
 	is(swim_cluster_wait_status(cluster, 1, 0, MEMBER_ALIVE, 1), 0,

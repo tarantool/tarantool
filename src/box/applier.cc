@@ -57,6 +57,7 @@
 #include "txn_limbo.h"
 #include "journal.h"
 #include "raft.h"
+#include "small/static.h"
 
 STRS(applier_state, applier_STATE);
 
@@ -337,16 +338,10 @@ applier_connect(struct applier *applier)
 	 */
 	applier->addr_len = sizeof(applier->addrstorage);
 	applier_set_state(applier, APPLIER_CONNECT);
-	char host[URI_MAXHOST] = { '\0' };
-	if (uri->host != NULL) {
-		snprintf(host, sizeof(host), "%.*s",
-			 (int)uri->host_len, uri->host);
-	}
-	char service[URI_MAXSERVICE];
-	snprintf(service, sizeof(service), "%.*s",
-		 (int)uri->service_len, uri->service);
-	int fd = coio_connect(host, service, uri->host_hint,
-			      &applier->addr, &applier->addr_len);
+	int fd = coio_connect(uri->host != NULL ? uri->host : "",
+			      uri->service != NULL ? uri->service : "",
+			      uri->host_hint, &applier->addr,
+			      &applier->addr_len);
 	if (fd < 0)
 		diag_raise();
 	iostream_create(io, fd);
@@ -414,9 +409,9 @@ applier_connect(struct applier *applier)
 	/* Authenticate */
 	applier_set_state(applier, APPLIER_AUTH);
 	xrow_encode_auth_xc(&row, greeting.salt, greeting.salt_len, uri->login,
-			    uri->login_len,
+			    strlen(uri->login),
 			    uri->password != NULL ? uri->password : "",
-			    uri->password_len);
+			    uri->password != NULL ? strlen(uri->password) : 0);
 	coio_write_xrow(io, &row);
 	coio_read_xrow(io, ibuf, &row);
 	applier->last_row_time = ev_monotonic_now(loop());
@@ -1670,9 +1665,7 @@ applier_new(const char *uri)
 	iostream_clear(&applier->io);
 	ibuf_create(&applier->ibuf, &cord()->slabc, 1024);
 
-	/* uri_parse() sets pointers to applier->source buffer */
-	snprintf(applier->source, sizeof(applier->source), "%s", uri);
-	int rc = uri_parse(&applier->uri, applier->source);
+	int rc = uri_create(&applier->uri, uri);
 	/* URI checked by box_check_replication() */
 	assert(rc == 0 && applier->uri.service != NULL);
 	(void) rc;
@@ -1692,6 +1685,7 @@ applier_delete(struct applier *applier)
 	assert(applier->reader == NULL && applier->writer == NULL);
 	assert(!iostream_is_initialized(&applier->io));
 	ibuf_destroy(&applier->ibuf);
+	uri_destroy(&applier->uri);
 	trigger_destroy(&applier->on_state);
 	diag_destroy(&applier->diag);
 	free(applier);
@@ -1797,4 +1791,12 @@ applier_resume_to_state(struct applier *applier, enum applier_state state,
 	if (rc != 0)
 		diag_raise();
 	assert(applier->state == state);
+}
+
+const char *
+applier_uri_str(const struct applier *applier)
+{
+	char *uri = (char *)static_alloc(APPLIER_SOURCE_MAXLEN);
+	uri_format(uri, APPLIER_SOURCE_MAXLEN, &applier->uri, false);
+	return uri;
 }
