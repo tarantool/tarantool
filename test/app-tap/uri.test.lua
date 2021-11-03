@@ -38,16 +38,16 @@ local function test_parse(test)
     test:is(u.host, "host", "host")
 
     u = uri.parse('127.0.0.1')
-    test:is(u.host, '127.0.0.1', 'ipv4')
+    test:is(u.host, '127.0.0.1', 'host')
     test:is(u.ipv4, '127.0.0.1', 'ipv4')
 
     u = uri.parse('[2a00:1148:b0ba:2016:12bf:48ff:fe78:fd10]')
-    test:is(u.host, '2a00:1148:b0ba:2016:12bf:48ff:fe78:fd10', 'ipv6')
+    test:is(u.host, '2a00:1148:b0ba:2016:12bf:48ff:fe78:fd10', 'host')
     test:is(u.ipv6, '2a00:1148:b0ba:2016:12bf:48ff:fe78:fd10', 'ipv6')
 
     u = uri.parse('/tmp/unix.sock')
-    test:is(u.host, 'unix/', 'unix')
-    test:is(u.service, '/tmp/unix.sock', 'unix')
+    test:is(u.host, 'unix/', 'host')
+    test:is(u.service, '/tmp/unix.sock', 'service')
     test:is(u.unix, '/tmp/unix.sock', 'unix')
 
     u = uri.parse("")
