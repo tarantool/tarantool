@@ -9,9 +9,126 @@
 
 #define XSTRNDUP(s, n)  (s != NULL ? xstrndup(s, n) : NULL)
 
+struct uri_param {
+	/** Name of URI parameter. */
+	char *name;
+	/** Count of values for this parameter. */
+	int value_count;
+	/** Array of values for this parameter. */
+	char **values;
+};
+
+/**
+ * Find URI parameter by its @a name in @a uri structure.
+ */
+static struct uri_param *
+uri_find_param(const struct uri *uri, const char *name)
+{
+	for (int i = 0; i < uri->param_count; i++) {
+		if (strcmp(uri->params[i].name, name) == 0)
+			return &uri->params[i];
+	}
+	return NULL;
+}
+
+/**
+ * Add new @a value to URI @a param.
+ */
+static void
+uri_param_add_value(struct uri_param *param, const char *value)
+{
+	size_t size = (param->value_count + 1) * sizeof(char *);
+	param->values = xrealloc(param->values, size);
+	param->values[param->value_count++] = xstrdup(value);
+}
+
+/**
+ * Destroy URI @a param and free all associated resources.
+ */
+static void
+uri_param_destroy(struct uri_param *param)
+{
+	for (int i = 0; i < param->value_count; i++)
+		free(param->values[i]);
+	free(param->values);
+	free(param->name);
+	TRASH(param);
+}
+
+/**
+ * Create new URI @a param, with given @a name.
+ */
+static void
+uri_param_create(struct uri_param *param, const char *name)
+{
+	param->name = xstrdup(name);
+	param->values = NULL;
+	param->value_count = 0;
+}
+
+/**
+ * Appends @a value to @a uri parameter with given @a name,
+ * creating one if it doesn't exist.
+ */
+static void
+uri_add_param(struct uri *uri, const char *name, const char *value)
+{
+	struct uri_param *param = uri_find_param(uri, name);
+	if (param == NULL) {
+		size_t size = (uri->param_count + 1) *
+			sizeof(struct uri_param);
+		uri->params = xrealloc(uri->params, size);
+		param = &uri->params[uri->param_count++];
+		uri_param_create(param, name);
+	}
+	if (value != NULL)
+		uri_param_add_value(param, value);
+}
+
+/**
+ * Destroy all @a uri parameters and free all resources associated
+ * with them.
+ */
+static void
+uri_destroy_params(struct uri *uri)
+{
+	for (int i = 0; i < uri->param_count; i++)
+		uri_param_destroy(&uri->params[i]);
+	free(uri->params);
+}
+
+/**
+ * Create parameters for @a uri from @a query string. Expected @a
+ * query format is a string which contains parameters separated by '&'.
+ * For example: "backlog=10&transport=tls". Also @a query can contain
+ * several values for one parameter separated by '&'. For example:
+ * "backlog=10&backlog=30".
+ */
+static void
+uri_create_params(struct uri *uri, const char *query)
+{
+	char *copy = xstrdup(query);
+	char *saveptr, *optstr = strtok_r(copy, "&", &saveptr);
+	while (optstr != NULL) {
+		char *value = NULL, *name = optstr;
+		char *delim = strchr(optstr, '=');
+		if (delim != NULL) {
+			*delim = '\0';
+			value = delim + 1;
+		}
+		optstr = strtok_r(NULL, "&", &saveptr);
+		/* Ignore params with empty name */
+		if (*name == 0)
+			continue;
+		uri_add_param(uri, name, value);
+	}
+	free(copy);
+}
+
 void
 uri_destroy(struct uri *uri)
 {
+	uri_destroy_params(uri);
 	free(uri->scheme);
 	free(uri->login);
 	free(uri->password);
@@ -41,6 +158,8 @@ uri_create(struct uri *uri, const char *str)
 	uri->query = XSTRNDUP(uri_raw.query, uri_raw.query_len);
 	uri->fragment = XSTRNDUP(uri_raw.fragment, uri_raw.fragment_len);
 	uri->host_hint = uri_raw.host_hint;
+	if (uri->query != NULL)
+		uri_create_params(uri, uri->query);
 	return 0;
 }
 
@@ -74,4 +193,21 @@ uri_format(char *str, int len, const struct uri *uri, bool write_password)
 		SNPRINT(total, snprintf, str, len, "#%s", uri->fragment);
 	}
 	return total;
+}
+
+const char *
+uri_param(const struct uri *uri, const char *name, int idx)
+{
+	struct uri_param *param = uri_find_param(uri, name);
+	assert(idx >= 0);
+	if (param == NULL || idx >= param->value_count)
+		return NULL;
+	return param->values[idx];
+}
+
+int
+uri_param_count(const struct uri *uri, const char *name)
+{
+	struct uri_param *param = uri_find_param(uri, name);
+	return (param != NULL ? param->value_count : 0);
 }

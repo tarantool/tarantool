@@ -4,6 +4,12 @@ local ffi = require('ffi')
 local buffer = require('buffer')
 
 ffi.cdef[[
+struct uri_param {
+    const char *name;
+    int value_count;
+    const char **values;
+};
+
 /**
  * We define all strings inside the `struct uri` as const, despite
  * the fact that they are not constant in the C structure. This is
@@ -21,6 +27,8 @@ struct uri {
     const char *query;
     const char *fragment;
     int host_hint;
+    int param_count;
+    struct uri_param *params;
 };
 
 int
@@ -54,6 +62,16 @@ local function parse(str)
         'path', 'query', 'fragment'}) do
         if uribuf[k] ~= nil then
             result[k] = ffi.string(uribuf[k])
+        end
+    end
+    result.params = {}
+    for param_idx = 0, uribuf.param_count - 1 do
+        local param = uribuf.params[param_idx]
+        local name = ffi.string(param.name)
+        result.params[name] = {}
+        for val_idx = 0, param.value_count - 1 do
+            result.params[name][val_idx + 1] =
+                ffi.string(param.values[val_idx])
         end
     end
     if uribuf.host_hint == 1 then
