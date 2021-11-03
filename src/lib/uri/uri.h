@@ -13,6 +13,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct uri_param;
+
 struct uri {
 	char *scheme;
 	char *login;
@@ -23,6 +25,10 @@ struct uri {
 	char *query;
 	char *fragment;
 	int host_hint;
+	/** Count of URI parameters */
+	int param_count;
+	/** Different URI parameters */
+	struct uri_param *params;
 };
 
 #define URI_HOST_UNIX "unix/"
@@ -37,7 +43,9 @@ struct uri {
  * URI components in appropriate fields of @a uri. @a uri
  * can be safely destroyed in case this function fails.
  * If @str == NULL function fill uri structure with zeros
- * and return 0. This function doesn't set diag.
+ * and return 0. Expected format of @a src string: "uri?query",
+ * where query contains parameters separated by '&'. This
+ * function doesn't set diag.
  */
 int
 uri_create(struct uri *uri, const char *str);
@@ -52,6 +60,21 @@ uri_destroy(struct uri *uri);
 
 int
 uri_format(char *str, int len, const struct uri *uri, bool write_password);
+
+/**
+ * Return @a uri parameter value by given @a idx. If parameter with @a name
+ * does not exist or @a idx is greater than or equal to URI parameter value
+ * count, return NULL.
+ */
+const char *
+uri_param(const struct uri *uri, const char *name, int idx);
+
+/**
+ * Return count of values for @a uri parameter with given @a name.
+ * If parameter with such @a name does not exist return 0.
+ */
+int
+uri_param_count(const struct uri *uri, const char *name);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -99,8 +99,58 @@ local function test_format(test)
     test:is(uri.format(u, true), "user:password@localhost", "password kept")
 end
 
+local function test_parse_uri_query_params(test)
+    -- Tests for uri.parse() Lua bindings (URI with query parameters).
+    -- Parser itself is tested by test/unit/uri unit test.
+    test:plan(33)
+
+    local u
+
+    u = uri.parse("/tmp/unix.sock?q1=v1")
+    test:is(u.host, 'unix/', 'host')
+    test:is(u.service, '/tmp/unix.sock', 'service')
+    test:is(u.unix, '/tmp/unix.sock', 'unix')
+    test:is(type(u.params["q1"]), "table", "name")
+    test:is(#u.params["q1"], 1, "value count")
+    test:is(u.params["q1"][1], "v1", "param value")
+
+    u = uri.parse("/tmp/unix.sock?q1=v1&q1=v2")
+    test:is(u.host, 'unix/', 'host')
+    test:is(u.service, '/tmp/unix.sock', 'service')
+    test:is(u.unix, '/tmp/unix.sock', 'unix')
+    test:is(type(u.params["q1"]), "table", "name")
+    test:is(#u.params["q1"], 2, "value count")
+    test:is(u.params["q1"][1], "v1", "param value")
+    test:is(u.params["q1"][2], "v2", "param value")
+
+    u = uri.parse("/tmp/unix.sock?q1=v11&q1=v12&q2=v21&q2=v22")
+    test:is(u.host, 'unix/', 'host')
+    test:is(u.service, '/tmp/unix.sock', 'service')
+    test:is(u.unix, '/tmp/unix.sock', 'unix')
+    test:is(type(u.params["q1"]), "table", "name")
+    test:is(#u.params["q1"], 2, "value count")
+    test:is(u.params["q1"][1], "v11", "param value")
+    test:is(u.params["q1"][2], "v12", "param value")
+    test:is(type(u.params["q2"]), "table", "name")
+    test:is(#u.params["q2"], 2, "value count")
+    test:is(u.params["q2"][1], "v21", "param value")
+    test:is(u.params["q2"][2], "v22", "param value")
+
+    u = uri.parse("/tmp/unix.sock?q1=v1&q1=&q2")
+    test:is(u.host, 'unix/', 'host')
+    test:is(u.service, '/tmp/unix.sock', 'service')
+    test:is(u.unix, '/tmp/unix.sock', 'unix')
+    test:is(type(u.params["q1"]), "table", "name")
+    test:is(#u.params["q1"], 2, "value count")
+    test:is(u.params["q1"][1], "v1", "param value")
+    test:is(u.params["q1"][2], "", "param value")
+    test:is(type(u.params["q2"]), "table", "name")
+    test:is(#u.params["q2"], 0, "value count")
+end
+
 tap.test("uri", function(test)
-    test:plan(2)
+    test:plan(3)
     test:test("parse", test_parse)
+    test:test("parse URI query params", test_parse_uri_query_params)
     test:test("format", test_format)
 end)
