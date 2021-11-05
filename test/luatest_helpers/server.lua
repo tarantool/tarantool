@@ -75,26 +75,43 @@ function Server:build_env()
     return res
 end
 
-function Server:wait_for_readiness()
-    local alias = self.alias
-    local id = self.id
-    local pid = self.process.pid
+local function wait_cond(cond_name, server, func, ...)
+    local alias = server.alias
+    local id = server.id
+    local pid = server.process.pid
 
     local deadline = clock.time() + WAIT_TIMEOUT
     while true do
+        if func(...) then
+            return
+        end
+        if clock.time() > deadline then
+            error(('Waiting for "%s" on server %s-%s (PID %d) timed out')
+                  :format(cond_name, alias, id, pid))
+        end
+        fiber.sleep(WAIT_DELAY)
+    end
+end
+
+function Server:wait_for_readiness()
+    return wait_cond('readiness', self, function()
         local ok, is_ready = pcall(function()
             self:connect_net_box()
             return self.net_box:eval('return _G.ready') == true
         end)
-        if ok and is_ready then
-            break
-        end
-        if clock.time() > deadline then
-            error(('Starting of server %s-%s (PID %d) was timed out'):format(
-                alias, id, pid))
-        end
-        fiber.sleep(WAIT_DELAY)
-    end
+        return ok and is_ready
+    end)
+end
+
+function Server:wait_election_leader()
+    return wait_cond('election leader', self, self.exec, self, function()
+        return box.info.election.state == 'leader'
+    end)
+end
+
+function Server:wait_election_leader_found()
+    return wait_cond('election leader is found', self, self.exec, self,
+                     function() return box.info.election.leader ~= 0 end)
 end
 
 -- Unlike the original luatest.Server function it waits for
@@ -114,6 +131,29 @@ function Server:start(opts)
     if wait_for_readiness then
         self:wait_for_readiness()
     end
+end
+
+function Server:instance_id()
+    -- Cache the value when found it first time.
+    if self.instance_id_value then
+        return self.instance_id_value
+    end
+    local id = self:exec(function() return box.info.id end)
+    -- But do not cache 0 - it is an anon instance, its ID might change.
+    if id ~= 0 then
+        self.instance_id_value = id
+    end
+    return id
+end
+
+function Server:instance_uuid()
+    -- Cache the value when found it first time.
+    if self.instance_uuid_value then
+        return self.instance_uuid_value
+    end
+    local uuid = self:exec(function() return box.info.uuid end)
+    self.instance_uuid_value = uuid
+    return uuid
 end
 
 -- TODO: Add the 'wait_for_readiness' parameter for the restart()
@@ -146,6 +186,8 @@ function Server:cleanup()
     for _, pattern in ipairs(DEFAULT_CHECKPOINT_PATTERNS) do
         fio.rmtree(('%s/%s'):format(self.workdir, pattern))
     end
+    self.instance_id_value = nil
+    self.instance_uuid_value = nil
 end
 
 function Server:drop()
