@@ -93,6 +93,7 @@ end
 
 function Cluster:build_server(server_config, instance_file)
     instance_file = instance_file or 'default.lua'
+    server_config = table.deepcopy(server_config)
     server_config.command = fio.pathjoin(root, 'test/instances/', instance_file)
     assert(server_config.alias, 'Either replicaset.alias or server.alias must be given')
     local server = Server:new(server_config)
