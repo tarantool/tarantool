@@ -48,6 +48,7 @@ enum opt_type {
 	OPT_STRPTR,	/* char*  */
 	OPT_ENUM,	/* enum */
 	OPT_ARRAY,	/* array */
+	OPT_CUSTOM,	/* custrom msgpack decoder */
 	OPT_LEGACY,	/* any type, skipped */
 	opt_type_MAX,
 };
@@ -74,8 +75,25 @@ typedef int64_t (*opt_def_to_enum_cb)(const char *str, uint32_t len);
  * @retval 0 on success.
  * @retval -1 on error.
  */
-typedef int (*opt_def_to_array_cb)(const char **str, uint32_t len, char *opt,
-				   uint32_t errcode, uint32_t field_no);
+typedef int
+(*opt_def_to_array_cb)(const char **str, uint32_t len, char *opt,
+		       uint32_t errcode, uint32_t field_no);
+
+struct region;
+
+/**
+ * Custom raw MsgPack decode callback.
+ * @param str - encoded data pointer.
+ * @param [out] opt pointer to store resulting value.
+ * @param region Allocator for internal allocation.
+ * @param errcode Code of error to set if something is wrong.
+ * @param field_no Field number of an option in a parent element.
+ * @retval 0 on success.
+ * @retval -1 on error.
+ */
+typedef int
+(*opt_def_custom_cb)(const char **str, void *opts, struct region *region,
+		     uint32_t errcode, uint32_t field_no);
 
 struct opt_def {
 	const char *name;
@@ -91,6 +109,8 @@ struct opt_def {
 	union {
 		opt_def_to_enum_cb to_enum;
 		opt_def_to_array_cb to_array;
+		/** Function to call in case of OPT_CUSTOM. */
+		opt_def_custom_cb custom;
 	};
 };
 
@@ -106,6 +126,9 @@ struct opt_def {
 #define OPT_DEF_ARRAY(key, opts, field, to_array) \
 	 { key, OPT_ARRAY, offsetof(opts, field), sizeof(((opts *)0)->field), \
 	   NULL, 0, NULL, 0, {(void *)to_array} }
+
+#define OPT_DEF_CUSTOM(key, custom_decoder) \
+	{ key, OPT_CUSTOM, 0, 0, NULL, 0, NULL, 0, { (void *)custom_decoder} }
 
 #define OPT_DEF_LEGACY(key) \
 	{ key, OPT_LEGACY, 0, 0, NULL, 0, NULL, 0, {NULL} }

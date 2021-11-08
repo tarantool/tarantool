@@ -147,6 +147,17 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 		if (def->to_array(val, ival, opt, errcode, field_no) != 0)
 			return -1;
 		break;
+	case OPT_CUSTOM:
+#ifndef NDEBUG
+		str = *val;
+#endif
+		if (def->custom(val, opts, region, errcode, field_no) != 0)
+			return -1;
+#ifndef NDEBUG
+		mp_next(&str);
+		assert(str == *val);
+#endif
+		break;
 	case OPT_LEGACY:
 		mp_next(val);
 		break;
