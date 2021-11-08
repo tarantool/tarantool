@@ -134,7 +134,8 @@ Copyright: 2008-2011, INADA Naoki <songofacandy@gmail.com>
 License: Apache-2.0
 
 Files: test-run/lib/checks/*
-Copyright: 2010-2018 Google, Inc
+Copyright: 2018-2021 Tarantool
+           2012 Sierra Wireless, Fabien Fleutot
 License: MIT
 
 Files: test-run/lib/luatest/*
