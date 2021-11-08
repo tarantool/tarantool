@@ -548,18 +548,11 @@ coio_service_on_accept(struct evio_service *evio_service,
 		say_error("can't create a handler fiber, dropping client connection");
 		return -1;
 	}
-	struct ev_io coio;
-	coio_create(&coio, fd);
 	/*
-	 * The coio is passed into the created fiber, reset the
-	 * libev callback param to point at it.
+	 * Start the created fiber. It becomes the socket fd owner
+	 * and will have to close it before termination.
 	 */
-	coio.data = f;
-	/*
-	 * Start the created fiber. It becomes the coio object owner
-	 * and will have to close it and free before termination.
-	 */
-	fiber_start(f, coio, addr, addrlen, service->handler_param);
+	fiber_start(f, fd, addr, addrlen, service->handler_param);
 	return 0;
 }
 
