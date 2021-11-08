@@ -28,15 +28,27 @@ box.watch('foo', {})
  | ...
 box.broadcast()
  | ---
- | - error: 'Usage: box.broadcast(key[, value])'
+ | - error: 'Usage: box.broadcast(key[, value]) or box.broadcast{key[ = value], ...}'
  | ...
 box.broadcast(1, 2, 3)
  | ---
- | - error: 'Usage: box.broadcast(key[, value])'
+ | - error: 'Usage: box.broadcast(key[, value]) or box.broadcast{key[ = value], ...}'
  | ...
-box.broadcast({})
+box.broadcast(123)
  | ---
- | - error: 'bad argument #1 to ''?'' (string expected, got table)'
+ | - error: 'box.broadcast: key must be a string'
+ | ...
+box.broadcast({}, 123)
+ | ---
+ | - error: 'box.broadcast: key must be a string'
+ | ...
+box.broadcast({123})
+ | ---
+ | - error: 'box.broadcast: key must be a string'
+ | ...
+box.broadcast({[123] = 456})
+ | ---
+ | - error: 'box.broadcast: key must be a string'
  | ...
 
 -- Callback is invoked after registration.
@@ -544,4 +556,113 @@ test_run:wait_cond(function() return count == 1 end)
 assert(count == 1)
  | ---
  | - true
+ | ...
+
+-- Broadcasting multiple keys.
+count = 0
+ | ---
+ | ...
+value = {}
+ | ---
+ | ...
+cb = function(k, v) value[k] = v count = count + 1 end
+ | ---
+ | ...
+w1 = box.watch('k1', cb)
+ | ---
+ | ...
+w2 = box.watch('k2', cb)
+ | ---
+ | ...
+box.broadcast{}
+ | ---
+ | ...
+fiber.sleep(0.01)
+ | ---
+ | ...
+assert(value.k1 == nil)
+ | ---
+ | - true
+ | ...
+assert(value.k2 == nil)
+ | ---
+ | - true
+ | ...
+count = 0
+ | ---
+ | ...
+box.broadcast{k1 = 'v1', k2 = 'v2'}
+ | ---
+ | ...
+test_run:wait_cond(function() return count == 2 end)
+ | ---
+ | - true
+ | ...
+assert(value.k1 == 'v1')
+ | ---
+ | - true
+ | ...
+assert(value.k2 == 'v2')
+ | ---
+ | - true
+ | ...
+count = 0
+ | ---
+ | ...
+box.broadcast{'k1', 'k2'}
+ | ---
+ | ...
+test_run:wait_cond(function() return count == 2 end)
+ | ---
+ | - true
+ | ...
+assert(value.k1 == nil)
+ | ---
+ | - true
+ | ...
+assert(value.k2 == nil)
+ | ---
+ | - true
+ | ...
+count = 0
+ | ---
+ | ...
+box.broadcast{k1 = 'v1', 'k2'}
+ | ---
+ | ...
+test_run:wait_cond(function() return count == 2 end)
+ | ---
+ | - true
+ | ...
+assert(value.k1 == 'v1')
+ | ---
+ | - true
+ | ...
+assert(value.k2 == nil)
+ | ---
+ | - true
+ | ...
+count = 0
+ | ---
+ | ...
+box.broadcast{'k1', k2 = 'v2'}
+ | ---
+ | ...
+test_run:wait_cond(function() return count == 2 end)
+ | ---
+ | - true
+ | ...
+assert(value.k1 == nil)
+ | ---
+ | - true
+ | ...
+assert(value.k2 == 'v2')
+ | ---
+ | - true
+ | ...
+w1:unregister()
+ | ---
+ | ...
+w2:unregister()
+ | ---
  | ...

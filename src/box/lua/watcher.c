@@ -164,6 +164,34 @@ lbox_watch(struct lua_State *L)
 	return 1;
 }
 
+static void
+lbox_broadcast_one(struct lua_State *L, int idx)
+{
+	/*
+	 * Check key type explicitly instead of using luaL_checklstring,
+	 * because the latter converts the underlying Lua value to string,
+	 * which breaks lua_next assumptions.
+	 */
+	if (!lua_isstring(L, idx) || lua_isnumber(L, idx))
+		luaL_error(L, "box.broadcast: key must be a string");
+	size_t key_len;
+	const char *key = lua_tolstring(L, idx, &key_len);
+	struct ibuf *ibuf = cord_ibuf_take();
+	const char *data = NULL;
+	const char *data_end = NULL;
+	if (!lua_isnoneornil(L, idx + 1)) {
+		struct mpstream stream;
+		mpstream_init(&stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
+			      luamp_error, L);
+		luamp_encode(L, luaL_msgpack_default, &stream, idx + 1);
+		mpstream_flush(&stream);
+		data = ibuf->rpos;
+		data_end = data + ibuf_used(ibuf);
+	}
+	box_broadcast(key, key_len, data, data_end);
+	cord_ibuf_put(ibuf);
+}
+
 /**
  * Lua wrapper around box_broadcast().
  */
@@ -171,24 +199,34 @@ static int
 lbox_broadcast(struct lua_State *L)
 {
 	int top = lua_gettop(L);
-	if (top != 1 && top != 2)
-		return luaL_error(L, "Usage: box.broadcast(key[, value])");
-	size_t key_len;
-	const char *key = luaL_checklstring(L, 1, &key_len);
-	struct ibuf *ibuf = cord_ibuf_take();
-	const char *data = NULL;
-	const char *data_end = NULL;
-	if (!lua_isnoneornil(L, 2)) {
-		struct mpstream stream;
-		mpstream_init(&stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
-			      luamp_error, L);
-		luamp_encode(L, luaL_msgpack_default, &stream, 2);
-		mpstream_flush(&stream);
-		data = ibuf->rpos;
-		data_end = data + ibuf_used(ibuf);
+	if (top == 1 && lua_istable(L, 1)) {
+		lua_pushnil(L);
+		while (lua_next(L, 1) != 0) {
+			/*
+			 * If this is an array entry (key is integer),
+			 * we treat the value as box.broadcast key
+			 * and pass nil for box.broacast value so that
+			 * the user can do something like this:
+			 *
+			 *   box.broacast{key1, key2, key3 = value3}
+			 *
+			 * which is equivalent to:
+			 *
+			 *   box.broadcast(key1)
+			 *   box.broadcast(key2)
+			 *   box.broadcast(key3, value3)
+			 */
+			int isnum;
+			lua_tointegerx(L, 2, &isnum);
+			lbox_broadcast_one(L, isnum ? 3 : 2);
+			lua_pop(L, 1);
+		}
+	} else if (top == 1 || top == 2) {
+		lbox_broadcast_one(L, 1);
+	} else {
+		return luaL_error(L, "Usage: box.broadcast(key[, value]) or "
+				  "box.broadcast{key[ = value], ...}");
 	}
-	box_broadcast(key, key_len, data, data_end);
-	cord_ibuf_put(ibuf);
 	return 0;
 }
 

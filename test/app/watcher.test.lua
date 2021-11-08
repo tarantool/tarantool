@@ -9,7 +9,10 @@ box.watch({}, {})
 box.watch('foo', {})
 box.broadcast()
 box.broadcast(1, 2, 3)
-box.broadcast({})
+box.broadcast(123)
+box.broadcast({}, 123)
+box.broadcast({123})
+box.broadcast({[123] = 456})
 
 -- Callback is invoked after registration.
 count = 0
@@ -175,3 +178,36 @@ count = 0
 box.broadcast('foo', 123)
 test_run:wait_cond(function() return count == 1 end)
 assert(count == 1)
+
+-- Broadcasting multiple keys.
+count = 0
+value = {}
+cb = function(k, v) value[k] = v count = count + 1 end
+w1 = box.watch('k1', cb)
+w2 = box.watch('k2', cb)
+box.broadcast{}
+fiber.sleep(0.01)
+assert(value.k1 == nil)
+assert(value.k2 == nil)
+count = 0
+box.broadcast{k1 = 'v1', k2 = 'v2'}
+test_run:wait_cond(function() return count == 2 end)
+assert(value.k1 == 'v1')
+assert(value.k2 == 'v2')
+count = 0
+box.broadcast{'k1', 'k2'}
+test_run:wait_cond(function() return count == 2 end)
+assert(value.k1 == nil)
+assert(value.k2 == nil)
+count = 0
+box.broadcast{k1 = 'v1', 'k2'}
+test_run:wait_cond(function() return count == 2 end)
+assert(value.k1 == 'v1')
+assert(value.k2 == nil)
+count = 0
+box.broadcast{'k1', k2 = 'v2'}
+test_run:wait_cond(function() return count == 2 end)
+assert(value.k1 == nil)
+assert(value.k2 == 'v2')
+w1:unregister()
+w2:unregister()
