@@ -236,18 +236,16 @@ coio_connect_timeout(struct uri *uri, struct sockaddr *addr,
  * timedout.
  */
 int
-coio_accept(struct ev_io *coio, struct sockaddr *addr,
-	    socklen_t addrlen, ev_tstamp timeout)
+coio_accept(int sfd, struct sockaddr *addr, socklen_t addrlen,
+	    ev_tstamp timeout)
 {
 	ev_tstamp start, delay;
 	coio_timeout_init(&start, &delay, timeout);
 
-	CoioGuard coio_guard(coio);
-
 	while (true) {
 		/* Assume that there are waiting clients
 		 * available */
-		int fd = sio_accept(coio->fd, addr, &addrlen);
+		int fd = sio_accept(sfd, addr, &addrlen);
 		if (fd >= 0) {
 			if (evio_setsockopt_client(fd, addr->sa_family,
 						   SOCK_STREAM) != 0) {
@@ -258,18 +256,13 @@ coio_accept(struct ev_io *coio, struct sockaddr *addr,
 		}
 		if (! sio_wouldblock(errno))
 			diag_raise();
-		/* The socket is not ready, yield */
-		if (! ev_is_active(coio)) {
-			ev_io_set(coio, coio->fd, EV_READ);
-			ev_io_start(loop(), coio);
-		}
 		/*
 		 * Yield control to other fibers until the
 		 * timeout is reached.
 		 */
-		bool is_timedout = coio_fiber_yield_timeout(coio, delay);
+		int revents = coio_wait(sfd, EV_READ, delay);
 		fiber_testcancel();
-		if (is_timedout)
+		if (revents == 0)
 			tnt_raise(TimedOut);
 		coio_timeout_update(&start, &delay);
 	}

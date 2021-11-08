@@ -65,12 +65,8 @@ coio_connect(struct uri *uri, struct sockaddr *addr, socklen_t *addr_len)
 	return coio_connect_timeout(uri, addr, addr_len, TIMEOUT_INFINITY);
 }
 
-void
-coio_bind(struct ev_io *coio, struct sockaddr *addr,
-	  socklen_t addrlen);
-
 int
-coio_accept(struct ev_io *coio, struct sockaddr *addr, socklen_t addrlen,
+coio_accept(int sfd, struct sockaddr *addr, socklen_t addrlen,
 	    ev_tstamp timeout);
 
 void
