@@ -144,7 +144,7 @@ local module_cfg_type = {
 -- forget to update it when add a new type or a combination of
 -- types here.
 local template_cfg = {
-    listen              = 'string, number',
+    listen              = 'string, number, table',
     memtx_memory        = 'number',
     strip_core          = 'boolean',
     memtx_min_tuple_size  = 'number',
@@ -226,7 +226,7 @@ local function normalize_uri(port)
     return tostring(port);
 end
 
-local function normalize_uri_list(port_list)
+local function normalize_uri_list_for_replication(port_list)
     local result = {}
     if type(port_list) == 'table' then
         for _, port in ipairs(port_list) do
@@ -238,10 +238,22 @@ local function normalize_uri_list(port_list)
     return result
 end
 
+local function normalize_uri_list_for_listen(port_list)
+    local result = {}
+    if type(port_list) == 'table' then
+        for _, port in ipairs(port_list) do
+            table.insert(result, normalize_uri(port))
+        end
+    else
+        return normalize_uri(port_list)
+    end
+    return result
+end
+
 -- options that require special handling
 local modify_cfg = {
-    listen             = normalize_uri,
-    replication        = normalize_uri_list,
+    listen             = normalize_uri_list_for_listen,
+    replication        = normalize_uri_list_for_replication,
 }
 
 local function purge_password_from_uri(uri)

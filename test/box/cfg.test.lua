@@ -11,7 +11,6 @@ cfg_filter(box.cfg)
 box.cfg{sherlock = 'holmes'}
 
 -- check that cfg with unexpected type of parameter fails
-box.cfg{listen = {}}
 box.cfg{wal_dir = 0}
 box.cfg{coredump = 'true'}
 

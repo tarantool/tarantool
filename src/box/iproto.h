@@ -124,7 +124,7 @@ void
 iproto_init(int threads_count);
 
 int
-iproto_listen(const char *uri);
+iproto_listen(const char **uris, int size);
 
 void
 iproto_set_msg_max(int iproto_msg_max);
