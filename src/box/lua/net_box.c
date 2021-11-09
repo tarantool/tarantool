@@ -2038,7 +2038,7 @@ error:
 /**
  * Performs an authorization request for an iproto connection.
  * Takes user, password, salt, netbox transport, socket fd.
- * Returns schema_version on success, nil and error on failure.
+ * Returns none on success, error on failure.
  */
 static int
 netbox_iproto_auth(struct lua_State *L)
@@ -2065,10 +2065,10 @@ netbox_iproto_auth(struct lua_State *L)
 		xrow_decode_error(&hdr);
 		goto error;
 	}
-	lua_pushinteger(L, hdr.schema_version);
-	return 1;
+	return 0;
 error:
-	return luaT_push_nil_and_error(L);
+	luaT_pusherror(L, diag_last_error(diag_get()));
+	return 1;
 }
 
 /**
@@ -2175,8 +2175,8 @@ restart:
 /**
  * Processes iproto requests in a loop until an error or a schema change.
  * Takes schema_version, netbox transport, socket fd.
- * Returns schema_version if the loop was broken because of a schema change.
- * If the loop was broken by an error, returns nil and the error.
+ * Returns none if the loop was broken because of a schema change.
+ * If the loop was broken by an error, returns the error.
  */
 static int
 netbox_iproto_loop(struct lua_State *L)
@@ -2188,13 +2188,13 @@ netbox_iproto_loop(struct lua_State *L)
 		struct xrow_header hdr;
 		if (netbox_send_and_recv(transport, fd, &hdr) != 0) {
 			luaL_testcancel(L);
-			return luaT_push_nil_and_error(L);
+			luaT_pusherror(L, diag_last_error(diag_get()));
+			return 1;
 		}
 		netbox_dispatch_response(L, transport, &hdr);
 		if (hdr.schema_version > 0 &&
 		    hdr.schema_version != schema_version) {
-			lua_pushinteger(L, hdr.schema_version);
-			return 1;
+			return 0;
 		}
 	}
 }
