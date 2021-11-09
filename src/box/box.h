@@ -199,11 +199,12 @@ box_process_auth(struct auth_request *request, const char *salt);
 
 /** Send current read view to the replica. */
 void
-box_process_fetch_snapshot(struct iostream *io, struct xrow_header *header);
+box_process_fetch_snapshot(struct iostream *io,
+			   const struct xrow_header *header);
 
 /** Register a replica */
 void
-box_process_register(struct iostream *io, struct xrow_header *header);
+box_process_register(struct iostream *io, const struct xrow_header *header);
 
 /**
  * Join a replica.
@@ -214,7 +215,7 @@ box_process_register(struct iostream *io, struct xrow_header *header);
  * \param JOIN packet header
  */
 void
-box_process_join(struct iostream *io, struct xrow_header *header);
+box_process_join(struct iostream *io, const struct xrow_header *header);
 
 /**
  * Subscribe a replica.
@@ -225,7 +226,7 @@ box_process_join(struct iostream *io, struct xrow_header *header);
  * \param SUBSCRIBE packet header
  */
 void
-box_process_subscribe(struct iostream *io, struct xrow_header *header);
+box_process_subscribe(struct iostream *io, const struct xrow_header *header);
 
 void
 box_process_vote(struct ballot *ballot);
