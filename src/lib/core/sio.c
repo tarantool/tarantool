@@ -215,7 +215,7 @@ int
 sio_bind(int fd, const struct sockaddr *addr, socklen_t addrlen)
 {
 	int rc = bind(fd, addr, addrlen);
-	if (rc < 0 && errno != EADDRINUSE)
+	if (rc < 0)
 		diag_set(SocketError, sio_socketname(fd), "bind");
 	return rc;
 }

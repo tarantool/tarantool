@@ -175,38 +175,41 @@ evio_service_accept_cb(ev_loop *loop, ev_io *watcher, int events)
 }
 
 /*
- * Check if the UNIX socket which we failed to create exists and
- * no one is listening on it. Unlink the file if it's the case.
- * Set an error and return -1 otherwise.
+ * Check if the UNIX socket exists and no one is
+ * listening on it. Unlink the file if it's the case.
  */
 static int
-evio_service_reuse_addr(struct evio_service *service, int fd)
+evio_service_reuse_addr(const char *uri)
 {
-	if ((service->addr.sa_family != AF_UNIX) || (errno != EADDRINUSE)) {
-		diag_set(SocketError, sio_socketname(fd),
-			 "evio_service_reuse_addr");
+	struct uri u;
+	if (uri_parse(&u, uri) || u.service == NULL) {
+		diag_set(IllegalParams, "invalid uri for bind: %s", uri);
 		return -1;
 	}
-	int save_errno = errno;
-	int cl_fd = sio_socket(service->addr.sa_family, SOCK_STREAM, 0);
+	if (strncmp(u.host, URI_HOST_UNIX, u.host_len) != 0)
+		return 0;
+
+	struct sockaddr_un un;
+	snprintf(un.sun_path, sizeof(un.sun_path), "%.*s",
+		 (int)u.service_len, u.service);
+	un.sun_family = AF_UNIX;
+
+	int cl_fd = sio_socket(un.sun_family, SOCK_STREAM, 0);
 	if (cl_fd < 0)
 		return -1;
 
-	if (connect(cl_fd, &service->addr, service->addr_len) == 0)
+	if (connect(cl_fd, (struct sockaddr *)&un, sizeof(un)) == 0)
 		goto err;
 
-	if (errno != ECONNREFUSED)
+	if (errno == ECONNREFUSED && unlink(un.sun_path) != 0)
 		goto err;
 
-	if (unlink(((struct sockaddr_un *)(&service->addr))->sun_path))
-		goto err;
 	close(cl_fd);
-
 	return 0;
 err:
-	errno = save_errno;
+	errno = EADDRINUSE;
+	diag_set(SocketError, sio_socketname(cl_fd), "unlink");
 	close(cl_fd);
-	diag_set(SocketError, sio_socketname(fd), "unlink");
 	return -1;
 }
 
@@ -230,19 +233,8 @@ evio_service_bind_addr(struct evio_service *service)
 				   SOCK_STREAM) != 0)
 		goto error;
 
-	if (sio_bind(fd, &service->addr, service->addr_len)) {
-		if (errno != EADDRINUSE)
-			goto error;
-		if (evio_service_reuse_addr(service, fd))
-			goto error;
-		if (sio_bind(fd, &service->addr, service->addr_len)) {
-			if (errno == EADDRINUSE) {
-				diag_set(SocketError, sio_socketname(fd),
-					 "bind");
-			}
-			goto error;
-		}
-	}
+	if (sio_bind(fd, &service->addr, service->addr_len) != 0)
+		goto error;
 
 	/*
 	 * After binding a result address may be different. For
@@ -306,6 +298,8 @@ evio_service_init(ev_loop *loop, struct evio_service *service, const char *name,
 int
 evio_service_bind(struct evio_service *service, const char *uri)
 {
+	if (evio_service_reuse_addr(uri) != 0)
+		return -1;
 	struct uri u;
 	if (uri_parse(&u, uri) || u.service == NULL) {
 		diag_set(IllegalParams, "invalid uri for bind: %s", uri);
