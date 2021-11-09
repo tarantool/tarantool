@@ -507,7 +507,8 @@ coio_service_init(struct coio_service *service, const char *name,
 int
 coio_service_start(struct evio_service *service, const char *uri)
 {
-	if (evio_service_bind(service, uri) != 0 ||
+	const char *uris[] = { uri };
+	if (evio_service_bind(service, uris, 1) != 0 ||
 	    evio_service_listen(service) != 0)
 		return -1;
 	return 0;

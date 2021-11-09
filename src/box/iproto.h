@@ -94,11 +94,18 @@ void
 iproto_reset_stat(void);
 
 /**
- * String representation of the address served by
- * iproto. To be shown in box.info.
+ * Return count of the addresses currently served by iproto.
+ */
+int
+iproto_addr_count(void);
+
+/**
+ * Return representation of the address served by iproto by
+ * it's @a idx. @a buf should have at least SERVICE_NAME_MAXLEN
+ * size.
  */
 const char *
-iproto_bound_address(char *buf);
+iproto_addr_str(char *buf, int idx);
 
 int
 iproto_rmean_foreach(void *cb, void *cb_ctx);
