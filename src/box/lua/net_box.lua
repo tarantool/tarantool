@@ -154,14 +154,12 @@ local function on_push_sync_default() end
 --
 -- State chart:
 --
--- connecting -> initial +-> active
---                        \
---                         +-> auth -> fetch_schema <-> active
+--  initial -> auth -> fetch_schema <-> active
 --
---  (any state, on error) -> error_reconnect -> connecting -> ...
+--  (any state, on error) -> error_reconnect -> auth -> ...
 --                                           \
---                                             -> [error]
---  (any_state, but [error]) -> [closed]
+--                                            -> error
+--  (any state, but 'error') -> closed
 --
 --
 -- State change events can be delivered to the transport user via
@@ -175,7 +173,6 @@ local function on_push_sync_default() end
 --
 --  'state_changed', state, error
 --  'handshake', greeting
---  'will_fetch_schema'   -> true (approve) / false (skip fetch)
 --  'did_fetch_schema', schema_version, spaces, indices
 --  'reconnect_timeout'   -> get reconnect timeout if set and > 0,
 --                           else nil is returned.
@@ -422,20 +419,16 @@ local function create_transport(host, port, user, password, callback)
             set_state('fetch_schema')
             return iproto_schema_sm()
         end
-        local schema_version, err = internal.iproto_auth(user, password, salt,
-                                                         transport, sock:fd())
-        if not schema_version then
+        local err = internal.iproto_auth(user, password, salt, transport,
+                                         sock:fd())
+        if err then
             return error_sm(err.code, err.message)
         end
         set_state('fetch_schema')
-        return iproto_schema_sm(schema_version)
+        return iproto_schema_sm()
     end
 
-    iproto_schema_sm = function(schema_version)
-        if not callback('will_fetch_schema') then
-            set_state('active')
-            return iproto_sm(schema_version)
-        end
+    iproto_schema_sm = function()
         local schema_version, schema = internal.iproto_schema(
             greeting.version_id, transport, sock:fd())
         if not schema_version then
@@ -449,15 +442,14 @@ local function create_transport(host, port, user, password, callback)
     end
 
     iproto_sm = function(schema_version)
-        local schema_version, err = internal.iproto_loop(schema_version,
-                                                         transport, sock:fd())
-        if not schema_version then
+        local err = internal.iproto_loop(schema_version, transport, sock:fd())
+        if err then
             return error_sm(err.code, err.message)
         end
         -- schema_version has been changed - start to load a new version.
         -- Sic: self.schema_version will be updated only after reload.
         set_state('fetch_schema')
-        return iproto_schema_sm(schema_version)
+        return iproto_schema_sm()
     end
 
     error_sm = function(err, msg)
@@ -717,8 +709,6 @@ local function new_sm(host, port, opts)
                            table.concat(missing, ', ')
                 end
             end
-        elseif what == 'will_fetch_schema' then
-            return true
         elseif what == 'fetch_connect_timeout' then
             return opts.connect_timeout or DEFAULT_CONNECT_TIMEOUT
         elseif what == 'did_fetch_schema' then
