@@ -498,8 +498,8 @@ void
 coio_service_init(struct coio_service *service, const char *name,
 		  fiber_func handler, void *handler_param)
 {
-	evio_service_init(loop(), &service->evio_service, name,
-			  coio_service_on_accept, service);
+	evio_service_create(loop(), &service->evio_service, name,
+			    coio_service_on_accept, service);
 	service->handler = handler;
 	service->handler_param = handler_param;
 }
