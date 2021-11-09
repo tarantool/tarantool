@@ -121,7 +121,7 @@ struct xrow_header {
  * encoded into a binary packet.
  */
 static inline size_t
-xrow_approx_len(struct xrow_header *row)
+xrow_approx_len(const struct xrow_header *row)
 {
 	size_t len = XROW_HEADER_LEN_MAX;
 	for (int i = 0; i < row->bodycnt; i++)
@@ -444,7 +444,7 @@ struct ballot {
  * @param[out] ballot Where to store the decoded ballot.
  */
 int
-xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot);
+xrow_decode_ballot(const struct xrow_header *row, struct ballot *ballot);
 
 /**
  * Encode an instance vote request.
@@ -502,10 +502,10 @@ xrow_encode_subscribe(struct xrow_header *row,
  * @retval -1 Memory or format error.
  */
 int
-xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
+xrow_decode_subscribe(const struct xrow_header *row,
+		      struct tt_uuid *replicaset_uuid,
 		      struct tt_uuid *instance_uuid, struct vclock *vclock,
-		      uint32_t *version_id, bool *anon,
-		      uint32_t *id_filter);
+		      uint32_t *version_id, bool *anon, uint32_t *id_filter);
 
 /**
  * Encode JOIN command.
@@ -528,7 +528,7 @@ xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid);
  * @retval -1 Memory or format error.
  */
 static inline int
-xrow_decode_join(struct xrow_header *row, struct tt_uuid *instance_uuid,
+xrow_decode_join(const struct xrow_header *row, struct tt_uuid *instance_uuid,
 		 uint32_t *version_id)
 {
 	return xrow_decode_subscribe(row, NULL, instance_uuid, NULL, version_id,
@@ -546,8 +546,9 @@ xrow_decode_join(struct xrow_header *row, struct tt_uuid *instance_uuid,
  * @retval -1 Memory or format error.
  */
 static inline int
-xrow_decode_register(struct xrow_header *row, struct tt_uuid *instance_uuid,
-		     struct vclock *vclock, uint32_t *version_id)
+xrow_decode_register(const struct xrow_header *row,
+		     struct tt_uuid *instance_uuid, struct vclock *vclock,
+		     uint32_t *version_id)
 {
 	return xrow_decode_subscribe(row, NULL, instance_uuid, vclock,
 				     version_id, NULL, NULL);
@@ -573,7 +574,7 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
  * @retval -1 Memory or format error.
  */
 static inline int
-xrow_decode_vclock(struct xrow_header *row, struct vclock *vclock)
+xrow_decode_vclock(const struct xrow_header *row, struct vclock *vclock)
 {
 	return xrow_decode_subscribe(row, NULL, NULL, vclock, NULL, NULL, NULL);
 }
@@ -602,7 +603,7 @@ xrow_encode_subscribe_response(struct xrow_header *row,
  * @retval -1 Memory or format error.
  */
 static inline int
-xrow_decode_subscribe_response(struct xrow_header *row,
+xrow_decode_subscribe_response(const struct xrow_header *row,
 			       struct tt_uuid *replicaset_uuid,
 			       struct vclock *vclock)
 {
@@ -883,7 +884,7 @@ xrow_to_iovec(const struct xrow_header *row, struct iovec *out);
  * @param row Encoded error.
  */
 void
-xrow_decode_error(struct xrow_header *row);
+xrow_decode_error(const struct xrow_header *row);
 
 /**
  * BEGIN request.
@@ -962,7 +963,7 @@ xrow_to_iovec_xc(const struct xrow_header *row, struct iovec *out)
 
 /** @copydoc xrow_decode_error. */
 static inline void
-xrow_decode_error_xc(struct xrow_header *row)
+xrow_decode_error_xc(const struct xrow_header *row)
 {
 	xrow_decode_error(row);
 	diag_raise();
@@ -1019,7 +1020,7 @@ xrow_encode_auth_xc(struct xrow_header *row, const char *salt, size_t salt_len,
 
 /** @copydoc xrow_decode_ballot. */
 static inline void
-xrow_decode_ballot_xc(struct xrow_header *row, struct ballot *ballot)
+xrow_decode_ballot_xc(const struct xrow_header *row, struct ballot *ballot)
 {
 	if (xrow_decode_ballot(row, ballot) != 0)
 		diag_raise();
@@ -1050,7 +1051,7 @@ xrow_encode_subscribe_xc(struct xrow_header *row,
 
 /** @copydoc xrow_decode_subscribe. */
 static inline void
-xrow_decode_subscribe_xc(struct xrow_header *row,
+xrow_decode_subscribe_xc(const struct xrow_header *row,
 			 struct tt_uuid *replicaset_uuid,
 			 struct tt_uuid *instance_uuid, struct vclock *vclock,
 			 uint32_t *replica_version_id, bool *anon,
@@ -1073,8 +1074,8 @@ xrow_encode_join_xc(struct xrow_header *row,
 
 /** @copydoc xrow_decode_join. */
 static inline void
-xrow_decode_join_xc(struct xrow_header *row, struct tt_uuid *instance_uuid,
-		    uint32_t *version_id)
+xrow_decode_join_xc(const struct xrow_header *row,
+		    struct tt_uuid *instance_uuid, uint32_t *version_id)
 {
 	if (xrow_decode_join(row, instance_uuid, version_id) != 0)
 		diag_raise();
@@ -1082,8 +1083,9 @@ xrow_decode_join_xc(struct xrow_header *row, struct tt_uuid *instance_uuid,
 
 /** @copydoc xrow_decode_register. */
 static inline void
-xrow_decode_register_xc(struct xrow_header *row, struct tt_uuid *instance_uuid,
-			struct vclock *vclock, uint32_t *version_id)
+xrow_decode_register_xc(const struct xrow_header *row,
+			struct tt_uuid *instance_uuid, struct vclock *vclock,
+			uint32_t *version_id)
 {
 	if (xrow_decode_register(row, instance_uuid, vclock, version_id) != 0)
 		diag_raise();
@@ -1099,7 +1101,7 @@ xrow_encode_vclock_xc(struct xrow_header *row, const struct vclock *vclock)
 
 /** @copydoc xrow_decode_vclock. */
 static inline void
-xrow_decode_vclock_xc(struct xrow_header *row, struct vclock *vclock)
+xrow_decode_vclock_xc(const struct xrow_header *row, struct vclock *vclock)
 {
 	if (xrow_decode_vclock(row, vclock) != 0)
 		diag_raise();
@@ -1117,7 +1119,7 @@ xrow_encode_subscribe_response_xc(struct xrow_header *row,
 
 /** @copydoc xrow_decode_subscribe_response. */
 static inline void
-xrow_decode_subscribe_response_xc(struct xrow_header *row,
+xrow_decode_subscribe_response_xc(const struct xrow_header *row,
 				  struct tt_uuid *replicaset_uuid,
 				  struct vclock *vclock)
 {

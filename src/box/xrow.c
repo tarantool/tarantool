@@ -1459,7 +1459,7 @@ xrow_encode_auth(struct xrow_header *packet, const char *salt, size_t salt_len,
 }
 
 void
-xrow_decode_error(struct xrow_header *row)
+xrow_decode_error(const struct xrow_header *row)
 {
 	uint32_t code = row->type & (IPROTO_TYPE_ERROR - 1);
 
@@ -1557,7 +1557,7 @@ xrow_encode_vote(struct xrow_header *row)
 }
 
 int
-xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
+xrow_decode_ballot(const struct xrow_header *row, struct ballot *ballot)
 {
 	ballot->is_ro_cfg = false;
 	ballot->can_lead = false;
@@ -1722,10 +1722,10 @@ xrow_encode_subscribe(struct xrow_header *row,
 }
 
 int
-xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
+xrow_decode_subscribe(const struct xrow_header *row,
+		      struct tt_uuid *replicaset_uuid,
 		      struct tt_uuid *instance_uuid, struct vclock *vclock,
-		      uint32_t *version_id, bool *anon,
-		      uint32_t *id_filter)
+		      uint32_t *version_id, bool *anon, uint32_t *id_filter)
 {
 	if (row->bodycnt == 0) {
 		diag_set(ClientError, ER_INVALID_MSGPACK, "request body");
