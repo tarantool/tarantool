@@ -178,13 +178,13 @@ sio_getsockopt(int fd, int level, int optname,
  * Connect a client socket to a server.
  * The diagnostics is not set in case of EINPROGRESS.
  */
-int sio_connect(int fd, struct sockaddr *addr, socklen_t addrlen);
+int sio_connect(int fd, const struct sockaddr *addr, socklen_t addrlen);
 
 /**
  * Bind a socket to the given address. The diagnostics is not set
  * in case of EADDRINUSE.
  */
-int sio_bind(int fd, struct sockaddr *addr, socklen_t addrlen);
+int sio_bind(int fd, const struct sockaddr *addr, socklen_t addrlen);
 
 /**
  * Mark a socket as accepting connections. The diagnostics is not

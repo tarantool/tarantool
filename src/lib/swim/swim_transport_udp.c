@@ -85,7 +85,7 @@ swim_transport_bind(struct swim_transport *transport,
 	int fd = sio_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (fd < 0)
 		return -1;
-	if (sio_bind(fd, (struct sockaddr *) addr, addr_len) != 0) {
+	if (sio_bind(fd, addr, addr_len) != 0) {
 		if (errno == EADDRINUSE)
 			diag_set(SocketError, sio_socketname(fd), "bind");
 		goto end_error;

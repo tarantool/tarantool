@@ -200,7 +200,7 @@ sio_getsockopt(int fd, int level, int optname,
 }
 
 int
-sio_connect(int fd, struct sockaddr *addr, socklen_t addrlen)
+sio_connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
 {
 	/* Establish the connection. */
 	int rc = connect(fd, (struct sockaddr *) addr, addrlen);
@@ -212,7 +212,7 @@ sio_connect(int fd, struct sockaddr *addr, socklen_t addrlen)
 }
 
 int
-sio_bind(int fd, struct sockaddr *addr, socklen_t addrlen)
+sio_bind(int fd, const struct sockaddr *addr, socklen_t addrlen)
 {
 	int rc = bind(fd, addr, addrlen);
 	if (rc < 0 && errno != EADDRINUSE)
