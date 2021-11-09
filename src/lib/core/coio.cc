@@ -49,7 +49,7 @@ typedef void (*ev_stat_cb)(ev_loop *, ev_stat *, int);
  * @retval socket fd
  */
 static int
-coio_connect_addr(struct sockaddr *addr, socklen_t len, ev_tstamp timeout)
+coio_connect_addr(const struct sockaddr *addr, socklen_t len, ev_tstamp timeout)
 {
 	int fd = sio_socket(addr->sa_family, SOCK_STREAM, 0);
 	if (fd < 0)
