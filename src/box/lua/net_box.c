@@ -800,9 +800,8 @@ netbox_decode_greeting(lua_State *L)
 }
 
 /**
- * Reads data from the given socket until the limit or boundary is reached.
- * Returns 0 and sets *size to limit or boundary position on success.
- * On error returns -1 and sets diag.
+ * Reads data from the given socket until the limit is reached.
+ * Returns 0 on success. On error returns -1 and sets diag.
  *
  * If the connection is closing, then the fiber in which the 'close' function
  * is called waits on the `on_send_buf_empty` conditional variable until all
@@ -819,8 +818,7 @@ netbox_decode_greeting(lua_State *L)
  * interaction.
  */
 static int
-netbox_communicate(struct netbox_transport *transport, int fd, size_t limit,
-		   const void *boundary, size_t boundary_len, size_t *size)
+netbox_communicate(struct netbox_transport *transport, int fd, size_t limit)
 {
 	struct ibuf *send_buf = &transport->send_buf;
 	struct ibuf *recv_buf = &transport->recv_buf;
@@ -829,19 +827,8 @@ netbox_communicate(struct netbox_transport *transport, int fd, size_t limit,
 	while (true) {
 		/* reader serviced first */
 check_limit:
-		if (ibuf_used(recv_buf) >= limit) {
-			*size = limit;
+		if (ibuf_used(recv_buf) >= limit)
 			return 0;
-		}
-		const char *p;
-		if (boundary != NULL && (p = memmem(
-					recv_buf->rpos,
-					ibuf_used(recv_buf),
-					boundary, boundary_len)) != NULL) {
-			*size = p - recv_buf->rpos;
-			return 0;
-		}
-
 		while (revents & COIO_READ) {
 			void *p = ibuf_reserve(recv_buf, NETBOX_READAHEAD);
 			if (p == NULL) {
@@ -900,8 +887,8 @@ handle_error:
  * On error returns -1.
  */
 static int
-netbox_send_and_recv_iproto(struct netbox_transport *transport, int fd,
-			    struct xrow_header *hdr)
+netbox_send_and_recv(struct netbox_transport *transport, int fd,
+		     struct xrow_header *hdr)
 {
 	while (true) {
 		size_t required;
@@ -922,35 +909,9 @@ netbox_send_and_recv_iproto(struct netbox_transport *transport, int fd,
 					/*end_is_exact=*/true);
 			}
 		}
-		size_t unused;
-		if (netbox_communicate(transport, fd, /*limit=*/required,
-				       /*boundary=*/NULL, /*boundary_len=*/0,
-				       &unused) != 0) {
+		if (netbox_communicate(transport, fd, required) != 0)
 			return -1;
-		}
 	}
-}
-
-/**
- * Sends and receives data over a console connection.
- * Returns a pointer to a response string and its len.
- * On error returns NULL.
- */
-static const char *
-netbox_send_and_recv_console(struct netbox_transport *transport, int fd,
-			     size_t *response_len)
-{
-	const char delim[] = "\n...\n";
-	size_t delim_len = sizeof(delim) - 1;
-	size_t delim_pos;
-	if (netbox_communicate(transport, fd, /*limit=*/SIZE_MAX,
-			       delim, delim_len, &delim_pos) != 0) {
-		return NULL;
-	}
-	const char *response = transport->recv_buf.rpos;
-	transport->recv_buf.rpos += delim_pos + delim_len;
-	*response_len = delim_pos + delim_len;
-	return response;
 }
 
 static void
@@ -1958,9 +1919,9 @@ netbox_on_event(struct lua_State *L, struct netbox_transport *transport,
  * a reference to it and executing the on-push trigger.
  */
 static void
-netbox_dispatch_response_iproto(struct lua_State *L,
-				struct netbox_transport *transport,
-				struct xrow_header *hdr)
+netbox_dispatch_response(struct lua_State *L,
+			 struct netbox_transport *transport,
+			 struct xrow_header *hdr)
 {
 	enum iproto_type status = hdr->type;
 	if (status == IPROTO_EVENT) {
@@ -2025,30 +1986,6 @@ netbox_dispatch_response_iproto(struct lua_State *L,
 }
 
 /**
- * Given a netbox transport, request id (sync), and a response string, assigns
- * the response to the request and completes it.
- *
- * Lua stack is used for temporarily storing the response string before getting
- * a reference to it.
- */
-static void
-netbox_dispatch_response_console(struct lua_State *L,
-				 struct netbox_transport *transport,
-				 uint64_t sync, const char *response,
-				 size_t response_len)
-{
-	struct netbox_request *request =
-		netbox_transport_lookup_request(transport, sync);
-	if (request == NULL) {
-		/* Nobody is waiting for the response. */
-		return;
-	}
-	lua_pushlstring(L, response, response_len);
-	netbox_request_set_result(request, luaL_ref(L, LUA_REGISTRYINDEX));
-	netbox_request_complete(request);
-}
-
-/**
  * Performs a features request for an iproto connection.
  * Takes peer_version_id, netbox transport, socket fd.
  * Returns server version and features array on success.
@@ -2070,9 +2007,8 @@ netbox_iproto_id(struct lua_State *L)
 	if (netbox_encode_id(&transport->send_buf, transport->next_sync++) != 0)
 		goto error;
 	struct xrow_header hdr;
-	if (netbox_send_and_recv_iproto(transport, fd, &hdr) != 0) {
+	if (netbox_send_and_recv(transport, fd, &hdr) != 0)
 		goto error;
-	}
 	if (hdr.type != IPROTO_OK) {
 		uint32_t errcode = hdr.type & (IPROTO_TYPE_ERROR - 1);
 		if (errcode == ER_UNKNOWN_REQUEST_TYPE)
@@ -2123,9 +2059,8 @@ netbox_iproto_auth(struct lua_State *L)
 		goto error;
 	}
 	struct xrow_header hdr;
-	if (netbox_send_and_recv_iproto(transport, fd, &hdr) != 0) {
+	if (netbox_send_and_recv(transport, fd, &hdr) != 0)
 		goto error;
-	}
 	if (hdr.type != IPROTO_OK) {
 		xrow_decode_error(&hdr);
 		goto error;
@@ -2178,11 +2113,11 @@ restart:
 	uint32_t schema_version = 0;
 	do {
 		struct xrow_header hdr;
-		if (netbox_send_and_recv_iproto(transport, fd, &hdr) != 0) {
+		if (netbox_send_and_recv(transport, fd, &hdr) != 0) {
 			luaL_testcancel(L);
 			return luaT_push_nil_and_error(L);
 		}
-		netbox_dispatch_response_iproto(L, transport, &hdr);
+		netbox_dispatch_response(L, transport, &hdr);
 		if (hdr.sync != vspace_sync &&
 		    hdr.sync != vindex_sync &&
 		    hdr.sync != vcollation_sync) {
@@ -2251,78 +2186,16 @@ netbox_iproto_loop(struct lua_State *L)
 	int fd = lua_tointeger(L, 3);
 	while (true) {
 		struct xrow_header hdr;
-		if (netbox_send_and_recv_iproto(transport, fd, &hdr) != 0) {
+		if (netbox_send_and_recv(transport, fd, &hdr) != 0) {
 			luaL_testcancel(L);
 			return luaT_push_nil_and_error(L);
 		}
-		netbox_dispatch_response_iproto(L, transport, &hdr);
+		netbox_dispatch_response(L, transport, &hdr);
 		if (hdr.schema_version > 0 &&
 		    hdr.schema_version != schema_version) {
 			lua_pushinteger(L, hdr.schema_version);
 			return 1;
 		}
-	}
-}
-
-/**
- * Sets up console delimiter. Should be called before serving any requests.
- * Takes netbox transport, socket fd.
- * Returns none on success, error on failure.
- */
-static int
-netbox_console_setup(struct lua_State *L)
-{
-	const char *setup_delimiter_cmd =
-		"require('console').delimiter('$EOF$')\n";
-	const size_t setup_delimiter_cmd_len = strlen(setup_delimiter_cmd);
-	const char *ok_response = "---\n...\n";
-	const size_t ok_response_len = strlen(ok_response);
-	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
-	int fd = lua_tointeger(L, 2);
-	void *wpos = ibuf_alloc(&transport->send_buf, setup_delimiter_cmd_len);
-	if (wpos == NULL)
-		return luaL_error(L, "out of memory");
-	memcpy(wpos, setup_delimiter_cmd, setup_delimiter_cmd_len);
-	size_t response_len;
-	const char *response = netbox_send_and_recv_console(transport, fd,
-							    &response_len);
-	if (response == NULL) {
-		luaL_testcancel(L);
-		goto error;
-	}
-	if (response_len != ok_response_len ||
-	    strncmp(response, ok_response, ok_response_len) != 0) {
-		box_error_raise(ER_NO_CONNECTION, "Unexpected response");
-		goto error;
-	}
-	return 0;
-error:
-	luaT_pusherror(L, box_error_last());
-	return 1;
-}
-
-/**
- * Processes console requests in a loop until an error.
- * Takes netbox transport, socket fd.
- * Returns the error that broke the loop.
- */
-static int
-netbox_console_loop(struct lua_State *L)
-{
-	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
-	int fd = lua_tointeger(L, 2);
-	uint64_t sync = transport->next_sync;
-	while (true) {
-		size_t response_len;
-		const char *response = netbox_send_and_recv_console(
-			transport, fd, &response_len);
-		if (response == NULL) {
-			luaL_testcancel(L);
-			luaT_pusherror(L, box_error_last());
-			return 1;
-		}
-		netbox_dispatch_response_console(L, transport, sync++,
-						 response, response_len);
 	}
 }
 
@@ -2378,8 +2251,6 @@ luaopen_net_box(struct lua_State *L)
 		{ "iproto_auth",    netbox_iproto_auth },
 		{ "iproto_schema",  netbox_iproto_schema },
 		{ "iproto_loop",    netbox_iproto_loop },
-		{ "console_setup",  netbox_console_setup },
-		{ "console_loop",   netbox_console_loop },
 		{ NULL, NULL}
 	};
 	/* luaL_register_module polutes _G */
