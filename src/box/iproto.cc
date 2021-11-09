@@ -2571,7 +2571,7 @@ iproto_on_accept(struct evio_service *service, int fd,
 	struct iproto_msg *msg;
 
 	struct iproto_thread *iproto_thread =
-		(struct iproto_thread*)service->on_accept_param;
+		(struct iproto_thread *)service->on_accept_param;
 	struct iproto_connection *con =
 		iproto_connection_new(iproto_thread, fd);
 	if (con == NULL)
@@ -2886,14 +2886,8 @@ iproto_init(int threads_count)
 	 * we don't need any accept functions.
 	 */
 	evio_service_init(loop(), &tx_binary, "tx_binary", NULL, NULL);
-
 	iproto_threads = (struct iproto_thread *)
-		calloc(threads_count, sizeof(struct iproto_thread));
-	if (iproto_threads == NULL) {
-		tnt_raise(OutOfMemory, threads_count *
-			  sizeof(struct iproto_thread), "calloc",
-			  "struct iproto_thread");
-	}
+		xcalloc(threads_count, sizeof(struct iproto_thread));
 
 	for (int i = 0; i < threads_count; i++, iproto_threads_count++) {
 		struct iproto_thread *iproto_thread = &iproto_threads[i];
@@ -2962,7 +2956,6 @@ struct iproto_cfg_msg: public cbus_call_msg
 		struct iproto_stats *stats;
 		/** Pointer to evio_service, used for bind */
 		struct evio_service *binary;
-
 		/** New iproto max message count. */
 		int iproto_msg_max;
 	};

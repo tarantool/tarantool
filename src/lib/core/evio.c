@@ -308,8 +308,7 @@ evio_service_bind(struct evio_service *service, const char *uri)
 {
 	struct uri u;
 	if (uri_parse(&u, uri) || u.service == NULL) {
-		diag_set(SocketError, sio_socketname(-1),
-			 "invalid uri for bind: %s", uri);
+		diag_set(IllegalParams, "invalid uri for bind: %s", uri);
 		return -1;
 	}
 
