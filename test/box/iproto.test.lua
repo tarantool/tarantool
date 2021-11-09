@@ -1,4 +1,4 @@
-net_box = require('net.box')
+socket = require('socket')
 urilib = require('uri')
 msgpack = require('msgpack')
 test_run = require('test_run').new()
@@ -42,7 +42,8 @@ body = { \
 }
 
 uri = urilib.parse(box.cfg.listen)
-sock = net_box.establish_connection(uri.host, uri.service)
+sock = socket.tcp_connect(uri.host, uri.service)
+_ = sock:read(128) -- skip greeting
 
 response = iproto_request(sock, header, body)
 sock:close()

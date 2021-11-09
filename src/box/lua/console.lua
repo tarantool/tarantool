@@ -29,6 +29,7 @@ local net_box = require('net.box')
 local box_internal = require('box.internal')
 local help = require('help').help
 
+local DEFAULT_CONNECT_TIMEOUT = 10
 local PUSH_TAG_HANDLE = '!push!'
 
 --
@@ -759,7 +760,32 @@ local function start()
 end
 
 --
--- Connect to remove instance
+-- Connect to Lua console
+--
+local function connect_lua_console(url, timeout, print_f)
+    local deadline = fiber.clock() + (timeout or DEFAULT_CONNECT_TIMEOUT)
+    local s, err = socket.tcp_connect(url.host, url.service,
+                                      deadline - fiber.clock())
+    if not s then
+        return nil, err
+    end
+    local greeting = s:read(128, deadline - fiber.clock())
+    if not greeting then
+        local err = s:error()
+        s:close()
+        return nil, err
+    end
+    if greeting:len() ~= 128 or
+       greeting:sub(64, 64) ~= '\n' or greeting:sub(128, 128) ~= '\n' or
+       not greeting:match("Tarantool%s+%d+%.%d+%.%d+%s+%(Lua console%)") then
+        s:close()
+        return nil, 'Invalid greeting'
+   end
+   return wrap_text_socket(s, url, print_f)
+end
+
+--
+-- Connect to remote instance
 --
 local function connect(uri, opts)
     opts = opts or {}
@@ -777,23 +803,26 @@ local function connect(uri, opts)
         error('Usage: console.connect("[login:password@][host:]port")')
     end
 
-    local connection, greeting =
-        net_box.establish_connection(u.host, u.service, opts.timeout)
-    if not connection then
-        log.verbose(greeting)
-        box.error(box.error.NO_CONNECTION)
-    end
-    local remote
-    if greeting.protocol == 'Lua console' then
-        remote = wrap_text_socket(connection, u,
-                                  function(msg) self:print(msg) end)
-    else
-        opts = {
+    -- We don't know if the remote end is binary or Lua console so we first try
+    -- to connect to it as binary using net.box and fall back on Lua console if
+    -- it fails.
+    local remote = net_box.connect(u.host, u.service, {
             connect_timeout = opts.timeout,
             user = u.login,
             password = u.password,
-        }
-        remote = net_box.wrap(connection, greeting, u.host, u.service, opts)
+    })
+    if remote.state == 'error' then
+        local err = remote.error
+        remote = nil
+        if err == 'Unsupported protocol: Lua console' then
+            remote, err = connect_lua_console(u, opts.timeout,
+                                              function(msg) self:print(msg) end)
+        end
+        if not remote then
+            log.verbose(err)
+            box.error(box.error.NO_CONNECTION)
+        end
+    else
         if not remote.host then
             remote.host = 'localhost'
         end

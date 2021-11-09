@@ -146,8 +146,8 @@ local function on_push_sync_default() end
 --
 -- Transport state machine:
 --
--- State machine starts in 'initial' state. New_sm method
--- accepts an established connection and spawns a worker fiber.
+-- State machine starts in 'initial' state. Start method
+-- spawns a worker fiber, which will establish a connection.
 -- Stop method sets the state to 'closed' and kills the worker.
 -- If the transport is already in 'error' state stop() does
 -- nothing.
@@ -183,8 +183,7 @@ local function on_push_sync_default() end
 -- Suggestion for callback writers: sleep a few secs before approving
 -- reconnect.
 --
-local function create_transport(host, port, user, password, callback,
-                                sock, greeting)
+local function create_transport(host, port, user, password, callback)
     -- check / normalize credentials
     if user == nil and password ~= nil then
         box.error(E_PROC_LUA, 'net.box: user is not defined')
@@ -210,6 +209,8 @@ local function create_transport(host, port, user, password, callback,
     -- wait for a result.
     local transport         = internal.new_transport(on_event)
 
+    local sock
+    local greeting
     local worker_fiber
     -- Flag indicates that connection is closing and waits until
     -- send buf became empty.
@@ -247,9 +248,7 @@ local function create_transport(host, port, user, password, callback,
             local ok, err, timeout
             worker_fiber = fiber_self()
             fiber.name(string.format('%s:%s (net.box)', host, port), {truncate=true})
-            if not sock then
-                goto do_connect
-            end
+            goto do_connect
     ::handle_connection::
             ok, err = pcall(protocol_sm)
             if not (ok or is_final_state[state]) then
@@ -516,15 +515,14 @@ end
 -- Now it is necessary to have a strong ref to callback somewhere or
 -- it is GC-ed prematurely. We wrap stop() method, stashing the
 -- ref in an upvalue (stop() performance doesn't matter much.)
-local create_transport = function(host, port, user, password, callback,
-                                  sock, greeting)
+local create_transport = function(host, port, user, password, callback)
     local weak_refs = setmetatable({callback = callback}, {__mode = 'v'})
     local function weak_callback(...)
         local callback = weak_refs.callback
         if callback then return callback(...) end
     end
     local transport = create_transport(host, port, user, password,
-                                       weak_callback, sock, greeting)
+                                       weak_callback)
     local transport_stop = transport.stop
     local gc_hook = ffi.gc(ffi.new('char[1]'), function()
         pcall(transport_stop)
@@ -692,7 +690,7 @@ local stream_spaces_mt = {
 
 local space_metatable, index_metatable
 
-local function new_sm(host, port, opts, sock, greeting)
+local function new_sm(host, port, opts)
     local user, password = opts.user, opts.password; opts.password = nil
     local last_reconnect_error
     local remote = {host = host, port = port, opts = opts, state = 'initial'}
@@ -797,8 +795,7 @@ local function new_sm(host, port, opts, sock, greeting)
     remote._on_disconnect = trigger.new("on_disconnect")
     remote._on_connect = trigger.new("on_connect")
     remote._is_connected = false
-    remote._transport = create_transport(host, port, user, password, callback,
-                                         sock, greeting)
+    remote._transport = create_transport(host, port, user, password, callback)
     remote._transport.start()
     if opts.wait_connected ~= false then
         remote._transport.wait_state('active', tonumber(opts.wait_connected))
@@ -809,31 +806,13 @@ local function new_sm(host, port, opts, sock, greeting)
 end
 
 --
--- Wrap an existing connection into net.box API.
--- @param sock Connected socket.
--- @param greeting Decoded greeting, received from a server.
--- @param host Hostname to which @a connection is established.
--- @param port TCP port to which @a connection is established.
--- @param opts Options like reconnect_after, connect_timeout,
---        wait_connected, login, password, ...
---
--- @retval Net.box object.
---
-local function wrap(sock, greeting, host, port, opts)
-    if sock == nil or type(greeting) ~= 'table' then
-        error('Usage: netbox.wrap(socket, greeting, [opts])')
-    end
-    opts = opts or {}
-    return new_sm(host, port, opts, sock, greeting)
-end
-
---
 -- Connect to a remote server.
 -- @param uri OR host and port. URI is a string like
 --        hostname:port@login:password. Host and port can be
 --        passed separately with login and password in the next
 --        parameter.
--- @param opts @Sa wrap().
+-- @param opts Options like reconnect_after, connect_timeout,
+--        wait_connected, login, password, ...
 --
 -- @retval Net.box object.
 --
@@ -1518,8 +1497,6 @@ local this_module = {
     create_transport = create_transport,
     connect = connect,
     new = connect, -- Tarantool < 1.7.1 compatibility,
-    wrap = wrap,
-    establish_connection = establish_connection,
     _method = { -- for tests
         ping        = M_PING,
         call_16     = M_CALL_16,
