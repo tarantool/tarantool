@@ -57,7 +57,7 @@ extern "C" {
  * How to use a service:
  * struct evio_service *service;
  * service = malloc(sizeof(struct evio_service));
- * evio_service_init(service, ..., on_accept_cb, ...);
+ * evio_service_create(service, ..., on_accept_cb, ...);
  * evio_service_bind(service);
  * evio_service_listen(service);
  * ...
@@ -102,8 +102,9 @@ struct evio_service
 
 /** Initialize the service. Don't bind to the port yet. */
 void
-evio_service_init(ev_loop *loop, struct evio_service *service, const char *name,
-		  evio_accept_f on_accept, void *on_accept_param);
+evio_service_create(ev_loop *loop, struct evio_service *service,
+                    const char *name, evio_accept_f on_accept,
+                    void *on_accept_param);
 
 /** Bind service to specified uri */
 int

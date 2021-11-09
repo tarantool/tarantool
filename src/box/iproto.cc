@@ -2610,8 +2610,8 @@ net_cord_f(va_list  ap)
 	mempool_create(&iproto_thread->iproto_stream_pool, &cord()->slabc,
 		       sizeof(struct iproto_stream));
 
-	evio_service_init(loop(), &iproto_thread->binary, "binary",
-			  iproto_on_accept, iproto_thread);
+	evio_service_create(loop(), &iproto_thread->binary, "binary",
+			    iproto_on_accept, iproto_thread);
 
 	char endpoint_name[ENDPOINT_NAME_MAX];
 	snprintf(endpoint_name, ENDPOINT_NAME_MAX, "net%u",
@@ -2885,7 +2885,7 @@ iproto_init(int threads_count)
 	 * We use this tx_binary only for bind, not for listen, so
 	 * we don't need any accept functions.
 	 */
-	evio_service_init(loop(), &tx_binary, "tx_binary", NULL, NULL);
+	evio_service_create(loop(), &tx_binary, "tx_binary", NULL, NULL);
 	iproto_threads = (struct iproto_thread *)
 		xcalloc(threads_count, sizeof(struct iproto_thread));
 
@@ -3095,7 +3095,7 @@ iproto_listen(const char *uri)
 {
 	iproto_send_stop_msg();
 	evio_service_stop(&tx_binary);
-	evio_service_init(loop(), &tx_binary, "tx_binary", NULL, NULL);
+	evio_service_create(loop(), &tx_binary, "tx_binary", NULL, NULL);
 	if (uri == NULL) {
 		tx_binary.addr_len = 0;
 		return 0;

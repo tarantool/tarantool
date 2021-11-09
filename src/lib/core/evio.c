@@ -273,8 +273,9 @@ evio_service_listen(struct evio_service *service)
 }
 
 void
-evio_service_init(ev_loop *loop, struct evio_service *service, const char *name,
-		  evio_accept_f on_accept, void *on_accept_param)
+evio_service_create(ev_loop *loop, struct evio_service *service,
+		    const char *name, evio_accept_f on_accept,
+		    void *on_accept_param)
 {
 	memset(service, 0, sizeof(struct evio_service));
 	snprintf(service->name, sizeof(service->name), "%s", name);
