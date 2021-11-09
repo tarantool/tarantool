@@ -174,13 +174,9 @@ local function on_push_sync_default() end
 --  'state_changed', state, error
 --  'handshake', greeting
 --  'did_fetch_schema', schema_version, spaces, indices
---  'reconnect_timeout'   -> get reconnect timeout if set and > 0,
---                           else nil is returned.
 --
--- Suggestion for callback writers: sleep a few secs before approving
--- reconnect.
---
-local function create_transport(host, port, user, password, callback)
+local function create_transport(host, port, user, password, callback,
+                                connect_timeout, reconnect_after)
     -- check / normalize credentials
     if user == nil and password ~= nil then
         box.error(E_PROC_LUA, 'net.box: user is not defined')
@@ -242,7 +238,7 @@ local function create_transport(host, port, user, password, callback)
     local function start()
         if state ~= 'initial' then return not is_final_state[state] end
         fiber.create(function()
-            local ok, err, timeout
+            local ok, err
             worker_fiber = fiber_self()
             fiber.name(string.format('%s:%s (net.box)', host, port), {truncate=true})
             goto do_connect
@@ -255,24 +251,18 @@ local function create_transport(host, port, user, password, callback)
                 sock:close()
                 sock = nil
             end
-            timeout = callback('reconnect_timeout')
     ::do_reconnect::
-            if not timeout or state ~= 'error_reconnect' then
+            if not reconnect_after or state ~= 'error_reconnect' then
                 goto stop
             end
-            fiber.sleep(timeout)
-            timeout = callback('reconnect_timeout')
-            if not timeout or state ~= 'error_reconnect' then
-                goto stop
-            end
+            fiber.sleep(reconnect_after)
     ::do_connect::
             sock, greeting =
-                establish_connection(host, port, callback('fetch_connect_timeout'))
+                establish_connection(host, port, connect_timeout)
             if sock then
                 goto handle_connection
             end
-            timeout = callback('reconnect_timeout')
-            if not timeout then
+            if not reconnect_after then
                 set_state('error', E_NO_CONNECTION, greeting)
                 goto stop
             end
@@ -455,7 +445,7 @@ local function create_transport(host, port, user, password, callback)
     error_sm = function(err, msg)
         if sock then sock:close(); sock = nil end
         if state ~= 'closed' then
-            if callback('reconnect_timeout') then
+            if reconnect_after then
                 set_state('error_reconnect', err, msg)
             else
                 set_state('error', err, msg)
@@ -484,14 +474,16 @@ end
 -- Now it is necessary to have a strong ref to callback somewhere or
 -- it is GC-ed prematurely. We wrap stop() method, stashing the
 -- ref in an upvalue (stop() performance doesn't matter much.)
-local create_transport = function(host, port, user, password, callback)
+local create_transport = function(host, port, user, password, callback,
+                                  connect_timeout, reconnect_after)
     local weak_refs = setmetatable({callback = callback}, {__mode = 'v'})
     local function weak_callback(...)
         local callback = weak_refs.callback
         if callback then return callback(...) end
     end
     local transport = create_transport(host, port, user, password,
-                                       weak_callback)
+                                       weak_callback, connect_timeout,
+                                       reconnect_after)
     local transport_stop = transport.stop
     local gc_hook = ffi.gc(ffi.new('char[1]'), function()
         pcall(transport_stop)
@@ -709,15 +701,8 @@ local function new_sm(host, port, opts)
                            table.concat(missing, ', ')
                 end
             end
-        elseif what == 'fetch_connect_timeout' then
-            return opts.connect_timeout or DEFAULT_CONNECT_TIMEOUT
         elseif what == 'did_fetch_schema' then
             remote:_install_schema(...)
-        elseif what == 'reconnect_timeout' then
-            if type(opts.reconnect_after) == 'number' and
-               opts.reconnect_after > 0 then
-                return opts.reconnect_after
-            end
         elseif what == 'event' then
             local key, value = ...
             local state = remote._watchers and remote._watchers[key]
@@ -750,7 +735,9 @@ local function new_sm(host, port, opts)
     remote._on_disconnect = trigger.new("on_disconnect")
     remote._on_connect = trigger.new("on_connect")
     remote._is_connected = false
-    remote._transport = create_transport(host, port, user, password, callback)
+    remote._transport = create_transport(host, port, user, password, callback,
+                                         opts.connect_timeout,
+                                         opts.reconnect_after)
     remote._transport.start()
     if opts.wait_connected ~= false then
         remote._transport.wait_state('active', tonumber(opts.wait_connected))
