@@ -2,6 +2,7 @@
 
 local ffi      = require('ffi')
 local fio      = require('fio')
+local socket   = require('socket')
 local tap      = require('tap')
 local uuid     = require('uuid')
 local errno    = require('errno')
@@ -92,17 +93,13 @@ end
 local function tctl_wait_start(dir, name)
     if name then
         local path = fio.pathjoin(dir, name .. '.control')
-        while not fio.stat(path) do
-            fiber.sleep(0.01)
-        end
         ::again::
-        local stat, _ = pcall(require('net.box').new, path, {
-            wait_connected = true, console = true
-        })
-        if stat == false then
+        local s = socket.tcp_connect('unix/', path)
+        if not s then
             fiber.sleep(0.01)
             goto again
         end
+        s:close()
     end
 end
 

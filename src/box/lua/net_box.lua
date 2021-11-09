@@ -55,7 +55,7 @@ local M_COUNT       = 16
 local M_BEGIN       = 17
 local M_COMMIT      = 18
 local M_ROLLBACK    = 19
--- Injects raw data into connection. Used by console and tests.
+-- Injects raw data into connection. Used by tests.
 local M_INJECT      = 20
 
 -- utility tables
@@ -135,13 +135,13 @@ end
 local function on_push_sync_default() end
 
 --
--- Basically, *transport* is a TCP connection speaking one of
--- Tarantool network protocols. This is a low-level interface.
+-- Basically, *transport* is a TCP connection speaking the Tarantool
+-- network protocol (IPROTO). This is a low-level interface.
 -- Primary features:
---  * implements protocols; concurrent perform_request()-s benefit from
---    multiplexing support in the protocol;
---  * schema-aware (optional) - snoops responses and initiates
---    schema reload when a response has a new schema version;
+--  * concurrent perform_request()-s benefit from multiplexing
+--    support in the protocol;
+--  * schema-aware - snoops responses and initiates schema reload
+--    when a response has a new schema version;
 --  * delivers transport events via the callback.
 --
 -- Transport state machine:
@@ -174,7 +174,7 @@ local function on_push_sync_default() end
 -- The following events are delivered, with arguments:
 --
 --  'state_changed', state, error
---  'handshake', greeting -> nil (accept) / errno, error (reject)
+--  'handshake', greeting
 --  'will_fetch_schema'   -> true (approve) / false (skip fetch)
 --  'did_fetch_schema', schema_version, spaces, indices
 --  'reconnect_timeout'   -> get reconnect timeout if set and > 0,
@@ -380,8 +380,7 @@ local function create_transport(host, port, user, password, callback)
     -- tail-recursive calls to each other. Yep, Lua optimizes
     -- such calls, and yep, this is the canonical way to implement
     -- a state machine in Lua.
-    local console_setup_sm, console_sm, iproto_setup_sm, iproto_auth_sm,
-        iproto_schema_sm, iproto_sm, error_sm
+    local iproto_setup_sm, iproto_auth_sm, iproto_schema_sm, iproto_sm, error_sm
 
     --
     -- Protocol_sm is a core function of netbox. It calls all
@@ -394,35 +393,13 @@ local function create_transport(host, port, user, password, callback)
     protocol_sm = function()
         assert(sock)
         assert(greeting)
-        local err, msg = callback('handshake', greeting)
-        if err then
-            return error_sm(err, msg)
-        end
-        -- @deprecated since 1.10
-        if greeting.protocol == 'Lua console' then
-            return console_setup_sm()
-        elseif greeting.protocol == 'Binary' then
+        callback('handshake', greeting)
+        if greeting.protocol == 'Binary' then
             return iproto_setup_sm()
         else
             return error_sm(E_NO_CONNECTION,
-                            'Unknown protocol: '..greeting.protocol)
+                            'Unsupported protocol: ' .. greeting.protocol)
         end
-    end
-
-    console_setup_sm = function()
-        log.warn("Netbox text protocol support is deprecated since 1.10, "..
-                 "please use require('console').connect() instead")
-        local err = internal.console_setup(transport, sock:fd())
-        if err then
-            return error_sm(err.code, err.message)
-        end
-        set_state('active')
-        return console_sm()
-    end
-
-    console_sm = function()
-        local err = internal.console_loop(transport, sock:fd())
-        return error_sm(err.code, err.message)
     end
 
     iproto_setup_sm = function()
@@ -602,12 +579,6 @@ local remote_mt = {
     __metatable = false
 }
 
-local console_methods = {}
-local console_mt = {
-    __index = console_methods, __serialize = remote_serialize,
-    __metatable = false
-}
-
 -- Create stream space index, which is same as connection space
 -- index, but have non zero stream ID.
 local function stream_wrap_index(stream_id, src)
@@ -723,10 +694,6 @@ local function new_sm(host, port, opts)
             end
         elseif what == 'handshake' then
             local greeting = ...
-            if not opts.console and greeting.protocol ~= 'Binary' then
-                return E_NO_CONNECTION,
-                       'Unsupported protocol: '..greeting.protocol
-            end
             remote.protocol = greeting.protocol
             remote.peer_uuid = greeting.uuid
             remote.peer_version_id = greeting.version_id
@@ -751,7 +718,7 @@ local function new_sm(host, port, opts)
                 end
             end
         elseif what == 'will_fetch_schema' then
-            return not opts.console
+            return true
         elseif what == 'fetch_connect_timeout' then
             return opts.connect_timeout or DEFAULT_CONNECT_TIMEOUT
         elseif what == 'did_fetch_schema' then
@@ -777,11 +744,9 @@ local function new_sm(host, port, opts)
             end
         end
     end
-    -- @deprecated since 1.10
     if opts.console then
-        log.warn("Netbox console API is deprecated since 1.10, please use "..
-                 "require('console').connect() instead")
-        setmetatable(remote, console_mt)
+        box.error("Netbox text protocol support was dropped, " ..
+                  "please use require('console').connect() instead")
     else
         setmetatable(remote, remote_mt)
         remote._space_mt = space_metatable(remote)
@@ -1319,38 +1284,6 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
     self.schema_version = schema_version
     self.space = sl
     self._on_schema_reload:run(self)
-end
-
--- console methods
-console_methods.close = remote_methods.close
-console_methods.on_schema_reload = remote_methods.on_schema_reload
-console_methods.on_disconnect = remote_methods.on_disconnect
-console_methods.on_connect = remote_methods.on_connect
-console_methods.is_connected = remote_methods.is_connected
-console_methods.wait_state = remote_methods.wait_state
-function console_methods:eval(line, timeout)
-    check_remote_arg(self, 'eval')
-    local err, res
-    local transport = self._transport
-    local pr = transport.perform_request
-    if self.state ~= 'active' then
-        local deadline = fiber_clock() + (timeout or TIMEOUT_INFINITY)
-        transport.wait_state('active', timeout)
-        timeout = max(0, deadline - fiber_clock())
-    end
-    if self.protocol == 'Binary' then
-        local loader = 'return require("console").eval(...)'
-        res, err = pr(timeout, nil, false, M_EVAL, nil, nil, nil, nil, loader,
-                      {line})
-    else
-        assert(self.protocol == 'Lua console')
-        res, err = pr(timeout, nil, false, M_INJECT, nil, nil, nil, nil,
-                      line..'$EOF$\n')
-    end
-    if err then
-        box.error(err)
-    end
-    return res[1] or res
 end
 
 local function nothing_or_data(value)

@@ -6,8 +6,8 @@ net = require('net.box')
 test_run:cmd("setopt delimiter ';'");
 need_stop = false;
 greeting =
-"Tarantool 1.7.3 (Lua console)~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" ..
-"type 'help' for interactive help~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
+"Tarantool 1.7.3 (Binary) 29b74bed-fdc5-454c-a828-1d4bf42c639a~~\n" ..
+"YcuIch+SfaiyL51uxcumke1V4eCCUQPy76t13ZI5HY8=~~~~~~~~~~~~~~~~~~~\n";
 socket = require('socket');
 srv = socket.tcp_server('localhost', 0, {
     handler = function(fd)
@@ -21,7 +21,7 @@ srv = socket.tcp_server('localhost', 0, {
 port = srv:name().port
 -- we must get timeout
 nb = net.new('localhost:' .. port, {
-    wait_connected = true, console = true,
+    wait_connected = true,
     connect_timeout = 0.1
 });
 nb.error:find('timed out') ~= nil;
@@ -29,7 +29,7 @@ need_stop = true
 nb:close();
 -- we must get peer closed
 nb = net.new('localhost:' .. port, {
-    wait_connected = true, console = true,
+    wait_connected = true,
     connect_timeout = 0.2
 });
 nb.error ~= "Timeout exceeded";
