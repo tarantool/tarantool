@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 
 local tap = require('tap')
-local net_box = require('net.box')
+local socket = require('socket')
 local urilib = require('uri')
 local msgpack = require('msgpack')
 
@@ -26,7 +26,8 @@ local test = tap.test('gh-4077-iproto-execute-no-bind')
 test:plan(3)
 
 local uri = urilib.parse(box.cfg.listen)
-local sock = net_box.establish_connection(uri.host, uri.service)
+local sock = socket.tcp_connect(uri.host, uri.service)
+sock:read(128) -- skip greeting
 
 -- Send request w/o SQL_BIND field in body.
 local next_request_id = 16
