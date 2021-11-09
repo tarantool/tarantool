@@ -791,6 +791,19 @@ box_check_replication(void)
 	}
 }
 
+static int
+box_check_listen(void)
+{
+	int count = cfg_getarr_size("listen");
+	for (int i = 0; i < count; i++) {
+		const char *source = cfg_getarr_elem("listen", i);
+		assert(source != NULL);
+		if (box_check_uri(source, "listen") != 0)
+			return -1;
+	}
+	return 0;
+}
+
 static double
 box_check_replication_timeout(void)
 {
@@ -1225,7 +1238,7 @@ box_check_config(void)
 {
 	struct tt_uuid uuid;
 	box_check_say();
-	if (box_check_uri(cfg_gets("listen"), "listen") != 0)
+	if (box_check_listen() != 0)
 		diag_raise();
 	box_check_instance_uuid(&uuid);
 	box_check_replicaset_uuid(&uuid);
@@ -1929,10 +1942,15 @@ box_demote(void)
 int
 box_listen(void)
 {
-	const char *uri = cfg_gets("listen");
-	if (box_check_uri(uri, "listen") != 0 || iproto_listen(uri) != 0)
+	if (box_check_listen() != 0)
 		return -1;
-	return 0;
+	int count = cfg_getarr_size("listen");
+	const char **uris = (const char **)xmalloc(count * sizeof(char *));
+	for (int i = 0; i < count; i++)
+		uris[i] = cfg_getarr_elem("listen", i);
+	int rc = iproto_listen(uris, count);
+	free(uris);
+	return rc;
 }
 
 void
