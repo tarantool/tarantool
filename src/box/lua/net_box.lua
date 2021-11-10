@@ -188,7 +188,6 @@ local function create_transport(host, port, user, password, callback,
     local state             = 'initial'
     local last_errno
     local last_error
-    local state_cond        = fiber.cond() -- signaled when the state changes
 
     local function on_event(key, value)
         callback('event', key, value)
@@ -216,21 +215,11 @@ local function create_transport(host, port, user, password, callback,
         last_errno = new_errno
         last_error = new_error
         callback('state_changed', new_state, new_error)
-        state_cond:broadcast()
         if state == 'error' or state == 'error_reconnect' or
            state == 'closed' then
             transport:reset(box.error.new({code = new_errno,
                                            reason = new_error}))
         end
-    end
-
-    -- FYI: [] on a string is valid
-    local function wait_state(target_state, timeout)
-        local deadline = fiber_clock() + (timeout or TIMEOUT_INFINITY)
-        repeat until state == target_state or target_state[state] or
-                     is_final_state[state] or
-                     not state_cond:wait(max(0, deadline - fiber_clock()))
-        return state == target_state or target_state[state] or false
     end
 
     -- START/STOP --
@@ -456,7 +445,6 @@ local function create_transport(host, port, user, password, callback,
     return {
         stop            = stop,
         start           = start,
-        wait_state      = wait_state,
         perform_request = perform_request,
         perform_async_request = perform_async_request,
         watch           = watch,
@@ -676,6 +664,7 @@ local function new_sm(host, port, opts)
                     log.verbose('%s:%s: %s', host or "", port or "", err)
                 end
             end
+            remote._state_cond:broadcast()
         elseif what == 'handshake' then
             local greeting, version, features = ...
             remote.protocol = greeting.protocol
@@ -733,15 +722,17 @@ local function new_sm(host, port, opts)
     remote._on_disconnect = trigger.new("on_disconnect")
     remote._on_connect = trigger.new("on_connect")
     remote._is_connected = false
+    -- Signaled when the state changes.
+    remote._state_cond = fiber.cond()
+    -- Last stream ID used for this connection.
+    remote._last_stream_id = 0
     remote._transport = create_transport(host, port, user, password, callback,
                                          opts.connect_timeout,
                                          opts.reconnect_after)
     remote._transport.start()
     if opts.wait_connected ~= false then
-        remote._transport.wait_state('active', tonumber(opts.wait_connected))
+        remote:wait_state('active', tonumber(opts.wait_connected))
     end
-    -- Last stream ID used for this connection
-    remote._last_stream_id = 0
     return remote
 end
 
@@ -1012,7 +1003,7 @@ end
 
 function remote_methods:wait_connected(timeout)
     check_remote_arg(self, 'wait_connected')
-    return self._transport.wait_state('active', timeout)
+    return self:wait_state('active', timeout)
 end
 
 function remote_methods:_request(method, opts, format, stream_id, ...)
@@ -1047,7 +1038,7 @@ function remote_methods:_request(method, opts, format, stream_id, ...)
     -- Execute synchronous request.
     local timeout = deadline and max(0, deadline - fiber_clock())
     if self.state ~= 'active' then
-        transport.wait_state('active', timeout)
+        self:wait_state('active', timeout)
         timeout = deadline and max(0, deadline - fiber_clock())
     end
     local res, err = transport.perform_request(timeout, buffer, skip_header,
@@ -1061,7 +1052,7 @@ function remote_methods:_request(method, opts, format, stream_id, ...)
     -- returned, since it does not depend on any schema things.
     if self.state == 'fetch_schema' then
         timeout = deadline and max(0, deadline - fiber_clock())
-        transport.wait_state('active', timeout)
+        self:wait_state('active', timeout)
     end
     return res
 end
@@ -1147,7 +1138,12 @@ end
 
 function remote_methods:wait_state(state, timeout)
     check_remote_arg(self, 'wait_state')
-    return self._transport.wait_state(state, timeout)
+    local deadline = fiber_clock() + (timeout or TIMEOUT_INFINITY)
+    -- FYI: [] on a string is valid
+    repeat until self.state == state or state[self.state] or
+                 is_final_state[self.state] or
+                 not self._state_cond:wait(max(0, deadline - fiber_clock()))
+    return self.state == state or state[self.state] or false
 end
 
 function remote_methods:_install_schema(schema_version, spaces, indices,
