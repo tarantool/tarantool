@@ -5,7 +5,7 @@ local uri = require('uri')
 
 local function test_parse(test)
     -- Tests for uri.parse() Lua bindings.
-    -- Parser itself is tested by test/unit/uri unit test.
+    -- Parser itself is tested by test/unit/uri_parser unit test.
     test:plan(54)
 
     local u
