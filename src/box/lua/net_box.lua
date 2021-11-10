@@ -172,8 +172,9 @@ local function on_push_sync_default() end
 -- The following events are delivered, with arguments:
 --
 --  'state_changed', state, error
---  'handshake', greeting
+--  'handshake', greeting, version, features
 --  'did_fetch_schema', schema_version, spaces, indices
+--  'event', key, value
 --
 local function create_transport(host, port, user, password, callback,
                                 connect_timeout, reconnect_after)
@@ -380,7 +381,6 @@ local function create_transport(host, port, user, password, callback,
     protocol_sm = function()
         assert(sock)
         assert(greeting)
-        callback('handshake', greeting)
         if greeting.protocol == 'Binary' then
             return iproto_setup_sm()
         else
@@ -396,7 +396,7 @@ local function create_transport(host, port, user, password, callback,
             local err = features
             return error_sm(err.code, err.message)
         end
-        local err, msg = callback('id', version, features)
+        local err, msg = callback('handshake', greeting, version, features)
         if err then
             return error_sm(err, msg)
         end
@@ -677,12 +677,10 @@ local function new_sm(host, port, opts)
                 end
             end
         elseif what == 'handshake' then
-            local greeting = ...
+            local greeting, version, features = ...
             remote.protocol = greeting.protocol
             remote.peer_uuid = greeting.uuid
             remote.peer_version_id = greeting.version_id
-        elseif what == 'id' then
-            local version, features = ...
             features = iproto_features_resolve(features)
             remote.peer_protocol_version = version
             remote.peer_protocol_features = features
