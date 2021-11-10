@@ -1628,6 +1628,7 @@ end
 --   'sql' - like mysql result (default)
 --   'gh' (or 'github' or 'markdown') - markdown syntax, for pasting to github.
 --   'jira' syntax (for pasting to jira)
+-- columns: array with desired columns (numbers or names).
 -- widths: array with desired widths of columns.
 -- max_width: limit entire length of a row string, longest fields will be cut.
 --  Set to 0 (default) to detect and use screen width. Set to -1 for no limit.
@@ -1636,7 +1637,14 @@ end
 --  in YAML output. Not applicabble when print=true.
 base_index_mt.fselect = function(index, key, opts, fselect_opts)
     -- Options.
-    if type(fselect_opts) ~= 'table' then fselect_opts = {} end
+    if type(opts) == 'string' and fselect_opts == nil then
+        fselect_opts = {columns = opts}
+        opts = nil
+    elseif type(fselect_opts) == 'string' then
+        fselect_opts = {columns = fselect_opts}
+    elseif type(fselect_opts) ~= 'table' then
+        fselect_opts = {}
+    end
 
     -- Get global value, like _G[name] but wrapped with pcall for strict mode.
     local function get_global(name)
@@ -1654,14 +1662,20 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
     -- Find an option in opts, fselect_opts or _G by given name.
     -- In opts and _G the value is searched with 'fselect_' prefix;
     -- In fselect_opts - with or without prefix.
-    local function get_opt(name, default, expected_type)
+    local function get_opt(name, default, expected_types)
+        local expected_types_set = {}
+        for _, v in pairs(expected_types:split(',')) do
+            expected_types_set[v:strip()] = true
+        end
         local prefix_name = 'fselect_' .. name
         local variants = {fselect_opts[prefix_name], fselect_opts[name],
             grab_from_opts(prefix_name), get_global(prefix_name), default }
         local min_i = 0
         local min_v = nil
         for i,v in pairs(variants) do
-            if (type(v) == expected_type and i < min_i) or min_v == nil then
+            -- Can't use ipairs since it's an array with nils.
+            -- Have to sort by i, because pairs() doesn't provide order.
+            if expected_types_set[type(v)] and (i < min_i or min_v == nil) then
                 min_i = i
                 min_v = v
             end
@@ -1676,6 +1690,7 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
     if fselect_type ~= 'sql' and fselect_type ~= 'markdown' and fselect_type ~= 'jira' then
         fselect_type = 'sql'
     end
+    local columns = get_opt('columns', nil, 'table, string')
     local widths = get_opt('widths', {}, 'table')
     local default_max_width = 0
     if #widths > 0 then default_max_width = -1 end
@@ -1685,6 +1700,22 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
     local min_col_width = 5
     local max_col_width = 1000
     if use_print then use_nbsp = false end
+
+    -- Convert comma separated columns into array, to numbers if possible
+    if type(columns) == 'string' then
+        columns = columns:split(',');
+    end
+    if columns then
+        local res_columns = {}
+        for _, str in ipairs(columns) do
+            if tonumber(str) then
+                table.insert(res_columns, tonumber(str))
+            else
+                table.insert(res_columns, str:strip())
+            end
+        end
+        columns = res_columns
+    end
 
     -- Screen size autodetection.
     local function detect_width()
@@ -1708,26 +1739,44 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
     -- select and stringify.
     local tab = { }
     local json = require('json')
-    for _,t in index:pairs(key, opts) do
+    for _, t in index:pairs(key, opts) do
         local row = { }
-        for _,f in t:pairs() do
-            table.insert(row, json.encode(f))
+        if columns then
+            for _, c in ipairs(columns) do
+                table.insert(row, json.encode(t[c]))
+            end
+        else
+            for _, f in t:pairs() do
+                table.insert(row, json.encode(f))
+            end
         end
         table.insert(tab, row)
     end
-
     local num_rows = #tab
-    local space = box.space[index.space_id]
-    local fmt = space:format()
-    local num_cols = math.max(#fmt, 1)
-    for i = 1,num_rows do
+    local num_cols = 1
+    for i = 1, num_rows do
         num_cols = math.max(num_cols, #tab[i])
     end
 
+    local fmt = box.space[index.space_id]:format()
     local names = {}
-    for j = 1,num_cols do
-        table.insert(names, fmt[j] and fmt[j].name or 'col' .. tostring(j))
+    if columns then
+        for _, c in ipairs(columns) do
+            if type(c) == 'string' then
+                table.insert(names, c)
+            elseif fmt[c] then
+                table.insert(names, fmt[c].name)
+            else
+                table.insert(names, 'col' .. tostring(c))
+            end
+        end
+    else
+        num_cols = math.max(num_cols, #fmt)
+        for c = 1, num_cols do
+            table.insert(names, fmt[c] and fmt[c].name or 'col' .. tostring(c))
+        end
     end
+
     local real_width = num_cols + 1 -- including '|' symbols
     for j = 1,num_cols do
         if type(widths[j]) ~= 'number' then
