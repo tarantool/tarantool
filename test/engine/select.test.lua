@@ -148,3 +148,8 @@ s:fselect({}, {fselect_type='jira'})
 s:jselect()
 s:fselect({}, {fselect_widths={8, 8, nil, 10}})
 s:fselect(nil, {fselect_use_nbsp=false})
+s:format{'id', 'name', 'more'}
+s:fselect(nil, 'id,name')
+s:fselect(nil, nil, 'name, id')
+s:fselect(nil, nil, {columns='id, name'})
+s:fselect(nil, nil, {columns={4, 3, 'name', 'id'}})
