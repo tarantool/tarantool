@@ -716,8 +716,7 @@ tuple_format_reuse(struct tuple_format **p_format)
 {
 	struct tuple_format *format = *p_format;
 	assert(format->is_reusable);
-	mh_int_t key = mh_tuple_format_find(tuple_formats_hash, format,
-					    NULL);
+	mh_int_t key = mh_tuple_format_find(tuple_formats_hash, format, NULL);
 	if (key != mh_end(tuple_formats_hash)) {
 		struct tuple_format **entry = mh_tuple_format_node(
 			tuple_formats_hash, key);
@@ -733,11 +732,10 @@ tuple_format_reuse(struct tuple_format **p_format)
  * Insert a reusable format into the hash table.
  */
 static void
-tuple_format_add_to_hash(struct tuple_format *format)
+tuple_format_add_to_hash(const struct tuple_format *format)
 {
 	assert(format->is_reusable);
-	mh_tuple_format_put(tuple_formats_hash,
-			    (const struct tuple_format **)&format, NULL, NULL);
+	mh_tuple_format_put(tuple_formats_hash, &format, NULL, NULL);
 }
 
 static void
