@@ -559,7 +559,7 @@ index4 = space:create_index('fourth', { parts = {2, 'str', 3, 'str'} })
 space:drop()
 
 --Collation
-s = box.schema.space.create('test')
+s = box.schema.space.create('test', { engine = engine })
 i1 = s:create_index('i1', { type = 'tree', parts = {{1, 'str', collation='unicode'}}, unique = true })
 
 _ = s:replace{"ааа"}

@@ -451,8 +451,8 @@ field_def_decode(struct field_def *field, const char **data,
 	}
 	if (is_action_missing) {
 		field->nullable_action = field->is_nullable ?
-					 ON_CONFLICT_ACTION_NONE
-							    : ON_CONFLICT_ACTION_DEFAULT;
+					 ON_CONFLICT_ACTION_NONE :
+					 ON_CONFLICT_ACTION_DEFAULT;
 	}
 	if (field->name == NULL) {
 		diag_set(ClientError, errcode, tt_cstr(space_name, name_len),

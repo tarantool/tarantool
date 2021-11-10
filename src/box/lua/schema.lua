@@ -407,7 +407,8 @@ local function update_format(format)
                     local coll = box.space._collation.index.name:get{v}
                     if not coll then
                         box.error(box.error.ILLEGAL_PARAMS,
-                            "format[" .. i .. "]: collation was not found by name '" .. v .. "'")
+                            "format[" .. i .. "]: collation " ..
+                            "was not found by name '" .. v .. "'")
                     end
                     field[k] = coll.id
                 else
