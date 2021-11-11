@@ -190,27 +190,31 @@ void
 coio_service_init(struct coio_service *service, const char *name,
 		  fiber_func handler, void *handler_param);
 
-/** Wait until the service binds to the port. */
-void
+/**
+ * Wait until the service binds to the port.
+ * Returns 0 on success, -1 on error.
+ */
+int
 coio_service_start(struct evio_service *service, const char *uri);
 
 void
 coio_stat_init(ev_stat *stat, const char *path);
 
-void
+/**
+ * Wait for the stat data changes.
+ * Returns 0 on event or timeout, -1 if the fiber was cancelled.
+ */
+int
 coio_stat_stat_timeout(ev_stat *stat, ev_tstamp delay);
 
 /**
  * Wait for a child to end.
- * @note this is a cancellation point (can throw
- * FiberIsCancelled).
- *
- * @retval exit status of the child.
- *
+ * The exit status is written to @a status.
+ * Returns 0 on success, -1 if the fiber was cancelled.
  * This call only works in the main thread.
  */
 int
-coio_waitpid(pid_t pid);
+coio_waitpid(pid_t pid, int *status);
 
 /** \cond public */
 

@@ -522,12 +522,13 @@ coio_service_init(struct coio_service *service, const char *name,
 	service->handler_param = handler_param;
 }
 
-void
+int
 coio_service_start(struct evio_service *service, const char *uri)
 {
 	if (evio_service_bind(service, uri) != 0 ||
 	    evio_service_listen(service) != 0)
-		diag_raise();
+		return -1;
+	return 0;
 }
 
 void
@@ -536,7 +537,7 @@ coio_stat_init(ev_stat *stat, const char *path)
 	ev_stat_init(stat, (ev_stat_cb) fiber_schedule_cb, path, 0.0);
 }
 
-void
+int
 coio_stat_stat_timeout(ev_stat *stat, ev_tstamp timeout)
 {
 	stat->data = fiber();
@@ -545,17 +546,17 @@ coio_stat_stat_timeout(ev_stat *stat, ev_tstamp timeout)
 	coio_timeout_init(&start, &delay, timeout);
 	fiber_yield_timeout(delay);
 	ev_stat_stop(loop(), stat);
-	fiber_testcancel();
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		return -1;
+	}
+	return 0;
 }
 
 typedef void (*ev_child_cb)(ev_loop *, ev_child *, int);
 
-/**
- * Wait for a forked child to complete.
- * @return process return status
- */
 int
-coio_waitpid(pid_t pid)
+coio_waitpid(pid_t pid, int *status)
 {
 	assert(cord_is_main());
 	ev_child cw;
@@ -572,9 +573,12 @@ coio_waitpid(pid_t pid)
 	fiber_yield();
 	fiber_set_cancellable(allow_cancel);
 	ev_child_stop(loop(), &cw);
-	int status = cw.rstatus;
-	fiber_testcancel();
-	return status;
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		return -1;
+	}
+	*status = cw.rstatus;
+	return 0;
 }
 
 /* Values of COIO_READ(WRITE) must equal to EV_READ(WRITE) */
