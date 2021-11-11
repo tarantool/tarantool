@@ -546,6 +546,7 @@ schema_free(void)
 		func_delete(func);
 	}
 	mh_i32ptr_delete(funcs);
+	mh_strnptr_delete(funcs_by_name);
 	while (mh_size(sequences) > 0) {
 		mh_int_t i = mh_first(sequences);
 
