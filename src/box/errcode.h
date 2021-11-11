@@ -59,7 +59,7 @@ struct errcode_record {
 	/*  4 */_(ER_TUPLE_NOT_FOUND,		"Tuple doesn't exist in index '%s' in space '%s'") \
 	/*  5 */_(ER_UNSUPPORTED,		"%s does not support %s") \
 	/*  6 */_(ER_NONMASTER,			"Can't modify data on a replication slave. My master is: %s") \
-	/*  7 */_(ER_READONLY,			"Can't modify data because this instance is in read-only mode.") \
+	/*  7 */_(ER_READONLY,			"Can't modify data on a read-only instance") \
 	/*  8 */_(ER_INJECTION,			"Error injection '%s'") \
 	/*  9 */_(ER_CREATE_SPACE,		"Failed to create space '%s': %s") \
 	/* 10 */_(ER_SPACE_EXISTS,		"Space '%s' already exists") \

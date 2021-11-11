@@ -58,7 +58,9 @@ test_run:wait_lsn('default', 'replica')
 test_run:switch('default')
 test_run:cmd('stop server replica')
 -- Will fail - the node is not a leader.
-box.space.test:replace{2}
+ok, err = pcall(box.space.test.replace, box.space.test, {2})
+assert(not ok)
+assert(err.code == box.error.READONLY)
 
 -- Set synchro timeout to a huge value to ensure, that when a leader is elected,
 -- it won't wait for this timeout.

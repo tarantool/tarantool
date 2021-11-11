@@ -273,6 +273,9 @@ error_format_msg(struct error *e, const char *format, ...);
 void
 error_vformat_msg(struct error *e, const char *format, va_list ap);
 
+void
+error_append_msg(struct error *e, const char *format, ...);
+
 /**
  * Diagnostics Area - a container for errors
  */
