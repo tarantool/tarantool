@@ -39,7 +39,6 @@
 
 #include "iostream.h"
 #include "sio.h"
-#include "scoped_guard.h"
 #include "coio_task.h" /* coio_resolve() */
 
 typedef void (*ev_stat_cb)(ev_loop *, ev_stat *, int);
@@ -55,15 +54,12 @@ coio_connect_addr(const struct sockaddr *addr, socklen_t len, ev_tstamp timeout)
 	int fd = sio_socket(addr->sa_family, SOCK_STREAM, 0);
 	if (fd < 0)
 		return -1;
-	auto fd_guard = make_scoped_guard([=]{ close(fd); });
 	if (evio_setsockopt_client(fd, addr->sa_family, SOCK_STREAM) != 0)
-		return -1;
-	if (sio_connect(fd, addr, len) == 0) {
-		fd_guard.is_active = false;
+		goto err;
+	if (sio_connect(fd, addr, len) == 0)
 		return fd;
-	}
 	if (errno != EINPROGRESS)
-		return -1;
+		goto err;
 	/*
 	 * Wait until socket is ready for writing or
 	 * timed out.
@@ -71,23 +67,25 @@ coio_connect_addr(const struct sockaddr *addr, socklen_t len, ev_tstamp timeout)
 	int revents = coio_wait(fd, EV_WRITE, timeout);
 	if (fiber_is_cancelled()) {
 		diag_set(FiberIsCancelled);
-		return -1;
+		goto err;
 	}
 	if (revents == 0) {
 		diag_set(TimedOut);
-		return -1;
+		goto err;
 	}
 	int error = EINPROGRESS;
 	socklen_t sz = sizeof(error);
 	if (sio_getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &sz))
-		return -1;
+		goto err;
 	if (error != 0) {
 		errno = error;
 		diag_set(SocketError, sio_socketname(fd), "connect");
-		return -1;
+		goto err;
 	}
-	fd_guard.is_active = false;
 	return fd;
+err:
+	close(fd);
+	return -1;
 }
 
 void
@@ -96,23 +94,25 @@ coio_fill_addrinfo(struct addrinfo *ai_local, const char *host,
 {
 	ai_local->ai_next = NULL;
 	if (host_hint == 1) { // IPv4
-		ai_local->ai_addrlen = sizeof(sockaddr_in);
-		ai_local->ai_addr = (sockaddr*)malloc(ai_local->ai_addrlen);
+		ai_local->ai_addrlen = sizeof(struct sockaddr_in);
+		ai_local->ai_addr = xmalloc(ai_local->ai_addrlen);
 		memset(ai_local->ai_addr, 0, ai_local->ai_addrlen);
-		((sockaddr_in*)ai_local->ai_addr)->sin_family = AF_INET;
-		((sockaddr_in*)ai_local->ai_addr)->sin_port =
+		((struct sockaddr_in *)ai_local->ai_addr)->sin_family =
+			AF_INET;
+		((struct sockaddr_in *)ai_local->ai_addr)->sin_port =
 			htons((uint16_t)atoi(service));
 		inet_pton(AF_INET, host,
-			&((sockaddr_in*)ai_local->ai_addr)->sin_addr);
+			&((struct sockaddr_in *)ai_local->ai_addr)->sin_addr);
 	} else { // IPv6
-		ai_local->ai_addrlen = sizeof(sockaddr_in6);
-		ai_local->ai_addr = (sockaddr*)malloc(ai_local->ai_addrlen);
+		ai_local->ai_addrlen = sizeof(struct sockaddr_in6);
+		ai_local->ai_addr = xmalloc(ai_local->ai_addrlen);
 		memset(ai_local->ai_addr, 0, ai_local->ai_addrlen);
-		((sockaddr_in6*)ai_local->ai_addr)->sin6_family = AF_INET6;
-		((sockaddr_in6*)ai_local->ai_addr)->sin6_port =
+		((struct sockaddr_in6 *)ai_local->ai_addr)->sin6_family =
+			AF_INET6;
+		((struct sockaddr_in6 *)ai_local->ai_addr)->sin6_port =
 			htons((uint16_t)atoi(service));
 		inet_pton(AF_INET6, host,
-			&((sockaddr_in6*)ai_local->ai_addr)->sin6_addr);
+			&((struct sockaddr_in6 *)ai_local->ai_addr)->sin6_addr);
 	}
 }
 
@@ -178,12 +178,6 @@ coio_connect_timeout(const char *host, const char *service, int host_hint,
 	    if (rc != 0)
 		    return -1;
 	}
-	auto addrinfo_guard = make_scoped_guard([=] {
-		if (host_hint == 0)
-			freeaddrinfo(ai);
-		else
-			free(ai_local.ai_addr);
-	});
 	evio_timeout_update(loop(), &start, &delay);
 	coio_timeout_init(&start, &delay, timeout);
 	while (ai) {
@@ -194,16 +188,22 @@ coio_connect_timeout(const char *host, const char *service, int host_hint,
 				*addr_len = MIN(ai->ai_addrlen, *addr_len);
 				memcpy(addr, ai->ai_addr, *addr_len);
 			}
-			return fd; /* connected */
+			goto out; /* connected */
 		}
 		if (ai->ai_next == NULL)
-			return -1;
+			goto out;
 		/* Ignore the error and try the next address. */
 		ai = ai->ai_next;
 		ev_now_update(loop);
 		coio_timeout_update(&start, &delay);
 	}
 	diag_set(SocketError, sio_socketname(fd), "connection failed");
+	return fd;
+out:
+	if (host_hint == 0)
+		freeaddrinfo(ai);
+	else
+		free(ai_local.ai_addr);
 	return fd;
 }
 
