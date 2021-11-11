@@ -32,7 +32,8 @@ stat_notify_test(FILE *f, const char *filename)
 	ev_stat stat;
 	note("filename: %s", filename);
 	coio_stat_init(&stat, filename);
-	coio_stat_stat_timeout(&stat, TIMEOUT_INFINITY);
+	int rc = coio_stat_stat_timeout(&stat, TIMEOUT_INFINITY);
+	fail_unless(rc == 0);
 	fail_unless(stat.prev.st_size < stat.attr.st_size);
 	fiber_cancel(touch);
 
@@ -46,7 +47,8 @@ stat_timeout_test(const char *filename)
 
 	ev_stat stat;
 	coio_stat_init(&stat, filename);
-	coio_stat_stat_timeout(&stat, 0.01);
+	int rc = coio_stat_stat_timeout(&stat, 0.01);
+	fail_unless(rc == 0);
 
 	footer();
 }
