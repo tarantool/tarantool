@@ -6,7 +6,7 @@ on:
       - '*'
   workflow_dispatch:
   schedule:
-    - cron:  '0 */3 * * *'
+    - cron: '0 1 * * *'
 
 jobs:
   perf_sysbench:
@@ -15,27 +15,60 @@ jobs:
     runs-on: perf-sh3
 
     steps:
-      - name: set PATH to GIT of the newer version 2.9.0
-        run: echo "/usr/local/git/bin" | tee -a $GITHUB_PATH
-      - name: cleanup workspace
-        run: docker run -w /source -v ${PWD}:/source -i centos:8 /bin/bash -c "chown -R $(id -u):$(id -g) * .[^.]*"
-      - uses: actions/checkout@v1
-      - name: test
-        env:
-          BENCH: 'sysbench'
-        uses: ./.github/actions/perf
+      - name: Checkout tarantool
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - uses: ./.github/actions/environment
+
+      - name: Checkout bench-run
+        uses: actions/checkout@v2
+        with:
+          path: bench-run
+          repository: tarantool/bench-run
+
+      - name: Checkout sysbench
+        uses: actions/checkout@v2
+        with:
+          path: sysbench
+          repository: tarantool/sysbench
+
+      - name: Build tarantool
+        run: |
+          cmake . -DCMAKE_BUILD_TYPE=Release
+          make -j
+
+      - name: Add tarantool path to $PATH
+        run: echo "${PWD}/src:${PWD}/extra/dist" >> ${GITHUB_PATH}
+
+      - name: Build and install sysbench
+        run: |
+          ./autogen.sh
+          ./configure --with-tarantool --without-mysql
+          make -j
+          make install
+        working-directory: ./sysbench
+
+      - name: Run sysbench
+        # Run each test only once. Using absolute path is intentional.
+        # It is needed for correct work of running scripts under the hood.
+        run: ${PWD}/bench-run/benchs/sysbench/run.sh 1
+
       - name: call action to send Telegram message on failure
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
           TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
         uses: ./.github/actions/send-telegram-notify
         if: failure()
-      - name: artifacts
+
+      - name: Collect artifacts
         uses: actions/upload-artifact@v2
         if: always()
         with:
           name: perf_sysbench
           retention-days: 21
           path: |
-            *_result.txt
-            *_t_version.txt
+            ./[Ss]ysbench_*.txt
+            ./tnt_server.txt
