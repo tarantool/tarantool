@@ -43,7 +43,7 @@ extern "C" {
 
 #include "mp_decimal.h"
 #include "box/mp_error.h"
-#include "uuid/mp_uuid.h"
+#include "mp_uuid.h"
 
 char *
 tnt_mp_encode_decimal(char *data, const decimal_t *dec);

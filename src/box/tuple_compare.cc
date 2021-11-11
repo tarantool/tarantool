@@ -28,15 +28,15 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "decimal.h"
 #include "tuple_compare.h"
 #include "tuple.h"
 #include "coll/coll.h"
 #include "trivia/util.h" /* NOINLINE */
 #include <math.h>
-#include "lib/core/decimal.h"
-#include "lib/core/mp_decimal.h"
-#include "uuid/mp_uuid.h"
-#include "lib/core/mp_extension_types.h"
+#include "mp_decimal.h"
+#include "mp_extension_types.h"
+#include "mp_uuid.h"
 
 /* {{{ tuple_compare */
 

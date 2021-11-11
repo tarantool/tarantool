@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
-#include "uuid/tt_uuid.h"
+#include "tt_uuid.h"
 #include "unit.h"
 #include "fiber.h"
 #include "uri/uri.h"

@@ -54,7 +54,7 @@ extern "C" {
 #include "diag.h"
 #include "tt_static.h"
 #include "mp_extension_types.h" /* MP_DECIMAL, MP_UUID */
-#include "uuid/tt_uuid.h" /* tt_uuid_to_string(), UUID_STR_LEN */
+#include "tt_uuid.h" /* tt_uuid_to_string(), UUID_STR_LEN */
 
 #define LUAYAML_TAG_PREFIX "tag:yaml.org,2002:"
 

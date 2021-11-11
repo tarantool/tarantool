@@ -31,7 +31,7 @@
 
 #include "memory.h"
 #include "fiber.h"
-#include "uuid/tt_uuid.h"
+#include "tt_uuid.h"
 #include "version.h"
 #include "msgpuck.h"
 #include "unit.h"

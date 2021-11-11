@@ -39,7 +39,7 @@
 
 #include "lib/core/decimal.h"
 #include "mp_extension_types.h"
-#include "uuid/tt_uuid.h"
+#include "tt_uuid.h"
 
 #include "lua-yaml/b64.h"
 

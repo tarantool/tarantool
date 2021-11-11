@@ -35,9 +35,9 @@
 #include <stddef.h>
 #include <sys/uio.h> /* struct iovec */
 
-#include "uuid/tt_uuid.h"
 #include "diag.h"
 #include "iproto_features.h"
+#include "tt_uuid.h"
 #include "vclock/vclock.h"
 
 #if defined(__cplusplus)

@@ -1,9 +1,9 @@
 #include "unit.h"
-#include "uuid/tt_uuid.h"
-#include "uuid/mp_uuid.h"
 #include "core/random.h"
+#include "mp_uuid.h"
 #include "msgpuck/msgpuck.h"
 #include "mp_extension_types.h"
+#include "tt_uuid.h"
 #include <string.h>
 
 static void

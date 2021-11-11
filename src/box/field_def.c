@@ -33,8 +33,8 @@
 #include "trivia/util.h"
 #include "key_def.h"
 #include "mp_extension_types.h"
-#include "uuid/mp_uuid.h"
-#include "uuid/tt_uuid.h"
+#include "mp_uuid.h"
+#include "tt_uuid.h"
 
 const char *mp_type_strs[] = {
 	/* .MP_NIL    = */ "nil",

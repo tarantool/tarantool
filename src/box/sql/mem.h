@@ -30,8 +30,8 @@
  * SUCH DAMAGE.
  */
 #include "box/field_def.h"
-#include "uuid/tt_uuid.h"
 #include "decimal.h"
+#include "tt_uuid.h"
 
 struct sql;
 struct Vdbe;
