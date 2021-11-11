@@ -110,8 +110,8 @@ coio_fill_addrinfo(struct addrinfo *ai_local, const char *host,
 }
 
 /**
- * Resolve hostname:service from \a uri and connect to the first available
- * address with a specified timeout.
+ * Resolve \a host and \a service with optional \a host_hint and connect to
+ * the first available address with a specified timeout.
  *
  * If \a addr is not NULL the function provides resolved address on success.
  * In this case, \a addr_len is a value-result argument. It should be
@@ -121,24 +121,17 @@ coio_fill_addrinfo(struct addrinfo *ai_local, const char *host,
  * in this case, addrlen will return a value greater than was supplied to the
  * call.
  *
- * This function also supports UNIX domain sockets if uri->path is not NULL and
- * uri->service is NULL.
+ * This function also supports UNIX domain sockets: if \a host is 'unix/',
+ * it will treat \a service as a path to a socket file.
  *
  * @retval socket fd
  */
 int
-coio_connect_timeout(struct uri *uri, struct sockaddr *addr,
-		     socklen_t *addr_len, ev_tstamp timeout)
+coio_connect_timeout(const char *host, const char *service, int host_hint,
+		     struct sockaddr *addr, socklen_t *addr_len,
+		     ev_tstamp timeout)
 {
 	int fd = -1;
-	char host[URI_MAXHOST] = { '\0' };
-	if (uri->host) {
-		snprintf(host, sizeof(host), "%.*s", (int) uri->host_len,
-			 uri->host);
-	}
-	char service[URI_MAXSERVICE];
-	snprintf(service, sizeof(service), "%.*s", (int) uri->service_len,
-		 uri->service);
 	/* try to resolve a hostname */
 	struct ev_loop *loop = loop();
 	ev_tstamp start, delay;
@@ -161,8 +154,8 @@ coio_connect_timeout(struct uri *uri, struct sockaddr *addr,
 
 	struct addrinfo *ai = NULL;
 	struct addrinfo ai_local;
-	if (uri->host_hint) {
-		coio_fill_addrinfo(&ai_local, host, service, uri->host_hint);
+	if (host_hint != 0) {
+		coio_fill_addrinfo(&ai_local, host, service, host_hint);
 		ai = &ai_local;
 	} else {
 	    struct addrinfo hints;
@@ -178,8 +171,10 @@ coio_connect_timeout(struct uri *uri, struct sockaddr *addr,
 	    }
 	}
 	auto addrinfo_guard = make_scoped_guard([=] {
-		if (!uri->host_hint) freeaddrinfo(ai);
-		else free(ai_local.ai_addr);
+		if (host_hint == 0)
+			freeaddrinfo(ai);
+		else
+			free(ai_local.ai_addr);
 	});
 	evio_timeout_update(loop(), &start, &delay);
 

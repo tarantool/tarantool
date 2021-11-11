@@ -337,7 +337,16 @@ applier_connect(struct applier *applier)
 	 */
 	applier->addr_len = sizeof(applier->addrstorage);
 	applier_set_state(applier, APPLIER_CONNECT);
-	int fd = coio_connect(uri, &applier->addr, &applier->addr_len);
+	char host[URI_MAXHOST] = { '\0' };
+	if (uri->host != NULL) {
+		snprintf(host, sizeof(host), "%.*s",
+			 (int)uri->host_len, uri->host);
+	}
+	char service[URI_MAXSERVICE];
+	snprintf(service, sizeof(service), "%.*s",
+		 (int)uri->service_len, uri->service);
+	int fd = coio_connect(host, service, uri->host_hint,
+			      &applier->addr, &applier->addr_len);
 	iostream_create(io, fd);
 	coio_readn(io, greetingbuf, IPROTO_GREETING_SIZE);
 	applier->last_row_time = ev_monotonic_now(loop());

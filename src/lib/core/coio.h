@@ -41,7 +41,6 @@ extern "C" {
 
 struct iostream;
 struct sockaddr;
-struct uri;
 
 /**
  * Co-operative I/O
@@ -57,13 +56,16 @@ struct coio_service
 };
 
 int
-coio_connect_timeout(struct uri *uri, struct sockaddr *addr,
-		     socklen_t *addr_len, ev_tstamp timeout);
+coio_connect_timeout(const char *host, const char *service, int host_hint,
+		     struct sockaddr *addr, socklen_t *addr_len,
+		     ev_tstamp timeout);
 
 static inline int
-coio_connect(struct uri *uri, struct sockaddr *addr, socklen_t *addr_len)
+coio_connect(const char *host, const char *service, int host_hint,
+	     struct sockaddr *addr, socklen_t *addr_len)
 {
-	return coio_connect_timeout(uri, addr, addr_len, TIMEOUT_INFINITY);
+	return coio_connect_timeout(host, service, host_hint, addr, addr_len,
+				    TIMEOUT_INFINITY);
 }
 
 int
