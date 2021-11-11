@@ -23,15 +23,31 @@ jobs:
       fail-fast: false
 
     steps:
-      - name: set PATH to GIT of the newer version 2.9.0
-        run: echo "/usr/local/git/bin" | tee -a $GITHUB_PATH
-      - name: cleanup workspace
-        run: docker run -w /source -v ${PWD}:/source -i centos:8 /bin/bash -c "chown -R $(id -u):$(id -g) * .[^.]*"
       - uses: actions/checkout@v1
-      - name: test
-        env:
-          BENCH: 'sysbench'
-        uses: ./.github/actions/perf
+        with:
+          submodules: recursive
+      - uses: actions/checkout@v2.3.4
+        with:
+          path: sysbench
+          repository: tarantool/sysbench
+      - name: tarantool build
+        run: |
+          cmake . -DENABLE_DIST=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo && make -j 4
+      - name: configure perf benchmark
+        run: |
+          ./autogen.sh
+          ./configure --with-tarantool --without-mysql
+          make -j 4
+        working-directory: ${{ github.workspace }}/sysbench
+      - uses: actions/checkout@v2.3.4
+        with:
+          path: bench-run
+          repository: tarantool/bench-run
+#         TODO: delete when publishing would be erased from 'run' scripts
+          ref: VitaliyaIoffe/do-not-publish
+      - name: run benchmark
+        run: ./run.sh
+        working-directory: ${{ github.workspace }}/bench-run/benchs/sysbench
       - name: call action to send Telegram message on failure
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
@@ -45,5 +61,5 @@ jobs:
           name: perf_sysbench
           retention-days: 21
           path: |
-            *_result.txt
-            *_t_version.txt
+            ${{ github.workspace }}/bench-run/benchs/sysbench/*_result.txt
+            ${{ github.workspace }}/bench-run/benchs/sysbench/*_t_version.txt
