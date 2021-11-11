@@ -5,6 +5,12 @@ local test = tap.test('errno')
 local date = require('datetime')
 local ffi = require('ffi')
 
+--[[
+    Workaround for #6599 where we may randomly fail on AWS Graviton machines,
+    while it's working properly when jit disabled.
+--]]
+if jit.arch == 'arm64' then jit.off() end
+
 test:plan(13)
 
 -- minimum supported date - -5879610-06-22
