@@ -36,7 +36,7 @@
 #include "crypto/crypto.h"
 #include "swim_transport.h"
 #include "tarantool_ev.h"
-#include "uuid/tt_uuid.h"
+#include "tt_uuid.h"
 #include <stdbool.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>

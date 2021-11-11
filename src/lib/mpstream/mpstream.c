@@ -34,7 +34,7 @@
 #include <stdint.h>
 #include "msgpuck.h"
 #include "mp_decimal.h"
-#include "uuid/mp_uuid.h"
+#include "mp_uuid.h"
 
 void
 mpstream_reserve_slow(struct mpstream *stream, size_t size)

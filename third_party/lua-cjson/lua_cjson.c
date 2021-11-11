@@ -52,8 +52,8 @@
 #include "mp_extension_types.h" /* MP_DECIMAL, MP_UUID */
 #include "diag.h"
 #include "tt_static.h"
-#include "uuid/tt_uuid.h" /* tt_uuid_to_string(), UUID_STR_LEN */
 #include "cord_buf.h"
+#include "tt_uuid.h" /* tt_uuid_to_string(), UUID_STR_LEN */
 
 typedef enum {
     T_OBJ_BEGIN,

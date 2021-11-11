@@ -14,12 +14,12 @@
 
 #include "small/static.h"
 #include "trivia/util.h"
-#include "uuid/tt_uuid.h"
 
 #include "box/replication.h"
 #include "backtrace.h"
 #include "crash.h"
 #include "say.h"
+#include "tt_uuid.h"
 
 #define pr_fmt(fmt)		"crash: " fmt
 #define pr_debug(fmt, ...)	say_debug(pr_fmt(fmt), ##__VA_ARGS__)

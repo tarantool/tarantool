@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "tt_static.h"
-#include "uuid/tt_uuid.h"
+#include "tt_uuid.h"
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>

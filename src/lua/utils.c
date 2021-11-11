@@ -37,7 +37,7 @@
 #include <trivia/util.h>
 #include <diag.h>
 #include <fiber.h>
-#include "uuid/tt_uuid.h"
+#include "tt_uuid.h"
 
 int luaL_nil_ref = LUA_REFNIL;
 

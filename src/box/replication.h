@@ -30,7 +30,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "uuid/tt_uuid.h"
 #include "trigger.h"
 #include <stdint.h>
 #define RB_COMPACT 1
@@ -38,6 +37,7 @@
 #include <small/rlist.h>
 #include "applier.h"
 #include "fiber_cond.h"
+#include "tt_uuid.h"
 #include "vclock/vclock.h"
 #include "latch.h"
 

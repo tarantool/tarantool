@@ -1,8 +1,8 @@
 #include "msgpuck.h"
 #include "module.h"
-#include "uuid/mp_uuid.h"
 #include "mp_decimal.h"
 #include "lua/tnt_msgpuck.h"
+#include "mp_uuid.h"
 
 enum {
 	BUF_SIZE = 512,

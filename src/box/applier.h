@@ -41,7 +41,7 @@
 #include "iostream.h"
 #include "trigger.h"
 #include "trivia/util.h"
-#include "uuid/tt_uuid.h"
+#include "tt_uuid.h"
 #include "uri/uri.h"
 
 #include "xrow.h"

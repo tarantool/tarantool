@@ -43,8 +43,8 @@
 #include "lua/serializer.h"
 #include "lua/msgpack.h"
 #include "lua/decimal.h"
-#include "uuid/mp_uuid.h"
 #include "mp_decimal.h"
+#include "mp_uuid.h"
 
 #define CMP_OLD_NEW(a, b, type) (((a) > (type)(b)) - ((a) < (type)(b)))
 

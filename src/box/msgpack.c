@@ -33,8 +33,8 @@
 
 #include "mp_extension_types.h"
 #include "mp_decimal.h"
-#include "uuid/mp_uuid.h"
 #include "mp_error.h"
+#include "mp_uuid.h"
 
 static int
 msgpack_fprint_ext(FILE *file, const char **data, int depth)

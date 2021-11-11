@@ -30,7 +30,7 @@
  */
 #include "swim_test_utils.h"
 #include "swim/swim_ev.h"
-#include "uuid/tt_uuid.h"
+#include "tt_uuid.h"
 #include "trivia/util.h"
 #include "msgpuck.h"
 #include "trigger.h"

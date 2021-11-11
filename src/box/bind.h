@@ -41,8 +41,8 @@ extern "C" {
 
 #include "msgpuck.h"
 #include "decimal.h"
-#include "uuid/tt_uuid.h"
 #include "mp_extension_types.h"
+#include "tt_uuid.h"
 
 struct sql_stmt;
 

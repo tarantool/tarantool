@@ -35,7 +35,7 @@ extern "C" {
 #include "box/error.h"
 #include "box/xrow.h"
 #include "box/iproto_constants.h"
-#include "uuid/tt_uuid.h"
+#include "tt_uuid.h"
 #include "version.h"
 #include "random.h"
 #include "memory.h"
