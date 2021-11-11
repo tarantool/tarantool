@@ -115,9 +115,16 @@ test_run:cmd('stop server replica')
  | - true
  | ...
 -- Will fail - the node is not a leader.
-box.space.test:replace{2}
+ok, err = pcall(box.space.test.replace, box.space.test, {2})
  | ---
- | - error: Can't modify data because this instance is in read-only mode.
+ | ...
+assert(not ok)
+ | ---
+ | - true
+ | ...
+assert(err.code == box.error.READONLY)
+ | ---
+ | - true
  | ...
 
 -- Set synchro timeout to a huge value to ensure, that when a leader is elected,

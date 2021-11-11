@@ -156,6 +156,17 @@ error_format_msg(struct error *e, const char *format, ...)
 }
 
 void
+error_append_msg(struct error *e, const char *format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	int prefix_len = strlen(e->errmsg);
+	char *msg = e->errmsg + prefix_len;
+	vsnprintf(msg, sizeof(e->errmsg) - prefix_len, format, ap);
+	va_end(ap);
+}
+
+void
 error_vformat_msg(struct error *e, const char *format, va_list ap)
 {
 	vsnprintf(e->errmsg, sizeof(e->errmsg), format, ap);

@@ -34,7 +34,9 @@ box.cfg{replication=rpl_listen}
 test_run:switch('replica')
 assert(box.info.ro)
 assert(box.info.synchro.queue.owner == test_run:get_server_id('default'))
-box.space.async:insert{2} -- failure.
+ok, err = pcall(box.space.async.insert, box.space.async, {2})
+assert(not ok)
+assert(err.code == box.error.READONLY)
 
 -- Promotion on the other node. Default should become ro.
 box.ctl.promote()
@@ -46,7 +48,9 @@ test_run:switch('default')
 test_run:wait_lsn('default', 'replica')
 assert(box.info.ro)
 assert(box.info.synchro.queue.owner == test_run:get_server_id('replica'))
-box.space.sync:insert{3} -- failure.
+ok, err = pcall(box.space.sync.insert, box.space.sync, {3})
+assert(not ok)
+assert(err.code == box.error.READONLY)
 
 box.ctl.promote()
 box.ctl.demote()

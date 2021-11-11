@@ -94,9 +94,16 @@ assert(box.info.synchro.queue.owner == test_run:get_server_id('default'))
  | ---
  | - true
  | ...
-box.space.async:insert{2} -- failure.
+ok, err = pcall(box.space.async.insert, box.space.async, {2})
  | ---
- | - error: Can't modify data because this instance is in read-only mode.
+ | ...
+assert(not ok)
+ | ---
+ | - true
+ | ...
+assert(err.code == box.error.READONLY)
+ | ---
+ | - true
  | ...
 
 -- Promotion on the other node. Default should become ro.
@@ -131,9 +138,16 @@ assert(box.info.synchro.queue.owner == test_run:get_server_id('replica'))
  | ---
  | - true
  | ...
-box.space.sync:insert{3} -- failure.
+ok, err = pcall(box.space.sync.insert, box.space.sync, {3})
  | ---
- | - error: Can't modify data because this instance is in read-only mode.
+ | ...
+assert(not ok)
+ | ---
+ | - true
+ | ...
+assert(err.code == box.error.READONLY)
+ | ---
+ | - true
  | ...
 
 box.ctl.promote()

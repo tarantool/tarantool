@@ -3,7 +3,8 @@
 local test = require("sqltester")
 test:plan(9)
 
-local expected_err = "Can't modify data because this instance is in read-only mode."
+local expected_err = "Can't modify data on a read-only instance - "..
+                     "box.cfg.read_only is true"
 
 test:execsql([[
     CREATE TABLE TEST (A INT, B INT, PRIMARY KEY (A));

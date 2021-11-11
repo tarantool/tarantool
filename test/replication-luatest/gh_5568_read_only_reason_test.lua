@@ -47,6 +47,8 @@ local g = t.group('gh-5568-read-only-reason1')
 g.before_all(make_create_cluster(g))
 g.after_all(make_destroy_cluster(g))
 
+local read_only_msg = "Can't modify data on a read-only instance - "
+
 --
 -- Read-only because of box.cfg{read_only = true}.
 --
@@ -57,6 +59,8 @@ g.test_read_only_reason_cfg = function(g)
         return ok, err:unpack()
     end)
     t.assert(not ok, 'fail ddl')
+    t.assert_str_contains(err.message, read_only_msg..
+                          'box.cfg.read_only is true')
     t.assert_covers(err, {
         reason = 'state',
         state = 'read_only',
@@ -88,6 +92,7 @@ g.test_read_only_reason_orphan = function(g)
         return old_timeout, ok, err:unpack()
     end, {fake_uri})
     t.assert(not ok, 'fail ddl')
+    t.assert_str_contains(err.message, read_only_msg..'it is an orphan')
     t.assert_covers(err, {
         reason = 'state',
         state = 'orphan',
@@ -117,6 +122,8 @@ g.test_read_only_reason_election_no_leader = function(g)
     end)
     t.assert(not ok, 'fail ddl')
     t.assert(err.term, 'has term')
+    t.assert_str_contains(err.message, read_only_msg..('state is election '..
+                          '%s with term %s'):format(err.state, err.term))
     t.assert_covers(err, {
         reason = 'election',
         state = 'follower',
@@ -148,6 +155,9 @@ g.test_read_only_reason_election_has_leader = function(g)
     end)
     t.assert(not ok, 'fail ddl')
     t.assert(err.term, 'has term')
+    t.assert_str_contains(err.message, read_only_msg..('state is election '..
+                          '%s with term %s, leader is %s (%s)'):format(
+                          err.state, err.term, err.leader_id, err.leader_uuid))
     t.assert_covers(err, {
         reason = 'election',
         state = 'follower',
@@ -187,6 +197,9 @@ g.test_read_only_reason_synchro = function(g)
     end)
     t.assert(not ok, 'fail ddl')
     t.assert(err.term, 'has term')
+    t.assert_str_contains(err.message, read_only_msg..('synchro queue with '..
+                          'term %s belongs to %s (%s)'):format(err.term,
+                          err.queue_owner_id, err.queue_owner_uuid))
     t.assert_covers(err, {
         reason = 'synchro',
         queue_owner_id = g.master:instance_id(),
@@ -242,6 +255,9 @@ g.test_read_only_reason_election_has_leader_no_uuid = function(g)
     t.assert(not ok, 'fail ddl')
     t.assert(err.term, 'has term')
     t.assert(not err.leader_uuid, 'has no leader uuid')
+    t.assert_str_contains(err.message, read_only_msg..('state is election %s '..
+                          'with term %s, leader is %s'):format(err.state,
+                          err.term, err.leader_id))
     t.assert_covers(err, {
         reason = 'election',
         state = 'follower',
@@ -276,6 +292,9 @@ g.test_read_only_reason_synchro_no_uuid = function(g)
     t.assert(not ok, 'fail ddl')
     t.assert(err.term, 'has term')
     t.assert(not err.queue_owner_uuid)
+    t.assert_str_contains(err.message, read_only_msg..('synchro queue with '..
+                          'term %s belongs to %s'):format(err.term,
+                          err.queue_owner_id))
     t.assert_covers(err, {
         reason = 'synchro',
         queue_owner_id = leader_id,

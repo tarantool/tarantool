@@ -182,6 +182,7 @@ box_check_writable(void)
 		return 0;
 	struct error *e = diag_set(ClientError, ER_READONLY);
 	struct raft *raft = box_raft();
+	error_append_msg(e, " - ");
 	/*
 	 * In case of multiple reasons at the same time only one is reported.
 	 * But the order is important. For example, if the instance has election
@@ -189,19 +190,27 @@ box_check_writable(void)
 	 * and who is the leader than just see cfg 'read_only' is true.
 	 */
 	if (raft_is_ro(raft)) {
+		const char *state = raft_state_str(raft->state);
+		uint64_t term = raft->volatile_term;
 		error_set_str(e, "reason", "election");
-		error_set_str(e, "state", raft_state_str(raft->state));
-		error_set_uint(e, "term", raft->volatile_term);
+		error_set_str(e, "state", state);
+		error_set_uint(e, "term", term);
+		error_append_msg(e, "state is election %s with term %llu",
+				 state, term);
 		uint32_t id = raft->leader;
 		if (id != REPLICA_ID_NIL) {
 			error_set_uint(e, "leader_id", id);
+			error_append_msg(e, ", leader is %u", id);
 			struct replica *r = replica_by_id(id);
 			/*
 			 * XXX: when the leader is dropped from _cluster, it
 			 * is not reported to Raft.
 			 */
-			if (r != NULL)
+			if (r != NULL) {
 				error_set_uuid(e, "leader_uuid", &r->uuid);
+				error_append_msg(e, " (%s)",
+						 tt_uuid_str(&r->uuid));
+			}
 		}
 	} else if (txn_limbo_is_ro(&txn_limbo)) {
 		error_set_str(e, "reason", "synchro");
@@ -209,21 +218,28 @@ box_check_writable(void)
 		uint64_t term = txn_limbo.promote_greatest_term;
 		error_set_uint(e, "queue_owner_id", id);
 		error_set_uint(e, "term", term);
+		error_append_msg(e, "synchro queue with term %llu belongs "
+				 "to %u", term, id);
 		struct replica *r = replica_by_id(id);
 		/*
 		 * XXX: when an instance is deleted from _cluster, its limbo's
 		 * ownership is not cleared.
 		 */
-		if (r != NULL)
+		if (r != NULL) {
 			error_set_uuid(e, "queue_owner_uuid", &r->uuid);
+			error_append_msg(e, " (%s)", tt_uuid_str(&r->uuid));
+		}
 	} else {
 		error_set_str(e, "reason", "state");
-		if (is_ro)
+		if (is_ro) {
 			error_set_str(e, "state", "read_only");
-		else if (is_orphan)
+			error_append_msg(e, "box.cfg.read_only is true");
+		} else if (is_orphan) {
 			error_set_str(e, "state", "orphan");
-		else
+			error_append_msg(e, "it is an orphan");
+		} else {
 			assert(false);
+		}
 	}
 	diag_log();
 	return -1;

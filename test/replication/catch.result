@@ -92,7 +92,7 @@ box.space.test ~= nil
 ...
 box.space.test:replace{1}
 ---
-- error: Can't modify data because this instance is in read-only mode.
+- error: Can't modify data on a read-only instance - it is an orphan
 ...
 -- Case #2: replace tuple on replica by net.box.
 test_run:cmd("switch default")
@@ -108,7 +108,7 @@ c = net_box.connect(r_uri)
 ...
 d = c.space.test:replace{1}
 ---
-- error: Can't modify data because this instance is in read-only mode.
+- error: Can't modify data on a read-only instance - it is an orphan
 ...
 -- Resume replication.
 errinj.set('ERRINJ_RELAY_SEND_DELAY', false)

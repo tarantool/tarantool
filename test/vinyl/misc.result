@@ -354,7 +354,7 @@ ch2:put(true)
 ...
 ch1:get()
 ---
-- Can't modify data because this instance is in read-only mode.
+- Can't modify data on a read-only instance - box.cfg.read_only is true
 ...
 ch1:get()
 ---
