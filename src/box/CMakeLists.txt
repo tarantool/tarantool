@@ -171,6 +171,7 @@ set(box_sources
     fk_constraint.c
     constraint_id.c
     func.c
+    func_cache.c
     func_def.c
     key_list.c
     alter.cc
