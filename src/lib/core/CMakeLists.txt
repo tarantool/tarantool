@@ -13,7 +13,7 @@ set(core_sources
     latch.c
     sio.c
     evio.c
-    coio.cc
+    coio.c
     coio_task.c
     coio_file.c
     popen.c
