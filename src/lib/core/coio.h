@@ -92,7 +92,7 @@ coio_timeout_update(ev_tstamp *start, ev_tstamp *delay)
 /**
  * Reat at least sz bytes, with readahead.
  *
- * Returns 0 in case of EOF.
+ * Returns 0 in case of EOF, -1 in case of error.
  */
 static inline ssize_t
 coio_read_ahead(struct iostream *io, void *buf, size_t sz, size_t bufsiz)
@@ -115,29 +115,6 @@ coio_read_timeout(struct iostream *io, void *buf, size_t sz, ev_tstamp timeout)
 	return coio_read_ahead_timeout(io, buf, sz, sz, timeout);
 }
 
-/**
- * Read data with timeout.
- *
- * Yield until some data will be available for read.
- *
- * Returns amount of read bytes at success, otherwise returns -1
- * and set a diag.
- *
- * Zero return value means EOF.
- *
- * Note: Less then @a count bytes may be available for read at a
- * moment, so a return value less then @a count does not mean EOF.
- *
- * Possible errors:
- *
- * - SocketError: an IO error occurs at read().
- * - TimedOut: @a timeout quota is exceeded.
- * - FiberIsCancelled: cancelled by an outside code.
- */
-ssize_t
-coio_read_ahead_timeout_noxc(struct iostream *io, void *buf, size_t sz,
-			     size_t bufsiz, ev_tstamp timeout);
-
 static inline ssize_t
 coio_readn(struct iostream *io, void *buf, size_t sz)
 {
@@ -151,24 +128,6 @@ coio_readn_ahead_timeout(struct iostream *io, void *buf, size_t sz,
 ssize_t
 coio_write_timeout(struct iostream *io, const void *buf, size_t sz,
 		   ev_tstamp timeout);
-
-/**
- * Write @a count bytes with timeout.
- *
- * Yield until all @a count bytes will be written.
- *
- * Returns @a count at success, otherwise returns -1 and set a
- * diag.
- *
- * Possible errors:
- *
- * - SocketError: an IO error occurs at write().
- * - TimedOut: @a timeout quota is exceeded.
- * - FiberIsCancelled: cancelled by an outside code.
- */
-ssize_t
-coio_write_timeout_noxc(struct iostream *io, const void *buf, size_t sz,
-			ev_tstamp timeout);
 
 static inline void
 coio_write(struct iostream *io, const void *buf, size_t sz)
