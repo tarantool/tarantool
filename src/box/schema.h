@@ -34,6 +34,7 @@
 #include <stdint.h>
 #include <stdio.h> /* snprintf */
 #include "error.h"
+#include "func_cache.h"
 #include "space.h"
 
 #if defined(__cplusplus)
@@ -85,22 +86,6 @@ space_cache_find(uint32_t id)
 	diag_set(ClientError, ER_NO_SUCH_SPACE, int2str(id));
 	return NULL;
 }
-
-/**
- * Insert a new function object in the function cache.
- * @param func Function object to insert.
- */
-void
-func_cache_insert(struct func *func);
-
-void
-func_cache_delete(uint32_t fid);
-
-struct func *
-func_by_id(uint32_t fid);
-
-struct func *
-func_by_name(const char *name, uint32_t name_len);
 
 /** Call a visitor function on every space in the space cache. */
 int

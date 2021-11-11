@@ -46,7 +46,7 @@
 #include <unicode/uchar.h>
 #include <unicode/ucol.h>
 #include "box/coll_id_cache.h"
-#include "box/schema.h"
+#include "box/func_cache.h"
 #include "box/user.h"
 #include "assoc.h"
 
