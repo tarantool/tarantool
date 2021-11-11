@@ -47,37 +47,44 @@ typedef void (*ev_stat_cb)(ev_loop *, ev_stat *, int);
 /**
  * Connect to a host with a specified timeout.
  * @retval socket fd
+ * @retval -1 error
  */
 static int
 coio_connect_addr(const struct sockaddr *addr, socklen_t len, ev_tstamp timeout)
 {
 	int fd = sio_socket(addr->sa_family, SOCK_STREAM, 0);
 	if (fd < 0)
-		diag_raise();
+		return -1;
 	auto fd_guard = make_scoped_guard([=]{ close(fd); });
 	if (evio_setsockopt_client(fd, addr->sa_family, SOCK_STREAM) != 0)
-		diag_raise();
+		return -1;
 	if (sio_connect(fd, addr, len) == 0) {
 		fd_guard.is_active = false;
 		return fd;
 	}
 	if (errno != EINPROGRESS)
-		diag_raise();
+		return -1;
 	/*
 	 * Wait until socket is ready for writing or
 	 * timed out.
 	 */
 	int revents = coio_wait(fd, EV_WRITE, timeout);
-	fiber_testcancel();
-	if (revents == 0)
-		tnt_raise(TimedOut);
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		return -1;
+	}
+	if (revents == 0) {
+		diag_set(TimedOut);
+		return -1;
+	}
 	int error = EINPROGRESS;
 	socklen_t sz = sizeof(error);
 	if (sio_getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &sz))
-		diag_raise();
+		return -1;
 	if (error != 0) {
 		errno = error;
-		tnt_raise(SocketError, sio_socketname(fd), "connect");
+		diag_set(SocketError, sio_socketname(fd), "connect");
+		return -1;
 	}
 	fd_guard.is_active = false;
 	return fd;
@@ -125,6 +132,7 @@ coio_fill_addrinfo(struct addrinfo *ai_local, const char *host,
  * it will treat \a service as a path to a socket file.
  *
  * @retval socket fd
+ * @retval -1 error
  */
 int
 coio_connect_timeout(const char *host, const char *service, int host_hint,
@@ -144,6 +152,8 @@ coio_connect_timeout(const char *host, const char *service, int host_hint,
 		un.sun_family = AF_UNIX;
 		fd = coio_connect_addr((struct sockaddr *)&un, sizeof(un),
 				       delay);
+		if (fd < 0)
+			return -1;
 		if (addr != NULL) {
 			assert(addr_len != NULL);
 			*addr_len = MIN(sizeof(un), *addr_len);
@@ -165,10 +175,8 @@ coio_connect_timeout(const char *host, const char *service, int host_hint,
 	    hints.ai_flags = AI_ADDRCONFIG|AI_NUMERICSERV|AI_PASSIVE;
 	    hints.ai_protocol = 0;
 	    int rc = coio_getaddrinfo(host, service, &hints, &ai, delay);
-	    if (rc != 0) {
-		    diag_raise();
-		    panic("unspecified getaddrinfo error");
-	    }
+	    if (rc != 0)
+		    return -1;
 	}
 	auto addrinfo_guard = make_scoped_guard([=] {
 		if (host_hint == 0)
@@ -177,34 +185,33 @@ coio_connect_timeout(const char *host, const char *service, int host_hint,
 			free(ai_local.ai_addr);
 	});
 	evio_timeout_update(loop(), &start, &delay);
-
 	coio_timeout_init(&start, &delay, timeout);
 	while (ai) {
-		try {
-			fd = coio_connect_addr(ai->ai_addr, ai->ai_addrlen,
-					       delay);
+		fd = coio_connect_addr(ai->ai_addr, ai->ai_addrlen, delay);
+		if (fd >= 0) {
 			if (addr != NULL) {
 				assert(addr_len != NULL);
 				*addr_len = MIN(ai->ai_addrlen, *addr_len);
 				memcpy(addr, ai->ai_addr, *addr_len);
 			}
 			return fd; /* connected */
-		} catch (SocketError *e) {
-			if (ai->ai_next == NULL)
-				throw;
-			/* ignore exception and try the next address */
 		}
+		if (ai->ai_next == NULL)
+			return -1;
+		/* Ignore the error and try the next address. */
 		ai = ai->ai_next;
 		ev_now_update(loop);
 		coio_timeout_update(&start, &delay);
 	}
-
-	tnt_raise(SocketError, sio_socketname(fd), "connection failed");
+	diag_set(SocketError, sio_socketname(fd), "connection failed");
+	return fd;
 }
 
 /**
  * Wait a client connection on a server socket until
  * timedout.
+ * @retval socket fd
+ * @retval -1 error
  */
 int
 coio_accept(int sfd, struct sockaddr *addr, socklen_t addrlen,
@@ -221,20 +228,25 @@ coio_accept(int sfd, struct sockaddr *addr, socklen_t addrlen,
 			if (evio_setsockopt_client(fd, addr->sa_family,
 						   SOCK_STREAM) != 0) {
 				close(fd);
-				diag_raise();
+				return -1;
 			}
 			return fd;
 		}
-		if (! sio_wouldblock(errno))
-			diag_raise();
+		if (!sio_wouldblock(errno))
+			return -1;
 		/*
 		 * Yield control to other fibers until the
 		 * timeout is reached.
 		 */
 		int revents = coio_wait(sfd, EV_READ, delay);
-		fiber_testcancel();
-		if (revents == 0)
-			tnt_raise(TimedOut);
+		if (fiber_is_cancelled()) {
+			diag_set(FiberIsCancelled);
+			return -1;
+		}
+		if (revents == 0) {
+			diag_set(TimedOut);
+			return -1;
+		}
 		coio_timeout_update(&start, &delay);
 	}
 }

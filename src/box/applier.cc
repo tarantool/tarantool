@@ -347,6 +347,8 @@ applier_connect(struct applier *applier)
 		 (int)uri->service_len, uri->service);
 	int fd = coio_connect(host, service, uri->host_hint,
 			      &applier->addr, &applier->addr_len);
+	if (fd < 0)
+		diag_raise();
 	iostream_create(io, fd);
 	coio_readn(io, greetingbuf, IPROTO_GREETING_SIZE);
 	applier->last_row_time = ev_monotonic_now(loop());
