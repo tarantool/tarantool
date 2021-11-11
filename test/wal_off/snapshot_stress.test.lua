@@ -161,10 +161,10 @@ end;
 
 snaps_done = false;
 function snaps()
-    while (workers_done ~= workers_count) do
+    repeat
         pcall(box.snapshot)
         fiber.sleep(snapshot_interval)
-    end
+    until workers_done == workers_count
     snaps_done = true
 end;
 
