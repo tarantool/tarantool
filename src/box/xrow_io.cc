@@ -100,6 +100,7 @@ coio_write_xrow(struct iostream *io, const struct xrow_header *row)
 {
 	struct iovec iov[XROW_IOVMAX];
 	int iovcnt = xrow_to_iovec_xc(row, iov);
-	coio_writev(io, iov, iovcnt, 0);
+	if (coio_writev(io, iov, iovcnt, 0) < 0)
+		diag_raise();
 }
 

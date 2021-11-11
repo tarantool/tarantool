@@ -258,6 +258,7 @@ coio_accept(int sfd, struct sockaddr *addr, socklen_t addrlen,
  * Can read up to bufsiz bytes.
  *
  * @retval the number of bytes read.
+ * @retval -1 error.
  */
 ssize_t
 coio_read_ahead_timeout(struct iostream *io, void *buf, size_t sz,
@@ -284,7 +285,7 @@ coio_read_ahead_timeout(struct iostream *io, void *buf, size_t sz,
 		} else if (nrd == 0) {
 			return sz - to_read;
 		} else if (nrd == IOSTREAM_ERROR) {
-			diag_raise();
+			return -1;
 		}
 		/*
 		 * Yield control to other fibers until the
@@ -292,9 +293,14 @@ coio_read_ahead_timeout(struct iostream *io, void *buf, size_t sz,
 		 */
 		int revents = coio_wait(io->fd, iostream_status_to_events(nrd),
 					delay);
-		fiber_testcancel();
-		if (revents == 0)
-			tnt_raise(TimedOut);
+		if (fiber_is_cancelled()) {
+			diag_set(FiberIsCancelled);
+			return -1;
+		}
+		if (revents == 0) {
+			diag_set(TimedOut);
+			return -1;
+		}
 		coio_timeout_update(&start, &delay);
 	}
 }
@@ -305,15 +311,17 @@ coio_read_ahead_timeout(struct iostream *io, void *buf, size_t sz,
  * Treats EOF as an error, and throws an exception.
  *
  * @retval the number of bytes read, > 0.
+ * @retval -1 error.
  */
 ssize_t
 coio_readn_ahead(struct iostream *io, void *buf, size_t sz, size_t bufsiz)
 {
 	ssize_t nrd = coio_read_ahead(io, buf, sz, bufsiz);
-	if (nrd < (ssize_t)sz) {
+	if (nrd >= 0 && nrd < (ssize_t)sz) {
 		errno = EPIPE;
-		tnt_raise(SocketError, sio_socketname(io->fd),
-			  "unexpected EOF when reading from socket");
+		diag_set(SocketError, sio_socketname(io->fd),
+			 "unexpected EOF when reading from socket");
+		return -1;
 	}
 	return nrd;
 }
@@ -324,6 +332,7 @@ coio_readn_ahead(struct iostream *io, void *buf, size_t sz, size_t bufsiz)
  * Treats EOF as an error, and throws an exception.
  *
  * @retval the number of bytes read, > 0.
+ * @retval -1 error.
  */
 ssize_t
 coio_readn_ahead_timeout(struct iostream *io, void *buf, size_t sz,
@@ -332,31 +341,12 @@ coio_readn_ahead_timeout(struct iostream *io, void *buf, size_t sz,
 	ssize_t nrd = coio_read_ahead_timeout(io, buf, sz, bufsiz, timeout);
 	if (nrd >= 0 && nrd < (ssize_t)sz) { /* EOF. */
 		errno = EPIPE;
-		tnt_raise(SocketError, sio_socketname(io->fd),
-			  "unexpected EOF when reading from socket");
+		diag_set(SocketError, sio_socketname(io->fd),
+			 "unexpected EOF when reading from socket");
+		return -1;
 	}
 	return nrd;
 }
-
-/*
- * FIXME: Rewrite coio_read_ahead_timeout() w/o C++ exceptions and
- * drop this function.
- */
-ssize_t
-coio_read_ahead_timeout_noxc(struct iostream *io, void *buf, size_t sz,
-			     size_t bufsiz, ev_tstamp timeout)
-{
-	try {
-		return coio_read_ahead_timeout(io, buf, sz, bufsiz, timeout);
-	} catch (Exception *) {
-		/*
-		 * The exception is already in the diagnostics
-		 * area. Nothing to do.
-		 */
-	}
-	return -1;
-}
-
 
 /**
  * Write sz bytes to socket.
@@ -368,6 +358,7 @@ coio_read_ahead_timeout_noxc(struct iostream *io, void *buf, size_t sz,
  *
  * @retval the number of bytes written. Always
  * equal to @a sz.
+ * @retval -1 error.
  */
 ssize_t
 coio_write_timeout(struct iostream *io, const void *buf, size_t sz,
@@ -390,7 +381,7 @@ coio_write_timeout(struct iostream *io, const void *buf, size_t sz,
 			buf = (char *) buf + nwr;
 			continue;
 		} else if (nwr == IOSTREAM_ERROR) {
-			diag_raise();
+			return -1;
 		}
 		/*
 		 * Yield control to other fibers until the
@@ -399,30 +390,16 @@ coio_write_timeout(struct iostream *io, const void *buf, size_t sz,
 		 */
 		int revents = coio_wait(io->fd, iostream_status_to_events(nwr),
 					delay);
-		fiber_testcancel();
-		if (revents == 0)
-			tnt_raise(TimedOut);
+		if (fiber_is_cancelled()) {
+			diag_set(FiberIsCancelled);
+			return -1;
+		}
+		if (revents == 0) {
+			diag_set(TimedOut);
+			return -1;
+		}
 		coio_timeout_update(&start, &delay);
 	}
-}
-
-/*
- * FIXME: Rewrite coio_write_timeout() w/o C++ exceptions and drop
- * this function.
- */
-ssize_t
-coio_write_timeout_noxc(struct iostream *io, const void *buf, size_t sz,
-			ev_tstamp timeout)
-{
-	try {
-		return coio_write_timeout(io, buf, sz, timeout);
-	} catch (Exception *) {
-		/*
-		 * The exception is already in the diagnostics
-		 * area. Nothing to do.
-		 */
-	}
-	return -1;
 }
 
 /*
@@ -468,7 +445,7 @@ coio_writev_timeout(struct iostream *io, struct iovec *iov, int iovcnt,
 			}
 			continue;
 		} else if (nwr == IOSTREAM_ERROR) {
-			diag_raise();
+			return -1;
 		}
 		/*
 		 * Yield control to other fibers until the
@@ -477,9 +454,14 @@ coio_writev_timeout(struct iostream *io, struct iovec *iov, int iovcnt,
 		 */
 		int revents = coio_wait(io->fd, iostream_status_to_events(nwr),
 					delay);
-		fiber_testcancel();
-		if (revents == 0)
-			tnt_raise(TimedOut);
+		if (fiber_is_cancelled()) {
+			diag_set(FiberIsCancelled);
+			return -1;
+		}
+		if (revents == 0) {
+			diag_set(TimedOut);
+			return -1;
+		}
 		coio_timeout_update(&start, &delay);
 	}
 	return total;

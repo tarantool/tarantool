@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "coio.h"
+#include "diag.h"
 #include <small/ibuf.h>
 
 struct iostream;
@@ -47,6 +48,8 @@ coio_bread(struct iostream *io, struct ibuf *buf, size_t sz)
 {
 	ibuf_reserve_xc(buf, sz);
 	ssize_t n = coio_read_ahead(io, buf->wpos, sz, ibuf_unused(buf));
+	if (n < 0)
+		diag_raise();
 	buf->wpos += n;
 	return n;
 }
@@ -63,6 +66,8 @@ coio_bread_timeout(struct iostream *io, struct ibuf *buf, size_t sz,
 	ibuf_reserve_xc(buf, sz);
 	ssize_t n = coio_read_ahead_timeout(io, buf->wpos, sz, ibuf_unused(buf),
 			                    timeout);
+	if (n < 0)
+		diag_raise();
 	buf->wpos += n;
 	return n;
 }
@@ -73,6 +78,8 @@ coio_breadn(struct iostream *io, struct ibuf *buf, size_t sz)
 {
 	ibuf_reserve_xc(buf, sz);
 	ssize_t n = coio_readn_ahead(io, buf->wpos, sz, ibuf_unused(buf));
+	if (n < 0)
+		diag_raise();
 	buf->wpos += n;
 	return n;
 }
@@ -90,6 +97,8 @@ coio_breadn_timeout(struct iostream *io, struct ibuf *buf, size_t sz,
 	ibuf_reserve_xc(buf, sz);
 	ssize_t n = coio_readn_ahead_timeout(io, buf->wpos, sz, ibuf_unused(buf),
 			                     timeout);
+	if (n < 0)
+		diag_raise();
 	buf->wpos += n;
 	return n;
 }

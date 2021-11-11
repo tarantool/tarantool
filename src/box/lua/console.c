@@ -576,8 +576,7 @@ console_session_push(struct session *session, struct port *port)
 		return -1;
 	struct iostream io;
 	iostream_create(&io, session_fd(session));
-	int ret = coio_write_timeout_noxc(&io, text, text_len,
-					  TIMEOUT_INFINITY);
+	int ret = coio_write_timeout(&io, text, text_len, TIMEOUT_INFINITY);
 	iostream_destroy(&io);
 	return ret >= 0 ? 0 : -1;
 }
