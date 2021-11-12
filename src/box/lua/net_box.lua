@@ -1149,6 +1149,13 @@ end
 
 function remote_methods:ping(opts)
     check_remote_arg(self, 'ping')
+
+    if opts ~= nil and type(opts) ~= 'table' then
+        box.error(
+            box.error.UNSUPPORTED, "ping",
+            string.format("options of type %s", type(opts)))
+    end
+
     return (pcall(self._request, self, M_PING, opts, nil, self._stream_id))
 end
 
