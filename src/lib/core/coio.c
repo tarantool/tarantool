@@ -238,17 +238,17 @@ coio_accept(int sfd, struct sockaddr *addr, socklen_t addrlen,
 		}
 		if (!sio_wouldblock(errno))
 			return -1;
+		if (delay <= 0) {
+			diag_set(TimedOut);
+			return -1;
+		}
 		/*
 		 * Yield control to other fibers until the
 		 * timeout is reached.
 		 */
-		int revents = coio_wait(sfd, EV_READ, delay);
+		coio_wait(sfd, EV_READ, delay);
 		if (fiber_is_cancelled()) {
 			diag_set(FiberIsCancelled);
-			return -1;
-		}
-		if (revents == 0) {
-			diag_set(TimedOut);
 			return -1;
 		}
 		coio_timeout_update(&start, &delay);
@@ -291,18 +291,17 @@ coio_read_ahead_timeout(struct iostream *io, void *buf, size_t sz,
 		} else if (nrd == IOSTREAM_ERROR) {
 			return -1;
 		}
+		if (delay <= 0) {
+			diag_set(TimedOut);
+			return -1;
+		}
 		/*
 		 * Yield control to other fibers until the
 		 * timeout is being reached.
 		 */
-		int revents = coio_wait(io->fd, iostream_status_to_events(nrd),
-					delay);
+		coio_wait(io->fd, iostream_status_to_events(nrd), delay);
 		if (fiber_is_cancelled()) {
 			diag_set(FiberIsCancelled);
-			return -1;
-		}
-		if (revents == 0) {
-			diag_set(TimedOut);
 			return -1;
 		}
 		coio_timeout_update(&start, &delay);
@@ -387,19 +386,18 @@ coio_write_timeout(struct iostream *io, const void *buf, size_t sz,
 		} else if (nwr == IOSTREAM_ERROR) {
 			return -1;
 		}
+		if (delay <= 0) {
+			diag_set(TimedOut);
+			return -1;
+		}
 		/*
 		 * Yield control to other fibers until the
 		 * timeout is reached or the socket is
 		 * ready.
 		 */
-		int revents = coio_wait(io->fd, iostream_status_to_events(nwr),
-					delay);
+		coio_wait(io->fd, iostream_status_to_events(nwr), delay);
 		if (fiber_is_cancelled()) {
 			diag_set(FiberIsCancelled);
-			return -1;
-		}
-		if (revents == 0) {
-			diag_set(TimedOut);
 			return -1;
 		}
 		coio_timeout_update(&start, &delay);
@@ -451,19 +449,18 @@ coio_writev_timeout(struct iostream *io, struct iovec *iov, int iovcnt,
 		} else if (nwr == IOSTREAM_ERROR) {
 			return -1;
 		}
+		if (delay <= 0) {
+			diag_set(TimedOut);
+			return -1;
+		}
 		/*
 		 * Yield control to other fibers until the
 		 * timeout is reached or the socket is
 		 * ready.
 		 */
-		int revents = coio_wait(io->fd, iostream_status_to_events(nwr),
-					delay);
+		coio_wait(io->fd, iostream_status_to_events(nwr), delay);
 		if (fiber_is_cancelled()) {
 			diag_set(FiberIsCancelled);
-			return -1;
-		}
-		if (revents == 0) {
-			diag_set(TimedOut);
 			return -1;
 		}
 		coio_timeout_update(&start, &delay);
