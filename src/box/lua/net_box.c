@@ -188,13 +188,6 @@ static const char netbox_request_typename[] = "net.box.request";
 static int netbox_on_event_lua_ref = LUA_NOREF;
 static int luaT_netbox_request_iterator_next_ref = LUA_NOREF;
 
-/** Passed to mpstream_init() to set a boolean flag on error. */
-static void
-mpstream_error_handler(void *error_ctx)
-{
-	*(bool *)error_ctx = true;
-}
-
 static void
 netbox_request_destroy(struct netbox_request *request)
 {
@@ -443,8 +436,12 @@ netbox_encode_ping(lua_State *L, int idx, struct mpstream *stream,
 	netbox_end_encode(stream, svp);
 }
 
-static int
-netbox_encode_id(struct ibuf *ibuf, uint64_t sync)
+/**
+ * Encodes an id request and writes it to the provided buffer.
+ * Raises a Lua error on memory allocation failure.
+ */
+static void
+netbox_encode_id(struct lua_State *L, struct ibuf *ibuf, uint64_t sync)
 {
 	struct iproto_features *features = &NETBOX_IPROTO_FEATURES;
 #ifndef NDEBUG
@@ -460,10 +457,9 @@ netbox_encode_id(struct ibuf *ibuf, uint64_t sync)
 			iproto_features_set(features, feature_id);
 	}
 #endif
-	bool is_error = false;
 	struct mpstream stream;
 	mpstream_init(&stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
-		      mpstream_error_handler, &is_error);
+		      luamp_error, L);
 	size_t svp = netbox_begin_encode(&stream, sync, IPROTO_ID, 0);
 
 	mpstream_encode_map(&stream, 2);
@@ -476,23 +472,21 @@ netbox_encode_id(struct ibuf *ibuf, uint64_t sync)
 	mpstream_advance(&stream, size);
 
 	netbox_end_encode(&stream, svp);
-	return is_error ? -1 : 0;
 }
 
 /**
  * Encodes an authorization request and writes it to the provided buffer.
- * Returns -1 on memory allocation error.
+ * Raises a Lua error on memory allocation failure.
  */
-static int
-netbox_encode_auth(struct ibuf *ibuf, uint64_t sync,
+static void
+netbox_encode_auth(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
 		   const char *user, size_t user_len,
 		   const char *password, size_t password_len,
 		   const char *salt)
 {
-	bool is_error = false;
 	struct mpstream stream;
 	mpstream_init(&stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
-		      mpstream_error_handler, &is_error);
+		      luamp_error, L);
 	size_t svp = netbox_begin_encode(&stream, sync, IPROTO_AUTH, 0);
 
 	/* Adapted from xrow_encode_auth() */
@@ -507,22 +501,20 @@ netbox_encode_auth(struct ibuf *ibuf, uint64_t sync,
 		mpstream_encode_str(&stream, "chap-sha1");
 		mpstream_encode_strn(&stream, scramble, SCRAMBLE_SIZE);
 	}
-
 	netbox_end_encode(&stream, svp);
-	return is_error ? -1 : 0;
 }
 
 /**
  * Encodes a SELECT(*) request and writes it to the provided buffer.
- * Returns -1 on memory allocation error.
+ * Raises a Lua error on memory allocation failure.
  */
-static int
-netbox_encode_select_all(struct ibuf *ibuf, uint64_t sync, uint32_t space_id)
+static void
+netbox_encode_select_all(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
+			 uint32_t space_id)
 {
-	bool is_error = false;
 	struct mpstream stream;
 	mpstream_init(&stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
-		      mpstream_error_handler, &is_error);
+		      luamp_error, L);
 	size_t svp = netbox_begin_encode(&stream, sync, IPROTO_SELECT, 0);
 	mpstream_encode_map(&stream, 3);
 	mpstream_encode_uint(&stream, IPROTO_SPACE_ID);
@@ -532,7 +524,6 @@ netbox_encode_select_all(struct ibuf *ibuf, uint64_t sync, uint32_t space_id)
 	mpstream_encode_uint(&stream, IPROTO_KEY);
 	mpstream_encode_array(&stream, 0);
 	netbox_end_encode(&stream, svp);
-	return is_error ? -1 : 0;
 }
 
 static void
@@ -1990,7 +1981,7 @@ netbox_dispatch_response(struct lua_State *L,
  * Takes peer_version_id, netbox transport, socket fd.
  * Returns server version and features array on success.
  * If the server doesn't support IPROTO_ID, returns 0 and an empty array.
- * On failure returns nil, error.
+ * On failure raises a Lua error.
  */
 static int
 netbox_iproto_id(struct lua_State *L)
@@ -2004,20 +1995,19 @@ netbox_iproto_id(struct lua_State *L)
 	ERROR_INJECT(ERRINJ_NETBOX_DISABLE_ID, goto out);
 	if (peer_version_id < version_id(2, 10, 0))
 		goto unsupported;
-	if (netbox_encode_id(&transport->send_buf, transport->next_sync++) != 0)
-		goto error;
+	netbox_encode_id(L, &transport->send_buf, transport->next_sync++);
 	struct xrow_header hdr;
 	if (netbox_send_and_recv(transport, fd, &hdr) != 0)
-		goto error;
+		return luaT_error(L);
 	if (hdr.type != IPROTO_OK) {
 		uint32_t errcode = hdr.type & (IPROTO_TYPE_ERROR - 1);
 		if (errcode == ER_UNKNOWN_REQUEST_TYPE)
 			goto unsupported;
 		xrow_decode_error(&hdr);
-		goto error;
+		return luaT_error(L);
 	}
 	if (xrow_decode_id(&hdr, &id) != 0)
-		goto error;
+		return luaT_error(L);
 out:
 	lua_pushinteger(L, id.version);
 	lua_newtable(L);
@@ -2031,14 +2021,12 @@ unsupported:
 	say_verbose("IPROTO_ID command is not supported by net.box connection "
 		    "at fd %d", fd);
 	goto out;
-error:
-	return luaT_push_nil_and_error(L);
 }
 
 /**
  * Performs an authorization request for an iproto connection.
  * Takes user, password, salt, netbox transport, socket fd.
- * Returns none on success, error on failure.
+ * Returns none on success, raises a Lua error on failure.
  */
 static int
 netbox_iproto_auth(struct lua_State *L)
@@ -2053,22 +2041,16 @@ netbox_iproto_auth(struct lua_State *L)
 		return luaL_error(L, "Invalid salt");
 	struct netbox_transport *transport = luaT_check_netbox_transport(L, 4);
 	int fd = lua_tointeger(L, 5);
-	if (netbox_encode_auth(&transport->send_buf, transport->next_sync++,
-			       user, user_len, password, password_len,
-			       salt) != 0) {
-		goto error;
-	}
+	netbox_encode_auth(L, &transport->send_buf, transport->next_sync++,
+			   user, user_len, password, password_len, salt);
 	struct xrow_header hdr;
 	if (netbox_send_and_recv(transport, fd, &hdr) != 0)
-		goto error;
+		return luaT_error(L);
 	if (hdr.type != IPROTO_OK) {
 		xrow_decode_error(&hdr);
-		goto error;
+		return luaT_error(L);
 	}
 	return 0;
-error:
-	luaT_pusherror(L, diag_last_error(diag_get()));
-	return 1;
 }
 
 /**
@@ -2079,7 +2061,7 @@ error:
  *   [VSPACE_ID] = <spaces>
  *   [VINDEX_ID] = <indexes>
  *   [VCOLLATION_ID] = <collations>
- * On failure returns nil, error.
+ * On failure raises a Lua error.
  */
 static int
 netbox_iproto_schema(struct lua_State *L)
@@ -2092,31 +2074,23 @@ netbox_iproto_schema(struct lua_State *L)
 restart:
 	lua_newtable(L);
 	uint64_t vspace_sync = transport->next_sync++;
-	if (netbox_encode_select_all(&transport->send_buf, vspace_sync,
-				     BOX_VSPACE_ID) != 0) {
-		return luaT_error(L);
-	}
+	netbox_encode_select_all(L, &transport->send_buf, vspace_sync,
+				 BOX_VSPACE_ID);
 	uint64_t vindex_sync = transport->next_sync++;
-	if (netbox_encode_select_all(&transport->send_buf, vindex_sync,
-				     BOX_VINDEX_ID) != 0) {
-		return luaT_error(L);
-	}
+	netbox_encode_select_all(L, &transport->send_buf, vindex_sync,
+				 BOX_VINDEX_ID);
 	uint64_t vcollation_sync = transport->next_sync++;
-	if (peer_has_vcollation &&
-	    netbox_encode_select_all(&transport->send_buf, vcollation_sync,
-				     BOX_VCOLLATION_ID) != 0) {
-		return luaT_error(L);
-	}
+	if (peer_has_vcollation)
+		netbox_encode_select_all(L, &transport->send_buf,
+					 vcollation_sync, BOX_VCOLLATION_ID);
 	bool got_vspace = false;
 	bool got_vindex = false;
 	bool got_vcollation = false;
 	uint32_t schema_version = 0;
 	do {
 		struct xrow_header hdr;
-		if (netbox_send_and_recv(transport, fd, &hdr) != 0) {
-			luaL_testcancel(L);
-			return luaT_push_nil_and_error(L);
-		}
+		if (netbox_send_and_recv(transport, fd, &hdr) != 0)
+			return luaT_error(L);
 		netbox_dispatch_response(L, transport, &hdr);
 		if (hdr.sync != vspace_sync &&
 		    hdr.sync != vindex_sync &&
@@ -2135,7 +2109,7 @@ restart:
 				continue;
 			}
 			xrow_decode_error(&hdr);
-			return luaT_push_nil_and_error(L);
+			return luaT_error(L);
 		}
 		if (schema_version == 0) {
 			schema_version = hdr.schema_version;
@@ -2176,7 +2150,7 @@ restart:
  * Processes iproto requests in a loop until an error or a schema change.
  * Takes schema_version, netbox transport, socket fd.
  * Returns none if the loop was broken because of a schema change.
- * If the loop was broken by an error, returns the error.
+ * On failure raises a Lua error.
  */
 static int
 netbox_iproto_loop(struct lua_State *L)
@@ -2186,11 +2160,8 @@ netbox_iproto_loop(struct lua_State *L)
 	int fd = lua_tointeger(L, 3);
 	while (true) {
 		struct xrow_header hdr;
-		if (netbox_send_and_recv(transport, fd, &hdr) != 0) {
-			luaL_testcancel(L);
-			luaT_pusherror(L, diag_last_error(diag_get()));
-			return 1;
-		}
+		if (netbox_send_and_recv(transport, fd, &hdr) != 0)
+			return luaT_error(L);
 		netbox_dispatch_response(L, transport, &hdr);
 		if (hdr.schema_version > 0 &&
 		    hdr.schema_version != schema_version) {
