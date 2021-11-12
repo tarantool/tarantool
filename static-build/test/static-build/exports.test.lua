@@ -66,6 +66,8 @@ local check_symbols = {
     'uri_create',
     'uri_destroy',
     'uri_format',
+    'uri_set_create',
+    'uri_set_destroy',
     'PMurHash32',
     'PMurHash32_Process',
     'PMurHash32_Result',

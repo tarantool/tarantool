@@ -31,11 +31,22 @@ struct uri {
     struct uri_param *params;
 };
 
+struct uri_set {
+    int uri_count;
+    struct uri *uris;
+};
+
 int
 uri_create(struct uri *uri, const char *str);
 
 void
 uri_destroy(struct uri *uri);
+
+int
+uri_set_create(struct uri_set *uri_set, const char *str);
+
+void
+uri_set_destroy(struct uri_set *uri_set);
 
 int
 uri_format(char *str, size_t len, struct uri *uri, bool write_password);
@@ -48,15 +59,11 @@ local uri_stash_put = uri_stash.put
 local cord_ibuf_take = buffer.internal.cord_ibuf_take
 local cord_ibuf_put = buffer.internal.cord_ibuf_put
 
-local function parse(str)
-    if str == nil then
-        error("Usage: uri.parse(string)")
-    end
-    local uribuf = uri_stash_take()
-    if builtin.uri_create(uribuf, str) ~= 0 then
-        uri_stash_put(uribuf)
-        return nil
-    end
+local uri_set_stash = buffer.ffi_stash_new('struct uri_set')
+local uri_set_stash_take = uri_set_stash.take
+local uri_set_stash_put = uri_set_stash.put
+
+local function parse_uribuf(uribuf)
     local result = {}
     for _, k in ipairs({ 'scheme', 'login', 'password', 'host', 'service',
         'path', 'query', 'fragment'}) do
@@ -81,8 +88,39 @@ local function parse(str)
     elseif uribuf.host_hint == 3 then
         result.unix = result.service
     end
+    return result
+end
+
+local function parse(str)
+    if str == nil then
+        error("Usage: uri.parse(string)")
+    end
+    local uribuf = uri_stash_take()
+    if builtin.uri_create(uribuf, str) ~= 0 then
+        uri_stash_put(uribuf)
+        return nil
+    end
+    local result = parse_uribuf(uribuf)
     builtin.uri_destroy(uribuf)
     uri_stash_put(uribuf)
+    return result
+end
+
+local function parse_many(str)
+    if str == nil then
+        error("Usage: uri.parse_many(string)")
+    end
+    local uri_set_buf = uri_set_stash_take()
+    if builtin.uri_set_create(uri_set_buf, str) ~= 0 then
+        uri_set_stash_put(uri_set_buf)
+        return nil
+    end
+    local result = {}
+    for i = 0, uri_set_buf.uri_count - 1 do
+        result[i + 1] = parse_uribuf(uri_set_buf.uris[i])
+    end
+    builtin.uri_set_destroy(uri_set_buf)
+    uri_set_stash_put(uri_set_buf)
     return result
 end
 
@@ -106,6 +144,7 @@ local function format(uri, write_password)
 end
 
 return {
+    parse_many = parse_many,
     parse = parse,
     format = format,
 };

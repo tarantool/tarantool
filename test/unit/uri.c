@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 
+#define URI_MAX 10
 #define URI_PARAM_MAX 10
 #define URI_PARAM_VALUE_MAX 10
 
@@ -28,6 +29,15 @@ struct uri_expected {
 	int param_count;
 	/** Array of expected URI parameters */
 	struct uri_param_expected params[URI_PARAM_MAX];
+};
+
+struct uri_set_expected {
+	/** String with several URIs passed for parse and validation */
+	const char *string;
+	/** Count of URIs */
+	int uri_count;
+	/** Array of expected URIs */
+	struct uri_expected uris[URI_MAX];
 };
 
 static int
@@ -51,6 +61,21 @@ uri_expected_check(const struct uri_expected *uri_ex, const struct uri *uri)
 	is(uri_ex->param_count, uri->param_count, "param count");
 	for (int i = 0; i < MIN(uri_ex->param_count, uri->param_count); i++)
 		uri_param_expected_check(&uri_ex->params[i], uri);
+	return check_plan();
+}
+
+static int
+uri_set_expected_check(const struct uri_set_expected *uri_set, bool parse_is_successful)
+{
+	struct uri_set u;
+	int rc = uri_set_create(&u, uri_set->string);
+	plan(1 + uri_set->uri_count);
+	is(rc, parse_is_successful ? 0 : -1, "%s: parse %s", uri_set->string,
+	   parse_is_successful ? "successful" : "unsuccessful");
+	for (int i = 0; i < MIN(uri_set->uri_count, u.uri_count); i++) {
+		uri_expected_check(&uri_set->uris[i], &u.uris[i]);
+	}
+	uri_set_destroy(&u);
 	return check_plan();
 }
 
@@ -254,10 +279,186 @@ test_string_uri_with_query_params_parse(void)
 	return check_plan();
 }
 
+static int
+test_string_uri_set_with_query_params_parse(void)
+{
+	const struct uri_set_expected uri_set_array[] = {
+		/**
+		 * One string URI with several query parameters, at the same
+		 * time, some of them have empty value or don't have values at
+		 * all. Most common example for the single URI.
+		 */
+		[0] = {
+			.string = "/unix.sock?q1=v1&q1=&q2&q3=",
+			.uri_count = 1,
+			.uris = {
+				[0] = {
+					.string = NULL,
+					.param_count = 3,
+					.params = {
+						[0] = {
+							.name = "q1",
+							.value_count = 2,
+							.values = { "v1", "" },
+						},
+						[1] = {
+							.name = "q2",
+							.value_count = 0,
+							.values = {},
+						},
+						[2] = {
+							.name = "q3",
+							.value_count = 1,
+							.values = { "" },
+						},
+					},
+				},
+			},
+		},
+		/**
+		 * Two URIs with different query parameters, separated
+		 * by commas.
+		 */
+		[1] = {
+			.string = "/unix.sock?q1=v1, unix.sock?q2=v2",
+			.uri_count = 2,
+			.uris = {
+				[0] = {
+					.string = NULL,
+					.param_count = 1,
+					.params = {
+						[0] = {
+							.name = "q1",
+							.value_count = 1,
+							.values = { "v1" },
+						},
+					},
+				},
+				[1] = {
+					.string = NULL,
+					.param_count = 1,
+					.params = {
+						[0] = {
+							.name = "q2",
+							.value_count = 1,
+							.values = { "v2" },
+						},
+					},
+				},
+			},
+		},
+		/**
+		 * Two URis with different parameters with differet values
+		 * separated by commas. The most common case.
+		 */
+		[2] = {
+			.string = "/unix.sock?q1=v1&q1=&q2&q3="
+				  ","
+				  "/unix.sock?q4=v4&q4=&q5&q6=",
+			.uri_count = 2,
+			.uris = {
+				[0] = {
+					.string = NULL,
+					.param_count = 3,
+					.params = {
+						[0] = {
+							.name = "q1",
+							.value_count = 2,
+							.values = { "v1", "" },
+						},
+						[1] = {
+							.name = "q2",
+							.value_count = 0,
+							.values = {},
+						},
+						[2] = {
+							.name = "q3",
+							.value_count = 1,
+							.values = { "" },
+						},
+					},
+				},
+				[1] = {
+					.string = NULL,
+					.param_count = 3,
+					.params = {
+						[0] = {
+							.name = "q4",
+							.value_count = 2,
+							.values = { "v4", "" },
+						},
+						[1] = {
+							.name = "q5",
+							.value_count = 0,
+							.values = {},
+						},
+						[2] = {
+							.name = "q6",
+							.value_count = 1,
+							.values = { "" },
+						},
+					},
+				},
+			},
+		},
+		[3] = {
+			.string = "",
+			.uri_count = 0,
+			.uris = {},
+		}
+	};
+	plan(lengthof(uri_set_array));
+	for (unsigned i = 0; i < lengthof(uri_set_array); i++)
+		uri_set_expected_check(&uri_set_array[i], true);
+	return check_plan();
+}
+
+static int
+test_invalid_string_uri_set(void)
+{
+	const struct uri_set_expected uri_set_array[] = {
+		/** Two URIs, second URIS is invalid. */
+		[0] = {
+			.string = "/unix.sock, ://",
+			.uri_count = 0,
+			.uris = {},
+		},
+		/**
+		 * Extra ',' in different variants.
+		 */
+		[1] = {
+			.string = "/unix.sock?q1=v1,, /unix.sock?q2=v2",
+			.uri_count = 0,
+			.uris = {}
+		},
+		[2] = {
+			.string = "/unix.sock?q1=v1,,/unix.sock?q2=v2",
+			.uri_count = 0,
+			.uris = {}
+		},
+		[3] = {
+			.string = "/unix.sock?q1=v1, ,/unix.sock?q2=v2",
+			.uri_count = 0,
+			.uris = {}
+		},
+		[4] = {
+			.string = "/unix.sock?q1=v1 ,,/unix.sock?q2=v2",
+			.uri_count = 0,
+			.uris = {}
+		}
+	};
+	plan(lengthof(uri_set_array));
+	for (unsigned i = 0; i < lengthof(uri_set_array); i++)
+		uri_set_expected_check(&uri_set_array[i], false);
+	return check_plan();
+}
+
 int
 main(void)
 {
-	plan(1);
+	plan(3);
 	test_string_uri_with_query_params_parse();
+	test_string_uri_set_with_query_params_parse();
+	test_invalid_string_uri_set();
 	return check_plan();
 }
