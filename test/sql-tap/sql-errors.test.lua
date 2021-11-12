@@ -850,7 +850,7 @@ test:do_catchsql_test(
 	[[
 		SELECT CAST(CAST('11111111-1111-1111-1111-111111111111' AS UUID) AS UNSIGNED);
 	]], {
-		1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to unsigned"
+		1, "Type mismatch: can not convert uuid(11111111-1111-1111-1111-111111111111) to unsigned"
 	})
 
 local bin = ''

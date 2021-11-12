@@ -163,7 +163,7 @@ mem_str(const struct Mem *mem)
 	}
 	case MEM_TYPE_UUID:
 		tt_uuid_to_string(&mem->u.uuid, buf);
-		return tt_sprintf("%s('%s')", type, buf);
+		return tt_sprintf("%s(%s)", type, buf);
 	case MEM_TYPE_BOOL:
 		return tt_sprintf("%s(%s)", type, mem->u.b ? "TRUE" : "FALSE");
 	default:

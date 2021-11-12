@@ -1067,7 +1067,7 @@ test:do_catchsql_test(
         INSERT INTO t3(s) VALUES(]]..uuid..[[);
     ]], {
         1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to string"
+           "uuid(11111111-1111-1111-1111-111111111111) to string"
     })
 
 -- Make sure that UUID cannot be implicitly cast to VARBINARY.
@@ -1077,7 +1077,7 @@ test:do_catchsql_test(
         INSERT INTO t4(v) VALUES(]]..uuid..[[);
     ]], {
         1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to varbinary"
+           "uuid(11111111-1111-1111-1111-111111111111) to varbinary"
     })
 
 -- Make sure that STRING and VARBINARY cannot be implicitly cast to UUID.

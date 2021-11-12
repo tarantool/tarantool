@@ -336,7 +336,7 @@ test:do_catchsql_test(
     [[
         SELECT u > CAST('11111111-1111-1111-1111-111111111111' AS UUID) FROM t2;
     ]], {
-        1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to number"
+        1, "Type mismatch: can not convert uuid(11111111-1111-1111-1111-111111111111) to number"
     })
 
 test:do_catchsql_test(
@@ -392,7 +392,7 @@ test:do_catchsql_test(
     [[
         SELECT u = CAST('11111111-1111-1111-1111-111111111111' AS UUID) FROM t2;
     ]], {
-        1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to number"
+        1, "Type mismatch: can not convert uuid(11111111-1111-1111-1111-111111111111) to number"
     })
 
 test:do_catchsql_test(
@@ -562,7 +562,7 @@ test:do_catchsql_test(
     [[
         SELECT cast(cast(x'11111111111111111111111111111111' AS UUID) AS DECIMAL);
     ]], {
-        1, "Type mismatch: can not convert uuid('11111111-1111-1111-1111-111111111111') to decimal"
+        1, "Type mismatch: can not convert uuid(11111111-1111-1111-1111-111111111111) to decimal"
     })
 
 test:execsql([[

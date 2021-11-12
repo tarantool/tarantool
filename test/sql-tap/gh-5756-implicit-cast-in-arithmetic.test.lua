@@ -60,7 +60,7 @@ test:do_catchsql_test(
         SELECT 9 + CAST('11111111-1111-1111-1111-111111111111' AS UUID);
     ]], {
         1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to integer, decimal or double"
+           "uuid(11111111-1111-1111-1111-111111111111) to integer, decimal or double"
     })
 
 test:do_execsql_test(
@@ -117,7 +117,7 @@ test:do_catchsql_test(
         SELECT 9 - CAST('11111111-1111-1111-1111-111111111111' AS UUID);
     ]], {
         1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to integer, decimal or double"
+           "uuid(11111111-1111-1111-1111-111111111111) to integer, decimal or double"
     })
 
 test:do_execsql_test(
@@ -174,7 +174,7 @@ test:do_catchsql_test(
         SELECT 9 * CAST('11111111-1111-1111-1111-111111111111' AS UUID);
     ]], {
         1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to integer, decimal or double"
+           "uuid(11111111-1111-1111-1111-111111111111) to integer, decimal or double"
     })
 
 test:do_execsql_test(
@@ -231,7 +231,7 @@ test:do_catchsql_test(
         SELECT 9 / CAST('11111111-1111-1111-1111-111111111111' AS UUID);
     ]], {
         1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to integer, decimal or double"
+           "uuid(11111111-1111-1111-1111-111111111111) to integer, decimal or double"
     })
 
 test:do_execsql_test(
@@ -288,7 +288,7 @@ test:do_catchsql_test(
         SELECT 9 % CAST('11111111-1111-1111-1111-111111111111' AS UUID);
     ]], {
         1, "Type mismatch: can not convert "..
-           "uuid('11111111-1111-1111-1111-111111111111') to integer"
+           "uuid(11111111-1111-1111-1111-111111111111) to integer"
     })
 
 test:finish_test()
