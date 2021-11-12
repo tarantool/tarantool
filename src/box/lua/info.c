@@ -321,6 +321,14 @@ lbox_info_ro(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_info_ro_reason(struct lua_State *L)
+{
+	/* Even if NULL, it works like lua_pushnil(), so this is fine. */
+	lua_pushstring(L, box_ro_reason());
+	return 1;
+}
+
 /*
  * Tarantool 1.6.x compat
  */
@@ -635,6 +643,7 @@ static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"signature", lbox_info_signature},
 	{"vclock", lbox_info_vclock},
 	{"ro", lbox_info_ro},
+	{"ro_reason", lbox_info_ro_reason},
 	{"replication", lbox_info_replication},
 	{"replication_anon", lbox_info_replication_anon},
 	{"status", lbox_info_status},

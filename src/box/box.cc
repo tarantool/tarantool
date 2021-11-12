@@ -175,6 +175,20 @@ box_update_ro_summary(void)
 	fiber_cond_broadcast(&ro_cond);
 }
 
+const char *
+box_ro_reason(void)
+{
+	if (raft_is_ro(box_raft()))
+		return "election";
+	if (txn_limbo_is_ro(&txn_limbo))
+		return "synchro";
+	if (is_ro)
+		return "config";
+	if (is_orphan)
+		return "orphan";
+	return NULL;
+}
+
 static int
 box_check_writable(void)
 {
@@ -183,6 +197,7 @@ box_check_writable(void)
 	struct error *e = diag_set(ClientError, ER_READONLY);
 	struct raft *raft = box_raft();
 	error_append_msg(e, " - ");
+	error_set_str(e, "reason", box_ro_reason());
 	/*
 	 * In case of multiple reasons at the same time only one is reported.
 	 * But the order is important. For example, if the instance has election
@@ -192,7 +207,6 @@ box_check_writable(void)
 	if (raft_is_ro(raft)) {
 		const char *state = raft_state_str(raft->state);
 		uint64_t term = raft->volatile_term;
-		error_set_str(e, "reason", "election");
 		error_set_str(e, "state", state);
 		error_set_uint(e, "term", term);
 		error_append_msg(e, "state is election %s with term %llu",
@@ -213,7 +227,6 @@ box_check_writable(void)
 			}
 		}
 	} else if (txn_limbo_is_ro(&txn_limbo)) {
-		error_set_str(e, "reason", "synchro");
 		uint32_t id = txn_limbo.owner_id;
 		uint64_t term = txn_limbo.promote_greatest_term;
 		error_set_uint(e, "queue_owner_id", id);
@@ -230,15 +243,12 @@ box_check_writable(void)
 			error_append_msg(e, " (%s)", tt_uuid_str(&r->uuid));
 		}
 	} else {
-		if (is_ro) {
-			error_set_str(e, "reason", "config");
+		if (is_ro)
 			error_append_msg(e, "box.cfg.read_only is true");
-		} else if (is_orphan) {
-			error_set_str(e, "reason", "orphan");
+		else if (is_orphan)
 			error_append_msg(e, "it is an orphan");
-		} else {
+		else
 			assert(false);
-		}
 	}
 	diag_log();
 	return -1;
