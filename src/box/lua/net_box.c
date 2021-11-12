@@ -185,7 +185,6 @@ static const char netbox_request_typename[] = "net.box.request";
  * We keep a reference to each C function that is frequently called with
  * lua_call so as not to create a new Lua object each time we call it.
  */
-static int netbox_on_event_lua_ref = LUA_NOREF;
 static int luaT_netbox_request_iterator_next_ref = LUA_NOREF;
 
 static void
@@ -1860,29 +1859,12 @@ netbox_unwatch(struct lua_State *L)
 	return 0;
 }
 
-/** Passed to pcall by netbox_on_event. */
-static int
-netbox_on_event_lua(struct lua_State *L)
-{
-	void **args = lua_touserdata(L, 1);
-	struct netbox_transport *transport = args[0];
-	struct watch_request *watch = args[1];
-	lua_rawgeti(L, LUA_REGISTRYINDEX, transport->on_event_ref);
-	lua_pushlstring(L, watch->key, watch->key_len);
-	if (watch->data != NULL) {
-		const char *data = watch->data;
-		luamp_decode(L, luaL_msgpack_default, &data);
-		assert(data == watch->data_end);
-	}
-	lua_call(L, watch->data != NULL ? 2 : 1, 0);
-	return 0;
-}
-
 /**
  * Handles an IPROTO_EVENT packet received from the remote host.
  *
- * Note, decoding msgpack may throw a Lua error so we wrap it along with
- * the callback in a pcall so as not to break the connection in this case.
+ * Note, decoding msgpack may throw a Lua error. This is fine: it will be
+ * passed through and handled at the top level, which wraps the whole state
+ * machine in pcall.
  */
 static void
 netbox_on_event(struct lua_State *L, struct netbox_transport *transport,
@@ -1890,15 +1872,16 @@ netbox_on_event(struct lua_State *L, struct netbox_transport *transport,
 {
 	assert(hdr->type == IPROTO_EVENT);
 	struct watch_request watch;
-	if (xrow_decode_watch(hdr, &watch) != 0) {
-		diag_log();
-		return;
+	if (xrow_decode_watch(hdr, &watch) != 0)
+		luaT_error(L);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, transport->on_event_ref);
+	lua_pushlstring(L, watch.key, watch.key_len);
+	if (watch.data != NULL) {
+		const char *data = watch.data;
+		luamp_decode(L, luaL_msgpack_default, &data);
+		assert(data == watch.data_end);
 	}
-	lua_rawgeti(L, LUA_REGISTRYINDEX, netbox_on_event_lua_ref);
-	void *args[] = {transport, &watch};
-	lua_pushlightuserdata(L, args);
-	if (luaT_call(L, 1, 0) != 0)
-		diag_log();
+	lua_call(L, watch.data != NULL ? 2 : 1, 0);
 }
 
 /**
@@ -2185,8 +2168,6 @@ luaopen_net_box(struct lua_State *L)
 
 	lua_pushcfunction(L, luaT_netbox_request_iterator_next);
 	luaT_netbox_request_iterator_next_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	lua_pushcfunction(L, netbox_on_event_lua);
-	netbox_on_event_lua_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
 	static const struct luaL_Reg netbox_transport_meta[] = {
 		{ "__gc",           luaT_netbox_transport_gc },

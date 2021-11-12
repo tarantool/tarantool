@@ -70,10 +70,13 @@ msgpack.cfg({decode_invalid_numbers = false})
 box.broadcast('foobad', math.huge)
 count = 0
 w = conn:watch('foobad', function() count = count + 1 end)
-test_run:wait_log('default', 'number must not be NaN or Inf', 1000)
+test_run:wait_cond(function() return conn.state == 'error' end)
+assert(string.match(conn.error, 'number must not be NaN or Inf'))
+conn:close()
 assert(count == 0)
 w:unregister()
 msgpack.cfg({decode_invalid_numbers = true})
+conn = net.connect(box.cfg.listen)
 
 -- Several watchers can be registered for the same key.
 count1 = 0
