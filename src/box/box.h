@@ -153,6 +153,13 @@ void
 box_update_ro_summary(void);
 
 /**
+ * Get the reason why the instance is read only if it is. Can't be called on a
+ * writable instance.
+ */
+const char *
+box_ro_reason(void);
+
+/**
  * Iterate over all spaces and save them to the
  * snapshot file.
  */

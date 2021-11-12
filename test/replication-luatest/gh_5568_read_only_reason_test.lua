@@ -53,6 +53,10 @@ local read_only_msg = "Can't modify data on a read-only instance - "
 -- Read-only because of box.cfg{read_only = true}.
 --
 g.test_read_only_reason_cfg = function(g)
+    t.assert_equals(g.master:exec(function()
+        return box.info.ro_reason
+    end), nil, "no ro reason");
+
     local ok, err = g.master:exec(function()
         box.cfg{read_only = true}
         local ok, err = pcall(box.schema.create_space, 'test')
@@ -61,6 +65,9 @@ g.test_read_only_reason_cfg = function(g)
     t.assert(not ok, 'fail ddl')
     t.assert_str_contains(err.message, read_only_msg..
                           'box.cfg.read_only is true')
+    t.assert_equals(g.master:exec(function()
+        return box.info.ro_reason
+    end), "config", "ro reason config");
     t.assert_covers(err, {
         reason = 'state',
         state = 'read_only',
@@ -93,6 +100,9 @@ g.test_read_only_reason_orphan = function(g)
     end, {fake_uri})
     t.assert(not ok, 'fail ddl')
     t.assert_str_contains(err.message, read_only_msg..'it is an orphan')
+    t.assert_equals(g.master:exec(function()
+        return box.info.ro_reason
+    end), "orphan", "ro reason orphan");
     t.assert_covers(err, {
         reason = 'state',
         state = 'orphan',
@@ -124,6 +134,9 @@ g.test_read_only_reason_election_no_leader = function(g)
     t.assert(err.term, 'has term')
     t.assert_str_contains(err.message, read_only_msg..('state is election '..
                           '%s with term %s'):format(err.state, err.term))
+    t.assert_equals(g.master:exec(function()
+        return box.info.ro_reason
+    end), "election", "ro reason election");
     t.assert_covers(err, {
         reason = 'election',
         state = 'follower',
@@ -158,6 +171,9 @@ g.test_read_only_reason_election_has_leader = function(g)
     t.assert_str_contains(err.message, read_only_msg..('state is election '..
                           '%s with term %s, leader is %s (%s)'):format(
                           err.state, err.term, err.leader_id, err.leader_uuid))
+    t.assert_equals(g.replica:exec(function()
+        return box.info.ro_reason
+    end), "election", "ro reason election");
     t.assert_covers(err, {
         reason = 'election',
         state = 'follower',
@@ -200,6 +216,9 @@ g.test_read_only_reason_synchro = function(g)
     t.assert_str_contains(err.message, read_only_msg..('synchro queue with '..
                           'term %s belongs to %s (%s)'):format(err.term,
                           err.queue_owner_id, err.queue_owner_uuid))
+    t.assert_equals(g.replica:exec(function()
+        return box.info.ro_reason
+    end), "synchro", "ro reason synchro");
     t.assert_covers(err, {
         reason = 'synchro',
         queue_owner_id = g.master:instance_id(),
@@ -258,6 +277,9 @@ g.test_read_only_reason_election_has_leader_no_uuid = function(g)
     t.assert_str_contains(err.message, read_only_msg..('state is election %s '..
                           'with term %s, leader is %s'):format(err.state,
                           err.term, err.leader_id))
+    t.assert_equals(g.replica:exec(function()
+        return box.info.ro_reason
+    end), "election", "ro reason election");
     t.assert_covers(err, {
         reason = 'election',
         state = 'follower',
@@ -295,6 +317,9 @@ g.test_read_only_reason_synchro_no_uuid = function(g)
     t.assert_str_contains(err.message, read_only_msg..('synchro queue with '..
                           'term %s belongs to %s'):format(err.term,
                           err.queue_owner_id))
+    t.assert_equals(g.replica:exec(function()
+        return box.info.ro_reason
+    end), "synchro", "ro reason synchro");
     t.assert_covers(err, {
         reason = 'synchro',
         queue_owner_id = leader_id,

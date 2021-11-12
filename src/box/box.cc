@@ -175,6 +175,20 @@ box_update_ro_summary(void)
 	fiber_cond_broadcast(&ro_cond);
 }
 
+const char *
+box_ro_reason(void)
+{
+	if (raft_is_ro(box_raft()))
+		return "election";
+	if (txn_limbo_is_ro(&txn_limbo))
+		return "synchro";
+	if (is_ro)
+		return "config";
+	if (is_orphan)
+		return "orphan";
+	return NULL;
+}
+
 static int
 box_check_writable(void)
 {
