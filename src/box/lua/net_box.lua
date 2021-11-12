@@ -228,23 +228,25 @@ local function create_transport(host, port, user, password, callback,
     local function start()
         if state ~= 'initial' then return not is_final_state[state] end
         fiber.create(function()
-            local ok, err
+            local ok, err, errno
             worker_fiber = fiber_self()
             fiber.name(string.format('%s:%s (net.box)', host, port), {truncate=true})
             goto do_connect
     ::handle_connection::
             ok, err = pcall(protocol_sm)
-            if not (ok or is_final_state[state]) then
-                set_state('error', E_UNKNOWN, err)
-            end
-            if sock then
-                sock:close()
-                sock = nil
-            end
-    ::do_reconnect::
-            if not reconnect_after or state ~= 'error_reconnect' then
+            assert(not ok)
+            sock:close()
+            if state == 'closed' then
                 goto stop
             end
+            errno = err.code or E_UNKNOWN
+            err = tostring(err)
+            if not reconnect_after then
+                set_state('error', errno, err)
+                goto stop
+            end
+            set_state('error_reconnect', errno, err)
+    ::do_reconnect::
             fiber.sleep(reconnect_after)
     ::do_connect::
             sock, greeting =
@@ -357,7 +359,7 @@ local function create_transport(host, port, user, password, callback,
     -- tail-recursive calls to each other. Yep, Lua optimizes
     -- such calls, and yep, this is the canonical way to implement
     -- a state machine in Lua.
-    local iproto_setup_sm, iproto_auth_sm, iproto_schema_sm, iproto_sm, error_sm
+    local iproto_setup_sm, iproto_auth_sm, iproto_schema_sm, iproto_sm
 
     --
     -- Protocol_sm is a core function of netbox. It calls all
@@ -373,22 +375,17 @@ local function create_transport(host, port, user, password, callback,
         if greeting.protocol == 'Binary' then
             return iproto_setup_sm()
         else
-            return error_sm(E_NO_CONNECTION,
-                            'Unsupported protocol: ' .. greeting.protocol)
+            box.error({
+                code = E_NO_CONNECTION,
+                reason = 'Unsupported protocol: ' .. greeting.protocol,
+            })
         end
     end
 
     iproto_setup_sm = function()
         local version, features = internal.iproto_id(greeting.version_id,
                                                      transport, sock:fd())
-        if not version then
-            local err = features
-            return error_sm(err.code, err.message)
-        end
-        local err, msg = callback('handshake', greeting, version, features)
-        if err then
-            return error_sm(err, msg)
-        end
+        callback('handshake', greeting, version, features)
         return iproto_auth_sm(greeting.salt)
     end
 
@@ -398,11 +395,7 @@ local function create_transport(host, port, user, password, callback,
             set_state('fetch_schema')
             return iproto_schema_sm()
         end
-        local err = internal.iproto_auth(user, password, salt, transport,
-                                         sock:fd())
-        if err then
-            return error_sm(err.code, err.message)
-        end
+        internal.iproto_auth(user, password, salt, transport, sock:fd())
         set_state('fetch_schema')
         return iproto_schema_sm()
     end
@@ -410,10 +403,6 @@ local function create_transport(host, port, user, password, callback,
     iproto_schema_sm = function()
         local schema_version, schema = internal.iproto_schema(
             greeting.version_id, transport, sock:fd())
-        if not schema_version then
-            local err = schema
-            return error_sm(err.code, err.message)
-        end
         callback('did_fetch_schema', schema_version, schema[VSPACE_ID],
                  schema[VINDEX_ID], schema[VCOLLATION_ID])
         set_state('active')
@@ -421,25 +410,11 @@ local function create_transport(host, port, user, password, callback,
     end
 
     iproto_sm = function(schema_version)
-        local err = internal.iproto_loop(schema_version, transport, sock:fd())
-        if err then
-            return error_sm(err.code, err.message)
-        end
+        internal.iproto_loop(schema_version, transport, sock:fd())
         -- schema_version has been changed - start to load a new version.
         -- Sic: self.schema_version will be updated only after reload.
         set_state('fetch_schema')
         return iproto_schema_sm()
-    end
-
-    error_sm = function(err, msg)
-        if sock then sock:close(); sock = nil end
-        if state ~= 'closed' then
-            if reconnect_after then
-                set_state('error_reconnect', err, msg)
-            else
-                set_state('error', err, msg)
-            end
-        end
     end
 
     return {
@@ -675,17 +650,22 @@ local function new_sm(host, port, opts)
             remote.peer_protocol_features = features
             if opts.required_protocol_version and
                opts.required_protocol_version > version then
-                return E_NO_CONNECTION,
-                       string.format('Protocol version (%d) < required (%d)',
-                                     version, opts.required_protocol_version)
+                box.error({
+                    code = E_NO_CONNECTION,
+                    reason = string.format(
+                        'Protocol version (%d) < required (%d)',
+                         version, opts.required_protocol_version),
+                })
             end
             if opts.required_protocol_features then
                 local ok, missing = iproto_features_check(
                     features, opts.required_protocol_features)
                 if not ok then
-                    return E_NO_CONNECTION,
-                           'Missing required protocol features: ' ..
-                           table.concat(missing, ', ')
+                    box.error({
+                        code = E_NO_CONNECTION,
+                        reason = 'Missing required protocol features: ' ..
+                                 table.concat(missing, ', '),
+                    })
                 end
             end
         elseif what == 'did_fetch_schema' then
