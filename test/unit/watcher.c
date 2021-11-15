@@ -4,6 +4,8 @@
 
 #include "box/watcher.h"
 #include "fiber.h"
+#include "lua/utils.h"
+#include "lualib.h"
 #include "memory.h"
 #include "tarantool_ev.h"
 #include "trivia/util.h"
@@ -519,6 +521,10 @@ main_f(va_list ap)
 int
 main()
 {
+	struct lua_State *L = luaL_newstate();
+	luaL_openlibs(L);
+	tarantool_L = L;
+
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	struct fiber *f = fiber_new("main", main_f);
@@ -526,5 +532,8 @@ main()
 	ev_run(loop(), 0);
 	fiber_free();
 	memory_free();
+
+	lua_close(L);
+	tarantool_L = NULL;
 	return test_result;
 }
