@@ -180,6 +180,20 @@ signal_cb(ev_loop *loop, struct ev_signal *w, int revents)
 	tarantool_exit(0);
 }
 
+/*
+ * Handle SIGINT like SIGTERM by default, but allow to overwrite the behavior.
+ * Used by console.
+ */
+static sigint_cb_t signal_sigint_cb = signal_cb;
+
+sigint_cb_t
+set_sigint_cb(sigint_cb_t new_sigint_cb)
+{
+	sigint_cb_t old_cb = signal_sigint_cb;
+	ev_set_cb(&ev_sigs[1], new_sigint_cb);
+	return old_cb;
+}
+
 static void
 signal_sigwinch_cb(ev_loop *loop, struct ev_signal *w, int revents)
 {
@@ -253,7 +267,7 @@ signal_init(void)
 	crash_signal_init();
 
 	ev_signal_init(&ev_sigs[0], sig_checkpoint, SIGUSR1);
-	ev_signal_init(&ev_sigs[1], signal_cb, SIGINT);
+	ev_signal_init(&ev_sigs[1], signal_sigint_cb, SIGINT);
 	ev_signal_init(&ev_sigs[2], signal_cb, SIGTERM);
 	ev_signal_init(&ev_sigs[3], signal_sigwinch_cb, SIGWINCH);
 	ev_signal_init(&ev_sigs[4], say_logrotate, SIGHUP);

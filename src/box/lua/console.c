@@ -41,6 +41,7 @@
 #include "iostream.h"
 #include "lua/msgpack.h"
 #include "lua-yaml/lyaml.h"
+#include "main.h"
 #include "serialize_lua.h"
 #include <lua.h>
 #include <lauxlib.h>
@@ -226,6 +227,27 @@ console_push_line(char *line)
 	free(line);
 }
 
+static bool sigint_called;
+/*
+ * The pointer to interactive fiber is needed to wake it up
+ * when SIGINT handler is called.
+ */
+static struct fiber *interactive_fb;
+
+/*
+ * The sigint callback for console mode.
+ */
+static void
+console_sigint_handler(ev_loop *loop, struct ev_signal *w, int revents)
+{
+	(void)loop;
+	(void)w;
+	(void)revents;
+
+	sigint_called = true;
+	fiber_wakeup(interactive_fb);
+}
+
 /* implements readline() Lua API */
 static int
 lbox_console_readline(struct lua_State *L)
@@ -233,6 +255,9 @@ lbox_console_readline(struct lua_State *L)
 	const char *prompt = NULL;
 	int top;
 	int completion = 0;
+	interactive_fb = fiber();
+	sigint_cb_t old_cb = set_sigint_cb(console_sigint_handler);
+	sigint_called = false;
 
 	if (lua_gettop(L) > 0) {
 		switch (lua_type(L, 1)) {
@@ -284,12 +309,35 @@ lbox_console_readline(struct lua_State *L)
 	while (top == lua_gettop(L)) {
 		while (coio_wait(STDIN_FILENO, COIO_READ,
 				 TIMEOUT_INFINITY) == 0) {
+			if (sigint_called) {
+				const char *line_end = "^C\n";
+				ssize_t rc = write(STDOUT_FILENO, line_end,
+						   strlen(line_end));
+				(void)rc;
+				/*
+				 * Discard current input and disable search
+				 * mode.
+				 */
+				RL_UNSETSTATE(RL_STATE_ISEARCH |
+					      RL_STATE_NSEARCH |
+					      RL_STATE_SEARCH);
+				rl_on_new_line();
+				rl_replace_line("", 0);
+				lua_pushstring(L, "");
+
+				readline_L = NULL;
+				sigint_called = false;
+				set_sigint_cb(old_cb);
+				return 1;
+			}
 			/*
 			 * Make sure the user of interactive
 			 * console has not hanged us, otherwise
 			 * we might spin here forever eating
 			 * the whole cpu time.
 			 */
+			if (fiber_is_cancelled())
+				set_sigint_cb(old_cb);
 			luaL_testcancel(L);
 		}
 		rl_callback_read_char();
@@ -299,6 +347,7 @@ lbox_console_readline(struct lua_State *L)
 	/* Incidents happen. */
 #pragma GCC poison readline_L
 	rl_attempted_completion_function = NULL;
+	set_sigint_cb(old_cb);
 	luaL_testcancel(L);
 	return 1;
 }

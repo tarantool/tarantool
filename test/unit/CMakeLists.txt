@@ -141,7 +141,7 @@ if (ENABLE_BUNDLED_MSGPUCK)
     target_link_libraries(msgpack.test ${MSGPUCK_LIBRARIES})
 endif ()
 
-add_executable(mp_print_unknown_ext.test mp_print_unknown_ext.c)
+add_executable(mp_print_unknown_ext.test mp_print_unknown_ext.c box_test_utils.c)
 target_link_libraries(mp_print_unknown_ext.test unit box core)
 
 add_executable(scramble.test scramble.c core_test_utils.c)
@@ -173,7 +173,7 @@ add_executable(histogram.test histogram.c core_test_utils.c)
 target_link_libraries(histogram.test stat unit)
 add_executable(ratelimit.test ratelimit.c)
 target_link_libraries(ratelimit.test unit)
-add_executable(luaT_tuple_new.test luaT_tuple_new.c)
+add_executable(luaT_tuple_new.test luaT_tuple_new.c box_test_utils.c)
 target_link_libraries(luaT_tuple_new.test unit box server core misc
     ${CURL_LIBRARIES} ${LIBYAML_LIBRARIES} ${READLINE_LIBRARIES}
     ${ICU_LIBRARIES} ${LUAJIT_LIBRARIES})
@@ -272,10 +272,10 @@ add_executable(swim_errinj.test swim_errinj.c swim_test_transport.c
                ${PROJECT_SOURCE_DIR}/src/version.c core_test_utils.c)
 target_link_libraries(swim_errinj.test unit fakesys swim)
 
-add_executable(merger.test merger.test.c)
+add_executable(merger.test merger.test.c box_test_utils.c)
 target_link_libraries(merger.test unit core box)
 
-add_executable(snap_quorum_delay.test snap_quorum_delay.cc)
+add_executable(snap_quorum_delay.test snap_quorum_delay.cc box_test_utils.c)
 target_link_libraries(snap_quorum_delay.test box core unit)
 
 add_executable(raft.test raft.c raft_test_utils.c core_test_utils.c)
@@ -288,7 +288,7 @@ add_executable(popen-child popen-child.c)
 add_executable(popen.test popen.c core_test_utils.c)
 target_link_libraries(popen.test misc unit core)
 
-add_executable(serializer.test serializer.c)
+add_executable(serializer.test serializer.c box_test_utils.c)
 target_link_libraries(serializer.test unit box ${LUAJIT_LIBRARIES})
 
 add_executable(watcher.test watcher.c)
