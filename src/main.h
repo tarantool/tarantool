@@ -45,6 +45,21 @@ tarantool_exit(int);
 void
 load_cfg(void);
 
+/* The type of sigint callback's pointer. */
+struct ev_loop;
+struct ev_signal;
+typedef void
+(*sigint_cb_t)(struct ev_loop *loop, struct ev_signal *w, int revents);
+
+/*
+ * This function is needed for setting the new sigint callback.
+ * Returns the pointer to the old callback function.
+ * The main scenario is to replace the current callback
+ * and having an opportunity to set the old one back.
+ */
+sigint_cb_t
+set_sigint_cb(sigint_cb_t new_sigint_cb);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
