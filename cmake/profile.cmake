@@ -76,7 +76,7 @@ if (ENABLE_ASAN)
             "\n")
     endif()
 
-    set(CMAKE_REQUIRED_FLAGS "-fsanitize=address -fsanitize-blacklist=${CMAKE_SOURCE_DIR}/asan/asan.supp")
+    set(CMAKE_REQUIRED_FLAGS "-fsanitize=address -fsanitize-blacklist=${PROJECT_SOURCE_DIR}/asan/asan.supp")
     check_c_source_compiles("int main(void) {
         #include <sanitizer/asan_interface.h>
         void *x;
@@ -99,5 +99,5 @@ if (ENABLE_ASAN)
         message(FATAL_ERROR "Cannot enable AddressSanitizer")
     endif()
 
-    add_compile_flags("C;CXX" -fsanitize=address -fsanitize-blacklist=${CMAKE_SOURCE_DIR}/asan/asan.supp)
+    add_compile_flags("C;CXX" -fsanitize=address -fsanitize-blacklist=${PROJECT_SOURCE_DIR}/asan/asan.supp)
 endif()

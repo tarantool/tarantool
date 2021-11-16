@@ -40,7 +40,7 @@ endmacro(set_source_files_compile_flags)
 # A helper function to compile *.lua source into *.lua.c sources
 function(lua_source varname filename)
     if (IS_ABSOLUTE "${filename}")
-        string (REPLACE "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}"
+            string (REPLACE "${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}"
             genname "${filename}")
         set (srcfile "${filename}")
         set (tmpfile "${genname}.new.c")
@@ -60,7 +60,7 @@ function(lua_source varname filename)
 
     ADD_CUSTOM_COMMAND(OUTPUT ${dstfile}
         COMMAND ${ECHO} 'const char ${module}_lua[] =' > ${tmpfile}
-        COMMAND ${CMAKE_BINARY_DIR}/extra/txt2c ${srcfile} >> ${tmpfile}
+        COMMAND ${PROJECT_BINARY_DIR}/extra/txt2c ${srcfile} >> ${tmpfile}
         COMMAND ${ECHO} '\;' >> ${tmpfile}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${tmpfile} ${dstfile}
         COMMAND ${CMAKE_COMMAND} -E remove ${tmpfile}
@@ -80,7 +80,7 @@ function(bin_source varname srcfile dstfile)
 
     ADD_CUSTOM_COMMAND(OUTPUT ${dstfile}
         COMMAND ${ECHO} 'const unsigned char ${module}_bin[] = {' > ${tmpfile}
-        COMMAND ${CMAKE_BINARY_DIR}/extra/bin2c "${srcfile}" >> ${tmpfile}
+        COMMAND ${PROJECT_BINARY_DIR}/extra/bin2c "${srcfile}" >> ${tmpfile}
         COMMAND ${ECHO} '}\;' >> ${tmpfile}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${tmpfile} ${dstfile}
         COMMAND ${CMAKE_COMMAND} -E remove ${tmpfile}
