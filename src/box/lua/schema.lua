@@ -388,6 +388,68 @@ end
 -- box.commit yields, so it's defined as Lua/C binding
 -- box.rollback and box.rollback_to_savepoint yields as well
 
+-- Check and normalize constraint definition.
+-- Given constraint @a constr is expected to be either a func name or
+--  a table with function names and/or consraint name:function name pairs.
+-- In case of error box.error.ILLEGAL_PARAMS is raised, and @a error_prefix
+--  is added before string message.
+local function normalize_constraint(constr, error_prefix)
+    if type(constr) == 'string' then
+        -- Short form of field constraint - just name of func,
+        -- e.g.: {...constraint = "func_name"}
+        local found = box.space._func.index.name:get(constr)
+        if not found then
+            box.error(box.error.ILLEGAL_PARAMS,
+                      error_prefix .. "constraint function " ..
+                      "was not found by name '" .. constr .. "'")
+        end
+        -- normalize form of constraint.
+        return {[constr] = found.id}
+    elseif type(constr) == 'table' then
+        -- Long form of field constraint - a table with:
+        -- 1) func names 2) constraint name -> func name pairs.
+        -- e.g.: {..., constraint = {func1, name2 = func2, ...}}
+        local result = {}
+        for constr_key, constr_func in pairs(constr) do
+            if type(constr_func) ~= 'string' then
+                box.error(box.error.ILLEGAL_PARAMS,
+                          error_prefix .. "constraint function " ..
+                          "is expected to be a string, " ..
+                          "but got " .. type(constr_func))
+            end
+            local found = box.space._func.index.name:get(constr_func)
+            if not found then
+                box.error(box.error.ILLEGAL_PARAMS,
+                          error_prefix .. "constraint function " ..
+                          "was not found by name '" .. constr_func .. "'")
+            end
+            local constr_name = nil
+            if type(constr_key) == 'number' then
+                -- 1) func name only.
+                constr_name = constr_func
+            elseif type(constr_key) == 'string' then
+                -- 2) constraint name + func name pair.
+                constr_name = constr_key
+            else
+                -- what are you?
+                box.error(box.error.ILLEGAL_PARAMS,
+                          error_prefix .. "constraint name " ..
+                          "is expected to be a string, " ..
+                          "but got " .. type(constr_key))
+            end
+            -- normalize form of constraint pair.
+            result[constr_name] = found.id
+        end
+        -- return normalized form of constraints.
+        return result
+    elseif constr then
+        -- unrecognized form of constraint.
+        box.error(box.error.ILLEGAL_PARAMS,
+                  error_prefix .. "constraint must be string or table")
+    end
+    return nil
+end
+
 local function update_format(format)
     local result = {}
     for i, given in ipairs(format) do
@@ -416,6 +478,8 @@ local function update_format(format)
                             "was not found by name '" .. v .. "'")
                     end
                     field[k] = coll.id
+                elseif k == 'constraint' then
+                    field[k] = normalize_constraint(v, "format[" .. i .. "]: ")
                 else
                     field[k] = v
                 end

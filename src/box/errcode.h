@@ -286,6 +286,8 @@ struct errcode_record {
 	/*231 */_(ER_TRANSACTION_TIMEOUT,       "Transaction has been aborted by timeout") \
 	/*232 */_(ER_ACTIVE_TIMER,              "Operation is not permitted if timer is already running") \
 	/*233 */_(ER_TUPLE_FIELD_COUNT_LIMIT,	"Tuple field count limit reached: see box.schema.FIELD_MAX") \
+	/*234 */_(ER_CREATE_CONSTRAINT,		"Failed to create constraint '%s' in space '%s': %s") \
+	/*235 */_(ER_FIELD_CONSTRAINT_FAILED,	"Check constraint '%s' failed for field '%s'") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

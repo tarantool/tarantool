@@ -28,11 +28,12 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "tuple_format.h"
 #include "bit/bit.h"
 #include "fiber.h"
 #include "json/json.h"
-#include "tuple_format.h"
 #include "coll_id_cache.h"
+#include "tuple_constraint.h"
 #include "tt_static.h"
 
 #include <PMurHash.h>
@@ -97,6 +98,12 @@ tuple_format_cmp(const struct tuple_format *format1,
 		if (field_a->is_key_part != field_b->is_key_part)
 			return (int)field_a->is_key_part -
 				(int)field_b->is_key_part;
+		/*
+		 * Format comparison is used for non-space formats only,
+		 * so there must be no constraints in both formats.
+		 */
+		assert(field_a->constraint_count == 0);
+		assert(field_b->constraint_count == 0);
 	}
 
 	return tuple_dictionary_cmp(format1->dict, format2->dict);
@@ -120,6 +127,11 @@ tuple_format_hash(struct tuple_format *format)
 		TUPLE_FIELD_MEMBER_HASH(f, coll_id, h, carry, size)
 		TUPLE_FIELD_MEMBER_HASH(f, nullable_action, h, carry, size)
 		TUPLE_FIELD_MEMBER_HASH(f, is_key_part, h, carry, size)
+		/*
+		 * We could calculate hash sum of constraints, but on the other
+		 * hand the hash is used only for non-space formats which are
+		 * never has constraints.
+		 */
 	}
 #undef TUPLE_FIELD_MEMBER_HASH
 	size += tuple_dictionary_hash_process(format->dict, &h, &carry);
@@ -155,6 +167,8 @@ tuple_field_new(void)
 	field->coll_id = COLL_NONE;
 	field->nullable_action = ON_CONFLICT_ACTION_NONE;
 	field->multikey_required_fields = NULL;
+	field->constraint_count = 0;
+	field->constraint = NULL;
 	return field;
 }
 
@@ -162,11 +176,14 @@ static void
 tuple_field_delete(struct tuple_field *field)
 {
 	free(field->multikey_required_fields);
+	for (uint32_t i = 0; i < field->constraint_count; i++)
+		field->constraint[i].destroy(&field->constraint[i]);
+	free(field->constraint);
 	free(field);
 }
 
 /** Return path to a tuple field. Used for error reporting. */
-static const char *
+const char *
 tuple_field_path(const struct tuple_field *field,
 		 const struct tuple_format *format)
 {
@@ -465,6 +482,11 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 		field->compression_type = fields[i].compression_type;
 		if (field->compression_type != COMPRESSION_TYPE_NONE)
 			format->is_compressed = true;
+
+		field->constraint =
+			tuple_constraint_array_new(fields[i].constraint_def,
+						   fields[i].constraint_count);
+		field->constraint_count = fields[i].constraint_count;
 	}
 
 	int current_slot = 0;
@@ -794,6 +816,38 @@ err:
 	return NULL;
 }
 
+/**
+ * Check that @a constr1_count constraints @a constr1 are tolerant to any
+ * tuple that satisfy @a constr2_count constraints @a constr2.
+ */
+static bool
+tuple_constraints1_can_store_constraints2_tuples(
+	const struct tuple_constraint *constr1, uint32_t constr1_count,
+	const struct tuple_constraint *constr2, uint32_t constr2_count)
+{
+	/*
+	 * Don't allow adding more constraints.
+	 * Don't look at constraint names, allowing a user to rename
+	 * constraints without rebuilding.
+	 */
+	for (uint32_t i = 0; i < constr1_count; i++) {
+		const struct tuple_constraint *c1 = &constr1[i];
+		/* Look for c1 in the second array of constraints. */
+		bool found = false;
+		for (uint32_t j = 0; j < constr2_count; j++) {
+			const struct tuple_constraint *c2 = &constr2[j];
+			if (tuple_constraint_cmp(c1, c2, true) != 0)
+				continue;
+			found = true;
+			break;
+		}
+		/* If not found than constr1 is wider than constr2. */
+		if (!found)
+			return false;
+	}
+	return true;
+}
+
 bool
 tuple_format_is_compatible_with_key_def(struct tuple_format *format,
 					struct key_def *key_def)
@@ -852,6 +906,12 @@ tuple_format1_can_store_format2_tuples(struct tuple_format *format1,
 		if (tuple_field_is_nullable(field2) &&
 		    !tuple_field_is_nullable(field1))
 			return false;
+
+		/* Check constraints compatibility. */
+		if (!tuple_constraints1_can_store_constraints2_tuples(
+			field1->constraint, field1->constraint_count,
+			field2->constraint, field2->constraint_count))
+			return false;
 	}
 	return true;
 }
@@ -860,6 +920,23 @@ static int
 tuple_format_required_fields_validate(struct tuple_format *format,
 				      void *required_fields,
 				      uint32_t required_fields_sz);
+
+/**
+ * Check constraints of one particular @a field.
+ */
+static int
+tuple_field_check_constraint(const struct tuple_field *field,
+			     const char *mp_data, const char *mp_data_end)
+{
+	if (tuple_field_is_nullable(field) && mp_typeof(*mp_data) == MP_NIL)
+		return 0;
+	for (uint32_t i = 0; i < field->constraint_count; i++) {
+		struct tuple_constraint *c = &field->constraint[i];
+		if (c->check(c, mp_data, mp_data_end, field) != 0)
+			return -1;
+	}
+	return 0;
+}
 
 static int
 tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
@@ -894,7 +971,10 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 
 	struct tuple_field *field;
 	struct json_token **token = format->fields.root.children;
-	for (uint32_t i = 0; i < defined_field_count; i++, token++, mp_next(&pos)) {
+	const char *next_pos = pos;
+	for (uint32_t i = 0; i < defined_field_count;
+	     i++, token++, pos = next_pos) {
+		mp_next(&next_pos);
 		field = json_tree_entry(*token, struct tuple_field, token);
 		if (validate) {
 			bool nullable = tuple_field_is_nullable(field);
@@ -906,6 +986,9 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 					 mp_type_strs[mp_typeof(*pos)]);
 				return -1;
 			}
+			if (tuple_field_check_constraint(field, pos,
+							 next_pos) != 0)
+				return -1;
 			bit_clear(required_fields, field->id);
 		}
 		if (field->offset_slot != TUPLE_OFFSET_SLOT_NIL &&
@@ -1251,6 +1334,9 @@ tuple_format_iterator_next(struct tuple_format_iterator *it,
 			 mp_type_strs[mp_typeof(*entry->data)]);
 		return -1;
 	}
+	if (tuple_field_check_constraint(field, entry->data,
+					 entry->data_end) != 0)
+		return -1;
 	bit_clear(it->multikey_frame != NULL ?
 		  it->multikey_required_fields : it->required_fields, field->id);
 	return 0;

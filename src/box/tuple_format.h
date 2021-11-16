@@ -86,6 +86,8 @@ struct tuple_format_vtab {
 	             const char *end);
 };
 
+struct tuple_constraint;
+
 /** Tuple field meta information for tuple_format. */
 struct tuple_field {
 	/** Unique field identifier. */
@@ -132,6 +134,14 @@ struct tuple_field {
 	void *multikey_required_fields;
 	/** Link in tuple_format::fields. */
 	struct json_token token;
+	/**
+	 * Array of constraints. Can be NULL if constraints_count == 0.
+	 * Strings of constraints are allocated in the same memory block
+	 * right after the array.
+	 */
+	struct tuple_constraint *constraint;
+	/** Number of constraints. */
+	uint32_t constraint_count;
 };
 
 /**
@@ -141,10 +151,17 @@ struct tuple_field {
  * @retval boolean nullability attribute
  */
 static inline bool
-tuple_field_is_nullable(struct tuple_field *tuple_field)
+tuple_field_is_nullable(const struct tuple_field *tuple_field)
 {
 	return tuple_field->nullable_action == ON_CONFLICT_ACTION_NONE;
 }
+
+/**
+ * Return path to a tuple field. Used for error reporting.
+ */
+const char *
+tuple_field_path(const struct tuple_field *field,
+		 const struct tuple_format *format);
 
 /**
  * @brief Tuple format

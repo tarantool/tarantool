@@ -35,6 +35,7 @@
 #include "sql.h"
 #include "msgpuck.h"
 #include "tt_static.h"
+#include "tuple_constraint_def.h"
 
 const struct space_opts space_opts_default = {
 	/* .group_id = */ 0,
@@ -146,6 +147,12 @@ space_def_dup(const struct space_def *src)
 				expr_pos += sql_expr_sizeof(e, 0);
 				ret->fields[i].default_value_expr = e;
 			}
+			ret->fields[i].constraint_count =
+				src->fields[i].constraint_count;
+			ret->fields[i].constraint_def =
+				tuple_constraint_def_array_dup(
+					src->fields[i].constraint_def,
+					src->fields[i].constraint_count);
 		}
 	}
 	tuple_dictionary_ref(ret->dict);
@@ -228,6 +235,11 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 				expr_pos += sql_expr_sizeof(e, 0);
 				def->fields[i].default_value_expr = e;
 			}
+
+			def->fields[i].constraint_def =
+				tuple_constraint_def_array_dup(
+					fields[i].constraint_def,
+					fields[i].constraint_count);
 		}
 	}
 	if (space_def_dup_opts(def, opts) != 0) {
@@ -266,6 +278,9 @@ space_def_destroy_fields(struct field_def *fields, uint32_t field_count,
 			sql_expr_delete(sql_get(), fields[i].default_value_expr,
 					extern_alloc);
 		}
+		if (extern_alloc)
+			free(fields[i].constraint_def);
+		TRASH(&fields[i]);
 	}
 }
 

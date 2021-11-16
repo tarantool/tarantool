@@ -132,7 +132,7 @@ struct space_def {
 };
 
 /*
- * Free a default value syntax trees of @a defs.
+ * Free a default value syntax trees and other private data of @a defs.
  * @param fields Fields array to destroy.
  * @param field_count Length of @a fields.
  * @param extern_alloc Fields expression AST allocated externally.
