@@ -3041,31 +3041,33 @@ mem_to_mpstream(const struct Mem *var, struct mpstream *stream)
 }
 
 char *
-sql_vdbe_mem_encode_tuple(struct Mem *fields, uint32_t field_count,
-			  uint32_t *tuple_size, struct region *region)
+mem_encode_array(const struct Mem *mems, uint32_t count, uint32_t *size,
+		 struct region *region)
 {
 	size_t used = region_used(region);
 	bool is_error = false;
 	struct mpstream stream;
 	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
 		      set_encode_error, &is_error);
-	mpstream_encode_array(&stream, field_count);
-	for (struct Mem *field = fields; field < fields + field_count; field++)
-		mem_to_mpstream(field, &stream);
+	mpstream_encode_array(&stream, count);
+	for (const struct Mem *mem = mems; mem < mems + count; mem++)
+		mem_to_mpstream(mem, &stream);
 	mpstream_flush(&stream);
 	if (is_error) {
+		region_truncate(region, used);
 		diag_set(OutOfMemory, stream.pos - stream.buf,
 			 "mpstream_flush", "stream");
 		return NULL;
 	}
-	*tuple_size = region_used(region) - used;
-	char *tuple = region_join(region, *tuple_size);
-	if (tuple == NULL) {
-		diag_set(OutOfMemory, *tuple_size, "region_join", "tuple");
+	*size = region_used(region) - used;
+	char *array = region_join(region, *size);
+	if (array == NULL) {
+		region_truncate(region, used);
+		diag_set(OutOfMemory, *size, "region_join", "array");
 		return NULL;
 	}
-	mp_tuple_assert(tuple, tuple + *tuple_size);
-	return tuple;
+	mp_tuple_assert(array, array + *size);
+	return array;
 }
 
 /**

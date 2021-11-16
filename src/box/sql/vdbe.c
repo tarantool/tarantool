@@ -2036,8 +2036,7 @@ case OP_MakeRecord: {
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
 	uint32_t tuple_size;
-	char *tuple =
-		sql_vdbe_mem_encode_tuple(pData0, nField, &tuple_size, region);
+	char *tuple = mem_encode_array(pData0, nField, &tuple_size, region);
 	if (tuple == NULL)
 		goto abort_due_to_error;
 	if ((int64_t)tuple_size > db->aLimit[SQL_LIMIT_LENGTH])

@@ -862,15 +862,15 @@ void
 mem_to_mpstream(const struct Mem *var, struct mpstream *stream);
 
 /**
- * Perform encoding field_count Vdbe memory fields on region as
- * msgpack array.
- * @param fields The first Vdbe memory field to encode.
- * @param field_count Count of fields to encode.
- * @param[out] tuple_size Size of encoded tuple.
+ * Encode array of MEMs as msgpack array on region.
+ *
+ * @param mems array of MEMs to encode.
+ * @param count number of elements in the array.
+ * @param[out] size Size of encoded msgpack array.
  * @param region Region to use.
  * @retval NULL on error, diag message is set.
- * @retval Pointer to valid tuple on success.
+ * @retval Pointer to valid msgpack array on success.
  */
 char *
-sql_vdbe_mem_encode_tuple(struct Mem *fields, uint32_t field_count,
-			  uint32_t *tuple_size, struct region *region);
+mem_encode_array(const struct Mem *mems, uint32_t count, uint32_t *size,
+		 struct region *region);

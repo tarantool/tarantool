@@ -211,7 +211,7 @@ sql_cursor_seek(struct BtCursor *cur, struct Mem *mems, uint32_t len, int *res)
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
 	uint32_t size;
-	const char *tuple = sql_vdbe_mem_encode_tuple(mems, len, &size, region);
+	const char *tuple = mem_encode_array(mems, len, &size, region);
 	if (tuple == NULL)
 		return -1;
 	if (key_alloc(cur, size) != 0)

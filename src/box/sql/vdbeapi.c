@@ -212,8 +212,8 @@ sql_stmt_result_to_msgpack(struct sql_stmt *stmt, uint32_t *tuple_size,
 			   struct region *region)
 {
 	struct Vdbe *vdbe = (struct Vdbe *)stmt;
-	return sql_vdbe_mem_encode_tuple(vdbe->pResultSet, vdbe->nResColumn,
-					 tuple_size, region);
+	return mem_encode_array(vdbe->pResultSet, vdbe->nResColumn, tuple_size,
+				region);
 }
 
 /*
