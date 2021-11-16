@@ -239,12 +239,9 @@ body = msgpack.encode({nil});
 size = msgpack.encode(header:len() + body:len());
 ---
 ...
-conn._transport.perform_request(nil, nil, false, net_box._method.inject,
-                                nil, nil, nil, nil,
-                                size .. header .. body);
+conn:_request(net_box._method.inject, nil, nil, nil, size .. header .. body);
 ---
-- null
-- Unable to process AUTH request in stream
+- error: Unable to process AUTH request in stream
 ...
 test_run:cmd("setopt delimiter ''");
 ---
