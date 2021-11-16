@@ -38,6 +38,12 @@ box.cfg({ txn_timeout = txn_timeout })
 box.schema.user.grant("guest", "super")
 ---
 ...
+fiber = require('fiber')
+---
+...
+function sleep_with_timeout(timeout) fiber.sleep(timeout) end
+---
+...
 test_run:switch("default")
 ---
 - true
@@ -93,7 +99,7 @@ space:select({}) -- [1]
 ---
 - - [1]
 ...
-fiber.sleep(txn_timeout + 0.1)
+_ = test_run:eval("test", string.format("sleep_with_timeout(%f)", txn_timeout + 0.1))
 ---
 ...
 space:select({}) -- []
@@ -128,7 +134,7 @@ space:select({}) -- [1]
 ---
 - - [1]
 ...
-fiber.sleep(txn_timeout + 0.1)
+_= test_run:eval("test", string.format("sleep_with_timeout(%f)", txn_timeout + 0.1))
 ---
 ...
 space:select({}) -- []
