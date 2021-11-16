@@ -12,6 +12,8 @@ _ = s:create_index("pk")
 txn_timeout = 0.5
 box.cfg({ txn_timeout = txn_timeout })
 box.schema.user.grant("guest", "super")
+fiber = require('fiber')
+function sleep_with_timeout(timeout) fiber.sleep(timeout) end
 test_run:switch("default")
 
 -- Checks for remote transactions
@@ -35,7 +37,7 @@ stream:begin({timeout = "5"})
 stream:begin()
 space:replace({1})
 space:select({}) -- [1]
-fiber.sleep(txn_timeout + 0.1)
+_ = test_run:eval("test", string.format("sleep_with_timeout(%f)", txn_timeout + 0.1))
 space:select({}) -- []
 space:replace({2})
 fiber.yield()
@@ -47,7 +49,7 @@ stream:commit() -- transaction was aborted by timeout
 stream:begin({timeout = txn_timeout})
 space:replace({1})
 space:select({}) -- [1]
-fiber.sleep(txn_timeout + 0.1)
+_= test_run:eval("test", string.format("sleep_with_timeout(%f)", txn_timeout + 0.1))
 space:select({}) -- []
 space:replace({2})
 fiber.yield()
