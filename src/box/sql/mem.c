@@ -2999,7 +2999,7 @@ mem_from_mp(struct Mem *mem, const char *buf, uint32_t *len)
 }
 
 void
-mpstream_encode_vdbe_mem(struct mpstream *stream, struct Mem *var)
+mem_to_mpstream(const struct Mem *var, struct mpstream *stream)
 {
 	assert(memIsValid(var));
 	switch (var->type) {
@@ -3051,7 +3051,7 @@ sql_vdbe_mem_encode_tuple(struct Mem *fields, uint32_t field_count,
 		      set_encode_error, &is_error);
 	mpstream_encode_array(&stream, field_count);
 	for (struct Mem *field = fields; field < fields + field_count; field++)
-		mpstream_encode_vdbe_mem(&stream, field);
+		mem_to_mpstream(field, &stream);
 	mpstream_flush(&stream);
 	if (is_error) {
 		diag_set(OutOfMemory, stream.pos - stream.buf,
@@ -3148,7 +3148,7 @@ port_vdbemem_get_msgpack(struct port *base, uint32_t *size)
 		      set_encode_error, &is_error);
 	mpstream_encode_array(&stream, port->mem_count);
 	for (uint32_t i = 0; i < port->mem_count && !is_error; i++)
-		mpstream_encode_vdbe_mem(&stream, (struct Mem *)port->mem + i);
+		mem_to_mpstream((struct Mem *)port->mem + i, &stream);
 	mpstream_flush(&stream);
 	*size = region_used(region) - region_svp;
 	if (is_error)

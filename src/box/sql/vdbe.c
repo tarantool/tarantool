@@ -3497,7 +3497,7 @@ case OP_Update: {
 		mpstream_encode_array(&stream, 3);
 		mpstream_encode_strn(&stream, "=", 1);
 		mpstream_encode_uint(&stream, field_idx);
-		mpstream_encode_vdbe_mem(&stream, new_tuple + field_idx);
+		mem_to_mpstream(new_tuple + field_idx, &stream);
 	}
 	mpstream_flush(&stream);
 	if (is_error) {

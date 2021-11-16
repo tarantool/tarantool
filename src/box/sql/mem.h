@@ -853,12 +853,13 @@ int
 mem_from_mp(struct Mem *mem, const char *buf, uint32_t *len);
 
 /**
- * Perform encoding memory variable to stream.
+ * Perform encoding of MEM to stream.
+ *
+ * @param var MEM to encode to stream.
  * @param stream Initialized mpstream encoder object.
- * @param var Vdbe memory variable to encode with stream.
  */
 void
-mpstream_encode_vdbe_mem(struct mpstream *stream, struct Mem *var);
+mem_to_mpstream(const struct Mem *var, struct mpstream *stream);
 
 /**
  * Perform encoding field_count Vdbe memory fields on region as
