@@ -2,6 +2,7 @@
 
 local ffi = require('ffi')
 local buffer = require('buffer')
+local uri = require('uri')
 
 ffi.cdef[[
 struct uri_param {
@@ -36,14 +37,8 @@ struct uri_set {
     struct uri *uris;
 };
 
-int
-uri_create(struct uri *uri, const char *str);
-
 void
 uri_destroy(struct uri *uri);
-
-int
-uri_set_create(struct uri_set *uri_set, const char *str);
 
 void
 uri_set_destroy(struct uri_set *uri_set);
@@ -93,12 +88,13 @@ end
 
 local function parse(str)
     if str == nil then
-        error("Usage: uri.parse(string)")
+        error("Usage: uri.parse(string|table)")
     end
     local uribuf = uri_stash_take()
-    if builtin.uri_create(uribuf, str) ~= 0 then
+    local status, errmsg = pcall(uri.internal.uri_create, uribuf, str)
+    if not status then
         uri_stash_put(uribuf)
-        return nil
+        return nil, errmsg
     end
     local result = parse_uribuf(uribuf)
     builtin.uri_destroy(uribuf)
@@ -108,12 +104,13 @@ end
 
 local function parse_many(str)
     if str == nil then
-        error("Usage: uri.parse_many(string)")
+        error("Usage: uri.parse_many(string|table)")
     end
     local uri_set_buf = uri_set_stash_take()
-    if builtin.uri_set_create(uri_set_buf, str) ~= 0 then
+    local status, errmsg = pcall(uri.internal.uri_set_create, uri_set_buf, str)
+    if not status then
         uri_set_stash_put(uri_set_buf)
-        return nil
+        return nil, errmsg
     end
     local result = {}
     for i = 0, uri_set_buf.uri_count - 1 do
@@ -122,6 +119,25 @@ local function parse_many(str)
     builtin.uri_set_destroy(uri_set_buf)
     uri_set_stash_put(uri_set_buf)
     return result
+end
+
+local function fill_uribuf_params(uribuf, uri)
+    uribuf.param_count = 0
+    for _, _ in pairs(uri.params) do
+        uribuf.param_count = uribuf.param_count + 1
+    end
+    uribuf.params = ffi.new("struct uri_param[?]", uribuf.param_count)
+    local i = 0
+    for param_name, param in pairs(uri.params) do
+        uribuf.params[i].value_count = #param
+        uribuf.params[i].name = param_name
+        uribuf.params[i].values =
+            ffi.new("const char *[?]", uribuf.params[i].value_count)
+        for j = 1, uribuf.params[i].value_count do
+            uribuf.params[i].values[j - 1] = param[j]
+        end
+        i = i + 1
+    end
 end
 
 local function format(uri, write_password)
@@ -134,6 +150,7 @@ local function format(uri, write_password)
     uribuf.path = uri.path
     uribuf.query = uri.query
     uribuf.fragment = uri.fragment
+    fill_uribuf_params(uribuf, uri)
     local ibuf = cord_ibuf_take()
     local str = ibuf:alloc(1024)
     local len = builtin.uri_format(str, 1024, uribuf, write_password and 1 or 0)

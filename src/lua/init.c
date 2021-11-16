@@ -62,6 +62,7 @@
 #include "lua/utf8.h"
 #include "lua/swim.h"
 #include "lua/decimal.h"
+#include "lua/uri.h"
 #include "digest.h"
 #include "errinj.h"
 #include <small/ibuf.h>
@@ -669,6 +670,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	lua_call(L, 0, 0);
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
+	tarantool_lua_uri_init(L);
 	tarantool_lua_utf8_init(L);
 	tarantool_lua_utils_init(L);
 	tarantool_lua_fiber_init(L);

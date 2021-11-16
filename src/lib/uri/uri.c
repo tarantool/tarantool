@@ -66,11 +66,20 @@ uri_param_create(struct uri_param *param, const char *name)
 	param->value_count = 0;
 }
 
-/**
- * Appends @a value to @a uri parameter with given @a name,
- * creating one if it doesn't exist.
- */
-static void
+void
+uri_remove_param(struct uri *uri, const char *name)
+{
+	struct uri_param *param = uri_find_param(uri, name);
+	if (param == NULL)
+		return;
+	int idx = param - uri->params;
+	uri_param_destroy(param);
+	for (int i = idx; i < uri->param_count - 1; i++)
+		uri->params[i] = uri->params[i + 1];
+	uri->param_count--;
+}
+
+void
 uri_add_param(struct uri *uri, const char *name, const char *value)
 {
 	struct uri_param *param = uri_find_param(uri, name);
@@ -170,6 +179,38 @@ uri_create(struct uri *uri, const char *str)
 	return 0;
 }
 
+static int
+uri_format_param(char *str, int len, const struct uri_param *param)
+{
+	int total = 0;
+	if (param->value_count == 0) {
+		SNPRINT(total, snprintf, str, len, "%s", param->name);
+		return total;
+	}
+	for (int i = 0; i < param->value_count; i++) {
+		SNPRINT(total, snprintf, str, len, "%s=%s",
+			param->name, param->values[i]);
+		if (i != param->value_count - 1)
+			SNPRINT(total, snprintf, str, len, "&");
+	}
+	return total;
+}
+
+static int
+uri_format_params(char *str, int len, const struct uri *uri)
+{
+	if (uri->param_count == 0)
+		return 0;
+	int total = 0;
+	SNPRINT(total, snprintf, str, len, "?");
+	for (int i = 0; i < uri->param_count; i++) {
+		SNPRINT(total, uri_format_param, str, len, &uri->params[i]);
+		if (i != uri->param_count - 1)
+			SNPRINT(total, snprintf, str, len, "&");
+	}
+	return total;
+}
+
 int
 uri_format(char *str, int len, const struct uri *uri, bool write_password)
 {
@@ -193,8 +234,8 @@ uri_format(char *str, int len, const struct uri *uri, bool write_password)
 	if (uri->path != NULL) {
 		SNPRINT(total, snprintf, str, len, "%s", uri->path);
 	}
-	if (uri->query != NULL) {
-		SNPRINT(total, snprintf, str, len, "?%s", uri->query);
+	if (uri->params != NULL) {
+		SNPRINT(total, uri_format_params, str, len, uri);
 	}
 	if (uri->fragment != NULL) {
 		SNPRINT(total, snprintf, str, len, "#%s", uri->fragment);
