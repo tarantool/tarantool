@@ -29,7 +29,14 @@
  * SUCH DAMAGE.
  */
 #include "net_box.h"
+
+#include <assert.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 
 #include <small/ibuf.h>
 #include <msgpuck.h> /* mp_store_u32() */
@@ -49,7 +56,9 @@
 
 #include "assoc.h"
 #include "coio.h"
+#include "fiber.h"
 #include "fiber_cond.h"
+#include "iostream.h"
 #include "box/errcode.h"
 #include "lua/fiber.h"
 #include "lua/fiber_cond.h"
@@ -60,6 +69,10 @@
 #define cfg luaL_msgpack_default
 
 enum {
+	/**
+	 * connect() timeout used by default, in seconds.
+	 */
+	NETBOX_DEFAULT_CONNECT_TIMEOUT = 10,
 	/**
 	 * Send and receive buffers readahead.
 	 */
@@ -100,19 +113,126 @@ enum netbox_method {
 	netbox_method_MAX
 };
 
+enum netbox_state {
+	NETBOX_INITIAL           = 0,
+	NETBOX_AUTH              = 1,
+	NETBOX_FETCH_SCHEMA      = 2,
+	NETBOX_ACTIVE            = 3,
+	NETBOX_ERROR             = 4,
+	NETBOX_ERROR_RECONNECT   = 5,
+	NETBOX_CLOSED            = 6,
+	netbox_state_MAX,
+};
+
+static const char *netbox_state_str[] = {
+	[NETBOX_INITIAL]         = "initial",
+	[NETBOX_AUTH]            = "auth",
+	[NETBOX_FETCH_SCHEMA]    = "fetch_schema",
+	[NETBOX_ACTIVE]          = "active",
+	[NETBOX_ERROR]           = "error",
+	[NETBOX_ERROR_RECONNECT] = "error_reconnect",
+	[NETBOX_CLOSED]          = "closed",
+};
+
+struct netbox_options {
+	/** Remote server host and port. */
+	char *host;
+	char *service;
+	/** User credentials. */
+	char *user;
+	char *password;
+	/**
+	 * Lua reference to the transport callback function
+	 * (see the comment to netbox_transport).
+	 */
+	int callback_ref;
+	/** connect() timeout, in seconds. */
+	double connect_timeout;
+	/**
+	 * Timeout to wait after a connection failure before trying to
+	 * reconnect, in seconds. Reconnect is disabled if it's 0.
+	 */
+	double reconnect_after;
+};
+
+/**
+ * Basically, *transport* is a TCP connection speaking the Tarantool
+ * network protocol (IPROTO). This is a low-level interface.
+ * Primary features:
+ *  * concurrent perform_request()-s benefit from multiplexing
+ *    support in the protocol;
+ *  * schema-aware - snoops responses and initiates schema reload
+ *    when a response has a new schema version;
+ *  * delivers transport events via the callback.
+ *
+ * Transport state machine:
+ *
+ * State machine starts in 'initial' state. Start method
+ * spawns a worker fiber, which will establish a connection.
+ * Stop method sets the state to 'closed' and kills the worker.
+ * If the transport is already in 'error' state stop() does
+ * nothing.
+ *
+ * State chart:
+ *
+ *  initial -> auth -> fetch_schema <-> active
+ *
+ *  (any state, on error) -> error_reconnect -> auth -> ...
+ *                                           \
+ *                                            -> error
+ *  (any state, but 'error') -> closed
+ *
+ *
+ * State change events can be delivered to the transport user via
+ * the optional 'callback' argument:
+ *
+ * The callback functions needs to have the following signature:
+ *
+ *  callback(event_name, ...)
+ *
+ * The following events are delivered, with arguments:
+ *
+ *  'state_changed', state, error
+ *  'handshake', greeting, version, features
+ *  'did_fetch_schema', schema_version, spaces, indices, collations
+ *  'event', key, value
+ */
 struct netbox_transport {
+	/** Connection options. Not modified after initialization. */
+	struct netbox_options opts;
+	/** Greeting received from the remote host. */
+	struct greeting greeting;
+	/** Connection state. */
+	enum netbox_state state;
+	/**
+	 * The connection is closing. No new requests are allowed.
+	 * The connection will be closed as soon as all pending requests
+	 * have been sent.
+	 */
+	bool is_closing;
+	/** Error that caused the last connection failure or NULL. */
+	struct error *last_error;
+	/** Fiber doing I/O and dispatching responses. */
+	struct fiber *worker;
+	/**
+	 * Lua reference to the Lua state used by the worker fiber or
+	 * LUA_NOREF if the worker fiber isn't running.
+	 */
+	int coro_ref;
+	/**
+	 * Lua reference to self or LUA_NOREF. Needed to prevent garbage
+	 * collection of this transport object while the worker fiber is
+	 * running.
+	 */
+	int self_ref;
+	/** Connection I/O stream. */
+	struct iostream io;
 	/** Connection send buffer. */
 	struct ibuf send_buf;
 	/** Connection receive buffer. */
 	struct ibuf recv_buf;
 	/** Signalled when send_buf becomes empty. */
 	struct fiber_cond on_send_buf_empty;
-	/**
-	 * Lua reference to a callback invoked when an IPROTO_EVENT packet is
-	 * received from the remote host. The callback is passed two arguments:
-	 * notification key (string) and data (can be of any type).
-	 */
-	int on_event_ref;
 	/** Next request id. */
 	uint64_t next_sync;
 	/** sync -> netbox_request */
@@ -309,13 +429,38 @@ netbox_request_push_result(struct netbox_request *request, struct lua_State *L)
 }
 
 static void
-netbox_transport_create(struct netbox_transport *transport,
-			int on_event_ref)
+netbox_options_create(struct netbox_options *opts)
 {
+	memset(opts, 0, sizeof(*opts));
+	opts->callback_ref = LUA_NOREF;
+	opts->connect_timeout = NETBOX_DEFAULT_CONNECT_TIMEOUT;
+}
+
+static void
+netbox_options_destroy(struct netbox_options *opts)
+{
+	free(opts->host);
+	free(opts->service);
+	free(opts->user);
+	free(opts->password);
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, opts->callback_ref);
+}
+
+static void
+netbox_transport_create(struct netbox_transport *transport)
+{
+	netbox_options_create(&transport->opts);
+	memset(&transport->greeting, 0, sizeof(transport->greeting));
+	transport->state = NETBOX_INITIAL;
+	transport->is_closing = false;
+	transport->last_error = NULL;
+	transport->worker = NULL;
+	transport->coro_ref = LUA_NOREF;
+	transport->self_ref = LUA_NOREF;
+	iostream_clear(&transport->io);
 	ibuf_create(&transport->send_buf, &cord()->slabc, NETBOX_READAHEAD);
 	ibuf_create(&transport->recv_buf, &cord()->slabc, NETBOX_READAHEAD);
 	fiber_cond_create(&transport->on_send_buf_empty);
-	transport->on_event_ref = on_event_ref;
 	transport->next_sync = 1;
 	transport->requests = mh_i64ptr_new();
 }
@@ -323,8 +468,16 @@ netbox_transport_create(struct netbox_transport *transport,
 static void
 netbox_transport_destroy(struct netbox_transport *transport)
 {
-	luaL_unref(tarantool_L, LUA_REGISTRYINDEX,
-		   transport->on_event_ref);
+	netbox_options_destroy(&transport->opts);
+	if (transport->last_error != NULL)
+		error_unref(transport->last_error);
+	assert(transport->worker == NULL);
+	assert(transport->coro_ref == LUA_NOREF);
+	assert(transport->self_ref == LUA_NOREF);
+	assert(!iostream_is_initialized(&transport->io));
+	assert(ibuf_used(&transport->send_buf) == 0);
+	assert(ibuf_used(&transport->recv_buf) == 0);
+	fiber_cond_destroy(&transport->on_send_buf_empty);
 	struct mh_i64ptr_t *h = transport->requests;
 	assert(mh_size(h) == 0);
 	mh_i64ptr_delete(h);
@@ -345,12 +498,19 @@ netbox_transport_lookup_request(struct netbox_transport *transport,
 }
 
 /**
- * Called when a connection is closed to complete pending requests with the
- * given error and reset buffers.
+ * Sets transport->last_error to the last error set in the diagnostics area
+ * and aborts all pending requests.
  */
 static void
-netbox_transport_reset(struct netbox_transport *transport, struct error *error)
+netbox_transport_set_error(struct netbox_transport *transport)
 {
+	/* Set last error. */
+	assert(!diag_is_empty(diag_get()));
+	struct error *error = diag_last_error(diag_get());
+	if (transport->last_error != NULL)
+		error_unref(transport->last_error);
+	transport->last_error = error;
+	error_ref(error);
 	/* Reset buffers. */
 	ibuf_reinit(&transport->send_buf);
 	ibuf_reinit(&transport->recv_buf);
@@ -479,19 +639,18 @@ netbox_encode_id(struct lua_State *L, struct ibuf *ibuf, uint64_t sync)
  */
 static void
 netbox_encode_auth(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
-		   const char *user, size_t user_len,
-		   const char *password, size_t password_len,
-		   const char *salt)
+		   const char *user, const char *password, const char *salt)
 {
 	char scramble[SCRAMBLE_SIZE];
-	scramble_prepare(scramble, salt, password, password_len);
+	scramble_prepare(scramble, salt, password,
+			 password != NULL ? strlen(password) : 0);
 	struct mpstream stream;
 	mpstream_init(&stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
 		      luamp_error, L);
 	size_t svp = netbox_begin_encode(&stream, sync, IPROTO_AUTH, 0);
 	mpstream_encode_map(&stream, 2);
 	mpstream_encode_uint(&stream, IPROTO_USER_NAME);
-	mpstream_encode_strn(&stream, user, user_len);
+	mpstream_encode_strn(&stream, user, strlen(user));
 	mpstream_encode_uint(&stream, IPROTO_TUPLE);
 	mpstream_encode_array(&stream, 2);
 	mpstream_encode_str(&stream, "chap-sha1");
@@ -753,36 +912,41 @@ netbox_encode_upsert(lua_State *L, int idx, struct mpstream *stream,
 	netbox_end_encode(stream, svp);
 }
 
+/**
+ * Connects a transport to a remote host and reads a greeting message.
+ * Returns 0 on success, -1 on error.
+ */
 static int
-netbox_decode_greeting(lua_State *L)
+netbox_transport_connect(struct netbox_transport *transport)
 {
-	struct greeting greeting;
-	size_t len;
-	const char *buf = NULL;
-
-	if (lua_isstring(L, 1))
-		buf = lua_tolstring(L, 1, &len);
-
-	if (buf == NULL || len != IPROTO_GREETING_SIZE ||
-		greeting_decode(buf, &greeting) != 0) {
-
-		lua_pushboolean(L, 0);
-		lua_pushstring(L, "Invalid greeting");
-		return 2;
+	struct iostream *io = &transport->io;
+	assert(!iostream_is_initialized(io));
+	ev_tstamp start, delay;
+	coio_timeout_init(&start, &delay, transport->opts.connect_timeout);
+	int fd = coio_connect_timeout(transport->opts.host,
+				      transport->opts.service, /*host_hint=*/0,
+				      /*addr=*/NULL, /*addr_len=*/NULL, delay);
+	coio_timeout_update(&start, &delay);
+	if (fd < 0)
+		return -1;
+	iostream_create(io, fd);
+	char greetingbuf[IPROTO_GREETING_SIZE];
+	if (coio_readn_timeout(io, greetingbuf, IPROTO_GREETING_SIZE,
+			       delay) < 0)
+		goto error;
+	if (greeting_decode(greetingbuf, &transport->greeting) != 0) {
+		box_error_raise(ER_NO_CONNECTION, "Invalid greeting");
+		goto error;
 	}
-
-	lua_newtable(L);
-	lua_pushinteger(L, greeting.version_id);
-	lua_setfield(L, -2, "version_id");
-	lua_pushstring(L, greeting.protocol);
-	lua_setfield(L, -2, "protocol");
-	lua_pushlstring(L, greeting.salt, greeting.salt_len);
-	lua_setfield(L, -2, "salt");
-
-	luaL_pushuuidstr(L, &greeting.uuid);
-	lua_setfield(L, -2, "uuid");
-
-	return 1;
+	if (strcmp(transport->greeting.protocol, "Binary") != 0) {
+		box_error_raise(ER_NO_CONNECTION, "Unsupported protocol: %s",
+				transport->greeting.protocol);
+		goto error;
+	}
+	return 0;
+error:
+	iostream_close(io);
+	return -1;
 }
 
 /**
@@ -804,8 +968,10 @@ netbox_decode_greeting(lua_State *L)
  * interaction.
  */
 static int
-netbox_communicate(struct netbox_transport *transport, int fd, size_t limit)
+netbox_transport_communicate(struct netbox_transport *transport, size_t limit)
 {
+	struct iostream *io = &transport->io;
+	assert(iostream_is_initialized(io));
 	struct ibuf *send_buf = &transport->send_buf;
 	struct ibuf *recv_buf = &transport->recv_buf;
 	struct fiber_cond *on_send_buf_empty = &transport->on_send_buf_empty;
@@ -819,38 +985,38 @@ netbox_communicate(struct netbox_transport *transport, int fd, size_t limit)
 					 "ibuf_reserve", "p");
 				return -1;
 			}
-			ssize_t rc = recv(
-				fd, recv_buf->wpos, ibuf_unused(recv_buf), 0);
+			ssize_t rc = iostream_read(io, recv_buf->wpos,
+						   ibuf_unused(recv_buf));
 			if (rc == 0) {
 				box_error_raise(ER_NO_CONNECTION,
 						"Peer closed");
 				return -1;
 			} if (rc > 0) {
 				recv_buf->wpos += rc;
-			} else if (!sio_wouldblock(errno)) {
+			} else if (rc == IOSTREAM_ERROR) {
 				goto handle_error;
 			} else {
-				events |= EV_READ;
+				events |= iostream_status_to_events(rc);
 				break;
 			}
 		}
 		if (ibuf_used(recv_buf) >= limit)
 			return 0;
 		while (ibuf_used(send_buf) > 0) {
-			ssize_t rc = send(
-				fd, send_buf->rpos, ibuf_used(send_buf), 0);
+			ssize_t rc = iostream_write(io, send_buf->rpos,
+						    ibuf_used(send_buf));
 			if (rc >= 0) {
 				send_buf->rpos += rc;
 				if (ibuf_used(send_buf) == 0)
 					fiber_cond_broadcast(on_send_buf_empty);
-			} else if (!sio_wouldblock(errno)) {
+			} else if (rc == IOSTREAM_ERROR) {
 				goto handle_error;
 			} else {
-				events |= EV_WRITE;
+				events |= iostream_status_to_events(rc);
 				break;
 			}
 		}
-		coio_wait(fd, events, TIMEOUT_INFINITY);
+		coio_wait(io->fd, events, TIMEOUT_INFINITY);
 		ERROR_INJECT_YIELD(ERRINJ_NETBOX_IO_DELAY);
 		ERROR_INJECT(ERRINJ_NETBOX_IO_ERROR, {
 			box_error_raise(ER_NO_CONNECTION, "Error injection");
@@ -872,8 +1038,8 @@ handle_error:
  * On error returns -1.
  */
 static int
-netbox_send_and_recv(struct netbox_transport *transport, int fd,
-		     struct xrow_header *hdr)
+netbox_transport_send_and_recv(struct netbox_transport *transport,
+			       struct xrow_header *hdr)
 {
 	while (true) {
 		size_t required;
@@ -894,7 +1060,7 @@ netbox_send_and_recv(struct netbox_transport *transport, int fd,
 					/*end_is_exact=*/true);
 			}
 		}
-		if (netbox_communicate(transport, fd, required) != 0)
+		if (netbox_transport_communicate(transport, required) != 0)
 			return -1;
 	}
 }
@@ -1443,24 +1609,6 @@ luaT_netbox_transport_gc(struct lua_State *L)
 	return 0;
 }
 
-static int
-luaT_netbox_transport_reset(struct lua_State *L)
-{
-	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
-	struct error *error = luaL_checkerror(L, 2);
-	netbox_transport_reset(transport, error);
-	return 0;
-}
-
-static int
-luaT_netbox_transport_wait_all_sent(struct lua_State *L)
-{
-	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
-	while (ibuf_used(&transport->send_buf) > 0)
-		fiber_cond_wait(&transport->on_send_buf_empty);
-	return 0;
-}
-
 static inline struct netbox_request *
 luaT_check_netbox_request(struct lua_State *L, int idx)
 {
@@ -1722,17 +1870,41 @@ luaT_netbox_request_pairs(struct lua_State *L)
 
 /**
  * Creates a netbox transport object (userdata) and pushes it to Lua stack.
- * Takes the on_event callback.
+ * Takes the following arguments: host (string or nil), service (string),
+ * user (string or nil), password (string or nil), callback (function),
+ * connect_timeout (number or nil), reconnect_after (number or nil).
  */
 static int
-netbox_new_transport(struct lua_State *L)
+luaT_netbox_new_transport(struct lua_State *L)
 {
-	int on_event_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	struct netbox_transport *transport = lua_newuserdata(
-		L, sizeof(*transport));
-	netbox_transport_create(transport, on_event_ref);
+	assert(lua_gettop(L) == 7);
+	/* Create a transport object. */
+	struct netbox_transport *transport;
+	transport = lua_newuserdata(L, sizeof(*transport));
+	netbox_transport_create(transport);
 	luaL_getmetatable(L, netbox_transport_typename);
 	lua_setmetatable(L, -2);
+	/* Initialize options from Lua arguments. */
+	struct netbox_options *opts = &transport->opts;
+	if (!lua_isnil(L, 1))
+		opts->host = xstrdup(luaL_checkstring(L, 1));
+	opts->service = xstrdup(luaL_checkstring(L, 2));
+	if (!lua_isnil(L, 3))
+		opts->user = xstrdup(luaL_checkstring(L, 3));
+	if (!lua_isnil(L, 4))
+		opts->password = xstrdup(luaL_checkstring(L, 4));
+	assert(lua_isfunction(L, 5));
+	lua_pushvalue(L, 5);
+	opts->callback_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	if (!lua_isnil(L, 6))
+		opts->connect_timeout = luaL_checknumber(L, 6);
+	if (!lua_isnil(L, 7))
+		opts->reconnect_after = luaL_checknumber(L, 7);
+	if (opts->user == NULL && opts->password != NULL) {
+		diag_set(ClientError, ER_PROC_LUA,
+			 "net.box: user is not defined");
+		return luaT_error(L);
+	}
 	return 1;
 }
 
@@ -1741,7 +1913,6 @@ netbox_new_transport(struct lua_State *L)
  * ('future') that can be used for waiting for a response.
  *
  * Takes the following values from Lua stack starting at index idx:
- *  - transport: transport to register the new request with
  *  - buffer: buffer (ibuf) to write the result to or nil
  *  - skip_header: whether to skip header when writing the result to the buffer
  *  - method: a value from the netbox_method enumeration
@@ -1750,34 +1921,58 @@ netbox_new_transport(struct lua_State *L)
  *  - format: tuple format to use for decoding the body or nil
  *  - stream_id: determines whether or not the request belongs to stream
  *  - ...: method-specific arguments passed to the encoder
+ *
+ * If the request cannot be performed, sets diag and returns -1,
+ * otherwise returns 0.
  */
-static void
-netbox_make_request(struct lua_State *L, int idx,
-		    struct netbox_request *request)
+static int
+luaT_netbox_transport_make_request(struct lua_State *L, int idx,
+				   struct netbox_transport *transport,
+				   struct netbox_request *request)
 {
+	if (transport->state != NETBOX_ACTIVE &&
+	    transport->state != NETBOX_FETCH_SCHEMA) {
+		struct error *e = transport->last_error;
+		if (e != NULL) {
+			box_error_raise(ER_NO_CONNECTION, e->errmsg);
+		} else {
+			const char *state = netbox_state_str[transport->state];
+			box_error_raise(ER_NO_CONNECTION,
+					"Connection is not established, "
+					"state is \"%s\"", state);
+		}
+		return -1;
+	}
+	if (transport->is_closing) {
+		box_error_raise(ER_NO_CONNECTION, "Connection is closing");
+		return -1;
+	}
+
+        /* Alert worker to notify it of the queued outgoing data. */
+	if (ibuf_used(&transport->send_buf) == 0)
+		fiber_wakeup(transport->worker);
+
 	/* Encode and write the request to the send buffer. */
-	struct netbox_transport *transport =
-		luaT_check_netbox_transport(L, idx);
-	enum netbox_method method = lua_tointeger(L, idx + 3);
+	enum netbox_method method = lua_tointeger(L, idx + 2);
 	assert(method < netbox_method_MAX);
 	uint64_t sync = transport->next_sync++;
-	uint64_t stream_id = luaL_touint64(L, idx + 7);
-	netbox_encode_method(L, idx + 8, method, &transport->send_buf, sync,
+	uint64_t stream_id = luaL_touint64(L, idx + 6);
+	netbox_encode_method(L, idx + 7, method, &transport->send_buf, sync,
 			     stream_id);
 
 	/* Initialize and register the request object. */
 	request->method = method;
 	request->sync = sync;
-	request->buffer = (struct ibuf *)lua_topointer(L, idx + 1);
-	lua_pushvalue(L, idx + 1);
+	request->buffer = (struct ibuf *)lua_topointer(L, idx);
+	lua_pushvalue(L, idx);
 	request->buffer_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	request->skip_header = lua_toboolean(L, idx + 2);
-	lua_pushvalue(L, idx + 4);
+	request->skip_header = lua_toboolean(L, idx + 1);
+	lua_pushvalue(L, idx + 3);
 	request->on_push_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	lua_pushvalue(L, idx + 5);
+	lua_pushvalue(L, idx + 4);
 	request->on_push_ctx_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	if (!lua_isnil(L, idx + 6))
-		request->format = lbox_check_tuple_format(L, idx + 6);
+	if (!lua_isnil(L, idx + 5))
+		request->format = lbox_check_tuple_format(L, idx + 5);
 	else
 		request->format = tuple_format_runtime;
 	tuple_format_ref(request->format);
@@ -1786,25 +1981,30 @@ netbox_make_request(struct lua_State *L, int idx,
 	request->result_ref = LUA_NOREF;
 	request->error = NULL;
 	netbox_request_register(request, transport);
+	return 0;
 }
 
 static int
-netbox_perform_async_request(struct lua_State *L)
+luaT_netbox_transport_perform_async_request(struct lua_State *L)
 {
+	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
 	struct netbox_request *request = lua_newuserdata(L, sizeof(*request));
-	netbox_make_request(L, 1, request);
+	if (luaT_netbox_transport_make_request(L, 2, transport, request) != 0)
+		return luaT_push_nil_and_error(L);
 	luaL_getmetatable(L, netbox_request_typename);
 	lua_setmetatable(L, -2);
 	return 1;
 }
 
 static int
-netbox_perform_request(struct lua_State *L)
+luaT_netbox_transport_perform_request(struct lua_State *L)
 {
-	double timeout = (!lua_isnil(L, 1) ?
-			  lua_tonumber(L, 1) : TIMEOUT_INFINITY);
+	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
+	double timeout = (!lua_isnil(L, 2) ?
+			  lua_tonumber(L, 2) : TIMEOUT_INFINITY);
 	struct netbox_request request;
-	netbox_make_request(L, 2, &request);
+	if (luaT_netbox_transport_make_request(L, 3, transport, &request) != 0)
+		return luaT_push_nil_and_error(L);
 	while (!netbox_request_is_ready(&request)) {
 		if (!netbox_request_wait(&request, &timeout)) {
 			netbox_request_unregister(&request);
@@ -1822,14 +2022,26 @@ netbox_perform_request(struct lua_State *L)
 /**
  * Encodes a WATCH/UNWATCH request and writes it to the send buffer.
  * Takes the name of the notification key to acknowledge.
+ * No-op if the connection is inactive or closing.
  */
 static void
-netbox_watch_or_unwatch(struct lua_State *L, enum iproto_type type)
+luaT_netbox_transport_watch_or_unwatch(struct lua_State *L,
+				       enum iproto_type type)
 {
 	assert(type == IPROTO_WATCH || type == IPROTO_UNWATCH);
 	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
 	size_t key_len;
 	const char *key = lua_tolstring(L, 2, &key_len);
+
+	if (transport->is_closing || (transport->state != NETBOX_ACTIVE &&
+				      transport->state != NETBOX_FETCH_SCHEMA))
+		return;
+
+        /* Alert worker to notify it of the queued outgoing data. */
+	if (ibuf_used(&transport->send_buf) == 0)
+		fiber_wakeup(transport->worker);
+
+	/* Encode and write the request to the send buffer. */
 	struct mpstream stream;
 	mpstream_init(&stream, &transport->send_buf, ibuf_reserve_cb,
 		      ibuf_alloc_cb, luamp_error, L);
@@ -1841,17 +2053,59 @@ netbox_watch_or_unwatch(struct lua_State *L, enum iproto_type type)
 }
 
 static int
-netbox_watch(struct lua_State *L)
+luaT_netbox_transport_watch(struct lua_State *L)
 {
-	netbox_watch_or_unwatch(L, IPROTO_WATCH);
+	luaT_netbox_transport_watch_or_unwatch(L, IPROTO_WATCH);
 	return 0;
 }
 
 static int
-netbox_unwatch(struct lua_State *L)
+luaT_netbox_transport_unwatch(struct lua_State *L)
 {
-	netbox_watch_or_unwatch(L, IPROTO_UNWATCH);
+	luaT_netbox_transport_watch_or_unwatch(L, IPROTO_UNWATCH);
 	return 0;
+}
+
+/**
+ * Invokes the 'state_changed' callback.
+ */
+static void
+netbox_transport_on_state_change(struct netbox_transport *transport,
+				 struct lua_State *L)
+{
+	enum netbox_state state = transport->state;
+	struct error *error = (state == NETBOX_CLOSED ||
+			       state == NETBOX_ERROR ||
+			       state == NETBOX_ERROR_RECONNECT ?
+			       transport->last_error : NULL);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, transport->opts.callback_ref);
+	lua_pushliteral(L, "state_changed");
+	lua_pushstring(L, netbox_state_str[state]);
+	if (error != NULL)
+		lua_pushstring(L, error->errmsg);
+	lua_call(L, error != NULL ? 3 : 2, 0);
+}
+
+static int
+netbox_transport_on_state_change_f(struct lua_State *L)
+{
+	struct netbox_transport *transport = (void *)lua_topointer(L, 1);
+	netbox_transport_on_state_change(transport, L);
+	return 0;
+}
+
+/**
+ * Invokes the 'state_changed' callback with pcall.
+ *
+ * The callback shouldn't fail so this is just a precaution against a run-away
+ * Lua exception in C code.
+ */
+static void
+netbox_transport_on_state_change_pcall(struct netbox_transport *transport,
+				       struct lua_State *L)
+{
+	if (luaT_cpcall(L, netbox_transport_on_state_change_f, transport) != 0)
+		diag_log();
 }
 
 /**
@@ -1862,21 +2116,22 @@ netbox_unwatch(struct lua_State *L)
  * machine in pcall.
  */
 static void
-netbox_on_event(struct lua_State *L, struct netbox_transport *transport,
-		struct xrow_header *hdr)
+netbox_transport_on_event(struct netbox_transport *transport,
+			  struct lua_State *L, struct xrow_header *hdr)
 {
 	assert(hdr->type == IPROTO_EVENT);
 	struct watch_request watch;
 	if (xrow_decode_watch(hdr, &watch) != 0)
 		luaT_error(L);
-	lua_rawgeti(L, LUA_REGISTRYINDEX, transport->on_event_ref);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, transport->opts.callback_ref);
+	lua_pushliteral(L, "event");
 	lua_pushlstring(L, watch.key, watch.key_len);
 	if (watch.data != NULL) {
 		const char *data = watch.data;
 		luamp_decode(L, luaL_msgpack_default, &data);
 		assert(data == watch.data_end);
 	}
-	lua_call(L, watch.data != NULL ? 2 : 1, 0);
+	lua_call(L, watch.data != NULL ? 3 : 2, 0);
 }
 
 /**
@@ -1888,13 +2143,12 @@ netbox_on_event(struct lua_State *L, struct netbox_transport *transport,
  * a reference to it and executing the on-push trigger.
  */
 static void
-netbox_dispatch_response(struct lua_State *L,
-			 struct netbox_transport *transport,
-			 struct xrow_header *hdr)
+netbox_transport_dispatch_response(struct netbox_transport *transport,
+				   struct lua_State *L, struct xrow_header *hdr)
 {
 	enum iproto_type status = hdr->type;
 	if (status == IPROTO_EVENT) {
-		netbox_on_event(L, transport, hdr);
+		netbox_transport_on_event(transport, L, hdr);
 		return;
 	}
 	struct netbox_request *request =
@@ -1956,17 +2210,15 @@ netbox_dispatch_response(struct lua_State *L,
 
 /**
  * Performs a features request for an iproto connection.
- * Takes peer_version_id, netbox transport, socket fd.
- * Returns server version and features array on success.
- * If the server doesn't support IPROTO_ID, returns 0 and an empty array.
- * On failure raises a Lua error.
+ * If the server doesn't support the IPROTO_ID command, assumes the protocol
+ * version to be 0 and the feature set to be empty.
+ * On success invokes the 'handshake' callback. On failure raises a Lua error.
  */
-static int
-netbox_iproto_id(struct lua_State *L)
+static void
+netbox_transport_do_id(struct netbox_transport *transport, struct lua_State *L)
 {
-	uint32_t peer_version_id = lua_tointeger(L, 1);
-	struct netbox_transport *transport = luaT_check_netbox_transport(L, 2);
-	int fd = lua_tointeger(L, 3);
+	struct greeting *greeting = &transport->greeting;
+	uint32_t peer_version_id = greeting->version_id;
 	struct id_request id;
 	id.version = 0;
 	iproto_features_create(&id.features);
@@ -1975,18 +2227,30 @@ netbox_iproto_id(struct lua_State *L)
 		goto unsupported;
 	netbox_encode_id(L, &transport->send_buf, transport->next_sync++);
 	struct xrow_header hdr;
-	if (netbox_send_and_recv(transport, fd, &hdr) != 0)
-		return luaT_error(L);
+	if (netbox_transport_send_and_recv(transport, &hdr) != 0)
+		luaT_error(L);
 	if (hdr.type != IPROTO_OK) {
 		uint32_t errcode = hdr.type & (IPROTO_TYPE_ERROR - 1);
 		if (errcode == ER_UNKNOWN_REQUEST_TYPE)
 			goto unsupported;
 		xrow_decode_error(&hdr);
-		return luaT_error(L);
+		luaT_error(L);
 	}
 	if (xrow_decode_id(&hdr, &id) != 0)
-		return luaT_error(L);
+		luaT_error(L);
 out:
+	/* Invoke the 'handshake' callback. */
+	lua_rawgeti(L, LUA_REGISTRYINDEX, transport->opts.callback_ref);
+	lua_pushliteral(L, "handshake");
+	/* Push the greeting. */
+	lua_newtable(L);
+	lua_pushinteger(L, greeting->version_id);
+	lua_setfield(L, -2, "version_id");
+	lua_pushstring(L, greeting->protocol);
+	lua_setfield(L, -2, "protocol");
+	luaL_pushuuidstr(L, &greeting->uuid);
+	lua_setfield(L, -2, "uuid");
+	/* Push the protocol version and features. */
 	lua_pushinteger(L, id.version);
 	lua_newtable(L);
 	int i = 1;
@@ -1994,63 +2258,56 @@ out:
 		lua_pushinteger(L, feature_id);
 		lua_rawseti(L, -2, i++);
 	}
-	return 2;
+	lua_call(L, 4, 0);
+	return;
 unsupported:
-	say_verbose("IPROTO_ID command is not supported by net.box connection "
-		    "at fd %d", fd);
+	say_verbose("IPROTO_ID command is not supported");
 	goto out;
 }
 
 /**
  * Performs an authorization request for an iproto connection.
- * Takes user, password, salt, netbox transport, socket fd.
- * Returns none on success, raises a Lua error on failure.
+ * On failure raises a Lua error.
  */
-static int
-netbox_iproto_auth(struct lua_State *L)
+static void
+netbox_transport_do_auth(struct netbox_transport *transport,
+			 struct lua_State *L)
 {
-	size_t user_len;
-	const char *user = lua_tolstring(L, 1, &user_len);
-	size_t password_len;
-	const char *password = lua_tolstring(L, 2, &password_len);
-	size_t salt_len;
-	const char *salt = lua_tolstring(L, 3, &salt_len);
-	if (salt_len < SCRAMBLE_SIZE)
-		return luaL_error(L, "Invalid salt");
-	struct netbox_transport *transport = luaT_check_netbox_transport(L, 4);
-	int fd = lua_tointeger(L, 5);
+	transport->state = NETBOX_AUTH;
+	netbox_transport_on_state_change(transport, L);
+	struct netbox_options *opts = &transport->opts;
+	if (opts->user == NULL)
+		return;
 	netbox_encode_auth(L, &transport->send_buf, transport->next_sync++,
-			   user, user_len, password, password_len, salt);
+			   opts->user, opts->password,
+			   transport->greeting.salt);
 	struct xrow_header hdr;
-	if (netbox_send_and_recv(transport, fd, &hdr) != 0)
-		return luaT_error(L);
+	if (netbox_transport_send_and_recv(transport, &hdr) != 0)
+		luaT_error(L);
 	if (hdr.type != IPROTO_OK) {
 		xrow_decode_error(&hdr);
-		return luaT_error(L);
+		luaT_error(L);
 	}
-	return 0;
 }
 
 /**
  * Fetches schema over an iproto connection. While waiting for the schema,
- * processes other requests in a loop, like netbox_iproto_loop().
- * Takes peer_version_id, netbox transport, socket fd.
- * Returns schema_version and a table with the following fields:
- *   [VSPACE_ID] = <spaces>
- *   [VINDEX_ID] = <indexes>
- *   [VCOLLATION_ID] = <collations>
- * On failure raises a Lua error.
+ * processes other requests in a loop, like netbox_transport_process_requests().
+ * On success invokes the 'did_fetch_schema' callback and returns the actual
+ * schema version. On failure raises a Lua error.
  */
-static int
-netbox_iproto_schema(struct lua_State *L)
+static uint32_t
+netbox_transport_fetch_schema(struct netbox_transport *transport,
+			      struct lua_State *L)
 {
-	uint32_t peer_version_id = lua_tointeger(L, 1);
-	struct netbox_transport *transport = luaT_check_netbox_transport(L, 2);
-	int fd = lua_tointeger(L, 3);
+	transport->state = NETBOX_FETCH_SCHEMA;
+	netbox_transport_on_state_change(transport, L);
+	uint32_t peer_version_id = transport->greeting.version_id;
 	/* _vcollation view was added in 2.2.0-389-g3e3ef182f */
 	bool peer_has_vcollation = peer_version_id >= version_id(2, 2, 1);
 restart:
 	lua_newtable(L);
+	int schema_table_idx = lua_gettop(L);
 	uint64_t vspace_sync = transport->next_sync++;
 	netbox_encode_select_all(L, &transport->send_buf, vspace_sync,
 				 BOX_VSPACE_ID);
@@ -2067,9 +2324,9 @@ restart:
 	uint32_t schema_version = 0;
 	do {
 		struct xrow_header hdr;
-		if (netbox_send_and_recv(transport, fd, &hdr) != 0)
-			return luaT_error(L);
-		netbox_dispatch_response(L, transport, &hdr);
+		if (netbox_transport_send_and_recv(transport, &hdr) != 0)
+			luaT_error(L);
+		netbox_transport_dispatch_response(transport, L, &hdr);
 		if (hdr.sync != vspace_sync &&
 		    hdr.sync != vindex_sync &&
 		    hdr.sync != vcollation_sync) {
@@ -2087,7 +2344,7 @@ restart:
 				continue;
 			}
 			xrow_decode_error(&hdr);
-			return luaT_error(L);
+			luaT_error(L);
 		}
 		if (schema_version == 0) {
 			schema_version = hdr.schema_version;
@@ -2114,38 +2371,182 @@ restart:
 		} else {
 			unreachable();
 		}
-		lua_pushinteger(L, key);
 		netbox_decode_table(L, &data, data_end, tuple_format_runtime);
-		lua_settable(L, -3);
+		lua_rawseti(L, schema_table_idx, key);
 	} while (!(got_vspace && got_vindex &&
 		   (got_vcollation || !peer_has_vcollation)));
+	/* Invoke the 'did_fetch_schema' callback. */
+	lua_rawgeti(L, LUA_REGISTRYINDEX, transport->opts.callback_ref);
+	lua_pushliteral(L, "did_fetch_schema");
 	lua_pushinteger(L, schema_version);
-	lua_insert(L, -2);
-	return 2;
+	lua_rawgeti(L, schema_table_idx, BOX_VSPACE_ID);
+	lua_rawgeti(L, schema_table_idx, BOX_VINDEX_ID);
+	lua_rawgeti(L, schema_table_idx, BOX_VCOLLATION_ID);
+	lua_call(L, 5, 0);
+	/* Pop the schema table. */
+	lua_pop(L, 1);
+	return schema_version;
 }
 
 /**
  * Processes iproto requests in a loop until an error or a schema change.
- * Takes schema_version, netbox transport, socket fd.
- * Returns none if the loop was broken because of a schema change.
- * On failure raises a Lua error.
+ * Returns on a schema change. On failure raises a Lua error.
  */
-static int
-netbox_iproto_loop(struct lua_State *L)
+static void
+netbox_transport_process_requests(struct netbox_transport *transport,
+				  struct lua_State *L, uint32_t schema_version)
 {
-	uint32_t schema_version = lua_tointeger(L, 1);
-	struct netbox_transport *transport = luaT_check_netbox_transport(L, 2);
-	int fd = lua_tointeger(L, 3);
+	transport->state = NETBOX_ACTIVE;
+	netbox_transport_on_state_change(transport, L);
 	while (true) {
 		struct xrow_header hdr;
-		if (netbox_send_and_recv(transport, fd, &hdr) != 0)
-			return luaT_error(L);
-		netbox_dispatch_response(L, transport, &hdr);
+		if (netbox_transport_send_and_recv(transport, &hdr) != 0)
+			luaT_error(L);
+		netbox_transport_dispatch_response(transport, L, &hdr);
 		if (hdr.schema_version > 0 &&
 		    hdr.schema_version != schema_version) {
-			return 0;
+			break;
 		}
 	}
+}
+
+/**
+ * Connection handler. Raises a Lua error on termination.
+ */
+static int
+netbox_connection_handler_f(struct lua_State *L)
+{
+	struct netbox_transport *transport = (void *)lua_topointer(L, 1);
+	netbox_transport_do_id(transport, L);
+	netbox_transport_do_auth(transport, L);
+	while (true) {
+		uint32_t schema_version;
+		schema_version = netbox_transport_fetch_schema(transport, L);
+		netbox_transport_process_requests(transport, L, schema_version);
+	}
+	return 0;
+}
+/**
+ * Worker fiber routine.
+ */
+static int
+netbox_worker_f(va_list ap)
+{
+	struct netbox_transport *transport;
+	transport = va_arg(ap, struct netbox_transport *);
+	struct lua_State *L = va_arg(ap, struct lua_State *);
+	assert(transport->worker == fiber());
+	assert(transport->coro_ref != LUA_NOREF);
+	assert(transport->self_ref != LUA_NOREF);
+	/*
+	 * Code that needs a temporary fiber-local Lua state may save some time
+	 * and resources for creating a new state and use this one.
+	 */
+	assert(fiber()->storage.lua.stack == NULL);
+	fiber()->storage.lua.stack = L;
+	const double reconnect_after = transport->opts.reconnect_after;
+	while (!fiber_is_cancelled()) {
+		if (netbox_transport_connect(transport) == 0) {
+			int rc = luaT_cpcall(L, netbox_connection_handler_f,
+					     transport);
+			/* The worker loop can only be broken by an error. */
+			assert(rc != 0);
+			(void)rc;
+			iostream_close(&transport->io);
+		}
+		if (transport->state == NETBOX_CLOSED)
+			break;
+		netbox_transport_set_error(transport);
+		transport->state = (reconnect_after > 0 ?
+				    NETBOX_ERROR_RECONNECT : NETBOX_ERROR);
+		netbox_transport_on_state_change_pcall(transport, L);
+		if (reconnect_after > 0) {
+			fiber_sleep(reconnect_after);
+		} else {
+			break;
+		}
+	}
+	transport->worker = NULL;
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, transport->coro_ref);
+	transport->coro_ref = LUA_NOREF;
+	/* Careful: luaL_unref may delete this transport object. */
+	int ref = transport->self_ref;
+	transport->self_ref = LUA_NOREF;
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, ref);
+	fiber()->storage.lua.stack = NULL;
+	return 0;
+}
+
+/**
+ * Starts a worker fiber.
+ */
+static int
+luaT_netbox_transport_start(struct lua_State *L)
+{
+	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
+	assert(transport->worker == NULL);
+	assert(transport->coro_ref == LUA_NOREF);
+	assert(transport->self_ref = LUA_NOREF);
+	struct lua_State *fiber_L = lua_newthread(L);
+	transport->coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	transport->self_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	transport->worker = fiber_new(tt_sprintf("%s:%s (net.box)",
+						 transport->opts.host,
+						 transport->opts.service),
+				      netbox_worker_f);
+	if (transport->worker == NULL) {
+		luaL_unref(L, LUA_REGISTRYINDEX, transport->coro_ref);
+		transport->coro_ref = LUA_NOREF;
+		luaL_unref(L, LUA_REGISTRYINDEX, transport->self_ref);
+		transport->self_ref = LUA_NOREF;
+		return luaT_error(L);
+	}
+	fiber_start(transport->worker, transport, fiber_L);
+	return 0;
+}
+
+/**
+ * Stops a worker fiber.
+ *
+ * Takes an optional boolean argument 'wait': if set the function will wait
+ * for all pending requests to be sent.
+ */
+static int
+luaT_netbox_transport_stop(struct lua_State *L)
+{
+	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
+	bool wait = lua_toboolean(L, 2);
+	if (wait &&
+	    transport->state != NETBOX_CLOSED &&
+	    transport->state != NETBOX_ERROR) {
+		transport->is_closing = true;
+		/*
+		 * Here we are waiting until send buf became empty:
+		 * it is necessary to ensure that all requests are
+		 * sent before the connection is closed.
+		 */
+		while (ibuf_used(&transport->send_buf) > 0)
+			fiber_cond_wait(&transport->on_send_buf_empty);
+		transport->is_closing = false;
+	}
+	/*
+	 * While we were waiting for the send buffer to be empty,
+	 * the state could change.
+	 */
+	if (transport->state != NETBOX_CLOSED &&
+	    transport->state != NETBOX_ERROR) {
+		box_error_raise(ER_NO_CONNECTION, "Connection closed");
+		netbox_transport_set_error(transport);
+		transport->state = NETBOX_CLOSED;
+		netbox_transport_on_state_change(transport, L);
+	}
+	/* Cancel the worker fiber. */
+	if (transport->worker != NULL) {
+		fiber_cancel(transport->worker);
+		/* Check if we cancelled ourselves. */
+		luaL_testcancel(L);
+	}
+	return 0;
 }
 
 int
@@ -2166,8 +2567,14 @@ luaopen_net_box(struct lua_State *L)
 
 	static const struct luaL_Reg netbox_transport_meta[] = {
 		{ "__gc",           luaT_netbox_transport_gc },
-		{ "reset",          luaT_netbox_transport_reset },
-		{ "wait_all_sent",  luaT_netbox_transport_wait_all_sent },
+		{ "start",          luaT_netbox_transport_start },
+		{ "stop",           luaT_netbox_transport_stop },
+		{ "perform_request",
+			luaT_netbox_transport_perform_request },
+		{ "perform_async_request",
+			luaT_netbox_transport_perform_async_request },
+		{ "watch",          luaT_netbox_transport_watch },
+		{ "unwatch",        luaT_netbox_transport_unwatch },
 		{ NULL, NULL }
 	};
 	luaL_register_type(L, netbox_transport_typename, netbox_transport_meta);
@@ -2188,16 +2595,7 @@ luaopen_net_box(struct lua_State *L)
 	luaL_register_type(L, netbox_request_typename, netbox_request_meta);
 
 	static const luaL_Reg net_box_lib[] = {
-		{ "decode_greeting",netbox_decode_greeting },
-		{ "new_transport",   netbox_new_transport },
-		{ "perform_async_request", netbox_perform_async_request },
-		{ "perform_request",netbox_perform_request },
-		{ "watch",          netbox_watch },
-		{ "unwatch",        netbox_unwatch },
-		{ "iproto_id",      netbox_iproto_id },
-		{ "iproto_auth",    netbox_iproto_auth },
-		{ "iproto_schema",  netbox_iproto_schema },
-		{ "iproto_loop",    netbox_iproto_loop },
+		{ "new_transport",  luaT_netbox_new_transport },
 		{ NULL, NULL}
 	};
 	/* luaL_register_module polutes _G */

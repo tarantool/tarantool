@@ -1,7 +1,6 @@
 -- net_box.lua (internal file)
 local log      = require('log')
 local ffi      = require('ffi')
-local socket   = require('socket')
 local fiber    = require('fiber')
 local msgpack  = require('msgpack')
 local urilib   = require('uri')
@@ -10,27 +9,15 @@ local trigger  = require('internal.trigger')
 
 local max               = math.max
 local fiber_clock       = fiber.clock
-local fiber_self        = fiber.self
 
 local check_iterator_type = box.internal.check_iterator_type
 local check_index_arg     = box.internal.check_index_arg
 local check_space_arg     = box.internal.check_space_arg
 local check_primary_index = box.internal.check_primary_index
 
-local perform_request_impl          = internal.perform_request
-local perform_async_request_impl    = internal.perform_async_request
-local watch_impl                    = internal.watch
-local unwatch_impl                  = internal.unwatch
-
 local TIMEOUT_INFINITY = 500 * 365 * 86400
-local VSPACE_ID        = 281
-local VINDEX_ID        = 289
-local VCOLLATION_ID    = 277
-local DEFAULT_CONNECT_TIMEOUT = 10
-local IPROTO_GREETING_SIZE = 128
 
 -- select errors from box.error
-local E_UNKNOWN              = box.error.UNKNOWN
 local E_NO_CONNECTION        = box.error.NO_CONNECTION
 local E_PROC_LUA             = box.error.PROC_LUA
 
@@ -57,9 +44,6 @@ local M_COMMIT      = 18
 local M_ROLLBACK    = 19
 -- Injects raw data into connection. Used by tests.
 local M_INJECT      = 20
-
--- utility tables
-local is_final_state         = {closed = 1, error = 1}
 
 -- IPROTO feature id -> name
 local IPROTO_FEATURE_NAMES = {
@@ -98,333 +82,10 @@ local function iproto_features_check(features, required)
 end
 
 --
--- Connect to a remote server, do handshake.
--- @param host Hostname.
--- @param port TCP port.
--- @param timeout Timeout to connect and receive greeting.
---
--- @retval nil, err Error occured. The reason is returned.
--- @retval two non-nils A connected socket and a decoded greeting.
---
-local function establish_connection(host, port, timeout)
-    local timeout = timeout or DEFAULT_CONNECT_TIMEOUT
-    local begin = fiber.clock()
-    local s, err = socket.tcp_connect(host, port, timeout)
-    if not s then
-        return nil, err
-    end
-    local msg = s:read({chunk = IPROTO_GREETING_SIZE},
-                        timeout - (fiber.clock() - begin))
-    if not msg then
-        local err = s:error()
-        s:close()
-        return nil, err
-    end
-    local greeting, err = internal.decode_greeting(msg)
-    if not greeting then
-        s:close()
-        return nil, err
-    end
-    return s, greeting
-end
-
---
 -- Default action on push during a synchronous request -
 -- ignore.
 --
 local function on_push_sync_default() end
-
---
--- Basically, *transport* is a TCP connection speaking the Tarantool
--- network protocol (IPROTO). This is a low-level interface.
--- Primary features:
---  * concurrent perform_request()-s benefit from multiplexing
---    support in the protocol;
---  * schema-aware - snoops responses and initiates schema reload
---    when a response has a new schema version;
---  * delivers transport events via the callback.
---
--- Transport state machine:
---
--- State machine starts in 'initial' state. Start method
--- spawns a worker fiber, which will establish a connection.
--- Stop method sets the state to 'closed' and kills the worker.
--- If the transport is already in 'error' state stop() does
--- nothing.
---
--- State chart:
---
---  initial -> auth -> fetch_schema <-> active
---
---  (any state, on error) -> error_reconnect -> auth -> ...
---                                           \
---                                            -> error
---  (any state, but 'error') -> closed
---
---
--- State change events can be delivered to the transport user via
--- the optional 'callback' argument:
---
--- The callback functions needs to have the following signature:
---
---  callback(event_name, ...)
---
--- The following events are delivered, with arguments:
---
---  'state_changed', state, error
---  'handshake', greeting, version, features
---  'did_fetch_schema', schema_version, spaces, indices
---  'event', key, value
---
-local function create_transport(host, port, user, password, callback,
-                                connect_timeout, reconnect_after)
-    -- check credentials
-    if user == nil and password ~= nil then
-        box.error(E_PROC_LUA, 'net.box: user is not defined')
-    end
-
-    -- Current state machine's state.
-    local state             = 'initial'
-    local last_errno
-    local last_error
-
-    local function on_event(key, value)
-        callback('event', key, value)
-    end
-
-    -- The transport stores requests that are currently 'in flight'
-    -- for this connection.
-    -- Async request can not be timed out completely. Instead a
-    -- user must decide when he does not want to wait for
-    -- response anymore.
-    -- Sync requests are implemented as async call + immediate
-    -- wait for a result.
-    local transport         = internal.new_transport(on_event)
-
-    local sock
-    local greeting
-    local worker_fiber
-    -- Flag indicates that connection is closing and waits until
-    -- send buf became empty.
-    local is_closing        = false
-
-    -- STATE SWITCHING --
-    local function set_state(new_state, new_errno, new_error)
-        state = new_state
-        last_errno = new_errno
-        last_error = new_error
-        callback('state_changed', new_state, new_error)
-        if state == 'error' or state == 'error_reconnect' or
-           state == 'closed' then
-            transport:reset(box.error.new({code = new_errno,
-                                           reason = new_error}))
-        end
-    end
-
-    -- START/STOP --
-    local protocol_sm
-
-    local function start()
-        if state ~= 'initial' then return not is_final_state[state] end
-        fiber.create(function()
-            local ok, err, errno
-            worker_fiber = fiber_self()
-            fiber.name(string.format('%s:%s (net.box)', host, port), {truncate=true})
-            goto do_connect
-    ::handle_connection::
-            ok, err = pcall(protocol_sm)
-            assert(not ok)
-            sock:close()
-            if state == 'closed' then
-                goto stop
-            end
-            errno = err.code or E_UNKNOWN
-            err = tostring(err)
-            if not reconnect_after then
-                set_state('error', errno, err)
-                goto stop
-            end
-            set_state('error_reconnect', errno, err)
-    ::do_reconnect::
-            fiber.sleep(reconnect_after)
-    ::do_connect::
-            sock, greeting =
-                establish_connection(host, port, connect_timeout)
-            if sock then
-                goto handle_connection
-            end
-            if not reconnect_after then
-                set_state('error', E_NO_CONNECTION, greeting)
-                goto stop
-            end
-            set_state('error_reconnect', E_NO_CONNECTION, greeting)
-            goto do_reconnect
-    ::stop::
-            worker_fiber = nil
-        end)
-    end
-
-    local function stop(wait)
-        if wait and not is_final_state[state] then
-            is_closing = true
-            -- Here we are waiting until send buf became empty:
-            -- it is necessary to ensure that all requests are
-            -- sent before the connection is closed.
-            transport:wait_all_sent()
-            is_closing = false
-        end
-        -- While we were waiting for the send buffer to be empty,
-        -- the state could change.
-        if not is_final_state[state] then
-            set_state('closed', E_NO_CONNECTION, 'Connection closed')
-        end
-        if worker_fiber then
-            worker_fiber:cancel()
-            worker_fiber = nil
-        end
-    end
-
-    local function prepare_perform_request()
-        if state ~= 'active' and state ~= 'fetch_schema' then
-            local code = last_errno or E_NO_CONNECTION
-            local msg = last_error or
-                string.format('Connection is not established, state is "%s"',
-                              state)
-            return box.error.new({code = code, reason = msg})
-        end
-        if is_closing then
-            local code = E_NO_CONNECTION
-            local msg = string.format("Connection is closing")
-            return box.error.new({code = code, reason = msg})
-        end
-        -- Alert worker to notify it of the queued outgoing data.
-        worker_fiber:wakeup()
-    end
-
-    --
-    -- Send a request and do not wait for response.
-    -- @retval nil, error Error occured.
-    -- @retval not nil Future object.
-    --
-    local function perform_async_request(buffer, skip_header, method, on_push,
-                                         on_push_ctx, format, stream_id, ...)
-        local err = prepare_perform_request()
-        if err then
-            return nil, err
-        end
-        return perform_async_request_impl(transport, buffer, skip_header,
-                                          method, on_push, on_push_ctx, format,
-                                          stream_id, ...)
-    end
-
-    --
-    -- Send a request and wait for response.
-    -- @retval nil, error Error occured.
-    -- @retval not nil Response object.
-    --
-    local function perform_request(timeout, buffer, skip_header, method,
-                                   on_push, on_push_ctx, format,
-                                   stream_id, ...)
-        local err = prepare_perform_request()
-        if err then
-            return nil, err
-        end
-        return perform_request_impl(timeout, transport, buffer, skip_header,
-                                    method, on_push, on_push_ctx, format,
-                                    stream_id, ...)
-    end
-
-    -- Send a WATCH request. No-op if the connection is inactive or closing.
-    local function watch(key)
-        if not is_closing and
-           (state == 'active' or state == 'fetch_schema') then
-            watch_impl(transport, key)
-            worker_fiber:wakeup()
-        end
-    end
-
-    -- Send an UNWATCH request. No-op if the connection is inactive or closing.
-    local function unwatch(key)
-        if not is_closing and
-           (state == 'active' or state == 'fetch_schema') then
-            unwatch_impl(transport, key)
-            worker_fiber:wakeup()
-        end
-    end
-
-    -- PROTOCOL STATE MACHINE (WORKER FIBER) --
-    --
-    -- The sm is implemented as a collection of functions performing
-    -- tail-recursive calls to each other. Yep, Lua optimizes
-    -- such calls, and yep, this is the canonical way to implement
-    -- a state machine in Lua.
-    local iproto_setup_sm, iproto_auth_sm, iproto_schema_sm, iproto_sm
-
-    --
-    -- Protocol_sm is a core function of netbox. It calls all
-    -- other ..._sm() functions, and explicitly or implicitly
-    -- holds Lua referece on a connection object. It means, that
-    -- until it works, the connection can not be garbage
-    -- collected. See gh-3164, where because of reconnect sleeps
-    -- in this function, a connection could not be deleted.
-    --
-    protocol_sm = function()
-        assert(sock)
-        assert(greeting)
-        if greeting.protocol == 'Binary' then
-            return iproto_setup_sm()
-        else
-            box.error({
-                code = E_NO_CONNECTION,
-                reason = 'Unsupported protocol: ' .. greeting.protocol,
-            })
-        end
-    end
-
-    iproto_setup_sm = function()
-        local version, features = internal.iproto_id(greeting.version_id,
-                                                     transport, sock:fd())
-        callback('handshake', greeting, version, features)
-        return iproto_auth_sm(greeting.salt)
-    end
-
-    iproto_auth_sm = function(salt)
-        set_state('auth')
-        if not user then
-            set_state('fetch_schema')
-            return iproto_schema_sm()
-        end
-        internal.iproto_auth(user, password, salt, transport, sock:fd())
-        set_state('fetch_schema')
-        return iproto_schema_sm()
-    end
-
-    iproto_schema_sm = function()
-        local schema_version, schema = internal.iproto_schema(
-            greeting.version_id, transport, sock:fd())
-        callback('did_fetch_schema', schema_version, schema[VSPACE_ID],
-                 schema[VINDEX_ID], schema[VCOLLATION_ID])
-        set_state('active')
-        return iproto_sm(schema_version)
-    end
-
-    iproto_sm = function(schema_version)
-        internal.iproto_loop(schema_version, transport, sock:fd())
-        -- schema_version has been changed - start to load a new version.
-        -- Sic: self.schema_version will be updated only after reload.
-        set_state('fetch_schema')
-        return iproto_schema_sm()
-    end
-
-    return {
-        stop            = stop,
-        start           = start,
-        perform_request = perform_request,
-        perform_async_request = perform_async_request,
-        watch           = watch,
-        unwatch         = unwatch,
-    }
-end
 
 local function parse_connect_params(host_or_uri, ...) -- self? host_or_uri port? opts?
     local port, opts = ...
@@ -689,14 +350,14 @@ local function new_sm(host, port, opts)
         if callback then return callback(...) end
     end
     remote._callback = callback
-    local transport = create_transport(host, port, user, password,
-                                       weak_callback, opts.connect_timeout,
-                                       opts.reconnect_after)
+    local transport = internal.new_transport(
+            host, port, user, password, weak_callback,
+            opts.connect_timeout, opts.reconnect_after)
     remote._transport = transport
     remote._gc_hook = ffi.gc(ffi.new('char[1]'), function()
-        pcall(transport.stop);
+        pcall(transport.stop, transport);
     end)
-    transport.start()
+    transport:start()
     if opts.wait_connected ~= false then
         remote:wait_state('active', tonumber(opts.wait_connected))
     end
@@ -829,7 +490,7 @@ function watcher_methods:_run()
         self._next = state.idle
         state.idle = self
         if not state.is_acknowledged then
-            self._conn._transport.watch(state.key)
+            self._conn._transport:watch(state.key)
             state.is_acknowledged = true
         end
     else
@@ -876,7 +537,7 @@ function watcher_methods:unregister()
     state.watcher_count = state.watcher_count - 1
     if state.watcher_count == 0 then
         -- No watchers left. Unsubscribe and drop the state.
-        conn._transport.unwatch(state.key)
+        conn._transport:unwatch(state.key)
         conn._watchers[state.key] = nil
     end
 end
@@ -894,7 +555,7 @@ function remote_methods:watch(key, func)
         -- Install a trigger to resubscribe registered watchers on reconnect.
         self._on_connect(function(conn)
             for key, _ in pairs(conn._watchers) do
-                conn._transport.watch(key)
+                conn._transport:watch(key)
             end
         end)
     end
@@ -923,7 +584,7 @@ function remote_methods:watch(key, func)
         -- We don't care whether the connection is active or not, because if
         -- the connection fails, we will resubscribe all registered watchers
         -- from the on_connect trigger.
-        self._transport.watch(key)
+        self._transport:watch(key)
         self._watchers[key] = state
     end
     local watcher = setmetatable({
@@ -945,7 +606,7 @@ end
 
 function remote_methods:close()
     check_remote_arg(self, 'close')
-    self._transport.stop(true)
+    self._transport:stop(true)
 end
 
 function remote_methods:on_schema_reload(...)
@@ -986,7 +647,7 @@ function remote_methods:_request(method, opts, format, stream_id, ...)
                 error('To handle pushes in an async request use future:pairs()')
             end
             local res, err =
-                transport.perform_async_request(buffer, skip_header, method,
+                transport:perform_async_request(buffer, skip_header, method,
                                                 table.insert, {}, format,
                                                 stream_id, ...)
             if err then
@@ -1008,7 +669,7 @@ function remote_methods:_request(method, opts, format, stream_id, ...)
         self:wait_state('active', timeout)
         timeout = deadline and max(0, deadline - fiber_clock())
     end
-    local res, err = transport.perform_request(timeout, buffer, skip_header,
+    local res, err = transport:perform_request(timeout, buffer, skip_header,
                                                method, on_push, on_push_ctx,
                                                format, stream_id, ...)
     if err then
@@ -1108,7 +769,7 @@ function remote_methods:wait_state(state, timeout)
     local deadline = fiber_clock() + (timeout or TIMEOUT_INFINITY)
     -- FYI: [] on a string is valid
     repeat until self.state == state or state[self.state] or
-                 is_final_state[self.state] or
+                 self.state == 'closed' or self.state == 'error' or
                  not self._state_cond:wait(max(0, deadline - fiber_clock()))
     return self.state == state or state[self.state] or false
 end

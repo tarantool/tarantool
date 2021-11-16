@@ -125,6 +125,12 @@ ssize_t
 coio_readn_ahead_timeout(struct iostream *io, void *buf, size_t sz,
 			 size_t bufsiz, ev_tstamp timeout);
 
+static inline ssize_t
+coio_readn_timeout(struct iostream *io, void *buf, size_t sz, ev_tstamp timeout)
+{
+	return coio_readn_ahead_timeout(io, buf, sz, sz, timeout);
+}
+
 ssize_t
 coio_write_timeout(struct iostream *io, const void *buf, size_t sz,
 		   ev_tstamp timeout);
