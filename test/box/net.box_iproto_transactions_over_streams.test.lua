@@ -129,9 +129,7 @@ header = msgpack.encode({
 });
 body = msgpack.encode({nil});
 size = msgpack.encode(header:len() + body:len());
-conn._transport.perform_request(nil, nil, false, net_box._method.inject,
-                                nil, nil, nil, nil,
-                                size .. header .. body);
+conn:_request(net_box._method.inject, nil, nil, nil, size .. header .. body);
 test_run:cmd("setopt delimiter ''");
 conn:close()
 test_run:cmd("stop server test")

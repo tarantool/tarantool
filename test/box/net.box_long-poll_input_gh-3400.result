@@ -1,3 +1,6 @@
+test_run = require('test_run').new()
+---
+...
 fiber = require 'fiber'
 ---
 ...
@@ -24,14 +27,28 @@ c:ping()
 -- new attempts to read any data - the connection is closed
 -- already.
 --
-f = fiber.create(c._transport.perform_request, nil, nil, false,         \
-                 net._method.call_17, nil, nil, nil, nil, 'long', {})   \
-c._transport.perform_request(nil, nil, false, net._method.inject,       \
-                             nil, nil, nil, nil, '\x80')
+result = nil
 ---
 ...
-while f:status() ~= 'dead' do fiber.sleep(0.01) end
+test_run:cmd("setopt delimiter ';'")
 ---
+- true
+...
+f = fiber.create(function()
+    _, result = pcall(c._request, c, net._method.call_17,
+                      nil, nil, nil, 'long', {})
+end)
+pcall(c._request, c, net._method.inject, nil, nil, nil, '\x80')
+test_run:cmd("setopt delimiter ''");
+---
+...
+test_run:wait_cond(function() return f:status() == 'dead' end)
+---
+- true
+...
+assert(tostring(result) == 'Peer closed')
+---
+- true
 ...
 c:close()
 ---
