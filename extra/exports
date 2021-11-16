@@ -463,10 +463,8 @@ tt_uuid_from_string
 tt_uuid_is_equal
 tt_uuid_is_nil
 tt_uuid_to_string
-uri_create
 uri_destroy
 uri_format
-uri_set_create
 uri_set_destroy
 uuid_nil
 uuid_unpack

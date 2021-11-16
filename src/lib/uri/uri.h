@@ -42,6 +42,18 @@ struct uri_set {
 #define URI_MAXHOST NI_MAXHOST
 #define URI_MAXSERVICE _POSIX_PATH_MAX /* _POSIX_PATH_MAX always > NI_MAXSERV */
 
+/**
+ * Appends @a value to @a uri parameter with given @a name,
+ * creating one if it doesn't exist.
+ */
+void
+uri_add_param(struct uri *uri, const char *name, const char *value);
+
+/**
+ * Remove @a uri parameter and all its values.
+ */
+void
+uri_remove_param(struct uri *uri, const char *name);
 
 /**
  * Creates new @a uri structure according to passed @a str.
