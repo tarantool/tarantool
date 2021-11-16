@@ -147,7 +147,7 @@ coio_connect_timeout(const char *host, const char *service, int host_hint,
 	ev_tstamp start, delay;
 	evio_timeout_init(loop, &start, &delay, timeout);
 
-	if (strcmp(host, URI_HOST_UNIX) == 0) {
+	if (host != NULL && strcmp(host, URI_HOST_UNIX) == 0) {
 		/* UNIX socket */
 		struct sockaddr_un un;
 		snprintf(un.sun_path, sizeof(un.sun_path), "%s", service);
