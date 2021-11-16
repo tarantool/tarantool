@@ -1,6 +1,6 @@
 if (NOT _OptionalPackagesFile)
     set(_OptionalPackagesFile
-        ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/OptionalPackages.txt)
+        ${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/OptionalPackages.txt)
     if (EXISTS ${_OptionalPackagesFile})
         file(REMOVE ${_OptionalPackagesFile})
     endif()
