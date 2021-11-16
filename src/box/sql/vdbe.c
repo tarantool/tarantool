@@ -1418,6 +1418,26 @@ case OP_Cast: {                  /* in1 */
 	goto abort_due_to_error;
 }
 
+/* Opcode: Array P1 P2 P3 * *
+ * Synopsis: r[P2]=array(P3@P1)
+ *
+ * Construct an ARRAY value from P1 registers starting at reg(P3).
+ */
+case OP_Array: {
+	pOut = &aMem[pOp->p2];
+
+	uint32_t size;
+	struct region *region = &fiber()->gc;
+	size_t svp = region_used(region);
+	char *val = mem_encode_array(&aMem[pOp->p3], pOp->p1, &size, region);
+	if (val == NULL || mem_copy_array(pOut, val, size) != 0) {
+		region_truncate(region, svp);
+		goto abort_due_to_error;
+	}
+	region_truncate(region, svp);
+	break;
+}
+
 /* Opcode: Eq P1 P2 P3 P4 P5
  * Synopsis: IF r[P3]==r[P1]
  *

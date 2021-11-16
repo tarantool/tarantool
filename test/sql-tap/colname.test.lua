@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(79)
+test:plan(76)
 
 --!./tcltestrunner.lua
 -- 2008 July 15
@@ -546,7 +546,6 @@ test:do_test(
 
 local data = {
     [[`a`]],
-    "[a]",
 }
 for i, val in ipairs(data) do
     test:do_catchsql_test(
@@ -559,7 +558,6 @@ end
 local data2 = {
     {[['a']],{1, "/Syntax error/"}}, -- because ' is delimiter for strings
     {[[`a`]],{1, "/unrecognized token/"}}, -- because ` is undefined symbol
-    {"[a]",{1, "/unrecognized token/"}} -- because [ is undefined symbol
 }
 for i, val in ipairs(data2) do
     test:do_catchsql_test(

@@ -1128,6 +1128,20 @@ expr(A) ::= CAST(X) LP expr(E) AS typedef(T) RP(Y). {
   sqlExprAttachSubtrees(pParse->db, A.pExpr, E.pExpr, 0);
 }
 
+expr(A) ::= LB(X) exprlist(Y) RB(E). {
+  struct Expr *expr = sql_expr_new_anon(pParse->db, TK_ARRAY);
+  if (expr == NULL) {
+    sql_expr_list_delete(pParse->db, Y);
+    pParse->is_aborted = true;
+    return;
+  }
+  expr->x.pList = Y;
+  expr->type = FIELD_TYPE_ARRAY;
+  sqlExprSetHeightAndFlags(pParse, expr);
+  A.pExpr = expr;
+  spanSet(&A, &X, &E);
+}
+
 expr(A) ::= TRIM(X) LP trim_operands(Y) RP(E). {
   A.pExpr = sqlExprFunction(pParse, Y, &X);
   spanSet(&A, &X, &E);

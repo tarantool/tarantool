@@ -3370,6 +3370,22 @@ int_overflow:
 			  is_neg ? P4_INT64 : P4_UINT64);
 }
 
+static void
+expr_code_array(struct Parse *parser, struct Expr *expr, int reg)
+{
+	struct Vdbe *vdbe = parser->pVdbe;
+	struct ExprList *list = expr->x.pList;
+	if (list == NULL) {
+		sqlVdbeAddOp3(vdbe, OP_Array, 0, reg, 0);
+		return;
+	}
+	int count = list->nExpr;
+	int values_reg = parser->nMem + 1;
+	parser->nMem += count;
+	sqlExprCodeExprList(parser, list, values_reg, 0, SQL_ECEL_FACTOR);
+	sqlVdbeAddOp3(vdbe, OP_Array, count, reg, values_reg);
+}
+
 /*
  * Erase column-cache entry number i
  */
@@ -3820,6 +3836,10 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sql_expr_type_cache_change(pParse, inReg, 1);
 			return inReg;
 		}
+
+	case TK_ARRAY:
+		expr_code_array(pParse, pExpr, target);
+		break;
 
 	case TK_LT:
 	case TK_LE:
