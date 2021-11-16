@@ -426,6 +426,14 @@ memtx_engine_begin_final_recovery(struct engine *engine)
 	/* End of the fast path: loaded the primary key. */
 	space_foreach(memtx_end_build_primary_key, memtx);
 
+	/* Complete space initialization. */
+	int rc = space_foreach(space_on_initial_recovery_complete, NULL);
+	/* If failed - the snapshot has inconsistent data. We cannot start. */
+	if (rc != 0) {
+		diag_log();
+		panic("Failed to complete recovery from snapshot!");
+	}
+
 	if (!memtx->force_recovery && !memtx_tx_manager_use_mvcc_engine) {
 		/*
 		 * Fast start path: "play out" WAL

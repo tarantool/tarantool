@@ -150,6 +150,10 @@ struct field_def {
 	struct Expr *default_value_expr;
 	/** Type of comression to this field */
 	enum compression_type compression_type;
+	/** Array of constraints. Can be NULL if constraints_count == 0. */
+	struct tuple_constraint_def *constraint_def;
+	/** Number of constraints. */
+	uint32_t constraint_count;
 };
 
 /**
