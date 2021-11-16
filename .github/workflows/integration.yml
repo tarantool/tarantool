@@ -94,3 +94,9 @@ jobs:
     uses: tarantool-php/queue/.github/workflows/reusable_qa.yml@master
     with:
       artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+
+  go-tarantool:
+    needs: tarantool
+    uses: tarantool/go-tarantool/.github/workflows/reusable_testing.yml@master
+    with:
+      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
