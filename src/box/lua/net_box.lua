@@ -427,37 +427,6 @@ local function create_transport(host, port, user, password, callback,
     }
 end
 
--- Wrap create_transport, adding auto-stop-on-GC feature.
--- All the GC magic is neatly encapsulated!
--- The tricky part is the callback:
---  * callback (typically) references the transport (indirectly);
---  * worker fiber references the callback;
---  * fibers are GC roots - i.e. transport is never GC-ed!
--- We solve the issue by making the worker->callback ref weak.
--- Now it is necessary to have a strong ref to callback somewhere or
--- it is GC-ed prematurely. We wrap stop() method, stashing the
--- ref in an upvalue (stop() performance doesn't matter much.)
-local create_transport = function(host, port, user, password, callback,
-                                  connect_timeout, reconnect_after)
-    local weak_refs = setmetatable({callback = callback}, {__mode = 'v'})
-    local function weak_callback(...)
-        local callback = weak_refs.callback
-        if callback then return callback(...) end
-    end
-    local transport = create_transport(host, port, user, password,
-                                       weak_callback, connect_timeout,
-                                       reconnect_after)
-    local transport_stop = transport.stop
-    local gc_hook = ffi.gc(ffi.new('char[1]'), function()
-        pcall(transport_stop)
-    end)
-    transport.stop = function()
-        -- dummy gc_hook, callback refs prevent premature GC
-        return transport_stop(gc_hook, callback)
-    end
-    return transport
-end
-
 local function parse_connect_params(host_or_uri, ...) -- self? host_or_uri port? opts?
     local port, opts = ...
     if type(host_or_uri) == 'table' then host_or_uri, port, opts = ... end
@@ -706,10 +675,29 @@ local function new_sm(host, port, opts)
     remote._state_cond = fiber.cond()
     -- Last stream ID used for this connection.
     remote._last_stream_id = 0
-    remote._transport = create_transport(host, port, user, password, callback,
-                                         opts.connect_timeout,
-                                         opts.reconnect_after)
-    remote._transport.start()
+    local weak_refs = setmetatable({callback = callback}, {__mode = 'v'})
+    -- Create a transport, adding auto-stop-on-GC feature.
+    -- The tricky part is the callback:
+    --  * callback references the transport (indirectly);
+    --  * worker fiber references the callback;
+    --  * fibers are GC roots - i.e. transport is never GC-ed!
+    -- We solve the issue by making the worker->callback ref weak.
+    -- Now it is necessary to have a strong ref to callback somewhere or
+    -- it is GC-ed prematurely. We store a strong reference in the remote
+    -- connection object.
+    local function weak_callback(...)
+        local callback = weak_refs.callback
+        if callback then return callback(...) end
+    end
+    remote._callback = callback
+    local transport = create_transport(host, port, user, password,
+                                       weak_callback, opts.connect_timeout,
+                                       opts.reconnect_after)
+    remote._transport = transport
+    remote._gc_hook = ffi.gc(ffi.new('char[1]'), function()
+        pcall(transport.stop);
+    end)
+    transport.start()
     if opts.wait_connected ~= false then
         remote:wait_state('active', tonumber(opts.wait_connected))
     end
@@ -1378,7 +1366,6 @@ index_metatable = function(remote)
 end
 
 local this_module = {
-    create_transport = create_transport,
     connect = connect,
     new = connect, -- Tarantool < 1.7.1 compatibility,
     _method = { -- for tests
