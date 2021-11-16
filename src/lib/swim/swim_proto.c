@@ -51,7 +51,7 @@ int
 swim_decode_map(const char **pos, const char *end, uint32_t *size,
 		const char *prefix, const char *param_name)
 {
-	if (mp_typeof(**pos) != MP_MAP || *pos == end ||
+	if (*pos == end || mp_typeof(**pos) != MP_MAP ||
 	    mp_check_map(*pos, end) > 0) {
 		diag_set(SwimError, "%s %s should be a map", prefix,
 			 param_name);
@@ -65,7 +65,7 @@ int
 swim_decode_array(const char **pos, const char *end, uint32_t *size,
 		  const char *prefix, const char *param_name)
 {
-	if (mp_typeof(**pos) != MP_ARRAY || *pos == end ||
+	if (*pos == end || mp_typeof(**pos) != MP_ARRAY ||
 	    mp_check_array(*pos, end) > 0) {
 		diag_set(SwimError, "%s %s should be an array", prefix,
 			 param_name);
@@ -79,7 +79,7 @@ int
 swim_decode_uint(const char **pos, const char *end, uint64_t *value,
 		 const char *prefix, const char *param_name)
 {
-	if (mp_typeof(**pos) != MP_UINT || *pos == end ||
+	if (*pos == end || mp_typeof(**pos) != MP_UINT ||
 	    mp_check_uint(*pos, end) > 0) {
 		diag_set(SwimError, "%s %s should be a uint", prefix,
 			 param_name);
@@ -125,7 +125,7 @@ static inline int
 swim_decode_bin(const char **bin, uint32_t *size, const char **pos,
 		const char *end, const char *prefix, const char *param_name)
 {
-	if (mp_typeof(**pos) != MP_BIN || *pos == end ||
+	if (*pos == end || mp_typeof(**pos) != MP_BIN ||
 	    mp_check_binl(*pos, end) > 0) {
 		diag_set(SwimError, "%s %s should be bin", prefix,
 			 param_name);
