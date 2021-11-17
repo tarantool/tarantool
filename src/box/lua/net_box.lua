@@ -265,19 +265,19 @@ local function create_transport(host, port, user, password, callback,
         end)
     end
 
-    local function stop()
-        if not is_final_state[state] then
+    local function stop(wait)
+        if wait and not is_final_state[state] then
             is_closing = true
             -- Here we are waiting until send buf became empty:
             -- it is necessary to ensure that all requests are
             -- sent before the connection is closed.
             transport:wait_all_sent()
             is_closing = false
-            -- While we were waiting for the send buffer to be
-            -- empty, the state could change.
-            if not is_final_state[state] then
-                set_state('closed', E_NO_CONNECTION, 'Connection closed')
-            end
+        end
+        -- While we were waiting for the send buffer to be empty,
+        -- the state could change.
+        if not is_final_state[state] then
+            set_state('closed', E_NO_CONNECTION, 'Connection closed')
         end
         if worker_fiber then
             worker_fiber:cancel()
@@ -958,7 +958,7 @@ end
 
 function remote_methods:close()
     check_remote_arg(self, 'close')
-    self._transport.stop()
+    self._transport.stop(true)
 end
 
 function remote_methods:on_schema_reload(...)
