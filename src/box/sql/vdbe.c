@@ -1463,6 +1463,35 @@ case OP_Map: {
 	break;
 }
 
+/**
+ * Opcode: Getitem P1 P2 P3 * *
+ * Synopsis: r[P2] = value[P3@P1]
+ *
+ * Get an element from the value in register P3[P1] using values in
+ * registers P3, ... P3 + (P1 - 1).
+ */
+case OP_Getitem: {
+	int count = pOp->p1;
+	assert(count > 0);
+	struct Mem *value = &aMem[pOp->p3 + count];
+	if (mem_is_null(value)) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "Selecting is not "
+			 "possible from NULL");
+		goto abort_due_to_error;
+	}
+	if (mem_is_any(value) || !mem_is_container(value)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(value),
+			 "map or array");
+		goto abort_due_to_error;
+	}
+
+	pOut = &aMem[pOp->p2];
+	struct Mem *keys = &aMem[pOp->p3];
+	if (mem_getitem(value, keys, count, pOut) != 0)
+		goto abort_due_to_error;
+	break;
+}
+
 /* Opcode: Eq P1 P2 P3 P4 P5
  * Synopsis: IF r[P3]==r[P1]
  *
