@@ -83,6 +83,8 @@ sql_expr_type(struct Expr *pExpr)
 		enum field_type lhs_type = sql_expr_type(pExpr->pLeft);
 		enum field_type rhs_type = sql_expr_type(pExpr->pRight);
 		return sql_type_result(rhs_type, lhs_type);
+	case TK_GETITEM:
+		return FIELD_TYPE_ANY;
 	case TK_CONCAT:
 		return FIELD_TYPE_STRING;
 	case TK_CASE: {
@@ -3462,6 +3464,43 @@ expr_code_map(struct Parse *parser, struct Expr *expr, int reg)
 	sqlVdbeAddOp3(vdbe, OP_Map, len, reg, result_reg);
 }
 
+/** Generate opcodes for operator []. */
+static void
+expr_code_getitem(struct Parse *parser, struct Expr *expr, int reg)
+{
+	struct Vdbe *vdbe = parser->pVdbe;
+	struct ExprList *list = expr->x.pList;
+	assert(list != NULL);
+	/* The last expr is the value to which the operator is applied. */
+	int count = list->nExpr - 1;
+	struct Expr *value = list->a[count].pExpr;
+
+	enum field_type type = value->op != TK_NULL ? sql_expr_type(value) :
+			       field_type_MAX;
+	if (value->op != TK_VARIABLE &&
+	    type != FIELD_TYPE_MAP && type != FIELD_TYPE_ARRAY) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC, "Selecting is "
+			 "only possible from map and array values");
+		parser->is_aborted = true;
+		return;
+	}
+	for (int i = 0; i < count; ++i) {
+		struct Expr *arg = list->a[i].pExpr;
+		enum field_type type = arg->op != TK_NULL ? sql_expr_type(arg) :
+				       field_type_MAX;
+		if (type == FIELD_TYPE_MAP || type == FIELD_TYPE_ARRAY) {
+			diag_set(ClientError, ER_SQL_PARSER_GENERIC, "Map and "
+				 "array values cannot be keys");
+			parser->is_aborted = true;
+			return;
+		}
+	}
+	int reg_operands = parser->nMem + 1;
+	parser->nMem += count + 1;
+	sqlExprCodeExprList(parser, list, reg_operands, 0, SQL_ECEL_FACTOR);
+	sqlVdbeAddOp3(vdbe, OP_Getitem, count, reg, reg_operands);
+}
+
 /*
  * Erase column-cache entry number i
  */
@@ -3919,6 +3958,10 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 
 	case TK_MAP:
 		expr_code_map(pParse, pExpr, target);
+		return target;
+
+	case TK_GETITEM:
+		expr_code_getitem(pParse, pExpr, target);
 		return target;
 
 	case TK_LT:

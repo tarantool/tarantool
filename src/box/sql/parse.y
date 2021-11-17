@@ -155,6 +155,7 @@ cmdx ::= cmd.
 %left CONCAT.
 %left COLLATE.
 %right BITNOT.
+%right LB.
 
 
 ///////////////////// Begin and end transactions. ////////////////////////////
@@ -1096,6 +1097,32 @@ expr(A) ::= CAST(X) LP expr(E) AS typedef(T) RP(Y). {
   A.pExpr->type = T.type;
   sqlExprAttachSubtrees(pParse->db, A.pExpr, E.pExpr, 0);
 }
+
+expr(A) ::= expr(X) LB getlist(Y) RB(E). {
+  struct Expr *expr = sql_expr_new_anon(pParse->db, TK_GETITEM);
+  if (expr == NULL) {
+    sql_expr_list_delete(pParse->db, Y);
+    pParse->is_aborted = true;
+    return;
+  }
+  Y = sql_expr_list_append(pParse->db, Y, X.pExpr);
+  expr->x.pList = Y;
+  expr->type = FIELD_TYPE_ANY;
+  sqlExprSetHeightAndFlags(pParse, expr);
+  A.pExpr = expr;
+  A.zStart = X.zStart;
+  A.zEnd = &E.z[E.n];
+}
+
+getlist(A) ::= getlist(A) RB LB expr(X). {
+  A = sql_expr_list_append(pParse->db, A, X.pExpr);
+}
+getlist(A) ::= expr(X). {
+  A = sql_expr_list_append(pParse->db, NULL, X.pExpr);
+}
+
+%type getlist {ExprList *}
+%destructor getlist {sql_expr_list_delete(pParse->db, $$);}
 
 expr(A) ::= LB(X) exprlist(Y) RB(E). {
   struct Expr *expr = sql_expr_new_anon(pParse->db, TK_ARRAY);
