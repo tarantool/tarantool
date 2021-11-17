@@ -1,0 +1,9 @@
+--
+-- gh-6617: GC callback yields if there are pending requests.
+--
+c = require('net.box').connect(box.cfg.listen)
+box.error.injection.set('ERRINJ_NETBOX_IO_DELAY', true)
+_ = c:eval('return true', {}, {is_async = true})
+c = nil
+_ = collectgarbage('collect')
+box.error.injection.set('ERRINJ_NETBOX_IO_DELAY', false)
