@@ -483,23 +483,19 @@ netbox_encode_auth(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
 		   const char *password, size_t password_len,
 		   const char *salt)
 {
+	char scramble[SCRAMBLE_SIZE];
+	scramble_prepare(scramble, salt, password, password_len);
 	struct mpstream stream;
 	mpstream_init(&stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
 		      luamp_error, L);
 	size_t svp = netbox_begin_encode(&stream, sync, IPROTO_AUTH, 0);
-
-	/* Adapted from xrow_encode_auth() */
-	mpstream_encode_map(&stream, password != NULL ? 2 : 1);
+	mpstream_encode_map(&stream, 2);
 	mpstream_encode_uint(&stream, IPROTO_USER_NAME);
 	mpstream_encode_strn(&stream, user, user_len);
-	if (password != NULL) { /* password can be omitted */
-		char scramble[SCRAMBLE_SIZE];
-		scramble_prepare(scramble, salt, password, password_len);
-		mpstream_encode_uint(&stream, IPROTO_TUPLE);
-		mpstream_encode_array(&stream, 2);
-		mpstream_encode_str(&stream, "chap-sha1");
-		mpstream_encode_strn(&stream, scramble, SCRAMBLE_SIZE);
-	}
+	mpstream_encode_uint(&stream, IPROTO_TUPLE);
+	mpstream_encode_array(&stream, 2);
+	mpstream_encode_str(&stream, "chap-sha1");
+	mpstream_encode_strn(&stream, scramble, SCRAMBLE_SIZE);
 	netbox_end_encode(&stream, svp);
 }
 

@@ -178,11 +178,10 @@ local function on_push_sync_default() end
 --
 local function create_transport(host, port, user, password, callback,
                                 connect_timeout, reconnect_after)
-    -- check / normalize credentials
+    -- check credentials
     if user == nil and password ~= nil then
         box.error(E_PROC_LUA, 'net.box: user is not defined')
     end
-    if user ~= nil and password == nil then password = '' end
 
     -- Current state machine's state.
     local state             = 'initial'
@@ -391,7 +390,7 @@ local function create_transport(host, port, user, password, callback,
 
     iproto_auth_sm = function(salt)
         set_state('auth')
-        if not user or not password then
+        if not user then
             set_state('fetch_schema')
             return iproto_schema_sm()
         end
