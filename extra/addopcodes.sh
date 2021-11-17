@@ -53,6 +53,7 @@ extras="            \
     LINEFEED        \
     SPACE           \
     ILLEGAL         \
+    GETITEM         \
 "
 
 IFS=" "
