@@ -809,13 +809,10 @@ netbox_communicate(struct netbox_transport *transport, int fd, size_t limit)
 	struct ibuf *send_buf = &transport->send_buf;
 	struct ibuf *recv_buf = &transport->recv_buf;
 	struct fiber_cond *on_send_buf_empty = &transport->on_send_buf_empty;
-	int revents = COIO_READ;
 	while (true) {
 		/* reader serviced first */
-check_limit:
-		if (ibuf_used(recv_buf) >= limit)
-			return 0;
-		while (revents & COIO_READ) {
+		int events = 0;
+		while (ibuf_used(recv_buf) < limit) {
 			void *p = ibuf_reserve(recv_buf, NETBOX_READAHEAD);
 			if (p == NULL) {
 				diag_set(OutOfMemory, NETBOX_READAHEAD,
@@ -830,33 +827,35 @@ check_limit:
 				return -1;
 			} if (rc > 0) {
 				recv_buf->wpos += rc;
-				goto check_limit;
-			} else if (errno == EAGAIN || errno == EWOULDBLOCK)
-				revents &= ~COIO_READ;
-			else if (errno != EINTR)
+			} else if (!sio_wouldblock(errno)) {
 				goto handle_error;
+			} else {
+				events |= EV_READ;
+				break;
+			}
 		}
-
-		while ((revents & COIO_WRITE) && ibuf_used(send_buf) != 0) {
+		if (ibuf_used(recv_buf) >= limit)
+			return 0;
+		while (ibuf_used(send_buf) > 0) {
 			ssize_t rc = send(
 				fd, send_buf->rpos, ibuf_used(send_buf), 0);
 			if (rc >= 0) {
 				send_buf->rpos += rc;
 				if (ibuf_used(send_buf) == 0)
 					fiber_cond_broadcast(on_send_buf_empty);
-			} else if (errno == EAGAIN || errno == EWOULDBLOCK)
-				revents &= ~COIO_WRITE;
-			else if (errno != EINTR)
+			} else if (!sio_wouldblock(errno)) {
 				goto handle_error;
+			} else {
+				events |= EV_WRITE;
+				break;
+			}
 		}
-
+		coio_wait(fd, events, TIMEOUT_INFINITY);
 		ERROR_INJECT_YIELD(ERRINJ_NETBOX_IO_DELAY);
 		ERROR_INJECT(ERRINJ_NETBOX_IO_ERROR, {
 			box_error_raise(ER_NO_CONNECTION, "Error injection");
 			return -1;
 		});
-		revents = coio_wait(fd, EV_READ | (ibuf_used(send_buf) != 0 ?
-				EV_WRITE : 0), TIMEOUT_INFINITY);
 		if (fiber_is_cancelled()) {
 			diag_set(FiberIsCancelled);
 			return -1;
