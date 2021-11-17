@@ -53,8 +53,6 @@ local check_symbols = {
     'tnt_mp_sizeof_error',
     'tnt_mp_sizeof_decimal',
     'tnt_mp_sizeof_uuid',
-    'exception_get_int',
-    'exception_get_string',
 
     'uuid_nil',
     'tt_uuid_create',
