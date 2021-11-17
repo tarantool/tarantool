@@ -3326,6 +3326,65 @@ error:
 	return NULL;
 }
 
+/* Locate an element in a MAP or ARRAY using the given key.*/
+static int
+mp_getitem(const char **data, const struct Mem *key)
+{
+	if (mp_typeof(**data) != MP_ARRAY && mp_typeof(**data) != MP_MAP) {
+		*data = NULL;
+		return 0;
+	}
+	if (mp_typeof(**data) == MP_ARRAY) {
+		uint32_t size = mp_decode_array(data);
+		if (!mem_is_uint(key) || key->u.u == 0 || key->u.u > size) {
+			*data = NULL;
+			return 0;
+		}
+		for (uint32_t i = 0; i < key->u.u - 1; ++i)
+			mp_next(data);
+		return 0;
+	}
+	struct Mem mem;
+	mem_create(&mem);
+	uint32_t size = mp_decode_map(data);
+	for (uint32_t i = 0; i < size; ++i) {
+		uint32_t len;
+		if (mem_from_mp_ephemeral(&mem, *data, &len) != 0)
+			return -1;
+		assert(mem_is_trivial(&mem) && !mem_is_metatype(&mem));
+		*data += len;
+		if (mem_is_comparable(&mem) &&
+		    mem_cmp_scalar(&mem, key, NULL) == 0)
+			return 0;
+		mp_next(data);
+	}
+	*data = NULL;
+	return 0;
+}
+
+int
+mem_getitem(const struct Mem *mem, const struct Mem *keys, int count,
+	    struct Mem *res)
+{
+	assert(count > 0);
+	assert(mem_is_map(mem) || mem_is_array(mem));
+	const char *data = mem->z;
+	for (int i = 0; i < count && data != NULL; ++i) {
+		if (mp_getitem(&data, &keys[i]) != 0)
+			return -1;
+	}
+	if (data == NULL) {
+		mem_set_null(res);
+		return 0;
+	}
+	uint32_t len;
+	if (mem_from_mp(res, data, &len) != 0)
+		return -1;
+	res->flags |= MEM_Any;
+	assert((res->flags & (MEM_Number | MEM_Scalar)) == 0);
+	return 0;
+}
+
 /**
  * Allocate a sequence of initialized vdbe memory registers
  * on region.
