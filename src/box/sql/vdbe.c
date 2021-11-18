@@ -1442,6 +1442,27 @@ case OP_Array: {
 	break;
 }
 
+/**
+ * Opcode: Map P1 P2 P3 * *
+ * Synopsis: r[P2] = map(P3@P1)
+ *
+ * Construct an MAP value from P1 registers starting at reg(P3).
+ */
+case OP_Map: {
+	pOut = &aMem[pOp->p2];
+
+	uint32_t size;
+	struct region *region = &fiber()->gc;
+	size_t svp = region_used(region);
+	char *val = mem_encode_map(&aMem[pOp->p3], pOp->p1, &size, region);
+	if (val == NULL || mem_copy_map(pOut, val, size) != 0) {
+		region_truncate(region, svp);
+		goto abort_due_to_error;
+	}
+	region_truncate(region, svp);
+	break;
+}
+
 /* Opcode: Eq P1 P2 P3 P4 P5
  * Synopsis: IF r[P3]==r[P1]
  *
