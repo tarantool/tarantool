@@ -261,7 +261,7 @@ g.test_read_only_reason_election_has_leader_no_uuid = function(g)
 
     t.helpers.retrying({}, function()
         assert(g.replica:exec(function(leader_id)
-            return box.space._cluster:get{leader_id} == nil
+            return box.info.replication[leader_id] == nil
         end, {leader_id}))
     end)
 
@@ -301,7 +301,7 @@ g.test_read_only_reason_synchro_no_uuid = function(g)
     t.helpers.retrying({}, function()
         assert(g.replica:exec(function(leader_id)
             return box.info.synchro.queue.owner ~= 0 and
-                   box.space._cluster:get{leader_id} == nil
+                   box.info.replication[leader_id] == nil
         end, {leader_id}))
     end)
 
