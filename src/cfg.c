@@ -45,6 +45,16 @@ cfg_get(const char *param)
 		panic("cfg_get('%s')", param);
 }
 
+void
+cfg_setb(const char *param, bool value)
+{
+	const char *value_str = value ? "true" : "false";
+	const char *buf = tt_snprintf(MAX_OPT_NAME_LEN, "box.cfg.%s = %s",
+				      param, value_str);
+	if (luaL_dostring(tarantool_L, buf) != 0)
+		panic("cfg_set('%s') failed", param);
+}
+
 int
 cfg_get_uri_set(const char *param, struct uri_set *uri_set)
 {

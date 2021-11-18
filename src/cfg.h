@@ -46,6 +46,9 @@ extern "C" {
 int
 cfg_get_uri_set(const char *param, struct uri_set *uri_set);
 
+void
+cfg_setb(const char *param, bool value);
+
 int
 cfg_geti(const char *param);
 
