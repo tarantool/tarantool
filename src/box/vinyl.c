@@ -2811,6 +2811,7 @@ vinyl_engine_begin_initial_recovery(struct engine *engine,
 			return -1;
 		vy_env_complete_recovery(e);
 		e->status = VINYL_INITIAL_RECOVERY_REMOTE;
+		e->run_env.initial_join = true;
 	}
 	return 0;
 }
@@ -2825,6 +2826,7 @@ vinyl_engine_begin_final_recovery(struct engine *engine)
 		break;
 	case VINYL_INITIAL_RECOVERY_REMOTE:
 		e->status = VINYL_FINAL_RECOVERY_REMOTE;
+		e->run_env.initial_join = false;
 		break;
 	default:
 		unreachable();

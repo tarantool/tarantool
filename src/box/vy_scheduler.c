@@ -1570,7 +1570,8 @@ vy_task_compaction_complete(struct vy_task *task)
 	 * next checkpoint.
 	 */
 	rlist_foreach_entry(run, &unused_runs, in_unused) {
-		if (run->dump_lsn > gc_lsn)
+		if (run->dump_lsn > gc_lsn ||
+		    scheduler->run_env->initial_join)
 			vy_run_remove_files(lsm->env->path, lsm->space_id,
 					    lsm->index_id, run->id);
 	}

@@ -69,6 +69,11 @@ struct vy_run_env {
 	 * processing the next read request.
 	 */
 	int next_reader;
+	/**
+	 * We need this flag during compaction in order to determine we can
+	 * unconditionally remove unused runs' files in-place.
+	 */
+	bool initial_join;
 };
 
 /**
