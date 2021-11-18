@@ -32,6 +32,7 @@
 #include "cfg.h"
 #include "lua/utils.h"
 #include "tt_static.h"
+#include "lua/uri.h"
 
 enum { MAX_OPT_NAME_LEN = 256, MAX_OPT_VAL_LEN = 256 };
 
@@ -42,6 +43,15 @@ cfg_get(const char *param)
 		tt_snprintf(MAX_OPT_NAME_LEN, "return box.cfg.%s", param);
 	if (luaL_dostring(tarantool_L, buf) != 0)
 		panic("cfg_get('%s')", param);
+}
+
+int
+cfg_get_uri_set(const char *param, struct uri_set *uri_set)
+{
+	cfg_get(param);
+	int rc = luaT_uri_set_create(tarantool_L, -1, uri_set);
+	lua_pop(tarantool_L, 1);
+	return rc;
 }
 
 int

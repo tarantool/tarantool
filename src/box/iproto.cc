@@ -3085,7 +3085,7 @@ iproto_send_listen_msg(struct evio_service *binary)
 }
 
 int
-iproto_listen(const char **uris, int size)
+iproto_listen(const struct uri_set *uri_set)
 {
 	iproto_send_stop_msg();
 	evio_service_stop(&tx_binary);
@@ -3096,7 +3096,7 @@ iproto_listen(const char **uris, int size)
 	 * implementation, we rely on the Linux kernel to distribute
 	 * incoming connections across iproto threads.
 	 */
-	if (evio_service_bind(&tx_binary, uris, size) != 0)
+	if (evio_service_bind(&tx_binary, uri_set) != 0)
 		return -1;
 	if (iproto_send_listen_msg(&tx_binary) != 0)
 		return -1;

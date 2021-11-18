@@ -33,6 +33,8 @@
 
 #include <stddef.h>
 
+struct uri_set;
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -124,7 +126,7 @@ void
 iproto_init(int threads_count);
 
 int
-iproto_listen(const char **uris, int size);
+iproto_listen(const struct uri_set *uri_set);
 
 void
 iproto_set_msg_max(int iproto_msg_max);

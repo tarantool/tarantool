@@ -1653,23 +1653,14 @@ applier_stop(struct applier *applier)
 }
 
 struct applier *
-applier_new(const char *uri)
+applier_new(struct uri *uri)
 {
 	struct applier *applier = (struct applier *)
-		calloc(1, sizeof(struct applier));
-	if (applier == NULL) {
-		diag_set(OutOfMemory, sizeof(*applier), "malloc",
-			 "struct applier");
-		return NULL;
-	}
+		xcalloc(1, sizeof(struct applier));
 	iostream_clear(&applier->io);
 	ibuf_create(&applier->ibuf, &cord()->slabc, 1024);
 
-	int rc = uri_create(&applier->uri, uri);
-	/* URI checked by box_check_replication() */
-	assert(rc == 0 && applier->uri.service != NULL);
-	(void) rc;
-
+	uri_move(&applier->uri, uri);
 	applier->last_row_time = ev_monotonic_now(loop());
 	rlist_create(&applier->on_state);
 	fiber_cond_create(&applier->resume_cond);

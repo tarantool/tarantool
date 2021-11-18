@@ -219,40 +219,15 @@ local template_cfg = {
     txn_timeout           = 'number',
 }
 
-local function normalize_uri(port)
-    if port == nil or type(port) == 'table' then
-        return port
-    end
-    return tostring(port);
-end
-
 local function normalize_uri_list_for_replication(port_list)
-    local result = {}
     if type(port_list) == 'table' then
-        for _, port in ipairs(port_list) do
-            table.insert(result, normalize_uri(port))
-        end
-    else
-        table.insert(result, normalize_uri(port_list))
+        return port_list
     end
-    return result
-end
-
-local function normalize_uri_list_for_listen(port_list)
-    local result = {}
-    if type(port_list) == 'table' then
-        for _, port in ipairs(port_list) do
-            table.insert(result, normalize_uri(port))
-        end
-    else
-        return normalize_uri(port_list)
-    end
-    return result
+    return {port_list}
 end
 
 -- options that require special handling
 local modify_cfg = {
-    listen             = normalize_uri_list_for_listen,
     replication        = normalize_uri_list_for_replication,
 }
 
