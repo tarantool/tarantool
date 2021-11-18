@@ -58,7 +58,9 @@
 #define CC_KYWD       1		/* Alphabetics or '_'.  Usable in a keyword */
 #define CC_ID         2		/* unicode characters usable in IDs */
 #define CC_DIGIT      3		/* Digits */
-/** SQL variables: '@', '#', ':', and '$'. */
+/** Character ':'. */
+#define CC_COLON      4
+/** SQL variable special characters: '@', '#', and '$'. */
 #define CC_VARALPHA   5
 #define CC_VARNUM     6		/* '?'.  Numeric SQL variables */
 #define CC_SPACE      7		/* Space characters */
@@ -85,17 +87,21 @@
 #define CC_LINEFEED  28		/* '\n' */
 #define CC_LB        29		/* '[' */
 #define CC_RB        30		/* ']' */
+/** Character '{'. */
+#define CC_LCB       31
+/** Character '}'. */
+#define CC_RCB       32
 
 static const char sql_ascii_class[] = {
 /*       x0  x1  x2  x3  x4  x5  x6  x7  x8 x9  xa xb  xc xd xe  xf */
 /* 0x */ 27, 27, 27, 27, 27, 27, 27, 27, 27, 7, 28, 7, 7, 7, 27, 27,
 /* 1x */ 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27,
 /* 2x */ 7, 15, 9, 5, 5, 22, 24, 8, 17, 18, 21, 20, 23, 11, 26, 16,
-/* 3x */ 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 5, 19, 12, 14, 13, 6,
+/* 3x */ 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 19, 12, 14, 13, 6,
 /* 4x */ 5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 /* 5x */ 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 29, 27, 30, 27, 1,
 /* 6x */ 27, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-/* 7x */ 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 27, 10, 27, 25, 27,
+/* 7x */ 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 31, 10, 32, 25, 27,
 /* 8x */ 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
 /* 9x */ 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
 /* Ax */ 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
@@ -227,6 +233,12 @@ sql_token(const char *z, int *type, bool *is_reserved)
 		return 1;
 	case CC_RB:
 		*type = TK_RB;
+		return 1;
+	case CC_LCB:
+		*type = TK_LCB;
+		return 1;
+	case CC_RCB:
+		*type = TK_RCB;
 		return 1;
 	case CC_SEMI:
 		*type = TK_SEMI;
@@ -370,6 +382,9 @@ sql_token(const char *z, int *type, bool *is_reserved)
 		return i;
 	case CC_VARNUM:
 		*type = TK_VARNUM;
+		return 1;
+	case CC_COLON:
+		*type = TK_COLON;
 		return 1;
 	case CC_VARALPHA:
 		*type = TK_VARIABLE;

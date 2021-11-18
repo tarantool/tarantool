@@ -3411,6 +3411,51 @@ expr_code_array(struct Parse *parser, struct Expr *expr, int reg)
 	sqlVdbeAddOp3(vdbe, OP_Array, count, reg, values_reg);
 }
 
+/** Generate opcodes that will create a MAP from an expression. */
+static void
+expr_code_map(struct Parse *parser, struct Expr *expr, int reg)
+{
+	struct Vdbe *vdbe = parser->pVdbe;
+	struct ExprList *list = expr->x.pList;
+	if (list == NULL) {
+		sqlVdbeAddOp3(vdbe, OP_Map, 0, reg, 0);
+		return;
+	}
+	assert(list->nExpr % 2 == 0);
+	int count = list->nExpr / 2;
+	for (int i = 0; i < count; ++i) {
+		struct Expr *expr = list->a[2 * i].pExpr;
+		enum field_type type = sql_expr_type(expr);
+		if (expr->op != TK_VARIABLE && type != FIELD_TYPE_INTEGER &&
+		    type != FIELD_TYPE_UNSIGNED && type != FIELD_TYPE_STRING &&
+		    type != FIELD_TYPE_UUID) {
+			diag_set(ClientError, ER_SQL_PARSER_GENERIC, "Only "
+				 "integer, string and uuid can be keys in map");
+			parser->is_aborted = true;
+			return;
+		}
+	}
+	int len = 0;
+	int result_reg = parser->nMem + 1;
+	for (int i = 0; i < count; ++i) {
+		struct Expr *key = list->a[2 * i].pExpr;
+		int j;
+		for (j = i + 1; j < count; ++j) {
+			struct Expr *tmp_key = list->a[2 * j].pExpr;
+			if (sqlExprCompare(key, tmp_key, -1) == 0)
+				break;
+		}
+		if (j < count)
+			continue;
+
+		++len;
+		struct Expr *value = list->a[2 * i + 1].pExpr;
+		sqlExprCodeFactorable(parser, key, ++parser->nMem);
+		sqlExprCodeFactorable(parser, value, ++parser->nMem);
+	}
+	sqlVdbeAddOp3(vdbe, OP_Map, len, reg, result_reg);
+}
+
 /*
  * Erase column-cache entry number i
  */
@@ -3865,6 +3910,10 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_ARRAY:
 		expr_code_array(pParse, pExpr, target);
 		break;
+
+	case TK_MAP:
+		expr_code_map(pParse, pExpr, target);
+		return target;
 
 	case TK_LT:
 	case TK_LE:

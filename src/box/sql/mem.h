@@ -919,3 +919,19 @@ mem_to_mpstream(const struct Mem *var, struct mpstream *stream);
 char *
 mem_encode_array(const struct Mem *mems, uint32_t count, uint32_t *size,
 		 struct region *region);
+
+/**
+ * Encode array of MEMs as msgpack map on region. Values in even position are
+ * treated as keys in MAP, values in odd position are treated as values in MAP.
+ * number of MEMs should be even.
+ *
+ * @param mems array of MEMs to encode.
+ * @param count number of elements in the array.
+ * @param[out] size Size of encoded msgpack map.
+ * @param region Region to use.
+ * @retval NULL on error, diag message is set.
+ * @retval Pointer to valid msgpack map on success.
+ */
+char *
+mem_encode_map(const struct Mem *mems, uint32_t count, uint32_t *size,
+	       struct region *region);

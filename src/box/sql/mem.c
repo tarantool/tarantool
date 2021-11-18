@@ -3245,6 +3245,45 @@ mem_encode_array(const struct Mem *mems, uint32_t count, uint32_t *size,
 	return array;
 }
 
+char *
+mem_encode_map(const struct Mem *mems, uint32_t count, uint32_t *size,
+	       struct region *region)
+{
+	size_t used = region_used(region);
+	bool is_error = false;
+	struct mpstream stream;
+	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
+		      set_encode_error, &is_error);
+	mpstream_encode_map(&stream, count);
+	for (uint32_t i = 0; i < count; ++i) {
+		const struct Mem *key = &mems[2 * i];
+		const struct Mem *value = &mems[2 * i + 1];
+		if (mem_is_metatype(key) ||
+		    (key->type & (MEM_TYPE_UINT | MEM_TYPE_INT | MEM_TYPE_UUID |
+				  MEM_TYPE_STR)) == 0) {
+			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+				 mem_str(key), "integer, string or uuid");
+			goto error;
+		}
+		mem_to_mpstream(key, &stream);
+		mem_to_mpstream(value, &stream);
+	}
+	mpstream_flush(&stream);
+	if (is_error) {
+		diag_set(OutOfMemory, stream.pos - stream.buf,
+			 "mpstream_flush", "stream");
+		goto error;
+	}
+	*size = region_used(region) - used;
+	char *map = region_join(region, *size);
+	if (map != NULL)
+		return map;
+	diag_set(OutOfMemory, *size, "region_join", "map");
+error:
+	region_truncate(region, used);
+	return NULL;
+}
+
 /**
  * Allocate a sequence of initialized vdbe memory registers
  * on region.
