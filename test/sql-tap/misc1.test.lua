@@ -1052,7 +1052,7 @@ test:do_catchsql_test(
         select''like''like''like#0;
     ]], {
         -- <misc1-21.1>
-        1, [[Syntax error at line 1 near '#0']]
+        1, [[Syntax error at line 1 near '#']]
         -- </misc1-21.1>
     })
 
@@ -1062,7 +1062,7 @@ test:do_catchsql_test(
         VALUES(0,0x0MATCH#0;
     ]], {
         -- <misc1-21.2>
-        1, [[Syntax error at line 1 near '#0']]
+        1, [[Syntax error at line 1 near '#']]
         -- </misc1-21.2>
     })
 

@@ -351,7 +351,7 @@ cn:execute('drop table if exists test3')
 --
 cn:execute('select ?1, ?2, ?3', {1, 2, 3})
 ---
-- error: Syntax error at line 1 near '?1'
+- error: Syntax error at line 1 near '1'
 ...
 cn:execute('select $name, $name2', {1, 2})
 ---
