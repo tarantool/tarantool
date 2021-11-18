@@ -101,7 +101,7 @@ watchable_drop_node(struct watchable *watchable, struct watchable_node *node)
 	struct mh_strnptr_t *h = watchable->node_by_key;
 	const char *key = node->key;
 	size_t key_len = node->key_len;
-	mh_int_t i = mh_strnptr_find_inp(h, key, key_len);
+	mh_int_t i = mh_strnptr_find_str(h, key, key_len);
 	assert(i != mh_end(h));
 	assert(mh_strnptr_node(h, i)->val == node);
 	mh_strnptr_del(h, i, NULL);

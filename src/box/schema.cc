@@ -100,7 +100,7 @@ space_by_id(uint32_t id)
 struct space *
 space_by_name(const char *name)
 {
-	mh_int_t space = mh_strnptr_find_inp(spaces_by_name, name,
+	mh_int_t space = mh_strnptr_find_str(spaces_by_name, name,
 					     strlen(name));
 	if (space == mh_end(spaces_by_name))
 		return NULL;
@@ -185,7 +185,7 @@ space_cache_replace(struct space *old_space, struct space *new_space)
 		if (old_space != NULL && strcmp(space_name(old_space),
 						space_name(new_space)) != 0) {
 			const char *name = space_name(old_space);
-			mh_int_t k = mh_strnptr_find_inp(spaces_by_name, name,
+			mh_int_t k = mh_strnptr_find_str(spaces_by_name, name,
 							 strlen(name));
 			assert(k != mh_end(spaces_by_name));
 			old_space_by_name = (struct space *)
@@ -233,7 +233,7 @@ space_cache_replace(struct space *old_space, struct space *new_space)
 		 * Delete @old_space from @spaces_by_name cache.
 		 */
 		const char *name = space_name(old_space);
-		k = mh_strnptr_find_inp(spaces_by_name, name, strlen(name));
+		k = mh_strnptr_find_str(spaces_by_name, name, strlen(name));
 		assert(k != mh_end(spaces_by_name));
 		struct space *old_space_by_name =
 			(struct space *)mh_strnptr_node(spaces_by_name, k)->val;

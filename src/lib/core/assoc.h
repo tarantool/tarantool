@@ -96,7 +96,7 @@ enum {
 };
 
 static inline uint32_t
-mh_strn_hash(const char *str, size_t len)
+mh_strn_hash(const char *str, uint32_t len)
 {
 	uint32_t h = MH_STRN_HASH_SEED;
 	uint32_t carry = 0;
@@ -107,14 +107,14 @@ mh_strn_hash(const char *str, size_t len)
 #define mh_name _strnptr
 struct mh_strnptr_key_t {
 	const char *str;
-	size_t len;
+	uint32_t len;
 	uint32_t hash;
 };
 #define mh_key_t struct mh_strnptr_key_t *
 
 struct mh_strnptr_node_t {
 	const char *str;
-	size_t len;
+	uint32_t len;
 	uint32_t hash;
 	void *val;
 };
@@ -129,7 +129,7 @@ struct mh_strnptr_node_t {
 #include "salad/mhash.h"
 
 static inline mh_int_t
-mh_strnptr_find_inp(struct mh_strnptr_t *h, const char *str, size_t len)
+mh_strnptr_find_str(struct mh_strnptr_t *h, const char *str, uint32_t len)
 {
 	uint32_t hash = mh_strn_hash(str, len);
 	struct mh_strnptr_key_t key = {str, len, hash};

@@ -128,7 +128,7 @@ schema_module_free(void)
 static struct schema_module *
 cache_find(const char *name, const char *name_end)
 {
-	mh_int_t i = mh_strnptr_find_inp(modules, name, name_end - name);
+	mh_int_t i = mh_strnptr_find_str(modules, name, name_end - name);
 	if (i == mh_end(modules))
 		return NULL;
 	return mh_strnptr_node(modules, i)->val;
@@ -169,7 +169,7 @@ cache_update(struct schema_module *module)
 	const char *str = module->base->package;
 	size_t len = module->base->package_len;
 
-	mh_int_t i = mh_strnptr_find_inp(modules, str, len);
+	mh_int_t i = mh_strnptr_find_str(modules, str, len);
 	if (i == mh_end(modules))
 		panic("func: failed to update cache: %s", str);
 
@@ -186,7 +186,7 @@ cache_del(struct schema_module *module)
 	const char *str = module->base->package;
 	size_t len = module->base->package_len;
 
-	mh_int_t i = mh_strnptr_find_inp(modules, str, len);
+	mh_int_t i = mh_strnptr_find_str(modules, str, len);
 	if (i != mh_end(modules)) {
 		struct schema_module *v;
 		v = mh_strnptr_node(modules, i)->val;

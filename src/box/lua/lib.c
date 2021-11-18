@@ -82,7 +82,7 @@ new_udata(struct lua_State *L, const char *uname, void *ptr)
 static void *
 cache_find(const char *str, size_t len)
 {
-	mh_int_t e = mh_strnptr_find_inp(func_hash, str, len);
+	mh_int_t e = mh_strnptr_find_str(func_hash, str, len);
 	if (e == mh_end(func_hash))
 		return NULL;
 	return mh_strnptr_node(func_hash, e)->val;
@@ -111,7 +111,7 @@ cache_put(struct box_module_func *cf)
 static void
 cache_del(struct box_module_func *cf)
 {
-	mh_int_t e = mh_strnptr_find_inp(func_hash, cf->key, cf->len);
+	mh_int_t e = mh_strnptr_find_str(func_hash, cf->key, cf->len);
 	if (e != mh_end(func_hash))
 		mh_strnptr_del(func_hash, e, NULL);
 }
