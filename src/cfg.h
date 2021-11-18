@@ -33,9 +33,18 @@
 
 #include <stdint.h>
 
+struct uri_set;
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+/**
+ * Fill @a uri_set according to cfg @a param.
+ * Return 0 if success, otherwise return -1
+ */
+int
+cfg_get_uri_set(const char *param, struct uri_set *uri_set);
 
 int
 cfg_geti(const char *param);

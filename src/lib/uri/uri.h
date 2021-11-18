@@ -56,6 +56,13 @@ void
 uri_remove_param(struct uri *uri, const char *name);
 
 /**
+ * Move constructor for @a dst URI. Move all fields from
+ * @a src URI to @a dst and clear @a src URI.
+ */
+void
+uri_move(struct uri *dst, struct uri *src);
+
+/**
  * Creates new @a uri structure according to passed @a str.
  * If @a str parsing failed function return -1, and fill
  * @a uri structure with zeros, otherwise return 0 and save

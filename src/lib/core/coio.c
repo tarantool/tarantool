@@ -506,10 +506,9 @@ coio_service_init(struct coio_service *service, const char *name,
 }
 
 int
-coio_service_start(struct evio_service *service, const char *uri)
+coio_service_start(struct evio_service *service, const struct uri_set *uri_set)
 {
-	const char *uris[] = { uri };
-	if (evio_service_bind(service, uris, 1) != 0 ||
+	if (evio_service_bind(service, uri_set) != 0 ||
 	    evio_service_listen(service) != 0)
 		return -1;
 	return 0;

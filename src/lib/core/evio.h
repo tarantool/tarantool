@@ -106,7 +106,7 @@ evio_service_create(struct ev_loop *loop, struct evio_service *service,
 
 /** Bind service to specified uri */
 int
-evio_service_bind(struct evio_service *service, const char **uris, int size);
+evio_service_bind(struct evio_service *service, const struct uri_set *uri_set);
 
 /**
  * Listen on bounded socket

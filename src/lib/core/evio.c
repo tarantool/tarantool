@@ -205,24 +205,15 @@ evio_service_entry_accept_cb(ev_loop *loop, ev_io *watcher, int events)
  * listening on it. Unlink the file if it's the case.
  */
 static int
-evio_service_entry_reuse_addr(const char *uri)
+evio_service_entry_reuse_addr(const struct uri *u)
 {
-	struct uri u;
-	if (uri_create(&u, uri) != 0 || u.service == NULL) {
-		uri_destroy(&u);
-		diag_set(IllegalParams, "invalid uri for bind: %s", uri);
-		return -1;
-	}
-	if (u.host != NULL && strcmp(u.host, URI_HOST_UNIX) != 0) {
-		uri_destroy(&u);
+	if (u->host != NULL && strcmp(u->host, URI_HOST_UNIX) != 0)
 		return 0;
-	}
 
 	struct sockaddr_un un = { 0 };
-	assert(u.service != NULL);
-	strlcpy(un.sun_path, u.service, sizeof(un.sun_path));
+	assert(u->service != NULL);
+	strlcpy(un.sun_path, u->service, sizeof(un.sun_path));
 	un.sun_family = AF_UNIX;
-	uri_destroy(&u);
 
 	int cl_fd = sio_socket(un.sun_family, SOCK_STREAM, 0);
 	if (cl_fd < 0)
@@ -324,20 +315,13 @@ evio_service_entry_create(struct evio_service_entry *entry,
  * Try to bind.
  */
 static int
-evio_service_entry_bind(struct evio_service_entry *entry, const char *uri)
+evio_service_entry_bind(struct evio_service_entry *entry, const struct uri *u)
 {
-	struct uri u;
-	if (uri_create(&u, uri) != 0 || u.service == NULL) {
-		uri_destroy(&u);
-		diag_set(IllegalParams, "invalid uri for bind: %s", uri);
-		return -1;
-	}
 	entry->serv[0] = entry->host[0] = '\0';
-	assert(u.service != NULL);
-	strlcpy(entry->serv, u.service, sizeof(entry->serv));
-	if (u.host != NULL && strcmp(u.host, "*") != 0)
-		strlcpy(entry->host, u.host, sizeof(entry->host));
-	uri_destroy(&u);
+	assert(u->service != NULL);
+	strlcpy(entry->serv, u->service, sizeof(entry->serv));
+	if (u->host != NULL && strcmp(u->host, "*") != 0)
+		strlcpy(entry->host, u->host, sizeof(entry->host));
 	assert(! ev_is_active(&entry->ev));
 
 	if (strcmp(entry->host, URI_HOST_UNIX) == 0) {
@@ -425,10 +409,11 @@ evio_service_entry_attach(struct evio_service_entry *dst,
 }
 
 static inline int
-evio_service_reuse_addr(const char **uris, int size)
+evio_service_reuse_addr(const struct uri_set *uri_set)
 {
-	for (int i = 0; i < size; i++) {
-		if (evio_service_entry_reuse_addr(uris[i]) != 0)
+	for (int i = 0; i < uri_set->uri_count; i++) {
+		const struct uri *uri = &uri_set->uris[i];
+		if (evio_service_entry_reuse_addr(uri) != 0)
 			return -1;
 	}
 	return 0;
@@ -522,13 +507,14 @@ evio_service_stop(struct evio_service *service)
 }
 
 int
-evio_service_bind(struct evio_service *service, const char **uris, int size)
+evio_service_bind(struct evio_service *service, const struct uri_set *uri_set)
 {
-	if (evio_service_reuse_addr(uris, size) != 0)
+	if (evio_service_reuse_addr(uri_set) != 0)
 		return -1;
-	evio_service_create_entries(service, size);
-	for (int i = 0; i < size; i++) {
-		if (evio_service_entry_bind(&service->entries[i], uris[i]) != 0)
+	evio_service_create_entries(service, uri_set->uri_count);
+	for (int i = 0; i < uri_set->uri_count; i++) {
+		const struct uri *uri = &uri_set->uris[i];
+		if (evio_service_entry_bind(&service->entries[i], uri) != 0)
 			return -1;
 	}
 	return 0;

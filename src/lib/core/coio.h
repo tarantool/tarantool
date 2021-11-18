@@ -160,7 +160,7 @@ coio_service_init(struct coio_service *service, const char *name,
  * Returns 0 on success, -1 on error.
  */
 int
-coio_service_start(struct evio_service *service, const char *uri);
+coio_service_start(struct evio_service *service, const struct uri_set *uri_set);
 
 void
 coio_stat_init(ev_stat *stat, const char *path);

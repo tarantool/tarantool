@@ -272,10 +272,7 @@ fail:
 	return -1;
 }
 
-/**
- * Create @a uri_set from the value at the given valid @a idx.
- */
-static int
+int
 luaT_uri_set_create(struct lua_State *L, int idx, struct uri_set *uri_set)
 {
 	int rc = 0;

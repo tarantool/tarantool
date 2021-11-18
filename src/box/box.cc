@@ -730,24 +730,6 @@ box_check_say(void)
 	}
 }
 
-static int
-box_check_uri(const char *source, const char *option_name)
-{
-	if (source == NULL)
-		return 0;
-	struct uri uri;
-
-	/* URI format is [host:]service */
-	if (uri_create(&uri, source) != 0 || !uri.service) {
-		uri_destroy(&uri);
-		diag_set(ClientError, ER_CFG, option_name,
-			 "expected host:service or /unix.socket");
-		return -1;
-	}
-	uri_destroy(&uri);
-	return 0;
-}
-
 static enum election_mode
 box_check_election_mode(void)
 {
@@ -783,28 +765,42 @@ box_check_election_timeout(void)
 	return d;
 }
 
-static void
+static int
+box_check_uri_set(const char *option_name)
+{
+	struct uri_set uri_set;
+	if (cfg_get_uri_set(option_name, &uri_set) != 0) {
+		diag_set(ClientError, ER_CFG, option_name,
+			 diag_last_error(diag_get())->errmsg);
+		return -1;
+	}
+	int rc = 0;
+	for (int i = 0; i < uri_set.uri_count; i++) {
+		const struct uri *uri = &uri_set.uris[i];
+		if (uri->service == NULL) {
+			char *uristr = tt_static_buf();
+			uri_format(uristr, TT_STATIC_BUF_LEN, uri, false);
+			diag_set(ClientError, ER_CFG, option_name,
+				 tt_sprintf("bad URI '%s': expected host:service "
+				 "or /unix.socket", uristr));
+			rc = -1;
+			break;
+		}
+	}
+	uri_set_destroy(&uri_set);
+	return rc;
+}
+
+static int
 box_check_replication(void)
 {
-	int count = cfg_getarr_size("replication");
-	for (int i = 0; i < count; i++) {
-		const char *source = cfg_getarr_elem("replication", i);
-		if (box_check_uri(source, "replication") != 0)
-			diag_raise();
-	}
+	return box_check_uri_set("replication");
 }
 
 static int
 box_check_listen(void)
 {
-	int count = cfg_getarr_size("listen");
-	for (int i = 0; i < count; i++) {
-		const char *source = cfg_getarr_elem("listen", i);
-		assert(source != NULL);
-		if (box_check_uri(source, "listen") != 0)
-			return -1;
-	}
-	return 0;
+	return box_check_uri_set("listen");
 }
 
 static double
@@ -1249,7 +1245,8 @@ box_check_config(void)
 		diag_raise();
 	if (box_check_election_timeout() < 0)
 		diag_raise();
-	box_check_replication();
+	if (box_check_replication() != 0)
+		diag_raise();
 	box_check_replication_timeout();
 	box_check_replication_connect_timeout();
 	box_check_replication_connect_quorum();
@@ -1314,26 +1311,23 @@ cfg_get_replication(int *p_count)
 	/* Use static buffer for result */
 	static struct applier *appliers[VCLOCK_MAX];
 
-	int count = cfg_getarr_size("replication");
-	if (count >= VCLOCK_MAX) {
-		tnt_raise(ClientError, ER_CFG, "replication",
-				"too many replicas");
+	struct uri_set uri_set;
+	int rc = cfg_get_uri_set("replication", &uri_set);
+	assert(rc == 0);
+	(void)rc;
+
+	if (uri_set.uri_count >= VCLOCK_MAX) {
+		diag_set(ClientError, ER_CFG, "replication",
+			 "too many replicas");
+		uri_set_destroy(&uri_set);
+		return NULL;
 	}
 
-	for (int i = 0; i < count; i++) {
-		const char *source = cfg_getarr_elem("replication", i);
-		struct applier *applier = applier_new(source);
-		if (applier == NULL) {
-			/* Delete created appliers */
-			while (--i >= 0)
-				applier_delete(appliers[i]);
-			return NULL;
-		}
-		appliers[i] = applier; /* link to the list */
-	}
+	*p_count = uri_set.uri_count;
+	for (int i = 0; i < uri_set.uri_count; i++)
+		appliers[i] = applier_new(&uri_set.uris[i]);
 
-	*p_count = count;
-
+	uri_set_destroy(&uri_set);
 	return appliers;
 }
 
@@ -1386,7 +1380,8 @@ box_set_replication(void)
 		return;
 	}
 
-	box_check_replication();
+	if (box_check_replication() != 0)
+		diag_raise();
 	/*
 	 * Try to connect to all replicas within the timeout period.
 	 * Stay in orphan mode in case we fail to connect to at least
@@ -1947,12 +1942,11 @@ box_listen(void)
 {
 	if (box_check_listen() != 0)
 		return -1;
-	int count = cfg_getarr_size("listen");
-	const char **uris = (const char **)xmalloc(count * sizeof(char *));
-	for (int i = 0; i < count; i++)
-		uris[i] = cfg_getarr_elem("listen", i);
-	int rc = iproto_listen(uris, count);
-	free(uris);
+	struct uri_set uri_set;
+	int rc = cfg_get_uri_set("listen", &uri_set);
+	assert(rc == 0);
+	rc = iproto_listen(&uri_set);
+	uri_set_destroy(&uri_set);
 	return rc;
 }
 

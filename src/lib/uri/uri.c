@@ -134,7 +134,7 @@ uri_create_params(struct uri *uri, const char *query)
 	free(copy);
 }
 
-static void
+void
 uri_move(struct uri *dst, struct uri *src)
 {
 	*dst = *src;
