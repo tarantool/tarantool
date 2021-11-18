@@ -88,32 +88,34 @@ err:
 	return -1;
 }
 
-void
+static int
 coio_fill_addrinfo(struct addrinfo *ai_local, const char *host,
 		   const char *service, int host_hint)
 {
+	int rc;
 	ai_local->ai_next = NULL;
 	if (host_hint == 1) { // IPv4
 		ai_local->ai_addrlen = sizeof(struct sockaddr_in);
 		ai_local->ai_addr = xmalloc(ai_local->ai_addrlen);
 		memset(ai_local->ai_addr, 0, ai_local->ai_addrlen);
-		((struct sockaddr_in *)ai_local->ai_addr)->sin_family =
-			AF_INET;
-		((struct sockaddr_in *)ai_local->ai_addr)->sin_port =
-			htons((uint16_t)atoi(service));
-		inet_pton(AF_INET, host,
-			&((struct sockaddr_in *)ai_local->ai_addr)->sin_addr);
+		struct sockaddr_in *addr = (void *)ai_local->ai_addr;
+		addr->sin_family = AF_INET;
+		addr->sin_port = htons((uint16_t)atoi(service));
+		rc = inet_pton(AF_INET, host, &addr->sin_addr);
 	} else { // IPv6
 		ai_local->ai_addrlen = sizeof(struct sockaddr_in6);
 		ai_local->ai_addr = xmalloc(ai_local->ai_addrlen);
 		memset(ai_local->ai_addr, 0, ai_local->ai_addrlen);
-		((struct sockaddr_in6 *)ai_local->ai_addr)->sin6_family =
-			AF_INET6;
-		((struct sockaddr_in6 *)ai_local->ai_addr)->sin6_port =
-			htons((uint16_t)atoi(service));
-		inet_pton(AF_INET6, host,
-			&((struct sockaddr_in6 *)ai_local->ai_addr)->sin6_addr);
+		struct sockaddr_in6 *addr = (void *)ai_local->ai_addr;
+		addr->sin6_family = AF_INET6;
+		addr->sin6_port = htons((uint16_t)atoi(service));
+		rc = inet_pton(AF_INET6, host, &addr->sin6_addr);
 	}
+	if (rc != 1) {
+		diag_set(IllegalParams, "Invalid host name: %s", host);
+		return -1;
+	}
+	return 0;
 }
 
 /**
@@ -165,7 +167,9 @@ coio_connect_timeout(const char *host, const char *service, int host_hint,
 	struct addrinfo *ai = NULL;
 	struct addrinfo ai_local;
 	if (host_hint != 0) {
-		coio_fill_addrinfo(&ai_local, host, service, host_hint);
+		if (coio_fill_addrinfo(&ai_local, host, service,
+				       host_hint) != 0)
+			return -1;
 		ai = &ai_local;
 	} else {
 	    struct addrinfo hints;

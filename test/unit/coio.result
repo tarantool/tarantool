@@ -12,3 +12,10 @@ ok 1 - getaddrinfo
 ok 2 - getaddrinfo retval
 ok 3 - getaddrinfo error message
 	*** test_getaddrinfo: done ***
+	*** test_connect ***
+1..4
+ok 1 - bad ipv4 host name - error
+ok 2 - bad ipv4 host name - error message
+ok 3 - bad ipv6 host name - error
+ok 4 - bad ipv6 host name - error message
+	*** test_connect: done ***

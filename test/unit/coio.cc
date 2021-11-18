@@ -115,6 +115,24 @@ test_getaddrinfo(void)
 	footer();
 }
 
+static void
+test_connect(void)
+{
+	header();
+	plan(4);
+	int rc;
+	rc = coio_connect("~~~", "12345", 1, NULL, NULL);
+	ok(rc != 0, "bad ipv4 host name - error");
+	ok(strcmp(diag_get()->last->errmsg, "Invalid host name: ~~~") == 0,
+	   "bad ipv4 host name - error message");
+	rc = coio_connect("~~~", "12345", 2, NULL, NULL);
+	ok(rc != 0, "bad ipv6 host name - error");
+	ok(strcmp(diag_get()->last->errmsg, "Invalid host name: ~~~") == 0,
+	   "bad ipv6 host name - error message");
+	check_plan();
+	footer();
+}
+
 static int
 main_f(va_list ap)
 {
@@ -134,6 +152,7 @@ main_f(va_list ap)
 	fiber_join(call_fiber);
 
 	test_getaddrinfo();
+	test_connect();
 
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
