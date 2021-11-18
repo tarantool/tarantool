@@ -1214,6 +1214,34 @@ end
 
 --------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------------
+-- Tarantool 2.10.0
+--------------------------------------------------------------------------------
+local function upgrade_to_2_10_0()
+    -- Create _space_upgrade system space.
+    local MAP = setmap({})
+    local _space = box.space._space
+    local _space_upgrade = box.space._space_upgrade
+    log.info("create space _space_upgrade")
+    local format = {{name = 'space_id',    type = 'unsigned'},
+                    {name = 'status',      type = 'string'},
+                    {name = 'function_id', type = 'unsigned'},
+                    {name = 'format',      type = 'array'},
+                    {name = 'uuid',        type = 'string'} }
+    _space:insert{_space_upgrade.id, ADMIN, '_space_upgrade', 'memtx', 0, MAP,
+                  format}
+
+    log.info("create index primary on _space_upgrade")
+    local _index = box.space._index
+    _index:insert{_space_upgrade.id, 0, 'primary', 'tree', {unique = true},
+                  {{0, 'unsigned'}} }
+    log.info("create index function_id on _space_upgrade")
+    _index:insert{_space_upgrade.id, 1, 'function_id', 'tree', {unique = false},
+                  {{2, 'unsigned'}}}
+end
+
+--------------------------------------------------------------------------------
+
 local handlers = {
     {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5, auto=true},
     {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6, auto = true},
@@ -1229,6 +1257,7 @@ local handlers = {
     {version = mkversion(2, 3, 1), func = upgrade_to_2_3_1, auto = true},
     {version = mkversion(2, 7, 1), func = upgrade_to_2_7_1, auto = true},
     {version = mkversion(2, 9, 1), func = upgrade_to_2_9_1, auto = true},
+    {version = mkversion(2, 10, 0), func = upgrade_to_2_10_0, auto = true},
 }
 
 -- Schema version of the snapshot.

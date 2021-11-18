@@ -106,7 +106,7 @@ space = box.space[t[1]]
 ...
 space.id
 ---
-- 381
+- 391
 ...
 space.field_count
 ---
@@ -151,7 +151,7 @@ space_deleted
 ...
 space:replace{0}
 ---
-- error: Space '381' does not exist
+- error: Space '391' does not exist
 ...
 err, res = pcall(function() return _index:insert{_space.id, 0, 'primary', 'tree', {unique=true}, {{0, 'unsigned'}}} end)
 ---
@@ -241,6 +241,8 @@ _index:select{}
   - [372, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'unsigned']]]
   - [372, 1, 'fid', 'tree', {'unique': false}, [[2, 'unsigned']]]
   - [380, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
+  - [390, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
+  - [390, 1, 'function_id', 'tree', {'unique': false}, [[2, 'unsigned']]]
 ...
 -- modify indexes of a system space
 _index:delete{_index.id, 0}

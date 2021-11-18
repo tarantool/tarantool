@@ -4,7 +4,7 @@ box.internal.bootstrap()
 box.space._schema:select{}
 ---
 - - ['max_id', 511]
-  - ['version', 2, 9, 1]
+  - ['version', 2, 10, 0]
 ...
 box.space._cluster:select{}
 ---
@@ -98,6 +98,9 @@ box.space._space:select{}
       {'name': 'index_id', 'type': 'unsigned'}, {'name': 'func_id', 'type': 'unsigned'}]]
   - [380, 1, '_session_settings', 'service', 2, {'temporary': true}, [{'name': 'name',
         'type': 'string'}, {'name': 'value', 'type': 'any'}]]
+  - [390, 1, '_space_upgrade', 'memtx', 0, {}, [{'name': 'space_id', 'type': 'unsigned'},
+      {'name': 'status', 'type': 'string'}, {'name': 'function_id', 'type': 'unsigned'},
+      {'name': 'format', 'type': 'array'}, {'name': 'uuid', 'type': 'string'}]]
 ...
 box.space._index:select{}
 ---
@@ -156,6 +159,8 @@ box.space._index:select{}
   - [372, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'unsigned']]]
   - [372, 1, 'fid', 'tree', {'unique': false}, [[2, 'unsigned']]]
   - [380, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
+  - [390, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
+  - [390, 1, 'function_id', 'tree', {'unique': false}, [[2, 'unsigned']]]
 ...
 box.space._user:select{}
 ---
