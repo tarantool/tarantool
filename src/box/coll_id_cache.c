@@ -77,7 +77,7 @@ coll_id_cache_delete(const struct coll_id *coll_id)
 {
 	mh_int_t id_i = mh_i32ptr_find(coll_id_cache, coll_id->id, NULL);
 	mh_i32ptr_del(coll_id_cache, id_i, NULL);
-	mh_int_t name_i = mh_strnptr_find_inp(coll_cache_name, coll_id->name,
+	mh_int_t name_i = mh_strnptr_find_str(coll_cache_name, coll_id->name,
 					      coll_id->name_len);
 	mh_strnptr_del(coll_cache_name, name_i, NULL);
 }
@@ -97,7 +97,7 @@ coll_by_id(uint32_t id)
 struct coll_id *
 coll_by_name(const char *name, uint32_t len)
 {
-	mh_int_t pos = mh_strnptr_find_inp(coll_cache_name, name, len);
+	mh_int_t pos = mh_strnptr_find_str(coll_cache_name, name, len);
 	if (pos == mh_end(coll_cache_name))
 		return NULL;
 	return mh_strnptr_node(coll_cache_name, pos)->val;

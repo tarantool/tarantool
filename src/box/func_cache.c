@@ -58,7 +58,7 @@ func_cache_delete(uint32_t fid)
 	struct func *func = (struct func *)
 		mh_i32ptr_node(funcs, k)->val;
 	mh_i32ptr_del(funcs, k, NULL);
-	k = mh_strnptr_find_inp(funcs_by_name, func->def->name,
+	k = mh_strnptr_find_str(funcs_by_name, func->def->name,
 				strlen(func->def->name));
 	if (k != mh_end(funcs))
 		mh_strnptr_del(funcs_by_name, k, NULL);
@@ -76,7 +76,7 @@ func_by_id(uint32_t fid)
 struct func *
 func_by_name(const char *name, uint32_t name_len)
 {
-	mh_int_t func = mh_strnptr_find_inp(funcs_by_name, name, name_len);
+	mh_int_t func = mh_strnptr_find_str(funcs_by_name, name, name_len);
 	if (func == mh_end(funcs_by_name))
 		return NULL;
 	return (struct func *)mh_strnptr_node(funcs_by_name, func)->val;

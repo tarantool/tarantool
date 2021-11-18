@@ -1900,7 +1900,7 @@ static struct sql_func_dictionary *
 built_in_func_get(const char *name)
 {
 	uint32_t len = strlen(name);
-	mh_int_t k = mh_strnptr_find_inp(built_in_functions, name, len);
+	mh_int_t k = mh_strnptr_find_str(built_in_functions, name, len);
 	if (k == mh_end(built_in_functions))
 		return NULL;
 	return mh_strnptr_node(built_in_functions, k)->val;
@@ -2185,7 +2185,7 @@ sql_built_in_functions_cache_free(void)
 	for (uint32_t i = 0; i < nelem(dictionaries); ++i) {
 		const char *name = dictionaries[i].name;
 		uint32_t len = strlen(name);
-		mh_int_t k = mh_strnptr_find_inp(built_in_functions, name, len);
+		mh_int_t k = mh_strnptr_find_str(built_in_functions, name, len);
 		if (k == mh_end(built_in_functions))
 			continue;
 		mh_strnptr_del(built_in_functions, k, NULL);

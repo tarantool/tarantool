@@ -33,7 +33,7 @@ static struct mh_strnptr_t *module_cache = NULL;
 static struct module *
 cache_find(const char *str, size_t len)
 {
-	mh_int_t e = mh_strnptr_find_inp(module_cache, str, len);
+	mh_int_t e = mh_strnptr_find_str(module_cache, str, len);
 	if (e == mh_end(module_cache))
 		return NULL;
 	return mh_strnptr_node(module_cache, e)->val;
@@ -45,7 +45,7 @@ cache_update(struct module *m)
 	const char *str = m->package;
 	size_t len = m->package_len;
 
-	mh_int_t e = mh_strnptr_find_inp(module_cache, str, len);
+	mh_int_t e = mh_strnptr_find_str(module_cache, str, len);
 	if (e == mh_end(module_cache))
 		panic("module: failed to update cache: %s", str);
 
@@ -79,7 +79,7 @@ cache_del(struct module *m)
 	const char *str = m->package;
 	size_t len = m->package_len;
 
-	mh_int_t e = mh_strnptr_find_inp(module_cache, str, len);
+	mh_int_t e = mh_strnptr_find_str(module_cache, str, len);
 	if (e != mh_end(module_cache)) {
 		struct module *v = mh_strnptr_node(module_cache, e)->val;
 		if (v == m) {

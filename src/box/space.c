@@ -632,7 +632,7 @@ space_find_constraint_id(struct space *space, const char *name)
 {
 	struct mh_strnptr_t *ids = space->constraint_ids;
 	uint32_t len = strlen(name);
-	mh_int_t pos = mh_strnptr_find_inp(ids, name, len);
+	mh_int_t pos = mh_strnptr_find_str(ids, name, len);
 	if (pos == mh_end(ids))
 		return NULL;
 	return (struct constraint_id *) mh_strnptr_node(ids, pos)->val;
@@ -654,7 +654,7 @@ space_pop_constraint_id(struct space *space, const char *name)
 {
 	struct mh_strnptr_t *ids = space->constraint_ids;
 	uint32_t len = strlen(name);
-	mh_int_t pos = mh_strnptr_find_inp(ids, name, len);
+	mh_int_t pos = mh_strnptr_find_str(ids, name, len);
 	assert(pos != mh_end(ids));
 	struct constraint_id *id = (struct constraint_id *)
 		mh_strnptr_node(ids, pos)->val;
