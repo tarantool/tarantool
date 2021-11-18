@@ -58,8 +58,8 @@
 #define CC_KYWD       1		/* Alphabetics or '_'.  Usable in a keyword */
 #define CC_ID         2		/* unicode characters usable in IDs */
 #define CC_DIGIT      3		/* Digits */
-#define CC_DOLLAR     4		/* '$' */
-#define CC_VARALPHA   5		/* '@', '#', ':'.  Alphabetic SQL variables */
+/** SQL variables: '@', '#', ':', and '$'. */
+#define CC_VARALPHA   5
 #define CC_VARNUM     6		/* '?'.  Numeric SQL variables */
 #define CC_SPACE      7		/* Space characters */
 #define CC_QUOTE      8		/* '\''. String literals */
@@ -90,7 +90,7 @@ static const char sql_ascii_class[] = {
 /*       x0  x1  x2  x3  x4  x5  x6  x7  x8 x9  xa xb  xc xd xe  xf */
 /* 0x */ 27, 27, 27, 27, 27, 27, 27, 27, 27, 7, 28, 7, 7, 7, 27, 27,
 /* 1x */ 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27,
-/* 2x */ 7, 15, 9, 5, 4, 22, 24, 8, 17, 18, 21, 20, 23, 11, 26, 16,
+/* 2x */ 7, 15, 9, 5, 5, 22, 24, 8, 17, 18, 21, 20, 23, 11, 26, 16,
 /* 3x */ 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 5, 19, 12, 14, 13, 6,
 /* 4x */ 5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 /* 5x */ 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 29, 27, 30, 27, 1,
@@ -184,7 +184,7 @@ int
 sql_token(const char *z, int *type, bool *is_reserved)
 {
 	*is_reserved = false;
-	int i, n;
+	int i;
 	char c, delim;
 	/* Switch on the character-class of the first byte
 	 * of the token. See the comment on the CC_ defines
@@ -369,23 +369,11 @@ sql_token(const char *z, int *type, bool *is_reserved)
 		}
 		return i;
 	case CC_VARNUM:
-		*type = TK_VARIABLE;
-		for (i = 1; sqlIsdigit(z[i]); i++) {
-		}
-		return i;
-	case CC_DOLLAR:
+		*type = TK_VARNUM;
+		return 1;
 	case CC_VARALPHA:
-		n = 0;
 		*type = TK_VARIABLE;
-		for (i = 1; (c = z[i]) != 0; i++) {
-			if (IdChar(c))
-				n++;
-			else
-				break;
-		}
-		if (n == 0)
-			*type = TK_ILLEGAL;
-		return i;
+		return 1;
 	case CC_KYWD:
 		for (i = 1; sql_ascii_class[*(unsigned char*)(z+i)] <= CC_KYWD;
 		     i++) {
