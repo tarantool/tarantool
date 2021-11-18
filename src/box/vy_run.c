@@ -183,6 +183,7 @@ vy_run_env_create(struct vy_run_env *env, int read_threads)
 	tt_pthread_key_create(&env->zdctx_key, vy_free_zdctx);
 	mempool_create(&env->read_task_pool, cord_slab_cache(),
 		       sizeof(struct vy_page_read_task));
+	env->initial_join = false;
 }
 
 /**
