@@ -2631,6 +2631,17 @@ void sqlExprAssignVarNumber(Parse *, Expr *, u32);
 ExprList *sqlExprListAppendVector(Parse *, ExprList *, IdList *, Expr *);
 
 /**
+ * Parse tokens as a name or a position of bound variable.
+ *
+ * @param parse Parse context.
+ * @param spec Special symbol for bound variable.
+ * @param id Name or position number of bound variable.
+ */
+struct Expr *
+expr_new_variable(struct Parse *parse, const struct Token *spec,
+		  const struct Token *id);
+
+/**
  * Set the sort order for the last element on the given ExprList.
  *
  * @param p Expression list.
