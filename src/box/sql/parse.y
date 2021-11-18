@@ -1000,15 +1000,6 @@ idlist(A) ::= nm(Y). {
       case TK_UNKNOWN:
         p->type = FIELD_TYPE_BOOLEAN;
         break;
-      case TK_VARIABLE:
-        /*
-         * For variables we set BOOLEAN type since
-         * unassigned bindings will be replaced
-         * with NULL automatically, i.e. without
-         * explicit call of sql_bind_*().
-         */
-        p->type = FIELD_TYPE_BOOLEAN;
-        break;
       default:
         p->type = FIELD_TYPE_SCALAR;
         break;
@@ -1017,20 +1008,16 @@ idlist(A) ::= nm(Y). {
       p->flags = EP_Leaf;
       p->iAgg = -1;
       p->u.zToken = (char*)&p[1];
-      if (op != TK_VARIABLE) {
-        int rc = sql_normalize_name(p->u.zToken, name_sz, t.z, t.n);
-        if (rc > name_sz) {
-          name_sz = rc;
-          p = sqlDbReallocOrFree(pParse->db, p, sizeof(*p) + name_sz);
-          if (p == NULL)
-            goto tarantool_error;
-          p->u.zToken = (char *) &p[1];
-          if (sql_normalize_name(p->u.zToken, name_sz, t.z, t.n) > name_sz)
-              unreachable();
+      int rc = sql_normalize_name(p->u.zToken, name_sz, t.z, t.n);
+      if (rc > name_sz) {
+        name_sz = rc;
+        p = sqlDbReallocOrFree(pParse->db, p, sizeof(*p) + name_sz);
+        if (p == NULL) {
+          pParse->is_aborted = true;
+          return;
         }
-      } else {
-        memcpy(p->u.zToken, t.z, t.n);
-        p->u.zToken[t.n] = 0;
+        p->u.zToken = (char *)&p[1];
+        sql_normalize_name(p->u.zToken, name_sz, t.z, t.n);
       }
 #if SQL_MAX_EXPR_DEPTH>0
       p->nHeight = 1;
@@ -1040,9 +1027,6 @@ idlist(A) ::= nm(Y). {
     pOut->zStart = t.z;
     pOut->zEnd = &t.z[t.n];
     return;
-tarantool_error:
-    sqlDbFree(pParse->db, p);
-    pParse->is_aborted = true;
   }
 }
 
@@ -1085,30 +1069,17 @@ term(A) ::= INTEGER(X). {
   A.zEnd = X.z + X.n;
   if( A.pExpr ) A.pExpr->flags |= EP_Leaf;
 }
-expr(A) ::= VARIABLE(X).     {
-  Token t = X;
-  if (pParse->parse_only) {
-    spanSet(&A, &t, &t);
-    diag_set(ClientError, ER_SQL_PARSER_GENERIC_WITH_POS, pParse->line_count,
-             pParse->line_pos, "bindings are not allowed in DDL");
-    pParse->is_aborted = true;
-    A.pExpr = NULL;
-  } else if (!(X.z[0]=='#' && sqlIsdigit(X.z[1]))) {
-    u32 n = X.n;
-    spanExpr(&A, pParse, TK_VARIABLE, X);
-    if (A.pExpr->u.zToken[0] == '?' && n > 1) {
-      diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN, pParse->line_count, t.n, t.z);
-      pParse->is_aborted = true;
-    } else {
-      sqlExprAssignVarNumber(pParse, A.pExpr, n);
-    }
-  }else{
-    assert( t.n>=2 );
-    spanSet(&A, &t, &t);
-    diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN, pParse->line_count, t.n, t.z);
-    pParse->is_aborted = true;
-    A.pExpr = NULL;
-  }
+expr(A) ::= VARNUM(X). {
+  A.pExpr = expr_new_variable(pParse, &X, NULL);
+  spanSet(&A, &X, &X);
+}
+expr(A) ::= VARIABLE(X) id(Y). {
+  A.pExpr = expr_new_variable(pParse, &X, &Y);
+  spanSet(&A, &X, &Y);
+}
+expr(A) ::= VARIABLE(X) INTEGER(Y). {
+  A.pExpr = expr_new_variable(pParse, &X, &Y);
+  spanSet(&A, &X, &Y);
 }
 expr(A) ::= expr(A) COLLATE id(C). {
   A.pExpr = sqlExprAddCollateToken(pParse, A.pExpr, &C, 1);
