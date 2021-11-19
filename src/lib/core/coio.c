@@ -176,8 +176,7 @@ coio_connect_timeout(const char *host, const char *service, int host_hint,
 	    memset(&hints, 0, sizeof(struct addrinfo));
 	    hints.ai_family = AF_UNSPEC; /* Allow IPv4 or IPv6 */
 	    hints.ai_socktype = SOCK_STREAM;
-	    hints.ai_flags = AI_ADDRCONFIG|AI_NUMERICSERV|AI_PASSIVE;
-	    hints.ai_protocol = 0;
+	    hints.ai_flags = AI_ADDRCONFIG;
 	    int rc = coio_getaddrinfo(host, service, &hints, &ai, delay);
 	    if (rc != 0)
 		    return -1;
