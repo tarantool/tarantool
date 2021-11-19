@@ -97,6 +97,12 @@ int64_t
 histogram_percentile_lower(struct histogram *hist, int pct);
 
 /**
+ * Return upper bound of bucket containing maximal observed value.
+ */
+int64_t
+histogram_max(struct histogram *hist);
+
+/**
  * Print string representation of a histogram.
  */
 int

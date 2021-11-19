@@ -168,6 +168,43 @@ test_percentile(void)
 	footer();
 }
 
+static void
+test_max(void)
+{
+	header();
+
+	size_t n_buckets;
+	int64_t *buckets = gen_buckets(&n_buckets);
+
+	size_t data_len;
+	int64_t *data = gen_rand_data(&data_len);
+
+	struct histogram *hist = histogram_new(buckets, n_buckets);
+
+	int64_t max = buckets[0];
+	int64_t max_bucket = buckets[n_buckets - 1];
+	for (size_t i = 0; i < data_len; i++) {
+		int64_t val = data[i];
+		histogram_collect(hist, val);
+		if (max < val && val <= max_bucket) {
+			for (size_t b = 0; b < n_buckets; b++) {
+				if (buckets[b] >= val) {
+					max = buckets[b];
+					break;
+				}
+			}
+		}
+		int64_t hist_max = histogram_max(hist);
+		fail_if(hist_max != max);
+	}
+
+	histogram_delete(hist);
+	free(data);
+	free(buckets);
+
+	footer();
+}
+
 int
 main()
 {
@@ -175,4 +212,5 @@ main()
 	test_counts();
 	test_discard();
 	test_percentile();
+	test_max();
 }
