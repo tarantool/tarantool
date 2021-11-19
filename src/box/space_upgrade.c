@@ -5,8 +5,10 @@
  */
 
 #include "box.h"
+#include "cfg.h"
 #include "func.h"
 #include "iproto_constants.h"
+#include "replication.h"
 #include "space.h"
 #include "tuple.h"
 #include "txn.h"
@@ -32,6 +34,71 @@ enum {
 	UPGRADE_TX_BATCH_SIZE = 10
 #endif
 };
+
+/** Mode which was set on instance before launching upgrade. */
+static bool was_ro = false;
+
+static void
+space_upgrade_change_ro(struct space_upgrade *upgrade, bool is_ro)
+{
+	cfg_setb("read_only", is_ro);
+	box_set_ro();
+	char str[UUID_STR_LEN + 1];
+	tt_uuid_to_string(&upgrade->host_uuid, str);
+	say_warn("Set read_only mode to %d during upgrade on replica %s",
+		 is_ro, str);
+	assert(box_is_ro() == is_ro);
+}
+
+/** Return true if _space_upgrade has any data in it. */
+static bool
+space_upgrade_has_more_than_one()
+{
+	struct space *_space_upgrade = space_by_id(BOX_SPACE_UPGRADE_ID);
+	assert(_space_upgrade != NULL);
+	struct index *pk = space_index(_space_upgrade, 0);
+	assert(pk != NULL);
+	return index_count(pk, ITER_ALL, NULL, 0) > 1;
+}
+
+void
+space_upgrade_set_ro(struct space_upgrade *upgrade)
+{
+	/* Don't change read_only mode in case it's host. */
+	if (tt_uuid_is_equal(&upgrade->host_uuid, &INSTANCE_UUID))
+		return;
+	/* Don't change read_only mode in case we are in TEST or ERROR mode. */
+	if (upgrade->status != SPACE_UPGRADE_INPROGRESS)
+		return;
+	/*
+	 * In case it is first entry in _space_upgrade - save current read-only
+	 * status to restore it after all upgrades are finished.
+	 */
+	if (! space_upgrade_has_more_than_one()) {
+		was_ro = box_is_ro();
+	}
+	space_upgrade_change_ro(upgrade, true);
+}
+
+void
+space_upgrade_reset_ro(struct space_upgrade *upgrade)
+{
+	/* Don't change read_only mode in case it's host. */
+	if (tt_uuid_is_equal(&upgrade->host_uuid, &INSTANCE_UUID))
+		return;
+	/* Don't change read_only mode in case we are in TEST or ERROR mode. */
+	if (upgrade->status != SPACE_UPGRADE_INPROGRESS)
+		return;
+	/*
+	 * In case we are going to remove last entry from _space_upgrade,
+	 * we should restore read-only mode.
+	 */
+	if (! space_upgrade_has_more_than_one()) {
+		assert(box_is_ro());
+		if (! was_ro)
+			space_upgrade_change_ro(upgrade, false);
+	}
+}
 
 void
 space_upgrade_delete(struct space_upgrade *upgrade)
@@ -375,6 +442,7 @@ space_upgrade(uint32_t space_id)
 			rc = txn_commit(txn);
 			region_truncate(&fiber()->gc, used);
 			tuple_unref(tuple);
+			ERROR_INJECT_YIELD(ERRINJ_SPACE_UPGRADE_DELAY);
 		}
 	}
 	iterator_delete(it);

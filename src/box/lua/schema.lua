@@ -658,14 +658,15 @@ end
 local function space_upgrade_run(space_id, mode, func_id, format, on_error)
     local _space_upgrade = box.space._space_upgrade
     local su = _space_upgrade:get({space_id})
+    local uuid = box.info.uuid
 
     local rc
     if mode ~= "notest" then
         -- It's OK if "test" entry will be replicated, it doesn't affect
         -- anything: just easy way to parse format and fill in metadata.
         --
-        _space_upgrade:replace({space_id, "test", func_id, format})
         log.info("Starting :upgrade() test...")
+        _space_upgrade:replace({space_id, "test", func_id, format, uuid})
         rc = builtin.space_upgrade_test(space_id)
         assert(box.space._space_upgrade:get({space_id}) == nil)
         if rc ~= 0 then
@@ -673,7 +674,7 @@ local function space_upgrade_run(space_id, mode, func_id, format, on_error)
             box.error()
         end
         assert(box.space._space_upgrade:get({space_id}) == nil)
-        log.info(":upgrade() test is finished")
+        log.info(":upgrade() test is finished on instance %s", uuid)
     end
 
     if mode == "test" then return end
@@ -682,7 +683,7 @@ local function space_upgrade_run(space_id, mode, func_id, format, on_error)
     -- upgrade status. Status allows us to manage alter locks during
     -- space lock and skip tuple verification.
     --
-    _space_upgrade:replace({space_id, "inprogress", func_id, format})
+    _space_upgrade:replace({space_id, "inprogress", func_id, format, uuid})
     log.info("Inserted entry to _space_upgrade")
     -- After successful update of _space_upgrade we can alter space
     -- (format and/or opts) via space:alter(). Even if format is not changed,
