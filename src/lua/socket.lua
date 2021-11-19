@@ -1046,8 +1046,11 @@ local function tcp_connect(host, port, timeout)
     end
     local timeout = timeout or TIMEOUT_INFINITY
     local stop = fiber.clock() + timeout
-    local dns, err = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM',
-        protocol = 'tcp' })
+    local dns, err = getaddrinfo(host, port, timeout, {
+        protocol = 'tcp',
+        type = 'SOCK_STREAM',
+        flags = 'AI_ADDRCONFIG',
+    })
     if dns == nil then
         return nil, err
     end
@@ -1176,8 +1179,11 @@ local function tcp_server_bind(host, port, prepare, timeout)
         dns = {{host = host, port = port, family = 'AF_UNIX', protocol = 0,
             type = 'SOCK_STREAM' }}
     else
-        dns, err = getaddrinfo(host, port, timeout, { type = 'SOCK_STREAM',
-            flags = 'AI_PASSIVE'})
+        dns, err = getaddrinfo(host, port, timeout, {
+            protocol = 'tcp',
+            type = 'SOCK_STREAM',
+            flags = {'AI_ADDRCONFIG', 'AI_PASSIVE'},
+        })
         if dns == nil then
             return nil, err
         end
