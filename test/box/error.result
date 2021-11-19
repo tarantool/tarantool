@@ -452,6 +452,7 @@ t;
  |   231: box.error.TRANSACTION_TIMEOUT
  |   232: box.error.ACTIVE_TIMER
  |   233: box.error.TUPLE_FIELD_COUNT_LIMIT
+ |   234: box.error.UPGRADE
  | ...
 
 test_run:cmd("setopt delimiter ''");

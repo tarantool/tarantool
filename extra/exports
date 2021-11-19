@@ -377,6 +377,8 @@ SHA1internal
 space_bsize
 space_by_id
 space_run_triggers
+space_upgrade
+space_upgrade_test
 string_strip_helper
 swim_add_member
 swim_broadcast

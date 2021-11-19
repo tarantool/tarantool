@@ -933,6 +933,7 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 	int rc;
 	struct tuple *tuple;
 	size_t count = 0;
+	assert(!space_is_being_upgraded(space));
 	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL) {
 		/*
 		 * Check that the tuple is OK according to the

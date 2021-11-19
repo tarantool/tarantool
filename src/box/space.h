@@ -243,6 +243,8 @@ struct space {
 	 * List of all tx stories in the space.
 	 */
 	struct rlist memtx_stories;
+	/** Status of upgrade operation if any. */
+	struct space_upgrade *upgrade;
 };
 
 /** Initialize a base space instance. */
@@ -562,6 +564,9 @@ space_add_constraint_id(struct space *space, struct constraint_id *id);
  */
 struct constraint_id *
 space_pop_constraint_id(struct space *space, const char *name);
+
+bool
+space_is_being_upgraded(struct space *space);
 
 /*
  * Virtual method stubs.

@@ -36,6 +36,7 @@
 #include "tuple_format.h"
 #include "trigger.h"
 #include "user.h"
+#include "space_upgrade.h"
 #include "session.h"
 #include "txn.h"
 #include "memtx_tx.h"
@@ -208,6 +209,7 @@ space_create(struct space *space, struct engine *engine,
 	}
 	space->constraint_ids = mh_strnptr_new();
 	rlist_create(&space->memtx_stories);
+	space->upgrade = NULL;
 	return 0;
 
 fail_free_indexes:
@@ -275,6 +277,7 @@ space_delete(struct space *space)
 	assert(rlist_empty(&space->parent_fk_constraint));
 	assert(rlist_empty(&space->child_fk_constraint));
 	assert(rlist_empty(&space->ck_constraint));
+	assert(space->upgrade == NULL);
 	space->vtab->destroy(space);
 }
 
@@ -651,6 +654,13 @@ space_pop_constraint_id(struct space *space, const char *name)
 		mh_strnptr_node(ids, pos)->val;
 	mh_strnptr_del(ids, pos, NULL);
 	return id;
+}
+
+bool
+space_is_being_upgraded(struct space *space)
+{
+	return space->upgrade != NULL &&
+	       space->upgrade->status == SPACE_UPGRADE_INPROGRESS;
 }
 
 /* {{{ Virtual method stubs */

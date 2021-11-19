@@ -57,6 +57,8 @@
 #include "sequence.h"
 #include "sql.h"
 #include "constraint_id.h"
+#include "memtx_engine.h" /* for memtx_tuple_format_vtab */
+#include "space_upgrade.h"
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -720,6 +722,12 @@ space_swap_constraint_ids(struct space *new_space, struct space *old_space)
 	SWAP(new_space->constraint_ids, old_space->constraint_ids);
 }
 
+static void
+space_swap_upgrade(struct space *new_space, struct space *old_space)
+{
+	SWAP(new_space->upgrade, old_space->upgrade);
+}
+
 /**
  * True if the space has records identified by key 'uid'.
  * Uses 'iid' index.
@@ -1048,6 +1056,7 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 	space_swap_triggers(alter->new_space, alter->old_space);
 	space_swap_fk_constraints(alter->new_space, alter->old_space);
 	space_swap_constraint_ids(alter->new_space, alter->old_space);
+	space_swap_upgrade(alter->new_space, alter->old_space);
 	space_cache_replace(alter->new_space, alter->old_space);
 	alter_space_delete(alter);
 	return 0;
@@ -1149,9 +1158,15 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 		op->prepare(alter);
 
 	/*
+	 * In case format change is a part of upgrade operation - hold
+	 * the lock until upgrade is finished. It will be release in
+	 * on_replace_space_upgrade trigger.
+	 *
 	 * This function must not throw exceptions or yield after
 	 * this point.
 	 */
+	if (space_is_being_upgraded(alter->old_space))
+		lock_guard.is_active = false;
 
 	/* Move old indexes, update space format. */
 	rlist_foreach_entry(op, &alter->ops, link)
@@ -1167,6 +1182,7 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	space_swap_triggers(alter->new_space, alter->old_space);
 	space_swap_fk_constraints(alter->new_space, alter->old_space);
 	space_swap_constraint_ids(alter->new_space, alter->old_space);
+	space_swap_upgrade(alter->new_space, alter->old_space);
 	/*
 	 * The new space is ready. Time to update the space
 	 * cache with it.
@@ -1212,6 +1228,14 @@ space_check_format_with_yield(struct space *space,
 void
 CheckSpaceFormat::prepare(struct alter_space *alter)
 {
+	/*
+	 * In case of space upgrade it's OK if some tuples do not correspond
+	 * to the new format - upgrade function is going to convert them.
+	 * But the main condition in this case is that indexed fields
+	 * remain unchanged.
+	 */
+	if (space_is_being_upgraded(alter->old_space))
+		return;
 	struct space *new_space = alter->new_space;
 	struct space *old_space = alter->old_space;
 	struct tuple_format *new_format = new_space->format;
@@ -2373,6 +2397,12 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  "the space has check constraints");
 			return -1;
 		}
+		if (old_space->upgrade != NULL) {
+			diag_set(ClientError, ER_DROP_SPACE,
+				 space_name(old_space),
+				 "upgrade of space is in-progress");
+			return -1;
+		}
 		/**
 		 * The space must be deleted from the space
 		 * cache right away to achieve linearisable
@@ -2683,6 +2713,12 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 			diag_set(ClientError, ER_ALTER_SPACE,
 				  space_name(old_space),
 				  "can not drop a referenced index");
+			return -1;
+		}
+		if (old_space->upgrade != NULL) {
+			diag_set(ClientError, ER_ALTER_SPACE,
+				 space_name(old_space),
+				 "upgrade of space is in-progress");
 			return -1;
 		}
 		if (alter_space_move_indexes(alter, 0, iid) != 0)
@@ -5974,6 +6010,354 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 	return 0;
 }
 
+/** Remove alter lock in order to allow change space format. */
+static void
+space_upgrade_reset_alter_lock(struct space_upgrade *new_upgrade)
+{
+	if (new_upgrade->status == SPACE_UPGRADE_INPROGRESS) {
+		if (alter_space_is_locked(new_upgrade->space_id)) {
+			alter_space_unlock(new_upgrade->space_id);
+		}
+	}
+}
+
+static int
+on_create_space_upgrade_rollback(struct trigger *trigger, void * /* event */)
+{
+	struct space_upgrade *upgrade = (struct space_upgrade *)trigger->data;
+	struct space *space = space_by_id(upgrade->space_id);
+	assert(space != NULL);
+	/*
+	 * NB: space is locked after altering in on_replace_dd_space trigger
+	 * (to be more precise in alter_space_do()). However, upgrade
+	 * might fail earlier - before alter_space_do(). So in fact it might
+	 * turn out that space is not locked.
+	 */
+	space_upgrade_reset_alter_lock(upgrade);
+	space_upgrade_delete(space->upgrade);
+	space->upgrade = NULL;
+	if (trigger_run(&on_alter_space, space) != 0)
+		return -1;
+	return 0;
+}
+
+static int
+on_delete_space_upgrade_rollback(struct trigger *trigger, void * /* event */)
+{
+	struct space_upgrade *upgrade = (struct space_upgrade *)trigger->data;
+	struct space *space = space_by_id(upgrade->space_id);
+	assert(space != NULL);
+	assert(space->upgrade == NULL);
+	space->upgrade = upgrade;
+	if (trigger_run(&on_alter_space, space) != 0)
+		return -1;
+	return 0;
+}
+
+static int
+on_delete_space_upgrade_commit(struct trigger *trigger, void * /* event */)
+{
+	struct space_upgrade *upgrade = (struct space_upgrade *)trigger->data;
+	/* space is not locked only for TEST mode. */
+	if (!alter_space_is_locked(upgrade->space_id))
+		assert(upgrade->status == SPACE_UPGRADE_TEST);
+	space_upgrade_reset_alter_lock(upgrade);
+	space_upgrade_delete(upgrade);
+	return 0;
+}
+
+static int
+on_alter_space_upgrade_rollback(struct trigger *trigger, void * /* event */)
+{
+	struct space_upgrade *old_upgrade = (struct space_upgrade *)trigger->data;
+	struct space *space = space_by_id(old_upgrade->space_id);
+	assert(space != NULL);
+	struct space_upgrade *new_upgrade = space->upgrade;
+	space->upgrade = old_upgrade;
+	space_upgrade_delete(new_upgrade);
+	if (trigger_run(&on_alter_space, space) != 0)
+		return -1;
+	return 0;
+}
+
+static int
+on_alter_space_upgrade_commit(struct trigger *trigger, void * /* event */)
+{
+	struct space_upgrade *old_upgrade = (struct space_upgrade *)trigger->data;
+	space_upgrade_delete(old_upgrade);
+	return 0;
+}
+
+/**
+ * Parse the content of tuple inserted into _space_upgrade and fill
+ * corresponding metadata of struct space_ugprade. Also provide some
+ * check of upgrade function and space format.
+ */
+static struct space_upgrade *
+space_upgrade_decode(struct tuple *tuple)
+{
+	struct space_upgrade *upgrade =
+		(struct space_upgrade *) calloc(1, sizeof(*upgrade));
+	if (upgrade == NULL) {
+		diag_set(OutOfMemory, sizeof(*upgrade), "malloc",
+			 "space_upgrade");
+		return NULL;
+	}
+	auto upgrade_guard = make_scoped_guard([=] {
+		free(upgrade);
+	});
+	if (tuple_field_u32(tuple, BOX_SPACE_UPGRADE_FIELD_SPACE_ID,
+			    &upgrade->space_id) != 0)
+		return NULL;
+	struct space *space = space_by_id(upgrade->space_id);
+	if (space == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_SPACE,
+			 int2str(upgrade->space_id));
+		return NULL;
+	}
+	uint32_t status_str_len;
+	const char *status_str =
+		tuple_field_str(tuple, BOX_SPACE_UPGRADE_FIELD_STATUS,
+				&status_str_len);
+	if (status_str == NULL)
+		return NULL;
+	upgrade->status =
+		upgrade_status_by_name(status_str, status_str_len);
+	uint32_t func_id;
+	if (tuple_field_u32(tuple, BOX_SPACE_UPGRADE_FIELD_FUNCTION_ID,
+			    &func_id) != 0)
+		return NULL;
+	struct func *func = func_by_id(func_id);
+	if (func == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_FUNCTION, int2str(func_id));
+		return NULL;
+	}
+	if (!func_is_normalized(func)) {
+		diag_set(ClientError, ER_UPGRADE, space_name(space),
+			 "upgrade function is not normalized");
+		return NULL;
+	}
+	upgrade->func = func;
+	/* Decode new format */
+	const char *format_raw =
+		tuple_field_with_type(tuple, BOX_SPACE_UPGRADE_FIELD_FORMAT,
+				      MP_ARRAY);
+	if (format_raw == NULL)
+		return NULL;
+	struct field_def *fields = NULL;
+	uint32_t field_count;
+	if (space_format_decode(format_raw, &field_count, space->def->name,
+				strlen(space->def->name), ER_UPGRADE,
+				&fiber()->gc, &fields) != 0)
+		return NULL;
+	auto fields_guard = make_scoped_guard([=] {
+		space_def_destroy_fields(fields, field_count, false);
+	});
+	struct tuple_dictionary *dict = tuple_dictionary_new(fields, field_count);
+	if (dict == NULL)
+		return NULL;
+	/*
+	 * Further @upgrade->format will be used to test that it is possible to
+	 * create new tuple after upgrade function invocation.
+	 */
+	struct rlist key_list;
+	space_dump_def(space, &key_list);
+	int key_count = 0;
+	struct key_def **keys = index_def_to_key_def(&key_list, &key_count);
+	if (keys == NULL) {
+		tuple_dictionary_unref(dict);
+		return NULL;
+	}
+	struct tuple_format *format =
+		tuple_format_new(&memtx_tuple_format_vtab,
+				 engine_by_name("memtx"), keys, key_count,
+				 fields, field_count, 0, dict, true, false);
+	tuple_dictionary_unref(dict);
+	if (format == NULL)
+		return NULL;
+	tuple_format_ref(format);
+	upgrade->format = format;
+	upgrade_guard.is_active = false;
+	return upgrade;
+}
+
+static int
+space_upgrade_check(struct space *space)
+{
+	if (!space_is_memtx(space)) {
+		diag_set(ClientError, ER_UPGRADE, space_name(space),
+			 "only memtx engine is supported");
+		return -1;
+	}
+	if (space_is_system(space)) {
+		diag_set(ClientError, ER_UPGRADE, space_name(space),
+			 "cant upgrade system space");
+		return -1;
+	}
+	if (space_is_temporary(space)) {
+		diag_set(ClientError, ER_UPGRADE, space_name(space),
+			 "space is temporary");
+		return -1;
+	}
+	if (space->def->opts.is_view) {
+		diag_set(ClientError, ER_UPGRADE, space_name(space),
+			 "space is view");
+		return -1;
+	}
+	for (uint32_t i = 0; i < space->index_count; ++i) {
+		struct index *idx = space->index[i];
+		if (idx->def->type != TREE) {
+			diag_set(ClientError, ER_UPGRADE, space_name(space),
+				 "upgrade is supported only for TREE indexes");
+			return -1;
+		}
+	}
+	if (access_check_ddl(space->def->name, space->def->id, space->def->uid,
+			     SC_SPACE, PRIV_C) != 0)
+		return -1;
+	return 0;
+}
+
+/**
+ * +------------+------+------------+-------+
+ * |  FROM/TO   | TEST | INPROGRESS | ERROR |
+ * +------------+------+------------+-------+
+ * | TEST       |  -   |      +     |   -   |
+ * | INPROGRESS |  -   |      -     |   +   |
+ * | ERROR      |  +   |      +     |   -   |
+ * +------------+------+------------+-------+
+ */
+static int
+space_upgrade_check_status_compatibility(struct space *space,
+					 struct space_upgrade *old_upgrade,
+					 struct space_upgrade *new_upgrade)
+{
+	enum space_upgrade_status old_status = old_upgrade->status;
+	enum space_upgrade_status new_status = new_upgrade->status;
+	if (old_status == new_status) {
+		diag_set(ClientError, ER_UPGRADE, space_name(space),
+			tt_sprintf("upgrade is already in %s state",
+				   upgrade_status_strs[old_status]));
+		return -1;
+	}
+	if ((old_status == SPACE_UPGRADE_INPROGRESS &&
+	     new_status == SPACE_UPGRADE_TEST) ||
+	    (old_status == SPACE_UPGRADE_TEST &&
+	     new_status == SPACE_UPGRADE_ERROR)) {
+		diag_set(ClientError, ER_UPGRADE, space_name(space),
+			 tt_sprintf("can't set status %s being in state %s",
+				    upgrade_status_strs[new_status],
+				    upgrade_status_strs[old_status]));
+		return -1;
+	}
+	return 0;
+}
+
+/** A trigger invoked on replace in the _space_upgrade space. */
+static int
+on_replace_dd_space_upgrade(struct trigger *trigger, void *event)
+{
+	(void) trigger;
+	struct txn *txn = (struct txn *) event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = stmt->old_tuple;
+	struct tuple *new_tuple = stmt->new_tuple;
+	struct space *space = NULL;
+
+	if (new_tuple != NULL && old_tuple == NULL) { /* INSERT */
+		struct space_upgrade *upgrade = space_upgrade_decode(new_tuple);
+		if (upgrade == NULL)
+			return -1;
+		auto upgrade_guard = make_scoped_guard([=] {
+			space_upgrade_delete(upgrade);
+		});
+		/*
+		 * Space will be alter-locked after changing space format.
+		 */
+		space = space_by_id(upgrade->space_id);
+		assert(!space_is_being_upgraded(space));
+		if (space_upgrade_check(space) != 0)
+			return -1;
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(on_create_space_upgrade_rollback,
+					      upgrade);
+		if (on_rollback == NULL)
+			return -1;
+		txn_stmt_on_rollback(stmt, on_rollback);
+		space->upgrade = upgrade;
+		upgrade_guard.is_active = false;
+	} else if (new_tuple == NULL) { /* DELETE */
+		uint32_t id;
+		if (tuple_field_u32(old_tuple, BOX_SPACE_UPGRADE_FIELD_SPACE_ID,
+				    &id) != 0)
+			return -1;
+		space = space_by_id(id);
+		if (space == NULL) {
+			diag_set(ClientError, ER_NO_SUCH_SPACE, int2str(id));
+			return -1;
+		}
+		struct space_upgrade *upgrade = space->upgrade;
+		assert(upgrade != NULL);
+		/* Once upgrade started it must be finished.*/
+		if (upgrade->status == SPACE_UPGRADE_ERROR) {
+			diag_set(ClientError, ER_UPGRADE, space_name(space),
+				"can't stop upgrade in error mode");
+			return -1;
+		}
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(on_delete_space_upgrade_rollback,
+					      upgrade);
+		if (on_rollback == NULL)
+			return -1;
+		struct trigger *on_commit =
+			txn_alter_trigger_new(on_delete_space_upgrade_commit,
+					      upgrade);
+		if (on_commit == NULL)
+			return -1;
+		space->upgrade = NULL;
+		txn_stmt_on_rollback(stmt, on_rollback);
+		txn_stmt_on_commit(stmt, on_commit);
+	} else { /* REPLACE */
+		assert(old_tuple != NULL && new_tuple != NULL);
+		/*
+		 * In most cases replace assumes upgrade reload with new
+		 * upgrade function and/or upgrade status.
+		 */
+		struct space_upgrade *new_upgrade =
+			space_upgrade_decode(new_tuple);
+		if (new_upgrade == NULL)
+			return -1;
+		auto upgrade_guard = make_scoped_guard([=] {
+			space_upgrade_delete(new_upgrade);
+		});
+		space = space_by_id(new_upgrade->space_id);
+		assert(space != NULL);
+		struct space_upgrade *old_upgrade = space->upgrade;
+		if (space_upgrade_check_status_compatibility(space, old_upgrade,
+							     new_upgrade) != 0)
+			return -1;
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(on_alter_space_upgrade_rollback,
+					      old_upgrade);
+		if (on_rollback == NULL)
+			return -1;
+		struct trigger *on_commit =
+			txn_alter_trigger_new(on_alter_space_upgrade_commit,
+					      old_upgrade);
+		if (on_commit == NULL)
+			return -1;
+		txn_stmt_on_rollback(stmt, on_rollback);
+		txn_stmt_on_commit(stmt, on_commit);
+		space->upgrade = new_upgrade;
+		space_upgrade_reset_alter_lock(new_upgrade);
+		upgrade_guard.is_active = false;
+	}
+	/* Upgrade Lua object and reset space.upgrade_state. */
+	if (trigger_run(&on_alter_space, space) != 0)
+		return -1;
+	return 0;
+}
+
 struct trigger alter_space_on_replace_space = {
 	RLIST_LINK_INITIALIZER, on_replace_dd_space, NULL, NULL
 };
@@ -6036,6 +6420,10 @@ struct trigger on_replace_ck_constraint = {
 
 struct trigger on_replace_func_index = {
 	RLIST_LINK_INITIALIZER, on_replace_dd_func_index, NULL, NULL
+};
+
+struct trigger on_replace_space_upgrade = {
+	RLIST_LINK_INITIALIZER, on_replace_dd_space_upgrade, NULL, NULL
 };
 
 /* vim: set foldmethod=marker */

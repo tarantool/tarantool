@@ -509,6 +509,12 @@ schema_init(void)
 		init_system_space(space);
 	}
 
+	/* _space_upgrade - spaces to be upgraded. */
+	key_parts[0].fieldno = 0; /* space id */
+	key_parts[0].type = FIELD_TYPE_UNSIGNED;
+	sc_space_new(BOX_SPACE_UPGRADE_ID, "_space_upgrade", key_parts, 1,
+		     &on_replace_space_upgrade);
+
 	/*
 	 * Run the triggers right after creating all the system
 	 * space stubs.

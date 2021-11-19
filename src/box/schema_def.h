@@ -116,6 +116,8 @@ enum {
 	BOX_FUNC_INDEX_ID = 372,
 	/** Space id of _session_settings. */
 	BOX_SESSION_SETTINGS_ID = 380,
+	/** Space id of _space_upgrade. */
+	BOX_SPACE_UPGRADE_ID = 390,
 	/** End of the reserved range of system spaces. */
 	BOX_SYSTEM_ID_MAX = 511,
 	BOX_ID_NIL = 2147483647
@@ -284,6 +286,13 @@ enum {
 enum {
 	BOX_SESSION_SETTINGS_FIELD_NAME = 0,
 	BOX_SESSION_SETTINGS_FIELD_VALUE = 1,
+};
+
+enum {
+	BOX_SPACE_UPGRADE_FIELD_SPACE_ID = 0,
+	BOX_SPACE_UPGRADE_FIELD_STATUS = 1,
+	BOX_SPACE_UPGRADE_FIELD_FUNCTION_ID = 2,
+	BOX_SPACE_UPGRADE_FIELD_FORMAT = 3,
 };
 
 /*

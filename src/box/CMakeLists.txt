@@ -196,6 +196,7 @@ set(box_sources
     merger.c
     ibuf.c
     watcher.c
+    space_upgrade.c
     ${sql_sources}
     ${lua_sources}
     lua/init.c

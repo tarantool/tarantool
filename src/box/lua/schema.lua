@@ -8,6 +8,7 @@ local buffer = require('buffer')
 local session = box.session
 local internal = require('box.internal')
 local utf8 = require('utf8')
+local fiber = require('fiber')
 local function setmap(table)
     return setmetatable(table, { __serialize = 'map' })
 end
@@ -111,6 +112,12 @@ ffi.cdef[[
 
     void password_prepare(const char *password, int len,
                           char *out, int out_len);
+
+    int
+    space_upgrade(uint32_t space_id);
+
+    int
+    space_upgrade_test(uint32_t space_id);
 
     enum priv_type {
         PRIV_R = 1,
@@ -574,6 +581,15 @@ box.schema.space.rename = function(space_id, space_name)
     _space:update(space_id, {{"=", 3, space_name}})
 end
 
+-- Find a function id by given function name
+local function func_id_by_name(func_name)
+    local func = box.space._func.index.name:get(func_name)
+    if func == nil then
+        box.error(box.error.NO_SUCH_FUNCTION, func_name)
+    end
+    return func.id
+end
+
 local alter_space_template = {
     field_count = 'number',
     user = 'string, number',
@@ -630,6 +646,104 @@ box.schema.space.alter = function(space_id, options)
     tuple[6] = flags
     tuple[7] = format
     _space:replace(tuple)
+end
+
+local function check_upgrade_mode(mode)
+    if mode ~= 'test' and mode ~= 'notest' and mode ~= 'upgrade' then
+        box.error(box.error.ILLEGAL_PARAMS,
+            "upgrade mode should be 'test|notest|upgrade' but got "..mode)
+    end
+end
+
+local function space_upgrade_run(space_id, mode, func_id, format)
+    local _space_upgrade = box.space._space_upgrade
+    local su = _space_upgrade:get({space_id})
+
+    local rc
+    if mode ~= "notest" then
+        -- It's OK if "test" entry will be replicated, it doesn't affect
+        -- anything: just easy way to parse format and fill in metadata.
+        --
+        _space_upgrade:replace({space_id, "test", func_id, format})
+        log.info("Starting :upgrade() test...")
+        rc = builtin.space_upgrade_test(space_id)
+        if rc ~= 0 then box.error() end
+        -- Test should provide cleanup of _space_upgrade entry.
+        assert(box.space._space_upgrade:get({space_id}) == nil)
+        log.info(":upgrade() test is finished")
+    end
+
+    if mode == "test" then return end
+
+    -- Firstly we should insert tuple to _space_upgrade to update
+    -- upgrade status. Status allows us to manage alter locks during
+    -- space lock and skip tuple verification.
+    --
+    _space_upgrade:replace({space_id, "inprogress", func_id, format})
+    log.info("Inserted entry to _space_upgrade")
+    -- After successful update of _space_upgrade we can alter space
+    -- (format and/or opts) via space:alter(). Even if format is not changed,
+    -- we should process insertion to _space in order to set alter lock on
+    -- space.
+    --
+    local options = {}
+    options.format = format
+    local _, err = pcall(box.schema.space.alter, space_id, options)
+    if err ~= nil and not su then
+        -- At this moment entry in _space_upgrade can be already committed,
+        -- so to make this function behave "consistently" let's remove
+        -- corresponding tuple.
+        --
+        box.space._space_upgrade:delete(space_id)
+        box.error(err)
+    end
+    log.info("Space format has been changed")
+
+    rc = builtin.space_upgrade(space_id)
+    if rc ~= 0 then
+        -- Space's format remains updated.
+        assert(box.space._space_upgrade:get({space_id})[2] == "error")
+        box.error()
+    end
+    -- space_upgrade() should provide entry cleanup in case of success.
+    assert(box.space._space_upgrade:get({space_id}) == nil)
+    log.info("Space upgrade has successfully finished")
+end
+
+box.schema.space.upgrade = function(space_id, options)
+    local upgrade_space_template = {
+        mode = 'string',
+        func = 'string',
+        format = 'table',
+        background = 'boolean'
+    }
+    local upgrade_space_defaults = {
+        -- We have to set format; otherwise we can't tell resetting
+        -- format to empty ({}) from just skipping it as an argument.
+        --
+        format = box.space._space:get({space_id}).format,
+        background = false
+    }
+    check_param_table(options, upgrade_space_template)
+    options = update_param_table(options, upgrade_space_defaults)
+    if options.mode == nil then
+        box.error(box.error.ILLEGAL_PARAMS, "upgrade mode is missing (nil)")
+    end
+    if options.func == nil then
+        box.error(box.error.ILLEGAL_PARAMS, "upgrade function is missing (nil)")
+    end
+    local mode = options.mode:lower()
+    check_upgrade_mode(mode)
+    local background = options.background
+    local format = update_format(options.format)
+    local func_id = func_id_by_name(options.func)
+
+    if background then
+        log.info("Started space:upgrade() process in a background fiber")
+        return fiber.create(space_upgrade_run, space_id, mode, func_id,
+                            format)
+    end
+    space_upgrade_run(space_id, mode, func_id, format)
 end
 
 box.schema.index = {}
@@ -1132,15 +1246,6 @@ end
 --
 local create_index_template = table.deepcopy(alter_index_template)
 create_index_template.if_not_exists = "boolean"
-
--- Find a function id by given function name
-local function func_id_by_name(func_name)
-    local func = box.space._func.index.name:get(func_name)
-    if func == nil then
-        box.error(box.error.NO_SUCH_FUNCTION, func_name)
-    end
-    return func.id
-end
 
 box.schema.index.create = function(space_id, name, options)
     check_param(space_id, 'space_id', 'number')
@@ -2171,6 +2276,11 @@ space_mt.alter = function(space, options)
     check_space_arg(space, 'alter')
     check_space_exists(space)
     return box.schema.space.alter(space.id, options)
+end
+space_mt.upgrade = function(space, options)
+    check_space_arg(space, 'upgrade')
+    check_space_exists(space)
+    return box.schema.space.upgrade(space.id, options)
 end
 space_mt.create_index = function(space, name, options)
     check_space_arg(space, 'create_index')
