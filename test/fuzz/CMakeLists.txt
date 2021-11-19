@@ -38,8 +38,16 @@ target_link_libraries(uri_fuzzer PUBLIC uri fuzzer_config)
 add_executable(http_parser_fuzzer http_parser_fuzzer.c)
 target_link_libraries(http_parser_fuzzer PUBLIC http_parser fuzzer_config)
 
+add_executable(swim_proto_member_fuzzer swim_proto_member_fuzzer.c)
+target_link_libraries(swim_proto_member_fuzzer PUBLIC swim fuzzer_config)
+
+add_executable(swim_proto_meta_fuzzer swim_proto_meta_fuzzer.c)
+target_link_libraries(swim_proto_meta_fuzzer PUBLIC swim fuzzer_config)
+
 set(fuzzing_binaries csv_fuzzer
                      http_parser_fuzzer
+                     swim_proto_member_fuzzer
+                     swim_proto_meta_fuzzer
                      uri_fuzzer)
 
 add_custom_target(fuzzers
