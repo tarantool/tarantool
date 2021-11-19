@@ -347,6 +347,7 @@ sql_ephemeral_space_new(const struct sql_space_info *info)
 	char *names = (char *)fields + names_indent;
 
 	for (uint32_t i = 0; i < info->field_count; ++i) {
+		fields[i] = field_def_default;
 		fields[i].name = names;
 		sprintf(names, "_COLUMN_%d", i);
 		names += strlen(fields[i].name) + 1;
