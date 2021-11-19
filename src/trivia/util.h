@@ -212,6 +212,9 @@ strnindex(const char **haystack, const char *needle, uint32_t len, uint32_t hmax
  *
  * \example struct obuf { int a; int b; alignas(16) int c; };
  */
+#if defined(__cplusplus)
+#  include <stdalign.h>
+#endif
 #if !defined(alignas) && !defined(__alignas_is_defined)
 #  if __has_feature(c_alignas) || (defined(__GNUC__) && __GNUC__ >= 5)
 #    include <stdalign.h>
