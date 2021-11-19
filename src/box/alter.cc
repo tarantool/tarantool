@@ -944,33 +944,33 @@ AlterSpaceOp::AlterSpaceOp(struct alter_space *alter)
  * lock is optimistic: if there is a lock already, we simply throw
  * an exception.
  */
-class AlterSpaceLock {
-	/** Set of all taken locks. */
-	static struct mh_i32_t *registry;
-	/** Identifier of the space this lock is for. */
-	uint32_t space_id;
-public:
-	/** Take a lock for the altered space. */
-	AlterSpaceLock(struct alter_space *alter) {
-		if (registry == NULL) {
-			registry = mh_i32_new();
-		}
-		space_id = alter->old_space->def->id;
-		if (mh_i32_find(registry, space_id, NULL) != mh_end(registry)) {
-			tnt_raise(ClientError, ER_ALTER_SPACE,
-				  space_name(alter->old_space),
-				  "the space is already being modified");
-		}
-		mh_i32_put(registry, &space_id, NULL, NULL);
-	}
-	~AlterSpaceLock() {
-		mh_int_t k = mh_i32_find(registry, space_id, NULL);
-		assert(k != mh_end(registry));
-		mh_i32_del(registry, k, NULL);
-	}
-};
+/** Set of all taken locks. */
+static struct mh_i32_t *space_lock_registry = NULL;
 
-struct mh_i32_t *AlterSpaceLock::registry;
+static bool
+alter_space_is_locked(uint32_t space_id)
+{
+	if (space_lock_registry == NULL)
+		space_lock_registry = mh_i32_new();
+	return mh_i32_find(space_lock_registry, space_id, NULL) !=
+	       mh_end(space_lock_registry);
+}
+
+static void
+alter_space_lock(uint32_t space_id)
+{
+	if (space_lock_registry == NULL)
+		space_lock_registry = mh_i32_new();
+	mh_i32_put(space_lock_registry, &space_id, NULL, NULL);
+}
+
+static void
+alter_space_unlock(uint32_t space_id)
+{
+	mh_int_t k = mh_i32_find(space_lock_registry, space_id, NULL);
+	assert(alter_space_is_locked(space_id));
+	mh_i32_del(space_lock_registry, k, NULL);
+}
 
 /**
  * Commit the alter.
@@ -1093,7 +1093,14 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	 * another DDL operation while this one is in progress so
 	 * we lock out all concurrent DDL for this space.
 	 */
-	AlterSpaceLock lock(alter);
+	if (alter_space_is_locked(space_id(alter->old_space))) {
+		tnt_raise(ClientError, ER_ALTER_SPACE,
+			  space_name(alter->old_space),
+			  "the space is already being modified");
+	}
+	alter_space_lock(space_id(alter->old_space));
+	auto lock_guard = make_scoped_guard([=] {
+		alter_space_unlock(alter->old_space->def->id); });
 	/*
 	 * Prepare triggers while we may fail. Note, we don't have to
 	 * free them in case of failure, because they are allocated on
