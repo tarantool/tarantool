@@ -557,6 +557,9 @@ int
 sql_bind_bin_static(sql_stmt *stmt, int i, const char *str, uint32_t size);
 
 int
+sql_bind_array_static(sql_stmt *stmt, int i, const char *str, uint32_t size);
+
+int
 sql_bind_uuid(struct sql_stmt *stmt, int i, const struct tt_uuid *uuid);
 
 int

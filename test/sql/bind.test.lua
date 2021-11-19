@@ -82,8 +82,6 @@ execute(sql, parameters)
 -- suitable method in its bind API.
 execute('SELECT ? AS big_uint', {0xefffffffffffffff})
 -- Bind incorrect parameters.
-ok, err = pcall(execute, 'SELECT ?', { {1, 2, 3} })
-ok
 parameters = {}
 parameters[1] = {}
 parameters[1][100] = 200

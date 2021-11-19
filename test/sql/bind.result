@@ -249,13 +249,6 @@ execute('SELECT ? AS big_uint', {0xefffffffffffffff})
   - [17293822569102704640]
 ...
 -- Bind incorrect parameters.
-ok, err = pcall(execute, 'SELECT ?', { {1, 2, 3} })
----
-...
-ok
----
-- false
-...
 parameters = {}
 ---
 ...

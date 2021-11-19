@@ -99,15 +99,12 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 	case MP_BIN:
 		bind->s = mp_decode_bin(packet, &bind->bytes);
 		break;
+	case MP_ARRAY:
 	case MP_EXT:
 		bind->s = *packet;
 		mp_next(packet);
 		bind->bytes = *packet - bind->s;
 		break;
-	case MP_ARRAY:
-		diag_set(ClientError, ER_SQL_BIND_TYPE, "ARRAY",
-			 sql_bind_name(bind));
-		return -1;
 	case MP_MAP:
 		diag_set(ClientError, ER_SQL_BIND_TYPE, "MAP",
 			 sql_bind_name(bind));
@@ -190,6 +187,8 @@ sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
 		return sql_bind_null(stmt, pos);
 	case MP_BIN:
 		return sql_bind_bin_static(stmt, pos, p->s, p->bytes);
+	case MP_ARRAY:
+		return sql_bind_array_static(stmt, pos, p->s, p->bytes);
 	case MP_EXT:
 		assert(p->ext_type == MP_UUID || p->ext_type == MP_DECIMAL);
 		if (p->ext_type == MP_UUID)
