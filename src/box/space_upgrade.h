@@ -96,6 +96,11 @@ space_upgrade_reset_ro(struct space_upgrade *upgrade);
 void
 space_upgrade_delete(struct space_upgrade *upgrade);
 
+/** Convert single tuple in case iterator returns old tuple. */
+int
+space_upgrade_convert_tuple(struct space *space, struct tuple *old_tuple,
+			    struct tuple **new_tuple);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

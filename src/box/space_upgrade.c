@@ -206,6 +206,30 @@ upgrade_function_apply(struct space *space, struct func *func,
 	return 0;
 }
 
+int
+space_upgrade_convert_tuple(struct space *space, struct tuple *old_tuple,
+			    struct tuple **new_tuple)
+{
+	assert(old_tuple != NULL);
+	assert(space_is_memtx(space));
+	assert(space_is_being_upgraded(space));
+	*new_tuple = old_tuple;
+	struct func *convert = space->upgrade->func;
+	if (convert == NULL)
+		return 0;
+	const char *new_tuple_data = NULL;
+	const char *new_tuple_data_end = NULL;
+	if (upgrade_function_apply(space, convert, old_tuple, &new_tuple_data,
+				   &new_tuple_data_end) != 0) {
+		return -1;
+	}
+	*new_tuple = tuple_new(space->format, new_tuple_data,
+			       new_tuple_data_end);
+	if (*new_tuple == NULL)
+		return -1;
+	return 0;
+}
+
 /**
  * Function provides verification of three conditions:
  * 1. If new tuple satisfy new space format;

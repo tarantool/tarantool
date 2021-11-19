@@ -53,7 +53,8 @@ local function check_replica_during_upgrade(replica)
     check_upgrade_status(replica, "inprogress")
     t.assert_equals(replica:eval("return box.cfg.read_only"), true)
     -- Check that only half of data has been upgraded.
-    t.assert_equals(replica:eval("return box.space.test.index[0]:get({15})[2]"), 15)
+    -- upd: since now iterators always return updated data.
+    t.assert_equals(replica:eval("return box.space.test.index[0]:get({15})[2]"), "15")
     t.assert_equals(replica:eval("return box.space.test.index[0]:get({5})[2]"), "5")
     -- Verify that data manipilations are now allowed due to RO mode.
     replica:eval("_, err = pcall(box.space.test.replace, box.space.test, {100, 100})")
