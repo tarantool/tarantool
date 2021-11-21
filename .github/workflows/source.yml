@@ -2,6 +2,8 @@ name: source
 
 on:
   push:
+    tags:
+      - '**'
   repository_dispatch:
     types: [backend_automation]
   workflow_dispatch:
@@ -11,9 +13,6 @@ env:
 
 jobs:
   source:
-    # We want to run only on tags.
-    if: startsWith(github.ref, 'refs/tags/')
-
     runs-on: ubuntu-20.04-self-hosted
 
     strategy:
