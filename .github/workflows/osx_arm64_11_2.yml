@@ -8,6 +8,8 @@ on:
       - '**-full-ci'
     tags:
       - '**'
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
   repository_dispatch:
     types: [backend_automation]
   workflow_dispatch:
@@ -37,8 +39,9 @@ env:
 
 jobs:
   osx_arm64_11_2:
-    # The job works on our own runners, forks do not have them.
-    if: github.repository == 'tarantool/tarantool'
+    # Run on pull request only if the 'full-ci' label is set.
+    if: github.event_name != 'pull_request' ||
+        contains(github.event.pull_request.labels.*.name, 'full-ci')
 
     runs-on: macos-m1-11.2
 
