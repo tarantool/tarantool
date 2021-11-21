@@ -8,6 +8,8 @@ on:
       - '**-full-ci'
     tags:
       - '**'
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
   repository_dispatch:
     types: [backend_automation]
   workflow_dispatch:
@@ -34,10 +36,10 @@ concurrency:
 
 jobs:
   centos_7_aarch64:
-    # The job works on our own runners, forks do not have them.
-    #
+    # Run on pull request only if the 'full-ci' label is set.
     # FIXME: Testing and deploy for aarch64 is disabled temporarily.
-    if: 0 && github.repository == 'tarantool/tarantool'
+    if: 0 && ( github.event_name != 'pull_request' ||
+        contains(github.event.pull_request.labels.*.name, 'full-ci') )
 
     runs-on: graviton
 
