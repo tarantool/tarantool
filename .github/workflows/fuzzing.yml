@@ -12,8 +12,6 @@ on:
 
 jobs:
   fuzzing:
-    if: (github.repository == 'tarantool/tarantool')
-
     runs-on: ubuntu-18.04
 
     strategy:

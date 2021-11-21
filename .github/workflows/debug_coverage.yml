@@ -2,6 +2,10 @@ name: debug_coverage
 
 on:
   push:
+    branches-ignore:
+      - '**-notest'
+    tags:
+      - '**'
   pull_request:
   repository_dispatch:
     types: [backend_automation]
@@ -32,11 +36,11 @@ env:
 
 jobs:
   debug_coverage:
-    # We want to run on external PRs, but not on our own internal PRs
-    # as they'll be run by the push to the branch.
-    if: ( github.event_name == 'push' ||
-        github.event_name == 'pull_request') &&
-        ! endsWith(github.ref, '-notest')
+    # Run on pull request only if the 'notest' label is unset and this is
+    # an external PR (internal PRs trigger a run on push).
+    if: github.event_name != 'pull_request' ||
+        ( ! contains(github.event.pull_request.labels.*.name, 'notest') &&
+          github.event.pull_request.head.repo.full_name != github.repository )
 
     runs-on: ubuntu-20.04-self-hosted
 
