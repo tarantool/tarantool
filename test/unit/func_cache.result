@@ -1,0 +1,53 @@
+	*** func_cache_pin_test_one_holder ***
+1..7
+ok 1 - ok
+ok 2 - ok
+ok 3 - ok
+ok 4 - ok
+ok 5 - ok
+ok 6 - ok
+ok 7 - ok
+	*** func_cache_pin_test_one_holder: done ***
+	*** func_cache_pin_test_fifo ***
+1..8
+ok 1 - ok
+ok 2 - ok
+ok 3 - ok
+ok 4 - ok
+ok 5 - ok
+ok 6 - ok
+ok 7 - ok
+ok 8 - ok
+	*** func_cache_pin_test_fifo: done ***
+	*** func_cache_pin_test_lifo ***
+1..8
+ok 1 - ok
+ok 2 - ok
+ok 3 - ok
+ok 4 - ok
+ok 5 - ok
+ok 6 - ok
+ok 7 - ok
+ok 8 - ok
+	*** func_cache_pin_test_lifo: done ***
+	*** func_cache_pin_test_several ***
+1..18
+ok 1 - ok
+ok 2 - ok
+ok 3 - ok
+ok 4 - ok
+ok 5 - ok
+ok 6 - ok
+ok 7 - ok
+ok 8 - ok
+ok 9 - ok
+ok 10 - ok
+ok 11 - ok
+ok 12 - ok
+ok 13 - ok
+ok 14 - ok
+ok 15 - ok
+ok 16 - ok
+ok 17 - ok
+ok 18 - ok
+	*** func_cache_pin_test_several: done ***

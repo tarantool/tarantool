@@ -399,6 +399,7 @@ func_new(struct func_def *def)
 	if (func == NULL)
 		return NULL;
 	func->def = def;
+	rlist_create(&func->func_cache_pin_list);
 	/** Nobody has access to the function but the owner. */
 	memset(func->access, 0, sizeof(func->access));
 	/*
@@ -500,6 +501,7 @@ static struct func_vtab func_c_vtab = {
 void
 func_delete(struct func *func)
 {
+	assert(rlist_empty(&func->func_cache_pin_list));
 	struct func_def *def = func->def;
 	credentials_destroy(&func->owner_credentials);
 	func->vtab->destroy(func);

@@ -3635,6 +3635,17 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 				  "function has references");
 			return -1;
 		}
+		/* Check whether old_func is used somewhere. */
+		enum func_holder_type pinned_type;
+		if (func_is_pinned(old_func, &pinned_type)) {
+			const char *type_str =
+				func_cache_holder_type_strs[pinned_type];
+			diag_set(ClientError, ER_DROP_FUNCTION,
+				 (unsigned int)old_func->def->uid,
+				 tt_sprintf("function is referenced by %s",
+					    type_str));
+			return -1;
+		}
 		struct trigger *on_commit =
 			txn_alter_trigger_new(on_drop_func_commit, old_func);
 		struct trigger *on_rollback =
