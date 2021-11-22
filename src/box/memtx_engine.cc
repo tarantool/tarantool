@@ -1492,10 +1492,10 @@ static void
 memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
-	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple_is_unreferenced(tuple));
 	struct memtx_tuple *memtx_tuple =
 		container_of(tuple, struct memtx_tuple, base);
+	say_debug("%s(%p)", __func__, memtx_tuple);
 	if (memtx->free_mode != MEMTX_ENGINE_DELAYED_FREE ||
 	    memtx_tuple->version == memtx->snapshot_version ||
 	    format->is_temporary) {
