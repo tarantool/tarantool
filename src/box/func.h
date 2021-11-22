@@ -60,6 +60,8 @@ struct func {
 	struct func_def *def;
 	/** Virtual method table. */
 	const struct func_vtab *vtab;
+	/** List of func holders. This member is a property of func cache. */
+	struct rlist func_cache_pin_list;
 	/**
 	 * Authentication id of the owner of the function,
 	 * used for set-user-id functions.

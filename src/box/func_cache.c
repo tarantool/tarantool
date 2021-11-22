@@ -13,6 +13,10 @@ static struct mh_i32ptr_t *funcs;
 /** Name -> func dictionary. */
 static struct mh_strnptr_t *funcs_by_name;
 
+const char *func_cache_holder_type_strs[FUNC_HOLDER_MAX] = {
+	"constraint",
+};
+
 void
 func_cache_init(void)
 {
@@ -55,8 +59,8 @@ func_cache_delete(uint32_t fid)
 	mh_int_t k = mh_i32ptr_find(funcs, fid, NULL);
 	if (k == mh_end(funcs))
 		return;
-	struct func *func = (struct func *)
-		mh_i32ptr_node(funcs, k)->val;
+	struct func *func = (struct func *)mh_i32ptr_node(funcs, k)->val;
+	assert(rlist_empty(&func->func_cache_pin_list));
 	mh_i32ptr_del(funcs, k, NULL);
 	k = mh_strnptr_find_str(funcs_by_name, func->def->name,
 				strlen(func->def->name));
@@ -80,4 +84,43 @@ func_by_name(const char *name, uint32_t name_len)
 	if (func == mh_end(funcs_by_name))
 		return NULL;
 	return (struct func *)mh_strnptr_node(funcs_by_name, func)->val;
+}
+
+void
+func_pin(struct func *func, struct func_cache_holder *holder,
+	 enum func_holder_type type)
+{
+	assert(func_by_id(func->def->fid) != NULL);
+	holder->func = func;
+	holder->type = type;
+	rlist_add_tail(&func->func_cache_pin_list, &holder->link);
+}
+
+void
+func_unpin(struct func_cache_holder *holder)
+{
+	assert(func_by_id(holder->func->def->fid) != NULL);
+#ifndef NDEBUG
+	/* Paranoid check that the func is pinned by holder. */
+	bool is_in_list = false;
+	struct rlist *tmp;
+	rlist_foreach(tmp, &holder->func->func_cache_pin_list)
+		is_in_list = is_in_list || tmp == &holder->link;
+	assert(is_in_list);
+#endif
+	rlist_del(&holder->link);
+	holder->func = NULL;
+}
+
+bool
+func_is_pinned(struct func *func, enum func_holder_type *type)
+{
+	assert(func_by_id(func->def->fid) != NULL);
+	if (rlist_empty(&func->func_cache_pin_list))
+		return false;
+	struct func_cache_holder *h =
+		rlist_first_entry(&func->func_cache_pin_list,
+				  struct func_cache_holder, link);
+	*type = h->type;
+	return true;
 }

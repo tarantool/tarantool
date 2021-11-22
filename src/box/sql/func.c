@@ -2149,6 +2149,7 @@ sql_built_in_functions_cache_init(void)
 			panic("Out of memory on creating SQL built-in");
 
 		func->base.def = def;
+		rlist_create(&func->base.func_cache_pin_list);
 		func->base.vtab = &func_sql_builtin_vtab;
 		credentials_create_empty(&func->base.owner_credentials);
 		memset(func->base.access, 0, sizeof(func->base.access));
