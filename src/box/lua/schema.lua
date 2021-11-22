@@ -75,6 +75,8 @@ ffi.cdef[[
     box_txn_set_timeout(double timeout);
     int
     box_txn_set_isolation(uint32_t level);
+    void
+    memtx_tx_story_gc_step();
     /** \endcond public */
     /** \cond public */
     int
@@ -406,6 +408,16 @@ box.begin = function(options)
 end
 
 box.is_in_txn = builtin.box_txn
+
+box.internal.memtx_tx_gc = function(step_num)
+    if type(step_num) ~= 'number' or step_num < 1 then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  "step_num must be a number not less than 1")
+    end
+    for _ = 1, step_num do
+        builtin.memtx_tx_story_gc_step()
+    end
+end
 
 box.txn_id = function()
     local id = builtin.box_txn_id()
