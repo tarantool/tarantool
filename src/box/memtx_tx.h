@@ -485,6 +485,12 @@ memtx_tx_snapshot_clarify(struct memtx_tx_snapshot_cleaner *cleaner,
 void
 memtx_tx_snapshot_cleaner_destroy(struct memtx_tx_snapshot_cleaner *cleaner);
 
+/**
+ * Export step of garbage collector to builtin module
+ */
+API_EXPORT void
+memtx_tx_story_gc_step();
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

@@ -73,6 +73,8 @@ ffi.cdef[[
     box_txn_begin();
     int
     box_txn_set_timeout(double timeout);
+    void
+    memtx_tx_story_gc_step();
     /** \endcond public */
     /** \cond public */
     int
@@ -349,6 +351,12 @@ box.begin = function(options)
 end
 
 box.is_in_txn = builtin.box_txn
+
+box.internal.memtx_tx_gc = function(step_num)
+    for _ = 1, step_num do
+        builtin.memtx_tx_story_gc_step()
+    end
+end
 
 box.txn_id = function()
     local id = builtin.box_txn_id()

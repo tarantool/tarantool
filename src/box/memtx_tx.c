@@ -864,7 +864,7 @@ memtx_tx_story_full_unlink(struct memtx_story *story)
  * Run one step of a crawler that traverses all stories and removes no more
  * used stories.
  */
-static void
+void
 memtx_tx_story_gc_step()
 {
 	if (txm.traverse_all_stories == &txm.all_stories) {
