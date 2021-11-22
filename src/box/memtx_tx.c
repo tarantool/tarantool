@@ -873,8 +873,13 @@ memtx_tx_story_gc_step()
 		return;
 	}
 
-	/* Lowest read view PSN */
-	int64_t lowest_rv_psm = txn_last_psn;
+	/*
+	 * Lowest read view PSN.
+	 * Default value is more than txn_last_psn because if it is not so
+	 * some stories (stories produced by last txn at least) will be marked as
+	 * potentially in read view even though there are no txns in read view.
+	 */
+	int64_t lowest_rv_psm = txn_last_psn + 1;
 	if (!rlist_empty(&txm.read_view_txs)) {
 		struct txn *txn =
 			rlist_first_entry(&txm.read_view_txs, struct txn,

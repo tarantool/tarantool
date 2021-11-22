@@ -1238,6 +1238,69 @@ tx2:commit()
 tx1("assert(tx1_id  == box.txn_id())")
 tx1:commit()
 
+-- https://github.com/tarantool/tarantool/issues/6635
+
+s = box.schema.create_space('test')
+_ = s:create_index('pk')
+
+-- Collect garbage before replacing tuples
+box.internal.memtx_tx_gc(100)
+collectgarbage('collect')
+
+default_log_lvl = box.cfg.log_level
+box.cfg{log_level = 7}
+_ = s:replace{0, 0, 0, 0, 0, 0, 0}
+box.cfg{log_level = default_log_lvl}
+
+-- Remember address of inserted tuple to check if it will be deleted.
+str = test_run:grep_log('tx_man', 'tuple_new%(%d+%) = 0x%x+$')
+new_tuple_address = string.match(str, '0x%x+$')
+new_tuple_address = string.sub(new_tuple_address, 3)
+
+_ = s:replace{0, 1}
+
+box.cfg{log_level = 7}
+box.internal.memtx_tx_gc(10)
+collectgarbage('collect')
+box.cfg{log_level = default_log_lvl}
+
+-- Check if last deleted tuple is the tuple which was inserted above.
+str = test_run:grep_log('tx_man', 'tuple_delete%(0x%x+%)')
+deleted_tuple_address = string.match(str, '0x%x+%)')
+deleted_tuple_address = string.sub(deleted_tuple_address, 3, -2)
+assert(new_tuple_address == deleted_tuple_address)
+
+s:drop()
+
+-- Better test coverage for garbage collector of memtx mvcc engine.
+
+s = box.schema.space.create('test')
+_ = s:create_index('pk')
+
+for i = 1, 100 do   \
+    s:replace{i, 0} \
+end
+
+tx1:begin()
+tx1('s:select{1}[1]')
+tx2:begin()
+tx2('s:replace{1, 1}')
+for i = 2, 100 do                \
+    tx2('s:delete(' .. i .. ')') \
+end
+tx2:commit()
+box.internal.memtx_tx_gc(1000)
+collectgarbage('collect')
+
+-- tx1 has read tuple {1, 0}, and then tx2 replaced it
+-- so tx1 must fall into read-view and all {i, 0} tuples
+-- must not be deleted.
+for i = 2, 100 do                               \
+    local res = tx1('s:get{' .. i .. '}')       \
+    assert(res[1] ~= nil)                       \
+end
+tx1:commit()
+
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
