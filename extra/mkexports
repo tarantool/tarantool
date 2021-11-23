@@ -23,5 +23,5 @@ else
         # or follow patch from shared object script
         nm -D `cat $so | grep GROUP | awk '{print $3}'` ;
       } | awk '{print $3}' ; done ;
-    } | sed '/^\s*$/d;s/$/;/;' && echo "};" ) > $2
+    } | sed '/^[[:space:]]*$/d;s/$/;/;' && echo "};" ) > $2
 fi
