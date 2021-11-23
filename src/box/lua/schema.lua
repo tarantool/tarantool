@@ -2380,53 +2380,56 @@ box.schema.sequence.drop = function(name, opts)
     _sequence:delete{id}
 end
 
-local function privilege_resolve(privilege)
-    local numeric = 0
-    if type(privilege) == 'string' then
-        privilege = string.lower(privilege)
-        if string.find(privilege, 'read') then
-            numeric = numeric + box.priv.R
+local function privilege_parse(privs)
+    -- TODO: introduce a global privilege -> bit mapping?
+    local privs_map = {
+        read      = box.priv.R,
+        write     = box.priv.W,
+        execute   = box.priv.X,
+        session   = box.priv.S,
+        usage     = box.priv.U,
+        create    = box.priv.C,
+        drop      = box.priv.D,
+        alter     = box.priv.A,
+        reference = box.priv.REFERENECE,
+        trigger   = box.priv.TRIGGER,
+        insert    = box.priv.INSERT,
+        update    = box.priv.UPDATE,
+        delete    = box.priv.DELETE
+    }
+    local privs_cp = string.lower(privs):gsub('^[%A]*', '')
+
+    local mask = 0
+    -- TODO: prove correctness formally (e.g. via a FSA)?
+    repeat
+        local matched = false
+        -- TODO: replace this with one group pattern when Lua patterns start
+        -- supporting disjunction (e.g. '|')
+        for priv, bit in pairs(privs_map) do
+            privs_cp = string.gsub(privs_cp, '^' .. priv .. '[%A]*',
+                                   function()
+                                       matched = true
+                                       mask = mask + bit
+                                       privs_map[priv] = 0
+                                       return ''
+                                   end)
         end
-        if string.find(privilege, 'write') then
-            numeric = numeric + box.priv.W
-        end
-        if string.find(privilege, 'execute') then
-            numeric = numeric + box.priv.X
-        end
-        if string.find(privilege, 'session') then
-            numeric = numeric + box.priv.S
-        end
-        if string.find(privilege, 'usage') then
-            numeric = numeric + box.priv.U
-        end
-        if string.find(privilege, 'create') then
-            numeric = numeric + box.priv.C
-        end
-        if string.find(privilege, 'drop') then
-            numeric = numeric + box.priv.D
-        end
-        if string.find(privilege, 'alter') then
-            numeric = numeric + box.priv.A
-        end
-        if string.find(privilege, 'reference') then
-            numeric = numeric + box.priv.REFERENCE
-        end
-        if string.find(privilege, 'trigger') then
-            numeric = numeric + box.priv.TRIGGER
-        end
-        if string.find(privilege, 'insert') then
-            numeric = numeric + box.priv.INSERT
-        end
-        if string.find(privilege, 'update') then
-            numeric = numeric + box.priv.UPDATE
-        end
-        if string.find(privilege, 'delete') then
-            numeric = numeric + box.priv.DELETE
-        end
-    else
-        numeric = privilege
+    until (not matched)
+
+    if privs_cp ~= '' then
+        mask = 0
     end
-    return numeric
+
+    return mask
+end
+
+local function privilege_resolve(privs)
+    if type(privs) == 'string' then
+        return privilege_parse(privs)
+    elseif type(privs) == 'number' then -- TODO: assert type(privs)?
+        return privs
+    end
+    return 0
 end
 
 -- allowed combination of privilege bits for object
