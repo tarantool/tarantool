@@ -1,0 +1,30 @@
+name: freebsd-13
+
+on:
+  push:
+  pull_request:
+  repository_dispatch:
+    types: [backend_automation]
+  workflow_dispatch:
+
+jobs:
+  freebsd-13:
+    # We want to run on external PRs, but not on our own internal PRs
+    # as they'll be run by the push to the branch.
+    if: ( github.event_name == 'push' ||
+        github.event.pull_request.head.repo.full_name != github.repository ) &&
+        ! endsWith(github.ref, '-notest')
+
+    runs-on: freebsd-13-mcs
+
+    strategy:
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - uses: ./.github/actions/environment
+      - name: test
+        run: make -f .travis.mk test_freebsd
