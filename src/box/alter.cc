@@ -3583,6 +3583,18 @@ on_drop_func_rollback(struct trigger *trigger, void * /* event */)
 	return 0;
 }
 
+static int
+func_has_references(struct func *func, bool *out)
+{
+	if (space_has_data(BOX_FUNC_INDEX_ID, 1, func->def->fid, out) != 0)
+		return -1;
+	if (*out)
+		return 0;
+	if (space_has_data(BOX_SPACE_UPGRADE_ID, 1, func->def->fid, out) != 0)
+		return -1;
+	return 0;
+}
+
 /**
  * A trigger invoked on replace in a space containing
  * functions on which there were defined any grants.
@@ -3643,14 +3655,15 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 				  "function has grants");
 			return -1;
 		}
-		if (space_has_data(BOX_FUNC_INDEX_ID, 1, old_func->def->fid, &out) != 0)
+		if (func_has_references(old_func, &out) != 0)
 			return -1;
-		if (old_func != NULL && out) {
+		if (out) {
 			diag_set(ClientError, ER_DROP_FUNCTION,
 				  (unsigned) old_func->def->uid,
 				  "function has references");
 			return -1;
 		}
+
 		struct trigger *on_commit =
 			txn_alter_trigger_new(on_drop_func_commit, old_func);
 		struct trigger *on_rollback =

@@ -3,7 +3,7 @@
 local tap = require('tap')
 local test = tap.test('space-upgrade-local')
 
-test:plan(74)
+test:plan(75)
 
 local bad_functions = {
     -- name, body, expected error message, does block upgrade process: if
@@ -421,6 +421,11 @@ local function upgrade_of_big_space()
     local ok, res = pcall(box.space.big.index[0].drop, box.space.big.index[0])
     test:is_deeply({ok, tostring(res)}, {false,  [[Can't modify space 'big': upgrade of space is in-progress]]},
         "Space can't be dropped")
+
+    -- Let's check that function can't be dropped until upgrade is finished.
+    local ok, res = pcall(box.schema.func.drop, "partial_upgrade")
+    test:is_deeply({ok, tostring(res)}, {false,  [[Can't drop function 1: function has references]]},
+                   "Function can't be dropped")
 
     local _, res = pcall(box.space.big.upgrade, box.space.big, {mode = "notest", func = "full_upgrade"})
     test:is(res, nil, "Upgrade has been finished")
