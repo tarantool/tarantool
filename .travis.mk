@@ -300,6 +300,6 @@ build_freebsd:
 
 test_freebsd_no_deps: build_freebsd
 	make LuaJIT-test
-	cd test && python3.8 test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
+	cd test && python3.8 test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_freebsd: deps_freebsd test_freebsd_no_deps
