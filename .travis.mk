@@ -290,7 +290,7 @@ test_osx_github_actions: deps_osx_github_actions test_osx_no_deps
 
 deps_freebsd:
 	sudo pkg install -y git cmake gmake icu libiconv \
-		python27 py27-yaml py27-six py27-gevent \
+		python38 py38-yaml py38-six py38-gevent \
 		autoconf automake libtool
 
 build_freebsd:
@@ -300,6 +300,6 @@ build_freebsd:
 
 test_freebsd_no_deps: build_freebsd
 	make LuaJIT-test
-	cd test && python2.7 test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
+	cd test && python3.8 test-run.py --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_freebsd: deps_freebsd test_freebsd_no_deps
