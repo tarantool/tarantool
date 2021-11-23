@@ -39,6 +39,7 @@
 #include "errinj.h"
 #include "iproto_constants.h"
 #include "box.h"
+#include "tx_memory.h"
 
 double too_long_threshold;
 
@@ -258,6 +259,8 @@ txn_new(void)
 	rlist_create(&txn->conflicted_by_list);
 	rlist_create(&txn->in_read_view_txs);
 	rlist_create(&txn->in_all_txs);
+	txn->mem_used = NULL;
+	txn->given_region_used = 0;
 	return txn;
 }
 

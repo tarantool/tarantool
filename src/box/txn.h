@@ -345,6 +345,10 @@ struct txn {
 	 */
 	struct region region;
 	/**
+	 * Used memory of region before it was given, 0 if was not.
+	 */
+	uint64_t given_region_used;
+	/**
 	 * A sequentially growing transaction id, assigned when
 	 * a transaction is initiated. Used to identify
 	 * a transaction after it has possibly been destroyed.
@@ -393,6 +397,11 @@ struct txn {
 	struct engine *engine;
 	/** Engine-specific transaction data */
 	void *engine_tx;
+	/**
+	 * Information about txn's allocations for memory manager.
+	 * Allocated on region of txn.
+	 */
+	struct txn_mem_used *mem_used;
 	/* A fiber to wake up when transaction is finished. */
 	struct fiber *fiber;
 	/** Timestampt of entry write start. */
