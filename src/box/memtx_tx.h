@@ -151,6 +151,13 @@ struct memtx_story {
 	 * Number of indexes in this space - and the count of link[].
 	 */
 	uint32_t index_count;
+	/** Status of story for memory manager. */
+	int pin_status;
+	/**
+	 * Flag is set when @a tuple is not placed in primary key and
+	 * the story is the only reason why @a tuple cannot be deleted.
+	 */
+	bool is_pinned;
 	/**
 	 * Link with older and newer stories (and just tuples) for each
 	 * index respectively.
@@ -181,6 +188,14 @@ memtx_tx_manager_init();
  */
 void
 memtx_tx_manager_free();
+
+
+struct memtx_tx_memory_manager;
+/**
+ * Get memory manager of memtx transaction manager.
+ */
+struct memtx_tx_memory_manager *
+memtx_tx_memory_get();
 
 /**
  * Transaction providing DDL changes is disallowed to yield after

@@ -93,7 +93,9 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 	/* Create a redo log row. */
 	int size;
 	struct xrow_header *row;
-	row = region_alloc_object(&txn->region, struct xrow_header, &size);
+	row = tx_memory_region_alloc_object(
+		(struct tx_memory_manager *)memtx_tx_memory_get(), txn,
+		struct xrow_header, &size, TXN_ALLOC_REDO_LOG);
 	if (row == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc_object", "row");
 		return -1;
@@ -118,7 +120,10 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 	 */
 	struct space *space = stmt->space;
 	row->group_id = space != NULL ? space_group_id(space) : 0;
-	row->bodycnt = xrow_encode_dml(request, &txn->region, row->body);
+	struct region *txn_region = tx_memory_txn_region_give(txn);
+	row->bodycnt = xrow_encode_dml(request, txn_region, row->body);
+	tx_memory_txn_region_take((struct tx_memory_manager *)memtx_tx_memory_get(),
+				  txn, TXN_ALLOC_REDO_LOG);
 	if (row->bodycnt < 0)
 		return -1;
 	stmt->row = row;
@@ -131,7 +136,9 @@ txn_stmt_new(struct txn *txn)
 {
 	int size;
 	struct txn_stmt *stmt;
-	stmt = region_alloc_object(&txn->region, struct txn_stmt, &size);
+	stmt = tx_memory_region_alloc_object(
+		(struct tx_memory_manager *)memtx_tx_memory_get(), txn,
+		struct txn_stmt, &size, TXN_ALLOC_STMT);
 	if (stmt == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc_object", "stmt");
 		return NULL;
@@ -235,9 +242,13 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 inline static struct txn *
 txn_new(void)
 {
-	if (!stailq_empty(&txn_cache))
-		return stailq_shift_entry(&txn_cache, struct txn, in_txn_cache);
-
+	if (!stailq_empty(&txn_cache)) {
+		struct txn *new_txn =
+			stailq_shift_entry(&txn_cache, struct txn, in_txn_cache);
+		tx_memory_register_txn(
+			(struct tx_memory_manager *)memtx_tx_memory_get(), new_txn);
+		return new_txn;
+	}
 	/* Create a region. */
 	struct region region;
 	region_create(&region, &cord()->slabc);
@@ -261,6 +272,7 @@ txn_new(void)
 	rlist_create(&txn->in_all_txs);
 	txn->mem_used = NULL;
 	txn->given_region_used = 0;
+	tx_memory_register_txn((struct tx_memory_manager *)memtx_tx_memory_get(), txn);
 	return txn;
 }
 
@@ -303,8 +315,8 @@ txn_free(struct txn *txn)
 		txn_stmt_destroy(stmt);
 
 	/* Truncate region up to struct txn size. */
-	region_truncate(&txn->region, sizeof(struct txn));
 	stailq_add(&txn_cache, &txn->in_txn_cache);
+	tx_memory_clear_txn((struct tx_memory_manager *)memtx_tx_memory_get(), txn);
 }
 
 void
@@ -651,8 +663,11 @@ txn_journal_entry_new(struct txn *txn)
 	assert(txn->n_new_rows + txn->n_applier_rows > 0);
 
 	/* Save space for an additional NOP row just in case. */
+	struct region *txn_region = tx_memory_txn_region_give(txn);
 	req = journal_entry_new(txn->n_new_rows + txn->n_applier_rows + 1,
-				&txn->region, txn_on_journal_write, txn);
+				txn_region, txn_on_journal_write, txn);
+	tx_memory_txn_region_take((struct tx_memory_manager *)memtx_tx_memory_get(),
+				  txn, TXN_ALLOC_JOURNAL_ENTRY);
 	if (req == NULL)
 		return NULL;
 
@@ -723,8 +738,9 @@ txn_journal_entry_new(struct txn *txn)
 	    (txn->n_local_rows != txn->n_new_rows || txn->n_applier_rows > 0) &&
 	    (*(local_row - 1))->group_id == GROUP_LOCAL) {
 		size_t size;
-		*local_row = region_alloc_object(&txn->region,
-						 typeof(**local_row), &size);
+		*local_row = tx_memory_region_alloc_object(
+			(struct tx_memory_manager *)memtx_tx_memory_get(), txn,
+			typeof(**local_row), &size, TXN_ALLOC_JOURNAL_ENTRY);
 		if (*local_row == NULL) {
 			diag_set(OutOfMemory, size, "region_alloc_object",
 				 "row");
@@ -881,8 +897,9 @@ txn_commit_try_async(struct txn *txn)
 		 * is sent to journal, so allocate early.
 		 */
 		size_t size;
-		struct trigger *trig =
-			region_alloc_object(&txn->region, typeof(*trig), &size);
+		struct trigger *trig = tx_memory_region_alloc_object(
+			(struct tx_memory_manager *)memtx_tx_memory_get(), txn,
+			typeof(*trig), &size, TXN_ALLOC_TRIGGER);
 		if (trig == NULL) {
 			diag_set(OutOfMemory, size, "region_alloc_object",
 				 "trig");
@@ -1157,8 +1174,9 @@ box_txn_alloc(size_t size)
 		double lf;
 		long l;
 	};
-	return region_aligned_alloc(&txn->region, size,
-	                            alignof(union natural_align));
+	return tx_memory_region_aligned_alloc(
+		(struct tx_memory_manager *)memtx_tx_memory_get(), txn, size,
+		alignof(union natural_align), TXN_ALLOC_USER_DATA);
 }
 
 int
@@ -1191,8 +1209,9 @@ txn_savepoint_new(struct txn *txn, const char *name)
 	static_assert(sizeof(svp->name) == 1,
 		      "name member already has 1 byte for 0 termination");
 	size_t size = sizeof(*svp) + name_len;
-	svp = (struct txn_savepoint *)region_aligned_alloc(&txn->region, size,
-							   alignof(*svp));
+	svp = (struct txn_savepoint *)tx_memory_region_aligned_alloc(
+		(struct tx_memory_manager *)memtx_tx_memory_get(), txn, size,
+		alignof(*svp), TXN_ALLOC_SVP);
 	if (svp == NULL) {
 		diag_set(OutOfMemory, size, "region_aligned_alloc", "svp");
 		return NULL;
@@ -1345,9 +1364,9 @@ txn_on_yield(struct trigger *trigger, void *event)
 	}
 	if (txn->rollback_timer == NULL && txn->timeout != TIMEOUT_INFINITY) {
 		int size;
-		txn->rollback_timer = region_alloc_object(&txn->region,
-							  struct ev_timer,
-							  &size);
+		txn->rollback_timer = tx_memory_region_alloc_object(
+			(struct tx_memory_manager *)memtx_tx_memory_get(), txn,
+			struct ev_timer, &size, TXN_ALLOC_TIMER);
 		if (txn->rollback_timer == NULL)
 			panic("Out of memory on creation of rollback timer");
 		ev_timer_init(txn->rollback_timer, txn_on_timeout,
