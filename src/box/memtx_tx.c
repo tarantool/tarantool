@@ -1053,20 +1053,19 @@ struct memtx_tx_conflict
 
 /**
  * Save @a breaker in list with head @a conflicts_head. New list node is
- * allocated on @a region.
+ * allocated on a region of @a breaker.
  * @return 0 on success, -1 on memory error.
  */
 static int
 memtx_tx_save_conflict(struct txn *breaker, struct txn *victim,
-		       struct memtx_tx_conflict **conflicts_head,
-		       struct region *region)
+		       struct memtx_tx_conflict **conflicts_head)
 {
-	size_t err_size;
+	size_t size;
 	struct memtx_tx_conflict *next_conflict;
-	next_conflict = region_alloc_object(region, struct memtx_tx_conflict,
-					    &err_size);
+	next_conflict = region_alloc_object(&breaker->region,
+					    struct memtx_tx_conflict, &size);
 	if (next_conflict == NULL) {
-		diag_set(OutOfMemory, err_size, "txn_region", "txn conflict");
+		diag_set(OutOfMemory, size, "txn_region", "txn conflict");
 		return -1;
 	}
 	next_conflict->breaker = breaker;
@@ -1148,8 +1147,7 @@ point_hole_storage_find(struct index *index, struct tuple *tuple)
 static int
 check_hole(struct space *space, uint32_t index,
 	   struct tuple *new_tuple, struct txn *inserter,
-	   struct memtx_tx_conflict **collected_conflicts,
-	   struct region *region)
+	   struct memtx_tx_conflict **collected_conflicts)
 {
 	struct point_hole_item *list =
 		point_hole_storage_find(space->index[index], new_tuple);
@@ -1159,7 +1157,7 @@ check_hole(struct space *space, uint32_t index,
 	struct point_hole_item *item = list;
 	do {
 		if (memtx_tx_save_conflict(inserter, item->txn,
-					   collected_conflicts, region) != 0)
+					   collected_conflicts) != 0)
 			return -1;
 		item = rlist_entry(item->ring.next,
 				   struct point_hole_item, ring);
@@ -1179,8 +1177,7 @@ static int
 check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
 		struct tuple **replaced, struct tuple **old_tuple,
 		enum dup_replace_mode mode,
-		struct memtx_tx_conflict **collected_conflicts,
-		struct region *region)
+		struct memtx_tx_conflict **collected_conflicts)
 {
 	assert(replaced[0] == NULL || !replaced[0]->is_dirty);
 	struct space *space = stmt->space;
@@ -1195,7 +1192,7 @@ check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
 
 	if (replaced[0] == NULL)
 		check_hole(space, 0, new_tuple, stmt->txn,
-			   collected_conflicts, region);
+			   collected_conflicts);
 
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		/*
@@ -1205,7 +1202,7 @@ check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
 		if (replaced[i] == NULL) {
 			/* NULL is OK. */
 			check_hole(space, i, new_tuple, stmt->txn,
-				   collected_conflicts, region);
+				   collected_conflicts);
 			continue;
 		}
 		if (!replaced[i]->is_dirty) {
@@ -1237,7 +1234,7 @@ check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
 
 		if (check_visible == NULL)
 			check_hole(space, i, new_tuple, stmt->txn,
-				   collected_conflicts, region);
+				   collected_conflicts);
 	}
 
 	*old_tuple = replaced[0];
@@ -1254,8 +1251,7 @@ static int
 check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 		struct tuple **replaced, struct tuple **old_tuple,
 		enum dup_replace_mode mode,
-		struct memtx_tx_conflict **collected_conflicts,
-		struct region *region)
+		struct memtx_tx_conflict **collected_conflicts)
 {
 	assert(replaced[0] != NULL && replaced[0]->is_dirty);
 	struct space *space = stmt->space;
@@ -1274,7 +1270,7 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 
 	if (visible_replaced == NULL)
 		check_hole(space, 0, new_tuple, stmt->txn,
-			   collected_conflicts, region);
+			   collected_conflicts);
 
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		/*
@@ -1284,7 +1280,7 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 		if (replaced[i] == NULL) {
 			/* NULL is OK. */
 			check_hole(space, i, new_tuple, stmt->txn,
-				   collected_conflicts, region);
+				   collected_conflicts);
 			continue;
 		}
 		if (!replaced[i]->is_dirty) {
@@ -1315,7 +1311,7 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 
 		if (check_visible == NULL)
 			check_hole(space, i, new_tuple, stmt->txn,
-				   collected_conflicts, region);
+				   collected_conflicts);
 	}
 
 	*old_tuple = visible_replaced;
@@ -1332,18 +1328,17 @@ static int
 check_dup_common(struct txn_stmt *stmt, struct tuple *new_tuple,
 		 struct tuple **directly_replaced, struct tuple **old_tuple,
 		 enum dup_replace_mode mode,
-		 struct memtx_tx_conflict **collected_conflicts,
-		 struct region *region)
+		 struct memtx_tx_conflict **collected_conflicts)
 {
 	struct tuple *replaced = directly_replaced[0];
 	if (replaced == NULL || !replaced->is_dirty)
 		return check_dup_clean(stmt, new_tuple, directly_replaced,
 				       old_tuple, mode,
-				       collected_conflicts, region);
+				       collected_conflicts);
 	else
 		return check_dup_dirty(stmt, new_tuple, directly_replaced,
 				       old_tuple, mode,
-				       collected_conflicts, region);
+				       collected_conflicts);
 }
 
 static struct gap_item *
@@ -1464,7 +1459,6 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	struct space *space = stmt->space;
 	struct memtx_story *add_story = NULL;
 	struct memtx_story *created_story = NULL, *replaced_story = NULL;
-	struct region *region = &stmt->txn->region;
 
 	/*
 	 * List of transactions that will conflict us once one of them
@@ -1494,7 +1488,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	/* Check overwritten tuple */
 	int rc = check_dup_common(stmt, new_tuple, directly_replaced,
 				  &old_tuple, mode,
-				  &collected_conflicts, region);
+				  &collected_conflicts);
 	if (rc != 0)
 		goto fail;
 
