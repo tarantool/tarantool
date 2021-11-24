@@ -445,6 +445,7 @@ test_static_build_cmake_osx_github_actions: base_deps_osx_github_actions test_st
 deps_freebsd:
 	sudo pkg install -y git cmake gmake icu libiconv \
 		python38 py38-yaml py38-six py38-gevent
+	which python3 || sudo ln -s /usr/local/bin/python3.8 /usr/local/bin/python3
 
 build_freebsd:
 	if [ "$$(swapctl -l | wc -l)" != "1" ]; then sudo swapoff -a ; fi ; swapctl -l
@@ -453,7 +454,7 @@ build_freebsd:
 
 test_freebsd_no_deps: build_freebsd
 	make LuaJIT-test
-	cd test && python3.8 test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
+	cd test && ./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_freebsd: deps_freebsd test_freebsd_no_deps
 
