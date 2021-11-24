@@ -101,6 +101,10 @@ int
 space_upgrade_convert_tuple(struct space *space, struct tuple *old_tuple,
 			    struct tuple **new_tuple);
 
+/** Cleanup _space_upgrade and run all pending upgrade processes after restart. */
+int
+space_upgrade_recovery(struct space *space, void *arg);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

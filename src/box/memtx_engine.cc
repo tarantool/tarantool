@@ -52,6 +52,7 @@
 #include "raft.h"
 #include "txn_limbo.h"
 #include "memtx_allocator.h"
+#include "space_upgrade.h"
 
 #include <type_traits>
 
@@ -425,6 +426,8 @@ memtx_engine_end_recovery(struct engine *engine)
 			return -1;
 	}
 	xdir_collect_inprogress(&memtx->snap_dir);
+	if (space_foreach(space_upgrade_recovery, NULL) != 0)
+		return -1;
 	return 0;
 }
 
