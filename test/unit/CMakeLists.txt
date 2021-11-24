@@ -295,3 +295,6 @@ target_link_libraries(serializer.test unit box ${LUAJIT_LIBRARIES})
 
 add_executable(watcher.test watcher.c)
 target_link_libraries(watcher.test unit box)
+
+add_executable(grp_alloc.test grp_alloc.c box_test_utils.c)
+target_link_libraries(grp_alloc.test unit)
