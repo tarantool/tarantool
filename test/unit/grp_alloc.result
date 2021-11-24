@@ -1,0 +1,52 @@
+	*** main ***
+1..1
+	*** test_simple ***
+    1..3
+	*** check_test_new ***
+        1..11
+        ok 1 - location
+        ok 2 - location
+        ok 3 - location
+        ok 4 - location
+        ok 5 - location
+        ok 6 - location
+        ok 7 - data
+        ok 8 - data
+        ok 9 - null-termination symbol
+        ok 10 - data
+        ok 11 - null-termination symbol
+    ok 1 - subtests
+	*** check_test_new: done ***
+	*** check_test_new ***
+        1..11
+        ok 1 - location
+        ok 2 - location
+        ok 3 - location
+        ok 4 - location
+        ok 5 - location
+        ok 6 - location
+        ok 7 - data
+        ok 8 - data
+        ok 9 - null-termination symbol
+        ok 10 - data
+        ok 11 - null-termination symbol
+    ok 2 - subtests
+	*** check_test_new: done ***
+	*** check_test_new ***
+        1..11
+        ok 1 - location
+        ok 2 - location
+        ok 3 - location
+        ok 4 - location
+        ok 5 - location
+        ok 6 - location
+        ok 7 - data
+        ok 8 - data
+        ok 9 - null-termination symbol
+        ok 10 - data
+        ok 11 - null-termination symbol
+    ok 3 - subtests
+	*** check_test_new: done ***
+ok 1 - subtests
+	*** test_simple: done ***
+	*** main: done ***
