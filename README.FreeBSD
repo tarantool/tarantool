@@ -1,8 +1,8 @@
-Target OS: FreeBSD 10.4 (RELEASE) and FreeBSD 11.2 (RELEASE)
+Target OS: FreeBSD 12.2 (RELEASE) and FreeBSD 13.0 (RELEASE)
 
 1. Install necessary packages:
 -------------
-pkg install git cmake gmake readline icu
+pkg install git cmake gmake readline icu libiconv
 
 
 2. Download & build tarantool source code:
@@ -16,21 +16,25 @@ git submodule update --init --recursive
 cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo
 gmake
 
-3. Set up python 2.7
+3. Set up python 3.8
 -------------
 
 Install testing dependences either from packages or from pip.
 
 3.1. From packages:
 -------------
-pkg install python27 py27-yaml py27-daemon py27-msgpack
+pkg install python38 py38-yaml py38-six py38-gevent
 
 3.2. From pip:
 -------------
-pkg install py27-virtualenv
+pkg install py38-virtualenv py38-pip
 virtualenv .venv
 source .venv/bin/activate
 pip install -r ../test-run/requirements.txt
+
+3.3. Fix python path if necessary
+-------------
+which python3 || ln -s /usr/local/bin/python3.8 /usr/local/bin/python3
 
 4. Run tarantool test suite
 -------------
