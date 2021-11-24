@@ -257,6 +257,8 @@ error_build_xc(struct mp_error *mp_error)
 		err = new SwimError();
 	} else if (strcmp(mp_error->type, "CryptoError") == 0) {
 		err = new CryptoError();
+	} else if (strcmp(mp_error->type, "GaiError") == 0) {
+		err = new GaiError();
 	} else {
 		err = new ClientError();
 	}

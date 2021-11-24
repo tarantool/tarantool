@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <netdb.h>
 
 #include "fiber.h"
 #include "reflection.h"
@@ -148,7 +149,8 @@ SystemError::SystemError(const char *file, unsigned line,
 void
 SystemError::log() const
 {
-	say_file_line(S_SYSERROR, file, line, strerror(saved_errno),
+	say_file_line(S_SYSERROR, file, line,
+		      saved_errno != 0 ? strerror(saved_errno) : NULL,
 		      "SystemError %s", errmsg);
 }
 
@@ -172,6 +174,15 @@ SocketError::SocketError(const char *file, unsigned line,
 	errno = save_errno;
 }
 
+const struct type_info type_GaiError =
+	make_type("GaiError", &type_GaiError);
+
+GaiError::GaiError(const char *file, unsigned line, int errcode)
+	: SystemError(&type_SocketError, file, line)
+{
+	saved_errno = 0;
+	error_format_msg(this, "getaddrinfo: %s", gai_strerror(errcode));
+}
 
 const struct type_info type_OutOfMemory =
 	make_type("OutOfMemory", &type_SystemError);
@@ -413,6 +424,13 @@ BuildSocketError(const char *file, unsigned line, const char *socketname,
 	error_format_msg(e, "%s, called on %s", buf, socketname);
 	errno = save_errno;
 	return e;
+}
+
+struct error *
+BuildGaiError(const char *file, unsigned line, int errcode)
+{
+	BuildAlloc(GaiError);
+	return new (p) GaiError(file, line, errcode);
 }
 
 struct error *

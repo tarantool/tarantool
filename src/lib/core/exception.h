@@ -49,6 +49,8 @@ extern const struct type_info type_ChannelIsClosed;
 extern const struct type_info type_LuajitError;
 extern const struct type_info type_IllegalParams;
 extern const struct type_info type_SystemError;
+extern const struct type_info type_SocketError;
+extern const struct type_info type_GaiError;
 extern const struct type_info type_CollationError;
 extern const struct type_info type_SwimError;
 extern const struct type_info type_CryptoError;
@@ -101,7 +103,6 @@ protected:
 	SystemError(const struct type_info *type, const char *file, unsigned line);
 };
 
-extern const struct type_info type_SocketError;
 class SocketError: public SystemError {
 public:
 	SocketError(const char *file, unsigned line, const char *socketname,
@@ -116,6 +117,18 @@ public:
 	{
 		throw this;
 	}
+};
+
+class GaiError: public SystemError {
+public:
+	GaiError(const char *file, unsigned line, int errcode);
+
+	GaiError()
+		:SystemError(&type_GaiError, NULL, 0)
+	{
+	}
+
+	virtual void raise() { throw this; }
 };
 
 class OutOfMemory: public SystemError {

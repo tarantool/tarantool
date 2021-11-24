@@ -533,9 +533,7 @@ syslog_connect_remote(const char *server_address)
 
 	ret = getaddrinfo(remote, portnum, &hints, &inf);
 	if (ret != 0) {
-		errno = EIO;
-		diag_set(SystemError, "getaddrinfo: %s",
-			 gai_strerror(ret));
+		diag_set(GaiError, ret);
 		goto out;
 	}
 	for (ptr = inf; ptr; ptr = ptr->ai_next) {

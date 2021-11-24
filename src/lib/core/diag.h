@@ -445,6 +445,8 @@ BuildUnsupportedIndexFeature(const char *file, unsigned line,
 struct error *
 BuildSocketError(const char *file, unsigned line, const char *socketname,
 		 const char *format, ...);
+struct error *
+BuildGaiError(const char *file, unsigned line, int errcode);
 
 #define diag_set_detailed(file, line, class, ...) ({			\
 	/* Preserve the original errno. */                              \

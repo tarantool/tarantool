@@ -416,9 +416,7 @@ coio_getaddrinfo(const char *host, const char *port,
 	/* Task finished */
 	if (task->rc != 0) {
 		/* getaddrinfo() failed */
-		errno = EIO;
-		diag_set(SystemError, "getaddrinfo: %s",
-			 gai_strerror(task->rc));
+		diag_set(GaiError, task->rc);
 		getaddrinfo_free_cb(&task->base);
 		return -1;
 	}

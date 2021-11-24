@@ -1000,7 +1000,12 @@ local function getaddrinfo(host, port, timeout, opts)
         end
 
     end
-    return internal.getaddrinfo(host, port, timeout, ga_opts)
+    local dns, err = internal.getaddrinfo(host, port, timeout, ga_opts)
+    if not dns then
+        boxerrno(boxerrno.EIO)
+        return nil, err
+    end
+    return dns
 end
 
 -- tcp connector
