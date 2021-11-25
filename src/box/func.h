@@ -90,7 +90,12 @@ void
 func_delete(struct func *func);
 
 /**
- * Call function with arguments represented with given args.
+ * Call function @a func with arguments @a args, put return value to @a ret.
+ * Return 0 on success and nonzero on failure.
+ * The port @a args must be initialized by the caller while @a ret is
+ * initialized by func_call, and only in case of success.
+ * Thus the caller must not initialize @a ret by himself and must destroy it
+ * if and only if func_call returns 0;
  */
 int
 func_call(struct func *func, struct port *args, struct port *ret);

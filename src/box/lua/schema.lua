@@ -83,6 +83,11 @@ ffi.cdef[[
     box_txn_savepoint_t *
     box_txn_savepoint();
 
+    struct port {
+        const struct port_vtab *vtab;
+        char pad[60];
+    };
+
     struct port_c_entry {
         struct port_c_entry *next;
         union {
@@ -1496,7 +1501,8 @@ local iterator_gen_luac = function(param, state) -- luacheck: no unused args
 end
 
 -- global struct port instance to use by select()/get()
-local port_c = ffi.new('struct port_c')
+local port = ffi.new('struct port')
+local port_c = ffi.cast('struct port_c *', port)
 
 -- Helper function to check space:method() usage
 local function check_space_arg(space, method)
@@ -2043,7 +2049,6 @@ base_index_mt.select_ffi = function(index, key, opts)
     local key, key_end = tuple_encode(ibuf, key)
     local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
 
-    local port = ffi.cast('struct port *', port_c)
     local nok = builtin.box_select(index.space_id, index.id, iterator, offset,
                                    limit, key, key_end, port) ~= 0
     cord_ibuf_put(ibuf)

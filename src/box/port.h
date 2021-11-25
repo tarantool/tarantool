@@ -124,6 +124,8 @@ struct port_c_entry {
 /**
  * C port is used by C functions from the public API. They can
  * return tuples and arbitrary MessagePack.
+ * Warning: this structure is exposed in FFI, so any change in it must be
+ * replicated if FFI cdef, see schema.lua.
  */
 struct port_c {
 	const struct port_vtab *vtab;

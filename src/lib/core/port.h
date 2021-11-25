@@ -114,6 +114,8 @@ struct port_vtab {
 /**
  * Abstract port instance. It is supposed to be converted to
  * a concrete port realization, e.g. port_c.
+ * Warning: this structure is exposed in FFI, so any change in it must be
+ * replicated if FFI cdef, see schema.lua.
  */
 struct port {
 	/** Virtual method table. */
