@@ -1398,7 +1398,7 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 		const char *zBlob = argv[0].z;
 		int nBlob = argv[0].n;
 		uint32_t size = 2 * nBlob + 3;
-		char *zText = zText = sqlDbMallocRawNN(sql_get(), size);
+		char *zText = sqlDbMallocRawNN(sql_get(), size);
 		if (zText == NULL) {
 			context->is_aborted = true;
 			return;
