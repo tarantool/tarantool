@@ -207,7 +207,7 @@ box_process_auth(struct auth_request *request, const char *salt);
 /** Send current read view to the replica. */
 void
 box_process_fetch_snapshot(struct iostream *io,
-			   const struct xrow_header *header);
+                           const struct xrow_header *header);
 
 /** Register a replica */
 void
@@ -259,9 +259,9 @@ void box_set_checkpoint_wal_threshold(void);
 int box_set_wal_queue_max_size(void);
 int box_set_wal_cleanup_delay(void);
 void box_set_memtx_memory(void);
-void box_set_memtx_max_tuple_size(void);
+int box_set_memtx_max_tuple_size(void);
 void box_set_vinyl_memory(void);
-void box_set_vinyl_max_tuple_size(void);
+int box_set_vinyl_max_tuple_size(void);
 void box_set_vinyl_cache(void);
 void box_set_vinyl_timeout(void);
 int box_set_election_mode(void);
@@ -303,9 +303,9 @@ box_promote_qsync(void);
 /* box_select is private and used only by FFI */
 API_EXPORT int
 box_select(uint32_t space_id, uint32_t index_id,
-	   int iterator, uint32_t offset, uint32_t limit,
-	   const char *key, const char *key_end,
-	   struct port *port);
+           int iterator, uint32_t offset, uint32_t limit,
+           const char *key, const char *key_end,
+           struct port *port);
 
 /** \cond public */
 
@@ -387,7 +387,7 @@ box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len);
  */
 API_EXPORT int
 box_insert(uint32_t space_id, const char *tuple, const char *tuple_end,
-	   box_tuple_t **result);
+           box_tuple_t **result);
 
 /**
  * Execute an REPLACE request.
@@ -402,7 +402,7 @@ box_insert(uint32_t space_id, const char *tuple, const char *tuple_end,
  */
 API_EXPORT int
 box_replace(uint32_t space_id, const char *tuple, const char *tuple_end,
-	    box_tuple_t **result);
+            box_tuple_t **result);
 
 /**
  * Execute an DELETE request.
@@ -418,7 +418,7 @@ box_replace(uint32_t space_id, const char *tuple, const char *tuple_end,
  */
 API_EXPORT int
 box_delete(uint32_t space_id, uint32_t index_id, const char *key,
-	   const char *key_end, box_tuple_t **result);
+           const char *key_end, box_tuple_t **result);
 
 /**
  * Execute an UPDATE request.
@@ -440,8 +440,8 @@ box_delete(uint32_t space_id, uint32_t index_id, const char *key,
  */
 API_EXPORT int
 box_update(uint32_t space_id, uint32_t index_id, const char *key,
-	   const char *key_end, const char *ops, const char *ops_end,
-	   int index_base, box_tuple_t **result);
+           const char *key_end, const char *ops, const char *ops_end,
+           int index_base, box_tuple_t **result);
 
 /**
  * Execute an UPSERT request.
@@ -463,8 +463,8 @@ box_update(uint32_t space_id, uint32_t index_id, const char *key,
  */
 API_EXPORT int
 box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
-	   const char *tuple_end, const char *ops, const char *ops_end,
-	   int index_base, box_tuple_t **result);
+           const char *tuple_end, const char *ops, const char *ops_end,
+           int index_base, box_tuple_t **result);
 
 /**
  * Truncate space.
@@ -558,7 +558,7 @@ box_process1(struct request *request, box_tuple_t **result);
  */
 int
 box_process_rw(struct request *request, struct space *space,
-	       struct tuple **result);
+               struct tuple **result);
 
 int
 boxk(int type, uint32_t space_id, const char *format, ...);
