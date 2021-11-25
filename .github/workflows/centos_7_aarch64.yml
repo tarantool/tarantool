@@ -37,9 +37,8 @@ concurrency:
 jobs:
   centos_7_aarch64:
     # Run on pull request only if the 'full-ci' label is set.
-    # FIXME: Testing and deploy for aarch64 is disabled temporarily.
-    if: 0 && ( github.event_name != 'pull_request' ||
-        contains(github.event.pull_request.labels.*.name, 'full-ci') )
+    if: github.event_name != 'pull_request' ||
+        contains(github.event.pull_request.labels.*.name, 'full-ci')
 
     runs-on: graviton
 
