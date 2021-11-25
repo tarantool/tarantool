@@ -3,7 +3,7 @@
 local tap = require('tap')
 local test = tap.test('space-upgrade-local')
 
-test:plan(73)
+test:plan(74)
 
 local bad_functions = {
     -- name, body, expected error message, does block upgrade process: if
@@ -338,6 +338,16 @@ local function upgrade_with_bad_functions(mode)
     check_space_upgrade_empty()
 end
 
+local function upgrade_error_handler()
+    test:diag("Test error handler")
+    local function on_error()
+        error("boom")
+    end
+    local _, res = pcall(box.space.t.upgrade, box.space.t,
+        {mode = "test", func = "not_declared_var", format = {}, on_error = on_error})
+    test:isnumber(string.find(tostring(res), "boom"), "Upgrade function failed")
+end
+
 local function upgrade_with_good_functions(mode)
     test:diag("Test upgrade with 'good' functions in mode "..mode)
     assert(mode == 'test' or mode == 'notest')
@@ -429,6 +439,7 @@ local function run_all()
         upgrade_with_bad_functions(v)
         upgrade_with_good_functions(v)
     end
+    upgrade_error_handler()
     upgrade_with_format_change()
     upgrade_of_big_space()
     finalize()
