@@ -29,9 +29,11 @@
  * SUCH DAMAGE.
  */
 #include "port.h"
+#include "trivia/util.h"
 
 void
 port_destroy(struct port *port)
 {
 	port->vtab->destroy(port);
+	TRASH(port);
 }
