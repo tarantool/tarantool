@@ -189,6 +189,12 @@ luaL_checkserializer(struct lua_State *L)
 		luaL_checkudata(L, lua_upvalueindex(1), LUAL_SERIALIZER);
 }
 
+static inline void
+luaL_pushserializer(struct lua_State *L)
+{
+	lua_pushvalue(L, lua_upvalueindex(1));
+}
+
 /**
  * Initialize serializer with default parameters.
  * @param cfg Serializer to inherit configuration.
