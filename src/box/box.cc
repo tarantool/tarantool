@@ -1115,7 +1115,7 @@ box_check_memory_quota(const char *quota_name)
 		return size;
 	diag_set(ClientError, ER_CFG, quota_name,
 		 tt_sprintf("must be >= 0 and <= %zu, but it is %lld",
-		 QUOTA_MAX, size));
+			    QUOTA_MAX, (long long)size));
 	return -1;
 }
 
