@@ -210,7 +210,7 @@ box_check_writable(void)
 		error_set_str(e, "state", state);
 		error_set_uint(e, "term", term);
 		error_append_msg(e, "state is election %s with term %llu",
-				 state, term);
+				 state, (unsigned long long)term);
 		uint32_t id = raft->leader;
 		if (id != REPLICA_ID_NIL) {
 			error_set_uint(e, "leader_id", id);
@@ -232,7 +232,8 @@ box_check_writable(void)
 		error_set_uint(e, "queue_owner_id", id);
 		error_set_uint(e, "term", term);
 		error_append_msg(e, "synchro queue with term %llu belongs "
-				 "to %u", term, id);
+				 "to %u", (unsigned long long)term,
+				 (unsigned)id);
 		struct replica *r = replica_by_id(id);
 		/*
 		 * XXX: when an instance is deleted from _cluster, its limbo's
