@@ -309,7 +309,7 @@ box_process_rw(struct request *request, struct space *space,
 	if (is_autocommit) {
 		if (txn_commit(txn) < 0)
 			goto error;
-	        fiber_gc();
+		fiber_gc();
 	}
 	if (return_tuple) {
 		tuple_bless(tuple);
@@ -1999,14 +1999,20 @@ box_set_memtx_memory(void)
 	memtx_engine_set_memory_xc(memtx, size);
 }
 
-void
+int
 box_set_memtx_max_tuple_size(void)
 {
 	struct memtx_engine *memtx;
 	memtx = (struct memtx_engine *)engine_by_name("memtx");
 	assert(memtx != NULL);
-	memtx_engine_set_max_tuple_size(memtx,
-			cfg_geti("memtx_max_tuple_size"));
+	int memtx_max_tuple_size = cfg_geti("memtx_max_tuple_size");
+	if (memtx_max_tuple_size <= 0) {
+		diag_set(ClientError, ER_CFG, "memtx_max_tuple_size",
+			 "must be greater than 0");
+		return -1;
+	}
+	memtx_engine_set_max_tuple_size(memtx, memtx_max_tuple_size);
+	return 0;
 }
 
 void
@@ -2087,13 +2093,19 @@ box_set_vinyl_memory(void)
 	vinyl_engine_set_memory_xc(vinyl, size);
 }
 
-void
+int
 box_set_vinyl_max_tuple_size(void)
 {
 	struct engine *vinyl = engine_by_name("vinyl");
 	assert(vinyl != NULL);
-	vinyl_engine_set_max_tuple_size(vinyl,
-			cfg_geti("vinyl_max_tuple_size"));
+	int vinyl_max_tuple_size = cfg_geti("vinyl_max_tuple_size");
+	if (vinyl_max_tuple_size <= 0) {
+		diag_set(ClientError, ER_CFG, "vinyl_max_tuple_size",
+			 "must be greater than 0");
+		return -1;
+	}
+	vinyl_engine_set_max_tuple_size(vinyl, vinyl_max_tuple_size);
+	return 0;
 }
 
 void
@@ -3200,7 +3212,8 @@ engine_init()
 				    cfg_gets("memtx_allocator"),
 				    cfg_getd("slab_alloc_factor"));
 	engine_register((struct engine *)memtx);
-	box_set_memtx_max_tuple_size();
+	if (box_set_memtx_max_tuple_size() != 0)
+		diag_raise();
 
 	struct sysview_engine *sysview = sysview_engine_new_xc();
 	engine_register((struct engine *)sysview);
@@ -3218,7 +3231,8 @@ engine_init()
 				    cfg_geti("vinyl_write_threads"),
 				    cfg_geti("force_recovery"));
 	engine_register((struct engine *)vinyl);
-	box_set_vinyl_max_tuple_size();
+	if (box_set_vinyl_max_tuple_size() != 0)
+		diag_raise();
 	box_set_vinyl_cache();
 	box_set_vinyl_timeout();
 }

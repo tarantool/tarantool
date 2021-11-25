@@ -202,11 +202,8 @@ lbox_cfg_set_memtx_memory(struct lua_State *L)
 static int
 lbox_cfg_set_memtx_max_tuple_size(struct lua_State *L)
 {
-	try {
-		box_set_memtx_max_tuple_size();
-	} catch (Exception *) {
+	if (box_set_memtx_max_tuple_size() != 0)
 		luaT_error(L);
-	}
 	return 0;
 }
 
@@ -224,11 +221,8 @@ lbox_cfg_set_vinyl_memory(struct lua_State *L)
 static int
 lbox_cfg_set_vinyl_max_tuple_size(struct lua_State *L)
 {
-	try {
-		box_set_vinyl_max_tuple_size();
-	} catch (Exception *) {
+	if (box_set_vinyl_max_tuple_size() != 0)
 		luaT_error(L);
-	}
 	return 0;
 }
 
