@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "small/static.h"
+#include "trivia/util.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -72,6 +73,7 @@ tt_cstr(const char *str, size_t len)
  * Wrapper around vsnprintf() that prints the result to
  * the static buffer.
  */
+CFORMAT(printf, 2, 0)
 static inline const char *
 tt_vsnprintf(size_t size, const char *format, va_list ap)
 {
@@ -89,6 +91,7 @@ tt_vsnprintf(size_t size, const char *format, va_list ap)
 }
 
 /** @copydoc tt_vsnprintf() */
+CFORMAT(printf, 1, 2)
 static inline const char *
 tt_sprintf(const char *format, ...)
 {
@@ -103,6 +106,7 @@ tt_sprintf(const char *format, ...)
  * The same as tt_sprintf() but allows to specify more precise
  * string limits.
  */
+CFORMAT(printf, 2, 3)
 static inline const char *
 tt_snprintf(size_t size, const char *format, ...)
 {

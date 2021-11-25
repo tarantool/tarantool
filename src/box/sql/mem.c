@@ -685,9 +685,9 @@ int_to_str0(struct Mem *mem)
 	assert((mem->type & (MEM_TYPE_INT | MEM_TYPE_UINT)) != 0);
 	const char *str;
 	if (mem->type == MEM_TYPE_UINT)
-		str = tt_sprintf("%llu", mem->u.u);
+		str = tt_sprintf("%llu", (unsigned long long)mem->u.u);
 	else
-		str = tt_sprintf("%lld", mem->u.i);
+		str = tt_sprintf("%lld", (long long)mem->u.i);
 	return mem_copy_str0(mem, str);
 }
 

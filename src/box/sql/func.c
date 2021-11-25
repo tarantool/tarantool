@@ -992,8 +992,11 @@ func_round(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 	double d = argv[0].u.r;
 	struct Mem *res = ctx->pOut;
-	if (n != 0)
-		return mem_set_double(res, atof(tt_sprintf("%.*f", n, d)));
+	if (n != 0) {
+		int precision = MIN(n, INT_MAX);
+		return mem_set_double(res, atof(tt_sprintf(
+			"%.*lf", precision, d)));
+	}
 	/*
 	 * DOUBLE values greater than 2^53 or less than -2^53 have no digits
 	 * after the decimal point.

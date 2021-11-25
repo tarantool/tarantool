@@ -409,8 +409,9 @@ memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def)
 	    def->opts.dimension > RTREE_MAX_DIMENSION) {
 		diag_set(UnsupportedIndexFeature, def,
 			 tt_sprintf("dimension (%lld): must belong to "
-				    "range [%u, %u]", def->opts.dimension,
-				    1, RTREE_MAX_DIMENSION));
+				    "range [%u, %u]",
+				    (long long)def->opts.dimension, 1,
+				    RTREE_MAX_DIMENSION));
 		return NULL;
 	}
 
