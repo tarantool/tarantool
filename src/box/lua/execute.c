@@ -386,6 +386,7 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 		diag_set(ClientError, ER_SQL_BIND_TYPE, "USERDATA",
 			 sql_bind_name(bind));
 		return -1;
+	case MP_MAP:
 	case MP_ARRAY: {
 		size_t used = region_used(region);
 		struct mpstream stream;
@@ -410,10 +411,6 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 		diag_set(OutOfMemory, bind->bytes, "region_join", "bind->s");
 		return -1;
 	}
-	case MP_MAP:
-		diag_set(ClientError, ER_SQL_BIND_TYPE, "MAP",
-			 sql_bind_name(bind));
-		return -1;
 	default:
 		unreachable();
 	}

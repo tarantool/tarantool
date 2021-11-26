@@ -533,6 +533,14 @@ sql_bind_array_static(sql_stmt *stmt, int i, const char *str, uint32_t size)
 }
 
 int
+sql_bind_map_static(sql_stmt *stmt, int i, const char *str, uint32_t size)
+{
+	struct Vdbe *vdbe = (struct Vdbe *)stmt;
+	mem_set_map_static(&vdbe->aVar[i - 1], (char *)str, size);
+	return sql_bind_type(vdbe, i, "map");
+}
+
+int
 sql_bind_uuid(struct sql_stmt *stmt, int i, const struct tt_uuid *uuid)
 {
 	struct Vdbe *p = (struct Vdbe *)stmt;

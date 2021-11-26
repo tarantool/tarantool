@@ -276,7 +276,11 @@ parameters[1][':value'] = {kek = 300}
 ...
 execute('SELECT :value', parameters)
 ---
-- error: Bind value type MAP for parameter ':value' is not supported
+- metadata:
+  - name: COLUMN_1
+    type: map
+  rows:
+  - [{'kek': 300}]
 ...
 -- gh-3810: bind values of integer in range up to 2^64 - 1.
 --
