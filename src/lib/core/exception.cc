@@ -136,20 +136,13 @@ SystemError::SystemError(const struct type_info *type,
 
 SystemError::SystemError(const char *file, unsigned line,
 			 const char *format, ...)
-	: Exception(&type_SystemError, file, line)
+	: SystemError(&type_SystemError, file, line)
 {
-	saved_errno = errno;
 	va_list ap;
 	va_start(ap, format);
 	error_vformat_msg(this, format, ap);
 	va_end(ap);
-}
-
-void
-SystemError::log() const
-{
-	say_file_line(S_SYSERROR, file, line, strerror(saved_errno),
-		      "SystemError %s", errmsg);
+	error_append_msg(this, ": %s", strerror(saved_errno));
 }
 
 const struct type_info type_SocketError =
@@ -160,16 +153,12 @@ SocketError::SocketError(const char *file, unsigned line,
 			 const char *format, ...)
 	: SystemError(&type_SocketError, file, line)
 {
-	int save_errno = errno;
-
-	char buf[DIAG_ERRMSG_MAX];
-
 	va_list ap;
 	va_start(ap, format);
-	vsnprintf(buf, sizeof(buf), format, ap);
+	error_vformat_msg(this, format, ap);
 	va_end(ap);
-	error_format_msg(this, "%s, called on %s", buf, socketname);
-	errno = save_errno;
+	error_append_msg(this, ", called on %s: %s", socketname,
+			 strerror(saved_errno));
 }
 
 
@@ -358,6 +347,7 @@ BuildSystemError(const char *file, unsigned line, const char *format, ...)
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);
 	va_end(ap);
+	error_append_msg(e, ": %s", strerror(e->saved_errno));
 	return e;
 }
 
@@ -401,17 +391,14 @@ struct error *
 BuildSocketError(const char *file, unsigned line, const char *socketname,
 		 const char *format, ...)
 {
-	int save_errno = errno;
 	BuildAlloc(SocketError);
-	SocketError *e =  new (p) SocketError(file, line, socketname, "");
-
-	char buf[DIAG_ERRMSG_MAX];
+	SocketError *e = new (p) SocketError(file, line, socketname, "");
 	va_list ap;
 	va_start(ap, format);
-	vsnprintf(buf, sizeof(buf), format, ap);
+	error_vformat_msg(e, format, ap);
 	va_end(ap);
-	error_format_msg(e, "%s, called on %s", buf, socketname);
-	errno = save_errno;
+	error_append_msg(e, ", called on %s: %s", socketname,
+			 strerror(e->saved_errno));
 	return e;
 }
 

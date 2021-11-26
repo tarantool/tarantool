@@ -7,7 +7,9 @@ errinj = box.error.injection
 -- does not make tarantool blind.
 bad_uri = "baduribaduri:1"
 old_listen = box.cfg.listen
-box.cfg({ listen = bad_uri })
+success, err = pcall(box.cfg, {listen = bad_uri})
+assert(not success)
+assert(err.message:match("can't resolve uri for bind") ~= nil)
 conn = netbox.connect(old_listen)
 assert(conn:ping())
 assert(fio.path.exists(old_listen))

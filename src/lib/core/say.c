@@ -483,7 +483,7 @@ syslog_connect_unix(const char *path)
 {
 	int fd = socket(PF_UNIX, SOCK_DGRAM, 0);
 	if (fd < 0) {
-		diag_set(SystemError, strerror(errno));
+		diag_set(SystemError, "socket");
 		return -1;
 	}
 	struct sockaddr_un un;
@@ -491,7 +491,7 @@ syslog_connect_unix(const char *path)
 	snprintf(un.sun_path, sizeof(un.sun_path), "%s", path);
 	un.sun_family = AF_UNIX;
 	if (connect(fd, (struct sockaddr *) &un, sizeof(un)) != 0) {
-		diag_set(SystemError, strerror(errno));
+		diag_set(SystemError, "connect");
 		close(fd);
 		return -1;
 	}
@@ -621,7 +621,7 @@ log_syslog_init(struct log *log, const char *init_str)
 	if (log->fd < 0) {
 		diag_log();
 		/* syslog indent is freed in atexit(). */
-		diag_set(SystemError, "syslog logger: %s", strerror(errno));
+		diag_set(SystemError, "syslog logger");
 		return -1;
 	}
 	return 0;

@@ -87,8 +87,6 @@ class SystemError: public Exception {
 public:
 	virtual void raise() { throw this; }
 
-	virtual void log() const;
-
 	SystemError(const char *file, unsigned line,
 		    const char *format, ...);
 

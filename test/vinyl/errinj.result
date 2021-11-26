@@ -604,7 +604,7 @@ errinj.set("ERRINJ_VYRUN_DATA_READ", true)
 ...
 s:select()
 ---
-- error: failed to read from file
+- error: 'failed to read from file: Input/output error'
 ...
 errinj.set("ERRINJ_VYRUN_DATA_READ", false)
 ---

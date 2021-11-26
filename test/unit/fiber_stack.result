@@ -1,4 +1,4 @@
-SystemError fiber mprotect failed: Cannot allocate memory
+SystemError: fiber mprotect failed: Cannot allocate memory
 	*** main_f ***
 1..6
 ok 1 - mprotect: failed to setup fiber guard page

@@ -48,7 +48,7 @@
 #include "coio_file.h"
 
 #define lbox_fio_pushsyserror(L) ({				\
-	diag_set(SystemError, "fio: %s", strerror(errno));	\
+	diag_set(SystemError, "fio");				\
 	luaT_push_nil_and_error(L);				\
 })
 
@@ -118,7 +118,7 @@ lbox_fio_pushbool(struct lua_State *L, bool res)
 {
 	lua_pushboolean(L, res);
 	if (!res) {
-		diag_set(SystemError, "fio: %s", strerror(errno));
+		diag_set(SystemError, "fio");
 		struct error *e = diag_last_error(diag_get());
 		assert(e != NULL);
 		luaT_pusherror(L, e);
