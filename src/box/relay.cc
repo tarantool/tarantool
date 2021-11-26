@@ -264,10 +264,27 @@ relay_yield(struct xstream *stream)
 }
 
 static void
-relay_start(struct relay *relay, int fd, uint64_t sync,
-	     void (*stream_write)(struct xstream *, struct xrow_header *))
+relay_send_heartbeat(struct relay *relay);
+
+/** A callback for recovery to send heartbeats while scanning a WAL. */
+static void
+relay_yield_and_send_heartbeat(struct xstream *stream)
 {
-	xstream_create(&relay->stream, stream_write, relay_yield);
+	struct relay *relay = container_of(stream, struct relay, stream);
+	/* Check for a heartbeat timeout. */
+	if (ev_monotonic_now(loop()) - relay->last_row_time >
+	    replication_timeout) {
+		relay_send_heartbeat(relay);
+	}
+	fiber_sleep(0);
+}
+
+static void
+relay_start(struct relay *relay, int fd, uint64_t sync,
+	     void (*stream_write)(struct xstream *, struct xrow_header *),
+	     void (*stream_cb)(struct xstream *))
+{
+	xstream_create(&relay->stream, stream_write, stream_cb);
 	/*
 	 * Clear the diagnostics at start, in case it has the old
 	 * error message which we keep around to display in
@@ -366,7 +383,7 @@ relay_initial_join(int fd, uint64_t sync, struct vclock *vclock,
 	if (relay == NULL)
 		diag_raise();
 
-	relay_start(relay, fd, sync, relay_send_initial_join_row);
+	relay_start(relay, fd, sync, relay_send_initial_join_row, relay_yield);
 	auto relay_guard = make_scoped_guard([=] {
 		relay_stop(relay);
 		relay_delete(relay);
@@ -456,7 +473,7 @@ relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
 	if (relay == NULL)
 		diag_raise();
 
-	relay_start(relay, fd, sync, relay_send_row);
+	relay_start(relay, fd, sync, relay_send_row, relay_yield);
 	auto relay_guard = make_scoped_guard([=] {
 		relay_stop(relay);
 		relay_delete(relay);
@@ -918,7 +935,8 @@ relay_subscribe(struct replica *replica, int fd, uint64_t sync,
 		gc_delay_unref();
 	}
 
-	relay_start(relay, fd, sync, relay_send_row);
+	relay_start(relay, fd, sync, relay_send_row,
+		    relay_yield_and_send_heartbeat);
 	auto relay_guard = make_scoped_guard([=] {
 		relay_stop(relay);
 		replica_on_relay_stop(replica);
