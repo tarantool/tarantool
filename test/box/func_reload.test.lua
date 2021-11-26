@@ -86,7 +86,7 @@ box.schema.func.reload("non-existing")
 -- path for DSO copy
 os.setenv("TMPDIR", "/dev/null")
 _, err = pcall(box.schema.func.reload, "reload")
-tostring(err):gsub(': [/%w]+$', '')
+tostring(err):gsub(': [/%w]+:', ':')
 os.setenv("TMPDIR", nil)
 
 box.schema.func.drop("reload.test_reload")

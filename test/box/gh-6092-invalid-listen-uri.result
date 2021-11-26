@@ -18,9 +18,16 @@ bad_uri = "baduribaduri:1"
 old_listen = box.cfg.listen
 ---
 ...
-box.cfg({ listen = bad_uri })
+success, err = pcall(box.cfg, {listen = bad_uri})
 ---
-- error: can't resolve uri for bind, called on fd -1
+...
+assert(not success)
+---
+- true
+...
+assert(err.message:match("can't resolve uri for bind") ~= nil)
+---
+- true
 ...
 conn = netbox.connect(old_listen)
 ---
