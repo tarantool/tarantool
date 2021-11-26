@@ -919,6 +919,7 @@ netbox_encode_upsert(lua_State *L, int idx, struct mpstream *stream,
 static int
 netbox_transport_connect(struct netbox_transport *transport)
 {
+	struct error *e;
 	struct iostream *io = &transport->io;
 	assert(!iostream_is_initialized(io));
 	ev_tstamp start, delay;
@@ -928,12 +929,12 @@ netbox_transport_connect(struct netbox_transport *transport)
 				      /*addr=*/NULL, /*addr_len=*/NULL, delay);
 	coio_timeout_update(&start, &delay);
 	if (fd < 0)
-		return -1;
+		goto io_error;
 	iostream_create(io, fd);
 	char greetingbuf[IPROTO_GREETING_SIZE];
 	if (coio_readn_timeout(io, greetingbuf, IPROTO_GREETING_SIZE,
 			       delay) < 0)
-		goto error;
+		goto io_error;
 	if (greeting_decode(greetingbuf, &transport->greeting) != 0) {
 		box_error_raise(ER_NO_CONNECTION, "Invalid greeting");
 		goto error;
@@ -944,8 +945,13 @@ netbox_transport_connect(struct netbox_transport *transport)
 		goto error;
 	}
 	return 0;
+io_error:
+	assert(!diag_is_empty(diag_get()));
+	e = diag_last_error(diag_get());
+	box_error_raise(ER_NO_CONNECTION, "%s", e->errmsg);
 error:
-	iostream_close(io);
+	if (iostream_is_initialized(io))
+		iostream_close(io);
 	return -1;
 }
 
@@ -970,6 +976,7 @@ error:
 static int
 netbox_transport_communicate(struct netbox_transport *transport, size_t limit)
 {
+	struct error *e;
 	struct iostream *io = &transport->io;
 	assert(iostream_is_initialized(io));
 	struct ibuf *send_buf = &transport->send_buf;
@@ -994,7 +1001,7 @@ netbox_transport_communicate(struct netbox_transport *transport, size_t limit)
 			} if (rc > 0) {
 				recv_buf->wpos += rc;
 			} else if (rc == IOSTREAM_ERROR) {
-				goto handle_error;
+				goto io_error;
 			} else {
 				events |= iostream_status_to_events(rc);
 				break;
@@ -1010,7 +1017,7 @@ netbox_transport_communicate(struct netbox_transport *transport, size_t limit)
 				if (ibuf_used(send_buf) == 0)
 					fiber_cond_broadcast(on_send_buf_empty);
 			} else if (rc == IOSTREAM_ERROR) {
-				goto handle_error;
+				goto io_error;
 			} else {
 				events |= iostream_status_to_events(rc);
 				break;
@@ -1027,8 +1034,10 @@ netbox_transport_communicate(struct netbox_transport *transport, size_t limit)
 			return -1;
 		}
 	}
-handle_error:
-	box_error_raise(ER_NO_CONNECTION, "%s", strerror(errno));
+io_error:
+	assert(!diag_is_empty(diag_get()));
+	e = diag_last_error(diag_get());
+	box_error_raise(ER_NO_CONNECTION, "%s", e->errmsg);
 	return -1;
 }
 
@@ -1934,7 +1943,7 @@ luaT_netbox_transport_make_request(struct lua_State *L, int idx,
 	    transport->state != NETBOX_FETCH_SCHEMA) {
 		struct error *e = transport->last_error;
 		if (e != NULL) {
-			box_error_raise(ER_NO_CONNECTION, e->errmsg);
+			box_error_raise(ER_NO_CONNECTION, "%s", e->errmsg);
 		} else {
 			const char *state = netbox_state_str[transport->state];
 			box_error_raise(ER_NO_CONNECTION,
