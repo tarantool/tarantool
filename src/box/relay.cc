@@ -133,11 +133,6 @@ struct relay {
 	 */
 	uint32_t id_filter;
 	/**
-	 * How many rows has this relay sent to the replica. Used to yield once
-	 * in a while when reading a WAL to unblock the event loop.
-	 */
-	int64_t row_count;
-	/**
 	 * Local vclock at the moment of subscribe, used to check
 	 * dataset on the other side and send missing data rows if any.
 	 */
@@ -282,7 +277,6 @@ relay_start(struct relay *relay, int fd, uint64_t sync,
 	coio_create(&relay->io, fd);
 	relay->sync = sync;
 	relay->state = RELAY_FOLLOW;
-	relay->row_count = 0;
 	relay->last_row_time = ev_monotonic_now(loop());
 }
 
