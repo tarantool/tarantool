@@ -147,7 +147,8 @@ coio_connect_timeout(const char *host, const char *service, int host_hint,
 	ev_tstamp start, delay;
 	evio_timeout_init(loop, &start, &delay, timeout);
 
-	if (host != NULL && strcmp(host, URI_HOST_UNIX) == 0) {
+	if (host != NULL && service != NULL &&
+	    strcmp(host, URI_HOST_UNIX) == 0) {
 		/* UNIX socket */
 		struct sockaddr_un un;
 		snprintf(un.sun_path, sizeof(un.sun_path), "%s", service);
@@ -166,20 +167,20 @@ coio_connect_timeout(const char *host, const char *service, int host_hint,
 
 	struct addrinfo *ai = NULL;
 	struct addrinfo ai_local;
-	if (host_hint != 0) {
+	if (host != NULL && service != NULL && host_hint != 0) {
 		if (coio_fill_addrinfo(&ai_local, host, service,
 				       host_hint) != 0)
 			return -1;
 		ai = &ai_local;
 	} else {
-	    struct addrinfo hints;
-	    memset(&hints, 0, sizeof(struct addrinfo));
-	    hints.ai_family = AF_UNSPEC; /* Allow IPv4 or IPv6 */
-	    hints.ai_socktype = SOCK_STREAM;
-	    hints.ai_flags = AI_ADDRCONFIG;
-	    int rc = coio_getaddrinfo(host, service, &hints, &ai, delay);
-	    if (rc != 0)
-		    return -1;
+		struct addrinfo hints;
+		memset(&hints, 0, sizeof(struct addrinfo));
+		hints.ai_family = AF_UNSPEC; /* Allow IPv4 or IPv6 */
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_flags = AI_ADDRCONFIG;
+		int rc = coio_getaddrinfo(host, service, &hints, &ai, delay);
+		if (rc != 0)
+			return -1;
 	}
 	evio_timeout_update(loop(), &start, &delay);
 	coio_timeout_init(&start, &delay, timeout);
