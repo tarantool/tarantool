@@ -646,6 +646,15 @@ luamp_new_object(struct lua_State *L, size_t data_len)
 	return obj;
 }
 
+void
+luamp_push(struct lua_State *L, const char *data, const char *data_end)
+{
+	size_t data_len = data_end - data;
+	struct luamp_object *obj = luamp_new_object(L, data_len);
+	memcpy((char *)obj->data, data, data_len);
+	assert(mp_check(&data, data_end) == 0 && data == data_end);
+}
+
 /**
  * Creates a new msgpack object and pushes it to Lua stack.
  * Takes a Lua object as the only argument.

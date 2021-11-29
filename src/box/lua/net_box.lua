@@ -638,20 +638,21 @@ end
 
 function remote_methods:_request(method, opts, format, stream_id, ...)
     local transport = self._transport
-    local on_push, on_push_ctx, buffer, skip_header, deadline
+    local on_push, on_push_ctx, buffer, skip_header, return_raw, deadline
     -- Extract options, set defaults, check if the request is
     -- async.
     if opts then
         buffer = opts.buffer
         skip_header = opts.skip_header
+        return_raw = opts.return_raw
         if opts.is_async then
             if opts.on_push or opts.on_push_ctx then
                 error('To handle pushes in an async request use future:pairs()')
             end
             local res, err =
-                transport:perform_async_request(buffer, skip_header, method,
+                transport:perform_async_request(buffer, skip_header, return_raw,
                                                 table.insert, {}, format,
-                                                stream_id, ...)
+                                                stream_id, method, ...)
             if err then
                 box.error(err)
             end
@@ -672,8 +673,8 @@ function remote_methods:_request(method, opts, format, stream_id, ...)
         timeout = deadline and max(0, deadline - fiber_clock())
     end
     local res, err = transport:perform_request(timeout, buffer, skip_header,
-                                               method, on_push, on_push_ctx,
-                                               format, stream_id, ...)
+                                               return_raw, on_push, on_push_ctx,
+                                               format, stream_id, method, ...)
     if err then
         box.error(err)
     end

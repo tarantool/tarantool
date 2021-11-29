@@ -62,6 +62,13 @@ luamp_error(void *);
 enum { LUAMP_ALLOC_FACTOR = 256 };
 
 /**
+ * Pushes to the Lua stack a new msgpack object and stores the given msgpack
+ * data in it. The new object uses the default serializer for decoding.
+ */
+void
+luamp_push(struct lua_State *L, const char *data, const char *data_end);
+
+/**
  * Returns a pointer to the msgpack data and writes the length of the data to
  * data_len if the object at the given index is a msgpack object. Otherwise
  * returns NULL.

@@ -271,6 +271,11 @@ struct netbox_request {
 	 * buffer is not set.
 	 */
 	bool skip_header;
+	/**
+	 * If this flag is set, the response data won't be decoded - instead,
+	 * a msgpack object will be returned to the caller.
+	 */
+	bool return_raw;
 	/** Lua references to on_push trigger and its context. */
 	int on_push_ref;
 	int on_push_ctx_ref;
@@ -1241,8 +1246,10 @@ netbox_encode_method(struct lua_State *L, int idx, enum netbox_method method,
  */
 static void
 netbox_decode_nil(struct lua_State *L, const char **data,
-		  const char *data_end, struct tuple_format *format)
+		  const char *data_end, bool return_raw,
+		  struct tuple_format *format)
 {
+	(void)return_raw;
 	(void)format;
 	*data = data_end;
 	lua_pushnil(L);
@@ -1271,12 +1278,18 @@ netbox_skip_to_data(const char **data)
  */
 static void
 netbox_decode_table(struct lua_State *L, const char **data,
-		    const char *data_end, struct tuple_format *format)
+		    const char *data_end, bool return_raw,
+		    struct tuple_format *format)
 {
 	(void)data_end;
 	(void)format;
 	netbox_skip_to_data(data);
-	luamp_decode(L, cfg, data);
+	if (return_raw) {
+		luamp_push(L, *data, data_end);
+		*data = data_end;
+	} else {
+		luamp_decode(L, cfg, data);
+	}
 }
 
 /**
@@ -1285,7 +1298,8 @@ netbox_decode_table(struct lua_State *L, const char **data,
  */
 static void
 netbox_decode_value(struct lua_State *L, const char **data,
-		    const char *data_end, struct tuple_format *format)
+		    const char *data_end, bool return_raw,
+		    struct tuple_format *format)
 {
 	(void)data_end;
 	(void)format;
@@ -1293,9 +1307,28 @@ netbox_decode_value(struct lua_State *L, const char **data,
 	uint32_t count = mp_decode_array(data);
 	if (count == 0)
 		return lua_pushnil(L);
-	luamp_decode(L, cfg, data);
+	if (return_raw) {
+		const char *begin = *data;
+		mp_next(data);
+		luamp_push(L, begin, *data);
+	} else {
+		luamp_decode(L, cfg, data);
+	}
 	for (uint32_t i = 1; i < count; ++i)
 		mp_next(data);
+}
+
+/**
+ * Used for decoding the index:count() result. It always returns a number so
+ * there's no point in wrapping it in a msgpack object.
+ */
+static void
+netbox_decode_count(struct lua_State *L, const char **data,
+		    const char *data_end, bool return_raw,
+		    struct tuple_format *format)
+{
+	(void)return_raw;
+	netbox_decode_value(L, data, data_end, /*return_raw=*/false, format);
 }
 
 /**
@@ -1325,11 +1358,17 @@ netbox_decode_data(struct lua_State *L, const char **data,
  */
 static void
 netbox_decode_select(struct lua_State *L, const char **data,
-		     const char *data_end, struct tuple_format *format)
+		     const char *data_end, bool return_raw,
+		     struct tuple_format *format)
 {
 	(void)data_end;
 	netbox_skip_to_data(data);
-	netbox_decode_data(L, data, format);
+	if (return_raw) {
+		luamp_push(L, *data, data_end);
+		*data = data_end;
+	} else {
+		netbox_decode_data(L, data, format);
+	}
 }
 
 /**
@@ -1338,7 +1377,8 @@ netbox_decode_select(struct lua_State *L, const char **data,
  */
 static void
 netbox_decode_tuple(struct lua_State *L, const char **data,
-		    const char *data_end, struct tuple_format *format)
+		    const char *data_end, bool return_raw,
+		    struct tuple_format *format)
 {
 	(void)data_end;
 	netbox_skip_to_data(data);
@@ -1347,10 +1387,14 @@ netbox_decode_tuple(struct lua_State *L, const char **data,
 		return lua_pushnil(L);
 	const char *begin = *data;
 	mp_next(data);
-	struct tuple *tuple = box_tuple_new(format, begin, *data);
-	if (tuple == NULL)
-		luaT_error(L);
-	luaT_pushtuple(L, tuple);
+	if (return_raw) {
+		luamp_push(L, begin, *data);
+	} else {
+		struct tuple *tuple = box_tuple_new(format, begin, *data);
+		if (tuple == NULL)
+			luaT_error(L);
+		luaT_pushtuple(L, tuple);
+	}
 	for (uint32_t i = 1; i < count; ++i)
 		mp_next(data);
 }
@@ -1473,7 +1517,8 @@ netbox_decode_sql_info(struct lua_State *L, const char **data)
 
 static void
 netbox_decode_execute(struct lua_State *L, const char **data,
-		      const char *data_end, struct tuple_format *format)
+		      const char *data_end, bool return_raw,
+		      struct tuple_format *format)
 {
 	(void)data_end;
 	(void)format;
@@ -1484,7 +1529,14 @@ netbox_decode_execute(struct lua_State *L, const char **data,
 		uint32_t key = mp_decode_uint(data);
 		switch(key) {
 		case IPROTO_DATA:
-			netbox_decode_data(L, data, tuple_format_runtime);
+			if (return_raw) {
+				const char *begin = *data;
+				mp_next(data);
+				luamp_push(L, begin, *data);
+			} else {
+				netbox_decode_data(L, data,
+						   tuple_format_runtime);
+			}
 			rows_index = i - map_size;
 			break;
 		case IPROTO_METADATA:
@@ -1514,9 +1566,11 @@ netbox_decode_execute(struct lua_State *L, const char **data,
 
 static void
 netbox_decode_prepare(struct lua_State *L, const char **data,
-		      const char *data_end, struct tuple_format *format)
+		      const char *data_end, bool return_raw,
+		      struct tuple_format *format)
 {
 	(void)data_end;
+	(void)return_raw;
 	(void)format;
 	assert(mp_typeof(**data) == MP_MAP);
 	uint32_t map_size = mp_decode_map(data);
@@ -1568,15 +1622,16 @@ netbox_decode_prepare(struct lua_State *L, const char **data,
 
 /**
  * Decodes a response body for the specified method and pushes the result to
- * Lua stack.
+ * Lua stack. If the return_raw flag is set, pushes a msgpack object instead of
+ * decoding data.
  */
 static void
 netbox_decode_method(struct lua_State *L, enum netbox_method method,
 		     const char **data, const char *data_end,
-		     struct tuple_format *format)
+		     bool return_raw, struct tuple_format *format)
 {
 	typedef void (*method_decoder_f)(struct lua_State *L, const char **data,
-					 const char *data_end,
+					 const char *data_end, bool return_raw,
 					 struct tuple_format *format);
 	static method_decoder_f method_decoder[] = {
 		[NETBOX_PING]		= netbox_decode_nil,
@@ -1595,13 +1650,13 @@ netbox_decode_method(struct lua_State *L, enum netbox_method method,
 		[NETBOX_GET]		= netbox_decode_tuple,
 		[NETBOX_MIN]		= netbox_decode_tuple,
 		[NETBOX_MAX]		= netbox_decode_tuple,
-		[NETBOX_COUNT]		= netbox_decode_value,
+		[NETBOX_COUNT]		= netbox_decode_count,
 		[NETBOX_BEGIN]          = netbox_decode_nil,
 		[NETBOX_COMMIT]         = netbox_decode_nil,
 		[NETBOX_ROLLBACK]       = netbox_decode_nil,
 		[NETBOX_INJECT]		= netbox_decode_table,
 	};
-	method_decoder[method](L, data, data_end, format);
+	method_decoder[method](L, data, data_end, return_raw, format);
 }
 
 static inline struct netbox_transport *
@@ -1924,11 +1979,12 @@ luaT_netbox_new_transport(struct lua_State *L)
  * Takes the following values from Lua stack starting at index idx:
  *  - buffer: buffer (ibuf) to write the result to or nil
  *  - skip_header: whether to skip header when writing the result to the buffer
- *  - method: a value from the netbox_method enumeration
+ *  - return_raw: if set, return msgpack object instead of decoding the result
  *  - on_push: on_push trigger function
  *  - on_push_ctx: on_push trigger function argument
  *  - format: tuple format to use for decoding the body or nil
  *  - stream_id: determines whether or not the request belongs to stream
+ *  - method: a value from the netbox_method enumeration
  *  - ...: method-specific arguments passed to the encoder
  *
  * If the request cannot be performed, sets diag and returns -1,
@@ -1962,26 +2018,29 @@ luaT_netbox_transport_make_request(struct lua_State *L, int idx,
 		fiber_wakeup(transport->worker);
 
 	/* Encode and write the request to the send buffer. */
-	enum netbox_method method = lua_tointeger(L, idx + 2);
-	assert(method < netbox_method_MAX);
+	int arg = idx + 6;
 	uint64_t sync = transport->next_sync++;
-	uint64_t stream_id = luaL_touint64(L, idx + 6);
-	netbox_encode_method(L, idx + 7, method, &transport->send_buf, sync,
+	uint64_t stream_id = luaL_touint64(L, arg++);
+	enum netbox_method method = lua_tointeger(L, arg++);
+	assert(method < netbox_method_MAX);
+	netbox_encode_method(L, arg++, method, &transport->send_buf, sync,
 			     stream_id);
 
 	/* Initialize and register the request object. */
+	arg = idx;
 	request->method = method;
 	request->sync = sync;
-	request->buffer = (struct ibuf *)lua_topointer(L, idx);
-	lua_pushvalue(L, idx);
+	request->buffer = (struct ibuf *)lua_topointer(L, arg);
+	lua_pushvalue(L, arg++);
 	request->buffer_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	request->skip_header = lua_toboolean(L, idx + 1);
-	lua_pushvalue(L, idx + 3);
+	request->skip_header = lua_toboolean(L, arg++);
+	request->return_raw = lua_toboolean(L, arg++);
+	lua_pushvalue(L, arg++);
 	request->on_push_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	lua_pushvalue(L, idx + 4);
+	lua_pushvalue(L, arg++);
 	request->on_push_ctx_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	if (!lua_isnil(L, idx + 5))
-		request->format = lbox_check_tuple_format(L, idx + 5);
+	if (!lua_isnil(L, arg))
+		request->format = lbox_check_tuple_format(L, arg++);
 	else
 		request->format = tuple_format_runtime;
 	tuple_format_ref(request->format);
@@ -2190,9 +2249,11 @@ netbox_transport_dispatch_response(struct netbox_transport *transport,
 		/* Decode xrow.body[DATA] to Lua objects. */
 		if (status == IPROTO_OK) {
 			netbox_decode_method(L, request->method, &data,
-					     data_end, request->format);
+					     data_end, request->return_raw,
+					     request->format);
 		} else {
 			netbox_decode_value(L, &data, data_end,
+					    request->return_raw,
 					    request->format);
 		}
 		assert(data == data_end);
@@ -2380,7 +2441,8 @@ restart:
 		} else {
 			unreachable();
 		}
-		netbox_decode_table(L, &data, data_end, tuple_format_runtime);
+		netbox_decode_table(L, &data, data_end, /*return_raw=*/false,
+				    tuple_format_runtime);
 		lua_rawseti(L, schema_table_idx, key);
 	} while (!(got_vspace && got_vindex &&
 		   (got_vcollation || !peer_has_vcollation)));
