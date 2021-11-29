@@ -642,7 +642,7 @@ netbox_encode_auth(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
 		   const char *user, const char *password, const char *salt)
 {
 	char scramble[SCRAMBLE_SIZE];
-	scramble_prepare(scramble, salt, password,
+	scramble_prepare(scramble, salt, password != NULL ? password : "",
 			 password != NULL ? strlen(password) : 0);
 	struct mpstream stream;
 	mpstream_init(&stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
