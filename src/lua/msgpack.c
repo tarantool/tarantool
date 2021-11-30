@@ -97,6 +97,18 @@ luamp_error(void *error_ctx)
 
 struct luaL_serializer *luaL_msgpack_default = NULL;
 
+const char *
+luamp_get(struct lua_State *L, int idx, size_t *data_len)
+{
+	struct luamp_object *obj;
+	obj = luaL_testudata(L, idx, luamp_object_typename);
+	if (obj != NULL) {
+		*data_len = obj->data_end - obj->data;
+		return obj->data;
+	}
+	return NULL;
+}
+
 static enum mp_type
 luamp_encode_extension_default(struct lua_State *L, int idx,
 			       struct mpstream *stream);
@@ -154,7 +166,8 @@ luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg,
 {
 	int top = lua_gettop(L);
 	enum mp_type type;
-	struct luamp_object *obj;
+	const char *data;
+	size_t data_len;
 
 restart: /* used by MP_EXT of unidentified subtype */
 	switch (field->type) {
@@ -243,11 +256,10 @@ restart: /* used by MP_EXT of unidentified subtype */
 			}
 			return luamp_encode_extension(L, top, stream);
 		default:
-			obj = luaL_testudata(L, top, luamp_object_typename);
-			if (obj != NULL) {
-				mpstream_memcpy(stream, obj->data,
-						obj->data_end - obj->data);
-				return mp_typeof(*obj->data);
+			data = luamp_get(L, top, &data_len);
+			if (data != NULL) {
+				mpstream_memcpy(stream, data, data_len);
+				return mp_typeof(*data);
 			}
 			/* Run trigger if type can't be encoded */
 			type = luamp_encode_extension(L, top, stream);
