@@ -61,6 +61,14 @@ luamp_error(void *);
 
 enum { LUAMP_ALLOC_FACTOR = 256 };
 
+/**
+ * Returns a pointer to the msgpack data and writes the length of the data to
+ * data_len if the object at the given index is a msgpack object. Otherwise
+ * returns NULL.
+ */
+const char *
+luamp_get(struct lua_State *L, int idx, size_t *data_len);
+
 /* low-level function needed for execute_lua_call() */
 enum mp_type
 luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg,

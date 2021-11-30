@@ -427,6 +427,11 @@ luamp_convert_key(struct lua_State *L, struct luaL_serializer *cfg,
 	if (tuple != NULL)
 		return tuple_to_mpstream(tuple, stream);
 
+	size_t data_len;
+	const char *data = luamp_get(L, index, &data_len);
+	if (data != NULL)
+		return mpstream_memcpy(stream, data, data_len);
+
 	struct luaL_field field;
 	if (luaL_tofield(L, cfg, index, &field) < 0)
 		luaT_error(L);
