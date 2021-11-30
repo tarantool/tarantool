@@ -2599,7 +2599,9 @@ box.schema.func.create = function(name, opts)
                               if_not_exists = 'boolean',
                               language = 'string', body = 'string',
                               is_deterministic = 'boolean',
-                              is_sandboxed = 'boolean', comment = 'string',
+                              is_sandboxed = 'boolean',
+                              is_multikey = 'boolean',
+                              comment = 'string',
                               param_list = 'table', returns = 'string',
                               exports = 'table', opts = 'table' })
     local _func = box.space[box.schema.FUNC_ID]
@@ -2620,6 +2622,9 @@ box.schema.func.create = function(name, opts)
                     comment = '', created = datetime, last_altered = datetime})
     opts.language = string.upper(opts.language)
     opts.setuid = opts.setuid and 1 or 0
+    if opts.is_multikey then
+        opts.opts.is_multikey = opts.is_multikey
+    end
     _func:auto_increment{session.euid(), name, opts.setuid, opts.language,
                          opts.body, opts.routine_type, opts.param_list,
                          opts.returns, opts.aggregate, opts.sql_data_access,
