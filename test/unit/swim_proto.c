@@ -45,7 +45,7 @@ static void
 swim_test_member_def(void)
 {
 	header();
-	plan(12);
+	plan(13);
 
 	struct swim_member_def mdef;
 	const char *pos = buffer;
@@ -128,6 +128,12 @@ swim_test_member_def(void)
 	end = mp_encode_uint(end, 0);
 	is(swim_member_def_decode(&mdef, &pos, end, "test"), 0,
 	   "normal member def");
+
+	pos = buffer;
+	end = mp_encode_bin(buffer, (const char *) &uuid, sizeof(uuid));
+	end = buffer + 1;
+	is(swim_decode_uuid(&uuid, &pos, end, "test", "test"), -1,
+	   "zero length bin");
 
 	check_plan();
 	footer();

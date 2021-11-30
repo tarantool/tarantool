@@ -125,7 +125,7 @@ static inline int
 swim_decode_bin(const char **bin, uint32_t *size, const char **pos,
 		const char *end, const char *prefix, const char *param_name)
 {
-	if (*pos == end || mp_typeof(**pos) != MP_BIN ||
+	if (*pos + 1 >= end || mp_typeof(**pos) != MP_BIN ||
 	    mp_check_binl(*pos, end) > 0) {
 		diag_set(SwimError, "%s %s should be bin", prefix,
 			 param_name);
