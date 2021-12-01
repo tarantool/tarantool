@@ -40,10 +40,12 @@ const char *func_aggregate_strs[] = {"none", "group"};
 
 const struct func_opts func_opts_default = {
 	/* .is_multikey = */ false,
+	/* .takes_raw_args = */ false,
 };
 
 const struct opt_def func_opts_reg[] = {
 	OPT_DEF("is_multikey", OPT_BOOL, struct func_opts, is_multikey),
+	OPT_DEF("takes_raw_args", OPT_BOOL, struct func_opts, takes_raw_args),
 };
 
 int
@@ -51,6 +53,8 @@ func_opts_cmp(struct func_opts *o1, struct func_opts *o2)
 {
 	if (o1->is_multikey != o2->is_multikey)
 		return o1->is_multikey - o2->is_multikey;
+	if (o1->takes_raw_args != o2->takes_raw_args)
+		return o1->takes_raw_args - o2->takes_raw_args;
 	return 0;
 }
 

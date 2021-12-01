@@ -341,8 +341,21 @@ struct execute_lua_ctx {
 	int lua_ref;
 	const char *name;
 	uint32_t name_len;
+	bool takes_raw_args;
 	struct port *args;
 };
+
+static inline void
+push_lua_args(lua_State *L, struct execute_lua_ctx *ctx)
+{
+	if (ctx->takes_raw_args) {
+		uint32_t size;
+		const char *data = port_get_msgpack(ctx->args, &size);
+		luamp_push(L, data, data + size);
+	} else {
+		port_dump_lua(ctx->args, L, true);
+	}
+}
 
 /**
  * Find a lua function by name and execute it. Used for body-less
@@ -367,7 +380,7 @@ execute_lua_call(lua_State *L)
 
 	/* Push the rest of args (a tuple). */
 	int top = lua_gettop(L);
-	port_dump_lua(ctx->args, L, true);
+	push_lua_args(L, ctx);
 	int arg_count = lua_gettop(L) - top;
 
 	lua_call(L, arg_count + oc - 1, LUA_MULTRET);
@@ -389,7 +402,7 @@ execute_lua_call_by_ref(lua_State *L)
 
 	/* Push the rest of args (a tuple). */
 	int top = lua_gettop(L);
-	port_dump_lua(ctx->args, L, true);
+	push_lua_args(L, ctx);
 	int arg_count = lua_gettop(L) - top;
 
 	lua_call(L, arg_count, LUA_MULTRET);
@@ -413,7 +426,7 @@ execute_lua_eval(lua_State *L)
 
 	/* Unpack arguments */
 	int top = lua_gettop(L);
-	port_dump_lua(ctx->args, L, true);
+	push_lua_args(L, ctx);
 	int arg_count = lua_gettop(L) - top;
 
 	/* Call compiled code */
@@ -661,6 +674,7 @@ box_lua_call(const char *name, uint32_t name_len,
 	ctx.name = name;
 	ctx.name_len = name_len;
 	ctx.args = args;
+	ctx.takes_raw_args = false;
 	return box_process_lua(HANDLER_CALL, &ctx, ret);
 }
 
@@ -672,6 +686,7 @@ box_lua_eval(const char *expr, uint32_t expr_len,
 	ctx.name = expr;
 	ctx.name_len = expr_len;
 	ctx.args = args;
+	ctx.takes_raw_args = false;
 	return box_process_lua(HANDLER_EVAL, &ctx, ret);
 }
 
@@ -853,7 +868,12 @@ func_lua_call(struct func *func, struct port *args, struct port *ret)
 {
 	assert(func != NULL && func->def->language == FUNC_LANGUAGE_LUA);
 	assert(func->vtab == &func_lua_vtab);
-	return box_lua_call(func->def->name, func->def->name_len, args, ret);
+	struct execute_lua_ctx ctx;
+	ctx.name = func->def->name;
+	ctx.name_len = func->def->name_len;
+	ctx.args = args;
+	ctx.takes_raw_args = func->def->opts.takes_raw_args;
+	return box_process_lua(HANDLER_CALL, &ctx, ret);
 }
 
 static struct func_vtab func_lua_vtab = {
@@ -888,6 +908,7 @@ func_persistent_lua_call(struct func *base, struct port *args, struct port *ret)
 	struct execute_lua_ctx ctx;
 	ctx.lua_ref = func->lua_ref;
 	ctx.args = args;
+	ctx.takes_raw_args = base->def->opts.takes_raw_args;
 	return box_process_lua(HANDLER_CALL_BY_REF, &ctx, ret);
 
 }
@@ -1022,6 +1043,9 @@ lbox_func_new(struct lua_State *L, struct func *func)
 	lua_settable(L, top);
 	lua_pushstring(L, "is_multikey");
 	lua_pushboolean(L, func->def->opts.is_multikey);
+	lua_settable(L, top);
+	lua_pushstring(L, "takes_raw_args");
+	lua_pushboolean(L, func->def->opts.takes_raw_args);
 	lua_settable(L, top);
 	lua_pushstring(L, "is_sandboxed");
 	if (func->def->body != NULL)

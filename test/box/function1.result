@@ -98,6 +98,7 @@ box.func["function1.args"]
     lua: true
     sql: false
   id: 66
+  takes_raw_args: false
   setuid: false
   is_multikey: false
   is_deterministic: false
@@ -589,6 +590,7 @@ func
     lua: true
     sql: false
   id: 66
+  takes_raw_args: false
   setuid: false
   is_multikey: false
   is_deterministic: false
@@ -661,6 +663,7 @@ func
     lua: true
     sql: false
   id: 66
+  takes_raw_args: false
   setuid: false
   is_multikey: false
   is_deterministic: false
