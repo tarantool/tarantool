@@ -2601,6 +2601,7 @@ box.schema.func.create = function(name, opts)
                               is_deterministic = 'boolean',
                               is_sandboxed = 'boolean',
                               is_multikey = 'boolean',
+                              takes_raw_args = 'boolean',
                               comment = 'string',
                               param_list = 'table', returns = 'string',
                               exports = 'table', opts = 'table' })
@@ -2624,6 +2625,9 @@ box.schema.func.create = function(name, opts)
     opts.setuid = opts.setuid and 1 or 0
     if opts.is_multikey then
         opts.opts.is_multikey = opts.is_multikey
+    end
+    if opts.takes_raw_args then
+        opts.opts.takes_raw_args = opts.takes_raw_args
     end
     _func:auto_increment{session.euid(), name, opts.setuid, opts.language,
                          opts.body, opts.routine_type, opts.param_list,

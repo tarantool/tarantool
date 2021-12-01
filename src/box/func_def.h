@@ -68,6 +68,10 @@ struct func_opts {
 	 * packed in array.
 	 */
 	bool is_multikey;
+	/**
+	 * True if the function expects a msgpack object for args.
+	 */
+	bool takes_raw_args;
 };
 
 extern const struct func_opts func_opts_default;
