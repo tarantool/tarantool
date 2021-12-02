@@ -25,22 +25,38 @@ private:
 	{
 		memory_init();
 		fiber_init(fiber_c_invoke);
-		region_alloc(&fiber()->gc, 4);
+		memtx_allocator_init();
 		tuple_init(NULL);
 
+		struct key_part_def kdp{0};
+		kdp.fieldno = 4;
+		kdp.type = FIELD_TYPE_UNSIGNED;
+		kd = key_def_new(&kdp, 1, false);
+		fmt = tuple_format_new(&memtx_tuple_format_vtab, &memtx, &kd, 1,
+				       NULL, 0, 0, NULL, false, false);
+		tuple_format_ref(fmt);
+	}
+	~MemtxEngine()
+	{
+		tuple_format_unref(fmt);
+		key_def_delete(kd);
+		tuple_free();
+		memtx_allocator_destroy();
+		fiber_free();
+		memory_free();
+	}
+	void
+	memtx_allocator_init(void)
+	{
 		memset(&memtx, 0, sizeof(memtx));
-
 		quota_init(&memtx.quota, QUOTA_MAX);
-
-		int rc;
-		rc = slab_arena_create(&memtx.arena, &memtx.quota,
-				       16 * 1024 * 1024, 16 * 1024 * 1024,
-				       SLAB_ARENA_PRIVATE);
+		int rc = slab_arena_create(&memtx.arena, &memtx.quota,
+					   16 * 1024 * 1024, 16 * 1024 * 1024,
+					   SLAB_ARENA_PRIVATE);
 		if (rc != 0)
 			abort();
 
 		slab_cache_create(&memtx.slab_cache, &memtx.arena);
-
 		float actual_alloc_factor;
 		allocator_settings alloc_settings;
 		allocator_settings_init(&alloc_settings, &memtx.slab_cache,
@@ -48,28 +64,14 @@ private:
 					&memtx.quota);
 		SmallAlloc::create(&alloc_settings);
 		memtx_set_tuple_format_vtab("small");
-
 		memtx.max_tuple_size = 1024 * 1024;
-
-		struct key_part_def kdp{0};
-		kdp.fieldno = 4;
-		kdp.type = FIELD_TYPE_UNSIGNED;
-		kd = key_def_new(&kdp, 1, false);
-		fmt = tuple_format_new(&memtx_tuple_format_vtab, &memtx, &kd, 1,
-					  NULL, 0, 0, NULL, false, false);
-		tuple_format_ref(fmt);
 	}
-	~MemtxEngine()
+	void
+	memtx_allocator_destroy(void)
 	{
-		key_def_delete(kd);
-		tuple_format_unref(fmt);
 		SmallAlloc::destroy();
 		slab_cache_destroy(&memtx.slab_cache);
 		tuple_arena_destroy(&memtx.arena);
-		box_tuple_last = NULL;
-		tuple_free();
-		fiber_free();
-		memory_free();
 	}
 
 	struct memtx_engine memtx;
@@ -177,13 +179,12 @@ bench_tuple_new(benchmark::State& state)
 		tuples[i] = box_tuple_new(format,
 					  dataset[i].begin(),
 					  dataset[i].end());
-		tuple_ref(tuples[i]);
-		++i;
+		tuple_ref(tuples[i++]);
 	}
 	total_count += i;
 	state.SetItemsProcessed(total_count);
 
-	for (size_t k = i; NUM_TEST_TUPLES < i; k++)
+	for (size_t k = 0; k < i; k++)
 		tuple_unref(tuples[k]);
 }
 
