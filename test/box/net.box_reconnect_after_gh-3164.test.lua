@@ -3,10 +3,6 @@ log = require 'log'
 test_run = require('test_run').new()
 net = require('net.box')
 
--- TODO(gh-5081): Remove this once the bug is fixed.
-jit_enabled = jit.status()
-if jit_enabled then jit.off() end
-
 test_run:cmd("push filter 'peer_uuid: .*' to 'peer_uuid: <UUID>'")
 test_run:cmd("push filter 'reconnect_after: .*' to 'reconnect_after: <NUM>'")
 test_run:cmd("push filter 'schema_version: .*' to 'schema_version: <NUM>'")
@@ -55,5 +51,3 @@ collectgarbage('collect')
 -- Now weak.c is null, because it was weak reference, and the
 -- connection is deleted by 'collect'.
 weak.c
-
-if jit_enabled then jit.on() end
