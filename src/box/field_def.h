@@ -77,6 +77,13 @@ enum on_conflict_action {
 	on_conflict_action_MAX
 };
 
+enum compression_type {
+	COMPRESSION_TYPE_NONE = 0,
+	COMPRESSION_TYPE_LZ4,
+	COMPRESSION_TYPE_ZSTD5,
+	compression_type_MAX
+};
+
 /** \endcond public */
 
 enum {
@@ -98,6 +105,8 @@ static_assert((int) field_type_MAX <= (int) FIELD_TYPE_MASK,
 extern const char *field_type_strs[];
 
 extern const char *on_conflict_action_strs[];
+
+extern const char *compression_type_strs[];
 
 /** Check if @a type1 can store values of @a type2. */
 bool
@@ -144,6 +153,8 @@ struct field_def {
 	char *default_value;
 	/** AST for parsed default value. */
 	struct Expr *default_value_expr;
+	/** Type of comression to this field */
+	enum compression_type compression_type;
 };
 
 /**

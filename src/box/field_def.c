@@ -116,6 +116,12 @@ const char *on_conflict_action_strs[] = {
 	/* [ON_CONFLICT_ACTION_DEFAULT]  = */ "default"
 };
 
+const char *compression_type_strs[] = {
+	/* [COMPRESSION_TYPE_NONE]       = */ "none",
+	/* [COMPRESSION_TYPE_LZ4]        = */ "lz4",
+	/* [COMPRESSION_TYPE_ZSTD5]      = */ "zsrd5",
+};
+
 static int64_t
 field_type_by_name_wrapper(const char *str, uint32_t len)
 {
@@ -160,6 +166,8 @@ const struct opt_def field_def_reg[] = {
 		     nullable_action, NULL),
 	OPT_DEF("collation", OPT_UINT32, struct field_def, coll_id),
 	OPT_DEF("default", OPT_STRPTR, struct field_def, default_value),
+	OPT_DEF_ENUM("compression", compression_type, struct field_def,
+		     compression_type, NULL),
 	OPT_END,
 };
 
