@@ -287,3 +287,6 @@ target_link_libraries(serializer.test unit box ${LUAJIT_LIBRARIES})
 
 add_executable(watcher.test watcher.c)
 target_link_libraries(watcher.test unit box)
+
+add_executable(msgpuck_compression.test msgpuck_compression.c)
+target_link_libraries(msgpuck_compression.test unit core box)

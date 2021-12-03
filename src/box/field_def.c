@@ -118,8 +118,8 @@ const char *on_conflict_action_strs[] = {
 
 const char *compression_type_strs[] = {
 	/* [COMPRESSION_TYPE_NONE]       = */ "none",
-	/* [COMPRESSION_TYPE_LZ4]        = */ "lz4",
 	/* [COMPRESSION_TYPE_ZSTD5]      = */ "zsrd5",
+	/* [COMPRESSION_TYPE_LZ4]        = */ "lz4",
 };
 
 static int64_t

@@ -79,8 +79,8 @@ enum on_conflict_action {
 
 enum compression_type {
 	COMPRESSION_TYPE_NONE = 0,
-	COMPRESSION_TYPE_LZ4,
 	COMPRESSION_TYPE_ZSTD5,
+	COMPRESSION_TYPE_LZ4,
 	compression_type_MAX
 };
 
