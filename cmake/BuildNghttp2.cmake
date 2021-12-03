@@ -1,0 +1,74 @@
+#
+# A macro to build the bundled nghttp2 library.
+macro(nghttp2_build)
+    set(NGHTTP2_SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/nghttp2)
+    set(NGHTTP2_BINARY_DIR ${PROJECT_BINARY_DIR}/build/nghttp2/work)
+    set(NGHTTP2_INSTALL_DIR ${PROJECT_BINARY_DIR}/build/nghttp2/dest)
+
+    # See BuildLibCURL.cmake for details.
+    set(NGHTTP2_CFLAGS "")
+    if (TARGET_OS_DARWIN AND NOT "${CMAKE_OSX_SYSROOT}" STREQUAL "")
+        set(NGHTTP2_CFLAGS "${NGHTTP2_CFLAGS} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT}")
+    endif()
+
+    set(NGHTTP2_CMAKE_FLAGS "-DENABLE_WERROR:BOOL=ON")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_DEBUG:BOOL=OFF")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_THREADS:BOOL=OFF")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_APP:BOOL=OFF")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_HPACK_TOOLS:BOOL=OFF")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_ASIO_LIB:BOOL=OFF")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_EXAMPLES:BOOL=OFF")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_PYTHON_BINDINGS:BOOL=OFF")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_FAILMALLOC:BOOL=ON")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_LIB_ONLY:BOOL=ON")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_STATIC_LIB:BOOL=ON")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_SHARED_LIB:BOOL=OFF")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_STATIC_CRT:BOOL=OFF")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_HTTP3:BOOL=OFF")
+
+    # Even though we set the external project's install dir
+    # below, we still need to pass the corresponding install
+    # prefix via cmake arguments.
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DCMAKE_INSTALL_PREFIX=${NGHTTP2_INSTALL_DIR}")
+    # The default values for the options below are not always
+    # "./lib", "./bin"  and "./include", while curl expects them
+    # to be.
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DCMAKE_INSTALL_LIBDIR=lib")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DCMAKE_INSTALL_INCLUDEDIR=include")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DCMAKE_INSTALL_BINDIR=bin")
+
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DCMAKE_LINKER=${CMAKE_LINKER}")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DCMAKE_AR=${CMAKE_AR}")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DCMAKE_RANLIB=${CMAKE_RANLIB}")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DCMAKE_NM=${CMAKE_NM}")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DCMAKE_STRIP=${CMAKE_STRIP}")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DCMAKE_C_FLAGS=${NGHTTP2_CFLAGS}")
+    # In hardened mode, which enables -fPIE by default,
+    # the cmake checks don't work without -fPIC.
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DCMAKE_REQUIRED_FLAGS=-fPIC")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
+
+    include(ExternalProject)
+    ExternalProject_Add(
+        bundled-nghttp2-project
+        SOURCE_DIR ${NGHTTP2_SOURCE_DIR}
+        INSTALL_DIR ${NGHTTP2_INSTALL_DIR}
+        DOWNLOAD_DIR ${NGHTTP2_BINARY_DIR}
+        TMP_DIR ${NGHTTP2_BINARY_DIR}/tmp
+        STAMP_DIR ${NGHTTP2_BINARY_DIR}/stamp
+        BINARY_DIR ${NGHTTP2_BINARY_DIR}
+        CMAKE_ARGS ${NGHTTP2_CMAKE_FLAGS})
+
+    add_library(bundled-nghttp2 STATIC IMPORTED GLOBAL)
+    set_target_properties(bundled-nghttp2 PROPERTIES IMPORTED_LOCATION
+        ${NGHTTP2_INSTALL_DIR}/lib/libnghttp2.a)
+    add_dependencies(bundled-nghttp2 bundled-nghttp2-project)
+    set(NGHTTP2_LIBRARIES bundled-nghttp2)
+
+    unset(NGHTTP2_CMAKE_FLAGS)
+    unset(NGHTTP2_CFLAGS)
+    unset(NGHTTP2_BINARY_DIR)
+    unset(NGHTTP2_SOURCE_DIR)
+endmacro(nghttp2_build)

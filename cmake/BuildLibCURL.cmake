@@ -46,15 +46,29 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DOPENSSL_ROOT_DIR=${FOUND_OPENSSL_ROOT_DIR}")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_MODULE_PATH=${PROJECT_SOURCE_DIR}/cmake")
 
+    set(LIBCURL_FIND_ROOT_PATH "")
+
     # Setup ARES and its library path, use either c-ares bundled
     # with tarantool or libcurl-default threaded resolver.
     if(BUNDLED_LIBCURL_USE_ARES)
         set(ENABLE_ARES "ON")
-        list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_FIND_ROOT_PATH=${ARES_INSTALL_DIR}")
+        list(APPEND LIBCURL_FIND_ROOT_PATH ${ARES_INSTALL_DIR})
     else()
         set(ENABLE_ARES "OFF")
     endif()
     list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_ARES=${ENABLE_ARES}")
+
+    # Setup http2 and nghttp2 library path
+    if(BUNDLED_LIBCURL_USE_NGHTTP2)
+        set(USE_NGHTTP2 "ON")
+        list(APPEND LIBCURL_FIND_ROOT_PATH ${NGHTTP2_INSTALL_DIR})
+    else()
+        set(USE_NGHTTP2 "OFF")
+    endif()
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_NGHTTP2=${USE_NGHTTP2}")
+
+    string(REPLACE ";" "$<SEMICOLON>" LIBCURL_FIND_ROOT_PATH_STR "${LIBCURL_FIND_ROOT_PATH}")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_FIND_ROOT_PATH=${LIBCURL_FIND_ROOT_PATH_STR}")
 
     # On cmake CMAKE_USE_LIBSSH2 flag is enabled by default, we need to switch it
     # off to avoid of issues, like:
@@ -108,7 +122,6 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_PATH=none")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_LIBRTMP=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DHAVE_LIBIDN2=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_NGHTTP2=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_NGTCP2=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_NGHTTP3=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_QUICHE=OFF")
@@ -161,6 +174,10 @@ macro(curl_build)
         # Need to build ares first
         add_dependencies(bundled-libcurl-project bundled-ares)
     endif()
+    if (BUNDLED_LIBCURL_USE_NGHTTP2)
+        # Need to build nghttp2 first
+        add_dependencies(bundled-libcurl-project bundled-nghttp2)
+    endif()
     add_dependencies(bundled-libcurl bundled-libcurl-project)
 
     # Setup CURL_INCLUDE_DIRS & CURL_LIBRARIES for global use.
@@ -168,6 +185,9 @@ macro(curl_build)
     set(CURL_LIBRARIES bundled-libcurl ${ZLIB_LIBRARIES})
     if (BUNDLED_LIBCURL_USE_ARES)
         set(CURL_LIBRARIES ${CURL_LIBRARIES} ${ARES_LIBRARIES})
+    endif()
+    if (BUNDLED_LIBCURL_USE_NGHTTP2)
+        set(CURL_LIBRARIES ${CURL_LIBRARIES} ${NGHTTP2_LIBRARIES})
     endif()
     if (TARGET_OS_LINUX OR TARGET_OS_FREEBSD)
         set(CURL_LIBRARIES ${CURL_LIBRARIES} rt)
