@@ -41,6 +41,10 @@ struct on_auth_trigger_ctx {
 	const char *username;
 	/* true if authentication was successful */
 	bool is_authenticated;
+
+	/* customized authentication artifacts */
+	const char *salt;
+	const char *scramble;
 };
 
 

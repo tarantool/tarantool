@@ -317,7 +317,7 @@ session_run_on_disconnect_triggers(struct session *session);
 
 /** Run auth triggers */
 int
-session_run_on_auth_triggers(const struct on_auth_trigger_ctx *result);
+session_run_on_auth_triggers(struct on_auth_trigger_ctx *result);
 
 /**
  * Check whether or not the current user is authorized to connect

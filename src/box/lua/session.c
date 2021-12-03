@@ -300,7 +300,37 @@ lbox_push_on_auth_event(struct lua_State *L, void *event)
 	struct on_auth_trigger_ctx *ctx = (struct on_auth_trigger_ctx *) event;
 	lua_pushstring(L, ctx->username);
 	lua_pushboolean(L, ctx->is_authenticated);
-	return 2;
+	if (ctx->salt)
+		lua_pushlstring(L, ctx->salt, SCRAMBLE_SIZE); // IPROTO_SALT_SIZE?
+	else
+		lua_pushnil(L);
+	if (ctx->scramble)
+		lua_pushlstring(L, ctx->scramble, SCRAMBLE_SIZE);
+	else
+		lua_pushnil(L);
+	return 4;
+}
+
+static int
+lbox_pop_on_auth_event(struct lua_State *L, int nret, void *event)
+{
+	struct on_auth_trigger_ctx *ctx = (struct on_auth_trigger_ctx *) event;
+
+	if (nret < 1) {
+		/* No return value - nothing to do. */
+		return 0;
+	}
+	int top = lua_gettop(L) - nret + 1;
+	if (lua_type(L, top) != LUA_TSTRING)
+	{
+		/* Invalid return value - raise error. */
+		diag_set(ClientError, ER_FUNC_INVALID_RETURN_TYPE,
+			 "on_auth", "string", lua_typename(L, lua_type(L, top)));
+		return -1;
+	}
+	ctx->username = lua_tostring(L, top);
+	ctx->is_authenticated = true;
+	return 0;
 }
 
 static int
@@ -339,7 +369,7 @@ static int
 lbox_session_on_auth(struct lua_State *L)
 {
 	return lbox_trigger_reset(L, 2, &session_on_auth,
-				  lbox_push_on_auth_event, NULL);
+				  lbox_push_on_auth_event, lbox_pop_on_auth_event);
 }
 
 static int

@@ -33,20 +33,94 @@
 #include "session.h"
 #include "msgpuck.h"
 #include "error.h"
+#include "core/tt_static.h"
+#include "box/schema.h"
 #include <base64.h>
 
 static char zero_hash[SCRAMBLE_SIZE];
+
+const char*
+get_scramble(uint32_t part_count, const char *tuple)
+{
+	if (part_count < 2) {
+		/* Expected at least: authentication mechanism and data. */
+		tnt_raise(ClientError, ER_ILLEGAL_PARAMS,
+				"authentication request body");
+	}
+
+	const char *scramble;
+	uint32_t scramble_len;
+	mp_next(&tuple); /* Skip authentication mechanism. */
+	if (mp_typeof(*tuple) == MP_STR) {
+		scramble = mp_decode_str(&tuple, &scramble_len);
+	} else if (mp_typeof(*tuple) == MP_BIN) {
+		/*
+		 * scramble is not a character stream, so some
+		 * codecs automatically pack it as MP_BIN
+		 */
+		scramble = mp_decode_bin(&tuple, &scramble_len);
+	} else {
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+				"authentication scramble");
+	}
+	if (scramble_len != SCRAMBLE_SIZE) {
+		/* Authentication mechanism, data. */
+		tnt_raise(ClientError, ER_INVALID_MSGPACK,
+				"invalid scramble size");
+	}
+	return scramble;
+}
 
 void
 authenticate(const char *user_name, uint32_t len, const char *salt,
 	     const char *tuple)
 {
-	struct user *user = user_find_by_name_xc(user_name, len);
+	struct user *user = user_find_by_name(user_name, len);
+	/* will try to assign user/role via trigger (external authentication) */
+	if (user == NULL)
+	{
+		/* throw if no chance to set the user */
+		if (rlist_empty(&session_on_auth))
+			diag_raise();
+
+		/*
+		 * We need to pass salt and scramble to on_auth trigger to let it
+		 * verify a pasword and to acquire an effective user/role name.
+		 */
+		uint32_t part_count = mp_decode_array(&tuple);
+		const char *scramble = get_scramble(part_count, tuple);
+		struct on_auth_trigger_ctx auth_res = {
+			tt_cstr(user_name, len),
+			false,
+			salt,
+			scramble
+		};
+
+		/* execute trigger with admin privileges */
+		struct session *session = current_session();
+		user = user_by_id(1);  /* admin id */
+		credentials_reset(&session->credentials, user);
+		if (session_run_on_auth_triggers(&auth_res) != 0)
+			diag_raise();
+
+		/* apply effective user/role */
+		uint32_t uid;
+		if (schema_find_id(BOX_USER_ID, 2, auth_res.username,
+								 strlen(auth_res.username), &uid) == 0
+			 && uid != BOX_ID_NIL) {
+			struct user *user = user_by_id(uid);
+			if (user != NULL) {
+				credentials_reset(&session->credentials, user);
+				return;
+			}
+		}
+		tnt_raise(ClientError, ER_NO_SUCH_USER, auth_res.username);
+	}
+
 	struct session *session = current_session();
 	uint32_t part_count;
-	uint32_t scramble_len;
 	const char *scramble;
-	struct on_auth_trigger_ctx auth_res = { user->def->name, true };
+	struct on_auth_trigger_ctx auth_res = { user->def->name, true, NULL, NULL };
 	/*
 	 * Allow authenticating back to GUEST user without
 	 * checking a password. This is useful for connection
@@ -65,30 +139,7 @@ authenticate(const char *user_name, uint32_t len, const char *salt,
 
 	access_check_session_xc(user);
 
-	if (part_count < 2) {
-		/* Expected at least: authentication mechanism and data. */
-		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			   "authentication request body");
-	}
-	mp_next(&tuple); /* Skip authentication mechanism. */
-	if (mp_typeof(*tuple) == MP_STR) {
-		scramble = mp_decode_str(&tuple, &scramble_len);
-	} else if (mp_typeof(*tuple) == MP_BIN) {
-		/*
-		 * scramble is not a character stream, so some
-		 * codecs automatically pack it as MP_BIN
-		 */
-		scramble = mp_decode_bin(&tuple, &scramble_len);
-	} else {
-		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			   "authentication scramble");
-	}
-	if (scramble_len != SCRAMBLE_SIZE) {
-		/* Authentication mechanism, data. */
-		tnt_raise(ClientError, ER_INVALID_MSGPACK,
-			   "invalid scramble size");
-	}
-
+	scramble = get_scramble(part_count, tuple);
 	if (scramble_check(scramble, salt, user->def->hash2)) {
 		auth_res.is_authenticated = false;
 		if (session_run_on_auth_triggers(&auth_res) != 0)
