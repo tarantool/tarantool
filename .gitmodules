@@ -53,3 +53,6 @@
 [submodule "third_party/luazip"]
 	path = third_party/luazip
 	url = https://github.com/tarantool/luazip.git
+[submodule "third_party/nghttp2"]
+	path = third_party/nghttp2
+	url = https://github.com/tarantool/nghttp2.git

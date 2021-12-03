@@ -378,6 +378,11 @@ Files: third_party/xxHash/*
 Copyright: 2012-2020 Yann Collet
 License: BSD-2-Clause
 
+Files: third_party/nghttp2/*
+Copyright: 2012, 2014, 2015, 2016 Tatsuhiro Tsujikawa
+           2012, 2014, 2015, 2016 nghttp2 contributors
+License: MIT
+
 Files: src/proc_title.c
 Copyright: 2000-2010, PostgreSQL Global Development Group
 License: BSD-2-Clause

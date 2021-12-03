@@ -281,7 +281,8 @@ if(BUILD_STATIC)
             # set variable to allow rescan (CMake depended)
             set(SYMBOLS_LIB "SYMBOLS_LIB-NOTFOUND")
         elseif (${libstatic} STREQUAL bundled-libcurl OR
-                ${libstatic} STREQUAL bundled-ares)
+                ${libstatic} STREQUAL bundled-ares OR
+                ${libstatic} STREQUAL bundled-nghttp2)
             message("We don't need to export symbols from statically linked ${libstatic}, skipped")
         else()
             message(WARNING "${libstatic} should be a static")
