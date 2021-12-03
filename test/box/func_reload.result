@@ -200,13 +200,11 @@ box.schema.func.reload("reload")
 _ = fiber.create(function() ch:put(c:call("reload.test_reload")) end)
 ---
 ...
-ch:get()
+_ = ch:get()
 ---
-- [[1]]
 ...
-ch:get()
+_ = ch:get()
 ---
-- [[2]]
 ...
 s:drop()
 ---
