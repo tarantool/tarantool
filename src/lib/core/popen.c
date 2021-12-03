@@ -1178,7 +1178,15 @@ popen_new(struct popen_opts *opts)
 	 * vfork to complete. Also we try to do as minimum
 	 * operations before the exec() as possible.
 	 */
+#pragma GCC diagnostic push
+	/*
+	 * TODO(gh-6674): we need to review popen's design and refactor this
+	 * part, completely getting rid of vfork, or change vfork to
+	 * posix_spawn here, but only on macOS.
+	 */
+#pragma GCC diagnostic warning "-Wdeprecated-declarations"
 	handle->pid = vfork();
+#pragma GCC diagnostic pop
 	if (handle->pid < 0) {
 		diag_set(SystemError, "vfork() fails");
 		goto out_err;
