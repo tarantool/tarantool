@@ -46,3 +46,6 @@
 [submodule "third_party/c-dt"]
 	path = third_party/c-dt
 	url = https://github.com/tarantool/c-dt.git
+[submodule "third_party/lua-zlib"]
+	path = third_party/lua-zlib
+	url = https://github.com/tarantool/lua-zlib.git

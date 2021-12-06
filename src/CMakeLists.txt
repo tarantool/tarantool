@@ -18,6 +18,10 @@ include_directories(${DECNUMBER_INCLUDE_DIR})
 set(LIBUTIL_FREEBSD_SRC ${PROJECT_SOURCE_DIR}/third_party/libutil_freebsd)
 include_directories(${LIBUTIL_FREEBSD_SRC})
 
+if(EMBED_LUAZLIB)
+    include_directories(${ZLIB_INCLUDE_DIRS})
+endif()
+
 # Compile src/lua/*.lua files into src/lua/*.lua.c sources
 set(lua_sources)
 lua_source(lua_sources lua/init.lua)
@@ -147,6 +151,11 @@ set (server_sources
      ${PROJECT_SOURCE_DIR}/third_party/lua-cjson/strbuf.c
 )
 
+if(EMBED_LUAZLIB)
+    list(APPEND server_sources
+        ${PROJECT_SOURCE_DIR}/third_party/lua-zlib/lua_zlib.c)
+endif()
+
 set(api_headers
     ${PROJECT_BINARY_DIR}/src/trivia/config.h
     ${PROJECT_SOURCE_DIR}/src/trivia/util.h
@@ -192,6 +201,10 @@ add_library(server STATIC ${server_sources})
 add_dependencies(server build_bundled_libs)
 target_link_libraries(server core coll http_parser bit uri swim swim_udp
                       swim_ev crypto mpstream crc32 tzcode)
+
+if(EMBED_LUAZLIB)
+    target_link_libraries(server ${ZLIB_LIBRARIES})
+endif()
 
 # Rule of thumb: if exporting a symbol from a static library, list the
 # library here.

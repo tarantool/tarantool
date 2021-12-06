@@ -361,6 +361,8 @@ find_package_message(MODULE_LIBPATH "Lua package.cpath: ${MODULE_LIBPATH}"
 ## Third-Party libraries
 ##
 
+set(EMBED_LUAZLIB ${BUILD_STATIC})
+
 #
 # Since we *optionally* build bundled libs, a direct build
 # dependency between tarantool_box and libluajit/libobjc won't
