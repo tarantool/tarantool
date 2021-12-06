@@ -799,6 +799,19 @@ box_check_replication(void)
 }
 
 static int
+box_check_replication_threads(void)
+{
+	int count = cfg_geti("replication_threads");
+	if (count <= 0 || count > REPLICATION_THREADS_MAX) {
+		diag_set(ClientError, ER_CFG, "replication_threads",
+			 tt_sprintf("must be greater than 0, less than or "
+				    "equal to %d", REPLICATION_THREADS_MAX));
+		return -1;
+	}
+	return 0;
+}
+
+static int
 box_check_listen(void)
 {
 	return box_check_uri_set("listen");
@@ -1255,6 +1268,8 @@ box_check_config(void)
 	if (box_check_replication_synchro_quorum() != 0)
 		diag_raise();
 	if (box_check_replication_synchro_timeout() < 0)
+		diag_raise();
+	if (box_check_replication_threads() < 0)
 		diag_raise();
 	box_check_replication_sync_timeout();
 	box_check_readahead(cfg_geti("readahead"));
@@ -3634,7 +3649,7 @@ box_cfg_xc(void)
 	gc_init();
 	engine_init();
 	schema_init();
-	replication_init();
+	replication_init(cfg_geti_default("replication_threads", 1));
 	port_init();
 	iproto_init(cfg_geti("iproto_threads"));
 	sql_init();

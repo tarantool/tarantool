@@ -98,6 +98,8 @@ struct gc_consumer;
 
 static const int REPLICATION_CONNECT_QUORUM_ALL = INT_MAX;
 
+enum { REPLICATION_THREADS_MAX = 1000 };
+
 /**
  * Network timeout. Determines how often master and slave exchange
  * heartbeat messages. Set by box.cfg.replication_timeout.
@@ -155,6 +157,9 @@ extern bool replication_skip_conflict;
  */
 extern bool replication_anon;
 
+/** How many threads to use for decoding incoming replication stream. */
+extern int replication_threads;
+
 /**
  * Wait for the given period of time before trying to reconnect
  * to a master.
@@ -176,7 +181,7 @@ replication_disconnect_timeout(void)
 }
 
 void
-replication_init(void);
+replication_init(int num_threads);
 
 void
 replication_free(void);
