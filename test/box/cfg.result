@@ -87,6 +87,8 @@ cfg_filter(box.cfg)
  |     - N / 2 + 1
  |   - - replication_synchro_timeout
  |     - 5
+ |   - - replication_threads
+ |     - 1
  |   - - replication_timeout
  |     - 1
  |   - - slab_alloc_factor
@@ -216,6 +218,8 @@ cfg_filter(box.cfg)
  |     - N / 2 + 1
  |   - - replication_synchro_timeout
  |     - 5
+ |   - - replication_threads
+ |     - 1
  |   - - replication_timeout
  |     - 1
  |   - - slab_alloc_factor

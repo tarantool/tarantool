@@ -56,6 +56,7 @@ double replication_synchro_timeout = 5.0; /* seconds */
 double replication_sync_timeout = 300.0; /* seconds */
 bool replication_skip_conflict = false;
 bool replication_anon = false;
+int replication_threads = 1;
 
 struct replicaset replicaset;
 
@@ -84,7 +85,7 @@ replicaset_quorum(void)
 }
 
 void
-replication_init(void)
+replication_init(int num_threads)
 {
 	memset(&replicaset, 0, sizeof(replicaset));
 	replica_hash_new(&replicaset.hash);
@@ -101,6 +102,10 @@ replication_init(void)
 	rlist_create(&replicaset.on_ack);
 
 	diag_create(&replicaset.applier.diag);
+
+	replication_threads = num_threads;
+
+	applier_init();
 }
 
 void
@@ -116,6 +121,8 @@ replication_free(void)
 
 	diag_destroy(&replicaset.applier.diag);
 	trigger_destroy(&replicaset.on_ack);
+
+	applier_free();
 }
 
 int

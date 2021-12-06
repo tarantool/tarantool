@@ -43,6 +43,8 @@
 #include "trivia/util.h"
 #include "tt_uuid.h"
 #include "uri/uri.h"
+#include "small/lsregion.h"
+#include "cbus.h"
 
 #include "xrow.h"
 
@@ -74,6 +76,41 @@ enum { APPLIER_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
 /** States for the applier */
 ENUM(applier_state, applier_STATE);
 extern const char *applier_state_strs[];
+
+/** A base message used in applier-thread <-> tx communication. */
+struct applier_msg {
+	struct cmsg base;
+	/**
+	 * The function to execute in applier fiber. cmsg->f refers to a simple
+	 * callback which wakes up the destination applier, so a separate
+	 * function pointer is needed to tell applier which function to execute
+	 * upon the message receipt.
+	 */
+	cmsg_f f;
+	/** The target applier this message is for. */
+	struct applier *applier;
+};
+
+/** A message sent from applier thread to notify tx that applier is exiting. */
+struct applier_exit_msg {
+	struct applier_msg base;
+	/**
+	 * The thread's saved diag. To propagate exception to applier fiber in
+	 * tx thread.
+	 */
+	struct diag diag;
+};
+
+/** A message carrying parsed transactions from applier thread to tx. */
+struct applier_data_msg {
+	struct applier_msg base;
+	/** A list of read up transactions to be processed in tx thread. */
+	struct stailq txs;
+	/** A lsregion identifier of the last row allocated for this message. */
+	int64_t lsr_id;
+	/** A counter to limit the count of transactions per message. */
+	int tx_cnt;
+};
 
 /**
  * State of a replication connection to the master
@@ -136,7 +173,58 @@ struct applier {
 	struct diag diag;
 	/* Master's vclock at the time of SUBSCRIBE. */
 	struct vclock remote_vclock_at_subscribe;
+	/** A pointer to the thread handling this applier's data stream. */
+	struct applier_thread *applier_thread;
+	/**
+	 * A conditional variable used by applier fiber in tx thread waiting for
+	 * the next message.
+	 */
+	struct fiber_cond msg_cond;
+	/**
+	 * A tx thread queue for messages delivered from applier thread but not
+	 * yet picked up by a corresponding applier.
+	 * Applier thread has a pair of rotating messages used to deliver parsed
+	 * transactions to the tx thread. It is possible, though, that an exit
+	 * notification message arrives right after both data messages are
+	 * pushed. Hence the queue size is 3.
+	 */
+	struct applier_msg *pending_msgs[3];
+	/** Pending message count. */
+	int pending_msg_cnt;
+	/** Fields used only by applier thread. */
+	struct {
+		alignas(CACHELINE_SIZE)
+		/**
+		 * A pair of rotating messages. While one of the messages is
+		 * processed in the tx thread the other is used to store
+		 * incoming rows.
+		 */
+		struct applier_data_msg msgs[2];
+		/** The input buffer used in thread to read rows. */
+		struct ibuf ibuf;
+		/** The lsregion for allocating rows in thread. */
+		struct lsregion lsr;
+		/** A growing identifier to track lsregion allocations. */
+		int64_t lsr_id;
+		/** An index of the message currently used in thread. */
+		int msg_ptr;
+		/**
+		 * A preallocated message used to notify tx that the applier
+		 * should exit due to a network error.
+		 */
+		struct applier_exit_msg exit_msg;
+		/** The reader fiber, reading and parsing incoming rows. */
+		struct fiber *reader;
+	} thread;
 };
+
+/** Initialize the applier subsystem. */
+void
+applier_init(void);
+
+/** Free the applier subsystem. */
+void
+applier_free(void);
 
 /**
  * Start a client to a remote master using a background fiber.

@@ -39,6 +39,7 @@ replication_sync_lag:10
 replication_sync_timeout:300
 replication_synchro_quorum:N / 2 + 1
 replication_synchro_timeout:5
+replication_threads:1
 replication_timeout:1
 slab_alloc_factor:1.05
 slab_alloc_granularity:8
