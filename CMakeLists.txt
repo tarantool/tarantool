@@ -386,6 +386,12 @@ else()
 endif()
 
 #
+# ZLIB
+#
+set(ZLIB_FIND_REQUIRED ON)
+find_package(ZLIB)
+
+#
 # OpenSSL
 #
 find_package(OpenSSL)
@@ -401,12 +407,7 @@ endif()
 # it to libraries list in case of static openssl linking.
 #
 if(OPENSSL_USE_STATIC_LIBS)
-    if(BUILD_STATIC)
-        find_library(Z_LIBRARY libz.a)
-    else()
-        find_library(Z_LIBRARY z)
-    endif()
-    set(OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES} ${Z_LIBRARY})
+    set(OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES})
 endif()
 
 #
