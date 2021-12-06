@@ -366,6 +366,10 @@ License: Expat
   or other dealings in this Software without prior written authorization
   of the copyright holder.
 
+Files: third_party/lua-zlib/*
+Copyright: 2009 Brian Maher
+License: MIT
+
 Files: third_party/luarocks/*
 Copyright: 2007-2018 Kepler Project
 License: MIT

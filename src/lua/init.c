@@ -70,6 +70,11 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
+#if defined(EMBED_LUAZLIB)
+LUALIB_API int
+luaopen_zlib(lua_State *L);
+#endif
+
 /**
  * The single Lua state of the transaction processor (tx) thread.
  */
@@ -489,6 +494,10 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	lua_pop(L, 1);
 	luaopen_json(L);
 	lua_pop(L, 1);
+#if defined(EMBED_LUAZLIB)
+	luaopen_zlib(L);
+	lua_pop(L, 1);
+#endif
 #if defined(HAVE_GNU_READLINE)
 	/*
 	 * Disable libreadline signals handlers. All signals are handled in
