@@ -149,6 +149,10 @@ macro(curl_build)
     # link hardening fails.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
 
+    # For debug builds: name the library as libcurl.a, not
+    # libcurl-d.a. We use this name below.
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_DEBUG_POSTFIX=")
+
     include(ExternalProject)
     ExternalProject_Add(
         bundled-libcurl-project
