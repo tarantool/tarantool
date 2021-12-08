@@ -325,3 +325,9 @@ add_test(
     COMMAND ${TARANTOOL_BINARY_DIR}/src/tarantool
             ${CMAKE_CURRENT_SOURCE_DIR}/test/static-build/traceback.test.lua
 )
+
+add_test(
+    NAME check-luarocks
+    COMMAND ${TARANTOOL_BINARY_DIR}/src/tarantool
+            ${CMAKE_CURRENT_SOURCE_DIR}/test/static-build/luarocks.test.lua
+)
