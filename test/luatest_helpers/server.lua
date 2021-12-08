@@ -104,8 +104,12 @@ function Server:wait_for_readiness()
 end
 
 function Server:wait_election_leader()
+    -- Include read-only property too because if an instance is a leader, it
+    -- does not mean it finished the synchro queue ownership transition. It is
+    -- read-only until that happens. But in tests usually the leader is needed
+    -- as a writable node.
     return wait_cond('election leader', self, self.exec, self, function()
-        return box.info.election.state == 'leader'
+        return box.info.election.state == 'leader' and not box.info.ro
     end)
 end
 

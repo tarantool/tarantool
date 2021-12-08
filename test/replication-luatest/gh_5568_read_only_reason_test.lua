@@ -1,6 +1,7 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
 local helpers = require('test.luatest_helpers')
+local wait_timeout = 120
 
 --
 -- gh-5568: ER_READONLY needs to carry additional info explaining the reason
@@ -37,6 +38,17 @@ end end
 local function make_destroy_cluster(g) return function()
     g.cluster:drop()
 end end
+
+-- XXX: retry demote in a loop. Otherwise it might fail due to a false-positive
+-- 'can not be called simultaneously'.
+local function force_demote(instance)
+    t.helpers.retrying({}, function()
+        assert(instance:exec(function()
+            box.ctl.demote()
+            return true
+        end))
+    end)
+end
 
 --
 -- This group's test cases leave instances in a valid state after which they can
@@ -155,12 +167,18 @@ end
 --
 g.test_read_only_reason_election_has_leader = function(g)
     g.master:exec(function()
-        box.cfg{election_mode = 'candidate'}
+        box.cfg{
+            election_mode = 'candidate',
+            replication_synchro_quorum = 2,
+        }
+    end)
+    g.replica:exec(function()
+        box.cfg{election_mode = 'voter'}
     end)
     g.master:wait_election_leader()
     g.replica:wait_election_leader_found()
+
     local ok, err = g.replica:exec(function()
-        box.cfg{election_mode = 'voter'}
         local ok, err = pcall(box.schema.create_space, 'test')
         return ok, err:unpack()
     end)
@@ -184,11 +202,12 @@ g.test_read_only_reason_election_has_leader = function(g)
     -- Cleanup.
     g.master:exec(function()
         box.cfg{election_mode = 'off'}
-        box.ctl.demote()
     end)
-    g.replica:exec(function()
+    force_demote(g.master)
+    g.replica:exec(function(wait_timeout)
         box.cfg{election_mode = 'off'}
-    end)
+        box.ctl.wait_rw(wait_timeout)
+    end, {wait_timeout})
 end
 
 --
@@ -196,6 +215,10 @@ end
 --
 g.test_read_only_reason_synchro = function(g)
     g.master:exec(function()
+        box.cfg{
+            replication_synchro_quorum = 2,
+            replication_synchro_timeout = 1000000,
+        }
         box.ctl.promote()
     end)
 
@@ -226,9 +249,10 @@ g.test_read_only_reason_synchro = function(g)
     }, 'reason is synchro, has owner')
 
     -- Cleanup.
-    g.master:exec(function()
-        box.ctl.demote()
-    end)
+    force_demote(g.master)
+    g.replica:exec(function(wait_timeout)
+        box.ctl.wait_rw(wait_timeout)
+    end, {wait_timeout})
 end
 
 --
@@ -248,7 +272,10 @@ g.test_read_only_reason_election_has_leader_no_uuid = function(g)
         box.cfg{election_mode = 'voter'}
     end)
     g.master:exec(function()
-        box.cfg{election_mode = 'candidate'}
+        box.cfg{
+            election_mode = 'candidate',
+            replication_synchro_quorum = 2
+        }
     end)
     g.master:wait_election_leader()
     g.replica:wait_election_leader_found()
@@ -292,6 +319,10 @@ end
 --
 g.test_read_only_reason_synchro_no_uuid = function(g)
     g.master:exec(function()
+        box.cfg{
+            replication_synchro_quorum = 2,
+            replication_synchro_timeout = 1000000,
+        }
         box.ctl.promote()
         box.space._cluster:run_triggers(false)
         box.space._cluster:delete{box.info.id}
