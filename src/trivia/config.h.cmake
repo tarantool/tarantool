@@ -261,6 +261,7 @@
 #cmakedefine EXPORT_LIBCURL_SYMBOLS 1
 
 #cmakedefine EMBED_LUAZLIB 1
+#cmakedefine EMBED_LUAROCKS 1
 
 /*
  * vim: syntax=c

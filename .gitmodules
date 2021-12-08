@@ -31,6 +31,7 @@
 	path = third_party/luarocks
 	url = https://github.com/tarantool/luarocks.git
 	branch = luarocks-3.1.1-tarantool
+	ignore = dirty
 [submodule "third_party/decNumber"]
 	path = third_party/decNumber
 	url = https://github.com/tarantool/decNumber.git

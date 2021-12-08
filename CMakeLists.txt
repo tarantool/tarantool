@@ -362,6 +362,7 @@ find_package_message(MODULE_LIBPATH "Lua package.cpath: ${MODULE_LIBPATH}"
 ##
 
 set(EMBED_LUAZLIB ${BUILD_STATIC})
+set(EMBED_LUAROCKS ${BUILD_STATIC})
 
 #
 # Since we *optionally* build bundled libs, a direct build
