@@ -38,7 +38,7 @@ macro(set_source_files_compile_flags)
 endmacro(set_source_files_compile_flags)
 
 # A helper function to compile *.lua source into *.lua.c sources
-function(lua_source varname filename)
+function(lua_source varname filename symbolname)
     if (IS_ABSOLUTE "${filename}")
             string (REPLACE "${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}"
             genname "${filename}")
@@ -50,7 +50,6 @@ function(lua_source varname filename)
         set (tmpfile "${CMAKE_CURRENT_BINARY_DIR}/${filename}.new.c")
         set (dstfile "${CMAKE_CURRENT_BINARY_DIR}/${filename}.c")
     endif(IS_ABSOLUTE "${filename}")
-    get_filename_component(module ${filename} NAME_WE)
     get_filename_component(_name ${dstfile} NAME)
     string(REGEX REPLACE "${_name}$" "" dstdir ${dstfile})
     if (IS_DIRECTORY ${dstdir})
@@ -59,7 +58,7 @@ function(lua_source varname filename)
     endif()
 
     ADD_CUSTOM_COMMAND(OUTPUT ${dstfile}
-        COMMAND ${ECHO} 'const char ${module}_lua[] =' > ${tmpfile}
+        COMMAND ${ECHO} 'const char ${symbolname}[] =' > ${tmpfile}
         COMMAND ${PROJECT_BINARY_DIR}/extra/txt2c ${srcfile} >> ${tmpfile}
         COMMAND ${ECHO} '\;' >> ${tmpfile}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${tmpfile} ${dstfile}
@@ -70,16 +69,15 @@ function(lua_source varname filename)
     set(${varname} ${var} ${dstfile} PARENT_SCOPE)
 endfunction()
 
-function(bin_source varname srcfile dstfile)
+function(bin_source varname srcfile dstfile symbolname)
     set(var ${${varname}})
     set (srcfile "${CMAKE_CURRENT_SOURCE_DIR}/${srcfile}")
     set (dstfile "${CMAKE_CURRENT_BINARY_DIR}/${dstfile}")
     set(${varname} ${var} "${dstfile}" PARENT_SCOPE)
     set (tmpfile "${dstfile}.tmp")
-    get_filename_component(module ${dstfile} NAME_WE)
 
     ADD_CUSTOM_COMMAND(OUTPUT ${dstfile}
-        COMMAND ${ECHO} 'const unsigned char ${module}_bin[] = {' > ${tmpfile}
+        COMMAND ${ECHO} 'const unsigned char ${symbolname}[] = {' > ${tmpfile}
         COMMAND ${PROJECT_BINARY_DIR}/extra/bin2c "${srcfile}" >> ${tmpfile}
         COMMAND ${ECHO} '}\;' >> ${tmpfile}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${tmpfile} ${dstfile}
