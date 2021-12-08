@@ -29,6 +29,100 @@ local LUA_TEMPLATES = { '?.lua', '?/init.lua' }
 local ROCKS_LIB_TEMPLATES = { ROCKS_LIB_PATH .. '/?.'..soext }
 local ROCKS_LUA_TEMPLATES = { ROCKS_LUA_PATH .. '/?.lua', ROCKS_LUA_PATH .. '/?/init.lua' }
 
+local function get_stack()
+    local info = debug.getinfo(2)
+    local stack = {}
+    local i = 2
+    while info ~= nil do
+        stack[i] = info
+        i = i + 1
+        info = debug.getinfo(i)
+    end
+    return stack
+end
+
+local function print_stack(stack)
+    for _, v in pairs(stack) do
+        print(string.format("[%s]:%d, %s, %d, nup = %d", v.short_src, v.currentline, v.name, v.linedefined, v.nups))
+    end
+end
+
+local function get_require_overload_num(stack)
+    local result = 0
+    for _, v in pairs(stack) do
+        if nil ~= v.name and nil ~= string.find(v.name, "wrapper_e6c2bafc7d0611ec8008db177bebd1df") then
+            return result + 1
+        end
+        result = result + 1
+    end
+    return 0
+end
+
+old_require = require
+local function remove_root_directory(path)
+    local cur_dir = os.getenv("PWD") .. '/'
+   local start_len = #path
+
+    while #cur_dir > 0 and start_len == #path do
+        if cur_dir == '/' then
+            if path:sub(1, 1) == '/' then
+                path = path:sub(2)
+            end
+            break
+        end
+        path = path:gsub(cur_dir, '')
+        local ind= cur_dir:find('[^/]+/$')
+        cur_dir = cur_dir:sub(1,ind - 1)
+    end
+    return path
+end
+
+
+local function module_name_form_filename(filename)
+    local pathes = package.path .. package.cpath
+    local result = filename
+    result = result:gsub('builtin/', '')
+
+    for path in  pathes:gmatch'/([A-Za-z\\/\\.0-9]+)\\?' do
+        result = result:gsub('/' .. path, '');
+    end
+
+    result = result:gsub('/init.lua', '');
+    result = result:gsub('%.lua', '');
+
+    result = remove_root_directory(result)
+    result = result:gsub(ROCKS_LIB_PATH .. '/', '');
+    result = result:gsub(ROCKS_LUA_PATH .. '/', '');
+    result = result:gsub('/', '.');
+    return result
+end
+
+local function module_name_by_func(func_level)
+    local debug = debug or old_require('debug')
+    local src_name = debug.getinfo(func_level + 1).source
+    src_name = src_name:sub(2)
+    return module_name_form_filename(src_name)
+end
+
+local function wrapper_e6c2bafc7d0611ec8008db177bebd1df()
+    return require('log.internal')
+end
+
+require = function(modname)
+    if modname == 'log' then
+        local log = old_require(modname)
+        local stack_int = wrapper_e6c2bafc7d0611ec8008db177bebd1df()
+        local overload_num = get_require_overload_num(stack_int)
+        log:new(module_name_by_func(2 + overload_num))
+        return table.copy(log)
+    end
+    if modname == 'log.internal' then
+        return get_stack()
+    end
+    return old_require(modname)
+end
+
+
 local package_searchroot
 
 local function searchroot()

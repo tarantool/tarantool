@@ -52,13 +52,14 @@ parse_syslog_opts(const char *input)
 
 static int
 format_func_custom(struct log *log, char *buf, int len, int level,
-		   const char *filename, int line, const char *error,
-		   const char *format, va_list ap)
+           const char* module_name, const char *filename, int line,
+           const char *error, const char *format, va_list ap)
 {
 	int total = 0;
 	(void) log;
 	(void) level;
 	(void) filename;
+	(void) module_name;
 	(void) line;
 	(void) error;
 	SNPRINT(total, snprintf, buf, len, "\"msg\" = \"");
@@ -211,11 +212,11 @@ int main()
 	struct log test_log;
 	log_create(&test_log, tmp_filename, false);
 	log_set_format(&test_log, say_format_plain);
-	log_say(&test_log, 0, NULL, 0, NULL, "hello %s\n", "user");
+	log_say(&test_log, 0, NULL, NULL, 0, NULL, "hello %s\n", "user");
 	log_set_format(&test_log, say_format_json);
-	log_say(&test_log, 0, NULL, 0, NULL, "hello %s", "user");
+	log_say(&test_log, 0, NULL, NULL, 0, NULL, "hello %s", "user");
 	log_set_format(&test_log, format_func_custom);
-	log_say(&test_log, 0, NULL, 0, NULL, "hello %s", "user");
+	log_say(&test_log, 0, NULL, NULL, 0, NULL, "hello %s", "user");
 
 	FILE* fd = fopen(tmp_filename, "r+");
 	const size_t len = 4096;
@@ -262,7 +263,7 @@ int main()
 	ok(test_log.syslog_facility == SYSLOG_LOCAL0, "parsed facility");
 	long before = ftell(fd);
 	ok(before >= 0, "ftell");
-	ok(log_say(&test_log, 0, NULL, 0, NULL, "hello %s", "user") > 0, "log_say");
+	ok(log_say(&test_log, 0, NULL, NULL, 0, NULL, "hello %s", "user") > 0, "log_say");
 	ok(fseek(fd, before, SEEK_SET) >= 0, "fseek");
 
 	if (fgets(line, len, fd) != NULL) {

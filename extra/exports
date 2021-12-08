@@ -385,6 +385,7 @@ say_logrotate
 say_parse_logger_type
 say_set_log_format
 say_set_log_level
+say_with_module
 SHA1internal
 space_bsize
 space_by_id
