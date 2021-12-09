@@ -83,6 +83,16 @@ tuple_format_cmp(const struct tuple_format *format1,
 	if (a->total_field_count != b->total_field_count)
 		return a->total_field_count - b->total_field_count;
 
+	if (a->constraint_count != b->constraint_count)
+		return (int)a->constraint_count - (int)b->constraint_count;
+	for (uint32_t i = 0; i < a->constraint_count; i++) {
+		int tmp = tuple_constraint_cmp(&a->constraint[i],
+					       &b->constraint[i],
+					       false);
+		if (tmp != 0)
+			return tmp;
+	}
+
 	struct tuple_field *field_a;
 	json_tree_foreach_entry_preorder(field_a, &a->fields.root,
 					 struct tuple_field, token) {
@@ -450,9 +460,11 @@ tuple_format_use_key_part(struct tuple_format *format, uint32_t field_count,
  * definitions.
  */
 static int
-tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
+tuple_format_create(struct tuple_format *format, struct key_def *const *keys,
 		    uint16_t key_count, const struct field_def *fields,
-		    uint32_t field_count)
+		    uint32_t field_count,
+		    struct tuple_constraint_def *constraint_def,
+		    uint32_t constraint_count)
 {
 	format->min_field_count =
 		tuple_format_min_field_count(keys, key_count, fields,
@@ -574,6 +586,10 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 			bit_set(required_fields, field->id);
 	}
 out:
+	format->constraint_count = constraint_count;
+	format->constraint = tuple_constraint_array_new(constraint_def,
+							constraint_count);
+
 	format->hash = tuple_format_hash(format);
 	return 0;
 }
@@ -708,6 +724,8 @@ tuple_format_alloc(struct key_def * const *keys, uint16_t key_count,
 	format->exact_field_count = 0;
 	format->min_field_count = 0;
 	format->epoch = 0;
+	format->constraint_count = 0;
+	format->constraint = NULL;
 	return format;
 error:
 	tuple_format_destroy_fields(format);
@@ -722,6 +740,7 @@ tuple_format_destroy(struct tuple_format *format)
 	free(format->required_fields);
 	tuple_format_destroy_fields(format);
 	tuple_dictionary_unref(format->dict);
+	free(format->constraint);
 }
 
 /**
@@ -783,7 +802,8 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 		 const struct field_def *space_fields,
 		 uint32_t space_field_count, uint32_t exact_field_count,
 		 struct tuple_dictionary *dict, bool is_temporary,
-		 bool is_reusable)
+		 bool is_reusable, struct tuple_constraint_def *constraint_def,
+		 uint32_t constraint_count)
 {
 	struct tuple_format *format =
 		tuple_format_alloc(keys, key_count, space_field_count, dict);
@@ -801,7 +821,8 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 	format->exact_field_count = exact_field_count;
 	format->epoch = ++formats_epoch;
 	if (tuple_format_create(format, keys, key_count, space_fields,
-				space_field_count) < 0)
+				space_field_count,
+				constraint_def, constraint_count) < 0)
 		goto err;
 	if (is_reusable && tuple_format_reuse(&format))
 		return format;
@@ -872,6 +893,14 @@ tuple_format1_can_store_format2_tuples(struct tuple_format *format1,
 {
 	if (format1->exact_field_count != format2->exact_field_count)
 		return false;
+	/* Check constraints compatibility. */
+	if (!tuple_constraints1_can_store_constraints2_tuples(
+		format1->constraint,
+		format1->constraint_count,
+		format2->constraint,
+		format2->constraint_count))
+		return false;
+
 	struct tuple_field *field1;
 	json_tree_foreach_entry_preorder(field1, &format1->fields.root,
 					 struct tuple_field, token) {
@@ -933,6 +962,24 @@ tuple_field_check_constraint(const struct tuple_field *field,
 	for (uint32_t i = 0; i < field->constraint_count; i++) {
 		struct tuple_constraint *c = &field->constraint[i];
 		if (c->check(c, mp_data, mp_data_end, field) != 0)
+			return -1;
+	}
+	return 0;
+}
+
+/**
+ * Check whole tuple constraints. Note that field constraints are not checked.
+ */
+static int
+tuple_check_constraint(const struct tuple_format *format, const char *mp_data)
+{
+	if (format->constraint_count == 0)
+		return 0;
+	const char *mp_data_end = mp_data;
+	mp_next(&mp_data_end);
+	for (uint32_t i = 0; i < format->constraint_count; i++) {
+		struct tuple_constraint *c = &format->constraint[i];
+		if (c->check(c, mp_data, mp_data_end, NULL) != 0)
 			return -1;
 	}
 	return 0;
@@ -1016,6 +1063,10 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
 	if (field_map_builder_create(builder, format->field_map_size,
 				     region) != 0)
 		return -1;
+
+	if (tuple_check_constraint(format, tuple) != 0)
+		return -1;
+
 	if (tuple_format_field_count(format) == 0)
 		return 0; /* Nothing to initialize */
 

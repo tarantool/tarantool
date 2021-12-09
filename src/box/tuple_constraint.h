@@ -19,6 +19,9 @@ struct space;
 
 /**
  * Type of constraint check function.
+ * The check can be done for fields (@a field != NULL, mp_data points to field
+ * msgpack) and for entire tuples (@a field == NULL, mp_data points to
+ * msgpack array of the tuple)
  * Must return 0 if constraint passed. Must set diag otherwise.
  */
 typedef int

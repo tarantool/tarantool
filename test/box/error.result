@@ -454,6 +454,7 @@ t;
  |   233: box.error.TUPLE_FIELD_COUNT_LIMIT
  |   234: box.error.CREATE_CONSTRAINT
  |   235: box.error.FIELD_CONSTRAINT_FAILED
+ |   236: box.error.TUPLE_CONSTRAINT_FAILED
  | ...
 
 test_run:cmd("setopt delimiter ''");
