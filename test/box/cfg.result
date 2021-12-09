@@ -638,7 +638,7 @@ test_run:cmd("start server cfg_tester6")
  | ---
  | - true
  | ...
-test_run:grep_log('cfg_tester6', 'set \'vinyl_memory\' configuration option to 1073741824', 1000)
+test_run:grep_log('cfg_tester6', 'set \'vinyl_memory\' configuration option to 1073741824')
  | ---
  | - set 'vinyl_memory' configuration option to 1073741824
  | ...
@@ -663,12 +663,12 @@ test_run:cmd("start server cfg_tester7")
  | - true
  | ...
 -- test there is replication log in log
-test_run:grep_log('cfg_tester7', 'set \'replication\' configuration option to', 1000)
+test_run:grep_log('cfg_tester7', 'set \'replication\' configuration option to')
  | ---
  | - set 'replication' configuration option to
  | ...
 -- test there is no password in log
-test_run:grep_log('cfg_tester7', 'test%-cluster%-cookie', 1000)
+test_run:grep_log('cfg_tester7', 'test%-cluster%-cookie')
  | ---
  | - null
  | ...
@@ -696,7 +696,7 @@ test_run:cmd("start server cfg_tester8")
 version_warning = "Please, consider using box.schema.upgrade()."
  | ---
  | ...
-test_run:wait_log('cfg_tester8', version_warning, 1000, 1.0) ~= nil
+test_run:wait_log('cfg_tester8', version_warning, nil, 1.0) ~= nil
  | ---
  | - true
  | ...
@@ -718,7 +718,7 @@ test_run:cmd("start server cfg_tester9")
  | - true
  | ...
 --- Check that the warning isn't printed.
-test_run:wait_log('cfg_tester9', version_warning, 1000, 1.0) == nil
+test_run:wait_log('cfg_tester9', version_warning, nil, 1.0) == nil
  | ---
  | - true
  | ...
