@@ -77,6 +77,7 @@ set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 include_directories(${ZSTD_INCLUDE_DIRS})
 include_directories(${PROJECT_BINARY_DIR}/src/box/sql)
 include_directories(${PROJECT_BINARY_DIR}/src/box)
+include_directories(${EXTRA_BOX_INCLUDE_DIRS})
 
 add_library(box_error STATIC error.cc errcode.c mp_error.cc)
 target_link_libraries(box_error core stat mpstream vclock)
@@ -112,7 +113,7 @@ target_link_libraries(tuple json box_error core ${MSGPUCK_LIBRARIES} ${ICU_LIBRA
 add_library(xlog STATIC xlog.c)
 target_link_libraries(xlog core box_error crc32 ${ZSTD_LIBRARIES})
 
-add_library(box STATIC
+set(box_sources
     allocator.cc
     memtx_allocator.cc
     msgpack.c
@@ -220,6 +221,14 @@ add_library(box STATIC
     lua/merger.c
     lua/watcher.c
     ${bin_sources})
+
+if(ENABLE_AUDIT_LOG)
+    list(APPEND box_sources ${AUDIT_LOG_SOURCES})
+else()
+    list(APPEND box_sources audit.c)
+endif()
+
+add_library(box STATIC ${box_sources})
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_definitions(-DSQL_DEBUG=1)

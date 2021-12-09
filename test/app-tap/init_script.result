@@ -3,6 +3,7 @@
 --
 
 box.cfg
+audit_nonblock:true
 background:false
 checkpoint_count:2
 checkpoint_interval:3600
