@@ -1341,10 +1341,10 @@ log.info(string.rep('a', 1000))
 _ = fiber.create(long_poll)
 ---
 ...
-while not test_run:grep_log('default', 'can not allocate memory for a new message', 1000) do fiber.sleep(0.01) end
+while not test_run:grep_log('default', 'can not allocate memory for a new message') do fiber.sleep(0.01) end
 ---
 ...
-test_run:grep_log('default', 'stopping input on connection', 1000) ~= nil
+test_run:grep_log('default', 'stopping input on connection') ~= nil
 ---
 - true
 ...

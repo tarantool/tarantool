@@ -62,7 +62,7 @@ w:unregister()
 
 -- Raising error from a callback.
 w = conn:watch('foobar', function() error('foobar') end)
-test_run:wait_log('default', 'foobar', 1000)
+test_run:wait_log('default', 'foobar')
 w:unregister()
 
 -- Broadcasting data that can't be encoded in msgpack.
