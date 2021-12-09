@@ -36,6 +36,7 @@
 #include "msgpuck.h"
 #include "tt_static.h"
 #include "tuple_constraint_def.h"
+#include "tuple_format.h"
 
 const struct space_opts space_opts_default = {
 	/* .group_id = */ 0,
@@ -82,6 +83,17 @@ space_def_sizeof(uint32_t name_len, const struct field_def *fields,
 	*def_expr_offset = small_align(*names_offset + field_strs_size,
 				       alignof(uint64_t));
 	return *def_expr_offset + def_exprs_size;
+}
+
+struct tuple_format *
+space_tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
+		       struct key_def *const *keys, uint16_t key_count,
+		       const struct space_def *def)
+{
+	return tuple_format_new(vtab, engine, keys, key_count,
+				def->fields, def->field_count,
+				def->exact_field_count, def->dict,
+				def->opts.is_temporary, def->opts.is_ephemeral);
 }
 
 /**

@@ -202,7 +202,7 @@ create_test_mem(struct key_def *def)
 {
 	/* Create format */
 	struct tuple_format *format;
-	format = vy_stmt_format_new(&stmt_env, &def, 1, NULL, 0, 0, NULL);
+	format = vy_simple_stmt_format_new(&stmt_env, &def, 1);
 	fail_if(format == NULL);
 
 	/* Create mem */
@@ -219,7 +219,7 @@ create_test_cache(uint32_t *fields, uint32_t *types,
 	*def = box_key_def_new(fields, types, key_cnt);
 	assert(*def != NULL);
 	vy_cache_create(cache, &cache_env, *def, true);
-	*format = vy_stmt_format_new(&stmt_env, def, 1, NULL, 0, 0, NULL);
+	*format = vy_simple_stmt_format_new(&stmt_env, def, 1);
 	tuple_format_ref(*format);
 }
 

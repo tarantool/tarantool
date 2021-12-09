@@ -593,6 +593,15 @@ vinyl_engine_check_space_def(struct space_def *def)
 	return 0;
 }
 
+/** Create a vinyl space statement format. */
+static struct tuple_format *
+vy_space_stmt_format_new(struct vy_stmt_env *env, struct key_def *const *keys,
+			 uint16_t key_count, struct space_def *space_def)
+{
+	return space_tuple_format_new(&env->tuple_format_vtab,
+				      env, keys, key_count, space_def);
+}
+
 static struct space *
 vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 			  struct rlist *key_list)
@@ -624,9 +633,7 @@ vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 		keys[key_count++] = index_def->key_def;
 
 	struct tuple_format *format;
-	format = vy_stmt_format_new(&env->stmt_env, keys, key_count,
-				    def->fields, def->field_count,
-				    def->exact_field_count, def->dict);
+	format = vy_space_stmt_format_new(&env->stmt_env, keys, key_count, def);
 	if (format == NULL) {
 		free(space);
 		return NULL;

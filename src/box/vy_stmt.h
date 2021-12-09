@@ -94,12 +94,10 @@ vy_stmt_env_create(struct vy_stmt_env *env);
 void
 vy_stmt_env_destroy(struct vy_stmt_env *env);
 
-/** Create a vinyl statement format. */
+/** Create a simple vinyl statement format. */
 struct tuple_format *
-vy_stmt_format_new(struct vy_stmt_env *env, struct key_def *const *keys,
-		   uint16_t key_count, const struct field_def *fields,
-		   uint32_t field_count, uint32_t exact_field_count,
-		   struct tuple_dictionary *dict);
+vy_simple_stmt_format_new(struct vy_stmt_env *env,
+			  struct key_def *const *keys, uint16_t key_count);
 
 /** Statement flags. */
 enum {

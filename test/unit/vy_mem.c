@@ -80,8 +80,8 @@ test_iterator_restore_after_insertion()
 	assert(key_def != NULL);
 
 	/* Create format */
-	struct tuple_format *format = vy_stmt_format_new(&stmt_env, &key_def, 1,
-							 NULL, 0, 0, NULL);
+	struct tuple_format *
+		format = vy_simple_stmt_format_new(&stmt_env, &key_def, 1);
 	assert(format != NULL);
 	tuple_format_ref(format);
 
