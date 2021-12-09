@@ -111,6 +111,7 @@ authenticate(const char *user_name, uint32_t len, const char *salt,
 			struct user *user = user_by_id(uid);
 			if (user != NULL) {
 				credentials_reset(&session->credentials, user);
+				session->credentials.universal_access |= PRIV_U;
 				return;
 			}
 		}
