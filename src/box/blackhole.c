@@ -153,10 +153,8 @@ blackhole_engine_create_space(struct engine *engine, struct space_def *def,
 
 	/* Allocate tuples on runtime arena, but check space format. */
 	struct tuple_format *format;
-	format = tuple_format_new(&tuple_format_runtime->vtab, NULL, NULL, 0,
-				  def->fields, def->field_count,
-				  def->exact_field_count, def->dict, false,
-				  false);
+	format = space_tuple_format_new(&tuple_format_runtime->vtab,
+					NULL, NULL, 0, def);
 	if (format == NULL) {
 		free(space);
 		return NULL;

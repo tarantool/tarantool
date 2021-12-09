@@ -907,7 +907,7 @@ tuple_format1_can_store_format2_tuples(struct tuple_format *format1,
 		    !tuple_field_is_nullable(field1))
 			return false;
 
-		/* Check constraints compatibility. */
+		/* Check field constraints compatibility. */
 		if (!tuple_constraints1_can_store_constraints2_tuples(
 			field1->constraint, field1->constraint_count,
 			field2->constraint, field2->constraint_count))

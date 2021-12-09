@@ -1466,10 +1466,8 @@ memtx_space_new(struct memtx_engine *memtx,
 		return NULL;
 	}
 	struct tuple_format *format =
-		tuple_format_new(&memtx_tuple_format_vtab, memtx, keys, key_count,
-				 def->fields, def->field_count,
-				 def->exact_field_count, def->dict,
-				 def->opts.is_temporary, def->opts.is_ephemeral);
+		space_tuple_format_new(&memtx_tuple_format_vtab,
+				       memtx, keys, key_count, def);
 	if (format == NULL) {
 		free(memtx_space);
 		return NULL;

@@ -210,6 +210,22 @@ space_def_sizeof(uint32_t name_len, const struct field_def *fields,
 		 uint32_t field_count, uint32_t *names_offset,
 		 uint32_t *fields_offset, uint32_t *def_expr_offset);
 
+struct tuple_format;
+struct tuple_format_vtab;
+struct key_def;
+/**
+ * Convenient @sa tuple_format_new helper.
+ * @param vtab Virtual function table for specific engines.
+ * @param engine Pointer to storage engine.
+ * @param keys Array of key_defs of a space.
+ * @param key_count The number of keys in @a keys array.
+ * @param def Source of the rest tuple_format_new arguments
+ */
+struct tuple_format *
+space_tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
+		       struct key_def *const *keys, uint16_t key_count,
+		       const struct space_def *def);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

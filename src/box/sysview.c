@@ -544,10 +544,7 @@ sysview_engine_create_space(struct engine *engine, struct space_def *def,
 		return NULL;
 	}
 	struct tuple_format *format =
-		tuple_format_new(NULL, NULL, keys, key_count, def->fields,
-				 def->field_count, def->exact_field_count,
-				 def->dict, def->opts.is_temporary,
-				 def->opts.is_ephemeral);
+		space_tuple_format_new(NULL, NULL, keys, key_count, def);
 	if (format == NULL) {
 		free(space);
 		return NULL;
