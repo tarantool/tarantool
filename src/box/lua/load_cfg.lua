@@ -67,6 +67,9 @@ local default_cfg = {
     -- a separate log module; they are
     -- 'log_' prefixed
 
+    audit_log           = nil,
+    audit_nonblock      = true,
+
     io_collect_interval = nil,
     readahead           = 16320,
     snap_io_rate_limit  = nil, -- no limit
@@ -173,6 +176,9 @@ local template_cfg = {
     log_nonblock        = 'module',
     log_level           = 'module',
     log_format          = 'module',
+
+    audit_log           = 'string',
+    audit_nonblock      = 'boolean',
 
     io_collect_interval = 'number',
     readahead           = 'number',

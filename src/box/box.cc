@@ -82,6 +82,7 @@
 #include "msgpack.h"
 #include "raft.h"
 #include "watcher.h"
+#include "audit.h"
 #include "trivia/util.h"
 #include "version.h"
 
@@ -3174,6 +3175,7 @@ box_free(void)
 		gc_free();
 		engine_shutdown();
 		wal_free();
+		audit_log_free();
 		sql_built_in_functions_cache_free();
 	}
 }
@@ -3737,6 +3739,8 @@ box_cfg_xc(void)
 
 	/* Follow replica */
 	replicaset_follow();
+
+	audit_log_init(cfg_gets("audit_log"), cfg_geti("audit_nonblock"));
 
 	fiber_gc();
 	is_box_configured = true;
