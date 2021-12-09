@@ -49,6 +49,7 @@ extern "C" {
 #include "box/schema.h"
 #include "box/user_def.h"
 #include "box/tuple.h"
+#include "box/tuple_constraint.h"
 #include "box/txn.h"
 #include "box/sequence.h"
 #include "box/coll_id_cache.h"
@@ -231,6 +232,30 @@ lbox_push_ck_constraint(struct lua_State *L, struct space *space, int i)
 		lua_setfield(L, -2, ck_constraint->def->name);
 	}
 	lua_pop(L, 1);
+}
+
+/**
+ * Create constraint field in lua space object, given by index i in lua stack.
+ * If the space has no constraints, there will be no constraint field.
+ */
+static void
+lbox_push_space_constraint(struct lua_State *L, struct space *space, int i)
+{
+	assert(i >= 0);
+	struct tuple_format *fmt = space->format;
+	if (fmt->constraint_count == 0) {
+		/* No constraints - no field. */
+		lua_pushnil(L);
+		lua_setfield(L, i, "constraint");
+		return;
+	}
+
+	lua_newtable(L);
+	for (size_t k = 0; k < fmt->constraint_count; k++) {
+		lua_pushnumber(L, fmt->constraint[k].def.func.id);
+		lua_setfield(L, -2, fmt->constraint[k].def.name);
+	}
+	lua_setfield(L, i, "constraint");
 }
 
 /**
@@ -472,6 +497,7 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	lua_pop(L, 1); /* pop the index field */
 
 	lbox_push_ck_constraint(L, space, i);
+	lbox_push_space_constraint(L, space, i);
 
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 	lua_pushstring(L, "schema");

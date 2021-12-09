@@ -97,7 +97,7 @@ tuple_constraint_call_func(const struct tuple_constraint *constr,
 		diag_log();
 		diag_clear(diag_get());
 	}
-	if (rc != 0) {
+	if (rc != 0 && field != NULL) {
 		const char *field_path =
 			tuple_field_path(field, constr->space->format);
 		struct error *e = diag_set(ClientError,
@@ -106,6 +106,11 @@ tuple_constraint_call_func(const struct tuple_constraint *constr,
 		error_set_str(e, "name", constr->def.name);
 		error_set_str(e, "field_path", field_path);
 		error_set_uint(e, "field_id", field->id);
+	} else if (rc != 0) {
+		struct error *e = diag_set(ClientError,
+					   ER_TUPLE_CONSTRAINT_FAILED,
+					   constr->def.name);
+		error_set_str(e, "name", constr->def.name);
 	}
 	return rc;
 }

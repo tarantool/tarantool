@@ -233,7 +233,7 @@ lbox_tuple_format_new(struct lua_State *L)
 		return luaT_error(L);
 	struct tuple_format *format =
 		tuple_format_new(&tuple_format_runtime->vtab, NULL, NULL, 0,
-				 NULL, 0, 0, dict, false, true);
+				 NULL, 0, 0, dict, false, true, NULL, 0);
 	/*
 	 * Since dictionary reference counter is 1 from the
 	 * beginning and after creation of the tuple_format

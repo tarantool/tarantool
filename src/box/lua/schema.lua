@@ -514,6 +514,7 @@ box.schema.space.create = function(name, options)
         temporary = 'boolean',
         is_sync = 'boolean',
         defer_deletes = 'boolean',
+        constraint = 'string, table',
     }
     local options_defaults = {
         engine = 'memtx',
@@ -559,12 +560,14 @@ box.schema.space.create = function(name, options)
     local format = options.format and options.format or {}
     check_param(format, 'format', 'table')
     format = update_format(format)
+    local constraint = normalize_constraint(options.constraint, '')
     -- filter out global parameters from the options array
     local space_options = setmap({
         group_id = options.is_local and 1 or nil,
         temporary = options.temporary and true or nil,
         is_sync = options.is_sync,
         defer_deletes = options.defer_deletes and true or nil,
+        constraint = constraint,
     })
     _space:insert{id, uid, name, options.engine, options.field_count,
         space_options, format}
@@ -659,6 +662,7 @@ local alter_space_template = {
     is_sync = 'boolean',
     defer_deletes = 'boolean',
     name = 'string',
+    constraint = 'string, table',
 }
 
 box.schema.space.alter = function(space_id, options)
@@ -703,6 +707,13 @@ box.schema.space.alter = function(space_id, options)
         format = update_format(options.format)
     else
         format = tuple.format
+    end
+
+    if options.constraint ~= nil then
+        if table.equals(options.constraint, {}) then
+            options.constraint = nil
+        end
+        flags.constraint = normalize_constraint(options.constraint, '')
     end
 
     tuple = tuple:totable()

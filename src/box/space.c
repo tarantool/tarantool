@@ -126,6 +126,13 @@ space_init_constraints(struct space *space)
 {
 	assert(space->def != NULL);
 	struct tuple_format *format = space->format;
+	for (size_t j = 0; j < format->constraint_count; j++) {
+		struct tuple_constraint *constr = &format->constraint[j];
+		if (constr->check != tuple_constraint_noop_check)
+			continue;
+		if (tuple_constraint_func_init(constr, space) != 0)
+			return -1;
+	}
 	for (uint32_t i = 0; i < tuple_format_field_count(format); i++) {
 		struct tuple_field *field = tuple_format_field(format, i);
 		for (size_t j = 0; j < field->constraint_count; j++) {
@@ -146,6 +153,10 @@ static int
 space_cleanup_constraints(struct space *space)
 {
 	struct tuple_format *format = space->format;
+	for (size_t j = 0; j < format->constraint_count; j++) {
+		struct tuple_constraint *constr = &format->constraint[j];
+		constr->destroy(constr);
+	}
 	for (size_t i = 0; i < tuple_format_field_count(format); i++) {
 		struct tuple_field *field = tuple_format_field(format, i);
 		for (size_t j = 0; j < field->constraint_count; j++) {

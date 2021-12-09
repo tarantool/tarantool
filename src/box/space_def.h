@@ -81,6 +81,10 @@ struct space_opts {
 	bool defer_deletes;
 	/** SQL statement that produced this space. */
 	char *sql;
+	/** Array of constraints. Can be NULL if constraints_count == 0. */
+	struct tuple_constraint_def *constraint_def;
+	/** Number of constraints. */
+	uint32_t constraint_count;
 };
 
 extern const struct space_opts space_opts_default;
