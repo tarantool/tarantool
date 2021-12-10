@@ -303,31 +303,31 @@ ExternalProject_Add(tarantool
 )
 
 enable_testing()
-ExternalProject_Get_Property(tarantool binary_dir)
-SET(TARANTOOL_BINARY_DIR ${binary_dir})
+ExternalProject_Get_Property(tarantool install_dir)
+SET(TARANTOOL_BINARY ${install_dir}/bin/tarantool)
 
 add_test(
     NAME check-dependencies
     COMMAND ${CMAKE_COMMAND}
-        -D FILE=${TARANTOOL_BINARY_DIR}/src/tarantool
+        -D FILE=${TARANTOOL_BINARY}
         -P CheckDependencies.cmake
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/test
 )
 
 add_test(
     NAME check-exports
-    COMMAND ${TARANTOOL_BINARY_DIR}/src/tarantool
+    COMMAND ${TARANTOOL_BINARY}
             ${CMAKE_CURRENT_SOURCE_DIR}/test/static-build/exports.test.lua
 )
 
 add_test(
     NAME check-traceback
-    COMMAND ${TARANTOOL_BINARY_DIR}/src/tarantool
+    COMMAND ${TARANTOOL_BINARY}
             ${CMAKE_CURRENT_SOURCE_DIR}/test/static-build/traceback.test.lua
 )
 
 add_test(
     NAME check-luarocks
-    COMMAND ${TARANTOOL_BINARY_DIR}/src/tarantool
+    COMMAND ${TARANTOOL_BINARY}
             ${CMAKE_CURRENT_SOURCE_DIR}/test/static-build/luarocks.test.lua
 )
