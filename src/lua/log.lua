@@ -144,17 +144,19 @@ local log_cfg = {
 -- back. Make sure all required fields
 -- are covered!
 local log2box_keys = {
-    ['log']             = 'log',
-    ['nonblock']        = 'log_nonblock',
-    ['level']           = 'log_level',
-    ['format']          = 'log_format',
+    ['log']                 = 'log',
+    ['nonblock']            = 'log_nonblock',
+    ['print_module_name']   = 'log_print_module_name',
+    ['format']              = 'log_format',
+    ['level']               = 'log_level',
 }
 
 local box2log_keys = {
-    ['log']             = 'log',
-    ['log_nonblock']    = 'nonblock',
-    ['log_level']       = 'level',
-    ['log_format']      = 'format',
+    ['log']                      = 'log',
+    ['log_nonblock']             = 'nonblock',
+    ['log_print_module_name']    = 'print_module_name',
+    ['log_level']                = 'level',
+    ['log_format']               = 'format',
 }
 
 -- Update cfg value(s) in box.cfg instance conditionally
@@ -186,8 +188,9 @@ end
 
 -- Log options which can be set ony once.
 local cfg_static_keys = {
-    log         = true,
-    nonblock    = true,
+    log               = true,
+    nonblock          = true,
+    print_module_name = true,
 }
 
 -- Test if static key is not changed.
@@ -592,6 +595,12 @@ local function load_cfg(self, cfg)
         end
     end
 
+    if cfg.print_module_name ~= nil then
+        if type(cfg.print_module_name) ~= 'boolean' then
+            error("log.cfg: 'print_module_name' option must be 'true' or 'false'")
+        end
+    end
+
     if ffi.C.say_logger_initialized() == true then
         return reload_cfg(cfg)
     end
@@ -599,6 +608,7 @@ local function load_cfg(self, cfg)
     cfg.level = cfg.level or log_cfg.level
     cfg.format = cfg.format or log_cfg.format
     cfg.nonblock = cfg.nonblock or log_cfg.nonblock
+    cfg.print_module_name = cfg.print_module_name or log_cfg.print_module_name
 
     -- nonblock is special: it has to become integer
     -- for ffi call but in config we have to save
@@ -633,6 +643,7 @@ local function load_cfg(self, cfg)
     rawset(log_cfg, 'log', cfg.log)
     rawset(log_cfg, 'level', cfg.level)
     rawset(log_cfg, 'nonblock', nonblock)
+    rawset(log_cfg, 'print_module_name', cfg.print_module_name)
     rawset(log_cfg, 'format', cfg.format)
 
     -- and box.cfg output as well.

@@ -346,7 +346,7 @@ tuple_format = box.internal.new_tuple_format(format)
 -- segfault
 --
 box.cfg{}
-local ffi = require'ffi' ffi.C._say(ffi.C.S_WARN, nil, 0, nil, "%s", "test log")
+local ffi = require'ffi' ffi.C._say(ffi.C.S_WARN, nil, nil, 0, nil, "%s", "test log")
 test_run:grep_log('default', 'test log')
 
 --

@@ -122,7 +122,6 @@ require = function(modname)
     return old_require(modname)
 end
 
-
 local package_searchroot
 
 local function searchroot()
