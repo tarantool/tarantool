@@ -45,9 +45,6 @@ jobs:
 
     runs-on: macos-11
 
-    strategy:
-      fail-fast: false
-
     steps:
       - uses: actions/checkout@v2.3.4
         with:
