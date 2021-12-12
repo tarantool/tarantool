@@ -1,4 +1,4 @@
-name: luacheck
+name: lint
 
 on:
   push:
