@@ -46,9 +46,6 @@ jobs:
 
     runs-on: ubuntu-20.04-self-hosted
 
-    strategy:
-      fail-fast: false
-
     # image built by .gitlab.mk instructions and targets from .travis.mk
     container:
       image: docker.io/tarantool/testing:debian-stretch

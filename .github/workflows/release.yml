@@ -44,9 +44,6 @@ jobs:
 
     runs-on: ubuntu-20.04-self-hosted
 
-    strategy:
-      fail-fast: false
-
     steps:
       # Permissions correction is needed for self-host runners,
       # where work path is saved between different workflows runs.
