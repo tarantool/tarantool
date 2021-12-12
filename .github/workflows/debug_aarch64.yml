@@ -45,9 +45,6 @@ jobs:
 
     runs-on: graviton
 
-    strategy:
-      fail-fast: false
-
     steps:
       - uses: actions/checkout@v1
       - uses: ./.github/actions/environment

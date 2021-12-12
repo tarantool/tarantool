@@ -19,9 +19,6 @@ jobs:
 
     runs-on: perf-sh2
 
-    strategy:
-      fail-fast: false
-
     steps:
       - name: set PATH to GIT of the newer version 2.9.0
         run: echo "/usr/local/git/bin" | tee -a $GITHUB_PATH
