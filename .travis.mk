@@ -329,7 +329,7 @@ build_odroid_arm64:
 	make -j
 
 test_odroid_arm64_no_deps: build_odroid_arm64
-	make LuaJIT-test
+	make test
 
 test_odroid_arm64: deps_odroid_arm64 test_odroid_arm64_no_deps
 
