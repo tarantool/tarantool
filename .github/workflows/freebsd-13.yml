@@ -42,9 +42,6 @@ jobs:
 
     runs-on: freebsd-13-mcs
 
-    strategy:
-      fail-fast: false
-
     steps:
       - uses: actions/checkout@v2
         with:
