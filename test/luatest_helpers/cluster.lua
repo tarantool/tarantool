@@ -128,5 +128,52 @@ function Cluster:exec_on_leader(bootstrap_function)
     return leader:exec(bootstrap_function)
 end
 
+--@TODO should be changed to
+-- server:wait_wal_write_count(wal_write_count + 2)
+-- server:wait_election_term(election_term + 1)
+-- or
+-- server:wait_election_term(leader:election_term())
+-- server:wait_synchro_queue_owner(leader:instance_id())
+-- and moved to Server class
+-- when https://github.com/tarantool/tarantool/issues/6754 will be fixed.
+-- Current workaround is here because order of "term increment" and
+-- "promote" messages is inconsistent. We wait for 2 WAL writes if
+-- term increment arrives first, if promote arrives first we can continue.
+local wait_election = function(server, wal_write_count, election_term)
+    server:wait_wal_write_count(wal_write_count + 1)
+
+    local new_election_term = server:election_term()
+
+    if new_election_term > election_term then
+        server:wait_wal_write_count(wal_write_count + 2)
+    end
+end
+
+-- Promote (func Server.promote())/demote (func is Server.demote()) server and
+-- make sure all servers in cluster recieve the promote/demote messages. This
+-- is usefull when we want to be sure no further communication caused by
+-- promote/demote call will happen.
+function Cluster:elect(server, func)
+    local election_terms = {}
+    local wal_write_counts = {}
+
+    for i, s in ipairs(self.servers) do
+        election_terms[i] = s:election_term()
+        wal_write_counts[i] = s:wal_write_count()
+    end
+    if func(server) then
+        for i, s in ipairs(self.servers) do
+            wait_election(s, wal_write_counts[i], election_terms[i])
+        end
+    end
+end
+
+function Cluster:promote(server)
+    self:elect(server, server.promote)
+end
+
+function Cluster:demote(server)
+    self:elect(server, server.demote)
+end
 
 return Cluster

@@ -128,6 +128,61 @@ function Server:wait_election_leader_found()
                      function() return box.info.election.leader ~= 0 end)
 end
 
+function Server:wait_election_state(state)
+    return wait_cond('election state', self, self.exec, self, function(state)
+        return box.info.election.state == state
+    end, {state})
+end
+
+function Server:wait_election_term(term)
+    return wait_cond('election term', self, self.exec, self, function(term)
+        return box.info.election.term >= term
+    end, {term})
+end
+
+function Server:wait_synchro_queue_owner(id)
+    if id == nil then
+        id = self:instance_id()
+    end
+
+    return wait_cond('synchro queue owner', self, self.exec, self, function(id)
+        return box.info.synchro.queue.owner == id
+    end, {id})
+end
+
+function Server:wait_synchro_queue_owner_found()
+    return wait_cond('synchro queue owner is found', self, self.exec, self,
+                     function() return box.info.synchro.queue.owner ~= 0 end)
+end
+
+function Server:wait_lsn(server, lsn)
+    if lsn == nil then
+        lsn = server:lsn()
+    end
+
+    return wait_cond('wait lsn', self, self.exec, self, function(server, lsn)
+        if lsn == 0 then
+            return true
+        end
+        if box.info.vclock[server] == nil then
+            return false
+        end
+        return box.info.vclock[server] >= lsn
+    end, {server:instance_id(), lsn})
+end
+
+function Server:wait_wal_write_count(count)
+    return wait_cond('wait wal write count', self, self.exec, self, function(count)
+        return box.error.injection.get('ERRINJ_WAL_WRITE_COUNT') >= count
+    end, {count})
+end
+
+function Server:wait_wal_delay()
+    return wait_cond('wait wal delay', self, self.exec, self, function()
+        return box.error.injection.get("ERRINJ_WAL_DELAY")
+    end)
+end
+
 -- Unlike the original luatest.Server function it waits for
 -- starting the server.
 function Server:start(opts)
@@ -168,6 +223,24 @@ function Server:instance_uuid()
     local uuid = self:exec(function() return box.info.uuid end)
     self.instance_uuid_value = uuid
     return uuid
+end
+
+function Server:election_term()
+    return self:exec(function() return box.info.election.term end)
+end
+
+function Server:wal_write_count()
+    return self:exec(function()
+        return box.error.injection.get('ERRINJ_WAL_WRITE_COUNT')
+    end)
+end
+
+function Server:lsn()
+    return self:exec(function() return box.info.lsn end)
+end
+
+function Server:box_config(config)
+    return self:exec(function(config) return box.cfg(config) end, {config})
 end
 
 -- TODO: Add the 'wait_for_readiness' parameter for the restart()
@@ -271,6 +344,64 @@ function Server:grep_log(what, bytes, opts)
     until s == ''
     file:close()
     return found
+end
+
+-- After this function returns server 100% thinks he owns synchro queue.
+-- If actual promotion happened (election term changed) it returns true,
+-- if term didn't change it return false.
+function Server:promote()
+    self:exec(function(delay, timeout)
+        local old_election_term = box.info.election.term
+        local deadline = require('clock').time() + timeout
+        repeat
+            if require('clock').time() > deadline then
+                error(('Promoting server %d timed out'):format(box.info.id))
+            end
+            pcall(box.ctl.promote)
+            require('fiber').sleep(delay)
+        until box.info.synchro.queue.owner == box.info.id
+        return box.info.election.term ~= old_election_term
+    end, {WAIT_DELAY, WAIT_TIMEOUT})
+end
+
+-- After this function returns server 100% thinks he doesn't own synchro queue.
+-- If actual promotion happened (election term changed) it returns true,
+-- if term didn't change it return false.
+function Server:demote()
+    self:exec(function(delay, timeout)
+        local old_election_term = box.info.election.term
+        local deadline = require('clock').time() + timeout
+        repeat
+            if require('clock').time() > deadline then
+                error(('Demoting server %d timed out'):format(box.info.id))
+            end
+            pcall(box.ctl.demote)
+            require('fiber').sleep(delay)
+        until box.info.synchro.queue.owner ~= box.info.id
+        return box.info.election.term ~= old_election_term
+    end, {WAIT_DELAY, WAIT_TIMEOUT})
+end
+
+function Server:promote_start()
+    return self:exec(function()
+        local f = require('fiber').new(box.ctl.promote)
+        f:set_joinable(true)
+        return f:id()
+    end)
+end
+
+function Server:demote_start()
+    return self:exec(function()
+        local f = require('fiber').new(box.ctl.demote)
+        f:set_joinable(true)
+        return f:id()
+    end)
+end
+
+function Server:fiber_join(fiber)
+    return self:exec(function(fiber)
+        return require('fiber').find(fiber):join()
+    end, {fiber})
 end
 
 return Server
