@@ -1,4 +1,4 @@
-## core/feature
+## feature/core
 
 * Previously, if a yield occurs for a transaction that does not
   support it, we roll back all its statements, but still process

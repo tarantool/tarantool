@@ -1,4 +1,4 @@
-##feature/luajit
+## feature/luajit
 
 * Now memory profiler records allocations from traces grouping them by the
   trace number (gh-5814). The memory profiler parser can display the new type
