@@ -55,6 +55,7 @@ extern "C" {
 #include "tt_static.h"
 #include "mp_extension_types.h" /* MP_DECIMAL, MP_UUID */
 #include "tt_uuid.h" /* tt_uuid_to_string(), UUID_STR_LEN */
+#include "lua/msgpack.h"
 
 #define LUAYAML_TAG_PREFIX "tag:yaml.org,2002:"
 
@@ -620,6 +621,8 @@ static int dump_node(struct lua_yaml_dumper *dumper)
    int is_binary = 0;
    char buf[FPCONV_G_FMT_BUFSIZE];
    struct luaL_field field;
+   int rc;
+   const char *data, **pdata = &data;
    bool unused;
    (void) unused;
 
@@ -712,6 +715,13 @@ static int dump_node(struct lua_yaml_dumper *dumper)
          str = field.errorval->errmsg;
          len = strlen(str);
          break;
+      case MP_COMPRESSION:
+         top = lua_gettop(dumper->L);
+         data = field.ttcval->data;
+         luamp_decode(dumper->L, dumper->cfg, pdata);
+         rc = dump_node(dumper);
+         lua_pop(dumper->L, lua_gettop(dumper->L) - top);
+         return rc;
       default:
          assert(0); /* checked by luaL_checkfield() */
       }

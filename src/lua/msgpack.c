@@ -46,6 +46,7 @@
 #include "lua/decimal.h" /* lua_pushdecimal() */
 #include "mp_extension_types.h"
 #include "mp_uuid.h" /* mp_decode_uuid() */
+#include "mp_compression.h"
 
 #include "cord_buf.h"
 #include <fiber.h>
@@ -203,6 +204,9 @@ restart: /* used by MP_EXT of unidentified subtype */
 				goto convert;
 			}
 			return luamp_encode_extension(L, top, stream);
+		case MP_COMPRESSION:
+			mpstream_encode_compression(stream, field->ttcval);
+			break;
 		default:
 			/* Run trigger if type can't be encoded */
 			type = luamp_encode_extension(L, top, stream);
@@ -333,6 +337,20 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 			*data = svp;
 			uuid = mp_decode_uuid(data, uuid);
 			if (uuid == NULL)
+				goto ext_decode_err;
+			return;
+		}
+		case MP_COMPRESSION:
+		{
+			uint32_t size;
+			*data = svp;
+			if (mp_sizeof_for_decompression((data), &size) != 0)
+				goto ext_decode_err;
+			struct tt_compression *ttc =
+				luaL_pushcompression(L, size,
+						     COMPRESSION_TYPE_NONE);
+			ttc = mp_decode_compression(data, ttc);
+			if (ttc == NULL)
 				goto ext_decode_err;
 			return;
 		}

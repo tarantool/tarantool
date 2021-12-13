@@ -52,6 +52,7 @@ lua_source(lua_sources lua/httpc.lua)
 lua_source(lua_sources lua/iconv.lua)
 lua_source(lua_sources lua/swim.lua)
 lua_source(lua_sources lua/datetime.lua)
+lua_source(lua_sources lua/compression.lua)
 
 # LuaJIT jit.* library
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/src/jit/bc.lua)

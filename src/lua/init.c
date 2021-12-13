@@ -83,6 +83,7 @@ bool start_loop = true;
 /* contents of src/lua/ files */
 extern char strict_lua[],
 	uuid_lua[],
+	compression_lua[],
 	msgpackffi_lua[],
 	fun_lua[],
 	crypto_lua[],
@@ -145,6 +146,7 @@ static const char *lua_modules[] = {
 	"buffer", buffer_lua,
 	"string", string_lua,
 	"table", table_lua,
+	"compression", compression_lua,
 	"msgpackffi", msgpackffi_lua,
 	"crypto", crypto_lua,
 	"digest", digest_lua,

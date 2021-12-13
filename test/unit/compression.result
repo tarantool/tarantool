@@ -1,0 +1,379 @@
+1..2
+    1..99
+    ok 1 - calculate compressed data size
+    ok 2 - compression
+    ok 3 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 4 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 5 - subtests
+    ok 6 - calculate decompressed data size
+    ok 7 - decompressed data size
+    ok 8 - decompression
+    ok 9 - compression/decompression
+    ok 10 - calculate compressed data size
+    ok 11 - compression
+    ok 12 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 13 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 14 - subtests
+    ok 15 - calculate decompressed data size
+    ok 16 - decompressed data size
+    ok 17 - decompression
+    ok 18 - compression/decompression
+    ok 19 - calculate compressed data size
+    ok 20 - compression
+    ok 21 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 22 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 23 - subtests
+    ok 24 - calculate decompressed data size
+    ok 25 - decompressed data size
+    ok 26 - decompression
+    ok 27 - compression/decompression
+    ok 28 - calculate compressed data size
+    ok 29 - compression
+    ok 30 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 31 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 32 - subtests
+    ok 33 - calculate decompressed data size
+    ok 34 - decompressed data size
+    ok 35 - decompression
+    ok 36 - compression/decompression
+    ok 37 - calculate compressed data size
+    ok 38 - compression
+    ok 39 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 40 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 41 - subtests
+    ok 42 - calculate decompressed data size
+    ok 43 - decompressed data size
+    ok 44 - decompression
+    ok 45 - compression/decompression
+    ok 46 - calculate compressed data size
+    ok 47 - compression
+    ok 48 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 49 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 50 - subtests
+    ok 51 - calculate decompressed data size
+    ok 52 - decompressed data size
+    ok 53 - decompression
+    ok 54 - compression/decompression
+    ok 55 - calculate compressed data size
+    ok 56 - compression
+    ok 57 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 58 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 59 - subtests
+    ok 60 - calculate decompressed data size
+    ok 61 - decompressed data size
+    ok 62 - decompression
+    ok 63 - compression/decompression
+    ok 64 - calculate compressed data size
+    ok 65 - compression
+    ok 66 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 67 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 68 - subtests
+    ok 69 - calculate decompressed data size
+    ok 70 - decompressed data size
+    ok 71 - decompression
+    ok 72 - compression/decompression
+    ok 73 - calculate compressed data size
+    ok 74 - compression
+    ok 75 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 76 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 77 - subtests
+    ok 78 - calculate decompressed data size
+    ok 79 - decompressed data size
+    ok 80 - decompression
+    ok 81 - compression/decompression
+    ok 82 - calculate compressed data size
+    ok 83 - compression
+    ok 84 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 85 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 86 - subtests
+    ok 87 - calculate decompressed data size
+    ok 88 - decompressed data size
+    ok 89 - decompression
+    ok 90 - compression/decompression
+    ok 91 - calculate compressed data size
+    ok 92 - compression
+    ok 93 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 94 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 95 - subtests
+    ok 96 - calculate decompressed data size
+    ok 97 - decompressed data size
+    ok 98 - decompression
+    ok 99 - compression/decompression
+ok 1 - subtests
+    1..99
+    ok 1 - calculate compressed data size
+    ok 2 - compression
+    ok 3 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 4 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 5 - subtests
+    ok 6 - calculate decompressed data size
+    ok 7 - decompressed data size
+    ok 8 - decompression
+    ok 9 - compression/decompression
+    ok 10 - calculate compressed data size
+    ok 11 - compression
+    ok 12 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 13 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 14 - subtests
+    ok 15 - calculate decompressed data size
+    ok 16 - decompressed data size
+    ok 17 - decompression
+    ok 18 - compression/decompression
+    ok 19 - calculate compressed data size
+    ok 20 - compression
+    ok 21 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 22 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 23 - subtests
+    ok 24 - calculate decompressed data size
+    ok 25 - decompressed data size
+    ok 26 - decompression
+    ok 27 - compression/decompression
+    ok 28 - calculate compressed data size
+    ok 29 - compression
+    ok 30 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 31 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 32 - subtests
+    ok 33 - calculate decompressed data size
+    ok 34 - decompressed data size
+    ok 35 - decompression
+    ok 36 - compression/decompression
+    ok 37 - calculate compressed data size
+    ok 38 - compression
+    ok 39 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 40 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 41 - subtests
+    ok 42 - calculate decompressed data size
+    ok 43 - decompressed data size
+    ok 44 - decompression
+    ok 45 - compression/decompression
+    ok 46 - calculate compressed data size
+    ok 47 - compression
+    ok 48 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 49 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 50 - subtests
+    ok 51 - calculate decompressed data size
+    ok 52 - decompressed data size
+    ok 53 - decompression
+    ok 54 - compression/decompression
+    ok 55 - calculate compressed data size
+    ok 56 - compression
+    ok 57 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 58 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 59 - subtests
+    ok 60 - calculate decompressed data size
+    ok 61 - decompressed data size
+    ok 62 - decompression
+    ok 63 - compression/decompression
+    ok 64 - calculate compressed data size
+    ok 65 - compression
+    ok 66 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 67 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 68 - subtests
+    ok 69 - calculate decompressed data size
+    ok 70 - decompressed data size
+    ok 71 - decompression
+    ok 72 - compression/decompression
+    ok 73 - calculate compressed data size
+    ok 74 - compression
+    ok 75 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 76 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 77 - subtests
+    ok 78 - calculate decompressed data size
+    ok 79 - decompressed data size
+    ok 80 - decompression
+    ok 81 - compression/decompression
+    ok 82 - calculate compressed data size
+    ok 83 - compression
+    ok 84 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 85 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 86 - subtests
+    ok 87 - calculate decompressed data size
+    ok 88 - decompressed data size
+    ok 89 - decompression
+    ok 90 - compression/decompression
+    ok 91 - calculate compressed data size
+    ok 92 - compression
+    ok 93 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 94 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 95 - subtests
+    ok 96 - calculate decompressed data size
+    ok 97 - decompressed data size
+    ok 98 - decompression
+    ok 99 - compression/decompression
+ok 2 - subtests

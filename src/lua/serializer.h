@@ -58,6 +58,7 @@ extern "C" {
 
 struct lua_State;
 struct tt_uuid;
+struct tt_compression;
 
 #define LUAL_SERIALIZER "serializer"
 #define LUAL_SERIALIZE "__serialize"
@@ -225,6 +226,7 @@ struct luaL_field {
 		decimal_t *decval;
 		struct tt_uuid *uuidval;
 		struct error *errorval;
+		struct tt_compression *ttcval;
 	};
 	enum mp_type type;
 	/* subtypes of MP_EXT */

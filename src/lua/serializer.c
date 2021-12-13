@@ -48,6 +48,7 @@
 int luaL_map_metatable_ref = LUA_REFNIL;
 int luaL_array_metatable_ref = LUA_REFNIL;
 extern uint32_t CTID_UUID;
+extern uint32_t CTID_STRUCT_TT_COMPRESSION_REF;
 extern uint32_t CTID_DECIMAL;
 
 /* {{{ luaL_serializer manipulations */
@@ -542,6 +543,10 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 			} else if (cd->ctypeid == CTID_CONST_STRUCT_ERROR_REF) {
 				field->ext_type = MP_ERROR;
 				field->errorval = *(struct error **)cdata;
+			} else if (cd->ctypeid ==
+				   CTID_STRUCT_TT_COMPRESSION_REF) {
+				field->ext_type = MP_COMPRESSION;
+				field->ttcval = *(struct tt_compression **)cdata;
 			} else {
 				field->ext_type = MP_UNKNOWN_EXTENSION;
 			}

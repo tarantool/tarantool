@@ -433,9 +433,11 @@ tnt_dt_year
 tnt_iconv
 tnt_iconv_close
 tnt_iconv_open
+tnt_mp_decode_compression
 tnt_mp_decode_double
 tnt_mp_decode_extl
 tnt_mp_decode_float
+tnt_mp_encode_compression
 tnt_mp_encode_decimal
 tnt_mp_encode_double
 tnt_mp_encode_error
@@ -443,6 +445,9 @@ tnt_mp_encode_float
 tnt_mp_encode_uuid
 tnt_mp_sizeof_decimal
 tnt_mp_sizeof_error
+tnt_mp_sizeof_extl
+tnt_mp_sizeof_for_compression
+tnt_mp_sizeof_for_decompression
 tnt_mp_sizeof_uuid
 tnt_rl_get_screen_size
 tnt_ssl_cert_paths_discover
@@ -456,6 +461,8 @@ tnt_XXH64_copyState
 tnt_XXH64_digest
 tnt_XXH64_reset
 tnt_XXH64_update
+tt_compression_delete
+tt_compression_new
 tt_uuid_bswap
 tt_uuid_compare
 tt_uuid_create
