@@ -48,6 +48,7 @@ static uint32_t CTID_STRUCT_IBUF_PTR;
 uint32_t CTID_CHAR_PTR;
 uint32_t CTID_CONST_CHAR_PTR;
 uint32_t CTID_UUID;
+uint32_t CTID_STRUCT_TT_COMPRESSION_REF;
 uint32_t CTID_DATETIME = 0;
 
 void *
@@ -119,6 +120,43 @@ luaL_pushuuidstr(struct lua_State *L, const struct tt_uuid *uuid)
 	char str[UUID_STR_LEN + 1];
 	tt_uuid_to_string(uuid, str);
 	lua_pushlstring(L, str, UUID_STR_LEN);
+}
+
+static struct tt_compression *
+luaT_check_tt_compression(struct lua_State *L, int idx)
+{
+	if (lua_type(L, idx) != LUA_TCDATA)
+		return NULL;
+
+	uint32_t cdata_type;
+	struct tt_compression **ttc = luaL_checkcdata(L, idx, &cdata_type);
+	if (ttc == NULL || cdata_type != CTID_STRUCT_TT_COMPRESSION_REF)
+		return NULL;
+	return *ttc;
+}
+
+/**
+ * Free tt_compression from Lua code.
+ */
+static int
+tt_compression_gc(struct lua_State *L)
+{
+	struct tt_compression *ttc = luaT_check_tt_compression(L, 1);
+	assert(ttc != NULL);
+	tt_compression_delete(ttc);
+	return 0;
+}
+
+struct tt_compression *
+luaL_pushcompression(struct lua_State *L, uint32_t size,
+		     enum compression_type type)
+{
+	struct tt_compression *ttc = tt_compression_new(size, type);
+	*(struct tt_compression **)
+		luaL_pushcdata(L, CTID_STRUCT_TT_COMPRESSION_REF) = ttc;
+	lua_pushcfunction(L, tt_compression_gc);
+	luaL_setcdatagc(L, -2);
+	return ttc;
 }
 
 int
@@ -736,6 +774,14 @@ tarantool_lua_utils_init(struct lua_State *L)
 	(void) rc;
 	CTID_DATETIME = luaL_ctypeid(L, "struct datetime");
 	assert(CTID_DATETIME != 0);
+
+
+	rc = luaL_cdef(L, "struct tt_compression;");
+	assert(rc == 0);
+	(void)rc;
+	CTID_STRUCT_TT_COMPRESSION_REF =
+		luaL_ctypeid(L, "struct tt_compression&");
+	assert(CTID_STRUCT_TT_COMPRESSION_REF != 0);
 
 	lua_pushcfunction(L, luaT_newthread_wrapper);
 	luaT_newthread_ref = luaL_ref(L, LUA_REGISTRYINDEX);

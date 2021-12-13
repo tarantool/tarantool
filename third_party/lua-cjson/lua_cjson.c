@@ -49,11 +49,12 @@
 
 #include "lua/utils.h"
 #include "lua/serializer.h"
-#include "mp_extension_types.h" /* MP_DECIMAL, MP_UUID */
+#include "mp_extension_types.h" /* MP_DECIMAL, MP_UUID, MP_COMPRESSION */
 #include "diag.h"
 #include "tt_static.h"
 #include "cord_buf.h"
 #include "tt_uuid.h" /* tt_uuid_to_string(), UUID_STR_LEN */
+#include "lua/msgpack.h"
 
 typedef enum {
     T_OBJ_BEGIN,
@@ -377,6 +378,8 @@ static void json_append_object(lua_State *l, struct luaL_serializer *cfg,
 static void json_append_data(lua_State *l, struct luaL_serializer *cfg,
                              int current_depth, strbuf_t *json)
 {
+    int top;
+    const char *data, **pdata = &data;
     struct luaL_field field;
     luaL_checkfield(l, cfg, -1, &field);
     switch (field.type) {
@@ -427,6 +430,13 @@ static void json_append_data(lua_State *l, struct luaL_serializer *cfg,
         case MP_UUID:
             return json_append_string(cfg, json, tt_uuid_str(field.uuidval),
                                       UUID_STR_LEN);
+        case MP_COMPRESSION:
+            top = lua_gettop(l);
+            data = field.ttcval->data;
+            luamp_decode(l, cfg, pdata);
+            json_append_data(l, cfg, current_depth, json);
+            lua_pop(l, lua_gettop(l) - top);
+            return;
         case MP_ERROR:
         {
             const char *str = field.errorval->errmsg;

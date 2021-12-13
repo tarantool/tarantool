@@ -521,6 +521,290 @@ local function test_error(test, s)
     }
 end
 
+local function msgpack_use_cfg(cfg)
+    if not cfg then
+        return msgpack.cfg
+    end
+    local save_cfg = msgpack.cfg
+    for k, v in pairs(cfg) do
+        msgpack.cfg[k] = v
+    end
+    return save_cfg
+end
+
+local function test_compression(test, s)
+    local compression = require('compression')
+    local decimal = require('decimal')
+    local uuid = require('uuid')
+    local yaml = require('yaml')
+    local json = require('json')
+
+    local arr = setmetatable({1, 2, 3, k1 = 'v1', k2 = 'v2', 4, 5},
+        { __serialize = 'seq'})
+    local map = setmetatable({1, 2, 3, 4, 5}, { __serialize = 'map'})
+    local obj = setmetatable({}, {
+        __serialize = function() return 'serialize' end
+    })
+    ffi.cdef[[struct serializer_cdata_test_1 {}]]
+    local ctype = ffi.typeof('struct serializer_cdata_test_1')
+    ffi.metatype(ctype, {
+        __index = {
+            __serialize = function() return 'unpack' end,
+        },
+        __tostring = function() return 'tostring' end
+    });
+    local cdata = ffi.new(ctype)
+    local udata = require('fiber').self()
+
+    local compression_type = {0, 1}
+    -- All test cases from previous tests
+    local msgpack_data = {
+        -- unsigned
+        {0, "cdata"},
+        {0LL, "cdata"},
+        {0ULL, "cdata"},
+        {1, "cdata"},
+        {1LL, "cdata"},
+        {1ULL, "cdata"},
+        {127, "cdata"},
+        {127LL, "cdata"},
+        {127ULL, "cdata"},
+        {128, "cdata"},
+        {128LL, "cdata"},
+        {128ULL, "cdata"},
+        {255, "cdata"},
+        {255LL, "cdata"},
+        {255ULL, "cdata"},
+        {256, "cdata"},
+        {256LL, "cdata"},
+        {256ULL, "cdata"},
+        {65535, "cdata"},
+        {65535LL, "cdata"},
+        {65535ULL, "cdata"},
+        {65536, "cdata"},
+        {65536LL, "cdata"},
+        {65536ULL, "cdata"},
+        {4294967294, "cdata"},
+        {4294967294LL, "cdata"},
+        {4294967294ULL, "cdata"},
+        {4294967295, "cdata"},
+        {4294967295LL, "cdata"},
+        {4294967295ULL, "cdata"},
+        {4294967296, "cdata"},
+        {4294967296LL, "cdata"},
+        {4294967296ULL, "cdata"},
+        {4294967297, "cdata"},
+        {4294967297LL, "cdata"},
+        {4294967297ULL, "cdata"},
+        {99999999999999, "cdata"},
+        {99999999999999LL, "cdata"},
+        {99999999999999ULL, "cdata"},
+        {100000000000000, "cdata"},
+        {100000000000000LL, "cdata"},
+        {100000000000000ULL, "cdata"},
+        {9223372036854775807LL, "cdata"},
+        {9223372036854775807ULL, "cdata"},
+        {9223372036854775808ULL, "cdata"},
+        {9223372036854775809ULL, "cdata"},
+        {18446744073709551614ULL, "cdata"},
+        {18446744073709551615ULL, "cdata"},
+        {-1ULL, "cdata"},
+        {ffi.new('char', 128), 'cdata'},
+        {ffi.new('unsigned short', 128), 'cdata'},
+        {ffi.new('unsigned int', 128), 'cdata'},
+        -- signed
+        {-1, 'cdata'},
+        {-1LL, 'cdata'},
+        {-31, 'cdata'},
+        {-31LL, 'cdata'},
+        {-32, 'cdata'},
+        {-32LL, 'cdata'},
+        {-127, 'cdata'},
+        {-127LL, 'cdata'},
+        {-128, 'cdata'},
+        {-128LL, 'cdata'},
+        {-32767, 'cdata'},
+        {-32767LL, 'cdata'},
+        {-32768, 'cdata'},
+        {-32768LL, 'cdata'},
+        {-2147483647, 'cdata'},
+        {-2147483647LL, 'cdata'},
+        {-2147483648, 'cdata'},
+        {-2147483648LL, 'cdata'},
+        {-99999999999999, "cdata"},
+        {-99999999999999LL, "cdata"},
+        {-100000000000000, "cdata"},
+        {-100000000000000LL, "cdata"},
+        {-9223372036854775806LL, 'cdata'},
+        {-9223372036854775807LL, 'cdata'},
+        {ffi.new('short', -128), 'cdata'},
+        {ffi.new('int', -128), 'cdata'},
+        {-9223372036854775808LL, "cdata"},
+        -- double
+        {-1.1, "cdata"},
+        {3.1415926535898, "cdata"},
+        {-3.1415926535898, "cdata"},
+        {-1e100, "cdata"},
+        {1e100, "cdata"},
+        {ffi.new('float', 123456), "cdata"},
+        {ffi.new('double', 123456), "cdata"},
+        {ffi.new('float', 12.121), "cdata"},
+        {ffi.new('double', 12.121), "cdata"},
+        {0/0, "cdata", {
+            encode_invalid_numbers = true,
+            decode_invalid_numbers = true
+        }},
+        {1/0, "cdata", {
+            encode_invalid_numbers = true,
+            decode_invalid_numbers = true
+        }},
+        -- decimal
+        {decimal.new(1), 'cdata'},
+        {decimal.new('1e37'), 'cdata'},
+        {decimal.new('1e-38'), 'cdata'},
+        {decimal.new('1234567891234567890.0987654321987654321'), 'cdata'},
+        {decimal.new('-1234567891234567890.0987654321987654321'), 'cdata'},
+        -- uuid
+        {uuid.new(), 'cdata'},
+        -- bool
+        {false, 'cdata'},
+        {true, 'cdata'},
+        {ffi.new('bool', true), "cdata"},
+        {ffi.new('bool', false), "cdata"},
+        -- string
+        {"", "cdata"},
+        {"abcde", "cdata"},
+        {"Кудыкины горы", "cdata"},
+        {string.rep("x", 33), "cdata"},
+        {"$a\t $", "cdata"},
+        {[[$a\t $]], "cdata"},
+        {[[$a\\t $]], "cdata"},
+        {s.NULL, "cdata"},
+        -- table
+        {{}, "cdata"},
+        {{1, 2, 3}, "cdata"},
+        {{k1 = 'v1', k2 = 'v2', k3 = 'v3'}, "cdata"},
+        {{['Метапеременная'] = { 'Метазначение' }}, "cdata"},
+        {{test = { 'Результат' }}, "cdata"},
+        {arr, "cdata", {encode_load_metatables = false}},
+        {arr, "cdata", {encode_load_metatables = true}},
+        {map, "cdata", {encode_load_metatables = false}},
+        {map, "cdata", {encode_load_metatables = true}},
+        {obj, "cdata", {encode_load_metatables = false}},
+        {obj, "cdata", {encode_load_metatables = true}},
+        -- error
+        {box.error.new(box.error.ILLEGAL_PARAMS, 'test'), "cdata", {
+            encode_error_as_ext = false, encode_load_metatables = false
+        }},
+        {box.error.new(box.error.ILLEGAL_PARAMS, 'test'), "cdata", {
+            encode_error_as_ext = false, encode_load_metatables = true
+        }},
+        {box.error.new(box.error.ILLEGAL_PARAMS, 'test'), "cdata", {
+            encode_error_as_ext = true, encode_load_metatables = false
+        }},
+        {box.error.new(box.error.ILLEGAL_PARAMS, 'test'), "cdata", {
+            encode_error_as_ext = true, encode_load_metatables = true
+        }},
+    }
+    local msgpack_data_cdata = {
+        -- ucdata
+        {cdata, "cdata", {
+            encode_load_metatables = false, encode_use_tostring = false,
+            encode_invalid_as_nil = false
+        }},
+        {udata, "cdata", {
+            encode_load_metatables = false, encode_use_tostring = false,
+            encode_invalid_as_nil = false
+        }},
+        {cdata, "cdata", {
+            encode_load_metatables = false, encode_use_tostring = false,
+            encode_invalid_as_nil = true
+        }},
+        {udata, "cdata", {
+            encode_load_metatables = false, encode_use_tostring = false,
+            encode_invalid_as_nil = true
+        }},
+        {cdata, "cdata", {
+            encode_load_metatables = false, encode_use_tostring = true,
+            encode_invalid_as_nil = true
+        }},
+        {udata, "cdata", {
+            encode_load_metatables = false, encode_use_tostring = true,
+            encode_invalid_as_nil = true
+        }},
+        {cdata, "cdata", {
+            encode_load_metatables = true, encode_use_tostring = false,
+            encode_invalid_as_nil = false
+        }},
+        {udata, "cdata", {
+            encode_load_metatables = true, encode_use_tostring = false,
+            encode_invalid_as_nil = false
+        }},
+        {cdata, "cdata", {
+            encode_load_metatables = true, encode_use_tostring = false,
+            encode_invalid_as_nil = true
+        }},
+        {udata, "cdata", {
+            encode_load_metatables = true, encode_use_tostring = false,
+            encode_invalid_as_nil = true
+        }},
+        {cdata, "cdata", {
+            encode_load_metatables = true, encode_use_tostring = true,
+            encode_invalid_as_nil = false
+        }},
+        {udata, "cdata", {
+            encode_load_metatables = true, encode_use_tostring = true,
+            encode_invalid_as_nil = false
+        }},
+        {cdata, "cdata", {
+            encode_load_metatables = true, encode_use_tostring = true,
+            encode_invalid_as_nil = true
+        }},
+        {udata, "cdata", {
+            encode_load_metatables = true, encode_use_tostring = true,
+            encode_invalid_as_nil = true
+        }},
+
+    }
+    if s.cfg then
+         for i = 1, #msgpack_data_cdata do
+             msgpack_data[#msgpack_data + 1] = msgpack_data_cdata[i]
+         end
+    end
+
+    test:plan(7 * #compression_type * #msgpack_data + 2)
+
+    for _, type in ipairs(compression_type) do
+        for _, data in ipairs(msgpack_data) do
+            local save_cfg = msgpack_use_cfg(data[3])
+            local enc = s.encode(data[1])
+            local dec = s.decode(enc)
+            local ttc = compression.new(enc:len(), type)
+            test:is(ttc:set_data(enc, enc:len(), ttc),
+                    0, "set data for compression")
+            rt(test, s, ttc, data[2])
+            local ttc_enc = s.encode(ttc)
+            local ttc_dec = s.decode(ttc_enc)
+            test:is(yaml.encode(dec), yaml.encode(ttc), "yaml")
+            test:is(yaml.encode(dec), yaml.encode(ttc_dec), "yaml")
+            test:is(json.encode(dec), json.encode(ttc), "json")
+            test:is(json.encode(dec), json.encode(ttc_dec), 'json')
+            msgpack_use_cfg(save_cfg)
+        end
+    end
+
+    local ttc = compression.new(0, 0)
+    local enc = s.encode(123)
+    -- Size of data array in compression is not equal to data size.
+    test:isnt(ttc:set_data(enc, enc:len(), ttc),
+              0, "invalid data for compression")
+    local str = "123"
+    ttc = compression.new(str:len(), 0)
+    -- Data for compression should be a msgpack field
+    test:isnt(ttc:set_data(str, str:len(), ttc),
+              0, "invalid data for compression")
+end
+
 return {
     test_unsigned = test_unsigned;
     test_signed = test_signed;
@@ -535,4 +819,5 @@ return {
     test_depth = test_depth;
     test_decode_buffer = test_decode_buffer;
     test_error = test_error;
+    test_compression = test_compression
 }

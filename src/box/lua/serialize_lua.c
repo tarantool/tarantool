@@ -45,6 +45,8 @@
 
 #include "serialize_lua.h"
 
+#include "lua/msgpack.h"
+
 #if 0
 # define SERIALIZER_TRACE
 #endif
@@ -772,6 +774,8 @@ dump_node(struct lua_dumper *d, struct node *nd, int indent)
 	int ltype = lua_type(d->L, -1);
 	const char *str = NULL;
 	size_t len = 0;
+	int top;
+	const char *data, **pdata = &data;
 
 	trace_node(d);
 
@@ -861,6 +865,13 @@ dump_node(struct lua_dumper *d, struct node *nd, int indent)
 			str = tt_uuid_str(field->uuidval);
 			len = UUID_STR_LEN;
 			break;
+		case MP_COMPRESSION:
+			top = lua_gettop(d->L);
+			data = field->ttcval->data;
+			luamp_decode(d->L, d->cfg, pdata);
+			int rc = dump_node(d, nd, indent);
+			lua_pop(d->L, lua_gettop(d->L) - top);
+			return rc;
 		default:
 			d->err = EINVAL;
 			snprintf(d->err_msg, sizeof(d->err_msg),

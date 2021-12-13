@@ -1,0 +1,671 @@
+1..3
+    1..110
+    ok 1 - set data for compression
+    ok 2 - calculate compressed data size
+    ok 3 - compression
+    ok 4 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 5 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 6 - subtests
+    ok 7 - calculate decompressed data size
+    ok 8 - decompressed data size
+    ok 9 - decompression
+    ok 10 - compression/decompression
+    ok 11 - set data for compression
+    ok 12 - calculate compressed data size
+    ok 13 - compression
+    ok 14 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 15 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 16 - subtests
+    ok 17 - calculate decompressed data size
+    ok 18 - decompressed data size
+    ok 19 - decompression
+    ok 20 - compression/decompression
+    ok 21 - set data for compression
+    ok 22 - calculate compressed data size
+    ok 23 - compression
+    ok 24 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 25 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 26 - subtests
+    ok 27 - calculate decompressed data size
+    ok 28 - decompressed data size
+    ok 29 - decompression
+    ok 30 - compression/decompression
+    ok 31 - set data for compression
+    ok 32 - calculate compressed data size
+    ok 33 - compression
+    ok 34 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 35 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 36 - subtests
+    ok 37 - calculate decompressed data size
+    ok 38 - decompressed data size
+    ok 39 - decompression
+    ok 40 - compression/decompression
+    ok 41 - set data for compression
+    ok 42 - calculate compressed data size
+    ok 43 - compression
+    ok 44 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 45 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 46 - subtests
+    ok 47 - calculate decompressed data size
+    ok 48 - decompressed data size
+    ok 49 - decompression
+    ok 50 - compression/decompression
+    ok 51 - set data for compression
+    ok 52 - calculate compressed data size
+    ok 53 - compression
+    ok 54 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 55 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 56 - subtests
+    ok 57 - calculate decompressed data size
+    ok 58 - decompressed data size
+    ok 59 - decompression
+    ok 60 - compression/decompression
+    ok 61 - set data for compression
+    ok 62 - calculate compressed data size
+    ok 63 - compression
+    ok 64 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 65 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 66 - subtests
+    ok 67 - calculate decompressed data size
+    ok 68 - decompressed data size
+    ok 69 - decompression
+    ok 70 - compression/decompression
+    ok 71 - set data for compression
+    ok 72 - calculate compressed data size
+    ok 73 - compression
+    ok 74 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 75 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 76 - subtests
+    ok 77 - calculate decompressed data size
+    ok 78 - decompressed data size
+    ok 79 - decompression
+    ok 80 - compression/decompression
+    ok 81 - set data for compression
+    ok 82 - calculate compressed data size
+    ok 83 - compression
+    ok 84 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 85 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 86 - subtests
+    ok 87 - calculate decompressed data size
+    ok 88 - decompressed data size
+    ok 89 - decompression
+    ok 90 - compression/decompression
+    ok 91 - set data for compression
+    ok 92 - calculate compressed data size
+    ok 93 - compression
+    ok 94 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 95 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 96 - subtests
+    ok 97 - calculate decompressed data size
+    ok 98 - decompressed data size
+    ok 99 - decompression
+    ok 100 - compression/decompression
+    ok 101 - set data for compression
+    ok 102 - calculate compressed data size
+    ok 103 - compression
+    ok 104 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 105 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 106 - subtests
+    ok 107 - calculate decompressed data size
+    ok 108 - decompressed data size
+    ok 109 - decompression
+    ok 110 - compression/decompression
+ok 1 - subtests
+    1..110
+    ok 1 - set data for compression
+    ok 2 - calculate compressed data size
+    ok 3 - compression
+    ok 4 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 5 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 6 - subtests
+    ok 7 - calculate decompressed data size
+    ok 8 - decompressed data size
+    ok 9 - decompression
+    ok 10 - compression/decompression
+    ok 11 - set data for compression
+    ok 12 - calculate compressed data size
+    ok 13 - compression
+    ok 14 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 15 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 16 - subtests
+    ok 17 - calculate decompressed data size
+    ok 18 - decompressed data size
+    ok 19 - decompression
+    ok 20 - compression/decompression
+    ok 21 - set data for compression
+    ok 22 - calculate compressed data size
+    ok 23 - compression
+    ok 24 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 25 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 26 - subtests
+    ok 27 - calculate decompressed data size
+    ok 28 - decompressed data size
+    ok 29 - decompression
+    ok 30 - compression/decompression
+    ok 31 - set data for compression
+    ok 32 - calculate compressed data size
+    ok 33 - compression
+    ok 34 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 35 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 36 - subtests
+    ok 37 - calculate decompressed data size
+    ok 38 - decompressed data size
+    ok 39 - decompression
+    ok 40 - compression/decompression
+    ok 41 - set data for compression
+    ok 42 - calculate compressed data size
+    ok 43 - compression
+    ok 44 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 45 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 46 - subtests
+    ok 47 - calculate decompressed data size
+    ok 48 - decompressed data size
+    ok 49 - decompression
+    ok 50 - compression/decompression
+    ok 51 - set data for compression
+    ok 52 - calculate compressed data size
+    ok 53 - compression
+    ok 54 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 55 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 56 - subtests
+    ok 57 - calculate decompressed data size
+    ok 58 - decompressed data size
+    ok 59 - decompression
+    ok 60 - compression/decompression
+    ok 61 - set data for compression
+    ok 62 - calculate compressed data size
+    ok 63 - compression
+    ok 64 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 65 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 66 - subtests
+    ok 67 - calculate decompressed data size
+    ok 68 - decompressed data size
+    ok 69 - decompression
+    ok 70 - compression/decompression
+    ok 71 - set data for compression
+    ok 72 - calculate compressed data size
+    ok 73 - compression
+    ok 74 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 75 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 76 - subtests
+    ok 77 - calculate decompressed data size
+    ok 78 - decompressed data size
+    ok 79 - decompression
+    ok 80 - compression/decompression
+    ok 81 - set data for compression
+    ok 82 - calculate compressed data size
+    ok 83 - compression
+    ok 84 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 85 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 86 - subtests
+    ok 87 - calculate decompressed data size
+    ok 88 - decompressed data size
+    ok 89 - decompression
+    ok 90 - compression/decompression
+    ok 91 - set data for compression
+    ok 92 - calculate compressed data size
+    ok 93 - compression
+    ok 94 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 95 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 96 - subtests
+    ok 97 - calculate decompressed data size
+    ok 98 - decompressed data size
+    ok 99 - decompression
+    ok 100 - compression/decompression
+    ok 101 - set data for compression
+    ok 102 - calculate compressed data size
+    ok 103 - compression
+    ok 104 - compressed data size
+        1..3
+        ok 1 - string representation size
+        ok 2 - string representation
+        ok 3 - string representation
+    ok 105 - subtests
+        1..3
+        ok 1 - file representation size
+        ok 2 - file representation
+        ok 3 - string representation
+    ok 106 - subtests
+    ok 107 - calculate decompressed data size
+    ok 108 - decompressed data size
+    ok 109 - decompression
+    ok 110 - compression/decompression
+ok 2 - subtests
+    1..268
+    ok 1 - invalid data size
+    ok 2 - set invalid data for compression
+    ok 3 - set invalid data for compression
+    ok 4 - set invalid data for compression
+    ok 5 - set invalid data for compression
+    ok 6 - set invalid data for compression
+    ok 7 - set invalid data for compression
+    ok 8 - set invalid data for compression
+    ok 9 - set invalid data for compression
+    ok 10 - set invalid data for compression
+    ok 11 - set invalid data for compression
+    ok 12 - set invalid data for compression
+    ok 13 - set invalid data for compression
+    ok 14 - set invalid data for compression
+    ok 15 - set invalid data for compression
+    ok 16 - set invalid data for compression
+    ok 17 - set invalid data for compression
+    ok 18 - set invalid data for compression
+    ok 19 - set invalid data for compression
+    ok 20 - set invalid data for compression
+    ok 21 - set invalid data for compression
+    ok 22 - set invalid data for compression
+    ok 23 - set invalid data for compression
+    ok 24 - set invalid data for compression
+    ok 25 - set invalid data for compression
+    ok 26 - set invalid data for compression
+    ok 27 - set invalid data for compression
+    ok 28 - set invalid data for compression
+    ok 29 - set invalid data for compression
+    ok 30 - set invalid data for compression
+    ok 31 - set invalid data for compression
+    ok 32 - set invalid data for compression
+    ok 33 - set invalid data for compression
+    ok 34 - set invalid data for compression
+    ok 35 - set invalid data for compression
+    ok 36 - set invalid data for compression
+    ok 37 - set invalid data for compression
+    ok 38 - set invalid data for compression
+    ok 39 - set invalid data for compression
+    ok 40 - set invalid data for compression
+    ok 41 - set invalid data for compression
+    ok 42 - set invalid data for compression
+    ok 43 - set invalid data for compression
+    ok 44 - set invalid data for compression
+    ok 45 - set invalid data for compression
+    ok 46 - set invalid data for compression
+    ok 47 - set invalid data for compression
+    ok 48 - set invalid data for compression
+    ok 49 - set invalid data for compression
+    ok 50 - set invalid data for compression
+    ok 51 - set invalid data for compression
+    ok 52 - set invalid data for compression
+    ok 53 - set invalid data for compression
+    ok 54 - set invalid data for compression
+    ok 55 - set invalid data for compression
+    ok 56 - set invalid data for compression
+    ok 57 - set invalid data for compression
+    ok 58 - set invalid data for compression
+    ok 59 - set invalid data for compression
+    ok 60 - set invalid data for compression
+    ok 61 - set invalid data for compression
+    ok 62 - set invalid data for compression
+    ok 63 - set invalid data for compression
+    ok 64 - set invalid data for compression
+    ok 65 - set invalid data for compression
+    ok 66 - set invalid data for compression
+    ok 67 - set invalid data for compression
+    ok 68 - set invalid data for compression
+    ok 69 - set invalid data for compression
+    ok 70 - set invalid data for compression
+    ok 71 - set invalid data for compression
+    ok 72 - set invalid data for compression
+    ok 73 - set invalid data for compression
+    ok 74 - set invalid data for compression
+    ok 75 - set invalid data for compression
+    ok 76 - set invalid data for compression
+    ok 77 - set invalid data for compression
+    ok 78 - set invalid data for compression
+    ok 79 - set invalid data for compression
+    ok 80 - set invalid data for compression
+    ok 81 - set invalid data for compression
+    ok 82 - set invalid data for compression
+    ok 83 - set invalid data for compression
+    ok 84 - set invalid data for compression
+    ok 85 - set invalid data for compression
+    ok 86 - set invalid data for compression
+    ok 87 - set invalid data for compression
+    ok 88 - set invalid data for compression
+    ok 89 - set invalid data for compression
+    ok 90 - set invalid data for compression
+    ok 91 - set invalid data for compression
+    ok 92 - set invalid data for compression
+    ok 93 - set invalid data for compression
+    ok 94 - set invalid data for compression
+    ok 95 - set invalid data for compression
+    ok 96 - set invalid data for compression
+    ok 97 - set invalid data for compression
+    ok 98 - set invalid data for compression
+    ok 99 - set invalid data for compression
+    ok 100 - set invalid data for compression
+    ok 101 - set invalid data for compression
+    ok 102 - set invalid data for compression
+    ok 103 - set invalid data for compression
+    ok 104 - set invalid data for compression
+    ok 105 - set invalid data for compression
+    ok 106 - set invalid data for compression
+    ok 107 - set invalid data for compression
+    ok 108 - set invalid data for compression
+    ok 109 - set invalid data for compression
+    ok 110 - set invalid data for compression
+    ok 111 - set invalid data for compression
+    ok 112 - set invalid data for compression
+    ok 113 - set invalid data for compression
+    ok 114 - set invalid data for compression
+    ok 115 - set invalid data for compression
+    ok 116 - set invalid data for compression
+    ok 117 - set invalid data for compression
+    ok 118 - set invalid data for compression
+    ok 119 - set invalid data for compression
+    ok 120 - set invalid data for compression
+    ok 121 - set invalid data for compression
+    ok 122 - set invalid data for compression
+    ok 123 - set invalid data for compression
+    ok 124 - set invalid data for compression
+    ok 125 - set invalid data for compression
+    ok 126 - set invalid data for compression
+    ok 127 - set invalid data for compression
+    ok 128 - set invalid data for compression
+    ok 129 - set invalid data for compression
+    ok 130 - set invalid data for compression
+    ok 131 - set invalid data for compression
+    ok 132 - set invalid data for compression
+    ok 133 - set invalid data for compression
+    ok 134 - set invalid data for compression
+    ok 135 - set invalid data for compression
+    ok 136 - set invalid data for compression
+    ok 137 - set invalid data for compression
+    ok 138 - set invalid data for compression
+    ok 139 - set invalid data for compression
+    ok 140 - set invalid data for compression
+    ok 141 - set invalid data for compression
+    ok 142 - set invalid data for compression
+    ok 143 - set invalid data for compression
+    ok 144 - set invalid data for compression
+    ok 145 - set invalid data for compression
+    ok 146 - set invalid data for compression
+    ok 147 - set invalid data for compression
+    ok 148 - set invalid data for compression
+    ok 149 - set invalid data for compression
+    ok 150 - set invalid data for compression
+    ok 151 - set invalid data for compression
+    ok 152 - set invalid data for compression
+    ok 153 - set invalid data for compression
+    ok 154 - set invalid data for compression
+    ok 155 - set invalid data for compression
+    ok 156 - set invalid data for compression
+    ok 157 - set invalid data for compression
+    ok 158 - set invalid data for compression
+    ok 159 - set invalid data for compression
+    ok 160 - set invalid data for compression
+    ok 161 - set invalid data for compression
+    ok 162 - set invalid data for compression
+    ok 163 - set invalid data for compression
+    ok 164 - set invalid data for compression
+    ok 165 - set invalid data for compression
+    ok 166 - set invalid data for compression
+    ok 167 - set invalid data for compression
+    ok 168 - set invalid data for compression
+    ok 169 - set invalid data for compression
+    ok 170 - set invalid data for compression
+    ok 171 - set invalid data for compression
+    ok 172 - set invalid data for compression
+    ok 173 - set invalid data for compression
+    ok 174 - set invalid data for compression
+    ok 175 - set invalid data for compression
+    ok 176 - set invalid data for compression
+    ok 177 - set invalid data for compression
+    ok 178 - set invalid data for compression
+    ok 179 - set invalid data for compression
+    ok 180 - set invalid data for compression
+    ok 181 - set invalid data for compression
+    ok 182 - set invalid data for compression
+    ok 183 - set invalid data for compression
+    ok 184 - set invalid data for compression
+    ok 185 - set invalid data for compression
+    ok 186 - set invalid data for compression
+    ok 187 - set invalid data for compression
+    ok 188 - set invalid data for compression
+    ok 189 - set invalid data for compression
+    ok 190 - set invalid data for compression
+    ok 191 - set invalid data for compression
+    ok 192 - set invalid data for compression
+    ok 193 - set invalid data for compression
+    ok 194 - set invalid data for compression
+    ok 195 - set invalid data for compression
+    ok 196 - set invalid data for compression
+    ok 197 - set invalid data for compression
+    ok 198 - set invalid data for compression
+    ok 199 - set invalid data for compression
+    ok 200 - set invalid data for compression
+    ok 201 - set invalid data for compression
+    ok 202 - set invalid data for compression
+    ok 203 - set invalid data for compression
+    ok 204 - set invalid data for compression
+    ok 205 - set invalid data for compression
+    ok 206 - set invalid data for compression
+    ok 207 - set invalid data for compression
+    ok 208 - set invalid data for compression
+    ok 209 - set invalid data for compression
+    ok 210 - set invalid data for compression
+    ok 211 - set invalid data for compression
+    ok 212 - set invalid data for compression
+    ok 213 - set invalid data for compression
+    ok 214 - set invalid data for compression
+    ok 215 - set invalid data for compression
+    ok 216 - set invalid data for compression
+    ok 217 - set invalid data for compression
+    ok 218 - set invalid data for compression
+    ok 219 - set invalid data for compression
+    ok 220 - set invalid data for compression
+    ok 221 - set invalid data for compression
+    ok 222 - set invalid data for compression
+    ok 223 - set invalid data for compression
+    ok 224 - set invalid data for compression
+    ok 225 - set invalid data for compression
+    ok 226 - set invalid data for compression
+    ok 227 - set invalid data for compression
+    ok 228 - set invalid data for compression
+    ok 229 - set invalid data for compression
+    ok 230 - set invalid data for compression
+    ok 231 - set invalid data for compression
+    ok 232 - set invalid data for compression
+    ok 233 - set invalid data for compression
+    ok 234 - set invalid data for compression
+    ok 235 - set invalid data for compression
+    ok 236 - set invalid data for compression
+    ok 237 - set invalid data for compression
+    ok 238 - set invalid data for compression
+    ok 239 - set invalid data for compression
+    ok 240 - set invalid data for compression
+    ok 241 - set invalid data for compression
+    ok 242 - set invalid data for compression
+    ok 243 - set invalid data for compression
+    ok 244 - set invalid data for compression
+    ok 245 - set invalid data for compression
+    ok 246 - set invalid data for compression
+    ok 247 - set invalid data for compression
+    ok 248 - set invalid data for compression
+    ok 249 - set invalid data for compression
+    ok 250 - set invalid data for compression
+    ok 251 - set invalid data for compression
+    ok 252 - set invalid data for compression
+    ok 253 - set invalid data for compression
+    ok 254 - set invalid data for compression
+    ok 255 - set invalid data for compression
+    ok 256 - set invalid data for compression
+    ok 257 - set invalid data for compression
+    ok 258 - several msgpack fields banned
+    ok 259 - several msgpack fields banned
+    ok 260 - several msgpack fields banned
+    ok 261 - several msgpack fields banned
+    ok 262 - several msgpack fields banned
+    ok 263 - several msgpack fields banned
+    ok 264 - several msgpack fields banned
+    ok 265 - several msgpack fields banned
+    ok 266 - several msgpack fields banned
+    ok 267 - several msgpack fields banned
+    ok 268 - several msgpack fields banned
+ok 3 - subtests

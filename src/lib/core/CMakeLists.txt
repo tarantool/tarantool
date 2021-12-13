@@ -34,6 +34,9 @@ set(core_sources
     iostream.c
     tt_uuid.c
     mp_uuid.c
+    tt_compression.c
+    compression.c
+    mp_compression.c
 )
 
 if (TARGET_OS_NETBSD)
@@ -48,7 +51,7 @@ add_library(core STATIC ${core_sources})
 target_link_libraries(core salad small uri decNumber bit tzcode
                       ${LIBEV_LIBRARIES}
                       ${LIBEIO_LIBRARIES} ${LIBCORO_LIBRARIES}
-                      ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES})
+                      ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES} ${ZSTD_LIBRARIES})
 
 if (ENABLE_BACKTRACE AND NOT TARGET_OS_DARWIN)
     target_link_libraries(core gcc_s ${UNWIND_LIBRARIES})

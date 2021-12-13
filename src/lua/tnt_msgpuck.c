@@ -57,6 +57,12 @@ tnt_mp_decode_double(const char **data)
 }
 
 uint32_t
+tnt_mp_sizeof_extl(uint32_t len)
+{
+        return mp_sizeof_extl(len);
+}
+
+uint32_t
 tnt_mp_decode_extl(const char **data, int8_t *type)
 {
 	return mp_decode_extl(data, type);
@@ -96,4 +102,36 @@ uint32_t
 tnt_mp_sizeof_error(const struct error *error)
 {
 	return mp_sizeof_error(error);
+}
+
+int
+tnt_mp_set_data_for_compression(const char *data, uint32_t size,
+                                struct tt_compression *ttc)
+{
+        return mp_set_data_for_compression(data, size, ttc);
+}
+
+char *
+tnt_mp_encode_compression(char *data, const struct tt_compression *ttc)
+{
+        return mp_encode_compression(data, ttc);
+}
+
+int
+tnt_mp_sizeof_for_compression(const struct tt_compression *ttc,
+                              uint32_t *size)
+{
+        return mp_sizeof_for_compression(ttc, size);
+}
+
+int
+tnt_mp_sizeof_for_decompression(const char **data, uint32_t *size)
+{
+        return mp_sizeof_for_decompression(data, size);
+}
+
+struct tt_compression *
+tnt_mp_decode_compression(const char **data, struct tt_compression *ttc)
+{
+        return mp_decode_compression(data, ttc);
 }

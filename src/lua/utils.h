@@ -55,6 +55,8 @@ extern "C" {
 
 #include "lua/error.h"
 
+#include "tt_compression.h"
+
 struct lua_State;
 struct ibuf;
 typedef struct ibuf box_ibuf_t;
@@ -72,6 +74,7 @@ extern struct lua_State *tarantool_L;
 extern uint32_t CTID_CHAR_PTR;
 extern uint32_t CTID_CONST_CHAR_PTR;
 extern uint32_t CTID_UUID;
+extern uint32_t CTID_STRUCT_TT_COMPRESSION_REF;
 extern uint32_t CTID_DATETIME;
 
 struct tt_uuid *
@@ -79,6 +82,10 @@ luaL_pushuuid(struct lua_State *L);
 
 void
 luaL_pushuuidstr(struct lua_State *L, const struct tt_uuid *uuid);
+
+struct tt_compression *
+luaL_pushcompression(struct lua_State *L, uint32_t size,
+                     enum compression_type type);
 
 /** \cond public */
 
