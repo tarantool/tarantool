@@ -32,6 +32,7 @@
  */
 #include <stdbool.h>
 #include <stdint.h>
+#include "bit/bit.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -44,19 +45,11 @@ extern "C" {
  * load_* - no boundary checking
  */
 
-static inline uint32_t
-load_u32(const char **data)
-{
-	const uint32_t *b = (const uint32_t *) *data;
-	*data += sizeof(uint32_t);
-	return *b;
-}
-
 #define pack_u(bits)						\
 static inline char *						\
 pack_u##bits(char *buf, uint##bits##_t val)			\
 {								\
-	*(uint##bits##_t *) buf = val;				\
+	memcpy(buf, &val, sizeof(val));				\
 	return buf + sizeof(uint##bits##_t);			\
 }
 
