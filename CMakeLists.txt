@@ -239,11 +239,11 @@ endif()
 # avoids git to search .git repository in parent
 # directories.
 #
-if (EXISTS "${PROJECT_SOURCE_DIR}/.git" AND GIT)
+if (EXISTS "${CMAKE_SOURCE_DIR}/.git" AND GIT)
     execute_process (COMMAND ${GIT} describe --long HEAD
         OUTPUT_VARIABLE TARANTOOL_GIT_VERSION
         OUTPUT_STRIP_TRAILING_WHITESPACE
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
     if (NOT ("${TARANTOOL_GIT_VERSION}" STREQUAL "${TARANTOOL_VERSION}"))
         set(TARANTOOL_VERSION "${TARANTOOL_GIT_VERSION}")
