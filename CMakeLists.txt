@@ -43,15 +43,11 @@ endif()
 #
 # Check submodules
 #
-function(update_submodules)
-    message(STATUS "Updating submodules")
-    execute_process(COMMAND ${GIT} submodule update --init --recursive
-                    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
-endfunction()
-
 if(NOT EXISTS ${PROJECT_SOURCE_DIR}/src/lib/small/CMakeLists.txt)
     if (EXISTS "${PROJECT_SOURCE_DIR}/.git" AND GIT)
-        update_submodules()
+        message(STATUS "Updating submodules")
+        execute_process(COMMAND ${GIT} submodule update --init --recursive
+                        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
     else()
         message(FATAL_ERROR "Failed to find submodules")
     endif()
@@ -249,8 +245,6 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/.git" AND GIT)
         set(TARANTOOL_VERSION "${TARANTOOL_GIT_VERSION}")
         message(STATUS "Generating VERSION file")
         file(WRITE ${VERSION_FILE} "${TARANTOOL_VERSION}\n")
-
-        update_submodules()
     endif()
 endif()
 
