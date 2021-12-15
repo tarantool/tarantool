@@ -7,18 +7,12 @@ return {
     LUA_MODULES_LUA_SUBDIR = [[/share/tarantool]],
     SYSCONFDIR = [[@CMAKE_INSTALL_FULL_SYSCONFDIR@/tarantool/rocks]],
     FORCE_CONFIG = false,
-    ROCKS_TREE = [[/usr/local/]],
     ROCKS_SUBDIR = [[/share/tarantool/rocks]],
     ROCKS_SERVERS = {
         [[http://rocks.tarantool.org/]],
     },
     LOCALDIR = require('fio').cwd(),
     HOME_TREE_SUBDIR = [[/.rocks]],
-    LUA_DIR_SET = true,
-    UNAME_S = [[@CMAKE_SYSTEM_NAME@]],
-    UNAME_M = [[@CMAKE_SYSTEM_PROCESSOR@]],
-    DOWNLOADER = [[curl]],
-    MD5CHECKER = [[openssl]],
     EXTERNAL_DEPS_SUBDIRS = {
         bin = "bin",
         lib = {"lib", [[@MULTILIB@]]},
