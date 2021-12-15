@@ -1,4 +1,10 @@
-configure_file(hardcoded.lua.cmake hardcoded.lua @ONLY)
+if(BUILD_STATIC)
+    set(LUAROCKS_CONFIG hardcoded_static.lua.cmake)
+else()
+    set(LUAROCKS_CONFIG hardcoded.lua.cmake)
+endif()
+
+configure_file(${LUAROCKS_CONFIG} hardcoded.lua @ONLY)
 
 if(NOT EMBED_LUAROCKS)
     install(DIRECTORY ${PROJECT_SOURCE_DIR}/third_party/luarocks/src/luarocks
