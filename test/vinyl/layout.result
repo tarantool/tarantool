@@ -243,7 +243,7 @@ result
           bloom_filter: <bloom_filter>
           max_key: ['ЭЭЭ']
           page_count: 1
-          stmt_stat: {9: 0, 2: 0, 5: 0, 3: 13}
+          stmt_stat: {2: 0, 3: 13, 5: 0, 9: 0}
           max_lsn: 20
           min_key: ['1001']
       - HEADER:
@@ -333,7 +333,7 @@ result
           bloom_filter: <bloom_filter>
           max_key: ['ЮЮЮ']
           page_count: 1
-          stmt_stat: {9: 0, 2: 0, 5: 0, 3: 3}
+          stmt_stat: {2: 0, 3: 3, 5: 0, 9: 0}
           max_lsn: 23
           min_key: ['ёёё']
       - HEADER:
@@ -376,7 +376,7 @@ result
           bloom_filter: <bloom_filter>
           max_key: [1010, '1010']
           page_count: 1
-          stmt_stat: {9: 0, 2: 0, 5: 0, 3: 13}
+          stmt_stat: {2: 0, 3: 13, 5: 0, 9: 0}
           max_lsn: 20
           min_key: [null, 'ёёё']
       - HEADER:
@@ -466,7 +466,7 @@ result
           bloom_filter: <bloom_filter>
           max_key: [789, 'ююю']
           page_count: 1
-          stmt_stat: {9: 0, 2: 0, 5: 0, 3: 3}
+          stmt_stat: {2: 0, 3: 3, 5: 0, 9: 0}
           max_lsn: 23
           min_key: [123, 'ёёё']
       - HEADER:

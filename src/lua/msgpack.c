@@ -303,11 +303,11 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 	case MP_MAP:
 	{
 		uint32_t size = mp_decode_map(data);
-		lua_createtable(L, 0, size);
+		lua_newtable(L);
 		for (uint32_t i = 0; i < size; i++) {
 			luamp_decode(L, cfg, data);
 			luamp_decode(L, cfg, data);
-			lua_settable(L, -3);
+			lua_rawset(L, -3);
 		}
 		if (cfg->decode_save_metatables)
 			luaL_setmaphint(L, -1);
