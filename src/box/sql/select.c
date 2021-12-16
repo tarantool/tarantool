@@ -4650,7 +4650,7 @@ is_simple_count(struct Select *select, struct AggInfo *agg_info)
 		return NULL;
 	assert(agg_info->aFunc->func->def->language ==
 	       FUNC_LANGUAGE_SQL_BUILTIN);
-	if (sql_func_flag_is_set(agg_info->aFunc->func, SQL_FUNC_COUNT) ||
+	if (strcmp(agg_info->aFunc->func->def->name, "COUNT") != 0 ||
 	    (agg_info->aFunc->pExpr->x.pList != NULL &&
 	     agg_info->aFunc->pExpr->x.pList->nExpr > 0))
 		return NULL;
