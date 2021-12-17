@@ -50,3 +50,6 @@
 [submodule "third_party/lua-zlib"]
 	path = third_party/lua-zlib
 	url = https://github.com/tarantool/lua-zlib.git
+[submodule "third_party/luazip"]
+	path = third_party/luazip
+	url = https://github.com/tarantool/luazip.git

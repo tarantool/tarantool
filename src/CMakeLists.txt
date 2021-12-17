@@ -22,6 +22,10 @@ if(EMBED_LUAZLIB)
     include_directories(${ZLIB_INCLUDE_DIRS})
 endif()
 
+if(EMBED_LUAZIP)
+    include_directories(${ZZIP_INCLUDE_DIRS})
+endif()
+
 # Compile src/lua/*.lua files into src/lua/*.lua.c sources
 set(lua_sources)
 lua_source(lua_sources lua/init.lua init_lua)
@@ -161,6 +165,11 @@ if(EMBED_LUAZLIB)
         ${PROJECT_SOURCE_DIR}/third_party/lua-zlib/lua_zlib.c)
 endif()
 
+if(EMBED_LUAZIP)
+    list(APPEND server_sources
+        ${PROJECT_SOURCE_DIR}/third_party/luazip/src/luazip.c)
+endif()
+
 set(api_headers
     ${PROJECT_BINARY_DIR}/src/trivia/config.h
     ${PROJECT_SOURCE_DIR}/src/trivia/util.h
@@ -209,6 +218,10 @@ target_link_libraries(server core coll http_parser bit uri swim swim_udp
 
 if(EMBED_LUAZLIB)
     target_link_libraries(server ${ZLIB_LIBRARIES})
+endif()
+
+if(EMBED_LUAZIP)
+    target_link_libraries(server ${ZZIP_LIBRARIES})
 endif()
 
 # Rule of thumb: if exporting a symbol from a static library, list the

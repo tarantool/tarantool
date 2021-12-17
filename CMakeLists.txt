@@ -368,6 +368,10 @@ set(EMBED_LUAROCKS ${BUILD_STATIC})
 
 add_custom_target(build_bundled_libs)
 
+#
+# ZSTD
+#
+
 # Debian: missing zstd_static.h in libzstd-dev
 # Fedora: not found
 # => use bundled version by default
@@ -387,6 +391,14 @@ endif()
 #
 set(ZLIB_FIND_REQUIRED ON)
 find_package(ZLIB)
+
+#
+# ZZIP
+#
+if(EMBED_LUAZIP)
+    set(ZZIP_FIND_REQUIRED ON)
+    find_package(ZZIP)
+endif()
 
 #
 # OpenSSL
@@ -564,10 +576,6 @@ else()
     set(LIBYAML_FIND_REQUIRED ON)
     find_package(LibYAML)
 endif()
-
-#
-# zstd
-#
 
 #
 # Christian Hansen c-dt
