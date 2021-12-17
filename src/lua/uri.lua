@@ -123,8 +123,15 @@ end
 
 local function fill_uribuf_params(uribuf, uri)
     uribuf.param_count = 0
+    uribuf.params = nil
+    if not uri.params then
+        return
+    end
     for _, _ in pairs(uri.params) do
         uribuf.param_count = uribuf.param_count + 1
+    end
+    if uribuf.param_count == 0 then
+        return
     end
     uribuf.params = ffi.new("struct uri_param[?]", uribuf.param_count)
     local i = 0

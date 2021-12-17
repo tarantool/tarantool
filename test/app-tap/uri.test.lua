@@ -97,7 +97,7 @@ local function test_parse(test)
 end
 
 local function test_format(test)
-    test:plan(12)
+    test:plan(13)
     local u = uri.parse("user:password@localhost")
     test:is(uri.format(u), "user@localhost", "password removed")
     test:is(uri.format(u, false), "user@localhost", "password removed")
@@ -150,6 +150,9 @@ local function test_format(test)
         params = {q1 = {"v13", "v14"}, q2 = "v2"}
     })
     test:is(uri.format(u), "unix/:/tmp/unix.sock?q1=v13&q1=v14&q2=v2", "URI format")
+
+    test:is(uri.format{host = "unix/", service = "/tmp/unix.sock"},
+            "unix/:/tmp/unix.sock", "URI format")
 end
 
 local function test_parse_uri_query_params(test)
