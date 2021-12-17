@@ -522,6 +522,216 @@ func_trim_str(struct sql_context *ctx, int argc, const struct Mem *argv)
 		ctx->is_aborted = true;
 }
 
+/**
+ * Internal part of KMP algorithm, calculates prefix table.
+ * Retuns prefix_table or NULL on failure.
+ */
+static int32_t *
+prefix_table_new(struct coll *coll, const char *key, int32_t size)
+{
+	assert(coll != NULL);
+	int32_t len = 0;
+	int32_t offset = 0;
+	while (offset < size) {
+		UChar32 c;
+		U8_NEXT((uint8_t *)key, offset, size, c);
+		len++;
+	}
+	struct region *region = &fiber()->gc;
+	size_t svp = region_used(region);
+	int32_t *offsets = region_aligned_alloc(region,
+						2 * len * sizeof(int32_t),
+						sizeof(int32_t));
+	if (offsets == NULL) {
+		diag_set(OutOfMemory, 2 * len * sizeof(int32_t),
+			 "region_alloc", "offsets");
+		return NULL;
+	}
+	int32_t *sizes = offsets + len;
+	int32_t *table = sqlDbMallocRawNN(sql_get(), len * sizeof(int32_t));
+	if (table == NULL) {
+		region_truncate(region, svp);
+		return NULL;
+	}
+	offset = 0;
+	for (int32_t i = 0; i < len; ++i) {
+		UChar32 c;
+		offsets[i] = offset;
+		U8_NEXT((uint8_t *)key, offset, size, c);
+		sizes[i] = offset - offsets[i];
+	}
+
+	table[0] = 0;
+	for (int32_t i = 1; i < len; ++i) {
+		int32_t k = table[i - 1];
+		int cmp_res = coll->cmp(key + offsets[k], sizes[k],
+					key + offsets[i], sizes[i], coll);
+		while (k > 0 && cmp_res != 0) {
+			k = table[k - 1];
+			cmp_res = coll->cmp(key + offsets[k], sizes[k],
+					    key + offsets[i], sizes[i], coll);
+		}
+		if (cmp_res == 0)
+			++k;
+		table[i] = k;
+	}
+	region_truncate(region, svp);
+	return table;
+}
+
+/**
+ * Internal part of KMP algorithm. Finds first occurrence of key in str and
+ * returns its position. Offset is an out argument, returns byte offset of
+ * first key occurrence.
+ */
+static int32_t
+kmp_internal(struct coll *coll, const char *str, int32_t str_size,
+	     const char *key, int32_t key_size, int32_t *prefix_table,
+	     int32_t *offset)
+{
+	assert(coll != NULL);
+	assert(offset != NULL);
+	assert(prefix_table != NULL);
+	int32_t len = 0;
+	int32_t str_offset = 0;
+	while (str_offset < str_size) {
+		UChar32 c;
+		U8_NEXT((uint8_t *)str, str_offset, str_size, c);
+		len++;
+	}
+	struct region *region = &fiber()->gc;
+	size_t svp = region_used(region);
+
+	int32_t *offsets = region_aligned_alloc(region, len * sizeof(int32_t),
+						sizeof(int32_t));
+	if (offsets == NULL) {
+		diag_set(OutOfMemory, 2 * len * sizeof(int32_t),
+			 "region_alloc", "offsets");
+		return 0;
+	}
+	int32_t *table = sqlDbMallocRawNN(sql_get(), len * sizeof(int32_t));
+	if (table == NULL) {
+		region_truncate(region, svp);
+		return 0;
+	}
+	str_offset = 0;
+	for (int32_t i = 0; i < len; ++i) {
+		UChar32 c;
+		offsets[i] = str_offset;
+		U8_NEXT((uint8_t *)str, str_offset, str_size, c);
+	}
+
+	int32_t str_end = 0;
+	int32_t str_pos = 0;
+	int32_t key_end = 0;
+	int32_t key_pos = 0;
+	UChar32 c = 0;
+
+	while (str_end < str_size) {
+		int32_t key_c = 0, str_c = 0;
+		U8_GET((uint8_t *)key, 0, key_end, key_size, key_c);
+		U8_GET((uint8_t *)str, 0, str_end, str_size, str_c);
+
+		if (coll->cmp(str + str_end, U8_LENGTH(str_c),
+			      key + key_end, U8_LENGTH(key_c), coll)
+				== UCOL_EQUAL) {
+			U8_NEXT((uint8_t *)key, key_end, key_size, c);
+			++key_pos;
+
+			U8_NEXT((uint8_t *)str, str_end, str_size, c);
+			++str_pos;
+		} else {
+			if (key_pos == 0) {
+				U8_NEXT((uint8_t *)str, str_end, str_size, c);
+				++str_pos;
+				continue;
+			}
+			key_end = offsets[prefix_table[key_pos - 1]];
+			key_pos = prefix_table[key_pos - 1];
+		}
+		if (key_end == key_size) {
+			*offset = str_end - key_end;
+			region_truncate(region, svp);
+			return str_pos - key_pos + 1;
+		}
+    }
+	*offset = str_end;
+	region_truncate(region, svp);
+	return 0;
+}
+
+/**
+ * Find first occurrence of key in str ussing ICU collation cmp.
+ * Returns: positions counted from 1; 0 if key is not found; -1 on
+ * error.
+ */
+static int32_t
+kmp_first(struct coll *coll, const char *str, int32_t str_size,
+	  const char *key, int32_t key_size)
+{
+	assert(coll != NULL);
+	int32_t *prefix_table = prefix_table_new(coll, key, key_size);
+	if (prefix_table == NULL)
+		return -1;
+	int32_t unused;
+	int32_t pos = kmp_internal(coll, str, str_size, key, key_size,
+				   prefix_table, &unused);
+	sqlDbFree(sql_get(), prefix_table);
+	return pos;
+}
+
+/**
+ * Find all occurrences of key in str ussing ICU collation cmp.
+ * Returns: null-terminated array with positions counted from 1; array
+ * starts with 0 if key is not found; NULL on error.
+ */
+int32_t *
+kmp_all(struct coll *coll, const char *str, int32_t str_size,
+	const char *key, int32_t key_size)
+{
+	assert(coll != NULL);
+	int32_t *prefix_table = prefix_table_new(coll, key, key_size);
+	if (prefix_table == NULL)
+		return NULL;
+	int32_t str_end = 0;
+	int32_t positions_size = 0;
+	int32_t positions_cap = 2;
+	int32_t *positions = xcalloc(positions_cap, sizeof(int32_t));
+	int32_t pos = -1;
+	while (str_end < str_size && pos != 0) {
+		int32_t offset = -1;
+		pos = kmp_internal(coll, str + str_end,
+				   str_size - str_end, key, key_size,
+				   prefix_table, &offset);
+
+		if (positions_size == positions_cap) {
+			positions_cap *= 2;
+			int32_t *tmp = xrealloc(positions, positions_cap);
+			if (tmp != NULL) {
+				positions = tmp;
+			} else {
+				free(positions);
+				positions = NULL;
+				goto finish;
+			}
+		}
+		if (positions_size != 0)
+			positions[positions_size] = pos +
+				positions[positions_size - 1];
+		else
+			positions[positions_size] = pos;
+		++positions_size;
+		str_end += offset;
+	}
+finish:
+	sqlDbFree(sql_get(), prefix_table);
+	/*
+	 * positions is a null terminated int32 array with Key positions in Str
+	 * positions == NULL in case of any runtime error
+	 */
+	return positions;
+}
+
 /** Implementation of the POSITION() function. */
 static void
 func_position_octets(struct sql_context *ctx, int argc, const struct Mem *argv)
@@ -573,18 +783,19 @@ func_position_characters(struct sql_context *ctx, int argc,
 	if (coll->cmp(key, key_size, str, str_end, coll) == 0)
 		return mem_set_uint(ctx->pOut, 1);
 
-	int i = 2;
-	int str_pos = 0;
-	while (str_end < str_size) {
-		UChar32 c;
-		U8_NEXT((uint8_t *)str, str_pos, str_size, c);
-		U8_NEXT((uint8_t *)str, str_end, str_size, c);
-		const char *s = str + str_pos;
-		if (coll->cmp(key, key_size, s, str_end - str_pos, coll) == 0)
-			return mem_set_uint(ctx->pOut, i);
-		++i;
+	int32_t pos = 0;
+	if (coll == NULL) {
+		char *res = memmem(str, str_size, key, key_size);
+		if (res != NULL)
+			pos = res - str + 1;
+	} else {
+		pos = kmp_first(ctx->coll, str, str_size, key, key_size);
+		if (pos == -1) {
+			ctx->is_aborted = true;
+			return;
+		}
 	}
-	return mem_set_uint(ctx->pOut, 0);
+	return mem_set_uint(ctx->pOut, pos);
 }
 
 /** Implementation of the SUBSTR() function. */
