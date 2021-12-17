@@ -66,14 +66,16 @@ local function parse_uribuf(uribuf)
             result[k] = ffi.string(uribuf[k])
         end
     end
-    result.params = {}
-    for param_idx = 0, uribuf.param_count - 1 do
-        local param = uribuf.params[param_idx]
-        local name = ffi.string(param.name)
-        result.params[name] = {}
-        for val_idx = 0, param.value_count - 1 do
-            result.params[name][val_idx + 1] =
-                ffi.string(param.values[val_idx])
+    if uribuf.param_count > 0 then
+        result.params = {}
+        for param_idx = 0, uribuf.param_count - 1 do
+            local param = uribuf.params[param_idx]
+            local name = ffi.string(param.name)
+            result.params[name] = {}
+            for val_idx = 0, param.value_count - 1 do
+                result.params[name][val_idx + 1] =
+                    ffi.string(param.values[val_idx])
+            end
         end
     end
     if uribuf.host_hint == 1 then
