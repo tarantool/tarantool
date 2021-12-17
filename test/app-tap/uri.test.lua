@@ -332,7 +332,7 @@ end
 local function test_parse_uri_set_from_lua_table(test)
     -- Tests for uri.parse_many() Lua bindings.
     -- (Several URIs with parameters, passed in different ways).
-    test:plan(134)
+    test:plan(132)
 
     local uri_set
 
@@ -525,13 +525,11 @@ local function test_parse_uri_set_from_lua_table(test)
     test:is(uri_set[1].host, 'unix/', 'host')
     test:is(uri_set[1].service, '/tmp/unix.sock', 'service')
     test:is(uri_set[1].unix, '/tmp/unix.sock', 'unix')
-    test:is(type(uri_set[1].params["q1"]), "nil", "name")
-    test:is(type(uri_set[1].params["q2"]), "nil", "name")
+    test:is(type(uri_set[1].params), "nil", "params")
     test:is(uri_set[2].host, 'unix/', 'host')
     test:is(uri_set[2].service, '/tmp/unix.sock', 'service')
     test:is(uri_set[2].unix, '/tmp/unix.sock', 'unix')
-    test:is(type(uri_set[2].params["q1"]), "nil", "name")
-    test:is(type(uri_set[2].params["q2"]), "nil", "name")
+    test:is(type(uri_set[1].params), "nil", "params")
 
     -- URI table without URI
     uri_set = uri.parse_many({
