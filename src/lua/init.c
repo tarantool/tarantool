@@ -76,6 +76,11 @@ LUALIB_API int
 luaopen_zlib(lua_State *L);
 #endif
 
+#if defined(EMBED_LUAZIP)
+LUALIB_API int
+luaopen_zip(lua_State *L);
+#endif
+
 /**
  * The single Lua state of the transaction processor (tx) thread.
  */
@@ -696,6 +701,10 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	lua_pop(L, 1);
 #if defined(EMBED_LUAZLIB)
 	luaopen_zlib(L);
+	lua_pop(L, 1);
+#endif
+#if defined(EMBED_LUAZIP)
+	luaopen_zip(L);
 	lua_pop(L, 1);
 #endif
 #if defined(HAVE_GNU_READLINE)
