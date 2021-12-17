@@ -83,6 +83,10 @@ test_run:switch('replica')
  | ---
  | - true
  | ...
+test_run:wait_upstream(1, {status = 'follow'})
+ | ---
+ | - true
+ | ...
 box.cfg{checkpoint_count = 1}
  | ---
  | ...
@@ -249,6 +253,10 @@ test_run:cmd('start server replica')
  | ...
 
 test_run:switch('replica')
+ | ---
+ | - true
+ | ...
+test_run:wait_upstream(1, {status = 'follow'})
  | ---
  | - true
  | ...

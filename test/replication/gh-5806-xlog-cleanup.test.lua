@@ -45,6 +45,7 @@ test_run:cmd('start server replica')
 -- there gonna be an own data loss). This allows us to
 -- trigger XlogGapError in the log.
 test_run:switch('replica')
+test_run:wait_upstream(1, {status = 'follow'})
 box.cfg{checkpoint_count = 1}
 s = box.schema.space.create('testreplica')
 _ = s:create_index('pk')
@@ -122,6 +123,7 @@ test_run:cmd('create server replica with rpl_master=master,\
 test_run:cmd('start server replica')
 
 test_run:switch('replica')
+test_run:wait_upstream(1, {status = 'follow'})
 box.cfg{checkpoint_count = 1}
 s = box.schema.space.create('testreplica')
 _ = s:create_index('pk')
