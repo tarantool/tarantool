@@ -120,10 +120,6 @@ message(STATUS "Looking for libunwind.h")
 find_path(UNWIND_INCLUDE_DIR libunwind.h)
 message(STATUS "Looking for libunwind.h - ${UNWIND_INCLUDE_DIR}")
 
-if (UNWIND_INCLUDE_DIR)
-    include_directories(${UNWIND_INCLUDE_DIR})
-endif()
-
 set(CMAKE_REQUIRED_INCLUDES ${UNWIND_INCLUDE_DIR})
 check_include_file(libunwind.h HAVE_LIBUNWIND_H)
 set(CMAKE_REQUIRED_INCLUDES "")

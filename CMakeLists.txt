@@ -282,6 +282,12 @@ include_directories(${PROJECT_SOURCE_DIR}/src/lib/small/third_party)
 include_directories(${PROJECT_SOURCE_DIR}/src/lib/core)
 include_directories(${PROJECT_SOURCE_DIR}/third_party)
 
+# gh-6683: libunwind include path should be after ${PROJECT_SOURCE_DIR}/src/lib
+if (UNWIND_INCLUDE_DIR)
+    include_directories(${UNWIND_INCLUDE_DIR})
+endif()
+
+
 #
 # Specify Tarantool modules prefixes
 #
