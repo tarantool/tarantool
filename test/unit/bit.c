@@ -159,7 +159,6 @@ test_index(void)
 	footer();
 }
 
-
 static void
 test_bit_iter(void)
 {
@@ -206,6 +205,38 @@ test_bit_iter_empty(void)
 	footer();
 }
 
+/**
+ * Check that bit iterator works correctly with bit sequences of size that are
+ * not multiple of uint64_t.
+ */
+static void
+test_bit_iter_fractional(void)
+{
+	header();
+
+	struct bit_iterator it;
+	uint64_t data[2] = {UINT64_MAX, UINT64_MAX};
+
+	for (size_t size = 1; size <= 16; size++) {
+		bit_iterator_init(&it, &data, size, true);
+
+		size_t expect_count = size * CHAR_BIT;
+		size_t expect_pos = 0;
+		size_t pos;
+
+		while ( (pos = bit_iterator_next(&it)) != SIZE_MAX) {
+			fail_unless(expect_count > 0);
+			fail_unless(pos == expect_pos);
+			expect_count--;
+			expect_pos++;
+		}
+
+		fail_unless(expect_count == 0);
+	}
+
+	footer();
+}
+
 static void
 test_bitmap_size(void)
 {
@@ -230,5 +261,6 @@ main(void)
 	test_index();
 	test_bit_iter();
 	test_bit_iter_empty();
+	test_bit_iter_fractional();
 	test_bitmap_size();
 }

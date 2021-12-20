@@ -590,11 +590,11 @@ bit_iterator_init(struct bit_iterator *it, const void *data, size_t size,
 	it->word_base = 0;
 
 	/* Check if size is a multiple of sizeof(ITER_UINT) */
-	const char *e = it->next + size % sizeof(ITER_UINT);
-	if (bit_likely(it->next == e)) {
+	if (bit_likely(size % sizeof(ITER_UINT) == 0)) {
 		it->word = ITER_LOAD(it->next);
 		it->next += sizeof(ITER_UINT);
 	} else {
+		const char *e = it->next + size % sizeof(ITER_UINT);
 		it->word = it->word_xor;
 		char *w = (char *) &it->word;
 		while (it->next < e)
