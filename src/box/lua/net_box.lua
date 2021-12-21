@@ -96,19 +96,19 @@ local function parse_connect_params(host_or_uri, ...) -- self? host_or_uri port?
         for k, v in pairs(opts) do copy[k] = v end
         opts = copy
     end
-    local host = host_or_uri
-    if port == nil then
-        local url = urilib.parse(tostring(host))
-        if url == nil or url.service == nil then
-            box.error(E_PROC_LUA,
-                "usage: connect(uri[, opts] | host, port[, opts])")
-        end
-        host, port = url.host, url.service
-        if opts.user == nil and opts.password == nil then
-            opts.user, opts.password = url.login, url.password
-        end
+    local uri
+    if port == nil and (type(host_or_uri) == 'string' or
+                        type(host_or_uri) == 'number' or
+                        type(host_or_uri) == 'table') then
+        uri = host_or_uri
+    elseif type(host_or_uri) == 'string' and (type(port) == 'string' or
+                                              type(port) == 'number') then
+        uri = urilib.format({host = host_or_uri, service = tostring(port)})
+    else
+        box.error(E_PROC_LUA,
+                  "usage: connect(uri[, opts] | host, port[, opts])")
     end
-    return host, port, opts
+    return uri, opts
 end
 
 local function remote_serialize(self)
@@ -237,7 +237,15 @@ local stream_spaces_mt = {
 
 local space_metatable, index_metatable
 
-local function new_sm(host, port, opts)
+local function new_sm(uri, opts)
+    local parsed_uri = urilib.parse(uri)
+    if not parsed_uri then
+        box.error()
+    end
+    if opts.user == nil and opts.password == nil then
+        opts.user, opts.password = parsed_uri.login, parsed_uri.password
+    end
+    local host, port = parsed_uri.host, parsed_uri.service
     local user, password = opts.user, opts.password; opts.password = nil
     local last_reconnect_error
     local remote = {host = host, port = port, opts = opts, state = 'initial'}
@@ -351,7 +359,7 @@ local function new_sm(host, port, opts)
     end
     remote._callback = callback
     local transport = internal.new_transport(
-            host, port, user, password, weak_callback,
+            uri, user, password, weak_callback,
             opts.connect_timeout, opts.reconnect_after)
     remote._transport = transport
     remote._gc_hook = ffi.gc(ffi.new('char[1]'), function()
@@ -1060,9 +1068,9 @@ function this_module.timeout(timeout, ...)
     if type(timeout) == 'table' then timeout = ... end
     if not timeout then return this_module end
     local function timed_connect(...)
-        local host, port, opts = parse_connect_params(...)
+        local uri, opts = parse_connect_params(...)
         if opts.wait_connected ~= false then opts.wait_connected = timeout end
-        return connect(host, port, opts)
+        return connect(uri, opts)
     end
     return setmetatable({
         connect = timed_connect, new = timed_connect
