@@ -55,7 +55,7 @@ mp_sizeof_datetime(const struct datetime *date)
 struct datetime *
 datetime_unpack(const char **data, uint32_t len, struct datetime *date)
 {
-	if (len <= 0)
+	if (len < sizeof(int64_t))
 		return NULL;
 
 	const char *const svp = *data;
@@ -67,7 +67,7 @@ datetime_unpack(const char **data, uint32_t len, struct datetime *date)
 	len -= sizeof(i_epoch);
 
 	if (len == 0)
-		return date;
+		goto return_validated;
 
 	if (len != SZ_TAIL) {
 		*data = svp;
@@ -75,6 +75,12 @@ datetime_unpack(const char **data, uint32_t len, struct datetime *date)
 	}
 	memcpy(&date->nsec, *data, SZ_TAIL);
 	*data += SZ_TAIL;
+
+return_validated:
+	if (!datetime_validate(date)) {
+		*data = svp;
+		return NULL;
+	}
 
 	return date;
 }
