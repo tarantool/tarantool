@@ -171,10 +171,7 @@ uri_create_from_lua_table(struct lua_State *L, int idx, struct uri *uri)
 
 }
 
-/**
- * Create @a uri from the value at the given valid @a idx.
- */
-static int
+int
 luaT_uri_create(struct lua_State *L, int idx, struct uri *uri)
 {
 	int rc = 0;

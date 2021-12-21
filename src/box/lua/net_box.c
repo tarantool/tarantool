@@ -62,8 +62,10 @@
 #include "box/errcode.h"
 #include "lua/fiber.h"
 #include "lua/fiber_cond.h"
+#include "lua/uri.h"
 #include "mpstream/mpstream.h"
 #include "misc.h" /* lbox_check_tuple_format() */
+#include "uri/uri.h"
 #include "version.h"
 
 #define cfg luaL_msgpack_default
@@ -135,9 +137,8 @@ static const char *netbox_state_str[] = {
 };
 
 struct netbox_options {
-	/** Remote server host and port. */
-	char *host;
-	char *service;
+	/** Remote server URI. */
+	struct uri uri;
 	/** User credentials. */
 	char *user;
 	char *password;
@@ -437,6 +438,7 @@ static void
 netbox_options_create(struct netbox_options *opts)
 {
 	memset(opts, 0, sizeof(*opts));
+	uri_create(&opts->uri, NULL);
 	opts->callback_ref = LUA_NOREF;
 	opts->connect_timeout = NETBOX_DEFAULT_CONNECT_TIMEOUT;
 }
@@ -444,8 +446,7 @@ netbox_options_create(struct netbox_options *opts)
 static void
 netbox_options_destroy(struct netbox_options *opts)
 {
-	free(opts->host);
-	free(opts->service);
+	uri_destroy(&opts->uri);
 	free(opts->user);
 	free(opts->password);
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, opts->callback_ref);
@@ -929,8 +930,9 @@ netbox_transport_connect(struct netbox_transport *transport)
 	assert(!iostream_is_initialized(io));
 	ev_tstamp start, delay;
 	coio_timeout_init(&start, &delay, transport->opts.connect_timeout);
-	int fd = coio_connect_timeout(transport->opts.host,
-				      transport->opts.service, /*host_hint=*/0,
+	int fd = coio_connect_timeout(transport->opts.uri.host,
+				      transport->opts.uri.service,
+				      transport->opts.uri.host_hint,
 				      /*addr=*/NULL, /*addr_len=*/NULL, delay);
 	coio_timeout_update(&start, &delay);
 	if (fd < 0)
@@ -1934,14 +1936,14 @@ luaT_netbox_request_pairs(struct lua_State *L)
 
 /**
  * Creates a netbox transport object (userdata) and pushes it to Lua stack.
- * Takes the following arguments: host (string or nil), service (string),
+ * Takes the following arguments: uri (string, number, or table),
  * user (string or nil), password (string or nil), callback (function),
  * connect_timeout (number or nil), reconnect_after (number or nil).
  */
 static int
 luaT_netbox_new_transport(struct lua_State *L)
 {
-	assert(lua_gettop(L) == 7);
+	assert(lua_gettop(L) == 6);
 	/* Create a transport object. */
 	struct netbox_transport *transport;
 	transport = lua_newuserdata(L, sizeof(*transport));
@@ -1950,20 +1952,19 @@ luaT_netbox_new_transport(struct lua_State *L)
 	lua_setmetatable(L, -2);
 	/* Initialize options from Lua arguments. */
 	struct netbox_options *opts = &transport->opts;
-	if (!lua_isnil(L, 1))
-		opts->host = xstrdup(luaL_checkstring(L, 1));
-	opts->service = xstrdup(luaL_checkstring(L, 2));
+	if (luaT_uri_create(L, 1, &opts->uri) != 0)
+		return luaT_error(L);
+	if (!lua_isnil(L, 2))
+		opts->user = xstrdup(luaL_checkstring(L, 2));
 	if (!lua_isnil(L, 3))
-		opts->user = xstrdup(luaL_checkstring(L, 3));
-	if (!lua_isnil(L, 4))
-		opts->password = xstrdup(luaL_checkstring(L, 4));
-	assert(lua_isfunction(L, 5));
-	lua_pushvalue(L, 5);
+		opts->password = xstrdup(luaL_checkstring(L, 3));
+	assert(lua_isfunction(L, 4));
+	lua_pushvalue(L, 4);
 	opts->callback_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	if (!lua_isnil(L, 5))
+		opts->connect_timeout = luaL_checknumber(L, 5);
 	if (!lua_isnil(L, 6))
-		opts->connect_timeout = luaL_checknumber(L, 6);
-	if (!lua_isnil(L, 7))
-		opts->reconnect_after = luaL_checknumber(L, 7);
+		opts->reconnect_after = luaL_checknumber(L, 6);
 	if (opts->user == NULL && opts->password != NULL) {
 		diag_set(ClientError, ER_PROC_LUA,
 			 "net.box: user is not defined");
@@ -2561,10 +2562,10 @@ luaT_netbox_transport_start(struct lua_State *L)
 	struct lua_State *fiber_L = lua_newthread(L);
 	transport->coro_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	transport->self_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	transport->worker = fiber_new(tt_sprintf("%s:%s (net.box)",
-						 transport->opts.host,
-						 transport->opts.service),
-				      netbox_worker_f);
+	const char *name = tt_sprintf("%s:%s (net.box)",
+				      transport->opts.uri.host ?: "",
+				      transport->opts.uri.service ?: "");
+	transport->worker = fiber_new(name, netbox_worker_f);
 	if (transport->worker == NULL) {
 		luaL_unref(L, LUA_REGISTRYINDEX, transport->coro_ref);
 		transport->coro_ref = LUA_NOREF;
