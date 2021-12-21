@@ -2565,11 +2565,12 @@ net_send_greeting(struct cmsg *m)
  * Create a connection and start input.
  */
 static int
-iproto_on_accept(struct evio_service *service, int fd,
+iproto_on_accept(struct evio_service *service, const struct uri *uri, int fd,
 		 struct sockaddr *addr, socklen_t addrlen)
 {
-	(void) addr;
-	(void) addrlen;
+	(void)uri;
+	(void)addr;
+	(void)addrlen;
 	struct iproto_msg *msg;
 
 	struct iproto_thread *iproto_thread =

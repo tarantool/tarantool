@@ -41,6 +41,7 @@ extern "C" {
 
 struct iostream;
 struct sockaddr;
+struct uri_set;
 
 /**
  * Co-operative I/O

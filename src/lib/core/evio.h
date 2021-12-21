@@ -37,7 +37,6 @@
 #include <stdbool.h>
 #include "tarantool_ev.h"
 #include "sio.h"
-#include "uri/uri.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -64,9 +63,12 @@ extern "C" {
  */
 struct evio_service_entry;
 struct evio_service;
+struct uri;
+struct uri_set;
 
-typedef int (*evio_accept_f)(struct evio_service *, int, struct sockaddr *,
-			     socklen_t);
+typedef int (*evio_accept_f)(struct evio_service *service,
+			     const struct uri *uri, int fd,
+			     struct sockaddr *addr, socklen_t addrlen);
 
 struct evio_service {
         /** Total count of services */

@@ -40,6 +40,7 @@
 #include "iostream.h"
 #include "sio.h"
 #include "coio_task.h" /* coio_resolve() */
+#include "uri/uri.h"
 
 typedef void (*ev_stat_cb)(ev_loop *, ev_stat *, int);
 
@@ -469,9 +470,10 @@ coio_writev_timeout(struct iostream *io, struct iovec *iov, int iovcnt,
 }
 
 static int
-coio_service_on_accept(struct evio_service *evio_service,
+coio_service_on_accept(struct evio_service *evio_service, const struct uri *uri,
 		       int fd, struct sockaddr *addr, socklen_t addrlen)
 {
+	(void)uri;
 	struct coio_service *service = (struct coio_service *)
 			evio_service->on_accept_param;
 

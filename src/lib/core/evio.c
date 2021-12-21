@@ -38,11 +38,11 @@
 
 #include <trivia/util.h>
 #include "exception.h"
+#include "uri/uri.h"
 
 struct evio_service_entry {
-	/** Bind host:service, useful for logging */
-	char host[URI_MAXHOST];
-	char serv[URI_MAXSERVICE];
+	/** Bind URI */
+	struct uri uri;
 
 	/** Interface/port to bind to */
 	union {
@@ -190,7 +190,7 @@ evio_service_entry_accept_cb(ev_loop *loop, ev_io *watcher, int events)
 		if (evio_setsockopt_client(fd, entry->addr.sa_family,
 					   SOCK_STREAM) != 0)
 			break;
-		if (entry->service->on_accept(entry->service, fd,
+		if (entry->service->on_accept(entry->service, &entry->uri, fd,
 					      (struct sockaddr *)&addr,
 					      addrlen) != 0)
 			break;
@@ -301,6 +301,7 @@ evio_service_entry_create(struct evio_service_entry *entry,
 			  struct evio_service *service)
 {
 	memset(entry, 0, sizeof(struct evio_service_entry));
+	uri_create(&entry->uri, NULL);
 	/*
 	 * Initialize libev objects to be able to detect if they
 	 * are active or not in evio_service_entry_stop().
@@ -317,18 +318,17 @@ evio_service_entry_create(struct evio_service_entry *entry,
 static int
 evio_service_entry_bind(struct evio_service_entry *entry, const struct uri *u)
 {
-	entry->serv[0] = entry->host[0] = '\0';
 	assert(u->service != NULL);
-	strlcpy(entry->serv, u->service, sizeof(entry->serv));
-	if (u->host != NULL && strcmp(u->host, "*") != 0)
-		strlcpy(entry->host, u->host, sizeof(entry->host));
-	assert(! ev_is_active(&entry->ev));
+	assert(!ev_is_active(&entry->ev));
 
-	if (strcmp(entry->host, URI_HOST_UNIX) == 0) {
+	uri_destroy(&entry->uri);
+	uri_copy(&entry->uri, u);
+
+	if (u->host != NULL && strcmp(u->host, URI_HOST_UNIX) == 0) {
 		/* UNIX domain socket */
 		struct sockaddr_un *un = (struct sockaddr_un *) &entry->addr;
 		entry->addr_len = sizeof(*un);
-		strlcpy(un->sun_path, entry->serv, sizeof(un->sun_path));
+		strlcpy(un->sun_path, u->service, sizeof(un->sun_path));
 		un->sun_family = AF_UNIX;
 		return evio_service_entry_bind_addr(entry);
 	}
@@ -340,9 +340,8 @@ evio_service_entry_bind(struct evio_service_entry *entry, const struct uri *u)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE|AI_ADDRCONFIG;
 
-	/* make no difference between empty string and NULL for host */
-	if (getaddrinfo(*entry->host ? entry->host : NULL, entry->serv,
-			&hints, &res) != 0 || res == NULL) {
+	if (getaddrinfo(u->host, u->service, &hints, &res) != 0 ||
+	    res == NULL) {
 		diag_set(SocketError, sio_socketname(-1),
 			 "can't resolve uri for bind");
 		return -1;
@@ -373,6 +372,7 @@ evio_service_entry_detach(struct evio_service_entry *entry)
 		entry->addr_len = 0;
 	}
 	ev_io_set(&entry->ev, -1, 0);
+	uri_destroy(&entry->uri);
 }
 
 /** It's safe to stop a service entry which is not started yet. */
@@ -401,8 +401,8 @@ evio_service_entry_attach(struct evio_service_entry *dst,
 			 const struct evio_service_entry *src)
 {
 	assert(!ev_is_active(&dst->ev));
-	strcpy(dst->host, src->host);
-	strcpy(dst->serv, src->serv);
+	uri_destroy(&dst->uri);
+	uri_copy(&dst->uri, &src->uri);
 	dst->addrstorage = src->addrstorage;
 	dst->addr_len = src->addr_len;
 	ev_io_set(&dst->ev, src->ev.fd, EV_READ);
