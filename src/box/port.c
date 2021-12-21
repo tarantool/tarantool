@@ -120,13 +120,17 @@ port_c_add_tuple(struct port *base, struct tuple *tuple)
 	return 0;
 }
 
-int
-port_c_add_mp(struct port *base, const char *mp, const char *mp_end)
+/**
+ * Helper function of port_c_add_mp etc.
+ * Allocate a buffer of given size and add it to new entry of given port.
+ * Return pointer to allocated buffer or NULL in case of error (diag set).
+ */
+static char *
+port_c_prepare_mp(struct port *base, uint32_t size)
 {
 	struct port_c *port = (struct port_c *)base;
 	struct port_c_entry *pe;
-	assert(mp_end > mp);
-	uint32_t size = mp_end - mp;
+	assert(size > 0);
 	char *dst;
 	if (size <= PORT_ENTRY_SIZE) {
 		/*
@@ -137,27 +141,49 @@ port_c_add_mp(struct port *base, const char *mp, const char *mp_end)
 		dst = mempool_alloc(&port_entry_pool);
 		if (dst == NULL) {
 			diag_set(OutOfMemory, size, "mempool_alloc", "dst");
-			return -1;
+			return NULL;
 		}
 	} else {
 		dst = malloc(size);
 		if (dst == NULL) {
 			diag_set(OutOfMemory, size, "malloc", "dst");
-			return -1;
+			return NULL;
 		}
 	}
 	pe = port_c_new_entry(port);
 	if (pe != NULL) {
-		memcpy(dst, mp, size);
 		pe->mp = dst;
 		pe->mp_size = size;
-		return 0;
+		return dst;
 	}
 	if (size <= PORT_ENTRY_SIZE)
 		mempool_free(&port_entry_pool, dst);
 	else
 		free(dst);
-	return -1;
+	return NULL;
+}
+
+int
+port_c_add_mp(struct port *base, const char *mp, const char *mp_end)
+{
+	assert(mp_end > mp);
+	uint32_t mp_size = mp_end - mp;
+	char *dst = port_c_prepare_mp(base, mp_size);
+	if (dst == NULL)
+		return -1;
+	memcpy(dst, mp, mp_end - mp);
+	return 0;
+}
+
+int
+port_c_add_str(struct port *base, const char *str, uint32_t len)
+{
+	uint32_t mp_size = mp_sizeof_str(len);
+	char *dst = port_c_prepare_mp(base, mp_size);
+	if (dst == NULL)
+		return -1;
+	mp_encode_str(dst, str, len);
+	return 0;
 }
 
 static int
