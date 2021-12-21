@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include "c-dt/dt.h"
+#include "trivia/util.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -61,6 +62,19 @@ struct tnt_tm;
 	(MAX_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_1970_OFFSET)
 #define MIN_EPOCH_SECS_VALUE    \
 	(MIN_DT_DAY_VALUE * SECS_PER_DAY - SECS_EPOCH_1970_OFFSET)
+
+/**
+ * At the moment the range of known timezones is UTC-12:00..UTC+14:00
+ * https://en.wikipedia.org/wiki/List_of_UTC_time_offsets
+ */
+#define MAX_TZOFFSET (14L * 60)
+#define MIN_TZOFFSET (-12L * 60)
+
+/**
+ * Actually we have lesser number of generated timezones, but 1024
+ * might be a good estimate.
+ */
+#define MAX_TZINDEX 1024
 
 /**
  * datetime structure keeps number of seconds and
@@ -400,6 +414,25 @@ static inline int64_t
 datetime_usec(const struct datetime *date)
 {
 	return datetime_nsec(date) / 1000;
+}
+
+/** Simplified checker for datetime structure validity */
+static inline bool
+datetime_validate(const struct datetime *date)
+{
+	if (unlikely(date->epoch < MIN_EPOCH_SECS_VALUE) ||
+	    unlikely(date->epoch > MAX_EPOCH_SECS_VALUE))
+		return false;
+	if (unlikely(date->nsec < 0) ||
+	    unlikely(date->nsec >= MAX_NANOS_PER_SEC))
+		return false;
+	if (unlikely(date->tzoffset < MIN_TZOFFSET) ||
+	    unlikely(date->tzoffset > MAX_TZOFFSET))
+		return false;
+	if (unlikely(date->tzindex < 0) ||
+	    unlikely(date->tzindex > MAX_TZINDEX))
+		return false;
+	return true;
 }
 
 /** Parse MAP value and construct DATETIME value. */
