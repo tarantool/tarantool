@@ -25,15 +25,14 @@ static struct date_time_zone zones_raw[] = {
 #undef ZONE_ABBREV
 };
 
-#define ZONES_MAX 1024
-static_assert(ZONES_MAX >= lengthof(zones_raw), "please increase ZONES_MAX");
+static_assert(MAX_TZINDEX >= lengthof(zones_raw), "please increase MAX_TZINDEX");
 
 /**
  * Sorted array of zone descriptors, whether it's abbreviation, full
  * zone name or [backward-compatible] link name.
  */
 static struct date_time_zone zones_sorted[lengthof(zones_raw)];
-static struct date_time_zone zones_unsorted[ZONES_MAX];
+static struct date_time_zone zones_unsorted[MAX_TZINDEX];
 
 static int
 compare_zones(const void *a, const void *b)
