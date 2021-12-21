@@ -7,6 +7,7 @@
 #include "uri_parser.h"
 #include "trivia/util.h"
 
+#define XSTRDUP(s)      (s != NULL ? xstrdup(s) : NULL)
 #define XSTRNDUP(s, n)  (s != NULL ? xstrndup(s, n) : NULL)
 
 struct uri_param {
@@ -64,6 +65,20 @@ uri_param_create(struct uri_param *param, const char *name)
 	param->name = xstrdup(name);
 	param->values = NULL;
 	param->value_count = 0;
+}
+
+/**
+ * Copy URI parameter @a src to @a dst.
+ */
+static void
+uri_param_copy(struct uri_param *dst, const struct uri_param *src)
+{
+	dst->name = xstrdup(src->name);
+	dst->value_count = src->value_count;
+	dst->values = (src->value_count == 0 ? NULL :
+		       xmalloc(src->value_count * sizeof(*dst->values)));
+	for (int i = 0; i < src->value_count; i++)
+		dst->values[i] = xstrdup(src->values[i]);
 }
 
 void
@@ -132,6 +147,25 @@ uri_create_params(struct uri *uri, const char *query)
 		uri_add_param(uri, name, value);
 	}
 	free(copy);
+}
+
+void
+uri_copy(struct uri *dst, const struct uri *src)
+{
+	dst->scheme = XSTRDUP(src->scheme);
+	dst->login = XSTRDUP(src->login);
+	dst->password = XSTRDUP(src->password);
+	dst->host = XSTRDUP(src->host);
+	dst->service = XSTRDUP(src->service);
+	dst->path = XSTRDUP(src->path);
+	dst->query = XSTRDUP(src->query);
+	dst->fragment = XSTRDUP(src->fragment);
+	dst->host_hint = src->host_hint;
+	dst->param_count = src->param_count;
+	dst->params = (src->param_count == 0 ? NULL :
+		       xmalloc(src->param_count * sizeof(*dst->params)));
+	for (int i = 0; i < src->param_count; i++)
+		uri_param_copy(&dst->params[i], &src->params[i]);
 }
 
 void

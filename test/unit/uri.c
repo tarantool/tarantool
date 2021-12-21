@@ -13,6 +13,133 @@
 #define URI_PARAM_MAX 10
 #define URI_PARAM_VALUE_MAX 10
 
+#define is_str(a, b, fmt, args...) ok(strcmp(a, b) == 0, fmt, ##args)
+
+static void
+sample_uri_create(struct uri *uri)
+{
+	int rc = uri_create(uri,
+			    "scheme://login:password@127.0.0.1:3301/path?"
+			    "q1=v1&q1=v2&q2=v3&q3#fragment");
+	ok(rc == 0, "sample uri create");
+}
+
+static void
+sample_uri_check(const struct uri *uri, const char *msg)
+{
+	plan(16);
+	is_str(uri->scheme, "scheme", "%s scheme", msg);
+	is_str(uri->login, "login", "%s login", msg);
+	is_str(uri->password, "password", "%s password", msg);
+	is_str(uri->host, "127.0.0.1", "%s host", msg);
+	is_str(uri->service, "3301", "%s service", msg);
+	is_str(uri->path, "/path", "%s path", msg);
+	is_str(uri->query, "q1=v1&q1=v2&q2=v3&q3", "%s query", msg);
+	is_str(uri->fragment, "fragment", "%s fragment", msg);
+	is(uri->host_hint, 1, "%s hint", msg);
+	is(uri->param_count, 3, "%s param count", msg);
+	is(uri_param_count(uri, "q1"), 2, "%s param 1 value count", msg);
+	is_str(uri_param(uri, "q1", 0), "v1", "%s param 1 value 1", msg);
+	is_str(uri_param(uri, "q1", 1), "v2", "%s param 1 value 2", msg);
+	is(uri_param_count(uri, "q2"), 1, "%s param 2 value count", msg);
+	is_str(uri_param(uri, "q2", 0), "v3", "%s param 2 value", msg);
+	is(uri_param_count(uri, "q3"), 0, "%s param 3 value count", msg);
+	check_plan();
+}
+
+static void
+empty_uri_create(struct uri *uri)
+{
+	int rc = uri_create(uri, NULL);
+	ok(rc == 0, "empty uri create");
+}
+
+static void
+empty_uri_check(struct uri *uri, const char *msg)
+{
+	plan(11);
+	is(uri->scheme, NULL, "%s scheme", msg);
+	is(uri->login, NULL, "%s login", msg);
+	is(uri->password, NULL, "%s password", msg);
+	is(uri->host, NULL, "%s host", msg);
+	is(uri->service, NULL, "%s service", msg);
+	is(uri->path, NULL, "%s path", msg);
+	is(uri->query, NULL, "%s query", msg);
+	is(uri->fragment, NULL, "%s fragment", msg);
+	is(uri->host_hint, 0, "%s hint", msg);
+	is(uri->param_count, 0, "%s param count", msg);
+	is(uri->params, NULL, "%s params", msg);
+	check_plan();
+}
+
+static void
+test_copy_sample(void)
+{
+	header();
+	plan(3);
+	struct uri src;
+	sample_uri_create(&src);
+	struct uri dst;
+	uri_copy(&dst, &src);
+	sample_uri_check(&src, "src");
+	sample_uri_check(&dst, "dst");
+	uri_destroy(&src);
+	uri_destroy(&dst);
+	check_plan();
+	footer();
+}
+
+static void
+test_copy_empty(void)
+{
+	header();
+	plan(3);
+	struct uri src;
+	empty_uri_create(&src);
+	struct uri dst;
+	uri_copy(&dst, &src);
+	empty_uri_check(&src, "src");
+	empty_uri_check(&dst, "dst");
+	uri_destroy(&src);
+	uri_destroy(&dst);
+	check_plan();
+	footer();
+}
+
+static void
+test_move_sample(void)
+{
+	header();
+	plan(3);
+	struct uri src;
+	sample_uri_create(&src);
+	struct uri dst;
+	uri_move(&dst, &src);
+	empty_uri_check(&src, "src");
+	sample_uri_check(&dst, "dst");
+	uri_destroy(&src);
+	uri_destroy(&dst);
+	check_plan();
+	footer();
+}
+
+static void
+test_move_empty(void)
+{
+	header();
+	plan(3);
+	struct uri src;
+	empty_uri_create(&src);
+	struct uri dst;
+	uri_move(&dst, &src);
+	empty_uri_check(&src, "src");
+	empty_uri_check(&dst, "dst");
+	uri_destroy(&src);
+	uri_destroy(&dst);
+	check_plan();
+	footer();
+}
+
 struct uri_param_expected {
 	/** URI parameter name */
 	const char *name;
@@ -79,7 +206,7 @@ uri_set_expected_check(const struct uri_set_expected *uri_set, bool parse_is_suc
 	return check_plan();
 }
 
-static int
+static void
 test_string_uri_with_query_params_parse(void)
 {
 	const struct uri_expected uris[] = {
@@ -268,6 +395,7 @@ test_string_uri_with_query_params_parse(void)
 			.params = {},
 		}
 	};
+	header();
 	plan(2 * lengthof(uris));
 	struct uri u;
 	for (unsigned i = 0; i < lengthof(uris); i++) {
@@ -276,10 +404,11 @@ test_string_uri_with_query_params_parse(void)
 		uri_expected_check(&uris[i], &u);
 		uri_destroy(&u);
 	}
-	return check_plan();
+	check_plan();
+	footer();
 }
 
-static int
+static void
 test_string_uri_set_with_query_params_parse(void)
 {
 	const struct uri_set_expected uri_set_array[] = {
@@ -407,13 +536,15 @@ test_string_uri_set_with_query_params_parse(void)
 			.uris = {},
 		}
 	};
+	header();
 	plan(lengthof(uri_set_array));
 	for (unsigned i = 0; i < lengthof(uri_set_array); i++)
 		uri_set_expected_check(&uri_set_array[i], true);
-	return check_plan();
+	check_plan();
+	footer();
 }
 
-static int
+static void
 test_invalid_string_uri_set(void)
 {
 	const struct uri_set_expected uri_set_array[] = {
@@ -447,16 +578,22 @@ test_invalid_string_uri_set(void)
 			.uris = {}
 		}
 	};
+	header();
 	plan(lengthof(uri_set_array));
 	for (unsigned i = 0; i < lengthof(uri_set_array); i++)
 		uri_set_expected_check(&uri_set_array[i], false);
-	return check_plan();
+	check_plan();
+	footer();
 }
 
 int
 main(void)
 {
-	plan(3);
+	plan(7);
+	test_copy_sample();
+	test_copy_empty();
+	test_move_sample();
+	test_move_empty();
 	test_string_uri_with_query_params_parse();
 	test_string_uri_set_with_query_params_parse();
 	test_invalid_string_uri_set();

@@ -56,6 +56,13 @@ void
 uri_remove_param(struct uri *uri, const char *name);
 
 /**
+ * Copy constructor for @a dst URI. Copies all fiels from
+ * @a src URI to @dst URI.
+ */
+void
+uri_copy(struct uri *dst, const struct uri *src);
+
+/**
  * Move constructor for @a dst URI. Move all fields from
  * @a src URI to @a dst and clear @a src URI.
  */
