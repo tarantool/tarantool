@@ -150,6 +150,10 @@ port_c_add_tuple(struct port *port, struct tuple *tuple);
 int
 port_c_add_mp(struct port *port, const char *mp, const char *mp_end);
 
+/** Append a string to the port. The string is copied as msgpack string. */
+int
+port_c_add_str(struct port *port, const char *str, uint32_t len);
+
 void
 port_init(void);
 
