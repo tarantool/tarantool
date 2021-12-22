@@ -2064,6 +2064,13 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	}
 	recovery_finalize(recovery);
 
+	if (vclock_compare(&replicaset.vclock, &recovery->vclock) != 0) {
+		panic("Can't proceed. Replicaset vclock (%s) doesn't match "
+		      "recovered data (%s)",
+		      vclock_to_string(&replicaset.vclock),
+		      vclock_to_string(&recovery->vclock));
+	}
+
 	/*
 	 * We must enable WAL before finalizing engine recovery,
 	 * because an engine may start writing to WAL right after
