@@ -67,6 +67,8 @@ datetime_strftime(const struct datetime *date, char *buf, size_t len,
 	return tnt_strftime(buf, len, fmt, &tm);
 }
 
+EXPORT_ALIAS(datetime_strftime, tnt_datetime_strftime);
+
 void
 datetime_now(struct datetime *now)
 {
@@ -79,6 +81,8 @@ datetime_now(struct datetime *now)
 	localtime_r(&tv.tv_sec, &tm);
 	now->tzoffset = tm.tm_gmtoff / 60;
 }
+
+EXPORT_ALIAS(datetime_now, tnt_datetime_now);
 
 /**
  * NB! buf may be NULL, and we should handle it gracefully, returning
@@ -133,6 +137,8 @@ datetime_to_string(const struct datetime *date, char *buf, ssize_t len)
 	}
 	return sz;
 }
+
+EXPORT_ALIAS(datetime_to_string, tnt_datetime_to_string);
 
 int
 datetime_compare(const struct datetime *lhs, const struct datetime *rhs)

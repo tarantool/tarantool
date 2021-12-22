@@ -79,6 +79,8 @@ datetime_unpack(const char **data, uint32_t len, struct datetime *date)
 	return date;
 }
 
+EXPORT_ALIAS(datetime_unpack, tnt_datetime_unpack);
+
 struct datetime *
 mp_decode_datetime(const char **data, struct datetime *date)
 {
@@ -96,6 +98,8 @@ mp_decode_datetime(const char **data, struct datetime *date)
 	}
 	return date;
 }
+
+EXPORT_ALIAS(mp_decode_datetime, tnt_mp_decode_datetime);
 
 char *
 datetime_pack(char *data, const struct datetime *date)

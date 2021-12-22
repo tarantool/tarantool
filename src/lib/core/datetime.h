@@ -8,6 +8,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include <sys/types.h>
+#include "trivia/util.h"
 
 #if defined(__cplusplus)
 extern "C" {
