@@ -1,7 +1,7 @@
 #include "msgpuck.h"
 #include "module.h"
 #include "mp_extension_types.h"
-#include "lua/tnt_msgpuck.h"
+#include "msgpuck.h"
 #include "mp_uuid.h"
 
 enum {
@@ -43,7 +43,7 @@ ret_uuid(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	memset(&uuid, 0x11, sizeof(uuid));
 	char res[BUF_SIZE];
 	memset(res, '\0', BUF_SIZE);
-	char *end = tnt_mp_encode_uuid(res, &uuid);
+	char *end = mp_encode_uuid(res, &uuid);
 	box_return_mp(ctx, res, end);
 	return 0;
 }

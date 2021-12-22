@@ -30,82 +30,23 @@
  */
 
 #include "msgpuck.h"
-#include "tnt_msgpuck.h"
+#include "trivia/util.h"
+#include "mp_datetime.h"
+#include "mp_decimal.h"
+#include "box/mp_error.h"
+#include "mp_uuid.h"
 
-char *
-tnt_mp_encode_float(char *data, float num)
-{
-	return mp_encode_float(data, num);
-}
+EXPORT_ALIAS(mp_encode_float, tnt_mp_encode_float);
+EXPORT_ALIAS(mp_encode_double, tnt_mp_encode_double);
+EXPORT_ALIAS(mp_decode_float, tnt_mp_decode_float); 
+EXPORT_ALIAS(mp_decode_double, tnt_mp_decode_double);
 
-char *
-tnt_mp_encode_double(char *data, double num)
-{
-	return mp_encode_double(data, num);
-}
-
-float
-tnt_mp_decode_float(const char **data)
-{
-	return mp_decode_float(data);
-}
-
-double
-tnt_mp_decode_double(const char **data)
-{
-	return mp_decode_double(data);
-}
-
-uint32_t
-tnt_mp_decode_extl(const char **data, int8_t *type)
-{
-	return mp_decode_extl(data, type);
-}
-
-char *
-tnt_mp_encode_decimal(char *data, const decimal_t *dec)
-{
-	return mp_encode_decimal(data, dec);
-}
-
-uint32_t
-tnt_mp_sizeof_decimal(const decimal_t *dec)
-{
-	return mp_sizeof_decimal(dec);
-}
-
-char *
-tnt_mp_encode_uuid(char *data, const struct tt_uuid *uuid)
-{
-	return mp_encode_uuid(data, uuid);
-}
-
-uint32_t
-tnt_mp_sizeof_uuid(void)
-{
-	return mp_sizeof_uuid();
-}
-
-char *
-tnt_mp_encode_error(char *data, const struct error *error)
-{
-	return mp_encode_error(data, error);
-}
-
-uint32_t
-tnt_mp_sizeof_error(const struct error *error)
-{
-	return mp_sizeof_error(error);
-}
-
-char *
-tnt_mp_encode_datetime(char *data, const struct datetime *date)
-{
-	return mp_encode_datetime(data, date);
-}
-
-uint32_t
-tnt_mp_sizeof_datetime(const struct datetime *date)
-{
-	return mp_sizeof_datetime(date);
-}
+EXPORT_ALIAS(mp_decode_extl, tnt_mp_decode_extl);
+EXPORT_ALIAS(mp_encode_decimal, tnt_mp_encode_decimal);
+EXPORT_ALIAS(mp_sizeof_decimal, tnt_mp_sizeof_decimal);
+EXPORT_ALIAS(mp_encode_uuid, tnt_mp_encode_uuid);
+EXPORT_ALIAS(mp_sizeof_uuid, tnt_mp_sizeof_uuid);
+EXPORT_ALIAS(mp_encode_error, tnt_mp_encode_error);
+EXPORT_ALIAS(mp_sizeof_error, tnt_mp_sizeof_error);
+EXPORT_ALIAS(mp_encode_datetime, tnt_mp_encode_datetime);
+EXPORT_ALIAS(mp_sizeof_datetime, tnt_mp_sizeof_datetime);
