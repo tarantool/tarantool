@@ -1,4 +1,0 @@
-## bugfix/sql
-
-* Fixed explicit cast of negative DOUBLE to UNSIGNED, which could return
-negative result (gh-6010).
