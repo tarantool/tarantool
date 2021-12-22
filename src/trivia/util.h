@@ -390,6 +390,31 @@ strnindex(const char **haystack, const char *needle, uint32_t len, uint32_t hmax
 #  define PACKED
 #endif
 
+/**
+ * EXPORT_ALIAS(name, alias) exports publicly renamed symbol, which may be 
+ * prefixed appropriately to avoid symbol collision.
+ *
+ * \example EXPORT_ALIAS(datetime_unpack, tnt_datetime_unpack)
+ */
+#define EXPORT_ALIAS(name, alias) _EXPORT_ALIAS(name, alias)
+
+#ifdef __APPLE__
+#  if defined(__arm64__) || defined(__arm__)
+#    define JMP "b "
+#  else
+#    define JMP "jmp "
+#  endif
+#define _EXPORT_ALIAS(name, aliasname) \
+	static void *ref_fun_##aliasname MAYBE_UNUSED = (void *)name; \
+	__asm__("\t.text\n" \
+		"\t.globl _" #aliasname "\n" \
+		"_" #aliasname ": " JMP "_" #name "\n"); \
+	extern __typeof(name) aliasname;
+#else
+#define _EXPORT_ALIAS(name, aliasname) \
+	extern __typeof(name) aliasname __attribute__((alias(#name)));
+#endif
+
 /** Function Attributes }}} */
 
 /** {{{ Statement Attributes */
