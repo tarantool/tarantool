@@ -63,11 +63,10 @@ private:
 	{
 		key_def_delete(kd);
 		tuple_format_unref(fmt);
+		tuple_free();
 		SmallAlloc::destroy();
 		slab_cache_destroy(&memtx.slab_cache);
 		tuple_arena_destroy(&memtx.arena);
-		box_tuple_last = NULL;
-		tuple_free();
 		fiber_free();
 		memory_free();
 	}
@@ -183,7 +182,7 @@ bench_tuple_new(benchmark::State& state)
 	total_count += i;
 	state.SetItemsProcessed(total_count);
 
-	for (size_t k = i; NUM_TEST_TUPLES < i; k++)
+	for (size_t k = 0; k < i; k++)
 		tuple_unref(tuples[k]);
 }
 
