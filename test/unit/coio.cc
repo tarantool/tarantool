@@ -227,9 +227,9 @@ read_write_test(void)
 		struct iostream io;
 		if (i == 0) {
 			/* A non-readable fd, since the pipe is empty. */
-			iostream_create(&io, fds[0]);
+			plain_iostream_create(&io, fds[0]);
 		} else {
-			iostream_create(&io, fds[1]);
+			plain_iostream_create(&io, fds[1]);
 			/* Make the fd non-writable. */
 			fill_pipe(fds[1]);
 		}

@@ -1409,7 +1409,7 @@ iproto_connection_new(struct iproto_thread *iproto_thread, int fd)
 	con->iproto_thread = iproto_thread;
 	con->input.data = con->output.data = con;
 	con->loop = loop();
-	iostream_create(&con->io, fd);
+	plain_iostream_create(&con->io, fd);
 	ev_io_init(&con->input, iproto_connection_on_input, fd, EV_READ);
 	ev_io_init(&con->output, iproto_connection_on_output, fd, EV_WRITE);
 	ibuf_create(&con->ibuf[0], cord_slab_cache(), iproto_readahead);

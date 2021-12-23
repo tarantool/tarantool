@@ -1347,7 +1347,7 @@ exit_child:
 			int parent_fd = pfd[i][parent_idx];
 
 			assert(!iostream_is_initialized(&handle->ios[i]));
-			iostream_create(&handle->ios[i], parent_fd);
+			plain_iostream_create(&handle->ios[i], parent_fd);
 			if (fcntl(parent_fd, F_SETFL, O_NONBLOCK)) {
 				diag_set(SystemError, "Can't set O_NONBLOCK [%s:%d]",
 					 stdX_str(i), parent_fd);

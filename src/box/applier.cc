@@ -344,7 +344,7 @@ applier_connect(struct applier *applier)
 			      &applier->addr_len);
 	if (fd < 0)
 		diag_raise();
-	iostream_create(io, fd);
+	plain_iostream_create(io, fd);
 	if (coio_readn(io, greetingbuf, IPROTO_GREETING_SIZE) < 0)
 		diag_raise();
 	applier->last_row_time = ev_monotonic_now(loop());

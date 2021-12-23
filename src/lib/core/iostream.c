@@ -16,7 +16,7 @@
 static const struct iostream_vtab plain_iostream_vtab;
 
 void
-iostream_create(struct iostream *io, int fd)
+plain_iostream_create(struct iostream *io, int fd)
 {
 	assert(fd >= 0);
 	io->vtab = &plain_iostream_vtab;

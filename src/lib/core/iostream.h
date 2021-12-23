@@ -102,7 +102,7 @@ iostream_clear(struct iostream *io)
 /**
  * Returns:
  *  - false after iostream_clear
- *  - true  after iostream_create
+ *  - true  after construction
  *  - false after iostream_destroy and iostream_close
  */
 static inline bool
@@ -116,7 +116,7 @@ iostream_is_initialized(struct iostream *io)
  * for the given file descriptor.
  */
 void
-iostream_create(struct iostream *io, int fd);
+plain_iostream_create(struct iostream *io, int fd);
 
 /**
  * Destroys a stream and closes its fd. The stream fd is set to -1.
