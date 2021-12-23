@@ -112,6 +112,17 @@ iostream_is_initialized(struct iostream *io)
 }
 
 /**
+ * Move constructor: copies src to dst and clears src.
+ */
+static inline void
+iostream_move(struct iostream *dst, struct iostream *src)
+{
+	assert(iostream_is_initialized(src));
+	*dst = *src;
+	iostream_clear(src);
+}
+
+/**
  * Creates a plain stream (reads/writes fd without any processing)
  * for the given file descriptor.
  */
