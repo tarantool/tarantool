@@ -1,0 +1,7 @@
+1..1
+    1..1
+        1..2
+        ok 1 - mp_snprint unknown extension
+        ok 2 - mp_fprint unknown extension
+    ok 1 - subtests
+ok 1 - subtests

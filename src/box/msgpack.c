@@ -40,7 +40,7 @@
 static int
 msgpack_fprint_ext(FILE *file, const char **data, int depth)
 {
-	const char **orig = data;
+	const char *orig = *data;
 	int8_t type;
 	uint32_t len = mp_decode_extl(data, &type);
 	switch(type) {
@@ -53,14 +53,15 @@ msgpack_fprint_ext(FILE *file, const char **data, int depth)
 	case MP_ERROR:
 		return mp_fprint_error(file, data, depth);
 	default:
-		return mp_fprint_ext_default(file, orig, depth);
+		*data = orig;
+		return mp_fprint_ext_default(file, data, depth);
 	}
 }
 
 static int
 msgpack_snprint_ext(char *buf, int size, const char **data, int depth)
 {
-	const char **orig = data;
+	const char *orig = *data;
 	int8_t type;
 	uint32_t len = mp_decode_extl(data, &type);
 	switch(type) {
@@ -73,7 +74,8 @@ msgpack_snprint_ext(char *buf, int size, const char **data, int depth)
 	case MP_ERROR:
 		return mp_snprint_error(buf, size, data, depth);
 	default:
-		return mp_snprint_ext_default(buf, size, orig, depth);
+		*data = orig;
+		return mp_snprint_ext_default(buf, size, data, depth);
 	}
 }
 
