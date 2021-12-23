@@ -38,6 +38,7 @@
 
 #include <trivia/util.h>
 #include "exception.h"
+#include "iostream.h"
 #include "uri/uri.h"
 
 struct evio_service_entry {
@@ -190,10 +191,16 @@ evio_service_entry_accept_cb(ev_loop *loop, ev_io *watcher, int events)
 		if (evio_setsockopt_client(fd, entry->addr.sa_family,
 					   SOCK_STREAM) != 0)
 			break;
-		if (entry->service->on_accept(entry->service, &entry->uri, fd,
+		struct iostream io;
+		plain_iostream_create(&io, fd);
+		if (entry->service->on_accept(entry->service, &io,
 					      (struct sockaddr *)&addr,
-					      addrlen) != 0)
+					      addrlen) != 0) {
+			iostream_destroy(&io);
 			break;
+		}
+		/* Must be moved by the callback. */
+		assert(!iostream_is_initialized(&io));
 	}
 	if (fd >= 0)
 		close(fd);

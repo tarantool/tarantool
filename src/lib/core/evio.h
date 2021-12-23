@@ -63,12 +63,12 @@ extern "C" {
  */
 struct evio_service_entry;
 struct evio_service;
-struct uri;
+struct iostream;
 struct uri_set;
 
-typedef int (*evio_accept_f)(struct evio_service *service,
-			     const struct uri *uri, int fd,
-			     struct sockaddr *addr, socklen_t addrlen);
+typedef int
+(*evio_accept_f)(struct evio_service *service, struct iostream *io,
+		 struct sockaddr *addr, socklen_t addrlen);
 
 struct evio_service {
         /** Total count of services */
@@ -81,6 +81,9 @@ struct evio_service {
          * A callback invoked on every accepted client socket.
          * If a callback returned != 0, the accepted socket is
          * closed and the error is logged.
+         *
+         * On success the callback must move the IO stream object
+         * it was passed.
          */
         evio_accept_f on_accept;
         void *on_accept_param;

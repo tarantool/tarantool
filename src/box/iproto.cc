@@ -1273,7 +1273,7 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 			int events = iostream_status_to_events(nrd);
 			if (con->input.events != events) {
 				ev_io_stop(loop, &con->input);
-				ev_io_set(&con->input, con->input.fd, events);
+				ev_io_set(&con->input, con->io.fd, events);
 			}
 			ev_io_start(loop, &con->input);
 			return;
@@ -1385,7 +1385,7 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 			int events = iostream_status_to_events(rc);
 			if (con->output.events != events) {
 				ev_io_stop(loop, &con->output);
-				ev_io_set(&con->output, con->output.fd, events);
+				ev_io_set(&con->output, con->io.fd, events);
 			}
 			ev_io_start(loop, &con->output);
 			return;
@@ -1397,7 +1397,7 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 }
 
 static struct iproto_connection *
-iproto_connection_new(struct iproto_thread *iproto_thread, int fd)
+iproto_connection_new(struct iproto_thread *iproto_thread)
 {
 	struct iproto_connection *con = (struct iproto_connection *)
 		mempool_alloc(&iproto_thread->iproto_connection_pool);
@@ -1409,9 +1409,9 @@ iproto_connection_new(struct iproto_thread *iproto_thread, int fd)
 	con->iproto_thread = iproto_thread;
 	con->input.data = con->output.data = con;
 	con->loop = loop();
-	plain_iostream_create(&con->io, fd);
-	ev_io_init(&con->input, iproto_connection_on_input, fd, EV_READ);
-	ev_io_init(&con->output, iproto_connection_on_output, fd, EV_WRITE);
+	iostream_clear(&con->io);
+	ev_io_init(&con->input, iproto_connection_on_input, -1, EV_NONE);
+	ev_io_init(&con->output, iproto_connection_on_output, -1, EV_NONE);
 	ibuf_create(&con->ibuf[0], cord_slab_cache(), iproto_readahead);
 	ibuf_create(&con->ibuf[1], cord_slab_cache(), iproto_readahead);
 	obuf_create(&con->obuf[0], &con->iproto_thread->net_slabc,
@@ -2565,18 +2565,16 @@ net_send_greeting(struct cmsg *m)
  * Create a connection and start input.
  */
 static int
-iproto_on_accept(struct evio_service *service, const struct uri *uri, int fd,
+iproto_on_accept(struct evio_service *service, struct iostream *io,
 		 struct sockaddr *addr, socklen_t addrlen)
 {
-	(void)uri;
 	(void)addr;
 	(void)addrlen;
 	struct iproto_msg *msg;
 
 	struct iproto_thread *iproto_thread =
 		(struct iproto_thread *)service->on_accept_param;
-	struct iproto_connection *con =
-		iproto_connection_new(iproto_thread, fd);
+	struct iproto_connection *con = iproto_connection_new(iproto_thread);
 	if (con == NULL)
 		return -1;
 	/*
@@ -2586,9 +2584,10 @@ iproto_on_accept(struct evio_service *service, const struct uri *uri, int fd,
 	 */
 	msg = iproto_msg_new(con);
 	if (msg == NULL) {
-		mempool_free(&con->iproto_thread->iproto_connection_pool, con);
+		iproto_connection_delete(con);
 		return -1;
 	}
+	iostream_move(&con->io, io);
 	cmsg_init(&msg->base, iproto_thread->connect_route);
 	msg->p_ibuf = con->p_ibuf;
 	msg->wpos = con->wpos;
@@ -2646,7 +2645,7 @@ iproto_session_fd(struct session *session)
 {
 	struct iproto_connection *con =
 		(struct iproto_connection *) session->meta.connection;
-	return con->output.fd;
+	return con->io.fd;
 }
 
 int64_t
