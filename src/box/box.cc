@@ -1303,54 +1303,34 @@ box_set_election_timeout(void)
 }
 
 /*
- * Parse box.cfg.replication and create appliers.
- */
-static struct applier **
-cfg_get_replication(int *p_count)
-{
-
-	/* Use static buffer for result */
-	static struct applier *appliers[VCLOCK_MAX];
-
-	struct uri_set uri_set;
-	int rc = cfg_get_uri_set("replication", &uri_set);
-	assert(rc == 0);
-	(void)rc;
-
-	if (uri_set.uri_count >= VCLOCK_MAX) {
-		diag_set(ClientError, ER_CFG, "replication",
-			 "too many replicas");
-		uri_set_destroy(&uri_set);
-		return NULL;
-	}
-
-	*p_count = uri_set.uri_count;
-	for (int i = 0; i < uri_set.uri_count; i++)
-		appliers[i] = applier_new(&uri_set.uris[i]);
-
-	uri_set_destroy(&uri_set);
-	return appliers;
-}
-
-/*
  * Sync box.cfg.replication with the cluster registry, but
  * don't start appliers.
  */
 static void
 box_sync_replication(bool do_quorum, bool do_reuse)
 {
+	struct uri_set uri_set;
+	int rc = cfg_get_uri_set("replication", &uri_set);
+	assert(rc == 0);
+	(void)rc;
+	auto uri_set_guard = make_scoped_guard([&]{
+		uri_set_destroy(&uri_set);
+	});
+	if (uri_set.uri_count >= VCLOCK_MAX) {
+		tnt_raise(ClientError, ER_CFG, "replication",
+			  "too many replicas");
+	}
 	int count = 0;
-	struct applier **appliers = cfg_get_replication(&count);
-	if (appliers == NULL)
-		diag_raise();
-
-	auto guard = make_scoped_guard([=]{
+	struct applier *appliers[VCLOCK_MAX] = {};
+	auto appliers_guard = make_scoped_guard([=]{
 		for (int i = 0; i < count; i++)
 			applier_delete(appliers[i]); /* doesn't affect diag */
 	});
+	for (; count < uri_set.uri_count; count++) {
+		appliers[count] = applier_new(&uri_set.uris[count]);
+	}
 	replicaset_connect(appliers, count, do_quorum, do_reuse);
-
-	guard.is_active = false;
+	appliers_guard.is_active = false;
 }
 
 static inline void
