@@ -469,53 +469,6 @@ coio_writev_timeout(struct iostream *io, struct iovec *iov, int iovcnt,
 	return total;
 }
 
-static int
-coio_service_on_accept(struct evio_service *evio_service, const struct uri *uri,
-		       int fd, struct sockaddr *addr, socklen_t addrlen)
-{
-	(void)uri;
-	struct coio_service *service = (struct coio_service *)
-			evio_service->on_accept_param;
-
-	/* Set connection name. */
-	char fiber_name[SERVICE_NAME_MAXLEN];
-	snprintf(fiber_name, sizeof(fiber_name),
-		 "%s/%s", evio_service->name, sio_strfaddr(addr, addrlen));
-
-	/* Create the worker fiber. */
-	struct fiber *f = fiber_new(fiber_name, service->handler);
-	if (f == NULL) {
-		diag_log();
-		say_error("can't create a handler fiber, dropping client connection");
-		return -1;
-	}
-	/*
-	 * Start the created fiber. It becomes the socket fd owner
-	 * and will have to close it before termination.
-	 */
-	fiber_start(f, fd, addr, addrlen, service->handler_param);
-	return 0;
-}
-
-void
-coio_service_init(struct coio_service *service, const char *name,
-		  fiber_func handler, void *handler_param)
-{
-	evio_service_create(loop(), &service->evio_service, name,
-			    coio_service_on_accept, service);
-	service->handler = handler;
-	service->handler_param = handler_param;
-}
-
-int
-coio_service_start(struct evio_service *service, const struct uri_set *uri_set)
-{
-	if (evio_service_bind(service, uri_set) != 0 ||
-	    evio_service_listen(service) != 0)
-		return -1;
-	return 0;
-}
-
 void
 coio_stat_init(ev_stat *stat, const char *path)
 {

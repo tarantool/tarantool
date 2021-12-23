@@ -41,20 +41,6 @@ extern "C" {
 
 struct iostream;
 struct sockaddr;
-struct uri_set;
-
-/**
- * Co-operative I/O
- * Yield the current fiber until IO is ready.
- */
-struct coio_service
-{
-	struct evio_service evio_service;
-	/* Fiber function. */
-	fiber_func handler;
-	/** Passed to the created fiber. */
-	void *handler_param;
-};
 
 int
 coio_connect_timeout(const char *host, const char *service, int host_hint,
@@ -151,17 +137,6 @@ coio_writev(struct iostream *io, struct iovec *iov, int iovcnt, size_t size)
 {
 	return coio_writev_timeout(io, iov, iovcnt, size, TIMEOUT_INFINITY);
 }
-
-void
-coio_service_init(struct coio_service *service, const char *name,
-		  fiber_func handler, void *handler_param);
-
-/**
- * Wait until the service binds to the port.
- * Returns 0 on success, -1 on error.
- */
-int
-coio_service_start(struct evio_service *service, const struct uri_set *uri_set);
 
 void
 coio_stat_init(ev_stat *stat, const char *path);
