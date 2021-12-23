@@ -937,7 +937,7 @@ netbox_transport_connect(struct netbox_transport *transport)
 	coio_timeout_update(&start, &delay);
 	if (fd < 0)
 		goto io_error;
-	iostream_create(io, fd);
+	plain_iostream_create(io, fd);
 	char greetingbuf[IPROTO_GREETING_SIZE];
 	if (coio_readn_timeout(io, greetingbuf, IPROTO_GREETING_SIZE,
 			       delay) < 0)
