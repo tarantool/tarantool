@@ -41,6 +41,7 @@
 #include "msgpuck.h"
 #include "mp_extension_types.h"
 #include "fiber.h"
+#include "ssl_error.h"
 
 /**
  * MP_ERROR format:
@@ -257,6 +258,8 @@ error_build_xc(struct mp_error *mp_error)
 		err = new SwimError();
 	} else if (strcmp(mp_error->type, "CryptoError") == 0) {
 		err = new CryptoError();
+	} else if (strcmp(mp_error->type, "SSLError") == 0) {
+		err = new SSLError();
 	} else {
 		err = new ClientError();
 	}

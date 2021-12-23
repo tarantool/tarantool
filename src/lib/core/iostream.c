@@ -12,7 +12,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "diag.h"
 #include "sio.h"
+#include "ssl.h"
+#include "uri/uri.h"
 
 static const struct iostream_vtab plain_iostream_vtab;
 
@@ -86,23 +89,48 @@ int
 iostream_ctx_create(struct iostream_ctx *ctx, enum iostream_mode mode,
 		    const struct uri *uri)
 {
-	(void)uri;
 	assert(mode == IOSTREAM_SERVER || mode == IOSTREAM_CLIENT);
 	ctx->mode = mode;
+	const char *transport = uri_param(uri, "transport", 0);
+	if (transport != NULL) {
+		if (strcmp(transport, "ssl") == 0) {
+			ctx->ssl = ssl_iostream_ctx_new(mode, uri);
+			if (ctx->ssl == NULL)
+				goto err;
+		} else if (strcmp(transport, "plain") == 0) {
+			ctx->ssl = NULL;
+		} else {
+			diag_set(IllegalParams, "Invalid transport: %s",
+				 transport);
+			goto err;
+		}
+	}
 	return 0;
+err:
+	iostream_ctx_clear(ctx);
+	return -1;
 }
 
 void
 iostream_ctx_destroy(struct iostream_ctx *ctx)
 {
+	if (ctx->ssl != NULL)
+		ssl_iostream_ctx_delete(ctx->ssl);
 	iostream_ctx_clear(ctx);
 }
 
 int
-iostream_create(struct iostream *io, int fd, struct iostream_ctx *ctx)
+iostream_create(struct iostream *io, int fd, const struct iostream_ctx *ctx)
 {
 	assert(ctx->mode == IOSTREAM_SERVER || ctx->mode == IOSTREAM_CLIENT);
-	(void)ctx;
-	plain_iostream_create(io, fd);
+	if (ctx->ssl != NULL) {
+		if (ssl_iostream_create(io, fd, ctx->mode, ctx->ssl) != 0)
+			goto err;
+	} else {
+		plain_iostream_create(io, fd);
+	}
 	return 0;
+err:
+	iostream_clear(io);
+	return -1;
 }

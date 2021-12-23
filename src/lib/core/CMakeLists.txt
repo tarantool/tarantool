@@ -37,6 +37,18 @@ set(core_sources
     mp_datetime.c
 )
 
+if(ENABLE_SSL)
+    list(APPEND core_sources ${SSL_SOURCES})
+else()
+    list(APPEND core_sources ssl.c ssl_error.cc)
+endif()
+
+include_directories(${EXTRA_CORE_INCLUDE_DIRS})
+
+if(ENABLE_SSL)
+    include_directories(${OPENSSL_INCLUDE_DIR})
+endif()
+
 if (TARGET_OS_NETBSD)
     # A workaround for "undefined reference to `__gcc_personality_v0'"
     # on x86_64-rumprun-netbsd-gcc
@@ -62,4 +74,8 @@ endif()
 # HAVE_CLOCK_GETTIME_WITHOUT_RT in ${REPO}/CMakeLists.txt.
 if ("${HAVE_CLOCK_GETTIME}" AND NOT "${HAVE_CLOCK_GETTIME_WITHOUT_RT}")
     target_link_libraries(core rt)
+endif()
+
+if(ENABLE_SSL)
+    target_link_libraries(core ${OPENSSL_LIBRARIES})
 endif()
