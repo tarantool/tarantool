@@ -226,6 +226,8 @@ struct netbox_transport {
 	 * running.
 	 */
 	int self_ref;
+	/** Connection I/O stream context. */
+	struct iostream_ctx io_ctx;
 	/** Connection I/O stream. */
 	struct iostream io;
 	/** Connection send buffer. */
@@ -463,6 +465,7 @@ netbox_transport_create(struct netbox_transport *transport)
 	transport->worker = NULL;
 	transport->coro_ref = LUA_NOREF;
 	transport->self_ref = LUA_NOREF;
+	iostream_ctx_clear(&transport->io_ctx);
 	iostream_clear(&transport->io);
 	ibuf_create(&transport->send_buf, &cord()->slabc, NETBOX_READAHEAD);
 	ibuf_create(&transport->recv_buf, &cord()->slabc, NETBOX_READAHEAD);
@@ -480,6 +483,7 @@ netbox_transport_destroy(struct netbox_transport *transport)
 	assert(transport->worker == NULL);
 	assert(transport->coro_ref == LUA_NOREF);
 	assert(transport->self_ref == LUA_NOREF);
+	iostream_ctx_destroy(&transport->io_ctx);
 	assert(!iostream_is_initialized(&transport->io));
 	assert(ibuf_used(&transport->send_buf) == 0);
 	assert(ibuf_used(&transport->recv_buf) == 0);
@@ -937,7 +941,10 @@ netbox_transport_connect(struct netbox_transport *transport)
 	coio_timeout_update(&start, &delay);
 	if (fd < 0)
 		goto io_error;
-	plain_iostream_create(io, fd);
+	if (iostream_create(io, fd, &transport->io_ctx) != 0) {
+		close(fd);
+		goto error;
+	}
 	char greetingbuf[IPROTO_GREETING_SIZE];
 	if (coio_readn_timeout(io, greetingbuf, IPROTO_GREETING_SIZE,
 			       delay) < 0)
@@ -1968,6 +1975,10 @@ luaT_netbox_new_transport(struct lua_State *L)
 	if (opts->user == NULL && opts->password != NULL) {
 		diag_set(ClientError, ER_PROC_LUA,
 			 "net.box: user is not defined");
+		return luaT_error(L);
+	}
+	if (iostream_ctx_create(&transport->io_ctx, IOSTREAM_CLIENT,
+				&opts->uri) != 0) {
 		return luaT_error(L);
 	}
 	return 1;

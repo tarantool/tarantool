@@ -344,7 +344,10 @@ applier_connect(struct applier *applier)
 			      &applier->addr_len);
 	if (fd < 0)
 		diag_raise();
-	plain_iostream_create(io, fd);
+	if (iostream_create(io, fd, &applier->io_ctx) != 0) {
+		close(fd);
+		diag_raise();
+	}
 	if (coio_readn(io, greetingbuf, IPROTO_GREETING_SIZE) < 0)
 		diag_raise();
 	applier->last_row_time = ev_monotonic_now(loop());
@@ -1657,6 +1660,10 @@ applier_new(struct uri *uri)
 {
 	struct applier *applier = (struct applier *)
 		xcalloc(1, sizeof(struct applier));
+	if (iostream_ctx_create(&applier->io_ctx, IOSTREAM_CLIENT, uri) != 0) {
+		free(applier);
+		diag_raise();
+	}
 	iostream_clear(&applier->io);
 	ibuf_create(&applier->ibuf, &cord()->slabc, 1024);
 
@@ -1675,6 +1682,7 @@ applier_delete(struct applier *applier)
 {
 	assert(applier->reader == NULL && applier->writer == NULL);
 	assert(!iostream_is_initialized(&applier->io));
+	iostream_ctx_destroy(&applier->io_ctx);
 	ibuf_destroy(&applier->ibuf);
 	uri_destroy(&applier->uri);
 	trigger_destroy(&applier->on_state);

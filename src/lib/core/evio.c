@@ -44,14 +44,14 @@
 struct evio_service_entry {
 	/** Bind URI */
 	struct uri uri;
-
 	/** Interface/port to bind to */
 	union {
 		struct sockaddr addr;
 		struct sockaddr_storage addrstorage;
 	};
 	socklen_t addr_len;
-
+	/** IO stream context. */
+	struct iostream_ctx io_ctx;
 	/** libev io object for the acceptor socket. */
 	struct ev_io ev;
 	/** Pointer to the root evio_service, which contains this object */
@@ -192,7 +192,8 @@ evio_service_entry_accept_cb(ev_loop *loop, ev_io *watcher, int events)
 					   SOCK_STREAM) != 0)
 			break;
 		struct iostream io;
-		plain_iostream_create(&io, fd);
+		if (iostream_create(&io, fd, &entry->io_ctx) != 0)
+			break;
 		if (entry->service->on_accept(entry->service, &io,
 					      (struct sockaddr *)&addr,
 					      addrlen) != 0) {
@@ -307,8 +308,10 @@ static void
 evio_service_entry_create(struct evio_service_entry *entry,
 			  struct evio_service *service)
 {
-	memset(entry, 0, sizeof(struct evio_service_entry));
 	uri_create(&entry->uri, NULL);
+	memset(&entry->addrstorage, 0, sizeof(entry->addrstorage));
+	entry->addr_len = 0;
+	iostream_ctx_clear(&entry->io_ctx);
 	/*
 	 * Initialize libev objects to be able to detect if they
 	 * are active or not in evio_service_entry_stop().
@@ -327,6 +330,9 @@ evio_service_entry_bind(struct evio_service_entry *entry, const struct uri *u)
 {
 	assert(u->service != NULL);
 	assert(!ev_is_active(&entry->ev));
+
+	if (iostream_ctx_create(&entry->io_ctx, IOSTREAM_SERVER, u) != 0)
+		return -1;
 
 	uri_destroy(&entry->uri);
 	uri_copy(&entry->uri, u);
@@ -374,6 +380,7 @@ evio_service_entry_bind(struct evio_service_entry *entry, const struct uri *u)
 static void
 evio_service_entry_detach(struct evio_service_entry *entry)
 {
+	iostream_ctx_clear(&entry->io_ctx);
 	if (ev_is_active(&entry->ev)) {
 		ev_io_stop(entry->service->loop, &entry->ev);
 		entry->addr_len = 0;
@@ -386,6 +393,8 @@ evio_service_entry_detach(struct evio_service_entry *entry)
 static void
 evio_service_entry_stop(struct evio_service_entry *entry)
 {
+	iostream_ctx_destroy(&entry->io_ctx);
+
 	int service_fd = entry->ev.fd;
 	evio_service_entry_detach(entry);
 	if (service_fd < 0)
@@ -412,6 +421,7 @@ evio_service_entry_attach(struct evio_service_entry *dst,
 	uri_copy(&dst->uri, &src->uri);
 	dst->addrstorage = src->addrstorage;
 	dst->addr_len = src->addr_len;
+	dst->io_ctx = src->io_ctx;
 	ev_io_set(&dst->ev, src->ev.fd, EV_READ);
 }
 
