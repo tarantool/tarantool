@@ -191,12 +191,19 @@ enum iostream_mode {
 	IOSTREAM_CLIENT,
 };
 
+struct ssl_iostream_ctx;
+
 /**
  * Context used for creating IO stream objects of a particular type.
  */
 struct iostream_ctx {
 	/** IO stream mode: server or client. */
 	enum iostream_mode mode;
+	/**
+	 * Context used for creating encrypted streams. If it's NULL, then
+	 * streams created with this context will be unencrypted.
+	 */
+	struct ssl_iostream_ctx *ssl;
 };
 
 /**
@@ -208,6 +215,7 @@ static inline void
 iostream_ctx_clear(struct iostream_ctx *ctx)
 {
 	ctx->mode = IOSTREAM_MODE_UNINITIALIZED;
+	ctx->ssl = NULL;
 }
 
 /**
@@ -232,7 +240,7 @@ iostream_ctx_destroy(struct iostream_ctx *ctx);
  * and clears the iostream struct (see iostream_clear).
  */
 int
-iostream_create(struct iostream *io, int fd, struct iostream_ctx *ctx);
+iostream_create(struct iostream *io, int fd, const struct iostream_ctx *ctx);
 
 #if defined(__cplusplus)
 } /* extern "C" */
