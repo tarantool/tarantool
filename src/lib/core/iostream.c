@@ -8,6 +8,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <stddef.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -80,3 +81,28 @@ static const struct iostream_vtab plain_iostream_vtab = {
 	/* .write = */ plain_iostream_write,
 	/* .writev = */ plain_iostream_writev,
 };
+
+int
+iostream_ctx_create(struct iostream_ctx *ctx, enum iostream_mode mode,
+		    const struct uri *uri)
+{
+	(void)uri;
+	assert(mode == IOSTREAM_SERVER || mode == IOSTREAM_CLIENT);
+	ctx->mode = mode;
+	return 0;
+}
+
+void
+iostream_ctx_destroy(struct iostream_ctx *ctx)
+{
+	iostream_ctx_clear(ctx);
+}
+
+int
+iostream_create(struct iostream *io, int fd, struct iostream_ctx *ctx)
+{
+	assert(ctx->mode == IOSTREAM_SERVER || ctx->mode == IOSTREAM_CLIENT);
+	(void)ctx;
+	plain_iostream_create(io, fd);
+	return 0;
+}

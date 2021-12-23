@@ -117,6 +117,8 @@ struct applier {
 	};
 	/** Length of addr */
 	socklen_t addr_len;
+	/** I/O stream context */
+	struct iostream_ctx io_ctx;
 	/** I/O stream */
 	struct iostream io;
 	/** Input buffer */
@@ -163,6 +165,7 @@ applier_stop(struct applier *applier);
  * remote uri (copied to struct applier).
  *
  * @pre     the uri is a valid and checked one
+ * @error   throws exception
  */
 struct applier *
 applier_new(struct uri *uri);

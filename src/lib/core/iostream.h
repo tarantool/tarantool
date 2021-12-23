@@ -8,6 +8,7 @@
 
 #include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <sys/types.h>
 
 #include "tarantool_ev.h"
@@ -19,6 +20,7 @@ extern "C" {
 
 struct iostream;
 struct iovec;
+struct uri;
 
 /**
  * A negative status code is returned by an iostream read/write operation
@@ -179,6 +181,58 @@ iostream_writev(struct iostream *io, const struct iovec *iov, int iovcnt)
 {
 	return io->vtab->writev(io, iov, iovcnt);
 }
+
+enum iostream_mode {
+	/** Uninitilized context (see iostream_ctx_clear). */
+	IOSTREAM_MODE_UNINITIALIZED = 0,
+	/** Server connection (accept). */
+	IOSTREAM_SERVER,
+	/** Client connection (connect). */
+	IOSTREAM_CLIENT,
+};
+
+/**
+ * Context used for creating IO stream objects of a particular type.
+ */
+struct iostream_ctx {
+	/** IO stream mode: server or client. */
+	enum iostream_mode mode;
+};
+
+/**
+ * Clears an IO stream context struct. A cleared struct may be passed
+ * to iostream_ctx_destroy (it'll be a no-op then), but passing it to
+ * iostream_create is illegal.
+ */
+static inline void
+iostream_ctx_clear(struct iostream_ctx *ctx)
+{
+	ctx->mode = IOSTREAM_MODE_UNINITIALIZED;
+}
+
+/**
+ * Creates an IO stream context for the given mode and URI.
+ * On success returns 0. On failure returns -1, sets diag,
+ * and clears the context struct (see iostream_ctx_clear).
+ */
+int
+iostream_ctx_create(struct iostream_ctx *ctx, enum iostream_mode mode,
+		    const struct uri *uri);
+
+/**
+ * Destroys an IO stream context and clears the context struct
+ * (see iostream_ctx_clear).
+ */
+void
+iostream_ctx_destroy(struct iostream_ctx *ctx);
+
+/**
+ * Creates an IO stream using the given context.
+ * On success returns 0. On failure returns -1, sets diag,
+ * and clears the iostream struct (see iostream_clear).
+ */
+int
+iostream_create(struct iostream *io, int fd, struct iostream_ctx *ctx);
 
 #if defined(__cplusplus)
 } /* extern "C" */
