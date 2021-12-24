@@ -1,6 +1,7 @@
 local msgpack = require('msgpack')
 local net = require('net.box')
 local server = require('test.luatest_helpers.server')
+local urilib = require('uri')
 local t = require('luatest')
 local g = t.group()
 
@@ -195,4 +196,65 @@ g.test_msgpack_object_return = function()
     t.assert_equals(ret, nil)
 
     c:close()
+end
+
+g.test_connect_uri = function()
+    local c
+    local opts = {reconnect_after = 42}
+
+    -- URI as string.
+    c = net.connect(g.server.net_box_uri)
+    t.assert_equals(c.state, 'active')
+    c:close()
+    c = net:connect(g.server.net_box_uri)
+    t.assert_equals(c.state, 'active')
+    c:close()
+    c = net.connect(g.server.net_box_uri, opts)
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c.opts.reconnect_after, 42)
+    c:close()
+    c = net:connect(g.server.net_box_uri, opts)
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c.opts.reconnect_after, 42)
+    c:close()
+
+    -- URI as table.
+    c = net.connect({g.server.net_box_uri})
+    t.assert_equals(c.state, 'active')
+    c:close()
+    c = net:connect({g.server.net_box_uri})
+    t.assert_equals(c.state, 'active')
+    c:close()
+    c = net.connect({g.server.net_box_uri}, opts)
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c.opts.reconnect_after, 42)
+    c:close()
+    c = net:connect({g.server.net_box_uri}, opts)
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c.opts.reconnect_after, 42)
+    c:close()
+
+    -- Host and port.
+    local uri = urilib.parse(g.server.net_box_uri)
+    c = net.connect(uri.host, uri.service)
+    t.assert_equals(c.state, 'active')
+    c:close()
+    c = net:connect(uri.host, uri.service)
+    t.assert_equals(c.state, 'active')
+    c:close()
+    c = net.connect(uri.host, uri.service, opts)
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c.opts.reconnect_after, 42)
+    c:close()
+    c = net:connect(uri.host, uri.service, opts)
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c.opts.reconnect_after, 42)
+    c:close()
+
+    -- Invalid arguments.
+    local errmsg = "usage: connect(uri[, opts] | host, port[, opts])"
+    t.assert_error_msg_content_equals(errmsg, net.connect, true)
+    t.assert_error_msg_content_equals(errmsg, net.connect, 123, 456)
+    t.assert_error_msg_content_equals(errmsg, net.connect, {}, '123')
+    t.assert_error_msg_content_equals(errmsg, net.connect, 'localhost', true)
 end

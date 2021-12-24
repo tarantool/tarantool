@@ -7,6 +7,8 @@ local urilib   = require('uri')
 local internal = require('net.box.lib')
 local trigger  = require('internal.trigger')
 
+local this_module
+
 local max               = math.max
 local fiber_clock       = fiber.clock
 
@@ -89,7 +91,7 @@ local function on_push_sync_default() end
 
 local function parse_connect_params(host_or_uri, ...) -- self? host_or_uri port? opts?
     local port, opts = ...
-    if type(host_or_uri) == 'table' then host_or_uri, port, opts = ... end
+    if host_or_uri == this_module then host_or_uri, port, opts = ... end
     if type(port) == 'table' then opts = port; port = nil end
     if opts == nil then opts = {} else
         local copy = {}
@@ -1036,7 +1038,7 @@ index_metatable = function(remote)
     return { __index = methods, __metatable = false }
 end
 
-local this_module = {
+this_module = {
     connect = connect,
     new = connect, -- Tarantool < 1.7.1 compatibility,
     _method = { -- for tests
