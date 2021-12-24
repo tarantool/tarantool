@@ -92,6 +92,8 @@ src/tarantool
 src/module.h
 tarantool-*.tar.gz
 perf/*.perftest
+test/enterprise-luatest
+test/enterprise-tap
 test/lib/
 test/unit/*.test
 test/unit/fiob
