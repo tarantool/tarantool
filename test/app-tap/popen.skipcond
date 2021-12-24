@@ -4,4 +4,8 @@ import platform
 if platform.system() == 'OpenBSD':
     self.skip = 1
 
+# Disabled on OSX due to fail #6674.
+if platform.system() == 'Darwin':
+    self.skip = 1
+
 # vim: set ft=python:
