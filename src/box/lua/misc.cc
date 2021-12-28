@@ -61,6 +61,83 @@ lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
 	return (char *) region_join_xc(gc, *p_len);
 }
 
+/**
+ * __index metamethod for the formatted array table that lookups field by name.
+ * Metatable of the table is expected to have `field_map` that provides
+ * name->index dictionary.
+ */
+static int
+lua_formatted_array_index(lua_State *L)
+{
+	/* L stack: table, field_name. */
+
+	assert(lua_gettop(L) == 2);
+
+	if (lua_getmetatable(L, 1) == 0) {
+		lua_settop(L, 0);
+		return 0;
+	}
+
+	/* L stack: table, field_name, metatable. */
+
+	lua_getfield(L, 3, "field_map");
+	if (lua_type(L, 4) != LUA_TTABLE) {
+		lua_settop(L, 0);
+		return 0;
+	}
+	lua_remove(L, 3);
+
+	/* L stack: table, field_name, field_map. */
+
+	lua_pushvalue(L, 2);
+	lua_remove(L, 2);
+
+	/* L stack: table, field_map, field_name. */
+
+	lua_gettable(L, 2);
+	if (lua_type(L, 3) != LUA_TNUMBER) {
+		lua_settop(L, 0);
+		return 0;
+	}
+	lua_remove(L, 2);
+
+	/* L stack: table, field_index. */
+
+	lua_gettable(L, 1);
+	lua_remove(L, 1);
+
+	return 1;
+}
+
+/**
+ * Set metatable for lua table on the top of lua stack @a L that would provide
+ * access by names in it according to given @a format.
+ * Lua table (that is on the top of L) is expected to be array-like.
+ */
+static void
+lua_wrap_formatted_array(struct lua_State *L, struct tuple_format *format)
+{
+	assert(format != NULL);
+	assert(lua_type(L, -1) == LUA_TTABLE);
+	if (format->dict->name_count == 0)
+		/* No names - no reason to wrap. */
+		return;
+
+	lua_newtable(L); /* metatable */
+	lua_newtable(L); /* metatable.field_map */
+
+	for (size_t i = 0; i < format->dict->name_count; i++) {
+		lua_pushnumber(L, i + 1);
+		lua_setfield(L, -2, format->dict->names[i]);
+	}
+
+	lua_setfield(L, -2, "field_map");
+
+	lua_pushcfunction(L, lua_formatted_array_index);
+	lua_setfield(L, -2, "__index");
+	lua_setmetatable(L, -2);
+}
+
 extern "C" void
 port_c_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 {
@@ -75,6 +152,11 @@ port_c_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 		} else {
 			mp = pe->mp;
 			luamp_decode(L, luaL_msgpack_default, &mp);
+
+			if (pe->mp_format != NULL) {
+				assert(mp_typeof(*pe->mp) == MP_ARRAY);
+				lua_wrap_formatted_array(L, pe->mp_format);
+			}
 		}
 		if (!is_flat)
 			lua_rawseti(L, -2, ++i);

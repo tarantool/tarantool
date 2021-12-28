@@ -60,6 +60,8 @@ port_c_destroy_entry(struct port_c_entry *pe)
 		mempool_free(&port_entry_pool, pe->mp);
 	else
 		free(pe->mp);
+	if (pe->mp_format != NULL)
+		tuple_format_unref(pe->mp_format);
 }
 
 static void
@@ -102,6 +104,7 @@ port_c_new_entry(struct port_c *port)
 		port->last = e;
 	}
 	e->next = NULL;
+	e->mp_format = NULL;
 	++port->size;
 	return e;
 }
@@ -172,6 +175,19 @@ port_c_add_mp(struct port *base, const char *mp, const char *mp_end)
 	if (dst == NULL)
 		return -1;
 	memcpy(dst, mp, mp_end - mp);
+	return 0;
+}
+
+int
+port_c_add_formatted_mp(struct port *base, const char *mp, const char *mp_end,
+			struct tuple_format *format)
+{
+	int rc = port_c_add_mp(base, mp, mp_end);
+	if (rc != 0)
+		return rc;
+	struct port_c *port = (struct port_c *)base;
+	port->last->mp_format = format;
+	tuple_format_ref(format);
 	return 0;
 }
 
