@@ -16,6 +16,7 @@ struct tuple_constraint;
 struct tuple_field;
 struct tuple_format;
 struct space;
+struct tuple_format;
 
 /**
  * Type of constraint check function.

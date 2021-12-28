@@ -79,7 +79,11 @@ tuple_constraint_call_func(const struct tuple_constraint *constr,
 {
 	struct port out_port, in_port;
 	port_c_create(&in_port);
-	port_c_add_mp(&in_port, mp_data, mp_data_end);
+	if (field != NULL)
+		port_c_add_mp(&in_port, mp_data, mp_data_end);
+	else
+		port_c_add_formatted_mp(&in_port, mp_data, mp_data_end,
+					constr->space->format);
 	port_c_add_str(&in_port, constr->def.name, constr->def.name_len);
 
 	int rc = func_call(constr->func_cache_holder.func, &in_port, &out_port);

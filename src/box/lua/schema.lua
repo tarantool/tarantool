@@ -85,7 +85,7 @@ ffi.cdef[[
 
     struct port {
         const struct port_vtab *vtab;
-        char pad[60];
+        char pad[68];
     };
 
     struct port_c_entry {
@@ -95,6 +95,7 @@ ffi.cdef[[
             char *mp;
         };
         uint32_t mp_size;
+        struct tuple_format *mp_format;
     };
 
     struct port_c {
