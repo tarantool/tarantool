@@ -602,15 +602,7 @@ local function compare_cfg(cfg1, cfg2)
     if type(cfg1) ~= 'table' then
         return cfg1 == cfg2
     end
-    if #cfg1 ~= #cfg2 then
-        return false
-    end
-    for k, v in ipairs(cfg1) do
-        if v ~= cfg2[k] then
-            return false
-        end
-    end
-    return true
+    return table.equals(cfg1, cfg2)
 end
 
 local function reload_cfg(oldcfg, cfg)
