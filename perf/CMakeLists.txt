@@ -9,6 +9,7 @@ endif()
 include_directories(${MSGPUCK_INCLUDE_DIRS})
 include_directories(${PROJECT_SOURCE_DIR}/src/box)
 include_directories(${PROJECT_SOURCE_DIR}/third_party)
+include_directories(${EXTRA_CORE_INCLUDE_DIRS})
 
 add_executable(tuple.perftest tuple.cc)
 target_link_libraries(tuple.perftest core box tuple benchmark::benchmark)

@@ -356,6 +356,7 @@ sql_ephemeral_space_new(const struct sql_space_info *info)
 		fields[i].default_value_expr = NULL;
 		fields[i].type = info->types[i];
 		fields[i].coll_id = info->coll_ids[i];
+		fields[i].compression_type = COMPRESSION_TYPE_NONE;
 	}
 	for (uint32_t i = 0; i < part_count; ++i) {
 		uint32_t j = info->parts == NULL ? i : info->parts[i];

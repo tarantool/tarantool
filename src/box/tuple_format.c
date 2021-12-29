@@ -462,6 +462,7 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 		}
 		field->coll = coll;
 		field->coll_id = cid;
+		field->compression_type = fields[i].compression_type;
 	}
 
 	int current_slot = 0;
@@ -789,6 +790,24 @@ err:
 	tuple_format_destroy(format);
 	free(format);
 	return NULL;
+}
+
+bool
+tuple_format_is_compatible_with_key_def(struct tuple_format *format,
+					struct key_def *key_def)
+{
+        for (uint32_t i = 0; i < tuple_format_field_count(format); i++) {
+        	struct tuple_field *field =
+                        tuple_format_field(format, i);
+        	if (field->compression_type == COMPRESSION_TYPE_NONE)
+			continue;
+		if (key_def_find_by_fieldno(key_def, i)) {
+			diag_set(ClientError, ER_UNSUPPORTED,
+				 "Indexed field", "compression");
+			return false;
+		}
+        }
+        return true;
 }
 
 bool

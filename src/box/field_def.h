@@ -38,6 +38,8 @@
 #include <msgpuck.h>
 #include "opt_def.h"
 
+#include "tt_compression.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -145,6 +147,8 @@ struct field_def {
 	char *default_value;
 	/** AST for parsed default value. */
 	struct Expr *default_value_expr;
+	/** Type of comression to this field */
+	enum compression_type compression_type;
 };
 
 /**

@@ -18,6 +18,7 @@ include_directories(${EXTRA_CORE_INCLUDE_DIRS})
 
 set(LIBUTIL_FREEBSD_SRC ${PROJECT_SOURCE_DIR}/third_party/libutil_freebsd)
 include_directories(${LIBUTIL_FREEBSD_SRC})
+include_directories(${EXTRA_CORE_INCLUDE_DIRS})
 
 if(EMBED_LUAZLIB)
     include_directories(${ZLIB_INCLUDE_DIRS})

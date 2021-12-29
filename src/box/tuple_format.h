@@ -37,6 +37,7 @@
 #include "json/json.h"
 #include "tuple_dictionary.h"
 #include "field_map.h"
+#include "index.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -120,6 +121,8 @@ struct tuple_field {
 	struct coll *coll;
 	/** Collation identifier. */
 	uint32_t coll_id;
+	/** Type of compression for this field. */
+	enum compression_type compression_type;
 	/**
 	 * Bitmap of fields that must be present in a tuple
 	 * conforming to the multikey subtree. Not NULL only
@@ -332,6 +335,15 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 		 uint32_t space_field_count, uint32_t exact_field_count,
 		 struct tuple_dictionary *dict, bool is_temporary,
 		 bool is_reusable);
+
+/**
+ * Check, if tuple @a format is compatible with @a key_def.
+ * This function return false and set diag in case when tuple
+ * @a format is not compatible with @a key_def.
+ */
+bool
+tuple_format_is_compatible_with_key_def(struct tuple_format *format,
+					struct key_def *key_def);
 
 /**
  * Check, if @a format1 can store any tuples of @a format2. For
