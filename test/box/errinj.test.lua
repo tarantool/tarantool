@@ -3,6 +3,8 @@ test_run = require('test_run').new()
 test_run:cmd("restart server default")
 box.error.last() == nil
 
+test_run:cmd("push filter 'Failed to allocate [0-9]+' to 'Failed to allocate <NUM>'")
+
 errinj = box.error.injection
 net_box = require('net.box')
 
