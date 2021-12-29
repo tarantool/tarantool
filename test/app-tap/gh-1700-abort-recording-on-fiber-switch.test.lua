@@ -25,17 +25,19 @@ if #arg == 0 then
 
   test:plan(#checks)
 
+  local libext = package.cpath:match('?.(%a+);')
   local vars = {
     LUABIN = arg[-1],
     SCRIPT = arg[0],
     -- To support out-of-source build use relative paths in repo
     PATH   = arg[-1]:gsub('src/tarantool$', 'test/app-tap'),
-    SUFFIX = package.cpath:match('?.(%a+);'),
+    SUFFIX = libext,
   }
 
   local cmd = string.gsub('LUA_CPATH="$LUA_CPATH;<PATH>/?.<SUFFIX>" ' ..
                           'LUA_PATH="$LUA_PATH;<PATH>/?.lua" ' ..
-                          'LD_LIBRARY_PATH=<PATH> ' ..
+                          ((libext == 'dylib' and 'DYLD' or 'LD') ..
+                           '_LIBRARY_PATH=<PATH> ') ..
                           '<LUABIN> 2>&1 <SCRIPT>', '%<(%w+)>', vars)
 
   for _, ch in pairs(checks) do
