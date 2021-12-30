@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'master'
+      - '**-full-ci'
     paths:
       - '.github/workflows/**'
       - 'src/**'
