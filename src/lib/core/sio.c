@@ -54,6 +54,7 @@ static int
 sio_socketname_to_buffer(int fd, char *buf, int size)
 {
 	int n = 0;
+	(void) n;
 	SNPRINT(n, snprintf, buf, size, "fd %d", fd);
 	if (fd < 0)
 		return 0;
