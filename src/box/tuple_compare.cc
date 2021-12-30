@@ -235,34 +235,53 @@ mp_compare_decimal(const char *lhs, const char *rhs)
 
 }
 
+/**
+ * Compare decimal to 'not a number' which is either NaN or inf. Decimal value
+ * does not matter then. It is always a valid number.
+ */
+static inline int
+decimal_compare_nan(double rhs)
+{
+	/* We assume NaN is less than everything else. */
+	if (isnan(rhs))
+		return 1;
+	assert(isinf(rhs));
+	return (rhs < 0) - (rhs > 0);
+}
+
 static int
 mp_compare_decimal_any_number(decimal_t *lhs, const char *rhs,
 			      enum mp_type rhs_type, int k)
 {
 	decimal_t rhs_dec;
+	decimal_t *rc;
 	switch (rhs_type) {
 	case MP_FLOAT:
 	{
 		double d = mp_decode_float(&rhs);
-		decimal_from_double(&rhs_dec, d);
+		rc = decimal_from_double(&rhs_dec, d);
+		if (rc == NULL)
+			return decimal_compare_nan(d) * k;
 		break;
 	}
 	case MP_DOUBLE:
 	{
 		double d = mp_decode_double(&rhs);
-		decimal_from_double(&rhs_dec, d);
+		rc = decimal_from_double(&rhs_dec, d);
+		if (rc == NULL)
+			return decimal_compare_nan(d) * k;
 		break;
 	}
 	case MP_INT:
 	{
 		int64_t num = mp_decode_int(&rhs);
-		decimal_from_int64(&rhs_dec, num);
+		rc = decimal_from_int64(&rhs_dec, num);
 		break;
 	}
 	case MP_UINT:
 	{
 		uint64_t num = mp_decode_uint(&rhs);
-		decimal_from_uint64(&rhs_dec, num);
+		rc = decimal_from_uint64(&rhs_dec, num);
 		break;
 	}
 	case MP_EXT:
@@ -271,7 +290,7 @@ mp_compare_decimal_any_number(decimal_t *lhs, const char *rhs,
 		uint32_t len = mp_decode_extl(&rhs, &ext_type);
 		switch (ext_type) {
 		case MP_DECIMAL:
-			decimal_unpack(&rhs, len, &rhs_dec);
+			rc = decimal_unpack(&rhs, len, &rhs_dec);
 			break;
 		default:
 			unreachable();
@@ -281,6 +300,7 @@ mp_compare_decimal_any_number(decimal_t *lhs, const char *rhs,
 	default:
 		unreachable();
 	}
+	assert(rc != NULL);
 	return k * decimal_compare(lhs, &rhs_dec);
 }
 
