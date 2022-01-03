@@ -411,10 +411,11 @@ def print_section(section, redefinitions):
     level = section['level']
     header = section['header']
 
+    # Prettify the header if it is in the lower case.
     redefinition = redefinitions.get((level, header))
     if redefinition:
         section.update(redefinition)
-    else:
+    elif header.islower():
         section['header'] = header.capitalize()
 
     level = section['level']
