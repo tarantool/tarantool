@@ -349,15 +349,20 @@ def parse_changelog_entries(changelog_entries):
 
         # Nested slash delimited subcategories.
         for section_header in parser.header.split('/'):
-            if section_header not in section['subsections']:
-                section['subsections'][section_header] = {
+            # Group entries by a section header (case
+            # insensitively). Save first header variant as is (not
+            # lowercased) into the 'header' field to prettify in
+            # ``print_section()`` later.
+            section_key = section_header.lower()
+            if section_key not in section['subsections']:
+                section['subsections'][section_key] = {
                     'header': section_header,
                     'level': section['level'] + 1,
                     'entries': [],
                     'subsections': dict(),
                     'nested_entry_count': 0,
                 }
-            section = section['subsections'][section_header]
+            section = section['subsections'][section_key]
             section['nested_entry_count'] += 1
 
         section['entries'].append(parser.content)
