@@ -208,9 +208,8 @@ def changelog_entries():
     # Add the rest in the alphabetical order.
     entries_glob = os.path.join(entries_dir, '*.md')
     entries = sorted(glob.glob(entries_glob))
-    if not entries:
-        raise RuntimeError('Not found any *.md file in the changelog entries '
-                           'directory {}'.format(entries_dir))
+    # NB: It is perfectly okay to have no entries at all: say, we
+    # just start to work on a future release.
     for entry in entries:
         if entry not in entries_known:
             res.append(entry)
