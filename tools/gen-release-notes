@@ -312,11 +312,27 @@ class Parser:
 def parse_changelog_entries(changelog_entries):
     """ Parse and structurize changelog entries content.
     """
+    # 'feature' and 'bugfix' sections are always present.
     entry_section = {
         'header': 'main',
         'level': 1,
         'entries': [],
-        'subsections': dict(),
+        'subsections': {
+            'feature': {
+                'header': 'feature',
+                'level': 2,
+                'entries': [],
+                'subsections': dict(),
+                'nested_entry_count': 0,
+            },
+            'bugfix': {
+                'header': 'bugfix',
+                'level': 2,
+                'entries': [],
+                'subsections': dict(),
+                'nested_entry_count': 0,
+            },
+        },
         'nested_entry_count': 0,
     }
     comments = []
@@ -421,6 +437,9 @@ def print_section(section, redefinitions):
     for subheader in it:
         if subheader in subsections:
             print_section(subsections[subheader], redefinitions)
+
+    if not section['entries'] and not section['subsections']:
+        print_block('*No changes.*')
 
 
 def print_templates(feature_count, bugfix_count):
