@@ -13,6 +13,11 @@ on:
 
 jobs:
   fuzzing:
+    # This workflow is disabled.
+    # See #6681 for details. Also, this comment
+    # https://github.com/tarantool/tarantool/pull/6764#issuecomment-1004616730
+    if: false
+
     runs-on: ubuntu-18.04
 
     strategy:
