@@ -281,11 +281,11 @@ struct errcode_record {
 	/*226 */_(ER_NOT_LEADER,		"The instance is not a leader. New leader is %u")\
 	/*227 */_(ER_SYNC_QUEUE_UNCLAIMED,	"The synchronous transaction queue doesn't belong to any instance")\
 	/*228 */_(ER_SYNC_QUEUE_FOREIGN,	"The synchronous transaction queue belongs to other instance with id %u")\
-	/*226 */_(ER_UNABLE_TO_PROCESS_IN_STREAM, "Unable to process %s request in stream") \
-	/*227 */_(ER_UNABLE_TO_PROCESS_OUT_OF_STREAM, "Unable to process %s request out of stream") \
-	/*228 */_(ER_TRANSACTION_TIMEOUT,       "Transaction has been aborted by timeout") \
-	/*229 */_(ER_ACTIVE_TIMER,              "Operation is not permitted if timer is already running") \
-	/*230 */_(ER_TUPLE_FIELD_COUNT_LIMIT,	"Tuple field count limit reached: see box.schema.FIELD_MAX") \
+	/*229 */_(ER_UNABLE_TO_PROCESS_IN_STREAM, "Unable to process %s request in stream") \
+	/*230 */_(ER_UNABLE_TO_PROCESS_OUT_OF_STREAM, "Unable to process %s request out of stream") \
+	/*231 */_(ER_TRANSACTION_TIMEOUT,       "Transaction has been aborted by timeout") \
+	/*232 */_(ER_ACTIVE_TIMER,              "Operation is not permitted if timer is already running") \
+	/*233 */_(ER_TUPLE_FIELD_COUNT_LIMIT,	"Tuple field count limit reached: see box.schema.FIELD_MAX") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
