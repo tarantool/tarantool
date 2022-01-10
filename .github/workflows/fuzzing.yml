@@ -10,9 +10,15 @@ on:
       - 'src/**'
       - 'test/fuzz/**'
       - 'test/static/corpus/**'
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
 
 jobs:
   fuzzing:
+    # Run on pull request only if the 'full-ci' label is set.
+    if: github.event_name != 'pull_request' ||
+        contains(github.event.pull_request.labels.*.name, 'full-ci')
+
     runs-on: ubuntu-18.04
 
     strategy:
