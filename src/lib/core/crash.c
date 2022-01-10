@@ -253,6 +253,7 @@ crash_report_feedback_daemon(struct crash_info *cinfo)
 	char *head = p;
 
 	int total = 0;
+	(void)total;
 	int size = 0;
 
 #define snprintf_safe(...) SNPRINT(total, snprintf, p, size, __VA_ARGS__)
