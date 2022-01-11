@@ -803,6 +803,13 @@ int
 iproto_send_event(struct obuf *out, const char *key, size_t key_len,
 		  const char *data, const char *data_end);
 
+/**
+ * Encode IPROTO_SHUTDOWN packet.
+ * @param out Encode to.
+ */
+int
+iproto_send_shutdown(struct obuf *out);
+
 /** Write error directly to a socket. */
 void
 iproto_do_write_error(struct iostream *io, const struct error *e,
