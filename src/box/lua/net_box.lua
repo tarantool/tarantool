@@ -53,6 +53,7 @@ local IPROTO_FEATURE_NAMES = {
     [1]     = 'transactions',
     [2]     = 'error_extension',
     [3]     = 'watchers',
+    [4]     = 'graceful_shutdown',
 }
 
 -- Given an array of IPROTO feature ids, returns a map {feature_name: bool}.

@@ -485,6 +485,8 @@ evio_service_attach(struct evio_service *dst, const struct evio_service *src)
 void
 evio_service_detach(struct evio_service *service)
 {
+	if (service->entries == NULL)
+		return;
 	for (int i = 0; i < service->entry_count; i++)
 		evio_service_entry_detach(&service->entries[i]);
 	free(service->entries);
@@ -515,6 +517,8 @@ evio_service_listen(struct evio_service *service)
 void
 evio_service_stop(struct evio_service *service)
 {
+	if (service->entries == NULL)
+		return;
 	say_info("%s: stopped", evio_service_name(service));
 	for (int i = 0; i < service->entry_count; i++)
 		evio_service_entry_stop(&service->entries[i]);
