@@ -123,6 +123,7 @@ enum netbox_state {
 	NETBOX_ERROR             = 4,
 	NETBOX_ERROR_RECONNECT   = 5,
 	NETBOX_CLOSED            = 6,
+	NETBOX_GRACEFUL_SHUTDOWN = 7,
 	netbox_state_MAX,
 };
 
@@ -134,6 +135,7 @@ static const char *netbox_state_str[] = {
 	[NETBOX_ERROR]           = "error",
 	[NETBOX_ERROR_RECONNECT] = "error_reconnect",
 	[NETBOX_CLOSED]          = "closed",
+	[NETBOX_GRACEFUL_SHUTDOWN] = "graceful_shutdown",
 };
 
 struct netbox_options {
@@ -178,11 +180,19 @@ struct netbox_options {
  *
  *  initial -> auth -> fetch_schema <-> active
  *
+ *  fetch_schema, active -> graceful_shutdown
+ *
  *  (any state, on error) -> error_reconnect -> auth -> ...
  *                                           \
  *                                            -> error
  *  (any state, but 'error') -> closed
  *
+ * State machine is switched to 'graceful_shutdown' state when it
+ * receives a SHUTDOWN packet from the remote host. In this state,
+ * no new requests are allowed, and once all in-progress requests
+ * have completed, the state machine will be switched to 'error' or
+ * 'error_reconnect' state, depending on whether reconnect_after is
+ * set.
  *
  * State change events can be delivered to the transport user via
  * the optional 'callback' argument:
@@ -197,6 +207,7 @@ struct netbox_options {
  *  'handshake', greeting, version, features
  *  'did_fetch_schema', schema_version, spaces, indices, collations
  *  'event', key, value
+ *  'shutdown'
  */
 struct netbox_transport {
 	/** Connection options. Not modified after initialization. */
@@ -240,6 +251,13 @@ struct netbox_transport {
 	uint64_t next_sync;
 	/** sync -> netbox_request */
 	struct mh_i64ptr_t *requests;
+	/**
+	 * Number of requests to which the server hasn't responded yet.
+	 * Note, it may be greater than the number of entries in the request
+	 * map, because a request is removed from the map when it's discarded
+	 * by the user.
+	 */
+	int64_t inprogress_request_count;
 };
 
 struct netbox_request {
@@ -472,6 +490,7 @@ netbox_transport_create(struct netbox_transport *transport)
 	fiber_cond_create(&transport->on_send_buf_empty);
 	transport->next_sync = 1;
 	transport->requests = mh_i64ptr_new();
+	transport->inprogress_request_count = 0;
 }
 
 static void
@@ -491,6 +510,7 @@ netbox_transport_destroy(struct netbox_transport *transport)
 	struct mh_i64ptr_t *h = transport->requests;
 	assert(mh_size(h) == 0);
 	mh_i64ptr_delete(h);
+	assert(transport->inprogress_request_count == 0);
 }
 
 /**
@@ -535,6 +555,7 @@ netbox_transport_set_error(struct netbox_transport *transport)
 		netbox_request_signal(request);
 	}
 	mh_i64ptr_clear(h);
+	transport->inprogress_request_count = 0;
 }
 
 static inline size_t
@@ -997,6 +1018,15 @@ netbox_transport_communicate(struct netbox_transport *transport, size_t limit)
 	struct ibuf *recv_buf = &transport->recv_buf;
 	struct fiber_cond *on_send_buf_empty = &transport->on_send_buf_empty;
 	while (true) {
+		/*
+		 * Gracefully shut down the connection if there are no more
+		 * in-progress requests and the server requested us to.
+		 */
+		if (transport->state == NETBOX_GRACEFUL_SHUTDOWN &&
+		    transport->inprogress_request_count == 0) {
+			box_error_raise(ER_NO_CONNECTION, "Peer closed");
+			return -1;
+		}
 		/* reader serviced first */
 		int events = 0;
 		while (ibuf_used(recv_buf) < limit) {
@@ -2037,6 +2067,7 @@ luaT_netbox_transport_make_request(struct lua_State *L, int idx,
 	assert(method < netbox_method_MAX);
 	netbox_encode_method(L, arg++, method, &transport->send_buf, sync,
 			     stream_id);
+	transport->inprogress_request_count++;
 
 	/* Initialize and register the request object. */
 	arg = idx;
@@ -2189,6 +2220,18 @@ netbox_transport_on_state_change_pcall(struct netbox_transport *transport,
 }
 
 /**
+ * Invokes the 'shutdown' callback.
+ */
+static void
+netbox_transport_on_shutdown(struct netbox_transport *transport,
+			     struct lua_State *L)
+{
+	lua_rawgeti(L, LUA_REGISTRYINDEX, transport->opts.callback_ref);
+	lua_pushliteral(L, "shutdown");
+	lua_call(L, 1, 0);
+}
+
+/**
  * Handles an IPROTO_EVENT packet received from the remote host.
  *
  * Note, decoding msgpack may throw a Lua error. This is fine: it will be
@@ -2227,9 +2270,18 @@ netbox_transport_dispatch_response(struct netbox_transport *transport,
 				   struct lua_State *L, struct xrow_header *hdr)
 {
 	enum iproto_type status = hdr->type;
-	if (status == IPROTO_EVENT) {
-		netbox_transport_on_event(transport, L, hdr);
-		return;
+	switch (status) {
+	case IPROTO_SHUTDOWN:
+		return netbox_transport_on_shutdown(transport, L);
+	case IPROTO_EVENT:
+		return netbox_transport_on_event(transport, L, hdr);
+	default:
+		break;
+	}
+	if (status == IPROTO_OK || iproto_type_is_error(status)) {
+		/* Account a response even if the request was discarded. */
+		assert(transport->inprogress_request_count > 0);
+		transport->inprogress_request_count--;
 	}
 	struct netbox_request *request =
 		netbox_transport_lookup_request(transport, hdr->sync);
@@ -2237,7 +2289,7 @@ netbox_transport_dispatch_response(struct netbox_transport *transport,
 		/* Nobody is waiting for the response. */
 		return;
 	}
-	if (status > IPROTO_CHUNK) {
+	if (iproto_type_is_error(status)) {
 		/* Handle errors. */
 		xrow_decode_error(hdr);
 		struct error *error = box_error_last();
@@ -2307,10 +2359,15 @@ netbox_transport_do_id(struct netbox_transport *transport, struct lua_State *L)
 	ERROR_INJECT(ERRINJ_NETBOX_DISABLE_ID, goto out);
 	if (peer_version_id < version_id(2, 10, 0))
 		goto unsupported;
+	ERROR_INJECT_YIELD(ERRINJ_NETBOX_ID_DELAY);
 	netbox_encode_id(L, &transport->send_buf, transport->next_sync++);
 	struct xrow_header hdr;
 	if (netbox_transport_send_and_recv(transport, &hdr) != 0)
 		luaT_error(L);
+	if (hdr.type == IPROTO_SHUTDOWN) {
+		box_error_raise(ER_NO_CONNECTION, "Peer closed");
+		luaT_error(L);
+	}
 	if (hdr.type != IPROTO_OK) {
 		uint32_t errcode = hdr.type & (IPROTO_TYPE_ERROR - 1);
 		if (errcode == ER_UNKNOWN_REQUEST_TYPE)
@@ -2355,17 +2412,24 @@ static void
 netbox_transport_do_auth(struct netbox_transport *transport,
 			 struct lua_State *L)
 {
+	assert(transport->state == NETBOX_INITIAL ||
+	       transport->state == NETBOX_ERROR_RECONNECT);
 	transport->state = NETBOX_AUTH;
 	netbox_transport_on_state_change(transport, L);
 	struct netbox_options *opts = &transport->opts;
 	if (opts->user == NULL)
 		return;
+	ERROR_INJECT_YIELD(ERRINJ_NETBOX_AUTH_DELAY);
 	netbox_encode_auth(L, &transport->send_buf, transport->next_sync++,
 			   opts->user, opts->password,
 			   transport->greeting.salt);
 	struct xrow_header hdr;
 	if (netbox_transport_send_and_recv(transport, &hdr) != 0)
 		luaT_error(L);
+	if (hdr.type == IPROTO_SHUTDOWN) {
+		box_error_raise(ER_NO_CONNECTION, "Peer closed");
+		luaT_error(L);
+	}
 	if (hdr.type != IPROTO_OK) {
 		xrow_decode_error(&hdr);
 		luaT_error(L);
@@ -2380,8 +2444,17 @@ netbox_transport_do_auth(struct netbox_transport *transport,
  */
 static uint32_t
 netbox_transport_fetch_schema(struct netbox_transport *transport,
-			      struct lua_State *L)
+			      struct lua_State *L, uint32_t schema_version)
 {
+	if (transport->state == NETBOX_GRACEFUL_SHUTDOWN) {
+		/*
+		 * If a connection is in the 'graceful_shutdown', it can't
+		 * issue new requests so there's no need to fetch schema.
+		 */
+		return schema_version;
+	}
+	assert(transport->state == NETBOX_AUTH ||
+	       transport->state == NETBOX_ACTIVE);
 	transport->state = NETBOX_FETCH_SCHEMA;
 	netbox_transport_on_state_change(transport, L);
 	uint32_t peer_version_id = transport->greeting.version_id;
@@ -2403,15 +2476,15 @@ restart:
 	bool got_vspace = false;
 	bool got_vindex = false;
 	bool got_vcollation = false;
-	uint32_t schema_version = 0;
+	schema_version = 0;
 	do {
 		struct xrow_header hdr;
 		if (netbox_transport_send_and_recv(transport, &hdr) != 0)
 			luaT_error(L);
-		netbox_transport_dispatch_response(transport, L, &hdr);
 		if (hdr.sync != vspace_sync &&
 		    hdr.sync != vindex_sync &&
 		    hdr.sync != vcollation_sync) {
+			netbox_transport_dispatch_response(transport, L, &hdr);
 			continue;
 		}
 		if (iproto_type_is_error(hdr.type)) {
@@ -2473,14 +2546,18 @@ restart:
 
 /**
  * Processes iproto requests in a loop until an error or a schema change.
- * Returns on a schema change. On failure raises a Lua error.
+ * Returns the current schema version on schema change. On failure raises
+ * a Lua error.
  */
-static void
+static uint32_t
 netbox_transport_process_requests(struct netbox_transport *transport,
 				  struct lua_State *L, uint32_t schema_version)
 {
-	transport->state = NETBOX_ACTIVE;
-	netbox_transport_on_state_change(transport, L);
+	if (transport->state != NETBOX_GRACEFUL_SHUTDOWN) {
+		assert(transport->state == NETBOX_FETCH_SCHEMA);
+		transport->state = NETBOX_ACTIVE;
+		netbox_transport_on_state_change(transport, L);
+	}
 	while (true) {
 		struct xrow_header hdr;
 		if (netbox_transport_send_and_recv(transport, &hdr) != 0)
@@ -2488,7 +2565,7 @@ netbox_transport_process_requests(struct netbox_transport *transport,
 		netbox_transport_dispatch_response(transport, L, &hdr);
 		if (hdr.schema_version > 0 &&
 		    hdr.schema_version != schema_version) {
-			break;
+			return hdr.schema_version;
 		}
 	}
 }
@@ -2502,10 +2579,12 @@ netbox_connection_handler_f(struct lua_State *L)
 	struct netbox_transport *transport = (void *)lua_topointer(L, 1);
 	netbox_transport_do_id(transport, L);
 	netbox_transport_do_auth(transport, L);
+	uint32_t schema_version = 0;
 	while (true) {
-		uint32_t schema_version;
-		schema_version = netbox_transport_fetch_schema(transport, L);
-		netbox_transport_process_requests(transport, L, schema_version);
+		schema_version = netbox_transport_fetch_schema(
+			transport, L, schema_version);
+		schema_version = netbox_transport_process_requests(
+			transport, L, schema_version);
 	}
 	return 0;
 }
@@ -2632,6 +2711,30 @@ luaT_netbox_transport_stop(struct lua_State *L)
 	return 0;
 }
 
+/**
+ * Puts an active connection to 'graceful_shutdown' state, in which no new
+ * requests are allowed. The connection will be switched to the error state
+ * (or error_reconnect if reconnect_after is configured) as soon as all pending
+ * requests have been completed.
+ */
+static int
+luaT_netbox_transport_graceful_shutdown(struct lua_State *L)
+{
+	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
+	if (transport->state == NETBOX_ACTIVE ||
+	    transport->state == NETBOX_FETCH_SCHEMA) {
+		transport->state = NETBOX_GRACEFUL_SHUTDOWN;
+		netbox_transport_on_state_change(transport, L);
+		/*
+		 * If there's no in-progress requests, the worker fiber would
+		 * never wake up by itself.
+		 */
+		if (transport->inprogress_request_count == 0)
+			fiber_wakeup(transport->worker);
+	}
+	return 0;
+}
+
 int
 luaopen_net_box(struct lua_State *L)
 {
@@ -2644,6 +2747,8 @@ luaopen_net_box(struct lua_State *L)
 			    IPROTO_FEATURE_ERROR_EXTENSION);
 	iproto_features_set(&NETBOX_IPROTO_FEATURES,
 			    IPROTO_FEATURE_WATCHERS);
+	iproto_features_set(&NETBOX_IPROTO_FEATURES,
+			    IPROTO_FEATURE_GRACEFUL_SHUTDOWN);
 
 	lua_pushcfunction(L, luaT_netbox_request_iterator_next);
 	luaT_netbox_request_iterator_next_ref = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -2652,6 +2757,8 @@ luaopen_net_box(struct lua_State *L)
 		{ "__gc",           luaT_netbox_transport_gc },
 		{ "start",          luaT_netbox_transport_start },
 		{ "stop",           luaT_netbox_transport_stop },
+		{ "graceful_shutdown",
+			luaT_netbox_transport_graceful_shutdown },
 		{ "perform_request",
 			luaT_netbox_transport_perform_request },
 		{ "perform_async_request",
