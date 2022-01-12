@@ -238,6 +238,23 @@ local stream_spaces_mt = {
     __serialize = stream_spaces_serialize
 }
 
+-- This callback is invoked in a new fiber upon receiving a SHUTDOWN packet
+-- from a remote host. It runs on_shutdown triggers and then gracefully
+-- terminates the connection.
+local function graceful_shutdown(remote)
+    local ok, err = pcall(remote._on_shutdown.run, remote._on_shutdown, remote)
+    if not ok then
+        log.error(err)
+    end
+    -- While the triggers were running, the connection could have been closed
+    -- and even reestablished (if reconnect_after is set), in which case we
+    -- must not initiate a graceful shutdown.
+    if remote._shutdown_fiber == fiber.self() then
+        remote._transport:graceful_shutdown()
+        remote._shutdown_fiber = nil
+    end
+end
+
 local space_metatable, index_metatable
 
 local function new_sm(uri, opts)
@@ -267,6 +284,13 @@ local function new_sm(uri, opts)
                     remote._is_connected = false
                     remote._on_disconnect:run(remote)
                 end
+                -- A server may exit after initiating a graceful shutdown but
+                -- before all clients close their connections (for example, on
+                -- timeout). In this case it's important that we don't initiate
+                -- a graceful shutdown on our side, because a connection can
+                -- already be reestablished (if reconnect_after is set) by the
+                -- time we finish running on_shutdown triggers.
+                remote._shutdown_fiber = nil
             end
             remote.state, remote.error = state, err
             if state == 'error_reconnect' then
@@ -324,6 +348,8 @@ local function new_sm(uri, opts)
                     watcher:_run_async()
                 end
             end
+        elseif what == 'shutdown' then
+            remote._shutdown_fiber = fiber.new(graceful_shutdown, remote)
         end
     end
     if opts.console then
@@ -339,6 +365,7 @@ local function new_sm(uri, opts)
         end
     end
     remote._on_schema_reload = trigger.new("on_schema_reload")
+    remote._on_shutdown = trigger.new("on_shutdown")
     remote._on_disconnect = trigger.new("on_disconnect")
     remote._on_connect = trigger.new("on_connect")
     remote._is_connected = false
@@ -627,6 +654,11 @@ function remote_methods:on_schema_reload(...)
     return self._on_schema_reload(...)
 end
 
+function remote_methods:on_shutdown(...)
+    check_remote_arg(self, 'on_shutdown')
+    return self._on_shutdown(...)
+end
+
 function remote_methods:on_disconnect(...)
     check_remote_arg(self, 'on_disconnect')
     return self._on_disconnect(...)
@@ -784,6 +816,8 @@ function remote_methods:wait_state(state, timeout)
     -- FYI: [] on a string is valid
     repeat until self.state == state or state[self.state] or
                  self.state == 'closed' or self.state == 'error' or
+                 (not self.opts.reconnect_after and
+                  self.state == 'graceful_shutdown') or
                  not self._state_cond:wait(max(0, deadline - fiber_clock()))
     return self.state == state or state[self.state] or false
 end
