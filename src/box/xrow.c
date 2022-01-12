@@ -1436,7 +1436,8 @@ int
 xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
 		 struct vclock *vclock)
 {
-	assert(row->type == IPROTO_RAFT);
+	if (row->type != IPROTO_RAFT)
+		goto bad_msgpack;
 	if (row->bodycnt != 1 || row->group_id != GROUP_LOCAL) {
 		diag_set(ClientError, ER_INVALID_MSGPACK,
 			 "malformed raft request");
@@ -1786,7 +1787,8 @@ error:
 int
 xrow_decode_begin(const struct xrow_header *row, struct begin_request *request)
 {
-	assert(row->type == IPROTO_BEGIN);
+	if (row->type != IPROTO_BEGIN)
+		goto bad_msgpack;
 	memset(request, 0, sizeof(*request));
 
 	/** Request without extra options. */

@@ -93,6 +93,46 @@ create_fuzz_test(PREFIX mp_datetime
                  LIBRARIES core fuzzer_config
 )
 
+# Building xrow library triggers building LuaJIT that doesn't support UBSan.
+# See https://github.com/tarantool/tarantool/issues/8473.
+if (NOT ENABLE_UB_SANITIZER)
+  create_fuzz_test(PREFIX xrow_greeting_decode
+                   SOURCES xrow_greeting_decode_fuzzer.c
+                   LIBRARIES xrow fuzzer_config)
+
+  create_fuzz_test(PREFIX xrow_decode_id
+                   SOURCES xrow_decode_id_fuzzer.c
+                   LIBRARIES xrow fuzzer_config)
+
+  create_fuzz_test(PREFIX xrow_decode_auth
+                   SOURCES xrow_decode_auth_fuzzer.c
+                   LIBRARIES xrow fuzzer_config)
+
+  create_fuzz_test(PREFIX xrow_decode_begin
+                   SOURCES xrow_decode_begin_fuzzer.c
+                   LIBRARIES xrow fuzzer_config)
+
+  create_fuzz_test(PREFIX xrow_decode_call
+                   SOURCES xrow_decode_call_fuzzer.c
+                  LIBRARIES xrow fuzzer_config)
+
+  create_fuzz_test(PREFIX xrow_decode_dml
+                   SOURCES xrow_decode_dml_fuzzer.c
+                   LIBRARIES xrow fuzzer_config)
+
+  create_fuzz_test(PREFIX xrow_decode_raft
+                   SOURCES xrow_decode_raft_fuzzer.c
+                   LIBRARIES xrow fuzzer_config)
+
+  create_fuzz_test(PREFIX xrow_decode_sql
+                   SOURCES xrow_decode_sql_fuzzer.c
+                   LIBRARIES xrow fuzzer_config)
+
+  create_fuzz_test(PREFIX xrow_decode_watch
+                   SOURCES xrow_decode_watch_fuzzer.c
+                   LIBRARIES xrow fuzzer_config)
+endif ()
+
 include(ProtobufMutator)
 
 # UndefinedBehaviorSanitizer is not supported in LuaJIT.
