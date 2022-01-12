@@ -757,6 +757,17 @@ str_to_bool(struct Mem *mem)
 }
 
 static inline int
+str_to_date(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_STR);
+	struct datetime date;
+	if (!datetime_parse_full(&date, mem->z, mem->n, 0))
+		return -1;
+	mem_set_date(mem, &date);
+	return 0;
+}
+
+static inline int
 bin_to_str(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_BIN);
@@ -1418,6 +1429,8 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 		mem->flags &= ~MEM_Any;
 		return 0;
 	case FIELD_TYPE_DATETIME:
+		if (mem->type == MEM_TYPE_STR)
+			return str_to_date(mem);
 		if (mem->type != MEM_TYPE_DATETIME)
 			return -1;
 		mem->flags = 0;
@@ -1548,6 +1561,8 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 		mem->flags = 0;
 		return 0;
 	case FIELD_TYPE_DATETIME:
+		if (mem->type == MEM_TYPE_STR)
+			return str_to_date(mem);
 		if (mem->type != MEM_TYPE_DATETIME)
 			return -1;
 		mem->flags = 0;
