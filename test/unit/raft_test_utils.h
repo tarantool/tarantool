@@ -200,6 +200,14 @@ raft_node_stop(struct raft_node *node);
 void
 raft_node_start(struct raft_node *node);
 
+/** Start the node but not configure it yet. Only recover. */
+void
+raft_node_recover(struct raft_node *node);
+
+/** Apply the entire Raft config to a started node. */
+void
+raft_node_cfg(struct raft_node *node);
+
 /** Block async work execution. */
 void
 raft_node_block(struct raft_node *node);

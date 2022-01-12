@@ -1,5 +1,5 @@
 	*** main_f ***
-1..14
+1..15
 	*** raft_test_leader_election ***
     1..24
     ok 1 - 1 pending message at start
@@ -29,7 +29,7 @@
 ok 1 - subtests
 	*** raft_test_leader_election: done ***
 	*** raft_test_recovery ***
-    1..12
+    1..13
     ok 1 - became candidate
     ok 2 - remote checkpoint of a candidate
     ok 3 - local checkpoint of a candidate
@@ -40,8 +40,9 @@ ok 1 - subtests
     ok 8 - remote checkpoint of a leader
     ok 9 - local checkpoint of a leader
     ok 10 - restart always as a follower
-    ok 11 - remote checkpoint of a leader
-    ok 12 - local checkpoint of a leader
+    ok 11 - vote count is restored correctly
+    ok 12 - remote checkpoint of a leader
+    ok 13 - local checkpoint of a leader
 ok 2 - subtests
 	*** raft_test_recovery: done ***
 	*** raft_test_bad_msg ***
@@ -261,4 +262,14 @@ ok 13 - subtests
     ok 12 - not a candidate
 ok 14 - subtests
 	*** raft_test_promote_restore: done ***
+	*** raft_test_bump_term_before_cfg ***
+    1..6
+    ok 1 - new term is started with vote for self
+    ok 2 - recovered
+    ok 3 - instance id is unknown
+    ok 4 - bump term externally
+    ok 5 - term write is in progress
+    ok 6 - started new term
+ok 15 - subtests
+	*** raft_test_bump_term_before_cfg: done ***
 	*** main_f: done ***

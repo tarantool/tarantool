@@ -70,7 +70,7 @@ raft_test_leader_election(void)
 		1 /* Volatile vote. */,
 		"{0: 1}" /* Vclock. */
 	), "elections with a new term");
-	is(node.raft.vote_count, 1, "single vote for self");
+	is(raft_vote_count(&node.raft), 1, "single vote for self");
 	ok(node.update_count > 0, "trigger worked");
 	node.update_count = 0;
 
@@ -100,7 +100,7 @@ raft_test_leader_election(void)
 		1 /* Vote. */,
 		2 /* Source. */
 	), 0, "vote response from 2");
-	is(node.raft.vote_count, 2, "2 votes - 1 self and 1 foreign");
+	is(raft_vote_count(&node.raft), 2, "2 votes - 1 self and 1 foreign");
 	ok(!node.has_work, "no work to do - not enough votes yet");
 
 	raft_run_for(node.cfg_election_timeout / 2);
@@ -115,7 +115,7 @@ raft_test_leader_election(void)
 		1 /* Vote. */,
 		3 /* Source. */
 	), 0, "vote response from 3");
-	is(node.raft.vote_count, 3, "2 votes - 1 self and 2 foreign");
+	is(raft_vote_count(&node.raft), 3, "2 votes - 1 self and 2 foreign");
 	is(node.raft.state, RAFT_STATE_LEADER, "became leader");
 	ok(node.update_count > 0, "trigger worked");
 	node.update_count = 0;
@@ -142,7 +142,7 @@ raft_test_leader_election(void)
 static void
 raft_test_recovery(void)
 {
-	raft_start_test(12);
+	raft_start_test(13);
 	struct raft_msg msg;
 	struct raft_node node;
 	raft_node_create(&node);
@@ -223,6 +223,8 @@ raft_test_recovery(void)
 		1 /* Volatile vote. */,
 		"{0: 1}" /* Vclock. */
 	), "restart always as a follower");
+
+	is(raft_vote_count(&node.raft), 1, "vote count is restored correctly");
 
 	raft_checkpoint_remote(&node.raft, &msg);
 	ok(raft_msg_check(&msg,
@@ -383,7 +385,7 @@ raft_test_vote_skip(void)
 		1 /* Vote. */,
 		2 /* Source. */
 	), 0, "message is accepted");
-	is(node.raft.vote_count, 1, "but ignored - too old term");
+	is(raft_vote_count(&node.raft), 1, "but ignored - too old term");
 
 	/* Competing vote requests are skipped. */
 
@@ -392,7 +394,8 @@ raft_test_vote_skip(void)
 		3 /* Vote. */,
 		2 /* Source. */
 	), 0, "message is accepted");
-	is(node.raft.vote_count, 1, "but ignored - vote not for this node");
+	is(raft_vote_count(&node.raft), 1,
+	   "but ignored - vote not for this node");
 	is(node.raft.state, RAFT_STATE_CANDIDATE, "this node does not give up");
 
 	/* Vote requests are ignored when node is disabled. */
@@ -1071,7 +1074,7 @@ raft_test_election_quorum(void)
 		1 /* Vote. */,
 		2 /* Source. */
 	), 0, "send vote response from second node");
-	is(node.raft.vote_count, 2, "vote is accepted");
+	is(raft_vote_count(&node.raft), 2, "vote is accepted");
 	is(node.raft.state, RAFT_STATE_CANDIDATE, "but still candidate");
 
 	raft_node_cfg_election_quorum(&node, 2);
@@ -1494,10 +1497,75 @@ raft_test_promote_restore(void)
 	raft_finish_test();
 }
 
+static void
+raft_test_bump_term_before_cfg()
+{
+	raft_start_test(6);
+	struct raft_node node;
+	raft_node_create(&node);
+	/*
+	 * Term bump is started between recovery and instance ID configuration
+	 * but WAL write is not finished yet.
+	 */
+	raft_run_next_event();
+	ok(raft_node_check_full_state(&node,
+		RAFT_STATE_CANDIDATE /* State. */,
+		0 /* Leader. */,
+		2 /* Term. */,
+		1 /* Vote. */,
+		2 /* Volatile term. */,
+		1 /* Volatile vote. */,
+		"{0: 1}" /* Vclock. */
+	), "new term is started with vote for self");
+
+	raft_node_stop(&node);
+	raft_node_recover(&node);
+	ok(raft_node_check_full_state(&node,
+		RAFT_STATE_FOLLOWER /* State. */,
+		0 /* Leader. */,
+		2 /* Term. */,
+		1 /* Vote. */,
+		2 /* Volatile term. */,
+		1 /* Volatile vote. */,
+		NULL /* Vclock. */
+	), "recovered");
+	is(node.raft.self, 0, "instance id is unknown");
+
+	raft_node_block(&node);
+	is(raft_node_send_follower(&node,
+		3 /* Term. */,
+		2 /* Source. */
+	), 0, "bump term externally");
+	ok(raft_node_check_full_state(&node,
+		RAFT_STATE_FOLLOWER /* State. */,
+		0 /* Leader. */,
+		2 /* Term. */,
+		1 /* Vote. */,
+		3 /* Volatile term. */,
+		0 /* Volatile vote. */,
+		NULL /* Vclock. */
+	), "term write is in progress");
+
+	raft_node_cfg(&node);
+	raft_node_unblock(&node);
+	ok(raft_node_check_full_state(&node,
+		RAFT_STATE_CANDIDATE /* State. */,
+		0 /* Leader. */,
+		3 /* Term. */,
+		1 /* Vote. */,
+		3 /* Volatile term. */,
+		1 /* Volatile vote. */,
+		"{0: 3}" /* Vclock. */
+	), "started new term");
+
+	raft_node_destroy(&node);
+	raft_finish_test();
+}
+
 static int
 main_f(va_list ap)
 {
-	raft_start_test(14);
+	raft_start_test(15);
 
 	(void) ap;
 	fakeev_init();
@@ -1516,6 +1584,7 @@ main_f(va_list ap)
 	raft_test_enable_disable();
 	raft_test_too_long_wal_write();
 	raft_test_promote_restore();
+	raft_test_bump_term_before_cfg();
 
 	fakeev_free();
 

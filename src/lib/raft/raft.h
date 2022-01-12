@@ -138,6 +138,14 @@ struct raft_vtab {
 	raft_schedule_async_f schedule_async;
 };
 
+/** Vote descriptor of a single node. */
+struct raft_vote {
+	/** Whether the node voted for anybody. */
+	bool did_vote;
+	/** How many votes the node got in the current term. */
+	int count;
+};
+
 struct raft {
 	/** Instance ID of this node. */
 	uint32_t self;
@@ -189,13 +197,8 @@ struct raft {
 	 */
 	uint64_t term;
 	uint32_t vote;
-	/**
-	 * Bit 1 on position N means that a vote from instance with ID = N was
-	 * obtained.
-	 */
-	vclock_map_t vote_mask;
-	/** Number of votes for this instance. Valid only in candidate state. */
-	int vote_count;
+	/** Statistics which node voted for who. */
+	struct raft_vote votes[VCLOCK_MAX];
 	/** Number of votes necessary for successful election. */
 	int election_quorum;
 	/**
@@ -241,6 +244,13 @@ static inline bool
 raft_is_enabled(const struct raft *raft)
 {
 	return raft->is_enabled;
+}
+
+/** Number of votes for self. */
+static inline int
+raft_vote_count(const struct raft *raft)
+{
+	return raft->votes[raft->self].count;
 }
 
 /** Process a raft entry stored in WAL/snapshot. */

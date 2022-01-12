@@ -224,13 +224,18 @@ raft_node_check_full_state(const struct raft_node *node, enum raft_state state,
 {
 	assert(raft_node_is_started(node));
 	const struct raft *raft = &node->raft;
-	struct vclock v;
-	raft_vclock_from_string(&v, vclock);
+	if (vclock != NULL) {
+		struct vclock v;
+		raft_vclock_from_string(&v, vclock);
+		if (vclock_compare(&v, raft->vclock) != 0)
+			return false;
+	} else if (raft->vclock != NULL) {
+		return false;
+	}
 	return raft->state == state && raft->leader == leader &&
 	       raft->term == term && raft->vote == vote &&
 	       raft->volatile_term == volatile_term &&
-	       raft->volatile_vote == volatile_vote &&
-	       vclock_compare(&v, raft->vclock) == 0;
+	       raft->volatile_vote == volatile_vote;
 }
 
 bool
@@ -343,6 +348,13 @@ raft_node_stop(struct raft_node *node)
 void
 raft_node_start(struct raft_node *node)
 {
+	raft_node_recover(node);
+	raft_node_cfg(node);
+}
+
+void
+raft_node_recover(struct raft_node *node)
+{
 	assert(!raft_node_is_started(node));
 
 	raft_net_create(&node->net);
@@ -358,6 +370,13 @@ raft_node_start(struct raft_node *node)
 
 	for (int i = 0; i < node->journal.size; ++i)
 		raft_process_recovery(&node->raft, &node->journal.rows[i]);
+	raft_run_async_work();
+}
+
+void
+raft_node_cfg(struct raft_node *node)
+{
+	assert(raft_node_is_started(node));
 
 	raft_cfg_is_enabled(&node->raft, node->cfg_is_enabled);
 	raft_cfg_is_candidate(&node->raft, node->cfg_is_candidate);

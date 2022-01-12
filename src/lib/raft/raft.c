@@ -152,6 +152,16 @@ raft_can_vote_for(const struct raft *raft, const struct vclock *v)
 	return cmp == 0 || cmp == 1;
 }
 
+static inline void
+raft_add_vote(struct raft *raft, int src, int dst)
+{
+	struct raft_vote *v = &raft->votes[src];
+	if (v->did_vote)
+		return;
+	v->did_vote = true;
+	++raft->votes[dst].count;
+}
+
 /** Schedule broadcast of the complete Raft state to all the followers. */
 static void
 raft_schedule_broadcast(struct raft *raft);
@@ -279,6 +289,12 @@ void
 raft_process_recovery(struct raft *raft, const struct raft_msg *req)
 {
 	say_verbose("RAFT: recover %s", raft_msg_to_string(req));
+	/*
+	 * Instance ID is unknown until recovery ends. Because apparently it can
+	 * change during join. In Raft it is set only one time when recovery
+	 * ends for good.
+	 */
+	assert(raft->self == 0);
 	if (req->term != 0) {
 		raft->term = req->term;
 		raft->volatile_term = req->term;
@@ -335,6 +351,8 @@ raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 	 * persisted long time ago and still broadcasted. Or a vote response.
 	 */
 	if (req->vote != 0) {
+		raft_add_vote(raft, source, req->vote);
+
 		switch (raft->state) {
 		case RAFT_STATE_FOLLOWER:
 		case RAFT_STATE_LEADER:
@@ -395,11 +413,10 @@ raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 			 * and now was answered by some other instance.
 			 */
 			assert(raft->volatile_vote == raft->self);
-			bool was_set = bit_set(&raft->vote_mask, source);
-			raft->vote_count += !was_set;
-			if (raft->vote_count < raft->election_quorum) {
+			int vote_count = raft_vote_count(raft);
+			if (vote_count < raft->election_quorum) {
 				say_info("RAFT: accepted vote for self, vote "
-					 "count is %d/%d", raft->vote_count,
+					 "count is %d/%d", vote_count,
 					 raft->election_quorum);
 				break;
 			}
@@ -640,13 +657,11 @@ raft_sm_become_candidate(struct raft *raft)
 	assert(raft->state == RAFT_STATE_FOLLOWER);
 	assert(raft->leader == 0);
 	assert(raft->vote == raft->self);
+	assert(raft_vote_count(raft) >= 1);
 	assert(raft->is_candidate);
 	assert(!raft->is_write_in_progress);
 	assert(raft->election_quorum > 1);
 	raft->state = RAFT_STATE_CANDIDATE;
-	raft->vote_count = 1;
-	raft->vote_mask = 0;
-	bit_set(&raft->vote_mask, raft->self);
 	raft_sm_wait_election_end(raft);
 	/* State is visible and it is changed - broadcast. */
 	raft_schedule_broadcast(raft);
@@ -663,6 +678,7 @@ raft_sm_schedule_new_term(struct raft *raft, uint64_t new_term)
 	raft->volatile_vote = 0;
 	raft->leader = 0;
 	raft->state = RAFT_STATE_FOLLOWER;
+	memset(raft->votes, 0, sizeof(raft->votes));
 	/*
 	 * The instance could be promoted for the previous term. But promotion
 	 * has no effect on following terms.
@@ -684,7 +700,9 @@ raft_sm_schedule_new_vote(struct raft *raft, uint32_t new_vote)
 	assert(raft->volatile_vote == 0);
 	assert(raft->leader == 0);
 	assert(raft->state == RAFT_STATE_FOLLOWER);
+	assert(!raft->votes[raft->self].did_vote);
 	raft->volatile_vote = new_vote;
+	raft_add_vote(raft, raft->self, raft->self);
 	raft_sm_pause_and_dump(raft);
 	/* Nothing visible is changed - no broadcast. */
 }
@@ -957,7 +975,7 @@ raft_cfg_election_quorum(struct raft *raft, int election_quorum)
 	assert(election_quorum > 0);
 	raft->election_quorum = election_quorum;
 	if (raft->state == RAFT_STATE_CANDIDATE &&
-	    raft->vote_count >= raft->election_quorum)
+	    raft_vote_count(raft) >= raft->election_quorum)
 		raft_sm_become_leader(raft);
 }
 
@@ -989,6 +1007,13 @@ raft_cfg_instance_id(struct raft *raft, uint32_t instance_id)
 	assert(raft->self == 0);
 	assert(instance_id != 0);
 	raft->self = instance_id;
+	/*
+	 * Couldn't do that reliably during recovery. Instance ID can change
+	 * more than once during join. Here instance ID is configured when it is
+	 * known forever and is safe to use.
+	 */
+	if (raft->volatile_vote != 0)
+		raft_add_vote(raft, instance_id, raft->volatile_vote);
 }
 
 void
