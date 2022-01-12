@@ -211,6 +211,66 @@ create_fuzz_test(PREFIX xrow_decode_error
                          ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
                  LIBRARIES xrow fuzzer_config)
 
+create_fuzz_test(PREFIX xrow_decode_ballot
+                 SOURCES xrow_decode_ballot_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
+                 LIBRARIES xrow fuzzer_config)
+
+create_fuzz_test(PREFIX xrow_decode_subscribe
+                 SOURCES xrow_decode_subscribe_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
+                 LIBRARIES xrow fuzzer_config)
+
+create_fuzz_test(PREFIX xrow_decode_synchro
+                 SOURCES xrow_decode_synchro_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
+                 LIBRARIES xrow fuzzer_config)
+
+create_fuzz_test(PREFIX xrow_decode_register
+                 SOURCES xrow_decode_register_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
+                 LIBRARIES xrow fuzzer_config)
+
+create_fuzz_test(PREFIX xrow_decode_subscribe_response
+                 SOURCES xrow_decode_subscribe_response_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
+                 LIBRARIES xrow fuzzer_config)
+
+create_fuzz_test(PREFIX xrow_decode_join
+                 SOURCES xrow_decode_join_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
+                 LIBRARIES xrow fuzzer_config)
+
+create_fuzz_test(PREFIX xrow_decode_fetch_snapshot
+                 SOURCES xrow_decode_fetch_snapshot_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
+                 LIBRARIES xrow fuzzer_config)
+
+create_fuzz_test(PREFIX xrow_decode_relay_heartbeat
+                 SOURCES xrow_decode_relay_heartbeat_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
+                 LIBRARIES xrow fuzzer_config)
+
+create_fuzz_test(PREFIX xrow_decode_applier_heartbeat
+                 SOURCES xrow_decode_applier_heartbeat_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
+                 LIBRARIES xrow fuzzer_config)
+
+create_fuzz_test(PREFIX xrow_decode_vclock_ignore0
+                 SOURCES xrow_decode_vclock_ignore0_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
+                 LIBRARIES xrow fuzzer_config)
+
+create_fuzz_test(PREFIX xrow_decode_commit
+                 SOURCES xrow_decode_commit_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
+                 LIBRARIES xrow fuzzer_config)
+
+create_fuzz_test(PREFIX xrow_decode_ballot_event
+                 SOURCES xrow_decode_ballot_event_fuzzer.c
+                         ${PROJECT_SOURCE_DIR}/test/unit/core_test_utils.c
+                 LIBRARIES xrow fuzzer_config)
+
 # Blocked by https://github.com/tarantool/tarantool/issues/8948.
 if (NOT ENABLE_UB_SANITIZER)
   create_fuzz_test(PREFIX decimal_to_int64

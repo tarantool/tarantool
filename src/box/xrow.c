@@ -128,8 +128,11 @@ mp_decode_vclock(const char **data, struct vclock *vclock)
 		int64_t lsn = mp_decode_uint(data);
 		if (lsn < 0 || id >= VCLOCK_MAX)
 			return -1;
-		if (lsn > 0)
+		if (lsn > 0) {
+			if (lsn <= vclock_get(vclock, id))
+				return -1;
 			vclock_follow(vclock, id, lsn);
+		}
 	}
 	return 0;
 }
@@ -2078,11 +2081,14 @@ mp_decode_ballot(const char *data, const char *end,
 		}
 		if (mp_decode_uint(&data) == IPROTO_BALLOT)
 			break;
+		mp_next(&data); /* skip value */
 	}
 	if (data == end)
 		return 0;
 
 	/* Decode BALLOT map. */
+	if (mp_typeof(*data) != MP_MAP)
+		return -1;
 	map_size = mp_decode_map(&data);
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(*data) != MP_UINT) {
