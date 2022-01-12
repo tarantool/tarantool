@@ -135,6 +135,10 @@ if (NOT ENABLE_UB_SANITIZER)
   create_fuzz_test(PREFIX xrow_header_decode
                    SOURCES xrow_header_decode_fuzzer.c
                    LIBRARIES xrow fuzzer_config)
+
+  create_fuzz_test(PREFIX xrow_decode_error
+                   SOURCES xrow_decode_error_fuzzer.c
+                   LIBRARIES xrow fuzzer_config)
 endif ()
 
 # Blocked by https://github.com/tarantool/tarantool/issues/8948.
