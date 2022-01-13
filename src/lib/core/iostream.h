@@ -62,9 +62,9 @@ iostream_status_to_events(ssize_t status)
 }
 
 struct iostream_vtab {
-	/** Frees implementation-specific context. */
+	/** Destroys implementation-specific data. */
 	void
-	(*delete_ctx)(void *ctx);
+	(*destroy)(struct iostream *io);
 	/** See iostream_read. */
 	ssize_t
 	(*read)(struct iostream *io, void *buf, size_t count);
@@ -82,8 +82,8 @@ struct iostream_vtab {
  */
 struct iostream {
 	const struct iostream_vtab *vtab;
-	/** Implementation specific context. */
-	void *ctx;
+	/** Implementation specific data. */
+	void *data;
 	/** File descriptor used for IO. Set to -1 on destruction. */
 	int fd;
 };
@@ -95,7 +95,7 @@ static inline void
 iostream_clear(struct iostream *io)
 {
 	io->vtab = NULL;
-	io->ctx = NULL;
+	io->data = NULL;
 	io->fd = -1;
 }
 
@@ -142,7 +142,7 @@ static inline void
 iostream_destroy(struct iostream *io)
 {
 	assert(io->fd >= 0);
-	io->vtab->delete_ctx(io->ctx);
+	io->vtab->destroy(io);
 	iostream_clear(io);
 }
 

@@ -20,7 +20,7 @@ plain_iostream_create(struct iostream *io, int fd)
 {
 	assert(fd >= 0);
 	io->vtab = &plain_iostream_vtab;
-	io->ctx = NULL;
+	io->data = NULL;
 	io->fd = fd;
 }
 
@@ -33,9 +33,9 @@ iostream_close(struct iostream *io)
 }
 
 static void
-plain_iostream_delete_ctx(void *ctx)
+plain_iostream_destroy(struct iostream *io)
 {
-	(void)ctx;
+	(void)io;
 }
 
 static ssize_t
@@ -75,7 +75,7 @@ plain_iostream_writev(struct iostream *io, const struct iovec *iov, int iovcnt)
 }
 
 static const struct iostream_vtab plain_iostream_vtab = {
-	/* .delete_ctx = */ plain_iostream_delete_ctx,
+	/* .destroy = */ plain_iostream_destroy,
 	/* .read = */ plain_iostream_read,
 	/* .write = */ plain_iostream_write,
 	/* .writev = */ plain_iostream_writev,
