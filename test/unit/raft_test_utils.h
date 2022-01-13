@@ -32,6 +32,7 @@
 #include "fakesys/fakeev.h"
 #include "fiber.h"
 #include "raft/raft.h"
+#include "raft/raft_ev.h"
 #include "unit.h"
 
 /** WAL simulation. It stores a list of rows which raft wanted to persist. */
@@ -105,6 +106,7 @@ struct raft_node {
 	int cfg_election_quorum;
 	double cfg_death_timeout;
 	uint32_t cfg_instance_id;
+	int cfg_cluster_size;
 	struct vclock *cfg_vclock;
 };
 
@@ -234,6 +236,9 @@ raft_node_cfg_is_enabled(struct raft_node *node, bool value);
 
 void
 raft_node_cfg_is_candidate(struct raft_node *node, bool value);
+
+void
+raft_node_cfg_cluster_size(struct raft_node *node, int value);
 
 void
 raft_node_cfg_election_timeout(struct raft_node *node, double value);

@@ -199,6 +199,10 @@ struct raft {
 	uint32_t vote;
 	/** Statistics which node voted for who. */
 	struct raft_vote votes[VCLOCK_MAX];
+	/** How many nodes voted in the current term. */
+	int voted_count;
+	/** Max vote count given to any node in the current term. */
+	int max_vote;
 	/** Number of votes necessary for successful election. */
 	int election_quorum;
 	/**
@@ -219,6 +223,8 @@ struct raft {
 	 * elections can be started.
 	 */
 	double death_timeout;
+	/** Number of instances registered in the cluster. */
+	int cluster_size;
 	/** Virtual table to perform application-specific actions. */
 	const struct raft_vtab *vtab;
 	/**
@@ -332,6 +338,10 @@ raft_cfg_instance_id(struct raft *raft, uint32_t instance_id);
  */
 void
 raft_cfg_vclock(struct raft *raft, const struct vclock *vclock);
+
+/** Configure number of registered instances in the cluster. */
+void
+raft_cfg_cluster_size(struct raft *raft, int size);
 
 /**
  * Bump the term. When it is persisted, the node checks if there is a leader,

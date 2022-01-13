@@ -1,5 +1,5 @@
 	*** main_f ***
-1..15
+1..16
 	*** raft_test_leader_election ***
     1..24
     ok 1 - 1 pending message at start
@@ -272,4 +272,66 @@ ok 14 - subtests
     ok 6 - started new term
 ok 15 - subtests
 	*** raft_test_bump_term_before_cfg: done ***
+	*** raft_test_split_vote ***
+    1..58
+    ok 1 - elections with a new term
+    ok 2 - vote response for 1 from 2
+    ok 3 - vote response for 3 from 3
+    ok 4 - term timeout >= election timeout normally
+    ok 5 - vote response for 3 from 4
+    ok 6 - split vote reduced the term timeout
+    ok 7 - a new term
+    ok 8 - timeout is normal again
+    ok 9 - is candidate
+    ok 10 - voted for self
+    ok 11 - vote response for 2 from 2
+    ok 12 - the vote is not split yet
+    ok 13 - cluster size change makes split vote
+    ok 14 - a new term
+    ok 15 - vote response for 2 from 2
+    ok 16 - message is accepted
+    ok 17 - other node's leadership is accepted
+    ok 18 - the only own vote was from self
+    ok 19 - cluster change does not affect the leader's death waiting
+    ok 20 - vote response for 2 from 2
+    ok 21 - vote response for 3 from 3
+    ok 22 - voter couldn't schedule new term
+    ok 23 - bump term
+    ok 24 - vote for self
+    ok 25 - vote response for 2 from 2
+    ok 26 - split vote is already inevitable
+    ok 27 - vote response for 3 from 3
+    ok 28 - split vote got worse, but delay didn't change
+    ok 29 - old term
+    ok 30 - unused vote
+    ok 31 - new volatile term
+    ok 32 - new volatile vote
+    ok 33 - vote response for 2 from 2
+    ok 34 - new term
+    ok 35 - voted for self
+    ok 36 - volatile term
+    ok 37 - volatile vote
+    ok 38 - found split vote after WAL write
+    ok 39 - bump term
+    ok 40 - vote for self
+    ok 41 - bump term
+    ok 42 - vote for self
+    ok 43 - vote response for 2 from 2
+    ok 44 - split vote is not checked for cluster < quorum
+    ok 45 - bump term
+    ok 46 - vote for self
+    ok 47 - vote response for 2 from 2
+    ok 48 - vote response for 2 from 3
+    ok 49 - vote response for 3 from 4
+    ok 50 - vote response for 4 from 5
+    ok 51 - split vote is not checked when vote count > cluster size
+    ok 52 - bump term
+    ok 53 - vote for self
+    ok 54 - vote response for 2 from 2
+    ok 55 - not split vote yet
+    ok 56 - split vote after quorum increase
+    ok 57 - bump term
+    ok 58 - vote for self
+ok 16 - subtests
+	*** raft_test_split_vote: done ***
 	*** main_f: done ***

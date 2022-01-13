@@ -1562,10 +1562,308 @@ raft_test_bump_term_before_cfg()
 	raft_finish_test();
 }
 
+static void
+raft_test_split_vote(void)
+{
+	raft_start_test(58);
+	struct raft_node node;
+	raft_node_create(&node);
+
+	/*
+	 * Normal split vote.
+	 */
+	raft_node_cfg_cluster_size(&node, 4);
+	raft_node_cfg_election_quorum(&node, 3);
+	raft_run_next_event();
+
+	ok(raft_node_check_full_state(&node,
+		RAFT_STATE_CANDIDATE /* State. */,
+		0 /* Leader. */,
+		2 /* Term. */,
+		1 /* Vote. */,
+		2 /* Volatile term. */,
+		1 /* Volatile vote. */,
+		"{0: 1}" /* Vclock. */
+	), "elections with a new term");
+
+	/* Make so node 1 has votes 1 and 2. Node 3 has votes 3 and 4. */
+	is(raft_node_send_vote_response(&node,
+		2 /* Term. */,
+		1 /* Vote. */,
+		2 /* Source. */
+	), 0, "vote response for 1 from 2");
+	is(raft_node_send_vote_response(&node,
+		2 /* Term. */,
+		3 /* Vote. */,
+		3 /* Source. */
+	), 0, "vote response for 3 from 3");
+
+	ok(node.raft.timer.repeat >= node.raft.election_timeout, "term "
+	   "timeout >= election timeout normally");
+
+	is(raft_node_send_vote_response(&node,
+		2 /* Term. */,
+		3 /* Vote. */,
+		4 /* Source. */
+	), 0, "vote response for 3 from 4");
+
+	ok(node.raft.timer.repeat < node.raft.election_timeout, "split vote "
+	   "reduced the term timeout");
+
+	raft_run_next_event();
+	ok(raft_node_check_full_state(&node,
+		RAFT_STATE_CANDIDATE /* State. */,
+		0 /* Leader. */,
+		3 /* Term. */,
+		1 /* Vote. */,
+		3 /* Volatile term. */,
+		1 /* Volatile vote. */,
+		"{0: 2}" /* Vclock. */
+	), "a new term");
+
+	ok(node.raft.timer.repeat >= node.raft.election_timeout, "timeout is "
+	   "normal again");
+
+	/*
+	 * Cluster size change can make split vote.
+	 */
+	raft_node_destroy(&node);
+	raft_node_create(&node);
+	raft_node_cfg_cluster_size(&node, 3);
+	raft_node_cfg_election_quorum(&node, 2);
+	raft_run_next_event();
+	is(node.raft.state, RAFT_STATE_CANDIDATE, "is candidate");
+	is(node.raft.vote, 1, "voted for self");
+
+	is(raft_node_send_vote_response(&node,
+		2 /* Term. */,
+		2 /* Vote. */,
+		2 /* Source. */
+	), 0, "vote response for 2 from 2");
+	ok(node.raft.timer.repeat >= node.raft.election_timeout, "the vote is "
+	   "not split yet");
+
+	raft_node_cfg_cluster_size(&node, 2);
+	ok(node.raft.timer.repeat < node.raft.election_timeout, "cluster size "
+	   "change makes split vote");
+
+	raft_run_next_event();
+	ok(raft_node_check_full_state(&node,
+		RAFT_STATE_CANDIDATE /* State. */,
+		0 /* Leader. */,
+		3 /* Term. */,
+		1 /* Vote. */,
+		3 /* Volatile term. */,
+		1 /* Volatile vote. */,
+		"{0: 2}" /* Vclock. */
+	), "a new term");
+
+	/*
+	 * Split vote can be even when the leader is already known - then
+	 * nothing to do. Votes are just left from the beginning of the term and
+	 * then probably cluster size reduced a bit.
+	 */
+	raft_node_destroy(&node);
+	raft_node_create(&node);
+	raft_node_cfg_cluster_size(&node, 3);
+	raft_node_cfg_election_quorum(&node, 2);
+	is(raft_node_send_vote_response(&node,
+		2 /* Term. */,
+		2 /* Vote. */,
+		2 /* Source. */
+	), 0, "vote response for 2 from 2");
+	/* There is also a vote from 3 for 2. But it wasn't delivered to 1. */
+	is(raft_node_send_leader(&node,
+		2 /* Term. */,
+		2 /* Source. */
+	), 0, "message is accepted");
+	is(node.raft.leader, 2, "other node's leadership is accepted");
+	is(raft_vote_count(&node.raft), 1, "the only own vote was from self");
+
+	raft_node_cfg_cluster_size(&node, 2);
+	ok(node.raft.timer.repeat >= node.raft.death_timeout, "cluster change "
+	   "does not affect the leader's death waiting");
+
+	/*
+	 * Non-candidate should ignore split vote.
+	 */
+	raft_node_destroy(&node);
+	raft_node_create(&node);
+	raft_node_cfg_cluster_size(&node, 3);
+	raft_node_cfg_election_quorum(&node, 3);
+	raft_node_cfg_is_candidate(&node, false);
+
+	is(raft_node_send_vote_response(&node,
+		2 /* Term. */,
+		2 /* Vote. */,
+		2 /* Source. */
+	), 0, "vote response for 2 from 2");
+	is(raft_node_send_vote_response(&node,
+		2 /* Term. */,
+		3 /* Vote. */,
+		3 /* Source. */
+	), 0, "vote response for 3 from 3");
+
+	ok(!raft_ev_is_active(&node.raft.timer), "voter couldn't schedule "
+	    "new term");
+
+	/*
+	 * Split vote can get worse, but it shouldn't lead to new term delay
+	 * restart.
+	 */
+	raft_node_destroy(&node);
+	raft_node_create(&node);
+	raft_node_cfg_cluster_size(&node, 3);
+	raft_node_cfg_election_quorum(&node, 3);
+
+	raft_run_next_event();
+	is(node.raft.term, 2, "bump term");
+	is(node.raft.vote, 1, "vote for self");
+	is(raft_node_send_vote_response(&node,
+		2 /* Term. */,
+		2 /* Vote. */,
+		2 /* Source. */
+	), 0, "vote response for 2 from 2");
+
+	double delay = node.raft.timer.repeat;
+	ok(delay < node.raft.election_timeout, "split vote is already "
+	   "inevitable");
+
+	is(raft_node_send_vote_response(&node,
+		2 /* Term. */,
+		3 /* Vote. */,
+		3 /* Source. */
+	), 0, "vote response for 3 from 3");
+
+	is(delay, node.raft.timer.repeat, "split vote got worse, but delay "
+	   "didn't change");
+
+	/*
+	 * Handle split vote when WAL write is in progress.
+	 */
+	raft_node_destroy(&node);
+	raft_node_create(&node);
+	raft_node_cfg_cluster_size(&node, 2);
+	raft_node_cfg_election_quorum(&node, 2);
+
+	raft_node_block(&node);
+	raft_run_next_event();
+	is(node.raft.term, 1, "old term");
+	is(node.raft.vote, 0, "unused vote");
+	is(node.raft.volatile_term, 2, "new volatile term");
+	is(node.raft.volatile_vote, 1, "new volatile vote");
+	is(raft_node_send_vote_response(&node,
+		2 /* Term. */,
+		2 /* Vote. */,
+		2 /* Source. */
+	), 0, "vote response for 2 from 2");
+
+	raft_node_unblock(&node);
+	is(node.raft.term, 2, "new term");
+	is(node.raft.vote, 1, "voted for self");
+	is(node.raft.volatile_term, 2, "volatile term");
+	is(node.raft.volatile_vote, 1, "volatile vote");
+	ok(node.raft.timer.repeat < node.raft.election_timeout, "found split "
+	   "vote after WAL write");
+
+	raft_run_next_event();
+	is(node.raft.term, 3, "bump term");
+	is(node.raft.vote, 1, "vote for self");
+
+	/*
+	 * Split vote check is disabled when cluster size < quorum. Makes no
+	 * sense to speed the elections up.
+	 */
+	raft_node_destroy(&node);
+	raft_node_create(&node);
+	raft_node_cfg_cluster_size(&node, 1);
+	raft_node_cfg_election_quorum(&node, 2);
+
+	raft_run_next_event();
+	is(node.raft.term, 2, "bump term");
+	is(node.raft.vote, 1, "vote for self");
+	is(raft_node_send_vote_response(&node,
+		2 /* Term. */,
+		2 /* Vote. */,
+		2 /* Source. */
+	), 0, "vote response for 2 from 2");
+
+	ok(node.raft.timer.repeat >= node.raft.election_timeout, "split vote "
+	   "is not checked for cluster < quorum");
+
+	/*
+	 * Split vote check is disabled when vote count > cluster size. The
+	 * reason is the same as with quorum > cluster size - something is odd,
+	 * more term bumps won't help.
+	 */
+	raft_node_destroy(&node);
+	raft_node_create(&node);
+	raft_node_cfg_cluster_size(&node, 3);
+	raft_node_cfg_election_quorum(&node, 2);
+
+	raft_run_next_event();
+	is(node.raft.term, 2, "bump term");
+	is(node.raft.vote, 1, "vote for self");
+	is(raft_node_send_vote_response(&node,
+		2 /* Term. */,
+		2 /* Vote. */,
+		2 /* Source. */
+	), 0, "vote response for 2 from 2");
+	is(raft_node_send_vote_response(&node,
+		2 /* Term. */,
+		2 /* Vote. */,
+		3 /* Source. */
+	), 0, "vote response for 2 from 3");
+	is(raft_node_send_vote_response(&node,
+		2 /* Term. */,
+		3 /* Vote. */,
+		4 /* Source. */
+	), 0, "vote response for 3 from 4");
+	is(raft_node_send_vote_response(&node,
+		2 /* Term. */,
+		4 /* Vote. */,
+		5 /* Source. */
+	), 0, "vote response for 4 from 5");
+
+	ok(node.raft.timer.repeat >= node.raft.election_timeout, "split vote "
+	   "is not checked when vote count > cluster size");
+
+	/*
+	 * Split vote can happen if quorum was suddenly increased.
+	 */
+	raft_node_destroy(&node);
+	raft_node_create(&node);
+	raft_node_cfg_cluster_size(&node, 3);
+	raft_node_cfg_election_quorum(&node, 2);
+
+	raft_run_next_event();
+	is(node.raft.term, 2, "bump term");
+	is(node.raft.vote, 1, "vote for self");
+	is(raft_node_send_vote_response(&node,
+		2 /* Term. */,
+		2 /* Vote. */,
+		2 /* Source. */
+	), 0, "vote response for 2 from 2");
+
+	ok(node.raft.timer.repeat >= node.raft.election_timeout, "not split "
+	   "vote yet");
+
+	raft_node_cfg_election_quorum(&node, 3);
+	ok(node.raft.timer.repeat < node.raft.election_timeout, "split vote "
+	   "after quorum increase");
+
+	raft_run_next_event();
+	is(node.raft.term, 3, "bump term");
+	is(node.raft.vote, 1, "vote for self");
+
+	raft_node_destroy(&node);
+	raft_finish_test();
+}
+
 static int
 main_f(va_list ap)
 {
-	raft_start_test(15);
+	raft_start_test(16);
 
 	(void) ap;
 	fakeev_init();
@@ -1585,6 +1883,7 @@ main_f(va_list ap)
 	raft_test_too_long_wal_write();
 	raft_test_promote_restore();
 	raft_test_bump_term_before_cfg();
+	raft_test_split_vote();
 
 	fakeev_free();
 
