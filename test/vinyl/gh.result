@@ -695,7 +695,7 @@ end);
 ...
 _ = fiber.create(function()
     while cont do
-        box.snapshot()
+        pcall(box.snapshot)
         fiber.sleep(0.01)
     end
     finished = finished + 1
