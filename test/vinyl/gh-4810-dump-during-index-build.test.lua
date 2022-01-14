@@ -47,7 +47,7 @@ function insert_loop()
 end;
 
 function idx_build()
-    _ = s:create_index('i1', {unique = true, parts = {2, 'unsigned', 3, 'unsigned'}})
+    _ = s:create_index('i1', {unique = false, parts = {2, 'unsigned', 3, 'unsigned'}})
     ch:put(true)
 end;
 
