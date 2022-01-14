@@ -220,7 +220,7 @@ ok 11 - subtests
 ok 12 - subtests
 	*** raft_test_enable_disable: done ***
 	*** raft_test_too_long_wal_write ***
-    1..8
+    1..22
     ok 1 - vote for 2
     ok 2 - vote is volatile
     ok 3 - message from leader
@@ -229,6 +229,20 @@ ok 12 - subtests
     ok 6 - wal write is finished
     ok 7 - timer works again
     ok 8 - became candidate
+    ok 9 - term is bumped
+    ok 10 - 2 votes for 3 in a new term
+    ok 11 - term is old
+    ok 12 - vote is used for self
+    ok 13 - volatile term is new
+    ok 14 - volatile vote is unused
+    ok 15 - new election timeout works
+    ok 16 - new term is started with vote for self
+    ok 17 - term is old
+    ok 18 - vote is unused
+    ok 19 - volatile term is new
+    ok 20 - volatile vote is self
+    ok 21 - new election timeout works
+    ok 22 - new term is started with vote for self
 ok 13 - subtests
 	*** raft_test_too_long_wal_write: done ***
 	*** raft_test_promote_restore ***
