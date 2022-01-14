@@ -229,7 +229,9 @@ box_raft_update_election_quorum(void)
 	 *   be lost.
 	 */
 	int quorum = MIN(replication_synchro_quorum, max);
-	raft_cfg_election_quorum(box_raft(), quorum);
+	struct raft *raft = box_raft();
+	raft_cfg_election_quorum(raft, quorum);
+	raft_cfg_cluster_size(raft, max);
 }
 
 void
