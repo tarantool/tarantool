@@ -44,7 +44,15 @@ target_link_libraries(swim_proto_member_fuzzer PUBLIC swim fuzzer_config)
 add_executable(swim_proto_meta_fuzzer swim_proto_meta_fuzzer.c)
 target_link_libraries(swim_proto_meta_fuzzer PUBLIC swim fuzzer_config)
 
+add_executable(datetime_parse_full_fuzzer datetime_parse_full_fuzzer.c)
+target_link_libraries(datetime_parse_full_fuzzer PUBLIC core fuzzer_config)
+
+add_executable(datetime_strptime_fuzzer datetime_strptime_fuzzer.c)
+target_link_libraries(datetime_strptime_fuzzer PUBLIC core fuzzer_config)
+
 set(fuzzing_binaries csv_fuzzer
+                     datetime_parse_full_fuzzer
+                     datetime_strptime_fuzzer
                      http_parser_fuzzer
                      swim_proto_member_fuzzer
                      swim_proto_meta_fuzzer
