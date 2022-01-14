@@ -353,8 +353,7 @@ box.stat.reset()
 -- of the secondary index.
 pk:compact()
 test_run:wait_cond(function() return pk:stat().disk.compaction.count > 0 end)
-
-sk:stat().disk.dump.count -- 1
+test_run:wait_cond(function() return sk:stat().disk.dump.count > 0 end)
 
 sk:stat().rows - dummy_rows -- 120 old REPLACEs + 120 new REPLACEs + 120 deferred DELETEs
 
