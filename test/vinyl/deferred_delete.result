@@ -1,9 +1,6 @@
 test_run = require('test_run').new()
 ---
 ...
-fiber = require('fiber')
----
-...
 --
 -- Create a space with secondary indexes and check that REPLACE and
 -- DELETE requests do not look up the old tuple in the primary index
@@ -198,8 +195,9 @@ box.snapshot()
 pk:compact()
 ---
 ...
-while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
+test_run:wait_cond(function() return pk:stat().disk.compaction.count > 0 end)
 ---
+- true
 ...
 pk:stat().rows -- 5 new REPLACEs
 ---
@@ -277,9 +275,6 @@ pk:stat().skip.rows -- 10
 ...
 -- Check that deferred DELETEs are not lost after restart.
 test_run:cmd("restart server default")
-fiber = require('fiber')
----
-...
 s = box.space.test
 ---
 ...
@@ -309,14 +304,16 @@ box.snapshot()
 i1:compact()
 ---
 ...
-while i1:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
+test_run:wait_cond(function() return i1:stat().disk.compaction.count > 0 end)
 ---
+- true
 ...
 i2:compact()
 ---
 ...
-while i2:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
+test_run:wait_cond(function() return i2:stat().disk.compaction.count > 0 end)
 ---
+- true
 ...
 i1:stat().rows -- 5 new REPLACEs
 ---
@@ -499,8 +496,9 @@ box.snapshot()
 sk:compact()
 ---
 ...
-while sk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
+test_run:wait_cond(function() return sk:stat().disk.compaction.count > 0 end)
 ---
+- true
 ...
 sk:stat().run_count -- 0
 ---
@@ -513,6 +511,9 @@ s:drop()
 -- Check that a transaction is aborted if it read a tuple from
 -- a secondary index that was overwritten in the primary index.
 --
+fiber = require('fiber')
+---
+...
 s = box.schema.space.create('test', {engine = 'vinyl'})
 ---
 ...
@@ -629,8 +630,9 @@ box.snapshot()
 pk:compact()
 ---
 ...
-while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
+test_run:wait_cond(function() return pk:stat().disk.compaction.count > 0 end)
 ---
+- true
 ...
 -- Compact the secondary index to cleanup garbage.
 box.snapshot()
@@ -640,8 +642,9 @@ box.snapshot()
 sk:compact()
 ---
 ...
-while sk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
+test_run:wait_cond(function() return sk:stat().disk.compaction.count > 0 end)
 ---
+- true
 ...
 sk:select({1000}, {iterator = 'le'})
 ---
@@ -708,8 +711,9 @@ box.snapshot()
 pk:compact()
 ---
 ...
-while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
+test_run:wait_cond(function() return pk:stat().disk.compaction.count > 0 end)
 ---
+- true
 ...
 sk:select() -- [1, 10, 'c']
 ---
@@ -890,9 +894,6 @@ test_run:cmd("switch test")
 ---
 - true
 ...
-fiber = require('fiber')
----
-...
 s = box.schema.space.create('test', {engine = 'vinyl'})
 ---
 ...
@@ -923,8 +924,9 @@ pk:compact()
 sk:compact()
 ---
 ...
-while box.stat.vinyl().scheduler.compaction_queue > 0 do fiber.sleep(0.001) end
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.compaction_queue == 0 end)
 ---
+- true
 ...
 pad = string.rep('x', 10 * 1024)
 ---
@@ -959,8 +961,9 @@ box.stat.reset()
 pk:compact()
 ---
 ...
-while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
+test_run:wait_cond(function() return pk:stat().disk.compaction.count > 0 end)
 ---
+- true
 ...
 sk:stat().disk.dump.count -- 1
 ---
