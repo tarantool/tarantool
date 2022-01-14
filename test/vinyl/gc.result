@@ -42,9 +42,11 @@ function ls_vylog() return fio.glob(fio.pathjoin(box.cfg.vinyl_dir, '*.vylog')) 
 function gc() temp:auto_increment{} box.snapshot() end
 ---
 ...
-function check_files_number(fnum) return (#files == fnum or \
-    (require('log').error(files) or \
-    require('log').error(box.info.gc()))) end
+function wait_gc(ls_files, expected_count) \
+    return test_run:wait_cond(function() \
+        return #ls_files() == expected_count \
+    end) \
+end
 ---
 ...
 -- Check that run files are deleted by gc.
@@ -60,18 +62,12 @@ while s.index.pk:stat().run_count > 1 do fiber.sleep(0.01) end -- wait for compa
 gc()
 ---
 ...
-files = ls_data()
----
-...
-check_files_number(2)
+assert(wait_gc(ls_data, 2))
 ---
 - true
 ...
 -- Check that gc keeps the current and previous log files.
-files = ls_vylog()
----
-...
-check_files_number(2)
+assert(wait_gc(ls_vylog, 2))
 ---
 - true
 ...
@@ -82,10 +78,7 @@ s:drop()
 gc()
 ---
 ...
-files = ls_data()
----
-...
-check_files_number(0)
+assert(wait_gc(ls_data, 0))
 ---
 - true
 ...
@@ -97,10 +90,7 @@ check_files_number(0)
 gc()
 ---
 ...
-files = ls_vylog()
----
-...
-check_files_number(2)
+assert(wait_gc(ls_vylog, 2))
 ---
 - true
 ...
@@ -109,10 +99,7 @@ check_files_number(2)
 gc()
 ---
 ...
-files = ls_vylog()
----
-...
-check_files_number(1)
+assert(wait_gc(ls_vylog, 1))
 ---
 - true
 ...
@@ -120,10 +107,7 @@ check_files_number(1)
 gc()
 ---
 ...
-files = ls_vylog()
----
-...
-check_files_number(0)
+assert(wait_gc(ls_vylog, 0))
 ---
 - true
 ...
