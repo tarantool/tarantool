@@ -1296,7 +1296,7 @@ raft_test_enable_disable(void)
 static void
 raft_test_too_long_wal_write(void)
 {
-	raft_start_test(8);
+	raft_start_test(22);
 	struct raft_node node;
 	raft_node_create(&node);
 
@@ -1361,6 +1361,79 @@ raft_test_too_long_wal_write(void)
 	raft_run_next_event();
 	ok(raft_time() - ts == node.cfg_death_timeout, "timer works again");
 	is(node.raft.state, RAFT_STATE_CANDIDATE, "became candidate");
+
+	/*
+	 * During WAL write it is possible to reconfigure election timeout.
+	 * The dangerous case is when the timer is active already. It happens
+	 * when the node voted and is a candidate, but leader is unknown.
+	 */
+	raft_node_destroy(&node);
+	raft_node_create(&node);
+
+	raft_node_cfg_election_timeout(&node, 100);
+	raft_run_next_event();
+	is(node.raft.term, 2, "term is bumped");
+
+	/* Bump term again but it is not written to WAL yet. */
+	raft_node_block(&node);
+	is(raft_node_send_vote_response(&node,
+		3 /* Term. */,
+		3 /* Vote. */,
+		2 /* Source. */
+	), 0, "2 votes for 3 in a new term");
+	raft_run_next_event();
+	is(node.raft.term, 2, "term is old");
+	is(node.raft.vote, 1, "vote is used for self");
+	is(node.raft.volatile_term, 3, "volatile term is new");
+	is(node.raft.volatile_vote, 0, "volatile vote is unused");
+
+	raft_node_cfg_election_timeout(&node, 50);
+	raft_node_unblock(&node);
+	ts = raft_time();
+	raft_run_next_event();
+	ts = raft_time() - ts;
+	/* 50 + <= 10% random delay. */
+	ok(ts >= 50 && ts <= 55, "new election timeout works");
+	ok(raft_node_check_full_state(&node,
+		RAFT_STATE_CANDIDATE /* State. */,
+		0 /* Leader. */,
+		4 /* Term. */,
+		1 /* Vote. */,
+		4 /* Volatile term. */,
+		1 /* Volatile vote. */,
+		"{0: 4}" /* Vclock. */
+	), "new term is started with vote for self");
+
+	/*
+	 * Similar case when a vote is being written but not finished yet.
+	 */
+	raft_node_destroy(&node);
+	raft_node_create(&node);
+
+	raft_node_cfg_election_timeout(&node, 100);
+	raft_node_block(&node);
+	raft_run_next_event();
+	is(node.raft.term, 1, "term is old");
+	is(node.raft.vote, 0, "vote is unused");
+	is(node.raft.volatile_term, 2, "volatile term is new");
+	is(node.raft.volatile_vote, 1, "volatile vote is self");
+
+	raft_node_cfg_election_timeout(&node, 50);
+	raft_node_unblock(&node);
+	ts = raft_time();
+	raft_run_next_event();
+	ts = raft_time() - ts;
+	/* 50 + <= 10% random delay. */
+	ok(ts >= 50 && ts <= 55, "new election timeout works");
+	ok(raft_node_check_full_state(&node,
+		RAFT_STATE_CANDIDATE /* State. */,
+		0 /* Leader. */,
+		3 /* Term. */,
+		1 /* Vote. */,
+		3 /* Volatile term. */,
+		1 /* Volatile vote. */,
+		"{0: 2}" /* Vclock. */
+	), "new term is started with vote for self");
 
 	raft_node_destroy(&node);
 	raft_finish_test();

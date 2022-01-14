@@ -935,7 +935,8 @@ raft_cfg_election_timeout(struct raft *raft, double timeout)
 		return;
 
 	raft->election_timeout = timeout;
-	if (raft->vote != 0 && raft->leader == 0 && raft->is_candidate) {
+	if (raft->vote != 0 && raft->leader == 0 && raft->is_candidate &&
+	    !raft->is_write_in_progress) {
 		assert(raft_ev_is_active(&raft->timer));
 		struct ev_loop *loop = raft_loop();
 		double timeout = raft_ev_timer_remaining(loop, &raft->timer) -
