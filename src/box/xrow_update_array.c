@@ -370,8 +370,14 @@ xrow_update_op_do_array_insert(struct xrow_update_op *op,
 
 	struct xrow_update_rope *rope = field->array.rope;
 	uint32_t size = xrow_update_rope_size(rope);
-	assert(size <= BOX_FIELD_MAX);
-	if (size == BOX_FIELD_MAX) {
+	int64_t tuple_field_cnt_lim = BOX_FIELD_MAX;
+	struct errinj *err_inj =
+		errinj(ERRINJ_TUPLE_FIELD_COUNT_LIMIT, ERRINJ_INT);
+	if (err_inj != NULL && err_inj->iparam > 0) {
+		tuple_field_cnt_lim = err_inj->iparam;
+	}
+	assert(size <= tuple_field_cnt_lim);
+	if (size == tuple_field_cnt_lim) {
 		diag_set(ClientError, ER_TUPLE_FIELD_COUNT_LIMIT);
 		return -1;
 	}
