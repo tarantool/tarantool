@@ -158,7 +158,9 @@ end);
 test_run:cmd("setopt delimiter ''");
 
 errinj.set("ERRINJ_BUILD_INDEX_DELAY", true)
-s:create_index('sk', {parts = {2, 'unsigned'}}) -- must fail
+ok, err = pcall(s.create_index, s, 'sk', {parts = {2, 'unsigned'}})
+assert(not ok)
+assert(tostring(err):find('Duplicate key') ~= nil)
 
 ch:get()
 

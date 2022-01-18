@@ -340,10 +340,16 @@ errinj.set("ERRINJ_BUILD_INDEX_DELAY", true)
 ---
 - ok
 ...
-s:create_index('sk', {parts = {2, 'unsigned'}}) -- must fail
+ok, err = pcall(s.create_index, s, 'sk', {parts = {2, 'unsigned'}})
 ---
-- error: Duplicate key exists in unique index "sk" in space "test" with old tuple
-    - [101, 101, "xxxxxxxxxxxxxxxx"] and new tuple - [100, 101]
+...
+assert(not ok)
+---
+- true
+...
+assert(tostring(err):find('Duplicate key') ~= nil)
+---
+- true
 ...
 ch:get()
 ---
