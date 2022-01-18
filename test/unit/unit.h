@@ -1,7 +1,7 @@
 #ifndef INCLUDES_TARANTOOL_TEST_UNIT_H
 #define INCLUDES_TARANTOOL_TEST_UNIT_H
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2022, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -33,9 +33,6 @@
 #include <stdio.h>
 #include <stdlib.h> /* exit() */
 
-#define header() printf("\t*** %s ***\n", __func__)
-#define footer() printf("\t*** %s: done ***\n", __func__)
-
 #define fail(expr, result) do {					\
 	fprintf(stderr, "Test failed: %s is %s at %s:%d, in function '%s'\n",\
 		expr, result, __FILE__, __LINE__, __func__);		\
@@ -44,6 +41,12 @@
 
 #define fail_if(expr) if (expr) fail(#expr, "true")
 #define fail_unless(expr) if (!(expr)) fail(#expr, "false")
+
+#define note(...) msg(stdout, __VA_ARGS__)
+#define diag(...) msg(stderr, __VA_ARGS__)
+
+#define msg(stream, ...) ({ _space(stream); fprintf(stream, "# "); \
+	fprintf(stream, __VA_ARGS__); fprintf(stream, "\n"); })
 
 #if defined(__cplusplus)
 extern "C" {
@@ -67,17 +70,17 @@ extern "C" {
 
 */
 
+#if !UNIT_TAP_COMPATIBLE
+
+#define header() printf("\t*** %s ***\n", __func__)
+#define footer() printf("\t*** %s: done ***\n", __func__)
+
+
 /* private function, use ok(...) instead */
 int _ok(int condition, const char *fmt, ...);
 
 /* private function, use note(...) or diag(...) instead */
 void _space(FILE *stream);
-
-#define msg(stream, ...) ({ _space(stream); fprintf(stream, "# ");            \
-	fprintf(stream, __VA_ARGS__); fprintf(stream, "\n"); })
-
-#define note(...) msg(stdout, __VA_ARGS__)
-#define diag(...) msg(stderr, __VA_ARGS__)
 
 /**
 @brief set and print plan
@@ -92,6 +95,8 @@ void plan(int count);
 @brief check if plan is reached and print report
 */
 int check_plan(void);
+
+#endif
 
 #define ok(condition, fmt, args...)	{		\
 	int res = _ok(condition, fmt, ##args);		\
@@ -128,6 +133,110 @@ int check_plan(void);
 		fprintf(stderr, "#   in %s at line %d\n", __FILE__, __LINE__); \
 	}						\
 }
+
+#if UNIT_TAP_COMPATIBLE
+
+#define header()					\
+	do { 						\
+		_space(stdout);				\
+		printf("# *** %s ***\n", __func__);	\
+	} while (0)
+
+#define footer()					\
+	do { 						\
+		_space(stdout);				\
+		printf("# *** %s: done ***\n", __func__); \
+	} while (0)
+
+enum { MAX_LEVELS = 10 };
+
+static int tests_done[MAX_LEVELS];
+static int tests_failed[MAX_LEVELS];
+static int plan_test[MAX_LEVELS];
+
+static int level = -1;
+
+/**
+ * private function, use note(...) or diag(...) instead
+ */
+static inline void
+_space(FILE *stream)
+{
+	for (int i = 0; i < level; i++) {
+		fprintf(stream, "    ");
+	}
+}
+
+/**
+ * private function, use ok(...) instead
+ */
+static inline int
+_ok(int condition, const char *fmt, ...)
+{
+	va_list ap;
+
+	_space(stdout);
+	printf("%s %d - ", condition ? "ok" : "not ok", ++tests_done[level]);
+	if (!condition)
+		tests_failed[level]++;
+	va_start(ap, fmt);
+	vprintf(fmt, ap);
+	printf("\n");
+	va_end(ap);
+	return condition;
+}
+
+/**
+ * @brief set and print plan
+ * @param count
+ * Before anything else, you need a testing plan.  This basically declares
+ * how many tests your program is going to run to protect against premature
+ * failure.
+ */
+static inline void
+plan(int count)
+{
+	++level;
+	plan_test[level] = count;
+	tests_done[level] = 0;
+	tests_failed[level] = 0;
+
+	if (level == 0)
+		printf("TAP version 13\n");
+
+	_space(stdout);
+	printf("%d..%d\n", 1, plan_test[level]);
+}
+
+/**
+ * @brief check if plan is reached and print report
+ */
+static inline int
+check_plan(void)
+{
+	int r = 0;
+	if (tests_done[level] != plan_test[level]) {
+		_space(stderr);
+		fprintf(stderr,
+			"# Looks like you planned %d tests but ran %d.\n",
+			plan_test[level], tests_done[level]);
+		r = -1;
+	}
+
+	if (tests_failed[level]) {
+		_space(stderr);
+		fprintf(stderr, "# Looks like you failed %d test of %d run.\n",
+			tests_failed[level], tests_done[level]);
+		r = tests_failed[level];
+	}
+	--level;
+	if (level >= 0) {
+		is(r, 0, "subtests");
+	}
+	return r;
+}
+
+#endif
 
 #if defined(__cplusplus)
 }
