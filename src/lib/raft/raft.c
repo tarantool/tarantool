@@ -931,22 +931,23 @@ raft_restore(struct raft *raft)
 void
 raft_cfg_election_timeout(struct raft *raft, double timeout)
 {
-	if (timeout == raft->election_timeout)
+	double old_timeout = raft->election_timeout;
+	if (timeout == old_timeout)
 		return;
 
 	raft->election_timeout = timeout;
-	if (raft->vote != 0 && raft->leader == 0 && raft->is_candidate &&
-	    !raft->is_write_in_progress) {
-		assert(raft_ev_is_active(&raft->timer));
-		struct ev_loop *loop = raft_loop();
-		double timeout = raft_ev_timer_remaining(loop, &raft->timer) -
-				 raft->timer.at + raft->election_timeout;
-		if (timeout < 0)
-			timeout = 0;
-		raft_ev_timer_stop(loop, &raft->timer);
-		raft_ev_timer_set(&raft->timer, timeout, timeout);
-		raft_ev_timer_start(loop, &raft->timer);
-	}
+	if (raft->vote == 0 || raft->leader != 0 || !raft->is_candidate ||
+	    raft->is_write_in_progress)
+		return;
+
+	assert(raft_ev_is_active(&raft->timer));
+	struct ev_loop *loop = raft_loop();
+	timeout += raft_ev_timer_remaining(loop, &raft->timer) - old_timeout;
+	if (timeout < 0)
+		timeout = 0;
+	raft_ev_timer_stop(loop, &raft->timer);
+	raft_ev_timer_set(&raft->timer, timeout, raft->election_timeout);
+	raft_ev_timer_start(loop, &raft->timer);
 }
 
 void
@@ -961,21 +962,25 @@ raft_cfg_election_quorum(struct raft *raft, int election_quorum)
 }
 
 void
-raft_cfg_death_timeout(struct raft *raft, double death_timeout)
+raft_cfg_death_timeout(struct raft *raft, double timeout)
 {
-	raft->death_timeout = death_timeout;
-	if (raft->state == RAFT_STATE_FOLLOWER && raft->is_candidate &&
-	    raft->leader != 0) {
-		assert(raft_ev_is_active(&raft->timer));
-		struct ev_loop *loop = raft_loop();
-		double timeout = raft_ev_timer_remaining(loop, &raft->timer) -
-				 raft->timer.at + raft->death_timeout;
-		if (timeout < 0)
-			timeout = 0;
-		raft_ev_timer_stop(loop, &raft->timer);
-		raft_ev_timer_set(&raft->timer, timeout, timeout);
-		raft_ev_timer_start(loop, &raft->timer);
-	}
+	double old_timeout = raft->death_timeout;
+	if (timeout == old_timeout)
+		return;
+
+	raft->death_timeout = timeout;
+	if (raft->state != RAFT_STATE_FOLLOWER || !raft->is_candidate ||
+	    raft->leader == 0)
+		return;
+
+	assert(raft_ev_is_active(&raft->timer));
+	struct ev_loop *loop = raft_loop();
+	timeout += raft_ev_timer_remaining(loop, &raft->timer) - old_timeout;
+	if (timeout < 0)
+		timeout = 0;
+	raft_ev_timer_stop(loop, &raft->timer);
+	raft_ev_timer_set(&raft->timer, timeout, raft->death_timeout);
+	raft_ev_timer_start(loop, &raft->timer);
 }
 
 void

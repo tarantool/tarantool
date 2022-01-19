@@ -37,8 +37,11 @@
 #include "say.h"
 #include <stdbool.h>
 
+/** Start not from 0 to catch bugs like incorrect usage of ev_timer members. */
+#define FAKEEV_START_TIME 10000
+
 /** Global watch, propagated by new events. */
-static double watch = 0;
+static double watch = FAKEEV_START_TIME;
 
 /**
  * Increasing event identifiers are used to preserve order of
@@ -278,6 +281,7 @@ fakeev_timer_start(struct ev_loop *loop, struct ev_timer *base)
 		return;
 	/* Create the periodic watcher and one event. */
 	fakeev_timer_event_new((struct ev_watcher *)base, base->at);
+	base->at += watch;
 }
 
 double
@@ -287,6 +291,7 @@ fakeev_timer_remaining(struct ev_loop *loop, struct ev_timer *base)
 	struct fakeev_event *e = fakeev_event_by_ev((struct ev_watcher *)base);
 	if (e == NULL)
 		return base->at;
+	assert(e->deadline == base->at);
 	return e->deadline - fakeev_time();
 }
 
@@ -298,6 +303,7 @@ fakeev_timer_again(struct ev_loop *loop, struct ev_timer *base)
 		return;
 	/* Create the periodic watcher and one event. */
 	fakeev_timer_event_new((struct ev_watcher *)base, base->repeat);
+	base->at = watch + base->repeat;
 }
 
 /** Time stop cancels the event if the timer is active. */
@@ -339,7 +345,7 @@ fakeev_reset(void)
 		fakeev_event_delete(e);
 	assert(mh_size(events_hash) == 0);
 	event_id = 0;
-	watch = 0;
+	watch = FAKEEV_START_TIME;
 }
 
 void
