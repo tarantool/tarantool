@@ -94,6 +94,7 @@ tarantool-*.tar.gz
 perf/*.perftest
 test/enterprise-luatest
 test/enterprise-tap
+test/enterprise-unit
 test/lib/
 test/unit/*.test
 test/unit/fiob
