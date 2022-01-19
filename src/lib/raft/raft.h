@@ -307,7 +307,7 @@ raft_cfg_election_quorum(struct raft *raft, int election_quorum);
  * heartbeats from the leader to consider it dead.
  */
 void
-raft_cfg_death_timeout(struct raft *raft, double death_timeout);
+raft_cfg_death_timeout(struct raft *raft, double timeout);
 
 /**
  * Configure ID of the given Raft instance. The ID can't be changed after it is
