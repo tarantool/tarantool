@@ -1093,12 +1093,30 @@ memtx_tree_index_replace_multikey(struct index *base, struct tuple *old_tuple,
 
 /** A dummy key allocator used when removing tuples from an index. */
 static const char *
-func_index_key_dummy_alloc(struct tuple *tuple, const char *key,
-			   uint32_t key_sz)
+func_index_key_dummy_alloc(const char *key, uint32_t key_sz)
 {
-	(void) tuple;
 	(void) key_sz;
 	return key;
+}
+
+/** Allocator used for allocating functional index key parts. */
+static const char *
+func_index_key_alloc(const char *key, uint32_t key_sz)
+{
+	void *ptr = memtx_alloc(key_sz);
+	if (ptr == NULL) {
+		diag_set(OutOfMemory, key_sz, "MemtxAllocator::alloc",
+			 "functional index key part");
+		return NULL;
+	}
+	memcpy(ptr, key, key_sz);
+	return (const char *)ptr;
+}
+
+static void
+func_index_key_free(const char *key)
+{
+	memtx_free((void *)key);
 }
 
 /**
@@ -1141,8 +1159,7 @@ memtx_tree_func_index_replace_rollback(struct memtx_tree_index<true> *index,
 	struct func_key_undo *entry;
 	rlist_foreach_entry(entry, new_keys, link) {
 		memtx_tree_delete_value(&index->tree, entry->key, NULL);
-		tuple_chunk_delete(entry->key.tuple,
-				   (const char *)entry->key.hint);
+		func_index_key_free((const char *)entry->key.hint);
 	}
 	rlist_foreach_entry(entry, old_keys, link)
 		memtx_tree_insert(&index->tree, entry->key, NULL, NULL);
@@ -1184,7 +1201,7 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 		rlist_create(&old_keys);
 		rlist_create(&new_keys);
 		if (key_list_iterator_create(&it, new_tuple, index_def, true,
-					     tuple_chunk_new) != 0)
+					     func_index_key_alloc) != 0)
 			goto end;
 		int err = 0;
 		const char *key;
@@ -1194,7 +1211,7 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 			/* Perform insertion, log it in list. */
 			undo = func_key_undo_new(region);
 			if (undo == NULL) {
-				tuple_chunk_delete(new_tuple, key);
+				func_index_key_free(key);
 				err = -1;
 				break;
 			}
@@ -1233,8 +1250,8 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 				 * Remove the replaced tuple undo
 				 * from undo list.
 				 */
-				tuple_chunk_delete(new_tuple,
-						(const char *)old_data.hint);
+				func_index_key_free(
+					(const char *)old_data.hint);
 				rlist_foreach_entry(undo, &new_keys, link) {
 					if (undo->key.hint == old_data.hint) {
 						rlist_del(&undo->link);
@@ -1257,8 +1274,7 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 		 * replaced entries.
 		 */
 		rlist_foreach_entry(undo, &old_keys, link) {
-			tuple_chunk_delete(undo->key.tuple,
-					   (const char *)undo->key.hint);
+			func_index_key_free((const char *)undo->key.hint);
 		}
 	}
 	if (old_tuple != NULL) {
@@ -1278,7 +1294,7 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 				 * Release related hint on
 				 * successful node deletion.
 				 */
-				tuple_chunk_delete(deleted_data.tuple,
+				func_index_key_free(
 					(const char *)deleted_data.hint);
 			}
 		}
@@ -1447,7 +1463,7 @@ memtx_tree_func_index_build_next(struct index *base, struct tuple *tuple)
 
 	struct key_list_iterator it;
 	if (key_list_iterator_create(&it, tuple, index_def, false,
-				     tuple_chunk_new) != 0)
+				     func_index_key_alloc) != 0)
 		return -1;
 
 	const char *key;
@@ -1462,8 +1478,7 @@ memtx_tree_func_index_build_next(struct index *base, struct tuple *tuple)
 	return 0;
 error:
 	for (uint32_t i = insert_idx; i < index->build_array_size; i++) {
-		tuple_chunk_delete(index->build_array[i].tuple,
-				   (const char *)index->build_array[i].hint);
+		func_index_key_free((const char *)index->build_array[i].hint);
 	}
 	region_truncate(region, region_svp);
 	return -1;
@@ -1477,7 +1492,7 @@ error:
 template <bool USE_HINT>
 static void
 memtx_tree_index_build_array_deduplicate(struct memtx_tree_index<USE_HINT> *index,
-			void (*destroy)(struct tuple *tuple, const char *hint))
+			void (*destroy)(const char *hint))
 {
 	if (index->build_array_size == 0)
 		return;
@@ -1503,8 +1518,7 @@ memtx_tree_index_build_array_deduplicate(struct memtx_tree_index<USE_HINT> *inde
 		/* Destroy deduplicated entries. */
 		for (r_idx = w_idx + 1;
 		     r_idx < index->build_array_size; r_idx++) {
-			destroy(index->build_array[r_idx].tuple,
-				(const char *)index->build_array[r_idx].hint);
+			destroy((const char *)index->build_array[r_idx].hint);
 		}
 	}
 	index->build_array_size = w_idx + 1;
@@ -1531,7 +1545,7 @@ memtx_tree_index_end_build(struct index *base)
 		memtx_tree_index_build_array_deduplicate<USE_HINT>(index, NULL);
 	} else if (cmp_def->for_func_index) {
 		memtx_tree_index_build_array_deduplicate<USE_HINT>(index,
-							 tuple_chunk_delete);
+							 func_index_key_free);
 	}
 	memtx_tree_build(&index->tree, index->build_array,
 			 index->build_array_size);
