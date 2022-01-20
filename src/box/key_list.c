@@ -131,7 +131,7 @@ key_list_iterator_next(struct key_list_iterator *it, const char **value)
 		 */
 		mp_next(&it->data);
 		assert(it->data <= it->data_end);
-		*value = it->key_allocator(it->tuple, key, it->data - key);
+		*value = it->key_allocator(key, it->data - key);
 		return *value != NULL ? 0 : -1;
 	}
 
@@ -177,6 +177,6 @@ key_list_iterator_next(struct key_list_iterator *it, const char **value)
 	}
 
 	it->data = key_end;
-	*value = it->key_allocator(it->tuple, key, key_end - key);
+	*value = it->key_allocator(key, key_end - key);
 	return *value != NULL ? 0 : -1;
 }

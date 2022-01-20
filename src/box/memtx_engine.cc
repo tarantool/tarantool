@@ -74,6 +74,40 @@ template <class ALLOC>
 static inline void
 create_memtx_tuple_format_vtab(struct tuple_format_vtab *vtab);
 
+void *
+(*memtx_alloc)(uint32_t size);
+void
+(*memtx_free)(void *ptr);
+
+template <class ALLOC>
+static void *
+memtx_alloc_impl(uint32_t size)
+{
+	void *ptr = MemtxAllocator<ALLOC>::alloc(size + sizeof(uint32_t));
+	if (ptr != NULL) {
+		*(uint32_t *)ptr = size;
+		return (uint32_t *)ptr + 1;
+	}
+	return NULL;
+}
+
+template <class ALLOC>
+static void
+memtx_free_impl(void *ptr)
+{
+	ptr = (uint32_t *)ptr - 1;
+	uint32_t size = *(uint32_t *)ptr;
+	MemtxAllocator<ALLOC>::free(ptr, size);
+}
+
+template <class ALLOC>
+static void
+memtx_alloc_init(void)
+{
+	memtx_alloc = memtx_alloc_impl<ALLOC>;
+	memtx_free = memtx_free_impl<ALLOC>;
+}
+
 static int
 memtx_end_build_primary_key(struct space *space, void *param)
 {
@@ -1123,9 +1157,11 @@ void
 memtx_set_tuple_format_vtab(const char *allocator_name)
 {
 	if (strncmp(allocator_name, "small", strlen("small")) == 0) {
+		memtx_alloc_init<SmallAlloc>();
 		create_memtx_tuple_format_vtab<SmallAlloc>
 			(&memtx_tuple_format_vtab);
 	} else if (strncmp(allocator_name, "system", strlen("system")) == 0) {
+		memtx_alloc_init<SysAlloc>();
 		create_memtx_tuple_format_vtab<SysAlloc>
 			(&memtx_tuple_format_vtab);
 	} else {
@@ -1387,36 +1423,6 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	tuple_format_unref(format);
 }
 
-template <class ALLOC>
-static void
-metmx_tuple_chunk_delete(struct tuple_format *format, const char *data)
-{
-	(void)format;
-	struct tuple_chunk *tuple_chunk =
-		container_of((const char (*)[0])data,
-			     struct tuple_chunk, data);
-	uint32_t sz = tuple_chunk_sz(tuple_chunk->data_sz);
-	MemtxAllocator<ALLOC>::free(tuple_chunk, sz);
-}
-
-template <class ALLOC>
-static const char *
-memtx_tuple_chunk_new(struct tuple_format *format, struct tuple *tuple,
-		      const char *data, uint32_t data_sz)
-{
-	(void) format;
-	uint32_t sz = tuple_chunk_sz(data_sz);
-	struct tuple_chunk *tuple_chunk =
-		(struct tuple_chunk *) MemtxAllocator<ALLOC>::alloc(sz);
-	if (tuple == NULL) {
-		diag_set(OutOfMemory, sz, "MemtxAllocator::alloc", "tuple");
-		return NULL;
-	}
-	tuple_chunk->data_sz = data_sz;
-	memcpy(tuple_chunk->data, data, data_sz);
-	return tuple_chunk->data;
-}
-
 struct tuple_format_vtab memtx_tuple_format_vtab;
 
 template <class ALLOC>
@@ -1425,8 +1431,6 @@ create_memtx_tuple_format_vtab(struct tuple_format_vtab *vtab)
 {
 	vtab->tuple_delete = memtx_tuple_delete<ALLOC>;
 	vtab->tuple_new = memtx_tuple_new<ALLOC>;
-	vtab->tuple_chunk_delete = metmx_tuple_chunk_delete<ALLOC>;
-	vtab->tuple_chunk_new = memtx_tuple_chunk_new<ALLOC>;
 }
 
 /**
