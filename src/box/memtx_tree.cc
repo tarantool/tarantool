@@ -243,6 +243,41 @@ static_assert(sizeof(struct tree_iterator<true>) <= MEMTX_ITERATOR_SIZE,
 	      "to MEMTX_ITERATOR_SIZE");
 
 template <bool USE_HINT>
+static inline void
+tree_iterator_set_current_tuple(struct tree_iterator<USE_HINT> *it,
+				struct tuple *tuple)
+{
+	if (it->current.tuple != NULL)
+		tuple_unref(it->current.tuple);
+	it->current.tuple = tuple;
+	if (tuple != NULL)
+		tuple_ref(tuple);
+}
+
+template <bool USE_HINT>
+static inline void
+tree_iterator_set_current_hint(struct tree_iterator<USE_HINT> *it, hint_t hint)
+{
+	if (!USE_HINT)
+		return;
+	it->current.set_hint(hint);
+}
+
+template <bool USE_HINT>
+static inline void
+tree_iterator_set_current(struct tree_iterator<USE_HINT> *it,
+			  struct memtx_tree_data<USE_HINT> *cur)
+{
+	if (cur != NULL) {
+		tree_iterator_set_current_tuple(it, cur->tuple);
+		tree_iterator_set_current_hint(it, cur->hint);
+	} else {
+		tree_iterator_set_current_tuple(it, NULL);
+		tree_iterator_set_current_hint(it, HINT_NONE);
+	}
+}
+
+template <bool USE_HINT>
 static void
 tree_iterator_free(struct iterator *iterator);
 
@@ -259,9 +294,7 @@ static void
 tree_iterator_free(struct iterator *iterator)
 {
 	struct tree_iterator<USE_HINT> *it = get_tree_iterator<USE_HINT>(iterator);
-	struct tuple *tuple = it->current.tuple;
-	if (tuple != NULL)
-		tuple_unref(tuple);
+	tree_iterator_set_current<USE_HINT>(it, NULL);
 	mempool_free(it->pool, it);
 }
 
@@ -289,18 +322,12 @@ tree_iterator_next_base(struct iterator *iterator, struct tuple **ret)
 	} else {
 		memtx_tree_iterator_next(&index->tree, &it->tree_iterator);
 	}
-	tuple_unref(it->current.tuple);
 	struct memtx_tree_data<USE_HINT> *res =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
-	if (res == NULL) {
+	tree_iterator_set_current<USE_HINT>(it, res);
+	*ret = it->current.tuple;
+	if (*ret == NULL)
 		iterator->next = tree_iterator_dummie;
-		it->current.tuple = NULL;
-		*ret = NULL;
-	} else {
-		*ret = res->tuple;
-		tuple_ref(*ret);
-		it->current = *res;
-	}
 	struct index *idx = iterator->index;
 	struct space *space = space_by_id(iterator->space_id);
 	/*
@@ -327,17 +354,13 @@ tree_iterator_prev_base(struct iterator *iterator, struct tuple **ret)
 	}
 	memtx_tree_iterator_prev(&index->tree, &it->tree_iterator);
 	struct tuple *successor = it->current.tuple;
+	tuple_ref(successor);
 	struct memtx_tree_data<USE_HINT> *res =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
-	if (!res) {
+	tree_iterator_set_current<USE_HINT>(it, res);
+	*ret = it->current.tuple;
+	if (*ret == NULL)
 		iterator->next = tree_iterator_dummie;
-		it->current.tuple = NULL;
-		*ret = NULL;
-	} else {
-		*ret = res->tuple;
-		tuple_ref(*ret);
-		it->current = *res;
-	}
 	struct index *idx = iterator->index;
 	struct space *space = space_by_id(iterator->space_id);
 	/*
@@ -365,9 +388,10 @@ tree_iterator_next_equal_base(struct iterator *iterator, struct tuple **ret)
 	} else {
 		memtx_tree_iterator_next(&index->tree, &it->tree_iterator);
 	}
-	tuple_unref(it->current.tuple);
 	struct memtx_tree_data<USE_HINT> *res =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
+	struct index *idx = iterator->index;
+	struct space *space = space_by_id(iterator->space_id);
 	/* Use user key def to save a few loops. */
 	if (res == NULL ||
 	    tuple_compare_with_key(res->tuple, res->hint,
@@ -375,17 +399,9 @@ tree_iterator_next_equal_base(struct iterator *iterator, struct tuple **ret)
 				   it->key_data.part_count,
 				   it->key_data.hint,
 				   index->base.def->key_def) != 0) {
+		tree_iterator_set_current<USE_HINT>(it, NULL);
 		iterator->next = tree_iterator_dummie;
-		it->current.tuple = NULL;
 		*ret = NULL;
-	} else {
-		*ret = res->tuple;
-		tuple_ref(*ret);
-		it->current = *res;
-	}
-	struct index *idx = iterator->index;
-	struct space *space = space_by_id(iterator->space_id);
-	if (*ret == NULL) {
 		/*
 		 * Got end of key. Store gap from the previous tuple to the
 		 * key boundary in nearby tuple.
@@ -394,12 +410,13 @@ tree_iterator_next_equal_base(struct iterator *iterator, struct tuple **ret)
 		memtx_tx_track_gap(in_txn(), space, idx, nearby_tuple, ITER_EQ,
 				   it->key_data.key, it->key_data.part_count);
 	} else {
+		tree_iterator_set_current<USE_HINT>(it, res);
+		*ret = res->tuple;
 		/*
 		 * Pass no key because any write to the gap between that
 		 * two tuples must lead to conflict.
 		 */
-		memtx_tx_track_gap(in_txn(), space, idx, *ret, ITER_GE,
-				   NULL, 0);
+		memtx_tx_track_gap(in_txn(), space, idx, *ret, ITER_GE, NULL, 0);
 	}
 	return 0;
 }
@@ -420,8 +437,11 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 	}
 	memtx_tree_iterator_prev(&index->tree, &it->tree_iterator);
 	struct tuple *successor = it->current.tuple;
+	tuple_ref(successor);
 	struct memtx_tree_data<USE_HINT> *res =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
+	struct index *idx = iterator->index;
+	struct space *space = space_by_id(iterator->space_id);
 	/* Use user key def to save a few loops. */
 	if (res == NULL ||
 	    tuple_compare_with_key(res->tuple, res->hint,
@@ -429,17 +449,9 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 				   it->key_data.part_count,
 				   it->key_data.hint,
 				   index->base.def->key_def) != 0) {
+		tree_iterator_set_current<USE_HINT>(it, NULL);
 		iterator->next = tree_iterator_dummie;
-		it->current.tuple = NULL;
 		*ret = NULL;
-	} else {
-		*ret = res->tuple;
-		tuple_ref(*ret);
-		it->current = *res;
-	}
-	struct index *idx = iterator->index;
-	struct space *space = space_by_id(iterator->space_id);
-	if (*ret == NULL) {
 		/*
 		 * Got end of key. Store gap from the key boundary to the
 		 * previous tuple in nearby tuple.
@@ -447,6 +459,8 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 		memtx_tx_track_gap(in_txn(), space, idx, successor, ITER_REQ,
 				   it->key_data.key, it->key_data.part_count);
 	} else {
+		tree_iterator_set_current<USE_HINT>(it, res);
+		*ret = res->tuple;
 		/*
 		 * Pass no key because any write to the gap between that
 		 * two tuples must lead to conflict.
@@ -487,9 +501,7 @@ name(struct iterator *iterator, struct tuple **ret)				\
 		*ret = memtx_tx_tuple_clarify(txn, space, *ret,			\
 					      idx, mk_index, is_rw);		\
 	} while (*ret == NULL);							\
-	tuple_unref(it->current.tuple);						\
-	it->current.tuple = *ret;						\
-	tuple_ref(it->current.tuple);						\
+	tree_iterator_set_current_tuple(it, *ret);				\
 	return 0;								\
 }										\
 struct forgot_to_add_semicolon
@@ -618,8 +630,7 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	if (!res)
 		return 0;
 	*ret = res->tuple;
-	tuple_ref(*ret);
-	it->current = *res;
+	tree_iterator_set_current(it, res);
 	tree_iterator_set_next_method(it);
 
 	bool is_multikey = iterator->index->def->key_def->is_multikey;
@@ -629,11 +640,8 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	if (*ret == NULL) {
 		return iterator->next(iterator, ret);
 	} else {
-		tuple_unref(it->current.tuple);
-		it->current.tuple = *ret;
-		tuple_ref(it->current.tuple);
+		tree_iterator_set_current_tuple(it, *ret);
 	}
-
 	return 0;
 }
 
@@ -1350,6 +1358,8 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 		it->key_data.set_hint(key_hint(key, part_count, cmp_def));
 	invalidate_tree_iterator(&it->tree_iterator);
 	it->current.tuple = NULL;
+	if (USE_HINT)
+		it->current.set_hint(HINT_NONE);
 	return (struct iterator *)it;
 }
 
