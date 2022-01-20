@@ -79,6 +79,27 @@ enum {
 	MAX_TUPLE_SIZE = 1 * 1024 * 1024,
 };
 
+static struct small_alloc *memtx_allocator;
+
+void *
+memtx_alloc(uint32_t size)
+{
+	void *ptr = smalloc(memtx_allocator, size + sizeof(uint32_t));
+	if (ptr != NULL) {
+		*(uint32_t *)ptr = size;
+		return (uint32_t *)ptr + 1;
+	}
+	return NULL;
+}
+
+void
+memtx_free(void *ptr)
+{
+	ptr = (uint32_t *)ptr - 1;
+	uint32_t size = *(uint32_t *)ptr;
+	smfree(memtx_allocator, ptr, size);
+}
+
 static int
 memtx_end_build_primary_key(struct space *space, void *param)
 {
@@ -143,6 +164,8 @@ memtx_engine_shutdown(struct engine *engine)
 	mempool_destroy(&memtx->index_extent_pool);
 	slab_cache_destroy(&memtx->index_slab_cache);
 	small_alloc_destroy(&memtx->alloc);
+	assert(memtx_allocator == &memtx->alloc);
+	memtx_allocator = NULL;
 	slab_cache_destroy(&memtx->slab_cache);
 	tuple_arena_destroy(&memtx->arena);
 	xdir_destroy(&memtx->snap_dir);
@@ -1196,6 +1219,8 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 			   &actual_alloc_factor);
 	say_info("Actual slab_alloc_factor calculated on the basis of desired "
 		 "slab_alloc_factor = %f", actual_alloc_factor);
+	assert(memtx_allocator == NULL);
+	memtx_allocator = &memtx->alloc;
 
 	/* Initialize index extent allocator. */
 	slab_cache_create(&memtx->index_slab_cache, &memtx->arena);
@@ -1356,39 +1381,9 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	tuple_format_unref(format);
 }
 
-void
-metmx_tuple_chunk_delete(struct tuple_format *format, const char *data)
-{
-	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
-	struct tuple_chunk *tuple_chunk =
-		container_of((const char (*)[0])data,
-			     struct tuple_chunk, data);
-	uint32_t sz = tuple_chunk_sz(tuple_chunk->data_sz);
-	smfree(&memtx->alloc, tuple_chunk, sz);
-}
-
-const char *
-memtx_tuple_chunk_new(struct tuple_format *format, struct tuple *tuple,
-		      const char *data, uint32_t data_sz)
-{
-	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
-	uint32_t sz = tuple_chunk_sz(data_sz);
-	struct tuple_chunk *tuple_chunk =
-		(struct tuple_chunk *) smalloc(&memtx->alloc, sz);
-	if (tuple == NULL) {
-		diag_set(OutOfMemory, sz, "smalloc", "tuple");
-		return NULL;
-	}
-	tuple_chunk->data_sz = data_sz;
-	memcpy(tuple_chunk->data, data, data_sz);
-	return tuple_chunk->data;
-}
-
 struct tuple_format_vtab memtx_tuple_format_vtab = {
 	memtx_tuple_delete,
 	memtx_tuple_new,
-	metmx_tuple_chunk_delete,
-	memtx_tuple_chunk_new,
 };
 
 /**

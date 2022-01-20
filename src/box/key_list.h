@@ -49,8 +49,7 @@ struct tuple;
  * key, since the key is only used to lookup the old tuple in the
  * b+* tree, so we pass in a dummy allocator.
  */
-typedef const char *(*key_list_allocator_t)(struct tuple *tuple, const char *key,
-					    uint32_t key_sz);
+typedef const char *(*key_list_allocator_t)(const char *key, uint32_t key_sz);
 
 /**
  * An iterator over key_data returned by a stored function function.

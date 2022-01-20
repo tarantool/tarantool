@@ -262,6 +262,19 @@ enum {
 };
 
 /**
+ * Allocates size bytes using the memtx allocator.
+ * On error returns NULL. Does not set diag.
+ */
+void *
+memtx_alloc(uint32_t size);
+
+/**
+ * Frees memory allocated with memtx_alloc.
+ */
+void
+memtx_free(void *ptr);
+
+/**
  * Allocate a block of size MEMTX_EXTENT_SIZE for memtx index
  * @ctx must point to memtx engine
  */
