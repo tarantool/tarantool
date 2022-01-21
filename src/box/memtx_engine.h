@@ -118,7 +118,7 @@ enum memtx_reserve_extents_num {
  * allocated for each iterator (except rtree index iterator that
  * is significantly bigger so has own pool).
  */
-#define MEMTX_ITERATOR_SIZE (152)
+#define MEMTX_ITERATOR_SIZE (176)
 
 struct memtx_engine {
 	struct engine base;
@@ -280,6 +280,16 @@ extern void *
  */
 extern void
 (*memtx_free)(void *ptr);
+
+/**
+ * Returns the size of an allocation done with memtx_alloc.
+ * (The size is stored before the data.)
+ */
+static inline uint32_t
+memtx_alloc_size(void *ptr)
+{
+	return *((uint32_t *)ptr - 1);
+}
 
 /**
  * Allocate a block of size MEMTX_EXTENT_SIZE for memtx index
