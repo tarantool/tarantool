@@ -39,6 +39,7 @@
 #include "tuple.h"
 #include "txn.h"
 #include "memtx_tx.h"
+#include "trivia/util.h"
 #include <qsort_arg.h>
 #include <small/mempool.h>
 
@@ -231,6 +232,17 @@ struct tree_iterator {
 	enum iterator_type type;
 	struct memtx_tree_key_data<USE_HINT> key_data;
 	struct memtx_tree_data<USE_HINT> current;
+	/**
+	 * For functional indexes only: copy of the functional index key at the
+	 * current iterator position. Allocated from current_func_key_buf or on
+	 * malloc.
+	 *
+	 * Since pinning a tuple doesn't prevent its functional keys from being
+	 * deleted, we need to copy it so that we can use it to restore the
+	 * iterator position.
+	 */
+	void *current_func_key;
+	char current_func_key_buf[32];
 	/** Memory pool the iterator was allocated from. */
 	struct mempool *pool;
 };
@@ -260,6 +272,22 @@ tree_iterator_set_current_hint(struct tree_iterator<USE_HINT> *it, hint_t hint)
 {
 	if (!USE_HINT)
 		return;
+	if (it->current_func_key != NULL &&
+	    it->current_func_key != it->current_func_key_buf) {
+		free(it->current_func_key);
+	}
+	it->current_func_key = NULL;
+	if (hint != HINT_NONE && it->base.index->def->key_def->for_func_index) {
+		void *key = (void *)hint;
+		uint32_t key_sz = memtx_alloc_size(key);
+		if (key_sz <= sizeof(it->current_func_key_buf)) {
+			it->current_func_key = it->current_func_key_buf;
+		} else {
+			it->current_func_key = xmalloc(key_sz);
+		}
+		memcpy(it->current_func_key, key, key_sz);
+		hint = (hint_t)it->current_func_key;
+	}
 	it->current.set_hint(hint);
 }
 
@@ -1360,6 +1388,7 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 	it->current.tuple = NULL;
 	if (USE_HINT)
 		it->current.set_hint(HINT_NONE);
+	it->current_func_key = NULL;
 	return (struct iterator *)it;
 }
 
