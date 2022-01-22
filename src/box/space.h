@@ -189,6 +189,8 @@ struct space {
 	char *sequence_path;
 	/** Enable/disable triggers. */
 	bool run_triggers;
+	/** This space has foreign key constraints in its format. */
+	bool has_foreign_keys;
 	/**
 	 * Space format or NULL if space does not have format
 	 * (sysview engine, for example).

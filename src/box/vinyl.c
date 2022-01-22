@@ -2130,7 +2130,8 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (tuple_validate_raw(pk->mem_format, tuple))
 		return -1;
 
-	if (space->index_count == 1 && rlist_empty(&space->on_replace))
+	if (space->index_count == 1 && rlist_empty(&space->on_replace) &&
+	    !space->has_foreign_keys)
 		return vy_lsm_upsert(tx, pk, tuple, tuple_end, ops, ops_end);
 
 	const char *old_tuple, *old_tuple_end;

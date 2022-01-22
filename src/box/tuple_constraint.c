@@ -5,6 +5,7 @@
  */
 #include "tuple_constraint.h"
 
+#include "salad/grp_alloc.h"
 #include "trivia/util.h"
 
 int
@@ -38,13 +39,33 @@ struct tuple_constraint *
 tuple_constraint_array_new(const struct tuple_constraint_def *defs,
 			   size_t count)
 {
+	/** Data bank for structs tuple_constraint_fkey_data. */
+	struct grp_alloc all = grp_alloc_initializer();
+	for (size_t i = 0; i < count; i++) {
+		if (defs[i].type != CONSTR_FKEY)
+			continue;
+		size_t size = offsetof(struct tuple_constraint_fkey_data,
+				       data[1]);
+		grp_alloc_reserve_data(&all, size);
+	}
 	struct tuple_constraint *res =
-		tuple_constraint_def_array_dup_raw(defs, count,
-						   sizeof(*res), 0);
+		tuple_constraint_def_array_dup_raw(defs, count, sizeof(*res),
+						   grp_alloc_size(&all));
 	/* Initialize uninitialized part. */
+	grp_alloc_use(&all, res + count);
 	for (size_t i = 0; i < count; i++) {
 		res[i].check = tuple_constraint_noop_check;
 		res[i].destroy = tuple_constraint_noop_destructor;
+		if (defs[i].type != CONSTR_FKEY) {
+			res[i].fkey = NULL;
+			continue;
+		}
+		size_t size = offsetof(struct tuple_constraint_fkey_data,
+				       data[1]);
+		res[i].fkey = grp_alloc_create_data(&all, size);
+		res[i].fkey->field_count = 1;
 	}
+
+	assert(grp_alloc_size(&all) == 0);
 	return res;
 }

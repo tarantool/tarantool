@@ -51,6 +51,7 @@
 #include "box.h"
 #include "tuple_constraint.h"
 #include "tuple_constraint_func.h"
+#include "tuple_constraint_fkey.h"
 
 int
 access_check_space(struct space *space, user_access_t access)
@@ -133,8 +134,11 @@ space_init_constraints(struct space *space)
 {
 	assert(space->def != NULL);
 	struct tuple_format *format = space->format;
+	bool has_foreign_keys = false;
 	for (size_t j = 0; j < format->constraint_count; j++) {
 		struct tuple_constraint *constr = &format->constraint[j];
+		has_foreign_keys = has_foreign_keys ||
+				   constr->def.type == CONSTR_FKEY;
 		if (constr->check != tuple_constraint_noop_check)
 			continue;
 		if (tuple_constraint_func_init(constr, space) != 0)
@@ -144,12 +148,23 @@ space_init_constraints(struct space *space)
 		struct tuple_field *field = tuple_format_field(format, i);
 		for (size_t j = 0; j < field->constraint_count; j++) {
 			struct tuple_constraint *constr = &field->constraint[j];
+			has_foreign_keys = has_foreign_keys ||
+					   constr->def.type == CONSTR_FKEY;
 			if (constr->check != tuple_constraint_noop_check)
 				continue;
-			if (tuple_constraint_func_init(constr, space) != 0)
-				return -1;
+			if (constr->def.type == CONSTR_FUNC) {
+				if (tuple_constraint_func_init(constr,
+							       space) != 0)
+					return -1;
+			} else {
+				assert(constr->def.type == CONSTR_FKEY);
+				if (tuple_constraint_fkey_init(constr,
+							       space, i) != 0)
+					return -1;
+			}
 		}
 	}
+	space->has_foreign_keys = has_foreign_keys;
 	return 0;
 }
 
@@ -409,8 +424,8 @@ index_name_by_id(struct space *space, uint32_t id)
 }
 
 /**
- * Run BEFORE triggers registered for a space. If a trigger
- * changes the current statement, this function updates the
+ * Run BEFORE triggers and foreign key constraint checks registered for a space.
+ * If a trigger changes the current statement, this function updates the
  * request accordingly.
  */
 static int
@@ -546,6 +561,27 @@ after_old_tuple_lookup:;
 
 	assert(old_tuple != NULL || new_tuple != NULL);
 
+	if (old_tuple != NULL) {
+		/*
+		 * Before deleting we must check that there are no tuples
+		 * in other spaces that refer to this tuple via foreign key
+		 * constraint.
+		 */
+		struct space_cache_holder *h;
+		rlist_foreach_entry(h, &space->space_cache_pin_list, link) {
+			if (h->type != SPACE_HOLDER_FOREIGN_KEY)
+				continue;
+			struct tuple_constraint *constr =
+				container_of(h, struct tuple_constraint,
+					     space_cache_holder);
+			assert(constr->def.type == CONSTR_FKEY);
+			if (tuple_constraint_fkey_check_delete(constr,
+							       old_tuple,
+							       new_tuple) != 0)
+				return -1;
+		}
+	}
+
 	/*
 	 * Execute all registered BEFORE triggers.
 	 *
@@ -622,8 +658,19 @@ space_execute_dml(struct space *space, struct txn *txn,
 			return -1;
 	}
 
-	if (unlikely(!rlist_empty(&space->before_replace) &&
-		     space->run_triggers)) {
+	/* Any operation except insert can remove old tuple. */
+	bool need_foreign_key_check = false;
+	if (request->type != IPROTO_INSERT) {
+		struct space_cache_holder *h;
+		rlist_foreach_entry(h, &space->space_cache_pin_list, link) {
+			if (h->type == SPACE_HOLDER_FOREIGN_KEY) {
+				need_foreign_key_check = true;
+				break;
+			}
+		}
+	}
+	if (unlikely((!rlist_empty(&space->before_replace) &&
+		      space->run_triggers) || need_foreign_key_check)) {
 		/*
 		 * Call BEFORE triggers if any before dispatching
 		 * the request. Note, it may change the request
