@@ -15,12 +15,42 @@ extern "C" {
 
 struct region;
 
+enum tuple_constraint_type {
+	CONSTR_FUNC,
+	CONSTR_FKEY,
+};
+
 /**
  * Definition of a func.
  */
 struct tuple_constraint_func_def {
 	/** ID of the function. */
 	uint32_t id;
+};
+
+/**
+ * Definition of field that can be defined by ID or name. Which definition
+ * is used can be recognized by 'name_len' member:
+ * name_len == 0: definition by ID, see 'id' member.
+ * name_len != 0: definition by name, see also 'name' member.
+ */
+struct tuple_constraint_field_id {
+	/** ID of the entity if is defined by ID. */
+	uint32_t id;
+	/** Name size of the entity if is defined by name or 0 if by ID. */
+	uint32_t name_len;
+	/** Name size of the entity if is defined by name or "" if by ID. */
+	const char *name;
+};
+
+/**
+ * Definition of a foreign key.
+ */
+struct tuple_constraint_fkey_def {
+	/** Definition of space. */
+	uint32_t space_id;
+	/** Definition of field. */
+	struct tuple_constraint_field_id field;
 };
 
 /**
@@ -31,8 +61,14 @@ struct tuple_constraint_def {
 	const char *name;
 	/** Length of name of the constraint. */
 	uint32_t name_len;
-	/** Function to check the constraint. */
-	struct tuple_constraint_func_def func;
+	/** Type of the constraint. */
+	enum tuple_constraint_type type;
+	union {
+		/** Function to check the constraint. */
+		struct tuple_constraint_func_def func;
+		/** Definition of foreign key. */
+		struct tuple_constraint_fkey_def fkey;
+	};
 };
 
 /**
@@ -50,6 +86,8 @@ tuple_constraint_def_cmp(const struct tuple_constraint_def *def1,
  * {constraint_name=function_name,...}
  * Allocate a temporary constraint array on @a region and save it in @a def.
  * Allocate needed for constraints strings also on @a region.
+ * If there are some constraints already (*def != NULL, *count != 0) then
+ * append the array with parsed constraints.
  * Set @a count to the count of parsed constraints.
  * Move @a data msgpack pointer to the end of msgpack value.
  *
@@ -64,6 +102,26 @@ tuple_constraint_def_decode(const char **data,
 			    struct region *region,
 			    uint32_t errcode, uint32_t field_no);
 
+/**
+ * Parse constraint array from msgpack @a *data with the following format:
+ * {foreign_key_name={space=.., field=...},...}
+ * Allocate a temporary constraint array on @a region and save it in @a def.
+ * If there are some constraints already (*def != NULL, *count != 0) then
+ * append the array with parsed constraints.
+ * Allocate needed for foreign key strings also on @a region.
+ * Set @a count to the total count of constraints.
+ * Move @a data msgpack pointer to the end of msgpack value.
+ *
+ * Return:
+ *   0 - success.
+ *  -1 - failure, diag is set. It can be an OutOfMemory or ClientError with
+ *   given @a errcode and @a field_no as first arguments.
+ */
+int
+tuple_constraint_def_decode_fkey(const char **data,
+				 struct tuple_constraint_def **def,
+				 uint32_t *count, struct region *region,
+				 uint32_t errcode, uint32_t field_no);
 /**
  * Allocate a single memory block needed for given @a count of constraint
  * definitions, including strings in them. Fill the block with strings and

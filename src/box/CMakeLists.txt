@@ -177,6 +177,7 @@ set(box_sources
     func_cache.c
     func_def.c
     tuple_constraint_func.c
+    tuple_constraint_fkey.c
     key_list.c
     alter.cc
     schema.cc

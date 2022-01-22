@@ -455,6 +455,9 @@ t;
  |   234: box.error.CREATE_CONSTRAINT
  |   235: box.error.FIELD_CONSTRAINT_FAILED
  |   236: box.error.TUPLE_CONSTRAINT_FAILED
+ |   237: box.error.CREATE_FOREIGN_KEY
+ |   238: box.error.FOREIGN_KEY_INTEGRITY
+ |   239: box.error.FIELD_FOREIGN_KEY_FAILED
  | ...
 
 test_run:cmd("setopt delimiter ''");

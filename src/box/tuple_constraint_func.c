@@ -136,6 +136,7 @@ int
 tuple_constraint_func_init(struct tuple_constraint *constr,
 			   struct space *space)
 {
+	assert(constr->def.type == CONSTR_FUNC);
 	constr->space = space;
 	struct func *func = tuple_constraint_func_find(constr);
 	if (func == NULL && recovery_state <= INITIAL_RECOVERY) {

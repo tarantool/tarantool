@@ -451,6 +451,84 @@ local function normalize_constraint(constr, error_prefix)
     return nil
 end
 
+-- Helper of normalize_foreign_key.
+-- Check and normalize one foreign key definition.
+local function normalize_foreign_key_one(def, error_prefix)
+    if def.space == nil then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  error_prefix .. "foreign key: space must be specified")
+    end
+    if def.field == nil then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  error_prefix .. "foreign key: field must be specified")
+    end
+    if type(def.space) ~= 'string' and type(def.space) ~= 'number' then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  error_prefix .. "foreign key: space must be string or number")
+    end
+    if type(def.field) ~= 'string' and type(def.field) ~= 'number' then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  error_prefix .. "foreign key: field must be string or number")
+    end
+    if type(def.field) == 'number' then
+        -- convert to zero-based index.
+        def.field = def.field - 1
+    end
+    if not box.space[def.space] then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  error_prefix .. "foreign key: space " .. tostring(def.space)
+                  .. " was not found")
+    end
+    for k in pairs(def) do
+        if k ~= 'space' and k ~= 'field' then
+            box.error(box.error.ILLEGAL_PARAMS, error_prefix ..
+                      "foreign key: unexpected parameter '" ..
+                      tostring(k) .. "'")
+        end
+    end
+    return {space = box.space[def.space].id, field = def.field}
+end
+
+-- Check and normalize foreign key definition.
+-- Given definition @a fkey is expected to be one of:
+-- {space=.., field=..}
+-- {fkey_name={space=.., field=..}, }
+-- In case of error box.error.ILLEGAL_PARAMS is raised, and @a error_prefix
+--  is added before string message.
+local function normalize_foreign_key(fkey, error_prefix)
+    if fkey == nil then
+        return nil
+    end
+    if type(fkey) ~= 'table' then
+        -- unrecognized form
+        box.error(box.error.ILLEGAL_PARAMS,
+                  error_prefix .. "foreign key must be a table")
+    end
+    if fkey.space ~= nil and fkey.field ~= nil and
+        (type(fkey.space) ~= 'table' or type(fkey.field) ~= 'table') then
+        -- the first, short form.
+        fkey = normalize_foreign_key_one(fkey, error_prefix)
+        return {[box.space[fkey.space].name]=fkey}
+    end
+    -- the second, detailed form.
+    local result = {}
+    for k,v in pairs(fkey) do
+        if type(k) ~= 'string' then
+            box.error(box.error.ILLEGAL_PARAMS,
+                      error_prefix .. "foreign key name must be a string")
+        end
+        if type(v) ~= 'table' then
+            -- unrecognized form
+            box.error(box.error.ILLEGAL_PARAMS,
+                      error_prefix .. "foreign key definition must be a table "
+                      .. "with 'space' and 'field' members")
+        end
+        v = normalize_foreign_key_one(v, error_prefix)
+        result[k] = v
+    end
+    return result
+end
+
 local function update_format(format)
     local result = {}
     for i, given in ipairs(format) do
@@ -481,6 +559,8 @@ local function update_format(format)
                     field[k] = coll.id
                 elseif k == 'constraint' then
                     field[k] = normalize_constraint(v, "format[" .. i .. "]: ")
+                elseif k == 'foreign_key' then
+                    field[k] = normalize_foreign_key(v, "format[" .. i .. "]: ")
                 else
                     field[k] = v
                 end

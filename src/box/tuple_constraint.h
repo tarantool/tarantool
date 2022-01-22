@@ -7,6 +7,7 @@
 
 #include "tuple_constraint_def.h"
 #include "func_cache.h"
+#include "space_cache.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,6 +38,47 @@ typedef void
 (*tuple_constraint_destroy_f)(struct tuple_constraint *constraint);
 
 /**
+ * Additional data for each local/foreign field pair in foreign key constraint.
+ */
+struct tuple_constraint_fkey_pair_data {
+	/**
+	 * Field number of foreign field. Can be -1 if the field was not found
+	 * by name.
+	 */
+	int32_t foreign_field_no;
+	/**
+	 * Field number of local field. Can be -1 if the field was not found
+	 * by name.
+	 */
+	int32_t local_field_no;
+};
+
+/**
+ * Additional data for foreign key constraints.
+ */
+struct tuple_constraint_fkey_data {
+	/**
+	 * Index number (dense ID) in local space that is build by field(s)
+	 * of this constraint. Can be -1 if there's no such index.
+	 */
+	int32_t local_index;
+	/**
+	 * Index number (dense ID) in foreign space that is unique and build by
+	 * field(s) that this constraint refers to. Can be -1 if there's no
+	 * such index.
+	 */
+	int32_t foreign_index;
+	/**
+	 * Number of local/foreign field pairs that participate in foreign key.
+	 */
+	uint32_t field_count;
+	/**
+	 * Array of data of each local/foreign field pair.
+	 */
+	struct tuple_constraint_fkey_pair_data data[];
+};
+
+/**
  * Generic constraint of a tuple or a tuple field.
  */
 struct tuple_constraint {
@@ -52,7 +94,12 @@ struct tuple_constraint {
 	union {
 		/** Data of pinned function in func cache. */
 		struct func_cache_holder func_cache_holder;
+		/** Data of pinned foreign space in space cache. */
+		struct space_cache_holder space_cache_holder;
+		/** Data of subscription in space cache. */
 	};
+	/** Additional data for foreign key constraints. */
+	struct tuple_constraint_fkey_data *fkey;
 };
 
 /**
