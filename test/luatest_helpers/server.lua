@@ -27,12 +27,15 @@ local DEFAULT_CHECKPOINT_PATTERNS = {"*.snap", "*.xlog", "*.vylog",
 -- * 'alias' is mandatory.
 -- * 'command' is optional, assumed test/instances/default.lua by
 --   default.
+-- * 'datadir' is optional, specifies a directory: if specified, the directory's
+--   contents will be recursively copied into 'workdir' during initialization.
 -- * 'workdir' is optional, determined by 'alias'.
 -- * The new 'box_cfg' parameter.
 -- * engine - provides engine for parameterized tests
 Server.constructor_checks = fun.chain(Server.constructor_checks, {
     alias = 'string',
     command = '?string',
+    datadir = '?string',
     workdir = '?string',
     box_cfg = '?table',
     engine = '?string',
@@ -52,6 +55,13 @@ function Server:initialize()
         self.workdir = ('%s/%s-%s'):format(vardir, self.alias, self.id)
         fio.rmtree(self.workdir)
         fio.mktree(self.workdir)
+    end
+    if self.datadir ~= nil then
+        local ok, err = fio.copytree(self.datadir, self.workdir)
+        if not ok then
+            error(string.format('Failed to copy directory: %s', err))
+        end
+        self.datadir = nil
     end
     if self.net_box_port == nil and self.net_box_uri == nil then
         self.net_box_uri = ('%s/%s.iproto'):format(vardir, self.alias)
