@@ -271,6 +271,7 @@ space_create(struct space *space, struct engine *engine,
 		}
 	}
 	space->constraint_ids = mh_strnptr_new();
+	rlist_create(&space->space_cache_pin_list);
 	rlist_create(&space->memtx_stories);
 	return 0;
 
@@ -350,6 +351,7 @@ space_delete(struct space *space)
 	assert(rlist_empty(&space->parent_fk_constraint));
 	assert(rlist_empty(&space->child_fk_constraint));
 	assert(rlist_empty(&space->ck_constraint));
+	assert(rlist_empty(&space->space_cache_pin_list));
 	space->vtab->destroy(space);
 }
 

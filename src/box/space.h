@@ -239,6 +239,8 @@ struct space {
 	 * Hash table with constraint identifiers hashed by name.
 	 */
 	struct mh_strnptr_t *constraint_ids;
+	/** List of space holders. This member is a property of space cache. */
+	struct rlist space_cache_pin_list;
 	/**
 	 * List of all tx stories in the space.
 	 */
