@@ -2380,6 +2380,17 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  "the space has check constraints");
 			return -1;
 		}
+		/* Check whether old_space is used somewhere. */
+		enum space_cache_holder_type pinned_type;
+		if (space_cache_is_pinned(old_space, &pinned_type)) {
+			const char *type_str =
+				space_cache_holder_type_strs[pinned_type];
+			diag_set(ClientError, ER_DROP_SPACE,
+				 space_name(old_space),
+				 tt_sprintf("space is referenced by %s",
+					    type_str));
+			return -1;
+		}
 		/**
 		 * The space must be deleted from the space
 		 * cache right away to achieve linearisable
@@ -2651,6 +2662,20 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 				  space_name(old_space),
 				  "can not drop primary key while "
 				  "space sequence exists");
+			return -1;
+		}
+
+		/*
+		 * Must not truncate pinned space.
+		 */
+		enum space_cache_holder_type pinned_type;
+		if (space_cache_is_pinned(old_space, &pinned_type)) {
+			const char *type_str =
+				space_cache_holder_type_strs[pinned_type];
+			diag_set(ClientError, ER_ALTER_SPACE,
+				 space_name(old_space),
+				 tt_sprintf("space is referenced by %s",
+					    type_str));
 			return -1;
 		}
 	}

@@ -21,6 +21,10 @@ static struct mh_strnptr_t *spaces_by_name;
  */
 uint32_t space_cache_version;
 
+const char *space_cache_holder_type_strs[SPACE_HOLDER_MAX] = {
+	"foreign key",
+};
+
 void
 space_cache_init(void)
 {
@@ -123,6 +127,29 @@ space_foreach(int (*func)(struct space *sp, void *udata), void *udata)
 	return 0;
 }
 
+/**
+ * If the @a old_space space is pinned, relink holders of that space to
+ * the @a new_space.
+ */
+static void
+space_cache_repin_pinned(struct space *old_space, struct space *new_space)
+{
+	assert(new_space != NULL);
+	assert(rlist_empty(&new_space->space_cache_pin_list));
+	if (old_space == NULL)
+		return;
+
+	rlist_swap(&new_space->space_cache_pin_list,
+		   &old_space->space_cache_pin_list);
+
+	struct space_cache_holder *h;
+	rlist_foreach_entry(h, &new_space->space_cache_pin_list, link) {
+		assert(h->space == old_space);
+		h->space = new_space;
+		h->on_replace(h, old_space);
+	}
+}
+
 void
 space_cache_replace(struct space *old_space, struct space *new_space)
 {
@@ -172,6 +199,9 @@ space_cache_replace(struct space *old_space, struct space *new_space)
 			old_space_by_name = (struct space *)p_old_s->val;
 		assert(old_space_by_name == old_space);
 		(void)old_space_by_name;
+
+		/* If old space is pinned, we have to pin the new space. */
+		space_cache_repin_pinned(old_space, new_space);
 	} else {
 		/*
 		 * Delete @old_space from @spaces cache.
@@ -194,6 +224,7 @@ space_cache_replace(struct space *old_space, struct space *new_space)
 		assert(old_space_by_name == old_space);
 		(void)old_space_by_name;
 		mh_strnptr_del(spaces_by_name, k, NULL);
+		assert(rlist_empty(&old_space->space_cache_pin_list));
 	}
 	space_cache_version++;
 
@@ -205,4 +236,54 @@ space_cache_replace(struct space *old_space, struct space *new_space)
 
 	if (old_space != NULL)
 		space_invalidate(old_space);
+}
+
+void
+space_cache_on_replace_noop(struct space_cache_holder *holder,
+			    struct space *old_space)
+{
+	(void)holder;
+	(void)old_space;
+}
+
+void
+space_cache_pin(struct space *space, struct space_cache_holder *holder,
+		space_cache_on_replace on_replace,
+		enum space_cache_holder_type type)
+{
+	assert(mh_i32ptr_find(spaces, space->def->id, NULL) != mh_end(spaces));
+	holder->on_replace = on_replace;
+	holder->type = type;
+	rlist_add_tail(&space->space_cache_pin_list, &holder->link);
+	holder->space = space;
+}
+
+void
+space_cache_unpin(struct space_cache_holder *holder)
+{
+	struct space *space = holder->space; (void)space;
+	assert(mh_i32ptr_find(spaces, space->def->id, NULL) != mh_end(spaces));
+#ifndef NDEBUG
+	/* Paranoid check that the holder in space's pin list. */
+	bool is_in_list = false;
+	struct rlist *tmp;
+	rlist_foreach(tmp, &space->space_cache_pin_list)
+		is_in_list = is_in_list || tmp == &holder->link;
+	assert(is_in_list);
+#endif
+	rlist_del(&holder->link);
+	holder->space = NULL;
+}
+
+bool
+space_cache_is_pinned(struct space *space, enum space_cache_holder_type *type)
+{
+	assert(mh_i32ptr_find(spaces, space->def->id, NULL) != mh_end(spaces));
+	if (rlist_empty(&space->space_cache_pin_list))
+		return false;
+	struct space_cache_holder *h =
+		rlist_first_entry(&space->space_cache_pin_list,
+				  struct space_cache_holder, link);
+	*type = h->type;
+	return true;
 }
