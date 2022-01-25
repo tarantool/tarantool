@@ -42,7 +42,7 @@ jobs:
         ( ! contains(github.event.pull_request.labels.*.name, 'notest') &&
           github.event.pull_request.head.repo.full_name != github.repository )
 
-    runs-on: ubuntu-20.04-self-hosted
+    runs-on: ubuntu-20.04-self-hosted-test-terraform
 
     steps:
       - uses: actions/checkout@v2.3.4
@@ -65,7 +65,7 @@ jobs:
         ( ! contains(github.event.pull_request.labels.*.name, 'notest') &&
           github.event.pull_request.head.repo.full_name != github.repository )
 
-    runs-on: ubuntu-20.04-self-hosted
+    runs-on: ubuntu-20.04-self-hosted-test-terraform
 
     steps:
       # We don't need neither deep fetch, nor submodules here.
