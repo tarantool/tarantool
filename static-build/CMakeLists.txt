@@ -211,7 +211,7 @@ if (APPLE)
     # So we need to find library and header and
     # copy it locally
     find_path(UNWIND_INCLUDE_DIR libunwind.h)
-    find_library(UNWIND_LIBRARY libunwind.dylib
+    find_library(UNWIND_LIBRARY libunwind.tbd
         PATH_SUFFIXES system
     )
 
@@ -231,7 +231,7 @@ if (APPLE)
                 "${UNWIND_INSTALL_PREFIX}/include/"
         )
         add_custom_command(
-            OUTPUT "${UNWIND_INSTALL_PREFIX}/lib/libunwind.dylib"
+            OUTPUT "${UNWIND_INSTALL_PREFIX}/lib/libunwind.tbd"
             COMMAND ${CMAKE_COMMAND} -E make_directory
                 "${UNWIND_INSTALL_PREFIX}/lib"
             COMMAND ${CMAKE_COMMAND} -E copy
@@ -240,7 +240,7 @@ if (APPLE)
         )
         set(UNWIND_DEPENDENCIES
             ${UNWIND_DEPENDENCIES}
-            "${UNWIND_INSTALL_PREFIX}/lib/libunwind.dylib"
+            "${UNWIND_INSTALL_PREFIX}/lib/libunwind.tbd"
             "${UNWIND_INSTALL_PREFIX}/include/libunwind.h"
         )
     else()
