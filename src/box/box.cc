@@ -1972,8 +1972,8 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	wal_stream_create(&wal_stream, cfg_geti64("rows_per_wal"));
 
 	struct recovery *recovery;
-	recovery = recovery_new(cfg_gets("wal_dir"),
-				cfg_geti("force_recovery"),
+	bool is_force_recovery = cfg_geti("force_recovery");
+	recovery = recovery_new(cfg_gets("wal_dir"), is_force_recovery,
 				checkpoint_vclock);
 
 	/*
@@ -2061,15 +2061,43 @@ local_recovery(const struct tt_uuid *instance_uuid,
 		vclock_copy(&replicaset.vclock, &recovery->vclock);
 		box_listen();
 		box_update_replication();
+	} else if (vclock_compare(&replicaset.vclock, &recovery->vclock) != 0) {
+		/*
+		 * There are several reasons for a node to recover a vclock not
+		 * matching the one scanned initially:
+		 *
+		 * 1) someone else might append the files we are reading.
+		 *    This shouldn't typically happen with Tarantool >= 1.7.x,
+		 *    because it takes a lock on WAL directory.
+		 *    But it's still possible in some crazy set up, for example
+		 *    one could recover from another instance's symlinked xlogs.
+		 *
+		 * 2) Non-matching (by signature) snaps and xlogs, i.e.:
+		 *    a) snaps from a remote instance together with local
+		 *       istance's xlogs.
+		 *    b) snaps/xlogs from Tarantool 1.6.
+		 *
+		 * The second case could be distinguished from the first one,
+		 * but this would require unnecessarily re-reading an xlog
+		 * preceding the latest snap, just to make sure the WAL doesn't
+		 * span over the snap creation signature.
+		 *
+		 * Allow both cases, if the user has set force_recovery.
+		 */
+		const char *mismatch_str =
+			tt_sprintf("Replicaset vclock %s doesn't match "
+				   "recovered data %s",
+				   vclock_to_string(&replicaset.vclock),
+				   vclock_to_string(&recovery->vclock));
+		if (is_force_recovery) {
+			say_warn("%s: ignoring, because 'force_recovery' "
+				 "configuration option is set.", mismatch_str);
+			vclock_copy(&replicaset.vclock, &recovery->vclock);
+		} else {
+			panic("Can't proceed. %s.", mismatch_str);
+		}
 	}
 	recovery_finalize(recovery);
-
-	if (vclock_compare(&replicaset.vclock, &recovery->vclock) != 0) {
-		panic("Can't proceed. Replicaset vclock (%s) doesn't match "
-		      "recovered data (%s)",
-		      vclock_to_string(&replicaset.vclock),
-		      vclock_to_string(&recovery->vclock));
-	}
 
 	/*
 	 * We must enable WAL before finalizing engine recovery,
