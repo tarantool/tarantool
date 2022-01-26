@@ -430,6 +430,7 @@ tnt_dt_dow
 tnt_dt_doy
 tnt_dt_from_rdn
 tnt_dt_from_ymd
+tnt_dt_from_ymd_checked
 tnt_dt_month
 tnt_dt_parse_iso_date
 tnt_dt_parse_iso_time
