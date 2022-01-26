@@ -491,6 +491,14 @@ strlcpy(char *dst, const char *src, size_t size);
 #endif
 
 /**
+ * Compares two strings @a lhs and @a rhs. If @a lhs is shorter than
+ * @a rhs then returns @retval < 0. Vice versa - returns @retval > 0.
+ * In case they are equal returns the result of strncmp().
+ */
+int
+strlcmp(const char *lhs, size_t lhs_len, const char *rhs, size_t rhs_len);
+
+/**
  * Check that @a str is valid utf-8 sequence and can be printed
  * unescaped.
  * @param str string
