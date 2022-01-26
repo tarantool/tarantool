@@ -161,7 +161,19 @@ test_ubuntu_ghactions: deps_ubuntu_ghactions test_debian_no_deps
 
 test_debian_clang11: deps_debian deps_buster_clang_11 test_debian_no_deps
 
-# Debug with coverage
+# Debug
+
+build_debug_debian:
+	cmake . -DCMAKE_BUILD_TYPE=Debug
+	make -j
+
+test_debug_debian_no_deps: build_debug_debian
+	make LuaJIT-test
+	cd test && ./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
+
+debug_ubuntu_ghactions: deps_ubuntu_ghactions test_debug_debian_no_deps
+
+# Coverage
 
 build_coverage_debian:
 	cmake . -DCMAKE_BUILD_TYPE=Debug -DENABLE_GCOV=ON
