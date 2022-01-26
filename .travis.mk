@@ -3,7 +3,7 @@
 #
 
 DOCKER_IMAGE?=packpack/packpack:debian-stretch
-DOCKER_IMAGE_TARANTOOL="registry.gitlab.com/tarantool/tarantool/testing/debian-stretch:latest"
+DOCKER_IMAGE_TARANTOOL=tarantool/testing:debian-stretch
 TEST_RUN_EXTRA_PARAMS?=
 MAX_FILES?=65534
 MAX_PROC?=2500
