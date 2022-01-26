@@ -102,7 +102,7 @@ datetime_test(void)
 	size_t index;
 	struct datetime date_expected;
 
-	plan(355);
+	plan(497);
 	datetime_parse_full(&date_expected, sample, sizeof(sample) - 1, 0);
 
 	for (index = 0; index < lengthof(tests); index++) {
@@ -121,15 +121,20 @@ datetime_test(void)
 		 * time fields
 		 */
 		static char buff[DT_TO_STRING_BUFSIZE];
-		struct tnt_tm tm = { .tm_sec = 0 };
 		len = datetime_strftime(&date, buff, sizeof(buff), "%F %T%z");
 		ok(len > 0, "strftime");
+		struct datetime date_strp;
+		len = datetime_strptime(&date_strp, buff, "%F %T%z");
+		is(len > 0, true, "correct parse_strptime return value for '%s'",
+		   buff);
+		is(date.epoch, date_strp.epoch,
+		   "reversible seconds via datetime_strptime for '%s'", buff);
 		struct datetime date_parsed;
 		len = datetime_parse_full(&date_parsed, buff, len, 0);
-		is(len > 0, true, "correct parse_datetime return value for '%s'",
-		   buff);
+		is(len > 0, true, "correct datetime_parse_full return value "
+		   "for '%s'", buff);
 		is(date.epoch, date_parsed.epoch,
-		   "reversible seconds via strftime for '%s'", buff);
+		   "reversible seconds via datetime_parse_full for '%s'", buff);
 	}
 	check_plan();
 }
@@ -158,10 +163,12 @@ tostring_datetime_test(void)
 		{"1973-11-29T21:33:09Z",    123456789,         0,    0},
 		{"2013-10-28T17:51:56Z",   1382982716,         0,    0},
 		{"9999-12-31T23:59:59Z", 253402300799,         0,    0},
+		{"10000-01-01T00:00:00Z",253402300800,         0,    0},
+		{"5879611-07-11T00:00:00Z",185480451417600,    0,    0},
 	};
 	size_t index;
 
-	plan(15);
+	plan(17);
 	for (index = 0; index < lengthof(tests); index++) {
 		struct datetime date = {
 			tests[index].secs,
@@ -187,7 +194,7 @@ _dt_to_epoch(dt_t dt)
 static void
 parse_date_test(void)
 {
-	plan(59);
+	plan(154);
 
 	static struct {
 		int64_t epoch;
@@ -210,6 +217,19 @@ parse_date_test(void)
 		{ -62135596800, "0001-W01-1", 10 },
 		{ -62135596800, "0001-01-01", 10 },
 		{ -62135596800, "0001-001", 8 },
+
+		/* Tarantool extra ranges */
+		{ -62167219200, "0000-01-01", 10 },
+		{ -62167046400, "0000-W01-1", 10 },
+		{ -62167219200, "0000-Q1-01", 10 },
+		{ -68447116800, "-200-12-31", 10 },
+		{ -377705203200, "-10000-12-31", 12 },
+		{ -185604722870400, "-5879610-06-22", 14 },
+		{ -185604706627200, "-5879610W521", 12 },
+		{ 253402214400, "9999-12-31", 10 },
+		{ 253402300800, "10000-01-01", 11 },
+		{ 185480451417600, "5879611-07-11", 13 },
+		{ 185480434915200, "5879611Q101", 11 },
 	};
 	size_t index;
 
@@ -220,10 +240,10 @@ parse_date_test(void)
 		int64_t expected_epoch = valid_tests[index].epoch;
 		size_t len = tnt_dt_parse_iso_date(str, expected_len, &dt);
 		int64_t epoch = _dt_to_epoch(dt);
-		is(len, expected_len, "string '%s' parse failed, len %lu", str,
+		is(len, expected_len, "string '%s' parse, len %lu", str,
 		   len);
-		is(epoch, expected_epoch,
-		   "string '%s' parse failed, epoch %" PRId64, str, epoch);
+		is(epoch, expected_epoch, "string '%s' parse, epoch %" PRId64,
+		   str, epoch);
 	}
 
 	const char * invalid_tests[] = {
@@ -262,6 +282,98 @@ parse_date_test(void)
 		is(len, 0, "expected failure of string '%s' parse, len %lu",
 		   str, len);
 	}
+
+	/* check strptime formats */
+	const struct {
+		const char *fmt;
+		const char *text;
+	} format_tests[] = {
+		{ "%A",                      "Thursday" },
+		{ "%a",                      "Thu" },
+		{ "%B",                      "January" },
+		{ "%b",                      "Jan" },
+		{ "%h",                      "Jan" },
+		{ "%c",                      "Thu Jan  1 03:00:00 1970" },
+		{ "%D",                      "01/01/70" },
+		{ "%m/%d/%y",                "01/01/70" },
+		{ "%d",                      "01" },
+		{ "%Ec",                     "Thu Jan  1 03:00:00 1970" },
+		{ "%Ex",                     "01/01/70" },
+		{ "%EX",                     "03:00:00" },
+		{ "%Ey",                     "70" },
+		{ "%EY",                     "1970" },
+		{ "%Od",                     "01" },
+		{ "%OH",                     "03" },
+		{ "%OI",                     "03" },
+		{ "%Om",                     "01" },
+		{ "%OM",                     "00" },
+		{ "%OS",                     "00" },
+		{ "%Ou",                     "4" },
+		{ "%OU",                     "00" },
+		{ "%Ow",                     "4" },
+		{ "%OW",                     "00" },
+		{ "%Oy",                     "70" },
+		{ "%e",                      " 1" },
+		{ "%F",                      "1970-01-01" },
+		{ "%Y-%m-%d",                "1970-01-01" },
+		{ "%H",                      "03" },
+		{ "%I",                      "03" },
+		{ "%j",                      "001" },
+		{ "%k",                      " 3" },
+		{ "%l",                      " 3" },
+		{ "%M",                      "00" },
+		{ "%m",                      "01" },
+		{ "%n",                      "\n" },
+		{ "%p",                      "AM" },
+		{ "%R",                      "03:00" },
+		{ "%H:%M",                   "03:00" },
+		{ "%r",                      "03:00:00 AM" },
+		{ "%I:%M:%S %p",             "03:00:00 AM" },
+		{ "%S",                      "00" },
+		{ "%s",                      "10800" },
+		{ "%f",                      "125" },
+		{ "%T",                      "03:00:00" },
+		{ "%H:%M:%S",                "03:00:00" },
+		{ "%t",                      "\t" },
+		{ "%U",                      "00" },
+		{ "%u",                      "4" },
+		{ "%G",                      "1970" },
+		{ "%g",                      "70" },
+		{ "%v",                      " 1-Jan-1970" },
+		{ "%e-%b-%Y",                " 1-Jan-1970" },
+		{ "%W",                      "00" },
+		{ "%w",                      "4" },
+		{ "%X",                      "03:00:00" },
+		{ "%x",                      "01/01/70" },
+		{ "%y",                      "70" },
+		{ "%Y",                      "1970" },
+		{ "%z",                      "+0300" },
+		{ "%%",                      "%" },
+		{ "%Y-%m-%dT%H:%M:%S.%9f%z", "1970-01-01T03:00:00.125000000+0300" },
+		{ "%Y-%m-%dT%H:%M:%S.%f%z",  "1970-01-01T03:00:00.125+0300" },
+		{ "%Y-%m-%dT%H:%M:%S.%f",    "1970-01-01T03:00:00.125" },
+		{ "%FT%T.%f",                "1970-01-01T03:00:00.125" },
+		{ "%FT%T.%f%z",              "1970-01-01T03:00:00.125+0300" },
+		{ "%FT%T.%9f%z",             "1970-01-01T03:00:00.125000000+0300" },
+		{ "%Y-%m-%d",                "0000-01-01" },
+		{ "%Y-%m-%d",                "0001-01-01" },
+		{ "%Y-%m-%d",                "9999-01-01" },
+		{ "%Y-%m-%d",                "10000-01-01" },
+		{ "%Y-%m-%d",                "10000-01-01" },
+		{ "%Y-%m-%d",                "5879611-07-11" },
+	};
+
+	for (index = 0; index < lengthof(format_tests); index++) {
+		const char *fmt = format_tests[index].fmt;
+		const char *text = format_tests[index].text;
+		struct tnt_tm date = { .tm_epoch = 0};
+		char *ptr = tnt_strptime(text, fmt, &date);
+		static char buff[DT_TO_STRING_BUFSIZE];
+		tnt_strftime(buff, sizeof(buff), "%FT%T%z", &date);
+		isnt(ptr, NULL, "parse string '%s' using '%s' (result '%s')",
+		     text, fmt, buff);
+	}
+
 	check_plan();
 }
 
