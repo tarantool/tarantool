@@ -83,6 +83,23 @@ first_wday_of(int year)
 		((year % 100) / 4) + (isleap(year) ? 6 : 0) + 1) % 7;
 }
 
+#define NUM_(N, buf) \
+	({	size_t _len = N; \
+		long val = 0; \
+		long sign = +1; \
+		if ('-' == *buf) { \
+			buf++; \
+			sign = -1; \
+		} \
+		for (; _len > 0 && *buf != 0 && is_digit((u_char)*buf); \
+		     buf++, _len--) \
+			val = val * 10 + (*buf - '0'); \
+		sign * val; \
+	})
+
+#define NUM2(buf) NUM_(2, buf)
+#define NUM3(buf) NUM_(3, buf)
+
 char *
 tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 	     struct tnt_tm *__restrict tm)
@@ -136,13 +153,7 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 				return NULL;
 
 			/* XXX This will break for 3-digit centuries. */
-			len = 2;
-			for (i = 0; len && *buf != 0 && is_digit((u_char)*buf);
-			     buf++) {
-				i *= 10;
-				i += *buf - '0';
-				len--;
-			}
+			i = NUM2(buf);
 
 			century = i;
 			flags |= FLAG_YEAR;
@@ -224,13 +235,7 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 			if (!is_digit((u_char)*buf))
 				return NULL;
 
-			len = 3;
-			for (i = 0; len && *buf != 0 && is_digit((u_char)*buf);
-			     buf++) {
-				i *= 10;
-				i += *buf - '0';
-				len--;
-			}
+			i = NUM3(buf);
 			if (i < 1 || i > 366)
 				return NULL;
 
@@ -283,13 +288,7 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 			if (!is_digit((u_char)*buf))
 				return NULL;
 
-			len = 2;
-			for (i = 0; len && *buf != 0 && is_digit((u_char)*buf);
-			     buf++) {
-				i *= 10;
-				i += *buf - '0';
-				len--;
-			}
+			i = NUM2(buf);
 
 			if (c == 'M') {
 				if (i > 59)
@@ -325,12 +324,7 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 			if (!is_digit((u_char)*buf))
 				return NULL;
 
-			for (i = 0; len && *buf != 0 && is_digit((u_char)*buf);
-			     buf++) {
-				i *= 10;
-				i += *buf - '0';
-				len--;
-			}
+			i = NUM_(len, buf);
 			if (c == 'H' || c == 'k') {
 				if (i > 23)
 					return NULL;
@@ -397,13 +391,7 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 			if (!is_digit((u_char)*buf))
 				return NULL;
 
-			len = 2;
-			for (i = 0; len && *buf != 0 && is_digit((u_char)*buf);
-			     buf++) {
-				i *= 10;
-				i += *buf - '0';
-				len--;
-			}
+			i = NUM2(buf);
 			if (i > 53)
 				return NULL;
 
@@ -452,13 +440,7 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 			if (!is_digit((u_char)*buf))
 				return NULL;
 
-			len = 2;
-			for (i = 0; len && *buf != 0 && is_digit((u_char)*buf);
-			     buf++) {
-				i *= 10;
-				i += *buf - '0';
-				len--;
-			}
+			i = NUM2(buf);
 			if (i == 0 || i > 31)
 				return NULL;
 
@@ -514,13 +496,7 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 			if (!is_digit((u_char)*buf))
 				return NULL;
 
-			len = 2;
-			for (i = 0; len && *buf != 0 && is_digit((u_char)*buf);
-			     buf++) {
-				i *= 10;
-				i += *buf - '0';
-				len--;
-			}
+			i = NUM2(buf);
 			if (i < 1 || i > 12)
 				return NULL;
 
@@ -549,16 +525,11 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 			if (*buf == 0 || isspace((u_char)*buf))
 				break;
 
-			if (!is_digit((u_char)*buf))
+			if (*buf != '-' && !is_digit((u_char)*buf))
 				return NULL;
 
-			len = (c == 'Y' || c == 'G') ? 4 : 2;
-			for (i = 0; len && *buf != 0 && is_digit((u_char)*buf);
-			     buf++) {
-				i *= 10;
-				i += *buf - '0';
-				len--;
-			}
+			len = (c == 'Y' || c == 'G') ? 7 : 2;
+			i = NUM_(len, buf);
 			if (c == 'Y' || c == 'G')
 				century = i / 100;
 			year = i % 100;
@@ -579,7 +550,8 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 				zonestr[cp - buf] = '\0';
 				tzset();
 				if (0 == strcmp(zonestr, "GMT") ||
-				    0 == strcmp(zonestr, "UTC")) {
+				    0 == strcmp(zonestr, "UTC") ||
+				    0 == strcmp(zonestr, "Z")) {
 					tm->tm_gmtoff = 0;
 				} else if (0 == strcmp(zonestr, tzname[0])) {
 					tm->tm_isdst = 0;
@@ -593,6 +565,16 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 		} break;
 
 		case 'z': {
+
+			/* Even for %z format specifier we better to accept
+			 * Zulu timezone as default Tarantool shortcut for
+			 * +00:00 offset.
+			 */
+			if (*buf == 'Z') {
+				buf++;
+				tm->tm_gmtoff = 0;
+				break;
+			}
 			int sign = 1;
 
 			if (*buf != '+') {

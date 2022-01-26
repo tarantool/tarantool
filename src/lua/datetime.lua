@@ -922,7 +922,7 @@ local function datetime_parse_full(str, tzoffset)
     if len == 0 then
         error(("could not parse '%s'"):format(str))
     end
-    return date, len
+    return date, tonumber(len)
 end
 
 --[[
@@ -935,7 +935,7 @@ local function datetime_parse_format(str, fmt)
     if len == 0 then
         error(("could not parse '%s' using '%s' format"):format(str, fmt))
     end
-    return date, len
+    return date, tonumber(len)
 end
 
 local function datetime_parse_from(str, obj)
