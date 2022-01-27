@@ -35,7 +35,7 @@
 #include <stdio.h> /* snprintf */
 #include "error.h"
 #include "func_cache.h"
-#include "space.h"
+#include "space_cache.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -44,52 +44,13 @@ extern "C" {
 struct func;
 
 extern uint32_t schema_version;
-extern uint32_t space_cache_version;
 extern uint32_t dd_version_id;
 
 /** Triggers invoked after schema initialization. */
 extern struct rlist on_schema_init;
 
-/**
- * Try to look up a space by space number in the space cache.
- * FFI-friendly no-exception-thrown space lookup function.
- *
- * @return NULL if space not found, otherwise space object.
- */
-struct space *
-space_by_id(uint32_t id);
-
-/**
- * Try to look up a space by space name in the space name cache.
- *
- * @return NULL if space not found, otherwise space object.
- */
-struct space *
-space_by_name(const char *name);
-
 uint32_t
 box_schema_version(void);
-
-static inline struct space *
-space_cache_find(uint32_t id)
-{
-	static uint32_t prev_space_cache_version = 0;
-	static struct space *space = NULL;
-	if (prev_space_cache_version != space_cache_version)
-		space = NULL;
-	if (space && space->def->id == id)
-		return space;
-	if ((space = space_by_id(id))) {
-		prev_space_cache_version = space_cache_version;
-		return space;
-	}
-	diag_set(ClientError, ER_NO_SUCH_SPACE, int2str(id));
-	return NULL;
-}
-
-/** Call a visitor function on every space in the space cache. */
-int
-space_foreach(int (*func)(struct space *sp, void *udata), void *udata);
 
 /**
  * Try to look up object name by id and type of object.
@@ -98,9 +59,6 @@ space_foreach(int (*func)(struct space *sp, void *udata), void *udata);
  */
 const char *
 schema_find_name(enum schema_object_type type, uint32_t object_id);
-
-bool
-space_is_system(struct space *space);
 
 /**
  * Find a sequence by id. Return NULL if the sequence was
@@ -127,27 +85,6 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id, const char *name,
 
 #if defined(__cplusplus)
 } /* extern "C" */
-
-static inline struct space *
-space_cache_find_xc(uint32_t id)
-{
-	struct space *space = space_cache_find(id);
-	if (space == NULL)
-		diag_raise();
-	return space;
-}
-
-/**
- * Update contents of the space cache.
- *
- * If @old_space is NULL, insert @new_space into the cache.
- * If @new_space is NULL, delete @old_space from the cache.
- * If neither @old_space nor @new_space is NULL, replace
- * @old_space with @new_space in the cache (both spaces must
- * have the same id).
- */
-void
-space_cache_replace(struct space *old_space, struct space *new_space);
 
 void
 schema_init(void);
@@ -188,14 +125,6 @@ void
 sequence_cache_delete(uint32_t id);
 
 #endif /* defined(__cplusplus) */
-
-/**
- * Triggers fired after committing a change in space definition.
- * The space is passed to the trigger callback in the event
- * argument. It is the new space in case of create/update or
- * the old space in case of drop.
- */
-extern struct rlist on_alter_space;
 
 /**
  * Triggers fired after committing a change in sequence definition.

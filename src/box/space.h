@@ -506,6 +506,13 @@ space_is_memtx(struct space *space) { return space->engine->id == 0; }
 static inline bool
 space_is_vinyl(struct space *space) { return strcmp(space->engine->name, "vinyl") == 0; }
 
+/**
+ * Check that the space is a system space, which means that is has a special
+ * meaning for tarantool and has predefined insert/remove triggers.
+ */
+bool
+space_is_system(struct space *space);
+
 struct field_def;
 /**
  * Allocate and initialize a space.
