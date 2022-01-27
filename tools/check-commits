@@ -1,0 +1,117 @@
+#!/usr/bin/env python
+
+import re
+import subprocess
+import sys
+import textwrap
+
+
+def stdout(msg):
+    sys.stdout.write(msg)
+    sys.stdout.flush()
+
+
+def git_rev_list(*revs):
+    if not revs:
+        return []
+    return (subprocess.check_output(('git', 'rev-list') + revs)
+            .decode('utf-8')
+            .strip('\n')
+            .split('\n'))
+
+
+def git_show(rev, *args):
+    return (subprocess.check_output(('git', 'show', rev) + args)
+            .decode('utf-8')
+            .strip('\n'))
+
+
+def git_show_subject(rev):
+    return git_show(rev, '--no-patch', '--format=%s')
+
+
+def git_show_message(rev):
+    return git_show(rev, '--no-patch', '--format=%B')
+
+
+def git_show_modified_files(rev):
+    return git_show(rev, '--name-only', '--format=').split('\n')
+
+
+class GitCommit:
+    def __init__(self, sha):
+        self.sha = sha
+        self.subject = git_show_subject(sha)
+        self.message = git_show_message(sha)
+        self.modified_files = git_show_modified_files(sha)
+
+
+class Fail:
+    def __init__(self, message):
+        self.message = message
+
+
+def check_commit_doc(commit):
+    has_doc = bool(re.search('^@TarantoolBot document$', commit.message,
+                             flags=re.MULTILINE))
+    has_tag = bool(re.search('^NO_DOC=', commit.message, flags=re.MULTILINE))
+    if not has_doc and not has_tag:
+        return Fail("Missing documentation request ('@TarantoolBot document' "
+                    "not found in the commit message). If this commit doesn't "
+                    "need to be documented, please add NO_DOC=<reason> to the "
+                    "commit message.")
+    if has_doc and has_tag:
+        return Fail("Redundant NO_DOC tag in the commit message.")
+
+
+def check_commit_changelog(commit):
+    has_changelog = any(path.startswith('changelogs/unreleased/')
+                        for path in commit.modified_files)
+    has_tag = bool(re.search('^NO_CHANGELOG=', commit.message,
+                             flags=re.MULTILINE))
+    if not has_changelog and not has_tag:
+        return Fail("Changelog not found in changelog/unreleased. "
+                    "If this commit doesn't require changelog, please add "
+                    "NO_CHANGELOG=<reason> to the commit message.")
+    if has_changelog and has_tag:
+        return Fail("Redundant NO_CHANGELOG tag in the commit message.")
+
+
+def check_commit(commit):
+    failures = []
+    stdout('Checking commit {} '.format(commit.sha))
+    for check_func in (
+            check_commit_doc,
+            check_commit_changelog,
+    ):
+        fail = check_func(commit)
+        if fail:
+            failures.append(fail)
+    if failures:
+        stdout('FAIL\n')
+        stdout('SHA:     {}\n'.format(commit.sha))
+        stdout('SUBJECT: {}\n'.format(commit.subject))
+        for fail in failures:
+            indent = ' ' * 2
+            stdout('{}ERROR:\n{}\n'
+                   .format(indent,
+                           textwrap.fill(fail.message, width=64,
+                                         initial_indent=indent * 2,
+                                         subsequent_indent=indent * 2)))
+        return False
+    else:
+        stdout('PASS\n')
+        return True
+
+
+def check_rev_list(*revs):
+    ret = True
+    for sha in git_rev_list(*revs):
+        if not check_commit(GitCommit(sha)):
+            ret = False
+    return ret
+
+
+if __name__ == '__main__':
+    if not check_rev_list(*sys.argv[1:]):
+        sys.exit(1)
