@@ -4190,18 +4190,11 @@ case OP_AggStep: {
 	break;
 }
 
-/* Opcode: AggFinal P1 P2 * P4 *
- * Synopsis: accum=r[P1] N=P2
+/* Opcode: AggFinal P1 * * P4 *
+ * Synopsis: accum=r[P1]
  *
- * Execute the finalizer function for an aggregate.  P1 is
- * the memory location that is the accumulator for the aggregate.
- *
- * P2 is the number of arguments that the step function takes and
- * P4 is a pointer to the FuncDef for this function.  The P2
- * argument is not used by this opcode.  It is only there to disambiguate
- * functions that can take varying numbers of arguments.  The
- * P4 argument is only needed for the degenerate case where
- * the step function was not previously called.
+ * Execute the finalizer function for an aggregate. P1 is the memory location
+ * that is the accumulator for the aggregate. P4 is a pointer to the function.
  */
 case OP_AggFinal: {
 	assert(pOp->p1>0 && pOp->p1<=(p->nMem+1 - p->nCursor));

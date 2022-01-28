@@ -5573,10 +5573,8 @@ finalizeAggFunctions(Parse * pParse, AggInfo * pAggInfo)
 	int i;
 	struct AggInfo_func *pF;
 	for (i = 0, pF = pAggInfo->aFunc; i < pAggInfo->nFunc; i++, pF++) {
-		ExprList *pList = pF->pExpr->x.pList;
 		assert(!ExprHasProperty(pF->pExpr, EP_xIsSelect));
-		sqlVdbeAddOp2(v, OP_AggFinal, pF->iMem,
-				  pList ? pList->nExpr : 0);
+		sqlVdbeAddOp1(v, OP_AggFinal, pF->iMem);
 		sqlVdbeAppendP4(v, pF->func, P4_FUNC);
 	}
 }
