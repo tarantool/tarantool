@@ -799,37 +799,6 @@ iproto_send_event(struct obuf *out, const char *key, size_t key_len,
 }
 
 int
-iproto_send_shutdown(struct obuf *out)
-{
-	/*
-	 * Calculate the packet size.
-	 * Note: no body; no sync or schema version.
-	 */
-	size_t size = 5;
-	size += mp_sizeof_map(1);
-	size += mp_sizeof_uint(IPROTO_REQUEST_TYPE);
-	size += mp_sizeof_uint(IPROTO_SHUTDOWN);
-	/* Encode the packet. */
-	char *buf = obuf_alloc(out, size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, size, "obuf_alloc", "buf");
-		return -1;
-	}
-	char *p = buf;
-	/* Fix header. */
-	*(p++) = 0xce;
-	mp_store_u32(p, size - 5);
-	p += 4;
-	/* Packet header. */
-	p = mp_encode_map(p, 1);
-	p = mp_encode_uint(p, IPROTO_REQUEST_TYPE);
-	p = mp_encode_uint(p, IPROTO_SHUTDOWN);
-	assert(size == (size_t)(p - buf));
-	(void)p;
-	return 0;
-}
-
-int
 xrow_decode_dml(struct xrow_header *row, struct request *request,
 		uint64_t key_map)
 {

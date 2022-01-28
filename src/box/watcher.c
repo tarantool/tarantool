@@ -15,8 +15,10 @@
 #include "assoc.h"
 #include "diag.h"
 #include "fiber.h"
+#include "msgpuck.h"
 #include "small/rlist.h"
 #include "trivia/util.h"
+#include "tt_static.h"
 
 /**
  * Global watchable object used by box.
@@ -411,6 +413,23 @@ box_broadcast(const char *key, size_t key_len,
 	      const char *data, const char *data_end)
 {
 	watchable_broadcast(&box_watchable, key, key_len, data, data_end);
+}
+
+void
+box_broadcast_fmt(const char *key, const char *format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	size_t size = mp_vformat(NULL, 0, format, ap);
+	va_end(ap);
+	if (size > TT_STATIC_BUF_LEN)
+		panic("not enough buffer space to broadcast '%s'", key);
+	char *data = tt_static_buf();
+	va_start(ap, format);
+	if (mp_vformat(data, size, format, ap) != size)
+		unreachable();
+	va_end(ap);
+	box_broadcast(key, strlen(key), data, data + size);
 }
 
 void

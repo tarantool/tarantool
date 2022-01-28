@@ -251,6 +251,14 @@ void
 box_broadcast(const char *key, size_t key_len,
 	      const char *data, const char *data_end);
 
+/**
+ * A convenience wrapper around box_broadcast(), which takes a zero-terminated
+ * string for key and generates msgpack with mp_vformat() from the given
+ * format.
+ */
+void
+box_broadcast_fmt(const char *key, const char *format, ...);
+
 void
 box_watcher_init(void);
 

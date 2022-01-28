@@ -188,7 +188,7 @@ struct netbox_options {
  *  (any state, but 'error') -> closed
  *
  * State machine is switched to 'graceful_shutdown' state when it
- * receives a SHUTDOWN packet from the remote host. In this state,
+ * receives a 'box.shutdown' event from the remote host. In this state,
  * no new requests are allowed, and once all in-progress requests
  * have completed, the state machine will be switched to 'error' or
  * 'error_reconnect' state, depending on whether reconnect_after is
@@ -2225,18 +2225,6 @@ netbox_transport_on_state_change_pcall(struct netbox_transport *transport,
 }
 
 /**
- * Invokes the 'shutdown' callback.
- */
-static void
-netbox_transport_on_shutdown(struct netbox_transport *transport,
-			     struct lua_State *L)
-{
-	lua_rawgeti(L, LUA_REGISTRYINDEX, transport->opts.callback_ref);
-	lua_pushliteral(L, "shutdown");
-	lua_call(L, 1, 0);
-}
-
-/**
  * Handles an IPROTO_EVENT packet received from the remote host.
  *
  * Note, decoding msgpack may throw a Lua error. This is fine: it will be
@@ -2275,13 +2263,8 @@ netbox_transport_dispatch_response(struct netbox_transport *transport,
 				   struct lua_State *L, struct xrow_header *hdr)
 {
 	enum iproto_type status = hdr->type;
-	switch (status) {
-	case IPROTO_SHUTDOWN:
-		return netbox_transport_on_shutdown(transport, L);
-	case IPROTO_EVENT:
+	if (status == IPROTO_EVENT) {
 		return netbox_transport_on_event(transport, L, hdr);
-	default:
-		break;
 	}
 	/*
 	 * Account a response even if the request was discarded, but ignore
@@ -2371,15 +2354,10 @@ netbox_transport_do_id(struct netbox_transport *transport, struct lua_State *L)
 	ERROR_INJECT(ERRINJ_NETBOX_DISABLE_ID, goto out);
 	if (peer_version_id < version_id(2, 10, 0))
 		goto unsupported;
-	ERROR_INJECT_YIELD(ERRINJ_NETBOX_ID_DELAY);
 	netbox_encode_id(L, &transport->send_buf, transport->next_sync++);
 	struct xrow_header hdr;
 	if (netbox_transport_send_and_recv(transport, &hdr) != 0)
 		luaT_error(L);
-	if (hdr.type == IPROTO_SHUTDOWN) {
-		box_error_raise(ER_NO_CONNECTION, "Peer closed");
-		luaT_error(L);
-	}
 	if (hdr.type != IPROTO_OK) {
 		uint32_t errcode = hdr.type & (IPROTO_TYPE_ERROR - 1);
 		if (errcode == ER_UNKNOWN_REQUEST_TYPE)
@@ -2432,17 +2410,12 @@ netbox_transport_do_auth(struct netbox_transport *transport,
 	struct netbox_options *opts = &transport->opts;
 	if (opts->user == NULL)
 		return;
-	ERROR_INJECT_YIELD(ERRINJ_NETBOX_AUTH_DELAY);
 	netbox_encode_auth(L, &transport->send_buf, transport->next_sync++,
 			   opts->user, opts->password,
 			   transport->greeting.salt);
 	struct xrow_header hdr;
 	if (netbox_transport_send_and_recv(transport, &hdr) != 0)
 		luaT_error(L);
-	if (hdr.type == IPROTO_SHUTDOWN) {
-		box_error_raise(ER_NO_CONNECTION, "Peer closed");
-		luaT_error(L);
-	}
 	if (hdr.type != IPROTO_OK) {
 		xrow_decode_error(&hdr);
 		luaT_error(L);
@@ -2760,8 +2733,6 @@ luaopen_net_box(struct lua_State *L)
 			    IPROTO_FEATURE_ERROR_EXTENSION);
 	iproto_features_set(&NETBOX_IPROTO_FEATURES,
 			    IPROTO_FEATURE_WATCHERS);
-	iproto_features_set(&NETBOX_IPROTO_FEATURES,
-			    IPROTO_FEATURE_GRACEFUL_SHUTDOWN);
 
 	lua_pushcfunction(L, luaT_netbox_request_iterator_next);
 	luaT_netbox_request_iterator_next_ref = luaL_ref(L, LUA_REGISTRYINDEX);

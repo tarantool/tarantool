@@ -53,7 +53,6 @@ local IPROTO_FEATURE_NAMES = {
     [1]     = 'transactions',
     [2]     = 'error_extension',
     [3]     = 'watchers',
-    [4]     = 'graceful_shutdown',
 }
 
 -- Given an array of IPROTO feature ids, returns a map {feature_name: bool}.
@@ -238,10 +237,11 @@ local stream_spaces_mt = {
     __serialize = stream_spaces_serialize
 }
 
--- This callback is invoked in a new fiber upon receiving a SHUTDOWN packet
+-- This callback is invoked in a new fiber upon receiving 'box.shutdown' event
 -- from a remote host. It runs on_shutdown triggers and then gracefully
 -- terminates the connection.
 local function graceful_shutdown(remote)
+    remote._shutdown_pending = true
     local ok, err = pcall(remote._on_shutdown.run, remote._on_shutdown, remote)
     if not ok then
         log.error(err)
@@ -249,9 +249,9 @@ local function graceful_shutdown(remote)
     -- While the triggers were running, the connection could have been closed
     -- and even reestablished (if reconnect_after is set), in which case we
     -- must not initiate a graceful shutdown.
-    if remote._shutdown_fiber == fiber.self() then
+    if remote._shutdown_pending then
         remote._transport:graceful_shutdown()
-        remote._shutdown_fiber = nil
+        remote._shutdown_pending = nil
     end
 end
 
@@ -290,7 +290,7 @@ local function new_sm(uri, opts)
                 -- a graceful shutdown on our side, because a connection can
                 -- already be reestablished (if reconnect_after is set) by the
                 -- time we finish running on_shutdown triggers.
-                remote._shutdown_fiber = nil
+                remote._shutdown_pending = nil
             end
             remote.state, remote.error = state, err
             if state == 'error_reconnect' then
@@ -348,8 +348,6 @@ local function new_sm(uri, opts)
                     watcher:_run_async()
                 end
             end
-        elseif what == 'shutdown' then
-            remote._shutdown_fiber = fiber.new(graceful_shutdown, remote)
         end
     end
     if opts.console then
@@ -395,6 +393,13 @@ local function new_sm(uri, opts)
     remote._gc_hook = ffi.gc(ffi.new('char[1]'), function()
         pcall(transport.stop, transport);
     end)
+    if not opts._disable_graceful_shutdown then
+        remote:watch('box.shutdown', function(_, value)
+            if value then
+                graceful_shutdown(remote)
+            end
+        end)
+    end
     transport:start()
     if opts.wait_connected ~= false then
         remote:wait_state('active', tonumber(opts.wait_connected))
