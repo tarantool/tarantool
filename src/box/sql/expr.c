@@ -5469,6 +5469,17 @@ analyzeAggregate(Walker * pWalker, Expr * pExpr)
 						       (pExpr, EP_xIsSelect));
 						pItem = &pAggInfo->aFunc[i];
 						pItem->pExpr = pExpr;
+						int n = pExpr->x.pList == NULL ?
+							0 : pExpr->x.pList->nExpr;
+						/*
+						 * Allocate n MEMs for arguments
+						 * and one more MEM for
+						 * accumulator. This makes it
+						 * easier to pass these n + 1
+						 * MEMs to the user-defined
+						 * aggregate function.
+						 */
+						pParse->nMem += n;
 						pItem->iMem = ++pParse->nMem;
 						assert(!ExprHasProperty
 						       (pExpr, EP_IntValue));
@@ -5479,12 +5490,6 @@ analyzeAggregate(Walker * pWalker, Expr * pExpr)
 								true;
 							return WRC_Abort;
 						}
-						assert(pItem->func->def->
-						       language ==
-						       FUNC_LANGUAGE_SQL_BUILTIN &&
-						       pItem->func->def->
-						       aggregate ==
-						       FUNC_AGGREGATE_GROUP);
 						if (pExpr->flags & EP_Distinct) {
 							pItem->iDistinct =
 								pParse->nTab++;

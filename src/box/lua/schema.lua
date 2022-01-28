@@ -2603,7 +2603,7 @@ box.schema.func.create = function(name, opts)
                               language = 'string', body = 'string',
                               is_deterministic = 'boolean',
                               is_sandboxed = 'boolean',
-                              is_multikey = 'boolean',
+                              is_multikey = 'boolean', aggregate = 'string',
                               takes_raw_args = 'boolean',
                               comment = 'string',
                               param_list = 'table', returns = 'string',

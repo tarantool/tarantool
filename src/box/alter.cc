@@ -3460,6 +3460,13 @@ func_def_new_from_tuple(struct tuple *tuple)
 				  def->name, "invalid aggregate value");
 			return NULL;
 		}
+		if (def->aggregate == FUNC_AGGREGATE_GROUP &&
+		    def->exports.lua) {
+			diag_set(ClientError, ER_CREATE_FUNCTION, def->name,
+				 "aggregate function can only be accessed in "
+				 "SQL");
+			return NULL;
+		}
 		const char *param_list = tuple_field_with_type(tuple,
 			BOX_FUNC_FIELD_PARAM_LIST, MP_ARRAY);
 		if (param_list == NULL)
@@ -3481,6 +3488,12 @@ func_def_new_from_tuple(struct tuple *tuple)
 					  def->name, "invalid argument type");
 				return NULL;
 			}
+		}
+		if (def->aggregate == FUNC_AGGREGATE_GROUP && argc == 0) {
+			diag_set(ClientError, ER_CREATE_FUNCTION, def->name,
+				 "aggregate function must have at least one "
+				 "argument");
+			return NULL;
 		}
 		def->param_count = argc;
 		const char *opts = tuple_field(tuple, BOX_FUNC_FIELD_OPTS);
