@@ -2071,6 +2071,19 @@ sql_func_find(struct Expr *expr)
 	return func;
 }
 
+struct func *
+sql_func_finalize(const char *name)
+{
+	const char *finalize_name = tt_sprintf("%s_finalize", name);
+	uint32_t len = strlen(finalize_name);
+	struct func *finalize = func_by_name(finalize_name, len);
+	if (finalize == NULL ||
+	    finalize->def->param_count != 1 ||
+	    finalize->def->aggregate == FUNC_AGGREGATE_GROUP)
+		return NULL;
+	return finalize;
+}
+
 uint32_t
 sql_func_flags(const char *name)
 {

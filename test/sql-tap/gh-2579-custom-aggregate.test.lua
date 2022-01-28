@@ -3,7 +3,7 @@ local build_path = os.getenv("BUILDDIR")
 package.cpath = build_path..'/test/sql-tap/?.so;'..build_path..'/test/sql-tap/?.dylib;'..package.cpath
 
 local test = require("sqltester")
-test:plan(5)
+test:plan(9)
 
 test:execsql([[
         CREATE TABLE t (i INT PRIMARY KEY);
@@ -105,6 +105,117 @@ test:do_test(
         "least one argument"
     })
 
+-- Make sure finalizers of aggregate functions work as intended.
+box.schema.func.create("F1_finalize", {
+    language = "Lua",
+    body = [[
+        function(state)
+            if state == nil then
+                return 0
+            end
+            return state.sum / state.count
+        end
+    ]],
+    param_list = {"map"},
+    returns = "number",
+    exports = {'LUA', 'SQL'},
+})
+
+test:do_execsql_test(
+    "gh-2579-6",
+    [[
+        SELECT f1(i), typeof(f1(i)) from t;
+    ]], {
+        3, "integer"
+    })
+
+--
+-- Make sure that the finalizers of the aggregate function and the aggregate
+-- function can be of different types.
+--
+box.schema.func.create("F2_finalize", {
+    language = "Lua",
+    body = [[
+        function(state)
+            if state == nil then
+                return 0
+            end
+            return state[#state]
+        end
+    ]],
+    param_list = {"array"},
+    returns = "number",
+    exports = {'LUA', 'SQL'},
+})
+
+test:do_execsql_test(
+    "gh-2579-7",
+    [[
+        SELECT f2(i) from t;
+    ]], {
+        5
+    })
+
+-- Make sure that aggregate function cannot become finalizer.
+box.schema.func.drop("F2_finalize")
+box.schema.func.create("F2_finalize", {
+    language = "Lua",
+    body = [[
+        function(state)
+            if state == nil then
+                return 0
+            end
+            sum = 0
+            for k, v in pairs(state) do
+                sum = sum + v
+            end
+            return sum
+        end
+    ]],
+    aggregate = "group",
+    param_list = {"array"},
+    returns = "number",
+    exports = {'SQL'},
+})
+
+test:do_execsql_test(
+    "gh-2579-8",
+    [[
+        SELECT f2(i), typeof(f2(i)) from t;
+    ]], {
+        {1, 2, 3, 4, 5}, "array"
+    })
+
+--
+-- Make sure that function with number of arguments not equal to 1 cannot become
+-- finalizer.
+--
+box.schema.func.drop("F2_finalize")
+box.schema.func.create("F2_finalize", {
+    language = "Lua",
+    body = [[
+        function(state, x)
+            if state == nil then
+                return 0
+            end
+            return state[#state] * x
+        end
+    ]],
+    param_list = {"map", "integer"},
+    returns = "number",
+    exports = {'LUA', 'SQL'},
+})
+
+test:do_execsql_test(
+    "gh-2579-9",
+    [[
+        SELECT f2(i), typeof(f2(i)), "F2_finalize"(f2(i), 2) from t;
+    ]], {
+        {1, 2, 3, 4, 5}, "array", 10
+    })
+
+box.schema.func.drop('F2_finalize')
+box.schema.func.drop('F1_finalize')
 box.schema.func.drop('gh-2579-custom-aggregate.f3')
 box.schema.func.drop('F2')
 box.schema.func.drop('F1')

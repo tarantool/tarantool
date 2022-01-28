@@ -663,6 +663,18 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				return WRC_Abort;
 			}
 			pExpr->type = func->def->returns;
+			/*
+			 * In case a user-defined aggregate function was called,
+			 * the result type will be the result type of the
+			 * FINALIZE part of the function.
+			 */
+			if (func->def->language != FUNC_LANGUAGE_SQL_BUILTIN &&
+			    func->def->aggregate == FUNC_AGGREGATE_GROUP) {
+				const char *name = pExpr->u.zToken;
+				struct func *finalize = sql_func_finalize(name);
+				if (finalize != NULL)
+					pExpr->type = finalize->def->returns;
+			}
 			assert(!func->def->is_deterministic ||
 			       (pNC->ncFlags & NC_IdxExpr) == 0);
 			if (func->def->is_deterministic)
