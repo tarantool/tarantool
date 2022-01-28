@@ -176,6 +176,7 @@ g.test_sync_request_completed_after_reconnect = function()
     end)
     local conn = net.connect(g.server.net_box_uri, {reconnect_after = 0.01})
     conn:call('func', {}, {is_async = true})
+    t.assert(conn:ping())
     local process = g.server.process
     local on_server_stop = fiber.channel(1)
     fiber.create(function()
@@ -292,6 +293,7 @@ g.test_connection_active_while_triggers_running = function()
     end
     local conn = net.connect(g.server.net_box_uri)
     conn:on_shutdown(trigger_f)
+    t.assert(conn:ping())
     local on_server_stop = fiber.channel(1)
     fiber.create(function()
         g.server:stop()
@@ -342,50 +344,48 @@ g.test_shutdown_aborted_on_reconnect = function()
     conn:close()
 end
 
--- Checks that if on_shutdown triggers return after the server restarts
--- (on timeout) and the client connection is reestablished and a *new*
--- graceful shutdown is initiated, the stale triggers won't interfere in
--- the new graceful shutdown process.
+-- Checks that if the server restarts (killed) and the client connection is
+-- reestablished and a *new* graceful shutdown is initiated while on_shutdown
+-- triggers are still running, triggers won't be started again until the
+-- currently running triggers return.
 g.test_shutdown_aborted_on_reconnect_2 = function()
     g.server:exec(function()
         box.ctl.set_on_shutdown_timeout(9000)
     end)
-    local next_trigger_id = 1
-    local on_trigger_start = {fiber.channel(1), fiber.channel(1)}
-    local stop_trigger = {fiber.channel(1), fiber.channel(1)}
+    local on_trigger_start = fiber.channel(1)
+    local stop_trigger = fiber.channel(1)
     local function trigger_f()
-        local id = next_trigger_id
-        next_trigger_id = id + 1
-        on_trigger_start[id]:put(true)
-        stop_trigger[id]:get()
+        on_trigger_start:put(true)
+        stop_trigger:get()
     end
     local conn = net.connect(g.server.net_box_uri, {reconnect_after = 0.01})
     conn:on_shutdown(trigger_f)
-    -- Start shutting down the server and wait for the first trigger to run.
+    -- Start shutting down the server and wait for the trigger to run.
     local process = g.server.process
     local on_server_stop = fiber.channel(1)
     fiber.create(function()
         g.server:stop()
         on_server_stop:put(true)
     end)
-    t.assert(on_trigger_start[1]:get())
+    t.assert(on_trigger_start:get())
     -- Restart the server and wait for the connection to be reestablished.
     process:kill('KILL')
     t.assert(on_server_stop:get())
     g.server:start()
     t.assert(conn:wait_state('active'))
-    -- Start shutting down the server and wait for the second trigger to run.
+    -- Start shutting down the server and check that the trigger doesn't run.
     fiber.create(function()
         g.server:stop()
         on_server_stop:put(true)
     end)
-    t.assert(on_trigger_start[2]:get())
-    -- Complete the first trigger and check that the connection isn't broken.
-    stop_trigger[1]:put(true)
+    t.assert_not(on_trigger_start:get(0.01))
+    -- Complete the trigger and check that the connection isn't broken and
+    -- the trigger is restarted.
+    stop_trigger:put(true)
     t.assert_not(conn:wait_state({'graceful_shutdown', 'error_reconnect'}, 0.1))
     t.assert_equals(conn.state, 'active')
-    -- Complete the second trigger and check that the server exited.
-    stop_trigger[2]:put(true)
+    t.assert(on_trigger_start:get())
+    stop_trigger:put(true)
     t.assert(on_server_stop:get())
     t.assert_equals(conn.state, 'error_reconnect')
     conn:close()
@@ -477,4 +477,32 @@ g.test_schema_not_fetched_during_shutdown = function()
     t.assert(fut2:result())
     conn1:close()
     conn2:close()
+end
+
+-- Checks that if a client didn't subscribe to the shutdown event, the server
+-- won't wait for it to close the connection.
+g.test_graceful_shutdown_not_supported_by_client = function()
+    g.server:exec(function()
+        local fiber = require('fiber')
+        rawset(_G, 'func', function()
+            box.session.push(true)
+            fiber.sleep(9000)
+            return true
+        end)
+        box.ctl.set_on_shutdown_timeout(9000)
+    end)
+    local conn = net.connect(g.server.net_box_uri, {
+        _disable_graceful_shutdown = true,
+    })
+    local fut = conn:call('func', {}, {is_async = true})
+    -- Wait for the server to invoke the call.
+    for _, v in fut:pairs() do -- luacheck: ignore
+        t.assert_equals(v, true)
+        break
+    end
+    g.server:stop()
+    local res, err = fut:result()
+    t.assert_not(res)
+    t.assert_equals(tostring(err), 'Peer closed')
+    conn:close()
 end

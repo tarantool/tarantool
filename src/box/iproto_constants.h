@@ -282,17 +282,6 @@ enum iproto_type {
 	IPROTO_WATCH = 74,
 	IPROTO_UNWATCH = 75,
 	IPROTO_EVENT = 76,
-	/**
-	 * Special request type sent by a server to all clients that support
-	 * the graceful shutdown feature to notify them that the server is
-	 * about to be shut down. The server won't exit until all the clients
-	 * close connections or a timeout occurs.
-	 *
-	 * The request type is asynchronous (doesn't have a sync number):
-	 * a client isn't supposed to reply to it; instead it's expected to
-	 * close the connection as soon as possible.
-	 */
-	IPROTO_SHUTDOWN = 77,
 
 	/** Vinyl run info stored in .index file */
 	VY_INDEX_RUN_INFO = 100,

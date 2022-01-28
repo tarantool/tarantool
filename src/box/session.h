@@ -128,6 +128,8 @@ struct session {
 	struct credentials credentials;
 	/** Trigger for fiber on_stop to cleanup created on-demand session */
 	struct trigger fiber_on_stop;
+	/** Link in shutdown_list. */
+	struct rlist in_shutdown_list;
 };
 
 struct session_vtab {

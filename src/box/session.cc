@@ -30,6 +30,7 @@
  */
 #include "session.h"
 #include "fiber.h"
+#include "fiber_cond.h"
 #include "memory.h"
 #include "assoc.h"
 #include "trigger.h"
@@ -38,6 +39,7 @@
 #include "tt_static.h"
 #include "sql_stmt_cache.h"
 #include "watcher.h"
+#include "on_shutdown.h"
 
 const char *session_type_strs[] = {
 	"background",
@@ -67,6 +69,15 @@ static struct mh_i64ptr_t *session_registry;
 uint32_t default_flags = 0;
 
 struct mempool session_pool;
+
+/**
+ * List of sessions blocking shutdown, linked by session::in_shutdown_list.
+ * The shutdown trigger callback won't return until it's empty.
+ */
+static RLIST_HEAD(shutdown_list);
+
+/** Signalled when shutdown_list becomes empty. */
+static struct fiber_cond shutdown_list_empty_cond;
 
 RLIST_HEAD(session_on_connect);
 RLIST_HEAD(session_on_disconnect);
@@ -166,6 +177,22 @@ session_unwatch(struct session *session, const char *key,
 }
 
 /**
+ * Returns true if the session is watching the given key.
+ * They key string is zero-terminated.
+ */
+static bool
+session_is_watching(struct session *session, const char *key)
+{
+	struct mh_strnptr_t *h = session->watchers;
+	if (h == NULL)
+		return false;
+	size_t key_len = strlen(key);
+	uint32_t key_hash = mh_strn_hash(key, key_len);
+	struct mh_strnptr_key_t k = {key, key_len, key_hash};
+	return mh_strnptr_find(h, &k, NULL) != mh_end(h);
+}
+
+/**
  * Unregisters all watchers registered in this session.
  * Called when the session is closed.
  */
@@ -205,6 +232,9 @@ session_close(struct session *session)
 {
 	session->vtab = &closed_session_vtab;
 	session_unregister_all_watchers(session);
+	rlist_del_entry(session, in_shutdown_list);
+	if (rlist_empty(&session->in_shutdown_list))
+		fiber_cond_broadcast(&shutdown_list_empty_cond);
 }
 
 void
@@ -234,6 +264,7 @@ session_create(enum session_type type)
 	session->sql_default_engine = SQL_STORAGE_ENGINE_MEMTX;
 	session->sql_stmts = NULL;
 	session->watchers = NULL;
+	rlist_create(&session->in_shutdown_list);
 
 	/* For on_connect triggers. */
 	credentials_create(&session->credentials, guest_user);
@@ -338,6 +369,7 @@ session_destroy(struct session *session)
 {
 	/* Watchers are unregistered in session_close(). */
 	assert(session->watchers == NULL);
+	assert(rlist_empty(&session->in_shutdown_list));
 	session_storage_cleanup(session->id);
 	struct mh_i64ptr_node_t node = { session->id, NULL };
 	mh_i64ptr_remove(session_registry, &node, NULL);
@@ -359,6 +391,29 @@ session_find(uint64_t sid)
 extern "C" void
 session_settings_init(void);
 
+/**
+ * Waits for all sessions that subscribed to 'box.shutdown' event to close.
+ */
+static int
+session_on_shutdown_f(void *arg)
+{
+	(void)arg;
+	fiber_set_name(fiber_self(), "session.shutdown");
+	struct mh_i64ptr_t *h = session_registry;
+	mh_int_t i;
+	mh_foreach(h, i) {
+		struct session *session =
+			(struct session *)mh_i64ptr_node(h, i)->val;
+		if (session_is_watching(session, "box.shutdown")) {
+			rlist_add_entry(&shutdown_list, session,
+					in_shutdown_list);
+		}
+	}
+	while (!rlist_empty(&shutdown_list))
+		fiber_cond_wait(&shutdown_list_empty_cond);
+	return 0;
+}
+
 void
 session_init(void)
 {
@@ -366,6 +421,9 @@ session_init(void)
 	mempool_create(&session_pool, &cord()->slabc, sizeof(struct session));
 	credentials_create(&admin_credentials, admin_user);
 	session_settings_init();
+	fiber_cond_create(&shutdown_list_empty_cond);
+	if (box_on_shutdown(NULL, session_on_shutdown_f, NULL) != 0)
+		panic("failed to set session shutdown trigger");
 }
 
 void

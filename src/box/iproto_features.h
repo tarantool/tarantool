@@ -45,15 +45,6 @@ enum iproto_feature_id {
 	 * IPROTO_WATCH, IPROTO_UNWATCH, IPROTO_EVENT commands.
 	 */
 	IPROTO_FEATURE_WATCHERS = 3,
-	/**
-	 * Graceful shutdown support: IPROTO_SHUTDOWN command.
-	 *
-	 * Upon receiving a shutdown request (os.exit or SIGTERM), a server
-	 * will send an IPROTO_SHUTDOWN packet to all clients that support
-	 * the graceful shutdown feature and won't exit until all of them
-	 * close connections or a timeout occurs.
-	 */
-	IPROTO_FEATURE_GRACEFUL_SHUTDOWN = 4,
 	iproto_feature_id_MAX,
 };
 
@@ -69,7 +60,7 @@ struct iproto_features {
  * It should be incremented every time a new feature is added or removed.
  */
 enum {
-	IPROTO_CURRENT_VERSION = 4,
+	IPROTO_CURRENT_VERSION = 3,
 };
 
 /**

@@ -257,23 +257,6 @@ unsigned iproto_readahead = 16320;
 /* The maximal number of iproto messages in fly. */
 static int iproto_msg_max = IPROTO_MSG_MAX_MIN;
 
-/**
- * List of connections blocking shutdown in tx, linked by
- * iproto_connection::in_shutdown_list. Accessed and modified
- * only from the tx thread.
- *
- * The shutdown trigger callback won't return until it's empty.
- * We add a connection to the list if it supports the graceful
- * shutdown feature, and remove it when it's closed.
- */
-static RLIST_HEAD(shutdown_list);
-
-/** Signalled when shutdown_list becomes empty. */
-static struct fiber_cond shutdown_list_empty_cond;
-
-/** This flag is set when the shutdown trigger is called. */
-static bool shutdown_is_inprogress;
-
 int
 iproto_addr_count(void)
 {
@@ -664,8 +647,6 @@ struct iproto_connection
 		 * return.
 		 */
 		bool is_push_pending;
-		/** Link in shutdown_list. */
-		struct rlist in_shutdown_list;
 	} tx;
 	/** Authentication salt. */
 	char salt[IPROTO_SALT_SIZE];
@@ -1460,7 +1441,6 @@ iproto_connection_new(struct iproto_thread *iproto_thread)
 	con->state = IPROTO_CONNECTION_ALIVE;
 	con->tx.is_push_pending = false;
 	con->tx.is_push_sent = false;
-	rlist_create(&con->tx.in_shutdown_list);
 	rmean_collect(iproto_thread->rmean, IPROTO_CONNECTIONS, 1);
 	return con;
 }
@@ -1473,7 +1453,6 @@ iproto_connection_delete(struct iproto_connection *con)
 	assert(!iostream_is_initialized(&con->io));
 	assert(con->session == NULL);
 	assert(con->state == IPROTO_CONNECTION_DESTROYED);
-	assert(rlist_empty(&con->tx.in_shutdown_list));
 	/*
 	 * The output buffers must have been deleted
 	 * in tx thread.
@@ -1745,9 +1724,6 @@ tx_process_disconnect(struct cmsg *m)
 			session_run_on_disconnect_triggers(con->session);
 		}
 	}
-	rlist_del_entry(con, tx.in_shutdown_list);
-	if (rlist_empty(&shutdown_list))
-		fiber_cond_broadcast(&shutdown_list_empty_cond);
 }
 
 static void
@@ -2195,22 +2171,6 @@ static void
 tx_process_id(struct iproto_connection *con, const struct id_request *id)
 {
 	con->session->meta.features = id->features;
-	if (iproto_features_test(&id->features,
-				 IPROTO_FEATURE_GRACEFUL_SHUTDOWN)) {
-		rlist_add_entry(&shutdown_list, con, tx.in_shutdown_list);
-		if (shutdown_is_inprogress) {
-			/*
-			 * IPROTO_ID enabling graceful shutdown was received
-			 * after we've sent shutdown packets. Sent a packet
-			 * to this one as well so that it doesn't block
-			 * shutdown.
-			 */
-			if (iproto_send_shutdown(con->tx.p_obuf) != 0) {
-				diag_log();
-				rlist_del_entry(con, tx.in_shutdown_list);
-			}
-		}
-	}
 }
 
 static void
@@ -2821,33 +2781,15 @@ static void
 iproto_send_stop_msg(void);
 
 /**
- * Shutdown trigger callback.
- *  1. Stops accepting new connections.
- *  2. Sends an IPROTO_SHUTDOWN packet to all clients that support
- *     the graceful shutdown feature.
- *  3. Waits for the clients to close connections.
+ * Stops accepting new connections on shutdown.
  */
 static int
 iproto_on_shutdown_f(void *arg)
 {
 	(void)arg;
-	assert(!shutdown_is_inprogress);
-	shutdown_is_inprogress = true;
 	fiber_set_name(fiber_self(), "iproto.shutdown");
 	iproto_send_stop_msg();
 	evio_service_stop(&tx_binary);
-	struct iproto_connection *con, *next_con;
-	rlist_foreach_entry_safe(con, &shutdown_list, tx.in_shutdown_list,
-				 next_con) {
-		if (iproto_send_shutdown(con->tx.p_obuf) != 0) {
-			diag_log();
-			rlist_del_entry(con, tx.in_shutdown_list);
-			continue;
-		}
-		tx_push(con);
-	}
-	while (!rlist_empty(&shutdown_list))
-		fiber_cond_wait(&shutdown_list_empty_cond);
 	return 0;
 }
 
@@ -3008,7 +2950,6 @@ iproto_init(int threads_count)
 
 	session_vtab_registry[SESSION_TYPE_BINARY] = iproto_session_vtab;
 
-	fiber_cond_create(&shutdown_list_empty_cond);
 	if (box_on_shutdown(NULL, iproto_on_shutdown_f, NULL) != 0)
 		panic("failed to set iproto shutdown trigger");
 	return;

@@ -77,6 +77,7 @@
 #include "box/session.h"
 #include "box/memtx_tx.h"
 #include "box/module_cache.h"
+#include "box/watcher.h"
 #include "systemd.h"
 #include "crypto/crypto.h"
 #include "core/popen.h"
@@ -156,6 +157,7 @@ tarantool_exit(int code)
 	}
 	is_shutting_down = true;
 	exit_code = code;
+	box_broadcast_fmt("box.shutdown", "%b", true);
 	fiber_call(on_shutdown_fiber);
 }
 
