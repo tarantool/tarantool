@@ -376,6 +376,16 @@ local function utc_secs(epoch, tzoffset)
     return epoch - tzoffset * 60
 end
 
+local function time_delocalize(self)
+    self.epoch = local_secs(self)
+    self.tzoffset = 0
+end
+
+local function time_localize(self, offset)
+    self.epoch = utc_secs(self.epoch, offset)
+    self.tzoffset = offset
+end
+
 -- get epoch seconds, shift to the local timezone
 -- adjust from 1970-related to 0000-related time
 -- then return dt in those coordinates (number of days
@@ -942,14 +952,13 @@ local function datetime_totable(self)
     }
 end
 
-local function datetime_update_dt(self, dt, new_offset)
-    local epoch = local_secs(self)
+local function datetime_update_dt(self, dt)
+    local epoch = self.epoch
     local secs_day = epoch % SECS_PER_DAY
-    epoch = (dt - DAYS_EPOCH_OFFSET) * SECS_PER_DAY + secs_day
-    self.epoch = utc_secs(epoch, new_offset)
+    self.epoch = (dt - DAYS_EPOCH_OFFSET) * SECS_PER_DAY + secs_day
 end
 
-local function datetime_ymd_update(self, y, M, d, new_offset)
+local function datetime_ymd_update(self, y, M, d)
     if d < 0 then
         d = builtin.tnt_dt_days_in_month(y, M)
     elseif d > 28 then
@@ -960,13 +969,13 @@ local function datetime_ymd_update(self, y, M, d, new_offset)
         end
     end
     local dt = dt_from_ymd_checked(y, M, d)
-    datetime_update_dt(self, dt, new_offset)
+    datetime_update_dt(self, dt)
 end
 
-local function datetime_hms_update(self, h, m, s, new_offset)
-    local epoch = local_secs(self)
+local function datetime_hms_update(self, h, m, s)
+    local epoch = self.epoch
     local secs_day = epoch - (epoch % SECS_PER_DAY)
-    self.epoch = utc_secs(secs_day + h * 3600 + m * 60 + s, new_offset)
+    self.epoch = secs_day + h * 3600 + m * 60 + s
 end
 
 local function datetime_set(self, obj)
@@ -1040,6 +1049,18 @@ local function datetime_set(self, obj)
         end
     end
 
+    local offset = obj.tzoffset
+    if offset ~= nil then
+        offset = get_timezone(offset, 'tzoffset')
+        check_range(offset, -720, 840, 'tzoffset')
+    end
+    offset = offset or self.tzoffset
+
+    local tzname = obj.tz
+    if tzname ~= nil then
+        offset, self.tzindex = parse_tzname(tzname)
+    end
+
     local ts = obj.timestamp
     if ts ~= nil then
         if ymd then
@@ -1060,38 +1081,31 @@ local function datetime_set(self, obj)
                   'if nsec, usec, or msecs provided', 2)
         end
 
-        self.epoch = sec_int
+        self.epoch = utc_secs(sec_int, offset)
         self.nsec = nsec
+        self.tzoffset = offset
 
         return self
     end
 
-    local offset = obj.tzoffset
-    if offset ~= nil then
-        offset = get_timezone(offset, 'tzoffset')
-        check_range(offset, -720, 840, 'tzoffset')
-    end
-    offset = offset or self.tzoffset
-
-    local tzname = obj.tz
-    if tzname ~= nil then
-        offset, self.tzindex = parse_tzname(tzname)
-    end
+    -- normalize time to UTC from current timezone
+    time_delocalize(self)
 
     -- .year, .month, .day
     if ymd then
         y = y or y0
         M = M or M0
         d = d or d0
-        datetime_ymd_update(self, y, M, d, offset)
+        datetime_ymd_update(self, y, M, d)
     end
 
     -- .hour, .minute, .second
     if hms then
-        datetime_hms_update(self, h or h0, m or m0, sec or sec0, offset)
+        datetime_hms_update(self, h or h0, m or m0, sec or sec0)
     end
 
-    self.tzoffset = offset
+    -- denormalize back to local timezone
+    time_localize(self, offset)
 
     return self
 end
