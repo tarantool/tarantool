@@ -11,7 +11,7 @@ local ffi = require('ffi')
 --]]
 if jit.arch == 'arm64' then jit.off() end
 
-test:plan(36)
+test:plan(37)
 
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
@@ -804,7 +804,7 @@ local strftime_formats = {
 test:test("Datetime string formatting detailed", function(test)
     test:plan(77)
     local T = date.new{ timestamp = 0.125 }
-    T:set{ tzoffset = 180 }
+    T:set{ hour = 3, tzoffset = 180 }
     test:is(tostring(T), '1970-01-01T03:00:00.125+0300', 'tostring()')
 
     for _, row in pairs(strftime_formats) do
@@ -817,7 +817,7 @@ end)
 test:test("Datetime string parsing by format (detailed)", function(test)
     test:plan(68)
     local T = date.new{ timestamp = 0.125 }
-    T:set{ tzoffset = 180 }
+    T:set{ hour = 3, tzoffset = 180 }
     test:is(tostring(T), '1970-01-01T03:00:00.125+0300', 'tostring()')
 
     for _, row in pairs(strftime_formats) do
@@ -1667,19 +1667,53 @@ test:test("Time :set{} operations", function(test)
             'hour 6')
     test:is(tostring(ts:set{ min = 12, sec = 23 }), '2020-11-09T04:12:23+0300',
             'min 12, sec 23')
-    test:is(tostring(ts:set{ tzoffset = -8*60 }), '2020-11-08T17:12:23-0800',
+    test:is(tostring(ts:set{ tzoffset = -8*60 }), '2020-11-09T04:12:23-0800',
             'offset -0800' )
-    test:is(tostring(ts:set{ tzoffset = '+0800' }), '2020-11-09T09:12:23+0800',
+    test:is(tostring(ts:set{ tzoffset = '+0800' }), '2020-11-09T04:12:23+0800',
             'offset +0800' )
+    -- timestamp 1630359071.125 is 2021-08-30T21:31:11.125Z
     test:is(tostring(ts:set{ timestamp = 1630359071.125 }),
-            '2021-08-31T05:31:11.125+0800', 'timestamp 1630359071.125' )
-    test:is(tostring(ts:set{ msec = 123}), '2021-08-31T05:31:11.123+0800',
+            '2021-08-30T21:31:11.125+0800', 'timestamp 1630359071.125' )
+    test:is(tostring(ts:set{ msec = 123}), '2021-08-30T21:31:11.123+0800',
             'msec = 123')
-    test:is(tostring(ts:set{ usec = 123}), '2021-08-31T05:31:11.000123+0800',
+    test:is(tostring(ts:set{ usec = 123}), '2021-08-30T21:31:11.000123+0800',
             'usec = 123')
-    test:is(tostring(ts:set{ nsec = 123}), '2021-08-31T05:31:11.000000123+0800',
+    test:is(tostring(ts:set{ nsec = 123}), '2021-08-30T21:31:11.000000123+0800',
             'nsec = 123')
 end)
+
+test:test("Check :set{} and .new{} equal for all attributes", function(test)
+    test:plan(11)
+    local ts, ts2
+    local obj = {}
+    local attribs = {
+        {'year', 2000},
+        {'month', 11},
+        {'day', 30},
+        {'hour', 6},
+        {'min', 12},
+        {'sec', 23},
+        {'tzoffset', -8*60},
+        {'tzoffset', '+0800'},
+        {'tz', 'MSK'},
+        {'nsec', 560000},
+    }
+    for _, row in pairs(attribs) do
+        local key, value = unpack(row)
+        obj[key] = value
+        ts = date.new(obj)
+        ts2 = date.new():set(obj)
+        test:is(ts, ts2, ('[%s] = %s (%s = %s)'):
+                format(key, tostring(value), tostring(ts), tostring(ts2)))
+    end
+
+    obj = {timestamp = 1630359071.125, tzoffset = '+0800'}
+    ts = date.new(obj)
+    ts2 = date.new():set(obj)
+    test:is(ts, ts2, ('timestamp+tzoffset (%s = %s)'):
+            format(tostring(ts), tostring(ts2)))
+end)
+
 
 test:test("Time invalid :set{} operations", function(test)
     test:plan(84)
