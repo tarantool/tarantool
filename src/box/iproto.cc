@@ -1609,6 +1609,11 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 		break;
 	case IPROTO_WATCH:
 	case IPROTO_UNWATCH:
+		ERROR_INJECT(ERRINJ_IPROTO_DISABLE_WATCH, {
+			diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE,
+				 (uint32_t)type);
+			goto error;
+		});
 		if (xrow_decode_watch(&msg->header, &msg->watch) != 0)
 			goto error;
 		cmsg_init(&msg->base, iproto_thread->misc_route);
