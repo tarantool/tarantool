@@ -1411,10 +1411,16 @@ iproto_connection_on_output(ev_loop *loop, struct ev_io *watcher,
 			ev_io_start(loop, &con->output);
 			return;
 		}
-		iproto_connection_feed_input(con);
 	}
 	if (ev_is_active(&con->output))
 		ev_io_stop(con->loop, &con->output);
+	/*
+	 * If the out channel isn't clogged, we can read more requests.
+	 * Note, we trigger input even if we didn't write any responses
+	 * (iproto_flush returned 1 right away). This is intentional:
+	 * some requests don't have responses (IPROTO_WATCH).
+	 */
+	iproto_connection_feed_input(con);
 }
 
 static struct iproto_connection *
