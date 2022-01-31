@@ -28,7 +28,7 @@ g.test_panic_without_force_recovery = function()
     end)
 end
 
-g.test_ingore_with_force_recovery = function()
+g.test_ignore_with_force_recovery = function()
     g.server.box_cfg = {force_recovery = true}
     g.server:start()
     t.helpers.retrying({}, function()
