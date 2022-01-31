@@ -214,6 +214,8 @@ struct netbox_transport {
 	struct netbox_options opts;
 	/** Greeting received from the remote host. */
 	struct greeting greeting;
+	/** Features supported by the server as reported by IPROTO_ID. */
+	struct iproto_features features;
 	/** Connection state. */
 	enum netbox_state state;
 	/**
@@ -477,6 +479,7 @@ netbox_transport_create(struct netbox_transport *transport)
 {
 	netbox_options_create(&transport->opts);
 	memset(&transport->greeting, 0, sizeof(transport->greeting));
+	iproto_features_create(&transport->features);
 	transport->state = NETBOX_INITIAL;
 	transport->is_closing = false;
 	transport->last_error = NULL;
@@ -2144,7 +2147,9 @@ luaT_netbox_transport_watch_or_unwatch(struct lua_State *L,
 	size_t key_len;
 	const char *key = lua_tolstring(L, 2, &key_len);
 
-	if (transport->is_closing || (transport->state != NETBOX_ACTIVE &&
+	if (!iproto_features_test(&transport->features,
+				  IPROTO_FEATURE_WATCHERS) ||
+	    transport->is_closing || (transport->state != NETBOX_ACTIVE &&
 				      transport->state != NETBOX_FETCH_SCHEMA))
 		return;
 
@@ -2278,8 +2283,15 @@ netbox_transport_dispatch_response(struct netbox_transport *transport,
 	default:
 		break;
 	}
-	if (status == IPROTO_OK || iproto_type_is_error(status)) {
-		/* Account a response even if the request was discarded. */
+	/*
+	 * Account a response even if the request was discarded, but ignore
+	 * packets with sync = 0. We use sync = 0 for IPROTO_WATCH, which
+	 * isn't accounted, because the server isn't supposed to reply to it.
+	 * However, the server may actually reply to it with an error if it
+	 * doesn't support the request type.
+	 */
+	if (hdr->sync > 0 && (status == IPROTO_OK ||
+			      iproto_type_is_error(status))) {
 		assert(transport->inprogress_request_count > 0);
 		transport->inprogress_request_count--;
 	}
@@ -2378,6 +2390,7 @@ netbox_transport_do_id(struct netbox_transport *transport, struct lua_State *L)
 	if (xrow_decode_id(&hdr, &id) != 0)
 		luaT_error(L);
 out:
+	transport->features = id.features;
 	/* Invoke the 'handshake' callback. */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, transport->opts.callback_ref);
 	lua_pushliteral(L, "handshake");
