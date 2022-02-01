@@ -262,5 +262,6 @@ field_def_parse_foreign_key(const char **data, void *opts,
 	struct field_def *def = (struct field_def *)opts;
 	return tuple_constraint_def_decode_fkey(data, &def->constraint_def,
 						&def->constraint_count,
-						region, errcode, field_no);
+						region, errcode, field_no,
+						false);
 }

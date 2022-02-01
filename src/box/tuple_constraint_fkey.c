@@ -15,6 +15,14 @@
 #include "tt_static.h"
 #include "trivia/util.h"
 
+/** Static buffer size for extraction of complex keys from tuples. */
+enum {
+	COMPLEX_KEY_BUFFER_SIZE = 4096,
+};
+
+/** Static buffer for extraction of complex keys from tuples. */
+static char complex_key_buffer[COMPLEX_KEY_BUFFER_SIZE];
+
 /**
  * Find field number in @a space by field def in constraint.
  * Return -1 if not found.
@@ -65,15 +73,21 @@ fkey_update_index_common(struct tuple_constraint *constr, bool is_foreign)
 		 */
 		uint32_t j;
 		for (j = 0; j < field_count; j++) {
-			uint32_t field_no = is_foreign ?
+			int32_t field_no = is_foreign ?
 				constr->fkey->data[j].foreign_field_no :
 				constr->fkey->data[j].local_field_no;
+			assert(field_no >= 0);
 			uint32_t k;
 			for (k = 0; k < field_count; k++)
-				if (parts[k].fieldno == field_no)
+				if (parts[k].fieldno == (uint32_t)field_no)
 					break;
 			if (k == field_count)
 				break; /* Not found. */
+			int16_t *order;
+			order = is_foreign ?
+				&constr->fkey->data[k].foreign_index_order :
+				&constr->fkey->data[k].local_index_order;
+			*order = j;
 		}
 		if (j != field_count)
 			continue; /* Not all found. */
@@ -113,12 +127,127 @@ field_foreign_key_failed(const struct tuple_constraint *constr,
 			 const struct tuple_field *field,
 			 const char *message)
 {
-	const char *field_path = tuple_field_path(field, constr->space->format);
-	struct error *err = diag_set(ClientError, ER_FIELD_FOREIGN_KEY_FAILED,
-				     constr->def.name, field_path, message);
+	struct error *err;
+	const char *field_path = NULL;
+	if (field != NULL) {
+		field_path = tuple_field_path(field, constr->space->format);
+		err = diag_set(ClientError, ER_FIELD_FOREIGN_KEY_FAILED,
+			       constr->def.name, field_path, message);
+	} else {
+		err = diag_set(ClientError, ER_COMPLEX_FOREIGN_KEY_FAILED,
+			       constr->def.name, message);
+	}
 	error_set_str(err, "name", constr->def.name);
-	error_set_str(err, "field_path", field_path);
-	error_set_uint(err, "field_id", field->id);
+	if (field != NULL) {
+		error_set_str(err, "field_path", field_path);
+		error_set_uint(err, "field_id", field->id);
+	}
+}
+
+/**
+ * Auxiliary data structure that is used for complex key extraction from tuple.
+ */
+struct key_info {
+	/** Index of key part in key definition. */
+	uint32_t index_order;
+	/** Field number of key part. */
+	uint32_t field_no;
+	/** Msgpack data of that part in tuple. */
+	const char *mp_data;
+	/** Size of msgpack data of that part in tuple. */
+	size_t mp_data_size;
+};
+
+/** Sort by index_order compare function. */
+static int
+key_info_by_order(const void *ptr1, const void *ptr2)
+{
+	const struct key_info *info1 = (const struct key_info *)ptr1;
+	const struct key_info *info2 = (const struct key_info *)ptr2;
+	return info1->index_order < info2->index_order ? -1 :
+	       info1->index_order > info2->index_order;
+}
+
+/** Sort by field_no compare function. */
+static int
+key_info_by_field_no(const void *ptr1, const void *ptr2)
+{
+	const struct key_info *info1 = (const struct key_info *)ptr1;
+	const struct key_info *info2 = (const struct key_info *)ptr2;
+	return info1->field_no < info2->field_no ? -1 :
+	       info1->field_no > info2->field_no;
+}
+
+/**
+ * Get of extract key for foreign index from local tuple by given as @a mp_data.
+ * Simply return mp_data for field foreign key - it is the field itself.
+ * For complex foreign keys collect field in one contiguous buffer.
+ * Try to place resulting key in @a *buffer, that must be a buffer of size
+ * COMPLEX_KEY_BUFFER_SIZE. If there's not enough space - allocate needed
+ * using xmalloc - that pointer is returned via @a buffer. Thus if the pointer
+ * is changed - a user of that function must free() the buffer after usage.
+ * Return pointer to ready-to-use key in any case.
+ */
+static const char *
+get_or_extract_key_mp(const struct tuple_constraint *constr,
+		      struct key_def *def, char **buffer, const char *mp_data)
+{
+	if (constr->def.fkey.field_mapping_size == 0)
+		return mp_data;
+
+	assert(def->part_count == constr->def.fkey.field_mapping_size);
+	const uint32_t info_count = def->part_count;
+	struct key_info info[info_count];
+
+	/* Collect fields_no in index order. */
+	for (uint32_t i = 0; i < info_count; ++i) {
+		info[i].index_order = i;
+		int16_t pair_no = constr->fkey->data[i].foreign_index_order;
+		info[i].field_no = constr->fkey->data[pair_no].local_field_no;
+	}
+
+	/* Reorder by fields_no, traverse tuple and collect fields. */
+	qsort(info, def->part_count, sizeof(info[0]), key_info_by_field_no);
+	assert(mp_typeof(*mp_data) == MP_ARRAY);
+	uint32_t tuple_size = mp_decode_array(&mp_data);
+	uint32_t info_pos = 0;
+	size_t total_size = 0;
+	for (uint32_t i = 0; i < tuple_size; i++) {
+		const char *mp_data_end = mp_data;
+		mp_next(&mp_data_end);
+
+		while (i == info[info_pos].field_no) {
+			info[info_pos].mp_data = mp_data;
+			info[info_pos].mp_data_size = mp_data_end - mp_data;
+			total_size += info[info_pos].mp_data_size;
+			info_pos++;
+			if (info_pos == info_count)
+				break;
+		}
+
+		if (info_pos == info_count)
+			break;
+
+		mp_data = mp_data_end;
+	}
+
+	if (info_pos != info_count)
+		return NULL; /* End of tuple reached unexpectedly. */
+
+	/* Allocate of necessary. */
+	if (total_size > COMPLEX_KEY_BUFFER_SIZE)
+		*buffer = xmalloc(total_size);
+	char *key = *buffer;
+	char *w_pos = key;
+
+	/* Reorder back to index order and join fields in one buffer. */
+	qsort(info, def->part_count, sizeof(info[0]), key_info_by_order);
+	for (uint32_t i = 0; i < info_count; ++i) {
+		memcpy(w_pos, info[i].mp_data, info[i].mp_data_size);
+		w_pos += info[i].mp_data_size;
+	}
+
+	return key;
 }
 
 /**
@@ -130,7 +259,7 @@ tuple_constraint_fkey_check(const struct tuple_constraint *constr,
 			    const struct tuple_field *field)
 {
 	(void)mp_data_end;
-	assert(field != NULL);
+	assert((constr->def.fkey.field_mapping_size == 0) == (field != NULL));
 	struct space *foreign_space = constr->space_cache_holder.space;
 
 	if (recovery_state <= FINAL_RECOVERY) {
@@ -150,29 +279,47 @@ tuple_constraint_fkey_check(const struct tuple_constraint *constr,
 					 "foreign index was not found");
 		return -1;
 	}
+	for (uint32_t i = 0; i < constr->fkey->field_count; i++) {
+		if (constr->fkey->data[i].local_field_no < 0) {
+			field_foreign_key_failed(constr, field,
+						 "wrong local field name");
+			return -1;
+		}
+	}
 	struct index *index = foreign_space->index[constr->fkey->foreign_index];
 	struct key_def *key_def = index->def->key_def;
 	uint32_t part_count = constr->fkey->field_count;
 	assert(constr->fkey->field_count == key_def->part_count);
 
-	const char *key = mp_data;
+	char *key_buffer = complex_key_buffer;
+	const char *key = get_or_extract_key_mp(constr, key_def,
+						&key_buffer, mp_data);
+	if (key == NULL) {
+		field_foreign_key_failed(constr, field, "extract key failed");
+		return -1;
+	}
 
+	int rc = -1;
 	const char *unused;
 	if (key_validate_parts(key_def, key, part_count, false, &unused) != 0) {
 		field_foreign_key_failed(constr, field, "wrong key type");
-		return -1;
+		goto done;
 	}
 	struct tuple *tuple = NULL;
 	if (index_get(index, key, part_count, &tuple) != 0) {
 		field_foreign_key_failed(constr, field, "index get failed");
-		return -1;
+		goto done;
 	}
 	if (tuple == NULL) {
 		field_foreign_key_failed(constr, field,
 					 "foreign tuple was not found");
-		return -1;
+		goto done;
 	}
-	return 0;
+	rc = 0;
+done:
+	if (key_buffer != complex_key_buffer)
+		free(key_buffer);
+	return rc;
 }
 
 /**
@@ -187,17 +334,73 @@ foreign_key_integrity_failed(const struct tuple_constraint *constr,
 	error_set_str(err, "name", constr->def.name);
 }
 
+/**
+ * Get of extract key for local index from foreign @a tuple.
+ * For field foreign key - return pointer to the field inside of tuple.
+ * For complex foreign keys collect field in one contiguous buffer.
+ * Try to place resulting key in @a *buffer, that must be a buffer of size
+ * COMPLEX_KEY_BUFFER_SIZE. If there's not enough space - allocate needed
+ * using xmalloc - that pointer is returned via @a buffer. Thus if the pointer
+ * is changed - a user of that function must free() the buffer after usage.
+ * Return pointer to ready-to-use key in any case.
+ */
+static const char *
+get_or_extract_key_tuple(const struct tuple_constraint *constr,
+			 struct key_def *def, char **buffer,
+			 struct tuple *tuple)
+{
+	if (constr->def.fkey.field_mapping_size == 0) {
+		assert(constr->fkey->field_count == 1);
+		return tuple_field(tuple,
+				   constr->fkey->data[0].foreign_field_no);
+	}
+
+	assert(def->part_count == constr->def.fkey.field_mapping_size);
+	const uint32_t info_count = def->part_count;
+	struct key_info info[info_count];
+
+	/* Traverse fields and calculate total size. */
+	size_t total_size = 0;
+	for (uint32_t i = 0; i < info_count; ++i) {
+		int16_t pair_no = constr->fkey->data[i].local_index_order;
+		int32_t field_no = constr->fkey->data[pair_no].foreign_field_no;
+		const char *field = tuple_field(tuple, field_no);
+		if (field == NULL || *field == MP_NIL)
+			return NULL;
+		info[i].mp_data = field;
+		mp_next(&field);
+		info[i].mp_data_size = field - info[i].mp_data;
+		total_size += info[i].mp_data_size;
+	}
+
+	/* Allocate of necessary. */
+	if (total_size > COMPLEX_KEY_BUFFER_SIZE)
+		*buffer = xmalloc(total_size);
+	char *key = *buffer;
+	char *w_pos = key;
+
+	/* Join fields in one buffer. */
+	for (uint32_t i = 0; i < info_count; ++i) {
+		memcpy(w_pos, info[i].mp_data, info[i].mp_data_size);
+		w_pos += info[i].mp_data_size;
+	}
+
+	return key;
+}
+
 int
 tuple_constraint_fkey_check_delete(const struct tuple_constraint *constr,
 				   struct tuple *deleted_tuple,
 				   struct tuple *replaced_with_tuple)
 {
 	assert(deleted_tuple != NULL);
-	int32_t foreign_field_no = constr->fkey->data->foreign_field_no;
-	if (foreign_field_no < 0) {
-		foreign_key_integrity_failed(constr,
-					     "wrong foreign field name");
-		return -1;
+	for (uint32_t i = 0; i < constr->fkey->field_count; i++) {
+		if (constr->fkey->data[i].foreign_field_no < 0) {
+			foreign_key_integrity_failed(constr,
+						     "wrong foreign "
+						     "field name");
+			return -1;
+		}
 	}
 	if (replaced_with_tuple != NULL) {
 		/*
@@ -240,28 +443,37 @@ tuple_constraint_fkey_check_delete(const struct tuple_constraint *constr,
 	uint32_t part_count = constr->fkey->field_count;
 	assert(constr->fkey->field_count == key_def->part_count);
 
-	const char *key = tuple_field(deleted_tuple, foreign_field_no);
+	char *key_buffer = complex_key_buffer;
+	const char *key = get_or_extract_key_tuple(constr, key_def,
+						   &key_buffer, deleted_tuple);
+
 	if (key == NULL || mp_typeof(*key) == MP_NIL) {
-		/* No field - nobody can be bound to it.*/
+		/* No field(s) - nobody can be bound to them.*/
 		return 0;
 	}
+	int rc = -1;
 
 	const char *unused;
 	if (key_validate_parts(key_def, key, part_count, false, &unused) != 0) {
 		foreign_key_integrity_failed(constr, "wrong key type");
-		return -1;
+		goto done;
 	}
 
 	struct tuple *found_tuple;
 	if (index->def->opts.is_unique ?
 	    index_get(index, key, part_count, &found_tuple) :
 	    index_min(index, key, part_count, &found_tuple) != 0)
-		return -1;
+		goto done;
 	if (found_tuple != NULL) {
 		foreign_key_integrity_failed(constr, "tuple is referenced");
-		return -1;
+		goto done;
 	}
-	return 0;
+	rc = 0;
+
+done:
+	if (key_buffer != complex_key_buffer)
+		free(key_buffer);
+	return rc;
 }
 
 /**
@@ -286,11 +498,54 @@ tuple_constraint_fkey_update_foreign(struct tuple_constraint *constraint)
 {
 	struct space *space = constraint->space_cache_holder.space;
 	constraint->fkey->foreign_index = -1;
-	assert(constraint->fkey->field_count == 1);
-	constraint->fkey->data[0].foreign_field_no =
-		find_field_no_by_def(space, &constraint->def.fkey.field);
-	if (constraint->fkey->data[0].foreign_field_no >= 0)
-		fkey_update_foreign_index(constraint);
+	uint32_t field_mapping_size = constraint->def.fkey.field_mapping_size;
+	if (field_mapping_size == 0) {
+		assert(constraint->fkey->field_count == 1);
+		constraint->fkey->data[0].foreign_field_no =
+			find_field_no_by_def(space,
+					     &constraint->def.fkey.field);
+		if (constraint->fkey->data[0].foreign_field_no >= 0)
+			fkey_update_foreign_index(constraint);
+		return;
+	}
+	for (uint32_t i = 0; i < field_mapping_size; i++) {
+		struct tuple_constraint_field_id *f =
+			&constraint->def.fkey.field_mapping[i].foreign_field;
+		int32_t field_no = find_field_no_by_def(space, f);
+		constraint->fkey->data[i].foreign_field_no = field_no;
+		if (field_no < 0)
+			return;
+	}
+	fkey_update_foreign_index(constraint);
+}
+
+/**
+ * Find and set local_field_no amd local_index fkey member of @a constraint.
+ * If something was not found - local_index is set to -1.
+ */
+static void
+tuple_constraint_fkey_update_local(struct tuple_constraint *constraint,
+				   int32_t field_no)
+{
+	struct space *space = constraint->space;
+	constraint->fkey->local_index = -1;
+	uint32_t field_mapping_size = constraint->def.fkey.field_mapping_size;
+	if (field_mapping_size == 0) {
+		assert(constraint->fkey->field_count == 1);
+		constraint->fkey->data[0].local_field_no = field_no;
+		assert(field_no >= 0);
+		fkey_update_local_index(constraint);
+		return;
+	}
+	for (uint32_t i = 0; i < field_mapping_size; i++) {
+		struct tuple_constraint_field_id *f =
+			&constraint->def.fkey.field_mapping[i].local_field;
+		field_no = find_field_no_by_def(space, f);
+		constraint->fkey->data[i].local_field_no = field_no;
+		if (field_no < 0)
+			return;
+	}
+	fkey_update_local_index(constraint);
 }
 
 /**
@@ -314,8 +569,7 @@ tuple_constraint_fkey_init(struct tuple_constraint *constr,
 {
 	assert(constr->def.type == CONSTR_FKEY);
 	constr->space = space;
-	constr->fkey->data[0].local_field_no = field_no;
-	fkey_update_local_index(constr);
+	tuple_constraint_fkey_update_local(constr, field_no);
 
 	struct space *foreign_space;
 	foreign_space = space_by_id(constr->def.fkey.space_id);

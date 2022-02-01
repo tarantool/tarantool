@@ -51,6 +51,18 @@ struct tuple_constraint_fkey_pair_data {
 	 * by name.
 	 */
 	int32_t local_field_no;
+	/**
+	 * Offset of corresponding field pair in foreign index. Can be -1 if
+	 * the index is not found. See tuple_constraint_fkey_data::data for
+	 * more details.
+	 */
+	int16_t foreign_index_order;
+	/**
+	 * Offset of corresponding field pair in local index. Can be -1 if
+	 * the index is not found. See tuple_constraint_fkey_data::data for
+	 * more details.
+	 */
+	int16_t local_index_order;
 };
 
 /**
@@ -73,7 +85,24 @@ struct tuple_constraint_fkey_data {
 	 */
 	uint32_t field_count;
 	/**
-	 * Array of data of each local/foreign field pair.
+	 * Array of data of each local/foreign field pair or of index parts.
+	 * First of all there are foreign_field_no and local_field_no members
+	 * there, that declares correspondence of local and foreign tuple
+	 * fields. The order of that pairs is unspecified and not even
+	 * important: constraint checks are made by space index that is
+	 * searched by a set of fields despite of order. Actually there two
+	 * indexes - foreign (used for check before addition to local space)
+	 * and local (used for check before deletion from foreign space).
+	 * Note that for the first check (in foreign index) fields of local
+	 * tuple (from local space) are used as a key, while for the second
+	 * check (in local index) - fields of foreign tuple are needed. Thus,
+	 * to extract a correct key, we have to know to which field pair each
+	 * index's key_def part correspond to. This mapping is stored in this
+	 * array in foreign_index_order and local_index_order members. For
+	 * example for foreign index query we need take the following fields
+	 * of local tuple:
+	 * data[data[0].foreign_index_order],data[data[1].foreign_index_order]..
+	 * Symmetrically for local index.
 	 */
 	struct tuple_constraint_fkey_pair_data data[];
 };

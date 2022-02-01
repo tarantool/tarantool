@@ -17,6 +17,8 @@ struct space;
 
 /**
  * Initialize @a constraint assuming that it is a foreign key.
+ * If this is a field constraint, @a field_no must be that field's index.
+ * If this is a complex constraint, @a field_no must be -1.
  */
 int
 tuple_constraint_fkey_init(struct tuple_constraint *constraint,
