@@ -581,14 +581,18 @@ local function apply_env_cfg(cfg, env_cfg)
     end
 end
 
-local function apply_default_cfg(cfg, default_cfg, module_cfg)
+local function apply_default_cfg_impl(cfg, default_cfg)
     for k,v in pairs(default_cfg) do
         if cfg[k] == nil then
             cfg[k] = v
         elseif type(v) == 'table' then
-            apply_default_cfg(cfg[k], v)
+            apply_default_cfg_impl(cfg[k], v)
         end
     end
+end
+
+local function apply_default_cfg(cfg, default_cfg, module_cfg)
+    apply_default_cfg_impl(cfg, default_cfg)
     for k in pairs(module_cfg) do
         if cfg[k] == nil then
             cfg[k] = module_cfg[k].cfg_get(k)
