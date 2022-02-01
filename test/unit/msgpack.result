@@ -2281,11 +2281,12 @@ ok 21 - subtests
     ok 96 - mp_read_double(mp_encode_strl(100)) check pos unchanged
     # *** test_numbers: done ***
 ok 22 - subtests
-    1..4
+    1..5
     # *** test_overflow ***
     ok 1 - mp_check array overflow
     ok 2 - mp_check map overflow
     ok 3 - mp_check str overflow
     ok 4 - mp_check bin overflow
+    ok 5 - mp_check str overflow
     # *** test_overflow: done ***
 ok 23 - subtests

@@ -94,12 +94,6 @@ enum {
 		sizeof(standard_errors) / sizeof(standard_errors[0]),
 };
 
-static inline char *
-mp_encode_str0(char *data, const char *str)
-{
-	return mp_encode_str(data, str, strlen(str));
-}
-
 /** Note, not the same as mp_encode_error(). */
 static char *
 mp_encode_mp_error(const struct mp_test_error *e, char *data)
