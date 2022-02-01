@@ -453,7 +453,11 @@ end
 
 -- Helper of normalize_foreign_key.
 -- Check and normalize one foreign key definition.
-local function normalize_foreign_key_one(def, error_prefix)
+-- If not is_complex, field is expected to be a numeric ID or string name of
+--  foreign field.
+-- If is_complex, field is expected to be a table with local field ->
+--  foreign field mapping.
+local function normalize_foreign_key_one(def, error_prefix, is_complex)
     if def.space == nil then
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "foreign key: space must be specified")
@@ -466,13 +470,51 @@ local function normalize_foreign_key_one(def, error_prefix)
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "foreign key: space must be string or number")
     end
-    if type(def.field) ~= 'string' and type(def.field) ~= 'number' then
-        box.error(box.error.ILLEGAL_PARAMS,
-                  error_prefix .. "foreign key: field must be string or number")
-    end
-    if type(def.field) == 'number' then
-        -- convert to zero-based index.
-        def.field = def.field - 1
+    if not is_complex then
+        if type(def.field) ~= 'string' and type(def.field) ~= 'number' then
+            box.error(box.error.ILLEGAL_PARAMS,
+                      error_prefix .. "foreign key: field must be string or number")
+        end
+        if type(def.field) == 'number' then
+            -- convert to zero-based index.
+            def.field = def.field - 1
+        end
+    else
+        if type(def.field) ~= 'table' then
+            box.error(box.error.ILLEGAL_PARAMS,
+                      error_prefix .. "foreign key: field must be a table " ..
+                      "with local field -> foreign field mapping")
+        end
+        local count = 0
+        local converted = {}
+        for k,v in pairs(def.field) do
+            count = count + 1
+            if type(k) ~= 'string' and type(k) ~= 'number' then
+                box.error(box.error.ILLEGAL_PARAMS,
+                          error_prefix .. "foreign key: local field must be "
+                          .. "string or number")
+            end
+            if type(k) == 'number' then
+                -- convert to zero-based index.
+                k = k - 1
+            end
+            if type(v) ~= 'string' and type(v) ~= 'number' then
+                box.error(box.error.ILLEGAL_PARAMS,
+                          error_prefix .. "foreign key: foreign field must be "
+                          .. "string or number")
+            end
+            if type(v) == 'number' then
+                -- convert to zero-based index.
+                v = v - 1
+            end
+            converted[k] = v
+        end
+        if count < 1 then
+            box.error(box.error.ILLEGAL_PARAMS,
+                      error_prefix .. "foreign key: field must be a table " ..
+                      "with local field -> foreign field mapping")
+        end
+        def.field = setmap(converted)
     end
     if not box.space[def.space] then
         box.error(box.error.ILLEGAL_PARAMS,
@@ -493,9 +535,13 @@ end
 -- Given definition @a fkey is expected to be one of:
 -- {space=.., field=..}
 -- {fkey_name={space=.., field=..}, }
+-- If not is_complex, field is expected to be a numeric ID or string name of
+--  foreign field.
+-- If is_complex, field is expected to be a table with local field ->
+--  foreign field mapping.
 -- In case of error box.error.ILLEGAL_PARAMS is raised, and @a error_prefix
 --  is added before string message.
-local function normalize_foreign_key(fkey, error_prefix)
+local function normalize_foreign_key(fkey, error_prefix, is_complex)
     if fkey == nil then
         return nil
     end
@@ -507,7 +553,7 @@ local function normalize_foreign_key(fkey, error_prefix)
     if fkey.space ~= nil and fkey.field ~= nil and
         (type(fkey.space) ~= 'table' or type(fkey.field) ~= 'table') then
         -- the first, short form.
-        fkey = normalize_foreign_key_one(fkey, error_prefix)
+        fkey = normalize_foreign_key_one(fkey, error_prefix, is_complex)
         return {[box.space[fkey.space].name]=fkey}
     end
     -- the second, detailed form.
@@ -523,7 +569,7 @@ local function normalize_foreign_key(fkey, error_prefix)
                       error_prefix .. "foreign key definition must be a table "
                       .. "with 'space' and 'field' members")
         end
-        v = normalize_foreign_key_one(v, error_prefix)
+        v = normalize_foreign_key_one(v, error_prefix, is_complex)
         result[k] = v
     end
     return result
@@ -596,6 +642,7 @@ box.schema.space.create = function(name, options)
         is_sync = 'boolean',
         defer_deletes = 'boolean',
         constraint = 'string, table',
+        foreign_key = 'table',
     }
     local options_defaults = {
         engine = 'memtx',
@@ -642,6 +689,7 @@ box.schema.space.create = function(name, options)
     check_param(format, 'format', 'table')
     format = update_format(format)
     local constraint = normalize_constraint(options.constraint, '')
+    local foreign_key = normalize_foreign_key(options.foreign_key, '', true)
     -- filter out global parameters from the options array
     local space_options = setmap({
         group_id = options.is_local and 1 or nil,
@@ -649,6 +697,7 @@ box.schema.space.create = function(name, options)
         is_sync = options.is_sync,
         defer_deletes = options.defer_deletes and true or nil,
         constraint = constraint,
+        foreign_key = foreign_key,
     })
     _space:insert{id, uid, name, options.engine, options.field_count,
         space_options, format}
@@ -744,6 +793,7 @@ local alter_space_template = {
     defer_deletes = 'boolean',
     name = 'string',
     constraint = 'string, table',
+    foreign_key = 'table',
 }
 
 box.schema.space.alter = function(space_id, options)
@@ -795,6 +845,13 @@ box.schema.space.alter = function(space_id, options)
             options.constraint = nil
         end
         flags.constraint = normalize_constraint(options.constraint, '')
+    end
+
+    if options.foreign_key ~= nil then
+        if table.equals(options.foreign_key, {}) then
+            options.foreign_key = nil
+        end
+        flags.foreign_key = normalize_foreign_key(options.foreign_key, '', true)
     end
 
     tuple = tuple:totable()

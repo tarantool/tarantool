@@ -35,7 +35,24 @@ tuple_constraint_def_cmp_fkey(const struct tuple_constraint_fkey_def *def1,
 {
 	if (def1->space_id != def2->space_id)
 		return def1->space_id < def2->space_id ? -1 : 1;
-	return field_id_cmp(&def1->field, &def2->field);
+	if (def1->field_mapping_size != def2->field_mapping_size)
+		return def1->field_mapping_size < def2->field_mapping_size ? -1
+									   : 1;
+	if (def1->field_mapping_size == 0)
+		return field_id_cmp(&def1->field, &def2->field);
+
+	for (uint32_t i = 0; i < def1->field_mapping_size; i++) {
+		int rc;
+		rc = field_id_cmp(&def1->field_mapping[i].local_field,
+				  &def2->field_mapping[i].local_field);
+		if (rc != 0)
+			return rc;
+		rc = field_id_cmp(&def1->field_mapping[i].foreign_field,
+				  &def2->field_mapping[i].foreign_field);
+		if (rc != 0)
+			return rc;
+	}
+	return 0;
 }
 
 int
@@ -173,11 +190,54 @@ field_id_decode(const char **data, struct tuple_constraint_field_id *def,
 	return 0;
 }
 
+/**
+ * Helper function of tuple_constraint_def_decode_fkey.
+ * Decode foreign key field mapping, that is expected to be MP_MAP with
+ * local field (id or name) -> foreign field (id or name) correspondence.
+ */
+static int
+field_mapping_decode(const char **data,
+		     struct tuple_constraint_fkey_def *fkey,
+		     struct region *region, uint32_t errcode, uint32_t field_no)
+{
+	if (mp_typeof(**data) != MP_MAP) {
+		diag_set(ClientError, errcode, field_no,
+			 "field mapping is expected to be a map");
+		return -1;
+	}
+	uint32_t mapping_size = mp_decode_map(data);
+	if (mapping_size == 0) {
+		diag_set(ClientError, errcode, field_no,
+			 "field mapping is expected to be a map");
+		return -1;
+	}
+	fkey->field_mapping_size = mapping_size;
+	size_t sz;
+	fkey->field_mapping =
+		region_alloc_array(region,
+				   struct tuple_constraint_fkey_field_mapping,
+				   mapping_size, &sz);
+	if (fkey->field_mapping == NULL) {
+		diag_set(OutOfMemory, sz, "region", "field mapping");
+		return -1;
+	}
+	for (uint32_t i = 0 ; i < 2 * mapping_size; i++) {
+		struct tuple_constraint_field_id *def = i % 2 == 0 ?
+			&fkey->field_mapping[i / 2].local_field :
+			&fkey->field_mapping[i / 2].foreign_field;
+		int rc = field_id_decode(data, def, region, errcode, field_no);
+		if (rc != 0)
+			return rc;
+	}
+	return 0;
+}
+
 int
 tuple_constraint_def_decode_fkey(const char **data,
 				 struct tuple_constraint_def **def,
 				 uint32_t *count, struct region *region,
-				 uint32_t errcode, uint32_t field_no)
+				 uint32_t errcode, uint32_t field_no,
+				 bool is_complex)
 {
 	/*
 	 * Expected normal form of foreign keys: {name1=data1, name2=data2..},
@@ -232,6 +292,7 @@ tuple_constraint_def_decode_fkey(const char **data,
 				 "is expected to be a map");
 			return -1;
 		}
+		new_def[i].fkey.field_mapping_size = 0;
 		uint32_t def_size = mp_decode_map(data);
 		bool has_space = false, has_field = false;
 		for (size_t j = 0; j < def_size; j++) {
@@ -260,13 +321,16 @@ tuple_constraint_def_decode_fkey(const char **data,
 			}
 			int rc;
 			struct tuple_constraint_fkey_def *fk = &new_def[i].fkey;
-			if (is_space) {
+			if (is_space)
 				rc = space_id_decode(data, &fk->space_id,
 						     errcode, field_no);
-			} else {
+			else if (!is_complex)
 				rc = field_id_decode(data, &fk->field, region,
 						     errcode, field_no);
-			}
+			else
+				rc = field_mapping_decode(data, fk,
+							  region, errcode,
+							  field_no);
 			if (rc != 0)
 				return rc;
 		}
@@ -284,6 +348,15 @@ tuple_constraint_def_decode_fkey(const char **data,
  * Copy tuple_constraint_field_id object, allocating data on given allocator.
  */
 static void
+field_id_reserve(const struct tuple_constraint_field_id *def,
+		 struct grp_alloc *all)
+{
+	/* Reservation is required only for strings. */
+	if (def->name_len != 0)
+		grp_alloc_reserve_str(all, def->name_len);
+}
+
+static void
 field_id_copy(struct tuple_constraint_field_id *dst,
 	      const struct tuple_constraint_field_id *src,
 	      struct grp_alloc *all)
@@ -297,6 +370,47 @@ field_id_copy(struct tuple_constraint_field_id *dst,
 }
 
 /**
+ * Reserve memory for field mapping of given constraint definition @a def
+ * on an allocator @all.
+ */
+static void
+field_mapping_reserve(const struct tuple_constraint_fkey_def *def,
+		      struct grp_alloc *all)
+{
+	assert(def->field_mapping_size != 0);
+	size_t bytes = def->field_mapping_size * sizeof(def->field_mapping[0]);
+	grp_alloc_reserve_data(all, bytes);
+	for (uint32_t i = 0; i < def->field_mapping_size; i++) {
+		const struct tuple_constraint_fkey_field_mapping *f =
+			&def->field_mapping[i];
+		field_id_reserve(&f->local_field, all);
+		field_id_reserve(&f->foreign_field, all);
+	}
+}
+
+/**
+ * Copy field mapping array from one definition to another.
+ */
+static void
+field_mapping_copy(struct tuple_constraint_fkey_def *dst,
+		   const struct tuple_constraint_fkey_def *src,
+		   struct grp_alloc *all)
+{
+	assert(src->field_mapping_size != 0);
+	dst->field_mapping_size = src->field_mapping_size;
+	size_t bytes = src->field_mapping_size * sizeof(dst->field_mapping[0]);
+	dst->field_mapping = grp_alloc_create_data(all, bytes);
+	for (uint32_t i = 0; i < src->field_mapping_size; i++) {
+		struct tuple_constraint_fkey_field_mapping *d =
+			&dst->field_mapping[i];
+		const struct tuple_constraint_fkey_field_mapping *s =
+			&src->field_mapping[i];
+		field_id_copy(&d->local_field, &s->local_field, all);
+		field_id_copy(&d->foreign_field, &s->foreign_field, all);
+	}
+}
+
+/**
  * Reserve strings needed for given constraint definition @a dev in given
  * string @a bank.
  */
@@ -306,8 +420,10 @@ tuple_constraint_def_reserve(const struct tuple_constraint_def *def,
 {
 	grp_alloc_reserve_str(all, def->name_len);
 	if (def->type == CONSTR_FKEY) {
-		if (def->fkey.field.name_len != 0)
-			grp_alloc_reserve_str(all, def->fkey.field.name_len);
+		if (def->fkey.field_mapping_size == 0)
+			field_id_reserve(&def->fkey.field, all);
+		else
+			field_mapping_reserve(&def->fkey, all);
 	}
 }
 
@@ -328,7 +444,11 @@ tuple_constraint_def_copy(struct tuple_constraint_def *dst,
 	} else {
 		assert(src->type == CONSTR_FKEY);
 		dst->fkey.space_id = src->fkey.space_id;
-		field_id_copy(&dst->fkey.field, &src->fkey.field, all);
+		dst->fkey.field_mapping_size = 0;
+		if (src->fkey.field_mapping_size == 0)
+			field_id_copy(&dst->fkey.field, &src->fkey.field, all);
+		else
+			field_mapping_copy(&dst->fkey, &src->fkey, all);
 	}
 }
 

@@ -44,13 +44,33 @@ struct tuple_constraint_field_id {
 };
 
 /**
+ * Definition of one pair in foreign key field mapping.
+ * Used only for complex foreign keys.
+ */
+struct tuple_constraint_fkey_field_mapping {
+	/** Field in local space. */
+	struct tuple_constraint_field_id local_field;
+	/** Field in foreign space. */
+	struct tuple_constraint_field_id foreign_field;
+};
+
+/**
  * Definition of a foreign key.
  */
 struct tuple_constraint_fkey_def {
 	/** Definition of space. */
 	uint32_t space_id;
-	/** Definition of field. */
-	struct tuple_constraint_field_id field;
+	/**
+	 * Number of records in field map. Nonzero only for complex foreign
+	 * keys. Zero for field foreign keys.
+	 */
+	uint32_t field_mapping_size;
+	union {
+		/** Definition of field. */
+		struct tuple_constraint_field_id field;
+		/** Field mapping. */
+		struct tuple_constraint_fkey_field_mapping *field_mapping;
+	};
 };
 
 /**
@@ -105,6 +125,9 @@ tuple_constraint_def_decode(const char **data,
 /**
  * Parse constraint array from msgpack @a *data with the following format:
  * {foreign_key_name={space=.., field=...},...}
+ * If @a is_complex is false, the field is parsed as ID or name.
+ * If @a is_complex is true, the field is parsed as msgpack map of
+ * local (as ID or name) to foreign (ad ID or name) field pairs.
  * Allocate a temporary constraint array on @a region and save it in @a def.
  * If there are some constraints already (*def != NULL, *count != 0) then
  * append the array with parsed constraints.
@@ -121,7 +144,9 @@ int
 tuple_constraint_def_decode_fkey(const char **data,
 				 struct tuple_constraint_def **def,
 				 uint32_t *count, struct region *region,
-				 uint32_t errcode, uint32_t field_no);
+				 uint32_t errcode, uint32_t field_no,
+				 bool is_complex);
+
 /**
  * Allocate a single memory block needed for given @a count of constraint
  * definitions, including strings in them. Fill the block with strings and

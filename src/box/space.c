@@ -141,8 +141,14 @@ space_init_constraints(struct space *space)
 				   constr->def.type == CONSTR_FKEY;
 		if (constr->check != tuple_constraint_noop_check)
 			continue;
-		if (tuple_constraint_func_init(constr, space) != 0)
-			return -1;
+		if (constr->def.type == CONSTR_FUNC) {
+			if (tuple_constraint_func_init(constr, space) != 0)
+				return -1;
+		} else {
+			assert(constr->def.type == CONSTR_FKEY);
+			if (tuple_constraint_fkey_init(constr, space, -1) != 0)
+				return -1;
+		}
 	}
 	for (uint32_t i = 0; i < tuple_format_field_count(format); i++) {
 		struct tuple_field *field = tuple_format_field(format, i);
