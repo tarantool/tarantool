@@ -2691,7 +2691,7 @@ luaT_netbox_transport_stop(struct lua_State *L)
 {
 	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
 	bool wait = lua_toboolean(L, 2);
-	if (wait &&
+	if (wait && fiber() != transport->worker &&
 	    transport->state != NETBOX_CLOSED &&
 	    transport->state != NETBOX_ERROR) {
 		transport->is_closing = true;
