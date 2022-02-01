@@ -169,12 +169,6 @@ mp_sizeof_error_one(const struct error *error)
 	return data_size;
 }
 
-static inline char *
-mp_encode_str0(char *data, const char *str)
-{
-	return mp_encode_str(data, str, strlen(str));
-}
-
 static char *
 mp_encode_error_one(char *data, const struct error *error)
 {
