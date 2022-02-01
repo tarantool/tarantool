@@ -195,6 +195,7 @@ static const struct index_vtab sysview_index_vtab = {
 	/* .get = */ sysview_index_get,
 	/* .replace = */ generic_index_replace,
 	/* .create_iterator = */ sysview_index_create_iterator,
+	/* .create_upgrade_iterator = */ generic_index_create_upgrade_iterator,
 	/* .create_snapshot_iterator = */
 		generic_index_create_snapshot_iterator,
 	/* .stat = */ generic_index_stat,

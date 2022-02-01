@@ -274,6 +274,7 @@ static const struct index_vtab session_settings_index_vtab = {
 	/* .get = */ session_settings_index_get,
 	/* .replace = */ generic_index_replace,
 	/* .create_iterator = */ session_settings_index_create_iterator,
+	/* .create_upgrade_iterator = */ generic_index_create_upgrade_iterator,
 	/* .create_snapshot_iterator = */
 		generic_index_create_snapshot_iterator,
 	/* .stat = */ generic_index_stat,

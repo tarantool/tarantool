@@ -570,6 +570,7 @@ static const struct index_vtab memtx_hash_index_vtab = {
 	/* .get = */ memtx_hash_index_get,
 	/* .replace = */ memtx_hash_index_replace,
 	/* .create_iterator = */ memtx_hash_index_create_iterator,
+	/* .create_upgrade_iterator = */ generic_index_create_upgrade_iterator,
 	/* .create_snapshot_iterator = */
 		memtx_hash_index_create_snapshot_iterator,
 	/* .stat = */ generic_index_stat,

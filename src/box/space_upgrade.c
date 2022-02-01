@@ -326,7 +326,7 @@ space_upgrade_test(uint32_t space_id)
 	struct index *pk = space_index(space, 0);
 	if (pk == NULL)
 		return 0;
-	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
+	struct iterator *it = index_create_upgrade_iterator(pk);
 	if (it == NULL)
 		return -1;
 	struct func *convert = space->upgrade->func;
@@ -385,7 +385,7 @@ space_upgrade(uint32_t space_id)
 	/* No indexes - nothing to upgrade. */
 	if (pk == NULL)
 		return 0;
-	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
+	struct iterator *it = index_create_upgrade_iterator(pk);
 	if (it == NULL)
 		return -1;
 	struct func *convert = space->upgrade->func;

@@ -252,6 +252,12 @@ struct iterator {
 	/** ID of the index the iterator is for. */
 	uint32_t index_id;
 	/**
+	 * True in case iterator is opened in order to process upgrade
+	 * operation over the space. In this case data is returned with no
+	 * upgrade modifications. See iterator_next() for the details.
+	 */
+	bool is_raw;
+	/**
 	 * Pointer to the index the iterator is for.
 	 * Guaranteed to be valid only if the schema
 	 * state has not changed since the last lookup.
@@ -430,6 +436,8 @@ struct index_vtab {
 	struct iterator *(*create_iterator)(struct index *index,
 			enum iterator_type type,
 			const char *key, uint32_t part_count);
+
+	struct iterator *(*create_upgrade_iterator)(struct index *index);
 	/**
 	 * Create an ALL iterator with personal read view so further
 	 * index modifications will not affect the iteration results.
@@ -686,6 +694,12 @@ index_create_iterator(struct index *index, enum iterator_type type,
 	return index->vtab->create_iterator(index, type, key, part_count);
 }
 
+static inline struct iterator *
+index_create_upgrade_iterator(struct index *index)
+{
+	return index->vtab->create_upgrade_iterator(index);
+}
+
 static inline struct snapshot_iterator *
 index_create_snapshot_iterator(struct index *index)
 {
@@ -765,6 +779,8 @@ int generic_index_reserve(struct index *, uint32_t);
 struct iterator *
 generic_index_create_iterator(struct index *base, enum iterator_type type,
 			      const char *key, uint32_t part_count);
+struct iterator *
+generic_index_create_upgrade_iterator(struct index *base);
 int generic_index_build_next(struct index *, struct tuple *);
 void generic_index_end_build(struct index *);
 int

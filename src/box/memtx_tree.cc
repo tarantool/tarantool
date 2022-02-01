@@ -1442,6 +1442,18 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 }
 
 template <bool USE_HINT>
+static struct iterator *
+memtx_tree_index_create_upgrade_iterator(struct index *base)
+{
+	struct iterator *it =
+		memtx_tree_index_create_iterator<USE_HINT>(base, ITER_ALL, NULL, 0);
+	if (it == NULL)
+		return it;
+	it->is_raw = true;
+	return it;
+}
+
+template <bool USE_HINT>
 static void
 memtx_tree_index_begin_build(struct index *base)
 {
@@ -1753,6 +1765,8 @@ static const struct index_vtab memtx_tree_no_hint_index_vtab = {
 	/* .get = */ memtx_tree_index_get<false>,
 	/* .replace = */ memtx_tree_index_replace<false>,
 	/* .create_iterator = */ memtx_tree_index_create_iterator<false>,
+	/* .create_upgrade_iterator = */
+			 memtx_tree_index_create_upgrade_iterator<false>,
 	/* .create_snapshot_iterator = */
 		memtx_tree_index_create_snapshot_iterator<false>,
 	/* .stat = */ generic_index_stat,
@@ -1783,6 +1797,8 @@ static const struct index_vtab memtx_tree_use_hint_index_vtab = {
 	/* .get = */ memtx_tree_index_get<true>,
 	/* .replace = */ memtx_tree_index_replace<true>,
 	/* .create_iterator = */ memtx_tree_index_create_iterator<true>,
+	/* .create_upgrade_iterator = */
+		memtx_tree_index_create_upgrade_iterator<true>,
 	/* .create_snapshot_iterator = */
 		memtx_tree_index_create_snapshot_iterator<true>,
 	/* .stat = */ generic_index_stat,
@@ -1813,6 +1829,7 @@ static const struct index_vtab memtx_tree_index_multikey_vtab = {
 	/* .get = */ memtx_tree_index_get<true>,
 	/* .replace = */ memtx_tree_index_replace_multikey,
 	/* .create_iterator = */ memtx_tree_index_create_iterator<true>,
+	/* .create_upgrade_iterator = */ generic_index_create_upgrade_iterator,
 	/* .create_snapshot_iterator = */
 		memtx_tree_index_create_snapshot_iterator<true>,
 	/* .stat = */ generic_index_stat,
@@ -1843,6 +1860,7 @@ static const struct index_vtab memtx_tree_func_index_vtab = {
 	/* .get = */ memtx_tree_index_get<true>,
 	/* .replace = */ memtx_tree_func_index_replace,
 	/* .create_iterator = */ memtx_tree_index_create_iterator<true>,
+	/* .create_upgrade_iterator = */ generic_index_create_upgrade_iterator,
 	/* .create_snapshot_iterator = */
 		memtx_tree_index_create_snapshot_iterator<true>,
 	/* .stat = */ generic_index_stat,
@@ -1879,6 +1897,7 @@ static const struct index_vtab memtx_tree_disabled_index_vtab = {
 	/* .get = */ generic_index_get,
 	/* .replace = */ disabled_index_replace,
 	/* .create_iterator = */ generic_index_create_iterator,
+	/* .create_upgrade_iterator = */ generic_index_create_upgrade_iterator,
 	/* .create_snapshot_iterator = */
 		generic_index_create_snapshot_iterator,
 	/* .stat = */ generic_index_stat,

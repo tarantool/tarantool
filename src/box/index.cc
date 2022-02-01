@@ -721,6 +721,12 @@ generic_index_create_iterator(struct index *base, enum iterator_type type,
 	return NULL;
 }
 
+struct iterator *
+generic_index_create_upgrade_iterator(struct index *base)
+{
+	diag_set(UnsupportedIndexFeature, base->def, "space upgrade");
+	return NULL;
+}
 
 struct snapshot_iterator *
 generic_index_create_snapshot_iterator(struct index *index)
