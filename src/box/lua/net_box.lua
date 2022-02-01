@@ -388,7 +388,8 @@ local function new_sm(uri, opts)
     remote._callback = callback
     local transport = internal.new_transport(
             uri, user, password, weak_callback,
-            opts.connect_timeout, opts.reconnect_after)
+            opts.connect_timeout, opts.reconnect_after,
+            opts.fetch_schema)
     remote._transport = transport
     remote._gc_hook = ffi.gc(ffi.new('char[1]'), function()
         pcall(transport.stop, transport);
