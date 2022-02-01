@@ -156,6 +156,10 @@ struct netbox_options {
 	 * reconnect, in seconds. Reconnect is disabled if it's 0.
 	 */
 	double reconnect_after;
+	/**
+	 * Flag that determines is it required to fetch server schema or not.
+	 */
+	 bool fetch_schema;
 };
 
 /**
@@ -463,6 +467,7 @@ netbox_options_create(struct netbox_options *opts)
 	uri_create(&opts->uri, NULL);
 	opts->callback_ref = LUA_NOREF;
 	opts->connect_timeout = NETBOX_DEFAULT_CONNECT_TIMEOUT;
+	opts->fetch_schema = true;
 }
 
 static void
@@ -1978,12 +1983,13 @@ luaT_netbox_request_pairs(struct lua_State *L)
  * Creates a netbox transport object (userdata) and pushes it to Lua stack.
  * Takes the following arguments: uri (string, number, or table),
  * user (string or nil), password (string or nil), callback (function),
- * connect_timeout (number or nil), reconnect_after (number or nil).
+ * connect_timeout (number or nil), reconnect_after (number or nil),
+ * fetch_schema (boolean or nil).
  */
 static int
 luaT_netbox_new_transport(struct lua_State *L)
 {
-	assert(lua_gettop(L) == 6);
+	assert(lua_gettop(L) == 7);
 	/* Create a transport object. */
 	struct netbox_transport *transport;
 	transport = lua_newuserdata(L, sizeof(*transport));
@@ -2005,6 +2011,8 @@ luaT_netbox_new_transport(struct lua_State *L)
 		opts->connect_timeout = luaL_checknumber(L, 5);
 	if (!lua_isnil(L, 6))
 		opts->reconnect_after = luaL_checknumber(L, 6);
+	if (!lua_isnil(L, 7))
+		opts->fetch_schema = lua_toboolean(L, 7);
 	if (opts->user == NULL && opts->password != NULL) {
 		diag_set(ClientError, ER_PROC_LUA,
 			 "net.box: user is not defined");
@@ -2432,6 +2440,9 @@ static uint32_t
 netbox_transport_fetch_schema(struct netbox_transport *transport,
 			      struct lua_State *L, uint32_t schema_version)
 {
+	if (!transport->opts.fetch_schema) {
+		return schema_version;
+	}
 	if (transport->state == NETBOX_GRACEFUL_SHUTDOWN) {
 		/*
 		 * If a connection is in the 'graceful_shutdown', it can't
@@ -2539,8 +2550,10 @@ static uint32_t
 netbox_transport_process_requests(struct netbox_transport *transport,
 				  struct lua_State *L, uint32_t schema_version)
 {
-	if (transport->state != NETBOX_GRACEFUL_SHUTDOWN) {
-		assert(transport->state == NETBOX_FETCH_SCHEMA);
+	if (transport->state != NETBOX_ACTIVE &&
+	    transport->state != NETBOX_GRACEFUL_SHUTDOWN) {
+		assert(transport->state == NETBOX_AUTH ||
+		       transport->state == NETBOX_FETCH_SCHEMA);
 		transport->state = NETBOX_ACTIVE;
 		netbox_transport_on_state_change(transport, L);
 	}

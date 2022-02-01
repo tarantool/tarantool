@@ -258,3 +258,46 @@ g.test_connect_uri = function()
     t.assert_error_msg_content_equals(errmsg, net.connect, {}, '123')
     t.assert_error_msg_content_equals(errmsg, net.connect, 'localhost', true)
 end
+
+g.test_schemaless = function()
+    local c
+    -- fetch_schema = false
+    local schema_update_counter = 0
+    c = net.connect(g.server.net_box_uri, {fetch_schema = false})
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c.opts.fetch_schema, false)
+    t.assert_equals(c.space, nil)
+
+    c:on_schema_reload(function()
+        schema_update_counter = schema_update_counter + 1
+    end)
+    c:eval('box.schema.space.create("test_space1")')
+    c:eval('box.space.test_space1:drop()')
+    t.assert_equals(schema_update_counter, 0)
+    c:close()
+
+    -- fetch_schema = true
+    c = net.connect(g.server.net_box_uri, {fetch_schema = true})
+    t.assert_equals(c.state, 'active')
+    t.assert_equals(c.opts.fetch_schema, true)
+    t.assert_not_equals(c.space, nil)
+
+    c:on_schema_reload(function()
+        schema_update_counter = schema_update_counter + 1
+    end)
+    c:eval('box.schema.space.create("test_space2")')
+    c:eval('box.space.test_space2:drop()')
+    t.assert_equals(schema_update_counter, 2)
+    c:close()
+end
+
+g.after_test('test_schemaless', function()
+    g.server:exec(function()
+        if box.space.test_space1 ~= nil then
+            box.space.test_space1:drop()
+        end
+        if box.space.test_space2 ~= nil then
+            box.space.test_space2:drop()
+        end
+    end)
+end)
