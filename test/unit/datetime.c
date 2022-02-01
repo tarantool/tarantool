@@ -10,6 +10,8 @@
 #include "mp_extension_types.h"
 #include "trivia/util.h"
 #include "tzcode/tzcode.h"
+
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
 static const char sample[] = "2012-12-24T15:30Z";
