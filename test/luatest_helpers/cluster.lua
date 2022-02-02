@@ -72,16 +72,39 @@ function Cluster:stop()
 end
 
 function Cluster:start(opts)
-    for _, server in ipairs(self.servers) do
-        if not server.process then
-            server:start({wait_for_readiness = false})
-        end
-    end
-
     -- The option is true by default.
     local wait_for_readiness = true
     if opts ~= nil and opts.wait_for_readiness ~= nil then
         wait_for_readiness = opts.wait_for_readiness
+    end
+
+    -- The option is false by default.
+    local sequential_startup = false
+    if opts ~= nil and opts.sequential_startup ~= nil then
+        sequential_startup = opts.sequential_startup
+    end
+
+    local replication_settings = {}
+    local started_server = {}
+
+    for i, server in ipairs(self.servers) do
+        if not server.process then
+            if sequential_startup then
+                replication_settings[i] = server.box_cfg.replication
+                server.box_cfg.replication = self.servers[1].net_box_uri
+            end
+            server:start({wait_for_readiness = sequential_startup})
+            started_server[i] = true
+        end
+    end
+
+    if sequential_startup then
+        for i, server in ipairs(self.servers) do
+            if started_server[i] == true then
+                server:box_config({replication = replication_settings[i]})
+                server.box_cfg.replication = replication_settings[i]
+            end
+        end
     end
 
     if wait_for_readiness then

@@ -67,6 +67,9 @@ function Server:initialize()
         self.net_box_uri = ('%s/%s.iproto'):format(vardir, self.alias)
         fio.mktree(vardir)
     end
+    if self.box_cfg == nil then
+        self.box_cfg = {}
+    end
 
     -- AFAIU, the inner getmetatable() returns our helpers.Server
     -- class, the outer one returns luatest.Server class.
@@ -78,7 +81,8 @@ end
 -- @return map
 function Server:build_env()
     local res = getmetatable(getmetatable(self)).build_env(self)
-    if self.box_cfg ~= nil then
+    -- Best way to check if table is not empty in lua I guess...
+    if not rawequal(next(self.box_cfg), nil) then
         res.TARANTOOL_BOX_CFG = json.encode(self.box_cfg)
     end
     res.TARANTOOL_ENGINE = self.engine
