@@ -1512,8 +1512,13 @@ box.internal.check_ck_constraint_arg = check_ck_constraint_arg
 box.internal.schema_version = builtin.box_schema_version
 
 local function check_iterator_type(opts, key_is_nil)
+    local opts_type = type(opts)
+    if opts ~= nil and opts_type ~= "table" and opts_type ~= "string" and opts_type ~= "number" then
+        box.error(box.error.ITERATOR_TYPE, opts)
+    end
+
     local itype
-    if opts and opts.iterator then
+    if opts_type == "table" and opts.iterator then
         if type(opts.iterator) == "number" then
             itype = opts.iterator
         elseif type(opts.iterator) == "string" then
@@ -1524,7 +1529,9 @@ local function check_iterator_type(opts, key_is_nil)
         else
             box.error(box.error.ITERATOR_TYPE, tostring(opts.iterator))
         end
-    elseif opts and type(opts) == "string" then
+    elseif opts_type == "number" then
+        itype = opts
+    elseif opts_type == "string" then
         itype = box.index[string.upper(opts)]
         if itype == nil then
             box.error(box.error.ITERATOR_TYPE, opts)
@@ -1536,7 +1543,7 @@ local function check_iterator_type(opts, key_is_nil)
     return itype
 end
 
-internal.check_iterator_type = check_iterator_type -- export for net.box
+internal.check_iterator_type = check_iterator_type
 
 local base_index_mt = {}
 base_index_mt.__index = base_index_mt
@@ -1931,7 +1938,7 @@ local function check_select_opts(opts, key_is_nil)
     local offset = 0
     local limit = 4294967295
     local iterator = check_iterator_type(opts, key_is_nil)
-    if opts ~= nil then
+    if opts ~= nil and type(opts) == "table" then
         if opts.offset ~= nil then
             offset = opts.offset
         end
@@ -1941,6 +1948,8 @@ local function check_select_opts(opts, key_is_nil)
     end
     return iterator, offset, limit
 end
+
+box.internal.check_select_opts = check_select_opts -- for net.box
 
 base_index_mt.select_ffi = function(index, key, opts)
     check_index_arg(index, 'select')
