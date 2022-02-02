@@ -148,3 +148,24 @@ collectgarbage('collect')
 collectgarbage('restart')
 lots_of_links
 s:drop()
+
+-- gh-6501 attempt to index local 'opts' (a number value)
+
+s = box.schema.space.create('select', { temporary = true })
+_ = s:create_index('primary', { type = 'tree' })
+_ = s:insert{0}
+_ = s:insert{1}
+_ = s:insert{2}
+s:select(0, true)
+s:select(0, box.NULL)
+s:select(0, box.index.GT)
+s:select(0, 'GT')
+s:select(0, {iterator = box.index.GT})
+s:select(0, {iterator = 'GT'})
+_ = s:pairs(nil, true)
+_ = s:pairs(nil, box.index.GT)
+_ = s:pairs(nil, 'GT')
+s:count(0, true)
+s:count(0, box.index.GT)
+s:count(0, 'GT')
+s:drop()
