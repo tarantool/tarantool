@@ -12,7 +12,7 @@ local this_module
 local max               = math.max
 local fiber_clock       = fiber.clock
 
-local check_iterator_type = box.internal.check_iterator_type
+local check_select_opts   = box.internal.check_select_opts
 local check_index_arg     = box.internal.check_index_arg
 local check_space_arg     = box.internal.check_space_arg
 local check_primary_index = box.internal.check_primary_index
@@ -1005,9 +1005,7 @@ index_metatable = function(remote)
         check_index_arg(self, 'select')
         local key_is_nil = (key == nil or
                             (type(key) == 'table' and #key == 0))
-        local iterator = check_iterator_type(opts, key_is_nil)
-        local offset = tonumber(opts and opts.offset) or 0
-        local limit = tonumber(opts and opts.limit) or 0xFFFFFFFF
+        local iterator, offset, limit = check_select_opts(opts, key_is_nil)
         return (remote:_request(M_SELECT, opts, self.space._format_cdata,
                                 self._stream_id, self.space.id, self.id,
                                 iterator, offset, limit, key))
