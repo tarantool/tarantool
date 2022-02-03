@@ -222,6 +222,7 @@ console_push_line(char *line)
 	 */
 	rl_callback_handler_install(NULL, NULL);
 #endif
+	free(line);
 }
 
 /* implements readline() Lua API */
