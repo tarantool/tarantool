@@ -115,6 +115,8 @@ mem_is_field_compatible(const struct Mem *mem, enum field_type type)
 		return (field_ext_type[type] & (1U << MP_UUID)) != 0;
 	if (mem->type == MEM_TYPE_DEC)
 		return (field_ext_type[type] & (1U << MP_DECIMAL)) != 0;
+	if (mem->type == MEM_TYPE_DATETIME)
+		return (field_ext_type[type] & (1U << MP_DATETIME)) != 0;
 	enum mp_type mp_type = mem_mp_type(mem);
 	assert(mp_type != MP_EXT);
 	return field_mp_plain_type_is_compatible(type, mp_type, true);

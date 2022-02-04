@@ -77,6 +77,7 @@
 #include "trivia/util.h"
 
 #include "decimal.h"
+#include "datetime.h"
 
 /*
  * These #defines should enable >2GB file support on POSIX if the
@@ -1405,6 +1406,7 @@ struct Expr {
 	union {
 		char *zToken;	/* Token value. Zero terminated and dequoted */
 		int iValue;	/* Non-negative integer value if EP_IntValue */
+		struct datetime dtValue; /* date/time value */
 	} u;
 
 	/* If the EP_TokenOnly flag is set in the Expr.flags mask, then no
@@ -1476,6 +1478,10 @@ struct Expr {
 #define EP_Leaf      0x800000	/* Expr.pLeft, .pRight, .u.pSelect all NULL */
 /** Expression is system-defined. */
 #define EP_System    0x1000000
+#define EP_Date      0x2000000
+#define EP_Time      0x4000000
+#define EP_TZOffset  0x8000000
+#define EP_Interval  0x10000000
 
 /*
  * Combinations of two or more EP_* flags
@@ -2593,6 +2599,9 @@ sql_expr_new_anon(struct sql *db, int op)
 {
 	return sql_expr_new_named(db, op, NULL);
 }
+
+struct Expr *
+sql_expr_new_date(struct sql *db, int op, const struct Token *token);
 
 void sqlExprAttachSubtrees(sql *, Expr *, Expr *, Expr *);
 Expr *sqlPExpr(Parse *, int, Expr *, Expr *);

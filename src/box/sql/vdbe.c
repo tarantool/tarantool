@@ -817,6 +817,18 @@ case OP_Decimal: {            /* same as TK_DECIMAL, out2 */
 	break;
 }
 
+/**
+ * Opcode: Date * P2 * P4 *
+ * Synopsis: r[P2]=P4
+ *
+ * P4 is a pointer to a DATE value. Write that value into register P2.
+ */
+case OP_Date: {            /* same as TK_DATE, out2 */
+	pOut = vdbe_prepare_null_out(p, pOp->p2);
+	mem_set_date(pOut, pOp->p4.date);
+	break;
+}
+
 /* Opcode: String8 * P2 * P4 *
  * Synopsis: r[P2]='P4'
  *

@@ -1914,6 +1914,18 @@ opt_interval(A) ::= . { A = 0; }
 interval_second(A) ::= SECOND . { A = 0; }
 interval_second(A) ::= SECOND ignored_len(B) . { (void) B; A = 0; }
 
+term(A) ::= DATE STRING(X). {
+  A.pExpr = sql_expr_new_date(pParse->db, TK_STRING, &X);
+  if (A.pExpr == NULL) {
+    pParse->is_aborted = true;
+    return;
+  }
+  A.pExpr->type = FIELD_TYPE_DATETIME;
+  A.zStart = X.z;
+  A.zEnd = X.z + X.n;
+  if (A.pExpr) A.pExpr->flags |= EP_Leaf;
+}
+
 /// VARCHAR
 
 ignored_len(A) ::= LP INTEGER(B) RP . {

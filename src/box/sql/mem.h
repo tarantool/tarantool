@@ -315,6 +315,10 @@ mem_set_uuid(struct Mem *mem, const struct tt_uuid *uuid);
 void
 mem_set_dec(struct Mem *mem, const decimal_t *dec);
 
+/** Clear MEM and set it to DATETIME. */
+void
+mem_set_date(struct Mem *mem, const struct datetime *date);
+
 /** Clear MEM and set it to STRING. The string belongs to another object. */
 void
 mem_set_str_ephemeral(struct Mem *mem, char *value, uint32_t len);

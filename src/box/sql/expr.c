@@ -1018,6 +1018,29 @@ sql_expr_new_int(struct sql *db, int value)
 }
 
 struct Expr *
+sql_expr_new_date(struct sql *db, int op, const struct Token *token)
+{
+	if (op != TK_STRING || token == NULL || token->z == NULL)
+		return NULL;
+	struct datetime date = { .epoch = 0 };
+	char buf[DT_TO_STRING_BUFSIZE];
+	memcpy(buf, token->z, token->n);
+	buf[token->n] = 0;
+	sqlDequote(buf);
+	size_t buf_len = strlen(buf);
+	size_t len = datetime_parse_full(&date, buf, buf_len, 0);
+	if (len < buf_len)
+		return NULL;
+	struct Expr *e = sql_expr_new_empty(db, TK_DATE, 0);
+	if (e != NULL) {
+		e->type = FIELD_TYPE_DATETIME;
+		e->flags |= EP_Date;
+		e->u.dtValue = date;
+	}
+	return e;
+}
+
+struct Expr *
 sql_expr_new(struct sql *db, int op, const struct Token *token)
 {
 	int extra_sz = 0;
@@ -3352,6 +3375,22 @@ int_overflow:
 }
 
 static void
+expr_code_date(struct Parse *parser, struct Expr *expr, int reg)
+{
+	assert(ExprHasAllProperty(expr, EP_Date));
+	struct datetime *value = sqlDbMallocRawNN(sql_get(), sizeof(*value));
+	if (value == NULL)
+		goto error;
+	*value = expr->u.dtValue;
+	sqlVdbeAddOp4(parser->pVdbe, OP_Date, 0, reg, 0, (char *)value,
+		      P4_DATE);
+	return;
+error:
+	sqlDbFree(sql_get(), value);
+	parser->is_aborted = true;
+}
+
+static void
 expr_code_array(struct Parse *parser, struct Expr *expr, int reg)
 {
 	struct Vdbe *vdbe = parser->pVdbe;
@@ -3765,12 +3804,16 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sqlVdbeAddOp2(v, OP_Null, 0, target);
 			return target;
 		}
+	case TK_DATE: {
+		expr_code_date(pParse, pExpr, target);
+		return target;
+	}
 #ifndef SQL_OMIT_BLOB_LITERAL
 	case TK_BLOB:{
 			int n;
 			const char *z;
 			char *zBlob;
-			assert(!ExprHasProperty(pExpr, EP_IntValue));
+			assert(!ExprHasProperty(pExpr, EP_IntValue | EP_Date));
 			assert(pExpr->u.zToken[0] == 'x'
 			       || pExpr->u.zToken[0] == 'X');
 			assert(pExpr->u.zToken[1] == '\'');
