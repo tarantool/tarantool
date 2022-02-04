@@ -569,6 +569,9 @@ sql_bind_uuid(struct sql_stmt *stmt, int i, const struct tt_uuid *uuid);
 int
 sql_bind_dec(struct sql_stmt *stmt, int i, const decimal_t *dec);
 
+int
+sql_bind_date(struct sql_stmt *stmt, int i, const struct datetime *date);
+
 /**
  * Return the number of wildcards that should be bound to.
  */

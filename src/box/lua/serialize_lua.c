@@ -156,6 +156,7 @@ static const char *mp_ext_type_names[] = {
 	__gen_mp_name(MP_DECIMAL),
 	__gen_mp_name(MP_UUID),
 	__gen_mp_name(MP_ERROR),
+	__gen_mp_name(MP_DATETIME),
 };
 #undef __gen_mp_name
 

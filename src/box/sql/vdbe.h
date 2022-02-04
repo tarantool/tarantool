@@ -40,6 +40,8 @@
 #define SQL_VDBE_H
 #include <stdio.h>
 
+struct datetime;
+
 /*
  * A single VDBE is an opaque structure named "Vdbe".  Only routines
  * in the source file sqlVdbe.c are allowed to see the insides
