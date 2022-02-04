@@ -190,6 +190,17 @@ enum txn_status {
 	TXN_ABORTED,
 };
 
+
+/**
+ * Structure which contains pointers to the tuples,
+ * that are used in rollback. Currently used only in
+ * memxt engine.
+ */
+struct txn_stmt_rollback_info {
+	struct tuple *old_tuple;
+	struct tuple *new_tuple;
+};
+
 /**
  * A single statement of a multi-statement
  * transaction: undo and redo info.
@@ -205,6 +216,8 @@ struct txn_stmt {
 	struct space *space;
 	struct tuple *old_tuple;
 	struct tuple *new_tuple;
+	/** Structure, which contains tuples for rollback. */
+	struct txn_stmt_rollback_info rollback_info;
 	/**
 	 * If new_tuple != NULL and this transaction was not prepared,
 	 * this member holds added story of the new_tuple.
@@ -638,6 +651,14 @@ txn_stmt_on_rollback(struct txn_stmt *stmt, struct trigger *trigger)
 	assert(trigger->destroy == NULL);
 	trigger_add(&stmt->on_rollback, trigger);
 }
+
+/**
+ * Save and ref @a old_tuple and @a new_tuple in special structure
+ * inside @a stmt. Later this tuples will be used in case of rollback.
+ */
+void
+txn_stmt_prepare_rollback_info(struct txn_stmt *stmt, struct tuple *old_tuple,
+			       struct tuple *new_tuple);
 
 /*
  * Return the total number of rows committed in the txn.
