@@ -4,9 +4,8 @@ local g = t.group()
 local fio = require('fio')
 
 g.before_each(function()
-    g.server = server:new({alias = 'master'})
-    -- Initialize server's workdir with specially crafted snap/xlog pair.
-    fio.copytree('./test/box-luatest/gh_6794_data', g.server.workdir)
+    g.server = server:new({alias = 'master',
+                          datadir = 'test/box-luatest/gh_6794_data'})
 end)
 
 g.after_test("test_panic_without_force_recovery", function()
