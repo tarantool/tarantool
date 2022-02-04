@@ -64,11 +64,22 @@
  *      Willmann-Bell, Inc
  *      Richmond, Virginia (USA)
  */
-#include "sqlInt.h"
 #include <stdlib.h>
 #include <assert.h>
 #include <time.h>
 
+#include "datetime.h"
+#include "sqlInt.h"
+
+bool
+sql_timestamp_parse(struct datetime *date, const char *str, size_t len)
+{
+	assert(len > 0);
+	assert(date != NULL);
+	assert(str != NULL);
+	size_t parsed_len = datetime_parse_full(date, str, len, 0);
+	return parsed_len == len;
+}
 /*
  * Till time-like types are implemented as native Tarantool
  * types, built-in functions below make no sense.

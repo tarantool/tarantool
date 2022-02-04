@@ -4410,4 +4410,9 @@ sql_generate_column_name(uint32_t number)
 	return tt_sprintf("COLUMN_%d", number);
 }
 
+struct datetime;
+
+bool
+sql_timestamp_parse(struct datetime *date, const char *str, size_t len);
+
 #endif				/* sqlINT_H */
