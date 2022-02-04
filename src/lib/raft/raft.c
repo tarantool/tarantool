@@ -486,6 +486,7 @@ raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 			 * it manually.
 			 */
 			raft->leader = 0;
+			raft_schedule_broadcast(raft);
 			if (raft->is_candidate)
 				raft_sm_schedule_new_election(raft);
 		}
