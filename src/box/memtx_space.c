@@ -329,28 +329,48 @@ dup_replace_mode(uint16_t op)
 	return op == IPROTO_INSERT ? DUP_INSERT : DUP_REPLACE_OR_INSERT;
 }
 
+/**
+ * Call replace method in memtx space and fill txn statement in case of
+ * success. @A new_tuple is expected to be referenced once and must be
+ * unreferenced by caller in case of failure.
+ */
+static inline int
+memtx_space_replace_tuple(struct space *space, struct txn_stmt *stmt,
+			  struct tuple *old_tuple, struct tuple *new_tuple,
+			  enum dup_replace_mode mode)
+{
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	struct tuple *result;
+	if (memtx_space->replace(space, old_tuple, new_tuple, mode,
+				 &result) != 0)
+		return -1;
+	stmt->engine_savepoint = stmt;
+	stmt->new_tuple = new_tuple;
+	stmt->old_tuple = result;
+	return 0;
+}
+
 static int
 memtx_space_execute_replace(struct space *space, struct txn *txn,
 			    struct request *request, struct tuple **result)
 {
-	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	enum dup_replace_mode mode = dup_replace_mode(request->type);
-	stmt->new_tuple =
+	struct tuple *new_tuple =
 		space->format->vtab.tuple_new(space->format, request->tuple,
 					      request->tuple_end);
-	if (stmt->new_tuple == NULL)
+	if (new_tuple == NULL)
 		return -1;
-	tuple_ref(stmt->new_tuple);
+	tuple_ref(new_tuple);
 
 	if (mode == DUP_INSERT)
 		stmt->does_require_old_tuple = true;
 
-	if (memtx_space->replace(space, NULL, stmt->new_tuple,
-				 mode, &stmt->old_tuple) != 0)
+	if (memtx_space_replace_tuple(space, stmt, NULL, new_tuple,
+				      mode) != 0) {
+		tuple_unref(new_tuple);
 		return -1;
-	stmt->engine_savepoint = stmt;
-	/** The new tuple is referenced by the primary key. */
+	}
 	*result = stmt->new_tuple;
 	return 0;
 }
@@ -359,7 +379,6 @@ static int
 memtx_space_execute_delete(struct space *space, struct txn *txn,
 			   struct request *request, struct tuple **result)
 {
-	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	/* Try to find the tuple by unique key. */
 	struct index *pk = index_find_unique(space, request->index_id);
@@ -373,17 +392,20 @@ memtx_space_execute_delete(struct space *space, struct txn *txn,
 	if (index_get(pk, key, part_count, &old_tuple) != 0)
 		return -1;
 
+	if (old_tuple == NULL) {
+		*result = NULL;
+		return 0;
+	}
+
 	/*
 	 * We have to delete exactly old_tuple just because we return it as
 	 * a result.
 	 */
 	stmt->does_require_old_tuple = true;
 
-	if (old_tuple != NULL &&
-	    memtx_space->replace(space, old_tuple, NULL,
-				 DUP_REPLACE_OR_INSERT, &stmt->old_tuple) != 0)
+	if (memtx_space_replace_tuple(space, stmt, old_tuple, NULL,
+				      DUP_REPLACE_OR_INSERT) != 0)
 		return -1;
-	stmt->engine_savepoint = stmt;
 	*result = stmt->old_tuple;
 	return 0;
 }
@@ -392,7 +414,6 @@ static int
 memtx_space_execute_update(struct space *space, struct txn *txn,
 			   struct request *request, struct tuple **result)
 {
-	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	/* Try to find the tuple by unique key. */
 	struct index *pk = index_find_unique(space, request->index_id);
@@ -422,19 +443,20 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 	if (new_data == NULL)
 		return -1;
 
-	stmt->new_tuple =
+	struct tuple *new_tuple =
 		space->format->vtab.tuple_new(format, new_data,
 					      new_data + new_size);
-	if (stmt->new_tuple == NULL)
+	if (new_tuple == NULL)
 		return -1;
-	tuple_ref(stmt->new_tuple);
+	tuple_ref(new_tuple);
 
 	stmt->does_require_old_tuple = true;
 
-	if (memtx_space->replace(space, old_tuple, stmt->new_tuple,
-				 DUP_REPLACE, &stmt->old_tuple) != 0)
+	if (memtx_space_replace_tuple(space, stmt, old_tuple, new_tuple,
+				      DUP_REPLACE) != 0) {
+		tuple_unref(new_tuple);
 		return -1;
-	stmt->engine_savepoint = stmt;
+	}
 	*result = stmt->new_tuple;
 	return 0;
 }
@@ -443,7 +465,6 @@ static int
 memtx_space_execute_upsert(struct space *space, struct txn *txn,
 			   struct request *request)
 {
-	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	/*
 	 * Check all tuple fields: we should produce an error on
@@ -473,6 +494,7 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		return -1;
 
 	struct tuple_format *format = space->format;
+	struct tuple *new_tuple = NULL;
 	if (old_tuple == NULL) {
 		/**
 		 * Old tuple was not found. A write optimized
@@ -494,12 +516,12 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 					  format, request->index_base) != 0) {
 			return -1;
 		}
-		stmt->new_tuple =
+		new_tuple =
 			space->format->vtab.tuple_new(format, request->tuple,
 						      request->tuple_end);
-		if (stmt->new_tuple == NULL)
+		if (new_tuple == NULL)
 			return -1;
-		tuple_ref(stmt->new_tuple);
+		tuple_ref(new_tuple);
 	} else {
 		uint32_t new_size = 0, bsize;
 		const char *old_data = tuple_data_range(old_tuple, &bsize);
@@ -519,26 +541,27 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		if (new_data == NULL)
 			return -1;
 
-		stmt->new_tuple =
+		new_tuple =
 			space->format->vtab.tuple_new(format, new_data,
 						      new_data + new_size);
-		if (stmt->new_tuple == NULL)
+		if (new_tuple == NULL)
 			return -1;
-		tuple_ref(stmt->new_tuple);
+		tuple_ref(new_tuple);
 
 		struct index *pk = space->index[0];
 		if (!key_update_can_be_skipped(pk->def->key_def->column_mask,
 					       column_mask) &&
-		    tuple_compare(old_tuple, HINT_NONE, stmt->new_tuple,
+		    tuple_compare(old_tuple, HINT_NONE, new_tuple,
 				  HINT_NONE, pk->def->key_def) != 0) {
 			/* Primary key is changed: log error and do nothing. */
 			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 				 pk->def->name, space_name(space));
 			diag_log();
-			tuple_unref(stmt->new_tuple);
-			stmt->new_tuple = NULL;
+			tuple_unref(new_tuple);
+			return 0;
 		}
 	}
+	assert(new_tuple != NULL);
 
 	stmt->does_require_old_tuple = true;
 
@@ -548,11 +571,11 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 	 * we checked this case explicitly and skipped the upsert
 	 * above.
 	 */
-	if (stmt->new_tuple != NULL &&
-	    memtx_space->replace(space, old_tuple, stmt->new_tuple,
-				 DUP_REPLACE_OR_INSERT, &stmt->old_tuple) != 0)
+	if (memtx_space_replace_tuple(space, stmt, old_tuple, new_tuple,
+				      DUP_REPLACE_OR_INSERT) != 0) {
+		tuple_unref(new_tuple);
 		return -1;
-	stmt->engine_savepoint = stmt;
+	}
 	/* Return nothing: UPSERT does not return data. */
 	return 0;
 }

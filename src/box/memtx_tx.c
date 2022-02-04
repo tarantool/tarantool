@@ -1533,8 +1533,6 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		/*
 		 * The result must be a referenced pointer. The caller must
 		 * unreference it by itself.
-		 * Actually now it goes only to stmt->old_tuple, and
-		 * stmt->old_tuple is unreferenced when stmt is destroyed.
 		 */
 		tuple_ref(*result);
 	}
@@ -1597,8 +1595,6 @@ memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
 		/*
 		 * The result must be a referenced pointer. The caller must
 		 * unreference it by itself.
-		 * Actually now it goes only to stmt->old_tuple, and
-		 * stmt->old_tuple is unreferenced when stmt is destroyed.
 		 */
 		tuple_ref(*result);
 	}
@@ -1614,9 +1610,7 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 	assert(stmt != NULL);
 	assert(stmt->space != NULL);
 	assert(new_tuple != NULL || old_tuple != NULL);
-	assert(new_tuple == stmt->new_tuple);
 	assert(new_tuple == NULL || !new_tuple->is_dirty);
-	assert(result == &stmt->old_tuple);
 
 	if (new_tuple != NULL)
 		return memtx_tx_history_add_insert_stmt(stmt, old_tuple,
