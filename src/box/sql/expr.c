@@ -1267,7 +1267,7 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 	if (pExpr == 0)
 		return;
 	assert(!ExprHasProperty
-	       (pExpr, EP_IntValue | EP_Reduced | EP_TokenOnly));
+	       (pExpr, EP_IntValue | EP_Date | EP_Reduced | EP_TokenOnly));
 	z = pExpr->u.zToken;
 	assert(z != 0);
 	assert(z[0] != 0);
@@ -1462,7 +1462,7 @@ static int
 dupedExprNodeSize(Expr * p, int flags)
 {
 	int nByte = dupedExprStructSize(p, flags) & 0xfff;
-	if (!ExprHasProperty(p, EP_IntValue) && p->u.zToken) {
+	if (!ExprHasProperty(p, EP_IntValue | EP_Date) && p->u.zToken) {
 		nByte += sqlStrlen30(p->u.zToken) + 1;
 	}
 	return ROUND8(nByte);
@@ -1514,7 +1514,7 @@ sql_expr_dup(struct sql *db, struct Expr *p, int flags, char **buffer)
 		const unsigned nStructSize = dupedExprStructSize(p, flags);
 		const int nNewSize = nStructSize & 0xfff;
 		int nToken;
-		if (!ExprHasProperty(p, EP_IntValue) && p->u.zToken)
+		if (!ExprHasProperty(p, EP_IntValue | EP_Date) && p->u.zToken)
 			nToken = sqlStrlen30(p->u.zToken) + 1;
 		else
 			nToken = 0;
@@ -3827,7 +3827,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		}
 #endif
 	case TK_VARIABLE:{
-			assert(!ExprHasProperty(pExpr, EP_IntValue));
+			assert(!ExprHasProperty(pExpr, EP_IntValue | EP_Date));
 			assert(pExpr->u.zToken != 0);
 			assert(pExpr->u.zToken[0] != 0);
 			sqlVdbeAddOp2(v, OP_Variable, pExpr->iColumn,
@@ -3954,7 +3954,8 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				expr_code_int(pParse, pLeft, true, target);
 				return target;
 			} else if (pLeft->op == TK_FLOAT) {
-				assert(!ExprHasProperty(pExpr, EP_IntValue));
+				assert(!ExprHasProperty(pExpr,
+							EP_IntValue | EP_Date));
 				codeReal(v, pLeft->u.zToken, 1, target);
 				return target;
 			} else if (pLeft->op == TK_DECIMAL) {
@@ -4008,7 +4009,8 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_AGG_FUNCTION:{
 			AggInfo *pInfo = pExpr->pAggInfo;
 			if (pInfo == 0) {
-				assert(!ExprHasProperty(pExpr, EP_IntValue));
+				assert(!ExprHasProperty(pExpr,
+							EP_IntValue | EP_Date));
 				const char *err = "misuse of aggregate: %s()";
 				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
 					 tt_sprintf(err, pExpr->u.zToken));
@@ -4032,7 +4034,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				pFarg = pExpr->x.pList;
 			}
 			nFarg = pFarg ? pFarg->nExpr : 0;
-			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			struct func *func = sql_func_find(pExpr);
 			if (func == NULL) {
 				pParse->is_aborted = true;
@@ -4428,7 +4429,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			pParse->is_aborted = true;
 			return 0;
 		}
-		assert(!ExprHasProperty(pExpr, EP_IntValue));
+		assert(!ExprHasProperty(pExpr, EP_IntValue | EP_Date));
 		if (pExpr->on_conflict_action == ON_CONFLICT_ACTION_IGNORE) {
 			sqlVdbeAddOp4(v, OP_Halt, 0,
 					  ON_CONFLICT_ACTION_IGNORE, 0,
@@ -5505,8 +5506,6 @@ analyzeAggregate(Walker * pWalker, Expr * pExpr)
 						 */
 						pParse->nMem += n;
 						pItem->iMem = ++pParse->nMem;
-						assert(!ExprHasProperty
-						       (pExpr, EP_IntValue));
 						pItem->func =
 							sql_func_find(pExpr);
 						if (pItem->func == NULL) {

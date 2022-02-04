@@ -2051,6 +2051,7 @@ find_built_in_func(struct Expr *expr, struct sql_func_dictionary *dict)
 struct func *
 sql_func_find(struct Expr *expr)
 {
+	assert(!ExprHasProperty(expr, EP_IntValue | EP_Date));
 	const char *name = expr->u.zToken;
 	struct sql_func_dictionary *dict = built_in_func_get(name);
 	if (dict != NULL)
