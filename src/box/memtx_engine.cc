@@ -480,7 +480,9 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 {
 	(void)engine;
 	(void)txn;
-	if (stmt->old_tuple == NULL && stmt->new_tuple == NULL)
+	struct tuple *old_tuple = stmt->rollback_info.old_tuple;
+	struct tuple *new_tuple = stmt->rollback_info.new_tuple;
+	if (old_tuple == NULL && new_tuple == NULL)
 		return;
 	struct space *space = stmt->space;
 	if (space == NULL) {
@@ -508,7 +510,7 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 		struct tuple *unused;
 		struct index *index = space->index[i];
 		/* Rollback must not fail. */
-		if (index_replace(index, stmt->new_tuple, stmt->old_tuple,
+		if (index_replace(index, new_tuple, old_tuple,
 				  DUP_INSERT, &unused, &unused) != 0) {
 			diag_log();
 			unreachable();
@@ -516,11 +518,11 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 		}
 	}
 
-	memtx_space_update_bsize(space, stmt->new_tuple, stmt->old_tuple);
-	if (stmt->old_tuple != NULL)
-		tuple_ref(stmt->old_tuple);
-	if (stmt->new_tuple != NULL)
-		tuple_unref(stmt->new_tuple);
+	memtx_space_update_bsize(space, new_tuple, old_tuple);
+	if (old_tuple != NULL)
+		tuple_ref(old_tuple);
+	if (new_tuple != NULL)
+		tuple_unref(new_tuple);
 }
 
 static int

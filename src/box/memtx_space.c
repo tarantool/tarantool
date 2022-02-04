@@ -344,6 +344,7 @@ memtx_space_replace_tuple(struct space *space, struct txn_stmt *stmt,
 	if (memtx_space->replace(space, old_tuple, new_tuple, mode,
 				 &result) != 0)
 		return -1;
+	txn_stmt_prepare_rollback_info(stmt, result, new_tuple);
 	stmt->engine_savepoint = stmt;
 	stmt->new_tuple = new_tuple;
 	stmt->old_tuple = result;
