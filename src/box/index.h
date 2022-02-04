@@ -258,6 +258,11 @@ struct iterator {
 	 */
 	bool is_raw;
 	/**
+	 * Pointer to the space iterator belongs to. Updated only on
+	 * schema changes.
+	 */
+	struct space *space_cached;
+	/**
 	 * Pointer to the index the iterator is for.
 	 * Guaranteed to be valid only if the schema
 	 * state has not changed since the last lookup.

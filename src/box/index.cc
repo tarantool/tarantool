@@ -461,6 +461,24 @@ iterator_create(struct iterator *it, struct index *index)
 	it->index_id = index->def->iid;
 	it->index = index;
 	it->is_raw = false;
+	it->space_cached = space_by_id(index->def->space_id);
+}
+
+static int
+iterator_update_space_version(struct iterator *it)
+{
+	if (unlikely(it->space_cache_version != space_cache_version)) {
+		struct space *space = space_by_id(it->space_id);
+		if (space == NULL)
+			return -1;
+		struct index *index = space_index(space, it->index_id);
+		if (index != it->index ||
+		    index->space_cache_version > it->space_cache_version)
+			return -1;
+		it->space_cache_version = space_cache_version;
+		it->space_cached = space;
+	}
+	return 0;
 }
 
 int
@@ -471,25 +489,20 @@ iterator_next(struct iterator *it, struct tuple **ret)
 	if (it->space_id == 0)
 		return it->next(it, ret);
 	int rc = 0;
-	struct space *space = NULL;
-	if (unlikely(it->space_cache_version != space_cache_version)) {
-		space = space_by_id(it->space_id);
-		if (space == NULL)
-			goto invalidate;
-		struct index *index = space_index(space, it->index_id);
-		if (index != it->index ||
-		    index->space_cache_version > it->space_cache_version)
-			goto invalidate;
-		it->space_cache_version = space_cache_version;
-	}
+	if (iterator_update_space_version(it) != 0)
+		goto invalidate;
 	rc = it->next(it, ret);
 	if (it->is_raw || *ret == NULL)
 		return rc;
-	if (space == NULL)
-		space = space_by_id(it->space_id);
-	if (space_is_being_upgraded(space)) {
+	/*
+	 * We have to check space version once again after next() invocation
+	 * since during it in vinyl yields may occur as well.
+	 */
+	if (iterator_update_space_version(it) != 0)
+		goto invalidate;
+	if (space_is_being_upgraded(it->space_cached)) {
 		struct tuple *upgraded_tuple = NULL;
-		if (space_upgrade_convert_tuple(space, *ret,
+		if (space_upgrade_convert_tuple(it->space_cached, *ret,
 						&upgraded_tuple) != 0)
 				return -1;
 		*ret = upgraded_tuple;
