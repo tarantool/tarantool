@@ -3,13 +3,21 @@ local t = require('luatest')
 local g = t.group()
 local fio = require('fio')
 
-g.before_each(function()
-    g.server = server:new({alias = 'master',
-                          datadir = 'test/box-luatest/gh_6794_data'})
+g.before_test('test_panic_without_force_recovery', function()
+    g.server = server:new({alias = 'master-test_panic',
+                           datadir = 'test/box-luatest/gh_6794_data'})
+    g.server:start({wait_for_readiness = false})
 end)
 
 g.after_test("test_panic_without_force_recovery", function()
     g.server:cleanup()
+end)
+
+g.before_test('test_ignore_with_force_recovery', function()
+    g.server = server:new({alias = 'master-test_ignore',
+                           datadir = 'test/box-luatest/gh_6794_data',
+                           box_cfg = {force_recovery = true}})
+    g.server:start()
 end)
 
 g.after_test("test_ignore_with_force_recovery", function()
@@ -19,7 +27,6 @@ end)
 local mismatch_msg = "Replicaset vclock {.*} doesn't match recovered data {.*}"
 
 g.test_panic_without_force_recovery = function()
-    g.server:start({wait_for_readiness = false})
     t.helpers.retrying({}, function()
         local msg = "Can't proceed. " .. mismatch_msg
         local filename = fio.pathjoin(g.server.workdir, g.server.alias..'.log')
@@ -28,8 +35,6 @@ g.test_panic_without_force_recovery = function()
 end
 
 g.test_ignore_with_force_recovery = function()
-    g.server.box_cfg = {force_recovery = true}
-    g.server:start()
     t.helpers.retrying({}, function()
         local msg = mismatch_msg .. ": ignoring, because 'force_recovery' "..
                     "configuration option is set."
