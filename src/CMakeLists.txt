@@ -58,13 +58,16 @@ lua_source(lua_sources lua/env.lua env_lua)
 lua_source(lua_sources lua/pwd.lua pwd_lua)
 lua_source(lua_sources lua/trigger.lua trigger_lua)
 lua_source(lua_sources lua/table.lua table_lua)
-lua_source(lua_sources ../third_party/luafun/fun.lua fun_lua)
 lua_source(lua_sources lua/httpc.lua httpc_lua)
 lua_source(lua_sources lua/iconv.lua iconv_lua)
 lua_source(lua_sources lua/swim.lua swim_lua)
 lua_source(lua_sources lua/datetime.lua datetime_lua)
 lua_source(lua_sources lua/timezones.lua timezones_lua)
 lua_source(lua_sources lua/print.lua print_lua)
+
+# 3rd party lua sources
+lua_source(lua_sources ../third_party/luafun/fun.lua fun_lua)
+lua_source(lua_sources ../third_party/lua/luadebug.lua luadebug_lua)
 
 # LuaJIT jit.* library
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/src/jit/bc.lua jit_bc_lua)
