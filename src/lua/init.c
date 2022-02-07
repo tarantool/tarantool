@@ -155,7 +155,8 @@ extern char strict_lua[],
 	sysprof_lua[],
 	datetime_lua[],
 	timezones_lua[],
-	print_lua[]
+	print_lua[],
+	luadebug_lua[]
 #if defined(EMBED_LUAROCKS)
 	, luarocks_core_hardcoded_lua[],
 	luarocks_admin_cache_lua[],
@@ -310,6 +311,7 @@ static const char *lua_modules[] = {
 	"timezones", timezones_lua,
 	"datetime", datetime_lua,
 	"internal.print", print_lua,
+	"luadebug", luadebug_lua,
 	NULL
 };
 
