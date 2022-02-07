@@ -149,7 +149,7 @@ index_rtree_iterator_free(struct iterator *i)
 }
 
 static int
-index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
+index_rtree_iterator_next_raw(struct iterator *i, struct tuple **ret)
 {
 	struct index_rtree_iterator *itr = (struct index_rtree_iterator *)i;
 	do {
@@ -218,8 +218,8 @@ memtx_rtree_index_count(struct index *base, enum iterator_type type,
 }
 
 static int
-memtx_rtree_index_get(struct index *base, const char *key,
-		      uint32_t part_count, struct tuple **result)
+memtx_rtree_index_get_raw(struct index *base, const char *key,
+			  uint32_t part_count, struct tuple **result)
 {
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 	struct rtree_iterator iterator;
@@ -294,6 +294,7 @@ memtx_rtree_index_reserve(struct index *base, uint32_t size_hint)
 	return memtx_index_extent_reserve(memtx, RESERVE_EXTENTS_BEFORE_REPLACE);
 }
 
+template <bool UNCHANGED>
 static struct iterator *
 memtx_rtree_index_create_iterator(struct index *base,  enum iterator_type type,
 				  const char *key, uint32_t part_count)
@@ -354,7 +355,9 @@ memtx_rtree_index_create_iterator(struct index *base,  enum iterator_type type,
 	}
 	iterator_create(&it->base, base);
 	it->pool = &memtx->rtree_iterator_pool;
-	it->base.next = index_rtree_iterator_next;
+	it->base.next_raw = index_rtree_iterator_next_raw;
+	it->base.next = UNCHANGED ? index_rtree_iterator_next_raw :
+		memtx_iterator_next;
 	it->base.free = index_rtree_iterator_free;
 	rtree_iterator_init(&it->impl);
 	/*
@@ -368,6 +371,12 @@ memtx_rtree_index_create_iterator(struct index *base,  enum iterator_type type,
 	return (struct iterator *)it;
 }
 
+/**
+ * Get index vtab by @a UNCHANGED, template version.
+ * If UNCHANGED == true iterator->next and index->get
+ * functions are the same as it's raw versions.
+ */
+template <bool UNCHANGED>
 static const struct index_vtab *
 get_memtx_rtree_index_vtab(void)
 {
@@ -387,9 +396,12 @@ get_memtx_rtree_index_vtab(void)
 		/* .max = */ generic_index_max,
 		/* .random = */ generic_index_random,
 		/* .count = */ memtx_rtree_index_count,
-		/* .get = */ memtx_rtree_index_get,
+		/* .get_raw = */ memtx_rtree_index_get_raw,
+		/* .get = */ UNCHANGED ? memtx_rtree_index_get_raw :
+			memtx_index_get,
 		/* .replace = */ memtx_rtree_index_replace,
-		/* .create_iterator = */ memtx_rtree_index_create_iterator,
+		/* .create_iterator = */
+			memtx_rtree_index_create_iterator<UNCHANGED>,
 		/* .create_snapshot_iterator = */
 			generic_index_create_snapshot_iterator,
 		/* .stat = */ generic_index_stat,
@@ -401,6 +413,19 @@ get_memtx_rtree_index_vtab(void)
 		/* .end_build = */ generic_index_end_build,
 	};
 	return &vtab;
+}
+
+/**
+ * Get index vtab by @a unchanged, argument version.
+ */
+static const struct index_vtab *
+get_memtx_rtree_index_vtab(bool unchanged)
+{
+	static const index_vtab *choice[2] = {
+		get_memtx_rtree_index_vtab<false>(),
+		get_memtx_rtree_index_vtab<true>()
+	};
+	return choice[unchanged];
 }
 
 struct index *
@@ -438,7 +463,7 @@ memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def)
 			 "malloc", "struct memtx_rtree_index");
 		return NULL;
 	}
-	const struct index_vtab *vtab = get_memtx_rtree_index_vtab();
+	const struct index_vtab *vtab = get_memtx_rtree_index_vtab(true);
 	if (index_create(&index->base, (struct engine *)memtx,
 			 vtab, def) != 0) {
 		free(index);

@@ -237,6 +237,12 @@ int
 box_index_compact(uint32_t space_id, uint32_t index_id);
 
 struct iterator {
+        /**
+         * Same as next(), but returns a tuple as it is stored in the index,
+         * without any transformations. Used internally by engines. For
+         * example, memtx returns a tuple without decompression.
+         */
+        int (*next_raw)(struct iterator *it, struct tuple **ret);
 	/**
 	 * Iterate to the next tuple.
 	 * The tuple is returned in @ret (NULL if EOF).
@@ -277,6 +283,15 @@ iterator_create(struct iterator *it, struct index *index);
  */
 int
 iterator_next(struct iterator *it, struct tuple **ret);
+
+/**
+ * Iterate to the next tuple as is, without any transformations.
+ *
+ * The tuple is returned in @ret (NULL if EOF).
+ * Returns 0 on success, -1 on error.
+ */
+int
+iterator_next_raw(struct iterator *it, struct tuple **ret);
 
 /**
  * Destroy an iterator instance and free associated memory.
@@ -411,6 +426,8 @@ struct index_vtab {
 	int (*random)(struct index *index, uint32_t rnd, struct tuple **result);
 	ssize_t (*count)(struct index *index, enum iterator_type type,
 			 const char *key, uint32_t part_count);
+        int (*get_raw)(struct index *index, const char *key,
+                       uint32_t part_count, struct tuple **result);
 	int (*get)(struct index *index, const char *key,
 		   uint32_t part_count, struct tuple **result);
 	/**
@@ -640,6 +657,13 @@ index_count(struct index *index, enum iterator_type type,
 }
 
 static inline int
+index_get_raw(struct index *index, const char *key,
+              uint32_t part_count, struct tuple **result)
+{
+        return index->vtab->get_raw(index, key, part_count, result);
+}
+
+static inline int
 index_get(struct index *index, const char *key,
 	   uint32_t part_count, struct tuple **result)
 {
@@ -752,6 +776,8 @@ int generic_index_max(struct index *, const char *, uint32_t, struct tuple **);
 int generic_index_random(struct index *, uint32_t, struct tuple **);
 ssize_t generic_index_count(struct index *, enum iterator_type,
 			    const char *, uint32_t);
+int generic_index_get_raw(struct index *, const char *, uint32_t,
+                          struct tuple **);
 int generic_index_get(struct index *, const char *, uint32_t, struct tuple **);
 int generic_index_replace(struct index *, struct tuple *, struct tuple *,
 			  enum dup_replace_mode,

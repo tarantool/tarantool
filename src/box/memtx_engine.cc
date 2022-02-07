@@ -52,6 +52,7 @@
 #include "raft.h"
 #include "txn_limbo.h"
 #include "memtx_allocator.h"
+#include "index.h"
 
 #include <type_traits>
 
@@ -1563,4 +1564,28 @@ memtx_index_def_change_requires_rebuild(struct index *index,
 	}
 	assert(old_cmp_def->is_multikey == new_cmp_def->is_multikey);
 	return false;
+}
+
+int
+memtx_prepare_result_tuple(struct tuple **result)
+{
+	(void)result;
+	return 0;
+}
+
+int
+memtx_index_get(struct index *index, const char *key, uint32_t part_count,
+		struct tuple **result)
+{
+	if (index->vtab->get_raw(index, key, part_count, result) != 0)
+		return -1;
+	return memtx_prepare_result_tuple(result);
+}
+
+int
+memtx_iterator_next(struct iterator *it, struct tuple **ret)
+{
+	if (it->next_raw(it, ret) != 0)
+		return -1;
+	return memtx_prepare_result_tuple(ret);
 }
