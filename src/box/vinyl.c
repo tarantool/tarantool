@@ -4595,6 +4595,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
 	/* .count = */ generic_index_count,
+	/* .get_raw = */ generic_index_get_raw,
 	/* .get = */ vinyl_index_get,
 	/* .replace = */ generic_index_replace,
 	/* .create_iterator = */ vinyl_index_create_iterator,

@@ -118,7 +118,7 @@ enum memtx_reserve_extents_num {
  * allocated for each iterator (except rtree index iterator that
  * is significantly bigger so has own pool).
  */
-#define MEMTX_ITERATOR_SIZE (176)
+#define MEMTX_ITERATOR_SIZE (184)
 
 struct memtx_engine {
 	struct engine base;
@@ -322,6 +322,29 @@ memtx_index_def_change_requires_rebuild(struct index *index,
 
 void
 memtx_set_tuple_format_vtab(const char *allocator_name);
+
+/**
+ * Converts a tuple from format in which it is stored in space
+ * to format in which, it should be visible for users.
+ */
+int
+memtx_prepare_result_tuple(struct tuple **result);
+
+/**
+ * Common function for all memtx indexes. Get tuple from memtx @a index
+ * and return it in @a result in format in which, it should be visible for
+ * users.
+ */
+int
+memtx_index_get(struct index *index, const char *key, uint32_t part_count,
+		struct tuple **result);
+
+/**
+ * Common function for all memtx indexes. Iterate to the next tuple and
+ * return it in @a ret in format in which, it should be visible for users.
+ */
+int
+memtx_iterator_next(struct iterator *it, struct tuple **ret);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -189,7 +189,7 @@ bitset_index_iterator_free(struct iterator *iterator)
 }
 
 static int
-bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
+bitset_index_iterator_next_raw(struct iterator *iterator, struct tuple **ret)
 {
 	assert(iterator->free == bitset_index_iterator_free);
 	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
@@ -335,6 +335,7 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 	return 0;
 }
 
+template <bool UNCHANGED>
 static struct iterator *
 memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 				   const char *key, uint32_t part_count)
@@ -355,7 +356,8 @@ memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 
 	iterator_create(&it->base, base);
 	it->pool = &memtx->iterator_pool;
-	it->base.next = bitset_index_iterator_next;
+	it->base.next_raw = bitset_index_iterator_next_raw;
+	it->base.next = UNCHANGED ? it->base.next_raw : memtx_iterator_next;
 	it->base.free = bitset_index_iterator_free;
 
 	tt_bitset_iterator_create(&it->bitset_it, realloc);
@@ -482,6 +484,12 @@ memtx_bitset_index_count(struct index *base, enum iterator_type type,
 	return generic_index_count(base, type, key, part_count);
 }
 
+/**
+ * Get index vtab by @a UNCHANGED, template version.
+ * If UNCHANGED == true iterator->next and index->get
+ * functions are the same as it's raw versions.
+ */
+template <bool UNCHANGED>
 static const struct index_vtab *
 get_memtx_bitset_index_vtab(void)
 {
@@ -501,9 +509,12 @@ get_memtx_bitset_index_vtab(void)
 		/* .max = */ generic_index_max,
 		/* .random = */ generic_index_random,
 		/* .count = */ memtx_bitset_index_count,
-		/* .get = */ generic_index_get,
+		/* .get_raw = */ generic_index_get_raw,
+		/* .get = */ UNCHANGED ? generic_index_get_raw :
+			     generic_index_get,
 		/* .replace = */ memtx_bitset_index_replace,
-		/* .create_iterator = */ memtx_bitset_index_create_iterator,
+		/* .create_iterator = */
+			memtx_bitset_index_create_iterator<UNCHANGED>,
 		/* .create_snapshot_iterator = */
 			generic_index_create_snapshot_iterator,
 		/* .stat = */ generic_index_stat,
@@ -515,6 +526,19 @@ get_memtx_bitset_index_vtab(void)
 		/* .end_build = */ generic_index_end_build,
 	};
 	return &vtab;
+}
+
+/**
+ * Get index vtab by @a unchanged, argument version.
+ */
+static const struct index_vtab *
+get_memtx_bitset_index_vtab(bool unchanged)
+{
+	static const index_vtab *choice[2] = {
+		get_memtx_bitset_index_vtab<false>(),
+		get_memtx_bitset_index_vtab<true>()
+	};
+	return choice[unchanged];
 }
 
 struct index *
@@ -530,7 +554,7 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 			 "malloc", "struct memtx_bitset_index");
 		return NULL;
 	}
-	const struct index_vtab *vtab = get_memtx_bitset_index_vtab();
+	const struct index_vtab *vtab = get_memtx_bitset_index_vtab(true);
 	if (index_create(&index->base, (struct engine *)memtx,
 			 vtab, def) != 0) {
 		free(index);
