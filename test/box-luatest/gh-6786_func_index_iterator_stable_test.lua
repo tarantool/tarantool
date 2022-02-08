@@ -23,7 +23,7 @@ g.before_test('test_func_index_iterator_stable', function()
             end]],
             is_deterministic = true,
             is_sandboxed = true,
-            is_multikey = true,
+            opts = { is_multikey = true },
         })
         local s = box.schema.create_space('test')
         s:create_index('pk')
