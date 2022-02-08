@@ -112,6 +112,16 @@ struct applier_data_msg {
 	int tx_cnt;
 };
 
+/** A message sent from tx to applier thread to trigger ACK. */
+struct applier_ack_msg {
+	struct cmsg base;
+	/**
+	 * Last written transaction timestamp.
+	 * Set to replica::applier_txn_last_tm.
+	 */
+	double txn_last_tm;
+};
+
 /** The underlying thread behind a number of appliers. */
 struct applier_thread {
 	struct cord cord;
@@ -129,17 +139,6 @@ struct applier_thread {
 struct applier {
 	/** Background fiber */
 	struct fiber *fiber;
-	/** Background fiber to reply with vclock */
-	struct fiber *writer;
-	/** Writer cond. */
-	struct fiber_cond writer_cond;
-	/**
-	 * True if the applier has vclocks not sent to the remote
-	 * master. The flag is needed because during sending one
-	 * vclock (ACK), it can be updated again. So just one
-	 * condition variable is not enough.
-	 */
-	bool has_acks_to_send;
 	/** Finite-state machine */
 	enum applier_state state;
 	/** Local time of this replica when the last row has been received */
@@ -202,6 +201,13 @@ struct applier {
 	struct applier_msg *pending_msgs[3];
 	/** Pending message count. */
 	int pending_msg_cnt;
+	/** Message sent to applier thread to trigger ACK. */
+	struct applier_ack_msg ack_msg;
+	struct cmsg_hop ack_route[2];
+	/** True if ack_msg was sent and hasn't returned yet. */
+	bool is_ack_sent;
+	/** True if ACK was signalled in tx while ack_msg was en route. */
+	bool is_ack_pending;
 	/** Fields used only by applier thread. */
 	struct {
 		alignas(CACHELINE_SIZE)
@@ -226,6 +232,22 @@ struct applier {
 		struct applier_exit_msg exit_msg;
 		/** The reader fiber, reading and parsing incoming rows. */
 		struct fiber *reader;
+		/** Background fiber to reply with vclock */
+		struct fiber *writer;
+		/** Writer cond. */
+		struct fiber_cond writer_cond;
+		/**
+		 * True if the applier has vclocks not sent to the remote
+		 * master. The flag is needed because during sending one
+		 * vclock (ACK), it can be updated again. So just one
+		 * condition variable is not enough.
+		 */
+		bool has_acks_to_send;
+		/**
+		 * Applier thread's view of the last written transaction
+		 * timestamp. Sent in ACK messages. Updated by applier_ack_msg.
+		 */
+		double txn_last_tm;
 	} thread;
 };
 
