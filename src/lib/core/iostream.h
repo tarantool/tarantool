@@ -14,6 +14,26 @@
 #include "tarantool_ev.h"
 #include "trivia/util.h"
 
+/**
+ * An IO stream object must not be used concurrently from different threads.
+ * To catch this, we set the owner to the current thread before doing an IO
+ * operation and clear it once done.
+ */
+#ifndef NDEBUG
+# include "fiber.h"
+# define IOSTREAM_OWNER_SET(io) ({					\
+	assert((io)->owner == NULL);					\
+	(io)->owner = cord();						\
+})
+# define IOSTREAM_OWNER_CLEAR(io) ({					\
+	assert((io)->owner == cord());					\
+	(io)->owner = NULL;						\
+})
+#else
+# define IOSTREAM_OWNER_SET(io)		(void)(io)
+# define IOSTREAM_OWNER_CLEAR(io)	(void)(io)
+#endif
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -88,6 +108,10 @@ struct iostream {
 	void *data;
 	/** File descriptor used for IO. Set to -1 on destruction. */
 	int fd;
+#ifndef NDEBUG
+	/** Thread currently doing an IO operation on this IO stream. */
+	struct cord *owner;
+#endif
 };
 
 /**
@@ -99,6 +123,9 @@ iostream_clear(struct iostream *io)
 	io->vtab = NULL;
 	io->data = NULL;
 	io->fd = -1;
+#ifndef NDEBUG
+	io->owner = NULL;
+#endif
 }
 
 /**
@@ -157,7 +184,10 @@ iostream_destroy(struct iostream *io)
 static inline ssize_t
 iostream_read(struct iostream *io, void *buf, size_t count)
 {
-	return io->vtab->read(io, buf, count);
+	IOSTREAM_OWNER_SET(io);
+	ssize_t ret = io->vtab->read(io, buf, count);
+	IOSTREAM_OWNER_CLEAR(io);
+	return ret;
 }
 
 /**
@@ -168,7 +198,10 @@ iostream_read(struct iostream *io, void *buf, size_t count)
 static inline ssize_t
 iostream_write(struct iostream *io, const void *buf, size_t count)
 {
-	return io->vtab->write(io, buf, count);
+	IOSTREAM_OWNER_SET(io);
+	ssize_t ret = io->vtab->write(io, buf, count);
+	IOSTREAM_OWNER_CLEAR(io);
+	return ret;
 }
 
 /**
@@ -179,7 +212,10 @@ iostream_write(struct iostream *io, const void *buf, size_t count)
 static inline ssize_t
 iostream_writev(struct iostream *io, const struct iovec *iov, int iovcnt)
 {
-	return io->vtab->writev(io, iov, iovcnt);
+	IOSTREAM_OWNER_SET(io);
+	ssize_t ret = io->vtab->writev(io, iov, iovcnt);
+	IOSTREAM_OWNER_CLEAR(io);
+	return ret;
 }
 
 enum iostream_mode {

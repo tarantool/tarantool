@@ -23,8 +23,8 @@ void
 plain_iostream_create(struct iostream *io, int fd)
 {
 	assert(fd >= 0);
+	iostream_clear(io);
 	io->vtab = &plain_iostream_vtab;
-	io->data = NULL;
 	io->fd = fd;
 }
 
