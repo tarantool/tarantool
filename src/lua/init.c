@@ -35,6 +35,7 @@
 #include <libgen.h>
 #endif
 
+#include <assert.h>
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
@@ -88,6 +89,8 @@ luaopen_zlib(lua_State *L);
 LUALIB_API int
 luaopen_zip(lua_State *L);
 #endif
+
+#define MAX_MODNAME 64
 
 /**
  * The single Lua state of the transaction processor (tx) thread.
@@ -424,6 +427,50 @@ static const char *lua_modules_preload[] = {
  * {{{ box Lua library: common functions
  */
 
+/*
+ * Retrieve builtin module sources, if available.
+ */
+static const char *
+tarantool_debug_getsources(const char *modname)
+{
+	for (size_t i = 0; lua_modules[i] != NULL; i += 2) {
+		const char *shortname = lua_modules[i];
+		const char *lua_code = lua_modules[i + 1];
+		assert(lua_code != NULL);
+		assert(strlen(shortname) + sizeof("@builtin/.lua") <=
+			MAX_MODNAME);
+		char fullname[MAX_MODNAME];
+		snprintf(fullname, sizeof(fullname), "@builtin/%s.lua",
+			 shortname);
+		if (!strcmp(shortname, modname) || !strcmp(fullname, modname))
+			return lua_code;
+	}
+	return NULL;
+}
+
+/*
+ * LuaC implementation of a function to retrieve builtin module sources.
+ */
+static int
+lbox_tarantool_debug_getsources(struct lua_State *L)
+{
+	int index = lua_gettop(L);
+	if (index != 1)
+		luaL_error(L, "getsources() function expects one argument");
+	size_t len = 0;
+	const char *modname = luaL_checklstring(L, index, &len);
+	if (len <= 0)
+		goto ret_nil;
+	const char *code = tarantool_debug_getsources(modname);
+	if (code == NULL)
+		goto ret_nil;
+	lua_pushstring(L, code);
+	return 1;
+ret_nil:
+	lua_pushnil(L);
+	return 1;
+}
+
 /**
  * Convert lua number or string to lua cdata 64bit number.
  */
@@ -707,6 +754,13 @@ luaopen_tarantool(lua_State *L)
 	lua_settable(L, -3);
 
 	lua_settable(L, -3);    /* box.info.build */
+
+	/* debug */
+	lua_newtable(L);
+	lua_pushcfunction(L, lbox_tarantool_debug_getsources);
+	lua_setfield(L, -2, "getsources");
+	lua_setfield(L, -2, "debug");
+	lua_pop(L, 1);
 	return 1;
 }
 
@@ -806,7 +860,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	lua_pop(L, 1); /* _PRELOAD */
 
 	luaopen_tarantool(L);
-	lua_pop(L, 1);
 
 	lua_newtable(L);
 	lua_pushinteger(L, -1);
