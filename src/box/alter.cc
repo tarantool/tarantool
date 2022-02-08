@@ -1155,6 +1155,7 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	/* Rebuild index maps once for all indexes. */
 	space_fill_index_map(alter->old_space);
 	space_fill_index_map(alter->new_space);
+
 	/*
 	 * Don't forget about space triggers, foreign keys and
 	 * constraints.

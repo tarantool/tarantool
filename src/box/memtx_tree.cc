@@ -1917,26 +1917,44 @@ memtx_tree_index_new_tpl(struct memtx_engine *memtx, struct index_def *def,
 	return &index->base;
 }
 
+static void
+memtx_tree_choose_type_and_hint(struct index_def *def,
+				memtx_tree_vtab_type *type,
+				bool *use_hint)
+{
+	*type = MEMTX_TREE_VTAB_GENERAL;
+	*use_hint = true; /* Force hints for multikey and func indexes. */
+	if (def->key_def->for_func_index) {
+		if (def->key_def->func_index_func == NULL)
+			*type = MEMTX_TREE_VTAB_DISABLED;
+		else
+			*type = MEMTX_TREE_VTAB_FUNC;
+	} else if (def->key_def->is_multikey) {
+		*type = MEMTX_TREE_VTAB_MULTIKEY;
+	} else {
+		*use_hint = def->opts.hint;
+	}
+}
+
 struct index *
 memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
 	const struct index_vtab *vtab;
-	memtx_tree_vtab_type type = MEMTX_TREE_VTAB_GENERAL;
-	bool use_hint = true; /* Force hints for multikey and func indexes. */
-	if (def->key_def->for_func_index) {
-		if (def->key_def->func_index_func == NULL)
-			type = MEMTX_TREE_VTAB_DISABLED;
-		else
-			type = MEMTX_TREE_VTAB_FUNC;
-	} else if (def->key_def->is_multikey) {
-		type = MEMTX_TREE_VTAB_MULTIKEY;
-	} else {
-		use_hint = def->opts.hint;
-	}
-
+	memtx_tree_vtab_type type;
+	bool use_hint;
+	memtx_tree_choose_type_and_hint(def, &type, &use_hint);
 	vtab = get_memtx_tree_index_vtab(type, true, use_hint);
 	if (use_hint)
 		return memtx_tree_index_new_tpl<true>(memtx, def, vtab);
 	else
 		return memtx_tree_index_new_tpl<false>(memtx, def, vtab);
+}
+
+void
+memtx_tree_index_set_vtab(struct index *index, bool unchanged)
+{
+	memtx_tree_vtab_type type;
+	bool use_hint;
+	memtx_tree_choose_type_and_hint(index->def, &type, &use_hint);
+	index->vtab = get_memtx_tree_index_vtab(type, unchanged, use_hint);
 }

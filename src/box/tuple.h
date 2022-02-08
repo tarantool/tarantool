@@ -612,6 +612,13 @@ tuple_format(struct tuple *tuple)
 	return format;
 }
 
+/** Check that some fields in tuple are compressed */
+static inline bool
+tuple_is_compressed(struct tuple *tuple)
+{
+        return tuple_format(tuple)->is_compressed;
+}
+
 /**
  * Instantiate a new engine-independent tuple from raw MsgPack Array data
  * using runtime arena. Use this function to create a standalone tuple

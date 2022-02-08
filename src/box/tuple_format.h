@@ -185,6 +185,8 @@ struct tuple_format {
 	 * those are never altered. We can also reuse formats exported to Lua.
 	 */
 	bool is_reusable;
+	/** True if tuples of this format may contain compressed fields. */
+	bool is_compressed;
 	/**
 	 * Size of minimal field map of tuple where each indexed
 	 * field has own offset slot (in bytes). The real tuple

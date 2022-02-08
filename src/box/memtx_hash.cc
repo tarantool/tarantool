@@ -644,4 +644,10 @@ memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 	return &index->base;
 }
 
+void
+memtx_hash_index_set_vtab(struct index *index, bool unchanged)
+{
+	index->vtab = get_memtx_hash_index_vtab(unchanged);
+}
+
 /* }}} */
