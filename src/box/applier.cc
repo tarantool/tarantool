@@ -1882,34 +1882,6 @@ applier_thread_data_create(struct applier *applier,
 }
 
 /**
- * Subscribe to the replication stream. Use a separate decoding thread.
- */
-static void
-applier_thread_subscribe(struct applier *applier)
-{
-	struct applier_thread *thread = applier_thread_next();
-
-	if (applier_thread_data_create(applier, thread) != 0)
-		diag_raise();
-
-
-	auto guard = make_scoped_guard([&]{
-		applier_thread_data_destroy(applier);
-	});
-
-	while (true) {
-		if (applier->pending_msg_cnt == 0) {
-			fiber_cond_wait(&applier->msg_cond);
-		}
-		fiber_testcancel();
-		struct applier_msg *msg = applier_thread_msg_take(applier);
-		msg->f(&msg->base);
-	}
-
-	unreachable();
-}
-
-/**
  * Execute and process SUBSCRIBE request (follow updates from a master).
  */
 static void
@@ -2016,12 +1988,25 @@ applier_subscribe(struct applier *applier)
 
 	applier->lag = TIMEOUT_INFINITY;
 
+	/** Attach the applier to a thread. */
+	struct applier_thread *thread = applier_thread_next();
+	if (applier_thread_data_create(applier, thread) != 0)
+		diag_raise();
+	auto thread_guard = make_scoped_guard([&]{
+		applier_thread_data_destroy(applier);
+	});
+
 	/*
 	 * Register triggers to handle WAL writes and rollbacks.
 	 *
 	 * Note we use them for syncronous packets handling as well
 	 * thus when changing make sure that synchro handling won't
 	 * be broken.
+	 *
+	 * Must be done after initializing the thread, because we
+	 * want triggers to be cleared before the applier is detached
+	 * from a thread (i.e. thread_guard must be destroyed before
+	 * trigger_guard).
 	 */
 	struct trigger on_wal_write;
 	trigger_create(&on_wal_write, applier_on_wal_write, applier, NULL);
@@ -2039,7 +2024,15 @@ applier_subscribe(struct applier *applier)
 	/*
 	 * Process a stream of rows from the binary log.
 	 */
-	applier_thread_subscribe(applier);
+	while (true) {
+		if (applier->pending_msg_cnt == 0) {
+			fiber_cond_wait(&applier->msg_cond);
+		}
+		fiber_testcancel();
+		struct applier_msg *msg = applier_thread_msg_take(applier);
+		msg->f(&msg->base);
+	}
+	unreachable();
 }
 
 static inline void
