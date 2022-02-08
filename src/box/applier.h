@@ -117,7 +117,7 @@ struct applier_data_msg {
  */
 struct applier {
 	/** Background fiber */
-	struct fiber *reader;
+	struct fiber *fiber;
 	/** Background fiber to reply with vclock */
 	struct fiber *writer;
 	/** Writer cond. */

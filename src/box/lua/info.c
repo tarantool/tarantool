@@ -99,7 +99,7 @@ lbox_pushapplier(lua_State *L, struct applier *applier)
 	lua_pushstring(L, status);
 	lua_settable(L, -3);
 
-	if (applier->reader) {
+	if (applier->fiber != NULL) {
 		lua_pushstring(L, "lag");
 		lua_pushnumber(L, applier->lag);
 		lua_settable(L, -3);
@@ -121,7 +121,7 @@ lbox_pushapplier(lua_State *L, struct applier *applier)
 		lua_pushlstring(L, name, total);
 		lua_settable(L, -3);
 
-		struct error *e = diag_last_error(&applier->reader->diag);
+		struct error *e = diag_last_error(&applier->fiber->diag);
 		if (e != NULL)
 			lbox_push_replication_error_message(L, e, -1);
 	}
