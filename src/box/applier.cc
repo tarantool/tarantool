@@ -154,6 +154,23 @@ applier_check_sync(struct applier *applier)
 	}
 }
 
+/**
+ * A helper function to create an applier fiber. Basically, it's a wrapper
+ * around fiber_new_xc(), which appends the applier URI to the fiber name and
+ * makes the new fiber joinable. Note, this function creates a new fiber, but
+ * doesn't start it.
+ */
+static struct fiber *
+applier_fiber_new(struct applier *applier, const char *name, fiber_func func)
+{
+	char buf[FIBER_NAME_MAX];
+	int pos = snprintf(buf, sizeof(buf), "%s/", name);
+	uri_format(buf + pos, sizeof(buf) - pos, &applier->uri, false);
+	struct fiber *f = fiber_new_xc(buf, func);
+	fiber_set_joinable(f, true);
+	return f;
+}
+
 /*
  * Fiber function to write vclock to replication master.
  * To track connection status, replica answers master
@@ -1760,8 +1777,8 @@ applier_thread_msgs_init(struct applier *applier)
 static inline void
 applier_thread_fiber_init(struct applier *applier)
 {
-	applier->thread.reader = fiber_new_xc("reader", applier_thread_reader_f);
-	fiber_set_joinable(applier->thread.reader, true);
+	applier->thread.reader = applier_fiber_new(applier, "reader",
+						   applier_thread_reader_f);
 	fiber_start(applier->thread.reader, applier);
 }
 
@@ -1998,13 +2015,8 @@ applier_subscribe(struct applier *applier)
 	if (applier->version_id >= version_id(1, 7, 4)) {
 		/* Enable replication ACKs for newer servers */
 		assert(applier->writer == NULL);
-
-		char name[FIBER_NAME_MAX];
-		int pos = snprintf(name, sizeof(name), "applierw/");
-		uri_format(name + pos, sizeof(name) - pos, &applier->uri, false);
-
-		applier->writer = fiber_new_xc(name, applier_writer_f);
-		fiber_set_joinable(applier->writer, true);
+		applier->writer = applier_fiber_new(applier, "applierw",
+						    applier_writer_f);
 		fiber_start(applier->writer, applier);
 	}
 
@@ -2226,20 +2238,9 @@ reconnect:
 void
 applier_start(struct applier *applier)
 {
-	char name[FIBER_NAME_MAX];
 	assert(applier->fiber == NULL);
-
-	int pos = snprintf(name, sizeof(name), "applier/");
-	uri_format(name + pos, sizeof(name) - pos, &applier->uri, false);
-
-	struct fiber *f = fiber_new_xc(name, applier_f);
-	/**
-	 * So that we can safely grab the status of the
-	 * fiber any time we want.
-	 */
-	fiber_set_joinable(f, true);
-	applier->fiber = f;
-	fiber_start(f, applier);
+	applier->fiber = applier_fiber_new(applier, "applier", applier_f);
+	fiber_start(applier->fiber, applier);
 }
 
 void
