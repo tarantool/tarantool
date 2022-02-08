@@ -209,10 +209,6 @@ applier_writer_f(va_list ap)
 		 */
 		applier_check_sync(applier);
 
-		/* Send ACKs only when in FOLLOW mode ,*/
-		if (applier->state != APPLIER_SYNC &&
-		    applier->state != APPLIER_FOLLOW)
-			continue;
 		try {
 			applier->has_acks_to_send = false;
 			struct xrow_header xrow;
