@@ -570,10 +570,6 @@ index_unref(struct index *index)
 		index_delete(index);
 }
 
-/** Build this index based on the contents of another index. */
-int
-index_build(struct index *index, struct index *pk);
-
 static inline void
 index_commit_create(struct index *index, int64_t signature)
 {
