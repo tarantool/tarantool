@@ -1342,7 +1342,7 @@ applier_on_rollback(struct trigger *trigger, void *event)
 			       diag_last_error(&replicaset.applier.diag));
 	}
 	/* Stop the applier fiber. */
-	fiber_cancel(applier->reader);
+	fiber_cancel(applier->fiber);
 	return 0;
 }
 
@@ -2227,7 +2227,7 @@ void
 applier_start(struct applier *applier)
 {
 	char name[FIBER_NAME_MAX];
-	assert(applier->reader == NULL);
+	assert(applier->fiber == NULL);
 
 	int pos = snprintf(name, sizeof(name), "applier/");
 	uri_format(name + pos, sizeof(name) - pos, &applier->uri, false);
@@ -2238,20 +2238,20 @@ applier_start(struct applier *applier)
 	 * fiber any time we want.
 	 */
 	fiber_set_joinable(f, true);
-	applier->reader = f;
+	applier->fiber = f;
 	fiber_start(f, applier);
 }
 
 void
 applier_stop(struct applier *applier)
 {
-	struct fiber *f = applier->reader;
+	struct fiber *f = applier->fiber;
 	if (f == NULL)
 		return;
 	fiber_cancel(f);
 	fiber_join(f);
 	applier_set_state(applier, APPLIER_OFF);
-	applier->reader = NULL;
+	applier->fiber = NULL;
 }
 
 struct applier *
@@ -2279,7 +2279,7 @@ applier_new(struct uri *uri)
 void
 applier_delete(struct applier *applier)
 {
-	assert(applier->reader == NULL && applier->writer == NULL);
+	assert(applier->fiber == NULL && applier->writer == NULL);
 	assert(!iostream_is_initialized(&applier->io));
 	iostream_ctx_destroy(&applier->io_ctx);
 	ibuf_destroy(&applier->ibuf);
@@ -2292,7 +2292,7 @@ applier_delete(struct applier *applier)
 void
 applier_resume(struct applier *applier)
 {
-	assert(!fiber_is_dead(applier->reader));
+	assert(!fiber_is_dead(applier->fiber));
 	applier->is_paused = false;
 	fiber_cond_signal(&applier->resume_cond);
 }
@@ -2301,7 +2301,7 @@ void
 applier_pause(struct applier *applier)
 {
 	/* Sleep until applier_resume() wake us up */
-	assert(fiber() == applier->reader);
+	assert(fiber() == applier->fiber);
 	assert(!applier->is_paused);
 	applier->is_paused = true;
 	while (applier->is_paused && !fiber_is_cancelled())
@@ -2370,8 +2370,8 @@ applier_wait_for_state(struct applier_on_state *trigger, double timeout)
 		assert(applier->state == APPLIER_OFF ||
 		       applier->state == APPLIER_STOPPED);
 		/* Re-throw the original error */
-		assert(!diag_is_empty(&applier->reader->diag));
-		diag_move(&applier->reader->diag, &fiber()->diag);
+		assert(!diag_is_empty(&applier->fiber->diag));
+		diag_move(&applier->fiber->diag, &fiber()->diag);
 		return -1;
 	}
 	return 0;
