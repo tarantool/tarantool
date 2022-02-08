@@ -136,6 +136,10 @@ applier_log_error(struct applier *applier, struct error *e)
 /**
  * A helper function which switches the applier to FOLLOW state
  * if it has synchronized with its master.
+ *
+ * This function is called from on_commit triggers, where yields
+ * are prohibited. It assumes that APPLIER_FOLLOW triggers don't
+ * yield. (Should we add a separate callback to be called on sync?)
  */
 static inline void
 applier_check_sync(struct applier *applier)
@@ -201,14 +205,6 @@ applier_writer_f(va_list ap)
 				fiber_cond_wait_timeout(&applier->writer_cond,
 							replication_timeout);
 		}
-		/*
-		 * A writer fiber is going to be awaken after a commit or
-		 * a heartbeat message. So this is an appropriate place to
-		 * update an applier status because the applier state could
-		 * yield and doesn't fit into a commit trigger.
-		 */
-		applier_check_sync(applier);
-
 		try {
 			applier->has_acks_to_send = false;
 			struct xrow_header xrow;
@@ -1338,6 +1334,7 @@ applier_on_wal_write(struct trigger *trigger, void *event)
 	(void) event;
 	struct applier *applier = (struct applier *)trigger->data;
 	applier_signal_ack(applier);
+	applier_check_sync(applier);
 	return 0;
 }
 
@@ -1459,6 +1456,7 @@ applier_process_batch(struct cmsg *base)
 			if (applier_handle_raft(applier, txr) != 0)
 				diag_raise();
 			applier_signal_ack(applier);
+			applier_check_sync(applier);
 		} else if (applier_apply_tx(applier, &tx->rows) != 0) {
 			diag_raise();
 		}
