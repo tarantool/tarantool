@@ -538,48 +538,6 @@ index_delete(struct index *index)
 	index_def_delete(def);
 }
 
-int
-index_build(struct index *index, struct index *pk)
-{
-	ssize_t n_tuples = index_size(pk);
-	if (n_tuples < 0)
-		return -1;
-	uint32_t estimated_tuples = n_tuples * 1.2;
-
-	index_begin_build(index);
-	if (index_reserve(index, estimated_tuples) < 0)
-		return -1;
-
-	if (n_tuples > 0) {
-		say_info("Adding %zd keys to %s index '%s' ...",
-			 n_tuples, index_type_strs[index->def->type],
-			 index->def->name);
-	}
-
-	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
-	if (it == NULL)
-		return -1;
-
-	int rc = 0;
-	while (true) {
-		struct tuple *tuple;
-		rc = iterator_next(it, &tuple);
-		if (rc != 0)
-			break;
-		if (tuple == NULL)
-			break;
-		rc = index_build_next(index, tuple);
-		if (rc != 0)
-			break;
-	}
-	iterator_delete(it);
-	if (rc != 0)
-		return -1;
-
-	index_end_build(index);
-	return 0;
-}
-
 struct tuple *
 index_filter_tuple_slow(struct index *index, struct tuple *tuple)
 {
