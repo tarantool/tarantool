@@ -112,6 +112,17 @@ struct applier_data_msg {
 	int tx_cnt;
 };
 
+/** The underlying thread behind a number of appliers. */
+struct applier_thread {
+	struct cord cord;
+	/** The single thread endpoint. */
+	struct cbus_endpoint endpoint;
+	/** A pipe from the applier thread to tx. */
+	struct cpipe tx_pipe;
+	/** A pipe from tx to the applier thread. */
+	struct cpipe thread_pipe;
+};
+
 /**
  * State of a replication connection to the master
  */

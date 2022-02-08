@@ -1356,17 +1356,6 @@ applier_on_rollback(struct trigger *trigger, void *event)
 	return 0;
 }
 
-/** The underlying thread behind a number of appliers. */
-struct applier_thread {
-	struct cord cord;
-	/** The single thread endpoint. */
-	struct cbus_endpoint endpoint;
-	/** A pipe from the applier thread to tx. */
-	struct cpipe tx_pipe;
-	/** A pipe from tx to the applier thread. */
-	struct cpipe thread_pipe;
-};
-
 /**
  * Propagate the exception causing the applier death to tx from applier
  * thread.
