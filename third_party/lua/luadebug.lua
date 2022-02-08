@@ -248,14 +248,34 @@ end
 local SOURCE_CACHE = {}
 
 local function where(info, context_lines)
+    local filesource = info.source
     local source = SOURCE_CACHE[info.source]
     if not source then
         source = {}
-        local filename = info.source:match("@(.*)")
-        if filename then
-            pcall(function() for line in io.lines(filename) do table.insert(source, line) end end)
-        elseif info.source then
-            for line in info.source:gmatch("(.-)\n") do table.insert(source, line) end
+        -- Tarantool builtin module
+        if filesource:match("@builtin/.*.lua") then
+            pcall(function()
+                local tnt_debug = require('tarantool').debug
+                local lua_code = tnt_debug.getsources(filesource)
+
+                for line in string.gmatch(lua_code, "([^\n]*)\n?") do
+                    table.insert(source, line)
+                end
+            end)
+        else
+            -- external module - load file
+            local filename = filesource:match("@(.*)")
+            if filename then
+                pcall(function()
+                    for line in io.lines(filename) do
+                        table.insert(source, line)
+                    end
+                end)
+            elseif filesource then
+                for line in info.source:gmatch("(.-)\n") do
+                    table.insert(filesource, line)
+                end
+            end
         end
         SOURCE_CACHE[info.source] = source
     end
