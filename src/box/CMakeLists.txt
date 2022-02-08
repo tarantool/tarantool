@@ -87,7 +87,7 @@ add_library(xrow STATIC xrow.c iproto_constants.c iproto_features.c)
 target_link_libraries(xrow server core small vclock misc box_error
                       scramble ${MSGPUCK_LIBRARIES})
 
-add_library(tuple STATIC
+set(tuple_sources
     tuple.c
     field_map.c
     tuple_format.c
@@ -109,6 +109,12 @@ add_library(tuple STATIC
     field_def.c
     opt_def.c
 )
+
+if(ENABLE_TUPLE_COMPRESSION)
+    list(APPEND tuple_sources ${TUPLE_COMPRESSION_BOX_SOURCES})
+endif()
+
+add_library(tuple STATIC ${tuple_sources})
 target_link_libraries(tuple json box_error core ${MSGPUCK_LIBRARIES} misc bit coll)
 
 add_library(xlog STATIC xlog.c)

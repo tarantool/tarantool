@@ -282,6 +282,14 @@ extern void
 (*memtx_free)(void *ptr);
 
 /**
+ * Allocate and return new memtx tuple. Data validation depends
+ * on @a validate value. On error returns NULL and set diag.
+ */
+extern struct tuple *
+(*memtx_tuple_new_raw)(struct tuple_format *format, const char *data,
+		       const char *end, bool validate);
+
+/**
  * Returns the size of an allocation done with memtx_alloc.
  * (The size is stored before the data.)
  */
@@ -345,6 +353,19 @@ memtx_index_get(struct index *index, const char *key, uint32_t part_count,
  */
 int
 memtx_iterator_next(struct iterator *it, struct tuple **ret);
+
+/*
+ * Check tuple data correspondence to the space format.
+ * Same as simple tuple_validate function, but can work
+ * with compressed tuples.
+ * @param format Format to which the tuple must match.
+ * @param tuple  Tuple to validate.
+ *
+ * @retval  0 The tuple is valid.
+ * @retval -1 The tuple is invalid.
+ */
+int
+memtx_tuple_validate(struct tuple_format *format, struct tuple *tuple);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -575,3 +575,9 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 	tt_bitset_index_create(&index->index, realloc);
 	return &index->base;
 }
+
+void
+memtx_bitset_index_set_vtab(struct index *index, bool unchanged)
+{
+	index->vtab = get_memtx_bitset_index_vtab(unchanged);
+}

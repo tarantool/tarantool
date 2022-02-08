@@ -463,6 +463,8 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 		field->coll = coll;
 		field->coll_id = cid;
 		field->compression_type = fields[i].compression_type;
+		if (field->compression_type != COMPRESSION_TYPE_NONE)
+			format->is_compressed = true;
 	}
 
 	int current_slot = 0;
@@ -774,6 +776,8 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 	format->engine = engine;
 	format->is_temporary = is_temporary;
 	format->is_reusable = is_reusable;
+	/* This flag is set in `tuple_format_create` function. */
+	format->is_compressed = false;
 	format->exact_field_count = exact_field_count;
 	format->epoch = ++formats_epoch;
 	if (tuple_format_create(format, keys, key_count, space_fields,
