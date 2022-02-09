@@ -40,6 +40,8 @@
 
 #include "coro.h"
 
+#include "trivia/config.h"
+
 #include <stddef.h>
 #include <string.h>
 
@@ -103,13 +105,29 @@ coro_init (void)
 
   coro_transfer (new_coro, create_coro);
 
-#if __GCC_HAVE_DWARF2_CFI_ASM && __amd64
-  asm (".cfi_undefined rip");
-#endif
-
-  func ((void *)arg);
-
-  /* the new coro returned. bad. just abort() for now */
+  __asm__(
+	  /*
+	   * Call-chain ends here: we need to invalidate this frame's return
+	   * address to make unwinding stop here.
+	   * Some nuances on x86_64, see:
+	   * https://github.com/libunwind/libunwind/blob/ec171c9ba7ea3abb2a1383cee2988a7abd483a1f/src/x86_64/Gstep.c#L91-L92
+	   * https://github.com/libunwind/libunwind/blob/ec171c9ba7ea3abb2a1383cee2988a7abd483a1f/src/dwarf/Gparser.c#L877
+	   */
+#ifdef ENABLE_BACKTRACE
+	  ".cfi_undefined rip\n"
+	  ".cfi_undefined rbp\n"
+	  ".cfi_return_column rbp\n"
+  #endif /* ENABLE_BACKTRACE */
+	  "\tmovq %0, %%rdi\n"
+	  "\txorq %%rbp, %%rbp\n"
+	  "\tcallq *%1\n"
+	  :
+	  : "rm" (arg), "rm" (func), "m" (*arg)
+	  : "rbp", "rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11",
+	    "xmm0","xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7",
+	    "xmm8","xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15",
+	    "mm0","mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm6", "st",
+	    "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)");
   abort ();
 }
 # endif
@@ -320,21 +338,32 @@ trampoline (int sig)
          ".fnend\n"
 
        #elif __aarch64__
-
+#ifdef ENABLE_BACKTRACE
          ".cfi_startproc\n"
-         "\tmov x30, #0\n"
-         "\tsub sp, sp, #16\n"
-         "\tstr x30, [sp, #0]\n"
-         ".cfi_def_cfa_offset 16\n"
-         ".cfi_offset 30, -16\n"
+	 /*
+	  * Call-chain ends here: we need to invalidate this frame's return
+	  * address to make unwinding stop here.
+	  * No nuances: AARCH64 has a special link register for storing
+	  * return addresses.
+	  */
+	 ".cfi_undefined x30\n"
          "\tmov x0, x20\n"
          "\tblr x19\n"
-# ifdef __APPLE__
+#ifdef __APPLE__
          "\tb _abort\n"
-# else
+#else /* __APPLE__ */
          "\tb abort\n"
-# endif
+#endif /* __APPLE__ */
          ".cfi_endproc\n"
+#else /* ENABLE_BACKTRACE */
+	 "\tmov x0, x20\n"
+         "\tblr x19\n"
+#ifdef __APPLE__
+         "\tb _abort\n"
+#else /* __APPLE__ */
+         "\tb abort\n"
+#endif /* __APPLE__ */
+#endif /* ENABLE_BACKTRACE */
 
        #else
          #error unsupported architecture
@@ -834,4 +863,3 @@ coro_stack_free (struct coro_stack *stack)
 }
 
 #endif
-

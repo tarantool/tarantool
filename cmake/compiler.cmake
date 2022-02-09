@@ -179,17 +179,6 @@ endif()
 
 add_compile_flags("C;CXX" "-fexceptions" "-funwind-tables")
 
-# We must set -fno-omit-frame-pointer here, since we rely
-# on frame pointer when getting a backtrace, and it must
-# be used consistently across all object files.
-# The same reasoning applies to -fno-stack-protector switch.
-
-if (ENABLE_BACKTRACE)
-    add_compile_flags("C;CXX"
-        "-fno-omit-frame-pointer"
-        "-fno-stack-protector")
-endif()
-
 # In C a global variable without a storage specifier (static/extern) and
 # without an initialiser is called a ’tentative definition’. The
 # language permits multiple tentative definitions in the single
