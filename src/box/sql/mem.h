@@ -139,6 +139,12 @@ mem_is_num(const struct Mem *mem)
 }
 
 static inline bool
+mem_is_date(const struct Mem *mem)
+{
+	return mem->type == MEM_TYPE_DATETIME;
+}
+
+static inline bool
 mem_is_metatype(const struct Mem *mem)
 {
 	return (mem->flags & (MEM_Number | MEM_Scalar | MEM_Any)) != 0;

@@ -797,6 +797,37 @@ func_char(struct sql_context *ctx, int argc, const struct Mem *argv)
 	mem_set_str_allocated(ctx->pOut, str, len);
 }
 
+
+/* FIXME */
+extern int time_token(const char * token_sz, size_t len);
+extern int64_t date_part(const struct datetime *date, int token);
+
+/**
+ * Implementation of the DATE_PART() functions.
+ *
+ */
+static void
+func_date_part(struct sql_context *ctx, int argc, const struct Mem *argv)
+{
+	assert(argc > 1);
+	(void)argc;
+	UNUSED_PARAMETER(ctx);
+	const struct Mem *arg1st = &argv[0];
+	if (mem_is_null(arg1st))
+		return;
+	assert(mem_is_str(arg1st) && arg1st->n >= 0);
+	int token = time_token(arg1st->z, arg1st->n);
+	if (token != 0) {
+		int64_t value = 1;
+		const struct Mem *arg2nd = &argv[1];
+		assert(mem_is_date(arg2nd));
+		value = date_part(&arg2nd->u.date, token);
+		mem_set_int(ctx->pOut, value, value < 0);
+	} else {
+		mem_set_null(ctx->pOut);
+	}
+}
+
 /**
  * Implementation of the GREATEST() and LEAST() functions.
  *
@@ -1656,6 +1687,8 @@ static struct sql_func_dictionary dictionaries[] = {
 	{"CHAR_LENGTH", 1, 1, 0, true, 0, NULL},
 	{"COALESCE", 2, SQL_MAX_FUNCTION_ARG, SQL_FUNC_COALESCE, true, 0, NULL},
 	{"COUNT", 0, 1, SQL_FUNC_AGG, false, 0, NULL},
+	{"DATE_PART", 2, 2, 0, true, 0, NULL},
+	/*{"EXTRACT", 1, 1, 0, true, 0, NULL},*/
 	{"GREATEST", 2, SQL_MAX_FUNCTION_ARG, SQL_FUNC_NEEDCOLL, true, 0, NULL},
 	{"GROUP_CONCAT", 1, 2, SQL_FUNC_AGG, false, 0, NULL},
 	{"HEX", 1, 1, 0, true, 0, NULL},
@@ -1745,6 +1778,8 @@ static struct sql_func_definition definitions[] = {
 	{"COUNT", 1, {field_type_MAX}, FIELD_TYPE_INTEGER, step_count,
 	 fin_count},
 
+	{"DATE_PART", 2, {FIELD_TYPE_STRING, FIELD_TYPE_DATETIME},
+	 FIELD_TYPE_NUMBER, func_date_part, NULL},
 	{"GREATEST", -1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER,
 	 func_greatest_least, NULL},
 	{"GREATEST", -1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE,

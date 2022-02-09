@@ -71,6 +71,137 @@
 #include "datetime.h"
 #include "sqlInt.h"
 
+enum datetime_token {
+	DTK_DATE = 2,
+	DTK_TIME,
+	DTK_TZ,
+	DTK_AGO,
+
+	DTK_EPOCH = 11,
+
+	DTK_DELTA = 17,
+	DTK_SECOND,
+	DTK_MINUTE,
+	DTK_HOUR,
+	DTK_DAY,
+	DTK_WEEK,
+	DTK_MONTH,
+	DTK_QUARTER,
+	DTK_YEAR,
+	DTK_DECADE,
+	DTK_CENTURY,
+	DTK_MILLENNIUM,
+	DTK_MILLISEC,
+	DTK_MICROSEC,
+	DTK_JULIAN,
+
+	DTK_DOW,
+	DTK_DOY,
+	DTK_TZ_HOUR,
+	DTK_TZ_MINUTE,
+	DTK_ISOYEAR,
+	DTK_ISODOW,
+
+	DTK_LAST
+};
+
+struct datetime_token_def {
+	char *token;
+	enum datetime_token value;
+};
+
+/* borrowed from postgres/src/backend/utils/adt/datetime.c */
+static struct datetime_token_def deltatktbl[] = {
+	/* token, type, value */
+	{ "c", DTK_CENTURY }, /* "century" relative */
+	{ "cent", DTK_CENTURY }, /* "century" relative */
+	{ "centuries", DTK_CENTURY }, /* "centuries" relative */
+	{ "century", DTK_CENTURY }, /* "century" relative */
+	{ "d", DTK_DAY }, /* "day"  */
+	{ "day", DTK_DAY }, /* "day" relative */
+	{ "days", DTK_DAY }, /* "days" relative */
+	{ "dow", DTK_DOW }, /* day of week */
+	{ "doy", DTK_DOY }, /* day of year */
+	{ "dec", DTK_DECADE }, /* "decade" relative */
+	{ "decade", DTK_DECADE }, /* "decade" relative */
+	{ "decades", DTK_DECADE }, /* "decades" relative */
+	{ "decs", DTK_DECADE }, /* "decades" relative */
+	{ "epoch", DTK_EPOCH }, /* "epoch" reserved for system epoch time */
+	{ "h", DTK_HOUR }, /* "hour" */
+	{ "hour", DTK_HOUR }, /* "hour" relative */
+	{ "hours", DTK_HOUR }, /* "hours" relative */
+	{ "hr", DTK_HOUR }, /* "hour" relative */
+	{ "hrs", DTK_HOUR }, /* "hours" relative */
+	{ "isodow", DTK_ISODOW }, /* ISO day of week, Sunday == 7 */
+	{ "isoyear", DTK_ISOYEAR }, /* year in terms of the ISO week date */
+	{ "j", DTK_JULIAN },
+	{ "jd", DTK_JULIAN },
+	{ "julian", DTK_JULIAN },
+	{ "m", DTK_MONTH }, /* "month" for ISO input */
+	{ "mm", DTK_MINUTE }, /* "minute" for ISO input */
+	{ "microsecon", DTK_MICROSEC }, /* "microsecond" relative */
+	{ "mil", DTK_MILLENNIUM }, /* "millennium" relative */
+	{ "millennia", DTK_MILLENNIUM }, /* "millennia" relative */
+	{ "millenium", DTK_MILLENNIUM }, /* "millennium" relative */
+	{ "millisecon", DTK_MILLISEC }, /* relative */
+	{ "mils", DTK_MILLENNIUM }, /* "millennia" relative */
+	{ "min", DTK_MINUTE }, /* "minute" relative */
+	{ "mins", DTK_MINUTE }, /* "minutes" relative */
+	{ "minute", DTK_MINUTE }, /* "minute" relative */
+	{ "minutes", DTK_MINUTE }, /* "minutes" relative */
+	{ "mon", DTK_MONTH }, /* "months" relative */
+	{ "mons", DTK_MONTH }, /* "months" relative */
+	{ "month", DTK_MONTH }, /* "month" relative */
+	{ "months", DTK_MONTH },
+	{ "ms", DTK_MILLISEC },
+	{ "msec", DTK_MILLISEC },
+	{ "millisec", DTK_MILLISEC },
+	{ "mseconds", DTK_MILLISEC },
+	{ "msecs", DTK_MILLISEC },
+	{ "qtr", DTK_QUARTER }, /* "quarter" relative */
+	{ "quarter", DTK_QUARTER }, /* "quarter" relative */
+	{ "s", DTK_SECOND }, /* "seconds" for ISO input */
+	{ "sec", DTK_SECOND },
+	{ "second", DTK_SECOND },
+	{ "seconds", DTK_SECOND },
+	{ "secs", DTK_SECOND },
+	{ "timezone", DTK_TZ }, /* "timezone" time offset */
+	{ "timezone_h", DTK_TZ_HOUR }, /* timezone hour units */
+	{ "timezone_m", DTK_TZ_MINUTE }, /* timezone minutes units */
+	{ "us", DTK_MICROSEC }, /* "microsecond" relative */
+	{ "usec", DTK_MICROSEC }, /* "microsecond" relative */
+	{ "microsec", DTK_MICROSEC }, /* "microsecond" relative */
+	{ "useconds", DTK_MICROSEC }, /* "microseconds" relative */
+	{ "usecs", DTK_MICROSEC }, /* "microseconds" relative */
+	{ "w", DTK_WEEK }, /* "week" relative */
+	{ "week", DTK_WEEK }, /* "week" relative */
+	{ "weeks", DTK_WEEK }, /* "weeks" relative */
+	{ "y", DTK_YEAR }, /* "year" relative */
+	{ "year", DTK_YEAR }, /* "year" relative */
+	{ "years", DTK_YEAR }, /* "years" relative */
+	{ "yr", DTK_YEAR }, /* "year" relative */
+	{ "yrs", DTK_YEAR } /* "years" relative */
+};
+
+int
+time_token(const char *token_sz, size_t len)
+{
+	for (size_t i = 0; i < lengthof(deltatktbl); i++) {
+		if (!strncmp(token_sz, deltatktbl[i].token, len))
+			return deltatktbl[i].value;
+	}
+	return 0;
+}
+
+int64_t
+date_part(const struct datetime *date, int token)
+{
+	UNUSED_PARAMETER(date);
+	UNUSED_PARAMETER(token);
+
+	return 1;
+}
+
 bool
 sql_timestamp_parse(struct datetime *date, const char *str, size_t len)
 {
