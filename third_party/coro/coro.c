@@ -103,9 +103,39 @@ coro_init (void)
 
   coro_transfer (new_coro, create_coro);
 
-#if __GCC_HAVE_DWARF2_CFI_ASM && __amd64
-  asm (".cfi_undefined rip");
-#endif
+/*
+ * Call-chain ends here: we need to annotate this frame with CFI assembly to
+ * make unwinding stop here.
+ *
+ * References
+ * glibc:
+ * clone https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/unix/sysv/linux/x86_64/clone.S;h=31ac12da0cc08a934d514fed1de9eba1cb3e8ec5;hb=ebbb8c9f64c3486603ef4ccee4dd2a5574e41039
+ * start https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/x86_64/start.S;h=9edd17b60cd54ec9eef11c76ab02322dcb5d057a;hb=5b736bc9b55115e67129e77db4de6cf193054cd2
+ * seastar: https://github.com/scylladb/seastar/blob/d27bf8b5a14e5b9e9c9df18fd1306489b651aa42/src/core/thread.cc#L278-L293
+ * julia: https://github.com/JuliaLang/julia/blob/2e2b1d2ad50fe12999cbded0b5acd3f0a36ec8c5/src/julia_internal.h#L90-L106
+ * android: https://cs.android.com/android/platform/superproject/+/master:bionic/libc/platform/bionic/macros.h;l=52-60;drc=2528dab7419a63f57fe20027886ba7dd3857aba8
+ */
+#if defined(__clang__) /* clang supports CFI assembly by default */ || \
+    defined(__GNUC__) && defined(__GCC_HAVE_DWARF2_CFI_ASM)
+#if defined(__x86_64__)
+  /*
+   * See https://github.com/libunwind/libunwind/blob/ec171c9ba7ea3abb2a1383cee2988a7abd483a1f/src/x86_64/Gstep.c#L91-L92
+   * and https://github.com/libunwind/libunwind/blob/ec171c9ba7ea3abb2a1383cee2988a7abd483a1f/src/dwarf/Gparser.c#L877.
+   */
+  __asm__("\t.cfi_undefined rip");
+  __asm__("\t.cfi_undefined rbp");
+  __asm__("\t.cfi_return_column rbp");
+#elif defined(__aarch64__)
+  /*
+   * No nuances here: AARCH64 has a special link register for storing
+   * return addresses.
+   */
+  __asm__("\t.cfi_undefined x30");
+#endif /* defined(__x86_64__) */
+#else
+#warning "no compiler support for CFI assembly: backtracing from coro "
+         "fibers may be broken";
+#endif /* defined(__clang__) || defined(__GNUC__) && defined(__GCC_HAVE_DWARF2_CFI_ASM) */
 
   func ((void *)arg);
 
@@ -834,4 +864,3 @@ coro_stack_free (struct coro_stack *stack)
 }
 
 #endif
-
