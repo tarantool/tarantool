@@ -40,6 +40,8 @@
 
 #include "coro.h"
 
+#include "trivia/config.h"
+
 #include <stddef.h>
 #include <string.h>
 
@@ -103,9 +105,20 @@ coro_init (void)
 
   coro_transfer (new_coro, create_coro);
 
-#if __GCC_HAVE_DWARF2_CFI_ASM && __amd64
-  asm (".cfi_undefined rip");
-#endif
+  /*
+   * Call-chain ends here: we need to invalidate this frame's return
+   * address to make unwinding stop here.
+   * Some nuances on x86_64, see:
+   * https://github.com/libunwind/libunwind/blob/ec171c9ba7ea3abb2a1383cee2988a7
+   * abd483a1f/src/x86_64/Gstep.c#L91-L92
+   * https://github.com/libunwind/libunwind/blob/ec171c9ba7ea3abb2a1383cee2988a7
+   * abd483a1f/src/dwarf/Gparser.c#L877
+   */
+#ifdef ENABLE_BACKTRACE
+  __asm__(".cfi_undefined rip\n"
+	  ".cfi_undefined rbp\n"
+	  ".cfi_return_column rbp\n");
+#endif /* ENABLE_BACKTRACE */
 
   func ((void *)arg);
 
@@ -320,21 +333,32 @@ trampoline (int sig)
          ".fnend\n"
 
        #elif __aarch64__
-
+#ifdef ENABLE_BACKTRACE
          ".cfi_startproc\n"
-         "\tmov x30, #0\n"
-         "\tsub sp, sp, #16\n"
-         "\tstr x30, [sp, #0]\n"
-         ".cfi_def_cfa_offset 16\n"
-         ".cfi_offset 30, -16\n"
+	 /*
+	  * Call-chain ends here: we need to invalidate this frame's return
+	  * address to make unwinding stop here.
+	  * No nuances: AARCH64 has a special link register for storing
+	  * return addresses.
+	  */
+	 ".cfi_undefined x30\n"
          "\tmov x0, x20\n"
          "\tblr x19\n"
-# ifdef __APPLE__
+#ifdef __APPLE__
          "\tb _abort\n"
-# else
+#else /* __APPLE__ */
          "\tb abort\n"
-# endif
+#endif /* __APPLE__ */
          ".cfi_endproc\n"
+#else /* ENABLE_BACKTRACE */
+	 "\tmov x0, x20\n"
+         "\tblr x19\n"
+#ifdef __APPLE__
+         "\tb _abort\n"
+#else /* __APPLE__ */
+         "\tb abort\n"
+#endif /* __APPLE__ */
+#endif /* ENABLE_BACKTRACE */
 
        #else
          #error unsupported architecture
@@ -834,4 +858,3 @@ coro_stack_free (struct coro_stack *stack)
 }
 
 #endif
-
