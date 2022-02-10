@@ -35,6 +35,7 @@
 #include "box/sql/sqlLimit.h"
 #include "lua/utils.h"
 #include "lua/trigger.h"
+#include "box/box.h"
 
 extern "C" {
 	#include <lua.h>
@@ -108,6 +109,25 @@ lbox_pop_txn_stmt(struct lua_State *L, int nret, void *event)
 }
 
 /**
+ * Wrapper over lbox_pop_txn_stmt that checks tuple's format.
+ */
+static int
+lbox_pop_txn_stmt_and_check_format(struct lua_State *L, int nret, void *event)
+{
+	struct txn_stmt *stmt = txn_current_stmt((struct txn *) event);
+	struct tuple *tuple = stmt->new_tuple;
+	/*
+	 * Since upgrade from pre-1.7.5 versions passes tuple with not suitable
+	 * format to before_replace triggers during recovery, we need to disable
+	 * format validation until box is configured.
+	 */
+	if (box_is_configured() && tuple != NULL &&
+	    tuple_validate(stmt->space->format, tuple) != 0)
+		return -1;
+	return lbox_pop_txn_stmt(L, nret, event);
+}
+
+/**
  * Set/Reset/Get space.on_replace trigger
  */
 static int
@@ -146,7 +166,8 @@ lbox_space_before_replace(struct lua_State *L)
 	lua_pop(L, 1);
 
 	return lbox_trigger_reset(L, 3, &space->before_replace,
-				  lbox_push_txn_stmt, lbox_pop_txn_stmt);
+				  lbox_push_txn_stmt,
+				  lbox_pop_txn_stmt_and_check_format);
 }
 
 /**
