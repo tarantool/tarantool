@@ -43,6 +43,7 @@
 #include "xrow.h"
 #include "iproto_constants.h"
 #include "schema.h"
+#include "box.h"
 
 int
 access_check_space(struct space *space, user_access_t access)
@@ -293,6 +294,14 @@ space_before_replace(struct space *space, struct txn *txn,
 	case IPROTO_INSERT:
 	case IPROTO_REPLACE:
 	case IPROTO_UPSERT:
+		/*
+		 * Since upgrade from pre-1.7.5 versions passes tuple with
+		 * not suitable format to before_replace triggers during recovery,
+		 * we need to disable format validation until box is configured.
+		 */
+		if (box_is_configured() && tuple_validate_raw(space->format,
+							      request->tuple) != 0)
+			return -1;
 		if (pk == NULL)
 			goto after_old_tuple_lookup;
 		index = pk;
