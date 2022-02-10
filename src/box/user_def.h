@@ -102,7 +102,7 @@ enum priv_type {
 	/* Never granted, but used internally. */
 	PRIV_REVOKE = 16384,
 	/* all bits */
-	PRIV_ALL  = ~((user_access_t) 0),
+	PRIV_ALL  = (user_access_t)(~0),
 };
 
 /**

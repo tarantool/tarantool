@@ -52,9 +52,12 @@ priv_name(user_access_t access)
 		"Grant",
 		"Revoke",
 	};
+	if (access == 0)
+		return "None";
+	else if (access == PRIV_ALL)
+		return "Any";
 	int bit_no = __builtin_ffs((int) access);
-	if (bit_no > 0 && bit_no <= (int) lengthof(priv_name_strs))
-		return priv_name_strs[bit_no - 1];
-	return "Any";
+	assert(bit_no > 0 && bit_no <= (int)lengthof(priv_name_strs));
+	return priv_name_strs[bit_no - 1];
 }
 
