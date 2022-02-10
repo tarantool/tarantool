@@ -15,7 +15,7 @@ _ = s:create_index('value', {parts={{1, type='decimal'}}})
 _ = s:before_replace(trigger)
  | ---
  | ...
-s:replace{'1111.1111'}
+s:delete('1111.1111')
  | ---
  | - error: 'Supplied key type of part 0 does not match index part type: expected decimal'
  | ...
