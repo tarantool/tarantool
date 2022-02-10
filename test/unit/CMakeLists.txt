@@ -294,9 +294,7 @@ target_link_libraries(serializer.test unit box ${LUAJIT_LIBRARIES})
 add_executable(watcher.test watcher.c)
 target_link_libraries(watcher.test unit box)
 
-if (UNWIND_LIBRARY AND HAVE_LIBUNWIND_H AND
-        NOT CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "arm*" AND
-        NOT CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "aarch*")
+if (UNWIND_LIBRARY AND HAVE_LIBUNWIND_H)
     add_executable(backtrace_unw_coro.test
             backtrace_unw_coro.c
             core_test_utils.c)
