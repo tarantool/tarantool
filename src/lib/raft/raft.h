@@ -223,6 +223,8 @@ struct raft {
 	 * elections can be started.
 	 */
 	double death_timeout;
+	/** Maximal deviation from the election timeout. */
+	double max_shift;
 	/** Number of instances registered in the cluster. */
 	int cluster_size;
 	/** Virtual table to perform application-specific actions. */
@@ -324,6 +326,13 @@ raft_cfg_election_quorum(struct raft *raft, int election_quorum);
  */
 void
 raft_cfg_death_timeout(struct raft *raft, double timeout);
+
+/**
+ * Configure maximal random shift from the election timeout. The timeout during
+ * election is randomized as cfg_timeout * (1 + shift).
+ */
+void
+raft_cfg_max_shift(struct raft *raft, double shift);
 
 /**
  * Configure ID of the given Raft instance. The ID can't be changed after it is

@@ -273,7 +273,7 @@ ok 14 - subtests
 ok 15 - subtests
 	*** raft_test_bump_term_before_cfg: done ***
 	*** raft_test_split_vote ***
-    1..58
+    1..64
     ok 1 - elections with a new term
     ok 2 - vote response for 1 from 2
     ok 3 - vote response for 3 from 3
@@ -332,6 +332,12 @@ ok 15 - subtests
     ok 56 - split vote after quorum increase
     ok 57 - bump term
     ok 58 - vote for self
+    ok 59 - bump term
+    ok 60 - vote for self
+    ok 61 - vote response for 2 from 2
+    ok 62 - planned new election after yield
+    ok 63 - vote response for 3 from 3
+    ok 64 - still waiting for yield
 ok 16 - subtests
 	*** raft_test_split_vote: done ***
 	*** main_f: done ***

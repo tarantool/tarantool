@@ -35,11 +35,6 @@
 #include "tt_static.h"
 
 /**
- * Maximal random deviation of the election timeout. From the configured value.
- */
-#define RAFT_RANDOM_ELECTION_FACTOR 0.1
-
-/**
  * When decoding we should never trust that there is
  * a valid data incomes.
  */
@@ -124,10 +119,7 @@ raft_new_random_election_shift(const struct raft *raft)
 {
 	double timeout = raft->election_timeout;
 	/* Translate to ms. Integer is needed to be able to use mod below. */
-	uint32_t rand_part =
-		(uint32_t)(timeout * RAFT_RANDOM_ELECTION_FACTOR * 1000);
-	if (rand_part == 0)
-		rand_part = 1;
+	uint32_t rand_part = (uint32_t)(timeout * raft->max_shift * 1000);
 	/*
 	 * XXX: this is not giving a good distribution, but it is not so trivial
 	 * to implement a correct random value generator. There is a task to
@@ -552,7 +544,7 @@ raft_process_heartbeat(struct raft *raft, uint32_t source)
 	 * anything was heard from the leader. Then in the timer callback check
 	 * the timestamp, and restart the timer, if it is fine.
 	 */
-	assert(raft_ev_is_active(&raft->timer));
+	assert(raft_ev_timer_is_active(&raft->timer));
 	raft_ev_timer_stop(raft_loop(), &raft->timer);
 	raft_sm_wait_leader_dead(raft);
 }
@@ -795,7 +787,7 @@ raft_sm_schedule_new_election_cb(struct ev_loop *loop, struct ev_timer *timer,
 static void
 raft_sm_wait_leader_dead(struct raft *raft)
 {
-	assert(!raft_ev_is_active(&raft->timer));
+	assert(!raft_ev_timer_is_active(&raft->timer));
 	assert(!raft->is_write_in_progress);
 	assert(raft->is_candidate);
 	assert(raft->state == RAFT_STATE_FOLLOWER);
@@ -807,7 +799,7 @@ raft_sm_wait_leader_dead(struct raft *raft)
 static void
 raft_sm_wait_leader_found(struct raft *raft)
 {
-	assert(!raft_ev_is_active(&raft->timer));
+	assert(!raft_ev_timer_is_active(&raft->timer));
 	assert(!raft->is_write_in_progress);
 	assert(raft->is_candidate);
 	assert(raft->state == RAFT_STATE_FOLLOWER);
@@ -819,7 +811,7 @@ raft_sm_wait_leader_found(struct raft *raft)
 static void
 raft_sm_wait_election_end(struct raft *raft)
 {
-	assert(!raft_ev_is_active(&raft->timer));
+	assert(!raft_ev_timer_is_active(&raft->timer));
 	assert(!raft->is_write_in_progress);
 	assert(raft->is_candidate);
 	assert(raft->state == RAFT_STATE_FOLLOWER ||
@@ -841,7 +833,7 @@ static void
 raft_sm_start(struct raft *raft)
 {
 	say_info("RAFT: start state machine");
-	assert(!raft_ev_is_active(&raft->timer));
+	assert(!raft_ev_timer_is_active(&raft->timer));
 	assert(!raft->is_enabled);
 	assert(raft->state == RAFT_STATE_FOLLOWER);
 	raft->is_enabled = true;
@@ -1022,7 +1014,7 @@ raft_cfg_election_timeout(struct raft *raft, double timeout)
 	    raft->is_write_in_progress)
 		return;
 
-	assert(raft_ev_is_active(&raft->timer));
+	assert(raft_ev_timer_is_active(&raft->timer));
 	struct ev_loop *loop = raft_loop();
 	timeout += raft_ev_timer_remaining(loop, &raft->timer) - old_timeout;
 	if (timeout < 0)
@@ -1057,7 +1049,7 @@ raft_cfg_death_timeout(struct raft *raft, double timeout)
 	    raft->leader == 0)
 		return;
 
-	assert(raft_ev_is_active(&raft->timer));
+	assert(raft_ev_timer_is_active(&raft->timer));
 	struct ev_loop *loop = raft_loop();
 	timeout += raft_ev_timer_remaining(loop, &raft->timer) - old_timeout;
 	if (timeout < 0)
@@ -1065,6 +1057,12 @@ raft_cfg_death_timeout(struct raft *raft, double timeout)
 	raft_ev_timer_stop(loop, &raft->timer);
 	raft_ev_timer_set(&raft->timer, timeout, raft->death_timeout);
 	raft_ev_timer_start(loop, &raft->timer);
+}
+
+void
+raft_cfg_max_shift(struct raft *raft, double shift)
+{
+	raft->max_shift = shift;
 }
 
 void
@@ -1138,7 +1136,7 @@ raft_check_split_vote(struct raft *raft)
 		return;
 	if (!raft_has_split_vote(raft))
 		return;
-	assert(raft_ev_is_active(&raft->timer));
+	assert(raft_ev_timer_is_active(&raft->timer));
 	/*
 	 * Could be already detected before. The timeout would be updated by now
 	 * then.
@@ -1175,6 +1173,7 @@ raft_create(struct raft *raft, const struct raft_vtab *vtab)
 		.election_quorum = 1,
 		.election_timeout = 5,
 		.death_timeout = 5,
+		.max_shift = 0.1,
 		.cluster_size = VCLOCK_MAX,
 		.vtab = vtab,
 	};

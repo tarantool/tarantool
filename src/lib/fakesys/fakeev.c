@@ -184,8 +184,9 @@ fakeev_timer_event_delete(struct fakeev_event *e)
 {
 	assert(e->type == FAKEEV_EVENT_TIMER);
 	struct fakeev_timer_event *te = (struct fakeev_timer_event *)e;
-	assert(te->watcher->active == 1);
+	assert(te->watcher->active == 1 || te->watcher->pending == 1);
 	te->watcher->active = 0;
+	te->watcher->pending = 0;
 	mh_int_t rc = mh_i64ptr_find(events_hash, (uint64_t) te->watcher, NULL);
 	assert(rc != mh_end(events_hash));
 	mh_i64ptr_del(events_hash, rc, NULL);
@@ -206,8 +207,11 @@ fakeev_timer_event_process(struct fakeev_event *e, struct ev_loop *loop)
 	struct ev_timer *t = (struct ev_timer *) w;
 	fakeev_timer_event_delete(e);
 	t->at = 0;
+	w->pending = 0;
 	if (t->repeat > 0)
 		fakeev_timer_event_new(w, t->repeat);
+	else
+		w->active = 0;
 	ev_invoke(loop, w, EV_TIMER);
 }
 
@@ -215,13 +219,20 @@ static void
 fakeev_timer_event_new(struct ev_watcher *watcher, double delay)
 {
 	assert(watcher->active == 0);
-	watcher->active = 1;
 	struct fakeev_timer_event *e = malloc(sizeof(*e));
 	assert(e != NULL);
 	fakeev_event_create(&e->base, FAKEEV_EVENT_TIMER, delay,
 			    fakeev_timer_event_process,
 			    fakeev_timer_event_delete);
 	e->watcher = watcher;
+	/*
+	 * In libev 0 timeout without repeat makes the timer not
+	 * active but just pending. To execute only once.
+	 */
+	if (delay > 0)
+		watcher->active = 1;
+	else
+		watcher->pending = 1;
 	assert(fakeev_event_by_ev(watcher) == NULL);
 	struct mh_i64ptr_node_t node = {(uint64_t) watcher, e};
 	mh_i64ptr_put(events_hash, &node, NULL, NULL);

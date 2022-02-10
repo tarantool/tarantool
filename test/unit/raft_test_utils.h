@@ -105,6 +105,7 @@ struct raft_node {
 	double cfg_election_timeout;
 	int cfg_election_quorum;
 	double cfg_death_timeout;
+	double cfg_max_shift;
 	uint32_t cfg_instance_id;
 	int cfg_cluster_size;
 	struct vclock *cfg_vclock;
@@ -248,6 +249,9 @@ raft_node_cfg_election_quorum(struct raft_node *node, int value);
 
 void
 raft_node_cfg_death_timeout(struct raft_node *node, double value);
+
+void
+raft_node_cfg_max_shift(struct raft_node *node, double value);
 
 /** Check that @a msg message matches the given arguments. */
 bool

@@ -193,6 +193,7 @@ raft_node_create(struct raft_node *node)
 	node->cfg_election_timeout = 5;
 	node->cfg_election_quorum = 3;
 	node->cfg_death_timeout = 5;
+	node->cfg_max_shift = 0.1;
 	node->cfg_instance_id = 1;
 	node->cfg_cluster_size = VCLOCK_MAX;
 	node->cfg_vclock = &node->journal.vclock;
@@ -384,6 +385,7 @@ raft_node_cfg(struct raft_node *node)
 	raft_cfg_election_timeout(&node->raft, node->cfg_election_timeout);
 	raft_cfg_election_quorum(&node->raft, node->cfg_election_quorum);
 	raft_cfg_death_timeout(&node->raft, node->cfg_death_timeout);
+	raft_cfg_max_shift(&node->raft, node->cfg_max_shift);
 	raft_cfg_instance_id(&node->raft, node->cfg_instance_id);
 	raft_cfg_cluster_size(&node->raft, node->cfg_cluster_size);
 	raft_cfg_vclock(&node->raft, node->cfg_vclock);
@@ -480,6 +482,16 @@ raft_node_cfg_death_timeout(struct raft_node *node, double value)
 	node->cfg_death_timeout = value;
 	if (raft_node_is_started(node)) {
 		raft_cfg_death_timeout(&node->raft, value);
+		raft_run_async_work();
+	}
+}
+
+void
+raft_node_cfg_max_shift(struct raft_node *node, double value)
+{
+	node->cfg_max_shift = value;
+	if (raft_node_is_started(node)) {
+		raft_cfg_max_shift(&node->raft, value);
 		raft_run_async_work();
 	}
 }

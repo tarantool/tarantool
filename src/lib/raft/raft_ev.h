@@ -52,6 +52,11 @@ raft_loop(void);
 
 #define raft_ev_is_active ev_is_active
 
+#define raft_ev_is_pending ev_is_pending
+
 #define raft_ev_timer_init ev_timer_init
 
 #define raft_ev_timer_set ev_timer_set
+
+#define raft_ev_timer_is_active(w)						\
+	(raft_ev_is_active(w) || raft_ev_is_pending(w))
