@@ -179,3 +179,18 @@ cfg_getarr_elem(const char *name, int i)
 	lua_pop(tarantool_L, 2);
 	return val;
 }
+
+const char *
+cfg_gettable_elem(const char *name, const char *key)
+{
+	cfg_get(name);
+	if (!lua_istable(tarantool_L, -1)) {
+		lua_pop(tarantool_L, 1);
+		return NULL;
+	}
+	lua_pushstring(tarantool_L, key);
+	lua_rawget(tarantool_L, -2);
+	const char *val = cfg_tostring(tarantool_L);
+	lua_pop(tarantool_L, 2);
+	return val;
+}

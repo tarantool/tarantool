@@ -155,6 +155,14 @@ sio_add_to_iov(struct iovec *iov, size_t size)
  */
 const char *sio_socketname(int fd);
 
+/**
+ * Print short socket name in statically allocated buffer.
+ * Preserves the errno. Returns thread-local buffer or NULL
+ * in case of error.
+ */
+const char *
+sio_short_socketname(int fd);
+
 /** Create a TCP or AF_UNIX socket. */
 int sio_socket(int domain, int type, int protocol);
 

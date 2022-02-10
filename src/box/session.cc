@@ -82,6 +82,7 @@ static struct fiber_cond shutdown_list_empty_cond;
 RLIST_HEAD(session_on_connect);
 RLIST_HEAD(session_on_disconnect);
 RLIST_HEAD(session_on_auth);
+RLIST_HEAD(session_on_call);
 
 static inline uint64_t
 sid_max(void)

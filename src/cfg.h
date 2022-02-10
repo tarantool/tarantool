@@ -83,6 +83,13 @@ cfg_getarr_size(const char *name);
 const char *
 cfg_getarr_elem(const char *name, int i);
 
+/**
+ * Return element from box.cfg."name" table by it's @a key
+ * as a string value or nil.
+ */
+const char *
+cfg_gettable_elem(const char *name, const char *key);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

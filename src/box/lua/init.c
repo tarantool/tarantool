@@ -67,6 +67,7 @@
 #include "box/lua/key_def.h"
 #include "box/lua/merger.h"
 #include "box/lua/watcher.h"
+#include "box/lua/audit.h"
 
 #include "mpstream/mpstream.h"
 
@@ -80,6 +81,9 @@ extern char session_lua[],
 	xlog_lua[],
 #if ENABLE_FEEDBACK_DAEMON
 	feedback_daemon_lua[],
+#endif
+#ifdef ENABLE_AUDIT_LOG
+	audit_lua[],
 #endif
 	net_box_lua[],
 	upgrade_lua[],
@@ -97,6 +101,14 @@ static const char *lua_sources[] = {
 	 * from the feedback daemon.
 	 */
 	"box/feedback_daemon", feedback_daemon_lua,
+#endif
+#if ENABLE_AUDIT_LOG
+	/*
+	 * It is important to initialize the audit log before
+	 * load_cfg, because the latter picks up some values
+	 * from the audit log.
+	 */
+	"box/audit", audit_lua,
 #endif
 	"box/upgrade", upgrade_lua,
 	"box/net_box", net_box_lua,
@@ -480,6 +492,8 @@ box_lua_init(struct lua_State *L)
 	box_lua_xlog_init(L);
 	box_lua_sql_init(L);
 	box_lua_watcher_init(L);
+	luaopen_audit(L);
+	lua_pop(L, 1);
 	luaopen_net_box(L);
 	lua_pop(L, 1);
 	tarantool_lua_console_init(L);

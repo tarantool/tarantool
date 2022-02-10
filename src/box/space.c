@@ -49,6 +49,7 @@
 #include "assoc.h"
 #include "constraint_id.h"
 #include "box.h"
+#include "audit.h"
 
 int
 access_check_space(struct space *space, user_access_t access)
@@ -143,6 +144,7 @@ space_create(struct space *space, struct engine *engine,
 	space->index_id_max = index_id_max;
 	rlist_create(&space->before_replace);
 	rlist_create(&space->on_replace);
+	rlist_create(&space->on_select);
 	space->run_triggers = true;
 
 	space->format = format;
@@ -209,6 +211,21 @@ space_create(struct space *space, struct engine *engine,
 	}
 	space->constraint_ids = mh_strnptr_new();
 	rlist_create(&space->memtx_stories);
+	/*
+	 * It is important to mention why we don't set on_replace triggers for
+	 * system spaces here but set it in `sc_space_new` function. The fact
+	 * is that in the `alter_space_do` function we swap triggers of new
+	 * created space and old space. But for space `_space` we do it in
+	 * on_replace trigger `alter_space_on_replace_space`. It is work only
+	 * because this trigger is last of `on_replace` triggers (we call all
+	 * triggers using `rlist_foreach_entry_safe` and if this trigger is
+	 * last we save in `tmp` value pointer to correct value of list head.
+	 * If it is not last we call next trigger and never return to old
+	 * list head, because after swapping we have new list head). For other
+	 * system spaces we set this trigger in `sc_space_new` for consistency.
+	 */
+	if (space->def->id > BOX_SYSTEM_ID_MAX)
+		audit_log_set_space_triggers(space);
 	return 0;
 
 fail_free_indexes:

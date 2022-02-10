@@ -97,6 +97,24 @@ sio_socketname(int fd)
 	return name;
 }
 
+const char *
+sio_short_socketname(int fd)
+{
+	/* Preserve errno */
+	int save_errno = errno;
+	int name_size = SERVICE_NAME_MAXLEN;
+	char *name = static_alloc(name_size);
+
+	struct sockaddr addr;
+	socklen_t addrlen = sizeof(addr);
+	if (sio_getsockname(fd, &addr, &addrlen) != 0 ||
+	    sio_addr_snprintf(name, name_size, &addr, addrlen) < 0)
+		name = NULL;
+
+	errno = save_errno;
+	return name;
+}
+
 /** Get a string representation of a socket option name,
  * for logging.
  */

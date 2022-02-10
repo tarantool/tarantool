@@ -131,6 +131,15 @@ const char *
 priv_name(user_access_t access);
 
 /**
+ * Check that @a privs constain all privileges from @a priv.
+ */
+static inline bool
+are_privs_contain(user_access_t privs, user_access_t priv)
+{
+	return ((privs & priv) == priv);
+}
+
+/**
  * Encapsulates privileges of a user on an object.
  * I.e. "space" object has an instance of this
  * structure for each user.

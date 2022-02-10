@@ -143,6 +143,13 @@ credentials_reset(struct credentials *cr, struct user *new_user)
 	credentials_create(cr, new_user);
 }
 
+/**
+ * Return @a user roles separated by commas in statically
+ * allocated buffer.
+ */
+const char *
+user_roles(struct user *user);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

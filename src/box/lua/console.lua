@@ -28,9 +28,18 @@ local yaml = require('yaml')
 local net_box = require('net.box')
 local box_internal = require('box.internal')
 local help = require('help').help
+local private = require('box.internal')
 
 local DEFAULT_CONNECT_TIMEOUT = 10
 local PUSH_TAG_HANDLE = '!push!'
+
+--
+-- Audit log with default options
+local audit_log
+if private.audit ~= nil then
+    local audit = require('audit')
+    audit_log = audit:new({})
+end
 
 --
 -- Default output handler set to YAML for backward
@@ -380,6 +389,9 @@ local function local_eval(storage, line)
     if not line then
         return nil
     end
+    if audit_log then
+        audit_log:log_eval_console({expr = line})
+    end
     local command = get_command(line)
     if command then
         return preprocess(storage, command)
@@ -556,6 +568,9 @@ end
 --
 local function remote_eval(self, line)
     if line and self.remote.state == 'active' then
+        if audit_log then
+            audit_log:log_eval_console({expr = line})
+        end
         local ok, res = pcall(self.remote.eval, self.remote, line)
         if self.remote.state == 'active' then
             return ok and res or format(false, res)
@@ -854,6 +869,34 @@ local function connect(uri, opts)
     return true
 end
 
+local function connect_console_raw(uri, opts)
+    opts = opts or {}
+
+    local u
+    if uri then
+        u = urilib.parse(tostring(uri))
+    end
+    if u == nil or u.service == nil then
+        error('Usage: console.connect("[login:password@][host:]port")')
+    end
+
+    local remote, err = connect_lua_console(u, opts.timeout)
+    if not remote then
+        log.verbose(err)
+        box.error(box.error.NO_CONNECTION)
+    end
+
+    -- check connection && permissions
+    local ok, res = pcall(remote.eval, remote, 'return true')
+    if not ok then
+        remote:close()
+        error(res)
+    end
+
+    log.info("connected to %s:%s", remote.host, remote.port)
+    return remote
+end
+
 local function client_handler(client, peer)
     session_internal.create(client:fd(), "console")
     session_internal.run_on_connect()
@@ -910,4 +953,5 @@ package.loaded['console'] = {
     on_start = on_start;
     on_client_disconnect = on_client_disconnect;
     completion_handler = internal.completion_handler;
+    connect_console_raw = connect_console_raw
 }

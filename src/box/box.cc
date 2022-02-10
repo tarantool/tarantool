@@ -1246,6 +1246,22 @@ box_check_txn_timeout(void)
 	return timeout;
 }
 
+/** Check that audit log format is correct. */
+static int
+box_check_audit_format(void)
+{
+	const char *format = cfg_gets("audit_format");
+	assert(format != NULL);
+	if (strcmp(format, "json") != 0 && strcmp(format, "csv") != 0 &&
+	    strcmp(format, "plain") != 0) {
+		diag_set(ClientError, ER_CFG, "audit_format",
+			 tt_sprintf("must be json, csv or plain, "
+				    "but was set to %s", format));
+		return -1;
+	}
+	return 0;
+}
+
 void
 box_check_config(void)
 {
@@ -1292,6 +1308,8 @@ box_check_config(void)
 	if (box_check_sql_cache_size(cfg_geti("sql_cache_size")) != 0)
 		diag_raise();
 	if (box_check_txn_timeout() < 0)
+		diag_raise();
+	if (box_check_audit_format() != 0)
 		diag_raise();
 }
 
@@ -2365,6 +2383,16 @@ box_select(uint32_t space_id, uint32_t index_id,
 	if (it == NULL) {
 		txn_rollback_stmt(txn);
 		return -1;
+	}
+
+	if (space->run_triggers && !rlist_empty(&space->on_select)) {
+		struct audit_event_ctx ctx;
+		ctx.code = SPACE_SELECT;
+		ctx.space_event.space = space->def->name;
+		if (trigger_run(&space->on_select, &ctx) != 0) {
+			txn_rollback_stmt(txn);
+			return -1;
+		}
 	}
 
 	int rc = 0;
@@ -3658,6 +3686,10 @@ box_cfg_xc(void)
 	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);
 
+	if (audit_log_init(cfg_gets("audit_log"), cfg_geti("audit_nonblock"),
+			   cfg_gets("audit_format")) != 0)
+		diag_raise();
+
 	gc_init();
 	engine_init();
 	schema_init();
@@ -3773,8 +3805,6 @@ box_cfg_xc(void)
 
 	/* Follow replica */
 	replicaset_follow();
-
-	audit_log_init(cfg_gets("audit_log"), cfg_geti("audit_nonblock"));
 
 	fiber_gc();
 	is_box_configured = true;

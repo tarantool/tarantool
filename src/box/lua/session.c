@@ -62,6 +62,13 @@ lbox_session_create(struct lua_State *L)
 	session_set_type(session, STR2ENUM(session_type,
 					   luaL_optstring(L, 2, "console")));
 
+	if (session->type == SESSION_TYPE_BINARY ||
+	    session->type == SESSION_TYPE_CONSOLE) {
+		const char *addr = sio_short_socketname(session->meta.fd);
+		if (addr == NULL)
+			return luaT_error(L);
+		strcpy(session->meta.addr, addr);
+	}
 	lua_pushnumber(L, session->id);
 	return 1;
 }

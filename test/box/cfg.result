@@ -15,7 +15,68 @@ box.cfg.nosuchoption = 1
  | ...
 cfg_filter(box.cfg)
  | ---
- | - - - audit_nonblock
+ | - - - audit_filter
+ |     - - - access_denied
+ |         - 'true'
+ |       - - audit_enabled
+ |         - 'false'
+ |       - - auth_user
+ |         - 'true'
+ |       - - call
+ |         - 'false'
+ |       - - close_connect
+ |         - 'true'
+ |       - - custom
+ |         - 'false'
+ |       - - eval
+ |         - 'false'
+ |       - - eval_console
+ |         - 'false'
+ |       - - message
+ |         - 'false'
+ |       - - no_auth_user
+ |         - 'true'
+ |       - - open_connect
+ |         - 'true'
+ |       - - password_changed
+ |         - 'true'
+ |       - - role_created
+ |         - 'true'
+ |       - - role_deleted
+ |         - 'true'
+ |       - - role_grant_rights
+ |         - 'true'
+ |       - - role_revoke_rights
+ |         - 'true'
+ |       - - space_delete
+ |         - 'false'
+ |       - - space_get
+ |         - 'false'
+ |       - - space_insert
+ |         - 'false'
+ |       - - space_replace
+ |         - 'false'
+ |       - - space_select
+ |         - 'false'
+ |       - - space_update
+ |         - 'false'
+ |       - - space_upsert
+ |         - 'false'
+ |       - - user_created
+ |         - 'true'
+ |       - - user_deleted
+ |         - 'true'
+ |       - - user_disabled
+ |         - 'true'
+ |       - - user_enabled
+ |         - 'true'
+ |       - - user_grant_rights
+ |         - 'true'
+ |       - - user_revoke_rights
+ |         - 'true'
+ |   - - audit_format
+ |     - csv
+ |   - - audit_nonblock
  |     - true
  |   - - background
  |     - false
@@ -146,7 +207,68 @@ box.cfg()
  | ...
 cfg_filter(box.cfg)
  | ---
- | - - - audit_nonblock
+ | - - - audit_filter
+ |     - - - access_denied
+ |         - 'true'
+ |       - - audit_enabled
+ |         - 'false'
+ |       - - auth_user
+ |         - 'true'
+ |       - - call
+ |         - 'false'
+ |       - - close_connect
+ |         - 'true'
+ |       - - custom
+ |         - 'false'
+ |       - - eval
+ |         - 'false'
+ |       - - eval_console
+ |         - 'false'
+ |       - - message
+ |         - 'false'
+ |       - - no_auth_user
+ |         - 'true'
+ |       - - open_connect
+ |         - 'true'
+ |       - - password_changed
+ |         - 'true'
+ |       - - role_created
+ |         - 'true'
+ |       - - role_deleted
+ |         - 'true'
+ |       - - role_grant_rights
+ |         - 'true'
+ |       - - role_revoke_rights
+ |         - 'true'
+ |       - - space_delete
+ |         - 'false'
+ |       - - space_get
+ |         - 'false'
+ |       - - space_insert
+ |         - 'false'
+ |       - - space_replace
+ |         - 'false'
+ |       - - space_select
+ |         - 'false'
+ |       - - space_update
+ |         - 'false'
+ |       - - space_upsert
+ |         - 'false'
+ |       - - user_created
+ |         - 'true'
+ |       - - user_deleted
+ |         - 'true'
+ |       - - user_disabled
+ |         - 'true'
+ |       - - user_enabled
+ |         - 'true'
+ |       - - user_grant_rights
+ |         - 'true'
+ |       - - user_revoke_rights
+ |         - 'true'
+ |   - - audit_format
+ |     - csv
+ |   - - audit_nonblock
  |     - true
  |   - - background
  |     - false

@@ -39,6 +39,7 @@
 #include "scoped_guard.h"
 #include "sequence.h"
 #include "tt_static.h"
+#include <trivia/util.h>
 
 struct universe universe;
 static struct user users[BOX_USER_MAX];
@@ -181,6 +182,33 @@ user_destroy(struct user *user)
 	region_destroy(&user->pool);
 	free(user->def);
 	memset(user, 0, sizeof(*user));
+}
+
+/**
+ * Print @a user roles separated by commas in @a buf.
+ * Return total number of written bytes.
+ */
+static inline int
+user_roles_impl(struct user *user, char *buf, int len)
+{
+	int total = 0;
+	char *tmp = buf;
+	struct user_map_iterator it;
+	user_map_iterator_init(&it, &user->roles);
+	struct user *role;
+	while ((role = user_map_iterator_next(&it)))
+		SNPRINT(total, snprintf, tmp, len, "%s,", role->def->name);
+	if (total > 0) {
+		buf[--total] = '\0';
+	}
+	return total;
+}
+
+const char *
+user_roles(struct user *user)
+{
+	char *tmp = tt_static_buf();
+	return user_roles_impl(user, tmp, TT_STATIC_BUF_LEN) > 0 ? tmp : NULL;
 }
 
 /**

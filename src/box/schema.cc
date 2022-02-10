@@ -40,6 +40,7 @@
 #include "fiber.h"
 #include "memtx_tx.h"
 #include "txn.h"
+#include "audit.h"
 
 /**
  * @module Data Dictionary
@@ -307,6 +308,7 @@ sc_space_new(uint32_t id, const char *name,
 	struct trigger *t = (struct trigger *) malloc(sizeof(*t));
 	trigger_create(t, on_replace_dd_system_space, NULL, (trigger_f0) free);
 	trigger_add(&space->on_replace, t);
+	audit_log_set_space_triggers(space);
 	/*
 	 * Data dictionary spaces are fully built since:
 	 * - they contain data right from the start

@@ -37,6 +37,7 @@
 #include "user.h"
 #include "authentication.h"
 #include "iproto_features.h"
+#include "sio.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -87,6 +88,8 @@ struct session_meta {
 		/** Console file/socket descriptor. */
 		int fd;
 	};
+	/** Network address for iproto connection. */
+	char addr[SERVICE_NAME_MAXLEN];
 	/** Console output format. */
 	enum output_format output_format;
 	/** IPROTO client features. */
@@ -186,6 +189,9 @@ session_find(uint64_t sid);
 extern struct rlist session_on_connect;
 
 extern struct rlist session_on_auth;
+
+/** Trigger fired before iproto call or eval. */
+extern struct rlist session_on_call;
 
 /**
  * Get the current session from @a fiber
@@ -388,6 +394,12 @@ static inline int
 session_sync(struct session *session)
 {
 	return session->vtab->sync(session);
+}
+
+static inline const char *
+session_addr(struct session *session)
+{
+	return session->meta.addr;
 }
 
 /**

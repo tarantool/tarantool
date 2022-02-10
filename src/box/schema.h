@@ -238,6 +238,8 @@ struct on_access_denied_ctx {
 	const char *object_type;
 	/** Name of object the required access was denied to */
 	const char *object_name;
+	/** User the required access was denied to */
+	const char *user;
 };
 
 /** Global grants to classes of objects. */

@@ -39,6 +39,7 @@
 #include "rmean.h"
 #include "info/info.h"
 #include "memtx_tx.h"
+#include "audit.h"
 
 /* {{{ Utilities. **********************************************/
 
@@ -243,6 +244,15 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 	struct txn_ro_savepoint svp;
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
 		return -1;
+	if (space->run_triggers && !rlist_empty(&space->on_select)) {
+		struct audit_event_ctx ctx;
+		ctx.code = SPACE_GET;
+		ctx.space_event.space = space->def->name;
+		if (trigger_run(&space->on_select, &ctx) != 0) {
+			txn_rollback_stmt(txn);
+			return -1;
+		}
+	}
 	if (index_get(index, key, part_count, result) != 0) {
 		txn_rollback_stmt(txn);
 		return -1;

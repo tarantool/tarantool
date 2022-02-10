@@ -14,6 +14,9 @@ lua_source(lua_sources lua/session.lua session_lua)
 if (ENABLE_FEEDBACK_DAEMON)
     lua_source(lua_sources lua/feedback_daemon.lua feedback_daemon_lua)
 endif()
+if (ENABLE_AUDIT_LOG)
+    lua_source(lua_sources ${AUDIT_LOG_LUA_SOURCES} audit_lua)
+endif()
 lua_source(lua_sources lua/net_box.lua net_box_lua)
 lua_source(lua_sources lua/upgrade.lua upgrade_lua)
 lua_source(lua_sources lua/console.lua console_lua)
@@ -231,8 +234,6 @@ set(box_sources
 
 if(ENABLE_AUDIT_LOG)
     list(APPEND box_sources ${AUDIT_LOG_SOURCES})
-else()
-    list(APPEND box_sources audit.c)
 endif()
 
 add_library(box STATIC ${box_sources})

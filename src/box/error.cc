@@ -278,7 +278,8 @@ AccessDeniedError::AccessDeniedError(const char *file, unsigned int line,
 	error_format_msg(this, tnt_errcode_desc(code),
 			 access_type, object_type, object_name, user_name);
 
-	struct on_access_denied_ctx ctx = {access_type, object_type, object_name};
+	struct on_access_denied_ctx ctx = {access_type, object_type,
+					   object_name, user_name};
 	/*
 	 * Don't run the triggers when create after marshaling
 	 * through network.

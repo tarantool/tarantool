@@ -31,9 +31,83 @@ local function ifdef_feedback(value)
     return private.feedback_daemon ~= nil and value or nil
 end
 
+--
+-- When audit log is disabled, every single mentioning of it should
+-- be eliminated. Even box.cfg{} should not accept any 'audit_*'
+-- parameters as valid. This is why they are set to nil, when the
+-- audit log does not exist.
+--
+local function ifdef_audit(value)
+    return private.audit ~= nil and value or nil
+end
+
 local ifdef_feedback_set_params =
     private.feedback_daemon ~= nil and
     private.feedback_daemon.set_feedback_params or nil
+
+local function normalize_audit_filter(audit_filter)
+    local event_filters = {
+        ["eval"] = true, ["call"] = true,
+        ["eval_console"] = true, ["audit_enabled"] = true,
+        ["space_select"] = true, ["space_insert"] = true,
+        ["space_replace"] = true, ["space_update"] = true,
+        ["space_upsert"] = true, ["space_delete"] = true,
+        ["space_get"] = true, ["auth_user"] = true,
+        ["no_auth_user"] = true, ["open_connect"] = true,
+        ["close_connect"] = true, ["user_created"] = true,
+        ["user_deleted"] = true, ["role_created"] = true,
+        ["role_deleted"] = true, ["user_enabled"] = true,
+        ["user_disabled"] = true, ["user_grant_rights"] = true,
+        ["role_grant_rights"] = true, ["user_revoke_rights"] = true,
+        ["role_revoke_rights"] = true, ["password_changed"] = true,
+        ["access_denied"] = true, ["custom"] = true, ["message"] = true,
+    }
+    local event_group_filters = {
+        ["data_operations"] = {
+            ["space_select"] = true, ["space_insert"] = true,
+            ["space_replace"] = true, ["space_update"] = true,
+            ["space_upsert"] = true, ["space_delete"] = true,
+            ["space_get"] = true,
+        },
+        ["compatibility"] = {
+            ["auth_user"] = true, ["no_auth_user"] = true,
+            ["open_connect"] = true, ["close_connect"] = true,
+            ["user_created"] = true, ["user_deleted"] = true,
+            ["role_created"] = true, ["role_deleted"] = true,
+            ["user_enabled"] = true, ["user_disabled"] = true,
+            ["user_grant_rights"] = true, ["role_grant_rights"] = true,
+            ["user_revoke_rights"] = true, ["role_revoke_rights"] = true,
+            ["password_changed"] = true, ["access_denied"] = true,
+        },
+        ["audit"] = {
+            ["audit_enabled"] = true
+        },
+        ["custom"] = {
+            ["custom"] = true,
+        },
+        ["all"] = event_filters,
+    }
+
+    local filters = {}
+    for _, filter in pairs(audit_filter) do
+        if event_filters[filter] then
+            filters[filter] = true
+        elseif event_group_filters[filter] then
+            for key, _ in pairs(event_group_filters[filter]) do
+                filters[key] = true
+            end
+        elseif string.find(filter, "^custom_") then
+            filters[filter] = true
+        else
+            box.error(box.error.CFG, 'audit_filter' , "unexpected value")
+        end
+    end
+    local rc = {}
+    for k, _ in pairs(event_filters) do
+        rc[k] = tostring(filters[k] or false)
+    end
+    return rc
+end
 
 -- all available options
 local default_cfg = {
@@ -69,6 +143,8 @@ local default_cfg = {
 
     audit_log           = nil,
     audit_nonblock      = true,
+    audit_format        = 'csv',
+    audit_filter        = normalize_audit_filter({'compatibility'}),
 
     io_collect_interval = nil,
     readahead           = 16320,
@@ -178,8 +254,10 @@ local template_cfg = {
     log_level           = 'module',
     log_format          = 'module',
 
-    audit_log           = 'string',
-    audit_nonblock      = 'boolean',
+    audit_log           = ifdef_audit('string'),
+    audit_nonblock      = ifdef_audit('boolean'),
+    audit_format        = ifdef_audit('string'),
+    audit_filter        = ifdef_audit('table'),
 
     io_collect_interval = 'number',
     readahead           = 'number',
@@ -237,6 +315,7 @@ end
 -- options that require special handling
 local modify_cfg = {
     replication        = normalize_uri_list_for_replication,
+    audit_filter       = normalize_audit_filter,
 }
 
 local function purge_password_from_uri(uri)

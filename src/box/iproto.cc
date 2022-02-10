@@ -2098,6 +2098,9 @@ tx_process_call(struct cmsg *m)
 
 	int rc;
 	struct port port;
+	if (!rlist_empty(&session_on_call) &&
+	    trigger_run(&session_on_call, &msg->call) != 0)
+		goto error;
 
 	switch (msg->header.type) {
 	case IPROTO_CALL:
@@ -2521,6 +2524,10 @@ tx_process_connect(struct cmsg *m)
 		if (con->session == NULL)
 			diag_raise();
 		con->session->meta.connection = con;
+		const char *addr = sio_short_socketname(con->io.fd);
+		if (addr == NULL)
+			diag_raise();
+		strcpy(con->session->meta.addr, addr);
 		iproto_features_create(&con->session->meta.features);
 		tx_fiber_init(con->session, 0);
 		char *greeting = (char *) static_alloc(IPROTO_GREETING_SIZE);
