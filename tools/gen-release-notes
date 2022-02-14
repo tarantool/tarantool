@@ -12,8 +12,8 @@ import subprocess
 # {{{ Redefinitions
 
 # Ensure certain order for known sections.
-SECTIONS_TOP = ['core', 'memtx', 'vinyl', 'replication', 'swim', 'raft',
-                'luajit', 'lua', 'sql']
+SECTIONS_TOP = ['enterprise', 'core', 'memtx', 'vinyl', 'replication', 'swim',
+                'raft', 'luajit', 'lua', 'sql']
 SECTIONS_BOTTOM = ['build', 'testing', 'misc']
 
 # Prettify headers, apply the ordering.
@@ -157,6 +157,16 @@ def popen(cmdline):
         raise RuntimeError("Unable to find '{}' executable: {}".format(
             cmdline[0], str(e)))
 
+
+def git_superproject_dir(source_dir):
+    """ Return the absolute path of the root of the superproject’s tree that
+        uses the given repository as its submodule. If the repository isn't
+        used as a submodule, returns none.
+    """
+    with popen(['git', '-C', source_dir, 'rev-parse',
+                '--show-superproject-working-tree']) as process:
+        return process.stdout.read().rstrip() or None
+
 # }}} Helpers
 
 
@@ -171,6 +181,9 @@ def changelog_dirs():
     script_dir = os.path.dirname(script_file)
     source_dir = os.path.dirname(script_dir)
     res.append(os.path.join(source_dir, 'changelogs', 'unreleased'))
+    superproject_dir = git_superproject_dir(source_dir)
+    if superproject_dir:
+        res.append(os.path.join(superproject_dir, 'changelogs', 'unreleased'))
     return res
 
 
