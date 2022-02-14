@@ -109,7 +109,7 @@ add_library(tuple STATIC
     field_def.c
     opt_def.c
 )
-target_link_libraries(tuple json box_error core ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES} misc bit)
+target_link_libraries(tuple json box_error core ${MSGPUCK_LIBRARIES} misc bit coll)
 
 add_library(xlog STATIC xlog.c)
 target_link_libraries(xlog core box_error crc32 ${ZSTD_LIBRARIES})
