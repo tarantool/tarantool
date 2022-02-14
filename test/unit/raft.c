@@ -583,7 +583,7 @@ raft_test_vote_skip(void)
 static void
 raft_test_leader_resign(void)
 {
-	raft_start_test(23);
+	raft_start_test(24);
 	struct raft_node node;
 
 	/*
@@ -622,8 +622,10 @@ raft_test_leader_resign(void)
 	/* Multiple candidate reset won't break anything. */
 	raft_node_cfg_is_candidate(&node, false);
 
+	int update_count = node.update_count;
 	is(raft_node_send_follower(&node, 1, 2), 0, "message is accepted");
 	is(node.raft.leader, 0, "leader has resigned");
+	is(node.update_count, update_count + 1, "resign makes a broadcast");
 
 	raft_run_for(node.cfg_death_timeout * 2);
 
