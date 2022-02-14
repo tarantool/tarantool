@@ -134,16 +134,13 @@ all the new features of the 1.10.x series.
 # }}} Templates
 
 
-# {{{ Collecting
+# {{{ Helpers
 
-def changelog_entries_sorted(entries_dir):
-    """ Acquire order of appearance from ```git log``.
-
-        Misses uncommitted entries and contains files that were
-        deleted.
+def popen(cmdline):
+    """ Wrapper around Popen.subprocess() that redirects the output to a pipe,
+        correctly handles encoding and raises a RuntimeError if the executable
+        was not found. Works on both Python 2 and 3.
     """
-    cmdline = ['git', '-C', entries_dir, 'log', '--reverse', '--pretty=',
-               '--name-only', '--relative']
     popen_kwargs = {
         'stdout': subprocess.PIPE,
     }
@@ -154,19 +151,32 @@ def changelog_entries_sorted(entries_dir):
         global FileNotFoundError
         FileNotFoundError = OSError
 
+    try:
+        return subprocess.Popen(cmdline, **popen_kwargs)
+    except FileNotFoundError as e:
+        raise RuntimeError("Unable to find '{}' executable: {}".format(
+            cmdline[0], str(e)))
+
+# }}} Helpers
+
+
+# {{{ Collecting
+
+def changelog_entries_sorted(entries_dir):
+    """ Acquire order of appearance from ```git log``.
+
+        Misses uncommitted entries and contains files that were
+        deleted.
+    """
     processed = set()
     res = []
-    try:
-        process = subprocess.Popen(cmdline, **popen_kwargs)
+    with popen(['git', '-C', entries_dir, 'log', '--reverse', '--pretty=',
+                '--name-only', '--relative']) as process:
         for line in process.stdout:
             entry_file = line.rstrip()
             if entry_file not in processed and entry_file.endswith('.md'):
                 processed.add(entry_file)
                 res.append(os.path.join(entries_dir, entry_file))
-        process.wait()
-    except FileNotFoundError as e:
-        raise RuntimeError("Unable to find '{}' executable: {}".format(
-            cmdline[0], str(e)))
     return res
 
 
