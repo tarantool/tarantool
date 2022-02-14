@@ -352,11 +352,7 @@ trampoline (int sig)
        #elif __aarch64__
 
          ".cfi_startproc\n"
-         "\tmov x30, #0\n"
-         "\tsub sp, sp, #16\n"
-         "\tstr x30, [sp, #0]\n"
-         ".cfi_def_cfa_offset 16\n"
-         ".cfi_offset 30, -16\n"
+         ".cfi_undefined x30\n"
          "\tmov x0, x20\n"
          "\tblr x19\n"
 # ifdef __APPLE__

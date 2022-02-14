@@ -66,15 +66,12 @@ test_unw()
 	unw_init_local(&unw_cur, &unw_ctx);
 	fail_if(unw_get_proc_name(&unw_cur, proc_name,
 				  sizeof(proc_name), &offset) != 0);
-	note("TOP %s", proc_name);
 	while (unw_step(&unw_cur) > 0) {
 		// `proc_name` and `offset` may differ under different systems.
 		fail_if(unw_get_proc_name(&unw_cur, proc_name,
 					  sizeof(proc_name), &offset) != 0);
 	}
-	note("BOTTOM %s", proc_name);
 
-	coro_transfer(&parent_ctx, &child_ctx);
 	coro_destroy(&parent_ctx);
 	coro_destroy(&child_ctx);
 	coro_stack_free(&co_stk);

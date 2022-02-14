@@ -363,6 +363,9 @@ backtrace_add_rip(struct backtrace *bt, struct fiber *fiber,
  * @returns @a stack
  * @sa backtrace_collect
  */
+#ifdef __x86_64__
+__attribute__ ((force_align_arg_pointer))
+#endif /* __x86_64__ */
 static void * NOINLINE
 backtrace_collect_local(struct backtrace *bt, struct fiber *fiber,
 			void *stack) {
@@ -462,9 +465,11 @@ __asm__ volatile(
 	"\tmovq 24(%%rsp), %%r12\n"
 	"\tmovq 32(%%rsp), %%rbx\n"
 	"\tmovq 40(%%rsp), %%rbp\n"
-	"\tandq $0xfffffffffffffff0, %%rsp\n"
+	".cfi_remember_state\n"
+	".cfi_def_cfa %%rsp, 8 * 7\n"
 	"\tleaq %P4(%%rip), %%rax\n"
 	"\tcall *%%rax\n"
+	".cfi_restore_state\n"
 	/* Restore old sp and context */
 	"\tmov %%rax, %%rsp\n"
 	"\tpopq %%r15\n"
@@ -580,7 +585,12 @@ __asm__ volatile(
 	"\tldp d12, d13, [x3, #16 * 8]\n"
 	"\tldp d14, d15, [x3, #16 * 9]\n"
 	"\tmov sp, x3\n"
+	".cfi_remember_state\n"
+	".cfi_def_cfa sp, 16 * 10\n"
+	".cfi_offset x29, -16 * 5\n"
+	".cfi_offset x30, -16 * 5 + 8\n"
 	"\tbl %4\n"
+	".cfi_restore_state\n"
 	/* Restore context (old sp in x0) */
 	"\tldp x19, x20, [x0, #16 * 0]\n"
 	"\tldp x21, x22, [x0, #16 * 1]\n"

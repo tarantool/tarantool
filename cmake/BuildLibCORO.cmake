@@ -20,4 +20,3 @@ macro(libcoro_build)
 
     unset(coro_src)
 endmacro(libcoro_build)
-

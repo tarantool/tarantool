@@ -138,12 +138,9 @@ test_unw()
 	fail_unless(data.rip_cnt > 2);
 	fail_if(rip_get_proc_name(data.rip_buf[1], proc_name,
 				  sizeof(proc_name)) != 0);
-	note("TOP %s", proc_name);
 	fail_if(rip_get_proc_name(data.rip_buf[data.rip_cnt - 1], proc_name,
 				  sizeof(proc_name)) != 0);
-	note("BOTTOM %s", proc_name);
 
-	coro_transfer(&parent_ctx, &child_ctx);
 	coro_destroy(&parent_ctx);
 	coro_destroy(&child_ctx);
 	coro_stack_free(&co_stk);

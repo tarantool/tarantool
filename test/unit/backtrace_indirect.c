@@ -14,6 +14,9 @@ struct data {
 	int csw;
 };
 
+#ifdef __x86_64__
+__attribute__ ((force_align_arg_pointer))
+#endif /* __x86_64__ */
 static void * NOINLINE
 rip_getcontext(void **rip_buf, int *rip_cnt, void *stack)
 {
@@ -69,16 +72,17 @@ baz(struct data *data)
 	bar(data);
 }
 
-static void
+static void NOINLINE
 co_fnc(void *arg)
 {
 	struct data *data = arg;
 	baz(data);
 }
 
-static void
+static void NOINLINE
 co_backtrace(void *rip_buf[], int *rip_cnt, struct coro_context *coro_ctx)
 {
+#if __x86_64__
 	__asm__ volatile(
 	/* Preserve current context */
 	"\tpushq %%rbp\n"
@@ -101,9 +105,11 @@ co_backtrace(void *rip_buf[], int *rip_cnt, struct coro_context *coro_ctx)
 	"\tmovq 24(%%rsp), %%r12\n"
 	"\tmovq 32(%%rsp), %%rbx\n"
 	"\tmovq 40(%%rsp), %%rbp\n"
-	"\tandq $0xfffffffffffffff0, %%rsp\n"
+	".cfi_remember_state\n"
+	"\t.cfi_def_cfa %%rsp, 8 * 7\n"
 	"\tleaq %P4(%%rip), %%rax\n"
 	"\tcall *%%rax\n"
+	".cfi_restore_state\n"
 	/* Restore old sp and context */
 	"\tmov %%rax, %%rsp\n"
 	"\tpopq %%r15\n"
@@ -116,6 +122,61 @@ co_backtrace(void *rip_buf[], int *rip_cnt, struct coro_context *coro_ctx)
 	: "r" (rip_buf), "r" (rip_cnt), "r" (coro_ctx), "i" (rip_getcontext)
 	: "rdi", "rsi", "rdx", "rax", "memory"
 	);
+#elif __aarch64__
+__asm__ volatile(
+	/* Setup first arg */
+	"\tmov x0, %1\n"
+	/* Setup second arg */
+	"\tmov x1, %2\n"
+	/* Save current context */
+	"\tsub x2, sp, #8 * 20\n"
+	"\tstp x19, x20, [x2, #16 * 0]\n"
+	"\tstp x21, x22, [x2, #16 * 1]\n"
+	"\tstp x23, x24, [x2, #16 * 2]\n"
+	"\tstp x25, x26, [x2, #16 * 3]\n"
+	"\tstp x27, x28, [x2, #16 * 4]\n"
+	"\tstp x29, x30, [x2, #16 * 5]\n"
+	"\tstp d8,  d9,  [x2, #16 * 6]\n"
+	"\tstp d10, d11, [x2, #16 * 7]\n"
+	"\tstp d12, d13, [x2, #16 * 8]\n"
+	"\tstp d14, d15, [x2, #16 * 9]\n"
+	/* Restore target context */
+	"\tldr x3, [%3]\n"
+	"\tldp x19, x20, [x3, #16 * 0]\n"
+	"\tldp x21, x22, [x3, #16 * 1]\n"
+	"\tldp x23, x24, [x3, #16 * 2]\n"
+	"\tldp x25, x26, [x3, #16 * 3]\n"
+	"\tldp x27, x28, [x3, #16 * 4]\n"
+	"\tldp x29, x30, [x3, #16 * 5]\n"
+	"\tldp d8,  d9,  [x3, #16 * 6]\n"
+	"\tldp d10, d11, [x3, #16 * 7]\n"
+	"\tldp d12, d13, [x3, #16 * 8]\n"
+	"\tldp d14, d15, [x3, #16 * 9]\n"
+	"\tmov sp, x3\n"
+	".cfi_remember_state\n"
+	".cfi_def_cfa sp, 16 * 10\n"
+	".cfi_offset x29, -16 * 5\n"
+	".cfi_offset x30, -16 * 5 + 8\n"
+	"\tbl %4\n"
+	".cfi_restore_state\n"
+	/* Restore context (old sp in x0) */
+	"\tldp x19, x20, [x0, #16 * 0]\n"
+	"\tldp x21, x22, [x0, #16 * 1]\n"
+	"\tldp x23, x24, [x0, #16 * 2]\n"
+	"\tldp x25, x26, [x0, #16 * 3]\n"
+	"\tldp x27, x28, [x0, #16 * 4]\n"
+	"\tldp x29, x30, [x0, #16 * 5]\n"
+	"\tldp d8,  d9,  [x0, #16 * 6]\n"
+	"\tldp d10, d11, [x0, #16 * 7]\n"
+	"\tldp d12, d13, [x0, #16 * 8]\n"
+	"\tldp d14, d15, [x0, #16 * 9]\n"
+	"\tadd sp, x0, #8 * 20\n"
+	: "=m" (*rip_buf)
+	: "r" (rip_buf), "r" (rip_cnt), "r" (coro_ctx), "S" (rip_getcontext)
+	: /*"lr", "r0", "r1", "r2", "ip" */
+	 "x0", "x1", "x2", "x3", "x30", "memory"
+	);
+#endif
 }
 
 static void

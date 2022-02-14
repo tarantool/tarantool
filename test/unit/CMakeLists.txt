@@ -305,13 +305,10 @@ if (UNWIND_LIBRARY AND HAVE_LIBUNWIND_H)
             core_test_utils.c)
     target_link_libraries(backtrace_rip_coro.test core unit)
 
-    if (NOT CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "arm*" AND
-        NOT CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "aarch*")
     add_executable(backtrace_indirect.test
             backtrace_indirect.c
             core_test_utils.c)
     target_link_libraries(backtrace_indirect.test core unit)
-    endif ()
 
     if (CMAKE_BUILD_TYPE MATCHES Debug)
         add_executable(backtrace.test backtrace.c core_test_utils.c)
