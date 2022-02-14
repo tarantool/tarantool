@@ -782,7 +782,25 @@ out:
 	if (key != NULL) {
 		int new_rc = sqlVdbeRecordCompareMsgpack(key, unpacked);
 		region_truncate(&fiber()->gc, original_size);
-		assert(rc == new_rc);
+		/*
+		 * Here we compare two results from memcmp() alike
+		 * calls. A particular implementation depends on
+		 * a type of msgpack values to compare. For some
+		 * of them we actually call memcmp().
+		 *
+		 * memcmp() only guarantees that a result will be
+		 * less than zero, zero or more than zero. It
+		 * DOES NOT guarantee that the result will be
+		 * subtraction of the first non-equal bytes or
+		 * something else about the result aside of its
+		 * sign.
+		 *
+		 * So we don't compare `rc` and `new_rc` for
+		 * equivalence.
+		 */
+		assert((rc == 0 && new_rc == 0) ||
+		       (rc < 0 && new_rc < 0) ||
+		       (rc > 0 && new_rc > 0));
 	}
 #endif
 	return rc;
