@@ -1,6 +1,5 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local asserts = require('test.luatest_helpers.asserts')
 local helpers = require('test.luatest_helpers')
 
 local g = t.group('gh-4669-applier-reconnect')
@@ -18,7 +17,7 @@ g.before_each(function()
     g.cluster:add_server(g.replica)
     g.cluster:add_server(g.replica2)
     g.cluster:start()
-    asserts:assert_server_follow_upstream(g.replica, 1)
+    g.replica:assert_follows_upstream(1)
 end)
 
 g.after_each(function()
@@ -44,6 +43,6 @@ g.test_applier_connection_on_reconfig = function(g)
             }
         }
     ]])
-    asserts:assert_server_follow_upstream(g.replica, 1)
+    g.replica:assert_follows_upstream(1)
     t.assert_equals(g.master:grep_log("exiting the relay loop"), nil)
 end
