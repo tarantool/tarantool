@@ -1,7 +1,7 @@
 local t = require('luatest')
 local log = require('log')
 local Cluster = require('test.luatest_helpers.cluster')
-local helpers = require('test.luatest_helpers')
+local server = require('test.luatest_helpers.server')
 
 local pg = t.group('no_quorum', {{engine = 'memtx'}, {engine = 'vinyl'}})
 
@@ -10,8 +10,8 @@ pg.before_each(function(cg)
     cg.cluster = Cluster:new({})
     cg.master = cg.cluster:build_server({alias = 'master', engine = engine})
     local box_cfg = {
-        listen = ('%s/no_quorum.iproto'):format(helpers.SOCKET_DIR),
-        replication = ('%s/master.iproto'):format(helpers.SOCKET_DIR),
+        listen = server.build_instance_uri('no_quorum'),
+        replication = server.build_instance_uri('master'),
         memtx_memory = 107374182,
         replication_connect_quorum = 0,
         replication_timeout = 0.1,
@@ -55,7 +55,7 @@ pg.test_replication_no_quorum = function(cg)
     cg.master:eval("return box.cfg{listen = os.getenv('TARANTOOL_LISTEN')}")
     t.assert_equals(cg.master:eval("return space:insert{2}"), {2})
     local vclock = cg.master:eval("return box.info.vclock")
-    helpers:wait_vclock(cg.replica, vclock)
+    cg.replica:wait_vclock(vclock)
     t.assert_str_matches(
         cg.replica:eval('return box.info.status'), 'running')
     t.assert_equals(cg.master:eval("return space:select()"), {{1}, {2}})

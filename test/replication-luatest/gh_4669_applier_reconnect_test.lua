@@ -1,6 +1,6 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local helpers = require('test.luatest_helpers')
+local server = require('test.luatest_helpers.server')
 
 local g = t.group('gh-4669-applier-reconnect')
 
@@ -8,7 +8,7 @@ g.before_each(function()
     g.cluster = cluster:new({})
     g.master = g.cluster:build_server({alias = 'master'})
     local box_cfg = {
-        replication = ('%s/master.iproto'):format(helpers.SOCKET_DIR),
+        replication = server.build_instance_uri('master'),
     }
     g.replica = g.cluster:build_server({alias = 'replica', box_cfg = box_cfg})
     g.replica2 = g.cluster:build_server({alias = 'replica2', box_cfg = box_cfg})
@@ -35,7 +35,7 @@ g.test_applier_connection_on_reconfig = function(g)
                 box.cfg.replication[1],
                 "%s/replica2.iproto",
             }
-        }]]):format(helpers.SOCKET_DIR))
+        }]]):format(server.socketdir))
     g.replica:eval([[
         box.cfg{
             replication = {

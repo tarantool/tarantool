@@ -1,7 +1,7 @@
 local t = require('luatest')
 local log = require('log')
 local Cluster =  require('test.luatest_helpers.cluster')
-local helpers = require('test.luatest_helpers')
+local server = require('test.luatest_helpers.server')
 local json = require('json')
 
 local pg = t.group('quorum_master', {{engine = 'memtx'}, {engine = 'vinyl'}})
@@ -12,8 +12,8 @@ pg.before_each(function(cg)
 
     cg.box_cfg = {
         replication = {
-            helpers.instance_uri('master_quorum', 1);
-            helpers.instance_uri('master_quorum', 2);
+            server.build_instance_uri('master_quorum1');
+            server.build_instance_uri('master_quorum2');
         };
         replication_connect_quorum = 0;
         replication_timeout = 0.1;
@@ -56,6 +56,6 @@ pg.test_master_master_works = function(cg)
     t.assert_equals(cg.master_quorum1:eval('return box.space.test:insert{1}'), {1})
     cg.master_quorum1:eval(('box.cfg{replication = %s}'):format(repl.replication))
     local vclock = cg.master_quorum1:eval('return box.info.vclock')
-    helpers:wait_vclock(cg.master_quorum2, vclock)
+    cg.master_quorum2:wait_vclock(vclock)
     t.assert_equals(cg.master_quorum2:eval('return box.space.test:select()'), {{1}})
 end

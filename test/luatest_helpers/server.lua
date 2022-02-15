@@ -6,6 +6,8 @@ local fio = require('fio')
 local fun = require('fun')
 local json = require('json')
 local errno = require('errno')
+local log = require('log')
+local yaml = require('yaml')
 
 local checks = require('checks')
 local luatest = require('luatest')
@@ -41,9 +43,13 @@ Server.constructor_checks = fun.chain(Server.constructor_checks, {
     engine = '?string',
 }):tomap()
 
-function Server:initialize()
-    local vardir = fio.abspath(os.getenv('VARDIR') or 'test/var')
+Server.socketdir = fio.abspath(os.getenv('VARDIR') or 'test/var')
 
+function Server.build_instance_uri(alias)
+    return ('%s/%s.iproto'):format(Server.socketdir, alias)
+end
+
+function Server:initialize()
     if self.id == nil then
         local random = digest.urandom(9)
         self.id = digest.base64_encode(random, {urlsafe = true})
@@ -52,7 +58,7 @@ function Server:initialize()
         self.command = 'test/instances/default.lua'
     end
     if self.workdir == nil then
-        self.workdir = ('%s/%s-%s'):format(vardir, self.alias, self.id)
+        self.workdir = ('%s/%s-%s'):format(self.socketdir, self.alias, self.id)
         fio.rmtree(self.workdir)
         fio.mktree(self.workdir)
     end
@@ -64,8 +70,8 @@ function Server:initialize()
         self.datadir = nil
     end
     if self.net_box_port == nil and self.net_box_uri == nil then
-        self.net_box_uri = ('%s/%s.iproto'):format(vardir, self.alias)
-        fio.mktree(vardir)
+        self.net_box_uri = self.build_instance_uri(self.alias)
+        fio.mktree(self.socketdir)
     end
 
     -- AFAIU, the inner getmetatable() returns our helpers.Server
@@ -279,6 +285,33 @@ function Server:assert_follows_upstream(server_id)
     end, {server_id})
     luatest.assert_equals(status, 'follow',
         ('%s: server does not follow upstream'):format(self.alias))
+end
+
+function Server:get_vclock()
+    return self:exec(function() return box.info.vclock end)
+end
+
+function Server:wait_vclock(to_vclock)
+    while true do
+        local vclock = self:get_vclock()
+        local ok = true
+
+        for server_id, to_lsn in pairs(to_vclock) do
+            local lsn = vclock[server_id]
+            if lsn == nil or lsn < to_lsn then
+                ok = false
+                break
+            end
+        end
+
+        if ok then
+            return
+        end
+
+        log.info("wait vclock: %s to %s",
+            yaml.encode(vclock), yaml.encode(to_vclock))
+        fiber.sleep(0.001)
+    end
 end
 
 return Server

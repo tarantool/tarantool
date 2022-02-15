@@ -1,6 +1,6 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local helpers = require('test.luatest_helpers')
+local server = require('test.luatest_helpers.server')
 local wait_timeout = 120
 
 --
@@ -16,8 +16,8 @@ local wait_timeout = 120
 --
 local function make_create_cluster(g) return function()
     g.cluster = cluster:new({})
-    local master_uri = helpers.instance_uri('master')
-    local replica_uri = helpers.instance_uri('replica')
+    local master_uri = server.build_instance_uri('master')
+    local replica_uri = server.build_instance_uri('replica')
     local replication = {master_uri, replica_uri}
     local box_cfg = {
         listen = master_uri,
@@ -96,7 +96,7 @@ end
 -- Read-only because is an orphan.
 --
 g.test_read_only_reason_orphan = function(g)
-    local fake_uri = helpers.instance_uri('fake')
+    local fake_uri = server.build_instance_uri('fake')
     local old_timeout, ok, err = g.master:exec(function(fake_uri)
         -- Make connect-quorum impossible to satisfy using a fake instance.
         local old_timeout = box.cfg.replication_connect_timeout
