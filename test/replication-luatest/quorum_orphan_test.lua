@@ -1,7 +1,7 @@
 local t = require('luatest')
 local log = require('log')
 local Cluster =  require('test.luatest_helpers.cluster')
-local helpers = require('test.luatest_helpers')
+local server = require('test.luatest_helpers.server')
 
 local pg = t.group('quorum_orphan', {{engine = 'memtx'}, {engine = 'vinyl'}})
 
@@ -15,9 +15,9 @@ pg.before_each(function(cg)
         replication_sync_lag = 0.01;
         replication_connect_quorum = 3;
         replication = {
-            helpers.instance_uri('quorum', 1);
-            helpers.instance_uri('quorum', 2);
-            helpers.instance_uri('quorum', 3);
+            server.build_instance_uri('quorum1');
+            server.build_instance_uri('quorum2');
+            server.build_instance_uri('quorum3');
         };
     }
 
