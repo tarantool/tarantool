@@ -1242,6 +1242,8 @@ log_vsay(struct log *log, int level, const char *filename, int line,
 	}
 	int total = log->format_func(log, buf, sizeof(buf), level,
 				     filename, line, error, format, ap);
+	if (total < 0)
+		return -1;
 	switch (log->type) {
 	case SAY_LOGGER_FILE:
 	case SAY_LOGGER_PIPE:
