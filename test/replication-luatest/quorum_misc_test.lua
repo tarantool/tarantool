@@ -2,7 +2,6 @@ local t = require('luatest')
 local log = require('log')
 local fio = require('fio')
 local Cluster =  require('test.luatest_helpers.cluster')
-local asserts = require('test.luatest_helpers.asserts')
 local helpers = require('test.luatest_helpers')
 local COUNT = 100
 
@@ -91,7 +90,7 @@ function(cg)
         box.space.test:create_index('primary')
     end
     cg.cluster:exec_on_leader(bootstrap_function)
-    asserts:wait_fullmesh({cg.quorum1, cg.quorum2, cg.quorum3})
+    cg.cluster:wait_fullmesh()
     t.helpers.retrying({timeout = 10},
         function()
             cg.quorum2:eval(
