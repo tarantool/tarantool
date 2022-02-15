@@ -2,7 +2,7 @@ local t = require('luatest')
 local log = require('log')
 local fio = require('fio')
 local Cluster =  require('test.luatest_helpers.cluster')
-local helpers = require('test.luatest_helpers')
+local server = require('test.luatest_helpers.server')
 local COUNT = 100
 
 local pg = t.group('quorum_misc', {{engine = 'memtx'}, {engine = 'vinyl'}})
@@ -16,9 +16,9 @@ pg.before_each(function(cg)
         replication_sync_lag = 0.01;
         replication_connect_quorum = 3;
         replication = {
-            helpers.instance_uri('quorum', 1);
-            helpers.instance_uri('quorum', 2);
-            helpers.instance_uri('quorum', 3);
+            server.build_instance_uri('quorum1');
+            server.build_instance_uri('quorum2');
+            server.build_instance_uri('quorum3');
         };
     }
     cg.quorum1 = cg.cluster:build_server({alias = 'quorum1', engine = engine, box_cfg = box_cfg})
@@ -29,9 +29,9 @@ pg.before_each(function(cg)
         replication_timeout = 0.05,
         replication_connect_timeout = 10,
         replication_connect_quorum = 1,
-        replication = {helpers.instance_uri('replica_quorum'),
-                       helpers.instance_uri('replica_quorum', 1),
-                       helpers.instance_uri('replica_quorum', 2)}
+        replication = {server.build_instance_uri('replica_quorum'),
+                       server.build_instance_uri('replica_quorum1'),
+                       server.build_instance_uri('replica_quorum2')}
     }
     cg.replica_quorum = cg.cluster:build_server({alias = 'replica_quorum', engine = engine, box_cfg = box_cfg})
 
@@ -64,7 +64,7 @@ pg.test_quorum_during_reconfiguration = function(cg)
                     }
                 })
     end
-    local nonexistent_uri = helpers.instance_uri('replica_quorum', 1)
+    local nonexistent_uri = server.build_instance_uri('replica_quorum1')
     t.helpers.retrying({timeout = 10},
         function()
             -- If replication_connect_quorum was ignored here, the instance
