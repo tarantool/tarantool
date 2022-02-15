@@ -273,4 +273,12 @@ function Server:grep_log(what, bytes, opts)
     return found
 end
 
+function Server:assert_follows_upstream(server_id)
+    local status = self:exec(function(id)
+        return box.info.replication[id].upstream.status
+    end, {server_id})
+    luatest.assert_equals(status, 'follow',
+        ('%s: server does not follow upstream'):format(self.alias))
+end
+
 return Server
