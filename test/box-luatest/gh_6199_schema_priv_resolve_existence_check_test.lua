@@ -4,15 +4,9 @@ local t = require('luatest')
 local g = t.group('gh-6199-schema-priv-resolve-existence-check')
 
 g.before_all(function()
-    local helpers = require('test.luatest_helpers')
-
     g.cluster = cluster:new({})
+    g.default = g.cluster:build_and_add_server({alias = 'default'})
 
-    local default_box_cfg = {
-        listen = helpers.instance_uri('default'),
-    }
-    g.default = g.cluster:build_and_add_server({alias   = 'default',
-                                                box_cfg = default_box_cfg})
     g.cluster:start()
     g.default:exec(function()
         box.session.su('admin')

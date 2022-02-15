@@ -6,23 +6,12 @@ local g = t.group('gh-6568-replica-initial-join-removal-of-compacted-run-files')
 
 local s_id = 0
 g.before_all(function()
-    local helpers = require('test.luatest_helpers')
-
     g.cluster = cluster:new({})
-
-    local master_uri = helpers.instance_uri('master')
-    local master_box_cfg = {
-        listen           = master_uri,
-    }
-    g.master = g.cluster:build_and_add_server({alias   = 'master',
-                                               box_cfg = master_box_cfg})
+    g.master = g.cluster:build_and_add_server({alias = 'master'})
 
     local replica_box_cfg = {
-        listen       = helpers.instance_uri('replica'),
         vinyl_memory = 128,
-        replication  = {
-            master_uri,
-        },
+        replication  = { g.master.net_box_uri },
         read_only    = true,
     }
     g.replica = g.cluster:build_and_add_server({alias   = 'replica',

@@ -4,23 +4,12 @@ local t = require('luatest')
 local g = t.group('gh-6310-grant-rw-access-on-_session_settings-space-to-public-role')
 
 g.before_all(function()
-    local helpers = require('test.luatest_helpers')
-
     g.cluster = cluster:new({})
-
-    local bootstrap_box_cfg = {
-        listen = helpers.instance_uri('bootstrap'),
-    }
-    g.bootstrap = g.cluster:build_and_add_server({alias   = 'bootstrap',
-                                                  box_cfg = bootstrap_box_cfg})
+    g.bootstrap = g.cluster:build_and_add_server({alias = 'bootstrap'})
 
     local data_dir = 'test/box-luatest/upgrade/2.9.1'
-    local upgrade_box_cfg = {
-        listen   = helpers.instance_uri('upgrade'),
-    }
     g.upgrade = g.cluster:build_and_add_server({alias   = 'upgrade',
-                                                datadir = data_dir,
-                                                box_cfg = upgrade_box_cfg})
+                                                datadir = data_dir})
 
     g.cluster:start()
 end)

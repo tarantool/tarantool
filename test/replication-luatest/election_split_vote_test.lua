@@ -1,6 +1,6 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local helpers = require('test.luatest_helpers')
+local server = require('test.luatest_helpers.server')
 local wait_timeout = 120
 
 --
@@ -12,8 +12,8 @@ local g = t.group('split-vote')
 
 g.before_each(function()
     g.cluster = cluster:new({})
-    local node1_uri = helpers.instance_uri('node1')
-    local node2_uri = helpers.instance_uri('node2')
+    local node1_uri = server.build_instance_uri('node1')
+    local node2_uri = server.build_instance_uri('node2')
     local replication = {node1_uri, node2_uri}
     local box_cfg = {
         listen = node1_uri,
