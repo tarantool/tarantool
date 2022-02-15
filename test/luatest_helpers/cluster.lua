@@ -1,9 +1,12 @@
+local checks = require('checks')
 local fio = require('fio')
+local luatest = require('luatest')
+
 local Server = require('test.luatest_helpers.server')
 
-local root = os.environ()['SOURCEDIR'] or '.'
-
 local Cluster = {}
+
+local ROOT = os.environ()['SOURCEDIR'] or '.'
 
 function Cluster:new(object)
     self:inherit(object)
@@ -45,7 +48,7 @@ function Cluster:drop()
 end
 
 function Cluster:get_index(server)
-    local index = nil
+    local index
     for i, v in ipairs(self.servers) do
         if (v.id == server) then
           index = i
@@ -94,7 +97,7 @@ end
 function Cluster:build_server(server_config, instance_file)
     instance_file = instance_file or 'default.lua'
     server_config = table.deepcopy(server_config)
-    server_config.command = fio.pathjoin(root, 'test/instances/', instance_file)
+    server_config.command = fio.pathjoin(ROOT, 'test/instances/', instance_file)
     assert(server_config.alias, 'Either replicaset.alias or server.alias must be given')
     local server = Server:new(server_config)
     table.insert(self.built_servers, server)
@@ -128,5 +131,28 @@ function Cluster:exec_on_leader(bootstrap_function)
     return leader:exec(bootstrap_function)
 end
 
+function Cluster:wait_fullmesh(params)
+    checks('table', {timeout = '?number', delay = '?number'})
+    if not params then params = {} end
+    local config = {timeout = params.timeout or 30, delay = params.delay or 0.1}
+
+    luatest.helpers.retrying(config, function(cluster)
+        for _, server1 in ipairs(cluster.servers) do
+            for _, server2 in ipairs(cluster.servers) do
+                if server1 ~= server2 then
+                    local server1_id = server1:exec(function()
+                        return box.info.id
+                    end)
+                    local server2_id = server2:exec(function()
+                        return box.info.id
+                    end)
+                    if server1_id ~= server2_id then
+                        server1:assert_follows_upstream(server2_id)
+                    end
+                end
+            end
+        end
+    end, self)
+end
 
 return Cluster
