@@ -55,22 +55,22 @@ end
 -- It will be fixed when multi-directional would be introduced:
 -- https://github.com/tarantool/tarantool/issues/3309
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "1.201",
     [[
         CREATE TABLE t2 (id INT PRIMARY KEY, a INT, b INT);
         INSERT INTO t2 VALUES (1, 2, 1), (2, -3, 5), (3, 2, -3), (4, 2, 12);
         SELECT * FROM t2 ORDER BY a ASC, b DESC LIMIT 5;
     ]],
-    {1, "ORDER BY with LIMIT does not support different sorting orders"}
+    {2, -3, 5, 4, 2, 12, 1, 2, 1, 3, 2, -3}
 )
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "1.202",
     [[
         SELECT * FROM t2 ORDER BY a, b DESC LIMIT 5;
     ]],
-    {1, "ORDER BY with LIMIT does not support different sorting orders"}
+    {2, -3, 5, 4, 2, 12, 1, 2, 1, 3, 2, -3}
 
 )
 
