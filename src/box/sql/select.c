@@ -310,6 +310,20 @@ sqlSelectDestInit(SelectDest * pDest, int eDest, int iParm, int reg_eph)
 	pDest->nSdst = 0;
 }
 
+static bool
+is_same_sorting_direction(const struct ExprList *expr_list)
+{
+	if(expr_list == NULL)
+		return true;
+	enum sort_order reference_order = expr_list->a[0].sort_order;
+	for (int i = 1; i < expr_list->nExpr; i++) {
+		assert(expr_list->a[i].sort_order != SORT_ORDER_UNDEF);
+		if (expr_list->a[i].sort_order != reference_order)
+			return false;
+	}
+	return true;
+}
+
 /*
  * Allocate a new Select structure and return a pointer to that
  * structure.
@@ -1037,9 +1051,9 @@ pushOntoSorter(Parse * pParse,		/* Parser context */
 	if (pSort->sortFlags & SORTFLAG_UseSorter) {
 		sqlVdbeAddOp2(v, OP_SorterInsert, pSort->iECursor,
 				  regRecord);
-	} else {
-		sqlVdbeAddOp2(v, OP_IdxInsert, regRecord, pSort->reg_eph);
+		return;
 	}
+	sqlVdbeAddOp2(v, OP_IdxInsert, regRecord, pSort->reg_eph);
 
 	if (iLimit) {
 		int addr;
@@ -1916,6 +1930,11 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 	 */
 	sqlVdbeResolveLabel(v, addrContinue);
 	if (pSort->sortFlags & SORTFLAG_UseSorter) {
+		if (p->iLimit != 0) {
+			int iLimit = p->iOffset ? p->iOffset + 1 : p->iLimit;
+			sqlVdbeAddOp2(v, OP_DecrJumpZero, iLimit, addrBreak);
+			VdbeCoverage(v);
+		}
 		sqlVdbeAddOp2(v, OP_SorterNext, iTab, addr);
 		VdbeCoverage(v);
 	} else {
@@ -6132,7 +6151,13 @@ sqlSelect(Parse * pParse,		/* The parser context */
 		p->nSelectRow = 320;	/* 4 billion rows */
 	}
 	computeLimitRegisters(pParse, p, iEnd);
-	if (p->iLimit == 0 && sSort.addrSortIndex >= 0) {
+	/*
+	 * At the moment we don't have iterators where the fields are sorted in
+	 * a different order. Because of this, we have to sort all the data and
+	 * select only the required number of rows.
+	 */
+	if (sSort.addrSortIndex >= 0 &&
+	    (p->iLimit == 0 || !is_same_sorting_direction(sSort.pOrderBy))) {
 		struct VdbeOp *op = sqlVdbeGetOp(v, sSort.addrSortIndex);
 		struct sql_key_info *key_info =
 			sql_key_info_new_from_space_info(op->p4.space_info);
