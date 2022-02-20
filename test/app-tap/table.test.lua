@@ -8,7 +8,7 @@ yaml.cfg{
     encode_invalid_as_nil  = true,
 }
 local test = require('tap').test('table')
-test:plan(44)
+test:plan(49)
 
 do -- check basic table.copy (deepcopy)
     local example_table = {
@@ -268,6 +268,19 @@ do -- check table.equals
     local tbl_f = setmetatable({a = 15}, {__eq = function() return true end})
     test:is(table.equals(tbl_d, tbl_f), false,
             "table.equals when metatables don't match")
+end
+
+do -- check table.equals with booleans (gh-6386)
+    test:is(table.equals({a = false}, {a = false}), true,
+            "table.equals when booleans are used")
+    test:is(table.equals({a = false}, {}), false,
+            "table.equals when booleans are used")
+    test:is(table.equals({}, {a = false}), false,
+            "table.equals when booleans are used")
+    test:is(table.equals({a = box.NULL}, {a = false}), false,
+            "table.equals when booleans are used")
+    test:is(table.equals({a = false}, {a = box.NULL}), false,
+            "table.equals when booleans are used")
 end
 
 os.exit(test:check() == true and 0 or 1)
