@@ -225,7 +225,7 @@ local function test(parent, name, fun, ...)
         failed  = 0;
         planned = 0;
         trace   = parent == nil and true or parent.trace;
-        strict = false;
+        strict = parent ~= nil and parent.strict or false;
     }, test_mt)
     if fun ~= nil then
         test:diag('%s', test.name)

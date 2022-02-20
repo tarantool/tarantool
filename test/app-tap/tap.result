@@ -137,7 +137,7 @@ not ok - failed subtests
   failed: 1
   ...
     # is_deeply
-    1..20
+    1..21
     ok - 1 and 1
     ok - abc and abc
     ok - empty tables
@@ -203,11 +203,31 @@ not ok - failed subtests
       strict: true
       ...
     ok - {a = box.NULL} and {a = box.NULL} strict true
+        # check strict flag inheritance
+        1..2
+        not ok - {} and {a = box.NULL} strict = true
+          ---
+          strict: true
+          expected: key a
+          got: nil
+          ...
+        not ok - nil and box.NULL strict = true
+          ---
+          got: nil
+          expected: cdata
+          strict: true
+          ...
+        # check strict flag inheritance: end
+    not ok - failed subtests
+      ---
+      planned: 2
+      failed: 2
+      ...
     # is_deeply: end
 not ok - failed subtests
   ---
-  planned: 20
-  failed: 8
+  planned: 21
+  failed: 9
   ...
     # like
     1..2
