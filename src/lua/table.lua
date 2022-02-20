@@ -78,7 +78,7 @@ local function table_equals(a, b)
         end
     end
     for k, _ in pairs(b) do
-        if not a[k] then
+        if type(a[k]) == 'nil' then
             return false
         end
     end
