@@ -131,7 +131,7 @@ end)
 
 
 test:test('is_deeply', function(t)
-    t:plan(20)
+    t:plan(21)
 
     t:is_deeply(1, 1, '1 and 1')
     t:is_deeply('abc', 'abc', 'abc and abc')
@@ -165,6 +165,13 @@ test:test('is_deeply', function(t)
     t:is_deeply(box.NULL, nil, 'box.NULL and nil strict = true')
     t:is_deeply({a = box.NULL}, {a = box.NULL},
                 '{a = box.NULL} and {a = box.NULL} strict true')
+
+    t:test('check strict flag inheritance', function(t)
+        t:plan(2)
+        t:is_deeply({}, {a = box.NULL}, '{} and {a = box.NULL} strict = true')
+        t:is_deeply(nil, box.NULL, 'nil and box.NULL strict = true')
+    end)
+
     t.strict = false
 end)
 
