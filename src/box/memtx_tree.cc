@@ -1734,126 +1734,6 @@ memtx_tree_index_create_snapshot_iterator(struct index *base)
 	return (struct snapshot_iterator *) it;
 }
 
-static const struct index_vtab memtx_tree_no_hint_index_vtab = {
-	/* .destroy = */ memtx_tree_index_destroy<false>,
-	/* .commit_create = */ generic_index_commit_create,
-	/* .abort_create = */ generic_index_abort_create,
-	/* .commit_modify = */ generic_index_commit_modify,
-	/* .commit_drop = */ generic_index_commit_drop,
-	/* .update_def = */ memtx_tree_index_update_def<false>,
-	/* .depends_on_pk = */ memtx_tree_index_depends_on_pk,
-	/* .def_change_requires_rebuild = */
-		memtx_index_def_change_requires_rebuild,
-	/* .size = */ memtx_tree_index_size<false>,
-	/* .bsize = */ memtx_tree_index_bsize<false>,
-	/* .min = */ generic_index_min,
-	/* .max = */ generic_index_max,
-	/* .random = */ memtx_tree_index_random<false>,
-	/* .count = */ memtx_tree_index_count<false>,
-	/* .get = */ memtx_tree_index_get<false>,
-	/* .replace = */ memtx_tree_index_replace<false>,
-	/* .create_iterator = */ memtx_tree_index_create_iterator<false>,
-	/* .create_snapshot_iterator = */
-		memtx_tree_index_create_snapshot_iterator<false>,
-	/* .stat = */ generic_index_stat,
-	/* .compact = */ generic_index_compact,
-	/* .reset_stat = */ generic_index_reset_stat,
-	/* .begin_build = */ memtx_tree_index_begin_build<false>,
-	/* .reserve = */ memtx_tree_index_reserve<false>,
-	/* .build_next = */ memtx_tree_index_build_next<false>,
-	/* .end_build = */ memtx_tree_index_end_build<false>,
-};
-
-static const struct index_vtab memtx_tree_use_hint_index_vtab = {
-	/* .destroy = */ memtx_tree_index_destroy<true>,
-	/* .commit_create = */ generic_index_commit_create,
-	/* .abort_create = */ generic_index_abort_create,
-	/* .commit_modify = */ generic_index_commit_modify,
-	/* .commit_drop = */ generic_index_commit_drop,
-	/* .update_def = */ memtx_tree_index_update_def<true>,
-	/* .depends_on_pk = */ memtx_tree_index_depends_on_pk,
-	/* .def_change_requires_rebuild = */
-		memtx_index_def_change_requires_rebuild,
-	/* .size = */ memtx_tree_index_size<true>,
-	/* .bsize = */ memtx_tree_index_bsize<true>,
-	/* .min = */ generic_index_min,
-	/* .max = */ generic_index_max,
-	/* .random = */ memtx_tree_index_random<true>,
-	/* .count = */ memtx_tree_index_count<true>,
-	/* .get = */ memtx_tree_index_get<true>,
-	/* .replace = */ memtx_tree_index_replace<true>,
-	/* .create_iterator = */ memtx_tree_index_create_iterator<true>,
-	/* .create_snapshot_iterator = */
-		memtx_tree_index_create_snapshot_iterator<true>,
-	/* .stat = */ generic_index_stat,
-	/* .compact = */ generic_index_compact,
-	/* .reset_stat = */ generic_index_reset_stat,
-	/* .begin_build = */ memtx_tree_index_begin_build<true>,
-	/* .reserve = */ memtx_tree_index_reserve<true>,
-	/* .build_next = */ memtx_tree_index_build_next<true>,
-	/* .end_build = */ memtx_tree_index_end_build<true>,
-};
-
-static const struct index_vtab memtx_tree_index_multikey_vtab = {
-	/* .destroy = */ memtx_tree_index_destroy<true>,
-	/* .commit_create = */ generic_index_commit_create,
-	/* .abort_create = */ generic_index_abort_create,
-	/* .commit_modify = */ generic_index_commit_modify,
-	/* .commit_drop = */ generic_index_commit_drop,
-	/* .update_def = */ memtx_tree_index_update_def<true>,
-	/* .depends_on_pk = */ memtx_tree_index_depends_on_pk,
-	/* .def_change_requires_rebuild = */
-		memtx_index_def_change_requires_rebuild,
-	/* .size = */ memtx_tree_index_size<true>,
-	/* .bsize = */ memtx_tree_index_bsize<true>,
-	/* .min = */ generic_index_min,
-	/* .max = */ generic_index_max,
-	/* .random = */ memtx_tree_index_random<true>,
-	/* .count = */ memtx_tree_index_count<true>,
-	/* .get = */ memtx_tree_index_get<true>,
-	/* .replace = */ memtx_tree_index_replace_multikey,
-	/* .create_iterator = */ memtx_tree_index_create_iterator<true>,
-	/* .create_snapshot_iterator = */
-		memtx_tree_index_create_snapshot_iterator<true>,
-	/* .stat = */ generic_index_stat,
-	/* .compact = */ generic_index_compact,
-	/* .reset_stat = */ generic_index_reset_stat,
-	/* .begin_build = */ memtx_tree_index_begin_build<true>,
-	/* .reserve = */ memtx_tree_index_reserve<true>,
-	/* .build_next = */ memtx_tree_index_build_next_multikey,
-	/* .end_build = */ memtx_tree_index_end_build<true>,
-};
-
-static const struct index_vtab memtx_tree_func_index_vtab = {
-	/* .destroy = */ memtx_tree_index_destroy<true>,
-	/* .commit_create = */ generic_index_commit_create,
-	/* .abort_create = */ generic_index_abort_create,
-	/* .commit_modify = */ generic_index_commit_modify,
-	/* .commit_drop = */ generic_index_commit_drop,
-	/* .update_def = */ memtx_tree_index_update_def<true>,
-	/* .depends_on_pk = */ memtx_tree_index_depends_on_pk,
-	/* .def_change_requires_rebuild = */
-		memtx_index_def_change_requires_rebuild,
-	/* .size = */ memtx_tree_index_size<true>,
-	/* .bsize = */ memtx_tree_index_bsize<true>,
-	/* .min = */ generic_index_min,
-	/* .max = */ generic_index_max,
-	/* .random = */ memtx_tree_index_random<true>,
-	/* .count = */ memtx_tree_index_count<true>,
-	/* .get = */ memtx_tree_index_get<true>,
-	/* .replace = */ memtx_tree_func_index_replace,
-	/* .create_iterator = */ memtx_tree_index_create_iterator<true>,
-	/* .create_snapshot_iterator = */
-		memtx_tree_index_create_snapshot_iterator<true>,
-	/* .stat = */ generic_index_stat,
-	/* .compact = */ generic_index_compact,
-	/* .reset_stat = */ generic_index_reset_stat,
-	/* .begin_build = */ memtx_tree_index_begin_build<true>,
-	/* .reserve = */ memtx_tree_index_reserve<true>,
-	/* .build_next = */ memtx_tree_func_index_build_next,
-	/* .end_build = */ memtx_tree_index_end_build<true>,
-};
-
 /**
  * A disabled index vtab provides safe dummy methods for
  * 'inactive' index. It is required to perform a fault-tolerant
@@ -1890,6 +1770,93 @@ static const struct index_vtab memtx_tree_disabled_index_vtab = {
 	/* .end_build = */ generic_index_end_build,
 };
 
+/** Type of index in terms of different vtabs. */
+enum memtx_tree_vtab_type {
+	/** General index type. */
+	MEMTX_TREE_VTAB_GENERAL,
+	/** Multikey index type. */
+	MEMTX_TREE_VTAB_MULTIKEY,
+	/** Func index type. */
+	MEMTX_TREE_VTAB_FUNC,
+	/** Disabled index type. */
+	MEMTX_TREE_VTAB_DISABLED,
+	/** Count of types. */
+	MEMTX_TREE_VTAB_TYPE_COUNT,
+};
+
+/**
+ * Get index vtab by @a TYPE and @a USE_HINT, template version.
+ * USE_HINT == false is only allowed for general index type.
+ */
+template <memtx_tree_vtab_type TYPE, bool USE_HINT = true>
+static const struct index_vtab *
+get_memtx_tree_index_vtab(void)
+{
+	static_assert(USE_HINT || TYPE == MEMTX_TREE_VTAB_GENERAL,
+		      "Multikey and func indexes must use hints");
+
+	if (TYPE == MEMTX_TREE_VTAB_DISABLED)
+		return &memtx_tree_disabled_index_vtab;
+
+	const bool is_mk = TYPE == MEMTX_TREE_VTAB_MULTIKEY;
+	const bool is_func = TYPE == MEMTX_TREE_VTAB_FUNC;
+	static const struct index_vtab vtab = {
+		/* .destroy = */ memtx_tree_index_destroy<USE_HINT>,
+		/* .commit_create = */ generic_index_commit_create,
+		/* .abort_create = */ generic_index_abort_create,
+		/* .commit_modify = */ generic_index_commit_modify,
+		/* .commit_drop = */ generic_index_commit_drop,
+		/* .update_def = */ memtx_tree_index_update_def<USE_HINT>,
+		/* .depends_on_pk = */ memtx_tree_index_depends_on_pk,
+		/* .def_change_requires_rebuild = */
+			memtx_index_def_change_requires_rebuild,
+		/* .size = */ memtx_tree_index_size<USE_HINT>,
+		/* .bsize = */ memtx_tree_index_bsize<USE_HINT>,
+		/* .min = */ generic_index_min,
+		/* .max = */ generic_index_max,
+		/* .random = */ memtx_tree_index_random<USE_HINT>,
+		/* .count = */ memtx_tree_index_count<USE_HINT>,
+		/* .get = */ memtx_tree_index_get<USE_HINT>,
+		/* .replace = */ is_mk ? memtx_tree_index_replace_multikey :
+				 is_func ? memtx_tree_func_index_replace :
+				 memtx_tree_index_replace<USE_HINT>,
+		/* .create_iterator = */
+			memtx_tree_index_create_iterator<USE_HINT>,
+		/* .create_snapshot_iterator = */
+			memtx_tree_index_create_snapshot_iterator<USE_HINT>,
+		/* .stat = */ generic_index_stat,
+		/* .compact = */ generic_index_compact,
+		/* .reset_stat = */ generic_index_reset_stat,
+		/* .begin_build = */ memtx_tree_index_begin_build<USE_HINT>,
+		/* .reserve = */ memtx_tree_index_reserve<USE_HINT>,
+		/* .build_next = */ is_mk ? memtx_tree_index_build_next_multikey :
+				    is_func ? memtx_tree_func_index_build_next :
+				    memtx_tree_index_build_next<USE_HINT>,
+		/* .end_build = */ memtx_tree_index_end_build<USE_HINT>,
+	};
+	return &vtab;
+}
+
+/**
+ * Get index vtab by @a type and @a use_hint, argument version.
+ * @a use_hint is ignored for every type except MEMTX_TREE_VTAB_GENERAL.
+ */
+static const struct index_vtab *
+get_memtx_tree_index_vtab(memtx_tree_vtab_type type, bool use_hint)
+{
+	static const index_vtab *choice[MEMTX_TREE_VTAB_TYPE_COUNT][2] = {
+		{get_memtx_tree_index_vtab<MEMTX_TREE_VTAB_GENERAL, false>(),
+		 get_memtx_tree_index_vtab<MEMTX_TREE_VTAB_GENERAL, true>()},
+		{get_memtx_tree_index_vtab<MEMTX_TREE_VTAB_MULTIKEY>(),
+		 get_memtx_tree_index_vtab<MEMTX_TREE_VTAB_MULTIKEY>()},
+		{get_memtx_tree_index_vtab<MEMTX_TREE_VTAB_FUNC>(),
+		 get_memtx_tree_index_vtab<MEMTX_TREE_VTAB_FUNC>()},
+		{get_memtx_tree_index_vtab<MEMTX_TREE_VTAB_DISABLED>(),
+		 get_memtx_tree_index_vtab<MEMTX_TREE_VTAB_DISABLED>()},
+	};
+	return choice[type][use_hint];
+}
+
 template <bool USE_HINT>
 static struct index *
 memtx_tree_index_new_tpl(struct memtx_engine *memtx, struct index_def *def,
@@ -1923,18 +1890,22 @@ struct index *
 memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
 	const struct index_vtab *vtab;
+	memtx_tree_vtab_type type = MEMTX_TREE_VTAB_GENERAL;
+	bool use_hint = true; /* Force hints for multikey and func indexes. */
 	if (def->key_def->for_func_index) {
 		if (def->key_def->func_index_func == NULL)
-			vtab = &memtx_tree_disabled_index_vtab;
+			type = MEMTX_TREE_VTAB_DISABLED;
 		else
-			vtab = &memtx_tree_func_index_vtab;
+			type = MEMTX_TREE_VTAB_FUNC;
 	} else if (def->key_def->is_multikey) {
-		vtab = &memtx_tree_index_multikey_vtab;
-	} else if (def->opts.hint) {
-		vtab = &memtx_tree_use_hint_index_vtab;
+		type = MEMTX_TREE_VTAB_MULTIKEY;
 	} else {
-		vtab = &memtx_tree_no_hint_index_vtab;
-		return memtx_tree_index_new_tpl<false>(memtx, def, vtab);
+		use_hint = def->opts.hint;
 	}
-	return memtx_tree_index_new_tpl<true>(memtx, def, vtab);
+
+	vtab = get_memtx_tree_index_vtab(type, use_hint);
+	if (use_hint)
+		return memtx_tree_index_new_tpl<true>(memtx, def, vtab);
+	else
+		return memtx_tree_index_new_tpl<false>(memtx, def, vtab);
 }

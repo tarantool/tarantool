@@ -552,35 +552,40 @@ memtx_hash_index_create_snapshot_iterator(struct index *base)
 	return (struct snapshot_iterator *) it;
 }
 
-static const struct index_vtab memtx_hash_index_vtab = {
-	/* .destroy = */ memtx_hash_index_destroy,
-	/* .commit_create = */ generic_index_commit_create,
-	/* .abort_create = */ generic_index_abort_create,
-	/* .commit_modify = */ generic_index_commit_modify,
-	/* .commit_drop = */ generic_index_commit_drop,
-	/* .update_def = */ memtx_hash_index_update_def,
-	/* .depends_on_pk = */ generic_index_depends_on_pk,
-	/* .def_change_requires_rebuild = */
-		memtx_index_def_change_requires_rebuild,
-	/* .size = */ memtx_hash_index_size,
-	/* .bsize = */ memtx_hash_index_bsize,
-	/* .min = */ generic_index_min,
-	/* .max = */ generic_index_max,
-	/* .random = */ memtx_hash_index_random,
-	/* .count = */ memtx_hash_index_count,
-	/* .get = */ memtx_hash_index_get,
-	/* .replace = */ memtx_hash_index_replace,
-	/* .create_iterator = */ memtx_hash_index_create_iterator,
-	/* .create_snapshot_iterator = */
+static const struct index_vtab *
+get_memtx_hash_index_vtab(void)
+{
+	static const struct index_vtab vtab = {
+		/* .destroy = */ memtx_hash_index_destroy,
+		/* .commit_create = */ generic_index_commit_create,
+		/* .abort_create = */ generic_index_abort_create,
+		/* .commit_modify = */ generic_index_commit_modify,
+		/* .commit_drop = */ generic_index_commit_drop,
+		/* .update_def = */ memtx_hash_index_update_def,
+		/* .depends_on_pk = */ generic_index_depends_on_pk,
+		/* .def_change_requires_rebuild = */
+			memtx_index_def_change_requires_rebuild,
+		/* .size = */ memtx_hash_index_size,
+		/* .bsize = */ memtx_hash_index_bsize,
+		/* .min = */ generic_index_min,
+		/* .max = */ generic_index_max,
+		/* .random = */ memtx_hash_index_random,
+		/* .count = */ memtx_hash_index_count,
+		/* .get = */ memtx_hash_index_get,
+		/* .replace = */ memtx_hash_index_replace,
+		/* .create_iterator = */ memtx_hash_index_create_iterator,
+		/* .create_snapshot_iterator = */
 		memtx_hash_index_create_snapshot_iterator,
-	/* .stat = */ generic_index_stat,
-	/* .compact = */ generic_index_compact,
-	/* .reset_stat = */ generic_index_reset_stat,
-	/* .begin_build = */ generic_index_begin_build,
-	/* .reserve = */ generic_index_reserve,
-	/* .build_next = */ generic_index_build_next,
-	/* .end_build = */ generic_index_end_build,
-};
+		/* .stat = */ generic_index_stat,
+		/* .compact = */ generic_index_compact,
+		/* .reset_stat = */ generic_index_reset_stat,
+		/* .begin_build = */ generic_index_begin_build,
+		/* .reserve = */ generic_index_reserve,
+		/* .build_next = */ generic_index_build_next,
+		/* .end_build = */ generic_index_end_build,
+	};
+	return &vtab;
+}
 
 struct index *
 memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
@@ -592,8 +597,9 @@ memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 			 "malloc", "struct memtx_hash_index");
 		return NULL;
 	}
+	const struct index_vtab *vtab = get_memtx_hash_index_vtab();
 	if (index_create(&index->base, (struct engine *)memtx,
-			 &memtx_hash_index_vtab, def) != 0) {
+			 vtab, def) != 0) {
 		free(index);
 		return NULL;
 	}

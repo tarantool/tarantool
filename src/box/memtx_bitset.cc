@@ -482,35 +482,40 @@ memtx_bitset_index_count(struct index *base, enum iterator_type type,
 	return generic_index_count(base, type, key, part_count);
 }
 
-static const struct index_vtab memtx_bitset_index_vtab = {
-	/* .destroy = */ memtx_bitset_index_destroy,
-	/* .commit_create = */ generic_index_commit_create,
-	/* .abort_create = */ generic_index_abort_create,
-	/* .commit_modify = */ generic_index_commit_modify,
-	/* .commit_drop = */ generic_index_commit_drop,
-	/* .update_def = */ generic_index_update_def,
-	/* .depends_on_pk = */ generic_index_depends_on_pk,
-	/* .def_change_requires_rebuild = */
-		memtx_index_def_change_requires_rebuild,
-	/* .size = */ memtx_bitset_index_size,
-	/* .bsize = */ memtx_bitset_index_bsize,
-	/* .min = */ generic_index_min,
-	/* .max = */ generic_index_max,
-	/* .random = */ generic_index_random,
-	/* .count = */ memtx_bitset_index_count,
-	/* .get = */ generic_index_get,
-	/* .replace = */ memtx_bitset_index_replace,
-	/* .create_iterator = */ memtx_bitset_index_create_iterator,
-	/* .create_snapshot_iterator = */
-		generic_index_create_snapshot_iterator,
-	/* .stat = */ generic_index_stat,
-	/* .compact = */ generic_index_compact,
-	/* .reset_stat = */ generic_index_reset_stat,
-	/* .begin_build = */ generic_index_begin_build,
-	/* .reserve = */ generic_index_reserve,
-	/* .build_next = */ generic_index_build_next,
-	/* .end_build = */ generic_index_end_build,
-};
+static const struct index_vtab *
+get_memtx_bitset_index_vtab(void)
+{
+	static const struct index_vtab vtab = {
+		/* .destroy = */ memtx_bitset_index_destroy,
+		/* .commit_create = */ generic_index_commit_create,
+		/* .abort_create = */ generic_index_abort_create,
+		/* .commit_modify = */ generic_index_commit_modify,
+		/* .commit_drop = */ generic_index_commit_drop,
+		/* .update_def = */ generic_index_update_def,
+		/* .depends_on_pk = */ generic_index_depends_on_pk,
+		/* .def_change_requires_rebuild = */
+			memtx_index_def_change_requires_rebuild,
+		/* .size = */ memtx_bitset_index_size,
+		/* .bsize = */ memtx_bitset_index_bsize,
+		/* .min = */ generic_index_min,
+		/* .max = */ generic_index_max,
+		/* .random = */ generic_index_random,
+		/* .count = */ memtx_bitset_index_count,
+		/* .get = */ generic_index_get,
+		/* .replace = */ memtx_bitset_index_replace,
+		/* .create_iterator = */ memtx_bitset_index_create_iterator,
+		/* .create_snapshot_iterator = */
+			generic_index_create_snapshot_iterator,
+		/* .stat = */ generic_index_stat,
+		/* .compact = */ generic_index_compact,
+		/* .reset_stat = */ generic_index_reset_stat,
+		/* .begin_build = */ generic_index_begin_build,
+		/* .reserve = */ generic_index_reserve,
+		/* .build_next = */ generic_index_build_next,
+		/* .end_build = */ generic_index_end_build,
+	};
+	return &vtab;
+}
 
 struct index *
 memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
@@ -525,8 +530,9 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 			 "malloc", "struct memtx_bitset_index");
 		return NULL;
 	}
+	const struct index_vtab *vtab = get_memtx_bitset_index_vtab();
 	if (index_create(&index->base, (struct engine *)memtx,
-			 &memtx_bitset_index_vtab, def) != 0) {
+			 vtab, def) != 0) {
 		free(index);
 		return NULL;
 	}
