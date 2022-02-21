@@ -125,10 +125,10 @@ set(box_sources
     index.cc
     index_def.c
     iterator_type.c
-    memtx_hash.c
+    memtx_hash.cc
     memtx_tree.cc
-    memtx_rtree.c
-    memtx_bitset.c
+    memtx_rtree.cc
+    memtx_bitset.cc
     memtx_tx.c
     module_cache.c
     engine.c

@@ -345,7 +345,8 @@ memtx_rtree_index_create_iterator(struct index *base,  enum iterator_type type,
 		return NULL;
 	}
 
-	struct index_rtree_iterator *it = mempool_alloc(&memtx->rtree_iterator_pool);
+	struct index_rtree_iterator *it = (struct index_rtree_iterator *)
+		mempool_alloc(&memtx->rtree_iterator_pool);
 	if (it == NULL) {
 		diag_set(OutOfMemory, sizeof(struct index_rtree_iterator),
 			 "memtx_rtree_index", "iterator");

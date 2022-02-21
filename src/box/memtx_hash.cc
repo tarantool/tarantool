@@ -412,7 +412,8 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 
 	assert(part_count == 0 || key != NULL);
 
-	struct hash_iterator *it = mempool_alloc(&memtx->iterator_pool);
+	struct hash_iterator *it = (struct hash_iterator *)
+		mempool_alloc(&memtx->iterator_pool);
 	if (it == NULL) {
 		diag_set(OutOfMemory, sizeof(struct hash_iterator),
 			 "memtx_hash_index", "iterator");

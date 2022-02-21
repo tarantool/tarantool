@@ -345,8 +345,8 @@ memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 	assert(part_count == 0 || key != NULL);
 	(void) part_count;
 
-	struct bitset_index_iterator *it;
-	it = mempool_alloc(&memtx->iterator_pool);
+	struct bitset_index_iterator *it = (struct bitset_index_iterator *)
+		mempool_alloc(&memtx->iterator_pool);
 	if (!it) {
 		diag_set(OutOfMemory, sizeof(*it),
 			 "memtx_bitset_index", "iterator");
