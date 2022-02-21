@@ -656,6 +656,15 @@ luaopen_tarantool(lua_State *L)
 	lua_pushstring(L, TARANTOOL_C_FLAGS);
 	lua_settable(L, -3);
 
+	/* build.linking */
+	lua_pushstring(L, "linking");
+#if defined(BUILD_STATIC)
+	lua_pushstring(L, "static");
+#else
+	lua_pushstring(L, "dynamic");
+#endif
+	lua_settable(L, -3);
+
 	lua_settable(L, -3);    /* box.info.build */
 	return 1;
 }

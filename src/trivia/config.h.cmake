@@ -262,6 +262,7 @@
 
 #cmakedefine EXPORT_LIBCURL_SYMBOLS 1
 
+#cmakedefine BUILD_STATIC 1
 #cmakedefine EMBED_LUAZLIB 1
 #cmakedefine EMBED_LUAZIP 1
 #cmakedefine EMBED_LUAROCKS 1
