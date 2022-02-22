@@ -70,6 +70,7 @@
 
 #include "datetime.h"
 #include "sqlInt.h"
+#include "dt_accessor.h"
 
 enum datetime_token {
 	DTK_DATE = 2,
@@ -93,6 +94,7 @@ enum datetime_token {
 	DTK_MILLENNIUM,
 	DTK_MILLISEC,
 	DTK_MICROSEC,
+	DTK_NANOSEC,
 	DTK_JULIAN,
 
 	DTK_DOW,
@@ -158,6 +160,11 @@ static struct datetime_token_def deltatktbl[] = {
 	{ "millisec", DTK_MILLISEC },
 	{ "mseconds", DTK_MILLISEC },
 	{ "msecs", DTK_MILLISEC },
+	{ "ns", DTK_NANOSEC },
+	{ "nsec", DTK_NANOSEC },
+	{ "nanosec", DTK_NANOSEC },
+	{ "nseconds", DTK_NANOSEC },
+	{ "nsecs", DTK_NANOSEC },
 	{ "qtr", DTK_QUARTER }, /* "quarter" relative */
 	{ "quarter", DTK_QUARTER }, /* "quarter" relative */
 	{ "s", DTK_SECOND }, /* "seconds" for ISO input */
@@ -193,11 +200,75 @@ time_token(const char *token_sz, size_t len)
 	return 0;
 }
 
+// FIXME - move to common header
+
+/** floored modulo and divide */
+#define MOD(a, b) unlikely(a < 0) ? (b + (a % b)) : (a % b)
+#define DIV(a, b) unlikely(a < 0) ? ((a - b + 1) / b) : (a / b)
+
+static int
+local_dt(int64_t secs)
+{
+	return dt_from_rdn((int)(DIV(secs, SECS_PER_DAY)) +
+			   DT_EPOCH_1970_OFFSET);
+}
+
+static int64_t
+local_secs(const struct datetime *date)
+{
+	return (int64_t)date->epoch + date->tzoffset * 60;
+}
+
 int64_t
 date_part(const struct datetime *date, int token)
 {
-	UNUSED_PARAMETER(date);
-	UNUSED_PARAMETER(token);
+	int64_t lsecs = local_secs(date);
+	int64_t ldt = local_dt(lsecs);
+
+	switch (token)
+	{
+		case DTK_EPOCH:
+			return date->epoch;
+		case DTK_DECADE:
+			return DIV(dt_year(ldt) + 9, 10);
+		case DTK_CENTURY:
+			return DIV(dt_year(ldt) + 99, 100);
+		case DTK_MILLENNIUM:
+			return DIV(dt_year(ldt) + 999, 1000);
+		case DTK_ISOYEAR:	// FIXME
+		case DTK_YEAR:
+			return dt_year(ldt);
+		case DTK_QUARTER:
+			return dt_quarter(ldt);
+		case DTK_MONTH:
+			return dt_month(ldt);
+		case DTK_WEEK:
+			return dt_woy(ldt);
+		case DTK_DAY:
+			return dt_dom(ldt);
+		case DTK_DOY:
+			return dt_doy(ldt);
+		case DTK_ISODOW:	// FIXME
+		case DTK_DOW:
+			return dt_dow(ldt);
+		case DTK_HOUR:
+			return MOD(DIV(lsecs, 3600), 24);
+		case DTK_MINUTE:
+			return MOD(DIV(lsecs, 60), 60);
+		case DTK_SECOND:
+			return MOD(lsecs, 60);
+		case DTK_MICROSEC:
+			return date->nsec / 1000;
+		case DTK_MILLISEC:
+			return date->nsec / 10000000;
+		case DTK_NANOSEC:
+			return date->nsec;
+		case DTK_JULIAN:
+			return dt_cjdn(ldt);
+		default:
+			unreachable();
+	}
+
 
 	return 1;
 }
