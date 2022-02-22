@@ -62,7 +62,8 @@ target_link_libraries(core salad small uri decNumber bit tzcode
                       ${LIBEV_LIBRARIES}
                       ${LIBEIO_LIBRARIES} ${LIBCORO_LIBRARIES}
                       ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES}
-                      ${LIBCDT_LIBRARIES})
+                      ${LIBCDT_LIBRARIES} ${OPENSSL_LIBRARIES}
+                      ${EXTRA_CORE_LINK_LIBRARIES})
 
 if (ENABLE_BACKTRACE AND NOT TARGET_OS_DARWIN)
     target_link_libraries(core gcc_s ${UNWIND_LIBRARIES})
@@ -74,8 +75,4 @@ endif()
 # HAVE_CLOCK_GETTIME_WITHOUT_RT in ${REPO}/CMakeLists.txt.
 if ("${HAVE_CLOCK_GETTIME}" AND NOT "${HAVE_CLOCK_GETTIME_WITHOUT_RT}")
     target_link_libraries(core rt)
-endif()
-
-if(ENABLE_SSL)
-    target_link_libraries(core ${OPENSSL_LIBRARIES})
 endif()

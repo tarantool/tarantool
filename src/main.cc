@@ -79,7 +79,7 @@
 #include "box/module_cache.h"
 #include "box/watcher.h"
 #include "systemd.h"
-#include "crypto/crypto.h"
+#include "core/ssl.h"
 #include "core/popen.h"
 #include "core/crash.h"
 #include "ssl_cert_paths_discover.h"
@@ -547,7 +547,7 @@ tarantool_free(void)
 	memory_free();
 	random_free();
 #endif
-	crypto_free();
+	ssl_free();
 	memtx_tx_manager_free();
 	coll_free();
 	systemd_free();
@@ -704,7 +704,7 @@ main(int argc, char **argv)
 	coll_init();
 	memtx_tx_manager_init();
 	module_init();
-	crypto_init();
+	ssl_init();
 	systemd_init();
 
 	const int override_cert_paths_env_vars = 0;

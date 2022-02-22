@@ -21,6 +21,12 @@ extern "C" {
 struct uri;
 struct ssl_iostream_ctx;
 
+void
+ssl_init(void);
+
+void
+ssl_free(void);
+
 struct ssl_iostream_ctx *
 ssl_iostream_ctx_new(enum iostream_mode mode, const struct uri *uri);
 

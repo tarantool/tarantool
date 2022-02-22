@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "crypto/crypto.h"
+#include "core/ssl.h"
 #include "core/random.h"
 #include "unit.h"
 #include "trivia/util.h"
@@ -286,7 +287,7 @@ main(void)
 	header();
 	plan(5);
 	random_init();
-	crypto_init();
+	ssl_init();
 	memory_init();
 	fiber_init(fiber_c_invoke);
 
@@ -300,7 +301,7 @@ main(void)
 
 	fiber_free();
 	memory_free();
-	crypto_free();
+	ssl_free();
 	random_free();
 	int rc = check_plan();
 	footer();
