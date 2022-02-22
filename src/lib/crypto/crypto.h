@@ -271,12 +271,6 @@ crypto_codec_decrypt(struct crypto_codec *c, const char *iv,
 void
 crypto_codec_delete(struct crypto_codec *c);
 
-void
-crypto_init(void);
-
-void
-crypto_free(void);
-
 #if defined(__cplusplus)
 }
 #endif

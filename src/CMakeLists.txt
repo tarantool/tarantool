@@ -14,6 +14,7 @@ include_directories(${CURL_INCLUDE_DIRS})
 include_directories(${ICU_INCLUDE_DIRS})
 include_directories(${ICONV_INCLUDE_DIRS})
 include_directories(${DECNUMBER_INCLUDE_DIR})
+include_directories(${EXTRA_CORE_INCLUDE_DIRS})
 
 set(LIBUTIL_FREEBSD_SRC ${PROJECT_SOURCE_DIR}/third_party/libutil_freebsd)
 include_directories(${LIBUTIL_FREEBSD_SRC})
