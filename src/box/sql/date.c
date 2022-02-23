@@ -112,9 +112,9 @@ struct datetime_token_def {
 	enum datetime_token value;
 };
 
-/* borrowed from postgres/src/backend/utils/adt/datetime.c */
+/* partially borrowed from postgres/src/backend/utils/adt/datetime.c */
 static struct datetime_token_def deltatktbl[] = {
-	/* token, type, value */
+	/* token, value */
 	{ "c", DTK_CENTURY }, /* "century" relative */
 	{ "cent", DTK_CENTURY }, /* "century" relative */
 	{ "centuries", DTK_CENTURY }, /* "centuries" relative */
