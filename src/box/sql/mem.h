@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 #include "box/field_def.h"
+#include "datetime.h"
 #include "decimal.h"
 #include "tt_uuid.h"
 
@@ -51,9 +52,10 @@ enum mem_type {
 	MEM_TYPE_DOUBLE		= 1 << 8,
 	MEM_TYPE_UUID		= 1 << 9,
 	MEM_TYPE_DEC		= 1 << 10,
-	MEM_TYPE_INVALID	= 1 << 11,
-	MEM_TYPE_FRAME		= 1 << 12,
-	MEM_TYPE_PTR		= 1 << 13,
+	MEM_TYPE_DATETIME	= 1 << 11,
+	MEM_TYPE_INVALID	= 1 << 12,
+	MEM_TYPE_FRAME		= 1 << 13,
+	MEM_TYPE_PTR		= 1 << 14,
 };
 
 /*
@@ -76,6 +78,8 @@ struct Mem {
 		struct VdbeFrame *pFrame;	/* Used when flags==MEM_Frame */
 		struct tt_uuid uuid;
 		decimal_t d;
+		/** DATETIME value. */
+		struct datetime dt;
 	} u;
 	/** Type of the value this MEM contains. */
 	enum mem_type type;
@@ -311,6 +315,10 @@ mem_set_uuid(struct Mem *mem, const struct tt_uuid *uuid);
 /** Clear MEM and set it to DECIMAL. */
 void
 mem_set_dec(struct Mem *mem, const decimal_t *dec);
+
+/** Clear MEM and set it to DATETIME. */
+void
+mem_set_datetime(struct Mem *mem, const struct datetime *dt);
 
 /** Clear MEM and set it to STRING. The string belongs to another object. */
 void

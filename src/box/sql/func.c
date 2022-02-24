@@ -1375,6 +1375,15 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 			context->is_aborted = true;
 		break;
 	}
+	case MEM_TYPE_DATETIME: {
+		char buf[DT_TO_STRING_BUFSIZE];
+		uint32_t len = datetime_to_string(&context->pOut->u.dt, buf,
+						  DT_TO_STRING_BUFSIZE);
+		assert(len == strlen(buf));
+		if (mem_copy_str(context->pOut, buf, len) != 0)
+			context->is_aborted = true;
+		break;
+	}
 	case MEM_TYPE_DOUBLE:
 	case MEM_TYPE_DEC:
 	case MEM_TYPE_UINT:
