@@ -39,6 +39,7 @@
 #include "tarantoolInt.h"
 #include "box/schema.h"
 #include "box/session.h"
+#include "diag.h"
 
 /* Forward declarations */
 static void exprCodeBetween(Parse *, Expr *, int,
@@ -1225,8 +1226,20 @@ sql_and_expr_new(struct sql *db, struct Expr *left_expr,
  * arguments.
  */
 Expr *
-sqlExprFunction(Parse * pParse, ExprList * pList, Token * pToken)
+sqlExprFunction(Parse * pParse, ExprList * pList, Token * pToken,
+		bool check_args)
 {
+	if (check_args && pList &&
+	    pList->nExpr > pParse->db->aLimit[SQL_LIMIT_FUNCTION_ARG]) {
+		const char *err =
+			tt_sprintf("Number of arguments to function %.*s",
+				   pToken->n, pToken->z);
+		diag_set(ClientError, ER_SQL_PARSER_LIMIT, err,
+			 pList->nExpr,
+			 pParse->db->aLimit[SQL_LIMIT_FUNCTION_ARG]);
+		pParse->is_aborted = true;
+		return NULL;
+	}
 	struct sql *db = pParse->db;
 	assert(pToken != NULL);
 	struct Expr *new_expr = sql_expr_new_dequoted(db, TK_FUNCTION, pToken);

@@ -1141,7 +1141,7 @@ expr(A) ::= LB(X) exprlist(Y) RB(E). {
 }
 
 expr(A) ::= TRIM(X) LP trim_operands(Y) RP(E). {
-  A.pExpr = sqlExprFunction(pParse, Y, &X);
+  A.pExpr = sqlExprFunction(pParse, Y, &X, false);
   spanSet(&A, &X, &E);
 }
 
@@ -1191,14 +1191,7 @@ trim_specification(A) ::= TRAILING. { A = TRIM_TRAILING; }
 trim_specification(A) ::= BOTH.     { A = TRIM_BOTH; }
 
 expr(A) ::= id(X) LP distinct(D) exprlist(Y) RP(E). {
-  if( Y && Y->nExpr>pParse->db->aLimit[SQL_LIMIT_FUNCTION_ARG] ){
-    const char *err =
-      tt_sprintf("Number of arguments to function %.*s", X.n, X.z);
-    diag_set(ClientError, ER_SQL_PARSER_LIMIT, err, Y->nExpr,
-             pParse->db->aLimit[SQL_LIMIT_FUNCTION_ARG]);
-    pParse->is_aborted = true;
-  }
-  A.pExpr = sqlExprFunction(pParse, Y, &X);
+  A.pExpr = sqlExprFunction(pParse, Y, &X, true);
   spanSet(&A,&X,&E);
   if( D==SF_Distinct && A.pExpr ){
     A.pExpr->flags |= EP_Distinct;
@@ -1211,14 +1204,7 @@ expr(A) ::= id(X) LP distinct(D) exprlist(Y) RP(E). {
  */
 type_func(A) ::= CHAR(A) .
 expr(A) ::= type_func(X) LP distinct(D) exprlist(Y) RP(E). {
-  if( Y && Y->nExpr>pParse->db->aLimit[SQL_LIMIT_FUNCTION_ARG] ){
-    const char *err =
-      tt_sprintf("Number of arguments to function %.*s", X.n, X.z);
-    diag_set(ClientError, ER_SQL_PARSER_LIMIT, err, Y->nExpr,
-             pParse->db->aLimit[SQL_LIMIT_FUNCTION_ARG]);
-    pParse->is_aborted = true;
-  }
-  A.pExpr = sqlExprFunction(pParse, Y, &X);
+  A.pExpr = sqlExprFunction(pParse, Y, &X, true);
   spanSet(&A,&X,&E);
   if( D==SF_Distinct && A.pExpr ){
     A.pExpr->flags |= EP_Distinct;
@@ -1226,7 +1212,7 @@ expr(A) ::= type_func(X) LP distinct(D) exprlist(Y) RP(E). {
 }
 
 expr(A) ::= id(X) LP STAR RP(E). {
-  A.pExpr = sqlExprFunction(pParse, 0, &X);
+  A.pExpr = sqlExprFunction(pParse, 0, &X, false);
   spanSet(&A,&X,&E);
 }
 /*
@@ -1292,7 +1278,7 @@ expr(A) ::= expr(A) likeop(OP) expr(Y).  [LIKE_KW]  {
   OP.n &= 0x7fffffff;
   pList = sql_expr_list_append(pParse->db,NULL, Y.pExpr);
   pList = sql_expr_list_append(pParse->db,pList, A.pExpr);
-  A.pExpr = sqlExprFunction(pParse, pList, &OP);
+  A.pExpr = sqlExprFunction(pParse, pList, &OP, false);
   exprNot(pParse, bNot, &A);
   A.zEnd = Y.zEnd;
   if( A.pExpr ) A.pExpr->flags |= EP_InfixFunc;
@@ -1304,7 +1290,7 @@ expr(A) ::= expr(A) likeop(OP) expr(Y) ESCAPE expr(E).  [LIKE_KW]  {
   pList = sql_expr_list_append(pParse->db,NULL, Y.pExpr);
   pList = sql_expr_list_append(pParse->db,pList, A.pExpr);
   pList = sql_expr_list_append(pParse->db,pList, E.pExpr);
-  A.pExpr = sqlExprFunction(pParse, pList, &OP);
+  A.pExpr = sqlExprFunction(pParse, pList, &OP, false);
   exprNot(pParse, bNot, &A);
   A.zEnd = E.zEnd;
   if( A.pExpr ) A.pExpr->flags |= EP_InfixFunc;

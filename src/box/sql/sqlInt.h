@@ -2629,7 +2629,7 @@ struct Expr *
 sql_and_expr_new(struct sql *db, struct Expr *left_expr,
 		 struct Expr *right_expr);
 
-Expr *sqlExprFunction(Parse *, ExprList *, Token *);
+Expr *sqlExprFunction(Parse *, ExprList *, Token *, bool);
 void sqlExprAssignVarNumber(Parse *, Expr *, u32);
 ExprList *sqlExprListAppendVector(Parse *, ExprList *, IdList *, Expr *);
 
