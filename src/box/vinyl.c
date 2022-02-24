@@ -4216,6 +4216,7 @@ err:
 static int
 vy_build_recover_mem(struct vy_lsm *lsm, struct vy_lsm *pk, struct vy_mem *mem)
 {
+	assert(lsm->dump_lsn >= 0);
 	/*
 	 * Recover statements starting from the oldest one.
 	 * Key order doesn't matter so we simply iterate over
@@ -4246,6 +4247,18 @@ vy_build_recover_mem(struct vy_lsm *lsm, struct vy_lsm *pk, struct vy_mem *mem)
 static int
 vy_build_recover(struct vy_env *env, struct vy_lsm *lsm, struct vy_lsm *pk)
 {
+	if (lsm->dump_lsn < 0) {
+		/*
+		 * The new index was never dumped, because the space's empty
+		 * so there's nothing to do.
+		 *
+		 * Note: the primary index may still have some cancelling
+		 * each other statements; we shouldn't try to apply them,
+		 * because they may be incompatible with the new index.
+		 */
+		return 0;
+	}
+
 	int rc = 0;
 	struct vy_mem *mem;
 	size_t mem_used_before, mem_used_after;
