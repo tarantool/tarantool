@@ -198,7 +198,7 @@ static Keyword aKeywordTable[] = {
   { "CURRENT_TIME",           "TK_STANDARD",    true  },
   { "CURRENT_TIMESTAMP",      "TK_STANDARD",    true  },
   { "DATE",                   "TK_STANDARD",    true  },
-  { "DATETIME",               "TK_STANDARD",    true  },
+  { "DATETIME",               "TK_DATETIME",    true  },
   { "DEC",                    "TK_DECIMAL",     true  },
   { "DECIMAL",                "TK_DECIMAL",     true  },
   { "DECLARE",                "TK_STANDARD",    true  },
