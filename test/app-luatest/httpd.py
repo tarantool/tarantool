@@ -47,7 +47,7 @@ def long_query():
 
 def redirect():
     code = "302 Found"
-    body = [b'redirecting']
+    body = [b'redirecting...']
     headers = [("Location", "/")]
     return code, body, headers
 

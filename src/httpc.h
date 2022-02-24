@@ -103,6 +103,8 @@ struct httpc_request {
 	struct curl_request curl_request;
 	/** HTTP status code */
 	int status;
+	/** Number of redirects that were followed. */
+	int redirect_count;
 	/** Error message */
 	const char *reason;
 	/** buffer of headers */
