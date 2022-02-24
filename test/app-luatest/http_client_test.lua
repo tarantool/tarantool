@@ -118,20 +118,52 @@ g.test_follow_location = function(cg)
     local r = client.request('GET', url .. endpoint, nil, opts)
     t.assert_equals(r.status, 200, 'default: status')
     t.assert_equals(r.body, 'hello world', 'default: body')
+    -- gh-6101: headers are reset on redirect
+    r.headers.date = r.headers.date and 'DATE'
+    r.headers.host = r.headers.host and 'HOST'
+    t.assert_equals(r.headers, {
+        ['date'] = 'DATE',
+        ['host'] = 'HOST',
+        ['accept'] = '*/*',
+        ['connection'] = 'close',
+        ['content-length'] = '11',
+        ['content-type'] = 'application/json',
+    }, 'default: headers')
 
     -- Verify {follow_location = true} behaviour.
     local r = client.request('GET', url .. endpoint, nil, merge(opts, {
                              follow_location = true}))
     t.assert_equals(r.status, 200, 'follow location: status')
     t.assert_equals(r.body, 'hello world', 'follow location: body')
+    -- gh-6101: headers are reset on redirect
+    r.headers.date = r.headers.date and 'DATE'
+    r.headers.host = r.headers.host and 'HOST'
+    t.assert_equals(r.headers, {
+        ['date'] = 'DATE',
+        ['host'] = 'HOST',
+        ['accept'] = '*/*',
+        ['connection'] = 'close',
+        ['content-length'] = '11',
+        ['content-type'] = 'application/json',
+    }, 'follow location: headers')
 
     -- Verify {follow_location = false} behaviour.
     local r = client.request('GET', url .. endpoint, nil, merge(opts, {
                              follow_location = false}))
     t.assert_equals(r.status, 302, 'do not follow location: status')
-    t.assert_equals(r.body, 'redirecting', 'do not follow location: body')
-    t.assert_equals(r.headers['location'], '/',
-                    'do not follow location: header')
+    t.assert_equals(r.body, 'redirecting...',
+                    'do not follow location: body')
+    -- gh-6101: headers are not reset if redirect is disabled
+    r.headers.date = r.headers.date and 'DATE'
+    r.headers.host = r.headers.host and 'HOST'
+    t.assert_equals(r.headers, {
+        ['date'] = 'DATE',
+        ['host'] = 'HOST',
+        ['location'] = '/',
+        ['accept'] = '*/*',
+        ['connection'] = 'close',
+        ['content-length'] = '14',
+    }, 'do not follow location: headers')
 end
 
 --
