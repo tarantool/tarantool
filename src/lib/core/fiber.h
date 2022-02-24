@@ -437,7 +437,7 @@ cord_slab_cache(void);
  *  | box_region_truncate(region_svp);
  *
  * There are module API functions that return a result on
- * this region. In this case a module is responsible to free the
+ * this region. In this case a caller is responsible to free the
  * result:
  *
  *  | size_t region_svp = box_region_used();
@@ -451,7 +451,7 @@ cord_slab_cache(void);
  * <box_region_*>() functions will remain API and ABI compatible.
  *
  * Data allocated on the region are guaranteed to be valid until
- * a fiber yield or a call of a function from the certain set:
+ * a call of a function from the certain set:
  *
  * - Related to transactions.
  * - Ones that may cause box initialization (box.cfg()).
@@ -464,8 +464,10 @@ cord_slab_cache(void);
  * It is safe to call simple box APIs around tuples, key_defs and
  * so on -- they don't invalidate the allocated data.
  *
- * Don't assume this region as fiber local. This is an
- * implementation detail and may be changed in a future.
+ * Each fiber has its own box region. It means that a call of,
+ * say, <box_region_used>() will give its own value in different
+ * fibers. It also means that a yield does not invalidate data in
+ * the box region.
  */
 
 /** How much memory is used by the box region. */
