@@ -42,6 +42,7 @@
 #include "small/region.h"
 #include "small/rlist.h"
 #include "salad/stailq.h"
+#include "clock_lowres.h"
 
 #include <coro/coro.h>
 
@@ -165,6 +166,10 @@ enum {
 	 * of fiber_pool.
 	 */
 	FIBER_IS_IDLE		= 1 << 7,
+	/**
+	 * This flag is set when fiber has custom max slice.
+	 */
+	FIBER_CUSTOM_SLICE	= 1 << 8,
 	FIBER_DEFAULT_FLAGS = FIBER_IS_CANCELLABLE
 };
 
@@ -518,6 +523,22 @@ struct credentials;
 struct lua_State;
 struct ipc_wait_pad;
 
+/**
+ * Warning and error slices.
+ */
+struct fiber_slice {
+	/**
+	 * If warning slice is exceeded, the warning will
+	 * be written in log when you check slice.
+	 */
+	double warn;
+	/**
+	 * If error slice is exceeded, fiber_check_slice()
+	 * will set diag and return -1.
+	 */
+	double err;
+};
+
 struct fiber {
 	coro_context ctx;
 	/** Coro stack slab. */
@@ -539,6 +560,8 @@ struct fiber {
 #endif
 	/** Coro stack size. */
 	size_t stack_size;
+	/** Fiber's custom slice if fiber has it, zero otherwise. */
+	struct fiber_slice max_slice;
 	/** Valgrind stack id. */
 	unsigned int stack_id;
 	/* A garbage-collected memory pool. */
@@ -722,6 +745,20 @@ struct cord {
 	struct slab_cache slabc;
 	/** The "main" fiber of this cord, the scheduler. */
 	struct fiber sched;
+	/**
+	 * Time when the current fiber was called.
+	 * Needed for checking slices. A low resolution
+	 * monotonic clock is used to measure the time
+	 * to reduce performance as little as possible.
+	 */
+	double call_time;
+	/**
+	 * Default max slice for fibers in seconds.
+	 * It is used if running fiber has no custom max slice.
+	 */
+	struct fiber_slice max_slice;
+	/** Slice for current fiber execution in seconds. */
+	struct fiber_slice slice;
 	char name[FIBER_NAME_INLINE];
 };
 
@@ -820,6 +857,23 @@ void
 fiber_free(void);
 
 /**
+ * Manually init signals needed for fiber module.
+ * This function is re-entrant.
+ * All needed signals are initialized in fiber_init,
+ * but you may need this functions to init signals
+ * after they have been reset before fork.
+ */
+void
+fiber_signal_init(void);
+
+/**
+ * Reset signals needed for fiber module.
+ * See fiber_signal_init description.
+ */
+void
+fiber_signal_reset(void);
+
+/**
  * Set fiber name.
  * @param fiber Fiber to set name for.
  * @param name A new name of @a fiber.
@@ -831,6 +885,101 @@ static inline const char *
 fiber_name(struct fiber *f)
 {
 	return f->name;
+}
+
+/** Helper function to check if slice is valid. */
+static inline bool
+fiber_slice_is_valid(struct fiber_slice slice)
+{
+	return slice.err >= 0 && slice.warn >= 0;
+}
+
+/**
+ * Time since current fiber was called.
+ * A low resolution monotonic clock is used to measure
+ * the time to reduce performance as little as possible.
+ */
+static inline double
+fiber_time_from_call(void)
+{
+	return clock_lowres_monotonic() - cord()->call_time;
+}
+
+/**
+ * Set slice for current fiber execution.
+ * Slices must be greater than 0.
+ */
+static inline void
+fiber_set_slice(struct fiber_slice slice)
+{
+	assert(cord_is_main());
+	assert(fiber_slice_is_valid(slice));
+	cord()->slice = slice;
+}
+
+/**
+ * Extend slice for current fiber execution.
+ * Slices must be greater than 0.
+ */
+static inline void
+fiber_extend_slice(struct fiber_slice slice)
+{
+	assert(cord_is_main());
+	assert(fiber_slice_is_valid(slice));
+	cord()->slice.err += slice.err;
+	cord()->slice.warn += slice.warn;
+}
+
+/**
+ * Set max slice for current cord.
+ * It will be used for fibers without custom max slice.
+ * Slices must be greater than 0.
+ */
+static inline void
+fiber_set_default_max_slice(struct fiber_slice slice)
+{
+	assert(cord_is_main());
+	assert(fiber_slice_is_valid(slice));
+	cord()->max_slice = slice;
+	if ((fiber()->flags & FIBER_CUSTOM_SLICE) == 0)
+		cord()->slice = slice;
+}
+
+/**
+ * Set max slice to fiber. Must be called in the thread in which the cord
+ * that manages this fiber is located.
+ * Slices must be greater than 0.
+ */
+static inline void
+fiber_set_max_slice(struct fiber *fib, struct fiber_slice slice)
+{
+	assert(cord_is_main());
+	assert(fiber_slice_is_valid(slice));
+	fib->max_slice = slice;
+	fib->flags |= FIBER_CUSTOM_SLICE;
+	if (fiber() == fib)
+		cord()->slice = slice;
+}
+
+/**
+ * Check if slice is over for current cord.
+ */
+static inline int
+fiber_check_slice(void)
+{
+	assert(cord_is_main());
+	double time_from_call = fiber_time_from_call();
+	struct fiber_slice slice = cord()->slice;
+	if (unlikely(slice.warn < time_from_call)) {
+		say_warn("fiber has not yielded for more than %.3lf seconds",
+			 slice.warn);
+		cord()->slice.warn = TIMEOUT_INFINITY;
+	}
+	if (unlikely(slice.err < time_from_call)) {
+		diag_set(FiberSliceIsExceeded);
+		return -1;
+	}
+	return 0;
 }
 
 bool
