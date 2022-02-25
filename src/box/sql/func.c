@@ -1688,7 +1688,7 @@ static struct sql_func_dictionary dictionaries[] = {
 	{"COALESCE", 2, SQL_MAX_FUNCTION_ARG, SQL_FUNC_COALESCE, true, 0, NULL},
 	{"COUNT", 0, 1, SQL_FUNC_AGG, false, 0, NULL},
 	{"DATE_PART", 2, 2, 0, true, 0, NULL},
-	/*{"EXTRACT", 1, 1, 0, true, 0, NULL},*/
+	{"EXTRACT", 2, 2, 0, true, 0, NULL},
 	{"GREATEST", 2, SQL_MAX_FUNCTION_ARG, SQL_FUNC_NEEDCOLL, true, 0, NULL},
 	{"GROUP_CONCAT", 1, 2, SQL_FUNC_AGG, false, 0, NULL},
 	{"HEX", 1, 1, 0, true, 0, NULL},
@@ -1779,6 +1779,8 @@ static struct sql_func_definition definitions[] = {
 	 fin_count},
 
 	{"DATE_PART", 2, {FIELD_TYPE_STRING, FIELD_TYPE_DATETIME},
+	 FIELD_TYPE_NUMBER, func_date_part, NULL},
+	{"EXTRACT", 2, {FIELD_TYPE_STRING, FIELD_TYPE_DATETIME},
 	 FIELD_TYPE_NUMBER, func_date_part, NULL},
 	{"GREATEST", -1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER,
 	 func_greatest_least, NULL},

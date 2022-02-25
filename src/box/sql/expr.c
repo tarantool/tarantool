@@ -1254,6 +1254,14 @@ sqlExprFunction(Parse * pParse, ExprList * pList, Token * pToken,
 	return new_expr;
 }
 
+ExprList*
+sql_expr_extract_arg(Parse *pParse, struct Expr *expr, Token *pToken)
+{
+	struct Expr *expr_id = sql_expr_new(pParse->db, TK_STRING, pToken);
+	struct ExprList * list = sql_expr_list_append(pParse->db, NULL, expr_id);
+	return sql_expr_list_append(pParse->db, list, expr);
+}
+
 /*
  * Assign a variable number to an expression that encodes a
  * wildcard in the original SQL statement.

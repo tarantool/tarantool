@@ -99,6 +99,7 @@ static Keyword aKeywordTable[] = {
   { "EXCEPT",                 "TK_EXCEPT",      true  },
   { "EXISTS",                 "TK_EXISTS",      true  },
   { "EXPLAIN",                "TK_EXPLAIN",     true  },
+  { "EXTRACT",                "TK_EXTRACT",     false },
   { "FAIL",                   "TK_FAIL",        false },
   { "FALSE",                  "TK_FALSE",       true  },
   { "FOR",                    "TK_FOR",         true  },

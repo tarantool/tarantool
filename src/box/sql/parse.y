@@ -265,7 +265,7 @@ columnlist ::= tcons.
 //
 %fallback ID
   ABORT ACTION ADD AFTER AUTOINCREMENT BEFORE CASCADE
-  CONFLICT DAY DATE DEFERRED END ENGINE FAIL
+  CONFLICT DAY DATE DEFERRED END ENGINE EXTRACT FAIL
   HOUR IGNORE INITIALLY INSTEAD NO MATCH MINUTE MONTH PLAN
   QUERY KEY OFFSET RAISE RELEASE REPLACE RESTRICT
   RENAME SECOND YEAR CTIME_KW IF ENABLE DISABLE UUID
@@ -1209,6 +1209,18 @@ expr(A) ::= type_func(X) LP distinct(D) exprlist(Y) RP(E). {
   if( D==SF_Distinct && A.pExpr ){
     A.pExpr->flags |= EP_Distinct;
   }
+}
+
+%type extract_arg {struct ExprList *}
+%destructor extract_arg {sql_expr_list_delete(pParse->db, $$);}
+
+extract_arg(A) ::= id(X) FROM expr(Y). {
+  A = sql_expr_extract_arg(pParse, Y.pExpr, &X);
+}
+
+expr(A) ::= EXTRACT(X) LP extract_arg(Y) RP(E). {
+  A.pExpr = sqlExprFunction(pParse, Y, &X, true);
+  spanSet(&A,&X,&E);
 }
 
 expr(A) ::= id(X) LP STAR RP(E). {

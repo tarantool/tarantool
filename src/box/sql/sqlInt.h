@@ -2629,6 +2629,12 @@ struct Expr *
 sql_and_expr_new(struct sql *db, struct Expr *left_expr,
 		 struct Expr *right_expr);
 
+/**
+ * EXTRACT( FROM) argument processing
+ */
+ExprList*
+sql_expr_extract_arg(Parse *, struct Expr *expr, Token *pToken);
+
 Expr *sqlExprFunction(Parse *, ExprList *, Token *, bool);
 void sqlExprAssignVarNumber(Parse *, Expr *, u32);
 ExprList *sqlExprListAppendVector(Parse *, ExprList *, IdList *, Expr *);
