@@ -1259,7 +1259,12 @@ sql_expr_extract_arg(Parse *pParse, struct Expr *expr, Token *pToken)
 {
 	struct Expr *expr_id = sql_expr_new(pParse->db, TK_STRING, pToken);
 	struct ExprList * list = sql_expr_list_append(pParse->db, NULL, expr_id);
-	return sql_expr_list_append(pParse->db, list, expr);
+	list = sql_expr_list_append(pParse->db, list, expr);
+	if (expr_id == NULL || list == NULL) {
+		pParse->is_aborted = true;
+		return NULL;
+	}
+	return list;
 }
 
 /*
