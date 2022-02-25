@@ -53,6 +53,8 @@ extern const struct type_info type_CollationError;
 extern const struct type_info type_SwimError;
 extern const struct type_info type_CryptoError;
 extern const struct type_info type_RaftError;
+/* type_info for FiberSliceIsExceeded exception */
+extern const struct type_info type_FiberSliceIsExceeded;
 
 const char *
 exception_get_string(struct error *e, const struct method_info *method);
@@ -168,6 +170,22 @@ public:
 	}
 
 	virtual void log() const;
+	virtual void raise() { throw this; }
+};
+
+/**
+ * This is thrown by fiber_* API calls when the fiber
+ * error slice is exceeded.
+ */
+class FiberSliceIsExceeded: public Exception {
+public:
+	FiberSliceIsExceeded(const char *file, unsigned line);
+
+	FiberSliceIsExceeded()
+		: Exception(&type_FiberSliceIsExceeded, NULL, 0)
+	{
+	}
+
 	virtual void raise() { throw this; }
 };
 

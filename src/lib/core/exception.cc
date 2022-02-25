@@ -211,6 +211,15 @@ FiberIsCancelled::log() const
 	say_info("fiber `%s': exiting", fiber_name(fiber()));
 }
 
+const struct type_info type_FiberSliceIsExceeded =
+	make_type("FiberSliceIsExceeded", &type_Exception);
+
+FiberSliceIsExceeded::FiberSliceIsExceeded(const char *file, unsigned line)
+	: Exception(&type_FiberSliceIsExceeded, file, line)
+{
+	error_format_msg(this, "fiber slice is exceeded");
+}
+
 const struct type_info type_LuajitError =
 	make_type("LuajitError", &type_Exception);
 
@@ -317,6 +326,13 @@ BuildFiberIsCancelled(const char *file, unsigned line)
 {
 	BuildAlloc(FiberIsCancelled);
 	return new (p) FiberIsCancelled(file, line);
+}
+
+struct error *
+BuildFiberSliceIsExceeded(const char *file, unsigned line)
+{
+	BuildAlloc(FiberSliceIsExceeded);
+	return new(p) FiberSliceIsExceeded(file, line);
 }
 
 struct error *

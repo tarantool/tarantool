@@ -404,6 +404,8 @@ BuildOutOfMemory(const char *file, unsigned line, size_t amount,
 struct error *
 BuildFiberIsCancelled(const char *file, unsigned line);
 struct error *
+BuildFiberSliceIsExceeded(const char *file, unsigned line);
+struct error *
 BuildTimedOut(const char *file, unsigned line);
 struct error *
 BuildChannelIsClosed(const char *file, unsigned line);

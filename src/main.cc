@@ -235,7 +235,7 @@ signal_reset(void)
 	    sigaction(SIGWINCH, &sa, NULL) == -1)
 		say_syserror("sigaction");
 
-	clock_lowres_signal_reset();
+	fiber_signal_reset();
 	crash_signal_reset();
 
 	/* Unblock any signals blocked by libev. */
@@ -267,7 +267,7 @@ signal_init(void)
 	if (sigaction(SIGPIPE, &sa, 0) == -1)
 		panic_syserror("sigaction");
 
-	clock_lowres_signal_init();
+	fiber_signal_init();
 	crash_signal_init();
 
 	ev_signal_init(&ev_sigs[0], sig_checkpoint, SIGUSR1);
