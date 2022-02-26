@@ -133,6 +133,13 @@ if (NOT ENABLE_UB_SANITIZER)
                    LIBRARIES xrow fuzzer_config)
 endif ()
 
+# Blocked by https://github.com/tarantool/tarantool/issues/8948.
+if (NOT ENABLE_UB_SANITIZER)
+  create_fuzz_test(PREFIX decimal_to_int64
+                   SOURCES decimal_to_int64_fuzzer.c
+                   LIBRARIES core fuzzer_config)
+endif ()
+
 include(ProtobufMutator)
 
 # UndefinedBehaviorSanitizer is not supported in LuaJIT.
