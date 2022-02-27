@@ -68,6 +68,7 @@
 #include <assert.h>
 #include <time.h>
 
+#define DT_PARSE_ISO_TNT
 #include "datetime.h"
 #include "sqlInt.h"
 #include "dt_accessor.h"
@@ -291,6 +292,36 @@ sql_timestamp_parse(struct datetime *date, const char *str, size_t len)
 	size_t parsed_len = datetime_parse_full(date, str, len, 0);
 	return parsed_len == len;
 }
+
+bool
+make_date(int y, int m, int d, struct datetime *date)
+{
+	dt_t dt = 0;
+	if (dt_from_ymd_checked(y, m, d, &dt) == false)
+		return false;
+
+	date->epoch =
+		((int64_t)dt_rdn(dt) - DT_EPOCH_1970_OFFSET) * SECS_PER_DAY;
+	date->nsec = date->tzoffset = date->tzindex = 0;
+	return true;
+}
+
+bool
+make_time(int hour, int min, double prec, struct datetime *date)
+{
+	int sec = (int)prec;
+	assert(date != NULL);
+	if (hour > 23 || min > 59 || sec > 59) {
+		if (!(hour == 24 && min == 0 && sec == 0))
+			return false;
+	}
+
+	// FIXME - handle nanoseconds from prec
+	date->epoch = hour * 3600 + min * 60 + sec;
+	date->nsec = date->tzoffset = date->tzindex = 0;
+	return true;
+}
+
 /*
  * Till time-like types are implemented as native Tarantool
  * types, built-in functions below make no sense.

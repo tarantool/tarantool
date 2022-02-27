@@ -811,6 +811,67 @@ func_current_date(struct sql_context *ctx, int argc, const struct Mem *argv)
 }
 
 /* FIXME */
+extern bool make_date(int y, int m, int d, struct datetime *date);
+extern bool make_time(int h, int min, double prec, struct datetime *date);
+;
+
+static void
+func_make_date(struct sql_context *ctx, int argc, const struct Mem *argv)
+{
+	assert(argc == 3);
+	int y, m, d;
+	const struct Mem *arg_year = &argv[0];
+	if (!mem_is_int(arg_year))
+		return;
+	y = arg_year->u.i;
+
+	const struct Mem *arg_month = &argv[1];
+	if (!mem_is_int(arg_month))
+		return;
+	m = arg_month->u.i;
+
+	const struct Mem *arg_day = &argv[2];
+	if (!mem_is_int(arg_day))
+		return;
+	d = arg_day->u.i;
+
+	struct datetime date;
+	if (!make_date(y, m, d, &date))
+		return;
+	mem_set_date(ctx->pOut, &date);
+}
+
+static void
+func_make_time(struct sql_context *ctx, int argc, const struct Mem *argv)
+{
+	assert(argc == 3);
+	int hour, min;
+	const struct Mem *arg_hour = &argv[0];
+	if (!mem_is_int(arg_hour))
+		return;
+	hour = arg_hour->u.i;
+
+	const struct Mem *arg_min = &argv[1];
+	if (!mem_is_int(arg_min))
+		return;
+	min = arg_min->u.i;
+
+	const struct Mem *arg_sec = &argv[2];
+	double prec = 0;
+	if (mem_is_int(arg_sec))
+		prec = arg_hour->u.i;
+	else if (mem_is_double(arg_sec))
+		prec = arg_hour->u.r;
+	else
+		return;
+
+	struct datetime date;
+	if (!make_time(hour, min, prec, &date))
+		return;
+	mem_set_date(ctx->pOut, &date);
+}
+
+/* FIXME */
 extern int time_token(const char * token_sz, size_t len);
 extern int64_t date_part(const struct datetime *date, int token);
 
@@ -1717,6 +1778,8 @@ static struct sql_func_dictionary dictionaries[] = {
 	{"LOCALTIMESTAMP", 0, 0, 0, false, 0, NULL},
 	{"LOWER", 1, 1, SQL_FUNC_DERIVEDCOLL | SQL_FUNC_NEEDCOLL, true, 0,
 	 NULL},
+	{"MAKE_DATE", 3, 3, 0, true, 0, NULL},
+	{"MAKE_TIME", 3, 3, 0, true, 0, NULL},
 	{"MAX", 1, 1, SQL_FUNC_MAX | SQL_FUNC_AGG | SQL_FUNC_NEEDCOLL, false, 0,
 	 NULL},
 	{"MIN", 1, 1, SQL_FUNC_MIN | SQL_FUNC_AGG | SQL_FUNC_NEEDCOLL, false, 0,
@@ -1866,6 +1929,10 @@ static struct sql_func_definition definitions[] = {
 	{"LOWER", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, func_lower_upper,
 	 NULL},
 
+	{"MAKE_DATE", 3, {FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER},
+	 FIELD_TYPE_DATETIME, func_make_date, NULL},
+	{"MAKE_TIME", 3, {FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER, FIELD_TYPE_DOUBLE},
+	 FIELD_TYPE_DATETIME, func_make_time, NULL},
 	{"MAX", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, step_minmax, NULL},
 	{"MAX", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, step_minmax, NULL},
 	{"MAX", 1, {FIELD_TYPE_DECIMAL}, FIELD_TYPE_DECIMAL, step_minmax, NULL},
