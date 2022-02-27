@@ -2,7 +2,7 @@
 -- TIMESTAMPTZ
 --
 
-CREATE TABLE TIMESTAMPTZ_TBL (d1 timestamp(2) with time zone);
+CREATE TABLE TIMESTAMPTZ_TBL (d1 timestamp(2) with time zone primary key);
 
 -- Test shorthand input values
 -- We can't just "select" the results since they aren't constants; test for
@@ -10,7 +10,7 @@ CREATE TABLE TIMESTAMPTZ_TBL (d1 timestamp(2) with time zone);
 -- block, within which the value of 'now' shouldn't change, and so these
 -- related values shouldn't either.
 
-BEGIN;
+--BEGIN;
 
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('today');
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('yesterday');
@@ -24,7 +24,7 @@ SELECT count(*) AS One FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp with time zone 
 SELECT count(*) AS One FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp with time zone 'tomorrow EST';
 SELECT count(*) AS One FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp with time zone 'tomorrow zulu';
 
-COMMIT;
+--COMMIT;
 
 DELETE FROM TIMESTAMPTZ_TBL;
 
@@ -32,16 +32,16 @@ DELETE FROM TIMESTAMPTZ_TBL;
 -- and that it doesn't change over the same interval within a transaction block
 
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('now');
-SELECT pg_sleep(0.1);
+--SELECT pg_sleep(0.1);
 
-BEGIN;
+--BEGIN;
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('now');
-SELECT pg_sleep(0.1);
+--SELECT pg_sleep(0.1);
 INSERT INTO TIMESTAMPTZ_TBL VALUES ('now');
-SELECT pg_sleep(0.1);
+--SELECT pg_sleep(0.1);
 SELECT count(*) AS two FROM TIMESTAMPTZ_TBL WHERE d1 = timestamp(2) with time zone 'now';
 SELECT count(d1) AS three, count(DISTINCT d1) AS two FROM TIMESTAMPTZ_TBL;
-COMMIT;
+--COMMIT;
 
 TRUNCATE TIMESTAMPTZ_TBL;
 
