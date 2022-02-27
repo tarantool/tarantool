@@ -269,6 +269,8 @@ columnlist ::= tcons.
   HOUR IGNORE INITIALLY INSTEAD NO MATCH MINUTE MONTH PLAN
   QUERY KEY OFFSET RAISE RELEASE REPLACE RESTRICT
   RENAME SECOND YEAR CTIME_KW IF ENABLE DISABLE UUID
+  LOCALTIME LOCALTIMESTAMP CURRENT_DATE CURRENT_TIME
+  CURRENT_TIMESTAMP
   .
 %wildcard WILDCARD.
 
@@ -1912,7 +1914,7 @@ opt_interval(A) ::= . { A = 0; }
 interval_second(A) ::= SECOND . { A = 0; }
 interval_second(A) ::= SECOND ignored_len(B) . { (void) B; A = 0; }
 
-term(A) ::= DATE STRING(X). {
+term(A) ::= DATE|TIMESTAMP STRING(X). {
   A.pExpr = sql_expr_new_date(pParse->db, TK_STRING, &X);
   if (A.pExpr == NULL) {
     pParse->is_aborted = true;

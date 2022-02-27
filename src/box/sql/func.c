@@ -798,6 +798,18 @@ func_char(struct sql_context *ctx, int argc, const struct Mem *argv)
 }
 
 
+static void
+func_current_date(struct sql_context *ctx, int argc, const struct Mem *argv)
+{
+	UNUSED_PARAMETER(argv);
+	// FIXME - distniguish CURRENT_DATE, CURRENT_TIME, CURRENT_TIMESTAMP
+	// LOCALTIME, LOCALTIMESTAMP
+	assert(argc == 0);
+	struct datetime now;
+	datetime_now(&now);
+	mem_set_date(ctx->pOut, &now);
+}
+
 /* FIXME */
 extern int time_token(const char * token_sz, size_t len);
 extern int64_t date_part(const struct datetime *date, int token);
@@ -1687,6 +1699,9 @@ static struct sql_func_dictionary dictionaries[] = {
 	{"CHAR_LENGTH", 1, 1, 0, true, 0, NULL},
 	{"COALESCE", 2, SQL_MAX_FUNCTION_ARG, SQL_FUNC_COALESCE, true, 0, NULL},
 	{"COUNT", 0, 1, SQL_FUNC_AGG, false, 0, NULL},
+	{"CURRENT_DATE", 0, 0, 0, false, 0, NULL},
+	{"CURRENT_TIME", 0, 0, 0, false, 0, NULL},
+	{"CURRENT_TIMESTAMP", 0, 0, 0, false, 0, NULL},
 	{"DATE_PART", 2, 2, 0, true, 0, NULL},
 	{"EXTRACT", 2, 2, 0, true, 0, NULL},
 	{"GREATEST", 2, SQL_MAX_FUNCTION_ARG, SQL_FUNC_NEEDCOLL, true, 0, NULL},
@@ -1698,6 +1713,8 @@ static struct sql_func_dictionary dictionaries[] = {
 	{"LIKE", 2, 3, SQL_FUNC_LIKE | SQL_FUNC_NEEDCOLL, true, 0, NULL},
 	{"LIKELIHOOD", 2, 2, SQL_FUNC_UNLIKELY, true, 0, NULL},
 	{"LIKELY", 1, 1, SQL_FUNC_UNLIKELY, true, 0, NULL},
+	{"LOCALTIME", 0, 0, 0, false, 0, NULL},
+	{"LOCALTIMESTAMP", 0, 0, 0, false, 0, NULL},
 	{"LOWER", 1, 1, SQL_FUNC_DERIVEDCOLL | SQL_FUNC_NEEDCOLL, true, 0,
 	 NULL},
 	{"MAX", 1, 1, SQL_FUNC_MAX | SQL_FUNC_AGG | SQL_FUNC_NEEDCOLL, false, 0,
@@ -1778,6 +1795,9 @@ static struct sql_func_definition definitions[] = {
 	{"COUNT", 1, {field_type_MAX}, FIELD_TYPE_INTEGER, step_count,
 	 fin_count},
 
+	{"CURRENT_DATE", 0, {}, FIELD_TYPE_DATETIME, func_current_date, NULL},
+	{"CURRENT_TIME", 0, {}, FIELD_TYPE_DATETIME, func_current_date, NULL},
+	{"CURRENT_TIMESTAMP", 0, {}, FIELD_TYPE_DATETIME, func_current_date, NULL},
 	{"DATE_PART", 2, {FIELD_TYPE_STRING, FIELD_TYPE_DATETIME},
 	 FIELD_TYPE_NUMBER, func_date_part, NULL},
 	{"EXTRACT", 2, {FIELD_TYPE_STRING, FIELD_TYPE_DATETIME},
@@ -1841,6 +1861,8 @@ static struct sql_func_definition definitions[] = {
 	 FIELD_TYPE_BOOLEAN, sql_builtin_stub, NULL},
 	{"LIKELY", 1, {field_type_MAX}, FIELD_TYPE_BOOLEAN, sql_builtin_stub,
 	 NULL},
+	{"LOCALTIME", 0, {}, FIELD_TYPE_DATETIME, func_current_date, NULL},
+	{"LOCALTIMESTAMP", 0, {}, FIELD_TYPE_DATETIME, func_current_date, NULL},
 	{"LOWER", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, func_lower_upper,
 	 NULL},
 
