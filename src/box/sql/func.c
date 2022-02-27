@@ -813,7 +813,8 @@ func_current_date(struct sql_context *ctx, int argc, const struct Mem *argv)
 /* FIXME */
 extern bool make_date(int y, int m, int d, struct datetime *date);
 extern bool make_time(int h, int min, double prec, struct datetime *date);
-;
+extern bool make_timestamptz(int y, int m, int d, int h, int min, double prec,
+			     const char *tz, struct datetime *date);
 
 static void
 func_make_date(struct sql_context *ctx, int argc, const struct Mem *argv)
@@ -859,9 +860,9 @@ func_make_time(struct sql_context *ctx, int argc, const struct Mem *argv)
 	const struct Mem *arg_sec = &argv[2];
 	double prec = 0;
 	if (mem_is_int(arg_sec))
-		prec = arg_hour->u.i;
+		prec = arg_sec->u.i;
 	else if (mem_is_double(arg_sec))
-		prec = arg_hour->u.r;
+		prec = arg_sec->u.r;
 	else
 		return;
 
@@ -869,6 +870,60 @@ func_make_time(struct sql_context *ctx, int argc, const struct Mem *argv)
 	if (!make_time(hour, min, prec, &date))
 		return;
 	mem_set_date(ctx->pOut, &date);
+}
+
+static void
+func_make_timestamp(struct sql_context *ctx, int argc, const struct Mem *argv)
+{
+	assert(argc == 6);
+	int y, m, d;
+	const struct Mem *arg_year = &argv[0];
+	if (!mem_is_int(arg_year))
+		return;
+	y = arg_year->u.i;
+
+	const struct Mem *arg_month = &argv[1];
+	if (!mem_is_int(arg_month))
+		return;
+	m = arg_month->u.i;
+
+	const struct Mem *arg_day = &argv[2];
+	if (!mem_is_int(arg_day))
+		return;
+	d = arg_day->u.i;
+
+	int hour, min;
+	const struct Mem *arg_hour = &argv[3];
+	if (!mem_is_int(arg_hour))
+		return;
+	hour = arg_hour->u.i;
+
+	const struct Mem *arg_min = &argv[4];
+	if (!mem_is_int(arg_min))
+		return;
+	min = arg_min->u.i;
+
+	const struct Mem *arg_sec = &argv[5];
+	double prec = 0;
+	if (mem_is_int(arg_sec))
+		prec = arg_sec->u.i;
+	else if (mem_is_double(arg_sec))
+		prec = arg_sec->u.r;
+	else
+		return;
+
+	struct datetime date;
+	if (!make_timestamptz(y, m, d, hour, min, prec, NULL, &date))
+		return;
+	mem_set_date(ctx->pOut, &date);
+}
+
+static void
+func_make_timestamptz(struct sql_context *ctx, int argc, const struct Mem *argv)
+{
+	assert(argc == 7);
+	// FIXME - handle extra tz
+	func_make_timestamp(ctx, --argc, argv);
 }
 
 /* FIXME */
@@ -1780,6 +1835,8 @@ static struct sql_func_dictionary dictionaries[] = {
 	 NULL},
 	{"MAKE_DATE", 3, 3, 0, true, 0, NULL},
 	{"MAKE_TIME", 3, 3, 0, true, 0, NULL},
+	{"MAKE_TIMESTAMP", 6, 6, 0, true, 0, NULL},
+	{"MAKE_TIMESTAMPTZ", 6, 7, 0, true, 0, NULL},
 	{"MAX", 1, 1, SQL_FUNC_MAX | SQL_FUNC_AGG | SQL_FUNC_NEEDCOLL, false, 0,
 	 NULL},
 	{"MIN", 1, 1, SQL_FUNC_MIN | SQL_FUNC_AGG | SQL_FUNC_NEEDCOLL, false, 0,
@@ -1826,7 +1883,7 @@ struct sql_func_definition {
 	 * has an unlimited number of arguments, all arguments are of the same
 	 * type.
 	 */
-	enum field_type argt[3];
+	enum field_type argt[7];
 	/** Type of the result of the implementation. */
 	enum field_type result;
 	/** Call implementation with given arguments. */
@@ -1933,6 +1990,16 @@ static struct sql_func_definition definitions[] = {
 	 FIELD_TYPE_DATETIME, func_make_date, NULL},
 	{"MAKE_TIME", 3, {FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER, FIELD_TYPE_DOUBLE},
 	 FIELD_TYPE_DATETIME, func_make_time, NULL},
+	{"MAKE_TIMESTAMP", 6, {FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER,
+	 FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER,
+	 FIELD_TYPE_DOUBLE}, FIELD_TYPE_DATETIME, func_make_timestamp, NULL},
+	{"MAKE_TIMESTAMPTZ", 6, {FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER,
+	 FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER,
+	 FIELD_TYPE_DOUBLE}, FIELD_TYPE_DATETIME, func_make_timestamp, NULL},
+	{"MAKE_TIMESTAMPTZ", 7, {FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER,
+	 FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER,
+	 FIELD_TYPE_DOUBLE, FIELD_TYPE_STRING}, FIELD_TYPE_DATETIME,
+	 func_make_timestamptz, NULL},
 	{"MAX", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, step_minmax, NULL},
 	{"MAX", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, step_minmax, NULL},
 	{"MAX", 1, {FIELD_TYPE_DECIMAL}, FIELD_TYPE_DECIMAL, step_minmax, NULL},

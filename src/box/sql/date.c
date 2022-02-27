@@ -322,6 +322,30 @@ make_time(int hour, int min, double prec, struct datetime *date)
 	return true;
 }
 
+bool
+make_timestamptz(int y, int m, int d, int hour, int min, double prec, 
+		 const char *tz, struct datetime *date)
+{
+	(void)tz;
+	dt_t dt = 0;
+	if (dt_from_ymd_checked(y, m, d, &dt) == false)
+		return false;
+
+	int sec = (int)prec;
+	assert(date != NULL);
+	if (hour > 23 || min > 59 || sec > 59) {
+		if (!(hour == 24 && min == 0 && sec == 0))
+			return false;
+	}
+	date->epoch =
+		((int64_t)dt_rdn(dt) - DT_EPOCH_1970_OFFSET) * SECS_PER_DAY +
+		hour * 3600 + min * 60 + sec;
+	// FIXME - handle nanoseconds from prec
+	date->nsec = date->tzoffset = date->tzindex = 0;
+	return true;
+
+}
+
 /*
  * Till time-like types are implemented as native Tarantool
  * types, built-in functions below make no sense.
