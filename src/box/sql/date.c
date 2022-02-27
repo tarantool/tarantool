@@ -141,11 +141,13 @@ static struct datetime_token_def deltatktbl[] = {
 	{ "julian", DTK_JULIAN },
 	{ "m", DTK_MONTH }, /* "month" for ISO input */
 	{ "mm", DTK_MINUTE }, /* "minute" for ISO input */
-	{ "microsecon", DTK_MICROSEC }, /* "microsecond" relative */
+	{ "microsecond", DTK_MICROSEC }, /* "microsecond" relative */
+	{ "microseconds", DTK_MICROSEC }, /* "microsecond" relative */
 	{ "mil", DTK_MILLENNIUM }, /* "millennium" relative */
 	{ "millennia", DTK_MILLENNIUM }, /* "millennia" relative */
 	{ "millenium", DTK_MILLENNIUM }, /* "millennium" relative */
-	{ "millisecon", DTK_MILLISEC }, /* relative */
+	{ "millisecond", DTK_MILLISEC }, /* relative */
+	{ "milliseconds", DTK_MILLISEC }, /* relative */
 	{ "mils", DTK_MILLENNIUM }, /* "millennia" relative */
 	{ "min", DTK_MINUTE }, /* "minute" relative */
 	{ "mins", DTK_MINUTE }, /* "minutes" relative */
@@ -162,6 +164,8 @@ static struct datetime_token_def deltatktbl[] = {
 	{ "msecs", DTK_MILLISEC },
 	{ "ns", DTK_NANOSEC },
 	{ "nsec", DTK_NANOSEC },
+	{ "nanosecond", DTK_NANOSEC },
+	{ "nanoseconds", DTK_NANOSEC },
 	{ "nanosec", DTK_NANOSEC },
 	{ "nseconds", DTK_NANOSEC },
 	{ "nsecs", DTK_NANOSEC },
