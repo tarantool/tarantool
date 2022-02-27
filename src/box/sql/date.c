@@ -198,7 +198,7 @@ int
 time_token(const char *token_sz, size_t len)
 {
 	for (size_t i = 0; i < lengthof(deltatktbl); i++) {
-		if (!strncmp(token_sz, deltatktbl[i].token, len))
+		if (!strncasecmp(token_sz, deltatktbl[i].token, len))
 			return deltatktbl[i].value;
 	}
 	return 0;
@@ -269,6 +269,11 @@ date_part(const struct datetime *date, int token)
 			return date->nsec;
 		case DTK_JULIAN:
 			return dt_cjdn(ldt);
+		case DTK_TZ:
+		case DTK_TZ_MINUTE:
+			return date->tzoffset;
+		case DTK_TZ_HOUR:
+			return date->tzoffset / 60;
 		default:
 			unreachable();
 	}
