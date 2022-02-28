@@ -1001,6 +1001,7 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 
 	relay_start(relay, io, sync, relay_send_row,
 		    relay_yield_and_send_heartbeat);
+	replica_on_relay_follow(replica);
 	auto relay_guard = make_scoped_guard([=] {
 		relay_stop(relay);
 		replica_on_relay_stop(replica);
