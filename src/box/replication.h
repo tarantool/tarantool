@@ -161,6 +161,16 @@ extern bool replication_anon;
 extern int replication_threads;
 
 /**
+ * A list of triggers fired once quorum of "healthy" connections is acquired.
+ */
+extern struct rlist replicaset_on_quorum_gain;
+
+/**
+ * A list of triggers fired once the quorum of "healthy" connections is lost.
+ */
+extern struct rlist replicaset_on_quorum_loss;
+
+/**
  * Wait for the given period of time before trying to reconnect
  * to a master.
  */
@@ -237,6 +247,13 @@ struct replicaset {
 	 * accounted here.
 	 */
 	int registered_count;
+	/**
+	 * Number of registered replicas, to which this node has a bidirectional
+	 * connection, such that both relay and applier are in FOLLOW state.
+	 * Used to notify various subsystems whether there is a quorum of
+	 * followers connected.
+	 */
+	int healthy_count;
 	/** Applier state. */
 	struct {
 		/**
@@ -313,6 +330,10 @@ struct replica {
 	 * _cluster table.
 	 */
 	bool anon;
+	/** Whether there is an established relay to this replica. */
+	bool is_relay_healthy;
+	/** Whether there is an applier subscribed to this replica. */
+	bool is_applier_healthy;
 	/** Applier fiber. */
 	struct applier *applier;
 	/** Relay thread. */
@@ -406,6 +427,86 @@ replica_clear_applier(struct replica *replica);
 
 void
 replica_set_applier(struct replica * replica, struct applier * applier);
+
+/**
+ * Check if there are enough "healthy" connections, and fire the appropriate
+ * triggers. A replica connection is considered "healthy", when:
+ * - it is a connection to a registered replica.
+ * - it is bidirectional, e.g. there are both relay and applier for this
+ *   replica.
+ * - both relay and applier are in "FOLLOW" state, the normal state of operation
+ *   during SUBSCRIBE.
+ */
+void
+replicaset_on_health_change(void);
+
+/** Return whether there are enough "healthy" connections to form a quorum. */
+bool
+replicaset_has_healthy_quorum(void);
+
+/**
+ * A special wrapper for replication_synchro_quorum, which lowers it to the
+ * count of nodes registered in cluster.
+ * The resulting value may differ from the configured synchro_quorum only
+ * during bootstrap, when specified value is too high to operate.
+ * Note, this value should never be used to commit synchronous transactions.
+ * It's only used for leader elections and some extensions like pre-vote and
+ * fencing.
+ * See the comment in function body for more details.
+ */
+static inline int
+replicaset_healthy_quorum(void)
+{
+	/*
+	 * When the instance is started first time, it does not have an ID, so
+	 * the registered count is 0. But the quorum can never be 0. At least
+	 * the current instance should participate in the quorum.
+	 */
+	int max = MAX(replicaset.registered_count, 1);
+	/*
+	 * Election quorum is not strictly equal to synchronous replication
+	 * quorum. Sometimes it can be lowered. That is about bootstrap.
+	 *
+	 * The problem with bootstrap is that when the replicaset boots, all the
+	 * instances can't write to WAL and can't recover from their initial
+	 * snapshot. They need one node which will boot first, and then they
+	 * will replicate from it.
+	 *
+	 * This one node should boot from its zero snapshot, create replicaset
+	 * UUID, register self with ID 1 in _cluster space, and then register
+	 * all the other instances here. To do that the node must be writable.
+	 * It should have read_only = false, connection quorum satisfied, and be
+	 * a Raft leader if Raft is enabled.
+	 *
+	 * To be elected a Raft leader it needs to perform election. But it
+	 * can't be done before at least synchronous quorum of the replicas is
+	 * bootstrapped. And they can't be bootstrapped because wait for a
+	 * leader to initialize _cluster. Cyclic dependency.
+	 *
+	 * This is resolved by truncation of the election quorum to the number
+	 * of registered replicas, if their count is less than synchronous
+	 * quorum. That helps to elect a first leader.
+	 *
+	 * It may seem that the first node could just declare itself a leader
+	 * and then strictly follow the protocol from now on, but that won't
+	 * work, because if the first node will restart after it is booted, but
+	 * before quorum of replicas is booted, the cluster will stuck again.
+	 *
+	 * The current solution is totally safe because
+	 *
+	 * - after all the cluster will have node count >= quorum, if user used
+	 *   a correct config (God help him if he didn't);
+	 *
+	 * - synchronous replication quorum is untouched - it is not truncated.
+	 *   Only leader election quorum is affected. So synchronous data won't
+	 *   be lost.
+	 */
+	return MIN(max, replication_synchro_quorum);
+}
+
+/** Track an established downstream connection in replica. */
+void
+replica_on_relay_follow(struct replica *replica);
 
 /**
  * Unregister \a relay from the \a replica.

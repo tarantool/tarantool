@@ -185,54 +185,11 @@ box_raft_on_update_f(struct trigger *trigger, void *event)
 void
 box_raft_update_election_quorum(void)
 {
-	/*
-	 * When the instance is started first time, it does not have an ID, so
-	 * the registered count is 0. But the quorum can never be 0. At least
-	 * the current instance should participate in the quorum.
-	 */
-	int max = MAX(replicaset.registered_count, 1);
-	/*
-	 * Election quorum is not strictly equal to synchronous replication
-	 * quorum. Sometimes it can be lowered. That is about bootstrap.
-	 *
-	 * The problem with bootstrap is that when the replicaset boots, all the
-	 * instances can't write to WAL and can't recover from their initial
-	 * snapshot. They need one node which will boot first, and then they
-	 * will replicate from it.
-	 *
-	 * This one node should boot from its zero snapshot, create replicaset
-	 * UUID, register self with ID 1 in _cluster space, and then register
-	 * all the other instances here. To do that the node must be writable.
-	 * It should have read_only = false, connection quorum satisfied, and be
-	 * a Raft leader if Raft is enabled.
-	 *
-	 * To be elected a Raft leader it needs to perform election. But it
-	 * can't be done before at least synchronous quorum of the replicas is
-	 * bootstrapped. And they can't be bootstrapped because wait for a
-	 * leader to initialize _cluster. Cyclic dependency.
-	 *
-	 * This is resolved by truncation of the election quorum to the number
-	 * of registered replicas, if their count is less than synchronous
-	 * quorum. That helps to elect a first leader.
-	 *
-	 * It may seem that the first node could just declare itself a leader
-	 * and then strictly follow the protocol from now on, but that won't
-	 * work, because if the first node will restart after it is booted, but
-	 * before quorum of replicas is booted, the cluster will stuck again.
-	 *
-	 * The current solution is totally safe because
-	 *
-	 * - after all the cluster will have node count >= quorum, if user used
-	 *   a correct config (God help him if he didn't);
-	 *
-	 * - synchronous replication quorum is untouched - it is not truncated.
-	 *   Only leader election quorum is affected. So synchronous data won't
-	 *   be lost.
-	 */
-	int quorum = MIN(replication_synchro_quorum, max);
 	struct raft *raft = box_raft();
+	int quorum = replicaset_healthy_quorum();
 	raft_cfg_election_quorum(raft, quorum);
-	raft_cfg_cluster_size(raft, max);
+	int size = MAX(replicaset.registered_count, 1);
+	raft_cfg_cluster_size(raft, size);
 }
 
 void
