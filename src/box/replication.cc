@@ -60,6 +60,12 @@ int replication_threads = 1;
 
 struct replicaset replicaset;
 
+struct rlist replicaset_on_quorum_gain =
+	RLIST_HEAD_INITIALIZER(replicaset_on_quorum_gain);
+
+struct rlist replicaset_on_quorum_loss =
+	RLIST_HEAD_INITIALIZER(replicaset_on_quorum_loss);
+
 static int
 replica_compare_by_uuid(const struct replica *a, const struct replica *b)
 {
@@ -104,6 +110,9 @@ replication_init(int num_threads)
 	diag_create(&replicaset.applier.diag);
 
 	replication_threads = num_threads;
+
+	/* The local instance is always part of the quorum. */
+	replicaset.healthy_count = 1;
 
 	applier_init();
 }
@@ -187,6 +196,8 @@ replica_new(void)
 	replica->uuid = uuid_nil;
 	replica->applier = NULL;
 	replica->gc = NULL;
+	replica->is_applier_healthy = false;
+	replica->is_relay_healthy = false;
 	rlist_create(&replica->in_anon);
 	trigger_create(&replica->on_applier_state,
 		       replica_on_applier_state_f, NULL, NULL);
@@ -318,6 +329,22 @@ replica_clear_id(struct replica *replica)
 	box_update_replication_synchro_quorum();
 }
 
+bool
+replicaset_has_healthy_quorum(void)
+{
+	int quorum = replicaset_healthy_quorum();
+	return replicaset.healthy_count >= quorum;
+}
+
+void
+replicaset_on_health_change(void)
+{
+	if (replicaset_has_healthy_quorum())
+		trigger_run(&replicaset_on_quorum_gain, NULL);
+	else
+		trigger_run(&replicaset_on_quorum_loss, NULL);
+}
+
 void
 replica_set_applier(struct replica *replica, struct applier *applier)
 {
@@ -327,12 +354,31 @@ replica_set_applier(struct replica *replica, struct applier *applier)
 		    &replica->on_applier_state);
 }
 
+/** A helper to track applier health on its state change. */
+static void
+replica_update_applier_health(struct replica *replica)
+{
+	struct applier *applier = replica->applier;
+	bool is_healthy = applier != NULL && applier->state == APPLIER_FOLLOW;
+	if (is_healthy == replica->is_applier_healthy)
+		return;
+	replica->is_applier_healthy = is_healthy;
+	if (!replica->is_relay_healthy || replica->anon)
+		return;
+	if (is_healthy)
+		replicaset.healthy_count++;
+	else
+		replicaset.healthy_count--;
+	replicaset_on_health_change();
+}
+
 void
 replica_clear_applier(struct replica *replica)
 {
 	assert(replica->applier != NULL);
 	replica->applier = NULL;
 	trigger_clear(&replica->on_applier_state);
+	replica_update_applier_health(replica);
 }
 
 static void
@@ -469,6 +515,7 @@ replica_on_applier_state_f(struct trigger *trigger, void *event)
 	(void)event;
 	struct replica *replica = container_of(trigger,
 			struct replica, on_applier_state);
+	replica_update_applier_health(replica);
 	switch (replica->applier->state) {
 	case APPLIER_INITIAL_JOIN:
 		replicaset.is_joining = true;
@@ -942,6 +989,33 @@ replicaset_check_quorum(void)
 		box_set_orphan(false);
 }
 
+/** A helper to update relay health on its start/stop. */
+static void
+replica_update_relay_health(struct replica *replica)
+{
+	struct relay *relay = replica->relay;
+	assert(relay != NULL);
+	bool is_healthy = relay_get_state(relay) == RELAY_FOLLOW;
+	if (is_healthy == replica->is_relay_healthy)
+		return;
+	replica->is_relay_healthy = is_healthy;
+	if (!replica->is_applier_healthy || replica->anon)
+		return;
+	if (is_healthy)
+		replicaset.healthy_count++;
+	else
+		replicaset.healthy_count--;
+	replicaset_on_health_change();
+}
+
+void
+replica_on_relay_follow(struct replica *replica)
+{
+	assert(relay_get_state(replica->relay) == RELAY_FOLLOW);
+	assert(!replica->is_relay_healthy);
+	replica_update_relay_health(replica);
+}
+
 void
 replica_on_relay_stop(struct replica *replica)
 {
@@ -959,6 +1033,9 @@ replica_on_relay_stop(struct replica *replica)
 			assert(replica->gc == NULL);
 		}
 	}
+
+	replica_update_relay_health(replica);
+
 	if (replica_is_orphan(replica)) {
 		replica_hash_remove(&replicaset.hash, replica);
 		replicaset.anon_count -= replica->anon;
