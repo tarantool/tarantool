@@ -9,7 +9,7 @@ trigger = function() end
 s = box.schema.space.create('gh-5093', {engine=test_run:get_cfg('engine')})
  | ---
  | ...
-_ = s:create_index('value', {parts={{1, type='decimal'}}})
+_ = s:create_index('value', {parts={{1, type='number'}}})
  | ---
  | ...
 _ = s:before_replace(trigger)
@@ -17,7 +17,7 @@ _ = s:before_replace(trigger)
  | ...
 s:delete('1111.1111')
  | ---
- | - error: 'Supplied key type of part 0 does not match index part type: expected decimal'
+ | - error: 'Supplied key type of part 0 does not match index part type: expected number'
  | ...
 s:drop()
  | ---
