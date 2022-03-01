@@ -1264,12 +1264,15 @@ case OP_FunctionByName: {
 	pOut = vdbe_prepare_null_out(p, pOp->p3);
 	uint32_t size;
 	struct Mem *mem = (struct Mem *)port_get_vdbemem(&ret, &size);
-	if (mem != NULL && size > 0)
-		*pOut = mem[0];
 	port_destroy(&ret);
-	region_truncate(region, region_svp);
-	if (mem == NULL)
+	if (mem == NULL) {
+		region_truncate(region, region_svp);
 		goto abort_due_to_error;
+	}
+	assert(size == 1);
+	mem_move(pOut, &mem[0]);
+	assert(mem_is_null(&mem[0]) && mem_is_trivial(&mem[0]));
+	region_truncate(region, region_svp);
 	if (!mem_is_field_compatible(pOut, returns)) {
 		diag_set(ClientError, ER_FUNC_INVALID_RETURN_TYPE, pOp->p4.z,
 			 field_type_strs[returns],
