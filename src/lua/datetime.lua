@@ -808,8 +808,7 @@ local function datetime_interval_sub(lhs, rhs)
     -- left is date, right is date
     elseif not left_is_interval and not right_is_interval then
         local obj = interval_new()
-        obj.sec, obj.nsec = normalize_nsec(lhs.epoch - rhs.epoch,
-                                           lhs.nsec - rhs.nsec)
+        obj.sec, obj.nsec = lhs.epoch - rhs.epoch, lhs.nsec - rhs.nsec
         return obj
     -- both left and right are intervals
     elseif left_is_interval and right_is_interval then
