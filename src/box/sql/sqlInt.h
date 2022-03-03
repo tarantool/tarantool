@@ -77,6 +77,7 @@
 #include "trivia/util.h"
 
 #include "decimal.h"
+#include "datetime.h"
 
 /*
  * These #defines should enable >2GB file support on POSIX if the
@@ -567,6 +568,10 @@ sql_bind_uuid(struct sql_stmt *stmt, int i, const struct tt_uuid *uuid);
 
 int
 sql_bind_dec(struct sql_stmt *stmt, int i, const decimal_t *dec);
+
+/** Perform DATETIME parameter binding for the sql statement. */
+int
+sql_bind_datetime(struct sql_stmt *stmt, int i, const struct datetime *dt);
 
 /**
  * Return the number of wildcards that should be bound to.

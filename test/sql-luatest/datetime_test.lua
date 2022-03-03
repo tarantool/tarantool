@@ -1587,3 +1587,30 @@ g.test_datetime_27 = function()
         t.assert_equals(rows, res)
     end)
 end
+
+-- Make sure that DATETIME value can be bound.
+g.test_datetime_28_1 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt4 = dt.new({year = 2004, month = 4, day = 4, hour = 4})
+        local sql = [[SELECT ?;]]
+        local res = {{dt4}}
+        local rows = box.execute(sql, {dt4}).rows
+
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_28_2 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt4 = dt.new({year = 2004, month = 4, day = 4, hour = 4})
+        local sql = [[SELECT $1;]]
+        local res = {{dt4}}
+        local rows = box.execute(sql, {dt4}).rows
+
+        t.assert_equals(rows, res)
+    end)
+end

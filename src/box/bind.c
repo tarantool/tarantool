@@ -189,10 +189,12 @@ sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
 	case MP_MAP:
 		return sql_bind_map_static(stmt, pos, p->s, p->bytes);
 	case MP_EXT:
-		assert(p->ext_type == MP_UUID || p->ext_type == MP_DECIMAL);
 		if (p->ext_type == MP_UUID)
 			return sql_bind_uuid(stmt, pos, &p->uuid);
-		return sql_bind_dec(stmt, pos, &p->dec);
+		else if (p->ext_type == MP_DECIMAL)
+			return sql_bind_dec(stmt, pos, &p->dec);
+		assert(p->ext_type == MP_DATETIME);
+		return sql_bind_datetime(stmt, pos, &p->dt);
 	default:
 		unreachable();
 	}
