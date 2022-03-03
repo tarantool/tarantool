@@ -11,7 +11,7 @@ local ffi = require('ffi')
 --]]
 if jit.arch == 'arm64' then jit.off() end
 
-test:plan(31)
+test:plan(32)
 
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
@@ -929,6 +929,25 @@ test:test("Time interval operations", function(test)
     assert_raises_like(test, expected_interval_but, function() tsub_t:sub('bogus') end)
     assert_raises_like(test, expected_interval_but, function() tsub_t:sub(123) end)
 end)
+
+test:test("Time interval operations - determinism", function(test)
+    test:plan(4)
+    local d1 = date.new()
+    local d2 = date.new()
+    local negsec0 = d1 - d2
+    local possec0 = d2 - d1
+    test:is(negsec0.sec, 0, "date.now() - date.now() should be 0")
+    test:is(possec0.sec, 0, "date.now() - date.now() should be 0 in reverse")
+
+    d1 = date.new{year = 2021, mon = 1, day = 12, hour = 12, min = 10, sec = 10,
+                  nsec = 4e6}
+    d2 = date.new{year = 2021, mon = 1, day = 12, hour = 12, min = 10, sec = 10,
+                  nsec = 5e6}
+    negsec0 = d1 - d2
+    possec0 = d2 - d1
+    test:is(negsec0.sec, 0, "nsec = 4e6 - 5e6 should be 0")
+    test:is(possec0.sec, 0, "nsec = 5e6 - 4e6 should be 0")
+    end)
 
 test:test("Time interval operations - different adjustments", function(test)
     test:plan(60)
