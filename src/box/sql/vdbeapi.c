@@ -561,6 +561,16 @@ sql_bind_dec(struct sql_stmt *stmt, int i, const decimal_t *dec)
 }
 
 int
+sql_bind_datetime(struct sql_stmt *stmt, int i, const struct datetime *dt)
+{
+	struct Vdbe *p = (struct Vdbe *)stmt;
+	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "datetime") != 0)
+		return -1;
+	mem_set_datetime(&p->aVar[i - 1], dt);
+	return 0;
+}
+
+int
 sql_bind_parameter_count(const struct sql_stmt *stmt)
 {
 	struct Vdbe *p = (struct Vdbe *) stmt;
