@@ -42,7 +42,7 @@ jobs:
         ( ! contains(github.event.pull_request.labels.*.name, 'notest') &&
           github.event.pull_request.head.repo.full_name != github.repository )
 
-    runs-on: ubuntu-20.04-self-hosted
+    runs-on: ghacts-2-8-90-5-2
 
     steps:
       - uses: actions/checkout@v2.3.4
