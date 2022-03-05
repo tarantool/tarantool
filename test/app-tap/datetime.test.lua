@@ -15,12 +15,8 @@ test:plan(32)
 
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
-local MIN_DATE_MONTH = 6
-local MIN_DATE_DAY = 22
 -- maximum supported date - 5879611-07-11
 local MAX_DATE_YEAR = 5879611
-local MAX_DATE_MONTH = 7
-local MAX_DATE_DAY = 11
 
 local SECS_PER_DAY      = 86400
 local AVERAGE_DAYS_YEAR = 365.25
@@ -78,14 +74,8 @@ local function range_check_3_error(name, value, range)
             format(value, name, range[1], range[2], range[3])
 end
 
-local function less_than_min(y, M, d)
-    return ('date %d-%02d-%02d is less than minimum allowed %d-%02d-%02d'):
-            format(y, M, d, MIN_DATE_YEAR, MIN_DATE_MONTH, MIN_DATE_DAY)
-end
-
-local function greater_than_max(y, M, d)
-    return ('date %d-%02d-%02d is greater than maximum allowed %d-%02d-%02d'):
-            format(y, M, d, MAX_DATE_YEAR, MAX_DATE_MONTH, MAX_DATE_DAY)
+local function invalid_date(y, M, d)
+    return ('date %d-%02d-%02d is invalid'):format(y, M, d)
 end
 
 local function invalid_tz_fmt_error(val)
@@ -320,17 +310,17 @@ test:test("Simple date creation by attributes - check failed", function(test)
         {range_check_3_error('day', 32, {-1, 1, 31}),
             {year = 2021, month = 6, day = 32}},
         {invalid_days_in_mon(31, 6, 2021), { year = 2021, month = 6, day = 31}},
-        {less_than_min(-5879610, 6, 21),
+        {invalid_date(-5879610, 6, 21),
             {year = -5879610, month = 6, day = 21}},
-        {less_than_min(-5879610, 1, 1),
+        {invalid_date(-5879610, 1, 1),
             {year = -5879610, month = 1, day = 1}},
         {range_check_error('year', -16009610, {MIN_DATE_YEAR, MAX_DATE_YEAR}),
             {year = -16009610, month = 12, day = 31}},
         {range_check_error('year', 16009610, {MIN_DATE_YEAR, MAX_DATE_YEAR}),
             {year = 16009610, month = 1, day = 1}},
-        {greater_than_max(MAX_DATE_YEAR, 9, 1),
+        {invalid_date(MAX_DATE_YEAR, 9, 1),
             {year = MAX_DATE_YEAR, month = 9, day = 1}},
-        {greater_than_max(MAX_DATE_YEAR, 7, 12),
+        {invalid_date(MAX_DATE_YEAR, 7, 12),
             {year = MAX_DATE_YEAR, month = 7, day = 12}},
     }
     for _, row in pairs(specific_errors) do
@@ -1610,17 +1600,17 @@ test:test("Time invalid :set{} operations", function(test)
         {range_check_3_error('day', 32, {-1, 1, 31}),
             {year = 2021, month = 6, day = 32}},
         {invalid_days_in_mon(31, 6, 2021), { month = 6, day = 31}},
-        {less_than_min(-5879610, 6, 21),
+        {invalid_date(-5879610, 6, 21),
             {year = -5879610, month = 6, day = 21}},
-        {less_than_min(-5879610, 1, 1),
+        {invalid_date(-5879610, 1, 1),
             {year = -5879610, month = 1, day = 1}},
         {range_check_error('year', -16009610, {MIN_DATE_YEAR, MAX_DATE_YEAR}),
             {year = -16009610, month = 12, day = 31}},
         {range_check_error('year', 16009610, {MIN_DATE_YEAR, MAX_DATE_YEAR}),
             {year = 16009610, month = 1, day = 1}},
-        {greater_than_max(MAX_DATE_YEAR, 9, 1),
+        {invalid_date(MAX_DATE_YEAR, 9, 1),
             {year = MAX_DATE_YEAR, month = 9, day = 1}},
-        {greater_than_max(MAX_DATE_YEAR, 7, 12),
+        {invalid_date(MAX_DATE_YEAR, 7, 12),
             {year = MAX_DATE_YEAR, month = 7, day = 12}},
     }
     for _, row in pairs(specific_errors) do
