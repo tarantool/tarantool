@@ -42,7 +42,7 @@ typedef enum {
 } dt_dow_t;
 
 dt_t   tnt_dt_from_rdn     (int n);
-dt_t   tnt_dt_from_ymd     (int y, int m, int d);
+bool   tnt_dt_from_ymd_checked(int y, int m, int d, dt_t *val);
 void   tnt_dt_to_ymd       (dt_t dt, int *y, int *m, int *d);
 
 dt_dow_t tnt_dt_dow        (dt_t dt);
@@ -287,38 +287,16 @@ local function check_dt(dt_v, direction, v, unit)
     end
 end
 
-local function check_ymd_range(y, M, d)
-    -- Fast path. Max/min year is rather theoretical. Nobody is going to
-    -- actually use them.
-    if y > MIN_DATE_YEAR and y < MAX_DATE_YEAR then
-        return
+local function dt_from_ymd_checked(y, M, d)
+    local pdt = date_dt_stash_take()
+    local is_valid = builtin.tnt_dt_from_ymd_checked(y, M, d, pdt)
+    if not is_valid then
+        date_dt_stash_put(pdt)
+        error(('date %4d-%02d-%02d is invalid'):format(y, M, d))
     end
-    -- Slow path.
-    if y < MIN_DATE_YEAR then
-        goto min_err
-    elseif y > MAX_DATE_YEAR then
-        goto max_err
-    elseif y == MIN_DATE_YEAR then
-        if M < MIN_DATE_MONTH then
-            goto min_err
-        elseif M == MIN_DATE_MONTH and d < MIN_DATE_DAY then
-            goto min_err
-        end
-        return
-    -- y == MAX_DATE_YEAR
-    elseif M > MAX_DATE_MONTH then
-        goto max_err
-    elseif M == MAX_DATE_MONTH and d > MAX_DATE_DAY then
-        goto max_err
-    else
-        return
-    end
-::min_err::
-    error(('date %d-%02d-%02d is less than minimum allowed %s'):
-        format(y, M, d, MIN_DATE_TEXT))
-::max_err::
-    error(('date %d-%02d-%02d is greater than maximum allowed %s'):
-        format(y, M, d, MAX_DATE_TEXT))
+    local dt = pdt[0]
+    date_dt_stash_put(pdt)
+    return dt
 end
 
 -- check v value against maximum/minimum possible values
@@ -619,8 +597,7 @@ local function datetime_new(obj)
                     format(d, M, y), 3)
             end
         end
-        check_ymd_range(y, M, d)
-        dt = builtin.tnt_dt_from_ymd(y, M, d)
+        dt = dt_from_ymd_checked(y, M, d)
     end
 
     -- .hour, .minute, .second
@@ -1036,7 +1013,7 @@ local function datetime_ymd_update(self, y, M, d, new_offset)
                   format(d, M, y), 3)
         end
     end
-    local dt = builtin.tnt_dt_from_ymd(y, M, d)
+    local dt = dt_from_ymd_checked(y, M, d)
     datetime_update_dt(self, dt, new_offset)
 end
 
@@ -1159,7 +1136,6 @@ local function datetime_set(self, obj)
         y = y or y0
         M = M or M0
         d = d or d0
-        check_ymd_range(y, M, d)
         datetime_ymd_update(self, y, M, d, offset)
     end
 
