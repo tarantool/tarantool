@@ -68,3 +68,8 @@ if(ENABLE_FUZZER)
     add_subdirectory(fuzz)
 endif()
 add_subdirectory(unit)
+foreach(TEST_SUITE ${EXTRA_TEST_SUITES})
+    add_subdirectory(
+        "${EXTRA_TEST_SUITES_SOURCE_DIR}/${TEST_SUITE}"
+        "${EXTRA_TEST_SUITES_BINARY_DIR}/${TEST_SUITE}")
+endforeach()
