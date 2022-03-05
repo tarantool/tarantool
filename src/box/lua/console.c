@@ -760,22 +760,27 @@ lua_rl_dmadd(dmlist *ml, const char *p, size_t pn, const char *s, int suf)
 	return 0;
 }
 
-/* Get __index field of metatable of object on top of stack. */
+/* Get a table from __autocomplete method of metatable if present. */
 static int
-lua_rl_getmetaindex(lua_State *L)
+lua_rl_getcompletetab(lua_State *L)
 {
 	if (!lua_getmetatable(L, -1)) {
 		lua_pop(L, 1);
 		return 0;
 	}
-	lua_pushstring(L, "__index");
+	lua_pushstring(L, "__autocomplete");
 	lua_rawget(L, -2);
-	lua_replace(L, -2);
 	if (lua_isnil(L, -1) || lua_rawequal(L, -1, -2)) {
 		lua_pop(L, 2);
 		return 0;
 	}
-	lua_replace(L, -2);
+	lua_replace(L, -2);     // remove metatable from stack
+	lua_insert(L, -2);      // set the table on top as arg to __autocomplete
+        if (lua_pcall(L, 1, 1, 0) != 0) {
+            diag_set(LuajitError, lua_tostring(L, -1));
+            lua_pop(L, 2);
+            return 0;
+        }
 	return 1;
 }	 /* 1: obj -- val, 0: obj -- */
 
@@ -798,7 +803,7 @@ lua_rl_getfield(lua_State *L, const char *s, size_t n)
 			lua_pop(L, 1);
 			return 0;
 		}
-	} while (lua_rl_getmetaindex(L));
+	} while (lua_rl_getcompletetab(L));
 	return 0;
 }	 /* 1: obj -- val, 0: obj -- */
 
@@ -904,7 +909,7 @@ lua_rl_complete(lua_State *L, const char *text, int start, int end)
 					goto error;
 			}
 		}
-	} while (++loop < METATABLE_RECURSION_MAX && lua_rl_getmetaindex(L));
+	} while (++loop < METATABLE_RECURSION_MAX && lua_rl_getcompletetab(L));
 
 	lua_pop(L, 1);
 

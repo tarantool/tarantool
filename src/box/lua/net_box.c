@@ -1736,6 +1736,13 @@ luaT_netbox_request_gc(struct lua_State *L)
 }
 
 static int
+luaT_netbox_request_autocomplete(struct lua_State *L)
+{
+        lua_getmetatable(L, -1);
+        return 1;
+}
+
+static int
 luaT_netbox_request_tostring(struct lua_State *L)
 {
 	lua_pushstring(L, netbox_request_typename);
@@ -2767,6 +2774,7 @@ luaopen_net_box(struct lua_State *L)
 	luaL_register_type(L, netbox_transport_typename, netbox_transport_meta);
 
 	static const struct luaL_Reg netbox_request_meta[] = {
+                { "__autocomplete", luaT_netbox_request_autocomplete },
 		{ "__gc",           luaT_netbox_request_gc },
 		{ "__tostring",     luaT_netbox_request_tostring },
 		{ "__serialize",    luaT_netbox_request_serialize },

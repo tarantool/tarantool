@@ -154,7 +154,8 @@ end
 local remote_methods = {}
 local remote_mt = {
     __index = remote_methods, __serialize = remote_serialize,
-    __metatable = false
+    __metatable = false,
+    __autocomplete = function() return remote_methods end
 }
 
 -- Create stream space index, which is same as connection space
@@ -165,7 +166,8 @@ local function stream_wrap_index(stream_id, src)
         _src = src,
     }, {
         __index = src,
-        __serialize = stream_index_serialize
+        __serialize = stream_index_serialize,
+        __autocomplete = stream_index_serialize
     })
 end
 
@@ -188,7 +190,8 @@ local stream_indexes_mt = {
         self[key] = res
         return res
     end,
-    __serialize = stream_indexes_serialize
+    __serialize = stream_indexes_serialize,
+    __autocomplete = stream_indexes_serialize
 }
 
 -- Create stream space, which is same as connection space,
@@ -202,7 +205,8 @@ local function stream_wrap_space(stream, src)
         }, stream_indexes_mt)
     }, {
         __index = src,
-        __serialize = stream_space_serialize
+        __serialize = stream_space_serialize,
+        __autocomplete = stream_space_serialize
     })
     res.index._space = res
     return res
@@ -234,7 +238,8 @@ local stream_spaces_mt = {
         self._stream_space_cache[key] = res
         return res
     end,
-    __serialize = stream_spaces_serialize
+    __serialize = stream_spaces_serialize,
+    __autocomplete = stream_spaces_serialize
 }
 
 -- This callback is invoked in a new fiber upon receiving 'box.shutdown' event
@@ -509,6 +514,7 @@ end
 local watcher_methods = {}
 local watcher_mt = {
     __index = watcher_methods,
+    __autocomplete = function() return watcher_methods end,
     __tostring = function()
         return 'net.box.watcher'
     end,
@@ -995,7 +1001,9 @@ space_metatable = function(remote)
         end
     end
 
-    return { __index = methods, __metatable = false }
+    return { __index = methods,
+             __metatable = false,
+             __autocomplete = function() return methods end }
 end
 
 index_metatable = function(remote)
@@ -1074,7 +1082,9 @@ index_metatable = function(remote)
                                                self.id, key, oplist))
     end
 
-    return { __index = methods, __metatable = false }
+    return { __index = methods,
+             __metatable = false,
+             __autocomplete = function() return methods end }
 end
 
 this_module = {
