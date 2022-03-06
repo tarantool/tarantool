@@ -71,6 +71,28 @@ struct datetime {
 	int16_t tzindex;
 };
 
+/**
+ * To be able to perform arithmetics on time intervals and receive
+ * deterministic results, we have to keep months and years separately
+ * from seconds.
+ * Weeks, days, hours and minutes, all could be _precisely_ converted
+ * to seconds, but it's not the case for months (which might be 28, 29,
+ * 30, or 31 days long), or years (which could be leap year or not).
+ * Approach used here - to add/subtract months or years intervals only
+ * at the moment when we have particular date we operate on.
+ * Determinism of results is achieved due to the order we apply
+ * operations (from larger to smaller quantities):
+ * - years, then months, then weeks, days, hours, minutes,
+ *   seconds, and nanoseconds.
+*/
+struct datetime_interval {
+	double sec;
+	int nsec;
+	int month;
+	int year;
+	int /*dt_adjust_t*/ adjust;
+};
+
 /*
  * Compare arguments of a datetime type
  * @param lhs left datetime argument

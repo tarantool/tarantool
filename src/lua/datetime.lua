@@ -56,13 +56,6 @@ int     tnt_dt_month        (dt_t dt);
 int     tnt_dt_doy          (dt_t dt);
 int     tnt_dt_dom          (dt_t dt);
 
-/* dt_arithmetic.h definitions */
-typedef enum {
-    DT_EXCESS,
-    DT_LIMIT,
-    DT_SNAP
-} dt_adjust_t;
-
 dt_t   tnt_dt_add_months   (dt_t dt, int delta, dt_adjust_t adjust);
 
 /* dt_parse_iso.h definitions */
@@ -145,30 +138,6 @@ local date_dt_stash_take = date_dt_stash.take
 local date_dt_stash_put = date_dt_stash.put
 
 local datetime_t = ffi.typeof('struct datetime')
-
---[[
-    To be able to perform arithmetics on time intervals and receive
-    deterministic results, we have to keep months and years separately
-    from seconds.
-    Weeks, days, hours and minutes, all could be _precisely_ converted
-    to seconds, but it's not the case for months (which might be 28, 29,
-    30, or 31 days long), or years (which could be leap year or not).
-    Approach used here - to add/subtract months or years intervals only
-    at the moment when we have particular date we operate on.
-    Determinism of results is achieved due to the order we apply
-    operations (from larger to smaller quantities):
-    - years, then months, then weeks, days, hours, minutes,
-      seconds, and nanoseconds.
-]]
-ffi.cdef [[
-    struct datetime_interval {
-        double sec;
-        int nsec;
-        int month;
-        int year;
-        dt_adjust_t adjust;
-    };
-]]
 local interval_t = ffi.typeof('struct datetime_interval')
 
 local function is_interval(o)
