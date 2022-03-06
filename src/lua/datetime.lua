@@ -334,9 +334,18 @@ local adjust_xlat = {
     excess = builtin.DT_EXCESS,
 }
 
-local function interval_decouple_args(obj)
+local function interval_init(year, month, sec, nsec, adjust)
+    return ffi.new(interval_t, sec, nsec, month, year, adjust)
+end
+
+local function interval_new_copy(obj)
+    return interval_init(obj.year, obj.month, obj.sec, obj.nsec, obj.adjust)
+end
+
+
+local function interval_decode_args(obj)
     if is_interval(obj) then
-        return obj.year, obj.month, obj.sec, obj.nsec, obj.adjust
+        return obj
     end
     local year = checked_max_value(obj.year, MAX_YEAR_RANGE, 'year', 0)
     local month = checked_max_value(obj.month, MAX_MONTH_RANGE, 'month', 0)
@@ -365,22 +374,15 @@ local function interval_decouple_args(obj)
     secs = secs + sec
     nsec = (msec or 0) * 1e6 + (usec or 0) * 1e3 + (nsec or 0)
 
-    return year, month, secs, nsec, adjust
+    return interval_init(year, month, secs, nsec, adjust)
 end
 
 local function interval_new(obj)
-    local ival = ffi.new(interval_t, 0, 0, 0, 0, DEF_DT_ADJUST)
     if obj == nil then
-        return ival
+        return ffi.new(interval_t, 0, 0, 0, 0, DEF_DT_ADJUST)
     end
     check_table(obj, 'interval.new()')
-    ival.year, ival.month, ival.sec, ival.nsec, ival.adjust =
-        interval_decouple_args(obj)
-    return ival
-end
-
-local function interval_init(year, month, sec, nsec, adjust)
-    return ffi.new(interval_t, sec, nsec, month, year, adjust)
+    return interval_decode_args(obj)
 end
 
 local function nyi(msg)
@@ -723,8 +725,7 @@ local function interval_tostring(o)
     return s
 end
 
-local function datetime_increment_by(self, direction, years, months,
-                                     seconds, nanoseconds, adjust)
+local function datetime_increment_by(self, direction, ival)
     -- operations with intervals should be done using local human dates
     -- not UTC dates, thus normalize to local timezone before operations.
     local dt = local_dt(self)
@@ -732,7 +733,9 @@ local function datetime_increment_by(self, direction, years, months,
     local offset = self.tzoffset
 
     local is_ym_updated = false
-    adjust = adjust or DEF_DT_ADJUST
+    local years, months = ival.year, ival.month
+    local seconds, nanoseconds = ival.sec, ival.nsec
+    local adjust = ival.adjust or DEF_DT_ADJUST
 
     if years ~= 0 then
         check_range(years, MIN_DATE_YEAR, MAX_DATE_YEAR, 'years')
@@ -794,13 +797,11 @@ local function datetime_interval_sub(lhs, rhs)
     check_date_interval_table(rhs, "operator -")
     local left_is_interval = is_table(lhs) or is_interval(lhs)
     local right_is_interval = is_table(rhs) or is_interval(rhs)
-    local year, month, secs, nsec, adjust
 
     -- left is date, right is interval
     if not left_is_interval and right_is_interval then
-        year, month, secs, nsec, adjust = interval_decouple_args(rhs)
-        return datetime_increment_by(datetime_new_copy(lhs), -1, year, month,
-                                     secs, nsec, adjust)
+        return datetime_increment_by(datetime_new_copy(lhs), -1,
+                                     interval_decode_args(rhs))
     -- left is date, right is date
     elseif not left_is_interval and not right_is_interval then
         local obj = interval_new()
@@ -808,14 +809,13 @@ local function datetime_interval_sub(lhs, rhs)
         return obj
     -- both left and right are intervals
     elseif left_is_interval and right_is_interval then
-        year, month, secs, nsec, adjust = interval_decouple_args(lhs)
-        local obj = interval_init(year, month, secs, nsec, adjust)
-        year, month, secs, nsec = interval_decouple_args(rhs)
-        obj.year = obj.year - year
-        obj.month = obj.month - month
+        local lobj = interval_decode_args(interval_new_copy(lhs))
+        local robj = interval_decode_args(rhs)
+        lobj.year = lobj.year - robj.year
+        lobj.month = lobj.month - robj.month
         -- do not normalize nsec yet - leave till the operation with date
-        obj.sec, obj.nsec = obj.sec - secs, obj.nsec - nsec
-        return obj
+        lobj.sec, lobj.nsec = lobj.sec - robj.sec, lobj.nsec - robj.nsec
+        return lobj
     else
         error_incompatible("operator -")
     end
@@ -837,23 +837,20 @@ local function datetime_interval_add(lhs, rhs)
     check_interval_table(rhs, "operator +")
     local left_is_interval = is_table(lhs) or is_interval(lhs)
     local right_is_interval = is_table(rhs) or is_interval(rhs)
-    local year, month, secs, nsec, adjust
 
     -- left is date, right is interval
     if not left_is_interval and right_is_interval then
         local obj = datetime_new_copy(lhs)
-        year, month, secs, nsec, adjust = interval_decouple_args(rhs)
-        return datetime_increment_by(obj, 1, year, month, secs, nsec, adjust)
+        return datetime_increment_by(obj, 1, interval_decode_args(rhs))
     -- both left and right are intervals
     elseif left_is_interval and right_is_interval then
-        year, month, secs, nsec, adjust = interval_decouple_args(lhs)
-        local obj = interval_init(year, month, secs, nsec, adjust)
-        year, month, secs, nsec = interval_decouple_args(rhs)
-        obj.year = obj.year + year
-        obj.month = obj.month + month
+        local lobj = interval_decode_args(interval_new_copy(lhs))
+        local robj = interval_decode_args(rhs)
+        lobj.year = lobj.year + robj.year
+        lobj.month = lobj.month + robj.month
         -- do not normalize nsec yet - leave till the operation with date
-        obj.sec, obj.nsec = obj.sec + secs, obj.nsec + nsec
-        return obj
+        lobj.sec, lobj.nsec = lobj.sec + robj.sec, lobj.nsec + robj.nsec
+        return lobj
     else
         error_incompatible("operator +")
     end
@@ -959,9 +956,7 @@ local function datetime_shift(self, o, direction)
     local title = direction > 0 and "datetime.add" or "datetime.sub"
     check_interval_table(o, title)
 
-    local year, month, secs, nsec, adjust = interval_decouple_args(o)
-    return datetime_increment_by(self, direction, year, month, secs, nsec,
-                                 adjust)
+    return datetime_increment_by(self, direction, interval_decode_args(o))
 end
 
 --[[
