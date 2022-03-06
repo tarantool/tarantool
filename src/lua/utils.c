@@ -49,6 +49,7 @@ uint32_t CTID_CHAR_PTR;
 uint32_t CTID_CONST_CHAR_PTR;
 uint32_t CTID_UUID;
 uint32_t CTID_DATETIME = 0;
+uint32_t CTID_INTERVAL = 0;
 
 void *
 luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
@@ -733,15 +734,35 @@ tarantool_lua_utils_init(struct lua_State *L)
 	assert(CTID_UUID != 0);
 
 	rc = luaL_cdef(L, "struct datetime {"
-			  "double epoch;"
-			  "int32_t nsec;"
-			  "int16_t tzoffset;"
-			  "int16_t tzindex;"
+				  "double epoch;"
+				  "int32_t nsec;"
+				  "int16_t tzoffset;"
+				  "int16_t tzindex;"
 			  "};");
 	assert(rc == 0);
 	(void) rc;
 	CTID_DATETIME = luaL_ctypeid(L, "struct datetime");
 	assert(CTID_DATETIME != 0);
+
+	rc = luaL_cdef(L, "typedef enum {"
+				  "DT_EXCESS,"
+				  "DT_LIMIT,"
+				  "DT_SNAP"
+			  "} dt_adjust_t;");
+	assert(rc == 0);
+	(void)rc;
+
+	rc = luaL_cdef(L, "struct interval {"
+				  "double sec;"
+				  "int nsec;"
+				  "int month;"
+				  "int year;"
+				  "dt_adjust_t adjust;"
+			  "};");
+	assert(rc == 0);
+	(void)rc;
+	CTID_INTERVAL = luaL_ctypeid(L, "struct interval");
+	assert(CTID_INTERVAL != 0);
 
 	lua_pushcfunction(L, luaT_newthread_wrapper);
 	luaT_newthread_ref = luaL_ref(L, LUA_REGISTRYINDEX);
