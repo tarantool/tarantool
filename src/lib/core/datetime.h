@@ -8,6 +8,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include <sys/types.h>
+#include "c-dt/dt.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -68,6 +69,33 @@ struct datetime {
 	int16_t tzoffset;
 	/** Olson timezone id */
 	int16_t tzindex;
+};
+
+/**
+ * To be able to perform arithmetics on time intervals and receive
+ * deterministic results, we have to keep months and years separately
+ * from seconds.
+ * Weeks, days, hours and minutes, all could be _precisely_ converted
+ * to seconds, but it's not the case for months (which might be 28, 29,
+ * 30, or 31 days long), or years (which could be leap year or not).
+ * Approach used here - to add/subtract months or years intervals only
+ * at the moment when we have particular date we operate on.
+ * Determinism of results is achieved due to the order we apply
+ * operations (from larger to smaller quantities):
+ * - years, then months, then weeks, days, hours, minutes,
+ *   seconds, and nanoseconds.
+ */
+struct interval {
+	/** Duration in seconds. */
+	double sec;
+	/** Fraction part of duration in seconds. */
+	int nsec;
+	/** Number of months, if specified. */
+	int month;
+	/** Number of years, if specified. */
+	int year;
+	/** Adjustment mode for day in month operations, @sa dt_adjust_t */
+	dt_adjust_t adjust;
 };
 
 /*
