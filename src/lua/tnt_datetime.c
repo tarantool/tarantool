@@ -44,3 +44,9 @@ tnt_datetime_unpack(const char **data, uint32_t len, struct datetime *date)
 {
 	return datetime_unpack(data, len, date);
 }
+
+size_t
+tnt_interval_to_string(const struct interval *ival, char *buf, ssize_t len)
+{
+	return interval_to_string(ival, buf, len);
+}
