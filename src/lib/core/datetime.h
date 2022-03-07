@@ -35,6 +35,14 @@ struct tnt_tm;
 /** Required size of datetime_to_string string buffer */
 #define DT_TO_STRING_BUFSIZE 48
 
+/** Length of
+  * "-5879610 years, 10000 months, 10000 days, 23 hours, 59 minutes, \
+59.999999999 seconds"
+  * is 84, but both months and days could have arbitrayr values, so let
+  * use semething larger
+  */
+#define DT_IVAL_TO_STRING_BUFSIZE 96
+
 /**
  * c-dt library uses int as type for dt value, which
  * represents the number of days since Rata Die date.
@@ -164,6 +172,9 @@ datetime_parse_full(struct datetime *date, const char *str, size_t len,
  */
 size_t
 datetime_strptime(struct datetime *date, const char *buf, const char *fmt);
+
+size_t
+interval_to_string(const struct datetime_interval *ival, char *buf, ssize_t len);
 
 #if defined(__cplusplus)
 } /* extern "C" */

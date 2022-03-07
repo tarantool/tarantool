@@ -62,7 +62,7 @@ dt_t   tnt_dt_add_months   (dt_t dt, int delta, dt_adjust_t adjust);
 size_t tnt_dt_parse_iso_date (const char *str, size_t len, dt_t *dt);
 size_t tnt_dt_parse_iso_zone_lenient(const char *str, size_t len, int *offset);
 
-/* Tarantool functions - datetime.c */
+/* Tarantool datetime functions - datetime.c */
 size_t tnt_datetime_to_string(const struct datetime * date, char *buf,
                               ssize_t len);
 size_t tnt_datetime_strftime(const struct datetime *date, char *buf,
@@ -73,13 +73,15 @@ size_t tnt_datetime_strptime(struct datetime *date, const char *buf,
                              const char *fmt);
 void   tnt_datetime_now(struct datetime *now);
 
+/* Tarantool interval support functions */
+size_t
+tnt_interval_to_string(const struct datetime_interval *, char *, ssize_t);
+
 ]]
 
 local builtin = ffi.C
 local math_modf = math.modf
 local math_floor = math.floor
-local math_fmod = math.fmod
-local math_abs = math.abs
 
 -- Unix, January 1, 1970, Thursday
 local DAYS_EPOCH_OFFSET = 719163
@@ -87,6 +89,7 @@ local SECS_PER_DAY      = 86400
 local SECS_EPOCH_OFFSET = DAYS_EPOCH_OFFSET * SECS_PER_DAY
 local NANOS_PER_SEC     = 1e9
 local TOSTRING_BUFSIZE  = 48
+local IVAL_TOSTRING_BUFSIZE = 96
 local STRFTIME_BUFSIZE  = 128
 
 -- minimum supported date - -5879610-06-22
@@ -127,6 +130,11 @@ local date_tostr_stash =
     buffer.ffi_stash_new(string.format('char[%s]', TOSTRING_BUFSIZE))
 local date_tostr_stash_take = date_tostr_stash.take
 local date_tostr_stash_put = date_tostr_stash.put
+
+local ival_tostr_stash =
+    buffer.ffi_stash_new(string.format('char[%s]', IVAL_TOSTRING_BUFSIZE))
+local ival_tostr_stash_take = ival_tostr_stash.take
+local ival_tostr_stash_put = ival_tostr_stash.put
 
 local date_strf_stash =
     buffer.ffi_stash_new(string.format('char[%s]', STRFTIME_BUFSIZE))
@@ -596,60 +604,11 @@ local function datetime_tostring(self)
     return s
 end
 
-local function qtail(s)
-    return #s ~= 0 and (s .. ', ') or s
-end
-
--- if |nsec| is larger than allowed range 1e9 then modify passed
--- sec accordingly
-local function denormalize_interval_nsec(sec, nsec)
-    if nsec == 0 then
-        return sec, nsec
-    end
-    -- nothing to change:
-    -- - if there is small nsec with 0 in sec
-    -- - or if both sec and nsec have the same sign, and nsec is
-    --   small enough
-    local same_sign = (sec < 0) == (nsec < 0)
-    if (sec == 0 or same_sign) and math_abs(nsec) < 1e9 then
-        return sec, nsec
-    end
-
-    sec = sec + math_modf(nsec / NANOS_PER_SEC)
-    if sec >= 0 then
-        nsec = nsec % NANOS_PER_SEC
-    else
-        nsec = NANOS_PER_SEC - nsec % NANOS_PER_SEC
-    end
-    return sec, nsec
-end
-
--- signed or unsigned textual representation of sec and nsec
-local function seconds_str(need_sign, sec, nsec)
-    sec = math_fmod(sec, 60)
-    sec, nsec = denormalize_interval_nsec(sec, nsec)
-    local is_negative = sec < 0 or (sec == 0 and nsec < 0)
-    local str = is_negative and '-' or (need_sign and '+' or '')
-    sec = math_abs(sec)
-    if nsec ~= 0 then
-        str = str .. ('%d.%09d seconds'):format(sec, math_abs(nsec))
-    else
-        str = str .. ('%d seconds'):format(sec)
-    end
-    return str
-end
-
-
-local signed_fmt = {
-    [false] = '%d',
-    [true]  = '%+d',
-}
-
 --[[
     Convert to text interval values of different types
 
     - depending on a values stored there generic interval
-      values may display in following format:
+      values may be displayed in the following format:
         +12 secs
         -23 minutes, 0 seconds
         +12 hours, 23 minutes, 1 seconds
@@ -657,41 +616,22 @@ local signed_fmt = {
     - years will be displayed as
         +10 years
     - months will be displayed as:
-         +2 months
+        +2 months
 ]]
-local function interval_tostring(o)
-    check_interval(o, 'datetime.interval.tostring')
-    local s = ''
-    local need_sign = true
-    if o.year ~= 0 then
-        s = qtail(s) .. ('%+d years'):format(o.year)
-        need_sign = false
+local function interval_tostring(self)
+    check_interval(self, 'datetime.interval.tostring')
+    local buff = ival_tostr_stash_take()
+    local len = builtin.tnt_interval_to_string(self, buff, IVAL_TOSTRING_BUFSIZE)
+    if len < IVAL_TOSTRING_BUFSIZE then
+        local s = ffi.string(buff)
+        ival_tostr_stash_put(buff)
+        return s
     end
-    if o.month ~= 0 then
-        s = qtail(s) .. (signed_fmt[need_sign] .. ' months'):format(o.month)
-        need_sign = false
-    end
-    local sec, nsec = o.sec, o.nsec
-    if sec == 0 and nsec == 0 then
-        return #s > 0 and s or '0 seconds'
-    end
-    local abs_s = math_abs(sec)
-    if abs_s < 60 then
-        s = qtail(s) .. seconds_str(need_sign, sec, nsec)
-    elseif abs_s < (60 * 60) then
-        s = qtail(s) .. (signed_fmt[need_sign] .. ' minutes, %s'):
-                        format(o.min, seconds_str(false, sec, nsec))
-    elseif abs_s < SECS_PER_DAY then
-        s = qtail(s) .. (signed_fmt[need_sign] .. ' hours, %d minutes, %s'):
-                        format(o.hour, math_fmod(o.min, 60),
-                               seconds_str(false, sec, nsec))
-    else
-        s = qtail(s) .. (signed_fmt[need_sign] .. ' days, %d hours, %d minutes, %s'):
-                        format(o.day, math_fmod(o.hour, 24),
-                               math_fmod(o.min, 60),
-                               seconds_str(false, sec, nsec))
-    end
-    return s
+    -- slow path - reallocate for a fuller size, and then restart interval_to_string
+    ival_tostr_stash_put(buff)
+    buff = ffi.new('char[?]', len + 1)
+    builtin.tnt_interval_to_string(self, buff, len + 1)
+    return ffi.string(buff)
 end
 
 local function datetime_increment_by(self, direction, ival)

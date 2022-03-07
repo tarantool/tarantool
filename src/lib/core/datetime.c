@@ -255,3 +255,150 @@ datetime_compare(const struct datetime *lhs, const struct datetime *rhs)
 
 	return COMPARE_RESULT(lhs->nsec, rhs->nsec);
 }
+
+/**
+ * Interval support functions: stringization and operations
+ */
+
+/**
+ * if |nsec| is larger than allowed range 1e9 then modify passed
+ * sec accordingly
+ */
+
+#define NANOS_PER_SEC 1000000000
+
+static inline int64_t
+interval_seconds(const struct datetime_interval *ival)
+{
+	return (int64_t)ival->sec + ival->nsec / NANOS_PER_SEC;
+}
+
+static inline int
+interval_days(const struct datetime_interval *ival)
+{
+	return interval_seconds(ival) / SECS_PER_DAY;
+}
+
+static inline int
+interval_hours(const struct datetime_interval *ival)
+{
+	return interval_seconds(ival) / (60 * 60);
+}
+
+static inline int
+interval_minutes(const struct datetime_interval *ival)
+{
+	return interval_seconds(ival) / 60;
+}
+
+static void
+denormalize_interval_nsec(int64_t *psec, int *pnsec)
+{
+	assert(psec != NULL);
+	assert(pnsec != NULL);
+	int64_t sec = *psec;
+	int nsec = *pnsec;
+	/*
+	 * nothing to change:
+	 * - if there is small nsec with 0 in sec
+	 * - or if both sec and nsec have the same sign, and nsec is
+	 *   small enough
+	 */
+	if (nsec == 0)
+		return;
+
+	bool zero_or_same_sign = sec == 0 || (sec < 0) == (nsec < 0);
+	if (zero_or_same_sign && labs(nsec) < NANOS_PER_SEC)
+		return;
+
+	sec += nsec / NANOS_PER_SEC;
+	nsec = nsec % NANOS_PER_SEC;
+
+	*psec = sec;
+	*pnsec = nsec;
+}
+
+static size_t
+seconds_str(char *buf, ssize_t len, bool need_sign, long sec, int nsec)
+{
+	sec %= 60;
+	denormalize_interval_nsec(&sec, &nsec);
+	size_t sz = 0;
+	bool is_neg = sec < 0 || (sec == 0 && nsec < 0);
+
+	SNPRINT(sz, snprintf, buf, len, is_neg ? "-" : (need_sign ? "+" : ""));
+	sec = labs(sec);
+	if (nsec != 0) {
+		SNPRINT(sz, snprintf, buf, len, "%ld.%09ld seconds",
+			sec, labs(nsec));
+	} else {
+		SNPRINT(sz, snprintf, buf, len, "%ld seconds", sec);
+	}
+	return sz;
+}
+
+#define SPACE() \
+	if (sz > 0) { \
+		SNPRINT(sz, snprintf, buf, len, ", "); \
+	}
+
+size_t
+interval_to_string(const struct datetime_interval *ival, char *buf, ssize_t len)
+{
+	static char* signed_fmt[] = {
+		"%d",	/* false */
+		"%+d",	/* true */
+	};
+	static const char zero_secs[] = "0 seconds";
+
+	bool need_sign = true;
+	size_t sz = 0;
+	if (ival->year != 0) {
+		SNPRINT(sz, snprintf, buf, len, "%+d years", ival->year);
+		need_sign = false;
+	}
+	if (ival->month != 0) {
+		SPACE();
+		SNPRINT(sz, snprintf, buf, len, signed_fmt[need_sign],
+			ival->month);
+		SNPRINT(sz, snprintf, buf, len, " months");
+		need_sign = false;
+	}
+	int64_t secs = (int64_t)ival->sec;
+	int nsec = ival->nsec;
+	if (secs == 0 && nsec == 0) {
+		if (sz != 0) {
+			return sz;
+		} else {
+			SNPRINT(sz, snprintf, buf, len, zero_secs);
+			return sizeof(zero_secs) - 1;
+		}
+	}
+	long abs_s = labs(secs);
+	if (abs_s < 60) {
+		SPACE();
+		SNPRINT(sz, seconds_str, buf, len, need_sign, secs, nsec);
+	} else if (abs_s < 60 * 60) {
+		SPACE();
+		SNPRINT(sz, snprintf, buf, len, signed_fmt[need_sign],
+			interval_minutes(ival));
+		SNPRINT(sz, snprintf, buf, len, " minutes, ");
+		SNPRINT(sz, seconds_str, buf, len, false, secs, nsec);
+	} else if (abs_s < SECS_PER_DAY) {
+		SPACE();
+		SNPRINT(sz, snprintf, buf, len, signed_fmt[need_sign],
+			interval_hours(ival));
+		SNPRINT(sz, snprintf, buf, len, " hours, %d minutes, ",
+			interval_minutes(ival) % 60);
+		SNPRINT(sz, seconds_str, buf, len, false, secs, nsec);
+	} else {
+		SPACE();
+		SNPRINT(sz, snprintf, buf, len, signed_fmt[need_sign],
+			interval_days(ival));
+		SNPRINT(sz, snprintf, buf, len, " days, %d hours, %d minutes, ",
+			interval_hours(ival) % 24,
+			interval_minutes(ival) % 60);
+		SNPRINT(sz, seconds_str, buf, len, false, secs, nsec);
+	}
+	return sz;
+}

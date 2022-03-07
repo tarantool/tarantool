@@ -440,6 +440,7 @@ tnt_dt_year
 tnt_iconv
 tnt_iconv_close
 tnt_iconv_open
+tnt_interval_to_string
 tnt_mp_decode_double
 tnt_mp_decode_extl
 tnt_mp_decode_float
