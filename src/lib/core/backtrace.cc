@@ -196,6 +196,9 @@ out:
  * @param stack pointer to preserve.
  * @retval preserved stack pointer.
  */
+#ifdef __x86_64__
+__attribute__ ((__force_align_arg_pointer__))
+#endif /* __x86_64__ */
 static void *
 unw_getcontext_f(unw_context_t *unw_context, void *stack)
 {
@@ -246,11 +249,11 @@ __asm__ volatile(
 	"\tmovq 40(%%rsp), %%rbp\n"
 	/* Set first arg and call */
 	"\tmovq %0, %%rdi\n"
-#ifdef TARGET_OS_DARWIN
-	"\tandq $0xfffffffffffffff0, %%rsp\n"
-#endif
+	".cfi_remember_state\n"
+	".cfi_def_cfa %%rsp, 8 * 7\n"
 	"\tleaq %P2(%%rip), %%rax\n"
 	"\tcall *%%rax\n"
+	".cfi_restore_state\n"
 	/* Restore old sp and context */
 	"\tmov %%rax, %%rsp\n"
 	"\tpopq %%r15\n"
@@ -354,7 +357,12 @@ __asm__ volatile(
 	"\tmov sp, x2\n"
 	/* Setup fisrst arg */
 	"\tmov x0, %0\n"
+	".cfi_remember_state\n"
+	".cfi_def_cfa sp, 8 * 20\n"
+	".cfi_offset x29, -16 * 5\n"
+	".cfi_offset x30, -16 * 5 + 8\n"
 	"\tbl %2\n"
+	".cfi_restore_state\n"
 	/* Restore context (old sp in x0) */
 	"\tldp x19, x20, [x0, #16 * 0]\n"
 	"\tldp x21, x22, [x0, #16 * 1]\n"
