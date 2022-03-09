@@ -472,7 +472,7 @@ load_cfg(void)
 void
 free_rl_state(void)
 {
-	/* tarantool_lua_free() was formerly reponsible for terminal reset,
+	/* tarantool_lua_free() was formerly responsible for terminal reset,
 	 * but it is no longer called
 	 */
 	if (isatty(STDIN_FILENO)) {
