@@ -626,7 +626,7 @@ main(int argc, char **argv)
 			break;
 		case 'l':
 		case 'e':
-			/* Save Lua interepter options to optv as is */
+			/* Save Lua interpreter options to optv as is */
 			if (optc == 0) {
 				optv = (const char **) calloc(argc,
 							      sizeof(optv[0]));
@@ -785,7 +785,7 @@ main(int argc, char **argv)
 		say_crit("exiting the event loop");
 	/*
 	 * If Tarantool was stopped using Ctrl+D, then we need to
-	 * call on_shutdown triggers, because Ctrl+D  causes not
+	 * call on_shutdown triggers, because Ctrl+D  doesn't cause
 	 * any signals.
 	 */
 	tarantool_exit(exit_code);
