@@ -343,6 +343,8 @@ struct replica {
 	double applier_txn_last_tm;
 	/* The latch is used to order replication requests. */
 	struct latch order_latch;
+	/* Last sent RAFT term */
+	uint64_t sent_term;
 };
 
 enum {

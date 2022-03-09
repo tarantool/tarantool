@@ -31,6 +31,7 @@
  */
 #include "raft/raft.h"
 #include "small/rlist.h"
+#include "fiber_cond.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -41,6 +42,11 @@ extern "C" {
  * It's allowed to yield inside it, and it's run asynchronously.
  */
 extern struct rlist box_raft_on_broadcast;
+
+/**
+ * Condition broadcasted by relay thread on every raft message sent.
+ */
+extern struct fiber_cond box_raft_on_message_cond;
 
 enum election_mode {
 	ELECTION_MODE_INVALID = -1,
@@ -111,6 +117,13 @@ box_raft_wait_term_outcome(void);
 /** Block this fiber until the current volatile term is persisted. */
 int
 box_raft_wait_term_persisted(void);
+
+/**
+ * Block this fiber until the current volatile term is broadcasted
+ * to all alive replicas.
+ */
+int
+box_raft_wait_term_broadcasted(void);
 
 void
 box_raft_init(void);

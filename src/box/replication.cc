@@ -193,6 +193,7 @@ replica_new(void)
 	replica->applier_sync_state = APPLIER_DISCONNECTED;
 	replica->applier_txn_last_tm = 0;
 	latch_create(&replica->order_latch);
+	replica->sent_term = 0;
 	return replica;
 }
 

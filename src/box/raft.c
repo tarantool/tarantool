@@ -64,6 +64,8 @@ static struct fiber *box_raft_worker = NULL;
 /** Flag installed each time when new work appears for the worker fiber. */
 static bool box_raft_has_work = false;
 
+struct fiber_cond box_raft_on_message_cond;
+
 static void
 box_raft_msg_to_request(const struct raft_msg *msg, struct raft_request *req)
 {
@@ -435,6 +437,51 @@ box_raft_wait_term_persisted(void)
 	return 0;
 }
 
+/** Test if term has been sent to all alive replicas */
+static bool
+box_raft_term_broadcasted(const uint64_t term)
+{
+	replicaset_foreach(replica) {
+		/*
+		 * Skip self; anonymous replicas and replicas without relay
+		 * (assume they will receive all broadcasts from our WAL
+		 * in correct order, when they connect).
+		 */
+		if (replica->relay == NULL || replica->anon ||
+		    tt_uuid_is_equal(&replica->uuid, &INSTANCE_UUID))
+			continue;
+
+		if (relay_get_state(replica->relay) == RELAY_FOLLOW &&
+		    replica->sent_term < term)
+			return false;
+	}
+	return true;
+}
+
+int
+box_raft_wait_term_broadcasted(void)
+{
+	struct raft *raft = box_raft();
+	uint64_t term = raft->volatile_term;
+	bool waiting = false;
+
+	do {
+		waiting = !box_raft_term_broadcasted(term);
+
+		if (waiting && fiber_cond_wait(&box_raft_on_message_cond) < 0)
+			return -1;
+
+		/*
+		 * Don't wait after term has been changed.
+		 * Maybe treat this as an error?
+		 */
+		if (raft->volatile_term > term)
+			waiting = false;
+	} while (waiting);
+
+	return 0;
+}
+
 void
 box_raft_init(void)
 {
@@ -446,6 +493,7 @@ box_raft_init(void)
 	raft_create(&box_raft_global, &box_raft_vtab);
 	trigger_create(&box_raft_on_update, box_raft_on_update_f, NULL, NULL);
 	raft_on_update(box_raft(), &box_raft_on_update);
+	fiber_cond_create(&box_raft_on_message_cond);
 }
 
 void
@@ -462,4 +510,5 @@ box_raft_free(void)
 	 * Invalidate so as box_raft() would fail if any usage attempt happens.
 	 */
 	raft->state = 0;
+	fiber_cond_destroy(&box_raft_on_message_cond);
 }
