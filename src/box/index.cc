@@ -444,6 +444,7 @@ box_index_compact(uint32_t space_id, uint32_t index_id)
 void
 iterator_create(struct iterator *it, struct index *index)
 {
+	it->next_raw = NULL;
 	it->next = NULL;
 	it->free = NULL;
 	it->space_cache_version = space_cache_version;
@@ -452,28 +453,45 @@ iterator_create(struct iterator *it, struct index *index)
 	it->index = index;
 }
 
+static bool
+iterator_is_valid(struct iterator *it)
+{
+	/* In case of ephemeral space there is no need to check schema version */
+	if (it->space_id == 0)
+		return true;
+	if (unlikely(it->space_cache_version != space_cache_version)) {
+		struct space *space = space_by_id(it->space_id);
+		if (space == NULL)
+			return false;
+		struct index *index = space_index(space, it->index_id);
+		if (index != it->index ||
+		    index->space_cache_version > it->space_cache_version)
+			return false;
+		it->space_cache_version = space_cache_version;
+	}
+	return true;
+}
+
 int
 iterator_next(struct iterator *it, struct tuple **ret)
 {
 	assert(it->next != NULL);
-	/* In case of ephemeral space there is no need to check schema version */
-	if (it->space_id == 0)
-		return it->next(it, ret);
-	if (unlikely(it->space_cache_version != space_cache_version)) {
-		struct space *space = space_by_id(it->space_id);
-		if (space == NULL)
-			goto invalidate;
-		struct index *index = space_index(space, it->index_id);
-		if (index != it->index ||
-		    index->space_cache_version > it->space_cache_version)
-			goto invalidate;
-		it->space_cache_version = space_cache_version;
+	if (!iterator_is_valid(it)) {
+		*ret = NULL;
+		return 0;
 	}
 	return it->next(it, ret);
+}
 
-invalidate:
-	*ret = NULL;
-	return 0;
+int
+iterator_next_raw(struct iterator *it, struct tuple **ret)
+{
+	assert(it->next_raw != NULL);
+	if (!iterator_is_valid(it)) {
+		*ret = NULL;
+		return 0;
+	}
+	return it->next_raw(it, ret);
 }
 
 void
@@ -518,48 +536,6 @@ index_delete(struct index *index)
 	memtx_tx_on_index_delete(index);
 	index->vtab->destroy(index);
 	index_def_delete(def);
-}
-
-int
-index_build(struct index *index, struct index *pk)
-{
-	ssize_t n_tuples = index_size(pk);
-	if (n_tuples < 0)
-		return -1;
-	uint32_t estimated_tuples = n_tuples * 1.2;
-
-	index_begin_build(index);
-	if (index_reserve(index, estimated_tuples) < 0)
-		return -1;
-
-	if (n_tuples > 0) {
-		say_info("Adding %zd keys to %s index '%s' ...",
-			 n_tuples, index_type_strs[index->def->type],
-			 index->def->name);
-	}
-
-	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
-	if (it == NULL)
-		return -1;
-
-	int rc = 0;
-	while (true) {
-		struct tuple *tuple;
-		rc = iterator_next(it, &tuple);
-		if (rc != 0)
-			break;
-		if (tuple == NULL)
-			break;
-		rc = index_build_next(index, tuple);
-		if (rc != 0)
-			break;
-	}
-	iterator_delete(it);
-	if (rc != 0)
-		return -1;
-
-	index_end_build(index);
-	return 0;
 }
 
 struct tuple *
@@ -685,6 +661,17 @@ generic_index_count(struct index *index, enum iterator_type type,
 	if (rc < 0)
 		return rc;
 	return count;
+}
+
+int
+generic_index_get_raw(struct index *index, const char *key,
+		      uint32_t part_count, struct tuple **result)
+{
+	(void)key;
+	(void)part_count;
+	(void)result;
+	diag_set(UnsupportedIndexFeature, index->def, "get_raw()");
+	return -1;
 }
 
 int

@@ -637,11 +637,13 @@ lbox_info_synchro(struct lua_State *L)
 
 	/* Queue information. */
 	struct txn_limbo *queue = &txn_limbo;
-	lua_createtable(L, 0, 2);
+	lua_createtable(L, 0, 3);
 	lua_pushnumber(L, queue->len);
 	lua_setfield(L, -2, "len");
 	lua_pushnumber(L, queue->owner_id);
 	lua_setfield(L, -2, "owner");
+	lua_pushboolean(L, latch_is_locked(&queue->promote_latch));
+	lua_setfield(L, -2, "busy");
 	lua_setfield(L, -2, "queue");
 
 	return 1;

@@ -271,6 +271,7 @@ static const struct index_vtab session_settings_index_vtab = {
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
 	/* .count = */ generic_index_count,
+	/* .get_raw = */ generic_index_get_raw,
 	/* .get = */ session_settings_index_get,
 	/* .replace = */ generic_index_replace,
 	/* .create_iterator = */ session_settings_index_create_iterator,

@@ -102,8 +102,9 @@ hash_iterator_free(struct iterator *iterator)
 	mempool_free(it->pool, it);
 }
 
+template <bool UNCHANGED>
 static int
-hash_iterator_ge_base(struct iterator *ptr, struct tuple **ret)
+hash_iterator_ge_raw_base(struct iterator *ptr, struct tuple **ret)
 {
 	assert(ptr->free == hash_iterator_free);
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
@@ -114,11 +115,14 @@ hash_iterator_ge_base(struct iterator *ptr, struct tuple **ret)
 	return 0;
 }
 
+template <bool UNCHANGED>
 static int
-hash_iterator_gt_base(struct iterator *ptr, struct tuple **ret)
+hash_iterator_gt_raw_base(struct iterator *ptr, struct tuple **ret)
 {
 	assert(ptr->free == hash_iterator_free);
-	ptr->next = hash_iterator_ge_base;
+	ptr->next_raw = hash_iterator_ge_raw_base<UNCHANGED>;
+	if (UNCHANGED)
+		ptr->next = ptr->next_raw;
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
 	struct memtx_hash_index *index = (struct memtx_hash_index *)ptr->index;
 	struct tuple **res = light_index_iterator_get_and_next(&index->hash_table,
@@ -131,6 +135,7 @@ hash_iterator_gt_base(struct iterator *ptr, struct tuple **ret)
 }
 
 #define WRAP_ITERATOR_METHOD(name)						\
+template <bool UNCHANGED>							\
 static int									\
 name(struct iterator *iterator, struct tuple **ret)				\
 {										\
@@ -140,8 +145,9 @@ name(struct iterator *iterator, struct tuple **ret)				\
 	struct index *idx = iterator->index;					\
 	bool is_first = true;							\
 	do {									\
-		int rc = is_first ? name##_base(iterator, ret)			\
-				  : hash_iterator_ge_base(iterator, ret);	\
+		int rc = is_first ?						\
+			name##_base<UNCHANGED>(iterator, ret) :			\
+			hash_iterator_ge_raw_base<UNCHANGED>(iterator, ret);	\
 		if (rc != 0 || *ret == NULL)					\
 			return rc;						\
 		is_first = false;						\
@@ -151,23 +157,27 @@ name(struct iterator *iterator, struct tuple **ret)				\
 }										\
 struct forgot_to_add_semicolon
 
-WRAP_ITERATOR_METHOD(hash_iterator_ge);
-WRAP_ITERATOR_METHOD(hash_iterator_gt);
+WRAP_ITERATOR_METHOD(hash_iterator_ge_raw);
+WRAP_ITERATOR_METHOD(hash_iterator_gt_raw);
 
 #undef WRAP_ITERATOR_METHOD
 
 static int
-hash_iterator_eq_next(MAYBE_UNUSED struct iterator *it, struct tuple **ret)
+tree_iterator_dummie(MAYBE_UNUSED struct iterator *it, struct tuple **ret)
 {
 	*ret = NULL;
 	return 0;
 }
 
+template <bool UNCHANGED>
 static int
-hash_iterator_eq(struct iterator *it, struct tuple **ret)
+hash_iterator_raw_eq(struct iterator *it, struct tuple **ret)
 {
-	it->next = hash_iterator_eq_next;
-	hash_iterator_ge_base(it, ret); /* always returns zero. */
+	it->next_raw = tree_iterator_dummie;
+	if (UNCHANGED)
+		it->next = it->next_raw;
+	/* always returns zero. */
+	hash_iterator_ge_raw_base<UNCHANGED>(it, ret);
 	if (*ret == NULL)
 		return 0;
 	struct txn *txn = in_txn();
@@ -295,7 +305,7 @@ memtx_hash_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 		rnd %= (hash_table->table_size);
 	}
 	*result = light_index_get(hash_table, rnd);
-	return 0;
+	return memtx_prepare_result_tuple(result);
 }
 
 static ssize_t
@@ -308,8 +318,8 @@ memtx_hash_index_count(struct index *base, enum iterator_type type,
 }
 
 static int
-memtx_hash_index_get(struct index *base, const char *key,
-		     uint32_t part_count, struct tuple **result)
+memtx_hash_index_get_raw(struct index *base, const char *key,
+			 uint32_t part_count, struct tuple **result)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 
@@ -403,6 +413,7 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 	return 0;
 }
 
+template <bool UNCHANGED>
 static struct iterator *
 memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 				 const char *key, uint32_t part_count)
@@ -412,7 +423,8 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 
 	assert(part_count == 0 || key != NULL);
 
-	struct hash_iterator *it = mempool_alloc(&memtx->iterator_pool);
+	struct hash_iterator *it = (struct hash_iterator *)
+		mempool_alloc(&memtx->iterator_pool);
 	if (it == NULL) {
 		diag_set(OutOfMemory, sizeof(struct hash_iterator),
 			 "memtx_hash_index", "iterator");
@@ -428,10 +440,10 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 		if (part_count != 0) {
 			light_index_iterator_key(&index->hash_table, &it->iterator,
 					key_hash(key, base->def->key_def), key);
-			it->base.next = hash_iterator_gt;
+			it->base.next_raw = hash_iterator_gt_raw<UNCHANGED>;
 		} else {
 			light_index_iterator_begin(&index->hash_table, &it->iterator);
-			it->base.next = hash_iterator_ge;
+			it->base.next_raw = hash_iterator_ge_raw<UNCHANGED>;
 		}
 		/* This iterator needs to be supported as a legacy. */
 		memtx_tx_track_full_scan(in_txn(),
@@ -440,7 +452,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 		break;
 	case ITER_ALL:
 		light_index_iterator_begin(&index->hash_table, &it->iterator);
-		it->base.next = hash_iterator_ge;
+		it->base.next_raw = hash_iterator_ge_raw<UNCHANGED>;
 		memtx_tx_track_full_scan(in_txn(),
 					 space_by_id(it->base.space_id),
 					 &index->base);
@@ -449,7 +461,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 		assert(part_count > 0);
 		light_index_iterator_key(&index->hash_table, &it->iterator,
 				key_hash(key, base->def->key_def), key);
-		it->base.next = hash_iterator_eq;
+		it->base.next_raw = hash_iterator_raw_eq<UNCHANGED>;
 		if (it->iterator.slotpos == light_index_end)
 			memtx_tx_track_point(in_txn(),
 					     space_by_id(it->base.space_id),
@@ -461,6 +473,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 		mempool_free(&memtx->iterator_pool, it);
 		return NULL;
 	}
+	it->base.next = UNCHANGED ? it->base.next_raw : memtx_iterator_next;
 	return (struct iterator *)it;
 }
 
@@ -551,35 +564,62 @@ memtx_hash_index_create_snapshot_iterator(struct index *base)
 	return (struct snapshot_iterator *) it;
 }
 
-static const struct index_vtab memtx_hash_index_vtab = {
-	/* .destroy = */ memtx_hash_index_destroy,
-	/* .commit_create = */ generic_index_commit_create,
-	/* .abort_create = */ generic_index_abort_create,
-	/* .commit_modify = */ generic_index_commit_modify,
-	/* .commit_drop = */ generic_index_commit_drop,
-	/* .update_def = */ memtx_hash_index_update_def,
-	/* .depends_on_pk = */ generic_index_depends_on_pk,
-	/* .def_change_requires_rebuild = */
-		memtx_index_def_change_requires_rebuild,
-	/* .size = */ memtx_hash_index_size,
-	/* .bsize = */ memtx_hash_index_bsize,
-	/* .min = */ generic_index_min,
-	/* .max = */ generic_index_max,
-	/* .random = */ memtx_hash_index_random,
-	/* .count = */ memtx_hash_index_count,
-	/* .get = */ memtx_hash_index_get,
-	/* .replace = */ memtx_hash_index_replace,
-	/* .create_iterator = */ memtx_hash_index_create_iterator,
-	/* .create_snapshot_iterator = */
-		memtx_hash_index_create_snapshot_iterator,
-	/* .stat = */ generic_index_stat,
-	/* .compact = */ generic_index_compact,
-	/* .reset_stat = */ generic_index_reset_stat,
-	/* .begin_build = */ generic_index_begin_build,
-	/* .reserve = */ generic_index_reserve,
-	/* .build_next = */ generic_index_build_next,
-	/* .end_build = */ generic_index_end_build,
-};
+/**
+ * Get index vtab by @a UNCHANGED, template version.
+ * If UNCHANGED == true iterator->next and index->get
+ * functions are the same as it's raw versions.
+ */
+template <bool UNCHANGED>
+static const struct index_vtab *
+get_memtx_hash_index_vtab(void)
+{
+	static const struct index_vtab vtab = {
+		/* .destroy = */ memtx_hash_index_destroy,
+		/* .commit_create = */ generic_index_commit_create,
+		/* .abort_create = */ generic_index_abort_create,
+		/* .commit_modify = */ generic_index_commit_modify,
+		/* .commit_drop = */ generic_index_commit_drop,
+		/* .update_def = */ memtx_hash_index_update_def,
+		/* .depends_on_pk = */ generic_index_depends_on_pk,
+		/* .def_change_requires_rebuild = */
+			memtx_index_def_change_requires_rebuild,
+		/* .size = */ memtx_hash_index_size,
+		/* .bsize = */ memtx_hash_index_bsize,
+		/* .min = */ generic_index_min,
+		/* .max = */ generic_index_max,
+		/* .random = */ memtx_hash_index_random,
+		/* .count = */ memtx_hash_index_count,
+		/* .get_raw = */ memtx_hash_index_get_raw,
+		/* .get = */ UNCHANGED ? memtx_hash_index_get_raw :
+			memtx_index_get,
+		/* .replace = */ memtx_hash_index_replace,
+		/* .create_iterator = */
+			memtx_hash_index_create_iterator<UNCHANGED>,
+		/* .create_snapshot_iterator = */
+			memtx_hash_index_create_snapshot_iterator,
+		/* .stat = */ generic_index_stat,
+		/* .compact = */ generic_index_compact,
+		/* .reset_stat = */ generic_index_reset_stat,
+		/* .begin_build = */ generic_index_begin_build,
+		/* .reserve = */ generic_index_reserve,
+		/* .build_next = */ generic_index_build_next,
+		/* .end_build = */ generic_index_end_build,
+	};
+	return &vtab;
+}
+
+/**
+ * Get index vtab by @a unchanged, argument version.
+ */
+static const struct index_vtab *
+get_memtx_hash_index_vtab(bool unchanged)
+{
+	static const index_vtab *choice[2] = {
+		get_memtx_hash_index_vtab<false>(),
+		get_memtx_hash_index_vtab<true>()
+	};
+	return choice[unchanged];
+}
 
 struct index *
 memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
@@ -591,8 +631,9 @@ memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 			 "malloc", "struct memtx_hash_index");
 		return NULL;
 	}
+	const struct index_vtab *vtab = get_memtx_hash_index_vtab(true);
 	if (index_create(&index->base, (struct engine *)memtx,
-			 &memtx_hash_index_vtab, def) != 0) {
+			 vtab, def) != 0) {
 		free(index);
 		return NULL;
 	}
@@ -601,6 +642,12 @@ memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 			   memtx_index_extent_alloc, memtx_index_extent_free,
 			   memtx, index->base.def->key_def);
 	return &index->base;
+}
+
+void
+memtx_hash_index_set_vtab(struct index *index, bool unchanged)
+{
+	index->vtab = get_memtx_hash_index_vtab(unchanged);
 }
 
 /* }}} */

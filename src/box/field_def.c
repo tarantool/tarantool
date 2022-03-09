@@ -165,6 +165,8 @@ const struct opt_def field_def_reg[] = {
 		     nullable_action, NULL),
 	OPT_DEF("collation", OPT_UINT32, struct field_def, coll_id),
 	OPT_DEF("default", OPT_STRPTR, struct field_def, default_value),
+	OPT_DEF_ENUM("compression", compression_type, struct field_def,
+		     compression_type, NULL),
 	OPT_END,
 };
 

@@ -38,6 +38,9 @@
 #include <msgpuck.h>
 #include "opt_def.h"
 
+#include "tt_compression.h"
+#include "mp_extension_types.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -145,6 +148,8 @@ struct field_def {
 	char *default_value;
 	/** AST for parsed default value. */
 	struct Expr *default_value_expr;
+	/** Type of comression to this field */
+	enum compression_type compression_type;
 };
 
 /**
@@ -176,6 +181,7 @@ field_mp_type_is_compatible(enum field_type type, const char *data,
 		int8_t ext_type;
 		mp_decode_extl(&data, &ext_type);
 		if (ext_type >= 0) {
+			assert(ext_type != MP_COMPRESSION);
 			mask = field_ext_type[type];
 			return (mask & (1U << ext_type)) != 0;
 		} else {

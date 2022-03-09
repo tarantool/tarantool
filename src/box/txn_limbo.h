@@ -31,6 +31,7 @@
  */
 #include "small/rlist.h"
 #include "vclock/vclock.h"
+#include "latch.h"
 
 #include <stdint.h>
 
@@ -148,6 +149,10 @@ struct txn_limbo {
 	 */
 	uint64_t promote_greatest_term;
 	/**
+	 * To order access to the promote data.
+	 */
+	struct latch promote_latch;
+	/**
 	 * Maximal LSN gathered quorum and either already confirmed in WAL, or
 	 * whose confirmation is in progress right now. Any attempt to confirm
 	 * something smaller than this value can be safely ignored. Moreover,
@@ -226,11 +231,13 @@ txn_limbo_replica_term(const struct txn_limbo *limbo, uint32_t replica_id)
  * data from it. The check is only valid when elections are enabled.
  */
 static inline bool
-txn_limbo_is_replica_outdated(const struct txn_limbo *limbo,
-			      uint32_t replica_id)
+txn_limbo_is_replica_outdated(struct txn_limbo *limbo, uint32_t replica_id)
 {
-	return txn_limbo_replica_term(limbo, replica_id) <
-	       limbo->promote_greatest_term;
+	latch_lock(&limbo->promote_latch);
+	uint64_t v = vclock_get(&limbo->promote_term_map, replica_id);
+	bool res = v < limbo->promote_greatest_term;
+	latch_unlock(&limbo->promote_latch);
+	return res;
 }
 
 /**
@@ -300,7 +307,34 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn);
 int
 txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry);
 
-/** Execute a synchronous replication request. */
+/**
+ * Initiate execution of a synchronous replication request.
+ */
+static inline void
+txn_limbo_begin(struct txn_limbo *limbo)
+{
+	latch_lock(&limbo->promote_latch);
+}
+
+/** Commit a synchronous replication request. */
+static inline void
+txn_limbo_commit(struct txn_limbo *limbo)
+{
+	latch_unlock(&limbo->promote_latch);
+}
+
+/** Rollback a synchronous replication request. */
+static inline void
+txn_limbo_rollback(struct txn_limbo *limbo)
+{
+	latch_unlock(&limbo->promote_latch);
+}
+
+/** Apply a synchronous replication request after processing stage. */
+void
+txn_limbo_apply(struct txn_limbo *limbo, const struct synchro_request *req);
+
+/** Process a synchronous replication request. */
 void
 txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req);
 

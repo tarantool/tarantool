@@ -578,6 +578,13 @@ vy_lsm_find_unique(struct space *space, uint32_t index_id)
 static int
 vinyl_engine_check_space_def(struct space_def *def)
 {
+	for (uint32_t i = 0; i < def->field_count; i++) {
+		if (def->fields[i].compression_type != COMPRESSION_TYPE_NONE) {
+			diag_set(ClientError, ER_UNSUPPORTED,
+				 "Vinyl", "compression");
+			return -1;
+		}
+	}
 	if (def->opts.is_temporary) {
 		diag_set(ClientError, ER_ALTER_SPACE,
 			 def->name, "engine does not support temporary flag");
@@ -4588,6 +4595,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
 	/* .count = */ generic_index_count,
+	/* .get_raw = */ generic_index_get_raw,
 	/* .get = */ vinyl_index_get,
 	/* .replace = */ generic_index_replace,
 	/* .create_iterator = */ vinyl_index_create_iterator,

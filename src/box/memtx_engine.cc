@@ -52,6 +52,9 @@
 #include "raft.h"
 #include "txn_limbo.h"
 #include "memtx_allocator.h"
+#include "index.h"
+#include "memtx_tuple_compression.h"
+#include "memtx_space.h"
 
 #include <type_traits>
 
@@ -78,6 +81,9 @@ void *
 (*memtx_alloc)(uint32_t size);
 void
 (*memtx_free)(void *ptr);
+struct tuple *
+(*memtx_tuple_new_raw)(struct tuple_format *format, const char *data,
+		       const char *end, bool validate);
 
 template <class ALLOC>
 static void *
@@ -101,11 +107,17 @@ memtx_free_impl(void *ptr)
 }
 
 template <class ALLOC>
+static inline struct tuple *
+memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
+			 const char *end, bool validate);
+
+template <class ALLOC>
 static void
 memtx_alloc_init(void)
 {
 	memtx_alloc = memtx_alloc_impl<ALLOC>;
 	memtx_free = memtx_free_impl<ALLOC>;
+	memtx_tuple_new_raw = memtx_tuple_new_raw_impl<ALLOC>;
 }
 
 static int
@@ -118,6 +130,51 @@ memtx_end_build_primary_key(struct space *space, void *param)
 
 	index_end_build(space->index[0]);
 	memtx_space->replace = memtx_space_replace_primary_key;
+	return 0;
+}
+
+/**
+ * Build memtx secondary index based on the contents of primary index.
+ */
+static int
+memtx_build_secondary_index(struct index *index, struct index *pk)
+{
+	ssize_t n_tuples = index_size(pk);
+	if (n_tuples < 0)
+		return -1;
+	uint32_t estimated_tuples = n_tuples * 1.2;
+
+	index_begin_build(index);
+	if (index_reserve(index, estimated_tuples) < 0)
+		return -1;
+
+	if (n_tuples > 0) {
+		say_info("Adding %zd keys to %s index '%s' ...",
+			 n_tuples, index_type_strs[index->def->type],
+			 index->def->name);
+	}
+
+	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
+	if (it == NULL)
+		return -1;
+
+	int rc = 0;
+	while (true) {
+		struct tuple *tuple;
+		rc = iterator_next_raw(it, &tuple);
+		if (rc != 0)
+			break;
+		if (tuple == NULL)
+			break;
+		rc = index_build_next(index, tuple);
+		if (rc != 0)
+			break;
+	}
+	iterator_delete(it);
+	if (rc != 0)
+		return -1;
+
+	index_end_build(index);
 	return 0;
 }
 
@@ -146,7 +203,8 @@ memtx_build_secondary_keys(struct space *space, void *param)
 		}
 
 		for (uint32_t j = 1; j < space->index_count; j++) {
-			if (index_build(space->index[j], pk) < 0)
+			if (memtx_build_secondary_index(space->index[j],
+							pk) < 0)
 				return -1;
 		}
 
@@ -480,7 +538,9 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 {
 	(void)engine;
 	(void)txn;
-	if (stmt->old_tuple == NULL && stmt->new_tuple == NULL)
+	struct tuple *old_tuple = stmt->rollback_info.old_tuple;
+	struct tuple *new_tuple = stmt->rollback_info.new_tuple;
+	if (old_tuple == NULL && new_tuple == NULL)
 		return;
 	struct space *space = stmt->space;
 	if (space == NULL) {
@@ -508,7 +568,7 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 		struct tuple *unused;
 		struct index *index = space->index[i];
 		/* Rollback must not fail. */
-		if (index_replace(index, stmt->new_tuple, stmt->old_tuple,
+		if (index_replace(index, new_tuple, old_tuple,
 				  DUP_INSERT, &unused, &unused) != 0) {
 			diag_log();
 			unreachable();
@@ -516,11 +576,12 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 		}
 	}
 
-	memtx_space_update_bsize(space, stmt->new_tuple, stmt->old_tuple);
-	if (stmt->old_tuple != NULL)
-		tuple_ref(stmt->old_tuple);
-	if (stmt->new_tuple != NULL)
-		tuple_unref(stmt->new_tuple);
+	memtx_space_update_bsize(space, new_tuple, old_tuple);
+	memtx_space_update_compressed_tuples(space, new_tuple, old_tuple);
+	if (old_tuple != NULL)
+		tuple_ref(old_tuple);
+	if (new_tuple != NULL)
+		tuple_unref(new_tuple);
 }
 
 static int
@@ -1169,6 +1230,20 @@ memtx_set_tuple_format_vtab(const char *allocator_name)
 	}
 }
 
+int
+memtx_tuple_validate(struct tuple_format *format, struct tuple *tuple)
+{
+	if (tuple_is_compressed(tuple)) {
+		tuple = memtx_tuple_decompress(tuple);
+		if (tuple == NULL)
+			return -1;
+	}
+	tuple_ref(tuple);
+	int rc = tuple_validate_raw(format, tuple_data(tuple));
+	tuple_unref(tuple);
+	return rc;
+}
+
 struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
@@ -1333,8 +1408,9 @@ memtx_leave_delayed_free_mode(struct memtx_engine *memtx)
 }
 
 template<class ALLOC>
-struct tuple *
-memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
+static struct tuple *
+memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
+			 const char *end, bool validate)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
 	assert(mp_typeof(*data) == MP_ARRAY);
@@ -1346,7 +1422,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	uint32_t data_offset, field_map_size;
 	char *raw;
 	bool make_compact;
-	if (tuple_field_map_create(format, data, true, &builder) != 0)
+	if (tuple_field_map_create(format, data, validate, &builder) != 0)
 		goto end;
 	field_map_size = field_map_build_size(&builder);
 	/*
@@ -1402,6 +1478,13 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 end:
 	region_truncate(region, region_svp);
 	return tuple;
+}
+
+template<class ALLOC>
+static inline struct tuple *
+memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
+{
+	return memtx_tuple_new_raw_impl<ALLOC>(format, data, end, true);
 }
 
 template<class ALLOC>
@@ -1561,4 +1644,33 @@ memtx_index_def_change_requires_rebuild(struct index *index,
 	}
 	assert(old_cmp_def->is_multikey == new_cmp_def->is_multikey);
 	return false;
+}
+
+int
+memtx_prepare_result_tuple(struct tuple **result)
+{
+	if (*result != NULL) {
+		*result = memtx_tuple_maybe_decompress(*result);
+		if (*result == NULL)
+			return -1;
+		tuple_bless(*result);
+	}
+	return 0;
+}
+
+int
+memtx_index_get(struct index *index, const char *key, uint32_t part_count,
+		struct tuple **result)
+{
+	if (index->vtab->get_raw(index, key, part_count, result) != 0)
+		return -1;
+	return memtx_prepare_result_tuple(result);
+}
+
+int
+memtx_iterator_next(struct iterator *it, struct tuple **ret)
+{
+	if (it->next_raw(it, ret) != 0)
+		return -1;
+	return memtx_prepare_result_tuple(ret);
 }
