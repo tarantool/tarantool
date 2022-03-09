@@ -38,7 +38,7 @@ jobs:
     if: github.event_name != 'pull_request' ||
       contains(github.event.pull_request.labels.*.name, 'full-ci')
 
-    runs-on: ubuntu-20.04-self-hosted
+    runs-on: ghacts-2-8-90-4
 
     steps:
       - name: Sources checkout
