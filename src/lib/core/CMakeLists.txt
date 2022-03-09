@@ -49,11 +49,8 @@ else()
     list(APPEND core_sources ssl.c ssl_error.cc)
 endif()
 
-include_directories(${EXTRA_CORE_INCLUDE_DIRS})
-
-if(ENABLE_SSL)
-    include_directories(${OPENSSL_INCLUDE_DIR})
-endif()
+include_directories(${OPENSSL_INCLUDE_DIR}
+                    ${EXTRA_CORE_INCLUDE_DIRS})
 
 if (TARGET_OS_NETBSD)
     # A workaround for "undefined reference to `__gcc_personality_v0'"
@@ -76,7 +73,7 @@ if (ENABLE_BACKTRACE AND NOT TARGET_OS_DARWIN)
 endif()
 
 if (ENABLE_TUPLE_COMPRESSION)
-    target_link_libraries(core ${ZSTD_LIBRARIES} ${LZ4_LIBRARIES})
+    target_link_libraries(core ${ZSTD_LIBRARIES})
 endif()
 
 # Since fiber.top() introduction, fiber.cc, which is part of core
