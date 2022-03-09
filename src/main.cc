@@ -438,7 +438,7 @@ load_cfg(void)
 	}
 
 	/*
-	 * logger init must happen before daemonising in order for the error
+	 * logger init must happen before demonising in order for the error
 	 * to show and for the process to exit with a failure status
 	 */
 	say_logger_init(log,
@@ -453,7 +453,7 @@ load_cfg(void)
 		daemonize();
 
 	/*
-	 * after (optional) daemonising to avoid confusing messages with
+	 * after (optional) demonising to avoid confusing messages with
 	 * different pids
 	 */
 	say_crit("%s %s", tarantool_package(), tarantool_version());
