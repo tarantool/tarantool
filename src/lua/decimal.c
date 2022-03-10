@@ -103,7 +103,7 @@ lua_pushdecimalstr(struct lua_State *L, const decimal_t *dec)
 
 /**
  * Returns true if a value at a given index is a decimal
- * and false otherwise
+ * and false otherwise.
  */
 bool
 lua_isdecimal(struct lua_State *L, int index)
