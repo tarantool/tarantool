@@ -282,6 +282,7 @@ test_static_build_cmake_linux: deps_tests
 
 test_debian_docker_luacheck:
 	docker run                       \
+		--rm                         \
 		-w ${OOS_SRC_PATH}           \
 		-v ${PWD}:${OOS_SRC_PATH}    \
 		--privileged                 \
@@ -321,7 +322,9 @@ test_oos_build:
 	# Our testing expects that the init process (PID 1) will
 	# reap orphan processes. At least the following test leans
 	# on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
-	docker run --network=host -w ${OOS_SRC_PATH} \
+	docker run \
+		--network=host -w ${OOS_SRC_PATH} \
+		--rm \
 		--init \
 		--mount type=bind,source="${PWD}",target=${OOS_SRC_PATH},readonly,bind-propagation=rslave \
 		-v ${PWD}/artifacts:${OOS_BUILD_PATH}/test/var/artifacts \
