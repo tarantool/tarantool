@@ -53,7 +53,7 @@ char **title_init(int argc, char **argv)
 	title_buf_size = proc_title_max_length();
 	title_buf = malloc(title_buf_size);
 
-	/* ensure title_get() always yields a valid string */
+	/* Ensure title_get() always yields a valid string */
 	if (title_buf != NULL && title_buf_size != 0)
 		title_buf[0] = '\0';
 
