@@ -81,7 +81,7 @@ const char *title_get(void)
  * Return a name without preceding path, e.g. /a/b/c -> c.
  * Like basename(), but doesn't modify the subject string.
  * Unlike basename, returns an empty string for directories
- * /a/b/c/
+ * /a/b/c/.
  */
 static const char *
 my_basename(const char *name)
