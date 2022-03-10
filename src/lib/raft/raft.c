@@ -627,14 +627,7 @@ raft_worker_handle_broadcast(struct raft *raft)
 {
 	assert(raft->is_broadcast_scheduled);
 	struct raft_msg req;
-	memset(&req, 0, sizeof(req));
-	req.term = raft->term;
-	req.vote = raft->vote;
-	req.state = raft->state;
-	if (req.state == RAFT_STATE_CANDIDATE) {
-		assert(raft->vote == raft->self);
-		req.vclock = raft->vclock;
-	}
+	raft_checkpoint_remote(raft, &req);
 	raft_broadcast(raft, &req);
 	raft->is_broadcast_scheduled = false;
 }
@@ -901,8 +894,10 @@ raft_checkpoint_remote(const struct raft *raft, struct raft_msg *req)
 	 * Raft does not own vclock, so it always expects it passed externally.
 	 * Vclock is sent out only by candidate instances.
 	 */
-	if (req->state == RAFT_STATE_CANDIDATE)
+	if (req->state == RAFT_STATE_CANDIDATE) {
+		assert(raft->vote == raft->self);
 		req->vclock = raft->vclock;
+	}
 }
 
 void
