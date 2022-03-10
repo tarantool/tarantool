@@ -84,7 +84,7 @@ jobs:
         uses: ./.github/actions/send-telegram-notify
         if: failure()
 
-  commits:
+  checkpatch:
     # Run only if the workflow was triggered by a pull request that doesn't
     # have the 'notest' label.
     if: github.event_name == 'pull_request' &&
@@ -98,7 +98,9 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
       - name: test
-        run: ./tools/check-commits HEAD~${{ github.event.pull_request.commits }}..HEAD
+        uses: tarantool/checkpatch/.github/actions/checkpatch@master
+        with:
+          revision-range: HEAD~${{ github.event.pull_request.commits }}..HEAD
       - name: call action to send Telegram message on failure
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
