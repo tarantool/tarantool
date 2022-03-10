@@ -171,8 +171,8 @@ done:
 		output = output_end - 1;
 	}
 	/*
-	 * failed snprintf leaves the buffer in unspecified state hence
-	 * explicit NUL termination
+	 * Failed snprintf leaves the buffer in unspecified state hence
+	 * explicit NUL termination.
 	 */
 	*output = '\0';
 	proc_title_set("%s", title_buf);
