@@ -103,7 +103,7 @@ lua_pushdecimalstr(struct lua_State *L, const decimal_t *dec)
 
 /**
  * Returns true if a value at a given index is a decimal
- * and false otherwise
+ * and false otherwise.
  */
 bool
 lua_isdecimal(struct lua_State *L, int index)
@@ -138,7 +138,7 @@ lua_todecimal(struct lua_State *L, int index)
 {
 	/*
 	 * Convert the index, if it is given relative to the top.
-	 * Othervise it will point to a wrong position after
+	 * Otherwise it will point to a wrong position after
 	 * pushdecimal().
 	 */
 	if (index < 0)
@@ -181,7 +181,7 @@ lua_todecimal(struct lua_State *L, int index)
 		case CTID_INT8:
 			ival = *(int8_t *) cdata;
 			/*
-			 * no errors are possible in decimal from
+			 * No errors are possible in decimal from
 			 * (u)int construction.
 			 */
 			decimal_from_int64(res, ival);
@@ -238,7 +238,7 @@ lua_todecimal(struct lua_State *L, int index)
 	}
 	lua_replace(L, index);
 	return res;
-err:	/* pop the decimal we prepared on top of the stack. */
+err:	/* Pop the decimal we prepared on top of the stack. */
 	lua_pop(L, 1);
 	luaL_error(L, "incorrect value to convert to decimal as %d argument",
 		   index);
@@ -338,7 +338,7 @@ ldecimal_trim(struct lua_State *L)
 	decimal_t *lhs = lua_checkdecimal(L, 1);
 	decimal_t *res = lua_pushdecimal(L);
 	*res = *lhs;
-	/* trim never fails */
+	/* Trim never fails */
 	decimal_trim(res);
 	return 1;
 }
