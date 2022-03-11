@@ -1735,6 +1735,33 @@ luaT_netbox_request_gc(struct lua_State *L)
 	return 0;
 }
 
+/*
+ * Autocomplete goes over the index of the object first, using
+ * the __autocomplete method.
+ * Then it needs a metatable of the type.
+ */
+static int
+luaT_netbox_request_autocomplete(struct lua_State *L)
+{
+	luaL_getmetatable(L, netbox_request_typename);
+	return 1;
+}
+
+/*
+ * Every new netbox_request object can store some user data.
+ * To support the autocompletion of these data a metatable is cerated.
+ */
+static void
+luaT_netbox_request_create_index_table(struct lua_State *L)
+{
+	lua_newtable(L);
+	lua_newtable(L);
+	lua_pushstring(L, "__autocomplete");
+	lua_pushcfunction(L, luaT_netbox_request_autocomplete);
+	lua_settable(L, -3);
+	lua_setmetatable(L, -2);
+}
+
 static int
 luaT_netbox_request_tostring(struct lua_State *L)
 {
@@ -1749,7 +1776,7 @@ luaT_netbox_request_serialize(struct lua_State *L)
 	if (request->index_ref != LUA_NOREF) {
 		lua_rawgeti(L, LUA_REGISTRYINDEX, request->index_ref);
 	} else {
-		lua_newtable(L);
+		luaT_netbox_request_create_index_table(L);
 	}
 	return 1;
 }
@@ -1786,7 +1813,7 @@ luaT_netbox_request_newindex(struct lua_State *L)
 	struct netbox_request *request = luaT_check_netbox_request(L, 1);
 	if (request->index_ref == LUA_NOREF) {
 		/* Lazily create the index table on the first invocation. */
-		lua_newtable(L);
+		luaT_netbox_request_create_index_table(L);
 		request->index_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	}
 	lua_rawgeti(L, LUA_REGISTRYINDEX, request->index_ref);
@@ -2767,6 +2794,7 @@ luaopen_net_box(struct lua_State *L)
 	luaL_register_type(L, netbox_transport_typename, netbox_transport_meta);
 
 	static const struct luaL_Reg netbox_request_meta[] = {
+		{ "__autocomplete", luaT_netbox_request_serialize },
 		{ "__gc",           luaT_netbox_request_gc },
 		{ "__tostring",     luaT_netbox_request_tostring },
 		{ "__serialize",    luaT_netbox_request_serialize },
