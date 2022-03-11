@@ -809,13 +809,32 @@ lua_rl_dmadd(dmlist *ml, const char *p, size_t pn, const char *s, int suf)
 	return 0;
 }
 
-/* Get __index field of metatable of object on top of stack. */
+/*
+ * Get table from __autocomplete function if it's present
+ * Use __index field of metatable of object as a fallback
+ */
 static int
-lua_rl_getmetaindex(lua_State *L)
+lua_rl_getcompletion(lua_State *L)
 {
 	if (!lua_getmetatable(L, -1)) {
 		lua_pop(L, 1);
 		return 0;
+	}
+	/* use __autocomplete metamethod if it's present */
+	lua_pushstring(L, "__autocomplete");
+	lua_rawget(L, -2);
+	if (lua_isfunction(L, -1)) {
+		lua_replace(L, -2);
+		lua_insert(L, -2);
+		if (lua_pcall(L, 1, 1, 0) != 0) {
+			/* pcall returns an error to the stack */
+			lua_pop(L, 1);
+			return 0;
+		} else {
+			return 1;
+		}
+	} else {
+		lua_pop(L, 1);
 	}
 	lua_pushstring(L, "__index");
 	lua_rawget(L, -2);
@@ -847,7 +866,7 @@ lua_rl_getfield(lua_State *L, const char *s, size_t n)
 			lua_pop(L, 1);
 			return 0;
 		}
-	} while (lua_rl_getmetaindex(L));
+	} while (lua_rl_getcompletion(L));
 	return 0;
 }	 /* 1: obj -- val, 0: obj -- */
 
@@ -953,7 +972,7 @@ lua_rl_complete(lua_State *L, const char *text, int start, int end)
 					goto error;
 			}
 		}
-	} while (++loop < METATABLE_RECURSION_MAX && lua_rl_getmetaindex(L));
+	} while (++loop < METATABLE_RECURSION_MAX && lua_rl_getcompletion(L));
 
 	lua_pop(L, 1);
 
