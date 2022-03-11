@@ -376,10 +376,10 @@ box_set_orphan(bool orphan)
 	box_do_set_orphan(orphan);
 	/* Update the title to reflect the new status. */
 	if (is_orphan) {
-		say_crit("entering orphan mode");
+		say_info("entering orphan mode");
 		title("orphan");
 	} else {
-		say_crit("leaving orphan mode");
+		say_info("leaving orphan mode");
 		title("running");
 	}
 }

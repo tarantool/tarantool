@@ -470,8 +470,8 @@ load_cfg(void)
 	 * after (optional) daemonising to avoid confusing messages with
 	 * different pids
 	 */
-	say_crit("%s %s", tarantool_package(), tarantool_version());
-	say_crit("log level %i", cfg_geti("log_level"));
+	say_info("%s %s", tarantool_package(), tarantool_version());
+	say_info("log level %i", cfg_geti("log_level"));
 
 	if (pid_file_handle != NULL) {
 		if (pidfile_write(pid_file_handle) == -1)
@@ -780,7 +780,7 @@ main(int argc, char **argv)
 		start_loop = start_loop && ev_activecnt(loop()) > events;
 		region_free(&fiber()->gc);
 		if (start_loop) {
-			say_crit("entering the event loop");
+			say_info("entering the event loop");
 			systemd_snotify("READY=1");
 			ev_now_update(loop());
 			ev_run(loop(), 0);
@@ -796,7 +796,7 @@ main(int argc, char **argv)
 	}
 
 	if (start_loop)
-		say_crit("exiting the event loop");
+		say_info("exiting the event loop");
 	/*
 	 * If Tarantool was stopped using Ctrl+D, then we need to
 	 * call on_shutdown triggers, because Ctrl+D  causes not

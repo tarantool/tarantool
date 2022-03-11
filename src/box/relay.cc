@@ -950,7 +950,7 @@ relay_subscribe_f(va_list ap)
 	assert(!diag_is_empty(&relay->diag));
 	diag_set_error(diag_get(), diag_last_error(&relay->diag));
 	diag_log();
-	say_crit("exiting the relay loop");
+	say_info("exiting the relay loop");
 
 	return -1;
 }
