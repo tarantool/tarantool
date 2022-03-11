@@ -914,6 +914,53 @@ luamp_iterator_take(struct lua_State *L)
 }
 
 /**
+ * Copies the given number of msgpack values starting from the iterator cursor
+ * position to a new msgpack array object. On success returns the new msgpack
+ * object and advances the iterator cursor. If there isn't enough values to
+ * decode, raises a Lua error and leaves the iterator cursor unchanged.
+ *
+ * This function could be implemented in Lua like this:
+ *
+ *     function take_array(iter, count)
+ *         local array = {}
+ *         for _ = 1, count do
+ *             table.insert(array, iter:take())
+ *         end
+ *         return msgpack.object(array)
+ *     end
+ *
+ * Note, in contrast to iter.take(), this function actually copies the original
+ * object data (not just references it), because it has to prepend a msgpack
+ * array header to the copied data.
+ */
+static int
+luamp_iterator_take_array(struct lua_State *L)
+{
+	struct luamp_iterator *it = luamp_check_iterator(L, 1);
+	if (lua_gettop(L) != 2)
+		return luaL_error(L, "Usage: iter:take_array(count)");
+	int count = luaL_checkinteger(L, 2);
+	if (count < 0)
+		return luaL_error(L, "count must be >= 0");
+	const char *start = it->pos;
+	const char *end = start;
+	for (int i = 0; i < count; i++) {
+		if (end == it->source->data_end)
+			return luaL_error(L, "iteration ended");
+		mp_next(&end);
+	}
+	size_t size = end - start;
+	struct luamp_object *obj = luamp_new_object(
+		L, mp_sizeof_array(count) + size);
+	char *data = (char *)obj->data;
+	data = mp_encode_array(data, count);
+	if (size > 0)
+		memcpy(data, start, size);
+	it->pos = end;
+	return 1;
+}
+
+/**
  * Advances the iterator cursor by skipping one msgpack value under the cursor.
  * Raises a Lua error if there's no data to skip.
  */
@@ -969,6 +1016,7 @@ luaopen_msgpack(lua_State *L)
 		{ "decode_map_header", luamp_iterator_decode_map_header },
 		{ "decode", luamp_iterator_decode },
 		{ "take", luamp_iterator_take },
+		{ "take_array", luamp_iterator_take_array },
 		{ "skip", luamp_iterator_skip },
 		{ NULL, NULL }
 	};
