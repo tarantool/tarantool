@@ -165,7 +165,8 @@ local function stream_wrap_index(stream_id, src)
         _src = src,
     }, {
         __index = src,
-        __serialize = stream_index_serialize
+        __serialize = stream_index_serialize,
+        __autocomplete = stream_index_serialize
     })
 end
 
@@ -188,7 +189,8 @@ local stream_indexes_mt = {
         self[key] = res
         return res
     end,
-    __serialize = stream_indexes_serialize
+    __serialize = stream_indexes_serialize,
+    __autocomplete = stream_indexes_serialize
 }
 
 -- Create stream space, which is same as connection space,
@@ -202,7 +204,8 @@ local function stream_wrap_space(stream, src)
         }, stream_indexes_mt)
     }, {
         __index = src,
-        __serialize = stream_space_serialize
+        __serialize = stream_space_serialize,
+        __autocomplete = stream_space_serialize
     })
     res.index._space = res
     return res
@@ -234,7 +237,8 @@ local stream_spaces_mt = {
         self._stream_space_cache[key] = res
         return res
     end,
-    __serialize = stream_spaces_serialize
+    __serialize = stream_spaces_serialize,
+    __autocomplete = stream_spaces_serialize
 }
 
 -- This callback is invoked in a new fiber upon receiving 'box.shutdown' event
