@@ -317,6 +317,28 @@ g.test_object_iterator = function()
     t.assert_equals(it2:decode(), 123)
     t.assert_error_msg_content_equals(
         "iteration ended", function() it2:decode() end)
+
+    -- iterator.take_array
+    it = msgpack.object({1, 2, 3}):iterator()
+    t.assert_error_msg_content_equals("iteration ended", it.take_array, it, 2)
+    t.assert_equals(it:take_array(0):decode(), {})
+    t.assert_equals(it:take_array(1):decode(), {{1, 2, 3}})
+    t.assert_equals(it:take_array(0):decode(), {})
+    t.assert_error_msg_content_equals("iteration ended", it.take_array, it, 1)
+
+    it = msgpack.object({10, 20, {30, 40}, 50, {60, 70, 80}, 90}):iterator()
+    t.assert_equals(it:decode_array_header(), 6)
+    t.assert_equals(it:decode(), 10)
+    t.assert_equals(it:take_array(3):decode(), {20, {30, 40}, 50})
+    t.assert_equals(it:decode_array_header(), 3)
+    t.assert_equals(it:decode(), 60)
+    t.assert_equals(it:take_array(3):decode(), {70, 80, 90})
+    t.assert_error_msg_content_equals("iteration ended", it.take, it)
+
+    it = msgpack.object({foo = 123}):iterator()
+    t.assert_equals(it:decode_map_header(), 1)
+    t.assert_equals(it:take_array(2):decode(), {'foo', 123})
+    t.assert_error_msg_content_equals("iteration ended", it.take_array, it, 1)
 end
 
 g.test_object_cfg = function()
