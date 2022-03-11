@@ -637,7 +637,7 @@ checkpoint_write_row(struct xlog *l, struct xrow_header *row)
 		return -1;
 
 	if ((l->rows + l->tx_rows) % 100000 == 0) {
-		say_crit_ratelimited("%.1fM rows written",
+		say_info_ratelimited("%.1fM rows written",
 				     (l->rows + l->tx_rows) / 1e6);
 	}
 	return 0;
