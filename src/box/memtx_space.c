@@ -1101,6 +1101,7 @@ memtx_space_drop_primary_key(struct space *space)
 	 */
 	memtx_space->replace = memtx_space_replace_no_keys;
 	memtx_space->bsize = 0;
+	memtx_space->compressed_tuples = 0;
 }
 
 static void

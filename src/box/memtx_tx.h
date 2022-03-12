@@ -277,10 +277,12 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt);
  * Make the statement's changes permanent. It becomes visible to all.
  *
  * @param stmt current statement.
- * @return the change in space bsize.
+ * @param bsize the space bsize.
+ * @param compressed_tuples count of compressed tuples in space.
  */
-ssize_t
-memtx_tx_history_commit_stmt(struct txn_stmt *stmt);
+void
+memtx_tx_history_commit_stmt(struct txn_stmt *stmt, size_t *bsize,
+			     uint64_t *compressed_tuples);
 
 /** Helper of memtx_tx_tuple_clarify */
 struct tuple *
