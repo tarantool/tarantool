@@ -523,11 +523,12 @@ memtx_engine_commit(struct engine *engine, struct txn *txn)
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->add_story != NULL || stmt->del_story != NULL) {
-			ssize_t bsize = memtx_tx_history_commit_stmt(stmt);
 			assert(stmt->space->engine == engine);
 			struct memtx_space *mspace =
 				(struct memtx_space *)stmt->space;
-			mspace->bsize += bsize;
+			size_t *bsize = &mspace->bsize;
+			uint64_t *ctuples = &mspace->compressed_tuples;
+			memtx_tx_history_commit_stmt(stmt, bsize, ctuples);
 		}
 	}
 }
