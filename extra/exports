@@ -423,6 +423,7 @@ title_set_interpretor_name
 title_set_script_name
 title_set_status
 title_update
+tnt_datetime_increment_by
 tnt_datetime_now
 tnt_datetime_parse_full
 tnt_datetime_strftime

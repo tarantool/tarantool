@@ -192,6 +192,18 @@ datetime_strptime(struct datetime *date, const char *buf, const char *fmt);
 size_t
 interval_to_string(const struct interval *ival, char *buf, ssize_t len);
 
+/**
+ * Add/subtract datetime value by passed interval using direction as a hint
+ * @param[in,out] self left source operand and target for binary operation
+ * @param[in] direction addition (0) or subtraction (-1)
+ * @param[in] ival interval objects (right operand)
+ * @retval 0 if there is no overflow, negative value if there is underflow
+ *         or positive if there is overflow.
+ */
+int
+datetime_increment_by(struct datetime *self, int direction,
+		      const struct interval *ival);
+
 /** Return the year from a date. */
 int64_t
 datetime_year(const struct datetime *date);

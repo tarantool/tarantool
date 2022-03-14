@@ -20,8 +20,8 @@
 #include "fiber.h"
 
 /** floored modulo and divide */
-#define MOD(a, b) unlikely(a < 0) ? (b + (a % b)) : (a % b)
-#define DIV(a, b) unlikely(a < 0) ? ((a - b + 1) / b) : (a / b)
+#define MOD(a, b) (unlikely((a) < 0) ? ((b) + ((a) % (b))) : ((a) % (b)))
+#define DIV(a, b) (unlikely((a) < 0) ? (((a) - (b) + 1) / (b)) : ((a) / (b)))
 
 /**
  * Given the seconds from Epoch (1970-01-01) we calculate date
@@ -568,4 +568,120 @@ interval_to_string(const struct interval *ival, char *buf, ssize_t len)
 		SNPRINT(sz, seconds_str, buf, len, false, secs, nsec);
 	}
 	return sz;
+}
+
+/**
+ * Normalize seconds and nanoseconds:
+ * - make sure that nanoseconds part is positive
+ * - make sure it's not exceeding maximum allowed value
+ */
+static void
+normalize_nsec(int64_t *psecs, int *pnsec)
+{
+	assert(psecs != NULL);
+	assert(pnsec != NULL);
+	int64_t secs = *psecs;
+	int nsec = *pnsec;
+
+	if (nsec < 0 || nsec >= NANOS_PER_SEC) {
+		secs += nsec / NANOS_PER_SEC;
+		nsec %= NANOS_PER_SEC;
+	}
+	*psecs = secs;
+	*pnsec = nsec;
+}
+
+static inline int64_t
+utc_secs(int64_t epoch, int tzoffset)
+{
+	return epoch - tzoffset * 60;
+}
+
+/** minimum supported date - -5879610-06-22 */
+#define MIN_DATE_YEAR -5879610
+#define MIN_DATE_MONTH 6
+#define MIN_DATE_DAY 22
+
+/** maximum supported date - 5879611-07-11 */
+#define MAX_DATE_YEAR 5879611
+#define MAX_DATE_MONTH 7
+#define MAX_DATE_DAY 11
+/**
+ * In the Julian calendar, the average year length is
+ * 365 1/4 days = 365.25 days. This gives an error of
+ * about 1 day in 128 years.
+ */
+#define AVERAGE_DAYS_YEAR 365.25
+#define AVERAGE_DAYS_MONTH (AVERAGE_DAYS_YEAR / 12)
+#define AVERAGE_WEEK_YEAR  (AVERAGE_DAYS_YEAR / 7)
+
+static inline int
+verify_range(int64_t v, int64_t from, int64_t to)
+{
+	return (v < from) ? -1 : (v > to ? +1 : 0);
+}
+
+static inline int
+verify_dt(int64_t dt)
+{
+	return verify_range(dt, INT_MIN, INT_MAX);
+}
+
+int
+datetime_increment_by(struct datetime *self, int direction,
+		      const struct interval *ival)
+{
+	int64_t secs = local_secs(self);
+	int64_t dt = local_dt(secs);
+	int nsec = self->nsec;
+	int offset = self->tzindex;
+
+	bool is_ym_updated = false;
+	int years = ival->year;
+	int months = ival->month;
+	int seconds = ival->sec;
+	int nanoseconds = ival->nsec;
+	dt_adjust_t adjust = ival->adjust;
+	int rc = 0;
+
+	if (years != 0) {
+		rc = verify_range(years, MIN_DATE_YEAR, MAX_DATE_YEAR);
+		if (rc != 0)
+			return rc;
+		rc = verify_dt(dt + direction * years * AVERAGE_DAYS_YEAR);
+		if (rc != 0)
+			return rc;
+		/* tnt_dt_add_years() not handle properly DT_SNAP or DT_LIMIT
+		 * mode so use tnt_dt_add_months() as a work-around
+		 */
+		dt = dt_add_months(dt, direction * years * 12, adjust);
+		is_ym_updated = true;
+	}
+	if (months != 0) {
+		rc = verify_dt(dt + direction * months * AVERAGE_DAYS_MONTH);
+		if (rc != 0)
+			return rc;
+
+		dt = dt_add_months(dt, direction * months, adjust);
+		is_ym_updated = true;
+	}
+
+	if (is_ym_updated) {
+		secs = dt * SECS_PER_DAY - SECS_EPOCH_1970_OFFSET +
+		       secs % SECS_PER_DAY;
+	}
+
+	if (seconds != 0)
+		secs += direction * seconds;
+	if (nanoseconds != 0)
+		nsec += direction * nanoseconds;
+
+	normalize_nsec(&secs, &nsec);
+	rc = verify_dt((secs + SECS_EPOCH_1970_OFFSET) / SECS_PER_DAY);
+	if (rc != 0)
+		return rc;
+
+	self->epoch = utc_secs(secs, offset);
+	self->nsec = nsec;
+	return 0;
 }
