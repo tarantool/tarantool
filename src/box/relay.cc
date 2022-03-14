@@ -141,8 +141,14 @@ struct relay {
 	 */
 	struct vclock local_vclock_at_subscribe;
 
-	/** Relay endpoint */
-	struct cbus_endpoint endpoint;
+	/** Endpoint to receive messages from WAL. */
+	struct cbus_endpoint wal_endpoint;
+	/**
+	 * Endpoint to receive messages from TX. Having the 2 endpoints
+	 * separated helps to synchronize the data coming from TX and WAL. Such
+	 * as term bumps from TX with PROMOTE rows from WAL.
+	 */
+	struct cbus_endpoint tx_endpoint;
 	/** A pipe from 'relay' thread to 'tx' */
 	struct cpipe tx_pipe;
 	/** A pipe from 'tx' thread to 'relay' */
@@ -811,7 +817,7 @@ relay_send_is_raft_enabled(struct relay *relay,
 	 * fiber.
 	 */
 	while (!msg->is_finished) {
-		cbus_process(&relay->endpoint);
+		cbus_process(&relay->tx_endpoint);
 		if (msg->is_finished)
 			break;
 		fiber_yield();
@@ -831,11 +837,15 @@ relay_subscribe_f(va_list ap)
 	coio_enable();
 	relay_set_cord_name(relay->io->fd);
 
-	/* Create cpipe to tx for propagating vclock. */
-	cbus_endpoint_create(&relay->endpoint, tt_sprintf("relay_%p", relay),
+	cbus_endpoint_create(&relay->tx_endpoint,
+			     tt_sprintf("relay_tx_%p", relay),
 			     fiber_schedule_cb, fiber());
-	cbus_pair("tx", relay->endpoint.name, &relay->tx_pipe,
+	cbus_pair("tx", relay->tx_endpoint.name, &relay->tx_pipe,
 		  &relay->relay_pipe, NULL, NULL, cbus_process);
+
+	cbus_endpoint_create(&relay->wal_endpoint,
+			     tt_sprintf("relay_wal_%p", relay),
+			     fiber_schedule_cb, fiber());
 
 	struct relay_is_raft_enabled_msg raft_enabler;
 	if (!relay->replica->anon && relay->version_id >= version_id(2, 6, 0))
@@ -852,7 +862,7 @@ relay_subscribe_f(va_list ap)
 		trigger_add(&relay->r->on_close_log, &on_close_log);
 
 	/* Setup WAL watcher for sending new rows to the replica. */
-	wal_set_watcher(&relay->wal_watcher, relay->endpoint.name,
+	wal_set_watcher(&relay->wal_watcher, relay->wal_endpoint.name,
 			relay_process_wal_event, cbus_process);
 
 	/* Start fiber for receiving replica acks. */
@@ -883,13 +893,15 @@ relay_subscribe_f(va_list ap)
 
 		fiber_cond_wait_deadline(&relay->reader_cond,
 					 relay->last_row_time + timeout);
-
 		/*
 		 * The fiber can be woken by IO cancel, by a timeout of
 		 * status messaging or by an acknowledge to status message.
 		 * Handle cbus messages first.
 		 */
-		cbus_process(&relay->endpoint);
+		inj = errinj(ERRINJ_RELAY_FROM_TX_DELAY, ERRINJ_BOOL);
+		if (inj == NULL || !inj->bparam)
+			cbus_process(&relay->tx_endpoint);
+		cbus_process(&relay->wal_endpoint);
 		/* Check for a heartbeat timeout. */
 		if (ev_monotonic_now(loop()) - relay->last_row_time > timeout)
 			relay_send_heartbeat(relay);
@@ -939,7 +951,8 @@ relay_subscribe_f(va_list ap)
 	/* Destroy cpipe to tx. */
 	cbus_unpair(&relay->tx_pipe, &relay->relay_pipe,
 		    NULL, NULL, cbus_process);
-	cbus_endpoint_destroy(&relay->endpoint, cbus_process);
+	cbus_endpoint_destroy(&relay->wal_endpoint, cbus_process);
+	cbus_endpoint_destroy(&relay->tx_endpoint, cbus_process);
 
 	relay_exit(relay);
 

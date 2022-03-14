@@ -134,6 +134,38 @@ function Server:wait_election_leader_found()
                      function() return box.info.election.leader ~= 0 end)
 end
 
+function Server:wait_election_term(term)
+    return wait_cond('election term', self, self.exec, self, function(term)
+        return box.info.election.term >= term
+    end, {term})
+end
+
+function Server:wait_synchro_queue_owner_id(id)
+    if id == nil then
+        id = self:instance_id()
+    end
+
+    return wait_cond('synchro queue owner', self, self.exec, self, function(id)
+        return box.info.synchro.queue.owner == id
+    end, {id})
+end
+
+function Server:wait_lsn(server, lsn)
+    if lsn == nil then
+        lsn = server:lsn()
+    end
+
+    return wait_cond('wait lsn', self, self.exec, self, function(server, lsn)
+        if lsn == 0 then
+            return true
+        end
+        if box.info.vclock[server] == nil then
+            return false
+        end
+        return box.info.vclock[server] >= lsn
+    end, {server:instance_id(), lsn})
+end
+
 -- Unlike the original luatest.Server function it waits for
 -- starting the server.
 function Server:start(opts)
@@ -174,6 +206,18 @@ function Server:instance_uuid()
     local uuid = self:exec(function() return box.info.uuid end)
     self.instance_uuid_value = uuid
     return uuid
+end
+
+function Server:election_term()
+    return self:exec(function() return box.info.election.term end)
+end
+
+function Server:synchro_queue_term()
+    return self:exec(function() return box.info.synchro.queue.term end)
+end
+
+function Server:lsn()
+    return self:exec(function() return box.info.lsn end)
 end
 
 -- TODO: Add the 'wait_for_readiness' parameter for the restart()

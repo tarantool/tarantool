@@ -644,6 +644,8 @@ lbox_info_synchro(struct lua_State *L)
 	lua_setfield(L, -2, "owner");
 	lua_pushboolean(L, latch_is_locked(&queue->promote_latch));
 	lua_setfield(L, -2, "busy");
+	luaL_pushuint64(L, queue->promote_greatest_term);
+	lua_setfield(L, -2, "term");
 	lua_setfield(L, -2, "queue");
 
 	return 1;
