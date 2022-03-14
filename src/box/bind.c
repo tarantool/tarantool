@@ -34,6 +34,9 @@
 #include "sql/sqlInt.h"
 #include "sql/sqlLimit.h"
 #include "sql/vdbe.h"
+#include "mp_datetime.h"
+#include "mp_decimal.h"
+#include "mp_uuid.h"
 
 const char *
 sql_bind_name(const struct sql_bind *bind)
@@ -99,9 +102,41 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 	case MP_BIN:
 		bind->s = mp_decode_bin(packet, &bind->bytes);
 		break;
+	case MP_EXT: {
+		int8_t ext_type;
+		uint32_t size = mp_decode_extl(packet, &ext_type);
+		switch (ext_type) {
+		case MP_UUID:
+			if (uuid_unpack(packet, size, &bind->uuid) == NULL) {
+				diag_set(ClientError, ER_INVALID_MSGPACK,
+					 "Invalid MP_UUID MsgPack format");
+				return -1;
+			}
+			break;
+		case MP_DECIMAL:
+			if (decimal_unpack(packet, size, &bind->dec) == NULL) {
+				diag_set(ClientError, ER_INVALID_MSGPACK,
+					 "Invalid MP_DECIMAL MsgPack format");
+				return -1;
+			}
+			break;
+		case MP_DATETIME:
+			if (datetime_unpack(packet, size, &bind->dt) == NULL) {
+				diag_set(ClientError, ER_INVALID_MSGPACK,
+					 "Invalid MP_DATETIME MsgPack format");
+				return -1;
+			}
+			break;
+		default:
+			diag_set(ClientError, ER_SQL_BIND_TYPE, "USERDATA",
+				 sql_bind_name(bind));
+			return -1;
+		}
+		bind->ext_type = ext_type;
+		break;
+	}
 	case MP_ARRAY:
 	case MP_MAP:
-	case MP_EXT:
 		bind->s = *packet;
 		mp_next(packet);
 		bind->bytes = *packet - bind->s;
