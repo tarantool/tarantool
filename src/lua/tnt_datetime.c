@@ -50,3 +50,10 @@ tnt_interval_to_string(const struct interval *ival, char *buf, ssize_t len)
 {
 	return interval_to_string(ival, buf, len);
 }
+
+int
+tnt_datetime_increment_by(struct datetime *self, int direction,
+			  const struct interval *ival)
+{
+	return datetime_increment_by(self, direction, ival);
+}
