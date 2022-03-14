@@ -755,7 +755,7 @@ tarantool_lua_utils_init(struct lua_State *L)
 			  "int nsec;"
 			  "int month;"
 			  "int year;"
-			  "dt_adjust_t adjust;"
+			  "int adjust;"
 			  "};");
 	assert(rc == 0);
 	(void) rc;

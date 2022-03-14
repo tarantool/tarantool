@@ -74,8 +74,9 @@ size_t tnt_datetime_strptime(struct datetime *date, const char *buf,
 void   tnt_datetime_now(struct datetime *now);
 
 /* Tarantool interval support functions */
-size_t
-tnt_interval_to_string(const struct datetime_interval *, char *, ssize_t);
+size_t tnt_interval_to_string(const struct datetime_interval *, char *, ssize_t);
+int    datetime_increment_by(/*out*/ struct datetime *self, int direction,
+		                     const struct datetime_interval *ival);
 
 ]]
 
@@ -87,7 +88,6 @@ local math_floor = math.floor
 local DAYS_EPOCH_OFFSET = 719163
 local SECS_PER_DAY      = 86400
 local SECS_EPOCH_OFFSET = DAYS_EPOCH_OFFSET * SECS_PER_DAY
-local NANOS_PER_SEC     = 1e9
 local TOSTRING_BUFSIZE  = 48
 local IVAL_TOSTRING_BUFSIZE = 96
 local STRFTIME_BUFSIZE  = 128
@@ -104,10 +104,8 @@ local MAX_DATE_DAY = 11
 -- 365 1/4 days = 365.25 days. This gives an error of
 -- about 1 day in 128 years.
 local AVERAGE_DAYS_YEAR = 365.25
-local AVERAGE_DAYS_MONTH = AVERAGE_DAYS_YEAR / 12
 local AVERAGE_WEEK_YEAR = AVERAGE_DAYS_YEAR / 7
 local INT_MAX = 2147483647
-local INT_MIN = -2147483648
 -- -5879610-06-22
 local MIN_DATE_TEXT = ('%d-%02d-%02d'):format(MIN_DATE_YEAR, MIN_DATE_MONTH,
                                               MIN_DATE_DAY)
@@ -246,24 +244,6 @@ local function check_range(v, from, to, txt, extra)
     end
 end
 
-local function check_dt(dt_v, direction, v, unit)
-    if dt_v >= INT_MIN and dt_v <= INT_MAX then
-        return
-    end
-    local operation = direction >= 0 and 'addition' or 'subtraction'
-    local title = unit ~= nil and ('%s of %d %s'):format(operation, v, unit) or
-                                  operation
-    if dt_v < INT_MIN then
-        error(('%s makes date less than minimum allowed %s'):
-                format(title, MIN_DATE_TEXT), 3)
-    elseif dt_v > INT_MAX then
-        error(('%s makes date greater than maximum allowed %s'):
-                format(title, MAX_DATE_TEXT), 3)
-    else
-        assert(false)
-    end
-end
-
 local function dt_from_ymd_checked(y, M, d)
     local pdt = date_dt_stash_take()
     local is_valid = builtin.tnt_dt_from_ymd_checked(y, M, d, pdt)
@@ -295,14 +275,6 @@ end
 
 local function bool2int(b)
     return b and 1 or 0
-end
-
-local function normalize_nsec(secs, nsec)
-    if nsec < 0 or nsec >= NANOS_PER_SEC then
-        secs = secs + math_floor(nsec / NANOS_PER_SEC)
-        nsec = nsec % NANOS_PER_SEC
-    end
-    return secs, nsec
 end
 
 local adjust_xlat = {
@@ -635,48 +607,18 @@ local function interval_tostring(self)
 end
 
 local function datetime_increment_by(self, direction, ival)
-    -- operations with intervals should be done using local human dates
-    -- not UTC dates, thus normalize to local timezone before operations.
-    local dt = local_dt(self)
-    local secs, nsec = local_secs(self), self.nsec
-    local offset = self.tzoffset
-
-    local is_ym_updated = false
-    local years, months = ival.year, ival.month
-    local seconds, nanoseconds = ival.sec, ival.nsec
-    local adjust = ival.adjust or DEF_DT_ADJUST
-
-    if years ~= 0 then
-        check_range(years, MIN_DATE_YEAR, MAX_DATE_YEAR, 'years')
-        local approx_dt = dt + direction * years * AVERAGE_DAYS_YEAR
-        check_dt(approx_dt, direction, years, 'years')
-        -- tnt_dt_add_years() not handle properly DT_SNAP or DT_LIMIT mode
-        -- so use tnt_dt_add_months() as a work-around
-        dt = builtin.tnt_dt_add_months(dt, direction * years * 12, adjust)
-        is_ym_updated = true
+    local rc = builtin.datetime_increment_by(self, direction, ival)
+    if rc == 0 then
+        return self
     end
-    if months ~= 0 then
-        local new_dt = dt + direction * months * AVERAGE_DAYS_MONTH
-        check_dt(new_dt, direction, months, 'months')
-        dt = builtin.tnt_dt_add_months(dt, direction * months, adjust)
-        is_ym_updated = true
+    local operation = direction >= 0 and 'addition' or 'subtraction'
+    if rc < 0 then
+        error(('%s makes date less than minimum allowed %s'):
+                format(operation, MIN_DATE_TEXT), 3)
+    else -- rc > 0
+        error(('%s makes date greater than maximum allowed %s'):
+                format(operation, MAX_DATE_TEXT), 3)
     end
-    if is_ym_updated then
-        secs = (dt - DAYS_EPOCH_OFFSET) * SECS_PER_DAY + secs % SECS_PER_DAY
-    end
-
-    if seconds ~= 0 then
-        secs = secs + direction * seconds
-    end
-
-    if nanoseconds ~= 0 then
-        nsec = nsec + direction * nanoseconds
-    end
-
-    secs, self.nsec = normalize_nsec(secs, nsec)
-    check_dt((secs + SECS_EPOCH_OFFSET) / SECS_PER_DAY, direction)
-    self.epoch = utc_secs(secs, offset)
-    return self
 end
 
 local function date_first(lhs, rhs)

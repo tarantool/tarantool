@@ -16,8 +16,8 @@
 #include "tzcode/tzcode.h"
 
 /** floored modulo and divide */
-#define MOD(a, b) unlikely(a < 0) ? (b + (a % b)) : (a % b)
-#define DIV(a, b) unlikely(a < 0) ? ((a - b + 1) / b) : (a / b)
+#define MOD(a, b) (unlikely(a < 0) ? (b + (a % b)) : (a % b))
+#define DIV(a, b) (unlikely(a < 0) ? ((a - b + 1) / b) : (a / b))
 
 /**
  * Given the seconds from Epoch (1970-01-01) we calculate date
@@ -401,4 +401,92 @@ interval_to_string(const struct datetime_interval *ival, char *buf, ssize_t len)
 		SNPRINT(sz, seconds_str, buf, len, false, secs, nsec);
 	}
 	return sz;
+}
+
+#define CHECK_RANGE(v, from, to) \
+	if ((v) < (from))	return -1; \
+	else if ((v) > (to))	return +1;
+
+#define CHECK_DT(dt) \
+	CHECK_RANGE(dt, INT_MIN, INT_MAX)
+
+static void
+normalize_nsec(int64_t *psecs, int *pnsec)
+{
+	assert(psecs != NULL);
+	assert(pnsec != NULL);
+	int64_t secs = *psecs;
+	int nsec = *pnsec;
+
+	if (nsec < 0 || nsec >= NANOS_PER_SEC) {
+		secs += nsec / NANOS_PER_SEC;
+		nsec %= NANOS_PER_SEC;
+	}
+	*psecs = secs;
+	*pnsec = nsec;
+}
+
+static inline int64_t
+utc_secs(int64_t epoch, int tzoffset)
+{
+	return epoch - tzoffset * 60;
+}
+
+// minimum supported date - -5879610-06-22
+#define MIN_DATE_YEAR -5879610
+#define MIN_DATE_MONTH 6
+#define MIN_DATE_DAY 22
+
+// maximum supported date - 5879611-07-11
+#define MAX_DATE_YEAR 5879611
+#define MAX_DATE_MONTH 7
+#define MAX_DATE_DAY 11
+// In the Julian calendar, the average year length is
+// 365 1/4 days = 365.25 days. This gives an error of
+// about 1 day in 128 years.
+#define AVERAGE_DAYS_YEAR 365.25
+#define AVERAGE_DAYS_MONTH (AVERAGE_DAYS_YEAR / 12)
+#define AVERAGE_WEEK_YEAR  (AVERAGE_DAYS_YEAR / 7)
+
+int
+datetime_increment_by(/*out*/ struct datetime *self, int direction,
+		      const struct datetime_interval *ival)
+{
+	int64_t secs = local_secs(self);
+	dt_t dt = local_dt(secs);
+	int nsec = self->nsec;
+	int offset = self->tzindex;
+
+	bool is_ym_updated = false;
+	int years = ival->year, months = ival->month;
+	int seconds = ival->sec, nanoseconds = ival->nsec;
+	dt_adjust_t adjust = ival->adjust;
+
+	if (years != 0) {
+		CHECK_RANGE(years, MIN_DATE_YEAR, MAX_DATE_YEAR)
+		CHECK_DT(dt + direction * years * AVERAGE_DAYS_YEAR);
+		// tnt_dt_add_years() not handle properly DT_SNAP or DT_LIMIT mode
+		// so use tnt_dt_add_months() as a work-around
+		dt = dt_add_months(dt, direction * years * 12, adjust);
+		is_ym_updated = true;
+	}
+	if (months != 0) {
+		CHECK_DT(dt + direction * months * AVERAGE_DAYS_MONTH)
+		dt = dt_add_months(dt, direction * months, adjust);
+		is_ym_updated = true;
+	}
+	if (is_ym_updated != false)
+		secs = (int64_t)dt * SECS_PER_DAY - SECS_EPOCH_1970_OFFSET +
+			secs % SECS_PER_DAY;
+	if (seconds != 0 )
+		secs += direction * seconds;
+	if (nanoseconds != 0)
+		nsec += direction * nanoseconds;
+
+	normalize_nsec(&secs, &nsec);
+	CHECK_DT((secs + SECS_EPOCH_1970_OFFSET) / SECS_PER_DAY)
+
+	self->epoch = utc_secs(secs, offset);
+	self->nsec = nsec;
+	return 0;
 }
