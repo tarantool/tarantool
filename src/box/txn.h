@@ -458,6 +458,10 @@ struct txn {
 	 * to complete within the timeout specified when it was created.
 	 */
 	struct ev_timer *rollback_timer;
+	/**
+	 * Nesting level of space on_replace triggers for current txn.
+	 */
+	int space_on_replace_triggers_depth;
 };
 
 static inline bool
