@@ -533,6 +533,7 @@ struct txn;
 struct credentials;
 struct lua_State;
 struct ipc_wait_pad;
+struct backtrace;
 
 struct fiber {
 	coro_context ctx;
@@ -662,6 +663,10 @@ struct fiber {
 	 */
 	char *name;
 	char inline_name[FIBER_NAME_INLINE];
+#ifdef ENABLE_BACKTRACE
+	/* Fiber parent's backtrace allocated on the 'gc' region. */
+	struct backtrace *parent_bt;
+#endif /* ENABLE_BACKTRACE */
 };
 
 /** Invoke on_stop triggers and delete them. */
@@ -876,6 +881,17 @@ fiber_top_enable(void);
 void
 fiber_top_disable(void);
 #endif /* ENABLE_FIBER_TOP */
+
+#ifdef ENABLE_BACKTRACE
+bool
+fiber_parent_backtrace_is_enabled(void);
+
+void
+fiber_parent_backtrace_enable(void);
+
+void
+fiber_parent_backtrace_disable(void);
+#endif /* ENABLE_BACKTRACE */
 
 /** Useful for C unit tests */
 static inline int

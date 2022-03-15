@@ -138,6 +138,12 @@ void
 backtrace_append_lua_frame(struct backtrace *bt, const char *proc_name,
 			   const char *src_name, int line_no);
 
+/*
+ * Append frames from 'add' to the end of 'to'.
+ */
+void
+backtrace_cat(struct backtrace *to, const struct backtrace *add);
+
 #endif /* ENABLE_BACKTRACE */
 
 #if defined(__cplusplus)

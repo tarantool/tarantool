@@ -582,6 +582,15 @@ backtrace_append_lua_frame(struct backtrace *bt, const char *proc_name,
 }
 
 void
+backtrace_cat(struct backtrace *to, const struct backtrace *add) {
+	int additional_frames = MIN(BACKTRACE_FRAMES_CNT_MAX - to->frames_cnt,
+				    add->frames_cnt);
+	memcpy(to->frames + to->frames_cnt, add->frames,
+	       sizeof(to->frames[0]) * additional_frames);
+	to->frames_cnt += additional_frames;
+}
+
+void
 print_backtrace(void)
 {
 	char *start = (char *)static_alloc(SMALL_STATIC_SIZE);
