@@ -15,10 +15,7 @@ env:
 
 jobs:
   jepsen-single-instance-txm:
-    if: github.event_name == 'push' ||
-        github.event_name == 'repository_dispatch' ||
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'schedule'
+    if: github.repository == 'tarantool/tarantool'
 
     runs-on: ubuntu-18.04
 
