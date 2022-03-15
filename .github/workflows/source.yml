@@ -13,6 +13,8 @@ env:
 
 jobs:
   source:
+    if: github.repository == 'tarantool/tarantool'
+
     runs-on: ubuntu-20.04-self-hosted
 
     steps:
