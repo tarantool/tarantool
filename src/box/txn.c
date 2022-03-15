@@ -258,6 +258,7 @@ txn_new(void)
 	rlist_create(&txn->conflicted_by_list);
 	rlist_create(&txn->in_read_view_txs);
 	rlist_create(&txn->in_all_txs);
+	txn->space_on_replace_triggers_depth = 0;
 	return txn;
 }
 
@@ -503,7 +504,10 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 			 */
 			stmt->does_require_old_tuple = true;
 
-			if(trigger_run(&stmt->space->on_replace, txn) != 0)
+			txn->space_on_replace_triggers_depth++;
+			int rc = trigger_run(&stmt->space->on_replace, txn);
+			txn->space_on_replace_triggers_depth--;
+			if (rc != 0)
 				goto fail;
 		}
 	}
