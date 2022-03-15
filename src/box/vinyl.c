@@ -1740,13 +1740,16 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (vy_unique_key_validate(lsm, key, part_count))
 		return -1;
 	/*
-	 * There are two cases when need to get the full tuple
+	 * There are three cases when we need to get the full tuple
 	 * before deletion.
 	 * - if the space has on_replace triggers and need to pass
 	 *   to them the old tuple.
 	 * - if deletion is done by a secondary index.
+	 * - if the space has a secondary index and deferred DELETES are
+	 *   disabled.
 	 */
-	if (lsm->index_id > 0 || !rlist_empty(&space->on_replace)) {
+	if ((space->index_count > 1 && !space->def->opts.defer_deletes) ||
+	    lsm->index_id > 0 || !rlist_empty(&space->on_replace)) {
 		if (vy_get_by_raw_key(lsm, tx, vy_tx_read_view(tx),
 				      key, part_count, &stmt->old_tuple) != 0)
 			return -1;
@@ -2275,11 +2278,14 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 			       COLUMN_MASK_FULL) != 0)
 		return -1;
 	/*
-	 * Get the overwritten tuple from the primary index if
-	 * the space has on_replace triggers, in which case we
-	 * need to pass the old tuple to trigger callbacks.
+	 * There are two cases when we need to get the full tuple on replace.
+	 * - if the space has on_replace triggers and need to pass
+	 *   to them the old tuple.
+	 * - if the space has a secondary index and deferred DELETES are
+	 *   disabled.
 	 */
-	if (!rlist_empty(&space->on_replace)) {
+	if ((space->index_count > 1 && !space->def->opts.defer_deletes) ||
+	    !rlist_empty(&space->on_replace)) {
 		if (vy_get(pk, tx, vy_tx_read_view(tx),
 			   stmt->new_tuple, &stmt->old_tuple) != 0)
 			return -1;

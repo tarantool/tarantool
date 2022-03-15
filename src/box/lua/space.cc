@@ -292,6 +292,12 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	lua_pushcfunction(L, lbox_space_before_replace);
 	lua_settable(L, i);
 
+	if (space_is_vinyl(space)) {
+		lua_pushstring(L, "defer_deletes");
+		lua_pushboolean(L, space->def->opts.defer_deletes);
+		lua_settable(L, i);
+	}
+
 	lua_getfield(L, i, "index");
 	if (lua_isnil(L, -1)) {
 		lua_pop(L, 1);

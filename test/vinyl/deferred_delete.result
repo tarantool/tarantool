@@ -1,6 +1,9 @@
 test_run = require('test_run').new()
 ---
 ...
+box.cfg{vinyl_defer_deletes = true}
+---
+...
 --
 -- Create a space with secondary indexes and check that REPLACE and
 -- DELETE requests do not look up the old tuple in the primary index
@@ -275,6 +278,9 @@ pk:stat().skip.rows -- 10
 ...
 -- Check that deferred DELETEs are not lost after restart.
 test_run:cmd("restart server default")
+box.cfg{vinyl_defer_deletes = true}
+---
+...
 s = box.space.test
 ---
 ...
@@ -894,6 +900,9 @@ test_run:cmd("switch test")
 ---
 - true
 ...
+box.cfg{vinyl_defer_deletes = true}
+---
+...
 s = box.schema.space.create('test', {engine = 'vinyl'})
 ---
 ...
@@ -974,6 +983,9 @@ sk:stat().rows - dummy_rows -- 120 old REPLACEs + 120 new REPLACEs + 120 deferre
 - 360
 ...
 test_run:cmd("restart server test with args='1048576'")
+box.cfg{vinyl_defer_deletes = true}
+---
+...
 s = box.space.test
 ---
 ...

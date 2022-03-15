@@ -443,6 +443,7 @@ box.schema.space.create = function(name, options)
         is_local = 'boolean',
         temporary = 'boolean',
         is_sync = 'boolean',
+        defer_deletes = 'boolean',
     }
     local options_defaults = {
         engine = 'memtx',
@@ -451,6 +452,11 @@ box.schema.space.create = function(name, options)
     }
     check_param_table(options, options_template)
     options = update_param_table(options, options_defaults)
+    if options.engine == 'vinyl' then
+        options = update_param_table(options, {
+            defer_deletes = box.cfg.vinyl_defer_deletes,
+        })
+    end
 
     local _space = box.space[box.schema.SPACE_ID]
     if box.space[name] then
@@ -487,7 +493,8 @@ box.schema.space.create = function(name, options)
     local space_options = setmap({
         group_id = options.is_local and 1 or nil,
         temporary = options.temporary and true or nil,
-        is_sync = options.is_sync
+        is_sync = options.is_sync,
+        defer_deletes = options.defer_deletes and true or nil,
     })
     _space:insert{id, uid, name, options.engine, options.field_count,
         space_options, format}
@@ -580,6 +587,7 @@ local alter_space_template = {
     format = 'table',
     temporary = 'boolean',
     is_sync = 'boolean',
+    defer_deletes = 'boolean',
     name = 'string',
 }
 
@@ -614,6 +622,10 @@ box.schema.space.alter = function(space_id, options)
 
     if options.is_sync ~= nil then
         flags.is_sync = options.is_sync
+    end
+
+    if options.defer_deletes ~= nil then
+        flags.defer_deletes = options.defer_deletes
     end
 
     local format
