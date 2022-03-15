@@ -2,8 +2,9 @@ name: lint
 
 on:
   push:
-    branches-ignore:
-      - '**-notest'
+    branches:
+      - 'master'
+      - '[0-9].[0-9]+'
     tags:
       - '**'
   pull_request:
@@ -36,11 +37,12 @@ env:
 
 jobs:
   luacheck:
-    # Run on pull request only if the 'notest' label is unset and this is
-    # an external PR (internal PRs trigger a run on push).
-    if: github.event_name != 'pull_request' ||
-        ( ! contains(github.event.pull_request.labels.*.name, 'notest') &&
-          github.event.pull_request.head.repo.full_name != github.repository )
+    # Run on push to the 'master' and release branches of tarantool/tarantool
+    # or on pull request if the 'notest' label is not set.
+    if: github.repository == 'tarantool/tarantool' &&
+        ( github.event_name != 'pull_request' ||
+          ( github.event_name == 'pull_request' &&
+            !contains(github.event.pull_request.labels.*.name, 'notest') ) )
 
     runs-on: ubuntu-20.04-self-hosted
 
@@ -59,11 +61,12 @@ jobs:
         if: failure()
 
   release-notes:
-    # Run on pull request only if the 'notest' label is unset and this is
-    # an external PR (internal PRs trigger a run on push).
-    if: github.event_name != 'pull_request' ||
-        ( ! contains(github.event.pull_request.labels.*.name, 'notest') &&
-          github.event.pull_request.head.repo.full_name != github.repository )
+    # Run on push to the 'master' and release branches of tarantool/tarantool
+    # or on pull request if the 'notest' label is not set.
+    if: github.repository == 'tarantool/tarantool' &&
+        ( github.event_name != 'pull_request' ||
+          ( github.event_name == 'pull_request' &&
+            !contains(github.event.pull_request.labels.*.name, 'notest') ) )
 
     runs-on: ubuntu-20.04-self-hosted
 
@@ -85,10 +88,11 @@ jobs:
         if: failure()
 
   checkpatch:
-    # Run only if the workflow was triggered by a pull request that doesn't
-    # have the 'notest' label.
-    if: github.event_name == 'pull_request' &&
-        ! contains(github.event.pull_request.labels.*.name, 'notest')
+    # Run only if the workflow was triggered by a pull request for
+    # tarantool/tarantool that doesn't have the 'notest' label.
+    if: github.repository == 'tarantool/tarantool' &&
+        ( github.event_name == 'pull_request' &&
+          !contains(github.event.pull_request.labels.*.name, 'notest') )
 
     runs-on: ubuntu-20.04-self-hosted
 
