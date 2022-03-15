@@ -428,6 +428,10 @@ struct txn {
 	struct rlist in_all_txs;
 	/** True in case transaction provides any DDL change. */
 	bool is_schema_changed;
+	/**
+	 * Nesting level of space on_replace triggers for current txn.
+	 */
+	int space_on_replace_triggers_depth;
 };
 
 static inline bool
