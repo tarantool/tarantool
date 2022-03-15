@@ -73,6 +73,12 @@ struct space_opts {
 	 * until replicated to a quorum of replicas.
 	 */
 	bool is_sync;
+	/**
+	 * Setting this flag for a Vinyl space defers generation of DELETE
+	 * statements for secondary indexes till the primary index compaction,
+	 * which should speed up writes, but may also slow down reads.
+	 */
+	bool defer_deletes;
 	/** SQL statement that produced this space. */
 	char *sql;
 };

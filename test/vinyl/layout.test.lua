@@ -6,7 +6,7 @@ fio = require 'fio'
 xlog = require 'xlog'
 fun = require 'fun'
 
-space = box.schema.space.create('test', {engine='vinyl'})
+space = box.schema.space.create('test', {engine = 'vinyl', defer_deletes = true})
 _ = space:create_index('pk', {parts = {{1, 'string', collation = 'unicode'}}, run_count_per_level=3})
 _ = space:create_index('sk', {parts = {{2, 'unsigned'}}, run_count_per_level=3})
 

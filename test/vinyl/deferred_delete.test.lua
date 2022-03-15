@@ -1,4 +1,5 @@
 test_run = require('test_run').new()
+box.cfg{vinyl_defer_deletes = true}
 
 --
 -- Create a space with secondary indexes and check that REPLACE and
@@ -92,6 +93,7 @@ pk:stat().skip.rows -- 10
 
 -- Check that deferred DELETEs are not lost after restart.
 test_run:cmd("restart server default")
+box.cfg{vinyl_defer_deletes = true}
 s = box.space.test
 pk = s.index.pk
 i1 = s.index.i1
@@ -321,6 +323,7 @@ box.cfg{vinyl_cache = vinyl_cache}
 test_run:cmd("create server test with script='vinyl/low_quota.lua'")
 test_run:cmd("start server test with args='1048576'")
 test_run:cmd("switch test")
+box.cfg{vinyl_defer_deletes = true}
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
 pk = s:create_index('pk', {run_count_per_level = 10, run_size_ratio = 2})
@@ -358,6 +361,7 @@ test_run:wait_cond(function() return sk:stat().disk.dump.count > 0 end)
 sk:stat().rows - dummy_rows -- 120 old REPLACEs + 120 new REPLACEs + 120 deferred DELETEs
 
 test_run:cmd("restart server test with args='1048576'")
+box.cfg{vinyl_defer_deletes = true}
 s = box.space.test
 pk = s.index.pk
 sk = s.index.sk

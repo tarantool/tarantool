@@ -1015,7 +1015,7 @@ fiber = require('fiber')
 errinj = box.error.injection
 ---
 ...
-s = box.schema.space.create('test', {engine = 'vinyl'})
+s = box.schema.space.create('test', {engine = 'vinyl', defer_deletes = true})
 ---
 ...
 _ = s:create_index('pk', {run_count_per_level = 10})

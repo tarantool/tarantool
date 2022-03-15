@@ -49,6 +49,7 @@ too_long_threshold:0.5
 txn_timeout:3153600000
 vinyl_bloom_fpr:0.05
 vinyl_cache:134217728
+vinyl_defer_deletes:false
 vinyl_dir:.
 vinyl_max_tuple_size:1048576
 vinyl_memory:134217728

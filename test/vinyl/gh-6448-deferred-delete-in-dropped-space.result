@@ -6,7 +6,7 @@ test_run:cmd("setopt delimiter ';'")
 - true
 ...
 function create_space()
-    box.schema.space.create('test', {engine = 'vinyl', id = 9000})
+    box.schema.space.create('test', {engine = 'vinyl', id = 9000, defer_deletes = true})
     box.space.test:create_index('pk', {run_count_per_level = 1})
     box.space.test:create_index('sk', {parts = {2, 'unsigned'}, unique = false})
 end;
