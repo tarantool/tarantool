@@ -43,7 +43,6 @@
 
 #include <fiber.h>
 #include "version.h"
-#include "backtrace.h"
 #include "coio.h"
 #include "lua/fiber.h"
 #include "lua/fiber_cond.h"
@@ -63,6 +62,7 @@
 #include "lua/swim.h"
 #include "lua/decimal.h"
 #include "lua/uri.h"
+#include "lua/backtrace.h"
 #include "digest.h"
 #include "errinj.h"
 #include <small/ibuf.h>
@@ -591,19 +591,21 @@ tarantool_lua_setpaths(struct lua_State *L)
 static int
 tarantool_panic_handler(lua_State *L) {
 	const char *problem = lua_tostring(L, -1);
-#ifdef ENABLE_BACKTRACE
-	print_backtrace();
-#endif /* ENABLE_BACKTRACE */
 	say_crit("%s", problem);
+#ifdef ENABLE_BACKTRACE
+	struct lua_backtrace bt;
+	lua_backtrace_collect_frames(&bt, fiber());
+	lua_backtrace_print_frames(&bt, S_CRIT);
+#else /* ENABLE_BACKTRACE */
 	int level = 1;
 	lua_Debug ar;
 	while (lua_getstack(L, level++, &ar) == 1) {
 		if (lua_getinfo(L, "nSl", &ar) == 0)
 			break;
-		say_crit("#%d %s (%s), %s:%d", level,
-			 ar.name, ar.namewhat,
+		say_crit("#%d %s (%s), %s:%d", level, ar.name, ar.namewhat,
 			 ar.short_src, ar.currentline);
 	}
+#endif /* ENABLE_BACKTRACE */
 	return 1;
 }
 
@@ -724,7 +726,9 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	rl_catch_signals = 0;
 	rl_catch_sigwinch = 0;
 #endif
-
+#if defined(ENABLE_BACKTRACE) && !defined(__APPLE__)
+	lua_backtrace_init();
+#endif /* defined(ENABLE_BACKTRACE) && !defined(__APPLE__) */
 	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 	for (const char **s = lua_modules; *s; s += 2) {
 		const char *modname = *s;

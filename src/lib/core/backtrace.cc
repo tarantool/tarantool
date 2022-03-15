@@ -1,260 +1,150 @@
 /*
- * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
+ * SPDX-License-Identifier: BSD-2-Clause
  *
- * Redistribution and use in source and binary forms, with or
- * without modification, are permitted provided that the following
- * conditions are met:
- *
- * 1. Redistributions of source code must retain the above
- *    copyright notice, this list of conditions and the
- *    following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above
- *    copyright notice, this list of conditions and the following
- *    disclaimer in the documentation and/or other materials
- *    provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
- * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
- * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
- * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * Copyright 2010-2022, Tarantool AUTHORS, please see AUTHORS file.
  */
-#include "backtrace.h"
-#include "trivia/util.h"
 
-#include <stdlib.h>
-#include <stdio.h>
+#include "core/backtrace.h"
+#ifdef ENABLE_BACKTRACE
+#include "core/fiber.h"
+#include "core/tt_static.h"
+
+#define UNW_LOCAL_ONLY
+#include "libunwind.h"
+#undef UNW_LOCAL_ONLY
+
+#ifdef __APPLE__
+#include <dlfcn.h>
+#endif
 
 #include <cxxabi.h>
 
-#include "say.h"
-#include "fiber.h"
-
-#include "assoc.h"
-
+#define C_FRAME_STR_FMT "#%-2d %p in %s+%zu"
 #define CRLF "\n"
 
-#ifdef ENABLE_BACKTRACE
-#include <libunwind.h>
+const char *const core_frame_str_fmt = C_FRAME_STR_FMT;
 
-#include "small/region.h"
-#include "small/static.h"
-/*
- * We use a static buffer interface because it is too late to do any
- * allocation when we are printing backtrace and fiber stack is
- * small.
- */
-
-#define BACKTRACE_NAME_MAX 200
-
-static __thread struct region cache_region;
-static __thread struct mh_i64ptr_t *proc_cache = NULL;
-
-struct proc_cache_entry {
-	char name[BACKTRACE_NAME_MAX];
-	unw_word_t offset;
-};
-
-void
-backtrace_proc_cache_clear(void)
-{
-	if (proc_cache == NULL)
-		return;
-	region_destroy(&cache_region);
-	mh_i64ptr_delete(proc_cache);
-	proc_cache = NULL;
-}
-
-/*
- * Find procedure name and offset identified by ip in the procedure cache.
- */
-static const char *
-backtrace_proc_cache_find(unw_word_t ip, unw_word_t *offset)
-{
-	if (proc_cache != NULL) {
-		mh_int_t k = mh_i64ptr_find(proc_cache, ip, NULL);
-		if (k != mh_end(proc_cache)) {
-			struct proc_cache_entry *entry =
-				(struct proc_cache_entry *)
-					mh_i64ptr_node(proc_cache, k)->val;
-			*offset = entry->offset;
-			return entry->name;
-		}
-	}
-	return NULL;
-}
-
-/*
- * Put procedure name and offset identified by ip into the procedure cache.
- */
+#ifdef __APPLE__
 static void
-backtrace_proc_cache_put(unw_word_t ip, const char *name, unw_word_t offset)
+append_frame(struct core_backtrace *bt, void *ip)
 {
-	if (proc_cache == NULL) {
-		region_create(&cache_region, &cord()->slabc);
-		proc_cache = mh_i64ptr_new();
+	assert(bt != nullptr);
+
+	if (bt->frame_count < CORE_BACKTRACE_FRAME_COUNT_MAX) {
+		struct core_frame *frame = &bt->frames[bt->frame_count++];
+		frame->ip = ip;
 	}
-
-	size_t size;
-	struct proc_cache_entry *entry =
-		region_alloc_object(&cache_region, typeof(*entry), &size);
-	if (unlikely(entry == NULL))
-		return;
-
-	struct mh_i64ptr_node_t node;
-	node.key = ip;
-	node.val = entry;
-	entry->offset = offset;
-	strlcpy(entry->name, name, BACKTRACE_NAME_MAX);
-	mh_i64ptr_put(proc_cache, &node, NULL, NULL);
 }
+#endif /* __APPLE__ */
 
-static const char *
-get_proc_name(unw_cursor_t *unw_cur, unw_word_t *offset, bool skip_cache)
-{
-	static __thread char proc_name[BACKTRACE_NAME_MAX];
-
-	if (skip_cache) {
-		unw_get_proc_name(unw_cur, proc_name, sizeof(proc_name),
-				  offset);
-		return proc_name;
-	}
-
-	unw_word_t ip;
-	unw_get_reg(unw_cur, UNW_REG_IP, &ip);
-	const char *cached_name = backtrace_proc_cache_find(ip, offset);
-	if (cached_name != NULL)
-		return cached_name;
-
-	unw_get_proc_name(unw_cur, proc_name, sizeof(proc_name), offset);
-	backtrace_proc_cache_put(ip, proc_name, *offset);
-	return proc_name;
-}
-
-char *
-backtrace(char *start, size_t size)
-{
-	int frame_no = 0;
-	unw_word_t sp = 0, old_sp = 0, ip, offset;
-	unw_context_t unw_context;
-	unw_getcontext(&unw_context);
-	unw_cursor_t unw_cur;
-	unw_init_local(&unw_cur, &unw_context);
-	int unw_status;
-	char *p = start;
-	char *end = start + size - 1;
-	*p = '\0';
-	while ((unw_status = unw_step(&unw_cur)) > 0) {
-		const char *proc;
-		old_sp = sp;
-		unw_get_reg(&unw_cur, UNW_REG_IP, &ip);
-		unw_get_reg(&unw_cur, UNW_REG_SP, &sp);
-		if (sp == old_sp) {
-			say_debug("unwinding error: previous frame "
-				  "identical to this frame (corrupt stack?)");
-			goto out;
-		}
-		proc = get_proc_name(&unw_cur, &offset, true);
-		p += snprintf(p, end - p, "#%-2d %p in ", frame_no, (void *)ip);
-		if (p >= end)
-			goto out;
-		p += snprintf(p, end - p, "%s+%lx", proc, (long)offset);
-		if (p >= end)
-			goto out;
-		p += snprintf(p, end - p, CRLF);
-		if (p >= end)
-			goto out;
-		++frame_no;
-	}
-#ifndef TARGET_OS_DARWIN
-	if (unw_status != 0)
-		say_debug("unwinding error: %s", unw_strerror(unw_status));
-#else
-	if (unw_status != 0)
-		say_debug("unwinding error: %i", unw_status);
-#endif
-out:
-	return start;
-}
-
-/*
- * Libunwind unw_getcontext wrapper.
- * unw_getcontext can be a macros on some platform and can not be called
- * directly from asm code. Stack variable pass through the wrapper to
- * preserve a old stack pointer during the wrapper call.
- *
- * @param unw_context unwind context to store execution state
- * @param stack pointer to preserve.
- * @retval preserved stack pointer.
- */
 #ifdef __x86_64__
 __attribute__ ((__force_align_arg_pointer__))
 #endif /* __x86_64__ */
-static void *
-unw_getcontext_f(unw_context_t *unw_context, void *stack)
+static NOINLINE void *
+collect_current_stack(struct core_backtrace *bt, void *stack)
 {
-	unw_getcontext(unw_context);
+	bt->frame_count = unw_backtrace((void **)bt->frames,
+					CORE_BACKTRACE_FRAME_COUNT_MAX);
+#else /* __APPLE__ */
+	/*
+	 * Unfortunately, glibc `backtrace` does not work on macOS.
+	 */
+	bt->frame_count = 0;
+	unw_context_t unw_ctx;
+	int rc = unw_getcontext(&unw_ctx);
+	if (rc != 0) {
+		say_error("unwinding error: unw_getcontext failed");
+		return stack;
+	}
+	unw_cursor_t unw_cur;
+	rc = unw_init_local(&unw_cur, &unw_ctx);
+	if (rc != 0) {
+		say_error("unwinding error: unw_init_local failed");
+		return stack;
+	}
+	for (unsigned frame_no = 0; frame_no < CORE_BACKTRACE_FRAME_COUNT_MAX;
+	     ++frame_no) {
+		unw_word_t ip;
+		rc = unw_get_reg(&unw_cur, UNW_REG_IP, &ip);
+		if (rc != 0) {
+			say_error("unwinding error: unw_get_reg failed with "
+				  "status: %d", rc);
+			return stack;
+		}
+		append_frame(bt, (void *)ip);
+		rc = unw_step(&unw_cur);
+		if (rc < 0)
+			say_error("unwinding error: unw_step failed with "
+				  "status: %d", rc);
+		if (rc == 0) {
+			break;
+		}
+	}
+#endif /* __APPLE__ */
 	return stack;
 }
 
 /*
- * Restore target coro context and call unw_getcontext over it.
- * Work is done in four parts:
- * 1. Save current fiber context to a stack and save a stack pointer
- * 2. Restore target fiber context, stack pointer is not incremented because
- *    all target stack context should be preserved across a call. No stack
- *    changes are allowed until unwinding is done.
- * 3. Setup new stack frame and call unw_getcontext wrapper. All callee-safe
- *    registers are used by target fiber context, so old stack pointer is
- *    passed as second arg to wrapper func.
- * 4. Restore old stack pointer from wrapper return and restore old fiber
- *    contex.
- *
- * @param @unw_context unwind context to store execution state.
- * @param @coro_ctx fiber context to unwind.
- *
- * Note, this function needs a separate stack frame and therefore
- * MUST NOT be inlined.
+ * Restore target fiber context (if needed) and call
+ * `backtrace_collect_curr_stk` over it.
  */
-static void NOINLINE
-coro_unwcontext(unw_context_t *unw_context, struct coro_context *coro_ctx)
+NOINLINE void
+core_backtrace_collect_frames(struct core_backtrace *bt,
+			      const struct fiber *fiber, int skip_frames)
 {
-#if __amd64
+	assert(bt != nullptr);
+	assert(fiber != nullptr);
+
+	if (fiber == fiber()) {
+		collect_current_stack(bt, nullptr);
+		goto skip_frames;
+	}
+	if ((fiber->flags & FIBER_IS_CANCELLABLE) == 0) {
+		/*
+		 * Fiber stacks can't be traced for non-cancellable fibers
+		 * due to the limited capabilities of libcoro in CORO_ASM mode.
+		 */
+		bt->frame_count = 0;
+		return;
+	}
+	/*
+	 * 1. Save current fiber context on stack.
+	 * 2. Setup arguments for `backtrace_collect_current_stack` call.
+	 * 3. Restore target fiber context.
+	 * 4. Setup current frame information (CFI) and call
+	 *    `backtrace_collect_current_stack`.
+	 * 5. Restore original stack pointer from
+	 *    `backtrace_collect_current_stack`'s return value and restore
+	 *    original fiber context.
+	 */
+#ifdef __x86_64__
 __asm__ volatile(
-	/* Preserve current context */
+	/* Save current fiber context. */
 	"\tpushq %%rbp\n"
 	"\tpushq %%rbx\n"
 	"\tpushq %%r12\n"
 	"\tpushq %%r13\n"
 	"\tpushq %%r14\n"
 	"\tpushq %%r15\n"
-	/* Setup second arg as old sp */
+	/* Setup first function argument. */
+	"\tmovq %1, %%rdi\n"
+	/* Setup second function argument. */
 	"\tmovq %%rsp, %%rsi\n"
-	/* Restore target context, but not increment sp to preserve it */
-	"\tmovq 0(%1), %%rsp\n"
+	/* Restore target fiber context. */
+	"\tmovq (%2), %%rsp\n"
 	"\tmovq 0(%%rsp), %%r15\n"
 	"\tmovq 8(%%rsp), %%r14\n"
 	"\tmovq 16(%%rsp), %%r13\n"
 	"\tmovq 24(%%rsp), %%r12\n"
 	"\tmovq 32(%%rsp), %%rbx\n"
 	"\tmovq 40(%%rsp), %%rbp\n"
-	/* Set first arg and call */
-	"\tmovq %0, %%rdi\n"
+	/* Setup CFI. */
 	".cfi_remember_state\n"
 	".cfi_def_cfa %%rsp, 8 * 7\n"
-	"\tleaq %P2(%%rip), %%rax\n"
+	"\tleaq %P3(%%rip), %%rax\n"
 	"\tcall *%%rax\n"
 	".cfi_restore_state\n"
-	/* Restore old sp and context */
+	/* Restore original fiber context. */
 	"\tmov %%rax, %%rsp\n"
 	"\tpopq %%r15\n"
 	"\tpopq %%r14\n"
@@ -262,75 +152,21 @@ __asm__ volatile(
 	"\tpopq %%r12\n"
 	"\tpopq %%rbx\n"
 	"\tpopq %%rbp\n"
-	:
-	: "r" (unw_context), "r" (coro_ctx), "i" (unw_getcontext_f)
-	: "rdi", "rsi", "rax"//, "r8"//"rsp", "r11", "r10", "r9", "r8"
-	);
-
-#elif __i386
-__asm__ volatile(
-	/* Save current context */
-	"\tpushl %%ebp\n"
-	"\tpushl %%ebx\n"
-	"\tpushl %%esi\n"
-	"\tpushl %%edi\n"
-	/* Setup second arg as old sp */
-	"\tmovl %%esp, %%ecx\n"
-	/* Restore target context ,but not increment sp to preserve it */
-	"\tmovl (%1), %%esp\n"
-	"\tmovl 0(%%esp), %%edi\n"
-	"\tmovl 4(%%esp), %%esi\n"
-	"\tmovl 8(%%esp), %%ebx\n"
-	"\tmovl 12(%%esp), %%ebp\n"
-	/* Setup first arg and call */
-	"\tpushl %%ecx\n"
-	"\tpushl %0\n"
-	"\tmovl %2, %%ecx\n"
-	"\tcall *%%ecx\n"
-	/* Restore old sp and context */
-	"\tmovl %%eax, %%esp\n"
-	"\tpopl %%edi\n"
-	"\tpopl %%esi\n"
-	"\tpopl %%ebx\n"
-	"\tpopl %%ebp\n"
-	:
-	: "r" (unw_context), "r" (coro_ctx), "i" (unw_getcontext_f)
-	: "ecx", "eax"
-	);
-
-#elif __ARM_ARCH==7
-__asm__ volatile(
-	/* Save current context */
-	".syntax unified\n"
-	"\tvpush {d8-d15}\n"
-	"\tpush {r4-r11,lr}\n"
-	/* Save sp */
-	"\tmov r1, sp\n"
-	/* Restore target context, but not increment sp to preserve it */
-	"\tldr sp, [%1]\n"
-	"\tldmia sp, {r4-r11,lr}\n"
-	"\tvldmia sp, {d8-d15}\n"
-	/* Setup first arg */
-	"\tmov r0, %0\n"
-	/* Setup stack frame */
-	"\tpush {r7, lr}\n"
-	"\tsub sp, #8\n"
-	"\tstr r0, [sp, #4]\n"
-	"\tstr r1, [sp, #0]\n"
-	"\tmov r7, sp\n"
-	"\tbl %2\n"
-	/* Old sp is returned via r0 */
-	"\tmov sp, r0\n"
-	"\tpop {r4-r11,lr}\n"
-	"\tvpop {d8-d15}\n"
-	:
-	: "r" (unw_context), "r" (coro_ctx), "i" (unw_getcontext_f)
-	: "lr", "r0", "r1", "ip"
-	);
-
+	: "=m" (*bt)
+	: "rm" (bt), "r" (&fiber->ctx), "i" (collect_current_stack)
+	: "rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "xmm0",
+	  "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8",
+	  "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15",
+#ifdef __AVX512F__
+	  "xmm16", "xmm17", "xmm18", "xmm19", "xmm20", "xmm21", "xmm22",
+	  "xmm23", "xmm24", "xmm25", "xmm26", "xmm27", "xmm28", "xmm29",
+	  "xmm30", "xmm31", "k0", "k1", "k2", "k3", "k4", "k5", "k6", "k7",
+#endif /* __AVX512F__ */
+	  "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7", "st",
+	  "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)");
 #elif __aarch64__
 __asm__ volatile(
-	/* Save current context */
+	/* Setup second function argument and save current fiber context. */
 	"\tsub x1, sp, #8 * 20\n"
 	"\tstp x19, x20, [x1, #16 * 0]\n"
 	"\tstp x21, x22, [x1, #16 * 1]\n"
@@ -342,28 +178,29 @@ __asm__ volatile(
 	"\tstp d10, d11, [x1, #16 * 7]\n"
 	"\tstp d12, d13, [x1, #16 * 8]\n"
 	"\tstp d14, d15, [x1, #16 * 9]\n"
-	/* Restore target context */
-	"\tldr x2, [%1]\n"
-	"\tldp x19, x20, [x2, #16 * 0]\n"
-	"\tldp x21, x22, [x2, #16 * 1]\n"
-	"\tldp x23, x24, [x2, #16 * 2]\n"
-	"\tldp x25, x26, [x2, #16 * 3]\n"
-	"\tldp x27, x28, [x2, #16 * 4]\n"
-	"\tldp x29, x30, [x2, #16 * 5]\n"
-	"\tldp d8,  d9,  [x2, #16 * 6]\n"
-	"\tldp d10, d11, [x2, #16 * 7]\n"
-	"\tldp d12, d13, [x2, #16 * 8]\n"
-	"\tldp d14, d15, [x2, #16 * 9]\n"
+	/* Setup first function argument. */
+	"\tldr x0, %1\n"
+	/* Restore target fiber context. */
+	"\tldr x2, [%2]\n"
 	"\tmov sp, x2\n"
-	/* Setup fisrst arg */
-	"\tmov x0, %0\n"
+	"\tldp x19, x20, [sp, #16 * 0]\n"
+	"\tldp x21, x22, [sp, #16 * 1]\n"
+	"\tldp x23, x24, [sp, #16 * 2]\n"
+	"\tldp x25, x26, [sp, #16 * 3]\n"
+	"\tldp x27, x28, [sp, #16 * 4]\n"
+	"\tldp x29, x30, [sp, #16 * 5]\n"
+	"\tldp d8,  d9,  [sp, #16 * 6]\n"
+	"\tldp d10, d11, [sp, #16 * 7]\n"
+	"\tldp d12, d13, [sp, #16 * 8]\n"
+	"\tldp d14, d15, [sp, #16 * 9]\n"
+	/* Setup CFI. */
 	".cfi_remember_state\n"
 	".cfi_def_cfa sp, 16 * 10\n"
 	".cfi_offset x29, -16 * 5\n"
 	".cfi_offset x30, -16 * 5 + 8\n"
-	"\tbl %2\n"
+	"\tbl %3\n"
 	".cfi_restore_state\n"
-	/* Restore context (old sp in x0) */
+	/* Restore original fiber context. */
 	"\tldp x19, x20, [x0, #16 * 0]\n"
 	"\tldp x21, x22, [x0, #16 * 1]\n"
 	"\tldp x23, x24, [x0, #16 * 2]\n"
@@ -375,97 +212,128 @@ __asm__ volatile(
 	"\tldp d12, d13, [x0, #16 * 8]\n"
 	"\tldp d14, d15, [x0, #16 * 9]\n"
 	"\tadd sp, x0, #8 * 20\n"
-	:
-	: "r" (unw_context), "r" (coro_ctx), "S" (unw_getcontext_f)
-	: /*"lr", "r0", "r1", "ip" */
-	 "x0", "x1", "x2", "x30"
-	);
-#endif
+	: "=m" (*bt)
+	: "m" (bt), "r" (&fiber->ctx), "S" (collect_current_stack)
+	: "x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10",
+	  "x11", "x12", "x13", "x14", "x15", "x16", "x17", "x18",
+	  "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10",
+	  "s11", "s12", "s13", "s14", "s15", "s16", "s17", "s18", "s19", "s20",
+	  "s21", "s22", "s23", "s24", "s25", "s26", "s27", "s28", "s29", "s30",
+	  "s31", "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7");
+#endif /* __x86_64__ */
+skip_frames:
+	bt->frame_count -= skip_frames;
+	memmove(bt->frames, bt->frames + skip_frames,
+		sizeof(bt->frames[0]) * bt->frame_count);
 }
 
-/**
- * Call `cb' callback for each `coro_ctx' contained frame or the current
- * executed coroutine if `coro_ctx' is NULL. A coro_context is a structure
- * created on each coroutine yield to store execution context so for an
- * on-CPU coroutine there is no valid coro_context could be defined and
- * NULL is passed.
- */
-void
-backtrace_foreach(backtrace_cb cb, coro_context *coro_ctx, void *cb_ctx)
+const char *
+core_backtrace_resolve_frame(unw_word_t ip, unw_word_t *offset,
+			     char **demangle_buf, size_t *demangle_buf_len)
 {
-	unw_cursor_t unw_cur;
-	unw_context_t unw_ctx_bt;
-	if (coro_ctx == NULL) {
-		/*
-		 * Current executing coroutine and simple unw_getcontext
-		 * should function.
-		 */
-		unw_getcontext(&unw_ctx_bt);
-	} else {
-		/*
-		 * Execution context is stored in the coro_ctx
-		 * so use special context-switching handler to
-		 * capture an unwind context.
-		 */
-		coro_unwcontext(&unw_ctx_bt, coro_ctx);
+	assert(offset != nullptr);
+	assert(demangle_buf != nullptr);
+	assert(demangle_buf_len != nullptr);
+
+#ifndef __APPLE__
+	unw_accessors_t *acc = unw_get_accessors(unw_local_addr_space);
+	assert(acc->get_proc_name != nullptr);
+	char *proc_name_buf = tt_static_buf();
+	int rc = acc->get_proc_name(unw_local_addr_space, ip, proc_name_buf,
+				    TT_STATIC_BUF_LEN, offset, nullptr);
+	if (rc != 0) {
+		say_error("unwinding error: `get_proc_name` accessor failed: "
+			  "%s", unw_strerror(rc));
+		return nullptr;
 	}
-	unw_init_local(&unw_cur, &unw_ctx_bt);
-	int frame_no = 0;
-	unw_word_t sp = 0, old_sp = 0, ip, offset;
-	int unw_status, demangle_status;
-	char *demangle_buf = NULL;
+#else /* __APPLE__ */
+	Dl_info dli;
+	if (dladdr((void *)ip, &dli) == 0) {
+		say_error("unwinding error: `dladdr` failed");
+		return nullptr;
+	}
+
+	*offset = ip - (unw_word_t)dli.dli_saddr;
+	const char *proc_name_buf = dli.dli_sname;
+#endif /* __APPLE__ */
+	int demangle_status;
+	char *demangled_proc_name =
+		abi::__cxa_demangle(proc_name_buf, *demangle_buf,
+				    demangle_buf_len, &demangle_status);
+	if (demangle_status != 0 && demangle_status != -2) {
+		say_error("unwinding error: "
+			  "abi::__cxa_demangle failed with "
+			  "status: %d", demangle_status);
+		return proc_name_buf;
+	}
+	if (demangled_proc_name != nullptr)
+		proc_name_buf = *demangle_buf = demangled_proc_name;
+	return proc_name_buf;
+}
+
+void
+core_backtrace_foreach(const struct core_backtrace *bt, int begin, int end,
+		       core_resolved_frame_cb core_resolved_frame_cb, void *ctx)
+{
+	assert(bt != nullptr);
+	assert(core_resolved_frame_cb != nullptr);
+
+	int frame_no = begin + 1;
+	char *demangle_buf = nullptr;
 	size_t demangle_buf_len = 0;
-
-	while ((unw_status = unw_step(&unw_cur)) > 0) {
-		const char *proc;
-		old_sp = sp;
-		unw_get_reg(&unw_cur, UNW_REG_IP, &ip);
-		unw_get_reg(&unw_cur, UNW_REG_SP, &sp);
-		if (sp == old_sp) {
-			say_debug("unwinding error: previous frame "
-				  "identical to this frame (corrupt stack?)");
-			goto out;
-		}
-		proc = get_proc_name(&unw_cur, &offset, false);
-
-		char *cxxname = abi::__cxa_demangle(proc, demangle_buf,
-						    &demangle_buf_len,
-						    &demangle_status);
-		if (cxxname != NULL)
-			demangle_buf = cxxname;
-		if (frame_no > 0 &&
-		    (cb(frame_no - 1, (void *)ip, cxxname != NULL ? cxxname : proc,
-			offset, cb_ctx) != 0))
-			goto out;
-		++frame_no;
+	for (const struct core_frame *frame = &bt->frames[begin];
+	     frame != &bt->frames[end];
+	     ++frame, ++frame_no) {
+		auto ip = (unw_word_t)frame->ip;
+		unw_word_t offset = 0;
+		const char *proc_name =
+			core_backtrace_resolve_frame(ip, &offset,
+						     &demangle_buf,
+						     &demangle_buf_len);
+		const struct core_resolved_frame resolved_frame{*frame,
+								frame_no,
+								proc_name,
+								offset};
+		int rc = core_resolved_frame_cb(&resolved_frame, ctx);
+		if (rc != 0)
+			break;
 	}
-#ifndef TARGET_OS_DARWIN
-	if (unw_status != 0)
-		say_debug("unwinding error: %s", unw_strerror(unw_status));
-#else
-	if (unw_status != 0)
-		say_debug("unwinding error: %i", unw_status);
-#endif
-out:
 	free(demangle_buf);
 }
 
 void
-print_backtrace(void)
+core_backtrace_dump_frames(const struct core_backtrace *bt, char *buf,
+			   size_t buf_len)
 {
-	char *start = (char *)static_alloc(SMALL_STATIC_SIZE);
-	fdprintf(STDERR_FILENO, "%s", backtrace(start, SMALL_STATIC_SIZE));
+	assert(bt != nullptr);
+
+	char *buf_end = &buf[buf_len];
+	struct dump_ctx {
+		char *buf;
+		char *buf_end;
+	} dump_ctx{buf, buf_end};
+	auto dump = [](const struct core_resolved_frame *frame, void *ctx) {
+		assert(frame != NULL);
+		assert(ctx != nullptr);
+
+		auto dump_ctx = (struct dump_ctx *)ctx;
+		int chars_written = snprintf(dump_ctx->buf,
+					     dump_ctx->buf_end - dump_ctx->buf,
+					     C_FRAME_STR_FMT CRLF, frame->no,
+					     (void *)frame->core_frame.ip,
+					     frame->proc_name, frame->offset);
+		if (chars_written < 0) {
+			say_error("unwinding error: snprintf failed: %s",
+				  strerror(errno));
+			return -1;
+		}
+		dump_ctx->buf += chars_written;
+		if (dump_ctx->buf >= dump_ctx->buf_end) {
+			return -1;
+		}
+		return 0;
+	};
+	core_backtrace_foreach(bt, 0, bt->frame_count, dump,
+			       &dump_ctx);
 }
 #endif /* ENABLE_BACKTRACE */
-
-
-NORETURN void
-assert_fail(const char *assertion, const char *file, unsigned int line, const char *function)
-{
-	fprintf(stderr, "%s:%i: %s: assertion %s failed.\n", file, line, function, assertion);
-#ifdef ENABLE_BACKTRACE
-	print_backtrace();
-#endif /* ENABLE_BACKTRACE */
-	close_all_xcpt(0);
-	abort();
-}

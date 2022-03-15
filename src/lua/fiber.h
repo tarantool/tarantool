@@ -34,6 +34,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+#include "trivia/config.h"
+
 struct lua_State;
 
 /**
