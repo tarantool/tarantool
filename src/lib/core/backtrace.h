@@ -40,20 +40,103 @@ extern "C" {
 #ifdef ENABLE_BACKTRACE
 #include <coro.h>
 
+enum {
+	/* Maximal length of a Lua function or source file name. */
+	BACKTRACE_LUA_LEN_MAX = 64,
+	/* Maximal number of frames in 'struct backtrace'. */
+	BACKTRACE_FRAMES_CNT_MAX = 64,
+};
+
+/*
+ * Each language used in our runtime can have its own specific frame
+ * information.
+ */
+enum {
+	BACKTRACE_FRAME_TYPE_C,
+	BACKTRACE_FRAME_TYPE_LUA,
+};
+
+/*
+ * C/C++ and Lua frame information sufficient for further resolving of function
+ * names and locations.
+ */
+struct backtrace_frame {
+	/* The language the frame came from. */
+	int type;
+	union {
+		/** C/C++ frame IP register value */
+		void *ip;
+		/** Lua frame */
+		struct {
+			/* Current line inside Lua function. */
+			int line;
+			/* Lua function name. */
+			char proc_name[BACKTRACE_LUA_LEN_MAX];
+			/* Lua source file name. */
+			char src_name[BACKTRACE_LUA_LEN_MAX];
+		};
+	};
+};
+
+/*
+ * Context for storing an array of 'struct backtrace_frame's along with context
+ * for pushing them to Lua.
+ */
+struct backtrace {
+	/* Number of frames collected. */
+	int frames_cnt;
+	/* Array of frame data. */
+	struct backtrace_frame frames[BACKTRACE_FRAMES_CNT_MAX];
+	/* Lua stack to push values. */
+	struct lua_State *L;
+	/* Count of processed frames (both C/C++ and Lua). */
+	int total_frame_cnt;
+};
+
+struct fiber;
+struct backtrace;
+
 char *
 backtrace(char *start, size_t size);
 
 void print_backtrace(void);
 
-typedef int (backtrace_cb)(int frameno, void *frameret,
-                           const char *func, size_t offset, void *cb_ctx);
-
-
+/*
+ * Initialize backtrace subsystem: set callback for Lua frame collection.
+ */
 void
-backtrace_foreach(backtrace_cb cb, coro_context *coro_ctx, void *cb_ctx);
+backtrace_init(void);
 
+/*
+ * Collect current stack snapshot of a current context of 'fiber' to 'bt'.
+ *
+ * Nota bene: requires its own stack frame — hence, NOINLINE.
+ *
+ * Returns the number of frames collected.
+ */
 void
-backtrace_proc_cache_clear(void);
+backtrace_collect(struct backtrace *bt, struct fiber *fiber);
+
+/*
+ * Run 'c_cb' and 'lua_cb' on each C/C++ and Lua frame of 'bt' correspondingly.
+ *
+ * Returns the number of frames traversed.
+ */
+void
+backtrace_foreach(struct backtrace *bt);
+
+/*
+ * Append C/C++ frame to the end of 'bt'.
+ */
+void
+backtrace_append_c_frame(struct backtrace *bt, void *rip);
+
+/*
+ * Append Lua frame to the end of 'bt'.
+ */
+void
+backtrace_append_lua_frame(struct backtrace *bt, const char *proc_name,
+			   const char *src_name, int line_no);
 
 #endif /* ENABLE_BACKTRACE */
 

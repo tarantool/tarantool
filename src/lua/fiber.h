@@ -34,7 +34,22 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+#include "trivia/config.h"
+
+#ifdef ENABLE_BACKTRACE
+#include "backtrace.h"
+
+/*
+ * This is the declaration of the Lua stack entry function: it does not exactly
+ * `lj_BC_FUNCC`'s signature and its only aim is to provide the `lj_BC_FUNCC`
+ * symbol's address to the backtrace subsystem for detecting Lua frames.
+ */
+void
+lj_BC_FUNCC(void);
+#endif /* ENABLE_BACKTRACE */
+
 struct lua_State;
+struct backtrace;
 
 /**
 * Initialize box.fiber system
@@ -44,6 +59,22 @@ tarantool_lua_fiber_init(struct lua_State *L);
 
 void
 luaL_testcancel(struct lua_State *L);
+
+#ifdef ENABLE_BACKTRACE
+void
+fiber_backtrace_collect_lua_frames_foreach(struct lua_State *L,
+					   struct backtrace *bt);
+
+void
+fiber_backtrace_foreach_c_frame_cb(int frame_no, void *frame_ip,
+				   const char *proc_name, size_t offs,
+				   struct backtrace *bt);
+
+void
+fiber_backtrace_foreach_lua_frame_cb(const char *proc_name,
+				     const char *src_name, int line_no,
+				     struct backtrace *bt);
+#endif /* ENABLE_BACKTRACE */
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -724,6 +724,9 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	rl_catch_signals = 0;
 	rl_catch_sigwinch = 0;
 #endif
+#ifdef ENABLE_BACKTRACE
+	backtrace_init();
+#endif
 
 	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 	for (const char **s = lua_modules; *s; s += 2) {

@@ -165,89 +165,6 @@ lbox_fiber_id(struct lua_State *L)
 	return 1;
 }
 
-/**
- * Lua fiber traceback context.
- */
-struct lua_fiber_tb_ctx {
-	/* Lua stack to push values. */
-	struct lua_State *L;
-	/* Lua stack to trace. */
-	struct lua_State *R;
-	/* Current Lua frame. */
-	int lua_frame;
-	/* Count of traced frames (both C and Lua). */
-	int tb_frame;
-};
-
-#ifdef ENABLE_BACKTRACE
-static void
-dump_lua_frame(struct lua_State *L, lua_Debug *ar, int tb_frame)
-{
-	char buf[512];
-	snprintf(buf, sizeof(buf), "%s in %s at line %i",
-		 ar->name != NULL ? ar->name : "(unnamed)",
-		 ar->source, ar->currentline);
-	lua_pushnumber(L, tb_frame);
-	lua_newtable(L);
-	lua_pushstring(L, "L");
-	lua_pushstring(L, buf);
-	lua_settable(L, -3);
-	lua_settable(L, -3);
-}
-
-static int
-fiber_backtrace_cb(int frameno, void *frameret, const char *func, size_t offset, void *cb_ctx)
-{
-	struct lua_fiber_tb_ctx *tb_ctx = (struct lua_fiber_tb_ctx *)cb_ctx;
-	struct lua_State *L = tb_ctx->L;
-	/*
-	 * There is impossible to get func == NULL until
-	 * https://github.com/tarantool/tarantool/issues/5326
-	 * will not resolved, but is possible afterwards.
-	 */
-	if (func != NULL && strstr(func, "lj_BC_FUNCC") == func) {
-		/* We are in the LUA vm. */
-		lua_Debug ar;
-		while (tb_ctx->R && lua_getstack(tb_ctx->R, tb_ctx->lua_frame, &ar) > 0) {
-			/* Skip all following C-frames. */
-			lua_getinfo(tb_ctx->R, "Sln", &ar);
-			if (*ar.what != 'C')
-				break;
-			if (ar.name != NULL) {
-				/* Dump frame if it is a C built-in call. */
-				tb_ctx->tb_frame++;
-				dump_lua_frame(L, &ar, tb_ctx->tb_frame);
-			}
-			tb_ctx->lua_frame++;
-		}
-		while (tb_ctx->R && lua_getstack(tb_ctx->R, tb_ctx->lua_frame, &ar) > 0) {
-			/* Trace Lua frame. */
-			lua_getinfo(tb_ctx->R, "Sln", &ar);
-			if (*ar.what == 'C') {
-				break;
-			}
-			tb_ctx->tb_frame++;
-			dump_lua_frame(L, &ar, tb_ctx->tb_frame);
-			tb_ctx->lua_frame++;
-		}
-	}
-	char buf[512];
-	int l = snprintf(buf, sizeof(buf), "#%-2d %p in ", frameno, frameret);
-	if (func)
-		snprintf(buf + l, sizeof(buf) - l, "%s+%zu", func, offset);
-	else
-		snprintf(buf + l, sizeof(buf) - l, "?");
-	tb_ctx->tb_frame++;
-	lua_pushnumber(L, tb_ctx->tb_frame);
-	lua_newtable(L);
-	lua_pushstring(L, "C");
-	lua_pushstring(L, buf);
-	lua_settable(L, -3);
-	lua_settable(L, -3);
-	return 0;
-}
-#endif
-
 static int
 lbox_fiber_statof_map(struct fiber *f, void *cb_ctx, bool backtrace)
 {
@@ -284,15 +201,13 @@ lbox_fiber_statof_map(struct fiber *f, void *cb_ctx, bool backtrace)
 
 	if (backtrace) {
 #ifdef ENABLE_BACKTRACE
-		struct lua_fiber_tb_ctx tb_ctx;
-		tb_ctx.L = L;
-		tb_ctx.R = f->storage.lua.stack;
-		tb_ctx.lua_frame = 0;
-		tb_ctx.tb_frame = 0;
 		lua_pushstring(L, "backtrace");
 		lua_newtable(L);
-		backtrace_foreach(fiber_backtrace_cb,
-				  f != fiber() ? &f->ctx : NULL, &tb_ctx);
+		struct backtrace bt;
+		backtrace_collect(&bt, f);
+		bt.L = L;
+		bt.total_frame_cnt = 0;
+		backtrace_foreach(&bt);
 		lua_settable(L, -3);
 #endif /* ENABLE_BACKTRACE */
 	}
@@ -316,6 +231,75 @@ static int
 lbox_fiber_statof_bt(struct fiber *f, void *cb_ctx)
 {
 	return lbox_fiber_statof(f, cb_ctx, true);
+}
+
+void
+fiber_backtrace_collect_lua_frames_foreach(struct lua_State *L,
+					   struct backtrace *bt)
+{
+	int lua_frame_cnt = 0, total_frame_cnt = 0;
+	lua_Debug ar;
+	while (lua_getstack(L, lua_frame_cnt, &ar) > 0) {
+		/* Skip all following C-frames. */
+		lua_getinfo(L, "Sln", &ar);
+		if (*ar.what != 'C')
+			break;
+		if (ar.name != NULL) {
+			/* Dump frame if it is a C built-in call. */
+			const char *proc_name =
+				ar.name != NULL ? ar.name : "(unnamed)";
+			backtrace_append_lua_frame(bt, proc_name, ar.source,
+						   ar.currentline);
+			total_frame_cnt++;
+		}
+		lua_frame_cnt++;
+	}
+	while (lua_getstack(L, lua_frame_cnt, &ar) > 0) {
+		/* Backtrace Lua frame. */
+		lua_getinfo(L, "Sln", &ar);
+		if (*ar.what == 'C')
+			break;
+		const char *proc_name = ar.name != NULL ? ar.name : "(unnamed)";
+		backtrace_append_lua_frame(bt, proc_name, ar.source,
+					   ar.currentline);
+		total_frame_cnt++;
+		lua_frame_cnt++;
+	}
+}
+
+void
+fiber_backtrace_foreach_c_frame_cb(int frame_no, void *frame_ip,
+				   const char *proc_name, size_t offs,
+				   struct backtrace *bt)
+{
+	const char *frame_str;
+	if (proc_name != NULL)
+		frame_str = tt_sprintf("#%-2d %p in %s+%zu", frame_no, frame_ip,
+				       proc_name, offs);
+	else
+		frame_str = tt_sprintf("#%-2d %p in ???", frame_no, frame_ip);
+	lua_pushnumber(bt->L, ++bt->total_frame_cnt);
+	lua_newtable(bt->L);
+	lua_pushstring(bt->L, "C");
+	lua_pushstring(bt->L, frame_str);
+	lua_settable(bt->L, -3);
+	lua_settable(bt->L, -3);
+}
+
+void
+fiber_backtrace_foreach_lua_frame_cb(const char *proc_name,
+				     const char *src_name,
+				     int line_no, struct backtrace *bt)
+{
+	proc_name = proc_name != NULL ? proc_name : "(unnamed)";
+	const char *frame_str =
+		tt_sprintf("%s in %s at line %i", proc_name, src_name, line_no);
+	lua_pushnumber(bt->L, ++bt->total_frame_cnt);
+	lua_newtable(bt->L);
+	lua_pushstring(bt->L, "L");
+	lua_pushstring(bt->L, frame_str);
+	lua_settable(bt->L, -3);
+	lua_settable(bt->L, -3);
 }
 #endif /* ENABLE_BACKTRACE */
 
