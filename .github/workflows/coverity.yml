@@ -12,6 +12,8 @@ env:
 
 jobs:
   coverity:
+    if: github.repository == 'tarantool/tarantool'
+
     runs-on: ubuntu-18.04
 
     # Image built by .gitlab.mk instructions and targets from .travis.mk.
