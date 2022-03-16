@@ -698,6 +698,17 @@ struct cord {
 	struct rlist ready;
 	/** A cache of dead fibers for reuse */
 	struct rlist dead;
+	/**
+	 * Latest dead fiber which couldn't be reused and waits for its
+	 * deletion. A fiber can't be reused if it is somehow non-standard. For
+	 * instance, has a special stack.
+	 * A fiber can't be deleted if it is the current fiber - can't delete
+	 * own stack safely. Then it schedules own deletion for later. The
+	 * approach is very similar to pthread stacks deletion - pthread can't
+	 * delete own stack, so they are saved and deleted later by a newer
+	 * pthread or by some other dying pthread. Same here with fibers.
+	 */
+	struct fiber *garbage;
 	/** A watcher to have a single async event for all ready fibers.
 	 * This technique is necessary to be able to suspend
 	 * a single fiber on a few watchers (for example,
@@ -809,6 +820,16 @@ cord_name(struct cord *cord)
 /** True if this cord represents the process main thread. */
 bool
 cord_is_main(void);
+
+/**
+ * Delete the latest garbage fiber which couldn't be deleted somewhy before. Can
+ * safely rely on the fiber being not the current one. Because if it was added
+ * here before, it means some previous fiber put itself here, then died
+ * immediately afterwards for good, and gave control to another fiber. It
+ * couldn't be scheduled again.
+ */
+void
+cord_collect_garbage(struct cord *cord);
 
 void
 fiber_init(int (*fiber_invoke)(fiber_func f, va_list ap));

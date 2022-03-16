@@ -11,6 +11,15 @@ static struct fiber_attr default_attr;
 static unsigned long page_size;
 #define PAGE_4K 4096
 
+/** Total count of allocated fibers in the cord. Including dead ones. */
+static int
+fiber_count_total(void)
+{
+	size_t res = mempool_count(&cord()->fiber_mempool);
+	assert(res <= INT_MAX);
+	return (int)res;
+}
+
 static int
 noop_f(va_list ap)
 {
@@ -153,6 +162,7 @@ fiber_stack_test()
 
 	struct fiber *fiber;
 	struct fiber_attr *fiber_attr;
+	struct slab_cache *slabc = &cord()->slabc;
 
 	/*
 	 * Test a fiber with the default stack size.
@@ -166,15 +176,22 @@ fiber_stack_test()
 	/*
 	 * Test a fiber with a custom stack size.
 	 */
+	int fiber_count = fiber_count_total();
+	size_t used1 = slabc->allocated.stats.used;
 	fiber_attr = fiber_attr_new();
 	fiber_attr_setstacksize(fiber_attr, default_attr.stack_size * 2);
 	stack_expand_limit = default_attr.stack_size * 3 / 2;
 	fiber = fiber_new_ex("test_stack", fiber_attr, test_stack_f);
+	fail_unless(fiber_count + 1 == fiber_count_total());
 	fiber_attr_delete(fiber_attr);
 	if (fiber == NULL)
 		diag_raise();
 	fiber_wakeup(fiber);
 	fiber_sleep(0);
+	cord_collect_garbage(cord());
+	fail_unless(fiber_count == fiber_count_total());
+	size_t used2 = slabc->allocated.stats.used;
+	fail_unless(used2 == used1);
 	note("big-stack fiber not crashed");
 
 	footer();
