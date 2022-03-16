@@ -34,8 +34,7 @@
 #include "index.h"
 #include "tuple.h"
 #include "space.h"
-
-#include "small/rlist.h"
+#include "txn.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -47,6 +46,56 @@ extern "C" {
  * and tx manager itself transaction reads in order to detect conflicts.
  */
 extern bool memtx_tx_manager_use_mvcc_engine;
+
+enum memtx_tx_alloc_type {
+	MEMTX_TX_ALLOC_TRACKER = 0,
+	MEMTX_TX_ALLOC_CONFLICT = 1,
+	MEMTX_TX_ALLOC_TYPE_MAX = 2,
+};
+
+extern const char *memtx_tx_alloc_type_strs[];
+
+/**
+ * Memtx_tx allocation objects for memtx_tx_region and memtx_tx_mempool.
+ */
+enum memtx_tx_alloc_object {
+	/**
+	 * Object of type struct memtx_tx_conflict.
+	 */
+	MEMTX_TX_OBJECT_CONFLICT = 0,
+	/**
+	 * Object of type struct tx_conflict_tracker.
+	 */
+	MEMTX_TX_OBJECT_CONFLICT_TRACKER = 1,
+	/**
+	 * Object of type struct tx_read_tracker.
+	 */
+	MEMTX_TX_OBJECT_READ_TRACKER = 2,
+	MEMTX_TX_OBJECT_MAX = 3,
+};
+
+/**
+ * Status of story. Describes the reason why it is not deleted.
+ * In the case when story fits several statuses at once, status with
+ * least value is chosen.
+ */
+enum memtx_tx_story_status {
+	/**
+	 * The story is used directly by some transactions.
+	 */
+	MEMTX_TX_STORY_USED = 0,
+	/**
+	 *  The story can be used by a read view.
+	 */
+	MEMTX_TX_STORY_READ_VIEW = 1,
+	/**
+	 * The story is used for gap tracking.
+	 */
+	MEMTX_TX_STORY_TRACK_GAP = 2,
+	MEMTX_TX_STORY_STATUS_MAX = 3,
+};
+
+extern const char *memtx_tx_story_status_strs[];
 
 /**
  * Record that links two transactions, breaker and victim.
@@ -152,6 +201,17 @@ struct memtx_story {
 	 */
 	uint32_t index_count;
 	/**
+	 * Status of story, describes the reason why story cannot be deleted.
+	 * It is initialized in memtx_story constructor and is changed only in
+	 * memtx_tx_story_gc.
+	 */
+	enum memtx_tx_story_status status;
+	/**
+	 * Flag is set when @a tuple is not placed in primary key and
+	 * the story is the only reason why @a tuple cannot be deleted.
+	 */
+	bool tuple_is_retained;
+	/**
 	 * Link with older and newer stories (and just tuples) for each
 	 * index respectively.
 	 */
@@ -167,7 +227,34 @@ struct memtx_tx_snapshot_cleaner {
 	struct mh_snapshot_cleaner_t *ht;
 };
 
+/**
+ * Cell of stats with total and count statistics.
+ */
+struct memtx_tx_stats {
+	/* Total over all measurements. */
+	size_t total;
+	/* Number of measured objects. */
+	size_t count;
+};
+
+/**
+ * Memory statistics of memtx mvcc engine.
+ */
+struct memtx_tx_statistics {
+	struct memtx_tx_stats stories[MEMTX_TX_STORY_STATUS_MAX];
+	struct memtx_tx_stats retained_tuples[MEMTX_TX_STORY_STATUS_MAX];
+	size_t memtx_tx_total[MEMTX_TX_ALLOC_TYPE_MAX];
+	size_t memtx_tx_max[MEMTX_TX_ALLOC_TYPE_MAX];
+	size_t tx_total[TX_ALLOC_TYPE_MAX];
+	size_t tx_max[TX_ALLOC_TYPE_MAX];
+	/* Number of txns registered in memtx transaction manager. */
+	size_t txn_count;
+};
+
 void
+memtx_tx_statistics_collect(struct memtx_tx_statistics *stats);
+
+int
 memtx_tx_register_tx(struct txn *tx);
 
 /**
