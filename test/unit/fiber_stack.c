@@ -6,6 +6,15 @@
 
 static struct fiber_attr default_attr;
 
+/** Total count of allocated fibers in the cord. Including dead ones. */
+static int
+fiber_count_total(void)
+{
+	size_t res = mempool_count(&cord()->fiber_mempool);
+	assert(res <= INT_MAX);
+	return (int)res;
+}
+
 static int
 noop_f(va_list ap)
 {
@@ -19,9 +28,10 @@ main_f(va_list ap)
 	size_t used_before, used_after;
 	struct errinj *inj;
 	struct fiber *fiber;
+	int fiber_count = fiber_count_total();
 
 	header();
-	plan(6);
+	plan(10);
 
 	/*
 	 * Set non-default stack size to prevent reusing of an
@@ -57,8 +67,14 @@ main_f(va_list ap)
 	fiber = fiber_new_ex("test_madvise", fiber_attr, noop_f);
 	inj->bparam = false;
 
+	ok(fiber_count_total() == fiber_count + 1, "allocated new");
 	ok(fiber != NULL, "madvise: non critical error on madvise hint");
 	ok(diag_get() != NULL, "madvise: diag is armed after error");
+
+	fiber_wakeup(fiber);
+	fiber_sleep(0);
+	cord_collect_garbage(cord());
+	ok(fiber_count_total() == fiber_count, "fiber is deleted");
 
 	/*
 	 * Check if we leak on fiber destruction.
@@ -76,6 +92,7 @@ main_f(va_list ap)
 
 	fiber = fiber_new_ex("test_madvise", fiber_attr, noop_f);
 	ok(fiber != NULL, "fiber with custom stack");
+	ok(fiber_count_total() == fiber_count + 1, "allocated new");
 	fiber_set_joinable(fiber, true);
 
 	inj = errinj(ERRINJ_FIBER_MPROTECT, ERRINJ_INT);
@@ -95,6 +112,9 @@ main_f(va_list ap)
 
 	used_after = slabc->allocated.stats.used;
 	ok(used_after > used_before, "expected leak detected");
+
+	cord_collect_garbage(cord());
+	ok(fiber_count_total() == fiber_count, "fiber is deleted");
 
 	fiber_attr_delete(fiber_attr);
 	footer();
