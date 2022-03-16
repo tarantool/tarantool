@@ -1784,7 +1784,6 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			    test_stmt->txn)
 				continue;
 			memtx_tx_handle_conflict(stmt->txn, test_stmt->txn);
-			memtx_tx_story_link_deleted_by(story, test_stmt);
 		}
 	}
 
