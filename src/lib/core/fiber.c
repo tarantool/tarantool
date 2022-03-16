@@ -1240,7 +1240,6 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 					  struct fiber, link);
 		rlist_move_entry(&cord->alive, fiber, link);
 		assert((fiber->flags | FIBER_IS_DEAD) != 0);
-		fiber->flags = FIBER_DEFAULT_FLAGS;
 	} else {
 		fiber = (struct fiber *)
 			mempool_alloc(&cord->fiber_mempool);
@@ -1265,11 +1264,10 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 		rlist_create(&fiber->wake);
 		diag_create(&fiber->diag);
 		fiber_reset(fiber);
-		fiber->flags = fiber_attr->flags;
 
 		rlist_add_entry(&cord->alive, fiber, link);
 	}
-
+	fiber->flags = fiber_attr->flags;
 	fiber->f = f;
 	/* Excluding reserved range */
 	if (++cord->max_fid < FIBER_ID_MAX_RESERVED)
