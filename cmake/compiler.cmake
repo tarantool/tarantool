@@ -116,10 +116,6 @@ set (CMAKE_CXX_FLAGS_RELWITHDEBINFO
 
 unset(CC_DEBUG_OPT)
 
-# Disabled backtraces support on FreeBSD by default, because of
-# gh-4278.
-# Disabled backtraces support on arm64 by default, because of
-# gh-6272, gh-6060 and gh-6222.
 check_c_source_compiles(
     "
     #if defined(__x86_64__) && !__has_attribute(force_align_arg_pointer)
@@ -140,11 +136,10 @@ check_c_source_compiles(
     int main(){}
     " HAVE_CFI_ASM)
 set(ENABLE_BACKTRACE_DEFAULT OFF)
-if(NOT TARGET_OS_FREEBSD AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "arm*" AND
-    NOT CMAKE_SYSTEM_PROCESSOR MATCHES "aarch*" AND
-    NOT CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "arm*" AND
-    NOT CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "aarch*" AND
-    HAVE_FORCE_ALIGN_ARG_POINTER_ATTR AND HAVE_CFI_ASM)
+# Disabled backtraces support on FreeBSD by default, because of
+# gh-4278.
+if(NOT TARGET_OS_FREEBSD AND HAVE_FORCE_ALIGN_ARG_POINTER_ATTR
+    AND HAVE_CFI_ASM)
     set(ENABLE_BACKTRACE_DEFAULT ON)
 endif()
 
@@ -178,6 +173,14 @@ endif()
 #
 
 add_compile_flags("C;CXX" "-fexceptions" "-funwind-tables")
+
+if(ENABLE_BACKTRACE)
+    string(FIND ${CMAKE_C_FLAGS} "-mbranch-protection"
+           WITH_BRANCH_PROTECTION)
+    if(WITH_BRANCH_PROTECTION EQUAL -1)
+        set(WITH_BRANCH_PROTECTION FALSE)
+    endif()
+endif()
 
 # In C a global variable without a storage specifier (static/extern) and
 # without an initialiser is called a ’tentative definition’. The
