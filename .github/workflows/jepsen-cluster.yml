@@ -1,8 +1,6 @@
 name: jepsen-cluster
 
 on:
-  repository_dispatch:
-    types: [backend_automation]
   workflow_dispatch:
 
 env:
