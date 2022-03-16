@@ -378,6 +378,26 @@ struct autoinc_id_entry {
 	int64_t id;
 };
 
+/** Type of allocation, used to collect statistics. */
+enum tx_alloc_type {
+	/**
+	 * Allocation of txn_stmt.
+	 */
+	TX_ALLOC_STMT = 0,
+	/**
+	 * Allocation made with box_txn_alloc().
+	 */
+	TX_ALLOC_USER_DATA = 1,
+	/**
+	 * Allocation made by txns for internal purposes
+	 * (xrow_header, ev_timer, trigger, etc).
+	 */
+	TX_ALLOC_SYSTEM = 2,
+	TX_ALLOC_TYPE_MAX = 3,
+};
+
+extern const char *tx_alloc_type_strs[];
+
 struct txn {
 	/** A stailq_entry to hold a txn in a cache. */
 	struct stailq_entry in_txn_cache;
@@ -386,9 +406,18 @@ struct txn {
 	 * Detaching transaction data from a fiber temporary storage
 	 * is required to allow an applier fiber to manage multiple
 	 * transactions simultaneously. Also interactive and autonomous
-	 * transactions will require this.
+	 * transactions will require this. To avoid missing memory consumption
+	 * monitoring, do not use directly, instead use tx_region methods.
 	 */
 	struct region region;
+	/**
+	 * Used memory of region before it was acquired, 0 if was not.
+	 */
+	uint32_t acquired_region_used;
+	/**
+	 * Allocation statistics.
+	 */
+	uint32_t alloc_stats[TX_ALLOC_TYPE_MAX];
 	/**
 	 * A sequentially growing transaction id, assigned when
 	 * a transaction is initiated. Used to identify
