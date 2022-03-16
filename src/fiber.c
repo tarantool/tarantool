@@ -394,14 +394,19 @@ fiber_wakeup(struct fiber *f)
 void
 fiber_cancel(struct fiber *f)
 {
-	assert(f->fid != 0);
 	/**
 	 * Do nothing if the fiber is dead, since cancelling
 	 * the fiber would clear the diagnostics area and
 	 * the cause of death would be lost.
 	 */
-	if (fiber_is_dead(f))
+	if (fiber_is_dead(f)) {
+		if ((f->flags & FIBER_IS_JOINABLE) == 0) {
+			panic("Cancel of a finished and already "
+			      "recycled fiber");
+		}
+		assert(f->fid != 0);
 		return;
+	}
 
 	f->flags |= FIBER_IS_CANCELLED;
 
@@ -501,6 +506,9 @@ fiber_join(struct fiber *fiber)
 			fiber_yield();
 		} while (! fiber_is_dead(fiber));
 	}
+	assert((fiber->flags & FIBER_IS_RUNNING) == 0);
+	assert((fiber->flags & FIBER_IS_JOINABLE) != 0);
+	fiber->flags &= ~FIBER_IS_JOINABLE;
 
 	/* Move exception to the caller */
 	int ret = fiber->f_ret;
@@ -714,17 +722,13 @@ fiber_reset(struct fiber *fiber)
 {
 	rlist_create(&fiber->on_yield);
 	rlist_create(&fiber->on_stop);
-	/*
-	 * Preserve the running flag if set. Reset might be called on the
-	 * current fiber when it is recycled.
-	 */
-	fiber->flags = FIBER_DEFAULT_FLAGS | (fiber->flags & FIBER_IS_RUNNING);
 }
 
 /** Destroy an active fiber and prepare it for reuse. */
 static void
 fiber_recycle(struct fiber *fiber)
 {
+	assert((fiber->flags & FIBER_IS_DEAD) != 0);
 	/* no exceptions are leaking */
 	assert(diag_is_empty(&fiber->diag));
 	/* no pending wakeup */
@@ -1050,6 +1054,8 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 		fiber = rlist_first_entry(&cord->dead,
 					  struct fiber, link);
 		rlist_move_entry(&cord->alive, fiber, link);
+		assert((fiber->flags | FIBER_IS_DEAD) != 0);
+		fiber->flags = FIBER_DEFAULT_FLAGS;
 	} else {
 		fiber = (struct fiber *)
 			mempool_alloc(&cord->fiber_mempool);
@@ -1205,7 +1211,7 @@ cord_create(struct cord *cord, const char *name)
 	region_create(&cord->sched.gc, &cord->slabc);
 	fiber_set_name(&cord->sched, "sched");
 	cord->fiber = &cord->sched;
-	cord->sched.flags |= FIBER_IS_RUNNING;
+	cord->sched.flags = FIBER_IS_RUNNING;
 
 	cord->max_fid = 100;
 	/*

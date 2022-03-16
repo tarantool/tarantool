@@ -246,6 +246,21 @@ fiber_wakeup_self_test()
 	footer();
 }
 
+static void
+fiber_dead_while_in_cache_test(void)
+{
+	header();
+
+	struct fiber *f = fiber_new_xc("nop", noop_f);
+	int fiber_count = fiber_count_total();
+	fiber_start(f);
+	/* The fiber remains in the cache of recycled fibers. */
+	fail_unless(fiber_count == fiber_count_total());
+	fail_unless(fiber_is_dead(f));
+
+	footer();
+}
+
 static int
 main_f(va_list ap)
 {
@@ -253,6 +268,7 @@ main_f(va_list ap)
 	fiber_join_test();
 	fiber_stack_test();
 	fiber_wakeup_self_test();
+	fiber_dead_while_in_cache_test();
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 }

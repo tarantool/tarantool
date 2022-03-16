@@ -19,3 +19,5 @@ SystemError Failed to allocate 42 bytes in allocator for exception: Cannot alloc
 	*** fiber_stack_test: done ***
 	*** fiber_wakeup_self_test ***
 	*** fiber_wakeup_self_test: done ***
+	*** fiber_dead_while_in_cache_test ***
+	*** fiber_dead_while_in_cache_test: done ***
