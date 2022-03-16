@@ -9,8 +9,6 @@ on:
       - '**'
   pull_request:
     types: [opened, reopened, synchronize, labeled]
-  repository_dispatch:
-    types: [backend_automation]
   workflow_dispatch:
 
 concurrency:
