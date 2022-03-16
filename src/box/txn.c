@@ -70,6 +70,168 @@ txn_on_stop(struct trigger *trigger, void *event);
 static int
 txn_on_yield(struct trigger *trigger, void *event);
 
+/** String representation of enum tx_alloc_type. */
+const char *tx_alloc_type_strs[TX_ALLOC_TYPE_MAX] = {
+	"statements",
+	"user",
+	"system",
+};
+
+/** Objects for tx_region_alloc_object method. */
+enum tx_alloc_object {
+	/**
+	 * Object of type struct txn_stmt.
+	 */
+	TX_OBJECT_STMT = 0,
+	/**
+	 * Object of type struct xrow_header.
+	 */
+	TX_OBJECT_XROW_HEADER = 1,
+	/**
+	 * Object of type struct trigger.
+	 */
+	TX_OBJECT_TRIGGER = 2,
+	/**
+	 * Object of type struct ev_timer.
+	 */
+	TX_OBJECT_EV_TIMER = 3,
+	TX_OBJECT_MAX = 4,
+};
+
+/**
+ * Reset txn's alloc_stats.
+ */
+static inline void
+txn_reset_stats(struct txn *txn)
+{
+	memset(txn->alloc_stats, 0, sizeof(txn->alloc_stats));
+}
+
+/**
+ * Collect allocation statistics.
+ */
+static inline void
+tx_track_allocation(struct txn *txn, size_t size, enum tx_alloc_type type)
+{
+	assert(type < TX_ALLOC_TYPE_MAX);
+	assert(txn != NULL);
+	assert(txn->alloc_stats != NULL);
+	/* Check if txn region is not released. */
+	assert(txn->acquired_region_used == 0);
+
+	txn->alloc_stats[type] += size;
+}
+
+/**
+ * Choose tx_alloc_type for alloc_obj.
+ */
+static inline enum tx_alloc_type
+tx_region_object_to_type(enum tx_alloc_object alloc_obj)
+{
+	enum tx_alloc_type alloc_type = TX_ALLOC_TYPE_MAX;
+	switch (alloc_obj) {
+	case TX_OBJECT_STMT:
+		alloc_type = TX_ALLOC_STMT;
+		break;
+	case TX_OBJECT_XROW_HEADER:
+	case TX_OBJECT_TRIGGER:
+	case TX_OBJECT_EV_TIMER:
+		alloc_type = TX_ALLOC_SYSTEM;
+		break;
+	default:
+		unreachable();
+	};
+	assert(alloc_type < TX_ALLOC_TYPE_MAX);
+	return alloc_type;
+}
+
+/**
+ * Alloc object on region. Pass object as enum tx_alloc_object.
+ * Use this method to track txn's allocations!
+ */
+static inline void *
+tx_region_alloc_object(struct txn *txn, enum tx_alloc_object alloc_obj,
+		       size_t *size)
+{
+	size_t alloc_size = 0;
+	void *alloc = NULL;
+	enum tx_alloc_type alloc_type = tx_region_object_to_type(alloc_obj);
+	switch (alloc_obj) {
+	case TX_OBJECT_STMT:
+		alloc = region_alloc_object(&txn->region,
+					    struct txn_stmt, &alloc_size);
+		break;
+	case TX_OBJECT_TRIGGER:
+		alloc = region_alloc_object(&txn->region,
+					    struct trigger, &alloc_size);
+		break;
+	case TX_OBJECT_XROW_HEADER:
+		alloc = region_alloc_object(&txn->region,
+					    struct xrow_header, &alloc_size);
+		break;
+	case TX_OBJECT_EV_TIMER:
+		alloc = region_alloc_object(&txn->region,
+					    struct ev_timer, &alloc_size);
+		break;
+	default:
+		unreachable();
+	}
+	assert(alloc_type < TX_ALLOC_TYPE_MAX);
+	*size = alloc_size;
+	if (alloc != NULL)
+		tx_track_allocation(txn, alloc_size, alloc_type);
+	return alloc;
+}
+
+/**
+ * Tx_region method for aligned allocations of arbitrary size.
+ * You must pass allocation type explicitly to categorize an allocation.
+ * Use this method to track txn's allocations!
+ */
+static inline void *
+tx_region_aligned_alloc(struct txn *txn, size_t size, size_t alignment,
+			size_t alloc_type)
+{
+	void *allocation = region_aligned_alloc(&txn->region, size, alignment);
+	if (allocation != NULL)
+		tx_track_allocation(txn, size, alloc_type);
+	return allocation;
+}
+
+/**
+ * Method to get txn's region to pass it outside the transaction manager.
+ * Do not use txn->region, use this method to track txn's allocations!
+ * Return region to txn with tx_region_release.
+ */
+static inline struct region *
+tx_region_acquire(struct txn *txn)
+{
+	assert(txn != NULL);
+	assert(txn->acquired_region_used == 0);
+
+	struct region *txn_region = &txn->region;
+	txn->acquired_region_used = region_used(txn_region);
+	return txn_region;
+}
+
+/**
+ * Method to return region to txn and account new allocations.
+ */
+static inline void
+tx_region_release(struct txn *txn, enum tx_alloc_type alloc_type)
+{
+	assert(txn != NULL);
+	assert(alloc_type < TX_ALLOC_TYPE_MAX);
+	assert(txn->acquired_region_used != 0);
+
+	size_t taken_region_used = region_used(&txn->region);
+	assert(taken_region_used >= txn->acquired_region_used);
+	size_t new_alloc_size = taken_region_used - txn->acquired_region_used;
+	txn->acquired_region_used = 0;
+	if (new_alloc_size > 0)
+		tx_track_allocation(txn, new_alloc_size, alloc_type);
+}
+
 static inline enum box_error_code
 txn_flags_to_error_code(struct txn *txn)
 {
@@ -106,11 +268,11 @@ static int
 txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 {
 	/* Create a redo log row. */
-	int size;
+	size_t size;
 	struct xrow_header *row;
-	row = region_alloc_object(&txn->region, struct xrow_header, &size);
+	row = tx_region_alloc_object(txn, TX_OBJECT_XROW_HEADER, &size);
 	if (row == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_object", "row");
+		diag_set(OutOfMemory, size, "tx_region_alloc_object", "row");
 		return -1;
 	}
 	if (request->header != NULL) {
@@ -133,7 +295,10 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 	 */
 	struct space *space = stmt->space;
 	row->group_id = space != NULL ? space_group_id(space) : 0;
-	row->bodycnt = xrow_encode_dml(request, &txn->region, row->body);
+	struct region *txn_region = tx_region_acquire(txn);
+	row->bodycnt = xrow_encode_dml(request, txn_region, row->body);
+	tx_region_release(txn, TX_ALLOC_SYSTEM);
+	txn_region = NULL;
 	if (row->bodycnt < 0)
 		return -1;
 	stmt->row = row;
@@ -144,11 +309,11 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 static struct txn_stmt *
 txn_stmt_new(struct txn *txn)
 {
-	int size;
+	size_t size;
 	struct txn_stmt *stmt;
-	stmt = region_alloc_object(&txn->region, struct txn_stmt, &size);
+	stmt = tx_region_alloc_object(txn, TX_OBJECT_STMT, &size);
 	if (stmt == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_object", "stmt");
+		diag_set(OutOfMemory, size, "tx_region_alloc_object", "stmt");
 		return NULL;
 	}
 
@@ -265,6 +430,7 @@ txn_new(void)
 		return NULL;
 	}
 	assert(region_used(&region) == sizeof(*txn));
+	txn_reset_stats(txn);
 	txn->region = region;
 	rlist_create(&txn->read_set);
 	rlist_create(&txn->point_holes_list);
@@ -275,6 +441,7 @@ txn_new(void)
 	rlist_create(&txn->in_read_view_txs);
 	rlist_create(&txn->in_all_txs);
 	txn->space_on_replace_triggers_depth = 0;
+	txn->acquired_region_used = 0;
 	return txn;
 }
 
@@ -317,6 +484,7 @@ txn_free(struct txn *txn)
 		txn_stmt_destroy(stmt);
 
 	/* Truncate region up to struct txn size. */
+	txn_reset_stats(txn);
 	region_truncate(&txn->region, sizeof(struct txn));
 	stailq_add(&txn_cache, &txn->in_txn_cache);
 }
@@ -669,8 +837,11 @@ txn_journal_entry_new(struct txn *txn)
 	assert(txn->n_new_rows + txn->n_applier_rows > 0);
 
 	/* Save space for an additional NOP row just in case. */
+	struct region *txn_region = tx_region_acquire(txn);
 	req = journal_entry_new(txn->n_new_rows + txn->n_applier_rows + 1,
-				&txn->region, txn_on_journal_write, txn);
+				txn_region, txn_on_journal_write, txn);
+	tx_region_release(txn, TX_ALLOC_SYSTEM);
+	txn_region = NULL;
 	if (req == NULL)
 		return NULL;
 
@@ -741,10 +912,11 @@ txn_journal_entry_new(struct txn *txn)
 	    (txn->n_local_rows != txn->n_new_rows || txn->n_applier_rows > 0) &&
 	    (*(local_row - 1))->group_id == GROUP_LOCAL) {
 		size_t size;
-		*local_row = region_alloc_object(&txn->region,
-						 typeof(**local_row), &size);
+		*local_row =
+			tx_region_alloc_object(txn, TX_OBJECT_XROW_HEADER,
+					       &size);
 		if (*local_row == NULL) {
-			diag_set(OutOfMemory, size, "region_alloc_object",
+			diag_set(OutOfMemory, size, "tx_region_alloc_object",
 				 "row");
 			return NULL;
 		}
@@ -900,9 +1072,9 @@ txn_commit_try_async(struct txn *txn)
 		 */
 		size_t size;
 		struct trigger *trig =
-			region_alloc_object(&txn->region, typeof(*trig), &size);
+			tx_region_alloc_object(txn, TX_OBJECT_TRIGGER, &size);
 		if (trig == NULL) {
-			diag_set(OutOfMemory, size, "region_alloc_object",
+			diag_set(OutOfMemory, size, "tx_region_alloc_object",
 				 "trig");
 			goto rollback;
 		}
@@ -1175,8 +1347,8 @@ box_txn_alloc(size_t size)
 		double lf;
 		long l;
 	};
-	return region_aligned_alloc(&txn->region, size,
-	                            alignof(union natural_align));
+	return tx_region_aligned_alloc(txn, size, alignof(union natural_align),
+				       TX_ALLOC_USER_DATA);
 }
 
 int
@@ -1232,8 +1404,8 @@ txn_savepoint_new(struct txn *txn, const char *name)
 	static_assert(sizeof(svp->name) == 1,
 		      "name member already has 1 byte for 0 termination");
 	size_t size = sizeof(*svp) + name_len;
-	svp = (struct txn_savepoint *)region_aligned_alloc(&txn->region, size,
-							   alignof(*svp));
+	svp = tx_region_aligned_alloc(txn, size, alignof(*svp),
+				      TX_ALLOC_SYSTEM);
 	if (svp == NULL) {
 		diag_set(OutOfMemory, size, "region_aligned_alloc", "svp");
 		return NULL;
@@ -1385,10 +1557,9 @@ txn_on_yield(struct trigger *trigger, void *event)
 		return 0;
 	}
 	if (txn->rollback_timer == NULL && txn->timeout != TIMEOUT_INFINITY) {
-		int size;
-		txn->rollback_timer = region_alloc_object(&txn->region,
-							  struct ev_timer,
-							  &size);
+		size_t size;
+		txn->rollback_timer =
+			tx_region_alloc_object(txn, TX_OBJECT_EV_TIMER, &size);
 		if (txn->rollback_timer == NULL)
 			panic("Out of memory on creation of rollback timer");
 		ev_timer_init(txn->rollback_timer, txn_on_timeout,
