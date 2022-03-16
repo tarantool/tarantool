@@ -1,0 +1,13 @@
+1..12
+ok 1 - Default year is 0
+ok 2 - Default month is 0
+ok 3 - Default week is 0
+ok 4 - Default day is 0
+ok 5 - Default hour is 0
+ok 6 - Default min is 0
+ok 7 - Default sec is 0
+ok 8 - Default nsec is 0
+ok 9 - Default adjust is INTERVAL_ADJUST_EXCESS
+ok 10 - 0 seconds
+ok 11 - 3 weeks
+ok 12 - -100 years, 100 months, 77 weeks, -77 days, 123 hours, -123 minutes, -1 seconds, 1 nanoseconds, LIMIT adjust
