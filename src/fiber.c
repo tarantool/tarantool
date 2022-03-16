@@ -239,7 +239,14 @@ static void
 fiber_stack_recycle(struct fiber *fiber);
 
 static void
-fiber_destroy(struct cord *cord, struct fiber *f);
+fiber_delete(struct cord *cord, struct fiber *f);
+
+/**
+ * Try to delete a fiber right now or later if can't do now. The latter happens
+ * for self fiber - can't delete own stack.
+ */
+static void
+cord_add_garbage(struct cord *cord, struct fiber *f);
 
 /**
  * Transfer control to callee fiber.
@@ -735,7 +742,7 @@ fiber_recycle(struct fiber *fiber)
 	if (!has_custom_stack) {
 		rlist_move_entry(&cord()->dead, fiber, link);
 	} else {
-		fiber_destroy(cord(), fiber);
+		cord_add_garbage(cord(), fiber);
 	}
 }
 
@@ -1035,6 +1042,7 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	struct cord *cord = cord();
 	struct fiber *fiber = NULL;
 	assert(fiber_attr != NULL);
+	cord_collect_garbage(cord);
 
 	/* Now we can not reuse fiber if custom attribute was set */
 	if (!(fiber_attr->flags & FIBER_CUSTOM_STACK) &&
@@ -1108,13 +1116,9 @@ fiber_new(const char *name, fiber_func f)
  * cord_destroy().
  */
 static void
-fiber_destroy(struct cord *cord, struct fiber *f)
+fiber_delete(struct cord *cord, struct fiber *f)
 {
-	if (f == fiber()) {
-		/** End of the application. */
-		assert(cord == &main_cord);
-		return;
-	}
+	assert(f != cord->fiber);
 	assert(f != &cord->sched);
 
 	trigger_destroy(&f->on_yield);
@@ -1124,17 +1128,27 @@ fiber_destroy(struct cord *cord, struct fiber *f)
 	region_destroy(&f->gc);
 	fiber_stack_destroy(f, &cord->slabc);
 	diag_destroy(&f->diag);
+	TRASH(f);
+	mempool_free(&cord->fiber_mempool, f);
+}
+
+/** Delete all fibers in the given list so it becomes empty. */
+static void
+cord_delete_fibers_in_list(struct cord *cord, struct rlist *list)
+{
+	while (!rlist_empty(list)) {
+		struct fiber *f = rlist_first_entry(list, struct fiber, link);
+		fiber_delete(cord, f);
+	}
 }
 
 void
-fiber_destroy_all(struct cord *cord)
+fiber_delete_all(struct cord *cord)
 {
-	while (!rlist_empty(&cord->alive))
-		fiber_destroy(cord, rlist_first_entry(&cord->alive,
-						      struct fiber, link));
-	while (!rlist_empty(&cord->dead))
-		fiber_destroy(cord, rlist_first_entry(&cord->dead,
-						      struct fiber, link));
+	cord_collect_garbage(cord);
+	cord_delete_fibers_in_list(cord, &cord->alive);
+	cord_delete_fibers_in_list(cord, &cord->dead);
+	cord_delete_fibers_in_list(cord, &cord->ready);
 }
 
 size_t
@@ -1181,6 +1195,7 @@ cord_create(struct cord *cord, const char *name)
 	rlist_create(&cord->alive);
 	rlist_create(&cord->ready);
 	rlist_create(&cord->dead);
+	cord->garbage = NULL;
 	cord->fiber_registry = mh_i32ptr_new();
 
 	/* sched fiber is not present in alive/ready/dead list. */
@@ -1218,6 +1233,27 @@ cord_create(struct cord *cord, const char *name)
 }
 
 void
+cord_collect_garbage(struct cord *cord)
+{
+	struct fiber *garbage = cord->garbage;
+	if (garbage == NULL)
+		return;
+	fiber_delete(cord, garbage);
+	cord->garbage = NULL;
+}
+
+static void
+cord_add_garbage(struct cord *cord, struct fiber *f)
+{
+	cord_collect_garbage(cord);
+	assert(cord->garbage == NULL);
+	if (f != cord->fiber)
+		fiber_delete(cord, f);
+	else
+		cord->garbage = f;
+}
+
+void
 cord_destroy(struct cord *cord)
 {
 	slab_cache_set_thread(&cord->slabc);
@@ -1225,7 +1261,7 @@ cord_destroy(struct cord *cord)
 		ev_loop_destroy(cord->loop);
 	/* Only clean up if initialized. */
 	if (cord->fiber_registry) {
-		fiber_destroy_all(cord);
+		fiber_delete_all(cord);
 		mh_i32ptr_delete(cord->fiber_registry);
 	}
 	region_destroy(&cord->sched.gc);
