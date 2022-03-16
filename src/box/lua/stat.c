@@ -43,6 +43,7 @@
 #include "box/engine.h"
 #include "box/vinyl.h"
 #include "box/sql.h"
+#include "box/memtx_tx.h"
 #include "info/info.h"
 #include "lua/info.h"
 #include "lua/utils.h"
@@ -279,6 +280,143 @@ lbox_stat_sql(struct lua_State *L)
 	return 1;
 }
 
+/**
+ * Push total, max and avg table onto lua stack.
+ */
+static void
+fill_memtx_mvcc_alloc_stat_item(struct lua_State *L, uint64_t total,
+				uint64_t max, uint64_t avg)
+{
+	lua_pushstring(L, "total");
+	lua_pushnumber(L, total);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "max");
+	lua_pushnumber(L, max);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "avg");
+	lua_pushnumber(L, avg);
+	lua_settable(L, -3);
+}
+
+/**
+ * Push table name with subtables total, max and avg onto the lua stack.
+ */
+static void
+set_memtx_mvcc_alloc_stat_item(struct lua_State *L, const char *name,
+			       uint64_t total, uint64_t max, uint64_t avg)
+{
+	lua_pushstring(L, name);
+	lua_newtable(L);
+
+	fill_memtx_mvcc_alloc_stat_item(L, total, max, avg);
+
+	lua_settable(L, -3);
+}
+
+void
+lbox_stat_memtx_mvcc_set_txn_item(struct lua_State *L,
+				  const struct memtx_tx_statistics *stats)
+{
+	lua_pushstring(L, "txn");
+	lua_newtable(L);
+	for (size_t i = 0; i < TX_ALLOC_TYPE_MAX; ++i) {
+		size_t avg = 0;
+		if (stats->txn_count != 0)
+			avg = stats->tx_total[i] / stats->txn_count;
+		set_memtx_mvcc_alloc_stat_item(L, tx_alloc_type_strs[i],
+					       stats->tx_total[i],
+					       stats->tx_max[i], avg);
+	}
+	lua_settable(L, -3);
+}
+
+void
+lbox_stat_memtx_mvcc_set_mvcc_item(struct lua_State *L,
+				   const struct memtx_tx_statistics *stats)
+{
+	lua_pushstring(L, "mvcc");
+	lua_newtable(L);
+	for (size_t i = 0; i < MEMTX_TX_ALLOC_TYPE_MAX; ++i) {
+		size_t avg = 0;
+		if (stats->txn_count != 0)
+			avg = stats->memtx_tx_total[i] / stats->txn_count;
+		set_memtx_mvcc_alloc_stat_item(L, memtx_tx_alloc_type_strs[i],
+					       stats->memtx_tx_total[i],
+					       stats->memtx_tx_max[i], avg);
+	}
+
+	lua_pushstring(L, "tuples");
+	lua_newtable(L);
+	for (size_t i = 0; i < MEMTX_TX_STORY_STATUS_MAX; ++i) {
+		lua_pushstring(L, memtx_tx_story_status_strs[i]);
+		lua_newtable(L);
+
+		lua_pushstring(L, "stories");
+		lua_newtable(L);
+		lua_pushstring(L, "total");
+		lua_pushnumber(L, stats->stories[i].total);
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "count");
+		lua_pushnumber(L, stats->stories[i].count);
+		lua_settable(L, -3);
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "retained");
+		lua_newtable(L);
+		lua_pushstring(L, "total");
+		lua_pushnumber(L, stats->retained_tuples[i].total);
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "count");
+		lua_pushnumber(L, stats->retained_tuples[i].count);
+		lua_settable(L, -3);
+		lua_settable(L, -3);
+
+		lua_settable(L, -3);
+	}
+	lua_settable(L, -3);
+}
+
+/**
+ * Memtx MVCC stats table's __call method.
+ */
+static int
+lbox_stat_memtx_mvcc_call(struct lua_State *L)
+{
+	struct memtx_tx_statistics stats;
+	memtx_tx_statistics_collect(&stats);
+	lbox_stat_memtx_mvcc_set_txn_item(L, &stats);
+	lbox_stat_memtx_mvcc_set_mvcc_item(L, &stats);
+	lua_settable(L, -3);
+
+	return 1;
+}
+
+/**
+ * Memtx MVCC stats table's __index method.
+ */
+static int
+lbox_stat_memtx_mvcc_index(struct lua_State *L)
+{
+	const char *key = luaL_checkstring(L, -1);
+	struct memtx_tx_statistics stats;
+	memtx_tx_statistics_collect(&stats);
+	lua_newtable(L);
+	if (strcmp("txn", key) == 0) {
+		lbox_stat_memtx_mvcc_set_txn_item(L, &stats);
+		return 1;
+	}
+	if (strcmp("mvcc", key) == 0) {
+		lbox_stat_memtx_mvcc_set_mvcc_item(L, &stats);
+		return 1;
+	}
+	lua_pop(L, -1);
+	return 0;
+}
+
 static const struct luaL_Reg lbox_stat_meta [] = {
 	{"__index", lbox_stat_index},
 	{"__call",  lbox_stat_call},
@@ -294,6 +432,12 @@ static const struct luaL_Reg lbox_stat_net_meta [] = {
 static const struct luaL_Reg lbox_stat_net_thread_meta [] = {
 	{"__index", lbox_stat_net_thread_index},
 	{"__call",  lbox_stat_net_thread_call},
+	{NULL, NULL}
+};
+
+static const struct luaL_Reg lbox_stat_memtx_mvcc_meta[] = {
+	{"__index", lbox_stat_memtx_mvcc_index },
+	{"__call", lbox_stat_memtx_mvcc_call },
 	{NULL, NULL}
 };
 
@@ -332,5 +476,17 @@ box_lua_stat_init(struct lua_State *L)
 	luaL_register(L, NULL, lbox_stat_net_thread_meta);
 	lua_setmetatable(L, -2);
 	lua_pop(L, 1); /* stat net module */
+
+	static const struct luaL_Reg memtx_mvcc_statlib[] = {
+		{NULL, NULL}
+	};
+
+	luaL_register_module(L, "box.stat.memtx.tx", memtx_mvcc_statlib);
+
+	lua_newtable(L);
+	luaL_register(L, NULL, lbox_stat_memtx_mvcc_meta);
+	lua_setmetatable(L, -2);
+	lua_pop(L, 1); /* stat tx module */
+
 }
 

@@ -544,7 +544,6 @@ txn_begin(void)
 	txn->fk_deferred_count = 0;
 	txn->is_schema_changed = false;
 	rlist_create(&txn->savepoints);
-	memtx_tx_register_tx(txn);
 	txn->fiber = NULL;
 	txn->timeout = TIMEOUT_INFINITY;
 	txn->rollback_timer = NULL;
@@ -559,6 +558,11 @@ txn_begin(void)
 	 * if they are not supported.
 	 */
 	txn_set_flags(txn, TXN_CAN_YIELD);
+	int rc = memtx_tx_register_tx(txn);
+	if (rc == -1) {
+		txn_free(txn);
+		return NULL;
+	}
 	return txn;
 }
 

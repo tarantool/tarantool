@@ -419,6 +419,10 @@ struct txn {
 	 */
 	uint32_t alloc_stats[TX_ALLOC_TYPE_MAX];
 	/**
+	 * Memtx tx allocation statistics.
+	 */
+	uint32_t *memtx_tx_alloc_stats;
+	/**
 	 * A sequentially growing transaction id, assigned when
 	 * a transaction is initiated. Used to identify
 	 * a transaction after it has possibly been destroyed.

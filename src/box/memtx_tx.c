@@ -35,7 +35,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "txn.h"
 #include "schema_def.h"
 #include "small/mempool.h"
 
@@ -183,6 +182,198 @@ point_hole_storage_key_equal(const struct point_hole_key *key,
 #define MH_SOURCE
 #include "salad/mhash.h"
 
+/**
+ * Temporary (allocated on region) struct that stores a conflicting TX.
+ */
+struct memtx_tx_conflict {
+	/* The transaction that will conflict us upon commit. */
+	struct txn *breaker;
+	/* The transaction that will conflicted by upon commit. */
+	struct txn *victim;
+	/* Link in single-linked list. */
+	struct memtx_tx_conflict *next;
+};
+
+/**
+ * Collect an allocation to memtx_tx_stats.
+ */
+static inline void
+memtx_tx_stats_collect(struct memtx_tx_stats *stats, size_t size)
+{
+	stats->count++;
+	stats->total += size;
+}
+
+/**
+ * Discard an allocation collected by memtx_tx_stats.
+ */
+static inline void
+memtx_tx_stats_discard(struct memtx_tx_stats *stats, size_t size)
+{
+	assert(stats->count > 0);
+	assert(stats->total >= size);
+
+	stats->count--;
+	stats->total -= size;
+}
+
+/**
+ * Collect allocation statistics.
+ */
+static inline void
+memtx_tx_track_allocation(struct txn *txn, size_t size,
+			  enum memtx_tx_alloc_type alloc_type)
+{
+	assert(alloc_type < MEMTX_TX_ALLOC_TYPE_MAX);
+	txn->memtx_tx_alloc_stats[alloc_type] += size;
+}
+
+/**
+ * Collect deallocation statistics.
+ */
+static inline void
+memtx_tx_track_deallocation(struct txn *txn, size_t size,
+			    enum memtx_tx_alloc_type alloc_type)
+{
+	assert(alloc_type < MEMTX_TX_ALLOC_TYPE_MAX);
+	assert(txn->memtx_tx_alloc_stats[alloc_type] >= size);
+	txn->memtx_tx_alloc_stats[alloc_type] -= size;
+}
+
+/**
+ * A wrapper over mempool.
+ * Use it instead of mempool to track allocations!
+ */
+struct memtx_tx_mempool {
+	/**
+	 * Wrapped mempool.
+	 */
+	struct mempool pool;
+	/**
+	 * Each allocation is accounted with this type.
+	 */
+	enum memtx_tx_alloc_type alloc_type;
+};
+
+static inline void
+memtx_tx_mempool_create(struct memtx_tx_mempool *mempool, uint32_t objsize,
+			enum memtx_tx_alloc_type alloc_type)
+{
+	mempool_create(&mempool->pool, cord_slab_cache(), objsize);
+	mempool->alloc_type = alloc_type;
+}
+
+static inline void
+memtx_tx_mempool_destroy(struct memtx_tx_mempool *mempool)
+{
+	mempool_destroy(&mempool->pool);
+	mempool->alloc_type = MEMTX_TX_ALLOC_TYPE_MAX;
+}
+
+void *
+memtx_tx_mempool_alloc(struct txn *txn, struct memtx_tx_mempool *mempool)
+{
+	void *allocation = mempool_alloc(&mempool->pool);
+	if (allocation != NULL) {
+		uint32_t size = mempool->pool.objsize;
+		memtx_tx_track_allocation(txn, size, mempool->alloc_type);
+	}
+	return allocation;
+}
+
+void
+memtx_tx_mempool_free(struct txn *txn, struct memtx_tx_mempool *mempool, void *ptr)
+{
+	uint32_t size = mempool->pool.objsize;
+	memtx_tx_track_deallocation(txn, size, mempool->alloc_type);
+	mempool_free(&mempool->pool, ptr);
+}
+
+/**
+ * Choose memtx_tx_alloc_type for alloc_obj.
+ */
+static inline enum memtx_tx_alloc_type
+memtx_tx_region_object_to_type(enum memtx_tx_alloc_object alloc_obj)
+{
+	enum memtx_tx_alloc_type alloc_type = MEMTX_TX_ALLOC_TYPE_MAX;
+	switch (alloc_obj) {
+	case MEMTX_TX_OBJECT_CONFLICT:
+		alloc_type = MEMTX_TX_ALLOC_CONFLICT;
+		break;
+
+	case MEMTX_TX_OBJECT_CONFLICT_TRACKER:
+	case MEMTX_TX_OBJECT_READ_TRACKER:
+		alloc_type = MEMTX_TX_ALLOC_TRACKER;
+		break;
+	default:
+		unreachable();
+	};
+	assert(alloc_type < MEMTX_TX_ALLOC_TYPE_MAX);
+	return alloc_type;
+}
+
+/**
+ * Alloc object on region. Pass object as enum memtx_tx_alloc_object.
+ * Use this method to track txn's allocations!
+ */
+static inline void *
+memtx_tx_region_alloc_object(struct txn *txn,
+			     enum memtx_tx_alloc_object alloc_obj)
+{
+	size_t size = 0;
+	void *alloc = NULL;
+	enum memtx_tx_alloc_type alloc_type =
+		memtx_tx_region_object_to_type(alloc_obj);
+	switch (alloc_obj) {
+	case MEMTX_TX_OBJECT_CONFLICT:
+		alloc = region_alloc_object(&txn->region,
+					    struct memtx_tx_conflict, &size);
+		break;
+	case MEMTX_TX_OBJECT_CONFLICT_TRACKER:
+		alloc = region_alloc_object(&txn->region,
+					    struct tx_conflict_tracker, &size);
+		break;
+	case MEMTX_TX_OBJECT_READ_TRACKER:
+		alloc = region_alloc_object(&txn->region,
+					    struct tx_read_tracker, &size);
+		break;
+	default:
+		unreachable();
+	}
+	assert(alloc_type < MEMTX_TX_ALLOC_TYPE_MAX);
+	if (alloc != NULL)
+		memtx_tx_track_allocation(txn, size, alloc_type);
+	return alloc;
+}
+
+/**
+ * Tx_region method for allocations of arbitrary size.
+ * You must pass allocation type explicitly to categorize an allocation.
+ * Use this method to track allocations!
+ */
+static inline void *
+memtx_tx_region_alloc(struct txn *txn, size_t size,
+		      enum memtx_tx_alloc_type alloc_type)
+{
+	void *allocation = region_alloc(&txn->region, size);
+	if (allocation != NULL)
+		memtx_tx_track_allocation(txn, size, alloc_type);
+	return allocation;
+}
+
+/** String representation of enum memtx_tx_alloc_type. */
+const char *memtx_tx_alloc_type_strs[MEMTX_TX_ALLOC_TYPE_MAX] = {
+	"trackers",
+	"conflicts",
+};
+
+/** String representation of enum memtx_tx_story_status. */
+const char *memtx_tx_story_status_strs[MEMTX_TX_STORY_STATUS_MAX] = {
+	"used",
+	"read_view",
+	"tracking",
+};
+
 struct tx_manager
 {
 	/**
@@ -191,22 +382,28 @@ struct tx_manager
 	 * so the list is ordered by rv_psn.
 	 */
 	struct rlist read_view_txs;
-	/** Mempools for tx_story objects with different index count. */
+	/**
+	 * Mempools for tx_story objects with different index count.
+	 * It's the only case when we use bare mempool in memtx_tx because
+	 * we cannot account story allocation to any particular txn.
+	 */
 	struct mempool memtx_tx_story_pool[BOX_INDEX_MAX];
 	/** Hash table tuple -> memtx_story of that tuple. */
 	struct mh_history_t *history;
 	/** Mempool for point_hole_item objects. */
-	struct mempool point_hole_item_pool;
+	struct memtx_tx_mempool point_hole_item_pool;
 	/** Hash table that hold point selects with empty result. */
 	struct mh_point_holes_t *point_holes;
 	/** Count of elements in point_holes table. */
 	size_t point_holes_size;
 	/** Mempool for gap_item objects. */
-	struct mempool gap_item_mempoool;
+	struct memtx_tx_mempool gap_item_mempoool;
 	/** Mempool for full_scan_item objects. */
-	struct mempool full_scan_item_mempool;
+	struct memtx_tx_mempool full_scan_item_mempool;
 	/** List of all memtx_story objects. */
 	struct rlist all_stories;
+	struct memtx_tx_stats story_stats[MEMTX_TX_STORY_STATUS_MAX];
+	struct memtx_tx_stats retained_tuple_stats[MEMTX_TX_STORY_STATUS_MAX];
 	/** Iterator that sequentially traverses all memtx_story objects. */
 	struct rlist *traverse_all_stories;
 	/** The list containing all transactions. */
@@ -241,18 +438,22 @@ memtx_tx_manager_init()
 			       cord_slab_cache(), item_size);
 	}
 	txm.history = mh_history_new();
-	mempool_create(&txm.point_hole_item_pool,
-		       cord_slab_cache(), sizeof(struct point_hole_item));
+	memtx_tx_mempool_create(&txm.point_hole_item_pool,
+				sizeof(struct point_hole_item),
+				MEMTX_TX_ALLOC_TRACKER);
 	txm.point_holes = mh_point_holes_new();
-	mempool_create(&txm.gap_item_mempoool,
-		       cord_slab_cache(), sizeof(struct gap_item));
-	mempool_create(&txm.full_scan_item_mempool,
-		       cord_slab_cache(), sizeof(struct full_scan_item));
+	memtx_tx_mempool_create(&txm.gap_item_mempoool,
+				sizeof(struct gap_item),
+				MEMTX_TX_ALLOC_TRACKER);
+	memtx_tx_mempool_create(&txm.full_scan_item_mempool,
+				sizeof(struct full_scan_item),
+				MEMTX_TX_ALLOC_TRACKER);
 	txm.point_holes_size = 0;
 	rlist_create(&txm.all_stories);
 	rlist_create(&txm.all_txs);
 	txm.traverse_all_stories = &txm.all_stories;
 	txm.must_do_gc_steps = 0;
+	memset(&txm.story_stats, 0, sizeof(txm.story_stats));
 }
 
 void
@@ -261,16 +462,57 @@ memtx_tx_manager_free()
 	for (size_t i = 0; i < BOX_INDEX_MAX; i++)
 		mempool_destroy(&txm.memtx_tx_story_pool[i]);
 	mh_history_delete(txm.history);
-	mempool_destroy(&txm.point_hole_item_pool);
+	memtx_tx_mempool_destroy(&txm.point_hole_item_pool);
 	mh_point_holes_delete(txm.point_holes);
-	mempool_destroy(&txm.gap_item_mempoool);
-	mempool_destroy(&txm.full_scan_item_mempool);
+	memtx_tx_mempool_destroy(&txm.gap_item_mempoool);
+	memtx_tx_mempool_destroy(&txm.full_scan_item_mempool);
 }
 
 void
+memtx_tx_statistics_collect(struct memtx_tx_statistics *stats)
+{
+	memset(stats, 0, sizeof(*stats));
+	for (size_t i = 0; i < MEMTX_TX_STORY_STATUS_MAX; ++i) {
+		stats->stories[i] = txm.story_stats[i];
+		stats->retained_tuples[i] = txm.retained_tuple_stats[i];
+	}
+	if (rlist_empty(&txm.all_txs)) {
+		return;
+	}
+	struct txn *txn;
+	size_t txn_count = 0;
+	rlist_foreach_entry(txn, &txm.all_txs, in_all_txs) {
+		txn_count++;
+		for (size_t i = 0; i < MEMTX_TX_ALLOC_TYPE_MAX; ++i) {
+			size_t txn_stat = txn->memtx_tx_alloc_stats[i];
+			stats->memtx_tx_total[i] += txn_stat;
+			if (txn_stat > stats->memtx_tx_max[i])
+				stats->memtx_tx_max[i] = txn_stat;
+		}
+		for (size_t i = 0; i < TX_ALLOC_TYPE_MAX; ++i) {
+			size_t txn_stat = txn->alloc_stats[i];
+			stats->tx_total[i] += txn_stat;
+			if (txn_stat > stats->tx_max[i])
+				stats->tx_max[i] = txn_stat;
+		}
+	}
+	stats->txn_count = txn_count;
+}
+
+int
 memtx_tx_register_tx(struct txn *tx)
 {
+	int size = 0;
+	tx->memtx_tx_alloc_stats =
+		region_alloc_array(&tx->region,
+				   typeof(*tx->memtx_tx_alloc_stats),
+				   MEMTX_TX_ALLOC_TYPE_MAX, &size);
+	if (tx->memtx_tx_alloc_stats == NULL)
+		return -1;
+	memset(tx->memtx_tx_alloc_stats, 0,
+	       sizeof(*tx->memtx_tx_alloc_stats) * MEMTX_TX_ALLOC_TYPE_MAX);
 	rlist_add_tail(&txm.all_txs, &tx->in_all_txs);
+	return 0;
 }
 
 void
@@ -328,12 +570,11 @@ memtx_tx_cause_conflict(struct txn *breaker, struct txn *victim)
 		rlist_del(&tracker->in_conflict_list);
 		rlist_del(&tracker->in_conflicted_by_list);
 	} else {
-		size_t size;
-		tracker = region_alloc_object(&victim->region,
-					      struct tx_conflict_tracker,
-					      &size);
+		tracker =
+			memtx_tx_region_alloc_object(
+				victim, MEMTX_TX_OBJECT_CONFLICT_TRACKER);
 		if (tracker == NULL) {
-			diag_set(OutOfMemory, size, "tx region",
+			diag_set(OutOfMemory, sizeof(*tracker), "tx region",
 				 "conflict_tracker");
 			return -1;
 		}
@@ -417,11 +658,107 @@ memtx_tx_handle_conflict(struct txn *breaker, struct txn *victim)
 }
 
 /**
+ * Calculate size of story with its links.
+ */
+static inline size_t
+memtx_story_size(struct memtx_story *story)
+{
+	struct mempool *pool = &txm.memtx_tx_story_pool[story->index_count];
+	return pool->objsize;
+}
+
+/**
+ * Notify memory manager that a tuple referenced by @a story
+ * was replaced from primary key and that is why @a story
+ * is the only reason why the tuple cannot be deleted.
+ */
+static inline void
+memtx_tx_story_track_retained_tuple(struct memtx_story *story)
+{
+	assert(!story->tuple_is_retained);
+	assert(story->status < MEMTX_TX_STORY_STATUS_MAX);
+
+	story->tuple_is_retained = true;
+	struct memtx_tx_stats *stats = &txm.retained_tuple_stats[story->status];
+	size_t tuplesize = tuple_size(story->tuple);
+	memtx_tx_stats_collect(stats, tuplesize);
+}
+
+/**
+ * Notify memory manager that a tuple referenced by @a story
+ * was placed to primary key.
+ */
+static inline void
+memtx_tx_story_untrack_retained_tuple(struct memtx_story *story)
+{
+	assert(story->tuple_is_retained);
+	assert(story->status < MEMTX_TX_STORY_STATUS_MAX);
+
+	story->tuple_is_retained = false;
+	struct memtx_tx_stats *stats = &txm.retained_tuple_stats[story->status];
+	size_t tuplesize = tuple_size(story->tuple);
+	memtx_tx_stats_discard(stats, tuplesize);
+}
+
+/** Set status of story (see memtx_tx_story_status) */
+static inline void
+memtx_tx_story_set_status(struct memtx_story *story,
+			  enum memtx_tx_story_status new_status)
+{
+	assert(story->status < MEMTX_TX_STORY_STATUS_MAX);
+	enum memtx_tx_story_status old_status = story->status;
+	if (old_status == new_status)
+		return;
+	story->status = new_status;
+	struct memtx_tx_stats *old_story_stats = &txm.story_stats[old_status];
+	struct memtx_tx_stats *new_story_stats = &txm.story_stats[new_status];
+	size_t story_size = memtx_story_size(story);
+	memtx_tx_stats_discard(old_story_stats, story_size);
+	memtx_tx_stats_collect(new_story_stats, story_size);
+	if (story->tuple_is_retained) {
+		size_t tuplesize = tuple_size(story->tuple);
+		struct memtx_tx_stats *old =
+			&txm.retained_tuple_stats[old_status];
+		struct memtx_tx_stats *new =
+			&txm.retained_tuple_stats[new_status];
+		memtx_tx_stats_discard(old, tuplesize);
+		memtx_tx_stats_collect(new, tuplesize);
+	}
+}
+
+/**
+ * Use this method to ref tuple that belongs to @a story
+ * by primary index. Do not use bare tuple_ref!!!
+ */
+static inline void
+memtx_tx_ref_to_primary(struct memtx_story *story)
+{
+	assert(story != NULL);
+	assert(story->tuple_is_retained);
+	tuple_ref(story->tuple);
+	memtx_tx_story_untrack_retained_tuple(story);
+}
+
+/**
+ * Use this method to unref tuple that belongs to @a story
+ * from primary index. Do not use bare tuple_unref!!!
+ */
+static inline void
+memtx_tx_unref_from_primary(struct memtx_story *story)
+{
+	assert(story != NULL);
+	tuple_unref(story->tuple);
+	if (!story->tuple_is_retained)
+		memtx_tx_story_track_retained_tuple(story);
+}
+
+/**
  * Create a new story and link it with the @a tuple.
  * @return story on success, NULL on error (diag is set).
  */
 static struct memtx_story *
-memtx_tx_story_new(struct space *space, struct tuple *tuple)
+memtx_tx_story_new(struct space *space, struct tuple *tuple,
+		   bool tuple_is_referenced_to_pk)
 {
 	txm.must_do_gc_steps += TX_MANAGER_GC_STEPS_SIZE;
 	assert(!tuple->is_dirty);
@@ -429,10 +766,8 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	assert(index_count < BOX_INDEX_MAX);
 	struct mempool *pool = &txm.memtx_tx_story_pool[index_count];
 	struct memtx_story *story = (struct memtx_story *) mempool_alloc(pool);
+	size_t item_size = pool->objsize;
 	if (story == NULL) {
-		size_t item_size = sizeof(struct memtx_story) +
-				   index_count *
-				   sizeof(struct memtx_story_link);
 		diag_set(OutOfMemory, item_size, "mempool_alloc", "story");
 		return NULL;
 	}
@@ -444,7 +779,12 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	mh_history_put(txm.history, put_story, &empty, 0);
 	tuple->is_dirty = true;
 	tuple_ref(tuple);
-
+	story->status = MEMTX_TX_STORY_USED;
+	struct memtx_tx_stats *stats = &txm.story_stats[story->status];
+	memtx_tx_stats_collect(stats, item_size);
+	story->tuple_is_retained = false;
+	if (!tuple_is_referenced_to_pk)
+		memtx_tx_story_track_retained_tuple(story);
 	story->space = space;
 	story->index_count = index_count;
 	story->add_stmt = NULL;
@@ -465,6 +805,11 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 static void
 memtx_tx_story_delete(struct memtx_story *story)
 {
+	memtx_tx_stats_discard(&txm.story_stats[story->status],
+			       memtx_story_size(story));
+	if (story->tuple_is_retained)
+		memtx_tx_story_untrack_retained_tuple(story);
+
 	if (story->add_stmt != NULL) {
 		assert(story->add_stmt->add_story == story);
 		story->add_stmt->add_story = NULL;
@@ -690,8 +1035,8 @@ memtx_tx_story_link_top(struct memtx_story *new_top,
 	 * index and dereference the tuple that was removed from it.
 	 */
 	if (idx == 0) {
-		tuple_ref(new_top->tuple);
-		tuple_unref(old_top->tuple);
+		memtx_tx_ref_to_primary(new_top);
+		memtx_tx_unref_from_primary(old_top);
 	}
 }
 
@@ -772,8 +1117,8 @@ memtx_tx_story_unlink_top(struct memtx_story *story, uint32_t idx)
 	 */
 	if (idx == 0) {
 		if (old_story != NULL)
-			tuple_ref(old_story->tuple);
-		tuple_unref(story->tuple);
+			memtx_tx_ref_to_primary(old_story);
+		memtx_tx_unref_from_primary(story);
 	}
 
 	memtx_tx_story_unlink_top_light(story, idx);
@@ -895,7 +1240,7 @@ memtx_tx_story_full_unlink(struct memtx_story *story)
 				 * Once removed it must be unreferenced.
 				 */
 				if (i == 0)
-					tuple_unref(story->tuple);
+					memtx_tx_unref_from_primary(story);
 			}
 
 			memtx_tx_story_unlink(story, link->older_story, i);
@@ -944,18 +1289,26 @@ memtx_tx_story_gc_step()
 			    in_all_stories);
 	txm.traverse_all_stories = txm.traverse_all_stories->next;
 
+	/**
+	 * The order in which conditions are checked is important,
+	 * see description of enum memtx_tx_story_status.
+	 */
 	if (story->add_stmt != NULL || story->del_stmt != NULL ||
 	    !rlist_empty(&story->reader_list)) {
+		memtx_tx_story_set_status(story, MEMTX_TX_STORY_USED);
 		/* The story is used directly by some transactions. */
 		return;
 	}
 	if (story->add_psn >= lowest_rv_psn ||
 	    story->del_psn >= lowest_rv_psn) {
+		memtx_tx_story_set_status(story, MEMTX_TX_STORY_READ_VIEW);
 		/* The story can be used by a read view. */
 		return;
 	}
 	for (uint32_t i = 0; i < story->index_count; i++) {
 		if (!rlist_empty(&story->link[i].nearby_gaps)) {
+			memtx_tx_story_set_status(story,
+						  MEMTX_TX_STORY_TRACK_GAP);
 			/* The story is used for gap tracking. */
 			return;
 		}
@@ -1044,19 +1397,6 @@ memtx_tx_story_is_visible(struct memtx_story *story, struct txn *txn,
 }
 
 /**
- * Temporary (allocated on region) struct that stores a conflicting TX.
- */
-struct memtx_tx_conflict
-{
-	/* The transaction that will conflict us upon commit. */
-	struct txn *breaker;
-	/* The transaction that will conflicted by upon commit. */
-	struct txn *victim;
-	/* Link in single-linked list. */
-	struct memtx_tx_conflict *next;
-};
-
-/**
  * Save @a breaker in list with head @a conflicts_head. New list node is
  * allocated on a region of @a breaker.
  * @return 0 on success, -1 on memory error.
@@ -1065,12 +1405,12 @@ static int
 memtx_tx_save_conflict(struct txn *breaker, struct txn *victim,
 		       struct memtx_tx_conflict **conflicts_head)
 {
-	size_t size;
 	struct memtx_tx_conflict *next_conflict;
-	next_conflict = region_alloc_object(&breaker->region,
-					    struct memtx_tx_conflict, &size);
+	next_conflict = memtx_tx_region_alloc_object(breaker,
+						     MEMTX_TX_OBJECT_CONFLICT);
 	if (next_conflict == NULL) {
-		diag_set(OutOfMemory, size, "txn_region", "txn conflict");
+		diag_set(OutOfMemory, sizeof(*next_conflict), "txn_region",
+			 "txn conflict");
 		return -1;
 	}
 	next_conflict->breaker = breaker;
@@ -1497,14 +1837,22 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	if (rc != 0)
 		goto fail;
 
-	/* Create add_story and replaced_story if necessary. */
-	add_story = memtx_tx_story_new(space, new_tuple);
+	/*
+	 * Create add_story and replaced_story if necessary.
+	 * Note that despite the tuple is already in pk,
+	 * it is not referenced to it, so we pass false as the last argument.
+	 */
+	add_story = memtx_tx_story_new(space, new_tuple, false);
 	if (add_story == NULL)
 		goto fail;
 	memtx_tx_story_link_added_by(add_story, stmt);
 
 	if (replaced != NULL && !replaced->is_dirty) {
-		created_story = memtx_tx_story_new(space, replaced);
+		/*
+		 * Note that despite the tuple is not in pk,
+		 * it is referenced to it, so we pass true as the last argument.
+		 */
+		created_story = memtx_tx_story_new(space, replaced, true);
 		if (created_story == NULL)
 			goto fail;
 		replaced_story = created_story;
@@ -1564,9 +1912,14 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		 * in primary index must be referenced (a replaces tuple must
 		 * be dereferenced).
 		 */
-		tuple_ref(new_tuple);
-		if (directly_replaced[0] != NULL)
-			tuple_unref(directly_replaced[0]);
+		assert(add_story == memtx_tx_story_get(new_tuple));
+
+		memtx_tx_ref_to_primary(add_story);
+		if (directly_replaced[0] != NULL) {
+			assert(replaced_story ==
+			       memtx_tx_story_get(directly_replaced[0]));
+			memtx_tx_unref_from_primary(replaced_story);
+		}
 	}
 
 	*result = old_tuple;
@@ -1624,10 +1977,17 @@ memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
 	if (old_tuple->is_dirty) {
 		del_story = memtx_tx_story_get(old_tuple);
 	} else {
-		del_story = memtx_tx_story_new(space, old_tuple);
+		assert(stmt->txn != NULL);
+		/*
+		 * The tuple is not dirty therefore it is placed in pk
+		 * and is referenced to it.
+		 */
+		del_story = memtx_tx_story_new(space, old_tuple, true);
 		if (del_story == NULL)
 			return -1;
 	}
+	if (!del_story->tuple_is_retained)
+		memtx_tx_story_track_retained_tuple(del_story);
 
 	memtx_tx_story_link_deleted_by(del_story, stmt);
 	*result = old_tuple;
@@ -2071,7 +2431,7 @@ memtx_tx_delete_gap(struct gap_item *item)
 {
 	rlist_del(&item->in_gap_list);
 	rlist_del(&item->in_nearby_gaps);
-	mempool_free(&txm.gap_item_mempoool, item);
+	memtx_tx_mempool_free(item->txn, &txm.gap_item_mempoool, item);
 }
 
 static void
@@ -2079,7 +2439,7 @@ memtx_tx_full_scan_item_delete(struct full_scan_item *item)
 {
 	rlist_del(&item->in_full_scan_list);
 	rlist_del(&item->in_full_scans);
-	mempool_free(&txm.full_scan_item_mempool, item);
+	memtx_tx_mempool_free(item->txn, &txm.full_scan_item_mempool, item);
 }
 
 void
@@ -2134,12 +2494,12 @@ static struct tx_read_tracker *
 tx_read_tracker_new(struct txn *reader, struct memtx_story *story,
 		    uint64_t index_mask)
 {
-	size_t sz;
 	struct tx_read_tracker *tracker;
-	tracker = region_alloc_object(&reader->region,
-				      struct tx_read_tracker, &sz);
+	tracker = memtx_tx_region_alloc_object(reader,
+					       MEMTX_TX_OBJECT_READ_TRACKER);
 	if (tracker == NULL) {
-		diag_set(OutOfMemory, sz, "tx region", "read_tracker");
+		diag_set(OutOfMemory, sizeof(*tracker), "tx region",
+			 "read_tracker");
 		return NULL;
 	}
 	tracker->reader = reader;
@@ -2217,7 +2577,12 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
 		struct memtx_story *story = memtx_tx_story_get(tuple);
 		return memtx_tx_track_read_story(txn, space, story, UINT64_MAX);
 	} else {
-		struct memtx_story *story = memtx_tx_story_new(space, tuple);
+		/*
+		 * The tuple is not dirty therefore it is placed in pk
+		 * and is referenced to it.
+		 */
+		struct memtx_story *story =
+			memtx_tx_story_new(space, tuple, true);
 		if (story == NULL)
 			return -1;
 		struct tx_read_tracker *tracker;
@@ -2239,9 +2604,8 @@ static int
 point_hole_storage_new(struct index *index, const char *key,
 		       size_t key_len, struct txn *txn)
 {
-	struct mempool *pool = &txm.point_hole_item_pool;
-	struct point_hole_item *object =
-		(struct point_hole_item *) mempool_alloc(pool);
+	struct memtx_tx_mempool *pool = &txm.point_hole_item_pool;
+	struct point_hole_item *object = memtx_tx_mempool_alloc(txn, pool);
 	if (object == NULL) {
 		diag_set(OutOfMemory, sizeof(*object),
 			 "mempool_alloc", "point_hole_item");
@@ -2255,9 +2619,10 @@ point_hole_storage_new(struct index *index, const char *key,
 	if (key_len <= sizeof(object->short_key)) {
 		object->key = object->short_key;
 	} else {
-		object->key = (char *)region_alloc(&txn->region, key_len);
+		object->key = memtx_tx_region_alloc(txn, key_len,
+						    MEMTX_TX_ALLOC_TRACKER);
 		if (object->key == NULL) {
-			mempool_free(pool, object);
+			memtx_tx_mempool_free(txn, pool, object);
 			diag_set(OutOfMemory, key_len, "tx region",
 				 "point key");
 			return -1;
@@ -2333,8 +2698,8 @@ point_hole_storage_delete(struct point_hole_item *object)
 		txm.point_holes_size--;
 	}
 	rlist_del(&object->in_point_holes_list);
-	struct mempool *pool = &txm.point_hole_item_pool;
-	mempool_free(pool, object);
+	struct memtx_tx_mempool *pool = &txm.point_hole_item_pool;
+	memtx_tx_mempool_free(object->txn, pool, object);
 }
 
 /**
@@ -2362,8 +2727,8 @@ static struct gap_item *
 memtx_tx_gap_item_new(struct txn *txn, enum iterator_type type,
 		      const char *key, uint32_t part_count)
 {
-	struct gap_item *item = (struct gap_item *)
-		mempool_alloc(&txm.gap_item_mempoool);
+	struct gap_item *item =
+		memtx_tx_mempool_alloc(txn, &txm.gap_item_mempoool);
 	if (item == NULL) {
 		diag_set(OutOfMemory, sizeof(*item), "mempool_alloc", "gap");
 		return NULL;
@@ -2381,9 +2746,11 @@ memtx_tx_gap_item_new(struct txn *txn, enum iterator_type type,
 	} else if (item->key_len <= sizeof(item->short_key)) {
 		item->key = item->short_key;
 	} else {
-		item->key = (char *)region_alloc(&txn->region, item->key_len);
+		item->key = memtx_tx_region_alloc(txn, item->key_len,
+						  MEMTX_TX_ALLOC_TRACKER);
 		if (item->key == NULL) {
-			mempool_free(&txm.gap_item_mempoool, item);
+			memtx_tx_mempool_free(txn,
+					      &txm.gap_item_mempoool, item);
 			diag_set(OutOfMemory, item->key_len, "tx region",
 				 "point key");
 			return NULL;
@@ -2421,9 +2788,15 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 		if (successor->is_dirty) {
 			story = memtx_tx_story_get(successor);
 		} else {
-			story = memtx_tx_story_new(space, successor);
+			/*
+			 * The tuple is not dirty therefore it is placed in pk
+			 * and is referenced to it.
+			 */
+			story = memtx_tx_story_new(space, successor, true);
 			if (story == NULL) {
-				mempool_free(&txm.gap_item_mempoool, item);
+				memtx_tx_mempool_free(txn,
+						      &txm.gap_item_mempoool,
+						      item);
 				return -1;
 			}
 		}
@@ -2440,8 +2813,9 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 static struct full_scan_item *
 memtx_tx_full_scan_item_new(struct txn *txn)
 {
-	struct full_scan_item *item = (struct full_scan_item *)
-		mempool_alloc(&txm.full_scan_item_mempool);
+	struct full_scan_item *item =
+		(struct full_scan_item *)memtx_tx_mempool_alloc(txn,
+			&txm.full_scan_item_mempool);
 	if (item == NULL) {
 		diag_set(OutOfMemory, sizeof(*item), "mempool_alloc",
 			 "full_scan_item");
