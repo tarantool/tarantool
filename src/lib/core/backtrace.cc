@@ -17,6 +17,10 @@
 #include <dlfcn.h>
 #endif
 
+#ifdef ENABLED_BRANCH_PROTECTION
+#include <execinfo.h>
+#endif /* ENABLED_BRANCH_PROTECTION */
+
 #include <cxxabi.h>
 
 #define C_FRAME_STR_FMT "#%-2d %p in %s+%zu"
@@ -43,8 +47,15 @@ __attribute__ ((__force_align_arg_pointer__))
 static NOINLINE void *
 collect_current_stack(struct core_backtrace *bt, void *stack)
 {
-	bt->frame_count = unw_backtrace((void **)bt->frames,
-					CORE_BACKTRACE_FRAME_COUNT_MAX);
+#ifndef __APPLE__
+	int (*backtrace_alias)(void **, int);
+#ifndef ENABLED_BRANCH_PROTECTION
+	backtrace_alias = unw_backtrace;
+#else /* ENABLED_BRANCH_PROTECTION */
+	backtrace_alias = backtrace;
+#endif /* ENABLED_BRANCH_PROTECTION */
+	bt->frame_count = backtrace_alias((void **)bt->frames,
+					  CORE_BACKTRACE_FRAME_COUNT_MAX);
 #else /* __APPLE__ */
 	/*
 	 * Unfortunately, glibc `backtrace` does not work on macOS.
