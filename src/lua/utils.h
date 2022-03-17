@@ -73,6 +73,8 @@ extern uint32_t CTID_CHAR_PTR;
 extern uint32_t CTID_CONST_CHAR_PTR;
 extern uint32_t CTID_UUID;
 extern uint32_t CTID_DATETIME;
+/** Type ID of struct interval. */
+extern uint32_t CTID_INTERVAL;
 
 struct tt_uuid *
 luaL_pushuuid(struct lua_State *L);
@@ -88,6 +90,10 @@ luaL_pushuuidstr(struct lua_State *L, const struct tt_uuid *uuid);
  */
 struct datetime *
 luaT_pushdatetime(struct lua_State *L);
+
+/** Push an interval cdata onto the stack. */
+struct interval *
+luaT_pushinterval(struct lua_State *L);
 
 /** \cond public */
 

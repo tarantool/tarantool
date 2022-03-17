@@ -39,6 +39,7 @@
 
 #include "lib/core/decimal.h"
 #include "mp_extension_types.h"
+#include "interval.h"
 #include "tt_uuid.h"
 
 #include "lua-yaml/b64.h"
@@ -768,7 +769,7 @@ static int
 dump_node(struct lua_dumper *d, struct node *nd, int indent)
 {
 	struct luaL_field *field = &nd->field;
-	char buf[MAX(FPCONV_G_FMT_BUFSIZE, DT_TO_STRING_BUFSIZE)];
+	char buf[INTERVAL_STR_MAX_LEN];
 	int ltype = lua_type(d->L, -1);
 	const char *str = NULL;
 	size_t len = 0;
@@ -866,6 +867,12 @@ dump_node(struct lua_dumper *d, struct node *nd, int indent)
 			str = buf;
 			len = datetime_to_string(field->dateval,
 						     buf, sizeof(buf));
+			break;
+		case MP_INTERVAL:
+			nd->mask |= NODE_QUOTE;
+			str = buf;
+			interval_to_string(field->interval, buf, sizeof(buf));
+			len = strlen(str);
 			break;
 		default:
 			d->err = EINVAL;

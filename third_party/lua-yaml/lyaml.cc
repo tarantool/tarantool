@@ -55,6 +55,7 @@ extern "C" {
 #include "tt_static.h"
 #include "mp_extension_types.h" /* MP_DECIMAL, MP_UUID */
 #include "tt_uuid.h" /* tt_uuid_to_string(), UUID_STR_LEN */
+#include "interval.h"
 
 #define LUAYAML_TAG_PREFIX "tag:yaml.org,2002:"
 
@@ -618,7 +619,7 @@ static int dump_node(struct lua_yaml_dumper *dumper)
    yaml_event_t ev;
    yaml_scalar_style_t style = YAML_PLAIN_SCALAR_STYLE;
    int is_binary = 0;
-   char buf[MAX(FPCONV_G_FMT_BUFSIZE, DT_TO_STRING_BUFSIZE)];
+   char buf[INTERVAL_STR_MAX_LEN];
    struct luaL_field field;
    bool unused;
    (void) unused;
@@ -715,6 +716,11 @@ static int dump_node(struct lua_yaml_dumper *dumper)
       case MP_DATETIME:
          len = datetime_to_string(field.dateval, buf, sizeof(buf));
          str = buf;
+         break;
+      case MP_INTERVAL:
+         interval_to_string(field.interval, buf, sizeof(buf));
+         str = buf;
+         len = strlen(str);
          break;
       default:
          assert(0); /* checked by luaL_checkfield() */

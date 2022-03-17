@@ -55,6 +55,7 @@
 #include "core/datetime.h"
 #include "cord_buf.h"
 #include "tt_uuid.h" /* tt_uuid_to_string(), UUID_STR_LEN */
+#include "interval.h"
 
 typedef enum {
     T_OBJ_BEGIN,
@@ -437,6 +438,13 @@ static void json_append_data(lua_State *l, struct luaL_serializer *cfg,
         {
             char buf[DT_TO_STRING_BUFSIZE];
             size_t sz = datetime_to_string(field.dateval, buf, sizeof(buf));
+            return json_append_string(cfg, json, buf, sz);
+        }
+        case MP_INTERVAL:
+        {
+            char buf[INTERVAL_STR_MAX_LEN];
+            interval_to_string(field.interval, buf, sizeof(buf));
+            size_t sz = strlen(buf);
             return json_append_string(cfg, json, buf, sz);
         }
         default:

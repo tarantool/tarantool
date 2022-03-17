@@ -47,6 +47,7 @@
 #include "mp_extension_types.h"
 #include "mp_uuid.h" /* mp_decode_uuid() */
 #include "mp_datetime.h"
+#include "mp_interval.h"
 
 #include "cord_buf.h"
 #include <fiber.h>
@@ -259,6 +260,9 @@ restart: /* used by MP_EXT of unidentified subtype */
 		case MP_DATETIME:
 			mpstream_encode_datetime(stream, field->dateval);
 			break;
+		case MP_INTERVAL:
+			mpstream_encode_interval(stream, field->interval);
+			break;
 		default:
 			data = luamp_get(L, top, &data_len);
 			if (data != NULL) {
@@ -404,6 +408,14 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 			struct datetime *date = luaT_pushdatetime(L);
 			date = datetime_unpack(data, len, date);
 			if (date == NULL)
+				goto ext_decode_err;
+			return;
+		}
+		case MP_INTERVAL:
+		{
+			struct interval *itv = luaT_pushinterval(L);
+			itv = interval_unpack(data, itv);
+			if (itv == NULL)
 				goto ext_decode_err;
 			return;
 		}
