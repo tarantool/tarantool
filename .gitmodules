@@ -56,3 +56,7 @@
 [submodule "third_party/nghttp2"]
 	path = third_party/nghttp2
 	url = https://github.com/tarantool/nghttp2.git
+[submodule "third_party/libunwind"]
+	path = third_party/libunwind
+	url = https://github.com/tarantool/libunwind.git
+	branch = libunwind-1.6.2-tarantool

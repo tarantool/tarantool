@@ -57,18 +57,22 @@ Requires(preun): chkconfig
 Requires(preun): initscripts
 %endif
 
-%if 0%{?rhel} >= 8
-# gh-4611: Disable backtraces on CentOS 8 by default due to lack
-# of libunwind package in the base system.
+# Enable backtraces everywhere, except AARCH64 and ancient GCC versions, which
+# lack compiler features required for backtrace.
+%define __cc "%{getenv:CC}"
+%if %{__cc} == ""
+%define __cc "cc"
+%endif
+%if "%(printf '%%s\n' "5.3.0" "$(%{__cc} -dumpfullversion -dumpversion)" | sort -V | head -n1)" != "5.3.0"
 %bcond_with backtrace
 %else
-# Enable backtraces everywhere except arm64.
 %ifnarch aarch64
 %bcond_without backtrace
 %else
 %bcond_with backtrace
 %endif
 %endif
+%undefine __cc
 
 # openSuSE sets its own build directory in its macros, but we
 # want to use in-source build there to simplify the RPM spec.
