@@ -76,6 +76,16 @@ mp_snprint_interval(char *buf, int size, const char **data);
 int
 mp_fprint_interval(FILE *file, const char **data);
 
+/**
+ * Check that the given buffer contains a valid interval.
+ * @param data The buffer containing a packed interval without MP_EXT header.
+ * @param len Length of @a data.
+ * @retval 1 Couldn't decode the interval.
+ * @retval 0 Ok.
+ */
+int
+mp_validate_interval(const char *data, uint32_t len);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

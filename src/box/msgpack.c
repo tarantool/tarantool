@@ -89,9 +89,31 @@ msgpack_snprint_ext(char *buf, int size, const char **data, int depth)
 	}
 }
 
+/** Our handler to validate MP_EXT contents. */
+static int
+msgpack_check_ext_data(int8_t type, const char *data, uint32_t len)
+{
+	switch (type) {
+	case MP_DECIMAL:
+		return mp_validate_decimal(data, len);
+	case MP_UUID:
+		return mp_validate_uuid(data, len);
+	case MP_DATETIME:
+		return mp_validate_datetime(data, len);
+	case MP_ERROR:
+		return mp_validate_error(data, len);
+	case MP_INTERVAL:
+		return mp_validate_interval(data, len);
+	case MP_COMPRESSION:
+	default:
+		return mp_check_ext_data_default(type, data, len);
+	}
+}
+
 void
 msgpack_init(void)
 {
 	mp_fprint_ext = msgpack_fprint_ext;
 	mp_snprint_ext = msgpack_snprint_ext;
+	mp_check_ext_data = msgpack_check_ext_data;
 }

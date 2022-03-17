@@ -186,3 +186,12 @@ mp_fprint_interval(FILE *file, const char **data)
 	interval_to_string(&itv, buf, TT_STATIC_BUF_LEN);
 	return fprintf(file, "%s", buf);
 }
+
+int
+mp_validate_interval(const char *data, uint32_t len)
+{
+	struct interval itv;
+	const char * const svp = data;
+	struct interval *rc = interval_unpack(&data, &itv);
+	return rc == NULL || (data - svp) != len;
+}
