@@ -59,6 +59,17 @@ mp_snprint_datetime(char *buf, int size, const char **data, uint32_t len);
 int
 mp_fprint_datetime(FILE *file, const char **data, uint32_t len);
 
+/**
+ * Check that the buffer contains a valid packed datetime.
+ * @sa mp_validate_decimal
+ */
+static inline int
+mp_validate_datetime(const char *data, uint32_t len)
+{
+	struct datetime date;
+	return datetime_unpack(&data, len, &date) == NULL;
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
