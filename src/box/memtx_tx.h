@@ -212,11 +212,16 @@ int
 memtx_tx_cause_conflict(struct txn *breaker, struct txn *victim);
 
 /**
- * Handle conflict when @a breaker transaction is prepared.
- * The conflict is happened if @a victim have read something that @a breaker
- * overwrites.
+ * Handle conflict when @a victim has read and @a breaker has written the same
+ * key, and @a breaker is prepared. The functions must be called in two cases:
+ * 1. @a breaker becomes prepared for every victim with non-empty intersection
+ * of victim read set / breaker write set.
+ * 2. @a victim has to read confirmed value and skips the value that prepared
+ * @a breaker wrote.
  * If @a victim is read-only or hasn't made any changes, it should be sent
- * to read view, in which is will not see @a breaker.
+ * to read view, in which is will not see @a breaker's changes. If @a victim
+ * is already in a read view - a read view that does not see every breaker
+ * changes is chosen.
  * Otherwise @a victim must be marked as conflicted and aborted on occasion.
  */
 void
