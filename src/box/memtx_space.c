@@ -299,6 +299,10 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 	 */
 	if (memtx_tx_manager_use_mvcc_engine && !space->def->opts.is_ephemeral) {
 		struct txn_stmt *stmt = txn_current_stmt(in_txn());
+		struct memtx_space *memtx_space = (struct memtx_space *)space;
+		if (new_tuple != NULL && tuple_is_compressed(new_tuple) &&
+		    memtx_space->compressed_tuples == 0)
+			memtx_space_update_indexes_vtab(space);
 		return memtx_tx_history_add_stmt(stmt, old_tuple, new_tuple,
 						 mode, result);
 	}
