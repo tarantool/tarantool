@@ -930,10 +930,10 @@ memtx_tx_story_gc()
  */
 static bool
 memtx_tx_story_is_visible(struct memtx_story *story, struct txn *txn,
-			  struct tuple **visible_tuple, bool is_prepared_ok,
-			  bool *own_change)
+			  bool is_prepared_ok, struct tuple **visible_tuple,
+			  bool *is_own_change)
 {
-	*own_change = false;
+	*is_own_change = false;
 	*visible_tuple = NULL;
 
 	int64_t rv_psn = INT64_MAX;
@@ -945,7 +945,7 @@ memtx_tx_story_is_visible(struct memtx_story *story, struct txn *txn,
 	while (dels != NULL) {
 		if (dels->txn == txn) {
 			/* Tuple is deleted by us (@txn). */
-			*own_change = true;
+			*is_own_change = true;
 			return true;
 		}
 		if (story->del_psn != 0 && dels->txn->psn == story->del_psn)
@@ -965,7 +965,7 @@ memtx_tx_story_is_visible(struct memtx_story *story, struct txn *txn,
 	if (story->add_stmt != NULL && story->add_stmt->txn == txn) {
 		/* Tuple is added by us (@txn). */
 		*visible_tuple = story->tuple;
-		*own_change = true;
+		*is_own_change = true;
 		return true;
 	}
 	if (is_prepared_ok && story->add_psn != 0 && story->add_psn < rv_psn) {
@@ -1026,28 +1026,23 @@ memtx_tx_save_conflict(struct txn *breaker, struct txn *victim,
 }
 
 /**
- * Scan a history starting with @a stmt statement in @a index for a visible
- * tuple (prepared suits), returned via @a visible_replaced.
- * Collect a list of transactions that will abort current transaction if they
- * are committed.
- *
- * @return 0 on success, -1 on memory error.
+ * Scan a history starting with @a story in @a index for a @a visible_tuple.
+ * If @a is_prepared_ok is true that prepared statements are visible for
+ * that lookup, and not visible otherwise.
  */
-static int
-memtx_tx_story_find_visible_tuple(struct memtx_story *story,
-				  struct txn_stmt *stmt,
-				  uint32_t index,
-				  struct tuple **visible_replaced)
+static void
+memtx_tx_story_find_visible_tuple(struct memtx_story *story, struct txn *tnx,
+				  uint32_t index, bool is_prepared_ok,
+				  struct tuple **visible_tuple)
 {
 	for (; story != NULL; story = story->link[index].older_story) {
 		assert(index < story->index_count);
 		bool unused;
-		if (memtx_tx_story_is_visible(story, stmt->txn,
-					      visible_replaced, true, &unused))
-			return 0;
+		if (memtx_tx_story_is_visible(story, tnx, is_prepared_ok,
+					      visible_tuple, &unused))
+			return;
 	}
-	*visible_replaced = NULL;
-	return 0;
+	*visible_tuple = NULL;
 }
 
 /**
@@ -1180,10 +1175,8 @@ check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
 		 */
 		struct memtx_story *second_story = memtx_tx_story_get(replaced[i]);
 		struct tuple *check_visible;
-
-		if (memtx_tx_story_find_visible_tuple(second_story, stmt, i,
-						      &check_visible) != 0)
-			return -1;
+		memtx_tx_story_find_visible_tuple(second_story, txn, i,
+						  true, &check_visible);
 
 		if (memtx_tx_check_dup(new_tuple, replaced[0], check_visible,
 				       DUP_INSERT, space->index[i], space) != 0) {
@@ -1219,9 +1212,8 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 
 	struct memtx_story *old_story = memtx_tx_story_get(replaced[0]);
 	struct tuple *visible_replaced;
-	if (memtx_tx_story_find_visible_tuple(old_story, stmt, 0,
-					      &visible_replaced) != 0)
-		return -1;
+	memtx_tx_story_find_visible_tuple(old_story, txn, 0, true,
+					  &visible_replaced);
 
 	if (memtx_tx_check_dup(new_tuple, *old_tuple, visible_replaced,
 			       mode, space->index[0], space) != 0) {
@@ -1260,9 +1252,8 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 		struct memtx_story *second_story = memtx_tx_story_get(replaced[i]);
 		struct tuple *check_visible;
 
-		if (memtx_tx_story_find_visible_tuple(second_story, stmt, i,
-						      &check_visible) != 0)
-			return -1;
+		memtx_tx_story_find_visible_tuple(second_story, txn, i, true,
+						  &check_visible);
 
 		if (memtx_tx_check_dup(new_tuple, visible_replaced,
 				       check_visible, DUP_INSERT,
@@ -1908,19 +1899,16 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 {
 	assert(tuple->is_dirty);
 	struct memtx_story *story = memtx_tx_story_get(tuple);
-	struct memtx_story *last_checked_story = story;
 	bool own_change = false;
 	struct tuple *result = NULL;
 
 	while (true) {
-		if (memtx_tx_story_is_visible(story, txn, &result,
-					      is_prepared_ok, &own_change)) {
+		if (memtx_tx_story_is_visible(story, txn, is_prepared_ok,
+					      &result, &own_change))
 			break;
-		}
+		if (story->link[index->dense_id].older_story == NULL)
+			break;
 		story = story->link[index->dense_id].older_story;
-		if (story == NULL)
-			break;
-		last_checked_story = story;
 	}
 	if (!own_change) {
 		/*
@@ -1931,7 +1919,7 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 		 */
 		int shift = index->dense_id & 63;
 		uint64_t mask = result == NULL ? 1ull << shift : UINT64_MAX;
-		memtx_tx_track_read_story(txn, space, last_checked_story, mask);
+		memtx_tx_track_read_story(txn, space, story, mask);
 	}
 	if (mk_index != 0) {
 		assert(false); /* TODO: multiindex */
@@ -1955,21 +1943,14 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
 		assert(index->dense_id < story->index_count);
 		struct memtx_story_link *link = &story->link[index->dense_id];
 		if (link->newer_story != NULL) {
-			/* The story in in chain, but not at top. */
+			/* The story is in chain, but not at top. */
 			continue;
 		}
 
 		struct tuple *visible = NULL;
-		struct memtx_story *lookup = story;
-		for (; lookup != NULL;
-		       lookup = lookup->link[index->dense_id].older_story) {
-			assert(index->dense_id < lookup->index_count);
-			bool unused;
-			if (memtx_tx_story_is_visible(lookup, txn,
-						      &visible, txn != NULL,
-						      &unused))
-				break;
-		}
+		bool is_prepared_ok = txn != NULL;
+		memtx_tx_story_find_visible_tuple(story, txn, index->dense_id,
+						  is_prepared_ok, &visible);
 		if (visible == NULL)
 			res++;
 	}
