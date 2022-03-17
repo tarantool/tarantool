@@ -820,7 +820,7 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		struct key_part *part = &key_def->parts[i];
 		if (part->type <= FIELD_TYPE_ANY ||
-		    part->type >= FIELD_TYPE_ARRAY) {
+		    part->type >= FIELD_TYPE_INTERVAL) {
 			diag_set(ClientError, ER_MODIFY_INDEX,
 				 index_def->name, space_name(space),
 				 tt_sprintf("field type '%s' is not supported",
