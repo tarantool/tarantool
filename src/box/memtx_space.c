@@ -923,27 +923,19 @@ memtx_space_create_index(struct space *space, struct index_def *index_def)
 		return sequence_data_index_new(memtx, index_def);
 	}
 
-	struct index *index = NULL;
 	switch (index_def->type) {
 	case HASH:
-		index = memtx_hash_index_new(memtx, index_def);
-		break;
+		return memtx_hash_index_new(memtx, index_def);
 	case TREE:
-		index = memtx_tree_index_new(memtx, index_def);
-		break;
+		return memtx_tree_index_new(memtx, index_def);
 	case RTREE:
-		index = memtx_rtree_index_new(memtx, index_def);
-		break;
+		return memtx_rtree_index_new(memtx, index_def);
 	case BITSET:
-		index = memtx_bitset_index_new(memtx, index_def);
-		break;
+		return memtx_bitset_index_new(memtx, index_def);
 	default:
 		unreachable();
 		return NULL;
 	}
-	if (index != NULL)
-		memtx_space_update_index_vtab(space, index);
-	return index;
 }
 
 /**
@@ -1403,6 +1395,16 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	return rc;
 }
 
+void
+memtx_space_swap_index(struct space *old_space, struct space *new_space,
+		       uint32_t old_index_id, uint32_t new_index_id)
+{
+	SWAP(old_space->index_map[old_index_id],
+	     new_space->index_map[new_index_id]);
+	memtx_space_update_index_vtab(new_space,
+				      new_space->index_map[new_index_id]);
+}
+
 static int
 memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
@@ -1442,7 +1444,7 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .drop_primary_key = */ memtx_space_drop_primary_key,
 	/* .check_format  = */ memtx_space_check_format,
 	/* .build_index = */ memtx_space_build_index,
-	/* .swap_index = */ generic_space_swap_index,
+	/* .swap_index = */ memtx_space_swap_index,
 	/* .prepare_alter = */ memtx_space_prepare_alter,
 	/* .invalidate = */ generic_space_invalidate,
 };

@@ -536,7 +536,11 @@ memtx_engine_commit(struct engine *engine, struct txn *txn)
 				(struct memtx_space *)stmt->space;
 			size_t *bsize = &mspace->bsize;
 			uint64_t *ctuples = &mspace->compressed_tuples;
+			uint64_t old_ctuples = *ctuples;
 			memtx_tx_history_commit_stmt(stmt, bsize, ctuples);
+			if ((old_ctuples != 0 && *ctuples == 0) ||
+			    (old_ctuples == 0 && *ctuples != 0))
+				memtx_space_update_indexes_vtab(stmt->space);
 		}
 	}
 }
