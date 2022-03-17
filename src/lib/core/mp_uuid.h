@@ -112,6 +112,20 @@ mp_snprint_uuid(char *buf, int size, const char **data, uint32_t len);
 int
 mp_fprint_uuid(FILE *file, const char **data, uint32_t len);
 
+/**
+ * Check that the buffer contains a valid packed uuid.
+ * @param data The buffer containing a packed uuid, without MP_EXT header.
+ * @param len  Length of @a data.
+ * @retval 1   Couldn't decode the uuid.
+ * @retval 0   Ok.
+ */
+static inline int
+mp_validate_uuid(const char *data, uint32_t len)
+{
+	struct tt_uuid uuid;
+	return uuid_unpack(&data, len, &uuid) == NULL;
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

@@ -1,4 +1,4 @@
-1..23
+1..24
     1..135
     # *** test_uints ***
     # uint 0U
@@ -2181,6 +2181,34 @@ ok 20 - subtests
     ok 65 - invalid map32 3
     # *** test_mp_check: done ***
 ok 21 - subtests
+    1..24
+    # *** test_mp_check_ext_data ***
+    ok 1 - invalid ext8 - bad type
+    ok 2 - invalid ext8 - bad data
+    ok 3 - valid ext8
+    ok 4 - invalid ext16 - bad type
+    ok 5 - invalid ext16 - bad data
+    ok 6 - valid ext16
+    ok 7 - invalid ext32 - bad type
+    ok 8 - invalid ext32 - bad data
+    ok 9 - valid ext32
+    ok 10 - invalid fixext8 - bad type
+    ok 11 - invalid fixext8 - bad data
+    ok 12 - valid fixext8
+    ok 13 - invalid fixext16 - bad type
+    ok 14 - invalid fixext16 - bad data
+    ok 15 - valid fixext16
+    ok 16 - invalid fixext32 - bad type
+    ok 17 - invalid fixext32 - bad data
+    ok 18 - valid fixext32
+    ok 19 - invalid fixext64 - bad type
+    ok 20 - invalid fixext64 - bad data
+    ok 21 - valid fixext64
+    ok 22 - invalid fixext128 - bad type
+    ok 23 - invalid fixext128 - bad data
+    ok 24 - valid fixext128
+    # *** test_mp_check_ext_data: done ***
+ok 22 - subtests
     1..96
     # *** test_numbers ***
     ok 1 - mp_read_int32(mp_encode_uint(123)) check success
@@ -2280,7 +2308,7 @@ ok 21 - subtests
     ok 95 - mp_read_double(mp_encode_strl(100)) check fail
     ok 96 - mp_read_double(mp_encode_strl(100)) check pos unchanged
     # *** test_numbers: done ***
-ok 22 - subtests
+ok 23 - subtests
     1..5
     # *** test_overflow ***
     ok 1 - mp_check array overflow
@@ -2289,4 +2317,4 @@ ok 22 - subtests
     ok 4 - mp_check bin overflow
     ok 5 - mp_check str overflow
     # *** test_overflow: done ***
-ok 23 - subtests
+ok 24 - subtests
