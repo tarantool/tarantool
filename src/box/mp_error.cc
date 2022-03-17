@@ -514,6 +514,21 @@ error_unpack_unsafe(const char **data)
 	return err;
 }
 
+int
+mp_validate_error(const char *data, uint32_t len)
+{
+	const char *end = data + len;
+	struct error *err = error_unpack_unsafe(&data);
+	if (err != NULL) {
+		/* A hack to delete the error. */
+		error_ref(err);
+		error_unref(err);
+		return data != end;
+	} else {
+		return 1;
+	}
+}
+
 /**
  * Include this file into self with a few template parameters
  * to create mp_snprint_error() and mp_fprint_error() functions

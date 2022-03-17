@@ -90,6 +90,21 @@ mp_snprint_decimal(char *buf, int size, const char **data, uint32_t len);
 int
 mp_fprint_decimal(FILE *file, const char **data, uint32_t len);
 
+/**
+ * Check that the given buffer contains a valid decimal.
+ * @param data The buffer containing a packed decimal representation, without
+ *             MP_EXT header.
+ * @param len  Length of @a data.
+ * @retval 1   Couldn't decode a decimal.
+ * @retval 0   Ok.
+ */
+static inline int
+mp_validate_decimal(const char *data, uint32_t len)
+{
+	decimal_t d;
+	return decimal_unpack(&data, len, &d) == NULL;
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

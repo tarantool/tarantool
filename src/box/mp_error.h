@@ -115,6 +115,16 @@ mp_snprint_error(char *buf, int size, const char **data, int depth);
 int
 mp_fprint_error(FILE *file, const char **data, int depth);
 
+/**
+ * Check that the buffer contains a valid packed error representation.
+ * @param data MessagePack encoded error, without MP_EXT header.
+ * @param len  Length of @a data.
+ * @retval 1   Error. The buffer doesn't contain a parseable error.
+ * @retval 0   Ok.
+ */
+int
+mp_validate_error(const char *data, uint32_t len);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
