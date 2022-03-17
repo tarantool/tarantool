@@ -1966,7 +1966,8 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
 			assert(index->dense_id < lookup->index_count);
 			bool unused;
 			if (memtx_tx_story_is_visible(lookup, txn,
-						      &visible, true, &unused))
+						      &visible, txn != NULL,
+						      &unused))
 				break;
 		}
 		if (visible == NULL)
