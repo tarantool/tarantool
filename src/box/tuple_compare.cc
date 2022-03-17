@@ -78,6 +78,7 @@ enum mp_class {
 	MP_CLASS_BIN,
 	MP_CLASS_UUID,
 	MP_CLASS_DATETIME,
+	MP_CLASS_INTERVAL,
 	MP_CLASS_ARRAY,
 	MP_CLASS_MAP,
 	mp_class_max,
@@ -103,6 +104,8 @@ static enum mp_class mp_ext_classes[] = {
 	/* .MP_UUID		 = */ MP_CLASS_UUID,
 	/* .MP_ERROR		 = */ mp_class_max,
 	/* .MP_DATETIME		 = */ MP_CLASS_DATETIME,
+	/* .MP_COMPRESSION	 = */ mp_class_max,
+	/* .MP_INTERVAL		 = */ MP_CLASS_INTERVAL,
 };
 
 static enum mp_class
@@ -416,6 +419,7 @@ static mp_compare_f mp_class_comparators[] = {
 	/* .MP_CLASS_BIN    = */ mp_compare_bin,
 	/* .MP_CLASS_UUID   = */ mp_compare_uuid,
 	/* .MP_CLASS_DATETIME=*/ mp_compare_datetime,
+	/* .MP_CLASS_INTERVAL=*/ NULL,
 	/* .MP_CLASS_ARRAY  = */ NULL,
 	/* .MP_CLASS_MAP    = */ NULL,
 };
