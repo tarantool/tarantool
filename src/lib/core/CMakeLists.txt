@@ -68,8 +68,11 @@ target_link_libraries(core salad small uri decNumber bit tzcode
                       ${LIBCDT_LIBRARIES} ${OPENSSL_LIBRARIES}
                       ${EXTRA_CORE_LINK_LIBRARIES})
 
-if (ENABLE_BACKTRACE AND NOT TARGET_OS_DARWIN)
-    target_link_libraries(core gcc_s ${UNWIND_LIBRARIES})
+if (ENABLE_BACKTRACE)
+    target_link_libraries(core ${LIBUNWIND_LIBRARIES})
+    if(ENABLE_BUNDLED_LIBUNWIND)
+        add_dependencies(core bundled-libunwind bundled-libunwind-platform)
+    endif()
 endif()
 
 if (ENABLE_TUPLE_COMPRESSION)

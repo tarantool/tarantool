@@ -116,89 +116,50 @@ set (CMAKE_CXX_FLAGS_RELWITHDEBINFO
 
 unset(CC_DEBUG_OPT)
 
-message(STATUS "Looking for libunwind.h")
-find_path(UNWIND_INCLUDE_DIR libunwind.h)
-message(STATUS "Looking for libunwind.h - ${UNWIND_INCLUDE_DIR}")
-
-if (UNWIND_INCLUDE_DIR)
-    include_directories(${UNWIND_INCLUDE_DIR})
-endif()
-
-set(CMAKE_REQUIRED_INCLUDES ${UNWIND_INCLUDE_DIR})
-check_include_file(libunwind.h HAVE_LIBUNWIND_H)
-set(CMAKE_REQUIRED_INCLUDES "")
-
-if(BUILD_STATIC AND NOT TARGET_OS_DARWIN)
-    set(UNWIND_LIB_NAME libunwind.a)
-else()
-    # libunwind can't be compiled on macOS.
-    # But there exists libunwind.dylib as a part of MacOSSDK
-    set(UNWIND_LIB_NAME unwind)
-endif()
-find_library(UNWIND_LIBRARY PATH_SUFFIXES system NAMES ${UNWIND_LIB_NAME})
-
 # Disabled backtraces support on FreeBSD by default, because of
 # gh-4278.
 # Disabled backtraces support on arm64 by default, because of
 # gh-6272, gh-6060 and gh-6222.
+check_c_source_compiles(
+    "
+    #if defined(__x86_64__) && !__has_attribute(force_align_arg_pointer)
+    #error
+    #endif /* defined(__x86_64__) &&
+            !__has_attribute(force_align_arg_pointer) */
+
+    int main(){}
+    " HAVE_FORCE_ALIGN_ARG_POINTER_ATTR)
+check_c_source_compiles(
+    "
+    #if !defined(__clang__) /* clang supports CFI assembly by default */ && \
+        (!defined(__GNUC__) || !defined(__GCC_HAVE_DWARF2_CFI_ASM))
+    #error
+    #endif  /* !defined(__clang__) && (!defined(__GNUC__) ||
+               !defined(__GCC_HAVE_DWARF2_CFI_ASM)) */
+
+    int main(){}
+    " HAVE_CFI_ASM)
 set(ENABLE_BACKTRACE_DEFAULT OFF)
-if (NOT TARGET_OS_FREEBSD AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "arm*" AND
+if(NOT TARGET_OS_FREEBSD AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "arm*" AND
     NOT CMAKE_SYSTEM_PROCESSOR MATCHES "aarch*" AND
     NOT CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "arm*" AND
     NOT CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "aarch*" AND
-    UNWIND_LIBRARY AND HAVE_LIBUNWIND_H)
+    HAVE_FORCE_ALIGN_ARG_POINTER_ATTR AND HAVE_CFI_ASM)
     set(ENABLE_BACKTRACE_DEFAULT ON)
 endif()
 
-option(ENABLE_BACKTRACE "Enable output of fiber backtrace information in
-'fiber.info()' command." ${ENABLE_BACKTRACE_DEFAULT})
+option(ENABLE_BACKTRACE "Enable output of fiber backtrace information in \
+                         'fiber.info()' command."
+       ${ENABLE_BACKTRACE_DEFAULT})
 
-if (ENABLE_BACKTRACE)
-    # unwind is required
-    if (NOT (UNWIND_LIBRARY AND HAVE_LIBUNWIND_H))
-        message (FATAL_ERROR "ENABLE_BACKTRACE option is set but unwind "
-                             "library is not found")
-    endif()
-    if (TARGET_OS_DARWIN)
-        set (UNWIND_LIBRARIES ${UNWIND_LIBRARY})
-    else()
-        if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR
-            CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-            if(BUILD_STATIC)
-                set(UNWIND_PLATFORM_LIB_NAME "libunwind-${CMAKE_SYSTEM_PROCESSOR}.a")
-            else()
-                set(UNWIND_PLATFORM_LIB_NAME "unwind-${CMAKE_SYSTEM_PROCESSOR}")
-            endif()
-        elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "i686")
-            if(BUILD_STATIC)
-                set(UNWIND_PLATFORM_LIB_NAME "libunwind-x86.a")
-            else()
-                set(UNWIND_PLATFORM_LIB_NAME "unwind-x86")
-            endif()
-        elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "arm*")
-            if(BUILD_STATIC)
-                set(UNWIND_PLATFORM_LIB_NAME "libunwind-arm.a")
-            else()
-                set(UNWIND_PLATFORM_LIB_NAME "unwind-arm")
-            endif()
-        endif()
-        find_library(UNWIND_PLATFORM_LIBRARY PATH_SUFFIXES system
-            NAMES ${UNWIND_PLATFORM_LIB_NAME})
-        set(UNWIND_LIBRARIES ${UNWIND_PLATFORM_LIBRARY} ${UNWIND_LIBRARY})
-    endif()
-    if (BUILD_STATIC)
-        # some versions of libunwind need liblzma, and we don't use pkg-config
-        # so we just look whether liblzma is installed, and add it if it is.
-        # It might not be actually needed, but doesn't hurt if it is not.
-        # We don't need any headers, just the lib, as it's privately needed.
-        find_library(LZMA_LIBRARY PATH_SUFFIXES system NAMES liblzma.a)
-        if (NOT LZMA_LIBRARY STREQUAL "LZMA_LIBRARY-NOTFOUND")
-            message(STATUS "liblzma found")
-            set(UNWIND_LIBRARIES ${UNWIND_LIBRARIES} ${LZMA_LIBRARY})
-        endif()
-    endif()
-    find_package_message(UNWIND_LIBRARIES "Found unwind" "${UNWIND_LIBRARIES}")
+check_include_file(stdatomic.h HAVE_STDATOMIC_H)
+set(ENABLE_BUNDLED_LIBUNWIND_DEFAULT ON)
+if(TARGET_OS_DARWIN OR NOT HAVE_STDATOMIC_H OR
+    NOT HAVE_FORCE_ALIGN_ARG_POINTER_ATTR)
+    set(ENABLE_BUNDLED_LIBUNWIND_DEFAULT OFF)
 endif()
+option(ENABLE_BUNDLED_LIBUNWIND "Bundled libunwind will be built"
+       ${ENABLE_BUNDLED_LIBUNWIND_DEFAULT})
 
 # On macOS there is no '-static-libstdc++' flag and it's use will
 # raise following error:

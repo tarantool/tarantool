@@ -599,6 +599,47 @@ include(BuildMisc)
 libmisc_build()
 add_dependencies(build_bundled_libs misc)
 
+#
+# libunwind
+#
+
+if(ENABLE_BACKTRACE)
+    if(NOT HAVE_FORCE_ALIGN_ARG_POINTER_ATTR)
+        message(SEND_ERROR "backtrace feature requires \
+                            `force_align_arg_pointer` function attribute \
+                            support from C/C++ compiler")
+    endif()
+
+    if(NOT HAVE_CFI_ASM)
+        message(SEND_ERROR "backtrace feature requires CFI assembly support \
+                            from C/C++ compiler")
+    endif()
+
+    if(ENABLE_BUNDLED_LIBUNWIND)
+        if(APPLE)
+            message(SEND_ERROR "libunwind does not support macOS")
+        endif()
+        if(NOT HAVE_STDATOMIC_H)
+            message(SEND_ERROR "building bundled libunwind requires stdatomic.h \
+                                support from C compiler")
+        endif()
+
+        include(BuildLibUnwind)
+        libunwind_build()
+        add_dependencies(build_bundled_libs
+                         bundled-libunwind
+                         bundled-libunwind-platform)
+    else()
+        find_package(LibUnwind MODULE REQUIRED)
+    endif()
+    if(NOT APPLE AND NOT ENABLE_BUNDLED_LIBUNWIND AND
+        LIBUNWIND_VERSION VERSION_LESS "1.3" AND
+        ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
+        message(SEND_ERROR "versions of libunwind earlier than 1.3.0 are \
+                            broken on AARCH64 architecture")
+    endif()
+endif()
+
 # cpack config. called package.cmake to avoid
 # conflicts with the global CPack.cmake (On MacOS X
 # file names are case-insensitive)
@@ -690,7 +731,8 @@ set(options PACKAGE VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
     ENABLE_DIST
     ENABLE_BUNDLED_LIBCURL
     ENABLE_BUNDLED_LIBYAML
-    ENABLE_BUNDLED_MSGPUCK)
+    ENABLE_BUNDLED_MSGPUCK
+    ENABLE_BUNDLED_LIBUNWIND)
 foreach(option IN LISTS options)
     if (NOT DEFINED ${option})
         set(value "${TARANTOOL_${option}}")
