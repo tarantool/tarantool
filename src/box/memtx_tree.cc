@@ -562,7 +562,6 @@ name(struct iterator *iterator, struct tuple **ret)				\
 	bool is_multikey = iterator->index->def->key_def->is_multikey;		\
 	struct txn *txn = in_txn();						\
 	struct space *space = space_by_id(iterator->space_id);			\
-	bool is_rw = txn != NULL;						\
 	do {									\
 		int rc = name##_base<USE_HINT>(iterator, ret);			\
 		if (rc != 0 || *ret == NULL)					\
@@ -574,8 +573,7 @@ name(struct iterator *iterator, struct tuple **ret)				\
 			assert(check != NULL);					\
 			mk_index = (uint32_t)check->hint;			\
 		}								\
-		*ret = memtx_tx_tuple_clarify(txn, space, *ret,			\
-					      idx, mk_index, is_rw);		\
+		*ret = memtx_tx_tuple_clarify(txn, space, *ret, idx, mk_index);	\
 	} while (*ret == NULL);							\
 	tree_iterator_set_current_tuple(it, *ret);				\
 	return 0;								\
@@ -719,8 +717,7 @@ tree_iterator_start_raw(struct iterator *iterator, struct tuple **ret)
 	if (!res)
 		return 0;
 
-	bool is_rw = txn != NULL;
-	*ret = memtx_tx_tuple_clarify(txn, space, *ret, idx, mk_index, is_rw);
+	*ret = memtx_tx_tuple_clarify(txn, space, *ret, idx, mk_index);
 	if (*ret == NULL) {
 		return iterator->next_raw(iterator, ret);
 	} else {
@@ -912,11 +909,10 @@ memtx_tree_index_get_raw(struct index *base, const char *key,
 			memtx_tx_track_point(txn, space, base, key);
 		return 0;
 	}
-	bool is_rw = txn != NULL;
 	bool is_multikey = base->def->key_def->is_multikey;
 	uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
 	*result = memtx_tx_tuple_clarify(txn, space, res->tuple, base,
-					 mk_index, is_rw);
+					 mk_index);
 	return 0;
 }
 

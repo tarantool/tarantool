@@ -136,7 +136,6 @@ name(struct iterator *iterator, struct tuple **ret)				\
 {										\
 	struct txn *txn = in_txn();						\
 	struct space *space = space_by_id(iterator->space_id);			\
-	bool is_rw = txn != NULL;						\
 	struct index *idx = iterator->index;					\
 	bool is_first = true;							\
 	do {									\
@@ -146,7 +145,7 @@ name(struct iterator *iterator, struct tuple **ret)				\
 		if (rc != 0 || *ret == NULL)					\
 			return rc;						\
 		is_first = false;						\
-		*ret = memtx_tx_tuple_clarify(txn, space, *ret, idx, 0, is_rw);	\
+		*ret = memtx_tx_tuple_clarify(txn, space, *ret, idx, 0);	\
 	} while (*ret == NULL);							\
 	return 0;								\
 }										\
@@ -174,8 +173,7 @@ hash_iterator_raw_eq(struct iterator *it, struct tuple **ret)
 		return 0;
 	struct txn *txn = in_txn();
 	struct space *sp = space_by_id(it->space_id);
-	bool is_rw = txn != NULL;
-	*ret = memtx_tx_tuple_clarify(txn, sp, *ret, it->index, 0, is_rw);
+	*ret = memtx_tx_tuple_clarify(txn, sp, *ret, it->index, 0);
 	return 0;
 }
 
@@ -326,9 +324,7 @@ memtx_hash_index_get_raw(struct index *base, const char *key,
 	uint32_t k = light_index_find_key(&index->hash_table, h, key);
 	if (k != light_index_end) {
 		struct tuple *tuple = light_index_get(&index->hash_table, k);
-		bool is_rw = txn != NULL;
-		*result = memtx_tx_tuple_clarify(txn, space, tuple, base,
-						 0, is_rw);
+		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
 	} else {
 		memtx_tx_track_point(txn, space, base, key);
 	}

@@ -211,8 +211,7 @@ bitset_index_iterator_next_raw(struct iterator *iterator, struct tuple **ret)
 		struct index *idx = iterator->index;
 		struct txn *txn = in_txn();
 		struct space *space = space_by_id(iterator->space_id);
-		bool is_rw = txn != NULL;
-		*ret = memtx_tx_tuple_clarify(txn, space, tuple, idx, 0, is_rw);
+		*ret = memtx_tx_tuple_clarify(txn, space, tuple, idx, 0);
 	} while (*ret == NULL);
 
 	return 0;
