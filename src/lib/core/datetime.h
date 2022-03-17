@@ -36,12 +36,10 @@ struct tnt_tm;
 #define DT_TO_STRING_BUFSIZE 48
 
 /**
- * Length of "-5879610 years, 10000 months, 10000 days, 23 hours, "\
- * "59 minutes, 59.999999999 seconds"
- * is 84, but both months and days could have arbitrary values, so let
- * use something larger.
+ * Required buffer size to store the string representation of any possible
+ * interval.
  */
-#define DT_IVAL_TO_STRING_BUFSIZE 96
+#define DT_IVAL_TO_STRING_BUFSIZE 256
 
 /**
  * c-dt library uses int as type for dt value, which

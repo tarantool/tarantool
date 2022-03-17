@@ -59,6 +59,7 @@ extern "C" {
 
 struct lua_State;
 struct tt_uuid;
+struct interval;
 
 #define LUAL_SERIALIZER "serializer"
 #define LUAL_SERIALIZE "__serialize"
@@ -233,6 +234,8 @@ struct luaL_field {
 		struct tt_uuid *uuidval;
 		struct error *errorval;
 		struct datetime *dateval;
+		/** Interval value. */
+		struct interval *interval;
 	};
 	enum mp_type type;
 	/* subtypes of MP_EXT */

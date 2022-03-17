@@ -49,6 +49,11 @@
 # define SERIALIZER_TRACE
 #endif
 
+static_assert(DT_IVAL_TO_STRING_BUFSIZE > FPCONV_G_FMT_BUFSIZE,
+	      "Buffer is too small");
+static_assert(DT_IVAL_TO_STRING_BUFSIZE > DT_TO_STRING_BUFSIZE,
+	      "Buffer is too small");
+
 /* Serializer for Lua output mode */
 static struct luaL_serializer *serializer_lua;
 
@@ -768,7 +773,7 @@ static int
 dump_node(struct lua_dumper *d, struct node *nd, int indent)
 {
 	struct luaL_field *field = &nd->field;
-	char buf[MAX(FPCONV_G_FMT_BUFSIZE, DT_TO_STRING_BUFSIZE)];
+	char buf[DT_IVAL_TO_STRING_BUFSIZE];
 	int ltype = lua_type(d->L, -1);
 	const char *str = NULL;
 	size_t len = 0;
@@ -866,6 +871,12 @@ dump_node(struct lua_dumper *d, struct node *nd, int indent)
 			str = buf;
 			len = datetime_to_string(field->dateval,
 						     buf, sizeof(buf));
+			break;
+		case MP_INTERVAL:
+			nd->mask |= NODE_QUOTE;
+			str = buf;
+			len = interval_to_string(field->interval, buf,
+						 sizeof(buf));
 			break;
 		default:
 			d->err = EINVAL;

@@ -1,7 +1,10 @@
 local t = require('luatest')
 local g = t.group()
+local msgpack = require('msgpack')
 local itv = require('datetime').interval
 
+-- Interval is 1 year, 127 days and 15 minutes
+local bin = '\xc7\x09\x06\x04\x00\x01\x03\x7f\x05\x0f\x08\x01'
 local val = itv.new({year = 1, day = 127, min = 15})
 
 g.test_check_interval_totable = function()
@@ -12,4 +15,12 @@ g.test_check_interval_totable = function()
     t.assert_equals(tval, tres)
     -- Now INTERVAL values can be used in require('luatest').assert_equals().
     t.assert_equals(val, itv.new({year = 1, day = 127, min = 15}))
+end
+
+g.test_check_interval_decode = function()
+    t.assert_equals(msgpack.decode(bin), val)
+end
+
+g.test_check_interval_encode = function()
+    t.assert_equals(bin, msgpack.encode(val))
 end

@@ -128,6 +128,12 @@ luaT_pushdatetime(struct lua_State *L)
 	return luaL_pushcdata(L, CTID_DATETIME);
 }
 
+struct interval *
+luaT_pushinterval(struct lua_State *L)
+{
+	return luaL_pushcdata(L, CTID_INTERVAL);
+}
+
 int
 luaL_iscdata(struct lua_State *L, int idx)
 {
