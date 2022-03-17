@@ -345,21 +345,72 @@ memtx_tx_cause_conflict(struct txn *breaker, struct txn *victim)
 	return 0;
 }
 
+/**
+ * Fix position of @a txn in global read view list to preserve the list to
+ * be ordered by rv_psn. Can only move txn to the beginning of the list.
+ * The function must be called when a transaction A sends itself to a read view
+ * (perhaps a deeper read view in case when it's already in a read view) because
+ * it has to skip a statement of another B, prepared transaction.
+ * The transaction is always added to the tail of read view list, but in this
+ * case there's no guarantee that psn of B is the greatest psn of all prepared
+ * transactions, so we have to additionally and push A in the global read view
+ * list, jumping over read views with greater rv_psn.
+ */
+static void
+memtx_tx_adjust_position_in_read_view_list(struct txn *txn)
+{
+	if (txn->in_read_view_txs.prev == &txm.read_view_txs)
+		return; /* No transaction before */
+	struct txn *prev_txn = rlist_prev_entry(txn, in_read_view_txs);
+	if (prev_txn->rv_psn <= txn->rv_psn)
+		return; /* The order is already correct. */
+	/* Remove from list for a while. */
+	rlist_del(&txn->in_read_view_txs);
+	while (prev_txn->in_read_view_txs.prev != &txm.read_view_txs) {
+		struct txn *scan = rlist_prev_entry(prev_txn, in_read_view_txs);
+		if (scan->rv_psn <= txn->rv_psn)
+			break;
+		prev_txn = scan;
+	}
+	/* Insert before prev_txn. */
+	rlist_add_tail(&prev_txn->in_read_view_txs, &txn->in_read_view_txs);
+}
+
 void
 memtx_tx_handle_conflict(struct txn *breaker, struct txn *victim)
 {
 	assert(breaker->psn != 0);
-	if (victim->status != TXN_INPROGRESS) {
+	if (victim->status != TXN_INPROGRESS &&
+	    victim->status != TXN_IN_READ_VIEW) {
 		/* Was conflicted by somebody else. */
 		return;
 	}
 	if (stailq_empty(&victim->stmts)) {
-		/* Send to read view. */
-		victim->status = TXN_IN_READ_VIEW;
-		victim->rv_psn = breaker->psn;
-		rlist_add_tail(&txm.read_view_txs, &victim->in_read_view_txs);
+		assert((victim->status == TXN_IN_READ_VIEW) ==
+		       (victim->rv_psn != 0));
+		/* Send to read view, perhaps a deeper one. */
+		if (victim->status != TXN_IN_READ_VIEW) {
+			victim->status = TXN_IN_READ_VIEW;
+			victim->rv_psn = breaker->psn;
+			rlist_add_tail(&txm.read_view_txs,
+				       &victim->in_read_view_txs);
+		} else if (victim->rv_psn > breaker->psn) {
+			/*
+			 * Note that in every case for every key we may choose
+			 * any read view psn between confirmed level and the
+			 * oldest prepared transaction that changes that key.
+			 * But we choose the latest level because it generally
+			 * costs less, and if there are several breakers - we
+			 * must sequentially decrease read view level.
+			 */
+			victim->rv_psn = breaker->psn;
+			assert(victim->rv_psn != 0);
+		}
+		memtx_tx_adjust_position_in_read_view_list(victim);
 	} else {
 		/* Mark as conflicted. */
+		if (victim->status == TXN_IN_READ_VIEW)
+			rlist_del(&victim->in_read_view_txs);
 		victim->status = TXN_CONFLICTED;
 		txn_set_flags(victim, TXN_IS_CONFLICTED);
 	}
@@ -1910,9 +1961,26 @@ memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
 		if (memtx_tx_story_is_visible(story, txn, is_prepared_ok,
 					      &result, &own_change))
 			break;
+		if (story->add_psn != 0 && story->add_stmt != NULL &&
+		    txn != NULL) {
+			/*
+			 * If we skip prepared story then the transaction
+			 * must be before prepared in serialization order.
+			 * That can be a read view or conflict already.
+			 */
+			memtx_tx_handle_conflict(story->add_stmt->txn, txn);
+		}
 		if (story->link[index->dense_id].older_story == NULL)
 			break;
 		story = story->link[index->dense_id].older_story;
+	}
+	if (story->del_psn != 0 && story->del_stmt != NULL && txn != NULL) {
+		/*
+		 * If we see a tuple that is deleted by prepared transaction
+		 * then the transaction must be before prepared in serialization
+		 * order. That can be a read view or conflict already.
+		 */
+		memtx_tx_handle_conflict(story->del_stmt->txn, txn);
 	}
 	if (!own_change) {
 		/*
@@ -1934,6 +2002,23 @@ memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
 
 /**
  * Helper of @sa memtx_tx_tuple_clarify.
+ * Detect whether the transaction can see prepared, but unconfirmed commits.
+ */
+static bool
+detect_whether_prepared_ok(struct txn *txn)
+{
+	/*
+	 * The best effort that we can make is to determine whether the
+	 * transaction is read-only or not. For read only (including autocommit
+	 * select, that is txn == NULL) we should see only confirmed changes,
+	 * ignoring prepared. For read-write transaction we should see prepared
+	 * changes in order to avoid conflicts.
+	 */
+	return txn != NULL && !stailq_empty(&txn->stmts);
+}
+
+/**
+ * Helper of @sa memtx_tx_tuple_clarify.
  * Detect is_prepared_ok flag and pass the job to memtx_tx_tuple_clarify_impl.
  */
 struct tuple *
@@ -1941,7 +2026,7 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 			    struct tuple *tuple, struct index *index,
 			    uint32_t mk_index)
 {
-	bool is_prepared_ok = txn != NULL;
+	bool is_prepared_ok = detect_whether_prepared_ok(txn);
 	return memtx_tx_tuple_clarify_impl(txn, space, tuple, index, mk_index,
 					   is_prepared_ok);
 }
@@ -1966,7 +2051,7 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
 		}
 
 		struct tuple *visible = NULL;
-		bool is_prepared_ok = txn != NULL;
+		bool is_prepared_ok = detect_whether_prepared_ok(txn);
 		memtx_tx_story_find_visible_tuple(story, txn, index->dense_id,
 						  is_prepared_ok, &visible);
 		if (visible == NULL)
