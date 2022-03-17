@@ -546,6 +546,9 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 			} else if (cd->ctypeid == CTID_DATETIME) {
 				field->ext_type = MP_DATETIME;
 				field->dateval = (struct datetime *)cdata;
+			} else if (cd->ctypeid == CTID_INTERVAL) {
+				field->ext_type = MP_INTERVAL;
+				field->interval = (struct interval *)cdata;
 			} else {
 				field->ext_type = MP_UNKNOWN_EXTENSION;
 			}
