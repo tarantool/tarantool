@@ -1892,8 +1892,12 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt, size_t *bsize)
 	}
 }
 
-struct tuple *
-memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
+/**
+ * Helper of @sa memtx_tx_tuple_clarify.
+ * Do actual work.
+ */
+static struct tuple *
+memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
 			    struct tuple *tuple, struct index *index,
 			    uint32_t mk_index, bool is_prepared_ok)
 {
@@ -1926,6 +1930,20 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 		panic("multikey indexes are not supported int TX manager");
 	}
 	return result;
+}
+
+/**
+ * Helper of @sa memtx_tx_tuple_clarify.
+ * Detect is_prepared_ok flag and pass the job to memtx_tx_tuple_clarify_impl.
+ */
+struct tuple *
+memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
+			    struct tuple *tuple, struct index *index,
+			    uint32_t mk_index)
+{
+	bool is_prepared_ok = txn != NULL;
+	return memtx_tx_tuple_clarify_impl(txn, space, tuple, index, mk_index,
+					   is_prepared_ok);
 }
 
 uint32_t
@@ -2433,7 +2451,7 @@ memtx_tx_snapshot_cleaner_create(struct memtx_tx_snapshot_cleaner *cleaner,
 	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories) {
 		struct tuple *tuple = story->tuple;
 		struct tuple *clean =
-			memtx_tx_tuple_clarify_slow(NULL, space, tuple,
+			memtx_tx_tuple_clarify_impl(NULL, space, tuple,
 						    space->index[0], 0, true);
 		if (clean == tuple)
 			continue;

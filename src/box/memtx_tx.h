@@ -286,7 +286,7 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt, size_t *bsize);
 struct tuple *
 memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 			    struct tuple *tuples, struct index *index,
-			    uint32_t mk_index, bool is_prepared_ok);
+			    uint32_t mk_index);
 
 /**
  * Record in TX manager that a transaction @txn have read a @tuple in @space.
@@ -395,7 +395,7 @@ memtx_tx_track_full_scan(struct txn *txn, struct space *space,
 static inline struct tuple *
 memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 		       struct tuple *tuple, struct index *index,
-		       uint32_t mk_index, bool is_prepared_ok)
+		       uint32_t mk_index)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return tuple;
@@ -403,8 +403,7 @@ memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 		memtx_tx_track_read(txn, space, tuple);
 		return tuple;
 	}
-	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index,
-					   is_prepared_ok);
+	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index);
 }
 
 uint32_t
