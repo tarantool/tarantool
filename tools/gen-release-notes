@@ -65,7 +65,7 @@ Notable changes are:
 * **TBD**
 * **TBD**
 
-[release_policy]: https://www.tarantool.io/en/doc/latest/dev_guide/release_management/#release-policy
+[release_policy]: https://www.tarantool.io/en/doc/latest/release/policy/
 [issues]: https://github.com/tarantool/tarantool/issues
 
 // }}} BETA X.Y.1
@@ -80,7 +80,7 @@ The "stable" label means that we have all planned features implemented and we
 see no high-impact issues. However, if you encounter an issue, feel free to
 [report it][issues] on GitHub.
 
-[release_policy]: https://www.tarantool.io/en/doc/latest/dev_guide/release_management/#release-policy
+[release_policy]: https://www.tarantool.io/en/doc/latest/release/policy/
 [issues]: https://github.com/tarantool/tarantool/issues
 
 // }}} STABLE X.Y.{2,3}
