@@ -1928,6 +1928,7 @@ tx_process_begin(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct obuf *out;
+	uint32_t txn_isolation = msg->begin.txn_isolation;
 
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
@@ -1937,6 +1938,12 @@ tx_process_begin(struct cmsg *m)
 
 	if (msg->begin.timeout != 0 &&
 	    box_txn_set_timeout(msg->begin.timeout) != 0) {
+		int rc = box_txn_rollback();
+		assert(rc == 0);
+		(void)rc;
+		goto error;
+	}
+	if (box_txn_set_isolation(txn_isolation) != 0) {
 		int rc = box_txn_rollback();
 		assert(rc == 0);
 		(void)rc;

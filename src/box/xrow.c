@@ -1537,6 +1537,9 @@ xrow_decode_begin(const struct xrow_header *row, struct begin_request *request)
 		case IPROTO_TIMEOUT:
 			request->timeout = mp_decode_double(&d);
 			break;
+		case IPROTO_TXN_ISOLATION:
+			request->txn_isolation = mp_decode_uint(&d);
+			break;
 		default:
 			mp_next(&d);
 			break;

@@ -458,6 +458,7 @@ end
 local function stream_begin(stream, txn_opts, netbox_opts)
     check_remote_arg(stream, 'begin')
     local timeout
+    local txn_isolation
     if txn_opts then
         if type(txn_opts) ~= 'table' then
             error("txn_opts should be a table")
@@ -466,9 +467,14 @@ local function stream_begin(stream, txn_opts, netbox_opts)
         if timeout and (type(timeout) ~= "number" or timeout <= 0) then
             error("timeout must be a number greater than 0")
         end
+        txn_isolation = txn_opts.txn_isolation
+        if txn_isolation ~= nil then
+            txn_isolation =
+                box.internal.normalize_txn_isolation_level(txn_isolation)
+        end
     end
     local res = stream:_request(M_BEGIN, netbox_opts, nil,
-                                stream._stream_id, timeout)
+                                stream._stream_id, timeout, txn_isolation)
     if netbox_opts and netbox_opts.is_async then
         return res
     end

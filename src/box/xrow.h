@@ -895,6 +895,11 @@ struct begin_request {
 	 * will be rolled back. Must be greater than zero.
 	 */
 	double timeout;
+	/**
+	 * Isolation level of beginning transaction.
+	 * Must be ono of enum txn_isolation_level values.
+	 */
+	uint32_t txn_isolation;
 };
 
 /**
