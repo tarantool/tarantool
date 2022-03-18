@@ -146,6 +146,51 @@ enum {
 	TXN_SIGNATURE_ABORT = JOURNAL_ENTRY_ERR_MIN - 4,
 };
 
+/** \cond public */
+/**
+ * When a transaction calls `commit`, this action can last for some time until
+ * redo data is written to WAL. While such a `commit` call is in progress we
+ * call changes of such a transaction as 'committed', and when the process is
+ * finished - we call the changes as 'confirmed'. One of the main options of
+ * a transaction is to see or not to see 'committed' changes.
+ * Note that now there are different terminologies in different places. This
+ * enum uses new 'committed' and 'confirmed' states of transactions. Meanwhile
+ * in engined the first state is usually called as 'prepared', and the second
+ * as 'committed' or 'completed'.
+ * Warning: this enum is exposed in lua via ffi, and thus any change in items
+ * must be correspondingly modified on ffi.cdef(), see schema.lua.
+ */
+enum txn_isolation_level {
+	/** Take isolation level from global default_isolation_level. */
+	TXN_ISOLATION_DEFAULT,
+	/** Allow to read committed, but not confirmed changes. */
+	TXN_ISOLATION_READ_COMMITTED,
+	/** Allow to read only confirmed changes. */
+	TXN_ISOLATION_READ_CONFIRMED,
+	/** Determine isolation level automatically. */
+	TXN_ISOLATION_BEST_EFFORT,
+	/** Upper bound of valid values. */
+	txn_isolation_level_MAX,
+};
+
+/** \endcond public */
+
+/**
+ * Common enum strings: uppercase letters, underscores.
+ */
+extern const char *txn_isolation_level_strs[txn_isolation_level_MAX];
+
+/**
+ * Aliases: lowercase letters, hyphens.
+ */
+extern const char *txn_isolation_level_aliases[txn_isolation_level_MAX];
+
+/**
+ * The level that is set for a transaction by default.
+ * Cannot be TXN_ISOLATION_DEFAULT since it senseless.
+ */
+extern enum txn_isolation_level txn_default_isolation;
+
 /**
  * Convert a result of a transaction execution to an error installed into the
  * current diag.
@@ -364,6 +409,11 @@ struct txn {
 	int64_t rv_psn;
 	/** Status of the TX */
 	enum txn_status status;
+	/**
+	 * Isolation level of TX. Can't be TXN_ISOLATION_DEFAULT since setting
+	 * this value actually uses txn_default_isolation
+	 */
+	enum txn_isolation_level isolation;
 	/** List of statements in a transaction. */
 	struct stailq stmts;
 	/** Number of new rows without an assigned LSN. */
@@ -879,6 +929,17 @@ box_txn_alloc(size_t size);
  */
 API_EXPORT int
 box_txn_set_timeout(double timeout);
+
+/**
+ * Set an isolation @a level for a transaction.
+ * Must be called before the first DML.
+ * The level must be of enun txn_isolation_level values.
+ * @retval 0 if success
+ * @retval -1 if failed, diag is set.
+ *
+ */
+API_EXPORT int
+box_txn_set_isolation(uint32_t level);
 
 /** \endcond public */
 

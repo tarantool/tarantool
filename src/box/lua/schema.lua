@@ -73,6 +73,8 @@ ffi.cdef[[
     box_txn_begin();
     int
     box_txn_set_timeout(double timeout);
+    int
+    box_txn_set_isolation(uint32_t level);
     /** \endcond public */
     /** \cond public */
     int
@@ -336,8 +338,48 @@ local function feedback_save_event(event)
     end
 end
 
+-- Public isolation level map string -> number.
+box.txn_isolation_level = {
+    ['default'] = 0,
+    ['DEFAULT'] = 0,
+    ['read-committed'] = 1,
+    ['READ_COMMITTED'] = 1,
+    ['read-confirmed'] = 2,
+    ['READ_CONFIRMED'] = 2,
+    ['best-effort'] = 3,
+    ['BEST_EFFORT'] = 3,
+}
+
+-- Create private isolation level map anything-correct -> number.
+local function create_txn_isolation_level_map()
+    local res = {}
+    for k,v in pairs(box.txn_isolation_level) do
+        res[k] = v
+        res[v] = v
+    end
+    return res
+end
+
+-- Private isolation level map anything-correct -> number.
+local txn_isolation_level_map = create_txn_isolation_level_map()
+box.internal.txn_isolation_level_map = txn_isolation_level_map
+
+-- Convert to numeric the value of txn isolation level, raise if failed.
+local function normalize_txn_isolation_level(txn_isolation)
+    txn_isolation = txn_isolation_level_map[txn_isolation]
+    if txn_isolation == nil then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  "txn_isolation must be one of box.txn_isolation_level" ..
+                  " (keys or values)")
+    end
+    return txn_isolation
+end
+
+box.internal.normalize_txn_isolation_level = normalize_txn_isolation_level
+
 box.begin = function(options)
     local timeout
+    local txn_isolation
     if options then
         check_param(options, 'options', 'table')
         timeout = options.timeout
@@ -345,12 +387,21 @@ box.begin = function(options)
             box.error(box.error.ILLEGAL_PARAMS,
                       "timeout must be a number greater than 0")
         end
+        txn_isolation = options.txn_isolation
+        if txn_isolation ~= nil then
+            txn_isolation = normalize_txn_isolation_level(txn_isolation)
+        end
     end
     if builtin.box_txn_begin() == -1 then
         box.error()
     end
     if timeout then
         assert(builtin.box_txn_set_timeout(timeout) == 0)
+    end
+    if txn_isolation and
+       builtin.box_txn_set_isolation(txn_isolation) ~= 0 then
+        box.rollback()
+        box.error()
     end
 end
 
