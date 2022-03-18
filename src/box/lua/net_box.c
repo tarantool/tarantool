@@ -1205,12 +1205,24 @@ netbox_encode_begin(struct lua_State *L, int idx, struct mpstream *stream,
 		    uint64_t sync, uint64_t stream_id)
 {
 	size_t svp = netbox_begin_encode(stream, sync, IPROTO_BEGIN, stream_id);
-	if (!lua_isnoneornil(L, idx)) {
+	bool has_timeout = !lua_isnoneornil(L, idx);
+	bool has_txn_isolation = !lua_isnoneornil(L, idx + 1);
+	if (has_timeout || has_txn_isolation) {
+		uint32_t map_size = (has_timeout ? 1 : 0) +
+				    (has_txn_isolation ? 1 : 0);
+		mpstream_encode_map(stream, map_size);
+	}
+	if (has_timeout) {
 		assert(lua_type(L, idx) == LUA_TNUMBER);
 		double timeout = lua_tonumber(L, idx);
-		mpstream_encode_map(stream, 1);
 		mpstream_encode_uint(stream, IPROTO_TIMEOUT);
 		mpstream_encode_double(stream, timeout);
+	}
+	if (has_txn_isolation) {
+		assert(lua_type(L, idx + 1) == LUA_TNUMBER);
+		uint32_t txn_isolation = lua_tonumber(L, idx + 1);
+		mpstream_encode_uint(stream, IPROTO_TXN_ISOLATION);
+		mpstream_encode_uint(stream, txn_isolation);
 	}
 	netbox_end_encode(stream, svp);
 }

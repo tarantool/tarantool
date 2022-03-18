@@ -152,6 +152,7 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x56 */	MP_DOUBLE, /* IPROTO_TIMEOUT */
 	/* 0x57 */	MP_STR, /* IPROTO_EVENT_KEY */
 	/* 0x58 */	MP_NIL, /* IPROTO_EVENT_DATA (can be any) */
+	/* 0x59 */	MP_UINT, /* IPROTO_TXN_ISOLATION */
 	/* }}} */
 };
 
@@ -288,6 +289,7 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"timeout",          /* 0x56 */
 	"event key",        /* 0x57 */
 	"event data",       /* 0x58 */
+	"txn isolation",    /* 0x59 */
 };
 
 const char *vy_page_info_key_strs[VY_PAGE_INFO_KEY_MAX] = {
