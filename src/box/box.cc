@@ -1263,6 +1263,40 @@ box_check_txn_timeout(void)
 	return timeout;
 }
 
+/**
+ * Get and check isolation level from config, converting number or string to
+ * enum txn_isolation_level.
+ * @return isolation level or txn_isolation_level_MAX is case of error.
+ */
+static enum txn_isolation_level
+box_check_txn_isolation(void)
+{
+	uint32_t level;
+	if (cfg_isnumber("txn_isolation")) {
+		level = cfg_geti("txn_isolation");
+	} else {
+		const char *str_level = cfg_gets("txn_isolation");
+		level = strindex(txn_isolation_level_strs, str_level,
+				 txn_isolation_level_MAX);
+		if (level == txn_isolation_level_MAX)
+			level = strindex(txn_isolation_level_aliases, str_level,
+					 txn_isolation_level_MAX);
+	}
+	if (level >= txn_isolation_level_MAX) {
+		diag_set(ClientError, ER_CFG, "txn_isolation",
+			 "must be one of "
+			 "box.txn_isolation_level (keys or values)");
+		return txn_isolation_level_MAX;
+	}
+	if (level == TXN_ISOLATION_DEFAULT) {
+		diag_set(ClientError, ER_CFG, "txn_isolation",
+			 "cannot set default transaction isolation "
+			 "to 'default'");
+		return txn_isolation_level_MAX;
+	}
+	return (enum txn_isolation_level)level;
+}
+
 void
 box_check_config(void)
 {
@@ -1309,6 +1343,8 @@ box_check_config(void)
 	if (box_check_sql_cache_size(cfg_geti("sql_cache_size")) != 0)
 		diag_raise();
 	if (box_check_txn_timeout() < 0)
+		diag_raise();
+	if (box_check_txn_isolation() == txn_isolation_level_MAX)
 		diag_raise();
 }
 
@@ -2171,6 +2207,16 @@ box_set_txn_timeout(void)
 	if (timeout < 0)
 		return -1;
 	txn_timeout_default = timeout;
+	return 0;
+}
+
+int
+box_set_txn_isolation(void)
+{
+	enum txn_isolation_level level = box_check_txn_isolation();
+	if (level == txn_isolation_level_MAX)
+		return -1;
+	txn_default_isolation = level;
 	return 0;
 }
 

@@ -105,6 +105,7 @@ t
   - stat
   - tuple
   - txn_id
+  - txn_isolation_level
   - unprepare
   - watch
 ...

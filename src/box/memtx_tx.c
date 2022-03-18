@@ -2007,6 +2007,13 @@ memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
 static bool
 detect_whether_prepared_ok(struct txn *txn)
 {
+	if (txn == NULL)
+		return false;
+	else if (txn->isolation == TXN_ISOLATION_READ_COMMITTED)
+		return true;
+	else if (txn->isolation == TXN_ISOLATION_READ_CONFIRMED)
+		return false;
+	assert(txn->isolation == TXN_ISOLATION_BEST_EFFORT);
 	/*
 	 * The best effort that we can make is to determine whether the
 	 * transaction is read-only or not. For read only (including autocommit
@@ -2014,7 +2021,7 @@ detect_whether_prepared_ok(struct txn *txn)
 	 * ignoring prepared. For read-write transaction we should see prepared
 	 * changes in order to avoid conflicts.
 	 */
-	return txn != NULL && !stailq_empty(&txn->stmts);
+	return !stailq_empty(&txn->stmts);
 }
 
 /**

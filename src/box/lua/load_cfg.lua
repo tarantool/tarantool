@@ -115,6 +115,7 @@ local default_cfg = {
     net_msg_max           = 768,
     sql_cache_size        = 5 * 1024 * 1024,
     txn_timeout           = 365 * 100 * 86400,
+    txn_isolation         = "best-effort",
 }
 
 -- cfg variables which are covered by modules
@@ -207,6 +208,7 @@ local template_cfg = {
     read_only           = 'boolean',
     hot_standby         = 'boolean',
     memtx_use_mvcc_engine = 'boolean',
+    txn_isolation = 'string, number',
     worker_pool_threads = 'number',
     election_mode       = 'string',
     election_timeout    = 'number',
@@ -336,6 +338,7 @@ local dynamic_cfg = {
     net_msg_max             = private.cfg_set_net_msg_max,
     sql_cache_size          = private.cfg_set_sql_cache_size,
     txn_timeout             = private.cfg_set_txn_timeout,
+    txn_isolation           = private.cfg_set_txn_isolation,
 }
 
 -- dynamically settable options, which should be reverted in case
@@ -670,6 +673,7 @@ local box_cfg_guard_whitelist = {
     ctl = true;
     watch = true;
     broadcast = true;
+    txn_isolation_level = true;
     NULL = true;
 };
 
