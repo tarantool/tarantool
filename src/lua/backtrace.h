@@ -77,6 +77,12 @@ backtrace_lua_collect(struct backtrace_lua *bt_lua, struct fiber *fiber,
 		      int skip_frames);
 
 /*
+ * Append frames from 'add' to the end of 'to'.
+ */
+void
+backtrace_lua_cat(struct backtrace_lua *to, const struct backtrace_lua *add);
+
+/*
  * Push collected Lua backtrace onto Lua stack.
  */
 void
