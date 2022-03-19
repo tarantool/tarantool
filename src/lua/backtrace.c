@@ -144,6 +144,17 @@ backtrace_lua_collect(struct backtrace_lua *bt_lua, struct fiber *fiber,
 }
 
 void
+backtrace_lua_cat(struct backtrace_lua *to, const struct backtrace_lua *add)
+{
+	int additional_frames =
+		MIN(BACKTRACE_LUA_FRAME_COUNT_MAX - to->frame_count,
+		    add->frame_count);
+	memcpy(to->frames + to->frame_count, add->frames,
+	       sizeof(to->frames[0]) * additional_frames);
+	to->frame_count += additional_frames;
+}
+
+void
 backtrace_lua_stack_push(const struct backtrace_lua *bt, struct lua_State *L)
 {
 	int frame_no = 1;
