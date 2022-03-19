@@ -171,7 +171,7 @@ enum {
  * \param fd - non-blocking socket file description
  * \param events - requested events to wait.
  * Combination of TNT_IO_READ | TNT_IO_WRITE bit flags.
- * \param timeoout - timeout in seconds.
+ * \param timeout - timeout in seconds.
  * \retval 0 - timeout
  * \retval >0 - returned events. Combination of TNT_IO_READ | TNT_IO_WRITE
  * bit flags.

@@ -103,7 +103,7 @@ luaT_tuple_encode(struct lua_State *L, int idx, size_t *tuple_len_ptr);
  * tuple.
  *
  * The new tuple is referenced in the same way as one created by
- * <box_tuple_new>(). There are two possible usage scenarious:
+ * <box_tuple_new>(). There are two possible usage scenarios:
  *
  * 1. A short living tuple may not be referenced explicitly and
  *    will be collected automatically at the next module API call

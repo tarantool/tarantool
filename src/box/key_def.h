@@ -611,7 +611,7 @@ box_key_def_validate_key(const box_key_def_t *key_def, const char *key,
  * respect to nullability.
  *
  * Imposes the same parts count in @a key as in @a key_def.
- * Absense of trailing key parts fails the check.
+ * Absence of trailing key parts fails the check.
  *
  * Note: nil is accepted for nullable fields, but only for them.
  *

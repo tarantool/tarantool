@@ -44,7 +44,7 @@ extern "C" {
  *            case this argument is NULL, function finds
  *            and destroys old on_shutdown handler.
  * @param[in] old_handler Old on_shutdown handler.
- * @retval return 0 if success othrewise return -1 and sets
+ * @retval return 0 if success otherwise return -1 and sets
  *                  errno. There are three cases when
  *                  function fails:
  *                  - both old_handler and new_handler are equal to
@@ -55,7 +55,7 @@ extern "C" {
  *                    return NULL (errno sets by malloc to ENOMEM).
  */
 API_EXPORT int
-box_on_shutdown(void *arg, int (*new_hadler)(void *),
+box_on_shutdown(void *arg, int (*new_handler)(void *),
 		int (*old_handler)(void *));
 
 /** \endcond public */

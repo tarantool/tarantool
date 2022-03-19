@@ -129,7 +129,7 @@ strnindex(const char **haystack, const char *needle, uint32_t len, uint32_t hmax
 /** \cond public */
 
 /**
- * Feature test macroses for -std=c11 / -std=c++11
+ * Feature test macros for -std=c11 / -std=c++11
  *
  * Sic: clang aims to be gcc-compatible and thus defines __GNUC__
  */
@@ -229,7 +229,7 @@ strnindex(const char **haystack, const char *needle, uint32_t len, uint32_t hmax
  * specifiers to modify the alignment requirement of the object being
  * declared.
  *
- * Sic: alignas() doesn't work on anonymous strucrs on gcc < 4.9
+ * Sic: alignas() doesn't work on anonymous structs on gcc < 4.9
  *
  * \example struct obuf { int a; int b; alignas(16) int c; };
  */
@@ -267,7 +267,7 @@ strnindex(const char **haystack, const char *needle, uint32_t len, uint32_t hmax
 /** Built-ins }}} */
 
 /**
- * Compiler-indepedent function attributes.
+ * Compiler-independent function attributes.
  *
  * \see https://gcc.gnu.org/onlinedocs/gcc/Type-Attributes.html
  * \see http://clang.llvm.org/docs/AttributeReference.html#function-attributes
