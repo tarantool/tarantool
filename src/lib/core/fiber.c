@@ -43,6 +43,10 @@
 #include "trigger.h"
 #include "errinj.h"
 
+#ifdef ENABLE_BACKTRACE
+#include "core/backtrace.h"
+#endif /* ENABLE_BACKTRACE */
+
 extern void cord_on_yield(void);
 
 #if ENABLE_FIBER_TOP
@@ -214,6 +218,10 @@ fiber_mprotect(void *addr, size_t len, int prot)
 #if ENABLE_FIBER_TOP
 static __thread bool fiber_top_enabled = false;
 #endif /* ENABLE_FIBER_TOP */
+
+#ifdef ENABLE_BACKTRACE
+static __thread bool fiber_parent_backtrace_enabled;
+#endif /* ENABLE_BACKTRACE */
 
 /**
  * An action performed each time a context switch happens.
@@ -1265,7 +1273,20 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	fiber_set_name(fiber, name);
 	register_fid(fiber);
 	fiber->csw = 0;
-
+#ifdef ENABLE_BACKTRACE
+	if (fiber_parent_backtrace_enabled) {
+		struct fiber *parent = fiber();
+		fiber->parent_bt =
+			region_alloc(&fiber->gc, sizeof(*fiber->parent_bt));
+		if (fiber->parent_bt != NULL) {
+			core_backtrace_collect_frames(fiber->parent_bt, parent,
+						      2);
+			if (parent->parent_bt != NULL)
+				core_backtrace_cat(fiber->parent_bt,
+						   parent->parent_bt);
+		}
+	}
+#endif /* ENABLE_BACKTRACE */
 	cord->next_fid++;
 	assert(cord->next_fid > FIBER_ID_MAX_RESERVED);
 
@@ -1409,6 +1430,26 @@ fiber_top_disable(void)
 	}
 }
 #endif /* ENABLE_FIBER_TOP */
+
+#ifdef ENABLE_BACKTRACE
+bool
+fiber_parent_backtrace_is_enabled(void)
+{
+	return fiber_parent_backtrace_enabled;
+}
+
+void
+fiber_parent_backtrace_enable(void)
+{
+	fiber_parent_backtrace_enabled = true;
+}
+
+void
+fiber_parent_backtrace_disable(void)
+{
+	fiber_parent_backtrace_enabled = false;
+}
+#endif /* ENABLE_BACKTRACE */
 
 size_t
 box_region_used(void)

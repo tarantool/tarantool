@@ -112,6 +112,12 @@ core_backtrace_foreach(const struct core_backtrace *bt, int begin, int end,
 void
 core_backtrace_dump_frames(const struct core_backtrace *bt, char *buf,
 			   size_t buf_len);
+
+/*
+ * Append frames from 'add' to the end of 'to'.
+ */
+void
+core_backtrace_cat(struct core_backtrace *to, const struct core_backtrace *add);
 #endif /* ENABLE_BACKTRACE */
 #ifdef __cplusplus
 } /* extern "C" */

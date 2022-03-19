@@ -347,4 +347,15 @@ core_backtrace_dump_frames(const struct core_backtrace *bt, char *buf,
 	core_backtrace_foreach(bt, 0, bt->frame_count, dump,
 			       &dump_ctx);
 }
+
+void
+core_backtrace_cat(struct core_backtrace *to, const struct core_backtrace *add)
+{
+	unsigned additional_frames =
+		MIN(CORE_BACKTRACE_FRAME_COUNT_MAX - to->frame_count,
+		    add->frame_count);
+	memcpy(to->frames + to->frame_count, add->frames,
+	       sizeof(to->frames[0]) * additional_frames);
+	to->frame_count += additional_frames;
+}
 #endif /* ENABLE_BACKTRACE */
