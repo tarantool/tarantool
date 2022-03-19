@@ -72,7 +72,7 @@ box_iterator_t *
 box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		   const char *key, const char *key_end);
 /**
- * Retrive the next item from the \a iterator.
+ * Retrieve the next item from the \a iterator.
  *
  * \param iterator an iterator returned by box_index_iterator().
  * \param[out] result a tuple or NULL if there is no more data.
@@ -85,7 +85,7 @@ box_iterator_next(box_iterator_t *iterator, box_tuple_t **result);
 /**
  * Destroy and deallocate iterator.
  *
- * \param iterator an interator returned by box_index_iterator()
+ * \param iterator an iterator returned by box_index_iterator()
  */
 void
 box_iterator_free(box_iterator_t *iterator);
