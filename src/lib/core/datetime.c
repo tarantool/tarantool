@@ -20,7 +20,8 @@
 #include "fiber.h"
 
 /** floored modulo and divide */
-#define MOD(a, b) (unlikely((a) < 0) ? ((b) + ((a) % (b))) : ((a) % (b)))
+#define MOD(a, b) (unlikely((a) < 0) ? (((b) + ((a) % (b))) % (b)) : \
+		  ((a) % (b)))
 #define DIV(a, b) (unlikely((a) < 0) ? (((a) - (b) + 1) / (b)) : ((a) / (b)))
 
 /**
@@ -422,31 +423,35 @@ datetime_nsec(const struct datetime *date)
 /**
  * Interval support functions: stringization and operations
  */
-
-#define NANOS_PER_SEC 1000000000
-
-static inline int64_t
-interval_seconds(const struct interval *ival)
+bool
+datetime_totable(const struct datetime *date, struct interval *out)
 {
-	return (int64_t)ival->sec + ival->nsec / NANOS_PER_SEC;
+	int64_t secs = local_secs(date);
+	int64_t dt = local_dt(secs);
+
+	out->year = dt_year(dt);
+	out->month = dt_month(dt);
+	out->week = 0;
+	out->day = dt_dom(dt);
+	out->hour = (secs / 3600) % 24;
+	out->min = (secs / 60) % 60;
+	out->sec = secs % 60;
+	out->nsec = date->nsec;
+	out->adjust = DT_LIMIT;
+
+	return true;
 }
 
-static inline int
-interval_days(const struct interval *ival)
-{
-	return interval_seconds(ival) / SECS_PER_DAY;
-}
+/**
+ * Interval support functions: stringization and operations
+ */
 
-static inline int
-interval_hours(const struct interval *ival)
-{
-	return interval_seconds(ival) / (60 * 60);
-}
+#define NANOS_PER_SEC 1000000000LL
 
-static inline int
-interval_minutes(const struct interval *ival)
+static inline bool
+zero_or_same_sign(int64_t sec, int64_t nsec)
 {
-	return interval_seconds(ival) / 60;
+	return sec == 0 || (sec < 0) == (nsec < 0);
 }
 
 /**
@@ -469,39 +474,23 @@ denormalize_interval_nsec(int64_t *psec, int *pnsec)
 	if (nsec == 0)
 		return;
 
-	bool zero_or_same_sign = sec == 0 || (sec < 0) == (nsec < 0);
-	if (zero_or_same_sign && labs(nsec) < NANOS_PER_SEC)
+	if (zero_or_same_sign(sec, nsec) && abs(nsec) < NANOS_PER_SEC)
 		return;
 
-	int64_t normalized_nsec = sec * NANOS_PER_SEC + nsec;
-	sec = normalized_nsec / NANOS_PER_SEC;
-	nsec = normalized_nsec % NANOS_PER_SEC;
+	sec += DIV(nsec, NANOS_PER_SEC);
+	nsec = MOD(nsec, NANOS_PER_SEC);
+
+	/*
+	 * We crafted a positive nsec value, so convert it to negative, if secs
+	 * are also negative.
+	 */
+	if (sec < 0) {
+		sec++;
+		nsec -= NANOS_PER_SEC;
+	}
 
 	*psec = sec;
 	*pnsec = nsec;
-}
-
-/**
- * SNPRINT-like function to generate textual representation of a sec.nsec
- * given buffer and size of buffer
- */
-static size_t
-seconds_str(char *buf, ssize_t len, bool need_sign, long sec, int nsec)
-{
-	sec %= 60;
-	denormalize_interval_nsec(&sec, &nsec);
-	size_t sz = 0;
-	bool is_neg = sec < 0 || (sec == 0 && nsec < 0);
-
-	SNPRINT(sz, snprintf, buf, len, is_neg ? "-" : (need_sign ? "+" : ""));
-	sec = labs(sec);
-	if (nsec != 0) {
-		SNPRINT(sz, snprintf, buf, len, "%" PRId64 ".%09ld seconds",
-			sec, labs(nsec));
-	} else {
-		SNPRINT(sz, snprintf, buf, len, "%" PRId64 " seconds", sec);
-	}
-	return sz;
 }
 
 #define SPACE() \
@@ -514,6 +503,10 @@ seconds_str(char *buf, ssize_t len, bool need_sign, long sec, int nsec)
 size_t
 interval_to_string(const struct interval *ival, char *buf, ssize_t len)
 {
+	static const char *const long_signed_fmt[] = {
+		"%" PRId64,	/* false */
+		"%+" PRId64,	/* true */
+	};
 	static const char *const signed_fmt[] = {
 		"%d",	/* false */
 		"%+d",	/* true */
@@ -533,6 +526,37 @@ interval_to_string(const struct interval *ival, char *buf, ssize_t len)
 		SNPRINT(sz, snprintf, buf, len, " months");
 		need_sign = false;
 	}
+	if (ival->week != 0) {
+		SPACE();
+		SNPRINT(sz, snprintf, buf, len, signed_fmt[need_sign],
+			ival->week);
+		SNPRINT(sz, snprintf, buf, len, " weeks");
+		need_sign = false;
+	}
+	int64_t days = (int64_t)ival->day;
+	if (days != 0) {
+		SPACE();
+		SNPRINT(sz, snprintf, buf, len, long_signed_fmt[need_sign],
+			days);
+		SNPRINT(sz, snprintf, buf, len, " days");
+		need_sign = false;
+	}
+	int64_t hours = (int64_t)ival->hour;
+	if (ival->hour != 0) {
+		SPACE();
+		SNPRINT(sz, snprintf, buf, len, long_signed_fmt[need_sign],
+			hours);
+		SNPRINT(sz, snprintf, buf, len, " hours");
+		need_sign = false;
+	}
+	int64_t minutes = (int64_t)ival->min;
+	if (minutes != 0) {
+		SPACE();
+		SNPRINT(sz, snprintf, buf, len, long_signed_fmt[need_sign],
+			minutes);
+		SNPRINT(sz, snprintf, buf, len, " minutes");
+		need_sign = false;
+	}
 	int64_t secs = (int64_t)ival->sec;
 	int nsec = ival->nsec;
 	if (secs == 0 && nsec == 0) {
@@ -541,31 +565,17 @@ interval_to_string(const struct interval *ival, char *buf, ssize_t len)
 		SNPRINT(sz, snprintf, buf, len, zero_secs);
 		return sizeof(zero_secs) - 1;
 	}
-	long abs_s = labs(secs);
-	if (abs_s < 60) {
-		SPACE();
-		SNPRINT(sz, seconds_str, buf, len, need_sign, secs, nsec);
-	} else if (abs_s < 60 * 60) {
-		SPACE();
-		SNPRINT(sz, snprintf, buf, len, signed_fmt[need_sign],
-			interval_minutes(ival));
-		SNPRINT(sz, snprintf, buf, len, " minutes, ");
-		SNPRINT(sz, seconds_str, buf, len, false, secs, nsec);
-	} else if (abs_s < SECS_PER_DAY) {
-		SPACE();
-		SNPRINT(sz, snprintf, buf, len, signed_fmt[need_sign],
-			interval_hours(ival));
-		SNPRINT(sz, snprintf, buf, len, " hours, %d minutes, ",
-			interval_minutes(ival) % 60);
-		SNPRINT(sz, seconds_str, buf, len, false, secs, nsec);
+	SPACE();
+	denormalize_interval_nsec(&secs, &nsec);
+	bool is_neg = secs < 0 || (secs == 0 && nsec < 0);
+
+	SNPRINT(sz, snprintf, buf, len, is_neg ? "-" : (need_sign ? "+" : ""));
+	secs = labs(secs);
+	if (nsec != 0) {
+		SNPRINT(sz, snprintf, buf, len, "%" PRId64 ".%09d seconds",
+			secs, abs(nsec));
 	} else {
-		SPACE();
-		SNPRINT(sz, snprintf, buf, len, signed_fmt[need_sign],
-			interval_days(ival));
-		SNPRINT(sz, snprintf, buf, len, " days, %d hours, %d minutes, ",
-			interval_hours(ival) % 24,
-			interval_minutes(ival) % 60);
-		SNPRINT(sz, seconds_str, buf, len, false, secs, nsec);
+		SNPRINT(sz, snprintf, buf, len, "%" PRId64 " seconds", secs);
 	}
 	return sz;
 }
@@ -636,18 +646,19 @@ datetime_increment_by(struct datetime *self, int direction,
 	int nsec = self->nsec;
 	int offset = self->tzindex;
 
-	bool is_ym_updated = false;
-	int years = ival->year;
-	int months = ival->month;
-	int seconds = ival->sec;
+	bool is_ymd_updated = false;
+	int64_t years = ival->year;
+	int64_t months = ival->month;
+	int64_t weeks = ival->week;
+	int64_t days = ival->day;
+	int64_t hours = ival->hour;
+	int64_t minutes = ival->min;
+	int64_t seconds = ival->sec;
 	int nanoseconds = ival->nsec;
 	dt_adjust_t adjust = ival->adjust;
 	int rc = 0;
 
 	if (years != 0) {
-		rc = verify_range(years, MIN_DATE_YEAR, MAX_DATE_YEAR);
-		if (rc != 0)
-			return rc;
 		rc = verify_dt(dt + direction * years * AVERAGE_DAYS_YEAR);
 		if (rc != 0)
 			return rc;
@@ -655,7 +666,7 @@ datetime_increment_by(struct datetime *self, int direction,
 		 * mode so use tnt_dt_add_months() as a work-around
 		 */
 		dt = dt_add_months(dt, direction * years * 12, adjust);
-		is_ym_updated = true;
+		is_ymd_updated = true;
 	}
 	if (months != 0) {
 		rc = verify_dt(dt + direction * months * AVERAGE_DAYS_MONTH);
@@ -663,16 +674,54 @@ datetime_increment_by(struct datetime *self, int direction,
 			return rc;
 
 		dt = dt_add_months(dt, direction * months, adjust);
-		is_ym_updated = true;
+		is_ymd_updated = true;
+	}
+	if (weeks != 0) {
+		rc = verify_dt(dt + direction * weeks * 7);
+		if (rc != 0)
+			return rc;
+
+		dt += direction * weeks * 7;
+		is_ymd_updated = true;
+	}
+	if (days != 0) {
+		rc = verify_dt(dt + direction * days);
+		if (rc != 0)
+			return rc;
+
+		dt += direction * days;
+		is_ymd_updated = true;
 	}
 
-	if (is_ym_updated) {
+	if (is_ymd_updated) {
 		secs = dt * SECS_PER_DAY - SECS_EPOCH_1970_OFFSET +
 		       secs % SECS_PER_DAY;
 	}
 
-	if (seconds != 0)
+	if (hours != 0) {
+		rc = verify_range(secs + direction * hours * 3600,
+				  MIN_EPOCH_SECS_VALUE, MAX_EPOCH_SECS_VALUE);
+		if (rc != 0)
+			return rc;
+
+		secs += direction * hours * 3600;
+	}
+	if (minutes != 0) {
+		rc = verify_range(secs + direction * minutes * 60,
+				  MIN_EPOCH_SECS_VALUE, MAX_EPOCH_SECS_VALUE);
+		if (rc != 0)
+			return rc;
+
+		secs += direction * minutes * 60;
+	}
+	if (seconds != 0) {
+		rc = verify_range(secs + direction * seconds,
+				  MIN_EPOCH_SECS_VALUE, MAX_EPOCH_SECS_VALUE);
+		if (rc != 0)
+			return rc;
+
 		secs += direction * seconds;
+	}
 	if (nanoseconds != 0)
 		nsec += direction * nanoseconds;
 
@@ -693,12 +742,10 @@ datetime_datetime_sub(struct interval *res, const struct datetime *lhs,
 	assert(res != NULL);
 	assert(lhs != NULL);
 	assert(rhs != NULL);
-	res->year = 0;
-	res->month = 0;
-	res->adjust = DT_LIMIT;
-	res->sec = lhs->epoch - rhs->epoch;
-	res->nsec = lhs->nsec - rhs->nsec;
-	return true;
+	struct interval inv_rhs;
+	datetime_totable(lhs, res);
+	datetime_totable(rhs, &inv_rhs);
+	return interval_interval_sub(res, &inv_rhs);
 }
 
 bool
@@ -708,6 +755,10 @@ interval_interval_sub(struct interval *lhs, const struct interval *rhs)
 	assert(rhs != NULL);
 	lhs->year -= rhs->year;
 	lhs->month -= rhs->month;
+	lhs->week -= rhs->week;
+	lhs->day -= rhs->day;
+	lhs->hour -= rhs->hour;
+	lhs->min -= rhs->min;
 	lhs->sec -= rhs->sec;
 	lhs->nsec -= rhs->nsec;
 	return true;
@@ -720,6 +771,10 @@ interval_interval_add(struct interval *lhs, const struct interval *rhs)
 	assert(rhs != NULL);
 	lhs->year += rhs->year;
 	lhs->month += rhs->month;
+	lhs->day += rhs->day;
+	lhs->week += rhs->week;
+	lhs->hour += rhs->hour;
+	lhs->min += rhs->min;
 	lhs->sec += rhs->sec;
 	lhs->nsec += rhs->nsec;
 	return true;

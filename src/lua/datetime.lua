@@ -72,6 +72,8 @@ size_t tnt_datetime_parse_full(struct datetime *date, const char *str,
 size_t tnt_datetime_strptime(struct datetime *date, const char *buf,
                              const char *fmt);
 void   tnt_datetime_now(struct datetime *now);
+bool   tnt_datetime_totable(const struct datetime *date,
+                            struct interval *out);
 
 /* Tarantool interval support functions */
 size_t tnt_interval_to_string(const struct interval *, char *, ssize_t);
@@ -291,12 +293,15 @@ local adjust_xlat = {
     excess = builtin.DT_EXCESS,
 }
 
-local function interval_init(year, month, sec, nsec, adjust)
-    return ffi.new(interval_t, sec, nsec, month, year, adjust)
+local function interval_init(year, month, week, day, hour, min, sec, nsec,
+                             adjust)
+    return ffi.new(interval_t, sec, min, hour, day, week, month, year, nsec,
+                   adjust)
 end
 
 local function interval_new_copy(obj)
-    return interval_init(obj.year, obj.month, obj.sec, obj.nsec, obj.adjust)
+    return interval_init(obj.year, obj.month, obj.week, obj.day, obj.hour,
+                         obj.min, obj.sec, obj.nsec, obj.adjust)
 end
 
 local function interval_decode_args(obj)
@@ -304,19 +309,20 @@ local function interval_decode_args(obj)
         return obj
     end
     local year = checked_max_value(obj.year, MAX_YEAR_RANGE, 'year', 0)
+    check_integer(year, 'year')
     local month = checked_max_value(obj.month, MAX_MONTH_RANGE, 'month', 0)
+    check_integer(month, 'month')
     local adjust = adjust_xlat[obj.adjust] or DEF_DT_ADJUST
 
-    local secs = 0
-    secs = secs + (7 * SECS_PER_DAY) *
-                  checked_max_value(obj.week, MAX_WEEK_RANGE, 'week', 0)
-    secs = secs + SECS_PER_DAY *
-                  checked_max_value(obj.day, MAX_DAY_RANGE, 'day', 0)
-    secs = secs + (60 * 60) *
-                  checked_max_value(obj.hour, MAX_HOUR_RANGE, 'hour', 0)
-    secs = secs + 60 * checked_max_value(obj.min, MAX_MIN_RANGE, 'min', 0)
-    local sec = checked_max_value(obj.sec, MAX_SEC_RANGE, 'sec', 0)
-    check_integer(sec, 'sec')
+    local weeks = checked_max_value(obj.week, MAX_WEEK_RANGE, 'week', 0)
+    local days = checked_max_value(obj.day, MAX_DAY_RANGE, 'day', 0)
+    check_integer(days, 'day')
+    local hours = checked_max_value(obj.hour, MAX_HOUR_RANGE, 'hour', 0)
+    check_integer(hours, 'hour')
+    local minutes = checked_max_value(obj.min, MAX_MIN_RANGE, 'min', 0)
+    check_integer(minutes, 'min')
+    local secs = checked_max_value(obj.sec, MAX_SEC_RANGE, 'sec', 0)
+    check_integer(secs, 'sec')
 
     local nsec = checked_max_value(obj.nsec, MAX_NSEC_RANGE, 'nsec')
     local usec = checked_max_value(obj.usec, MAX_USEC_RANGE, 'usec')
@@ -327,15 +333,15 @@ local function interval_decode_args(obj)
         error('only one of nsec, usec or msecs may be defined '..
                 'simultaneously', 3)
     end
-    secs = secs + sec
     nsec = (msec or 0) * 1e6 + (usec or 0) * 1e3 + (nsec or 0)
 
-    return interval_init(year, month, secs, nsec, adjust)
+    return interval_init(year, month, weeks, days, hours, minutes, secs, nsec,
+                         adjust)
 end
 
 local function interval_new(obj)
     if obj == nil then
-        return ffi.new(interval_t, 0, 0, 0, 0, DEF_DT_ADJUST)
+        return ffi.new(interval_t, 0, 0, 0, 0, 0, 0, 0, DEF_DT_ADJUST)
     end
     check_table(obj, 'interval.new()')
     return interval_decode_args(obj)
@@ -844,18 +850,20 @@ end
 ]]
 local function datetime_totable(self)
     check_date(self, 'datetime.totable()')
-    local secs = local_secs(self) -- hour:minute should be in local timezone
     local dt = local_dt(self)
+    local tmp_ival = interval_new()
+    local rc = builtin.tnt_datetime_totable(self, tmp_ival)
+    assert(rc == true)
 
     return {
-        year = builtin.tnt_dt_year(dt),
-        month = builtin.tnt_dt_month(dt),
+        year = tmp_ival.year,
+        month = tmp_ival.month,
         yday = builtin.tnt_dt_doy(dt),
-        day = builtin.tnt_dt_dom(dt),
         wday = dow_to_wday(builtin.tnt_dt_dow(dt)),
-        hour = math_floor((secs / 3600) % 24),
-        min = math_floor((secs / 60) % 60),
-        sec = secs % 60,
+        day = tmp_ival.day,
+        hour = tmp_ival.hour,
+        min = tmp_ival.min,
+        sec = tmp_ival.sec,
         isdst = false,
         nsec = self.nsec,
         tzoffset = self.tzoffset,
@@ -1086,26 +1094,9 @@ ffi.metatype(datetime_t, {
     __index = datetime_index,
 })
 
-local function total_secs(self)
-    return self.sec + self.nsec / 1e9
-end
-
 local interval_index_fields = {
     usec = function(self) return math_floor(self.nsec / 1e3) end,
     msec = function(self) return math_floor(self.nsec / 1e6) end,
-
-    week = function(self)
-        return math_modf(total_secs(self) / (7 * SECS_PER_DAY))
-    end,
-    day = function(self)
-        return math_modf(total_secs(self) / SECS_PER_DAY)
-    end,
-    hour = function(self)
-        return math_modf(total_secs(self) / (60 * 60))
-    end,
-    min =  function(self)
-        return math_modf(total_secs(self) / 60)
-    end,
 }
 
 local interval_index_functions = {

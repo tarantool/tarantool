@@ -754,9 +754,13 @@ tarantool_lua_utils_init(struct lua_State *L)
 
 	rc = luaL_cdef(L, "struct interval {"
 				  "double sec;"
-				  "int nsec;"
-				  "int month;"
-				  "int year;"
+				  "double min;"
+				  "double hour;"
+				  "double day;"
+				  "int32_t week;"
+				  "int32_t month;"
+				  "int32_t year;"
+				  "int32_t nsec;"
 				  "dt_adjust_t adjust;"
 			  "};");
 	assert(rc == 0);
