@@ -744,21 +744,21 @@ test:test("Time interval tostring()", function(test)
         {{day = 2, hour = 8, min = 10, sec = 30},
          '+2 days, 8 hours, 10 minutes, 30 seconds'},
         {{week = 10, hour = 8, min = 10, sec = 30},
-         '+70 days, 8 hours, 10 minutes, 30 seconds'},
+         '+10 weeks, 8 hours, 10 minutes, 30 seconds'},
         {{month = 20, week = 10, hour = 8, min = 10, sec = 30},
-         '+20 months, 70 days, 8 hours, 10 minutes, 30 seconds'},
+         '+20 months, 10 weeks, 8 hours, 10 minutes, 30 seconds'},
         {{year = 10, month = 20, week = 10, hour = 8, min = 10, sec = 30},
-         '+10 years, 20 months, 70 days, 8 hours, 10 minutes, 30 seconds'},
+         '+10 years, 20 months, 10 weeks, 8 hours, 10 minutes, 30 seconds'},
         {{year = 1e4, month = 20, week = 10, hour = 8, min = 10, sec = 30},
-         '+10000 years, 20 months, 70 days, 8 hours, 10 minutes, 30 seconds'},
+         '+10000 years, 20 months, 10 weeks, 8 hours, 10 minutes, 30 seconds'},
         {{year = 5e6, month = 20, week = 10, hour = 8, min = 10, sec = 30},
-         '+5000000 years, 20 months, 70 days, 8 hours, 10 minutes, 30 seconds'},
+         '+5000000 years, 20 months, 10 weeks, 8 hours, 10 minutes, 30 seconds'},
         {{year = -5e6, month = -20, week = -10, hour = -8, min = -10, sec = -30},
-         '-5000000 years, -20 months, -70 days, -8 hours, -10 minutes, -30 seconds'},
+         '-5000000 years, -20 months, -10 weeks, -8 hours, -10 minutes, -30 seconds'},
         {{month = -20, week = -10, hour = -8, min = -10, sec = -30},
-         '-20 months, -70 days, -8 hours, -10 minutes, -30 seconds'},
+         '-20 months, -10 weeks, -8 hours, -10 minutes, -30 seconds'},
         {{week = -10, hour = -8, min = -10, sec = -30},
-         '-70 days, -8 hours, -10 minutes, -30 seconds'},
+         '-10 weeks, -8 hours, -10 minutes, -30 seconds'},
         {{hour = -12, min = -10, sec = -30}, '-12 hours, -10 minutes, -30 seconds'},
         {{hour = -1, min = -59, sec = -10}, '-1 hours, -59 minutes, -10 seconds'},
         {{min = -10, sec = -30}, '-10 minutes, -30 seconds'},
@@ -778,8 +778,8 @@ test:test("Time interval __index fields", function(test)
     local ival = date.interval.new{year = 12345, month = 123, week = 100,
                                    day = 45, hour = 48, min = 3, sec = 1,
                                    nsec = 12345678}
-    test:is(tostring(ival), '+12345 years, 123 months, 747 days, 0 hours,'..
-            ' 3 minutes, 1.012345678 seconds', '__tostring')
+    test:is(tostring(ival), '+12345 years, 123 months, 100 weeks, 45 days, 48 hours, '..
+            '3 minutes, 1.012345678 seconds', '__tostring')
 
     test:is(ival.nsec, 12345678, 'nsec')
     test:is(ival.usec, 12345, 'usec')
@@ -787,11 +787,11 @@ test:test("Time interval __index fields", function(test)
 
     test:is(ival.year, 12345, 'interval.year')
     test:is(ival.month, 123, 'interval.month')
-    test:is(ival.week, 106, 'interval.week')
-    test:is(ival.day, 747, 'interval.day')
-    test:is(ival.hour, 17928, 'interval.hour')
-    test:is(ival.min, 1075683, 'interval.min')
-    test:is(ival.sec, 64540981, 'interval.sec')
+    test:is(ival.week, 100, 'interval.week')
+    test:is(ival.day, 45, 'interval.day')
+    test:is(ival.hour, 48, 'interval.hour')
+    test:is(ival.min, 3, 'interval.min')
+    test:is(ival.sec, 1, 'interval.sec')
 end)
 
 test:test("Time interval operations", function(test)
@@ -1061,7 +1061,7 @@ test:test("Time interval operations - different adjustments", function(test)
 end)
 
 test:test("Time intervals creation - range checks", function(test)
-    test:plan(23)
+    test:plan(36)
 
     local inew = date.interval.new
 
@@ -1109,6 +1109,41 @@ test:test("Time intervals creation - range checks", function(test)
         assert_raises(test, err_msg, function() return inew(attribs) end)
     end
 
+    -- handle tricky cases of huge ranges
+    local huge_year = 3e6
+    local neg_year = date.new{year = -huge_year}
+    test:is(tostring(neg_year), '-3000000-01-01T00:00:00Z', '-3000000')
+    local double_delta = date.interval.new{year = 2 * huge_year}
+    test:is(tostring(double_delta), '+6000000 years', '+6000000 years')
+    local res = neg_year + double_delta
+    test:is(tostring(res), '3000000-01-01T00:00:00Z', '3000000Z')
+    local huge_month = huge_year * 12
+    double_delta = date.interval.new{month = 2 * huge_month}
+    test:is(tostring(double_delta), '+72000000 months', '+72000000 months')
+    res = neg_year + double_delta
+    test:is(tostring(res), '3000000-01-01T00:00:00Z', '3000000Z')
+    local huge_days = huge_year * AVERAGE_DAYS_YEAR
+    double_delta = date.interval.new{day = 2 * huge_days}
+    test:is(tostring(double_delta), '+2191500000 days', '+2191500000 days')
+    res = neg_year + double_delta
+    test:is(tostring(res), '3000123-03-17T00:00:00Z', '3000123-03-17Z')
+    local huge_hours = huge_days * 24
+    double_delta = date.interval.new{hour = 2 * huge_hours}
+    test:is(tostring(double_delta), '+52596000000 hours', '+52596000000 hours')
+    res = neg_year + double_delta
+    test:is(tostring(res), '3000123-03-17T00:00:00Z', '3000123-03-17Z')
+    local huge_minutes = huge_hours * 60
+    double_delta = date.interval.new{min = 2 * huge_minutes}
+    test:is(tostring(double_delta), '+3155760000000 minutes',
+            '+315576e7 minutes')
+    res = neg_year + double_delta
+    test:is(tostring(res), '3000123-03-17T00:00:00Z', '3000123-03-17Z')
+    local huge_seconds = huge_minutes * 60
+    double_delta = date.interval.new{sec = 2 * huge_seconds}
+    test:is(tostring(double_delta), '+189345600000000 seconds',
+            '+189345600000000 seconds')
+    res = neg_year + double_delta
+    test:is(tostring(res), '3000123-03-17T00:00:00Z', '3000123-03-17Z')
 end)
 
 test:test("Months intervals with last days", function(test)
@@ -1295,8 +1330,7 @@ test:test("Matrix of allowed time and interval subtractions", function(test)
     test:is(tostring(T1970 - I1), "1969-12-31T00:00:00Z", "value: T - I")
     test:is(tostring(T1970 - M2), "1969-11-01T00:00:00Z", "value: T - M")
     test:is(tostring(T1970 - Y1), "1969-01-01T00:00:00Z", "value: T - Y")
-    test:is(tostring(T1970 - T2000), "-10957 days, 0 hours, 0 minutes, 0 seconds",
-            "value: T - T")
+    test:is(tostring(T1970 - T2000), "-30 years", "value: T - T")
     test:is(tostring(Y5 - Y1), "+4 years", "value: Y - Y")
 
     assert_raises_like(test, expected_datetime_but,

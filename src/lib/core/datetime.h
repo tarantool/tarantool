@@ -81,27 +81,34 @@ struct datetime {
 
 /**
  * To be able to perform arithmetics on time intervals and receive
- * deterministic results, we have to keep months and years separately
- * from seconds.
- * Weeks, days, hours and minutes, all could be _precisely_ converted
- * to seconds, but it's not the case for months (which might be 28, 29,
- * 30, or 31 days long), or years (which could be leap year or not).
- * Approach used here - to add/subtract months or years intervals only
- * at the moment when we have particular date we operate on.
- * Determinism of results is achieved due to the order we apply
- * operations (from larger to smaller quantities):
- * - years, then months, then weeks, days, hours, minutes,
- *   seconds, and nanoseconds.
+ * deterministic results, we keep each component (i.e. years, months, weeks,
+ * days, etc) separately from seconds.
+ * We add/subtract interval components separately, and rebase upon resultant
+ * date only at the moment when we apply them to the datetime object, at this
+ * time all leap seconds/leap year logic taken into consideration.
+ * Datetime supports range of values -5879610..5879611, thus interval should be
+ * able to support positive and negative increments covering full distance from
+ * minimum to maximum i.e. 11759221. Such years, months, and weeks values might
+ * be handled by 32-bit integer, but should be extended to 64-bit once we need
+ * to handle corresponding days, hours and seconds values.
  */
 struct interval {
 	/** Duration in seconds. */
 	double sec;
-	/** Fraction part of duration in seconds. */
-	int nsec;
+	/** Number of minutes, if specified. */
+	double min;
+	/** Number of hours, if specified. */
+	double hour;
+	/** Number of days, if specified. */
+	double day;
+	/** Number of weeks, if specified. */
+	int32_t week;
 	/** Number of months, if specified. */
-	int month;
+	int32_t month;
 	/** Number of years, if specified. */
-	int year;
+	int32_t year;
+	/** Fraction part of duration in seconds. */
+	int32_t nsec;
 	/** Adjustment mode for day in month operations, @sa dt_adjust_t */
 	dt_adjust_t adjust;
 };
@@ -181,6 +188,14 @@ datetime_parse_full(struct datetime *date, const char *str, size_t len,
  */
 size_t
 datetime_strptime(struct datetime *date, const char *buf, const char *fmt);
+
+/**
+ * Decompose datetime into components
+ * @param[in] date origonal datetime value to decompose
+ * @param[out] out resultant time components holder
+ */
+bool
+datetime_totable(const struct datetime *date, struct interval *out);
 
 /**
  * Convert datetime interval to string using default format
