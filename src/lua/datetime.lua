@@ -77,6 +77,14 @@ void   tnt_datetime_now(struct datetime *now);
 size_t tnt_interval_to_string(const struct interval *, char *, ssize_t);
 int    tnt_datetime_increment_by(struct datetime *self, int direction,
                                  const struct interval *ival);
+bool   tnt_datetime_datetime_sub(struct interval *res,
+                                 const struct datetime *lhs,
+                                 const struct datetime *rhs);
+
+bool   tnt_interval_interval_sub(struct interval *lhs,
+                                 const struct interval *rhs);
+bool   tnt_interval_interval_add(struct interval *lhs,
+                                 const struct interval *rhs);
 
 ]]
 
@@ -605,6 +613,7 @@ local function interval_tostring(self)
     return ffi.string(buff)
 end
 
+-- subtract/addition operation for date object and interval
 local function datetime_increment_by(self, direction, ival)
     local rc = builtin.tnt_datetime_increment_by(self, direction, ival)
     if rc == 0 then
@@ -618,6 +627,32 @@ local function datetime_increment_by(self, direction, ival)
         error(('%s makes date greater than maximum allowed %s'):
                 format(operation, MAX_DATE_TEXT), 3)
     end
+end
+
+-- subtract operation when left is date, and right is date
+local function datetime_datetime_sub(lhs, rhs)
+    local obj = interval_new()
+    local rc = builtin.tnt_datetime_datetime_sub(obj, lhs, rhs)
+    assert(rc ~= false)
+    return obj
+end
+
+-- subtract operation for both left and right operands are intervals
+local function interval_interval_sub(lhs, rhs)
+    local lobj = interval_decode_args(interval_new_copy(lhs))
+    local robj = interval_decode_args(rhs)
+    local rc = builtin.tnt_interval_interval_sub(lobj, robj)
+    assert(rc ~= false)
+    return lobj
+end
+
+-- addition operation for both left and right operands are intervals
+local function interval_interval_add(lhs, rhs)
+    local lobj = interval_decode_args(interval_new_copy(lhs))
+    local robj = interval_decode_args(rhs)
+    local rc = builtin.tnt_interval_interval_add(lobj, robj)
+    assert(rc ~= false)
+    return lobj
 end
 
 local function date_first(lhs, rhs)
@@ -654,18 +689,10 @@ local function datetime_interval_sub(lhs, rhs)
                                      interval_decode_args(rhs))
     -- left is date, right is date
     elseif not left_is_interval and not right_is_interval then
-        local obj = interval_new()
-        obj.sec, obj.nsec = lhs.epoch - rhs.epoch, lhs.nsec - rhs.nsec
-        return obj
+        return datetime_datetime_sub(lhs, rhs)
     -- both left and right are intervals
     elseif left_is_interval and right_is_interval then
-        local lobj = interval_decode_args(interval_new_copy(lhs))
-        local robj = interval_decode_args(rhs)
-        lobj.year = lobj.year - robj.year
-        lobj.month = lobj.month - robj.month
-        -- do not normalize nsec yet - leave till the operation with date
-        lobj.sec, lobj.nsec = lobj.sec - robj.sec, lobj.nsec - robj.nsec
-        return lobj
+        return interval_interval_sub(lhs, rhs)
     else
         error_incompatible("operator -")
     end
@@ -694,13 +721,7 @@ local function datetime_interval_add(lhs, rhs)
         return datetime_increment_by(obj, 1, interval_decode_args(rhs))
     -- both left and right are intervals
     elseif left_is_interval and right_is_interval then
-        local lobj = interval_decode_args(interval_new_copy(lhs))
-        local robj = interval_decode_args(rhs)
-        lobj.year = lobj.year + robj.year
-        lobj.month = lobj.month + robj.month
-        -- do not normalize nsec yet - leave till the operation with date
-        lobj.sec, lobj.nsec = lobj.sec + robj.sec, lobj.nsec + robj.nsec
-        return lobj
+        return interval_interval_add(lhs, rhs)
     else
         error_incompatible("operator +")
     end

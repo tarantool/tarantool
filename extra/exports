@@ -423,6 +423,7 @@ title_set_interpretor_name
 title_set_script_name
 title_set_status
 title_update
+tnt_datetime_datetime_sub
 tnt_datetime_increment_by
 tnt_datetime_now
 tnt_datetime_parse_full
@@ -450,6 +451,8 @@ tnt_iconv
 tnt_iconv_close
 tnt_iconv_open
 tnt_interval_to_string
+tnt_interval_interval_sub
+tnt_interval_interval_add
 tnt_mp_decode_double
 tnt_mp_decode_extl
 tnt_mp_decode_float

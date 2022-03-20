@@ -204,6 +204,32 @@ int
 datetime_increment_by(struct datetime *self, int direction,
 		      const struct interval *ival);
 
+/**
+ * Subtract datetime values and return interval between epoch seconds
+ * @param[out] res resultant interval
+ * @param[in] lhs left datetime operand
+ * @param[in] rhs right datetime operand
+ */
+bool
+datetime_datetime_sub(struct interval *res, const struct datetime *lhs,
+		      const struct datetime *rhs);
+
+/**
+ * Subtract interval values, modify left operand for returning value
+ * @param[in,out] lhs left interval operand, return resultant value
+ * @param[in] rhs right interval operand
+ */
+bool
+interval_interval_sub(struct interval *lhs, const struct interval *rhs);
+
+/**
+ * Add interval values, modify left operand for returning value
+ * @param[in,out] lhs left interval operand, return resultant value
+ * @param[in] rhs right interval operand
+ */
+bool
+interval_interval_add(struct interval *lhs, const struct interval *rhs);
+
 /** Return the year from a date. */
 int64_t
 datetime_year(const struct datetime *date);

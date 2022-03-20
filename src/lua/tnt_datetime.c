@@ -57,3 +57,22 @@ tnt_datetime_increment_by(struct datetime *self, int direction,
 {
 	return datetime_increment_by(self, direction, ival);
 }
+
+bool
+tnt_datetime_datetime_sub(struct interval *res, const struct datetime *lhs,
+			  const struct datetime *rhs)
+{
+	return datetime_datetime_sub(res, lhs, rhs);
+}
+
+bool
+tnt_interval_interval_sub(struct interval *lhs, const struct interval *rhs)
+{
+	return interval_interval_sub(lhs, rhs);
+}
+
+bool
+tnt_interval_interval_add(struct interval *lhs, const struct interval *rhs)
+{
+	return interval_interval_add(lhs, rhs);
+}

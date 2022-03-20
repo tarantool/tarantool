@@ -685,3 +685,42 @@ datetime_increment_by(struct datetime *self, int direction,
 	self->nsec = nsec;
 	return 0;
 }
+
+bool
+datetime_datetime_sub(struct interval *res, const struct datetime *lhs,
+		      const struct datetime *rhs)
+{
+	assert(res != NULL);
+	assert(lhs != NULL);
+	assert(rhs != NULL);
+	res->year = 0;
+	res->month = 0;
+	res->adjust = DT_LIMIT;
+	res->sec = lhs->epoch - rhs->epoch;
+	res->nsec = lhs->nsec - rhs->nsec;
+	return true;
+}
+
+bool
+interval_interval_sub(struct interval *lhs, const struct interval *rhs)
+{
+	assert(lhs != NULL);
+	assert(rhs != NULL);
+	lhs->year -= rhs->year;
+	lhs->month -= rhs->month;
+	lhs->sec -= rhs->sec;
+	lhs->nsec -= rhs->nsec;
+	return true;
+}
+
+bool
+interval_interval_add(struct interval *lhs, const struct interval *rhs)
+{
+	assert(lhs != NULL);
+	assert(rhs != NULL);
+	lhs->year += rhs->year;
+	lhs->month += rhs->month;
+	lhs->sec += rhs->sec;
+	lhs->nsec += rhs->nsec;
+	return true;
+}
