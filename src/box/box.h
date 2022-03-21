@@ -108,6 +108,25 @@ box_is_configured(void);
 void
 box_atfork(void);
 
+/** Check if the slice of main cord has expired. */
+int
+box_check_slice_slow(void);
+
+/** Check periodically if the slice of main cord has expired. */
+static inline int
+box_check_slice(void)
+{
+	const uint32_t check_limit = 1000;
+	static uint32_t check_count;
+	check_count++;
+	if (check_count == check_limit) {
+		check_count = 0;
+		return box_check_slice_slow();
+	} else {
+		return 0;
+	}
+}
+
 void
 box_set_ro(void);
 

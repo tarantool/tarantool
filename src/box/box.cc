@@ -218,6 +218,12 @@ box_ro_reason(void)
 	return NULL;
 }
 
+int
+box_check_slice_slow(void)
+{
+	return fiber_check_slice();
+}
+
 static int
 box_check_writable(void)
 {
@@ -2443,6 +2449,8 @@ box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len)
 int
 box_process1(struct request *request, box_tuple_t **result)
 {
+	if (box_check_slice() != 0)
+		return -1;
 	/* Allow to write to temporary spaces in read-only mode. */
 	struct space *space = space_cache_find(request->space_id);
 	if (space == NULL)
@@ -2528,6 +2536,9 @@ box_select(uint32_t space_id, uint32_t index_id,
 	struct tuple *tuple;
 	port_c_create(port);
 	while (found < limit) {
+		rc = box_check_slice();
+		if (rc != 0)
+			break;
 		struct result_processor res_proc;
 		result_process_prepare(&res_proc, space);
 		rc = iterator_next(it, &tuple);
