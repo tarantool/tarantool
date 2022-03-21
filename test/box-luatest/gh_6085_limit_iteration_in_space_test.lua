@@ -72,3 +72,27 @@ g.test_limit_iteration = function()
         check_fiber_slice(endless_replace_func)
     end)
 end
+
+g.test_limit_on_sigurg = function()
+    local pid = g.server:eval('return box.info.pid')
+    local os = require('os')
+    local clock = require('clock')
+
+    g.server:exec(function()
+        local timeout = 5
+        require('fiber').set_max_slice(timeout)
+    end)
+
+    local start_time = clock.monotonic()
+    local cmd = 'while true do box.space.tester:select{} end'
+    local future = g.server:eval(cmd, {}, {is_async=true})
+    -- Wait while fiber will be waken up.
+    future:wait_result(0.2)
+    -- Send SIGURG
+    os.execute('kill -URG ' .. tonumber(pid))
+    local _, err = future:wait_result(1.5)
+    local end_time = clock.monotonic()
+    t.assert_equals(tostring(err), "fiber slice is exceeded")
+    -- Must end before slice is over.
+    t.assert(end_time - start_time < 3)
+end
