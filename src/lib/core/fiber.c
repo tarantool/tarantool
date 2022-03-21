@@ -43,6 +43,7 @@
 #include "trigger.h"
 #include "errinj.h"
 #include "clock.h"
+#include "tt_sigaction.h"
 
 extern void cord_on_yield(void);
 
@@ -1888,6 +1889,15 @@ fiber_free(void)
  */
 static bool signal_initialized;
 
+/** Reset current slice on SIGURG. */
+static void
+signal_sigurg_cb(int signum)
+{
+	(void)signum;
+	assert(cord_is_main());
+	fiber_set_slice(zero_slice);
+}
+
 void
 fiber_signal_init(void)
 {
@@ -1896,6 +1906,12 @@ fiber_signal_init(void)
 		return;
 	signal_initialized = true;
 	clock_lowres_signal_init();
+
+	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = signal_sigurg_cb;
+	if (tt_sigaction(SIGURG, &sa, NULL) == -1)
+		panic_syserror("cannot set fiber sigurg handler");
 }
 
 void
@@ -1905,6 +1921,12 @@ fiber_signal_reset(void)
 	assert(signal_initialized);
 	signal_initialized = false;
 	clock_lowres_signal_reset();
+
+	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = SIG_DFL;
+	if (tt_sigaction(SIGURG, &sa, NULL) == -1)
+		say_syserror("cannot reset fiber sigurg handler");
 }
 
 int fiber_stat(fiber_stat_cb cb, void *cb_ctx)
