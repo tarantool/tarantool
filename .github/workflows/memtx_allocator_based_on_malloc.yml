@@ -65,4 +65,4 @@ jobs:
         with:
           name: memtx_allocator_based_on_malloc
           retention-days: 21
-          path: test/var/artifacts
+          path: ${{ env.VARDIR }}/artifacts

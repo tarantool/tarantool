@@ -66,4 +66,4 @@ jobs:
         with:
           name: osx_11_aarch64_debug
           retention-days: 21
-          path: /tmp/tnt/artifacts
+          path: ${{ env.VARDIR }}/artifacts
