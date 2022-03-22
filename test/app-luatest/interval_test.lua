@@ -1,6 +1,7 @@
 local t = require('luatest')
 local g = t.group()
 local msgpack = require('msgpack')
+local msgpackffi = require('msgpackffi')
 local itv = require('datetime').interval
 
 -- Interval is 1 year, 127 days and 15 minutes
@@ -23,4 +24,12 @@ end
 
 g.test_check_interval_encode = function()
     t.assert_equals(bin, msgpack.encode(val))
+end
+
+g.test_check_interval_decode_ffi = function()
+    t.assert_equals(msgpackffi.decode(bin), val)
+end
+
+g.test_check_interval_encode_ffi = function()
+    t.assert_equals(bin, msgpackffi.encode(val))
 end

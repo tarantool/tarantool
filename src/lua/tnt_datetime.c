@@ -6,6 +6,7 @@
 
 #include <datetime.h>
 #include <mp_datetime.h>
+#include <mp_interval.h>
 
 size_t
 tnt_datetime_strftime(const struct datetime *date, char *buf, size_t len,
@@ -81,4 +82,10 @@ int
 tnt_interval_interval_add(struct interval *lhs, const struct interval *rhs)
 {
 	return interval_interval_add(lhs, rhs);
+}
+
+struct interval *
+tnt_interval_unpack(const char **data, struct interval *itv)
+{
+	return interval_unpack(data, itv);
 }

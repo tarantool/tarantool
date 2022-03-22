@@ -46,6 +46,8 @@ extern "C" {
 #include "box/mp_error.h"
 #include "mp_uuid.h"
 
+struct interval;
+
 char *
 tnt_mp_encode_decimal(char *data, const decimal_t *dec);
 
@@ -69,6 +71,14 @@ tnt_mp_encode_datetime(char *data, const struct datetime *date);
 
 uint32_t
 tnt_mp_sizeof_datetime(const struct datetime *date);
+
+/** Wrapper around mp_encode_interval(). */
+char *
+tnt_mp_encode_interval(char *data, const struct interval *itv);
+
+/** Wrapper around mp_sizeof_interval(). */
+uint32_t
+tnt_mp_sizeof_interval(const struct interval *itv);
 
 #if defined(__cplusplus)
 } /* extern "C" */

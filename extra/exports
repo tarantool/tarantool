@@ -454,6 +454,7 @@ tnt_iconv_open
 tnt_interval_to_string
 tnt_interval_interval_sub
 tnt_interval_interval_add
+tnt_interval_unpack
 tnt_mp_decode_double
 tnt_mp_decode_extl
 tnt_mp_decode_float
@@ -462,10 +463,12 @@ tnt_mp_encode_decimal
 tnt_mp_encode_double
 tnt_mp_encode_error
 tnt_mp_encode_float
+tnt_mp_encode_interval
 tnt_mp_encode_uuid
 tnt_mp_sizeof_datetime
 tnt_mp_sizeof_decimal
 tnt_mp_sizeof_error
+tnt_mp_sizeof_interval
 tnt_mp_sizeof_uuid
 tnt_rl_get_screen_size
 tnt_ssl_cert_paths_discover
