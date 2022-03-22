@@ -46,6 +46,7 @@ enum mp_extension_type {
     MP_ERROR = 3,
     MP_DATETIME = 4,
     MP_COMPRESSION = 5,
+    MP_INTERVAL = 6,
     mp_extension_type_MAX,
 };
 

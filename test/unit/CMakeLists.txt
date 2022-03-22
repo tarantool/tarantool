@@ -65,6 +65,8 @@ add_executable(datetime.test datetime.c)
 target_link_libraries(datetime.test tzcode core cdt unit)
 add_executable(error.test error.c core_test_utils.c)
 target_link_libraries(error.test unit core)
+add_executable(interval.test interval.c core_test_utils.c)
+target_link_libraries(interval.test core unit)
 
 add_executable(bps_tree.test bps_tree.cc)
 target_link_libraries(bps_tree.test small misc)

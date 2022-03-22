@@ -36,6 +36,7 @@
 #include "mp_error.h"
 #include "mp_uuid.h"
 #include "mp_datetime.h"
+#include "mp_interval.h"
 #include "mp_compression.h"
 
 static int
@@ -55,6 +56,8 @@ msgpack_fprint_ext(FILE *file, const char **data, int depth)
 		return mp_fprint_error(file, data, depth);
 	case MP_COMPRESSION:
 		return mp_fprint_compression(file, data, len);
+	case MP_INTERVAL:
+		return mp_fprint_interval(file, data);
 	default:
 		*data = orig;
 		return mp_fprint_ext_default(file, data, depth);
@@ -78,6 +81,8 @@ msgpack_snprint_ext(char *buf, int size, const char **data, int depth)
 		return mp_snprint_error(buf, size, data, depth);
 	case MP_COMPRESSION:
 		return mp_snprint_compression(buf, size, data, len);
+	case MP_INTERVAL:
+		return mp_snprint_interval(buf, size, data);
 	default:
 		*data = orig;
 		return mp_snprint_ext_default(buf, size, data, depth);
