@@ -36,6 +36,7 @@ set(core_sources
     tt_uuid.c
     mp_uuid.c
     mp_datetime.c
+    mp_interval.c
     prbuf.c
 )
 

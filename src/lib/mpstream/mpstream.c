@@ -36,6 +36,7 @@
 #include "mp_decimal.h"
 #include "mp_uuid.h"
 #include "mp_datetime.h"
+#include "mp_interval.h"
 
 void
 mpstream_reserve_slow(struct mpstream *stream, size_t size)
@@ -216,6 +217,16 @@ mpstream_encode_datetime(struct mpstream *stream, const struct datetime *val)
 	if (data == NULL)
 		return;
 	char *pos = mp_encode_datetime(data, val);
+	mpstream_advance(stream, pos - data);
+}
+
+void
+mpstream_encode_interval(struct mpstream *stream, const struct interval *val)
+{
+	char *data = mpstream_reserve(stream, mp_sizeof_interval(val));
+	if (data == NULL)
+		return;
+	char *pos = mp_encode_interval(data, val);
 	mpstream_advance(stream, pos - data);
 }
 
