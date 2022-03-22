@@ -361,6 +361,7 @@ lua_upvalueid
 lua_upvaluejoin
 lua_xmove
 lua_yield
+interval_unpack
 password_prepare
 PMurHash32
 PMurHash32_Process
@@ -443,10 +444,12 @@ tnt_mp_encode_decimal
 tnt_mp_encode_double
 tnt_mp_encode_error
 tnt_mp_encode_float
+tnt_mp_encode_interval
 tnt_mp_encode_uuid
 tnt_mp_sizeof_datetime
 tnt_mp_sizeof_decimal
 tnt_mp_sizeof_error
+tnt_mp_sizeof_interval
 tnt_mp_sizeof_uuid
 tnt_rl_get_screen_size
 tnt_ssl_cert_paths_discover
