@@ -34,6 +34,10 @@ uint32_t
 tnt_mp_sizeof_datetime(const struct datetime *date);
 char *
 tnt_mp_encode_datetime(char *data, const struct datetime *date);
+char *
+tnt_mp_encode_interval(char *data, const struct interval *itv);
+uint32_t
+tnt_mp_sizeof_interval(const struct interval *itv);
 float
 tnt_mp_decode_float(const char **data);
 double
@@ -50,6 +54,8 @@ void
 error_unref(struct error *e);
 struct datetime *
 tnt_datetime_unpack(const char **data, uint32_t len, struct datetime *date);
+struct interval *
+tnt_interval_unpack(const char **data, struct interval *itv);
 ]])
 
 local strict_alignment = (jit.arch == 'arm')
@@ -159,6 +165,11 @@ end
 local function encode_datetime(buf, date)
     local p = buf:alloc(builtin.tnt_mp_sizeof_datetime(date))
     builtin.tnt_mp_encode_datetime(p, date)
+end
+
+local function encode_interval(buf, itv)
+    local p = buf:alloc(builtin.tnt_mp_sizeof_interval(itv))
+    builtin.tnt_mp_encode_interval(p, itv)
 end
 
 local function encode_int(buf, num)
@@ -350,6 +361,7 @@ on_encode(ffi.typeof('decimal_t'), encode_decimal)
 on_encode(ffi.typeof('struct tt_uuid'), encode_uuid)
 on_encode(ffi.typeof('const struct error &'), encode_error)
 on_encode(ffi.typeof('struct datetime'), encode_datetime)
+on_encode(ffi.typeof('struct interval'), encode_interval)
 
 --------------------------------------------------------------------------------
 -- Decoder
@@ -562,6 +574,12 @@ local ext_decoder = {
         local dt = ffi.new("struct datetime")
         builtin.tnt_datetime_unpack(data, len, dt)
         return dt
+    end,
+    -- MP_INTERVAL
+    [6] = function(data)
+        local itv = ffi.new("struct interval")
+        builtin.tnt_interval_unpack(data, itv)
+        return itv
     end,
 }
 
