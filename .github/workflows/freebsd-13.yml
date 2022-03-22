@@ -49,3 +49,10 @@ jobs:
       - uses: ./.github/actions/environment
       - name: test
         run: make -f .travis.mk test_freebsd
+      - name: artifacts
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: freebsd-13
+          retention-days: 21
+          path: ${{ env.VARDIR }}/artifacts
