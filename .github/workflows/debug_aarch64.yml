@@ -64,6 +64,6 @@ jobs:
         uses: actions/upload-artifact@v2
         if: failure()
         with:
-          name: odroid_debug_arm64
+          name: failure-logs
           retention-days: 21
-          path: /tmp/tnt/artifacts
+          path: ${{ env.VARDIR }}/artifacts
