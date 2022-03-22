@@ -67,9 +67,17 @@ jobs:
         uses: ./.github/actions/send-telegram-notify
         if: failure()
 
-      - name: Collect artifacts
+      - name: Collect coverage info
         uses: actions/upload-artifact@v2
+        with:
+          name: coverage
+          retention-days: 21
+          path: ./coverage.info
+
+      - name: Collect failure logs
+        uses: actions/upload-artifact@v2
+        if: failure()
         with:
           name: failure-logs
           retention-days: 21
-          path: ./coverage.info
+          path: ${{ env.VARDIR }}/artifacts
