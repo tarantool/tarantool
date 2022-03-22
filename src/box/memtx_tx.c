@@ -925,13 +925,13 @@ memtx_tx_story_gc_step()
 	}
 
 	/* Lowest read view PSN */
-	int64_t lowest_rv_psm = txn_last_psn;
+	int64_t lowest_rv_psn = txn_last_psn;
 	if (!rlist_empty(&txm.read_view_txs)) {
 		struct txn *txn =
 			rlist_first_entry(&txm.read_view_txs, struct txn,
 					  in_read_view_txs);
 		assert(txn->rv_psn != 0);
-		lowest_rv_psm = txn->rv_psn;
+		lowest_rv_psn = txn->rv_psn;
 	}
 
 	struct memtx_story *story =
@@ -944,8 +944,8 @@ memtx_tx_story_gc_step()
 		/* The story is used directly by some transactions. */
 		return;
 	}
-	if (story->add_psn >= lowest_rv_psm ||
-	    story->del_psn >= lowest_rv_psm) {
+	if (story->add_psn >= lowest_rv_psn ||
+	    story->del_psn >= lowest_rv_psn) {
 		/* The story can be used by a read view. */
 		return;
 	}
