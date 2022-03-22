@@ -40,6 +40,7 @@ extern "C" {
 
 struct tt_uuid;
 struct datetime;
+struct interval;
 
 /**
 * Ask the allocator to reserve at least size bytes. It can reserve
@@ -148,6 +149,10 @@ mpstream_encode_uuid(struct mpstream *stream, const struct tt_uuid *uuid);
 
 void
 mpstream_encode_datetime(struct mpstream *stream, const struct datetime *dt);
+
+/** Encode interval value to a stream. */
+void
+mpstream_encode_interval(struct mpstream *stream, const struct interval *val);
 
 /** Copies n bytes from memory area src to stream. */
 void

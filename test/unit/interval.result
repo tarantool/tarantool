@@ -1,4 +1,4 @@
-1..12
+1..33
 ok 1 - Default year is 0
 ok 2 - Default month is 0
 ok 3 - Default week is 0
@@ -11,3 +11,24 @@ ok 9 - Default adjust is INTERVAL_ADJUST_EXCESS
 ok 10 - 0 seconds
 ok 11 - 3 weeks
 ok 12 - -100 years, 100 months, 77 weeks, -77 days, 123 hours, -123 minutes, -1 seconds, 1 nanoseconds, LIMIT adjust
+ok 13 - Size of interval is 3
+ok 14 - Size of interval is 6
+ok 15 - Size of interval is 9
+ok 16 - Size of interval is 12
+ok 17 - Size of interval is 18
+ok 18 - Size of interval is 24
+ok 19 - Intervals are equal.
+ok 20 - Intervals are equal.
+ok 21 - Intervals are equal.
+ok 22 - Intervals are equal.
+ok 23 - Intervals are equal.
+ok 24 - Intervals are equal.
+ok 25 - Year value is right
+ok 26 - Month value is right
+ok 27 - Week value is right
+ok 28 - Day value is right
+ok 29 - Hour value is right
+ok 30 - Minute value is right
+ok 31 - Second value is right
+ok 32 - Nanosecond value is right
+ok 33 - Adjust value is right

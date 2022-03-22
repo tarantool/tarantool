@@ -2,6 +2,7 @@
 
 #include "unit.h"
 #include "interval.h"
+#include "mp_interval.h"
 
 enum {
 	SIZE = 512,
@@ -55,11 +56,96 @@ test_interval_to_string(void)
 	is(strcmp(buf, res3), 0, "%s", buf);
 }
 
+static void
+test_interval_sizeof(void)
+{
+	struct interval itv;
+	interval_create(&itv);
+	uint32_t size = 3;
+	is(mp_sizeof_interval(&itv), size, "Size of interval is %d", size);
+	itv.year = 1;
+	size = 6;
+	is(mp_sizeof_interval(&itv), size, "Size of interval is %d", size);
+	itv.month = 200;
+	size = 9;
+	is(mp_sizeof_interval(&itv), size, "Size of interval is %d", size);
+	itv.day = -77;
+	size = 12;
+	is(mp_sizeof_interval(&itv), size, "Size of interval is %d", size);
+	itv.hour = 2000000000;
+	size = 18;
+	is(mp_sizeof_interval(&itv), size, "Size of interval is %d", size);
+	itv.sec = -2000000000;
+	size = 24;
+	is(mp_sizeof_interval(&itv), size, "Size of interval is %d", size);
+}
+
+static void
+test_interval_encode_decode(void)
+{
+	struct interval itv;
+	struct interval result;
+	interval_create(&itv);
+	char buf[SIZE];
+	char *to_write = buf;
+	mp_encode_interval(to_write, &itv);
+	const char *to_read = buf;
+	mp_decode_interval(&to_read, &result);
+	is(memcmp(&itv, &result, sizeof(itv)), 0, "Intervals are equal.");
+
+	itv.year = 1;
+	to_write = buf;
+	mp_encode_interval(to_write, &itv);
+	to_read = buf;
+	mp_decode_interval(&to_read, &result);
+	is(memcmp(&itv, &result, sizeof(itv)), 0, "Intervals are equal.");
+
+	itv.month = 200;
+	to_write = buf;
+	mp_encode_interval(to_write, &itv);
+	to_read = buf;
+	mp_decode_interval(&to_read, &result);
+	is(memcmp(&itv, &result, sizeof(itv)), 0, "Intervals are equal.");
+
+	itv.day = -77;
+	to_write = buf;
+	mp_encode_interval(to_write, &itv);
+	to_read = buf;
+	mp_decode_interval(&to_read, &result);
+	is(memcmp(&itv, &result, sizeof(itv)), 0, "Intervals are equal.");
+
+	itv.hour = 2000000000;
+	to_write = buf;
+	mp_encode_interval(to_write, &itv);
+	to_read = buf;
+	mp_decode_interval(&to_read, &result);
+	is(memcmp(&itv, &result, sizeof(itv)), 0, "Intervals are equal.");
+
+	itv.sec = -2000000000;
+	to_write = buf;
+	mp_encode_interval(to_write, &itv);
+	to_read = buf;
+	mp_decode_interval(&to_read, &result);
+	is(memcmp(&itv, &result, sizeof(itv)), 0, "Intervals are equal.");
+
+	is(result.year, 1, "Year value is right");
+	is(result.month, 200, "Month value is right");
+	is(result.week, 0, "Week value is right");
+	is(result.day, -77, "Day value is right");
+	is(result.hour, 2000000000, "Hour value is right");
+	is(result.min, 0, "Minute value is right");
+	is(result.sec, -2000000000, "Second value is right");
+	is(result.nsec, 0, "Nanosecond value is right");
+	is(result.adjust, INTERVAL_ADJUST_EXCESS, "Adjust value is right");
+}
+
 int
 main(void)
 {
-	plan(12);
+	plan(33);
 	test_interval_default_fields();
 	test_interval_to_string();
+	test_interval_sizeof();
+	test_interval_encode_decode();
 	return check_plan();
 }
