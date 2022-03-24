@@ -344,7 +344,8 @@ build_odroid_arm64:
 	make -j
 
 test_odroid_arm64_no_deps: build_odroid_arm64
-	make test
+	make LuaJIT-test
+	cd test && ./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
 
 test_odroid_arm64: deps_odroid_arm64 test_odroid_arm64_no_deps
 
