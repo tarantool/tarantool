@@ -295,7 +295,7 @@ test_debian_docker_luacheck:
 test_debian_install_luacheck:
 	sudo apt update -y
 	sudo apt install -y lua5.1 luarocks
-	sudo luarocks install luacheck
+	sudo luarocks install luacheck 0.25.0
 
 test_debian_luacheck: test_debian_install_luacheck configure_debian
 	make luacheck
