@@ -191,10 +191,22 @@ log_create(struct log *log, const char *init_str, int nonblock);
 void
 log_destroy(struct log *log);
 
-/** Perform log write. */
+/** A utility function to handle va_list from different varargs functions. */
 int
+log_vsay(struct log *log, int level, const char *filename, int line,
+	 const char *error, const char *format, va_list ap);
+
+/** Perform log write. */
+static inline int
 log_say(struct log *log, int level, const char *filename,
-	int line, const char *error, const char *format, ...);
+	int line, const char *error, const char *format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	int total = log_vsay(log, level, filename, line, error, format, ap);
+	va_end(ap);
+	return total;
+}
 
 /**
  * Default logger type info.
