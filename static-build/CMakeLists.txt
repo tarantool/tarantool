@@ -89,7 +89,7 @@ ExternalProject_Add(icu
 # ZLIB
 #
 ExternalProject_Add(zlib
-    URL https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz
+    URL https://packages.hb.bizmrg.com/third_party/zlib-${ZLIB_VERSION}.tar.gz
     URL_MD5 ${ZLIB_HASH}
     CONFIGURE_COMMAND env
         CC=${CMAKE_C_COMPILER}
