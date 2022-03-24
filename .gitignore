@@ -93,6 +93,7 @@ src/module.h
 tarantool-*.tar.gz
 perf/*.perftest
 test/enterprise-luatest
+test/enterprise-perf
 test/enterprise-tap
 test/enterprise-unit
 test/lib/
