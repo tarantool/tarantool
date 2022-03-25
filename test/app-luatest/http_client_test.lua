@@ -185,7 +185,7 @@ g.test_cancel_and_errinj = function(cg)
                     "After cancel fiber timeout is returned - status")
     t.assert_str_contains(r.reason, "Timeout",
                           "After cancel fiber timeout is returned - reason")
-    r = http:get(url, merge(opts, {timeout = 0.0001}))
+    r = http:get(url .. 'long_query', merge(opts, {timeout = 0.0001}))
     t.assert_equals(r.status, 408, "Timeout check - status")
     t.assert_str_contains(r.reason, "Timeout", "Timeout check - reason")
     local errinj = box.error.injection
