@@ -101,13 +101,6 @@ setmetatable(PMurHash, {
 
 local CRC32
 local CRC32_methods = {
-    update = function(self, str)
-        if type(str) ~= 'string' then
-            error("Usage crc32:update(string)")
-        end
-        self.value = ffi.C.crc32_calc(self.value, str, string.len(str))
-    end,
-
     result = function(self)
         return self.value
     end,
@@ -133,13 +126,12 @@ CRC32 = {
     end
 }
 
+local __crc32 = require('crc32.internal')(CRC32)
+
+CRC32_methods.update = __crc32.update
+
 setmetatable(CRC32, {
-    __call = function(self, str)
-        if type(str) ~= 'string' then
-            error("Usage digest.crc32(string)")
-        end
-        return ffi.C.crc32_calc(CRC32.crc_begin, str, string.len(str))
-    end
+    __call = __crc32.__call
 })
 
 local pbkdf2 = function(pass, salt, iters, digest_len)
