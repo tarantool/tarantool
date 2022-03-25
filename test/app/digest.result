@@ -249,7 +249,7 @@ digest.md5_hex()
 ...
 digest.crc32()
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage digest.crc32(string)'
+- error: Usage digest.crc32(string)
 ...
 digest.crc32_update(4294967295, '')
 ---
