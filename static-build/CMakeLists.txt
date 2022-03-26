@@ -20,6 +20,7 @@ set(NCURSES_VERSION 6.2)
 set(NCURSES_HASH e812da327b1c2214ac1aed440ea3ae8d)
 set(READLINE_VERSION 8.0)
 set(READLINE_HASH 7e6c1f16aee3244a69aba6e438295ca3)
+set(BACKUP_STORAGE https://distrib.hb.bizmrg.com)
 
 # Pass -isysroot=<SDK_PATH> option on Mac OS to a preprocessor and a C
 # compiler to find header files installed with an SDK.
@@ -46,7 +47,7 @@ endif()
 # OpenSSL
 #
 ExternalProject_Add(openssl
-    URL https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz
+    URL ${BACKUP_STORAGE}/openssl/openssl-${OPENSSL_VERSION}.tar.gz
     URL_MD5 ${OPENSSL_HASH}
     CONFIGURE_COMMAND <SOURCE_DIR>/config
         CC=${CMAKE_C_COMPILER}
@@ -92,7 +93,7 @@ ExternalProject_Add(icu
 # ZLIB
 #
 ExternalProject_Add(zlib
-    URL https://packages.hb.bizmrg.com/third_party/zlib-${ZLIB_VERSION}.tar.gz
+    URL ${BACKUP_STORAGE}/zlib/zlib-${ZLIB_VERSION}.tar.gz
     URL_MD5 ${ZLIB_HASH}
     CONFIGURE_COMMAND env
         CC=${CMAKE_C_COMPILER}
