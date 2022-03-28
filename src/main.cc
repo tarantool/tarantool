@@ -653,6 +653,8 @@ main(int argc, char **argv)
 	/* Lua interpeter options, e.g. -e and -l */
 	int optc = 0;
 	const char **optv = NULL;
+	/* The maximum possible number of Lua interpeter options */
+	int optc_max = (argc - 1) * 2;
 	auto guard = make_scoped_guard([=]{ if (optc) free(optv); });
 
 	static struct option longopts[] = {
@@ -679,12 +681,9 @@ main(int argc, char **argv)
 		case 'l':
 		case 'e':
 			/* Save Lua interepter options to optv as is */
-			if (optc == 0) {
-				optv = (const char **) calloc(argc,
+			if (optc == 0)
+				optv = (const char **)xcalloc(optc_max,
 							      sizeof(optv[0]));
-				if (optv == NULL)
-					panic_syserror("No enough memory for arguments");
-			}
 			optv[optc++] = ch == 'l' ? "-l" : "-e";
 			optv[optc++] = optarg;
 			break;
