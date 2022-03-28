@@ -1625,7 +1625,7 @@ void
 memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 {
 	if (stmt->add_story != NULL) {
-		assert(stmt->add_story->tuple == stmt->new_tuple);
+		assert(stmt->add_story->tuple == stmt->rollback_info.new_tuple);
 		struct memtx_story *story = stmt->add_story;
 
 		/*
