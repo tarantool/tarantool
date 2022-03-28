@@ -175,6 +175,8 @@ lbox_broadcast(struct lua_State *L)
 		return luaL_error(L, "Usage: box.broadcast(key[, value])");
 	size_t key_len;
 	const char *key = luaL_checklstring(L, 1, &key_len);
+	if (strncmp(key, "box.", 4) == 0)
+		return luaL_error(L, "System event can't be override");
 	struct ibuf *ibuf = cord_ibuf_take();
 	const char *data = NULL;
 	const char *data_end = NULL;

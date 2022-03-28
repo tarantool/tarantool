@@ -563,6 +563,24 @@ box_process_rw(struct request *request, struct space *space,
 int
 boxk(int type, uint32_t space_id, const char *format, ...);
 
+/**
+ * Broadcast the identification of the instance
+ */
+void
+box_broadcast_id(void);
+
+/**
+ * Broadcast the current election state of RAFT machinery
+ */
+void
+box_broadcast_election(void);
+
+/**
+ * Broadcast the current schema version
+ */
+void
+box_broadcast_schema(void);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

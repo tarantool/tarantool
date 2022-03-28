@@ -85,6 +85,7 @@
 #include "audit.h"
 #include "trivia/util.h"
 #include "version.h"
+#include "mp_uuid.h"
 
 static char status[64] = "unknown";
 
@@ -97,14 +98,6 @@ double txn_timeout_default;
 
 struct rlist box_on_shutdown_trigger_list =
 	RLIST_HEAD_INITIALIZER(box_on_shutdown_trigger_list);
-
-static void title(const char *new_status)
-{
-	snprintf(status, sizeof(status), "%s", new_status);
-	title_set_status(new_status);
-	title_update();
-	systemd_snotify("STATUS=%s", status);
-}
 
 const struct vclock *box_vclock = &replicaset.vclock;
 
@@ -161,6 +154,28 @@ static struct fiber_pool tx_fiber_pool;
  */
 static struct cbus_endpoint tx_prio_endpoint;
 
+static void
+builtin_events_init(void);
+
+/**
+ * Broadcast the current instance status
+ */
+static void
+box_broadcast_status(void);
+
+/**
+ * Generate and update the instance status title
+ */
+static void
+title(const char *new_status)
+{
+	snprintf(status, sizeof(status), "%s", new_status);
+	title_set_status(new_status);
+	title_update();
+	systemd_snotify("STATUS=%s", status);
+	box_broadcast_status();
+}
+
 void
 box_update_ro_summary(void)
 {
@@ -174,6 +189,8 @@ box_update_ro_summary(void)
 	if (is_ro_summary)
 		engine_switch_to_ro();
 	fiber_cond_broadcast(&ro_cond);
+	box_broadcast_status();
+	box_broadcast_election();
 }
 
 const char *
@@ -3359,6 +3376,7 @@ bootstrap(const struct tt_uuid *instance_uuid,
 	else
 		tt_uuid_create(&INSTANCE_UUID);
 
+	box_broadcast_id();
 	say_info("instance uuid %s", tt_uuid_str(&INSTANCE_UUID));
 
 	/*
@@ -3637,6 +3655,12 @@ box_init(void)
 	sequence_init();
 	box_raft_init();
 	box_watcher_init();
+
+	/*
+	 * Default built-in events to help users distinguish an event
+	 * being not supported from box.cfg not being called yet.
+	 */
+	builtin_events_init();
 }
 
 bool
@@ -3936,4 +3960,85 @@ box_reset_stat(void)
 	rmean_cleanup(rmean_error);
 	engine_reset_stat();
 	space_foreach(box_reset_space_stat, NULL);
+}
+
+static void
+builtin_events_init(void)
+{
+	box_broadcast_fmt("box.id", "{}");
+	box_broadcast_fmt("box.schema", "{}");
+	box_broadcast_fmt("box.status", "{}");
+	box_broadcast_fmt("box.election", "{}");
+}
+
+void
+box_broadcast_id(void)
+{
+	char buf[1024];
+	char *w = buf;
+	w = mp_encode_map(w, 3);
+	w = mp_encode_str0(w, "id");
+	w = mp_encode_uint(w, instance_id);
+	w = mp_encode_str0(w, "instance_uuid");
+	w = mp_encode_uuid(w, &INSTANCE_UUID);
+	w = mp_encode_str0(w, "replicaset_uuid");
+	w = mp_encode_uuid(w, &REPLICASET_UUID);
+
+	box_broadcast("box.id", strlen("box.id"), buf, w);
+
+	assert((size_t)(w - buf) < 1024);
+}
+
+static void
+box_broadcast_status(void)
+{
+	char buf[1024];
+	char *w = buf;
+	w = mp_encode_map(w, 3);
+	w = mp_encode_str0(w, "is_ro");
+	w = mp_encode_bool(w, box_is_ro());
+	w = mp_encode_str0(w, "is_ro_cfg");
+	w = mp_encode_bool(w, cfg_geti("read_only"));
+	w = mp_encode_str0(w, "status");
+	w = mp_encode_str0(w, box_status());
+
+	box_broadcast("box.status", strlen("box.status"), buf, w);
+
+	assert((size_t)(w - buf) < 1024);
+}
+
+void
+box_broadcast_election(void)
+{
+	struct raft *raft = box_raft();
+
+	char buf[1024];
+	char *w = buf;
+	w = mp_encode_map(w, 4);
+	w = mp_encode_str0(w, "term");
+	w = mp_encode_uint(w, raft->term);
+	w = mp_encode_str0(w, "role");
+	w = mp_encode_str0(w, raft_state_str(raft->state));
+	w = mp_encode_str0(w, "is_ro");
+	w = mp_encode_bool(w, box_is_ro());
+	w = mp_encode_str0(w, "leader");
+	w = mp_encode_uint(w, raft->leader);
+
+	box_broadcast("box.election", strlen("box.election"), buf, w);
+
+	assert((size_t)(w - buf) < 1024);
+}
+
+void
+box_broadcast_schema(void)
+{
+	char buf[1024];
+	char *w = buf;
+	w = mp_encode_map(w, 1);
+	w = mp_encode_str0(w, "version");
+	w = mp_encode_uint(w, box_schema_version());
+
+	box_broadcast("box.schema", strlen("box.schema"), buf, w);
+
+	assert((size_t)(w - buf) < 1024);
 }
