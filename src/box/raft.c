@@ -170,6 +170,7 @@ box_raft_on_update_f(struct trigger *trigger, void *event)
 	 * writable only after it clears its synchro queue.
 	 */
 	box_update_ro_summary();
+	box_broadcast_election();
 	if (raft->state != RAFT_STATE_LEADER)
 		return 0;
 	/*

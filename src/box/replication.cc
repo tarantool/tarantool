@@ -247,6 +247,7 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 		/* Assign local replica id */
 		assert(instance_id == REPLICA_ID_NIL);
 		instance_id = replica_id;
+		box_broadcast_id();
 	} else if (replica->anon) {
 		/*
 		 * Set replica gc on its transition from
@@ -287,6 +288,7 @@ replica_clear_id(struct replica *replica)
 		/* See replica_check_id(). */
 		assert(replicaset.is_joining);
 		instance_id = REPLICA_ID_NIL;
+		box_broadcast_id();
 	}
 	replica->id = REPLICA_ID_NIL;
 	say_info("removed replica %s", tt_uuid_str(&replica->uuid));
