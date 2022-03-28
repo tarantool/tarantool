@@ -89,22 +89,6 @@ memtx_space_update_bsize(struct space *space, struct tuple *old_tuple,
 	memtx_space->bsize += new_bsize - old_bsize;
 }
 
-void
-memtx_space_update_compressed_tuples(struct space *space,
-				     struct tuple *old_tuple,
-				     struct tuple *new_tuple)
-{
-	struct memtx_space *memtx_space = (struct memtx_space *)space;
-	uint64_t old_compressed_tuples = memtx_space->compressed_tuples;
-	if (old_tuple != NULL && tuple_is_compressed(old_tuple))
-		memtx_space->compressed_tuples--;
-	if (new_tuple != NULL && tuple_is_compressed(new_tuple))
-		memtx_space->compressed_tuples++;
-	if ((old_compressed_tuples != 0 && memtx_space->compressed_tuples == 0) ||
-	    (old_compressed_tuples == 0 && memtx_space->compressed_tuples != 0))
-		memtx_space_update_indexes_vtab(space);
-}
-
 /**
  * A version of space_replace for a space which has
  * no indexes (is not yet fully built).
@@ -150,7 +134,6 @@ memtx_space_replace_build_next(struct space *space, struct tuple *old_tuple,
 	if (index_build_next(space->index[0], new_tuple) != 0)
 		return -1;
 	memtx_space_update_bsize(space, NULL, new_tuple);
-	memtx_space_update_compressed_tuples(space, NULL, new_tuple);
 	tuple_ref(new_tuple);
 	return 0;
 }
@@ -170,7 +153,6 @@ memtx_space_replace_primary_key(struct space *space, struct tuple *old_tuple,
 			  new_tuple, mode, &old_tuple, &successor) != 0)
 		return -1;
 	memtx_space_update_bsize(space, old_tuple, new_tuple);
-	memtx_space_update_compressed_tuples(space, old_tuple, new_tuple);
 	if (new_tuple != NULL)
 		tuple_ref(new_tuple);
 	*result = old_tuple;
@@ -323,7 +305,6 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 	}
 
 	memtx_space_update_bsize(space, old_tuple, new_tuple);
-	memtx_space_update_compressed_tuples(space, old_tuple, new_tuple);
 	if (new_tuple != NULL)
 		tuple_ref(new_tuple);
 	*result = old_tuple;
@@ -877,36 +858,6 @@ sequence_data_index_new(struct memtx_engine *memtx, struct index_def *def)
 	return index;
 }
 
-/**
- * Update @a index vtab according to @a space format and count of
- * compressed tuples in space. If there is no compressed tuples
- * in space and current space format without compression we set
- * vtab with `index_get` and `iterator_next` function versions
- * same as it's raw analogs. Otherwise we set vtab with special
- * versions of this functions.
- */
-static void
-memtx_space_update_index_vtab(struct space *space, struct index *index)
-{
-	if (space_is_system(space))
-		return;
-	struct memtx_space *memtx_space = (struct memtx_space *)space;
-	bool unchanged = (!memtx_space->base.format->is_compressed &&
-		memtx_space->compressed_tuples == 0);
-	switch (index->def->type) {
-	case HASH:
-		return memtx_hash_index_set_vtab(index, unchanged);
-	case TREE:
-		return memtx_tree_index_set_vtab(index, unchanged);
-	case RTREE:
-		return memtx_rtree_index_set_vtab(index, unchanged);
-	case BITSET:
-		return memtx_bitset_index_set_vtab(index, unchanged);
-	default:
-		unreachable();
-	}
-}
-
 static struct index *
 memtx_space_create_index(struct space *space, struct index_def *index_def)
 {
@@ -923,27 +874,19 @@ memtx_space_create_index(struct space *space, struct index_def *index_def)
 		return sequence_data_index_new(memtx, index_def);
 	}
 
-	struct index *index = NULL;
 	switch (index_def->type) {
 	case HASH:
-		index = memtx_hash_index_new(memtx, index_def);
-		break;
+		return memtx_hash_index_new(memtx, index_def);
 	case TREE:
-		index = memtx_tree_index_new(memtx, index_def);
-		break;
+		return memtx_tree_index_new(memtx, index_def);
 	case RTREE:
-		index = memtx_rtree_index_new(memtx, index_def);
-		break;
+		return memtx_rtree_index_new(memtx, index_def);
 	case BITSET:
-		index = memtx_bitset_index_new(memtx, index_def);
-		break;
+		return memtx_bitset_index_new(memtx, index_def);
 	default:
 		unreachable();
 		return NULL;
 	}
-	if (index != NULL)
-		memtx_space_update_index_vtab(space, index);
-	return index;
 }
 
 /**
@@ -1101,7 +1044,6 @@ memtx_space_drop_primary_key(struct space *space)
 	 */
 	memtx_space->replace = memtx_space_replace_no_keys;
 	memtx_space->bsize = 0;
-	memtx_space->compressed_tuples = 0;
 }
 
 static void
@@ -1418,7 +1360,6 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 
 	new_memtx_space->replace = old_memtx_space->replace;
 	new_memtx_space->bsize = old_memtx_space->bsize;
-	new_memtx_space->compressed_tuples = old_memtx_space->compressed_tuples;
 	return 0;
 }
 
@@ -1486,14 +1427,6 @@ memtx_space_new(struct memtx_engine *memtx,
 
 	memtx_space->bsize = 0;
 	memtx_space->rowid = 0;
-	memtx_space->compressed_tuples = 0;
 	memtx_space->replace = memtx_space_replace_no_keys;
 	return (struct space *)memtx_space;
-}
-
-void
-memtx_space_update_indexes_vtab(struct space *space)
-{
-	for (uint32_t i = 0; i < space->index_count; i++)
-		memtx_space_update_index_vtab(space, space->index[i]);
 }

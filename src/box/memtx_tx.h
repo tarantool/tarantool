@@ -278,11 +278,9 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt);
  *
  * @param stmt current statement.
  * @param bsize the space bsize.
- * @param compressed_tuples count of compressed tuples in space.
  */
 void
-memtx_tx_history_commit_stmt(struct txn_stmt *stmt, size_t *bsize,
-			     uint64_t *compressed_tuples);
+memtx_tx_history_commit_stmt(struct txn_stmt *stmt, size_t *bsize);
 
 /** Helper of memtx_tx_tuple_clarify */
 struct tuple *

@@ -42,15 +42,6 @@ struct memtx_engine;
 struct index *
 memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def);
 
-/**
- * Change @a index vtab according to @a unchanged argument.
- * If @a unchanged is false it's mean that tuple in index should
- * be transformed before return it to user, so we need special
- * `index_get` and `iterator_next` functions version.
- */
-void
-memtx_rtree_index_set_vtab(struct index *index, bool unchanged);
-
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

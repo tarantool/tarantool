@@ -294,7 +294,6 @@ memtx_rtree_index_reserve(struct index *base, uint32_t size_hint)
 	return memtx_index_extent_reserve(memtx, RESERVE_EXTENTS_BEFORE_REPLACE);
 }
 
-template <bool UNCHANGED>
 static struct iterator *
 memtx_rtree_index_create_iterator(struct index *base,  enum iterator_type type,
 				  const char *key, uint32_t part_count)
@@ -356,8 +355,7 @@ memtx_rtree_index_create_iterator(struct index *base,  enum iterator_type type,
 	iterator_create(&it->base, base);
 	it->pool = &memtx->rtree_iterator_pool;
 	it->base.next_raw = index_rtree_iterator_next_raw;
-	it->base.next = UNCHANGED ? index_rtree_iterator_next_raw :
-		memtx_iterator_next;
+	it->base.next = memtx_iterator_next;
 	it->base.free = index_rtree_iterator_free;
 	rtree_iterator_init(&it->impl);
 	/*
@@ -371,62 +369,36 @@ memtx_rtree_index_create_iterator(struct index *base,  enum iterator_type type,
 	return (struct iterator *)it;
 }
 
-/**
- * Get index vtab by @a UNCHANGED, template version.
- * If UNCHANGED == true iterator->next and index->get
- * functions are the same as it's raw versions.
- */
-template <bool UNCHANGED>
-static const struct index_vtab *
-get_memtx_rtree_index_vtab(void)
-{
-	static const struct index_vtab vtab = {
-		/* .destroy = */ memtx_rtree_index_destroy,
-		/* .commit_create = */ generic_index_commit_create,
-		/* .abort_create = */ generic_index_abort_create,
-		/* .commit_modify = */ generic_index_commit_modify,
-		/* .commit_drop = */ generic_index_commit_drop,
-		/* .update_def = */ generic_index_update_def,
-		/* .depends_on_pk = */ generic_index_depends_on_pk,
-		/* .def_change_requires_rebuild = */
-			memtx_rtree_index_def_change_requires_rebuild,
-		/* .size = */ memtx_rtree_index_size,
-		/* .bsize = */ memtx_rtree_index_bsize,
-		/* .min = */ generic_index_min,
-		/* .max = */ generic_index_max,
-		/* .random = */ generic_index_random,
-		/* .count = */ memtx_rtree_index_count,
-		/* .get_raw = */ memtx_rtree_index_get_raw,
-		/* .get = */ UNCHANGED ? memtx_rtree_index_get_raw :
-			memtx_index_get,
-		/* .replace = */ memtx_rtree_index_replace,
-		/* .create_iterator = */
-			memtx_rtree_index_create_iterator<UNCHANGED>,
-		/* .create_snapshot_iterator = */
-			generic_index_create_snapshot_iterator,
-		/* .stat = */ generic_index_stat,
-		/* .compact = */ generic_index_compact,
-		/* .reset_stat = */ generic_index_reset_stat,
-		/* .begin_build = */ generic_index_begin_build,
-		/* .reserve = */ memtx_rtree_index_reserve,
-		/* .build_next = */ generic_index_build_next,
-		/* .end_build = */ generic_index_end_build,
-	};
-	return &vtab;
-}
-
-/**
- * Get index vtab by @a unchanged, argument version.
- */
-static const struct index_vtab *
-get_memtx_rtree_index_vtab(bool unchanged)
-{
-	static const index_vtab *choice[2] = {
-		get_memtx_rtree_index_vtab<false>(),
-		get_memtx_rtree_index_vtab<true>()
-	};
-	return choice[unchanged];
-}
+static const struct index_vtab memtx_rtree_index_vtab = {
+	/* .destroy = */ memtx_rtree_index_destroy,
+	/* .commit_create = */ generic_index_commit_create,
+	/* .abort_create = */ generic_index_abort_create,
+	/* .commit_modify = */ generic_index_commit_modify,
+	/* .commit_drop = */ generic_index_commit_drop,
+	/* .update_def = */ generic_index_update_def,
+	/* .depends_on_pk = */ generic_index_depends_on_pk,
+	/* .def_change_requires_rebuild = */
+		memtx_rtree_index_def_change_requires_rebuild,
+	/* .size = */ memtx_rtree_index_size,
+	/* .bsize = */ memtx_rtree_index_bsize,
+	/* .min = */ generic_index_min,
+	/* .max = */ generic_index_max,
+	/* .random = */ generic_index_random,
+	/* .count = */ memtx_rtree_index_count,
+	/* .get_raw = */ memtx_rtree_index_get_raw,
+	/* .get = */ memtx_index_get,
+	/* .replace = */ memtx_rtree_index_replace,
+	/* .create_iterator = */ memtx_rtree_index_create_iterator,
+	/* .create_snapshot_iterator = */
+		generic_index_create_snapshot_iterator,
+	/* .stat = */ generic_index_stat,
+	/* .compact = */ generic_index_compact,
+	/* .reset_stat = */ generic_index_reset_stat,
+	/* .begin_build = */ generic_index_begin_build,
+	/* .reserve = */ memtx_rtree_index_reserve,
+	/* .build_next = */ generic_index_build_next,
+	/* .end_build = */ generic_index_end_build,
+};
 
 struct index *
 memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def)
@@ -463,9 +435,8 @@ memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def)
 			 "malloc", "struct memtx_rtree_index");
 		return NULL;
 	}
-	const struct index_vtab *vtab = get_memtx_rtree_index_vtab(true);
 	if (index_create(&index->base, (struct engine *)memtx,
-			 vtab, def) != 0) {
+			 &memtx_rtree_index_vtab, def) != 0) {
 		free(index);
 		return NULL;
 	}
@@ -475,10 +446,4 @@ memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def)
 		   memtx_index_extent_alloc, memtx_index_extent_free, memtx,
 		   distance_type);
 	return &index->base;
-}
-
-void
-memtx_rtree_index_set_vtab(struct index *index, bool unchanged)
-{
-	index->vtab = get_memtx_rtree_index_vtab(unchanged);
 }
