@@ -1884,20 +1884,15 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt)
 }
 
 void
-memtx_tx_history_commit_stmt(struct txn_stmt *stmt, size_t *bsize,
-			     uint64_t *compressed_tuples)
+memtx_tx_history_commit_stmt(struct txn_stmt *stmt, size_t *bsize)
 {
 	if (stmt->add_story != NULL) {
 		assert(stmt->add_story->add_stmt == stmt);
 		*bsize += tuple_bsize(stmt->add_story->tuple);
-		if (tuple_is_compressed(stmt->add_story->tuple))
-			(*compressed_tuples)++;
 		memtx_tx_story_unlink_added_by(stmt->add_story, stmt);
 	}
 	if (stmt->del_story != NULL) {
 		*bsize -= tuple_bsize(stmt->del_story->tuple);
-		if (tuple_is_compressed(stmt->del_story->tuple))
-			(*compressed_tuples)--;
 		memtx_tx_story_unlink_deleted_by(stmt->del_story, stmt);
 	}
 }

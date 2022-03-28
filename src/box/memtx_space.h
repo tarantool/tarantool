@@ -50,8 +50,6 @@ struct memtx_space {
 	 * tuples within one unique primary key.
 	 */
 	uint64_t rowid;
-        /** Count of compressed tuples contained in this space. */
-        uint64_t compressed_tuples;
 	/**
 	 * A pointer to replace function, set to different values
 	 * at different stages of recovery.
@@ -73,18 +71,6 @@ void
 memtx_space_update_bsize(struct space *space, struct tuple *old_tuple,
 			 struct tuple *new_tuple);
 
-/**
- * Undate count of compressed tuples in @a space. If @a old_tuple
- * is compressed wwe decrement count of compressed tuples. If @a
- * new_tuple is compressed we increment count of compressed tuples.
- * If count of compressed tuples is equal to zero we update vtabs
- * of all space indexes.
- */
-void
-memtx_space_update_compressed_tuples(struct space *space,
-                                     struct tuple *old_tuple,
-                                     struct tuple *new_tuple);
-
 int
 memtx_space_replace_no_keys(struct space *, struct tuple *, struct tuple *,
 			    enum dup_replace_mode, struct tuple **);
@@ -101,13 +87,6 @@ memtx_space_replace_all_keys(struct space *, struct tuple *, struct tuple *,
 struct space *
 memtx_space_new(struct memtx_engine *memtx,
 		struct space_def *def, struct rlist *key_list);
-
-/**
- * Update vtabs of all indexes in @a space according to
- * @a space format and count of compressed tuples.
- */
-void
-memtx_space_update_indexes_vtab(struct space *space);
 
 static inline bool
 memtx_space_is_recovering(struct space *space)

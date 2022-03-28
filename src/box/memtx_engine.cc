@@ -535,8 +535,7 @@ memtx_engine_commit(struct engine *engine, struct txn *txn)
 			struct memtx_space *mspace =
 				(struct memtx_space *)stmt->space;
 			size_t *bsize = &mspace->bsize;
-			uint64_t *ctuples = &mspace->compressed_tuples;
-			memtx_tx_history_commit_stmt(stmt, bsize, ctuples);
+			memtx_tx_history_commit_stmt(stmt, bsize);
 		}
 	}
 }
@@ -586,7 +585,6 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	}
 
 	memtx_space_update_bsize(space, new_tuple, old_tuple);
-	memtx_space_update_compressed_tuples(space, new_tuple, old_tuple);
 	if (old_tuple != NULL)
 		tuple_ref(old_tuple);
 	if (new_tuple != NULL)
