@@ -725,7 +725,7 @@ txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout)
 }
 
 void
-txn_limbo_apply(struct txn_limbo *limbo, const struct synchro_request *req)
+txn_limbo_req_commit(struct txn_limbo *limbo, const struct synchro_request *req)
 {
 	assert(latch_is_locked(&limbo->promote_latch));
 
@@ -793,7 +793,7 @@ void
 txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 {
 	txn_limbo_begin(limbo);
-	txn_limbo_apply(limbo, req);
+	txn_limbo_req_commit(limbo, req);
 	txn_limbo_commit(limbo);
 }
 

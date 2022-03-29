@@ -960,7 +960,7 @@ apply_synchro_req_cb(struct journal_entry *entry)
 		applier_rollback_by_wal_io(entry->res);
 	} else {
 		replica_txn_wal_write_cb(synchro_entry->rcb);
-		txn_limbo_apply(&txn_limbo, synchro_entry->req);
+		txn_limbo_req_commit(&txn_limbo, synchro_entry->req);
 		trigger_run(&replicaset.applier.on_wal_write, NULL);
 	}
 	fiber_wakeup(synchro_entry->owner);
