@@ -528,7 +528,7 @@ txn_limbo_read_promote(struct txn_limbo *limbo, uint32_t replica_id,
 {
 	txn_limbo_read_confirm(limbo, lsn);
 	txn_limbo_read_rollback(limbo, lsn + 1);
-	assert(txn_limbo_is_empty(&txn_limbo));
+	assert(txn_limbo_is_empty(limbo));
 	limbo->owner_id = replica_id;
 	box_update_ro_summary();
 	limbo->confirmed_lsn = 0;
