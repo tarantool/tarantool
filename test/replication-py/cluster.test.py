@@ -259,13 +259,14 @@ failed.script = "replication-py/failed.lua"
 failed.vardir = server.vardir
 failed.rpl_master = master
 failed.name = "failed"
-failed.crash_expected = True
-try:
-    failed.deploy()
-except Exception as e:
-    line = "ER_READONLY"
-    if failed.logfile_pos.seek_once(line) >= 0:
-        print("'{}' exists in server log".format(line))
+
+failed.deploy(True, wait=False)
+line = "ER_READONLY"
+if failed.logfile_pos.seek_wait(line) >= 0:
+    print("'{}' exists in server log".format(line))
+
+failed.stop()
+failed.cleanup()
 
 master.admin("box.cfg { read_only = false }")
 
