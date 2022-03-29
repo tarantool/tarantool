@@ -312,19 +312,10 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo,
 	req->term = limbo->promote_greatest_term;
 }
 
+/** Write a request to WAL. */
 static void
-txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
-			uint64_t term)
+synchro_request_write(const struct synchro_request *req)
 {
-	assert(lsn >= 0);
-
-	struct synchro_request req = {
-		.type		= type,
-		.replica_id	= limbo->owner_id,
-		.lsn		= lsn,
-		.term		= term,
-	};
-
 	/*
 	 * This is a synchronous commit so we can
 	 * allocate everything on a stack.
@@ -337,7 +328,7 @@ txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
 	struct journal_entry *entry = (struct journal_entry *)buf;
 	entry->rows[0] = &row;
 
-	xrow_encode_synchro(&row, body, &req);
+	xrow_encode_synchro(&row, body, req);
 
 	journal_entry_create(entry, 1, xrow_approx_len(&row),
 			     journal_entry_fiber_wakeup_cb, fiber());
@@ -359,8 +350,23 @@ fail:
 	 * problems are fixed. Or retry automatically with some period.
 	 */
 	panic("Could not write a synchro request to WAL: lsn = %lld, "
-	      "type = %s\n", (long long)lsn, iproto_type_name(type));
+	      "type = %s\n", (long long)req->lsn, iproto_type_name(req->type));
+}
 
+/** Create a request for a specific limbo and write it to WAL. */
+static void
+txn_limbo_write_synchro(struct txn_limbo *limbo, uint16_t type, int64_t lsn,
+			uint64_t term)
+{
+	assert(lsn >= 0);
+
+	struct synchro_request req = {
+		.type = type,
+		.replica_id = limbo->owner_id,
+		.lsn = lsn,
+		.term = term,
+	};
+	synchro_request_write(&req);
 }
 
 /**
@@ -490,8 +496,7 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 void
 txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 {
-	limbo->confirmed_lsn = lsn;
-	limbo->is_in_rollback = true;
+	assert(latch_is_locked(&limbo->promote_latch));
 	/*
 	 * We make sure that promote is only written once everything this
 	 * instance has may be confirmed.
@@ -499,7 +504,17 @@ txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 	struct txn_limbo_entry *e = txn_limbo_last_synchro_entry(limbo);
 	assert(e == NULL || e->lsn <= lsn);
 	(void) e;
-	txn_limbo_write_synchro(limbo, IPROTO_RAFT_PROMOTE, lsn, term);
+	struct synchro_request req = {
+		.type = IPROTO_RAFT_PROMOTE,
+		.replica_id = limbo->owner_id,
+		.origin_id = instance_id,
+		.lsn = lsn,
+		.term = term,
+	};
+	limbo->confirmed_lsn = lsn;
+	limbo->is_in_rollback = true;
+	synchro_request_write(&req);
+	txn_limbo_req_commit(limbo, &req);
 	limbo->is_in_rollback = false;
 }
 
@@ -522,12 +537,21 @@ txn_limbo_read_promote(struct txn_limbo *limbo, uint32_t replica_id,
 void
 txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 {
-	limbo->confirmed_lsn = lsn;
-	limbo->is_in_rollback = true;
+	assert(latch_is_locked(&limbo->promote_latch));
 	struct txn_limbo_entry *e = txn_limbo_last_synchro_entry(limbo);
 	assert(e == NULL || e->lsn <= lsn);
 	(void)e;
-	txn_limbo_write_synchro(limbo, IPROTO_RAFT_DEMOTE, lsn, term);
+	struct synchro_request req = {
+		.type = IPROTO_RAFT_DEMOTE,
+		.replica_id = limbo->owner_id,
+		.origin_id = instance_id,
+		.lsn = lsn,
+		.term = term,
+	};
+	limbo->confirmed_lsn = lsn;
+	limbo->is_in_rollback = true;
+	synchro_request_write(&req);
+	txn_limbo_req_commit(limbo, &req);
 	limbo->is_in_rollback = false;
 }
 
