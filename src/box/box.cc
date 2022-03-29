@@ -1860,7 +1860,7 @@ box_issue_promote(uint32_t prev_leader_id, int64_t promote_lsn)
 		.lsn = promote_lsn,
 		.term = raft->term,
 	};
-	txn_limbo_apply(&txn_limbo, &req);
+	txn_limbo_req_commit(&txn_limbo, &req);
 	txn_limbo_commit(&txn_limbo);
 	assert(txn_limbo_is_empty(&txn_limbo));
 }
@@ -1884,7 +1884,7 @@ box_issue_demote(uint32_t prev_leader_id, int64_t promote_lsn)
 		.lsn = promote_lsn,
 		.term = box_raft()->term,
 	};
-	txn_limbo_apply(&txn_limbo, &req);
+	txn_limbo_req_commit(&txn_limbo, &req);
 	txn_limbo_commit(&txn_limbo);
 	assert(txn_limbo_is_empty(&txn_limbo));
 }

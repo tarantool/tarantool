@@ -332,7 +332,8 @@ txn_limbo_rollback(struct txn_limbo *limbo)
 
 /** Apply a synchronous replication request after processing stage. */
 void
-txn_limbo_apply(struct txn_limbo *limbo, const struct synchro_request *req);
+txn_limbo_req_commit(struct txn_limbo *limbo,
+		     const struct synchro_request *req);
 
 /** Process a synchronous replication request. */
 void
