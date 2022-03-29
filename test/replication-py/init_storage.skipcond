@@ -1,0 +1,2 @@
+# Disabled until bug tarantool/tarantool#6966 is resolved.
+self.skip = 1
