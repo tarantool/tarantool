@@ -1,0 +1,70 @@
+1..37
+	*** test_buffer_foreach_copy_number ***
+ok 1 - prbuf(size=128, payload=4, iterations=16) has been validated
+ok 2 - prbuf(size=128, payload=4, iterations=32) has been validated
+ok 3 - prbuf(size=128, payload=4, iterations=64) has been validated
+	*** test_buffer_foreach_copy_number: done ***
+	*** test_buffer_foreach_copy_number ***
+ok 4 - prbuf(size=128, payload=16, iterations=16) has been validated
+ok 5 - prbuf(size=128, payload=16, iterations=32) has been validated
+ok 6 - prbuf(size=128, payload=16, iterations=64) has been validated
+	*** test_buffer_foreach_copy_number: done ***
+	*** test_buffer_foreach_copy_number ***
+ok 7 - prbuf(size=128, payload=40, iterations=16) has been validated
+ok 8 - prbuf(size=128, payload=40, iterations=32) has been validated
+ok 9 - prbuf(size=128, payload=40, iterations=64) has been validated
+	*** test_buffer_foreach_copy_number: done ***
+	*** test_buffer_foreach_copy_number ***
+ok 10 - prbuf(size=256, payload=4, iterations=16) has been validated
+ok 11 - prbuf(size=256, payload=4, iterations=32) has been validated
+ok 12 - prbuf(size=256, payload=4, iterations=64) has been validated
+	*** test_buffer_foreach_copy_number: done ***
+	*** test_buffer_foreach_copy_number ***
+ok 13 - prbuf(size=256, payload=16, iterations=16) has been validated
+ok 14 - prbuf(size=256, payload=16, iterations=32) has been validated
+ok 15 - prbuf(size=256, payload=16, iterations=64) has been validated
+	*** test_buffer_foreach_copy_number: done ***
+	*** test_buffer_foreach_copy_number ***
+ok 16 - prbuf(size=256, payload=40, iterations=16) has been validated
+ok 17 - prbuf(size=256, payload=40, iterations=32) has been validated
+ok 18 - prbuf(size=256, payload=40, iterations=64) has been validated
+	*** test_buffer_foreach_copy_number: done ***
+	*** test_buffer_foreach_copy_number ***
+ok 19 - prbuf(size=512, payload=4, iterations=16) has been validated
+ok 20 - prbuf(size=512, payload=4, iterations=32) has been validated
+ok 21 - prbuf(size=512, payload=4, iterations=64) has been validated
+	*** test_buffer_foreach_copy_number: done ***
+	*** test_buffer_foreach_copy_number ***
+ok 22 - prbuf(size=512, payload=16, iterations=16) has been validated
+ok 23 - prbuf(size=512, payload=16, iterations=32) has been validated
+ok 24 - prbuf(size=512, payload=16, iterations=64) has been validated
+	*** test_buffer_foreach_copy_number: done ***
+	*** test_buffer_foreach_copy_number ***
+ok 25 - prbuf(size=512, payload=40, iterations=16) has been validated
+ok 26 - prbuf(size=512, payload=40, iterations=32) has been validated
+ok 27 - prbuf(size=512, payload=40, iterations=64) has been validated
+	*** test_buffer_foreach_copy_number: done ***
+	*** test_buffer_bad_version ***
+ok 28 - Failed to open buffer with malformed version
+	*** test_buffer_bad_version: done ***
+	*** test_buffer_bad_header ***
+ok 29 - Failed to open buffer with malformed header
+	*** test_buffer_bad_header: done ***
+	*** test_buffer_corrupted_record ***
+ok 30 - Failed to open buffer with malformed record
+	*** test_buffer_corrupted_record: done ***
+	*** test_buffer_too_large_entry ***
+ok 31 - Failed to allocate too large entry
+	*** test_buffer_too_large_entry: done ***
+	*** test_buffer_empty ***
+ok 32 - Buffer is empty
+	*** test_buffer_empty: done ***
+	*** test_buffer_prepared ***
+ok 33 - Prepare has not failed
+ok 34 - Entry count has decreased
+	*** test_buffer_prepared: done ***
+	*** test_buffer_prepared_large ***
+ok 35 - Prepare has not failed
+ok 36 - Buffer is empty
+ok 37 - Buffer is in correct state
+	*** test_buffer_prepared_large: done ***

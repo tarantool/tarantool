@@ -94,6 +94,8 @@ add_executable(fiber_stack.test fiber_stack.c core_test_utils.c)
 target_link_libraries(fiber_stack.test core unit)
 add_executable(func_cache.test func_cache.c box_test_utils.c)
 target_link_libraries(func_cache.test box unit)
+add_executable(prbuf.test prbuf.c)
+target_link_libraries(prbuf.test unit core)
 
 if (NOT ENABLE_GCOV)
     # This test is known to be broken with GCOV
