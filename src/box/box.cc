@@ -2633,6 +2633,12 @@ box_process_register(struct ev_io *io, struct xrow_header *header)
 		tnt_raise(ClientError, ER_REPLICA_NOT_ANON,
 			  tt_uuid_str(&instance_uuid));
 	}
+
+	if (replication_anon) {
+		tnt_raise(ClientError, ER_UNSUPPORTED, "Anonymous replica",
+			  "registration of non-anonymous nodes.");
+	}
+
 	/* See box_process_join() */
 	box_check_writable_xc();
 	struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
@@ -2756,6 +2762,11 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	/* Check permissions */
 	access_check_universe_xc(PRIV_R);
+
+	if (replication_anon) {
+		tnt_raise(ClientError, ER_UNSUPPORTED, "Anonymous replica",
+			  "registration of non-anonymous nodes.");
+	}
 
 	/*
 	 * Unless already registered, the new replica will be
