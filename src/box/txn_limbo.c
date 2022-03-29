@@ -51,6 +51,7 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->confirmed_lsn = 0;
 	limbo->rollback_count = 0;
 	limbo->is_in_rollback = false;
+	limbo->svp_confirmed_lsn = -1;
 }
 
 bool
@@ -511,11 +512,9 @@ txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 		.lsn = lsn,
 		.term = term,
 	};
-	limbo->confirmed_lsn = lsn;
-	limbo->is_in_rollback = true;
+	txn_limbo_req_prepare(limbo, &req);
 	synchro_request_write(&req);
 	txn_limbo_req_commit(limbo, &req);
-	limbo->is_in_rollback = false;
 }
 
 /**
@@ -548,11 +547,9 @@ txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 		.lsn = lsn,
 		.term = term,
 	};
-	limbo->confirmed_lsn = lsn;
-	limbo->is_in_rollback = true;
+	txn_limbo_req_prepare(limbo, &req);
 	synchro_request_write(&req);
 	txn_limbo_req_commit(limbo, &req);
-	limbo->is_in_rollback = false;
 }
 
 /**
@@ -749,9 +746,81 @@ txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout)
 }
 
 void
+txn_limbo_req_prepare(struct txn_limbo *limbo,
+		      const struct synchro_request *req)
+{
+	assert(latch_is_locked(&limbo->promote_latch));
+	switch (req->type) {
+	case IPROTO_RAFT_PROMOTE:
+	case IPROTO_RAFT_DEMOTE: {
+		assert(!limbo->is_in_rollback);
+		assert(limbo->svp_confirmed_lsn == -1);
+		/*
+		 * Guard against new transactions appearing during WAL write. It
+		 * is necessary because otherwise when PROMOTE/DEMOTE would be
+		 * done and it would see a txn without LSN in the limbo, it
+		 * couldn't tell whether the transaction should be confirmed or
+		 * rolled back. It could be delivered to the PROMOTE/DEMOTE
+		 * initiator even before than to the local TX thread, or could
+		 * be not.
+		 */
+		limbo->svp_confirmed_lsn = limbo->confirmed_lsn;
+		limbo->confirmed_lsn = req->lsn;
+		limbo->is_in_rollback = true;
+		break;
+	}
+	/*
+	 * XXX: ideally all requests should go through req_* methods. To unify
+	 * their work from applier and locally.
+	 */
+	default: {
+		break;
+	}
+	}
+}
+
+void
+txn_limbo_req_rollback(struct txn_limbo *limbo,
+		       const struct synchro_request *req)
+{
+	assert(latch_is_locked(&limbo->promote_latch));
+	switch (req->type) {
+	case IPROTO_RAFT_PROMOTE:
+	case IPROTO_RAFT_DEMOTE: {
+		assert(limbo->is_in_rollback);
+		assert(limbo->svp_confirmed_lsn >= 0);
+		limbo->confirmed_lsn = limbo->svp_confirmed_lsn;
+		limbo->svp_confirmed_lsn = -1;
+		limbo->is_in_rollback = false;
+		break;
+	}
+	/*
+	 * XXX: ideally all requests should go through req_* methods. To unify
+	 * their work from applier and locally.
+	 */
+	default: {
+		break;
+	}
+	}
+}
+
+void
 txn_limbo_req_commit(struct txn_limbo *limbo, const struct synchro_request *req)
 {
 	assert(latch_is_locked(&limbo->promote_latch));
+	switch (req->type) {
+	case IPROTO_RAFT_PROMOTE:
+	case IPROTO_RAFT_DEMOTE: {
+		assert(limbo->svp_confirmed_lsn >= 0);
+		assert(limbo->is_in_rollback);
+		limbo->svp_confirmed_lsn = -1;
+		limbo->is_in_rollback = false;
+		break;
+	}
+	default: {
+		break;
+	}
+	}
 
 	uint64_t term = req->term;
 	uint32_t origin = req->origin_id;
@@ -817,6 +886,7 @@ void
 txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 {
 	txn_limbo_begin(limbo);
+	txn_limbo_req_prepare(limbo, req);
 	txn_limbo_req_commit(limbo, req);
 	txn_limbo_commit(limbo);
 }

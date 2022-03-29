@@ -957,6 +957,7 @@ apply_synchro_req_cb(struct journal_entry *entry)
 	struct synchro_entry *synchro_entry =
 		(struct synchro_entry *)entry->complete_data;
 	if (entry->res < 0) {
+		txn_limbo_req_rollback(&txn_limbo, synchro_entry->req);
 		applier_rollback_by_wal_io(entry->res);
 	} else {
 		replica_txn_wal_write_cb(synchro_entry->rcb);
@@ -1006,8 +1007,11 @@ apply_synchro_req(uint32_t replica_id, struct xrow_header *row, struct synchro_r
 	 * transactions side, including the async ones.
 	 */
 	txn_limbo_begin(&txn_limbo);
-	if (journal_write(&entry.base) != 0)
+	txn_limbo_req_prepare(&txn_limbo, req);
+	if (journal_write(&entry.base) != 0) {
+		txn_limbo_req_rollback(&txn_limbo, req);
 		goto err;
+	}
 	if (entry.base.res < 0) {
 		diag_set_journal_res(entry.base.res);
 		goto err;

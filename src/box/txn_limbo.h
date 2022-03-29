@@ -184,6 +184,11 @@ struct txn_limbo {
 	 * by the 'reversed rollback order' rule - contradiction.
 	 */
 	bool is_in_rollback;
+	/**
+	 * Savepoint of confirmed LSN. To rollback to in case the current
+	 * synchro command (promote/demote/...) fails.
+	 */
+	int64_t svp_confirmed_lsn;
 };
 
 /**
@@ -330,7 +335,26 @@ txn_limbo_rollback(struct txn_limbo *limbo)
 	latch_unlock(&limbo->promote_latch);
 }
 
-/** Apply a synchronous replication request after processing stage. */
+/**
+ * Prepare a limbo request for WAL write and commit. Similar to txn_stmt
+ * prepare.
+ */
+void
+txn_limbo_req_prepare(struct txn_limbo *limbo,
+		      const struct synchro_request *req);
+
+/**
+ * Rollback a limbo request after a fail, such as a bad WAL write. Similar to
+ * txn_stmt rollback.
+ */
+void
+txn_limbo_req_rollback(struct txn_limbo *limbo,
+		       const struct synchro_request *req);
+
+/**
+ * Commit a synchronous replication request after a successful WAL write.
+ * Similar to txn_stmt commit.
+ */
 void
 txn_limbo_req_commit(struct txn_limbo *limbo,
 		     const struct synchro_request *req);
