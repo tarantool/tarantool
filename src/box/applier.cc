@@ -114,6 +114,7 @@ applier_log_error(struct applier *applier, struct error *e)
 	error_log(e);
 	switch (errcode) {
 	case ER_LOADING:
+	case ER_READONLY:
 	case ER_CFG:
 	case ER_ACCESS_DENIED:
 	case ER_NO_SUCH_USER:
@@ -2144,7 +2145,8 @@ applier_f(va_list ap)
 				/* Connection to itself, stop applier */
 				applier_disconnect(applier, APPLIER_OFF);
 				return 0;
-			} else if (e->errcode() == ER_LOADING) {
+			} else if (e->errcode() == ER_LOADING ||
+				   e->errcode() == ER_READONLY) {
 				/* Autobootstrap */
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_LOADING);

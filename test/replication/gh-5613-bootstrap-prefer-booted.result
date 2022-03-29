@@ -43,19 +43,22 @@ test_run:cmd('create server replica2 with script="replication/gh-5613-replica2.l
  | ---
  | - true
  | ...
--- It returns false, but it is expected.
-test_run:cmd('start server replica2 with crash_expected=True')
+test_run:cmd('start server replica2 with wait=False')
  | ---
- | - false
+ | - true
  | ...
 opts = {filename = 'gh-5613-replica2.log'}
  | ---
  | ...
-assert(test_run:grep_log(nil, 'ER_READONLY', nil, opts) ~= nil)
+assert(test_run:wait_log(nil, 'ER_READONLY', nil, nil, opts) ~= nil)
  | ---
  | - true
  | ...
 
+test_run:cmd('stop server replica2')
+ | ---
+ | - true
+ | ...
 test_run:cmd('delete server replica2')
  | ---
  | - true
