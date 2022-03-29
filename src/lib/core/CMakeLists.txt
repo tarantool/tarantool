@@ -35,6 +35,7 @@ set(core_sources
     tt_uuid.c
     mp_uuid.c
     mp_datetime.c
+    prbuf.c
 )
 
 if(ENABLE_TUPLE_COMPRESSION)
