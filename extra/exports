@@ -479,3 +479,4 @@ uri_set_destroy
 uuid_nil
 uuid_unpack
 _say
+json_escape_forward_slash_change

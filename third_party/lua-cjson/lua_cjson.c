@@ -124,7 +124,47 @@ typedef struct {
     int string_len;
 } json_token_t;
 
-static const char *char2escape[256] = {
+
+static const char *char2escape_without_forward_slash_escape[256] = {            // TODO write good long comment about what the fuck is going on
+    "\\u0000", "\\u0001", "\\u0002", "\\u0003",
+    "\\u0004", "\\u0005", "\\u0006", "\\u0007",
+    "\\b", "\\t", "\\n", "\\u000b",
+    "\\f", "\\r", "\\u000e", "\\u000f",
+    "\\u0010", "\\u0011", "\\u0012", "\\u0013",
+    "\\u0014", "\\u0015", "\\u0016", "\\u0017",
+    "\\u0018", "\\u0019", "\\u001a", "\\u001b",
+    "\\u001c", "\\u001d", "\\u001e", "\\u001f",
+    NULL, NULL, "\\\"", NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, "\\\\", NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, "\\u007f",
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+};
+
+static const char *char2escape_with_forward_slash_escape[256] = {
     "\\u0000", "\\u0001", "\\u0002", "\\u0003",
     "\\u0004", "\\u0005", "\\u0006", "\\u0007",
     "\\b", "\\t", "\\n", "\\u000b",
@@ -163,6 +203,8 @@ static const char *char2escape[256] = {
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 };
 
+static char **char2escape = NULL;        // TODO ask if it is safe to do like this, in cases when compat won't be called, and what default behaviour to set then
+
 #if 0
 static int json_destroy_config(lua_State *l)
 {
@@ -176,6 +218,15 @@ static int json_destroy_config(lua_State *l)
     return 0;
 }
 #endif
+
+void json_escape_forward_slash_change(bool value)              //TODO
+{
+    fprintf(stderr, "json_escape_forward_slash_change called with value = %d!\n", value);
+    if (value)
+        char2escape = (char**)char2escape_with_forward_slash_escape;
+    else
+        char2escape = (char**)char2escape_without_forward_slash_escape;
+}
 
 static void json_create_tokens()
 {

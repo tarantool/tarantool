@@ -1,28 +1,29 @@
 -- compat.lua -- internal file
 
+local ffi = require('ffi')
+ffi.cdef[[
+	extern void json_escape_forward_slash_change(bool value);
+]]
+
 local options = {
 	json_escape_forward_slash = {
-		old = false,
-		new = true,
-		default = false,
+		old = true,
+		new = false,
+		default = true,
 		brief = "<...>",
-		name = "json_escape_forward_slash",
 		doc  = "https://github.com/tarantool/tarantool/wiki/compat_json_escape_forward_slash"
 	},
 	option_2 = {
-		old = true,
-		new = false,
-		default = false,
+		old = false,
+		new = true,
+		default = true,
 		brief = "<...>",
-		name = "option_2",
 		doc  = "https://github.com/tarantool/tarantool/wiki/option_2"
 	}
 }
 
 local postaction = {
-	json_escape_forward_slash = function (value)
-			print("json_escape_forward_slash postaction was called!")
-		end,
+	json_escape_forward_slash = ffi.C.json_escape_forward_slash_change,
 	option_2 = function (value)
 			print("option_2 postaction was called!")
 		end
@@ -34,6 +35,7 @@ for name, elem in pairs(options) do
 	cfg[name] = { }
  	cfg[name].value = elem.default
 	cfg[name].selected = false
+	postaction[name](elem.default)
 end
 
 local function serialize_policy(key, policy)
@@ -76,7 +78,7 @@ compat = setmetatable({
 				end
 				return result
 			end,
-			restore = function()
+			reset = function()
 				for name, elem in pairs(options) do
  					cfg[name].value = elem.default
 					cfg[name].selected = false
@@ -84,7 +86,7 @@ compat = setmetatable({
 			end
 		}, {
 			__call = function(compat, list)
-				if type(list) ~= table then
+				if type(list) ~= 'table' then
 					error(('Invalid argument %s'):format(list))
 				end
 				for key, val in pairs(list) do
