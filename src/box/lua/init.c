@@ -72,6 +72,11 @@
 
 static uint32_t CTID_STRUCT_TXN_SAVEPOINT_PTR = 0;
 
+#if ENABLE_AUDIT_LOG
+void
+box_lua_audit_init(struct lua_State *L);
+#endif
+
 extern char session_lua[],
 	tuple_lua[],
 	key_def_lua[],
@@ -80,6 +85,9 @@ extern char session_lua[],
 	xlog_lua[],
 #if ENABLE_FEEDBACK_DAEMON
 	feedback_daemon_lua[],
+#endif
+#if ENABLE_AUDIT_LOG
+	audit_lua[],
 #endif
 	net_box_lua[],
 	upgrade_lua[],
@@ -97,6 +105,9 @@ static const char *lua_sources[] = {
 	 * from the feedback daemon.
 	 */
 	"box/feedback_daemon", feedback_daemon_lua,
+#endif
+#if ENABLE_AUDIT_LOG
+	"box/audit", audit_lua,
 #endif
 	"box/upgrade", upgrade_lua,
 	"box/net_box", net_box_lua,
@@ -480,6 +491,9 @@ box_lua_init(struct lua_State *L)
 	box_lua_xlog_init(L);
 	box_lua_sql_init(L);
 	box_lua_watcher_init(L);
+#ifdef ENABLE_AUDIT_LOG
+	box_lua_audit_init(L);
+#endif
 	luaopen_net_box(L);
 	lua_pop(L, 1);
 	tarantool_lua_console_init(L);
