@@ -1,4 +1,4 @@
 ## bugfix/vinyl
 
-* Fix possible keys divergence during secondary index build which might
+* Fixed possible keys divergence during secondary index build that might
   lead to missing tuples in it (gh-6045).

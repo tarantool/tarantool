@@ -1,3 +1,4 @@
 ## bugfix/core
 
-* Fix a bug when rollbacked changes appears in built-in-background index (gh-5958)
+* Fixed a bug when rolled back changes appear in the built-in-background index
+  (gh-5958).

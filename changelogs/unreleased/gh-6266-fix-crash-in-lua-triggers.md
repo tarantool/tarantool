@@ -1,5 +1,6 @@
 ## bugfix/lua/triggers
 
-* Fixed possibility crash in case when trigger removes itself.
-  Fixed possibility crash in case when someone destroy trigger,
-  when it's yield (gh-6266).
+* Fixed the possibility of a crash in case when trigger removes itself.
+
+* Fixed the possibility of a crash in case someone destroys trigger
+  when it's yielding (gh-6266).

@@ -1,3 +1,3 @@
 ## feature/core
 
-* Added linking type (dynamic or static) to tarantool build info.
+* Added linking type (dynamic or static) to Tarantool build info.

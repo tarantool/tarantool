@@ -1,3 +1,3 @@
 ## bugfix/sql
 
-* Fixed wrong comparison between DECIMAL and large DOUBLE values (gh-6376).
+* Fixed wrong comparison between `DECIMAL` and large `DOUBLE` values (gh-6376).

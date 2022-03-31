@@ -1,3 +1,3 @@
 ## feature/core
 
- * Field type UUID is now part of field type SCALAR (gh-6042).
+* Field type `UUID` is now a part of field type `SCALAR` (gh-6042).

@@ -1,12 +1,14 @@
 ## bugfix/core
 
-* **[Breaking change]** `fiber.wakeup()` in Lua and `fiber_wakeup()` in C became
-  NOP on the currently running fiber. Previously they allowed to "ignore" the
-  next yield or sleep leading to unexpected spurious wakeups. Could lead to a
-  crash (in debug build) or undefined behaviour (in release build) if called
-  right before `fiber.create()` in Lua or `fiber_start()` in C (gh-6043).
+* **[Breaking change]** `fiber.wakeup()` in Lua and `fiber_wakeup()` in C
+  became NOP on the currently running fiber.
 
-  There was a single usecase for that - reschedule in the same event loop
+  Previously, they allowed to "ignore" the next yield or sleep, leading to
+  unexpected spurious wake-ups. This could lead to a crash (in debug build) or
+  undefined behavior (in release build) if called right before `fiber.create()`
+  in Lua or `fiber_start()` in C (gh-6043).
+
+  There was a single use case for that---reschedule in the same event loop
   iteration which is not the same as `fiber.sleep(0)` in Lua and
   `fiber_sleep(0)` in C. Could be done in C like that:
   ```C
@@ -18,10 +20,10 @@
   fiber.self():wakeup()
   fiber.yield()
   ```
-  Now to get the same effect in C use `fiber_reschedule()`. In Lua it is now
+  Now, to get the same effect in C, use `fiber_reschedule()`. In Lua, it is now
   simply impossible to reschedule the current fiber in the same event loop
-  iteration directly. But still can reschedule self through a second fiber like
-  this (**never use it, please**):
+  iteration directly. But still it can reschedule itself through the second
+  fiber like this (**do not use it, please**):
   ```Lua
   local self = fiber.self()
   fiber.new(function() self:wakeup() end)
@@ -29,5 +31,5 @@
   ```
 
 ----
-Breaking change: `fiber.wakeup()` in Lua and `fiber_wakeup()` in C became NOP on
-the currently running fiber.
+Breaking change: `fiber.wakeup()` in Lua and `fiber_wakeup()` in C became NOP
+on the currently running fiber.

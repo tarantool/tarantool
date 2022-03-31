@@ -1,4 +1,4 @@
 ## bugfix/core
 
-* Fixed bug in MVCC connected which happens on rollback after
+* Fixed a bug in MVCC connected which happened on a rollback after
   DDL operation (gh-5998).

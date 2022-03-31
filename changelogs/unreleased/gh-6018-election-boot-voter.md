@@ -1,4 +1,4 @@
 ## bugfix/replication
 
-* Fixed a cluster sometimes being unable to bootstrap if it contains nodes with
+* Fixed a cluster that sometimes could not bootstrap if it contained nodes with
   `election_mode` `manual` or `voter` (gh-6018).
