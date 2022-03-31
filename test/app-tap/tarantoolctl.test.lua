@@ -11,6 +11,7 @@ local ok, test_run = pcall(require, 'test_run')
 test_run = ok and test_run.new() or nil
 
 local BUILDDIR = os.getenv('BUILDDIR') or '.'
+local SOURCEDIR = os.getenv("SOURCEDIR") or '.'
 local TARANTOOLCTL_PATH = ('%s/extra/dist/tarantoolctl'):format(BUILDDIR)
 
 local function recursive_rmdir(path)
@@ -111,10 +112,11 @@ local function tctl_wait_stop(dir, name)
 end
 
 local function tctl_command(dir, cmd, args)
+    local rocks_path = SOURCEDIR .. '/third_party/luarocks/src/?.lua;;'
     if not fio.stat(fio.pathjoin(dir, '.tarantoolctl')) then
         create_script(dir, '.tarantoolctl', tctlcfg_code)
     end
-    local command = ('tarantoolctl %s %s'):format(cmd, args)
+    local command = ('LUA_PATH="' .. rocks_path .. '" tarantoolctl %s %s'):format(cmd, args)
     return run_command(dir, command)
 end
 
@@ -327,11 +329,14 @@ do
 
     local status, err = pcall(function()
         test:test("check basic help", function(test_i)
-            test_i:plan(4)
+            local exp = 'tarantoolctl rocks %- ' ..
+                'LuaRocks main command%-line interface'
+            test_i:plan(6)
             test_help(test_i, nil, "tarantoolctl", "Usage:")
             test_help(test_i, nil, "tarantoolctl help", "Usage:")
             test_help(test_i, nil, "tarantoolctl --help", "Usage:")
             test_help(test_i, dir, "tarantoolctl", "Usage:")
+            check_ok(test_i, dir, "rocks", "--help", 0, exp)
         end)
     end)
 
