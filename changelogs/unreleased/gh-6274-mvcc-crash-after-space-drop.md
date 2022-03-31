@@ -1,3 +1,4 @@
 ## bugfix/core
 
-* Fix a crash in mvcc after drop of a space with several indexes (gh-6274)
+* Fixed a crash in MVCC after the drop of a space with several indexes
+  (gh-6274).

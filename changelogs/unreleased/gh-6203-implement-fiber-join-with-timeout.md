@@ -1,3 +1,3 @@
 ## feature/core
 
-* Implement timeout for 'fiber:join' in lua (gh-6203).
+* Implemented a timeout for `fiber:join` in Lua (gh-6203).

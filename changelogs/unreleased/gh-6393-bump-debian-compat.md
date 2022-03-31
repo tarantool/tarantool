@@ -1,5 +1,5 @@
 ## feature/build
 
-* Bump debian package compatibility level to 10 (gh-5429).
+* Bumped Debian package compatibility level to 10 (gh-5429).
 
-  Bump minimal required debhelper to version 10 (except for Ubuntu Xenial).
+* Bumped minimal required debhelper to version 10 (except for Ubuntu Xenial).

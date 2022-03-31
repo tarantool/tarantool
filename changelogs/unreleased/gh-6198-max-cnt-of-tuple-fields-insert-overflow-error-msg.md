@@ -1,4 +1,4 @@
 ## bugfix/box
 
-* Fix error message on attempt to insert into a tuple which size equals to 
-  box.schema.FIELD_MAX (gh-6198).
+* Fixed the error message in an attempt to insert into a tuple the size of
+  which equals to `box.schema.FIELD_MAX` (gh-6198).

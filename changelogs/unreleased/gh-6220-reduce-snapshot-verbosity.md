@@ -1,3 +1,3 @@
 ## feature/xlog
 
-* Reduce snapshot verbosity (gh-6620).
+* Reduced snapshot verbosity (gh-6620).

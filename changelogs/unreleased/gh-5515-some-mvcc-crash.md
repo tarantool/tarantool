@@ -1,3 +1,3 @@
 ## bugfix/core
 
-* Fix a bug when memtx mvcc crashed during reading uncommitted DDL (gh-5515)
+* Fixed a bug when memtx MVCC crashed during reading uncommitted DDL (gh-5515).

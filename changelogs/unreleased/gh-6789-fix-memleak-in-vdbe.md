@@ -1,3 +1,3 @@
 ## bugfix/sql
 
-* Fixed memleak in SQL during calling of user-defined function (gh-6789).
+* Fixed a memory leak in SQL during calling of user-defined function (gh-6789).
