@@ -1,3 +1,4 @@
 ## bugfix/core
 
-* Fix a crash if you call box.snapshot during an incomplete transaction (gh-6229)
+* Fixed a crash that happened when a user called `box.snapshot` during
+  an incomplete transaction (gh-6229).

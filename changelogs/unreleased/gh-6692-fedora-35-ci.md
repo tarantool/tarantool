@@ -1,3 +1,3 @@
 ## feature/build
 
- * Support fedora-35 build. (gh-6692)
+* Support fedora-35 build (gh-6692).

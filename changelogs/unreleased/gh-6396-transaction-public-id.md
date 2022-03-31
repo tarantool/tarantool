@@ -1,3 +1,4 @@
 ## feature/core
 
-* Added new function box.txn_id(), which returns the id of the current transaction if called within a transaction, nil otherwise.
+* Added the new `box.txn_id()` function that returns the id of the current
+  transaction if called within a transaction, nil otherwise.

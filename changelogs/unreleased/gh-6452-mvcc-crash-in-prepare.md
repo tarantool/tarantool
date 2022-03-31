@@ -1,3 +1,3 @@
 ## bugfix/core
 
-* Fixed a crash in mvcc connected with secondary index conflict (gh-6452).
+* Fixed a crash in MVCC related to a secondary index conflict (gh-6452).
