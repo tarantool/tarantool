@@ -25,6 +25,8 @@ int getppid(void);
 
 local TIMEOUT_INFINITY = 100 * 365 * 86400
 
+-- path of tarantoolctl binary
+local command_path = arg[0]
 -- name of tarantoolctl binary
 local self_name = fio.basename(arg[0])
 -- command that we're executing
@@ -945,6 +947,9 @@ local function rocks()
     util.see_help = function(command, program) -- luacheck: no unused args
         -- TODO: print extended help message here
         return "See Tarantool documentation for help."
+    end
+    util.this_program = function(default) -- luacheck: no unused args
+        return command_path .. " rocks"
     end
 
     -- Disabled: path, upload
