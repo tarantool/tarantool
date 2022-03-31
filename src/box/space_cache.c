@@ -135,10 +135,10 @@ static void
 space_cache_repin_pinned(struct space *old_space, struct space *new_space)
 {
 	assert(new_space != NULL);
-	assert(rlist_empty(&new_space->space_cache_pin_list));
 	if (old_space == NULL)
 		return;
 
+	assert(rlist_empty(&new_space->space_cache_pin_list));
 	rlist_swap(&new_space->space_cache_pin_list,
 		   &old_space->space_cache_pin_list);
 
@@ -224,7 +224,6 @@ space_cache_replace(struct space *old_space, struct space *new_space)
 		assert(old_space_by_name == old_space);
 		(void)old_space_by_name;
 		mh_strnptr_del(spaces_by_name, k, NULL);
-		assert(rlist_empty(&old_space->space_cache_pin_list));
 	}
 	space_cache_version++;
 
@@ -249,20 +248,25 @@ space_cache_on_replace_noop(struct space_cache_holder *holder,
 void
 space_cache_pin(struct space *space, struct space_cache_holder *holder,
 		space_cache_on_replace on_replace,
-		enum space_cache_holder_type type)
+		enum space_cache_holder_type type, bool selfpin)
 {
-	assert(mh_i32ptr_find(spaces, space->def->id, NULL) != mh_end(spaces));
+	if (!selfpin)
+		assert(mh_i32ptr_find(spaces, space->def->id, NULL)
+		       != mh_end(spaces));
 	holder->on_replace = on_replace;
 	holder->type = type;
 	rlist_add_tail(&space->space_cache_pin_list, &holder->link);
 	holder->space = space;
+	holder->selfpin = selfpin;
 }
 
 void
 space_cache_unpin(struct space_cache_holder *holder)
 {
 	struct space *space = holder->space; (void)space;
-	assert(mh_i32ptr_find(spaces, space->def->id, NULL) != mh_end(spaces));
+	if (!holder->selfpin)
+		assert(mh_i32ptr_find(spaces, space->def->id, NULL)
+		       != mh_end(spaces));
 #ifndef NDEBUG
 	/* Paranoid check that the holder in space's pin list. */
 	bool is_in_list = false;
@@ -279,11 +283,13 @@ bool
 space_cache_is_pinned(struct space *space, enum space_cache_holder_type *type)
 {
 	assert(mh_i32ptr_find(spaces, space->def->id, NULL) != mh_end(spaces));
-	if (rlist_empty(&space->space_cache_pin_list))
-		return false;
-	struct space_cache_holder *h =
-		rlist_first_entry(&space->space_cache_pin_list,
-				  struct space_cache_holder, link);
-	*type = h->type;
-	return true;
+	struct space_cache_holder *h;
+	rlist_foreach_entry(h, &space->space_cache_pin_list, link) {
+		/* Self-pinned spaces are treated as not pinned. */
+		if (!h->selfpin) {
+			*type = h->type;
+			return true;
+		}
+	}
+	return false;
 }
