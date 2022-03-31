@@ -571,14 +571,16 @@ tuple_constraint_fkey_init(struct tuple_constraint *constr,
 	constr->space = space;
 	tuple_constraint_fkey_update_local(constr, field_no);
 
-	struct space *foreign_space;
-	foreign_space = space_by_id(constr->def.fkey.space_id);
+	bool fkey_same_space = constr->def.fkey.space_id == space->def->id;
+	struct space *foreign_space = space_by_id(constr->def.fkey.space_id);
+	if (fkey_same_space && foreign_space == NULL)
+		foreign_space = space;
 	enum space_cache_holder_type type = SPACE_HOLDER_FOREIGN_KEY;
 	if (foreign_space != NULL) {
 		/* Space was found, use it. */
 		space_cache_pin(foreign_space, &constr->space_cache_holder,
 				tuple_constraint_fkey_space_cache_on_replace,
-				type);
+				type, fkey_same_space);
 		tuple_constraint_fkey_update_foreign(constr);
 		constr->check = tuple_constraint_fkey_check;
 		constr->destroy = tuple_constraint_fkey_unpin;

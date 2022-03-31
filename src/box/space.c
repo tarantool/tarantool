@@ -260,6 +260,7 @@ space_create(struct space *space, struct engine *engine,
 	}
 	space_fill_index_map(space);
 
+	rlist_create(&space->space_cache_pin_list);
 	if (space_init_constraints(space) != 0)
 		goto fail_free_indexes;
 
@@ -292,7 +293,6 @@ space_create(struct space *space, struct engine *engine,
 		}
 	}
 	space->constraint_ids = mh_strnptr_new();
-	rlist_create(&space->space_cache_pin_list);
 	rlist_create(&space->memtx_stories);
 	return 0;
 
@@ -570,8 +570,8 @@ after_old_tuple_lookup:;
 	if (old_tuple != NULL) {
 		/*
 		 * Before deleting we must check that there are no tuples
-		 * in other spaces that refer to this tuple via foreign key
-		 * constraint.
+		 * in this space or in other spaces that refer to this tuple
+		 * via foreign key constraint.
 		 */
 		struct space_cache_holder *h;
 		rlist_foreach_entry(h, &space->space_cache_pin_list, link) {

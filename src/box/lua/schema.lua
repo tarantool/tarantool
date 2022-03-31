@@ -520,7 +520,8 @@ end
 --  foreign field.
 -- If is_complex, field is expected to be a table with local field ->
 --  foreign field mapping.
-local function normalize_foreign_key_one(def, error_prefix, is_complex)
+local function normalize_foreign_key_one(space_id, space_name, def,
+                                         error_prefix, is_complex)
     if def.space == nil then
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "foreign key: space must be specified")
@@ -579,7 +580,8 @@ local function normalize_foreign_key_one(def, error_prefix, is_complex)
         end
         def.field = setmap(converted)
     end
-    if not box.space[def.space] then
+    local fkey_same_space = (def.space == space_id or def.space == space_name)
+    if not box.space[def.space] and not fkey_same_space then
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "foreign key: space " .. tostring(def.space)
                   .. " was not found")
@@ -591,7 +593,11 @@ local function normalize_foreign_key_one(def, error_prefix, is_complex)
                       tostring(k) .. "'")
         end
     end
-    return {space = box.space[def.space].id, field = def.field}
+    if fkey_same_space then
+        return {space = space_id, field = def.field}
+    else
+        return {space = box.space[def.space].id, field = def.field}
+    end
 end
 
 -- Check and normalize foreign key definition.
@@ -602,9 +608,12 @@ end
 --  foreign field.
 -- If is_complex, field is expected to be a table with local field ->
 --  foreign field mapping.
+-- @a space_id and @a space_name - ID and name of a space, which contains the
+--  foreign key.
 -- In case of error box.error.ILLEGAL_PARAMS is raised, and @a error_prefix
 --  is added before string message.
-local function normalize_foreign_key(fkey, error_prefix, is_complex)
+local function normalize_foreign_key(space_id, space_name, fkey, error_prefix,
+                                     is_complex)
     if fkey == nil then
         return nil
     end
@@ -616,8 +625,15 @@ local function normalize_foreign_key(fkey, error_prefix, is_complex)
     if fkey.space ~= nil and fkey.field ~= nil and
         (type(fkey.space) ~= 'table' or type(fkey.field) ~= 'table') then
         -- the first, short form.
-        fkey = normalize_foreign_key_one(fkey, error_prefix, is_complex)
-        return {[box.space[fkey.space].name]=fkey}
+        fkey = normalize_foreign_key_one(space_id, space_name, fkey,
+                                         error_prefix, is_complex)
+        local fkey_same_space = (fkey.space == space_id or
+                                 fkey.space == space_name)
+        if fkey_same_space then
+            return {[space_name] = fkey}
+        else
+            return {[box.space[fkey.space].name] = fkey}
+        end
     end
     -- the second, detailed form.
     local result = {}
@@ -632,13 +648,14 @@ local function normalize_foreign_key(fkey, error_prefix, is_complex)
                       error_prefix .. "foreign key definition must be a table "
                       .. "with 'space' and 'field' members")
         end
-        v = normalize_foreign_key_one(v, error_prefix, is_complex)
+        v = normalize_foreign_key_one(space_id, space_name, v, error_prefix,
+                                      is_complex)
         result[k] = v
     end
     return result
 end
 
-local function update_format(format)
+local function update_format(space_id, space_name, format)
     local result = {}
     for i, given in ipairs(format) do
         local field = {}
@@ -669,7 +686,8 @@ local function update_format(format)
                 elseif k == 'constraint' then
                     field[k] = normalize_constraint(v, "format[" .. i .. "]: ")
                 elseif k == 'foreign_key' then
-                    field[k] = normalize_foreign_key(v, "format[" .. i .. "]: ")
+                    field[k] = normalize_foreign_key(space_id, space_name,
+                                                     v, "format[" .. i .. "]: ")
                 else
                     field[k] = v
                 end
@@ -750,9 +768,10 @@ box.schema.space.create = function(name, options)
     end
     local format = options.format and options.format or {}
     check_param(format, 'format', 'table')
-    format = update_format(format)
+    format = update_format(id, name, format)
     local constraint = normalize_constraint(options.constraint, '')
-    local foreign_key = normalize_foreign_key(options.foreign_key, '', true)
+    local foreign_key = normalize_foreign_key(id, name, options.foreign_key, '',
+                                              true)
     -- filter out global parameters from the options array
     local space_options = setmap({
         group_id = options.is_local and 1 or nil,
@@ -775,15 +794,16 @@ function box.schema.space.format(id, format)
     local _vspace = box.space._vspace
     check_param(id, 'id', 'number')
 
+    local tuple = _vspace:get(id)
+    if tuple == nil then
+        box.error(box.error.NO_SUCH_SPACE, '#' .. tostring(id))
+    end
+
     if format == nil then
-        local tuple = _vspace:get(id)
-        if tuple == nil then
-            box.error(box.error.NO_SUCH_SPACE, '#' .. tostring(id))
-        end
         return tuple.format
     else
         check_param(format, 'format', 'table')
-        format = update_format(format)
+        format = update_format(id, tuple.name, format)
         _space:update(id, {{'=', 7, format}})
     end
 end
@@ -898,7 +918,7 @@ box.schema.space.alter = function(space_id, options)
 
     local format
     if options.format ~= nil then
-        format = update_format(options.format)
+        format = update_format(space_id, tuple.name, options.format)
     else
         format = tuple.format
     end
@@ -914,7 +934,8 @@ box.schema.space.alter = function(space_id, options)
         if table.equals(options.foreign_key, {}) then
             options.foreign_key = nil
         end
-        flags.foreign_key = normalize_foreign_key(options.foreign_key, '', true)
+        flags.foreign_key = normalize_foreign_key(space_id, name,
+                                                  options.foreign_key, '', true)
     end
 
     tuple = tuple:totable()

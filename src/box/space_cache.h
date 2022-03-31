@@ -64,6 +64,8 @@ struct space_cache_holder {
 	 * used for proper container_of application.
 	 */
 	enum space_cache_holder_type type;
+	/** True for a space that had pinned itself. */
+	bool selfpin;
 };
 
 /**
@@ -159,11 +161,12 @@ space_cache_on_replace_noop(struct space_cache_holder *holder,
  * If a space has holders, it must not be deleted (asserted). It can be
  * replaced though, the holder will hold the new space in that case and
  * @a on_replace callback is called.
+ * @a selfpin expected to be true if a space pins itself.
  */
 void
 space_cache_pin(struct space *space, struct space_cache_holder *holder,
 		space_cache_on_replace on_replace,
-		enum space_cache_holder_type type);
+		enum space_cache_holder_type type, bool selfpin);
 
 /**
  * Notify that a @a holder does not depend anymore on @a space.
