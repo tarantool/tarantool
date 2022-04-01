@@ -294,6 +294,7 @@ struct errcode_record {
 	/*239 */_(ER_FIELD_FOREIGN_KEY_FAILED,	"Foreign key constraint '%s' failed for field '%s': %s") \
 	/*240 */_(ER_COMPLEX_FOREIGN_KEY_FAILED, "Foreign key constraint '%s' failed: %s") \
 	/*241 */_(ER_WRONG_SPACE_UPGRADE_OPTIONS, "Wrong space upgrade options: %s") \
+	/*242 */_(ER_NO_ELECTION_QUORUM,	"Not enough peers connected to start elections: %d out of minimal required %d")\
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

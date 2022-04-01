@@ -460,6 +460,7 @@ t;
  |   239: box.error.FIELD_FOREIGN_KEY_FAILED
  |   240: box.error.COMPLEX_FOREIGN_KEY_FAILED
  |   241: box.error.WRONG_SPACE_UPGRADE_OPTIONS
+ |   242: box.error.NO_ELECTION_QUORUM
  | ...
 
 test_run:cmd("setopt delimiter ''");
