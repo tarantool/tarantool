@@ -1614,3 +1614,29 @@ g.test_datetime_28_2 = function()
         t.assert_equals(rows, res)
     end)
 end
+
+-- Make sure that function NOW() works as intended.
+g.test_datetime_29_1 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local sql = [[SELECT typeof(now());]]
+        local res = {{"datetime"}}
+        local rows = box.execute(sql).rows
+
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_29_2 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local sql = [[SELECT now(), now() FROM (values(1), (2), (3));]]
+        local rows = box.execute(sql).rows
+
+        t.assert_equals(rows[1][1], rows[1][2])
+        t.assert_equals(rows[1][1], rows[2][1])
+        t.assert_equals(rows[1][1], rows[2][2])
+        t.assert_equals(rows[1][1], rows[3][1])
+        t.assert_equals(rows[1][1], rows[3][2])
+    end)
+end

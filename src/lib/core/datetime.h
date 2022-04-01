@@ -107,6 +107,10 @@ datetime_strftime(const struct datetime *date, char *buf, size_t len,
 void
 datetime_now(struct datetime *now);
 
+/** Return current date and time. Cheaper version of datetime_now(). */
+void
+datetime_ev_now(struct datetime *now);
+
 /**
  * Convert @sa datetime to @sa dt_tm
  */
