@@ -275,3 +275,144 @@ datetime_compare(const struct datetime *lhs, const struct datetime *rhs)
 
 	return COMPARE_RESULT(lhs->nsec, rhs->nsec);
 }
+
+static inline int64_t
+dt_seconds(const struct datetime *date)
+{
+	return (int64_t)date->epoch + date->tzoffset * 60 +
+	       SECS_EPOCH_1970_OFFSET;
+}
+
+int64_t
+datetime_year(const struct datetime *date)
+{
+	int64_t rd_seconds = dt_seconds(date);
+	int64_t rd_number = DIV(rd_seconds, SECS_PER_DAY);
+	assert(rd_number <= INT_MAX && rd_number >= INT_MIN);
+	dt_t dt = dt_from_rdn((int)rd_number);
+	int year;
+	int day;
+	dt_to_yd(dt, &year, &day);
+	return year;
+}
+
+int64_t
+datetime_quarter(const struct datetime *date)
+{
+	int64_t rd_seconds = dt_seconds(date);
+	int64_t rd_number = DIV(rd_seconds, SECS_PER_DAY);
+	assert(rd_number <= INT_MAX && rd_number >= INT_MIN);
+	dt_t dt = dt_from_rdn((int)rd_number);
+	int year;
+	int quarter;
+	int day;
+	dt_to_yqd(dt, &year, &quarter, &day);
+	return quarter;
+}
+
+int64_t
+datetime_month(const struct datetime *date)
+{
+	int64_t rd_seconds = dt_seconds(date);
+	int64_t rd_number = DIV(rd_seconds, SECS_PER_DAY);
+	assert(rd_number <= INT_MAX && rd_number >= INT_MIN);
+	dt_t dt = dt_from_rdn((int)rd_number);
+	int year;
+	int month;
+	int day;
+	dt_to_ymd(dt, &year, &month, &day);
+	return month;
+}
+
+int64_t
+datetime_week(const struct datetime *date)
+{
+	int64_t rd_seconds = dt_seconds(date);
+	int64_t rd_number = DIV(rd_seconds, SECS_PER_DAY);
+	assert(rd_number <= INT_MAX && rd_number >= INT_MIN);
+	dt_t dt = dt_from_rdn((int)rd_number);
+	int year;
+	int week;
+	int day;
+	dt_to_ywd(dt, &year, &week, &day);
+	return week;
+}
+
+int64_t
+datetime_day(const struct datetime *date)
+{
+	int64_t rd_seconds = dt_seconds(date);
+	int64_t rd_number = DIV(rd_seconds, SECS_PER_DAY);
+	assert(rd_number <= INT_MAX && rd_number >= INT_MIN);
+	dt_t dt = dt_from_rdn((int)rd_number);
+	int year;
+	int month;
+	int day;
+	dt_to_ymd(dt, &year, &month, &day);
+	return day;
+}
+
+int64_t
+datetime_dow(const struct datetime *date)
+{
+	int64_t rd_seconds = dt_seconds(date);
+	int64_t rd_number = DIV(rd_seconds, SECS_PER_DAY);
+	assert(rd_number <= INT_MAX && rd_number >= INT_MIN);
+	dt_t dt = dt_from_rdn((int)rd_number);
+	return (int64_t)dt_dow(dt);
+}
+
+int64_t
+datetime_doy(const struct datetime *date)
+{
+	int64_t rd_seconds = dt_seconds(date);
+	int64_t rd_number = DIV(rd_seconds, SECS_PER_DAY);
+	assert(rd_number <= INT_MAX && rd_number >= INT_MIN);
+	dt_t dt = dt_from_rdn((int)rd_number);
+	int year;
+	int day;
+	dt_to_yd(dt, &year, &day);
+	return day;
+}
+
+int64_t
+datetime_hour(const struct datetime *date)
+{
+	int64_t rd_seconds = dt_seconds(date);
+	int64_t hour = (MOD(rd_seconds, SECS_PER_DAY) / 3600) % 24;
+	return hour;
+}
+
+int64_t
+datetime_min(const struct datetime *date)
+{
+	int64_t rd_seconds = dt_seconds(date);
+	int64_t minute = (MOD(rd_seconds, SECS_PER_DAY) / 60) % 60;
+	return minute;
+}
+
+int64_t
+datetime_sec(const struct datetime *date)
+{
+	int64_t rd_seconds = dt_seconds(date);
+	int64_t second = MOD(rd_seconds, 60);
+	return second;
+}
+
+int64_t
+datetime_tzoffset(const struct datetime *date)
+{
+	return date->tzoffset;
+}
+
+int64_t
+datetime_epoch(const struct datetime *date)
+{
+	return date->epoch;
+}
+
+int64_t
+datetime_nsec(const struct datetime *date)
+{
+	return date->nsec;
+}

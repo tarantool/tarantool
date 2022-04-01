@@ -188,6 +188,12 @@ mem_is_array(const struct Mem *mem)
 }
 
 static inline bool
+mem_is_datetime(const struct Mem *mem)
+{
+	return mem->type == MEM_TYPE_DATETIME;
+}
+
+static inline bool
 mem_is_bytes(const struct Mem *mem)
 {
 	return (mem->type & (MEM_TYPE_BIN | MEM_TYPE_STR |
@@ -299,6 +305,20 @@ mem_set_int(struct Mem *mem, int64_t value, bool is_neg);
 /** Clear MEM and set it to UNSIGNED. */
 void
 mem_set_uint(struct Mem *mem, uint64_t value);
+
+/** Clear MEM and set it to NEGATIVE INTEGER. */
+void
+mem_set_nint(struct Mem *mem, int64_t value);
+
+/** Clear MEM and set it to INT64. */
+static inline void
+mem_set_int64(struct Mem *mem, int64_t value)
+{
+	if (value < 0)
+		mem_set_nint(mem, value);
+	else
+		mem_set_uint(mem, value);
+}
 
 /** Clear MEM and set it to BOOLEAN. */
 void

@@ -313,6 +313,16 @@ mem_set_uint(struct Mem *mem, uint64_t value)
 }
 
 void
+mem_set_nint(struct Mem *mem, int64_t value)
+{
+	assert(value < 0);
+	mem_clear(mem);
+	mem->u.i = value;
+	mem->type = MEM_TYPE_INT;
+	assert(mem->flags == 0);
+}
+
+void
 mem_set_bool(struct Mem *mem, bool value)
 {
 	mem_clear(mem);

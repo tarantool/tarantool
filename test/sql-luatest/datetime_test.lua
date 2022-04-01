@@ -1640,3 +1640,632 @@ g.test_datetime_29_2 = function()
         t.assert_equals(rows[1][1], rows[3][2])
     end)
 end
+
+-- Make sure that function DATE_PART() works as intended.
+g.test_datetime_30_1 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('millennium', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{2}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 2001})}).rows
+        res = {{3}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1999})}).rows
+        res = {{2}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 0})}).rows
+        res = {{-1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = -999})}).rows
+        res = {{-1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = -1000})}).rows
+        res = {{-2}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = -1001})}).rows
+        res = {{-2}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_2 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('century', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{20}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 2001})}).rows
+        res = {{21}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1999})}).rows
+        res = {{20}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 0})}).rows
+        res = {{-1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = -999})}).rows
+        res = {{-10}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = -1000})}).rows
+        res = {{-11}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = -1001})}).rows
+        res = {{-11}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_3 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('decade', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{200}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 2001})}).rows
+        res = {{200}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1999})}).rows
+        res = {{199}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 0})}).rows
+        res = {{-1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = -999})}).rows
+        res = {{-100}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = -1000})}).rows
+        res = {{-101}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = -1001})}).rows
+        res = {{-101}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_4 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('year', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{2000}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 2001})}).rows
+        res = {{2001}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1999})}).rows
+        res = {{1999}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 0})}).rows
+        res = {{0}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = -999})}).rows
+        res = {{-999}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = -1000})}).rows
+        res = {{-1000}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = -1001})}).rows
+        res = {{-1001}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_5 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('quarter', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{2}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 1, day = 1})}).rows
+        res = {{1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 3, day = 1})}).rows
+        res = {{1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 4, day = 1})}).rows
+        res = {{2}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 3, day = 31})}).rows
+        res = {{1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 7, day = 15})}).rows
+        res = {{3}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 12, day = 31})}).rows
+        res = {{4}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_6 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('month', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{4}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 1})}).rows
+        res = {{1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 3})}).rows
+        res = {{3}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 4})}).rows
+        res = {{4}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 3})}).rows
+        res = {{3}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 7})}).rows
+        res = {{7}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 12})}).rows
+        res = {{12}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_7 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('week', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{14}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 1, day = 1})}).rows
+        res = {{1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 3, day = 1})}).rows
+        res = {{9}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 4, day = 1})}).rows
+        res = {{13}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 3, day = 31})}).rows
+        res = {{13}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 7, day = 15})}).rows
+        res = {{28}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 12, day = 31})}).rows
+        res = {{1}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_8 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('day', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{5}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 1, day = 1})}).rows
+        res = {{1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 3, day = 1})}).rows
+        res = {{1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 4, day = 1})}).rows
+        res = {{1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 3, day = 31})}).rows
+        res = {{31}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 7, day = 15})}).rows
+        res = {{15}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({month = 12, day = 31})}).rows
+        res = {{31}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_9 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('dow', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{3}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 1, day = 1})}).rows
+        res = {{1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 3, day = 1})}).rows
+        res = {{4}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 4, day = 1})}).rows
+        res = {{7}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 3, day = 31})}).rows
+        res = {{6}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 7, day = 15})}).rows
+        res = {{7}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 12, day = 31})}).rows
+        res = {{1}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_10 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('doy', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{96}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 1, day = 1})}).rows
+        res = {{1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 3, day = 1})}).rows
+        res = {{60}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 4, day = 1})}).rows
+        res = {{91}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 3, day = 31})}).rows
+        res = {{90}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 7, day = 15})}).rows
+        res = {{196}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({year = 1, month = 12, day = 31})}).rows
+        res = {{365}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_11 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('hour', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{6}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({hour = 13, min = 1})}).rows
+        res = {{13}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({hour = 1, min = 20})}).rows
+        res = {{1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({hour = 7, min = 47})}).rows
+        res = {{7}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({hour = 23, min = 59})}).rows
+        res = {{23}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_12 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('minute', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{33}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({min = 1, sec = 13})}).rows
+        res = {{1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({min = 20, sec = 59})}).rows
+        res = {{20}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({min = 47, sec = 1})}).rows
+        res = {{47}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({min = 59, sec = 29})}).rows
+        res = {{59}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_13 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('second', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{22}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({min = 1, sec = 13})}).rows
+        res = {{13}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({min = 20, sec = 59})}).rows
+        res = {{59}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({min = 47, sec = 1})}).rows
+        res = {{1}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({min = 59, sec = 29})}).rows
+        res = {{29}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_14 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('millisecond', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{523}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({sec = 1, nsec = 13123546})}).rows
+        res = {{13}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({sec = 20, nsec = 591256})}).rows
+        res = {{0}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({sec = 47, nsec = 176318368})}).rows
+        res = {{176}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({sec = 59, nsec = 29})}).rows
+        res = {{0}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_15 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('microsecond', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{523999}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({sec = 1, nsec = 13123546})}).rows
+        res = {{13123}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({sec = 20, nsec = 591256})}).rows
+        res = {{591}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({sec = 47, nsec = 176318368})}).rows
+        res = {{176318}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({sec = 59, nsec = 29})}).rows
+        res = {{0}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_16 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('nanosecond', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{523999111}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({sec = 1, nsec = 13123546})}).rows
+        res = {{13123546}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({sec = 20, nsec = 591256})}).rows
+        res = {{591256}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({sec = 47, nsec = 176318368})}).rows
+        res = {{176318368}}
+        t.assert_equals(rows, res)
+
+        rows = box.execute(sql, {dt.new({sec = 59, nsec = 29})}).rows
+        res = {{29}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_17 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('epoch', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{954916402}}
+        t.assert_equals(rows, res)
+
+        dt0 = dt.new({year = 1, month = 1, day = 15, hour = 6, min = 12})
+        rows = box.execute(sql, {dt0}).rows
+        res = {{-62134364880}}
+        t.assert_equals(rows, res)
+
+        dt0 = dt.new({year = -1000, month = 11, day = 1, hour = 16, sec = 41})
+        rows = box.execute(sql, {dt0}).rows
+        res = {{-93697804759}}
+        t.assert_equals(rows, res)
+
+        dt0 = dt.new({year = 1000000, sec = 23})
+        rows = box.execute(sql, {dt0}).rows
+        res = {{31494784780823}}
+        t.assert_equals(rows, res)
+
+        dt0 = dt.new({year = -1000000})
+        rows = box.execute(sql, {dt0}).rows
+        res = {{-31619119219200}}
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_30_18 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
+                            min = 33, sec = 22, nsec = 523999111})
+
+        local sql = [[SELECT date_part('timezone_offset', ?);]]
+        local rows = box.execute(sql, {dt0}).rows
+        local res = {{0}}
+        t.assert_equals(rows, res)
+
+        dt0 = dt.new({year = 1, month = 1, day = 15, hour = 6, min = 12})
+        rows = box.execute(sql, {dt0}).rows
+        res = {{0}}
+        t.assert_equals(rows, res)
+
+        dt0 = dt.new({year = -1000, month = 11, day = 1, hour = 16, sec = 41})
+        rows = box.execute(sql, {dt0}).rows
+        res = {{0}}
+        t.assert_equals(rows, res)
+
+        dt0 = dt.new({year = 1000000, sec = 23})
+        rows = box.execute(sql, {dt0}).rows
+        res = {{0}}
+        t.assert_equals(rows, res)
+
+        dt0 = dt.new({year = -1000000})
+        rows = box.execute(sql, {dt0}).rows
+        res = {{0}}
+        t.assert_equals(rows, res)
+    end)
+end
