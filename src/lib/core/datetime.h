@@ -146,6 +146,102 @@ datetime_parse_full(struct datetime *date, const char *str, size_t len,
 size_t
 datetime_strptime(struct datetime *date, const char *buf, const char *fmt);
 
+/** Return the year from a date. */
+int64_t
+datetime_year(const struct datetime *date);
+
+/** Return the month of year from a date. */
+int64_t
+datetime_month(const struct datetime *date);
+
+/** Return the quarter of year from a date. */
+int64_t
+datetime_quarter(const struct datetime *date);
+
+/** Return the week of year from a date. */
+int64_t
+datetime_week(const struct datetime *date);
+
+/** Return the day of month from a date. */
+int64_t
+datetime_day(const struct datetime *date);
+
+/** Return the day of week from a date. */
+int64_t
+datetime_dow(const struct datetime *date);
+
+/** Return the day of year from a date. */
+int64_t
+datetime_doy(const struct datetime *date);
+
+/** Return the hour of day from a date. */
+int64_t
+datetime_hour(const struct datetime *date);
+
+/** Return the minute of hour from a date. */
+int64_t
+datetime_min(const struct datetime *date);
+
+/** Return the second of minute from a date. */
+int64_t
+datetime_sec(const struct datetime *date);
+
+/** Return the timezone offset from a date. */
+int64_t
+datetime_tzoffset(const struct datetime *date);
+
+/** Return the epoch from a date. */
+int64_t
+datetime_epoch(const struct datetime *date);
+
+/** Return the nanosecond of second from a date. */
+int64_t
+datetime_nsec(const struct datetime *date);
+
+/** Return the millennium from a date. */
+static inline int64_t
+datetime_millennium(const struct datetime *date)
+{
+	int64_t year = datetime_year(date);
+	if (year > 0)
+		return (year - 1) / 1000 + 1;
+	return year / 1000 - 1;
+}
+
+/** Return the century from a date. */
+static inline int64_t
+datetime_century(const struct datetime *date)
+{
+	int64_t year = datetime_year(date);
+	if (year > 0)
+		return (year - 1) / 100 + 1;
+	return year / 100 - 1;
+}
+
+/** Return the decade from a date. */
+static inline int64_t
+datetime_decade(const struct datetime *date)
+{
+	int64_t year = datetime_year(date);
+	if (year > 0)
+		return year / 10;
+	return year / 10 - 1;
+}
+
+/** Return the millisecond of second from a date. */
+static inline int64_t
+datetime_msec(const struct datetime *date)
+{
+	return datetime_nsec(date) / 1000000;
+}
+
+/** Return the microsecond of second from a date. */
+static inline int64_t
+datetime_usec(const struct datetime *date)
+{
+	return datetime_nsec(date) / 1000;
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

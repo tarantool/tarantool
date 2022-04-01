@@ -1118,6 +1118,61 @@ func_now(struct sql_context *ctx, int argc, const struct Mem *argv)
 	mem_set_datetime(ctx->pOut, &dt);
 }
 
+/**
+ * Implementation of the DATE_PART() function.
+ *
+ * Returns the requested information from a DATETIME value.
+ */
+static void
+func_date_part(struct sql_context *ctx, int argc, const struct Mem *argv)
+{
+	assert(argc == 2);
+	(void)argc;
+	const struct Mem *part = &argv[0];
+	const struct Mem *date = &argv[1];
+	if (mem_is_any_null(part, date))
+		return;
+	assert(mem_is_str(part) && mem_is_datetime(date));
+	const char *str = tt_cstr(part->z, part->n);
+	const struct datetime *dt = &date->u.dt;
+	if (strcasecmp("millennium", str) == 0)
+		return mem_set_int64(ctx->pOut, datetime_millennium(dt));
+	if (strcasecmp("century", str) == 0)
+		return mem_set_int64(ctx->pOut, datetime_century(dt));
+	if (strcasecmp("decade", str) == 0)
+		return mem_set_int64(ctx->pOut, datetime_decade(dt));
+	if (strcasecmp("year", str) == 0)
+		return mem_set_int64(ctx->pOut, datetime_year(dt));
+	if (strcasecmp("quarter", str) == 0)
+		return mem_set_uint(ctx->pOut, datetime_quarter(dt));
+	if (strcasecmp("month", str) == 0)
+		return mem_set_uint(ctx->pOut, datetime_month(dt));
+	if (strcasecmp("week", str) == 0)
+		return mem_set_uint(ctx->pOut, datetime_week(dt));
+	if (strcasecmp("day", str) == 0)
+		return mem_set_uint(ctx->pOut, datetime_day(dt));
+	if (strcasecmp("dow", str) == 0)
+		return mem_set_uint(ctx->pOut, datetime_dow(dt));
+	if (strcasecmp("doy", str) == 0)
+		return mem_set_uint(ctx->pOut, datetime_doy(dt));
+	if (strcasecmp("hour", str) == 0)
+		return mem_set_uint(ctx->pOut, datetime_hour(dt));
+	if (strcasecmp("minute", str) == 0)
+		return mem_set_uint(ctx->pOut, datetime_min(dt));
+	if (strcasecmp("second", str) == 0)
+		return mem_set_uint(ctx->pOut, datetime_sec(dt));
+	if (strcasecmp("millisecond", str) == 0)
+		return mem_set_uint(ctx->pOut, datetime_msec(dt));
+	if (strcasecmp("microsecond", str) == 0)
+		return mem_set_uint(ctx->pOut, datetime_usec(dt));
+	if (strcasecmp("nanosecond", str) == 0)
+		return mem_set_uint(ctx->pOut, datetime_nsec(dt));
+	if (strcasecmp("epoch", str) == 0)
+		return mem_set_int64(ctx->pOut, datetime_epoch(dt));
+	if (strcasecmp("timezone_offset", str) == 0)
+		return mem_set_int64(ctx->pOut, datetime_tzoffset(dt));
+}
+
 #define Utf8Read(s, e) \
 	ucnv_getNextUChar(icu_utf8_conv, &(s), (e), &status)
 
@@ -1702,6 +1757,7 @@ static struct sql_func_dictionary dictionaries[] = {
 	{"CHAR_LENGTH", 1, 1, 0, true, 0, NULL},
 	{"COALESCE", 2, SQL_MAX_FUNCTION_ARG, SQL_FUNC_COALESCE, true, 0, NULL},
 	{"COUNT", 0, 1, SQL_FUNC_AGG, false, 0, NULL},
+	{"DATE_PART", 2, 2, 0, true, 0, NULL},
 	{"GREATEST", 2, SQL_MAX_FUNCTION_ARG, SQL_FUNC_NEEDCOLL, true, 0, NULL},
 	{"GROUP_CONCAT", 1, 2, SQL_FUNC_AGG, false, 0, NULL},
 	{"HEX", 1, 1, 0, true, 0, NULL},
@@ -1791,6 +1847,8 @@ static struct sql_func_definition definitions[] = {
 	{"COUNT", 0, {}, FIELD_TYPE_INTEGER, step_count, fin_count},
 	{"COUNT", 1, {field_type_MAX}, FIELD_TYPE_INTEGER, step_count,
 	 fin_count},
+	{"DATE_PART", 2, {FIELD_TYPE_STRING, FIELD_TYPE_DATETIME},
+	 FIELD_TYPE_INTEGER, func_date_part, NULL},
 
 	{"GREATEST", -1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER,
 	 func_greatest_least, NULL},
