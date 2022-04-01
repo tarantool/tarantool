@@ -8,3 +8,8 @@
 
  * Added `leader_idle` field to `box.info.election` table. This value shows time
    in seconds since the last communication with a known leader (gh-6654).
+
+## bugfix/raft
+
+ * Fixed `box.ctl.promote()` entering an infinite election loop when a node
+   doesn't have enough peers to win the elections (gh-6654).

@@ -1747,10 +1747,17 @@ box_run_elections(void)
 			raft_restore(raft);
 			return -1;
 		}
-	} while (raft->leader == 0);
+	} while (raft->leader == 0 && replicaset_has_healthy_quorum());
 	if (raft->state != RAFT_STATE_LEADER) {
-		diag_set(ClientError, ER_INTERFERING_PROMOTE,
-			 raft->leader);
+		if (raft->leader != 0) {
+			diag_set(ClientError, ER_INTERFERING_PROMOTE,
+				 raft->leader);
+		} else {
+			int connected = replicaset.healthy_count;
+			int quorum = replicaset_healthy_quorum();
+			diag_set(ClientError, ER_NO_ELECTION_QUORUM,
+				 connected, quorum);
+		}
 		return -1;
 	}
 

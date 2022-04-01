@@ -23,6 +23,7 @@ g.before_all(function()
         },
         election_mode = 'candidate',
         replication_timeout = REPLICATION_TIMEOUT,
+        election_timeout = DEATH_TIMEOUT,
     }
     g.node1 = g.cluster:build_and_add_server({alias = 'node1', box_cfg = g.cfg})
     g.node2 = g.cluster:build_and_add_server({alias = 'node2', box_cfg = g.cfg})
@@ -100,6 +101,26 @@ g.test_no_quorum = function(g)
     t.assert_equals(g.follower1:exec(get_election_term), term,
                     'No elections after leader reconnect')
 end
+
+--
+-- Test that the node doesn't enter infinite election loop in box.ctl.promote(),
+-- when it lacks a quorum of peers.
+--
+g.test_promote_no_quorum = function(g)
+    g.follower1:exec(function() box.cfg{replication = ''} end)
+    local term = g.follower1:exec(get_election_term)
+    t.assert_error_msg_content_equals(
+        'Not enough peers connected to start '..
+        'elections: 1 out of minimal required 2',
+        g.follower1.exec, g.follower1, function() box.ctl.promote() end)
+    t.assert(g.follower1:exec(get_election_term) > term,
+             'Elections are started once')
+end
+
+g.after_test('test_promote_no_quorum', function(g)
+    g.follower1:exec(function(cfg) box.cfg(cfg) end,
+        {{replication = g.cfg.replication}})
+end)
 
 g.after_all(function()
     g.cluster:drop()
