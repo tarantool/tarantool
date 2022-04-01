@@ -94,10 +94,11 @@ extern "C" {
 #define STRN2ENUM(enum_name, str, len) ((enum enum_name) strnindex(enum_name##_strs, str, len, enum_name##_MAX))
 
 uint32_t
-strindex(const char **haystack, const char *needle, uint32_t hmax);
+strindex(const char *const *haystack, const char *needle, uint32_t hmax);
 
 uint32_t
-strnindex(const char **haystack, const char *needle, uint32_t len, uint32_t hmax);
+strnindex(const char *const *haystack, const char *needle, uint32_t len,
+	  uint32_t hmax);
 
 #define nelem(x)     (sizeof((x))/sizeof((x)[0]))
 #define field_sizeof(compound_type, field) sizeof(((compound_type *)NULL)->field)
