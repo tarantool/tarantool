@@ -15,8 +15,15 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+static inline int
+audit_log_check_format(const char *format)
+{
+	(void)format;
+	return 0;
+}
+
 void
-audit_log_init(const char *init_str, int log_nonblock);
+audit_log_init(const char *init_str, int log_nonblock, const char *format);
 
 static inline void
 audit_log_free(void) {}

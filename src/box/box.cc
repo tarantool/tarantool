@@ -748,6 +748,18 @@ box_check_say(void)
 	}
 }
 
+/**
+ * Raises error if audit log configuration is incorrect.
+ */
+static void
+box_check_audit(void)
+{
+	if (audit_log_check_format(cfg_gets("audit_format")) != 0) {
+		tnt_raise(ClientError, ER_CFG, "audit_format",
+			  diag_last_error(diag_get())->errmsg);
+	}
+}
+
 static enum election_mode
 box_check_election_mode(void)
 {
@@ -1302,6 +1314,7 @@ box_check_config(void)
 {
 	struct tt_uuid uuid;
 	box_check_say();
+	box_check_audit();
 	if (box_check_listen() != 0)
 		diag_raise();
 	box_check_instance_uuid(&uuid);
@@ -3855,7 +3868,8 @@ box_cfg_xc(void)
 	/* Follow replica */
 	replicaset_follow();
 
-	audit_log_init(cfg_gets("audit_log"), cfg_geti("audit_nonblock"));
+	audit_log_init(cfg_gets("audit_log"), cfg_geti("audit_nonblock"),
+		       cfg_gets("audit_format"));
 
 	fiber_gc();
 	is_box_configured = true;

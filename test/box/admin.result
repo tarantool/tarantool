@@ -27,7 +27,9 @@ help()
 ...
 cfg_filter(box.cfg)
 ---
-- - - audit_nonblock
+- - - audit_format
+    - csv
+  - - audit_nonblock
     - true
   - - background
     - false

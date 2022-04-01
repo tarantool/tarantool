@@ -3,6 +3,7 @@
 --
 
 box.cfg
+audit_format:csv
 audit_nonblock:true
 background:false
 checkpoint_count:2
