@@ -16,6 +16,8 @@
 #include "trivia/util.h"
 #include "tzcode/tzcode.h"
 
+#include "fiber.h"
+
 /** floored modulo and divide */
 #define MOD(a, b) unlikely(a < 0) ? (b + (a % b)) : (a % b)
 #define DIV(a, b) unlikely(a < 0) ? ((a - b + 1) / b) : (a / b)
@@ -135,6 +137,20 @@ datetime_now(struct datetime *now)
 
 	struct tm tm;
 	localtime_r(&tv.tv_sec, &tm);
+	now->tzoffset = tm.tm_gmtoff / 60;
+}
+
+void
+datetime_ev_now(struct datetime *now)
+{
+	double timestamp = fiber_time();
+	assert(timestamp > INT32_MIN && timestamp < INT32_MAX);
+	long sec = timestamp;
+	now->epoch = sec;
+	now->nsec = (timestamp - sec) * 1000000000;
+
+	struct tm tm;
+	localtime_r(&sec, &tm);
 	now->tzoffset = tm.tm_gmtoff / 60;
 }
 

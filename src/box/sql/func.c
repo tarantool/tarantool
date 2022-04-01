@@ -1102,6 +1102,22 @@ func_unicode(struct sql_context *ctx, int argc, const struct Mem *argv)
 	mem_set_uint(ctx->pOut, (uint64_t)c);
 }
 
+/**
+ * Implementation of the NOW() function.
+ *
+ * Return the current date and time.
+ */
+static void
+func_now(struct sql_context *ctx, int argc, const struct Mem *argv)
+{
+	assert(argc == 0);
+	(void)argc;
+	(void)argv;
+	struct datetime dt;
+	datetime_ev_now(&dt);
+	mem_set_datetime(ctx->pOut, &dt);
+}
+
 #define Utf8Read(s, e) \
 	ucnv_getNextUChar(icu_utf8_conv, &(s), (e), &status)
 
@@ -1701,6 +1717,7 @@ static struct sql_func_dictionary dictionaries[] = {
 	 NULL},
 	{"MIN", 1, 1, SQL_FUNC_MIN | SQL_FUNC_AGG | SQL_FUNC_NEEDCOLL, false, 0,
 	 NULL},
+	{"NOW", 0, 0, 0, true, 0, NULL},
 	{"NULLIF", 2, 2, SQL_FUNC_NEEDCOLL, true, 0, NULL},
 	{"POSITION", 2, 2, SQL_FUNC_NEEDCOLL, true, 0, NULL},
 	{"PRINTF", 0, SQL_MAX_FUNCTION_ARG, 0, true, 0, NULL},
@@ -1856,6 +1873,7 @@ static struct sql_func_definition definitions[] = {
 	{"MIN", 1, {FIELD_TYPE_UUID}, FIELD_TYPE_UUID, step_minmax, NULL},
 	{"MIN", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, step_minmax, NULL},
 	{"MIN", 1, {FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR, step_minmax, NULL},
+	{"NOW", 0, {}, FIELD_TYPE_DATETIME, func_now, NULL},
 
 	{"NULLIF", 2, {FIELD_TYPE_SCALAR, FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR,
 	 func_nullif, NULL},
