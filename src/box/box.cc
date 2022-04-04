@@ -2017,20 +2017,6 @@ box_listen(void)
 }
 
 void
-box_set_log_level(void)
-{
-	say_set_log_level(cfg_geti("log_level"));
-}
-
-void
-box_set_log_format(void)
-{
-	box_check_say();
-	enum say_format format = say_format_by_name(cfg_gets("log_format"));
-	say_set_log_format(format);
-}
-
-void
 box_set_io_collect_interval(void)
 {
 	ev_set_io_collect_interval(loop(), cfg_getd("io_collect_interval"));
