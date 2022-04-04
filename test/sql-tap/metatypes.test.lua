@@ -611,7 +611,7 @@ test:do_catchsql_test(
     [[
         SELECT ROUND(a) FROM t;
     ]], {
-        1, "Type mismatch: can not convert any(1) to double"
+        1, "Type mismatch: can not convert any(1) to decimal"
     })
 
 test:do_catchsql_test(
