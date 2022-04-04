@@ -979,9 +979,9 @@ func_typeof(struct sql_context *ctx, int argc, const struct Mem *argv)
 	return mem_set_str0_static(ctx->pOut, mem_type_to_str(&argv[0]));
 }
 
-/** Implementation of the ROUND() function. */
+/** Implementation of the ROUND() function for DOUBLE argument. */
 static void
-func_round(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_round_double(struct sql_context *ctx, int argc, const struct Mem *argv)
 {
 	assert(argc == 1 || argc == 2);
 	if (mem_is_null(&argv[0]) || (argc == 2 && mem_is_null(&argv[1])))
@@ -1006,6 +1006,34 @@ func_round(struct sql_context *ctx, int argc, const struct Mem *argv)
 		return mem_set_double(res, d);
 	double delta = d < 0 ? -0.5 : 0.5;
 	return mem_set_double(res, (double)(int64_t)(d + delta));
+}
+
+/** Implementation of the ROUND() function for DECIMAL argument. */
+static void
+func_round_dec(struct sql_context *ctx, int argc, const struct Mem *argv)
+{
+	assert(argc == 1 || argc == 2);
+	if (mem_is_null(&argv[0]) || (argc == 2 && mem_is_null(&argv[1])))
+		return;
+	assert(mem_is_dec(&argv[0]));
+	assert(argc == 1 || mem_is_int(&argv[1]));
+	uint64_t n = (argc == 2 && mem_is_uint(&argv[1])) ? argv[1].u.u : 0;
+
+	mem_set_dec(ctx->pOut, &argv[0].u.d);
+	if (n < DECIMAL_MAX_DIGITS)
+		decimal_round(&ctx->pOut->u.d, n);
+}
+
+/** Implementation of the ROUND() function for INTEGER argument. */
+static void
+func_round_int(struct sql_context *ctx, int argc, const struct Mem *argv)
+{
+	assert(argc == 1 || argc == 2);
+	if (mem_is_null(&argv[0]) || (argc == 2 && mem_is_null(&argv[1])))
+		return;
+	assert(mem_is_int(&argv[0]));
+	assert(argc == 1 || mem_is_int(&argv[1]));
+	return mem_copy_as_ephemeral(ctx->pOut, &argv[0]);
 }
 
 /** Implementation of the ROW_COUNT() function. */
@@ -1846,9 +1874,18 @@ static struct sql_func_definition definitions[] = {
 	{"REPLACE", 3,
 	 {FIELD_TYPE_VARBINARY, FIELD_TYPE_VARBINARY, FIELD_TYPE_VARBINARY},
 	 FIELD_TYPE_VARBINARY, replaceFunc, NULL},
-	{"ROUND", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, func_round, NULL},
+	{"ROUND", 1, {FIELD_TYPE_DECIMAL}, FIELD_TYPE_DECIMAL, func_round_dec,
+	 NULL},
+	{"ROUND", 2, {FIELD_TYPE_DECIMAL, FIELD_TYPE_INTEGER},
+	 FIELD_TYPE_DECIMAL, func_round_dec, NULL},
+	{"ROUND", 1, {FIELD_TYPE_DOUBLE}, FIELD_TYPE_DOUBLE, func_round_double,
+	 NULL},
 	{"ROUND", 2, {FIELD_TYPE_DOUBLE, FIELD_TYPE_INTEGER}, FIELD_TYPE_DOUBLE,
-	 func_round, NULL},
+	 func_round_double, NULL},
+	{"ROUND", 1, {FIELD_TYPE_INTEGER}, FIELD_TYPE_INTEGER, func_round_int,
+	 NULL},
+	{"ROUND", 2, {FIELD_TYPE_INTEGER, FIELD_TYPE_INTEGER},
+	 FIELD_TYPE_INTEGER, func_round_int, NULL},
 	{"ROW_COUNT", 0, {}, FIELD_TYPE_INTEGER, func_row_count, NULL},
 	{"SOUNDEX", 1, {FIELD_TYPE_STRING}, FIELD_TYPE_STRING, soundexFunc,
 	 NULL},

@@ -497,7 +497,7 @@ test:do_execsql_test(
         SELECT typeof(round(5.1,1));
     ]], {
         -- <func-4.14>
-        "double"
+        "decimal"
         -- </func-4.14>
     })
 
@@ -507,14 +507,14 @@ test:do_execsql_test(
         SELECT typeof(round(5.1));
     ]], {
         -- <func-4.15>
-        "double"
+        "decimal"
         -- </func-4.15>
     })
 
 test:do_catchsql_test(
     "func-4.16",
     [[
-        SELECT round(b,2.0) FROM t1 ORDER BY b
+        SELECT round(b,2) FROM t1 ORDER BY b
     ]], {
         -- <func-4.16>
         0, {-2.0, 1.23, 2.0}
@@ -530,7 +530,7 @@ for i = 1, 1000-1, 1 do
     local x2 = (40223 + i)
     test:do_execsql_test(
         "func-4.17."..i,
-        "SELECT round("..x1..");", {
+        "SELECT round(CAST("..x1.." AS DOUBLE));", {
             x2
         })
 
@@ -540,7 +540,7 @@ for i = 1, 1000-1, 1 do
     local x2 = (40222.1 + i)
     test:do_execsql_test(
         "func-4.18."..i,
-        "SELECT round("..x1..",1);", {
+        "SELECT round(CAST("..x1.." AS DOUBLE), 1);", {
             x2
         })
 
@@ -548,7 +548,7 @@ end
 test:do_execsql_test(
     "func-4.20",
     [[
-        SELECT round(40223.4999999999);
+        SELECT round(40223.4999999999e0);
     ]], {
         -- <func-4.20>
         40223.0
@@ -558,7 +558,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.21",
     [[
-        SELECT round(40224.4999999999);
+        SELECT round(40224.4999999999e0);
     ]], {
         -- <func-4.21>
         40224.0
@@ -568,7 +568,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.22",
     [[
-        SELECT round(40225.4999999999);
+        SELECT round(40225.4999999999e0);
     ]], {
         -- <func-4.22>
         40225.0
@@ -578,19 +578,19 @@ test:do_execsql_test(
 for i = 1, 9, 1 do
     test:do_execsql_test(
         "func-4.23."..i,
-        string.format("SELECT round(40223.4999999999,%s);", i), {
+        string.format("SELECT round(40223.4999999999e0,%s);", i), {
             40223.5
         })
 
     test:do_execsql_test(
         "func-4.24."..i,
-        string.format("SELECT round(40224.4999999999,%s);", i), {
+        string.format("SELECT round(40224.4999999999e0,%s);", i), {
             40224.5
         })
 
     test:do_execsql_test(
         "func-4.25."..i,
-        string.format("SELECT round(40225.4999999999,%s);", i), {
+        string.format("SELECT round(40225.4999999999e0,%s);", i), {
             40225.5
         })
 
@@ -598,19 +598,19 @@ end
 for i = 10, 31, 1 do
     test:do_execsql_test(
         "func-4.26."..i,
-        string.format("SELECT round(40223.4999999999,%s);", i), {
+        string.format("SELECT round(40223.4999999999e0,%s);", i), {
             40223.4999999999
         })
 
     test:do_execsql_test(
         "func-4.27."..i,
-        string.format("SELECT round(40224.4999999999,%s);", i), {
+        string.format("SELECT round(40224.4999999999e0,%s);", i), {
             40224.4999999999
         })
 
     test:do_execsql_test(
         "func-4.28."..i,
-        string.format("SELECT round(40225.4999999999,%s);", i), {
+        string.format("SELECT round(40225.4999999999e0,%s);", i), {
             40225.4999999999
         })
 
@@ -618,7 +618,7 @@ end
 test:do_execsql_test(
     "func-4.29",
     [[
-        SELECT round(1234567890.5);
+        SELECT round(1234567890.5e0);
     ]], {
         -- <func-4.29>
         1234567891.0
@@ -628,7 +628,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.30",
     [[
-        SELECT round(12345678901.5);
+        SELECT round(12345678901.5e0);
     ]], {
         -- <func-4.30>
         12345678902.0
@@ -638,7 +638,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.31",
     [[
-        SELECT round(123456789012.5);
+        SELECT round(123456789012.5e0);
     ]], {
         -- <func-4.31>
         123456789013.0
@@ -648,7 +648,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.32",
     [[
-        SELECT round(1234567890123.5);
+        SELECT round(1234567890123.5e0);
     ]], {
         -- <func-4.32>
         1234567890124.0
@@ -658,7 +658,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.33",
     [[
-        SELECT round(12345678901234.5);
+        SELECT round(12345678901234.5e0);
     ]], {
         -- <func-4.33>
         12345678901235.0
@@ -668,7 +668,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.34",
     [[
-        SELECT round(1234567890123.35,1);
+        SELECT round(1234567890123.35e0,1);
     ]], {
         -- <func-4.34>
         1234567890123.4
@@ -688,7 +688,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.36",
     [[
-        SELECT round(99999999999994.5);
+        SELECT round(99999999999994.5e0);
     ]], {
         -- <func-4.36>
         99999999999995.0
@@ -698,7 +698,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-4.37",
     [[
-        SELECT round(9999999999999.55,1);
+        SELECT round(9999999999999.55e0,1);
     ]], {
         -- <func-4.37>
         9999999999999.6

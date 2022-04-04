@@ -415,7 +415,7 @@ test:do_test(
         local res = {pcall(box.execute, [[SELECT ROUND(?);]], {'1'})}
         return {tostring(res[3])}
     end, {
-        "Type mismatch: can not convert string('1') to double"
+        "Type mismatch: can not convert string('1') to decimal"
     })
 
 test:do_catchsql_test(
