@@ -13,10 +13,12 @@
 #endif
 
 void
-audit_log_init(const char *init_str, int log_nonblock, const char *format)
+audit_log_init(const char *init_str, int log_nonblock, const char *format,
+	       const char *filter)
 {
 	(void)log_nonblock;
 	(void)format;
+	(void)filter;
 	if (init_str != NULL)
 		say_error("audit log is not available in this build");
 }

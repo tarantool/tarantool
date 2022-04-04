@@ -22,8 +22,16 @@ audit_log_check_format(const char *format)
 	return 0;
 }
 
+static inline int
+audit_log_check_filter(const char *filter)
+{
+	(void)filter;
+	return 0;
+}
+
 void
-audit_log_init(const char *init_str, int log_nonblock, const char *format);
+audit_log_init(const char *init_str, int log_nonblock, const char *format,
+	       const char *filter);
 
 static inline void
 audit_log_free(void) {}
