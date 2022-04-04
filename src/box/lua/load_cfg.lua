@@ -71,6 +71,7 @@ local default_cfg = {
     audit_log           = nil,
     audit_nonblock      = true,
     audit_format        = 'csv',
+    audit_filter        = 'compatibility',
 
     io_collect_interval = nil,
     readahead           = 16320,
@@ -185,6 +186,7 @@ local template_cfg = {
     audit_log           = 'string',
     audit_nonblock      = 'boolean',
     audit_format        = 'string',
+    audit_filter        = 'string',
 
     io_collect_interval = 'number',
     readahead           = 'number',

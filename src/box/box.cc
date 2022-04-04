@@ -758,6 +758,10 @@ box_check_audit(void)
 		tnt_raise(ClientError, ER_CFG, "audit_format",
 			  diag_last_error(diag_get())->errmsg);
 	}
+	if (audit_log_check_filter(cfg_gets("audit_filter")) != 0) {
+		tnt_raise(ClientError, ER_CFG, "audit_filter",
+			  diag_last_error(diag_get())->errmsg);
+	}
 }
 
 static enum election_mode
@@ -3855,7 +3859,7 @@ box_cfg_xc(void)
 	replicaset_follow();
 
 	audit_log_init(cfg_gets("audit_log"), cfg_geti("audit_nonblock"),
-		       cfg_gets("audit_format"));
+		       cfg_gets("audit_format"), cfg_gets("audit_filter"));
 
 	fiber_gc();
 	is_box_configured = true;

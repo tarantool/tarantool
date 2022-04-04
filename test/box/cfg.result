@@ -15,7 +15,9 @@ box.cfg.nosuchoption = 1
  | ...
 cfg_filter(box.cfg)
  | ---
- | - - - audit_format
+ | - - - audit_filter
+ |     - compatibility
+ |   - - audit_format
  |     - csv
  |   - - audit_nonblock
  |     - true
@@ -152,7 +154,9 @@ box.cfg()
  | ...
 cfg_filter(box.cfg)
  | ---
- | - - - audit_format
+ | - - - audit_filter
+ |     - compatibility
+ |   - - audit_format
  |     - csv
  |   - - audit_nonblock
  |     - true
