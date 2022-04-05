@@ -169,6 +169,7 @@ struct errinj {
 	_(ERRINJ_XLOG_META, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_XLOG_READ, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_XLOG_RENAME_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_TX_DELAY_PRIO_ENDPOINT, ERRINJ_DOUBLE, {.dparam = 0}) \
 
 ENUM0(errinj_id, ERRINJ_LIST);
 extern struct errinj errinjs[];

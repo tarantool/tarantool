@@ -3683,6 +3683,17 @@ tx_prio_cb(struct ev_loop *loop, ev_watcher *watcher, int events)
 	(void) loop;
 	(void) events;
 	struct cbus_endpoint *endpoint = (struct cbus_endpoint *)watcher->data;
+#ifndef NDEBUG
+	/*
+	 * The sleep is legal because it is not a fiber sleep. It puts the
+	 * entire thread to sleep to simulate it being slow. It can happen in
+	 * reality if the thread somewhy isn't scheduled for too long.
+	 */
+	struct errinj *inj = errinj(ERRINJ_TX_DELAY_PRIO_ENDPOINT,
+				    ERRINJ_DOUBLE);
+	if (inj->dparam != 0)
+		usleep(inj->dparam * 1000000);
+#endif
 	cbus_process(endpoint);
 }
 
