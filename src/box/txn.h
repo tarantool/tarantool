@@ -542,6 +542,10 @@ struct txn {
 	 */
 	struct ev_timer *rollback_timer;
 	/**
+	 * For synchronous transactions - their context in the synchro queue.
+	 */
+	struct txn_limbo_entry *limbo_entry;
+	/**
 	 * Nesting level of space on_replace triggers for current txn.
 	 */
 	int space_on_replace_triggers_depth;

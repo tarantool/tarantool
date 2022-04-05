@@ -170,8 +170,14 @@ txn_limbo_assign_remote_lsn(struct txn_limbo *limbo,
 	assert(limbo->owner_id != instance_id);
 	assert(entry->lsn == -1);
 	assert(lsn > 0);
-	assert(txn_has_flag(entry->txn, TXN_WAIT_ACK));
 	(void) limbo;
+	/*
+	 * Same as with local LSN assign, it is given after a WAL write. But for
+	 * remotely received transactions it doesn't matter so far. They don't
+	 * needs ACKs. They wait for explicit confirmations. That will be a
+	 * problem when need acks for anything else and when local txns will
+	 * become optionally non-blocking.
+	 */
 	entry->lsn = lsn;
 }
 
@@ -183,7 +189,6 @@ txn_limbo_assign_local_lsn(struct txn_limbo *limbo,
 	assert(limbo->owner_id == instance_id);
 	assert(entry->lsn == -1);
 	assert(lsn > 0);
-	assert(txn_has_flag(entry->txn, TXN_WAIT_ACK));
 
 	entry->lsn = lsn;
 	/*
@@ -267,6 +272,7 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 	rlist_foreach_entry_safe_reverse(e, &limbo->queue,
 					 in_queue, tmp) {
 		e->txn->signature = TXN_SIGNATURE_QUORUM_TIMEOUT;
+		e->txn->limbo_entry = NULL;
 		txn_limbo_abort(limbo, e);
 		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
 		txn_complete_fail(e->txn);
@@ -432,10 +438,12 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 			 * the txn to get a crash on any usage attempt instead
 			 * of potential undefined behaviour.
 			 */
+			e->txn->limbo_entry = NULL;
 			e->txn = NULL;
 			continue;
 		}
 		e->is_commit = true;
+		e->txn->limbo_entry = NULL;
 		txn_limbo_remove(limbo, e);
 		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
 		/*
@@ -488,6 +496,7 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 		 */
 		assert(e->txn->signature >= 0);
 		e->txn->signature = TXN_SIGNATURE_SYNC_ROLLBACK;
+		e->txn->limbo_entry = NULL;
 		txn_complete_fail(e->txn);
 		if (e == last_rollback)
 			break;
@@ -604,7 +613,6 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 		 * after all the previous sync transactions are.
 		 */
 		if (!txn_has_flag(e->txn, TXN_WAIT_ACK)) {
-			assert(e->lsn == -1);
 			continue;
 		} else if (e->lsn <= prev_lsn) {
 			continue;
@@ -901,7 +909,6 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 	rlist_foreach_entry(e, &limbo->queue, in_queue) {
 		assert(e->ack_count <= VCLOCK_MAX);
 		if (!txn_has_flag(e->txn, TXN_WAIT_ACK)) {
-			assert(e->lsn == -1);
 			continue;
 		} else if (e->ack_count < replication_synchro_quorum) {
 			continue;

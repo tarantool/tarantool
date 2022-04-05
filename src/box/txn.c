@@ -443,6 +443,7 @@ txn_new(void)
 	rlist_create(&txn->in_all_txs);
 	txn->space_on_replace_triggers_depth = 0;
 	txn->acquired_region_used = 0;
+	txn->limbo_entry = NULL;
 	return txn;
 }
 
@@ -452,6 +453,7 @@ txn_new(void)
 inline static void
 txn_free(struct txn *txn)
 {
+	assert(txn->limbo_entry == NULL);
 	if (txn->rollback_timer != NULL)
 		ev_timer_stop(loop(), txn->rollback_timer);
 	memtx_tx_clean_txn(txn);
@@ -749,6 +751,11 @@ txn_complete_fail(struct txn *txn)
 	assert(!txn_has_flag(txn, TXN_IS_DONE));
 	assert(txn->signature < 0);
 	assert(txn->signature != TXN_SIGNATURE_UNKNOWN);
+	if (txn->limbo_entry != NULL) {
+		assert(txn_has_flag(txn, TXN_WAIT_SYNC));
+		txn_limbo_abort(&txn_limbo, txn->limbo_entry);
+		txn->limbo_entry = NULL;
+	}
 	txn->status = TXN_ABORTED;
 	struct txn_stmt *stmt;
 	stailq_reverse(&txn->stmts);
@@ -839,10 +846,22 @@ txn_on_journal_write(struct journal_entry *entry)
 	}
 	if (txn_has_flag(txn, TXN_HAS_TRIGGERS))
 		txn_run_wal_write_triggers(txn);
-	if (!txn_has_flag(txn, TXN_WAIT_SYNC))
+	if (!txn_has_flag(txn, TXN_WAIT_SYNC)) {
 		txn_complete_success(txn);
-	else if (txn->fiber != NULL)
-		fiber_wakeup(txn->fiber);
+	} else {
+		int64_t lsn;
+		/*
+		 * XXX: that is quite ugly. Need a more reliable way to get the
+		 * synchro LSN.
+		 */
+		if (txn->n_applier_rows > 0)
+			lsn = entry->rows[txn->n_applier_rows - 1]->lsn;
+		else
+			lsn = entry->rows[entry->n_rows - 1]->lsn;
+		txn_limbo_assign_lsn(&txn_limbo, txn->limbo_entry, lsn);
+		if (txn->fiber != NULL)
+			fiber_wakeup(txn->fiber);
+	}
 finish:
 	fiber_set_txn(fiber(), NULL);
 	fiber_set_user(fiber(), orig_creds);
@@ -1045,23 +1064,6 @@ txn_commit_nop(struct txn *txn)
 	return false;
 }
 
-/*
- * A trigger called on tx rollback due to a failed WAL write,
- * when tx is waiting for confirmation.
- */
-static int
-txn_limbo_on_rollback(struct trigger *trig, void *event)
-{
-	(void) event;
-	struct txn *txn = (struct txn *) event;
-	/* Check whether limbo has performed the cleanup. */
-	if (!txn_has_flag(txn, TXN_WAIT_SYNC))
-		return 0;
-	struct txn_limbo_entry *entry = (struct txn_limbo_entry *) trig->data;
-	txn_limbo_abort(&txn_limbo, entry);
-	return 0;
-}
-
 int
 txn_commit_try_async(struct txn *txn)
 {
@@ -1084,47 +1086,12 @@ txn_commit_try_async(struct txn *txn)
 		goto rollback;
 
 	bool is_sync = txn_has_flag(txn, TXN_WAIT_SYNC);
-	struct txn_limbo_entry *limbo_entry;
 	if (is_sync) {
-		/*
-		 * We'll need this trigger for sync transactions later,
-		 * but allocation failure is inappropriate after the entry
-		 * is sent to journal, so allocate early.
-		 */
-		size_t size;
-		struct trigger *trig =
-			tx_region_alloc_object(txn, TX_OBJECT_TRIGGER, &size);
-		if (trig == NULL) {
-			diag_set(OutOfMemory, size, "tx_region_alloc_object",
-				 "trig");
-			goto rollback;
-		}
-
 		/* See txn_commit(). */
 		uint32_t origin_id = req->rows[0]->replica_id;
-		limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn);
-		if (limbo_entry == NULL)
+		txn->limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn);
+		if (txn->limbo_entry == NULL)
 			goto rollback;
-
-		if (txn_has_flag(txn, TXN_WAIT_ACK)) {
-			int64_t lsn = req->rows[txn->n_applier_rows - 1]->lsn;
-			/*
-			 * Can't tell whether it is local or not -
-			 * async commit is used both by applier
-			 * and during recovery. Use general LSN
-			 * assignment to let the limbo rule this
-			 * out.
-			 */
-			txn_limbo_assign_lsn(&txn_limbo, limbo_entry, lsn);
-		}
-
-		/*
-		 * Set a trigger to abort waiting for confirm on
-		 * WAL write failure.
-		 */
-		trigger_create(trig, txn_limbo_on_rollback,
-			       limbo_entry, NULL);
-		txn_on_rollback(txn, trig);
 	}
 
 	fiber_set_txn(fiber(), NULL);
@@ -1183,6 +1150,7 @@ txn_commit(struct txn *txn)
 		limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn);
 		if (limbo_entry == NULL)
 			goto rollback_abort;
+		txn->limbo_entry = limbo_entry;
 	}
 
 	fiber_set_txn(fiber(), NULL);
@@ -1193,17 +1161,15 @@ txn_commit(struct txn *txn)
 		goto rollback_io;
 	}
 	if (txn_has_flag(txn, TXN_WAIT_SYNC)) {
+		assert(limbo_entry->lsn > 0);
+		/*
+		 * XXX: ACK should be done on WAL write too. But it can make
+		 * another WAL write. Can't be done until it works
+		 * asynchronously.
+		 */
 		if (txn_has_flag(txn, TXN_WAIT_ACK)) {
-			int64_t lsn = req->rows[req->n_rows - 1]->lsn;
-			/*
-			 * Use local LSN assignment. Because
-			 * blocking commit is used by local
-			 * transactions only.
-			 */
-			txn_limbo_assign_local_lsn(&txn_limbo, limbo_entry,
-						   lsn);
-			/* Local WAL write is a first 'ACK'. */
-			txn_limbo_ack(&txn_limbo, txn_limbo.owner_id, lsn);
+			txn_limbo_ack(&txn_limbo, txn_limbo.owner_id,
+				      limbo_entry->lsn);
 		}
 		if (txn_limbo_wait_complete(&txn_limbo, limbo_entry) < 0)
 			goto rollback;
@@ -1217,8 +1183,6 @@ txn_commit(struct txn *txn)
 
 rollback_io:
 	diag_log();
-	if (txn_has_flag(txn, TXN_WAIT_SYNC))
-		txn_limbo_abort(&txn_limbo, limbo_entry);
 rollback_abort:
 	txn->signature = TXN_SIGNATURE_ABORT;
 rollback:

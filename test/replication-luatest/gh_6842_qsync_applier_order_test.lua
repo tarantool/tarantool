@@ -96,6 +96,30 @@ local function wait_synchro_owner(server, owner_id)
 end
 
 --
+-- Wait until the server sees synchro queue has the given length.
+--
+local function wait_synchro_len(server, len_arg)
+    luatest.helpers.retrying({timeout = wait_timeout}, server.exec, server,
+                             function(len)
+        if box.info.synchro.queue.len ~= len then
+            error('Waiting for queue len')
+        end
+    end, {len_arg})
+end
+
+--
+-- Wait until the server sees synchro queue as busy.
+--
+local function wait_synchro_is_busy(server)
+    luatest.helpers.retrying({timeout = wait_timeout}, server.exec, server,
+                             function()
+        if not box.info.synchro.queue.busy then
+            error('Waiting for busy queue')
+        end
+    end)
+end
+
+--
 -- Server 1 was a synchro queue owner. Then it receives a foreign PROMOTE which
 -- goes to WAL but is not applied yet. Server 1 during that tries to make a
 -- synchro transaction. It is expected to be aborted at commit attempt, because
@@ -161,4 +185,92 @@ g.test_local_txn_during_remote_promote = function(g)
         return box.space.test:select{}
     end)
     luatest.assert_equals(content, {{3}}, 'synchro transactions work')
+end
+
+--
+-- Server 1 was a synchro queue owner. It starts a synchro txn. The txn is
+-- written to WAL but not reported to TX yet. Relay manages to send it. Server 2
+-- receives the txn and makes a PROMOTE including this txn.
+--
+-- Then the PROMOTE is delivered to server 1 and goes to WAL too. Then the txn
+-- and PROMOTE WAL writes are processed by TX thread in a single batch without
+-- yields.
+--
+-- The bug was that the txn's synchro queue entry didn't get an LSN right after
+-- WAL write and PROMOTE couldn't process synchro entries not having an LSN.
+--
+g.test_remote_promote_during_local_txn_including_it = function(g)
+    -- Start synchro txns on server 1.
+    local fids = g.server1:exec(function()
+        box.ctl.promote()
+        local s = box.schema.create_space('test', {is_sync = true})
+        s:create_index('pk')
+        box.cfg{
+            -- To hang own transactions in the synchro queue.
+            replication_synchro_quorum = 3,
+        }
+        box.error.injection.set('ERRINJ_RELAY_FASTER_THAN_TX', true)
+        local fiber = require('fiber')
+        -- More than one transaction to ensure that it works not just for one.
+        local f1 = fiber.new(s.replace, s, {1})
+        f1:set_joinable(true)
+        local f2 = fiber.new(s.replace, s, {2})
+        f2:set_joinable(true)
+        return {f1:id(), f2:id()}
+    end)
+
+    -- The txns are delivered to server 2.
+    wait_synchro_len(g.server2, #fids)
+
+    -- Server 2 confirms the txns and sends a PROMOTE covering it to server 1.
+    g.server2:exec(function()
+        box.cfg{
+            replication_synchro_quorum = 1,
+            -- To make it not wait for confirm from server 1. Just confirm via
+            -- the promotion ASAP.
+            replication_synchro_timeout = 0.001,
+        }
+        box.ctl.promote()
+        box.cfg{
+            replication_synchro_quorum = 2,
+            replication_synchro_timeout = 1000,
+        }
+    end)
+
+    -- Server 1 receives the foreign PROMOTE. Now the local txns and a remote
+    -- PROMOTE are being written to WAL.
+    wait_synchro_is_busy(g.server1)
+
+    local rows = g.server1:exec(function(fids)
+        -- Simulate the TX thread being slow. To increase likelihood of the txn
+        -- and PROMOTE WAL writes being processed by TX in a single batch.
+        box.error.injection.set('ERRINJ_TX_DELAY_PRIO_ENDPOINT', 0.1)
+        -- Let them finish WAL writes.
+        box.error.injection.set('ERRINJ_RELAY_FASTER_THAN_TX', false)
+
+        local fiber = require('fiber')
+        for _, fid in pairs(fids) do
+            fiber.find(fid):join()
+        end
+        box.error.injection.set('ERRINJ_TX_DELAY_PRIO_ENDPOINT', 0)
+        return box.space.test:select()
+    end, {fids})
+    -- The txn was confirmed by another instance even before it was confirmed
+    -- locally.
+    luatest.assert_equals(rows, {{1}, {2}}, 'txn was confirmed')
+
+    local rows2 = g.server2:exec(function()
+        return box.space.test:select()
+    end)
+    luatest.assert_equals(rows2, rows, 'on instance 2 too')
+
+    -- The synchronous replication is functional - new owner can use the queue.
+    g.server2:exec(function()
+        box.space.test:replace{3}
+    end)
+    g.server1:wait_vclock_of(g.server2)
+    rows = g.server1:exec(function()
+        return box.space.test:select{}
+    end)
+    luatest.assert_equals(rows, {{1}, {2}, {3}}, 'synchro transactions work')
 end
