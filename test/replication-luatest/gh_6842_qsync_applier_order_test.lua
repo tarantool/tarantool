@@ -6,7 +6,7 @@ local wait_timeout = 120
 
 local g = luatest.group('gh-6842')
 
-g.before_all(function(g)
+local function cluster_create(g)
     g.cluster = cluster:new({})
     local box_cfg = {
         replication_timeout = 0.1,
@@ -32,13 +32,16 @@ g.before_all(function(g)
             read_only = false
         }
     end)
-end)
+end
 
-g.after_all(function(g)
+local function cluster_drop(g)
     g.cluster:drop()
     g.server1 = nil
     g.server2 = nil
-end)
+end
+
+g.before_all(cluster_create)
+g.after_all(cluster_drop)
 
 g.after_each(function(g)
     -- Restore cluster state like it was on start.
@@ -117,6 +120,19 @@ local function wait_synchro_is_busy(server)
             error('Waiting for busy queue')
         end
     end)
+end
+
+--
+-- Wait until the server sees the given upstream status for a specified
+-- replica ID.
+--
+local function wait_upstream_status(server, id_arg, status_arg)
+    luatest.helpers.retrying({timeout = wait_timeout}, server.exec, server,
+                             function(id, status)
+        if box.info.replication[id].upstream.status ~= status then
+            error('Waiting for upstream status')
+        end
+    end, {id_arg, status_arg})
 end
 
 --
@@ -273,4 +289,82 @@ g.test_remote_promote_during_local_txn_including_it = function(g)
         return box.space.test:select{}
     end)
     luatest.assert_equals(rows, {{1}, {2}, {3}}, 'synchro transactions work')
+end
+
+--
+-- Server 1 was a synchro queue owner. It starts a synchro txn. The txn is
+-- not written to WAL yet. Server 2 makes a PROMOTE which doesn't include that
+-- txn.
+--
+-- Then the PROMOTE is delivered to server 1 and goes to WAL too. Then the txn
+-- and PROMOTE WAL writes are processed by TX thread in a single batch without
+-- yields.
+--
+-- The bug was that the fiber authored the txn wasn't ready to a WAL write
+-- being success, txn being marked as non-synchro anymore (it happened on
+-- rollback in the synchro queue), but the txn signature being bad.
+--
+g.test_remote_promote_during_local_txn_not_including_it = function(g)
+    -- Start a synchro txn on server 1.
+    local fids = g.server1:exec(function()
+        box.ctl.promote()
+        local s = box.schema.create_space('test', {is_sync = true})
+        s:create_index('pk')
+        box.cfg{
+            replication_synchro_quorum = 3,
+        }
+        box.error.injection.set('ERRINJ_WAL_DELAY', true)
+        local fiber = require('fiber')
+        -- More than one transaction to ensure that it works not just for one.
+        local f1 = fiber.new(s.replace, s, {1})
+        f1:set_joinable(true)
+        local f2 = fiber.new(s.replace, s, {2})
+        f2:set_joinable(true)
+        return {f1:id(), f2:id()}
+    end)
+    -- Deliver server 1 promotion to 2. Otherwise server 2 might fail trying to
+    -- start its own promotion simultaneously.
+    g.server2:wait_vclock_of(g.server1)
+
+    -- Server 2 sends a PROMOTE not covering the txns to server 1.
+    g.server2:exec(function()
+        box.cfg{
+            replication_synchro_quorum = 1,
+        }
+        box.ctl.promote()
+    end)
+
+    -- Server 1 receives the PROMOTE.
+    wait_synchro_is_busy(g.server1)
+
+    local rows = g.server1:exec(function(fids)
+        -- Simulate the TX thread being slow. To increase likelihood of the txn
+        -- and PROMOTE WAL writes being processed by TX in a single batch.
+        box.error.injection.set('ERRINJ_TX_DELAY_PRIO_ENDPOINT', 0.1)
+        -- Let them finish WAL writes.
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+
+        local fiber = require('fiber')
+        for _, fid in pairs(fids) do
+            fiber.find(fid):join()
+        end
+        box.error.injection.set('ERRINJ_TX_DELAY_PRIO_ENDPOINT', 0)
+        return box.space.test:select()
+    end, {fids})
+    luatest.assert_equals(rows, {}, 'txns were rolled back')
+
+    -- Replication is broken now because server 2 (synchro queue owner) got a
+    -- txn from server 1. It was written before ownership transaction but it
+    -- doesn't matter. Although maybe some day it could be detected and handled
+    -- more graceful.
+    wait_upstream_status(g.server2, g.server1:instance_id(), 'stopped')
+
+    rows = g.server2:exec(function()
+        return box.space.test:select()
+    end)
+    luatest.assert_equals(rows, {}, 'server 2 received it but did not apply')
+
+    -- Recreate the cluster because it is broken now.
+    cluster_drop(g)
+    cluster_create(g)
 end
