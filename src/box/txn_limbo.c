@@ -489,7 +489,7 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 		return;
 	rlist_foreach_entry_safe_reverse(e, &limbo->queue, in_queue, tmp) {
 		txn_limbo_abort(limbo, e);
-		txn_clear_flags(e->txn, TXN_WAIT_SYNC | TXN_WAIT_ACK);
+		txn_clear_flags(e->txn, TXN_WAIT_ACK);
 		/*
 		 * Should be written to WAL by now. Rollback is always written
 		 * after the affected transactions.
@@ -575,6 +575,7 @@ txn_limbo_read_demote(struct txn_limbo *limbo, int64_t lsn)
 void
 txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 {
+	assert(!txn_limbo_is_ro(limbo));
 	if (rlist_empty(&limbo->queue))
 		return;
 	/*
