@@ -203,7 +203,7 @@ static const char *char2escape_with_forward_slash_escape[256] = {
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 };
 
-static char **char2escape = NULL;        // TODO ask if it is safe to do like this, in cases when compat won't be called, and what default behaviour to set then
+static char **char2escape = NULL;       // TODO add char*** to serializer
 
 #if 0
 static int json_destroy_config(lua_State *l)

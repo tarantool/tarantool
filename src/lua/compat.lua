@@ -66,22 +66,37 @@ compat = setmetatable({
 				end
 				return result
 			end,
-			dump = function()							-- TODO check how dump should look like
-				local result = { }
-				local i = 1
+			dump = function()
+				local result = "require('tarantool').compat({"
+				local isFirst = true
 				for key, val in pairs(options) do
 					if cfg[key].selected then
-						local str = key ..  " = " .. tostring(cfg[key].value)
-						result[i] = str
-						i = i + 1
+						if not isFirst then
+							result = result .. ", "
+						end
+						result = result .. key ..  " = " .. tostring(cfg[key].value)
+						isFirst = false
 					end
 				end
-				return result
+				return result .. "})"
 			end,
 			reset = function()
 				for name, elem in pairs(options) do
  					cfg[name].value = elem.default
 					cfg[name].selected = false
+				end
+			end,
+			restore = function(list)								-- TODO mention that it receives only {'option_1', 'option_2'} lists
+				if type(list) ~= 'table' then
+					error(('Invalid argument %s'):format(list))
+				end
+				for i, key in pairs(list) do
+					if not options[key] then
+						error(('Invalid option %s'):format(key))
+					end
+					cfg[key].value = options[key].default
+					cfg[key].selected = false
+					postaction[key](cfg[key].value)
 				end
 			end
 		}, {
@@ -94,10 +109,11 @@ compat = setmetatable({
 						error(('Invalid option %s'):format(key))
 					end
 					cfg[key].value = val
+					cfg[key].selected = true
 					postaction[key](val)
 				end
 			end,
-			__newindex = function(compat, key, val)
+			__newindex = function(compat, key, val)					-- TODO debate if setters should be 'old'/'new' or true/false
 				if not options[key] then
 					error(('Invalid option %s'):format(key))
 				end
@@ -113,7 +129,7 @@ compat = setmetatable({
 				return serialize_policy(key, policy);
 			end,
 			__serialize = serialize_compat,
-			__to_string = serialize_compat
+			__tostring = serialize_compat
 		}
 	)
 
