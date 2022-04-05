@@ -45,6 +45,11 @@ struct error_payload {
 void
 error_payload_create(struct error_payload *p);
 
+/** Create error payload by copying another error payload. */
+void
+error_payload_create_copy(struct error_payload *dst,
+			  const struct error_payload *src);
+
 /** Destroy error payload. */
 void
 error_payload_destroy(struct error_payload *p);

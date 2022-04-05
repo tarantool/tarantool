@@ -451,6 +451,74 @@ test_payload_move(void)
 }
 
 static void
+test_payload_copy(void)
+{
+	header();
+	plan(25);
+
+	struct error_payload p1, p2;
+	error_payload_create(&p1);
+	error_payload_create_copy(&p2, &p1);
+	ok(p2.count == 0 && p2.fields == NULL, "copied empty");
+
+	error_payload_set_str(&p1, "key", "value");
+	error_payload_create_copy(&p2, &p1);
+	is(p2.count, 1, "got 1 field");
+	isnt(p2.fields, NULL, "got 1 field");
+	is(strcmp(error_payload_get_str(&p2, "key"), "value"), 0, "key");
+	error_payload_destroy(&p2);
+
+	error_payload_set_str(&p1, "key1", "value1");
+	error_payload_set_str(&p1, "key2", "value2");
+	error_payload_set_str(&p1, "key3", "value3");
+	error_payload_create_copy(&p2, &p1);
+	is(p2.count, 4, "got 4 fields");
+	isnt(p2.fields, NULL, "got 4 fields");
+	is(strcmp(error_payload_get_str(&p2, "key"), "value"), 0, "key");
+	is(strcmp(error_payload_get_str(&p2, "key1"), "value1"), 0, "key1");
+	is(strcmp(error_payload_get_str(&p2, "key2"), "value2"), 0, "key2");
+	is(strcmp(error_payload_get_str(&p2, "key3"), "value3"), 0, "key3");
+
+	error_payload_set_str(&p1, "key4", "value4");
+	is(p2.count, 4, "still 4 fields");
+	is(error_payload_get_str(&p2, "key4"), NULL, "no key4");
+	error_payload_clear(&p1, "key1");
+	is(p2.count, 4, "still 4 fields");
+	is(strcmp(error_payload_get_str(&p2, "key"), "value"), 0, "key");
+	is(strcmp(error_payload_get_str(&p2, "key1"), "value1"), 0, "key1");
+	is(strcmp(error_payload_get_str(&p2, "key2"), "value2"), 0, "key2");
+	is(strcmp(error_payload_get_str(&p2, "key3"), "value3"), 0, "key3");
+	error_payload_destroy(&p1);
+	error_payload_destroy(&p2);
+
+	error_payload_create(&p1);
+	bool bool_val1 = true;
+	uint64_t uint_val1 = 0xAB7C9ACFAB7C9ACF;
+	double double_val1 = 1.;
+	error_payload_set_bool(&p1, "bool", bool_val1);
+	error_payload_set_uint(&p1, "uint", uint_val1);
+	error_payload_set_double(&p1, "double", double_val1);
+
+	error_payload_create_copy(&p2, &p1);
+	is(p2.count, p1.count, "got the same count");
+	isnt(p2.fields, NULL, "got fields");
+	bool bool_val2 = !bool_val1;
+	uint64_t uint_val2 = ~0xAB7C9ACFAB7C9ACF;
+	double double_val2 = 1. / 3;
+	ok(error_payload_get_bool(&p2, "bool", &bool_val2), "get bool");
+	is(bool_val1, bool_val2, "the same bool");
+	ok(error_payload_get_uint(&p2, "uint", &uint_val2), "get uint");
+	is(uint_val1, uint_val2, "the same uint");
+	ok(error_payload_get_double(&p2, "double", &double_val2), "get double");
+	is(double_val1, double_val2, "the same double");
+	error_payload_destroy(&p1);
+	error_payload_destroy(&p2);
+
+	check_plan();
+	footer();
+}
+
+static void
 test_error_code(void)
 {
 	header();
@@ -521,7 +589,7 @@ int
 main(void)
 {
 	header();
-	plan(11);
+	plan(12);
 
 	random_init();
 	memory_init();
@@ -538,6 +606,7 @@ main(void)
 	test_payload_move();
 	test_error_code();
 	test_pthread();
+	test_payload_copy();
 
 	fiber_free();
 	memory_free();
