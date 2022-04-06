@@ -41,7 +41,10 @@
 #include "iproto_constants.h"
 #include "rmean.h"
 #include "small/obuf.h"
+#include "small/rlist.h"
 #include "tt_static.h"
+
+struct rlist box_on_call = RLIST_HEAD_INITIALIZER(box_on_call);
 
 static const struct port_vtab port_msgpack_vtab;
 
@@ -131,6 +134,23 @@ box_module_reload(const char *name)
 	return schema_module_reload(name, name + strlen(name));
 }
 
+/** Runs box_on_call triggers. */
+static inline void
+box_run_on_call(enum iproto_type type, const char *expr, int expr_len,
+		const char *args)
+{
+	assert(type == IPROTO_CALL || type == IPROTO_EVAL);
+	if (likely(rlist_empty(&box_on_call)))
+		return;
+	struct box_on_call_ctx ctx = {
+		.is_eval = (type == IPROTO_EVAL),
+		.expr = expr,
+		.expr_len = expr_len,
+		.args = args,
+	};
+	trigger_run(&box_on_call, &ctx);
+}
+
 int
 box_process_call(struct call_request *request, struct port *port)
 {
@@ -148,6 +168,7 @@ box_process_call(struct call_request *request, struct port *port)
 	if (func != NULL) {
 		if (func_access_check(func) != 0)
 			return -1;
+		box_run_on_call(IPROTO_CALL, name, name_len, request->args);
 		if (func_call_no_access_check(func, &args, port) != 0)
 			return -1;
 	} else {
@@ -155,6 +176,7 @@ box_process_call(struct call_request *request, struct port *port)
 						 SC_FUNCTION,
 						 tt_cstr(name, name_len)) != 0)
 			return -1;
+		box_run_on_call(IPROTO_CALL, name, name_len, request->args);
 		if (box_lua_call(name, name_len, &args, port) != 0)
 			return -1;
 	}
@@ -173,6 +195,7 @@ box_process_eval(struct call_request *request, struct port *port)
 			    request->args_end - request->args);
 	const char *expr = request->expr;
 	uint32_t expr_len = mp_decode_strl(&expr);
+	box_run_on_call(IPROTO_EVAL, expr, expr_len, request->args);
 	if (box_lua_eval(expr, expr_len, &args, port) != 0)
 		return -1;
 	return 0;
