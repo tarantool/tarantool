@@ -16,6 +16,7 @@
 #include "datetime.h"
 #include "trivia/util.h"
 #include "tzcode/tzcode.h"
+#include "tzcode/timezone.h"
 
 #include "fiber.h"
 
@@ -220,6 +221,7 @@ datetime_parse_full(struct datetime *date, const char *str, size_t len,
 	const char *svp = str;
 	char c;
 	int sec_of_day = 0, nanosecond = 0;
+	int16_t tzindex = 0;
 
 	n = dt_parse_iso_date(str, len, &dt);
 	if (n == 0)
@@ -253,9 +255,23 @@ datetime_parse_full(struct datetime *date, const char *str, size_t len,
 	if (len <= 0)
 		goto exit;
 
+	/* 1st attempt: decode as MSK */
+	const struct date_time_zone *zone;
+	n = timezone_lookup(str, len, &zone);
+	if (n > 0) {
+		assert(zone != NULL);
+		if ((TZ_AMBIGUOUS | TZ_NYI) & timezone_flags(zone))
+			return 0;
+		offset = timezone_offset(zone);
+		tzindex = timezone_index(zone);
+		str += n;
+		len -= n;
+		if (len <= 0)
+			goto exit;
+	}
+
+	/* 2nd attempt: decode as +03:00 */
 	n = dt_parse_iso_zone_lenient(str, len, &offset);
-	if (n == 0)
-		return 0;
 	str += n;
 
 exit:
@@ -264,7 +280,7 @@ exit:
 		sec_of_day - offset * 60;
 	date->nsec = nanosecond;
 	date->tzoffset = offset;
-	date->tzindex = 0;
+	date->tzindex = tzindex;
 
 	return str - svp;
 }

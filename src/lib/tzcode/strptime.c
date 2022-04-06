@@ -57,6 +57,7 @@ static char sccsid[] __attribute__((unused)) =
 #include "private.h"
 #include "timelocal.h"
 #include "tzcode.h"
+#include "timezone.h"
 
 enum flags {
 	FLAG_NONE = 1 << 0,
@@ -548,18 +549,17 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 				zonestr = alloca(cp - buf + 1);
 				strncpy(zonestr, buf, cp - buf);
 				zonestr[cp - buf] = '\0';
-				tzset();
-				if (0 == strcmp(zonestr, "GMT") ||
-				    0 == strcmp(zonestr, "UTC") ||
-				    0 == strcmp(zonestr, "Z")) {
-					tm->tm_gmtoff = 0;
-				} else if (0 == strcmp(zonestr, tzname[0])) {
-					tm->tm_isdst = 0;
-				} else if (0 == strcmp(zonestr, tzname[1])) {
-					tm->tm_isdst = 1;
-				} else {
+
+				const struct date_time_zone *zone;
+				size_t n = timezone_lookup(zonestr, cp - buf,
+							   &zone);
+				if (n == 0 ||
+				   (TZ_AMBIGUOUS | TZ_NYI) & timezone_flags(zone))
 					return NULL;
-				}
+				tm->tm_gmtoff = timezone_offset(zone);
+				tm->tm_tzindex = timezone_index(zone);
+				tm->tm_isdst = false;
+
 				buf += cp - buf;
 			}
 		} break;

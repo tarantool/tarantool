@@ -11,7 +11,7 @@ local ffi = require('ffi')
 --]]
 if jit.arch == 'arm64' then jit.off() end
 
-test:plan(33)
+test:plan(35)
 
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
@@ -551,6 +551,80 @@ test:test("Check parsing of dates with invalid attributes", function(test)
         txt = create_date_string{[attr_name] = right + 50}
         assert_raises(test, couldnt_parse(txt),
                       function() dt, len = date.parse(txt) end)
+    end
+end)
+
+test:test("Parsing of timezone abbrevs", function(test)
+    test:plan(156)
+    local zone_abbrevs = {
+        -- military
+        A =   1*60, B =   2*60, C =   3*60,
+        D =   4*60, E =   5*60, F =   6*60,
+        G =   7*60, H =   8*60, I =   9*60,
+        K =  10*60, L =  11*60, M =  12*60,
+
+        N =  -1*60, O =  -2*60, P =  -3*60,
+        Q =  -4*60, R =  -5*60, S =  -6*60,
+        T =  -7*60, U =  -8*60, V =  -9*60,
+        W = -10*60, X = -11*60, Y = -12*60,
+
+        Z = 0,
+
+        -- universal
+        GMT = 0, UTC = 0, UT = 0,
+        -- some non ambiguous
+        MSK = 3 * 60,   MCK = 3 * 60,   CET = 1 * 60,
+        AMDT = 5 * 60,  BDST = 1 * 60,  IRKT = 8 * 60,
+        KST = 9 * 60,   PDT = -7 * 60,  WET = 0 * 60,
+        HOVDST = 8 * 60, CHODST = 9 * 60,
+    }
+    local exp_pattern = '^2020%-02%-10T00:00'
+    local base_date = '2020-02-10T0000 '
+
+    for zone, offset in pairs(zone_abbrevs) do
+        local date_text = base_date .. zone
+        local date, len = date.parse(date_text)
+        test:isnt(date, nil, 'parse ' .. zone)
+        test:ok(len > #base_date, 'length longer than ' .. #base_date)
+        test:is(1, tostring(date):find(exp_pattern), 'expected prefix')
+        test:is(date.tzoffset, offset, 'expected offset')
+    end
+end)
+
+test:test("Parsing of timezone names (tzindex)", function(test)
+    test:plan(117)
+    local zone_abbrevs = {
+        -- military
+        A =  1, B =  2, C =  3,
+        D =  4, E =  5, F =  6,
+        G =  7, H =  8, I =  9,
+        K = 10, L = 11, M = 12,
+
+        N = 13, O = 14, P = 15,
+        Q = 16, R = 17, S = 18,
+        T = 19, U = 20, V = 21,
+        W = 22, X = 23, Y = 24,
+
+        Z = 25,
+
+        -- universal
+        GMT = 186, UTC = 296, UT = 112,
+
+        -- some non ambiguous
+        MSK = 238,   MCK = 232,  CET = 155,
+        AMDT = 336,  BDST = 344, IRKT = 409,
+        KST = 226,   PDT = 264,  WET = 314,
+        HOVDST = 664, CHODST = 656,
+    }
+    local base_date = '2020-02-10T0000 '
+
+    for zone, index in pairs(zone_abbrevs) do
+        local date_text = base_date .. zone
+        local date, len = date.parse(date_text)
+        test:isnt(date, nil, 'parse ' .. zone)
+        test:ok(len > #base_date, 'length longer than ' .. #base_date)
+        -- test:is(1, tostring(date):find(exp_pattern), 'expected prefix')
+        test:is(date.tzindex, index, 'expected tzindex')
     end
 end)
 
