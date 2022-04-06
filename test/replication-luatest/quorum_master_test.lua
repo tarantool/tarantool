@@ -55,7 +55,6 @@ pg.test_master_master_works = function(cg)
     cg.master_quorum1:eval('box.cfg{replication = ""}')
     t.assert_equals(cg.master_quorum1:eval('return box.space.test:insert{1}'), {1})
     cg.master_quorum1:eval(('box.cfg{replication = %s}'):format(repl.replication))
-    local vclock = cg.master_quorum1:eval('return box.info.vclock')
-    cg.master_quorum2:wait_vclock(vclock)
+    cg.master_quorum2:wait_vclock_of(cg.master_quorum1)
     t.assert_equals(cg.master_quorum2:eval('return box.space.test:select()'), {{1}})
 end
