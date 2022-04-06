@@ -37,12 +37,12 @@ struct tnt_tm {
 
 	/** Seconds east of UTC. */
 	long int tm_gmtoff;
-	/** Timezone abbreviation. */
-	const char *tm_zone;
 	/** Seconds since Epoch */
 	int64_t tm_epoch;
 	/** nanoseconds */
 	int tm_nsec;
+	/** Timezone index. */
+	int16_t tm_tzindex;
 };
 
 /**
