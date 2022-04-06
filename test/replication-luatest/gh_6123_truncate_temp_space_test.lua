@@ -57,9 +57,7 @@ g.test_truncate_is_local_transaction = function(cg)
 
     -- Checking that replica has received the last transaction,
     -- and that replication isn't broken.
-    local vclock = cg.master:get_vclock()
-    vclock[0] = nil
-    cg.replica:wait_vclock(vclock)
+    cg.replica:wait_vclock_of(cg.master)
 
     t.assert_equals(cg.replica:eval("return box.space._schema:select{'smth'}"), {{'smth'}})
     t.assert_equals(cg.replica:eval("return box.info.replication[1].upstream.status"), 'follow')

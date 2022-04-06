@@ -77,10 +77,8 @@ g.test_qsync_order = function(cg)
         box.space.test:insert{1}
     end)
 
-    local vclock = cg.r1:get_vclock()
-    vclock[0] = nil
-    cg.r2:wait_vclock(vclock)
-    cg.r3:wait_vclock(vclock)
+    cg.r2:wait_vclock_of(cg.r1)
+    cg.r3:wait_vclock_of(cg.r1)
 
     t.assert_equals(cg.r1:exec(select), {{1}})
     t.assert_equals(cg.r2:exec(select), {{1}})
@@ -179,9 +177,7 @@ g.test_promote_order = function(cg)
         box.ctl.promote()
         box.ctl.wait_rw()
     end)
-    local vclock = cg.r1:get_vclock()
-    vclock[0] = nil
-    cg.r2:wait_vclock(vclock)
+    cg.r2:wait_vclock_of(cg.r1)
 
     --
     -- Drop connection between r1 and the rest of the cluster.

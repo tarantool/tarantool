@@ -53,9 +53,7 @@ g.test_qsync_with_anon = function(cg)
         function() cg.master:eval("return box.space.sync:insert{1}") end)
 
     -- Wait until everything is replicated from the master to the replica
-    local vclock = cg.master:eval("return box.info.vclock")
-    vclock[0] = nil
-    cg.replica:wait_vclock(vclock)
+    cg.replica:wait_vclock_of(cg.master)
 
     t.assert_equals(cg.master:eval("return box.space.sync:select()"), {})
     t.assert_equals(cg.replica:eval("return box.space.sync:select()"), {})
