@@ -130,6 +130,18 @@ function Server:wait_election_leader_found()
                      function() return box.info.election.leader ~= 0 end)
 end
 
+function Server:wait_election_term(term)
+    return wait_cond('election term', self, self.exec, self, function(term)
+        return box.info.election.term >= term
+    end, {term})
+end
+
+function Server:wait_synchro_queue_term(term)
+    return wait_cond('synchro queue term', self, self.exec, self, function(term)
+        return box.info.synchro.queue.term >= term
+    end, {term})
+end
+
 -- Unlike the original luatest.Server function it waits for
 -- starting the server.
 function Server:start(opts)
@@ -170,6 +182,14 @@ function Server:instance_uuid()
     local uuid = self:exec(function() return box.info.uuid end)
     self.instance_uuid_value = uuid
     return uuid
+end
+
+function Server:election_term()
+    return self:exec(function() return box.info.election.term end)
+end
+
+function Server:synchro_queue_term()
+    return self:exec(function() return box.info.synchro.queue.term end)
 end
 
 -- TODO: Add the 'wait_for_readiness' parameter for the restart()
