@@ -1003,43 +1003,6 @@ relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row)
 }
 
 /**
- * Recreate recovery cursor from the last confirmed point. That is
- * used by Raft, when the node becomes a leader. It may happen,
- * that it already sent some data to other nodes as a follower,
- * and they ignored the data. Now when the node is a leader, it
- * should send the not confirmed data again. Otherwise the cluster
- * will stuck, or worse - the newer data would be sent without the
- * older sent but ignored data.
- */
-static void
-relay_restart_recovery(struct relay *relay)
-{
-	/*
-	 * Need to keep the 0 component unchanged. The remote vclock has it
-	 * unset, because it is a local LSN, and it is not sent between the
-	 * instances. Nonetheless, the recovery procedures still need the local
-	 * LSN set to find a proper xlog to start from. If it is not set, the
-	 * recovery process will treat it as 0, and will try to find an xlog
-	 * file having the first local row. Which of course may not exist for a
-	 * long time already. And then it will fail with an xlog gap error.
-	 *
-	 * The currently used local LSN is ok to use, even if it is outdated a
-	 * bit. Because the existing recovery object keeps the current xlog file
-	 * not deleted thanks to xlog GC subsystem. So by using the current
-	 * local LSN and the last confirmed remote LSNs we can be sure such an
-	 * xlog file still exists.
-	 */
-	struct vclock restart_vclock;
-	vclock_copy(&restart_vclock, &relay->recv_vclock);
-	vclock_reset(&restart_vclock, 0, vclock_get(&relay->r->vclock, 0));
-	struct recovery *r = recovery_new(wal_dir(), false, &restart_vclock);
-	rlist_swap(&relay->r->on_close_log, &r->on_close_log);
-	recovery_delete(relay->r);
-	relay->r = r;
-	recover_remaining_wals(relay->r, &relay->stream, NULL, true);
-}
-
-/**
  * Send a Raft message to the peer. This is done asynchronously, out of scope
  * of recover_remaining_wals loop.
  */
@@ -1056,8 +1019,6 @@ relay_raft_msg_push(struct cmsg *base)
 		 * would be ignored again.
 		 */
 		relay_send(msg->relay, &row);
-		if (msg->req.state == RAFT_STATE_LEADER)
-			relay_restart_recovery(msg->relay);
 	} catch (Exception *e) {
 		relay_set_error(msg->relay, e);
 		fiber_cancel(fiber());
