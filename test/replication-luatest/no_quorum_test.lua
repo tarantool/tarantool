@@ -54,8 +54,7 @@ pg.test_replication_no_quorum = function(cg)
     -- Check that replica is able to reconnect, case was broken with earlier quorum "fix".
     cg.master:eval("return box.cfg{listen = os.getenv('TARANTOOL_LISTEN')}")
     t.assert_equals(cg.master:eval("return space:insert{2}"), {2})
-    local vclock = cg.master:eval("return box.info.vclock")
-    cg.replica:wait_vclock(vclock)
+    cg.replica:wait_vclock_of(cg.master)
     t.assert_str_matches(
         cg.replica:eval('return box.info.status'), 'running')
     t.assert_equals(cg.master:eval("return space:select()"), {{1}, {2}})
