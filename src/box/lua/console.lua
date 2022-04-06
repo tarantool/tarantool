@@ -380,6 +380,7 @@ local function local_eval(storage, line)
     if not line then
         return nil
     end
+    internal.run_on_eval(line)
     local command = get_command(line)
     if command then
         return preprocess(storage, command)

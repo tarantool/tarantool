@@ -30,9 +30,18 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include "small/rlist.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+/**
+ * Triggers invoked on console eval.
+ * Passed eval expression string.
+ */
+extern struct rlist on_console_eval;
 
 struct lua_State;
 
