@@ -64,6 +64,7 @@ static struct {
 	size_t offset; /* offset in structure */
 	int type;
 	int defvalue;
+	// char ***char2escape = ; /* pointer to table that changes with configuration */
 } OPTIONS[] = {
 	OPTION(LUA_TBOOLEAN, encode_sparse_convert, 1),
 	OPTION(LUA_TNUMBER,  encode_sparse_ratio, 2),

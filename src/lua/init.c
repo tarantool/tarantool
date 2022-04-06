@@ -93,6 +93,7 @@ bool start_loop = true;
 
 /* contents of src/lua/ files */
 extern char strict_lua[],
+	compat_lua[],
 	uuid_lua[],
 	msgpackffi_lua[],
 	fun_lua[],
@@ -141,8 +142,7 @@ extern char strict_lua[],
 	memprof_process_lua[],
 	memprof_humanize_lua[],
 	memprof_lua[],
-	datetime_lua[],
-	compat_lua[]
+	datetime_lua[]
 #if defined(EMBED_LUAROCKS)
 	, luarocks_core_hardcoded_lua[],
 	luarocks_admin_cache_lua[],
@@ -241,6 +241,7 @@ extern char strict_lua[],
 static const char *lua_modules[] = {
 	/* Make it first to affect load of all other modules */
 	"strict", strict_lua,
+	"compat", compat_lua,
 	"fun", fun_lua,
 	"debug", debug_lua,
 	"tarantool", init_lua,
@@ -291,7 +292,6 @@ static const char *lua_modules[] = {
 	"memprof.humanize", memprof_humanize_lua,
 	"memprof", memprof_lua,
 	"datetime", datetime_lua,
-	"compat", compat_lua,
 	NULL
 };
 
@@ -762,7 +762,10 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	lua_pop(L, 1); /* _PRELOAD */
 
 	luaopen_tarantool(L);
-	lua_pop(L, 1);
+	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+	lua_getfield(L, -1, "compat");
+	lua_getfield(L, -3, "compat");
+	lua_pop(L, 2);
 
 	lua_newtable(L);
 	lua_pushinteger(L, -1);

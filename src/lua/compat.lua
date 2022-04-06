@@ -31,13 +31,6 @@ local postaction = {
 
 local cfg = { }
 
-for name, elem in pairs(options) do
-	cfg[name] = { }
- 	cfg[name].value = elem.default
-	cfg[name].selected = false
-	postaction[name](elem.default)
-end
-
 local function serialize_policy(key, policy)
 	assert(policy ~= nil)
 	local result = { }
@@ -98,6 +91,28 @@ compat = setmetatable({
 					cfg[key].selected = false
 					postaction[key](cfg[key].value)
 				end
+			end,
+			preload = function()
+				for name, elem in pairs(options) do
+					cfg[name] = { }
+ 					cfg[name].value = elem.default
+					cfg[name].selected = false
+				end
+			end,
+			postload = function()
+				for name, elem in pairs(options) do
+					postaction[name](elem.default)
+				end
+			end,
+			__autocomplete = function(self)
+				local res = { }
+				local i = 1
+				for name, elem in pairs(options) do
+					res[i] = name
+					i = i + 1
+				end
+				print(res)
+				return res
 			end
 		}, {
 			__call = function(compat, list)
@@ -117,6 +132,15 @@ compat = setmetatable({
 				if not options[key] then
 					error(('Invalid option %s'):format(key))
 				end
+				if val == 'new' then
+					val = options[key].new
+				end
+				if val == 'old' then
+					val = options[key].old
+				end
+				if type(val) ~= 'bool' then
+					error(('Invalid argument %s'):format(val))
+				end
 				cfg[key].value = val
 				cfg[key].selected = true
 				postaction[key](val)
@@ -129,8 +153,21 @@ compat = setmetatable({
 				return serialize_policy(key, policy);
 			end,
 			__serialize = serialize_compat,
-			__tostring = serialize_compat
+			__tostring = serialize_compat,
+			__autocomplete = function(self)
+				local res = { }
+				local i = 1
+				for name, elem in pairs(options) do
+					res[i] = name
+					i = i + 1
+				end
+				print(res)
+				return res
+			end
 		}
 	)
+
+compat.preload()
+compat.preload = nil
 
 return compat
