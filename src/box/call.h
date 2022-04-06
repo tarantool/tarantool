@@ -31,12 +31,34 @@
  * SUCH DAMAGE.
  */
 
+#include <stdbool.h>
+
+#include "small/rlist.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct port;
 struct call_request;
+
+/** Context passed to box_on_call trigger callback. */
+struct box_on_call_ctx {
+	/** True for EVAL, false for CALL. */
+	bool is_eval;
+	/** CALL function name or EVAL expression. */
+	const char *expr;
+	/** Length of the expr string. */
+	int expr_len;
+	/** Arguments (MsgPack array). */
+	const char *args;
+};
+
+/**
+ * Triggers invoked by box_process_call and box_process_eval.
+ * Trigger callback is passed on_box_call_ctx.
+ */
+extern struct rlist box_on_call;
 
 /**
  * Reload loadable module by name.
