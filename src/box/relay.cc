@@ -129,6 +129,11 @@ struct relay {
 	/** Replicatoin slave version. */
 	uint32_t version_id;
 	/**
+	 * The biggest Raft term that node has broadcasted. Used to synchronize
+	 * Raft term (from tx thread) and PROMOTE (from WAL) dispatch.
+	 */
+	uint64_t sent_raft_term;
+	/**
 	 * A filter of replica ids whose rows should be ignored.
 	 * Each set filter bit corresponds to a replica id whose
 	 * rows shouldn't be relayed. The list of ids to ignore
@@ -322,6 +327,7 @@ relay_start(struct relay *relay, struct iostream *io, uint64_t sync,
 	relay->io = io;
 	relay->sync = sync;
 	relay->state = RELAY_FOLLOW;
+	relay->sent_raft_term = 0;
 	relay->last_row_time = ev_monotonic_now(loop());
 }
 
@@ -850,6 +856,8 @@ relay_subscribe_f(va_list ap)
 	struct relay_is_raft_enabled_msg raft_enabler;
 	if (!relay->replica->anon && relay->version_id >= version_id(2, 6, 0))
 		relay_send_is_raft_enabled(relay, &raft_enabler, true);
+	else
+		relay->sent_raft_term = UINT64_MAX;
 
 	/*
 	 * Setup garbage collection trigger.
@@ -899,7 +907,9 @@ relay_subscribe_f(va_list ap)
 		 * status messaging or by an acknowledge to status message.
 		 * Handle cbus messages first.
 		 */
-		cbus_process(&relay->tx_endpoint);
+		inj = errinj(ERRINJ_RELAY_FROM_TX_DELAY, ERRINJ_BOOL);
+		if (inj == NULL || !inj->bparam)
+			cbus_process(&relay->tx_endpoint);
 		cbus_process(&relay->wal_endpoint);
 		/* Check for a heartbeat timeout. */
 		if (ev_monotonic_now(loop()) - relay->last_row_time > timeout)
@@ -1061,6 +1071,7 @@ relay_raft_msg_push(struct cmsg *base)
 		 * would be ignored again.
 		 */
 		relay_send(msg->relay, &row);
+		msg->relay->sent_raft_term = msg->req.term;
 	} catch (Exception *e) {
 		relay_set_error(msg->relay, e);
 		fiber_cancel(fiber());
@@ -1149,6 +1160,26 @@ relay_send_row(struct xstream *stream, struct xrow_header *packet)
 			packet->tsn = packet->lsn;
 			say_warn("injected broken lsn: %lld",
 				 (long long) packet->lsn);
+		}
+		if (iproto_type_is_promote_request(packet->type)) {
+			struct synchro_request req;
+			xrow_decode_synchro(packet, &req);
+			/*
+			 * PROMOTE/DEMOTE should be sent only after
+			 * corresponding RAFT term was already sent.
+			 * We assume that PROMOTE/DEMOTE will arive after RAFT
+			 * term, otherwise something might break.
+			 */
+			while (relay->sent_raft_term < req.term) {
+				if (fiber_is_cancelled()) {
+					diag_set(FiberIsCancelled);
+					diag_raise();
+				}
+				cbus_process(&relay->tx_endpoint);
+				if (relay->sent_raft_term >= req.term)
+					break;
+				fiber_yield();
+			}
 		}
 		relay_send(relay, packet);
 	}
