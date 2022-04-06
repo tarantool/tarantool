@@ -314,4 +314,11 @@ function Server:wait_vclock(to_vclock)
     end
 end
 
+function Server:wait_vclock_of(other_server)
+    local vclock = other_server:get_vclock()
+    -- First component is for local changes.
+    vclock[0] = nil
+    return self:wait_vclock(vclock)
+end
+
 return Server
