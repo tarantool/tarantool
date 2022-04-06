@@ -51,6 +51,8 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+struct rlist on_console_eval = RLIST_HEAD_INITIALIZER(on_console_eval);
+
 static struct luaL_serializer *serializer_yaml;
 static struct luaL_serializer *serializer_lua;
 
@@ -472,6 +474,18 @@ lbox_console_format_yaml(struct lua_State *L)
 	return lua_yaml_encode(L, serializer_yaml, NULL, NULL);
 }
 
+/**
+ * Runs registered on_console_eval triggers.
+ * Takes eval expression string, which is passed to trigger callback.
+ */
+static int
+lbox_console_run_on_eval(struct lua_State *L)
+{
+	const char *expr = lua_tostring(L, 1);
+	trigger_run(&on_console_eval, (void *)expr);
+	return 0;
+}
+
 int
 console_session_fd(struct session *session)
 {
@@ -641,6 +655,7 @@ tarantool_lua_console_init(struct lua_State *L)
 		{"completion_handler",	lbox_console_completion_handler},
 		{"format_yaml",		lbox_console_format_yaml},
 		{"format_lua",		lbox_console_format_lua},
+		{"run_on_eval",		lbox_console_run_on_eval},
 		{NULL, NULL}
 	};
 	luaL_register_module(L, "console", consolelib);
