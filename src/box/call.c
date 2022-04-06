@@ -141,20 +141,23 @@ box_process_call(struct call_request *request, struct port *port)
 	const char *name = request->name;
 	assert(name != NULL);
 	uint32_t name_len = mp_decode_strl(&name);
-
-	int rc;
 	struct port args;
 	port_msgpack_create(&args, request->args,
 			    request->args_end - request->args);
 	struct func *func = func_by_name(name, name_len);
 	if (func != NULL) {
-		rc = func_call(func, &args, port);
-	} else if ((rc = access_check_universe_object(PRIV_X | PRIV_U,
-				SC_FUNCTION, tt_cstr(name, name_len))) == 0) {
-		rc = box_lua_call(name, name_len, &args, port);
+		if (func_access_check(func) != 0)
+			return -1;
+		if (func_call_no_access_check(func, &args, port) != 0)
+			return -1;
+	} else {
+		if (access_check_universe_object(PRIV_X | PRIV_U,
+						 SC_FUNCTION,
+						 tt_cstr(name, name_len)) != 0)
+			return -1;
+		if (box_lua_call(name, name_len, &args, port) != 0)
+			return -1;
 	}
-	if (rc != 0)
-		return -1;
 	return 0;
 }
 

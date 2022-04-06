@@ -91,6 +91,10 @@ func_new(struct func_def *def);
 void
 func_delete(struct func *func);
 
+/** Check "EXECUTE" permissions for a given function. */
+int
+func_access_check(struct func *func);
+
 /**
  * Call function @a func with arguments @a args, put return value to @a ret.
  * Return 0 on success and nonzero on failure.
@@ -100,7 +104,16 @@ func_delete(struct func *func);
  * if and only if func_call returns 0;
  */
 int
-func_call(struct func *func, struct port *args, struct port *ret);
+func_call_no_access_check(struct func *func, struct port *args,
+			  struct port *ret);
+
+static inline int
+func_call(struct func *func, struct port *args, struct port *ret)
+{
+	if (func_access_check(func) != 0)
+		return -1;
+	return func_call_no_access_check(func, args, ret);
+}
 
 /**
  * Reload dynamically loadable schema module.

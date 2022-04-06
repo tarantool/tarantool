@@ -508,8 +508,7 @@ func_delete(struct func *func)
 	free(def);
 }
 
-/** Check "EXECUTE" permissions for a given function. */
-static int
+int
 func_access_check(struct func *func)
 {
 	struct credentials *credentials = effective_user();
@@ -541,10 +540,9 @@ func_access_check(struct func *func)
 }
 
 int
-func_call(struct func *base, struct port *args, struct port *ret)
+func_call_no_access_check(struct func *base, struct port *args,
+			  struct port *ret)
 {
-	if (func_access_check(base) != 0)
-		return -1;
 	/**
 	 * Change the current user id if the function is
 	 * a set-definer-uid one. If the function is not
