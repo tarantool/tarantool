@@ -262,7 +262,7 @@ failed.name = "failed"
 
 failed.deploy(True, wait=False)
 line = "ER_READONLY"
-if failed.logfile_pos.seek_wait(line) >= 0:
+if failed.logfile_pos.seek_wait(line):
     print("'{}' exists in server log".format(line))
 
 failed.stop()
