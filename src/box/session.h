@@ -198,15 +198,32 @@ fiber_get_session(struct fiber *fiber)
  * @param session a value to set
  */
 static inline void
-fiber_set_user(struct fiber *fiber, struct credentials *cr)
-{
-	fiber->storage.credentials = cr;
-}
-
-static inline void
 fiber_set_session(struct fiber *fiber, struct session *session)
 {
 	fiber->storage.session = session;
+}
+
+/**
+ * Get the current user from @a fiber
+ * @param fiber fiber
+ * @return user if any
+ * @retval NULL if there is no active user
+ */
+static inline struct credentials *
+fiber_get_user(struct fiber *fiber)
+{
+	return fiber->storage.credentials;
+}
+
+/**
+ * Set the current user in @a fiber
+ * @param fiber fiber
+ * @param cr a value to set
+ */
+static inline void
+fiber_set_user(struct fiber *fiber, struct credentials *cr)
+{
+	fiber->storage.credentials = cr;
 }
 
 /*
