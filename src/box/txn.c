@@ -39,6 +39,7 @@
 #include "errinj.h"
 #include "iproto_constants.h"
 #include "box.h"
+#include "session.h"
 
 double too_long_threshold;
 
@@ -637,6 +638,20 @@ txn_on_journal_write(struct journal_entry *entry)
 	 */
 	assert(in_txn() == NULL);
 	fiber_set_txn(fiber(), txn);
+	/*
+	 * Use session and credentials of the original fiber for
+	 * commit/rollback triggers.
+	 */
+	struct session *orig_session = fiber_get_session(fiber());
+	struct session *session = (txn->fiber != NULL ?
+				   fiber_get_session(txn->fiber) : NULL);
+	if (session != NULL)
+		fiber_set_session(fiber(), session);
+	struct credentials *orig_creds = fiber_get_user(fiber());
+	struct credentials *creds = (txn->fiber != NULL ?
+				     fiber_get_user(txn->fiber) : NULL);
+	if (creds != NULL)
+		fiber_set_user(fiber(), creds);
 	if (txn->signature < 0) {
 		txn_complete_fail(txn);
 		goto finish;
@@ -658,6 +673,8 @@ txn_on_journal_write(struct journal_entry *entry)
 		fiber_wakeup(txn->fiber);
 finish:
 	fiber_set_txn(fiber(), NULL);
+	fiber_set_user(fiber(), orig_creds);
+	fiber_set_session(fiber(), orig_session);
 }
 
 static struct journal_entry *
