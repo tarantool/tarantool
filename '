@@ -29,18 +29,18 @@ local postaction = {
 }
 
 local help = [[
-This is Tarantool compatibility module.
+This is Tarantool compatability module.
 To get help, see the Tarantool manual at https://tarantool.io/en/doc/
 Available commands:
 	
-	candidates()                -- list all unselected options
-	dump()                      -- get command that sets up compat with same options as current
-	help                        -- show this help
-	reset()                     -- set all options to default
-	restore{'option_name'}      -- set to default specified options
-	{option_name = true}        -- set list of options to desired values, could be true, false, 'old', 'new', 'default'
-	option_name                 -- list option info
-	option_name = true          -- set desired value to option, could be true, false, 'old', 'new', 'default'
+	candidates()  				-- list all unselected options
+	dump()						-- get command that sets up compat with same options as current
+	help 						-- show this help
+	reset()						-- set all options to default
+	restore{'option_name'}		-- set to default specified options
+	{option_name = true}  		-- set list of options to desired values, could be true, false, 'old', 'new', 'default'
+	option_name 				-- list option info
+	option_name = true			-- set desired value to option, could be true, false, 'old', 'new', 'default'
 ]]
 
 local cfg = { }
@@ -61,27 +61,6 @@ local function serialize_compat(compat)
 		result[key] = serialize_policy(key, val)
 	end
 	return result
-end
-
-local function set_option(key, val)
-	if not options[key] then
-		error(('Invalid option %s'):format(key))
-	end
-	if val == 'new' then
-		val = options[key].new
-	end
-	if val == 'old' then
-		val = options[key].old
-	end
-	if val == 'default' then							-- should 'default' set option as `selected`?
-		val = options[key].default
-	end
-	if type(val) ~= 'boolean' then
-		error(('Invalid argument %s'):format(val))
-	end
-	cfg[key].value = val
-	cfg[key].selected = true
-	postaction[key](val)
 end
 
 compat = setmetatable({
@@ -139,21 +118,40 @@ compat = setmetatable({
 					postaction[name](elem.default)
 				end
 			end,
-			help = function()
-				print()												-- not sure about this
-				print(help)
-			end
+			help = help
 		}, {
 			__call = function(compat, list)
 				if type(list) ~= 'table' then
 					error(('Invalid argument %s'):format(list))
 				end
 				for key, val in pairs(list) do
-					set_option(key, val)
+					if not options[key] then
+						error(('Invalid option %s'):format(key))
+					end
+					cfg[key].value = val
+					cfg[key].selected = true
+					postaction[key](val)
 				end
 			end,
 			__newindex = function(compat, key, val)					-- setters should be 'old'/'new' or true/false ?
-				set_option(key, val)
+				if not options[key] then
+					error(('Invalid option %s'):format(key))
+				end
+				if val == 'new' then
+					val = options[key].new
+				end
+				if val == 'old' then
+					val = options[key].old
+				end
+				if val == 'default' then
+					val = options[key].default
+				end
+				if type(val) ~= 'boolean' then
+					error(('Invalid argument %s'):format(val))
+				end
+				cfg[key].value = val
+				cfg[key].selected = true
+				postaction[key](val)
 			end,
 			__index = function(compat, key)
 				local policy = options[key]

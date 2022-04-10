@@ -135,6 +135,8 @@ struct luaL_serializer {
 	int encode_invalid_as_nil;
 	/** Encode error object as MP_ERROR extension (MsgPack only). */
 	int encode_error_as_ext;
+	/** Encode escapes forward slash (gh-6200). */
+	int encode_esc_slash;
 
 	/** Enables decoding NaN and Inf numbers */
 	int decode_invalid_numbers;

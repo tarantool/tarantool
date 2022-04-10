@@ -125,7 +125,7 @@ typedef struct {
 } json_token_t;
 
 
-static const char *char2escape_without_forward_slash_escape[256] = {            // TODO write good long comment about what the fuck is going on
+static const char *char2escape_no_esc_slash[256] = {            // TODO write good long comment about what is going on
     "\\u0000", "\\u0001", "\\u0002", "\\u0003",
     "\\u0004", "\\u0005", "\\u0006", "\\u0007",
     "\\b", "\\t", "\\n", "\\u000b",
@@ -164,7 +164,7 @@ static const char *char2escape_without_forward_slash_escape[256] = {            
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 };
 
-static const char *char2escape_with_forward_slash_escape[256] = {
+static const char *char2escape_esc_slash[256] = {
     "\\u0000", "\\u0001", "\\u0002", "\\u0003",
     "\\u0004", "\\u0005", "\\u0006", "\\u0007",
     "\\b", "\\t", "\\n", "\\u000b",
@@ -203,8 +203,6 @@ static const char *char2escape_with_forward_slash_escape[256] = {
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 };
 
-static char **char2escape = NULL;       // TODO add char*** to serializer
-
 #if 0
 static int json_destroy_config(lua_State *l)
 {
@@ -219,14 +217,6 @@ static int json_destroy_config(lua_State *l)
 }
 #endif
 
-void json_escape_forward_slash_change(bool value)              //TODO
-{
-    fprintf(stderr, "json_escape_forward_slash_change called with value = %d!\n", value);
-    if (value)
-        char2escape = (char**)char2escape_with_forward_slash_escape;
-    else
-        char2escape = (char**)char2escape_without_forward_slash_escape;
-}
 
 static void json_create_tokens()
 {
@@ -292,6 +282,9 @@ static void json_append_string(struct luaL_serializer *cfg, strbuf_t *json,
     (void) cfg;
     const char *escstr;
     size_t i;
+
+    const char **char2escape = (cfg->encode_esc_slash ?
+            char2escape_esc_slash : char2escape_no_esc_slash);
 
     /* Worst case is len * 6 (all unicode escapes).
      * This buffer is reused constantly for small strings

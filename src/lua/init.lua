@@ -205,4 +205,5 @@ rawset(package, "setsearchroot", setsearchroot)
 return {
     uptime = uptime;
     pid = pid;
+	compat = require('compat')
 }

@@ -64,7 +64,6 @@ static struct {
 	size_t offset; /* offset in structure */
 	int type;
 	int defvalue;
-	// char ***char2escape = ; /* pointer to table that changes with configuration */
 } OPTIONS[] = {
 	OPTION(LUA_TBOOLEAN, encode_sparse_convert, 1),
 	OPTION(LUA_TNUMBER,  encode_sparse_ratio, 2),
@@ -77,6 +76,7 @@ static struct {
 	OPTION(LUA_TBOOLEAN, encode_use_tostring, 0),
 	OPTION(LUA_TBOOLEAN, encode_invalid_as_nil, 0),
 	OPTION(LUA_TBOOLEAN, encode_error_as_ext, 1),
+	OPTION(LUA_TBOOLEAN, encode_esc_slash, 0),
 	OPTION(LUA_TBOOLEAN, decode_invalid_numbers, 1),
 	OPTION(LUA_TBOOLEAN, decode_save_metatables, 1),
 	OPTION(LUA_TNUMBER,  decode_max_depth, 128),

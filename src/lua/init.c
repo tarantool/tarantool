@@ -762,10 +762,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	lua_pop(L, 1); /* _PRELOAD */
 
 	luaopen_tarantool(L);
-	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-	lua_getfield(L, -1, "compat");
-	lua_getfield(L, -3, "compat");
-	lua_pop(L, 2);
+	lua_pop(L, 1);
 
 	lua_newtable(L);
 	lua_pushinteger(L, -1);
