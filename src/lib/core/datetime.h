@@ -220,12 +220,30 @@ datetime_increment_by(struct datetime *self, int direction,
 		      const struct interval *ival);
 
 /**
+ * Error code multipliers for interval operations
+ */
+enum check_attr_multiplier {
+	CHECK_YEARS = 1,
+	CHECK_MONTHS = 2,
+	CHECK_WEEKS = 3,
+	CHECK_DAYS = 4,
+	CHECK_HOURS = 5,
+	CHECK_MINUTES = 6,
+	CHECK_SECONDS = 7,
+	CHECK_NANOSECS = 8,
+};
+
+/**
  * Subtract datetime values and return interval between epoch seconds
  * @param[out] res resultant interval
  * @param[in] lhs left datetime operand
  * @param[in] rhs right datetime operand
+ * @retval 0 if there is no overflow, negative value if there is underflow
+ *         in particular attribute, or positive if there is overflow.
+ *         Return value is multiplied by @sa check_attr_multiplier to
+ *         indicate which particular attributed is overflowed/underflowed.
  */
-bool
+int
 datetime_datetime_sub(struct interval *res, const struct datetime *lhs,
 		      const struct datetime *rhs);
 
@@ -233,16 +251,24 @@ datetime_datetime_sub(struct interval *res, const struct datetime *lhs,
  * Subtract interval values, modify left operand for returning value
  * @param[in,out] lhs left interval operand, return resultant value
  * @param[in] rhs right interval operand
+ * @retval 0 if there is no overflow, negative value if there is underflow
+ *         in particular attribute, or positive if there is overflow.
+ *         Return value is multiplied by @sa check_attr_multiplier to
+ *         indicate which particular attributed is overflowed/underflowed.
  */
-bool
+int
 interval_interval_sub(struct interval *lhs, const struct interval *rhs);
 
 /**
  * Add interval values, modify left operand for returning value
  * @param[in,out] lhs left interval operand, return resultant value
  * @param[in] rhs right interval operand
+ * @retval 0 if there is no overflow, negative value if there is underflow
+ *         in particular attribute, or positive if there is overflow.
+ *         Return value is multiplied by @sa check_attr_multiplier to
+ *         indicate which particular attributed is overflowed/underflowed.
  */
-bool
+int
 interval_interval_add(struct interval *lhs, const struct interval *rhs);
 
 /** Return the year from a date. */

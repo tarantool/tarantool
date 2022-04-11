@@ -11,7 +11,7 @@ local ffi = require('ffi')
 --]]
 if jit.arch == 'arm64' then jit.off() end
 
-test:plan(32)
+test:plan(33)
 
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
@@ -72,6 +72,11 @@ end
 local function range_check_3_error(name, value, range)
     return ('value %d of %s is out of allowed range [%d, %d..%d]'):
             format(value, name, range[1], range[2], range[3])
+end
+
+local function ival_overflow(op, name, value, max)
+    return ('%s moves value %s of %s out of allowed range [%s, %s]'):
+            format(op, value, name, -max, max)
 end
 
 local function invalid_date(y, M, d)
@@ -1061,7 +1066,7 @@ test:test("Time interval operations - different adjustments", function(test)
 end)
 
 test:test("Time intervals creation - range checks", function(test)
-    test:plan(36)
+    test:plan(23)
 
     local inew = date.interval.new
 
@@ -1108,42 +1113,48 @@ test:test("Time intervals creation - range checks", function(test)
         local err_msg, attribs = unpack(row)
         assert_raises(test, err_msg, function() return inew(attribs) end)
     end
+end)
 
-    -- handle tricky cases of huge ranges
+test:test("Time intervals ops - huge values", function(test)
+    test:plan(25)
+
     local huge_year = 3e6
+    local huge_month = huge_year * 12
+    local huge_days = huge_year * AVERAGE_DAYS_YEAR
+    local huge_hours = huge_days * 24
+    local huge_minutes = huge_hours * 60
+    local huge_seconds = huge_minutes * 60
+
     local neg_year = date.new{year = -huge_year}
     test:is(tostring(neg_year), '-3000000-01-01T00:00:00Z', '-3000000')
-    local double_delta = date.interval.new{year = 2 * huge_year}
-    test:is(tostring(double_delta), '+6000000 years', '+6000000 years')
-    local res = neg_year + double_delta
-    test:is(tostring(res), '3000000-01-01T00:00:00Z', '3000000Z')
-    local huge_month = huge_year * 12
-    double_delta = date.interval.new{month = 2 * huge_month}
-    test:is(tostring(double_delta), '+72000000 months', '+72000000 months')
-    res = neg_year + double_delta
-    test:is(tostring(res), '3000000-01-01T00:00:00Z', '3000000Z')
-    local huge_days = huge_year * AVERAGE_DAYS_YEAR
-    double_delta = date.interval.new{day = 2 * huge_days}
-    test:is(tostring(double_delta), '+2191500000 days', '+2191500000 days')
-    res = neg_year + double_delta
-    test:is(tostring(res), '3000123-03-17T00:00:00Z', '3000123-03-17Z')
-    local huge_hours = huge_days * 24
-    double_delta = date.interval.new{hour = 2 * huge_hours}
-    test:is(tostring(double_delta), '+52596000000 hours', '+52596000000 hours')
-    res = neg_year + double_delta
-    test:is(tostring(res), '3000123-03-17T00:00:00Z', '3000123-03-17Z')
-    local huge_minutes = huge_hours * 60
-    double_delta = date.interval.new{min = 2 * huge_minutes}
-    test:is(tostring(double_delta), '+3155760000000 minutes',
-            '+315576e7 minutes')
-    res = neg_year + double_delta
-    test:is(tostring(res), '3000123-03-17T00:00:00Z', '3000123-03-17Z')
-    local huge_seconds = huge_minutes * 60
-    double_delta = date.interval.new{sec = 2 * huge_seconds}
-    test:is(tostring(double_delta), '+189345600000000 seconds',
-            '+189345600000000 seconds')
-    res = neg_year + double_delta
-    test:is(tostring(res), '3000123-03-17T00:00:00Z', '3000123-03-17Z')
+
+    local checks = {
+        {'year', 2 * huge_year, '+6000000 years', '3000000-01-01T00:00:00Z',
+         MAX_YEAR_RANGE},
+        {'month', 2 * huge_month, '+72000000 months', '3000000-01-01T00:00:00Z',
+         MAX_MONTH_RANGE},
+        {'day', 2 * huge_days, '+2191500000 days', '3000123-03-17T00:00:00Z',
+         MAX_DAY_RANGE},
+        {'hour', 2 * huge_hours, '+52596000000 hours',
+         '3000123-03-17T00:00:00Z', MAX_HOUR_RANGE},
+        {'min', 2 * huge_minutes, '+3155760000000 minutes',
+         '3000123-03-17T00:00:00Z', MAX_MIN_RANGE},
+        {'sec', 2 * huge_seconds, '+189345600000000 seconds',
+         '3000123-03-17T00:00:00Z', MAX_SEC_RANGE},
+    }
+    local zero = date.interval.new()
+    for _, row in pairs(checks) do
+        local attr, huge, ival_txt, date_txt, max = unpack(row)
+        local double_delta = date.interval.new{[attr] = huge}
+        test:is(tostring(double_delta), ival_txt, ival_txt)
+        local res = neg_year + double_delta
+        test:is(tostring(res), date_txt, date_txt)
+        assert_raises(test, ival_overflow('addition', attr, 2 * huge, max),
+                      function() return double_delta + double_delta end)
+        assert_raises(test, ival_overflow('subtraction', attr, -2 * huge, max),
+                      function() return zero - double_delta - double_delta end)
+
+    end
 end)
 
 test:test("Months intervals with last days", function(test)
