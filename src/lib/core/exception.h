@@ -65,6 +65,8 @@ exception_get_int(struct error *e, const struct method_info *method);
 #if defined(__cplusplus)
 } /* extern "C" */
 
+#include "trivia/util_cxx.h"
+
 class Exception: public error {
 public:
 	void *operator new(size_t size);
@@ -77,11 +79,16 @@ public:
 
 	NORETURN virtual void raise() = 0;
 	virtual void log() const;
+	/** Copy an exception by using its copy constructor. */
+	virtual Exception *copy() const = 0;
 	virtual ~Exception();
+	/** Make a copy of the exception object and all of its prev nodes. */
+	Exception *copy_all() const;
 
-	Exception(const Exception &) = delete;
 	Exception& operator=(const Exception&) = delete;
 protected:
+	/** Copy constructor for Exception object. */
+	Exception(const Exception &other) { error_create_copy(this, &other); }
 	Exception(const struct type_info *type, const char *file, unsigned line);
 };
 
@@ -97,6 +104,7 @@ public:
 	{
 	}
 
+	virtual SystemError *copy() const { return util::copy(this); }
 protected:
 	SystemError(const struct type_info *type, const char *file, unsigned line);
 };
@@ -111,6 +119,8 @@ public:
 		:SystemError(&type_SocketError, NULL, 0)
 	{
 	}
+
+	virtual SocketError *copy() const { return util::copy(this); }
 
 	virtual void raise()
 	{
@@ -129,6 +139,8 @@ public:
 	{
 	}
 
+	virtual OutOfMemory *copy() const { return util::copy(this); }
+
 	virtual void raise() { throw this; }
 };
 
@@ -141,6 +153,8 @@ public:
 	{
 	}
 
+	virtual TimedOut *copy() const { return util::copy(this); }
+
 	virtual void raise() { throw this; }
 };
 
@@ -152,6 +166,8 @@ public:
 		:Exception(&type_ChannelIsClosed, NULL, 0)
 	{
 	}
+
+	virtual ChannelIsClosed *copy() const { return util::copy(this); }
 
 	virtual void raise() { throw this; }
 };
@@ -168,6 +184,8 @@ public:
 		:Exception(&type_FiberIsCancelled, NULL, 0)
 	{
 	}
+
+	virtual FiberIsCancelled *copy() const { return util::copy(this); }
 
 	virtual void log() const;
 	virtual void raise() { throw this; }
@@ -186,6 +204,8 @@ public:
 	{
 	}
 
+	virtual FiberSliceIsExceeded *copy() const { return util::copy(this); }
+
 	virtual void raise() { throw this; }
 };
 
@@ -199,6 +219,8 @@ public:
 	{
 	}
 
+	virtual LuajitError *copy() const { return util::copy(this); }
+
 	virtual void raise() { throw this; }
 };
 
@@ -210,6 +232,8 @@ public:
 		:Exception(&type_IllegalParams, NULL, 0)
 	{
 	}
+
+	virtual IllegalParams *copy() const { return util::copy(this); }
 
 	virtual void raise() { throw this; }
 };
@@ -224,6 +248,8 @@ public:
 	{
 	}
 
+	virtual CollationError *copy() const { return util::copy(this); }
+
 	virtual void raise() { throw this; }
 };
 
@@ -235,6 +261,8 @@ public:
 		:Exception(&type_SwimError, NULL, 0)
 	{
 	}
+
+	virtual SwimError *copy() const { return util::copy(this); }
 
 	virtual void raise() { throw this; }
 };
@@ -248,12 +276,15 @@ public:
 	{
 	}
 
+	virtual CryptoError *copy() const { return util::copy(this); }
+
 	virtual void raise() { throw this; }
 };
 
 class RaftError: public Exception {
 public:
 	RaftError(const char *file, unsigned line, const char *format, ...);
+	virtual RaftError *copy() const { return util::copy(this); }
 	virtual void raise() { throw this; }
 };
 

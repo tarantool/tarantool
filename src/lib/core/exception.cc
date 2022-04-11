@@ -38,11 +38,19 @@
 #include "reflection.h"
 #include "tt_strerror.h"
 
+/** out_of_memory::size is zero-initialized by the linker. */
+static OutOfMemory out_of_memory = OutOfMemory(__FILE__, __LINE__,
+					       sizeof(OutOfMemory),
+					       "malloc", "exception");
+
 extern "C" {
 
 static void
 exception_destroy(struct error *e)
 {
+	if (e != &out_of_memory) {
+		assert(e->refs == 0);
+	}
 	delete (Exception *) e;
 }
 
@@ -58,6 +66,34 @@ exception_log(struct error *error)
 {
 	Exception *e = (Exception *) error;
 	e->log();
+}
+
+struct error *
+error_copy_all(const struct error *e)
+{
+	try {
+		const Exception *ex = (const Exception *)e;
+		return ex->copy_all();
+	} catch (Exception *ex) {
+		return ex;
+	} catch (...) {
+		/** Must not raise an exception from C code. */
+		panic("Unknown exception");
+	}
+}
+
+struct error *
+error_copy_one(const struct error *e)
+{
+	try {
+		const Exception *ex = (const Exception *)e;
+		return ex->copy();
+	} catch (Exception *ex) {
+		return ex;
+	} catch (...) {
+		/** Must not raise an exception from C code. */
+		panic("Unknown exception");
+	}
 }
 
 const char *
@@ -82,10 +118,6 @@ exception_get_int(struct error *e, const struct method_info *method)
 
 } /* extern "C" */
 
-/** out_of_memory::size is zero-initialized by the linker. */
-static OutOfMemory out_of_memory(__FILE__, __LINE__,
-				 sizeof(OutOfMemory), "malloc", "exception");
-
 const struct type_info type_Exception = make_type("Exception", NULL);
 
 void *
@@ -106,9 +138,7 @@ Exception::operator delete(void *ptr)
 
 Exception::~Exception()
 {
-	if (this != &out_of_memory) {
-		assert(refs == 0);
-	}
+	error_destroy(this);
 	TRASH((struct error *) this);
 }
 
@@ -117,6 +147,33 @@ Exception::Exception(const struct type_info *type_arg, const char *file,
 {
 	error_create(this, exception_destroy, exception_raise,
 		     exception_log, type_arg, file, line);
+}
+
+Exception *
+Exception::copy_all() const
+{
+	Exception *head = nullptr;
+	try {
+		head = copy();
+
+		struct error *err = head;
+		struct error *to_copy = cause;
+		while (to_copy) {
+			err->cause = ((Exception *)(to_copy))->copy();
+			error_ref(err->cause);
+			err->cause->effect = err;
+			to_copy = to_copy->cause;
+			err = err->cause;
+		}
+		return head;
+	} catch (Exception *e) {
+		while (head) {
+			Exception *prev = (Exception *)head->cause;
+			delete head;
+			head = prev;
+		}
+		throw;
+	}
 }
 
 void

@@ -198,6 +198,7 @@ endif()
 set(api_headers
     ${PROJECT_BINARY_DIR}/src/trivia/config.h
     ${PROJECT_SOURCE_DIR}/src/trivia/util.h
+    ${PROJECT_SOURCE_DIR}/src/trivia/util_cxx.h
     ${PROJECT_SOURCE_DIR}/src/on_shutdown.h
     ${PROJECT_SOURCE_DIR}/src/lib/core/say.h
     ${PROJECT_SOURCE_DIR}/src/lib/core/fiber.h

@@ -193,6 +193,8 @@ csv_next
 csv_setopt
 decimal_from_string
 decimal_unpack
+error_copy_all
+error_copy_one
 error_find_field
 error_ref
 error_set_prev

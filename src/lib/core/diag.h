@@ -251,11 +251,41 @@ error_log(struct error *e)
 	e->log(e);
 }
 
+/**
+ * Copy a single error.
+ * @param e original error.
+ * @return copy of the original error.
+ */
+struct error *
+error_copy_one(const struct error *e);
+
+/**
+ * Copy an error and all its previous nodes.
+ * @param e original error.
+ * @return copy of the original error and its previous nodes.
+ */
+struct error *
+error_copy_all(const struct error *e);
+
+/**
+ * Create an error by copying another without its nodes.
+ * @param dst destination for copied error.
+ * @param src error to be copied.
+ */
+void
+error_create_copy(struct error *dst, const struct error *src);
+
 void
 error_create(struct error *e,
-	     error_f create, error_f raise, error_f log,
+	     error_f destroy, error_f raise, error_f log,
 	     const struct type_info *type, const char *file,
 	     unsigned line);
+
+/**
+ * Destructor for error object.
+ */
+void
+error_destroy(struct error *e);
 
 void
 error_set_location(struct error *e, const char *file, int line);

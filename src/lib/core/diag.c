@@ -53,7 +53,6 @@ error_unref(struct error *e)
 			to_delete->cause->effect = NULL;
 			to_delete->cause = NULL;
 		}
-		error_payload_destroy(&to_delete->payload);
 		to_delete->destroy(to_delete);
 		if (cause == NULL)
 			return;
@@ -134,6 +133,30 @@ error_create(struct error *e,
 }
 
 void
+error_create_copy(struct error *dst, const struct error *src)
+{
+	assert(dst != src);
+	dst->destroy = src->destroy;
+	dst->raise = src->raise;
+	dst->log = src->log;
+	dst->type = src->type;
+	dst->refs = 0;
+	dst->saved_errno = src->saved_errno;
+	dst->code = src->code;
+	error_payload_create_copy(&dst->payload, &src->payload);
+	error_set_location(dst, src->file, src->line);
+	memcpy(dst->errmsg, src->errmsg, DIAG_ERRMSG_MAX);
+	dst->cause = NULL;
+	dst->effect = NULL;
+}
+
+void
+error_destroy(struct error *e)
+{
+	error_payload_destroy(&e->payload);
+}
+
+void
 error_set_location(struct error *e, const char *file, int line)
 {
 	snprintf(e->file, sizeof(e->file), "%s", file);
@@ -171,4 +194,3 @@ error_vformat_msg(struct error *e, const char *format, va_list ap)
 {
 	vsnprintf(e->errmsg, sizeof(e->errmsg), format, ap);
 }
-

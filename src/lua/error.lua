@@ -45,6 +45,12 @@ struct error {
     struct error *_effect;
 };
 
+struct error *
+error_copy_one(const struct error *e);
+
+struct error *
+error_copy_all(const struct error *e);
+
 int
 error_set_prev(struct error *e, struct error *prev);
 
@@ -103,6 +109,20 @@ local function error_prev(err)
     else
         return nil
     end
+end
+
+local function error_copy_all(err)
+    if not ffi.istype('const struct error', err) then
+        error("Usage: error:copy_all()")
+    end
+    return ffi.C.error_copy_all(err)
+end
+
+local function error_copy_one(err)
+    if not ffi.istype('const struct error', err) then
+        error("Usage: error:copy_one()")
+    end
+    return ffi.C.error_copy_one(err)
 end
 
 local function error_set_prev(err, prev)
@@ -170,6 +190,8 @@ end
 local error_methods = {
     ["unpack"] = error_unpack;
     ["raise"] = error_raise;
+    ["copy_all"] = error_copy_all;
+    ["copy_one"] = error_copy_one;
     ["match"] = error_match; -- Tarantool 1.6 backward compatibility
     ["__serialize"] = error_serialize;
     ["set_prev"] = error_set_prev;

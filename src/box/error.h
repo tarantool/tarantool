@@ -185,6 +185,7 @@ extern const struct type_info type_CustomError;
 #if defined(__cplusplus)
 } /* extern "C" */
 #include "exception.h"
+#include "trivia/util_cxx.h"
 
 struct rmean;
 extern "C" struct rmean *rmean_error;
@@ -218,6 +219,8 @@ public:
 	{
 	}
 
+	virtual ClientError *copy() const { return util::copy(this); }
+
 	static uint32_t get_errcode(const struct error *e);
 protected:
 	ClientError(const type_info *type, const char *file, unsigned line,
@@ -234,6 +237,8 @@ public:
 		/* TODO: actually calls ClientError::log */
 		log();
 	}
+
+	virtual LoggedError *copy() const { return util::copy(this); }
 };
 
 /**
@@ -252,6 +257,8 @@ public:
 		:ClientError(&type_AccessDeniedError, NULL, 0, 0)
 	{
 	}
+
+	virtual AccessDeniedError *copy() const { return util::copy(this); }
 
 	const char *
 	object_type() const
@@ -298,6 +305,8 @@ struct XlogError: public Exception
 	{
 	}
 
+	virtual XlogError *copy() const { return util::copy(this); }
+
 	virtual void raise() { throw this; }
 };
 
@@ -310,6 +319,8 @@ struct XlogGapError: public XlogError
 		:XlogError(&type_XlogGapError, NULL, 0)
 	{
 	}
+
+	virtual XlogGapError *copy() const { return util::copy(this); }
 
 	virtual void raise() { throw this; }
 };
@@ -324,6 +335,8 @@ public:
 		:ClientError(&type_CustomError, NULL, 0, 0)
 	{
 	}
+
+	virtual CustomError *copy() const { return util::copy(this); }
 
 	virtual void log() const;
 

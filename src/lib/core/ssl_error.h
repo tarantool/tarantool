@@ -29,11 +29,14 @@ BuildSSLError(const char *file, unsigned line, const char *format, ...);
 #if defined(__cplusplus)
 } /* extern "C" */
 
+#include "trivia/util_cxx.h"
+
 class SSLError: public Exception {
 public:
 	SSLError(const char *file, unsigned line)
 		: Exception(&type_SSLError, file, line) {}
 	SSLError() : SSLError(NULL, 0) {}
+	virtual SSLError *copy() const { return util::copy(this); }
 	virtual void raise() { throw this; }
 };
 
