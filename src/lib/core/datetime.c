@@ -608,12 +608,12 @@ utc_secs(int64_t epoch, int tzoffset)
 }
 
 /** minimum supported date - -5879610-06-22 */
-#define MIN_DATE_YEAR -5879610
+#define MIN_DATE_YEAR -5879610LL
 #define MIN_DATE_MONTH 6
 #define MIN_DATE_DAY 22
 
 /** maximum supported date - 5879611-07-11 */
-#define MAX_DATE_YEAR 5879611
+#define MAX_DATE_YEAR 5879611LL
 #define MAX_DATE_MONTH 7
 #define MAX_DATE_DAY 11
 /**
@@ -624,6 +624,15 @@ utc_secs(int64_t epoch, int tzoffset)
 #define AVERAGE_DAYS_YEAR 365.25
 #define AVERAGE_DAYS_MONTH (AVERAGE_DAYS_YEAR / 12)
 #define AVERAGE_WEEK_YEAR  (AVERAGE_DAYS_YEAR / 7)
+
+#define MAX_YEAR_RANGE (MAX_DATE_YEAR - MIN_DATE_YEAR)
+#define MAX_MONTH_RANGE (MAX_YEAR_RANGE * 12)
+#define MAX_WEEK_RANGE (MAX_YEAR_RANGE * AVERAGE_WEEK_YEAR)
+#define MAX_DAY_RANGE (MAX_YEAR_RANGE * AVERAGE_DAYS_YEAR)
+#define MAX_HOUR_RANGE (MAX_DAY_RANGE * 24)
+#define MAX_MIN_RANGE (MAX_HOUR_RANGE * 60)
+#define MAX_SEC_RANGE (MAX_DAY_RANGE * SECS_PER_DAY)
+#define MAX_NSEC_RANGE ((int64_t)INT_MAX)
 
 static inline int
 verify_range(int64_t v, int64_t from, int64_t to)
@@ -735,7 +744,38 @@ datetime_increment_by(struct datetime *self, int direction,
 	return 0;
 }
 
-bool
+/**
+ * Check attributes of interval record after prior operation
+ */
+static int
+interval_check_args(const struct interval *ival)
+{
+	int rc = verify_range(ival->year, -MAX_YEAR_RANGE, MAX_YEAR_RANGE);
+	if (rc != 0)
+		return rc * CHECK_YEARS;
+	rc = verify_range(ival->month, -MAX_MONTH_RANGE, MAX_MONTH_RANGE);
+	if (rc != 0)
+		return rc * CHECK_MONTHS;
+	rc = verify_range(ival->week, -MAX_WEEK_RANGE, MAX_WEEK_RANGE);
+	if (rc != 0)
+		return rc * CHECK_WEEKS;
+	rc = verify_range(ival->day, -MAX_DAY_RANGE, MAX_DAY_RANGE);
+	if (rc != 0)
+		return rc * CHECK_DAYS;
+	rc = verify_range(ival->hour, -MAX_HOUR_RANGE, MAX_HOUR_RANGE);
+	if (rc != 0)
+		return rc * CHECK_HOURS;
+	rc = verify_range(ival->min, -MAX_MIN_RANGE, MAX_MIN_RANGE);
+	if (rc != 0)
+		return rc * CHECK_MINUTES;
+	rc = verify_range(ival->sec, -MAX_SEC_RANGE, MAX_SEC_RANGE);
+	if (rc != 0)
+		return rc * CHECK_SECONDS;
+	return verify_range(ival->nsec, -MAX_NSEC_RANGE, MAX_NSEC_RANGE) *
+		CHECK_NANOSECS;
+}
+
+int
 datetime_datetime_sub(struct interval *res, const struct datetime *lhs,
 		      const struct datetime *rhs)
 {
@@ -748,7 +788,7 @@ datetime_datetime_sub(struct interval *res, const struct datetime *lhs,
 	return interval_interval_sub(res, &inv_rhs);
 }
 
-bool
+int
 interval_interval_sub(struct interval *lhs, const struct interval *rhs)
 {
 	assert(lhs != NULL);
@@ -761,10 +801,10 @@ interval_interval_sub(struct interval *lhs, const struct interval *rhs)
 	lhs->min -= rhs->min;
 	lhs->sec -= rhs->sec;
 	lhs->nsec -= rhs->nsec;
-	return true;
+	return interval_check_args(lhs);
 }
 
-bool
+int
 interval_interval_add(struct interval *lhs, const struct interval *rhs)
 {
 	assert(lhs != NULL);
@@ -777,5 +817,5 @@ interval_interval_add(struct interval *lhs, const struct interval *rhs)
 	lhs->min += rhs->min;
 	lhs->sec += rhs->sec;
 	lhs->nsec += rhs->nsec;
-	return true;
+	return interval_check_args(lhs);
 }

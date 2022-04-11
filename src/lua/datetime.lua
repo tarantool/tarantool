@@ -79,13 +79,13 @@ bool   tnt_datetime_totable(const struct datetime *date,
 size_t tnt_interval_to_string(const struct interval *, char *, ssize_t);
 int    tnt_datetime_increment_by(struct datetime *self, int direction,
                                  const struct interval *ival);
-bool   tnt_datetime_datetime_sub(struct interval *res,
+int    tnt_datetime_datetime_sub(struct interval *res,
                                  const struct datetime *lhs,
                                  const struct datetime *rhs);
 
-bool   tnt_interval_interval_sub(struct interval *lhs,
+int    tnt_interval_interval_sub(struct interval *lhs,
                                  const struct interval *rhs);
-bool   tnt_interval_interval_add(struct interval *lhs,
+int    tnt_interval_interval_add(struct interval *lhs,
                                  const struct interval *rhs);
 
 ]]
@@ -635,12 +635,37 @@ local function datetime_increment_by(self, direction, ival)
     end
 end
 
+local check_ranges = {
+    [1] = {'year', MAX_YEAR_RANGE},
+    [2] = {'month', MAX_MONTH_RANGE},
+    [3] = {'week', MAX_WEEK_RANGE},
+    [4] = {'day', MAX_DAY_RANGE},
+    [5] = {'hour', MAX_HOUR_RANGE},
+    [6] = {'min', MAX_MIN_RANGE},
+    [7] = {'sec', MAX_SEC_RANGE},
+    [8] = {'nsec', MAX_NSEC_RANGE},
+}
+
+local function check_rc(rc, operation, obj)
+    -- fast path
+    if rc == 0 then
+        return obj
+    end
+
+    -- slow, error reporting path
+    local index = rc < 0 and -rc or rc
+    assert(index >= 1 and index <= 8)
+    local txt, max = unpack(check_ranges[index])
+    local v = obj[txt]
+    error(('%s moves value %s of %s out of allowed range [%s, %s]'):
+            format(operation, v, txt, -max, max), 3)
+end
+
 -- subtract operation when left is date, and right is date
 local function datetime_datetime_sub(lhs, rhs)
     local obj = interval_new()
     local rc = builtin.tnt_datetime_datetime_sub(obj, lhs, rhs)
-    assert(rc ~= false)
-    return obj
+    return check_rc(rc, 'subtraction', obj)
 end
 
 -- subtract operation for both left and right operands are intervals
@@ -648,8 +673,7 @@ local function interval_interval_sub(lhs, rhs)
     local lobj = interval_decode_args(interval_new_copy(lhs))
     local robj = interval_decode_args(rhs)
     local rc = builtin.tnt_interval_interval_sub(lobj, robj)
-    assert(rc ~= false)
-    return lobj
+    return check_rc(rc, 'subtraction', lobj)
 end
 
 -- addition operation for both left and right operands are intervals
@@ -657,8 +681,7 @@ local function interval_interval_add(lhs, rhs)
     local lobj = interval_decode_args(interval_new_copy(lhs))
     local robj = interval_decode_args(rhs)
     local rc = builtin.tnt_interval_interval_add(lobj, robj)
-    assert(rc ~= false)
-    return lobj
+    return check_rc(rc, 'addition', lobj)
 end
 
 local function date_first(lhs, rhs)
