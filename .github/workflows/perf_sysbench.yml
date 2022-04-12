@@ -38,7 +38,7 @@ jobs:
       - name: Build tarantool
         run: |
           cmake . -DCMAKE_BUILD_TYPE=Release
-          make -j
+          make -j $(nproc)
 
       - name: Add tarantool path to $PATH
         run: echo "${PWD}/src:${PWD}/extra/dist" >> ${GITHUB_PATH}
@@ -47,7 +47,7 @@ jobs:
         run: |
           ./autogen.sh
           ./configure --with-tarantool --without-mysql
-          make -j
+          make -j $(nproc)
           make install
         working-directory: ./sysbench
 
