@@ -334,6 +334,8 @@ local function update_param_table(table, defaults)
     return new_table
 end
 
+box.internal.check_param_table = check_param_table
+
 local function feedback_save_event(event)
     if internal.feedback_daemon ~= nil then
         internal.feedback_daemon.save_event(event)
