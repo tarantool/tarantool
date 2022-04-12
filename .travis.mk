@@ -149,7 +149,7 @@ configure_debian:
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
 
 build_debian: configure_debian
-	make -j
+	make -j $$(nproc)
 
 test_debian_no_deps: build_debian
 	make LuaJIT-test
@@ -165,7 +165,7 @@ test_debian_clang11: deps_debian deps_buster_clang_11 test_debian_no_deps
 
 build_debug_debian:
 	cmake . -DCMAKE_BUILD_TYPE=Debug
-	make -j
+	make -j $$(nproc)
 
 test_debug_debian_no_deps: build_debug_debian
 	make LuaJIT-test
@@ -177,7 +177,7 @@ debug_ubuntu_ghactions: deps_ubuntu_ghactions test_debug_debian_no_deps
 
 build_coverage_debian:
 	cmake . -DCMAKE_BUILD_TYPE=Debug -DENABLE_GCOV=ON
-	make -j
+	make -j $$(nproc)
 
 test_coverage_debian_no_deps: build_coverage_debian
 	make LuaJIT-test
@@ -197,7 +197,7 @@ coverage_ubuntu_ghactions: deps_coverage_ubuntu_ghactions test_coverage_debian_n
 
 build_coverity_debian: configure_debian
 	export PATH=${PATH}:${COVERITY_BINS} ; \
-		cov-build --dir cov-int make -j
+		cov-build --dir cov-int make -j $$(nproc)
 
 test_coverity_debian_no_deps: build_coverity_debian
 	tar czvf tarantool.tgz cov-int
@@ -229,7 +229,7 @@ build_asan_debian:
 	CC=clang-11 CXX=clang++-11 cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		-DENABLE_WERROR=ON -DENABLE_ASAN=ON -DENABLE_UB_SANITIZER=ON \
 		-DENABLE_FUZZER=ON ${CMAKE_EXTRA_PARAMS}
-	make -j
+	make -j $$(nproc)
 
 test_asan_debian_no_deps: build_asan_debian
 	# FIXME: PUC-Rio-Lua-5.1 test suite is disabled for ASAN
@@ -271,7 +271,7 @@ test_static_build: deps_debian_static
 # ExternalProject_Add()
 test_static_build_cmake_linux: deps_tests
 	cd static-build && cmake -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON" . && \
-	make -j && ctest -V
+	make -j $$(nproc) && ctest -V
 	make -C ${PWD}/static-build/tarantool-prefix/src/tarantool-build LuaJIT-test
 	cd test && ./test-run.py --vardir ${VARDIR} --force \
 		--builddir ${PWD}/static-build/tarantool-prefix/src/tarantool-build $(TEST_RUN_EXTRA_PARAMS)
@@ -306,7 +306,7 @@ build_oos:
 	mkdir ${OOS_BUILD_PATH} 2>/dev/null || : ; \
 		cd ${OOS_BUILD_PATH} && \
 		cmake ${OOS_SRC_PATH} ${CMAKE_EXTRA_PARAMS} && \
-		make -j
+		make -j $$(nproc)
 
 test_oos_no_deps: build_oos
 	make -C ${OOS_BUILD_PATH} LuaJIT-test
@@ -362,7 +362,7 @@ build_osx:
 	# control it's status
 	sysctl vm.swapusage
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
-	make -j
+	make -j $$(sysctl -n hw.ncpu)
 
 
 # Limits: Increase the maximum number of open file descriptors on macOS:
@@ -415,7 +415,7 @@ test_static_build_cmake_osx_no_deps:
 	# control it's status
 	sysctl vm.swapusage
 	cd static-build && cmake -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON" . && \
-	make -j && ctest -V
+	make -j $$(sysctl -n hw.ncpu) && ctest -V
 	make -C ${PWD}/static-build/tarantool-prefix/src/tarantool-build LuaJIT-test
 	${INIT_TEST_ENV_OSX}; \
 	cd test && ./test-run.py --vardir ${VARDIR} \
@@ -439,7 +439,7 @@ deps_freebsd:
 build_freebsd:
 	if [ "$$(swapctl -l | wc -l)" != "1" ]; then sudo swapoff -a ; fi ; swapctl -l
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON ${CMAKE_EXTRA_PARAMS}
-	gmake -j
+	gmake -j $$(sysctl -n hw.ncpu)
 
 test_freebsd_no_deps: build_freebsd
 	make LuaJIT-test
