@@ -32,6 +32,7 @@
  */
 #include <inttypes.h>
 #include <stdbool.h>
+#include <sys/socket.h>
 #include "trigger.h"
 #include "fiber.h"
 #include "user.h"
@@ -87,6 +88,16 @@ struct session_meta {
 		/** Console file/socket descriptor. */
 		int fd;
 	};
+	struct {
+		union {
+			/** Peer address. */
+			struct sockaddr addr;
+			/** Peer address storage. */
+			struct sockaddr_storage addrstorage;
+		};
+		/** Peer address size or 0 if the session is local. */
+		socklen_t addrlen;
+	} peer;
 	/** Console output format. */
 	enum output_format output_format;
 	/** IPROTO client features. */
@@ -330,6 +341,25 @@ session_remove_stmt_id(struct session *session, uint32_t stmt_id);
  */
 void
 session_destroy(struct session *);
+
+/**
+ * Set session peer address.
+ */
+static inline void
+session_set_peer_addr(struct session *session,
+		      const struct sockaddr *addr, socklen_t addrlen)
+{
+	assert(addrlen <= sizeof(session->meta.peer.addrstorage));
+	memcpy(&session->meta.peer.addrstorage, addr, addrlen);
+	session->meta.peer.addrlen = addrlen;
+}
+
+/**
+ * Return session peer name or NULL if the session is local.
+ * The string is allocated in the static buffer.
+ */
+const char *
+session_peer(const struct session *session);
 
 /** Run on-connect triggers */
 int
