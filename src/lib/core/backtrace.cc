@@ -264,70 +264,16 @@ __asm__ volatile(
 	"\tpopq %%rbp\n"
 	:
 	: "r" (unw_context), "r" (coro_ctx), "i" (unw_getcontext_f)
-	: "rdi", "rsi", "rax"//, "r8"//"rsp", "r11", "r10", "r9", "r8"
-	);
-
-#elif __i386
-__asm__ volatile(
-	/* Save current context */
-	"\tpushl %%ebp\n"
-	"\tpushl %%ebx\n"
-	"\tpushl %%esi\n"
-	"\tpushl %%edi\n"
-	/* Setup second arg as old sp */
-	"\tmovl %%esp, %%ecx\n"
-	/* Restore target context ,but not increment sp to preserve it */
-	"\tmovl (%1), %%esp\n"
-	"\tmovl 0(%%esp), %%edi\n"
-	"\tmovl 4(%%esp), %%esi\n"
-	"\tmovl 8(%%esp), %%ebx\n"
-	"\tmovl 12(%%esp), %%ebp\n"
-	/* Setup first arg and call */
-	"\tpushl %%ecx\n"
-	"\tpushl %0\n"
-	"\tmovl %2, %%ecx\n"
-	"\tcall *%%ecx\n"
-	/* Restore old sp and context */
-	"\tmovl %%eax, %%esp\n"
-	"\tpopl %%edi\n"
-	"\tpopl %%esi\n"
-	"\tpopl %%ebx\n"
-	"\tpopl %%ebp\n"
-	:
-	: "r" (unw_context), "r" (coro_ctx), "i" (unw_getcontext_f)
-	: "ecx", "eax"
-	);
-
-#elif __ARM_ARCH==7
-__asm__ volatile(
-	/* Save current context */
-	".syntax unified\n"
-	"\tvpush {d8-d15}\n"
-	"\tpush {r4-r11,lr}\n"
-	/* Save sp */
-	"\tmov r1, sp\n"
-	/* Restore target context, but not increment sp to preserve it */
-	"\tldr sp, [%1]\n"
-	"\tldmia sp, {r4-r11,lr}\n"
-	"\tvldmia sp, {d8-d15}\n"
-	/* Setup first arg */
-	"\tmov r0, %0\n"
-	/* Setup stack frame */
-	"\tpush {r7, lr}\n"
-	"\tsub sp, #8\n"
-	"\tstr r0, [sp, #4]\n"
-	"\tstr r1, [sp, #0]\n"
-	"\tmov r7, sp\n"
-	"\tbl %2\n"
-	/* Old sp is returned via r0 */
-	"\tmov sp, r0\n"
-	"\tpop {r4-r11,lr}\n"
-	"\tvpop {d8-d15}\n"
-	:
-	: "r" (unw_context), "r" (coro_ctx), "i" (unw_getcontext_f)
-	: "lr", "r0", "r1", "ip"
-	);
-
+	: "rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "xmm0",
+	  "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8",
+	  "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15",
+#ifdef __AVX512F__
+	  "xmm16", "xmm17", "xmm18", "xmm19", "xmm20", "xmm21", "xmm22",
+	  "xmm23", "xmm24", "xmm25", "xmm26", "xmm27", "xmm28", "xmm29",
+	  "xmm30", "xmm31", "k0", "k1", "k2", "k3", "k4", "k5", "k6", "k7",
+#endif /* __AVX512F__ */
+	  "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7", "st",
+	  "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)");
 #elif __aarch64__
 __asm__ volatile(
 	/* Save current context */
@@ -377,10 +323,16 @@ __asm__ volatile(
 	"\tadd sp, x0, #8 * 20\n"
 	:
 	: "r" (unw_context), "r" (coro_ctx), "S" (unw_getcontext_f)
-	: /*"lr", "r0", "r1", "ip" */
-	 "x0", "x1", "x2", "x30"
-	);
-#endif
+	: "x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10",
+	  "x11", "x12", "x13", "x14", "x15", "x16", "x17",
+#ifndef __APPLE__
+	  "x18",
+#endif /* __APPLE__ */
+	  "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10",
+	  "s11", "s12", "s13", "s14", "s15", "s16", "s17", "s18", "s19", "s20",
+	  "s21", "s22", "s23", "s24", "s25", "s26", "s27", "s28", "s29", "s30",
+	  "s31", "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7");
+#endif /* x86_64 */
 }
 
 /**
