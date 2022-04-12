@@ -30,6 +30,7 @@
  */
 #include "session.h"
 #include "fiber.h"
+#include "sio.h"
 #include "memory.h"
 #include "assoc.h"
 #include "trigger.h"
@@ -230,6 +231,15 @@ session_find(uint64_t sid)
 		return NULL;
 	return (struct session *)
 		mh_i64ptr_node(session_registry, k)->val;
+}
+
+const char *
+session_peer(const struct session *session)
+{
+	if (session->meta.peer.addrlen == 0)
+		return NULL;
+	return sio_strfaddr((struct sockaddr *)&session->meta.peer.addr,
+			    session->meta.peer.addrlen);
 }
 
 void

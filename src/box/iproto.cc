@@ -170,6 +170,17 @@ struct iproto_msg
 	/* Request message code and sync. */
 	struct xrow_header header;
 	union {
+		/** Connect. */
+		struct {
+			union {
+				/** Peer address. */
+				struct sockaddr addr;
+				/** Peer address storage. */
+				struct sockaddr_storage addrstorage;
+			};
+			/** Peer address size. */
+			socklen_t addrlen;
+		} connect;
 		/** Box request, if this is a DML */
 		struct request dml;
 		/** Box request, if this is a call or eval. */
@@ -1830,6 +1841,8 @@ tx_process_connect(struct cmsg *m)
 		if (con->session == NULL)
 			diag_raise();
 		con->session->meta.connection = con;
+		session_set_peer_addr(con->session, &msg->connect.addr,
+				      msg->connect.addrlen);
 		tx_fiber_init(con->session, 0);
 		static __thread char greeting[IPROTO_GREETING_SIZE];
 		/* TODO: dirty read from tx thread */
@@ -1900,8 +1913,6 @@ static void
 iproto_on_accept(struct evio_service * /* service */, int fd,
 		 struct sockaddr *addr, socklen_t addrlen)
 {
-	(void) addr;
-	(void) addrlen;
 	struct iproto_msg *msg;
 	struct iproto_connection *con = iproto_connection_new(fd);
 	if (con == NULL)
@@ -1915,6 +1926,9 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 	if (msg == NULL)
 		goto error_msg;
 	cmsg_init(&msg->base, connect_route);
+	assert(addrlen <= sizeof(msg->connect.addrstorage));
+	memcpy(&msg->connect.addrstorage, addr, addrlen);
+	msg->connect.addrlen = addrlen;
 	msg->p_ibuf = con->p_ibuf;
 	msg->wpos = con->wpos;
 	cpipe_push(&tx_pipe, &msg->base);

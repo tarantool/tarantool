@@ -32,6 +32,7 @@
  */
 #include <inttypes.h>
 #include <stdbool.h>
+#include <sys/socket.h>
 #include "trigger.h"
 #include "fiber.h"
 #include "user.h"
@@ -66,11 +67,23 @@ extern const char *session_type_strs[];
  * types, and allows to do not store attributes in struct session,
  * that are used only by a session of particular type.
  */
-union session_meta {
-	/** IProto connection. */
-	void *connection;
-	/** Console file/socket descriptor. */
-	int fd;
+struct session_meta {
+	union {
+		/** IProto connection. */
+		void *connection;
+		/** Console file/socket descriptor. */
+		int fd;
+	};
+	struct {
+		union {
+			/** Peer address. */
+			struct sockaddr addr;
+			/** Peer address storage. */
+			struct sockaddr_storage addrstorage;
+		};
+		/** Peer address size or 0 if the session is local. */
+		socklen_t addrlen;
+	} peer;
 };
 
 /**
@@ -89,7 +102,7 @@ struct session {
 	/** Session virtual methods. */
 	const struct session_vtab *vtab;
 	/** Session metadata. */
-	union session_meta meta;
+	struct session_meta meta;
 	/** Session user id and global grants */
 	struct credentials credentials;
 	/** Trigger for fiber on_stop to cleanup created on-demand session */
@@ -267,6 +280,25 @@ session_create(enum session_type type);
  */
 void
 session_destroy(struct session *);
+
+/**
+ * Set session peer address.
+ */
+static inline void
+session_set_peer_addr(struct session *session,
+		      const struct sockaddr *addr, socklen_t addrlen)
+{
+	assert(addrlen <= sizeof(session->meta.peer.addrstorage));
+	memcpy(&session->meta.peer.addrstorage, addr, addrlen);
+	session->meta.peer.addrlen = addrlen;
+}
+
+/**
+ * Return session peer name or NULL if the session is local.
+ * The string is allocated in the static buffer.
+ */
+const char *
+session_peer(const struct session *session);
 
 /** Run on-connect triggers */
 int

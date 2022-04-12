@@ -49,17 +49,25 @@ static const char *sessionlib_name = "box.session";
 static int
 lbox_session_create(struct lua_State *L)
 {
+	int fd = luaL_optinteger(L, 1, -1);
+	enum session_type type = STR2ENUM(session_type,
+					  luaL_optstring(L, 2, "console"));
 	struct session *session = fiber_get_session(fiber());
 	if (session == NULL) {
 		session = session_create_on_demand();
 		if (session == NULL)
 			return luaT_error(L);
-		session->meta.fd = luaL_optinteger(L, 1, -1);
+		session->meta.fd = fd;
+		if (fd >= 0 && type != SESSION_TYPE_REPL) {
+			struct sockaddr_storage addrstorage;
+			struct sockaddr *addr = (struct sockaddr *)&addrstorage;
+			socklen_t addrlen = sizeof(addrstorage);
+			if (sio_getpeername(fd, addr, &addrlen) == 0)
+				session_set_peer_addr(session, addr, addrlen);
+		}
 	}
 	/* If a session already exists, simply reset its type */
-	session_set_type(session, STR2ENUM(session_type,
-					   luaL_optstring(L, 2, "console")));
-
+	session_set_type(session, type);
 	lua_pushnumber(L, session->id);
 	return 1;
 }
@@ -248,7 +256,6 @@ lbox_session_peer(struct lua_State *L)
 	if (lua_gettop(L) > 1)
 		luaL_error(L, "session.peer(sid): bad arguments");
 
-	int fd;
 	struct session *session;
 	if (lua_gettop(L) == 1)
 		session = session_find(luaL_checkint(L, 1));
@@ -256,21 +263,12 @@ lbox_session_peer(struct lua_State *L)
 		session = current_session();
 	if (session == NULL)
 		luaL_error(L, "session.peer(): session does not exist");
-	fd = session_fd(session);
-	if (fd < 0) {
+	const char *peer = session_peer(session);
+	if (peer == NULL) {
 		lua_pushnil(L); /* no associated peer */
 		return 1;
 	}
-
-	struct sockaddr_storage addr;
-	socklen_t addrlen = sizeof(addr);
-	struct sockaddr *addr_base = (struct sockaddr *)&addr;
-	if (sio_getpeername(fd, addr_base, &addrlen) < 0)
-		luaL_error(L, "session.peer(): getpeername() failed");
-
-	char addrbuf[SERVICE_NAME_MAXLEN];
-	sio_addr_snprintf(addrbuf, sizeof(addrbuf), addr_base, addrlen);
-	lua_pushstring(L, addrbuf);
+	lua_pushstring(L, peer);
 	return 1;
 }
 
