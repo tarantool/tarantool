@@ -15,7 +15,7 @@ session = box.session
 space = box.schema.space.create('tweedledum')
 space:create_index('primary', { type = 'hash' })
 
-test:plan(56)
+test:plan(54)
 
 ---
 --- Check that Tarantool creates ADMIN session for #! script
@@ -69,15 +69,12 @@ session.on_connect(nil, fail)
 session.on_disconnect(nil, fail)
 
 -- check how connect/disconnect triggers work
-local peer_name = "peer_name"
 local active_connections = 0
 local function inc() active_connections = active_connections + 1 end
 local function dec() active_connections = active_connections - 1 end
-local function peer() peer_name = box.session.peer() end
 local net = { box = require('net.box') }
 test:is(type(session.on_connect(inc)), "function", "type of trigger inc on_connect")
 test:is(type(session.on_disconnect(dec)), "function", "type of trigger dec on_disconnect")
-test:is(type(session.on_disconnect(peer)), "function", "type of trigger peer on_disconnect")
 local c = net.box.connect(HOST, PORT)
 while active_connections < 1 do fiber.sleep(0.001) end
 test:is(active_connections, 1, "active_connections after 1 connection")
@@ -88,11 +85,9 @@ c:close()
 c1:close()
 while active_connections > 0 do fiber.sleep(0.001) end
 test:is(active_connections, 0, "active_connections after closing")
-test:isnil(peer_name, "peer_name after closing")
 
 session.on_connect(nil, inc)
 session.on_disconnect(nil, dec)
-session.on_disconnect(nil, peer)
 
 -- write audit trail of connect/disconnect into a space
 local function audit_connect() box.space['tweedledum']:insert{session.id()} end

@@ -315,6 +315,17 @@ struct iproto_msg
 	/* Request message code and sync. */
 	struct xrow_header header;
 	union {
+		/** Connect. */
+		struct {
+			union {
+				/** Peer address. */
+				struct sockaddr addr;
+				/** Peer address storage. */
+				struct sockaddr_storage addrstorage;
+			};
+			/** Peer address size. */
+			socklen_t addrlen;
+		} connect;
 		/** Box request, if this is a DML */
 		struct request dml;
 		/** Box request, if this is a call or eval. */
@@ -2528,6 +2539,8 @@ tx_process_connect(struct cmsg *m)
 		if (con->session == NULL)
 			diag_raise();
 		con->session->meta.connection = con;
+		session_set_peer_addr(con->session, &msg->connect.addr,
+				      msg->connect.addrlen);
 		iproto_features_create(&con->session->meta.features);
 		tx_fiber_init(con->session, 0);
 		char *greeting = (char *) static_alloc(IPROTO_GREETING_SIZE);
@@ -2594,10 +2607,6 @@ static int
 iproto_on_accept(struct evio_service *service, struct iostream *io,
 		 struct sockaddr *addr, socklen_t addrlen)
 {
-	(void)addr;
-	(void)addrlen;
-	struct iproto_msg *msg;
-
 	struct iproto_thread *iproto_thread =
 		(struct iproto_thread *)service->on_accept_param;
 	struct iproto_connection *con = iproto_connection_new(iproto_thread);
@@ -2608,11 +2617,14 @@ iproto_on_accept(struct evio_service *service, struct iostream *io,
 	 * fixed so there is a limited number of msgs in
 	 * use, all stored in just a few blocks of the memory pool.
 	 */
-	msg = iproto_msg_new(con);
+	struct iproto_msg *msg = iproto_msg_new(con);
 	if (msg == NULL) {
 		iproto_connection_delete(con);
 		return -1;
 	}
+	assert(addrlen <= sizeof(msg->connect.addrstorage));
+	memcpy(&msg->connect.addrstorage, addr, addrlen);
+	msg->connect.addrlen = addrlen;
 	iostream_move(&con->io, io);
 	cmsg_init(&msg->base, iproto_thread->connect_route);
 	msg->p_ibuf = con->p_ibuf;
