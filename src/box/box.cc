@@ -87,6 +87,7 @@
 #include "trivia/util.h"
 #include "version.h"
 #include "mp_uuid.h"
+#include "flightrec.h"
 
 static char status[64] = "unknown";
 
@@ -772,6 +773,19 @@ box_check_audit(void)
 	}
 }
 
+/**
+ * Raises error if flight recorder configuration is incorrect.
+ */
+static void
+box_check_flightrec(void)
+{
+	if (flightrec_check_cfg(
+			cfg_geti64("flightrec_logs_size"),
+			cfg_geti64("flightrec_logs_max_msg_size"),
+			cfg_geti("flightrec_logs_log_level")) != 0)
+		diag_raise();
+}
+
 static enum election_mode
 box_check_election_mode(void)
 {
@@ -1342,6 +1356,7 @@ box_check_config(void)
 	struct tt_uuid uuid;
 	box_check_say();
 	box_check_audit();
+	box_check_flightrec();
 	if (box_check_listen() != 0)
 		diag_raise();
 	box_check_instance_uuid(&uuid);
@@ -3313,6 +3328,7 @@ box_free(void)
 		gc_free();
 		engine_shutdown();
 		wal_free();
+		flightrec_free();
 		audit_log_free();
 		sql_built_in_functions_cache_free();
 	}

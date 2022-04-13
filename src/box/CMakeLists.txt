@@ -253,6 +253,10 @@ else()
     list(APPEND box_sources space_upgrade.c)
 endif()
 
+if(ENABLE_FLIGHT_RECORDER)
+    list(APPEND box_sources ${FLIGHT_RECORDER_SOURCES})
+endif()
+
 add_library(box STATIC ${box_sources})
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
