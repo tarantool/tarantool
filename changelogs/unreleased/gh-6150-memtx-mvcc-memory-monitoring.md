@@ -1,3 +1,3 @@
 ## feature/memtx
 
-* Introduced memtx mvcc memory monitoring (gh-6150).
+* Introduce memtx MVCC memory monitoring (gh-6150).

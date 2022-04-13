@@ -1,3 +1,3 @@
 ## bugfix/replication
 
-* Fixed replicas failing to bootstrap when master is just re-started (gh-6966).
+* Fixed replicas failing to bootstrap when the master has just restarted (gh-6966).
