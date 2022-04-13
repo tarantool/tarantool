@@ -31,6 +31,8 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
+#include "small/rlist.h"
+#include "trigger.h"
 #include "trivia/util.h"
 #include "iterator_type.h"
 #include "index_def.h"
@@ -41,6 +43,7 @@ extern "C" {
 
 struct tuple;
 struct engine;
+struct space;
 struct index;
 struct index_def;
 struct key_def;
@@ -48,6 +51,40 @@ struct info_handler;
 
 typedef struct tuple box_tuple_t;
 typedef struct key_def box_key_def_t;
+
+/** Context passed to box_on_select trigger callback. */
+struct box_on_select_ctx {
+	/** Target space. */
+	struct space *space;
+	/** Target index in the space. */
+	struct index *index;
+	/** Iterator type. */
+	enum iterator_type type;
+	/** Key (MsgPack array). */
+	const char *key;
+};
+
+/**
+ * Triggers invoked on select (by box_select, box_index_iterator, etc).
+ * Trigger callback is passed on_box_select_ctx.
+ */
+extern struct rlist box_on_select;
+
+/** Runs box_on_select triggers. */
+static inline void
+box_run_on_select(struct space *space, struct index *index,
+		  enum iterator_type type, const char *key)
+{
+	if (likely(rlist_empty(&box_on_select)))
+		return;
+	struct box_on_select_ctx ctx = {
+		.space = space,
+		.index = index,
+		.type = type,
+		.key = key,
+	};
+	trigger_run(&box_on_select, &ctx);
+}
 
 /** \cond public */
 
