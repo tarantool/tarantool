@@ -70,7 +70,7 @@ local default_cfg = {
 
     audit_log           = nil,
     audit_nonblock      = true,
-    audit_format        = 'csv',
+    audit_format        = 'json',
     audit_filter        = 'compatibility',
 
     io_collect_interval = nil,

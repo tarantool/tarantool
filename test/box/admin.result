@@ -30,7 +30,7 @@ cfg_filter(box.cfg)
 - - - audit_filter
     - compatibility
   - - audit_format
-    - csv
+    - json
   - - audit_nonblock
     - true
   - - background
