@@ -1339,6 +1339,18 @@ tuple_bless(struct tuple *tuple)
 ssize_t
 tuple_to_buf(struct tuple *tuple, char *buf, size_t size);
 
+/**
+ * Amount of memory allocated on runtime arena for tuples.
+ *
+ * This metric disregards the internal fragmentation: it does not
+ * count unused parts of slabs.
+ *
+ * Example: a tuple created using `box.tuple.new(<...>)` from Lua
+ * uses this memory.
+ */
+size_t
+tuple_runtime_memory_used(void);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
