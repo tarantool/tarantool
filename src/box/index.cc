@@ -40,6 +40,8 @@
 #include "info/info.h"
 #include "memtx_tx.h"
 
+struct rlist box_on_select = RLIST_HEAD_INITIALIZER(box_on_select);
+
 /* {{{ Utilities. **********************************************/
 
 UnsupportedIndexFeature::UnsupportedIndexFeature(const char *file,
@@ -235,9 +237,11 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 		diag_set(ClientError, ER_MORE_THAN_ONE_TUPLE);
 		return -1;
 	}
+	const char *key_array = key;
 	uint32_t part_count = mp_decode_array(&key);
 	if (exact_key_validate(index->def->key_def, key, part_count))
 		return -1;
+	box_run_on_select(space, index, ITER_EQ, key_array);
 	/* Start transaction in the engine. */
 	struct txn *txn;
 	struct txn_ro_savepoint svp;
@@ -270,9 +274,11 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 		diag_set(UnsupportedIndexFeature, index->def, "min()");
 		return -1;
 	}
+	const char *key_array = key;
 	uint32_t part_count = mp_decode_array(&key);
 	if (key_validate(index->def, ITER_GE, key, part_count))
 		return -1;
+	box_run_on_select(space, index, ITER_GE, key_array);
 	/* Start transaction in the engine. */
 	struct txn *txn;
 	struct txn_ro_savepoint svp;
@@ -303,9 +309,11 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 		diag_set(UnsupportedIndexFeature, index->def, "max()");
 		return -1;
 	}
+	const char *key_array = key;
 	uint32_t part_count = mp_decode_array(&key);
 	if (key_validate(index->def, ITER_LE, key, part_count))
 		return -1;
+	box_run_on_select(space, index, ITER_LE, key_array);
 	/* Start transaction in the engine. */
 	struct txn *txn;
 	struct txn_ro_savepoint svp;
@@ -374,10 +382,12 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 	struct index *index;
 	if (check_index(space_id, index_id, &space, &index) != 0)
 		return NULL;
+	const char *key_array = key;
 	assert(mp_typeof(*key) == MP_ARRAY); /* checked by Lua */
 	uint32_t part_count = mp_decode_array(&key);
 	if (key_validate(index->def, itype, key, part_count))
 		return NULL;
+	box_run_on_select(space, index, itype, key_array);
 	struct txn *txn;
 	struct txn_ro_savepoint svp;
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)

@@ -2412,9 +2412,12 @@ box_select(uint32_t space_id, uint32_t index_id,
 		return -1;
 
 	enum iterator_type type = (enum iterator_type) iterator;
+	const char *key_array = key;
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
 	if (key_validate(index->def, type, key, part_count))
 		return -1;
+
+	box_run_on_select(space, index, type, key_array);
 
 	ERROR_INJECT(ERRINJ_TESTING, {
 		diag_set(ClientError, ER_INJECTION, "ERRINJ_TESTING");
