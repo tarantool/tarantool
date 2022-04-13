@@ -686,9 +686,20 @@ tree_iterator_start_raw(struct iterator *iterator, struct tuple **ret)
 	}
 
 	if (!equals && (type == ITER_EQ || type == ITER_REQ)) {
-		/* Found nothing */
-		if (key_is_full)
+		/*
+		 * Found nothing, iteration will be stopped now. That is the
+		 * last chance to record that the transaction have read the key.
+		 */
+		if (key_is_full) {
 			memtx_tx_track_point(txn, space, idx, it->key_data.key);
+			return 0;
+		}
+		/* it->tree_iterator is positioned on successor of a key! */
+		struct memtx_tree_data<USE_HINT> *res =
+			memtx_tree_iterator_get_elem(tree, &it->tree_iterator);
+		struct tuple *successor = res == NULL ? NULL : res->tuple;
+		memtx_tx_track_gap(txn, space, idx, successor, type,
+				   it->key_data.key, it->key_data.part_count);
 		return 0;
 	}
 
