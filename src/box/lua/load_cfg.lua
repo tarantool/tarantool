@@ -73,6 +73,11 @@ local default_cfg = {
     audit_format        = 'json',
     audit_filter        = 'compatibility',
 
+    flightrec_enabled = false,
+    flightrec_logs_size = 10485760,
+    flightrec_logs_max_msg_size = 4096,
+    flightrec_logs_log_level = 6,
+
     io_collect_interval = nil,
     readahead           = 16320,
     snap_io_rate_limit  = nil, -- no limit
@@ -188,6 +193,11 @@ local template_cfg = {
     audit_nonblock      = 'boolean',
     audit_format        = 'string',
     audit_filter        = 'string',
+
+    flightrec_enabled = 'boolean',
+    flightrec_logs_size = 'number',
+    flightrec_logs_max_msg_size = 'number',
+    flightrec_logs_log_level = 'number',
 
     io_collect_interval = 'number',
     readahead           = 'number',

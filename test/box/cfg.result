@@ -45,6 +45,14 @@ cfg_filter(box.cfg)
  |     - https://feedback.tarantool.io
  |   - - feedback_interval
  |     - 3600
+ |   - - flightrec_enabled
+ |     - false
+ |   - - flightrec_logs_log_level
+ |     - 6
+ |   - - flightrec_logs_max_msg_size
+ |     - 4096
+ |   - - flightrec_logs_size
+ |     - 10485760
  |   - - force_recovery
  |     - false
  |   - - hot_standby
@@ -186,6 +194,14 @@ cfg_filter(box.cfg)
  |     - https://feedback.tarantool.io
  |   - - feedback_interval
  |     - 3600
+ |   - - flightrec_enabled
+ |     - false
+ |   - - flightrec_logs_log_level
+ |     - 6
+ |   - - flightrec_logs_max_msg_size
+ |     - 4096
+ |   - - flightrec_logs_size
+ |     - 10485760
  |   - - force_recovery
  |     - false
  |   - - hot_standby
