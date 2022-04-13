@@ -63,6 +63,7 @@
 #include "backtrace.h"
 #include "tt_pthread.h"
 #include "lua/init.h"
+#include "box/flightrec.h"
 #include "box/box.h"
 #include "box/error.h"
 #include "small/small_features.h"
@@ -460,6 +461,18 @@ load_cfg(void)
 			cfg_getb("log_nonblock"),
 			log_format,
 			background);
+
+	/*
+	 * Initialize flight recorder after say logger: we might set on_log
+	 * callback to duplicate logs to flight recorder.
+	 */
+	bool flightrec_is_enabled = cfg_getb("flightrec_enabled") == 1;
+	if (flightrec_is_enabled) {
+		flightrec_init(cfg_gets("memtx_dir"),
+			       cfg_geti64("flightrec_logs_size"),
+			       cfg_geti64("flightrec_logs_max_msg_size"),
+			       cfg_geti("flightrec_logs_log_level"));
+	}
 
 	memtx_tx_manager_use_mvcc_engine = cfg_getb("memtx_use_mvcc_engine");
 
