@@ -45,6 +45,7 @@
 #include "box/engine.h"
 #include "box/memtx_engine.h"
 #include "box/allocator.h"
+#include "box/tuple.h"
 
 static int
 small_stats_lua_cb(const void *stats, void *cb_ctx)
@@ -250,6 +251,9 @@ lbox_runtime_info(struct lua_State *L)
 	lua_pushstring(L, "lua");
 	lua_pushinteger(L, G(L)->gc.total);
 	lua_settable(L, -3);
+
+	luaL_pushuint64(L, tuple_runtime_memory_used());
+	lua_setfield(L, -2, "tuple");
 
 	return 1;
 }

@@ -378,6 +378,22 @@ tuple_free(void)
 	mh_tuple_uploaded_refs_delete(tuple_uploaded_refs);
 }
 
+static int
+small_stats_noop_cb(const void *stats, void *cb_ctx)
+{
+	(void)stats;
+	(void)cb_ctx;
+	return 0;
+}
+
+size_t
+tuple_runtime_memory_used(void)
+{
+	struct small_stats data_stats;
+	small_stats(&runtime_alloc, &data_stats, small_stats_noop_cb, NULL);
+	return data_stats.used;
+}
+
 /* {{{ tuple_field_* getters */
 
 int
