@@ -4,7 +4,7 @@
 
 box.cfg
 audit_filter:compatibility
-audit_format:csv
+audit_format:json
 audit_nonblock:true
 background:false
 checkpoint_count:2
