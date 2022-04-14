@@ -9,15 +9,25 @@ on:
     - cron: '0 1 * * *'
 
 jobs:
-  run_sysbench:
+  perf_sysbench:
     if: github.repository == 'tarantool/tarantool'
 
     runs-on: perf-sh3
+
+    # Scheduled workflows cannot be run on non-default branches even they reside
+    # in them [1]. So using matrix here to run against release branches as well.
+    # [1] https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        branch: [ 'master', '2.8' ]
 
     steps:
       - name: Checkout tarantool
         uses: actions/checkout@v2
         with:
+          ref: ${{ matrix.branch }}
           fetch-depth: 0
           submodules: recursive
 
@@ -56,52 +66,8 @@ jobs:
         # It is needed for correct work of running scripts under the hood.
         run: ${PWD}/bench-run/benchs/sysbench/run.sh 1
 
-      - name: call action to send Telegram message on failure
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
-          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
-        uses: ./.github/actions/send-telegram-notify
-        if: failure()
-
-      - name: Collect artifacts
-        uses: actions/upload-artifact@v2
-        if: always()
-        with:
-          name: perf_sysbench
-          retention-days: 21
-          path: |
-            ./[Ss]ysbench_*.txt
-            ./tnt_server.txt
-
-  publish_metrics:
-    needs: run_sysbench
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout tarantool
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-
-      - name: Checkout bench-run
-        uses: actions/checkout@v2
-        with:
-          path: bench-run
-          repository: tarantool/bench-run
-
-      - name: Download perf artifacts
-        uses: actions/download-artifact@v2
-        with:
-          name: perf_sysbench
-
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.7
-
-      - name: Install requirements
-        run: python3 -m pip install -r requirements.txt
+      - name: Install requirements for metrics publisher
+        run: python3 -m pip install --user --requirement requirements.txt
         working-directory: ./bench-run/publishing
 
       - name: Publish metrics
@@ -118,3 +84,13 @@ jobs:
           TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
         uses: ./.github/actions/send-telegram-notify
         if: failure()
+
+      - name: Collect artifacts
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: perf_sysbench_${{ matrix.branch }}
+          retention-days: 21
+          path: |
+            ./[Ss]ysbench_*.txt
+            ./tnt_server.txt
