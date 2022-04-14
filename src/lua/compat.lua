@@ -35,7 +35,7 @@ Available commands:
 	
 	candidates()                -- list all unselected options
 	dump()                      -- get command that sets up compat with same options as current
-	help                        -- show this help
+	help()                      -- show this help
 	reset()                     -- set all options to default
 	restore{'option_name'}      -- set to default specified options
 	{option_name = true}        -- set list of options to desired values, could be true, false, 'old', 'new', 'default'
