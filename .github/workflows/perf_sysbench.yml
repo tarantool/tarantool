@@ -9,7 +9,7 @@ on:
     - cron: '0 1 * * *'
 
 jobs:
-  perf_sysbench:
+  run_sysbench:
     if: github.repository == 'tarantool/tarantool'
 
     runs-on: perf-sh3
@@ -72,3 +72,49 @@ jobs:
           path: |
             ./[Ss]ysbench_*.txt
             ./tnt_server.txt
+
+  publish_metrics:
+    needs: run_sysbench
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout tarantool
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Checkout bench-run
+        uses: actions/checkout@v2
+        with:
+          path: bench-run
+          repository: tarantool/bench-run
+
+      - name: Download perf artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: perf_sysbench
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.7
+
+      - name: Install requirements
+        run: python3 -m pip install -r requirements.txt
+        working-directory: ./bench-run/publishing
+
+      - name: Publish metrics
+        env:
+          INFLUXDB_ORG: tarantool
+          INFLUXDB_BUCKET: perf
+          INFLUXDB_URL: ${{ secrets.INFLUXDB_URL }}
+          INFLUXDB_TOKEN: ${{ secrets.INFLUXDB_TOKEN }}
+        run: ./bench-run/publishing/influxdb.py -m sysbench -f Sysbench_result.txt
+
+      - name: call action to send Telegram message on failure
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
+          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
+        uses: ./.github/actions/send-telegram-notify
+        if: failure()
