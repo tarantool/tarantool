@@ -3766,6 +3766,8 @@ box_cfg_xc(void)
 	port_init();
 	iproto_init(cfg_geti("iproto_threads"));
 	sql_init();
+	audit_log_init(cfg_gets("audit_log"), cfg_geti("audit_nonblock"),
+		       cfg_gets("audit_format"), cfg_gets("audit_filter"));
 
 	int64_t wal_max_size = box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
@@ -3874,9 +3876,6 @@ box_cfg_xc(void)
 
 	/* Follow replica */
 	replicaset_follow();
-
-	audit_log_init(cfg_gets("audit_log"), cfg_geti("audit_nonblock"),
-		       cfg_gets("audit_format"), cfg_gets("audit_filter"));
 
 	fiber_gc();
 	is_box_configured = true;
