@@ -62,9 +62,10 @@ jobs:
         working-directory: ./sysbench
 
       - name: Run sysbench
-        # Run each test only once. Using absolute path is intentional.
-        # It is needed for correct work of running scripts under the hood.
-        run: ${PWD}/bench-run/benchs/sysbench/run.sh 1
+        # Run each test 10 times to get average result.
+        # Using absolute path is intentional. It is needed for correct work of
+        # the running scripts under the hood.
+        run: ${PWD}/bench-run/benchs/sysbench/run.sh 10
 
       - name: Install requirements for metrics publisher
         run: python3 -m pip install --user --requirement requirements.txt
