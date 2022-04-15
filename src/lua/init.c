@@ -43,8 +43,10 @@
 
 #include <fiber.h>
 #include "version.h"
-#include "backtrace.h"
 #include "coio.h"
+#include "core/backtrace.h"
+#include "core/tt_static.h"
+#include "lua/backtrace.h"
 #include "lua/fiber.h"
 #include "lua/fiber_cond.h"
 #include "lua/fiber_channel.h"
@@ -592,7 +594,9 @@ static int
 tarantool_panic_handler(lua_State *L) {
 	const char *problem = lua_tostring(L, -1);
 #ifdef ENABLE_BACKTRACE
-	print_backtrace();
+	struct backtrace bt;
+	backtrace_collect(&bt, fiber(), 1);
+	backtrace_print(&bt, STDERR_FILENO);
 #endif /* ENABLE_BACKTRACE */
 	say_crit("%s", problem);
 	int level = 1;
@@ -724,7 +728,9 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	rl_catch_signals = 0;
 	rl_catch_sigwinch = 0;
 #endif
-
+#if defined(ENABLE_BACKTRACE)
+	backtrace_lua_init();
+#endif /* defined(ENABLE_BACKTRACE) */
 	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 	for (const char **s = lua_modules; *s; s += 2) {
 		const char *modname = *s;

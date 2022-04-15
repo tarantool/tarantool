@@ -1,64 +1,92 @@
-#ifndef TARANTOOL_LIB_CORE_BACKTRACE_H_INCLUDED
-#define TARANTOOL_LIB_CORE_BACKTRACE_H_INCLUDED
 /*
- * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
+ * SPDX-License-Identifier: BSD-2-Clause
  *
- * Redistribution and use in source and binary forms, with or
- * without modification, are permitted provided that the following
- * conditions are met:
- *
- * 1. Redistributions of source code must retain the above
- *    copyright notice, this list of conditions and the
- *    following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above
- *    copyright notice, this list of conditions and the following
- *    disclaimer in the documentation and/or other materials
- *    provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
- * <COPYRIGHT HOLDER> OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
- * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
- * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * Copyright 2010-2022, Tarantool AUTHORS, please see AUTHORS file.
  */
-#include "trivia/config.h"
-#include <stddef.h>
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
+#pragma once
+
+#include "trivia/config.h"
 
 #ifdef ENABLE_BACKTRACE
-#include <coro.h>
+#include "trivia/util.h"
 
-char *
-backtrace(char *start, size_t size);
+#include "libunwind.h"
 
-void print_backtrace(void);
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+/*
+ * Format for printing C/C++ frames.
+ */
+#define C_FRAME_STR_FMT "#%-2d %p in %s+%zu"
 
-typedef int (backtrace_cb)(int frameno, void *frameret,
-                           const char *func, size_t offset, void *cb_ctx);
+enum {
+	/* Maximal number of frames collected. */
+	BACKTRACE_FRAME_COUNT_MAX = 64,
+};
 
+/*
+ * C/C++ frame information sufficient for further resolving of function name
+ * and offset.
+ */
+struct backtrace_frame {
+	/* Value of IP register. */
+	void *ip;
+};
 
+/*
+ * Collection of C/C++ frames.
+ */
+struct backtrace {
+	/* Number of frames collected. */
+	int frame_count;
+	/* Array of frames to be further resolved. */
+	struct backtrace_frame frames[BACKTRACE_FRAME_COUNT_MAX];
+};
+
+struct fiber;
+
+/*
+ * Collect call stack of `fiber` (only C/C++ frames) to `bt`.
+ *
+ * `skip_frames` determines the number of frames skipped, starting from the
+ * frame of `backtrace_collect`. It is expected to have a non-negative value.
+ * For example, if skip_frames is 0, then the backtrace will contain
+ * `backtrace_collect` and every function on the call stack up to the limit.
+ * If it is 1, then it will skip `backtrace_collect`. If it is 2, then it will
+ * skip `backtrace_collect` and the function the first function on the call
+ * stack. Etc.
+ *
+ * Nota bene: requires its own stack frame — hence, NOINLINE.
+ */
+NOINLINE void
+backtrace_collect(struct backtrace *bt, const struct fiber *fiber,
+		  int skip_frames);
+
+/*
+ * Resolve C/C++ function name and `offset` from `frame`.
+ */
+const char *
+backtrace_frame_resolve(const struct backtrace_frame *frame,
+			unw_word_t *offset);
+
+/*
+ * Dump collected C/C++ frames to `buf`, is `SNPRINT`-compatible
+ * (see src/trivia/util.h for details).
+ *
+ * Returns the number of characters the backtrace string takes, or a negative
+ * value in case of failure.
+ */
+int
+backtrace_snprint(char *buf, int buf_len, const struct backtrace *bt);
+
+/*
+ * Print collected C/C++ frames to `fd`.
+ */
 void
-backtrace_foreach(backtrace_cb cb, coro_context *coro_ctx, void *cb_ctx);
-
-void
-backtrace_proc_cache_clear(void);
-
-#endif /* ENABLE_BACKTRACE */
-
-#if defined(__cplusplus)
+backtrace_print(const struct backtrace *bt, int fd);
+#ifdef __cplusplus
 } /* extern "C" */
-#endif /* defined(__cplusplus) */
-
-#endif /* TARANTOOL_LIB_CORE_BACKTRACE_H_INCLUDED */
+#endif /* __cplusplus */
+#endif /* ENABLE_BACKTRACE */
