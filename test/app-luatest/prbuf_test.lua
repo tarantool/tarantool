@@ -37,6 +37,9 @@ g.test_object_misc = function()
     while entry ~= nil do
         entry_count = entry_count + 1
         t.assert_equals(entry.size, sample_size)
+        local data = entry:data()
+        t.assert_equals(string.len(data), entry.size)
+        t.assert_equals(data, require('ffi').string(entry.ptr, entry.size))
         t.assert_equals(check_memory(entry.ptr, tonumber(entry.size)), true)
         entry = iter:next()
     end
