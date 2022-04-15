@@ -290,6 +290,13 @@ local function prbuf_iterator_next(iterator)
     return entry
 end
 
+local function prbuf_entry_data(entry)
+    if not ffi.istype(prbuf_entry_t, entry) then
+        errorf('Attempt to entry:data() without object, use entry:data()')
+    end
+    return ffi.string(entry.ptr, tonumber(entry.size))
+end
+
 local prbuf_iterator_methods = {
     next = prbuf_iterator_next;
 }
@@ -299,6 +306,16 @@ local prbuf_iterator_mt = {
 }
 
 ffi.metatype(prbuf_iterator_t, prbuf_iterator_mt);
+
+local prbuf_entry_methods = {
+    data = prbuf_entry_data;
+}
+
+local prbuf_entry_mt = {
+    __index = prbuf_entry_methods;
+}
+
+ffi.metatype(prbuf_entry_t, prbuf_entry_mt);
 
 local function prbuf_tostring(self)
     return '<prbuf>'
