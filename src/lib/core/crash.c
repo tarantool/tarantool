@@ -17,7 +17,7 @@
 #include "trivia/util.h"
 
 #include "box/replication.h"
-#include "backtrace.h"
+#include "core/backtrace.h"
 #include "crash.h"
 #include "say.h"
 #include "tt_uuid.h"
@@ -213,8 +213,10 @@ crash_collect(int signo, siginfo_t *siginfo, void *ucontext)
 	cinfo->siginfo_addr = siginfo;
 
 #ifdef ENABLE_BACKTRACE
-	char *start = cinfo->backtrace_buf;
-	backtrace(start, sizeof(cinfo->backtrace_buf));
+	struct backtrace bt;
+	backtrace_collect(&bt, fiber(), 1);
+	backtrace_snprint(cinfo->backtrace_buf,
+			  sizeof(cinfo->backtrace_buf), &bt);
 #endif
 
 #ifdef HAS_GREG
