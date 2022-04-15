@@ -57,6 +57,7 @@ for i = 1,10 do
     r2_nr = (old_leader_nr + 1) % 3 + 1
     test_run:wait_lsn('election_replica'..r1_nr, 'election_replica'..old_leader_nr)
     test_run:wait_lsn('election_replica'..r2_nr, 'election_replica'..old_leader_nr)
+    c:close()
     test_run:cmd('stop server '..old_leader)
     nrs[old_leader_nr] = false
     new_leader_nr = get_leader(nrs)
