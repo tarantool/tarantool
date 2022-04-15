@@ -14,3 +14,8 @@ include_directories(${EXTRA_CORE_INCLUDE_DIRS})
 add_executable(tuple.perftest tuple.cc
                ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c)
 target_link_libraries(tuple.perftest core box tuple benchmark::benchmark)
+
+add_executable(mhash.perftest mhash.cc)
+target_include_directories(mhash.perftest PRIVATE
+                           ${PROJECT_SOURCE_DIR}/src/lib/salad)
+target_link_libraries(mhash.perftest salad benchmark::benchmark)
