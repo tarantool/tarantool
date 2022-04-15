@@ -46,6 +46,8 @@
 #ifdef ENABLE_BACKTRACE
 #include <libunwind.h>
 
+#include "cxx_abi.h"
+
 #include "small/region.h"
 #include "small/static.h"
 /*
@@ -364,9 +366,7 @@ backtrace_foreach(backtrace_cb cb, coro_context *coro_ctx, void *cb_ctx)
 	unw_init_local(&unw_cur, &unw_ctx_bt);
 	int frame_no = 0;
 	unw_word_t sp = 0, old_sp = 0, ip, offset;
-	int unw_status, demangle_status;
-	char *demangle_buf = NULL;
-	size_t demangle_buf_len = 0;
+	int unw_status;
 
 	while ((unw_status = unw_step(&unw_cur)) > 0) {
 		const char *proc;
@@ -380,11 +380,7 @@ backtrace_foreach(backtrace_cb cb, coro_context *coro_ctx, void *cb_ctx)
 		}
 		proc = get_proc_name(&unw_cur, &offset, false);
 
-		char *cxxname = abi::__cxa_demangle(proc, demangle_buf,
-						    &demangle_buf_len,
-						    &demangle_status);
-		if (cxxname != NULL)
-			demangle_buf = cxxname;
+		const char *cxxname = cxx_abi_demangle(proc);
 		if (frame_no > 0 &&
 		    (cb(frame_no - 1, (void *)ip, cxxname != NULL ? cxxname : proc,
 			offset, cb_ctx) != 0))
@@ -399,7 +395,6 @@ backtrace_foreach(backtrace_cb cb, coro_context *coro_ctx, void *cb_ctx)
 		say_debug("unwinding error: %i", unw_status);
 #endif
 out:
-	free(demangle_buf);
 }
 
 void
