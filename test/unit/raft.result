@@ -1,5 +1,5 @@
 	*** main_f ***
-1..16
+1..17
 	*** raft_test_leader_election ***
     1..24
     ok 1 - 1 pending message at start
@@ -341,4 +341,51 @@ ok 15 - subtests
     ok 64 - still waiting for yield
 ok 16 - subtests
 	*** raft_test_split_vote: done ***
+	*** raft_test_pre_vote ***
+    1..43
+    ok 1 - leader notification
+    ok 2 - WAL write is in progress
+    ok 3 - leader just appeared
+    ok 4 - leader_idle increased
+    ok 5 - heartbeat resets idle counter during WAL write
+    ok 6 - WAL write finished
+    ok 7 - leader_idle increased
+    ok 8 - heartbeat resets idle counter when no WAL write
+    ok 9 - voter tracks leader death
+    ok 10 - leader still remembered
+    ok 11 - idle increased
+    ok 12 - timed out
+    ok 13 - heartbeat resets idle
+    ok 14 - heartbeat restarts timer
+    ok 15 - leader seen notification accepted
+    ok 16 - leader not seen
+    ok 17 - timed out
+    ok 18 - no elections when leader seen indirectly
+    ok 19 - leader not seen notification accepted
+    ok 20 - elections once no one sees the leader
+    ok 21 - become leader on quorum change
+    ok 22 - cfg_is_candidate_later doesn't disrupt leader
+    ok 23 - accept term bump
+    ok 24 - term bump after cfg_is_candidate_later makes node a voter.
+    ok 25 - cfg_is_candidate_later doesn't transfer voter to a candidate
+    ok 26 - accept term bump
+    ok 27 - Term bump with cfg_is_candidate_later transfers voter to candiate
+    ok 28 - leader_idle is zero on the current leader
+    ok 29 - leader_idle counts from 0 on a previous leader
+    ok 30 - leader is seen message accepted when raft disabled
+    ok 31 - who sees leader is tracked on disabled node
+    ok 32 - disabled node doesn't wait for anything
+    ok 33 - no elections on start when someone sees the leader
+    ok 34 - nothing to wait for as long as someone sees the leader
+    ok 35 - no elections on becoming candidate when someone sees the leader
+    ok 36 - nothing to wait for as long as someone sees the leader
+    ok 37 - leader is accepted
+    ok 38 - timed out
+    ok 39 - No timer re-start on death timeout reconfig when already timed-out
+    ok 40 - vote for 2
+    ok 41 - leader accepted
+    ok 42 - leader seen notification accepted
+    ok 43 - No timer re_start on election timeout reconfig when it's not time for elections yet
+ok 17 - subtests
+	*** raft_test_pre_vote: done ***
 	*** main_f: done ***
