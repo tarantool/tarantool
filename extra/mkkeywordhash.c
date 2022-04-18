@@ -255,6 +255,7 @@ static Keyword aKeywordTable[] = {
   { "LEADING",                "TK_LEADING",     true  },
   { "TRAILING",               "TK_TRAILING",    true  },
   { "BOTH",                   "TK_BOTH",        true  },
+  { "INTERVAL",               "TK_INTERVAL",    true  },
 };
 
 /* Number of keywords */
