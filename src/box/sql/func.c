@@ -1483,6 +1483,15 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 			context->is_aborted = true;
 		break;
 	}
+	case MEM_TYPE_INTERVAL: {
+		char buf[DT_IVAL_TO_STRING_BUFSIZE];
+		uint32_t len = interval_to_string(&context->pOut->u.itv, buf,
+						  DT_IVAL_TO_STRING_BUFSIZE);
+		assert(len == strlen(buf));
+		if (mem_copy_str(context->pOut, buf, len) != 0)
+			context->is_aborted = true;
+		break;
+	}
 	case MEM_TYPE_DOUBLE:
 	case MEM_TYPE_DEC:
 	case MEM_TYPE_UINT:
@@ -2065,7 +2074,7 @@ is_upcast(int op, enum field_type a, enum field_type b)
 	return is_exact(op, a, b) ||
 	       (a == FIELD_TYPE_NUMBER && sql_type_is_numeric(b)) ||
 	       (a == FIELD_TYPE_SCALAR && b != FIELD_TYPE_MAP &&
-		b != FIELD_TYPE_ARRAY);
+		b != FIELD_TYPE_INTERVAL && b != FIELD_TYPE_ARRAY);
 }
 
 /**

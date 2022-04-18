@@ -43,6 +43,7 @@
 #include "lua/serializer.h"
 #include "lua/msgpack.h"
 #include "lua/decimal.h"
+#include "mp_interval.h"
 #include "mp_datetime.h"
 #include "mp_decimal.h"
 #include "mp_uuid.h"
@@ -117,6 +118,8 @@ mem_is_field_compatible(const struct Mem *mem, enum field_type type)
 		return (field_ext_type[type] & (1U << MP_DECIMAL)) != 0;
 	if (mem->type == MEM_TYPE_DATETIME)
 		return (field_ext_type[type] & (1U << MP_DATETIME)) != 0;
+	if (mem->type == MEM_TYPE_INTERVAL)
+		return (field_ext_type[type] & (1U << MP_INTERVAL)) != 0;
 	enum mp_type mp_type = mem_mp_type(mem);
 	assert(mp_type != MP_EXT);
 	return field_mp_plain_type_is_compatible(type, mp_type, true);
@@ -162,6 +165,9 @@ mem_snprintf(char *buf, uint32_t size, const struct Mem *mem)
 		res = snprintf(buf, size, "%s", str);
 		break;
 	}
+	case MEM_TYPE_INTERVAL:
+		res = interval_to_string(&mem->u.itv, buf, size);
+		break;
 	case MEM_TYPE_BOOL:
 		res = snprintf(buf, size, mem->u.b ? "TRUE" : "FALSE");
 		break;
@@ -240,6 +246,8 @@ mem_type_class_to_str(const struct Mem *mem)
 		return "map";
 	case MEM_TYPE_DATETIME:
 		return "datetime";
+	case MEM_TYPE_INTERVAL:
+		return "interval";
 	default:
 		break;
 	}
@@ -366,6 +374,15 @@ mem_set_datetime(struct Mem *mem, const struct datetime *dt)
 	mem_clear(mem);
 	mem->u.dt = *dt;
 	mem->type = MEM_TYPE_DATETIME;
+	assert(mem->flags == 0);
+}
+
+void
+mem_set_interval(struct Mem *mem, const struct interval *itv)
+{
+	mem_clear(mem);
+	mem->u.itv = *itv;
+	mem->type = MEM_TYPE_INTERVAL;
 	assert(mem->flags == 0);
 }
 
@@ -1248,6 +1265,18 @@ datetime_to_str0(struct Mem *mem)
 	return mem_copy_str(mem, buf, len);
 }
 
+/** Convert MEM from INTERVAL to STRING. */
+static inline int
+interval_to_str0(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_INTERVAL);
+	char buf[DT_IVAL_TO_STRING_BUFSIZE];
+	uint32_t len = interval_to_string(&mem->u.itv, buf,
+					  DT_IVAL_TO_STRING_BUFSIZE);
+	assert(len == strlen(buf));
+	return mem_copy_str(mem, buf, len);
+}
+
 static inline int
 uuid_to_bin(struct Mem *mem)
 {
@@ -1346,6 +1375,8 @@ mem_to_str(struct Mem *mem)
 		return dec_to_str0(mem);
 	case MEM_TYPE_DATETIME:
 		return datetime_to_str0(mem);
+	case MEM_TYPE_INTERVAL:
+		return interval_to_str0(mem);
 	default:
 		return -1;
 	}
@@ -1430,6 +1461,11 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 			return -1;
 		mem->flags = 0;
 		return 0;
+	case FIELD_TYPE_INTERVAL:
+		if (mem->type != MEM_TYPE_INTERVAL)
+			return -1;
+		mem->flags = 0;
+		return 0;
 	case FIELD_TYPE_ARRAY:
 		if (mem->type != MEM_TYPE_ARRAY)
 			return -1;
@@ -1441,7 +1477,8 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 		mem->flags &= ~MEM_Any;
 		return 0;
 	case FIELD_TYPE_SCALAR:
-		if ((mem->type & (MEM_TYPE_MAP | MEM_TYPE_ARRAY)) != 0)
+		if ((mem->type &
+		     (MEM_TYPE_MAP | MEM_TYPE_ARRAY | MEM_TYPE_INTERVAL)) != 0)
 			return -1;
 		mem->flags |= MEM_Scalar;
 		mem->flags &= ~(MEM_Number | MEM_Any);
@@ -1555,7 +1592,8 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 			return 0;
 		return -1;
 	case FIELD_TYPE_SCALAR:
-		if ((mem->type & (MEM_TYPE_MAP | MEM_TYPE_ARRAY)) != 0)
+		if ((mem->type &
+		     (MEM_TYPE_MAP | MEM_TYPE_ARRAY | MEM_TYPE_INTERVAL)) != 0)
 			return -1;
 		mem->flags |= MEM_Scalar;
 		mem->flags &= ~(MEM_Number | MEM_Any);
@@ -1567,6 +1605,11 @@ mem_cast_implicit(struct Mem *mem, enum field_type type)
 		return 0;
 	case FIELD_TYPE_DATETIME:
 		if (mem->type != MEM_TYPE_DATETIME)
+			return -1;
+		mem->flags = 0;
+		return 0;
+	case FIELD_TYPE_INTERVAL:
+		if (mem->type != MEM_TYPE_INTERVAL)
 			return -1;
 		mem->flags = 0;
 		return 0;
@@ -2508,6 +2551,10 @@ mem_cmp_msgpack(const struct Mem *a, const char **b, int *result,
 				return -1;
 			}
 			break;
+		} else if (type == MP_INTERVAL) {
+			diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mp_str(*b),
+				 "comparable type");
+			return -1;
 		}
 		*b += len;
 		mem.type = MEM_TYPE_BIN;
@@ -2613,6 +2660,8 @@ mem_type_to_str(const struct Mem *p)
 		return "decimal";
 	case MEM_TYPE_DATETIME:
 		return "datetime";
+	case MEM_TYPE_INTERVAL:
+		return "interval";
 	default:
 		unreachable();
 	}
@@ -2644,6 +2693,7 @@ mem_mp_type(const struct Mem *mem)
 	case MEM_TYPE_DEC:
 	case MEM_TYPE_UUID:
 	case MEM_TYPE_DATETIME:
+	case MEM_TYPE_INTERVAL:
 		return MP_EXT;
 	default:
 		unreachable();
@@ -2881,6 +2931,15 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 			mem->type = MEM_TYPE_DATETIME;
 			mem->flags = 0;
 			break;
+		} else if (type == MP_INTERVAL) {
+			if (interval_unpack(&buf, &mem->u.itv) == NULL) {
+				diag_set(ClientError, ER_INVALID_MSGPACK,
+					 "Invalid MP_INTERVAL MsgPack format");
+				return -1;
+			}
+			mem->type = MEM_TYPE_INTERVAL;
+			mem->flags = 0;
+			break;
 		}
 		buf += size;
 		mem->z = (char *)svp;
@@ -3013,6 +3072,9 @@ mem_to_mpstream(const struct Mem *var, struct mpstream *stream)
 	case MEM_TYPE_DATETIME:
 		mpstream_encode_datetime(stream, &var->u.dt);
 		return;
+	case MEM_TYPE_INTERVAL:
+		mpstream_encode_interval(stream, &var->u.itv);
+		return;
 	default:
 		unreachable();
 	}
@@ -3112,6 +3174,9 @@ port_vdbemem_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 			break;
 		case MEM_TYPE_DATETIME:
 			*luaT_pushdatetime(L) = mem->u.dt;
+			break;
+		case MEM_TYPE_INTERVAL:
+			*luaT_pushinterval(L) = mem->u.itv;
 			break;
 		default:
 			unreachable();
@@ -3271,6 +3336,8 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 				mem_set_dec(&val[i], field.decval);
 			} else if (field.ext_type == MP_DATETIME) {
 				mem_set_datetime(&val[i], field.dateval);
+			} else if (field.ext_type == MP_INTERVAL) {
+				mem_set_interval(&val[i], field.interval);
 			} else {
 				diag_set(ClientError, ER_SQL_EXECUTE,
 					 "Unsupported type passed from Lua");
@@ -3399,6 +3466,16 @@ port_c_get_vdbemem(struct port *base, uint32_t *size)
 					goto error;
 				}
 				val[i].type = MEM_TYPE_DATETIME;
+				break;
+			} else if (type == MP_INTERVAL) {
+				struct interval *itv = &val[i].u.itv;
+				if (interval_unpack(&data, itv) == NULL) {
+					diag_set(ClientError,
+						 ER_INVALID_MSGPACK, "Invalid "
+						 "MP_INTERVAL MsgPack format");
+					goto error;
+				}
+				val[i].type = MEM_TYPE_INTERVAL;
 				break;
 			}
 			data += len;

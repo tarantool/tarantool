@@ -53,9 +53,10 @@ enum mem_type {
 	MEM_TYPE_UUID		= 1 << 9,
 	MEM_TYPE_DEC		= 1 << 10,
 	MEM_TYPE_DATETIME	= 1 << 11,
-	MEM_TYPE_INVALID	= 1 << 12,
-	MEM_TYPE_FRAME		= 1 << 13,
-	MEM_TYPE_PTR		= 1 << 14,
+	MEM_TYPE_INTERVAL	= 1 << 12,
+	MEM_TYPE_INVALID	= 1 << 13,
+	MEM_TYPE_FRAME		= 1 << 14,
+	MEM_TYPE_PTR		= 1 << 15,
 };
 
 /*
@@ -80,6 +81,8 @@ struct Mem {
 		decimal_t d;
 		/** DATETIME value. */
 		struct datetime dt;
+		/** INTERVAL value. */
+		struct interval itv;
 	} u;
 	/** Type of the value this MEM contains. */
 	enum mem_type type;
@@ -249,8 +252,8 @@ mem_is_cleared(const struct Mem *mem)
 static inline bool
 mem_is_comparable(const struct Mem *mem)
 {
-	uint32_t incmp_types = MEM_TYPE_ARRAY | MEM_TYPE_MAP;
-	return (mem->flags & MEM_Any) == 0 && (mem->type & incmp_types) == 0;
+	uint32_t incmp = MEM_TYPE_ARRAY | MEM_TYPE_MAP | MEM_TYPE_INTERVAL;
+	return (mem->flags & MEM_Any) == 0 && (mem->type & incmp) == 0;
 }
 
 static inline bool
@@ -346,6 +349,10 @@ mem_set_dec(struct Mem *mem, const decimal_t *dec);
 /** Clear MEM and set it to DATETIME. */
 void
 mem_set_datetime(struct Mem *mem, const struct datetime *dt);
+
+/** Clear MEM and set it to INTERVAL. */
+void
+mem_set_interval(struct Mem *mem, const struct interval *itv);
 
 /** Clear MEM and set it to STRING. The string belongs to another object. */
 void

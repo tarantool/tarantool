@@ -1,3 +1,5 @@
 include_directories(${MSGPUCK_INCLUDE_DIRS})
 build_module(sql_datetime sql_datetime.c)
 target_link_libraries(sql_datetime msgpuck core)
+build_module(sql_interval sql_interval.c)
+target_link_libraries(sql_interval msgpuck core)
