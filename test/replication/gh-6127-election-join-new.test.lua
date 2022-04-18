@@ -10,6 +10,8 @@ test_run:cmd('start server master1 with wait=False')
 test_run:cmd('create server master2 with script="replication/gh-6127-master2.lua"')
 test_run:cmd('start server master2')
 
+test_run:wait_fullmesh{'master1', 'master2'}
+
 test_run:switch('master1')
 box.cfg{election_mode = 'voter'}
 test_run:switch('master2')
@@ -30,7 +32,7 @@ test_run:wait_lsn('master1', 'master2')
 test_run:cmd('create server replica with script="replication/gh-6127-replica.lua"')
 test_run:cmd('start server replica')
 test_run:switch('replica')
-assert(box.info.leader ~= 0)
+assert(box.info.election.leader ~= 0)
 
 test_run:switch('default')
 test_run:cmd('stop server replica')

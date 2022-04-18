@@ -623,6 +623,10 @@ lbox_info_election(struct lua_State *L)
 	lua_setfield(L, -2, "vote");
 	lua_pushinteger(L, raft->leader);
 	lua_setfield(L, -2, "leader");
+	if (raft_is_enabled(raft)) {
+		lua_pushnumber(L, raft_leader_idle(raft));
+		lua_setfield(L, -2, "leader_idle");
+	}
 	return 1;
 }
 

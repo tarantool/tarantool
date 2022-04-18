@@ -52,6 +52,12 @@ enum election_mode box_election_mode = ELECTION_MODE_INVALID;
  */
 static struct trigger box_raft_on_update;
 
+/** Triggers executed once the node gains a quorum of connected peers. */
+static struct trigger box_raft_on_quorum_gain;
+
+/** Triggers executed once the node loses a quorum of connected peers. */
+static struct trigger box_raft_on_quorum_loss;
+
 struct rlist box_raft_on_broadcast =
 	RLIST_HEAD_INITIALIZER(box_raft_on_broadcast);
 
@@ -70,6 +76,8 @@ box_raft_msg_to_request(const struct raft_msg *msg, struct raft_request *req)
 	*req = (struct raft_request) {
 		.term = msg->term,
 		.vote = msg->vote,
+		.leader_id = msg->leader_id,
+		.is_leader_seen = msg->is_leader_seen,
 		.state = msg->state,
 		.vclock = msg->vclock,
 	};
@@ -81,6 +89,8 @@ box_raft_request_to_msg(const struct raft_request *req, struct raft_msg *msg)
 	*msg = (struct raft_msg) {
 		.term = req->term,
 		.vote = req->vote,
+		.leader_id = req->leader_id,
+		.is_leader_seen = req->is_leader_seen,
 		.state = req->state,
 		.vclock = req->vclock,
 	};
@@ -190,6 +200,98 @@ box_raft_update_election_quorum(void)
 	raft_cfg_election_quorum(raft, quorum);
 	int size = MAX(replicaset.registered_count, 1);
 	raft_cfg_cluster_size(raft, size);
+}
+
+/** Set Raft triggers on quorum loss/gain. */
+static void
+box_raft_add_quorum_triggers(void);
+
+/** Remove triggers on quorum loss/gain. */
+static void
+box_raft_remove_quorum_triggers(void);
+
+void
+box_raft_cfg_election_mode(enum election_mode mode)
+{
+	struct raft *raft = box_raft();
+	if (mode == box_election_mode)
+		return;
+	box_election_mode = mode;
+	switch (mode) {
+	case ELECTION_MODE_OFF:
+	case ELECTION_MODE_VOTER:
+		box_raft_remove_quorum_triggers();
+		raft_cfg_is_candidate(raft, false);
+		break;
+	case ELECTION_MODE_MANUAL:
+		box_raft_add_quorum_triggers();
+		if (raft->state == RAFT_STATE_LEADER ||
+		    raft->state == RAFT_STATE_CANDIDATE) {
+			/*
+			 * The node was configured to be a candidate. Don't
+			 * disrupt its current leadership or the elections it's
+			 * just started.
+			 */
+			raft_cfg_is_candidate_later(raft, false);
+		} else {
+			raft_cfg_is_candidate(raft, false);
+		}
+		break;
+	case ELECTION_MODE_CANDIDATE:
+		box_raft_add_quorum_triggers();
+		if (replicaset_has_healthy_quorum()) {
+			raft_cfg_is_candidate(raft, true);
+		} else {
+			/*
+			 * NOP. The candidate will be started as soon as the
+			 * node gains a quorum of peers.
+			 */
+			assert(!raft->is_cfg_candidate);
+		}
+		break;
+	default:
+		unreachable();
+	}
+	raft_cfg_is_enabled(raft, mode != ELECTION_MODE_OFF);
+}
+
+/**
+ * Configure the raft node according to whether it has a quorum of connected
+ * peers or not. It can't start elections, when it doesn't.
+ */
+static void
+box_raft_notify_have_quorum(void)
+{
+	struct raft *raft = box_raft();
+	switch (box_election_mode) {
+	case ELECTION_MODE_MANUAL:
+		/* Quorum loss shouldn't interfere with manual elections. */
+		/*
+		 * TODO: make a manually elected leader step off immediately due
+		 * to fencing.
+		 */
+		assert(!raft->is_cfg_candidate);
+		break;
+	case ELECTION_MODE_CANDIDATE:
+		if (replicaset_has_healthy_quorum()) {
+			raft_cfg_is_candidate(raft, true);
+		} else if (raft->state == RAFT_STATE_CANDIDATE ||
+			   raft->state == RAFT_STATE_LEADER) {
+			/*
+			 * TODO: make the leader step off immediately due to
+			 * fencing.
+			 */
+			raft_cfg_is_candidate_later(raft, false);
+		} else {
+			raft_cfg_is_candidate(raft, false);
+		}
+		break;
+	/* Triggers can't fire while the node can't start elections. */
+	case ELECTION_MODE_OFF:
+	case ELECTION_MODE_VOTER:
+	default:
+		unreachable();
+	}
 }
 
 void
@@ -393,6 +495,33 @@ box_raft_wait_term_persisted(void)
 	return 0;
 }
 
+static int
+box_raft_on_quorum_change_f(struct trigger *trigger, void *event)
+{
+	(void)trigger;
+	(void)event;
+
+	box_raft_notify_have_quorum();
+
+	return 0;
+}
+
+static inline void
+box_raft_add_quorum_triggers(void)
+{
+	trigger_add_unique(&replicaset_on_quorum_gain,
+			   &box_raft_on_quorum_gain);
+	trigger_add_unique(&replicaset_on_quorum_loss,
+			   &box_raft_on_quorum_loss);
+}
+
+static inline void
+box_raft_remove_quorum_triggers(void)
+{
+	trigger_clear(&box_raft_on_quorum_loss);
+	trigger_clear(&box_raft_on_quorum_gain);
+}
+
 void
 box_raft_init(void)
 {
@@ -404,6 +533,11 @@ box_raft_init(void)
 	raft_create(&box_raft_global, &box_raft_vtab);
 	trigger_create(&box_raft_on_update, box_raft_on_update_f, NULL, NULL);
 	raft_on_update(box_raft(), &box_raft_on_update);
+
+	trigger_create(&box_raft_on_quorum_gain, box_raft_on_quorum_change_f,
+		       NULL, NULL);
+	trigger_create(&box_raft_on_quorum_loss, box_raft_on_quorum_change_f,
+		       NULL, NULL);
 }
 
 void
@@ -420,4 +554,6 @@ box_raft_free(void)
 	 * Invalidate so as box_raft() would fail if any usage attempt happens.
 	 */
 	raft->state = 0;
+
+	box_raft_remove_quorum_triggers();
 }

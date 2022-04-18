@@ -51,11 +51,15 @@ g.test_split_vote = function(g)
     end)
 
     -- Both vote for self but don't see the split-vote yet.
+    -- Have to promote the nodes to make them start elections when none of them
+    -- sees a quorum of peers.
     g.node1:exec(function()
         box.cfg{election_mode = 'candidate'}
+        require('fiber').new(box.ctl.promote)
     end)
     g.node2:exec(function()
         box.cfg{election_mode = 'candidate'}
+        require('fiber').new(box.ctl.promote)
     end)
 
     -- Wait for the votes to actually happen.

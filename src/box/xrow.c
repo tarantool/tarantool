@@ -1135,6 +1135,16 @@ xrow_encode_raft(struct xrow_header *row, struct region *region,
 		size += mp_sizeof_uint(IPROTO_RAFT_STATE) +
 			mp_sizeof_uint(r->state);
 	}
+	if (r->leader_id != 0) {
+		++map_size;
+		size += mp_sizeof_uint(IPROTO_RAFT_LEADER_ID) +
+			mp_sizeof_uint(r->leader_id);
+	}
+	if (r->is_leader_seen) {
+		++map_size;
+		size += mp_sizeof_uint(IPROTO_RAFT_IS_LEADER_SEEN) +
+			mp_sizeof_bool(r->is_leader_seen);
+	}
 	if (r->vclock != NULL) {
 		++map_size;
 		size += mp_sizeof_uint(IPROTO_RAFT_VCLOCK) +
@@ -1164,6 +1174,14 @@ xrow_encode_raft(struct xrow_header *row, struct region *region,
 	if (r->state != 0) {
 		buf = mp_encode_uint(buf, IPROTO_RAFT_STATE);
 		buf = mp_encode_uint(buf, r->state);
+	}
+	if (r->leader_id != 0) {
+		buf = mp_encode_uint(buf, IPROTO_RAFT_LEADER_ID);
+		buf = mp_encode_uint(buf, r->leader_id);
+	}
+	if (r->is_leader_seen) {
+		buf = mp_encode_uint(buf, IPROTO_RAFT_IS_LEADER_SEEN);
+		buf = mp_encode_bool(buf, true);
 	}
 	if (r->vclock != NULL) {
 		buf = mp_encode_uint(buf, IPROTO_RAFT_VCLOCK);
@@ -1207,6 +1225,16 @@ xrow_decode_raft(const struct xrow_header *row, struct raft_request *r,
 			if (mp_typeof(*pos) != MP_UINT)
 				goto bad_msgpack;
 			r->state = mp_decode_uint(&pos);
+			break;
+		case IPROTO_RAFT_LEADER_ID:
+			if (mp_typeof(*pos) != MP_UINT)
+				goto bad_msgpack;
+			r->leader_id = mp_decode_uint(&pos);
+			break;
+		case IPROTO_RAFT_IS_LEADER_SEEN:
+			if (mp_typeof(*pos) != MP_BOOL)
+				goto bad_msgpack;
+			r->is_leader_seen = mp_decode_bool(&pos);
 			break;
 		case IPROTO_RAFT_VCLOCK:
 			r->vclock = vclock;
