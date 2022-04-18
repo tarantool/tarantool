@@ -145,7 +145,7 @@ static const bool field_type_compatibility[] = {
 /* VARBINARY*/ true,   false,   false,   false,   false,   false,   false,   true,   true,   false,  false,   false,    false,   false,
 /*  SCALAR  */ true,   false,   false,   false,   false,   false,   false,   false,  true,   false,  false,   false,    false,   false,
 /*  DECIMAL */ true,   false,   false,   true,    false,   false,   false,   false,  true,   true,   false,   false,    false,   false,
-/*   UUID   */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  true,    false,    false,   false,
+/*   UUID   */ true,   false,   false,   false,   false,   false,   false,   false,  true,   false,  true,    false,    false,   false,
 /* DATETIME */ true,   false,   false,   false,   false,   false,   false,   false,  true,   false,  false,   true,     false,   false,
 /*   ARRAY  */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  false,   false,    true,    false,
 /*    MAP   */ true,   false,   false,   false,   false,   false,   false,   false,  false,  false,  false,   false,    false,   true,
