@@ -6,4 +6,5 @@ box.cfg({
         'unix/:./master1.sock',
         'unix/:./master2.sock'
     },
+    replication_timeout = 0.1,
 })
