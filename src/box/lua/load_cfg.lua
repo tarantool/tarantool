@@ -77,6 +77,8 @@ local default_cfg = {
     flightrec_logs_size = 10485760,
     flightrec_logs_max_msg_size = 4096,
     flightrec_logs_log_level = 6,
+    flightrec_metrics_interval = 1.0,
+    flightrec_metrics_period = 60 * 3,
 
     io_collect_interval = nil,
     readahead           = 16320,
@@ -198,6 +200,8 @@ local template_cfg = {
     flightrec_logs_size = 'number',
     flightrec_logs_max_msg_size = 'number',
     flightrec_logs_log_level = 'number',
+    flightrec_metrics_interval = 'number',
+    flightrec_metrics_period = 'number',
 
     io_collect_interval = 'number',
     readahead           = 'number',
@@ -827,6 +831,13 @@ local function load_cfg(cfg)
     box_configured = nil
 
     box_is_configured = true
+
+    -- Setup flight recorder if available. Should be called after config
+    -- is loaded since it uses box.cfg parameters.
+    local has_flightrec, flightrec = pcall(require, 'flightrec')
+    if has_flightrec then
+        flightrec.start()
+    end
 
     -- Check if schema version matches Tarantool version and print
     -- warning if it's not (in case user forgot to call

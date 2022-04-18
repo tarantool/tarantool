@@ -24,12 +24,15 @@ extern "C" {
 /** No-op in OS version. */
 static inline void
 flightrec_init(const char *fr_dirname, size_t logs_size,
-	       size_t logs_max_msg_size, int logs_log_level)
+	       size_t logs_max_msg_size, int logs_log_level,
+	       double metrics_interval, size_t metrics_period)
 {
 	(void)fr_dirname;
 	(void)logs_size;
 	(void)logs_max_msg_size;
 	(void)logs_log_level;
+	(void)metrics_interval;
+	(void)metrics_period;
 	say_error("Flight recorder is not available in this build");
 }
 
@@ -42,11 +45,14 @@ flightrec_free(void)
 /** No-op in OS version. */
 static inline int
 flightrec_check_cfg(int64_t logs_size, int64_t logs_max_msg_size,
-		    int logs_log_level)
+		    int logs_log_level, double metrics_interval,
+		    int64_t metrics_period)
 {
 	(void)logs_size;
 	(void)logs_max_msg_size;
 	(void)logs_log_level;
+	(void)metrics_interval;
+	(void)metrics_period;
 	return 0;
 }
 

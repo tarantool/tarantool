@@ -471,7 +471,9 @@ load_cfg(void)
 		flightrec_init(cfg_gets("memtx_dir"),
 			       cfg_geti64("flightrec_logs_size"),
 			       cfg_geti64("flightrec_logs_max_msg_size"),
-			       cfg_geti("flightrec_logs_log_level"));
+			       cfg_geti("flightrec_logs_log_level"),
+			       cfg_getd("flightrec_metrics_interval"),
+			       cfg_geti("flightrec_metrics_period"));
 	}
 
 	memtx_tx_manager_use_mvcc_engine = cfg_getb("memtx_use_mvcc_engine");
