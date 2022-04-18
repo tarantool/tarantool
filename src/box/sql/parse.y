@@ -1857,6 +1857,7 @@ typedef(A) ::= ANY . { A.type = FIELD_TYPE_ANY; }
 typedef(A) ::= ARRAY . { A.type = FIELD_TYPE_ARRAY; }
 typedef(A) ::= MAP . { A.type = FIELD_TYPE_MAP; }
 typedef(A) ::= DATETIME . { A.type = FIELD_TYPE_DATETIME; }
+typedef(A) ::= INTERVAL . { A.type = FIELD_TYPE_INTERVAL; }
 
 /**
  * Time-like types are temporary disabled, until they are
