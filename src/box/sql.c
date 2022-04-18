@@ -381,7 +381,16 @@ sql_ephemeral_space_new(const struct sql_space_info *info)
 		parts[i].exclude_null = false;
 		parts[i].sort_order = SORT_ORDER_ASC;
 		parts[i].path = NULL;
-		parts[i].type = info->types[j];
+		enum field_type type = info->types[j];
+		parts[i].type = type;
+		if (!field_type1_contains_type2(FIELD_TYPE_SCALAR, type)) {
+			const char *err =
+				tt_sprintf("field type '%s' is not comparable",
+					   field_type_strs[type]);
+			diag_set(ClientError, ER_SQL_EXECUTE, err);
+			return NULL;
+		}
+
 		parts[i].coll_id = info->coll_ids[j];
 	}
 
