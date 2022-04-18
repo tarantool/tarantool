@@ -1117,12 +1117,32 @@ ffi.metatype(datetime_t, {
     __index = datetime_index,
 })
 
+local function interval_totable(self)
+    if not is_interval(self) then
+        return error(("interval.totable(): expected interval, but received "..
+                     type(self)), 2)
+    end
+    local adjust = {'excess', 'none', 'last'}
+    return {
+        year = self.year,
+        month = self.month,
+        week = self.week,
+        day = self.day,
+        hour = self.hour,
+        min = self.min,
+        sec = self.sec,
+        nsec = self.nsec,
+        adjust = adjust[tonumber(self.adjust) + 1],
+    }
+end
+
 local interval_index_fields = {
     usec = function(self) return math_floor(self.nsec / 1e3) end,
     msec = function(self) return math_floor(self.nsec / 1e6) end,
 }
 
 local interval_index_functions = {
+    totable = interval_totable,
     __serialize = interval_tostring,
 }
 
