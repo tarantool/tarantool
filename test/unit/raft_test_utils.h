@@ -188,6 +188,14 @@ raft_node_send_follower(struct raft_node *node, uint64_t term, uint32_t source);
 void
 raft_node_send_heartbeat(struct raft_node *node, uint32_t source);
 
+/**
+ * Deliver a message with is_leader_seen set to @a is_seen from @a source
+ * instance.
+ */
+int
+raft_node_send_is_leader_seen(struct raft_node *node, uint64_t term,
+			      bool is_seen, uint32_t source);
+
 /** Restart the node. The same as stop + start. */
 void
 raft_node_restart(struct raft_node *node);

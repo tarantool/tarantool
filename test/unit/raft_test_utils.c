@@ -53,6 +53,13 @@ raft_ev_timer_stop(struct ev_loop *loop, struct ev_timer *watcher)
 	fakeev_timer_stop(loop, watcher);
 }
 
+double
+raft_ev_monotonic_now(struct ev_loop *loop)
+{
+	(void)loop;
+	return raft_time();
+}
+
 struct ev_loop *
 raft_loop(void)
 {
@@ -326,6 +333,17 @@ raft_node_send_heartbeat(struct raft_node *node, uint32_t source)
 	raft_process_heartbeat(&node->raft, source);
 }
 
+int
+raft_node_send_is_leader_seen(struct raft_node *node, uint64_t term,
+			      bool is_seen, uint32_t source)
+{
+	struct raft_msg msg = {
+		.state = RAFT_STATE_FOLLOWER,
+		.term = term,
+		.is_leader_seen = is_seen,
+	};
+	return raft_node_process_msg(node, &msg, source);
+}
 void
 raft_node_restart(struct raft_node *node)
 {

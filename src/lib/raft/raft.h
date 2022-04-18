@@ -33,6 +33,7 @@
 #include <stdbool.h>
 #include <assert.h>
 #include "tarantool_ev.h"
+#include "raft_ev.h"
 #include "trigger.h"
 #include "vclock/vclock.h"
 
@@ -106,6 +107,13 @@ struct raft_msg {
 	 * 0 means the node didn't vote in this term.
 	 */
 	uint32_t vote;
+	/**
+	 * Instance id of the current term leader. Can be 0 when leader is
+	 * unknown.
+	 */
+	uint32_t leader_id;
+	/** Whether the node has a direct connection to the leader. */
+	bool is_leader_seen;
 	/**
 	 * State of the instance. Can be 0 if the state does not matter for the
 	 * message. For instance, when the message is sent to disk.
@@ -203,6 +211,8 @@ struct raft {
 	int voted_count;
 	/** Max vote count given to any node in the current term. */
 	int max_vote;
+	/** A bitmap of sources which see the leader of the current term. */
+	vclock_map_t leader_witness_map;
 	/** Number of votes necessary for successful election. */
 	int election_quorum;
 	/**
@@ -216,6 +226,8 @@ struct raft {
 	const struct vclock *vclock;
 	/** State machine timed event trigger. */
 	struct ev_timer timer;
+	/** The moment of the last communication with the leader. */
+	double leader_last_seen;
 	/** Configured election timeout in seconds. */
 	double election_timeout;
 	/**
@@ -261,6 +273,18 @@ raft_vote_count(const struct raft *raft)
 	return raft->votes[raft->self].count;
 }
 
+/** Time since the latest communication with the leader. */
+static inline double
+raft_leader_idle(const struct raft *raft)
+{
+	assert(raft->is_enabled);
+	if (raft->state != RAFT_STATE_LEADER) {
+		return raft_ev_monotonic_now(raft_loop()) -
+		       raft->leader_last_seen;
+	}
+	return 0;
+}
+
 /** Process a raft entry stored in WAL/snapshot. */
 void
 raft_process_recovery(struct raft *raft, const struct raft_msg *req);
@@ -291,6 +315,20 @@ raft_cfg_is_enabled(struct raft *raft, bool is_enabled);
  */
 void
 raft_cfg_is_candidate(struct raft *raft, bool is_candidate);
+
+/** Notify this instance whether its peer sees the current leader. */
+void
+raft_notify_is_leader_seen(struct raft *raft, bool is_leader_seen,
+			   uint32_t source);
+
+/**
+ * Configure whether the node may be a candidate, e.g. start new elections and
+ * become a Raft leader. The configurations takes effect in the next term, so
+ * that it doesn't take effect on current leader or candidate until someone else
+ * starts new term.
+ */
+void
+raft_cfg_is_candidate_later(struct raft *raft, bool is_candidate);
 
 /**
  * Bump the term and become a candidate for it regardless of the config. In case
