@@ -1076,7 +1076,7 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
 				     region) != 0)
 		return -1;
 
-	if (tuple_check_constraint(format, tuple) != 0)
+	if (validate && tuple_check_constraint(format, tuple) != 0)
 		return -1;
 
 	if (tuple_format_field_count(format) == 0)
