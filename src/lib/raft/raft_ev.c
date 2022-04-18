@@ -50,6 +50,12 @@ raft_ev_timer_stop(struct ev_loop *loop, struct ev_timer *watcher)
 	ev_timer_stop(loop, watcher);
 }
 
+double
+raft_ev_monotonic_now(struct ev_loop *loop)
+{
+	return ev_monotonic_now(loop);
+}
+
 struct ev_loop *
 raft_loop(void)
 {

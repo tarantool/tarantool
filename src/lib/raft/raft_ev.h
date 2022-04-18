@@ -50,6 +50,10 @@ raft_ev_timer_remaining(struct ev_loop *loop, struct ev_timer *watcher);
 void
 raft_ev_timer_stop(struct ev_loop *loop, struct ev_timer *watcher);
 
+/** A wrapper around ev_monotonic_now(). */
+double
+raft_ev_monotonic_now(struct ev_loop *loop);
+
 /** A wrapper around loop(), which returns this cord's ev_loop. */
 struct ev_loop *
 raft_loop(void);
