@@ -592,7 +592,7 @@ test:test("Parsing of timezone abbrevs", function(test)
 end)
 
 test:test("Parsing of timezone names (tzindex)", function(test)
-    test:plan(117)
+    test:plan(234)
     local zone_abbrevs = {
         -- military
         A =  1, B =  2, C =  3,
@@ -616,15 +616,20 @@ test:test("Parsing of timezone names (tzindex)", function(test)
         KST = 226,   PDT = 264,  WET = 314,
         HOVDST = 664, CHODST = 656,
     }
+    local exp_pattern = '^2020%-02%-10T00:00'
     local base_date = '2020-02-10T0000 '
 
     for zone, index in pairs(zone_abbrevs) do
         local date_text = base_date .. zone
         local date, len = date.parse(date_text)
         test:isnt(date, nil, 'parse ' .. zone)
-        test:ok(len > #base_date, 'length longer than ' .. #base_date)
-        -- test:is(1, tostring(date):find(exp_pattern), 'expected prefix')
         test:is(date.tzindex, index, 'expected tzindex')
+        test:ok(len > #base_date, 'length longer than ' .. #base_date)
+        local txt = tostring(date)
+        test:is(1, txt:find(exp_pattern), 'expected prefix')
+        test:is(zone, txt:sub(#txt - #zone + 1, #txt), 'sub of ' .. txt)
+        txt = date:format('%FT%T %Z')
+        test:is(zone, txt:sub(#txt - #zone + 1, #txt), 'sub of ' .. txt)
     end
 end)
 
@@ -1530,7 +1535,7 @@ test:test("Parse tiny date into seconds and other parts", function(test)
 end)
 
 test:test("Parse strptime format", function(test)
-    test:plan(17)
+    test:plan(19)
     local formats = {
         {'Thu Jan  1 03:00:00 1970',    '%c',       '1970-01-01T03:00:00Z'},
         {'01/01/70',                    '%D',       '1970-01-01T00:00:00Z'},
@@ -1553,8 +1558,12 @@ test:test("Parse strptime format", function(test)
             '1970-01-01T03:00:00.125Z'},
         {'1970-01-01T03:00:00.125',             '%FT%T.%f',
             '1970-01-01T03:00:00.125Z'},
+        {'1970-01-01T03:00:00.125 MSK',         '%FT%T.%f %Z',
+            '1970-01-01T03:00:00.125 MSK'},
         {'1970-01-01T03:00:00.125+0300',        '%FT%T.%f%z',
             '1970-01-01T03:00:00.125+0300'},
+        {'1970-01-01T03:00:00.125000000MSK',    '%FT%T.%f%Z',
+            '1970-01-01T03:00:00.125 MSK'},
         {'1970-01-01T03:00:00.125000000+0300',  '%FT%T.%f%z',
             '1970-01-01T03:00:00.125+0300'},
     }

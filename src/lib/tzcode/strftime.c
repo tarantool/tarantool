@@ -36,6 +36,7 @@
 #include "private.h"
 #include "trivia/util.h"
 #include "tzcode.h"
+#include "timezone.h"
 #include "timelocal.h"
 
 #include <assert.h>
@@ -477,15 +478,10 @@ _fmt(char *buf, ssize_t size, const char *format, const struct tnt_tm *t,
 					t->tm_year, TM_YEAR_BASE, true, true);
 				continue;
 			case 'Z':
-				if (t->tm_isdst >= 0)
-					SNPRINT(total, _add, buf, size,
-						tzname[t->tm_isdst != 0]);
-				/*
-				 ** C99 and later say that %Z must be
-				 ** replaced by the empty string if the
-				 ** time zone abbreviation is not
-				 ** determinable.
-				 */
+				assert(t->tm_tzindex != 0);
+				assert(timezone_name(t->tm_tzindex) != NULL);
+				SNPRINT(total, snprintf, buf, size,
+					"%s", timezone_name(t->tm_tzindex));
 				continue;
 			case 'z': {
 				long diff;
