@@ -53,6 +53,10 @@ cfg_filter(box.cfg)
  |     - 4096
  |   - - flightrec_logs_size
  |     - 10485760
+ |   - - flightrec_metrics_interval
+ |     - 1
+ |   - - flightrec_metrics_period
+ |     - 180
  |   - - force_recovery
  |     - false
  |   - - hot_standby
@@ -202,6 +206,10 @@ cfg_filter(box.cfg)
  |     - 4096
  |   - - flightrec_logs_size
  |     - 10485760
+ |   - - flightrec_metrics_interval
+ |     - 1
+ |   - - flightrec_metrics_period
+ |     - 180
  |   - - force_recovery
  |     - false
  |   - - hot_standby
