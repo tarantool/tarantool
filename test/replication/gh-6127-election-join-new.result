@@ -25,6 +25,10 @@ test_run:cmd('start server master2')
  | - true
  | ...
 
+test_run:wait_fullmesh{'master1', 'master2'}
+ | ---
+ | ...
+
 test_run:switch('master1')
  | ---
  | - true
@@ -70,7 +74,7 @@ test_run:switch('replica')
  | ---
  | - true
  | ...
-assert(box.info.leader ~= 0)
+assert(box.info.election.leader ~= 0)
  | ---
  | - true
  | ...

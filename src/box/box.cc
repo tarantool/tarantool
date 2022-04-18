@@ -1379,9 +1379,7 @@ box_set_election_mode(void)
 	enum election_mode mode = box_check_election_mode();
 	if (mode == ELECTION_MODE_INVALID)
 		return -1;
-	box_election_mode = mode;
-	raft_cfg_is_candidate(box_raft(), mode == ELECTION_MODE_CANDIDATE);
-	raft_cfg_is_enabled(box_raft(), mode != ELECTION_MODE_OFF);
+	box_raft_cfg_election_mode(mode);
 	return 0;
 }
 

@@ -82,6 +82,10 @@ box_raft(void)
 void
 box_raft_update_election_quorum(void);
 
+/** Set the node's election_mode to @a mode. */
+void
+box_raft_cfg_election_mode(enum election_mode mode);
+
 /**
  * Recover a single Raft request. Raft state machine is not turned on yet, this
  * works only during instance recovery from the journal.
