@@ -57,6 +57,7 @@ datetime_to_tm(const struct datetime *date, struct tnt_tm *tm)
 	tm->tm_yday = t.tm_yday;
 
 	tm->tm_gmtoff = date->tzoffset * 60;
+	tm->tm_tzindex = date->tzindex;
 	tm->tm_nsec = date->nsec;
 
 	int seconds_of_day = MOD(tm->tm_epoch, SECS_PER_DAY);
@@ -110,7 +111,7 @@ tm_to_datetime(struct tnt_tm *tm, struct datetime *date)
 	local_secs += tm->tm_hour * 3600 + tm->tm_min * 60 + tm->tm_sec;
 	date->epoch = local_secs - tm->tm_gmtoff;
 	date->nsec = tm->tm_nsec;
-	date->tzindex = 0;
+	date->tzindex = tm->tm_tzindex;
 	date->tzoffset = tm->tm_gmtoff / 60;
 	return true;
 }
@@ -166,6 +167,7 @@ size_t
 datetime_to_string(const struct datetime *date, char *buf, ssize_t len)
 {
 	int offset = date->tzoffset;
+	int tzindex = date->tzindex;
 	int64_t rd_seconds = (int64_t)date->epoch + offset * 60 +
 			     SECS_EPOCH_1970_OFFSET;
 	int64_t rd_number = DIV(rd_seconds, SECS_PER_DAY);
@@ -197,7 +199,13 @@ datetime_to_string(const struct datetime *date, char *buf, ssize_t len)
 			SNPRINT(sz, snprintf, buf, len, ".%09d", nanosec);
 		}
 	}
-	if (offset == 0) {
+	if (tzindex != 0) {
+		const char *tz_name = timezone_name(tzindex);
+		assert(tz_name != NULL);
+		SNPRINT(sz, snprintf, buf, len,
+			tz_name[1] == '\0' ? "%s" : " %s",
+			tz_name);
+	} else if (offset == 0) {
 		SNPRINT(sz, snprintf, buf, len, "Z");
 	} else {
 		if (offset < 0) {
