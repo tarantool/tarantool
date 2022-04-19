@@ -1126,42 +1126,50 @@ SELECT -a FROM t;
 SELECT true + true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT true + false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT false + true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT false + false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT true - true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT true - false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT false - true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT false - false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT true * true;
  | ---
@@ -1227,22 +1235,26 @@ SELECT false % false;
 SELECT a, true + a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a, false + a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a, true - a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a, false - a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a, true * a FROM t;
  | ---
@@ -1277,22 +1289,26 @@ SELECT a, false % a FROM t;
 SELECT a, a + true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a, a + false FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a, a - true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a, a - false FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a, a * true FROM t;
  | ---
@@ -1328,12 +1344,14 @@ SELECT a, a % false FROM t;
 SELECT a, a1, a + a1 FROM t, t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a, a1, a - a1 FROM t, t6;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a, a1, a * a1 FROM t, t6;
  | ---
@@ -2631,22 +2649,26 @@ SELECT a2, b, b OR a2 FROM t6, t7;
 SELECT true + 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT false + 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT true - 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT false - 2;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT true * 2;
  | ---
@@ -2732,12 +2754,14 @@ SELECT 2 % false;
 SELECT a1, a1 + 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a1, a1 - 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a1, a1 * 2 FROM t6
  | ---
@@ -2782,12 +2806,14 @@ SELECT a1, 2 % a1 FROM t6
 SELECT a2, a2 + 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a2, a2 - 2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a2, a2 * 2 FROM t6
  | ---
@@ -2833,22 +2859,26 @@ SELECT a2, 2 % a2 FROM t6
 SELECT b, true + b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT b, false + b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT b, true - b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT b, false - b FROM t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT b, true * b FROM t7;
  | ---
@@ -2934,12 +2964,14 @@ SELECT b, b % false FROM t7;
 SELECT a1, b, a1 + b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a1, b, a1 - b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a1, b, a1 * b FROM t6, t7;
  | ---
@@ -2984,12 +3016,14 @@ SELECT a1, b, b % a1 FROM t6, t7;
 SELECT a2, b, a2 + b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a2, b, a2 - b FROM t6, t7;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a2, b, a2 * b FROM t6, t7;
  | ---
@@ -4100,22 +4134,26 @@ SELECT a2, c, c OR a2 FROM t6, t8;
 SELECT true + 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT false + 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT true - 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT false - 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT true * 2.3;
  | ---
@@ -4201,12 +4239,14 @@ SELECT 2.3 % false;
 SELECT a1, a1 + 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a1, a1 - 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a1, a1 * 2.3 FROM t6
  | ---
@@ -4251,12 +4291,14 @@ SELECT a1, 2.3 % a1 FROM t6
 SELECT a2, a2 + 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a2, a2 - 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a2, a2 * 2.3 FROM t6
  | ---
@@ -4302,22 +4344,26 @@ SELECT a2, 2.3 % a2 FROM t6
 SELECT c, true + c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT c, false + c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT c, true - c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT c, false - c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT c, true * c FROM t8;
  | ---
@@ -4403,12 +4449,14 @@ SELECT c, c % false FROM t8;
 SELECT a1, c, a1 + c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a1, c, a1 - c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a1, c, a1 * c FROM t6, t8;
  | ---
@@ -4453,12 +4501,14 @@ SELECT a1, c, c % a1 FROM t6, t8;
 SELECT a2, c, a2 + c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a2, c, a2 - c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal, double, datetime
+ |   or interval'
  | ...
 SELECT a2, c, a2 * c FROM t6, t8;
  | ---

@@ -1242,9 +1242,8 @@ g.test_interval_23_2 = function()
     g.server:exec(function()
         local t = require('luatest')
         local sql = [[SELECT itv + 1 FROM t0;]]
-        local res = [[Type mismatch: can not convert ]]..
-                    [[interval(+1 years, 2 months, 3 days, 4 hours) to ]]..
-                    [[integer, decimal or double]]
+        local res = [[Type mismatch: can not convert integer(1) to datetime ]]..
+                    [[or interval]]
         local _, err = box.execute(sql)
         t.assert_equals(err.message, res)
     end)
@@ -1254,9 +1253,7 @@ g.test_interval_23_3 = function()
     g.server:exec(function()
         local t = require('luatest')
         local sql = [[SELECT itv - 1 FROM t0;]]
-        local res = [[Type mismatch: can not convert ]]..
-                    [[interval(+1 years, 2 months, 3 days, 4 hours) to ]]..
-                    [[integer, decimal or double]]
+        local res = [[Type mismatch: can not convert integer(1) to interval]]
         local _, err = box.execute(sql)
         t.assert_equals(err.message, res)
     end)

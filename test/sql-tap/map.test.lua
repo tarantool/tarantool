@@ -477,7 +477,7 @@ test:do_catchsql_test(
         SELECT m1(1, 2) + 1;
     ]], {
         1, 'Type mismatch: can not convert map({1: 2}) to integer, '..
-           "decimal or double"
+           "decimal, double, datetime or interval"
     })
 
 test:do_catchsql_test(
@@ -486,7 +486,7 @@ test:do_catchsql_test(
         SELECT m1(1, 2) - 1;
     ]], {
         1, 'Type mismatch: can not convert map({1: 2}) to integer, '..
-           "decimal or double"
+           "decimal, double, datetime or interval"
     })
 
 test:do_catchsql_test(

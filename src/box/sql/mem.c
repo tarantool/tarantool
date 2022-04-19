@@ -2002,15 +2002,20 @@ check_types_numeric_arithmetic(const struct Mem *a, const struct Mem *b)
 	return 0;
 }
 
-int
-mem_add(const struct Mem *left, const struct Mem *right, struct Mem *result)
+/**
+ * Add the first MEM to the second MEM and write the result to the third MEM.
+ * The first and the second MEMs should be of numeric types. The result is of
+ * numeric type.
+ */
+static int
+mem_add_num(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
-	if (mem_is_any_null(left, right)) {
-		mem_set_null(result);
-		return 0;
-	}
-	if (check_types_numeric_arithmetic(left, right) != 0)
+	assert(mem_is_num(left) && !mem_is_metatype(left));
+	if (!mem_is_num(right) || mem_is_metatype(right)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+			 "integer, decimal or double");
 		return -1;
+	}
 	if (((left->type | right->type) & MEM_TYPE_DOUBLE) != 0) {
 		double a;
 		double b;
@@ -2044,15 +2049,79 @@ mem_add(const struct Mem *left, const struct Mem *right, struct Mem *result)
 	return 0;
 }
 
+/**
+ * Add the first MEM to the second MEM and write the result to the third MEM.
+ * The first MEM should be of DATETIME type and the second MEMs should be of
+ * INTERVAL type. The result is of DATETIME type.
+ */
+static int
+mem_add_dt(const struct Mem *left, const struct Mem *right, struct Mem *result)
+{
+	assert(mem_is_datetime(left) && !mem_is_metatype(left));
+	if (!mem_is_interval(right) || mem_is_metatype(right)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+			 "interval");
+		return -1;
+	}
+	mem_set_datetime(result, &left->u.dt);
+	return datetime_increment_by(&result->u.dt, 1, &right->u.itv);
+}
+
+/**
+ * Add the first MEM to the second MEM and write the result to the third MEM.
+ * The first MEM should be of INTERVAL type and the second MEMs should be of
+ * INTERVAL or DATETIME type. The result is of the same type as the second
+ * argument.
+ */
+static int
+mem_add_itv(const struct Mem *left, const struct Mem *right, struct Mem *result)
+{
+	assert(mem_is_interval(left) && !mem_is_metatype(left));
+	if (mem_is_datetime(right) && !mem_is_metatype(right))
+		return mem_add_dt(right, left, result);
+	if (!mem_is_interval(right) || mem_is_metatype(right)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+			 "datetime or interval");
+		return -1;
+	}
+	mem_set_interval(result, &left->u.itv);
+	return interval_interval_add(&result->u.itv, &right->u.itv);
+}
+
 int
-mem_sub(const struct Mem *left, const struct Mem *right, struct Mem *result)
+mem_add(const struct Mem *left, const struct Mem *right, struct Mem *result)
 {
 	if (mem_is_any_null(left, right)) {
 		mem_set_null(result);
 		return 0;
 	}
-	if (check_types_numeric_arithmetic(left, right) != 0)
+	if (!mem_is_metatype(left)) {
+		if (mem_is_num(left))
+			return mem_add_num(left, right, result);
+		if (mem_is_datetime(left))
+			return mem_add_dt(left, right, result);
+		if (mem_is_interval(left))
+			return mem_add_itv(left, right, result);
+	}
+	diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
+		 "integer, decimal, double, datetime or interval");
+	return -1;
+}
+
+/**
+ * Subtract the second MEM from the first MEM and write the result to the third
+ * MEM. The first and the second MEMs should be of numeric types. The result is
+ * of numeric type.
+ */
+static int
+mem_sub_num(const struct Mem *left, const struct Mem *right, struct Mem *result)
+{
+	assert(mem_is_num(left) && !mem_is_metatype(left));
+	if (!mem_is_num(right) || mem_is_metatype(right)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+			 "integer, decimal or double");
 		return -1;
+	}
 	if (((left->type | right->type) & MEM_TYPE_DOUBLE) != 0) {
 		double a;
 		double b;
@@ -2084,6 +2153,72 @@ mem_sub(const struct Mem *left, const struct Mem *right, struct Mem *result)
 	}
 	mem_set_int(result, res, is_neg);
 	return 0;
+}
+
+/**
+ * Subtract the second MEM from the first MEM and write the result to the third
+ * MEM. The first MEM should be of DATETIME type and the second MEMs should be
+ * of INTERVAL or DATETIME type. The result is of INTERVAL type if the second
+ * MEM is of DATETIME type and the result if of DATETIME type if the second
+ * argument if of INTERVAL type.
+ */
+static int
+mem_sub_dt(const struct Mem *left, const struct Mem *right, struct Mem *result)
+{
+	assert(mem_is_datetime(left) && !mem_is_metatype(left));
+	if (mem_is_datetime(right) && !mem_is_metatype(right)) {
+		struct interval res;
+		memset(&res, 0, sizeof(res));
+		mem_set_interval(result, &res);
+		return datetime_datetime_sub(&result->u.itv, &left->u.dt,
+					     &right->u.dt);
+	}
+
+	if (!mem_is_interval(right) || mem_is_metatype(right)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+			 "datetime or interval");
+		return -1;
+	}
+	mem_set_datetime(result, &left->u.dt);
+	return datetime_increment_by(&result->u.dt, -1, &right->u.itv);
+}
+
+/**
+ * Subtract the second MEM from the first MEM and write the result to the third
+ * MEM. The first and the second MEMs should be of INTERVAL types. The result is
+ * of INTERVAL type.
+ */
+static int
+mem_sub_itv(const struct Mem *left, const struct Mem *right, struct Mem *result)
+{
+	assert(mem_is_interval(left) && !mem_is_metatype(left));
+	if (!mem_is_interval(right) || mem_is_metatype(right)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+			 "interval");
+		return -1;
+	}
+	mem_set_interval(result, &left->u.itv);
+	return interval_interval_sub(&result->u.itv, &right->u.itv);
+}
+
+int
+mem_sub(const struct Mem *left, const struct Mem *right, struct Mem *result)
+{
+	if (mem_is_any_null(left, right)) {
+		mem_set_null(result);
+		return 0;
+	}
+	if (!mem_is_metatype(left)) {
+		if (mem_is_num(left))
+			return mem_sub_num(left, right, result);
+		if (mem_is_datetime(left))
+			return mem_sub_dt(left, right, result);
+		if (mem_is_interval(left))
+			return mem_sub_itv(left, right, result);
+	}
+	diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
+		 "integer, decimal, double, datetime or interval");
+	return -1;
 }
 
 int

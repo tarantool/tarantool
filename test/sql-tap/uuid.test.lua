@@ -953,7 +953,9 @@ test:do_catchsql_test(
     [[
         SELECT u + 1 FROM t2;
     ]], {
-        1, "Type mismatch: can not convert uuid(11111111-1111-1111-1111-111111111111) to integer, decimal or double"
+        1, "Type mismatch: can not convert "..
+           "uuid(11111111-1111-1111-1111-111111111111) to integer, decimal, "..
+           "double, datetime or interval"
     })
 
 test:do_catchsql_test(
@@ -961,7 +963,9 @@ test:do_catchsql_test(
     [[
         SELECT u - 1 FROM t2;
     ]], {
-        1, "Type mismatch: can not convert uuid(11111111-1111-1111-1111-111111111111) to integer, decimal or double"
+        1, "Type mismatch: can not convert "..
+           "uuid(11111111-1111-1111-1111-111111111111) to integer, decimal, "..
+           "double, datetime or interval"
     })
 
 test:do_catchsql_test(
