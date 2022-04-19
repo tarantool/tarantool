@@ -27,7 +27,8 @@ test:do_catchsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x+0 AND y=='1';
     ]], {
         -- <1.0>
-        1, "Type mismatch: can not convert string('1') to integer, decimal or double"
+        1, "Type mismatch: can not convert string('1') to integer, decimal, "..
+           "double, datetime or interval"
         -- </1.0>
     })
 
@@ -37,7 +38,8 @@ test:do_catchsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x-0 AND y=='1';
     ]], {
         -- <1.1>
-        1, "Type mismatch: can not convert string('1') to integer, decimal or double"
+        1, "Type mismatch: can not convert string('1') to integer, decimal, "..
+           "double, datetime or interval"
         -- </1.1>
     })
 
@@ -78,7 +80,8 @@ test:do_catchsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x+0 AND y=='1';
     ]], {
         -- <3.0>
-        1, "Type mismatch: can not convert string('1.0') to integer, decimal or double"
+        1, "Type mismatch: can not convert string('1.0') to integer, "..
+           "decimal, double, datetime or interval"
         -- </3.0>
     })
 
@@ -88,7 +91,8 @@ test:do_catchsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x-0 AND y=='1';
     ]], {
         -- <3.1>
-        1, "Type mismatch: can not convert string('1.0') to integer, decimal or double"
+        1, "Type mismatch: can not convert string('1.0') to integer, "..
+           "decimal, double, datetime or interval"
         -- </3.1>
     })
 

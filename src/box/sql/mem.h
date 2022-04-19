@@ -197,6 +197,12 @@ mem_is_datetime(const struct Mem *mem)
 }
 
 static inline bool
+mem_is_interval(const struct Mem *mem)
+{
+	return mem->type == MEM_TYPE_INTERVAL;
+}
+
+static inline bool
 mem_is_bytes(const struct Mem *mem)
 {
 	return (mem->type & (MEM_TYPE_BIN | MEM_TYPE_STR |

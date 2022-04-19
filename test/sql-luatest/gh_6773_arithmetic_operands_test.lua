@@ -15,7 +15,7 @@ g.test_add = function()
     g.server:exec(function()
         local t = require('luatest')
         local res = [[Type mismatch: can not convert string('1') to ]]..
-                    [[integer, decimal or double]]
+                    [[integer, decimal, double, datetime or interval]]
         local _, err = box.execute([[SELECT '1' + '2';]])
         t.assert_equals(err.message, res)
         _, err = box.execute([[SELECT 1 + '2';]])
@@ -29,7 +29,7 @@ g.test_sub = function()
     g.server:exec(function()
         local t = require('luatest')
         local res = [[Type mismatch: can not convert string('1') to ]]..
-                    [[integer, decimal or double]]
+                    [[integer, decimal, double, datetime or interval]]
         local _, err = box.execute([[SELECT '1' - '2';]])
         t.assert_equals(err.message, res)
         _, err = box.execute([[SELECT 1 - '2';]])

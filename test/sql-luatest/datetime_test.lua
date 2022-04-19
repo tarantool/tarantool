@@ -1321,9 +1321,7 @@ g.test_datetime_23_2 = function()
     g.server:exec(function()
         local t = require('luatest')
         local sql = [[SELECT dt + 1 FROM t2;]]
-        local res = [[Type mismatch: can not convert ]]..
-                    [[datetime(2001-01-01T01:00:00Z) ]]..
-                    [[to integer, decimal or double]]
+        local res = [[Type mismatch: can not convert integer(1) to interval]]
         local _, err = box.execute(sql)
         t.assert_equals(err.message, res)
     end)
@@ -1333,9 +1331,8 @@ g.test_datetime_23_3 = function()
     g.server:exec(function()
         local t = require('luatest')
         local sql = [[SELECT dt - 1 FROM t2;]]
-        local res = [[Type mismatch: can not convert ]]..
-                    [[datetime(2001-01-01T01:00:00Z) ]]..
-                    [[to integer, decimal or double]]
+        local res = [[Type mismatch: can not convert integer(1) to ]]..
+                    [[datetime or interval]]
         local _, err = box.execute(sql)
         t.assert_equals(err.message, res)
     end)
@@ -2257,5 +2254,111 @@ g.test_datetime_30_18 = function()
         rows = box.execute(sql, {dt0}).rows
         res = {{0}}
         t.assert_equals(rows, res)
+    end)
+end
+
+-- Make sure that arithmetic for datetime works as intended.
+g.test_datetime_31_1 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local itv = dt.interval
+        local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
+        local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
+        local itv1 = itv.new({year = 1, month = 1, day = 1, hour = 1})
+        t.assert_equals(dt2 - dt1, itv1)
+
+        local rows = box.execute([[SELECT $1 - $2;]], {dt2, dt1}).rows
+        t.assert_equals(rows, {{itv1}})
+    end)
+end
+
+g.test_datetime_31_2 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
+        local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
+        local _, err = box.execute([[SELECT $1 + $2;]], {dt1, dt2})
+        t.assert_equals(err.message, [[Type mismatch: can not convert ]]..
+                                     [[datetime(2002-02-02T02:00:00Z) to ]]..
+                                     [[interval]])
+    end)
+end
+
+g.test_datetime_31_3 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local itv = dt.interval
+        local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
+        local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
+        local itv1 = itv.new({year = 1, month = 1, day = 1, hour = 1})
+        local rows = box.execute([[SELECT $1 + $2;]], {dt1, itv1}).rows
+        t.assert_equals(rows, {{dt2}})
+    end)
+end
+
+g.test_datetime_31_4 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local itv = dt.interval
+        local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
+        local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
+        local itv1 = itv.new({year = 1, month = 1, day = 1, hour = 1})
+        local rows = box.execute([[SELECT $1 - $2;]], {dt2, itv1}).rows
+        t.assert_equals(rows, {{dt1}})
+    end)
+end
+
+g.test_datetime_31_5 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local itv = dt.interval
+        local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
+        local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
+        local itv1 = itv.new({year = 1, month = 1, day = 1, hour = 1})
+        local rows = box.execute([[SELECT $1 + $2;]], {itv1, dt1}).rows
+        t.assert_equals(rows, {{dt2}})
+    end)
+end
+
+g.test_datetime_31_6 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local itv = dt.interval
+        local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
+        local itv1 = itv.new({year = 1, month = 1, day = 1, hour = 1})
+        local _, err = box.execute([[SELECT $1 - $2;]], {itv1, dt1})
+        t.assert_equals(err.message, [[Type mismatch: can not convert ]]..
+                                     [[datetime(2001-01-01T01:00:00Z) to ]]..
+                                     [[interval]])
+    end)
+end
+
+g.test_datetime_31_7 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local itv = require('datetime').interval
+        local itv1 = itv.new({year = 1, month = 1, day = 1, hour = 1})
+        local itv2 = itv.new({year = 2, month = 3, day = 4, hour = 5})
+        local itv3 = itv.new({year = 3, month = 4, day = 5, hour = 6})
+        local rows = box.execute([[SELECT $1 - $2;]], {itv3, itv1}).rows
+        t.assert_equals(rows, {{itv2}})
+    end)
+end
+
+g.test_datetime_31_8 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local itv = require('datetime').interval
+        local itv1 = itv.new({year = 1, month = 1, day = 1, hour = 1})
+        local itv2 = itv.new({year = 2, month = 3, day = 4, hour = 5})
+        local itv3 = itv.new({year = 3, month = 4, day = 5, hour = 6})
+        local rows = box.execute([[SELECT $1 + $2;]], {itv2, itv1}).rows
+        t.assert_equals(rows, {{itv3}})
     end)
 end

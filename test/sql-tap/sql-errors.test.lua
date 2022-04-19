@@ -696,7 +696,8 @@ test:do_catchsql_test(
 		SELECT X'ff' + 1;
 	]], {
 		-- <sql-errors-2.1>
-		1, "Type mismatch: can not convert varbinary(x'FF') to integer, decimal or double"
+                1, "Type mismatch: can not convert varbinary(x'FF') to "..
+                   "integer, decimal, double, datetime or interval"
 		-- </sql-errors-2.1>
 	})
 
@@ -706,7 +707,8 @@ test:do_catchsql_test(
 		SELECT X'ff' - 1;
 	]], {
 		-- <sql-errors-2.2>
-		1, "Type mismatch: can not convert varbinary(x'FF') to integer, decimal or double"
+                1, "Type mismatch: can not convert varbinary(x'FF') to "..
+                   "integer, decimal, double, datetime or interval"
 		-- </sql-errors-2.2>
 	})
 

@@ -233,7 +233,8 @@ test:do_catchsql_test(
     [[
         SELECT CAST(1 AS ANY) - 1;
     ]], {
-        1, "Type mismatch: can not convert any(1) to integer, decimal or double"
+        1, "Type mismatch: can not convert any(1) to integer, decimal, "..
+           "double, datetime or interval"
     })
 
 -- Check that bitwise operations are prohibited for NUMBER, SCALAR and ANY.
