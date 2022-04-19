@@ -179,21 +179,25 @@ key_info_by_field_no(const void *ptr1, const void *ptr2)
 }
 
 /**
- * Get of extract key for foreign index from local tuple by given as @a mp_data.
+ * Get or extract key for foreign index from local tuple by given as @a mp_data.
  * Simply return mp_data for field foreign key - it is the field itself.
  * For complex foreign keys collect field in one contiguous buffer.
  * Try to place resulting key in @a *buffer, that must be a buffer of size
  * COMPLEX_KEY_BUFFER_SIZE. If there's not enough space - allocate needed
  * using xmalloc - that pointer is returned via @a buffer. Thus if the pointer
  * is changed - a user of that function must free() the buffer after usage.
- * Return pointer to ready-to-use key in any case.
+ * In any case, the pointer to ready-to-use key is returned in @a key, or it is
+ * set to NULL if all parts of the key are null.
  */
-static const char *
+static int
 get_or_extract_key_mp(const struct tuple_constraint *constr,
-		      struct key_def *def, char **buffer, const char *mp_data)
+		      struct key_def *def, char **buffer, const char **key,
+		      const char *mp_data)
 {
-	if (constr->def.fkey.field_mapping_size == 0)
-		return mp_data;
+	if (constr->def.fkey.field_mapping_size == 0) {
+		*key = mp_data;
+		return 0;
+	}
 
 	assert(def->part_count == constr->def.fkey.field_mapping_size);
 	const uint32_t info_count = def->part_count;
@@ -211,6 +215,7 @@ get_or_extract_key_mp(const struct tuple_constraint *constr,
 	assert(mp_typeof(*mp_data) == MP_ARRAY);
 	uint32_t tuple_size = mp_decode_array(&mp_data);
 	uint32_t info_pos = 0;
+	uint32_t null_count = 0;
 	size_t total_size = 0;
 	for (uint32_t i = 0; i < tuple_size; i++) {
 		const char *mp_data_end = mp_data;
@@ -220,6 +225,8 @@ get_or_extract_key_mp(const struct tuple_constraint *constr,
 			info[info_pos].mp_data = mp_data;
 			info[info_pos].mp_data_size = mp_data_end - mp_data;
 			total_size += info[info_pos].mp_data_size;
+			if (mp_typeof(*mp_data) == MP_NIL)
+				null_count++;
 			info_pos++;
 			if (info_pos == info_count)
 				break;
@@ -231,14 +238,19 @@ get_or_extract_key_mp(const struct tuple_constraint *constr,
 		mp_data = mp_data_end;
 	}
 
+	if (info_pos == null_count) {
+		/* All parts of the key are null. */
+		*key = NULL;
+		return 0;
+	}
+
 	if (info_pos != info_count)
-		return NULL; /* End of tuple reached unexpectedly. */
+		return -1; /* End of tuple reached unexpectedly. */
 
 	/* Allocate of necessary. */
 	if (total_size > COMPLEX_KEY_BUFFER_SIZE)
 		*buffer = xmalloc(total_size);
-	char *key = *buffer;
-	char *w_pos = key;
+	char *w_pos = *buffer;
 
 	/* Reorder back to index order and join fields in one buffer. */
 	qsort(info, def->part_count, sizeof(info[0]), key_info_by_order);
@@ -247,7 +259,8 @@ get_or_extract_key_mp(const struct tuple_constraint *constr,
 		w_pos += info[i].mp_data_size;
 	}
 
-	return key;
+	*key = *buffer;
+	return 0;
 }
 
 /**
@@ -292,12 +305,16 @@ tuple_constraint_fkey_check(const struct tuple_constraint *constr,
 	assert(constr->fkey->field_count == key_def->part_count);
 
 	char *key_buffer = complex_key_buffer;
-	const char *key = get_or_extract_key_mp(constr, key_def,
-						&key_buffer, mp_data);
-	if (key == NULL) {
+	const char *key;
+	int key_rc = get_or_extract_key_mp(constr, key_def, &key_buffer, &key,
+					   mp_data);
+	if (key_rc == -1) {
 		field_foreign_key_failed(constr, field, "extract key failed");
 		return -1;
 	}
+
+	if (key == NULL)
+		return 0; /* No need to validate all-null key. */
 
 	int rc = -1;
 	const char *unused;
