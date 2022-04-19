@@ -247,6 +247,13 @@ mem_is_cleared(const struct Mem *mem)
 }
 
 static inline bool
+mem_is_comparable(const struct Mem *mem)
+{
+	uint32_t incmp_types = MEM_TYPE_ARRAY | MEM_TYPE_MAP;
+	return (mem->flags & MEM_Any) == 0 && (mem->type & incmp_types) == 0;
+}
+
+static inline bool
 mem_is_same_type(const struct Mem *mem1, const struct Mem *mem2)
 {
 	return mem1->type == mem2->type;

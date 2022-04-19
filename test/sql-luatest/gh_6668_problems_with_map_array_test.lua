@@ -33,3 +33,28 @@ g.test_distinct = function()
         box.execute([[DROP TABLE tm;]])
     end)
 end
+
+-- Disallow incomparable values in GROUP BY.
+g.test_group_by = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        box.execute([[CREATE TABLE ta(i INT PRIMARY KEY, a ARRAY);]])
+        box.execute([[INSERT INTO ta VALUES(1, [1]), (2, [2]);]])
+        local sql = [[SELECT a FROM ta GROUP BY a;]]
+        local res = [[Type mismatch: can not convert array([2]) to ]]..
+                    [[comparable type]]
+        local _, err = box.execute(sql)
+        t.assert_equals(err.message, res)
+        box.execute([[DROP TABLE ta;]])
+
+        box.execute([[CREATE TABLE tm(i INT PRIMARY KEY, m map);]])
+        box.space.TM:insert({1, {a = 1}})
+        box.space.TM:insert({2, {b = 2}})
+        sql = [[SELECT m FROM tm GROUP BY m;]]
+        res = [[Type mismatch: can not convert map({"b": 2}) to ]]..
+              [[comparable type]]
+        _, err = box.execute(sql)
+        t.assert_equals(err.message, res)
+        box.execute([[DROP TABLE tm;]])
+    end)
+end
