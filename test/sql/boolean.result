@@ -1131,12 +1131,12 @@ SELECT true + true;
 SELECT true + false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
  | ...
 SELECT false + true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
  | ...
 SELECT false + false;
  | ---
@@ -1151,12 +1151,12 @@ SELECT true - true;
 SELECT true - false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
  | ...
 SELECT false - true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
  | ...
 SELECT false - false;
  | ---
@@ -1171,12 +1171,12 @@ SELECT true * true;
 SELECT true * false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
  | ...
 SELECT false * true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
  | ...
 SELECT false * false;
  | ---
@@ -1191,12 +1191,12 @@ SELECT true / true;
 SELECT true / false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
  | ...
 SELECT false / true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
  | ...
 SELECT false / false;
  | ---
@@ -1211,12 +1211,12 @@ SELECT true % true;
 SELECT true % false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer'
  | ...
 SELECT false % true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer'
  | ...
 SELECT false % false;
  | ---
@@ -1227,7 +1227,7 @@ SELECT false % false;
 SELECT a, true + a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
  | ...
 SELECT a, false + a FROM t;
  | ---
@@ -1237,7 +1237,7 @@ SELECT a, false + a FROM t;
 SELECT a, true - a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
  | ...
 SELECT a, false - a FROM t;
  | ---
@@ -1247,7 +1247,7 @@ SELECT a, false - a FROM t;
 SELECT a, true * a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
  | ...
 SELECT a, false * a FROM t;
  | ---
@@ -1257,7 +1257,7 @@ SELECT a, false * a FROM t;
 SELECT a, true / a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
  | ...
 SELECT a, false / a FROM t;
  | ---
@@ -1267,7 +1267,7 @@ SELECT a, false / a FROM t;
 SELECT a, true % a FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer'
  | ...
 SELECT a, false % a FROM t;
  | ---
@@ -1277,7 +1277,7 @@ SELECT a, false % a FROM t;
 SELECT a, a + true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
  | ...
 SELECT a, a + false FROM t;
  | ---
@@ -1287,7 +1287,7 @@ SELECT a, a + false FROM t;
 SELECT a, a - true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
  | ...
 SELECT a, a - false FROM t;
  | ---
@@ -1297,7 +1297,7 @@ SELECT a, a - false FROM t;
 SELECT a, a * true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
  | ...
 SELECT a, a * false FROM t;
  | ---
@@ -1307,7 +1307,7 @@ SELECT a, a * false FROM t;
 SELECT a, a / true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer, decimal or double'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer, decimal or double'
  | ...
 SELECT a, a / false FROM t;
  | ---
@@ -1317,7 +1317,7 @@ SELECT a, a / false FROM t;
 SELECT a, a % true FROM t;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer'
  | ...
 SELECT a, a % false FROM t;
  | ---
@@ -4140,12 +4140,12 @@ SELECT false / 2.3;
 SELECT true % 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert decimal(2.3) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer'
  | ...
 SELECT false % 2.3;
  | ---
  | - null
- | - 'Type mismatch: can not convert decimal(2.3) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer'
  | ...
 SELECT 2.3 + true;
  | ---
@@ -4190,12 +4190,12 @@ SELECT 2.3 / false;
 SELECT 2.3 % true;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert decimal(2.3) to integer'
  | ...
 SELECT 2.3 % false;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert decimal(2.3) to integer'
  | ...
 
 SELECT a1, a1 + 2.3 FROM t6
@@ -4221,7 +4221,7 @@ SELECT a1, a1 / 2.3 FROM t6
 SELECT a1, a1 % 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert decimal(2.3) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer'
  | ...
 SELECT a1, 2.3 + a1 FROM t6
  | ---
@@ -4246,7 +4246,7 @@ SELECT a1, 2.3 / a1 FROM t6
 SELECT a1, 2.3 % a1 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert decimal(2.3) to integer'
  | ...
 SELECT a2, a2 + 2.3 FROM t6
  | ---
@@ -4271,7 +4271,7 @@ SELECT a2, a2 / 2.3 FROM t6
 SELECT a2, a2 % 2.3 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert decimal(2.3) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer'
  | ...
 SELECT a2, 2.3 + a2 FROM t6
  | ---
@@ -4296,7 +4296,7 @@ SELECT a2, 2.3 / a2 FROM t6
 SELECT a2, 2.3 % a2 FROM t6
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert decimal(2.3) to integer'
  | ...
 
 SELECT c, true + c FROM t8;
@@ -4342,12 +4342,12 @@ SELECT c, false / c FROM t8;
 SELECT c, true % c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer'
  | ...
 SELECT c, false % c FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer'
  | ...
 SELECT c, c + true FROM t8;
  | ---
@@ -4392,12 +4392,12 @@ SELECT c, c / false FROM t8;
 SELECT c, c % true FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert double(4.56) to integer'
  | ...
 SELECT c, c % false FROM t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert double(4.56) to integer'
  | ...
 
 SELECT a1, c, a1 + c FROM t6, t8;
@@ -4423,7 +4423,7 @@ SELECT a1, c, a1 / c FROM t6, t8;
 SELECT a1, c, a1 % c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to integer'
+ | - 'Type mismatch: can not convert boolean(FALSE) to integer'
  | ...
 SELECT a1, c, c + a1 FROM t6, t8;
  | ---
@@ -4448,7 +4448,7 @@ SELECT a1, c, c / a1 FROM t6, t8;
 SELECT a1, c, c % a1 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(FALSE) to integer'
+ | - 'Type mismatch: can not convert double(4.56) to integer'
  | ...
 SELECT a2, c, a2 + c FROM t6, t8;
  | ---
@@ -4473,7 +4473,7 @@ SELECT a2, c, a2 / c FROM t6, t8;
 SELECT a2, c, a2 % c FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert double(4.56) to integer'
+ | - 'Type mismatch: can not convert boolean(TRUE) to integer'
  | ...
 SELECT a2, c, c + a2 FROM t6, t8;
  | ---
@@ -4498,7 +4498,7 @@ SELECT a2, c, c / a2 FROM t6, t8;
 SELECT a2, c, c % a2 FROM t6, t8;
  | ---
  | - null
- | - 'Type mismatch: can not convert boolean(TRUE) to integer'
+ | - 'Type mismatch: can not convert double(4.56) to integer'
  | ...
 
 SELECT true > 2.3;
