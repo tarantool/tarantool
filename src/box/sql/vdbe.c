@@ -1675,6 +1675,16 @@ case OP_Compare: {
 		bool is_rev = def->parts[i].sort_order == SORT_ORDER_DESC;
 		struct Mem *a = &aMem[p1+idx];
 		struct Mem *b = &aMem[p2+idx];
+		if (!mem_is_comparable(a)) {
+			diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(a),
+				 "comparable type");
+			goto abort_due_to_error;
+		}
+		if (!mem_is_comparable(b)) {
+			diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(b),
+				 "comparable type");
+			goto abort_due_to_error;
+		}
 		iCompare = mem_cmp_scalar(a, b, coll);
 		if (iCompare) {
 			if (is_rev)
