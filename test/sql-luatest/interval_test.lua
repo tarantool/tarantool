@@ -1506,3 +1506,42 @@ g.test_interval_26_9 = function()
         t.assert_equals(err.message, res)
     end)
 end
+
+-- Make sure that DATETIME value can be bound.
+g.test_datetime_27_1 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local itv = require('datetime').interval
+        local itv1 = itv.new({year = 1, month = 2, day = 3, hour = 4})
+        local rows = box.execute([[SELECT ?;]], {itv1}).rows
+        t.assert_equals(rows, {{itv1}})
+    end)
+end
+
+g.test_datetime_27_2 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local itv = require('datetime').interval
+        local itv1 = itv.new({year = 1, month = 2, day = 3, hour = 4})
+        local rows = box.execute([[SELECT $1;]], {itv1}).rows
+        t.assert_equals(rows, {{itv1}})
+    end)
+end
+
+g.test_datetime_27_3 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local itv = require('datetime').interval
+        local itv1 = itv.new({year = 1, month = 2, day = 3, hour = 4})
+        local rows = box.execute([[SELECT #a;]], {{['#a'] = itv1}}).rows
+        t.assert_equals(rows, {{itv1}})
+    end)
+end
+
+g.test_datetime_27_4 = function()
+    local conn = g.server.net_box
+    local itv = require('datetime').interval
+    local itv1 = itv.new({year = 1, month = 2, day = 3, hour = 4})
+    local rows = conn:execute([[SELECT ?;]], {itv1}).rows
+    t.assert_equals(rows, {{itv1}})
+end
