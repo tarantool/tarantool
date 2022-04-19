@@ -2009,7 +2009,7 @@ mem_add(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		mem_set_null(result);
 		return 0;
 	}
-	if (check_types_numeric_arithmetic(right, left) != 0)
+	if (check_types_numeric_arithmetic(left, right) != 0)
 		return -1;
 	if (((left->type | right->type) & MEM_TYPE_DOUBLE) != 0) {
 		double a;
@@ -2051,7 +2051,7 @@ mem_sub(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		mem_set_null(result);
 		return 0;
 	}
-	if (check_types_numeric_arithmetic(right, left) != 0)
+	if (check_types_numeric_arithmetic(left, right) != 0)
 		return -1;
 	if (((left->type | right->type) & MEM_TYPE_DOUBLE) != 0) {
 		double a;
@@ -2093,7 +2093,7 @@ mem_mul(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		mem_set_null(result);
 		return 0;
 	}
-	if (check_types_numeric_arithmetic(right, left) != 0)
+	if (check_types_numeric_arithmetic(left, right) != 0)
 		return -1;
 	if (((left->type | right->type) & MEM_TYPE_DOUBLE) != 0) {
 		double a;
@@ -2135,7 +2135,7 @@ mem_div(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		mem_set_null(result);
 		return 0;
 	}
-	if (check_types_numeric_arithmetic(right, left) != 0)
+	if (check_types_numeric_arithmetic(left, right) != 0)
 		return -1;
 	if (((left->type | right->type) & MEM_TYPE_DOUBLE) != 0) {
 		double a;
@@ -2193,13 +2193,13 @@ mem_rem(const struct Mem *left, const struct Mem *right, struct Mem *result)
 		mem_set_null(result);
 		return 0;
 	}
-	if (!mem_is_int(right) || mem_is_metatype(right)) {
-		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
+	if (!mem_is_int(left) || mem_is_metatype(left)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
 			 "integer");
 		return -1;
 	}
-	if (!mem_is_int(left) || mem_is_metatype(left)) {
-		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(left),
+	if (!mem_is_int(right) || mem_is_metatype(right)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(right),
 			 "integer");
 		return -1;
 	}
