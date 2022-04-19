@@ -58,3 +58,19 @@ g.test_group_by = function()
         box.execute([[DROP TABLE tm;]])
     end)
 end
+
+--
+-- Make sure that the error description for the incompatible right operand is
+-- correct.
+--
+g.test_group_by = function()
+    g.server:exec(function()
+
+        local t = require('luatest')
+        local sql = [[SELECT 1 > [1];]]
+        local res = [[Type mismatch: can not convert array([1]) to ]]..
+                    [[comparable type]]
+        local _, err = box.execute(sql)
+        t.assert_equals(err.message, res)
+    end)
+end
