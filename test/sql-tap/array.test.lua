@@ -473,7 +473,7 @@ test:do_catchsql_test(
         SELECT a3(1, 2, 3) + 1;
     ]], {
         1, "Type mismatch: can not convert array([1, 2, 3]) to integer, "..
-           "decimal or double"
+           "decimal, double, datetime or interval"
     })
 
 test:do_catchsql_test(
@@ -482,7 +482,7 @@ test:do_catchsql_test(
         SELECT a3(1, 2, 3) - 1;
     ]], {
         1, "Type mismatch: can not convert array([1, 2, 3]) to integer, "..
-           "decimal or double"
+           "decimal, double, datetime or interval"
     })
 
 test:do_catchsql_test(
