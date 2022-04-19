@@ -573,6 +573,10 @@ sql_bind_dec(struct sql_stmt *stmt, int i, const decimal_t *dec);
 int
 sql_bind_datetime(struct sql_stmt *stmt, int i, const struct datetime *dt);
 
+/** Perform INTERVAL parameter binding for the SQL statement. */
+int
+sql_bind_interval(struct sql_stmt *stmt, int i, const struct interval *itv);
+
 /**
  * Return the number of wildcards that should be bound to.
  */

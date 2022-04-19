@@ -571,6 +571,16 @@ sql_bind_datetime(struct sql_stmt *stmt, int i, const struct datetime *dt)
 }
 
 int
+sql_bind_interval(struct sql_stmt *stmt, int i, const struct interval *itv)
+{
+	struct Vdbe *p = (struct Vdbe *)stmt;
+	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "interval") != 0)
+		return -1;
+	mem_set_interval(&p->aVar[i - 1], itv);
+	return 0;
+}
+
+int
 sql_bind_parameter_count(const struct sql_stmt *stmt)
 {
 	struct Vdbe *p = (struct Vdbe *) stmt;

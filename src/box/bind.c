@@ -34,6 +34,7 @@
 #include "sql/sqlInt.h"
 #include "sql/sqlLimit.h"
 #include "sql/vdbe.h"
+#include "mp_interval.h"
 #include "mp_datetime.h"
 #include "mp_decimal.h"
 #include "mp_uuid.h"
@@ -124,6 +125,13 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 			if (datetime_unpack(packet, size, &bind->dt) == NULL) {
 				diag_set(ClientError, ER_INVALID_MSGPACK,
 					 "Invalid MP_DATETIME MsgPack format");
+				return -1;
+			}
+			break;
+		case MP_INTERVAL:
+			if (interval_unpack(packet, &bind->itv) == NULL) {
+				diag_set(ClientError, ER_INVALID_MSGPACK,
+					 "Invalid MP_INTERVAL MsgPack format");
 				return -1;
 			}
 			break;
@@ -224,12 +232,18 @@ sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
 	case MP_MAP:
 		return sql_bind_map_static(stmt, pos, p->s, p->bytes);
 	case MP_EXT:
-		if (p->ext_type == MP_UUID)
+		switch (p->ext_type) {
+		case MP_UUID:
 			return sql_bind_uuid(stmt, pos, &p->uuid);
-		else if (p->ext_type == MP_DECIMAL)
+		case MP_DECIMAL:
 			return sql_bind_dec(stmt, pos, &p->dec);
-		assert(p->ext_type == MP_DATETIME);
-		return sql_bind_datetime(stmt, pos, &p->dt);
+		case MP_DATETIME:
+			return sql_bind_datetime(stmt, pos, &p->dt);
+		case MP_INTERVAL:
+			return sql_bind_interval(stmt, pos, &p->itv);
+		default:
+			unreachable();
+		}
 	default:
 		unreachable();
 	}

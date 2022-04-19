@@ -387,6 +387,10 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 			bind->dt = *field.dateval;
 			break;
 		}
+		if (field.ext_type == MP_INTERVAL) {
+			bind->itv = *field.interval;
+			break;
+		}
 		diag_set(ClientError, ER_SQL_BIND_TYPE, "USERDATA",
 			 sql_bind_name(bind));
 		return -1;
