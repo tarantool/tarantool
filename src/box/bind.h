@@ -77,6 +77,8 @@ struct sql_bind {
 		decimal_t dec;
 		/** DATETIME value. */
 		struct datetime dt;
+		/** INTERVAL value. */
+		struct interval itv;
 	};
 };
 
