@@ -2535,9 +2535,13 @@ mem_cmp(const struct Mem *a, const struct Mem *b, int *result,
 			*result = 1;
 		return 0;
 	}
-	if (((a->flags | b->flags) & MEM_Any) != 0 ||
-	    ((a->type | b->type) & (MEM_TYPE_ARRAY | MEM_TYPE_MAP)) != 0) {
+	if (!mem_is_comparable(a)) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(a),
+			 "comparable type");
+		return -1;
+	}
+	if (!mem_is_comparable(b)) {
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(b),
 			 "comparable type");
 		return -1;
 	}
