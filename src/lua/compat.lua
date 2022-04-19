@@ -7,15 +7,25 @@ local options = {
 		old = true,
 		new = false,
 		default = true,
-		brief = "<...>",
+		frozen = false,
+		brief = "json escapes '/' during encode",
 		doc  = "https://github.com/tarantool/tarantool/wiki/compat_json_escape_forward_slash"
 	},
 	option_2 = {
 		old = false,
 		new = true,
+		frozen = false,
 		default = true,
 		brief = "<...>",
 		doc  = "https://github.com/tarantool/tarantool/wiki/option_2"
+	},
+	option_3 = {
+		old = true,
+		new = false,
+		frozen = true,
+		default = false,
+		brief = "<...>",
+		doc  = "https://github.com/tarantool/tarantool/wiki/option_3"
 	}
 }
 
@@ -25,6 +35,9 @@ local postaction = {
 		end,
 	option_2 = function (value)
 			print("option_2 postaction was called!")
+		end,
+	option_3 = function (value)
+			assert(not "option_3 is frozen its postaction should never be called")
 		end
 }
 
@@ -32,7 +45,7 @@ local help = [[
 This is Tarantool compatibility module.
 To get help, see the Tarantool manual at https://tarantool.io/en/doc/
 Available commands:
-	
+
 	candidates()                -- list all unselected options
 	dump()                      -- get command that sets up compat with same options as current
 	help()                      -- show this help
@@ -55,7 +68,7 @@ local function serialize_policy(key, policy)
 	return result
 end
 
-local function serialize_compat(compat)
+local function serialize_compat(compat)						-- should it list frozen options?
 	local result = { }
 	for key, val in pairs(options) do
 		result[key] = serialize_policy(key, val)
@@ -73,28 +86,42 @@ local function set_option(key, val)
 	if val == 'old' then
 		val = options[key].old
 	end
-	if val == 'default' then							-- should 'default' set option as `selected`?
+	local default = false;
+	if val == 'default' then
 		val = options[key].default
+		default = true
 	end
 	if type(val) ~= 'boolean' then
 		error(('Invalid argument %s'):format(val))
 	end
+	if not options[key].frozen then
+		if options[key].default == options[key].new and val == options[key].old then
+			print("WARNING: chosen option provides outdated behavior and will soon get frozen!")
+			print(("For more info, see the Tarantool manual at %s"):format(options[key].doc))
+		end
+		postaction[key](val)
+	else if not default then
+		if val == options[key].new then
+			print("WARNING: chosen option is the only available!")		-- a better way to throw warnings?
+		else
+			error("Chosen option is no longer available")				-- is it a good idea to throw errors this way, so file and line get listed?
+		end
+	end end
 	cfg[key].value = val
 	cfg[key].selected = true
-	postaction[key](val)
 end
 
-compat = setmetatable({
+local compat = setmetatable({
 			candidates = function()
 				local result = { }
 				for key, val in pairs(options) do
-					if not cfg[key].selected then
+					if not cfg[key].selected and not options[key].frozen then
 						result[key] = serialize_policy(key, val)
 					end
 				end
 				return result
 			end,
-			dump = function()
+			dump = function()											-- should frozen options be listed in dump?
 				local result = "require('tarantool').compat({"
 				local isFirst = true
 				for key, val in pairs(options) do
@@ -109,34 +136,43 @@ compat = setmetatable({
 				return result .. "})"
 			end,
 			reset = function()
-				for name, elem in pairs(options) do
- 					cfg[name].value = elem.default
-					cfg[name].selected = false
-				end
-			end,
-			restore = function(list)								-- it receives only {'option_1', 'option_2'} lists
-				if type(list) ~= 'table' then
-					error(('Invalid argument %s'):format(list))
-				end
-				for i, key in pairs(list) do
-					if not options[key] then
-						error(('Invalid option %s'):format(key))
-					end
-					cfg[key].value = options[key].default
+				for key, elem in pairs(options) do
+					set_option(key, 'default')
 					cfg[key].selected = false
-					postaction[key](cfg[key].value)
 				end
 			end,
+			restore = setmetatable({}, {
+				__call = function(self, list)
+					if type(list) ~= 'table' then
+						error(('Invalid argument %s'):format(list))
+					end
+					for i, key in pairs(list) do
+						set_option(key, 'default')
+						cfg[key].selected = false
+
+					end
+				end,
+				__autocomplete = function(self)						-- this is not how you want it to autocomplete
+					local res = { }
+					for key, elem in pairs(options) do
+						if not options[key].frozen then
+							res[key] = true
+						end
+					end
+					return res
+				end
+				} ),
 			preload = function()
-				for name, elem in pairs(options) do
-					cfg[name] = { }
- 					cfg[name].value = elem.default
-					cfg[name].selected = false
+				for key, elem in pairs(options) do
+					cfg[key] = { }
+ 					cfg[key].value = elem.default
+					cfg[key].selected = false
+					assert(not options[key].frozen or options[key].default == options[key].new)		-- checks if defaults for frozen values are correct
 				end
 			end,
 			postload = function()
-				for name, elem in pairs(options) do
-					postaction[name](elem.default)
+				for key, elem in pairs(options) do
+					set_option(key, options[key].default)
 				end
 			end,
 			help = function()
@@ -152,7 +188,7 @@ compat = setmetatable({
 					set_option(key, val)
 				end
 			end,
-			__newindex = function(compat, key, val)					-- setters should be 'old'/'new' or true/false ?
+			__newindex = function(compat, key, val)
 				set_option(key, val)
 			end,
 			__index = function(compat, key)
@@ -166,10 +202,10 @@ compat = setmetatable({
 			__tostring = serialize_compat,
 			__autocomplete = function(self)
 				local res = { }
-				local i = 1
-				for name, elem in pairs(options) do
-					res[name] = true
-					i = i + 1
+				for key, elem in pairs(options) do
+					if not options[key].frozen then
+						res[key] = true
+					end
 				end
 				return res
 			end
@@ -178,7 +214,7 @@ compat = setmetatable({
 
 compat.preload()
 compat.preload = nil
-compat.postload()				-- should postload be called from within init.c?
+compat.postload()				-- when should we perform postload?
 compat.postload = nil
 								-- "A log warning at start for old values. Possibly also CLI / UI warnings." ?
 return compat
