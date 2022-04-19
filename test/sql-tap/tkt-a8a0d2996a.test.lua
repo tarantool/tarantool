@@ -138,7 +138,8 @@ test:do_catchsql_test(
         SELECT '1.23e64'/'1.0000e+62';
     ]], {
         -- <4.1>
-        1, "Type mismatch: can not convert string('1.0000e+62') to integer, decimal or double"
+        1, "Type mismatch: can not convert string('1.23e64') to integer, "..
+           "decimal or double"
         -- </4.1>
     })
 
