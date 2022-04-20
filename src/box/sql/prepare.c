@@ -226,7 +226,7 @@ sql_parser_destroy(Parse *parser)
 		sql_select_delete(db, parser->parsed_ast.select);
 		break;
 	case AST_TYPE_EXPR:
-		sql_expr_delete(db, parser->parsed_ast.expr, false);
+		sql_expr_delete(db, parser->parsed_ast.expr);
 		break;
 	case AST_TYPE_TRIGGER:
 		sql_trigger_delete(db, parser->parsed_ast.trigger);

@@ -540,7 +540,7 @@ sqlAddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 			field->default_value[default_length] = '\0';
 		}
 	}
-	sql_expr_delete(db, pSpan->pExpr, false);
+	sql_expr_delete(db, pSpan->pExpr);
 }
 
 static int
@@ -701,7 +701,7 @@ sql_create_check_contraint(struct Parse *parser)
 {
 	struct create_ck_def *create_ck_def = &parser->create_ck_def;
 	struct ExprSpan *expr_span = create_ck_def->expr;
-	sql_expr_delete(parser->db, expr_span->pExpr, false);
+	sql_expr_delete(parser->db, expr_span->pExpr);
 
 	struct alter_entity_def *alter_def =
 		(struct alter_entity_def *) create_ck_def;
@@ -1620,7 +1620,7 @@ sql_id_eq_str_expr(struct Parse *parse, const char *col_name,
 	struct Expr *col_value_expr =
 		sql_expr_new_named(db, TK_STRING, col_value);
 	if (col_value_expr == NULL) {
-		sql_expr_delete(db, col_name_expr, false);
+		sql_expr_delete(db, col_name_expr);
 		parse->is_aborted = true;
 		return NULL;
 	}
@@ -3243,7 +3243,7 @@ sqlSrcListDelete(sql * db, SrcList * pList)
 			!pItem->space->def->opts.is_ephemeral ||
 			pItem->space->index == NULL);
 		sql_select_delete(db, pItem->pSelect);
-		sql_expr_delete(db, pItem->pOn, false);
+		sql_expr_delete(db, pItem->pOn);
 		sqlIdListDelete(db, pItem->pUsing);
 	}
 	sqlDbFree(db, pList);
@@ -3306,7 +3306,7 @@ sqlSrcListAppendFromTerm(Parse * pParse,	/* Parsing context */
 
  append_from_error:
 	assert(p == 0);
-	sql_expr_delete(db, pOn, false);
+	sql_expr_delete(db, pOn);
 	sqlIdListDelete(db, pUsing);
 	sql_select_delete(db, pSubquery);
 	return 0;

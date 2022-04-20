@@ -281,12 +281,12 @@ clearSelect(sql * db, Select * p, int bFree)
 		Select *pPrior = p->pPrior;
 		sql_expr_list_delete(db, p->pEList);
 		sqlSrcListDelete(db, p->pSrc);
-		sql_expr_delete(db, p->pWhere, false);
+		sql_expr_delete(db, p->pWhere);
 		sql_expr_list_delete(db, p->pGroupBy);
-		sql_expr_delete(db, p->pHaving, false);
+		sql_expr_delete(db, p->pHaving);
 		sql_expr_list_delete(db, p->pOrderBy);
-		sql_expr_delete(db, p->pLimit, false);
-		sql_expr_delete(db, p->pOffset, false);
+		sql_expr_delete(db, p->pLimit);
+		sql_expr_delete(db, p->pOffset);
 		if (p->pWith)
 			sqlWithDelete(db, p->pWith);
 		if (bFree)
@@ -3055,7 +3055,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 							     pPrior->
 							     nSelectRow);
 				}
-				sql_expr_delete(db, p->pLimit, false);
+				sql_expr_delete(db, p->pLimit);
 				p->pLimit = pLimit;
 				p->pOffset = pOffset;
 				p->iLimit = 0;
@@ -3158,7 +3158,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				p->pPrior = pPrior;
 				if (p->nSelectRow > pPrior->nSelectRow)
 					p->nSelectRow = pPrior->nSelectRow;
-				sql_expr_delete(db, p->pLimit, false);
+				sql_expr_delete(db, p->pLimit);
 				p->pLimit = pLimit;
 				p->pOffset = pOffset;
 
@@ -3665,9 +3665,9 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 	} else {
 		regLimitA = regLimitB = 0;
 	}
-	sql_expr_delete(db, p->pLimit, false);
+	sql_expr_delete(db, p->pLimit);
 	p->pLimit = 0;
-	sql_expr_delete(db, p->pOffset, false);
+	sql_expr_delete(db, p->pOffset);
 	p->pOffset = 0;
 
 	regAddrA = ++pParse->nMem;
@@ -3887,7 +3887,7 @@ substExpr(Parse * pParse,	/* Report errors here */
 					    pExpr->iRightJoinTable;
 					pNew->flags |= EP_FromJoin;
 				}
-				sql_expr_delete(db, pExpr, false);
+				sql_expr_delete(db, pExpr);
 				pExpr = pNew;
 			}
 		}

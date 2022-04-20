@@ -215,10 +215,9 @@ sql_expr_dup(struct sql *db, struct Expr *p, int flags, char **buffer);
  * Free AST pointed by expr.
  * @param db SQL handle.
  * @param expr Root pointer of ASR
- * @param extern_alloc True if skeleton was allocated externally.
  */
 void
-sql_expr_delete(struct sql *db, struct Expr *expr, bool extern_alloc);
+sql_expr_delete(struct sql *db, struct Expr *expr);
 
 /**
  * Create and initialize a new template space object.

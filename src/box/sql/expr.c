@@ -1084,8 +1084,8 @@ sqlExprAttachSubtrees(sql * db,
 {
 	if (pRoot == 0) {
 		assert(db->mallocFailed);
-		sql_expr_delete(db, pLeft, false);
-		sql_expr_delete(db, pRight, false);
+		sql_expr_delete(db, pLeft);
+		sql_expr_delete(db, pRight);
 	} else {
 		if (pRight) {
 			pRoot->pRight = pRight;
@@ -1184,8 +1184,8 @@ sql_and_expr_new(struct sql *db, struct Expr *left_expr,
 	} else if (right_expr == NULL) {
 		return left_expr;
 	} else if (exprAlwaysFalse(left_expr) || exprAlwaysFalse(right_expr)) {
-		sql_expr_delete(db, left_expr, false);
-		sql_expr_delete(db, right_expr, false);
+		sql_expr_delete(db, left_expr);
+		sql_expr_delete(db, right_expr);
 		struct Expr *f = sql_expr_new_anon(db, TK_FALSE);
 		if (f != NULL)
 			f->type = FIELD_TYPE_BOOLEAN;
@@ -1318,7 +1318,7 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
  * Recursively delete an expression tree.
  */
 static SQL_NOINLINE void
-sqlExprDeleteNN(sql * db, Expr * p, bool extern_alloc)
+sqlExprDeleteNN(sql *db, Expr *p)
 {
 	assert(p != 0);
 	/* Sanity check: Assert that the IntValue is non-negative if it exists */
@@ -1333,10 +1333,9 @@ sqlExprDeleteNN(sql * db, Expr * p, bool extern_alloc)
 	if (!ExprHasProperty(p, (EP_TokenOnly | EP_Leaf))) {
 		/* The Expr.x union is never used at the same time as Expr.pRight */
 		assert(p->x.pList == 0 || p->pRight == 0);
-		if (p->pLeft && p->op != TK_SELECT_COLUMN && !extern_alloc)
-			sqlExprDeleteNN(db, p->pLeft, extern_alloc);
-		if (!extern_alloc)
-			sql_expr_delete(db, p->pRight, extern_alloc);
+		if (p->pLeft && p->op != TK_SELECT_COLUMN)
+			sqlExprDeleteNN(db, p->pLeft);
+		sql_expr_delete(db, p->pRight);
 		if (ExprHasProperty(p, EP_xIsSelect)) {
 			sql_select_delete(db, p->x.pSelect);
 		} else {
@@ -1351,10 +1350,10 @@ sqlExprDeleteNN(sql * db, Expr * p, bool extern_alloc)
 }
 
 void
-sql_expr_delete(sql *db, Expr *expr, bool extern_alloc)
+sql_expr_delete(sql *db, Expr *expr)
 {
 	if (expr != NULL)
-		sqlExprDeleteNN(db, expr, extern_alloc);
+		sqlExprDeleteNN(db, expr);
 }
 
 /*
@@ -1817,7 +1816,7 @@ sql_expr_list_append(struct sql *db, struct ExprList *expr_list,
 
  no_mem:
 	/* Avoid leaking memory if malloc has failed. */
-	sql_expr_delete(db, expr, false);
+	sql_expr_delete(db, expr);
 	sql_expr_list_delete(db, expr_list);
 	return NULL;
 }
@@ -1895,7 +1894,7 @@ sqlExprListAppendVector(Parse * pParse,	/* Parsing context */
 	}
 
  vector_append_error:
-	sql_expr_delete(db, pExpr, false);
+	sql_expr_delete(db, pExpr);
 	sqlIdListDelete(db, pColumns);
 	return pList;
 }
@@ -1983,7 +1982,7 @@ exprListDeleteNN(sql * db, ExprList * pList)
 	struct ExprList_item *pItem;
 	assert(pList->a != 0 || pList->nExpr == 0);
 	for (pItem = pList->a, i = 0; i < pList->nExpr; i++, pItem++) {
-		sql_expr_delete(db, pItem->pExpr, false);
+		sql_expr_delete(db, pItem->pExpr);
 		sqlDbFree(db, pItem->zName);
 		sqlDbFree(db, pItem->zSpan);
 	}
