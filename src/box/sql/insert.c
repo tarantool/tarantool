@@ -41,6 +41,7 @@
 #include "bit/bit.h"
 #include "box/box.h"
 #include "box/schema.h"
+#include "box/tuple_format.h"
 
 void
 sql_emit_table_types(struct Vdbe *v, struct space_def *def, int reg)
@@ -588,9 +589,11 @@ sqlInsert(Parse * pParse,	/* Parser context */
 					sqlVdbeAddOp2(v, OP_Integer, -1,
 							  regCols + i + 1);
 				} else {
-					struct Expr *dflt = NULL;
-					dflt = space_def->fields[i].
-						default_value_expr;
+					struct tuple_field *field =
+						tuple_format_field(
+							space->format, i);
+					struct Expr *dflt =
+						field->default_value_expr;
 					sqlExprCode(pParse,
 							dflt,
 							regCols + i + 1);
@@ -650,8 +653,9 @@ sqlInsert(Parse * pParse,	/* Parser context */
 					sqlVdbeAddOp2(v, OP_Null, 0, iRegStore);
 					continue;
 				}
-				struct Expr *dflt = NULL;
-				dflt = space_def->fields[i].default_value_expr;
+				struct tuple_field *field =
+					tuple_format_field(space->format, i);
+				struct Expr *dflt = field->default_value_expr;
 				sqlExprCodeFactorable(pParse,
 							  dflt,
 							  iRegStore);

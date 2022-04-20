@@ -135,19 +135,6 @@ struct space_def {
 	char name[0];
 };
 
-/*
- * Free a default value syntax trees and other private data of @a defs.
- * @param fields Fields array to destroy.
- * @param field_count Length of @a fields.
- * @param extern_alloc Fields expression AST allocated externally.
- *                     (specify false when sql_expr_delete should
- *                      release default_value_expr memory,
- *                      true - when shouldn't)
- */
-void
-space_def_destroy_fields(struct field_def *fields, uint32_t field_count,
-			 bool extern_alloc);
-
 /**
  * Delete the space_def object.
  * @param def Def to delete.
@@ -205,14 +192,12 @@ space_def_new_ephemeral(uint32_t exact_field_count, struct field_def *fields);
  *             a field names memory.
  * @param[out] fields_offset Offset from the beginning of a def to
  *             a fields array.
- * @param[out] def_expr_offset Offset from the beginning of a def
- *             to a def_value_expr array.
  * @retval Size in bytes.
  */
 size_t
 space_def_sizeof(uint32_t name_len, const struct field_def *fields,
 		 uint32_t field_count, uint32_t *names_offset,
-		 uint32_t *fields_offset, uint32_t *def_expr_offset);
+		 uint32_t *fields_offset);
 
 struct tuple_format;
 struct tuple_format_vtab;

@@ -198,7 +198,6 @@ const struct field_def field_def_default = {
 	.nullable_action = ON_CONFLICT_ACTION_DEFAULT,
 	.coll_id = COLL_NONE,
 	.default_value = NULL,
-	.default_value_expr = NULL,
 	.constraint_count = 0,
 	.constraint_def = NULL,
 };

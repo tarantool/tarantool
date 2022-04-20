@@ -515,14 +515,6 @@ field_def_decode(struct field_def *field, const char **data,
 				    fieldno + TUPLE_INDEX_BASE));
 		return -1;
 	}
-
-	const char *dv = field->default_value;
-	if (dv != NULL) {
-		field->default_value_expr = sql_expr_compile(sql_get(), dv,
-							     strlen(dv));
-		if (field->default_value_expr == NULL)
-			return -1;
-	}
 	return 0;
 }
 
@@ -559,21 +551,11 @@ space_format_decode(const char *data, uint32_t *out_count,
 			 "region_defs");
 		return -1;
 	}
-	/*
-	 * Nullify to prevent a case when decoding will fail in
-	 * the middle and space_def_destroy_fields() below will
-	 * work with garbage pointers.
-	 */
-	memset(region_defs, 0, size);
-	auto fields_guard = make_scoped_guard([=] {
-	    space_def_destroy_fields(region_defs, count, false);
-	});
 	for (uint32_t i = 0; i < count; ++i) {
 		if (field_def_decode(&region_defs[i], &data, space_name, name_len,
 				     errcode, i, region) != 0)
 			return -1;
 	}
-	fields_guard.is_active = false;
 	*fields = region_defs;
 	return 0;
 }
@@ -649,9 +631,6 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 	if (space_format_decode(format, &field_count, name,
 				name_len, errcode, region, &fields) != 0)
 		return NULL;
-	auto fields_guard = make_scoped_guard([=] {
-	    space_def_destroy_fields(fields, field_count, false);
-	});
 	if (exact_field_count != 0 &&
 	    exact_field_count < field_count) {
 		diag_set(ClientError, errcode, tt_cstr(name, name_len),

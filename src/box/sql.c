@@ -64,9 +64,24 @@ static const uint32_t default_sql_flags = SQL_EnableTrigger
 					  | SQL_AutoIndex
 					  | SQL_RecTriggers;
 
+static Expr *
+sql_expr_compile_cb(const char *expr, int expr_len)
+{
+	return sql_expr_compile(sql_get(), expr, expr_len);
+}
+
+static void
+sql_expr_delete_cb(struct Expr *expr)
+{
+	sql_expr_delete(sql_get(), expr, false);
+}
+
 void
 sql_init(void)
 {
+	tuple_format_expr_compile = sql_expr_compile_cb;
+	tuple_format_expr_delete = sql_expr_delete_cb;
+
 	default_flags |= default_sql_flags;
 
 	current_session()->sql_flags |= default_sql_flags;
@@ -354,7 +369,6 @@ sql_ephemeral_space_new(const struct sql_space_info *info)
 		fields[i].is_nullable = true;
 		fields[i].nullable_action = ON_CONFLICT_ACTION_NONE;
 		fields[i].default_value = NULL;
-		fields[i].default_value_expr = NULL;
 		fields[i].type = info->types[i];
 		fields[i].coll_id = info->coll_ids[i];
 		fields[i].compression_type = COMPRESSION_TYPE_NONE;
@@ -1223,8 +1237,8 @@ space_column_default_expr(uint32_t space_id, uint32_t fieldno)
 	if (space->def->opts.is_view)
 		return NULL;
 	assert(space->def->field_count > fieldno);
-
-	return space->def->fields[fieldno].default_value_expr;
+	struct tuple_field *field = tuple_format_field(space->format, fieldno);
+	return field->default_value_expr;
 }
 
 /**
@@ -1240,8 +1254,7 @@ sql_template_space_def_new(struct Parse *parser, const char *name)
 	struct space_def *def = NULL;
 	size_t name_len = name != NULL ? strlen(name) : 0;
 	uint32_t dummy;
-	size_t size = space_def_sizeof(name_len, NULL, 0, &dummy, &dummy,
-				       &dummy);
+	size_t size = space_def_sizeof(name_len, NULL, 0, &dummy, &dummy);
 	def = (struct space_def *)region_aligned_alloc(&parser->region, size,
 						       alignof(*def));
 	if (def == NULL) {
