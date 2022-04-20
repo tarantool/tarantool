@@ -231,6 +231,10 @@ raft_node_unblock(struct raft_node *node);
 void
 raft_node_promote(struct raft_node *node);
 
+/** Resign leadership. Node becomes follower without bumping the term. */
+void
+raft_node_resign(struct raft_node *node);
+
 /**
  * Restore the node's state back to its is_candidate config. It is demoted if
  * was a leader.

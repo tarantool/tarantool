@@ -116,6 +116,21 @@ box_raft_wait_term_outcome(void);
 int
 box_raft_wait_term_persisted(void);
 
+/**
+ * Enable/disable fencing. If enabled: instance will resign its leader role,
+ * when it looses quorum.
+ */
+void
+box_raft_set_election_fencing_enabled(bool enabled);
+
+/**
+ * Pause fencing. Instance will not resign its leader role when it looses
+ * quorum even if fencing is enabled. Useful to prevent fencing while adding
+ * replicas to replicaset or bootstraping.
+ */
+void
+box_raft_election_fencing_pause(void);
+
 void
 box_raft_init(void);
 

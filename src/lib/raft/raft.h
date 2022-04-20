@@ -339,6 +339,13 @@ void
 raft_promote(struct raft *raft);
 
 /**
+ * Resign from RAFT leadership. Become follower in current term.
+ * Don't start new term until quorum is reobtained.
+ */
+void
+raft_resign(struct raft *raft);
+
+/**
  * Restore the instance role according to its config. In particular, if it was
  * promoted and elected in the current term despite its config, restoration
  * makes it a follower.

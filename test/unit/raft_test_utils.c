@@ -437,6 +437,14 @@ raft_node_promote(struct raft_node *node)
 }
 
 void
+raft_node_resign(struct raft_node *node)
+{
+	assert(raft_node_is_started(node));
+	raft_resign(&node->raft);
+	raft_run_async_work();
+}
+
+void
 raft_node_restore(struct raft_node *node)
 {
 	assert(raft_node_is_started(node));
