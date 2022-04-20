@@ -1,7 +1,5 @@
 -- compat.lua -- internal file
 
-local json = require('json')
-
 local options = {
 	json_escape_forward_slash = {
 		old = true,
@@ -31,10 +29,10 @@ local options = {
 
 local postaction = {
 	json_escape_forward_slash = function(value)
-			json.cfg{encode_esc_slash = value}
+			require('json').cfg{encode_esc_slash = value}
 		end,
 	option_2 = function (value)
-			print("option_2 postaction was called!")
+			-- print("option_2 postaction was called!")
 		end,
 	option_3 = function (value)
 			assert(not "option_3 is frozen its postaction should never be called")
@@ -172,7 +170,9 @@ local compat = setmetatable({
 			end,
 			postload = function()
 				for key, elem in pairs(options) do
-					set_option(key, options[key].default)
+					if not options[key].frozen then
+						postaction[key](cfg[key].value)
+					end
 				end
 			end,
 			help = function()
