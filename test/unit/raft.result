@@ -1,5 +1,5 @@
 	*** main_f ***
-1..17
+1..18
 	*** raft_test_leader_election ***
     1..24
     ok 1 - 1 pending message at start
@@ -388,4 +388,10 @@ ok 16 - subtests
     ok 43 - No timer re_start on election timeout reconfig when it's not time for elections yet
 ok 17 - subtests
 	*** raft_test_pre_vote: done ***
+	*** raft_test_resign ***
+    1..2
+    ok 1 - became leader
+    ok 2 - resigned from leader state
+ok 18 - subtests
+	*** raft_test_resign: done ***
 	*** main_f: done ***
