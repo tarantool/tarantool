@@ -34,4 +34,5 @@ runs:
               ;;
           esac
         fi
+        REPO_TYPE=release RWS_BASE_URL=https://rws-dev.tarantool.org make -f .gitlab.mk deploy
       shell: bash

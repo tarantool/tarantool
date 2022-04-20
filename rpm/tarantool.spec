@@ -11,6 +11,9 @@
 # need to use cmake3 package to build Tarantool on old systems.
 %define use_cmake3 0%{?rhel} == 7
 
+#
+%define _gc64 %{getenv:GC64}
+
 %if %use_cmake3
 # XXX: Unfortunately there is no way to make rpmbuild install and
 # enable EPEL repository prior to the build step. However, the
@@ -190,6 +193,9 @@ C and Lua/C modules.
 %endif
 %if 0%{?fedora} >= 33
          -DENABLE_LTO=ON \
+%endif
+%if "%{_gc64}"
+         %{_gc64} \
 %endif
          -DENABLE_WERROR:BOOL=ON \
          -DENABLE_DIST:BOOL=ON
