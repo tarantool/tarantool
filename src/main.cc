@@ -473,7 +473,10 @@ load_cfg(void)
 			       cfg_geti64("flightrec_logs_max_msg_size"),
 			       cfg_geti("flightrec_logs_log_level"),
 			       cfg_getd("flightrec_metrics_interval"),
-			       cfg_geti("flightrec_metrics_period"));
+			       cfg_geti("flightrec_metrics_period"),
+			       cfg_geti("flightrec_requests_size"),
+			       cfg_geti("flightrec_requests_max_req_size"),
+			       cfg_geti("flightrec_requests_max_res_size"));
 	}
 
 	memtx_tx_manager_use_mvcc_engine = cfg_getb("memtx_use_mvcc_engine");
