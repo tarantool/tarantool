@@ -140,6 +140,10 @@ typedef int (*log_format_func_t)(struct log *log, char *buf, int len, int level,
 				 const char *filename, int line, const char *error,
 				 const char *format, va_list ap);
 
+typedef void
+(*log_callback_t)(int level, const char *filename, int line,
+		  const char *error, const char *format, va_list ap);
+
 /**
  * A log object. There is a singleton for the default log.
  */
@@ -175,6 +179,8 @@ struct log {
 	int rotating_threads;
 	enum syslog_facility syslog_facility;
 	struct rlist in_log_list;
+	/** Callback called on log event. */
+	log_callback_t on_log;
 };
 
 /**
@@ -262,6 +268,12 @@ say_set_log_level(int new_level);
  */
 void
 say_set_log_format(enum say_format format);
+
+/**
+ * Set callback function called on each log event.
+ */
+void
+say_set_log_callback(log_callback_t callback);
 
 /**
  * Return say format by name.
