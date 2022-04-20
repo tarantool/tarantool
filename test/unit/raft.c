@@ -2187,10 +2187,48 @@ raft_test_pre_vote(void)
 	raft_finish_test();
 }
 
+static void
+raft_test_resign(void)
+{
+	raft_start_test(2);
+	struct raft_node node;
+	raft_node_create(&node);
+	raft_node_cfg_is_candidate(&node, true);
+
+	raft_node_cfg_election_quorum(&node, 1);
+	raft_node_promote(&node);
+	ok(raft_node_check_full_state(
+		&node,
+		RAFT_STATE_LEADER /* State. */,
+		1 /* Leader. */,
+		2 /* Term. */,
+		1 /* Vote. */,
+		2 /* Volatile term. */,
+		1 /* Volatile vote. */,
+		"{0: 2}" /* Vclock. */
+	), "became leader");
+
+	raft_node_resign(&node);
+
+	ok(raft_node_check_full_state(
+		&node,
+		RAFT_STATE_FOLLOWER /* State. */,
+		0 /* Leader. */,
+		2 /* Term. */,
+		1 /* Vote. */,
+		2 /* Volatile term. */,
+		1 /* Volatile vote. */,
+		"{0: 2}" /* Vclock. */
+	), "resigned from leader state");
+
+	raft_node_destroy(&node);
+	raft_finish_test();
+}
+
 static int
 main_f(va_list ap)
 {
-	raft_start_test(17);
+	raft_start_test(18);
 
 	(void) ap;
 	fakeev_init();
@@ -2212,6 +2250,7 @@ main_f(va_list ap)
 	raft_test_bump_term_before_cfg();
 	raft_test_split_vote();
 	raft_test_pre_vote();
+	raft_test_resign();
 
 	fakeev_free();
 

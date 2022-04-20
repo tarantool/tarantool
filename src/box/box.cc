@@ -807,6 +807,21 @@ box_check_election_timeout(void)
 	return d;
 }
 
+/**
+ * Raises error if election_fencing_enabled configuration is incorrect.
+ */
+static int
+box_check_election_fencing_enabled(void)
+{
+	int i = cfg_getb("election_fencing_enabled");
+	if (i < 0) {
+		diag_set(ClientError, ER_CFG, "election_fencing_enabled",
+			 "the value must be a boolean");
+		return -1;
+	}
+	return i;
+}
+
 static int
 box_check_uri_set(const char *option_name)
 {
@@ -1335,6 +1350,8 @@ box_check_config(void)
 		diag_raise();
 	if (box_check_election_timeout() < 0)
 		diag_raise();
+	if (box_check_election_fencing_enabled() < 0)
+		diag_raise();
 	if (box_check_replication() != 0)
 		diag_raise();
 	box_check_replication_timeout();
@@ -1390,6 +1407,16 @@ box_set_election_timeout(void)
 	if (d < 0)
 		return -1;
 	raft_cfg_election_timeout(box_raft(), d);
+	return 0;
+}
+
+int
+box_set_election_fencing_enabled(void)
+{
+	int enabled = box_check_election_fencing_enabled();
+	if (enabled < 0)
+		return -1;
+	box_raft_set_election_fencing_enabled((bool)enabled);
 	return 0;
 }
 
@@ -1522,6 +1549,13 @@ box_update_replication_synchro_quorum(void)
 	 */
 	if (quorum <= 0 || quorum >= VCLOCK_MAX)
 		panic("failed to eval/fetch replication_synchro_quorum");
+
+	/*
+	 * Extending replicaset pause fencing until quorum is obtained.
+	 */
+	if (quorum > replication_synchro_quorum &&
+	    replicaset.healthy_count < quorum)
+		box_raft_election_fencing_pause();
 
 	replication_synchro_quorum = quorum;
 	txn_limbo_on_parameters_change(&txn_limbo);
@@ -3914,6 +3948,8 @@ box_cfg_xc(void)
 	raft_cfg_vclock(raft, &replicaset.vclock);
 
 	if (box_set_election_timeout() != 0)
+		diag_raise();
+	if (box_set_election_fencing_enabled() != 0)
 		diag_raise();
 	/*
 	 * Election is enabled last. So as all the parameters are installed by

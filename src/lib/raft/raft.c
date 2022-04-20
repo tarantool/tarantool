@@ -1124,6 +1124,14 @@ raft_promote(struct raft *raft)
 }
 
 void
+raft_resign(struct raft *raft)
+{
+	assert(raft->state == RAFT_STATE_LEADER);
+	say_warn("RAFT: resigning from leader state");
+	raft_stop_candidate(raft);
+}
+
+void
 raft_restore(struct raft *raft)
 {
 	raft_set_candidate(raft, raft->is_cfg_candidate && raft->is_enabled);
