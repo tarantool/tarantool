@@ -79,6 +79,9 @@ local default_cfg = {
     flightrec_logs_log_level = 6,
     flightrec_metrics_interval = 1.0,
     flightrec_metrics_period = 60 * 3,
+    flightrec_requests_size = 10485760,
+    flightrec_requests_max_req_size = 16384,
+    flightrec_requests_max_res_size = 16384,
 
     io_collect_interval = nil,
     readahead           = 16320,
@@ -202,6 +205,9 @@ local template_cfg = {
     flightrec_logs_log_level = 'number',
     flightrec_metrics_interval = 'number',
     flightrec_metrics_period = 'number',
+    flightrec_requests_size = 'number',
+    flightrec_requests_max_req_size = 'number',
+    flightrec_requests_max_res_size = 'number',
 
     io_collect_interval = 'number',
     readahead           = 'number',

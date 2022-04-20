@@ -25,7 +25,9 @@ extern "C" {
 static inline void
 flightrec_init(const char *fr_dirname, size_t logs_size,
 	       size_t logs_max_msg_size, int logs_log_level,
-	       double metrics_interval, size_t metrics_period)
+	       double metrics_interval, size_t metrics_period,
+	       size_t requests_size, size_t requests_max_req_size,
+	       size_t requests_max_res_size)
 {
 	(void)fr_dirname;
 	(void)logs_size;
@@ -33,6 +35,9 @@ flightrec_init(const char *fr_dirname, size_t logs_size,
 	(void)logs_log_level;
 	(void)metrics_interval;
 	(void)metrics_period;
+	(void)requests_size;
+	(void)requests_max_req_size;
+	(void)requests_max_res_size;
 	say_error("Flight recorder is not available in this build");
 }
 
@@ -46,14 +51,38 @@ flightrec_free(void)
 static inline int
 flightrec_check_cfg(int64_t logs_size, int64_t logs_max_msg_size,
 		    int logs_log_level, double metrics_interval,
-		    int64_t metrics_period)
+		    int64_t metrics_period, int64_t requests_size,
+		    int64_t requests_max_req_size,
+		    int64_t requests_max_res_size)
 {
 	(void)logs_size;
 	(void)logs_max_msg_size;
 	(void)logs_log_level;
 	(void)metrics_interval;
 	(void)metrics_period;
+	(void)requests_size;
+	(void)requests_max_req_size;
+	(void)requests_max_res_size;
 	return 0;
+}
+
+/** No-op in OS version. */
+static inline void
+flightrec_write_request(char *request_mspack, size_t len)
+{
+	(void)request_mspack;
+	(void)len;
+}
+
+struct obuf;
+struct obuf_svp;
+
+/** No-op in OS version. */
+static inline void
+flightrec_write_response(struct obuf *buf, struct obuf_svp *svp)
+{
+	(void)buf;
+	(void)svp;
 }
 
 #if defined(__cplusplus)

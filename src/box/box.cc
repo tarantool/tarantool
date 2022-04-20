@@ -784,7 +784,10 @@ box_check_flightrec(void)
 			cfg_geti64("flightrec_logs_max_msg_size"),
 			cfg_geti("flightrec_logs_log_level"),
 			cfg_getd("flightrec_metrics_interval"),
-			cfg_geti64("flightrec_metrics_period")) != 0)
+			cfg_geti64("flightrec_metrics_period"),
+			cfg_geti64("flightrec_requests_size"),
+			cfg_geti64("flightrec_requests_max_req_size"),
+			cfg_geti64("flightrec_requests_max_res_size")) != 0)
 		diag_raise();
 }
 
