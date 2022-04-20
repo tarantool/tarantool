@@ -1,5 +1,14 @@
 -- compat.lua -- internal file
 
+local options_format = {
+    old     = "boolean",
+    new     = "boolean",
+    default = "boolean",
+    frozen  = "boolean",
+    brief   = "string",
+    doc     = "string"
+}
+
 local options = {
     json_escape_forward_slash = {
         old = true,
@@ -31,11 +40,11 @@ local postaction = {
     json_escape_forward_slash = function(value)
             require('json').cfg{encode_esc_slash = value}
         end,
-    option_2 = function (value)
+    option_2 = function()
             -- print("option_2 postaction was called!")
         end,
-    option_3 = function (value)
-            assert(not "option_3 is frozen its postaction should never be called")
+    option_3 = function()
+            assert(not "option_3 is frozen, its postaction should never be called")
         end
 }
 
@@ -44,14 +53,15 @@ This is Tarantool compatibility module.
 To get help, see the Tarantool manual at https://tarantool.io/en/doc/
 Available commands:
 
-    candidates()                -- list all unselected options
-    dump()                      -- get command that sets up compat with same options as current
-    help()                      -- show this help
-    reset()                     -- set all options to default
-    restore{'option_name'}      -- set to default specified options
-    {option_name = true}        -- set list of options to desired values, could be true, false, 'old', 'new', 'default'
-    option_name                 -- list option info
-    option_name = true          -- set desired value to option, could be true, false, 'old', 'new', 'default'
+    candidates()                    -- list all unselected options
+    dump()                          -- get command that sets up compat with same options as current
+    help()                          -- show this help
+    reset()                         -- set all options to default
+    add_options{{name, {}, action}} -- add new options by providing name, option table and postaction for each one
+    restore{'option_name'}          -- set to default specified options
+    {option_name = true}            -- set listed options to desired values (true, false, 'old', 'new', 'default')
+    option_name                     -- list option info
+    option_name = true              -- set desired value to option, could be true, false, 'old', 'new', 'default'
 ]]
 
 local cfg = { }
@@ -66,12 +76,23 @@ local function serialize_policy(key, policy)
     return result
 end
 
-local function serialize_compat(compat)                     -- should it list frozen options?
+local function serialize_compat()                       -- should it list frozen options?
     local result = { }
     for key, val in pairs(options) do
         result[key] = serialize_policy(key, val)
     end
     return result
+end
+
+local function verify_option(name, option)
+    for p, t in pairs(options_format) do
+        if type(option[p]) ~= t then
+            error(('Invalid option table for %s, bad %s (%s is expected)'):format(name, p, t))
+        end
+        if option.frozen and not option.default == option.new then
+            error(('Frozen option %s default is wrong'):format(name))
+        end
+    end
 end
 
 local function set_option(key, val)
@@ -102,7 +123,8 @@ local function set_option(key, val)
         if val == options[key].new then
             print("WARNING: chosen option is the only available!")      -- a better way to throw warnings?
         else
-            error("Chosen option is no longer available")               -- is it a good idea to throw errors this way, so file and line get listed?
+            error("Chosen option is no longer available")               -- is it a good idea to throw errors this way,
+                                                                        -- so file and line get listed?
         end
     end end
     cfg[key].value = val
@@ -122,7 +144,7 @@ local compat = setmetatable({
             dump = function()                                           -- should frozen options be listed in dump?
                 local result = "require('tarantool').compat({"
                 local isFirst = true
-                for key, val in pairs(options) do
+                for key, _ in pairs(options) do
                     if cfg[key].selected then
                         if not isFirst then
                             result = result .. ", "
@@ -134,42 +156,40 @@ local compat = setmetatable({
                 return result .. "})"
             end,
             reset = function()
-                for key, elem in pairs(options) do
+                for key, _ in pairs(options) do
                     set_option(key, 'default')
                     cfg[key].selected = false
                 end
             end,
-            restore = setmetatable({}, {
-                __call = function(self, list)
-                    if type(list) ~= 'table' then
-                        error(('Invalid argument %s'):format(list))
-                    end
-                    for i, key in pairs(list) do
-                        set_option(key, 'default')
-                        cfg[key].selected = false
-
-                    end
-                end,
-                __autocomplete = function(self)                     -- this is not how you want it to autocomplete
-                    local res = { }
-                    for key, elem in pairs(options) do
-                        if not options[key].frozen then
-                            res[key] = true
-                        end
-                    end
-                    return res
+            restore = function(list)
+                if type(list) ~= 'table' then
+                    error(('Invalid argument %s'):format(list))
                 end
-                } ),
+                for _, key in pairs(list) do
+                    set_option(key, 'default')
+                    cfg[key].selected = false
+                end
+            end,
+            add_options = function(list)
+                if type(list) ~= 'table' then
+                    error(('Invalid argument %s'):format(list))
+                end
+                for _, val in pairs(list) do
+                    local name, option, action = unpack(val)
+                    verify_option(name, option)
+                    options[name] = option
+                    postaction[name] = action
+                    cfg[name] = {value = option.default, selected = false}
+                end
+            end,
             preload = function()
                 for key, elem in pairs(options) do
-                    cfg[key] = { }
-                    cfg[key].value = elem.default
-                    cfg[key].selected = false
-                    assert(not options[key].frozen or options[key].default == options[key].new)     -- checks if defaults for frozen values are correct
+                    verify_option(key, elem)
+                    cfg[key] = {value = elem.default, selected = false}
                 end
             end,
             postload = function()
-                for key, elem in pairs(options) do
+                for key, _ in pairs(options) do
                     if not options[key].frozen then
                         postaction[key](cfg[key].value)
                     end
@@ -180,7 +200,7 @@ local compat = setmetatable({
                 print(help)
             end
         }, {
-            __call = function(compat, list)
+            __call = function(_, list)
                 if type(list) ~= 'table' then
                     error(('Invalid argument %s'):format(list))
                 end
@@ -188,10 +208,10 @@ local compat = setmetatable({
                     set_option(key, val)
                 end
             end,
-            __newindex = function(compat, key, val)
+            __newindex = function(_, key, val)
                 set_option(key, val)
             end,
-            __index = function(compat, key)
+            __index = function(_, key)
                 local policy = options[key]
                 if not policy then
                     error(('Invalid option %s'):format(key))
@@ -199,10 +219,10 @@ local compat = setmetatable({
                 return serialize_policy(key, policy);
             end,
             __serialize = serialize_compat,
-            __tostring = serialize_compat,
+            __tostring  = serialize_compat,
             __autocomplete = function(self)
                 local res = { }
-                for key, elem in pairs(options) do
+                for key, _ in pairs(options) do
                     if not options[key].frozen then
                         res[key] = true
                     end
