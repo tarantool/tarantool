@@ -87,6 +87,7 @@ static struct log log_boot = {
 	.format_func = say_format_boot,
 	.pid = 0,
 	.syslog_ident = NULL,
+	.on_log = NULL,
 };
 
 /** Default logger used after bootstrap. */
@@ -222,6 +223,12 @@ say_set_log_format(enum say_format format)
 
 	log_set_format(log_default, format_func);
 	log_format = format;
+}
+
+void
+say_set_log_callback(log_callback_t callback)
+{
+	log_default->on_log = callback;
 }
 
 static const char *say_format_strs[] = {
@@ -634,6 +641,7 @@ log_create(struct log *log, const char *init_str, int nonblock)
 	log->format_func = NULL;
 	log->level = S_INFO;
 	log->rotating_threads = 0;
+	log->on_log = NULL;
 	fiber_cond_create(&log->rotate_cond);
 	ev_async_init(&log->log_async, log_rotate_async_cb);
 	setvbuf(stderr, NULL, _IONBF, 0);
@@ -1232,6 +1240,12 @@ log_vsay(struct log *log, int level, const char *filename, int line,
 	 const char *error, const char *format, va_list ap)
 {
 	int errsv = errno;
+	if (log->on_log != NULL) {
+		va_list ap_copy;
+		va_copy(ap_copy, ap);
+		log->on_log(level, filename, line, error, format, ap_copy);
+		va_end(ap_copy);
+	}
 	if (level > log->level) {
 		return 0;
 	}
