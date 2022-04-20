@@ -137,6 +137,7 @@ extern char strict_lua[],
 	jit_p_lua[], /* LuaJIT 2.1 profiler */
 	jit_zone_lua[], /* LuaJIT 2.1 profiler */
 	/* tools.* libraries. */
+	utils_avl_lua[],
 	utils_bufread_lua[],
 	utils_symtab_lua[],
 	memprof_parse_lua[],
@@ -285,6 +286,7 @@ static const char *lua_modules[] = {
 	"jit.p", jit_p_lua,
 	"jit.zone", jit_zone_lua,
 	/* tools.* libraries. Order is important. */
+	"utils.avl", utils_avl_lua,
 	"utils.bufread", utils_bufread_lua,
 	"utils.symtab", utils_symtab_lua,
 	"memprof.parse", memprof_parse_lua,
