@@ -37,6 +37,7 @@
 #include "sqlInt.h"
 #include "box/fk_constraint.h"
 #include "box/schema.h"
+#include "box/tuple_format.h"
 
 /*
  * Deferred and Immediate FKs
@@ -808,7 +809,9 @@ fk_constraint_action_trigger(struct Parse *pParse, struct space_def *def,
 
 		if (action != FKEY_ACTION_RESTRICT &&
 		    (action != FKEY_ACTION_CASCADE || is_update)) {
-			struct Expr *d = child_fields[chcol].default_value_expr;
+			struct tuple_field *field = tuple_format_field(
+				child_space->format, chcol);
+			struct Expr *d = field->default_value_expr;
 			if (action == FKEY_ACTION_CASCADE) {
 				new = sql_expr_new_2part_id(pParse, &t_new,
 							    &t_to_col);

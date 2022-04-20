@@ -45,6 +45,9 @@ static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 static uint32_t formats_size = 0, formats_capacity = 0;
 static uint64_t formats_epoch = 0;
 
+tuple_format_expr_compile_f tuple_format_expr_compile;
+tuple_format_expr_delete_f tuple_format_expr_delete;
+
 /**
  * Find in format1::fields the field by format2_field's JSON path.
  * Routine uses fiber region for temporal path allocation and
@@ -189,6 +192,8 @@ tuple_field_delete(struct tuple_field *field)
 	for (uint32_t i = 0; i < field->constraint_count; i++)
 		field->constraint[i].destroy(&field->constraint[i]);
 	free(field->constraint);
+	if (field->default_value_expr != NULL)
+		tuple_format_expr_delete(field->default_value_expr);
 	free(field);
 }
 
@@ -499,6 +504,13 @@ tuple_format_create(struct tuple_format *format, struct key_def *const *keys,
 			tuple_constraint_array_new(fields[i].constraint_def,
 						   fields[i].constraint_count);
 		field->constraint_count = fields[i].constraint_count;
+		const char *expr = fields[i].default_value;
+		if (expr != NULL) {
+			field->default_value_expr =
+				tuple_format_expr_compile(expr, strlen(expr));
+			if (field->default_value_expr == NULL)
+				return -1;
+		}
 	}
 
 	int current_slot = 0;

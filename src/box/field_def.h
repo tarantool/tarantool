@@ -146,8 +146,6 @@ struct field_def {
 	uint32_t coll_id;
 	/** 0-terminated SQL expression for DEFAULT value. */
 	char *default_value;
-	/** AST for parsed default value. */
-	struct Expr *default_value_expr;
 	/** Type of comression to this field */
 	enum compression_type compression_type;
 	/** Array of constraints. Can be NULL if constraints_count == 0. */
