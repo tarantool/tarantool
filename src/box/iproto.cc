@@ -70,6 +70,7 @@
 #include "assoc.h"
 #include "txn.h"
 #include "on_shutdown.h"
+#include "flightrec.h"
 
 enum {
 	IPROTO_SALT_SIZE = 32,
@@ -1883,6 +1884,7 @@ tx_accept_msg(struct cmsg *m)
 	msg->connection->iproto_thread->tx.requests_in_progress++;
 	rmean_collect(msg->connection->iproto_thread->tx.rmean,
 		      REQUESTS_IN_PROGRESS, 1);
+	flightrec_write_request(msg->p_ibuf->rpos, msg->len);
 	return msg;
 }
 
@@ -1894,7 +1896,9 @@ tx_end_msg(struct iproto_msg *msg, struct obuf_svp *svp)
 		msg->stream->txn = txn_detach();
 	}
 	msg->connection->iproto_thread->tx.requests_in_progress--;
-	(void)svp;
+	/* Log response to the flight recorder. */
+	struct obuf *out = msg->connection->tx.p_obuf;
+	flightrec_write_response(out, svp);
 }
 
 /**
