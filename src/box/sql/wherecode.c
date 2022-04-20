@@ -1346,7 +1346,7 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			pLevel->iIdxCur = iCovCur;
 		if (pAndExpr) {
 			pAndExpr->pLeft = 0;
-			sql_expr_delete(db, pAndExpr, false);
+			sql_expr_delete(db, pAndExpr);
 		}
 		sqlVdbeChangeP1(v, iRetInit, sqlVdbeCurrentAddr(v));
 		sqlVdbeGoto(v, pLevel->addrBrk);

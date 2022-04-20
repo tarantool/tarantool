@@ -729,7 +729,7 @@ joinop(X) ::= JOIN_KW(A) join_nm(B) join_nm(C) JOIN.
                   {X = sqlJoinType(pParse,&A,&B,&C);/*X-overwrites-A*/}
 
 %type on_opt {Expr*}
-%destructor on_opt {sql_expr_delete(pParse->db, $$, false);}
+%destructor on_opt {sql_expr_delete(pParse->db, $$);}
 on_opt(N) ::= ON expr(E).   {N = E.pExpr;}
 on_opt(N) ::= .             {N = 0;}
 
@@ -823,7 +823,7 @@ groupby_opt(A) ::= .                      {A = 0;}
 groupby_opt(A) ::= GROUP BY nexprlist(X). {A = X;}
 
 %type having_opt {Expr*}
-%destructor having_opt {sql_expr_delete(pParse->db, $$, false);}
+%destructor having_opt {sql_expr_delete(pParse->db, $$);}
 having_opt(A) ::= .                {A = 0;}
 having_opt(A) ::= HAVING expr(X).  {A = X.pExpr;}
 
@@ -866,7 +866,7 @@ cmd ::= TRUNCATE TABLE fullname(X). {
 }
 
 %type where_opt {Expr*}
-%destructor where_opt {sql_expr_delete(pParse->db, $$, false);}
+%destructor where_opt {sql_expr_delete(pParse->db, $$);}
 
 where_opt(A) ::= .                    {A = 0;}
 where_opt(A) ::= WHERE expr(X).       {A = X.pExpr;}
@@ -955,9 +955,9 @@ idlist(A) ::= nm(Y). {
 //
 
 %type expr {ExprSpan}
-%destructor expr {sql_expr_delete(pParse->db, $$.pExpr, false);}
+%destructor expr {sql_expr_delete(pParse->db, $$.pExpr);}
 %type term {ExprSpan}
-%destructor term {sql_expr_delete(pParse->db, $$.pExpr, false);}
+%destructor term {sql_expr_delete(pParse->db, $$.pExpr);}
 
 %include {
   /* This is a utility routine used to set the ExprSpan.zStart and
@@ -1060,7 +1060,7 @@ expr(A) ::= nm(X) DOT nm(Y). {
   }
   struct Expr *temp2 = sql_expr_new_dequoted(pParse->db, TK_ID, &Y);
   if (temp2 == NULL) {
-    sql_expr_delete(pParse->db, temp1, false);
+    sql_expr_delete(pParse->db, temp1);
     pParse->is_aborted = true;
     return;
   }
@@ -1179,7 +1179,7 @@ trim_operands(A) ::= expr(Y). {
 }
 
 %type expr_optional {struct Expr *}
-%destructor expr_optional {sql_expr_delete(pParse->db, $$, false);}
+%destructor expr_optional {sql_expr_delete(pParse->db, $$);}
 
 expr_optional(A) ::= .        { A = NULL; }
 expr_optional(A) ::= expr(X). { A = X.pExpr; }
@@ -1386,7 +1386,7 @@ expr(A) ::= expr(A) in_op(N) LP exprlist(Y) RP(E). [IN] {
     ** simplify to constants 0 (false) and 1 (true), respectively,
     ** regardless of the value of expr1.
     */
-    sql_expr_delete(pParse->db, A.pExpr, false);
+    sql_expr_delete(pParse->db, A.pExpr);
     int tk = N == 0 ? TK_FALSE : TK_TRUE;
     A.pExpr = sql_expr_new_anon(pParse->db, tk);
     if (A.pExpr == NULL) {
@@ -1462,7 +1462,7 @@ expr(A) ::= CASE(C) expr_optional(X) case_exprlist(Y) case_else(Z) END(E). {
     sqlExprSetHeightAndFlags(pParse, A.pExpr);
   }else{
     sql_expr_list_delete(pParse->db, Y);
-    sql_expr_delete(pParse->db, Z, false);
+    sql_expr_delete(pParse->db, Z);
   }
 }
 %type case_exprlist {ExprList*}
@@ -1476,7 +1476,7 @@ case_exprlist(A) ::= WHEN expr(Y) THEN expr(Z). {
   A = sql_expr_list_append(pParse->db,A, Z.pExpr);
 }
 %type case_else {Expr*}
-%destructor case_else {sql_expr_delete(pParse->db, $$, false);}
+%destructor case_else {sql_expr_delete(pParse->db, $$);}
 case_else(A) ::=  ELSE expr(X).         {A = X.pExpr;}
 case_else(A) ::=  .                     {A = 0;} 
 
@@ -1625,7 +1625,7 @@ foreach_clause ::= . {
 foreach_clause ::= FOR EACH ROW.
 
 %type when_clause {Expr*}
-%destructor when_clause {sql_expr_delete(pParse->db, $$, false);}
+%destructor when_clause {sql_expr_delete(pParse->db, $$);}
 when_clause(A) ::= .             { A = 0; }
 when_clause(A) ::= WHEN expr(X). { A = X.pExpr; }
 

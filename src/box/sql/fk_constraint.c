@@ -479,7 +479,7 @@ fk_constraint_scan_children(struct Parse *parser, struct SrcList *src,
 		sqlWhereEnd(info);
 
 	/* Clean up the WHERE clause constructed above. */
-	sql_expr_delete(db, where, false);
+	sql_expr_delete(db, where);
 	if (fkifzero_label != 0)
 		sqlVdbeJumpHere(v, fkifzero_label);
 }
@@ -869,8 +869,8 @@ fk_constraint_action_trigger(struct Parse *pParse, struct space_def *def,
 		}
 	}
 
-	sql_expr_delete(db, where, false);
-	sql_expr_delete(db, when, false);
+	sql_expr_delete(db, where);
+	sql_expr_delete(db, when);
 	sql_expr_list_delete(db, list);
 	sql_select_delete(db, select);
 	if (db->mallocFailed) {

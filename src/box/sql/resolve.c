@@ -124,7 +124,7 @@ resolveAlias(Parse * pParse,	/* Parsing context */
 	 * make a copy of the token before doing the sqlDbFree().
 	 */
 	ExprSetProperty(pExpr, EP_Static);
-	sql_expr_delete(db, pExpr, false);
+	sql_expr_delete(db, pExpr);
 	memcpy(pExpr, pDup, sizeof(*pExpr));
 	if (!ExprHasProperty(pExpr, EP_IntValue) && pExpr->u.zToken != 0) {
 		assert((pExpr->flags & (EP_Reduced | EP_TokenOnly)) == 0);
@@ -457,9 +457,9 @@ lookupName(Parse * pParse,	/* The parsing context */
 
 	/* Clean up and return
 	 */
-	sql_expr_delete(db, pExpr->pLeft, false);
+	sql_expr_delete(db, pExpr->pLeft);
 	pExpr->pLeft = 0;
-	sql_expr_delete(db, pExpr->pRight, false);
+	sql_expr_delete(db, pExpr->pRight);
 	pExpr->pRight = 0;
 	pExpr->op = (isTrigger ? TK_TRIGGER : TK_COLUMN_REF);
  lookupname_end:
@@ -925,7 +925,7 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 						    resolveOrderByTermToExprList
 						    (pParse, pSelect, pDup);
 					}
-					sql_expr_delete(db, pDup, false);
+					sql_expr_delete(db, pDup);
 				}
 			}
 			if (iCol > 0) {
@@ -951,7 +951,7 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 					assert(pParent->pLeft == pE);
 					pParent->pLeft = pNew;
 				}
-				sql_expr_delete(db, pE, false);
+				sql_expr_delete(db, pE);
 				pItem->u.x.iOrderByCol = (u16) iCol;
 				pItem->done = 1;
 			} else {
@@ -1300,7 +1300,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
 			 * LIMIT but there is no reason to
 			 * restrict it directly).
 			 */
-			sql_expr_delete(db, p->pLimit, false);
+			sql_expr_delete(db, p->pLimit);
 			p->pLimit = sql_expr_new(db, TK_INTEGER,
 						 &sqlIntTokens[1]);
 			if (p->pLimit == NULL)
