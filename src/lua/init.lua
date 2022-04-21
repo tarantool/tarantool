@@ -203,7 +203,11 @@ rawset(package, "search", search)
 rawset(package, "searchroot", searchroot)
 rawset(package, "setsearchroot", setsearchroot)
 
+local compat = require('compat')
+package.loaded.compat = nil
+
 return {
     uptime = uptime;
     pid = pid;
+    compat = compat
 }
