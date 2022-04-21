@@ -204,8 +204,7 @@ key_def_set_part_path(struct key_def *def, uint32_t part_no, const char *path,
 				 def->multikey_path_len,
 				 TUPLE_INDEX_BASE) != 0) {
 		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-			 part_no + TUPLE_INDEX_BASE,
-			 "incompatable multikey index path");
+			 "incompatible multikey index path");
 		return -1;
 	}
 
@@ -225,7 +224,6 @@ key_def_set_part_path(struct key_def *def, uint32_t part_no, const char *path,
 				      TUPLE_INDEX_BASE) !=
 	    multikey_path_suffix_len) {
 		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-			 part_no + TUPLE_INDEX_BASE,
 			 "no more than one array index placeholder [*] is "
 			 "allowed in JSON path");
 		return -1;
@@ -285,7 +283,7 @@ key_def_new(const struct key_part_def *parts, uint32_t part_count,
 			struct coll_id *coll_id = coll_by_id(part->coll_id);
 			if (coll_id == NULL) {
 				diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-					 i + 1, "collation was not found by ID");
+					 "collation was not found by ID");
 				goto error;
 			}
 			coll = coll_id->coll;
@@ -922,7 +920,6 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 		struct key_part_def *part = &parts[i];
 		if (mp_typeof(**data) != MP_MAP) {
 			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-				 i + TUPLE_INDEX_BASE,
 				 "index part is expected to be a map");
 			return -1;
 		}
@@ -933,16 +930,14 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 		for (int j = 0; j < opts_count; ++j) {
 			if (mp_typeof(**data) != MP_STR) {
 				diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-					 i + TUPLE_INDEX_BASE,
 					 "key must be a string");
 				return -1;
 			}
 			uint32_t key_len;
 			const char *key = mp_decode_str(data, &key_len);
-			if (opts_parse_key(part, part_def_reg, key, key_len, data,
-					   ER_WRONG_INDEX_OPTIONS,
-					   i + TUPLE_INDEX_BASE, region,
-					   false) != 0)
+			if (opts_parse_key(part, part_def_reg, key, key_len,
+					   data, ER_WRONG_INDEX_OPTIONS,
+					   region, false) != 0)
 				return -1;
 			if (is_action_missing &&
 			    key_len == action_literal_len &&
@@ -957,7 +952,6 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 		}
 		if (part->type == field_type_MAX) {
 			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-				 i + TUPLE_INDEX_BASE,
 				 "index part: unknown field type");
 			return -1;
 		}
@@ -965,7 +959,6 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 		    part->type != FIELD_TYPE_STRING &&
 		    part->type != FIELD_TYPE_SCALAR) {
 			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-				 i + 1,
 				 "collation is reasonable only for "
 				 "string and scalar parts");
 			return -1;
@@ -976,14 +969,12 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 			  && part->nullable_action !=
 			  ON_CONFLICT_ACTION_NONE))) {
 			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-				 i + TUPLE_INDEX_BASE,
 				 "index part: conflicting nullability and "
 				 "nullable action properties");
 			return -1;
 		}
 		if (part->sort_order == sort_order_MAX) {
 			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-				 i + TUPLE_INDEX_BASE,
 				 "index part: unknown sort order");
 			return -1;
 		}
@@ -991,7 +982,7 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 		    json_path_validate(part->path, strlen(part->path),
 				       TUPLE_INDEX_BASE) != 0) {
 			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-				 i + TUPLE_INDEX_BASE, "invalid path");
+				 "invalid path");
 			return -1;
 		}
 	}

@@ -71,13 +71,12 @@ typedef int64_t (*opt_def_to_enum_cb)(const char *str, uint32_t len);
  * @param len array length (items count).
  * @param [out] opt pointer to store resulting value.
  * @param errcode Code of error to set if something is wrong.
- * @param field_no Field number of an option in a parent element.
  * @retval 0 on success.
  * @retval -1 on error.
  */
 typedef int
 (*opt_def_to_array_cb)(const char **str, uint32_t len, char *opt,
-		       uint32_t errcode, uint32_t field_no);
+		       uint32_t errcode);
 
 struct region;
 
@@ -87,13 +86,12 @@ struct region;
  * @param [out] opt pointer to store resulting value.
  * @param region Allocator for internal allocation.
  * @param errcode Code of error to set if something is wrong.
- * @param field_no Field number of an option in a parent element.
  * @retval 0 on success.
  * @retval -1 on error.
  */
 typedef int
 (*opt_def_custom_cb)(const char **str, void *opts, struct region *region,
-		     uint32_t errcode, uint32_t field_no);
+		     uint32_t errcode);
 
 struct opt_def {
 	const char *name;
@@ -143,7 +141,7 @@ struct region;
  */
 int
 opts_decode(void *opts, const struct opt_def *reg, const char **map,
-	    uint32_t errcode, uint32_t field_no, struct region *region);
+	    uint32_t errcode, struct region *region);
 
 /**
  * Decode one option and store it into @a opts struct as a field.
@@ -153,7 +151,6 @@ opts_decode(void *opts, const struct opt_def *reg, const char **map,
  * @param key_len Length of @a key.
  * @param data Option value.
  * @param errcode Code of error to set if something is wrong.
- * @param field_no Field number of an option in a parent element.
  * @param region Region to allocate OPT_STRPTR option.
  * @param skip_unknown_options If true, do not set error, if an
  *        option is unknown. Useful, when it is neccessary to
@@ -162,8 +159,7 @@ opts_decode(void *opts, const struct opt_def *reg, const char **map,
 int
 opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
 	       uint32_t key_len, const char **data, uint32_t errcode,
-	       uint32_t field_no, struct region *region,
-	       bool skip_unknown_options);
+	       struct region *region, bool skip_unknown_options);
 
 #if defined(__cplusplus)
 } /* extern "C" */

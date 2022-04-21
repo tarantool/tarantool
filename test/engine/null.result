@@ -44,7 +44,7 @@ format[2].is_nullable = 100
 ...
 s:format(format) -- Fail.
 ---
-- error: 'Wrong space format (field 2): ''is_nullable'' must be boolean'
+- error: 'Wrong space format: ''is_nullable'' must be boolean'
 ...
 -- Primary can not be nullable.
 parts = {}
@@ -828,48 +828,48 @@ parts[1] = {field = 2, type = 'unsigned', is_nullable = true, nullable_action = 
 ...
 sk = s:create_index('sk', { parts = parts }) -- Fail.
 ---
-- error: 'Wrong index options (field 1): index part: conflicting nullability and nullable
-    action properties'
+- error: 'Wrong index options: index part: conflicting nullability and nullable action
+    properties'
 ...
 parts[1].nullable_action = 'rollback'
 ---
 ...
 sk = s:create_index('sk', { parts = parts }) -- Fail.
 ---
-- error: 'Wrong index options (field 1): index part: conflicting nullability and nullable
-    action properties'
+- error: 'Wrong index options: index part: conflicting nullability and nullable action
+    properties'
 ...
 parts[1].nullable_action = 'fail'
 ---
 ...
 sk = s:create_index('sk', { parts = parts }) -- Fail.
 ---
-- error: 'Wrong index options (field 1): index part: conflicting nullability and nullable
-    action properties'
+- error: 'Wrong index options: index part: conflicting nullability and nullable action
+    properties'
 ...
 parts[1].nullable_action = 'ignore'
 ---
 ...
 sk = s:create_index('sk', { parts = parts }) -- Fail.
 ---
-- error: 'Wrong index options (field 1): index part: conflicting nullability and nullable
-    action properties'
+- error: 'Wrong index options: index part: conflicting nullability and nullable action
+    properties'
 ...
 parts[1].nullable_action = 'replace'
 ---
 ...
 sk = s:create_index('sk', { parts = parts }) -- Fail.
 ---
-- error: 'Wrong index options (field 1): index part: conflicting nullability and nullable
-    action properties'
+- error: 'Wrong index options: index part: conflicting nullability and nullable action
+    properties'
 ...
 parts[1].nullable_action = 'default'
 ---
 ...
 sk = s:create_index('sk', { parts = parts }) -- Fail.
 ---
-- error: 'Wrong index options (field 1): index part: conflicting nullability and nullable
-    action properties'
+- error: 'Wrong index options: index part: conflicting nullability and nullable action
+    properties'
 ...
 parts[1].nullable_action = 'none'
 ---
@@ -888,8 +888,8 @@ parts[1].nullable_action = 'none'
 ...
 sk = s:create_index('sk', { parts = parts }) -- Fail.
 ---
-- error: 'Wrong index options (field 1): index part: conflicting nullability and nullable
-    action properties'
+- error: 'Wrong index options: index part: conflicting nullability and nullable action
+    properties'
 ...
 parts[1].nullable_action = 'abort'
 ---

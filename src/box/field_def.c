@@ -164,7 +164,7 @@ field_type1_contains_type2(enum field_type type1, enum field_type type2)
  */
 static int
 field_def_parse_constraint(const char **data, void *opts, struct region *region,
-			   uint32_t errcode, uint32_t field_no);
+			   uint32_t errcode);
 
 /**
  * Callback to parse a value with 'foreign_key' key in msgpack field definition.
@@ -173,7 +173,7 @@ field_def_parse_constraint(const char **data, void *opts, struct region *region,
 static int
 field_def_parse_foreign_key(const char **data, void *opts,
 			    struct region *region,
-			    uint32_t errcode, uint32_t field_no);
+			    uint32_t errcode);
 
 const struct opt_def field_def_reg[] = {
 	OPT_DEF_ENUM("type", field_type, struct field_def, type,
@@ -227,18 +227,17 @@ field_type_by_name(const char *name, size_t len)
  * Allocate a temporary constraint array on @a region and set pointer to it
  *  as field_def->constraint, also setting field_def->constraint_count.
  * If there are constraints already - realloc and append array.
- * Return 0 on success or -1 on error (diag is set to @a errcode with
- *  reference to field by @a field_no).
+ * Return 0 on success or -1 on error (diag is set to @a errcode).
  */
 static int
 field_def_parse_constraint(const char **data, void *opts, struct region *region,
-			   uint32_t errcode, uint32_t field_no)
+			   uint32_t errcode)
 {
 	/* Expected normal form of constraints: {name1=func1, name2=func2..}. */
 	struct field_def *def = (struct field_def *)opts;
 	return tuple_constraint_def_decode(data, &def->constraint_def,
 					   &def->constraint_count, region,
-					   errcode, field_no);
+					   errcode);
 }
 
 /**
@@ -249,18 +248,15 @@ field_def_parse_constraint(const char **data, void *opts, struct region *region,
  * Allocate a temporary constraint array on @a region and set pointer to it
  *  as field_def->constraint, also setting field_def->constraint_count.
  * If there are constraints already - realloc and append array.
- * Return 0 on success or -1 on error (diag is set to @a errcode with
- *  reference to field by @a field_no).
+ * Return 0 on success or -1 on error (diag is set to @a errcode).
  */
 static int
 field_def_parse_foreign_key(const char **data, void *opts,
-			    struct region *region,
-			    uint32_t errcode, uint32_t field_no)
+			    struct region *region, uint32_t errcode)
 {
 	/* Expected normal form of constraints: {name1={space=.., field=..}.. */
 	struct field_def *def = (struct field_def *)opts;
 	return tuple_constraint_def_decode_fkey(data, &def->constraint_def,
 						&def->constraint_count,
-						region, errcode, field_no,
-						false);
+						region, errcode, false);
 }

@@ -900,23 +900,23 @@ s = box.schema.space.create('test')
 ...
 not not s:create_index('test1', {parts = {{1, 'number', collation = 'unicode_ci'}}})
 ---
-- error: 'Wrong index options (field 1): collation is reasonable only for string and
-    scalar parts'
+- error: 'Wrong index options: collation is reasonable only for string and scalar
+    parts'
 ...
 not not s:create_index('test2', {parts = {{2, 'unsigned', collation = 'unicode_ci'}}})
 ---
-- error: 'Wrong index options (field 1): collation is reasonable only for string and
-    scalar parts'
+- error: 'Wrong index options: collation is reasonable only for string and scalar
+    parts'
 ...
 not not s:create_index('test3', {parts = {{3, 'integer', collation = 'unicode_ci'}}})
 ---
-- error: 'Wrong index options (field 1): collation is reasonable only for string and
-    scalar parts'
+- error: 'Wrong index options: collation is reasonable only for string and scalar
+    parts'
 ...
 not not s:create_index('test4', {parts = {{4, 'boolean', collation = 'unicode_ci'}}})
 ---
-- error: 'Wrong index options (field 1): collation is reasonable only for string and
-    scalar parts'
+- error: 'Wrong index options: collation is reasonable only for string and scalar
+    parts'
 ...
 s:drop()
 ---
@@ -1092,11 +1092,11 @@ s = box.schema.space.create('test')
 ...
 i = s:create_index('test1', {parts = {1, 'unsigned', unique=false}})
 ---
-- error: 'Wrong index options (field 1): unexpected option ''unique'''
+- error: 'Wrong index options: unexpected option ''unique'''
 ...
 i = s:create_index('test1', {parts = {1, 'unsigned', distance=3}})
 ---
-- error: 'Wrong index options (field 1): unexpected option ''distance'''
+- error: 'Wrong index options: unexpected option ''distance'''
 ...
 i = s:create_index('test1', {parts = {2, 'string', 3, 'string', unique=false}})
 ---
@@ -1110,7 +1110,7 @@ i = s:create_index('test1', {parts = {2, 'string', 3, 'string', distance=3}})
 ...
 i = s:create_index('test1', {parts = {{1,'int', distance=3}, {field=2, type='int'}}})
 ---
-- error: 'Wrong index options (field 1): unexpected option ''distance'''
+- error: 'Wrong index options: unexpected option ''distance'''
 ...
 i = s:create_index('test1', {parts = {{1,'int'}, {field=2, type='int', type='hash'}}})
 ---

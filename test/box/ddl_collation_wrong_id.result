@@ -17,5 +17,5 @@ surrogate_space = {12345, 1, 'test', 'memtx', 0, EMPTY_MAP, format}
  | ...
 _space:insert(surrogate_space)
  | ---
- | - error: 'Wrong collation options (field 1): collation was not found by ID'
+ | - error: 'Wrong collation options: collation was not found by ID'
  | ...

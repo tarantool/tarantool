@@ -55,8 +55,7 @@ const struct space_opts space_opts_default = {
  */
 static int
 space_opts_parse_constraint(const char **data, void *vopts,
-			    struct region *region,
-			    uint32_t errcode, uint32_t field_no);
+			    struct region *region, uint32_t errcode);
 
 /**
  * Callback to parse a value with 'foreign_key' key in msgpack space opts
@@ -64,8 +63,7 @@ space_opts_parse_constraint(const char **data, void *vopts,
  */
 static int
 space_opts_parse_foreign_key(const char **data, void *vopts,
-			     struct region *region,
-			     uint32_t errcode, uint32_t field_no);
+			     struct region *region, uint32_t errcode);
 
 const struct opt_def space_opts_reg[] = {
 	OPT_DEF("group_id", OPT_UINT32, struct space_opts, group_id),
@@ -292,19 +290,17 @@ space_opts_destroy(struct space_opts *opts)
  * By convention @a opts must point to corresponding struct space_opts.
  * Allocate a temporary constraint array on @a region and set pointer to it
  *  as field_def->constraint, also setting field_def->constraint_count.
- * Return 0 on success or -1 on error (diag is set to @a errcode with
- *  reference to field by @a field_no).
+ * Return 0 on success or -1 on error (diag is set to @a errcode).
  */
 int
 space_opts_parse_constraint(const char **data, void *vopts,
-			    struct region *region,
-			    uint32_t errcode, uint32_t field_no)
+			    struct region *region, uint32_t errcode)
 {
 	/* Expected normal form of constraints: {name1=func1, name2=func2..}. */
 	struct space_opts *opts = (struct space_opts *)vopts;
 	return tuple_constraint_def_decode(data, &opts->constraint_def,
 					   &opts->constraint_count, region,
-					   errcode, field_no);
+					   errcode);
 }
 
 /**
@@ -314,18 +310,15 @@ space_opts_parse_constraint(const char **data, void *vopts,
  * By convention @a opts must point to corresponding struct space_opts.
  * Allocate a temporary constraint array on @a region and set pointer to it
  *  as field_def->constraint, also setting field_def->constraint_count.
- * Return 0 on success or -1 on error (diag is set to @a errcode with
- *  reference to field by @a field_no).
+ * Return 0 on success or -1 on error (diag is set to @a errcode).
  */
 int
 space_opts_parse_foreign_key(const char **data, void *vopts,
-			     struct region *region,
-			     uint32_t errcode, uint32_t field_no)
+			     struct region *region, uint32_t errcode)
 {
 	/* Expected normal form of constraints: {name1={space=.., field=..}.. */
 	struct space_opts *opts = (struct space_opts *)vopts;
 	return tuple_constraint_def_decode_fkey(data, &opts->constraint_def,
 						&opts->constraint_count,
-						region, errcode, field_no,
-						true);
+						region, errcode, true);
 }

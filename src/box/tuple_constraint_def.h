@@ -114,13 +114,12 @@ tuple_constraint_def_cmp(const struct tuple_constraint_def *def1,
  * Return:
  *   0 - success.
  *  -1 - failure, diag is set. It can be an OutOfMemory or ClientError with
- *   given @a errcode and @a field_no as first arguments.
+ *   given @a errcode.
  */
 int
 tuple_constraint_def_decode(const char **data,
 			    struct tuple_constraint_def **def, uint32_t *count,
-			    struct region *region,
-			    uint32_t errcode, uint32_t field_no);
+			    struct region *region, uint32_t errcode);
 
 /**
  * Parse constraint array from msgpack @a *data with the following format:
@@ -138,14 +137,13 @@ tuple_constraint_def_decode(const char **data,
  * Return:
  *   0 - success.
  *  -1 - failure, diag is set. It can be an OutOfMemory or ClientError with
- *   given @a errcode and @a field_no as first arguments.
+ *   given @a errcode.
  */
 int
 tuple_constraint_def_decode_fkey(const char **data,
 				 struct tuple_constraint_def **def,
 				 uint32_t *count, struct region *region,
-				 uint32_t errcode, uint32_t field_no,
-				 bool is_complex);
+				 uint32_t errcode, bool is_complex);
 
 /**
  * Allocate a single memory block needed for given @a count of constraint
