@@ -335,6 +335,7 @@ txn_stmt_new(struct txn *txn)
 	stmt->row = NULL;
 	stmt->has_triggers = false;
 	stmt->does_require_old_tuple = false;
+	stmt->is_pure_insert = false;
 	return stmt;
 }
 
