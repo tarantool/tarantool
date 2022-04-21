@@ -269,18 +269,11 @@ space_def_delete(struct space_def *def)
 		free(field->constraint_def);
 		TRASH(field);
 	}
-	space_opts_destroy(&def->opts);
 	tuple_dictionary_unref(def->dict);
+	free(def->opts.sql);
+	free(def->opts.constraint_def);
 	TRASH(def);
 	free(def);
-}
-
-void
-space_opts_destroy(struct space_opts *opts)
-{
-	free(opts->sql);
-	free(opts->constraint_def);
-	TRASH(opts);
 }
 
 /**

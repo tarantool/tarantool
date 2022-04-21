@@ -100,12 +100,6 @@ space_opts_create(struct space_opts *opts)
 	*opts = space_opts_default;
 }
 
-/**
- * Destroy space options
- */
-void
-space_opts_destroy(struct space_opts *opts);
-
 /** Space metadata. */
 struct space_def {
 	/** Space id. */
