@@ -860,7 +860,12 @@ memtx_tx_story_get(struct tuple *tuple)
 
 	mh_int_t pos = mh_history_find(txm.history, tuple, 0);
 	assert(pos != mh_end(txm.history));
-	return *mh_history_node(txm.history, pos);
+	struct memtx_story *story = *mh_history_node(txm.history, pos);
+	if (story->add_stmt != NULL)
+		assert(story->add_psn == story->add_stmt->txn->psn);
+	if (story->del_stmt != NULL)
+		assert(story->del_psn == story->del_stmt->txn->psn);
+	return story;
 }
 
 /**
@@ -1428,17 +1433,20 @@ memtx_tx_save_conflict(struct txn *breaker, struct txn *victim,
  * Scan a history starting with @a story in @a index for a @a visible_tuple.
  * If @a is_prepared_ok is true that prepared statements are visible for
  * that lookup, and not visible otherwise.
+ *
+ * `is_own_change` is set to true iff `visible_tuple` was modified (either
+ * added or deleted) by `txn`.
  */
 static void
 memtx_tx_story_find_visible_tuple(struct memtx_story *story, struct txn *tnx,
 				  uint32_t index, bool is_prepared_ok,
-				  struct tuple **visible_tuple)
+				  struct tuple **visible_tuple,
+				  bool *is_own_change)
 {
 	for (; story != NULL; story = story->link[index].older_story) {
 		assert(index < story->index_count);
-		bool unused;
 		if (memtx_tx_story_is_visible(story, tnx, is_prepared_ok,
-					      visible_tuple, &unused))
+					      visible_tuple, is_own_change))
 			return;
 	}
 	*visible_tuple = NULL;
@@ -1571,8 +1579,10 @@ check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
 		 */
 		struct memtx_story *second_story = memtx_tx_story_get(replaced[i]);
 		struct tuple *check_visible;
+		bool unused;
 		memtx_tx_story_find_visible_tuple(second_story, txn, i,
-						  true, &check_visible);
+						  true, &check_visible,
+						  &unused);
 
 		if (memtx_tx_check_dup(new_tuple, replaced[0], check_visible,
 				       DUP_INSERT, space->index[i], space) != 0) {
@@ -1594,12 +1604,16 @@ check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
  * replace rules. See memtx_space_replace_all_keys comment.
  * (!) Version for the case when replaced tuple is dirty.
  * @return 0 on success or -1 on fail.
+ *
+ * `is_own_change` is set to true iff `old_tuple` was modified (either
+ * added or deleted) by `stmt`'s transaction.
  */
 static int
 check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 		struct tuple **replaced, struct tuple **old_tuple,
 		enum dup_replace_mode mode,
-		struct memtx_tx_conflict **collected_conflicts)
+		struct memtx_tx_conflict **collected_conflicts,
+		bool *is_own_change)
 {
 	assert(replaced[0] != NULL && replaced[0]->is_dirty);
 	struct space *space = stmt->space;
@@ -1608,7 +1622,7 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 	struct memtx_story *old_story = memtx_tx_story_get(replaced[0]);
 	struct tuple *visible_replaced;
 	memtx_tx_story_find_visible_tuple(old_story, txn, 0, true,
-					  &visible_replaced);
+					  &visible_replaced, is_own_change);
 
 	if (memtx_tx_check_dup(new_tuple, *old_tuple, visible_replaced,
 			       mode, space->index[0], space) != 0) {
@@ -1646,9 +1660,9 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 
 		struct memtx_story *second_story = memtx_tx_story_get(replaced[i]);
 		struct tuple *check_visible;
-
+		bool unused;
 		memtx_tx_story_find_visible_tuple(second_story, txn, i, true,
-						  &check_visible);
+						  &check_visible, &unused);
 
 		if (memtx_tx_check_dup(new_tuple, visible_replaced,
 				       check_visible, DUP_INSERT,
@@ -1671,12 +1685,16 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
  * replace rules. See memtx_space_replace_all_keys comment.
  * Call check_dup_clean or check_dup_dirty depending on situation.
  * @return 0 on success or -1 on fail.
+ *
+ * `is_own_change` is set to true iff `old_tuple` was modified (either
+ * added or deleted) by `stmt`'s transaction.
  */
 static int
 check_dup_common(struct txn_stmt *stmt, struct tuple *new_tuple,
 		 struct tuple **directly_replaced, struct tuple **old_tuple,
 		 enum dup_replace_mode mode,
-		 struct memtx_tx_conflict **collected_conflicts)
+		 struct memtx_tx_conflict **collected_conflicts,
+		 bool *is_own_change)
 {
 	struct tuple *replaced = directly_replaced[0];
 	if (replaced == NULL || !replaced->is_dirty)
@@ -1686,7 +1704,7 @@ check_dup_common(struct txn_stmt *stmt, struct tuple *new_tuple,
 	else
 		return check_dup_dirty(stmt, new_tuple, directly_replaced,
 				       old_tuple, mode,
-				       collected_conflicts);
+				       collected_conflicts, is_own_change);
 }
 
 static struct gap_item *
@@ -1835,9 +1853,10 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	struct tuple *replaced = directly_replaced[0];
 
 	/* Check overwritten tuple */
+	bool is_own_change = false;
 	int rc = check_dup_common(stmt, new_tuple, directly_replaced,
 				  &old_tuple, mode,
-				  &collected_conflicts);
+				  &collected_conflicts, &is_own_change);
 	if (rc != 0)
 		goto fail;
 
@@ -1907,7 +1926,8 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		else
 			del_story = memtx_tx_story_get(old_tuple);
 		memtx_tx_story_link_deleted_by(del_story, stmt);
-	}
+	} else if (is_own_change)
+		stmt->is_pure_insert = true;
 
 	if (new_tuple != NULL) {
 		/*
@@ -2125,7 +2145,9 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			struct txn_stmt *test_stmt = test->add_stmt;
 			if (test_stmt->txn == stmt->txn)
 				continue;
-			if (test_stmt->del_story != stmt->del_story) {
+			if (test_stmt->is_pure_insert)
+				continue;
+			if (test_stmt->del_story != NULL) {
 				assert(test_stmt->del_story->add_stmt->txn
 				       == test_stmt->txn);
 				continue;
@@ -2152,11 +2174,17 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		while (*from != NULL) {
 			struct txn_stmt *test_stmt = *from;
 			assert(test_stmt->del_story == old_story);
-			if (test_stmt == stmt || test_stmt->txn->psn != 0) {
-				/* This or prepared. Go to the next stmt. */
+			if (test_stmt->txn == stmt->txn) {
+				assert(test_stmt == stmt ||
+				       test_stmt->add_story == NULL);
+				/*
+				 * Statement from the same transaction. Go to
+				 * the next statement.
+				 */
 				from = &test_stmt->next_in_del_list;
 				continue;
 			}
+			assert(test_stmt->txn->psn == 0);
 			/* Unlink from old list in any case. */
 			*from = test_stmt->next_in_del_list;
 			test_stmt->next_in_del_list = NULL;
@@ -2180,6 +2208,8 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			link = &test->link[i];
 			struct txn_stmt *test_stmt = test->add_stmt;
 			if (test_stmt->txn == stmt->txn)
+				continue;
+			if (test_stmt->is_pure_insert)
 				continue;
 			if (test_stmt->del_story == story)
 				continue;
@@ -2252,11 +2282,17 @@ memtx_tx_history_prepare_delete_stmt(struct txn_stmt *stmt)
 	while (*itr != NULL) {
 		struct txn_stmt *test_stmt = *itr;
 		assert(test_stmt->del_story == story);
-		if (test_stmt == stmt && test_stmt->txn->psn != 0) {
-			/* This statement. Go to the next stmt. */
+		if (test_stmt->txn == stmt->txn) {
+			assert(test_stmt == stmt ||
+			       test_stmt->add_story == NULL);
+			/*
+			 * Statement from the same transaction. Go to the next
+			 * statement.
+			 */
 			itr = &test_stmt->next_in_del_list;
 			continue;
 		}
+		assert(test_stmt->txn->psn == 0);
 		/* Unlink from old list in any case. */
 		*itr = test_stmt->next_in_del_list;
 		test_stmt->next_in_del_list = NULL;
@@ -2326,6 +2362,7 @@ memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
 			break;
 		if (story->add_psn != 0 && story->add_stmt != NULL &&
 		    txn != NULL) {
+			assert(story->add_psn == story->add_stmt->txn->psn);
 			/*
 			 * If we skip prepared story then the transaction
 			 * must be before prepared in serialization order.
@@ -2338,6 +2375,7 @@ memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
 		story = story->link[index->dense_id].older_story;
 	}
 	if (story->del_psn != 0 && story->del_stmt != NULL && txn != NULL) {
+		assert(story->del_psn == story->del_stmt->txn->psn);
 		/*
 		 * If we see a tuple that is deleted by prepared transaction
 		 * then the transaction must be before prepared in serialization
@@ -2422,8 +2460,10 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
 
 		struct tuple *visible = NULL;
 		bool is_prepared_ok = detect_whether_prepared_ok(txn);
+		bool unused;
 		memtx_tx_story_find_visible_tuple(story, txn, index->dense_id,
-						  is_prepared_ok, &visible);
+						  is_prepared_ok, &visible,
+						  &unused);
 		if (visible == NULL)
 			res++;
 	}
