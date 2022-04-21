@@ -209,8 +209,8 @@ action_is_nullable(enum on_conflict_action nullable_action)
  * @retval Error code.
  */
 int
-space_format_decode(const char *data, uint32_t *out_count,
-		    struct region *region, struct field_def **fields);
+field_def_array_decode(const char *data, uint32_t *out_count,
+		       struct region *region, struct field_def **fields);
 
 #if defined(__cplusplus)
 } /* extern "C" */

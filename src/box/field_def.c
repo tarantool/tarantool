@@ -367,8 +367,8 @@ field_def_decode(struct field_def *field, const char **data,
 }
 
 int
-space_format_decode(const char *data, uint32_t *out_count,
-		    struct region *region, struct field_def **fields)
+field_def_array_decode(const char *data, uint32_t *out_count,
+		       struct region *region, struct field_def **fields)
 {
 	/* Type is checked by _space format. */
 	assert(mp_typeof(*data) == MP_ARRAY);
