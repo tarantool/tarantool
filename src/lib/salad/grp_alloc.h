@@ -90,6 +90,16 @@ grp_alloc_reserve_str(struct grp_alloc *bank, size_t size)
 }
 
 /**
+ * Phase 1: account a null-terminated string that is needed to be allocated,
+ * including char for null-termination.
+ */
+static inline void
+grp_alloc_reserve_str0(struct grp_alloc *bank, const char *src)
+{
+	grp_alloc_reserve_str(bank, strlen(src));
+}
+
+/**
  * Phase 1 end: get total memory size required for all data.
  */
 static inline size_t
@@ -131,6 +141,16 @@ grp_alloc_create_str(struct grp_alloc *bank, const char *src, size_t src_size)
 	bank->data_end -= src_size;
 	memcpy(bank->data_end, src, src_size);
 	return bank->data_end;
+}
+
+/**
+ * Phase 2: allocate and fill a null-terminated string with given data @a src,
+ * including null-termination. Return new string.
+ */
+static inline char *
+grp_alloc_create_str0(struct grp_alloc *bank, const char *src)
+{
+	return grp_alloc_create_str(bank, src, strlen(src));
 }
 
 #ifdef __cplusplus
