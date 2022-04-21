@@ -701,8 +701,6 @@ alter_space_new(struct space *old_space)
 	rlist_create(&alter->ops);
 	alter->old_space = old_space;
 	alter->space_def = space_def_dup(alter->old_space->def);
-	if (alter->space_def == NULL)
-		return NULL;
 	if (old_space->format != NULL)
 		alter->new_min_field_count = old_space->format->min_field_count;
 	else

@@ -140,6 +140,8 @@ space_def_delete(struct space_def *def);
  * Duplicate space_def object.
  * @param src Def to duplicate.
  * @retval Copy of the @src.
+ *
+ * The function never fails (never returns NULL).
  */
 struct space_def *
 space_def_dup(const struct space_def *src);
@@ -197,15 +199,6 @@ space_tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 } /* extern "C" */
 
 #include "diag.h"
-
-static inline struct space_def *
-space_def_dup_xc(const struct space_def *src)
-{
-	struct space_def *ret = space_def_dup(src);
-	if (ret == NULL)
-		diag_raise();
-	return ret;
-}
 
 static inline struct space_def *
 space_def_new_xc(uint32_t id, uint32_t uid, uint32_t exact_field_count,
