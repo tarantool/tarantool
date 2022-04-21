@@ -303,6 +303,14 @@ struct txn_stmt {
 	 * old_tuple to be NULL.
 	 */
 	bool does_require_old_tuple;
+	/*
+	 * `insert` statement is guaranteed not to delete anything
+	 * from the transaction's point of view (i.e., there was a preceding
+	 * `delete` in the scope of the same transaction): no linking to the
+	 * list of `delete` statements is required during preparation of insert
+	 * statements that add preceding stories.
+	 */
+	bool is_pure_insert;
 	/**
 	* Request type - IPROTO type code
 	*/
