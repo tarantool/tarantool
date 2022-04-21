@@ -45,6 +45,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct region;
+
 /** \cond public */
 
 /*
@@ -120,7 +122,6 @@ extern const char *mp_type_strs[];
 extern const uint32_t field_mp_type[];
 extern const uint32_t field_ext_type[];
 
-extern const struct opt_def field_def_reg[];
 extern const struct field_def field_def_default;
 
 /**
@@ -197,6 +198,19 @@ action_is_nullable(enum on_conflict_action nullable_action)
 {
 	return nullable_action == ON_CONFLICT_ACTION_NONE;
 }
+
+/**
+ * Decode MessagePack array of fields.
+ * @param data MessagePack array of fields.
+ * @param[out] out_count Length of a result array.
+ * @param region Region to allocate result array.
+ * @param[out] fields Array of fields.
+ *
+ * @retval Error code.
+ */
+int
+space_format_decode(const char *data, uint32_t *out_count,
+		    struct region *region, struct field_def **fields);
 
 #if defined(__cplusplus)
 } /* extern "C" */

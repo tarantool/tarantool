@@ -30,12 +30,16 @@
  */
 
 #include "field_def.h"
+#include "identifier.h"
 #include "trivia/util.h"
 #include "key_def.h"
 #include "mp_extension_types.h"
 #include "mp_uuid.h"
+#include "schema_def.h"
 #include "tt_uuid.h"
+#include "tt_static.h"
 #include "tuple_constraint_def.h"
+#include "tuple_format.h"
 #include "small/region.h"
 
 const char *mp_type_strs[] = {
@@ -175,7 +179,7 @@ field_def_parse_foreign_key(const char **data, void *opts,
 			    struct region *region,
 			    uint32_t errcode);
 
-const struct opt_def field_def_reg[] = {
+static const struct opt_def field_def_reg[] = {
 	OPT_DEF_ENUM("type", field_type, struct field_def, type,
 		     field_type_by_name_wrapper),
 	OPT_DEF("name", OPT_STRPTR, struct field_def, name),
@@ -259,4 +263,135 @@ field_def_parse_foreign_key(const char **data, void *opts,
 	return tuple_constraint_def_decode_fkey(data, &def->constraint_def,
 						&def->constraint_count,
 						region, errcode, false);
+}
+
+/**
+ * Decode field definition from MessagePack map. Format:
+ * {name: <string>, type: <string>}. Type is optional.
+ * @param[out] field Field to decode to.
+ * @param data MessagePack map to decode.
+ * @param fieldno Field number to decode. Used in error messages.
+ * @param region Region to allocate field name.
+ */
+static int
+field_def_decode(struct field_def *field, const char **data,
+		 uint32_t fieldno, struct region *region)
+{
+	if (mp_typeof(**data) != MP_MAP) {
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
+			 tt_sprintf("field %d is not map",
+				    fieldno + TUPLE_INDEX_BASE));
+		return -1;
+	}
+	int count = mp_decode_map(data);
+	*field = field_def_default;
+	bool is_action_missing = true;
+	uint32_t action_literal_len = strlen("nullable_action");
+	for (int i = 0; i < count; ++i) {
+		if (mp_typeof(**data) != MP_STR) {
+			diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
+				 tt_sprintf("field %d format is not map "
+					    "with string keys",
+					    fieldno + TUPLE_INDEX_BASE));
+			return -1;
+		}
+		uint32_t key_len;
+		const char *key = mp_decode_str(data, &key_len);
+		if (opts_parse_key(field, field_def_reg, key, key_len, data,
+				   ER_WRONG_SPACE_FORMAT, region, true) != 0)
+			return -1;
+		if (is_action_missing &&
+		    key_len == action_literal_len &&
+		    memcmp(key, "nullable_action", action_literal_len) == 0)
+			is_action_missing = false;
+	}
+	if (is_action_missing) {
+		field->nullable_action = field->is_nullable ?
+					 ON_CONFLICT_ACTION_NONE :
+					 ON_CONFLICT_ACTION_DEFAULT;
+	}
+	if (field->name == NULL) {
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
+			 tt_sprintf("field %d name is not specified",
+				    fieldno + TUPLE_INDEX_BASE));
+		return -1;
+	}
+	size_t field_name_len = strlen(field->name);
+	if (field_name_len > BOX_NAME_MAX) {
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
+			 tt_sprintf("field %d name is too long",
+				    fieldno + TUPLE_INDEX_BASE));
+		return -1;
+	}
+	if (identifier_check(field->name, field_name_len) != 0)
+		return -1;
+	if (field->type == field_type_MAX) {
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
+			 tt_sprintf("field %d has unknown field type",
+				    fieldno + TUPLE_INDEX_BASE));
+		return -1;
+	}
+	if (field->nullable_action == on_conflict_action_MAX) {
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
+			 tt_sprintf("field %d has unknown field on conflict "
+				    "nullable action",
+				    fieldno + TUPLE_INDEX_BASE));
+		return -1;
+	}
+	if (!((field->is_nullable &&
+	       field->nullable_action == ON_CONFLICT_ACTION_NONE) ||
+	      (!field->is_nullable &&
+	       field->nullable_action != ON_CONFLICT_ACTION_NONE))) {
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
+			 tt_sprintf("field %d has conflicting nullability and "
+				    "nullable action properties",
+				    fieldno + TUPLE_INDEX_BASE));
+		return -1;
+	}
+	if (field->coll_id != COLL_NONE &&
+	    field->type != FIELD_TYPE_STRING &&
+	    field->type != FIELD_TYPE_SCALAR &&
+	    field->type != FIELD_TYPE_ANY) {
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
+			 tt_sprintf("collation is reasonable only for "
+				    "string, scalar and any fields"));
+		return -1;
+	}
+	if (field->compression_type == compression_type_MAX) {
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
+			 tt_sprintf("field %d has unknown compression type",
+				    fieldno + TUPLE_INDEX_BASE));
+		return -1;
+	}
+	return 0;
+}
+
+int
+space_format_decode(const char *data, uint32_t *out_count,
+		    struct region *region, struct field_def **fields)
+{
+	/* Type is checked by _space format. */
+	assert(mp_typeof(*data) == MP_ARRAY);
+	uint32_t count = mp_decode_array(&data);
+	*out_count = count;
+	if (count == 0) {
+		*fields = NULL;
+		return 0;
+	}
+	size_t size;
+	struct field_def *region_defs =
+		region_alloc_array(region, typeof(region_defs[0]), count,
+				   &size);
+	if (region_defs == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc_array",
+			 "region_defs");
+		return -1;
+	}
+	for (uint32_t i = 0; i < count; ++i) {
+		if (field_def_decode(&region_defs[i], &data,
+				     i, region) != 0)
+			return -1;
+	}
+	*fields = region_defs;
+	return 0;
 }

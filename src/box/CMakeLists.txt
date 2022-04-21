@@ -113,6 +113,7 @@ set(tuple_sources
     coll_id_cache.c
     field_def.c
     opt_def.c
+    identifier.c
 )
 
 if(ENABLE_TUPLE_COMPRESSION)
@@ -132,7 +133,6 @@ set(box_sources
     iproto.cc
     xrow_io.cc
     tuple_convert.c
-    identifier.c
     index.cc
     index_def.c
     iterator_type.c
