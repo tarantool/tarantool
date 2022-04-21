@@ -95,45 +95,29 @@ space_tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
  * Initialize def->opts with opts duplicate.
  * @param def  Def to initialize.
  * @param opts Opts to duplicate.
- * @retval 0 on success.
- * @retval not 0 on error.
  */
-static int
+static void
 space_def_dup_opts(struct space_def *def, const struct space_opts *opts)
 {
 	def->opts = *opts;
-	if (opts->sql != NULL) {
-		def->opts.sql = strdup(opts->sql);
-		if (def->opts.sql == NULL) {
-			diag_set(OutOfMemory, strlen(opts->sql) + 1, "strdup",
-				 "def->opts.sql");
-			return -1;
-		}
-	}
+	if (opts->sql != NULL)
+		def->opts.sql = xstrdup(opts->sql);
 	def->opts.constraint_count = opts->constraint_count;
 	def->opts.constraint_def =
 		tuple_constraint_def_array_dup(opts->constraint_def,
 					       opts->constraint_count);
-	return 0;
 }
 
 struct space_def *
 space_def_dup(const struct space_def *src)
 {
 	size_t size = sizeof(struct space_def) + strlen(src->name) + 1;
-	struct space_def *ret = (struct space_def *) malloc(size);
-	if (ret == NULL) {
-		diag_set(OutOfMemory, size, "malloc", "ret");
-		return NULL;
-	}
+	struct space_def *ret = xmalloc(size);
 	memcpy(ret, src, size);
 	memset(&ret->opts, 0, sizeof(ret->opts));
 	ret->fields = field_def_array_dup(src->fields, src->field_count);
 	tuple_dictionary_ref(ret->dict);
-	if (space_def_dup_opts(ret, &src->opts) != 0) {
-		space_def_delete(ret);
-		return NULL;
-	}
+	space_def_dup_opts(ret, &src->opts);
 	return ret;
 }
 
@@ -145,11 +129,7 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	      uint32_t field_count)
 {
 	size_t size = sizeof(struct space_def) + name_len + 1;
-	struct space_def *def = (struct space_def *) malloc(size);
-	if (def == NULL) {
-		diag_set(OutOfMemory, size, "malloc", "def");
-		return NULL;
-	}
+	struct space_def *def = xmalloc(size);
 	assert(name_len <= BOX_NAME_MAX);
 	assert(engine_len <= ENGINE_NAME_MAX);
 	def->dict = tuple_dictionary_new(fields, field_count);
@@ -168,10 +148,7 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	def->view_ref_count = 0;
 	def->field_count = field_count;
 	def->fields = field_def_array_dup(fields, field_count);
-	if (space_def_dup_opts(def, opts) != 0) {
-		space_def_delete(def);
-		return NULL;
-	}
+	space_def_dup_opts(def, opts);
 	return def;
 }
 

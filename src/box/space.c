@@ -230,8 +230,6 @@ space_create(struct space *space, struct engine *engine,
 		tuple_format_ref(format);
 
 	space->def = space_def_dup(def);
-	if (space->def == NULL)
-		goto fail;
 
 	/* Create indexes and fill the index map. */
 	space->index_map = (struct index **)
