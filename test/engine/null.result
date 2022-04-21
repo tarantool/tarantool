@@ -770,8 +770,8 @@ format[2].nullable_action = 'none'
 ...
 s:format(format) -- Fail.
 ---
-- error: 'Can''t modify space ''test'': field 2 has conflicting nullability and nullable
-    action properties'
+- error: 'Wrong space format: field 2 has conflicting nullability and nullable action
+    properties'
 ...
 format[2].is_nullable = false
 ---
@@ -817,8 +817,8 @@ format[2].nullable_action = 'none'
 ...
 s:format(format) -- Fail.
 ---
-- error: 'Can''t modify space ''test'': field 2 has conflicting nullability and nullable
-    action properties'
+- error: 'Wrong space format: field 2 has conflicting nullability and nullable action
+    properties'
 ...
 parts = {}
 ---

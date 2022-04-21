@@ -1070,7 +1070,7 @@ format[2] = {name = 'field2', 'unsigned', 'unknown'}
 ...
 s:format(format)
 ---
-- error: 'Can''t modify space ''test'': field 2 format is not map with string keys'
+- error: 'Wrong space format: field 2 format is not map with string keys'
 ...
 s:format()
 ---

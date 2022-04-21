@@ -25,7 +25,7 @@ g.test_invalid_compression_type_during_space_creation = function(cg)
             name = 'x', type = 'unsigned', compression = compression
         }}
         t.assert_error_msg_content_equals(
-            "Failed to create space 'T': field 1 has unknown compression type",
+            "Wrong space format: field 1 has unknown compression type",
             box.schema.space.create, 'T', {engine = engine, format = format})
     end, {cg.params.engine, cg.params.compression})
 end
@@ -43,10 +43,10 @@ g.test_invalid_compression_type_during_setting_format = function(cg)
             name = 'x', type = 'unsigned', compression = compression
         }}
         t.assert_error_msg_content_equals(
-            "Can't modify space 'space': field 1 has unknown compression type",
+            "Wrong space format: field 1 has unknown compression type",
             box.space.space.format, box.space.space, format)
         t.assert_error_msg_content_equals(
-            "Can't modify space 'space': field 1 has unknown compression type",
+            "Wrong space format: field 1 has unknown compression type",
             box.space.space.alter, box.space.space, {format = format})
     end, {cg.params.compression})
 end
