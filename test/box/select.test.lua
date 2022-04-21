@@ -2,6 +2,9 @@ msgpack = require('msgpack')
 env = require('test_run')
 test_run = env.new()
 
+fiber = require('fiber')
+fiber.set_max_slice(15)
+
 s = box.schema.space.create('select', { temporary = true })
 index1 = s:create_index('primary', { type = 'tree' })
 index2 = s:create_index('second', { type = 'tree', unique = true,  parts = {2, 'unsigned', 1, 'unsigned'}})
