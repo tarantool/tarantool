@@ -41,3 +41,7 @@ end
 function _dofile(filename)
   return dofile(path_to_sources..filename)
 end
+
+-- This is workaround introduced for flaky macosx tests reported by
+-- https://github.com/tarantool/tarantool/issues/7058
+collectgarbage('collect')
