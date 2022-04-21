@@ -64,6 +64,7 @@ lua_source(lua_sources lua/swim.lua swim_lua)
 lua_source(lua_sources lua/datetime.lua datetime_lua)
 lua_source(lua_sources lua/timezones.lua timezones_lua)
 lua_source(lua_sources lua/print.lua print_lua)
+lua_source(lua_sources lua/compat.lua compat_lua)
 
 # 3rd party lua sources
 lua_source(lua_sources ../third_party/luafun/fun.lua fun_lua)
@@ -168,6 +169,7 @@ set (server_sources
      lua/uri.c
      lua/backtrace.c
      lua/builtin_modcache.c
+     lua/compat.c
      ${lua_sources}
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/lyaml.cc
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/b64.c

@@ -68,6 +68,7 @@
 #include "lua/decimal.h"
 #include "lua/uri.h"
 #include "lua/builtin_modcache.h"
+#include "lua/compat.h"
 #include "digest.h"
 #include "errinj.h"
 
@@ -105,6 +106,7 @@ bool start_loop = true;
 
 /* contents of src/lua/ files */
 extern char strict_lua[],
+	compat_lua[],
 	uuid_lua[],
 	msgpackffi_lua[],
 	fun_lua[],
@@ -259,6 +261,7 @@ extern char strict_lua[],
 static const char *lua_modules[] = {
 	/* Make it first to affect load of all other modules */
 	"strict", strict_lua,
+	"compat", compat_lua,
 	"fun", fun_lua,
 	"debug", debug_lua,
 	"tarantool", init_lua,
@@ -810,6 +813,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_serializer_init(L);
 	tarantool_lua_swim_init(L);
 	tarantool_lua_decimal_init(L);
+	tarantool_lua_compat_init(L);
 #ifdef ENABLE_BACKTRACE
 	luaM_sysprof_set_backtracer(fiber_backtracer);
 #endif
