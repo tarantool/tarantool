@@ -177,22 +177,6 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 struct space_def *
 space_def_new_ephemeral(uint32_t exact_field_count, struct field_def *fields);
 
-/**
- * Size of the space_def.
- * @param name_len Length of the space name.
- * @param fields Fields array of space format.
- * @param field_count Space field count.
- * @param[out] names_offset Offset from the beginning of a def to
- *             a field names memory.
- * @param[out] fields_offset Offset from the beginning of a def to
- *             a fields array.
- * @retval Size in bytes.
- */
-size_t
-space_def_sizeof(uint32_t name_len, const struct field_def *fields,
-		 uint32_t field_count, uint32_t *names_offset,
-		 uint32_t *fields_offset);
-
 struct tuple_format;
 struct tuple_format_vtab;
 struct key_def;

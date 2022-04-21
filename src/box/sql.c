@@ -1253,8 +1253,7 @@ sql_template_space_def_new(struct Parse *parser, const char *name)
 {
 	struct space_def *def = NULL;
 	size_t name_len = name != NULL ? strlen(name) : 0;
-	uint32_t dummy;
-	size_t size = space_def_sizeof(name_len, NULL, 0, &dummy, &dummy);
+	size_t size = sizeof(*def) + name_len + 1;
 	def = (struct space_def *)region_aligned_alloc(&parser->region, size,
 						       alignof(*def));
 	if (def == NULL) {

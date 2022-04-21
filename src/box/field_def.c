@@ -40,6 +40,7 @@
 #include "tt_static.h"
 #include "tuple_constraint_def.h"
 #include "tuple_format.h"
+#include "salad/grp_alloc.h"
 #include "small/region.h"
 
 const char *mp_type_strs[] = {
@@ -394,4 +395,43 @@ field_def_array_decode(const char *data, uint32_t *out_count,
 	}
 	*fields = region_defs;
 	return 0;
+}
+
+struct field_def *
+field_def_array_dup(const struct field_def *fields, uint32_t field_count)
+{
+	if (field_count == 0)
+		return NULL;
+	struct grp_alloc all = grp_alloc_initializer();
+	grp_alloc_reserve_data(&all, sizeof(*fields) * field_count);
+	for (uint32_t i = 0; i < field_count; i++) {
+		grp_alloc_reserve_str0(&all, fields[i].name);
+		if (fields[i].default_value != NULL)
+			grp_alloc_reserve_str0(&all, fields[i].default_value);
+	}
+	grp_alloc_use(&all, xmalloc(grp_alloc_size(&all)));
+	struct field_def *copy = grp_alloc_create_data(
+		&all, sizeof(*fields) * field_count);
+	for (uint32_t i = 0; i < field_count; ++i) {
+		copy[i] = fields[i];
+		copy[i].name = grp_alloc_create_str0(&all, fields[i].name);
+		if (fields[i].default_value != NULL) {
+			copy[i].default_value = grp_alloc_create_str0(
+				&all, fields[i].default_value);
+		}
+		copy[i].constraint_def = tuple_constraint_def_array_dup(
+			fields[i].constraint_def, fields[i].constraint_count);
+	}
+	assert(grp_alloc_size(&all) == 0);
+	return copy;
+}
+
+void
+field_def_array_delete(struct field_def *fields, uint32_t field_count)
+{
+	for (uint32_t i = 0; i < field_count; i++) {
+		free(fields[i].constraint_def);
+		TRASH(&fields[i]);
+	}
+	free(fields);
 }
