@@ -152,6 +152,7 @@ datetime_ev_now(struct datetime *now)
 	struct tm tm;
 	localtime_r(&sec, &tm);
 	now->tzoffset = tm.tm_gmtoff / 60;
+	now->tzindex = 0;
 }
 
 /**

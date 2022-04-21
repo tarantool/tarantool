@@ -2223,16 +2223,6 @@ g.test_datetime_30_17 = function()
         rows = box.execute(sql, {dt0}).rows
         res = {{-93697804759}}
         t.assert_equals(rows, res)
-
-        dt0 = dt.new({year = 1000000, sec = 23})
-        rows = box.execute(sql, {dt0}).rows
-        res = {{31494784780823}}
-        t.assert_equals(rows, res)
-
-        dt0 = dt.new({year = -1000000})
-        rows = box.execute(sql, {dt0}).rows
-        res = {{-31619119219200}}
-        t.assert_equals(rows, res)
     end)
 end
 
