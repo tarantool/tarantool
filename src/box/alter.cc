@@ -392,20 +392,8 @@ space_opts_decode(struct space_opts *opts, const char *map,
 		  struct region *region)
 {
 	space_opts_create(opts);
-	if (opts_decode(opts, space_opts_reg, &map, ER_WRONG_SPACE_OPTIONS,
-			BOX_SPACE_FIELD_OPTS, region) != 0)
-		return -1;
-	if (opts->sql != NULL) {
-		char *sql = strdup(opts->sql);
-		if (sql == NULL) {
-			size_t optlen = strlen(opts->sql) + 1;
-			opts->sql = NULL;
-			diag_set(OutOfMemory, optlen, "strdup", "sql");
-			return -1;
-		}
-		opts->sql = sql;
-	}
-	return 0;
+	return opts_decode(opts, space_opts_reg, &map, ER_WRONG_SPACE_OPTIONS,
+			   BOX_SPACE_FIELD_OPTS, region);
 }
 
 /**
