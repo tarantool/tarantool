@@ -1,5 +1,8 @@
 test_run = require('test_run').new()
 
+fiber = require('fiber')
+fiber.set_max_slice(15)
+
 s = box.schema.create_space('test', {engine = 'vinyl'})
 pk = s:create_index('pk')
 s:insert{1, 1}
