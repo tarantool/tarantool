@@ -160,10 +160,10 @@ struct errcode_record {
 	/*105 */_(ER_UPSERT_UNIQUE_SECONDARY_KEY, "Space %s has a unique secondary index and does not support UPSERT") \
 	/*106 */_(ER_WRONG_INDEX_RECORD,	"Wrong record in _index space: got {%s}, expected {%s}") \
 	/*107 */_(ER_WRONG_INDEX_PARTS,		"Wrong index parts: %s; expected field1 id (number), field1 type (string), ...") \
-	/*108 */_(ER_WRONG_INDEX_OPTIONS,	"Wrong index options (field %u): %s") \
+	/*108 */_(ER_WRONG_INDEX_OPTIONS,	"Wrong index options: %s") \
 	/*109 */_(ER_WRONG_SCHEMA_VERSION,	"Wrong schema version, current: %d, in request: %u") \
 	/*110 */_(ER_MEMTX_MAX_TUPLE_SIZE,	"Failed to allocate %u bytes for tuple: tuple is too large. Check 'memtx_max_tuple_size' configuration option.") \
-	/*111 */_(ER_WRONG_SPACE_OPTIONS,	"Wrong space options (field %u): %s") \
+	/*111 */_(ER_WRONG_SPACE_OPTIONS,	"Wrong space options: %s") \
 	/*112 */_(ER_UNSUPPORTED_INDEX_FEATURE,	"Index '%s' (%s) of space '%s' (%s) does not support %s") \
 	/*113 */_(ER_VIEW_IS_RO,		"View '%s' is read-only") \
 	/*114 */_(ER_NO_TRANSACTION,		"No active transaction") \
@@ -193,7 +193,7 @@ struct errcode_record {
 	/*138 */_(ER_LOAD_MODULE,		"Failed to dynamically load module '%.*s': %s") \
 	/*139 */_(ER_VINYL_MAX_TUPLE_SIZE,	"Failed to allocate %u bytes for tuple: tuple is too large. Check 'vinyl_max_tuple_size' configuration option.") \
 	/*140 */_(ER_WRONG_DD_VERSION,		"Wrong _schema version: expected 'major.minor[.patch]'") \
-	/*141 */_(ER_WRONG_SPACE_FORMAT,	"Wrong space format (field %u): %s") \
+	/*141 */_(ER_WRONG_SPACE_FORMAT,	"Wrong space format: %s") \
 	/*142 */_(ER_CREATE_SEQUENCE,		"Failed to create sequence '%s': %s") \
 	/*143 */_(ER_ALTER_SEQUENCE,		"Can't modify sequence '%s': %s") \
 	/*144 */_(ER_DROP_SEQUENCE,		"Can't drop sequence '%s': %s") \
@@ -203,7 +203,7 @@ struct errcode_record {
 	/*148 */_(ER_NO_SUCH_INDEX_NAME,	"No index '%s' is defined in space '%s'") \
 	/*149 */_(ER_SPACE_FIELD_IS_DUPLICATE,	"Space field '%s' is duplicate") \
 	/*150 */_(ER_CANT_CREATE_COLLATION,	"Failed to initialize collation: %s.") \
-	/*151 */_(ER_WRONG_COLLATION_OPTIONS,	"Wrong collation options (field %u): %s") \
+	/*151 */_(ER_WRONG_COLLATION_OPTIONS,	"Wrong collation options: %s") \
 	/*152 */_(ER_NULLABLE_PRIMARY,		"Primary index of space '%s' can not contain nullable parts") \
 	/*153 */_(ER_NO_SUCH_FIELD_NAME_IN_SPACE,	"Field '%s' was not found in space '%s' format") \
 	/*154 */_(ER_TRANSACTION_YIELD,		"Transaction has been aborted by a fiber yield") \

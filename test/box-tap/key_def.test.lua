@@ -15,10 +15,9 @@ local usage_error = 'Bad params, use: key_def.new({' ..
                     '[, collation_id = <number>]' ..
                     '[, collation = <string>]}, ...}'
 
-local function coll_not_found(fieldno, collation)
+local function coll_not_found(collation)
     if type(collation) == 'number' then
-        return ('Wrong index options (field %d): ' ..
-               'collation was not found by ID'):format(fieldno)
+        return 'Wrong index options: collation was not found by ID'
     end
 
     return ('Unknown collation: "%s"'):format(collation)
@@ -62,7 +61,7 @@ local key_def_new_cases = {
             type = 'string',
             collation_id = 2,
         }},
-        exp_err = coll_not_found(1, 2),
+        exp_err = coll_not_found(2),
     },
     {
         'Try to use collation before box.cfg{}',
@@ -71,7 +70,7 @@ local key_def_new_cases = {
             type = 'string',
             collation = 'unicode_ci',
         }},
-        exp_err = coll_not_found(1, 'unicode_ci'),
+        exp_err = coll_not_found('unicode_ci'),
     },
     function()
         -- For collations.
@@ -95,7 +94,7 @@ local key_def_new_cases = {
             type = 'string',
             collation_id = 999,
         }},
-        exp_err = coll_not_found(1, 999),
+        exp_err = coll_not_found(999),
     },
     {
         'Unknown collation name',

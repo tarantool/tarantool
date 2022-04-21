@@ -213,37 +213,32 @@ index_opts_decode(struct index_opts *opts, const char *map,
 {
 	index_opts_create(opts);
 	if (opts_decode(opts, index_opts_reg, &map, ER_WRONG_INDEX_OPTIONS,
-			BOX_INDEX_FIELD_OPTS, region) != 0)
+			region) != 0)
 		return -1;
 	if (opts->distance == rtree_index_distance_type_MAX) {
 		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-			 BOX_INDEX_FIELD_OPTS, "distance must be either "\
-			  "'euclid' or 'manhattan'");
+			 "distance must be either 'euclid' or 'manhattan'");
 		return -1;
 	}
 	if (opts->page_size <= 0 || (opts->range_size > 0 &&
 				     opts->page_size > opts->range_size)) {
 		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-			 BOX_INDEX_FIELD_OPTS,
 			 "page_size must be greater than 0 and "
 			 "less than or equal to range_size");
 		return -1;
 	}
 	if (opts->run_count_per_level <= 0) {
 		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-			 BOX_INDEX_FIELD_OPTS,
 			 "run_count_per_level must be greater than 0");
 		return -1;
 	}
 	if (opts->run_size_ratio <= 1) {
 		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-			 BOX_INDEX_FIELD_OPTS,
 			 "run_size_ratio must be greater than 1");
 		return -1;
 	}
 	if (opts->bloom_fpr <= 0 || opts->bloom_fpr > 1) {
 		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
-			 BOX_INDEX_FIELD_OPTS,
 			 "bloom_fpr must be greater than 0 and "
 			 "less than or equal to 1");
 		return -1;
@@ -262,9 +257,9 @@ func_index_check_func(struct func *func) {
 	if (func->def->language != FUNC_LANGUAGE_LUA ||
 	    func->def->body == NULL || !func->def->is_deterministic ||
 	    !func->def->is_sandboxed) {
-		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS, 0,
-			  "referenced function doesn't satisfy "
-			  "functional index function constraints");
+		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+			 "referenced function doesn't satisfy "
+			 "functional index function constraints");
 		return -1;
 	}
 	return 0;
@@ -393,7 +388,7 @@ space_opts_decode(struct space_opts *opts, const char *map,
 {
 	space_opts_create(opts);
 	return opts_decode(opts, space_opts_reg, &map, ER_WRONG_SPACE_OPTIONS,
-			   BOX_SPACE_FIELD_OPTS, region);
+			   region);
 }
 
 /**
@@ -436,9 +431,7 @@ field_def_decode(struct field_def *field, const char **data,
 		uint32_t key_len;
 		const char *key = mp_decode_str(data, &key_len);
 		if (opts_parse_key(field, field_def_reg, key, key_len, data,
-				   ER_WRONG_SPACE_FORMAT,
-				   fieldno + TUPLE_INDEX_BASE, region,
-				   true) != 0)
+				   ER_WRONG_SPACE_FORMAT, region, true) != 0)
 			return -1;
 		if (is_action_missing &&
 		    key_len == action_literal_len &&
@@ -3516,8 +3509,7 @@ func_def_new_from_tuple(struct tuple *tuple)
 		def->param_count = argc;
 		const char *opts = tuple_field(tuple, BOX_FUNC_FIELD_OPTS);
 		if (opts_decode(&def->opts, func_opts_reg, &opts,
-				ER_WRONG_SPACE_OPTIONS, BOX_FUNC_FIELD_OPTS,
-				NULL) != 0)
+				ER_WRONG_SPACE_OPTIONS, NULL) != 0)
 			return NULL;
 	} else {
 		def->is_deterministic = false;
@@ -3732,8 +3724,7 @@ coll_id_def_new_from_tuple(struct tuple *tuple, struct coll_id_def *def)
 	if (options == NULL)
 		return -1;
 	if (opts_decode(&base->icu, coll_icu_opts_reg, &options,
-			ER_WRONG_COLLATION_OPTIONS,
-			BOX_COLLATION_FIELD_OPTIONS, NULL) != 0)
+			ER_WRONG_COLLATION_OPTIONS, NULL) != 0)
 		return -1;
 
 	if (base->icu.french_collation == coll_icu_on_off_MAX) {
@@ -5942,9 +5933,9 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 		if (func_index_check_func(func) != 0)
 			return -1;
 		if (index->def->opts.func_id != func->def->fid) {
-			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS, 0,
-				  "Function ids defined in _index and "
-				  "_func_index don't match");
+			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+				 "Function ids defined in _index and "
+				 "_func_index don't match");
 			return -1;
 		}
 	} else if (old_tuple != NULL && new_tuple == NULL) {

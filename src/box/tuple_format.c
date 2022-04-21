@@ -489,7 +489,7 @@ tuple_format_create(struct tuple_format *format, struct key_def *const *keys,
 			struct coll_id *coll_id = coll_by_id(cid);
 			if (coll_id == NULL) {
 				diag_set(ClientError,ER_WRONG_COLLATION_OPTIONS,
-					 i + 1, "collation was not found by ID");
+					 "collation was not found by ID");
 				return -1;
 			}
 			coll = coll_id->coll;

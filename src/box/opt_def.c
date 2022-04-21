@@ -51,7 +51,7 @@ const char *opt_type_strs[] = {
 
 static int
 opt_set(void *opts, const struct opt_def *def, const char **val,
-	struct region *region, uint32_t errcode, uint32_t field_no)
+	struct region *region, uint32_t errcode)
 {
 	int64_t ival;
 	uint64_t uval;
@@ -144,14 +144,14 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 			goto type_mismatch_err;
 		ival = mp_decode_array(val);
 		assert(def->to_array != NULL);
-		if (def->to_array(val, ival, opt, errcode, field_no) != 0)
+		if (def->to_array(val, ival, opt, errcode) != 0)
 			return -1;
 		break;
 	case OPT_CUSTOM:
 #ifndef NDEBUG
 		str = *val;
 #endif
-		if (def->custom(val, opts, region, errcode, field_no) != 0)
+		if (def->custom(val, opts, region, errcode) != 0)
 			return -1;
 #ifndef NDEBUG
 		mp_next(&str);
@@ -169,28 +169,27 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 type_mismatch_err:
 	snprintf(errmsg, TT_STATIC_BUF_LEN, "'%s' must be %s", def->name,
 		 opt_type_strs[def->type]);
-	diag_set(ClientError, errcode, field_no, errmsg);
+	diag_set(ClientError, errcode, errmsg);
 	return -1;
 }
 
 int
 opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
 	       uint32_t key_len, const char **data, uint32_t errcode,
-	       uint32_t field_no, struct region *region,
-	       bool skip_unknown_options)
+	       struct region *region, bool skip_unknown_options)
 {
 	for (const struct opt_def *def = reg; def->name != NULL; def++) {
 		if (key_len != strlen(def->name) ||
 		    memcmp(key, def->name, key_len) != 0)
 			continue;
 
-		return opt_set(opts, def, data, region, errcode, field_no);
+		return opt_set(opts, def, data, region, errcode);
 	}
 	if (! skip_unknown_options) {
 		char *errmsg = tt_static_buf();
 		snprintf(errmsg, TT_STATIC_BUF_LEN, "unexpected option '%.*s'",
 			 key_len, key);
-		diag_set(ClientError, errcode, field_no, errmsg);
+		diag_set(ClientError, errcode, errmsg);
 		return -1;
 	}
 	mp_next(data);
@@ -203,7 +202,7 @@ opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
  */
 int
 opts_decode(void *opts, const struct opt_def *reg, const char **map,
-	    uint32_t errcode, uint32_t field_no, struct region *region)
+	    uint32_t errcode, struct region *region)
 {
 	assert(mp_typeof(**map) == MP_MAP);
 
@@ -214,14 +213,13 @@ opts_decode(void *opts, const struct opt_def *reg, const char **map,
 	uint32_t map_size = mp_decode_map(map);
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(**map) != MP_STR) {
-			diag_set(ClientError, errcode, field_no,
-				 "key must be a string");
+			diag_set(ClientError, errcode, "key must be a string");
 			return -1;
 		}
 		uint32_t key_len;
 		const char *key = mp_decode_str(map, &key_len);
 		if (opts_parse_key(opts, reg, key, key_len, map, errcode,
-				   field_no, region, false) != 0)
+				   region, false) != 0)
 			return -1;
 	}
 	return 0;

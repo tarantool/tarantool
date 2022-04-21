@@ -845,7 +845,7 @@ ts:drop()
 --
 box.space._space:replace{600, 1, 'test', 'memtx', 0, { sql = 100 }, {}}
 ---
-- error: 'Wrong space options (field 5): ''sql'' must be string'
+- error: 'Wrong space options: ''sql'' must be string'
 ...
 --
 -- gh-2914: Allow any space name which consists of printable characters

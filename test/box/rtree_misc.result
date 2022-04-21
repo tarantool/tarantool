@@ -579,7 +579,7 @@ box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 22},
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, dimension = 'dimension'}, {{2, 'array'}}}
 ---
-- error: 'Wrong index options (field 4): ''dimension'' must be integer'
+- error: 'Wrong index options: ''dimension'' must be integer'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'unsigned'}}}
 ---
@@ -598,7 +598,7 @@ box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{'no','time'}}
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, distance = 'lobachevsky'}, {{2, 'array'}}}
 ---
-- error: 'Wrong index options (field 4): distance must be either ''euclid'' or ''manhattan'''
+- error: 'Wrong index options: distance must be either ''euclid'' or ''manhattan'''
 ...
 box.space._index:insert{s.id, 2, 's', 'rtee', {unique = false}, {{2, 'array'}}}
 ---
@@ -612,12 +612,12 @@ box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{}}}
 -- unknown args checked
 f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, holy = 'cow'}, {{2, 'array'}}})
 ---
-- error: 'Wrong index options (field 4): unexpected option ''holy'''
+- error: 'Wrong index options: unexpected option ''holy'''
 ...
 -- unknown part args are no more ignored (#2649)
 f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{field=2, type='array', part = 'opts'}}})
 ---
-- error: 'Wrong index options (field 1): unexpected option ''part'''
+- error: 'Wrong index options: unexpected option ''part'''
 ...
 -- alter
 i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}})
