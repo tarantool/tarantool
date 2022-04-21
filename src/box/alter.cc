@@ -396,21 +396,15 @@ space_opts_decode(struct space_opts *opts, const char *map,
  * {name: <string>, type: <string>}. Type is optional.
  * @param[out] field Field to decode to.
  * @param data MessagePack map to decode.
- * @param space_name Name of a space, from which the field is got.
- *        Used in error messages.
- * @param name_len Length of @a space_name.
- * @param errcode Error code to use for client errors. Either
- *        create or modify space errors.
  * @param fieldno Field number to decode. Used in error messages.
  * @param region Region to allocate field name.
  */
 static int
 field_def_decode(struct field_def *field, const char **data,
-		 const char *space_name, uint32_t name_len,
-		 uint32_t errcode, uint32_t fieldno, struct region *region)
+		 uint32_t fieldno, struct region *region)
 {
 	if (mp_typeof(**data) != MP_MAP) {
-		diag_set(ClientError, errcode, tt_cstr(space_name, name_len),
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
 			 tt_sprintf("field %d is not map",
 				    fieldno + TUPLE_INDEX_BASE));
 		return -1;
@@ -421,10 +415,9 @@ field_def_decode(struct field_def *field, const char **data,
 	uint32_t action_literal_len = strlen("nullable_action");
 	for (int i = 0; i < count; ++i) {
 		if (mp_typeof(**data) != MP_STR) {
-			diag_set(ClientError, errcode,
-				 tt_cstr(space_name, name_len),
-				 tt_sprintf("field %d format is not map"\
-					     " with string keys",
+			diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
+				 tt_sprintf("field %d format is not map "
+					    "with string keys",
 					    fieldno + TUPLE_INDEX_BASE));
 			return -1;
 		}
@@ -444,14 +437,14 @@ field_def_decode(struct field_def *field, const char **data,
 					 ON_CONFLICT_ACTION_DEFAULT;
 	}
 	if (field->name == NULL) {
-		diag_set(ClientError, errcode, tt_cstr(space_name, name_len),
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
 			 tt_sprintf("field %d name is not specified",
 				    fieldno + TUPLE_INDEX_BASE));
 		return -1;
 	}
 	size_t field_name_len = strlen(field->name);
 	if (field_name_len > BOX_NAME_MAX) {
-		diag_set(ClientError, errcode, tt_cstr(space_name, name_len),
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
 			 tt_sprintf("field %d name is too long",
 				    fieldno + TUPLE_INDEX_BASE));
 		return -1;
@@ -459,13 +452,13 @@ field_def_decode(struct field_def *field, const char **data,
 	if (identifier_check(field->name, field_name_len) != 0)
 		return -1;
 	if (field->type == field_type_MAX) {
-		diag_set(ClientError, errcode, tt_cstr(space_name, name_len),
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
 			 tt_sprintf("field %d has unknown field type",
 				    fieldno + TUPLE_INDEX_BASE));
 		return -1;
 	}
 	if (field->nullable_action == on_conflict_action_MAX) {
-		diag_set(ClientError, errcode, tt_cstr(space_name, name_len),
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
 			 tt_sprintf("field %d has unknown field on conflict "
 				    "nullable action",
 				    fieldno + TUPLE_INDEX_BASE));
@@ -475,23 +468,23 @@ field_def_decode(struct field_def *field, const char **data,
 				     ON_CONFLICT_ACTION_NONE)
 	      || (!field->is_nullable
 		  && field->nullable_action != ON_CONFLICT_ACTION_NONE))) {
-		diag_set(ClientError, errcode, tt_cstr(space_name, name_len),
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
 			 tt_sprintf("field %d has conflicting nullability and "
-				    "nullable action properties", fieldno +
-								  TUPLE_INDEX_BASE));
+				    "nullable action properties",
+				    fieldno + TUPLE_INDEX_BASE));
 		return -1;
 	}
 	if (field->coll_id != COLL_NONE &&
 	    field->type != FIELD_TYPE_STRING &&
 	    field->type != FIELD_TYPE_SCALAR &&
 	    field->type != FIELD_TYPE_ANY) {
-		diag_set(ClientError, errcode, tt_cstr(space_name, name_len),
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
 			 tt_sprintf("collation is reasonable only for "
 				    "string, scalar and any fields"));
 		return -1;
 	}
 	if (field->compression_type == compression_type_MAX) {
-		diag_set(ClientError, errcode, tt_cstr(space_name, name_len),
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
 			 tt_sprintf("field %d has unknown compression type",
 				    fieldno + TUPLE_INDEX_BASE));
 		return -1;
@@ -503,8 +496,6 @@ field_def_decode(struct field_def *field, const char **data,
  * Decode MessagePack array of fields.
  * @param data MessagePack array of fields.
  * @param[out] out_count Length of a result array.
- * @param space_name Space name to use in error messages.
- * @param errcode Errcode for client errors.
  * @param region Region to allocate result array.
  * @param[out] fields Array of fields.
  *
@@ -512,8 +503,7 @@ field_def_decode(struct field_def *field, const char **data,
  */
 static int
 space_format_decode(const char *data, uint32_t *out_count,
-		    const char *space_name, uint32_t name_len,
-		    uint32_t errcode, struct region *region, struct field_def **fields)
+		    struct region *region, struct field_def **fields)
 {
 	/* Type is checked by _space format. */
 	assert(mp_typeof(*data) == MP_ARRAY);
@@ -533,8 +523,8 @@ space_format_decode(const char *data, uint32_t *out_count,
 		return -1;
 	}
 	for (uint32_t i = 0; i < count; ++i) {
-		if (field_def_decode(&region_defs[i], &data, space_name, name_len,
-				     errcode, i, region) != 0)
+		if (field_def_decode(&region_defs[i], &data,
+				     i, region) != 0)
 			return -1;
 	}
 	*fields = region_defs;
@@ -609,8 +599,7 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 		return NULL;
 	struct field_def *fields = NULL;
 	uint32_t field_count;
-	if (space_format_decode(format, &field_count, name,
-				name_len, errcode, region, &fields) != 0)
+	if (space_format_decode(format, &field_count, region, &fields) != 0)
 		return NULL;
 	if (exact_field_count != 0 &&
 	    exact_field_count < field_count) {
