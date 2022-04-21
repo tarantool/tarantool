@@ -212,6 +212,19 @@ int
 field_def_array_decode(const char *data, uint32_t *out_count,
 		       struct region *region, struct field_def **fields);
 
+/**
+ * Duplicates array of fields using malloc. Never fails.
+ * Returns NULL if zero-size array is passed.
+ */
+struct field_def *
+field_def_array_dup(const struct field_def *fields, uint32_t field_count);
+
+/**
+ * Frees array of fields that was allocated with field_def_array_dup().
+ */
+void
+field_def_array_delete(struct field_def *fields, uint32_t field_count);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

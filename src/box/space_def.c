@@ -78,25 +78,6 @@ const struct opt_def space_opts_reg[] = {
 	OPT_END,
 };
 
-size_t
-space_def_sizeof(uint32_t name_len, const struct field_def *fields,
-		 uint32_t field_count, uint32_t *names_offset,
-		 uint32_t *fields_offset)
-{
-	uint32_t field_strs_size = 0;
-	for (uint32_t i = 0; i < field_count; ++i) {
-		field_strs_size += strlen(fields[i].name) + 1;
-		if (fields[i].default_value != NULL) {
-			int len = strlen(fields[i].default_value);
-			field_strs_size += len + 1;
-		}
-	}
-	*fields_offset = small_align(sizeof(struct space_def) + name_len + 1,
-				     alignof(typeof(fields[0])));
-	*names_offset = *fields_offset + field_count * sizeof(struct field_def);
-	return *names_offset + field_strs_size;
-}
-
 struct tuple_format *
 space_tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 		       struct key_def *const *keys, uint16_t key_count,
@@ -139,10 +120,7 @@ space_def_dup_opts(struct space_def *def, const struct space_opts *opts)
 struct space_def *
 space_def_dup(const struct space_def *src)
 {
-	uint32_t strs_offset, fields_offset;
-	size_t size = space_def_sizeof(strlen(src->name), src->fields,
-				       src->field_count, &strs_offset,
-				       &fields_offset);
+	size_t size = sizeof(struct space_def) + strlen(src->name) + 1;
 	struct space_def *ret = (struct space_def *) malloc(size);
 	if (ret == NULL) {
 		diag_set(OutOfMemory, size, "malloc", "ret");
@@ -150,24 +128,7 @@ space_def_dup(const struct space_def *src)
 	}
 	memcpy(ret, src, size);
 	memset(&ret->opts, 0, sizeof(ret->opts));
-	char *strs_pos = (char *)ret + strs_offset;
-	if (src->field_count > 0) {
-		ret->fields = (struct field_def *)((char *)ret + fields_offset);
-		for (uint32_t i = 0; i < src->field_count; ++i) {
-			ret->fields[i].name = strs_pos;
-			strs_pos += strlen(strs_pos) + 1;
-			if (src->fields[i].default_value != NULL) {
-				ret->fields[i].default_value = strs_pos;
-				strs_pos += strlen(strs_pos) + 1;
-			}
-			ret->fields[i].constraint_count =
-				src->fields[i].constraint_count;
-			ret->fields[i].constraint_def =
-				tuple_constraint_def_array_dup(
-					src->fields[i].constraint_def,
-					src->fields[i].constraint_count);
-		}
-	}
+	ret->fields = field_def_array_dup(src->fields, src->field_count);
 	tuple_dictionary_ref(ret->dict);
 	if (space_def_dup_opts(ret, &src->opts) != 0) {
 		space_def_delete(ret);
@@ -183,9 +144,7 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	      const struct space_opts *opts, const struct field_def *fields,
 	      uint32_t field_count)
 {
-	uint32_t strs_offset, fields_offset;
-	size_t size = space_def_sizeof(name_len, fields, field_count,
-				       &strs_offset, &fields_offset);
+	size_t size = sizeof(struct space_def) + name_len + 1;
 	struct space_def *def = (struct space_def *) malloc(size);
 	if (def == NULL) {
 		diag_set(OutOfMemory, size, "malloc", "def");
@@ -208,33 +167,7 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 
 	def->view_ref_count = 0;
 	def->field_count = field_count;
-	if (field_count == 0) {
-		def->fields = NULL;
-	} else {
-		char *strs_pos = (char *)def + strs_offset;
-		def->fields = (struct field_def *)((char *)def + fields_offset);
-		for (uint32_t i = 0; i < field_count; ++i) {
-			def->fields[i] = fields[i];
-			def->fields[i].name = strs_pos;
-			uint32_t len = strlen(fields[i].name);
-			memcpy(def->fields[i].name, fields[i].name, len);
-			def->fields[i].name[len] = 0;
-			strs_pos += len + 1;
-
-			if (fields[i].default_value != NULL) {
-				def->fields[i].default_value = strs_pos;
-				len = strlen(fields[i].default_value);
-				memcpy(def->fields[i].default_value,
-				       fields[i].default_value, len);
-				def->fields[i].default_value[len] = 0;
-				strs_pos += len + 1;
-			}
-			def->fields[i].constraint_def =
-				tuple_constraint_def_array_dup(
-					fields[i].constraint_def,
-					fields[i].constraint_count);
-		}
-	}
+	def->fields = field_def_array_dup(fields, field_count);
 	if (space_def_dup_opts(def, opts) != 0) {
 		space_def_delete(def);
 		return NULL;
@@ -264,11 +197,7 @@ space_def_new_ephemeral(uint32_t exact_field_count, struct field_def *fields)
 void
 space_def_delete(struct space_def *def)
 {
-	for (uint32_t i = 0; i < def->field_count; ++i) {
-		struct field_def *field = &def->fields[i];
-		free(field->constraint_def);
-		TRASH(field);
-	}
+	field_def_array_delete(def->fields, def->field_count);
 	tuple_dictionary_unref(def->dict);
 	free(def->opts.sql);
 	free(def->opts.constraint_def);
