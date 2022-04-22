@@ -300,6 +300,11 @@ struct iterator {
 	 * state has not changed since the last lookup.
 	 */
 	struct index *index;
+	/**
+	 * Pointer to the space this iterator is for.
+	 * Don't access directly, use iterator_space().
+	 */
+	struct space *space;
 };
 
 /**
@@ -311,6 +316,24 @@ struct iterator {
  */
 void
 iterator_create(struct iterator *it, struct index *index);
+
+/** iterator_space() slow path. */
+struct space *
+iterator_space_slow(struct iterator *it);
+
+/**
+ * Returns the space this iterator is for or NULL if the iterator is invalid
+ * (e.g. the index was dropped).
+ */
+static inline struct space *
+iterator_space(struct iterator *it)
+{
+	extern uint32_t space_cache_version;
+	if (likely(it->space != NULL &&
+		   it->space_cache_version == space_cache_version))
+		return it->space;
+	return iterator_space_slow(it);
+}
 
 /**
  * Iterate to the next tuple.
