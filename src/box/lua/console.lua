@@ -51,23 +51,24 @@ local output_handlers = { }
 local output_eos = { ["yaml"] = '\n...\n', ["lua"] = ';' }
 
 output_handlers["yaml"] = function(status, opts, ...)
-    local err
+    local err, ok, res
+     -- Using pcall, because serializer can raise an exception
     if status then
-        -- serializer can raise an exception
-        status, err = pcall(internal.format_yaml, ...)
-        if status then
-            return err
-        else
-            err = 'console: an exception occurred when formatting the output: '..
-                tostring(err)
-        end
+        ok, res = pcall(internal.format_yaml, ...)
     else
         err = ...
         if err == nil then
             err = box.NULL
         end
+        ok, res = pcall(internal.format_yaml, { error = err })
     end
-    return internal.format_yaml({ error = err })
+    if ok then
+        return res
+    else
+        local m = 'console: exception while formatting the output: "%s"'
+        err = m:format(tostring(res))
+        return internal.format_yaml({ error = err })
+    end
 end
 
 --
