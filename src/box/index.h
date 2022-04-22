@@ -855,31 +855,6 @@ struct IteratorGuard
 	~IteratorGuard() { iterator_delete(it); }
 };
 
-/*
- * C++ wrappers around index methods.
- * They throw an exception in case of error.
- */
-
-static inline struct iterator *
-index_create_iterator_xc(struct index *index, enum iterator_type type,
-			 const char *key, uint32_t part_count)
-{
-	struct iterator *it = index_create_iterator(index, type,
-						    key, part_count);
-	if (it == NULL)
-		diag_raise();
-	return it;
-}
-
-static inline struct tuple *
-iterator_next_xc(struct iterator *it)
-{
-	struct tuple *tuple;
-	if (iterator_next(it, &tuple) != 0)
-		diag_raise();
-	return tuple;
-}
-
 #endif /* defined(__plusplus) */
 
 #endif /* TARANTOOL_BOX_INDEX_H_INCLUDED */
