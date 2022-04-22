@@ -1887,13 +1887,14 @@ tx_accept_msg(struct cmsg *m)
 }
 
 static inline void
-tx_end_msg(struct iproto_msg *msg)
+tx_end_msg(struct iproto_msg *msg, struct obuf_svp *svp)
 {
 	if (msg->stream != NULL) {
 		assert(msg->stream->txn == NULL);
 		msg->stream->txn = txn_detach();
 	}
 	msg->connection->iproto_thread->tx.requests_in_progress--;
+	(void)svp;
 }
 
 /**
@@ -1918,10 +1919,11 @@ tx_reply_iproto_error(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct obuf *out = msg->connection->tx.p_obuf;
+	struct obuf_svp header = obuf_create_svp(out);
 	iproto_reply_error(out, diag_last_error(&msg->diag),
 			   msg->header.sync, ::schema_version);
 	iproto_wpos_create(&msg->wpos, out);
-	tx_end_msg(msg);
+	tx_end_msg(msg, &header);
 }
 
 /** Inject a short delay on tx request processing for testing. */
@@ -1939,6 +1941,7 @@ tx_process_begin(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct obuf *out;
+	struct obuf_svp header;
 	uint32_t txn_isolation = msg->begin.txn_isolation;
 
 	if (tx_check_schema(msg->header.schema_version))
@@ -1961,13 +1964,16 @@ tx_process_begin(struct cmsg *m)
 		goto error;
 	}
 	out = msg->connection->tx.p_obuf;
+	header = obuf_create_svp(out);
 	iproto_reply_ok(out, msg->header.sync, ::schema_version);
 	iproto_wpos_create(&msg->wpos, out);
-	tx_end_msg(msg);
+	tx_end_msg(msg, &header);
 	return;
 error:
+	out = msg->connection->tx.p_obuf;
+	header = obuf_create_svp(out);
 	tx_reply_error(msg);
-	tx_end_msg(msg);
+	tx_end_msg(msg, &header);
 }
 
 static void
@@ -1975,6 +1981,7 @@ tx_process_commit(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct obuf *out;
+	struct obuf_svp header;
 
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
@@ -1983,13 +1990,16 @@ tx_process_commit(struct cmsg *m)
 		goto error;
 
 	out = msg->connection->tx.p_obuf;
+	header = obuf_create_svp(out);
 	iproto_reply_ok(out, msg->header.sync, ::schema_version);
 	iproto_wpos_create(&msg->wpos, out);
-	tx_end_msg(msg);
+	tx_end_msg(msg, &header);
 	return;
 error:
+	out = msg->connection->tx.p_obuf;
+	header = obuf_create_svp(out);
 	tx_reply_error(msg);
-	tx_end_msg(msg);
+	tx_end_msg(msg, &header);
 }
 
 static void
@@ -1997,6 +2007,7 @@ tx_process_rollback(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct obuf *out;
+	struct obuf_svp header;
 
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
@@ -2005,13 +2016,16 @@ tx_process_rollback(struct cmsg *m)
 		goto error;
 
 	out = msg->connection->tx.p_obuf;
+	header = obuf_create_svp(out);
 	iproto_reply_ok(out, msg->header.sync, ::schema_version);
 	iproto_wpos_create(&msg->wpos, out);
-	tx_end_msg(msg);
+	tx_end_msg(msg, &header);
 	return;
 error:
+	out = msg->connection->tx.p_obuf;
+	header = obuf_create_svp(out);
 	tx_reply_error(msg);
-	tx_end_msg(msg);
+	tx_end_msg(msg, &header);
 }
 
 static void
@@ -2035,11 +2049,13 @@ tx_process1(struct cmsg *m)
 	iproto_reply_select(out, &svp, msg->header.sync, ::schema_version,
 			    tuple != 0);
 	iproto_wpos_create(&msg->wpos, out);
-	tx_end_msg(msg);
+	tx_end_msg(msg, &svp);
 	return;
 error:
+	out = msg->connection->tx.p_obuf;
+	svp = obuf_create_svp(out);
 	tx_reply_error(msg);
-	tx_end_msg(msg);
+	tx_end_msg(msg, &svp);
 }
 
 static void
@@ -2080,11 +2096,13 @@ tx_process_select(struct cmsg *m)
 	iproto_reply_select(out, &svp, msg->header.sync,
 			    ::schema_version, count);
 	iproto_wpos_create(&msg->wpos, out);
-	tx_end_msg(msg);
+	tx_end_msg(msg, &svp);
 	return;
 error:
+	out = msg->connection->tx.p_obuf;
+	svp = obuf_create_svp(out);
 	tx_reply_error(msg);
-	tx_end_msg(msg);
+	tx_end_msg(msg, &svp);
 }
 
 static int
@@ -2178,11 +2196,13 @@ tx_process_call(struct cmsg *m)
 	iproto_reply_select(out, &svp, msg->header.sync,
 			    ::schema_version, count);
 	iproto_wpos_create(&msg->wpos, out);
-	tx_end_msg(msg);
+	tx_end_msg(msg, &svp);
 	return;
 error:
+	out = msg->connection->tx.p_obuf;
+	svp = obuf_create_svp(out);
 	tx_reply_error(msg);
-	tx_end_msg(msg);
+	tx_end_msg(msg, &svp);
 }
 
 static void
@@ -2202,12 +2222,14 @@ tx_process_misc(struct cmsg *m)
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct iproto_connection *con = msg->connection;
 	struct obuf *out = con->tx.p_obuf;
+	struct obuf_svp header;
 	assert(!(msg->header.type != IPROTO_PING && in_txn()));
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
 
 	try {
 		struct ballot ballot;
+		header = obuf_create_svp(out);
 		switch (msg->header.type) {
 		case IPROTO_AUTH:
 			box_process_auth(&msg->auth, con->salt);
@@ -2249,13 +2271,15 @@ tx_process_misc(struct cmsg *m)
 		}
 		iproto_wpos_create(&msg->wpos, out);
 	} catch (Exception *e) {
+		header = obuf_create_svp(out);
 		tx_reply_error(msg);
 	}
-	tx_end_msg(msg);
+	tx_end_msg(msg, &header);
 	return;
 error:
+	header = obuf_create_svp(out);
 	tx_reply_error(msg);
-	tx_end_msg(msg);
+	tx_end_msg(msg, &header);
 }
 
 static void
@@ -2329,13 +2353,15 @@ tx_process_sql(struct cmsg *m)
 	 * become out of date during yield.
 	 */
 	out = msg->connection->tx.p_obuf;
+	struct obuf_svp header_svp;
 	if (is_unprepare) {
+		header_svp = obuf_create_svp(out);
 		if (iproto_reply_ok(out, msg->header.sync, schema_version) != 0)
 			goto error;
 		iproto_wpos_create(&msg->wpos, out);
+		tx_end_msg(msg, &header_svp);
 		return;
 	}
-	struct obuf_svp header_svp;
 	/* Prepare memory for the iproto header. */
 	if (iproto_prepare_header(out, &header_svp, IPROTO_HEADER_LEN) != 0) {
 		port_destroy(&port);
@@ -2349,11 +2375,13 @@ tx_process_sql(struct cmsg *m)
 	port_destroy(&port);
 	iproto_reply_sql(out, &header_svp, msg->header.sync, schema_version);
 	iproto_wpos_create(&msg->wpos, out);
-	tx_end_msg(msg);
+	tx_end_msg(msg, &header_svp);
 	return;
 error:
+	out = msg->connection->tx.p_obuf;
+	header_svp = obuf_create_svp(out);
 	tx_reply_error(msg);
-	tx_end_msg(msg);
+	tx_end_msg(msg, &header_svp);
 }
 
 static void
@@ -2401,7 +2429,8 @@ tx_process_replication(struct cmsg *m)
 	} catch (Exception *e) {
 		iproto_write_error(io, e, ::schema_version, msg->header.sync);
 	}
-	tx_end_msg(msg);
+	struct obuf_svp empty = obuf_create_svp(msg->connection->tx.p_obuf);
+	tx_end_msg(msg, &empty);
 }
 
 static void
