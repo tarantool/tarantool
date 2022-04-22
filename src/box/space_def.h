@@ -40,6 +40,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct space_upgrade_def;
+
 /** Space options */
 struct space_opts {
 	/**
@@ -85,6 +87,8 @@ struct space_opts {
 	struct tuple_constraint_def *constraint_def;
 	/** Number of constraints. */
 	uint32_t constraint_count;
+	/** Space upgrade definition or NULL. */
+	struct space_upgrade_def *upgrade_def;
 };
 
 extern const struct space_opts space_opts_default;

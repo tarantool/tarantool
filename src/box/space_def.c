@@ -33,6 +33,7 @@
 #include "diag.h"
 #include "error.h"
 #include "msgpuck.h"
+#include "space_upgrade.h"
 #include "tt_static.h"
 #include "tuple_constraint_def.h"
 #include "tuple_format.h"
@@ -47,6 +48,7 @@ const struct space_opts space_opts_default = {
 	/* .sql        = */ NULL,
 	/* .constraint_def = */ NULL,
 	/* .constraint_count = */ 0,
+	/* .upgrade_def = */ NULL,
 };
 
 /**
@@ -65,6 +67,14 @@ static int
 space_opts_parse_foreign_key(const char **data, void *vopts,
 			     struct region *region, uint32_t errcode);
 
+/**
+ * Callback to parse a value with 'upgrade' key in msgpack space opts
+ * definition. See function definition below.
+ */
+static int
+space_opts_parse_upgrade(const char **data, void *vopts,
+			 struct region *region, uint32_t errcode);
+
 const struct opt_def space_opts_reg[] = {
 	OPT_DEF("group_id", OPT_UINT32, struct space_opts, group_id),
 	OPT_DEF("temporary", OPT_BOOL, struct space_opts, is_temporary),
@@ -74,6 +84,7 @@ const struct opt_def space_opts_reg[] = {
 	OPT_DEF("sql", OPT_STRPTR, struct space_opts, sql),
 	OPT_DEF_CUSTOM("constraint", space_opts_parse_constraint),
 	OPT_DEF_CUSTOM("foreign_key", space_opts_parse_foreign_key),
+	OPT_DEF_CUSTOM("upgrade", space_opts_parse_upgrade),
 	OPT_DEF_LEGACY("checks"),
 	OPT_END,
 };
@@ -106,6 +117,7 @@ space_def_dup_opts(struct space_def *def, const struct space_opts *opts)
 	def->opts.constraint_def =
 		tuple_constraint_def_array_dup(opts->constraint_def,
 					       opts->constraint_count);
+	def->opts.upgrade_def = space_upgrade_def_dup(opts->upgrade_def);
 }
 
 struct space_def *
@@ -178,6 +190,7 @@ space_def_delete(struct space_def *def)
 	tuple_dictionary_unref(def->dict);
 	free(def->opts.sql);
 	free(def->opts.constraint_def);
+	space_upgrade_def_delete(def->opts.upgrade_def);
 	TRASH(def);
 	free(def);
 }
@@ -220,4 +233,14 @@ space_opts_parse_foreign_key(const char **data, void *vopts,
 	return tuple_constraint_def_decode_fkey(data, &opts->constraint_def,
 						&opts->constraint_count,
 						region, errcode, true);
+}
+
+static int
+space_opts_parse_upgrade(const char **data, void *vopts,
+			 struct region *region, uint32_t errcode)
+{
+	(void)errcode;
+	struct space_opts *opts = (struct space_opts *)vopts;
+	opts->upgrade_def = space_upgrade_def_decode(data, region);
+	return opts->upgrade_def == NULL ? -1 : 0;
 }

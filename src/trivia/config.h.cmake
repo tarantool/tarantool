@@ -264,6 +264,7 @@
 #define CACHELINE_SIZE 64
 
 #cmakedefine ENABLE_TUPLE_COMPRESSION 1
+#cmakedefine ENABLE_SPACE_UPGRADE 1
 #cmakedefine ENABLE_SSL 1
 #cmakedefine ENABLE_AUDIT_LOG 1
 #cmakedefine ENABLE_FEEDBACK_DAEMON 1

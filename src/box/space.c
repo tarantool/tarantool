@@ -49,6 +49,7 @@
 #include "assoc.h"
 #include "constraint_id.h"
 #include "box.h"
+#include "space_upgrade.h"
 #include "tuple_constraint.h"
 #include "tuple_constraint_func.h"
 #include "tuple_constraint_fkey.h"
@@ -231,6 +232,13 @@ space_create(struct space *space, struct engine *engine,
 
 	space->def = space_def_dup(def);
 
+	if (space->def->opts.upgrade_def != NULL) {
+		space->upgrade = space_upgrade_new(
+			space->def->opts.upgrade_def);
+		if (space->upgrade == NULL)
+			goto fail;
+	}
+
 	/* Create indexes and fill the index map. */
 	space->index_map = (struct index **)
 		calloc(index_count + index_id_max + 1, sizeof(struct index *));
@@ -303,6 +311,8 @@ fail_free_indexes:
 fail:
 	free(space->index_map);
 	free(space->check_unique_constraint_map);
+	if (space->upgrade != NULL)
+		space_upgrade_unref(space->upgrade);
 	if (space->def != NULL)
 		space_def_delete(space->def);
 	if (space->format != NULL) {
@@ -317,6 +327,14 @@ space_on_initial_recovery_complete(struct space *space, void *nothing)
 {
 	(void)nothing;
 	return space_init_constraints(space);
+}
+
+int
+space_on_final_recovery_complete(struct space *space, void *nothing)
+{
+	(void)nothing;
+	space_upgrade_run(space);
+	return 0;
 }
 
 struct space *
@@ -358,6 +376,8 @@ space_delete(struct space *space)
 	}
 	trigger_destroy(&space->before_replace);
 	trigger_destroy(&space->on_replace);
+	if (space->upgrade != NULL)
+		space_upgrade_unref(space->upgrade);
 	space_def_delete(space->def);
 	/*
 	 * SQL triggers and constraints should be deleted with

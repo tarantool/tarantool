@@ -491,6 +491,13 @@ memtx_engine_end_recovery(struct engine *engine)
 			return -1;
 	}
 	xdir_collect_inprogress(&memtx->snap_dir);
+
+	/* Complete space initialization. */
+	int rc = space_foreach(space_on_final_recovery_complete, NULL);
+	if (rc != 0) {
+		diag_log();
+		panic("Failed to complete recovery from WAL!");
+	}
 	return 0;
 }
 
