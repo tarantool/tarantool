@@ -34,6 +34,7 @@
 #include "schema.h"
 #include "user_def.h"
 #include "space.h"
+#include "result.h"
 #include "iproto_constants.h"
 #include "txn.h"
 #include "rmean.h"
@@ -216,7 +217,11 @@ box_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd,
 	if (check_index(space_id, index_id, &space, &index) != 0)
 		return -1;
 	/* No tx management, random() is for approximation anyway. */
-	if (index_random(index, rnd, result) != 0)
+	struct result_processor res_proc;
+	result_process_prepare(&res_proc, space);
+	int rc = index_random(index, rnd, result);
+	result_process(&res_proc, &rc, result);
+	if (rc != 0)
 		return -1;
 	if (*result != NULL)
 		tuple_bless(*result);
@@ -247,7 +252,11 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 	struct txn_ro_savepoint svp;
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
 		return -1;
-	if (index_get(index, key, part_count, result) != 0) {
+	struct result_processor res_proc;
+	result_process_prepare(&res_proc, space);
+	int rc = index_get(index, key, part_count, result);
+	result_process(&res_proc, &rc, result);
+	if (rc != 0) {
 		txn_rollback_stmt(txn);
 		return -1;
 	}
@@ -284,7 +293,11 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 	struct txn_ro_savepoint svp;
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
 		return -1;
-	if (index_min(index, key, part_count, result) != 0) {
+	struct result_processor res_proc;
+	result_process_prepare(&res_proc, space);
+	int rc = index_min(index, key, part_count, result);
+	result_process(&res_proc, &rc, result);
+	if (rc != 0) {
 		txn_rollback_stmt(txn);
 		return -1;
 	}
@@ -319,7 +332,11 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 	struct txn_ro_savepoint svp;
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
 		return -1;
-	if (index_max(index, key, part_count, result) != 0) {
+	struct result_processor res_proc;
+	result_process_prepare(&res_proc, space);
+	int rc = index_max(index, key, part_count, result);
+	result_process(&res_proc, &rc, result);
+	if (rc != 0) {
 		txn_rollback_stmt(txn);
 		return -1;
 	}
@@ -408,7 +425,16 @@ int
 box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 {
 	assert(result != NULL);
-	if (iterator_next(itr, result) != 0)
+	struct space *space = iterator_space(itr);
+	if (space == NULL) {
+		*result = NULL;
+		return 0;
+	}
+	struct result_processor res_proc;
+	result_process_prepare(&res_proc, space);
+	int rc = iterator_next(itr, result);
+	result_process(&res_proc, &rc, result);
+	if (rc != 0)
 		return -1;
 	if (*result != NULL)
 		tuple_bless(*result);
