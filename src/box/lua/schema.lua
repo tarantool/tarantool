@@ -655,7 +655,7 @@ local function normalize_foreign_key(space_id, space_name, fkey, error_prefix,
     return result
 end
 
-local function update_format(space_id, space_name, format)
+local function normalize_format(space_id, space_name, format)
     local result = {}
     for i, given in ipairs(format) do
         local field = {}
@@ -768,7 +768,7 @@ box.schema.space.create = function(name, options)
     end
     local format = options.format and options.format or {}
     check_param(format, 'format', 'table')
-    format = update_format(id, name, format)
+    format = normalize_format(id, name, format)
     local constraint = normalize_constraint(options.constraint, '')
     local foreign_key = normalize_foreign_key(id, name, options.foreign_key, '',
                                               true)
@@ -803,7 +803,7 @@ function box.schema.space.format(id, format)
         return tuple.format
     else
         check_param(format, 'format', 'table')
-        format = update_format(id, tuple.name, format)
+        format = normalize_format(id, tuple.name, format)
         _space:update(id, {{'=', 7, format}})
     end
 end
@@ -918,7 +918,7 @@ box.schema.space.alter = function(space_id, options)
 
     local format
     if options.format ~= nil then
-        format = update_format(space_id, tuple.name, options.format)
+        format = normalize_format(space_id, tuple.name, options.format)
     else
         format = tuple.format
     end
