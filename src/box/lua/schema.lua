@@ -2351,8 +2351,21 @@ end
 
 box.internal.check_select_opts = check_select_opts -- for net.box
 
+local check_select_args_rl = log.internal.ratelimit:new()
+local function check_select_args(index, key, opts)
+    local rl = check_select_args_rl
+
+    if index.space_id >= 512 and
+       (type(key) == 'nil' or (type(key) == 'table' and next(key) == nil)) and
+       (opts == nil or not opts.fullscan) then
+        rl:log_crit('empty or nil `select` call on user space with id=%d\n %s',
+                    index.space_id, debug.traceback())
+    end
+end
+
 base_index_mt.select_ffi = function(index, key, opts)
     check_index_arg(index, 'select')
+    check_select_args(index, key, opts)
     local ibuf = cord_ibuf_take()
     local key, key_end = tuple_encode(ibuf, key)
     local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
@@ -2376,6 +2389,7 @@ end
 
 base_index_mt.select_luac = function(index, key, opts)
     check_index_arg(index, 'select')
+    check_select_args(index, key, opts)
     local key = keify(key)
     local iterator, offset, limit = check_select_opts(opts, #key == 0)
     return internal.select(index.space_id, index.id, iterator,
