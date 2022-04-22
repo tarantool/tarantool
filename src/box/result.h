@@ -5,8 +5,11 @@
  */
 #pragma once
 
-struct space;
-struct tuple;
+#include <stddef.h>
+
+#include "space.h"
+#include "space_upgrade.h"
+#include "trivia/util.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -31,21 +34,29 @@ extern "C" {
  * must be called as well, because it may need to free some resources.
  */
 struct result_processor {
+	/** Space upgrade state or NULL. */
+	struct space_upgrade *upgrade;
 };
 
 static inline void
 result_process_prepare(struct result_processor *p, struct space *space)
 {
-	(void)p;
-	(void)space;
+	p->upgrade = space->upgrade;
+	if (unlikely(p->upgrade != NULL))
+		space_upgrade_ref(p->upgrade);
 }
 
 static inline void
 result_process(struct result_processor *p, int *rc, struct tuple **result)
 {
-	(void)p;
-	(void)rc;
-	(void)result;
+	if (likely(p->upgrade == NULL))
+		return;
+	if (*rc == 0 && *result != NULL) {
+		*result = space_upgrade_apply(p->upgrade, *result);
+		if (*result == NULL)
+			*rc = -1;
+	}
+	space_upgrade_unref(p->upgrade);
 }
 
 #if defined(__cplusplus)

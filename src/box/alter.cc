@@ -57,6 +57,7 @@
 #include "sequence.h"
 #include "sql.h"
 #include "constraint_id.h"
+#include "space_upgrade.h"
 #include "box.h"
 
 /* {{{ Auxiliary functions and methods. */
@@ -823,6 +824,7 @@ alter_space_commit(struct trigger *trigger, void *event)
 		return -1;
 	}
 
+	struct space *space = alter->new_space;
 	alter->new_space = NULL; /* for alter_space_delete(). */
 	/*
 	 * Delete the old version of the space, we are not
@@ -831,6 +833,8 @@ alter_space_commit(struct trigger *trigger, void *event)
 	space_delete(alter->old_space);
 	alter->old_space = NULL;
 	alter_space_delete(alter);
+
+	space_upgrade_run(space);
 	return 0;
 }
 
@@ -903,6 +907,8 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 static void
 alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 {
+	if (space_upgrade_check_alter(alter->old_space, alter->space_def) != 0)
+		diag_raise();
 	/**
 	 * AlterSpaceOp::prepare() may perform a potentially long
 	 * lasting operation that may yield, e.g. building of a new
@@ -1027,6 +1033,13 @@ CheckSpaceFormat::prepare(struct alter_space *alter)
 	struct space *old_space = alter->old_space;
 	struct tuple_format *new_format = new_space->format;
 	struct tuple_format *old_format = old_space->format;
+	if (new_space->upgrade != NULL) {
+		/*
+		 * Tuples stored in the space will be checked against
+		 * the new format during space upgrade.
+		 */
+		return;
+	}
 	if (old_format != NULL) {
 		assert(new_format != NULL);
 		for (uint32_t i = 0; i < old_space->index_count; i++) {

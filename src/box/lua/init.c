@@ -72,6 +72,11 @@
 
 static uint32_t CTID_STRUCT_TXN_SAVEPOINT_PTR = 0;
 
+#if ENABLE_SPACE_UPGRADE
+void
+box_lua_space_upgrade_init(struct lua_State *L);
+#endif
+
 #if ENABLE_AUDIT_LOG
 void
 box_lua_audit_init(struct lua_State *L);
@@ -85,6 +90,9 @@ extern char session_lua[],
 	xlog_lua[],
 #if ENABLE_FEEDBACK_DAEMON
 	feedback_daemon_lua[],
+#endif
+#if ENABLE_SPACE_UPGRADE
+	space_upgrade_lua[],
 #endif
 #if ENABLE_AUDIT_LOG
 	audit_lua[],
@@ -105,6 +113,9 @@ static const char *lua_sources[] = {
 	 * from the feedback daemon.
 	 */
 	"box/feedback_daemon", feedback_daemon_lua,
+#endif
+#if ENABLE_SPACE_UPGRADE
+	"box/space_upgrade", space_upgrade_lua,
 #endif
 #if ENABLE_AUDIT_LOG
 	"box/audit", audit_lua,
@@ -491,6 +502,9 @@ box_lua_init(struct lua_State *L)
 	box_lua_xlog_init(L);
 	box_lua_sql_init(L);
 	box_lua_watcher_init(L);
+#ifdef ENABLE_SPACE_UPGRADE
+	box_lua_space_upgrade_init(L);
+#endif
 #ifdef ENABLE_AUDIT_LOG
 	box_lua_audit_init(L);
 #endif
