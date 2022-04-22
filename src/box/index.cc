@@ -398,6 +398,7 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 		txn_rollback_stmt(txn);
 		return NULL;
 	}
+	it->space = space;
 	txn_commit_ro_stmt(txn, &svp);
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 	return it;
@@ -461,6 +462,27 @@ iterator_create(struct iterator *it, struct index *index)
 	it->space_id = index->def->space_id;
 	it->index_id = index->def->iid;
 	it->index = index;
+	it->space = NULL;
+}
+
+/**
+ * Helper function that checks that the iterated index wasn't dropped
+ * and updates it->space and it->space_cache_version on success.
+ * Returns 0 on success, -1 on failure.
+ */
+static int
+iterator_check_space(struct iterator *it)
+{
+	struct space *space = space_by_id(it->space_id);
+	if (space == NULL)
+		return -1;
+	struct index *index = space_index(space, it->index_id);
+	if (index != it->index ||
+	    index->space_cache_version > it->space_cache_version)
+		return -1;
+	it->space_cache_version = space_cache_version;
+	it->space = space;
+	return 0;
 }
 
 static bool
@@ -470,16 +492,18 @@ iterator_is_valid(struct iterator *it)
 	if (it->space_id == 0)
 		return true;
 	if (unlikely(it->space_cache_version != space_cache_version)) {
-		struct space *space = space_by_id(it->space_id);
-		if (space == NULL)
+		if (iterator_check_space(it) != 0)
 			return false;
-		struct index *index = space_index(space, it->index_id);
-		if (index != it->index ||
-		    index->space_cache_version > it->space_cache_version)
-			return false;
-		it->space_cache_version = space_cache_version;
 	}
 	return true;
+}
+
+struct space *
+iterator_space_slow(struct iterator *it)
+{
+	if (iterator_check_space(it) != 0)
+		return NULL;
+	return it->space;
 }
 
 int
