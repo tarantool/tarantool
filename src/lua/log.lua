@@ -136,7 +136,7 @@ local log_cfg = {
     log               = nil,
     nonblock          = nil,
     print_module_name = false,
-    level             = S_INFO,
+    level             = {default = S_INFO},
     format            = fmt_num2str[ffi.C.SF_PLAIN],
 }
 
@@ -253,7 +253,41 @@ local function verify_format(key, name, cfg)
     return true
 end
 
--- Test if level is a valid string. The
+local function verify_module_level(level)
+    if type(level) == 'string' then
+        if not log_level_keys[level] then
+            local m = "expected %s"
+            return false, m:format(log_level_list())
+        end
+    elseif type(level) ~= 'number' then
+        return false
+    end
+    return true
+end
+
+local function verify_table_level(level)
+    assert(type(level) == 'table')
+
+    if not level.default then
+        return false, "level table must contain 'default' key"
+    end
+    if not verify_module_level(level.default) then
+        return false, "'default' must be a number or a string"
+    end
+    if level.modules then
+        if type(level.modules) ~= 'table' then
+            return false, "'modules' must be a table"
+        end
+        for _, mod_level in pairs(level.modules) do
+            if not verify_module_level(mod_level) then
+                return false, "level must be a number or a string"
+            end
+        end
+    end
+    return true
+end
+
+-- Test if level is a valid table ot number. The
 -- number may be any for to backward compatibility.
 local function verify_level(key, level)
     assert(log_cfg[key] ~= nil)
@@ -263,8 +297,10 @@ local function verify_level(key, level)
             local m = "expected %s"
             return false, m:format(log_level_list())
         end
+    elseif type(level) == 'table' then
+            return verify_table_level(level)
     elseif type(level) ~= 'number' then
-            return false, "must be a number or a string"
+        return false, "must be a number or a string or a table with 'default' key"
     end
 
     return true
@@ -298,12 +334,41 @@ local function verify_option(k, v, ...)
     return true
 end
 
+local function normolize_level(level)
+    if type(level) == 'string' then
+        return {default = log_level_keys[level]}
+    elseif type(level) == 'number' then
+        return {default = level}
+    elseif type(level) == 'table' then
+        if type(level.default) == 'string' then
+            level.default = log_level_keys[level.default]
+        end
+        if level.modules then
+            for mod_name, mod_level in pairs(level.modules) do
+                if type(mod_level) == 'string' then
+                    level.modules[mod_name] = log_level_keys[level.modules[mod_name]]
+                end
+            end
+        end
+    end
+    return level
+end
+
 -- Main routine which pass data to C logging code.
 local function say(self, level, fmt, ...)
-    if ffi.C.log_level < level then
-        -- don't waste cycles on debug.getinfo()
-        return
+    if self ~= nil then
+        self.cfg.level = normolize_level(self.cfg.level)
+        if self.cfg.level.modules ~= nil and self.cfg.level.modules[self.module_name] ~= nil then
+            if self.cfg.level.modules[self.module_name] < level then
+                -- don't waste cycles on debug.getinfo()
+                return
+            end
+        else if  self.cfg.level.default < level then
+                return
+            end
+        end
     end
+
     local type_fmt = type(fmt)
     local format = "%s"
     if select('#', ...) ~= 0 then
@@ -359,9 +424,10 @@ end
 
 -- Set new logging level, the level must be valid!
 local function set_log_level(level, update_box_cfg)
-    assert(type(level) == 'number')
+    assert(type(level) == 'table')
+    assert(type(level.default) == 'number')
 
-    ffi.C.say_set_log_level(level)
+    ffi.C.say_set_log_level(level.default)
 
     rawset(log_cfg, 'level', level)
 
@@ -370,7 +436,7 @@ local function set_log_level(level, update_box_cfg)
     end
 
     local m = "log: level set to %s"
-    say_closure(S_DEBUG, nil)(m:format(level))
+    say_closure(S_DEBUG, nil)(m:format(level.default))
 end
 
 -- Tries to set a new level, or print an error.
@@ -380,10 +446,7 @@ local function log_level(level)
         error(msg)
     end
 
-    if type(level) == 'string' then
-        level = log_level_keys[level]
-    end
-
+    level = normolize_level(level)
     set_log_level(level, true)
 end
 
@@ -514,10 +577,7 @@ local function box_api_cfg_set_log_level()
         box.error(box.error.CFG, 'log_level', msg)
     end
 
-    if type(v) == 'string' then
-        v = log_level_keys[v]
-    end
-
+    v = normolize_level(v)
     set_log_level(v, false)
 end
 
@@ -581,12 +641,8 @@ local function load_cfg(self, cfg)
             local m = "log.cfg: \'%s\' %s"
             error(m:format('level', msg))
         end
-        -- Convert level to a numeric value since
-        -- low level api operates with numbers only.
-        if type(cfg.level) == 'string' then
-            assert(log_level_keys[cfg.level] ~= nil)
-            cfg.level = log_level_keys[cfg.level]
-        end
+
+        cfg.level = normolize_level(cfg.level)
     end
 
     if cfg.nonblock ~= nil then
@@ -629,7 +685,7 @@ local function load_cfg(self, cfg)
     -- We never allow confgure the logger in background
     -- mode since we don't know how the box will be configured
     -- later.
-    ffi.C.say_logger_init(cfg.log, cfg.level,
+    ffi.C.say_logger_init(cfg.log, cfg.level.default,
                           nonblock, cfg.format, 0)
 
     if nonblock == 1 then

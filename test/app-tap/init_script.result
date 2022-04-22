@@ -33,7 +33,6 @@ iproto_threads:1
 listen:port
 log:tarantool.log
 log_format:plain
-log_level:5
 log_print_module_name:false
 memtx_allocator:small
 memtx_dir:.

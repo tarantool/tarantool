@@ -88,7 +88,8 @@ cfg_filter(box.cfg)
   - - log_format
     - plain
   - - log_level
-    - 5
+    - - - default
+        - 5
   - - log_print_module_name
     - false
   - - memtx_allocator

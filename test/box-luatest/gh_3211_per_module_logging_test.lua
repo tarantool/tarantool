@@ -15,6 +15,12 @@ local function configure_server_with_printing_module()
     g.server:start()
 end
 
+local function configure_server_with_log_level(level)
+    g.server = server:new({alias = 'with_option',
+                           box_cfg = {log_print_module_name=true, log_level = level}})
+    g.server:start()
+end
+
 g.before_test("test_with_option", configure_server_with_printing_module)
 g.after_test("test_with_option", function() g.server:drop() end)
 
@@ -110,4 +116,80 @@ g.test_expirationd = function()
         })
     end)
     module_name_is_in_logs('expirationd', "I")
+end
+
+g.before_test("test_own_log_level", function ()
+    configure_server_with_log_level({default = 5,
+                                     modules = {['test.box-luatest.gh_3211_modules.testmod'] = 7}})
+end)
+g.after_test("test_own_log_level", function() g.server:drop() end)
+
+g.test_own_log_level = function()
+    g.server:exec(function()
+        testmod = require('test.box-luatest.gh_3211_modules.testmod')
+        testmod.make_logs()
+        testmod3 = require('test.box-luatest.gh_3211_modules.testmod3')
+        testmod3.make_logs()
+    end)
+    module_name_is_in_logs('testmod', "I")
+    module_name_is_in_logs('testmod', "D")
+    module_name_is_in_logs('testmod3', "I")
+    t.xfail()
+    module_name_is_in_logs('testmod3', "D")
+end
+
+g.before_test("test_own_log_level_string_levels", function ()
+    configure_server_with_log_level({default = 'info',
+                                     modules = {['test.box-luatest.gh_3211_modules.testmod'] = 'debug'}})
+end)
+g.after_test("test_own_log_level_string_levels", function() g.server:drop() end)
+
+g.test_own_log_level_string_levels = g.test_own_log_level
+
+g.before_test("test_own_log_level_lower", function ()
+    configure_server_with_log_level({default = 5,
+                                     modules = {['test.box-luatest.gh_3211_modules.testmod'] = 3}})
+end)
+g.after_test("test_own_log_level_lower", function() g.server:drop() end)
+
+g.test_own_log_level_lower = function()
+    g.server:exec(function()
+        testmod = require('test.box-luatest.gh_3211_modules.testmod')
+        testmod.make_logs()
+        testmod3 = require('test.box-luatest.gh_3211_modules.testmod3')
+        testmod3.make_logs()
+    end)
+    module_name_is_in_logs('testmod3', "I")
+    t.xfail()
+    module_name_is_in_logs('testmod', "I")
+end
+
+g.before_test("test_set_level", configure_server_with_printing_module)
+g.after_test("test_set_level", function() g.server:drop() end)
+
+g.test_set_level = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local log = require('log')
+
+        t.assert_error_msg_contains("'default' must be a number or a string",
+                function() log.level({default = {'hello'}}) end)
+        t.assert_error_msg_contains("level table must contain 'default' key",
+                function() log.level({modules = {expirationd = 7}}) end)
+        t.assert_error_msg_contains("'modules' must be a table",
+                function() log.level({default = 5, modules = 'hello'}) end)
+        t.assert_error_msg_contains("level must be a number or a string",
+                function() log.level({default = 5, modules = {expirationd = {'hello'}}}) end)
+        log.level({default = 5,
+                   modules = {['test.box-luatest.gh_3211_modules.testmod'] = 7}})
+    end)
+    g.test_own_log_level()
+    g.server:exec(function()
+        log.level(5)
+    end)
+    g.test_with_option()
+    g.server:exec(function()
+        log.level('info')
+    end)
+    g.test_with_option()
 end

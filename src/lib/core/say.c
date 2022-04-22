@@ -1286,7 +1286,7 @@ log_vsay(struct log *log, int level, const char* module_name, const char *filena
 		log->on_log(level, filename, line, error, format, ap_copy);
 		va_end(ap_copy);
 	}
-	if (level > log->level) {
+	if (module_name == NULL && level > log->level) {
 		return 0;
 	}
 	int total = log->format_func(log, buf, sizeof(buf), level, module_name,

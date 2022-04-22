@@ -9,28 +9,28 @@ log.log_format('plain')
 
 -- Test symbolic names for loglevels
 local _, err = pcall(log.cfg, {level='fatal'})
-test:ok(err == nil and log.cfg.level == 0, 'both got fatal')
+test:ok(err == nil and log.cfg.level.default == 0, 'both got fatal')
 
 _, err = pcall(log.cfg, {level='syserror'})
-test:ok(err == nil and log.cfg.level == 1, 'got syserror')
+test:ok(err == nil and log.cfg.level.default == 1, 'got syserror')
 
 _, err = pcall(log.cfg, {level='error'})
-test:ok(err == nil and log.cfg.level == 2, 'got error')
+test:ok(err == nil and log.cfg.level.default == 2, 'got error')
 
 _, err = pcall(log.cfg, {level='crit'})
-test:ok(err == nil and log.cfg.level == 3, 'got crit')
+test:ok(err == nil and log.cfg.level.default == 3, 'got crit')
 
 _, err = pcall(log.cfg, {level='warn'})
-test:ok(err == nil and log.cfg.level == 4, 'got warn')
+test:ok(err == nil and log.cfg.level.default == 4, 'got warn')
 
 _, err = pcall(log.cfg, {level='info'})
-test:ok(err == nil and log.cfg.level == 5, 'got info')
+test:ok(err == nil and log.cfg.level.default == 5, 'got info')
 
 _, err = pcall(log.cfg, {level='verbose'})
-test:ok(err == nil and log.cfg.level == 6, 'got verbose')
+test:ok(err == nil and log.cfg.level.default == 6, 'got verbose')
 
 _, err = pcall(log.cfg, {level='debug'})
-test:ok(err == nil and log.cfg.level == 7, 'got debug')
+test:ok(err == nil and log.cfg.level.default == 7, 'got debug')
 
 test:check()
 os.exit()
