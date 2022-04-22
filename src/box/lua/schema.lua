@@ -297,6 +297,7 @@ local function check_param_table(table, template)
         end
     end
 end
+box.internal.check_param_table = check_param_table
 
 --[[
  @brief Common function to check type parameter (of function)
@@ -309,6 +310,7 @@ local function check_param(param, name, should_be_type)
                   name .. " should be a " .. should_be_type)
     end
 end
+box.internal.check_param = check_param
 
 --[[
  Adds to a table key-value pairs from defaults table
@@ -707,6 +709,7 @@ local function normalize_format(space_id, space_name, format)
     end
     return result
 end
+box.internal.space.normalize_format = normalize_format -- for space.upgrade
 
 box.schema.space = {}
 box.schema.space.create = function(name, options)
@@ -806,6 +809,14 @@ function box.schema.space.format(id, format)
         format = normalize_format(id, tuple.name, format)
         _space:update(id, {{'=', 7, format}})
     end
+end
+
+function box.schema.space.upgrade(id, ...)
+    check_param(id, 'id', 'number')
+    if not box.internal.space.upgrade then
+        box.error(box.error.UNSUPPORTED, "Community edition", "space upgrade")
+    end
+    return box.internal.space.upgrade(id, ...)
 end
 
 box.schema.create_space = box.schema.space.create
@@ -2529,6 +2540,10 @@ end
 space_mt.format = function(space, format)
     check_space_arg(space, 'format')
     return box.schema.space.format(space.id, format)
+end
+space_mt.upgrade = function(space, ...)
+    check_space_arg(space, 'upgrade')
+    return box.schema.space.upgrade(space.id, ...)
 end
 space_mt.drop = function(space)
     check_space_arg(space, 'drop')

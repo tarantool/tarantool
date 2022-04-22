@@ -53,6 +53,7 @@ struct tuple;
 struct tuple_format;
 struct ck_constraint;
 struct constraint_id;
+struct space_upgrade;
 
 struct space_vtab {
 	/** Free a space instance. */
@@ -247,6 +248,8 @@ struct space {
 	 * List of all tx stories in the space.
 	 */
 	struct rlist memtx_stories;
+	/** Space upgrade state or NULL. */
+	struct space_upgrade *upgrade;
 };
 
 /** Initialize a base space instance. */
@@ -270,6 +273,14 @@ space_create(struct space *space, struct engine *engine,
  */
 int
 space_on_initial_recovery_complete(struct space *space, void *nothing);
+
+/**
+ * Finish space initialization after finishing final recovery.
+ * See the comment to space_on_initial_recovery_complete() for
+ * the function semantics and rationale.
+ */
+int
+space_on_final_recovery_complete(struct space *space, void *nothing);
 
 /** Get space ordinal number. */
 static inline uint32_t
