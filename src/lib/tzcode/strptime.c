@@ -553,8 +553,7 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 				const struct date_time_zone *zone;
 				size_t n = timezone_lookup(zonestr, cp - buf,
 							   &zone);
-				if (n == 0 ||
-				   (TZ_AMBIGUOUS | TZ_NYI) & timezone_flags(zone))
+				if (n <= 0)
 					return NULL;
 				tm->tm_gmtoff = timezone_offset(zone);
 				tm->tm_tzindex = timezone_index(zone);
