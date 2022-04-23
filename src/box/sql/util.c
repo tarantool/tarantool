@@ -80,8 +80,8 @@ sqlStrlen30(const char *z)
  * input does not begin with a quote character, then this routine
  * is a no-op.
  *
- * The input string must be zero-terminated.  A new zero-terminator
- * is added to the dequoted string.
+ * The input string must be zero-terminated. The resulting dequoted
+ * string will also be zero-terminated.
  *
  * The return value is -1 if no dequoting occurs or the length of the
  * dequoted string, exclusive of the zero terminator, if dequoting does
@@ -102,19 +102,19 @@ sqlDequote(char *z)
 	if (!sqlIsquote(quote))
 		return;
 	for (i = 1, j = 0;; i++) {
-		assert(z[i]);
 		if (z[i] == quote) {
 			if (z[i + 1] == quote) {
 				z[j++] = quote;
 				i++;
-			} else {
-				break;
 			}
+		} else if (z[i] == 0) {
+			z[j] = 0;
+			return;
 		} else {
 			z[j++] = z[i];
 		}
+		assert(z[i] != 0);
 	}
-	z[j] = 0;
 }
 
 int
