@@ -53,6 +53,10 @@ jobs:
       - name: Add tarantool path to $PATH
         run: echo "${PWD}/src:${PWD}/extra/dist" >> ${GITHUB_PATH}
 
+      - name: Get tarantool version
+        id: tarantool-version
+        run: echo "::set-output name=value::$(tarantool -e 'print(_TARANTOOL)')"
+
       - name: Build and install sysbench
         run: |
           ./autogen.sh
@@ -71,13 +75,57 @@ jobs:
         run: python3 -m pip install --user --requirement requirements.txt
         working-directory: ./bench-run/publishing
 
-      - name: Publish metrics
+      - name: Publish metrics to database
         env:
           INFLUXDB_ORG: tarantool
           INFLUXDB_BUCKET: perf
           INFLUXDB_URL: ${{ secrets.INFLUXDB_URL }}
           INFLUXDB_TOKEN: ${{ secrets.INFLUXDB_TOKEN }}
-        run: ./bench-run/publishing/influxdb.py -m sysbench -f Sysbench_result.txt
+        run: |
+          ./bench-run/publishing/influxdb.py \
+            --measurement sysbench \
+            --file Sysbench_result.txt \
+            --save sysbench_db_record.txt \
+            --prev
+
+      - name: Install requirements for metrics reporter
+        run: python3 -m pip install --user --requirement requirements.txt
+        working-directory: ./bench-run/reporting
+
+      - name: Generate metrics report
+        run: |
+          ./bench-run/reporting/table.py \
+            --input sysbench_db_record.txt \
+            --output sysbench_result_table.txt
+
+      - name: Send metrics report to MyTeam chat
+        env:
+          MYTEAM_URL: ${{ secrets.MYTEAM_URL }}
+          MYTEAM_TOKEN: ${{ secrets.MYTEAM_TOKEN }}
+          MYTEAM_CHAT_ID: ${{ secrets.MYTEAM_CHAT_ID }}
+        run: |
+          ./bench-run/reporting/myteam.py \
+            --message-file sysbench_result_table.txt \
+            --format MarkdownV2
+
+      - name: Prepare email body
+        run: |
+          { echo '<pre>'; cat sysbench_result_table.txt; echo '<pre/>'; } \
+            > sysbench_result_table.html
+
+      - name: Send metrics report to mailing list
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.PERF_EMAIL_SERVER }}
+          server_port: 25
+          subject: >
+            Tarantool Perf Testing. Branch: ${{ github.ref_name }}.
+            Build: ${{ steps.tarantool-version.outputs.value }}.
+            Test: sysbench
+          to: ${{ secrets.PERF_EMAIL_RECIPIENTS }}
+          from: ${{ secrets.PERF_EMAIL_SENDER }}
+          html_body: file://sysbench_result_table.html
+          ignore_cert: false
 
       - name: call action to send Telegram message on failure
         env:
