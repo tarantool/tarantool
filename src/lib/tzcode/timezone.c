@@ -73,23 +73,34 @@ sort_abbrevs_singleton(void)
 	return sorted;
 }
 
+/**
+ * We want to accept only names in a form:
+ * - Z, AT, MSK, i.e. [A-Z]{1,6}
+ * - Etc/GMT, Europe/Moscow, America/St_Kitts, i.e. [A-Za-z][A-Za-z/_-]*
+ * NB! Eventually should be reimplemented with proper regexp, but now
+ * it accepts slightly wider class of input.
+ */
 static size_t
 char_span_alpha(const char *src, size_t len)
 {
 	size_t n;
 
-	for (n = 0; n < len; n++)
-		if (!isalpha(src[n]) && !ispunct(src[n]))
+	if (len == 0 || !isalpha(src[0]))
+		return 0;
+	for (n = 0; n < len; n++) {
+		char ch = src[n];
+		if (!isalpha(ch) && ch != '/' && ch != '_' && ch != '-')
 			break;
 
+	}
 	return n;
 }
 
-size_t
+ssize_t
 timezone_lookup(const char *str, size_t len, const struct date_time_zone **zone)
 {
 	len = char_span_alpha(str, len);
-	if (!len || len > 6)
+	if (len == 0)
 		return 0;
 
 	struct date_time_zone *sorted = sort_abbrevs_singleton();
@@ -99,8 +110,13 @@ timezone_lookup(const char *str, size_t len, const struct date_time_zone **zone)
 			sizeof(struct date_time_zone), compare_abbrevs);
 
 	if (found != NULL) {
+		/* lua assumes that single bit is set, not both */
+		assert((found->flags & (TZ_NYI | TZ_AMBIGUOUS)) !=
+		       (TZ_NYI | TZ_AMBIGUOUS));
+		if (found->flags & (TZ_NYI | TZ_AMBIGUOUS))
+			return -found->flags;
 		*zone = found;
 		return len;
 	}
-	return 0;
+	return -1;
 }

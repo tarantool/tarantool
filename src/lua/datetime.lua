@@ -67,8 +67,8 @@ size_t tnt_datetime_to_string(const struct datetime * date, char *buf,
                               ssize_t len);
 size_t tnt_datetime_strftime(const struct datetime *date, char *buf,
                              uint32_t len, const char *fmt);
-size_t tnt_datetime_parse_full(struct datetime *date, const char *str,
-                               size_t len, int32_t offset);
+ssize_t tnt_datetime_parse_full(struct datetime *date, const char *str,
+                                size_t len, int32_t offset);
 size_t tnt_datetime_strptime(struct datetime *date, const char *buf,
                              const char *fmt);
 void   tnt_datetime_now(struct datetime *now);
@@ -87,6 +87,15 @@ int    tnt_interval_interval_sub(struct interval *lhs,
                                  const struct interval *rhs);
 int    tnt_interval_interval_add(struct interval *lhs,
                                  const struct interval *rhs);
+
+/* Tarantool timezone support */
+enum {
+    TZ_UTC = 0x01,
+    TZ_RFC = 0x02,
+    TZ_MILITARY = 0x04,
+    TZ_AMBIGUOUS = 0x08,
+    TZ_NYI = 0x10,
+};
 
 ]]
 
@@ -793,10 +802,15 @@ local function datetime_parse_full(str, tzoffset)
     check_str(str, 'datetime.parse()')
     local date = ffi.new(datetime_t)
     local len = builtin.tnt_datetime_parse_full(date, str, #str, tzoffset)
-    if len == 0 then
+    if len > 0 then
+        return date, tonumber(len)
+    elseif len == -builtin.TZ_NYI then
+        error(("could not parse '%s' - nyi timezone"):format(str))
+    elseif len == -builtin.TZ_AMBIGUOUS then
+        error(("could not parse '%s' - ambiguous timezone"):format(str))
+    else -- len <= 0
         error(("could not parse '%s'"):format(str))
     end
-    return date, tonumber(len)
 end
 
 --[[

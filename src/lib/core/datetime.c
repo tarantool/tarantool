@@ -220,7 +220,7 @@ datetime_to_string(const struct datetime *date, char *buf, ssize_t len)
 	return sz;
 }
 
-size_t
+ssize_t
 datetime_parse_full(struct datetime *date, const char *str, size_t len,
 		    int32_t offset)
 {
@@ -265,15 +265,16 @@ datetime_parse_full(struct datetime *date, const char *str, size_t len,
 
 	/* 1st attempt: decode as MSK */
 	const struct date_time_zone *zone;
-	n = timezone_lookup(str, len, &zone);
-	if (n > 0) {
+	ssize_t l = timezone_lookup(str, len, &zone);
+	if (l < 0)
+		return l;
+	if (l > 0) {
 		assert(zone != NULL);
-		if ((TZ_AMBIGUOUS | TZ_NYI) & timezone_flags(zone))
-			return 0;
+		assert(((TZ_AMBIGUOUS | TZ_NYI) & timezone_flags(zone)) == 0);
 		offset = timezone_offset(zone);
 		tzindex = timezone_index(zone);
-		str += n;
-		len -= n;
+		str += l;
+		len -= l;
 		if (len <= 0)
 			goto exit;
 	}
