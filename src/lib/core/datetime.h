@@ -172,9 +172,10 @@ datetime_to_tm(const struct datetime *date, struct tnt_tm *tm);
  * @retval Upon successful completion returns length of accepted
  *         prefix substring. It's ok if there is some unaccepted trailer.
  *         Returns 0 only if text is not recognizable as date/time string.
+ *         Returns negative value is there is unaccepted timezone.
  * @sa datetime_strptime()
  */
-size_t
+ssize_t
 datetime_parse_full(struct datetime *date, const char *str, size_t len,
 		    int32_t offset);
 /**

@@ -11,7 +11,7 @@ local ffi = require('ffi')
 --]]
 if jit.arch == 'arm64' then jit.off() end
 
-test:plan(35)
+test:plan(36)
 
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
@@ -630,6 +630,44 @@ test:test("Parsing of timezone names (tzindex)", function(test)
         test:is(zone, txt:sub(#txt - #zone + 1, #txt), 'sub of ' .. txt)
         txt = date:format('%FT%T %Z')
         test:is(zone, txt:sub(#txt - #zone + 1, #txt), 'sub of ' .. txt)
+    end
+end)
+
+local function error_ambiguous(s)
+    return ("could not parse '%s' - ambiguous timezone"):format(s)
+end
+
+local function error_nyi(s)
+    return ("could not parse '%s' - nyi timezone"):format(s)
+end
+
+local function error_generic(s)
+    return ("could not parse '%s'"):format(s)
+end
+
+test:test("Parsing of timezone names (errors)", function(test)
+    test:plan(13)
+    local zones_arratic = {
+        -- ambiguous
+        AT = error_ambiguous, BT = error_ambiguous,
+        ACT = error_ambiguous, BST = error_ambiguous,
+        GST = error_ambiguous, WAT = error_ambiguous,
+        AZOST = error_ambiguous,
+        -- not yet implemented
+        ['Africa/Abidjan'] = error_nyi,
+        ['America/Argentina/Buenos_Aires'] = error_nyi,
+        ['Asia/Krasnoyarsk'] = error_nyi,
+        ['Pacific/Fiji'] = error_nyi,
+        -- generic errors
+        ['XXX'] = error_generic,
+        ['A-_'] = error_generic,
+    }
+    local base_date = '2020-02-10T0000 '
+
+    for zone, error_function in pairs(zones_arratic) do
+        local date_text = base_date .. zone
+        assert_raises(test, error_function(date_text),
+                      function() return date.parse(date_text) end)
     end
 end)
 

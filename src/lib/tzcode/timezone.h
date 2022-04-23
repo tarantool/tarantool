@@ -19,21 +19,43 @@ enum {
 	TZ_NYI = 0x10,
 };
 
+/**
+ * Time zone attributes
+ */
 struct date_time_zone {
+	/** Zone name */
 	const char *name;
+	/** Id assigned to this zone */
 	int16_t	id;
+	/** Flags (rfc, military, etc) */
 	uint16_t flags;
+	/** Timezone offset (in minutes) */
 	int16_t offset;
 };
 
-size_t
-timezone_lookup(const char *str, size_t, const struct date_time_zone **zone);
+/**
+ * Parse given str string (no longer than given len) and fill zone
+ * with attributes of this symbol
+ * @param[in] s input string to parse
+ * @param[in] len length of input string
+ * @param[out] zone return zone structure, if found
+ * @retval positive value - length of accepted string,
+ *         negative value - string looks legit, but is unknown or
+ *         unsupported at the moment and should generate exception,
+ *         0 - means string is bogus, and should be ignored.
+ */
+ssize_t
+timezone_lookup(const char *s, size_t len, const struct date_time_zone **zone);
+/** Return offset in minutes for given zone */
 int16_t
 timezone_offset(const struct date_time_zone *zone);
+/** Return tzindex for given zone */
 int16_t
 timezone_index(const struct date_time_zone *zone);
+/** Return attributes flags for given zone */
 uint16_t
 timezone_flags(const struct date_time_zone *zone);
+/** Translate tzindex to zone name */
 const char*
 timezone_name(int64_t index);
 
