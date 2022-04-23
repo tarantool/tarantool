@@ -832,16 +832,8 @@ typedef u64 uptr;
  * Assert that the pointer X is aligned to an 8-byte boundary.  This
  * macro is used only within assert() to verify that the code gets
  * all alignment restrictions correct.
- *
- * Except, if sql_4_BYTE_ALIGNED_MALLOC is defined, then the
- * underlying malloc() implementation might return us 4-byte aligned
- * pointers.  In that case, only verify 4-byte alignment.
  */
-#ifdef SQL_4_BYTE_ALIGNED_MALLOC
-#define EIGHT_BYTE_ALIGNMENT(X)   ((((char*)(X) - (char*)0)&3)==0)
-#else
-#define EIGHT_BYTE_ALIGNMENT(X)   ((((char*)(X) - (char*)0)&7)==0)
-#endif
+#define EIGHT_BYTE_ALIGNMENT(X)   ((((uintptr_t)((char *)(X))) & 7) == 0)
 
 /*
  * Default maximum size of memory used by memory-mapped I/O in the VFS
