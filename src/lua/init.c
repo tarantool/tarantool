@@ -144,6 +144,9 @@ extern char strict_lua[],
 	memprof_process_lua[],
 	memprof_humanize_lua[],
 	memprof_lua[],
+	sysprof_parse_lua[],
+	sysprof_collapse_lua[],
+	sysprof_lua[],
 	datetime_lua[]
 #if defined(EMBED_LUAROCKS)
 	, luarocks_core_hardcoded_lua[],
@@ -293,6 +296,9 @@ static const char *lua_modules[] = {
 	"memprof.process", memprof_process_lua,
 	"memprof.humanize", memprof_humanize_lua,
 	"memprof", memprof_lua,
+	"sysprof.parse", sysprof_parse_lua,
+	"sysprof.collapse", sysprof_collapse_lua,
+	"sysprof", sysprof_lua,
 	"datetime", datetime_lua,
 	NULL
 };
