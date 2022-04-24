@@ -19,6 +19,12 @@ DEB_CMAKE_EXTRA_FLAGS := \
 	-DWITH_SYSVINIT=ON \
 	-DWITH_SYSTEMD=$(WITH_SYSTEMD)
 
+# Append CMAKE flag with -DLUAJIT_ENABLE_GC64 value. It is required
+# for CI to build Tarantool with GC64 enabled or disabled dynamically.
+ifneq ($(GC64),)
+	DEB_CMAKE_EXTRA_FLAGS += $(GC64)
+endif
+
 # Install tarantool.service within tarantool-common package, but does not
 # install it within tarantool and tarantool-dev packages.
 DEB_DH_INSTALLINIT_ARGS                     := --name=tarantool

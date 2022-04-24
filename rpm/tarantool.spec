@@ -11,6 +11,11 @@
 # need to use cmake3 package to build Tarantool on old systems.
 %define use_cmake3 0%{?rhel} == 7
 
+# Get GC64 variable which can keep compiler flag -DLUAJIT_ENABLE_GC64
+# with a value of ON or OFF to enable or disable luajit gc64.
+# It needs to build Tarantool in CI dynamically.
+%define _gc64 %{getenv:GC64}
+
 %if %use_cmake3
 # XXX: Unfortunately there is no way to make rpmbuild install and
 # enable EPEL repository prior to the build step. However, the
@@ -105,7 +110,16 @@ BuildRequires: python3-pyyaml
 # Install prove to run LuaJIT tests.
 BuildRequires: perl-Test-Harness
 
+# Set product name from env variable or use default "tarantool".
+# It is a temporary solution to define special name of the package
+# to "tarantool-gc64" in CI. It is required to set up Tarantool
+# with GC64 enabled by "yum install tarantool-gc64"
+%define _product %{getenv:PRODUCT_NAME}
+%if "%{_product}"
+Name: %{_product}
+%else
 Name: tarantool
+%endif
 # ${major}.${major}.${minor}.${patch}, e.g. 1.6.8.175
 # Version is updated automaically using git describe --long --always
 Version: 1.7.2.385
@@ -190,6 +204,9 @@ C and Lua/C modules.
 %endif
 %if 0%{?fedora} >= 33
          -DENABLE_LTO=ON \
+%endif
+%if "%{_gc64}"
+         %{_gc64} \
 %endif
          -DENABLE_WERROR:BOOL=ON \
          -DENABLE_DIST:BOOL=ON
