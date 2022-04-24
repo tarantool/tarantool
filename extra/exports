@@ -257,6 +257,10 @@ luaL_typerror
 luaL_unref
 luaL_where
 luaM_metrics
+luaM_sysprof_configure
+luaM_sysprof_report
+luaM_sysprof_start
+luaM_sysprof_stop
 luaopen_base
 luaopen_bit
 luaopen_debug
