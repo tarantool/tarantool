@@ -69,6 +69,8 @@ size_t tnt_datetime_strftime(const struct datetime *date, char *buf,
                              uint32_t len, const char *fmt);
 ssize_t tnt_datetime_parse_full(struct datetime *date, const char *str,
                                 size_t len, int32_t offset);
+ssize_t tnt_datetime_parse_tz(const char *str, size_t len, int16_t *tzoffset,
+                              int16_t *tzindex);
 size_t tnt_datetime_strptime(struct datetime *date, const char *buf,
                              const char *fmt);
 void   tnt_datetime_now(struct datetime *now);
@@ -161,6 +163,10 @@ local date_strf_stash_put = date_strf_stash.put
 local date_dt_stash = buffer.ffi_stash_new('dt_t[1]')
 local date_dt_stash_take = date_dt_stash.take
 local date_dt_stash_put = date_dt_stash.put
+
+local date_int16_stash = buffer.ffi_stash_new('int16_t[1]')
+local date_int16_stash_take = date_int16_stash.take
+local date_int16_stash_put = date_int16_stash.put
 
 local datetime_t = ffi.typeof('struct datetime')
 local interval_t = ffi.typeof('struct interval')
@@ -356,10 +362,6 @@ local function interval_new(obj)
     return interval_decode_args(obj)
 end
 
-local function nyi(msg)
-    error(("Not yet implemented : '%s'"):format(msg), 3)
-end
-
 -- convert from epoch related time to Rata Die related
 local function local_rd(secs)
     return math_floor((secs + SECS_EPOCH_OFFSET) / SECS_PER_DAY)
@@ -429,25 +431,54 @@ local function parse_tzoffset(str)
     return offset[0]
 end
 
-local function datetime_new_raw(epoch, nsec, tzoffset)
+--[[
+    Parse timezone name similar way as datetime_parse_full parse
+    full literal.
+]]
+local function parse_tzname(tzname)
+    check_str(tzname, 'parse_tzname()')
+    local ptzindex = date_int16_stash_take()
+    local ptzoffset = date_int16_stash_take()
+    local len = builtin.tnt_datetime_parse_tz(tzname, #tzname, ptzoffset,
+                                              ptzindex)
+    if len > 0 then
+        local tzoffset, tzindex = ptzoffset[0], ptzindex[0]
+        date_int16_stash_put(ptzoffset)
+        date_int16_stash_put(ptzindex)
+        return tzoffset, tzindex
+    end
+    date_int16_stash_put(ptzoffset)
+    date_int16_stash_put(ptzindex)
+    if len == -builtin.TZ_NYI then
+        error(("could not parse '%s' - nyi timezone"):format(tzname))
+    elseif len == -builtin.TZ_AMBIGUOUS then
+        error(("could not parse '%s' - ambiguous timezone"):format(tzname))
+    else -- len <= 0
+        error(("could not parse '%s'"):format(tzname))
+    end
+end
+
+local function datetime_new_raw(epoch, nsec, tzoffset, tzindex)
     local dt_obj = ffi.new(datetime_t)
     dt_obj.epoch = epoch
     dt_obj.nsec = nsec
     dt_obj.tzoffset = tzoffset
-    dt_obj.tzindex = 0
+    dt_obj.tzindex = tzindex
     return dt_obj
 end
 
 local function datetime_new_copy(obj)
-    return datetime_new_raw(obj.epoch, obj.nsec, obj.tzoffset)
+    return datetime_new_raw(obj.epoch, obj.nsec, obj.tzoffset, obj.tzindex)
 end
 
-local function datetime_new_dt(dt, secs, nanosecs, offset)
+local function datetime_new_dt(dt, secs, nanosecs, offset, tzindex)
     secs = secs or 0
     nanosecs = nanosecs or 0
     offset = offset or 0
+    tzindex = tzindex or 0
     local epoch = (dt - DAYS_EPOCH_OFFSET) * SECS_PER_DAY
-    return datetime_new_raw(epoch + secs - offset * 60, nanosecs, offset)
+    return datetime_new_raw(epoch + secs - offset * 60, nanosecs,
+                            offset, tzindex)
 end
 
 local function get_timezone(offset, msg)
@@ -464,7 +495,7 @@ end
 -- create datetime given attribute values from obj
 local function datetime_new(obj)
     if obj == nil then
-        return datetime_new_raw(0, 0, 0)
+        return datetime_new_raw(0, 0, 0, 0)
     end
     check_table(obj, 'datetime.new()')
 
@@ -552,8 +583,10 @@ local function datetime_new(obj)
         check_range(offset, -720, 840, 'tzoffset')
     end
 
-    if obj.tz ~= nil then
-        nyi('tz')
+    local tzindex = 0
+    local tzname = obj.tz
+    if tzname ~= nil then
+        offset, tzindex = parse_tzname(tzname)
     end
 
     -- .year, .month, .day
@@ -579,7 +612,7 @@ local function datetime_new(obj)
         secs = (h or 0) * 3600 + (m or 0) * 60 + (s or 0)
     end
 
-    return datetime_new_dt(dt, secs, nsec, offset or 0)
+    return datetime_new_dt(dt, secs, nsec, offset or 0, tzindex)
 end
 
 --[[
@@ -798,11 +831,12 @@ end
        date [T] time [ ] time_zone
     Returns constructed datetime object and length of accepted string.
 ]]
-local function datetime_parse_full(str, tzoffset)
+local function datetime_parse_full(str, tzoffset, tzindex)
     check_str(str, 'datetime.parse()')
     local date = ffi.new(datetime_t)
     local len = builtin.tnt_datetime_parse_full(date, str, #str, tzoffset)
     if len > 0 then
+        date.tzindex = tzindex and tzindex or date.tzindex
         return date, tonumber(len)
     elseif len == -builtin.TZ_NYI then
         error(("could not parse '%s' - nyi timezone"):format(str))
@@ -830,6 +864,7 @@ local function datetime_parse_from(str, obj)
     check_str(str, 'datetime.parse()')
     local fmt = ''
     local offset
+    local tzindex
 
     if obj ~= nil then
         check_table(obj, 'datetime.parse()')
@@ -843,11 +878,11 @@ local function datetime_parse_from(str, obj)
         check_range(offset, -720, 840, 'tzoffset')
     end
     if obj and obj.tz ~= nil then
-        nyi('tz')
+        offset, tzindex = parse_tzname(obj.tz)
     end
 
     if not fmt or fmt == '' or fmt == 'iso8601' or fmt == 'rfc3339' then
-        return datetime_parse_full(str, offset or 0)
+        return datetime_parse_full(str, offset or 0, tzindex)
     else
         return datetime_parse_format(str, fmt)
     end
@@ -858,7 +893,7 @@ end
     platform timer and local timezone information.
 ]]
 local function datetime_now()
-    local d = datetime_new_raw(0, 0, 0)
+    local d = datetime_new_raw(0, 0, 0, 0)
     builtin.tnt_datetime_now(d)
     return d
 end
@@ -1038,8 +1073,9 @@ local function datetime_set(self, obj)
     end
     offset = offset or self.tzoffset
 
-    if obj.tz ~= nil then
-        nyi('tz')
+    local tzname = obj.tz
+    if tzname ~= nil then
+        offset, self.tzindex = parse_tzname(tzname)
     end
 
     -- .year, .month, .day
@@ -1103,6 +1139,7 @@ local datetime_index_fields = {
     usec = function(self) return self.nsec / 1e3 end,
     msec = function(self) return self.nsec / 1e6 end,
     isdst = function(_) return false end,
+    tz = function(self) return self:format('%Z') end,
 }
 
 local datetime_index_functions = {

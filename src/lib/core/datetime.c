@@ -294,6 +294,23 @@ exit:
 	return str - svp;
 }
 
+ssize_t
+datetime_parse_tz(const char *str, size_t len, int16_t *tzoffset,
+		  int16_t *tzindex)
+{
+	const struct date_time_zone *zone;
+	ssize_t l = timezone_lookup(str, len, &zone);
+	if (l <= 0)
+		return l;
+
+	assert(l <= (ssize_t)len);
+	assert(zone != NULL);
+	assert(((TZ_AMBIGUOUS | TZ_NYI) & timezone_flags(zone)) == 0);
+	*tzoffset = timezone_offset(zone);
+	*tzindex = timezone_index(zone);
+	return l;
+}
+
 int
 datetime_compare(const struct datetime *lhs, const struct datetime *rhs)
 {

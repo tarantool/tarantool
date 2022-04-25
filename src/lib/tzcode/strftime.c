@@ -71,9 +71,11 @@ tnt_strftime(char *s, size_t maxsize, const char *format,
 	tzset();
 	enum warn warn = IN_NONE;
 
+	if (s != NULL && maxsize > 0)
+		s[0] = '\0';
 	ssize_t total = _fmt(s, maxsize, format, t, &warn);
 	assert(total >= 0);
-	assert(maxsize == 0 || s[MIN((size_t)total, maxsize - 1)] == 0);
+	assert(maxsize == 0 || s[MIN((size_t)total, maxsize - 1)] == '\0');
 
 	return (size_t)total;
 }
@@ -478,7 +480,8 @@ _fmt(char *buf, ssize_t size, const char *format, const struct tnt_tm *t,
 					t->tm_year, TM_YEAR_BASE, true, true);
 				continue;
 			case 'Z':
-				assert(t->tm_tzindex != 0);
+				if (t->tm_tzindex == 0)
+					continue;
 				assert(timezone_name(t->tm_tzindex) != NULL);
 				SNPRINT(total, snprintf, buf, size,
 					"%s", timezone_name(t->tm_tzindex));
