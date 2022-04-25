@@ -432,6 +432,7 @@ tnt_datetime_datetime_sub
 tnt_datetime_increment_by
 tnt_datetime_now
 tnt_datetime_parse_full
+tnt_datetime_parse_tz
 tnt_datetime_strftime
 tnt_datetime_strptime
 tnt_datetime_to_string

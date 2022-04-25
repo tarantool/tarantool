@@ -176,6 +176,21 @@ datetime_to_tm(const struct datetime *date, struct tnt_tm *tm);
 ssize_t
 datetime_parse_full(struct datetime *date, const char *str, size_t len,
 		    int32_t offset);
+
+/** Parse timezone suffix
+ * @param str input text in relaxed ISO-8601 format (0-terminated)
+ * @param len length of str buffer
+ * @param[out] tzoffset return timezone offset if recognized
+ * @param[out] tzindex return timzeon index if recognized
+ * @retval Upon successful completion returns length of accepted
+ *         substring. Returns 0 if text is not recognizable as timzeone.
+ *         Returns negative value is there is unaccepted timezone.
+ * @sa datetime_parse_full()
+ */
+ssize_t
+datetime_parse_tz(const char *str, size_t len, int16_t *tzoffset,
+		  int16_t *tzindex);
+
 /**
  * Parse buffer given format, and construct datetime value
  * @param date output datetime value
