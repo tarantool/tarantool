@@ -105,7 +105,6 @@ macro(curl_build)
                 --without-ca-bundle
                 --without-ca-path
                 --without-libpsl
-                --without-libmetalink
                 --without-librtmp
                 --without-winidn
                 --without-libidn2

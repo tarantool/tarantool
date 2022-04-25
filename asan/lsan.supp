@@ -23,6 +23,7 @@ leak:Curl_hash_add
 leak:Curl_he2ai
 leak:Curl_open
 leak:Curl_resolver_init
+leak:Curl_resolv
 
 # test: app-tap/iconv.test.lua
 # source: /usr/lib/x86_64-linux-gnu/gconv/UTF-16.so
