@@ -74,7 +74,8 @@ deps_tests:
 
 deps_ubuntu_ghactions: deps_tests
 	sudo apt-get update ${APT_EXTRA_FLAGS} && \
-		sudo apt-get install -y -f libreadline-dev libunwind-dev
+		sudo apt-get install -y -f libreadline-dev libunwind-dev \
+		    autoconf automake libtool
 
 deps_coverage_ubuntu_ghactions: deps_ubuntu_ghactions
 	sudo apt-get install -y -f lcov
