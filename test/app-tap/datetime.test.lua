@@ -47,10 +47,6 @@ local function exp_datetime(name, value)
     return ("%s: expected datetime, but received %s"):format(name, type(value))
 end
 
-local function nyi_error(msg)
-    return ("Not yet implemented : '%s'"):format(msg)
-end
-
 local function table_expected(msg, value)
     return ("%s: expected table, but received %s"):
             format(msg, type(value))
@@ -201,7 +197,7 @@ test:test("Default date creation and comparison", function(test)
 end)
 
 test:test("Simple date creation by attributes", function(test)
-    test:plan(12)
+    test:plan(14)
     local ts
     local obj = {}
     local attribs = {
@@ -213,6 +209,8 @@ test:test("Simple date creation by attributes", function(test)
         { 'sec', 23, '2000-11-30T06:12:23Z' },
         { 'tzoffset', -8*60, '2000-11-30T06:12:23-0800' },
         { 'tzoffset', '+0800', '2000-11-30T06:12:23+0800' },
+        { 'tz', 'MSK', '2000-11-30T06:12:23 MSK' },
+        { 'tz', 'Z', '2000-11-30T06:12:23Z' },
     }
     for _, row in pairs(attribs) do
         local key, value, str = unpack(row)
@@ -232,7 +230,7 @@ test:test("Simple date creation by attributes", function(test)
 end)
 
 test:test("Simple date creation by attributes - check failed", function(test)
-    test:plan(84)
+    test:plan(83)
 
     local boundary_checks = {
         {'year', {MIN_DATE_YEAR, MAX_DATE_YEAR}},
@@ -309,7 +307,6 @@ test:test("Simple date creation by attributes - check failed", function(test)
         {timestamp_and_hms, {timestamp = 1630359071.125, hour = 20 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, min = 10 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, sec = 29 }},
-        {nyi_error('tz'), {tz = 400}},
         {table_expected('datetime.new()', '2001-01-01'), '2001-01-01'},
         {table_expected('datetime.new()', 20010101), 20010101},
         {range_check_3_error('day', 32, {-1, 1, 31}),
@@ -555,7 +552,7 @@ test:test("Check parsing of dates with invalid attributes", function(test)
 end)
 
 test:test("Parsing of timezone abbrevs", function(test)
-    test:plan(156)
+    test:plan(195)
     local zone_abbrevs = {
         -- military
         A =   1*60, B =   2*60, C =   3*60,
@@ -588,11 +585,12 @@ test:test("Parsing of timezone abbrevs", function(test)
         test:ok(len > #base_date, 'length longer than ' .. #base_date)
         test:is(1, tostring(date):find(exp_pattern), 'expected prefix')
         test:is(date.tzoffset, offset, 'expected offset')
+        test:is(date.tz, zone, 'expected timezone name')
     end
 end)
 
 test:test("Parsing of timezone names (tzindex)", function(test)
-    test:plan(234)
+    test:plan(273)
     local zone_abbrevs = {
         -- military
         A =  1, B =  2, C =  3,
@@ -624,6 +622,7 @@ test:test("Parsing of timezone names (tzindex)", function(test)
         local date, len = date.parse(date_text)
         test:isnt(date, nil, 'parse ' .. zone)
         test:is(date.tzindex, index, 'expected tzindex')
+        test:is(date.tz, zone, 'expected timezone name')
         test:ok(len > #base_date, 'length longer than ' .. #base_date)
         local txt = tostring(date)
         test:is(1, txt:find(exp_pattern), 'expected prefix')
@@ -831,11 +830,11 @@ test:test("Datetime string parsing by format (detailed)", function(test)
 end)
 
 test:test("__index functions()", function(test)
-    test:plan(15)
-    -- 2000-01-29T03:30:12Z'
+    test:plan(16)
+    -- 2000-01-29T03:30:12 MSK'
     local ts = date.new{sec = 12, min = 30, hour = 3,
                        tzoffset = 0,  day = 29, month = 1, year = 2000,
-                       nsec = 123000000}
+                       nsec = 123000000, tz = 'MSK'}
 
     test:is(ts.year, 2000, 'ts.year')
     test:is(ts.yday, 29, 'ts.yday')
@@ -847,12 +846,13 @@ test:test("__index functions()", function(test)
     test:is(ts.min, 30, 'ts.min')
     test:is(ts.sec, 12, 'ts.sec')
     test:is(ts.isdst, false, "ts.isdst")
-    test:is(ts.tzoffset, 0, "ts.tzoffset")
-    test:is(ts.timestamp, 949116612.123, "ts.timestamp")
+    test:is(ts.tzoffset, 180, "ts.tzoffset")
+    test:is(ts.timestamp, 949105812.123, "ts.timestamp")
 
     test:is(ts.nsec, 123000000, 'ts.nsec')
     test:is(ts.usec, 123000, 'ts.usec')
     test:is(ts.msec, 123, 'ts.msec')
+    test:is(ts.tz, 'MSK', 'ts.tz')
 end)
 
 test:test("Time interval tostring()", function(test)
@@ -1760,7 +1760,7 @@ test:test("Time invalid :set{} operations", function(test)
         {timestamp_and_hms, {timestamp = 1630359071.125, hour = 20 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, min = 10 }},
         {timestamp_and_hms, {timestamp = 1630359071.125, sec = 29 }},
-        {nyi_error('tz'), {tz = 400}},
+        {expected_str('parse_tzname()', 400), {tz = 400}},
         {table_expected('datetime.set()', '2001-01-01'), '2001-01-01'},
         {table_expected('datetime.set()', 20010101), 20010101},
         {range_check_3_error('day', 32, {-1, 1, 31}),
@@ -1786,7 +1786,7 @@ test:test("Time invalid :set{} operations", function(test)
 end)
 
 test:test("Time invalid tzoffset in :set{} operations", function(test)
-    test:plan(14)
+    test:plan(13)
 
     local ts = date.new{}
     local bad_strings = {
@@ -1815,7 +1815,6 @@ test:test("Time invalid tzoffset in :set{} operations", function(test)
         assert_raises(test, range_check_error('tzoffset', val, {-720, 840}),
                       function() ts:set{ tzoffset = val } end)
     end
-    assert_raises(test, nyi_error('tz'), function() ts:set{tz = 400} end)
 end)
 
 test:test("Time :set{day = -1} operations", function(test)
