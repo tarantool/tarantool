@@ -1,4 +1,4 @@
-local tarantool = require('tarantool')
+local misc = require('test.luatest_helpers.misc')
 local server = require('test.luatest_helpers.server')
 local t = require('luatest')
 
@@ -16,9 +16,8 @@ g.after_all(function(cg)
     cg.server:stop()
 end)
 
-if tarantool.package ~= 'Tarantool Enterprise' then
-
 g.test_invalid_compression_type_during_space_creation = function(cg)
+    misc.skip_if_enterprise()
     cg.server:exec(function(engine, compression)
         local t = require('luatest')
         local format = {{
@@ -37,6 +36,7 @@ g.before_test('test_invalid_compression_type_during_setting_format', function(cg
 end)
 
 g.test_invalid_compression_type_during_setting_format = function(cg)
+    misc.skip_if_enterprise()
     cg.server:exec(function(compression)
         local t = require('luatest')
         local format = {{
@@ -56,8 +56,6 @@ g.after_test('test_invalid_compression_type_during_setting_format', function(cg)
         box.space.space:drop()
     end)
 end)
-
-end -- tarantool.package ~= 'Tarantool Enterprise'
 
 g = t.group("none compression", t.helpers.matrix({
     engine = {'memtx', 'vinyl'},
