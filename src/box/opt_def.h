@@ -101,7 +101,9 @@ struct opt_def {
 
 	const char *enum_name;
 	int enum_size;
-	const char **enum_strs;
+	/** Enum key names. Passed to strnindex. */
+	const char *const *enum_strs;
+	/** Enum key count. Passed to strnindex. */
 	uint32_t enum_max;
 	/** MsgPack data decode callbacks. */
 	union {
