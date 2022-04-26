@@ -100,7 +100,7 @@ S3_SOURCE_REPO_URL=s3://tarantool_repo/sources
 endif
 
 RWS_BASE_URL=https://rws.tarantool.org
-RWS_ENDPOINT=${RWS_BASE_URL}/${REPO_TYPE}/${TARANTOOL_SERIES}/${OS}/${DIST}
+PRODUCT_NAME=tarantool
 
 deploy_prepare:
 	rm -rf packpack
@@ -109,15 +109,6 @@ deploy_prepare:
 	rm -rf build
 
 package: deploy_prepare
-	# Set PRODUCT_NAME for the package itself.
-	if [ "$$(echo $(GC64) | sed 's/.*=//')" = ON ]; then                                                           \
-		export PRODUCT_NAME=tarantool-gc64; \
-		if [ "${OS}" = "ubuntu" ] || [ "${OS}" = "debian" ]; then \
-		    $$(sed -i'' -e 's/Package: tarantool$$/Package: tarantool-gc64/' debian/control); \
-		fi; \
-	else \
-		export PRODUCT_NAME=tarantool; \
-	fi; \
 	if [ -n "$(GIT_TAG)" ]; then                                                                                    \
 		export VERSION="$$(echo $(GIT_TAG) | sed 's/-/~/')";                                                    \
 	else                                                                                                            \
@@ -126,18 +117,18 @@ package: deploy_prepare
 	echo VERSION=$$VERSION;                                                                                         \
 	PACKPACK_EXTRA_DOCKER_RUN_PARAMS="--network=host ${PACKPACK_EXTRA_DOCKER_RUN_PARAMS}"                           \
 	TARBALL_EXTRA_ARGS="--exclude=*.exe --exclude=*.dll"                                                            \
-	PRESERVE_ENVVARS="PRODUCT_NAME,TARBALL_EXTRA_ARGS,${PRESERVE_ENVVARS}" ./packpack/packpack
+	PRESERVE_ENVVARS="TARBALL_EXTRA_ARGS,${PRESERVE_ENVVARS}" ./packpack/packpack
 
 deploy:
 	if [ -z "${REPO_TYPE}" ]; then \
 		echo "Env variable 'REPO_TYPE' must be defined!"; \
 		exit 1; \
 	fi; \
-	# Set PRODUCT_NAME for the package in the repository.
-	if [ "$$(echo $(GC64) | sed 's/.*=//')" = ON ]; then                                                                                    \
-		PRODUCT_NAME=tarantool-gc64; \
+	# Use different repos for vanilla and GC64 version.
+	if [ "$$(echo ${GC64} | sed 's/.*=//')" = ON ]; then \
+		RWS_ENDPOINT=${RWS_BASE_URL}/${REPO_TYPE}/${TARANTOOL_SERIES}-gc64/${OS}/${DIST}; \
 	else \
-		PRODUCT_NAME=tarantool; \
+		RWS_ENDPOINT=${RWS_BASE_URL}/${REPO_TYPE}/${TARANTOOL_SERIES}/${OS}/${DIST}; \
 	fi; \
 	CURL_CMD="curl \
 		--location \
@@ -146,9 +137,9 @@ deploy:
 		--show-error \
 		--retry 5 \
 		--retry-delay 5 \
-		--request PUT ${RWS_ENDPOINT} \
+		--request PUT $${RWS_ENDPOINT} \
 		--user $${RWS_AUTH} \
-		--form product=$${PRODUCT_NAME}"; \
+		--form product=${PRODUCT_NAME}"; \
 	for f in $$(ls -I '*build*' -I '*.changes' ./build); do \
 		CURL_CMD="$${CURL_CMD} --form $$(basename $${f})=@./build/$${f}"; \
 	done; \
