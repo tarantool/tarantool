@@ -460,7 +460,7 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 		return NULL;
 	struct field_def *fields = NULL;
 	uint32_t field_count;
-	if (field_def_array_decode(format, &field_count, region, &fields) != 0)
+	if (field_def_array_decode(&format, &fields, &field_count, region) != 0)
 		return NULL;
 	if (exact_field_count != 0 &&
 	    exact_field_count < field_count) {

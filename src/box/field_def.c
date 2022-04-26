@@ -372,13 +372,16 @@ field_def_decode(struct field_def *field, const char **data,
 }
 
 int
-field_def_array_decode(const char *data, uint32_t *out_count,
-		       struct region *region, struct field_def **fields)
+field_def_array_decode(const char **data, struct field_def **fields,
+		       uint32_t *field_count, struct region *region)
 {
-	/* Type is checked by _space format. */
-	assert(mp_typeof(*data) == MP_ARRAY);
-	uint32_t count = mp_decode_array(&data);
-	*out_count = count;
+	if (mp_typeof(**data) != MP_ARRAY) {
+		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
+			 "expected an array");
+		return -1;
+	}
+	uint32_t count = mp_decode_array(data);
+	*field_count = count;
 	if (count == 0) {
 		*fields = NULL;
 		return 0;
@@ -393,8 +396,7 @@ field_def_array_decode(const char *data, uint32_t *out_count,
 		return -1;
 	}
 	for (uint32_t i = 0; i < count; ++i) {
-		if (field_def_decode(&region_defs[i], &data,
-				     i, region) != 0)
+		if (field_def_decode(&region_defs[i], data, i, region) != 0)
 			return -1;
 	}
 	*fields = region_defs;

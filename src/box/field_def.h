@@ -202,16 +202,15 @@ action_is_nullable(enum on_conflict_action nullable_action)
 
 /**
  * Decode MessagePack array of fields.
- * @param data MessagePack array of fields.
- * @param[out] out_count Length of a result array.
- * @param region Region to allocate result array.
+ * @param[inout] data MessagePack array of fields.
  * @param[out] fields Array of fields.
- *
+ * @param[out] field_count Length of a result array.
+ * @param region Region to allocate result array.
  * @retval Error code.
  */
 int
-field_def_array_decode(const char *data, uint32_t *out_count,
-		       struct region *region, struct field_def **fields);
+field_def_array_decode(const char **data, struct field_def **fields,
+		       uint32_t *field_count, struct region *region);
 
 /**
  * Duplicates array of fields using malloc. Never fails.
