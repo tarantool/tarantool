@@ -19,6 +19,7 @@ struct func;
  */
 enum func_holder_type {
 	FUNC_HOLDER_CONSTRAINT,
+	FUNC_HOLDER_SPACE_UPGRADE,
 	FUNC_HOLDER_MAX,
 };
 
