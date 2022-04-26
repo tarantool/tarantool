@@ -77,6 +77,12 @@ create_perf_test_target(TARGET light)
 
 create_perf_test_target(TARGET small)
 
+create_perf_test(NAME memtx
+                 SOURCES memtx.cc ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c
+                 LIBRARIES core box server benchmark::benchmark
+)
+create_perf_test_target(TARGET memtx)
+
 add_custom_target(test-c-perf
                   DEPENDS ${RUN_PERF_C_TESTS_LIST}
                   COMMENT "Running C performance tests"
