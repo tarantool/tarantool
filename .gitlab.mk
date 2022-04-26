@@ -113,7 +113,11 @@ package: deploy_prepare
 	if [ "$$(echo $(GC64) | sed 's/.*=//')" = ON ]; then                                                           \
 		export PRODUCT_NAME=tarantool-gc64; \
 		if [ "${OS}" = "ubuntu" ] || [ "${OS}" = "debian" ]; then \
-		    $$(sed -i'' -e 's/Package: tarantool$$/Package: tarantool-gc64/' debian/control); \
+			$$(sed -i'.backup' -e 's/Package: tarantool$$/Package: tarantool-gc64 \
+				\nProvides: tarantool (= $${binary:Version})/' debian/control); \
+			for suffix in docs install lintian-overrides postinst prerm README.Debian; do \
+				mv debian/tarantool.$${suffix} debian/tarantool-gc64.$${suffix}; \
+			done; \
 		fi; \
 	else \
 		export PRODUCT_NAME=tarantool; \
