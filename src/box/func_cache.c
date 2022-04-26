@@ -14,7 +14,8 @@ static struct mh_i32ptr_t *funcs;
 static struct mh_strnptr_t *funcs_by_name;
 
 const char *func_cache_holder_type_strs[FUNC_HOLDER_MAX] = {
-	"constraint",
+	[FUNC_HOLDER_CONSTRAINT] = "constraint",
+	[FUNC_HOLDER_SPACE_UPGRADE] = "space upgrade",
 };
 
 void
