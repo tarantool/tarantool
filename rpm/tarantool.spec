@@ -110,16 +110,7 @@ BuildRequires: python3-pyyaml
 # Install prove to run LuaJIT tests.
 BuildRequires: perl-Test-Harness
 
-# Set product name from env variable or use default "tarantool".
-# It is a temporary solution to define special name of the package
-# to "tarantool-gc64" in CI. It is required to set up Tarantool
-# with GC64 enabled by "yum install tarantool-gc64"
-%define _product %{getenv:PRODUCT_NAME}
-%if "%{_product}"
-Name: %{_product}
-%else
 Name: tarantool
-%endif
 # ${major}.${major}.${minor}.${patch}, e.g. 1.6.8.175
 # Version is updated automaically using git describe --long --always
 Version: 1.7.2.385
