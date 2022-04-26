@@ -518,6 +518,7 @@ user_find_by_name(const char *name, uint32_t len)
 void
 user_cache_init(void)
 {
+	memset(users, 0, sizeof(users));
 	/** Mark all tokens as unused. */
 	memset(tokens, 0xFF, sizeof(tokens));
 	user_registry = mh_i32ptr_new();

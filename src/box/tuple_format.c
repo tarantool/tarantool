@@ -1240,6 +1240,10 @@ void
 tuple_format_init()
 {
 	tuple_formats_hash = mh_tuple_format_new();
+	tuple_formats = NULL;
+	recycled_format_ids = FORMAT_ID_NIL;
+	formats_size = 0;
+	formats_capacity = 0;
 }
 
 /** Destroy tuple format subsystem and free resourses */
