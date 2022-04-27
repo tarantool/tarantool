@@ -117,11 +117,12 @@ jobs:
     with:
       artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
 
-  php-client:
-    needs: tarantool
-    uses: tarantool-php/client/.github/workflows/reusable_qa.yml@master
-    with:
-      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
+# TODO: Enable testing when tarantool-php/client/issues/79 is resolved.
+#  php-client:
+#    needs: tarantool
+#    uses: tarantool-php/client/.github/workflows/reusable_qa.yml@master
+#    with:
+#      artifact_name: tarantool-ubuntu-focal-${{ github.sha }}
 
   php-queue:
     needs: tarantool
