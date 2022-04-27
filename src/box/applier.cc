@@ -204,7 +204,7 @@ applier_thread_writer_f(va_list ap)
 		try {
 			applier->thread.has_acks_to_send = false;
 			struct xrow_header xrow;
-			xrow_encode_vclock(&xrow, &replicaset.vclock);
+			xrow_encode_vclock(&xrow, &applier->thread.ack_vclock);
 			xrow.tm = applier->thread.txn_last_tm;
 			coio_write_xrow(&applier->io, &xrow);
 			ERROR_INJECT(ERRINJ_APPLIER_SLOW_ACK, {
@@ -1325,6 +1325,7 @@ applier_signal_ack(struct applier *applier)
 		struct replica *r = replica_by_id(applier->instance_id);
 		applier->ack_msg.txn_last_tm = (r == NULL ? 0 :
 						r->applier_txn_last_tm);
+		vclock_copy(&applier->ack_msg.vclock, &replicaset.vclock);
 		cmsg_init(&applier->ack_msg.base, applier->ack_route);
 		cpipe_push(&applier->applier_thread->thread_pipe,
 			   &applier->ack_msg.base);
@@ -1345,6 +1346,7 @@ applier_thread_signal_ack(struct cmsg *base)
 	fiber_cond_signal(&applier->thread.writer_cond);
 	applier->thread.has_acks_to_send = true;
 	applier->thread.txn_last_tm = msg->txn_last_tm;
+	vclock_copy(&applier->thread.ack_vclock, &msg->vclock);
 }
 
 /**
