@@ -13,7 +13,7 @@ resource "openstack_compute_instance_v2" "instance" {
 
   config_drive = true
 
-  availability_zone = "DP1"
+  availability_zone = "GZ1"
 
   security_groups = [
     "default",
