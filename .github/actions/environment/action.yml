@@ -4,7 +4,7 @@ runs:
   using: "composite"
   steps:
     - run: |
-        echo VARDIR=/tmp/tnt | tee -a $GITHUB_ENV
+        echo VARDIR=/tmp/t | tee -a $GITHUB_ENV
         echo TEST_RUN_RETRIES=3 | tee -a $GITHUB_ENV
         echo SERVER_START_TIMEOUT=290 | tee -a $GITHUB_ENV
         echo REPLICATION_SYNC_TIMEOUT=300 | tee -a $GITHUB_ENV
