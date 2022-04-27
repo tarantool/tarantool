@@ -234,7 +234,7 @@ space_create(struct space *space, struct engine *engine,
 
 	if (space->def->opts.upgrade_def != NULL) {
 		space->upgrade = space_upgrade_new(
-			space->def->opts.upgrade_def);
+			space->def->opts.upgrade_def, format);
 		if (space->upgrade == NULL)
 			goto fail;
 	}

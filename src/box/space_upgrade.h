@@ -25,6 +25,7 @@ struct space_def;
 struct space_upgrade;
 struct space_upgrade_def;
 struct tuple;
+struct tuple_format;
 
 /**
  * Decodes space upgrade definition from MsgPack data.
@@ -59,14 +60,16 @@ space_upgrade_def_delete(struct space_upgrade_def *def)
 }
 
 /**
- * Creates a space upgrade state from a definition.
+ * Creates a space upgrade state from a definition and the new space format.
  * Returns NULL and sets diag on error.
  * The reference count of the new state is set to 1.
  */
 static inline struct space_upgrade *
-space_upgrade_new(const struct space_upgrade_def *def)
+space_upgrade_new(const struct space_upgrade_def *def,
+		  struct tuple_format *format)
 {
 	(void)def;
+	(void)format;
 	unreachable();
 	return NULL;
 }
