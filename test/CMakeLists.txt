@@ -47,15 +47,13 @@ add_custom_target(test
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
             LuaJIT-test
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
-        --builddir=${PROJECT_BINARY_DIR}
-        --vardir=${PROJECT_BINARY_DIR}/test/var)
+        --builddir=${PROJECT_BINARY_DIR})
 
 add_custom_target(test-force
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
             LuaJIT-test
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
         --builddir=${PROJECT_BINARY_DIR}
-        --vardir=${PROJECT_BINARY_DIR}/test/var
         --force)
 
 add_subdirectory(app)
