@@ -120,6 +120,8 @@ struct applier_ack_msg {
 	 * Set to replica::applier_txn_last_tm.
 	 */
 	double txn_last_tm;
+	/** Replicaset vclock. */
+	struct vclock vclock;
 };
 
 /** The underlying thread behind a number of appliers. */
@@ -248,6 +250,11 @@ struct applier {
 		 * timestamp. Sent in ACK messages. Updated by applier_ack_msg.
 		 */
 		double txn_last_tm;
+		/**
+		 * Applier thread's copy of the node's vclock. Sent in ACK
+		 * messages and updated by applier_ack_msg.
+		 */
+		struct vclock ack_vclock;
 	} thread;
 };
 
