@@ -118,6 +118,7 @@ struct errinj {
 	_(ERRINJ_SNAP_COMMIT_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SNAP_COMMIT_FAIL, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SNAP_WRITE_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_SPACE_UPGRADE_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SQL_NAME_NORMALIZATION, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_STDIN_ISATTY, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_SWIM_FD_ONLY, ERRINJ_BOOL, {.bparam = false}) \
@@ -126,6 +127,7 @@ struct errinj {
 	_(ERRINJ_TUPLE_FIELD, ERRINJ_BOOL, {.bparam = false}) \
         _(ERRINJ_TUPLE_FIELD_COUNT_LIMIT, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_TUPLE_FORMAT_COUNT, ERRINJ_INT, {.iparam = -1}) \
+	_(ERRINJ_TX_DELAY_PRIO_ENDPOINT, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_TXN_COMMIT_ASYNC, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_VYRUN_DATA_READ, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_VY_COMPACTION_DELAY, ERRINJ_BOOL, {.bparam = false}) \
@@ -170,7 +172,6 @@ struct errinj {
 	_(ERRINJ_XLOG_META, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_XLOG_READ, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_XLOG_RENAME_DELAY, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_TX_DELAY_PRIO_ENDPOINT, ERRINJ_DOUBLE, {.dparam = 0}) \
 
 ENUM0(errinj_id, ERRINJ_LIST);
 extern struct errinj errinjs[];
