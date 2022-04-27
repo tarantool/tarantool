@@ -43,7 +43,7 @@ Server.constructor_checks = fun.chain(Server.constructor_checks, {
     engine = '?string',
 }):tomap()
 
-Server.socketdir = fio.abspath(os.getenv('VARDIR') or 'test/var')
+Server.socketdir = fio.abspath(os.getenv('VARDIR') or '/tmp/t')
 
 function Server.build_instance_uri(alias)
     return ('%s/%s.iproto'):format(Server.socketdir, alias)
