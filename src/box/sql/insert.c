@@ -428,77 +428,6 @@ sqlInsert(Parse * pParse,	/* Parser context */
 		sqlVdbeJumpHere(v, addrTop - 1);	/* label B: */
 		assert(pSelect->pEList);
 		nColumn = pSelect->pEList->nExpr;
-
-		/*
-		 * Set useTempTable to TRUE if the result of the
-		 * SELECT statement should be written into a
-		 * temporary table (template 4). Set to FALSE if
-		 * each output row of the SELECT can be written
-		 * directly into the destination table
-		 * (template 3).
-		 *
-		 * A temp table must be used if the table being
-		 * updated is also one of the tables being read by
-		 * the SELECT statement. Also use a temp table in
-		 * the case of row triggers.
-		 */
-		if (trigger != NULL || vdbe_has_space_read(pParse, space_def))
-			useTempTable = 1;
-
-		if (useTempTable) {
-			/* Invoke the coroutine to extract information from the SELECT
-			 * and add it to a transient table srcTab.  The code generated
-			 * here is from the 4th template:
-			 *
-			 *      B: open temp table
-			 *      L: yield X, goto M at EOF
-			 *         insert row from R..R+n into temp table
-			 *         goto L
-			 *      M: ...
-			 */
-			int regRec;	/* Register to hold packed record */
-			int regCopy;    /* Register to keep copy of registers from select */
-			int addrL;	/* Label "L" */
-
-			srcTab = pParse->nTab++;
-			reg_eph = ++pParse->nMem;
-			regRec = sqlGetTempReg(pParse);
-			regCopy = sqlGetTempRange(pParse, nColumn + 1);
-			/*
-			 * Order of inserted values is important since it is
-			 * possible, that NULL will be inserted in field with
-			 * AUTOINCREMENT. So, the first part of key should be
-			 * rowid. Since each rowid is unique, we do not need any
-			 * other parts.
-			 */
-			struct sql_space_info *info =
-				sql_space_info_new_from_id_list(space_def,
-								nColumn,
-								pColumn);
-			if (info == NULL) {
-				pParse->is_aborted = true;
-				goto insert_cleanup;
-			}
-			sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph, 0, 0,
-				      (char *)info, P4_DYNAMIC);
-			addrL = sqlVdbeAddOp1(v, OP_Yield, dest.iSDParm);
-			VdbeCoverage(v);
-			sqlVdbeAddOp2(v, OP_NextIdEphemeral, reg_eph,
-					  regCopy + nColumn);
-			sqlVdbeAddOp3(v, OP_Copy, regFromSelect, regCopy, nColumn-1);
-			sqlVdbeAddOp4(v, OP_ApplyType, regCopy, nColumn + 1, 0,
-				      (char *)info->types, P4_STATIC);
-			sqlVdbeAddOp3(v, OP_MakeRecord, regCopy,
-					  nColumn + 1, regRec);
-			/* Set flag to save memory allocating one by malloc. */
-			sqlVdbeChangeP5(v, 1);
-			sqlVdbeAddOp2(v, OP_IdxInsert, regRec, reg_eph);
-
-			sqlVdbeGoto(v, addrL);
-			sqlVdbeJumpHere(v, addrL);
-			sqlReleaseTempReg(pParse, regRec);
-			sqlReleaseTempRange(pParse, regCopy, nColumn);
-		}
 	} else {
 		/* This is the case if the data for the INSERT is coming from a
 		 * single-row VALUES clause
@@ -535,6 +464,78 @@ sqlInsert(Parse * pParse,	/* Parser context */
 			 tt_sprintf(err, nColumn, pColumn->nId));
 		pParse->is_aborted = true;
 		goto insert_cleanup;
+	}
+
+	/* Invoke the coroutine to extract information from the SELECT
+	 * and add it to a transient table srcTab. The code generated
+	 * here is from the 4th template:
+	 *
+	 *      B: open temp table
+	 *      L: yield X, goto M at EOF
+	 *         insert row from R..R+n into temp table
+	 *         goto L
+	 *      M: ...
+	 */
+	if (pSelect && (trigger != NULL ||
+			vdbe_has_space_read(pParse, space_def))) {
+		/*
+		 * Set useTempTable to TRUE if the result of the
+		 * SELECT statement should be written into a
+		 * temporary table (template 4). Set to FALSE if
+		 * each output row of the SELECT can be written
+		 * directly into the destination table
+		 * (template 3).
+		 *
+		 * A temp table must be used if the table being
+		 * updated is also one of the tables being read by
+		 * the SELECT statement. Also use a temp table in
+		 * the case of row triggers.
+		 */
+		useTempTable = 1;
+
+		/* Register to hold packed record */
+		int regRec;
+		/* Register to keep copy of registers from select */
+		int regCopy;
+		/* Label "L" */
+		int addrL;
+
+		srcTab = pParse->nTab++;
+		reg_eph = ++pParse->nMem;
+		regRec = sqlGetTempReg(pParse);
+		regCopy = sqlGetTempRange(pParse, nColumn + 1);
+		/*
+		 * Order of inserted values is important since it is
+		 * possible, that NULL will be inserted in field with
+		 * AUTOINCREMENT. So, the first part of key should be
+		 * rowid. Since each rowid is unique, we do not need any
+		 * other parts.
+		 */
+		struct sql_space_info *info =
+			sql_space_info_new_from_id_list(space_def, nColumn,
+							pColumn);
+		if (info == NULL) {
+			pParse->is_aborted = true;
+			goto insert_cleanup;
+		}
+		sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph, 0, 0,
+			      (char *)info, P4_DYNAMIC);
+		addrL = sqlVdbeAddOp1(v, OP_Yield, dest.iSDParm);
+		VdbeCoverage(v);
+		sqlVdbeAddOp2(v, OP_NextIdEphemeral, reg_eph,
+			      regCopy + nColumn);
+		sqlVdbeAddOp3(v, OP_Copy, regFromSelect, regCopy, nColumn - 1);
+		sqlVdbeAddOp4(v, OP_ApplyType, regCopy, nColumn + 1, 0,
+			      (char *)info->types, P4_STATIC);
+		sqlVdbeAddOp3(v, OP_MakeRecord, regCopy, nColumn + 1, regRec);
+		/* Set flag to save memory allocating one by malloc. */
+		sqlVdbeChangeP5(v, 1);
+		sqlVdbeAddOp2(v, OP_IdxInsert, regRec, reg_eph);
+
+		sqlVdbeGoto(v, addrL);
+		sqlVdbeJumpHere(v, addrL);
+		sqlReleaseTempReg(pParse, regRec);
+		sqlReleaseTempRange(pParse, regCopy, nColumn);
 	}
 
 	/* This is the top of the main insertion loop */
