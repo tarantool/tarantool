@@ -357,6 +357,15 @@ struct iproto_msg
 	 */
 	size_t len;
 	/**
+	 * Pointer to the start of unparsed request stored in @a p_ibuf.
+	 * It is used to dump request to flight recorder (if available) in
+	 * TX thread. It is guaranteed that @a reqstart points to the valid
+	 * position: rpos of input buffer is moved after processing the message;
+	 * meanwhile requests are handled in the order they are stored in
+	 * the buffer.
+	 */
+	const char *reqstart;
+	/**
 	 * Position in the connection output buffer. When sending a
 	 * message to the tx thread, iproto sets it to its current
 	 * flush position so that tx can reuse a buffer that has been
@@ -1140,6 +1149,7 @@ err_msgpack:
 			return 0;
 		}
 		msg->p_ibuf = con->p_ibuf;
+		msg->reqstart = reqstart;
 		msg->wpos = con->wpos;
 
 		msg->len = reqend - reqstart; /* total request length */
@@ -1884,7 +1894,7 @@ tx_accept_msg(struct cmsg *m)
 	msg->connection->iproto_thread->tx.requests_in_progress++;
 	rmean_collect(msg->connection->iproto_thread->tx.rmean,
 		      REQUESTS_IN_PROGRESS, 1);
-	flightrec_write_request(msg->p_ibuf->rpos, msg->len);
+	flightrec_write_request(msg->reqstart, msg->len);
 	return msg;
 }
 
