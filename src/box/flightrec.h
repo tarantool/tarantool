@@ -68,9 +68,9 @@ flightrec_check_cfg(int64_t logs_size, int64_t logs_max_msg_size,
 
 /** No-op in OS version. */
 static inline void
-flightrec_write_request(char *request_mspack, size_t len)
+flightrec_write_request(const char *request_msgpack, size_t len)
 {
-	(void)request_mspack;
+	(void)request_msgpack;
 	(void)len;
 }
 
