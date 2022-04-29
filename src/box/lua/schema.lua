@@ -26,6 +26,7 @@ local INT64_MIN = tonumber64('-9223372036854775808')
 local INT64_MAX = tonumber64('9223372036854775807')
 
 ffi.cdef[[
+    extern bool box_read_ffi_is_disabled;
     struct space *space_by_id(uint32_t id);
     extern uint32_t box_schema_version();
     void space_run_triggers(struct space *space, bool yesno);
@@ -1765,7 +1766,19 @@ ffi.metatype(iterator_t, {
     end;
 })
 
+local iterator_gen_luac = function(param, state) -- luacheck: no unused args
+    local tuple = internal.iterator_next(state)
+    if tuple ~= nil then
+        return state, tuple -- new state, value
+    else
+        return nil
+    end
+end
+
 local iterator_gen = function(param, state) -- luacheck: no unused args
+    if builtin.box_read_ffi_is_disabled then
+        return iterator_gen_luac(param, state)
+    end
     --[[
         index:pairs() mostly conforms to the Lua for-in loop conventions and
         tries to follow the best practices of Lua community.
@@ -1794,15 +1807,6 @@ local iterator_gen = function(param, state) -- luacheck: no unused args
         return box.error() -- error
     elseif ptuple[0] ~= nil then
         return state, tuple_bless(ptuple[0]) -- new state, value
-    else
-        return nil
-    end
-end
-
-local iterator_gen_luac = function(param, state) -- luacheck: no unused args
-    local tuple = internal.iterator_next(state)
-    if tuple ~= nil then
-        return state, tuple -- new state, value
     else
         return nil
     end
@@ -2207,6 +2211,9 @@ end
 base_index_mt.__len = base_index_mt.len
 -- min and max
 base_index_mt.min_ffi = function(index, key)
+    if builtin.box_read_ffi_is_disabled then
+        return index:min_luac(key)
+    end
     check_index_arg(index, 'min')
     local ibuf = cord_ibuf_take()
     local pkey, pkey_end = tuple_encode(ibuf, key)
@@ -2227,6 +2234,9 @@ base_index_mt.min_luac = function(index, key)
     return internal.min(index.space_id, index.id, key);
 end
 base_index_mt.max_ffi = function(index, key)
+    if builtin.box_read_ffi_is_disabled then
+        return index:max_luac(key)
+    end
     check_index_arg(index, 'max')
     local ibuf = cord_ibuf_take()
     local pkey, pkey_end = tuple_encode(ibuf, key)
@@ -2247,6 +2257,9 @@ base_index_mt.max_luac = function(index, key)
     return internal.max(index.space_id, index.id, key);
 end
 base_index_mt.random_ffi = function(index, rnd)
+    if builtin.box_read_ffi_is_disabled then
+        return index:random_luac(rnd)
+    end
     check_index_arg(index, 'random')
     rnd = rnd or math.random()
     if builtin.box_index_random(index.space_id, index.id, rnd,
@@ -2314,6 +2327,9 @@ base_index_mt.count_luac = function(index, key, opts)
 end
 
 base_index_mt.get_ffi = function(index, key)
+    if builtin.box_read_ffi_is_disabled then
+        return index:get_luac(key)
+    end
     check_index_arg(index, 'get')
     local ibuf = cord_ibuf_take()
     local key, key_end = tuple_encode(ibuf, key)
@@ -2364,6 +2380,9 @@ local function check_select_args(index, key, opts)
 end
 
 base_index_mt.select_ffi = function(index, key, opts)
+    if builtin.box_read_ffi_is_disabled then
+        return index:select_luac(key, opts)
+    end
     check_index_arg(index, 'select')
     check_select_args(index, key, opts)
     local ibuf = cord_ibuf_take()

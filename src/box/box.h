@@ -586,6 +586,36 @@ box_broadcast_election(void);
 void
 box_broadcast_schema(void);
 
+/**
+ * True if FFI must not be used for calling box read operations from Lua, see
+ * box/lua/schema.lua.
+ *
+ * Lua FFI is faster than Lua C API, but it must not be used if the executed C
+ * function may yield or call a Lua function. In particular, we have to disable
+ * FFI during online space upgrade, which installs a Lua handler for each read
+ * operation to return updated data.
+ *
+ * See also box_read_ffi_enable(), box_read_ffi_disable().
+ */
+extern bool box_read_ffi_is_disabled;
+
+/**
+ * Disables Lua FFI for box read operations, see box_read_ffi_is_disabled.
+ *
+ * It's okay to call this function multiple times, because we use a counter
+ * under the hood, not a boolean flag. To re-enable Lua FFI, one should call
+ * box_read_ffi_enable() the same amount of times.
+ */
+void
+box_read_ffi_disable(void);
+
+/**
+ * Re-enables Lua FFI for box read operations, which was disabled with
+ * box_read_ffi_disable().
+ */
+void
+box_read_ffi_enable(void);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

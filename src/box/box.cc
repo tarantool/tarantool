@@ -116,6 +116,14 @@ static bool backup_is_in_progress;
  */
 static struct gc_checkpoint_ref backup_gc;
 
+bool box_read_ffi_is_disabled;
+
+/**
+ * Counter behind box_read_ffi_is_disabled: FFI is re-enabled
+ * when it hits zero.
+ */
+static int box_read_ffi_disable_count;
+
 /**
  * The instance is in read-write mode: the local checkpoint
  * and all write ahead logs are processed. For a replica,
@@ -4197,4 +4205,21 @@ box_broadcast_schema(void)
 	box_broadcast("box.schema", strlen("box.schema"), buf, w);
 
 	assert((size_t)(w - buf) < 1024);
+}
+
+void
+box_read_ffi_disable(void)
+{
+	assert(box_read_ffi_is_disabled == (box_read_ffi_disable_count > 0));
+	box_read_ffi_disable_count++;
+	box_read_ffi_is_disabled = true;
+}
+
+void
+box_read_ffi_enable(void)
+{
+	assert(box_read_ffi_is_disabled);
+	assert(box_read_ffi_disable_count > 0);
+	if (--box_read_ffi_disable_count == 0)
+		box_read_ffi_is_disabled = false;
 }
