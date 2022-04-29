@@ -40,7 +40,7 @@
 /** {{{ box.index Lua library: access to spaces and indexes
  */
 
-static int CTID_STRUCT_ITERATOR_REF = 0;
+static uint32_t CTID_STRUCT_ITERATOR_PTR = 0;
 
 static int
 lbox_insert(lua_State *L)
@@ -257,9 +257,9 @@ lbox_index_iterator(lua_State *L)
 	if (it == NULL)
 		return luaT_error(L);
 
-	assert(CTID_STRUCT_ITERATOR_REF != 0);
+	assert(CTID_STRUCT_ITERATOR_PTR != 0);
 	struct iterator **ptr = (struct iterator **) luaL_pushcdata(L,
-		CTID_STRUCT_ITERATOR_REF);
+		CTID_STRUCT_ITERATOR_PTR);
 	*ptr = it; /* NULL handled by Lua, gc also set by Lua */
 	return 1;
 }
@@ -271,10 +271,10 @@ lbox_iterator_next(lua_State *L)
 	if (lua_gettop(L) < 1 || lua_type(L, 1) != LUA_TCDATA)
 		return luaL_error(L, "usage: next(state)");
 
-	assert(CTID_STRUCT_ITERATOR_REF != 0);
+	assert(CTID_STRUCT_ITERATOR_PTR != 0);
 	uint32_t ctypeid;
 	void *data = luaL_checkcdata(L, 1, &ctypeid);
-	if (ctypeid != (uint32_t) CTID_STRUCT_ITERATOR_REF)
+	if (ctypeid != CTID_STRUCT_ITERATOR_PTR)
 		return luaL_error(L, "usage: next(state)");
 
 	struct iterator *itr = *(struct iterator **) data;
@@ -337,8 +337,8 @@ box_lua_index_init(struct lua_State *L)
 	int rc = luaL_cdef(L, "struct iterator;");
 	assert(rc == 0);
 	(void) rc;
-	CTID_STRUCT_ITERATOR_REF = luaL_ctypeid(L, "struct iterator&");
-	assert(CTID_STRUCT_ITERATOR_REF != 0);
+	CTID_STRUCT_ITERATOR_PTR = luaL_ctypeid(L, "struct iterator*");
+	assert(CTID_STRUCT_ITERATOR_PTR != 0);
 
 	static const struct luaL_Reg indexlib [] = {
 		{NULL, NULL}
