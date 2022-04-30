@@ -128,6 +128,9 @@ Group: Applications/Databases
 Summary: In-memory database and Lua application server
 License: BSD
 
+%if "%{_product}" == "tarantool-gc64"
+Provides: tarantool = %{version}-%{release}
+%endif
 Provides: tarantool-debuginfo = %{version}-%{release}
 Provides: tarantool-common = %{version}-%{release}
 Obsoletes: tarantool-common < 1.6.8.434-1

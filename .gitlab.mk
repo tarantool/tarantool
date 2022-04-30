@@ -109,7 +109,7 @@ deploy_prepare:
 	rm -rf build
 
 package: deploy_prepare
-	# Set PRODUCT_NAME for the package itself.
+	# Set PRODUCT_NAME for the package itself. Needed for RPM packages.
 	if [ "$$(echo $(GC64) | sed 's/.*=//')" = ON ]; then                                                           \
 		export PRODUCT_NAME=tarantool-gc64; \
 		if [ "${OS}" = "ubuntu" ] || [ "${OS}" = "debian" ]; then \
