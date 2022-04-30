@@ -907,8 +907,6 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 static void
 alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 {
-	if (space_upgrade_check_alter(alter->old_space, alter->space_def) != 0)
-		diag_raise();
 	/**
 	 * AlterSpaceOp::prepare() may perform a potentially long
 	 * lasting operation that may yield, e.g. building of a new
@@ -937,6 +935,8 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	 */
 	rlist_foreach_entry(op, &alter->ops, link)
 		op->alter_def(alter);
+	if (space_upgrade_check_alter(alter->old_space, alter->space_def) != 0)
+		diag_raise();
 	/*
 	 * Create a new (empty) space for the new definition.
 	 * Sic: the triggers are not moved over yet.
