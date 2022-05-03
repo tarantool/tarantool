@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        gc64: [ "GC64=OFF" ]
+        gc64: [ "GC64=OFF", "GC64=ON" ]
 
     steps:
       - uses: actions/checkout@v2.3.4
