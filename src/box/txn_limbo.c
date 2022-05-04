@@ -464,6 +464,13 @@ txn_limbo_read_confirm(struct txn_limbo *limbo, int64_t lsn)
 		assert(e->txn->signature >= 0);
 		txn_complete_success(e->txn);
 	}
+	/*
+	 * Track CONFIRM lsn on replica in order to detect split-brain by
+	 * comparing existing confirm_lsn with the one arriving from a remote
+	 * instance.
+	 */
+	if (limbo->confirmed_lsn < lsn)
+		limbo->confirmed_lsn = lsn;
 }
 
 /**
