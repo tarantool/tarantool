@@ -536,14 +536,19 @@ txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
  */
 static void
 txn_limbo_read_promote(struct txn_limbo *limbo, uint32_t replica_id,
-		       int64_t lsn)
+		       uint32_t prev_id, int64_t lsn)
 {
 	txn_limbo_read_confirm(limbo, lsn);
 	txn_limbo_read_rollback(limbo, lsn + 1);
 	assert(txn_limbo_is_empty(limbo));
 	limbo->owner_id = replica_id;
 	box_update_ro_summary();
-	limbo->confirmed_lsn = 0;
+	/*
+	 * Only nullify confirmed_lsn when the new value is unknown. I.e. when
+	 * prev_id != replica_id.
+	 */
+	if (replica_id != prev_id)
+		limbo->confirmed_lsn = 0;
 }
 
 void
@@ -571,9 +576,9 @@ txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
  * @sa txn_limbo_read_promote.
  */
 static void
-txn_limbo_read_demote(struct txn_limbo *limbo, int64_t lsn)
+txn_limbo_read_demote(struct txn_limbo *limbo, uint32_t prev_id, int64_t lsn)
 {
-	return txn_limbo_read_promote(limbo, REPLICA_ID_NIL, lsn);
+	return txn_limbo_read_promote(limbo, REPLICA_ID_NIL, prev_id, lsn);
 }
 
 void
@@ -889,10 +894,11 @@ txn_limbo_req_commit(struct txn_limbo *limbo, const struct synchro_request *req)
 		txn_limbo_read_rollback(limbo, lsn);
 		break;
 	case IPROTO_RAFT_PROMOTE:
-		txn_limbo_read_promote(limbo, req->origin_id, lsn);
+		txn_limbo_read_promote(limbo, req->origin_id, req->replica_id,
+				       lsn);
 		break;
 	case IPROTO_RAFT_DEMOTE:
-		txn_limbo_read_demote(limbo, lsn);
+		txn_limbo_read_demote(limbo, req->replica_id, lsn);
 		break;
 	default:
 		unreachable();
