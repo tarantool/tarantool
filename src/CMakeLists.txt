@@ -266,6 +266,8 @@ set (common_libraries ${common_libraries} PARENT_SCOPE)
 add_subdirectory(lib)
 add_subdirectory(box)
 
+include_directories(${EXTRA_BOX_INCLUDE_DIRS})
+
 # Save CMAKE_XXX_FLAGS from this directory for config.h (used in --version)
 set(TARANTOOL_C_FLAGS ${CMAKE_C_FLAGS} PARENT_SCOPE)
 set(TARANTOOL_CXX_FLAGS ${CMAKE_CXX_FLAGS} PARENT_SCOPE)
