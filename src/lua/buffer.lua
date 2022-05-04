@@ -227,8 +227,8 @@ local prbuf_entry_t = ffi.typeof('struct prbuf_entry')
 
 local function prbuf_open(mem)
     if not ffi.istype(ffi.typeof('char *'), mem) then
-        errorf('Attempt to prbuf_open() with argument of wrong type %s',
-               ffi.typeof(mem))
+        errorf('Attempt to prbuf_open() with argument of wrong type, '..
+               'expected <char *>')
     end
     local buf = ffi.new(prbuf_t)
     local rc = builtin.prbuf_open(buf, mem)
@@ -240,8 +240,8 @@ end
 
 local function prbuf_create(mem, size)
     if not ffi.istype(ffi.typeof('char *'), mem) then
-        errorf('Attempt to prbuf_open() with argument of wrong type %s',
-               ffi.typeof(mem))
+        errorf('Attempt to prbuf_create() with argument of wrong type, '..
+               'expected <char *>')
     end
     local buf = ffi.new(prbuf_t)
     builtin.prbuf_create(buf, mem, size)
