@@ -160,6 +160,7 @@ set (server_sources
      lua/string.c
      lua/swim.c
      lua/decimal.c
+     lua/sysprof.c
      lua/uri.c
      lua/backtrace.c
      ${lua_sources}

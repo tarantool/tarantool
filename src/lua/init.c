@@ -64,6 +64,7 @@
 #include "lua/utf8.h"
 #include "lua/swim.h"
 #include "lua/decimal.h"
+#include "lua/sysprof.h"
 #include "lua/uri.h"
 #include "digest.h"
 #include "errinj.h"
@@ -713,6 +714,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_swim_init(L);
 	tarantool_lua_decimal_init(L);
 	luaopen_http_client_driver(L);
+	tarantool_lua_sysprof_init();
 	lua_pop(L, 1);
 	luaopen_msgpack(L);
 	lua_pop(L, 1);
