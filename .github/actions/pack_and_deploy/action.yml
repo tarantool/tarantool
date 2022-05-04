@@ -11,6 +11,7 @@ runs:
 
         # Create packages.
         make -f .gitlab.mk package
+        REPO_TYPE=pre-release make -f .gitlab.mk deploy
 
         # Deploy live packages. Enabled only for 1.10 and 2.8 branches.
         if ${{ github.ref == 'refs/heads/1.10' ||

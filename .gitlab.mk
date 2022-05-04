@@ -99,7 +99,7 @@ TARANTOOL_SERIES=series-$(MAJOR_VERSION)
 S3_SOURCE_REPO_URL=s3://tarantool_repo/sources
 endif
 
-RWS_BASE_URL=https://rws.tarantool.org
+RWS_BASE_URL=https://rws-dev.tarantool.org
 PRODUCT_NAME=tarantool
 
 deploy_prepare:
