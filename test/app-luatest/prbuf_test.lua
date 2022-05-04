@@ -1,4 +1,5 @@
 local buffer = require('buffer')
+local ffi = require('ffi')
 local t = require('luatest')
 local g = t.group()
 
@@ -44,4 +45,19 @@ g.test_object_misc = function()
         entry = iter:next()
     end
     t.assert_equals(entry_count, 5)
+end
+
+g.test_wrong_arg_type = function()
+    local int = ffi.new('int')
+    local map = {}
+    local status, err = pcall(buffer.prbuf_create, int, 4)
+    local expected_err = 'Attempt to prbuf_create%(%) with argument '..
+                         'of wrong type, expected %<char %*%>'
+    t.assert_equals(status, false)
+    t.assert_equals(string.find(tostring(err), expected_err) ~= nil, true)
+    expected_err = 'Attempt to prbuf_open%(%) with argument '..
+                   'of wrong type, expected %<char %*%>'
+    local status, err = pcall(buffer.prbuf_open, map, 4)
+    t.assert_equals(status, false)
+    t.assert_equals(string.find(tostring(err), expected_err) ~= nil, true)
 end
