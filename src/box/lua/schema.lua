@@ -812,12 +812,9 @@ function box.schema.space.format(id, format)
     end
 end
 
-function box.schema.space.upgrade(id, ...)
+function box.schema.space.upgrade(id)
     check_param(id, 'id', 'number')
-    if not box.internal.space.upgrade then
-        box.error(box.error.UNSUPPORTED, "Community edition", "space upgrade")
-    end
-    return box.internal.space.upgrade(id, ...)
+    box.error(box.error.UNSUPPORTED, "Community edition", "space upgrade")
 end
 
 box.schema.create_space = box.schema.space.create
@@ -1468,6 +1465,7 @@ local function func_id_by_name(func_name)
     end
     return func.id
 end
+box.internal.func_id_by_name = func_id_by_name -- for space.upgrade
 
 box.schema.index.create = function(space_id, name, options)
     check_param(space_id, 'space_id', 'number')
