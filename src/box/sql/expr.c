@@ -417,6 +417,12 @@ sql_type_result(enum field_type lhs, enum field_type rhs)
 		       rhs == FIELD_TYPE_UNSIGNED);
 		return FIELD_TYPE_UNSIGNED;
 	}
+	if ((lhs == FIELD_TYPE_DATETIME && rhs == FIELD_TYPE_DATETIME) ||
+	    (lhs == FIELD_TYPE_INTERVAL && rhs == FIELD_TYPE_INTERVAL))
+		return FIELD_TYPE_INTERVAL;
+	if ((lhs == FIELD_TYPE_INTERVAL && rhs == FIELD_TYPE_DATETIME) ||
+	    (lhs == FIELD_TYPE_DATETIME && rhs == FIELD_TYPE_INTERVAL))
+		return FIELD_TYPE_DATETIME;
 	return FIELD_TYPE_SCALAR;
 }
 
