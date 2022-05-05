@@ -11,10 +11,9 @@
 # need to use cmake3 package to build Tarantool on old systems.
 %define use_cmake3 0%{?rhel} == 7
 
-# Get GC64 variable which can keep compiler flag -DLUAJIT_ENABLE_GC64
-# with a value of ON or OFF to enable or disable luajit gc64.
-# It needs to build Tarantool in CI dynamically.
-%define _gc64 %{getenv:GC64}
+# Get ${GC64} env variable which can keep the value of 'true' or 'false' to
+# enable or disable luajit gc64.
+%define _gc64 "%{getenv:GC64}"
 
 %if %use_cmake3
 # XXX: Unfortunately there is no way to make rpmbuild install and
@@ -196,8 +195,8 @@ C and Lua/C modules.
 %if 0%{?fedora} >= 33
          -DENABLE_LTO=ON \
 %endif
-%if "%{_gc64}"
-         %{_gc64} \
+%if %{_gc64} == "true"
+         -DLUAJIT_ENABLE_GC64:BOOL=ON \
 %endif
          -DENABLE_WERROR:BOOL=ON \
          -DENABLE_DIST:BOOL=ON

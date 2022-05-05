@@ -125,7 +125,7 @@ deploy:
 		exit 1; \
 	fi; \
 	# Use different repos for vanilla and GC64 version.
-	if [ "$$(echo ${GC64} | sed 's/.*=//')" = ON ]; then \
+	if [ "${GC64}" = "true" ]; then \
 		RWS_ENDPOINT=${RWS_BASE_URL}/${REPO_TYPE}/${TARANTOOL_SERIES}-gc64/${OS}/${DIST}; \
 	else \
 		RWS_ENDPOINT=${RWS_BASE_URL}/${REPO_TYPE}/${TARANTOOL_SERIES}/${OS}/${DIST}; \
