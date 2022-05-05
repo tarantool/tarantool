@@ -2860,3 +2860,47 @@ g.test_datetime_34_3 = function()
         t.assert_equals(box.execute(sql).rows, {{dt1}})
     end)
 end
+
+-- Properly compute type of result of DATETIME arithmetic.
+g.test_datetime_35 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt1 = dt.new({year = 1})
+        local itv1 = dt.interval.new({year = 1})
+
+        box.execute([[CREATE TABLE t(dt DATETIME PRIMARY KEY, itv INTERVAL);]])
+        box.execute([[INSERT INTO t VALUES (?, ?);]], {dt1, itv1})
+
+        local sql = [[SELECT typeof(dt - dt) FROM t;]]
+        t.assert_equals(box.execute(sql).rows, {{'interval'}})
+
+        sql = [[SELECT dt - dt FROM t;]]
+        t.assert_equals(box.execute(sql).metadata[1].type, 'interval')
+
+        sql = [[SELECT typeof(dt - itv) FROM t;]]
+        t.assert_equals(box.execute(sql).rows, {{'datetime'}})
+
+        sql = [[SELECT dt - itv FROM t;]]
+        t.assert_equals(box.execute(sql).metadata[1].type, 'datetime')
+
+        sql = [[SELECT typeof(dt + itv) FROM t;]]
+        t.assert_equals(box.execute(sql).rows, {{'datetime'}})
+
+        sql = [[SELECT dt + itv FROM t;]]
+        t.assert_equals(box.execute(sql).metadata[1].type, 'datetime')
+
+        sql = [[SELECT typeof(itv - itv) FROM t;]]
+        t.assert_equals(box.execute(sql).rows, {{'interval'}})
+
+        sql = [[SELECT itv - itv FROM t;]]
+        t.assert_equals(box.execute(sql).metadata[1].type, 'interval')
+
+        sql = [[SELECT typeof(itv + itv) FROM t;]]
+        t.assert_equals(box.execute(sql).rows, {{'interval'}})
+
+        sql = [[SELECT itv + itv FROM t;]]
+        t.assert_equals(box.execute(sql).metadata[1].type, 'interval')
+        box.execute([[DROP TABLE t;]])
+    end)
+end
