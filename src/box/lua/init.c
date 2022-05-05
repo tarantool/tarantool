@@ -118,6 +118,10 @@ static const char *lua_sources[] = {
 	"box/feedback_daemon", feedback_daemon_lua,
 #endif
 #if ENABLE_SPACE_UPGRADE
+	/*
+	 * Must be loaded after schema_lua, because it redefines
+	 * box.schema.space.upgrade.
+	 */
 	"box/space_upgrade", space_upgrade_lua,
 #endif
 #if ENABLE_AUDIT_LOG
