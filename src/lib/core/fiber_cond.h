@@ -58,6 +58,9 @@ struct fiber_cond {
 	struct rlist waiters;
 };
 
+#define FIBER_COND_INITIALIZER(name) { RLIST_HEAD_INITIALIZER(name.waiters) }
+#define FIBER_COND(name) struct fiber_cond name = FIBER_COND_INITIALIZER(name)
+
 /**
  * Initialize the fiber condition variable.
  *
