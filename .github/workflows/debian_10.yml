@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        gc64: [ "GC64=OFF", "GC64=ON" ]
+        build-type: [ '', 'gc64' ]
 
     steps:
       - uses: actions/checkout@v2.3.4
@@ -57,7 +57,7 @@ jobs:
           RWS_AUTH: ${{ secrets.RWS_AUTH }}
           OS: 'debian'
           DIST: 'buster'
-          GC64: -DLUAJIT_ENABLE_${{ matrix.gc64 }}
+          GC64: ${{ matrix.build-type == 'gc64' }}
         uses: ./.github/actions/pack_and_deploy
       - name: call action to send Telegram message on failure
         env:
