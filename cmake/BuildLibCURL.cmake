@@ -17,7 +17,7 @@ macro(curl_build)
     # Use the same OpenSSL library for libcurl as is used for
     # tarantool itself.
     get_filename_component(FOUND_OPENSSL_ROOT_DIR ${OPENSSL_INCLUDE_DIR} DIRECTORY)
-    set(LIBCURL_OPENSSL_OPT "--with-ssl=${FOUND_OPENSSL_ROOT_DIR}")
+    set(LIBCURL_OPENSSL_OPT "--with-openssl=${FOUND_OPENSSL_ROOT_DIR}")
 
     # Use either c-ares bundled with tarantool or
     # libcurl-default threaded resolver.
@@ -139,6 +139,7 @@ macro(curl_build)
                 --disable-imap
                 --disable-smb
                 --disable-gopher
+                --disable-mqtt
                 --disable-manual
                 --disable-sspi
                 --disable-crypto-auth
@@ -149,6 +150,15 @@ macro(curl_build)
                 --disable-progress-meter
                 --disable-dnsshuffle
                 --disable-alt-svc
+                --enable-hsts
+                --enable-libcurl-option
+                --enable-openssl-auto-load-config
+                --enable-socketpair
+                --enable-verbose
+                --disable-werror
+                --disable-debug
+                --disable-curldebug
+                --without-msh3
         BUILD_COMMAND cd <BINARY_DIR> && $(MAKE)
         INSTALL_COMMAND cd <BINARY_DIR> && $(MAKE) install)
 
