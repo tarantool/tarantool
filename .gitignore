@@ -146,7 +146,6 @@ obj-*/
 parts/
 prime/
 stage/
-*.snap
 ftp.log
 sftp.log
 ftpscript.txt
