@@ -21,9 +21,6 @@ local Server = luatest.Server:inherit({})
 local WAIT_TIMEOUT = 60
 local WAIT_DELAY = 0.1
 
-local DEFAULT_CHECKPOINT_PATTERNS = {"*.snap", "*.xlog", "*.vylog",
-                                     "*.inprogress", "[0-9]*/"}
-
 -- Differences from luatest.Server:
 --
 -- * 'alias' is mandatory.
@@ -223,9 +220,7 @@ function Server:stop()
 end
 
 function Server:cleanup()
-    for _, pattern in ipairs(DEFAULT_CHECKPOINT_PATTERNS) do
-        fio.rmtree(('%s/%s'):format(self.workdir, pattern))
-    end
+    fio.rmtree(self.workdir)
     self.instance_id_value = nil
     self.instance_uuid_value = nil
 end
