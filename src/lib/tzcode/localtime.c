@@ -15,8 +15,9 @@
 #include <unistd.h>
 #define LOCALTIME_IMPLEMENTATION
 #include "private.h"
-
 #include "tzfile.h"
+#include "tzcode.h"
+
 #include <fcntl.h>
 
 #ifndef TZ_ABBR_MAX_LEN
@@ -66,9 +67,9 @@
 #define WILDABBR "   "
 #endif /* !defined WILDABBR */
 
-static const char wildabbr[] = WILDABBR;
-
 static const char gmt[] = "GMT";
+
+static const char wildabbr[] = WILDABBR;
 
 /*
 ** The DST rules to use if TZ has no rules and we can't load TZDEFRULES.
