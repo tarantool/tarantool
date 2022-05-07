@@ -31,7 +31,9 @@ timezone_flags(const struct date_time_zone *zone)
 static const char * zone_names[] = {
 #define ZONE_ABBREV(id, offset, name, flags) [id] = name,
 #define ZONE_UNIQUE(id, name) [id] = name,
+#define ZONE_ALIAS(id, alias, name)
 #include "timezones.h"
+#undef ZONE_ALIAS
 #undef ZONE_UNIQUE
 #undef ZONE_ABBREV
 };
@@ -45,9 +47,10 @@ timezone_name(int64_t index)
 
 static struct date_time_zone zone_abbrevs[] = {
 #define ZONE_ABBREV(id, offset, name, flags) { name, id, flags, offset },
-#define ZONE_UNIQUE(id, name) { name, id, TZ_NYI, 0 },
-
+#define ZONE_UNIQUE(id, name) { name, id, TZ_OLSON, 0 },
+#define ZONE_ALIAS(id, alias, name) { alias, id, TZ_OLSON|TZ_ALIAS, 0 },
 #include "timezones.h"
+#undef ZONE_ALIAS
 #undef ZONE_UNIQUE
 #undef ZONE_ABBREV
 };

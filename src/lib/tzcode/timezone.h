@@ -17,6 +17,8 @@ enum {
 	TZ_MILITARY = 0x04,
 	TZ_AMBIGUOUS = 0x08,
 	TZ_NYI = 0x10,
+	TZ_OLSON = 0x20,
+	TZ_ALIAS = 0x40,
 };
 
 /**

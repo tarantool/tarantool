@@ -66,6 +66,13 @@ char *
 tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 	     struct tnt_tm *__restrict tm);
 
+typedef struct state *timezone_t;
+
+/** Find installed timezone definition and load it to memory */
+timezone_t tzalloc(const char *);
+/** Free loaded timezone definition */
+void tzfree(timezone_t);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
