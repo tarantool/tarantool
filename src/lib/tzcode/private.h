@@ -149,16 +149,16 @@ extern long altzone;
 
 #ifdef STD_INSPIRED
 # if TZ_TIME_T || !defined offtime
-struct tm *offtime(time_t const *, long);
+struct tnt_tm *offtime(time_t const *, long);
 # endif
 # if TZ_TIME_T || !defined timegm
-time_t timegm(struct tm *);
+time_t timegm(struct tnt_tm *);
 # endif
 # if TZ_TIME_T || !defined timelocal
-time_t timelocal(struct tm *);
+time_t timelocal(struct tnt_tm *);
 # endif
 # if TZ_TIME_T || !defined timeoff
-time_t timeoff(struct tm *, long);
+time_t timeoff(struct tnt_tm *, long);
 # endif
 # if TZ_TIME_T || !defined time2posix
 time_t time2posix(time_t);
@@ -169,13 +169,15 @@ time_t posix2time(time_t);
 #endif
 
 /* Infer TM_ZONE on systems where this information is known, but suppress
-   guessing if NO_TM_ZONE is defined.  Similarly for TM_GMTOFF.  */
+   guessing if NO_TM_ZONE is defined.  Similarly for TM_GMTOFF.
+   Tarantool should use NO_TM_ZONE as there are different facilities for
+   timezone names. */
+
+#define NO_TM_ZONE
+
 #if (defined __GLIBC__ \
      || defined __FreeBSD__ || defined __NetBSD__ || defined __OpenBSD__ \
      || (defined __APPLE__ && defined __MACH__))
-# if !defined TM_GMTOFF && !defined NO_TM_GMTOFF
-#  define TM_GMTOFF tm_gmtoff
-# endif
 # if !defined TM_ZONE && !defined NO_TM_ZONE
 #  define TM_ZONE tm_zone
 # endif
@@ -191,17 +193,27 @@ time_t posix2time(time_t);
 */
 #if NETBSD_INSPIRED
 typedef struct state *timezone_t;
-struct tm *localtime_rz(timezone_t restrict, time_t const *restrict,
-			struct tm *restrict);
-time_t mktime_z(timezone_t restrict, struct tm *restrict);
-timezone_t tzalloc(char const *);
-void tzfree(timezone_t);
+struct tnt_tm *
+localtime_rz(timezone_t restrict, time_t const *restrict,
+	     struct tnt_tm *restrict);
+
+time_t
+mktime_z(timezone_t restrict, struct tnt_tm *restrict);
+
+timezone_t
+tzalloc(char const *);
+
+void
+tzfree(timezone_t);
+
 # ifdef STD_INSPIRED
 #  if TZ_TIME_T || !defined posix2time_z
-time_t posix2time_z(timezone_t, time_t) ATTRIBUTE_PURE;
+time_t
+posix2time_z(timezone_t, time_t) ATTRIBUTE_PURE;
 #  endif
 #  if TZ_TIME_T || !defined time2posix_z
-time_t time2posix_z(timezone_t, time_t) ATTRIBUTE_PURE;
+time_t
+time2posix_z(timezone_t, time_t) ATTRIBUTE_PURE;
 #  endif
 # endif
 #endif
@@ -274,7 +286,7 @@ time_t time2posix_z(timezone_t, time_t) ATTRIBUTE_PURE;
 /* Whether memory access must strictly follow the C standard.
    If 0, it's OK to read uninitialized storage so long as the value is
    not relied upon.  Defining it to 0 lets mktime access parts of
-   struct tm that might be uninitialized, as a heuristic when the
+   struct tnt_tm that might be uninitialized, as a heuristic when the
    standard doesn't say what to return and when tm_gmtoff can help
    mktime likely infer a better value.  */
 #ifndef UNINIT_TRAP
