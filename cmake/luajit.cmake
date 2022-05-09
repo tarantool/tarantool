@@ -69,7 +69,7 @@ endif()
 # are several places wrapped with LUAJIT_USE_ASAN define.
 # Just enable it here if needed and patiently wait until ASAN
 # support is implemented properly in LuaJIT.
-if(ENABLE_ASAN)
+if(ENABLE_ASAN OR ENABLE_TSAN)
     add_definitions(-DLUAJIT_USE_ASAN=1)
 endif()
 

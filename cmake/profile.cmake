@@ -101,3 +101,16 @@ if (ENABLE_ASAN)
 
     add_compile_flags("C;CXX" -fsanitize=address -fsanitize-blacklist=${PROJECT_SOURCE_DIR}/asan/asan.supp)
 endif()
+
+option(ENABLE_TSAN "Enable ThreadSanitizer" OFF)
+if (ENABLE_TSAN)
+    if (CMAKE_COMPILER_IS_GNUCC)
+        message(FATAL_ERROR
+            "\n"
+            " Tarantool does not support GCC's ThreadSanitizer. Use clang:\n"
+            " $ git clean -xfd; git submodule foreach --recursive git clean -xfd\n"
+            " $ CC=clang CXX=clang++ cmake . <...> -DENABLE_TSAN=ON && make -j\n"
+            "\n")
+    endif()
+    add_compile_flags("C;CXX" -fsanitize=thread)
+endif()

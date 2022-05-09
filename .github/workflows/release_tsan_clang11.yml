@@ -1,4 +1,4 @@
-name: freebsd-13
+name: release_tsan_clang11
 
 on:
   push:
@@ -31,28 +31,37 @@ concurrency:
     format('{0}-{1}', github.workflow, github.ref) }}
   cancel-in-progress: true
 
+env:
+  CI_MAKE: make -f .travis.mk
+
 jobs:
-  freebsd-13:
+  release_tsan_clang11:
     # Run on push to the 'master' and release branches of tarantool/tarantool
     # or on pull request if the 'full-ci' label is set.
     if: github.repository == 'tarantool/tarantool' &&
         ( github.event_name != 'pull_request' ||
           contains(github.event.pull_request.labels.*.name, 'full-ci') )
 
-    runs-on: freebsd-13-mcs
+    runs-on: ubuntu-20.04-self-hosted
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
         with:
           fetch-depth: 0
           submodules: recursive
       - uses: ./.github/actions/environment
       - name: test
-        run: make -f .travis.mk test_freebsd
+        run: ${CI_MAKE} test_tsan_ubuntu_ghactions
+      - name: call action to send Telegram message on failure
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
+          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
+        uses: ./.github/actions/send-telegram-notify
+        if: failure()
       - name: artifacts
         uses: actions/upload-artifact@v2
         if: failure()
         with:
-          name: freebsd-13
+          name: release_tsan_clang11
           retention-days: 21
           path: ${{ env.VARDIR }}/artifacts
