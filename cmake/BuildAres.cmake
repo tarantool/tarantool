@@ -47,7 +47,8 @@ macro(ares_build)
         TMP_DIR ${ARES_BINARY_DIR}/tmp
         STAMP_DIR ${ARES_BINARY_DIR}/stamp
         BINARY_DIR ${ARES_BINARY_DIR}
-        CMAKE_ARGS ${ARES_CMAKE_FLAGS})
+        CMAKE_ARGS ${ARES_CMAKE_FLAGS}
+        BUILD_BYPRODUCTS ${ARES_INSTALL_DIR}/lib/libcares.a)
 
     add_library(bundled-ares STATIC IMPORTED GLOBAL)
     set_target_properties(bundled-ares PROPERTIES IMPORTED_LOCATION
