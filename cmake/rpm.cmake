@@ -20,7 +20,7 @@ if (RPMBUILD)
 
     add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/tarantool-${PACKAGE_VERSION}.tar.gz
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
-        COMMAND $(MAKE) package_source)
+        COMMAND ${CMAKE_MAKE_COMMAND} package_source)
 
     add_custom_command(OUTPUT ${RPM_BUILDROOT}
         COMMAND ${MKDIR} -p ${RPM_BUILDROOT})

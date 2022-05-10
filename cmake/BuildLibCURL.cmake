@@ -203,10 +203,12 @@ macro(curl_build)
         STAMP_DIR ${LIBCURL_BINARY_DIR}/stamp
         BINARY_DIR ${LIBCURL_BINARY_DIR}/curl
         CONFIGURE_COMMAND
-            cd <BINARY_DIR> && ${CMAKE_COMMAND} <SOURCE_DIR>
-                ${LIBCURL_CMAKE_FLAGS}
-        BUILD_COMMAND cd <BINARY_DIR> && $(MAKE)
-        INSTALL_COMMAND cd <BINARY_DIR> && $(MAKE) install)
+            ${CMAKE_COMMAND} -B <BINARY_DIR> -S <SOURCE_DIR>
+                -G ${CMAKE_GENERATOR} ${LIBCURL_CMAKE_FLAGS}
+        BUILD_COMMAND cd <BINARY_DIR> && ${CMAKE_MAKE_PROGRAM}
+        INSTALL_COMMAND cd <BINARY_DIR> && ${CMAKE_MAKE_PROGRAM} install
+        CMAKE_GENERATOR ${CMAKE_GENERATOR}
+        BUILD_BYPRODUCTS ${LIBCURL_INSTALL_DIR}/lib/libcurl.a)
 
     add_library(bundled-libcurl STATIC IMPORTED GLOBAL)
     set_target_properties(bundled-libcurl PROPERTIES IMPORTED_LOCATION
