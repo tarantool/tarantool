@@ -70,7 +70,10 @@ macro(libunwind_build)
                         LOG_MERGED_STDOUTERR TRUE
                         LOG_OUTPUT_ON_FAILURE TRUE
 
-                        EXCLUDE_FROM_ALL)
+                        EXCLUDE_FROM_ALL
+
+                        BUILD_BYPRODUCTS ${LIBUNWIND_INSTALL_DIR}/lib/libunwind-x86_64.a
+                        BUILD_BYPRODUCTS ${LIBUNWIND_INSTALL_DIR}/lib/libunwind.a)
 
     add_library(bundled-libunwind STATIC IMPORTED GLOBAL)
     set_target_properties(bundled-libunwind PROPERTIES

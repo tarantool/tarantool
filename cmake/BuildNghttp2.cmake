@@ -59,7 +59,8 @@ macro(nghttp2_build)
         TMP_DIR ${NGHTTP2_BINARY_DIR}/tmp
         STAMP_DIR ${NGHTTP2_BINARY_DIR}/stamp
         BINARY_DIR ${NGHTTP2_BINARY_DIR}
-        CMAKE_ARGS ${NGHTTP2_CMAKE_FLAGS})
+        CMAKE_ARGS ${NGHTTP2_CMAKE_FLAGS}
+        BUILD_BYPRODUCTS ${NGHTTP2_INSTALL_DIR}/lib/libnghttp2.a)
 
     add_library(bundled-nghttp2 STATIC IMPORTED GLOBAL)
     set_target_properties(bundled-nghttp2 PROPERTIES IMPORTED_LOCATION
