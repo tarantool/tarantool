@@ -7,7 +7,7 @@ pkg_add git m4 curl cmake gmake
 2. Download & build tarantool source code
 -----------------------------------------
 
-git clone git://github.com/tarantool/tarantool.git
+git clone https://github.com/tarantool/tarantool.git
 
 cd tarantool
 git submodule update --init --recursive
