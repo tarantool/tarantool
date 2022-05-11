@@ -228,7 +228,7 @@ coverity_debian: deps_coverity_debian test_coverity_debian_no_deps
 build_asan_debian:
 	CC=clang-11 CXX=clang++-11 cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		-DENABLE_WERROR=ON -DENABLE_ASAN=ON -DENABLE_UB_SANITIZER=ON \
-		-DENABLE_FUZZER=ON ${CMAKE_EXTRA_PARAMS}
+		 -DENABLE_FUZZER=ON ${CMAKE_EXTRA_PARAMS}
 	make -j $$(nproc)
 
 test_asan_debian_no_deps: build_asan_debian
@@ -252,6 +252,32 @@ test_asan_debian_no_deps: build_asan_debian
 test_asan_debian: deps_debian deps_buster_clang_11 test_asan_debian_no_deps
 
 test_asan_ubuntu_ghactions: deps_ubuntu_ghactions test_asan_debian_no_deps
+
+# TSAN
+
+build_tsan_debian:
+	CC=clang-11 CXX=clang++-11 cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DENABLE_WERROR=ON -DENABLE_TSAN=ON -DENABLE_UB_SANITIZER=ON \
+		-DENABLE_FUZZER=ON ${CMAKE_EXTRA_PARAMS}
+	make -j $$(nproc)
+
+test_tsan_debian_no_deps: build_tsan_debian
+	# FIXME: PUC-Rio-Lua-5.1 test suite is disabled for ASAN
+	# due to https://github.com/tarantool/tarantool/issues/5880.
+	# Run tests suites manually.
+	LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
+		make LuaJIT-tests lua-Harness-tests tarantool-tests
+	# Temporary excluded some tests by issue #4360:
+	#  - To exclude tests from ASAN checks the asan/asan.supp file
+	#    was set at the build time in cmake/profile.cmake file.
+	#  - To exclude tests from LSAN checks the asan/lsan.supp file
+	#    was set in environment options to be used at run time.
+	cd test && LSAN_OPTIONS=suppressions=${PWD}/asan/lsan.supp \
+		./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS)
+
+test_tsan_debian: deps_debian deps_buster_clang_11 test_tsan_debian_no_deps
+
+test_tsan_ubuntu_ghactions: deps_ubuntu_ghactions test_tsan_debian_no_deps
 
 # Static build
 
