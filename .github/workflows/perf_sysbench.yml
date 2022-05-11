@@ -28,7 +28,7 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        branch: [ 'master', '2.8' ]
+        branch: [ 'master', '2.10' ]
 
     steps:
       - name: Checkout tarantool
