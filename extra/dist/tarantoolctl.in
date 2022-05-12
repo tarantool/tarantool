@@ -1154,7 +1154,8 @@ local commands = setmetatable({
         func = exit_wrapper(cat), process = process_remote, help = {
             header =
                 "%s cat FILE.. [--space=space_no ..] [--show-system]" ..
-                " [--from=from_lsn] [--to=to_lsn] [--replica=replica_id ..]",
+                " [--from=from_lsn] [--to=to_lsn] [--replica=replica_id ..]" ..
+                " [--format=format_name]",
             description =
 [=[
         Print into stdout the contents of .snap/.xlog files.
@@ -1167,6 +1168,8 @@ local commands = setmetatable({
         * --to=to_lsn to show operations ending with the given lsn.
         * --replica=replica_id to filter the output by replica id.
           May be passed more than once.
+        * --format=format_name to indicate format.
+          Defaults to 'yaml', can also be 'json' or 'lua'.
 ]=],
             weight = 90,
             deprecated = false,
