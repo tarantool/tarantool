@@ -858,6 +858,18 @@ str_to_dec(struct Mem *mem)
 	return 0;
 }
 
+/** Convert MEM from STRING to DATETIME. */
+static inline int
+str_to_datetime(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_STR);
+	struct datetime dt;
+	if (datetime_parse_full(&dt, mem->z, mem->n, 0) <= 0)
+		return -1;
+	mem_set_datetime(mem, &dt);
+	return 0;
+}
+
 static inline int
 double_to_int(struct Mem *mem)
 {
@@ -1457,6 +1469,8 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 			return bin_to_uuid(mem);
 		return -1;
 	case FIELD_TYPE_DATETIME:
+		if (mem->type == MEM_TYPE_STR)
+			return str_to_datetime(mem);
 		if (mem->type != MEM_TYPE_DATETIME)
 			return -1;
 		mem->flags = 0;
