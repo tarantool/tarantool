@@ -129,7 +129,7 @@ jobs:
           server_address: ${{ secrets.PERF_EMAIL_SERVER }}
           server_port: 25
           subject: >
-            Tarantool Perf Testing. Branch: ${{ github.ref_name }}.
+            Tarantool Perf Testing. Branch: ${{ matrix.branch }}.
             Build: ${{ steps.tarantool-version.outputs.value }}.
             Test: sysbench
           to: ${{ github.event.inputs.debug == 'true' &&
