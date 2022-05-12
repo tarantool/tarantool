@@ -931,11 +931,12 @@ end
 g.test_datetime_18_3 = function()
     g.server:exec(function()
         local t = require('luatest')
+        local dt = require('datetime')
+        local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local sql = [[SELECT CAST('2001-01-01T01:00:00Z' AS DATETIME);]]
-        local res = [[Type mismatch: can not convert ]]..
-                    [[string('2001-01-01T01:00:00Z') to datetime]]
-        local _, err = box.execute(sql)
-        t.assert_equals(err.message, res)
+        local res = {{dt1}}
+        local rows = box.execute(sql).rows
+        t.assert_equals(rows, res)
     end)
 end
 
@@ -2360,5 +2361,29 @@ g.test_datetime_31_8 = function()
         local itv3 = itv.new({year = 3, month = 4, day = 5, hour = 6})
         local rows = box.execute([[SELECT $1 + $2;]], {itv2, itv1}).rows
         t.assert_equals(rows, {{itv3}})
+    end)
+end
+
+-- Make sure cast from STRING to DATETIME works as intended.
+g.test_datetime_32_1 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt1 = dt.new({year = 2000, month = 2, day = 29, hour = 1})
+        local sql = [[SELECT CAST('2000-02-29T01:00:00Z' AS DATETIME);]]
+        local res = {{dt1}}
+        local rows = box.execute(sql).rows
+        t.assert_equals(rows, res)
+    end)
+end
+
+g.test_datetime_32_2 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local sql = [[SELECT CAST('2001-02-29T01:00:00Z' AS DATETIME);]]
+        local _, err = box.execute(sql)
+        local res = [[Type mismatch: can not convert ]]..
+                    [[string('2001-02-29T01:00:00Z') to datetime]]
+        t.assert_equals(err.message, res)
     end)
 end
