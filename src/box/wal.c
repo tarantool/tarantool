@@ -1319,9 +1319,10 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 	if (wal_write_async(journal, entry) != 0)
 		return -1;
 
-	bool cancellable = fiber_set_cancellable(false);
-	fiber_yield();
-	fiber_set_cancellable(cancellable);
+	assert(!entry->is_complete);
+	do {
+		fiber_yield();
+	} while (!entry->is_complete);
 
 	return 0;
 }
