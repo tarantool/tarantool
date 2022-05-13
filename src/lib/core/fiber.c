@@ -1760,17 +1760,10 @@ cord_cojoin(struct cord *cord)
 		 * thread invokes cord_cojoin_on_exit, signaling
 		 * ev_async, making the event loop call
 		 * cord_cojoin_wakeup, waking up this fiber again.
-		 *
-		 * The fiber is non-cancellable during the wait to
-		 * avoid invalidating of the cord_cojoin_ctx
-		 * object declared on stack.
 		 */
-		bool cancellable = fiber_set_cancellable(false);
-		fiber_yield();
-		/* Spurious wakeup indicates a severe BUG, fail early. */
-		if (ctx.task_complete == 0)
-			panic("Wrong fiber woken");
-		fiber_set_cancellable(cancellable);
+		do {
+			fiber_yield();
+		} while (!ctx.task_complete);
 	}
 
 	ev_async_stop(loop(), &ctx.async);
