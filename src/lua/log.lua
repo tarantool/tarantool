@@ -396,6 +396,16 @@ local function log_pid()
     return tonumber(ffi.C.log_pid)
 end
 
+local ratelimit_enabled = true
+
+local function ratelimit_enable()
+    ratelimit_enabled = true
+end
+
+local function ratelimit_disable()
+    ratelimit_enabled = false
+end
+
 local Ratelimit = {
     interval = 60,
     burst = 10,
@@ -403,6 +413,10 @@ local Ratelimit = {
     suppressed = 0,
     start = 0,
 }
+
+local function ratelimit_new(object)
+    return Ratelimit:new(object)
+end
 
 function Ratelimit:new(object)
     object = object or {}
@@ -412,8 +426,11 @@ function Ratelimit:new(object)
 end
 
 function Ratelimit:check()
-    local clock = require('clock')
+    if not ratelimit_enabled then
+        return 0, true
+    end
 
+    local clock = require('clock')
     local now = clock.monotonic()
     local saved_suppressed = 0
     if now > self.start + self.interval then
@@ -650,7 +667,11 @@ local log = {
         cfg_set_log_format = box_api_set_log_format,
     },
     internal = {
-        ratelimit = Ratelimit
+        ratelimit = {
+            new = ratelimit_new,
+            enable = ratelimit_enable,
+            disable = ratelimit_disable,
+        },
     }
 }
 
