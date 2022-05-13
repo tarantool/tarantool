@@ -2352,6 +2352,7 @@ local function check_select_opts(opts, key_is_nil)
     local offset = 0
     local limit = 4294967295
     local iterator = check_iterator_type(opts, key_is_nil)
+    local fullscan = false
     if opts ~= nil and type(opts) == "table" then
         if opts.offset ~= nil then
             offset = opts.offset
@@ -2359,21 +2360,26 @@ local function check_select_opts(opts, key_is_nil)
         if opts.limit ~= nil then
             limit = opts.limit
         end
+        if opts.fullscan ~= nil then
+            fullscan = opts.fullscan
+        end
     end
-    return iterator, offset, limit
+    return iterator, offset, limit, fullscan
 end
 
 box.internal.check_select_opts = check_select_opts -- for net.box
 
-local check_select_args_rl = log.internal.ratelimit:new()
-local function check_select_args(index, key, opts)
-    local rl = check_select_args_rl
-
-    if index.space_id >= 512 and
-       (type(key) == 'nil' or (type(key) == 'table' and next(key) == nil)) and
-       (opts == nil or not opts.fullscan) then
-        rl:log_crit('empty or nil `select` call on user space with id=%d\n %s',
-                    index.space_id, debug.traceback())
+local check_select_safety_rl = log.internal.ratelimit.new()
+local function check_select_safety(index, key_is_nil, itype, limit, offset,
+                                   fullscan)
+    local rl = check_select_safety_rl
+    local sid = index.space_id
+    local point_iter = itype == box.index.EQ or itype == box.index.REQ
+    local window = offset + limit
+    if sid >= 512 and (key_is_nil or not point_iter) and
+       (not fullscan and window > 1000) then
+        rl:log_crit("Potentially long select from space '%s' (%d)\n %s",
+                    box.space[sid].name, sid, debug.traceback())
     end
 end
 
@@ -2382,10 +2388,12 @@ base_index_mt.select_ffi = function(index, key, opts)
         return index:select_luac(key, opts)
     end
     check_index_arg(index, 'select')
-    check_select_args(index, key, opts)
     local ibuf = cord_ibuf_take()
     local key, key_end = tuple_encode(ibuf, key)
-    local iterator, offset, limit = check_select_opts(opts, key + 1 >= key_end)
+    local key_is_nil = key + 1 >= key_end
+    local iterator, offset, limit, fullscan =
+        check_select_opts(opts, key_is_nil)
+    check_select_safety(index, key_is_nil, iterator, limit, offset, fullscan)
 
     local nok = builtin.box_select(index.space_id, index.id, iterator, offset,
                                    limit, key, key_end, port) ~= 0
@@ -2406,9 +2414,11 @@ end
 
 base_index_mt.select_luac = function(index, key, opts)
     check_index_arg(index, 'select')
-    check_select_args(index, key, opts)
     local key = keify(key)
-    local iterator, offset, limit = check_select_opts(opts, #key == 0)
+    local key_is_nil = #key == 0
+    local iterator, offset, limit, fullscan =
+        check_select_opts(opts, key_is_nil)
+    check_select_safety(index, key_is_nil, iterator, limit, offset, fullscan)
     return internal.select(index.space_id, index.id, iterator,
         offset, limit, key)
 end
