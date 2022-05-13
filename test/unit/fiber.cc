@@ -107,6 +107,28 @@ test_stack_f(va_list ap)
 	return 0;
 }
 
+static int
+fib_ok_f(va_list ap)
+{
+	fiber_sleep(0.1);
+	return 0;
+}
+
+static int
+fib_err_f(va_list ap)
+{
+	diag_set(SystemError, "some error");
+	return 42;
+}
+
+static int
+waker_f(va_list ap)
+{
+	struct fiber *main_fiber = (struct fiber *)fiber()->f_arg;
+	fiber_wakeup(main_fiber);
+	return 0;
+}
+
 static void
 fiber_join_test()
 {
@@ -292,6 +314,28 @@ fiber_flags_respect_test(void)
 	footer();
 }
 
+static void
+cord_cojoin_test(void)
+{
+	header();
+
+	struct cord cords[2];
+	fail_if(cord_costart(&cords[0], "cord1", fib_ok_f, NULL) != 0);
+	fail_if(cord_costart(&cords[1], "cord2", fib_err_f, NULL) != 0);
+
+	/* Check that cord_cojoin is not interrupted by fiber_wakeup. */
+	struct fiber *waker_fiber = fiber_new("waker", waker_f);
+	fail_if(waker_fiber == NULL);
+	waker_fiber->f_arg = fiber();
+	fiber_wakeup(waker_fiber);
+
+	/* cord_cojoin will yield till fib_ok_f completion. */
+	fail_if(cord_cojoin(&cords[0]) != 0);
+	fail_if(cord_cojoin(&cords[1]) != -1);
+
+	footer();
+}
+
 static int
 main_f(va_list ap)
 {
@@ -301,6 +345,7 @@ main_f(va_list ap)
 	fiber_wakeup_self_test();
 	fiber_dead_while_in_cache_test();
 	fiber_flags_respect_test();
+	cord_cojoin_test();
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 }
