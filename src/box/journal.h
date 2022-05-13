@@ -102,6 +102,11 @@ struct journal_entry {
 	 */
 	size_t approx_len;
 	/**
+	 * Set to true when execution of a batch that contains this
+	 * journal entry is completed.
+	 */
+	bool is_complete;
+	/**
 	 * The number of rows in the request.
 	 */
 	int n_rows;
@@ -128,6 +133,7 @@ journal_entry_create(struct journal_entry *entry, size_t n_rows,
 	entry->n_rows		= n_rows;
 	entry->res		= JOURNAL_ENTRY_ERR_UNKNOWN;
 	entry->flags		= 0;
+	entry->is_complete = false;
 }
 
 /**
@@ -243,6 +249,8 @@ static inline void
 journal_async_complete(struct journal_entry *entry)
 {
 	assert(entry->write_async_cb != NULL);
+
+	entry->is_complete = true;
 
 	journal_queue_on_complete(entry);
 
