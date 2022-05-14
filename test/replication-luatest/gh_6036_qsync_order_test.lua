@@ -71,45 +71,45 @@ g.before_test("test_qsync_order", function(cg)
 end)
 
 g.test_qsync_order = function(cg)
-    cg.r1:exec(function()
+    cg.r3:exec(function()
         box.ctl.promote()
         box.ctl.wait_rw()
         box.space.test:insert{1}
     end)
 
-    cg.r2:wait_vclock_of(cg.r1)
-    cg.r3:wait_vclock_of(cg.r1)
+    cg.r1:wait_vclock_of(cg.r3)
+    cg.r2:wait_vclock_of(cg.r3)
 
     t.assert_equals(cg.r1:exec(select), {{1}})
     t.assert_equals(cg.r2:exec(select), {{1}})
     t.assert_equals(cg.r3:exec(select), {{1}})
 
     --
-    -- Drop connection between r1 and r2.
-    cg.r1:exec(update_replication, {
+    -- Drop connection between r3 and r2.
+    cg.r3:exec(update_replication, {
         server.build_instance_uri("r1"),
         server.build_instance_uri("r3"),
     })
 
     --
-    -- Drop connection between r2 and r1.
+    -- Drop connection between r2 and r3.
     cg.r2:exec(update_replication, {
+        server.build_instance_uri("r1"),
         server.build_instance_uri("r2"),
-        server.build_instance_uri("r3"),
     })
 
     --
     -- Here we have the following scheme
     --
-    --      r3 (WAL delay)
+    --      r1 (WAL delay)
     --      /            \
-    --    r1              r2
+    --    r3              r2
     --
 
     --
     -- Initiate disk delay in a bit tricky way: the next write will
     -- fall into forever sleep.
-    cg.r3:exec(function()
+    cg.r1:exec(function()
         box.error.injection.set('ERRINJ_WAL_DELAY', true)
     end)
 
@@ -124,7 +124,7 @@ g.test_qsync_order = function(cg)
         box.ctl.wait_rw()
     end)
     t.helpers.retrying({}, function()
-        t.assert(cg.r3:exec(function()
+        t.assert(cg.r1:exec(function()
             return box.info.synchro.queue.busy == true
         end))
     end)
@@ -133,26 +133,25 @@ g.test_qsync_order = function(cg)
     end)
 
     --
-    -- The r1 node has no clue that there is a new leader and continue
-    -- writing data with obsolete term. Since r3 is delayed now
+    -- The r3 node has no clue that there is a new leader and continue
+    -- writing data with obsolete term. Since r1 is delayed now
     -- the INSERT won't proceed yet but get queued.
-    cg.r1:exec(function()
+    cg.r3:exec(function()
         box.space.test:insert{3}
     end)
-
     --
-    -- Finally enable r3 back. Make sure the data from new r2 leader get
+    -- Finally enable r1 back. Make sure the data from new r2 leader get
     -- writing while old leader's data ignored.
-    cg.r3:exec(function()
+    cg.r1:exec(function()
         box.error.injection.set('ERRINJ_WAL_DELAY', false)
     end)
     t.helpers.retrying({}, function()
-        t.assert(cg.r3:exec(function()
+        t.assert(cg.r1:exec(function()
             return box.space.test:get{2} ~= nil
         end))
     end)
 
-    t.assert_equals(cg.r3:exec(select), {{1},{2}})
+    t.assert_equals(cg.r1:exec(select), {{1},{2}})
 end
 
 --
