@@ -47,6 +47,48 @@ local_secs(const struct datetime *date)
 	return (int64_t)date->epoch + date->tzoffset * 60;
 }
 
+/**
+ * Resolve tzindex encoded timezone from @sa date using Olson facilities.
+ * @param[in] date decode input datetime value.
+ * @param[out] gmtoff return resolved timezone offset (in seconds).
+ * @param[out] isdst return resolved daylight saving time status for the zone.
+ */
+static inline bool
+datetime_timezone_lookup(const struct datetime *date, long *gmtoff, int *isdst)
+{
+	if (date->tzindex == 0)
+		return false;
+
+	struct tnt_tm tm = {.tm_epoch = date->epoch};
+	if (!timezone_tzindex_lookup(date->tzindex, &tm))
+		return false;
+
+	*gmtoff = tm.tm_gmtoff;
+	*isdst = tm.tm_isdst;
+
+	return true;
+}
+
+bool
+datetime_isdst(const struct datetime *date)
+{
+	int isdst = 0;
+	long gmtoff = 0;
+
+	return datetime_timezone_lookup(date, &gmtoff, &isdst) && (isdst != 0);
+}
+
+long
+datetime_gmtoff(const struct datetime *date)
+{
+	int isdst = 0;
+	long gmtoff = date->tzoffset * 60;
+
+	datetime_timezone_lookup(date, &gmtoff, &isdst);
+
+	return gmtoff;
+}
+
 void
 datetime_to_tm(const struct datetime *date, struct tnt_tm *tm)
 {
@@ -721,7 +763,7 @@ datetime_increment_by(struct datetime *self, int direction,
 	int64_t secs = local_secs(self);
 	int64_t dt = local_dt(secs);
 	int nsec = self->nsec;
-	int offset = self->tzindex;
+	int offset = self->tzoffset;
 
 	bool is_ymd_updated = false;
 	int64_t years = ival->year;
@@ -809,6 +851,7 @@ datetime_increment_by(struct datetime *self, int direction,
 
 	self->epoch = utc_secs(secs, offset);
 	self->nsec = nsec;
+	self->tzoffset = datetime_gmtoff(self) / 60;
 	return 0;
 }
 

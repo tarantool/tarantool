@@ -110,6 +110,9 @@ BEGIN {
         TZ_MILITARY  => 0x04,
         TZ_AMBIGUOUS => 0x08,
         TZ_NYI       => 0x10,
+        TZ_OLSON     => 0x20,
+        TZ_ALIAS     => 0x40,
+        TZ_DST       => 0x80,
     );
     require constant; constant->import(\%flags);
     %FlagName = reverse %flags;
@@ -154,6 +157,10 @@ sub read_abbrevs_file($) {
         else {
             my ( $h, $m ) = split /[:]/, $offset1;
             $offset = $h * 60 + $m;
+        }
+
+        if (/(Daylight|Summer)/) {
+            $flags |= TZ_DST;
         }
 
         if ( exists $ZoneAbbrevs{$encoded} ) {

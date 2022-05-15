@@ -77,6 +77,7 @@ size_t tnt_datetime_strptime(struct datetime *date, const char *buf,
 void   tnt_datetime_now(struct datetime *now);
 bool   tnt_datetime_totable(const struct datetime *date,
                             struct interval *out);
+bool   tnt_datetime_isdst(const struct datetime *date);
 
 /* Tarantool interval support functions */
 size_t tnt_interval_to_string(const struct interval *, char *, ssize_t);
@@ -444,6 +445,11 @@ end
 
 local function epoch_from_dt(dt)
     return (dt - DAYS_EPOCH_OFFSET) * SECS_PER_DAY
+end
+
+-- Use Olson facilities to determine whether local time in obj is DST
+local function datetime_isdst(obj)
+    return builtin.tnt_datetime_isdst(obj)
 end
 
 --[[
@@ -953,7 +959,7 @@ local function datetime_totable(self)
         hour = tmp_ival.hour,
         min = tmp_ival.min,
         sec = tmp_ival.sec,
-        isdst = false,
+        isdst = datetime_isdst(self),
         nsec = self.nsec,
         tzoffset = self.tzoffset,
     }
@@ -1163,7 +1169,7 @@ local datetime_index_fields = {
     sec = function(self) return self.epoch % 60 end,
     usec = function(self) return self.nsec / 1e3 end,
     msec = function(self) return self.nsec / 1e6 end,
-    isdst = function(_) return false end,
+    isdst = function(self) return datetime_isdst(self) end,
     tz = function(self) return self:format('%Z') end,
 }
 
