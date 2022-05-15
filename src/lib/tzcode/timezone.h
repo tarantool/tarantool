@@ -21,6 +21,7 @@ enum {
 	TZ_NYI = 0x10,
 	TZ_OLSON = 0x20,
 	TZ_ALIAS = 0x40,
+	TZ_DST = 0x80,
 
 	TZ_ERROR_MASK = TZ_AMBIGUOUS | TZ_NYI,
 };
@@ -67,6 +68,13 @@ timezone_tm_lookup(const char *str, size_t len,
 		   const struct date_time_zone **zone,
 		   struct tnt_tm *tm);
 
+/**
+ * Parse timezone string corresponding to @sa tzindex like
+ * @sa timezone_tm_lookup does.
+ */
+bool
+timezone_tzindex_lookup(int16_t tzindex, struct tnt_tm *tm);
+
 /** Return offset in minutes for given zone */
 int16_t
 timezone_offset(const struct date_time_zone *zone);
@@ -76,6 +84,9 @@ timezone_index(const struct date_time_zone *zone);
 /** Return attributes flags for given zone */
 uint16_t
 timezone_flags(const struct date_time_zone *zone);
+/** Return DST flag for given zone */
+bool
+timezone_isdst(const struct date_time_zone *zone);
 /** Translate tzindex to zone name */
 const char*
 timezone_name(int64_t index);

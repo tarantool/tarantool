@@ -79,6 +79,12 @@ timezone_flags(const struct date_time_zone *zone)
 	return zone->flags;
 }
 
+bool
+timezone_isdst(const struct date_time_zone *zone)
+{
+	return !!(zone->flags & TZ_DST);
+}
+
 const char*
 timezone_name(int64_t index)
 {
@@ -124,10 +130,9 @@ timezone_raw_lookup(const char *str, size_t len,
 
 	if (found != NULL) {
 		/* lua assumes that single bit is set, not both */
-		assert((found->flags & (TZ_NYI | TZ_AMBIGUOUS)) !=
-		       (TZ_NYI | TZ_AMBIGUOUS));
-		if (found->flags & (TZ_NYI | TZ_AMBIGUOUS))
-			return -found->flags;
+		assert((found->flags & TZ_ERROR_MASK) != TZ_ERROR_MASK);
+		if (found->flags & TZ_ERROR_MASK)
+			return -(found->flags & TZ_ERROR_MASK);
 		*zone = found;
 		return len;
 	}
@@ -147,7 +152,7 @@ timezone_tm_lookup(const char *str, size_t len,
 	if ((found->flags & TZ_OLSON) == 0) {
 		tm->tm_gmtoff = found->offset * 60;
 		tm->tm_tzindex = found->id;
-		tm->tm_isdst = false;
+		tm->tm_isdst = !!(found->flags & TZ_DST);
 		return rc;
 	}
 	timezone_t tz = tzalloc(str); // FIXME - cache loaded
@@ -198,4 +203,26 @@ exit_0:
 	if (tz != NULL)
 		tzfree(tz);
 	return 0;
+}
+
+bool
+timezone_tzindex_lookup(int16_t tzindex, struct tnt_tm *tm)
+{
+	assert(tm != NULL);
+	if (tzindex == 0)
+		return false;
+
+	timezone_t tz = tzalloc(timezone_name(tzindex));
+	if (tz == NULL)
+		return false;
+	time_t epoch = (int64_t)tm->tm_epoch;
+	struct tnt_tm *result = tnt_localtime_rz(tz, &epoch, tm);
+	if (result == NULL)
+		goto exit_failure;
+	tzfree(tz);
+	return true;
+exit_failure:
+	if (tz != NULL)
+		tzfree(tz);
+	return false;
 }

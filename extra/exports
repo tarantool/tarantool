@@ -430,6 +430,7 @@ title_set_status
 title_update
 tnt_datetime_datetime_sub
 tnt_datetime_increment_by
+tnt_datetime_isdst
 tnt_datetime_now
 tnt_datetime_parse_full
 tnt_datetime_parse_tz
