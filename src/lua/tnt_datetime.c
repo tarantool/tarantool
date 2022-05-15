@@ -96,3 +96,9 @@ tnt_interval_unpack(const char **data, struct interval *itv)
 {
 	return interval_unpack(data, itv);
 }
+
+bool
+tnt_datetime_isdst(const struct datetime *date)
+{
+	return datetime_isdst(date);
+}

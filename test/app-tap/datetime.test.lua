@@ -11,7 +11,7 @@ local ffi = require('ffi')
 --]]
 if jit.arch == 'arm64' then jit.off() end
 
-test:plan(37)
+test:plan(38)
 
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
@@ -673,6 +673,59 @@ test:test("Parsing of timezone names (errors)", function(test)
         local date_text = base_date .. zone
         assert_raises(test, error_function(date_text),
                       function() return date.parse(date_text) end)
+    end
+end)
+
+test:test("Daylight saving checks", function (test)
+    --[[
+        Check various dates in `Europe/Moscow` timezone for their
+        proper daylight saving settings.
+
+        Tzdata defines these rules for `Europe/Moscow` time-zone:
+```
+Zone Europe/Moscow  2:30:17 -       LMT 1880
+                    2:30:17 -       MMT 1916 Jul  3 # Moscow Mean Time
+                    2:31:19 Russia  %s  1919 Jul  1  0:00u
+                    3:00    Russia  %s  1921 10
+                    3:00    Russia  Europe/Moscow/Europe/Moscow 1922 10
+                    2:00    -       EET 1930 Jun 21
+                    3:00    Russia  Europe/Moscow/Europe/Moscow 1991 03 31 2:00s
+                    2:00    Russia  EE%sT 1992 Jan 19  2:00s
+                    3:00    Russia  Europe/Moscow/Europe/Moscow 2011 03 27 2:00s
+                    4:00    -       Europe/Moscow 2014 10 26 2:00s
+                    3:00    -       Europe/Moscow
+```
+        Either you could see the same table dumped in more or less
+        human-readable form using `zdump` utility:
+
+        `zdump -c 2004,2022 -v Europe/Moscow`
+    ]]
+    test:plan(30)
+    local moments = {
+        -- string, isdst?, tzoffset (mins)
+        {'2004-10-31T02:00:00 Europe/Moscow', false, 3 * 60},
+        {'2005-03-27T03:00:00 Europe/Moscow', true, 4 * 60},
+        {'2005-10-30T02:00:00 Europe/Moscow', false, 3 * 60},
+        {'2006-03-26T03:00:00 Europe/Moscow', true, 4 * 60},
+        {'2006-10-29T02:00:00 Europe/Moscow', false, 3 * 60},
+        {'2007-03-25T03:00:00 Europe/Moscow', true, 4 * 60},
+        {'2007-10-28T02:00:00 Europe/Moscow', false, 3 * 60},
+        {'2008-03-30T03:00:00 Europe/Moscow', true, 4 * 60},
+        {'2008-10-26T02:00:00 Europe/Moscow', false, 3 * 60},
+        {'2009-03-29T03:00:00 Europe/Moscow', true, 4 * 60},
+        {'2009-10-25T02:00:00 Europe/Moscow', false, 3 * 60},
+        {'2010-03-28T03:00:00 Europe/Moscow', true, 4 * 60},
+        {'2010-10-31T02:00:00 Europe/Moscow', false, 3 * 60},
+        {'2011-03-27T03:00:00 Europe/Moscow', false, 4 * 60},
+        {'2014-10-26T01:00:00 Europe/Moscow', false, 3 * 60},
+    }
+    for _, row in pairs(moments) do
+        local str, isdst, tzoffset = unpack(row)
+        local dt = date.parse(str)
+        test:is(dt.isdst, isdst,
+                ('%s: isdst = %s'):format(tostring(dt), dt.isdst))
+        test:is(dt.tzoffset, tzoffset,
+                ('%s: tzoffset = %s'):format(tostring(dt), dt.tzoffset))
     end
 end)
 
