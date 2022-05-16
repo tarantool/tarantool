@@ -1230,8 +1230,8 @@ iproto_connection_resume(struct iproto_connection *con)
 	 */
 	if (iproto_enqueue_batch(con, con->p_ibuf) != 0) {
 		struct error *e = box_error_last();
-		iproto_write_error(&con->io, e, ::schema_version, 0);
 		error_log(e);
+		iproto_write_error(&con->io, e, ::schema_version, 0);
 		iproto_connection_close(con);
 	}
 }
@@ -1317,9 +1317,9 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		if (iproto_enqueue_batch(con, in) != 0)
 			diag_raise();
 	} catch (Exception *e) {
+		e->log();
 		/* Best effort at sending the error message to the client. */
 		iproto_write_error(io, e, ::schema_version, 0);
-		e->log();
 		iproto_connection_close(con);
 	}
 }
