@@ -183,12 +183,11 @@ replication_reconnect_interval(void)
 /**
  * Disconnect a replica if no heartbeat message has been
  * received from it within the given period.
+ * This timeout might be different for Raft leader. Used in strict fencing,
+ * to provide best effort to achieve leader uniqueness.
  */
-static inline double
-replication_disconnect_timeout(void)
-{
-	return replication_timeout * 4;
-}
+double
+replication_disconnect_timeout(void);
 
 void
 replication_init(int num_threads);

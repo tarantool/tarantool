@@ -50,6 +50,26 @@ enum election_mode {
 	ELECTION_MODE_CANDIDATE = 3,
 };
 
+/**
+ * Election fencing mode.
+ */
+enum election_fencing_mode {
+	ELECTION_FENCING_MODE_INVALID = -1,
+	/** Leader won't resign leadership when quorum is lost. */
+	ELECTION_FENCING_MODE_OFF = 0,
+	/**
+	 * Leader will resign leadership when quorum is lost.
+	 * Quite possible it will happen after new leader is already elected.
+	 */
+	ELECTION_FENCING_MODE_SOFT = 1,
+	/**
+	 * Leader will resign leadership when quorum is lost, it will resign
+	 * before automatic elections should start in any part of cluster
+	 * (assuming replication_timeout is same on every replica).
+	 */
+	ELECTION_FENCING_MODE_STRICT = 2,
+};
+
 struct raft_request;
 
 /**
@@ -60,6 +80,11 @@ struct raft_request;
  * candidate for some period of time when user calls `box.ctl.promote()`
  */
 extern enum election_mode box_election_mode;
+
+/**
+ * Current leader fencing mode.
+ */
+extern enum election_fencing_mode box_election_fencing_mode;
 
 /** Raft state of this instance. */
 static inline struct raft *
@@ -115,12 +140,9 @@ box_raft_wait_term_outcome(void);
 int
 box_raft_wait_term_persisted(void);
 
-/**
- * Enable/disable fencing. If enabled: instance will resign its leader role,
- * when it looses quorum.
- */
+/** Set the node's election_fencing_mode to @a mode. */
 void
-box_raft_set_election_fencing_enabled(bool enabled);
+box_raft_set_election_fencing_mode(enum election_fencing_mode mode);
 
 /**
  * Pause fencing. Instance will not resign its leader role when it looses

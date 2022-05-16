@@ -843,18 +843,27 @@ box_check_election_timeout(void)
 }
 
 /**
- * Raises error if election_fencing_enabled configuration is incorrect.
+ * Raises error if election_fencing_mode configuration is incorrect.
  */
-static int
-box_check_election_fencing_enabled(void)
+static election_fencing_mode
+box_check_election_fencing_mode(void)
 {
-	int i = cfg_getb("election_fencing_enabled");
-	if (i < 0) {
-		diag_set(ClientError, ER_CFG, "election_fencing_enabled",
-			 "the value must be a boolean");
-		return -1;
-	}
-	return i;
+	const char *mode = cfg_gets("election_fencing_mode");
+	if (mode == NULL)
+		goto error;
+
+	if (strcmp(mode, "off") == 0)
+		return ELECTION_FENCING_MODE_OFF;
+	else if (strcmp(mode, "soft") == 0)
+		return ELECTION_FENCING_MODE_SOFT;
+	else if (strcmp(mode, "strict") == 0)
+		return ELECTION_FENCING_MODE_STRICT;
+
+error:
+	diag_set(ClientError, ER_CFG, "election_fencing_mode",
+		 "the value must be one of the following strings: "
+		 "'off', 'soft', 'strict'");
+	return ELECTION_FENCING_MODE_INVALID;
 }
 
 static int
@@ -1386,7 +1395,7 @@ box_check_config(void)
 		diag_raise();
 	if (box_check_election_timeout() < 0)
 		diag_raise();
-	if (box_check_election_fencing_enabled() < 0)
+	if (box_check_election_fencing_mode() == ELECTION_FENCING_MODE_INVALID)
 		diag_raise();
 	if (box_check_replication() != 0)
 		diag_raise();
@@ -1447,12 +1456,12 @@ box_set_election_timeout(void)
 }
 
 int
-box_set_election_fencing_enabled(void)
+box_set_election_fencing_mode(void)
 {
-	int enabled = box_check_election_fencing_enabled();
-	if (enabled < 0)
+	enum election_fencing_mode mode = box_check_election_fencing_mode();
+	if (mode == ELECTION_FENCING_MODE_INVALID)
 		return -1;
-	box_raft_set_election_fencing_enabled((bool)enabled);
+	box_raft_set_election_fencing_mode(mode);
 	return 0;
 }
 
@@ -4000,7 +4009,7 @@ box_cfg_xc(void)
 
 	if (box_set_election_timeout() != 0)
 		diag_raise();
-	if (box_set_election_fencing_enabled() != 0)
+	if (box_set_election_fencing_mode() != 0)
 		diag_raise();
 	/*
 	 * Election is enabled last. So as all the parameters are installed by

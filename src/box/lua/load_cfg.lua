@@ -112,7 +112,7 @@ local default_cfg = {
     worker_pool_threads = 4,
     election_mode       = 'off',
     election_timeout    = 5,
-    election_fencing_enabled = true,
+    election_fencing_mode = 'soft',
     replication_timeout = 1,
     replication_sync_lag = 10,
     replication_sync_timeout = 300,
@@ -240,7 +240,7 @@ local template_cfg = {
     worker_pool_threads = 'number',
     election_mode       = 'string',
     election_timeout    = 'number',
-    election_fencing_enabled = 'boolean',
+    election_fencing_mode = 'string',
     replication_timeout = 'number',
     replication_sync_lag = 'number',
     replication_sync_timeout = 'number',
@@ -363,7 +363,7 @@ local dynamic_cfg = {
     force_recovery          = function() end,
     election_mode           = private.cfg_set_election_mode,
     election_timeout        = private.cfg_set_election_timeout,
-    election_fencing_enabled = private.cfg_set_election_fencing_enabled,
+    election_fencing_mode = private.cfg_set_election_fencing_mode,
     replication_timeout     = private.cfg_set_replication_timeout,
     replication_connect_timeout = private.cfg_set_replication_connect_timeout,
     replication_connect_quorum = private.cfg_set_replication_connect_quorum,
@@ -441,7 +441,7 @@ local dynamic_cfg_order = {
     wal_cleanup_delay       = 260,
     election_mode           = 300,
     election_timeout        = 320,
-    election_fencing_enabled = 320,
+    election_fencing_mode   = 320,
 }
 
 local function sort_cfg_cb(l, r)
@@ -461,7 +461,7 @@ local dynamic_cfg_skip_at_load = {
     too_long_threshold      = true,
     election_mode           = true,
     election_timeout        = true,
-    election_fencing_enabled = true,
+    election_fencing_mode   = true,
     replication             = true,
     replication_timeout     = true,
     replication_connect_timeout = true,
@@ -510,6 +510,12 @@ local translate_cfg = {
     replication_source = {'replication'},
     rows_per_wal = {'wal_max_size', function(old, new)
         return old, new
+    end},
+    election_fencing_enabled = {'election_fencing_mode', function(old, new)
+        if new ~= nil then return nil, new
+        elseif old == false then return nil, 'off'
+        elseif old == true then return nil, 'soft'
+        end
     end},
 }
 
