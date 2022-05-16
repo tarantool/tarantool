@@ -34,7 +34,7 @@ test_run:cmd('setopt delimiter ""');
 -- to cluster.
 --
 SERVERS = {'election_replica1', 'election_replica2' ,'election_replica3'}
-test_run:create_cluster(SERVERS, "replication", {args='2 0.4'})
+test_run:create_cluster(SERVERS, "replication", {args='2 0.4 candidate 3 off'})
 test_run:wait_fullmesh(SERVERS)
 
 -- Any of the three instances may bootstrap the cluster and become leader.
@@ -94,9 +94,9 @@ is_possible_leader[other_nr] = false
 -- Otherwise it would stall for replication_sync_timeout. This is due to the
 -- nature of the test and may be ignored (we restart the instance to simulate
 -- a situation when some rows from the old leader were not received).
-test_run:cmd('start server '..next_leader..' with args="1 0.4 candidate 1"')
+test_run:cmd('start server '..next_leader..' with args="1 0.4 candidate 1 off"')
 assert(get_leader(is_possible_leader) == next_leader_nr)
-test_run:cmd('start server '..other..' with args="1 0.4 voter 2"')
+test_run:cmd('start server '..other..' with args="1 0.4 voter 2 off"')
 is_possible_leader[other_nr] = true
 test_run:switch(other)
 -- New leader didn't know about the unconfirmed rows but still rolled them back.
@@ -110,7 +110,7 @@ box.space.test:select{} -- 1
 test_run:switch('default')
 -- Old leader returns and old unconfirmed rows from it must be ignored.
 -- Note, it wins the elections fairly.
-test_run:cmd('start server '..leader..' with args="3 0.4 voter"')
+test_run:cmd('start server '..leader..' with args="3 0.4 voter 3 off"')
 test_run:wait_lsn(leader, next_leader)
 test_run:switch(leader)
 test_run:wait_cond(function() return box.space.test:get{2} == nil end)

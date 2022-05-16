@@ -118,6 +118,12 @@ function Server:wait_for_readiness()
     end)
 end
 
+function Server:wait_election_state(state)
+    return wait_cond('election state', self, self.exec, self, function(state)
+        return box.info.election.state == state
+    end, {state})
+end
+
 function Server:wait_election_leader()
     -- Include read-only property too because if an instance is a leader, it
     -- does not mean it finished the synchro queue ownership transition. It is

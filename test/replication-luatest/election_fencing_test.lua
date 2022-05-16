@@ -4,25 +4,18 @@ local server = require('test.luatest_helpers.server')
 local g_async = luatest.group('fencing_async', {
     {election_mode = 'manual'}, {election_mode = 'candidate'}})
 local g_sync = luatest.group('fencing_sync')
+local g_mode = luatest.group('fencing_mode', {
+    {election_fencing_mode = 'soft'}, {election_fencing_mode = 'strict'}})
 
 local SHORT_TIMEOUT = 0.1
 local LONG_TIMEOUT = 1000
 local DEATH_TIMEOUT = 2 * SHORT_TIMEOUT
 
 local function promote(server)
-    luatest.helpers.retrying({}, function()
-        luatest.assert(server:exec(function()
-            pcall(box.ctl.promote)
-            if box.info.election.state ~= 'leader' then
-                return false
-            end
-            if box.info.synchro.queue.owner ~= box.info.id then
-                return false
-            end
-            return true
-        end))
+    server:exec(function()
+        box.ctl.promote()
+        box.ctl.wait_rw()
     end)
-    server:exec(function() box.ctl.wait_rw() end)
 end
 
 local function wait_sync(leader, servers)
@@ -154,14 +147,14 @@ g_async.test_fencing = function(g)
 
     -- Turn off fencing, disconnect both replicas,
     -- Leader must not become ro even after quorum loss.
-    box_cfg_update({g.server_1}, {election_fencing_enabled = false})
+    box_cfg_update({g.server_1}, {election_fencing_mode = 'off'})
     box_cfg_update({g.server_2}, {replication = {}})
     wait_disconnected(g.server_1, g.server_2)
     local ok = test_rw(g.server_1)
     luatest.assert(ok, 'Leader is rw after quorum loss')
 
     -- Turning on fencing on leader when quorum is allready lost must make it ro
-    box_cfg_update({g.server_1}, {election_fencing_enabled = true})
+    box_cfg_update({g.server_1}, {election_fencing_mode = 'soft'})
     local ok, err = test_rw(g.server_1)
     luatest.assert(not ok and err.code == box.error.READONLY,
         'Leader is ro after quorum loss')
@@ -178,7 +171,7 @@ g_sync.test_fencing = function(g)
     end)
 
     box_cfg_update({g.server_1}, {
-        election_fencing_enabled = false,
+        election_fencing_mode = 'off',
         replication_synchro_timeout = LONG_TIMEOUT,
     })
 
@@ -198,7 +191,7 @@ g_sync.test_fencing = function(g)
     end)
 
     -- Enabling fencing leads to leader resign.
-    box_cfg_update({g.server_1}, {election_fencing_enabled = true})
+    box_cfg_update({g.server_1}, {election_fencing_mode = 'soft'})
     box_cfg_update({g.server_1}, {replication_synchro_timeout = SHORT_TIMEOUT})
 
     -- Fenced leader must not CONFIRM/ROLLBACK unfinished synchronous
@@ -229,7 +222,7 @@ g_sync.test_fencing = function(g)
         'Sync write confirmed after leadership regain')
 
     box_cfg_update({g.server_1}, {
-        election_fencing_enabled = false,
+        election_fencing_mode = 'off',
         replication_synchro_timeout = LONG_TIMEOUT,
     })
 
@@ -260,7 +253,7 @@ g_sync.test_fencing = function(g)
         require('fiber').create(function() box.space.test:replace{2} end)
     end)
 
-    box_cfg_update({g.server_1}, {election_fencing_enabled = true})
+    box_cfg_update({g.server_1}, {election_fencing_mode = 'soft'})
     box_cfg_update({g.server_1}, {replication_synchro_timeout = SHORT_TIMEOUT})
 
     local leader, limbo_len = g.server_1:exec(function(t)
@@ -288,4 +281,66 @@ g_sync.test_fencing = function(g)
     end)
     luatest.assert_equals(ret, {},
         'Sync write rollbacked after new leader discovered')
+end
+
+g_mode.before_all(function(g)
+    start(g)
+    box_cfg_update({g.server_3}, {replication = {}})
+    wait_disconnected(g.server_1, g.server_3)
+    wait_disconnected(g.server_2, g.server_3)
+end)
+
+g_mode.after_all(stop)
+
+g_mode.test_fencing_mode = function(g)
+    local timeout = 0.5
+    box_cfg_update({g.server_1, g.server_2}, {
+        election_fencing_mode = g.params.election_fencing_mode,
+        replication_timeout = timeout,
+    })
+
+    local proxy = require('test.luatest_helpers.proxy.proxy'):new({
+        client_socket_path = server.build_instance_uri('server_1_proxy'),
+        server_socket_path = server.build_instance_uri('server_1'),
+    })
+    proxy:start({force = true})
+
+    local proxied_replication = {
+        server.build_instance_uri('server_1_proxy'),
+        server.build_instance_uri('server_2'),
+    }
+
+    box_cfg_update({g.server_2}, {replication = {}})
+    wait_disconnected(g.server_1, g.server_2)
+    box_cfg_update({g.server_2}, {replication = proxied_replication})
+    wait_connected(g.server_1, g.server_2)
+
+    promote(g.server_1)
+    local leader_id = g.server_1:instance_id()
+    wait_sync(g.server_1, {g.server_2})
+
+    box_cfg_update({g.server_2}, {
+        election_mode = 'candidate',
+        replication_synchro_quorum = 1,
+    })
+
+    proxy:pause()
+
+    g.server_1:wait_election_state('follower')
+
+    -- Give folower some time to notice leader disconnection.
+    require('fiber').sleep(timeout / 10)
+    local follower_connection_status = g.server_2:exec(function(leader_id)
+        return box.info.replication[leader_id].upstream.status
+    end, {leader_id})
+
+    if g.params.election_fencing_mode == 'strict' then
+        luatest.assert_equals(follower_connection_status, 'follow',
+            'Follower did not notice leader disconnection')
+    else
+        luatest.assert_not_equals(follower_connection_status, 'follow',
+            'Follower noticed leader disconnection')
+    end
+
+    proxy:stop()
 end

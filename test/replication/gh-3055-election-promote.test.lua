@@ -5,7 +5,7 @@ test_run = require('test_run').new()
 -- in order to promote it to leader.
 SERVERS = {'election_replica1', 'election_replica2', 'election_replica3'}
 -- Start in candidate state in order for bootstrap to work.
-test_run:create_cluster(SERVERS, 'replication', {args='2 0.1 candidate'})
+test_run:create_cluster(SERVERS, 'replication', {args='2 0.1 candidate 3 off'})
 test_run:wait_fullmesh(SERVERS)
 
 cfg_set_voter =\
