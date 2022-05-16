@@ -929,6 +929,58 @@ get_double_from_mp(const char **data, double *value)
 	return 0;
 }
 
+/** Parse msgpack value and convert it to int32, if possible. */
+static int
+get_int32_from_mp(const char **data, int32_t *value)
+{
+	switch (mp_typeof(**data)) {
+	case MP_INT: {
+		int64_t val = mp_decode_int(data);
+		if (val < INT32_MIN)
+			return -1;
+		*value = val;
+		break;
+	}
+	case MP_UINT: {
+		uint64_t val = mp_decode_uint(data);
+		if (val > INT32_MAX)
+			return -1;
+		*value = val;
+		break;
+	}
+	case MP_DOUBLE: {
+		double val = mp_decode_double(data);
+		if (val > (double)INT32_MAX || val < (double)INT32_MIN)
+			return -1;
+		if (val != floor(val))
+			return -1;
+		*value = val;
+		break;
+	}
+	case MP_EXT: {
+		int8_t type;
+		uint32_t len = mp_decode_extl(data, &type);
+		if (type != MP_DECIMAL)
+			return -1;
+		decimal_t dec;
+		if (decimal_unpack(data, len, &dec) == NULL)
+			return -1;
+		if (!decimal_is_int(&dec))
+			return -1;
+		int64_t val;
+		if (decimal_to_int64(&dec, &val) == NULL)
+			return -1;
+		if (val < INT32_MIN || val > INT32_MAX)
+			return -1;
+		*value = val;
+		break;
+	}
+	default:
+		return -1;
+	}
+	return 0;
+}
+
 /** Define field of DATETIME value from field of given MAP value.*/
 static int
 map_field_to_dt_field(struct dt_fields *fields, const char **data)
@@ -1049,4 +1101,78 @@ datetime_from_map(struct datetime *dt, const char *data)
 			return -1;
 	}
 	return datetime_from_fields(dt, &fields);
+}
+
+/** Define field of INTERVAL value from field of given MAP value.*/
+static int
+map_field_to_itv_field(struct interval *itv, const char **data)
+{
+	if (mp_typeof(**data) != MP_STR) {
+		mp_next(data);
+		mp_next(data);
+		return 0;
+	}
+	uint32_t size;
+	const char *str = mp_decode_str(data, &size);
+	double *dvalue = NULL;
+	int32_t *ivalue = NULL;
+	if (strncmp(str, "year", size) == 0) {
+		ivalue = &itv->year;
+	} else if (strncmp(str, "month", size) == 0) {
+		ivalue = &itv->month;
+	} else if (strncmp(str, "week", size) == 0) {
+		ivalue = &itv->week;
+	} else if (strncmp(str, "day", size) == 0) {
+		dvalue = &itv->day;
+	} else if (strncmp(str, "hour", size) == 0) {
+		dvalue = &itv->hour;
+	} else if (strncmp(str, "min", size) == 0) {
+		dvalue = &itv->min;
+	} else if (strncmp(str, "sec", size) == 0) {
+		dvalue = &itv->sec;
+	} else if (strncmp(str, "nsec", size) == 0) {
+		ivalue = &itv->nsec;
+	} else if (strncmp(str, "adjust", size) == 0) {
+		if (mp_typeof(**data) != MP_STR)
+			return -1;
+		uint32_t vsize;
+		const char *val = mp_decode_str(data, &vsize);
+		if (strncasecmp(val, "none", vsize) == 0)
+			itv->adjust = DT_LIMIT;
+		else if (strncasecmp(val, "last", vsize) == 0)
+			itv->adjust = DT_SNAP;
+		else if (strncasecmp(val, "excess", vsize) == 0)
+			itv->adjust = DT_EXCESS;
+		else
+			return -1;
+		return 0;
+	} else {
+		mp_next(data);
+		return 0;
+	}
+	if (dvalue != NULL) {
+		double val;
+		if (get_double_from_mp(data, &val) != 0)
+			return -1;
+		if (val != floor(val))
+			return -1;
+		*dvalue = val;
+		return 0;
+	}
+	assert(ivalue != NULL);
+	return get_int32_from_mp(data, ivalue);
+}
+
+int
+interval_from_map(struct interval *itv, const char *data)
+{
+	assert(mp_typeof(*data) == MP_MAP);
+	uint32_t len = mp_decode_map(&data);
+	memset(itv, 0, sizeof(*itv));
+	itv->adjust = DT_LIMIT;
+	for (uint32_t i = 0; i < len; ++i) {
+		if (map_field_to_itv_field(itv, &data) != 0)
+			return -1;
+	}
+	return interval_check_args(itv) == 0 ? 0 : -1;
 }
