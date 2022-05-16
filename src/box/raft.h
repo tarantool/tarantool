@@ -68,10 +68,9 @@ box_raft(void)
 	extern struct raft box_raft_global;
 	/**
 	 * Ensure the raft node can be used. I.e. that it is properly
-	 * initialized. Entirely for debug purposes.
+	 * initialized.
 	 */
-	assert(box_raft_global.state != 0);
-	return &box_raft_global;
+	return box_raft_global.state != 0 ? &box_raft_global : NULL;
 }
 
 /**
