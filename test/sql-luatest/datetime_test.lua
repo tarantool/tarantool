@@ -2680,3 +2680,183 @@ g.test_datetime_33_3 = function()
         t.assert_equals(box.execute(sql).rows, {{dt1}})
     end)
 end
+
+-- Make sure cast from MAP to INTERVAL works as intended.
+
+--
+-- The result of CAST() from MAP value to INTERVAL must be equal to the result
+-- of calling require('datetime').interval.new() with the corresponding table as
+-- an argument.
+--
+g.test_datetime_34_1 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local itv = require('datetime').interval
+        local v = setmetatable({}, { __serialize = 'map' })
+        local sql = [[SELECT CAST(#v AS INTERVAL);]]
+        t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{itv.new(v)}})
+
+        v.something = 1
+        t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{itv.new(v)}})
+
+        v = {year = 1, month = 1, week = 1, day = 1, hour = 1, min = 1, sec = 1,
+             nsec = 1, adjust = 'none'}
+        t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{itv.new(v)}})
+    end)
+end
+
+--
+-- Make sure an error is thrown if the INTERVAL value cannot be constructed from
+-- the corresponding table.
+--
+g.test_datetime_34_2 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local sql = [[SELECT CAST(#v AS INTERVAL);]]
+
+        -- "year" cannot be more than 11759221.
+        local v = {year = 11759222}
+        local _, err = box.execute(sql, {{['#v'] = v}})
+        local res = [[Type mismatch: can not convert ]]..
+                    [[map({"year": 11759222}) to interval]]
+        t.assert_equals(err.message, res)
+
+        -- "year" cannot be less than -11759221.
+        v = {year = -11759222}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"year": -11759222}) to interval]]
+        t.assert_equals(err.message, res)
+
+        -- "month" cannot be more than 141110652.
+        v = {month = 141110653}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"month": 141110653}) to interval]]
+        t.assert_equals(err.message, res)
+
+        -- "month" cannot be less than -141110652.
+        v = {month = -141110653}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"month": -141110653}) to interval]]
+        t.assert_equals(err.message, res)
+
+        -- "week" cannot be more than 613579352.
+        v = {week = 613579353}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"week": 613579353}) to interval]]
+        t.assert_equals(err.message, res)
+
+        -- "week" cannot be less than -613579352.
+        v = {week = -613579353}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"week": -613579353}) to interval]]
+        t.assert_equals(err.message, res)
+
+        -- "day" cannot be more than 4295055470.
+        v = {day = 4295055471}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"day": 4295055471}) to interval]]
+        t.assert_equals(err.message, res)
+
+        -- "day" cannot be less than -4295055470.
+        v = {day = -4295055471}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"day": -4295055471}) to interval]]
+        t.assert_equals(err.message, res)
+
+        -- "hour" cannot be more than 103081331286.
+        v = {hour = 103081331287}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"hour": 103081331287}) to interval]]
+        t.assert_equals(err.message, res)
+
+        -- "hour" cannot be less than 103081331286.
+        v = {hour = -103081331287}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"hour": -103081331287}) to interval]]
+        t.assert_equals(err.message, res)
+
+        -- "min" cannot be more than 6184879877160.
+        v = {min = 6184879877161}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"min": 6184879877161}) to interval]]
+        t.assert_equals(err.message, res)
+
+        -- "min" cannot be less than -6184879877160.
+        v = {min = -6184879877161}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"min": -6184879877161}) to interval]]
+        t.assert_equals(err.message, res)
+
+        -- "sec" cannot be more than 371092792629600.
+        v = {sec = 371092792629601}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"sec": 371092792629601}) to interval]]
+        t.assert_equals(err.message, res)
+
+        -- "sec" cannot be less than -371092792629600.
+        v = {sec = -371092792629601}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"sec": -371092792629601}) to interval]]
+        t.assert_equals(err.message, res)
+
+        -- "nsec" cannot be more than 2147483647.
+        v = {nsec = 2147483648}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"nsec": 2147483648}) ]]..
+              [[to interval]]
+        t.assert_equals(err.message, res)
+
+        -- "nsec" cannot be less than -2147483647.
+        v = {nsec = -2147483648}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"nsec": -2147483648}) ]]..
+              [[to interval]]
+        t.assert_equals(err.message, res)
+
+        -- "adjust" cannot be anything other than "none", "excess", "last".
+        v = {adjust = 1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"adjust": 1}) ]]..
+              [[to interval]]
+        t.assert_equals(err.message, res)
+
+        v = {adjust = 'asd'}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"adjust": "asd"}) ]]..
+              [[to interval]]
+        t.assert_equals(err.message, res)
+    end)
+end
+
+--
+-- Make sure that any of the DECIMAL, INTEGER, and DOUBLE values can be used as
+-- values in the MAP converted to a INTERVAL.
+--
+g.test_datetime_34_3 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local itv = require('datetime').interval
+        local dt1 = itv.new({year = 1})
+        local sql = [[SELECT CAST({'year': 1.0} AS INTERVAL);]]
+        t.assert_equals(box.execute(sql).rows, {{dt1}})
+
+        sql = [[SELECT CAST({'year': 1.e0} AS INTERVAL);]]
+        t.assert_equals(box.execute(sql).rows, {{dt1}})
+
+        sql = [[SELECT CAST({'year': 1} AS INTERVAL);]]
+        t.assert_equals(box.execute(sql).rows, {{dt1}})
+    end)
+end

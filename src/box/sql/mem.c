@@ -1308,6 +1308,18 @@ map_to_datetime(struct Mem *mem)
 	return 0;
 }
 
+/** Convert MEM from MAP to INTERVAL. */
+static inline int
+map_to_interval(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_MAP);
+	struct interval itv;
+	if (interval_from_map(&itv, mem->z) != 0)
+		return -1;
+	mem_set_interval(mem, &itv);
+	return 0;
+}
+
 int
 mem_to_int(struct Mem *mem)
 {
@@ -1490,6 +1502,8 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 		mem->flags = 0;
 		return 0;
 	case FIELD_TYPE_INTERVAL:
+		if (mem->type == MEM_TYPE_MAP)
+			return map_to_interval(mem);
 		if (mem->type != MEM_TYPE_INTERVAL)
 			return -1;
 		mem->flags = 0;
