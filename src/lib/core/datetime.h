@@ -381,6 +381,10 @@ datetime_usec(const struct datetime *date)
 	return datetime_nsec(date) / 1000;
 }
 
+/** Parse MAP value and construct DATETIME value. */
+int
+datetime_from_map(struct datetime *dt, const char *data);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

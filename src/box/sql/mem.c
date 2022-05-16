@@ -1296,6 +1296,18 @@ uuid_to_bin(struct Mem *mem)
 	return mem_copy_bin(mem, (char *)&mem->u.uuid, UUID_LEN);
 }
 
+/** Convert MEM from MAP to DATETIME. */
+static inline int
+map_to_datetime(struct Mem *mem)
+{
+	assert(mem->type == MEM_TYPE_MAP);
+	struct datetime dt;
+	if (datetime_from_map(&dt, mem->z) != 0)
+		return -1;
+	mem_set_datetime(mem, &dt);
+	return 0;
+}
+
 int
 mem_to_int(struct Mem *mem)
 {
@@ -1471,6 +1483,8 @@ mem_cast_explicit(struct Mem *mem, enum field_type type)
 	case FIELD_TYPE_DATETIME:
 		if (mem->type == MEM_TYPE_STR)
 			return str_to_datetime(mem);
+		if (mem->type == MEM_TYPE_MAP)
+			return map_to_datetime(mem);
 		if (mem->type != MEM_TYPE_DATETIME)
 			return -1;
 		mem->flags = 0;
