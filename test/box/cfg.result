@@ -31,8 +31,8 @@ cfg_filter(box.cfg)
  |     - 1000000000000000000
  |   - - coredump
  |     - false
- |   - - election_fencing_enabled
- |     - true
+ |   - - election_fencing_mode
+ |     - soft
  |   - - election_mode
  |     - off
  |   - - election_timeout
@@ -190,8 +190,8 @@ cfg_filter(box.cfg)
  |     - 1000000000000000000
  |   - - coredump
  |     - false
- |   - - election_fencing_enabled
- |     - true
+ |   - - election_fencing_mode
+ |     - soft
  |   - - election_mode
  |     - off
  |   - - election_timeout

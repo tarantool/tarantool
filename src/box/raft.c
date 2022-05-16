@@ -48,11 +48,8 @@ struct raft box_raft_global = {
 
 enum election_mode box_election_mode = ELECTION_MODE_INVALID;
 
-/**
- * Flag whether Raft leader fencing is enabled. If enabled leader will
- * resign when it looses quorum for any reason.
- */
-static bool election_fencing_enabled = true;
+enum election_fencing_mode box_election_fencing_mode =
+	ELECTION_FENCING_MODE_SOFT;
 
 /**
  * A trigger executed each time the Raft state machine updates any
@@ -285,7 +282,8 @@ box_raft_fence(void)
 {
 	struct raft *raft = box_raft();
 	if (!raft->is_enabled || raft->state != RAFT_STATE_LEADER ||
-	    !election_fencing_enabled || box_raft_election_fencing_paused)
+	    box_election_fencing_mode == ELECTION_FENCING_MODE_OFF ||
+	    box_raft_election_fencing_paused)
 		return;
 
 	txn_limbo_fence(&txn_limbo);
@@ -553,11 +551,27 @@ box_raft_remove_quorum_triggers(void)
 }
 
 void
-box_raft_set_election_fencing_enabled(bool enabled)
+box_raft_set_election_fencing_mode(enum election_fencing_mode mode)
 {
-	election_fencing_enabled = enabled;
-	say_info("RAFT: fencing %s", enabled ? "enabled" : "disabled");
-	if (!enabled)
+	if (box_election_fencing_mode == mode)
+		return;
+
+	box_election_fencing_mode = mode;
+	switch (box_election_fencing_mode) {
+	case ELECTION_FENCING_MODE_OFF:
+		say_info("RAFT: disabled fencing");
+		break;
+	case ELECTION_FENCING_MODE_SOFT:
+		say_info("RAFT: enabled soft fencing");
+		break;
+	case ELECTION_FENCING_MODE_STRICT:
+		say_info("RAFT: enabled strict fencing");
+		break;
+	default:
+		unreachable();
+	}
+
+	if (box_election_fencing_mode == ELECTION_FENCING_MODE_OFF)
 		txn_limbo_unfence(&txn_limbo);
 	replicaset_on_health_change();
 }

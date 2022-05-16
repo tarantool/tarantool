@@ -299,9 +299,9 @@ lbox_cfg_set_election_timeout(struct lua_State *L)
 }
 
 static int
-lbox_cfg_set_election_fencing_enabled(struct lua_State *L)
+lbox_cfg_set_election_fencing_mode(struct lua_State *L)
 {
-	if (box_set_election_fencing_enabled() != 0)
+	if (box_set_election_fencing_mode() != 0)
 		luaT_error(L);
 	return 0;
 }
@@ -447,7 +447,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_vinyl_timeout", lbox_cfg_set_vinyl_timeout},
 		{"cfg_set_election_mode", lbox_cfg_set_election_mode},
 		{"cfg_set_election_timeout", lbox_cfg_set_election_timeout},
-		{"cfg_set_election_fencing_enabled", lbox_cfg_set_election_fencing_enabled},
+		{"cfg_set_election_fencing_mode", lbox_cfg_set_election_fencing_mode},
 		{"cfg_set_replication_timeout", lbox_cfg_set_replication_timeout},
 		{"cfg_set_replication_connect_quorum", lbox_cfg_set_replication_connect_quorum},
 		{"cfg_set_replication_connect_timeout", lbox_cfg_set_replication_connect_timeout},

@@ -80,6 +80,16 @@ rb_gen(MAYBE_UNUSED static, replica_hash_, replica_hash_t,
 	     item != NULL && ((next = replica_hash_next(hash, item)) || 1); \
 	     item = next)
 
+double
+replication_disconnect_timeout(void)
+{
+	struct raft *raft = box_raft();
+	if (raft != NULL && raft->state == RAFT_STATE_LEADER &&
+	    box_election_fencing_mode == ELECTION_FENCING_MODE_STRICT)
+		return replication_timeout * 2;
+	return replication_timeout * 4;
+}
+
 /**
  * Return the number of replicas that have to be synchronized
  * in order to form a quorum in the replica set.
