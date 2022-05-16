@@ -1080,15 +1080,23 @@ void
 ModifySpace::alter_def(struct alter_space *alter)
 {
 	/*
-	 * Use the old dictionary for the new space, because
-	 * it is already referenced by existing tuple formats.
+	 * Unless it's online space upgrade, Use the old dictionary for the new
+	 * space, because it's already referenced by existing tuple formats.
 	 * We will update it in place in ModifySpace::alter.
+	 *
+	 * For online space upgrade, all tuples fetched from the space will be
+	 * upgraded to the new format before returning to the user so it isn't
+	 * necessary. Moreover, the old tuples may be incompatible with the new
+	 * format so using the new dictionary for them would be wrong and could
+	 * result in error accessing fields by name from the space upgrade
+	 * function.
 	 */
-	new_dict = new_def->dict;
-	new_def->dict = alter->old_space->def->dict;
-	tuple_dictionary_ref(new_def->dict);
+	if (new_def->opts.upgrade_def == NULL) {
+		new_dict = new_def->dict;
+		new_def->dict = alter->old_space->def->dict;
+		tuple_dictionary_ref(new_def->dict);
+	}
 	new_def->view_ref_count = alter->old_space->def->view_ref_count;
-
 	space_def_delete(alter->space_def);
 	alter->space_def = new_def;
 	/* Now alter owns the def. */
@@ -1103,13 +1111,15 @@ ModifySpace::alter(struct alter_space *alter)
 	 * referenced by existing tuple formats. New dictionary
 	 * object is deleted later, in destructor.
 	 */
-	tuple_dictionary_swap(alter->new_space->def->dict, new_dict);
+	if (new_dict != NULL)
+		tuple_dictionary_swap(alter->new_space->def->dict, new_dict);
 }
 
 void
 ModifySpace::rollback(struct alter_space *alter)
 {
-	tuple_dictionary_swap(alter->new_space->def->dict, new_dict);
+	if (new_dict != NULL)
+		tuple_dictionary_swap(alter->new_space->def->dict, new_dict);
 }
 
 ModifySpace::~ModifySpace()
