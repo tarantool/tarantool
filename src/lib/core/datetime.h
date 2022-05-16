@@ -385,6 +385,10 @@ datetime_usec(const struct datetime *date)
 int
 datetime_from_map(struct datetime *dt, const char *data);
 
+/** Parse MAP value and construct INTERVAL value. */
+int
+interval_from_map(struct interval *itv, const char *data);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
