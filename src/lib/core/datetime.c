@@ -4,6 +4,7 @@
  * Copyright 2021, Tarantool AUTHORS, please see AUTHORS file.
  */
 
+#include <math.h>
 #include <assert.h>
 #include <limits.h>
 #include <string.h>
@@ -12,11 +13,14 @@
 #include <inttypes.h>
 
 #define DT_PARSE_ISO_TNT
+#include "decimal.h"
+#include "msgpuck.h"
 #include "c-dt/dt.h"
 #include "datetime.h"
 #include "trivia/util.h"
 #include "tzcode/tzcode.h"
 #include "tzcode/timezone.h"
+#include "mp_extension_types.h"
 
 #include "fiber.h"
 
@@ -860,4 +864,189 @@ interval_interval_add(struct interval *lhs, const struct interval *rhs)
 	lhs->sec += rhs->sec;
 	lhs->nsec += rhs->nsec;
 	return interval_check_args(lhs);
+}
+
+/** This structure contains information about the given date and time fields. */
+struct dt_fields {
+	/* Specified year. */
+	double year;
+	/* Specified month. */
+	double month;
+	/* Specified day. */
+	double day;
+	/* Specified hour. */
+	double hour;
+	/* Specified minute. */
+	double min;
+	/* Specified second. */
+	double sec;
+	/* Specified millisecond. */
+	double msec;
+	/* Specified microsecond. */
+	double usec;
+	/* Specified nanosecond. */
+	double nsec;
+	/* Specified timestamp. */
+	double timestamp;
+	/* Specified timezone offset. */
+	double tzoffset;
+	/* Number of given fields among msec, usec and nsec. */
+	int count_usec;
+	/* True, if any of year, month, day, hour, min or sec is specified. */
+	bool is_ymdhms;
+	/* True, if timestamp is specified. */
+	bool is_ts;
+};
+
+/** Parse msgpack value and convert it to double, if possible. */
+static int
+get_double_from_mp(const char **data, double *value)
+{
+	switch (mp_typeof(**data)) {
+	case MP_INT:
+		*value = mp_decode_int(data);
+		break;
+	case MP_UINT:
+		*value = mp_decode_uint(data);
+		break;
+	case MP_DOUBLE:
+		*value = mp_decode_double(data);
+		break;
+	case MP_EXT: {
+		int8_t type;
+		uint32_t len = mp_decode_extl(data, &type);
+		if (type != MP_DECIMAL)
+			return -1;
+		decimal_t dec;
+		if (decimal_unpack(data, len, &dec) == NULL)
+			return -1;
+		*value = atof(decimal_str(&dec));
+		break;
+	}
+	default:
+		return -1;
+	}
+	return 0;
+}
+
+/** Define field of DATETIME value from field of given MAP value.*/
+static int
+map_field_to_dt_field(struct dt_fields *fields, const char **data)
+{
+	if (mp_typeof(**data) != MP_STR) {
+		mp_next(data);
+		mp_next(data);
+		return 0;
+	}
+	uint32_t size;
+	const char *str = mp_decode_str(data, &size);
+	double *value;
+	if (strncmp(str, "year", size) == 0) {
+		value = &fields->year;
+		fields->is_ymdhms = true;
+	} else if (strncmp(str, "month", size) == 0) {
+		value = &fields->month;
+		fields->is_ymdhms = true;
+	} else if (strncmp(str, "day", size) == 0) {
+		value = &fields->day;
+		fields->is_ymdhms = true;
+	} else if (strncmp(str, "hour", size) == 0) {
+		value = &fields->hour;
+		fields->is_ymdhms = true;
+	} else if (strncmp(str, "min", size) == 0) {
+		value = &fields->min;
+		fields->is_ymdhms = true;
+	} else if (strncmp(str, "sec", size) == 0) {
+		value = &fields->sec;
+		fields->is_ymdhms = true;
+	} else if (strncmp(str, "msec", size) == 0) {
+		value = &fields->msec;
+		++fields->count_usec;
+	} else if (strncmp(str, "usec", size) == 0) {
+		value = &fields->usec;
+		++fields->count_usec;
+	} else if (strncmp(str, "nsec", size) == 0) {
+		value = &fields->nsec;
+		++fields->count_usec;
+	} else if (strncmp(str, "timestamp", size) == 0) {
+		value = &fields->timestamp;
+		fields->is_ts = true;
+	} else if (strncmp(str, "tzoffset", size) == 0) {
+		value = &fields->tzoffset;
+	} else {
+		mp_next(data);
+		return 0;
+	}
+	return get_double_from_mp(data, value);
+}
+
+/** Create a DATETIME value using fields of the DATETIME. */
+static int
+datetime_from_fields(struct datetime *dt, const struct dt_fields *fields)
+{
+	if (fields->count_usec > 1)
+		return -1;
+	double nsec = fields->msec * 1000000 + fields->usec * 1000 +
+		      fields->nsec;
+	if (nsec < 0 || nsec > 1000000000)
+		return -1;
+	if (fields->tzoffset < -720 || fields->tzoffset > 840)
+		return -1;
+	if (fields->timestamp < (double)INT32_MIN * SECS_PER_DAY ||
+	    fields->timestamp > (double)INT32_MAX * SECS_PER_DAY)
+		return -1;
+	if (fields->is_ts) {
+		if (fields->is_ymdhms)
+			return -1;
+		double timestamp = floor(fields->timestamp);
+		double frac = fields->timestamp - timestamp;
+		if (frac != 0) {
+			if (fields->count_usec > 0)
+				return -1;
+			nsec = frac * 1000000000;
+		}
+		dt->epoch = timestamp;
+		dt->nsec = nsec;
+		dt->tzoffset = fields->tzoffset;
+		dt->tzindex = 0;
+		return 0;
+	}
+	if (fields->year < MIN_DATE_YEAR || fields->year > MAX_DATE_YEAR)
+		return -1;
+	if (fields->month < 1 || fields->month > 12)
+		return -1;
+	if (fields->day < 1 ||
+	    fields->day > dt_days_in_month(fields->year, fields->month))
+		return -1;
+	if (fields->hour < 0 || fields->hour > 23)
+		return -1;
+	if (fields->min < 0 || fields->min > 59)
+		return -1;
+	if (fields->sec < 0 || fields->sec > 60)
+		return -1;
+	double days = dt_from_ymd(fields->year, fields->month, fields->day) -
+		      DT_EPOCH_1970_OFFSET;
+	dt->epoch = days * SECS_PER_DAY + fields->hour * 3600 +
+		    fields->min * 60 + fields->sec;
+	dt->nsec = nsec;
+	dt->tzoffset = fields->tzoffset;
+	dt->tzindex = 0;
+	return 0;
+}
+
+int
+datetime_from_map(struct datetime *dt, const char *data)
+{
+	assert(mp_typeof(*data) == MP_MAP);
+	uint32_t len = mp_decode_map(&data);
+	struct dt_fields fields;
+	memset(&fields, 0, sizeof(fields));
+	fields.year = 1970;
+	fields.month = 1;
+	fields.day = 1;
+	for (uint32_t i = 0; i < len; ++i) {
+		if (map_field_to_dt_field(&fields, &data) != 0)
+			return -1;
+	}
+	return datetime_from_fields(dt, &fields);
 }

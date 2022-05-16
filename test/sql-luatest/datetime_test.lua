@@ -2387,3 +2387,296 @@ g.test_datetime_32_2 = function()
         t.assert_equals(err.message, res)
     end)
 end
+
+-- Make sure cast from MAP to DATETIME works as intended.
+
+--
+-- The result of CAST() from MAP value to DATETIME must be equal to the result
+-- of calling require('datetime').new() with the corresponding table as an
+-- argument.
+--
+g.test_datetime_33_1 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local v = setmetatable({}, { __serialize = 'map' })
+        local sql = [[SELECT CAST(#v AS DATETIME);]]
+        t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{dt.new(v)}})
+
+        v.something = 1
+        t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{dt.new(v)}})
+
+        v = {year = 1, month = 1, day = 1, hour = 1, min = 1, sec = 1}
+        t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{dt.new(v)}})
+
+        v.nsec = 1
+        t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{dt.new(v)}})
+
+        v.nsec = nil
+        v.usec = 1
+        t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{dt.new(v)}})
+
+        v.usec = nil
+        v.msec = 1
+        t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{dt.new(v)}})
+
+        v = {year = 1.1, month = 1.1, day = 1.1, hour = 1.1, min = 1.1,
+             sec = 1.1}
+        t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{dt.new(v)}})
+
+        v = {timestamp = 1}
+        t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{dt.new(v)}})
+
+        v.nsec = 1
+        t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{dt.new(v)}})
+
+        v.nsec = nil
+        v.usec = 1
+        t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{dt.new(v)}})
+
+        v.usec = nil
+        v.msec = 1
+        t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{dt.new(v)}})
+
+        v = {timestamp = 1.5}
+        t.assert_equals(box.execute(sql, {{['#v'] = v}}).rows, {{dt.new(v)}})
+    end)
+end
+
+--
+-- Make sure an error is thrown if the DATETIME value cannot be constructed from
+-- the corresponding table.
+--
+g.test_datetime_33_2 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local sql = [[SELECT CAST(#v AS DATETIME);]]
+
+        -- "year" cannot be more than 5879611.
+        local v = {year = 5879612}
+        local _, err = box.execute(sql, {{['#v'] = v}})
+        local res = [[Type mismatch: can not convert ]]..
+                    [[map({"year": 5879612}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "year" cannot be less than -5879610.
+        v = {year = -5879611}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"year": -5879611}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "month" cannot be more than 12.
+        v = {month = 13}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"month": 13}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "month" cannot be less than 1.
+        v = {month = 0}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"month": 0}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "day" cannot be more than 31.
+        v = {day = 32}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"day": 32}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "day" cannot be less than 1.
+        v = {day = 0}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"day": 0}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "hour" cannot be more than 23.
+        v = {hour = 24}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"hour": 24}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "hour" cannot be less than 0.
+        v = {hour = -1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"hour": -1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "min" cannot be more than 59.
+        v = {min = 60}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"min": 60}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "min" cannot be less than 0.
+        v = {min = -1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"min": -1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "sec" cannot be more than 60.
+        v = {sec = 61}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"sec": 61}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "sec" cannot be less than 0.
+        v = {sec = -1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"sec": -1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "msec" cannot be more than 1000.
+        v = {msec = 1001}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"msec": 1001}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "msec" cannot be less than 0.
+        v = {msec = -1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"msec": -1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "usec" cannot be more than 1000000.
+        v = {usec = 1000001}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"usec": 1000001}) ]]..
+              [[to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "usec" cannot be less than 0.
+        v = {usec = -1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"usec": -1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "nsec" cannot be more than 1000000000.
+        v = {nsec = 1000000001}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"nsec": 1000000001}) ]]..
+              [[to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "nsec" cannot be less than 0.
+        v = {nsec = -1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"nsec": -1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "tzoffset" cannot be more than 840.
+        v = {tzoffset = 841}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"tzoffset": 841}) ]]..
+              [[to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- "tzoffset" cannot be less than -720.
+        v = {tzoffset = -721}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"tzoffset": -721}) ]]..
+              [[to datetime]]
+        t.assert_equals(err.message, res)
+
+        -- Only one of "msec", "usec" and "nsec" can be specified.
+        v = {msec = 1, usec = 1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"usec": 1, "msec": 1}) ]]..
+              [[to datetime]]
+        t.assert_equals(err.message, res)
+
+        v = {msec = 1, nsec = 1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"nsec": 1, "msec": 1}) ]]..
+              [[to datetime]]
+        t.assert_equals(err.message, res)
+
+        v = {nsec = 1, usec = 1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert map({"usec": 1, "nsec": 1}) ]]..
+              [[to datetime]]
+        t.assert_equals(err.message, res)
+
+        --
+        -- "timestamp" cannot be specified when any of "year", "month", "day",
+        -- "hour", "min", "sec" is specified.
+        --
+        v = {timestamp = 1, year = 1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"timestamp": 1, "year": 1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        v = {timestamp = 1, month = 1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"month": 1, "timestamp": 1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        v = {timestamp = 1, day = 1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"day": 1, "timestamp": 1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        v = {timestamp = 1, hour = 1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"timestamp": 1, "hour": 1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        v = {timestamp = 1, min = 1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"min": 1, "timestamp": 1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        v = {timestamp = 1, sec = 1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"timestamp": 1, "sec": 1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        --
+        -- If "timestamp" contains fractional part, it cannot be when any of
+        -- "msec", "usec", "nsec" is specified.
+        --
+        v = {timestamp = 1.1, msec = 1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"msec": 1, "timestamp": 1.1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        v = {timestamp = 1.1, usec = 1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"usec": 1, "timestamp": 1.1}) to datetime]]
+        t.assert_equals(err.message, res)
+
+        v = {timestamp = 1.1, nsec = 1}
+        _, err = box.execute(sql, {{['#v'] = v}})
+        res = [[Type mismatch: can not convert ]]..
+              [[map({"nsec": 1, "timestamp": 1.1}) to datetime]]
+        t.assert_equals(err.message, res)
+    end)
+end
+
+--
+-- Make sure that any of the DECIMAL, INTEGER, and DOUBLE values can be used as
+-- values in the MAP converted to a DATETIME.
+--
+g.test_datetime_33_3 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local dt = require('datetime')
+        local dt1 = dt.new({year = 1})
+        local sql = [[SELECT CAST({'year': 1.1} AS DATETIME);]]
+        t.assert_equals(box.execute(sql).rows, {{dt1}})
+
+        sql = [[SELECT CAST({'year': 1.1e0} AS DATETIME);]]
+        t.assert_equals(box.execute(sql).rows, {{dt1}})
+
+        sql = [[SELECT CAST({'year': 1} AS DATETIME);]]
+        t.assert_equals(box.execute(sql).rows, {{dt1}})
+    end)
+end
