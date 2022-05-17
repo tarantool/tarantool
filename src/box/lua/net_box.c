@@ -2749,6 +2749,14 @@ luaT_netbox_transport_stop(struct lua_State *L)
 	return 0;
 }
 
+static int
+luaT_netbox_transport_next_sync(struct lua_State *L)
+{
+	struct netbox_transport *transport = luaT_check_netbox_transport(L, 1);
+	luaL_pushuint64(L, transport->next_sync);
+	return 1;
+}
+
 /**
  * Puts an active connection to 'graceful_shutdown' state, in which no new
  * requests are allowed. The connection will be switched to the error state
@@ -2793,6 +2801,7 @@ luaopen_net_box(struct lua_State *L)
 		{ "__gc",           luaT_netbox_transport_gc },
 		{ "start",          luaT_netbox_transport_start },
 		{ "stop",           luaT_netbox_transport_stop },
+		{ "next_sync",	    luaT_netbox_transport_next_sync },
 		{ "graceful_shutdown",
 			luaT_netbox_transport_graceful_shutdown },
 		{ "perform_request",
