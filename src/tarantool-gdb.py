@@ -4,7 +4,27 @@ To use, just put 'source <path-to-this-file>' in gdb.
 """
 
 import gdb.printing
+import argparse
 import struct
+import itertools
+import re
+import sys
+from collections import namedtuple
+
+slice = itertools.islice
+if sys.version_info[0] == 2:
+    filter = itertools.ifilter
+    zip = itertools.izip
+
+def dump_type(type):
+    return 'tag={} code={}'.format(type.tag, type.code)
+
+def nth(iterable, n, default=None):
+    """Returns the nth item or a default value."""
+    return next(itertools.islice(iterable, n, None), default)
+
+def equal_types(type1, type2):
+    return type1.code == type2.code and type1.tag == type2.tag
 
 # couple of functions below don't raise an exception and should be used
 # when type/value may or may not exist
@@ -21,14 +41,12 @@ def find_value(sym):
     except Exception as exc:
         return None
 
-def equal_types(type1, type2):
-    return type1.code == type2.code and type1.tag == type2.tag
-
-def dump_type(type):
-    return 'tag={} code={}'.format(type.tag, type.code)
+def cast_ptr(dest_type, ptr, offset):
+    dest_ptr = ptr.cast(gdb.lookup_type('char').pointer()) + offset
+    return dest_ptr.cast(dest_type.pointer())
 
 def container_of(ptr, container_type, field):
-    return (ptr.cast(gdb.lookup_type('char').pointer()) - container_type[field].bitpos // 8).cast(container_type.pointer()).dereference()
+    return cast_ptr(container_type, ptr, -(container_type[field].bitpos // 8)).dereference()
 
 def type_has_field(type, field_name):
     for field in type.fields():
@@ -1399,3 +1417,606 @@ Usage: tt-tuple EXP [MSGPACK_DEPTH [MSGPACK_MAXLENGTH]]
 
 MsgPackPrint()
 TuplePrint()
+
+
+class TtListEntryInfo(object):
+    def __init__(self, entry_info):
+        self.__str = entry_info
+        entry_type, _, fields = entry_info.partition('::')
+        self.__entry_type = gdb.lookup_type('struct ' + entry_type)
+        self.__offset = 0
+        container_type = self.__entry_type
+        for field in fields.split('::'):
+            self.__offset -= int(container_type[field].bitpos/8)
+            container_type = container_type[field].type
+
+    def __eq__(self, other):
+        return self.__str == other.__str
+
+    def __hash__(self):
+        return hash(str(self))
+
+    def __str__(self):
+        return self.__str
+
+    @property
+    def entry_type(self):
+        return self.__entry_type
+
+    def entry_from_item(self, item):
+        assert equal_types(item.type.target(), TtList.rlist_type)
+        return cast_ptr(self.__entry_type, item, self.__offset)
+
+
+class TtListsLut(object):
+    def build_list_variables_map():
+        ret = {}
+        rlist_syms = (
+            ('box_on_call', 'trigger::link'),
+            ('box_on_select', 'trigger::link'),
+            ('box_on_shutdown_trigger_list', 'trigger::link'),
+            ('box_raft_on_broadcast', 'trigger::link'),
+            ('engines', 'engine::link'),
+            ('log_rotate_list', 'log::in_log_list'), #static
+            ('on_access_denied', 'trigger::link'),
+            ('on_alter_func', 'trigger::link'),
+            ('on_alter_sequence', 'trigger::link'),
+            ('on_alter_space', 'trigger::link'),
+            ('on_console_eval', 'trigger::link'),
+            ('on_schema_init', 'trigger::link'),
+            ('on_shutdown_trigger_list', 'on_shutdown_trigger::link'),
+            ('popen_head', 'popen_handle::list'),
+            ('replicaset_on_quorum_gain', 'trigger::link'),
+            ('replicaset_on_quorum_loss', 'trigger::link'),
+            ('session_on_auth', 'trigger::link'),
+            ('session_on_connect', 'trigger::link'),
+            ('session_on_disconnect', 'trigger::link'),
+            ('shutdown_list', 'session::in_shutdown_list'),
+        )
+        for sym, entry in rlist_syms:
+            try:
+                ret[sym] = TtListEntryInfo(entry)
+            except Exception as exc:
+                gdb.write(str(exc) + '\n')
+        return ret
+
+    def build_list_containers_map():
+        ret = {}
+        rlist_containers = (
+            ('alter_space::ops', 'AlterSpaceOp::link'),
+            ('alter_space::key_list', 'index_def::link'),
+            ('applier::on_state', 'trigger::link'),
+            ('cbus::endpoints', 'cbus_endpoint::in_cbus'),
+            ('checkpoint::entries', 'checkpoint_entry::link'),
+            ('cord::alive', 'fiber::link'),
+            ('cord::dead', 'fiber::link'),
+            ('cord::ready', 'fiber::state'),
+            ('cpipe::on_flush', 'trigger::link'),
+            ('create_ck_constraint_parse_def::checks', 'ck_constraint_parse::link'),
+            ('create_fk_constraint_parse_def::fkeys', 'fk_constraint_parse::link'),
+            ('fiber::on_stop', 'trigger::link'),
+            ('fiber::on_yield', 'trigger::link'),
+            ('fiber::wake', 'fiber::state'),
+            ('fiber_channel::waiters', 'fiber::state'),
+            ('fiber_cond::waiters', 'fiber::state'),
+            ('fiber_pool::idle', 'fiber::state'),
+            ('func::func_cache_pin_list', 'func_cache_holder::link'),
+            ('gc_checkpoint::refs', 'gc_checkpoint_ref::in_refs'),
+            ('gc_state::checkpoints', 'gc_checkpoint::in_checkpoints'),
+            ('index::full_scans', 'full_scan_item::in_full_scans'),
+            ('index::nearby_gaps', 'gap_item::in_nearby_gaps'),
+            ('iproto_thread::stopped_connections', 'iproto_connection::in_stop_list'),
+            ('journal_queue::waiters', 'fiber::state'),
+            ('latch::queue', 'fiber::state'),
+            ('luaL_serializer::on_update', 'trigger::link'),
+            ('mempool::cold_slabs', 'mslab::next_in_cold'),
+            ('memtx_join_ctx::entries', 'memtx_join_entry::in_ctx'),
+            ('memtx_story::reader_list', 'tx_read_tracker::in_reader_list'),
+            ('memtx_story_link::nearby_gaps', 'gap_item::in_nearby_gaps'),
+            ('point_hole_item::ring', 'point_hole_item::ring'),
+            ('raft::on_update', 'trigger::link'),
+            ('RebuildCkConstraints::ck_constraint', 'ck_constraint::link'),
+            ('recovery::on_close_log', 'trigger::link'),
+            ('replicaset::anon', 'replica::in_anon'),
+            ('replicaset::on_ack', 'trigger::link'),
+            ('replicaset::applier::on_rollback', 'trigger::link'),
+            ('replicaset::applier::on_wal_write', 'trigger::link'),
+            ('schema_module::funcs', 'func_c::item'),
+            ('space::before_replace', 'trigger::link'),
+            ('space::child_fk_constraint', 'fk_constraint::in_child_space'),
+            ('space::ck_constraint', 'ck_constraint::link'),
+            ('space::memtx_stories', 'memtx_story::in_space_stories'),
+            ('space::on_replace', 'trigger::link'),
+            ('space::parent_fk_constraint', 'fk_constraint::in_parent_space'),
+            ('space::space_cache_pin_list', 'space_cache_holder::link'),
+            ('swim::dissemination_queue', 'swim_member::in_dissemination_queue'),
+            ('swim::on_member_event', 'trigger::link'),
+            ('swim::round_queue', 'swim_member::in_round_queue'),
+            ('swim_scheduler::queue_output', 'swim_task::in_queue_output'),
+            ('tx_manager::read_view_txs', 'txn::in_read_view_txs'),
+            ('tx_manager::all_stories', 'memtx_story::in_all_stories'),
+            ('tx_manager::traverse_all_stories', 'memtx_story::in_all_stories'), # struct rlist*
+            ('tx_manager::all_txs', 'txn::in_all_txs'),
+            ('txn::conflict_list', 'tx_conflict_tracker::in_conflict_list'),
+            ('txn::conflicted_by_list', 'tx_conflict_tracker::in_conflicted_by_list'),
+            ('txn::gap_list', 'gap_item::in_gap_list'),
+            ('txn::full_scan_list', 'full_scan_item::in_full_scan_list'),
+            ('txn::on_commit', 'trigger::link'),
+            ('txn::on_rollback', 'trigger::link'),
+            ('txn::on_wal_write', 'trigger::link'),
+            ('txn::point_holes_list', 'point_hole_item::in_point_holes_list'),
+            ('txn::read_set', 'tx_read_tracker::in_read_set'),
+            ('txn::savepoints', 'txn_savepoint::link'),
+            ('txn_limbo::queue', 'txn_limbo_entry::in_queue'),
+            ('txn_stmt::on_commit', 'trigger::link'),
+            ('txn_stmt::on_rollback', 'trigger::link'),
+            ('sql_stmt_cache::gc_queue', 'stmt_cache_entry::link'),
+            ('sys_alloc::allocations', 'container::rlist'),
+            ('user::credentials_list', 'credentials::in_user'),
+            ('vy_cache_env::cache_lru', 'vy_cache_node::in_lru'),
+            ('vy_history::stmts', 'vy_history_node::link'),
+            ('vy_join_ctx::entries', 'vy_join_entry::in_ctx'),
+            ('vy_lsm::on_destroy', 'trigger::link'),
+            ('vy_lsm::runs', 'vy_run::in_lsm'),
+            ('vy_lsm::sealed', 'vy_mem::in_sealed'),
+            ('vy_lsm_recovery_info::ranges', 'vy_range_recovery_info::in_lsm'),
+            ('vy_lsm_recovery_info::runs', 'vy_run_recovery_info::in_lsm'),
+            ('vy_quota::wait_queue', 'vy_quota_wait_node::in_wait_queue'),
+            ('vy_range::slices', 'vy_slice::::in_range'),
+            ('vy_range_recovery_info::slices', 'vy_slice_recovery_info::in_range'),
+            ('vy_recovery::lsms', 'vy_lsm_recovery_info::in_recovery'),
+            ('vy_tx::on_destroy', 'trigger::link'),
+            ('vy_tx_manager::read_views', 'vy_read_view::in_read_views'),
+            ('vy_tx_manager::writers', 'vy_tx::in_writers'),
+            ('vy_write_iterator::src_list', 'vy_write_src::in_src_list'),
+            ('wal_writer::watchers', 'wal_watcher::next'),
+            ('watchable::pending_watchers', 'watcher::in_idle_or_pending'),
+            ('watchable_node::all_watchers', 'watcher::in_all_watchers'),
+            ('watchable_node::idle_watchers', 'watcher::in_idle_or_pending'),
+        )
+        for container, entry in rlist_containers:
+            container_type, _, container_field = container.rpartition('::')
+            container_lists = ret.setdefault(container_type, {})
+            try:
+                container_lists[container_field] = TtListEntryInfo(entry)
+            except Exception as exc:
+                gdb.write(str(exc) + '\n')
+        return ret
+
+    list_variables_map = build_list_variables_map()
+    list_containers_map = build_list_containers_map()
+
+    Info = namedtuple('Info', ['head', 'entry_info'])
+
+    symbol_regexp = '<(\w+(?:\+\d+)?)>'
+    symbol_re = re.compile(symbol_regexp)
+
+    @classmethod
+    def lookup_list_entry_info(cls, item):
+        # Ancient gdb versions don't have 'format_string' in gdb.Value
+        if hasattr(item, 'format_string'):
+            address = item.format_string(address=False, symbols=True)
+        else:
+            address = str(item)
+
+        symbol_match = cls.symbol_re.search(address)
+        if symbol_match is None:
+            return None
+
+        symbol, _, offset = symbol_match.group(1).partition('+')
+        offset = 0 if len(offset) == 0 else int(offset)
+
+        symbol_val = gdb.parse_and_eval(symbol)
+        entry_info = None
+        if equal_types(symbol_val.type, TtList.rlist_type):
+            entry_info = cls.list_variables_map[symbol]
+        elif symbol_val.type.code == gdb.TYPE_CODE_STRUCT:
+            for field in symbol_val.type.fields():
+                if field.bitpos/8 == offset:
+                    entry_info = cls.list_containers_map[symbol_val.type.tag][field.name]
+                    break
+
+        return entry_info
+
+    @classmethod
+    def lookup_list_info(cls, item):
+        """Try to identify list head and type of list entries from its item."""
+        assert equal_types(item.type.target(), TtList.rlist_type)
+        item_index = -1
+        item_sentinel = item['next']
+        while True:
+            entry_info = cls.lookup_list_entry_info(item)
+            if entry_info is not None:
+                return cls.Info(item, entry_info), item_index
+            if item == item_sentinel:
+                break
+            item = item['prev']
+            item_index += 1
+        return None, item_index + 1
+
+
+class TtList(object):
+    rlist_type = gdb.lookup_type('rlist')
+
+    @classmethod
+    def resolve_item(cls, item, head=None, entry_info=None):
+        assert equal_types(item.type.target(), cls.rlist_type)
+
+        list_info, index_or_len = TtListsLut.lookup_list_info(item)
+        assert index_or_len is not None, 'index_or_len is not None'
+        if list_info is None:
+            missing_parts = []
+            if head is None:
+                missing_parts.append('head')
+            if entry_info is None:
+                missing_parts.append('entry_info')
+            if len(missing_parts) > 0:
+                gdb.write("Warning: failed to identify list ({})\n".format(
+                    ', '.join(missing_parts)), gdb.STDERR)
+            return cls(head, entry_info, index_or_len), None
+
+        if head is None:
+            head = list_info.head
+        elif head != list_info.head:
+            gdb.write(
+                "Warning: specified head ({}) doesn't match"
+                " the predefined one ({})\n".format(head,
+                                                    list_info.head))
+        if entry_info is None:
+            entry_info = list_info.entry_info
+        elif entry_info != list_info.entry_info:
+            gdb.write(
+                "Warning: specified entry info ({}) doesn't match"
+                " the predefined one ({})\n".format(entry_info,
+                                                    list_info.entry_info))
+        return cls(head, entry_info), index_or_len
+
+    def __init__(self, head=None, entry_info=None, len=None):
+        self.__head = head
+        self.__entry_info = entry_info
+        self.__len = len
+
+    @property
+    def head(self):
+        return self.__head
+
+    @property
+    def entry_info(self):
+        return self.__entry_info
+
+    def __iter__(self):
+        item = self.__head['next']
+        while item != self.__head:
+            yield item
+            item = item['next']
+
+    def __reversed__(self):
+        item = self.__head['prev']
+        while item != self.__head:
+            yield item
+            item = item['prev']
+
+    def __len__(self):
+        if self.__len is None:
+            self.__len = sum(1 for _ in self)
+        return self.__len
+
+    def index(self, item):
+        if item == self.__head:
+            return None
+        return next((i for i, it in enumerate(self) if it == item), None)
+
+class TtPrintListEntryParameter(gdb.Parameter):
+    name = 'print tt-list-entry'
+
+    set_doc = 'Set printing of actual rlist entries'
+    show_doc = 'Show printing of actual rlist entries'
+
+    def __init__(self):
+        super(TtPrintListEntryParameter, self).__init__(self.name,
+            gdb.COMMAND_DATA, gdb.PARAM_BOOLEAN)
+        self.value = True
+
+    def get_set_string(self):
+        return ''
+
+    def get_show_string(self, svalue):
+        return 'Printing of actual rlist entries is ' + svalue
+
+TtPrintListEntryParameter()
+
+
+class TtListPrinter(object):
+    """
+Pretty-printer for rlist
+
+To avoid recursive printing of rlist (each entry has 'rlist' field that is used
+as the entry anchor) only one instance of this printer is allowed.
+This limitation is managed with '__instance_exists' class variable.
+
+This script holds the table of 'rlist' references used in tarantool (see class
+TtListsLut). When one tries to print 'rlist' first the script tries to identify
+the head of the list by traversing along the list and checking against the
+reference table. Once it succeed (the most likely scenario) we have both
+the list head and the actual type of the list entries. Then if the specified
+expression directly refers to the head of the list, the entire list is
+displayed entry-by-entry. If the expression refers to the certain entry then
+this only entry is displayed (along with its index in the list).
+This default behavior can be altered with the class variables (see below).
+
+predicate
+  Default is 'None'.
+  When it's not 'None' entries are filtered by predicate.
+  See '-filter' option of 'tt-list' command
+
+reverse
+  Default is 'False'.
+  When it's 'True' it forces to iterate the list in reverse direction.
+  Displayed indices are affected accordingly.
+  See '-reverse' option of 'tt-list' command
+
+entry_info
+  Default is 'None'.
+  When it's not 'None' it overrides the one discovered with the reference
+  table. It defines how to convert abstract rlist item into actual entry.
+  See '-entry-info' option of 'tt-list' command
+
+head
+  Default is 'None'.
+  When it's not 'None' it overrides the one discovered with the reference
+  table. Special value '' (empty string) means that printed value itself
+  is the head of the list.
+  See '-head' option of 'tt-list' command
+    """
+
+    __instance_exists = False
+    __type_uint = gdb.lookup_type('uint')
+
+    # Initialization of config with default values is deferred so it can be
+    # done in a single place to avoid duplication of default constants
+    __config = None
+
+    @classmethod
+    def reset_config(cls,
+                    entry_info=None,
+                    head=None,
+                    predicate=None,
+                    reverse=False):
+        cls.__config = dict(
+            entry_info=entry_info,
+            head=head,
+            predicate=predicate,
+            reverse=reverse,
+        )
+
+    def __new__(cls, val):
+        # Deferred initialization of config
+        if cls.__config is None:
+            cls.reset_config()
+        # Don't create multiple instances to avoid recursive printing
+        if cls.__instance_exists:
+            return None
+        cls.__instance_exists = True
+        return super(TtListPrinter, cls).__new__(cls)
+
+    def __init__(self, val):
+        assert self.__class__.__instance_exists
+        if not equal_types(val.type, TtList.rlist_type):
+            raise gdb.GdbError("expression doesn't evaluate to rlist")
+
+        super(TtListPrinter, self).__init__()
+
+        self.val = val
+
+        self.print_entry = gdb.parameter(TtPrintListEntryParameter.name)
+
+        # Pull configuration from class variables into the instance for
+        # convenience
+        config = self.__class__.__config
+        assert config is not None
+        self.entry_info = config['entry_info']
+        self.head = config['head']
+        self.predicate = config['predicate']
+        self.reverse = config['reverse']
+
+        # Turn entry_info into TtListEntryInfo
+        if self.entry_info is not None:
+            self.entry_info = TtListEntryInfo(self.entry_info)
+
+        # Turn head into gdb.Value
+        if self.head is not None:
+            if self.head == '':
+                self.head = val.address
+            else:
+                self.head = '({}*){}'.format(TtList.rlist_type.tag, self.head)
+                self.head = gdb.parse_and_eval(self.head)
+
+        # Try to identify the list item belongs to along with the item's index
+        self.list, self.item_index =\
+            TtList.resolve_item(val.address, self.head, self.entry_info)
+
+    def __del__(self):
+        assert self.__class__.__instance_exists
+        self.__class__.__instance_exists = False
+
+    def to_string(self):
+        entry_info = '???' if self.list.entry_info is None\
+            else self.list.entry_info
+        s = 'rlist<{}> of length {}'.format(entry_info, len(self.list))
+        if self.list.head is not None:
+            s += ', head=*({}*){:#x}'.format(
+                TtList.rlist_type.tag, int(self.list.head.cast(self.__type_uint)))
+        return s
+
+    def child(self, item_index, item):
+        if item_index is None:
+            item_index = '?'
+        if not self.print_entry or self.list.entry_info is None:
+            return '[{}]'.format(item_index), item
+        entry_ptr = self.list.entry_info.entry_from_item(item)
+        child_name = '[{}] (({}*){})'.format(item_index,
+            entry_ptr.type.target().tag, entry_ptr)
+        return child_name, entry_ptr.dereference()
+
+    def children(self):
+        # Display single item if it is requested
+        if self.val.address != self.list.head and self.predicate is None:
+            item_index = self.item_index
+            if self.reverse and item_index is not None:
+                item_index = len(self.list) - 1 - self.item_index
+            yield self.child(item_index, self.val.address)
+            return
+
+        # Get items iterator considering direction
+        items = iter(self.list) if not self.reverse else reversed(self.list)
+
+        # Add sequence numbers
+        indexed_items = enumerate(items)
+
+        # If the head of the list is specified the entire list is iterated,
+        # if the concrete item is specified iteration is started from it till
+        # the end of the list (with respect to direction, see above)
+        if self.item_index is not None and self.item_index > 0:
+            indexed_items = slice(indexed_items, self.item_index, None)
+
+        # Filter items with predicate, if any
+        if self.predicate is not None:
+            entry_info = self.list.entry_info
+            entry_type = entry_info.entry_type
+            # Adjustment that is not item-specific need to be applied only once
+            predicate = self.predicate\
+                .replace('$item', '(({}*)$item)'.format(TtList.rlist_type.tag))\
+                .replace('$entry', '(({}*)$entry)'.format(entry_type.tag))
+            # This function applies item-specific substitutions and is used as
+            # a predicate for standard filter function. Its argument is a tuple
+            # that contains item and its index
+            def subst_and_eval(indexed_item):
+                item_index, item = indexed_item
+                return gdb.parse_and_eval(predicate\
+                    .replace('$index', str(item_index))
+                    .replace('$item', str(item))
+                    .replace('$entry', str(entry_info.entry_from_item(item)))
+                )
+            indexed_items = filter(subst_and_eval, indexed_items)
+
+        # Finally display items
+        for item_index, item in indexed_items:
+            yield self.child(item_index, item)
+
+pp.add_printer('rlist', '^rlist$', TtListPrinter)
+
+
+class TtListSelect(gdb.Command):
+    """
+tt-list
+Display list entry RLIST_EXP refers to or the entire list if RLIST_EXP refers
+to the list head.
+
+Usage: tt-list [[OPTION]... --] RLIST_EXP
+
+Options:
+  -filter PREDICATE
+    Filter entries with PREDICATE. It is a boolean expression similar to
+    the condition expression in 'condition' or 'break' command. It is evaluated
+    for each list item, which may be referred within the expression with the
+    following placeholders:
+      $index - item index
+      $item - pointer to the item (rlist anchor)
+      $entry - pointer to the actual entry
+    Note, that with this option if RLIST_EXP refers to the single item the
+    iteration starts from this item, i.e. items before the specified one are
+    not checked. If you need to check the entire list either check in reverse
+    direction as well (with -r option) or use the list head as RLIST_EXP.
+
+  -pre EXP
+  -post EXP
+    Evaluate expression EXP before/after the command (see examples).
+
+  -reverse
+    Iterate list in reverse direction.
+
+  -entry-info entry_info
+    Normally entry info (entry type and anchor field) is identified
+    automatically, but if failed it can be specified explicitly with
+    this option, where entry_info should have format 'type::field'
+    (type -- entry type, field -- anchor field)
+    Please, note that the fact that you need this option indicates that most
+    likely the list referenced by RLIST_EXP is missing in the internal table
+    and thus the table needs to be updated.
+
+  -head [HEAD]
+    In most cases the head of the list is identified automatically, but if not
+    it can be specified explicitly with this option. If HEAD argument omitted
+    it means RLIST_EXP should be treated as it refers to the head.
+
+  Any print option (see 'help print').
+
+Examples:
+
+# Display all engines ('engines' is a global variable)
+(gdb) tt-list engines
+
+# Display the first engine
+(gdb) tt-list engines->next
+
+# Display the engine of the name 'memtx'
+(gdb) tt-list -f '$_streq($entry->name, "memtx")' -- engines
+
+# Display engines which names start with 's'
+(gdb) tt-list -f '$_memeq($entry->name, "s", 1)' -- engines
+
+# Walk the engines (repeat the last command)
+(gdb) set $i=0
+(gdb) tt-list -f '$index==$i' -post '$i++' -- engines
+
+# Walk the engines in reverse direction
+(gdb) set $i=0
+(gdb) tt-list -f '$index==$i' -post '$i++' -r -- engines
+    """
+
+    def __init__(self):
+        super(TtListSelect, self).__init__('tt-list', gdb.COMMAND_DATA)
+
+    def invoke(self, arg, from_tty):
+        parser = argparse.ArgumentParser(add_help=False)
+        parser.add_argument('-entry-info', action='store')
+        parser.add_argument('-filter', action='store')
+        parser.add_argument('-head', action='store',
+            nargs='?', const='', default=None)
+        parser.add_argument('-reverse', action='store_true')
+        parser.add_argument('-pre', action='store')
+        parser.add_argument('-post', action='store')
+
+        # It is assumed that unknown arguments are for 'print' command
+        args, print_args = parser.parse_known_args(gdb.string_to_argv(arg))
+
+        # Configure TtListPrinter according to the command arguments
+        # Considering that the only one instance of this printer is allowed
+        # at a time it looks quite safe to pass additional parameters to the
+        # printer over the class variables.
+        # It works as follows:
+        # 1. Initially all the mentioned class variables have default values
+        #    It corresponds to default behavior of the printer as it works
+        #    with 'print' command
+        # 2. Setup class variables in 'tt-list' command and execute 'print'
+        # 3. Restore default printer configuration, so subsequent 'print'
+        #    works the same
+        TtListPrinter.reset_config(
+            entry_info = args.entry_info,
+            predicate = args.filter,
+            head = args.head,
+            reverse = args.reverse,
+        )
+
+        try:
+            args.pre and gdb.parse_and_eval(args.pre)
+            gdb.execute('print {}'.format(' '.join(print_args)), from_tty)
+            args.post and gdb.parse_and_eval(args.post)
+
+        except Exception as e:
+            raise e
+
+        finally:
+            TtListPrinter.reset_config()
+
+TtListSelect()
