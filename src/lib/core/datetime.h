@@ -33,7 +33,7 @@ struct tnt_tm;
 #endif
 
 /** Required size of datetime_to_string string buffer */
-#define DT_TO_STRING_BUFSIZE 48
+#define DT_TO_STRING_BUFSIZE 64
 
 /**
  * Required buffer size to store the string representation of any possible
@@ -159,14 +159,21 @@ void
 datetime_to_tm(const struct datetime *date, struct tnt_tm *tm);
 
 /**
+ * Create @sa datetime structure using given @sa tnt_tm fields.
+ */
+bool
+tm_to_datetime(struct tnt_tm *tm, struct datetime *date);
+
+/**
  * Parse datetime text in ISO-8601 given format, and construct output
  * datetime value
  * @param date output datetime value
  * @param str input text in relaxed ISO-8601 format (0-terminated)
  * @param len length of str buffer
- * @param offset timezone offset, if you need to interpret
- *        date/time value as local. Pass 0 if you need to interpret it as UTC,
- *        or apply offset from string.
+ * @param tzsuffix timezone override, if you need to interpret
+ *        date/time value as local. Pass NULL if you need to interpret it
+ *        as UTC, or you provide meaningful suffix in the literal to be
+ *        parsed.
  * @retval Upon successful completion returns length of accepted
  *         prefix substring. It's ok if there is some unaccepted trailer.
  *         Returns 0 only if text is not recognizable as date/time string.
@@ -175,7 +182,7 @@ datetime_to_tm(const struct datetime *date, struct tnt_tm *tm);
  */
 ssize_t
 datetime_parse_full(struct datetime *date, const char *str, size_t len,
-		    int32_t offset);
+		    const char *tzsuffix, int32_t offset);
 
 /** Parse timezone suffix
  * @param str input text in relaxed ISO-8601 format (0-terminated)
@@ -188,7 +195,7 @@ datetime_parse_full(struct datetime *date, const char *str, size_t len,
  * @sa datetime_parse_full()
  */
 ssize_t
-datetime_parse_tz(const char *str, size_t len, int16_t *tzoffset,
+datetime_parse_tz(const char *str, size_t len, time_t base, int16_t *tzoffset,
 		  int16_t *tzindex);
 
 /**
