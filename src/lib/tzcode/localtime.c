@@ -1507,7 +1507,7 @@ localsub(struct state const *sp, time_t const *timep, int_fast32_t setname,
 #if NETBSD_INSPIRED
 
 struct tnt_tm *
-localtime_rz(struct state *sp, time_t const *timep, struct tnt_tm *tmp)
+tnt_localtime_rz(struct state *sp, time_t const *timep, struct tnt_tm *tmp)
 {
 	return localsub(sp, timep, 0, tmp);
 }

@@ -35,16 +35,16 @@ tnt_datetime_to_string(const struct datetime *date, char *buf, ssize_t len)
 
 ssize_t
 tnt_datetime_parse_full(struct datetime *date, const char *str, size_t len,
-			int32_t offset)
+			const char *tzsuffix, int32_t offset)
 {
-	return datetime_parse_full(date, str, len, offset);
+	return datetime_parse_full(date, str, len, tzsuffix, offset);
 }
 
 ssize_t
-tnt_datetime_parse_tz(const char *str, size_t len, int16_t *tzoffset,
-		      int16_t *tzindex)
+tnt_datetime_parse_tz(const char *str, size_t len, time_t base_date,
+		      int16_t *tzoffset, int16_t *tzindex)
 {
-	return datetime_parse_tz(str, len, tzoffset, tzindex);
+	return datetime_parse_tz(str, len, base_date, tzoffset, tzindex);
 }
 
 struct datetime *

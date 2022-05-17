@@ -551,13 +551,10 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 				zonestr[cp - buf] = '\0';
 
 				const struct date_time_zone *zone;
-				size_t n = timezone_lookup(zonestr, cp - buf,
-							   &zone);
+				size_t n = timezone_tm_lookup(zonestr, cp - buf,
+							      &zone, tm);
 				if (n <= 0)
 					return NULL;
-				tm->tm_gmtoff = timezone_offset(zone);
-				tm->tm_tzindex = timezone_index(zone);
-				tm->tm_isdst = false;
 
 				buf += cp - buf;
 			}
