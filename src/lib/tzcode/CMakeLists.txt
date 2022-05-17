@@ -8,6 +8,7 @@ set(TZCODE_PREFIX_DIR tz)
 set(TZCODE_PREFIX ${TZCODE_BUILD_DIR}/${TZCODE_PREFIX_DIR})
 set(TZDATA_TARGET main.zi)
 set(TZCODE_SRC ${PROJECT_SOURCE_DIR}/src/lib/tzcode)
+set(TZLUA_SRC ${PROJECT_SOURCE_DIR}/src/lua)
 
 set(TZDATA_FULL_TARGET
     ${TZCODE_PREFIX}/src/${TZCODE_PROJECT}/${TZDATA_TARGET})
@@ -40,9 +41,10 @@ find_program(PERL perl)
 add_custom_target(gen-timezones DEPENDS ${TZCODE_PROJECT})
 add_custom_command(TARGET gen-timezones
     COMMAND
-    ${PERL} ${TZCODE_SRC}/gen-zone-abbrevs.pl ${TZCODE_SRC}/zone-abbrevs.txt
-    ${TZDATA_FULL_TARGET} > ${TZCODE_SRC}/timezones.h
-    COMMENT "Generating timezones.h"
+    ${PERL} ${TZCODE_SRC}/gen-zone-abbrevs.pl
+        ${TZCODE_SRC}/zone-abbrevs.txt ${TZDATA_FULL_TARGET}
+        ${TZCODE_SRC}/timezones.h ${TZLUA_SRC}/timezones.lua
+    COMMENT "Generating timezones.h and timezones.lua"
 )
 
 # We excluded build of gen-timezones and tzcode-iana (main.zi) targets
@@ -51,4 +53,5 @@ add_custom_command(TARGET gen-timezones
 # ```sh
 #   make gen-timezones VERBOSE=1
 # ```
-# it will regenerate `timezones.h` in-place, in their repository location.
+# it will regenerate `timezones.h`, `timezones.lua` in-place, in their
+# repository location.
