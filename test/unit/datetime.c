@@ -106,12 +106,13 @@ datetime_test(void)
 	struct datetime date_expected;
 
 	plan(497);
-	datetime_parse_full(&date_expected, sample, sizeof(sample) - 1, 0);
+	datetime_parse_full(&date_expected, sample, sizeof(sample) - 1,
+			    NULL, 0);
 
 	for (index = 0; index < lengthof(tests); index++) {
 		struct datetime date;
 		size_t len = datetime_parse_full(&date, tests[index].str,
-						 tests[index].len, 0);
+						 tests[index].len, NULL, 0);
 		is(len > 0, true, "correct parse_datetime return value "
 		   "for '%s'", tests[index].str);
 		is(date.epoch, date_expected.epoch,
@@ -133,7 +134,7 @@ datetime_test(void)
 		is(date.epoch, date_strp.epoch,
 		   "reversible seconds via datetime_strptime for '%s'", buff);
 		struct datetime date_parsed;
-		len = datetime_parse_full(&date_parsed, buff, len, 0);
+		len = datetime_parse_full(&date_parsed, buff, len, NULL, 0);
 		is(len > 0, true, "correct datetime_parse_full return value "
 		   "for '%s'", buff);
 		is(date.epoch, date_parsed.epoch,

@@ -552,7 +552,7 @@ test:test("Check parsing of dates with invalid attributes", function(test)
 end)
 
 test:test("Parsing of timezone abbrevs", function(test)
-    test:plan(195)
+    test:plan(220)
     local zone_abbrevs = {
         -- military
         A =   1*60, B =   2*60, C =   3*60,
@@ -574,6 +574,13 @@ test:test("Parsing of timezone abbrevs", function(test)
         AMDT = 5 * 60,  BDST = 1 * 60,  IRKT = 8 * 60,
         KST = 9 * 60,   PDT = -7 * 60,  WET = 0 * 60,
         HOVDST = 8 * 60, CHODST = 9 * 60,
+
+        -- Olson
+        ['Europe/Moscow'] = 180,
+        ['Africa/Abidjan'] = 0,
+        ['America/Argentina/Buenos_Aires'] = -180,
+        ['Asia/Krasnoyarsk'] = 420,
+        ['Pacific/Fiji'] = 720,
     }
     local exp_pattern = '^2020%-02%-10T00:00'
     local base_date = '2020-02-10T0000 '
@@ -590,7 +597,7 @@ test:test("Parsing of timezone abbrevs", function(test)
 end)
 
 test:test("Parsing of timezone names (tzindex)", function(test)
-    test:plan(273)
+    test:plan(308)
     local zone_abbrevs = {
         -- military
         A =  1, B =  2, C =  3,
@@ -613,6 +620,13 @@ test:test("Parsing of timezone names (tzindex)", function(test)
         AMDT = 336,  BDST = 344, IRKT = 409,
         KST = 226,   PDT = 264,  WET = 314,
         HOVDST = 664, CHODST = 656,
+
+        -- Olson
+        ['Europe/Moscow'] = 947,
+        ['Africa/Abidjan'] = 672,
+        ['America/Argentina/Buenos_Aires'] = 694,
+        ['Asia/Krasnoyarsk'] = 861,
+        ['Pacific/Fiji'] = 984,
     }
     local exp_pattern = '^2020%-02%-10T00:00'
     local base_date = '2020-02-10T0000 '
@@ -620,6 +634,7 @@ test:test("Parsing of timezone names (tzindex)", function(test)
     for zone, index in pairs(zone_abbrevs) do
         local date_text = base_date .. zone
         local date, len = date.parse(date_text)
+        print(zone, index)
         test:isnt(date, nil, 'parse ' .. zone)
         test:is(date.tzindex, index, 'expected tzindex')
         test:is(date.tz, zone, 'expected timezone name')
@@ -636,27 +651,18 @@ local function error_ambiguous(s)
     return ("could not parse '%s' - ambiguous timezone"):format(s)
 end
 
-local function error_nyi(s)
-    return ("could not parse '%s' - nyi timezone"):format(s)
-end
-
 local function error_generic(s)
     return ("could not parse '%s'"):format(s)
 end
 
 test:test("Parsing of timezone names (errors)", function(test)
-    test:plan(13)
+    test:plan(9)
     local zones_arratic = {
         -- ambiguous
         AT = error_ambiguous, BT = error_ambiguous,
         ACT = error_ambiguous, BST = error_ambiguous,
         GST = error_ambiguous, WAT = error_ambiguous,
         AZOST = error_ambiguous,
-        -- not yet implemented
-        ['Africa/Abidjan'] = error_nyi,
-        ['America/Argentina/Buenos_Aires'] = error_nyi,
-        ['Asia/Krasnoyarsk'] = error_nyi,
-        ['Pacific/Fiji'] = error_nyi,
         -- generic errors
         ['XXX'] = error_generic,
         ['A-_'] = error_generic,
