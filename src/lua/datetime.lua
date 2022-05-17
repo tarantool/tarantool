@@ -1,5 +1,6 @@
 local ffi = require('ffi')
 local buffer = require('buffer')
+local tz = require('timezones')
 
 --[[
     `c-dt` library functions handles properly both positive and negative `dt`
@@ -1253,5 +1254,6 @@ return setmetatable(
         parse       = datetime_parse_from,
         parse_date  = datetime_parse_date,
         is_datetime = is_datetime,
+        TZ          = tz,
     }, {}
 )
