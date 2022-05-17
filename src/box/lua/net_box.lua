@@ -748,6 +748,14 @@ function remote_methods:_request(method, opts, format, stream_id, ...)
     return res
 end
 
+function remote_methods:_inject(str, opts)
+    return self:_request(M_INJECT, opts, nil, nil, str)
+end
+
+function remote_methods:_next_sync()
+    return self._transport:next_sync()
+end
+
 function remote_methods:ping(opts)
     check_remote_arg(self, 'ping')
     return (pcall(self._request, self, M_PING, opts, nil, self._stream_id))
