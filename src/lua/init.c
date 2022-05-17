@@ -153,7 +153,8 @@ extern char strict_lua[],
 	sysprof_parse_lua[],
 	sysprof_collapse_lua[],
 	sysprof_lua[],
-	datetime_lua[]
+	datetime_lua[],
+	timezones_lua[]
 #if defined(EMBED_LUAROCKS)
 	, luarocks_core_hardcoded_lua[],
 	luarocks_admin_cache_lua[],
@@ -305,6 +306,7 @@ static const char *lua_modules[] = {
 	"sysprof.parse", sysprof_parse_lua,
 	"sysprof.collapse", sysprof_collapse_lua,
 	"sysprof", sysprof_lua,
+	"timezones", timezones_lua,
 	"datetime", datetime_lua,
 	NULL
 };

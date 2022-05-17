@@ -4,6 +4,7 @@ local tap = require('tap')
 local test = tap.test('errno')
 local date = require('datetime')
 local ffi = require('ffi')
+local TZ = date.TZ
 
 --[[
     Workaround for #6599 where we may randomly fail on AWS Graviton machines,
@@ -597,7 +598,7 @@ test:test("Parsing of timezone abbrevs", function(test)
 end)
 
 test:test("Parsing of timezone names (tzindex)", function(test)
-    test:plan(308)
+    test:plan(396)
     local zone_abbrevs = {
         -- military
         A =  1, B =  2, C =  3,
@@ -636,8 +637,12 @@ test:test("Parsing of timezone names (tzindex)", function(test)
         local date, len = date.parse(date_text)
         print(zone, index)
         test:isnt(date, nil, 'parse ' .. zone)
-        test:is(date.tzindex, index, 'expected tzindex')
-        test:is(date.tz, zone, 'expected timezone name')
+        local tzname = date.tz
+        local tzindex = date.tzindex
+        test:is(tzindex, index, 'expected tzindex')
+        test:is(tzname, zone, 'expected timezone name')
+        test:is(TZ[tzindex], tzname, ('TZ[%d] => %s'):format(tzindex, tzname))
+        test:is(TZ[tzname], tzindex, ('TZ[%s] => %d'):format(tzname, tzindex))
         test:ok(len > #base_date, 'length longer than ' .. #base_date)
         local txt = tostring(date)
         test:is(1, txt:find(exp_pattern), 'expected prefix')
