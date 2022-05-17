@@ -57,8 +57,8 @@ Please report bugs to our [issue tracker][issue-tracker]. We also warmly
 welcome your feedback on the [discussions][discussions-url] page and questions
 on [Stack Overflow][stackoverflow-url].
 
-We accept contributions via pull requests. Check out our [How to get
-involved][get-involved] guide.
+We accept contributions via pull requests. Check out our [contributing
+guide][contributing].
 
 Thank you for your interest in Tarantool!
 
@@ -84,5 +84,5 @@ Thank you for your interest in Tarantool!
 [download]: https://www.tarantool.io/en/download/
 [building]: https://www.tarantool.io/en/doc/latest/dev_guide/building_from_source/
 [issue-tracker]: https://github.com/tarantool/tarantool/issues
-[get-involved]: https://www.tarantool.io/en/doc/latest/contributing/contributing/
+[contributing]: CONTRIBUTING.md
 [awesome-list]: https://github.com/tarantool/awesome-tarantool/
