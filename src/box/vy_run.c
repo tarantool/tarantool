@@ -226,10 +226,8 @@ vy_run_env_coio_call(struct vy_run_env *env, struct cbus_call_msg *msg,
 	env->next_reader %= env->reader_pool_size;
 
 	/* Post the task to the reader thread. */
-	bool cancellable = fiber_set_cancellable(false);
 	int rc = cbus_call(&reader->reader_pipe, &reader->tx_pipe,
 			   msg, func, NULL, TIMEOUT_INFINITY);
-	fiber_set_cancellable(cancellable);
 	if (rc != 0)
 		return -1;
 
