@@ -22,12 +22,18 @@ extern "C" {
 
 extern const struct type_info type_SSLError;
 
+/** Builds an instance of SSLError with the given message. */
+struct error *
+BuildSSLError(const char *file, unsigned line, const char *format, ...);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
 class SSLError: public Exception {
 public:
-	SSLError(): Exception(&type_SSLError, NULL, 0) {}
+	SSLError(const char *file, unsigned line)
+		: Exception(&type_SSLError, file, line) {}
+	SSLError() : SSLError(NULL, 0) {}
 	virtual void raise() { throw this; }
 };
 

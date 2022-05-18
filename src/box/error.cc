@@ -36,6 +36,7 @@
 #include "trigger.h"
 #include "vclock/vclock.h"
 #include "schema.h"
+#include "ssl_error.h"
 
 /* {{{ public API */
 
@@ -213,6 +214,8 @@ ClientError::get_errcode(const struct error *e)
 		return ER_MEMORY_ISSUE;
 	if (type_cast(SystemError, e))
 		return ER_SYSTEM;
+	if (type_cast(SSLError, e))
+		return ER_SSL;
 	if (type_cast(CollationError, e))
 		return ER_CANT_CREATE_COLLATION;
 	if (type_cast(XlogGapError, e))
