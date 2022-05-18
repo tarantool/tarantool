@@ -1,4 +1,4 @@
 ## bugfix/sql
 
-* SQL queries with sub-queries and quoted names now return correct column names
-in projection (gh-7063).
+* Now SQL queries with subqueries and quoted names return the correct
+  column names in projection (gh-7063).
