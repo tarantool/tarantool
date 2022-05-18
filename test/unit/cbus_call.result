@@ -1,0 +1,7 @@
+	*** main ***
+1..4
+ok 1 - cbus_call ordinary
+ok 2 - cbus_call timeout
+ok 3 - cbus_call wakeup
+ok 4 - cbus_call cancel
+	*** main: done ***

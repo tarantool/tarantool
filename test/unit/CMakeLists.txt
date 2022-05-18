@@ -125,6 +125,9 @@ target_link_libraries(cbus_stress.test core stat)
 add_executable(cbus.test cbus.c core_test_utils.c)
 target_link_libraries(cbus.test core unit stat)
 
+add_executable(cbus_call.test cbus_call.c core_test_utils.c)
+target_link_libraries(cbus_call.test core unit stat)
+
 include(CheckSymbolExists)
 check_symbol_exists(__GLIBC__ features.h GLIBC_USED)
 if (GLIBC_USED)
