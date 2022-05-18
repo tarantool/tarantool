@@ -489,12 +489,58 @@ set(ICU_FIND_REQUIRED ON)
 find_package(ICU)
 
 #
+# libunwind
+#
+
+if(ENABLE_BACKTRACE)
+    if(NOT HAVE_FORCE_ALIGN_ARG_POINTER_ATTR)
+        message(SEND_ERROR "backtrace feature requires \
+                            `force_align_arg_pointer` function attribute \
+                            support from C/C++ compiler")
+    endif()
+
+    if(NOT HAVE_CFI_ASM)
+        message(SEND_ERROR "backtrace feature requires CFI assembly support \
+                            from C/C++ compiler")
+    endif()
+
+    if(ENABLE_BUNDLED_LIBUNWIND)
+        if(APPLE)
+            message(SEND_ERROR "libunwind does not support macOS")
+        endif()
+        if(NOT HAVE_STDATOMIC_H)
+            message(SEND_ERROR "building bundled libunwind requires stdatomic.h \
+                                support from C compiler")
+        endif()
+
+        include(BuildLibUnwind)
+        libunwind_build()
+        add_dependencies(build_bundled_libs
+                         bundled-libunwind
+                         bundled-libunwind-platform)
+    else()
+        find_package(LibUnwind MODULE REQUIRED)
+    endif()
+    if(NOT APPLE AND NOT ENABLE_BUNDLED_LIBUNWIND AND
+        LIBUNWIND_VERSION VERSION_LESS "1.3" AND
+        ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
+        message(SEND_ERROR "versions of libunwind earlier than 1.3.0 are \
+                            broken on AARCH64 architecture")
+    endif()
+endif()
+
+#
 # LuaJIT
 #
 # Patched.
 #
 set(ENABLE_BUNDLED_LUAJIT ON)
 set(LUAJIT_ENABLE_GC64_DEFAULT OFF)
+
+if(NOT ENABLE_BACKTRACE)
+    set(LUAJIT_DISABLE_SYSPROF ON)
+    message(STATUS "Sysprof is not available without backtrace.")
+endif()
 if (TARGET_OS_DARWIN)
     # LuaJIT is unusable on OS X without enabled GC64
     # See https://github.com/tarantool/tarantool/issues/2643
@@ -598,47 +644,6 @@ add_dependencies(build_bundled_libs cdt)
 include(BuildMisc)
 libmisc_build()
 add_dependencies(build_bundled_libs misc)
-
-#
-# libunwind
-#
-
-if(ENABLE_BACKTRACE)
-    if(NOT HAVE_FORCE_ALIGN_ARG_POINTER_ATTR)
-        message(SEND_ERROR "backtrace feature requires \
-                            `force_align_arg_pointer` function attribute \
-                            support from C/C++ compiler")
-    endif()
-
-    if(NOT HAVE_CFI_ASM)
-        message(SEND_ERROR "backtrace feature requires CFI assembly support \
-                            from C/C++ compiler")
-    endif()
-
-    if(ENABLE_BUNDLED_LIBUNWIND)
-        if(APPLE)
-            message(SEND_ERROR "libunwind does not support macOS")
-        endif()
-        if(NOT HAVE_STDATOMIC_H)
-            message(SEND_ERROR "building bundled libunwind requires stdatomic.h \
-                                support from C compiler")
-        endif()
-
-        include(BuildLibUnwind)
-        libunwind_build()
-        add_dependencies(build_bundled_libs
-                         bundled-libunwind
-                         bundled-libunwind-platform)
-    else()
-        find_package(LibUnwind MODULE REQUIRED)
-    endif()
-    if(NOT APPLE AND NOT ENABLE_BUNDLED_LIBUNWIND AND
-        LIBUNWIND_VERSION VERSION_LESS "1.3" AND
-        ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
-        message(SEND_ERROR "versions of libunwind earlier than 1.3.0 are \
-                            broken on AARCH64 architecture")
-    endif()
-endif()
 
 # cpack config. called package.cmake to avoid
 # conflicts with the global CPack.cmake (On MacOS X
