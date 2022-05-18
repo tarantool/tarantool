@@ -433,15 +433,15 @@ cbus_call(struct cpipe *callee, struct cpipe *caller, struct cbus_call_msg *msg,
 
 	cpipe_push(callee, cmsg(msg));
 
-	fiber_yield_timeout(timeout);
-	if (msg->complete == false) {           /* timed out or cancelled */
-		msg->caller = NULL;
-		if (fiber_is_cancelled())
-			diag_set(FiberIsCancelled);
-		else
+	ev_tstamp deadline = ev_monotonic_now(loop()) + timeout;
+	do {
+		bool exceeded = fiber_yield_deadline(deadline);
+		if (exceeded) {
 			diag_set(TimedOut);
-		return -1;
-	}
+			return -1;
+		}
+	} while (!msg->complete);
+
 	if ((rc = msg->rc))
 		diag_move(&msg->diag, &fiber()->diag);
 	return rc;

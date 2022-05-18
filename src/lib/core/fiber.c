@@ -761,6 +761,13 @@ fiber_yield_timeout(ev_tstamp delay)
 	return state.timed_out;
 }
 
+bool
+fiber_yield_deadline(ev_tstamp deadline)
+{
+	ev_tstamp timeout = deadline - ev_monotonic_now(loop());
+	return fiber_yield_timeout(timeout);
+}
+
 /**
  * Yield the current fiber to events in the event loop.
  */
