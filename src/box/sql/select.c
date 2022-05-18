@@ -270,6 +270,24 @@ sql_key_info_new_from_space_info(const struct sql_space_info *info)
 	return key_info;
 }
 
+/* Drop fields with type field_type_MAX from space info. */
+static void
+sql_space_info_normalize(struct sql_space_info *info, uint32_t drop_count)
+{
+	for (uint32_t j = 0; j < drop_count; ++j) {
+		uint32_t k = 0;
+		for (; k < info->field_count - j - 1; ++k) {
+			if (info->types[k] == field_type_MAX)
+				break;
+		}
+		for (; k < info->field_count - j - 1; ++k) {
+			info->types[k] = info->types[k + 1];
+			info->coll_ids[k] = info->coll_ids[k + 1];
+		}
+	}
+	info->field_count -= drop_count;
+}
+
 /*
  * Delete all the content of a Select structure.  Deallocate the structure
  * itself only if bFree is true.
@@ -1262,18 +1280,19 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 				if (op->opcode != OP_OpenTEphemeral)
 					continue;
 				struct sql_space_info *info = op->p4.space_info;
-				--info->field_count;
-				for (int k = j; k < pEList->nExpr; ++k) {
-					int n = k + pSort->pOrderBy->nExpr + 1;
-					info->types[n - 1] = info->types[n];
-					info->coll_ids[n - 1] =
-						info->coll_ids[n];
-				}
+				/* Mark fields to drop in info. */
+				info->types[j + pSort->pOrderBy->nExpr] =
+					field_type_MAX;
 			}
 			if (op->opcode != OP_OpenTEphemeral) {
 				assert(op->p2 - excess_field_count > 0);
 				sqlVdbeChangeP2(v, pSort->addrSortIndex,
 						op->p2 - excess_field_count);
+			} else {
+				struct sql_space_info *info = op->p4.space_info;
+				assert(info != NULL);
+				sql_space_info_normalize(info,
+							 excess_field_count);
 			}
 			regOrig = 0;
 			assert(eDest == SRT_Set || eDest == SRT_Mem
