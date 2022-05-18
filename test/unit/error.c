@@ -3,11 +3,17 @@
  *
  * Copyright 2010-2021, Tarantool AUTHORS, please see AUTHORS file.
  */
+#include "box/error.h"
+#include "diag.h"
 #include "error_payload.h"
+#include "fiber.h"
+#include "memory.h"
 #include "mp_uuid.h"
 #include "msgpuck.h"
 #include "random.h"
+#include "ssl_error.h"
 #include "unit.h"
+#include "vclock/vclock.h"
 
 #include <float.h>
 
@@ -441,13 +447,47 @@ test_payload_move(void)
 	footer();
 }
 
-int
-main(void)
+static void
+test_error_code(void)
 {
 	header();
 	plan(9);
 
+	diag_set(ClientError, ER_READONLY);
+	is(box_error_code(box_error_last()), ER_READONLY, "ClientError");
+	diag_set(OutOfMemory, 42, "foo", "bar");
+	is(box_error_code(box_error_last()), ER_MEMORY_ISSUE, "OutOfMemory");
+	diag_set(SystemError, "foo");
+	is(box_error_code(box_error_last()), ER_SYSTEM, "SystemError");
+	diag_set(SocketError, "foo", "bar");
+	is(box_error_code(box_error_last()), ER_SYSTEM, "SocketError");
+	diag_set(TimedOut);
+	is(box_error_code(box_error_last()), ER_SYSTEM, "TimedOut");
+	diag_set(SSLError, "foo");
+	is(box_error_code(box_error_last()), ER_SSL, "SSLError");
+	diag_set(CollationError, "foo");
+	is(box_error_code(box_error_last()), ER_CANT_CREATE_COLLATION,
+	   "CollationError");
+	struct vclock vclock;
+	vclock_create(&vclock);
+	diag_set(XlogGapError, &vclock, &vclock);
+	is(box_error_code(box_error_last()), ER_XLOG_GAP, "XlogGapError");
+	diag_set(FiberIsCancelled);
+	is(box_error_code(box_error_last()), ER_PROC_LUA, "FiberIsCancelled");
+
+	check_plan();
+	footer();
+}
+
+int
+main(void)
+{
+	header();
+	plan(10);
+
 	random_init();
+	memory_init();
+	fiber_init(fiber_c_invoke);
 
 	test_payload_field_str();
 	test_payload_field_uint();
@@ -458,7 +498,10 @@ main(void)
 	test_payload_field_mp();
 	test_payload_clear();
 	test_payload_move();
+	test_error_code();
 
+	fiber_free();
+	memory_free();
 	random_free();
 
 	footer();
