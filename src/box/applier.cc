@@ -60,6 +60,7 @@
 #include "small/static.h"
 #include "tt_static.h"
 #include "memory.h"
+#include "ssl_error.h"
 
 STRS(applier_state, applier_STATE);
 
@@ -119,6 +120,7 @@ applier_log_error(struct applier *applier, struct error *e)
 	case ER_ACCESS_DENIED:
 	case ER_NO_SUCH_USER:
 	case ER_SYSTEM:
+	case ER_SSL:
 	case ER_UNKNOWN_REPLICA:
 	case ER_PASSWORD_MISMATCH:
 	case ER_XLOG_GAP:
@@ -2184,7 +2186,8 @@ applier_f(va_list ap)
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_LOADING);
 				goto reconnect;
-			} else if (e->errcode() == ER_SYSTEM) {
+			} else if (e->errcode() == ER_SYSTEM ||
+				   e->errcode() == ER_SSL) {
 				/* System error from master instance. */
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_DISCONNECTED);
@@ -2234,6 +2237,10 @@ applier_f(va_list ap)
 			applier_disconnect(applier, APPLIER_DISCONNECTED);
 			goto reconnect;
 		} catch (SystemError *e) {
+			applier_log_error(applier, e);
+			applier_disconnect(applier, APPLIER_DISCONNECTED);
+			goto reconnect;
+		} catch (SSLError *e) {
 			applier_log_error(applier, e);
 			applier_disconnect(applier, APPLIER_DISCONNECTED);
 			goto reconnect;
