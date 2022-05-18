@@ -39,6 +39,7 @@
 #include <lauxlib.h>
 #include <lualib.h>
 #include <lj_cdata.h>
+#include <lmisclib.h>
 #include <luajit.h>
 
 #include <fiber.h>
@@ -67,6 +68,11 @@
 #include "lua/uri.h"
 #include "digest.h"
 #include "errinj.h"
+
+#ifdef ENABLE_BACKTRACE
+#include "core/backtrace.h"
+#endif
+
 #include <small/ibuf.h>
 
 #include <ctype.h>
@@ -534,6 +540,23 @@ skip:		base = (base == -1 ? 10 : base);
 
 /* }}} */
 
+#ifdef ENABLE_BACKTRACE
+/**
+ * Backtracing function for sysprof.
+ **/
+static void
+fiber_backtracer(void *(*frame_writer)(int frame_no, void *addr))
+{
+	struct backtrace bt = {};
+	int frame_no;
+	const struct fiber *cur = fiber_self();
+	backtrace_collect(&bt, cur, 0);
+	for (frame_no = 0; frame_no < bt.frame_count; ++frame_no) {
+		frame_writer(frame_no, bt.frames[frame_no].ip);
+	}
+}
+#endif
+
 /**
  * Original LuaJIT/Lua logic: <luajit/src/lib_package.c - function setpath>
  *
@@ -712,6 +735,9 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_serializer_init(L);
 	tarantool_lua_swim_init(L);
 	tarantool_lua_decimal_init(L);
+#ifdef ENABLE_BACKTRACE
+	luaM_sysprof_set_backtracer(fiber_backtracer);
+#endif
 	luaopen_http_client_driver(L);
 	lua_pop(L, 1);
 	luaopen_msgpack(L);
