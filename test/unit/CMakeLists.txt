@@ -64,7 +64,7 @@ target_link_libraries(xmalloc.test unit)
 add_executable(datetime.test datetime.c)
 target_link_libraries(datetime.test tzcode core cdt unit)
 add_executable(error.test error.c core_test_utils.c)
-target_link_libraries(error.test unit core)
+target_link_libraries(error.test unit core box_error)
 add_executable(interval.test interval.c core_test_utils.c)
 target_link_libraries(interval.test core unit)
 

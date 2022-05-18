@@ -1,5 +1,5 @@
 	*** main ***
-1..9
+1..10
 	*** test_payload_field_str ***
     1..15
     ok 1 - no fields in the beginning
@@ -158,4 +158,17 @@ ok 8 - subtests
     ok 7 - key
 ok 9 - subtests
 	*** test_payload_move: done ***
+	*** test_error_code ***
+    1..9
+    ok 1 - ClientError
+    ok 2 - OutOfMemory
+    ok 3 - SystemError
+    ok 4 - SocketError
+    ok 5 - TimedOut
+    ok 6 - SSLError
+    ok 7 - CollationError
+    ok 8 - XlogGapError
+    ok 9 - FiberIsCancelled
+ok 10 - subtests
+	*** test_error_code: done ***
 	*** main: done ***
