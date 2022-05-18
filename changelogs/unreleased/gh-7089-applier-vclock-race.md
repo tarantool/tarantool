@@ -1,4 +1,4 @@
 ## bugfix/replication
 
-* Fixed a case when replication was broken on master side with
+* Fixed a bug when replication was broken on the master side with
   `ER_INVALID_MSGPACK` (gh-7089).
