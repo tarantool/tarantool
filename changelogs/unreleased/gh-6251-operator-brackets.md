@@ -1,3 +1,3 @@
 ## feature/sql
 
-* Operator [] for MAP and ARRAY values is now introduced (gh-6251).
+* Introduced `[]` operator for `MAP` and `ARRAY` values (gh-6251).
