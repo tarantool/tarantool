@@ -467,7 +467,10 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 	struct tuple *decompressed = memtx_tuple_maybe_decompress(old_tuple);
 	if (decompressed == NULL)
 		return -1;
-	tuple_ref(decompressed);
+	tuple_bless(decompressed);
+	decompressed = result_process(space, decompressed);
+	if (decompressed == NULL)
+		return -1;
 
 	/* Update the tuple; legacy, request ops are in request->tuple */
 	uint32_t new_size = 0, bsize;
@@ -477,7 +480,6 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 		xrow_update_execute(request->tuple, request->tuple_end,
 				    old_data, old_data + bsize, format,
 				    &new_size, request->index_base, NULL);
-	tuple_unref(decompressed);
 	if (new_data == NULL)
 		return -1;
 
@@ -565,7 +567,10 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 			memtx_tuple_maybe_decompress(old_tuple);
 		if (decompressed == NULL)
 			return -1;
-		tuple_ref(decompressed);
+		tuple_bless(decompressed);
+		decompressed = result_process(space, decompressed);
+		if (decompressed == NULL)
+			return -1;
 
 		uint32_t new_size = 0, bsize;
 		const char *old_data = tuple_data_range(decompressed, &bsize);
@@ -582,7 +587,6 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 					    format, &new_size,
 					    request->index_base, false,
 					    &column_mask);
-		tuple_unref(decompressed);
 		if (new_data == NULL)
 			return -1;
 
