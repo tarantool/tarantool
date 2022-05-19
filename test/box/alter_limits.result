@@ -931,8 +931,7 @@ s:insert{3, 2}
 -- changing index id is not allowed
 s.index.secondary:alter{ id = 10}
 ---
-- error: Attempt to modify a tuple field which is part of index 'primary' in space
-    '_index'
+- error: Attempt to modify a tuple field which is part of primary index in space '_index'
 ...
 s:drop()
 ---

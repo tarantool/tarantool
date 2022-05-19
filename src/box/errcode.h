@@ -146,7 +146,7 @@ struct errcode_record {
 	/* 91 */_(ER_PRIV_NOT_GRANTED,		"User '%s' does not have %s access on %s '%s'") \
 	/* 92 */_(ER_ROLE_NOT_GRANTED,		"User '%s' does not have role '%s'") \
 	/* 93 */_(ER_MISSING_SNAPSHOT,		"Can't find snapshot") \
-	/* 94 */_(ER_CANT_UPDATE_PRIMARY_KEY,	"Attempt to modify a tuple field which is part of index '%s' in space '%s'") \
+	/* 94 */_(ER_CANT_UPDATE_PRIMARY_KEY,	"Attempt to modify a tuple field which is part of primary index in space '%s'") \
 	/* 95 */_(ER_UPDATE_INTEGER_OVERFLOW,   "Integer overflow when performing '%c' operation on field %s") \
 	/* 96 */_(ER_GUEST_USER_PASSWORD,       "Setting password for guest user has no effect") \
 	/* 97 */_(ER_TRANSACTION_CONFLICT,      "Transaction has been aborted by conflict") \
