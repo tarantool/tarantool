@@ -232,13 +232,6 @@ space_create(struct space *space, struct engine *engine,
 
 	space->def = space_def_dup(def);
 
-	if (space->def->opts.upgrade_def != NULL) {
-		space->upgrade = space_upgrade_new(
-			space->def->opts.upgrade_def, format);
-		if (space->upgrade == NULL)
-			goto fail;
-	}
-
 	/* Create indexes and fill the index map. */
 	space->index_map = (struct index **)
 		calloc(index_count + index_id_max + 1, sizeof(struct index *));
@@ -265,6 +258,16 @@ space_create(struct space *space, struct engine *engine,
 				index_def->iid);
 	}
 	space_fill_index_map(space);
+
+	if (space->def->opts.upgrade_def != NULL) {
+		struct index *pk = space_index(space, 0);
+		assert(pk != NULL);
+		space->upgrade = space_upgrade_new(
+			space->def->opts.upgrade_def, space->def->name,
+			pk->def->key_def, format);
+		if (space->upgrade == NULL)
+			goto fail_free_indexes;
+	}
 
 	rlist_create(&space->space_cache_pin_list);
 	if (space_init_constraints(space) != 0)
