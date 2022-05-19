@@ -38,6 +38,7 @@ set(core_sources
     mp_datetime.c
     mp_interval.c
     prbuf.c
+    clock_lowres.c
 )
 
 if(ENABLE_TUPLE_COMPRESSION)
