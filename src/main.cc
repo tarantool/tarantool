@@ -85,6 +85,7 @@
 #include "core/crash.h"
 #include "ssl_cert_paths_discover.h"
 #include "core/errinj.h"
+#include "core/clock_lowres.h"
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -234,6 +235,7 @@ signal_reset(void)
 	    sigaction(SIGWINCH, &sa, NULL) == -1)
 		say_syserror("sigaction");
 
+	clock_lowres_signal_reset();
 	crash_signal_reset();
 
 	/* Unblock any signals blocked by libev. */
@@ -265,6 +267,7 @@ signal_init(void)
 	if (sigaction(SIGPIPE, &sa, 0) == -1)
 		panic_syserror("sigaction");
 
+	clock_lowres_signal_init();
 	crash_signal_init();
 
 	ev_signal_init(&ev_sigs[0], sig_checkpoint, SIGUSR1);
