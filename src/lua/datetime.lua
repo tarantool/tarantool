@@ -359,7 +359,7 @@ end
 
 local function interval_new(obj)
     if obj == nil then
-        return ffi.new(interval_t, 0, 0, 0, 0, 0, 0, 0, DEF_DT_ADJUST)
+        return interval_init(0, 0, 0, 0, 0, 0, 0, 0, DEF_DT_ADJUST)
     end
     check_table(obj, 'interval.new()')
     return interval_decode_args(obj)
