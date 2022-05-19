@@ -258,13 +258,11 @@ s:update('sql_defer_foreign_keys', {{'=', {'value'}, true}})
  | ...
 s:update('sql_defer_foreign_keys', {{'=', 1, 'new_key'}})
  | ---
- | - error: Attempt to modify a tuple field which is part of index 'primary' in space
- |     '_session_settings'
+ | - error: Attempt to modify a tuple field which is part of primary index in space '_session_settings'
  | ...
 s:update('sql_defer_foreign_keys', {{'=', 'name', 'new_key'}})
  | ---
- | - error: Attempt to modify a tuple field which is part of index 'primary' in space
- |     '_session_settings'
+ | - error: Attempt to modify a tuple field which is part of primary index in space '_session_settings'
  | ...
 s:update('sql_defer_foreign_keys', {{'=', 3, true}})
  | ---

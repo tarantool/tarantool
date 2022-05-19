@@ -86,13 +86,11 @@ _space:delete{_index.id}
 --
 _space:update({_space.id}, {{'-', 1, 1}})
 ---
-- error: Attempt to modify a tuple field which is part of index 'primary' in space
-    '_space'
+- error: Attempt to modify a tuple field which is part of primary index in space '_space'
 ...
 _space:update({_space.id}, {{'-', 1, 2}})
 ---
-- error: Attempt to modify a tuple field which is part of index 'primary' in space
-    '_space'
+- error: Attempt to modify a tuple field which is part of primary index in space '_space'
 ...
 --
 -- Create a space

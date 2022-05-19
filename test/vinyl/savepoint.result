@@ -368,8 +368,7 @@ space:insert({5})
 ...
 index:update({1}, {{'+', 1, 3}})
 ---
-- error: Attempt to modify a tuple field which is part of index 'primary' in space
-    'test'
+- error: Attempt to modify a tuple field which is part of primary index in space 'test'
 ...
 box.commit()
 ---
