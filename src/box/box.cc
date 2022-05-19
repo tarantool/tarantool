@@ -307,8 +307,6 @@ box_process_rw(struct request *request, struct space *space,
 	bool return_tuple = false;
 	struct txn *txn = in_txn();
 	bool is_autocommit = txn == NULL;
-	struct result_processor res_proc;
-	int rc;
 	if (is_autocommit && (txn = txn_begin()) == NULL)
 		return -1;
 	assert(iproto_type_is_dml(request->type));
@@ -317,19 +315,14 @@ box_process_rw(struct request *request, struct space *space,
 		goto rollback;
 	if (txn_begin_stmt(txn, space, request->type) != 0)
 		goto rollback;
-	result_process_prepare(&res_proc, space);
-	rc = space_execute_dml(space, txn, request, &tuple);
-	if (result == NULL)
-		tuple = NULL;
-	result_process_perform(&res_proc, &rc, &tuple);
-	if (rc != 0) {
+	if (space_execute_dml(space, txn, request, &tuple) != 0) {
 		txn_rollback_stmt(txn);
 		goto rollback;
 	}
 	if (result != NULL)
 		*result = tuple;
 
-	return_tuple = tuple != NULL;
+	return_tuple = result != NULL && tuple != NULL;
 	if (return_tuple) {
 		/*
 		 * Pin the tuple locally before the commit,
