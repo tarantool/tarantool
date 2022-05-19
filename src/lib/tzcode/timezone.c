@@ -92,6 +92,34 @@ timezone_name(int64_t index)
 	return zones_unsorted[index].name;
 }
 
+/** lookaside values we reuse across parser calls */
+static timezone_t prev_tz;
+static char prev_zonename[DT_TO_STRING_BUFSIZE];
+
+static timezone_t
+timezone_alloc(const char * zonename)
+{
+	assert(zonename != NULL);
+	if (prev_zonename[0] != '\0' && strcmp(prev_zonename, zonename) == 0)
+		return prev_tz;
+	if (prev_tz != NULL)
+		tzfree(prev_tz);
+	prev_tz = tzalloc(zonename);
+	assert(strlen(zonename) < lengthof(prev_zonename));
+	strcpy(prev_zonename, zonename);
+	return prev_tz;
+}
+
+static void __attribute__((destructor))
+timezone_free(void)
+{
+	if (prev_tz != NULL) {
+		tzfree(prev_tz);
+		prev_tz = NULL;
+		prev_zonename[0] = '\0';
+	}
+}
+
 /**
  * We want to accept only names in a form:
  * - Z, AT, MSK, i.e. [A-Z]{1,6}
@@ -155,22 +183,17 @@ timezone_tm_lookup(const char *str, size_t len,
 		tm->tm_isdst = !!(found->flags & TZ_DST);
 		return rc;
 	}
-	timezone_t tz = tzalloc(str); // FIXME - cache loaded
+	timezone_t tz = timezone_alloc(str);
 	if (tz == NULL)
 		return 0;
 	struct datetime date = {.epoch = 0};
 	if (tm_to_datetime(tm, &date) == false)
-		goto exit_0;
+		return 0;
 	time_t epoch = (int64_t)date.epoch;
 	struct tnt_tm * result = tnt_localtime_rz(tz, &epoch, tm);
 	if (result == NULL)
-		goto exit_0;
-	tzfree(tz);
+		return 0;
 	return rc;
-exit_0:
-	if (tz != NULL)
-		tzfree(tz);
-	return 0;
 }
 
 ssize_t
@@ -189,20 +212,15 @@ timezone_epoch_lookup(const char *str, size_t len, time_t base,
 		return rc;
 	}
 	timezone_t tz = NULL;
-	tz = tzalloc(str); // FIXME - cache loaded
+	tz = timezone_alloc(str);
 	if (tz == NULL)
 		return 0;
 	struct tnt_tm tm = {.tm_epoch = 0};
 	struct tnt_tm * result = tnt_localtime_rz(tz, &base, &tm);
 	if (result == NULL)
-		goto exit_0;
+		return 0;
 	*gmtoff = result->tm_gmtoff;
-	tzfree(tz);
 	return rc;
-exit_0:
-	if (tz != NULL)
-		tzfree(tz);
-	return 0;
 }
 
 bool
@@ -212,17 +230,12 @@ timezone_tzindex_lookup(int16_t tzindex, struct tnt_tm *tm)
 	if (tzindex == 0)
 		return false;
 
-	timezone_t tz = tzalloc(timezone_name(tzindex));
+	timezone_t tz = timezone_alloc(timezone_name(tzindex));
 	if (tz == NULL)
 		return false;
 	time_t epoch = (int64_t)tm->tm_epoch;
 	struct tnt_tm *result = tnt_localtime_rz(tz, &epoch, tm);
 	if (result == NULL)
-		goto exit_failure;
-	tzfree(tz);
+		return false;
 	return true;
-exit_failure:
-	if (tz != NULL)
-		tzfree(tz);
-	return false;
 }
