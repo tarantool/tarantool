@@ -45,6 +45,7 @@
 #include "sequence.h"
 #include "memtx_tuple_compression.h"
 #include "schema.h"
+#include "result.h"
 
 /*
  * Yield every 1K tuples while building a new index or checking
@@ -437,8 +438,8 @@ memtx_space_execute_delete(struct space *space, struct txn *txn,
 	if (memtx_space_replace_tuple(space, stmt, old_tuple, NULL,
 				      DUP_REPLACE_OR_INSERT) != 0)
 		return -1;
-	*result = stmt->old_tuple;
-	return 0;
+	*result = result_process(space, stmt->old_tuple);
+	return *result == NULL ? -1 : 0;
 }
 
 static int
