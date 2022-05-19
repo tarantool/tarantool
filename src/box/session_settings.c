@@ -369,7 +369,7 @@ session_settings_space_execute_update(struct space *space, struct txn *txn,
 		if (key_len != new_key_len ||
 		    memcmp(key, new_key, key_len) != 0) {
 			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-				 pk_def->name, space_name(space));
+				 space_name(space));
 			goto finish;
 		}
 	}

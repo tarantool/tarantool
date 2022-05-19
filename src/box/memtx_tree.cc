@@ -958,7 +958,6 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 						 tuple_str(new_data.tuple));
 				} else {
 					diag_set(ClientError, errcode,
-						 base->def->name,
 						 space_name(sp));
 				}
 			}
