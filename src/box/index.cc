@@ -220,7 +220,7 @@ box_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd,
 	struct result_processor res_proc;
 	result_process_prepare(&res_proc, space);
 	int rc = index_random(index, rnd, result);
-	result_process(&res_proc, &rc, result);
+	result_process_perform(&res_proc, &rc, result);
 	if (rc != 0)
 		return -1;
 	if (*result != NULL)
@@ -255,7 +255,7 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 	struct result_processor res_proc;
 	result_process_prepare(&res_proc, space);
 	int rc = index_get(index, key, part_count, result);
-	result_process(&res_proc, &rc, result);
+	result_process_perform(&res_proc, &rc, result);
 	if (rc != 0) {
 		txn_rollback_stmt(txn);
 		return -1;
@@ -296,7 +296,7 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 	struct result_processor res_proc;
 	result_process_prepare(&res_proc, space);
 	int rc = index_min(index, key, part_count, result);
-	result_process(&res_proc, &rc, result);
+	result_process_perform(&res_proc, &rc, result);
 	if (rc != 0) {
 		txn_rollback_stmt(txn);
 		return -1;
@@ -335,7 +335,7 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 	struct result_processor res_proc;
 	result_process_prepare(&res_proc, space);
 	int rc = index_max(index, key, part_count, result);
-	result_process(&res_proc, &rc, result);
+	result_process_perform(&res_proc, &rc, result);
 	if (rc != 0) {
 		txn_rollback_stmt(txn);
 		return -1;
@@ -433,7 +433,7 @@ box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 	struct result_processor res_proc;
 	result_process_prepare(&res_proc, space);
 	int rc = iterator_next(itr, result);
-	result_process(&res_proc, &rc, result);
+	result_process_perform(&res_proc, &rc, result);
 	if (rc != 0)
 		return -1;
 	if (*result != NULL)
