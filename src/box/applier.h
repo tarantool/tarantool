@@ -72,6 +72,7 @@ enum { APPLIER_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
 	_(APPLIER_FETCHED_SNAPSHOT, 14)                              \
 	_(APPLIER_REGISTER, 15)                                      \
 	_(APPLIER_REGISTERED, 16)                                    \
+	_(APPLIER_CONTINUE_SNAPSHOT, 17)                             \
 
 /** States for the applier */
 ENUM(applier_state, applier_STATE);
