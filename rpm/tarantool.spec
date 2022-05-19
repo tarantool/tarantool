@@ -35,7 +35,14 @@ BuildRequires: gcc-c++ >= 4.5
 BuildRequires: coreutils
 BuildRequires: sed
 BuildRequires: readline-devel
+%if 0%{?fedora} >= 36
+# In Fedora 36 the default version of the openssl-devel package is 3.
+# But for now Tarantool doesn't work with this version. See for details:
+# https://github.com/tarantool/tarantool/issues/6477
+BuildRequires: openssl1.1-devel
+%else
 BuildRequires: openssl-devel
+%endif
 BuildRequires: libicu-devel
 #BuildRequires: msgpuck-devel
 %if 0%{?fedora} > 0
@@ -127,7 +134,14 @@ Requires: /etc/protocols
 Requires: /etc/services
 # Deps for built-in package manager
 # https://github.com/tarantool/tarantool/issues/2612
+%if 0%{?fedora} >= 36
+# In Fedora 36 the default version of the openssl-devel package is 3.
+# But for now Tarantool doesn't work with this version. See for details:
+# https://github.com/tarantool/tarantool/issues/6477
+Requires: openssl1.1
+%else
 Requires: openssl
+%endif
 %if (0%{?fedora} >= 22 || 0%{?rhel} >= 8 || 0%{?sle_version} >= 1500)
 # RHEL <= 7 doesn't support Recommends:
 Recommends: tarantool-devel
@@ -208,7 +222,13 @@ make %{?_smp_mflags}
 rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
 
 %check
+%if 0%{?fedora} >= 36
+# Workaround to make app/crypto.test.lua and app/digest.test.lua tests work.
+# See for details: https://github.com/tarantool/tarantool/issues/6477
+OPENSSL_CONF=/dev/null make test-force
+%else
 make test-force
+%endif
 
 %pre
 /usr/sbin/groupadd -r tarantool > /dev/null 2>&1 || :
