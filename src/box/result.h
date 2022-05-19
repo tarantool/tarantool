@@ -28,9 +28,9 @@ extern "C" {
  *   struct result_processor res_proc;
  *   result_process_prepare(&res_proc, space);
  *   rc = index_get(index, key, part_count, result);
- *   result_process(&res_proc, &rc, result);
+ *   result_process_perform(&res_proc, &rc, result);
  *
- * Note, if result_process_prepare() was called, then result_process()
+ * Note, if result_process_prepare() was called, then result_process_perform()
  * must be called as well, because it may need to free some resources.
  */
 struct result_processor {
@@ -47,7 +47,8 @@ result_process_prepare(struct result_processor *p, struct space *space)
 }
 
 static inline void
-result_process(struct result_processor *p, int *rc, struct tuple **result)
+result_process_perform(struct result_processor *p, int *rc,
+		       struct tuple **result)
 {
 	if (likely(p->upgrade == NULL))
 		return;
