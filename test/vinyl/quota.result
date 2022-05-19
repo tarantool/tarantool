@@ -44,7 +44,7 @@ box.stat.vinyl().memory.level0
 ...
 space:update({1}, {{'!', 1, 100}}) -- try to modify the primary key
 ---
-- error: Attempt to modify a tuple field which is part of index 'pk' in space 'test'
+- error: Attempt to modify a tuple field which is part of primary index in space 'test'
 ...
 box.stat.vinyl().memory.level0
 ---

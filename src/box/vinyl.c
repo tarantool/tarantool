@@ -1817,7 +1817,6 @@ vy_check_update(struct space *space, const struct vy_lsm *pk,
 	    vy_stmt_compare(old_tuple, HINT_NONE, new_tuple,
 			    HINT_NONE, pk->key_def) != 0) {
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
-			 index_name_by_id(space, pk->index_id),
 			 space_name(space));
 		return -1;
 	}

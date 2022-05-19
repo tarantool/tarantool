@@ -249,7 +249,7 @@ test:do_catchsql_test(
         INSERT INTO test VALUES (1);
         UPDATE test SET id = 2;
     ]], {
-        1, "Attempt to modify a tuple field which is part of index 'pk_unnamed_TEST_1' in space 'TEST'"
+        1, "Attempt to modify a tuple field which is part of primary index in space 'TEST'"
     })
 
 --### INDICES

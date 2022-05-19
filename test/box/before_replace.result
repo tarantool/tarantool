@@ -325,8 +325,7 @@ s:before_replace(ret_update_pk) == ret_update_pk
 ...
 s:replace{1, 2}
 ---
-- error: Attempt to modify a tuple field which is part of index 'primary' in space
-    'test'
+- error: Attempt to modify a tuple field which is part of primary index in space 'test'
 ...
 s:before_replace(nil, ret_update_pk)
 ---
