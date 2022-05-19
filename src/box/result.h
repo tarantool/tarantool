@@ -60,6 +60,23 @@ result_process_perform(struct result_processor *p, int *rc,
 	space_upgrade_unref(p->upgrade);
 }
 
+/**
+ * A shortcut for
+ *
+ *   int rc = 0;
+ *   struct result_processor res_proc;
+ *   result_process_prepare(&res_proc, space);
+ *   result_process_perform(&res_proc, &rc, &tuple);
+ */
+static inline struct tuple *
+result_process(struct space *space, struct tuple *tuple)
+{
+	if (unlikely(space->upgrade != NULL))
+		return space_upgrade_apply(space->upgrade, tuple);
+	else
+		return tuple;
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
