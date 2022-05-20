@@ -959,7 +959,7 @@ test:test("Time interval tostring()", function(test)
 end)
 
 test:test("Time interval __index fields", function(test)
-    test:plan(11)
+    test:plan(14)
 
     local ival = date.interval.new{year = 12345, month = 123, week = 100,
                                    day = 45, hour = 48, min = 3, sec = 1,
@@ -978,6 +978,14 @@ test:test("Time interval __index fields", function(test)
     test:is(ival.hour, 48, 'interval.hour')
     test:is(ival.min, 3, 'interval.min')
     test:is(ival.sec, 1, 'interval.sec')
+    local ival2 = date.interval.new{year = 12345, month = 123, week = 100,
+                              day = 45, hour = 48, min = 3, sec = 1,
+                              nsec = 12345678}
+    test:is(ival, ival2, 'interval comparison eq')
+    local ival3 = date.interval.new{year = -12345, month = 123, week = 100,
+                              day = 45, hour = 48, min = 3, sec = 1}
+    test:isnt(ival, ival3, 'interval comparison neq')
+    test:is(ival3 < ival, true, 'interval less')
 end)
 
 test:test("Time interval operations", function(test)

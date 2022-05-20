@@ -1219,6 +1219,39 @@ local function interval_totable(self)
     }
 end
 
+local function interval_cmp(lhs, rhs, is_raising)
+    if not is_interval(lhs) or not is_interval(rhs) then
+        if is_raising then
+            error('incompatible types for interval comparison', 3)
+        else
+            return nil
+        end
+    end
+    local tags = {
+        'year', 'month', 'week', 'day',
+        'hour', 'min', 'sec', 'nsec'
+    }
+    for _, key in pairs(tags) do
+        local diff = lhs[key] - rhs[key]
+        if diff ~= 0 then
+            return diff
+        end
+    end
+    return 0
+end
+
+local function interval_eq(lhs, rhs)
+    return interval_cmp(lhs, rhs, false) == 0
+end
+
+local function interval_lt(lhs, rhs)
+    return interval_cmp(lhs, rhs, true) < 0
+end
+
+local function interval_le(lhs, rhs)
+    return interval_cmp(lhs, rhs, true) <= 0
+end
+
 local interval_index_fields = {
     usec = function(self) return math_floor(self.nsec / 1e3) end,
     msec = function(self) return math_floor(self.nsec / 1e6) end,
@@ -1237,6 +1270,9 @@ end
 
 ffi.metatype(interval_t, {
     __tostring = interval_tostring,
+    __eq = interval_eq,
+    __lt = interval_lt,
+    __le = interval_le,
     __sub = datetime_interval_sub,
     __add = datetime_interval_add,
     __index = interval_index,
