@@ -301,3 +301,16 @@ g.after_test('test_schemaless', function()
         end
     end)
 end)
+
+g.test_box_error = function()
+    t.assert_error_msg_equals(
+        "Illegal parameters, Netbox text protocol support was dropped, "..
+        "please use require('console').connect() instead",
+        net.connect, g.server.net_box_uri, {console = 123})
+    local c = net.connect(g.server.net_box_uri)
+
+    t.assert_error_msg_equals(
+        "Illegal parameters, query id is expected to be numeric",
+        c.unprepare, c, "asd")
+    c:close()
+end
