@@ -355,7 +355,8 @@ local function new_sm(uri, opts)
         end
     end
     if opts.console then
-        box.error("Netbox text protocol support was dropped, " ..
+        box.error(box.error.ILLEGAL_PARAMS,
+                  "Netbox text protocol support was dropped, " ..
                   "please use require('console').connect() instead")
     else
         setmetatable(remote, remote_mt)
@@ -817,7 +818,8 @@ end
 function remote_methods:unprepare(query, parameters, sql_opts, netbox_opts)
     check_remote_arg(self, "unprepare")
     if type(query) ~= "number" then
-        box.error("query id is expected to be numeric")
+        box.error(box.error.ILLEGAL_PARAMS,
+                  "query id is expected to be numeric")
     end
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "unprepare", "options")
