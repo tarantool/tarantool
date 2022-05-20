@@ -173,6 +173,7 @@ fiber_cond_wait
 fiber_cond_wait_timeout
 fiber_is_cancelled
 fiber_join
+fiber_join_timeout
 fiber_new
 fiber_new_ex
 fiber_reschedule
