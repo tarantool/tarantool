@@ -3436,12 +3436,19 @@ bootstrap_master(const struct tt_uuid *replicaset_uuid)
  * @param[out] start_vclock  the vector time of the master
  *                           at the moment of replica bootstrap
  */
-static void
+static int
 bootstrap_from_master(struct replica *master)
 {
 	struct applier *applier = master->applier;
 	assert(applier != NULL);
-	applier_resume_to_state(applier, APPLIER_READY, TIMEOUT_INFINITY);
+
+	try {
+		applier_resume_to_state(applier, APPLIER_READY,
+					TIMEOUT_INFINITY);
+	} catch (...) {
+		return -1;
+	}
+
 	assert(applier->state == APPLIER_READY);
 
 	say_info("bootstrapping replica from %s at %s",
@@ -3452,18 +3459,34 @@ bootstrap_from_master(struct replica *master)
 	 * Send JOIN request to master
 	 * See box_process_join().
 	 */
-
 	assert(!tt_uuid_is_nil(&INSTANCE_UUID));
 	enum applier_state wait_state = replication_anon ?
 					APPLIER_FETCH_SNAPSHOT :
 					APPLIER_INITIAL_JOIN;
-	applier_resume_to_state(applier, wait_state, TIMEOUT_INFINITY);
+	try {
+		applier_resume_to_state(applier, wait_state,
+					TIMEOUT_INFINITY);
+	} catch (...) {
+		return -1;
+	}
+
+
+	try {
+		applier_resume_to_state(applier, APPLIER_CONTINUE_SNAPSHOT,
+					box_check_replication_timeout());
+		say_info("box.cc 5");
+	} catch (...) {
+		say_info("box.cc 6");
+		return -1;
+	}
+
 	/*
 	 * Process initial data (snapshot or dirty disk data).
 	 */
 	engine_begin_initial_recovery_xc(NULL);
 	wait_state = replication_anon ? APPLIER_FETCHED_SNAPSHOT :
 					APPLIER_FINAL_JOIN;
+
 	applier_resume_to_state(applier, wait_state, TIMEOUT_INFINITY);
 
 	/*
@@ -3476,6 +3499,7 @@ bootstrap_from_master(struct replica *master)
 		applier_resume_to_state(applier, APPLIER_JOINED,
 					TIMEOUT_INFINITY);
 	}
+
 	/* Finalize the new replica */
 	engine_end_recovery_xc();
 
@@ -3499,6 +3523,28 @@ bootstrap_from_master(struct replica *master)
 	/* Make the initial checkpoint */
 	if (gc_checkpoint() != 0)
 		panic("failed to create a checkpoint");
+
+	return 0;
+}
+
+/**
+ * If bootstrap failed from remote master rebootstrap it,
+ * in the case of non-critical error.
+ */
+static void
+rebootstrap_from_master(struct replica *master)
+{
+	do {
+		box_restart_replication();
+
+		master = replicaset_find_join_master();
+		assert(master == NULL || master->applier != NULL);
+
+		if (master == NULL || master->applier == NULL ||
+			master->applier->state != APPLIER_CONNECTED) {
+				tnt_raise(ClientError, ER_CANNOT_REGISTER);
+		}
+	} while (bootstrap_from_master(master) != 0);
 }
 
 /**
@@ -3545,7 +3591,7 @@ bootstrap(const struct tt_uuid *instance_uuid,
 	assert(master == NULL || master->applier != NULL);
 
 	if (master != NULL && !tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID)) {
-		bootstrap_from_master(master);
+		rebootstrap_from_master(master);
 		/* Check replica set UUID */
 		if (!tt_uuid_is_nil(replicaset_uuid) &&
 		    !tt_uuid_is_equal(replicaset_uuid, &REPLICASET_UUID)) {
@@ -3621,7 +3667,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 		struct replica *master;
 		if (replicaset_needs_rejoin(&master)) {
 			say_crit("replica is too old, initiating rebootstrap");
-			return bootstrap_from_master(master);
+			return rebootstrap_from_master(master);
 		}
 	}
 

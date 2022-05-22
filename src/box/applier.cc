@@ -444,9 +444,9 @@ applier_wait_snapshot(struct applier *applier)
 	struct xrow_header row;
 
 	/**
-	 * Tarantool < 1.7.0: if JOIN is successful, there is no "OK"
-	 * response, but a stream of rows from checkpoint.
-	 */
+	* Tarantool < 1.7.0: if JOIN is successful, there is no "OK"
+	* response, but a stream of rows from checkpoint.
+	*/
 	if (applier->version_id >= version_id(1, 7, 0)) {
 		/* Decode JOIN/FETCH_SNAPSHOT response */
 		coio_read_xrow(io, ibuf, &row);
@@ -454,14 +454,14 @@ applier_wait_snapshot(struct applier *applier)
 			xrow_decode_error_xc(&row); /* re-throw error */
 		} else if (row.type != IPROTO_OK) {
 			tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-				  (uint32_t) row.type);
+				(uint32_t) row.type);
 		}
 		/*
-		 * Start vclock. The vclock of the checkpoint
-		 * the master is sending to the replica.
-		 * Used to initialize the replica's initial
-		 * vclock in bootstrap_from_master()
-		 */
+		* Start vclock. The vclock of the checkpoint
+		* the master is sending to the replica.
+		* Used to initialize the replica's initial
+		* vclock in bootstrap_from_master()
+		*/
 		xrow_decode_vclock_xc(&row, &replicaset.vclock);
 	}
 
@@ -474,21 +474,30 @@ applier_wait_snapshot(struct applier *applier)
 				xrow_decode_error_xc(&row);
 			} else if (iproto_type_is_promote_request(row.type)) {
 				struct synchro_request req;
-				if (xrow_decode_synchro(&row, &req) != 0)
+				if (xrow_decode_synchro(&row, &req) != 0) {
 					diag_raise();
+					//fiber_cancel(applier->fiber);
+					//fiber_gc();
+				}
+
 				txn_limbo_process(&txn_limbo, &req);
 			} else if (iproto_type_is_raft_request(row.type)) {
 				struct raft_request req;
-				if (xrow_decode_raft(&row, &req, NULL) != 0)
+				if (xrow_decode_raft(&row, &req, NULL) != 0) {
 					diag_raise();
+					//fiber_cancel(applier->fiber);
+					//fiber_gc();
+				}
 				box_raft_recover(&req);
 			} else if (row.type != IPROTO_JOIN_SNAPSHOT) {
 				tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE,
-					  (uint32_t)row.type);
+					(uint32_t)row.type);
 			}
 		} while (row.type != IPROTO_JOIN_SNAPSHOT);
 		coio_read_xrow(io, ibuf, &row);
 	}
+
+	applier_set_state(applier, APPLIER_CONTINUE_SNAPSHOT);
 
 	/*
 	 * Receive initial data.
