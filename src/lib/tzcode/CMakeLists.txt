@@ -3,15 +3,14 @@ add_library(tzcode STATIC
 target_link_libraries(tzcode)
 
 set(TZCODE_PROJECT tzcode-iana)
-set(TZCODE_BUILD_DIR ${CMAKE_CURRENT_BINARY_DIR})
-set(TZCODE_PREFIX_DIR tz)
-set(TZCODE_PREFIX ${TZCODE_BUILD_DIR}/${TZCODE_PREFIX_DIR})
+set(TZCODE_BINARY_DIR ${PROJECT_BINARY_DIR}/build/${TZCODE_PROJECT}/work)
+set(TZCODE_SOURCE_DIR ${PROJECT_BINARY_DIR}/build/${TZCODE_PROJECT}/src)
+
 set(TZDATA_TARGET main.zi)
+set(TZDATA_FULL_TARGET ${TZCODE_SOURCE_DIR}/${TZDATA_TARGET})
+
 set(TZCODE_SRC ${PROJECT_SOURCE_DIR}/src/lib/tzcode)
 set(TZLUA_SRC ${PROJECT_SOURCE_DIR}/src/lua)
-
-set(TZDATA_FULL_TARGET
-    ${TZCODE_PREFIX}/src/${TZCODE_PROJECT}/${TZDATA_TARGET})
 
 ExternalProject_Add(${TZCODE_PROJECT}
     GIT_REPOSITORY https://github.com/tarantool/tz
@@ -19,11 +18,18 @@ ExternalProject_Add(${TZCODE_PROJECT}
     GIT_SHALLOW YES
 
     EXCLUDE_FROM_ALL 1
-    INSTALL_DIR ${TZCODE_BUILD_DIR}/install
-    PREFIX ${TZCODE_PREFIX_DIR}
+    DOWNLOAD_DIR ${TZCODE_BINARY_DIR}
+    TMP_DIR ${TZCODE_BINARY_DIR}/tmp
+    STAMP_DIR ${TZCODE_BINARY_DIR}/stamp
+    # git will fail if directory is not empty - thus source should be
+    # different than any other directory involved, i.e. ${TZCODE_BINARY_DIR}
+    # and ${TZCODE_SOURCE_DIR} should not be intersecting.
+    SOURCE_DIR ${TZCODE_SOURCE_DIR}
 
     UPDATE_COMMAND ""
     CONFIGURE_COMMAND ""
+    INSTALL_COMMAND ""
+    TEST_COMMAND ""
 
     BUILD_COMMAND ${CMAKE_COMMAND} -E env
         CC=${CMAKE_C_COMPILER}
@@ -31,8 +37,6 @@ ExternalProject_Add(${TZCODE_PROJECT}
         PACKRATDATA=backzone
         make -C <SOURCE_DIR> ${TZDATA_TARGET}
     BUILD_IN_SOURCE TRUE
-    TEST_COMMAND ""
-    INSTALL_COMMAND make DESTDIR=<INSTALL_DIR> install
     BUILD_BYPRODUCTS ${TZDATA_FULL_TARGET}
 )
 
