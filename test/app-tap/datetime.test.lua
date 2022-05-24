@@ -964,8 +964,9 @@ test:test("Time interval __index fields", function(test)
     local ival = date.interval.new{year = 12345, month = 123, week = 100,
                                    day = 45, hour = 48, min = 3, sec = 1,
                                    nsec = 12345678}
-    test:is(tostring(ival), '+12345 years, 123 months, 100 weeks, 45 days, 48 hours, '..
-            '3 minutes, 1.012345678 seconds', '__tostring')
+    test:is(tostring(ival), '+12345 years, 123 months, 100 weeks, 45 days, '..
+            '48 hours, 3 minutes, 1 seconds, 12345678 nanoseconds',
+            '__tostring')
 
     test:is(ival.nsec, 12345678, 'nsec')
     test:is(ival.usec, 12345, 'usec')
@@ -1115,10 +1116,12 @@ test:test("Time interval operations", function(test)
     local i1, i2
     i1 = ival_new{nsec = 1e9 - 1}
     i2 = ival_new{nsec = 2}
-    test:is(tostring(i1 + i2), '+1.000000001 seconds', 'nsec: 999999999 + 2')
+    test:is(tostring(i1 + i2), '+0 seconds, 1000000001 nanoseconds',
+            'nsec: 999999999 + 2')
     i1 = ival_new{nsec = -1e9 + 1}
     i2 = ival_new{nsec = -2}
-    test:is(tostring(i1 + i2), '-1.000000001 seconds', 'nsec: -999999999 - 2')
+    test:is(tostring(i1 + i2), '+0 seconds, -1000000001 nanoseconds',
+            'nsec: -999999999 - 2')
 
     local specific_errors = {
         {only_one_of, { nsec = 123456, usec = 123}},
