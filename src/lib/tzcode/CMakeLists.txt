@@ -3,8 +3,9 @@ add_library(tzcode STATIC
 target_link_libraries(tzcode)
 
 set(TZCODE_PROJECT tzcode-iana)
-set(TZCODE_BINARY_DIR ${PROJECT_BINARY_DIR}/build/${TZCODE_PROJECT}/work)
-set(TZCODE_SOURCE_DIR ${PROJECT_BINARY_DIR}/build/${TZCODE_PROJECT}/src)
+set(TZCODE_BINARY_DIR ${PROJECT_BINARY_DIR}/build/${TZCODE_PROJECT})
+set(TZCODE_SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/tz)
+
 
 set(TZDATA_TARGET main.zi)
 set(TZDATA_FULL_TARGET ${TZCODE_SOURCE_DIR}/${TZDATA_TARGET})
@@ -13,17 +14,10 @@ set(TZCODE_SRC ${PROJECT_SOURCE_DIR}/src/lib/tzcode)
 set(TZLUA_SRC ${PROJECT_SOURCE_DIR}/src/lua)
 
 ExternalProject_Add(${TZCODE_PROJECT}
-    GIT_REPOSITORY https://github.com/tarantool/tz
-    GIT_TAG 2022a
-    GIT_SHALLOW YES
-
     EXCLUDE_FROM_ALL 1
     DOWNLOAD_DIR ${TZCODE_BINARY_DIR}
     TMP_DIR ${TZCODE_BINARY_DIR}/tmp
     STAMP_DIR ${TZCODE_BINARY_DIR}/stamp
-    # git will fail if directory is not empty - thus source should be
-    # different than any other directory involved, i.e. ${TZCODE_BINARY_DIR}
-    # and ${TZCODE_SOURCE_DIR} should not be intersecting.
     SOURCE_DIR ${TZCODE_SOURCE_DIR}
 
     UPDATE_COMMAND ""
