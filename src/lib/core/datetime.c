@@ -558,51 +558,6 @@ datetime_totable(const struct datetime *date, struct interval *out)
 
 #define NANOS_PER_SEC 1000000000LL
 
-static inline bool
-zero_or_same_sign(int64_t sec, int64_t nsec)
-{
-	return sec == 0 || (sec < 0) == (nsec < 0);
-}
-
-/**
- * If |nsec| is larger than allowed range 1e9 then modify passed
- * sec accordingly.
- */
-static void
-denormalize_interval_nsec(int64_t *psec, int *pnsec)
-{
-	assert(psec != NULL);
-	assert(pnsec != NULL);
-	int64_t sec = *psec;
-	int nsec = *pnsec;
-	/*
-	 * There is nothing to change:
-	 * - if there is a small nsec with 0 in sec;
-	 * - or if both sec and nsec have the same sign, and nsec is
-	 *   small enough.
-	 */
-	if (nsec == 0)
-		return;
-
-	if (zero_or_same_sign(sec, nsec) && abs(nsec) < NANOS_PER_SEC)
-		return;
-
-	sec += DIV(nsec, NANOS_PER_SEC);
-	nsec = MOD(nsec, NANOS_PER_SEC);
-
-	/*
-	 * We crafted a positive nsec value, so convert it to negative, if secs
-	 * are also negative.
-	 */
-	if (sec < 0) {
-		sec++;
-		nsec -= NANOS_PER_SEC;
-	}
-
-	*psec = sec;
-	*pnsec = nsec;
-}
-
 #define SPACE() \
 	do { \
 		if (sz > 0) { \
@@ -621,7 +576,6 @@ interval_to_string(const struct interval *ival, char *buf, ssize_t len)
 		"%d",	/* false */
 		"%+d",	/* true */
 	};
-	static const char zero_secs[] = "0 seconds";
 
 	bool need_sign = true;
 	size_t sz = 0;
@@ -667,25 +621,21 @@ interval_to_string(const struct interval *ival, char *buf, ssize_t len)
 		SNPRINT(sz, snprintf, buf, len, " minutes");
 		need_sign = false;
 	}
-	int64_t secs = (int64_t)ival->sec;
-	int nsec = ival->nsec;
-	if (secs == 0 && nsec == 0) {
-		if (sz != 0)
-			return sz;
-		SNPRINT(sz, snprintf, buf, len, zero_secs);
-		return sizeof(zero_secs) - 1;
-	}
-	SPACE();
-	denormalize_interval_nsec(&secs, &nsec);
-	bool is_neg = secs < 0 || (secs == 0 && nsec < 0);
 
-	SNPRINT(sz, snprintf, buf, len, is_neg ? "-" : (need_sign ? "+" : ""));
-	secs = labs(secs);
+	int64_t secs = (int64_t)ival->sec;
+	if (secs != 0 || sz == 0) {
+		SPACE();
+		SNPRINT(sz, snprintf, buf, len, long_signed_fmt[need_sign],
+			secs);
+		SNPRINT(sz, snprintf, buf, len, " seconds");
+		need_sign = false;
+	}
+	int32_t nsec = ival->nsec;
 	if (nsec != 0) {
-		SNPRINT(sz, snprintf, buf, len, "%" PRId64 ".%09d seconds",
-			secs, abs(nsec));
-	} else {
-		SNPRINT(sz, snprintf, buf, len, "%" PRId64 " seconds", secs);
+		SPACE();
+		SNPRINT(sz, snprintf, buf, len, signed_fmt[need_sign],
+			nsec);
+		SNPRINT(sz, snprintf, buf, len, " nanoseconds");
 	}
 	return sz;
 }

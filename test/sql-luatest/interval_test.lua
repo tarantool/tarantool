@@ -667,7 +667,7 @@ g.test_interval_17_3 = function()
         local t = require('luatest')
         local sql = [[SELECT CAST(itv AS STRING) FROM t0;]]
         local res = {{'+1 years, 2 months, 3 days, 4 hours'},
-                     {'+5 minutes, 6.000000007 seconds'}}
+                     {'+5 minutes, 6 seconds, 7 nanoseconds'}}
         local rows = box.execute(sql).rows
         t.assert_equals(rows, res)
     end)
