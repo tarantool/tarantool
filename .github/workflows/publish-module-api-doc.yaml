@@ -1,0 +1,27 @@
+name: Publish module API documentation
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  publish-api-doc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the module
+        uses: actions/checkout@v2
+
+      - name: Setup Doxygen
+        run: sudo apt install -y doxygen
+
+      - name: Build module API documentation using Doxygen
+        run: |
+            cmake .
+            make module_api
+            sed -e "s%@PROJECT_.\+_DIR@/%%" Doxyfile.API.in > Doxyfile.API
+            doxygen Doxyfile.API
+
+      - name: Publish generated API documentation to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@4.4.0
+        with:
+          folder: doc/
