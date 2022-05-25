@@ -275,6 +275,7 @@ test_request_str()
 	header.replica_id = 5;
 	header.lsn = 100;
 	struct request request;
+	memset(&request, 0, sizeof(request));
 	request.header = &header;
 	request.type = 1;
 	request.space_id = 512;
@@ -337,12 +338,80 @@ test_xrow_fields()
 	check_plan();
 }
 
+/**
+ * Test that xrow_encode_dml() encodes all request fields properly.
+ */
+static void
+test_xrow_encode_dml(void)
+{
+	plan(20);
+
+	struct request r;
+	memset(&r, 0, sizeof(r));
+	r.space_id = 666;
+	r.index_id = 222;
+	r.index_base = 123;
+	r.key = "key";
+	r.key_end = r.key + strlen(r.key);
+	r.ops = "ops";
+	r.ops_end = r.ops + strlen(r.ops);
+	r.tuple_meta = "meta";
+	r.tuple_meta_end = r.tuple_meta + strlen(r.tuple_meta);
+	r.tuple = "tuple";
+	r.tuple_end = r.tuple + strlen(r.tuple);
+	r.old_tuple = "old tuple";
+	r.old_tuple_end = r.old_tuple + strlen(r.old_tuple);
+	r.new_tuple = "new tuple";
+	r.new_tuple_end = r.new_tuple + strlen(r.new_tuple);
+
+	struct iovec iov[1];
+	is(xrow_encode_dml(&r, &fiber()->gc, iov), 1, "xrow_encode_dml rc");
+	const char *data = (const char *)iov[0].iov_base;
+	int map_size = mp_decode_map(&data);
+	is(map_size, 9, "decoded request map");
+
+	is(mp_decode_uint(&data), IPROTO_SPACE_ID, "decoded space id key");
+	is(mp_decode_uint(&data), r.space_id, "decoded space id");
+
+	is(mp_decode_uint(&data), IPROTO_INDEX_ID, "decoded index id key");
+	is(mp_decode_uint(&data), r.index_id, "decoded index id");
+
+	is(mp_decode_uint(&data), IPROTO_INDEX_BASE, "decoded index base key");
+	is(mp_decode_uint(&data), (uint64_t)r.index_base, "decoded index base");
+
+	is(mp_decode_uint(&data), IPROTO_KEY, "decoded iproto key");
+	is(memcmp(data, r.key, strlen(r.key)), 0, "decoded key");
+	data += strlen(r.key);
+
+	is(mp_decode_uint(&data), IPROTO_OPS, "decoded ops key")
+	is(memcmp(data, r.ops, strlen(r.ops)), 0, "decoded ops");
+	data += strlen(r.ops);
+
+	is(mp_decode_uint(&data), IPROTO_TUPLE_META, "decoded meta key")
+	is(memcmp(data, r.tuple_meta, strlen(r.tuple_meta)), 0,
+	   "decoded meta");
+	data += strlen(r.tuple_meta);
+
+	is(mp_decode_uint(&data), IPROTO_TUPLE, "decoded tuple key")
+	is(memcmp(data, r.tuple, strlen(r.tuple)), 0, "decoded tuple");
+	data += strlen(r.tuple);
+
+	is(mp_decode_uint(&data), IPROTO_OLD_TUPLE, "decoded old tuple key");
+	is(memcmp(data, r.old_tuple, strlen(r.old_tuple)), 0,
+	   "decoded old tuple");
+	data += strlen(r.old_tuple);
+
+	is(mp_decode_uint(&data), IPROTO_NEW_TUPLE, "decoded new tuple key");
+	is(memcmp(data, r.new_tuple, strlen(r.new_tuple)), 0,
+	   "decoded new tuple");
+}
+
 int
 main(void)
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	plan(4);
+	plan(5);
 
 	random_init();
 
@@ -351,6 +420,7 @@ main(void)
 	test_xrow_header_encode_decode();
 	test_request_str();
 	test_xrow_fields();
+	test_xrow_encode_dml();
 
 	random_free();
 	fiber_free();

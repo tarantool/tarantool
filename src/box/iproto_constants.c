@@ -89,11 +89,11 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x29 */	MP_MAP, /* IPROTO_BALLOT */
 	/* 0x2a */	MP_MAP, /* IPROTO_TUPLE_META */
 	/* 0x2b */	MP_MAP, /* IPROTO_OPTIONS */
+	/* 0x2c */	MP_ARRAY, /* IPROTO_OLD_TUPLE */
+	/* 0x2d */	MP_ARRAY, /* IPROTO_NEW_TUPLE */
 	/* }}} */
 
 	/* {{{ unused */
-	/* 0x2c */	MP_UINT,
-	/* 0x2d */	MP_UINT,
 	/* 0x2e */	MP_UINT,
 	/* 0x2f */	MP_UINT,
 	/* }}} */
@@ -244,8 +244,8 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"ballot",           /* 0x29 */
 	"tuple meta",       /* 0x2a */
 	"options",          /* 0x2b */
-	NULL,               /* 0x2c */
-	NULL,               /* 0x2d */
+	"old tuple",        /* 0x2c */
+	"new tuple",        /* 0x2d */
 	NULL,               /* 0x2e */
 	NULL,               /* 0x2f */
 	"data",             /* 0x30 */

@@ -1,4 +1,4 @@
-1..4
+1..5
     1..40
     ok 1 - round trip
     ok 2 - roundtrip.version_id
@@ -175,3 +175,25 @@ ok 3 - subtests
     ok 5 - WAIT_SYNC -> header.wait_sync
     ok 6 - WAIT_ACK -> header.wait_ack
 ok 4 - subtests
+    1..20
+    ok 1 - xrow_encode_dml rc
+    ok 2 - decoded request map
+    ok 3 - decoded space id key
+    ok 4 - decoded space id
+    ok 5 - decoded index id key
+    ok 6 - decoded index id
+    ok 7 - decoded index base key
+    ok 8 - decoded index base
+    ok 9 - decoded iproto key
+    ok 10 - decoded key
+    ok 11 - decoded ops key
+    ok 12 - decoded ops
+    ok 13 - decoded meta key
+    ok 14 - decoded meta
+    ok 15 - decoded tuple key
+    ok 16 - decoded tuple
+    ok 17 - decoded old tuple key
+    ok 18 - decoded old tuple
+    ok 19 - decoded new tuple key
+    ok 20 - decoded new tuple
+ok 5 - subtests
