@@ -107,8 +107,8 @@ lbox_xlog_parse_body_kv(struct lua_State *L, int type, const char **beg, const c
 		lua_pushinteger(L, v); /* unknown key */
 	}
 
-	if ((v == IPROTO_KEY || v == IPROTO_TUPLE) &&
-	    (mp_typeof(**beg) == MP_ARRAY)) {
+	if ((v == IPROTO_KEY || v == IPROTO_TUPLE || v == IPROTO_OLD_TUPLE ||
+	     v == IPROTO_NEW_TUPLE) && (mp_typeof(**beg) == MP_ARRAY)) {
 		/*
 		 * Push tuple if possible.
 		 */
