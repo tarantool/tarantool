@@ -577,63 +577,55 @@ interval_to_string(const struct interval *ival, char *buf, ssize_t len)
 		"%+d",	/* true */
 	};
 
-	bool need_sign = true;
 	size_t sz = 0;
 	if (ival->year != 0) {
 		SNPRINT(sz, snprintf, buf, len, "%+d years", ival->year);
-		need_sign = false;
 	}
 	if (ival->month != 0) {
 		SPACE();
-		SNPRINT(sz, snprintf, buf, len, signed_fmt[need_sign],
+		SNPRINT(sz, snprintf, buf, len, signed_fmt[sz == 0],
 			ival->month);
 		SNPRINT(sz, snprintf, buf, len, " months");
-		need_sign = false;
 	}
 	if (ival->week != 0) {
 		SPACE();
-		SNPRINT(sz, snprintf, buf, len, signed_fmt[need_sign],
+		SNPRINT(sz, snprintf, buf, len, signed_fmt[sz == 0],
 			ival->week);
 		SNPRINT(sz, snprintf, buf, len, " weeks");
-		need_sign = false;
 	}
 	int64_t days = (int64_t)ival->day;
 	if (days != 0) {
 		SPACE();
-		SNPRINT(sz, snprintf, buf, len, long_signed_fmt[need_sign],
+		SNPRINT(sz, snprintf, buf, len, long_signed_fmt[sz == 0],
 			days);
 		SNPRINT(sz, snprintf, buf, len, " days");
-		need_sign = false;
 	}
 	int64_t hours = (int64_t)ival->hour;
 	if (ival->hour != 0) {
 		SPACE();
-		SNPRINT(sz, snprintf, buf, len, long_signed_fmt[need_sign],
+		SNPRINT(sz, snprintf, buf, len, long_signed_fmt[sz == 0],
 			hours);
 		SNPRINT(sz, snprintf, buf, len, " hours");
-		need_sign = false;
 	}
 	int64_t minutes = (int64_t)ival->min;
 	if (minutes != 0) {
 		SPACE();
-		SNPRINT(sz, snprintf, buf, len, long_signed_fmt[need_sign],
+		SNPRINT(sz, snprintf, buf, len, long_signed_fmt[sz == 0],
 			minutes);
 		SNPRINT(sz, snprintf, buf, len, " minutes");
-		need_sign = false;
 	}
 
 	int64_t secs = (int64_t)ival->sec;
 	if (secs != 0 || sz == 0) {
 		SPACE();
-		SNPRINT(sz, snprintf, buf, len, long_signed_fmt[need_sign],
+		SNPRINT(sz, snprintf, buf, len, long_signed_fmt[sz == 0],
 			secs);
 		SNPRINT(sz, snprintf, buf, len, " seconds");
-		need_sign = false;
 	}
 	int32_t nsec = ival->nsec;
 	if (nsec != 0) {
 		SPACE();
-		SNPRINT(sz, snprintf, buf, len, signed_fmt[need_sign],
+		SNPRINT(sz, snprintf, buf, len, signed_fmt[sz == 0],
 			nsec);
 		SNPRINT(sz, snprintf, buf, len, " nanoseconds");
 	}
