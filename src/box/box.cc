@@ -1804,6 +1804,19 @@ box_check_promote_term_intact(uint64_t promote_term)
 	return 0;
 }
 
+/**
+ * Check whether the raft term has changed since it was last read.
+ */
+static int
+box_check_election_term_intact(uint64_t term)
+{
+	if (box_raft()->volatile_term != term) {
+		diag_set(ClientError, ER_INTERFERING_ELECTIONS);
+		return -1;
+	}
+	return 0;
+}
+
 /** Trigger a new election round but don't wait for its result. */
 static int
 box_trigger_elections(void)
@@ -1884,29 +1897,33 @@ box_wait_limbo_acked(double timeout)
 
 /** Write and process a PROMOTE request. */
 static int
-box_issue_promote(uint32_t prev_leader_id, int64_t promote_lsn)
+box_issue_promote(int64_t promote_lsn)
 {
-	struct raft *raft = box_raft();
-	uint64_t term = raft->term;
-	assert(raft->volatile_term == term);
+	int rc = 0;
+	uint64_t term = box_raft()->term;
+	uint64_t promote_term = txn_limbo.promote_greatest_term;
 	assert(promote_lsn >= 0);
+	rc = box_check_election_term_intact(term);
+	if (rc != 0)
+		return rc;
 
 	txn_limbo_begin(&txn_limbo);
-	/*
-	 * XXX: 'begin' takes time. Conditions could change and it is not
-	 * handled anyhow except for these assertions.
-	 */
-	assert(raft->volatile_term == term);
-	assert(txn_limbo.owner_id == prev_leader_id);
-	(void)prev_leader_id;
-	if (txn_limbo_write_promote(&txn_limbo, promote_lsn, term) < 0) {
-		txn_limbo_rollback(&txn_limbo);
-		return -1;
-	}
-	txn_limbo_commit(&txn_limbo);
+	rc = box_check_election_term_intact(term);
+	if (rc != 0)
+		goto end;
+	rc = box_check_promote_term_intact(promote_term);
+	if (rc != 0)
+		goto end;
+	rc = txn_limbo_write_promote(&txn_limbo, promote_lsn, term);
 
-	assert(txn_limbo_is_empty(&txn_limbo));
-	return 0;
+end:
+	if (rc == 0) {
+		txn_limbo_commit(&txn_limbo);
+		assert(txn_limbo_is_empty(&txn_limbo));
+	} else {
+		txn_limbo_rollback(&txn_limbo);
+	}
+	return rc;
 }
 
 /** A guard to block multiple simultaneous promote()/demote() invocations. */
@@ -1914,29 +1931,34 @@ static bool is_in_box_promote = false;
 
 /** Write and process a DEMOTE request. */
 static int
-box_issue_demote(uint32_t prev_leader_id, int64_t promote_lsn)
+box_issue_demote(int64_t promote_lsn)
 {
-	struct raft *raft = box_raft();
-	uint64_t term = raft->term;
-	assert(raft->volatile_term == term);
+	int rc = 0;
+	uint64_t term = box_raft()->term;
+	uint64_t promote_term = txn_limbo.promote_greatest_term;
 	assert(promote_lsn >= 0);
 
-	txn_limbo_begin(&txn_limbo);
-	/*
-	 * XXX: 'begin' takes time. Conditions could change and it is not
-	 * handled anyhow except for these assertions.
-	 */
-	assert(raft->volatile_term == term);
-	assert(txn_limbo.owner_id == prev_leader_id);
-	(void)prev_leader_id;
-	if (txn_limbo_write_demote(&txn_limbo, promote_lsn, term) < 0) {
-		txn_limbo_rollback(&txn_limbo);
-		return -1;
-	}
-	txn_limbo_commit(&txn_limbo);
+	rc = box_check_election_term_intact(term);
+	if (rc != 0)
+		return rc;
 
-	assert(txn_limbo_is_empty(&txn_limbo));
-	return 0;
+	txn_limbo_begin(&txn_limbo);
+	rc = box_check_election_term_intact(term);
+	if (rc != 0)
+		goto end;
+	rc = box_check_promote_term_intact(promote_term);
+	if (rc != 0)
+		goto end;
+	rc = txn_limbo_write_demote(&txn_limbo, promote_lsn, term);
+
+end:
+	if (rc == 0) {
+		txn_limbo_commit(&txn_limbo);
+		assert(txn_limbo_is_empty(&txn_limbo));
+	} else {
+		txn_limbo_rollback(&txn_limbo);
+	}
+	return rc;
 }
 
 int
@@ -1959,7 +1981,7 @@ box_promote_qsync(void)
 		diag_set(ClientError, ER_NOT_LEADER, raft->leader);
 		return -1;
 	}
-	return box_issue_promote(txn_limbo.owner_id, wait_lsn);
+	return box_issue_promote(wait_lsn);
 }
 
 int
@@ -2017,7 +2039,7 @@ box_promote(void)
 	if (wait_lsn < 0)
 		return -1;
 
-	return box_issue_promote(txn_limbo.owner_id, wait_lsn);
+	return box_issue_promote(wait_lsn);
 }
 
 int
@@ -2052,7 +2074,7 @@ box_demote(void)
 	int64_t wait_lsn = box_wait_limbo_acked(replication_synchro_timeout);
 	if (wait_lsn < 0)
 		return -1;
-	return box_issue_demote(txn_limbo.owner_id, wait_lsn);
+	return box_issue_demote(wait_lsn);
 }
 
 int

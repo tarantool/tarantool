@@ -32,6 +32,7 @@
 #include "small/rlist.h"
 #include "vclock/vclock.h"
 #include "latch.h"
+#include "errinj.h"
 
 #include <stdint.h>
 
@@ -339,6 +340,7 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry);
 static inline void
 txn_limbo_begin(struct txn_limbo *limbo)
 {
+	ERROR_INJECT_YIELD(ERRINJ_TXN_LIMBO_BEGIN_DELAY);
 	latch_lock(&limbo->promote_latch);
 }
 

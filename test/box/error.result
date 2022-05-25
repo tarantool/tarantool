@@ -464,6 +464,7 @@ t;
  |   243: box.error.SSL
  |   244: box.error.SPLIT_BRAIN
  |   245: box.error.OLD_TERM
+ |   246: box.error.INTERFERING_ELECTIONS
  | ...
 
 test_run:cmd("setopt delimiter ''");
