@@ -866,6 +866,14 @@ error:
 			request->tuple_meta = value;
 			request->tuple_meta_end = data;
 			break;
+		case IPROTO_OLD_TUPLE:
+			request->old_tuple = value;
+			request->old_tuple_end = data;
+			break;
+		case IPROTO_NEW_TUPLE:
+			request->new_tuple = value;
+			request->new_tuple_end = data;
+			break;
 		default:
 			break;
 		}
@@ -904,6 +912,14 @@ request_snprint(char *buf, int size, const struct request *request)
 		SNPRINT(total, snprintf, buf, size, ", ops: ");
 		SNPRINT(total, mp_snprint, buf, size, request->ops);
 	}
+	if (request->old_tuple != NULL) {
+		SNPRINT(total, snprintf, buf, size, ", old_tuple: ");
+		SNPRINT(total, mp_snprint, buf, size, request->old_tuple);
+	}
+	if (request->new_tuple != NULL) {
+		SNPRINT(total, snprintf, buf, size, ", new_tuple: ");
+		SNPRINT(total, mp_snprint, buf, size, request->new_tuple);
+	}
 	SNPRINT(total, snprintf, buf, size, "}");
 	return total;
 }
@@ -927,8 +943,10 @@ xrow_encode_dml(const struct request *request, struct region *region,
 	uint32_t ops_len = request->ops_end - request->ops;
 	uint32_t tuple_meta_len = request->tuple_meta_end - request->tuple_meta;
 	uint32_t tuple_len = request->tuple_end - request->tuple;
+	uint32_t old_tuple_len = request->old_tuple_end - request->old_tuple;
+	uint32_t new_tuple_len = request->new_tuple_end - request->new_tuple;
 	uint32_t len = MAP_LEN_MAX + key_len + ops_len + tuple_meta_len +
-		       tuple_len;
+		       tuple_len + old_tuple_len + new_tuple_len;
 	char *begin = (char *) region_alloc(region, len);
 	if (begin == NULL) {
 		diag_set(OutOfMemory, len, "region_alloc", "begin");
@@ -973,6 +991,18 @@ xrow_encode_dml(const struct request *request, struct region *region,
 		pos = mp_encode_uint(pos, IPROTO_TUPLE);
 		memcpy(pos, request->tuple, tuple_len);
 		pos += tuple_len;
+		map_size++;
+	}
+	if (request->old_tuple != NULL) {
+		pos = mp_encode_uint(pos, IPROTO_OLD_TUPLE);
+		memcpy(pos, request->old_tuple, old_tuple_len);
+		pos += old_tuple_len;
+		map_size++;
+	}
+	if (request->new_tuple != NULL) {
+		pos = mp_encode_uint(pos, IPROTO_NEW_TUPLE);
+		memcpy(pos, request->new_tuple, new_tuple_len);
+		pos += new_tuple_len;
 		map_size++;
 	}
 

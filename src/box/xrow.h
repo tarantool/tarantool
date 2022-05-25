@@ -194,6 +194,14 @@ struct request {
 	/** Tuple metadata. */
 	const char *tuple_meta;
 	const char *tuple_meta_end;
+	/** Old tuple - tuple before request is applied. */
+	const char *old_tuple;
+	/** End of @old_tuple. */
+	const char *old_tuple_end;
+	/** Tuple which remains after request is applied (i.e. result). */
+	const char *new_tuple;
+	/** End of @new_tuple. */
+	const char *new_tuple_end;
 	/** Base field offset for UPDATE/UPSERT, e.g. 0 for C and 1 for Lua. */
 	int index_base;
 };

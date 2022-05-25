@@ -104,6 +104,10 @@ enum iproto_key {
 	IPROTO_BALLOT = 0x29,
 	IPROTO_TUPLE_META = 0x2a,
 	IPROTO_OPTIONS = 0x2b,
+	/** Old tuple (i.e. before DML request is applied). */
+	IPROTO_OLD_TUPLE = 0x2c,
+	/** New tuple (i.e. result of DML request). */
+	IPROTO_NEW_TUPLE = 0x2d,
 
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
