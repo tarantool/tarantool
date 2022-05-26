@@ -16,12 +16,10 @@
 
 static const struct timeval LOW_RES_GRANULARITY = {
 	.tv_sec = 0,
-	.tv_usec = 10 * 1e3,
+	.tv_usec = 10,
 };
 
 double low_res_monotonic_clock = 0.0;
-
-#ifndef NDEBUG
 
 pthread_t owner;
 
@@ -31,14 +29,16 @@ clock_lowres_thread_is_owner(void)
 	return pthread_self() == owner;
 }
 
-#endif /* NDEBUG */
-
 /** A tick of low_res_clock, SIGALRM handler. */
 static void
 clock_monotonic_lowres_tick(int signum)
 {
 	(void)signum;
 	assert(clock_lowres_thread_is_owner());
+	if (!clock_lowres_thread_is_owner()) {
+		say_error("Clock lowres tick handled by another thread");
+		abort();
+	}
 	low_res_monotonic_clock = clock_monotonic();
 }
 
