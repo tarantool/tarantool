@@ -90,7 +90,7 @@ deps_ubuntu_ghactions: deps_tests
 		sudo apt-get install -y -f libreadline-dev libunwind-dev
 
 deps_coverage_ubuntu_ghactions: deps_ubuntu_ghactions
-	sudo apt-get install -y -f lcov
+	sudo apt-get install -y -f lcov ninja-build
 	sudo gem install coveralls-lcov
 	# Link src/lib/uri/src to local src dircetory to avoid of issue:
 	# /var/lib/gems/2.7.0/gems/coveralls-lcov-1.7.0/lib/coveralls/lcov/converter.rb:64:in
@@ -176,11 +176,11 @@ debug_ubuntu_ghactions: deps_ubuntu_ghactions test_debug_debian_no_deps
 # Coverage
 
 build_coverage_debian:
-	cmake . -DCMAKE_BUILD_TYPE=Debug -DENABLE_GCOV=ON
-	make -j $$(nproc)
+	cmake . -G Ninja -DCMAKE_BUILD_TYPE=Debug -DENABLE_GCOV=ON
+	cmake --build . --parallel $$(nproc)
 
 test_coverage_debian_no_deps: build_coverage_debian
-	make LuaJIT-test
+	cmake --build . --parallel $$(nproc) -t LuaJIT-test
 	# Enable --long tests for coverage
 	cd test && ./test-run.py --vardir ${VARDIR} --force $(TEST_RUN_EXTRA_PARAMS) --long
 	lcov --compat-libtool --directory src/ --capture --output-file coverage.info.tmp \
