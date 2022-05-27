@@ -357,7 +357,15 @@ applier_connect(struct applier *applier)
 		close(fd);
 		diag_raise();
 	}
-	if (coio_readn(io, greetingbuf, IPROTO_GREETING_SIZE) < 0)
+	/*
+	 * Abort if the master doesn't send a greeting within the configured
+	 * timeout so as not to block forever if we connect to a wrong
+	 * instance, which doesn't send anything to accepted clients.
+	 * No timeouts after this point, because if we receive a proper
+	 * greeting, the server is likely to be fine.
+	 */
+	if (coio_readn_timeout(io, greetingbuf, IPROTO_GREETING_SIZE,
+			       replication_disconnect_timeout()) < 0)
 		diag_raise();
 	applier->last_row_time = ev_monotonic_now(loop());
 
