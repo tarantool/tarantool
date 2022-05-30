@@ -32,7 +32,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CI_MAKE: make -f .travis.mk
+  CI_MAKE: make -f .gitlab.mk
 
 jobs:
   default_gcc_centos_7:
@@ -69,4 +69,4 @@ jobs:
         with:
           name: default_gcc_centos_7
           retention-days: 21
-          path: build/usr/src/*/tarantool-*/test/var/artifacts
+          path: ${{ env.VARDIR }}/artifacts
