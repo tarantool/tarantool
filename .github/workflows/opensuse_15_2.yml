@@ -65,4 +65,4 @@ jobs:
         with:
           name: opensuse-leap-15.2
           retention-days: 21
-          path: build/usr/src/*/tarantool-*/test/var/artifacts
+          path: ${{ env.VARDIR }}/artifacts

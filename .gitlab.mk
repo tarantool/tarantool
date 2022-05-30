@@ -108,7 +108,7 @@ deploy_prepare:
 	rm -rf build
 
 package: deploy_prepare
-	PACKPACK_EXTRA_DOCKER_RUN_PARAMS="--network=host ${PACKPACK_EXTRA_DOCKER_RUN_PARAMS}" ./packpack/packpack
+	PACKPACK_EXTRA_DOCKER_RUN_PARAMS="--network=host --volume /tmp/t:/tmp/t ${PACKPACK_EXTRA_DOCKER_RUN_PARAMS}" ./packpack/packpack
 
 deploy:
 	if [ -z "${REPO_TYPE}" ]; then \
