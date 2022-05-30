@@ -42,6 +42,7 @@ jobs:
     runs-on: graviton
 
     steps:
+      - uses: tarantool/actions/cleanup@master
       - uses: actions/checkout@v2.3.4
         with:
           fetch-depth: 0
