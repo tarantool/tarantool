@@ -317,15 +317,15 @@ lbox_fiber_top_disable(struct lua_State *L)
 
 #ifdef ENABLE_BACKTRACE
 bool
-lbox_do_backtrace(struct lua_State *L)
+lbox_do_backtrace(struct lua_State *L, int index)
 {
-	if (lua_istable(L, 1)) {
+	if (lua_istable(L, index)) {
 		lua_pushstring(L, "backtrace");
-		lua_gettable(L, 1);
-		if (lua_isnil(L, -1)){
+		lua_gettable(L, index);
+		if (lua_isnil(L, -1)) {
 			lua_pop(L, 1);
 			lua_pushstring(L, "bt");
-			lua_gettable(L, 1);
+			lua_gettable(L, index);
 		}
 		if (!lua_isnil(L, -1))
 			return lua_toboolean(L, -1);
@@ -358,7 +358,7 @@ static int
 lbox_fiber_info(struct lua_State *L)
 {
 #ifdef ENABLE_BACKTRACE
-	bool do_backtrace = lbox_do_backtrace(L);
+	bool do_backtrace = lbox_do_backtrace(L, 1);
 	if (do_backtrace) {
 		lua_newtable(L);
 		fiber_stat(lbox_fiber_statof_bt, L);
@@ -519,7 +519,7 @@ lbox_fiber_object_info(struct lua_State *L)
 	if (f == NULL)
 		luaL_error(L, "the fiber is dead");
 #ifdef ENABLE_BACKTRACE
-	bool do_backtrace = lbox_do_backtrace(L);
+	bool do_backtrace = lbox_do_backtrace(L, 2);
 	if (do_backtrace) {
 		lua_newtable(L);
 		lbox_fiber_statof_map(f, L, true);
