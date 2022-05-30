@@ -25,6 +25,7 @@
 ]]
 
 local dbg
+local fio = require('fio')
 
 local DEBUGGER = 'luadebug.lua'
 -- Use ANSI color codes in the prompt by default.
@@ -68,6 +69,17 @@ local function pretty(obj, max_depth)
     end
 
     return recurse(obj, 0)
+end
+
+local function get_stack_length(offset)
+    local index = offset + 1
+    while true do
+        if not debug.getinfo(index) then
+            break
+        end
+        index = index + 1
+    end
+    return index - offset - 1
 end
 
 -- The stack level that cmd_* functions use to access locals or info
@@ -136,39 +148,68 @@ local function format_stack_frame_info(info)
     return format_loc(source, info.currentline) .. " in " .. namewhat .. " " .. name
 end
 
+local function normalize_path(file)
+    -- If the name doesn't start with `@`, assume it's a file name if it's all
+    -- on one line.
+    if string.find(file, "^@") or not string.find(file, "[\r\n]") then
+        file = string.gsub(string.gsub(file, "^@", ""), "\\", "/")
+
+        file = fio.basename(file)
+
+        -- some file systems allow newlines in file names; remove these.
+        file = string.gsub(file, "\n", ' ')
+    end
+    return file
+end
+
+local myself = normalize_path(debug.getinfo(1,'S').source)
+
 local repl
 
 -- Return false for stack frames without source,
 -- which includes C frames, Lua bytecode, and `loadstring` functions
 local function frame_has_line(info) return info.currentline >= 0 end
 
-local function hook_factory(repl_threshold)
-    return function(offset, reason)
+local dbg_hook_ofs = 2
+
+local function hook_factory(level)
+    local stop_level = level or -1
+    return function(reason)
         return function(event, _)
             -- Skip events that don't have line information.
-            if not frame_has_line(debug.getinfo(2)) then return end
+            local info = debug.getinfo(2, "Snl")
+            local file = normalize_path(info.source)
 
-            -- Tail calls are specifically ignored since they also will have tail returns to balance out.
-            if event == "call" then
-                offset = offset + 1
-            elseif event == "return" and offset > repl_threshold then
-                offset = offset - 1
-            elseif event == "line" and offset <= repl_threshold then
-                repl(reason)
+            if not frame_has_line(info) or file == myself then
+                return
+            end
+
+            -- [Correction logics borrowed from mobdebug.lua]
+            -- This is needed to check if the stack got shorter or longer.
+            -- Unfortunately counting call/return calls is not reliable.
+            -- The discrepancy may happen when "pcall(load, '')" call is made
+            -- or when "error()" is called in a function.
+            -- Start from one level higher just in case we need to grow the
+            -- stack. This may happen after coroutine.resume call to a function
+            -- that doesn't have any other instructions to execute. It triggers
+            -- three returns: "return, tail return, return", which needs to be
+            -- accounted for.
+            local offset = get_stack_length(dbg_hook_ofs)
+
+            if event == "line" then
+                if offset <= stop_level then
+                    repl(reason)
+                end
             end
         end
     end
 end
 
-local hook_step = hook_factory(1)
-local hook_next = hook_factory(0)
-local hook_finish = hook_factory(-1)
-
 -- Create a table of all the locally accessible variables.
 -- Globals are not included when running the locals command, but are when running the print command.
 local function local_bindings(offset, include_globals)
     local level = offset + stack_inspect_offset + CMD_STACK_LEVEL
-    local func = debug.getinfo(level).func
+    local func = debug.getinfo(level, "f").func
     local bindings = {}
 
     -- Retrieve the upvalues
@@ -316,20 +357,18 @@ end
 local unpack = unpack or table.unpack
 local pack = function(...) return { n = select("#", ...), ... } end
 
+local current_stack_level = function() return get_stack_length(stack_top) end
+
 local function cmd_step()
-    stack_inspect_offset = stack_top
-    return true, hook_step
+    return true, hook_factory(math.huge)
 end
 
 local function cmd_next()
-    stack_inspect_offset = stack_top
-    return true, hook_next
+    return true, hook_factory(current_stack_level() - CMD_STACK_LEVEL)
 end
 
 local function cmd_finish()
-    local offset = stack_top - stack_inspect_offset
-    stack_inspect_offset = stack_top
-    return true, offset < 0 and hook_factory(offset - 1) or hook_finish
+    return true, hook_factory(current_stack_level() - CMD_STACK_LEVEL - 1)
 end
 
 -- simply continue execution
@@ -386,7 +425,7 @@ local function cmd_down()
 
     repeat -- Find the next frame with a file.
         offset = offset + 1
-        info = debug.getinfo(offset + CMD_STACK_LEVEL)
+        info = debug.getinfo(offset + CMD_STACK_LEVEL, "Snl")
     until not info or frame_has_line(info)
 
     if info then
@@ -426,13 +465,13 @@ local function cmd_up()
 end
 
 local function cmd_where(context_lines)
-    local info = debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL)
+    local info = debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL, "Snl")
     return (info and where(info, tonumber(context_lines) or 5))
 end
 
 local function cmd_listing(context_lines)
     local offset = stack_inspect_offset + CMD_STACK_LEVEL - 2
-    local info = debug.getinfo(offset)
+    local info = debug.getinfo(offset, "Snl")
     return (info and where(info, tonumber(context_lines) or 5))
 end
 
@@ -440,7 +479,7 @@ local function cmd_trace()
     dbg_writeln("Inspecting frame %d", stack_inspect_offset - stack_top)
     local i = 0;
     while true do
-        local info = debug.getinfo(stack_top + CMD_STACK_LEVEL + i)
+        local info = debug.getinfo(stack_top + CMD_STACK_LEVEL + i, "Snl")
         if not info then break end
 
         local is_current_frame = (i + stack_top == stack_inspect_offset)
@@ -635,11 +674,13 @@ end
 repl = function(reason)
     start_repl()
     -- Skip frames without source info.
-    while not frame_has_line(debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL - 3)) do
+    while not frame_has_line(debug.getinfo(stack_inspect_offset +
+                                           CMD_STACK_LEVEL - 3, "Snl")) do
         stack_inspect_offset = stack_inspect_offset + 1
     end
 
-    local info = debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL - 3)
+    local info = debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL - 3,
+                               "Snl")
     reason = reason and (color_yellow("break via ") .. color_red(reason) ..
              GREEN_CARET) or ""
     dbg_writeln(reason .. format_stack_frame_info(info))
@@ -693,7 +734,8 @@ dbg = setmetatable({
         stack_inspect_offset = top_offset
         stack_top = top_offset
 
-        debug.sethook(hook_next(1, source or "dbg()"), "crl")
+        local hook_next = hook_factory(current_stack_level())
+        debug.sethook(hook_next(source or "dbg()"), "l")
         return
     end,
 })
