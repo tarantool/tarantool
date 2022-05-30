@@ -239,8 +239,8 @@ signal_reset(void)
 	/* Unblock any signals blocked by libev. */
 	sigset_t sigset;
 	sigfillset(&sigset);
-	if (sigprocmask(SIG_UNBLOCK, &sigset, NULL) == -1)
-		say_syserror("sigprocmask");
+	if (pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) == -1)
+		say_syserror("pthread_sigmask");
 }
 
 static void

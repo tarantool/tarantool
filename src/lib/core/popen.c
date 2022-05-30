@@ -993,7 +993,7 @@ signal_reset(void)
 
 	/* Unblock any signals blocked by libev */
 	sigfillset(&sigset);
-	if (sigprocmask(SIG_UNBLOCK, &sigset, NULL) == -1) {
+	if (pthread_sigmask(SIG_UNBLOCK, &sigset, NULL) == -1) {
 		say_error("child: SIG_UNBLOCK failed");
 		_exit(errno);
 	}
