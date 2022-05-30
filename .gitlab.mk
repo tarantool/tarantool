@@ -115,7 +115,7 @@ package: deploy_prepare
 		export VERSION="$$(echo $(GIT_DESCRIBE) | sed 's/-\([0-9]\+\)-g[0-9a-f]\+$$/.\1/' | sed 's/-/~/').dev"; \
 	fi;                                                                                                             \
 	echo VERSION=$$VERSION;                                                                                         \
-	PACKPACK_EXTRA_DOCKER_RUN_PARAMS="--network=host ${PACKPACK_EXTRA_DOCKER_RUN_PARAMS}"                           \
+	PACKPACK_EXTRA_DOCKER_RUN_PARAMS="--network=host --volume /tmp/t:/tmp/t ${PACKPACK_EXTRA_DOCKER_RUN_PARAMS}"    \
 	TARBALL_EXTRA_ARGS="--exclude=*.exe --exclude=*.dll"                                                            \
 	PRESERVE_ENVVARS="TARBALL_EXTRA_ARGS,${PRESERVE_ENVVARS}" ./packpack/packpack
 
