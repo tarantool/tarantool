@@ -69,6 +69,6 @@ jobs:
         uses: actions/upload-artifact@v2
         if: failure()
         with:
-          name: ubuntu-impish
+          name: ubuntu-impish${{ matrix.build-type == 'gc64' && '-gc64' || '' }}
           retention-days: 21
           path: ${{ env.VARDIR }}/artifacts
