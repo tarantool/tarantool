@@ -407,7 +407,7 @@ coro_create (coro_context *ctx, coro_func coro, void *arg, void *sptr, size_t ss
 
   sigemptyset (&nsig);
   sigaddset (&nsig, SIGUSR2);
-  sigprocmask (SIG_BLOCK, &nsig, &osig);
+  pthread_sigmask (SIG_BLOCK, &nsig, &osig);
 
   nsa.sa_handler = trampoline;
   sigemptyset (&nsa.sa_mask);
@@ -450,7 +450,7 @@ coro_create (coro_context *ctx, coro_func coro, void *arg, void *sptr, size_t ss
     sigaltstack (&ostk, 0);
 
   sigaction (SIGUSR2, &osa, 0);
-  sigprocmask (SIG_SETMASK, &osig, 0);
+  pthread_sigmask (SIG_SETMASK, &osig, 0);
 
 # elif CORO_LOSER
 

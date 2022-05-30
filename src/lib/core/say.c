@@ -381,8 +381,8 @@ log_pipe_init(struct log *log, const char *init_str)
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGCHLD);
 
-	if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1)
-		say_syserror("sigprocmask");
+	if (pthread_sigmask(SIG_BLOCK, &mask, NULL) == -1)
+		say_syserror("pthread_sigmask");
 
 	if (pipe(pipefd) == -1) {
 		diag_set(SystemError, "failed to create pipe");
@@ -401,7 +401,7 @@ log_pipe_init(struct log *log, const char *init_str)
 	}
 
 	if (log->pid == 0) {
-		sigprocmask(SIG_UNBLOCK, &mask, NULL);
+		pthread_sigmask(SIG_UNBLOCK, &mask, NULL);
 
 		close(pipefd[1]);
 		dup2(pipefd[0], STDIN_FILENO);
@@ -443,7 +443,7 @@ log_pipe_init(struct log *log, const char *init_str)
 #endif
 #endif
 	/* OK, let's hope for the best. */
-	sigprocmask(SIG_UNBLOCK, &mask, NULL);
+	pthread_sigmask(SIG_UNBLOCK, &mask, NULL);
 	close(pipefd[0]);
 	log->fd = pipefd[1];
 	return 0;
