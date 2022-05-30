@@ -69,6 +69,6 @@ jobs:
         uses: actions/upload-artifact@v2
         if: failure()
         with:
-          name: debian-stretch
+          name: debian-stretch${{ matrix.build-type == 'gc64' && '-gc64' || '' }}
           retention-days: 21
           path: ${{ env.VARDIR }}/artifacts
