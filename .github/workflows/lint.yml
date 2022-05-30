@@ -45,6 +45,7 @@ jobs:
     runs-on: ubuntu-20.04-self-hosted
 
     steps:
+      - uses: tarantool/actions/cleanup@master
       - uses: actions/checkout@v2.3.4
         with:
           fetch-depth: 0
@@ -69,6 +70,7 @@ jobs:
     runs-on: ubuntu-20.04-self-hosted
 
     steps:
+      - uses: tarantool/actions/cleanup@master
       # We don't need neither deep fetch, nor submodules here.
       - uses: actions/checkout@v2.3.4
       # Don't use actions/setup-python to don't bother with proper
@@ -95,6 +97,7 @@ jobs:
     runs-on: ubuntu-20.04-self-hosted
 
     steps:
+      - uses: tarantool/actions/cleanup@master
       - uses: actions/checkout@v2.3.4
         with:
           fetch-depth: 0
