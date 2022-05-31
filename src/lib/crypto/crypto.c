@@ -112,7 +112,7 @@ evp_cipher_find(enum crypto_algo algo, enum crypto_mode mode)
  */
 #define diag_set_OpenSSL()					\
 	diag_set(CryptoError, "OpenSSL error: %s",		\
-		 ERR_error_string(ERR_get_error(), NULL))
+		 ERR_reason_error_string(ERR_get_error()))
 
 /** Stream to encrypt/decrypt data packets step by step. */
 struct crypto_stream {

@@ -448,8 +448,7 @@ digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspa
 ...
 digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh'), 'nosspasspasspasspasspasspasspass', 'iv12tras8712cvbh')
 ---
-- error: 'OpenSSL error: error:06065064:digital envelope routines:EVP_DecryptFinal_ex:bad
-    decrypt'
+- error: 'OpenSSL error: bad decrypt'
 ...
 --
 -- Test base64 options. (gh-2479, gh-2478, gh-2777).
