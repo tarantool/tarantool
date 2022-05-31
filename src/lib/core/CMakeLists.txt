@@ -39,6 +39,7 @@ set(core_sources
     mp_interval.c
     prbuf.c
     clock_lowres.c
+    ssl_init.c
 )
 
 if(ENABLE_TUPLE_COMPRESSION)
