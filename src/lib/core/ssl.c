@@ -5,14 +5,11 @@
  */
 #include "ssl.h"
 
-#include <openssl/crypto.h>
-#include <openssl/err.h>
-#include <openssl/evp.h>
-#include <openssl/ssl.h>
 #include <stddef.h>
 
 #include "diag.h"
 #include "iostream.h"
+#include "ssl_init.h"
 #include "trivia/config.h"
 
 #if defined(ENABLE_SSL)
@@ -22,22 +19,13 @@
 void
 ssl_init(void)
 {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
-	OpenSSL_add_all_digests();
-	OpenSSL_add_all_ciphers();
-	ERR_load_crypto_strings();
-#else
-	OPENSSL_init_crypto(0, NULL);
-	OPENSSL_init_ssl(0, NULL);
-#endif
+	ssl_init_impl();
 }
 
 void
 ssl_free(void)
 {
-#ifdef OPENSSL_cleanup
-	OPENSSL_cleanup();
-#endif
+	ssl_free_impl();
 }
 
 struct ssl_iostream_ctx *
