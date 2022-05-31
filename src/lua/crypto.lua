@@ -28,10 +28,11 @@ ffi.cdef[[
     HMAC_CTX *crypto_HMAC_CTX_new(void);
     void crypto_HMAC_CTX_free(HMAC_CTX *ctx);
     int crypto_HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int len,
-                            const EVP_MD *md, ENGINE *impl);
+                            const char *digest, const EVP_MD *md, ENGINE *impl);
     int crypto_HMAC_Update(HMAC_CTX *ctx, const unsigned char *data,
                            size_t len);
-    int crypto_HMAC_Final(HMAC_CTX *ctx, unsigned char *md, unsigned int *len);
+    int crypto_HMAC_Final(HMAC_CTX *ctx, unsigned char *md,
+                          unsigned int *len, unsigned int size);
 
     enum crypto_algo {
         CRYPTO_ALGO_NONE,
@@ -167,7 +168,7 @@ local function hmac_gc(ctx)
     ffi.C.crypto_HMAC_CTX_free(ctx)
 end
 
-local function hmac_new(digest, key)
+local function hmac_new(class, digest, key)
     if key == nil then
         return error('Key should be specified for HMAC operations')
     end
@@ -178,6 +179,7 @@ local function hmac_new(digest, key)
     ffi.gc(ctx, hmac_gc)
     local self = setmetatable({
         ctx = ctx,
+        class = class,
         digest = digest,
         initialized = false,
     }, hmac_mt)
@@ -189,7 +191,8 @@ local function hmac_init(self, key)
     if self.ctx == nil then
         return error('HMAC context isn\'t usable')
     end
-    if ffi.C.crypto_HMAC_Init_ex(self.ctx, key, key:len(), self.digest, nil) ~= 1 then
+    if ffi.C.crypto_HMAC_Init_ex(self.ctx, key, key:len(), self.class,
+                                 self.digest, nil) ~= 1 then
         return error('Can\'t init HMAC: ' .. openssl_err_str())
     end
     self.initialized = true
@@ -210,9 +213,10 @@ local function hmac_final(self)
     end
     self.initialized = false
     local ibuf = cord_ibuf_take()
-    local buf = ibuf:alloc(64)
+    local buf_size = 64
+    local buf = ibuf:alloc(buf_size)
     local ai = ffi.new('int[1]')
-    if ffi.C.crypto_HMAC_Final(self.ctx, buf, ai) ~= 1 then
+    if ffi.C.crypto_HMAC_Final(self.ctx, buf, ai, buf_size) ~= 1 then
         cord_ibuf_put(ibuf)
         return error('Can\'t finalize HMAC: ' .. openssl_err_str())
     end
@@ -349,13 +353,13 @@ digest_api = setmetatable(digest_api,
 local hmac_api = {}
 for class, digest in pairs(hmacs) do
     hmac_api[class] = setmetatable({
-        new = function (key) return hmac_new(digest, key) end
+        new = function (key) return hmac_new(class, digest, key) end
     }, {
         __call = function (self, key, str)
             if type(str) ~= 'string' then
                 error("Usage: hmac."..class.."(key, string)")
             end
-            local ctx = hmac_new(digest, key)
+            local ctx = hmac_new(class, digest, key)
             ctx:update(str)
             local res = ctx:result()
             ctx:free()

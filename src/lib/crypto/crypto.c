@@ -343,7 +343,13 @@ crypto_EVP_MD_CTX_free(EVP_MD_CTX *ctx)
 #endif
 }
 
-HMAC_CTX *
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
+# define crypto_HMAC_CTX HMAC_CTX
+#else
+# define crypto_HMAC_CTX EVP_MAC_CTX
+#endif
+
+crypto_HMAC_CTX *
 crypto_HMAC_CTX_new(void)
 {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
@@ -353,20 +359,29 @@ crypto_HMAC_CTX_new(void)
 	}
 	HMAC_CTX_init(ctx);
 	return ctx;
-#else
+#elif OPENSSL_VERSION_NUMBER < 0x30000000L
 	return HMAC_CTX_new();
+#else
+	static EVP_MAC *mac;
+	if (mac == NULL)
+		mac = EVP_MAC_fetch(NULL, "hmac", NULL);
+	if (mac == NULL)
+		return NULL;
+	return EVP_MAC_CTX_new(mac);
 #endif
 
 }
 
 void
-crypto_HMAC_CTX_free(HMAC_CTX *ctx)
+crypto_HMAC_CTX_free(crypto_HMAC_CTX *ctx)
 {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	HMAC_cleanup(ctx); /* Remove key from memory */
 	OPENSSL_free(ctx);
-#else
+#elif OPENSSL_VERSION_NUMBER < 0x30000000L
 	HMAC_CTX_free(ctx);
+#else
+	EVP_MAC_CTX_free(ctx);
 #endif
 }
 
@@ -406,22 +421,46 @@ crypto_EVP_get_digestbyname(const char *name)
 }
 
 int
-crypto_HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int len, const EVP_MD *md,
-		    ENGINE *impl)
+crypto_HMAC_Init_ex(crypto_HMAC_CTX *ctx, const void *key, int len,
+		    const char *digest, const EVP_MD *md, ENGINE *impl)
 {
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
+	(void)digest;
 	return HMAC_Init_ex(ctx, key, len, md, impl);
+#else
+	(void)md;
+	(void)impl;
+	OSSL_PARAM params[2];
+	params[0] = OSSL_PARAM_construct_utf8_string("digest",
+						     (char *)digest, 0);
+	params[1] = OSSL_PARAM_construct_end();
+	return EVP_MAC_init(ctx, key, len, params);
+#endif
 }
 
 int
-crypto_HMAC_Update(HMAC_CTX *ctx, const unsigned char *data, size_t len)
+crypto_HMAC_Update(crypto_HMAC_CTX *ctx, const unsigned char *data, size_t len)
 {
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
 	return HMAC_Update(ctx, data, len);
+#else
+	return EVP_MAC_update(ctx, data, len);
+#endif
 }
 
 int
-crypto_HMAC_Final(HMAC_CTX *ctx, unsigned char *md, unsigned int *len)
+crypto_HMAC_Final(crypto_HMAC_CTX *ctx, unsigned char *md, unsigned int *len,
+		  unsigned int size)
 {
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
+	(void)size;
 	return HMAC_Final(ctx, md, len);
+#else
+	size_t l;
+	int rc = EVP_MAC_final(ctx, md, &l, size);
+	*len = l;
+	return rc;
+#endif
 }
 
 const char *
