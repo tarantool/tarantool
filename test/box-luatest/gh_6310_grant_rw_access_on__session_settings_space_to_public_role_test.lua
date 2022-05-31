@@ -49,7 +49,6 @@ g.test_upgrade = function()
     g.upgrade:exec(function()
         local t = require('luatest')
 
-        box.schema.upgrade()
         local _session_settings_privs
         local public_privs = box.schema.role.info('public')
         for _, priv in pairs(public_privs) do
