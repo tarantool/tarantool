@@ -75,7 +75,7 @@ ffi.cdef[[
 ]]
 
 local function openssl_err_str()
-  return ffi.string(ffi.crypto_ERR_error_string(ffi.C.crypto_ERR_get_error(), nil))
+  return ffi.string(ffi.C.crypto_ERR_error_string(ffi.C.crypto_ERR_get_error(), nil))
 end
 
 local digests = {}
