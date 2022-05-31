@@ -167,13 +167,11 @@ bad_iv = '123456abcdefghij'
 ...
 ciph.decrypt(enc, bad_pass, iv)
 ---
-- error: 'OpenSSL error: error:06065064:digital envelope routines:EVP_DecryptFinal_ex:bad
-    decrypt'
+- error: 'OpenSSL error: bad decrypt'
 ...
 ciph.decrypt(enc, pass, bad_iv)
 ---
-- error: 'OpenSSL error: error:06065064:digital envelope routines:EVP_DecryptFinal_ex:bad
-    decrypt'
+- error: 'OpenSSL error: bad decrypt'
 ...
 test_run:cmd("clear filter")
 ---
