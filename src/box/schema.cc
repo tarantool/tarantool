@@ -555,11 +555,13 @@ error:
 void
 sequence_cache_delete(uint32_t id)
 {
-	struct sequence *seq = sequence_by_id(id);
-	if (seq != NULL) {
+	mh_int_t k = mh_i32ptr_find(sequences, id, NULL);
+	if (k != mh_end(sequences)) {
+		struct sequence *seq = (struct sequence *)
+			mh_i32ptr_node(sequences, k)->val;
 		/* Delete sequence data. */
 		sequence_reset(seq);
-		mh_i32ptr_del(sequences, seq->def->id, NULL);
+		mh_i32ptr_del(sequences, k, NULL);
 		free(seq->def);
 		TRASH(seq);
 		free(seq);
