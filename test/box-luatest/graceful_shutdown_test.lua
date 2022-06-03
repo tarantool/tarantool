@@ -506,3 +506,21 @@ g.test_graceful_shutdown_not_supported_by_client = function()
     t.assert_equals(tostring(err), 'Peer closed')
     conn:close()
 end
+
+-- Checks that if the net.box callback, which processes box.shutdown event, is
+-- garbage collected while the remote isn't, such partially garbage collected
+-- connection won't block shutdown (gh-7225).
+g.test_net_box_callback_garbage_collected = function()
+    g.server:exec(function()
+        box.ctl.set_on_shutdown_timeout(9000)
+    end)
+    local conn = net.connect(g.server.net_box_uri)
+    t.assert_is_not(conn._callback, nil)
+    -- Simulate a situation when the 'conn' reference was lost, the garbage
+    -- collector collected 'conn._callback', but hasn't collected the 'conn'
+    -- object yet.
+    conn._callback = nil
+    collectgarbage('collect')
+    g.server:stop()
+    conn:close()
+end
