@@ -82,6 +82,11 @@ void
 box_lua_audit_init(struct lua_State *L);
 #endif
 
+#if ENABLE_WAL_EXT
+void
+box_lua_wal_ext_init(struct lua_State *L);
+#endif
+
 extern char session_lua[],
 	tuple_lua[],
 	key_def_lua[],
@@ -517,6 +522,9 @@ box_lua_init(struct lua_State *L)
 #endif
 #ifdef ENABLE_AUDIT_LOG
 	box_lua_audit_init(L);
+#endif
+#ifdef ENABLE_WAL_EXT
+	box_lua_wal_ext_init(L);
 #endif
 	luaopen_net_box(L);
 	lua_pop(L, 1);

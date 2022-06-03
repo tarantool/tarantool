@@ -54,6 +54,7 @@ struct tuple_format;
 struct ck_constraint;
 struct constraint_id;
 struct space_upgrade;
+struct space_wal_ext;
 
 struct space_vtab {
 	/** Free a space instance. */
@@ -250,6 +251,11 @@ struct space {
 	struct rlist memtx_stories;
 	/** Space upgrade state or NULL. */
 	struct space_upgrade *upgrade;
+	/**
+	 * Pointer to the WAL extension configuration for this space
+	 * (i.e. if not NULL WAL entries may contain extra fields).
+	 */
+	struct space_wal_ext *wal_ext;
 };
 
 /** Initialize a base space instance. */
