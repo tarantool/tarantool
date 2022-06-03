@@ -92,6 +92,7 @@ local default_cfg = {
     wal_dir_rescan_delay= 2,
     wal_queue_max_size  = 16 * 1024 * 1024,
     wal_cleanup_delay   = 4 * 3600,
+    wal_ext             = nil,
     force_recovery      = false,
     replication         = nil,
     instance_uuid       = nil,
@@ -217,6 +218,7 @@ local template_cfg = {
     wal_max_size        = 'number',
     wal_dir_rescan_delay= 'number',
     wal_cleanup_delay   = 'number',
+    wal_ext             = 'table',
     force_recovery      = 'boolean',
     replication         = 'string, number, table',
     instance_uuid       = 'string',
@@ -309,6 +311,16 @@ local function check_replicaset_uuid()
     end
 end
 
+-- Stub implementation of the WAL extension configuration function.
+if private.cfg_set_wal_ext == nil then
+    private.cfg_set_wal_ext = function()
+        if box.cfg.wal_ext ~= nil then
+            box.error(box.error.UNSUPPORTED, "Community edition",
+                      "WAL extensions")
+        end
+    end
+end
+
 -- dynamically settable options
 --
 -- Note: An option should be in <dynamic_cfg_skip_at_load> table
@@ -366,6 +378,7 @@ local dynamic_cfg = {
     sql_cache_size          = private.cfg_set_sql_cache_size,
     txn_timeout             = private.cfg_set_txn_timeout,
     txn_isolation           = private.cfg_set_txn_isolation,
+    wal_ext                 = private.cfg_set_wal_ext
 }
 
 -- dynamically settable options, which should be reverted in case

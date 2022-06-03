@@ -8,6 +8,7 @@
 #include "assoc.h"
 #include "alter.h"
 #include "tuple.h"
+#include "wal_ext.h"
 
 /** ID -> space dictionary. */
 static struct mh_i32ptr_t *spaces;
@@ -202,6 +203,14 @@ space_cache_replace(struct space *old_space, struct space *new_space)
 
 		/* If old space is pinned, we have to pin the new space. */
 		space_cache_repin_pinned(old_space, new_space);
+		/*
+		 * We should update reference to WAL extensions; otherwise
+		 * since alter operation may yield and then rollback
+		 * (e.g. due to disk issues) - in this gap WAL extensions can
+		 * be reconfigured; as a result space->wal_ext will point to
+		 * dangling (already freed) memory.
+		 */
+		new_space->wal_ext = space_wal_ext_by_name(name);
 	} else {
 		/*
 		 * Delete @old_space from @spaces cache.

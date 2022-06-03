@@ -88,6 +88,7 @@
 #include "version.h"
 #include "mp_uuid.h"
 #include "flightrec.h"
+#include "wal_ext.h"
 
 static char status[64] = "unknown";
 
@@ -3342,6 +3343,7 @@ box_free(void)
 		tuple_free();
 		port_free();
 #endif
+		wal_ext_free();
 		box_watcher_free();
 		box_raft_free();
 		iproto_free();
@@ -3826,6 +3828,7 @@ box_init(void)
 	sequence_init();
 	box_raft_init();
 	box_watcher_init();
+	wal_ext_init();
 
 	/*
 	 * Default built-in events to help users distinguish an event
