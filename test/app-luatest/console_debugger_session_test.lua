@@ -78,7 +78,8 @@ local sequence = {
     { ['p obj'] = 'obj => {"tzoffset" = "+0300", "hour" = 3}' },
     { ['n'] = dbg_prompt },
     { ['p ymd'] = 'ymd => false' },
-    { ['w'] = 'local hms = false' },
+    { ['w'] = 'Error: command expects argument, but none received'},
+    { ['w 1'] = 'local hms = false' },
     { ['h'] = dbg_prompt },
     { ['t'] = 'debug-target.lua:5 in chunk at' },
     { ['u'] = 'Already at the top of the stack.' },
@@ -96,7 +97,7 @@ local sequence = {
     { ['c'] = '' },
 }
 
-g.test_interactive_debugger_session = function()
+local function debug_session(sequence)
     local cmd = { TARANTOOL_PATH, debug_target_script }
     --[[
         repeat multiple times to check all command aliases
@@ -135,4 +136,22 @@ g.test_interactive_debugger_session = function()
         end
         fh:close()
     end
+end
+
+g.test_interactive_debugger_session = function()
+    debug_session(sequence)
+end
+
+local breakpoints_sequence = {
+    { ['\t'] = dbg_header }, -- \t is a special value for start
+    { ['b +11'] = dbg_prompt },
+    { ['c'] = 'debug-target.lua:11' },
+    { ['n'] = dbg_prompt },
+    { ['p S'] = 'S => "1970-01-01T0300+0300"' },
+    { ['p T'] = 'T => 1970-01-01T03:00:00+0300' },
+    { ['c'] = '' },
+}
+
+g.test_interactive_debugger_breakpoints = function()
+    debug_session(breakpoints_sequence)
 end

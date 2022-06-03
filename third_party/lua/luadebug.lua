@@ -35,6 +35,7 @@ local COLOR_BLUE = ""
 local COLOR_YELLOW = ""
 local COLOR_RESET = ""
 local GREEN_CARET = " => "
+local RED_BREAK = "  ● "
 local auto_listing = true
 
 local function pretty(obj, max_depth)
@@ -163,6 +164,16 @@ local function normalize_path(file)
 end
 
 local myself = normalize_path(debug.getinfo(1,'S').source)
+local breakpoints = {}
+
+local function has_breakpoint(file, line)
+    return breakpoints[line] and breakpoints[line][file]
+end
+
+local function has_active_breakpoints()
+    local key = next(breakpoints)
+    return key ~= nil
+end
 
 local repl
 
@@ -197,10 +208,26 @@ local function hook_factory(level)
             local offset = get_stack_length(dbg_hook_ofs)
 
             if event == "line" then
-                if offset <= stop_level then
+                local matched = offset <= stop_level or
+                                has_breakpoint(file, info.currentline)
+                if matched then
                     repl(reason)
                 end
             end
+        end
+    end
+end
+
+local function hook_check_bps()
+    return function(event, _)
+        -- Skip events that don't have line information.
+        local info = debug.getinfo(2, "Snl")
+        local file = normalize_path(info.source)
+        if not frame_has_line(info) then
+            return
+        end
+        if event == 'line' and has_breakpoint(file, info.currentline) then
+            repl()
         end
     end
 end
@@ -305,7 +332,7 @@ end
 local SOURCE_CACHE = {}
 local tnt = nil
 
-local function where(info, context_lines)
+local function where(info, context_lines, as_break)
     local filesource = info.source
     local source = SOURCE_CACHE[info.source]
     if not source then
@@ -321,7 +348,7 @@ local function where(info, context_lines)
             end)
         else
             -- external module - load file
-            local filename = filesource:match("@(.*)")
+            local filename = filesource:match("@(.*)") or filesource
             if filename then
                 pcall(function()
                     for line in io.lines(filename) do
@@ -338,8 +365,10 @@ local function where(info, context_lines)
     end
 
     if source and source[info.currentline] then
-        for i = info.currentline - context_lines, info.currentline + context_lines do
-            local tab_or_caret = (i == info.currentline and GREEN_CARET or "    ")
+        for i = info.currentline - context_lines,
+                info.currentline + context_lines do
+            local sep = as_break and RED_BREAK or GREEN_CARET
+            local tab_or_caret = i == info.currentline and sep or "    "
             local line = source[i]
             if line then
                 dbg_writeln(color_grey("% 4d") .. tab_or_caret .. "%s", i, line)
@@ -371,9 +400,13 @@ local function cmd_finish()
     return true, hook_factory(current_stack_level() - CMD_STACK_LEVEL - 1)
 end
 
--- simply continue execution
+-- if there is no any single defined breakpoint yet, then
+-- do not stop in debugger hooks
 local function cmd_continue()
-    return true
+    if not has_active_breakpoints() then
+        return true
+    end
+    return true, hook_check_bps
 end
 
 local function cmd_print(expr)
@@ -416,6 +449,59 @@ local function cmd_eval(code)
         dbg_writeln(color_red("Error:") .. " " .. tostring(err))
     end
 
+    return false
+end
+
+local function parse_bp(expr)
+    local _, _, file, line = expr:find('^(.-)%s*[+:](%d+)%s*$')
+    return file, tonumber(line)
+end
+
+local function cmd_add_breakpoint(bps)
+    local fullfile, line = parse_bp(bps)
+    local info = debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL, "S")
+    local debuggee = info.source
+    local file = #fullfile > 0 and fullfile or debuggee
+    local normfile = normalize_path(file)
+
+    if not breakpoints[line] then
+        breakpoints[line] = {}
+    end
+    breakpoints[line][normfile] = true
+    dbg_writeln("Added breakpoint %s:%d", color_blue(normfile), line)
+    where({source = file, currentline = line}, 0, true)
+    return false
+end
+
+local function cmd_remove_breakpoint(bps)
+    local file, line = parse_bp(bps)
+    local info = debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL, "S")
+    local debuggee = info.source
+
+    if file == nil then
+        file = debuggee
+    end
+    if file == '*' and line == 0 then
+        breakpoints = {}
+    end
+    if breakpoints[line] then
+        breakpoints[line][file] = nil
+    end
+    dbg_writeln("Removed breakpoint %s:%d", file, line)
+    return false
+end
+
+local function cmd_list_breakpoints()
+    if has_active_breakpoints() then
+        dbg_writeln("List of active breakpoints:")
+        for line, breaks in pairs(breakpoints) do
+            for file, _ in pairs(breaks) do
+                dbg_writeln("\t%s:%d", file, line)
+            end
+        end
+    else
+        dbg_writeln("No active breakpoints defined")
+    end
     return false
 end
 
@@ -538,6 +624,9 @@ local function cmd_quit()
 end
 
 local commands_help = {
+    {'b.reak.point $address', 'set new breakpoints at module.lua+num', cmd_add_breakpoint},
+    {'bd.elete|delete_break.points', 'delete breakpoints',  cmd_remove_breakpoint},
+    {'bl.ist|list_break.points', 'list breakpoints', cmd_list_breakpoints},
     {'c.ont.inue', 'continue execution', cmd_continue},
     {'d.own', 'move down the stack by one frame',  cmd_down},
     {'e.val $expression', 'execute the statement',  cmd_eval},
@@ -808,6 +897,7 @@ if color_maybe_supported and not os.getenv("NO_COLOR") then
     COLOR_YELLOW = string.char(27) .. "[33m"
     COLOR_RESET = string.char(27) .. "[0m"
     GREEN_CARET = string.char(27) .. "[92m => " .. COLOR_RESET
+    RED_BREAK = string.char(27) .. "[91m  ● " .. COLOR_RESET
 end
 
 return dbg
