@@ -1747,16 +1747,18 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (vy_unique_key_validate(lsm, key, part_count))
 		return -1;
 	/*
-	 * There are three cases when we need to get the full tuple
+	 * There are four cases when we need to get the full tuple
 	 * before deletion.
 	 * - if the space has on_replace triggers and need to pass
 	 *   to them the old tuple.
 	 * - if deletion is done by a secondary index.
 	 * - if the space has a secondary index and deferred DELETES are
 	 *   disabled.
+	 * - CDC is enabled.
 	 */
 	if ((space->index_count > 1 && !space->def->opts.defer_deletes) ||
-	    lsm->index_id > 0 || !rlist_empty(&space->on_replace)) {
+	    lsm->index_id > 0 || !rlist_empty(&space->on_replace) ||
+	    space->wal_ext != NULL) {
 		if (vy_get_by_raw_key(lsm, tx, vy_tx_read_view(tx),
 				      key, part_count, &stmt->old_tuple) != 0)
 			return -1;
@@ -2130,7 +2132,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		return -1;
 
 	if (space->index_count == 1 && rlist_empty(&space->on_replace) &&
-	    !space->has_foreign_keys)
+	    !space->has_foreign_keys && space->wal_ext == NULL)
 		return vy_lsm_upsert(tx, pk, tuple, tuple_end, ops, ops_end);
 
 	const char *old_tuple, *old_tuple_end;
@@ -2285,14 +2287,15 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 			       COLUMN_MASK_FULL) != 0)
 		return -1;
 	/*
-	 * There are two cases when we need to get the full tuple on replace.
+	 * There are three cases when we need to get the full tuple on replace.
 	 * - if the space has on_replace triggers and need to pass
 	 *   to them the old tuple.
 	 * - if the space has a secondary index and deferred DELETES are
 	 *   disabled.
+	 * - if the space has WAL extensions.
 	 */
 	if ((space->index_count > 1 && !space->def->opts.defer_deletes) ||
-	    !rlist_empty(&space->on_replace)) {
+	    !rlist_empty(&space->on_replace) || space->wal_ext != NULL) {
 		if (vy_get(pk, tx, vy_tx_read_view(tx),
 			   stmt->new_tuple, &stmt->old_tuple) != 0)
 			return -1;
