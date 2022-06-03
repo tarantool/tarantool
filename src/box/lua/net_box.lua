@@ -389,12 +389,20 @@ local function new_sm(uri, opts)
     local function weak_callback(...)
         local callback = weak_refs.callback
         if callback then return callback(...) end
+        -- The callback is responsible for handling graceful shutdown.
+        -- If it's garbage collected, the connection won't be closed on
+        -- receiving 'box.shutdown' event and so the server won't exit
+        -- until the connection object is garbage collected, which may
+        -- take forever. To avoid that, let's break the worker loop if
+        -- we see that the callback is unavailable.
+        weak_refs.transport:stop()
     end
     remote._callback = callback
     local transport = internal.new_transport(
             uri, user, password, weak_callback,
             opts.connect_timeout, opts.reconnect_after,
             opts.fetch_schema)
+    weak_refs.transport = transport
     remote._transport = transport
     remote._gc_hook = ffi.gc(ffi.new('char[1]'), function()
         pcall(transport.stop, transport);
