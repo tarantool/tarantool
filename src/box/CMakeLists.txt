@@ -260,6 +260,10 @@ if(ENABLE_FLIGHT_RECORDER)
     list(APPEND box_sources ${FLIGHT_RECORDER_SOURCES})
 endif()
 
+if(ENABLE_WAL_EXT)
+    list(APPEND box_sources ${WAL_EXT_SOURCES})
+endif()
+
 add_library(box STATIC ${box_sources})
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

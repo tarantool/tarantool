@@ -53,6 +53,7 @@
 #include "tuple_constraint.h"
 #include "tuple_constraint_func.h"
 #include "tuple_constraint_fkey.h"
+#include "wal_ext.h"
 
 int
 access_check_space(struct space *space, user_access_t access)

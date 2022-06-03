@@ -40,6 +40,7 @@
 #include "iproto_constants.h"
 #include "box.h"
 #include "session.h"
+#include "wal_ext.h"
 
 double too_long_threshold;
 
@@ -296,6 +297,8 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 	 */
 	struct space *space = stmt->space;
 	row->group_id = space != NULL ? space_group_id(space) : 0;
+	if (space != NULL && space->wal_ext != NULL)
+		space_wal_ext_process_request(space->wal_ext, stmt, request);
 	struct region *txn_region = tx_region_acquire(txn);
 	row->bodycnt = xrow_encode_dml(request, txn_region, row->body);
 	tx_region_release(txn, TX_ALLOC_SYSTEM);
