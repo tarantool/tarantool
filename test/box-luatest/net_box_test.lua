@@ -1,3 +1,4 @@
+local fiber = require('fiber')
 local msgpack = require('msgpack')
 local net = require('net.box')
 local server = require('test.luatest_helpers.server')
@@ -313,4 +314,25 @@ g.test_box_error = function()
         "Illegal parameters, query id is expected to be numeric",
         c.unprepare, c, "asd")
     c:close()
+end
+
+g.test_gc = function()
+    local c = net.connect(g.server.net_box_uri)
+    t.assert(c:eval('return true'))
+    local weak_refs = setmetatable({
+        conn = c,
+        callback = c._callback,
+        transport = c._transport,
+    }, {__mode = 'v'})
+    t.assert(weak_refs.conn)
+    t.assert(weak_refs.callback)
+    t.assert(weak_refs.transport)
+    c = nil -- luacheck: no unused
+    fiber.yield()
+    collectgarbage('collect')
+    fiber.yield()
+    collectgarbage('collect')
+    t.assert_not(weak_refs.conn)
+    t.assert_not(weak_refs.callback)
+    t.assert_not(weak_refs.transport)
 end
