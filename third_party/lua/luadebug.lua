@@ -35,7 +35,10 @@ local COLOR_BLUE = ""
 local COLOR_YELLOW = ""
 local COLOR_RESET = ""
 local GREEN_CARET = " => "
+local RED_BREAK = "  ● "
 local auto_listing = true
+
+local LJ_MAX_LINE = 0x7fffff00 -- Max. source code line number.
 
 local function pretty(obj, max_depth)
     if max_depth == nil then
@@ -148,21 +151,40 @@ local function format_stack_frame_info(info)
     return format_loc(source, info.currentline) .. " in " .. namewhat .. " " .. name
 end
 
+local normalized_paths = {}
+
+-- This function is on a hot path of a debugger hook.
+-- Try very hard to avoid wasting of CPU cycles, so reuse
+-- previously calculated results via memoization
 local function normalize_path(file)
+    local decorated_name = file
+    if normalized_paths[decorated_name] ~= nil then
+        return normalized_paths[decorated_name]
+    end
     -- If the name doesn't start with `@`, assume it's a file name if it's all
     -- on one line.
     if string.find(file, "^@") or not string.find(file, "[\r\n]") then
-        file = string.gsub(string.gsub(file, "^@", ""), "\\", "/")
-
-        file = fio.basename(file)
+        file = fio.basename(string.gsub(file, "^@", ""))
 
         -- some file systems allow newlines in file names; remove these.
         file = string.gsub(file, "\n", ' ')
     end
+    -- memoize current result - it will be needed very soon
+    normalized_paths[decorated_name] = file
     return file
 end
 
 local myself = normalize_path(debug.getinfo(1,'S').source)
+local breakpoints = {}
+
+local function has_breakpoint(file, line)
+    return breakpoints[line] and breakpoints[line][file]
+end
+
+local function has_active_breakpoints()
+    local key = next(breakpoints)
+    return key ~= nil
+end
 
 local repl
 
@@ -197,10 +219,32 @@ local function hook_factory(level)
             local offset = get_stack_length(dbg_hook_ofs)
 
             if event == "line" then
-                if offset <= stop_level then
+                local matched = offset <= stop_level or
+                                has_breakpoint(file, info.currentline)
+                if matched then
                     repl(reason)
                 end
             end
+        end
+    end
+end
+
+-- For the breakpoint hook, we will bail out of a function
+-- for a majority of a calls (say in 99.999% of a cases).
+-- So it's very important to spend as little time as possible
+-- here: quick return if irrelevant, allocate the least possible
+-- memory, memoize calculated values - as for neighborhood lines it will
+-- be mostly the same
+local function hook_check_bps()
+    return function(event, _)
+        -- Skip events that don't have line information.
+        local info = debug.getinfo(2, "Snl")
+        local file = normalize_path(info.source)
+        if not frame_has_line(info) then
+            return
+        end
+        if event == 'line' and has_breakpoint(file, info.currentline) then
+            repl()
         end
     end
 end
@@ -305,7 +349,7 @@ end
 local SOURCE_CACHE = {}
 local tnt = nil
 
-local function where(info, context_lines)
+local function where(info, context_lines, as_break)
     local filesource = info.source
     local source = SOURCE_CACHE[info.source]
     if not source then
@@ -321,7 +365,7 @@ local function where(info, context_lines)
             end)
         else
             -- external module - load file
-            local filename = filesource:match("@(.*)")
+            local filename = filesource:match("@(.*)") or filesource
             if filename then
                 pcall(function()
                     for line in io.lines(filename) do
@@ -338,8 +382,10 @@ local function where(info, context_lines)
     end
 
     if source and source[info.currentline] then
-        for i = info.currentline - context_lines, info.currentline + context_lines do
-            local tab_or_caret = (i == info.currentline and GREEN_CARET or "    ")
+        for i = info.currentline - context_lines,
+                info.currentline + context_lines do
+            local sep = as_break and RED_BREAK or GREEN_CARET
+            local tab_or_caret = i == info.currentline and sep or "    "
             local line = source[i]
             if line then
                 dbg_writeln(color_grey("% 4d") .. tab_or_caret .. "%s", i, line)
@@ -371,9 +417,13 @@ local function cmd_finish()
     return true, hook_factory(current_stack_level() - CMD_STACK_LEVEL - 1)
 end
 
--- simply continue execution
+-- If there is no any single defined breakpoint yet, then
+-- do not stop in debugger hooks
 local function cmd_continue()
-    return true
+    if not has_active_breakpoints() then
+        return true
+    end
+    return true, hook_check_bps
 end
 
 local function cmd_print(expr)
@@ -416,6 +466,144 @@ local function cmd_eval(code)
         dbg_writeln(color_red("Error:") .. " " .. tostring(err))
     end
 
+    return false
+end
+
+--[[
+    Parse source location syntax. One of a kind:
+        luadebug.lua:100
+        luadebug.lua+100
+        :100
+        +100
+--]]
+local function parse_bp(expr)
+    assert(expr)
+    local from, to, file, line = expr:find('^(.-)%s*[+:](%d+)%s*$')
+    if not from then return nil end
+    assert(to == #expr)
+    return file, tonumber(line)
+end
+
+local function _bp_format_expected()
+    dbg_writeln(color_red("Error:") ..
+        " command expects argument in format filename:NN or" ..
+        " filename+NN, where NN should be a positive number."
+    )
+end
+
+-- check range to fit in boundaries {from, to}
+local function check_line_max(v, from, to)
+    if type(v) ~= 'number' then
+        dbg_writeln(color_red("Error:") ..
+                    " numeric value expected as line number, but received %s",
+                    type(v))
+        return false
+    end
+    if v >= from and v <= to then
+        return true
+    end
+    dbg_writeln(color_red("Error:") ..
+                " line number %d is out of allowed range [%d, %d]",
+                v, from, to)
+    return false
+end
+
+
+local function cmd_add_breakpoint(bps)
+    assert(bps)
+    local fullfile, line = parse_bp(bps)
+    if not fullfile then
+        _bp_format_expected()
+        return false
+    end
+    if not check_line_max(line, 1, LJ_MAX_LINE) then
+        return false
+    end
+    local info = debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL, "S")
+    local debuggee = info.source
+    local file = #fullfile > 0 and fullfile or debuggee
+    local normfile = normalize_path(file)
+
+    -- save direct hash (for faster lookup): line -> file
+    if not breakpoints[line] then
+        breakpoints[line] = {}
+    end
+    breakpoints[line][normfile] = true
+    -- save reversed hash information: file -> [lines]
+    if not breakpoints[normfile] then
+        breakpoints[normfile] = {}
+    end
+    breakpoints[normfile][line] = true
+
+    dbg_writeln("Added breakpoint %s:%d.", color_blue(normfile), line)
+    where({source = file, currentline = line}, 0, true)
+    return false
+end
+
+local function _bpd_format_expected()
+    dbg_writeln(color_red("Error:") ..
+        " command expects argument specifying breakpoint or" ..
+        " * for all breakpoints."
+    )
+end
+
+local function cmd_remove_breakpoint(bps)
+    assert(bps)
+    if bps == '*' then
+        breakpoints = {}
+        dbg_writeln("Removed all breakpoints.")
+        return false
+    end
+
+    local fullfile, line = parse_bp(bps)
+    if not fullfile then
+        _bpd_format_expected()
+        return false
+    end
+    if not check_line_max(line, 1, LJ_MAX_LINE) then
+        return false
+    end
+    local info = debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL, "S")
+    local debuggee = info.source
+    local file = #fullfile > 0 and fullfile or debuggee
+    local normfile = normalize_path(file)
+    local removed = false
+
+    if breakpoints[line] and breakpoints[line][normfile] then
+        breakpoints[line][normfile] = nil
+        -- direct and reverse hashes should be in sync
+        assert(breakpoints[normfile] and breakpoints[normfile][line])
+        breakpoints[normfile][line] = nil
+        removed = true
+    end
+    if removed then
+        dbg_writeln("Removed breakpoint %s:%d.", color_blue(normfile), line)
+    else
+        dbg_writeln("No breakpoint defined in %s:%d.", color_blue(normfile), line)
+    end
+    return false
+end
+
+local function cmd_list_breakpoints()
+    if has_active_breakpoints() then
+        dbg_writeln("List of active breakpoints:")
+        -- we keep both lines->file and file->line in the same
+        -- breakpoints[] array, thus we should filter out strings
+        for file, breaks in pairs(breakpoints) do
+            if type(file) == 'string' then
+                local sorted = {}
+                for line, _ in pairs(breaks) do
+                    table.insert(sorted, line)
+                end
+                table.sort(sorted)
+                for _, line in pairs(sorted) do
+                    dbg_writeln("\t%s:%d", file, line)
+                end
+            end
+        end
+    else
+        dbg_writeln("No active breakpoints defined.")
+    end
     return false
 end
 
@@ -544,6 +732,9 @@ local function cmd_quit()
 end
 
 local commands_help = {
+    {'b.reak.point $location|add_break.point', 'set new breakpoints at module.lua+num', cmd_add_breakpoint},
+    {'bd.elete $location|delete_break.point', 'delete breakpoints',  cmd_remove_breakpoint},
+    {'bl.ist|list_break.points', 'list breakpoints', cmd_list_breakpoints},
     {'c.ont.inue', 'continue execution', cmd_continue},
     {'d.own', 'move down the stack by one frame',  cmd_down},
     {'e.val $expression', 'execute the statement',  cmd_eval},
@@ -567,6 +758,11 @@ local function build_commands_map(commands)
         local first = true
         local main_cmd
         local pattern = '^[^%s]+%s+([^%s]+)'
+        --[[
+            "expected argument" is treated as a global attribute,
+            active for all command's aliases.
+        ]]
+        local arg_exp = false
 
         for subcmds in c:gmatch('[^|]+') do
             local arg = subcmds:match(pattern)
@@ -580,6 +776,7 @@ local function build_commands_map(commands)
             -- remember the first segment (main shortcut for command)
             if first then
                 main_cmd = prefix
+                arg_exp = arg
             end
 
             repeat
@@ -590,7 +787,7 @@ local function build_commands_map(commands)
                     first = first,
                     suffix = suffix,
                     aliases = {},
-                    arg = arg
+                    arg = arg_exp
                 }
                 if first then
                     table.insert(gen_commands, main_cmd)
@@ -637,7 +834,7 @@ local function run_command(line)
     if handler then
         if arg_expected and command_arg == nil then
             dbg_writeln(color_red("Error:") ..
-                " command expects argument, but none received '%s'.\n" ..
+                " command '%s' expects argument, but none received.\n" ..
                 "Type 'h' and press return for a command list.", line)
             return false
         else
@@ -649,7 +846,7 @@ local function run_command(line)
         return unpack({ cmd_eval(line) })
     else
         dbg_writeln(color_red("Error:") ..
-            " command '%s' not recognized.\n" ..
+            " command '%s' is not recognized.\n" ..
             "Type 'h' and press return for a command list.", line)
         return false
     end
@@ -814,6 +1011,7 @@ if color_maybe_supported and not os.getenv("NO_COLOR") then
     COLOR_YELLOW = string.char(27) .. "[33m"
     COLOR_RESET = string.char(27) .. "[0m"
     GREEN_CARET = string.char(27) .. "[92m => " .. COLOR_RESET
+    RED_BREAK = string.char(27) .. "[91m  ● " .. COLOR_RESET
 end
 
 return dbg
