@@ -543,11 +543,9 @@ sqlGetInt32(const char *zNum, int *pValue)
 	 *             1234567890
 	 *     2^31 -> 2147483648
 	 */
-	testcase(i == 10);
 	if (i > 10) {
 		return 0;
 	}
-	testcase(v - neg == 2147483647);
 	if (v - neg > 2147483647) {
 		return 0;
 	}

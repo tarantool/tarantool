@@ -381,8 +381,6 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
 
 		if (pLoop->index_def != NULL &&
 		    pLoop->index_def->key_def->parts[iEq].sort_order) {
-			testcase(iEq == 0);
-			testcase(bRev);
 			bRev = !bRev;
 		}
 		assert(pX->op == TK_IN);
@@ -465,7 +463,6 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
 					aiMap =
 					    (int *)sqlDbMallocZero(pParse->db,
 								       sizeof(int) * nEq);
-					testcase(aiMap == 0);
 				}
 				pSelect->pEList = pRhs;
 				db->dbOptFlags |= SQL_QueryFlattener;
@@ -474,7 +471,6 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
 						       IN_INDEX_LOOP, 0, aiMap,
 						       0);
 				db->dbOptFlags = savedDbOptFlags;
-				testcase(aiMap != 0 && aiMap[0] != 0);
 				pSelect->pEList = pOrigRhs;
 				pLeft->x.pList = pOrigLhs;
 				pX->pLeft = pLeft;
@@ -484,7 +480,6 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
 		}
 
 		if (eType == IN_INDEX_INDEX_DESC) {
-			testcase(bRev);
 			bRev = !bRev;
 		}
 		iTab = pX->iTable;
@@ -632,8 +627,6 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 		/* The following testcase is true for indices with redundant columns.
 		 * Ex: CREATE INDEX i1 ON t1(a,b,a); SELECT * FROM t1 WHERE a=0 AND b=0;
 		 */
-		testcase((pTerm->wtFlags & TERM_CODED) != 0);
-		testcase(pTerm->wtFlags & TERM_VIRTUAL);
 		r1 = codeEqualityTerm(pParse, pTerm, pLevel, j, bRev,
 				      regBase + j);
 		if (r1 != regBase + j) {
@@ -910,10 +903,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 		    codeAllEqualityTerms(pParse, pLevel, bRev, nExtraReg);
 		addrNxt = pLevel->addrNxt;
 
-		testcase(pRangeStart && (pRangeStart->eOperator & WO_LE) != 0);
-		testcase(pRangeStart && (pRangeStart->eOperator & WO_GE) != 0);
-		testcase(pRangeEnd && (pRangeEnd->eOperator & WO_LE) != 0);
-		testcase(pRangeEnd && (pRangeEnd->eOperator & WO_GE) != 0);
 		startEq = !pRangeStart
 		    || pRangeStart->eOperator & (WO_LE | WO_GE);
 		endEq = !pRangeEnd || pRangeEnd->eOperator & (WO_LE | WO_GE);
@@ -933,7 +922,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			}
 
 			nConstraint += nBtm;
-			testcase(pRangeStart->wtFlags & TERM_VIRTUAL);
 			if (sqlExprIsVector(pRight) == 0) {
 				disableTerm(pLevel, pRangeStart);
 			} else {
@@ -959,17 +947,11 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 					     nConstraint);
 			VdbeCoverage(v);
 			VdbeCoverageIf(v, op == OP_Rewind);
-			testcase(op == OP_Rewind);
 			VdbeCoverageIf(v, op == OP_Last);
-			testcase(op == OP_Last);
 			VdbeCoverageIf(v, op == OP_SeekGT);
-			testcase(op == OP_SeekGT);
 			VdbeCoverageIf(v, op == OP_SeekGE);
-			testcase(op == OP_SeekGE);
 			VdbeCoverageIf(v, op == OP_SeekLE);
-			testcase(op == OP_SeekLE);
 			VdbeCoverageIf(v, op == OP_SeekLT);
-			testcase(op == OP_SeekLT);
 		}
 
 		/* Load the value for the inequality constraint at the end of the
@@ -987,7 +969,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 				VdbeCoverage(v);
 			}
 			nConstraint += nTop;
-			testcase(pRangeEnd->wtFlags & TERM_VIRTUAL);
 
 			if (sqlExprIsVector(pRight) == 0) {
 				disableTerm(pLevel, pRangeEnd);
@@ -1008,13 +989,9 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			op = aEndOp[bRev * 2 + endEq];
 			sqlVdbeAddOp4Int(v, op, iIdxCur, addrNxt, regBase,
 					     nConstraint);
-			testcase(op == OP_IdxGT);
 			VdbeCoverageIf(v, op == OP_IdxGT);
-			testcase(op == OP_IdxGE);
 			VdbeCoverageIf(v, op == OP_IdxGE);
-			testcase(op == OP_IdxLT);
 			VdbeCoverageIf(v, op == OP_IdxLT);
-			testcase(op == OP_IdxLE);
 			VdbeCoverageIf(v, op == OP_IdxLE);
 		}
 
@@ -1172,15 +1149,12 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 					continue;
 				if (ExprHasProperty(pExpr, EP_FromJoin))
 					continue;
-				testcase(pWC->a[iTerm].wtFlags & TERM_VIRTUAL);
-				testcase(pWC->a[iTerm].wtFlags & TERM_CODED);
 				if ((pWC->a[iTerm].
 				     wtFlags & (TERM_VIRTUAL | TERM_CODED)) !=
 				    0)
 					continue;
 				if ((pWC->a[iTerm].eOperator & WO_ALL) == 0)
 					continue;
-				testcase(pWC->a[iTerm].wtFlags & TERM_ORINFO);
 				pExpr = sqlExprDup(db, pExpr, 0);
 				pAndExpr = sql_and_expr_new(db, pAndExpr,
 							    pExpr);
@@ -1388,14 +1362,9 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 	for (pTerm = pWC->a, j = pWC->nTerm; j > 0; j--, pTerm++) {
 		Expr *pE;
 		int skipLikeAddr = 0;
-		testcase(pTerm->wtFlags & TERM_VIRTUAL);
-		testcase(pTerm->wtFlags & TERM_CODED);
 		if (pTerm->wtFlags & (TERM_VIRTUAL | TERM_CODED))
 			continue;
 		if ((pTerm->prereqAll & pLevel->notReady) != 0) {
-			testcase(pWInfo->untestedTerms == 0
-				 && (pWInfo->wctrlFlags & WHERE_OR_SUBCLAUSE) !=
-				 0);
 			pWInfo->untestedTerms = 1;
 			continue;
 		}
@@ -1450,8 +1419,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			continue;
 		if (pAlt->wtFlags & (TERM_CODED))
 			continue;
-		testcase(pAlt->eOperator & WO_EQ);
-		testcase(pAlt->eOperator & WO_IN);
 		VdbeModuleComment((v, "begin transitive constraint"));
 		sEAlt = *pAlt->pExpr;
 		sEAlt.pLeft = pE->pLeft;
@@ -1467,8 +1434,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 		VdbeComment((v, "record LEFT JOIN hit"));
 		sqlExprCacheClear(pParse);
 		for (pTerm = pWC->a, j = 0; j < pWC->nTerm; j++, pTerm++) {
-			testcase(pTerm->wtFlags & TERM_VIRTUAL);
-			testcase(pTerm->wtFlags & TERM_CODED);
 			if (pTerm->wtFlags & (TERM_VIRTUAL | TERM_CODED))
 				continue;
 			if ((pTerm->prereqAll & pLevel->notReady) != 0) {

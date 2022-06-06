@@ -3138,7 +3138,6 @@ case OP_RowData: {
 	if (n>(u32)db->aLimit[SQL_LIMIT_LENGTH]) {
 		goto too_big;
 	}
-	testcase( n==0);
 
 	char *buf = region_alloc(&fiber()->gc, n);
 	if (buf == NULL) {
@@ -3390,7 +3389,6 @@ case OP_Next:          /* jump */
 	assert(pC!=0);
 	assert(pC->eCurType==CURTYPE_TARANTOOL);
 	assert(res==0 || res==1);
-	testcase( res==1);
 	assert(pOp->opcode!=OP_Next || pOp->p4.xAdvance == sqlCursorNext);
 	assert(pOp->opcode!=OP_Prev || pOp->p4.xAdvance == sqlCursorPrevious);
 	assert(pOp->opcode!=OP_NextIfOpen || pOp->p4.xAdvance == sqlCursorNext);
@@ -4491,7 +4489,6 @@ abort_due_to_error:
 
 	/* This is the only way out of this procedure. */
 vdbe_return:
-	testcase( nVmStep>0);
 	p->aCounter[SQL_STMTSTATUS_VM_STEP] += (int)nVmStep;
 	assert(rc == 0 || rc == -1 || rc == SQL_ROW || rc == SQL_DONE);
 	return rc;

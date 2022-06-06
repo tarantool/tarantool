@@ -1091,10 +1091,6 @@ strftimeFunc(sql_context * context, int argc, sql_value ** argv)
 			i++;
 		}
 	}
-	testcase(n == sizeof(zBuf) - 1);
-	testcase(n == sizeof(zBuf));
-	testcase(n == (u64) db->aLimit[SQL_LIMIT_LENGTH] + 1);
-	testcase(n == (u64) db->aLimit[SQL_LIMIT_LENGTH]);
 	if (n < sizeof(zBuf)) {
 		z = zBuf;
 	} else if (n > (u64) db->aLimit[SQL_LIMIT_LENGTH]) {

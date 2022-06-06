@@ -290,7 +290,6 @@ sqlVXPrintf(StrAccum * pAccum,	/* Accumulate results here */
 				wx = wx * 10 + c - '0';
 				c = *++fmt;
 			}
-			testcase(wx > 0x7fffffff);
 			width = wx & 0x7fffffff;
 		}
 		assert(width >= 0);
@@ -316,7 +315,6 @@ sqlVXPrintf(StrAccum * pAccum,	/* Accumulate results here */
 					px = px * 10 + c - '0';
 					c = *++fmt;
 				}
-				testcase(px > 0x7fffffff);
 				precision = px & 0x7fffffff;
 			}
 		} else {
@@ -495,7 +493,6 @@ sqlVXPrintf(StrAccum * pAccum,	/* Accumulate results here */
 			}
 			if (xtype == etGENERIC && precision > 0)
 				precision--;
-			testcase(precision > 0xfff);
 			for (idx = precision & 0xfff, rounder = 0.5; idx > 0;
 			     idx--, rounder *= 0.1) {
 			}
@@ -831,8 +828,6 @@ sqlStrAccumEnlarge(StrAccum * p, int N)
 	char *zNew;
 	assert(p->nChar + (i64) N >= p->nAlloc);	/* Only called if really needed */
 	if (p->accError) {
-		testcase(p->accError == STRACCUM_TOOBIG);
-		testcase(p->accError == STRACCUM_NOMEM);
 		return 0;
 	}
 	if (p->mxAlloc == 0) {
@@ -884,7 +879,6 @@ sqlStrAccumEnlarge(StrAccum * p, int N)
 void
 sqlAppendChar(StrAccum * p, int N, char c)
 {
-	testcase(p->nChar + (i64) N > 0x7fffffff);
 	if (p->nChar + (i64) N >= p->nAlloc
 	    && (N = sqlStrAccumEnlarge(p, N)) <= 0) {
 		return;
