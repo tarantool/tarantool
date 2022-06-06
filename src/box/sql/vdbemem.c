@@ -315,7 +315,6 @@ valueFromExpr(sql * db,	/* The database connection */
 		if ((rc = vdbe_mem_numerify(pVal)) != 0)
 			return rc;
 	}
-#ifndef SQL_OMIT_BLOB_LITERAL
 	else if (op == TK_BLOB) {
 		int nVal;
 		assert(pExpr->u.zToken[0] == 'x' || pExpr->u.zToken[0] == 'X');
@@ -329,7 +328,6 @@ valueFromExpr(sql * db,	/* The database connection */
 		sqlVdbeMemSetStr(pVal, sqlHexToBlob(db, zVal, nVal),
 				     nVal / 2, 0, SQL_DYNAMIC);
 	}
-#endif
 
 	else if (op == TK_FUNCTION && pCtx != 0) {
 		rc = valueFromFunction(db, pExpr, type, &pVal, pCtx);

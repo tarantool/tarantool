@@ -906,7 +906,6 @@ sqlHexToInt(int h)
 	return (u8) (h & 0xf);
 }
 
-#if !defined(SQL_OMIT_BLOB_LITERAL) || defined(SQL_HAS_CODEC)
 /*
  * Convert a BLOB literal of the form "x'hhhhhh'" into its binary
  * value.  Return a pointer to its binary value.  Space to hold the
@@ -931,7 +930,6 @@ sqlHexToBlob(sql * db, const char *z, int n)
 	}
 	return zBlob;
 }
-#endif				/* !SQL_OMIT_BLOB_LITERAL || SQL_HAS_CODEC */
 
 int
 sql_add_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
