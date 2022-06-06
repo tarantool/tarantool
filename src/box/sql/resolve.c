@@ -447,7 +447,6 @@ lookupName(Parse * pParse,	/* The parsing context */
 	 */
 	if (pExpr->iColumn >= 0 && pMatch != 0) {
 		int n = pExpr->iColumn;
-		testcase(n == BMS - 1);
 		if (n >= BMS) {
 			n = BMS - 1;
 		}
@@ -683,9 +682,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 		}
 	case TK_SELECT:
 	case TK_EXISTS:
-		testcase(pExpr->op == TK_EXISTS);
 	case TK_IN:{
-			testcase(pExpr->op == TK_IN);
 			if (ExprHasProperty(pExpr, EP_xIsSelect)) {
 				int nRef = pNC->nRef;
 				assert((pNC->ncFlags & NC_IdxExpr) == 0);

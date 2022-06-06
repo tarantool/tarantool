@@ -60,8 +60,6 @@ static SQL_NOINLINE int
 walkExpr(Walker * pWalker, Expr * pExpr)
 {
 	int rc;
-	testcase(ExprHasProperty(pExpr, EP_TokenOnly));
-	testcase(ExprHasProperty(pExpr, EP_Reduced));
 	rc = pWalker->xExprCallback(pWalker, pExpr);
 	if (rc || ExprHasProperty(pExpr, (EP_TokenOnly | EP_Leaf))) {
 		return rc & WRC_Abort;

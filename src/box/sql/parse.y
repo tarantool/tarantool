@@ -64,11 +64,6 @@
 #define YYNOERRORRECOVERY 1
 
 /*
-** Make yytestcase() the same as testcase()
-*/
-#define yytestcase(X) testcase(X)
-
-/*
 ** Indicate that sqlParserFree() will never be called with a null
 ** pointer.
 */

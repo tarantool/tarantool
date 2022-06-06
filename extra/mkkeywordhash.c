@@ -568,10 +568,6 @@ int main(int argc, char **argv){
   printf("      zKW = &zText[aOffset[i]];\n");
   printf("      while( j<n && (z[j]&~0x20)==zKW[j] ){ j++; }\n");
   printf("      if( j<n ) continue;\n");
-  for(i=0; i<nKeyword; i++){
-    printf("      testcase( i==%d ); /* %s */\n",
-           i, aKeywordTable[i].zOrigName);
-  }
   printf("      *pType = aCode[i];\n");
   printf("      if (pFlag) {\n");
   printf("        *pFlag = aFlag[i];\n");

@@ -840,8 +840,6 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 			int iCol = pTerm->u.leftColumn;
 			Bitmask cMask =
 			    iCol >= BMS ? MASKBIT(BMS - 1) : MASKBIT(iCol);
-			testcase(iCol == BMS - 1);
-			testcase(iCol == BMS);
 			if ((idxCols & cMask) == 0) {
 				idxCols |= cMask;
 				struct field_def *field =
@@ -1409,7 +1407,6 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 			int iUprIdx = -1;	/* aSample[] for the upper bound */
 
 			if (pRec) {
-				testcase(pRec->nField != pBuilder->nRecValid);
 				pRec->nField = pBuilder->nRecValid;
 			}
 			/* Determine iLower and iUpper using ($P) only. */
@@ -2442,7 +2439,6 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 		if ((pSrc->fg.jointype & JT_LEFT) != 0
 		    && !ExprHasProperty(pTerm->pExpr, EP_FromJoin)
 		    && (eOp & WO_ISNULL) != 0) {
-			testcase(eOp & WO_ISNULL);
 			continue;
 		}
 
@@ -2510,8 +2506,6 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 		} else if (eOp & WO_ISNULL) {
 			pNew->wsFlags |= WHERE_COLUMN_NULL;
 		} else if (eOp & (WO_GT | WO_GE)) {
-			testcase(eOp & WO_GT);
-			testcase(eOp & WO_GE);
 			pNew->wsFlags |= WHERE_COLUMN_RANGE | WHERE_BTM_LIMIT;
 			pNew->nBtm =
 			    whereRangeVectorLen(pParse, pSrc->iCursor, probe,
@@ -2535,8 +2529,6 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 			}
 		} else {
 			assert(eOp & (WO_LT | WO_LE));
-			testcase(eOp & WO_LT);
-			testcase(eOp & WO_LE);
 			pNew->wsFlags |= WHERE_COLUMN_RANGE | WHERE_TOP_LIMIT;
 			pNew->nTop =
 			    whereRangeVectorLen(pParse, pSrc->iCursor, probe,
@@ -2565,7 +2557,6 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 			assert(pNew->nOut == saved_nOut);
 			if (pTerm->truthProb <= 0 && probe->space_id != 0) {
 				assert((eOp & WO_IN) || nIn == 0);
-				testcase(eOp & WO_IN);
 				pNew->nOut += pTerm->truthProb;
 				pNew->nOut -= nIn;
 			} else {
@@ -2580,8 +2571,6 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 					Expr *pExpr = pTerm->pExpr;
 					if ((eOp & (WO_EQ | WO_ISNULL))
 					    != 0) {
-						testcase(eOp & WO_EQ);
-						testcase(eOp & WO_ISNULL);
 						rc = whereEqualScanEst(pParse,
 								       pBuilder,
 								       pExpr->pRight,
@@ -3238,7 +3227,6 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 		return 0;
 
 	nOrderBy = pOrderBy->nExpr;
-	testcase(nOrderBy == BMS - 1);
 	if (nOrderBy > BMS - 1)
 		return 0;	/* Cannot optimize overly large ORDER BYs */
 	isOrderDistinct = 1;
@@ -3351,7 +3339,6 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 					 */
 					if ((eOp & eqOpMask) != 0) {
 						if (eOp & WO_ISNULL) {
-							testcase(isOrderDistinct);
 							isOrderDistinct = 0;
 						}
 						continue;
@@ -3413,8 +3400,6 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 						continue;
 					pOBExpr =
 					    sqlExprSkipCollate(pOrderBy-> a[i].pExpr);
-					testcase(wctrlFlags & WHERE_GROUPBY);
-					testcase(wctrlFlags & WHERE_DISTINCTBY);
 					if ((wctrlFlags & (WHERE_GROUPBY | WHERE_DISTINCTBY)) == 0)
 						bOnce = 0;
 					if (iColumn >= (-1)) {
@@ -3466,14 +3451,12 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 				} else {
 					/* No match found */
 					if (j == 0 || j < nColumn) {
-						testcase(isOrderDistinct != 0);
 						isOrderDistinct = 0;
 					}
 					break;
 				}
 			}	/* end Loop over all index columns */
 			if (distinctColumns) {
-				testcase(isOrderDistinct == 0);
 				isOrderDistinct = 1;
 			}
 		}
@@ -3795,7 +3778,6 @@ wherePathSolver(WhereInfo * pWInfo, LogEst nRowEst)
 					if (pTo->maskLoop == maskNew
 					    && ((pTo->isOrdered ^ isOrdered) &
 						0x80) == 0) {
-						testcase(jj == nTo - 1);
 						break;
 					}
 				}
@@ -3871,10 +3853,8 @@ wherePathSolver(WhereInfo * pWInfo, LogEst nRowEst)
 						}
 #endif
 						/* Discard the candidate path from further consideration */
-						testcase(pTo->rCost == rCost);
 						continue;
 					}
-					testcase(pTo->rCost == rCost + 1);
 					/* Control reaches here if the candidate path is better than the
 					 * pTo path.  Replace pTo with the candidate.
 					 */
@@ -4007,9 +3987,6 @@ wherePathSolver(WhereInfo * pWInfo, LogEst nRowEst)
 						     nLoop - 1,
 						     pFrom->aLoop[nLoop - 1],
 						     &m);
-						testcase(wsFlags & WHERE_IPK);
-						testcase(wsFlags &
-							 WHERE_COLUMN_IN);
 						if (rc ==
 						    pWInfo->pOrderBy->nExpr) {
 							pWInfo->
@@ -4072,7 +4049,6 @@ where_loop_assign_terms(struct WhereLoop *loop, struct WhereClause *where,
 					       idx_def->key_def : NULL);
 		if (term == NULL)
 			break;
-		testcase(pTerm->eOperator & WO_IS);
 		loop->aLTerm[i] = term;
 	}
 	if (i != column_count)
@@ -4304,7 +4280,6 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 	memset(&sWLB, 0, sizeof(sWLB));
 
 	/* An ORDER/GROUP BY clause of more than 63 terms cannot be optimized */
-	testcase(pOrderBy && pOrderBy->nExpr == BMS - 1);
 	if (pOrderBy && pOrderBy->nExpr >= BMS)
 		pOrderBy = 0;
 	sWLB.pOrderBy = pOrderBy;
@@ -4319,7 +4294,6 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 	/* The number of tables in the FROM clause is limited by the number of
 	 * bits in a Bitmask
 	 */
-	testcase(pTabList->nSrc == BMS);
 	if (pTabList->nSrc > BMS) {
 		diag_set(ClientError, ER_SQL_PARSER_LIMIT, "The number of "\
 			 "tables in a join", pTabList->nSrc, BMS);

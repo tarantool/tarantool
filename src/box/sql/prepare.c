@@ -70,8 +70,6 @@ sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 	if (nBytes >= 0 && (nBytes == 0 || zSql[nBytes - 1] != 0)) {
 		char *zSqlCopy;
 		int mxLen = db->aLimit[SQL_LIMIT_SQL_LENGTH];
-		testcase(nBytes == mxLen);
-		testcase(nBytes == mxLen + 1);
 		if (nBytes > mxLen) {
 			diag_set(ClientError, ER_SQL_PARSER_LIMIT,
 				 "SQL command length", nBytes, mxLen);

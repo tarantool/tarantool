@@ -2913,13 +2913,11 @@ static int
 sqlVdbeMemGrow(struct Mem *pMem, int n, int bPreserve)
 {
 	assert(sqlVdbeCheckMemInvariants(pMem));
-	testcase(pMem->db == 0);
 
 	/* If the bPreserve flag is set to true, then the memory cell must already
 	 * contain a valid string or blob value.
 	 */
 	assert(bPreserve == 0 || mem_is_bytes(pMem));
-	testcase(bPreserve && pMem->z == 0);
 
 	assert(pMem->szMalloc == 0 ||
 	       pMem->szMalloc == sqlDbMallocSize(pMem->db, pMem->zMalloc));

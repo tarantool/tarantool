@@ -200,33 +200,6 @@
 #endif
 
 /*
- * The testcase() macro is used to aid in coverage testing.  When
- * doing coverage testing, the condition inside the argument to
- * testcase() must be evaluated both true and false in order to
- * get full branch coverage.  The testcase() macro is inserted
- * to help ensure adequate test coverage in places where simple
- * condition/decision coverage is inadequate.  For example, testcase()
- * can be used to make sure boundary values are tested.  For
- * bitmask tests, testcase() can be used to make sure each bit
- * is significant and used at least once.  On switch statements
- * where multiple cases go to the same block of code, testcase()
- * can insure that all cases are evaluated.
- *
- */
-#define testcase(X)
-
-/*
- * The TESTONLY macro is used to enclose variable declarations or
- * other bits of code that are needed to support the arguments
- * within testcase() and assert() macros.
- */
-#if !defined(NDEBUG)
-#define TESTONLY(X)  X
-#else
-#define TESTONLY(X)
-#endif
-
-/*
  * Sometimes we need a small amount of code such as a variable initialization
  * to setup for a later assert() statement.  We do not want this code to
  * appear when assert() is disabled.  The following macro is therefore

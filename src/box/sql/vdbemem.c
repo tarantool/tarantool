@@ -240,7 +240,6 @@ valueFromExpr(sql * db,	/* The database connection */
 
 	if (op == TK_CAST) {
 		rc = valueFromExpr(db, pExpr->pLeft, pExpr->type, ppVal, pCtx);
-		testcase(rc != 0);
 		if (*ppVal) {
 			sqlVdbeMemCast(*ppVal, pExpr->type);
 			sql_value_apply_type(*ppVal, type);
