@@ -361,12 +361,10 @@ sqlTreeViewExpr(TreeView * pView, const Expr * pExpr, u8 moreToFollow)
 			sqlTreeViewLine(pView, "NULL");
 			break;
 		}
-#ifndef SQL_OMIT_BLOB_LITERAL
 	case TK_BLOB:{
 			sqlTreeViewLine(pView, "%s", pExpr->u.zToken);
 			break;
 		}
-#endif
 	case TK_VARIABLE:{
 			sqlTreeViewLine(pView, "VARIABLE(%s,%d)",
 					    pExpr->u.zToken, pExpr->iColumn);

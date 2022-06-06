@@ -3844,7 +3844,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sqlVdbeAddOp2(v, OP_Null, 0, target);
 			return target;
 		}
-#ifndef SQL_OMIT_BLOB_LITERAL
 	case TK_BLOB:{
 			int n;
 			const char *z;
@@ -3861,7 +3860,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					  P4_DYNAMIC);
 			return target;
 		}
-#endif
 	case TK_VARIABLE:{
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			assert(pExpr->u.zToken != 0);
