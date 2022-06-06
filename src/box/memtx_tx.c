@@ -1705,7 +1705,8 @@ memtx_tx_handle_gap_write(struct txn *txn, struct space *space,
 	struct full_scan_item *fsc_item, *fsc_tmp;
 	struct rlist *fsc_list = &index->full_scans;
 	rlist_foreach_entry_safe(fsc_item, fsc_list, in_full_scans, fsc_tmp) {
-		if (memtx_tx_cause_conflict(txn, fsc_item->txn) != 0)
+		if (fsc_item->txn != txn &&
+		    memtx_tx_cause_conflict(txn, fsc_item->txn) != 0)
 			return -1;
 	}
 	if (successor != NULL && !successor->is_dirty)
