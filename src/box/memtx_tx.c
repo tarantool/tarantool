@@ -1499,7 +1499,8 @@ check_hole(struct space *space, uint32_t index,
 
 	struct point_hole_item *item = list;
 	do {
-		if (memtx_tx_save_conflict(inserter, item->txn,
+		if (inserter != item->txn &&
+		    memtx_tx_save_conflict(inserter, item->txn,
 					   collected_conflicts) != 0)
 			return -1;
 		item = rlist_entry(item->ring.next,
