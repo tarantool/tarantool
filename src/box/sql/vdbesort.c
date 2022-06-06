@@ -621,7 +621,6 @@ vdbeSorterMapFile(SortSubtask * pTask, SorterFile * pFile, u8 ** pp)
 		if (pFd->pMethods->iVersion >= 3) {
 			rc = sqlOsFetch(pFd, 0, (int)pFile->iEof,
 					    (void **)pp);
-			testcase(rc != 0);
 		}
 	}
 	return rc;
@@ -668,7 +667,6 @@ vdbePmaReaderSeek(SortSubtask * pTask,	/* Task context */
 			}
 			rc = sqlOsRead(pReadr->pFd, &pReadr->aBuffer[iBuf],
 					   nRead, pReadr->iReadOff);
-			testcase(rc != 0);
 		}
 	}
 
@@ -701,7 +699,6 @@ vdbePmaReaderNext(PmaReader * pReadr)
 		if (bEof) {
 			/* This is an EOF condition */
 			vdbePmaReaderClear(pReadr);
-			testcase(rc != 0);
 			return rc;
 		}
 	}
@@ -711,7 +708,6 @@ vdbePmaReaderNext(PmaReader * pReadr)
 	if (rc == 0) {
 		pReadr->nKey = (int)nRec;
 		rc = vdbePmaReadBlob(pReadr, (int)nRec, &pReadr->aKey);
-		testcase(rc != 0);
 	}
 
 	return rc;

@@ -260,7 +260,6 @@ void *
 sqlDbMallocZero(sql * db, u64 n)
 {
 	void *p;
-	testcase(db == 0);
 	p = sqlDbMallocRaw(db, n);
 	if (p)
 		memset(p, 0, (size_t) n);

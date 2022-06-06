@@ -133,10 +133,6 @@ sqlVdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
 			} else {
 				assert(zRawSql[0] == ':' || zRawSql[0] == '$' ||
 				       zRawSql[0] == '@' || zRawSql[0] == '#');
-				testcase(zRawSql[0] == ':');
-				testcase(zRawSql[0] == '$');
-				testcase(zRawSql[0] == '@');
-				testcase(zRawSql[0] == '#');
 				idx =
 				    sqlVdbeParameterIndex(p, zRawSql,
 							      nToken);

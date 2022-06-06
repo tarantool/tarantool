@@ -90,7 +90,6 @@ whereClauseInsert(WhereClause * pWC, Expr * p, u16 wtFlags)
 {
 	WhereTerm *pTerm;
 	int idx;
-	testcase(wtFlags & TERM_VIRTUAL);
 	if (pWC->nTerm >= pWC->nSlot) {
 		WhereTerm *pOld = pWC->a;
 		sql *db = pWC->pWInfo->pParse->db;
@@ -743,10 +742,6 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 					 * or follwed by an inverted copy (t2.b==t1.a).  Skip this term
 					 * and use its inversion.
 					 */
-					testcase(pOrTerm->
-						 wtFlags & TERM_COPIED);
-					testcase(pOrTerm->
-						 wtFlags & TERM_VIRTUAL);
 					assert(pOrTerm->
 					       wtFlags & (TERM_COPIED |
 							  TERM_VIRTUAL));
@@ -767,7 +762,6 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 							   iCursor));
 				break;
 			}
-			testcase(j == 1);
 
 			/* We have found a candidate table and column.  Check to see if that
 			 * table and column is common to every term in the OR clause
@@ -836,7 +830,6 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 				    whereClauseInsert(pWC, pNew,
 						      TERM_VIRTUAL |
 						      TERM_DYNAMIC);
-				testcase(idxNew == 0);
 				exprAnalyze(pSrc, pWC, idxNew);
 				pTerm = &pWC->a[idxTerm];
 				markTermAsChild(pWC, idxNew, idxTerm);
@@ -1107,7 +1100,6 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 			exprCommute(pParse, pDup);
 			pNew->leftCursor = iCur;
 			pNew->u.leftColumn = iColumn;
-			testcase((prereqLeft | extraRight) != prereqLeft);
 			pNew->prereqRight = prereqLeft | extraRight;
 			pNew->prereqAll = prereqAll;
 			pNew->eOperator =
@@ -1149,7 +1141,6 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 			idxNew =
 			    whereClauseInsert(pWC, pNewExpr,
 					      TERM_VIRTUAL | TERM_DYNAMIC);
-			testcase(idxNew == 0);
 			exprAnalyze(pSrc, pWC, idxNew);
 			pTerm = &pWC->a[idxTerm];
 			markTermAsChild(pWC, idxNew, idxTerm);
@@ -1205,13 +1196,11 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 		pNewExpr1 = sqlPExpr(pParse, TK_GE, pNewExpr1, pStr1);
 		transferJoinMarkings(pNewExpr1, pExpr);
 		idxNew1 = whereClauseInsert(pWC, pNewExpr1, wtFlags);
-		testcase(idxNew1 == 0);
 		exprAnalyze(pSrc, pWC, idxNew1);
 		pNewExpr2 = sqlExprDup(db, pLeft, 0);
 		pNewExpr2 = sqlPExpr(pParse, TK_LT, pNewExpr2, pStr2);
 		transferJoinMarkings(pNewExpr2, pExpr);
 		idxNew2 = whereClauseInsert(pWC, pNewExpr2, wtFlags);
-		testcase(idxNew2 == 0);
 		exprAnalyze(pSrc, pWC, idxNew2);
 		pTerm = &pWC->a[idxTerm];
 		if (isComplete) {
@@ -1311,7 +1300,6 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 	/* Prevent ON clause terms of a LEFT JOIN from being used to drive
 	 * an index for tables to the left of the join.
 	 */
-	testcase(pTerm != &pWC->a[idxTerm]);
 	pTerm = &pWC->a[idxTerm];
 	pTerm->prereqRight |= extraRight;
 }

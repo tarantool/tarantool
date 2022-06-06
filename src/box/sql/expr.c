@@ -787,17 +787,11 @@ codeVectorCompare(Parse * pParse,	/* Code generator context */
 		r2 = exprVectorRegister(pParse, pRight, i, regRight, &pR,
 					&regFree2);
 		codeCompare(pParse, pL, pR, opx, r1, r2, dest, p5);
-		testcase(op == OP_Lt);
 		VdbeCoverageIf(v, op == OP_Lt);
-		testcase(op == OP_Le);
 		VdbeCoverageIf(v, op == OP_Le);
-		testcase(op == OP_Gt);
 		VdbeCoverageIf(v, op == OP_Gt);
-		testcase(op == OP_Ge);
 		VdbeCoverageIf(v, op == OP_Ge);
-		testcase(op == OP_Eq);
 		VdbeCoverageIf(v, op == OP_Eq);
-		testcase(op == OP_Ne);
 		VdbeCoverageIf(v, op == OP_Ne);
 		sqlReleaseTempReg(pParse, regFree1);
 		sqlReleaseTempReg(pParse, regFree2);
@@ -1274,10 +1268,6 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 			bool is_neg;
 			bool is_ok = 0 == sql_atoi64(&z[1], &i, &is_neg, n - 1);
 			x = (ynVar) i;
-			testcase(i == 0);
-			testcase(i == 1);
-			testcase(i == SQL_BIND_PARAMETER_MAX - 1);
-			testcase(i == SQL_BIND_PARAMETER_MAX);
 			if (is_neg || i < 1) {
 				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
 					 "Index of binding slots must start "\
@@ -2119,10 +2109,6 @@ exprNodeIsConstant(Walker * pWalker, Expr * pExpr)
 	case TK_COLUMN_REF:
 	case TK_AGG_FUNCTION:
 	case TK_AGG_COLUMN:
-		testcase(pExpr->op == TK_ID);
-		testcase(pExpr->op == TK_COLUMN_REF);
-		testcase(pExpr->op == TK_AGG_FUNCTION);
-		testcase(pExpr->op == TK_AGG_COLUMN);
 		if (pWalker->eCode == 3 && pExpr->iTable == pWalker->u.iCur) {
 			return WRC_Continue;
 		} else {
@@ -2139,8 +2125,6 @@ exprNodeIsConstant(Walker * pWalker, Expr * pExpr)
 		}
 		/* Fall through */
 	default:
-		testcase(pExpr->op == TK_SELECT);	/* selectNodeIsConstant will disallow */
-		testcase(pExpr->op == TK_EXISTS);	/* selectNodeIsConstant will disallow */
 		return WRC_Continue;
 	}
 }
@@ -2324,10 +2308,6 @@ isCandidateForInOpt(Expr * pX)
 	if (p->pPrior)
 		return 0;	/* Not a compound SELECT */
 	if (p->selFlags & (SF_Distinct | SF_Aggregate)) {
-		testcase((p->selFlags & (SF_Distinct | SF_Aggregate)) ==
-			 SF_Distinct);
-		testcase((p->selFlags & (SF_Distinct | SF_Aggregate)) ==
-			 SF_Aggregate);
 		return 0;	/* No DISTINCT keyword and no aggregate functions */
 	}
 	assert(p->pGroupBy == 0);	/* Has no GROUP BY clause */
@@ -2576,8 +2556,6 @@ sqlFindInIndex(Parse * pParse,	/* Parsing context */
 				/* Maximum nColumn is BMS-2, not BMS-1, so that we can compute
 				 * BITMASK(nExpr) without overflowing
 				 */
-				testcase(part_count == BMS - 2);
-				testcase(part_count == BMS - 1);
 				if (part_count >= BMS - 1)
 					continue;
 				if (mustBeUnique &&
@@ -2850,8 +2828,6 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 					assert((pExpr->iTable & 0x0000FFFF) ==
 					       pExpr->iTable);
 					pSelect->iLimit = 0;
-					testcase(pSelect->
-						 selFlags & SF_Distinct);
 					if (sqlSelect
 					    (pParse, pSelect, &dest)) {
 						sqlDbFree(pParse->db,
@@ -2942,8 +2918,6 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 			SelectDest dest;	/* How to deal with SELECT result */
 			int nReg;	/* Registers to allocate */
 
-			testcase(pExpr->op == TK_EXISTS);
-			testcase(pExpr->op == TK_SELECT);
 			assert(pExpr->op == TK_EXISTS
 			       || pExpr->op == TK_SELECT);
 			assert(ExprHasProperty(pExpr, EP_xIsSelect));
@@ -3730,7 +3704,7 @@ sqlExprCodeMove(Parse * pParse, int iFrom, int iTo, int nReg)
  * Return true if any register in the range iFrom..iTo (inclusive)
  * is used as part of the column cache.
  *
- * This routine is used within assert() and testcase() macros only
+ * This routine is used within assert() only
  * and does not appear in a normal build.
  */
 static int
@@ -3947,7 +3921,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				inReg = target;
 			}
 			sqlVdbeAddOp2(v, OP_Cast, target, pExpr->type);
-			testcase(usedAsColumnCache(pParse, inReg, inReg));
 			sql_expr_type_cache_change(pParse, inReg, 1);
 			return inReg;
 		}
@@ -3981,25 +3954,17 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				codeCompare(pParse, pLeft, pExpr->pRight, op,
 					    r1, r2, inReg, SQL_STOREP2);
 				assert(TK_LT == OP_Lt);
-				testcase(op == OP_Lt);
 				VdbeCoverageIf(v, op == OP_Lt);
 				assert(TK_LE == OP_Le);
-				testcase(op == OP_Le);
 				VdbeCoverageIf(v, op == OP_Le);
 				assert(TK_GT == OP_Gt);
-				testcase(op == OP_Gt);
 				VdbeCoverageIf(v, op == OP_Gt);
 				assert(TK_GE == OP_Ge);
-				testcase(op == OP_Ge);
 				VdbeCoverageIf(v, op == OP_Ge);
 				assert(TK_EQ == OP_Eq);
-				testcase(op == OP_Eq);
 				VdbeCoverageIf(v, op == OP_Eq);
 				assert(TK_NE == OP_Ne);
-				testcase(op == OP_Ne);
 				VdbeCoverageIf(v, op == OP_Ne);
-				testcase(regFree1 == 0);
-				testcase(regFree2 == 0);
 			}
 			break;
 		}
@@ -4016,34 +3981,21 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_RSHIFT:
 	case TK_CONCAT:{
 			assert(TK_AND == OP_And);
-			testcase(op == TK_AND);
 			assert(TK_OR == OP_Or);
-			testcase(op == TK_OR);
 			assert(TK_PLUS == OP_Add);
-			testcase(op == TK_PLUS);
 			assert(TK_MINUS == OP_Subtract);
-			testcase(op == TK_MINUS);
 			assert(TK_REM == OP_Remainder);
-			testcase(op == TK_REM);
 			assert(TK_BITAND == OP_BitAnd);
-			testcase(op == TK_BITAND);
 			assert(TK_BITOR == OP_BitOr);
-			testcase(op == TK_BITOR);
 			assert(TK_SLASH == OP_Divide);
-			testcase(op == TK_SLASH);
 			assert(TK_LSHIFT == OP_ShiftLeft);
-			testcase(op == TK_LSHIFT);
 			assert(TK_RSHIFT == OP_ShiftRight);
-			testcase(op == TK_RSHIFT);
 			assert(TK_CONCAT == OP_Concat);
-			testcase(op == TK_CONCAT);
 			r1 = sqlExprCodeTemp(pParse, pExpr->pLeft,
 						 &regFree1);
 			r2 = sqlExprCodeTemp(pParse, pExpr->pRight,
 						 &regFree2);
 			sqlVdbeAddOp3(v, op, r2, r1, target);
-			testcase(regFree1 == 0);
-			testcase(regFree2 == 0);
 			break;
 		}
 	case TK_UMINUS:{
@@ -4070,19 +4022,15 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 							 &regFree2);
 				sqlVdbeAddOp3(v, OP_Subtract, r2, r1,
 						  target);
-				testcase(regFree2 == 0);
 			}
 			break;
 		}
 	case TK_BITNOT:
 	case TK_NOT:{
 			assert(TK_BITNOT == OP_BitNot);
-			testcase(op == TK_BITNOT);
 			assert(TK_NOT == OP_Not);
-			testcase(op == TK_NOT);
 			r1 = sqlExprCodeTemp(pParse, pExpr->pLeft,
 						 &regFree1);
-			testcase(regFree1 == 0);
 			sqlVdbeAddOp2(v, op, r1, inReg);
 			break;
 		}
@@ -4090,13 +4038,10 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_NOTNULL:{
 			int addr;
 			assert(TK_ISNULL == OP_IsNull);
-			testcase(op == TK_ISNULL);
 			assert(TK_NOTNULL == OP_NotNull);
-			testcase(op == TK_NOTNULL);
 			sqlVdbeAddOp2(v, OP_Bool, true, target);
 			r1 = sqlExprCodeTemp(pParse, pExpr->pLeft,
 						 &regFree1);
-			testcase(regFree1 == 0);
 			addr = sqlVdbeAddOp1(v, op, r1);
 			VdbeCoverageIf(v, op == TK_ISNULL);
 			VdbeCoverageIf(v, op == TK_NOTNULL);
@@ -4190,7 +4135,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				if (i < 32
 				    && sqlExprIsConstant(pFarg->a[i].
 							     pExpr)) {
-					testcase(i == 31);
 					constMask |= MASKBIT32(i);
 				}
 			}
@@ -4304,8 +4248,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_EXISTS:
 	case TK_SELECT:{
 			int nCol;
-			testcase(op == TK_EXISTS);
-			testcase(op == TK_SELECT);
 			if (op == TK_SELECT
 			    && (nCol = pExpr->x.pSelect->pEList->nExpr) != 1) {
 				diag_set(ClientError, ER_SQL_COLUMN_COUNT,
@@ -4470,11 +4412,9 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			endLabel = sqlVdbeMakeLabel(v);
 			if ((pX = pExpr->pLeft) != 0) {
 				tempX = *pX;
-				testcase(pX->op == TK_COLUMN_REF);
 				exprToRegister(&tempX,
 					       exprCodeVector(pParse, &tempX,
 							      &regFree1));
-				testcase(regFree1 == 0);
 				memset(&opCompare, 0, sizeof(opCompare));
 				opCompare.op = TK_EQ;
 				opCompare.pLeft = &tempX;
@@ -4495,11 +4435,8 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					pTest = aListelem[i].pExpr;
 				}
 				nextCase = sqlVdbeMakeLabel(v);
-				testcase(pTest->op == TK_COLUMN_REF);
 				sqlExprIfFalse(pParse, pTest, nextCase,
 						   SQL_JUMPIFNULL);
-				testcase(aListelem[i + 1].pExpr->op ==
-					 TK_COLUMN_REF);
 				sqlExprCode(pParse, aListelem[i + 1].pExpr,
 						target);
 				sqlVdbeGoto(v, endLabel);
@@ -4818,25 +4755,6 @@ exprCodeBetween(Parse * pParse,	/* Parsing and code generating context */
 		sqlExprCodeTarget(pParse, &exprAnd, dest);
 	}
 	sqlReleaseTempReg(pParse, regFree1);
-
-	/* Ensure adequate test coverage */
-	testcase(xJump == sqlExprIfTrue && jumpIfNull == 0
-		 && regFree1 == 0);
-	testcase(xJump == sqlExprIfTrue && jumpIfNull == 0
-		 && regFree1 != 0);
-	testcase(xJump == sqlExprIfTrue && jumpIfNull != 0
-		 && regFree1 == 0);
-	testcase(xJump == sqlExprIfTrue && jumpIfNull != 0
-		 && regFree1 != 0);
-	testcase(xJump == sqlExprIfFalse && jumpIfNull == 0
-		 && regFree1 == 0);
-	testcase(xJump == sqlExprIfFalse && jumpIfNull == 0
-		 && regFree1 != 0);
-	testcase(xJump == sqlExprIfFalse && jumpIfNull != 0
-		 && regFree1 == 0);
-	testcase(xJump == sqlExprIfFalse && jumpIfNull != 0
-		 && regFree1 != 0);
-	testcase(xJump == 0);
 }
 
 /*
@@ -4871,7 +4789,6 @@ sqlExprIfTrue(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 	switch (op) {
 	case TK_AND:{
 			int d2 = sqlVdbeMakeLabel(v);
-			testcase(jumpIfNull == 0);
 			sqlExprIfFalse(pParse, pExpr->pLeft, d2,
 					   jumpIfNull ^ SQL_JUMPIFNULL);
 			sqlExprCachePush(pParse);
@@ -4882,7 +4799,6 @@ sqlExprIfTrue(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 			break;
 		}
 	case TK_OR:{
-			testcase(jumpIfNull == 0);
 			sqlExprIfTrue(pParse, pExpr->pLeft, dest,
 					  jumpIfNull);
 			sqlExprCachePush(pParse);
@@ -4892,7 +4808,6 @@ sqlExprIfTrue(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 			break;
 		}
 	case TK_NOT:{
-			testcase(jumpIfNull == 0);
 			sqlExprIfFalse(pParse, pExpr->pLeft, dest,
 					   jumpIfNull);
 			break;
@@ -4905,7 +4820,6 @@ sqlExprIfTrue(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 	case TK_EQ:{
 			if (sqlExprIsVector(pExpr->pLeft))
 				goto default_expr;
-			testcase(jumpIfNull == 0);
 			r1 = sqlExprCodeTemp(pParse, pExpr->pLeft,
 						 &regFree1);
 			r2 = sqlExprCodeTemp(pParse, pExpr->pRight,
@@ -4913,49 +4827,37 @@ sqlExprIfTrue(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 			codeCompare(pParse, pExpr->pLeft, pExpr->pRight, op, r1,
 				    r2, dest, jumpIfNull);
 			assert(TK_LT == OP_Lt);
-			testcase(op == OP_Lt);
 			VdbeCoverageIf(v, op == OP_Lt);
 			assert(TK_LE == OP_Le);
-			testcase(op == OP_Le);
 			VdbeCoverageIf(v, op == OP_Le);
 			assert(TK_GT == OP_Gt);
-			testcase(op == OP_Gt);
 			VdbeCoverageIf(v, op == OP_Gt);
 			assert(TK_GE == OP_Ge);
-			testcase(op == OP_Ge);
 			VdbeCoverageIf(v, op == OP_Ge);
 			assert(TK_EQ == OP_Eq);
-			testcase(op == OP_Eq);
 			VdbeCoverageIf(v, op == OP_Eq
 				       && jumpIfNull == SQL_NULLEQ);
 			VdbeCoverageIf(v, op == OP_Eq
 				       && jumpIfNull != SQL_NULLEQ);
 			assert(TK_NE == OP_Ne);
-			testcase(op == OP_Ne);
 			VdbeCoverageIf(v, op == OP_Ne
 				       && jumpIfNull == SQL_NULLEQ);
 			VdbeCoverageIf(v, op == OP_Ne
 				       && jumpIfNull != SQL_NULLEQ);
-			testcase(regFree1 == 0);
-			testcase(regFree2 == 0);
 			break;
 		}
 	case TK_ISNULL:
 	case TK_NOTNULL:{
 			assert(TK_ISNULL == OP_IsNull);
-			testcase(op == TK_ISNULL);
 			assert(TK_NOTNULL == OP_NotNull);
-			testcase(op == TK_NOTNULL);
 			r1 = sqlExprCodeTemp(pParse, pExpr->pLeft,
 						 &regFree1);
 			sqlVdbeAddOp2(v, op, r1, dest);
 			VdbeCoverageIf(v, op == TK_ISNULL);
 			VdbeCoverageIf(v, op == TK_NOTNULL);
-			testcase(regFree1 == 0);
 			break;
 		}
 	case TK_BETWEEN:{
-			testcase(jumpIfNull == 0);
 			exprCodeBetween(pParse, pExpr, dest, sqlExprIfTrue,
 					jumpIfNull);
 			break;
@@ -4981,8 +4883,6 @@ sqlExprIfTrue(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 				sqlVdbeAddOp3(v, OP_If, r1, dest,
 						  jumpIfNull != 0);
 				VdbeCoverage(v);
-				testcase(regFree1 == 0);
-				testcase(jumpIfNull == 0);
 			}
 			break;
 		}
@@ -5063,7 +4963,6 @@ sqlExprIfFalse(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 
 	switch (pExpr->op) {
 	case TK_AND:{
-			testcase(jumpIfNull == 0);
 			sqlExprIfFalse(pParse, pExpr->pLeft, dest,
 					   jumpIfNull);
 			sqlExprCachePush(pParse);
@@ -5074,7 +4973,6 @@ sqlExprIfFalse(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 		}
 	case TK_OR:{
 			int d2 = sqlVdbeMakeLabel(v);
-			testcase(jumpIfNull == 0);
 			sqlExprIfTrue(pParse, pExpr->pLeft, d2,
 					  jumpIfNull ^ SQL_JUMPIFNULL);
 			sqlExprCachePush(pParse);
@@ -5085,7 +4983,6 @@ sqlExprIfFalse(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 			break;
 		}
 	case TK_NOT:{
-			testcase(jumpIfNull == 0);
 			sqlExprIfTrue(pParse, pExpr->pLeft, dest,
 					  jumpIfNull);
 			break;
@@ -5098,7 +4995,6 @@ sqlExprIfFalse(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 	case TK_EQ:{
 			if (sqlExprIsVector(pExpr->pLeft))
 				goto default_expr;
-			testcase(jumpIfNull == 0);
 			r1 = sqlExprCodeTemp(pParse, pExpr->pLeft,
 						 &regFree1);
 			r2 = sqlExprCodeTemp(pParse, pExpr->pRight,
@@ -5106,31 +5002,23 @@ sqlExprIfFalse(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 			codeCompare(pParse, pExpr->pLeft, pExpr->pRight, op, r1,
 				    r2, dest, jumpIfNull);
 			assert(TK_LT == OP_Lt);
-			testcase(op == OP_Lt);
 			VdbeCoverageIf(v, op == OP_Lt);
 			assert(TK_LE == OP_Le);
-			testcase(op == OP_Le);
 			VdbeCoverageIf(v, op == OP_Le);
 			assert(TK_GT == OP_Gt);
-			testcase(op == OP_Gt);
 			VdbeCoverageIf(v, op == OP_Gt);
 			assert(TK_GE == OP_Ge);
-			testcase(op == OP_Ge);
 			VdbeCoverageIf(v, op == OP_Ge);
 			assert(TK_EQ == OP_Eq);
-			testcase(op == OP_Eq);
 			VdbeCoverageIf(v, op == OP_Eq
 				       && jumpIfNull != SQL_NULLEQ);
 			VdbeCoverageIf(v, op == OP_Eq
 				       && jumpIfNull == SQL_NULLEQ);
 			assert(TK_NE == OP_Ne);
-			testcase(op == OP_Ne);
 			VdbeCoverageIf(v, op == OP_Ne
 				       && jumpIfNull != SQL_NULLEQ);
 			VdbeCoverageIf(v, op == OP_Ne
 				       && jumpIfNull == SQL_NULLEQ);
-			testcase(regFree1 == 0);
-			testcase(regFree2 == 0);
 			break;
 		}
 	case TK_ISNULL:
@@ -5138,15 +5026,11 @@ sqlExprIfFalse(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 			r1 = sqlExprCodeTemp(pParse, pExpr->pLeft,
 						 &regFree1);
 			sqlVdbeAddOp2(v, op, r1, dest);
-			testcase(op == TK_ISNULL);
 			VdbeCoverageIf(v, op == TK_ISNULL);
-			testcase(op == TK_NOTNULL);
 			VdbeCoverageIf(v, op == TK_NOTNULL);
-			testcase(regFree1 == 0);
 			break;
 		}
 	case TK_BETWEEN:{
-			testcase(jumpIfNull == 0);
 			exprCodeBetween(pParse, pExpr, dest, sqlExprIfFalse,
 					jumpIfNull);
 			break;
@@ -5174,8 +5058,6 @@ sqlExprIfFalse(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 				sqlVdbeAddOp3(v, OP_IfNot, r1, dest,
 						  jumpIfNull != 0);
 				VdbeCoverage(v);
-				testcase(regFree1 == 0);
-				testcase(jumpIfNull == 0);
 			}
 			break;
 		}
@@ -5334,7 +5216,6 @@ sqlExprImpliesExpr(Expr * pE1, Expr * pE2, int iTab)
 	}
 	if (pE2->op == TK_NOTNULL && pE1->op != TK_ISNULL) {
 		Expr *pX = sqlExprSkipCollate(pE1->pLeft);
-		testcase(pX != pE1->pLeft);
 		if (sqlExprCompare(pX, pE2->pLeft, iTab) == 0)
 			return 1;
 	}
@@ -5452,8 +5333,6 @@ analyzeAggregate(Walker * pWalker, Expr * pExpr)
 	switch (pExpr->op) {
 	case TK_AGG_COLUMN:
 	case TK_COLUMN_REF:{
-			testcase(pExpr->op == TK_AGG_COLUMN);
-			testcase(pExpr->op == TK_COLUMN_REF);
 			/* Check to see if the column is in one of the tables in the FROM
 			 * clause of the aggregate query
 			 */
