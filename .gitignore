@@ -21,6 +21,7 @@ coverage.info
 *.swp*
 .gitignore
 .gdb_history
+.tdbg_history*
 CMakeFiles
 CMakeCache.txt
 CPackConfig.cmake
