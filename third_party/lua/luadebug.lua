@@ -28,6 +28,7 @@ local dbg
 local fio = require('fio')
 
 local DEBUGGER = 'luadebug.lua'
+local HISRTORYFILE = '.tdbg-history'
 -- Use ANSI color codes in the prompt by default.
 local COLOR_GRAY = ""
 local COLOR_RED = ""
@@ -96,11 +97,19 @@ local stack_top = 0
 -- Changed using the up/down commands
 local stack_inspect_offset = 0
 
--- Default dbg.read function
-local function dbg_read(prompt)
-    dbg.write(prompt)
-    io.flush()
-    return io.read()
+-- Tarantool console compatible readline support.
+local function dbg_readline(prompt)
+    local console = require 'console_internal'
+    local line = console.readline({
+        prompt = prompt,
+        completion = nil,
+    })
+    if not line then
+        return nil
+    end
+    console.add_history(line)
+    console.save_history(HISRTORYFILE)
+    return line
 end
 
 -- Default dbg.write function
@@ -786,6 +795,7 @@ local function start_repl()
         return
     end
     motto()
+    require 'console_internal'.load_history(HISRTORYFILE)
     started = true
 end
 
@@ -826,7 +836,7 @@ end
 
 -- Make the debugger object callable like a function.
 dbg = setmetatable({
-        read    = dbg_read,
+        read    = dbg_readline,
         write   = dbg_write,
         writeln = dbg_writeln,
 
