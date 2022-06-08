@@ -667,10 +667,11 @@ static int dump_node(struct lua_yaml_dumper *dumper)
       if (utf8_check_printable(str, len)) {
          if (yaml_is_flow_mode(dumper)) {
             style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-         } else if (strstr(str, "\n\n") != 0) {
+         } else if (strstr(str, FORCE_LITERAL_SUBSTRING) != NULL) {
             /*
-             * Tarantool-specific: use literal style for string
-             * with empty lines.
+             * Tarantool-specific: use literal block style for either every
+             * multiline string or string containing "\n\n" depending on compat
+             * setup.
              * Useful for tutorial().
              */
             style = YAML_LITERAL_SCALAR_STYLE;

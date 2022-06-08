@@ -23,6 +23,15 @@ don't escape the forward slash, so the new behavior is considered more safe.
 https://github.com/tarantool/tarantool/wiki/compat%3Ajson_escape_forward_slash
 ]]
 
+local YAML_PRETTY_MULTILINE_BRIEF = [[
+Whether to encode in block scalar style all multiline strings or ones
+containing "\n\n" substring. The new behavior makes all multiline string output
+as single text block which is handier for the reader, but may be incompatible
+with some existing applications that rely on the old style.
+
+https://github.com/tarantool/tarantool/wiki/compat%3Ayaml_pretty_multiline
+]]
+
 -- Contains options descriptions in following format:
 -- * default  (string)
 -- * brief    (string)
@@ -42,6 +51,12 @@ local options = {
             internal.json_escape_forward_slash_toggle(esc_slash)
             internal.msgpuck_escape_forward_slash_toggle(esc_slash)
         end,
+    },
+    yaml_pretty_multiline = {
+        default = 'old',
+        obsolete = nil,
+        brief = YAML_PRETTY_MULTILINE_BRIEF,
+        action = internal.yaml_pretty_multiline_toggle,
     },
 }
 
