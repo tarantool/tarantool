@@ -148,7 +148,9 @@ g.test_mvcc_isolation_level_basics = function()
         -- With default best-effort isolation RO->RW transaction can be aborted:
         box.begin()
         res1 = s:select(1) -- read confirmed {}
-        s:replace{2}
+        t.assert_error_msg_content_equals(
+            "Transaction has been aborted by conflict",
+            function() s:replace{2} end)
         t.assert_error_msg_content_equals(
             "Transaction has been aborted by conflict",
             function() box.commit() end)

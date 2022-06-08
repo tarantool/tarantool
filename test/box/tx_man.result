@@ -409,11 +409,11 @@ tx1("s:select{}")
  | ...
 tx1("s:replace{3, 13}")
  | ---
- | - - [3, 13]
+ | - - {'error': 'Transaction has been aborted by conflict'}
  | ...
 tx1("s:select{}")
  | ---
- | - - [[1, 1], [2, 2], [3, 13]]
+ | - - {'error': 'Transaction has been aborted by conflict'}
  | ...
 tx1:commit()
  | ---
@@ -2089,7 +2089,7 @@ tx2:commit()
  | ...
 tx1("s:update({1}, {{'=', 2, 3}})")
  | ---
- | - - [1, 3]
+ | - - {'error': 'Transaction has been aborted by conflict'}
  | ...
 tx1:commit()
  | ---
@@ -2369,7 +2369,8 @@ conn:execute([[UPDATE u SET column2 = 21;]])
 
 box.execute([[UPDATE u SET column2 = 22;]])
  | ---
- | - row_count: 1
+ | - null
+ | - Transaction has been aborted by conflict
  | ...
 box.execute([[COMMIT;]])
  | ---
@@ -3495,7 +3496,7 @@ s:delete{1}
  | ...
 tx1('s:replace{10, 10}') -- make an op to become RW
  | ---
- | - - [10, 10]
+ | - - {'error': 'Transaction has been aborted by conflict'}
  | ...
 tx1:commit() -- must fail since it actually saw {1, 1, "original"}
  | ---
@@ -3503,7 +3504,7 @@ tx1:commit() -- must fail since it actually saw {1, 1, "original"}
  | ...
 tx2('s:replace{11, 11}') -- make an op to become RW
  | ---
- | - - [11, 11]
+ | - - {'error': 'Transaction has been aborted by conflict'}
  | ...
 tx2:commit() -- must fail since it actually saw {1, 1, "original"}
  | ---

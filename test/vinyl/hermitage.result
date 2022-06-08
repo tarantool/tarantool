@@ -131,7 +131,7 @@ c1:commit()
 ...
 c2("t:update(2, {{'=', 2, 22}})")
 ---
-- - [2, 22]
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 c2:commit() -- rollback
 ---
@@ -451,7 +451,7 @@ c1:commit() -- ok
 ...
 c2("t:get{1}") -- {1, 10}
 ---
-- - [1, 10]
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 c2:commit() -- rollback -- conflict
 ---
@@ -619,11 +619,11 @@ c2:commit() -- T2
 ...
 c1("t:delete{2}")
 ---
-- 
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 c1("t:get{2}") -- finds nothing
 ---
-- 
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 c1:commit() -- rollback
 ---
@@ -792,7 +792,7 @@ c3:commit() -- ok
 ...
 c1("t:replace{1, 0}")
 ---
-- - [1, 0]
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 c1:commit() -- rollback
 ---
