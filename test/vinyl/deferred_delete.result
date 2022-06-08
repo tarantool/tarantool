@@ -560,7 +560,7 @@ sk:select{1}
 ...
 s:replace{10, 10}
 ---
-- [10, 10]
+- error: Transaction has been aborted by conflict
 ...
 box.commit() -- error
 ---
