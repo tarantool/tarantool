@@ -782,6 +782,10 @@ txn_begin_ro_stmt(struct space *space, struct txn **txn,
 {
 	*txn = in_txn();
 	if (*txn != NULL) {
+		if ((*txn)->status == TXN_CONFLICTED) {
+			diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+			return -1;
+		}
 		struct engine *engine = space->engine;
 		return txn_begin_in_engine(engine, *txn);
 	}
