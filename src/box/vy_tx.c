@@ -375,7 +375,7 @@ vy_tx_is_in_read_view(struct vy_tx *tx)
 
 /**
  * Send to read view all transactions that are reading key @v
- * modified by transaction @tx.
+ * modified by transaction @tx and abort all transactions that are modifying it.
  */
 static int
 vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
@@ -393,6 +393,10 @@ vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
 		/* already in (earlier) read view */
 		if (vy_tx_is_in_read_view(abort))
 			continue;
+		if (!vy_tx_is_ro(abort)) {
+			vy_tx_abort(abort);
+			continue;
+		}
 		struct vy_read_view *rv = vy_tx_manager_read_view(tx->xm);
 		if (rv == NULL)
 			return -1;
@@ -672,23 +676,14 @@ vy_tx_prepare(struct vy_tx *tx)
 	}
 
 	assert(tx->state == VINYL_TX_READY);
-	if (vy_tx_is_ro(tx)) {
-		tx->state = VINYL_TX_COMMIT;
-		return 0;
-	}
-	if (vy_tx_is_in_read_view(tx)) {
-		xm->stat.conflict++;
-		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
-		return -1;
-	}
-
-	assert(tx->state == VINYL_TX_READY);
 	tx->state = VINYL_TX_COMMIT;
-
+	if (vy_tx_is_ro(tx))
+		return 0;
+	assert(!vy_tx_is_in_read_view(tx));
 	assert(tx->read_view == &xm->global_read_view);
 	tx->psn = ++xm->psn;
 
-	/** Send to read view read/write intersection. */
+	/** Send to read view read intersection and abort write intersection. */
 	struct txv *v;
 	struct write_set_iterator it;
 	write_set_ifirst(&tx->write_set, &it);
@@ -893,6 +888,8 @@ vy_tx_rollback(struct vy_tx *tx)
 int
 vy_tx_begin_statement(struct vy_tx *tx, struct space *space, void **savepoint)
 {
+	if (tx->state == VINYL_TX_READY && vy_tx_is_in_read_view(tx))
+		vy_tx_abort(tx);
 	if (tx->state == VINYL_TX_ABORT) {
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;

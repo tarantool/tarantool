@@ -48,8 +48,10 @@ g.test_empty_range_select_left = function()
         t.assert_equals(tx(select_req), {{}})
         s:replace{key, 0}
         t.assert_equals(tx(select_req), {{}})
-        t.assert_equals(tx(replace_req), {{key, 1}})
-        t.assert_equals(tx(select_req), {{{key, 1}}})
+        t.assert_equals(tx(replace_req),
+                        {{error = "Transaction has been aborted by conflict"}})
+        t.assert_equals(tx(select_req),
+                        {{error = "Transaction has been aborted by conflict"}})
         t.assert_equals(tx:commit(),
             {{error = "Transaction has been aborted by conflict"}})
 
@@ -75,8 +77,10 @@ g.test_empty_range_select_middle = function()
         t.assert_equals(tx(select_req), {{}})
         s:replace{key, 0}
         t.assert_equals(tx(select_req), {{}})
-        t.assert_equals(tx(replace_req), {{key, 1}})
-        t.assert_equals(tx(select_req), {{{key, 1}}})
+        t.assert_equals(tx(replace_req),
+                        {{error = "Transaction has been aborted by conflict"}})
+        t.assert_equals(tx(select_req),
+                        {{error = "Transaction has been aborted by conflict"}})
         t.assert_equals(tx:commit(),
             {{error = "Transaction has been aborted by conflict"}})
 
@@ -102,8 +106,10 @@ g.test_empty_range_select_right = function()
         t.assert_equals(tx(select_req), {{}})
         s:replace{key, 0}
         t.assert_equals(tx(select_req), {{}})
-        t.assert_equals(tx(replace_req), {{key, 1}})
-        t.assert_equals(tx(select_req), {{{key, 1}}})
+        t.assert_equals(tx(replace_req),
+                        {{error = "Transaction has been aborted by conflict"}})
+        t.assert_equals(tx(select_req),
+                        {{error = "Transaction has been aborted by conflict"}})
         t.assert_equals(tx:commit(),
             {{error = "Transaction has been aborted by conflict"}})
 

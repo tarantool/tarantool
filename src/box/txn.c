@@ -597,6 +597,12 @@ txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
 		return -1;
 	}
 
+	if (txn->status == TXN_IN_READ_VIEW) {
+		rlist_del(&txn->in_read_view_txs);
+		txn->status = TXN_CONFLICTED;
+		txn_set_flags(txn, TXN_IS_CONFLICTED);
+	}
+
 	if (txn_check_can_continue(txn) != 0)
 		return -1;
 
@@ -1007,10 +1013,8 @@ txn_prepare(struct txn *txn)
 	 * Somebody else has written some value that we have read.
 	 * The RW transaction is not possible.
 	 */
-	if (txn->status == TXN_IN_READ_VIEW && !stailq_empty(&txn->stmts)) {
-		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
-		return -1;
-	}
+	if (txn->status == TXN_IN_READ_VIEW)
+		assert(stailq_empty(&txn->stmts));
 
 	/*
 	 * Perform transaction conflict resolution. Engine == NULL when

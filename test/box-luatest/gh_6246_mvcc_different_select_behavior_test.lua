@@ -112,7 +112,9 @@ g.test_mvcc_different_select_behavior_ro_rw = function()
         local res1 = s:select()
         local res2 = s:select(1)
         local res3 = s:count()
-        s:replace{2}
+        t.assert_error_msg_content_equals(
+            "Transaction has been aborted by conflict",
+            function() s:replace{2} end)
         t.assert_error_msg_content_equals(
             "Transaction has been aborted by conflict",
             function() box.commit() end)
@@ -146,7 +148,9 @@ g.test_mvcc_different_select_behavior_ro_rw_delete = function()
         local res1 = s:select()
         local res2 = s:select(1)
         local res3 = s:count()
-        s:replace{2}
+        t.assert_error_msg_content_equals(
+            "Transaction has been aborted by conflict",
+            function() s:replace{2} end)
         t.assert_error_msg_content_equals(
             "Transaction has been aborted by conflict",
             function() box.commit() end)

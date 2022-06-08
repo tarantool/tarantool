@@ -98,7 +98,9 @@ g.test_mvcc_netbox_isolation_level_basics = function()
     -- With default best-effort isolation RO->RW transaction can be aborted:
     strm:begin()
     t.assert_equals(strm.space.test:select{1}, {})
-    strm.space.test:replace{2}
+    t.assert_error_msg_content_equals(
+        "Transaction has been aborted by conflict",
+        function() strm.space.test:replace{2} end)
     t.assert_error_msg_content_equals(
         "Transaction has been aborted by conflict",
         function() strm:commit() end)
