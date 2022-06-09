@@ -713,8 +713,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 	omitTable = (pLoop->wsFlags & WHERE_IDX_ONLY) != 0
 	    && ((pWInfo->wctrlFlags & WHERE_OR_SUBCLAUSE) == 0 ||
 		(pLoop->wsFlags & WHERE_AUTO_INDEX) != 0);
-	VdbeModuleComment((v, "Begin WHERE-loop%d: %s", iLevel,
-			   pTabItem->pTab->zName));
 
 	/* Create labels for the "break" and "continue" instructions
 	 * for the current loop.  Jump to addrBrk to break out of a loop.
@@ -1393,7 +1391,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			continue;
 		if (pAlt->wtFlags & (TERM_CODED))
 			continue;
-		VdbeModuleComment((v, "begin transitive constraint"));
 		sEAlt = *pAlt->pExpr;
 		sEAlt.pLeft = pE->pLeft;
 		sqlExprIfFalse(pParse, &sEAlt, addrCont, SQL_JUMPIFNULL);

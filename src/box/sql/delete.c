@@ -422,8 +422,6 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 	 * stage.
 	 */
 	assert(v != NULL);
-	VdbeModuleComment((v, "BEGIN: GenRowDel(%d,%d,%d,%d)",
-			   cursor, iIdxCur, reg_pk, (int)nPk));
 
 	/* Seek cursor iCur to the row to delete. If this row no
 	 * longer exists (this can happen if a trigger program has
@@ -528,5 +526,4 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 	 * throws a RAISE(IGNORE) exception.
 	 */
 	sqlVdbeResolveLabel(v, label);
-	VdbeModuleComment((v, "END: GenRowDel()"));
 }

@@ -289,24 +289,14 @@ void sqlVdbeLinkSubProgram(Vdbe *, SubProgram *);
 
 /* Use SQL_ENABLE_COMMENTS to enable generation of extra comments on
  * each VDBE opcode.
- *
- * Use the SQL_ENABLE_MODULE_COMMENTS macro to see some extra no-op
- * comments in VDBE programs that show key decision points in the code
- * generator.
  */
 #ifdef SQL_ENABLE_EXPLAIN_COMMENTS
 void sqlVdbeComment(Vdbe *, const char *, ...);
 #define VdbeComment(X)  sqlVdbeComment X
 void sqlVdbeNoopComment(Vdbe *, const char *, ...);
 #define VdbeNoopComment(X)  sqlVdbeNoopComment X
-#ifdef SQL_ENABLE_MODULE_COMMENTS
-#define VdbeModuleComment(X)  sqlVdbeNoopComment X
-#else
-#define VdbeModuleComment(X)
-#endif
 #else
 #define VdbeComment(X) (void) 0
 #define VdbeNoopComment(X) (void) 0
-#define VdbeModuleComment(X) (void) 0
 #endif
 #endif				/* SQL_VDBE_H */
