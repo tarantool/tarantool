@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <stddef.h>
+#include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -33,6 +34,12 @@ iostream_close(struct iostream *io)
 {
 	int fd = io->fd;
 	iostream_destroy(io);
+	/*
+	 * Explicitly shut down the socket before closing its fd so that
+	 * the connection will be terminated even if the Tarantool process
+	 * forked and the child process did not close parent fds.
+	 */
+	shutdown(fd, SHUT_RDWR);
 	close(fd);
 }
 
