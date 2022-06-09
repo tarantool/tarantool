@@ -4674,7 +4674,6 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 	}
 
 	/* Done. */
-	VdbeModuleComment((v, "Begin WHERE-core"));
 	return pWInfo;
 
 	/* Jump here if malloc fails */
@@ -4703,7 +4702,6 @@ sqlWhereEnd(WhereInfo * pWInfo)
 
 	/* Generate loop termination code.
 	 */
-	VdbeModuleComment((v, "End WHERE-core"));
 	sqlExprCacheClear(pParse);
 	for (i = pWInfo->nLevel - 1; i >= 0; i--) {
 		int addr;
@@ -4762,9 +4760,6 @@ sqlWhereEnd(WhereInfo * pWInfo)
 			}
 			sqlVdbeJumpHere(v, addr);
 		}
-		VdbeModuleComment((v, "End WHERE-loop%d: %s", i,
-				   pWInfo->pTabList->a[pLevel->iFrom].space->
-				   def->name));
 	}
 
 	/* The "break" point is here, just past the end of the outer loop.
