@@ -521,7 +521,6 @@ sqlInsert(Parse * pParse,	/* Parser context */
 		sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph, 0, 0,
 			      (char *)info, P4_DYNAMIC);
 		addrL = sqlVdbeAddOp1(v, OP_Yield, dest.iSDParm);
-		VdbeCoverage(v);
 		sqlVdbeAddOp2(v, OP_NextIdEphemeral, reg_eph,
 			      regCopy + nColumn);
 		sqlVdbeAddOp3(v, OP_Copy, regFromSelect, regCopy, nColumn - 1);
@@ -551,7 +550,6 @@ sqlInsert(Parse * pParse,	/* Parser context */
 		 */
 		sqlVdbeAddOp3(v, OP_IteratorOpen, srcTab, 0, reg_eph);
 		addrInsTop = sqlVdbeAddOp1(v, OP_Rewind, srcTab);
-		VdbeCoverage(v);
 		addrCont = sqlVdbeCurrentAddr(v);
 	} else if (pSelect) {
 		/* This block codes the top of loop only.  The complete loop is the
@@ -564,7 +562,6 @@ sqlInsert(Parse * pParse,	/* Parser context */
 		 */
 		addrInsTop = addrCont =
 		    sqlVdbeAddOp1(v, OP_Yield, dest.iSDParm);
-		VdbeCoverage(v);
 	}
 	assert(space != NULL);
 	uint32_t autoinc_fieldno = sql_space_autoinc_fieldno(space);
@@ -782,7 +779,6 @@ sqlInsert(Parse * pParse,	/* Parser context */
 	sqlVdbeResolveLabel(v, endOfLoop);
 	if (useTempTable) {
 		sqlVdbeAddOp2(v, OP_Next, srcTab, addrCont);
-		VdbeCoverage(v);
 		sqlVdbeJumpHere(v, addrInsTop);
 		sqlVdbeAddOp1(v, OP_Close, srcTab);
 	} else if (pSelect) {
@@ -1210,7 +1206,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	    onError == ON_CONFLICT_ACTION_IGNORE) ||
 	    is_err_action_default) {
 		addr1 = sqlVdbeAddOp2(v, OP_Rewind, iDest, 0);
-		VdbeCoverage(v);
 		emptyDestTest = sqlVdbeAddOp0(v, OP_Goto);
 		sqlVdbeJumpHere(v, addr1);
 	}
@@ -1218,7 +1213,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	vdbe_emit_open_cursor(pParse, iSrc, 0, src);
 	VdbeComment((v, "%s", src->def->name));
 	addr1 = sqlVdbeAddOp2(v, OP_Rewind, iSrc, 0);
-	VdbeCoverage(v);
 	sqlVdbeAddOp2(v, OP_RowData, iSrc, regData);
 
 #ifdef SQL_TEST
@@ -1239,7 +1233,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		break;
 	}
 	sqlVdbeAddOp2(v, OP_Next, iSrc, addr1 + 1);
-	VdbeCoverage(v);
 	sqlVdbeJumpHere(v, addr1);
 	sqlVdbeAddOp2(v, OP_Close, iSrc, 0);
 	sqlVdbeAddOp2(v, OP_Close, iDest, 0);

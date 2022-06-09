@@ -787,12 +787,6 @@ codeVectorCompare(Parse * pParse,	/* Code generator context */
 		r2 = exprVectorRegister(pParse, pRight, i, regRight, &pR,
 					&regFree2);
 		codeCompare(pParse, pL, pR, opx, r1, r2, dest, p5);
-		VdbeCoverageIf(v, op == OP_Lt);
-		VdbeCoverageIf(v, op == OP_Le);
-		VdbeCoverageIf(v, op == OP_Gt);
-		VdbeCoverageIf(v, op == OP_Ge);
-		VdbeCoverageIf(v, op == OP_Eq);
-		VdbeCoverageIf(v, op == OP_Ne);
 		sqlReleaseTempReg(pParse, regFree1);
 		sqlReleaseTempReg(pParse, regFree2);
 		if (i > 0)
@@ -802,20 +796,14 @@ codeVectorCompare(Parse * pParse,	/* Code generator context */
 		}
 		if (opx == TK_EQ) {
 			sqlVdbeAddOp2(v, OP_IfNot, dest, addrDone);
-			VdbeCoverage(v);
 			p5 |= SQL_KEEPNULL;
 		} else if (opx == TK_NE) {
 			sqlVdbeAddOp2(v, OP_If, dest, addrDone);
-			VdbeCoverage(v);
 			p5 |= SQL_KEEPNULL;
 		} else {
 			assert(op == TK_LT || op == TK_GT || op == TK_LE
 			       || op == TK_GE);
 			sqlVdbeAddOp2(v, OP_ElseNotEq, 0, addrDone);
-			VdbeCoverageIf(v, op == TK_LT);
-			VdbeCoverageIf(v, op == TK_GT);
-			VdbeCoverageIf(v, op == TK_LE);
-			VdbeCoverageIf(v, op == TK_GE);
 			if (i == nLeft - 2)
 				opx = op;
 		}
@@ -2353,7 +2341,6 @@ sqlSetHasNullFlag(Vdbe * v, int iCur, int iCol, int regHasNull)
 	int addr1;
 	sqlVdbeAddOp2(v, OP_Integer, 0, regHasNull);
 	addr1 = sqlVdbeAddOp1(v, OP_Rewind, iCur);
-	VdbeCoverage(v);
 	sqlVdbeAddOp3(v, OP_Column, iCur, iCol, regHasNull);
 	sqlVdbeChangeP5(v, OPFLAG_TYPEOFARG);
 	VdbeComment((v, "first_entry_in(%d)", iCur));
@@ -2603,7 +2590,6 @@ sqlFindInIndex(Parse * pParse,	/* Parsing context */
 				if (colUsed == (MASKBIT(nExpr) - 1)) {
 					/* If we reach this point, that means the index pIdx is usable */
 					int iAddr = sqlVdbeAddOp0(v, OP_Once);
-					VdbeCoverage(v);
 					sqlVdbeAddOp4(v, OP_Explain,
 							  0, 0, 0,
 							  sqlMPrintf(db,
@@ -2761,10 +2747,8 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 	 * If all of the above are false, then we can run this code just once
 	 * save the results, and reuse the same result on subsequent invocations.
 	 */
-	if (!ExprHasProperty(pExpr, EP_VarSelect)) {
+	if (!ExprHasProperty(pExpr, EP_VarSelect))
 		jmpIfDynamic = sqlVdbeAddOp0(v, OP_Once);
-		VdbeCoverage(v);
-	}
 	if (pParse->explain == 2) {
 		char *zMsg =
 		    sqlMPrintf(pParse->db, "EXECUTE %s%s SUBQUERY %d",
@@ -3130,15 +3114,12 @@ sqlExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 			if (ii < pList->nExpr - 1 || destIfNull != destIfFalse) {
 				sqlVdbeAddOp4(v, OP_Eq, rLhs, labelOk, r2,
 						  (void *)coll, P4_COLLSEQ);
-				VdbeCoverageIf(v, ii < pList->nExpr - 1);
-				VdbeCoverageIf(v, ii == pList->nExpr - 1);
 				sqlVdbeChangeP5(v, zAff[0]);
 			} else {
 				assert(destIfNull == destIfFalse);
 				sqlVdbeAddOp4(v, OP_Ne, rLhs, destIfFalse,
 						  r2, (void *)coll,
 						  P4_COLLSEQ);
-				VdbeCoverage(v);
 				sqlVdbeChangeP5(v,
 						    zAff[0] |
 						    SQL_JUMPIFNULL);
@@ -3147,7 +3128,6 @@ sqlExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 		}
 		if (regCkNull) {
 			sqlVdbeAddOp2(v, OP_IsNull, regCkNull, destIfNull);
-			VdbeCoverage(v);
 			sqlVdbeGoto(v, destIfFalse);
 		}
 		sqlVdbeResolveLabel(v, labelOk);
@@ -3166,10 +3146,8 @@ sqlExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	}
 	for (i = 0; i < nVector; i++) {
 		Expr *p = sqlVectorFieldSubexpr(pExpr->pLeft, i);
-		if (sqlExprCanBeNull(p)) {
+		if (sqlExprCanBeNull(p))
 			sqlVdbeAddOp2(v, OP_IsNull, rLhs + i, destStep2);
-			VdbeCoverage(v);
-		}
 	}
 
 	/* Step 3.  The LHS is now known to be non-NULL.  Do the binary search
@@ -3188,22 +3166,18 @@ sqlExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 		/* Combine Step 3 and Step 5 into a single opcode */
 		sqlVdbeAddOp4Int(v, OP_NotFound, pExpr->iTable,
 				     destIfFalse, rLhs, nVector);
-		VdbeCoverage(v);
 		goto sqlExprCodeIN_finished;
 	}
 	/* Ordinary Step 3, for the case where FALSE and NULL are distinct */
 	addrTruthOp =
 		sqlVdbeAddOp4Int(v, OP_Found, pExpr->iTable, 0, rLhs,
 				     nVector);
-	VdbeCoverage(v);
 
 	/* Step 4.  If the RHS is known to be non-NULL and we did not find
 	 * an match on the search above, then the result must be FALSE.
 	 */
-	if (rRhsHasNull && nVector == 1) {
+	if (rRhsHasNull && nVector == 1)
 		sqlVdbeAddOp2(v, OP_NotNull, rRhsHasNull, destIfFalse);
-		VdbeCoverage(v);
-	}
 
 	/* Step 5.  If we do not care about the difference between NULL and
 	 * FALSE, then just return false.
@@ -3221,7 +3195,6 @@ sqlExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	if (destStep6)
 		sqlVdbeResolveLabel(v, destStep6);
 	addrTop = sqlVdbeAddOp2(v, OP_Rewind, pExpr->iTable, destIfFalse);
-	VdbeCoverage(v);
 	if (nVector > 1) {
 		destNotNull = sqlVdbeMakeLabel(v);
 	} else {
@@ -3244,14 +3217,12 @@ sqlExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 		sqlVdbeAddOp3(v, OP_Column, pExpr->iTable, aiMap[i], r3);
 		sqlVdbeAddOp4(v, OP_Ne, rLhs + i, destNotNull, r3,
 				  (void *)pColl, P4_COLLSEQ);
-		VdbeCoverage(v);
 		sqlReleaseTempReg(pParse, r3);
 	}
 	sqlVdbeAddOp2(v, OP_Goto, 0, destIfNull);
 	if (nVector > 1) {
 		sqlVdbeResolveLabel(v, destNotNull);
 		sqlVdbeAddOp2(v, OP_Next, pExpr->iTable, addrTop + 1);
-		VdbeCoverage(v);
 
 		/* Step 7:  If we reach this point, we know that the result must
 		 * be false.
@@ -3954,17 +3925,11 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				codeCompare(pParse, pLeft, pExpr->pRight, op,
 					    r1, r2, inReg, SQL_STOREP2);
 				assert(TK_LT == OP_Lt);
-				VdbeCoverageIf(v, op == OP_Lt);
 				assert(TK_LE == OP_Le);
-				VdbeCoverageIf(v, op == OP_Le);
 				assert(TK_GT == OP_Gt);
-				VdbeCoverageIf(v, op == OP_Gt);
 				assert(TK_GE == OP_Ge);
-				VdbeCoverageIf(v, op == OP_Ge);
 				assert(TK_EQ == OP_Eq);
-				VdbeCoverageIf(v, op == OP_Eq);
 				assert(TK_NE == OP_Ne);
-				VdbeCoverageIf(v, op == OP_Ne);
 			}
 			break;
 		}
@@ -4043,8 +4008,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			r1 = sqlExprCodeTemp(pParse, pExpr->pLeft,
 						 &regFree1);
 			addr = sqlVdbeAddOp1(v, op, r1);
-			VdbeCoverageIf(v, op == TK_ISNULL);
-			VdbeCoverageIf(v, op == TK_NOTNULL);
 			sqlVdbeAddOp2(v, OP_Bool, false, target);
 			sqlVdbeJumpHere(v, addr);
 			break;
@@ -4101,7 +4064,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				for (i = 1; i < nFarg; i++) {
 					sqlVdbeAddOp2(v, OP_NotNull, target,
 							  endCoalesce);
-					VdbeCoverage(v);
 					sqlExprCacheRemove(pParse, target,
 							       1);
 					sqlExprCachePush(pParse);
@@ -4827,23 +4789,11 @@ sqlExprIfTrue(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 			codeCompare(pParse, pExpr->pLeft, pExpr->pRight, op, r1,
 				    r2, dest, jumpIfNull);
 			assert(TK_LT == OP_Lt);
-			VdbeCoverageIf(v, op == OP_Lt);
 			assert(TK_LE == OP_Le);
-			VdbeCoverageIf(v, op == OP_Le);
 			assert(TK_GT == OP_Gt);
-			VdbeCoverageIf(v, op == OP_Gt);
 			assert(TK_GE == OP_Ge);
-			VdbeCoverageIf(v, op == OP_Ge);
 			assert(TK_EQ == OP_Eq);
-			VdbeCoverageIf(v, op == OP_Eq
-				       && jumpIfNull == SQL_NULLEQ);
-			VdbeCoverageIf(v, op == OP_Eq
-				       && jumpIfNull != SQL_NULLEQ);
 			assert(TK_NE == OP_Ne);
-			VdbeCoverageIf(v, op == OP_Ne
-				       && jumpIfNull == SQL_NULLEQ);
-			VdbeCoverageIf(v, op == OP_Ne
-				       && jumpIfNull != SQL_NULLEQ);
 			break;
 		}
 	case TK_ISNULL:
@@ -4853,8 +4803,6 @@ sqlExprIfTrue(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 			r1 = sqlExprCodeTemp(pParse, pExpr->pLeft,
 						 &regFree1);
 			sqlVdbeAddOp2(v, op, r1, dest);
-			VdbeCoverageIf(v, op == TK_ISNULL);
-			VdbeCoverageIf(v, op == TK_NOTNULL);
 			break;
 		}
 	case TK_BETWEEN:{
@@ -4882,7 +4830,6 @@ sqlExprIfTrue(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 							 &regFree1);
 				sqlVdbeAddOp3(v, OP_If, r1, dest,
 						  jumpIfNull != 0);
-				VdbeCoverage(v);
 			}
 			break;
 		}
@@ -5002,23 +4949,11 @@ sqlExprIfFalse(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 			codeCompare(pParse, pExpr->pLeft, pExpr->pRight, op, r1,
 				    r2, dest, jumpIfNull);
 			assert(TK_LT == OP_Lt);
-			VdbeCoverageIf(v, op == OP_Lt);
 			assert(TK_LE == OP_Le);
-			VdbeCoverageIf(v, op == OP_Le);
 			assert(TK_GT == OP_Gt);
-			VdbeCoverageIf(v, op == OP_Gt);
 			assert(TK_GE == OP_Ge);
-			VdbeCoverageIf(v, op == OP_Ge);
 			assert(TK_EQ == OP_Eq);
-			VdbeCoverageIf(v, op == OP_Eq
-				       && jumpIfNull != SQL_NULLEQ);
-			VdbeCoverageIf(v, op == OP_Eq
-				       && jumpIfNull == SQL_NULLEQ);
 			assert(TK_NE == OP_Ne);
-			VdbeCoverageIf(v, op == OP_Ne
-				       && jumpIfNull != SQL_NULLEQ);
-			VdbeCoverageIf(v, op == OP_Ne
-				       && jumpIfNull == SQL_NULLEQ);
 			break;
 		}
 	case TK_ISNULL:
@@ -5026,8 +4961,6 @@ sqlExprIfFalse(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 			r1 = sqlExprCodeTemp(pParse, pExpr->pLeft,
 						 &regFree1);
 			sqlVdbeAddOp2(v, op, r1, dest);
-			VdbeCoverageIf(v, op == TK_ISNULL);
-			VdbeCoverageIf(v, op == TK_NOTNULL);
 			break;
 		}
 	case TK_BETWEEN:{
@@ -5057,7 +4990,6 @@ sqlExprIfFalse(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 							 &regFree1);
 				sqlVdbeAddOp3(v, OP_IfNot, r1, dest,
 						  jumpIfNull != 0);
-				VdbeCoverage(v);
 			}
 			break;
 		}
