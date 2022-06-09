@@ -2288,13 +2288,6 @@ struct sqlConfig {
 	 */
 	int isInit;		/* True after initialization has finished */
 	int inProgress;		/* True while initialization in progress */
-#ifdef SQL_VDBE_COVERAGE
-	/* The following callback (if not NULL) is invoked on every VDBE branch
-	 * operation.  Set the callback using sql_TESTCTRL_VDBE_COVERAGE.
-	 */
-	void (*xVdbeBranch) (void *, int iSrcLine, u8 eThis, u8 eMx);	/* Callback */
-	void *pVdbeBranchArg;	/* 1st argument */
-#endif
 	int iOnceResetThreshold;	/* When to reset OP_Once counters */
 };
 
