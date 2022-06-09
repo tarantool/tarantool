@@ -155,10 +155,6 @@ SQL_WSD struct sqlConfig sqlConfig = {
 	/* All the rest should always be initialized to zero */
 	0,			/* isInit */
 	0,			/* inProgress */
-#ifdef SQL_VDBE_COVERAGE
-	0,			/* xVdbeBranch */
-	0,			/* pVbeBranchArg */
-#endif
 	0x7ffffffe		/* iOnceResetThreshold */
 };
 

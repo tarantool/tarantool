@@ -160,43 +160,6 @@ int sql_found_count = 0;
 # define UPDATE_MAX_BLOBSIZE(P)
 #endif
 
-/*
- * Invoke the VDBE coverage callback, if that callback is defined.  This
- * feature is used for test suite validation only and does not appear an
- * production builds.
- *
- * M is an integer, 2 or 3, that indices how many different ways the
- * branch can go.  It is usually 2.  "I" is the direction the branch
- * goes.  0 means falls through.  1 means branch is taken.  2 means the
- * second alternative branch is taken.
- *
- * iSrcLine is the source code line (from the __LINE__ macro) that
- * generated the VDBE instruction.  This instrumentation assumes that all
- * source code is in a single file (the amalgamation).  Special values 1
- * and 2 for the iSrcLine parameter mean that this particular branch is
- * always taken or never taken, respectively.
- */
-#if !defined(SQL_VDBE_COVERAGE)
-# define VdbeBranchTaken(I,M)
-#else
-# define VdbeBranchTaken(I,M) vdbeTakeBranch(pOp->iSrcLine,I,M)
-static void
-vdbeTakeBranch(int iSrcLine, u8 I, u8 M)
-{
-	if (iSrcLine<=2 && ALWAYS(iSrcLine>0)) {
-		M = iSrcLine;
-		/* Assert the truth of VdbeCoverageAlwaysTaken() and
-		 * VdbeCoverageNeverTaken()
-		 */
-		assert((M & I)==I);
-	} else {
-		if (sqlGlobalConfig.xVdbeBranch==0) return;  /*NO_TEST*/
-		sqlGlobalConfig.xVdbeBranch(sqlGlobalConfig.pVdbeBranchArg,
-						iSrcLine,I,M);
-	}
-}
-#endif
-
 /* Return true if the cursor was opened using the OP_OpenSorter opcode. */
 #define isSorter(x) ((x)->eCurType==CURTYPE_SORTER)
 
@@ -1524,7 +1487,6 @@ case OP_Ne: {             /* same as TK_NE, jump, in1, in3 */
 			REGISTER_TRACE(p, pOp->p2, pOut);
 			break;
 		}
-		VdbeBranchTaken(2, 3);
 		if ((pOp->p5 & SQL_JUMPIFNULL) != 0)
 			goto jump_to_p2;
 		break;
@@ -1540,7 +1502,6 @@ case OP_Ne: {             /* same as TK_NE, jump, in1, in3 */
 		REGISTER_TRACE(p, pOp->p2, pOut);
 		break;
 	}
-	VdbeBranchTaken(result, (pOp->p5 & SQL_NULLEQ) != 0 ? 2 : 3);
 	if (result)
 		goto jump_to_p2;
 	break;
@@ -1586,7 +1547,6 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 			REGISTER_TRACE(p, pOp->p2, pOut);
 			break;
 		}
-		VdbeBranchTaken(2,3);
 		if ((pOp->p5 & SQL_JUMPIFNULL) != 0)
 			goto jump_to_p2;
 		break;
@@ -1620,7 +1580,6 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 		REGISTER_TRACE(p, pOp->p2, pOut);
 		break;
 	}
-	VdbeBranchTaken(result, 3);
 	if (result)
 		goto jump_to_p2;
 	break;
@@ -1638,7 +1597,6 @@ case OP_ElseNotEq: {       /* same as TK_ESCAPE, jump */
 	assert(pOp>aOp);
 	assert(pOp[-1].opcode==OP_Lt || pOp[-1].opcode==OP_Gt);
 	assert(pOp[-1].p5 & SQL_STOREP2);
-	VdbeBranchTaken(iCompare!=0, 2);
 	if (iCompare!=0) goto jump_to_p2;
 	break;
 }
@@ -1753,13 +1711,12 @@ case OP_Compare: {
  * equal to, or greater than the P2 vector, respectively.
  */
 case OP_Jump: {             /* jump */
-	if (iCompare<0) {
-		VdbeBranchTaken(0,3); pOp = &aOp[pOp->p1 - 1];
-	} else if (iCompare==0) {
-		VdbeBranchTaken(1,3); pOp = &aOp[pOp->p2 - 1];
-	} else {
-		VdbeBranchTaken(2,3); pOp = &aOp[pOp->p3 - 1];
-	}
+	if (iCompare < 0)
+		pOp = &aOp[pOp->p1 - 1];
+	else if (iCompare == 0)
+		pOp = &aOp[pOp->p2 - 1];
+	else
+		pOp = &aOp[pOp->p3 - 1];
 	break;
 }
 
@@ -1866,7 +1823,6 @@ case OP_BitNot: {             /* same as TK_BITNOT, in1, out2 */
  */
 case OP_Once: {             /* jump */
 	assert(p->aOp[0].opcode==OP_Init);
-	VdbeBranchTaken(p->aOp[0].p1==pOp->p1, 2);
 	if (p->aOp[0].p1==pOp->p1) {
 		goto jump_to_p2;
 	} else {
@@ -1898,7 +1854,6 @@ case OP_IfNot: {            /* jump, in1 */
 			 mem_str(pIn1), "boolean");
 		goto abort_due_to_error;
 	}
-	VdbeBranchTaken(c!=0, 2);
 	if (c) {
 		goto jump_to_p2;
 	}
@@ -1912,7 +1867,6 @@ case OP_IfNot: {            /* jump, in1 */
  */
 case OP_IsNull: {            /* same as TK_ISNULL, jump, in1 */
 	pIn1 = &aMem[pOp->p1];
-	VdbeBranchTaken(mem_is_null(pIn1), 2);
 	if (mem_is_null(pIn1)) {
 		goto jump_to_p2;
 	}
@@ -1926,7 +1880,6 @@ case OP_IsNull: {            /* same as TK_ISNULL, jump, in1 */
  */
 case OP_NotNull: {            /* same as TK_NOTNULL, jump, in1 */
 	pIn1 = &aMem[pOp->p1];
-	VdbeBranchTaken(!mem_is_null(pIn1), 2);
 	if (!mem_is_null(pIn1)) {
 		goto jump_to_p2;
 	}
@@ -2587,7 +2540,6 @@ case OP_SeekGT: {       /* jump, in3 */
 	sql_search_count++;
 #endif
 	assert(pOp->p2 > 0);
-	VdbeBranchTaken(res, 2);
 	if (res != 0)
 		goto jump_to_p2;
 	break;
@@ -2686,7 +2638,6 @@ case OP_SeekGE: {       /* jump, in3 */
 	}
 	if (is_zero) {
 		assert(pOp->p2 > 0);
-		VdbeBranchTaken(1, 2);
 		goto jump_to_p2;
 	}
 	if (!is_eq && is_op_change)
@@ -2701,7 +2652,6 @@ case OP_SeekGE: {       /* jump, in3 */
 	sql_search_count++;
 #endif
 	assert(pOp->p2 > 0);
-	VdbeBranchTaken(res, 2);
 	if (res != 0)
 		goto jump_to_p2;
 	/* Skip the OP_IdxLT/OP_IdxGT that follows if we have EQ. */
@@ -2841,12 +2791,12 @@ case OP_Found: {        /* jump, in3 */
 	alreadyExists = (res==0);
 	pC->nullRow = 1-alreadyExists;
 	pC->cacheStatus = CACHE_STALE;
-	if (pOp->opcode==OP_Found) {
-		VdbeBranchTaken(alreadyExists!=0,2);
-		if (alreadyExists) goto jump_to_p2;
+	if (pOp->opcode == OP_Found) {
+		if (alreadyExists)
+			goto jump_to_p2;
 	} else {
-		VdbeBranchTaken(takeJump||alreadyExists==0,2);
-		if (takeJump || !alreadyExists) goto jump_to_p2;
+		if (takeJump || !alreadyExists)
+			goto jump_to_p2;
 	}
 	break;
 }
@@ -3049,7 +2999,6 @@ case OP_SorterCompare: {
 			nKeyCol = pOp->p4.i;
 			if (sqlVdbeSorterCompare(pC, pIn3, nKeyCol, &res) != 0)
 				goto abort_due_to_error;
-			VdbeBranchTaken(res!=0,2);
 			if (res) goto jump_to_p2;
 			break;
 		};
@@ -3213,10 +3162,8 @@ case OP_Last: {        /* jump */
 			goto abort_due_to_error;
 		pC->nullRow = (u8)res;
 		pC->cacheStatus = CACHE_STALE;
-		if (pOp->p2>0) {
-			VdbeBranchTaken(res!=0,2);
-			if (res) goto jump_to_p2;
-		}
+		if (pOp->p2 > 0 && res != 0)
+			goto jump_to_p2;
 	} else {
 		assert(pOp->p2==0);
 	}
@@ -3293,7 +3240,6 @@ case OP_Rewind: {        /* jump */
 	}
 	pC->nullRow = (u8)res;
 	assert(pOp->p2>0 && pOp->p2<p->nOp);
-	VdbeBranchTaken(res!=0,2);
 	if (res) goto jump_to_p2;
 	break;
 }
@@ -3408,8 +3354,7 @@ case OP_Next:          /* jump */
 		goto abort_due_to_error;
 			next_tail:
 	pC->cacheStatus = CACHE_STALE;
-	VdbeBranchTaken(res==0,2);
-	if (res==0) {
+	if (res == 0) {
 		pC->nullRow = 0;
 		p->aCounter[pOp->p5]++;
 #ifdef SQL_TEST
@@ -3794,8 +3739,8 @@ case OP_IdxGE:  {       /* jump */
 		assert(pOp->opcode==OP_IdxGE || pOp->opcode==OP_IdxGT);
 		res++;
 	}
-	VdbeBranchTaken(res>0,2);
-	if (res>0) goto jump_to_p2;
+	if (res > 0)
+		goto jump_to_p2;
 	break;
 }
 
