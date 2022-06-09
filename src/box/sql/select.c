@@ -1013,7 +1013,6 @@ pushOntoSorter(Parse * pParse,		/* Parser context */
 			    sqlVdbeAddOp1(v, OP_SequenceTest,
 					      pSort->iECursor);
 		}
-		VdbeCoverage(v);
 		sqlVdbeAddOp3(v, OP_Compare, regPrevKey, regBase,
 				  pSort->nOBSat);
 		pOp = sqlVdbeGetOp(v, pSort->addrSortIndex);
@@ -1048,7 +1047,6 @@ pushOntoSorter(Parse * pParse,		/* Parser context */
 		}
 		addrJmp = sqlVdbeCurrentAddr(v);
 		sqlVdbeAddOp3(v, OP_Jump, addrJmp + 1, 0, addrJmp + 1);
-		VdbeCoverage(v);
 		pSort->labelBkOut = sqlVdbeMakeLabel(v);
 		pSort->regReturn = ++pParse->nMem;
 		sqlVdbeAddOp2(v, OP_Gosub, pSort->regReturn,
@@ -1080,7 +1078,6 @@ pushOntoSorter(Parse * pParse,		/* Parser context */
 		 * Thus we never hold more than the LIMIT+OFFSET rows in memory at once
 		 */
 		addr = sqlVdbeAddOp1(v, OP_IfNotZero, iLimit);
-		VdbeCoverage(v);
 		if (pSort->sortFlags & SORTFLAG_DESC) {
 			int iNextInstr = sqlVdbeCurrentAddr(v) + 1;
 			sqlVdbeAddOp2(v, OP_Rewind, pSort->iECursor, iNextInstr);
@@ -1104,7 +1101,6 @@ pushOntoSorter(Parse * pParse,		/* Parser context */
 			int iBrk = sqlVdbeCurrentAddr(v) + 2;
 			sqlVdbeAddOp3(v, OP_Eq, regBase + nExpr, iBrk, r1);
 			sqlVdbeChangeP5(v, SQL_NULLEQ);
-			VdbeCoverage(v);
 		}
 		sqlVdbeJumpHere(v, addr);
 	}
@@ -1120,7 +1116,6 @@ codeOffset(Vdbe * v,		/* Generate code into this VM */
 {
 	if (iOffset > 0) {
 		sqlVdbeAddOp3(v, OP_IfPos, iOffset, iContinue, 1);
-		VdbeCoverage(v);
 		VdbeComment((v, "OFFSET"));
 	}
 }
@@ -1353,13 +1348,11 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 								  regResult + i,
 								  iJump,
 								  regPrev + i);
-						VdbeCoverage(v);
 					} else {
 						sqlVdbeAddOp3(v, OP_Eq,
 								  regResult + i,
 								  iContinue,
 								  regPrev + i);
-						VdbeCoverage(v);
 					}
 					if (coll != NULL) {
 						sqlVdbeChangeP4(v, -1,
@@ -1448,7 +1441,6 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 				int addr = sqlVdbeCurrentAddr(v) + 6;
 				sqlVdbeAddOp4Int(v, OP_Found, iParm + 1,
 						     addr, r1, 0);
-				VdbeCoverage(v);
 				sqlVdbeAddOp2(v, OP_IdxInsert, r1,
 						  pDest->reg_eph + 1);
 				assert(pSort == 0);
@@ -1581,7 +1573,6 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 				    sqlVdbeAddOp4Int(v, OP_Found, iParm + 1,
 							 0, regResult,
 							 nResultCol);
-				VdbeCoverage(v);
 			}
 			sqlVdbeAddOp3(v, OP_MakeRecord, regResult,
 					  nResultCol, r3);
@@ -1620,10 +1611,8 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 	 * there is a sorter, in which case the sorter has already limited
 	 * the output for us.
 	 */
-	if (pSort == 0 && p->iLimit) {
+	if (pSort == 0 && p->iLimit)
 		sqlVdbeAddOp2(v, OP_DecrJumpZero, p->iLimit, iBreak);
-		VdbeCoverage(v);
-	}
 }
 
 static inline size_t
@@ -1850,16 +1839,13 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 	if (pSort->sortFlags & SORTFLAG_UseSorter) {
 		int regSortOut = ++pParse->nMem;
 		iSortTab = pParse->nTab++;
-		if (pSort->labelBkOut) {
+		if (pSort->labelBkOut)
 			addrOnce = sqlVdbeAddOp0(v, OP_Once);
-			VdbeCoverage(v);
-		}
 		sqlVdbeAddOp3(v, OP_OpenPseudo, iSortTab, regSortOut,
 				  nKey + 1 + nSortData);
 		if (addrOnce)
 			sqlVdbeJumpHere(v, addrOnce);
 		addr = 1 + sqlVdbeAddOp2(v, OP_SorterSort, iTab, addrBreak);
-		VdbeCoverage(v);
 		codeOffset(v, p->iOffset, addrContinue);
 		sqlVdbeAddOp3(v, OP_SorterData, iTab, regSortOut, iSortTab);
 		bSeq = 0;
@@ -1869,7 +1855,6 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 		int opPositioning = (pSort->sortFlags & SORTFLAG_DESC) ?
 				    OP_Last : OP_Sort;
 		addr = 1 + sqlVdbeAddOp2(v, opPositioning, iTab, addrBreak);
-		VdbeCoverage(v);
 		codeOffset(v, p->iOffset, addrContinue);
 		iSortTab = iTab;
 		bSeq = 1;
@@ -1942,16 +1927,13 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 		if (p->iLimit != 0) {
 			int iLimit = p->iOffset ? p->iOffset + 1 : p->iLimit;
 			sqlVdbeAddOp2(v, OP_DecrJumpZero, iLimit, addrBreak);
-			VdbeCoverage(v);
 		}
 		sqlVdbeAddOp2(v, OP_SorterNext, iTab, addr);
-		VdbeCoverage(v);
 	} else {
 		/* In case of DESC sorting cursor should move backward. */
 		int opPositioning = (pSort->sortFlags & SORTFLAG_DESC) ?
 				    OP_Prev : OP_Next;
 		sqlVdbeAddOp2(v, opPositioning, iTab, addr);
-		VdbeCoverage(v);
 	}
 	if (pSort->regReturn)
 		sqlVdbeAddOp1(v, OP_Return, pSort->regReturn);
@@ -2384,7 +2366,6 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 		sqlVdbeAddOp1(v, OP_Halt, -1);
 
 		sqlVdbeResolveLabel(v, positive_limit_label);
-		VdbeCoverage(v);
 		VdbeComment((v, "LIMIT counter"));
 		sqlVdbeAddOp3(v, OP_Eq, r1, iBreak, iLimit);
 		sqlReleaseTempReg(pParse, r1);
@@ -2445,7 +2426,6 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 
 			sqlVdbeResolveLabel(v, positive_offset_label);
             		sqlReleaseTempReg(pParse, r1);
-			VdbeCoverage(v);
 			VdbeComment((v, "OFFSET counter"));
 			sqlVdbeAddOp3(v, OP_OffsetLimit, iLimit,
 					  iOffset + 1, iOffset);
@@ -2701,7 +2681,6 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 
 	/* Find the next row in the Queue and output that row */
 	addrTop = sqlVdbeAddOp2(v, OP_Rewind, iQueue, addrBreak);
-	VdbeCoverage(v);
 
 	/* Transfer the next row in Queue over to Current */
 	sqlVdbeAddOp1(v, OP_NullRow, iCurrent);	/* To reset column cache */
@@ -2718,10 +2697,8 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 	codeOffset(v, regOffset, addrCont);
 	selectInnerLoop(pParse, p, p->pEList, iCurrent,
 			0, 0, pDest, addrCont, addrBreak);
-	if (regLimit) {
+	if (regLimit)
 		sqlVdbeAddOp2(v, OP_DecrJumpZero, regLimit, addrBreak);
-		VdbeCoverage(v);
-	}
 	sqlVdbeResolveLabel(v, addrCont);
 
 	/* Execute the recursive SELECT taking the single row in Current as
@@ -3088,7 +3065,6 @@ multiSelect(Parse * pParse,	/* Parsing context */
 							      iBreak);
 					sqlVdbeAddOp2(v, OP_Rewind,
 							  unionTab, iBreak);
-					VdbeCoverage(v);
 					iStart = sqlVdbeCurrentAddr(v);
 					selectInnerLoop(pParse, p, p->pEList,
 							unionTab, 0, 0, &dest,
@@ -3096,7 +3072,6 @@ multiSelect(Parse * pParse,	/* Parsing context */
 					sqlVdbeResolveLabel(v, iCont);
 					sqlVdbeAddOp2(v, OP_Next, unionTab,
 							  iStart);
-					VdbeCoverage(v);
 					sqlVdbeResolveLabel(v, iBreak);
 					sqlVdbeAddOp2(v, OP_Close, unionTab,
 							  0);
@@ -3182,19 +3157,16 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				iCont = sqlVdbeMakeLabel(v);
 				computeLimitRegisters(pParse, p, iBreak);
 				sqlVdbeAddOp2(v, OP_Rewind, tab1, iBreak);
-				VdbeCoverage(v);
 				r1 = sqlGetTempReg(pParse);
 				iStart =
 				    sqlVdbeAddOp2(v, OP_RowData, tab1, r1);
 				sqlVdbeAddOp4Int(v, OP_NotFound, tab2,
 						     iCont, r1, 0);
-				VdbeCoverage(v);
 				sqlReleaseTempReg(pParse, r1);
 				selectInnerLoop(pParse, p, p->pEList, tab1,
 						0, 0, &dest, iCont, iBreak);
 				sqlVdbeResolveLabel(v, iCont);
 				sqlVdbeAddOp2(v, OP_Next, tab1, iStart);
-				VdbeCoverage(v);
 				sqlVdbeResolveLabel(v, iBreak);
 				sqlVdbeAddOp2(v, OP_Close, tab2, 0);
 				sqlVdbeAddOp2(v, OP_Close, tab1, 0);
@@ -3303,14 +3275,12 @@ generateOutputSubroutine(struct Parse *parse, struct Select *p,
 	if (reg_prev) {
 		int addr1, addr2;
 		addr1 = sqlVdbeAddOp1(v, OP_IfNot, reg_prev);
-		VdbeCoverage(v);
 		addr2 =
 		    sqlVdbeAddOp4(v, OP_Compare, in->iSdst, reg_prev + 1,
 				      in->nSdst,
 				      (char *)sql_key_info_ref(key_info),
 				      P4_KEYINFO);
 		sqlVdbeAddOp3(v, OP_Jump, addr2 + 2, iContinue, addr2 + 2);
-		VdbeCoverage(v);
 		sqlVdbeJumpHere(v, addr1);
 		sqlVdbeAddOp3(v, OP_Copy, in->iSdst, reg_prev + 1,
 				  in->nSdst - 1);
@@ -3407,10 +3377,8 @@ generateOutputSubroutine(struct Parse *parse, struct Select *p,
 
 	/* Jump to the end of the loop if the LIMIT is reached.
 	 */
-	if (p->iLimit) {
+	if (p->iLimit)
 		sqlVdbeAddOp2(v, OP_DecrJumpZero, p->iLimit, break_addr);
-		VdbeCoverage(v);
-	}
 
 	/* Generate the subroutine return
 	 */
@@ -3740,7 +3708,6 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 		addrEofA = sqlVdbeAddOp2(v, OP_Gosub, regOutB, addrOutB);
 		addrEofA_noB =
 		    sqlVdbeAddOp2(v, OP_Yield, regAddrB, labelEnd);
-		VdbeCoverage(v);
 		sqlVdbeGoto(v, addrEofA);
 		p->nSelectRow =
 		    sqlLogEstAdd(p->nSelectRow, pPrior->nSelectRow);
@@ -3757,7 +3724,6 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 		VdbeNoopComment((v, "eof-B subroutine"));
 		addrEofB = sqlVdbeAddOp2(v, OP_Gosub, regOutA, addrOutA);
 		sqlVdbeAddOp2(v, OP_Yield, regAddrA, labelEnd);
-		VdbeCoverage(v);
 		sqlVdbeGoto(v, addrEofB);
 	}
 
@@ -3766,7 +3732,6 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 	VdbeNoopComment((v, "A-lt-B subroutine"));
 	addrAltB = sqlVdbeAddOp2(v, OP_Gosub, regOutA, addrOutA);
 	sqlVdbeAddOp2(v, OP_Yield, regAddrA, addrEofA);
-	VdbeCoverage(v);
 	sqlVdbeGoto(v, labelCmpr);
 
 	/* Generate code to handle the case of A==B
@@ -3779,7 +3744,6 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 	} else {
 		VdbeNoopComment((v, "A-eq-B subroutine"));
 		addrAeqB = sqlVdbeAddOp2(v, OP_Yield, regAddrA, addrEofA);
-		VdbeCoverage(v);
 		sqlVdbeGoto(v, labelCmpr);
 	}
 
@@ -3791,16 +3755,13 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 		sqlVdbeAddOp2(v, OP_Gosub, regOutB, addrOutB);
 	}
 	sqlVdbeAddOp2(v, OP_Yield, regAddrB, addrEofB);
-	VdbeCoverage(v);
 	sqlVdbeGoto(v, labelCmpr);
 
 	/* This code runs once to initialize everything.
 	 */
 	sqlVdbeJumpHere(v, addr1);
 	sqlVdbeAddOp2(v, OP_Yield, regAddrA, addrEofA_noB);
-	VdbeCoverage(v);
 	sqlVdbeAddOp2(v, OP_Yield, regAddrB, addrEofB);
-	VdbeCoverage(v);
 
 	/* Implement the main merge loop
 	 */
@@ -3811,7 +3772,6 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 			  (char *)key_info_merge, P4_KEYINFO);
 	sqlVdbeChangeP5(v, OPFLAG_PERMUTE);
 	sqlVdbeAddOp3(v, OP_Jump, addrAltB, addrAeqB, addrAgtB);
-	VdbeCoverage(v);
 
 	/* Jump to the this point in order to terminate the query.
 	 */
@@ -5687,10 +5647,8 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 	 * Another solution would be to change the OP_SCopy used to copy cached
 	 * values to an OP_Copy.
 	 */
-	if (regHit) {
+	if (regHit)
 		addrHitTest = sqlVdbeAddOp1(v, OP_If, regHit);
-		VdbeCoverage(v);
-	}
 	sqlExprCacheClear(pParse);
 	for (i = 0, pC = pAggInfo->aCol; i < pAggInfo->nAccumulator; i++, pC++) {
 		sqlExprCode(pParse, pC->pExpr, pC->iMem);
@@ -6008,7 +5966,6 @@ sqlSelect(Parse * pParse,		/* The parser context */
 				 * value of the subquery once.
 				 */
 				onceAddr = sqlVdbeAddOp0(v, OP_Once);
-				VdbeCoverage(v);
 				VdbeComment((v, "materialize \"%s\"",
 					     pItem->space->def->name));
 			} else {
@@ -6445,7 +6402,6 @@ sqlSelect(Parse * pParse,		/* The parser context */
 				sqlVdbeAddOp2(v, OP_SorterSort,
 						  sAggInfo.sortingIdx, addrEnd);
 				VdbeComment((v, "GROUP BY sort"));
-				VdbeCoverage(v);
 				sAggInfo.useSortingIdx = 1;
 				sqlExprCacheClear(pParse);
 
@@ -6498,7 +6454,6 @@ sqlSelect(Parse * pParse,		/* The parser context */
 					  P4_KEYINFO);
 			addr1 = sqlVdbeCurrentAddr(v);
 			sqlVdbeAddOp3(v, OP_Jump, addr1 + 1, 0, addr1 + 1);
-			VdbeCoverage(v);
 
 			/* Generate code that runs whenever the GROUP BY changes.
 			 * Changes in the GROUP BY are detected by the previous code
@@ -6515,7 +6470,6 @@ sqlSelect(Parse * pParse,		/* The parser context */
 					  addrOutputRow);
 			VdbeComment((v, "output one row"));
 			sqlVdbeAddOp2(v, OP_IfPos, iAbortFlag, addrEnd);
-			VdbeCoverage(v);
 			VdbeComment((v, "check abort flag"));
 			sqlVdbeAddOp2(v, OP_Gosub, regReset, addrReset);
 			VdbeComment((v, "reset accumulator"));
@@ -6536,7 +6490,6 @@ sqlSelect(Parse * pParse,		/* The parser context */
 				sqlVdbeAddOp2(v, OP_SorterNext,
 						  sAggInfo.sortingIdx,
 						  addrTopOfLoop);
-				VdbeCoverage(v);
 			} else {
 				sqlWhereEnd(pWInfo);
 				sqlVdbeChangeToNoop(v, addrSortingIdx);
@@ -6567,7 +6520,6 @@ sqlSelect(Parse * pParse,		/* The parser context */
 			addrOutputRow = sqlVdbeCurrentAddr(v);
 			sqlVdbeAddOp2(v, OP_IfPos, iUseFlag,
 					  addrOutputRow + 2);
-			VdbeCoverage(v);
 			VdbeComment((v,
 				     "Groupby result generator entry point"));
 			sqlVdbeAddOp1(v, OP_Return, regOutputRow);

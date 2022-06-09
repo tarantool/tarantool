@@ -775,7 +775,6 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 	v = pParse->pVdbe;
 	assert(v != 0);
 	addrInit = sqlVdbeAddOp0(v, OP_Once);
-	VdbeCoverage(v);
 
 	/* Count the number of columns that will be added to the index
 	 * and used to match WHERE clause constraints
@@ -934,13 +933,11 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 	assert(pWC->pWInfo->pTabList->a[pLevel->iFrom].fg.viaCoroutine == 0);
 	int cursor = pLevel->iTabCur;
 	addrTop = sqlVdbeAddOp1(v, OP_Rewind, cursor);
-	VdbeCoverage(v);
 	regRecord = sqlGetTempReg(pParse);
 	vdbe_emit_ephemeral_index_tuple(pParse, idx_def->key_def, cursor,
 					regRecord, reg_eph);
 	sqlVdbeAddOp2(v, OP_IdxInsert, regRecord, reg_eph);
 	sqlVdbeAddOp2(v, OP_Next, cursor, addrTop + 1);
-	VdbeCoverage(v);
 	sqlVdbeChangeP5(v, SQL_STMTSTATUS_AUTOINDEX);
 	sqlVdbeJumpHere(v, addrTop);
 	sqlReleaseTempReg(pParse, regRecord);
@@ -4717,9 +4714,6 @@ sqlWhereEnd(WhereInfo * pWInfo)
 			sqlVdbeAddOp3(v, pLevel->op, pLevel->p1, pLevel->p2,
 					  pLevel->p3);
 			sqlVdbeChangeP5(v, pLevel->p5);
-			VdbeCoverage(v);
-			VdbeCoverageIf(v, pLevel->op == OP_Next);
-			VdbeCoverageIf(v, pLevel->op == OP_Prev);
 		}
 		if (pLoop->wsFlags & WHERE_IN_ABLE && pLevel->u.in.nIn > 0) {
 			struct InLoop *pIn;
@@ -4732,9 +4726,6 @@ sqlWhereEnd(WhereInfo * pWInfo)
 					sqlVdbeAddOp2(v, pIn->eEndLoopOp,
 							  pIn->iCur,
 							  pIn->addrInTop);
-					VdbeCoverage(v);
-					VdbeCoverageIf(v, pIn->eEndLoopOp == OP_PrevIfOpen);
-					VdbeCoverageIf(v, pIn->eEndLoopOp == OP_NextIfOpen);
 				}
 				sqlVdbeJumpHere(v, pIn->addrInTop - 1);
 			}
@@ -4751,7 +4742,6 @@ sqlWhereEnd(WhereInfo * pWInfo)
 			int ws = pLoop->wsFlags;
 			addr =
 			    sqlVdbeAddOp1(v, OP_IfPos, pLevel->iLeftJoin);
-			VdbeCoverage(v);
 			assert((ws & WHERE_IDX_ONLY) == 0
 			       || (ws & WHERE_INDEXED) != 0);
 			if ((ws & WHERE_IDX_ONLY) == 0) {

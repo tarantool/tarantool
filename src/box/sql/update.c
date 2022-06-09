@@ -476,7 +476,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	} else {
 		sqlVdbeResolveLabel(v, labelContinue);
 		sqlVdbeAddOp2(v, OP_Next, iEph, addrTop);
-		VdbeCoverage(v);
 	}
 	sqlVdbeResolveLabel(v, labelBreak);
 
