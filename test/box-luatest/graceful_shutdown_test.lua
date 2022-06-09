@@ -1,5 +1,6 @@
 local fiber = require('fiber')
 local net = require('net.box')
+local popen = require('popen')
 local server = require('test.luatest_helpers.server')
 local t = require('luatest')
 local g = t.group()
@@ -523,4 +524,18 @@ g.test_net_box_callback_garbage_collected = function()
     collectgarbage('collect')
     g.server:stop()
     conn:close()
+end
+
+-- Checks that the client closes the connection socket fd even if there is
+-- a child processes that shares it (gh-6820).
+g.test_graceful_shutdown_and_fork = function()
+    g.server:exec(function()
+        box.ctl.set_on_shutdown_timeout(9000)
+    end)
+    local c = net.connect(g.server.net_box_uri)
+    local p = popen.new({'/usr/bin/sleep', '9000'}, {close_fds = false})
+    t.assert(p)
+    c:close()
+    g.server:stop()
+    p:close()
 end
