@@ -484,8 +484,6 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
 		}
 		iTab = pX->iTable;
 		sqlVdbeAddOp2(v, bRev ? OP_Last : OP_Rewind, iTab, 0);
-		VdbeCoverageIf(v, bRev);
-		VdbeCoverageIf(v, !bRev);
 		assert((pLoop->wsFlags & WHERE_MULTI_OR) == 0);
 
 		pLoop->wsFlags |= WHERE_IN_ABLE;
@@ -514,7 +512,6 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
 								  iTab, iCol,
 								  iOut);
 					sqlVdbeAddOp1(v, OP_IsNull, iOut);
-					VdbeCoverage(v);
 					if (i == iEq) {
 						pIn->iCur = iTab;
 						pIn->eEndLoopOp =
@@ -600,15 +597,11 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 	if (nSkip) {
 		int iIdxCur = pLevel->iIdxCur;
 		sqlVdbeAddOp1(v, (bRev ? OP_Last : OP_Rewind), iIdxCur);
-		VdbeCoverageIf(v, bRev == 0);
-		VdbeCoverageIf(v, bRev != 0);
 		VdbeComment((v, "begin skip-scan on %s", idx_def->name));
 		j = sqlVdbeAddOp0(v, OP_Goto);
 		pLevel->addrSkip =
 		    sqlVdbeAddOp4Int(v, (bRev ? OP_SeekLT : OP_SeekGT),
 					 iIdxCur, 0, regBase, nSkip);
-		VdbeCoverageIf(v, bRev == 0);
-		VdbeCoverageIf(v, bRev != 0);
 		sqlVdbeJumpHere(v, j);
 		for (j = 0; j < nSkip; j++) {
 			sqlVdbeAddOp3(v, OP_Column, iIdxCur,
@@ -642,7 +635,6 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 			if (sqlExprCanBeNull(pRight)) {
 				sqlVdbeAddOp2(v, OP_IsNull, regBase + j,
 						  pLevel->addrBrk);
-				VdbeCoverage(v);
 			}
 		}
 	}
@@ -753,7 +745,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 		sqlVdbeAddOp3(v, OP_InitCoroutine, regYield, 0,
 				  pTabItem->addrFillSub);
 		pLevel->p2 = sqlVdbeAddOp2(v, OP_Yield, regYield, addrBrk);
-		VdbeCoverage(v);
 		VdbeComment((v, "next row of \"%s\"", pTabItem->space->def->name));
 		pLevel->op = OP_Goto;
 	} else if (pLoop->wsFlags & WHERE_INDEXED) {
@@ -918,7 +909,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			    && sqlExprCanBeNull(pRight)) {
 				sqlVdbeAddOp2(v, OP_IsNull, regBase + nEq,
 						  addrNxt);
-				VdbeCoverage(v);
 			}
 
 			nConstraint += nBtm;
@@ -945,13 +935,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			assert(op != 0);
 			sqlVdbeAddOp4Int(v, op, iIdxCur, addrNxt, regBase,
 					     nConstraint);
-			VdbeCoverage(v);
-			VdbeCoverageIf(v, op == OP_Rewind);
-			VdbeCoverageIf(v, op == OP_Last);
-			VdbeCoverageIf(v, op == OP_SeekGT);
-			VdbeCoverageIf(v, op == OP_SeekGE);
-			VdbeCoverageIf(v, op == OP_SeekLE);
-			VdbeCoverageIf(v, op == OP_SeekLT);
 		}
 
 		/* Load the value for the inequality constraint at the end of the
@@ -966,7 +949,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			    && sqlExprCanBeNull(pRight)) {
 				sqlVdbeAddOp2(v, OP_IsNull, regBase + nEq,
 						  addrNxt);
-				VdbeCoverage(v);
 			}
 			nConstraint += nTop;
 
@@ -989,10 +971,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			op = aEndOp[bRev * 2 + endEq];
 			sqlVdbeAddOp4Int(v, op, iIdxCur, addrNxt, regBase,
 					     nConstraint);
-			VdbeCoverageIf(v, op == OP_IdxGT);
-			VdbeCoverageIf(v, op == OP_IdxGE);
-			VdbeCoverageIf(v, op == OP_IdxLT);
-			VdbeCoverageIf(v, op == OP_IdxLE);
 		}
 
 		/* Seek the table cursor, if required */
@@ -1009,7 +987,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			}
 			sqlVdbeAddOp4Int(v, OP_NotFound, iCur, addrCont,
 					     iKeyReg, pk_part_count);
-			VdbeCoverage(v);
 			sqlReleaseTempRange(pParse, iKeyReg, pk_part_count);
 		}
 
@@ -1252,7 +1229,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 								 cur_row_set, 0,
 								 r,
 								 pk_part_count);
-							VdbeCoverage(v);
 						}
 						if (iSet >= 0) {
 							sqlVdbeAddOp3
@@ -1350,8 +1326,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			pLevel->p2 =
 			    1 + sqlVdbeAddOp2(v, aStart[bRev], iCur,
 						  addrBrk);
-			VdbeCoverageIf(v, bRev == 0);
-			VdbeCoverageIf(v, bRev != 0);
 			pLevel->p5 = SQL_STMTSTATUS_FULLSCAN_STEP;
 		}
 	}

@@ -401,7 +401,6 @@ fk_constraint_scan_children(struct Parse *parser, struct SrcList *src,
 	if (incr_count < 0) {
 		fkifzero_label = sqlVdbeAddOp2(v, OP_FkIfZero,
 						   fk_def->is_deferred, 0);
-		VdbeCoverage(v);
 	}
 
 	struct space *child_space = src->a[0].space;

@@ -354,10 +354,8 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		 */
 		if (!is_view) {
 			int iAddrOnce = 0;
-			if (one_pass == ONEPASS_MULTI) {
+			if (one_pass == ONEPASS_MULTI)
 				iAddrOnce = sqlVdbeAddOp0(v, OP_Once);
-				VdbeCoverage(v);
-			}
 			sqlVdbeAddOp4(v, OP_IteratorOpen, tab_cursor, 0, 0,
 					  (void *) space, P4_SPACEPTR);
 			VdbeComment((v, "%s", space->index[0]->def->name));
@@ -375,13 +373,10 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			assert(key_len == pk_len);
 			sqlVdbeAddOp4Int(v, OP_NotFound, tab_cursor,
 					     addr_bypass, reg_key, key_len);
-
-			VdbeCoverage(v);
 		} else {
 			sqlVdbeAddOp3(v, OP_IteratorOpen,
 					  eph_cursor, 0, reg_eph);
 			addr_loop = sqlVdbeAddOp1(v, OP_Rewind, eph_cursor);
-			VdbeCoverage(v);
 			sqlVdbeAddOp2(v, OP_RowData, eph_cursor, reg_key);
 		}
 
@@ -406,7 +401,6 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		} else {
 			sqlVdbeAddOp2(v, OP_Next, eph_cursor,
 					  addr_loop + 1);
-			VdbeCoverage(v);
 			sqlVdbeJumpHere(v, addr_loop);
 		}
 	}
@@ -437,10 +431,8 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 	 * fire any DELETE triggers.
 	 */
 	int label = sqlVdbeMakeLabel(v);
-	if (mode == ONEPASS_OFF) {
+	if (mode == ONEPASS_OFF)
 		sqlVdbeAddOp4Int(v, OP_NotFound, cursor, label, reg_pk, npk);
-		VdbeCoverageIf(v, opSeek == OP_NotFound);
-	}
 
 	int first_old_reg = 0;
 	/* If there are any triggers to fire, allocate a range of registers to
@@ -486,7 +478,6 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 		if (addr_start < sqlVdbeCurrentAddr(v)) {
 			sqlVdbeAddOp4Int(v, OP_NotFound, cursor, label,
 					     reg_pk, npk);
-			VdbeCoverageIf(v, opSeek == OP_NotFound);
 		}
 
 		/* Do FK processing. This call checks that any FK

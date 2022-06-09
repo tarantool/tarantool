@@ -237,9 +237,6 @@ sqlVdbeAddOp3(Vdbe * p, int op, int p1, int p2, int p3)
 	pOp->cycles = 0;
 	pOp->cnt = 0;
 #endif
-#ifdef SQL_VDBE_COVERAGE
-	pOp->iSrcLine = 0;
-#endif
 	return i;
 }
 
@@ -819,17 +816,6 @@ sqlVdbeNoopComment(Vdbe * p, const char *zFormat, ...)
 	}
 }
 #endif				/* NDEBUG */
-
-#ifdef SQL_VDBE_COVERAGE
-/*
- * Set the value if the iSrcLine field for the previously coded instruction.
- */
-void
-sqlVdbeSetLineNumber(Vdbe * v, int iLine)
-{
-	sqlVdbeGetOp(v, -1)->iSrcLine = iLine;
-}
-#endif				/* SQL_VDBE_COVERAGE */
 
 /*
  * Return the opcode for a given address.  If the address is -1, then
