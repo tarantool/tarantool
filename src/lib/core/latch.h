@@ -144,7 +144,6 @@ latch_lock_timeout(struct latch *l, ev_tstamp timeout)
 	if (timeout <= 0)
 		return 1;
 
-	bool was_cancellable = fiber_set_cancellable(false);
 	int result = 0;
 	struct latch_waiter waiter;
 	waiter.fiber = fiber();
@@ -163,7 +162,6 @@ latch_lock_timeout(struct latch *l, ev_tstamp timeout)
 		}
 	}
 	rlist_del_entry(&waiter, link);
-	fiber_set_cancellable(was_cancellable);
 	return result;
 }
 
