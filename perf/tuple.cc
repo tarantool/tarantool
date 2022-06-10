@@ -276,7 +276,10 @@ tuple_access_members(benchmark::State& state)
 			i = 0;
 		}
 		struct tuple *t = tuples[i++];
-		benchmark::DoNotOptimize(bool(t->is_dirty));
+		// Previously tuple had is_dirty bit field, which was later
+		// replaced with tuple flags. So to avoid changing test
+		// semantics we check now if tuple has corresponding flag.
+		benchmark::DoNotOptimize(tuple_has_flag(t, TUPLE_IS_DIRTY));
 		benchmark::DoNotOptimize(uint16_t(t->format_id));
 	}
 	total_count += i;

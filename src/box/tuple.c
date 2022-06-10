@@ -148,7 +148,7 @@ runtime_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	assert(format->vtab.tuple_delete == tuple_format_runtime_vtab.tuple_delete);
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->local_refs == 0);
-	assert(!tuple->has_uploaded_refs);
+	assert(!tuple_has_flag(tuple, TUPLE_HAS_UPLOADED_REFS));
 	size_t total = tuple_size(tuple);
 	tuple_format_unref(format);
 	smfree(&runtime_alloc, tuple, total);
@@ -219,7 +219,7 @@ enum { TUPLE_UPLOAD_REFS = TUPLE_LOCAL_REF_MAX / 2 + 1 };
 static uint32_t
 tuple_ref_get_uploaded_refs(struct tuple *tuple)
 {
-	if (!tuple->has_uploaded_refs)
+	if (!tuple_has_flag(tuple, TUPLE_HAS_UPLOADED_REFS))
 		return 0;
 	mh_int_t pos = mh_tuple_uploaded_refs_find(tuple_uploaded_refs, tuple,
 						   0);
@@ -246,7 +246,7 @@ tuple_ref_set_uploaded_refs(struct tuple *tuple, uint32_t refs)
 static void
 tuple_ref_drop_uploaded_refs(struct tuple *tuple)
 {
-	assert(tuple->has_uploaded_refs);
+	assert(tuple_has_flag(tuple, TUPLE_HAS_UPLOADED_REFS));
 	mh_int_t pos = mh_tuple_uploaded_refs_find(tuple_uploaded_refs, tuple,
 						   0);
 	assert(pos != mh_end(tuple_uploaded_refs));
@@ -259,7 +259,7 @@ tuple_upload_refs(struct tuple *tuple)
 	assert(tuple->local_refs == TUPLE_LOCAL_REF_MAX);
 	uint32_t refs = tuple_ref_get_uploaded_refs(tuple);
 	tuple_ref_set_uploaded_refs(tuple, refs + TUPLE_UPLOAD_REFS);
-	tuple->has_uploaded_refs = true;
+	tuple_set_flag(tuple, TUPLE_HAS_UPLOADED_REFS);
 	tuple->local_refs -= TUPLE_UPLOAD_REFS;
 }
 
@@ -267,11 +267,11 @@ void
 tuple_acquire_refs(struct tuple *tuple)
 {
 	assert(tuple->local_refs == 0);
-	assert(tuple->has_uploaded_refs);
+	assert(tuple_has_flag(tuple, TUPLE_HAS_UPLOADED_REFS));
 	uint32_t refs = tuple_ref_get_uploaded_refs(tuple);
 	if (refs == TUPLE_UPLOAD_REFS) {
 		tuple_ref_drop_uploaded_refs(tuple);
-		tuple->has_uploaded_refs = false;
+		tuple_clear_flag(tuple, TUPLE_HAS_UPLOADED_REFS);
 	} else {
 		tuple_ref_set_uploaded_refs(tuple, refs - TUPLE_UPLOAD_REFS);
 	}
