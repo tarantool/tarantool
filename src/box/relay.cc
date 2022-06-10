@@ -315,7 +315,7 @@ relay_yield_and_send_heartbeat(struct xstream *stream)
 static void
 relay_start(struct relay *relay, struct iostream *io, uint64_t sync,
 	     void (*stream_write)(struct xstream *, struct xrow_header *),
-	     void (*stream_cb)(struct xstream *))
+	     void (*stream_cb)(struct xstream *), uint64_t sent_raft_term)
 {
 	xstream_create(&relay->stream, stream_write, stream_cb);
 	/*
@@ -327,7 +327,7 @@ relay_start(struct relay *relay, struct iostream *io, uint64_t sync,
 	relay->io = io;
 	relay->sync = sync;
 	relay->state = RELAY_FOLLOW;
-	relay->sent_raft_term = 0;
+	relay->sent_raft_term = sent_raft_term;
 	relay->last_row_time = ev_monotonic_now(loop());
 }
 
@@ -424,7 +424,8 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	if (relay == NULL)
 		diag_raise();
 
-	relay_start(relay, io, sync, relay_send_initial_join_row, relay_yield);
+	relay_start(relay, io, sync, relay_send_initial_join_row, relay_yield,
+		    UINT64_MAX);
 	auto relay_guard = make_scoped_guard([=] {
 		relay_stop(relay);
 		relay_delete(relay);
@@ -514,7 +515,7 @@ relay_final_join(struct iostream *io, uint64_t sync,
 	if (relay == NULL)
 		diag_raise();
 
-	relay_start(relay, io, sync, relay_send_row, relay_yield);
+	relay_start(relay, io, sync, relay_send_row, relay_yield, UINT64_MAX);
 	auto relay_guard = make_scoped_guard([=] {
 		relay_stop(relay);
 		relay_delete(relay);
@@ -981,7 +982,7 @@ relay_subscribe_f(va_list ap)
 void
 relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 		struct vclock *replica_clock, uint32_t replica_version_id,
-		uint32_t replica_id_filter)
+		uint32_t replica_id_filter, uint64_t sent_raft_term)
 {
 	assert(replica->anon || replica->id != REPLICA_ID_NIL);
 	struct relay *relay = replica->relay;
@@ -1000,7 +1001,7 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 	}
 
 	relay_start(relay, io, sync, relay_send_row,
-		    relay_yield_and_send_heartbeat);
+		    relay_yield_and_send_heartbeat, sent_raft_term);
 	replica_on_relay_follow(replica);
 	auto relay_guard = make_scoped_guard([=] {
 		relay_stop(relay);
