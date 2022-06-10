@@ -234,7 +234,6 @@ int
 txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 {
 	assert(entry->lsn > 0 || !txn_has_flag(entry->txn, TXN_WAIT_ACK));
-	bool cancellable = fiber_set_cancellable(false);
 
 	if (txn_limbo_entry_is_complete(entry))
 		goto complete;
@@ -293,7 +292,6 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 			break;
 		fiber_wakeup(e->txn->fiber);
 	}
-	fiber_set_cancellable(cancellable);
 	diag_set(ClientError, ER_SYNC_QUORUM_TIMEOUT);
 	return -1;
 
@@ -310,7 +308,6 @@ complete:
 	 */
 	assert(rlist_empty(&entry->in_queue));
 	assert(txn_has_flag(entry->txn, TXN_IS_DONE));
-	fiber_set_cancellable(cancellable);
 	/*
 	 * The first tx to be rolled back already performed all
 	 * the necessary cleanups for us.
@@ -727,9 +724,7 @@ txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 			rc = -1;
 			break;
 		}
-		bool cancellable = fiber_set_cancellable(false);
 		rc = fiber_cond_wait_timeout(&limbo->wait_cond, timeout);
-		fiber_set_cancellable(cancellable);
 		if (cwp.is_confirm || cwp.is_rollback) {
 			*is_rollback = cwp.is_rollback;
 			rc = 0;
