@@ -3234,6 +3234,7 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		 tt_uuid_str(&replica_uuid), sio_socketname(io->fd));
 	say_info("remote vclock %s local vclock %s",
 		 vclock_to_string(&replica_clock), vclock_to_string(&vclock));
+	uint64_t sent_raft_term = 0;
 	if (replica_version_id >= version_id(2, 6, 0) && !anon) {
 		/*
 		 * Send out the current raft state of the instance. Don't do
@@ -3246,6 +3247,7 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		box_raft_checkpoint_remote(&req);
 		xrow_encode_raft(&row, &fiber()->gc, &req);
 		coio_write_xrow(io, &row);
+		sent_raft_term = req.term;
 	}
 	/*
 	 * Replica clock is used in gc state and recovery
@@ -3277,7 +3279,7 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * indefinitely).
 	 */
 	relay_subscribe(replica, io, header->sync, &replica_clock,
-			replica_version_id, id_filter);
+			replica_version_id, id_filter, sent_raft_term);
 }
 
 void
