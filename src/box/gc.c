@@ -573,12 +573,6 @@ gc_checkpoint_fiber_f(va_list ap)
 {
 	(void)ap;
 
-	/*
-	 * Make the fiber non-cancellable so as not to bother
-	 * about spurious wakeups.
-	 */
-	fiber_set_cancellable(false);
-
 	struct checkpoint_schedule *sched = &gc.checkpoint_schedule;
 	while (!fiber_is_cancelled()) {
 		double timeout = checkpoint_schedule_timeout(sched,
@@ -597,7 +591,8 @@ gc_checkpoint_fiber_f(va_list ap)
 		if (!fiber_yield_timeout(timeout) &&
 		    !gc.checkpoint_is_pending) {
 			/*
-			 * The checkpoint schedule has changed.
+			 * The checkpoint schedule has changed or the fiber has
+			 * been woken up spuriously.
 			 * Reschedule the next checkpoint.
 			 */
 			continue;
