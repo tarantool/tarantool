@@ -1200,23 +1200,27 @@ applier_synchro_filter_tx(struct stailq *rows)
 	if (!txn_limbo_is_replica_outdated(&txn_limbo, row->replica_id))
 		return;
 
-	if (stailq_last_entry(rows, struct applier_tx_row, next)->row.wait_sync)
-		goto nopify;
-
 	/*
-	 * Not waiting for sync and not a synchro request - this make it already
-	 * NOP or an asynchronous transaction not depending on any synchronous
-	 * ones - let it go as is.
+	 * We do not nopify promotion/demotion and confirm/rollback.
+	 * Such syncrhonous requests should be filtered by txn_limbo to detect
+	 * possible split brain situations.
+	 *
+	 * This means the only filtered out transactions are synchronous ones or
+	 * the ones depending on them.
+	 *
+	 * Any asynchronous transaction from an obsolete term is a marker of
+	 * split-brain by itself: consider it a synchronous transaction, which
+	 * is committed with quorum 1.
 	 */
-	if (!iproto_type_is_synchro_request(row->type))
+	struct xrow_header *last_row =
+		&stailq_last_entry(rows, struct applier_tx_row, next)->row;
+	if (!last_row->wait_sync) {
+		if (iproto_type_is_dml(last_row->type)) {
+			tnt_raise(ClientError, ER_SPLIT_BRAIN,
+				  "got an async transaction from an old term");
+		}
 		return;
-	/*
-	 * Do not NOPify promotion, otherwise won't even know who is the limbo
-	 * owner now.
-	 */
-	if (iproto_type_is_promote_request(row->type))
-		return;
-nopify:;
+	}
 	struct applier_tx_row *item;
 	stailq_foreach_entry(item, rows, next) {
 		row = &item->row;
