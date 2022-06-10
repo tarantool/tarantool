@@ -3996,6 +3996,13 @@ box_cfg_xc(void)
 	if (box_set_election_mode() != 0)
 		diag_raise();
 
+	/*
+	 * Enable split brain detection once node is fully recovered or
+	 * bootstrapped. No split brain could happen during bootstrap or local
+	 * recovery.
+	 */
+	txn_limbo_filter_enable(&txn_limbo);
+
 	title("running");
 	say_info("ready to accept requests");
 

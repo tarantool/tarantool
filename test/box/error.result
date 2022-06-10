@@ -462,6 +462,7 @@ t;
  |   241: box.error.WRONG_SPACE_UPGRADE_OPTIONS
  |   242: box.error.NO_ELECTION_QUORUM
  |   243: box.error.SSL
+ |   244: box.error.SPLIT_BRAIN
  | ...
 
 test_run:cmd("setopt delimiter ''");

@@ -296,6 +296,7 @@ struct errcode_record {
 	/*241 */_(ER_WRONG_SPACE_UPGRADE_OPTIONS, "Wrong space upgrade options: %s") \
 	/*242 */_(ER_NO_ELECTION_QUORUM,	"Not enough peers connected to start elections: %d out of minimal required %d")\
 	/*243 */_(ER_SSL,			"%s") \
+	/*244 */_(ER_SPLIT_BRAIN,		"Split-Brain discovered: %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

@@ -215,6 +215,15 @@ struct txn_limbo {
 			bool is_frozen_until_promotion : 1;
 		};
 	};
+	/**
+	 * Whether this instance validates incoming synchro requests. When the
+	 * setting is on, the instance only allows CONFIRM/ROLLBACK from the
+	 * limbo owner, tracks PROMOTE/DEMOTE term and owner_id consistency.
+	 * The filtering is turned off during bootstrap, because it makes no
+	 * sense when applying a full copy of a remote instance's data. There
+	 * can't be any inconsistencies.
+	 */
+	bool do_validate;
 };
 
 /**
@@ -362,8 +371,8 @@ txn_limbo_rollback(struct txn_limbo *limbo)
 }
 
 /**
- * Prepare a limbo request for WAL write and commit. Similar to txn_stmt
- * prepare.
+ * Prepare a limbo request for WAL write and commit. And check if the request is
+ * valid. Similar to txn_stmt prepare.
  */
 int
 txn_limbo_req_prepare(struct txn_limbo *limbo,
@@ -426,6 +435,10 @@ txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term);
  */
 void
 txn_limbo_on_parameters_change(struct txn_limbo *limbo);
+
+/** Start filtering incoming syncrho requests. */
+void
+txn_limbo_filter_enable(struct txn_limbo *limbo);
 
 /**
  * Freeze limbo. Prevent CONFIRMs and ROLLBACKs until limbo is unfrozen.

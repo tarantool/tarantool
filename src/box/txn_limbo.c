@@ -35,6 +35,7 @@
 #include "journal.h"
 #include "box.h"
 #include "raft.h"
+#include "tt_static.h"
 
 struct txn_limbo txn_limbo;
 
@@ -55,6 +56,7 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->svp_confirmed_lsn = -1;
 	limbo->frozen_reasons = 0;
 	limbo->is_frozen_until_promotion = true;
+	limbo->do_validate = false;
 }
 
 static inline bool
@@ -783,37 +785,308 @@ txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout)
 	return 0;
 }
 
+static int
+txn_write_cb(struct trigger *trigger, void *event)
+{
+	(void)event;
+	struct fiber *fiber = (struct fiber *)trigger->data;
+	fiber_wakeup(fiber);
+	return 0;
+}
+
+/**
+ * Wait until all the limbo entries receive an lsn.
+ */
+static int
+txn_limbo_wait_persisted(struct txn_limbo *limbo)
+{
+	if (txn_limbo_is_empty(limbo))
+		return 0;
+	struct txn_limbo_entry *e = txn_limbo_last_entry(limbo);
+	while (e != NULL && e->lsn <= 0) {
+		struct trigger on_wal_write;
+		trigger_create(&on_wal_write, txn_write_cb, fiber(), NULL);
+		txn_on_wal_write(e->txn, &on_wal_write);
+		fiber_yield();
+		trigger_clear(&on_wal_write);
+		if (fiber_is_cancelled()) {
+			diag_set(FiberIsCancelled);
+			return -1;
+		}
+		e = txn_limbo_last_entry(limbo);
+	}
+	return 0;
+}
+
+/**
+ * Fill the reject reason with request data.
+ * The function is not reenterable, use with care.
+ */
+static const char *
+reject_str(const struct synchro_request *req)
+{
+	const char *type_name = iproto_type_name(req->type);
+
+	return tt_sprintf("RAFT: rejecting %s (%d) request from origin_id %u "
+			  "replica_id %u term %llu",
+			  type_name ? type_name : "UNKNOWN", req->type,
+			  req->origin_id, req->replica_id,
+			  (long long)req->term);
+}
+
+/**
+ * Common filter for any incoming packet.
+ */
+static int
+txn_limbo_filter_generic(struct txn_limbo *limbo,
+			 const struct synchro_request *req)
+{
+	assert(latch_is_locked(&limbo->promote_latch));
+
+	if (!limbo->do_validate)
+		return 0;
+
+	/*
+	 * Zero replica_id is allowed for PROMOTE packets only.
+	 */
+	if (req->replica_id == REPLICA_ID_NIL) {
+		if (req->type != IPROTO_RAFT_PROMOTE) {
+			say_error("%s. Zero replica_id detected",
+				  reject_str(req));
+			diag_set(ClientError, ER_UNSUPPORTED, "Replication",
+				 "synchronous requests with zero replica_id");
+			return -1;
+		}
+	}
+	if (req->replica_id != limbo->owner_id) {
+		/*
+		 * Incoming packets should esteem limbo owner,
+		 * if it doesn't match it means the sender
+		 * missed limbo owner migrations and is out of date.
+		 */
+		say_error("%s. Limbo owner mismatch, owner_id %u",
+			  reject_str(req), limbo->owner_id);
+		diag_set(ClientError, ER_SPLIT_BRAIN,
+			 "got a request from a foreign synchro queue owner");
+		return -1;
+	}
+
+	return 0;
+}
+
+/**
+ * A common filter for all synchro requests, checking that request operates
+ * over a valid lsn range.
+ */
+static int
+txn_limbo_filter_queue_boundaries(struct txn_limbo *limbo,
+				  const struct synchro_request *req)
+{
+	int64_t lsn = req->lsn;
+	/*
+	 * Easy case - processed LSN matches the new one which comes inside
+	 * request, everything is consistent. This is allowed only for
+	 * PROMOTE/DEMOTE.
+	 */
+	if (limbo->confirmed_lsn == lsn) {
+		if (iproto_type_is_promote_request(req->type)) {
+			return 0;
+		} else {
+			say_error("%s. Duplicate request with confirmed lsn "
+				  "%lld = request lsn %lld", reject_str(req),
+				  (long long)limbo->confirmed_lsn,
+				  (long long)lsn);
+			diag_set(ClientError, ER_UNSUPPORTED, "Replication",
+				 "Duplicate CONFIRM/ROLLBACK request");
+			return -1;
+		}
+	}
+
+	/*
+	 * Explicit split brain situation. Request comes in with an old LSN
+	 * which we've already processed.
+	 */
+	if (limbo->confirmed_lsn > lsn) {
+		say_error("%s. confirmed lsn %lld > request lsn %lld",
+			  reject_str(req), (long long)limbo->confirmed_lsn,
+			  (long long)lsn);
+		diag_set(ClientError, ER_SPLIT_BRAIN,
+			 "got a request with lsn from an already "
+			 "processed range");
+		return -1;
+	}
+
+	/*
+	 * The last case requires a few subcases.
+	 */
+	assert(limbo->confirmed_lsn < lsn);
+
+	if (txn_limbo_is_empty(limbo)) {
+		/*
+		 * Transactions are rolled back already,
+		 * since the limbo is empty.
+		 */
+		say_error("%s. confirmed lsn %lld < request lsn %lld "
+			  "and empty limbo", reject_str(req),
+			  (long long)limbo->confirmed_lsn,
+			  (long long)lsn);
+		diag_set(ClientError, ER_SPLIT_BRAIN,
+			 "got a request mentioning future lsn");
+		return -1;
+	} else {
+		/*
+		 * Some entries are present in the limbo, we need to make sure
+		 * that request lsn lays inside limbo [first; last] range.
+		 * So that the request has some queued data to process,
+		 * otherwise it means the request comes from split brained node.
+		 */
+		int64_t first_lsn = txn_limbo_first_entry(limbo)->lsn;
+		int64_t last_lsn = txn_limbo_last_synchro_entry(limbo)->lsn;
+
+		if (lsn < first_lsn || last_lsn < lsn) {
+			say_error("%s. request lsn %lld out of range "
+				  "[%lld; %lld]", reject_str(req),
+				  (long long)lsn,
+				  (long long)first_lsn,
+				  (long long)last_lsn);
+			diag_set(ClientError, ER_SPLIT_BRAIN,
+				 "got a request lsn out of queue range");
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Filter CONFIRM and ROLLBACK packets.
+ */
+static int
+txn_limbo_filter_confirm_rollback(struct txn_limbo *limbo,
+				  const struct synchro_request *req)
+{
+	assert(latch_is_locked(&limbo->promote_latch));
+	assert(limbo->do_validate);
+	assert(req->type == IPROTO_RAFT_CONFIRM ||
+	       req->type == IPROTO_RAFT_ROLLBACK);
+	/*
+	 * Zero LSN is allowed for PROMOTE and DEMOTE requests only.
+	 */
+	if (req->lsn == 0) {
+		say_error("%s. Zero lsn detected", reject_str(req));
+		diag_set(ClientError, ER_UNSUPPORTED, "Replication",
+			 "zero LSN for CONFIRM/ROLLBACK");
+		return -1;
+	}
+
+	return txn_limbo_filter_queue_boundaries(limbo, req);
+}
+
+/** A filter PROMOTE and DEMOTE packets. */
+static int
+txn_limbo_filter_promote_demote(struct txn_limbo *limbo,
+				const struct synchro_request *req)
+{
+	assert(latch_is_locked(&limbo->promote_latch));
+	assert(limbo->do_validate);
+	assert(iproto_type_is_promote_request(req->type));
+	/*
+	 * PROMOTE and DEMOTE packets must not have zero
+	 * term supplied, otherwise it is a broken packet.
+	 */
+	if (req->term == 0) {
+		say_error("%s. Zero term detected", reject_str(req));
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 "Replication", "PROMOTE/DEMOTE with a zero term");
+		return -1;
+	}
+
+	/*
+	 * If the term is already seen it means it comes
+	 * from a node which didn't notice new elections,
+	 * thus been living in subdomain and its data is
+	 * no longer consistent.
+	 */
+	if (limbo->promote_greatest_term >= req->term) {
+		say_error("%s. Max term seen is %llu", reject_str(req),
+			  (long long)limbo->promote_greatest_term);
+		diag_set(ClientError, ER_SPLIT_BRAIN,
+			 "got a PROMOTE/DEMOTE with an obsolete term");
+		return -1;
+	}
+
+	return txn_limbo_filter_queue_boundaries(limbo, req);
+}
+
+/** A fine-grained filter checking specific request type constraints. */
+static int
+txn_limbo_filter_request(struct txn_limbo *limbo,
+			 const struct synchro_request *req)
+{
+	if (!limbo->do_validate)
+		return 0;
+	/*
+	 * Wait until all the entries receive an lsn. The lsn will be
+	 * used to determine whether filtered request is safe to apply.
+	 */
+	if (txn_limbo_wait_persisted(limbo) < 0)
+		return -1;
+	switch (req->type) {
+	case IPROTO_RAFT_CONFIRM:
+	case IPROTO_RAFT_ROLLBACK:
+		return txn_limbo_filter_confirm_rollback(limbo, req);
+	case IPROTO_RAFT_PROMOTE:
+	case IPROTO_RAFT_DEMOTE:
+		return txn_limbo_filter_promote_demote(limbo, req);
+	default:
+		unreachable();
+	}
+}
+
 int
 txn_limbo_req_prepare(struct txn_limbo *limbo,
 		      const struct synchro_request *req)
 {
 	assert(latch_is_locked(&limbo->promote_latch));
+
+	if (txn_limbo_filter_generic(limbo, req) < 0)
+		return -1;
+
+	/*
+	 * Guard against new transactions appearing during WAL write. It is
+	 * necessary because otherwise when PROMOTE/DEMOTE would be done and it
+	 * would see a txn without LSN in the limbo, it couldn't tell whether
+	 * the transaction should be confirmed or rolled back. It could be
+	 * delivered to the PROMOTE/DEMOTE initiator even before than to the
+	 * local TX thread, or could be not.
+	 *
+	 * CONFIRM and ROLLBACK need this guard only during  the filter stage.
+	 * Because the filter needs to see all the transactions LSNs to work
+	 * correctly.
+	 */
+	assert(!limbo->is_in_rollback);
+	limbo->is_in_rollback = true;
+	if (txn_limbo_filter_request(limbo, req) < 0) {
+		limbo->is_in_rollback = false;
+		return -1;
+	}
+	/* Prepare for request execution and fine-grained filtering. */
 	switch (req->type) {
+	case IPROTO_RAFT_CONFIRM:
+	case IPROTO_RAFT_ROLLBACK:
+		limbo->is_in_rollback = false;
+		break;
 	case IPROTO_RAFT_PROMOTE:
 	case IPROTO_RAFT_DEMOTE: {
-		assert(!limbo->is_in_rollback);
 		assert(limbo->svp_confirmed_lsn == -1);
-		/*
-		 * Guard against new transactions appearing during WAL write. It
-		 * is necessary because otherwise when PROMOTE/DEMOTE would be
-		 * done and it would see a txn without LSN in the limbo, it
-		 * couldn't tell whether the transaction should be confirmed or
-		 * rolled back. It could be delivered to the PROMOTE/DEMOTE
-		 * initiator even before than to the local TX thread, or could
-		 * be not.
-		 */
 		limbo->svp_confirmed_lsn = limbo->confirmed_lsn;
 		limbo->confirmed_lsn = req->lsn;
-		limbo->is_in_rollback = true;
 		break;
 	}
 	/*
 	 * XXX: ideally all requests should go through req_* methods. To unify
 	 * their work from applier and locally.
 	 */
-	default: {
-		break;
-	}
 	}
 	return 0;
 }
@@ -883,41 +1156,9 @@ txn_limbo_req_commit(struct txn_limbo *limbo, const struct synchro_request *req)
 				txn_limbo_unfreeze_on_first_promote(&txn_limbo);
 			}
 		}
-	} else if (iproto_type_is_promote_request(req->type) &&
-		   limbo->promote_greatest_term > 1) {
-		/* PROMOTE for outdated term. Ignore. */
-		say_info("RAFT: ignoring %s request from instance "
-			 "id %u for term %llu. Greatest term seen "
-			 "before (%llu) is bigger.",
-			 iproto_type_name(req->type), origin, (long long)term,
-			 (long long)limbo->promote_greatest_term);
-		return;
 	}
 
 	int64_t lsn = req->lsn;
-	if (req->replica_id == REPLICA_ID_NIL) {
-		/*
-		 * The limbo was empty on the instance issuing the request.
-		 * This means this instance must empty its limbo as well.
-		 */
-		assert(lsn == 0 && iproto_type_is_promote_request(req->type));
-	} else if (req->replica_id != limbo->owner_id) {
-		/*
-		 * Ignore CONFIRM/ROLLBACK messages for a foreign master.
-		 * These are most likely outdated messages for already confirmed
-		 * data from an old leader, who has just started and written
-		 * confirm right on synchronous transaction recovery.
-		 */
-		if (!iproto_type_is_promote_request(req->type))
-			return;
-		/*
-		 * Promote has a bigger term, and tries to steal the limbo. It
-		 * means it probably was elected with a quorum, and it makes no
-		 * sense to wait here for confirmations. The other nodes already
-		 * elected a new leader. Rollback all the local txns.
-		 */
-		lsn = 0;
-	}
 	switch (req->type) {
 	case IPROTO_RAFT_CONFIRM:
 		txn_limbo_read_confirm(limbo, lsn);
@@ -995,6 +1236,14 @@ txn_limbo_unfence(struct txn_limbo *limbo)
 {
 	limbo->is_frozen_due_to_fencing = false;
 	box_update_ro_summary();
+}
+
+void
+txn_limbo_filter_enable(struct txn_limbo *limbo)
+{
+	latch_lock(&limbo->promote_latch);
+	limbo->do_validate = true;
+	latch_unlock(&limbo->promote_latch);
 }
 
 void
