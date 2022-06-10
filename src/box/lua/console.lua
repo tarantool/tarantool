@@ -50,7 +50,7 @@ local output_handlers = { }
 -- puts it inside of a stream.
 local output_eos = { ["yaml"] = '\n...\n', ["lua"] = ';' }
 
-output_handlers["yaml"] = function(status, opts, ...)
+output_handlers["yaml"] = function(status, _opts, ...)
     local err, ok, res
      -- Using pcall, because serializer can raise an exception
     if status then
@@ -261,7 +261,7 @@ local function delimiter(delim)
     end
 end
 
-local function set_delimiter(storage, value)
+local function set_delimiter(_storage, value)
     local console = fiber.self().storage.console
     if console ~= nil and console.delimiter == '$EOF$' then
         return error('Can not install delimiter for net box sessions')
@@ -282,7 +282,7 @@ local function set_language(storage, value)
     return true
 end
 
-local function set_output(storage, value)
+local function set_output(_storage, value)
     local err, fmt, opts = parse_output(value)
     if err then
         return error(err)
@@ -302,7 +302,7 @@ local param_handlers = {
     d = set_delimiter
 }
 
-local function set_param(storage, func, param, value)
+local function set_param(storage, _func, param, value)
     if param == nil then
         return format(false, 'Invalid set syntax, type \\help for help')
     end
@@ -312,11 +312,11 @@ local function set_param(storage, func, param, value)
     return format(pcall(param_handlers[param], storage, value))
 end
 
-local function help_wrapper(storage)
+local function help_wrapper(_storage)
     return format(true, help())
 end
 
-local function quit(storage)
+local function quit(_storage)
     local console = fiber.self().storage.console
     if console ~= nil then
         console.running = false
@@ -878,7 +878,7 @@ local function connect(uri, opts)
     return true
 end
 
-local function client_handler(client, peer)
+local function client_handler(client, _peer)
     session_internal.create(client:fd(), "console")
     session_internal.run_on_connect()
     session_internal.run_on_auth(box.session.user(), true)

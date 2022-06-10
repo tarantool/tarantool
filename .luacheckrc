@@ -21,6 +21,8 @@ ignore = {
     "431",
     -- Shadowing an upvalue argument.
     "432",
+    -- Unused variable with `_` prefix.
+    "212/_.*",
 }
 
 include_files = {
@@ -62,12 +64,6 @@ files["src/lua/help.lua"] = {
 files["src/lua/init.lua"] = {
     -- Miscellaneous global function definition.
     globals = {"dostring"},
-}
-files["src/box/lua/console.lua"] = {
-    ignore = {
-        -- https://github.com/tarantool/tarantool/issues/5032
-        "212",
-    }
 }
 files["test/box/box.lua"] = {
     globals = {
