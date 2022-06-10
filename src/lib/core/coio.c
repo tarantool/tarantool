@@ -491,25 +491,36 @@ coio_stat_stat_timeout(ev_stat *stat, ev_tstamp timeout)
 	return 0;
 }
 
-typedef void (*ev_child_cb)(ev_loop *, ev_child *, int);
+/**
+ * The process status change callback.
+ * Similar to fiber_schedule_cb, but also set watcher->data to NULL to indicate
+ * that the fiber has been woken up on the child process termination.
+ */
+static void
+coio_status_change_cb(ev_loop *loop, ev_child *watcher, int revents)
+{
+	(void)loop;
+	(void)revents;
+	struct fiber *fiber = watcher->data;
+	assert(fiber() == &cord()->sched);
+	watcher->data = NULL;
+	fiber_wakeup(fiber);
+}
 
 int
 coio_waitpid(pid_t pid, int *status)
 {
 	assert(cord_is_main());
 	ev_child cw;
-	ev_init(&cw, (ev_child_cb) fiber_schedule_cb);
+	ev_init(&cw, coio_status_change_cb);
 	ev_child_set(&cw, pid, 0);
 	cw.data = fiber();
 	ev_child_start(loop(), &cw);
-	/*
-	 * It's not safe to spuriously wakeup this fiber since
-	 * in this case the server will leave a zombie process
-	 * behind.
-	 */
-	bool allow_cancel = fiber_set_cancellable(false);
-	fiber_yield();
-	fiber_set_cancellable(allow_cancel);
+
+	do {
+		fiber_yield();
+	} while (cw.data != NULL);
+
 	ev_child_stop(loop(), &cw);
 	if (fiber_is_cancelled()) {
 		diag_set(FiberIsCancelled);
