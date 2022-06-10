@@ -176,14 +176,7 @@ box_raft_schedule_async(struct raft *raft)
 		box_raft_worker->f_arg = raft;
 		fiber_set_joinable(box_raft_worker, true);
 	}
-	/*
-	 * Don't wake the fiber if it writes something (not cancellable).
-	 * Otherwise it would be a spurious wakeup breaking the WAL write not
-	 * adapted to this. Also don't wakeup the current fiber - it leads to
-	 * undefined behaviour.
-	 */
-	if ((box_raft_worker->flags & FIBER_IS_CANCELLABLE) != 0)
-		fiber_wakeup(box_raft_worker);
+	fiber_wakeup(box_raft_worker);
 	box_raft_has_work = true;
 }
 
@@ -403,14 +396,7 @@ box_raft_write(struct raft *raft, const struct raft_msg *msg)
 		goto fail;
 	journal_entry_create(entry, 1, xrow_approx_len(&row),
 			     journal_entry_fiber_wakeup_cb, fiber());
-
-	/*
-	 * A non-cancelable fiber is considered non-wake-able, generally. Raft
-	 * follows this pattern of 'protection'.
-	 */
-	bool cancellable = fiber_set_cancellable(false);
 	bool is_err = journal_write(entry) != 0;
-	fiber_set_cancellable(cancellable);
 	if (is_err)
 		goto fail;
 	if (entry->res < 0) {
