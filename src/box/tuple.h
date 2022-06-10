@@ -297,6 +297,26 @@ box_tuple_validate(box_tuple_t *tuple, box_tuple_format_t *format);
 /** \endcond public */
 
 /**
+ * Tuple flags. Each value is a position of corresponding bit in
+ * tuple->flags member.
+ */
+enum tuple_flag {
+	/**
+	 * Flag that shows that the tuple has more references in separate
+	 * external storage, see @sa tuple_upload_refs and tuple_acquire_refs.
+	 * For private use only.
+	 */
+	TUPLE_HAS_UPLOADED_REFS = 0,
+	/**
+	 * The tuple (if it's found in index for example) could be invisible
+	 * for current transactions. The flag means that the tuple must
+	 * be clarified by transaction engine.
+	 */
+	TUPLE_IS_DIRTY = 1,
+	tuple_flag_MAX,
+};
+
+/**
  * An atom of Tarantool storage. Represents MsgPack Array.
  * Tuple has the following structure:
  *                           uint32       uint32     bsize
@@ -319,18 +339,8 @@ struct PACKED tuple
 	 * tuple_ref_init, tuple_ref, tuple_unref instead.
 	 */
 	uint8_t local_refs;
-	/**
-	 * Flag that shows that the tuple has more references in separate
-	 * external storage, see @sa tuple_upload_refs and tuple_acquire_refs.
-	 * For private use only.
-	 */
-	bool has_uploaded_refs : 1;
-	/**
-	 * The tuple (if it's found in index for example) could be invisible
-	 * for current transactions. The flag means that the tuple must
-	 * be clarified by transaction engine.
-	 */
-	bool is_dirty : 1;
+	/** Tuple flags (e.g. see TUPLE_HAS_UPLOADED_REFS). */
+	uint8_t flags;
 	/** Format identifier. */
 	uint16_t format_id;
 	/**
@@ -358,6 +368,34 @@ struct PACKED tuple
 };
 
 static_assert(sizeof(struct tuple) == 10, "Just to be sure");
+
+static_assert(DIV_ROUND_UP(tuple_flag_MAX, 8) <=
+	      sizeof(((struct tuple *)0)->flags),
+	      "enum tuple_flag doesn't fit into tuple->flags");
+
+/** Set flag of the tuple. */
+static inline void
+tuple_set_flag(struct tuple *tuple, enum tuple_flag flag)
+{
+	assert(flag < tuple_flag_MAX);
+	tuple->flags |= (1 << flag);
+}
+
+/** Test if tuple has a flag. */
+static inline bool
+tuple_has_flag(struct tuple *tuple, enum tuple_flag flag)
+{
+	assert(flag < tuple_flag_MAX);
+	return (tuple->flags & (1 << flag)) != 0;
+}
+
+/** Clears tuple flag. */
+static inline void
+tuple_clear_flag(struct tuple *tuple, enum tuple_flag flag)
+{
+	assert(flag < tuple_flag_MAX);
+	tuple->flags &= ~(1 << flag);
+}
 
 enum {
 	/** Maximal value of tuple::local_refs. */
@@ -421,8 +459,7 @@ tuple_create(struct tuple *tuple, uint8_t refs, uint16_t format_id,
 {
 	assert(data_offset <= INT16_MAX);
 	tuple->local_refs = refs;
-	tuple->has_uploaded_refs = false;
-	tuple->is_dirty = false;
+	tuple->flags = 0;
 	tuple->format_id = format_id;
 	if (make_compact) {
 		assert(tuple_can_be_compact(data_offset, bsize));
@@ -448,7 +485,7 @@ static inline void
 tuple_ref_init(struct tuple *tuple, uint8_t refs)
 {
 	tuple->local_refs = refs;
-	tuple->has_uploaded_refs = false;
+	tuple_clear_flag(tuple, TUPLE_HAS_UPLOADED_REFS);
 }
 
 /**
@@ -645,8 +682,7 @@ tuple_delete(struct tuple *tuple)
 {
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->local_refs == 0);
-	assert(!tuple->has_uploaded_refs);
-	assert(!tuple->is_dirty);
+	assert(tuple->flags == 0);
 	struct tuple_format *format = tuple_format(tuple);
 	format->vtab.tuple_delete(format, tuple);
 }
@@ -1299,7 +1335,7 @@ tuple_unref(struct tuple *tuple)
 {
 	assert(tuple->local_refs >= 1);
 	if (--tuple->local_refs == 0) {
-		if (unlikely(tuple->has_uploaded_refs))
+		if (unlikely(tuple_has_flag(tuple, TUPLE_HAS_UPLOADED_REFS)))
 			tuple_acquire_refs(tuple);
 		else
 			tuple_delete(tuple);

@@ -764,7 +764,7 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple,
 		   bool tuple_is_referenced_to_pk)
 {
 	txm.must_do_gc_steps += TX_MANAGER_GC_STEPS_SIZE;
-	assert(!tuple->is_dirty);
+	assert(!tuple_has_flag(tuple, TUPLE_IS_DIRTY));
 	uint32_t index_count = space->index_count;
 	assert(index_count < BOX_INDEX_MAX);
 	struct mempool *pool = &txm.memtx_tx_story_pool[index_count];
@@ -780,7 +780,7 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple,
 		(const struct memtx_story **) &story;
 	struct memtx_story **empty = NULL;
 	mh_history_put(txm.history, put_story, &empty, 0);
-	tuple->is_dirty = true;
+	tuple_set_flag(tuple, TUPLE_IS_DIRTY);
 	tuple_ref(tuple);
 	story->status = MEMTX_TX_STORY_USED;
 	struct memtx_tx_stats *stats = &txm.story_stats[story->status];
@@ -835,7 +835,7 @@ memtx_tx_story_delete(struct memtx_story *story)
 	assert(pos != mh_end(txm.history));
 	mh_history_del(txm.history, pos, 0);
 
-	story->tuple->is_dirty = false;
+	tuple_clear_flag(story->tuple, TUPLE_IS_DIRTY);
 	tuple_unref(story->tuple);
 
 #ifndef NDEBUG
@@ -856,7 +856,7 @@ memtx_tx_story_delete(struct memtx_story *story)
 static struct memtx_story *
 memtx_tx_story_get(struct tuple *tuple)
 {
-	assert(tuple->is_dirty);
+	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
 
 	mh_int_t pos = mh_history_find(txm.history, tuple, 0);
 	assert(pos != mh_end(txm.history));
@@ -1527,7 +1527,8 @@ check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
 		enum dup_replace_mode mode,
 		struct memtx_tx_conflict **collected_conflicts)
 {
-	assert(replaced[0] == NULL || !replaced[0]->is_dirty);
+	assert(replaced[0] == NULL ||
+	       !tuple_has_flag(replaced[0], TUPLE_IS_DIRTY));
 	struct space *space = stmt->space;
 	struct txn *txn = stmt->txn;
 
@@ -1553,7 +1554,7 @@ check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
 				   collected_conflicts);
 			continue;
 		}
-		if (!replaced[i]->is_dirty) {
+		if (!tuple_has_flag(replaced[i], TUPLE_IS_DIRTY)) {
 			/* Check like there's no mvcc. */
 			if (memtx_tx_check_dup(new_tuple, replaced[0],
 					       replaced[i], DUP_INSERT,
@@ -1601,7 +1602,8 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 		enum dup_replace_mode mode,
 		struct memtx_tx_conflict **collected_conflicts)
 {
-	assert(replaced[0] != NULL && replaced[0]->is_dirty);
+	assert(replaced[0] != NULL &&
+	       tuple_has_flag(replaced[0], TUPLE_IS_DIRTY));
 	struct space *space = stmt->space;
 	struct txn *txn = stmt->txn;
 
@@ -1631,7 +1633,7 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 				   collected_conflicts);
 			continue;
 		}
-		if (!replaced[i]->is_dirty) {
+		if (!tuple_has_flag(replaced[i], TUPLE_IS_DIRTY)) {
 			/*
 			 * Non-null clean tuple cannot be NULL or
 			 * visible_replaced since visible_replaced is dirty.
@@ -1679,7 +1681,7 @@ check_dup_common(struct txn_stmt *stmt, struct tuple *new_tuple,
 		 struct memtx_tx_conflict **collected_conflicts)
 {
 	struct tuple *replaced = directly_replaced[0];
-	if (replaced == NULL || !replaced->is_dirty)
+	if (replaced == NULL || !tuple_has_flag(replaced, TUPLE_IS_DIRTY))
 		return check_dup_clean(stmt, new_tuple, directly_replaced,
 				       old_tuple, mode,
 				       collected_conflicts);
@@ -1714,12 +1716,12 @@ memtx_tx_handle_gap_write(struct txn *txn, struct space *space,
 		    memtx_tx_cause_conflict(txn, fsc_item->txn) != 0)
 			return -1;
 	}
-	if (successor != NULL && !successor->is_dirty)
+	if (successor != NULL && !tuple_has_flag(successor, TUPLE_IS_DIRTY))
 		return 0; /* no gap records */
 
 	struct rlist *list = &index->nearby_gaps;
 	if (successor != NULL) {
-		assert(successor->is_dirty);
+		assert(tuple_has_flag(successor, TUPLE_IS_DIRTY));
 		struct memtx_story *succ_story = memtx_tx_story_get(successor);
 		assert(ind < succ_story->index_count);
 		list = &succ_story->link[ind].nearby_gaps;
@@ -1851,7 +1853,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		goto fail;
 	memtx_tx_story_link_added_by(add_story, stmt);
 
-	if (replaced != NULL && !replaced->is_dirty) {
+	if (replaced != NULL && !tuple_has_flag(replaced, TUPLE_IS_DIRTY)) {
 		/*
 		 * Note that despite the tuple is not in pk,
 		 * it is referenced to it, so we pass true as the last argument.
@@ -1891,7 +1893,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 				goto fail;
 			continue;
 		}
-		assert(directly_replaced[i]->is_dirty);
+		assert(tuple_has_flag(directly_replaced[i], TUPLE_IS_DIRTY));
 		struct memtx_story *secondary_replaced =
 			memtx_tx_story_get(directly_replaced[i]);
 		memtx_tx_story_link_top_light(add_story, secondary_replaced, i);
@@ -1899,7 +1901,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	}
 
 	if (old_tuple != NULL) {
-		assert(old_tuple->is_dirty);
+		assert(tuple_has_flag(old_tuple, TUPLE_IS_DIRTY));
 
 		struct memtx_story *del_story = NULL;
 		if (old_tuple == replaced)
@@ -1978,7 +1980,7 @@ memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
 	struct space *space = stmt->space;
 	struct memtx_story *del_story;
 
-	if (old_tuple->is_dirty) {
+	if (tuple_has_flag(old_tuple, TUPLE_IS_DIRTY)) {
 		del_story = memtx_tx_story_get(old_tuple);
 	} else {
 		assert(stmt->txn != NULL);
@@ -2015,7 +2017,7 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 	assert(stmt != NULL);
 	assert(stmt->space != NULL);
 	assert(new_tuple != NULL || old_tuple != NULL);
-	assert(new_tuple == NULL || !new_tuple->is_dirty);
+	assert(new_tuple == NULL || !tuple_has_flag(new_tuple, TUPLE_IS_DIRTY));
 
 	if (new_tuple != NULL)
 		return memtx_tx_history_add_insert_stmt(stmt, old_tuple,
@@ -2315,7 +2317,7 @@ memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
 			    struct tuple *tuple, struct index *index,
 			    uint32_t mk_index, bool is_prepared_ok)
 {
-	assert(tuple->is_dirty);
+	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
 	struct memtx_story *story = memtx_tx_story_get(tuple);
 	bool own_change = false;
 	struct tuple *result = NULL;
@@ -2577,7 +2579,7 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
 	if (space->def->opts.is_ephemeral)
 		return 0;
 
-	if (tuple->is_dirty) {
+	if (tuple_has_flag(tuple, TUPLE_IS_DIRTY)) {
 		struct memtx_story *story = memtx_tx_story_get(tuple);
 		return memtx_tx_track_read_story(txn, space, story, UINT64_MAX);
 	} else {
@@ -2789,7 +2791,7 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 
 	if (successor != NULL) {
 		struct memtx_story *story;
-		if (successor->is_dirty) {
+		if (tuple_has_flag(successor, TUPLE_IS_DIRTY)) {
 			story = memtx_tx_story_get(successor);
 		} else {
 			/*
