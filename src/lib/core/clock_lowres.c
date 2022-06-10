@@ -3,14 +3,14 @@
  *
  * Copyright 2010-2022, Tarantool AUTHORS, please see AUTHORS file.
  */
-#include <signal.h>
 #include <string.h>
 #include <say.h>
 #include <pthread.h>
+#include "tt_sigaction.h"
 #include "clock.h"
 #include "clock_lowres.h"
 
-#if defined(__APPLE__) || !defined(NDEBUG)
+#ifndef NDEBUG
 /**
  * A thread that initialized this module. Only owner thread
  * is allowed to handle SIGALRM and use methods from this module.
@@ -44,27 +44,15 @@ double clock_lowres_monotonic_clock_value = 0.0;
 static void
 clock_lowres_tick(int signum)
 {
-#ifdef __APPLE__
-	/**
-	 * We cannot guarantee that the signal is delivered
-	 * only to owner thread on MacOS. So use this workaround.
-	 * https://github.com/tarantool/tarantool/issues/7206
-	 */
-	if (!clock_lowres_thread_is_owner()) {
-		pthread_kill(owner, signum);
-		return;
-	}
-#else
 	(void)signum;
 	assert(clock_lowres_thread_is_owner());
-#endif
 	clock_lowres_monotonic_clock_value = clock_monotonic();
 }
 
 void
 clock_lowres_signal_init(void)
 {
-#if defined(__APPLE__) || !defined(NDEBUG)
+#ifndef NDEBUG
 	owner = pthread_self();
 #endif
 	clock_lowres_monotonic_clock_value = clock_monotonic();
@@ -72,7 +60,7 @@ clock_lowres_signal_init(void)
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = clock_lowres_tick;
 	sa.sa_flags = SA_RESTART;
-	if (sigaction(SIGALRM, &sa, NULL) == -1)
+	if (tt_sigaction(SIGALRM, &sa, NULL) == -1)
 		panic_syserror("cannot set low resolution clock timer signal");
 
 	struct itimerval timer;
@@ -93,6 +81,6 @@ clock_lowres_signal_reset(void)
 	struct sigaction sa;
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = SIG_DFL;
-	if (sigaction(SIGALRM, &sa, NULL) == -1)
+	if (tt_sigaction(SIGALRM, &sa, NULL) == -1)
 		say_syserror("cannot reset low resolution clock timer signal");
 }
