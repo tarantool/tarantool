@@ -403,8 +403,7 @@ public:
 	void wakeup(unsigned events)
 	{
 		this->events |= events;
-		if (f->flags & FIBER_IS_CANCELLABLE)
-			fiber_wakeup(f);
+		fiber_wakeup(f);
 	}
 
 	WalSubscription(const char *wal_dir)
@@ -500,14 +499,12 @@ hot_standby_f(va_list ap)
 					  r->cursor.name : NULL);
 
 		bool timed_out = false;
-		if (subscription.events == 0) {
-			/**
-			 * Allow an immediate wakeup/break loop
-			 * from recovery_stop_local().
-			 */
-			fiber_set_cancellable(true);
-			timed_out = fiber_yield_timeout(wal_dir_rescan_delay);
-			fiber_set_cancellable(false);
+		ev_tstamp deadline = ev_monotonic_now(loop())
+				     + wal_dir_rescan_delay;
+		while (r->watcher != NULL &&
+		       !timed_out &&
+		       subscription.events == 0) {
+			timed_out = fiber_yield_deadline(deadline);
 		}
 
 		scan_dir = timed_out ||
@@ -538,6 +535,7 @@ recovery_stop_local(struct recovery *r)
 {
 	if (r->watcher) {
 		struct fiber *f = r->watcher;
+		/* Break the loop in hot_standby_f(). */
 		r->watcher = NULL;
 		fiber_cancel(f);
 		if (fiber_join(f) != 0)
