@@ -8,6 +8,7 @@
 
 #include <fcntl.h>
 #include <sys/uio.h>
+#include <sys/wait.h>
 #include <sys/errno.h>
 
 int
@@ -171,6 +172,29 @@ test_writev_f(va_list ap)
 	return 0;
 }
 
+static int
+test_waitpid_f(va_list ap)
+{
+	/* Flush buffers to avoid multiple output. */
+	fflush(stdout);
+	fflush(stderr);
+
+	pid_t pid = fork();
+
+	/* Child process: do something for 10ms and exit. */
+	if (pid == 0) {
+		usleep(10000);
+		exit(0);
+	}
+
+	fail_if(pid == -1);
+	int status, rc = coio_waitpid(pid, &status);
+	fail_if(rc != 0);
+	fail_if(WIFEXITED(status) == 0);
+
+	return 0;
+}
+
 static void
 fill_pipe(int fd)
 {
@@ -211,11 +235,13 @@ read_write_test(void)
 		test_read_f,
 		test_write_f,
 		test_writev_f,
+		test_waitpid_f
 	};
 	const char *descr[] = {
 		"read",
 		"write",
 		"writev",
+		"waitpid"
 	};
 
 	int num_tests = sizeof(test_funcs) / sizeof(test_funcs[0]);

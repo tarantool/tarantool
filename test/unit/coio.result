@@ -20,11 +20,13 @@ ok 3 - bad ipv6 host name - error
 ok 4 - bad ipv6 host name - error message
 	*** test_connect: done ***
 	*** read_write_test ***
-1..6
+1..8
 ok 1 - coio_read handle spurious wakeup
 ok 2 - coio_read success after a spurious wakeup
 ok 3 - coio_write handle spurious wakeup
 ok 4 - coio_write success after a spurious wakeup
 ok 5 - coio_writev handle spurious wakeup
 ok 6 - coio_writev success after a spurious wakeup
+ok 7 - coio_waitpid handle spurious wakeup
+ok 8 - coio_waitpid success after a spurious wakeup
 	*** read_write_test: done ***
