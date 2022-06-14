@@ -5,12 +5,12 @@ TOOL=$(basename "$0")
 HELP=$(cat <<HELP
 ${TOOL} - gdb wrapper loading artefacts collected via tarabrt.sh
 
-	Soon her eye fell upon a little glass box lying underneath
-	the table. She opened it and found in it a very small
-	cake, on which the words "EAT ME" were beautifully marked
-	in currants.
+    Soon her eye fell upon a little glass box lying underneath
+    the table. She opened it and found in it a very small
+    cake, on which the words "EAT ME" were beautifully marked
+    in currants.
 
-	- Alice's Adventures in Wonderland.
+    - Alice's Adventures in Wonderland.
 HELP
 )
 
@@ -18,32 +18,32 @@ HELP
 OPTIONS=$(getopt -o h -n "${TOOL}" -- "$@")
 eval set -- "${OPTIONS}"
 while true; do
-	case "$1" in
-		--) shift; break;;
-		-h) printf "%s\n" "${HELP}";
-			exit 0;;
-		*)  printf "Invalid option: $1\n%s\n" "${HELP}";
-			exit 1;;
-	esac
+    case "$1" in
+        --) shift; break;;
+        -h) printf "%s\n" "${HELP}";
+            exit 0;;
+        *)  printf "Invalid option: $1\n%s\n" "${HELP}";
+            exit 1;;
+    esac
 done
 
 # Do not proceed if there are some CLI arguments left. Everything
 # should be parsed before this line. Refer to the help message in
 # a funny way.
 if [ $# -ne 0 ]; then
-	echo "RUN ME"
-	exit 1;
+    echo "RUN ME"
+    exit 1;
 fi
 
 # Check that gdb is installed.
 if ! command -v gdb >/dev/null; then
-	cat <<NOGDB
+    cat <<NOGDB
 gdb is not installed or not found in the PATH.
 
 Install gdb or adjust you PATH if you are using non-system gdb and
 try once more.
 NOGDB
-	exit 1;
+    exit 1;
 fi
 
 VERSION=${PWD}/version
@@ -53,7 +53,7 @@ VERSION=${PWD}/version
 # unpacked tarball. Otherwise, there is no guarantee the coredump
 # is collected the right way and we can't proceed loading it.
 if [ ! -f "${VERSION}" ]; then
-	cat <<NOARTEFACTS
+    cat <<NOARTEFACTS
 ${VERSION} file is missing.
 
 If the coredump artefacts are collected via \`tararbrt.sh' tool
@@ -64,7 +64,7 @@ is collected the right way and its loading can't be proceeded
 with this script. Check whether current working directory is the
 tarball root, or try load the core dump file manually.
 NOARTEFACTS
-	exit 1;
+    exit 1;
 fi
 
 SOURCES=${PWD}/sources
@@ -76,8 +76,8 @@ SOURCES=${PWD}/sources
 # the wrapper more complex by additional checks, so this activity
 # is left for the user.
 if [ ! -d "${SOURCES}" ]; then
-	REVISION=$(grep -oP 'Tarantool \d+\.\d+\.\d+-\d+-g\K[a-f0-9]+' "$VERSION")
-	cat <<SOURCES
+    REVISION=$(grep -oP 'Tarantool \d+\.\d+\.\d+-\d+-g\K[a-f0-9]+' "$VERSION")
+    cat <<SOURCES
 ================================================================================
 
 Do not forget to properly setup the environment:
@@ -89,14 +89,14 @@ Do not forget to properly setup the environment:
 
 ================================================================================
 SOURCES
-	exit 1;
+    exit 1;
 fi
 
 # Define the build path to be substituted with the source path.
 # XXX: Check the absolute path on the function <main> definition
 # considering it is located in src/main.cc within Tarantool repo.
 SUBPATH=$(gdb -batch -n ./tarantool -ex 'info line main' | \
-	grep -oP 'Line \d+ of \"\K.+(?=\/src\/main\.cc\")')
+    grep -oP 'Line \d+ of \"\K.+(?=\/src\/main\.cc\")')
 
 # Launch gdb and load coredump with all related artefacts.
 gdb ./tarantool \
