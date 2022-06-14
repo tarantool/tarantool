@@ -502,14 +502,15 @@ void
 fiber_wakeup(struct fiber *f)
 {
 	/*
-	 * DEAD is checked both in the assertion and in the release build
-	 * because it should not ever happen, at least internally. But in some
-	 * user modules it might happen, and better ignore such fibers.
-	 * Especially since this was allowed for quite some time in the public
-	 * API and need to keep it if it costs nothing, for backward
-	 * compatibility.
+	 * DEAD fiber can be lingering in the cord fiber list
+	 * if it is joinable. And once its execution is complete
+	 * it should be reaped with fiber_join() call.
+	 *
+	 * Still our API allows to call fiber_wakeup() on dead
+	 * joinable fibers so simply ignore it.
 	 */
-	assert((f->flags & FIBER_IS_DEAD) == 0);
+	assert((f->flags & FIBER_IS_DEAD) == 0 ||
+	       (f->flags & FIBER_IS_JOINABLE) != 0);
 	const int no_flags = FIBER_IS_READY | FIBER_IS_DEAD | FIBER_IS_RUNNING;
 	if ((f->flags & no_flags) == 0)
 		fiber_make_ready(f);
