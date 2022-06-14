@@ -318,7 +318,7 @@ struct Vdbe {
 void sqlVdbeFreeCursor(Vdbe *, VdbeCursor *);
 void sqlVdbePopStack(Vdbe *, int);
 int sqlVdbeCursorRestore(VdbeCursor *);
-#if defined(SQL_DEBUG) || defined(VDBE_PROFILE)
+#if defined(SQL_DEBUG)
 void sqlVdbePrintOp(FILE *, int, Op *);
 #endif
 
