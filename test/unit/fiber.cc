@@ -277,6 +277,21 @@ fiber_wakeup_self_test()
 }
 
 static void
+fiber_wakeup_dead_test()
+{
+	header();
+
+	struct fiber *fiber = fiber_new_xc("wakeup_dead", noop_f);
+	fiber_set_joinable(fiber, true);
+	fiber_start(fiber);
+	fiber_wakeup(fiber);
+	fiber_wakeup(fiber);
+	fiber_join(fiber);
+
+	footer();
+}
+
+static void
 fiber_dead_while_in_cache_test(void)
 {
 	header();
@@ -343,6 +358,7 @@ main_f(va_list ap)
 	fiber_join_test();
 	fiber_stack_test();
 	fiber_wakeup_self_test();
+	fiber_wakeup_dead_test();
 	fiber_dead_while_in_cache_test();
 	fiber_flags_respect_test();
 	cord_cojoin_test();
