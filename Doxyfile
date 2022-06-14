@@ -45,7 +45,7 @@ PROJECT_BRIEF          = "Get your data in RAM. Get compute close to data. Enjoy
 # exceed 55 pixels and the maximum width should not exceed 200 pixels.
 # Doxygen will copy the logo to the output directory.
 
-PROJECT_LOGO           = doc/www/theme/static/logo.png
+# PROJECT_LOGO           = doc/www/theme/static/logo.png
 
 # The OUTPUT_DIRECTORY tag is used to specify the (relative or absolute)
 # base path where the generated documentation will be put.
