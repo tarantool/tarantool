@@ -1311,13 +1311,13 @@ function gen_tuple(payload)
 end;
 ---
 ...
-function cmp_tuple(t1, t2)
+function tuple_equals(t1, t2)
     for i = 1, PAYLOAD_FIELD do
         if t1[i] ~= t2[i] then
-            return t1[i] > t2[i] and 1 or -1
+            return false
         end
     end
-    return 0
+    return true
 end;
 ---
 ...
@@ -1373,7 +1373,7 @@ for i = 1, TX_COUNT do
         local result = loadstring('return ' .. sel.cmd)()
         if #result == #sel.result then
             for k, v in ipairs(result) do
-                if cmp_tuple(v, sel.result[k]) ~= 0 then
+                if not tuple_equals(v, sel.result[k]) then
                     tx.should_abort = true
                     break
                 end
