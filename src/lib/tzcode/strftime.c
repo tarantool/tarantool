@@ -35,6 +35,7 @@
 
 #include "private.h"
 #include "trivia/util.h"
+#include "datetime.h"
 #include "tzcode.h"
 #include "timezone.h"
 #include "timelocal.h"
@@ -281,7 +282,7 @@ _fmt(char *buf, ssize_t size, const char *format, const struct tnt_tm *t,
 				/* fallthru */
 			case 'f': {
 				int nsec = t->tm_nsec;
-				assert(nsec < 1000000000);
+				assert(nsec < MAX_NANOS_PER_SEC);
 
 				/*
 				 ** no length modifier provided -

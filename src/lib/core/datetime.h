@@ -30,6 +30,8 @@ struct tnt_tm;
 #ifndef SECS_PER_DAY
 #define SECS_PER_DAY          86400
 #define DT_EPOCH_1970_OFFSET  719163
+#define NANOS_PER_SEC         1000000000LL
+#define MAX_NANOS_PER_SEC     2000000000LL
 #endif
 
 /** Required size of datetime_to_string string buffer */
