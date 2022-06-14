@@ -222,17 +222,6 @@ allocateCursor(
 #  define REGISTER_TRACE(P,R,M)
 #endif
 
-
-#ifdef VDBE_PROFILE
-
-/*
- * hwtime.h contains inline assembler code for implementing
- * high-performance timing routines.
- */
-#include "hwtime.h"
-
-#endif
-
 static struct Mem *
 vdbe_prepare_null_out(struct Vdbe *v, int n)
 {
@@ -382,7 +371,7 @@ int sqlVdbeExec(Vdbe *p)
 {
 	Op *aOp = p->aOp;          /* Copy of p->aOp */
 	Op *pOp = aOp;             /* Current operation */
-#if defined(SQL_DEBUG) || defined(VDBE_PROFILE)
+#if defined(SQL_DEBUG)
 	Op *pOrigOp;               /* Value of pOp at the top of the loop */
 #endif
 	int rc = 0;        /* Value to return */
@@ -395,9 +384,6 @@ int sqlVdbeExec(Vdbe *p)
 	Mem *pIn3 = 0;             /* 3rd input operand */
 	Mem *pOut = 0;             /* Output operand */
 	int *aPermute = 0;         /* Permutation of columns for OP_Compare */
-#ifdef VDBE_PROFILE
-	u64 start;                 /* CPU clock count at start of opcode */
-#endif
 	/*** INSERT STACK UNION HERE ***/
 
 	assert(p->magic==VDBE_MAGIC_RUN);  /* sql_step() verifies this */
@@ -437,9 +423,6 @@ int sqlVdbeExec(Vdbe *p)
 		assert(rc == 0);
 
 		assert(pOp>=aOp && pOp<&aOp[p->nOp]);
-#ifdef VDBE_PROFILE
-		start = sqlHwtime();
-#endif
 		nVmStep++;
 
 		/* Only allow tracing if SQL_DEBUG is defined.
@@ -487,7 +470,7 @@ int sqlVdbeExec(Vdbe *p)
 			}
 		}
 #endif
-#if defined(SQL_DEBUG) || defined(VDBE_PROFILE)
+#if defined(SQL_DEBUG)
 		pOrigOp = pOp;
 #endif
 
@@ -4391,14 +4374,6 @@ default: {          /* This is really OP_Noop and OP_Explain */
  * restored.
  ****************************************************************************/
 		}
-
-#ifdef VDBE_PROFILE
-		{
-			u64 endTime = sqlHwtime();
-			if (endTime>start) pOrigOp->cycles += endTime - start;
-			pOrigOp->cnt++;
-		}
-#endif
 
 		/* The following code adds nothing to the actual functionality
 		 * of the program.  It is only here for testing and debugging.

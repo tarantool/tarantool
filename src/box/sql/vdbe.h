@@ -103,10 +103,6 @@ struct VdbeOp {
 #ifdef SQL_ENABLE_EXPLAIN_COMMENTS
 	char *zComment;		/* Comment to improve readability */
 #endif
-#ifdef VDBE_PROFILE
-	u32 cnt;		/* Number of times this instruction was executed */
-	u64 cycles;		/* Total time spent executing this instruction */
-#endif
 };
 typedef struct VdbeOp VdbeOp;
 
