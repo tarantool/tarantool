@@ -76,7 +76,8 @@ SOURCES=${PWD}/sources
 # the wrapper more complex by additional checks, so this activity
 # is left for the user.
 if [ ! -d "${SOURCES}" ]; then
-    REVISION=$(grep -oP 'Tarantool \d+\.\d+\.\d+-\d+-g\K[a-f0-9]+' "$VERSION")
+    REGEX='Tarantool \d+\.\d+\.\d+(-(alpha|beta|rc)[0-9]+|(-entrypoint))?-\d+-g\K[a-f0-9]+'
+    REVISION=$(grep -oP "$REGEX" "$VERSION")
     cat <<SOURCES
 ================================================================================
 
