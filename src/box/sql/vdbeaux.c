@@ -233,10 +233,6 @@ sqlVdbeAddOp3(Vdbe * p, int op, int p1, int p2, int p3)
 #ifdef SQL_DEBUG
 	test_addop_breakpoint();
 #endif
-#ifdef VDBE_PROFILE
-	pOp->cycles = 0;
-	pOp->cnt = 0;
-#endif
 	return i;
 }
 
@@ -1115,7 +1111,7 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 }
 
 
-#if defined(VDBE_PROFILE) || defined(SQL_DEBUG)
+#if defined(SQL_DEBUG)
 /*
  * Print a single opcode.  This routine is used for debugging only.
  */
@@ -1408,7 +1404,7 @@ allocSpace(struct ReusableSpace *p,	/* Bulk memory available for allocation */
 void
 sqlVdbeRewind(Vdbe * p)
 {
-#if defined(SQL_DEBUG) || defined(VDBE_PROFILE)
+#if defined(SQL_DEBUG)
 	int i;
 #endif
 	assert(p != 0);
@@ -1434,12 +1430,6 @@ sqlVdbeRewind(Vdbe * p)
 	p->cacheCtr = 1;
 	p->iStatement = 0;
 	p->nFkConstraint = 0;
-#ifdef VDBE_PROFILE
-	for (i = 0; i < p->nOp; i++) {
-		p->aOp[i].cnt = 0;
-		p->aOp[i].cycles = 0;
-	}
-#endif
 }
 
 /*
@@ -2070,46 +2060,6 @@ sqlVdbeReset(Vdbe * p)
 	 */
 	Cleanup(p);
 
-	/* Save profiling information from this VDBE run.
-	 */
-#ifdef VDBE_PROFILE
-	{
-		FILE *out = fopen("vdbe_profile.out", "a");
-		if (out) {
-			int i;
-			fprintf(out, "---- ");
-			for (i = 0; i < p->nOp; i++) {
-				fprintf(out, "%02x", p->aOp[i].opcode);
-			}
-			fprintf(out, "\n");
-			if (p->zSql) {
-				char c, pc = 0;
-				fprintf(out, "-- ");
-				for (i = 0; (c = p->zSql[i]) != 0; i++) {
-					if (pc == '\n')
-						fprintf(out, "-- ");
-					putc(c, out);
-					pc = c;
-				}
-				if (pc != '\n')
-					fprintf(out, "\n");
-			}
-			for (i = 0; i < p->nOp; i++) {
-				char zHdr[100];
-				sql_snprintf(sizeof(zHdr), zHdr,
-						 "%6u %12llu %8llu ",
-						 p->aOp[i].cnt,
-						 p->aOp[i].cycles,
-						 p->aOp[i].cnt >
-						 0 ? p->aOp[i].cycles /
-						 p->aOp[i].cnt : 0);
-				fprintf(out, "%s", zHdr);
-				sqlVdbePrintOp(out, i, &p->aOp[i]);
-			}
-			fclose(out);
-		}
-	}
-#endif
 	p->iCurrentTime = 0;
 	p->magic = VDBE_MAGIC_RESET;
 	return p->is_aborted ? -1 : 0;
