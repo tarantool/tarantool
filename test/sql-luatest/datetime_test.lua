@@ -2527,9 +2527,9 @@ g.test_datetime_33_2 = function()
         t.assert_equals(err.message, res)
 
         -- "msec" cannot be more than 1000.
-        v = {msec = 1001}
+        v = {msec = 2000}
         _, err = box.execute(sql, {{['#v'] = v}})
-        res = [[Type mismatch: can not convert map({"msec": 1001}) to datetime]]
+        res = [[Type mismatch: can not convert map({"msec": 2000}) to datetime]]
         t.assert_equals(err.message, res)
 
         -- "msec" cannot be less than 0.
@@ -2539,9 +2539,9 @@ g.test_datetime_33_2 = function()
         t.assert_equals(err.message, res)
 
         -- "usec" cannot be more than 1000000.
-        v = {usec = 1000001}
+        v = {usec = 2000000}
         _, err = box.execute(sql, {{['#v'] = v}})
-        res = [[Type mismatch: can not convert map({"usec": 1000001}) ]]..
+        res = [[Type mismatch: can not convert map({"usec": 2000000}) ]]..
               [[to datetime]]
         t.assert_equals(err.message, res)
 
@@ -2552,9 +2552,9 @@ g.test_datetime_33_2 = function()
         t.assert_equals(err.message, res)
 
         -- "nsec" cannot be more than 1000000000.
-        v = {nsec = 1000000001}
+        v = {nsec = 2000000000}
         _, err = box.execute(sql, {{['#v'] = v}})
-        res = [[Type mismatch: can not convert map({"nsec": 1000000001}) ]]..
+        res = [[Type mismatch: can not convert map({"nsec": 2000000000}) ]]..
               [[to datetime]]
         t.assert_equals(err.message, res)
 
