@@ -194,7 +194,7 @@ datetime_ev_now(struct datetime *now)
 	assert(timestamp > INT32_MIN && timestamp < INT32_MAX);
 	long sec = timestamp;
 	now->epoch = sec;
-	now->nsec = (timestamp - sec) * 1000000000;
+	now->nsec = (timestamp - sec) * NANOS_PER_SEC;
 
 	struct tm tm;
 	localtime_r(&sec, &tm);
@@ -555,8 +555,6 @@ datetime_totable(const struct datetime *date, struct interval *out)
 /**
  * Interval support functions: stringization and operations
  */
-
-#define NANOS_PER_SEC 1000000000LL
 
 #define SPACE() \
 	do { \
@@ -1047,7 +1045,7 @@ datetime_from_fields(struct datetime *dt, const struct dt_fields *fields)
 		return -1;
 	double nsec = fields->msec * 1000000 + fields->usec * 1000 +
 		      fields->nsec;
-	if (nsec < 0 || nsec > 1000000000)
+	if (nsec < 0 || nsec >= MAX_NANOS_PER_SEC)
 		return -1;
 	if (fields->tzoffset < -720 || fields->tzoffset > 840)
 		return -1;
@@ -1062,7 +1060,7 @@ datetime_from_fields(struct datetime *dt, const struct dt_fields *fields)
 		if (frac != 0) {
 			if (fields->count_usec > 0)
 				return -1;
-			nsec = frac * 1000000000;
+			nsec = frac * NANOS_PER_SEC;
 		}
 		dt->epoch = timestamp;
 		dt->nsec = nsec;
