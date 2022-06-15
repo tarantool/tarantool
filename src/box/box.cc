@@ -1922,7 +1922,7 @@ box_wait_limbo_acked(double timeout)
 }
 
 /** Write and process a PROMOTE request. */
-static void
+static int
 box_issue_promote(uint32_t prev_leader_id, int64_t promote_lsn)
 {
 	struct raft *raft = box_raft();
@@ -1942,13 +1942,14 @@ box_issue_promote(uint32_t prev_leader_id, int64_t promote_lsn)
 	txn_limbo_commit(&txn_limbo);
 
 	assert(txn_limbo_is_empty(&txn_limbo));
+	return 0;
 }
 
 /** A guard to block multiple simultaneous promote()/demote() invocations. */
 static bool is_in_box_promote = false;
 
 /** Write and process a DEMOTE request. */
-static void
+static int
 box_issue_demote(uint32_t prev_leader_id, int64_t promote_lsn)
 {
 	struct raft *raft = box_raft();
@@ -1968,6 +1969,7 @@ box_issue_demote(uint32_t prev_leader_id, int64_t promote_lsn)
 	txn_limbo_commit(&txn_limbo);
 
 	assert(txn_limbo_is_empty(&txn_limbo));
+	return 0;
 }
 
 int
@@ -1990,8 +1992,7 @@ box_promote_qsync(void)
 		diag_set(ClientError, ER_NOT_LEADER, raft->leader);
 		return -1;
 	}
-	box_issue_promote(txn_limbo.owner_id, wait_lsn);
-	return 0;
+	return box_issue_promote(txn_limbo.owner_id, wait_lsn);
 }
 
 int
@@ -2049,9 +2050,7 @@ box_promote(void)
 	if (wait_lsn < 0)
 		return -1;
 
-	box_issue_promote(txn_limbo.owner_id, wait_lsn);
-
-	return 0;
+	return box_issue_promote(txn_limbo.owner_id, wait_lsn);
 }
 
 int
@@ -2086,8 +2085,7 @@ box_demote(void)
 	int64_t wait_lsn = box_wait_limbo_acked(replication_synchro_timeout);
 	if (wait_lsn < 0)
 		return -1;
-	box_issue_demote(txn_limbo.owner_id, wait_lsn);
-	return 0;
+	return box_issue_demote(txn_limbo.owner_id, wait_lsn);
 }
 
 int
