@@ -50,10 +50,14 @@ target_link_libraries(datetime_parse_full_fuzzer PUBLIC core fuzzer_config)
 add_executable(datetime_strptime_fuzzer datetime_strptime_fuzzer.c)
 target_link_libraries(datetime_strptime_fuzzer PUBLIC core fuzzer_config)
 
+add_executable(mp_datetime_fuzzer mp_datetime_fuzzer.c)
+target_link_libraries(mp_datetime_fuzzer PUBLIC core fuzzer_config)
+
 set(fuzzing_binaries csv_fuzzer
                      datetime_parse_full_fuzzer
                      datetime_strptime_fuzzer
                      http_parser_fuzzer
+                     mp_datetime_fuzzer
                      swim_proto_member_fuzzer
                      swim_proto_meta_fuzzer
                      uri_fuzzer)
