@@ -55,7 +55,7 @@ Improve on "5.1, "Olá", "Lua""
 by using variables rather than literals,
 and put the strings inside braces, which means
 they’re elements of a TABLE.
-More in the Lua manual: http://www.lua.org/pil/2.html
+More in the Lua manual: https://www.lua.org/pil/2.html
 
 You don’t need to declare variables in advance
 because Lua figures out the data type from what
@@ -63,7 +63,7 @@ you assign to it. Assignment is done with the "=" operator.
 
 If the data type of variable t is table, then the
 elements can be referenced as t[1], t[2], and so on.
-More in the Lua manual: http://www.lua.org/pil/2.5.html
+More in the Lua manual: https://www.lua.org/pil/2.5.html
 
 Request #2 is:
 
@@ -90,7 +90,7 @@ for variable-name = start-value, end-value, 1 do loop-body end
 which is good enough if you want to assign a
 start-value to a variable, do what’s in the loop body,
 add 1 to the variable, and repeat until it equals end-value.
-More in the Lua manual: http://www.lua.org/pil/4.3.4.html.
+More in the Lua manual: https://www.lua.org/pil/4.3.4.html.
 
 Request #3 is:
 
@@ -114,7 +114,7 @@ Tutorial -- Screen #4 -- Operators
 Among the many operators that Lua supports, you most often see:
 For arithmetic: * (multiply), + (add), - (subtract), / (divide).
 For strings: .. (concatenate)
-More in the Lua manual: http://www.lua.org/pil/3.1.html
+More in the Lua manual: https://www.lua.org/pil/3.1.html
 
 Request #4 is:
 
@@ -141,7 +141,7 @@ Tutorial -- Screen #5 -- Conditions
 A condition involves a comparison operator such as "==",
 ">", ">=", "<", "<=". Conditions are used in statements
 of the form if ... then.
-More in the Lua manual: http://www.lua.org/pil/4.3.1.html
+More in the Lua manual: https://www.lua.org/pil/4.3.1.html
 
 Request #5 is:
 
@@ -199,7 +199,7 @@ Tutorial -- Screen #7 -- Simple functions
 A function, or a stored procedure that returns a value,
 is a named set of Lua requests whose simplest form is
 function function_name () body end
-More in the Lua manual: http://www.lua.org/pil/5.html
+More in the Lua manual: https://www.lua.org/pil/5.html
 
 Request #7 is:
 
@@ -223,7 +223,7 @@ Tutorial -- Screen #8 -- Improved functions
 Improve the simple function by avoiding globals.
 The variable n could be passed as a parameter
 and the variable i could be declared as local.
-More in the Lua manual: http://www.lua.org/pil/4.2.html
+More in the Lua manual: https://www.lua.org/pil/4.2.html
 
 Request #8 is:
 
@@ -242,7 +242,7 @@ Tutorial -- Screen #9 -- Comments
 
 There are several ways to add comments, but
 one will do: (minus sign) (minus sign) comment-text.
-More in the Lua manual: http://www.lua.org/pil/1.3.html
+More in the Lua manual: https://www.lua.org/pil/1.3.html
 
 Request #9 is:
 
@@ -272,7 +272,7 @@ Tutorial -- Screen #10 -- Modules
 Many developers have gone to the trouble of making modules,
 i.e. distributable packages of functions that have a general
 utility. In the Lua world, modules are called "rocks".
-More in the Luarocks list: http://luarocks.org/
+More in the Luarocks list: https://luarocks.org/
 
 Most modules have to be "required", with the syntax
 variable_name = require("module-name")
@@ -535,7 +535,7 @@ must be a number, the second field must be a string,
 and the later fields can be anything.
 Use a function in the Lua string library to make
 values for the second field.
-More in the Lua manual: http://www.lua.org/pil/20.html
+More in the Lua manual: https://www.lua.org/pil/20.html
 
 Request #18 is:
 
