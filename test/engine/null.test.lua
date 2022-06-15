@@ -330,7 +330,7 @@ s:drop()
 format = {}
 format[1] = {name = 'field1', type = 'unsigned'}
 format[2] = {name = 'field2', type = 'unsigned'}
-s = box.schema.create_space('test', {format = format})
+s = box.schema.create_space('test', {engine = engine, format = format})
 pk = s:create_index('pk')
 s:replace{1, 1}
 s:replace{100, 100}
@@ -345,7 +345,7 @@ s:replace{150, box.NULL}
 s:select{}
 s:drop()
 
-s = box.schema.create_space('test')
+s = box.schema.create_space('test', {engine = engine})
 pk = s:create_index('pk')
 sk = s:create_index('sk', {parts = {{2, 'unsigned', is_nullable = false}}})
 s:replace{1, 1}
@@ -481,7 +481,7 @@ s:drop()
 -- The main case of absent nullable fields - create an index over
 -- them on not empty space (available on memtx only).
 --
-s = box.schema.space.create('test', {engine = 'memtx'})
+s = box.schema.space.create('test', {engine = engine})
 pk = s:create_index('pk')
 s:replace{1}
 s:replace{2}
@@ -502,7 +502,7 @@ s:drop()
 -- optional and turn on comparators for optional fields. See the
 -- big comment in alter.cc in index_def_new_from_tuple().
 --
-s = box.schema.create_space('test', {engine = 'memtx'})
+s = box.schema.create_space('test', {engine = engine})
 pk = s:create_index('pk')
 sk = s:create_index('sk', {parts = {2, 'unsigned'}})
 s:replace{1, 1}
@@ -522,7 +522,7 @@ s:drop()
 -- this field is used in another index, then this another index
 -- is updated too. Case of @locker.
 --
-s = box.schema.space.create('test', {engine = 'memtx'})
+s = box.schema.space.create('test', {engine = engine})
 _ = s:create_index('pk')
 i1 = s:create_index('i1', {parts = {2, 'unsigned', 3, 'unsigned'}})
 i2 = s:create_index('i2', {parts = {3, 'unsigned', 2, 'unsigned'}})
@@ -716,7 +716,7 @@ s:select{}
 s:drop()
 
 -- Tuple without the field
-s = box.schema.space.create('test')
+s = box.schema.space.create('test', {engine = engine})
 pk = s:create_index('pk', {type='tree', parts={{1, 'uint'}}})
 sk = s:create_index('sk', {type='tree', parts={{2, 'uint', exclude_null=true}}})
 s:replace{1}
