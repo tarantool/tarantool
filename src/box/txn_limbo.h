@@ -365,7 +365,7 @@ txn_limbo_rollback(struct txn_limbo *limbo)
  * Prepare a limbo request for WAL write and commit. Similar to txn_stmt
  * prepare.
  */
-void
+int
 txn_limbo_req_prepare(struct txn_limbo *limbo,
 		      const struct synchro_request *req);
 
@@ -386,7 +386,7 @@ txn_limbo_req_commit(struct txn_limbo *limbo,
 		     const struct synchro_request *req);
 
 /** Process a synchronous replication request. */
-void
+int
 txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req);
 
 /**
@@ -411,14 +411,14 @@ txn_limbo_checkpoint(const struct txn_limbo *limbo,
  * Write a PROMOTE request, which has the same effect as CONFIRM(@a lsn) and
  * ROLLBACK(@a lsn + 1) combined.
  */
-void
+int
 txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term);
 
 /**
  * Write a DEMOTE request.
  * It has the same effect as PROMOTE and additionally clears limbo ownership.
  */
-void
+int
 txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term);
 
 /**
