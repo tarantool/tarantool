@@ -271,6 +271,15 @@ box_check_writable(void)
 			error_set_uuid(e, "queue_owner_uuid", &r->uuid);
 			error_append_msg(e, " (%s)", tt_uuid_str(&r->uuid));
 		}
+		if (txn_limbo.owner_id == instance_id) {
+			if (txn_limbo.is_frozen_due_to_fencing) {
+				error_append_msg(e, " and is frozen due to "
+						    "fencing");
+			} else if (txn_limbo.is_frozen_until_promotion) {
+				error_append_msg(e, " and is frozen until "
+						    "promotion");
+			}
+		}
 	} else {
 		if (is_ro)
 			error_append_msg(e, "box.cfg.read_only is true");
@@ -2005,8 +2014,10 @@ box_promote(void)
 	 * Currently active leader (the instance that is seen as leader by both
 	 * raft and txn_limbo) can't issue another PROMOTE.
 	 */
-	bool is_leader = txn_limbo_replica_term(&txn_limbo, instance_id) ==
-			 raft->term && txn_limbo.owner_id == instance_id;
+	bool is_leader =
+		txn_limbo_replica_term(&txn_limbo, instance_id) == raft->term &&
+		txn_limbo.owner_id == instance_id &&
+		!txn_limbo.is_frozen_until_promotion;
 	if (box_election_mode != ELECTION_MODE_OFF)
 		is_leader = is_leader && raft->state == RAFT_STATE_LEADER;
 

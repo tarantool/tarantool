@@ -80,6 +80,8 @@ loc = box.space.loc
 async:select()
 sync:select()
 loc:select()
+
+box.ctl.promote()
 async:drop()
 sync:drop()
 loc:drop()
