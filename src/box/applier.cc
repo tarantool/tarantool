@@ -1183,14 +1183,6 @@ apply_final_join_tx(uint32_t replica_id, struct stailq *rows)
 static void
 applier_synchro_filter_tx(struct stailq *rows)
 {
-	/*
-	 * XXX: in case raft is disabled, synchronous replication still works
-	 * but without any filtering. That might lead to issues with
-	 * unpredictable confirms after rollbacks which are supposed to be
-	 * fixed by the filtering.
-	 */
-	if (!raft_is_enabled(box_raft()))
-		return;
 	struct xrow_header *row;
 	/*
 	 * It  may happen that we receive the instance's rows via some third
