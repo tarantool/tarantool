@@ -782,7 +782,9 @@ vy_entry_compare_with_raw_key(struct vy_entry entry,
 	      ((entry).hint = !(key_def)->is_multikey ?			\
 			vy_stmt_hint((src_stmt), (key_def)) :		\
 			multikey_idx), true);				\
-	     ++multikey_idx)
+	     ++multikey_idx)						\
+		if (!tuple_key_is_excluded(src_stmt, key_def,		\
+					   multikey_idx))
 
 #if defined(__cplusplus)
 } /* extern "C" */

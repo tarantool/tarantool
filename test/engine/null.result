@@ -2253,7 +2253,7 @@ s:replace{1}
 ...
 sk:select{}
 ---
-- - [1]
+- []
 ...
 s:select{}
 ---

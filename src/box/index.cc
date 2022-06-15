@@ -598,23 +598,6 @@ index_delete(struct index *index)
 	index_def_delete(def);
 }
 
-struct tuple *
-index_filter_tuple_slow(struct index *index, struct tuple *tuple)
-{
-	if (tuple == NULL)
-		return tuple;
-	struct key_def* key_def = index->def->key_def;
-	struct key_part* parts = key_def->parts;
-	for (uint32_t i = 0; i < key_def->part_count; ++i) {
-		if (!parts[i].exclude_null)
-			continue;
-		const char* field = tuple_field(tuple, parts[i].fieldno);
-		if (field != NULL && mp_typeof(*field) == MP_NIL)
-			return NULL;
-	}
-	return tuple;
-}
-
 /* }}} */
 
 /* {{{ Virtual method stubs */
