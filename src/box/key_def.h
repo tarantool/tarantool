@@ -879,6 +879,30 @@ bool
 tuple_key_contains_null(struct tuple *tuple, struct key_def *def,
 			int multikey_idx);
 
+/** Slow path of tuple_key_is_excluded(). */
+bool
+tuple_key_is_excluded_slow(struct tuple *tuple, struct key_def *def,
+			   int multikey_idx);
+
+/**
+ * Check if a tuple should be excluded from an index.
+ * @param tuple Tuple to check.
+ * @param def Key definition to check the tuple against.
+ * @param multikey_idx Multikey index hint.
+ * @retval true if the tuple key should be excluded from the index.
+ *
+ * We exclude a tuple if any of its key fields contains null and
+ * the index has the 'exclude_null' flag set.
+ */
+static inline bool
+tuple_key_is_excluded(struct tuple *tuple, struct key_def *def,
+		      int multikey_idx)
+{
+	if (likely(!def->has_exclude_null))
+		return false;
+	return tuple_key_is_excluded_slow(tuple, def, multikey_idx);
+}
+
 /**
  * Check that tuple fields match with given key definition
  * key_def.
