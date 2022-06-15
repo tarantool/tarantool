@@ -43,58 +43,16 @@ box.snapshot()
 test_run:cmd("restart server default")
  | 
 
--- Could hang if the limbo would incorrectly handle the snapshot end.
-box.space.sync:replace{11}
+-- Would be non-empty if limbo would incorrectly handle the snapshot end.
+box.info.synchro.queue.len
  | ---
- | - [11]
+ | - 0
  | ...
 
-old_synchro_quorum = box.cfg.replication_synchro_quorum
- | ---
- | ...
-old_synchro_timeout = box.cfg.replication_synchro_timeout
+box.ctl.promote()
  | ---
  | ...
 
-box.cfg{                                                                        \
-    replication_synchro_timeout = 0.001,                                        \
-    replication_synchro_quorum = 2,                                             \
-}
- | ---
- | ...
-box.space.sync:replace{12}
- | ---
- | - error: Quorum collection for a synchronous transaction is timed out
- | ...
-
-box.cfg{                                                                        \
-    replication_synchro_timeout = 1000,                                         \
-    replication_synchro_quorum = 1,                                             \
-}
- | ---
- | ...
-box.space.sync:replace{13}
- | ---
- | - [13]
- | ...
-box.space.sync:get({11})
- | ---
- | - [11]
- | ...
-box.space.sync:get({12})
- | ---
- | ...
-box.space.sync:get({13})
- | ---
- | - [13]
- | ...
-
-box.cfg{                                                                        \
-    replication_synchro_timeout = old_synchro_timeout,                          \
-    replication_synchro_quorum = old_synchro_quorum,                            \
-}
- | ---
- | ...
 box.space.sync:drop()
  | ---
  | ...

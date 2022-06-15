@@ -30,6 +30,9 @@ box.space.sync:select{}
  | ---
  | - - [1]
  | ...
+box.ctl.promote()
+ | ---
+ | ...
 box.space.sync:drop()
  | ---
  | ...

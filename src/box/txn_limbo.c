@@ -54,6 +54,7 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->is_in_rollback = false;
 	limbo->svp_confirmed_lsn = -1;
 	limbo->frozen_reasons = 0;
+	limbo->is_frozen_until_promotion = true;
 }
 
 static inline bool
@@ -830,6 +831,16 @@ txn_limbo_req_rollback(struct txn_limbo *limbo,
 	}
 }
 
+/** Unfreeze the limbo encountering the first new PROMOTE after a restart. */
+static inline void
+txn_limbo_unfreeze_on_first_promote(struct txn_limbo *limbo)
+{
+	if (box_is_configured()) {
+		limbo->is_frozen_until_promotion = false;
+		box_update_ro_summary();
+	}
+}
+
 void
 txn_limbo_req_commit(struct txn_limbo *limbo, const struct synchro_request *req)
 {
@@ -854,9 +865,11 @@ txn_limbo_req_commit(struct txn_limbo *limbo, const struct synchro_request *req)
 		vclock_follow(&limbo->promote_term_map, origin, term);
 		if (term > limbo->promote_greatest_term) {
 			limbo->promote_greatest_term = term;
-			if (iproto_type_is_promote_request(req->type) &&
-			    term >= box_raft()->volatile_term)
-				txn_limbo_unfence(&txn_limbo);
+			if (iproto_type_is_promote_request(req->type)) {
+				if (term >= box_raft()->volatile_term)
+					txn_limbo_unfence(limbo);
+				txn_limbo_unfreeze_on_first_promote(&txn_limbo);
+			}
 		}
 	} else if (iproto_type_is_promote_request(req->type) &&
 		   limbo->promote_greatest_term > 1) {

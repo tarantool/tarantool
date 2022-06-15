@@ -12,5 +12,6 @@ box.ctl.promote()
 box.space.sync:replace{1}
 test_run:cmd('restart server default')
 box.space.sync:select{}
+box.ctl.promote()
 box.space.sync:drop()
 box.ctl.demote()
