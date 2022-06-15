@@ -138,8 +138,8 @@ end
 --
 -- Server 1 was a synchro queue owner. Then it receives a foreign PROMOTE which
 -- goes to WAL but is not applied yet. Server 1 during that tries to make a
--- synchro transaction. It is expected to be aborted at commit attempt, because
--- the queue is already in the process of ownership transition.
+-- synchro transaction. It is expected to be aborted, because server gets fenced
+-- seeing a new term where it isn't the limbo owner.
 --
 g.test_local_txn_during_remote_promote = function(g)
     -- Server 1 takes the synchro queue.
@@ -186,8 +186,8 @@ g.test_local_txn_during_remote_promote = function(g)
     luatest.assert(not ok1 and not ok2 and err1 and err2,
                    'both transactions failed')
     luatest.assert_equals(err1.code, err2.code, 'same error')
-    luatest.assert_equals(err1.code, box.error.SYNC_ROLLBACK,
-                          'error is synchro rollback')
+    luatest.assert_equals(err1.code, box.error.READONLY,
+                          'error is read-only')
 
     -- Server 1 correctly processed the remote PROMOTE.
     wait_synchro_owner(g.server1, g.server2:instance_id())

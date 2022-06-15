@@ -34,6 +34,7 @@
 #include "iproto_constants.h"
 #include "journal.h"
 #include "box.h"
+#include "raft.h"
 
 struct txn_limbo txn_limbo;
 
@@ -64,9 +65,8 @@ txn_limbo_is_frozen(const struct txn_limbo *limbo)
 bool
 txn_limbo_is_ro(struct txn_limbo *limbo)
 {
-	return txn_limbo_is_frozen(limbo) ||
-	       (limbo->owner_id != REPLICA_ID_NIL &&
-		limbo->owner_id != instance_id);
+	return limbo->owner_id != REPLICA_ID_NIL &&
+	       (limbo->owner_id != instance_id || txn_limbo_is_frozen(limbo));
 }
 
 struct txn_limbo_entry *
@@ -854,7 +854,8 @@ txn_limbo_req_commit(struct txn_limbo *limbo, const struct synchro_request *req)
 		vclock_follow(&limbo->promote_term_map, origin, term);
 		if (term > limbo->promote_greatest_term) {
 			limbo->promote_greatest_term = term;
-			if (iproto_type_is_promote_request(req->type))
+			if (iproto_type_is_promote_request(req->type) &&
+			    term >= box_raft()->volatile_term)
 				txn_limbo_unfence(&txn_limbo);
 		}
 	} else if (iproto_type_is_promote_request(req->type) &&
