@@ -23,6 +23,8 @@ macro(libunwind_build)
     set(LIBUNWIND_BUILD_DIR ${PROJECT_BINARY_DIR}/build/libunwind)
     set(LIBUNWIND_BINARY_DIR ${LIBUNWIND_BUILD_DIR}/work)
     set(LIBUNWIND_INSTALL_DIR ${LIBUNWIND_BUILD_DIR}/dest)
+    set(LIBUNWIND_CFLAGS "-g -O2")
+    set(LIBUNWIND_CXXFLAGS "-g -O2")
 
     include(ExternalProject)
     ExternalProject_Add(bundled-libunwind-project
@@ -36,8 +38,11 @@ macro(libunwind_build)
 
                         CONFIGURE_COMMAND
                         <SOURCE_DIR>/configure
+                        AR=${CMAKE_AR}
                         CC=${CMAKE_C_COMPILER}
                         CXX=${CMAKE_CXX_COMPILER}
+                        CFLAGS=${LIBUNWIND_CFLAGS}
+                        CXXFLAGS=${LIBUNWIND_CXXFLAGS}
                         --prefix=<INSTALL_DIR>
                         # Bundled libraries are linked statically.
                         --disable-shared
@@ -74,6 +79,8 @@ macro(libunwind_build)
 
                         BUILD_BYPRODUCTS ${LIBUNWIND_INSTALL_DIR}/lib/libunwind-x86_64.a
                         BUILD_BYPRODUCTS ${LIBUNWIND_INSTALL_DIR}/lib/libunwind.a)
+    unset(LIBUNWIND_CFLAGS)
+    unset(LIBUNWIND_CXXFLAGS)
 
     add_library(bundled-libunwind STATIC IMPORTED GLOBAL)
     set_target_properties(bundled-libunwind PROPERTIES
