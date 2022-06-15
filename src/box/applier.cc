@@ -484,7 +484,8 @@ applier_wait_snapshot(struct applier *applier)
 				struct synchro_request req;
 				if (xrow_decode_synchro(&row, &req) != 0)
 					diag_raise();
-				txn_limbo_process(&txn_limbo, &req);
+				if (txn_limbo_process(&txn_limbo, &req) != 0)
+					diag_raise();
 			} else if (iproto_type_is_raft_request(row.type)) {
 				struct raft_request req;
 				if (xrow_decode_raft(&row, &req, NULL) != 0)
@@ -1017,7 +1018,8 @@ apply_synchro_req(uint32_t replica_id, struct xrow_header *row, struct synchro_r
 	 * transactions side, including the async ones.
 	 */
 	txn_limbo_begin(&txn_limbo);
-	txn_limbo_req_prepare(&txn_limbo, req);
+	if (txn_limbo_req_prepare(&txn_limbo, req) < 0)
+		goto err;
 	if (journal_write(&entry.base) != 0) {
 		txn_limbo_req_rollback(&txn_limbo, req);
 		goto err;

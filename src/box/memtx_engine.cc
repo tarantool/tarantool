@@ -330,8 +330,7 @@ memtx_engine_recover_synchro(const struct xrow_header *row)
 	 * because all its rows have a zero replica_id.
 	 */
 	req.origin_id = req.replica_id;
-	txn_limbo_process(&txn_limbo, &req);
-	return 0;
+	return txn_limbo_process(&txn_limbo, &req);
 }
 
 static int
