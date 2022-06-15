@@ -287,7 +287,7 @@ box_raft_fence(void)
 	    !election_fencing_enabled || box_raft_election_fencing_paused)
 		return;
 
-	txn_limbo_freeze(&txn_limbo);
+	txn_limbo_fence(&txn_limbo);
 	raft_resign(raft);
 }
 
@@ -563,7 +563,7 @@ box_raft_set_election_fencing_enabled(bool enabled)
 	election_fencing_enabled = enabled;
 	say_info("RAFT: fencing %s", enabled ? "enabled" : "disabled");
 	if (!enabled)
-		txn_limbo_unfreeze(&txn_limbo);
+		txn_limbo_unfence(&txn_limbo);
 	replicaset_on_health_change();
 }
 

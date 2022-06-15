@@ -189,14 +189,26 @@ struct txn_limbo {
 	 * synchro command (promote/demote/...) fails.
 	 */
 	int64_t svp_confirmed_lsn;
-	/**
-	 * Whether the limbo is frozen. This mode prevents CONFIRMs and
-	 * ROLLBACKs being written by this instance. This mode is turned on when
-	 * quorum is lost if this instance is the current RAFT leader and
-	 * fencing is enabled. Instance leaves this mode when it becomes leader
-	 * again or PROMOTE/DEMOTE arrives from some remote instance.
-	 */
-	bool frozen;
+	union {
+		/**
+		 * Whether the limbo is frozen. This mode prevents CONFIRMs and
+		 * ROLLBACKs being written by this instance. This, in turn,
+		 * helps to prevent split-brain situations, when a node
+		 * finalizes some transaction before knowing that the
+		 * transaction was already finalized by someone else.
+		 */
+		uint8_t frozen_reasons;
+		struct {
+			/*
+			 * This mode is turned on when quorum is lost if this
+			 * instance is the current RAFT leader and fencing is
+			 * enabled. Instance leaves this mode when it becomes
+			 * leader again or PROMOTE/DEMOTE arrives from some
+			 * remote instance.
+			 */
+			bool is_frozen_due_to_fencing : 1;
+		};
+	};
 };
 
 /**
@@ -413,13 +425,13 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo);
  * Freeze limbo. Prevent CONFIRMs and ROLLBACKs until limbo is unfrozen.
  */
 void
-txn_limbo_freeze(struct txn_limbo *limbo);
+txn_limbo_fence(struct txn_limbo *limbo);
 
 /**
  * Unfreeze limbo. Continue limbo processing as usual.
  */
 void
-txn_limbo_unfreeze(struct txn_limbo *limbo);
+txn_limbo_unfence(struct txn_limbo *limbo);
 
 /**
  * Initialize qsync engine.
