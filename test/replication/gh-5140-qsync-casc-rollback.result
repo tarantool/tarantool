@@ -206,6 +206,10 @@ box.space.sync:select{}
  |   - [4]
  | ...
 
+box.ctl.promote()
+ | ---
+ | ...
+
 box.space.sync:drop()
  | ---
  | ...

@@ -25,6 +25,9 @@ box.snapshot()
  | ...
 test_run:cmd('restart server default')
  | 
+box.ctl.promote()
+ | ---
+ | ...
 box.space.sync:drop()
  | ---
  | ...

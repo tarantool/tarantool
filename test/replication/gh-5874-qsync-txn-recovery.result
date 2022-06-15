@@ -154,6 +154,10 @@ loc:select()
  |   - [2]
  |   - [3]
  | ...
+
+box.ctl.promote()
+ | ---
+ | ...
 async:drop()
  | ---
  | ...

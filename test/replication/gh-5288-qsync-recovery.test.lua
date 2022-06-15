@@ -9,5 +9,6 @@ box.ctl.promote()
 s:insert{1}
 box.snapshot()
 test_run:cmd('restart server default')
+box.ctl.promote()
 box.space.sync:drop()
 box.ctl.demote()
