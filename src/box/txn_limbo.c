@@ -52,13 +52,19 @@ txn_limbo_create(struct txn_limbo *limbo)
 	limbo->rollback_count = 0;
 	limbo->is_in_rollback = false;
 	limbo->svp_confirmed_lsn = -1;
-	limbo->frozen = false;
+	limbo->frozen_reasons = 0;
+}
+
+static inline bool
+txn_limbo_is_frozen(const struct txn_limbo *limbo)
+{
+	return limbo->frozen_reasons != 0;
 }
 
 bool
 txn_limbo_is_ro(struct txn_limbo *limbo)
 {
-	return limbo->frozen ||
+	return txn_limbo_is_frozen(limbo) ||
 	       (limbo->owner_id != REPLICA_ID_NIL &&
 		limbo->owner_id != instance_id);
 }
@@ -237,7 +243,7 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 		double deadline = start_time + replication_synchro_timeout;
 		double timeout = deadline - fiber_clock();
 		int rc = fiber_cond_wait_timeout(&limbo->wait_cond, timeout);
-		if (limbo->frozen)
+		if (txn_limbo_is_frozen(limbo))
 			goto wait;
 		if (txn_limbo_entry_is_complete(entry))
 			goto complete;
@@ -586,7 +592,7 @@ txn_limbo_ack(struct txn_limbo *limbo, uint32_t replica_id, int64_t lsn)
 {
 	if (rlist_empty(&limbo->queue))
 		return;
-	if (limbo->frozen)
+	if (txn_limbo_is_frozen(limbo))
 		return;
 	assert(!txn_limbo_is_ro(limbo));
 	/*
@@ -849,7 +855,7 @@ txn_limbo_req_commit(struct txn_limbo *limbo, const struct synchro_request *req)
 		if (term > limbo->promote_greatest_term) {
 			limbo->promote_greatest_term = term;
 			if (iproto_type_is_promote_request(req->type))
-				txn_limbo_unfreeze(&txn_limbo);
+				txn_limbo_unfence(&txn_limbo);
 		}
 	} else if (iproto_type_is_promote_request(req->type) &&
 		   limbo->promote_greatest_term > 1) {
@@ -918,7 +924,7 @@ txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 void
 txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 {
-	if (rlist_empty(&limbo->queue) || limbo->frozen)
+	if (rlist_empty(&limbo->queue) || txn_limbo_is_frozen(limbo))
 		return;
 	struct txn_limbo_entry *e;
 	int64_t confirm_lsn = -1;
@@ -948,16 +954,16 @@ txn_limbo_on_parameters_change(struct txn_limbo *limbo)
 }
 
 void
-txn_limbo_freeze(struct txn_limbo *limbo)
+txn_limbo_fence(struct txn_limbo *limbo)
 {
-	limbo->frozen = true;
+	limbo->is_frozen_due_to_fencing = true;
 	box_update_ro_summary();
 }
 
 void
-txn_limbo_unfreeze(struct txn_limbo *limbo)
+txn_limbo_unfence(struct txn_limbo *limbo)
 {
-	limbo->frozen = false;
+	limbo->is_frozen_due_to_fencing = false;
 	box_update_ro_summary();
 }
 
