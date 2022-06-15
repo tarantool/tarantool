@@ -521,7 +521,7 @@ txn_limbo_read_rollback(struct txn_limbo *limbo, int64_t lsn)
 	}
 }
 
-void
+int
 txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 {
 	assert(latch_is_locked(&limbo->promote_latch));
@@ -539,9 +539,11 @@ txn_limbo_write_promote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 		.lsn = lsn,
 		.term = term,
 	};
-	txn_limbo_req_prepare(limbo, &req);
+	if (txn_limbo_req_prepare(limbo, &req) < 0)
+		return -1;
 	synchro_request_write(&req);
 	txn_limbo_req_commit(limbo, &req);
+	return 0;
 }
 
 /**
@@ -565,7 +567,7 @@ txn_limbo_read_promote(struct txn_limbo *limbo, uint32_t replica_id,
 		limbo->confirmed_lsn = 0;
 }
 
-void
+int
 txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 {
 	assert(latch_is_locked(&limbo->promote_latch));
@@ -579,9 +581,11 @@ txn_limbo_write_demote(struct txn_limbo *limbo, int64_t lsn, uint64_t term)
 		.lsn = lsn,
 		.term = term,
 	};
-	txn_limbo_req_prepare(limbo, &req);
+	if (txn_limbo_req_prepare(limbo, &req) < 0)
+		return -1;
 	synchro_request_write(&req);
 	txn_limbo_req_commit(limbo, &req);
+	return 0;
 }
 
 /**
@@ -779,7 +783,7 @@ txn_limbo_wait_empty(struct txn_limbo *limbo, double timeout)
 	return 0;
 }
 
-void
+int
 txn_limbo_req_prepare(struct txn_limbo *limbo,
 		      const struct synchro_request *req)
 {
@@ -811,6 +815,7 @@ txn_limbo_req_prepare(struct txn_limbo *limbo,
 		break;
 	}
 	}
+	return 0;
 }
 
 void
@@ -933,13 +938,17 @@ txn_limbo_req_commit(struct txn_limbo *limbo, const struct synchro_request *req)
 	return;
 }
 
-void
+int
 txn_limbo_process(struct txn_limbo *limbo, const struct synchro_request *req)
 {
 	txn_limbo_begin(limbo);
-	txn_limbo_req_prepare(limbo, req);
+	if (txn_limbo_req_prepare(limbo, req) < 0) {
+		txn_limbo_rollback(limbo);
+		return -1;
+	}
 	txn_limbo_req_commit(limbo, req);
 	txn_limbo_commit(limbo);
+	return 0;
 }
 
 void
