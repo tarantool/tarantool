@@ -476,6 +476,27 @@ tuple_key_contains_null(struct tuple *tuple, struct key_def *def,
 	return false;
 }
 
+bool
+tuple_key_is_excluded_slow(struct tuple *tuple, struct key_def *def,
+			   int multikey_idx)
+{
+	assert(def->has_exclude_null);
+	struct tuple_format *format = tuple_format(tuple);
+	const char *data = tuple_data(tuple);
+	const uint32_t *field_map = tuple_field_map(tuple);
+	for (struct key_part *part = def->parts, *end = part + def->part_count;
+	     part < end; ++part) {
+		if (!part->exclude_null)
+			continue;
+		const char *field = tuple_field_raw_by_part(format, data,
+							    field_map, part,
+							    multikey_idx);
+		if (field == NULL || mp_typeof(*field) == MP_NIL)
+			return true;
+	}
+	return false;
+}
+
 int
 tuple_validate_key_parts(struct key_def *key_def, struct tuple *tuple)
 {
