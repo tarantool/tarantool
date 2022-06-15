@@ -207,6 +207,12 @@ struct txn_limbo {
 			 * remote instance.
 			 */
 			bool is_frozen_due_to_fencing : 1;
+			/*
+			 * This mode is always on upon node start and is turned
+			 * off by any new PROMOTE arriving either via
+			 * replication or issued by the node.
+			 */
+			bool is_frozen_until_promotion : 1;
 		};
 	};
 };

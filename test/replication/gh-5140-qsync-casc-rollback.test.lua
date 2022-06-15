@@ -97,6 +97,8 @@ test_run:switch('default')
 box.space.async:select{}
 box.space.sync:select{}
 
+box.ctl.promote()
+
 box.space.sync:drop()
 box.space.async:drop()
 
