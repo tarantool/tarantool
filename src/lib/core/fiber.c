@@ -491,8 +491,7 @@ fiber_make_ready(struct fiber *f)
 	 * It's critical that the newly scheduled fiber is
 	 * added to the tail of the list, to preserve correct
 	 * transaction commit order after a successful WAL write.
-	 * (see tx_schedule_commit()/tx_schedule_rollback() in
-	 * box/wal.cc)
+	 * (see tx_schedule_queue() in box/wal.c)
 	 */
 	rlist_move_tail_entry(&cord->ready, f, state);
 	f->flags |= FIBER_IS_READY;
