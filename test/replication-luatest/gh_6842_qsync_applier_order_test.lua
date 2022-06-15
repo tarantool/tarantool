@@ -353,12 +353,10 @@ g.test_remote_promote_during_local_txn_not_including_it = function(g)
     end, {fids})
     luatest.assert_equals(rows, {}, 'txns were rolled back')
 
-    -- Replication is broken now because server 2 (synchro queue owner) got a
-    -- txn from server 1. It was written before ownership transaction but it
-    -- doesn't matter. Although maybe some day it could be detected and handled
-    -- more graceful.
-    wait_upstream_status(g.server2, g.server1:instance_id(), 'stopped')
-
+    -- Wait until the stale txns (written before promotion) arrive to server2.
+    -- It should simply ignore them.
+    g.server2:wait_vclock_of(g.server1)
+    wait_upstream_status(g.server2, g.server1:instance_id(), 'follow')
     rows = g.server2:exec(function()
         return box.space.test:select()
     end)

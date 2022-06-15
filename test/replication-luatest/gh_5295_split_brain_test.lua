@@ -23,7 +23,6 @@ g.before_all(function(cg)
         replication_timeout         = 0.1,
         replication_synchro_quorum  = 1,
         replication_synchro_timeout = 0.01,
-        election_mode               = 'manual',
         election_timeout            = 0.1,
         election_fencing_enabled    = false,
         log_level                   = 6,
