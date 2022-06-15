@@ -529,8 +529,7 @@ wal_stream_apply_synchro_row(struct wal_stream *stream, struct xrow_header *row)
 		say_error("couldn't decode a synchro request");
 		return -1;
 	}
-	txn_limbo_process(&txn_limbo, &syn_req);
-	return 0;
+	return txn_limbo_process(&txn_limbo, &syn_req);
 }
 
 static int
@@ -1938,7 +1937,10 @@ box_issue_promote(uint32_t prev_leader_id, int64_t promote_lsn)
 	assert(raft->volatile_term == term);
 	assert(txn_limbo.owner_id == prev_leader_id);
 	(void)prev_leader_id;
-	txn_limbo_write_promote(&txn_limbo, promote_lsn, term);
+	if (txn_limbo_write_promote(&txn_limbo, promote_lsn, term) < 0) {
+		txn_limbo_rollback(&txn_limbo);
+		return -1;
+	}
 	txn_limbo_commit(&txn_limbo);
 
 	assert(txn_limbo_is_empty(&txn_limbo));
@@ -1965,7 +1967,10 @@ box_issue_demote(uint32_t prev_leader_id, int64_t promote_lsn)
 	assert(raft->volatile_term == term);
 	assert(txn_limbo.owner_id == prev_leader_id);
 	(void)prev_leader_id;
-	txn_limbo_write_demote(&txn_limbo, promote_lsn, term);
+	if (txn_limbo_write_demote(&txn_limbo, promote_lsn, term) < 0) {
+		txn_limbo_rollback(&txn_limbo);
+		return -1;
+	}
 	txn_limbo_commit(&txn_limbo);
 
 	assert(txn_limbo_is_empty(&txn_limbo));
