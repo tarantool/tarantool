@@ -3788,6 +3788,11 @@ on_wal_checkpoint_threshold(void)
 	gc_trigger_checkpoint();
 }
 
+static uint32_t tuple_lua_hash(const char *str, uint32_t len)
+{
+	return lua_hash(tarantool_L, str, len);
+}
+
 void
 box_init(void)
 {
@@ -3803,7 +3808,7 @@ box_init(void)
 	session_init();
 	schema_module_init();
 
-	if (tuple_init(lua_hash) != 0)
+	if (tuple_init(tuple_lua_hash) != 0)
 		diag_raise();
 
 	txn_limbo_init();
