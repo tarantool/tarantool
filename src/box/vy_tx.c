@@ -1149,6 +1149,20 @@ vy_tx_set_entry(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 int
 vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
 {
+	if (vy_tx_is_in_read_view(tx)) {
+		/*
+		 * If a conflict occurs while the first DML statement in
+		 * a transaction is waiting for a disk read to check key
+		 * uniqueness, the transaction will not be aborted by
+		 * vy_tx_send_to_read_view, because technically it is still
+		 * read-only. So in addition to vy_tx_begin_statement we
+		 * need to abort transactions sent to read view when we
+		 * add a new statement to the write set.
+		 */
+		assert(vy_tx_is_ro(tx));
+		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+		return -1;
+	}
 	struct vy_entry entry;
 	vy_stmt_foreach_entry(entry, stmt, lsm->cmp_def) {
 		if (vy_tx_set_entry(tx, lsm, entry) != 0)
