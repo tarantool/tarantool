@@ -19,6 +19,7 @@
 #endif /* WITH_BRANCH_PROTECTION */
 
 #include "cxx_abi.h"
+#include "proc_name_cache.h"
 
 #ifdef __APPLE__
 /*
@@ -246,6 +247,9 @@ const char *
 backtrace_frame_resolve(const struct backtrace_frame *frame,
 			unw_word_t *offset)
 {
+	const char *name = proc_name_cache_find((unw_word_t)frame->ip, offset);
+	if (name != NULL)
+		return name;
 #ifndef __APPLE__
 	unw_accessors_t *acc = unw_get_accessors(unw_local_addr_space);
 	assert(acc->get_proc_name != NULL);
@@ -268,7 +272,9 @@ backtrace_frame_resolve(const struct backtrace_frame *frame,
 	*offset = (unw_word_t)frame->ip - (unw_word_t)dli.dli_saddr;
 	const char *proc_name_buf = dli.dli_sname;
 #endif /* __APPLE__ */
-	return cxx_abi_demangle(proc_name_buf);
+	const char *demangled_name = cxx_abi_demangle(proc_name_buf);
+	proc_name_cache_insert((unw_word_t)frame->ip, demangled_name, *offset);
+	return demangled_name;
 }
 
 int
