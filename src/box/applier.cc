@@ -547,7 +547,7 @@ applier_fetch_snapshot(struct applier *applier)
 	row.type = IPROTO_FETCH_SNAPSHOT;
 	coio_write_xrow(io, &row);
 
-	applier_set_state(applier, APPLIER_FETCH_SNAPSHOT);
+	applier_set_state(applier, APPLIER_INITIAL_JOIN);
 	applier_wait_snapshot(applier);
 	applier_set_state(applier, APPLIER_FETCHED_SNAPSHOT);
 	applier_set_state(applier, APPLIER_READY);
