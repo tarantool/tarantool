@@ -41,6 +41,10 @@ set(core_sources
     ssl_init.c
 )
 
+if (ENABLE_BACKTRACE)
+    list(APPEND core_sources  proc_name_cache.cc)
+endif()
+
 if(ENABLE_TUPLE_COMPRESSION)
     list(APPEND core_sources ${TUPLE_COMPRESSION_CORE_SOURCES})
 else()
