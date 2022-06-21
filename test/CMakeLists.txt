@@ -36,6 +36,34 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/small
 add_custom_target(symlink_small_tests ALL
    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small)
 
+add_custom_target(test-unit
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
+    COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+        --builddir=${PROJECT_BINARY_DIR}
+        small/
+        unit/)
+
+add_custom_target(test-unit-force
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
+    COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+        --builddir=${PROJECT_BINARY_DIR}
+        --force
+        small/
+        unit/)
+
+add_custom_target(test-func
+    COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+        --builddir=${PROJECT_BINARY_DIR}
+        --exclude small/
+        --exclude unit/)
+
+add_custom_target(test-func-force
+    COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+        --builddir=${PROJECT_BINARY_DIR}
+        --exclude small/
+        --exclude unit/
+        --force)
+
 add_custom_target(test
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
             LuaJIT-test
