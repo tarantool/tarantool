@@ -29,8 +29,7 @@ if #arg == 0 then
   local vars = {
     LUABIN = arg[-1],
     SCRIPT = arg[0],
-    -- To support out-of-source build use relative paths in repo
-    PATH   = arg[-1]:gsub('src/tarantool$', 'test/app-tap'),
+    PATH   = os.getenv('BUILDDIR') .. '/test/app-tap',
     SUFFIX = libext,
   }
 
