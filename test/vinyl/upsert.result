@@ -511,6 +511,7 @@ stat1 = index:stat()
 ---
 ...
 -- separate upserts w/o on disk data
+-- NOT squashed, see gh-5080
 space:upsert({1, 1, 1}, {{'+', 2, 10}})
 ---
 ...
@@ -525,8 +526,8 @@ stat2 = index:stat()
 ...
 upsert_stat_diff(stat2, stat1)
 ---
-- squashed: 3
-  applied: 3
+- squashed: 0
+  applied: 0
 ...
 stat1 = stat2
 ---
@@ -556,8 +557,8 @@ stat2 = index:stat()
 ...
 upsert_stat_diff(stat2, stat1)
 ---
-- squashed: 3
-  applied: 3
+- squashed: 2
+  applied: 2
 ...
 stat1 = stat2
 ---
