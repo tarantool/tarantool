@@ -533,6 +533,21 @@ int
 vy_lsm_rotate_mem(struct vy_lsm *lsm);
 
 /**
+ * Allocate a new in-memory tree if either of the following
+ * conditions is true:
+ *
+ * - Generation has increased after the tree was created.
+ *   In this case we need to dump the tree as is in order to
+ *   guarantee dump consistency.
+ *
+ * - Schema state has increased after the tree was created.
+ *   We have to seal the tree, because we don't support mixing
+ *   statements of different formats in the same tree.
+ */
+int
+vy_lsm_rotate_mem_if_required(struct vy_lsm *lsm);
+
+/**
  * Remove an in-memory tree from the sealed list of an LSM tree,
  * unaccount and delete it.
  */

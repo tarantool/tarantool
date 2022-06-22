@@ -870,6 +870,17 @@ vy_lsm_rotate_mem(struct vy_lsm *lsm)
 	return 0;
 }
 
+int
+vy_lsm_rotate_mem_if_required(struct vy_lsm *lsm)
+{
+	if (lsm->mem->space_cache_version != space_cache_version ||
+	    lsm->mem->generation != *lsm->env->p_generation) {
+		if (vy_lsm_rotate_mem(lsm) != 0)
+			return -1;
+	}
+	return 0;
+}
+
 void
 vy_lsm_delete_mem(struct vy_lsm *lsm, struct vy_mem *mem)
 {
