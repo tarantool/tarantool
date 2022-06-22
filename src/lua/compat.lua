@@ -4,7 +4,6 @@
 local NEW = true
 local OLD = false
 
--- luacheck: no unused
 local internal = require('internal.compat')
 
 local options_format = {
@@ -15,6 +14,15 @@ local options_format = {
     action         = 'function/nil',
 }
 
+local JSON_ESCAPE_BRIEF = [[
+Whether to escape the forward slash symbol '/' using a backslash in a
+json.encode() result. The old and the new behavior produce a result, which
+is compatible ith the JSON specification. However most of other JSON encoders
+don't escape the forward slash, so the new behavior is considered more safe.
+
+https://github.com/tarantool/tarantool/wiki/compat%3Ajson_escape_forward_slash
+]]
+
 -- Contains options descriptions in following format:
 -- * default  (string)
 -- * brief    (string)
@@ -22,7 +30,20 @@ local options_format = {
 -- * current  (boolean, true for 'new')
 -- * selected (boolean)
 -- * action   (function)
-local options = { }
+local options = {
+    json_escape_forward_slash = {
+        default = 'old',
+        obsolete = nil,
+        brief = JSON_ESCAPE_BRIEF,
+        run_action_now = true,
+        action = function(is_new)
+            local esc_slash = not is_new
+            require('json').cfg{encode_escape_forward_slash = esc_slash}
+            internal.json_escape_forward_slash_toggle(esc_slash)
+            internal.msgpuck_escape_forward_slash_toggle(esc_slash)
+        end,
+    },
+}
 
 -- Array with option names in order of addition.
 local options_order = { }
