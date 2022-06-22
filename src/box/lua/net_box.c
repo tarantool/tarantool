@@ -415,6 +415,12 @@ netbox_request_complete(struct netbox_request *request)
 static inline bool
 netbox_request_wait(struct netbox_request *request, double *timeout)
 {
+	/*
+	 * Waiting for a request completion in the net.box worker fiber
+	 * would result in a dead lock.
+	 */
+	assert(request->transport != NULL &&
+	       request->transport->worker != fiber());
 	if (*timeout == 0)
 		return false;
 	double ts = ev_monotonic_now(loop());
@@ -1877,6 +1883,11 @@ luaT_netbox_request_wait_result(struct lua_State *L)
 		    (timeout = lua_tonumber(L, 2)) < 0)
 			luaL_error(L, "Usage: future:wait_result(timeout)");
 	}
+	if (request->transport != NULL &&
+	    request->transport->worker == fiber()) {
+		luaL_error(L, "Synchronous requests are not allowed in "
+			   "net.box trigger");
+	}
 	while (!netbox_request_is_ready(request)) {
 		if (!netbox_request_wait(request, &timeout)) {
 			luaL_testcancel(L);
@@ -1927,6 +1938,11 @@ luaT_netbox_request_iterator_next(struct lua_State *L)
 	struct netbox_request *request = luaT_check_netbox_request(L, -1);
 	lua_rawgeti(L, 1, 2);
 	double timeout = lua_tonumber(L, -1);
+	if (request->transport != NULL &&
+	    request->transport->worker == fiber()) {
+		luaL_error(L, "Synchronous requests are not allowed in "
+			   "net.box trigger");
+	}
 	/* The second argument is the index of the last returned message. */
 	if (luaL_isnull(L, 2)) {
 		/* The previous call returned an error. */
