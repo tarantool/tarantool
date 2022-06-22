@@ -940,8 +940,6 @@ vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
 	 */
 	assert(lsm->index_id == 0);
 
-	const struct tuple *older;
-	int64_t lsn = vy_stmt_lsn(stmt);
 	uint8_t n_upserts = vy_stmt_n_upserts(stmt);
 	/*
 	 * If there are a lot of successive upserts for the same key,
@@ -967,9 +965,11 @@ vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
 		 * one-key continous UPSERTs sequence.
 		 */
 #ifndef NDEBUG
-		older = vy_mem_older_lsn(mem, stmt);
+		const struct tuple *older = vy_mem_older_lsn(mem, stmt);
 		assert(older != NULL && vy_stmt_type(older) == IPROTO_UPSERT &&
 		       vy_stmt_n_upserts(older) == VY_UPSERT_THRESHOLD - 1);
+#else
+		(void)mem;
 #endif
 		if (lsm->env->upsert_thresh_cb == NULL) {
 			/* Squash callback is not installed. */
@@ -987,63 +987,6 @@ vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
 		 * good, but is not necessary.
 		 */
 		return;
-	}
-
-	/*
-	 * If there are no other mems and runs and n_upserts == 0,
-	 * then we can turn the UPSERT into the REPLACE.
-	 */
-	if (n_upserts == 0 &&
-	    lsm->stat.memory.count.rows == lsm->mem->count.rows &&
-	    lsm->run_count == 0) {
-		older = vy_mem_older_lsn(mem, stmt);
-		assert(older == NULL || vy_stmt_type(older) != IPROTO_UPSERT);
-		struct tuple *upserted =
-			vy_apply_upsert(stmt, older, lsm->cmp_def,
-					lsm->mem_format, false);
-		lsm->stat.upsert.applied++;
-
-		if (upserted == NULL) {
-			/* OOM */
-			diag_clear(diag_get());
-			return;
-		}
-		int64_t upserted_lsn = vy_stmt_lsn(upserted);
-		if (upserted_lsn != lsn) {
-			/**
-			 * This could only happen if the upsert completely
-			 * failed and the old tuple was returned.
-			 * In this case we shouldn't insert the same replace
-			 * again.
-			 */
-			assert(older == NULL ||
-			       upserted_lsn == vy_stmt_lsn(older));
-			tuple_unref(upserted);
-			return;
-		}
-		assert(older == NULL || upserted_lsn != vy_stmt_lsn(older));
-		assert(vy_stmt_type(upserted) == IPROTO_REPLACE);
-
-		const struct tuple *region_stmt =
-			vy_stmt_dup_lsregion(upserted, &mem->env->allocator,
-					     mem->generation);
-		if (region_stmt == NULL) {
-			/* OOM */
-			tuple_unref(upserted);
-			diag_clear(diag_get());
-			return;
-		}
-
-		int rc = vy_lsm_set(lsm, mem, upserted, &region_stmt);
-		/**
-		 * Since we have already allocated mem statement and
-		 * now we replacing one statement with another, the
-		 * vy_lsm_set() cannot fail.
-		 */
-		assert(rc == 0); (void)rc;
-		tuple_unref(upserted);
-		vy_mem_commit_stmt(mem, region_stmt);
-		lsm->stat.upsert.squashed++;
 	}
 }
 
