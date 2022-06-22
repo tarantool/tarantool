@@ -3993,11 +3993,9 @@ vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
 	 * Hence, to get right mem (during mem rotation it becomes
 	 * sealed i.e. read-only) we should fetch it from lsm again.
 	 */
-	if (lsm->mem->generation != *lsm->env->p_generation) {
-		if (vy_lsm_rotate_mem(lsm) != 0) {
-			tuple_unref(stmt);
-			return -1;
-		}
+	if (vy_lsm_rotate_mem_if_required(lsm) != 0) {
+		tuple_unref(stmt);
+		return -1;
 	}
 	mem = lsm->mem;
 
@@ -4452,10 +4450,8 @@ vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
 		 * don't yield between statements.
 		 */
 		struct vy_mem *mem = lsm->mem;
-		if (is_first_statement &&
-		    (mem->space_cache_version != space_cache_version ||
-		     mem->generation != *lsm->env->p_generation)) {
-			rc = vy_lsm_rotate_mem(lsm);
+		if (is_first_statement) {
+			rc = vy_lsm_rotate_mem_if_required(lsm);
 			if (rc != 0)
 				break;
 			mem = lsm->mem;
