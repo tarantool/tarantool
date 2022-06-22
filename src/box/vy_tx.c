@@ -451,24 +451,8 @@ static int
 vy_tx_write_prepare(struct txv *v)
 {
 	struct vy_lsm *lsm = v->lsm;
-
-	/*
-	 * Allocate a new in-memory tree if either of the following
-	 * conditions is true:
-	 *
-	 * - Generation has increased after the tree was created.
-	 *   In this case we need to dump the tree as is in order to
-	 *   guarantee dump consistency.
-	 *
-	 * - Schema state has increased after the tree was created.
-	 *   We have to seal the tree, because we don't support mixing
-	 *   statements of different formats in the same tree.
-	 */
-	if (unlikely(lsm->mem->space_cache_version != space_cache_version ||
-		     lsm->mem->generation != *lsm->env->p_generation)) {
-		if (vy_lsm_rotate_mem(lsm) != 0)
-			return -1;
-	}
+	if (vy_lsm_rotate_mem_if_required(lsm) != 0)
+		return -1;
 	vy_mem_pin(lsm->mem);
 	v->mem = lsm->mem;
 	return 0;
