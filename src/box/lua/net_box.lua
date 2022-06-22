@@ -274,6 +274,9 @@ local function new_sm(uri, opts)
     local last_reconnect_error
     local remote = {host = host, port = port, opts = opts, state = 'initial'}
     local function callback(what, ...)
+        if remote._fiber == nil then
+            remote._fiber = fiber.self()
+        end
         if what == 'state_changed' then
             local state, err = ...
             local was_connected = remote._is_connected
@@ -735,6 +738,9 @@ function remote_methods:_request(method, opts, format, stream_id, ...)
         on_push = on_push_sync_default
     end
     -- Execute synchronous request.
+    if self._fiber == fiber.self() then
+        error('Synchronous requests are not allowed in net.box trigger')
+    end
     local timeout = deadline and max(0, deadline - fiber_clock())
     if self.state ~= 'active' then
         self:wait_state('active', timeout)
