@@ -1339,8 +1339,7 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	}
 
 	/* Rotate the active tree if it needs to be dumped. */
-	if (lsm->mem->generation == scheduler->dump_generation &&
-	    vy_lsm_rotate_mem(lsm) != 0)
+	if (vy_lsm_rotate_mem_if_required(lsm) != 0)
 		goto err;
 
 	/*
