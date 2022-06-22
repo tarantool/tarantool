@@ -32,11 +32,18 @@ add_test(NAME ${test_path}/test_engine.lua${TEST_PARAM_DELIM}vinyl
           --test_dir ${CMAKE_CURRENT_BINARY_DIR}/test_engine-vinyl
           --engine vinyl
 )
+add_test(NAME ${test_path}/mvcc_test.lua
+  COMMAND ${TARANTOOL_BIN}
+          ${LUATEST_COMMAND_WITH_FLAGS}
+          ./mvcc_test.lua
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
 set_tests_properties(
   ${test_path}/test_engine.lua${TEST_PARAM_DELIM}vinyl
   ${test_path}/test_engine.lua${TEST_PARAM_DELIM}memtx
+  ${test_path}/mvcc_test.lua
   PROPERTIES
-    ENVIRONMENT "LUA_PATH=${LUA_PATH}"
+    ENVIRONMENT "LUA_PATH=${LUATEST_LUA_PATH};${LUA_PATH}"
     LABELS "${TEST_SUITE_NAME};fuzzing;"
     DEPENDS ${TEST_SUITE_NAME}-deps
 )
