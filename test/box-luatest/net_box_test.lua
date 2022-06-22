@@ -336,3 +336,35 @@ g.test_gc = function()
     t.assert_not(weak_refs.callback)
     t.assert_not(weak_refs.transport)
 end
+
+--
+-- Checks that synchronous requests fail with an error in on_connect and
+-- on_schema_reload triggers (gh-5358).
+--
+g.test_sync_request_in_trigger = function()
+    local c
+    local ch = fiber.channel(100)
+    local function trigger_cb()
+        local status, err
+        status, err = pcall(c.call, c, 'box.session.user', {timeout = 5})
+        ch:put(status or tostring(err))
+        local fut = c:call('box.session.user', {}, {is_async = true})
+        status, err = pcall(fut.wait_result, fut, 5)
+        ch:put(status or tostring(err))
+        status, err = pcall(function() for _, _ in fut:pairs(5) do end end)
+        ch:put(status or tostring(err))
+    end
+    local function check()
+        local msg = 'Synchronous requests are not allowed in net.box trigger'
+        t.assert_str_contains(ch:get(5), msg) -- conn:call
+        t.assert_str_contains(ch:get(5), msg) -- fut:wait_result
+        t.assert_str_contains(ch:get(5), msg) -- fut:pairs
+    end
+    c = net.connect(g.server.net_box_uri, {wait_connected = false})
+    t.assert_equals(c.state, 'initial')
+    c:on_connect(trigger_cb)
+    c:on_schema_reload(trigger_cb)
+    check() -- on_connect
+    check() -- on_schema_reload
+    c:close()
+end
