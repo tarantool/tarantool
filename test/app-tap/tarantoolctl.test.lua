@@ -12,7 +12,27 @@ test_run = ok and test_run.new() or nil
 
 local BUILDDIR = os.getenv('BUILDDIR') or '.'
 local SOURCEDIR = os.getenv("SOURCEDIR") or '.'
-local TARANTOOLCTL_PATH = ('%s/extra/dist/tarantoolctl'):format(BUILDDIR)
+
+-- Find tarantoolctl.
+local TARANTOOLCTL_PATH
+if test_run == nil then
+    -- If we're not under test-run, assume that current directory
+    -- is tarantool's build directory. Also allow to set it via the
+    -- BUILDDIR environment variable.
+    TARANTOOLCTL_PATH = ('%s/extra/dist/tarantoolctl'):format(BUILDDIR)
+    -- If we have no tarantoolctl in the build directory, assume
+    -- that the testing is performed against system tarantool.
+    if not fio.path.exists(TARANTOOLCTL_PATH) then
+        TARANTOOLCTL_PATH = arg[-1] .. 'ctl'
+    end
+else
+    -- test-run knows the path to tarantoolctl.
+    TARANTOOLCTL_PATH = os.getenv('TARANTOOLCTL')
+end
+
+if TARANTOOLCTL_PATH == nil then
+    error("Can't find tarantoolctl")
+end
 
 local function recursive_rmdir(path)
     path = fio.abspath(path)
