@@ -206,6 +206,7 @@ index = space:create_index('primary')
 stat1 = index:stat()
 
 -- separate upserts w/o on disk data
+-- NOT squashed, see gh-5080
 space:upsert({1, 1, 1}, {{'+', 2, 10}})
 space:upsert({1, 1, 1}, {{'-', 2, 20}})
 space:upsert({1, 1, 1}, {{'=', 2, 20}})
