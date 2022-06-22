@@ -3326,6 +3326,16 @@ vy_squash_process(struct vy_squash *squash)
 		return 0;
 
 	/*
+	 * While we yielded in vy_point_lookup() above, the memory
+	 * generation could have been bumped so we might need to
+	 * rotate the active in-memory index.
+	 */
+	if (vy_lsm_rotate_mem_if_required(lsm) != 0) {
+		tuple_unref(result.stmt);
+		return -1;
+	}
+
+	/*
 	 * While we were reading on-disk runs, new statements could
 	 * have been prepared for the squashed key. We mustn't apply
 	 * them, because they may be rolled back, but we must adjust
