@@ -24,6 +24,8 @@ ifeq ($(GC64), true)
 	DEB_CMAKE_EXTRA_FLAGS += -DLUAJIT_ENABLE_GC64=ON
 endif
 
+DEB_MAKE_CHECK_TARGET := test-force
+
 # Install tarantool.service within tarantool-common package, but does not
 # install it within tarantool and tarantool-dev packages.
 DEB_DH_INSTALLINIT_ARGS                     := --name=tarantool

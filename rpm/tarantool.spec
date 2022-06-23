@@ -105,6 +105,8 @@ BuildRequires: python3-PyYAML
 %else
 BuildRequires: python3-pyyaml
 %endif
+# needed for datetime tests
+BuildRequires: tzdata
 
 # Install prove to run LuaJIT tests.
 BuildRequires: perl-Test-Harness
