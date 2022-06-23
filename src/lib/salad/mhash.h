@@ -61,6 +61,10 @@
 #define MH_INCREMENTAL_RESIZE 1
 #endif
 
+#ifndef MH_FAST_MOD
+#define MH_FAST_MOD 1
+#endif /* MH_FAST_MOD */
+
 #include <assert.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -75,6 +79,27 @@
 
 #define mh_unlikely(x)  __builtin_expect((x),0)
 
+/* Modular multiplicative inverse computation. */
+#define mh_mmi(p) (UINT64_C(0xFFFFFFFFFFFFFFFF) / (p) + 1)
+
+#if MH_FAST_MOD && __SIZEOF_INT128__
+#define mh_mul_u64_u32(u64, u32) \
+	({ (uint32_t)(((__uint128_t)(u64) * (u32)) >> 64); })
+#define mh_mod(n, mmi, d) mh_mul_u64_u32((n) * (mmi), (d))
+#define mh_mod_const(n, d) mh_mul_u64_u32((n) * mh_mmi(d), (d))
+#define mh_mod_prime(n, p) \
+	mh_mod((n), __ac_primes_mmi_list[(p)], __ac_prime_list[(p)])
+#define mh_mod_prime_minus_one(n, p) \
+	mh_mod((n), __ac_primes_minus_one_mmi_list[(p)], \
+	       __ac_primes_minus_one_list[(p)])
+#else /* MH_FAST_MOD && __SIZEOF_INT128__ */
+#define mh_mod(n, mmi, d) ({ (n) % (d); })
+#define mh_mod_const(n, d) mh_mod((n), 0, (d))
+#define mh_mod_prime(n, p) mh_mod((n), 0, __ac_prime_list[(p)])
+#define mh_mod_prime_minus_one(n, p) \
+	mh_mod((n), 0, __ac_primes_minus_one_list[(p)])
+#endif /* MH_FAST_MOD */
+
 #ifndef MH_TYPEDEFS
 #define MH_TYPEDEFS 1
 typedef uint32_t mh_int_t;
@@ -85,16 +110,41 @@ typedef uint32_t mh_int_t;
 
 #ifndef __ac_HASH_PRIME_SIZE
 #define __ac_HASH_PRIME_SIZE 31
+#define PRIMES_LIST(_) \
+	_(3ul),		 _(11ul),	  _(23ul),		_(53ul),\
+	_(97ul),	 _(193ul),	  _(389ul),		_(769ul),\
+	_(1543ul),	 _(3079ul),	  _(6151ul),		_(12289ul),\
+	_(24593ul),	 _(49157ul),	  _(98317ul),		_(196613ul),\
+	_(393241ul),	 _(786433ul),	  _(1572869ul),		_(3145739ul),\
+	_(6291469ul),	 _(12582917ul),	  _(25165843ul),	_(50331653ul),\
+	_(100663319ul),	 _(201326611ul),  _(402653189ul),	_(805306457ul),\
+	_(1610612741ul), _(3221225473ul), _(4294967291ul)
+#define PRIME(p) (p)
 static const mh_int_t __ac_prime_list[__ac_HASH_PRIME_SIZE] = {
-	3ul,		11ul,		23ul,		53ul,
-	97ul,		193ul,		389ul,		769ul,
-	1543ul,		3079ul,		6151ul,		12289ul,
-	24593ul,	49157ul,	98317ul,	196613ul,
-	393241ul,	786433ul,	1572869ul,	3145739ul,
-	6291469ul,	12582917ul,	25165843ul,	50331653ul,
-	100663319ul,	201326611ul,	402653189ul,	805306457ul,
-	1610612741ul,	3221225473ul,	4294967291ul
+	PRIMES_LIST(PRIME)
 };
+
+#define PRIME_MINUS_ONE(p) ((p) - 1)
+static const mh_int_t __ac_primes_minus_one_list[__ac_HASH_PRIME_SIZE] = {
+	PRIMES_LIST(PRIME_MINUS_ONE)
+};
+
+#undef PRIME_MINUS_ONE
+#undef PRIME
+#if MH_FAST_MOD
+static const uint64_t __ac_primes_mmi_list[__ac_HASH_PRIME_SIZE] = {
+	PRIMES_LIST(mh_mmi)
+};
+
+#define PRIME_MINUS_ONE_MMI(p) mh_mmi((p) - 1)
+static const uint64_t __ac_primes_minus_one_mmi_list[__ac_HASH_PRIME_SIZE] = {
+	PRIMES_LIST(PRIME_MINUS_ONE_MMI)
+};
+
+#undef PRIME_MINUS_ONE_MMI
+#endif /* MH_FAST_MOD */
+#undef PRIMES_LIST
+#undef PRIMES_MINUS_ONE_LIST
 #endif /* __ac_HASH_PRIME_SIZE */
 
 #ifndef mh_bytemap
@@ -131,7 +181,7 @@ struct _mh(t) {
 #else
 #define mh_exist(h, i)		({ h->b[i] & 0x7f; })
 #define mh_dirty(h, i)		({ h->b[i] & 0x80; })
-#define mh_gethk(hash)		({ (hash) % 127 + 1; })
+#define mh_gethk(hash)		({ mh_mod_const(hash, 127) + 1; })
 #define mh_mayeq(h, i, hk)	({ mh_exist(h, i) == hk; })
 
 #define mh_setfree(h, i)	({ h->b[i] &= 0x80; })
@@ -212,15 +262,15 @@ _mh(find)(struct _mh(t) *h, mh_key_t key, mh_arg_t arg)
 
 	mh_int_t k = mh_hash_key(key, arg);
 	uint8_t hk = mh_gethk(k); (void)hk;
-	mh_int_t i = k % mh_capacity(h);
-	mh_int_t inc = 1 + k % (mh_capacity(h) - 1);
+	mh_int_t i = mh_mod_prime(k, h->prime);
+	mh_int_t inc = 1 + mh_mod_prime_minus_one(k, h->prime);
 	for (;;) {
 		if ((mh_mayeq(h, i, hk) &&
 		    !mh_cmp_key(key, mh_node(h, i), arg)))
 			return i;
 
 		if (!mh_dirty(h, i))
-			return mh_capacity(h);
+			return mh_end(h);
 
 		i = _mh(next_slot)(i, inc, mh_capacity(h));
 	}
@@ -235,8 +285,8 @@ _mh(get)(struct _mh(t) *h, const mh_node_t *node,
 
 	mh_int_t k = mh_hash(node, arg);
 	uint8_t hk = mh_gethk(k); (void)hk;
-	mh_int_t i = k % mh_capacity(h);
-	mh_int_t inc = 1 + k % (mh_capacity(h) - 1);
+	mh_int_t i = mh_mod_prime(k, h->prime);
+	mh_int_t inc = 1 + mh_mod_prime_minus_one(k, h->prime);
 	for (;;) {
 		if ((mh_mayeq(h, i, hk) && !mh_cmp(node, mh_node(h, i), arg)))
 			return i;
@@ -251,7 +301,7 @@ _mh(get)(struct _mh(t) *h, const mh_node_t *node,
 static inline mh_int_t
 _mh(random)(struct _mh(t) *h, mh_int_t rnd)
 {
-	mh_int_t res = mh_next(h, rnd % mh_end(h));
+	mh_int_t res = mh_next(h, mh_mod_prime(rnd, h->prime));
 	if (res != mh_end(h))
 		return res;
 	return mh_first(h);
@@ -265,9 +315,9 @@ _mh(put_slot)(struct _mh(t) *h, const mh_node_t *node, int *exist,
 
 	mh_int_t k = mh_hash(node, arg); /* hash key */
 	uint8_t hk = mh_gethk(k); (void)hk;
-	mh_int_t i = k % mh_capacity(h); /* offset in the hash table. */
+	mh_int_t i = mh_mod_prime(k, h->prime); /* offset in the hash table. */
 	/* overflow chain increment. */
-	mh_int_t inc = 1 + k % (mh_capacity(h) - 1);
+	mh_int_t inc = 1 + mh_mod_prime_minus_one(k, h->prime);
 
 	*exist = 1;
 	/* Skip through all collisions. */
@@ -337,7 +387,6 @@ _mh(put)(struct _mh(t) *h, const mh_node_t *node, mh_node_t **ret,
 		_mh(start_resize)(h, mh_capacity(h) + 1, h->size, arg);
 	}
 #endif
-
 	x = put_slot(h, node, &exist, arg);
 
 	if (ret) {
@@ -536,7 +585,7 @@ _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 	memcpy(s, h, sizeof(*h));
 	s->resize_position = 0;
 	s->prime = new_prime;
-	s->upper_bound = mh_capacity(h) * MH_DENSITY;
+	s->upper_bound = mh_capacity(s) * MH_DENSITY;
 	s->n_dirty = 0;
 	s->size = 0;
 	s->p = p;
