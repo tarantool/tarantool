@@ -42,6 +42,7 @@
 #include "memory.h"
 #include "trigger.h"
 #include "errinj.h"
+#include "clock.h"
 
 extern void cord_on_yield(void);
 
@@ -93,13 +94,7 @@ cpu_stat_start(struct cpu_stat *stat)
 	 * ev_time() since they use either monotonic or realtime
 	 * system clocks.
 	 */
-	struct timespec ts;
-	if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) != 0) {
-		say_debug("clock_gettime(): failed to get this thread's"
-			  " cpu time.");
-		return;
-	}
-	stat->prev_cputime = (uint64_t) ts.tv_sec * FIBER_TIME_RES + ts.tv_nsec;
+	stat->prev_cputime = clock_thread64();
 }
 
 static inline void
@@ -133,19 +128,11 @@ cpu_stat_end(struct cpu_stat *stat, struct clock_stat *cord_clock_stat)
 	stat->prev_cpu_miss_count = stat->cpu_miss_count;
 	stat->cpu_miss_count = 0;
 
-	struct timespec ts;
-	uint64_t delta_time;
 	double nsec_per_clock = 0;
-	if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) != 0) {
-		say_debug("clock_gettime(): failed to get this thread's"
-			  " cpu time.");
-	} else {
-		delta_time = (uint64_t) ts.tv_sec * FIBER_TIME_RES +
-			     ts.tv_nsec;
-		if (delta_time > stat->prev_cputime && cord_clock_stat->delta > 0) {
-			delta_time -= stat->prev_cputime;
-			nsec_per_clock = (double) delta_time / cord()->clock_stat.delta;
-		}
+	uint64_t delta_time = clock_thread64();
+	if (delta_time > stat->prev_cputime && cord_clock_stat->delta > 0) {
+		delta_time -= stat->prev_cputime;
+		nsec_per_clock = (double)delta_time / cord()->clock_stat.delta;
 	}
 	return nsec_per_clock;
 }
