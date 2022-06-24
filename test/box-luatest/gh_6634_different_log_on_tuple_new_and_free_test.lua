@@ -23,7 +23,7 @@ g.test_different_logs_on_new_and_free = function()
         box.cfg{log_level = 5}
     end)
 
-    local str = g.server:grep_log('tuple_new[%w_]*%(%d+%) = 0x%x+$', 1024)
+    local str = g.server:grep_log('memtx_tuple_new[%w_]*%(%d+%) = 0x%x+$', 1024)
     local new_tuple_address = string.match(str, '0x%x+$')
     new_tuple_address = string.sub(new_tuple_address, 3)
 
@@ -34,7 +34,7 @@ g.test_different_logs_on_new_and_free = function()
         box.cfg{log_level = 5}
     end)
 
-    str = g.server:grep_log('tuple_delete%w*%(0x%x+%)', 1024)
+    str = g.server:grep_log('memtx_tuple_delete%w*%(0x%x+%)', 1024)
     local deleted_tuple_address = string.match(str, '0x%x+%)')
     deleted_tuple_address = string.sub(deleted_tuple_address, 3, -2)
     t.assert_equals(new_tuple_address, deleted_tuple_address)
