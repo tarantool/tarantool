@@ -567,7 +567,7 @@ tarantool_free(void)
 	free(pid_file);
 	signal_free();
 #ifdef ENABLE_GCOV
-	__gcov_flush();
+	gcov_flush();
 #endif
 	cbus_free();
 #if 0
