@@ -1740,11 +1740,11 @@ test:test("Time :set{} operations", function(test)
             'day 9')
     test:is(tostring(ts:set{ hour = 6 }),  '2020-11-09T06:31:11+0300',
             'hour 6')
-    test:is(tostring(ts:set{ min = 12, sec = 23 }), '2020-11-09T04:12:23+0300',
+    test:is(tostring(ts:set{ min = 12, sec = 23 }), '2020-11-09T06:12:23+0300',
             'min 12, sec 23')
-    test:is(tostring(ts:set{ tzoffset = -8*60 }), '2020-11-09T04:12:23-0800',
+    test:is(tostring(ts:set{ tzoffset = -8*60 }), '2020-11-09T06:12:23-0800',
             'offset -0800' )
-    test:is(tostring(ts:set{ tzoffset = '+0800' }), '2020-11-09T04:12:23+0800',
+    test:is(tostring(ts:set{ tzoffset = '+0800' }), '2020-11-09T06:12:23+0800',
             'offset +0800' )
     -- timestamp 1630359071.125 is 2021-08-30T21:31:11.125Z
     test:is(tostring(ts:set{ timestamp = 1630359071.125 }),
