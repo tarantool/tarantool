@@ -98,7 +98,7 @@ test/enterprise-unit
 test/lib/
 test/unit/*.test
 test/unit/fiob
-test/small
+test/small/*.test
 test/var
 test/luajit-tap
 test/unit/popen-child
