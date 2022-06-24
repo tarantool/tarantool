@@ -42,7 +42,7 @@ jobs:
           ( github.event_name == 'pull_request' &&
             !contains(github.event.pull_request.labels.*.name, 'notest') ) )
 
-    runs-on: ubuntu-20.04-self-hosted
+    runs-on: flavor-1-2
 
     steps:
       - uses: tarantool/actions/cleanup@master
@@ -67,7 +67,7 @@ jobs:
           ( github.event_name == 'pull_request' &&
             !contains(github.event.pull_request.labels.*.name, 'notest') ) )
 
-    runs-on: ubuntu-20.04-self-hosted
+    runs-on: flavor-1-2
 
     steps:
       - uses: tarantool/actions/cleanup@master
@@ -94,7 +94,7 @@ jobs:
         ( github.event_name == 'pull_request' &&
           !contains(github.event.pull_request.labels.*.name, 'notest') )
 
-    runs-on: ubuntu-20.04-self-hosted
+    runs-on: flavor-1-2
 
     steps:
       - uses: tarantool/actions/cleanup@master

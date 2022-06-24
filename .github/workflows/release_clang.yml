@@ -40,9 +40,9 @@ jobs:
     # or on pull request if the 'full-ci' label is set.
     if: github.repository == 'tarantool/tarantool' &&
         ( github.event_name != 'pull_request' ||
-          contains(github.event.pull_request.labels.*.name, 'full-ci') )
+          contains(github.event.pull_request.labels.*.name, 'test') )
 
-    runs-on: ubuntu-20.04-self-hosted
+    runs-on: flavor-4-8
 
     steps:
       - uses: tarantool/actions/cleanup@master
