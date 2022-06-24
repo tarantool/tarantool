@@ -1023,7 +1023,7 @@ local function datetime_set(self, obj)
     end
 
     local lsecs = local_secs(self)
-    local h0 = math_floor(lsecs / (24 * 60)) % 24
+    local h0 = math_floor(lsecs / (60 * 60)) % 24
     local m0 = math_floor(lsecs / 60) % 60
     local sec0 = lsecs % 60
 
