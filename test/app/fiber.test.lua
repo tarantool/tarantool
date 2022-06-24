@@ -647,12 +647,11 @@ if is_fiber_top then\
     while fiber.top().cpu["1/sched"].instant == 0 do fiber.yield() end\
 end
 
-a = is_fiber_top and fiber.top() or {cpu = {["1/sched"] = {}}, cpu_misses = 0}
+a = is_fiber_top and fiber.top() or {cpu = {["1/sched"] = {}}}
 type(a) == 'table'
 -- scheduler is present in fiber.top()
 -- and is indexed by name
 a.cpu["1/sched"] ~= nil
-type(a.cpu_misses) == 'number'
 sum_inst = 0
 sum_avg = is_fiber_top and 0 or 100
 

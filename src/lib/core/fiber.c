@@ -86,7 +86,6 @@ static void
 cpu_stat_start(struct cpu_stat *stat)
 {
 	stat->prev_clock = clock_monotonic64();
-	stat->cpu_miss_count = 0;
 	/*
 	 * We want to measure thread cpu time here to calculate
 	 * each fiber's cpu time, so don't use libev's ev_now() or
@@ -99,7 +98,6 @@ cpu_stat_start(struct cpu_stat *stat)
 static inline void
 cpu_stat_reset(struct cpu_stat *stat)
 {
-	stat->prev_cpu_miss_count = 0;
 	cpu_stat_start(stat);
 }
 
@@ -124,9 +122,6 @@ cpu_stat_on_csw(struct cpu_stat *stat)
 static double
 cpu_stat_end(struct cpu_stat *stat, struct clock_stat *cord_clock_stat)
 {
-	stat->prev_cpu_miss_count = stat->cpu_miss_count;
-	stat->cpu_miss_count = 0;
-
 	double nsec_per_clock = 0;
 	uint64_t delta_time = clock_thread64();
 	if (delta_time > stat->prev_cputime && cord_clock_stat->delta > 0) {
