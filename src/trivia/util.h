@@ -417,7 +417,32 @@ strnindex(const char **haystack, const char *needle, uint32_t len, uint32_t hmax
 
 void close_all_xcpt(int fdc, ...);
 
-void __gcov_flush();
+#if defined(__GNUC__) && __GNUC__ >= 11
+/** Import __gcov_dump function. */
+void
+__gcov_dump(void);
+
+/** Import __gcov_reset function. */
+void
+__gcov_reset(void);
+
+static inline void
+gcov_flush(void)
+{
+	__gcov_dump();
+	__gcov_reset();
+}
+#else
+/** Import __gcov_flush function. */
+void
+__gcov_flush(void);
+
+static inline void
+gcov_flush(void)
+{
+	__gcov_flush();
+}
+#endif
 
 /**
  * Async-signal-safe implementation of printf(), to

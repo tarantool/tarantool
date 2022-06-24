@@ -1,5 +1,12 @@
 set(CMAKE_REQUIRED_FLAGS "-fprofile-arcs -ftest-coverage")
-check_library_exists("" __gcov_flush "" HAVE_GCOV)
+if (CMAKE_C_COMPILER_ID STREQUAL "GNU" AND NOT CMAKE_C_COMPILER_VERSION VERSION_LESS 11)
+    check_library_exists("" __gcov_dump "" HAVE_GCOV)
+    if (HAVE_GCOV)
+        check_library_exists("" __gcov_reset "" HAVE_GCOV)
+      endif()
+else()
+    check_library_exists("" __gcov_flush "" HAVE_GCOV)
+endif()
 set(CMAKE_REQUIRED_FLAGS "")
 
 set(ENABLE_GCOV_DEFAULT OFF)
