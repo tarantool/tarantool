@@ -1180,8 +1180,8 @@ this_module.self = {
     timeout = function(self) return self end,
     wait_connected = function(self) return true end,
     is_connected = function(self) return true end,
-    call = function(_box, proc_name, args)
-        check_remote_arg(_box, 'call')
+    call = function(__box, proc_name, args)
+        check_remote_arg(__box, 'call')
         check_call_args(args)
         args = args or {}
         proc_name = tostring(proc_name)
@@ -1197,8 +1197,8 @@ this_module.self = {
             return handle_eval_result(pcall(proc, unpack(args)))
         end
     end,
-    eval = function(_box, expr, args)
-        check_remote_arg(_box, 'eval')
+    eval = function(__box, expr, args)
+        check_remote_arg(__box, 'eval')
         check_eval_args(args)
         args = args or {}
         local proc, errmsg = loadstring(expr)
