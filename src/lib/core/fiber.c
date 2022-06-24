@@ -46,8 +46,6 @@
 
 extern void cord_on_yield(void);
 
-#if ENABLE_FIBER_TOP
-
 static inline void
 clock_stat_add_delta(struct clock_stat *stat, uint64_t clock_delta)
 {
@@ -131,8 +129,6 @@ cpu_stat_end(struct cpu_stat *stat, struct clock_stat *cord_clock_stat)
 	return nsec_per_clock;
 }
 
-#endif /* ENABLE_FIBER_TOP */
-
 #include <valgrind/memcheck.h>
 
 static int (*fiber_invoke)(fiber_func f, va_list ap);
@@ -192,9 +188,7 @@ fiber_mprotect(void *addr, size_t len, int prot)
 	return 0;
 }
 
-#if ENABLE_FIBER_TOP
 static __thread bool fiber_top_enabled = false;
-#endif /* ENABLE_FIBER_TOP */
 
 #ifdef ENABLE_BACKTRACE
 static __thread bool fiber_parent_backtrace_enabled;
@@ -209,7 +203,6 @@ clock_set_on_csw(struct fiber *caller)
 {
 	caller->csw++;
 
-#if ENABLE_FIBER_TOP
 	if (!fiber_top_enabled)
 		return;
 
@@ -217,8 +210,6 @@ clock_set_on_csw(struct fiber *caller)
 
 	clock_stat_add_delta(&cord()->clock_stat, delta);
 	clock_stat_add_delta(&caller->clock_stat, delta);
-#endif /* ENABLE_FIBER_TOP */
-
 }
 
 /*
@@ -877,9 +868,7 @@ fiber_reset(struct fiber *fiber)
 {
 	rlist_create(&fiber->on_yield);
 	rlist_create(&fiber->on_stop);
-#if ENABLE_FIBER_TOP
 	clock_stat_reset(&fiber->clock_stat);
-#endif /* ENABLE_FIBER_TOP */
 }
 
 /** Destroy an active fiber and prepare it for reuse. */
@@ -1340,7 +1329,6 @@ fiber_delete_all(struct cord *cord)
 	cord_delete_fibers_in_list(cord, &cord->ready);
 }
 
-#if ENABLE_FIBER_TOP
 static void
 loop_on_iteration_start(ev_loop *loop, ev_check *watcher, int revents)
 {
@@ -1419,7 +1407,6 @@ fiber_top_disable(void)
 		fiber_top_enabled = false;
 	}
 }
-#endif /* ENABLE_FIBER_TOP */
 
 #ifdef ENABLE_BACKTRACE
 bool
@@ -1508,12 +1495,10 @@ cord_create(struct cord *cord, const char *name)
 
 	ev_idle_init(&cord->idle_event, fiber_schedule_idle);
 
-#if ENABLE_FIBER_TOP
 	/* fiber.top() currently works only for the main thread. */
 	if (cord_is_main()) {
 		fiber_top_init();
 	}
-#endif /* ENABLE_FIBER_TOP */
 	cord_set_name(name);
 
 #if ENABLE_ASAN
