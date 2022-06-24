@@ -114,9 +114,6 @@ struct cpu_stat {
 	 * 1 / FIBER_TIME_RES seconds.
 	 */
 	uint64_t prev_cputime;
-	uint32_t prev_cpu_id;
-	uint32_t cpu_miss_count;
-	uint32_t prev_cpu_miss_count;
 };
 
 #endif /* ENABLE_FIBER_TOP */
