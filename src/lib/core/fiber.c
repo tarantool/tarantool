@@ -42,11 +42,11 @@
 #include "memory.h"
 #include "trigger.h"
 #include "errinj.h"
+#include "clock.h"
 
 extern void cord_on_yield(void);
 
 #if ENABLE_FIBER_TOP
-#include <x86intrin.h> /* __rdtscp() */
 
 static inline void
 clock_stat_add_delta(struct clock_stat *stat, uint64_t clock_delta)
@@ -85,7 +85,7 @@ clock_stat_reset(struct clock_stat *stat)
 static void
 cpu_stat_start(struct cpu_stat *stat)
 {
-	stat->prev_clock = __rdtscp(&stat->prev_cpu_id);
+	stat->prev_clock = clock_monotonic64();
 	stat->cpu_miss_count = 0;
 	/*
 	 * We want to measure thread cpu time here to calculate
@@ -112,18 +112,18 @@ cpu_stat_reset(struct cpu_stat *stat)
 static uint64_t
 cpu_stat_on_csw(struct cpu_stat *stat)
 {
-	uint32_t cpu_id;
-	uint64_t delta, clock = __rdtscp(&cpu_id);
-
-	if (cpu_id == stat->prev_cpu_id) {
-		delta = clock - stat->prev_clock;
-	} else {
+	uint64_t delta, clock = clock_monotonic64();
+	/*
+	 * Just in case. On Linux CLOCK_MONOTONIC guarantee that the
+	 * time returned by consecutive calls to clock_gettime will not
+	 * go backwards, however for other systems it might not be true.
+	 */
+	if (clock < stat->prev_clock)
 		delta = 0;
-		stat->prev_cpu_id = cpu_id;
-		stat->cpu_miss_count++;
-	}
-	stat->prev_clock = clock;
+	else
+		delta = clock - stat->prev_clock;
 
+	stat->prev_clock = clock;
 	return delta;
 }
 
