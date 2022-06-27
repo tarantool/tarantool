@@ -1718,6 +1718,19 @@ vy_unique_key_validate(struct vy_lsm *lsm, const char *key,
 }
 
 /**
+ * Returns true if the deferred DELETE optimization should be enabled for the
+ * given space. It is regulated by a per-space knob, but we also disable it if
+ * the space has UPSERT statements, because the deferred DELETE optimization
+ * doesn't handle them properly, see vy_write_iterator_deferred_delete().
+ */
+static inline bool
+vy_defer_deletes(struct space *space, struct vy_lsm *pk)
+{
+	return space->def->opts.defer_deletes &&
+		pk->stat.disk.stmt.upserts == 0;
+}
+
+/**
  * Execute DELETE in a vinyl space.
  * @param env     Vinyl environment.
  * @param tx      Current transaction.
@@ -1756,7 +1769,7 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 *   disabled.
 	 * - CDC is enabled.
 	 */
-	if ((space->index_count > 1 && !space->def->opts.defer_deletes) ||
+	if ((space->index_count > 1 && !vy_defer_deletes(space, pk)) ||
 	    lsm->index_id > 0 || !rlist_empty(&space->on_replace) ||
 	    space->wal_ext != NULL) {
 		if (vy_get_by_raw_key(lsm, tx, vy_tx_read_view(tx),
@@ -2288,7 +2301,7 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 *   disabled.
 	 * - if the space has WAL extensions.
 	 */
-	if ((space->index_count > 1 && !space->def->opts.defer_deletes) ||
+	if ((space->index_count > 1 && !vy_defer_deletes(space, pk)) ||
 	    !rlist_empty(&space->on_replace) || space->wal_ext != NULL) {
 		if (vy_get(pk, tx, vy_tx_read_view(tx),
 			   stmt->new_tuple, &stmt->old_tuple) != 0)
