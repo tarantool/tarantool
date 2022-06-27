@@ -41,15 +41,8 @@ jobs:
       - name: 'Build tarantool packages for ${{ env.OS }}(${{ env.DIST }})'
         id: run_build
         env:
-          # Our testing expects that the init process (PID 1) will
-          # reap orphan processes. At least the following test leans
-          # on it: app-tap/gh-4983-tnt-e-assert-false-hangs.test.lua.
-          PACKPACK_EXTRA_DOCKER_RUN_PARAMS: --init
-          # There are packages like tzdata or postfix, whose configuration
-          # is interactive by default. The environment variable below
-          # forbids interactive configuration phase. Otherwise the CI gets
-          # stuck from time to time on `apt-get update`.
-          DEBIAN_FRONTEND: noninteractive
+          MAKE_CHECK: false
+          PRESERVE_ENVVARS: 'MAKE_CHECK,${{ env.PRESERVE_ENVVARS }}'
         run: make -f .gitlab.mk package
       - name: 'Upload build artifacts'
         uses: actions/upload-artifact@v2
