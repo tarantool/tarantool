@@ -36,6 +36,7 @@ g.before_each(function()
     t.assert(g.leader ~= nil, 'Cluster elected a leader')
     g.follower1 = g.node1 ~= g.leader and g.node1 or g.node2
     g.follower2 = g.node3 ~= g.leader and g.node3 or g.node2
+    g.cluster:wait_fullmesh()
 end)
 
 local function get_election_term()
