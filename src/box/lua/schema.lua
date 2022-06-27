@@ -3323,6 +3323,7 @@ local function grant(uid, name, privilege, object_type,
         old_privilege = 0
     end
     privilege_hex = bit.bor(privilege_hex, old_privilege)
+    privilege_hex = tonumber(ffi.cast('uint32_t', privilege_hex))
     -- do not execute a replace if it does not change anything
     -- XXX bug if we decide to add a grant option: new grantor
     -- replaces the old one, old grantor is lost
