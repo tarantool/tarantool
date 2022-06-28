@@ -578,7 +578,6 @@ tarantool_free(void)
 	tarantool_lua_free();
 	session_free();
 	user_cache_free();
-	fiber_free();
 	memory_free();
 	random_free();
 #endif
@@ -587,6 +586,7 @@ tarantool_free(void)
 	coll_free();
 	systemd_free();
 	say_logger_free();
+	fiber_free();
 }
 
 static void
