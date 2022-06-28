@@ -205,8 +205,8 @@ macro(curl_build)
         CONFIGURE_COMMAND
             ${CMAKE_COMMAND} -B <BINARY_DIR> -S <SOURCE_DIR>
                 -G ${CMAKE_GENERATOR} ${LIBCURL_CMAKE_FLAGS}
-        BUILD_COMMAND cd <BINARY_DIR> && $(MAKE)
-        INSTALL_COMMAND cd <BINARY_DIR> && $(MAKE) install
+        BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR>
+        INSTALL_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target install
         CMAKE_GENERATOR ${CMAKE_GENERATOR}
         BUILD_BYPRODUCTS ${LIBCURL_INSTALL_DIR}/lib/libcurl.a)
 
