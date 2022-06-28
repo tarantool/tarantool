@@ -244,6 +244,32 @@ vy_read_iterator_evaluate_src(struct vy_read_iterator *itr,
 	}
 }
 
+/**
+ * Reevaluate scanned (not skipped) read sources and position 'next' to
+ * the statement that is minimal from this read iterator's perspective.
+ * This function assumes that all scanned read sources are up-to-date.
+ * See also vy_read_iterator_evaluate_src().
+ */
+static void
+vy_read_iterator_reevaluate_srcs(struct vy_read_iterator *itr,
+				 struct tuple **next_key)
+{
+	*next_key = NULL;
+	for (uint32_t i = 0; i < itr->src_count; i++) {
+		if (i >= itr->skipped_src)
+			break;
+		struct vy_read_src *src = &itr->src[i];
+		struct tuple *stmt = vy_history_last_stmt(&src->history);
+		int cmp = vy_read_iterator_cmp_stmt(itr, stmt, *next_key);
+		if (cmp < 0) {
+			*next_key = stmt;
+			itr->front_id++;
+		}
+		if (cmp <= 0)
+			src->front_id = itr->front_id;
+	}
+}
+
 /*
  * Each of the functions from the vy_read_iterator_scan_* family
  * is used by vy_read_iterator_advance() to:
@@ -404,11 +430,16 @@ vy_read_iterator_restore_mem(struct vy_read_iterator *itr,
 	cmp = vy_read_iterator_cmp_stmt(itr, stmt, *next_key);
 	if (cmp > 0) {
 		/*
-		 * Memory trees are append-only so if the
-		 * source is not on top of the heap after
-		 * restoration, it was not before.
+		 * Normally, memory trees are append-only so if the source is
+		 * not on top of the heap after restoration, it was not before.
+		 * There's one exception to this rule though: a statement may
+		 * be deleted from a memory tree on rollback after a WAL write
+		 * failure. If the deleted statement was on top of the heap,
+		 * we need to reevaluate all read sources to reposition the
+		 * iterator to the minimal statement.
 		 */
-		assert(src->front_id < itr->front_id);
+		if (src->front_id == itr->front_id)
+			vy_read_iterator_reevaluate_srcs(itr, next_key);
 		return 0;
 	}
 	if (cmp < 0) {
