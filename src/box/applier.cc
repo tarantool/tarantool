@@ -1182,13 +1182,19 @@ apply_final_join_tx(uint32_t replica_id, struct stailq *rows)
 static void
 applier_synchro_filter_tx(struct stailq *rows)
 {
+	latch_lock(&txn_limbo.promote_latch);
+	auto guard = make_scoped_guard([] {
+		latch_unlock(&txn_limbo.promote_latch);
+	});
 	struct xrow_header *row;
 	/*
 	 * It  may happen that we receive the instance's rows via some third
 	 * node, so cannot check for applier->instance_id here.
 	 */
 	row = &stailq_first_entry(rows, struct applier_tx_row, next)->row;
-	if (!txn_limbo_is_replica_outdated(&txn_limbo, row->replica_id))
+	uint64_t term = txn_limbo_replica_term(&txn_limbo, row->replica_id);
+	assert(term <= txn_limbo.promote_greatest_term);
+	if (term == txn_limbo.promote_greatest_term)
 		return;
 
 	/*

@@ -267,20 +267,6 @@ txn_limbo_replica_term(const struct txn_limbo *limbo, uint32_t replica_id)
 }
 
 /**
- * Check whether replica with id @a source_id is too old to apply synchronous
- * data from it.
- */
-static inline bool
-txn_limbo_is_replica_outdated(struct txn_limbo *limbo, uint32_t replica_id)
-{
-	latch_lock(&limbo->promote_latch);
-	uint64_t v = vclock_get(&limbo->promote_term_map, replica_id);
-	bool res = v < limbo->promote_greatest_term;
-	latch_unlock(&limbo->promote_latch);
-	return res;
-}
-
-/**
  * Return the last synchronous transaction in the limbo or NULL when it is
  * empty.
  */
