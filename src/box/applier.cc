@@ -1174,10 +1174,9 @@ apply_final_join_tx(uint32_t replica_id, struct stailq *rows)
 }
 
 /**
- * When elections are enabled we must filter out synchronous rows coming
- * from an instance that fell behind the current leader. This includes
- * both synchronous tx rows and rows for txs following unconfirmed
- * synchronous transactions.
+ * We must filter out synchronous rows coming from an instance that fell behind
+ * the current synchro queue owner. This includes both synchronous tx rows and
+ * rows for txs following unconfirmed synchronous transactions.
  * The rows are replaced with NOPs to preserve the vclock consistency.
  */
 static void
