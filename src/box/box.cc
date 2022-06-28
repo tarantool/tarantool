@@ -3341,7 +3341,6 @@ box_free(void)
 		schema_free();
 		schema_module_free();
 		tuple_free();
-		port_free();
 #endif
 		wal_ext_free();
 		box_watcher_free();
@@ -3355,6 +3354,7 @@ box_free(void)
 		flightrec_free();
 		audit_log_free();
 		sql_built_in_functions_cache_free();
+		port_free();
 	}
 }
 
