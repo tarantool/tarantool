@@ -199,8 +199,10 @@ make %{?_smp_mflags}
 # %%doc and %%license macroses are used instead
 rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
 
+%if "%{getenv:MAKE_CHECK}" != "false"
 %check
 make test-force
+%endif
 
 %pre
 /usr/sbin/groupadd -r tarantool > /dev/null 2>&1 || :

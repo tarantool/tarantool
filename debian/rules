@@ -19,7 +19,9 @@ DEB_CMAKE_EXTRA_FLAGS := \
 	-DWITH_SYSVINIT=ON \
 	-DWITH_SYSTEMD=$(WITH_SYSTEMD)
 
-DEB_MAKE_CHECK_TARGET := test-force
+ifneq ($(MAKE_CHECK), false)
+	DEB_MAKE_CHECK_TARGET := test-force
+endif
 
 # Install tarantool.service within tarantool-common package, but does not
 # install it within tarantool and tarantool-dev packages.
