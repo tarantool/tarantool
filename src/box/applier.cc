@@ -1205,14 +1205,15 @@ applier_synchro_filter_tx(struct stailq *rows)
 	 * This means the only filtered out transactions are synchronous ones or
 	 * the ones depending on them.
 	 *
-	 * Any asynchronous transaction from an obsolete term is a marker of
-	 * split-brain by itself: consider it a synchronous transaction, which
-	 * is committed with quorum 1.
+	 * Any asynchronous transaction from an obsolete term when limbo is
+	 * claimed by someone is a marker of split-brain by itself: consider it
+	 * a synchronous transaction, which is committed with quorum 1.
 	 */
 	struct xrow_header *last_row =
 		&stailq_last_entry(rows, struct applier_tx_row, next)->row;
 	if (!last_row->wait_sync) {
-		if (iproto_type_is_dml(last_row->type)) {
+		if (iproto_type_is_dml(last_row->type) &&
+		    txn_limbo.owner_id != REPLICA_ID_NIL) {
 			tnt_raise(ClientError, ER_SPLIT_BRAIN,
 				  "got an async transaction from an old term");
 		}
