@@ -268,7 +268,7 @@ txn_limbo_replica_term(const struct txn_limbo *limbo, uint32_t replica_id)
 
 /**
  * Check whether replica with id @a source_id is too old to apply synchronous
- * data from it. The check is only valid when elections are enabled.
+ * data from it.
  */
 static inline bool
 txn_limbo_is_replica_outdated(struct txn_limbo *limbo, uint32_t replica_id)
