@@ -1315,18 +1315,11 @@ fiber_new(const char *name, fiber_func f)
 	return fiber_new_ex(name, &fiber_attr_default, f);
 }
 
-/**
- * Free as much memory as possible taken by the fiber.
- *
- * Sic: cord()->sched needs manual destruction in
- * cord_destroy().
- */
+/** Free all fiber's resources. */
 static void
-fiber_delete(struct cord *cord, struct fiber *f)
+fiber_destroy(struct cord *cord, struct fiber *f)
 {
 	assert(f != cord->fiber);
-	assert(f != &cord->sched);
-
 	trigger_destroy(&f->on_yield);
 	trigger_destroy(&f->on_stop);
 	rlist_del(&f->state);
@@ -1337,6 +1330,14 @@ fiber_delete(struct cord *cord, struct fiber *f)
 	if (f->name != f->inline_name)
 		free(f->name);
 	TRASH(f);
+}
+
+/** Free all fiber's resources and the fiber itself. */
+static void
+fiber_delete(struct cord *cord, struct fiber *f)
+{
+	assert(f != &cord->sched);
+	fiber_destroy(cord, f);
 	mempool_free(&cord->fiber_mempool, f);
 }
 
@@ -1508,6 +1509,8 @@ cord_create(struct cord *cord, const char *name)
 	cord->fiber_registry = mh_i64ptr_new();
 
 	/* sched fiber is not present in alive/ready/dead list. */
+	rlist_create(&cord->sched.state);
+	rlist_create(&cord->sched.link);
 	cord->sched.fid = FIBER_ID_SCHED;
 	fiber_reset(&cord->sched);
 	diag_create(&cord->sched.diag);
@@ -1581,10 +1584,12 @@ cord_destroy(struct cord *cord)
 		fiber_delete_all(cord);
 		mh_i64ptr_delete(cord->fiber_registry);
 	}
-	region_destroy(&cord->sched.gc);
-	diag_destroy(&cord->sched.diag);
-	if (cord->sched.name != cord->sched.inline_name)
-		free(cord->sched.name);
+	cord->fiber = NULL;
+#if ENABLE_ASAN
+	cord->sched.stack = NULL;
+	cord->sched.stack_size = 0;
+#endif
+	fiber_destroy(cord, &cord->sched);
 	slab_cache_destroy(&cord->slabc);
 }
 
