@@ -51,19 +51,13 @@ const char *session_type_strs[] = {
 	"unknown",
 };
 
-static struct session_vtab generic_session_vtab = {
+static const struct session_vtab generic_session_vtab = {
 	/* .push = */ generic_session_push,
 	/* .fd = */ generic_session_fd,
 	/* .sync = */ generic_session_sync,
 };
 
-struct session_vtab session_vtab_registry[] = {
-	/* BACKGROUND */ generic_session_vtab,
-	/* BINARY */ generic_session_vtab,
-	/* CONSOLE */ generic_session_vtab,
-	/* REPL */ generic_session_vtab,
-	/* APPLIER */ generic_session_vtab,
-};
+struct session_vtab session_vtab_registry[session_type_MAX];
 
 static struct mh_i64ptr_t *session_registry;
 
@@ -95,8 +89,9 @@ sid_max(void)
 }
 
 static int
-session_on_stop(struct trigger *trigger, void * /* event */)
+session_on_stop(struct trigger *trigger, void *event)
 {
+	(void)event;
 	/*
 	 * Remove on_stop trigger from the fiber, otherwise the
 	 * fiber will attempt to destroy the trigger eventually,
@@ -285,10 +280,8 @@ session_create_on_demand(void)
 	struct session *s = session_create(SESSION_TYPE_BACKGROUND);
 	if (s == NULL)
 		return NULL;
-	s->fiber_on_stop = {
-		RLIST_LINK_INITIALIZER, session_on_stop, NULL, NULL
-	};
 	/* Add a trigger to destroy session on fiber stop */
+	trigger_create(&s->fiber_on_stop, session_on_stop, NULL, NULL);
 	trigger_add(&fiber()->on_stop, &s->fiber_on_stop);
 	credentials_reset(&s->credentials, admin_user);
 	fiber_set_session(fiber(), s);
@@ -398,7 +391,7 @@ session_peer(const struct session *session)
 			    session->meta.peer.addrlen);
 }
 
-extern "C" void
+void
 session_settings_init(void);
 
 /**
@@ -427,6 +420,8 @@ session_on_shutdown_f(void *arg)
 void
 session_init(void)
 {
+	for (int type = 0; type < session_type_MAX; type++)
+		session_vtab_registry[type] = generic_session_vtab;
 	session_registry = mh_i64ptr_new();
 	mempool_create(&session_pool, &cord()->slabc, sizeof(struct session));
 	credentials_create(&admin_credentials, admin_user);
