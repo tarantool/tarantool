@@ -402,16 +402,53 @@ test_fromstring_invalid()
 
 #undef test
 
+#define test(fun, a, b, exp) ({						\
+	struct vclock va;						\
+	vclock_create(&va);						\
+	struct vclock vb;						\
+	vclock_create(&vb);						\
+	struct vclock vexp;						\
+	vclock_create(&vexp);						\
+	vclock_from_string(&va, (a));					\
+	vclock_from_string(&vb, (b));					\
+	vclock_from_string(&vexp, (exp));				\
+	vclock_##fun##_ignore0(&va, &vb);				\
+	is(vclock_compare(&va, &vexp), 0,				\
+	   #fun " between %s and %s is %s", a, b, exp);			\
+})
+
+int
+test_minmax_ignore0(void)
+{
+	plan(4);
+	header();
+
+	test(max, "{0: 1, 1: 17, 2: 3}", "{0: 10, 1: 5, 2: 7}",
+	     "{0: 1, 1: 17, 2: 7}");
+	test(min, "{0: 10, 1: 17, 2: 3}", "{0: 1, 1: 5, 2: 7}",
+	     "{0: 10, 1: 5, 2: 3}");
+	test(max, "{1: 1, 2: 1, 3: 1}", "{1: 100, 2: 100, 31: 100}",
+	     "{1: 100, 2: 100, 3: 1, 31: 100}");
+	test(min, "{1: 1, 2: 1, 3: 1}", "{1: 100, 2: 100, 31: 100}",
+	     "{1:1, 2: 1}");
+
+	footer();
+	return check_plan();
+}
+
+#undef test
+
 int
 main(void)
 {
-	plan(5);
+	plan(6);
 
 	test_compare();
 	test_isearch();
 	test_tostring();
 	test_fromstring();
 	test_fromstring_invalid();
+	test_minmax_ignore0();
 
 	return check_plan();
 }
