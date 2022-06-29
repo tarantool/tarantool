@@ -3663,9 +3663,7 @@ bootstrap_from_master(struct replica *master)
 	 */
 
 	assert(!tt_uuid_is_nil(&INSTANCE_UUID));
-	enum applier_state wait_state = replication_anon ?
-					APPLIER_FETCH_SNAPSHOT :
-					APPLIER_INITIAL_JOIN;
+	enum applier_state wait_state = APPLIER_WAIT_SNAPSHOT;
 	applier_resume_to_state(applier, wait_state, TIMEOUT_INFINITY);
 	/*
 	 * Process initial data (snapshot or dirty disk data).
