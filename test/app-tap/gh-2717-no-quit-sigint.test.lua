@@ -19,7 +19,7 @@ local TARANTOOL_PATH = arg[-1]
 local test = tap.test('gh-2717-no-quit-sigint')
 
 test:plan(6)
-local cmd = 'ERRINJ_STDIN_ISATTY=1 ' .. TARANTOOL_PATH .. ' -i 2>&1'
+local cmd = 'ERRINJ_STDIN_ISATTY=1 INPUTRC=Pheiphe2 ' .. TARANTOOL_PATH .. ' -i 2>&1'
 local ph = popen.new({cmd}, {
     shell = true,
     setsid = true,
@@ -150,7 +150,7 @@ os.remove(snap_file)
 --
 -- Testing case when the client and instance are called in the same console.
 --
-cmd = 'ERRINJ_STDIN_ISATTY=1 ' .. TARANTOOL_PATH .. ' -i 2>&1'
+cmd = 'ERRINJ_STDIN_ISATTY=1 INPUTRC=Pheiphe2 ' .. TARANTOOL_PATH .. ' -i 2>&1'
 ph = popen.new({cmd}, {
     shell = true,
     setsid = true,
