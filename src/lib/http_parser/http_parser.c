@@ -54,11 +54,11 @@ void http_parser_create(struct http_parser *parser)
  * Utility function used in headers parsing
  */
 static int
-http_parse_status_line(struct http_parser *parser, char **bufp,
+http_parse_status_line(struct http_parser *parser, const char **bufp,
 		       const char *end_buf)
 {
 	char ch;
-	char *p = *bufp;
+	const char *p = *bufp;
 	enum {
 		sw_start = 0,
 		sw_H,
@@ -218,13 +218,13 @@ done:
 }
 
 int
-http_parse_header_line(struct http_parser *prsr, char **bufp,
+http_parse_header_line(struct http_parser *prsr, const char **bufp,
 		       const char *end_buf, int max_hname_len)
 {
 	char c;
 	unsigned char ch;
-	char *p = *bufp;
-	char *header_name_start = p;
+	const char *p = *bufp;
+	const char *header_name_start = p;
 	prsr->hdr_name_idx = 0;
 
 	enum {
