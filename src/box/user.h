@@ -143,9 +143,6 @@ credentials_reset(struct credentials *cr, struct user *new_user)
 	credentials_create(cr, new_user);
 }
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
 /**
  * For best performance, all users are maintained in this array.
  * Position in the array is store in user->auth_token and also
@@ -158,6 +155,9 @@ credentials_reset(struct credentials *cr, struct user *new_user)
  * objects, such as spaces and functions.
  */
 extern struct user *guest_user, *admin_user;
+
+#if defined(__cplusplus)
+} /* extern "C" */
 
 /*
  * Insert or update user object (a cache entry
