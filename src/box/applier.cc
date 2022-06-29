@@ -2107,8 +2107,6 @@ applier_f(va_list ap)
 	 * triggers.
 	 */
 	struct session *session = session_new_on_demand();
-	if (session == NULL)
-		return -1;
 	session_set_type(session, SESSION_TYPE_APPLIER);
 
 	/*

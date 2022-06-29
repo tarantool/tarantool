@@ -2579,8 +2579,6 @@ tx_process_connect(struct cmsg *m)
 	struct obuf *out = msg->connection->tx.p_obuf;
 	try {              /* connect. */
 		con->session = session_new(SESSION_TYPE_BINARY);
-		if (con->session == NULL)
-			diag_raise();
 		con->session->meta.connection = con;
 		session_set_peer_addr(con->session, &msg->connect.addr,
 				      msg->connect.addrlen);
