@@ -188,6 +188,14 @@ struct relay {
 	double txn_lag;
 	/** Relay sync state. */
 	enum relay_state state;
+	/** Whether relay should speed up the next heartbeat dispatch. */
+	bool need_new_vclock_sync;
+	/**
+	 * Whether relay is in process of sending a tx to the remote peer. In
+	 * this case cannot interrupt the transaction stream with any heartbeats
+	 * or other requests.
+	 */
+	bool is_sending_tx;
 
 	struct {
 		/* Align to prevent false-sharing with tx thread */
@@ -337,6 +345,8 @@ relay_start(struct relay *relay, struct iostream *io, uint64_t sync,
 	relay->sync = sync;
 	relay->state = RELAY_FOLLOW;
 	relay->sent_raft_term = sent_raft_term;
+	relay->need_new_vclock_sync = false;
+	relay->is_sending_tx = false;
 	relay->last_row_time = ev_monotonic_now(loop());
 	relay->tx_seen_time = ev_monotonic_now(loop());
 }
@@ -758,6 +768,8 @@ relay_reader_f(va_list ap)
 static inline void
 relay_send_heartbeat(struct relay *relay)
 {
+	if (relay->is_sending_tx)
+		return;
 	struct xrow_header row;
 	try {
 		uint64_t vclock_sync = ++relay->sent_vclock_sync;
@@ -765,6 +777,7 @@ relay_send_heartbeat(struct relay *relay)
 		row.tm = ev_now(loop());
 		row.replica_id = instance_id;
 		relay_send(relay, &row);
+		relay->need_new_vclock_sync = false;
 	} catch (Exception *e) {
 		relay_set_error(relay, e);
 		fiber_cancel(fiber());
@@ -790,8 +803,9 @@ relay_send_heartbeat_on_timeout(struct relay *relay)
 	 * network error. IOW transient hangs are tolerated without leader
 	 * switchover.
 	 */
-	if (now - relay->last_row_time <= replication_timeout ||
-	    now - relay->tx_seen_time >= replication_disconnect_timeout())
+	if (!relay->need_new_vclock_sync &&
+	    (now - relay->last_row_time <= replication_timeout ||
+	    now - relay->tx_seen_time >= replication_disconnect_timeout()))
 		return;
 	relay_send_heartbeat(relay);
 }
@@ -822,6 +836,7 @@ relay_thread_on_start(void *arg)
 		if (relay->tx.is_raft_push_pending)
 			relay_push_raft_msg(relay);
 	}
+	trigger_run(&replicaset.on_relay_thread_start, relay->replica);
 }
 
 /** A notification about relay detach from the cbus. */
@@ -830,6 +845,52 @@ relay_thread_on_stop(void *arg)
 {
 	struct relay *relay = (struct relay *)arg;
 	relay->tx.is_raft_enabled = false;
+}
+
+/** The trigger_vclock_sync call message. */
+struct relay_trigger_vclock_sync_msg {
+	/** Parent cbus message. */
+	struct cbus_call_msg base;
+	/** The queried relay. */
+	struct relay *relay;
+	/** Sync value returned from relay. */
+	uint64_t vclock_sync;
+};
+
+/** A callback to free the message once it returns to tx thread. */
+static int
+relay_trigger_vclock_sync_msg_free(struct cbus_call_msg *msg)
+{
+	free(msg);
+	return 0;
+}
+
+/** Relay side of the trigger_vclock_sync call. */
+static int
+relay_trigger_vclock_sync_f(struct cbus_call_msg *msg)
+{
+	struct relay_trigger_vclock_sync_msg *m =
+		(struct relay_trigger_vclock_sync_msg *)msg;
+	m->vclock_sync = m->relay->sent_vclock_sync + 1;
+	m->relay->need_new_vclock_sync = true;
+	return 0;
+}
+
+int
+relay_trigger_vclock_sync(struct relay *relay, uint64_t *vclock_sync,
+			  double deadline)
+{
+	struct relay_trigger_vclock_sync_msg *msg =
+		(struct relay_trigger_vclock_sync_msg *)xmalloc(sizeof(*msg));
+	msg->relay = relay;
+	double timeout = deadline - ev_monotonic_now(loop());
+	if (cbus_call_timeout(&relay->relay_pipe, &relay->tx_pipe, &msg->base,
+			      relay_trigger_vclock_sync_f,
+			      relay_trigger_vclock_sync_msg_free, timeout) < 0)
+		return -1;
+	*vclock_sync = msg->vclock_sync;
+	free(msg);
+	return 0;
 }
 
 /**
@@ -1180,5 +1241,9 @@ relay_send_row(struct xstream *stream, struct xrow_header *packet)
 			}
 		}
 		relay_send(relay, packet);
+		relay->is_sending_tx = !packet->is_commit;
+		if (!relay->is_sending_tx) {
+			relay_send_heartbeat_on_timeout(relay);
+		}
 	}
 }

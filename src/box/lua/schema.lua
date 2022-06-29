@@ -74,8 +74,6 @@ ffi.cdef[[
     box_txn_begin();
     int
     box_txn_set_timeout(double timeout);
-    int
-    box_txn_set_isolation(uint32_t level);
     void
     memtx_tx_story_gc_step();
     /** \endcond public */
@@ -368,6 +366,8 @@ box.txn_isolation_level = {
     ['READ_CONFIRMED'] = 2,
     ['best-effort'] = 3,
     ['BEST_EFFORT'] = 3,
+    ['linearizable'] = 4,
+    ['LINEARIZABLE'] = 4,
 }
 
 -- Create private isolation level map anything-correct -> number.
@@ -424,7 +424,7 @@ box.begin = function(options)
         assert(builtin.box_txn_set_timeout(timeout) == 0)
     end
     if txn_isolation and
-       builtin.box_txn_set_isolation(txn_isolation) ~= 0 then
+       internal.txn_set_isolation(txn_isolation) ~= 0 then
         box.rollback()
         box.error()
     end

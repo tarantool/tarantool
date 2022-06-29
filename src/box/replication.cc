@@ -116,6 +116,7 @@ replication_init(int num_threads)
 	rlist_create(&replicaset.applier.on_wal_write);
 
 	rlist_create(&replicaset.on_ack);
+	rlist_create(&replicaset.on_relay_thread_start);
 
 	diag_create(&replicaset.applier.diag);
 
@@ -140,6 +141,7 @@ replication_free(void)
 
 	diag_destroy(&replicaset.applier.diag);
 	trigger_destroy(&replicaset.on_ack);
+	trigger_destroy(&replicaset.on_relay_thread_start);
 
 	applier_free();
 }

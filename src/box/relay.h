@@ -101,6 +101,14 @@ double
 relay_txn_lag(const struct relay *relay);
 
 /**
+ * Makes the relay issue a new vclock sync request and returns the sync to wait
+ * for.
+ */
+int
+relay_trigger_vclock_sync(struct relay *relay, uint64_t *vclock_sync,
+			  double deadline);
+
+/**
  * Send a Raft update request to the relay channel. It is not
  * guaranteed that it will be delivered. The connection may break.
  */

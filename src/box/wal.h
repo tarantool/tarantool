@@ -76,6 +76,12 @@ extern const char *wal_mode_STRS[];
 
 extern int wal_dir_lock;
 
+/**
+ * Triggers ivoked by tx thread's sched fiber upon WAL write confirmation
+ * arrival.
+ */
+extern struct rlist wal_on_write;
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */

@@ -64,6 +64,8 @@ const char *wal_mode_STRS[WAL_MODE_MAX] = {
 
 int wal_dir_lock = -1;
 
+RLIST_HEAD(wal_on_write);
+
 static int
 wal_write_async(struct journal *, struct journal_entry *);
 
@@ -375,6 +377,7 @@ tx_complete_batch(struct cmsg *msg)
 	/* Update the tx vclock to the latest written by wal. */
 	vclock_copy(&replicaset.vclock, &batch->vclock);
 	tx_schedule_queue(&batch->commit);
+	trigger_run(&wal_on_write, NULL);
 	mempool_free(&writer->msg_pool, container_of(msg, struct wal_msg, base));
 }
 
@@ -591,6 +594,8 @@ wal_free(void)
 		/* We can't recover from this in any reasonable way. */
 		panic_syserror("WAL writer: thread join failed");
 	}
+
+	trigger_destroy(&wal_on_write);
 
 	wal_writer_destroy(writer);
 }

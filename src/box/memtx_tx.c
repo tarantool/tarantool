@@ -2412,7 +2412,8 @@ detect_whether_prepared_ok(struct txn *txn)
 		return false;
 	else if (txn->isolation == TXN_ISOLATION_READ_COMMITTED)
 		return true;
-	else if (txn->isolation == TXN_ISOLATION_READ_CONFIRMED)
+	else if (txn->isolation == TXN_ISOLATION_READ_CONFIRMED ||
+		 txn->isolation == TXN_ISOLATION_LINEARIZABLE)
 		return false;
 	assert(txn->isolation == TXN_ISOLATION_BEST_EFFORT);
 	/*
