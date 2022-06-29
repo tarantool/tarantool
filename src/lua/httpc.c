@@ -61,7 +61,7 @@ lua_add_key_u64(lua_State *L, const char *key, uint64_t value)
 }
 
 static int
-parse_headers(lua_State *L, char *buffer, size_t len,
+parse_headers(lua_State *L, const char *buffer, size_t len,
 	      int max_header_name_len)
 {
 	struct http_parser parser;
@@ -72,7 +72,7 @@ parse_headers(lua_State *L, char *buffer, size_t len,
 			 "malloc", "hdr_name");
 		return -1;
 	}
-	char *end_buf = buffer + len;
+	const char *end_buf = buffer + len;
 	lua_pushstring(L, "headers");
 	lua_newtable(L);
 	while (true) {

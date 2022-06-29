@@ -39,13 +39,31 @@ enum {
 };
 
 struct http_parser {
-	char *hdr_value_start;
-	char *hdr_value_end;
+	/**
+	 * Pointer to header field value start.
+	 */
+	const char *hdr_value_start;
+	/**
+	 * Pointer to header field value end (exlusive).
+	 */
+	const char *hdr_value_end;
 
+	/**
+	 * HTTP protocol version major number.
+	 */
 	int http_major;
+	/**
+	 * HTTP protocol version minor number.
+	 */
 	int http_minor;
 
+	/**
+	 * Pointer to header field name start.
+	 */
 	char *hdr_name;
+	/**
+	 * Length of header field name.
+	 */
 	int hdr_name_idx;
 };
 
@@ -65,7 +83,7 @@ void http_parser_create(struct http_parser *parser);
  *		HTTP_PARSE_INVALID - error during parsing
  */
 int
-http_parse_header_line(struct http_parser *prsr, char **bufp,
+http_parse_header_line(struct http_parser *prsr, const char **bufp,
 		       const char *end_buf, int max_hname_len);
 
 #endif /* TARANTOOL_LIB_HTTP_PARSER_HTTP_PARSER_H_INCLUDED */
