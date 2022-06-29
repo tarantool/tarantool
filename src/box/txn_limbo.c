@@ -694,10 +694,7 @@ txn_rollback_cb(struct trigger *trigger, void *event)
 	return 0;
 }
 
-/**
- * Wait until the last transaction in the limbo is finished and get its result.
- */
-static int
+int
 txn_limbo_wait_last_txn(struct txn_limbo *limbo, bool *is_rollback,
 			double timeout)
 {

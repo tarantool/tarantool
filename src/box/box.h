@@ -324,6 +324,14 @@ box_demote(void);
 int
 box_promote_qsync(void);
 
+/**
+ * Wait for a linearization point. That is, wait until every operation that
+ * might be committed on a quorum at the moment this function is called, reaches
+ * this instance.
+ */
+int
+box_wait_linearization_point(double timeout);
+
 /* box_select is private and used only by FFI */
 API_EXPORT int
 box_select(uint32_t space_id, uint32_t index_id,

@@ -54,6 +54,7 @@ const char *txn_isolation_level_strs[txn_isolation_level_MAX] = {
 	"READ_COMMITTED",
 	"READ_CONFIRMED",
 	"BEST_EFFORT",
+	"LINEARIZABLE",
 };
 
 const char *txn_isolation_level_aliases[txn_isolation_level_MAX] = {
@@ -61,6 +62,7 @@ const char *txn_isolation_level_aliases[txn_isolation_level_MAX] = {
 	"read-committed",
 	"read-confirmed",
 	"best-effort",
+	"linearizable"
 };
 
 /* Txn cache. */
@@ -621,6 +623,9 @@ txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
 
 	if (space == NULL)
 		return 0;
+
+	if (txn_check_space(txn, space) != 0)
+		goto fail;
 
 	struct engine *engine = space->engine;
 	if (txn_begin_in_engine(engine, txn) != 0)
@@ -1365,6 +1370,49 @@ box_txn_set_timeout(double timeout)
 	return 0;
 }
 
+/** Wait for a linearization point for a transaction. */
+static int
+txn_make_linearizable(struct txn *txn)
+{
+	if (!memtx_tx_manager_use_mvcc_engine) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Linearizable "
+			 "transaction", "disabled memtx mvcc engine");
+		return -1;
+	}
+	return box_wait_linearization_point(txn->timeout);
+}
+
+int
+txn_check_space_linearizability(const struct txn *txn,
+				const struct space *space)
+{
+	assert(txn->isolation == TXN_ISOLATION_LINEARIZABLE);
+	(void)txn;
+	/* TODO (gh-7699): Enable linearizable transactions in Vinyl. */
+	if (!space_is_memtx(space)) {
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 tt_sprintf("space \"%s\"", space_name(space)),
+			 "linearizable operations");
+		return -1;
+	}
+	/*
+	 * We can't guarantee linearizable access to async spaces. This would
+	 * require checking whether **any** node in the replicaset has
+	 * committed something, which's impossible as soon as at least one node
+	 * becomes unavailable.
+	 * The only exception are local and temporary spaces, which only store
+	 * updates present on this particular node.
+	 */
+	if (!space_is_sync(space) && !space_is_temporary(space) &&
+	    !space_is_local(space)) {
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 tt_sprintf("space \"%s\"", space_name(space)),
+			 "linearizable operations");
+		return -1;
+	}
+	return 0;
+}
+
 int
 box_txn_set_isolation(uint32_t level)
 {
@@ -1385,6 +1433,8 @@ box_txn_set_isolation(uint32_t level)
 	if (level == TXN_ISOLATION_DEFAULT)
 		level = txn_default_isolation;
 	txn->isolation = level;
+	if (level == TXN_ISOLATION_LINEARIZABLE)
+		return txn_make_linearizable(txn);
 	return 0;
 }
 

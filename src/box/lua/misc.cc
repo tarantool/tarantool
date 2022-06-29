@@ -41,6 +41,7 @@
 #include "box/tuple_format.h"
 #include "box/lua/tuple.h"
 #include "box/xrow.h"
+#include "box/txn.h"
 #include "mpstream/mpstream.h"
 
 static uint32_t CTID_STRUCT_TUPLE_FORMAT_PTR;
@@ -220,6 +221,21 @@ lbox_select(lua_State *L)
 
 /* }}} */
 
+/**
+ * Lua/C wrapper over box_txn_set_isolation. Is used in lua sources instead of
+ * a ffi call because box_txn_set_isolation yields occasionally.
+ */
+static int
+lbox_txn_set_isolation(struct lua_State *L)
+{
+	if (lua_gettop(L) != 1 || !lua_isnumber(L, 1))
+		return luaL_error(L, "Usage txn_set_isolation(level)");
+	uint32_t level = lua_tonumber(L, 1);
+	int rc = box_txn_set_isolation(level);
+	lua_pushnumber(L, rc);
+	return 1;
+}
+
 /** {{{ Utils to work with tuple_format. **/
 
 struct tuple_format *
@@ -333,6 +349,7 @@ box_lua_misc_init(struct lua_State *L)
 	static const struct luaL_Reg boxlib_internal[] = {
 		{"select", lbox_select},
 		{"new_tuple_format", lbox_tuple_format_new},
+		{"txn_set_isolation", lbox_txn_set_isolation},
 		{NULL, NULL}
 	};
 

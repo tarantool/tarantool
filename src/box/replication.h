@@ -304,6 +304,8 @@ struct replicaset {
 	} applier;
 	/** Triggers are invoked on each ACK from each replica. */
 	struct rlist on_ack;
+	/** Triggers invoked once relay thread becomes operational. */
+	struct rlist on_relay_thread_start;
 	/** Map of all known replica_id's to correspponding replica's. */
 	struct replica *replica_by_id[VCLOCK_MAX];
 };

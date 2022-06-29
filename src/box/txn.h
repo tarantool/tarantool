@@ -37,6 +37,7 @@
 #include "fiber.h"
 #include "space.h"
 #include "journal.h"
+#include "tt_static.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -169,6 +170,8 @@ enum txn_isolation_level {
 	TXN_ISOLATION_READ_CONFIRMED,
 	/** Determine isolation level automatically. */
 	TXN_ISOLATION_BEST_EFFORT,
+	/** Allow to read only the changes confirmed on any cluster node. */
+	TXN_ISOLATION_LINEARIZABLE,
 	/** Upper bound of valid values. */
 	txn_isolation_level_MAX,
 };
@@ -560,7 +563,7 @@ struct txn {
 };
 
 static inline bool
-txn_has_flag(struct txn *txn, enum txn_flag flag)
+txn_has_flag(const struct txn *txn, enum txn_flag flag)
 {
 	assert((flag & (flag - 1)) == 0);
 	return (txn->flags & flag) != 0;
@@ -778,6 +781,23 @@ int
 txn_begin_in_engine(struct engine *engine, struct txn *txn);
 
 /**
+ * Check if a space supports linearizable access, i.e. it is either synchronous
+ * or not replicated at all, and its engine prevents dirty reads.
+ */
+int
+txn_check_space_linearizability(const struct txn *txn,
+				const struct space *space);
+
+static inline int
+txn_check_space(const struct txn *txn,
+		const struct space *space)
+{
+	if (txn->isolation == TXN_ISOLATION_LINEARIZABLE)
+		return txn_check_space_linearizability(txn, space);
+	return 0;
+}
+
+/**
  * This is an optimization, which exists to speed up selects
  * in autocommit mode. For such selects, we only need to
  * manage fiber garbage heap. If autocommit mode is
@@ -796,6 +816,8 @@ txn_begin_ro_stmt(struct space *space, struct txn **txn,
 			diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 			return -1;
 		}
+		if (txn_check_space(*txn, space) != 0)
+			return -1;
 		struct engine *engine = space->engine;
 		return txn_begin_in_engine(engine, *txn);
 	}

@@ -1377,6 +1377,12 @@ box_check_txn_isolation(void)
 			 "to 'default'");
 		return txn_isolation_level_MAX;
 	}
+	if (level == TXN_ISOLATION_LINEARIZABLE) {
+		diag_set(ClientError, ER_CFG, "txn_isolation",
+			 "cannot set default transaction isolation "
+			 "to 'linearizable'");
+		return txn_isolation_level_MAX;
+	}
 	return (enum txn_isolation_level)level;
 }
 
@@ -1802,6 +1808,235 @@ box_wait_quorum(uint32_t lead_id, int64_t target_lsn, int quorum,
 			 timeout, ack_count));
 		return -1;
 	}
+	return 0;
+}
+
+/** A structure holding trigger data to collect syncs. */
+struct sync_trigger_data {
+	/** Syncs to wait for. */
+	uint64_t vclock_syncs[VCLOCK_MAX];
+	/**
+	 * A bitmap holding replica ids whose vclocks were already collected.
+	 */
+	vclock_map_t collected_vclock_map;
+	/** The fiber waiting for vclock. */
+	struct fiber *waiter;
+	/** Collected vclock. */
+	struct vclock *vclock;
+	/** The request deadline. */
+	double deadline;
+	/** How many vclocks are needed. */
+	int count;
+	/** Whether the request is timed out. */
+	bool is_timed_out;
+};
+
+/**
+ * A trigger executed on each ack to collect up to date remote node vclocks.
+ * When an ack comes with requested sync for some replica id, ack vclock is
+ * accounted.
+ */
+static int
+check_vclock_sync_on_ack(struct trigger *trigger, void *event)
+{
+	struct replication_ack *ack = (struct replication_ack *)event;
+	struct sync_trigger_data *data =
+		(struct sync_trigger_data *)trigger->data;
+	uint32_t id = ack->source;
+	/*
+	 * Anonymous replica acks are not counted for synchronous transactions,
+	 * so linearizable read shouldn't count them as well.
+	 */
+	if (id == 0)
+		return 0;
+	uint64_t sync = data->vclock_syncs[id];
+	int accounted_count = bit_count_u32(data->collected_vclock_map);
+	if (!bit_test(&data->collected_vclock_map, id) && sync > 0 &&
+	    ack->vclock_sync >= sync && accounted_count < data->count) {
+		vclock_max_ignore0(data->vclock, ack->vclock);
+		bit_set(&data->collected_vclock_map, id);
+		++accounted_count;
+		if (accounted_count >= data->count)
+			fiber_wakeup(data->waiter);
+	}
+	return 0;
+}
+
+/** A trigger querying relay's next sync value once it becomes operational. */
+static int
+relay_get_sync_on_start(struct trigger *trigger, void *event)
+{
+	struct replica *replica = (struct replica *)event;
+	if (replica->anon)
+		return 0;
+	struct relay *relay = replica->relay;
+	struct sync_trigger_data *data =
+		(struct sync_trigger_data *)trigger->data;
+	uint32_t id = replica->id;
+	/* Already accounted. */
+	if (bit_test(&data->collected_vclock_map, id))
+		return 0;
+	if (relay_trigger_vclock_sync(relay, &data->vclock_syncs[id],
+				      data->deadline) != 0) {
+		diag_clear(diag_get());
+		data->is_timed_out = true;
+		fiber_wakeup(data->waiter);
+	}
+	return 0;
+}
+
+/** Find the minimal vclock which has all the data confirmed on a quorum. */
+static int
+box_collect_confirmed_vclock(struct vclock *confirmed_vclock, double deadline)
+{
+	/*
+	 * How many vclocks we should see to be sure that at least one of them
+	 * contains all data present on any real quorum.
+	 */
+	int vclock_count = MAX(1, replicaset.registered_count) -
+			   replication_synchro_quorum + 1;
+	/*
+	 * We should check the vclock on self plus vclock_count - 1 remote
+	 * instances.
+	 */
+	vclock_copy(confirmed_vclock, &replicaset.vclock);
+	if (vclock_count <= 1)
+		return 0;
+
+	struct sync_trigger_data data = {
+		.vclock_syncs = {0},
+		.collected_vclock_map = 0,
+		.waiter = fiber(),
+		.vclock = confirmed_vclock,
+		.deadline = deadline,
+		.count = vclock_count,
+		.is_timed_out = false,
+	};
+	bit_set(&data.collected_vclock_map, instance_id);
+	struct trigger on_relay_thread_start;
+	trigger_create(&on_relay_thread_start, relay_get_sync_on_start, &data,
+		       NULL);
+	trigger_add(&replicaset.on_relay_thread_start, &on_relay_thread_start);
+	struct trigger on_ack;
+	trigger_create(&on_ack, check_vclock_sync_on_ack, &data, NULL);
+	trigger_add(&replicaset.on_ack, &on_ack);
+	replicaset_foreach(replica) {
+		if (relay_get_state(replica->relay) != RELAY_FOLLOW ||
+		    replica->anon) {
+			continue;
+		}
+		/* Might be already filled by on_relay_thread_start trigger. */
+		if (data.vclock_syncs[replica->id] != 0)
+			continue;
+		if (relay_trigger_vclock_sync(replica->relay,
+					      &data.vclock_syncs[replica->id],
+					      deadline) != 0) {
+			/* Timed out. */
+			trigger_clear(&on_ack);
+			trigger_clear(&on_relay_thread_start);
+			return -1;
+		}
+	}
+
+	while (bit_count_u32(data.collected_vclock_map) < vclock_count &&
+	       !data.is_timed_out && !fiber_is_cancelled()) {
+		if (fiber_yield_deadline(deadline))
+			break;
+	}
+
+	trigger_clear(&on_ack);
+	trigger_clear(&on_relay_thread_start);
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		return -1;
+	}
+	if (bit_count_u32(data.collected_vclock_map) < vclock_count) {
+		diag_set(TimedOut);
+		return -1;
+	}
+	return 0;
+}
+
+/** box_wait_vclock trigger data. */
+struct box_wait_vclock_data {
+	/** Whether the request is finished. */
+	bool is_ready;
+	/** The vclock to wait for. */
+	const struct vclock *vclock;
+	/** The fiber waiting for vclock. */
+	struct fiber *waiter;
+};
+
+static int
+box_wait_vclock_f(struct trigger *trigger, void *event)
+{
+	(void)event;
+	struct box_wait_vclock_data *data =
+		(struct box_wait_vclock_data *)trigger->data;
+	if (vclock_compare_ignore0(data->vclock, &replicaset.vclock) <= 0) {
+		data->is_ready = true;
+		fiber_wakeup(data->waiter);
+	}
+	return 0;
+}
+
+/**
+ * Wait until this instance's vclock reaches @a vclock or @a deadline is
+ * reached.
+ */
+static int
+box_wait_vclock(const struct vclock *vclock, double deadline)
+{
+	if (vclock_compare_ignore0(vclock, &replicaset.vclock) <= 0)
+		return 0;
+	struct trigger on_wal_write;
+	struct box_wait_vclock_data data = {
+		.is_ready = false,
+		.vclock = vclock,
+		.waiter = fiber(),
+	};
+	trigger_create(&on_wal_write, box_wait_vclock_f, &data, NULL);
+	trigger_add(&wal_on_write, &on_wal_write);
+	do {
+		if (fiber_yield_deadline(deadline))
+			break;
+	} while (!data.is_ready && !fiber_is_cancelled());
+	trigger_clear(&on_wal_write);
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		return -1;
+	}
+	if (!data.is_ready) {
+		diag_set(TimedOut);
+		return -1;
+	}
+	return 0;
+}
+
+int
+box_wait_linearization_point(double timeout)
+{
+	double deadline = ev_monotonic_now(loop()) + timeout;
+	struct vclock confirmed_vclock;
+	vclock_create(&confirmed_vclock);
+	/*
+	 * First find out the vclock which might be confirmed on remote
+	 * instances.
+	 */
+	if (box_collect_confirmed_vclock(&confirmed_vclock, deadline) != 0)
+		return -1;
+	/* Then wait until all the rows up to this vclock are received. */
+	if (box_wait_vclock(&confirmed_vclock, deadline) != 0)
+		return -1;
+	/*
+	 * Finally, wait until all the synchronous transactions, which should be
+	 * visible to this tx, become visible.
+	 */
+	bool is_rollback;
+	timeout = deadline - ev_monotonic_now(loop());
+	if (!txn_limbo_is_empty(&txn_limbo) &&
+	    txn_limbo_wait_last_txn(&txn_limbo, &is_rollback, timeout) != 0)
+		return -1;
 	return 0;
 }
 
