@@ -245,13 +245,6 @@ error_unlink_effect(struct error *e)
 int
 error_set_prev(struct error *e, struct error *prev);
 
-NORETURN static inline void
-error_raise(struct error *e)
-{
-	e->raise(e);
-	unreachable();
-}
-
 static inline void
 error_log(struct error *e)
 {
@@ -396,14 +389,6 @@ diag_last_error(struct diag *diag)
 struct diag *
 diag_get(void);
 
-NORETURN static inline void
-diag_raise(void)
-{
-	struct error *e = diag_last_error(diag_get());
-	assert(e != NULL);
-	error_raise(e);
-}
-
 static inline void
 diag_log(void)
 {
@@ -473,6 +458,22 @@ BuildSocketError(const char *file, unsigned line, const char *socketname,
 
 #if defined(__cplusplus)
 } /* extern "C" */
+
+NORETURN static inline void
+error_raise(struct error *e)
+{
+	e->raise(e);
+	unreachable();
+}
+
+NORETURN static inline void
+diag_raise(void)
+{
+	struct error *e = diag_last_error(diag_get());
+	assert(e != NULL);
+	error_raise(e);
+}
+
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_LIB_CORE_DIAG_H_INCLUDED */

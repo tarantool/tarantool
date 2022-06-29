@@ -119,18 +119,6 @@ space_cache_find(uint32_t id)
 }
 
 /**
- * Exception-throwing version of space_cache_find(..)
- */
-static inline struct space *
-space_cache_find_xc(uint32_t id)
-{
-	struct space *space = space_cache_find(id);
-	if (space == NULL)
-		diag_raise();
-	return space;
-}
-
-/**
  * Call a visitor function on every space in the space cache.
  * Traverse system spaces before other.
  */
@@ -187,4 +175,17 @@ space_cache_is_pinned(struct space *space, enum space_cache_holder_type *type);
 
 #if defined(__cplusplus)
 } /* extern "C" */
+
+/**
+ * Exception-throwing version of space_cache_find(..)
+ */
+static inline struct space *
+space_cache_find_xc(uint32_t id)
+{
+	struct space *space = space_cache_find(id);
+	if (space == NULL)
+		diag_raise();
+	return space;
+}
+
 #endif /* defined(__cplusplus) */
