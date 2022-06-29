@@ -40,7 +40,10 @@ end
 assert(clock.monotonic() - start_time < time_quota, 'time_quota is violated')
 ph:signal(popen.signal.SIGINT)
 
-while output:find(prompt .. '^C\n---\n...\n\n' .. prompt) == nil and
+-- calibrate prompt for the case readline appending a prefix
+prompt = output:gsub('.*\n', '')
+
+while not output:endswith(prompt .. '^C\n---\n...\n\n' .. prompt) and
         clock.monotonic() - start_time < time_quota do
     local data = ph:read({timeout = 1.0})
     if data ~= nil then
@@ -51,8 +54,8 @@ assert(clock.monotonic() - start_time < time_quota, 'time_quota is violated')
 
 test:unlike(ph:info().status.state, popen.state.EXITED,
             'SIGINT doesn\'t kill tarantool in interactive mode')
-test:like(output, prompt .. '^C\n---\n...\n\n' .. prompt,
-          'Ctrl+C discards the input and calls the new prompt')
+test:ok(output:endswith(prompt .. '^C\n---\n...\n\n' .. prompt),
+        'Ctrl+C discards the input and calls the new prompt')
 
 ph:shutdown({stdin = true})
 ph:close()
@@ -164,7 +167,7 @@ start_time = clock.monotonic()
 time_quota = 10.0
 
 output = ''
-while output:find(prompt) == nil
+while not output:endswith(prompt)
         and clock.monotonic() - start_time < time_quota do
     data = ph:read({timeout = 1.0})
     if data ~= nil then
@@ -189,6 +192,9 @@ while not output:endswith(prompt)
 end
 assert(clock.monotonic() - start_time < time_quota, 'time_quota is violated')
 ph:signal(popen.signal.SIGINT)
+
+-- calibrate prompt for the case readline appending a prefix
+prompt = output:gsub('.*\n', '')
 
 start_time = clock.monotonic()
 while string.endswith(output, prompt .. '^C\n---\n...\n\n' .. prompt) == false
