@@ -2112,7 +2112,7 @@ applier_f(va_list ap)
 	 * Set correct session type for use in on_replace()
 	 * triggers.
 	 */
-	struct session *session = session_create_on_demand();
+	struct session *session = session_new_on_demand();
 	if (session == NULL)
 		return -1;
 	session_set_type(session, SESSION_TYPE_APPLIER);
