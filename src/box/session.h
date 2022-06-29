@@ -274,8 +274,7 @@ current_session(void)
 	struct session *session = fiber_get_session(fiber());
 	if (session == NULL) {
 		session = session_new_on_demand();
-		if (session == NULL)
-			diag_raise();
+		assert(session != NULL);
 	}
 	return session;
 }
