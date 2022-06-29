@@ -532,7 +532,7 @@ replica_on_applier_state_f(struct trigger *trigger, void *event)
 			struct replica, on_applier_state);
 	replica_update_applier_health(replica);
 	switch (replica->applier->state) {
-	case APPLIER_INITIAL_JOIN:
+	case APPLIER_WAIT_SNAPSHOT:
 		replicaset.is_joining = true;
 		break;
 	case APPLIER_JOINED:
