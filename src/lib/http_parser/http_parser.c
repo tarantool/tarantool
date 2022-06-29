@@ -125,6 +125,11 @@ http_parse_status_line(struct http_parser *parser, const char **bufp,
 				state = sw_first_minor_digit;
 				break;
 			}
+			if (ch == ' ') {
+				parser->http_minor = 0;
+				state = sw_status;
+				break;
+			}
 			if (ch < '0' || ch > '9') {
 				return HTTP_PARSE_INVALID;
 			}
