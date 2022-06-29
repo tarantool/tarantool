@@ -5,7 +5,6 @@ local popen = require('popen')
 local process_timeout = require('process_timeout')
 local fio = require('fio')
 local clock = require('clock')
-local fiber = require('fiber')
 
 --
 -- gh-2717: tarantool console quit on sigint.
@@ -174,13 +173,21 @@ while output:find(prompt) == nil
 end
 assert(clock.monotonic() - start_time < time_quota, 'time_quota is violated')
 
+output = ''
 prompt = 'unix/:' .. sock .. '> '
 ph:write('_ = require(\'console\').listen(\'' .. sock .. '\')\n',
          {timeout = 1.0})
 ph:write('_ = require(\'console\').connect(\'' .. sock .. '\')\n',
          {timeout = 1.0})
 
-fiber.sleep(0.2)
+while not output:endswith(prompt)
+        and clock.monotonic() - start_time < time_quota do
+    local data = ph:read({timeout = 1.0})
+    if data ~= nil then
+        output = output .. data
+    end
+end
+assert(clock.monotonic() - start_time < time_quota, 'time_quota is violated')
 ph:signal(popen.signal.SIGINT)
 
 start_time = clock.monotonic()
