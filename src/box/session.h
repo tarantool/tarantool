@@ -256,7 +256,7 @@ extern struct credentials admin_credentials;
  * trigger to destroy it when this fiber ends.
  */
 struct session *
-session_create_on_demand(void);
+session_new_on_demand(void);
 
 /*
  * When creating a new fiber, the database (box)
@@ -273,7 +273,7 @@ current_session(void)
 {
 	struct session *session = fiber_get_session(fiber());
 	if (session == NULL) {
-		session = session_create_on_demand();
+		session = session_new_on_demand();
 		if (session == NULL)
 			diag_raise();
 	}
@@ -292,7 +292,7 @@ effective_user(void)
 	struct fiber *f = fiber();
 	struct credentials *u = f->storage.credentials;
 	if (u == NULL) {
-		session_create_on_demand();
+		session_new_on_demand();
 		u = f->storage.credentials;
 	}
 	return u;
@@ -306,17 +306,10 @@ session_storage_cleanup(int sid);
 
 /**
  * Create a session.
- * Invokes a Lua trigger box.session.on_connect if it is
- * defined. Issues a new session identifier.
- * Must called by the networking layer
- * when a new connection is established.
- *
  * @return handle for a created session
- * @exception tnt_Exception or lua error if session
- * trigger fails or runs out of resources.
  */
 struct session *
-session_create(enum session_type type);
+session_new(enum session_type type);
 
 /** Return true if given statement id belongs to the session. */
 bool
@@ -333,14 +326,10 @@ session_remove_stmt_id(struct session *session, uint32_t stmt_id);
 /**
  * Destroy a session.
  * Must be called by the networking layer on disconnect.
- * Invokes a Lua trigger box.session.on_disconnect if it
- * is defined.
- * @param session   session to destroy. may be NULL.
- *
- * @exception none
+ * @param session session to destroy.
  */
 void
-session_destroy(struct session *);
+session_delete(struct session *session);
 
 /**
  * Set session peer address.

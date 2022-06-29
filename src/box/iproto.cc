@@ -1767,7 +1767,7 @@ tx_process_destroy(struct cmsg *m)
 		container_of(m, struct iproto_connection, destroy_msg);
 	assert(con->state == IPROTO_CONNECTION_DESTROYED);
 	if (con->session) {
-		session_destroy(con->session);
+		session_delete(con->session);
 		con->session = NULL; /* safety */
 	}
 	/*
@@ -2578,7 +2578,7 @@ tx_process_connect(struct cmsg *m)
 	struct iproto_connection *con = msg->connection;
 	struct obuf *out = msg->connection->tx.p_obuf;
 	try {              /* connect. */
-		con->session = session_create(SESSION_TYPE_BINARY);
+		con->session = session_new(SESSION_TYPE_BINARY);
 		if (con->session == NULL)
 			diag_raise();
 		con->session->meta.connection = con;
