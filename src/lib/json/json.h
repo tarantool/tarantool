@@ -354,6 +354,11 @@ json_tree_lookup_slowpath(struct json_tree *tree, struct json_token *parent,
 /**
  * Look up a token in a JSON tree given a parent token and a key.
  *
+ * Note that if the parent is a multikey node (that is it has the only child
+ * with type '*' aka 'any'), then we return its only child for any key,
+ * including '*'. Otherwise we return the child whose key matches the given
+ * key, assuming no key matches '*'.
+ *
  * Returns NULL if not found.
  */
 static inline struct json_token *
@@ -371,8 +376,6 @@ json_tree_lookup(struct json_tree *tree, struct json_token *parent,
 			ret = parent->children[token->num];
 		break;
 	case JSON_TOKEN_ANY:
-		if (likely(parent->max_child_idx >= 0))
-			ret = parent->children[parent->max_child_idx];
 		break;
 	case JSON_TOKEN_STR:
 		ret = json_tree_lookup_slowpath(tree, parent, token);

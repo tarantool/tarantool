@@ -426,7 +426,7 @@ test_tree()
 	token->type = JSON_TOKEN_ANY;
 	node = json_tree_lookup_entry(&tree, &records[0].node, token,
 				      struct test_struct, node);
-	is(node->node.num, 9, "lookup any token in non-multikey node");
+	is(node, NULL, "lookup any token in non-multikey node");
 
 	/* Can't attach ANY token to non-leaf node. Cleanup. */
 	json_tree_del(&tree, &records[1].node);
