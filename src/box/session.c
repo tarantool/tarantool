@@ -99,7 +99,7 @@ session_on_stop(struct trigger *trigger, void *event)
 	 */
 	trigger_clear(trigger);
 	/* Destroy the session */
-	session_destroy(fiber_get_session(fiber()));
+	session_delete(fiber_get_session(fiber()));
 	return 0;
 }
 
@@ -243,7 +243,7 @@ session_set_type(struct session *session, enum session_type type)
 }
 
 struct session *
-session_create(enum session_type type)
+session_new(enum session_type type)
 {
 	struct session *session =
 		(struct session *) mempool_alloc(&session_pool);
@@ -272,12 +272,12 @@ session_create(enum session_type type)
 }
 
 struct session *
-session_create_on_demand(void)
+session_new_on_demand(void)
 {
 	assert(fiber_get_session(fiber()) == NULL);
 
 	/* Create session on demand */
-	struct session *s = session_create(SESSION_TYPE_BACKGROUND);
+	struct session *s = session_new(SESSION_TYPE_BACKGROUND);
 	if (s == NULL)
 		return NULL;
 	/* Add a trigger to destroy session on fiber stop */
@@ -359,7 +359,7 @@ session_run_on_auth_triggers(const struct on_auth_trigger_ctx *result)
 }
 
 void
-session_destroy(struct session *session)
+session_delete(struct session *session)
 {
 	/* Watchers are unregistered in session_close(). */
 	assert(session->watchers == NULL);
