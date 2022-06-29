@@ -105,7 +105,7 @@ applier_log_error(struct applier *applier, struct error *e)
 		break;
 	case APPLIER_SYNC:
 	case APPLIER_FOLLOW:
-	case APPLIER_INITIAL_JOIN:
+	case APPLIER_WAIT_SNAPSHOT:
 	case APPLIER_FINAL_JOIN:
 		say_info("can't read row");
 		break;
@@ -547,7 +547,7 @@ applier_fetch_snapshot(struct applier *applier)
 	row.type = IPROTO_FETCH_SNAPSHOT;
 	coio_write_xrow(io, &row);
 
-	applier_set_state(applier, APPLIER_FETCH_SNAPSHOT);
+	applier_set_state(applier, APPLIER_WAIT_SNAPSHOT);
 	applier_wait_snapshot(applier);
 	applier_set_state(applier, APPLIER_FETCHED_SNAPSHOT);
 	applier_set_state(applier, APPLIER_READY);
@@ -728,7 +728,7 @@ applier_join(struct applier *applier)
 	xrow_encode_join_xc(&row, &INSTANCE_UUID);
 	coio_write_xrow(io, &row);
 
-	applier_set_state(applier, APPLIER_INITIAL_JOIN);
+	applier_set_state(applier, APPLIER_WAIT_SNAPSHOT);
 
 	row_count = applier_wait_snapshot(applier);
 
