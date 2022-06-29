@@ -218,6 +218,8 @@ done:
  *
  * The callback creates a copy of the line on the Lua stack; this copy
  * becomes the lbox_console_readline()'s ultimate result.
+ *
+ * The second return value is boolean, which means 'discard the line'.
  */
 static void
 console_push_line(char *line)
@@ -228,6 +230,7 @@ console_push_line(char *line)
 	else
 		lua_pushstring(readline_L, line);
 
+	lua_pushboolean(readline_L, false);
 #ifdef HAVE_GNU_READLINE
 	/*
 	 * This is to avoid a stray prompt on the next line with GNU
@@ -239,6 +242,9 @@ console_push_line(char *line)
 	free(line);
 }
 
+/*
+ * The flag indicates if sigint was sent.
+ */
 static bool sigint_called;
 /*
  * The pointer to interactive fiber is needed to wake it up
@@ -336,11 +342,12 @@ lbox_console_readline(struct lua_State *L)
 				rl_on_new_line();
 				rl_replace_line("", 0);
 				lua_pushstring(L, "");
+				lua_pushboolean(L, sigint_called);
 
 				readline_L = NULL;
 				sigint_called = false;
 				set_sigint_cb(old_cb);
-				return 1;
+				return 2;
 			}
 			/*
 			 * Make sure the user of interactive
@@ -361,7 +368,7 @@ lbox_console_readline(struct lua_State *L)
 	rl_attempted_completion_function = NULL;
 	set_sigint_cb(old_cb);
 	luaL_testcancel(L);
-	return 1;
+	return 2;
 }
 
 /* C string array to lua table converter */
