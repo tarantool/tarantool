@@ -191,7 +191,7 @@ set(box_sources
     alter.cc
     schema.cc
     schema_def.c
-    session.cc
+    session.c
     port.c
     txn.c
     txn_limbo.c
