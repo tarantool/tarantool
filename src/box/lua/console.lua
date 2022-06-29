@@ -617,12 +617,15 @@ local function local_read(self)
     local prompt = self.prompt
     while true do
         local delim = self.delimiter
-        local line = internal.readline({
+        local line, discard_buffer = internal.readline({
             prompt = prompt.. "> ",
             completion = self.ac and self.completion or nil
         })
         if not line then
             return nil
+        end
+        if discard_buffer then
+            return ''
         end
         buf = buf..line
         if buf:sub(1, 1) == '\\' then
