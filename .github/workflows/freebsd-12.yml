@@ -37,7 +37,7 @@ jobs:
     # or on pull request if the 'full-ci' label is set.
     if: github.repository == 'tarantool/tarantool' &&
         ( github.event_name != 'pull_request' ||
-          contains(github.event.pull_request.labels.*.name, 'full-ci') )
+          contains(github.event.pull_request.labels.*.name, 'freebsd') )
 
     runs-on: freebsd-12-mcs
 
