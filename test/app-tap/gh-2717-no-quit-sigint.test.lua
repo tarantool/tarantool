@@ -18,7 +18,7 @@ local prompt = 'tarantool> '
 local TARANTOOL_PATH = arg[-1]
 local test = tap.test('gh-2717-no-quit-sigint')
 
-test:plan(6)
+test:plan(8)
 local cmd = 'ERRINJ_STDIN_ISATTY=1 INPUTRC=Pheiphe2 ' .. TARANTOOL_PATH .. ' -i 2>&1'
 local ph = popen.new({cmd}, {
     shell = true,
@@ -54,6 +54,70 @@ test:unlike(ph:info().status.state, popen.state.EXITED,
             'SIGINT doesn\'t kill tarantool in interactive mode')
 test:like(output, prompt .. '^C\n---\n...\n\n' .. prompt,
           'Ctrl+C discards the input and calls the new prompt')
+
+ph:shutdown({stdin = true})
+ph:close()
+
+--
+-- gh-7109: Ctrl+C does not break multiline input.
+--
+cmd = 'ERRINJ_STDIN_ISATTY=1 ' .. TARANTOOL_PATH .. ' -i 2>&1'
+ph = popen.new({cmd}, {
+    shell = true,
+    setsid = true,
+    group_signal = true,
+    stdout = popen.opts.PIPE,
+    stderr = popen.opts.DEVNULL,
+    stdin = popen.opts.PIPE,
+})
+assert(ph, 'process is not up')
+
+start_time = clock.monotonic()
+time_quota = 10.0
+output = ''
+local prompt_name = 'tarantool'
+local expected_output = prompt
+while output:find(expected_output) == nil
+        and clock.monotonic() - start_time < time_quota do
+    output = output .. ph:read({timeout = 1.0})
+end
+assert(clock.monotonic() - start_time < time_quota, 'time_quota is violated')
+
+ph:write('foo{\n')
+
+start_time = clock.monotonic()
+time_quota = 10.0
+expected_output = expected_output .. 'foo{' .. '\n' ..
+        string.rep(' ', #prompt_name) .. '> '
+
+while output:find(expected_output) == nil and
+        clock.monotonic() - start_time < time_quota do
+    local data = ph:read({timeout = 1.0})
+    if data ~= nil then
+        output = output .. data
+    end
+end
+assert(clock.monotonic() - start_time < time_quota, 'time_quota is violated')
+
+ph:signal(popen.signal.SIGINT)
+
+start_time = clock.monotonic()
+time_quota = 10.0
+expected_output = expected_output .. '^C\n---\n...\n\n' .. prompt
+
+while output:find(expected_output) == nil and
+        clock.monotonic() - start_time < time_quota do
+    local data = ph:read({timeout = 1.0})
+    if data ~= nil then
+        output = output .. data
+    end
+end
+assert(clock.monotonic() - start_time < time_quota, 'time_quota is violated')
+
+test:unlike(ph:info().status.state, popen.state.EXITED,
+        'SIGINT doesn\'t kill tarantool in interactive mode')
+test:like(output, expected_output,
+        'Ctrl+C discards the multiline input mode and calls the new default prompt')
 
 ph:shutdown({stdin = true})
 ph:close()
