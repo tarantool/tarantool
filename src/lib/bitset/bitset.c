@@ -174,6 +174,7 @@ tt_bitset_info(struct tt_bitset *bitset, struct tt_bitset_info *info)
 		page = tt_bitset_pages_next(&bitset->pages, page);
 	}
 
+	(void)cardinality_check;
 	assert(tt_bitset_cardinality(bitset) == cardinality_check);
 }
 
