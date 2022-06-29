@@ -387,14 +387,18 @@ vclock_lex_compare(const struct vclock *a, const struct vclock *b)
 }
 
 /**
- * Return a vclock, which is a componentwise minimum between
- * vclocks @a a and @a b. Do not take vclock[0] into account.
+ * Return a vclock, which is a componentwise minimum (when @sign is -1) or
+ * maximum (when @sign is +1) between vclocks @a a and @a b. Do not take
+ * vclock[0] into account.
  *
  * @param[in,out] a Vclock containing the minimum components.
  * @param b Vclock to compare with.
+ * @param sign Which extremum to find:
+ *             -1 for minimum,
+ *             +1 for maximum.
  */
 static inline void
-vclock_min_ignore0(struct vclock *a, const struct vclock *b)
+vclock_minmax_ignore0(struct vclock *a, const struct vclock *b, int sign)
 {
 	vclock_map_t map = a->map | b->map;
 	struct bit_iterator it;
@@ -406,10 +410,24 @@ vclock_min_ignore0(struct vclock *a, const struct vclock *b)
 	for( ; replica_id < VCLOCK_MAX; replica_id = bit_iterator_next(&it)) {
 		int64_t lsn_a = vclock_get(a, replica_id);
 		int64_t lsn_b = vclock_get(b, replica_id);
-		if (lsn_a <= lsn_b)
+		if (sign * lsn_a >= sign * lsn_b)
 			continue;
 		vclock_reset(a, replica_id, lsn_b);
 	}
+}
+
+/** @sa vclock_minmax_ignore0. */
+static inline void
+vclock_min_ignore0(struct vclock *a, const struct vclock *b)
+{
+	return vclock_minmax_ignore0(a, b, -1);
+}
+
+/** @sa vclock_minmax_ignore0. */
+static inline void
+vclock_max_ignore0(struct vclock *a, const struct vclock *b)
+{
+	return vclock_minmax_ignore0(a, b, 1);
 }
 
 /**
