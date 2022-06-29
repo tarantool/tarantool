@@ -44,7 +44,7 @@ struct http_parser {
 	 */
 	const char *hdr_value_start;
 	/**
-	 * Pointer to header field value end (exlusive).
+	 * Pointer to header field value end (exclusive).
 	 */
 	const char *hdr_value_end;
 

@@ -178,6 +178,9 @@ target_link_libraries(csv.test csv)
 add_executable(json.test json.c)
 target_link_libraries(json.test json unit ${ICU_LIBRARIES})
 
+add_executable(http_parser.test http_parser.c)
+target_link_libraries(http_parser.test unit http_parser)
+
 add_executable(rmean.test rmean.cc core_test_utils.c)
 target_link_libraries(rmean.test stat unit)
 add_executable(histogram.test histogram.c core_test_utils.c)
