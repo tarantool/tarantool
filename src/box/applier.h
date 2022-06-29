@@ -60,16 +60,16 @@ enum { APPLIER_SOURCE_MAXLEN = 1024 }; /* enough to fit URI with passwords */
 	_(APPLIER_CONNECTED, 2)                                      \
 	_(APPLIER_AUTH, 3)                                           \
 	_(APPLIER_READY, 4)                                          \
-	_(APPLIER_INITIAL_JOIN, 5)                                   \
-	_(APPLIER_FINAL_JOIN, 6)                                     \
-	_(APPLIER_JOINED, 7)                                         \
-	_(APPLIER_SYNC, 8)                                           \
-	_(APPLIER_FOLLOW, 9)                                         \
-	_(APPLIER_STOPPED, 10)                                       \
-	_(APPLIER_DISCONNECTED, 11)                                  \
-	_(APPLIER_LOADING, 12)                                       \
-	_(APPLIER_FETCH_SNAPSHOT, 13)                                \
-	_(APPLIER_FETCHED_SNAPSHOT, 14)                              \
+	_(APPLIER_FINAL_JOIN, 5)                                     \
+	_(APPLIER_JOINED, 6)                                         \
+	_(APPLIER_SYNC, 7)                                           \
+	_(APPLIER_FOLLOW, 8)                                         \
+	_(APPLIER_STOPPED, 9)                                        \
+	_(APPLIER_DISCONNECTED, 10)                                  \
+	_(APPLIER_LOADING, 11)                                       \
+	_(APPLIER_FETCH_SNAPSHOT, 12)                                \
+	_(APPLIER_FETCHED_SNAPSHOT, 13)                              \
+	_(APPLIER_WAIT_SNAPSHOT, 14)                                 \
 	_(APPLIER_REGISTER, 15)                                      \
 	_(APPLIER_REGISTERED, 16)                                    \
 
