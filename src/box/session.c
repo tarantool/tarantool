@@ -245,14 +245,7 @@ session_set_type(struct session *session, enum session_type type)
 struct session *
 session_new(enum session_type type)
 {
-	struct session *session =
-		(struct session *) mempool_alloc(&session_pool);
-	if (session == NULL) {
-		diag_set(OutOfMemory, session_pool.objsize, "mempool",
-			 "new slab");
-		return NULL;
-	}
-
+	struct session *session = xmempool_alloc(&session_pool);
 	session->id = sid_max();
 	memset(&session->meta, 0, sizeof(session->meta));
 	session_set_type(session, type);
@@ -278,8 +271,6 @@ session_new_on_demand(void)
 
 	/* Create session on demand */
 	struct session *s = session_new(SESSION_TYPE_BACKGROUND);
-	if (s == NULL)
-		return NULL;
 	/* Add a trigger to destroy session on fiber stop */
 	trigger_create(&s->fiber_on_stop, session_on_stop, NULL, NULL);
 	trigger_add(&fiber()->on_stop, &s->fiber_on_stop);

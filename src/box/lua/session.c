@@ -57,8 +57,6 @@ lbox_session_create(struct lua_State *L)
 	struct session *session = fiber_get_session(fiber());
 	if (session == NULL) {
 		session = session_new_on_demand();
-		if (session == NULL)
-			return luaT_error(L);
 		session->meta.fd = fd;
 		if (fd >= 0 && type != SESSION_TYPE_REPL) {
 			struct sockaddr_storage addrstorage;
