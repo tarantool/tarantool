@@ -90,6 +90,7 @@ enum vy_status {
 	VINYL_INITIAL_RECOVERY_REMOTE,
 	VINYL_FINAL_RECOVERY_LOCAL,
 	VINYL_FINAL_RECOVERY_REMOTE,
+	VINYL_HOT_STANDBY,
 	VINYL_ONLINE,
 };
 
@@ -777,6 +778,11 @@ vinyl_index_open(struct index *index)
 				   env->force_recovery) != 0)
 			return -1;
 		break;
+	case VINYL_HOT_STANDBY:
+		/* See the comment to vinyl_engine_begin_hot_standby(). */
+		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+			 "hot standby mode");
+		return -1;
 	default:
 		unreachable();
 	}
@@ -2907,12 +2913,33 @@ vinyl_engine_begin_final_recovery(struct engine *engine)
 	return 0;
 }
 
+/**
+ * Vinyl doesn't support the hot standby mode so we raise an error on
+ * an attempt to enter the hot standby mode in case the instance has
+ * Vinyl spaces.  We also have a check in vinyl_index_open() that fails
+ * on an attempt to create a Vinyl space in the hot standby mode.
+ */
+static int
+vinyl_engine_begin_hot_standby(struct engine *engine)
+{
+	struct vy_env *e = vy_env(engine);
+	assert(e->status == VINYL_FINAL_RECOVERY_LOCAL);
+	if (e->lsm_env.lsm_count > 0) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+			 "hot standby mode");
+		return -1;
+	}
+	e->status = VINYL_HOT_STANDBY;
+	return 0;
+}
+
 static int
 vinyl_engine_end_recovery(struct engine *engine)
 {
 	struct vy_env *e = vy_env(engine);
 	switch (e->status) {
 	case VINYL_FINAL_RECOVERY_LOCAL:
+	case VINYL_HOT_STANDBY:
 		if (vy_log_end_recovery() != 0)
 			return -1;
 		/*
@@ -4560,7 +4587,7 @@ static const struct engine_vtab vinyl_engine_vtab = {
 	/* .bootstrap = */ vinyl_engine_bootstrap,
 	/* .begin_initial_recovery = */ vinyl_engine_begin_initial_recovery,
 	/* .begin_final_recovery = */ vinyl_engine_begin_final_recovery,
-	/* .begin_hot_standby = */ generic_engine_begin_hot_standby,
+	/* .begin_hot_standby = */ vinyl_engine_begin_hot_standby,
 	/* .end_recovery = */ vinyl_engine_end_recovery,
 	/* .begin_checkpoint = */ vinyl_engine_begin_checkpoint,
 	/* .wait_checkpoint = */ vinyl_engine_wait_checkpoint,
