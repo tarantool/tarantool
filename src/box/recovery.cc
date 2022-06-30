@@ -483,9 +483,12 @@ hot_standby_f(va_list ap)
 		int64_t start, end;
 		do {
 			start = vclock_sum(&r->vclock);
-
-			recover_remaining_wals(r, stream, NULL, scan_dir);
-
+			try {
+				recover_remaining_wals(r, stream, NULL,
+						       scan_dir);
+			} catch (Exception *e) {
+				e->log();
+			}
 			end = vclock_sum(&r->vclock);
 			/*
 			 * Continue, given there's been progress *and* there is a
