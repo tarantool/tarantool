@@ -106,7 +106,11 @@ BuildRequires: python3-PyYAML
 BuildRequires: python3-pyyaml
 %endif
 # needed for datetime tests
+%if 0%{?sle_version} >= 1500
+BuildRequires: timezone
+%else
 BuildRequires: tzdata
+%endif
 
 # Install prove to run LuaJIT tests.
 BuildRequires: perl-Test-Harness
@@ -130,6 +134,11 @@ Requires: /etc/services
 # Deps for built-in package manager
 # https://github.com/tarantool/tarantool/issues/2612
 Requires: openssl
+%if 0%{?sle_version} >= 1500
+Requires: timezone
+%else
+Requires: tzdata
+%endif
 %if (0%{?fedora} >= 22 || 0%{?rhel} >= 8 || 0%{?sle_version} >= 1500)
 # RHEL <= 7 doesn't support Recommends:
 Recommends: tarantool-devel
