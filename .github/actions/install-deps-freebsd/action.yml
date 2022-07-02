@@ -1,0 +1,23 @@
+name: Install Deps FreeBSD
+
+description: Install build and test dependencies on FreeBSD systems
+
+runs:
+  using: composite
+  steps:
+    - env:
+        PIP_URL: https://bootstrap.pypa.io/get-pip.py
+      run: |
+        pkg install -y \
+          cmake \
+          gmake \
+          icu \
+          libiconv \
+          python38 \
+          autoconf \
+          automake \
+          libtool
+
+        which python3 || ln -s /usr/local/bin/python3.8 /usr/local/bin/python3
+        python3 -m pip -V || curl -fsSL ${PIP_URL} | python3
+      shell: bash
