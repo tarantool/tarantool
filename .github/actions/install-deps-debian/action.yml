@@ -1,0 +1,25 @@
+name: Install Deps Debian
+
+description: Install build and test dependencies on Debian-based systems
+
+runs:
+  using: composite
+  steps:
+    - run: |
+        apt-get --allow-releaseinfo-change update
+        apt-get -y -f install \
+          build-essential \
+          ninja-build \
+          cmake \
+          lua5.1 \
+          luarocks \
+          lcov \
+          ruby-dev \
+          liblz4-dev \
+          autoconf \
+          automake \
+          libtool
+
+        luarocks install luacheck 0.26.1
+        gem install coveralls-lcov
+      shell: bash
