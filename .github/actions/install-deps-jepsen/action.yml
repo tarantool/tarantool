@@ -1,0 +1,31 @@
+name: Install Deps Jepsen
+
+description: Install dependencies for Jepsen testing
+
+runs:
+  using: composite
+  steps:
+    - env:
+        CLOJURE_URL: https://download.clojure.org/install/linux-install-1.10.1.561.sh
+        LEIN_URL: https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein
+        TERRAFORM_URL: https://releases.hashicorp.com/terraform/0.13.1/terraform_0.13.1_linux_amd64.zip
+        BIN_DIR: /usr/local/bin
+      run: |
+        apt-get --allow-releaseinfo-change update
+        apt-get -y -f install \
+          openjdk-8-jre \
+          openjdk-8-jre-headless \
+          libjna-java \
+          gnuplot \
+          graphviz \
+          zip \
+          unzip \
+          openssh-client \
+          jq
+
+        curl ${CLOJURE_URL} | bash
+        curl ${LEIN_URL} > ${BIN_DIR}/lein
+        chmod a+x ${BIN_DIR}/lein
+        curl -O ${TERRAFORM_URL}
+        unzip -o $(basename ${TERRAFORM_URL}) terraform -d ${BIN_DIR}
+      shell: bash
