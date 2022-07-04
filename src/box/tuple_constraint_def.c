@@ -239,7 +239,7 @@ tuple_constraint_def_decode_fkey(const char **data,
 {
 	/*
 	 * Expected normal form of foreign keys: {name1=data1, name2=data2..},
-	 * where dataX has form: {space=id, field=id/name}
+	 * where dataX has form: {field=id/name} or {space=id, field=id/name}
 	 */
 	if (mp_typeof(**data) != MP_MAP) {
 		diag_set(ClientError, errcode,
@@ -293,6 +293,7 @@ tuple_constraint_def_decode_fkey(const char **data,
 		new_def[i].fkey.field_mapping_size = 0;
 		uint32_t def_size = mp_decode_map(data);
 		bool has_space = false, has_field = false;
+		struct tuple_constraint_fkey_def *fk = &new_def[i].fkey;
 		for (size_t j = 0; j < def_size; j++) {
 			if (mp_typeof(**data) != MP_STR) {
 				diag_set(ClientError, errcode,
@@ -314,11 +315,10 @@ tuple_constraint_def_decode_fkey(const char **data,
 			} else {
 				diag_set(ClientError, errcode,
 					 "foreign key definition is expected "
-					 "to be {space=.., field=..}");
+					 "to be {[space=..,] field=..}");
 				return -1;
 			}
 			int rc;
-			struct tuple_constraint_fkey_def *fk = &new_def[i].fkey;
 			if (is_space)
 				rc = space_id_decode(data, &fk->space_id,
 						     errcode);
@@ -331,10 +331,12 @@ tuple_constraint_def_decode_fkey(const char **data,
 			if (rc != 0)
 				return rc;
 		}
-		if (!has_space || !has_field) {
+		if (!has_space)
+			fk->space_id = 0;
+		if (!has_field) {
 			diag_set(ClientError, errcode,
 				 "foreign key definition is expected "
-				 "to be {space=.., field=..}");
+				 "to be {[space=..,] field=..}");
 			return -1;
 		}
 	}

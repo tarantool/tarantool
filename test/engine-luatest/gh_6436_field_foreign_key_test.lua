@@ -53,19 +53,9 @@ g.test_bad_foreign_key = function(cg)
             "Illegal parameters, format[2]: foreign key definition must be a table with 'space' and 'field' members",
             function() box.schema.create_space('city', {engine=engine, format=fmt}) end
         )
-        fmt = gen_format({field = 'id'})
-        t.assert_error_msg_content_equals(
-            "Illegal parameters, format[2]: foreign key definition must be a table with 'space' and 'field' members",
-            function() box.schema.create_space('city', {engine=engine, format=fmt}) end
-        )
         fmt = gen_format({fkey={space = 'country'}})
         t.assert_error_msg_content_equals(
             "Illegal parameters, format[2]: foreign key: field must be specified",
-            function() box.schema.create_space('city', {engine=engine, format=fmt}) end
-        )
-        fmt = gen_format({fkey={field = 'id'}})
-        t.assert_error_msg_content_equals(
-            "Illegal parameters, format[2]: foreign key: space must be specified",
             function() box.schema.create_space('city', {engine=engine, format=fmt}) end
         )
         fmt = gen_format({space = 'planet', field = 'id'})

@@ -309,7 +309,12 @@ lbox_push_space_foreign_key(struct lua_State *L, struct space *space, int i)
 			continue;
 
 		lua_newtable(L);
-		lua_pushnumber(L, c->def.fkey.space_id);
+		if (c->def.fkey.space_id == 0) {
+			/* No space id - no field. */
+			lua_pushnil(L);
+		} else {
+			lua_pushnumber(L, c->def.fkey.space_id);
+		}
 		lua_setfield(L, -2, "space");
 		lua_newtable(L);
 		for (uint32_t j = 0; j < c->def.fkey.field_mapping_size; j++) {
