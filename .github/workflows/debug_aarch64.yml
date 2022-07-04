@@ -31,9 +31,6 @@ concurrency:
     format('{0}-{1}', github.workflow, github.ref) }}
   cancel-in-progress: true
 
-env:
-  CI_MAKE: make -f .travis.mk
-
 jobs:
   debug_aarch64:
     # Run on push to the 'master' and release branches of tarantool/tarantool
@@ -51,10 +48,10 @@ jobs:
           fetch-depth: 0
           submodules: recursive
       - uses: ./.github/actions/environment
+      - name: Install deps
+        uses: ./.github/actions/install-deps-debian
       - name: test
-        env:
-          CMAKE_BUILD_TYPE: Debug
-        run: ${CI_MAKE} test_odroid_arm64
+        run: make -f .test.mk test-debug
       - name: call action to send Telegram message on failure
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}

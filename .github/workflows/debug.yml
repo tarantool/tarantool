@@ -52,8 +52,11 @@ jobs:
       - name: Set environment
         uses: ./.github/actions/environment
 
+      - name: Install deps
+        uses: ./.github/actions/install-deps-debian
+
       - name: Run testing
-        run: make -f .travis.mk debug_ubuntu_ghactions
+        run: make -f .test.mk test-debug
 
       - name: Send Telegram message on failure
         env:

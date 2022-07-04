@@ -5,9 +5,6 @@ on:
   schedule:
     - cron:  '0 4 * * 6'
 
-env:
-  CI_MAKE: make -f .travis.mk
-
 jobs:
   coverity:
     if: github.repository == 'tarantool/tarantool'
@@ -28,7 +25,7 @@ jobs:
       - uses: actions/checkout@v1
       - uses: ./.github/actions/environment
       - name: test
-        run: ${CI_MAKE} test_coverity_debian_no_deps
+        run: make -f .test.mk test-coverity
         env:
           COVERITY_TOKEN: ${{ secrets.COVERITY_TOKEN }}
       - name: call action to send Telegram message on failure
