@@ -31,9 +31,6 @@ concurrency:
     format('{0}-{1}', github.workflow, github.ref) }}
   cancel-in-progress: true
 
-env:
-  CI_MAKE: make -f .travis.mk
-
 jobs:
   release_lto:
     # Run on push to the 'master' and release branches of tarantool/tarantool
@@ -50,10 +47,12 @@ jobs:
           fetch-depth: 0
           submodules: recursive
       - uses: ./.github/actions/environment
+      - name: Install deps
+        uses: ./.github/actions/install-deps-debian
       - name: test
         env:
           CMAKE_EXTRA_PARAMS: -DENABLE_LTO=ON
-        run: ${CI_MAKE} test_ubuntu_ghactions
+        run: make -f .test.mk test-release
       - name: call action to send Telegram message on failure
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}

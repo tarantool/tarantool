@@ -51,8 +51,11 @@ jobs:
       - name: Set environment
         uses: ./.github/actions/environment
 
+      - name: Install deps
+        uses: ./.github/actions/install-deps-debian
+
       - name: Run testing with coverage enabled
-        run: make -f .travis.mk coverage_ubuntu_ghactions
+        run: make -f .test.mk test-coverage
 
       - name: Upload coverage results to coveralls.io
         uses: coverallsapp/github-action@v1.1.2
