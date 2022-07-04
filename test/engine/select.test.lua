@@ -153,3 +153,11 @@ s:fselect(nil, 'id,name')
 s:fselect(nil, nil, 'name, id')
 s:fselect(nil, nil, {columns='id, name'})
 s:fselect(nil, nil, {columns={4, 3, 'name', 'id'}})
+
+-- https://github.com/tarantool/tarantool/issues/7040
+-- formatted select (binary data)
+_ = s:replace{1, 2, '\x1f\x7f', 'bad utf8: \x80', '😀'}
+_ = s:replace{3, 4, {1, {3, {aa=1,bb='bb\x80bb'}}, 3}}
+_ = s:delete{5}
+_ = s:delete{7}
+s:fselect()
