@@ -538,17 +538,15 @@ end
 --  foreign field.
 -- If is_complex, field is expected to be a table with local field ->
 --  foreign field mapping.
-local function normalize_foreign_key_one(space_id, space_name, def,
-                                         error_prefix, is_complex)
-    if def.space == nil then
-        box.error(box.error.ILLEGAL_PARAMS,
-                  error_prefix .. "foreign key: space must be specified")
-    end
+-- If fkey_same_space, the foreign key refers to the same space.
+local function normalize_foreign_key_one(def, error_prefix, is_complex,
+                                         fkey_same_space)
     if def.field == nil then
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "foreign key: field must be specified")
     end
-    if type(def.space) ~= 'string' and type(def.space) ~= 'number' then
+    if def.space ~= nil and
+       type(def.space) ~= 'string' and type(def.space) ~= 'number' then
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "foreign key: space must be string or number")
     end
@@ -598,7 +596,6 @@ local function normalize_foreign_key_one(space_id, space_name, def,
         end
         def.field = setmap(converted)
     end
-    local fkey_same_space = (def.space == space_id or def.space == space_name)
     if not box.space[def.space] and not fkey_same_space then
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "foreign key: space " .. tostring(def.space)
@@ -612,7 +609,7 @@ local function normalize_foreign_key_one(space_id, space_name, def,
         end
     end
     if fkey_same_space then
-        return {space = space_id, field = def.field}
+        return {field = def.field}
     else
         return {space = box.space[def.space].id, field = def.field}
     end
@@ -640,18 +637,17 @@ local function normalize_foreign_key(space_id, space_name, fkey, error_prefix,
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "foreign key must be a table")
     end
-    if fkey.space ~= nil and fkey.field ~= nil and
+    if fkey.field ~= nil and
         (type(fkey.space) ~= 'table' or type(fkey.field) ~= 'table') then
         -- the first, short form.
-        fkey = normalize_foreign_key_one(space_id, space_name, fkey,
-                                         error_prefix, is_complex)
-        local fkey_same_space = (fkey.space == space_id or
+        local fkey_same_space = (fkey.space == nil or
+                                 fkey.space == space_id or
                                  fkey.space == space_name)
-        if fkey_same_space then
-            return {[space_name] = fkey}
-        else
-            return {[box.space[fkey.space].name] = fkey}
-        end
+        fkey = normalize_foreign_key_one(fkey, error_prefix, is_complex,
+                                         fkey_same_space)
+        local fkey_name = fkey_same_space and space_name or
+                          box.space[fkey.space].name
+        return {[fkey_name] = fkey}
     end
     -- the second, detailed form.
     local result = {}
@@ -666,8 +662,11 @@ local function normalize_foreign_key(space_id, space_name, fkey, error_prefix,
                       error_prefix .. "foreign key definition must be a table "
                       .. "with 'space' and 'field' members")
         end
-        v = normalize_foreign_key_one(space_id, space_name, v, error_prefix,
-                                      is_complex)
+        local fkey_same_space = (v.space == nil or
+                                 v.space == space_id or
+                                 v.space == space_name)
+        v = normalize_foreign_key_one(v, error_prefix, is_complex,
+                                      fkey_same_space)
         result[k] = v
     end
     return result

@@ -588,8 +588,11 @@ tuple_constraint_fkey_init(struct tuple_constraint *constr,
 	constr->space = space;
 	tuple_constraint_fkey_update_local(constr, field_no);
 
-	bool fkey_same_space = constr->def.fkey.space_id == space->def->id;
-	struct space *foreign_space = space_by_id(constr->def.fkey.space_id);
+	bool fkey_same_space = constr->def.fkey.space_id == 0 ||
+			       constr->def.fkey.space_id == space->def->id;
+	uint32_t space_id = fkey_same_space ? space->def->id :
+			    constr->def.fkey.space_id;
+	struct space *foreign_space = space_by_id(space_id);
 	if (fkey_same_space && foreign_space == NULL)
 		foreign_space = space;
 	enum space_cache_holder_type type = SPACE_HOLDER_FOREIGN_KEY;
