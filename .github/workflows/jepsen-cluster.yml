@@ -3,9 +3,6 @@ name: jepsen-cluster
 on:
   workflow_dispatch:
 
-env:
-  CI_MAKE: make -f .travis.mk
-
 jobs:
   jepsen-cluster:
     if: github.repository == 'tarantool/tarantool'
@@ -21,6 +18,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v1
+      - name: Install deps
+        uses: ./.github/actions/install-deps-jepsen
       - name: long_test
         env:
           TF_VAR_keypair_name: ${{ secrets.TF_VAR_keypair_name }}
@@ -31,7 +30,7 @@ jobs:
           TF_VAR_ssh_key: ${{ secrets.TF_VAR_ssh_key }}
           LEIN_OPT: '--nemesis standard'
           INSTANCE_COUNT: '5'
-        run: ${CI_MAKE} test_jepsen
+        run: make -f .test.mk test-jepsen
       - name: call action to send Telegram message on failure
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}

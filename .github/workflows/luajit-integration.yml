@@ -67,22 +67,23 @@ jobs:
       - name: Set environment
         uses: ./.github/actions/environment
 
+      - name: Get machine platform and arch
+        run: |
+          echo PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]') | \
+            tee -a ${GITHUB_ENV}
+          echo ARCH=$(uname -m) | tee -a ${GITHUB_ENV}
+
+      - name: Install deps on Linux
+        uses: ./.github/actions/install-deps-debian
+        if: ${{ env.PLATFORM == 'linux' }}
+
+      - name: Install deps on Darwin
+        uses: ./.github/actions/install-deps-osx
+        if: ${{ env.PLATFORM == 'darwin' }}
+
       - name: Run tests
         env:
-          CMAKE_BUILD_TYPE: ${{ inputs.buildtype }}
-          CMAKE_EXTRA_PARAMS: -DLUAJIT_ENABLE_GC64=${{ inputs.GC64 }}
-        run: |
-          # XXX: sysctl.proc_translated is the only hack for M1
-          # machines to check whether GitHub agent is being run
-          # under Rosetta 2 or not (since it changes the output of
-          # <uname -m> and other similar methods to detect the
-          # architecture of the host given in <runs-on> field).
-          # If sysctl.proc_translated is not provided by the
-          # system, assume it's being disabled (i.e. yields 0).
-          ARCH=$([[ $(sysctl -n sysctl.proc_translated || echo 0) == 0 ]] \
-            && uname -m || echo "Rosetta")
-          # XXX: To avoid many <if> statements right in this
-          # section, the branching is moved to .travis.mk and
-          # the required Makefile target is chosen by the kernel
-          # name and machine name yielded by <uname>.
-          make -f .travis.mk "luajit_$(uname -s)_${ARCH}_test"
+          CMAKE_EXTRA_PARAMS: >
+            -DCMAKE_BUILD_TYPE=${{ inputs.buildtype }}
+            -DLUAJIT_ENABLE_GC64=${{ inputs.GC64 }}
+        run: make -f .test.mk test-luajit-${{ env.PLATFORM }}-${{ env.ARCH }}
