@@ -389,9 +389,30 @@ txn_rollback_one_stmt(struct txn *txn, struct txn_stmt *stmt)
 	}
 }
 
+/*
+ * Begins the rollback to savepoint process by assigning a PSN to the
+ * transaction (rolled back statements require a PSN).
+ */
+static void
+txn_rollback_to_svp_begin(struct txn *txn)
+{
+	txn->psn = ++txn_last_psn;
+}
+
+/*
+ * Finishes the rollback to savepoint process by resetting the transaction's
+ * PSN (since this not a complete transaction rollback).
+ */
+static void
+txn_rollback_to_svp_finish(struct txn *txn)
+{
+	txn->psn = 0;
+}
+
 static void
 txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 {
+	txn_rollback_to_svp_begin(txn);
 	struct txn_stmt *stmt;
 	struct stailq rollback;
 	stailq_cut_tail(&txn->stmts, svp, &rollback);
@@ -412,6 +433,7 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 		stmt->space = NULL;
 		stmt->row = NULL;
 	}
+	txn_rollback_to_svp_finish(txn);
 }
 
 /*
@@ -758,6 +780,7 @@ txn_free_or_wakeup(struct txn *txn)
 void
 txn_complete_fail(struct txn *txn)
 {
+	assert(txn->psn != 0);
 	assert(!txn_has_flag(txn, TXN_IS_DONE));
 	assert(txn->signature < 0);
 	assert(txn->signature != TXN_SIGNATURE_UNKNOWN);
@@ -1220,6 +1243,10 @@ txn_rollback(struct txn *txn)
 {
 	assert(txn == in_txn());
 	assert(txn->signature != TXN_SIGNATURE_UNKNOWN);
+	/*
+	 * Rolled back statements require a PSN.
+	 */
+	txn->psn = ++txn_last_psn;
 	txn->status = TXN_ABORTED;
 	trigger_clear(&txn->fiber_on_stop);
 	trigger_clear(&txn->fiber_on_yield);
