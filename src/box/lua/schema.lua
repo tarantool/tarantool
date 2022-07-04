@@ -2075,6 +2075,19 @@ base_index_mt.fselect = function(index, key, opts, fselect_opts)
         num_cols = math.max(num_cols, #tab[i])
     end
 
+    -- The JSON encoder above passes through invalid UTF-8 characters untouched.
+    -- Replace such strings with the <binary> tag.
+    for j = 1,num_cols do
+        for i = 1,num_rows do
+            if tab[i][j] then
+                local _, err = utf8.len(tab[i][j])
+                if err then
+                    tab[i][j] = '<binary>'
+                end
+            end
+        end
+    end
+
     local fmt = box.space[index.space_id]:format()
     local names = {}
     if columns then
