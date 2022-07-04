@@ -47,8 +47,10 @@ jobs:
           fetch-depth: 0
           submodules: recursive
       - uses: ./.github/actions/environment
+      - name: Install deps
+        uses: ./.github/actions/install-deps-freebsd
       - name: test
-        run: make -f .travis.mk test_freebsd
+        run: gmake -f .test.mk test-freebsd-release
       - name: artifacts
         uses: actions/upload-artifact@v2
         if: failure()
