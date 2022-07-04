@@ -2120,6 +2120,36 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 	assert(stmt->add_story == NULL && stmt->del_story == NULL);
 }
 
+/*
+ * Completely remove statement that adds a story.
+ */
+static void
+memtx_tx_history_remove_added_story(struct txn_stmt *stmt)
+{
+	memtx_tx_history_rollback_added_story(stmt);
+}
+
+/*
+ * Completely remove statement that deletes a story.
+ */
+static void
+memtx_tx_history_remove_deleted_story(struct txn_stmt *stmt)
+{
+	memtx_tx_history_rollback_deleted_story(stmt);
+}
+
+/*
+ * Completely (as opposed to rollback) remove statement from history.
+ */
+static void
+memtx_tx_history_remove_stmt(struct txn_stmt *stmt)
+{
+	if (stmt->add_story != NULL)
+		memtx_tx_history_remove_added_story(stmt);
+	if (stmt->del_story != NULL)
+		memtx_tx_history_remove_deleted_story(stmt);
+}
+
 /**
  * Helper of memtx_tx_history_prepare_stmt. Do the job in case when
  * stmt->add_story != NULL, that is REPLACE, INSERT, UPDATE etc.
@@ -2549,10 +2579,9 @@ memtx_tx_on_space_delete(struct space *space)
 		 * should be destroyed immediately.
 		 */
 		if (story->add_stmt != NULL)
-			memtx_tx_history_rollback_stmt(story->add_stmt);
+			memtx_tx_history_remove_stmt(story->add_stmt);
 		if (story->del_stmt != NULL)
-			memtx_tx_history_rollback_stmt(story->del_stmt);
-		rlist_del(&story->in_space_stories);
+			memtx_tx_history_remove_stmt(story->del_stmt);
 		memtx_tx_story_full_unlink(story);
 		memtx_tx_story_delete(story);
 	}
