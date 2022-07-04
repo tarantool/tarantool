@@ -2043,6 +2043,28 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 }
 
 /*
+ * Relink those who delete this story and make them delete older story.
+ */
+static void
+memtx_tx_history_remove_story_del_stmts(struct memtx_story *story)
+{
+	struct memtx_story *old_story = story->link[0].older_story;
+	while (story->del_stmt) {
+		struct txn_stmt *del_stmt = story->del_stmt;
+
+		/* Unlink from old list in any case. */
+		story->del_stmt = del_stmt->next_in_del_list;
+		del_stmt->next_in_del_list = NULL;
+		del_stmt->del_story = NULL;
+
+		/* Link to old story's list. */
+		if (old_story != NULL)
+			memtx_tx_story_link_deleted_by(old_story,
+						       del_stmt);
+	}
+}
+
+/*
  * Push story down the history chain to the level of prepared stories in each
  * index.
  */
@@ -2068,25 +2090,7 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 		assert(stmt->add_story->tuple == stmt->rollback_info.new_tuple);
 		struct memtx_story *story = stmt->add_story;
 
-		/*
-		 * Relink those who delete this story and make them
-		 * delete older story.
-		 */
-		struct memtx_story_link *link = &story->link[0];
-		struct memtx_story *old_story = link->older_story;
-		while (story->del_stmt) {
-			struct txn_stmt *del_stmt = story->del_stmt;
-
-			/* Unlink from old list in any case. */
-			story->del_stmt = del_stmt->next_in_del_list;
-			del_stmt->next_in_del_list = NULL;
-			del_stmt->del_story = NULL;
-
-			/* Link to old story's list. */
-			if (old_story != NULL)
-				memtx_tx_story_link_deleted_by(old_story,
-							       del_stmt);
-		}
+		memtx_tx_history_remove_story_del_stmts(story);
 
 		for (uint32_t i = 0; i < story->index_count; i++)
 			memtx_tx_story_unlink_both(story, i);
