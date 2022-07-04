@@ -413,11 +413,10 @@ sql_type_result(enum field_type lhs, enum field_type rhs)
 			return FIELD_TYPE_DOUBLE;
 		if (lhs == FIELD_TYPE_DECIMAL || rhs == FIELD_TYPE_DECIMAL)
 			return FIELD_TYPE_DECIMAL;
-		if (lhs == FIELD_TYPE_INTEGER || rhs == FIELD_TYPE_INTEGER)
-			return FIELD_TYPE_INTEGER;
 		assert(lhs == FIELD_TYPE_UNSIGNED ||
-		       rhs == FIELD_TYPE_UNSIGNED);
-		return FIELD_TYPE_UNSIGNED;
+		       lhs == FIELD_TYPE_INTEGER ||
+		       rhs == FIELD_TYPE_UNSIGNED || rhs == FIELD_TYPE_INTEGER);
+		return FIELD_TYPE_INTEGER;
 	}
 	if ((lhs == FIELD_TYPE_DATETIME && rhs == FIELD_TYPE_DATETIME) ||
 	    (lhs == FIELD_TYPE_INTERVAL && rhs == FIELD_TYPE_INTERVAL))
