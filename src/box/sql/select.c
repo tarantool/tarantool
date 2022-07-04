@@ -229,8 +229,6 @@ sql_space_info_new_for_sorting(struct Parse *parser, struct ExprList *order_by,
 		bool b;
 		struct Expr *expr = list->a[i].pExpr;
 		enum field_type type = sql_expr_type(expr);
-		if (type == FIELD_TYPE_ANY)
-			type = FIELD_TYPE_SCALAR;
 		uint32_t id;
 		struct coll *coll;
 		if (sql_expr_coll(parser, expr, &b, &id, &coll) != 0)
