@@ -2042,6 +2042,25 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 							result);
 }
 
+/*
+ * Push story down the history chain to the level of prepared stories in each
+ * index.
+ */
+static void
+memtx_tx_history_sink_story(struct memtx_story *story)
+{
+	for (uint32_t i = 0; i < story->index_count; ) {
+		struct memtx_story *old_story = story->link[i].older_story;
+		if (old_story == NULL || old_story->add_psn != 0 ||
+		    old_story->add_stmt == NULL) {
+			/* Old story is absent or prepared or committed. */
+			i++; /* Go to the next index. */
+			continue;
+		}
+		memtx_tx_story_reorder(story, old_story, i);
+	}
+}
+
 void
 memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 {
@@ -2103,20 +2122,7 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 	 */
 	struct memtx_story *story = stmt->add_story;
 	uint32_t index_count = story->index_count;
-	/*
-	 * That's a common loop for both index iteration and sequential push
-	 * of the story down in lists of stories.
-	 */
-	for (uint32_t i = 0; i < story->index_count; ) {
-		struct memtx_story *old_story = story->link[i].older_story;
-		if (old_story == NULL || old_story->add_psn != 0 ||
-		    old_story->add_stmt == NULL) {
-			/* Old story is absent or prepared or committed. */
-			i++; /* Go to the next index. */
-			continue;
-		}
-		memtx_tx_story_reorder(story, old_story, i);
-	}
+	memtx_tx_history_sink_story(story);
 
 	struct memtx_story *old_story = story->link[0].older_story;
 	if (stmt->del_story == NULL)
