@@ -147,7 +147,9 @@ test_run:cmd('delete server replica_anon2')
 -- Check that joining to an anonymous replica is prohibited.
 test_run:cmd([[create server replica with rpl_master=replica_anon1,\
              script="replication/replica.lua"]])
-test_run:cmd('start server replica with crash_expected=True')
+test_run:cmd('start server replica with wait_load=False, wait=False')
+test_run:wait_log('replica', 'ER_UNSUPPORTED: Anonymous replica does not support registration of non%-anonymous nodes.', nil, 10)
+test_run:cmd('stop server replica')
 test_run:cmd('delete server replica')
 
 -- A normal instance (already joined) can't follow an anonymous
