@@ -106,6 +106,7 @@ applier_log_error(struct applier *applier, struct error *e)
 	case APPLIER_SYNC:
 	case APPLIER_FOLLOW:
 	case APPLIER_WAIT_SNAPSHOT:
+	case APPLIER_FETCH_SNAPSHOT:
 	case APPLIER_FINAL_JOIN:
 		say_info("can't read row");
 		break;
@@ -498,6 +499,8 @@ applier_wait_snapshot(struct applier *applier)
 		} while (row.type != IPROTO_JOIN_SNAPSHOT);
 		coio_read_xrow(io, ibuf, &row);
 	}
+
+	applier_set_state(applier, APPLIER_FETCH_SNAPSHOT);
 
 	/*
 	 * Receive initial data.
