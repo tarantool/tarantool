@@ -3642,15 +3642,21 @@ bootstrap_master(const struct tt_uuid *replicaset_uuid)
  * \pre  master->applier->state == APPLIER_CONNECTED
  * \post master->applier->state == APPLIER_READY
  *
- * @param[out] start_vclock  the vector time of the master
- *                           at the moment of replica bootstrap
+ * \throws an exception in case an unrecoverable error
+ * \return false in case of a transient error
+ *         true in case everything is fine
  */
-static void
+static bool
 bootstrap_from_master(struct replica *master)
 {
 	struct applier *applier = master->applier;
 	assert(applier != NULL);
-	applier_resume_to_state(applier, APPLIER_READY, TIMEOUT_INFINITY);
+	try {
+		applier_resume_to_state(applier, APPLIER_READY,
+					TIMEOUT_INFINITY);
+	} catch (...) {
+		return false;
+	}
 	assert(applier->state == APPLIER_READY);
 
 	say_info("bootstrapping replica from %s at %s",
@@ -3661,15 +3667,20 @@ bootstrap_from_master(struct replica *master)
 	 * Send JOIN request to master
 	 * See box_process_join().
 	 */
-
 	assert(!tt_uuid_is_nil(&INSTANCE_UUID));
-	enum applier_state wait_state = APPLIER_WAIT_SNAPSHOT;
-	applier_resume_to_state(applier, wait_state, TIMEOUT_INFINITY);
+	try {
+		applier_resume_to_state(applier, APPLIER_FETCH_SNAPSHOT,
+					TIMEOUT_INFINITY);
+	} catch (...) {
+		return false;
+	}
+
 	/*
 	 * Process initial data (snapshot or dirty disk data).
 	 */
 	engine_begin_initial_recovery_xc(NULL);
-	wait_state = replication_anon ? APPLIER_FETCHED_SNAPSHOT :
+	enum applier_state wait_state = replication_anon ?
+					APPLIER_FETCHED_SNAPSHOT :
 					APPLIER_FINAL_JOIN;
 	applier_resume_to_state(applier, wait_state, TIMEOUT_INFINITY);
 
@@ -3706,6 +3717,8 @@ bootstrap_from_master(struct replica *master)
 	/* Make the initial checkpoint */
 	if (gc_checkpoint() != 0)
 		panic("failed to create a checkpoint");
+
+	return true;
 }
 
 /**
@@ -3746,23 +3759,49 @@ bootstrap(const struct tt_uuid *instance_uuid,
 	 * with connecting to 'replication_connect_quorum' masters.
 	 * If this also fails, throw an error.
 	 */
-	box_restart_replication();
+	struct replica *master;
+	/*
+	 * Rebootstrap
+	 *
+	 * 1) Try to connect to all nodes in the replicaset during
+	 *    the waiting period in order to update their ballot.
+	 *
+	 * 2) After updated the ballot of all nodes, it are looking
+	 *    for a new master.
+	 *
+	 * 3) Wait until bootstrap_from_master succeeds.
+	 */
+	double timeout = replication_timeout;
+	bool say_once = false;
 
-	struct replica *master = replicaset_find_join_master();
-	assert(master == NULL || master->applier != NULL);
+	while (true) {
+		box_restart_replication();
+		master = replicaset_find_join_master();
+		if (master == NULL ||
+		    tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID)) {
+			bootstrap_master(replicaset_uuid);
+			*is_bootstrap_leader = true;
+			break;
+		}
 
-	if (master != NULL && !tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID)) {
-		bootstrap_from_master(master);
-		/* Check replica set UUID */
-		if (!tt_uuid_is_nil(replicaset_uuid) &&
+		bool is_bootstrapped = bootstrap_from_master(master);
+		if (is_bootstrapped && !tt_uuid_is_nil(replicaset_uuid) &&
 		    !tt_uuid_is_equal(replicaset_uuid, &REPLICASET_UUID)) {
 			tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
 				  tt_uuid_str(replicaset_uuid),
 				  tt_uuid_str(&REPLICASET_UUID));
 		}
-	} else {
-		bootstrap_master(replicaset_uuid);
-		*is_bootstrap_leader = true;
+		if (is_bootstrapped) {
+			*is_bootstrap_leader = false;
+			break;
+		}
+		if (!say_once) {
+			say_info("rebootstrap failed, will retry "
+				 "every %.2lf second", timeout);
+		}
+
+		say_once = true;
+		fiber_sleep(timeout);
 	}
 }
 
@@ -3826,9 +3865,26 @@ local_recovery(const struct tt_uuid *instance_uuid,
 		box_update_replication();
 
 		struct replica *master;
-		if (replicaset_needs_rejoin(&master)) {
-			say_crit("replica is too old, initiating rebootstrap");
-			return bootstrap_from_master(master);
+		double timeout = replication_timeout;
+		bool say_once = false;
+
+		while (replicaset_needs_rejoin(&master)) {
+			if (!say_once) {
+				say_crit("replica is too old, initiating "
+					 "rebootstrap");
+			}
+
+			if (bootstrap_from_master(master))
+				return;
+			box_restart_replication();
+
+			if (!say_once) {
+				say_info("rebootstrap failed, will retry "
+					 "every %.2lf second", timeout);
+			}
+
+			say_once = true;
+			fiber_sleep(timeout);
 		}
 	}
 
