@@ -22,6 +22,10 @@ g.before_all(function()
     end)
 end)
 
+g.after_all(function()
+    g.server:drop()
+end)
+
 g.before_each(function()
     g.server:exec(function()
         box.schema.space.create('test', {engine = 'vinyl'})
