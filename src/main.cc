@@ -504,7 +504,7 @@ load_cfg(void)
 	box_cfg();
 }
 
-void
+static void
 free_rl_state(void)
 {
 	/* tarantool_lua_free() was formerly reponsible for terminal reset,
@@ -519,7 +519,7 @@ free_rl_state(void)
 	}
 }
 
-void
+static void
 tarantool_atexit(void)
 {
 	/* Same checks as in tarantool_free() */
@@ -532,7 +532,7 @@ tarantool_atexit(void)
 	free_rl_state();
 }
 
-void
+static void
 tarantool_free(void)
 {
 	/*
