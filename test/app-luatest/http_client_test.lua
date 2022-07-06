@@ -640,3 +640,209 @@ g.test_concurrent = function(cg)
     t.assert(ok_sockets_added, "free sockets")
     t.assert(ok_active, "no active requests")
 end
+
+g.test_default_body_encoders = function(_)
+    local httpc = client:new()
+    t.assert_equals(type(httpc.encoders), 'table')
+    t.assert_equals(type(httpc.encoders['application/json']), 'function')
+    t.assert_equals(type(httpc.encoders['application/yaml']), 'function')
+    t.assert_equals(type(httpc.encoders['application/msgpack']), 'function')
+end
+
+g.test_default_body_encoders_module = function(_)
+    t.assert_equals(type(client.encoders), 'table')
+    t.assert_equals(type(client.encoders['application/json']), 'function')
+    t.assert_equals(type(client.encoders['application/yaml']), 'function')
+    t.assert_equals(type(client.encoders['application/msgpack']), 'function')
+end
+
+-- Each of the httpc instance contains an independent copy of encoders table.
+g.test_body_encoders = function(_)
+    local mime_type = "application/yaml"
+
+    local httpc1 = client:new()
+    t.assert_equals(type(httpc1.encoders), 'table')
+    t.assert_not_equals(httpc1.encoders[mime_type], nil)
+    httpc1.encoders[mime_type] = nil
+
+    local httpc2 = client:new()
+    t.assert_not_equals(httpc2.encoders[mime_type], nil)
+end
+
+g.test_encode_body_method_post_default_content_type_table = function(cg)
+    local url = cg.url
+    local opts = table.deepcopy(cg.opts)
+    opts.headers = {
+        ['content-type'] = nil,
+    }
+    local body = {
+        Moscow = 1,
+    }
+    local default_content_type = client._internal.default_content_type
+
+    local http = client:new()
+    local r, _ = http:request("POST", url, body, opts)
+    t.assert_equals(r.status, 200, 'HTTP code is not 200')
+    t.assert_equals(r.body, json.encode(body))
+    t.assert_equals(r.headers['content_type'], default_content_type)
+end
+
+g.test_encode_body_method_post_default_content_type_string = function(cg)
+    local url = cg.url
+    local opts = table.deepcopy(cg.opts)
+    opts.headers = {
+        ['content-type'] = nil,
+    }
+    local body = "Hello, there!"
+
+    local http = client:new()
+    local r, _ = http:request("POST", url, body, opts)
+    t.assert_equals(r.status, 200, 'HTTP code is not 200')
+    t.assert_equals(r.body, body)
+    t.assert_equals(r.headers['content_type'], 'application/x-www-form-urlencoded')
+end
+
+g.test_encode_body_method_post_default_content_type_number = function(cg)
+    local url = cg.url
+    local opts = table.deepcopy(cg.opts)
+    opts.headers = {
+        ['content-type'] = nil,
+    }
+    local body = 1337
+
+    local http = client:new()
+    local r, _ = http:request("POST", url, body, opts)
+    t.assert_equals(r.status, 200, 'HTTP code is not 200')
+    t.assert_equals(r.body, tostring(body))
+    t.assert_equals(r.headers['content_type'], 'application/x-www-form-urlencoded')
+end
+
+g.test_encode_body_method_post_default_content_type_boolean = function(cg)
+    local url = cg.url
+    local opts = table.deepcopy(cg.opts)
+    opts.headers = {
+        ['content-type'] = nil,
+    }
+    local body = true
+
+    local http = client:new()
+    local r, _ = http:request("POST", url, body, opts)
+    t.assert_equals(r.status, 200, 'HTTP code is not 200')
+    t.assert_equals(r.body, tostring(body))
+    t.assert_equals(r.headers['content_type'], 'application/x-www-form-urlencoded')
+end
+
+-- Each of the httpc instance contains an independent copy of decoders table.
+g.test_body_decoders = function(_)
+    local mime_type = "application/yaml"
+
+    local httpc1 = client:new()
+    t.assert_equals(type(httpc1.decoders), 'table')
+    t.assert_not_equals(httpc1.decoders[mime_type], nil)
+    httpc1.decoders[mime_type] = nil
+
+    local httpc2 = client:new()
+    t.assert_not_equals(httpc2.decoders[mime_type], nil)
+end
+
+g.test_default_body_decoders = function(_)
+    local httpc = client:new()
+    t.assert_equals(type(httpc.decoders), 'table')
+    t.assert_equals(type(httpc.decoders['application/json']), 'function')
+    t.assert_equals(type(httpc.decoders['application/yaml']), 'function')
+    t.assert_equals(type(httpc.decoders['application/msgpack']), 'function')
+end
+
+g.test_encode_body_method_post_content_type_camelcase = function(cg)
+    local url = cg.url
+    local content_type = 'Application/JSON'
+    local opts = table.deepcopy(cg.opts)
+    opts.headers = {
+        ['content-type'] = content_type
+    }
+    local body = {
+        Moscow = 1,
+    }
+
+    local http_method = "POST"
+    local http = client:new()
+    local r, _ = http:request(http_method, url, body, opts)
+    t.assert_equals(r.status, 200, 'HTTP code is not 200')
+    t.assert_equals(r.body, json.encode(body))
+    t.assert_equals(r.headers['content_type'], content_type)
+end
+
+g.test_encode_body_method_post = function(cg)
+    local url = cg.url
+    local opts = table.deepcopy(cg.opts)
+    opts.headers = {
+        ['content-type'] = 'application/json'
+    }
+    local body = {
+        Moscow = 1,
+    }
+
+    -- Via method.
+    local http_method = "POST"
+    local http = client:new()
+    local r, _ = http:request(http_method, url, body, opts)
+    t.assert_equals(r.status, 200, 'HTTP code is not 200')
+    t.assert_equals(r.body, json.encode(body))
+    t.assert_equals(r.headers['content_type'], 'application/json')
+
+    -- Via module.
+    r, _ = client.post(url, body, opts)
+    t.assert_equals(r.status, 200, 'HTTP code is not 200')
+    t.assert_equals(r.body, json.encode(body))
+    t.assert_equals(r.headers['content_type'], 'application/json')
+end
+
+g.test_encode_body_method_put = function(cg)
+    local url = cg.url
+    local opts = table.deepcopy(cg.opts)
+    opts.headers = {
+        ['content-type'] = 'application/json'
+    }
+    local body = {
+        Moscow = 1,
+    }
+
+    -- Via method.
+    local http = client:new()
+    local http_method = "PUT"
+    local r, _ = http:request(http_method, url, body, opts)
+    t.assert_equals(r.status, 200, 'HTTP code is not 200')
+    t.assert_equals(r.body, json.encode(body))
+    t.assert_equals(r.headers['content_type'], 'application/json')
+
+    -- Via module.
+    r, _ = client.put(url, body, opts)
+    t.assert_equals(r.status, 200, 'HTTP code is not 200')
+    t.assert_equals(r.body, json.encode(body))
+    t.assert_equals(r.headers['content_type'], 'application/json')
+end
+
+g.test_encode_body_method_patch = function(cg)
+    local url = cg.url
+    local opts = table.deepcopy(cg.opts)
+    opts.headers = {
+        ['content-type'] = 'application/json'
+    }
+    local body = {
+        Moscow = 1,
+    }
+
+    -- Via method.
+    local http = client:new()
+    local http_method = "PATCH"
+    local r, _ = http:request(http_method, url, body, opts)
+    t.assert_equals(r.status, 200, 'HTTP code is not 200')
+    t.assert_equals(r.body, json.encode(body))
+    t.assert_equals(r.headers['content_type'], 'application/json')
+
+    -- Via module.
+    r, _ = client.patch(url, body, opts)
+    t.assert_equals(r.status, 200, 'HTTP code is not 200')
+    t.assert_equals(r.body, json.encode(body))
+    t.assert_equals(r.headers['content_type'], 'application/json')
+end

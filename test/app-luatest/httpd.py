@@ -80,6 +80,8 @@ def post_handle(env, response):
     for key,value in iter(env.items()):
         if "HTTP_" in key:
             headers.append((key[5:].lower(), value))
+    if env.get("CONTENT_TYPE"):
+        headers.append(("content_type", env["CONTENT_TYPE"]))
     response(code, headers)
     return body
 
