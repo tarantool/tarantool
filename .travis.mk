@@ -334,7 +334,8 @@ tarantool_linux_deps:
 	sudo apt update -y && sudo apt -y install git build-essential cmake \
 		make ninja-build zlib1g-dev libreadline-dev libncurses5-dev \
 		libssl-dev libunwind-dev libicu-dev \
-		python3 python3-six python3-gevent python3-pip
+		python3 python3-six python3-pip
+	pip3 install -r test-run/requirements.txt
 
 tarantool_linux_tests: tarantool_linux_deps cmake_build cmake_luajit_test test_run_tarantool_test
 
