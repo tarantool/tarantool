@@ -180,11 +180,9 @@ test_waitpid_f(va_list ap)
 	fflush(stderr);
 
 	pid_t pid = fork();
-
-	/* Child process: do something for 10ms and exit. */
 	if (pid == 0) {
-		usleep(10000);
-		exit(0);
+		/* Child process. */
+		execlp("true", "", NULL);
 	}
 
 	fail_if(pid == -1);
