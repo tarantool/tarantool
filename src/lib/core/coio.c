@@ -171,7 +171,7 @@ coio_connect_timeout(const char *host, const char *service, int host_hint,
 	if (host != NULL && service != NULL && host_hint != 0) {
 		if (coio_fill_addrinfo(&ai_local, host, service,
 				       host_hint) != 0)
-			return -1;
+			goto out;
 		ai = &ai_local;
 	} else {
 		struct addrinfo hints;
