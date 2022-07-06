@@ -32,7 +32,19 @@
 local driver = package.loaded.http.client
 package.loaded.http = nil
 
+local json = require('json')
+local yaml = require('yaml')
+local msgpack = require('msgpack')
+
 local curl_mt
+
+local default_content_type = 'application/json'
+
+local encoders = {
+    ['application/json'] = function(body, _content_type) return json.encode(body) end,
+    ['application/yaml'] = function(body, _content_type) return yaml.encode(body) end,
+    ['application/msgpack'] = function(body, _content_type) return msgpack.encode(body) end,
+}
 
 --
 --  <http> - create a new curl instance.
@@ -54,7 +66,10 @@ local http_new = function(opts)
     opts.max_total_connections = opts.max_total_connections or 0
 
     local curl = driver.new(opts.max_connections, opts.max_total_connections)
-    return setmetatable({ curl = curl, }, curl_mt )
+    return setmetatable({
+        curl = curl,
+        encoders = table.copy(encoders),
+    }, curl_mt)
 end
 
 local check_args_fmt = 'Use client:%s(...) instead of client.%s(...):'
@@ -228,6 +243,82 @@ local function process_headers(headers)
     return headers
 end
 
+-- In RFC 1521, the Content-Type entity-header field indicates the media type
+-- of the Entity-Body:
+--
+--   Content-Type   = "Content-Type" ":" media-type
+--
+-- Where media-type is defined as follows:
+--
+--   media-type     = type "/" subtype *( ";" parameter )
+--
+-- See RFC 1521, https://www.w3.org/Protocols/HTTP/1.0/spec.html#Media-Types
+-- Function splits header with content type for part with type, part with
+-- subtype and part with parameters and returns a string "type/subtype".
+local function extract_mime_type(content_type)
+    if content_type == nil then
+        return nil
+    end
+    if type(content_type) ~= "string" then
+        error('content type must be a string')
+    end
+    return content_type:split(';', 1)[1]:strip()
+end
+
+local function string_lower(str)
+    if type(str) == 'string' then
+        str = str:lower()
+    end
+    return str
+end
+
+-- Get a value from map by case-insensitive key.
+-- Returns the value in the lower case on the first match.
+local function get_icase(t, key)
+    key = string_lower(key)
+    for k, v in pairs(t) do
+        k = string_lower(k)
+        if k == key then
+            v = string_lower(v)
+            return v
+        end
+    end
+
+    return nil
+end
+
+local function encode_body(body, content_type, encoders)
+    local raw_body
+    local body_type = type(body)
+    local mime_type
+    if body == nil then
+        raw_body = ''
+    elseif body_type == 'cdata' or
+           body_type == 'userdata' or
+           body_type == 'table' then
+        mime_type = extract_mime_type(content_type)
+        mime_type = string_lower(mime_type)
+        local encoder = encoders[mime_type]
+        if encoder == nil then
+            local msg = 'Unable to encode body: encode function is not found (%s)'
+            error(msg:format(content_type))
+        end
+        local ok, res = pcall(encoder, body, content_type)
+        if not ok then
+            error(('Unable to encode body: %s'):format(res))
+        end
+        raw_body = res
+    elseif body_type == 'number' or
+           body_type == 'string' or
+           body_type == 'boolean' then
+        raw_body = tostring(body)
+    else
+        error(('Unsupported body type: %s'):format(body_type))
+    end
+
+    return raw_body
+end
+
 --
 --  <request> This function does HTTP request
 --
@@ -317,6 +408,25 @@ curl_mt = {
             if not method or not url then
                 error('request(method, url[, body, [options]])')
             end
+
+            opts = opts or {}
+            opts.headers = opts.headers or {}
+            method = method:upper()
+            if method == 'PATCH' or
+               method == 'POST' or
+               method == 'PUT' then
+                local content_type = get_icase(opts.headers, 'content-type')
+                if content_type == nil then
+                    content_type = default_content_type
+                    local body_type = type(body)
+                    if body_type == 'cdata' or
+                       body_type == 'userdata' or
+                       body_type == 'table' then
+                        opts.headers['content-type'] = default_content_type
+                    end
+                end
+                body = encode_body(body, content_type, self.encoders)
+            end
             local resp = self.curl:request(method, url, body, opts or {})
             if resp and resp.headers then
                 if resp.headers['set-cookie'] ~= nil then
@@ -324,6 +434,7 @@ curl_mt = {
                 end
                 resp.headers = process_headers(resp.headers)
             end
+
             return resp
         end,
 
@@ -439,7 +550,16 @@ curl_mt = {
 -- Export
 --
 local http_default = http_new()
-local this_module = { new = http_new, }
+local this_module = {
+    new = http_new,
+    encoders = table.copy(encoders),
+    _internal = {
+        default_content_type = default_content_type,
+        encode_body = encode_body,
+        extract_mime_type = extract_mime_type,
+        get_icase = get_icase,
+    }
+}
 
 local function http_default_wrap(fname)
     return function(...) return http_default[fname](http_default, ...) end
