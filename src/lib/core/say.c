@@ -750,11 +750,24 @@ fail:
 	panic("failed to initialize logging subsystem");
 }
 
+/*
+ * Logger uses events loop and to free resources we need
+ * to wait until logs rotation is complete. Thus make sure
+ * this routine is called before events loop is finished.
+ */
 void
 say_logger_free(void)
 {
-	if (say_logger_initialized())
+	if (say_logger_initialized()) {
 		log_destroy(&log_std);
+		/*
+		 * Once destroyed switch to boot logger
+		 * because boot logger is safe to use
+		 * anytime and might be suitable for
+		 * debugging.
+		 */
+		log_default = &log_boot;
+	}
 }
 
 /** {{{ Formatters */
