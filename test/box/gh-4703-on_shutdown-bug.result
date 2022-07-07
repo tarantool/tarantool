@@ -20,9 +20,10 @@ test_run:cmd("setopt delimiter ';'");
  | ---
  | - true
  | ...
+-- Extra \n is required on openSUSE.
 on_shutdown_cmd = "box.ctl.on_shutdown(function() local fio = require('fio') "..
                    "fio.open('"..file_name.."', "..
-                   "{'O_CREAT', 'O_TRUNC', 'O_WRONLY'}, 777):close() end)";
+                   "{'O_CREAT', 'O_TRUNC', 'O_WRONLY'}, 777):close() end)\n";
  | ---
  | ...
 test_run:cmd("setopt delimiter ''");
