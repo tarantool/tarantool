@@ -1330,13 +1330,12 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	tuple_arena_create(&memtx->arena, &memtx->quota, tuple_arena_max_size,
 			   SLAB_SIZE, dontdump, "memtx");
 	slab_cache_create(&memtx->slab_cache, &memtx->arena);
-	memtx->free_mode = MEMTX_ENGINE_FREE;
 	float actual_alloc_factor;
 	allocator_settings alloc_settings;
 	allocator_settings_init(&alloc_settings, &memtx->slab_cache,
 				objsize_min, granularity, alloc_factor,
 				&actual_alloc_factor, &memtx->quota);
-	memtx_allocators_init(memtx, &alloc_settings);
+	memtx_allocators_init(&alloc_settings);
 	memtx_set_tuple_format_vtab(allocator);
 
 	say_info("Actual slab_alloc_factor calculated on the basis of desired "
@@ -1403,21 +1402,15 @@ memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size)
 void
 memtx_enter_delayed_free_mode(struct memtx_engine *memtx)
 {
-	memtx->snapshot_version++;
-	if (memtx->delayed_free_mode++ == 0) {
-		memtx->free_mode = MEMTX_ENGINE_DELAYED_FREE;
-		memtx_allocators_set_mode(memtx->free_mode);
-	}
+	(void)memtx;
+	memtx_allocators_enter_delayed_free_mode();
 }
 
 void
 memtx_leave_delayed_free_mode(struct memtx_engine *memtx)
 {
-	assert(memtx->delayed_free_mode > 0);
-	if (--memtx->delayed_free_mode == 0) {
-		memtx->free_mode = MEMTX_ENGINE_COLLECT_GARBAGE;
-		memtx_allocators_set_mode(memtx->free_mode);
-	}
+	(void)memtx;
+	memtx_allocators_leave_delayed_free_mode();
 }
 
 template<class ALLOC>
@@ -1438,18 +1431,13 @@ memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 	if (tuple_field_map_create(format, data, validate, &builder) != 0)
 		goto end;
 	field_map_size = field_map_build_size(&builder);
-	/*
-	 * Data offset is calculated from the begin of the struct
-	 * tuple base, not from memtx_tuple, because the struct
-	 * tuple is not the first field of the memtx_tuple.
-	 */
 	data_offset = sizeof(struct tuple) + field_map_size;
 	if (tuple_check_data_offset(data_offset) != 0)
 		goto end;
 
 	tuple_len = end - data;
 	assert(tuple_len <= UINT32_MAX); /* bsize is UINT32_MAX */
-	total = sizeof(struct memtx_tuple) + field_map_size + tuple_len;
+	total = sizeof(struct tuple) + field_map_size + tuple_len;
 
 	make_compact = tuple_can_be_compact(data_offset, tuple_len);
 	if (make_compact) {
@@ -1467,27 +1455,23 @@ memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 		goto end;
 	}
 
-	struct memtx_tuple *memtx_tuple;
-	while ((memtx_tuple = (struct memtx_tuple *)
-			MemtxAllocator<ALLOC>::alloc(total)) == NULL) {
+	while ((tuple = MemtxAllocator<ALLOC>::alloc_tuple(total)) == NULL) {
 		bool stop;
 		memtx_engine_run_gc(memtx, &stop);
 		if (stop)
 			break;
 	}
-	if (memtx_tuple == NULL) {
+	if (tuple == NULL) {
 		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
 		goto end;
 	}
-	tuple = &memtx_tuple->base;
 	tuple_create(tuple, 0, tuple_format_id(format),
 		     data_offset, tuple_len, make_compact);
-	memtx_tuple->version = memtx->snapshot_version;
 	tuple_format_ref(format);
 	raw = (char *) tuple + data_offset;
 	field_map_build(&builder, raw - field_map_size);
 	memcpy(raw, data, tuple_len);
-	say_debug("%s(%zu) = %p", __func__, tuple_len, memtx_tuple);
+	say_debug("%s(%zu) = %p", __func__, tuple_len, tuple);
 end:
 	region_truncate(region, region_svp);
 	return tuple;
@@ -1504,18 +1488,9 @@ template<class ALLOC>
 static void
 memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
-	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
 	assert(tuple_is_unreferenced(tuple));
-	struct memtx_tuple *memtx_tuple =
-		container_of(tuple, struct memtx_tuple, base);
-	say_debug("%s(%p)", __func__, memtx_tuple);
-	if (memtx->free_mode != MEMTX_ENGINE_DELAYED_FREE ||
-	    memtx_tuple->version == memtx->snapshot_version ||
-	    format->is_temporary) {
-		MemtxAllocator<ALLOC>::free(memtx_tuple);
-	} else {
-		MemtxAllocator<ALLOC>::delayed_free(memtx_tuple);
-	}
+	say_debug("%s(%p)", __func__, tuple);
+	MemtxAllocator<ALLOC>::free_tuple(tuple, format->is_temporary);
 	tuple_format_unref(format);
 }
 
