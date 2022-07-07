@@ -30,8 +30,19 @@
  * SUCH DAMAGE.
  */
 #include "allocator.h"
-#include "memtx_engine.h"
 #include "tuple.h"
+
+/**
+ * Free mode, determines a strategy for freeing up memory
+ */
+enum memtx_engine_free_mode {
+	/** Free objects immediately. */
+	MEMTX_ENGINE_FREE,
+	/** Collect garbage after delayed free. */
+	MEMTX_ENGINE_COLLECT_GARBAGE,
+	/** Postpone deletion of objects. */
+	MEMTX_ENGINE_DELAYED_FREE,
+};
 
 struct PACKED memtx_tuple {
 	/*
@@ -48,50 +59,103 @@ struct PACKED memtx_tuple {
 template<class Allocator>
 class MemtxAllocator {
 public:
-	static void free(void *item)
-	{
-		struct memtx_tuple *memtx_tuple = (struct memtx_tuple *) item;
-		struct tuple *tuple = &memtx_tuple->base;
-		size_t total = tuple_size(tuple) +
-			       offsetof(struct memtx_tuple, base);
-		Allocator::free((void *) memtx_tuple, total);
-	}
-
 	static void free(void *ptr, size_t size)
 	{
 		Allocator::free(ptr, size);
 	}
 
-	static void delayed_free(void *ptr)
-	{
-		lifo_push(&lifo, ptr);
-	}
-
-	static void * alloc(size_t size)
+	static void *alloc(size_t size)
 	{
 		collect_garbage();
 		return Allocator::alloc(size);
 	}
 
-	static void create(enum memtx_engine_free_mode m)
+	static void create()
 	{
-		mode = m;
+		mode = MEMTX_ENGINE_FREE;
 		lifo_init(&lifo);
-	}
-
-	static void set_mode(enum memtx_engine_free_mode m)
-	{
-		mode = m;
 	}
 
 	static void destroy()
 	{
 		void *item;
 		while ((item = lifo_pop(&lifo)))
-			free(item);
+			immediate_free_tuple((struct memtx_tuple *)item);
 	}
+
+	/**
+	 * Enter tuple delayed free mode: tuple allocated before the call
+	 * won't be freed until leave_delayed_free_mode() is called.
+	 * This function is reentrant, meaning it's okay to call it multiple
+	 * times from the same or different fibers - one just has to leave
+	 * the delayed free mode the same amount of times then.
+	 */
+	static void enter_delayed_free_mode()
+	{
+		snapshot_version++;
+		if (delayed_free_mode++ == 0)
+			mode = MEMTX_ENGINE_DELAYED_FREE;
+	}
+
+	/**
+	 * Leave tuple delayed free mode. This function undoes the effect
+	 * of enter_delayed_free_mode().
+	 */
+	static void leave_delayed_free_mode()
+	{
+		assert(delayed_free_mode > 0);
+		if (--delayed_free_mode == 0)
+			mode = MEMTX_ENGINE_COLLECT_GARBAGE;
+	}
+
+	/**
+	 * Allocate a tuple of the given size.
+	 */
+	static struct tuple *alloc_tuple(size_t size)
+	{
+		size_t total = size + offsetof(struct memtx_tuple, base);
+		struct memtx_tuple *memtx_tuple =
+			(struct memtx_tuple *)alloc(total);
+		if (memtx_tuple == NULL)
+			return NULL;
+		memtx_tuple->version = snapshot_version;
+		return &memtx_tuple->base;
+	}
+
+	/**
+	 * Free a tuple allocated with alloc_tuple().
+	 *
+	 * The tuple is freed immediately if there's no snapshot that may use
+	 * it. Otherwise, it's put in the garbage collection list to be free as
+	 * soon as the last snapshot using it is destroyed.
+	 */
+	static void free_tuple(struct tuple *tuple, bool is_temporary)
+	{
+		struct memtx_tuple *memtx_tuple = container_of(
+			tuple, struct memtx_tuple, base);
+		if (mode != MEMTX_ENGINE_DELAYED_FREE ||
+		    memtx_tuple->version == snapshot_version ||
+		    is_temporary) {
+			immediate_free_tuple(memtx_tuple);
+		} else {
+			delayed_free_tuple(memtx_tuple);
+		}
+	}
+
 private:
 	static constexpr int GC_BATCH_SIZE = 100;
+
+	static void immediate_free_tuple(struct memtx_tuple *memtx_tuple)
+	{
+		size_t size = tuple_size(&memtx_tuple->base) +
+			      offsetof(struct memtx_tuple, base);
+		free(memtx_tuple, size);
+	}
+
+	static void delayed_free_tuple(struct memtx_tuple *memtx_tuple)
+	{
+		lifo_push(&lifo, memtx_tuple);
+	}
 
 	static void collect_garbage()
 	{
@@ -102,14 +166,29 @@ private:
 				void *item = lifo_pop(&lifo);
 				if (item == NULL)
 					break;
-				free(item);
+				immediate_free_tuple(
+					(struct memtx_tuple *)item);
 			}
 		} else {
 			mode = MEMTX_ENGINE_FREE;
 		}
 	}
+
+	/**
+	 * Tuple garbage collection list. Contains tuples that were not freed
+	 * immediately because they are currently in use by a snapshot.
+	 */
 	static struct lifo lifo;
+	/** Free mode, determines a strategy for freeing up memory. */
 	static enum memtx_engine_free_mode mode;
+	/**
+	 * Unless zero, freeing of tuples allocated before the last call to
+	 * enter_delayed_free_mode() is delayed until leave_delayed_free_mode()
+	 * is called.
+	 */
+	static uint32_t delayed_free_mode;
+	/** Incremented with each next snapshot. */
+	static uint32_t snapshot_version;
 };
 
 template<class Allocator>
@@ -118,15 +197,25 @@ struct lifo MemtxAllocator<Allocator>::lifo;
 template<class Allocator>
 enum memtx_engine_free_mode MemtxAllocator<Allocator>::mode;
 
-void
-memtx_allocators_init(struct memtx_engine *memtx,
-		      struct allocator_settings *settings);
+template<class Allocator>
+uint32_t MemtxAllocator<Allocator>::delayed_free_mode;
+
+template<class Allocator>
+uint32_t MemtxAllocator<Allocator>::snapshot_version;
 
 void
-memtx_allocators_set_mode(enum memtx_engine_free_mode mode);
+memtx_allocators_init(struct allocator_settings *settings);
 
 void
 memtx_allocators_destroy();
+
+/** Call enter_delayed_free_mode for each MemtxAllocator. */
+void
+memtx_allocators_enter_delayed_free_mode();
+
+/** Call leave_delayed_free_mode for each MemtxAllocator. */
+void
+memtx_allocators_leave_delayed_free_mode();
 
 using memtx_allocators = std::tuple<MemtxAllocator<SmallAlloc>,
 				    MemtxAllocator<SysAlloc>>;

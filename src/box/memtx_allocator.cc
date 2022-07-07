@@ -30,31 +30,13 @@
  */
 #include "memtx_allocator.h"
 
-struct memtx_allocator_set_mode {
-	template<typename Allocator, typename...Arg>
-	void
-	invoke(Arg&&...mode)
-	{
-		Allocator::set_mode(mode...);
-	}
-};
-
 void
-memtx_allocators_init(struct memtx_engine *memtx,
-		      struct allocator_settings *settings)
+memtx_allocators_init(struct allocator_settings *settings)
 {
 	foreach_allocator<allocator_create,
 		struct allocator_settings *&>(settings);
 
-	foreach_memtx_allocator<allocator_create,
-		enum memtx_engine_free_mode &>(memtx->free_mode);
-}
-
-void
-memtx_allocators_set_mode(enum memtx_engine_free_mode mode)
-{
-	foreach_memtx_allocator<memtx_allocator_set_mode,
-		enum memtx_engine_free_mode &>(mode);
+	foreach_memtx_allocator<allocator_create>();
 }
 
 void
@@ -62,4 +44,34 @@ memtx_allocators_destroy()
 {
 	foreach_memtx_allocator<allocator_destroy>();
 	foreach_allocator<allocator_destroy>();
+}
+
+/** Helper for memtx_allocator_enter_delayed_free_mode(). */
+struct memtx_allocator_enter_delayed_free_mode {
+	template<typename Allocator>
+	void invoke()
+	{
+		Allocator::enter_delayed_free_mode();
+	}
+};
+
+void
+memtx_allocators_enter_delayed_free_mode()
+{
+	foreach_memtx_allocator<memtx_allocator_enter_delayed_free_mode>();
+}
+
+/** Helper for memtx_allocator_leave_delayed_free_mode(). */
+struct memtx_allocator_leave_delayed_free_mode {
+	template<typename Allocator>
+	void invoke()
+	{
+		Allocator::leave_delayed_free_mode();
+	}
+};
+
+void
+memtx_allocators_leave_delayed_free_mode()
+{
+	foreach_memtx_allocator<memtx_allocator_leave_delayed_free_mode>();
 }
