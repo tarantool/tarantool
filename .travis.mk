@@ -87,10 +87,11 @@ deps_tests:
 
 deps_ubuntu_ghactions: deps_tests
 	sudo apt-get update ${APT_EXTRA_FLAGS} && \
-		sudo apt-get install -y -f libreadline-dev libunwind-dev autoconf automake
+		sudo apt-get install -y -f libreadline-dev libunwind-dev \
+		autoconf automake libtool
 
 deps_coverage_ubuntu_ghactions: deps_ubuntu_ghactions
-	sudo apt-get install -y -f lcov ninja-build autoconf automake
+	sudo apt-get install -y -f lcov ninja-build autoconf automake libtool
 	sudo gem install coveralls-lcov
 	# Link src/lib/uri/src to local src dircetory to avoid of issue:
 	# /var/lib/gems/2.7.0/gems/coveralls-lcov-1.7.0/lib/coveralls/lcov/converter.rb:64:in
@@ -261,7 +262,7 @@ deps_debian_static: deps_tests
 	# while liblzma dynamic library exists. So the build dynamicaly has no
 	# issues, while static build fails. To fix it we need to install
 	# liblzma-dev package with static library only for static build.
-	sudo apt-get install -y -f liblzma-dev autoconf automake
+	sudo apt-get install -y -f liblzma-dev autoconf automake libtool
 
 test_static_build: deps_debian_static
 	CMAKE_EXTRA_PARAMS=-DBUILD_STATIC=ON make -f .travis.mk test_debian_no_deps
@@ -337,7 +338,7 @@ test_oos_build:
 deps_odroid_arm64:
 	sudo apt update -y && sudo apt -y install git build-essential cmake make zlib1g-dev \
 		libreadline-dev libncurses5-dev libssl-dev libunwind-dev libicu-dev python3 \
-		python3-six python3-pip autoconf automake
+		python3-six python3-pip autoconf automake libtool
 	pip3 install -r test-run/requirements.txt
 
 build_odroid_arm64:
@@ -503,7 +504,7 @@ test_run_tarantool_test:
 tarantool_linux_deps:
 	sudo apt update -y && sudo apt -y install git build-essential cmake \
 		make ninja-build zlib1g-dev libreadline-dev libncurses5-dev \
-		libssl-dev libunwind-dev libicu-dev autoconf automake \
+		libssl-dev libunwind-dev libicu-dev autoconf automake libtool \
 		python3 python3-six python3-pip
 	pip3 install -r test-run/requirements.txt
 
