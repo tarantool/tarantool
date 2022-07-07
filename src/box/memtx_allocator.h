@@ -64,7 +64,7 @@ public:
 
 	static void delayed_free(void *ptr)
 	{
-		lifo_push(&MemtxAllocator<Allocator>::lifo, ptr);
+		lifo_push(&lifo, ptr);
 	}
 
 	static void * alloc(size_t size)
@@ -75,19 +75,19 @@ public:
 
 	static void create(enum memtx_engine_free_mode m)
 	{
-		MemtxAllocator<Allocator>::mode = m;
-		lifo_init(&MemtxAllocator<Allocator>::lifo);
+		mode = m;
+		lifo_init(&lifo);
 	}
 
 	static void set_mode(enum memtx_engine_free_mode m)
 	{
-		MemtxAllocator<Allocator>::mode = m;
+		mode = m;
 	}
 
 	static void destroy()
 	{
 		void *item;
-		while ((item = lifo_pop(&MemtxAllocator<Allocator>::lifo)))
+		while ((item = lifo_pop(&lifo)))
 			free(item);
 	}
 private:
@@ -95,18 +95,17 @@ private:
 
 	static void collect_garbage()
 	{
-		if (MemtxAllocator<Allocator>::mode !=
-		    MEMTX_ENGINE_COLLECT_GARBAGE)
+		if (mode != MEMTX_ENGINE_COLLECT_GARBAGE)
 			return;
-		if (! lifo_is_empty(&MemtxAllocator<Allocator>::lifo)) {
+		if (!lifo_is_empty(&lifo)) {
 			for (int i = 0; i < GC_BATCH_SIZE; i++) {
-				void *item = lifo_pop(&MemtxAllocator<Allocator>::lifo);
+				void *item = lifo_pop(&lifo);
 				if (item == NULL)
 					break;
 				free(item);
 			}
 		} else {
-			MemtxAllocator<Allocator>::mode = MEMTX_ENGINE_FREE;
+			mode = MEMTX_ENGINE_FREE;
 		}
 	}
 	static struct lifo lifo;
