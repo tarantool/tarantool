@@ -78,7 +78,7 @@ deps_ubuntu_ghactions: deps_tests
 		    autoconf automake libtool
 
 deps_coverage_ubuntu_ghactions: deps_ubuntu_ghactions
-	sudo apt-get install -y -f lcov
+	sudo apt-get install -y -f lcov autoconf automake
 	sudo gem install coveralls-lcov
 	# Link src/lib/uri/src to local src dircetory to avoid of issue:
 	# /var/lib/gems/2.7.0/gems/coveralls-lcov-1.7.0/lib/coveralls/lcov/converter.rb:64:in
@@ -227,7 +227,7 @@ deps_debian_static: deps_tests
 	# while liblzma dynamic library exists. So the build dynamicaly has no
 	# issues, while static build fails. To fix it we need to install
 	# liblzma-dev package with static library only for static build.
-	sudo apt-get install -y -f liblzma-dev
+	sudo apt-get install -y -f liblzma-dev autoconf automake
 
 test_static_build: deps_debian_static
 	CMAKE_EXTRA_PARAMS=-DBUILD_STATIC=ON make -f .travis.mk test_debian_no_deps
@@ -333,7 +333,7 @@ test_run_tarantool_test:
 tarantool_linux_deps:
 	sudo apt update -y && sudo apt -y install git build-essential cmake \
 		make ninja-build zlib1g-dev libreadline-dev libncurses5-dev \
-		libssl-dev libunwind-dev libicu-dev \
+		libssl-dev libunwind-dev libicu-dev autoconf automake \
 		python3 python3-six python3-pip
 	pip3 install -r test-run/requirements.txt
 
