@@ -1457,6 +1457,8 @@ memtx_tuple_new_raw_impl(struct tuple_format *format, const char *data,
 	}
 	tuple_create(tuple, 0, tuple_format_id(format),
 		     data_offset, tuple_len, make_compact);
+	if (format->is_temporary)
+		tuple_set_flag(tuple, TUPLE_IS_TEMPORARY);
 	tuple_format_ref(format);
 	raw = (char *) tuple + data_offset;
 	field_map_build(&builder, raw - field_map_size);
@@ -1480,7 +1482,7 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
 	assert(tuple_is_unreferenced(tuple));
 	say_debug("%s(%p)", __func__, tuple);
-	MemtxAllocator<ALLOC>::free_tuple(tuple, format->is_temporary);
+	MemtxAllocator<ALLOC>::free_tuple(tuple);
 	tuple_format_unref(format);
 }
 
