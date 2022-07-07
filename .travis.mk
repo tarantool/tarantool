@@ -302,10 +302,10 @@ test_osx_github_actions: deps_osx_github_actions test_osx_no_deps
 ###########
 
 deps_freebsd:
-	sudo pkg install -y git cmake gmake icu libiconv \
-		python38 py38-yaml py38-six py38-gevent \
-		autoconf automake libtool
+	sudo pkg install -y git cmake gmake icu libiconv python38
 	which python3 || sudo ln -s /usr/local/bin/python3.8 /usr/local/bin/python3
+	python3 -m pip -V || curl -fsSL https://bootstrap.pypa.io/get-pip.py | python3
+	python3 -m pip install -r test-run/requirements.txt
 
 build_freebsd:
 	if [ "$$(swapctl -l | wc -l)" != "1" ]; then sudo swapoff -a ; fi ; swapctl -l
