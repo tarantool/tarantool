@@ -313,6 +313,11 @@ enum tuple_flag {
 	 * be clarified by transaction engine.
 	 */
 	TUPLE_IS_DIRTY = 1,
+	/**
+	 * The tuple belongs to a temporary space so it can be freed
+	 * immediately while a snapshot is in progress.
+	 */
+	TUPLE_IS_TEMPORARY = 2,
 	tuple_flag_MAX,
 };
 
@@ -682,7 +687,8 @@ tuple_delete(struct tuple *tuple)
 {
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->local_refs == 0);
-	assert(tuple->flags == 0);
+	assert(!tuple_has_flag(tuple, TUPLE_HAS_UPLOADED_REFS));
+	assert(!tuple_has_flag(tuple, TUPLE_IS_DIRTY));
 	struct tuple_format *format = tuple_format(tuple);
 	format->vtab.tuple_delete(format, tuple);
 }

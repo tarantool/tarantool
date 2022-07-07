@@ -129,13 +129,13 @@ public:
 	 * it. Otherwise, it's put in the garbage collection list to be free as
 	 * soon as the last snapshot using it is destroyed.
 	 */
-	static void free_tuple(struct tuple *tuple, bool is_temporary)
+	static void free_tuple(struct tuple *tuple)
 	{
 		struct memtx_tuple *memtx_tuple = container_of(
 			tuple, struct memtx_tuple, base);
 		if (mode != MEMTX_ENGINE_DELAYED_FREE ||
 		    memtx_tuple->version == snapshot_version ||
-		    is_temporary) {
+		    tuple_has_flag(tuple, TUPLE_IS_TEMPORARY)) {
 			immediate_free_tuple(memtx_tuple);
 		} else {
 			delayed_free_tuple(memtx_tuple);
