@@ -52,18 +52,6 @@ struct tuple;
 struct tuple_format;
 
 /**
- * Free mode, determines a strategy for freeing up memory
- */
-enum memtx_engine_free_mode {
-	/** Free objects immediately. */
-	MEMTX_ENGINE_FREE,
-	/** Collect garbage after delayed free. */
-	MEMTX_ENGINE_COLLECT_GARBAGE,
-	/** Postpone deletion of objects. */
-	MEMTX_ENGINE_DELAYED_FREE,
-};
-
-/**
  * Recovery state of memtx engine.
  *
  * For faster recovery an optimization is used: initial recovery
@@ -163,14 +151,6 @@ struct memtx_engine {
 	void *reserved_extents;
 	/** Maximal allowed tuple size, box.cfg.memtx_max_tuple_size. */
 	size_t max_tuple_size;
-	/** Incremented with each next snapshot. */
-	uint32_t snapshot_version;
-	/**
-	 * Unless zero, freeing of tuples allocated before the last
-	 * call to memtx_enter_delayed_free_mode() is delayed until
-	 * memtx_leave_delayed_free_mode() is called.
-	 */
-	uint32_t delayed_free_mode;
 	/** Memory pool for rtree index iterator. */
 	struct mempool rtree_iterator_pool;
 	/**
@@ -189,10 +169,6 @@ struct memtx_engine {
 	 * memtx_gc_task::link.
 	 */
 	struct stailq gc_queue;
-	/**
-	 * Free mode, determines a strategy for freeing up memory
-	 */
-	enum memtx_engine_free_mode free_mode;
 };
 
 struct memtx_gc_task;
