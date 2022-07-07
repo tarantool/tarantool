@@ -735,6 +735,7 @@ checkpoint_delete(struct checkpoint *ckpt)
 		entry->iterator->free(entry->iterator);
 		free(entry);
 	}
+	memtx_allocators_leave_delayed_free_mode();
 	xdir_destroy(&ckpt->dir);
 	free(ckpt);
 }
@@ -888,6 +889,7 @@ memtx_engine_begin_checkpoint(struct engine *engine, bool is_scheduled)
 		memtx->checkpoint = NULL;
 		return -1;
 	}
+	memtx_allocators_enter_delayed_free_mode();
 	return 0;
 }
 
@@ -1062,6 +1064,7 @@ memtx_engine_prepare_join(struct engine *engine, void **arg)
 		free(ctx);
 		return -1;
 	}
+	memtx_allocators_enter_delayed_free_mode();
 	*arg = ctx;
 	return 0;
 }
@@ -1139,6 +1142,7 @@ memtx_engine_complete_join(struct engine *engine, void *arg)
 		entry->iterator->free(entry->iterator);
 		free(entry);
 	}
+	memtx_allocators_leave_delayed_free_mode();
 	free(ctx);
 }
 
@@ -1397,20 +1401,6 @@ void
 memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size)
 {
 	memtx->max_tuple_size = max_size;
-}
-
-void
-memtx_enter_delayed_free_mode(struct memtx_engine *memtx)
-{
-	(void)memtx;
-	memtx_allocators_enter_delayed_free_mode();
-}
-
-void
-memtx_leave_delayed_free_mode(struct memtx_engine *memtx)
-{
-	(void)memtx;
-	memtx_allocators_leave_delayed_free_mode();
 }
 
 template<class ALLOC>
