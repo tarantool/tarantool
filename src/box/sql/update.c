@@ -274,6 +274,8 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	 */
 	sqlWhereEnd(pWInfo);
 
+	int64_t reg = ++pParse->nMem;
+	sqlVdbeAddOp2(v, OP_OpenSpace, (int)reg, space->def->id);
 	labelBreak = sqlVdbeMakeLabel(v);
 	/* Top of the update loop */
 	if (okOnePass) {
@@ -419,9 +421,9 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 			fk_constraint_emit_check(pParse, space, 0, regNewPk, aXRef);
 		}
 		if (on_error == ON_CONFLICT_ACTION_REPLACE) {
-			 vdbe_emit_insertion_completion(v, space, regNew,
-							space->def->field_count,
-							on_error, 0);
+			vdbe_emit_insertion_completion(v, reg, regNew,
+						       space->def->field_count,
+						       on_error, 0);
 
 		} else {
 			int key_reg;
@@ -451,8 +453,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 			u16 pik_flags = OPFLAG_NCHANGE;
 			SET_CONFLICT_FLAG(pik_flags, on_error);
 			sqlVdbeAddOp4(v, OP_Update, regNew, key_reg,
-					  upd_cols_reg, (char *)space,
-					  P4_SPACEPTR);
+				      upd_cols_reg, (char *)reg, P4_INT32);
 			sqlVdbeChangeP5(v, pik_flags);
 		}
 		/*

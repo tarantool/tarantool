@@ -354,12 +354,11 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		 */
 		if (!is_view) {
 			int iAddrOnce = 0;
-			if (one_pass == ONEPASS_MULTI) {
+			if (one_pass == ONEPASS_MULTI)
 				iAddrOnce = sqlVdbeAddOp0(v, OP_Once);
-				VdbeCoverage(v);
-			}
-			sqlVdbeAddOp4(v, OP_IteratorOpen, tab_cursor, 0, 0,
-					  (void *) space, P4_SPACEPTR);
+			int reg = ++parse->nMem;
+			sqlVdbeAddOp2(v, OP_OpenSpace, reg, space->def->id);
+			sqlVdbeAddOp3(v, OP_IteratorOpen, tab_cursor, 0, reg);
 			VdbeComment((v, "%s", space->index[0]->def->name));
 
 			if (one_pass == ONEPASS_MULTI)

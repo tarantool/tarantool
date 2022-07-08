@@ -129,8 +129,10 @@ sql_alter_ck_constraint_enable(struct Parse *parse)
 		      tuple_reg + field_count - 1);
 	sqlVdbeAddOp3(v, OP_MakeRecord, tuple_reg, field_count,
 		      tuple_reg + field_count);
-	sqlVdbeAddOp4(v, OP_IdxReplace, tuple_reg + field_count, 0, 0,
-		      (char *)ck_space, P4_SPACEPTR);
+
+	int reg = ++parse->nMem;
+	sqlVdbeAddOp2(v, OP_OpenSpace, reg, BOX_CK_CONSTRAINT_ID);
+	sqlVdbeAddOp2(v, OP_IdxReplace, tuple_reg + field_count, reg);
 exit_alter_ck_constraint:
 	sqlDbFree(db, constraint_name);
 	sqlSrcListDelete(db, src_tab);
