@@ -711,6 +711,14 @@ static int dump_node(struct lua_yaml_dumper *dumper)
       case MP_ERROR:
          str = field.errorval->errmsg;
          len = strlen(str);
+         if (!utf8_check_printable(str, len)) {
+            is_binary = 1;
+            lua_pop(dumper->L, 1);
+            lua_pushlstring(dumper->L, str, len);
+            tobase64(dumper->L, -1);
+            str = lua_tolstring(dumper->L, -1, &len);
+            tag = (yaml_char_t *) LUAYAML_TAG_PREFIX "binary";
+         }
          break;
       case MP_DATETIME:
          len = datetime_to_string(field.dateval, buf, sizeof(buf));
