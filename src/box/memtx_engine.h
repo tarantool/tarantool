@@ -232,35 +232,12 @@ enum {
 };
 
 /**
- * Allocates size bytes using the memtx allocator (MemtxAllocator::alloc).
- * On error returns NULL. Does not set diag.
- */
-extern void *
-(*memtx_alloc)(uint32_t size);
-
-/**
- * Frees memory allocated with memtx_alloc.
- */
-extern void
-(*memtx_free)(void *ptr);
-
-/**
  * Allocate and return new memtx tuple. Data validation depends
  * on @a validate value. On error returns NULL and set diag.
  */
 extern struct tuple *
 (*memtx_tuple_new_raw)(struct tuple_format *format, const char *data,
 		       const char *end, bool validate);
-
-/**
- * Returns the size of an allocation done with memtx_alloc.
- * (The size is stored before the data.)
- */
-static inline uint32_t
-memtx_alloc_size(void *ptr)
-{
-	return *((uint32_t *)ptr - 1);
-}
 
 /**
  * Allocate a block of size MEMTX_EXTENT_SIZE for memtx index
