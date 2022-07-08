@@ -17,6 +17,10 @@ g.before_each(function(cg)
 end)
 
 g.after_each(function(cg)
+    -- The replica should fail to initialize and exit by itself, but let's
+    -- still try to kill it to prevent it from lingering until the next test,
+    -- because the next test may try to connect to the same URI.
+    pcall(cg.replica.stop, cg.replica)
     cg.master:drop()
 end)
 
