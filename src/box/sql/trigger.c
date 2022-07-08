@@ -193,9 +193,6 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 		if (db->mallocFailed)
 			goto cleanup;
 
-		struct space *_trigger = space_by_id(BOX_TRIGGER_ID);
-		assert(_trigger != NULL);
-
 		int first_col = parse->nMem + 1;
 		parse->nMem += 3;
 		int record = ++parse->nMem;
@@ -227,9 +224,9 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 		sqlVdbeAddOp4(v, OP_Blob, opts_buff_sz, first_col + 2,
 				  SQL_SUBTYPE_MSGPACK, opts_buff, P4_DYNAMIC);
 		sqlVdbeAddOp3(v, OP_MakeRecord, first_col, 3, record);
-		sqlVdbeAddOp4(v, OP_IdxInsert, record, 0, 0,
-				  (char *)_trigger, P4_SPACEPTR);
-
+		int reg = ++parse->nMem;
+		sqlVdbeAddOp2(v, OP_OpenSpace, reg, BOX_TRIGGER_ID);
+		sqlVdbeAddOp2(v, OP_IdxInsert, record, reg);
 		sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 
 		sql_set_multi_write(parse, false);
