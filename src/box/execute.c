@@ -583,8 +583,11 @@ sql_execute_prepared(uint32_t stmt_id, const struct sql_bind *bind,
 	struct sql_stmt *stmt = sql_stmt_cache_find(stmt_id);
 	assert(stmt != NULL);
 	if (!sql_stmt_schema_version_is_valid(stmt)) {
-		diag_set(ClientError, ER_SQL_EXECUTE, "statement has expired");
-		return -1;
+		if (sql_reprepare(&stmt) != 0) {
+			diag_set(ClientError, ER_SQL_EXECUTE,
+				 "statement reprepare failed");
+			return -1;
+		}
 	}
 	if (sql_stmt_busy(stmt)) {
 		const char *sql_str = sql_stmt_query_str(stmt);

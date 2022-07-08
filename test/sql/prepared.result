@@ -212,7 +212,7 @@ execute(s.stmt_id)
  | ...
 execute(s.stmt_id)
  | ---
- | - error: 'Failed to execute SQL statement: statement has expired'
+ | - error: 'Failed to execute SQL statement: statement reprepare failed'
  | ...
 unprepare(s.stmt_id)
  | ---
@@ -228,7 +228,7 @@ execute(s.stmt_id)
  | ...
 execute(s.stmt_id)
  | ---
- | - error: 'Failed to execute SQL statement: statement has expired'
+ | - error: No index 'I1' is defined in space 'TEST'
  | ...
 unprepare(s.stmt_id)
  | ---
@@ -244,7 +244,7 @@ execute(s.stmt_id)
  | ...
 execute(s.stmt_id)
  | ---
- | - error: 'Failed to execute SQL statement: statement has expired'
+ | - error: Space 'V' already exists
  | ...
 unprepare(s.stmt_id)
  | ---
@@ -260,7 +260,7 @@ execute(s.stmt_id)
  | ...
 execute(s.stmt_id)
  | ---
- | - error: 'Failed to execute SQL statement: statement has expired'
+ | - error: 'Failed to execute SQL statement: statement reprepare failed'
  | ...
 unprepare(s.stmt_id)
  | ---
@@ -276,7 +276,7 @@ execute(s.stmt_id)
  | ...
 execute(s.stmt_id)
  | ---
- | - error: 'Failed to execute SQL statement: statement has expired'
+ | - error: 'Failed to execute SQL statement: statement reprepare failed'
  | ...
 unprepare(s.stmt_id)
  | ---
@@ -296,7 +296,7 @@ execute(s.stmt_id)
  | ...
 execute(s.stmt_id)
  | ---
- | - error: 'Failed to execute SQL statement: statement has expired'
+ | - error: FOREIGN KEY constraint 'FK1' already exists in space 'TEST2'
  | ...
 unprepare(s.stmt_id)
  | ---
@@ -315,7 +315,7 @@ execute(s.stmt_id)
  | ...
 execute(s.stmt_id)
  | ---
- | - error: 'Failed to execute SQL statement: statement has expired'
+ | - error: Trigger 'TR1' already exists
  | ...
 unprepare(s.stmt_id)
  | ---
@@ -331,7 +331,7 @@ execute(s.stmt_id)
  | ...
 execute(s.stmt_id)
  | ---
- | - error: 'Failed to execute SQL statement: statement has expired'
+ | - error: Trigger 'TR1' doesn't exist
  | ...
 unprepare(s.stmt_id)
  | ---
@@ -347,7 +347,7 @@ execute(s.stmt_id)
  | ...
 execute(s.stmt_id)
  | ---
- | - error: 'Failed to execute SQL statement: statement has expired'
+ | - error: 'Failed to execute SQL statement: statement reprepare failed'
  | ...
 unprepare(s.stmt_id)
  | ---
@@ -670,7 +670,10 @@ sp:drop()
  | ...
 execute(s.stmt_id)
  | ---
- | - error: 'Failed to execute SQL statement: statement has expired'
+ | - metadata:
+ |   - name: A
+ |     type: number
+ |   rows: []
  | ...
 _ = prepare("SELECT a FROM test WHERE b = ?;")
  | ---
