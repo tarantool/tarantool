@@ -1411,8 +1411,8 @@ func_index_compare(struct tuple *tuple_a, hint_t tuple_a_hint,
 	assert(cmp_def->for_func_index);
 	assert(is_nullable == cmp_def->is_nullable);
 
-	const char *key_a = (const char *)tuple_a_hint;
-	const char *key_b = (const char *)tuple_b_hint;
+	const char *key_a = tuple_data((struct tuple *)tuple_a_hint);
+	const char *key_b = tuple_data((struct tuple *)tuple_b_hint);
 	assert(mp_typeof(*key_a) == MP_ARRAY);
 	uint32_t part_count_a = mp_decode_array(&key_a);
 	assert(mp_typeof(*key_b) == MP_ARRAY);
@@ -1469,7 +1469,7 @@ func_index_compare_with_key(struct tuple *tuple, hint_t tuple_hint,
 	(void)tuple; (void)key_hint;
 	assert(key_def->for_func_index);
 	assert(is_nullable == key_def->is_nullable);
-	const char *tuple_key = (const char *)tuple_hint;
+	const char *tuple_key = tuple_data((struct tuple *)tuple_hint);
 	assert(mp_typeof(*tuple_key) == MP_ARRAY);
 
 	uint32_t tuple_key_count = mp_decode_array(&tuple_key);

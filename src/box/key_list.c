@@ -40,16 +40,17 @@
 #include "port.h"
 #include "schema.h"
 #include "tt_static.h"
+#include "tuple.h"
 
 int
 key_list_iterator_create(struct key_list_iterator *it, struct tuple *tuple,
 			 struct index_def *index_def, bool validate,
-			 key_list_allocator_t key_allocator)
+			 struct tuple_format *format)
 {
 	it->index_def = index_def;
 	it->validate = validate;
 	it->tuple = tuple;
-	it->key_allocator = key_allocator;
+	it->format = format;
 
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
@@ -116,7 +117,7 @@ key_list_iterator_create(struct key_list_iterator *it, struct tuple *tuple,
 }
 
 int
-key_list_iterator_next(struct key_list_iterator *it, const char **value)
+key_list_iterator_next(struct key_list_iterator *it, struct tuple **value)
 {
 	assert(it->data <= it->data_end);
 	if (it->data == it->data_end) {
@@ -124,15 +125,16 @@ key_list_iterator_next(struct key_list_iterator *it, const char **value)
 		return 0;
 	}
 	const char *key = it->data;
+	const char *key_end;
 	if (!it->validate) {
 		/*
 		 * Valid key is a MP_ARRAY, so just go to the
 		 * next key via mp_next().
 		 */
-		mp_next(&it->data);
-		assert(it->data <= it->data_end);
-		*value = it->key_allocator(key, it->data - key);
-		return *value != NULL ? 0 : -1;
+		key_end = it->data;
+		mp_next(&key_end);
+		assert(key_end <= it->data_end);
+		goto out;
 	}
 
 	if (mp_typeof(*key) != MP_ARRAY) {
@@ -162,7 +164,6 @@ key_list_iterator_next(struct key_list_iterator *it, const char **value)
 				   key_def->part_count, part_count));
 		return -1;
 	}
-	const char *key_end;
 	if (key_validate_parts(key_def, rptr, part_count, true,
 			       &key_end) != 0) {
 		struct space *space = space_by_id(it->index_def->space_id);
@@ -175,8 +176,13 @@ key_list_iterator_next(struct key_list_iterator *it, const char **value)
 			 "key does not follow functional index definition");
 		return -1;
 	}
-
+out:
 	it->data = key_end;
-	*value = it->key_allocator(key, key_end - key);
-	return *value != NULL ? 0 : -1;
+	*value = tuple_new(it->format, key, key_end);
+	if (*value == NULL)
+		return -1;
+	if (tuple_has_flag(it->tuple, TUPLE_IS_TEMPORARY))
+		tuple_set_flag(*value, TUPLE_IS_TEMPORARY);
+	tuple_bless(*value);
+	return 0;
 }

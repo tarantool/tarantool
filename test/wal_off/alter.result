@@ -28,7 +28,7 @@ end;
 ...
 #spaces;
 ---
-- 65501
+- 65500
 ...
 -- cleanup
 for k, v in pairs(spaces) do
