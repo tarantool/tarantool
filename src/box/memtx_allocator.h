@@ -59,17 +59,6 @@ struct PACKED memtx_tuple {
 template<class Allocator>
 class MemtxAllocator {
 public:
-	static void free(void *ptr, size_t size)
-	{
-		Allocator::free(ptr, size);
-	}
-
-	static void *alloc(size_t size)
-	{
-		collect_garbage();
-		return Allocator::alloc(size);
-	}
-
 	static void create()
 	{
 		mode = MEMTX_ENGINE_FREE;
@@ -144,6 +133,17 @@ public:
 
 private:
 	static constexpr int GC_BATCH_SIZE = 100;
+
+	static void free(void *ptr, size_t size)
+	{
+		Allocator::free(ptr, size);
+	}
+
+	static void *alloc(size_t size)
+	{
+		collect_garbage();
+		return Allocator::alloc(size);
+	}
 
 	static void immediate_free_tuple(struct memtx_tuple *memtx_tuple)
 	{
