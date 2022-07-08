@@ -350,9 +350,9 @@ luajit_Linux_x86_64_test: tarantool_linux_tests
 
 tarantool_darwin_deps:
 	${ARCH} brew install --force openssl readline curl icu4c libiconv zlib \
-		cmake python@3.8 \
+		cmake python@3.8 autoconf automake libtool \
 	|| ${ARCH} brew upgrade openssl readline curl icu4c libiconv zlib \
-		cmake python@3.8
+		cmake python@3.8 autoconf automake libtool
 	${ARCH} pip3 install --force-reinstall -r test-run/requirements.txt
 
 tarantool_darwin_prebuild:
