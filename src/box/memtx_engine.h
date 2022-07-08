@@ -106,7 +106,7 @@ enum memtx_reserve_extents_num {
  * allocated for each iterator (except rtree index iterator that
  * is significantly bigger so has own pool).
  */
-#define MEMTX_ITERATOR_SIZE (192)
+#define MEMTX_ITERATOR_SIZE (160)
 
 struct memtx_engine {
 	struct engine base;
@@ -169,6 +169,10 @@ struct memtx_engine {
 	 * memtx_gc_task::link.
 	 */
 	struct stailq gc_queue;
+	/**
+	 * Format used for allocating functional index keys.
+	 */
+	struct tuple_format *func_key_format;
 };
 
 struct memtx_gc_task;
