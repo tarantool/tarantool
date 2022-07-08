@@ -461,8 +461,9 @@ sql_create_column_end(struct Parse *parse)
 		      SQL_SUBTYPE_MSGPACK, raw, P4_DYNAMIC);
 	sqlVdbeAddOp3(v, OP_MakeRecord, tuple_reg, box_space_field_MAX,
 		      tuple_reg + box_space_field_MAX);
-	sqlVdbeAddOp4(v, OP_IdxReplace, tuple_reg + box_space_field_MAX, 0, 0,
-		      (char *) s_space, P4_SPACEPTR);
+	int reg = ++parse->nMem;
+	sqlVdbeAddOp2(v, OP_OpenSpace, reg, BOX_SPACE_ID);
+	sqlVdbeAddOp2(v, OP_IdxReplace, tuple_reg + box_space_field_MAX, reg);
 	sqlVdbeCountChanges(v);
 	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 	sqlReleaseTempRange(parse, tuple_reg, box_space_field_MAX + 1);
@@ -879,8 +880,10 @@ vdbe_emit_open_cursor(struct Parse *parse_context, int cursor, int index_id,
 		parse_context->is_aborted = true;
 		return -1;
 	}
-	return sqlVdbeAddOp4(parse_context->pVdbe, OP_IteratorOpen, cursor,
-				 index_id, 0, (void *) space, P4_SPACEPTR);
+	struct Vdbe *vdbe = parse_context->pVdbe;
+	int reg = ++parse_context->nMem;
+	sqlVdbeAddOp2(vdbe, OP_OpenSpace, reg, space->def->id);
+	return sqlVdbeAddOp3(vdbe, OP_IteratorOpen, cursor, index_id, reg);
 }
 
 /*
@@ -2934,9 +2937,9 @@ sql_create_index(struct Parse *parse) {
 			goto exit_create_index;
 
 		sql_set_multi_write(parse, true);
-		sqlVdbeAddOp4(vdbe, OP_IteratorOpen, cursor, 0, 0,
-				  (void *)space_by_id(BOX_INDEX_ID),
-				  P4_SPACEPTR);
+		int reg = ++parse->nMem;
+		sqlVdbeAddOp2(vdbe, OP_OpenSpace, reg, BOX_INDEX_ID);
+		sqlVdbeAddOp3(vdbe, OP_IteratorOpen, cursor, 0, reg);
 		sqlVdbeChangeP5(vdbe, OPFLAG_SEEKEQ);
 		int index_id;
 		/*

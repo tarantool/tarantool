@@ -3197,16 +3197,15 @@ void
 vdbe_emit_ck_constraint(struct Parse *parser, struct Expr *expr,
 			const char *name, const char *expr_str,
 			int vdbe_field_ref_reg);
+
 /**
- * This routine generates code to finish the INSERT or UPDATE
- * operation that was started by a prior call to
- * vdbe_emit_constraint_checks. It encodes raw data which is held
- * in a range of registers starting from @raw_data_reg and length
- * of @tuple_len and inserts this record to space using given
- * @cursor_id.
+ * This routine generates code to finish the INSERT or UPDATE operation that was
+ * started by a prior call to vdbe_emit_constraint_checks(). It encodes raw data
+ * which is held in a range of registers starting from raw_data_reg and length
+ * of tuple_len and inserts this record to space defined by space_id.
  *
  * @param v Virtual database engine.
- * @param space Pointer to space object.
+ * @param space_reg A register containing a pointer of the space.
  * @param raw_data_reg Register with raw data to insert.
  * @param tuple_len Number of registers to hold the tuple.
  * @param on_conflict On conflict action.
@@ -3215,7 +3214,7 @@ vdbe_emit_ck_constraint(struct Parse *parser, struct Expr *expr,
  *                    into the field with AUTOINCREMENT.
  */
 void
-vdbe_emit_insertion_completion(struct Vdbe *v, struct space *space,
+vdbe_emit_insertion_completion(struct Vdbe *v, int space_reg,
 			       int raw_data_reg, uint32_t tuple_len,
 			       enum on_conflict_action on_conflict,
 			       int autoinc_reg);

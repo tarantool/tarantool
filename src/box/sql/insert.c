@@ -102,14 +102,14 @@ sql_space_autoinc_fieldno(struct space *space)
  * SELECT. Otherwise, it may fall into infinite loop.
  *
  * @param parser Parse context.
- * @param space_def Space definition.
+ * @param space_id Space ID.
  * @retval  true if the space (given by space_id) in database or
  *          any of its indices have been opened at any point in
  *          the VDBE program.
  * @retval  false else.
  */
 static bool
-vdbe_has_space_read(struct Parse *parser, const struct space_def *space_def)
+vdbe_has_space_open(struct Parse *parser, uint32_t space_id)
 {
 	struct Vdbe *v = sqlGetVdbe(parser);
 	int last_instr = sqlVdbeCurrentAddr(v);
@@ -120,13 +120,8 @@ vdbe_has_space_read(struct Parse *parser, const struct space_def *space_def)
 		 * Currently, there is no difference between Read
 		 * and Write cursors.
 		 */
-		if (op->opcode == OP_IteratorOpen) {
-			struct space *space = NULL;
-			if (op->p4type == P4_SPACEPTR)
-				space = op->p4.space;
-			else
-				continue;
-			if (space->def->id == space_def->id)
+		if (op->opcode == OP_OpenSpace) {
+			if (op->p2 == (int)space_id)
 				return true;
 		}
 	}
@@ -400,6 +395,9 @@ sqlInsert(Parse * pParse,	/* Parser context */
 		}
 	}
 
+	int reg = ++pParse->nMem;
+	sqlVdbeAddOp2(v, OP_OpenSpace, reg, space->def->id);
+
 	int reg_eph;
 	/* Figure out how many columns of data are supplied.  If the data
 	 * is coming from a SELECT statement, then generate a co-routine that
@@ -477,7 +475,7 @@ sqlInsert(Parse * pParse,	/* Parser context */
 	 *      M: ...
 	 */
 	if (pSelect && (trigger != NULL ||
-			vdbe_has_space_read(pParse, space_def))) {
+			vdbe_has_space_open(pParse, space_def->id))) {
 		/*
 		 * Set useTempTable to TRUE if the result of the
 		 * SELECT statement should be written into a
@@ -760,7 +758,7 @@ sqlInsert(Parse * pParse,	/* Parser context */
 		vdbe_emit_constraint_checks(pParse, space, regIns + 1,
 					    on_error, endOfLoop, 0);
 		fk_constraint_emit_check(pParse, space, 0, regIns, 0);
-		vdbe_emit_insertion_completion(v, space, regIns + 1,
+		vdbe_emit_insertion_completion(v, reg, regIns + 1,
 					       space->def->field_count,
 					       on_error, autoinc_reg);
 	}
@@ -971,7 +969,7 @@ process_index:  ;
 }
 
 void
-vdbe_emit_insertion_completion(struct Vdbe *v, struct space *space,
+vdbe_emit_insertion_completion(struct Vdbe *v, int space_reg,
 			       int raw_data_reg, uint32_t tuple_len,
 			       enum on_conflict_action on_conflict,
 			       int autoinc_reg)
@@ -981,9 +979,8 @@ vdbe_emit_insertion_completion(struct Vdbe *v, struct space *space,
 	SET_CONFLICT_FLAG(pik_flags, on_conflict);
 	sqlVdbeAddOp3(v, OP_MakeRecord, raw_data_reg, tuple_len,
 			  raw_data_reg + tuple_len);
-	sqlVdbeAddOp3(v, OP_IdxInsert, raw_data_reg + tuple_len, 0,
+	sqlVdbeAddOp3(v, OP_IdxInsert, raw_data_reg + tuple_len, space_reg,
 		      autoinc_reg);
-	sqlVdbeChangeP4(v, -1, (char *)space, P4_SPACEPTR);
 	sqlVdbeChangeP5(v, pik_flags);
 }
 
@@ -1212,15 +1209,16 @@ xferOptimization(Parse * pParse,	/* Parser context */
 
 	vdbe_emit_open_cursor(pParse, iSrc, 0, src);
 	VdbeComment((v, "%s", src->def->name));
-	addr1 = sqlVdbeAddOp2(v, OP_Rewind, iSrc, 0);
-	sqlVdbeAddOp2(v, OP_RowData, iSrc, regData);
+	int addr_rewind = sqlVdbeAddOp2(v, OP_Rewind, iSrc, 0);
+	int reg = ++pParse->nMem;
+	sqlVdbeAddOp2(v, OP_OpenSpace, reg, dest->def->id);
+	addr1 = sqlVdbeAddOp2(v, OP_RowData, iSrc, regData);
 
 #ifdef SQL_TEST
 	sqlVdbeChangeP5(v, OPFLAG_XFER_OPT);
 #endif
 
-	sqlVdbeAddOp4(v, OP_IdxInsert, regData, 0, 0,
-			  (char *)dest, P4_SPACEPTR);
+	sqlVdbeAddOp2(v, OP_IdxInsert, regData, reg);
 	switch (onError) {
 	case ON_CONFLICT_ACTION_IGNORE:
 		sqlVdbeChangeP5(v, OPFLAG_OE_IGNORE | OPFLAG_NCHANGE);
@@ -1232,8 +1230,8 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 		break;
 	}
-	sqlVdbeAddOp2(v, OP_Next, iSrc, addr1 + 1);
-	sqlVdbeJumpHere(v, addr1);
+	sqlVdbeAddOp2(v, OP_Next, iSrc, addr1);
+	sqlVdbeJumpHere(v, addr_rewind);
 	sqlVdbeAddOp2(v, OP_Close, iSrc, 0);
 	sqlVdbeAddOp2(v, OP_Close, iDest, 0);
 

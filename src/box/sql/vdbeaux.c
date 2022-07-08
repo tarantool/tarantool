@@ -1093,10 +1093,6 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 			zTemp[0] = 0;
 			break;
 		}
-	case P4_SPACEPTR: {
-		sqlXPrintf(&x, "space<name=%s>", space_name(pOp->p4.space));
-		break;
-	}
 	default:{
 			zP4 = pOp->p4.z;
 			if (zP4 == 0) {
