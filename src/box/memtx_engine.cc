@@ -77,34 +77,9 @@ template <class ALLOC>
 static inline void
 create_memtx_tuple_format_vtab(struct tuple_format_vtab *vtab);
 
-void *
-(*memtx_alloc)(uint32_t size);
-void
-(*memtx_free)(void *ptr);
 struct tuple *
 (*memtx_tuple_new_raw)(struct tuple_format *format, const char *data,
 		       const char *end, bool validate);
-
-template <class ALLOC>
-static void *
-memtx_alloc_impl(uint32_t size)
-{
-	void *ptr = MemtxAllocator<ALLOC>::alloc(size + sizeof(uint32_t));
-	if (ptr != NULL) {
-		*(uint32_t *)ptr = size;
-		return (uint32_t *)ptr + 1;
-	}
-	return NULL;
-}
-
-template <class ALLOC>
-static void
-memtx_free_impl(void *ptr)
-{
-	ptr = (uint32_t *)ptr - 1;
-	uint32_t size = *(uint32_t *)ptr;
-	MemtxAllocator<ALLOC>::free(ptr, size);
-}
 
 template <class ALLOC>
 static inline struct tuple *
@@ -115,8 +90,6 @@ template <class ALLOC>
 static void
 memtx_alloc_init(void)
 {
-	memtx_alloc = memtx_alloc_impl<ALLOC>;
-	memtx_free = memtx_free_impl<ALLOC>;
 	memtx_tuple_new_raw = memtx_tuple_new_raw_impl<ALLOC>;
 }
 
