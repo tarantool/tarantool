@@ -2334,15 +2334,13 @@ case OP_TTransaction: {
 	break;
 }
 
-/* Opcode: IteratorOpen P1 P2 P3 P4 P5
- * Synopsis: index id = P2, space ptr = P4 or reg[P3]
+/* Opcode: IteratorOpen P1 P2 P3 * P5
+ * Synopsis: index id = P2, space ptr = reg[P3]
  *
- * Open a cursor for a space specified by pointer in P4 and index
- * id in P2. Give the new cursor an identifier of P1. The P1
- * values need not be contiguous but all P1 values should be
- * small integers. It is an error for P1 to be negative.
- * If P4 was not set, then P3 supposed to be the register
- * containing space pointer.
+ * Open a cursor for a space specified by pointer in  the register P3 and index
+ * id in P2. Give the new cursor an identifier of P1. The P1 values need not be
+ * contiguous but all P1 values should be small integers. It is an error for P1
+ * to be negative.
  */
 case OP_IteratorOpen: {
 	struct VdbeCursor *cur = p->apCsr[pOp->p1];
@@ -2353,11 +2351,7 @@ case OP_IteratorOpen: {
 			 "changed: need to re-compile SQL statement");
 		goto abort_due_to_error;
 	}
-	struct space *space;
-	if (pOp->p4type == P4_SPACEPTR)
-		space = pOp->p4.space;
-	else
-		space = aMem[pOp->p3].u.p;
+	struct space *space = aMem[pOp->p3].u.p;
 	assert(space != NULL);
 	if (access_check_space(space, PRIV_R) != 0)
 		goto abort_due_to_error;
@@ -2382,6 +2376,21 @@ case OP_IteratorOpen: {
 	cur->key_def = index->def->key_def;
 	cur->nullRow = 1;
 	cur->uc.pCursor->hints = pOp->p5 & OPFLAG_SEEKEQ;
+	break;
+}
+
+/**
+ * Opcode: OP_OpenSpace P1 P2 * * *
+ * Synopsis: reg[P1] = space_by_id(P2)
+ *
+ * Open the space using its ID stored in register P2 and write a pointer to the
+ * space to register P1.
+ */
+case OP_OpenSpace: {
+	assert(pOp->p1 >= 0 && pOp->p1 > 0);
+	struct space *space = space_by_id(pOp->p2);
+	assert(space != NULL);
+	mem_set_ptr(&aMem[pOp->p1], space);
 	break;
 }
 
@@ -3423,25 +3432,23 @@ case OP_SorterInsert: {      /* in2 */
 	break;
 }
 
-/* Opcode: IdxInsert P1 P2 P3 P4 P5
+/* Opcode: IdxInsert P1 P2 P3 * P5
  * Synopsis: key=r[P1]
  *
  * @param P1 Index of a register with MessagePack data to insert.
- * @param P2 If P4 is not set, then P2 is register containing pointer
- *           to space to insert into.
+ * @param P2 Register containing pointer to space to insert into.
  * @param P3 If not 0, than it is an index of a register that
  *           contains value that will be inserted into field with
  *           AUTOINCREMENT. If the value is NULL, than the newly
  *           generated autoincrement value will be saved to VDBE
  *           context.
- * @param P4 Pointer to the struct space to insert to.
  * @param P5 Flags. If P5 contains OPFLAG_NCHANGE, then VDBE
  *        accounts the change in a case of successful insertion in
  *        nChange counter. If P5 contains OPFLAG_OE_IGNORE, then
  *        we are processing INSERT OR INGORE statement. Thus, in
  *        case of conflict we don't raise an error.
  */
-/* Opcode: IdxReplace2 P1 * * P4 P5
+/* Opcode: IdxReplace P1 P2 P3 * P5
  * Synopsis: key=r[P1]
  *
  * This opcode works exactly as IdxInsert does, but in Tarantool
@@ -3451,11 +3458,7 @@ case OP_IdxReplace:
 case OP_IdxInsert: {
 	pIn2 = &aMem[pOp->p1];
 	assert(mem_is_bin(pIn2));
-	struct space *space;
-	if (pOp->p4type == P4_SPACEPTR)
-		space = pOp->p4.space;
-	else
-		space = aMem[pOp->p2].u.p;
+	struct space *space = aMem[pOp->p2].u.p;
 	assert(space != NULL);
 	if (space->def->id != 0) {
 		/* Make sure that memory has been allocated on region. */
@@ -3522,7 +3525,7 @@ case OP_IdxInsert: {
  *           It's items are numbers of fields to be replaced with
  *           new values from P1. They must be sorted in ascending
  *           order.
- * @param P4 Pointer to the struct space to be updated.
+ * @param P4 Register containing pointer to space to update.
  * @param P5 Flags. If P5 contains OPFLAG_NCHANGE, then VDBE
  *           accounts the change in a case of successful
  *           insertion in nChange counter. If P5 contains
@@ -3535,8 +3538,8 @@ case OP_Update: {
 	if (pOp->p5 & OPFLAG_NCHANGE)
 		p->nChange++;
 
-	struct space *space = pOp->p4.space;
-	assert(pOp->p4type == P4_SPACEPTR);
+	struct space *space = aMem[pOp->p4.i].u.p;
+	assert(pOp->p4type == P4_INT32);
 
 	struct Mem *key_mem = &aMem[pOp->p2];
 	assert(mem_is_bin(key_mem));
