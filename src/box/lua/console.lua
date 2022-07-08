@@ -74,22 +74,20 @@ end
 --
 -- Format a Lua value.
 local function format_lua_value(status, internal_opts, value)
-    local err
-    if status then
-        status, err = pcall(internal.format_lua, internal_opts, value)
-        if status then
-            return err
-        else
-            local m = 'console: exception while formatting output: "%s"'
-            err = m:format(tostring(err))
+    if not status then
+        if value == nil then
+            value = box.NULL
         end
-    else
-        err = value
-        if err == nil then
-            err = box.NULL
-        end
+        value = { error = value }
     end
-    return internal.format_lua(internal_opts, { error = err })
+    local ok, res = pcall(internal.format_lua, internal_opts, value)
+    if ok then
+        return res
+    else
+        local m = 'console: exception while formatting the output: "%s"'
+        local err = m:format(tostring(res))
+        return internal.format_lua(internal_opts, { error = err })
+    end
 end
 
 --
