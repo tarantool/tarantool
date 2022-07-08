@@ -89,7 +89,13 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_GOPHER=ON")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_DISABLE_CRYPTO_AUTH=ON")
 
-    # Switch on ca-fallback feature.
+    # Don't attempt to find system CA bundle/certificates at
+    # libcurl configuration step (build time). Fallback to
+    # OpenSSL's SSL_CTX_set_default_verify_paths() instead and
+    # configure the default paths in runtime (see
+    # tnt_ssl_cert_paths_discover()).
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_BUNDLE=none")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_PATH=none")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_FALLBACK=ON")
 
     # Even though we set the external project's install dir
@@ -123,11 +129,6 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_MBEDTLS=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_WOLFSSL=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_USE_NSS=OFF")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_BUNDLE=none")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_BUNDLE_SET=ON")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_PATH=none")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_PATH_SET=ON")
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_CA_FALLBACK=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_LIBRTMP=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DHAVE_LIBIDN2=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_LIBIDN2=ON")
