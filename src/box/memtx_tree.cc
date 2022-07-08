@@ -254,16 +254,14 @@ struct tree_iterator {
 	struct memtx_tree_key_data<USE_HINT> key_data;
 	struct memtx_tree_data<USE_HINT> current;
 	/**
-	 * For functional indexes only: copy of the functional index key at the
-	 * current iterator position. Allocated from current_func_key_buf or on
-	 * malloc.
+	 * For functional indexes only: reference to the functional index key
+	 * at the current iterator position.
 	 *
 	 * Since pinning a tuple doesn't prevent its functional keys from being
-	 * deleted, we need to copy it so that we can use it to restore the
-	 * iterator position.
+	 * deleted, we need to reference the key so that we can use it to
+	 * restore the iterator position.
 	 */
-	void *current_func_key;
-	char current_func_key_buf[32];
+	struct tuple *current_func_key;
 	/** Memory pool the iterator was allocated from. */
 	struct mempool *pool;
 };
@@ -293,21 +291,12 @@ tree_iterator_set_current_hint(struct tree_iterator<USE_HINT> *it, hint_t hint)
 {
 	if (!USE_HINT)
 		return;
-	if (it->current_func_key != NULL &&
-	    it->current_func_key != it->current_func_key_buf) {
-		free(it->current_func_key);
-	}
+	if (it->current_func_key != NULL)
+		tuple_unref(it->current_func_key);
 	it->current_func_key = NULL;
 	if (hint != HINT_NONE && it->base.index->def->key_def->for_func_index) {
-		void *key = (void *)hint;
-		uint32_t key_sz = memtx_alloc_size(key);
-		if (key_sz <= sizeof(it->current_func_key_buf)) {
-			it->current_func_key = it->current_func_key_buf;
-		} else {
-			it->current_func_key = xmalloc(key_sz);
-		}
-		memcpy(it->current_func_key, key, key_sz);
-		hint = (hint_t)it->current_func_key;
+		it->current_func_key = (struct tuple *)hint;
+		tuple_ref(it->current_func_key);
 	}
 	it->current.set_hint(hint);
 }
@@ -1194,34 +1183,6 @@ memtx_tree_index_replace_multikey(struct index *base, struct tuple *old_tuple,
 	return 0;
 }
 
-/** A dummy key allocator used when removing tuples from an index. */
-static const char *
-func_index_key_dummy_alloc(const char *key, uint32_t key_sz)
-{
-	(void) key_sz;
-	return key;
-}
-
-/** Allocator used for allocating functional index key parts. */
-static const char *
-func_index_key_alloc(const char *key, uint32_t key_sz)
-{
-	void *ptr = memtx_alloc(key_sz);
-	if (ptr == NULL) {
-		diag_set(OutOfMemory, key_sz, "MemtxAllocator::alloc",
-			 "functional index key part");
-		return NULL;
-	}
-	memcpy(ptr, key, key_sz);
-	return (const char *)ptr;
-}
-
-static void
-func_index_key_free(const char *key)
-{
-	memtx_free((void *)key);
-}
-
 /**
  * An undo entry for multikey functional index replace operation.
  * Used to roll back a failed insert/replace and restore the
@@ -1262,7 +1223,7 @@ memtx_tree_func_index_replace_rollback(struct memtx_tree_index<true> *index,
 	struct func_key_undo *entry;
 	rlist_foreach_entry(entry, new_keys, link) {
 		memtx_tree_delete_value(&index->tree, entry->key, NULL);
-		func_index_key_free((const char *)entry->key.hint);
+		tuple_unref((struct tuple *)entry->key.hint);
 	}
 	rlist_foreach_entry(entry, old_keys, link)
 		memtx_tree_insert(&index->tree, entry->key, NULL, NULL);
@@ -1288,6 +1249,7 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 	/* FUNC doesn't support successor for now. */
 	*successor = NULL;
 
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
 	struct memtx_tree_index<true> *index =
 		(struct memtx_tree_index<true> *)base;
 	struct index_def *index_def = index->base.def;
@@ -1304,20 +1266,20 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 		rlist_create(&old_keys);
 		rlist_create(&new_keys);
 		if (key_list_iterator_create(&it, new_tuple, index_def, true,
-					     func_index_key_alloc) != 0)
+					     memtx->func_key_format) != 0)
 			goto end;
 		int err = 0;
-		const char *key;
+		struct tuple *key;
 		struct func_key_undo *undo;
 		while ((err = key_list_iterator_next(&it, &key)) == 0 &&
 			key != NULL) {
 			/* Perform insertion, log it in list. */
 			undo = func_key_undo_new(region);
 			if (undo == NULL) {
-				func_index_key_free(key);
 				err = -1;
 				break;
 			}
+			tuple_ref(key);
 			undo->key.tuple = new_tuple;
 			undo->key.hint = (hint_t)key;
 			rlist_add(&new_keys, &undo->link);
@@ -1353,8 +1315,7 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 				 * Remove the replaced tuple undo
 				 * from undo list.
 				 */
-				func_index_key_free(
-					(const char *)old_data.hint);
+				tuple_unref((struct tuple *)old_data.hint);
 				rlist_foreach_entry(undo, &new_keys, link) {
 					if (undo->key.hint == old_data.hint) {
 						rlist_del(&undo->link);
@@ -1377,16 +1338,21 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 		 * replaced entries.
 		 */
 		rlist_foreach_entry(undo, &old_keys, link) {
-			func_index_key_free((const char *)undo->key.hint);
+			tuple_unref((struct tuple *)undo->key.hint);
 		}
 	}
 	if (old_tuple != NULL) {
+		/*
+		 * Use the runtime format to avoid OOM while deleting a tuple
+		 * from a space. It's okay, because we are not going to store
+		 * the keys in the index.
+		 */
 		if (key_list_iterator_create(&it, old_tuple, index_def, false,
-					     func_index_key_dummy_alloc) != 0)
+					     tuple_format_runtime) != 0)
 			goto end;
 		struct memtx_tree_data<true> data, deleted_data;
 		data.tuple = old_tuple;
-		const char *key;
+		struct tuple *key;
 		while (key_list_iterator_next(&it, &key) == 0 && key != NULL) {
 			data.hint = (hint_t) key;
 			deleted_data.tuple = NULL;
@@ -1397,8 +1363,7 @@ memtx_tree_func_index_replace(struct index *base, struct tuple *old_tuple,
 				 * Release related hint on
 				 * successful node deletion.
 				 */
-				func_index_key_free(
-					(const char *)deleted_data.hint);
+				tuple_unref((struct tuple *)deleted_data.hint);
 			}
 		}
 		assert(key == NULL);
@@ -1564,7 +1529,9 @@ memtx_tree_index_build_next_multikey(struct index *base, struct tuple *tuple)
 static int
 memtx_tree_func_index_build_next(struct index *base, struct tuple *tuple)
 {
-	struct memtx_tree_index<true> *index = (struct memtx_tree_index<true> *)base;
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+	struct memtx_tree_index<true> *index =
+		(struct memtx_tree_index<true> *)base;
 	struct index_def *index_def = index->base.def;
 	assert(index_def->key_def->for_func_index);
 
@@ -1573,22 +1540,23 @@ memtx_tree_func_index_build_next(struct index *base, struct tuple *tuple)
 
 	struct key_list_iterator it;
 	if (key_list_iterator_create(&it, tuple, index_def, false,
-				     func_index_key_alloc) != 0)
+				     memtx->func_key_format) != 0)
 		return -1;
 
-	const char *key;
+	struct tuple *key;
 	uint32_t insert_idx = index->build_array_size;
 	while (key_list_iterator_next(&it, &key) == 0 && key != NULL) {
 		if (memtx_tree_index_build_array_append(index, tuple,
 							(hint_t)key) != 0)
 			goto error;
+		tuple_ref(key);
 	}
 	assert(key == NULL);
 	region_truncate(region, region_svp);
 	return 0;
 error:
 	for (uint32_t i = insert_idx; i < index->build_array_size; i++) {
-		func_index_key_free((const char *)index->build_array[i].hint);
+		tuple_unref((struct tuple *)index->build_array[i].hint);
 	}
 	region_truncate(region, region_svp);
 	return -1;
@@ -1601,8 +1569,8 @@ error:
  */
 template <bool USE_HINT>
 static void
-memtx_tree_index_build_array_deduplicate(struct memtx_tree_index<USE_HINT> *index,
-			void (*destroy)(const char *hint))
+memtx_tree_index_build_array_deduplicate(
+	struct memtx_tree_index<USE_HINT> *index)
 {
 	if (index->build_array_size == 0)
 		return;
@@ -1624,11 +1592,12 @@ memtx_tree_index_build_array_deduplicate(struct memtx_tree_index<USE_HINT> *inde
 		}
 		r_idx++;
 	}
-	if (destroy != NULL) {
+	if (cmp_def->for_func_index) {
 		/* Destroy deduplicated entries. */
 		for (r_idx = w_idx + 1;
 		     r_idx < index->build_array_size; r_idx++) {
-			destroy((const char *)index->build_array[r_idx].hint);
+			hint_t hint = index->build_array[r_idx].hint;
+			tuple_unref((struct tuple *)hint);
 		}
 	}
 	index->build_array_size = w_idx + 1;
@@ -1644,7 +1613,7 @@ memtx_tree_index_end_build(struct index *base)
 	qsort_arg(index->build_array, index->build_array_size,
 		  sizeof(index->build_array[0]),
 		  memtx_tree_qcompare<USE_HINT>, cmp_def);
-	if (cmp_def->is_multikey) {
+	if (cmp_def->is_multikey || cmp_def->for_func_index) {
 		/*
 		 * Multikey index may have equal(in terms of
 		 * cmp_def) keys inserted by different multikey
@@ -1652,10 +1621,7 @@ memtx_tree_index_end_build(struct index *base)
 		 * the following memtx_tree_build assumes that
 		 * all keys are unique.
 		 */
-		memtx_tree_index_build_array_deduplicate<USE_HINT>(index, NULL);
-	} else if (cmp_def->for_func_index) {
-		memtx_tree_index_build_array_deduplicate<USE_HINT>(index,
-							 func_index_key_free);
+		memtx_tree_index_build_array_deduplicate<USE_HINT>(index);
 	}
 	memtx_tree_build(&index->tree, index->build_array,
 			 index->build_array_size);

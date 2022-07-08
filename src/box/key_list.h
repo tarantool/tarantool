@@ -39,17 +39,7 @@ extern "C" {
 
 struct index_def;
 struct tuple;
-
-/**
- * We iterate over a functional index key list in two cases: when
- * adding a new tuple or removing the old one. When adding a new
- * tuple we need to copy functional index data to tuple memory, so
- * provide an allocator for that. When removing an old index, it's
- * fine to use a temporary memory area for the functional index
- * key, since the key is only used to lookup the old tuple in the
- * b+* tree, so we pass in a dummy allocator.
- */
-typedef const char *(*key_list_allocator_t)(const char *key, uint32_t key_sz);
+struct tuple_format;
 
 /**
  * An iterator over key_data returned by a stored function function.
@@ -76,8 +66,8 @@ struct key_list_iterator {
 	const char *data_end;
 	/** Whether the iterator must validate processed keys. */
 	bool validate;
-	/** Allocate a key copy before returning it. */
-	key_list_allocator_t key_allocator;
+	/** Format used for allocating keys. Not referenced. */
+	struct tuple_format *format;
 };
 
 /**
@@ -86,6 +76,7 @@ struct key_list_iterator {
  * Executes a function specified in the given functional index
  * definition and initializes a new iterator over the MsgPack
  * array with keys. Each key is a nested MsgPack array.
+ * Keys are allocated using the supplied tuple format.
  *
  * When validate flag is set, each array entry is validated
  * to match the given functional index key definition.
@@ -97,17 +88,18 @@ struct key_list_iterator {
 int
 key_list_iterator_create(struct key_list_iterator *it, struct tuple *tuple,
 			 struct index_def *index_def, bool validate,
-			 key_list_allocator_t key_allocator);
+			 struct tuple_format *format);
 
 /**
  * Return the next key and advance the iterator state.
- * If the iterator is exhausted, the value is set to 0.
+ * If the iterator is exhausted, the value is set to NULL.
+ * The new tuple is pinned with tuple_bless().
  *
  * @retval 0 on success or EOF.
  * @retval -1 on error; diag is set.
  */
 int
-key_list_iterator_next(struct key_list_iterator *it, const char **value);
+key_list_iterator_next(struct key_list_iterator *it, struct tuple **value);
 
 #ifdef __cplusplus
 } /* extern "C" */

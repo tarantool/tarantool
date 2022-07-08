@@ -238,6 +238,7 @@ memtx_engine_shutdown(struct engine *engine)
 	tuple_arena_destroy(&memtx->arena);
 
 	xdir_destroy(&memtx->snap_dir);
+	tuple_format_unref(memtx->func_key_format);
 	free(memtx);
 }
 
@@ -1362,6 +1363,14 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 
 	memtx->base.vtab = &memtx_engine_vtab;
 	memtx->base.name = "memtx";
+
+	memtx->func_key_format = simple_tuple_format_new(
+		&memtx_tuple_format_vtab, &memtx->base, NULL, 0);
+	if (memtx->func_key_format == NULL) {
+		diag_log();
+		panic("failed to create functional index key format");
+	}
+	tuple_format_ref(memtx->func_key_format);
 
 	fiber_start(memtx->gc_fiber, memtx);
 	return memtx;
