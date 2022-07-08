@@ -38,10 +38,11 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-/** Latch of cooperative multitasking environment. */
-
-struct latch
-{
+/**
+ * Latch of cooperative multitasking environment, which preserves strict order
+ * of fibers waiting for the latch.
+ */
+struct latch {
 	/**
 	 * The fiber that locked the latch, or NULL
 	 * if the latch is unlocked.
@@ -51,6 +52,21 @@ struct latch
 	 * The queue of fibers waiting on the latch.
 	 */
 	struct rlist queue;
+};
+
+/**
+ * A structure for adding to the latch->queue list. fiber->link cannot be used
+ * for that purpose, because it may break the order of waiters.
+ */
+struct latch_waiter {
+	/**
+	 * The fiber that is waiting for the latch.
+	 */
+	struct fiber *fiber;
+	/**
+	 * Link in the latch->queue list.
+	 */
+	struct rlist link;
 };
 
 /**
@@ -109,6 +125,7 @@ latch_is_locked(const struct latch *l)
 /**
  * Lock a latch. If the latch is already locked by another fiber,
  * waits for timeout.
+ * Locks are acquired in the strict order as they were requested.
  *
  * @param l - latch to be locked.
  * @param timeout - maximal time to wait
@@ -127,23 +144,25 @@ latch_lock_timeout(struct latch *l, ev_tstamp timeout)
 	if (timeout <= 0)
 		return 1;
 
-	rlist_add_tail_entry(&l->queue, fiber(), state);
 	bool was_cancellable = fiber_set_cancellable(false);
-	ev_tstamp start = ev_monotonic_now(loop());
 	int result = 0;
+	struct latch_waiter waiter;
+	waiter.fiber = fiber();
+	rlist_add_tail_entry(&l->queue, &waiter, link);
+	ev_tstamp deadline = ev_monotonic_now(loop()) + timeout;
+
 	while (true) {
-		fiber_yield_timeout(timeout);
+		bool exceeded = fiber_yield_deadline(deadline);
 		if (l->owner == fiber()) {
 			/* Current fiber was woken by previous latch owner. */
 			break;
 		}
-		timeout -= ev_monotonic_now(loop()) - start;
-		if (timeout <= 0) {
+		if (exceeded) {
 			result = 1;
 			break;
 		}
-		rlist_add_entry(&l->queue, fiber(), state);
 	}
+	rlist_del_entry(&waiter, link);
 	fiber_set_cancellable(was_cancellable);
 	return result;
 }
@@ -175,15 +194,16 @@ latch_unlock(struct latch *l)
 	assert(l->owner == fiber());
 	l->owner = NULL;
 	if (!rlist_empty(&l->queue)) {
-		struct fiber *f = rlist_first_entry(&l->queue,
-						    struct fiber, state);
 		/*
-		 * Set this fiber as latch owner because fiber_wakeup remove
-		 * its from waiting queue and any other already scheduled
-		 * fiber can intercept this latch.
+		 * Set the first waiter as latch owner because otherwise any
+		 * other waiter can intercept this latch in arbitrary order.
 		 */
-		l->owner = f;
-		fiber_wakeup(f);
+		struct latch_waiter *waiter;
+		waiter = rlist_first_entry(&l->queue,
+					   struct latch_waiter,
+					   link);
+		l->owner = waiter->fiber;
+		fiber_wakeup(waiter->fiber);
 	}
 }
 
@@ -210,7 +230,7 @@ box_latch_delete(box_latch_t *latch);
 
 /**
 * Lock a latch. Waits indefinitely until the current fiber can gain access to
-* the latch.
+* the latch. Locks are acquired in the strict order as they were requested.
 *
 * \param latch a latch
 */
