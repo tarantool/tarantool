@@ -4625,7 +4625,7 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 			} else if (iAuxArg
 				   && (wctrlFlags & WHERE_OR_SUBCLAUSE) != 0) {
 				iIndexCur = iAuxArg;
-				op = OP_IteratorReopen;
+				assert(op == OP_IteratorOpen);
 			} else {
 				iIndexCur = pParse->nTab++;
 			}
