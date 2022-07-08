@@ -2334,17 +2334,6 @@ case OP_TTransaction: {
 	break;
 }
 
-/* Opcode: IteratorReopen P1 P2 P3 P4 P5
- * Synopsis: index id = P2, space ptr = P4
- *
- * The IteratorReopen opcode works exactly like IteratorOpen except
- * that it first checks to see if the cursor on P1 is already open
- * with the same index and if it is this opcode becomes a no-op.
- * In other words, if the cursor is already open, do not reopen
- * it.
- *
- * The IteratorReopen opcode may only be used with P5 == 0.
- */
 /* Opcode: IteratorOpen P1 P2 P3 P4 P5
  * Synopsis: index id = P2, space ptr = P4 or reg[P3]
  *
@@ -2355,16 +2344,8 @@ case OP_TTransaction: {
  * If P4 was not set, then P3 supposed to be the register
  * containing space pointer.
  */
-case OP_IteratorReopen: {
-	assert(pOp->p5 == 0);
+case OP_IteratorOpen: {
 	struct VdbeCursor *cur = p->apCsr[pOp->p1];
-	if (cur != NULL && cur->uc.pCursor->space == pOp->p4.space &&
-	    cur->uc.pCursor->index->def->iid == (uint32_t)pOp->p2)
-		goto open_cursor_set_hints;
-	/* If the cursor is not currently open or is open on a different
-	 * index, then fall through into OP_OpenCursor to force a reopen
-	 */
-case OP_IteratorOpen:
 	if (box_schema_version() != p->schema_ver &&
 	    (pOp->p5 & OPFLAG_SYSTEMSP) == 0) {
 		p->expired = 1;
@@ -2400,7 +2381,6 @@ case OP_IteratorOpen:
 	/* Key info still contains sorter order and collation. */
 	cur->key_def = index->def->key_def;
 	cur->nullRow = 1;
-open_cursor_set_hints:
 	cur->uc.pCursor->hints = pOp->p5 & OPFLAG_SEEKEQ;
 	break;
 }
