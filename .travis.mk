@@ -358,7 +358,7 @@ test_odroid_arm64: deps_odroid_arm64 test_odroid_arm64_no_deps
 # FIXME: Temporary pinned python3 to specific version (i.e. python@3.8) to
 # avoid gevent package installation failure described in gevent/gevent#1721.
 # Revert this back when the issue is resolved.
-OSX_PKGS=openssl readline curl icu4c libiconv zlib cmake python@3.8
+OSX_PKGS=openssl readline curl icu4c libiconv zlib cmake python@3.8 autoconf automake libtool
 
 deps_osx:
 	# install brew using command from Homebrew repository instructions:
@@ -521,9 +521,9 @@ luajit_Linux_x86_64_test: tarantool_linux_tests
 
 tarantool_darwin_deps:
 	${ARCH} brew install --force openssl readline curl icu4c libiconv zlib \
-		cmake python@3.8 \
+		cmake python@3.8 autoconf automake libtool \
 	|| ${ARCH} brew upgrade openssl readline curl icu4c libiconv zlib \
-		cmake python@3.8
+		cmake python@3.8 autoconf automake libtool
 	${ARCH} pip3 install --force-reinstall -r test-run/requirements.txt
 
 tarantool_darwin_prebuild:
