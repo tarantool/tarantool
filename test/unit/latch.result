@@ -1,0 +1,14 @@
+1..7
+	*** latch_order_test ***
+ok 1 - check order
+ok 2 - check order
+ok 3 - check order
+	*** latch_order_test: done ***
+	*** latch_order_test ***
+ok 4 - check order
+ok 5 - check order
+ok 6 - check order
+	*** latch_order_test: done ***
+	*** latch_timeout_test ***
+ok 7 - check timeout
+	*** latch_timeout_test: done ***
