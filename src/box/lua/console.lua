@@ -633,10 +633,6 @@ end
 -- Print result to stdout
 --
 local function local_print(self, output)
-    if output == nil then
-        self.running = nil
-        return
-    end
     print(output)
 end
 
@@ -668,14 +664,6 @@ end
 -- Print result to connected client from console.listen()
 --
 local function client_print(self, output)
-    if not self.client then
-        return
-    elseif not output then
-        -- disconnect peer
-        self.client = nil -- socket will be closed by tcp_server() function
-        self.running = nil
-        return
-    end
     self.client:write(output)
 end
 
@@ -707,8 +695,10 @@ local function repl(self)
     while self.running do
         local command = self:read()
         local output = self:eval(command)
+        if output == nil then break end
         self:print(output)
     end
+    self.running = false
     fiber.self().storage.console = nil
 end
 
