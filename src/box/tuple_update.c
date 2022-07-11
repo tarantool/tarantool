@@ -902,7 +902,7 @@ update_write_tuple(struct tuple_update *update, char *buffer, char *buffer_end)
 		}
 		total_field_count += field_count;
 	}
-
+	(void)total_field_count;
 	assert(rope_size(update->rope) == total_field_count);
 	assert(new_data <= buffer_end);
 	return new_data - buffer; /* real_tuple_size */
