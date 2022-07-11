@@ -437,6 +437,7 @@ cbus_call(struct cpipe *callee, struct cpipe *caller, struct cbus_call_msg *msg,
 	do {
 		bool exceeded = fiber_yield_deadline(deadline);
 		if (exceeded) {
+			msg->caller = NULL;
 			diag_set(TimedOut);
 			return -1;
 		}

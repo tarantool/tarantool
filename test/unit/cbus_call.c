@@ -42,17 +42,34 @@ barrier(void)
 	fail_if(rc != 0);
 }
 
+struct test_msg {
+	struct cbus_call_msg base;
+	bool was_freed;
+};
+
+static int
+free_cb(struct cbus_call_msg *msg)
+{
+	struct test_msg *m = (struct test_msg *)msg;
+	m->was_freed = true;
+	return 0;
+}
+
 /** Set cbus_call timeout to 10 ms, while func runs for 100 ms. */
 static void
 test_cbus_call_timeout(void)
 {
-	struct cbus_call_msg msg;
-	int rc = cbus_call(&pipe_to_callee, &pipe_to_caller, &msg, func, NULL,
-			   0.01);
+	plan(3);
+	struct test_msg msg;
+	int rc = cbus_call(&pipe_to_callee, &pipe_to_caller, &msg.base, func,
+			   free_cb, 0.01);
 	struct error *err = diag_last_error(diag_get());
 	bool pass = (rc == -1) && err && (err->type == &type_TimedOut);
 	ok(pass, "cbus_call timeout");
+	ok(!msg.was_freed, "free_cb doesn't fire on timeout");
 	barrier();
+	ok(msg.was_freed, "free_cb executed on message return");
+	check_plan();
 }
 
 static int
