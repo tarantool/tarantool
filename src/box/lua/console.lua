@@ -373,6 +373,13 @@ local function get_command(line)
 end
 
 --
+-- return args as table with 'n' set to args number
+--
+local function table_pack(...)
+    return {n = select('#', ...), ...}
+end
+
+--
 -- Evaluate command on local instance
 --
 local function local_eval(storage, line)
@@ -400,7 +407,22 @@ local function local_eval(storage, line)
     if not fun then
         return format(false, errmsg)
     end
-    return format(pcall(fun))
+    -- box.is_in_txn() is stubbed to throw a error before call to box.cfg{}
+    local in_txn_before = ffi.C.box_txn()
+    local res = table_pack(pcall(fun))
+    --
+    -- Rollback if transaction was began in the failed expression.
+    --
+    -- In case of remote binary console if eval leaves an active transaction
+    -- then later a error is thrown overwriting error thrown by eval thus the
+    -- rollback. Also the check if we were already in transaction allows for
+    -- local and remote text console to preserve interactive transactions.
+    --
+    if not res[1] and not in_txn_before and ffi.C.box_txn() then
+        box.rollback()
+    end
+    -- specify length to preserve trailing nils
+    return format(unpack(res, 1, res.n))
 end
 
 local function eval(line)
