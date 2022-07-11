@@ -593,34 +593,20 @@ box.commit();
 ...
 -- DDL and select from a vinyl space. Multi-engine transaction
 -- is not allowed.
--- A transaction is left open due to an exception in the Lua fragment
 box.begin()
 box.space.test:truncate()
-box.space.vinyl:select{}
-
-box.rollback();
+box.space.vinyl:select{};
 ---
 - error: A multi-statement transaction can not use multiple storage engines
 ...
--- DDL as a second statement - doesn't work
-box.begin()
-box.space.memtx:insert{2, 'truncate'}
-box.space.test:truncate();
----
-- error: 'Operation is not permitted when there is an active transaction '
-...
 -- A transaction is left open due to an exception in the Lua fragment
 box.rollback();
 ---
 ...
-box.space.memtx:select{};
----
-- - [1, 'memtx']
-...
--- DML as a second statement - works if the engine is the same
+-- DDL as a second statement - works if the egine is the same
 box.begin()
-box.space.test:truncate()
 box.space.memtx:insert{2, 'truncate'}
+box.space.test:truncate()
 box.commit();
 ---
 ...
@@ -630,6 +616,19 @@ box.space.memtx:select{};
   - [2, 'truncate']
 ...
 -- DML as a second statement - works if the engine is the same
+box.begin()
+box.space.test:truncate()
+box.space.memtx:insert{3, 'truncate'}
+box.commit();
+---
+...
+box.space.memtx:select{};
+---
+- - [1, 'memtx']
+  - [2, 'truncate']
+  - [3, 'truncate']
+...
+-- DML as a second statement. Multi-engine transaction is not allowed.
 box.begin()
 box.space.test:truncate()
 box.space.vinyl:insert{2, 'truncate'};
@@ -662,6 +661,7 @@ box.space.memtx:select{};
 ---
 - - [1, 'memtx']
   - [2, 'truncate']
+  - [3, 'truncate']
 ...
 box.space.vinyl:select{};
 ---
