@@ -501,7 +501,7 @@ wal_open(struct wal_writer *writer)
 	 */
 	struct cbus_call_msg msg;
 	if (cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &msg,
-		      wal_open_f, NULL, TIMEOUT_INFINITY) == 0) {
+		      wal_open_f) == 0) {
 		/*
 		 * Success: we can now append to
 		 * the existing WAL file.
@@ -633,8 +633,8 @@ wal_sync(struct vclock *vclock)
 		return -1;
 	}
 	struct wal_vclock_msg msg;
-	int rc = cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe,
-			   &msg.base, wal_sync_f, NULL, TIMEOUT_INFINITY);
+	int rc = cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &msg.base,
+			   wal_sync_f);
 	if (vclock != NULL)
 		vclock_copy(vclock, &msg.vclock);
 	return rc;
@@ -692,12 +692,8 @@ wal_begin_checkpoint(struct wal_checkpoint *checkpoint)
 		diag_set(ClientError, ER_CASCADE_ROLLBACK);
 		return -1;
 	}
-	int rc = cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe,
-			   &checkpoint->base, wal_begin_checkpoint_f, NULL,
-			   TIMEOUT_INFINITY);
-	if (rc != 0)
-		return -1;
-	return 0;
+	return cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe,
+			 &checkpoint->base, wal_begin_checkpoint_f);
 }
 
 static int
@@ -730,9 +726,8 @@ wal_commit_checkpoint(struct wal_checkpoint *checkpoint)
 		vclock_copy(&writer->checkpoint_vclock, &checkpoint->vclock);
 		return;
 	}
-	cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe,
-		  &checkpoint->base, wal_commit_checkpoint_f, NULL,
-		  TIMEOUT_INFINITY);
+	cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &checkpoint->base,
+		  wal_commit_checkpoint_f);
 }
 
 struct wal_set_checkpoint_threshold_msg {
@@ -758,9 +753,8 @@ wal_set_checkpoint_threshold(int64_t threshold)
 		return;
 	struct wal_set_checkpoint_threshold_msg msg;
 	msg.checkpoint_threshold = threshold;
-	cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe,
-		  &msg.base, wal_set_checkpoint_threshold_f, NULL,
-		  TIMEOUT_INFINITY);
+	cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &msg.base,
+		  wal_set_checkpoint_threshold_f);
 }
 
 void
@@ -812,7 +806,7 @@ wal_collect_garbage(const struct vclock *vclock)
 	struct wal_gc_msg msg;
 	msg.vclock = vclock;
 	cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &msg.base,
-		  wal_collect_garbage_f, NULL, TIMEOUT_INFINITY);
+		  wal_collect_garbage_f);
 }
 
 static void
@@ -1377,10 +1371,8 @@ wal_write_vy_log(struct journal_entry *entry)
 	struct wal_writer *writer = &wal_writer_singleton;
 	struct wal_write_vy_log_msg msg;
 	msg.entry= entry;
-	int rc = cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe,
-			   &msg.base, wal_write_vy_log_f, NULL,
-			   TIMEOUT_INFINITY);
-	return rc;
+	return cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &msg.base,
+			 wal_write_vy_log_f);
 }
 
 static int
@@ -1398,7 +1390,7 @@ wal_rotate_vy_log(void)
 	struct wal_writer *writer = &wal_writer_singleton;
 	struct cbus_call_msg msg;
 	cbus_call(&writer->wal_pipe, &writer->tx_prio_pipe, &msg,
-		  wal_rotate_vy_log_f, NULL, TIMEOUT_INFINITY);
+		  wal_rotate_vy_log_f);
 }
 
 static void

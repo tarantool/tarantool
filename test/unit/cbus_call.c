@@ -21,8 +21,7 @@ static void
 test_cbus_call(void)
 {
 	struct cbus_call_msg msg;
-	int rc = cbus_call(&pipe_to_callee, &pipe_to_caller, &msg, func, NULL,
-			   TIMEOUT_INFINITY);
+	int rc = cbus_call(&pipe_to_callee, &pipe_to_caller, &msg, func);
 	is(rc, 0, "cbus_call ordinary");
 }
 
@@ -37,8 +36,7 @@ static void
 barrier(void)
 {
 	struct cbus_call_msg msg;
-	int rc = cbus_call(&pipe_to_callee, &pipe_to_caller, &msg, empty, NULL,
-			   TIMEOUT_INFINITY);
+	int rc = cbus_call(&pipe_to_callee, &pipe_to_caller, &msg, empty);
 	fail_if(rc != 0);
 }
 
@@ -61,8 +59,8 @@ test_cbus_call_timeout(void)
 {
 	plan(3);
 	struct test_msg msg;
-	int rc = cbus_call(&pipe_to_callee, &pipe_to_caller, &msg.base, func,
-			   free_cb, 0.01);
+	int rc = cbus_call_timeout(&pipe_to_callee, &pipe_to_caller, &msg.base,
+				   func, free_cb, 0.01);
 	struct error *err = diag_last_error(diag_get());
 	bool pass = (rc == -1) && err && (err->type == &type_TimedOut);
 	ok(pass, "cbus_call timeout");
@@ -89,8 +87,7 @@ test_cbus_call_wakeup(void)
 	fiber_wakeup(waker_fiber);
 
 	struct cbus_call_msg msg;
-	int rc = cbus_call(&pipe_to_callee, &pipe_to_caller, &msg, func, NULL,
-			   TIMEOUT_INFINITY);
+	int rc = cbus_call(&pipe_to_callee, &pipe_to_caller, &msg, func);
 	is(rc, 0, "cbus_call wakeup");
 	barrier();
 }
@@ -112,8 +109,7 @@ test_cbus_call_cancel(void)
 	fiber_wakeup(canceler_fiber);
 
 	struct cbus_call_msg msg;
-	int rc = cbus_call(&pipe_to_callee, &pipe_to_caller, &msg, func, NULL,
-			   TIMEOUT_INFINITY);
+	int rc = cbus_call(&pipe_to_callee, &pipe_to_caller, &msg, func);
 	is(rc, 0, "cbus_call cancel");
 	barrier();
 }

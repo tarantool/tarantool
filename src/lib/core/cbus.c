@@ -409,12 +409,10 @@ cbus_call_done(struct cmsg *m)
 	fiber_wakeup(msg->caller);
 }
 
-/**
- * Execute a synchronous call over cbus.
- */
 int
-cbus_call(struct cpipe *callee, struct cpipe *caller, struct cbus_call_msg *msg,
-	cbus_call_f func, cbus_call_f free_cb, double timeout)
+cbus_call_timeout(struct cpipe *callee, struct cpipe *caller,
+		  struct cbus_call_msg *msg, cbus_call_f func,
+		  cbus_call_f free_cb, double timeout)
 {
 	int rc;
 
