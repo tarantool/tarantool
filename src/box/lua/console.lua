@@ -579,7 +579,7 @@ end
 --
 local function remote_eval(self, line)
     if line and self.remote.state == 'active' then
-        local ok, res = pcall(self.remote.eval, self.remote, line)
+        local ok, res = pcall(self.remote.console_eval, line)
         if self.remote.state == 'active' then
             return ok and res or format(false, res)
         end
@@ -587,6 +587,7 @@ local function remote_eval(self, line)
     local err = self.remote.error
     self.remote:close()
     self.remote = nil
+    self.console_eval = nil
     self.eval = nil
     self.prompt = nil
     self.completion = nil
@@ -835,18 +836,26 @@ local function connect(uri, opts)
             log.verbose(err)
             box.error(box.error.NO_CONNECTION)
         end
+        remote.console_eval = function(line)
+            return remote:eval(line)
+        end
     else
         if not remote.host then
             remote.host = 'localhost'
         end
-        local old_eval = remote.eval
-        remote.eval = function(con, line)
-            return old_eval(con, 'return require("console").eval(...)', {line})
+        local eval_obj
+        if remote.peer_protocol_features.streams then
+            eval_obj = remote:new_stream()
+        else
+            eval_obj = remote
+        end
+        remote.console_eval = function(line)
+            return eval_obj:eval('return require("console").eval(...)', {line})
         end
     end
 
     -- check connection && permissions
-    local ok, res = pcall(remote.eval, remote, 'return true')
+    local ok, res = pcall(remote.console_eval, 'return true')
     if not ok then
         remote:close()
         pcall(self.on_client_disconnect, self)
@@ -861,7 +870,7 @@ local function connect(uri, opts)
         local c = string.format(
             'return require("console").completion_handler(%q, %d, %d)',
             str, pos1, pos2)
-        return yaml.decode(remote:eval(c))[1]
+        return yaml.decode(remote.console_eval(c))[1]
     end
     log.info("connected to %s:%s", self.remote.host, self.remote.port)
     return true

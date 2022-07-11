@@ -3,6 +3,7 @@ local console = require('console')
 local fiber = require('fiber')
 local fio = require('fio')
 local string = require('string')
+local netbox = require('net.box')
 local t = require('luatest')
 
 local function configure_box()
@@ -158,7 +159,6 @@ local false_output = [[
 ]]
 
 g.test_begin_in_expr_without_error = function(cg)
-    t.xfail_if(cg.params.name == "remote_bin")
     local console = cg.console
     console:send('box.begin()')
     t.assert_equals(console:send('box.is_in_txn()'), true_output)
@@ -176,9 +176,52 @@ g.test_begin_in_expr_with_error = function(cg)
 end
 
 g.test_error_in_different_expr = function(cg)
-    t.xfail_if(cg.params.name == "remote_bin")
     local console = cg.console
     console:send('box.begin()')
     console:send('error("test error")')
     t.assert_equals(console:send('box.is_in_txn()'), true_output)
+end
+
+local gb = t.group('gh-7288-bin-backcompat')
+
+gb.before_all(function()
+    gb.save = netbox.connect
+    netbox.connect = function(...)
+        local remote = gb.save(...)
+        remote.peer_protocol_features.streams = false
+        return remote
+    end
+    gb.console = TestConsole:new(flavours.remote_bin)
+    gb.console:start()
+end)
+
+gb.after_all(function()
+    gb.console:stop()
+    gb.console = nil
+    netbox.connect = gb.save
+end)
+
+gb.before_each(function()
+    gb.console:connect()
+end)
+
+gb.after_each(function()
+    gb.console:disconnect()
+end)
+
+gb.test_remote_bin_no_streams_works = function(cg)
+    local console = cg.console
+    -- first check we have backcompat mode without streams
+    local expected = [[
+---
+- error: Transaction is active at return from function
+...
+]]
+    t.assert_equals(console:send('box.begin()'), expected)
+    local expected = [[
+---
+- 4
+...
+]]
+    t.assert_equals(console:send('2 + 2'), expected)
 end
