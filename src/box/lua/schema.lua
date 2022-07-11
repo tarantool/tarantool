@@ -727,6 +727,38 @@ local function normalize_format(space_id, space_name, format)
 end
 box.internal.space.normalize_format = normalize_format -- for space.upgrade
 
+local function denormalize_foreign_key_one(fkey)
+    assert(type(fkey.field) == 'string' or type(fkey.field) == 'number')
+    local result = fkey
+    if type(fkey.field) == 'number' then
+        -- convert to one-based index
+        result.field = result.field + 1
+    end
+    return result
+end
+
+local function denormalize_foreign_key(fkey)
+    local result = setmap{}
+    for k, v in pairs(fkey) do
+        result[k] = denormalize_foreign_key_one(v)
+    end
+    return result
+end
+
+-- Convert zero-based foreign key field numbers to one-based
+local function denormalize_format(format)
+    local result = setmetatable({}, { __serialize = 'seq' })
+    for i, f in ipairs(format) do
+        result[i] = f
+        for k, v in pairs(f) do
+            if k == 'foreign_key' then
+                result[i][k] = denormalize_foreign_key(v)
+            end
+        end
+    end
+    return result
+end
+
 box.schema.space = {}
 box.schema.space.create = function(name, options)
     check_param(name, 'name', 'string')
@@ -819,7 +851,7 @@ function box.schema.space.format(id, format)
     end
 
     if format == nil then
-        return tuple.format
+        return denormalize_format(tuple.format)
     else
         check_param(format, 'format', 'table')
         format = normalize_format(id, tuple.name, format)

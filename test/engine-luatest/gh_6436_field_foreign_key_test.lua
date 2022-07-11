@@ -287,12 +287,8 @@ g.test_foreign_key_numeric = function(cg)
         local city = box.schema.create_space('city', {engine=engine, format=fmt})
         -- Check that fmt is not modified by create_space()
         t.assert_equals(fmt_copy, fmt)
-        -- Note that the format was normalized and field converted to zero-based.
-        t.assert_equals(city:format(),
-                        { { name = "id", type = "unsigned"},
-                          { foreign_key = {country = {field = 1, space = country.id}},
-                            name = "country_code", type = "string"},
-                          { name = "name", type = "string"} });
+        -- Check that format() returns one-based field number
+        t.assert_equals(city:format(), fmt)
         city:create_index('pk')
 
         t.assert_equals(country:select{}, {{1, 'ru', 'Russia'}, {2, 'fr', 'France'}})
