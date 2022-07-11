@@ -301,30 +301,28 @@ box.commit();
 -- is not allowed.
 box.begin()
 box.space.test:truncate()
-box.space.vinyl:select{}
+box.space.vinyl:select{};
 
 -- A transaction is left open due to an exception in the Lua fragment
 box.rollback();
 
--- DDL as a second statement - doesn't work
+-- DDL as a second statement - works if the egine is the same
 box.begin()
 box.space.memtx:insert{2, 'truncate'}
-box.space.test:truncate();
-
--- A transaction is left open due to an exception in the Lua fragment
-box.rollback();
+box.space.test:truncate()
+box.commit();
 
 box.space.memtx:select{};
 
 -- DML as a second statement - works if the engine is the same
 box.begin()
 box.space.test:truncate()
-box.space.memtx:insert{2, 'truncate'}
+box.space.memtx:insert{3, 'truncate'}
 box.commit();
 
 box.space.memtx:select{};
 
--- DML as a second statement - works if the engine is the same
+-- DML as a second statement. Multi-engine transaction is not allowed.
 box.begin()
 box.space.test:truncate()
 box.space.vinyl:insert{2, 'truncate'};
