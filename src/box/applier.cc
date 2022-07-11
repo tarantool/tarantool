@@ -1870,23 +1870,6 @@ applier_thread_detach_applier(struct cbus_call_msg *base)
 	return 0;
 }
 
-static int
-applier_cfg_msg_free(struct cbus_call_msg *base)
-{
-	struct applier_cfg_msg *msg = (struct applier_cfg_msg *)base;
-	free(msg);
-	return 0;
-}
-
-static int
-applier_thread_data_do_destroy(struct cbus_call_msg *base)
-{
-	struct applier_cfg_msg *msg = (struct applier_cfg_msg *)base;
-	fiber_cond_destroy(&msg->applier->msg_cond);
-	applier_cfg_msg_free(base);
-	return 0;
-}
-
 /**
  * Remove the applier from the thread and destroy the supporting data structure.
  */
@@ -1900,20 +1883,12 @@ applier_thread_data_destroy(struct applier *applier)
 	 */
 	applier->is_ack_pending = false;
 
-	struct applier_cfg_msg *msg =
-		(struct applier_cfg_msg *)xmalloc(sizeof(*msg));
-	msg->applier = applier;
-	if (cbus_call(&thread->thread_pipe, &thread->tx_pipe,
-		      &msg->base, applier_thread_detach_applier,
-		      applier_thread_data_do_destroy, TIMEOUT_INFINITY) != 0) {
-		/*
-		 * The call was interrupted somehow, everything will be freed
-		 * once the message returns to tx.
-		 */
-		return;
-	}
+	struct applier_cfg_msg msg;
+	msg.applier = applier;
+	cbus_call(&thread->thread_pipe, &thread->tx_pipe, &msg.base,
+		  applier_thread_detach_applier);
 
-	applier_thread_data_do_destroy(&msg->base);
+	fiber_cond_destroy(&applier->msg_cond);
 }
 
 /**
@@ -1932,20 +1907,13 @@ applier_thread_data_create(struct applier *applier,
 	applier->ack_route[0] = {applier_thread_signal_ack, &thread->tx_pipe};
 	applier->ack_route[1] = {applier_complete_ack, NULL};
 
-	struct applier_cfg_msg *msg =
-		(struct applier_cfg_msg *)xmalloc(sizeof(*msg));
-	msg->applier = applier;
+	struct applier_cfg_msg msg;
+	msg.applier = applier;
 
-	if (cbus_call(&thread->thread_pipe, &thread->tx_pipe,
-		      &msg->base, applier_thread_attach_applier,
-		      applier_cfg_msg_free, TIMEOUT_INFINITY) != 0) {
-		applier_thread_data_destroy(applier);
-		return -1;
-	}
+	cbus_call(&thread->thread_pipe, &thread->tx_pipe, &msg.base,
+		  applier_thread_attach_applier);
 
 	ibuf_reset(&applier->ibuf);
-
-	applier_cfg_msg_free(&msg->base);
 
 	return 0;
 }

@@ -3145,9 +3145,8 @@ static inline int
 iproto_do_cfg(struct iproto_thread *iproto_thread, struct iproto_cfg_msg *msg)
 {
 	msg->iproto_thread = iproto_thread;
-	int rc = cbus_call(&iproto_thread->net_pipe, &iproto_thread->tx_pipe,
-			   msg, iproto_do_cfg_f, NULL, TIMEOUT_INFINITY);
-	return rc;
+	return cbus_call(&iproto_thread->net_pipe, &iproto_thread->tx_pipe, msg,
+			 iproto_do_cfg_f);
 }
 
 static inline void

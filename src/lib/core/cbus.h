@@ -374,10 +374,19 @@ struct cbus_call_msg
 	cbus_call_f free_cb;
 };
 
+/** Execute a synchronous call over cbus. */
 int
-cbus_call(struct cpipe *callee, struct cpipe *caller,
-	  struct cbus_call_msg *msg,
-	  cbus_call_f func, cbus_call_f free_cb, double timeout);
+cbus_call_timeout(struct cpipe *callee, struct cpipe *caller,
+		  struct cbus_call_msg *msg, cbus_call_f func,
+		  cbus_call_f free_cb, double timeout);
+
+static inline int
+cbus_call(struct cpipe *callee, struct cpipe *caller, struct cbus_call_msg *msg,
+	  cbus_call_f func)
+{
+	return cbus_call_timeout(callee, caller, msg, func, NULL,
+				 TIMEOUT_INFINITY);
+}
 
 /**
  * Block until all messages queued in a pipe have been processed.
