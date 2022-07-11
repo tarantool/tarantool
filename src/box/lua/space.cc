@@ -269,13 +269,14 @@ lbox_push_space_constraint(struct lua_State *L, struct space *space, int i)
 /**
  * Helper function of lbox_push_space_foreign_key.
  * Push a value @a def to the top of lua stack @a L.
+ * ID-defined fields are converted to one-based index.
  */
 static void
 lbox_push_field_id(struct lua_State *L,
 		   struct tuple_constraint_field_id *def)
 {
 	if (def->name_len == 0)
-		lua_pushnumber(L, def->id);
+		lua_pushnumber(L, def->id + 1);
 	else
 		lua_pushstring(L, def->name);
 }

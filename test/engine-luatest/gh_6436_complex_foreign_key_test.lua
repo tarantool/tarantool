@@ -283,9 +283,7 @@ g.test_complex_foreign_key_numeric = function(cg)
         local fkey = {cntr = {space=country.id,
                               field={[4]=4, [3]=2, [2]=3}}}
         local city = box.schema.create_space('city', city_space_opts(fkey))
-        t.assert_equals(city.foreign_key,
-                        {cntr = {field = {[1] = 2, [2] = 1, [3] = 3},
-                                 space = country.id}});
+        t.assert_equals(city.foreign_key, fkey)
         city:create_index('pk')
 
         t.assert_equals(country:select{}, {{100, 1, 'earth', 'ru', 'Russia'},
