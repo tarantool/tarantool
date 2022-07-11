@@ -51,6 +51,9 @@ local output_eos = { ["yaml"] = '\n...\n', ["lua"] = ';' }
 
 local default_local_eos = ''
 
+-- Each but the last string of multiline command should end with this string.
+local continuation_symbol = '\\'
+
 output_handlers["yaml"] = function(status, _opts, ...)
     local err, ok, res
      -- Using pcall, because serializer can raise an exception
@@ -294,6 +297,14 @@ local function set_output(storage, value)
     return true
 end
 
+local function set_continuation(storage, value)
+    if value ~= 'on' and value ~= 'off' then
+        return error('usage: \\set continuation on|off')
+    end
+    storage.continuation_on = value == 'on'
+    return true
+end
+
 local param_handlers = {
     language = set_language,
     lang = set_language,
@@ -302,7 +313,8 @@ local param_handlers = {
     o = set_output,
     delimiter = set_delimiter,
     delim = set_delimiter,
-    d = set_delimiter
+    d = set_delimiter,
+    continuation = set_continuation,
 }
 
 local function set_param(storage, _func, param, value)
@@ -497,6 +509,14 @@ local text_connection_mt = {
                     end
                 end
             end
+            if operators[items[1]] == set_param and
+                param_handlers[items[2]] == set_continuation then
+
+                local continuation = items[3]
+                if continuation == 'on' or continuation == 'off' then
+                   self.continuation_on = continuation == 'on'
+               end
+            end
             return text
         end,
         --
@@ -573,7 +593,8 @@ local function wrap_text_socket(connection, url, print_f)
         print_f = print_f,
         eos = current_eos(),
         fmt = current_output()["fmt"],
-        local_eos = default_local_eos
+        local_eos = default_local_eos,
+        continuation_on = false,
     }, text_connection_mt)
     --
     -- Prepare the connection: setup EOS symbol
@@ -649,19 +670,34 @@ local function local_read(self)
             break
         end
         if delim == "" then
-            local lang = self.language
-            if not lang or lang == 'lua' then
-                -- stop once a complete Lua statement is entered
-                if local_check_lua(buf) then
-                    break
-                end
+            local continuation_on
+            if self.remote ~= nil then
+                continuation_on = self.remote.continuation_on
             else
-                break
+                continuation_on = self.continuation_on
             end
+            local lang = self.language or 'lua'
+            -- Continue reading if Lua input seems incomplete according to
+            -- internal heuristic.
+            if lang == 'lua' and not local_check_lua(buf) then
+                goto continue
+            end
+            -- Interpret continuation_symbol as a line continuation marker.
+            --
+            -- This check is performed after local_check_lua() because in some
+            -- rare cases (e.g. in multiline strings with line ending with
+            -- slash) the slash would be treated as continuation marker and
+            -- removed.
+            if continuation_on and line:endswith(continuation_symbol) then
+                buf = buf:sub(1, -1 - #continuation_symbol)
+                goto continue
+            end
+            break
         elseif #buf >= #delim and buf:sub(#buf - #delim + 1) == delim then
             buf = buf:sub(0, #buf - #delim)
             break
         end
+        ::continue::
         buf = buf.."\n"
         prompt = string.rep(' ', #self.prompt)
     end
@@ -689,9 +725,12 @@ local function local_print(self, output)
 end
 
 --
--- Read command from connected client console.listen()
+-- Read a line or a chunk from connected client console.listen().
 --
-local function client_read(self)
+-- The value is returned without delimiter (if any) and trailing
+-- newline character.
+--
+local function client_read_line(self)
     --
     -- Byte sequences that come over the network and come from
     -- the local client console may have a different terminal
@@ -710,6 +749,31 @@ local function client_read(self)
     end
     -- remove trailing delimiter
     return buf:sub(1, -#self.delimiter-2)
+end
+
+--
+-- Read a command from connected client console.listen().
+--
+local function client_read(self)
+    local buf = ''
+    local continuation_on = self.continuation_on
+    while true do
+        local line = client_read_line(self)
+        if line == nil then
+            -- EOF or error.
+            --
+            -- Note: Even if `buf` is not empty, skip unfinished
+            -- command.
+            return nil
+        end
+        buf = buf .. line
+        if continuation_on and line:endswith(continuation_symbol) then
+            buf = buf:sub(1, -1 - #continuation_symbol)
+        else
+            break
+        end
+    end
+    return buf
 end
 
 --
@@ -733,6 +797,7 @@ local repl_mt = {
         completion = internal.completion_handler;
         ac = true;
         local_eos = default_local_eos;
+        continuation_on = false;
     };
 }
 
