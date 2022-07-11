@@ -1,0 +1,43 @@
+1..5
+	*** test_main ***
+    1..5
+	*** test_alloc_stats ***
+    ok 1 - count before alloc
+    ok 2 - count after alloc 1
+    ok 3 - count after alloc 2
+    ok 4 - count after free 1
+    ok 5 - count after free 2
+	*** test_alloc_stats: done ***
+ok 1 - subtests
+    1..4
+	*** test_free_delayed_if_alloc_before_read_view ***
+    ok 1 - count before alloc
+    ok 2 - count after alloc
+    ok 3 - count after free
+    ok 4 - count after read view closed
+	*** test_free_delayed_if_alloc_before_read_view: done ***
+ok 2 - subtests
+    1..5
+	*** test_free_delayed_until_all_read_views_closed ***
+    ok 1 - count before alloc
+    ok 2 - count after alloc
+    ok 3 - count after free
+    ok 4 - count after first read view closed
+    ok 5 - count after second read view closed
+	*** test_free_delayed_until_all_read_views_closed: done ***
+ok 3 - subtests
+    1..3
+	*** test_free_not_delayed_if_alloc_after_read_view ***
+    ok 1 - count before alloc
+    ok 2 - count after alloc
+    ok 3 - count after free
+	*** test_free_not_delayed_if_alloc_after_read_view: done ***
+ok 4 - subtests
+    1..3
+	*** test_free_not_delayed_if_temporary ***
+    ok 1 - count before alloc
+    ok 2 - count after alloc
+    ok 3 - count after free
+	*** test_free_not_delayed_if_temporary: done ***
+ok 5 - subtests
+	*** test_main: done ***
