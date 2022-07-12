@@ -20,6 +20,8 @@ local Server = luatest.Server:inherit({})
 
 local WAIT_TIMEOUT = 60
 local WAIT_DELAY = 0.1
+local SOURCE_DIR = fio.abspath(os.getenv('SOURCEDIR') or '.')
+local DEFAULT_COMMAND = fio.pathjoin(SOURCE_DIR, 'test/instances/default.lua')
 
 -- Differences from luatest.Server:
 --
@@ -52,7 +54,7 @@ function Server:initialize()
         self.id = digest.base64_encode(random, {urlsafe = true})
     end
     if self.command == nil then
-        self.command = 'test/instances/default.lua'
+        self.command = DEFAULT_COMMAND
     end
     if self.workdir == nil then
         self.workdir = ('%s/%s-%s'):format(self.vardir, self.alias, self.id)
