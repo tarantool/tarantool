@@ -209,12 +209,7 @@ prebuild-jepsen:
 .PHONY: test-jepsen
 test-jepsen: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON -DWITH_JEPSEN=ON
 test-jepsen: configure prebuild-jepsen
-	# TODO: Support parallel build. In order to do it we need to run Jepsen
-	# testing in a `debian-buster` container instead of `debian-stretch` due
-	# to the old `cmake` version. The `cmake` utility started to support the
-	# `--parallel` option since 3.12 version. In Debian Stretch `cmake` has
-	# version 3.7. In Debian Buster `cmake` has version 3.13.
-	${CMAKE_ENV} cmake --build ${BUILD_DIR} --target run-jepsen
+	${CMAKE_BUILD} --target run-jepsen
 
 ##############################
 # Coverity testing           #

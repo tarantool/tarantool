@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-18.04
 
     container:
-      image: docker.io/tarantool/testing:debian-stretch
+      image: docker.io/tarantool/testing:debian-buster
       ports:
         # Opens tcp port 2222 on the host for internal SSH port
         - 2222:22
