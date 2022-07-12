@@ -32,18 +32,6 @@
 #include "allocator.h"
 #include "tuple.h"
 
-/**
- * Free mode, determines a strategy for freeing up memory
- */
-enum memtx_engine_free_mode {
-	/** Free objects immediately. */
-	MEMTX_ENGINE_FREE,
-	/** Collect garbage after delayed free. */
-	MEMTX_ENGINE_COLLECT_GARBAGE,
-	/** Postpone deletion of objects. */
-	MEMTX_ENGINE_DELAYED_FREE,
-};
-
 struct PACKED memtx_tuple {
 	/*
 	 * sic: the header of the tuple is used
@@ -61,7 +49,6 @@ class MemtxAllocator {
 public:
 	static void create()
 	{
-		mode = MEMTX_ENGINE_FREE;
 		lifo_init(&lifo);
 	}
 
@@ -82,8 +69,7 @@ public:
 	static void enter_delayed_free_mode()
 	{
 		snapshot_version++;
-		if (delayed_free_mode++ == 0)
-			mode = MEMTX_ENGINE_DELAYED_FREE;
+		delayed_free_mode++;
 	}
 
 	/**
@@ -93,8 +79,7 @@ public:
 	static void leave_delayed_free_mode()
 	{
 		assert(delayed_free_mode > 0);
-		if (--delayed_free_mode == 0)
-			mode = MEMTX_ENGINE_COLLECT_GARBAGE;
+		--delayed_free_mode;
 	}
 
 	/**
@@ -122,7 +107,7 @@ public:
 	{
 		struct memtx_tuple *memtx_tuple = container_of(
 			tuple, struct memtx_tuple, base);
-		if (mode != MEMTX_ENGINE_DELAYED_FREE ||
+		if (delayed_free_mode == 0 ||
 		    memtx_tuple->version == snapshot_version ||
 		    tuple_has_flag(tuple, TUPLE_IS_TEMPORARY)) {
 			immediate_free_tuple(memtx_tuple);
@@ -159,7 +144,7 @@ private:
 
 	static void collect_garbage()
 	{
-		if (mode != MEMTX_ENGINE_COLLECT_GARBAGE)
+		if (delayed_free_mode > 0)
 			return;
 		if (!lifo_is_empty(&lifo)) {
 			for (int i = 0; i < GC_BATCH_SIZE; i++) {
@@ -169,8 +154,6 @@ private:
 				immediate_free_tuple(
 					(struct memtx_tuple *)item);
 			}
-		} else {
-			mode = MEMTX_ENGINE_FREE;
 		}
 	}
 
@@ -179,8 +162,6 @@ private:
 	 * immediately because they are currently in use by a snapshot.
 	 */
 	static struct lifo lifo;
-	/** Free mode, determines a strategy for freeing up memory. */
-	static enum memtx_engine_free_mode mode;
 	/**
 	 * Unless zero, freeing of tuples allocated before the last call to
 	 * enter_delayed_free_mode() is delayed until leave_delayed_free_mode()
@@ -193,9 +174,6 @@ private:
 
 template<class Allocator>
 struct lifo MemtxAllocator<Allocator>::lifo;
-
-template<class Allocator>
-enum memtx_engine_free_mode MemtxAllocator<Allocator>::mode;
 
 template<class Allocator>
 uint32_t MemtxAllocator<Allocator>::delayed_free_mode;
