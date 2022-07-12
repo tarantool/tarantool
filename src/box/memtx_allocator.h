@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 #include "allocator.h"
+#include "salad/stailq.h"
 #include "tuple.h"
 
 /**
@@ -44,9 +45,16 @@ struct memtx_tuple {
 	 * Please don't change it without understanding
 	 * how smfree_delayed and snapshotting COW works.
 	 */
-	/** Snapshot generation version. */
-	uint32_t version;
-	struct tuple base;
+	union {
+		struct {
+			/** Snapshot generation version. */
+			uint32_t version;
+			/** Base tuple class. */
+			struct tuple base;
+		};
+		/** Link in garbage collection list. */
+		struct stailq_entry in_gc;
+	};
 };
 
 template<class Allocator>
@@ -54,14 +62,16 @@ class MemtxAllocator {
 public:
 	static void create()
 	{
-		lifo_init(&lifo);
+		stailq_create(&gc);
 	}
 
 	static void destroy()
 	{
-		void *item;
-		while ((item = lifo_pop(&lifo)))
-			immediate_free_tuple((struct memtx_tuple *)item);
+		while (!stailq_empty(&gc)) {
+			struct memtx_tuple *memtx_tuple = stailq_shift_entry(
+					&gc, struct memtx_tuple, in_gc);
+			immediate_free_tuple(memtx_tuple);
+		}
 	}
 
 	/**
@@ -144,21 +154,17 @@ private:
 
 	static void delayed_free_tuple(struct memtx_tuple *memtx_tuple)
 	{
-		lifo_push(&lifo, memtx_tuple);
+		stailq_add_entry(&gc, memtx_tuple, in_gc);
 	}
 
 	static void collect_garbage()
 	{
 		if (delayed_free_mode > 0)
 			return;
-		if (!lifo_is_empty(&lifo)) {
-			for (int i = 0; i < GC_BATCH_SIZE; i++) {
-				void *item = lifo_pop(&lifo);
-				if (item == NULL)
-					break;
-				immediate_free_tuple(
-					(struct memtx_tuple *)item);
-			}
+		for (int i = 0; i < GC_BATCH_SIZE && !stailq_empty(&gc); i++) {
+			struct memtx_tuple *memtx_tuple = stailq_shift_entry(
+					&gc, struct memtx_tuple, in_gc);
+			immediate_free_tuple(memtx_tuple);
 		}
 	}
 
@@ -166,7 +172,7 @@ private:
 	 * Tuple garbage collection list. Contains tuples that were not freed
 	 * immediately because they are currently in use by a snapshot.
 	 */
-	static struct lifo lifo;
+	static struct stailq gc;
 	/**
 	 * Unless zero, freeing of tuples allocated before the last call to
 	 * enter_delayed_free_mode() is delayed until leave_delayed_free_mode()
@@ -178,7 +184,7 @@ private:
 };
 
 template<class Allocator>
-struct lifo MemtxAllocator<Allocator>::lifo;
+struct stailq MemtxAllocator<Allocator>::gc;
 
 template<class Allocator>
 uint32_t MemtxAllocator<Allocator>::delayed_free_mode;
