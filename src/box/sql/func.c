@@ -989,13 +989,20 @@ func_round_double(struct sql_context *ctx, int argc, const struct Mem *argv)
 	assert(mem_is_double(&argv[0]));
 	assert(argc == 1 || mem_is_int(&argv[1]));
 	uint64_t n = (argc == 2 && mem_is_uint(&argv[1])) ? argv[1].u.u : 0;
+	/*
+	 * The smallest positive double value is 2.225E-307, and the value
+	 * before the exponent has a maximum of 15 digits after the decimal
+	 * point. This means that double values cannot have more than 307 + 15
+	 * digits after the decimal point.
+	 */
+	if (n > 322)
+		return mem_copy_as_ephemeral(ctx->pOut, &argv[0]);
 
 	double d = argv[0].u.r;
 	struct Mem *res = ctx->pOut;
 	if (n != 0) {
-		int precision = MIN(n, INT_MAX);
-		return mem_set_double(res, atof(tt_sprintf(
-			"%.*lf", precision, d)));
+		d = atof(tt_sprintf("%.*lf", (int)n, d));
+		return mem_set_double(res, d);
 	}
 	/*
 	 * DOUBLE values greater than 2^53 or less than -2^53 have no digits
