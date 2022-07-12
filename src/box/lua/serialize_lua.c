@@ -955,7 +955,7 @@ dump_root(struct lua_dumper *d)
 
 	luaL_checkfield(d->L, d->cfg, lua_gettop(d->L), &nd.field);
 
-	if (nd.field.type != MP_ARRAY || nd.field.size != 1) {
+	if (nd.field.type != MP_ARRAY || nd.field.size > 1) {
 		d->err = EINVAL;
 		snprintf(d->err_msg, sizeof(d->err_msg),
 			 "serializer: unexpected data "

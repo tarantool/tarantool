@@ -118,7 +118,17 @@ lbox_console_format_lua(struct lua_State *L)
 
 	lua_replace(L, 1);
 	lua_settop(L, 1);
-	return lua_encode(L, serializer_lua, &opts);
+	int ret = lua_encode(L, serializer_lua, &opts);
+	if (ret == 2) {
+		/*
+		 * Nil and error object are pushed onto the stack.
+		 */
+		assert(lua_isnil(L, -2));
+		assert(lua_isstring(L, -1));
+		return luaL_error(L, lua_tostring(L, -1));
+	}
+	assert(ret == 1);
+	return ret;
 }
 
 /*
