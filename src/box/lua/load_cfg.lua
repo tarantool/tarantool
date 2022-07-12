@@ -6,6 +6,7 @@ local private = require('box.internal')
 local urilib = require('uri')
 local math = require('math')
 local fiber = require('fiber')
+local fio = require('fio')
 
 -- Function decorator that is used to prevent box.cfg() from
 -- being called concurrently by different fibers.
@@ -806,7 +807,11 @@ local function load_cfg(cfg)
     -- When recovering from such an old snapshot, special recovery triggers on
     -- system spaces are needed in order to be able to recover and upgrade
     -- the schema then.
+    -- This code is executed before load_cfg, so work_dir is not yet set.
     local snap_dir = box.cfg.memtx_dir
+    if not snap_dir:startswith('/') and box.cfg.work_dir ~= nil then
+        snap_dir = fio.pathjoin(box.cfg.work_dir, snap_dir)
+    end
     local snap_version = private.get_snapshot_version(snap_dir)
     if snap_version then
         private.set_recovery_triggers(snap_version)
