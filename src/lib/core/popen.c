@@ -1185,7 +1185,11 @@ popen_new(struct popen_opts *opts)
 	 * posix_spawn here, but only on macOS.
 	 */
 #pragma GCC diagnostic warning "-Wdeprecated-declarations"
+#ifdef TARGET_OS_DARWIN
+	handle->pid = fork();
+#else
 	handle->pid = vfork();
+#endif
 #pragma GCC diagnostic pop
 	if (handle->pid < 0) {
 		diag_set(SystemError, "vfork() fails");
