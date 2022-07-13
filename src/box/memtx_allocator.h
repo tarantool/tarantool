@@ -57,9 +57,20 @@ struct memtx_tuple {
 	};
 };
 
+/** Memtx read view options. */
+struct memtx_read_view_opts {};
+
 template<class Allocator>
 class MemtxAllocator {
 public:
+	/**
+	 * Tuple read view.
+	 *
+	 * Opening a read view pins tuples that were allocated before
+	 * the read view was created. See open_read_view().
+	 */
+	struct ReadView {};
+
 	static void create()
 	{
 		stailq_create(&gc);
@@ -75,24 +86,25 @@ public:
 	}
 
 	/**
-	 * Enter tuple delayed free mode: tuple allocated before the call
-	 * won't be freed until leave_delayed_free_mode() is called.
-	 * This function is reentrant, meaning it's okay to call it multiple
-	 * times from the same or different fibers - one just has to leave
-	 * the delayed free mode the same amount of times then.
+	 * Opens a tuple read view: tuples visible from the read view
+	 * (allocated before the read view was created) won't be freed
+	 * until the read view is closed with close_read_view().
 	 */
-	static void enter_delayed_free_mode()
+	static ReadView *open_read_view(struct memtx_read_view_opts opts)
 	{
+		(void)opts;
 		snapshot_version++;
 		delayed_free_mode++;
+		return nullptr;
 	}
 
 	/**
-	 * Leave tuple delayed free mode. This function undoes the effect
-	 * of enter_delayed_free_mode().
+	 * Closes a tuple read view opened with open_read_view().
 	 */
-	static void leave_delayed_free_mode()
+	static void close_read_view(ReadView *rv)
 	{
+		assert(rv == nullptr);
+		(void)rv;
 		assert(delayed_free_mode > 0);
 		--delayed_free_mode;
 	}
@@ -161,7 +173,7 @@ private:
 	{
 		if (delayed_free_mode > 0)
 			return;
-		for (int i = 0; i < GC_BATCH_SIZE && !stailq_empty(&gc); i++) {
+		for (int i = 0; !stailq_empty(&gc) && i < GC_BATCH_SIZE; i++) {
 			struct memtx_tuple *memtx_tuple = stailq_shift_entry(
 					&gc, struct memtx_tuple, in_gc);
 			immediate_free_tuple(memtx_tuple);
@@ -175,8 +187,7 @@ private:
 	static struct stailq gc;
 	/**
 	 * Unless zero, freeing of tuples allocated before the last call to
-	 * enter_delayed_free_mode() is delayed until leave_delayed_free_mode()
-	 * is called.
+	 * open_read_view() is delayed until close_read_view() is called.
 	 */
 	static uint32_t delayed_free_mode;
 	/** Incremented with each next snapshot. */
@@ -198,16 +209,20 @@ memtx_allocators_init(struct allocator_settings *settings);
 void
 memtx_allocators_destroy();
 
-/** Call enter_delayed_free_mode for each MemtxAllocator. */
-void
-memtx_allocators_enter_delayed_free_mode();
-
-/** Call leave_delayed_free_mode for each MemtxAllocator. */
-void
-memtx_allocators_leave_delayed_free_mode();
-
 using memtx_allocators = std::tuple<MemtxAllocator<SmallAlloc>,
 				    MemtxAllocator<SysAlloc>>;
+
+using memtx_allocators_read_view =
+		std::tuple<MemtxAllocator<SmallAlloc>::ReadView *,
+			   MemtxAllocator<SysAlloc>::ReadView *>;
+
+/** Opens a read view for each MemtxAllocator. */
+memtx_allocators_read_view
+memtx_allocators_open_read_view(struct memtx_read_view_opts opts);
+
+/** Closes a read view for each MemtxAllocator. */
+void
+memtx_allocators_close_read_view(memtx_allocators_read_view rv);
 
 template<class F, class...Arg>
 static void

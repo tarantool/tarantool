@@ -132,10 +132,10 @@ test_free_delayed_if_alloc_before_read_view()
 	is(alloc_tuple_count(), 0, "count before alloc");
 	struct tuple *tuple = alloc_tuple();
 	is(alloc_tuple_count(), 1, "count after alloc");
-	memtx_allocators_enter_delayed_free_mode();
+	memtx_allocators_read_view rv = memtx_allocators_open_read_view({});
 	free_tuple(tuple);
 	is(alloc_tuple_count(), 1, "count after free");
-	memtx_allocators_leave_delayed_free_mode();
+	memtx_allocators_close_read_view(rv);
 	is(alloc_tuple_count(), 0, "count after read view closed");
 
 	footer();
@@ -155,13 +155,13 @@ test_free_delayed_until_all_read_views_closed()
 	is(alloc_tuple_count(), 0, "count before alloc");
 	struct tuple *tuple = alloc_tuple();
 	is(alloc_tuple_count(), 1, "count after alloc");
-	memtx_allocators_enter_delayed_free_mode();
-	memtx_allocators_enter_delayed_free_mode();
+	memtx_allocators_read_view rv1 = memtx_allocators_open_read_view({});
+	memtx_allocators_read_view rv2 = memtx_allocators_open_read_view({});
 	free_tuple(tuple);
 	is(alloc_tuple_count(), 1, "count after free");
-	memtx_allocators_leave_delayed_free_mode();
+	memtx_allocators_close_read_view(rv1);
 	is(alloc_tuple_count(), 1, "count after first read view closed");
-	memtx_allocators_leave_delayed_free_mode();
+	memtx_allocators_close_read_view(rv2);
 	is(alloc_tuple_count(), 0, "count after second read view closed");
 
 	footer();
@@ -178,13 +178,13 @@ test_free_not_delayed_if_alloc_after_read_view()
 	plan(3);
 	header();
 
-	memtx_allocators_enter_delayed_free_mode();
+	memtx_allocators_read_view rv = memtx_allocators_open_read_view({});
 	is(alloc_tuple_count(), 0, "count before alloc");
 	struct tuple *tuple = alloc_tuple();
 	is(alloc_tuple_count(), 1, "count after alloc");
 	free_tuple(tuple);
 	is(alloc_tuple_count(), 0, "count after free");
-	memtx_allocators_leave_delayed_free_mode();
+	memtx_allocators_close_read_view(rv);
 
 	footer();
 	check_plan();
@@ -203,10 +203,10 @@ test_free_not_delayed_if_temporary()
 	struct tuple *tuple = alloc_tuple();
 	is(alloc_tuple_count(), 1, "count after alloc");
 	tuple_set_flag(tuple, TUPLE_IS_TEMPORARY);
-	memtx_allocators_enter_delayed_free_mode();
+	memtx_allocators_read_view rv = memtx_allocators_open_read_view({});
 	free_tuple(tuple);
 	is(alloc_tuple_count(), 0, "count after free");
-	memtx_allocators_leave_delayed_free_mode();
+	memtx_allocators_close_read_view(rv);
 
 	footer();
 	check_plan();

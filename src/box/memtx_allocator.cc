@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "memtx_allocator.h"
+#include "trivia/tuple.h"
 
 void
 memtx_allocators_init(struct allocator_settings *settings)
@@ -46,32 +47,42 @@ memtx_allocators_destroy()
 	foreach_allocator<allocator_destroy>();
 }
 
-/** Helper for memtx_allocator_enter_delayed_free_mode(). */
-struct memtx_allocator_enter_delayed_free_mode {
+struct memtx_allocator_open_read_view {
+	/** Opens a read view for the specified MemtxAllocator. */
 	template<typename Allocator>
-	void invoke()
+	void invoke(memtx_allocators_read_view &rv_all,
+		    const struct memtx_read_view_opts &opts)
 	{
-		Allocator::enter_delayed_free_mode();
+		util::get<typename Allocator::ReadView *>(rv_all) =
+			Allocator::open_read_view(opts);
 	}
 };
 
-void
-memtx_allocators_enter_delayed_free_mode()
+memtx_allocators_read_view
+memtx_allocators_open_read_view(struct memtx_read_view_opts opts)
 {
-	foreach_memtx_allocator<memtx_allocator_enter_delayed_free_mode>();
+	memtx_allocators_read_view rv;
+	foreach_memtx_allocator<memtx_allocator_open_read_view,
+				memtx_allocators_read_view &,
+				const struct memtx_read_view_opts &>(rv, opts);
+	return rv;
 }
 
-/** Helper for memtx_allocator_leave_delayed_free_mode(). */
-struct memtx_allocator_leave_delayed_free_mode {
+struct memtx_allocator_close_read_view {
+	/** Closes a read view and sets the read view ptr to null. */
 	template<typename Allocator>
-	void invoke()
+	void invoke(memtx_allocators_read_view &rv_all)
 	{
-		Allocator::leave_delayed_free_mode();
+		typename Allocator::ReadView *&rv =
+			util::get<typename Allocator::ReadView *>(rv_all);
+		Allocator::close_read_view(rv);
+		rv = nullptr;
 	}
 };
 
 void
-memtx_allocators_leave_delayed_free_mode()
+memtx_allocators_close_read_view(memtx_allocators_read_view rv)
 {
-	foreach_memtx_allocator<memtx_allocator_leave_delayed_free_mode>();
+	foreach_memtx_allocator<memtx_allocator_close_read_view,
+				memtx_allocators_read_view &>(rv);
 }
