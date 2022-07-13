@@ -35,7 +35,7 @@ g.test_applier_connection_on_reconfig = function(g)
                 box.cfg.replication[1],
                 "%s/replica2.iproto",
             }
-        }]]):format(server.socketdir))
+        }]]):format(server.vardir))
     g.replica:eval([[
         box.cfg{
             replication = {
