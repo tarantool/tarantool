@@ -749,13 +749,13 @@ setmetatable(box, {
 -- `true` when box is configured.
 --
 -- Use locked() wrapper to obtain reliable results.
-local box_is_configured = false
+box.is_configured = false
 
 local function load_cfg(cfg)
     -- A user may save box.cfg (this function) before box loading
     -- and call it afterwards. We should reconfigure box in the
     -- case.
-    if box_is_configured then
+    if box.is_configured then
         reload_cfg(box.cfg, cfg)
         return
     end
@@ -780,7 +780,7 @@ local function load_cfg(cfg)
     -- NB: After this point the function should not raise an
     -- error.
     --
-    -- This is important to have right <box_is_configured> (this
+    -- This is important to have right <box.is_configured> (this
     -- file) and <is_box_configured> (box.cc) values.
     --
     -- It also would be counter-intuitive to receive an error from
@@ -849,7 +849,7 @@ local function load_cfg(cfg)
     end
     box_configured = nil
 
-    box_is_configured = true
+    box.is_configured = true
 
     -- Setup flight recorder if available. Should be called after config
     -- is loaded since it uses box.cfg parameters.
@@ -889,12 +889,12 @@ box_load_and_execute = function(...)
     -- We should check whether box is configured, because a user
     -- may save <box_load_and_execute> function before box loading
     -- and call it afterwards.
-    if not box_is_configured then
+    if not box.is_configured then
         locked(function()
             -- Re-check, because after releasing of the lock the
             -- box state may be changed. We should call load_cfg()
             -- only once.
-            if not box_is_configured then
+            if not box.is_configured then
                 load_cfg()
             end
         end)()

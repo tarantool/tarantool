@@ -85,6 +85,7 @@ t
   - index
   - info
   - internal
+  - is_configured
   - is_in_txn
   - lib
   - on_commit
