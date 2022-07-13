@@ -331,3 +331,6 @@ target_link_libraries(string.test core unit)
 
 add_executable(qsort_arg.test qsort_arg.cc core_test_utils.c)
 target_link_libraries(qsort_arg.test misc unit)
+
+add_executable(hyperloglog.test hyperloglog.c)
+target_link_libraries(hyperloglog.test unit salad m)
