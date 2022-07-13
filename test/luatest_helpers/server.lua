@@ -43,10 +43,10 @@ Server.constructor_checks = fun.chain(Server.constructor_checks, {
     engine = '?string',
 }):tomap()
 
-Server.socketdir = fio.abspath(os.getenv('VARDIR') or '/tmp/t')
+Server.vardir = fio.abspath(os.getenv('VARDIR') or '/tmp/t')
 
 function Server.build_instance_uri(alias)
-    return ('%s/%s.iproto'):format(Server.socketdir, alias)
+    return ('%s/%s.iproto'):format(Server.vardir, alias)
 end
 
 function Server:initialize()
@@ -58,7 +58,7 @@ function Server:initialize()
         self.command = 'test/instances/default.lua'
     end
     if self.workdir == nil then
-        self.workdir = ('%s/%s-%s'):format(self.socketdir, self.alias, self.id)
+        self.workdir = ('%s/%s-%s'):format(self.vardir, self.alias, self.id)
         fio.rmtree(self.workdir)
         fio.mktree(self.workdir)
     end
@@ -71,7 +71,7 @@ function Server:initialize()
     end
     if self.net_box_port == nil and self.net_box_uri == nil then
         self.net_box_uri = self.build_instance_uri(self.alias)
-        fio.mktree(self.socketdir)
+        fio.mktree(self.vardir)
     end
 
     -- AFAIU, the inner getmetatable() returns our helpers.Server
