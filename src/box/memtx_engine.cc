@@ -664,6 +664,11 @@ struct checkpoint {
 	 * read view iterators.
 	 */
 	struct rlist entries;
+	/**
+	 * Allocator read view that prevents tuples referenced by
+	 * the snapshot iterators from being freed.
+	 */
+	memtx_allocators_read_view rv;
 	struct cord cord;
 	bool waiting_for_snap_thread;
 	/** The vclock of the snapshot file. */
@@ -709,7 +714,7 @@ checkpoint_delete(struct checkpoint *ckpt)
 		entry->iterator->free(entry->iterator);
 		free(entry);
 	}
-	memtx_allocators_leave_delayed_free_mode();
+	memtx_allocators_close_read_view(ckpt->rv);
 	xdir_destroy(&ckpt->dir);
 	free(ckpt);
 }
@@ -863,7 +868,7 @@ memtx_engine_begin_checkpoint(struct engine *engine, bool is_scheduled)
 		memtx->checkpoint = NULL;
 		return -1;
 	}
-	memtx_allocators_enter_delayed_free_mode();
+	memtx->checkpoint->rv = memtx_allocators_open_read_view({});
 	return 0;
 }
 
@@ -988,7 +993,16 @@ struct memtx_join_entry {
 };
 
 struct memtx_join_ctx {
+	/**
+	 * List of MemTX spaces to snapshot, with consistent
+	 * read view iterators.
+	 */
 	struct rlist entries;
+	/**
+	 * Allocator read view that prevents tuples referenced by
+	 * the snapshot iterators from being freed.
+	 */
+	memtx_allocators_read_view rv;
 	struct xstream *stream;
 };
 
@@ -1038,7 +1052,7 @@ memtx_engine_prepare_join(struct engine *engine, void **arg)
 		free(ctx);
 		return -1;
 	}
-	memtx_allocators_enter_delayed_free_mode();
+	ctx->rv = memtx_allocators_open_read_view({});
 	*arg = ctx;
 	return 0;
 }
@@ -1116,7 +1130,7 @@ memtx_engine_complete_join(struct engine *engine, void *arg)
 		entry->iterator->free(entry->iterator);
 		free(entry);
 	}
-	memtx_allocators_leave_delayed_free_mode();
+	memtx_allocators_close_read_view(ctx->rv);
 	free(ctx);
 }
 
