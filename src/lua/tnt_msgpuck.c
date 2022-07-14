@@ -33,92 +33,19 @@
 #include "tnt_msgpuck.h"
 #include "mp_interval.h"
 
-char *
-tnt_mp_encode_float(char *data, float num)
-{
-	return mp_encode_float(data, num);
-}
+EXPORT_SYMBOL(mp_encode_float, tnt_mp_encode_float)
+EXPORT_SYMBOL(mp_encode_double, tnt_mp_encode_double)
+EXPORT_SYMBOL(mp_decode_float, tnt_mp_decode_float)
+EXPORT_SYMBOL(mp_decode_double, tnt_mp_decode_double)
+EXPORT_SYMBOL(mp_decode_extl, tnt_mp_decode_extl)
+EXPORT_SYMBOL(mp_encode_decimal, tnt_mp_encode_decimal)
+EXPORT_SYMBOL(mp_sizeof_decimal, tnt_mp_sizeof_decimal)
+EXPORT_SYMBOL(mp_encode_uuid, tnt_mp_encode_uuid)
+EXPORT_SYMBOL(mp_sizeof_uuid, tnt_mp_sizeof_uuid)
+EXPORT_SYMBOL(mp_encode_error, tnt_mp_encode_error)
+EXPORT_SYMBOL(mp_sizeof_error, tnt_mp_sizeof_error)
+EXPORT_SYMBOL(mp_encode_datetime, tnt_mp_encode_datetime)
+EXPORT_SYMBOL(mp_sizeof_datetime, tnt_mp_sizeof_datetime)
+EXPORT_SYMBOL(mp_encode_interval, tnt_mp_encode_interval)
+EXPORT_SYMBOL(mp_sizeof_interval, tnt_mp_sizeof_interval)
 
-char *
-tnt_mp_encode_double(char *data, double num)
-{
-	return mp_encode_double(data, num);
-}
-
-float
-tnt_mp_decode_float(const char **data)
-{
-	return mp_decode_float(data);
-}
-
-double
-tnt_mp_decode_double(const char **data)
-{
-	return mp_decode_double(data);
-}
-
-uint32_t
-tnt_mp_decode_extl(const char **data, int8_t *type)
-{
-	return mp_decode_extl(data, type);
-}
-
-char *
-tnt_mp_encode_decimal(char *data, const decimal_t *dec)
-{
-	return mp_encode_decimal(data, dec);
-}
-
-uint32_t
-tnt_mp_sizeof_decimal(const decimal_t *dec)
-{
-	return mp_sizeof_decimal(dec);
-}
-
-char *
-tnt_mp_encode_uuid(char *data, const struct tt_uuid *uuid)
-{
-	return mp_encode_uuid(data, uuid);
-}
-
-uint32_t
-tnt_mp_sizeof_uuid(void)
-{
-	return mp_sizeof_uuid();
-}
-
-char *
-tnt_mp_encode_error(char *data, const struct error *error)
-{
-	return mp_encode_error(data, error);
-}
-
-uint32_t
-tnt_mp_sizeof_error(const struct error *error)
-{
-	return mp_sizeof_error(error);
-}
-
-char *
-tnt_mp_encode_datetime(char *data, const struct datetime *date)
-{
-	return mp_encode_datetime(data, date);
-}
-
-uint32_t
-tnt_mp_sizeof_datetime(const struct datetime *date)
-{
-	return mp_sizeof_datetime(date);
-}
-
-char *
-tnt_mp_encode_interval(char *data, const struct interval *itv)
-{
-	return mp_encode_interval(data, itv);
-}
-
-uint32_t
-tnt_mp_sizeof_interval(const struct interval *itv)
-{
-	return mp_sizeof_interval(itv);
-}
