@@ -2845,6 +2845,7 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 			}
 		}
 		assert(index->dense_id < story->index_count);
+		assert(story->link[index->dense_id].in_index != NULL);
 		rlist_add(&story->link[index->dense_id].nearby_gaps,
 			  &item->in_nearby_gaps);
 	} else {
