@@ -145,6 +145,8 @@ interval_unpack(const char **data, struct interval *itv)
 	return itv;
 }
 
+EXPORT_SYMBOL(interval_unpack, tnt_interval_unpack)
+
 char *
 mp_encode_interval(char *data, const struct interval *itv)
 {
