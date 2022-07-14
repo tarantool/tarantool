@@ -12,8 +12,8 @@ set(LIBICU_VERSION release-71-1/icu4c-71_1)
 set(LIBICU_HASH e06ffc96f59762bd3c929b217445aaec)
 set(LIBICONV_VERSION 1.16)
 set(LIBICONV_HASH 7d2a800b952942bb2880efb00cfd524c)
-set(OPENSSL_VERSION 1.1.1n)
-set(OPENSSL_HASH 2aad5635f9bb338bc2c6b7d19cbc9676)
+set(OPENSSL_VERSION 1.1.1q)
+set(OPENSSL_HASH c685d239b6a6e1bd78be45624c092f51)
 set(ZLIB_VERSION 1.2.11)
 set(ZLIB_HASH 1c9f62f0778697a09d36121ead88e08e)
 set(NCURSES_VERSION 6.2)
@@ -46,6 +46,9 @@ endif()
 #
 # OpenSSL
 #
+# Patched to build on Mac OS. See
+# https://github.com/openssl/openssl/issues/18720
+#
 ExternalProject_Add(openssl
     URL ${BACKUP_STORAGE}/openssl/openssl-${OPENSSL_VERSION}.tar.gz
     URL_MD5 ${OPENSSL_HASH}
@@ -60,6 +63,8 @@ ExternalProject_Add(openssl
         --libdir=lib
         no-shared
     INSTALL_COMMAND ${CMAKE_MAKE_PROGRAM} install_sw
+    PATCH_COMMAND patch -d <SOURCE_DIR> -p1 <
+        "${CMAKE_CURRENT_SOURCE_DIR}/openssl-111q-gh-18720.patch"
 )
 
 #
