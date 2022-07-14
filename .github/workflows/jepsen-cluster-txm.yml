@@ -9,7 +9,6 @@ jobs:
 
     runs-on: ubuntu-18.04
 
-    # image built by .gitlab.mk instructions and targets from .travis.mk
     container:
       image: docker.io/tarantool/testing:debian-stretch
       ports:
