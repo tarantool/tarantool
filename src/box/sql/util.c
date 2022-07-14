@@ -1093,7 +1093,7 @@ sql_rem_int(int64_t lhs, bool is_lhs_neg, int64_t rhs, bool is_rhs_neg,
 		uint64_t u_lhs = (uint64_t) (-lhs);
 		uint64_t u_res = u_lhs % u_rhs;
 		*res = -u_res;
-		*is_res_neg = true;
+		*is_res_neg = u_res != 0;
 		return 0;
 	}
 	/*
