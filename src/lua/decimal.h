@@ -42,10 +42,7 @@ extern uint32_t CTID_DECIMAL;
 struct lua_State;
 
 decimal_t *
-lua_pushdecimal(struct lua_State *L);
-
-void
-lua_pushdecimalstr(struct lua_State *L, const decimal_t *dec);
+luaT_pushdecimal(struct lua_State *L);
 
 void
 tarantool_lua_decimal_init(struct lua_State *L);
