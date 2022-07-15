@@ -1,5 +1,7 @@
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <module.h>
 
 #include <small/ibuf.h>
@@ -19,6 +21,19 @@
 #ifndef lengthof
 #define lengthof(array) (sizeof(array) / sizeof((array)[0]))
 #endif
+
+#define xalloc_impl(size, func, args...)					\
+	({									\
+		void *ret = func(args);						\
+		if (unlikely(ret == NULL)) {					\
+			fprintf(stderr, "Can't allocate %zu bytes at %s:%d",	\
+				(size_t)(size), __FILE__, __LINE__);		\
+			exit(EXIT_FAILURE);					\
+		}								\
+		ret;								\
+	})
+
+#define xmalloc(size)		xalloc_impl((size), malloc, (size))
 
 /* Test for constants */
 static const char *consts[] = {
@@ -2379,6 +2394,374 @@ test_tuple_validate_formatted(lua_State *L)
 	return 1;
 }
 
+/* {{{ decimal */
+
+/**
+ * Check decimal value against expected one.
+ */
+static void
+check_decimal(const decimal_t *dec, const char *exp)
+{
+	/*
+	 * Ideally we shouldn't use anything from the decimal
+	 * library to validate its implementation. However we
+	 * use decimal_to_string() here for simplicity.
+	 */
+	char str[DECIMAL_MAX_STR_LEN];
+	decimal_to_string(dec, str);
+	assert(strcmp(str, exp) == 0);
+}
+
+/**
+ * Basic decimal test.
+ *
+ * Just call each function on some valid input.
+ * No corner, tricky and errorneous cases.
+ */
+static int
+test_decimal(struct lua_State *L)
+{
+	/* From string. */
+	decimal_t pi;
+	decimal_t *p = decimal_from_string(&pi, "3.14");
+	assert(p == &pi);
+	check_decimal(&pi, "3.14");
+
+	/* To string. */
+	char str[DECIMAL_MAX_STR_LEN];
+	decimal_to_string(&pi, str);
+	assert(strcmp(str, "3.14") == 0);
+
+	/* Precision. */
+	int precision = decimal_precision(&pi);
+	assert(precision == 3);
+
+	/* Scale. */
+	int scale = decimal_scale(&pi);
+	assert(scale == 2);
+
+	/* Zero. */
+	decimal_t zero;
+	p = decimal_zero(&zero);
+	assert(p == &zero);
+	check_decimal(&zero, "0");
+
+	/* Is integer? */
+	bool is_int = decimal_is_int(&pi);
+	assert(!is_int);
+	is_int = decimal_is_int(&zero);
+	assert(is_int);
+
+	/* Is negative? */
+	decimal_t mariana;
+	decimal_from_string(&mariana, "-10.9");
+	bool is_neg = decimal_is_neg(&pi);
+	assert(!is_neg);
+	is_neg = decimal_is_neg(&zero);
+	assert(!is_neg);
+	is_neg = decimal_is_neg(&mariana);
+	assert(is_neg);
+
+	/* From double. */
+	decimal_t guinness;
+	p = decimal_from_double(&guinness, 119.5);
+	assert(p == &guinness);
+	check_decimal(&guinness, "119.5");
+
+	/* From int64_t. */
+	decimal_t celsius;
+	p = decimal_from_int64(&celsius, (int64_t)(-273));
+	assert(p == &celsius);
+	check_decimal(&celsius, "-273");
+
+	/* From uint64_t. */
+	decimal_t vostok_1;
+	p = decimal_from_uint64(&vostok_1, (uint64_t)1961);
+	assert(p == &vostok_1);
+	check_decimal(&vostok_1, "1961");
+
+	/* To int64_t. */
+	decimal_t carthage;
+	decimal_from_string(&carthage, "-146");
+	int64_t carthage_64 = 0;
+	const decimal_t *cp = decimal_to_int64(&carthage, &carthage_64);
+	assert(cp == &carthage);
+	assert(carthage_64 == (int64_t)(-146));
+
+	/* To uint64_t. */
+	decimal_t g;
+	decimal_from_string(&g, "9.81");
+	uint64_t g_u64 = 0;
+	cp = decimal_to_uint64(&g, &g_u64);
+	assert(cp == &g);
+	assert(g_u64 == (uint64_t)9);
+
+	/* Compare. */
+	decimal_t five_1;
+	decimal_t five_2;
+	decimal_t six;
+	decimal_from_string(&five_1, "5");
+	decimal_from_string(&five_2, "5");
+	decimal_from_string(&six, "6");
+	int rc = decimal_compare(&five_1, &six);
+	assert(rc == -1);
+	rc = decimal_compare(&five_1, &five_2);
+	assert(rc == 0);
+	rc = decimal_compare(&six, &five_1);
+	assert(rc == 1);
+	decimal_t zerooo;
+	decimal_from_string(&zero, "0");
+	decimal_from_string(&zerooo, "0.00");
+	rc = decimal_compare(&zero, &zerooo);
+	assert(rc == 0);
+
+	/*
+	 * Rounding (to nearest integer, half goes away from
+	 * zero).
+	 *
+	 * [+-]1.5 cases are to ensure that the mode is not 'half
+	 * to nearest odd' (it would be quite surprising, but
+	 * we're in a test: it is okay to do crazy suppositions).
+	 */
+	struct {
+		const char *input;
+		int scale;
+		const char *exp;
+	} round_cases[] = {
+		{"7.62",   1, "7.6"  }, /* AK-47 cartridge. */
+		{"7.62",   0, "8"    },
+		{"-38.83", 1, "-38.8"}, /* Mercury melting. */
+		{"-38.83", 0, "-39"  },
+		{"0.5",    0, "1"    },
+		{"-0.5",   0, "-1",  },
+		{"1.5",    0, "2"    },
+		{"-1.5",   0, "-2",  },
+	};
+	for (size_t i = 0; i < lengthof(round_cases); ++i) {
+		decimal_t dec;
+		decimal_from_string(&dec, round_cases[i].input);
+		p = decimal_round(&dec, round_cases[i].scale);
+		assert(p == &dec);
+		check_decimal(&dec, round_cases[i].exp);
+	}
+
+	/*
+	 * Floor (rounding toward zero).
+	 *
+	 * Interesting enough that I got floor(-0.5, 0) == -0
+	 * (in the string representation of decimal value). I
+	 * don't know why not just zero and how -0 is different
+	 * from just zero for decimals. OTOH, if -0 exists it is
+	 * a correct answer everywhere, where 0 is correct answer.
+	 * So I just hold it in the test.
+	 */
+	struct {
+		const char *input;
+		int scale;
+		const char *exp;
+	} floor_cases[] = {
+		{"7.62",   1, "7.6"  },
+		{"7.62",   0, "7"    },
+		{"-38.83", 1, "-38.8"},
+		{"-38.83", 0, "-38"  },
+		{"0.5",    0, "0"    },
+		{"-0.5",   0, "-0",  }, /* Hm. */
+		{"1.5",    0, "1"    },
+		{"-1.5",   0, "-1",  },
+	};
+	for (size_t i = 0; i < lengthof(floor_cases); ++i) {
+		decimal_t dec;
+		decimal_from_string(&dec, floor_cases[i].input);
+		p = decimal_floor(&dec, floor_cases[i].scale);
+		assert(p == &dec);
+		check_decimal(&dec, floor_cases[i].exp);
+	}
+
+	/* Trim trailing zeros. */
+	decimal_from_string(&zerooo, "0.00");
+	check_decimal(&zerooo, "0.00");
+	p = decimal_trim(&zerooo);
+	assert(p == &zerooo);
+	check_decimal(&zerooo, "0");
+	decimal_t percent;
+	decimal_from_string(&percent, "0.50");
+	check_decimal(&percent, "0.50");
+	p = decimal_trim(&percent);
+	assert(p == &percent);
+	check_decimal(&percent, "0.5");
+
+	/*
+	 * Rescale.
+	 *
+	 * Round or add fractional zeros if needed.
+	 */
+	decimal_t circumference;
+	decimal_from_string(&circumference, "40075.017");
+	p = decimal_rescale(&circumference, 2);
+	assert(p == &circumference);
+	check_decimal(&circumference, "40075.02");
+	decimal_t radius;
+	decimal_from_string(&radius, "6378.137");
+	p = decimal_rescale(&radius, 6);
+	assert(p == &radius);
+	check_decimal(&radius, "6378.137000");
+	decimal_t mass;
+	decimal_from_string(&mass, "3e-6");
+	check_decimal(&mass, "0.000003");
+	p = decimal_rescale(&mass, 6);
+	assert(p == &mass);
+	check_decimal(&mass, "0.000003");
+
+	/* Unary operations. */
+	typedef decimal_t *
+		unary_op_t(decimal_t *res, const decimal_t *arg);
+	struct {
+		unary_op_t *op;
+		const char *arg;
+		const char *exp;
+	} unary_cases[] = {
+		{decimal_abs,   "-1",  "1" },
+		{decimal_abs,   "0",   "0" },
+		{decimal_abs,   "1",   "1" },
+		{decimal_minus, "-1",  "1" },
+		/* Interesting enough that here I got
+		 * minus(0) == 0, not minus zero as
+		 * above for floor(-0.5, 0).
+		 */
+		{decimal_minus, "0",   "0" },
+		{decimal_minus, "1",   "-1"},
+		{decimal_log10, "100", "2" },
+		{decimal_log10, "2",
+			/* Zero and 38 digits of the logarith. */
+			"0.30102999566398119521373889472449302677"},
+		{decimal_log10, "1",   "0" },
+		{decimal_ln,    "2",
+			/*
+			 * Zero and 37 digits of the logarith.
+			 *
+			 * Interesting that it should be
+			 * ...656808 (not ...656810) if we'll
+			 * round 'exact' value to 38 digits.
+			 *
+			 * I guess it is okay to have precision
+			 * loss near to DECIMAL_MAX_DIGITS digits
+			 * after period, so just hold the result
+			 * in the test.
+			 */
+			"0.6931471805599453094172321214581765681"},
+		{decimal_ln,    "1",   "0" },
+		{decimal_exp,   "0",   "1" },
+		{decimal_exp,   "1",
+			"2.7182818284590452353602874713526624978"},
+		{decimal_exp,   "2",
+			"7.3890560989306502272304274605750078132"},
+		{decimal_sqrt,  "4",   "2" },
+	};
+	for (size_t i = 0; i < lengthof(unary_cases); ++i) {
+		/* res = op(arg) */
+		decimal_t arg;
+		decimal_from_string(&arg, unary_cases[i].arg);
+		decimal_t res;
+		p = unary_cases[i].op(&res, &arg);
+		assert(p == &res);
+		check_decimal(&res, unary_cases[i].exp);
+		/* arg = op(arg) */
+		p = unary_cases[i].op(&arg, &arg);
+		assert(p == &arg);
+		check_decimal(&arg, unary_cases[i].exp);
+	}
+
+	/* Binary operations. */
+	typedef decimal_t *
+		binary_op_t(decimal_t *res, const decimal_t *arg_1,
+			    const decimal_t *arg_2);
+	struct {
+		binary_op_t *op;
+		const char *arg_1;
+		const char *arg_2;
+		const char *exp;
+	} binary_cases[] = {
+		{decimal_remainder, "7",    "2",   "1"   },
+		{decimal_remainder, "-7",   "3",   "-1"  },
+		{decimal_remainder, "36.6", "5",   "1.6" },
+		{decimal_remainder, "36.6", "0.5", "0.1" },
+		{decimal_add,       "6",    "7",   "13"  },
+		{decimal_sub,       "6",    "7",   "-1"  },
+		{decimal_mul,       "6",    "7",   "42"  },
+		/* Zero and three 38 times (DECIMAL_MAX_DIGITS == 38). */
+		{decimal_mul,       "0.33333333333333333333333333333333333333",
+			/* Zero and nine 38 times. */
+			"3",   "0.99999999999999999999999999999999999999"},
+		{decimal_div,       "7",    "2",   "3.5" },
+		{decimal_div,       "-7",   "3",
+			/* Two and three 37 times. */
+			"-2.3333333333333333333333333333333333333"},
+		{decimal_div,       "36.6", "5",   "7.32"},
+		{decimal_div,       "36.6", "0.5", "73.2"},
+		{decimal_pow,       "2",    "8",   "256" },
+		{decimal_pow,       "-2",   "8",   "256" },
+		/*
+		 * It is interesting: amount of trailing zeros
+		 * seems multiply of amount of them in the first
+		 * argument and value of the second argument.
+		 *
+		 * The API says nothing about how operations
+		 * should interpret trailing zeros in arguments.
+		 * So just hold those values in the test.
+		 */
+		{decimal_pow,       "2.0",  "8",   "256.00000000"},
+		{decimal_pow,       "2.0",  "8.0", "256.00000000"},
+		{decimal_pow,       "2",    "8.0", "256" },
+		{decimal_pow,       "2.00", "8",   "256.0000000000000000"},
+	};
+	for (size_t i = 0; i < lengthof(binary_cases); ++i) {
+		/* res = op(arg_1, arg_2) */
+		decimal_t arg_1;
+		decimal_from_string(&arg_1, binary_cases[i].arg_1);
+		decimal_t arg_2;
+		decimal_from_string(&arg_2, binary_cases[i].arg_2);
+		decimal_t res;
+		p = binary_cases[i].op(&res, &arg_1, &arg_2);
+		assert(p == &res);
+		check_decimal(&res, binary_cases[i].exp);
+		/* arg_1 = op(arg_1, arg_2) */
+		p = binary_cases[i].op(&arg_1, &arg_1, &arg_2);
+		assert(p == &arg_1);
+		check_decimal(&arg_1, binary_cases[i].exp);
+		/* Restore arg_1. */
+		decimal_from_string(&arg_1, binary_cases[i].arg_1);
+		/* arg_2 = op(arg_1, arg_2) */
+		p = binary_cases[i].op(&arg_2, &arg_1, &arg_2);
+		assert(p == &arg_2);
+		check_decimal(&arg_2, binary_cases[i].exp);
+	}
+
+	/*
+	 * Packed length, packing, unpacking.
+	 *
+	 * Don't check the packed data, just marshalling and
+	 * data pointers.
+	 */
+	decimal_t ammonia;
+	decimal_from_string(&ammonia, "-77.73");
+	uint32_t len = decimal_len(&ammonia);
+	char *data = xmalloc(len);
+	char *data_end = decimal_pack(data, &ammonia);
+	assert(data_end - data == len);
+	decimal_t ammonia_copy;
+	const char *data_ptr_copy = data;
+	p = decimal_unpack(&data_ptr_copy, len, &ammonia_copy);
+	assert(p == &ammonia_copy);
+	assert(data_ptr_copy == data_end);
+	check_decimal(&ammonia_copy, "-77.73");
+	free(data);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+/* }}} decimal */
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -2422,6 +2805,7 @@ luaopen_module_api(lua_State *L)
 		{"tuple_validate_def", test_tuple_validate_default},
 		{"tuple_validate_fmt", test_tuple_validate_formatted},
 		{"test_key_def_dup", test_key_def_dup},
+		{"test_decimal", test_decimal},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);

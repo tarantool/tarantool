@@ -1,7 +1,7 @@
 #include "msgpuck.h"
+#include "lua/tnt_msgpuck.h"
 #include "module.h"
 #include "mp_extension_types.h"
-#include "lua/tnt_msgpuck.h"
 #include "mp_interval.h"
 #include "datetime.h"
 

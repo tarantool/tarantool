@@ -1,6 +1,6 @@
 #include "msgpuck.h"
-#include "module.h"
 #include "mp_decimal.h"
+#include "module.h"
 #include "mp_extension_types.h"
 #include "lua/tnt_msgpuck.h"
 
