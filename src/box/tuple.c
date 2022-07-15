@@ -650,6 +650,24 @@ box_tuple_field(box_tuple_t *tuple, uint32_t fieldno)
 	return tuple_field(tuple, fieldno);
 }
 
+const char *
+box_tuple_field_by_path(box_tuple_t *tuple, const char *path,
+			uint32_t path_len, int index_base)
+{
+	assert(tuple != NULL);
+	assert(path != NULL);
+
+	if (path_len == 0)
+		return NULL;
+
+	uint32_t path_hash = field_name_hash(path, path_len);
+	return tuple_field_raw_by_full_path(tuple_format(tuple),
+					    tuple_data(tuple),
+					    tuple_field_map(tuple),
+					    path, path_len, path_hash,
+					    index_base);
+}
+
 typedef struct tuple_iterator box_tuple_iterator_t;
 
 box_tuple_iterator_t *
