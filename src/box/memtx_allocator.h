@@ -32,7 +32,12 @@
 #include "allocator.h"
 #include "tuple.h"
 
-struct PACKED memtx_tuple {
+/**
+ * Memtx tuple sub-class.
+ *
+ * FIXME(gh-7422): Make this struct packed.
+ */
+struct memtx_tuple {
 	/*
 	 * sic: the header of the tuple is used
 	 * to store a free list pointer in smfree_delayed.
