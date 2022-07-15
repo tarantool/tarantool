@@ -102,20 +102,21 @@ luaT_pushdecimalstr(struct lua_State *L, const decimal_t *dec)
 }
 
 /**
- * Returns true if a value at a given index is a decimal
- * and false otherwise
+ * Returns pointer to decimal_t if a value at a given index is
+ * a decimal and NULL otherwise.
  */
-static bool
+static decimal_t *
 luaT_isdecimal(struct lua_State *L, int index)
 {
+	assert(CTID_DECIMAL != 0);
 	if (lua_type(L, index) != LUA_TCDATA)
-		return false;
+		return NULL;
 
 	uint32_t ctypeid;
-	luaL_checkcdata(L, index, &ctypeid);
+	void *res = luaL_checkcdata(L, index, &ctypeid);
 	if (ctypeid != CTID_DECIMAL)
-		return false;
-	return true;
+		return NULL;
+	return res;
 }
 
 /** Check whether a value at a given index is a decimal. */
@@ -308,7 +309,7 @@ ldecimal_isdecimal(struct lua_State *L)
 {
 	if (lua_gettop(L) < 1)
 		luaL_error(L, "usage: decimal.is_decimal(value)");
-	bool is_decimal = luaT_isdecimal(L, 1);
+	bool is_decimal = luaT_isdecimal(L, 1) != NULL;
 	lua_pushboolean(L, is_decimal);
 	return 1;
 }
