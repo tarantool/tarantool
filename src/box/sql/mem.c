@@ -3443,7 +3443,7 @@ port_vdbemem_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 			*luaL_pushuuid(L) = mem->u.uuid;
 			break;
 		case MEM_TYPE_DEC:
-			*lua_pushdecimal(L) = mem->u.d;
+			*luaT_pushdecimal(L) = mem->u.d;
 			break;
 		case MEM_TYPE_DATETIME:
 			*luaT_pushdatetime(L) = mem->u.dt;
