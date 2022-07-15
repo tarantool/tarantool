@@ -82,15 +82,15 @@ ldecimal_##name(struct lua_State *L) {						\
 
 uint32_t CTID_DECIMAL;
 
-decimal_t *
+box_decimal_t *
 luaT_newdecimal(struct lua_State *L)
 {
 	decimal_t *res = luaL_pushcdata(L, CTID_DECIMAL);
 	return res;
 }
 
-decimal_t *
-luaT_pushdecimal(struct lua_State *L, const decimal_t *dec)
+box_decimal_t *
+luaT_pushdecimal(struct lua_State *L, const box_decimal_t *dec)
 {
 	decimal_t *res = luaT_newdecimal(L);
 	memcpy(res, dec, sizeof(decimal_t));
@@ -113,7 +113,7 @@ luaT_pushdecimalstr(struct lua_State *L, const decimal_t *dec)
  * Returns pointer to decimal_t if a value at a given index is
  * a decimal and NULL otherwise.
  */
-static decimal_t *
+box_decimal_t *
 luaT_isdecimal(struct lua_State *L, int index)
 {
 	assert(CTID_DECIMAL != 0);
