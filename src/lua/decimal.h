@@ -32,6 +32,7 @@
 #define TARANTOOL_LUA_DECIMAL_H_INCLUDED
 
 #include "lib/core/decimal.h"
+#include "trivia/util.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -41,19 +42,41 @@ extern uint32_t CTID_DECIMAL;
 
 struct lua_State;
 
+/*
+ * Alias box_decimal_t to decimal_t to use luaT_*decimal()
+ * functions within tarantool source code without type
+ * casting.
+ *
+ * The module API has its own box_decimal_t definition.
+ */
+typedef decNumber box_decimal_t;
+
+/** \cond public */
+
 /**
  * Allocate a new decimal on the Lua stack and return
  * a pointer to it.
  */
-decimal_t *
+API_EXPORT box_decimal_t *
 luaT_newdecimal(struct lua_State *L);
 
 /**
  * Allocate a new decimal on the Lua stack with copy of given
  * decimal and return a pointer to it.
  */
-decimal_t *
-luaT_pushdecimal(struct lua_State *L, const decimal_t *dec);
+API_EXPORT box_decimal_t *
+luaT_pushdecimal(struct lua_State *L, const box_decimal_t *dec);
+
+/**
+ * Check whether a value on the Lua stack is a decimal.
+ *
+ * Returns a pointer to the decimal on a successful check,
+ * NULL otherwise.
+ */
+API_EXPORT box_decimal_t *
+luaT_isdecimal(struct lua_State *L, int index);
+
+/** \endcond public */
 
 void
 tarantool_lua_decimal_init(struct lua_State *L);

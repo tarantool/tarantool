@@ -214,6 +214,7 @@ set(api_headers
     ${PROJECT_SOURCE_DIR}/src/lib/core/latch.h
     ${PROJECT_SOURCE_DIR}/src/lib/core/clock.h
     ${PROJECT_SOURCE_DIR}/src/box/decimal.h
+    ${PROJECT_SOURCE_DIR}/src/lua/decimal.h
 )
 rebuild_module_api(${api_headers})
 

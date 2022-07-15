@@ -2881,6 +2881,110 @@ test_decimal(struct lua_State *L)
 
 /* }}} decimal */
 
+/* {{{ Helpers for decimal Lua/C API test cases */
+
+/**
+ * Accept two decimal values and return their multiplication.
+ *
+ * Here we verify luaT_newdecimal().
+ */
+static int
+test_decimal_mul(struct lua_State *L)
+{
+	assert(lua_gettop(L) == 2);
+
+	box_decimal_t arg_1;
+	box_decimal_from_string(&arg_1, lua_tostring(L, 1));
+
+	box_decimal_t arg_2;
+	box_decimal_from_string(&arg_2, lua_tostring(L, 2));
+
+	box_decimal_t *res = luaT_newdecimal(L);
+	box_decimal_mul(res, &arg_1, &arg_2);
+	assert(lua_gettop(L) == 3);
+	return 1;
+}
+
+/**
+ * Accept two decimal values and return their division.
+ *
+ * Here we verify luaT_pushdecimal().
+ */
+static int
+test_decimal_div(struct lua_State *L)
+{
+	assert(lua_gettop(L) == 2);
+
+	box_decimal_t arg_1;
+	box_decimal_from_string(&arg_1, lua_tostring(L, 1));
+
+	box_decimal_t arg_2;
+	box_decimal_from_string(&arg_2, lua_tostring(L, 2));
+
+	box_decimal_t res;
+	box_decimal_div(&res, &arg_1, &arg_2);
+	luaT_pushdecimal(L, &res);
+	assert(lua_gettop(L) == 3);
+	return 1;
+}
+
+/**
+ * Accept a value and an indicator whether it is a decimal.
+ *
+ * Return whether luaT_isdecimal() reports the same indicator
+ * as one given in the arguments.
+ *
+ * Here we verify luaT_isdecimal().
+ */
+static int
+test_isdecimal(struct lua_State *L)
+{
+	assert(lua_gettop(L) == 2);
+
+	int exp = lua_toboolean(L, 2);
+
+	/* Basic test. */
+	int res = luaT_isdecimal(L, 1) != NULL;
+	int ok = res == exp;
+	assert(lua_gettop(L) == 2);
+
+	/* Use negative index. */
+	res = luaT_isdecimal(L, -2) != NULL;
+	ok = ok && res == exp;
+	assert(lua_gettop(L) == 2);
+
+	lua_pushboolean(L, ok);
+	return 1;
+}
+
+/**
+ * Accept a decimal value and its string representation.
+ *
+ * Verify that the string representation of the decimal value,
+ * which is returned from luaT_isdecimal(), is the same as the
+ * expected one.
+ *
+ * Return whether the strings are matches (boolean).
+ *
+ * Here we verify luaT_isdecimal().
+ */
+static int
+test_isdecimal_ptr(struct lua_State *L)
+{
+	assert(lua_gettop(L) == 2);
+	box_decimal_t *dec = luaT_isdecimal(L, 1);
+	assert(lua_gettop(L) == 2);
+	const char *exp = lua_tostring(L, 2);
+
+	char str[BOX_DECIMAL_STRING_BUFFER_SIZE];
+	box_decimal_to_string(dec, str);
+
+	lua_pushboolean(L, strcmp(str, exp) == 0);
+	return 1;
+}
+
+/* }}} Helpers for decimal Lua/C API test cases */
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -2926,6 +3030,10 @@ luaopen_module_api(lua_State *L)
 		{"test_key_def_dup", test_key_def_dup},
 		{"tuple_field_by_path", tuple_field_by_path},
 		{"test_decimal", test_decimal},
+		{"decimal_mul", test_decimal_mul},
+		{"decimal_div", test_decimal_div},
+		{"isdecimal", test_isdecimal},
+		{"isdecimal_ptr", test_isdecimal_ptr},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
