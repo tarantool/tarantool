@@ -40,9 +40,9 @@ RUN yum -y install python3-devel python3-pip
 
 RUN set -x && \
     cd / && \
-    curl -O -L https://www.openssl.org/source/openssl-1.1.1n.tar.gz && \
-    tar -xvf openssl-1.1.1n.tar.gz && \
-    cd openssl-1.1.1n && \
+    curl -O -L https://www.openssl.org/source/openssl-1.1.1q.tar.gz && \
+    tar -xvf openssl-1.1.1q.tar.gz && \
+    cd openssl-1.1.1q && \
     ./config --libdir=lib && \
     make -j && make install
 
