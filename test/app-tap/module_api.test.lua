@@ -411,8 +411,72 @@ local function test_tuple_field_by_path(test, module)
     space:drop()
 end
 
+local function test_pushdecimal(test, module)
+    local decimal = require('decimal')
+
+    test:plan(4)
+
+    local dec = module.decimal_mul('2.72', '2')
+    test:ok(decimal.is_decimal(dec), 'decimal is pushed from C')
+    test:is(tostring(dec), '5.44', 'got expected decimal value')
+
+    local dec = module.decimal_div('5.44', '2')
+    test:ok(decimal.is_decimal(dec), 'decimal is pushed from C')
+    test:is(tostring(dec), '2.72', 'got expected decimal value')
+end
+
+local function test_isdecimal(test, module)
+    local decimal = require('decimal')
+
+    local cases = {
+        {
+            obj = nil,
+            exp = false,
+            description = 'nil',
+        },
+        {
+            obj = 1,
+            exp = false,
+            description = 'number',
+        },
+        {
+            obj = 'hello',
+            exp = false,
+            description = 'string',
+        },
+        {
+            obj = {},
+            exp = false,
+            description = 'table',
+        },
+        {
+            obj = function() end,
+            exp = false,
+            description = 'function',
+        },
+        {
+            obj = 1LL,
+            exp = false,
+            description = 'cdata (number64)',
+        },
+        {
+            obj = decimal.new('2.72'),
+            exp = true,
+            description = 'decimal',
+        },
+    }
+
+    test:plan(#cases + 1)
+    for _, case in ipairs(cases) do
+        test:ok(module.isdecimal(case.obj, case.exp), case.description)
+    end
+
+    local ok = module.isdecimal_ptr(decimal.new('2.72'), '2.72')
+    test:ok(ok, 'verify pointer from luaT_isdecimal()')
+end
+
 require('tap').test("module_api", function(test)
-    test:plan(40)
+    test:plan(42)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
@@ -442,6 +506,8 @@ require('tap').test("module_api", function(test)
     test:test("buffers", test_buffers, module)
     test:test("tuple_validate", test_tuple_validate, module)
     test:test("tuple_field_by_path", test_tuple_field_by_path, module)
+    test:test("pushdecimal", test_pushdecimal, module)
+    test:test("isdecimal", test_isdecimal, module)
 
     space:drop()
 end)

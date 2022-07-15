@@ -316,7 +316,10 @@ luaT_call
 luaT_checktuple
 luaT_cpcall
 luaT_error
+luaT_isdecimal
 luaT_istuple
+luaT_newdecimal
+luaT_pushdecimal
 luaT_pushtuple
 luaT_state
 luaT_toibuf
