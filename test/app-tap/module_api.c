@@ -2379,6 +2379,40 @@ test_tuple_validate_formatted(lua_State *L)
 	return 1;
 }
 
+/**
+ * Get a pointer to a tuple field pointed by a JSON path.
+ *
+ * It is a helper to test box_tuple_field_by_path().
+ *
+ * Accepts a tuple, a JSON path (string) and an index base
+ * (0 or 1).
+ *
+ * Returns the field as a string in the msgpack format if the
+ * field exists, nil otherwise.
+ */
+static int
+tuple_field_by_path(struct lua_State *L)
+{
+	assert(lua_gettop(L) == 3);
+
+	box_tuple_t *tuple = luaT_istuple(L, 1);
+	size_t len;
+	const char *path = lua_tolstring(L, 2, &len);
+	int index_base = lua_tointeger(L, 3);
+
+	const char *field = box_tuple_field_by_path(tuple, path, len,
+						    index_base);
+	if (field == NULL) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	const char *field_end = field;
+	mp_next(&field_end);
+	lua_pushlstring(L, field, field_end - field);
+	return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -2422,6 +2456,7 @@ luaopen_module_api(lua_State *L)
 		{"tuple_validate_def", test_tuple_validate_default},
 		{"tuple_validate_fmt", test_tuple_validate_formatted},
 		{"test_key_def_dup", test_key_def_dup},
+		{"tuple_field_by_path", tuple_field_by_path},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
