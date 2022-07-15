@@ -171,6 +171,37 @@ const char *
 box_tuple_field(box_tuple_t *tuple, uint32_t fieldno);
 
 /**
+ * Return a raw tuple field in the MsgPack format pointed by
+ * a JSON path.
+ *
+ * The JSON path includes the outmost field. For example, "c" in
+ * ["a", ["b", "c"], "d"] can be accessed using "[2][2]" path (if
+ * index_base is 1, as in Lua). If index_base is set to 0, the
+ * same field will be pointed by the "[1][1]" path.
+ *
+ * The first JSON path token may be a field name if the tuple
+ * has associated format with named fields. A field of a nested
+ * map can be accessed in the same way: "foo.bar" or ".foo.bar".
+ *
+ * The return value is valid until the tuple is destroyed, see
+ * box_tuple_ref().
+ *
+ * Return NULL if the field does not exist or if the JSON path is
+ * malformed or invalid. Multikey JSON path token [*] is treated
+ * as invalid in this context.
+ *
+ * \param tuple a tuple
+ * \param path a JSON path
+ * \param path_len a length of @a path
+ * \param index_base 0 if array element indexes in @a path are
+ *        zero-based (like in C) or 1 if they're one-based (like
+ *        in Lua)
+ * \retval a pointer to a field data if the field exists or NULL
+ */
+API_EXPORT const char *
+box_tuple_field_by_path(box_tuple_t *tuple, const char *path,
+			uint32_t path_len, int index_base);
+/**
  * Tuple iterator
  */
 typedef struct tuple_iterator box_tuple_iterator_t;
