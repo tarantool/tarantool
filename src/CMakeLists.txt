@@ -180,6 +180,14 @@ if(EMBED_LUAZIP)
         ${PROJECT_SOURCE_DIR}/third_party/luazip/src/luazip.c)
 endif()
 
+# List of header files to scan for the module API declarations.
+#
+# Blocks of the following kind are extracted from the headers and
+# placed into the module.h file.
+#
+# /** \cond public */
+# <...>
+# /** \endcond public */
 set(api_headers
     ${PROJECT_BINARY_DIR}/src/trivia/config.h
     ${PROJECT_SOURCE_DIR}/src/trivia/util.h
@@ -192,20 +200,16 @@ set(api_headers
     ${PROJECT_SOURCE_DIR}/src/box/ibuf.h
     ${PROJECT_SOURCE_DIR}/src/lua/utils.h
     ${PROJECT_SOURCE_DIR}/src/lua/error.h
-    ${PROJECT_SOURCE_DIR}/src/lua/string.h
     ${PROJECT_SOURCE_DIR}/src/box/txn.h
     ${PROJECT_SOURCE_DIR}/src/box/tuple.h
     ${PROJECT_SOURCE_DIR}/src/box/key_def.h
-    ${PROJECT_SOURCE_DIR}/src/box/lua/key_def.h
     ${PROJECT_SOURCE_DIR}/src/box/field_def.h
     ${PROJECT_SOURCE_DIR}/src/box/tuple_format.h
-    ${PROJECT_SOURCE_DIR}/src/box/tuple_extract_key.h
     ${PROJECT_SOURCE_DIR}/src/box/schema_def.h
     ${PROJECT_SOURCE_DIR}/src/box/box.h
     ${PROJECT_SOURCE_DIR}/src/box/index.h
     ${PROJECT_SOURCE_DIR}/src/box/iterator_type.h
     ${PROJECT_SOURCE_DIR}/src/box/error.h
-    ${PROJECT_SOURCE_DIR}/src/box/lua/call.h
     ${PROJECT_SOURCE_DIR}/src/box/lua/tuple.h
     ${PROJECT_SOURCE_DIR}/src/lib/core/latch.h
     ${PROJECT_SOURCE_DIR}/src/lib/core/clock.h
