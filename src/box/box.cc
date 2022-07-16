@@ -2444,7 +2444,6 @@ box_index_id_by_name(uint32_t space_id, const char *name, uint32_t len)
 	(void) tuple_field_u32(tuple, BOX_INDEX_FIELD_ID, &result);
 	return result;
 }
-/** \endcond public */
 
 int
 box_process1(struct request *request, box_tuple_t **result)
