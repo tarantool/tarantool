@@ -341,6 +341,138 @@ add_dependencies(tarantool build_bundled_libs preprocess_exports)
 # Re-link if exports changed
 set_target_properties(tarantool PROPERTIES LINK_DEPENDS ${exports_file})
 
+# {{{ Generate symbols file (src/symbols.c)
+
+# Generate src/symbols.c, which exposes one function:
+#
+# void *
+# tnt_internal_symbol(const char *)
+#
+# This file holds addresses of internal functions and allows
+# to access them from an external module. It is not a public
+# list and not a stable list, but rather ability to hack
+# something around.
+
+# The list is based on add_library() calls inside CMake files.
+#
+# It would be nice to get a list of static libraries on which
+# the tarantool executable depends automatically. Something like
+# get_target_property(VAR tarantool LINK_LIBRARIES).
+#
+# However the LINK_LIBRARIES property does not list transitive
+# dependencies, see [1]. So the libraries are listed manually.
+#
+# TODO: If we link against external static libraries, add them
+# here too. See the static-build directory.
+#
+# [1]: https://gitlab.kitware.com/cmake/cmake/-/issues/12435
+set(TARANTOOL_LIBRARY_TARGETS
+    # ---- src/lib ----
+    bit
+    bitset
+    coll
+    core
+    crypto
+    csv
+    # skip fakesys -- testing library
+    http_parser
+    # skip info -- header only
+    json
+    mpstream
+    msgpuck
+    raft
+    # skip raft_algo -- testing library
+    salad
+    small
+    swim
+    swim_udp
+    swim_ev
+    tzcode
+    uri
+    vclock
+
+    # ---- src/box ----
+    box
+    box_error
+    tuple
+    xrow
+    xlog
+
+    # ---- src ----
+    cpu_feature
+    crc32
+    # skip symbols -- to avoid circular dependency
+    scramble
+    server
+    shutdown
+    stat
+
+    # ---- cmake ----
+    # bundled-ares is enabled conditionally below
+    # bundled-libcurl is enabled conditionally below
+    # bundled-libunwind is enabled conditionally below
+    # bundled-libunwind-platform is enabled conditionally below
+    # bundled-nghttp2 is enabled conditionally below
+    coro
+    decNumber
+    eio
+    ev
+    libluajit_static
+    misc
+    xxhash
+    # zstd is enabled conditionally below
+
+    # ---- third_party ----
+    cdt
+    yaml
+)
+
+# Add library targets conditionally, depending on whether they're
+# bundled into tarantool.
+if (ENABLE_BUNDLED_LIBCURL AND BUNDLED_LIBCURL_USE_ARES)
+    list(APPEND TARANTOOL_LIBRARY_TARGETS bundled-ares)
+endif()
+if (ENABLE_BUNDLED_LIBCURL)
+    list(APPEND TARANTOOL_LIBRARY_TARGETS bundled-libcurl)
+endif()
+if (ENABLE_BUNDLED_LIBCURL AND BUNDLED_LIBCURL_USE_NGHTTP2)
+    list(APPEND TARANTOOL_LIBRARY_TARGETS bundled-nghttp2)
+endif()
+if (ENABLE_BACKTRACE AND ENABLE_BUNDLED_LIBUNWIND)
+    list(APPEND TARANTOOL_LIBRARY_TARGETS bundled-libunwind)
+    list(APPEND TARANTOOL_LIBRARY_TARGETS bundled-libunwind-platform)
+endif()
+if (ENABLE_BUNDLED_ZSTD)
+    list(APPEND TARANTOOL_LIBRARY_TARGETS zstd)
+endif()
+
+# Transform ev -> /path/to/libev.a.
+set(TARANTOOL_STATIC_LIBRARIES)
+foreach(TGT ${TARANTOOL_LIBRARY_TARGETS})
+    if (TARGET ${TGT})
+        list(APPEND TARANTOOL_STATIC_LIBRARIES "$<TARGET_FILE:${TGT}>")
+    else()
+        message(FATAL_ERROR "The library target is not a CMake target: ${TGT}")
+    endif()
+endforeach()
+
+# We need a space separated paths for the shell script.
+string(REPLACE ";" " " TARANTOOL_STATIC_LIBRARIES_STR "${TARANTOOL_STATIC_LIBRARIES}")
+
+set(symbols_file ${CMAKE_CURRENT_BINARY_DIR}/symbols.c)
+add_custom_command(
+    OUTPUT  ${symbols_file}
+    DEPENDS ${TARANTOOL_LIBRARY_TARGETS}
+    COMMAND ${PROJECT_SOURCE_DIR}/extra/mksymbols
+            ${TARANTOOL_STATIC_LIBRARIES_STR}
+            ${symbols_file})
+add_custom_target(generate_symbols_file
+                  DEPENDS ${symbols_file})
+add_library(symbols STATIC ${symbols_file})
+add_dependencies(symbols generate_symbols_file)
+
+# }}} Generate symbols file (src/symbols.c)
+
 # A note about linkers:
 # [GNU linker] When linking an *executable* visibility is ignored, and
 #              either nothing is exported (default), or any non-static
@@ -361,7 +493,7 @@ if (TARGET_OS_DARWIN)
 else ()
     target_link_libraries(tarantool
                           -Wl,--whole-archive box ${reexport_libraries}
-                          salad -Wl,--no-whole-archive
+                          salad symbols -Wl,--no-whole-archive
                           ${common_libraries}
                           ${generic_libraries})
     set_target_properties(tarantool PROPERTIES
