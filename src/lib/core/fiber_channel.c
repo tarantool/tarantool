@@ -78,7 +78,7 @@ fiber_channel_new(uint32_t size)
 	return res;
 }
 
-bool
+static bool
 fiber_channel_has_waiter(struct fiber_channel *ch,
 			 enum fiber_channel_wait_status status)
 {
@@ -158,7 +158,7 @@ fiber_channel_waiter_wakeup(struct fiber *f,
 }
 
 
-int
+static int
 fiber_channel_check_wait(struct fiber_channel *ch, ev_tstamp start_time,
 		       ev_tstamp timeout)
 {

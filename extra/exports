@@ -462,6 +462,7 @@ tnt_dt_year
 tnt_iconv
 tnt_iconv_close
 tnt_iconv_open
+tnt_internal_symbol
 tnt_interval_to_string
 tnt_interval_interval_sub
 tnt_interval_interval_add
