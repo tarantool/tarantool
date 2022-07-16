@@ -634,7 +634,7 @@ thread_sleep(double sec);
 
 #define EXPORT_SYMBOL(name, alias) _EXPORT_SYMBOL(name, alias)
 
-#if defined(__arm64__) || defined(__arm__)
+#if defined(__arm64__) || defined(__arm__) || defined(__aarch64__)
 #  define JMP "b "
 #else
 #  define JMP "jmp "
