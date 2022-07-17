@@ -642,8 +642,10 @@ thread_sleep(double sec);
 
 #ifdef __APPLE__
 #  define _U_ "_"
+#  define _PLT_
 #else
 #  define _U_
+#  define _PLT_ "@PLT"
 #endif
 
 #define _EXPORT_SYMBOL(name, aliasname) \
@@ -651,7 +653,7 @@ thread_sleep(double sec);
 		(void *)name; \
 	__asm__("\t.text\n" \
 		"\t.globl " _U_ #aliasname "\n" \
-		_U_ #aliasname ": " JMP _U_ #name "\n"); \
+		_U_ #aliasname ": " JMP _U_ #name _PLT_ "\n");\
 	extern __typeof(name) aliasname;
 
 #if defined(__cplusplus)
