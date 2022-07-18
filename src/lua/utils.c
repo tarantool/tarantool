@@ -147,9 +147,17 @@ luaT_pushdatetime(struct lua_State *L, const struct datetime *dt)
 }
 
 struct interval *
-luaT_pushinterval(struct lua_State *L)
+luaT_newinterval(struct lua_State *L)
 {
 	return luaL_pushcdata(L, CTID_INTERVAL);
+}
+
+struct interval *
+luaT_pushinterval(struct lua_State *L, const struct interval *itv)
+{
+	struct interval *res = luaT_newinterval(L);
+	memcpy(res, itv, sizeof(struct interval));
+	return res;
 }
 
 int
