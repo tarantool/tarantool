@@ -99,7 +99,18 @@ luaT_pushuuidstr(struct lua_State *L, const struct tt_uuid *uuid);
  * @return memory associated with this datetime data
  */
 struct datetime *
-luaT_pushdatetime(struct lua_State *L);
+luaT_newdatetime(struct lua_State *L);
+
+/**
+ * @brief Push cdata of a datetime type onto the stack and
+ * copy given datetime value into it.
+ * @param L Lua State
+ * @param dt datetime value to copy from
+ * @sa luaL_pushcdata
+ * @return memory associated with this datetime data
+ */
+struct datetime *
+luaT_pushdatetime(struct lua_State *L, const struct datetime *dt);
 
 /** Push an interval cdata onto the stack. */
 struct interval *

@@ -39,6 +39,7 @@
 #include <diag.h>
 #include <fiber.h>
 #include "tt_uuid.h"
+#include "core/datetime.h"
 
 int luaL_nil_ref = LUA_REFNIL;
 
@@ -132,9 +133,17 @@ luaT_pushuuidstr(struct lua_State *L, const struct tt_uuid *uuid)
 }
 
 struct datetime *
-luaT_pushdatetime(struct lua_State *L)
+luaT_newdatetime(struct lua_State *L)
 {
 	return luaL_pushcdata(L, CTID_DATETIME);
+}
+
+struct datetime *
+luaT_pushdatetime(struct lua_State *L, const struct datetime *dt)
+{
+	struct datetime *res = luaT_newdatetime(L);
+	memcpy(res, dt, sizeof(struct datetime));
+	return res;
 }
 
 struct interval *
