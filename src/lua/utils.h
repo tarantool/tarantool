@@ -112,9 +112,19 @@ luaT_newdatetime(struct lua_State *L);
 struct datetime *
 luaT_pushdatetime(struct lua_State *L, const struct datetime *dt);
 
-/** Push an interval cdata onto the stack. */
+/**
+ * Allocate a new time interval on the Lua stack and return
+ * a pointer to it.
+ */
 struct interval *
-luaT_pushinterval(struct lua_State *L);
+luaT_newinterval(struct lua_State *L);
+
+/**
+ * Allocate a new time interval on the Lua stack with copy of
+ * given interval and return a pointer to it.
+ */
+struct interval *
+luaT_pushinterval(struct lua_State *L, const struct interval *itv);
 
 /** \cond public */
 
