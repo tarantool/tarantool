@@ -33,6 +33,7 @@
 #include "lib/core/decimal.h"
 #include "lua/utils.h"
 
+#include <string.h>
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
@@ -43,7 +44,7 @@ ldecimal_##name(struct lua_State *L) {						\
 	assert(lua_gettop(L) == 2);						\
 	decimal_t *lhs = luaT_todecimal(L, 1);					\
 	decimal_t *rhs = luaT_todecimal(L, 2);					\
-	decimal_t *res = luaT_pushdecimal(L);					\
+	decimal_t *res = luaT_newdecimal(L);					\
 	if (decimal_##opname(res, lhs, rhs) == NULL) {				\
 		lua_pop(L, 1);							\
 		luaL_error(L, "decimal operation failed");			\
@@ -57,7 +58,7 @@ ldecimal_##name(struct lua_State *L) {						\
 	if (lua_gettop(L) < 1)							\
 		return luaL_error(L, "usage: decimal."#name"(decimal)");	\
 	decimal_t *lhs = luaT_todecimal(L, 1);					\
-	decimal_t *res = luaT_pushdecimal(L);					\
+	decimal_t *res = luaT_newdecimal(L);					\
 	if (decimal_##opname(res, lhs) == NULL) {				\
 		lua_pop(L, 1);							\
 		luaL_error(L, "decimal operation failed");			\
@@ -81,11 +82,18 @@ ldecimal_##name(struct lua_State *L) {						\
 
 uint32_t CTID_DECIMAL;
 
-/** Push a new decimal on the stack and return a pointer to it. */
 decimal_t *
-luaT_pushdecimal(struct lua_State *L)
+luaT_newdecimal(struct lua_State *L)
 {
 	decimal_t *res = luaL_pushcdata(L, CTID_DECIMAL);
+	return res;
+}
+
+decimal_t *
+luaT_pushdecimal(struct lua_State *L, const decimal_t *dec)
+{
+	decimal_t *res = luaT_newdecimal(L);
+	memcpy(res, dec, sizeof(decimal_t));
 	return res;
 }
 
@@ -144,7 +152,7 @@ luaT_todecimal(struct lua_State *L, int index)
 	 */
 	if (index < 0)
 		index = lua_gettop(L) + index + 1;
-	decimal_t *res = luaT_pushdecimal(L);
+	decimal_t *res = luaT_newdecimal(L);
 	switch(lua_type(L, index))
 	{
 	case LUA_TNUMBER:
@@ -287,7 +295,7 @@ ldecimal_minus(struct lua_State *L)
 	 */
 	assert(lua_gettop(L) == 2);
 	decimal_t *lhs = luaT_todecimal(L, 1);
-	decimal_t *res = luaT_pushdecimal(L);
+	decimal_t *res = luaT_newdecimal(L);
 	/* _minus never fails. */
 	decimal_minus(res, lhs);
 	return 1;
@@ -299,8 +307,7 @@ ldecimal_new(struct lua_State *L)
 	if (lua_gettop(L) < 1)
 		luaL_error(L, "usage: decimal.new(value)");
 	decimal_t *lhs = luaT_todecimal(L, 1);
-	decimal_t *res = luaT_pushdecimal(L);
-	*res = *lhs;
+	luaT_pushdecimal(L, lhs);
 	return 1;
 }
 
@@ -321,8 +328,7 @@ ldecimal_round(struct lua_State *L)
 		return luaL_error(L, "usage: decimal.round(decimal, scale)");
 	decimal_t *lhs = luaT_checkdecimal(L, 1);
 	int n = lua_tointeger(L, 2);
-	decimal_t *res = luaT_pushdecimal(L);
-	*res = *lhs;
+	decimal_t *res = luaT_pushdecimal(L, lhs);
 	/*
 	 * If the operation fails, it just
 	 * leaves the number intact.
@@ -337,8 +343,7 @@ ldecimal_trim(struct lua_State *L)
 	if (lua_gettop(L) < 1)
 		return luaL_error(L, "usage: decimal.trim(decimal)");
 	decimal_t *lhs = luaT_checkdecimal(L, 1);
-	decimal_t *res = luaT_pushdecimal(L);
-	*res = *lhs;
+	decimal_t *res = luaT_pushdecimal(L, lhs);
 	/* trim never fails */
 	decimal_trim(res);
 	return 1;
@@ -351,8 +356,7 @@ ldecimal_rescale(struct lua_State *L)
 		return luaL_error(L, "usage: decimal.rescale(decimal, scale)");
 	decimal_t *lhs = luaT_checkdecimal(L, 1);
 	int n = lua_tointeger(L, 2);
-	decimal_t *res = luaT_pushdecimal(L);
-	*res = *lhs;
+	decimal_t *res = luaT_pushdecimal(L, lhs);
 	/*
 	 * If the operation fails, it just
 	 * leaves the number intact.
