@@ -40,14 +40,17 @@
  */
 struct memtx_tuple {
 	/*
-	 * sic: the header of the tuple is used
-	 * to store a free list pointer in smfree_delayed.
-	 * Please don't change it without understanding
-	 * how smfree_delayed and snapshotting COW works.
+	 * Sic: The header of the tuple is used to store a link in
+	 * a tuple garbage collection list. Please don't change it
+	 * without understanding how tuple garbage collection and
+	 * copy-on-write mechanisms work.
 	 */
 	union {
 		struct {
-			/** Snapshot generation version. */
+			/**
+			 * Most recent read view's version at the time
+			 * when the tuple was allocated.
+			 */
 			uint32_t version;
 			/** Base tuple class. */
 			struct tuple base;
@@ -93,7 +96,7 @@ public:
 	static ReadView *open_read_view(struct memtx_read_view_opts opts)
 	{
 		(void)opts;
-		snapshot_version++;
+		read_view_version++;
 		delayed_free_mode++;
 		return nullptr;
 	}
@@ -119,23 +122,23 @@ public:
 			(struct memtx_tuple *)alloc(total);
 		if (memtx_tuple == NULL)
 			return NULL;
-		memtx_tuple->version = snapshot_version;
+		memtx_tuple->version = read_view_version;
 		return &memtx_tuple->base;
 	}
 
 	/**
 	 * Free a tuple allocated with alloc_tuple().
 	 *
-	 * The tuple is freed immediately if there's no snapshot that may use
+	 * The tuple is freed immediately if there's no read view that may use
 	 * it. Otherwise, it's put in the garbage collection list to be free as
-	 * soon as the last snapshot using it is destroyed.
+	 * soon as the last read view using it is destroyed.
 	 */
 	static void free_tuple(struct tuple *tuple)
 	{
 		struct memtx_tuple *memtx_tuple = container_of(
 			tuple, struct memtx_tuple, base);
 		if (delayed_free_mode == 0 ||
-		    memtx_tuple->version == snapshot_version ||
+		    memtx_tuple->version == read_view_version ||
 		    tuple_has_flag(tuple, TUPLE_IS_TEMPORARY)) {
 			immediate_free_tuple(memtx_tuple);
 		} else {
@@ -182,7 +185,7 @@ private:
 
 	/**
 	 * Tuple garbage collection list. Contains tuples that were not freed
-	 * immediately because they are currently in use by a snapshot.
+	 * immediately because they are currently in use by a read view.
 	 */
 	static struct stailq gc;
 	/**
@@ -190,8 +193,12 @@ private:
 	 * open_read_view() is delayed until close_read_view() is called.
 	 */
 	static uint32_t delayed_free_mode;
-	/** Incremented with each next snapshot. */
-	static uint32_t snapshot_version;
+	/**
+	 * Most recent read view's version.
+	 *
+	 * Incremented with each open read view. Not supposed to wrap around.
+	 */
+	static uint32_t read_view_version;
 };
 
 template<class Allocator>
@@ -201,7 +208,7 @@ template<class Allocator>
 uint32_t MemtxAllocator<Allocator>::delayed_free_mode;
 
 template<class Allocator>
-uint32_t MemtxAllocator<Allocator>::snapshot_version;
+uint32_t MemtxAllocator<Allocator>::read_view_version;
 
 void
 memtx_allocators_init(struct allocator_settings *settings);
