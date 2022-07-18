@@ -76,11 +76,21 @@ extern uint32_t CTID_DATETIME;
 /** Type ID of struct interval. */
 extern uint32_t CTID_INTERVAL;
 
+/**
+ * Allocate a new uuid on the Lua stack and return a pointer to it.
+ */
 struct tt_uuid *
-luaL_pushuuid(struct lua_State *L);
+luaT_newuuid(struct lua_State *L);
+
+/**
+ * Allocate a new uuid on the Lua stack with copy of given
+ * uuid and return a pointer to it.
+ */
+struct tt_uuid *
+luaT_pushuuid(struct lua_State *L, const struct tt_uuid *uuid);
 
 void
-luaL_pushuuidstr(struct lua_State *L, const struct tt_uuid *uuid);
+luaT_pushuuidstr(struct lua_State *L, const struct tt_uuid *uuid);
 
 /**
  * @brief Push cdata of a datetime type onto the stack.
