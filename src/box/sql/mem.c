@@ -3449,7 +3449,7 @@ port_vdbemem_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 			luaT_pushdatetime(L, &mem->u.dt);
 			break;
 		case MEM_TYPE_INTERVAL:
-			*luaT_pushinterval(L) = mem->u.itv;
+			luaT_pushinterval(L, &mem->u.itv);
 			break;
 		default:
 			unreachable();
