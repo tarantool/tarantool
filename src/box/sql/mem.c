@@ -3440,7 +3440,7 @@ port_vdbemem_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 			lua_pushboolean(L, mem->u.b);
 			break;
 		case MEM_TYPE_UUID:
-			*luaL_pushuuid(L) = mem->u.uuid;
+			luaT_pushuuid(L, &mem->u.uuid);
 			break;
 		case MEM_TYPE_DEC:
 			luaT_pushdecimal(L, &mem->u.d);

@@ -31,6 +31,7 @@
 #include "lua/utils.h"
 #include <lj_trace.h>
 
+#include <string.h>
 #include <assert.h>
 #include <errno.h>
 
@@ -105,13 +106,21 @@ luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
 }
 
 struct tt_uuid *
-luaL_pushuuid(struct lua_State *L)
+luaT_newuuid(struct lua_State *L)
 {
 	return luaL_pushcdata(L, CTID_UUID);
 }
 
+struct tt_uuid *
+luaT_pushuuid(struct lua_State *L, const struct tt_uuid *uuid)
+{
+	struct tt_uuid *res = luaT_newuuid(L);
+	memcpy(res, uuid, sizeof(struct tt_uuid));
+	return res;
+}
+
 void
-luaL_pushuuidstr(struct lua_State *L, const struct tt_uuid *uuid)
+luaT_pushuuidstr(struct lua_State *L, const struct tt_uuid *uuid)
 {
 	/*
 	 * Do not use a global buffer. It might be overwritten if GC starts
