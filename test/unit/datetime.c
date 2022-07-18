@@ -440,6 +440,67 @@ mp_datetime_test()
 	check_plan();
 }
 
+static void
+mp_datetime_unpack_valid_checks(void)
+{
+	/* Binary, message-pack representation of datetime
+	 * payload in MP value
+	 */
+	struct binary_datetime {
+		/** Seconds since Epoch. */
+		int64_t epoch;
+		/** Nanoseconds, if any. */
+		int32_t nsec;
+		/** Offset in minutes from UTC. */
+		int16_t tzoffset;
+		/** Olson timezone id */
+		int16_t tzindex;
+	};
+
+	static struct binary_datetime invalid_values[] = {
+		{.epoch = MAX_EPOCH_SECS_VALUE + 1},
+		{.epoch = MIN_EPOCH_SECS_VALUE - 1},
+		{.nsec = MAX_NANOS_PER_SEC},
+		{.nsec = -1},
+		{.tzoffset = MIN_TZOFFSET - 1},
+		{.tzoffset = MAX_TZOFFSET + 1},
+		{.tzindex = MAX_TZINDEX + 1},
+		{.tzindex = -1},
+	};
+
+	static struct binary_datetime valid_values[] = {
+		{.epoch = MAX_EPOCH_SECS_VALUE},
+		{.epoch = MIN_EPOCH_SECS_VALUE},
+		{.nsec = MAX_NANOS_PER_SEC - 1},
+		{.nsec = 0},
+		{.tzoffset = MIN_TZOFFSET},
+		{.tzoffset = MAX_TZOFFSET},
+		{.tzindex = MAX_TZINDEX},
+		{.tzindex = 0},
+	};
+	size_t index;
+	const char *p;
+	struct datetime date;
+
+	plan(24);
+	for (index = 0; index < lengthof(valid_values); index++) {
+		struct binary_datetime value = valid_values[index];
+		p = (char *)&value;
+		memset(&date, 0, sizeof(date));
+		struct datetime *dt = datetime_unpack(&p, sizeof(value), &date);
+		isnt(dt, NULL, "datetime_unpack() is not NULL");
+		is((int64_t)dt->epoch, value.epoch, "epoch value expected");
+	}
+
+	for (index = 0; index < lengthof(valid_values); index++) {
+		struct binary_datetime value = invalid_values[index];
+		p = (char *)&value;
+		memset(&date, 0, sizeof(date));
+		struct datetime *dt = datetime_unpack(&p, sizeof(value), &date);
+		is(dt, NULL, "datetime_unpack() is NULL");
+	}
+	check_plan();
+}
 
 static int
 mp_fprint_ext_test(FILE *file, const char **data, int depth)
@@ -505,10 +566,11 @@ mp_print_test(void)
 int
 main(void)
 {
-	plan(5);
+	plan(6);
 	datetime_test();
 	tostring_datetime_test();
 	parse_date_test();
+	mp_datetime_unpack_valid_checks();
 	mp_datetime_test();
 	mp_print_test();
 
