@@ -41,8 +41,19 @@ extern uint32_t CTID_DECIMAL;
 
 struct lua_State;
 
+/**
+ * Allocate a new decimal on the Lua stack and return
+ * a pointer to it.
+ */
 decimal_t *
-luaT_pushdecimal(struct lua_State *L);
+luaT_newdecimal(struct lua_State *L);
+
+/**
+ * Allocate a new decimal on the Lua stack with copy of given
+ * decimal and return a pointer to it.
+ */
+decimal_t *
+luaT_pushdecimal(struct lua_State *L, const decimal_t *dec);
 
 void
 tarantool_lua_decimal_init(struct lua_State *L);

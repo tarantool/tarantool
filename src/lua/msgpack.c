@@ -43,7 +43,7 @@
 #include <small/ibuf.h>
 
 #include "core/decimal.h" /* decimal_unpack() */
-#include "lua/decimal.h" /* luaT_pushdecimal() */
+#include "lua/decimal.h" /* luaT_newdecimal() */
 #include "mp_extension_types.h"
 #include "mp_uuid.h" /* mp_decode_uuid() */
 #include "mp_datetime.h"
@@ -388,7 +388,7 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 		switch (ext_type) {
 		case MP_DECIMAL:
 		{
-			decimal_t *dec = luaT_pushdecimal(L);
+			decimal_t *dec = luaT_newdecimal(L);
 			dec = decimal_unpack(data, len, dec);
 			if (dec == NULL)
 				goto ext_decode_err;
