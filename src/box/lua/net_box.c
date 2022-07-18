@@ -2441,7 +2441,7 @@ out:
 	lua_setfield(L, -2, "version_id");
 	lua_pushstring(L, greeting->protocol);
 	lua_setfield(L, -2, "protocol");
-	luaL_pushuuidstr(L, &greeting->uuid);
+	luaT_pushuuidstr(L, &greeting->uuid);
 	lua_setfield(L, -2, "uuid");
 	/* Push the protocol version and features. */
 	lua_pushinteger(L, id.version);

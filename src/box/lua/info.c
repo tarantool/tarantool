@@ -176,7 +176,7 @@ lbox_pushreplica(lua_State *L, struct replica *replica)
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "uuid");
-	luaL_pushuuidstr(L, &replica->uuid);
+	luaT_pushuuidstr(L, &replica->uuid);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "lsn");
@@ -235,7 +235,7 @@ lbox_info_replication_anon_call(struct lua_State *L)
 		if (!replica->anon)
 			continue;
 
-		luaL_pushuuidstr(L, &replica->uuid);
+		luaT_pushuuidstr(L, &replica->uuid);
 		lbox_pushreplica(L, replica);
 
 		lua_settable(L, -3);
@@ -290,7 +290,7 @@ lbox_info_id(struct lua_State *L)
 static int
 lbox_info_uuid(struct lua_State *L)
 {
-	luaL_pushuuidstr(L, &INSTANCE_UUID);
+	luaT_pushuuidstr(L, &INSTANCE_UUID);
 	return 1;
 }
 
@@ -384,7 +384,7 @@ lbox_info_cluster(struct lua_State *L)
 {
 	lua_createtable(L, 0, 2);
 	lua_pushliteral(L, "uuid");
-	luaL_pushuuidstr(L, &REPLICASET_UUID);
+	luaT_pushuuidstr(L, &REPLICASET_UUID);
 	lua_settable(L, -3);
 	return 1;
 }
