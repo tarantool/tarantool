@@ -410,17 +410,24 @@ tree_iterator_next_raw_base(struct iterator *iterator, struct tuple **ret)
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
 	tree_iterator_set_current<USE_HINT>(it, res);
 	*ret = it->current.tuple;
-	if (*ret == NULL)
-		tree_iterator_set_dummie(iterator);
 	struct index *idx = iterator->index;
 	struct space *space = space_by_id(iterator->space_id);
-
+	if (*ret == NULL) {
+		tree_iterator_set_dummie(iterator);
+	} else {
+		struct txn *txn = in_txn();
+		bool is_multikey = iterator->index->def->key_def->is_multikey;
+		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
+		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple, idx,
+					      mk_index);
+	}
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 	/*
 	 * Pass no key because any write to the gap between that
 	 * two tuples must lead to conflict.
 	 */
-	memtx_tx_track_gap(in_txn(), space, idx, *ret, ITER_GE, NULL, 0);
+	struct tuple *successor = res != NULL ? res->tuple : NULL;
+	memtx_tx_track_gap(in_txn(), space, idx, successor, ITER_GE, NULL, 0);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 
 	return 0;
@@ -445,11 +452,21 @@ tree_iterator_prev_raw_base(struct iterator *iterator, struct tuple **ret)
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
 	tree_iterator_set_current<USE_HINT>(it, res);
 	*ret = it->current.tuple;
-	if (*ret == NULL)
-		tree_iterator_set_dummie(iterator);
 	struct index *idx = iterator->index;
 	struct space *space = space_by_id(iterator->space_id);
-
+	if (*ret == NULL) {
+		tree_iterator_set_dummie(iterator);
+	} else {
+		struct txn *txn = in_txn();
+		bool is_multikey = iterator->index->def->key_def->is_multikey;
+		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
+		/*
+		 * We need to clarify the result tuple before story garbage
+		 * collection, otherwise it could get cleaned there.
+		 */
+		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple, idx,
+					      mk_index);
+	}
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 	/*
 	 * Pass no key because any write to the gap between that
@@ -504,14 +521,18 @@ tree_iterator_next_equal_raw_base(struct iterator *iterator, struct tuple **ret)
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	} else {
 		tree_iterator_set_current<USE_HINT>(it, res);
-		*ret = res->tuple;
-
+		struct txn *txn = in_txn();
+		bool is_multikey = iterator->index->def->key_def->is_multikey;
+		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
+		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple, idx,
+					      mk_index);
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		/*
 		 * Pass no key because any write to the gap between that
 		 * two tuples must lead to conflict.
 		 */
-		memtx_tx_track_gap(in_txn(), space, idx, *ret, ITER_GE, NULL, 0);
+		memtx_tx_track_gap(in_txn(), space, idx, res->tuple, ITER_GE,
+				   NULL, 0);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	}
 
@@ -558,8 +579,15 @@ tree_iterator_prev_equal_raw_base(struct iterator *iterator, struct tuple **ret)
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	} else {
 		tree_iterator_set_current<USE_HINT>(it, res);
-		*ret = res->tuple;
-
+		struct txn *txn = in_txn();
+		bool is_multikey = iterator->index->def->key_def->is_multikey;
+		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
+		/*
+		 * We need to clarify the result tuple before story garbage
+		 * collection, otherwise it could get cleaned there.
+		 */
+		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple, idx,
+					      mk_index);
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		/*
 		 * Pass no key because any write to the gap between that
@@ -578,27 +606,10 @@ template <bool USE_HINT>							\
 static int									\
 name(struct iterator *iterator, struct tuple **ret)				\
 {										\
-	memtx_tree_t<USE_HINT> *tree =						\
-		&((struct memtx_tree_index<USE_HINT> *)iterator->index)->tree;	\
-	struct tree_iterator<USE_HINT> *it =   					\
-		get_tree_iterator<USE_HINT>(iterator);				\
-	memtx_tree_iterator_t<USE_HINT> *ti = &it->tree_iterator;		\
-	struct index *idx = iterator->index;					\
-	bool is_multikey = iterator->index->def->key_def->is_multikey;		\
-	struct txn *txn = in_txn();						\
-	struct space *space = space_by_id(iterator->space_id);			\
 	do {									\
 		int rc = name##_base<USE_HINT>(iterator, ret);			\
-		if (rc != 0 || *ret == NULL)					\
+		if (rc != 0 || iterator->next_raw == tree_iterator_dummie)	\
 			return rc;						\
-		uint32_t mk_index = 0;						\
-		if (is_multikey) {						\
-			struct memtx_tree_data<USE_HINT> *check =		\
-				memtx_tree_iterator_get_elem(tree, ti);		\
-			assert(check != NULL);					\
-			mk_index = (uint32_t)check->hint;			\
-		}								\
-		*ret = memtx_tx_tuple_clarify(txn, space, *ret, idx, mk_index);	\
 	} while (*ret == NULL);							\
 	return 0;								\
 }										\
