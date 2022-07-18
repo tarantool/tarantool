@@ -405,7 +405,7 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 		}
 		case MP_DATETIME:
 		{
-			struct datetime *date = luaT_pushdatetime(L);
+			struct datetime *date = luaT_newdatetime(L);
 			date = datetime_unpack(data, len, date);
 			if (date == NULL)
 				goto ext_decode_err;
