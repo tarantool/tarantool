@@ -396,7 +396,7 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 		}
 		case MP_UUID:
 		{
-			struct tt_uuid *uuid = luaL_pushuuid(L);
+			struct tt_uuid *uuid = luaT_newuuid(L);
 			*data = svp;
 			uuid = mp_decode_uuid(data, uuid);
 			if (uuid == NULL)
