@@ -88,10 +88,8 @@ alloc_tuple_count_cb(const void *stats_, void *ctx_)
 static int
 alloc_tuple_count()
 {
-	/* Trigger garbage collection before checking count. */
-	struct tuple *tuple = alloc_tuple();
-	fail_if(tuple == NULL);
-	free_tuple(tuple);
+	while (MemtxAllocator<SmallAlloc>::collect_garbage()) {
+	}
 	struct alloc_tuple_count_ctx ctx;
 	struct allocator_stats unused;
 	ctx.count = 0;
