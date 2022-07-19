@@ -147,6 +147,8 @@ ExternalProject_Add(ncurses
 #
 # ReadLine
 #
+# Patched to fix file descriptor leak with zero-length history file.
+#
 ExternalProject_Add(readline
     URL https://ftp.gnu.org/gnu/readline/readline-${READLINE_VERSION}.tar.gz
     URL_MD5 ${READLINE_HASH}
@@ -158,6 +160,8 @@ ExternalProject_Add(readline
 
         --prefix=<INSTALL_DIR>
         --disable-shared
+    PATCH_COMMAND patch -d <SOURCE_DIR> -p0 <
+        "${CMAKE_CURRENT_SOURCE_DIR}/readline80-001.patch"
 )
 
 #
