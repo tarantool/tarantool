@@ -16,8 +16,8 @@ set(OPENSSL_VERSION 1.1.1q)
 set(OPENSSL_HASH c685d239b6a6e1bd78be45624c092f51)
 set(ZLIB_VERSION 1.2.11)
 set(ZLIB_HASH 1c9f62f0778697a09d36121ead88e08e)
-set(NCURSES_VERSION 6.2)
-set(NCURSES_HASH e812da327b1c2214ac1aed440ea3ae8d)
+set(NCURSES_VERSION 6.3-20220716)
+set(NCURSES_HASH 2b7a0e31ebbd8144680f985d61f5bbd5)
 set(READLINE_VERSION 8.0)
 set(READLINE_HASH 7e6c1f16aee3244a69aba6e438295ca3)
 set(BACKUP_STORAGE https://distrib.hb.bizmrg.com)
@@ -114,7 +114,7 @@ ExternalProject_Add(zlib
 # Ncurses
 #
 ExternalProject_Add(ncurses
-    URL https://ftp.gnu.org/gnu/ncurses/ncurses-${NCURSES_VERSION}.tar.gz
+    URL ${BACKUP_STORAGE}/ncurses/ncurses-${NCURSES_VERSION}.tgz
     URL_MD5 ${NCURSES_HASH}
     CONFIGURE_COMMAND <SOURCE_DIR>/configure
         CC=${CMAKE_C_COMPILER}
