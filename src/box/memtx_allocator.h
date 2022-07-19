@@ -198,10 +198,7 @@ public:
 
 	static void destroy()
 	{
-		while (!stailq_empty(&gc)) {
-			struct memtx_tuple *memtx_tuple = stailq_shift_entry(
-					&gc, struct memtx_tuple, in_gc);
-			immediate_free_tuple(memtx_tuple);
+		while (collect_garbage()) {
 		}
 	}
 
@@ -273,6 +270,20 @@ public:
 		}
 	}
 
+	/**
+	 * Does a garbage collection step. Returns false if there's no more
+	 * tuples to collect.
+	 */
+	static bool collect_garbage()
+	{
+		for (int i = 0; !stailq_empty(&gc) && i < GC_BATCH_SIZE; i++) {
+			struct memtx_tuple *memtx_tuple = stailq_shift_entry(
+					&gc, struct memtx_tuple, in_gc);
+			immediate_free_tuple(memtx_tuple);
+		}
+		return !stailq_empty(&gc);
+	}
+
 private:
 	static constexpr int GC_BATCH_SIZE = 100;
 
@@ -292,15 +303,6 @@ private:
 		size_t size = tuple_size(&memtx_tuple->base) +
 			      offsetof(struct memtx_tuple, base);
 		free(memtx_tuple, size);
-	}
-
-	static void collect_garbage()
-	{
-		for (int i = 0; !stailq_empty(&gc) && i < GC_BATCH_SIZE; i++) {
-			struct memtx_tuple *memtx_tuple = stailq_shift_entry(
-					&gc, struct memtx_tuple, in_gc);
-			immediate_free_tuple(memtx_tuple);
-		}
 	}
 
 	/**
