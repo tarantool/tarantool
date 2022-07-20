@@ -113,6 +113,13 @@ test-static-cmake: LUAJIT_TEST_BUILD_DIR = ${STATIC_BIN_DIR}
 test-static-cmake: TEST_RUN_PARAMS = --builddir ${PWD}/${STATIC_BIN_DIR}
 test-static-cmake: build run-luajit-test run-test
 
+# Static build (docker)
+
+test-static-docker:
+	docker build --no-cache --network=host -f Dockerfile.staticbuild -t static_build:tmp .
+	docker run --rm --volume ${PWD}/artifacts:${VARDIR} static_build:tmp \
+		-c "set -x && cd /tarantool/test && ./test-run.py --force box/admin || (chmod -R a+rwx ${VARDIR}; exit 1)"
+
 # Coverage build
 
 .PHONY: test-coverage
