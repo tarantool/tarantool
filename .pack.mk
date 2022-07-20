@@ -16,7 +16,7 @@ VERSION = ${MAJOR_VERSION}.${MINOR_VERSION}
 
 TARANTOOL_SERIES = series-${MAJOR_VERSION}
 S3_SOURCE_REPO_URL = s3://tarantool_repo/sources
-ifeq (${VERSION}, $(filter ${VERSION}, 1.10 2.8))
+ifeq (${VERSION}, $(filter ${VERSION}, 1.10))
 	TARANTOOL_SERIES = ${MAJOR_VERSION}.${MINOR_VERSION}
 	S3_SOURCE_REPO_URL = s3://tarantool_repo/sources/${TARANTOOL_SERIES}
 endif
