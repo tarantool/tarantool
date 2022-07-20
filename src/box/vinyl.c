@@ -4164,7 +4164,7 @@ vy_build_recover_mem(struct vy_lsm *lsm, struct vy_lsm *pk, struct vy_mem *mem)
 	 * the in-memory index in reverse order.
 	 */
 	struct vy_mem_tree_iterator itr;
-	itr = vy_mem_tree_iterator_last(&mem->tree);
+	itr = vy_mem_tree_last(&mem->tree);
 	while (!vy_mem_tree_iterator_is_invalid(&itr)) {
 		struct vy_entry mem_entry;
 		mem_entry = *vy_mem_tree_iterator_get_elem(&mem->tree, &itr);

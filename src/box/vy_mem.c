@@ -415,7 +415,7 @@ vy_mem_iterator_seek(struct vy_mem_iterator *itr, struct vy_entry last)
 		itr->curr_pos = vy_mem_tree_invalid_iterator();
 	} else {
 		assert(iterator_type == ITER_GE);
-		itr->curr_pos = vy_mem_tree_iterator_first(&itr->mem->tree);
+		itr->curr_pos = vy_mem_tree_first(&itr->mem->tree);
 	}
 
 	if (iterator_type == ITER_LT || iterator_type == ITER_LE)
@@ -639,7 +639,7 @@ vy_mem_stream_open(struct vy_mem_stream *stream, struct vy_mem *mem)
 {
 	stream->base.iface = &vy_mem_stream_iface;
 	stream->mem = mem;
-	stream->curr_pos = vy_mem_tree_iterator_first(&mem->tree);
+	stream->curr_pos = vy_mem_tree_first(&mem->tree);
 }
 
 /* }}} vy_mem_iterator API implementation */
