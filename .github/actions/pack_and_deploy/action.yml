@@ -10,12 +10,12 @@ runs:
         export PACKPACK_EXTRA_DOCKER_RUN_PARAMS='--init'
 
         # Create packages.
-        make -f .gitlab.mk package
+        make -f .pack.mk package
 
         # Deploy live packages. Enabled only for 1.10 and 2.8 branches.
         if ${{ github.ref == 'refs/heads/1.10' ||
                github.ref == 'refs/heads/2.8' }}; then
-          REPO_TYPE=live make -f .gitlab.mk deploy
+          REPO_TYPE=live make -f .pack.mk deploy
         fi
 
         # Deploy pre-release (since 2.10) and release packages. It's expected
@@ -26,11 +26,11 @@ runs:
           case ${{ github.ref }} in
             # It's relevant since 2.10 only.
             refs/tags/*-alpha*|refs/tags/*-beta*|refs/tags/*-rc*)
-              REPO_TYPE=pre-release make -f .gitlab.mk deploy
+              REPO_TYPE=pre-release make -f .pack.mk deploy
               ;;
 
             refs/tags/*)
-              REPO_TYPE=release make -f .gitlab.mk deploy
+              REPO_TYPE=release make -f .pack.mk deploy
               ;;
           esac
         fi
