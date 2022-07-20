@@ -248,7 +248,9 @@ end
  @param table - table with parameters
  @param template - table with expected types of expected parameters
   type could be comma separated string with lua types (number, string etc),
-  or 'any' if any type is allowed
+  or 'any' if any type is allowed. Instead of this string, function, which will
+  be used to check if the parameter is correct, can be used too. It should
+  accept option as an argument and return either true or false + expected_type.
  The function checks following:
  1)that parameters table is a table (or nil)
  2)all keys in parameters are present in template
@@ -259,7 +261,13 @@ end
  @example
  check_param_table(options, { user = 'string',
                               port = 'string, number',
-                              data = 'any'} )
+                              data = 'any',
+                              addr = function(opt)
+                                if not ffi.istype(addr_t, buf) then
+                                    return false, "struct addr"
+                                end
+                                return true
+                              end} )
 --]]
 local function check_param_table(table, template)
     if table == nil then
@@ -277,6 +285,13 @@ local function check_param_table(table, template)
         if template[k] == nil then
             box.error(box.error.ILLEGAL_PARAMS,
                       "unexpected option '" .. k .. "'")
+        elseif type(template[k]) == 'function' then
+            local res, expected_type = template[k](v)
+            if not res then
+                box.error(box.error.ILLEGAL_PARAMS,
+                          "options parameter '" .. k ..
+                          "' should be of type " .. expected_type)
+            end
         elseif template[k] == 'any' then -- luacheck: ignore
             -- any type is ok
         elseif (string.find(template[k], ',') == nil) then
