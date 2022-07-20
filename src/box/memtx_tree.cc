@@ -665,7 +665,7 @@ tree_iterator_start_raw(struct iterator *iterator, struct tuple **ret)
 			 */
 			invalidate_tree_iterator(&it->tree_iterator);
 		else
-			it->tree_iterator = memtx_tree_iterator_first(tree);
+			it->tree_iterator = memtx_tree_first(tree);
 		/* If there is at least one tuple in the tree, it is
 		 * efficiently equals to the empty key. */
 		equals = memtx_tree_size(tree) != 0;
@@ -814,7 +814,7 @@ memtx_tree_index_destroy(struct index *base)
 		 * background task in order not to block tx thread.
 		 */
 		index->gc_task.vtab = get_memtx_tree_index_gc_vtab<USE_HINT>();
-		index->gc_iterator = memtx_tree_iterator_first(&index->tree);
+		index->gc_iterator = memtx_tree_first(&index->tree);
 		memtx_engine_schedule_gc(memtx, &index->gc_task);
 	} else {
 		/*
@@ -1735,7 +1735,7 @@ memtx_tree_index_create_snapshot_iterator(struct index *base)
 	it->base.next = tree_snapshot_iterator_next<USE_HINT>;
 	it->index = index;
 	index_ref(base);
-	it->tree_iterator = memtx_tree_iterator_first(&index->tree);
+	it->tree_iterator = memtx_tree_first(&index->tree);
 	memtx_tree_iterator_freeze(&index->tree, &it->tree_iterator);
 	return (struct snapshot_iterator *) it;
 }

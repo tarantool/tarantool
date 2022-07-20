@@ -79,7 +79,7 @@ iterator_check()
 		tmp2 = test_invalid_iterator();
 		if (!test_iterator_is_invalid(&tmp1))
 			fail("invalid iterator is not invalid", "true");
-		if (!test_iterator_are_equal(&tree, &tmp1, &tmp2))
+		if (!test_iterator_is_equal(&tree, &tmp1, &tmp2))
 			fail("invalid iterators are not equal", "true");
 	}
 
@@ -108,7 +108,7 @@ iterator_check()
 	/* Print first 7 elems */
 	{
 		printf("--> ");
-		test_iterator iterator = test_iterator_first(&tree);
+		test_iterator iterator = test_first(&tree);
 		for (int i = 0; i < 7; i++) {
 			elem_t *elem = test_iterator_get_elem(&tree, &iterator);
 			printf("(%ld,%ld) ", elem->first, elem->second);
@@ -119,7 +119,7 @@ iterator_check()
 	/* Print last 7 elems */
 	{
 		printf("<-- ");
-		test_iterator iterator = test_iterator_last(&tree);
+		test_iterator iterator = test_last(&tree);
 		for (int i = 0; i < 7; i++) {
 			elem_t *elem = test_iterator_get_elem(&tree, &iterator);
 			printf("(%ld,%ld) ", elem->first, elem->second);
@@ -130,7 +130,7 @@ iterator_check()
 
 	/* Iterate forward all elements 5 times */
 	{
-		test_iterator iterator = test_iterator_first(&tree);
+		test_iterator iterator = test_first(&tree);
 		for (long i = 0; i < count1 * count2 * 5; i++) {
 			elem_t *elem = test_iterator_get_elem(&tree, &iterator);
 			if (elem->first != ((i % (count1 * count2)) / count2) * 2)
@@ -150,7 +150,7 @@ iterator_check()
 
 	/* Iterate backward all elements 5 times */
 	{
-		test_iterator iterator = test_iterator_last(&tree);
+		test_iterator iterator = test_last(&tree);
 		for (long i = 0; i < count1 * count2 * 5; i++) {
 			elem_t *elem = test_iterator_get_elem(&tree, &iterator);
 			long j = count1 * count2 - 1 - (i % (count1 * count2));
@@ -185,14 +185,14 @@ iterator_check()
 			test_iterator_is_invalid(&begin) ? "eof" : "ptr",
 			test_iterator_is_invalid(&end) ? "eof" : "ptr");
 		test_iterator runner = begin;
-		while (!test_iterator_are_equal(&tree, &runner, &end)) {
+		while (!test_iterator_is_equal(&tree, &runner, &end)) {
 			elem_t *elem = test_iterator_get_elem(&tree, &runner);
 			printf("(%ld,%ld) ", elem->first, elem->second);
 			test_iterator_next(&tree, &runner);
 		}
 		printf(" <-> ");
 		runner = end;
-		while (!test_iterator_are_equal(&tree, &runner, &begin)) {
+		while (!test_iterator_is_equal(&tree, &runner, &begin)) {
 			test_iterator_prev(&tree, &runner);
 			elem_t *elem = test_iterator_get_elem(&tree, &runner);
 			printf("(%ld,%ld) ", elem->first, elem->second);
@@ -206,7 +206,7 @@ iterator_check()
 		test_iterator begin = test_lower_bound(&tree, i, 0);
 		test_iterator end = test_upper_bound(&tree, i, 0);
 		long real_count = 0;
-		while (!test_iterator_are_equal(&tree, &begin, &end)) {
+		while (!test_iterator_is_equal(&tree, &begin, &end)) {
 			elem_t *elem = test_iterator_get_elem(&tree, &begin);
 			if (elem->first != i)
 				fail("range iterator failed (1)", "true");
@@ -234,14 +234,14 @@ iterator_check()
 		       test_iterator_is_invalid(&begin) ? "eof" : "ptr",
 		       test_iterator_is_invalid(&end) ? "eof" : "ptr");
 		test_iterator runner = begin;
-		while (!test_iterator_are_equal(&tree, &runner, &end)) {
+		while (!test_iterator_is_equal(&tree, &runner, &end)) {
 			elem_t *elem = test_iterator_get_elem(&tree, &runner);
 			printf("(%ld,%ld) ", elem->first, elem->second);
 			test_iterator_next(&tree, &runner);
 		}
 		printf(" <-> ");
 		runner = end;
-		while (!test_iterator_are_equal(&tree, &runner, &begin)) {
+		while (!test_iterator_is_equal(&tree, &runner, &begin)) {
 			test_iterator_prev(&tree, &runner);
 			elem_t *elem = test_iterator_get_elem(&tree, &runner);
 			printf("(%ld,%ld) ", elem->first, elem->second);
@@ -257,7 +257,7 @@ iterator_check()
 		test_iterator begin = test_lower_bound_elem(&tree, lower_elem_key, 0);
 		test_iterator end = test_upper_bound_elem(&tree, upper_elem_key, 0);
 		long real_count = 0;
-		while (!test_iterator_are_equal(&tree, &begin, &end)) {
+		while (!test_iterator_is_equal(&tree, &begin, &end)) {
 			elem_t *elem = test_iterator_get_elem(&tree, &begin);
 			if (elem->first != i)
 				fail("range iterator failed (1)", "true");
@@ -307,7 +307,7 @@ iterator_invalidate_check()
 			e.second = i * test_size * 2;
 			test_insert(&tree, e, 0, 0);
 		}
-		iterators[0] = test_iterator_first(&tree);
+		iterators[0] = test_first(&tree);
 		assert(test_iterator_get_elem(&tree, iterators));
 		for (long i = 1; i < test_size; i++) {
 			iterators[i] = iterators[i - 1];
@@ -352,7 +352,7 @@ iterator_invalidate_check()
 			e.second = i * test_size * 2;
 			test_insert(&tree, e, 0, 0);
 		}
-		iterators [0] = test_iterator_first(&tree);
+		iterators[0] = test_first(&tree);
 		assert(test_iterator_get_elem(&tree, iterators));
 		for (long i = 1; i < test_size; i++) {
 			iterators[i] = iterators[i - 1];
@@ -408,7 +408,7 @@ iterator_invalidate_check()
 			e.second = i * test_size * 2;
 			test_insert(&tree, e, 0, 0);
 		}
-		iterators[0] = test_iterator_first(&tree);
+		iterators[0] = test_first(&tree);
 		assert(test_iterator_get_elem(&tree, iterators));
 		for (long i = 1; i < test_size; i++) {
 			iterators[i] = iterators[i - 1];
@@ -483,15 +483,15 @@ iterator_freeze_check()
 			fail_if(check);
 			assert(check == 0);
 		}
-		struct test_iterator iterator = test_iterator_first(&tree);
+		struct test_iterator iterator = test_first(&tree);
 		elem_t *e;
 		while ((e = test_iterator_get_elem(&tree, &iterator))) {
 			comp_buf1[comp_buf_size1++] = *e;
 			test_iterator_next(&tree, &iterator);
 		}
-		struct test_iterator iterator1 = test_iterator_first(&tree);
+		struct test_iterator iterator1 = test_first(&tree);
 		test_iterator_freeze(&tree, &iterator1);
-		struct test_iterator iterator2 = test_iterator_first(&tree);
+		struct test_iterator iterator2 = test_first(&tree);
 		test_iterator_freeze(&tree, &iterator2);
 		for (int j = 0; j < test_data_size; j++) {
 			elem_t e;

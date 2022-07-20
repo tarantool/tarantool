@@ -292,7 +292,7 @@ check_trees_are_identical(test *tree, sptree_test *spt_test)
 	if (test_size(tree) != spt_test->size)
 		return false;
 	int n = test_size(tree);
-	test_iterator iterator = test_iterator_first(tree);
+	test_iterator iterator = test_first(tree);
 	sptree_test_iterator *spitr = sptree_test_iterator_init(spt_test);
 	for (int i = 0; i < n; i++) {
 		type_t v1 = *test_iterator_get_elem(tree, &iterator);
@@ -611,7 +611,7 @@ loading_test()
 			fail("debug check nonzero", "true");
 
 		struct test_iterator iterator;
-		iterator = test_iterator_first(&tree);
+		iterator = test_first(&tree);
 		for (type_t j = 0; j < i; j++) {
 			type_t *v = test_iterator_get_elem(&tree, &iterator);
 			if (!v || *v != j)

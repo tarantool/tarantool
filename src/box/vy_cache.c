@@ -151,7 +151,7 @@ void
 vy_cache_destroy(struct vy_cache *cache)
 {
 	struct vy_cache_tree_iterator itr =
-		vy_cache_tree_iterator_first(&cache->cache_tree);
+		vy_cache_tree_first(&cache->cache_tree);
 	while (!vy_cache_tree_iterator_is_invalid(&itr)) {
 		struct vy_cache_node **node =
 			vy_cache_tree_iterator_get_elem(&cache->cache_tree,
@@ -672,7 +672,7 @@ vy_cache_iterator_seek(struct vy_cache_iterator *itr, struct vy_entry last)
 		itr->curr_pos = vy_cache_tree_invalid_iterator();
 	} else {
 		assert(iterator_type == ITER_GE);
-		itr->curr_pos = vy_cache_tree_iterator_first(tree);
+		itr->curr_pos = vy_cache_tree_first(tree);
 	}
 
 	if (iterator_type == ITER_LT || iterator_type == ITER_LE)
