@@ -307,7 +307,7 @@ g.test_box_error = function()
     t.assert_error_msg_equals(
         "Illegal parameters, Netbox text protocol support was dropped, "..
         "please use require('console').connect() instead",
-        net.connect, g.server.net_box_uri, {console = 123})
+        net.connect, g.server.net_box_uri, {console = true})
     local c = net.connect(g.server.net_box_uri)
 
     t.assert_error_msg_equals(
