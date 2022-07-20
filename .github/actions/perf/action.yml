@@ -12,14 +12,13 @@ runs:
       shell: bash
     - name: test
       env:
-        CI_MAKE: make -f .gitlab.mk
         IMAGE_PERF: docker.io/tarantool/perf:ubuntu-bionic_perf_master
         IMAGE_PERF_BUILT: ubuntu-bionic:perf_${{ github.sha }}
         DOCKER_NETWORK_ARG: --network=host
         DOCKER_RUN_ARGS: ${DOCKER_NETWORK_ARG} ${{ env.DOCKER_RUN_ARGS }}
       run: |
           set -x
-          ${CI_MAKE} perf_clone_benchs_repo
+          git clone https://github.com/tarantool/bench-run.git
           docker build ${DOCKER_NETWORK_ARG} \
             --add-host ${{ env.HOSTNAME }}:127.0.0.1 \
             -t ${IMAGE_PERF} \
@@ -36,5 +35,5 @@ runs:
             -w /source \
             -i ${IMAGE_PERF_BUILT}${{ env.IMAGE_SUFFIX }} \
             /opt/bench-run/benchs/${BENCH}/run.sh ${ARG}
-          ${CI_MAKE} perf_cleanup_image
+          make -f bench-run/targets.mk cleanup
       shell: bash
