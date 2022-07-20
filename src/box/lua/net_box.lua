@@ -16,6 +16,9 @@ local check_select_opts   = box.internal.check_select_opts
 local check_index_arg     = box.internal.check_index_arg
 local check_space_arg     = box.internal.check_space_arg
 local check_primary_index = box.internal.check_primary_index
+local check_param_table   = box.internal.check_param_table
+
+local ibuf_t = ffi.typeof('struct ibuf')
 
 local TIMEOUT_INFINITY = 500 * 365 * 86400
 
@@ -53,6 +56,38 @@ local IPROTO_FEATURE_NAMES = {
     [1]     = 'transactions',
     [2]     = 'error_extension',
     [3]     = 'watchers',
+}
+
+local REQUEST_OPTION_TYPES = {
+    is_async    = "boolean",
+    iterator    = "string",
+    limit       = "number",
+    offset      = "number",
+    on_push     = "function",
+    on_push_ctx = "any",
+    return_raw  = "boolean",
+    skip_header = "boolean",
+    timeout     = "number",
+    buffer = function(buf)
+       if not ffi.istype(ibuf_t, buf) then
+           return false, "struct ibuf"
+       end
+       return true
+    end,
+}
+
+local CONNECT_OPTION_TYPES = {
+    user                        = "string",
+    password                    = "string",
+    wait_connected              = "number, boolean",
+    reconnect_after             = "number",
+    call_16                     = "boolean",
+    console                     = "boolean",
+    connect_timeout             = "number",
+    fetch_schema                = "boolean",
+    required_protocol_version   = "number",
+    required_protocol_features  = "table",
+    _disable_graceful_shutdown  = "boolean",
 }
 
 -- Given an array of IPROTO feature ids, returns a map {feature_name: bool}.
@@ -436,7 +471,9 @@ end
 -- @retval Net.box object.
 --
 local function connect(...)
-    return new_sm(parse_connect_params(...))
+    local uri, opts = parse_connect_params(...)
+    check_param_table(opts, CONNECT_OPTION_TYPES)
+    return new_sm(uri, opts)
 end
 
 local function check_remote_arg(remote, method)
@@ -469,6 +506,7 @@ end
 
 local function stream_begin(stream, txn_opts, netbox_opts)
     check_remote_arg(stream, 'begin')
+    check_param_table(netbox_opts, REQUEST_OPTION_TYPES)
     local timeout
     local txn_isolation
     if txn_opts then
@@ -494,6 +532,7 @@ end
 
 local function stream_commit(stream, opts)
     check_remote_arg(stream, 'commit')
+    check_param_table(opts, REQUEST_OPTION_TYPES)
     local res = stream:_request(M_COMMIT, opts, nil, stream._stream_id)
     if opts and opts.is_async then
         return res
@@ -502,6 +541,7 @@ end
 
 local function stream_rollback(stream, opts)
     check_remote_arg(stream, 'rollback')
+    check_param_table(opts, REQUEST_OPTION_TYPES)
     local res = stream:_request(M_ROLLBACK, opts, nil, stream._stream_id)
     if opts and opts.is_async then
         return res
@@ -707,7 +747,12 @@ function remote_methods:wait_connected(timeout)
     return self:wait_state('active', timeout)
 end
 
-function remote_methods:_request(method, opts, format, stream_id, ...)
+--
+-- Make a request, which throws an exception in case of critical errors
+-- (e.g. wrong API usage) and returns nil,err if there's connection related
+-- issues.
+--
+function remote_methods:_request_impl(method, opts, format, stream_id, ...)
     local transport = self._transport
     local on_push, on_push_ctx, buffer, skip_header, return_raw, deadline
     -- Extract options, set defaults, check if the request is
@@ -720,14 +765,10 @@ function remote_methods:_request(method, opts, format, stream_id, ...)
             if opts.on_push or opts.on_push_ctx then
                 error('To handle pushes in an async request use future:pairs()')
             end
-            local res, err =
-                transport:perform_async_request(buffer, skip_header, return_raw,
-                                                table.insert, {}, format,
-                                                stream_id, method, ...)
-            if err then
-                box.error(err)
-            end
-            return res
+            return transport:perform_async_request(buffer, skip_header,
+                                                   return_raw, table.insert,
+                                                   {}, format, stream_id,
+                                                   method, ...)
         end
         if opts.timeout then
             deadline = fiber_clock() + opts.timeout
@@ -749,9 +790,6 @@ function remote_methods:_request(method, opts, format, stream_id, ...)
     local res, err = transport:perform_request(timeout, buffer, skip_header,
                                                return_raw, on_push, on_push_ctx,
                                                format, stream_id, method, ...)
-    if err then
-        box.error(err)
-    end
     -- Try to wait until a schema is reloaded if needed.
     -- Regardless of reloading result, the main response is
     -- returned, since it does not depend on any schema things.
@@ -759,10 +797,19 @@ function remote_methods:_request(method, opts, format, stream_id, ...)
         timeout = deadline and max(0, deadline - fiber_clock())
         self:wait_state('active', timeout)
     end
+    return res, err
+end
+
+function remote_methods:_request(method, opts, format, stream_id, ...)
+    local res, err = self:_request_impl(method, opts, format, stream_id, ...)
+    if err then
+        box.error(err)
+    end
     return res
 end
 
 function remote_methods:_inject(str, opts)
+    check_param_table(opts, REQUEST_OPTION_TYPES)
     return self:_request(M_INJECT, opts, nil, nil, str)
 end
 
@@ -772,7 +819,12 @@ end
 
 function remote_methods:ping(opts)
     check_remote_arg(self, 'ping')
-    return (pcall(self._request, self, M_PING, opts, nil, self._stream_id))
+    check_param_table(opts, REQUEST_OPTION_TYPES)
+    if opts and opts.is_async then
+        error("conn:ping() doesn't support `is_async` argument")
+    end
+    local _, err = self:_request_impl(M_PING, opts, nil, self._stream_id)
+    return err == nil
 end
 
 function remote_methods:reload_schema()
@@ -790,6 +842,7 @@ end
 function remote_methods:call(func_name, args, opts)
     check_remote_arg(self, 'call')
     check_call_args(args)
+    check_param_table(opts, REQUEST_OPTION_TYPES)
     args = args or {}
     local res = self:_request(M_CALL_17, opts, nil, self._stream_id,
                               tostring(func_name), args)
@@ -809,6 +862,7 @@ end
 function remote_methods:eval(code, args, opts)
     check_remote_arg(self, 'eval')
     check_eval_args(args)
+    check_param_table(opts, REQUEST_OPTION_TYPES)
     args = args or {}
     local res = self:_request(M_EVAL, opts, nil, self._stream_id, code, args)
     if type(res) ~= 'table' or opts and opts.is_async then
@@ -822,6 +876,7 @@ function remote_methods:execute(query, parameters, sql_opts, netbox_opts)
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "execute", "options")
     end
+    check_param_table(netbox_opts, REQUEST_OPTION_TYPES)
     return self:_request(M_EXECUTE, netbox_opts, nil, self._stream_id,
                          query, parameters or {}, sql_opts or {})
 end
@@ -834,6 +889,7 @@ function remote_methods:prepare(query, parameters, sql_opts, netbox_opts) -- lua
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "prepare", "options")
     end
+    check_param_table(netbox_opts, REQUEST_OPTION_TYPES)
     return self:_request(M_PREPARE, netbox_opts, nil, self._stream_id, query)
 end
 
@@ -846,6 +902,7 @@ function remote_methods:unprepare(query, parameters, sql_opts, netbox_opts)
     if sql_opts ~= nil then
         box.error(box.error.UNSUPPORTED, "unprepare", "options")
     end
+    check_param_table(netbox_opts, REQUEST_OPTION_TYPES)
     return self:_request(M_UNPREPARE, netbox_opts, nil, self._stream_id,
                          query, parameters or {}, sql_opts or {})
 end
@@ -984,12 +1041,14 @@ space_metatable = function(remote)
 
     function methods:insert(tuple, opts)
         check_space_arg(self, 'insert')
+        check_param_table(opts, REQUEST_OPTION_TYPES)
         return remote:_request(M_INSERT, opts, self._format_cdata,
                                self._stream_id, self.id, tuple)
     end
 
     function methods:replace(tuple, opts)
         check_space_arg(self, 'replace')
+        check_param_table(opts, REQUEST_OPTION_TYPES)
         return remote:_request(M_REPLACE, opts, self._format_cdata,
                                self._stream_id, self.id, tuple)
     end
@@ -1011,6 +1070,7 @@ space_metatable = function(remote)
 
     function methods:upsert(key, oplist, opts)
         check_space_arg(self, 'upsert')
+        check_param_table(opts, REQUEST_OPTION_TYPES)
         return nothing_or_data(remote:_request(M_UPSERT, opts, nil,
                                                self._stream_id, self.id,
                                                key, oplist))
@@ -1037,6 +1097,7 @@ index_metatable = function(remote)
 
     function methods:select(key, opts)
         check_index_arg(self, 'select')
+        check_param_table(opts, REQUEST_OPTION_TYPES)
         local key_is_nil = (key == nil or
                             (type(key) == 'table' and #key == 0))
         local iterator, offset, limit = check_select_opts(opts, key_is_nil)
@@ -1047,6 +1108,7 @@ index_metatable = function(remote)
 
     function methods:get(key, opts)
         check_index_arg(self, 'get')
+        check_param_table(opts, REQUEST_OPTION_TYPES)
         if opts and opts.buffer then
             error("index:get() doesn't support `buffer` argument")
         end
@@ -1059,6 +1121,7 @@ index_metatable = function(remote)
 
     function methods:min(key, opts)
         check_index_arg(self, 'min')
+        check_param_table(opts, REQUEST_OPTION_TYPES)
         if opts and opts.buffer then
             error("index:min() doesn't support `buffer` argument")
         end
@@ -1071,6 +1134,7 @@ index_metatable = function(remote)
 
     function methods:max(key, opts)
         check_index_arg(self, 'max')
+        check_param_table(opts, REQUEST_OPTION_TYPES)
         if opts and opts.buffer then
             error("index:max() doesn't support `buffer` argument")
         end
@@ -1083,6 +1147,7 @@ index_metatable = function(remote)
 
     function methods:count(key, opts)
         check_index_arg(self, 'count')
+        check_param_table(opts, REQUEST_OPTION_TYPES)
         if opts and opts.buffer then
             error("index:count() doesn't support `buffer` argument")
         end
@@ -1094,6 +1159,7 @@ index_metatable = function(remote)
 
     function methods:delete(key, opts)
         check_index_arg(self, 'delete')
+        check_param_table(opts, REQUEST_OPTION_TYPES)
         return nothing_or_data(remote:_request(M_DELETE, opts,
                                                self.space._format_cdata,
                                                self._stream_id, self.space.id,
@@ -1102,6 +1168,7 @@ index_metatable = function(remote)
 
     function methods:update(key, oplist, opts)
         check_index_arg(self, 'update')
+        check_param_table(opts, REQUEST_OPTION_TYPES)
         return nothing_or_data(remote:_request(M_UPDATE, opts,
                                                self.space._format_cdata,
                                                self._stream_id, self.space.id,
