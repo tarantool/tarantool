@@ -150,9 +150,9 @@
  * // iterators:
  * struct bps_tree_iterator bps_tree_invalid_iterator();
  * bool bps_tree_iterator_is_invalid(itr);
- * bool bps_tree_iterator_are_equal(tree, itr1, itr2);
- * struct bps_tree_iterator bps_tree_iterator_first(tree);
- * struct bps_tree_iterator bps_tree_iterator_last(tree);
+ * bool bps_tree_iterator_is_equal(tree, itr1, itr2);
+ * struct bps_tree_iterator bps_tree_first(tree);
+ * struct bps_tree_iterator bps_tree_last(tree);
  * struct bps_tree_iterator bps_tree_lower_bound(tree, key, exact);
  * struct bps_tree_iterator bps_tree_upper_bound(tree, key, exact);
  * struct bps_tree_iterator bps_tree_lower_bound_elem(tree, elem, exact);
@@ -381,9 +381,9 @@ typedef uint32_t bps_tree_block_id_t;
 #define bps_tree_random _api_name(random)
 #define bps_tree_invalid_iterator _api_name(invalid_iterator)
 #define bps_tree_iterator_is_invalid _api_name(iterator_is_invalid)
-#define bps_tree_iterator_are_equal _api_name(iterator_are_equal)
-#define bps_tree_iterator_first _api_name(iterator_first)
-#define bps_tree_iterator_last _api_name(iterator_last)
+#define bps_tree_iterator_is_equal _api_name(iterator_is_equal)
+#define bps_tree_first _api_name(first)
+#define bps_tree_last _api_name(last)
 #define bps_tree_lower_bound _api_name(lower_bound)
 #define bps_tree_upper_bound _api_name(upper_bound)
 #define bps_tree_lower_bound_elem _api_name(lower_bound_elem)
@@ -711,9 +711,9 @@ bps_tree_iterator_is_invalid(struct bps_tree_iterator *itr);
  * @return - true if iterators are equal, false otherwise
  */
 static inline bool
-bps_tree_iterator_are_equal(const struct bps_tree *tree,
-		            struct bps_tree_iterator *itr1,
-		            struct bps_tree_iterator *itr2);
+bps_tree_iterator_is_equal(const struct bps_tree *tree,
+			   struct bps_tree_iterator *itr1,
+			   struct bps_tree_iterator *itr2);
 
 /**
  * @brief Get an iterator to the first element of the tree
@@ -721,7 +721,7 @@ bps_tree_iterator_are_equal(const struct bps_tree *tree,
  * @return - First iterator. Could be invalid if the tree is empty.
  */
 static inline struct bps_tree_iterator
-bps_tree_iterator_first(const struct bps_tree *tree);
+bps_tree_first(const struct bps_tree *tree);
 
 /**
  * @brief Get an iterator to the last element of the tree
@@ -729,7 +729,7 @@ bps_tree_iterator_first(const struct bps_tree *tree);
  * @return - Last iterator. Could be invalid if the tree is empty.
  */
 static inline struct bps_tree_iterator
-bps_tree_iterator_last(const struct bps_tree *tree);
+bps_tree_last(const struct bps_tree *tree);
 
 /**
  * @brief Get an iterator to the first element that is greater or
@@ -1616,9 +1616,9 @@ bps_tree_get_leaf_safe(const struct bps_tree *tree,
  * @return - true if iterators are equal, false otherwise
  */
 static inline bool
-bps_tree_iterator_are_equal(const struct bps_tree *tree,
-		            struct bps_tree_iterator *itr1,
-		            struct bps_tree_iterator *itr2)
+bps_tree_iterator_is_equal(const struct bps_tree *tree,
+			   struct bps_tree_iterator *itr1,
+			   struct bps_tree_iterator *itr2)
 {
 	if (bps_tree_iterator_is_invalid(itr1) && bps_tree_iterator_is_invalid(itr2))
 		return true;
@@ -1651,7 +1651,7 @@ bps_tree_iterator_are_equal(const struct bps_tree *tree,
  * @return - First iterator. Could be invalid if the tree is empty.
  */
 static inline struct bps_tree_iterator
-bps_tree_iterator_first(const struct bps_tree *tree)
+bps_tree_first(const struct bps_tree *tree)
 {
 	struct bps_tree_iterator itr;
 	itr.block_id = tree->first_id;
@@ -1666,7 +1666,7 @@ bps_tree_iterator_first(const struct bps_tree *tree)
  * @return - Last iterator. Could be invalid if the tree is empty.
  */
 static inline struct bps_tree_iterator
-bps_tree_iterator_last(const struct bps_tree *tree)
+bps_tree_last(const struct bps_tree *tree)
 {
 	struct bps_tree_iterator itr;
 	itr.block_id = tree->last_id;
@@ -6116,9 +6116,9 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_random
 #undef bps_tree_invalid_iterator
 #undef bps_tree_iterator_is_invalid
-#undef bps_tree_iterator_are_equal
-#undef bps_tree_iterator_first
-#undef bps_tree_iterator_last
+#undef bps_tree_iterator_is_equal
+#undef bps_tree_first
+#undef bps_tree_last
 #undef bps_tree_lower_bound
 #undef bps_tree_upper_bound
 #undef bps_tree_lower_bound_elem
