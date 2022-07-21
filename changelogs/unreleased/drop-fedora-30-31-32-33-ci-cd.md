@@ -1,3 +1,3 @@
 ## feature/build
 
-* Stop support of Fedora 30/31/32/33 builds.
+* Fedora 30, 31,32, and 33 are no longer supported.

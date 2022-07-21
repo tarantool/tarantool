@@ -1,4 +1,4 @@
 ## bugfix/core
 
-* Improved incoming tuple validation. Now tuples coming over the net can't
-  contain malformed decimals, uuids, datetime values (gh-6857).
+* Improved validation of incoming tuples. Now tuples coming over the network
+ can't contain malformed decimals, uuids, or datetime values (gh-6857).

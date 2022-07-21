@@ -1,3 +1,3 @@
 ## bugfix/core
 
-* Fixed `space_object:fselect()` behavior on binary data (gh-7040).
+* Fixed the behavior of `space_object:fselect()` on binary data (gh-7040).

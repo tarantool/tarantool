@@ -1,6 +1,5 @@
 ## bugfix/http client
 
-* Enable runtime autodetection of system CA certificates back (gh-7372).
-
-  Otherwise HTTPS can't be used without `verify_peer = false` option. It is the
-  regression from 2.10.0.
+* Enabled the automatic detection of system CA certificates in the runtime (gh-7372).
+  It was disabled in 2.10.0, which led to the inability to use HTTPS without
+  the `verify_peer = false` option.

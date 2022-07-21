@@ -1,3 +1,3 @@
 ## bugfix/lua
 
-* Fixed case when fiber_obj:info() ignored options (gh-7210).
+* The `fiber_obj:info()` now correctly handles its options (gh-7210).

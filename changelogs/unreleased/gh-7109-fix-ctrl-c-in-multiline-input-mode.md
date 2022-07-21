@@ -1,3 +1,3 @@
 ## bugfix/lua
 
-* Fixed a bug when ctrl+c doesn't discard the input in multiline mode (gh-7109).
+* Fixed a bug when Ctrl+C doesn't discard the multiline input (gh-7109).

@@ -1,4 +1,4 @@
 ## bugfix/memtx
 
-* Fixed repeatable `replace` with _memtx_ transaction manager enabled which
-  triggered assertion (gh-7214).
+* Fixed false assertion on repeatable `replace` with the memtx transaction
+  manager enabled (gh-7214).

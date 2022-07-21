@@ -1,3 +1,3 @@
 ## bugfix/core
 
-* Fixed `exclude_null` index option for multikey and JSON indexes (gh-5861).
+* Fixed the `exclude_null` index option not working for multikey and JSON indexes (gh-5861).
