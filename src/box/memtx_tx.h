@@ -272,6 +272,8 @@ memtx_tx_manager_free();
 /**
  * Transaction providing DDL changes is disallowed to yield after
  * modifications of internal caches (i.e. after ALTER operation finishes).
+ *
+ * NB: can trigger story garbage collection.
  */
 void
 memtx_tx_acquire_ddl(struct txn *tx);
@@ -280,6 +282,8 @@ memtx_tx_acquire_ddl(struct txn *tx);
  * Mark all transactions except for a given as aborted due to conflict:
  * when DDL operation is about to be committed other transactions are
  * considered to use obsolete schema so that should be aborted.
+ *
+ * NB: can trigger story garbage collection.
  */
 void
 memtx_tx_abort_all_for_ddl(struct txn *ddl_owner);
@@ -293,6 +297,9 @@ memtx_tx_abort_all_for_ddl(struct txn *ddl_owner);
  * For example: there's two rw transaction in progress, one have read
  * some value while the second is about to overwrite it. If the second
  * is committed first, the first must be aborted.
+ *
+ * NB: can trigger story garbage collection.
+ *
  * @return 0 on success, -1 on memory error.
  */
 int
@@ -310,6 +317,8 @@ memtx_tx_cause_conflict(struct txn *breaker, struct txn *victim);
  * is already in a read view - a read view that does not see every breaker
  * changes is chosen.
  * Otherwise @a victim must be marked as conflicted and aborted on occasion.
+ *
+ * NB: can trigger story garbage collection.
  */
 void
 memtx_tx_handle_conflict(struct txn *breaker, struct txn *victim);
@@ -321,6 +330,8 @@ memtx_tx_handle_conflict(struct txn *breaker, struct txn *victim);
  * With that clarifying the statement will be visible to current transaction,
  * but invisible to all others.
  * Follows signature of @sa memtx_space_replace_all_keys .
+ *
+ * NB: can trigger story garbage collection.
  *
  * @param stmt current statement.
  * @param old_tuple the tuple that should be removed (can be NULL).
@@ -342,6 +353,8 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
  * Prepared statements could be also removed, but for consistency all latter
  * prepared statement must be also rolled back.
  *
+ * NB: can trigger story garbage collection.
+ *
  * @param stmt current statement.
  */
 void
@@ -359,6 +372,8 @@ memtx_tx_history_rollback_stmt(struct txn_stmt *stmt);
  * between earlier prepared stories and in-progress stories. That's what
  * this function does.
  *
+ * NB: can trigger story garbage collection.
+ *
  * @param stmt current statement.
  */
 void
@@ -367,6 +382,8 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt);
 /**
  * @brief Commit statement in history.
  * Make the statement's changes permanent. It becomes visible to all.
+ *
+ * NB: can trigger story garbage collection.
  *
  * @param stmt current statement.
  * @param bsize the space bsize.
@@ -382,6 +399,9 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 
 /**
  * Record in TX manager that a transaction @txn have read a @tuple in @space.
+ *
+ * NB: can trigger story garbage collection.
+ *
  * @return 0 on success, -1 on memory error.
  */
 int
@@ -398,6 +418,9 @@ memtx_tx_track_point_slow(struct txn *txn, struct index *index,
  * from @a space and @ a index with @ key.
  * The key is expected to be full, that is has part count equal to part
  * count in unique cmp_key of the index.
+ *
+ * NB: can trigger story garbage collection.
+ *
  * @return 0 on success, -1 on memory error.
  */
 static inline int
@@ -429,6 +452,9 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
  * This function must be used for ordered indexes, such as TREE, for queries
  * when interation type is not EQ or when the key is not full (otherwise
  * it's faster to use memtx_tx_track_point).
+ *
+ * NB: can trigger story garbage collection.
+ *
  * @return 0 on success, -1 on memory error.
  */
 static inline int
@@ -458,6 +484,9 @@ memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index);
  * from @a space.
  * This function must be used for unordered indexes, such as HASH, for queries
  * when interation type is ALL.
+ *
+ * NB: can trigger story garbage collection.
+ *
  * @return 0 on success, -1 on memory error.
  */
 static inline int
@@ -475,7 +504,16 @@ memtx_tx_track_full_scan(struct txn *txn, struct space *space,
 }
 
 /**
+ * Run several rounds of memtx_tx_story_gc_step()
+ */
+void
+memtx_tx_story_gc();
+
+/**
  * Clean a tuple if it's dirty - finds a visible tuple in history.
+ *
+ * NB: can trigger story garbage collection.
+ *
  * @param txn - current transactions.
  * @param space - space in which the tuple was found.
  * @param tuple - tuple to clean.
@@ -493,6 +531,7 @@ memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 		return tuple;
 	if (!tuple_has_flag(tuple, TUPLE_IS_DIRTY)) {
 		memtx_tx_track_read(txn, space, tuple);
+		memtx_tx_story_gc();
 		return tuple;
 	}
 	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index);
@@ -509,6 +548,8 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
  * standalone observer.
  * The function calculates tje number of tuples that are physically present
  * in index, but have no visible value.
+ *
+ * NB: can trigger story garbage collection.
  */
 static inline uint32_t
 memtx_tx_index_invisible_count(struct txn *txn,
@@ -521,12 +562,16 @@ memtx_tx_index_invisible_count(struct txn *txn,
 
 /**
  * Clean memtx_tx part of @a txm.
+ *
+ * NB: can trigger story garbage collection.
  */
 void
 memtx_tx_clean_txn(struct txn *txn);
 
 /**
  * Notify manager tha an index is deleted and free data, save in index.
+ *
+ * NB: can trigger story garbage collection.
  */
 void
 memtx_tx_on_index_delete(struct index *index);
@@ -536,6 +581,8 @@ memtx_tx_on_index_delete(struct index *index);
  * It's necessary because there is a chance that garbage collector hasn't
  * deleted all stories of that space and in that case some actions of
  * story's destructor are not applicable.
+ *
+ * NB: can trigger story garbage collection.
  */
 void
 memtx_tx_on_space_delete(struct space *space);
