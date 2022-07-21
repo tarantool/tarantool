@@ -182,7 +182,7 @@ test_waitpid_f(va_list ap)
 	pid_t pid = fork();
 	if (pid == 0) {
 		/* Child process. */
-		execlp("true", "", NULL);
+		execlp("true", "true", NULL);
 	}
 
 	fail_if(pid == -1);
