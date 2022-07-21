@@ -1,6 +1,5 @@
 ## bugfix/core
 
-* Remove assertion raised in case of `fiber_wakeup()` get called with
-  dead fibers. Due to backward compatibility we've allowed such calls
-  for release builds but not for debug builds. In result there
-  was inconsistency between program behaviour (gh-5843).
+* Removed an assertion on `fiber_wakeup()` calls with dead fibers
+  in debug builds. Such behavior was inconsistent with release builds,
+  in which the same calls were allowed (gh-5843).

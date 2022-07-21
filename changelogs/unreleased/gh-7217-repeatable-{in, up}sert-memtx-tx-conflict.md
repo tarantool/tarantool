@@ -1,4 +1,4 @@
 ## bugfix/memtx
 
-* Fixed repeatable `{in, up}sert` with _memtx_ transaction manager enabled which
-  caused spurious transaction conflict (gh-7217).
+* Fixed false transaction conflict on repeatable `insert`/`upsert`
+  with the memtx transaction manager enabled (gh-7217).

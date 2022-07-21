@@ -1,4 +1,4 @@
 ## bugfix/core
 
-* Fixed expression evaluation error overwritten by "Transaction is active at
-  return from function" error in case expression begins a transaction (gh-7288).
+* Fixed a bug when the "Transaction is active at return from function" error
+  was overwriting expression evaluation errors in case the expression begins a transaction (gh-7288).

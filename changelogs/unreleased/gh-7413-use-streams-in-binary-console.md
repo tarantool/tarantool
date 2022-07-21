@@ -1,3 +1,3 @@
 ## feature/core
 
-* Supported interactive transactions for remote binary console (gh-7413).
+* Interactive transactions are now possible in remote binary consoles (gh-7413).

@@ -1,3 +1,3 @@
 ## feature/build
 
-* Stop support of Ubuntu Groovy/Hirsute (20.10/21.04) builds.
+* Ubuntu 20.10 (Groovy Gorilla) and 21.04 (Hirsute Hippo) are no longer supported.

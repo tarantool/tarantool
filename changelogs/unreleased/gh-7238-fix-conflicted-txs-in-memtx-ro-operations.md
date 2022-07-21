@@ -1,4 +1,4 @@
 ## bugfix/memtx
 
-* Fixed conflicted transactions in memtx being able to perform read-only
-  operations which gave spurious results (gh-7238).
+* Fixed the ability to perform read-only operations in conflicting transactions
+  in memtx, which led to spurious results (gh-7238).
