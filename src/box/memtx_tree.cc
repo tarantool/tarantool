@@ -736,11 +736,15 @@ tree_iterator_start_raw(struct iterator *iterator, struct tuple **ret)
 		 * We need to clarify the result tuple before story garbage
 		 * collection, otherwise it could get cleaned there.
 		 */
+/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		*ret = memtx_tx_tuple_clarify(txn, space, res->tuple, idx,
 					      mk_index);
+/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	}
 	if (key_is_full && !eq_match)
+/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_track_point(txn, space, idx, it->key_data.key);
+/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	if (!key_is_full ||
 	    ((type == ITER_GE || type == ITER_LE) && !equals) ||
 	    (type == ITER_GT || type == ITER_LT))
@@ -932,13 +936,17 @@ memtx_tree_index_get_raw(struct index *base, const char *key,
 	if (res == NULL) {
 		*result = NULL;
 		if (part_count == cmp_def->part_count)
+/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 			memtx_tx_track_point(txn, space, base, key);
+/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		return 0;
 	}
 	bool is_multikey = base->def->key_def->is_multikey;
 	uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
+/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 	*result = memtx_tx_tuple_clarify(txn, space, res->tuple, base,
 					 mk_index);
+/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	return 0;
 }
 

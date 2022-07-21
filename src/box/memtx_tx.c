@@ -1327,10 +1327,7 @@ memtx_tx_story_gc_step()
 	memtx_tx_story_delete(story);
 }
 
-/**
- * Run several rounds of memtx_tx_story_gc_step()
- */
-static void
+void
 memtx_tx_story_gc()
 {
 	for (size_t i = 0; i < txm.must_do_gc_steps; i++)
@@ -1955,8 +1952,6 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		 */
 		tuple_ref(*result);
 	}
-
-	memtx_tx_story_gc();
 	return 0;
 
 fail:
@@ -2024,7 +2019,6 @@ memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
 		 */
 		tuple_ref(*result);
 	}
-	memtx_tx_story_gc();
 	return 0;
 }
 
@@ -2038,6 +2032,7 @@ memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
 	assert(new_tuple != NULL || old_tuple != NULL);
 	assert(new_tuple == NULL || !new_tuple->is_dirty);
 
+	memtx_tx_story_gc();
 	if (new_tuple != NULL)
 		return memtx_tx_history_add_insert_stmt(stmt, old_tuple,
 							new_tuple, mode,
@@ -2327,6 +2322,7 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt)
 		stmt->add_story->add_psn = stmt->txn->psn;
 	if (stmt->del_story != NULL)
 		stmt->del_story->del_psn = stmt->txn->psn;
+	memtx_tx_story_gc();
 }
 
 void
@@ -2341,6 +2337,7 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt, size_t *bsize)
 		*bsize -= tuple_bsize(stmt->del_story->tuple);
 		memtx_tx_story_unlink_deleted_by(stmt->del_story, stmt);
 	}
+	memtx_tx_story_gc();
 }
 
 /**
@@ -2436,8 +2433,11 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 			    uint32_t mk_index)
 {
 	bool is_prepared_ok = detect_whether_prepared_ok(txn);
-	return memtx_tx_tuple_clarify_impl(txn, space, tuple, index, mk_index,
-					   is_prepared_ok);
+	struct tuple *res =
+		memtx_tx_tuple_clarify_impl(txn, space, tuple, index, mk_index,
+					    is_prepared_ok);
+	memtx_tx_story_gc();
+	return res;
 }
 
 uint32_t
@@ -2468,6 +2468,7 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
 		if (visible == NULL)
 			res++;
 	}
+	memtx_tx_story_gc();
 	return res;
 }
 
@@ -2504,6 +2505,7 @@ memtx_tx_on_index_delete(struct index *index)
 					  in_full_scans);
 		memtx_tx_full_scan_item_delete(item);
 	}
+	memtx_tx_story_gc();
 }
 
 void
@@ -2589,7 +2591,6 @@ memtx_tx_track_read_story_slow(struct txn *txn, struct memtx_story *story,
 	}
 	rlist_add(&story->reader_list, &tracker->in_reader_list);
 	rlist_add(&txn->read_set, &tracker->in_read_set);
-	memtx_tx_story_gc();
 	return 0;
 }
 
@@ -2606,6 +2607,11 @@ memtx_tx_track_read_story(struct txn *txn, struct space *space,
 	return memtx_tx_track_read_story_slow(txn, story, index_mask);
 }
 
+/**
+ * Record in TX manager that a transaction @txn have read a @tuple in @space.
+ *
+ * @return 0 on success, -1 on memory error.
+ */
 int
 memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
 {
@@ -2765,6 +2771,7 @@ memtx_tx_track_point_slow(struct txn *txn, struct index *index, const char *key)
 	for (uint32_t i = 0; i < def->part_count; i++)
 		mp_next(&tmp);
 	size_t key_len = tmp - key;
+	memtx_tx_story_gc();
 	return point_hole_storage_new(index, key, key_len, txn);
 }
 
@@ -2813,6 +2820,7 @@ memtx_tx_gap_item_new(struct txn *txn, enum iterator_type type,
  * This function must be used for ordered indexes, such as TREE, for queries
  * when interation type is not EQ or when the key is not full (otherwise
  * it's faster to use memtx_tx_track_point).
+ *
  * @return 0 on success, -1 on memory error.
  */
 int
@@ -2877,6 +2885,7 @@ memtx_tx_full_scan_item_new(struct txn *txn)
  * Record in TX manager that a transaction @a txn have read full @ a index.
  * This function must be used for unordered indexes, such as HASH, for queries
  * when interation type is ALL.
+ *
  * @return 0 on success, -1 on memory error.
  */
 int
@@ -2921,6 +2930,7 @@ memtx_tx_clean_txn(struct txn *txn)
 					  in_full_scan_list);
 		memtx_tx_full_scan_item_delete(item);
 	}
+	memtx_tx_story_gc();
 }
 
 static uint32_t
@@ -2992,7 +3002,6 @@ memtx_tx_snapshot_clarify_slow(struct memtx_tx_snapshot_cleaner *cleaner,
 		assert(entry->from == tuple);
 		tuple = entry->to;
 	}
-
 	return tuple;
 }
 

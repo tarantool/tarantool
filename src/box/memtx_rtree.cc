@@ -159,7 +159,9 @@ index_rtree_iterator_next_raw(struct iterator *i, struct tuple **ret)
 		struct index *idx = i->index;
 		struct txn *txn = in_txn();
 		struct space *space = space_by_id(i->space_id);
+/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		*ret = memtx_tx_tuple_clarify(txn, space, *ret, idx, 0);
+/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	} while (*ret == NULL);
 	return 0;
 }
@@ -240,7 +242,9 @@ memtx_rtree_index_get_raw(struct index *base, const char *key,
 			break;
 		struct txn *txn = in_txn();
 		struct space *space = space_by_id(base->def->space_id);
+/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
+/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	} while (*result == NULL);
 	rtree_iterator_destroy(&iterator);
 	return 0;
