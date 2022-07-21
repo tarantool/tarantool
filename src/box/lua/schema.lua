@@ -550,24 +550,25 @@ local function normalize_foreign_key_one(def, error_prefix, is_complex,
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "foreign key: space must be string or number")
     end
+    local field = def.field
     if not is_complex then
-        if type(def.field) ~= 'string' and type(def.field) ~= 'number' then
+        if type(field) ~= 'string' and type(field) ~= 'number' then
             box.error(box.error.ILLEGAL_PARAMS,
                       error_prefix .. "foreign key: field must be string or number")
         end
-        if type(def.field) == 'number' then
+        if type(field) == 'number' then
             -- convert to zero-based index.
-            def.field = def.field - 1
+            field = field - 1
         end
     else
-        if type(def.field) ~= 'table' then
+        if type(field) ~= 'table' then
             box.error(box.error.ILLEGAL_PARAMS,
                       error_prefix .. "foreign key: field must be a table " ..
                       "with local field -> foreign field mapping")
         end
         local count = 0
         local converted = {}
-        for k,v in pairs(def.field) do
+        for k,v in pairs(field) do
             count = count + 1
             if type(k) ~= 'string' and type(k) ~= 'number' then
                 box.error(box.error.ILLEGAL_PARAMS,
@@ -594,7 +595,7 @@ local function normalize_foreign_key_one(def, error_prefix, is_complex,
                       error_prefix .. "foreign key: field must be a table " ..
                       "with local field -> foreign field mapping")
         end
-        def.field = setmap(converted)
+        field = setmap(converted)
     end
     if not box.space[def.space] and not fkey_same_space then
         box.error(box.error.ILLEGAL_PARAMS,
@@ -609,9 +610,9 @@ local function normalize_foreign_key_one(def, error_prefix, is_complex,
         end
     end
     if fkey_same_space then
-        return {field = def.field}
+        return {field = field}
     else
-        return {space = box.space[def.space].id, field = def.field}
+        return {space = box.space[def.space].id, field = field}
     end
 end
 

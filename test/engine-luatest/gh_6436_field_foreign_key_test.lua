@@ -283,7 +283,10 @@ g.test_foreign_key_numeric = function(cg)
                      {name='country_code', type='string',
                       foreign_key={country={space=country.id, field=2}}},
                      {name='name', type='string'} }
+        local fmt_copy = table.deepcopy(fmt)
         local city = box.schema.create_space('city', {engine=engine, format=fmt})
+        -- Check that fmt is not modified by create_space()
+        t.assert_equals(fmt_copy, fmt)
         -- Note that the format was normalized and field converted to zero-based.
         t.assert_equals(city:format(),
                         { { name = "id", type = "unsigned"},
