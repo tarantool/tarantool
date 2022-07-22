@@ -753,6 +753,9 @@ tuple_field_count(struct tuple *tuple)
  *                      with NULL.
  * @param path The path to process.
  * @param path_len The length of the @path.
+ * @param index_base 0 if array element indexes in @a path are
+ *        zero-based (like in C) or 1 if they're one-based (like
+ *        in Lua).
  * @param multikey_idx The multikey index hint - index of
  *                     multikey index key to retrieve when array
  *                     index placeholder "[*]" is met.
@@ -761,7 +764,7 @@ tuple_field_count(struct tuple *tuple)
  */
 int
 tuple_go_to_path(const char **data, const char *path, uint32_t path_len,
-		 int multikey_idx);
+		 int index_base, int multikey_idx);
 
 /**
  * Propagate @a field to MessagePack(field)[index].
@@ -792,8 +795,12 @@ tuple_field_go_to_key(const char **field, const char *key, int len);
  * @param format Tuple format.
  * @param tuple MessagePack tuple's body.
  * @param field_map Tuple field map.
+ * @param fieldno The index of a root field.
  * @param path Relative JSON path to field.
  * @param path_len Length of @a path.
+ * @param index_base 0 if array element indexes in @a path are
+ *        zero-based (like in C) or 1 if they're one-based (like
+ *        in Lua).
  * @param offset_slot_hint The pointer to a variable that contains
  *                         an offset slot. May be NULL.
  *                         If specified AND value by pointer is
@@ -809,7 +816,8 @@ static inline const char *
 tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 			const uint32_t *field_map, uint32_t fieldno,
 			const char *path, uint32_t path_len,
-			int32_t *offset_slot_hint, int multikey_idx)
+			int index_base, int32_t *offset_slot_hint,
+			int multikey_idx)
 {
 	int32_t offset_slot;
 	if (offset_slot_hint != NULL &&
@@ -825,7 +833,7 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 			return tuple;
 		}
 		field = tuple_format_field_by_path(format, fieldno, path,
-						   path_len);
+						   path_len, index_base);
 		assert(field != NULL || path != NULL);
 		if (path != NULL && field == NULL)
 			goto parse;
@@ -871,7 +879,7 @@ parse:
 			mp_next(&tuple);
 		if (path != NULL &&
 		    unlikely(tuple_go_to_path(&tuple, path, path_len,
-					      multikey_idx) != 0))
+					      index_base, multikey_idx) != 0))
 			return NULL;
 	}
 	return tuple;
@@ -949,13 +957,17 @@ tuple_field(struct tuple *tuple, uint32_t fieldno)
  * @param path Full JSON path to field.
  * @param path_len Length of @a path.
  * @param path_hash Hash of @a path.
+ * @param index_base 0 if array element indexes in @a path are
+ *        zero-based (like in C) or 1 if they're one-based (like
+ *        in Lua).
  *
  * @retval field data if field exists or NULL
  */
 const char *
 tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
 			     const uint32_t *field_map, const char *path,
-			     uint32_t path_len, uint32_t path_hash);
+			     uint32_t path_len, uint32_t path_hash,
+			     int index_base);
 
 /**
  * Get a tuple field pointed to by an index part and multikey
@@ -983,6 +995,7 @@ tuple_field_raw_by_part(struct tuple_format *format, const char *data,
 	}
 	return tuple_field_raw_by_path(format, data, field_map, part->fieldno,
 				       part->path, part->path_len,
+				       TUPLE_INDEX_BASE,
 				       &part->offset_slot_cache, multikey_idx);
 }
 

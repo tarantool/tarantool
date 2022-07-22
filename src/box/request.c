@@ -179,7 +179,8 @@ request_handle_sequence(struct request *request, struct space *space)
 	}
 
 	if (path != NULL) {
-		tuple_go_to_path(&key, path, strlen(path), MULTIKEY_NONE);
+		tuple_go_to_path(&key, path, strlen(path), TUPLE_INDEX_BASE,
+				 MULTIKEY_NONE);
 		if (key == NULL)
 			return 0; /* field not found */
 	}
