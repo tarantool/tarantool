@@ -1,0 +1,76 @@
+1..8
+	*** main ***
+    1..4
+	*** test_size ***
+    ok 1 - empty view size before tree change
+    ok 2 - empty view size after tree change
+    ok 3 - non-empty view size before tree change
+    ok 4 - non-empty view size after tree change
+	*** test_size: done ***
+ok 1 - subtests
+    1..2
+	*** test_find ***
+    ok 1 - old values found
+    ok 2 - new values not found
+	*** test_find: done ***
+ok 2 - subtests
+    1..4
+	*** test_first ***
+    ok 1 - empty view first before tree change
+    ok 2 - empty view first after tree change
+    ok 3 - non-empty view first before tree change
+    ok 4 - non-empty view first after tree change
+	*** test_first: done ***
+ok 3 - subtests
+    1..4
+	*** test_last ***
+    ok 1 - empty view last before tree change
+    ok 2 - empty view last after tree change
+    ok 3 - non-empty view last before tree change
+    ok 4 - non-empty view last after tree change
+	*** test_last: done ***
+ok 4 - subtests
+    1..5
+	*** test_lower_bound ***
+    ok 1 - not found
+    ok 2 - found not exact
+    ok 3 - found exact
+    ok 4 - found elem not exact
+    ok 5 - found elem exact
+	*** test_lower_bound: done ***
+ok 5 - subtests
+    1..5
+	*** test_upper_bound ***
+    ok 1 - not found
+    ok 2 - found not exact
+    ok 3 - found exact
+    ok 4 - found elem not exact
+    ok 5 - found elem exact
+	*** test_upper_bound: done ***
+ok 6 - subtests
+    1..4
+	*** test_iterator ***
+    ok 1 - scan forward
+    ok 2 - scan backward
+    ok 3 - next invalid
+    ok 4 - prev invalid
+	*** test_iterator: done ***
+ok 7 - subtests
+    1..13
+	*** test_iterator_is_equal ***
+    ok 1 - invalid - invalid
+    ok 2 - invalid - first
+    ok 3 - invalid - next to first
+    ok 4 - invalid - last
+    ok 5 - invalid - prev to last
+    ok 6 - first - first
+    ok 7 - first - first after get
+    ok 8 - last - last
+    ok 9 - last - last after get
+    ok 10 - first - last
+    ok 11 - next to first - last
+    ok 12 - first - prev to last
+    ok 13 - next to first - prev to last
+	*** test_iterator_is_equal: done ***
+ok 8 - subtests
+	*** main: done ***

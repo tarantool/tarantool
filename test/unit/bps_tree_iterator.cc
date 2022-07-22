@@ -489,10 +489,12 @@ iterator_freeze_check()
 			comp_buf1[comp_buf_size1++] = *e;
 			test_iterator_next(&tree, &iterator);
 		}
-		struct test_iterator iterator1 = test_first(&tree);
-		test_iterator_freeze(&tree, &iterator1);
-		struct test_iterator iterator2 = test_first(&tree);
-		test_iterator_freeze(&tree, &iterator2);
+		struct test_view view1;
+		test_view_create(&view1, &tree);
+		struct test_iterator iterator1 = test_view_first(&view1);
+		struct test_view view2;
+		test_view_create(&view2, &tree);
+		struct test_iterator iterator2 = test_view_first(&view2);
 		for (int j = 0; j < test_data_size; j++) {
 			elem_t e;
 			e.first = rand() % test_data_mod;
@@ -503,7 +505,7 @@ iterator_freeze_check()
 			assert(check == 0);
 		}
 		int tested_count = 0;
-		while ((e = test_iterator_get_elem(&tree, &iterator1))) {
+		while ((e = test_view_iterator_get_elem(&view1, &iterator1))) {
 			if (!equal(*e, comp_buf1[tested_count])) {
 				fail("version restore failed (1)", "true");
 			}
@@ -511,9 +513,9 @@ iterator_freeze_check()
 			if (tested_count > comp_buf_size1) {
 				fail("version restore failed (2)", "true");
 			}
-			test_iterator_next(&tree, &iterator1);
+			test_view_iterator_next(&view1, &iterator1);
 		}
-		test_iterator_destroy(&tree, &iterator1);
+		test_view_destroy(&view1);
 		for (int j = 0; j < test_data_size; j++) {
 			elem_t e;
 			e.first = rand() % test_data_mod;
@@ -525,7 +527,7 @@ iterator_freeze_check()
 		}
 
 		tested_count = 0;
-		while ((e = test_iterator_get_elem(&tree, &iterator2))) {
+		while ((e = test_view_iterator_get_elem(&view2, &iterator2))) {
 			if (!equal(*e, comp_buf1[tested_count])) {
 				fail("version restore failed (1)", "true");
 			}
@@ -533,9 +535,9 @@ iterator_freeze_check()
 			if (tested_count > comp_buf_size1) {
 				fail("version restore failed (2)", "true");
 			}
-			test_iterator_next(&tree, &iterator2);
+			test_view_iterator_next(&view2, &iterator2);
 		}
-
+		test_view_destroy(&view2);
 		test_destroy(&tree);
 	}
 
