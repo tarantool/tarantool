@@ -1,3 +1,3 @@
 ## feature/build
 
-* Bump OpenSSL from 1.1.1f to 1.1.1n for static build (gh-6947).
+* Updated OpenSSL used for static builds to version 1.1.1n. (gh-6947).

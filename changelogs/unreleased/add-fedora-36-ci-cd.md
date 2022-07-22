@@ -1,3 +1,3 @@
 ## feature/build
 
-* Support Fedora-36 build.
+* Fedora 36 is now supported.

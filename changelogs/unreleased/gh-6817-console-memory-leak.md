@@ -1,3 +1,3 @@
 ## bugfix/core
 
-* Fixed memory leak in interactive console (gh-6817).
+* Fixed a memory leak in the interactive console (gh-6817).

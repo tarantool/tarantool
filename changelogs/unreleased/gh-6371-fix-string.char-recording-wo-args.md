@@ -1,4 +1,4 @@
 ## bugfix/luajit
 
-* `string.char()` builtin recording is fixed in case when no arguments are
-  given (gh-6371, gh-6548).
+* Fixed a bug with `string.char()` builtin recording when no arguments are
+  provided (gh-6371, gh-6548).

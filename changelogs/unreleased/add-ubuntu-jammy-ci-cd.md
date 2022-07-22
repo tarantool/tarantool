@@ -1,3 +1,3 @@
 ## feature/build
 
-* Support Ubuntu Jammy (22.04) build.
+* Ubuntu 22.04 (Jammy Jellyfish) is now supported.

@@ -1,3 +1,3 @@
 ## feature/build
 
-* Stop support of Ubuntu Hirsute (21.04) build.
+* Ubuntu 21.04 (Hirsute Hippo) is no longer supported.
