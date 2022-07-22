@@ -554,17 +554,17 @@ compare_with_sptree_check_branches()
 			fail("trees identity", "false");
 	}
 
-	if (tree.debug_insert_leaf_branches_mask !=
-	    tree.debug_insert_leaf_branches_max_mask)
+	if (tree.common.debug_insert_leaf_branches_mask !=
+	    tree.common.debug_insert_leaf_branches_max_mask)
 		fail("not all insert leaf branches was tested", "true");
-	if (tree.debug_insert_inner_branches_mask !=
-	    tree.debug_insert_inner_branches_max_mask)
+	if (tree.common.debug_insert_inner_branches_mask !=
+	    tree.common.debug_insert_inner_branches_max_mask)
 		fail("not all insert inner branches was tested", "true");
-	if (tree.debug_delete_leaf_branches_mask !=
-	    tree.debug_delete_leaf_branches_max_mask)
+	if (tree.common.debug_delete_leaf_branches_mask !=
+	    tree.common.debug_delete_leaf_branches_max_mask)
 		fail("not all delete leaf branches was tested", "true");
-	if (tree.debug_delete_inner_branches_mask !=
-	    tree.debug_delete_inner_branches_max_mask)
+	if (tree.common.debug_delete_inner_branches_mask !=
+	    tree.common.debug_delete_inner_branches_max_mask)
 		fail("not all delete inner branches was tested", "true");
 
 	sptree_test_destroy(&spt_test);

@@ -166,6 +166,18 @@ template <bool USE_HINT>
 using memtx_tree_t = struct memtx_tree_selector<USE_HINT>;
 
 template <bool USE_HINT>
+struct memtx_tree_view_selector;
+
+template <>
+struct memtx_tree_view_selector<false> : NS_NO_HINT::memtx_tree_view {};
+
+template <>
+struct memtx_tree_view_selector<true> : NS_USE_HINT::memtx_tree_view {};
+
+template <bool USE_HINT>
+using memtx_tree_view_t = struct memtx_tree_view_selector<USE_HINT>;
+
+template <bool USE_HINT>
 struct memtx_tree_iterator_selector;
 
 template <>
@@ -209,7 +221,7 @@ template <class TREE>
 static inline struct key_def *
 memtx_tree_cmp_def(TREE *tree)
 {
-	return tree->arg;
+	return tree->common.arg;
 }
 
 template <bool USE_HINT>
@@ -838,8 +850,9 @@ memtx_tree_index_update_def(struct index *base)
 	 * NULLs. To correctly compare these NULLs extended key
 	 * def must be used. For details @sa tuple_compare.cc.
 	 */
-	index->tree.arg = def->opts.is_unique && !def->key_def->is_nullable ?
-						def->key_def : def->cmp_def;
+	index->tree.common.arg = def->opts.is_unique &&
+				 !def->key_def->is_nullable ?
+				 def->key_def : def->cmp_def;
 }
 
 static bool
@@ -1655,6 +1668,7 @@ template <bool USE_HINT>
 struct tree_snapshot_iterator {
 	struct snapshot_iterator base;
 	struct memtx_tree_index<USE_HINT> *index;
+	memtx_tree_view_t<USE_HINT> tree_view;
 	memtx_tree_iterator_t<USE_HINT> tree_iterator;
 	struct memtx_tx_snapshot_cleaner cleaner;
 };
@@ -1666,7 +1680,7 @@ tree_snapshot_iterator_free(struct snapshot_iterator *iterator)
 	assert(iterator->free == &tree_snapshot_iterator_free<USE_HINT>);
 	struct tree_snapshot_iterator<USE_HINT> *it =
 		(struct tree_snapshot_iterator<USE_HINT> *)iterator;
-	memtx_tree_iterator_destroy(&it->index->tree, &it->tree_iterator);
+	memtx_tree_view_destroy(&it->tree_view);
 	index_unref(&it->index->base);
 	memtx_tx_snapshot_cleaner_destroy(&it->cleaner);
 	free(iterator);
@@ -1680,18 +1694,19 @@ tree_snapshot_iterator_next(struct snapshot_iterator *iterator,
 	assert(iterator->free == &tree_snapshot_iterator_free<USE_HINT>);
 	struct tree_snapshot_iterator<USE_HINT> *it =
 		(struct tree_snapshot_iterator<USE_HINT> *)iterator;
-	memtx_tree_t<USE_HINT> *tree = &it->index->tree;
 
 	while (true) {
 		struct memtx_tree_data<USE_HINT> *res =
-			memtx_tree_iterator_get_elem(tree, &it->tree_iterator);
+			memtx_tree_view_iterator_get_elem(&it->tree_view,
+							  &it->tree_iterator);
 
 		if (res == NULL) {
 			*data = NULL;
 			return 0;
 		}
 
-		memtx_tree_iterator_next(tree, &it->tree_iterator);
+		memtx_tree_view_iterator_next(&it->tree_view,
+					      &it->tree_iterator);
 
 		struct tuple *tuple = res->tuple;
 		tuple = memtx_tx_snapshot_clarify(&it->cleaner, tuple);
@@ -1735,8 +1750,8 @@ memtx_tree_index_create_snapshot_iterator(struct index *base)
 	it->base.next = tree_snapshot_iterator_next<USE_HINT>;
 	it->index = index;
 	index_ref(base);
-	it->tree_iterator = memtx_tree_first(&index->tree);
-	memtx_tree_iterator_freeze(&index->tree, &it->tree_iterator);
+	memtx_tree_view_create(&it->tree_view, &index->tree);
+	it->tree_iterator = memtx_tree_view_first(&it->tree_view);
 	return (struct snapshot_iterator *) it;
 }
 
