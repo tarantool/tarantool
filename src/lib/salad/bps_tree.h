@@ -141,6 +141,7 @@
  * int bps_tree_insert_get_iterator(tree, new_elem, replaced_elem,
  * 				    inserted_iterator)
  * int bps_tree_delete(tree, elem);
+ * int bps_tree_delete_value(tree, elem, deleted_elem);
  * size_t bps_tree_size(tree);
  * size_t bps_tree_mem_used(tree);
  * bps_tree_elem_t *bps_tree_random(tree, rnd);
@@ -157,7 +158,7 @@
  * struct bps_tree_iterator bps_tree_upper_bound(tree, key, exact);
  * struct bps_tree_iterator bps_tree_lower_bound_elem(tree, elem, exact);
  * struct bps_tree_iterator bps_tree_upper_bound_elem(tree, elem, exact);
- * size_t bps_tree_approxiamte_count(tree, key);
+ * size_t bps_tree_approximate_count(tree, key);
  * bps_tree_elem_t *bps_tree_iterator_get_elem(tree, itr);
  * bool bps_tree_iterator_next(tree, itr);
  * bool bps_tree_iterator_prev(tree, itr);
@@ -661,9 +662,22 @@ static inline int
 bps_tree_delete(struct bps_tree *tree, bps_tree_elem_t elem);
 
 /**
+ * @brief Delete an identical element from a tree (unlike
+ * bps_tree_delete this routine relies on BPS_TREE_IS_IDENTICAL
+ * instead of BPS_TREE_COMPARE).
+ * @param tree - pointer to a tree
+ * @param elem - the element tot delete
+ * @return - true on success or false if the element was not
+ *           found in tree or is not identical.
+ */
+static inline int
+bps_tree_delete_value(struct bps_tree *tree, bps_tree_elem_t elem,
+		      bps_tree_elem_t *deleted_elem);
+
+/**
  * @brief Get size of tree, i.e. count of elements in tree
  * @param tree - pointer to a tree
- * @return - count count of elements in tree
+ * @return - count of elements in tree
  */
 static inline size_t
 bps_tree_size(const struct bps_tree *tree);
@@ -672,7 +686,7 @@ bps_tree_size(const struct bps_tree *tree);
  * @brief Get amount of memory in bytes that the tree is using
  *  (not including sizeof(struct bps_tree))
  * @param tree - pointer to a tree
- * @return - count count of elements in tree
+ * @return - count of elements in tree
  */
 static inline size_t
 bps_tree_mem_used(const struct bps_tree *tree);
@@ -681,7 +695,7 @@ bps_tree_mem_used(const struct bps_tree *tree);
  * @brief Get a random element in a tree.
  * @param tree - pointer to a tree
  * @param rnd - some random value
- * @return - count count of elements in tree
+ * @return - pointer to a random element or NULL if the tree is empty
  */
 static inline bps_tree_elem_t *
 bps_tree_random(const struct bps_tree *tree, size_t rnd);
@@ -1262,7 +1276,7 @@ bps_tree_destroy(struct bps_tree *tree)
 /**
  * @brief Get size of tree, i.e. count of elements in tree
  * @param tree - pointer to a tree
- * @return - count count of elements in tree
+ * @return - count of elements in tree
  */
 static inline size_t
 bps_tree_size(const struct bps_tree *tree)
@@ -1274,7 +1288,7 @@ bps_tree_size(const struct bps_tree *tree)
  * @brief Get amount of memory in bytes that the tree is using
  *  (not including sizeof(struct bps_tree))
  * @param tree - pointer to a tree
- * @return - count count of elements in tree
+ * @return - count of elements in tree
  */
 static inline size_t
 bps_tree_mem_used(const struct bps_tree *tree)
@@ -1325,7 +1339,7 @@ bps_tree_touch_block(struct bps_tree *tree, bps_tree_block_id_t id)
  * @brief Get a random element in a tree.
  * @param tree - pointer to a tree
  * @param rnd - some random value
- * @return - count count of elements in tree
+ * @return - pointer to a random element or NULL if the tree is empty
  */
 static inline bps_tree_elem_t *
 bps_tree_random(const struct bps_tree *tree, size_t rnd)
