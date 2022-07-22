@@ -300,7 +300,7 @@ tuple_format_field_count(struct tuple_format *format)
  */
 static inline struct tuple_field *
 tuple_format_field_by_path(struct tuple_format *format, uint32_t fieldno,
-			   const char *path, uint32_t path_len)
+			   const char *path, uint32_t path_len, int index_base)
 {
 	assert(fieldno < tuple_format_field_count(format));
 	struct json_token token;
@@ -313,7 +313,7 @@ tuple_format_field_by_path(struct tuple_format *format, uint32_t fieldno,
 	if (path == NULL)
 		return root;
 	return json_tree_lookup_path_entry(&format->fields, &root->token,
-					   path, path_len, TUPLE_INDEX_BASE,
+					   path, path_len, index_base,
 					   struct tuple_field, token);
 }
 
@@ -324,7 +324,7 @@ tuple_format_field_by_path(struct tuple_format *format, uint32_t fieldno,
 static inline struct tuple_field *
 tuple_format_field(struct tuple_format *format, uint32_t fieldno)
 {
-	return tuple_format_field_by_path(format, fieldno, NULL, 0);
+	return tuple_format_field_by_path(format, fieldno, NULL, 0, 0);
 }
 
 extern struct tuple_format **tuple_formats;
