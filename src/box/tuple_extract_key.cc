@@ -329,6 +329,7 @@ tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
 		const char *src_end = field_end;
 		if (has_json_paths && part->path != NULL) {
 			if (tuple_go_to_path(&src, part->path, part->path_len,
+					     TUPLE_INDEX_BASE,
 					     multikey_idx) != 0) {
 				/*
 				 * The path must be correct as
