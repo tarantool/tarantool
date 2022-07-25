@@ -293,14 +293,10 @@ memtx_hash_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 	struct light_index_core *hash_table = &index->hash_table;
 
 	*result = NULL;
-	if (hash_table->count == 0)
+	uint32_t k = light_index_random(hash_table, rnd);
+	if (k == light_index_end)
 		return 0;
-	rnd %= (hash_table->table_size);
-	while (!light_index_pos_valid(hash_table, rnd)) {
-		rnd++;
-		rnd %= (hash_table->table_size);
-	}
-	*result = light_index_get(hash_table, rnd);
+	*result = light_index_get(hash_table, k);
 	return memtx_prepare_result_tuple(result);
 }
 
