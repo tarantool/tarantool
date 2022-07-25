@@ -286,13 +286,13 @@ static inline LIGHT_DATA_TYPE
 LIGHT(get)(struct LIGHT(core) *ht, uint32_t slotpos);
 
 /**
- * @brief Determine if posision holds a value
+ * @brief Get a random record
  * @param ht - pointer to a hash table struct
- * @param slotpos - ID of an record
- *  ID must be in valid range [0, ht->table_size) (asserted).
+ * @param rnd - some random value
+ * @return integer ID of random record or light_end if table is empty
  */
-static inline bool
-LIGHT(pos_valid)(struct LIGHT(core) *ht, uint32_t slotpos);
+static inline uint32_t
+LIGHT(random)(const struct LIGHT(core) *ht, uint32_t rnd);
 
 /**
  * @brief Set iterator to the beginning of hash table
@@ -983,18 +983,26 @@ LIGHT(get)(struct LIGHT(core) *ht, uint32_t slotpos)
 }
 
 /**
- * @brief Determine if posision holds a value
+ * @brief Get a random record
  * @param ht - pointer to a hash table struct
- * @param slotpos - ID of an record
- *  ID must be in valid range [0, ht->table_size) (asserted).
+ * @param rnd - some random value
+ * @return integer ID of random record or light_end if table is empty
  */
-static inline bool
-LIGHT(pos_valid)(struct LIGHT(core) *ht, uint32_t slotpos)
+static inline uint32_t
+LIGHT(random)(const struct LIGHT(core) *ht, uint32_t rnd)
 {
-	assert(slotpos < ht->table_size);
-	struct LIGHT(record) *record = (struct LIGHT(record) *)
-		matras_get(&ht->mtable, slotpos);
-	return record->next != slotpos;
+	if (ht->count == 0)
+		return LIGHT(end);
+	rnd %= (ht->table_size);
+	while (true) {
+		struct LIGHT(record) *record = (struct LIGHT(record) *)
+			matras_get(&ht->mtable, rnd);
+		if (record->next != rnd)
+			break;
+		rnd++;
+		rnd %= (ht->table_size);
+	}
+	return rnd;
 }
 
 /**
