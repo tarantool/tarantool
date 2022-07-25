@@ -269,7 +269,7 @@ memtx_hash_index_size(struct index *base)
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct space *space = space_by_id(base->def->space_id);
 	/* Substract invisible count. */
-	return index->hash_table.count -
+	return light_index_count(&index->hash_table) -
 	       memtx_tx_index_invisible_count(in_txn(), space, base);
 }
 
@@ -288,7 +288,7 @@ memtx_hash_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 	struct light_index_core *hash_table = &index->hash_table;
 
 	*result = NULL;
-	if (hash_table->count == 0)
+	if (light_index_count(hash_table) == 0)
 		return 0;
 	rnd %= (hash_table->table_size);
 	while (!light_index_pos_valid(hash_table, rnd)) {
@@ -358,7 +358,8 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 		});
 
 		if (pos == light_index_end) {
-			diag_set(OutOfMemory, (ssize_t)hash_table->count,
+			diag_set(OutOfMemory,
+				 (ssize_t)light_index_count(hash_table),
 				 "hash_table", "key");
 			return -1;
 		}

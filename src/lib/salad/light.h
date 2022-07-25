@@ -207,6 +207,14 @@ static inline void
 LIGHT(destroy)(struct LIGHT(core) *ht);
 
 /**
+ * @brief Number of records stored in hash table
+ * @param ht - pointer to a hash table struct
+ * @return number of records
+ */
+static inline uint32_t
+LIGHT(count)(struct LIGHT(core) *ht);
+
+/**
  * @brief Find a record with given hash and value
  * @param ht - pointer to a hash table struct
  * @param hash - hash to find
@@ -370,6 +378,17 @@ static inline void
 LIGHT(destroy)(struct LIGHT(core) *ht)
 {
 	matras_destroy(&ht->mtable);
+}
+
+/**
+ * @brief Number of records stored in hash table
+ * @param ht - pointer to a hash table struct
+ * @return number of records
+ */
+static inline uint32_t
+LIGHT(count)(struct LIGHT(core) *ht)
+{
+	return ht->count;
 }
 
 /**

@@ -96,7 +96,7 @@ simple_test()
 				light_delete(&ht, fnd);
 			}
 
-			if (count != ht.count)
+			if (count != light_count(&ht))
 				fail("count check failed!", "true");
 
 			bool identical = true;
@@ -160,7 +160,7 @@ collision_test()
 				light_delete(&ht, fnd);
 			}
 
-			if (count != ht.count)
+			if (count != light_count(&ht))
 				fail("count check failed!", "true");
 
 			bool identical = true;
