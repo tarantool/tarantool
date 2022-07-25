@@ -408,6 +408,24 @@ LIGHT(slot)(const struct LIGHT(core) *ht, uint32_t hash)
 }
 
 /**
+ * Get a record stored at the given hash table slot for read.
+ */
+static inline struct LIGHT(record) *
+LIGHT(get_record)(const struct LIGHT(core) *ht, uint32_t slot)
+{
+	return (struct LIGHT(record) *)matras_get(&ht->mtable, slot);
+}
+
+/**
+ * Get a record stored at the given hash table slot for update.
+ */
+static inline struct LIGHT(record) *
+LIGHT(touch_record)(struct LIGHT(core) *ht, uint32_t slot)
+{
+	return (struct LIGHT(record) *)matras_touch(&ht->mtable, slot);
+}
+
+/**
  * @brief Find a record with given hash and value
  * @param ht - pointer to a hash table struct
  * @param hash - hash to find
@@ -420,8 +438,7 @@ LIGHT(find)(const struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE value)
 	if (ht->count == 0)
 		return LIGHT(end);
 	uint32_t slot = LIGHT(slot)(ht, hash);
-	struct LIGHT(record) *record = (struct LIGHT(record) *)
-		matras_get(&ht->mtable, slot);
+	struct LIGHT(record) *record = LIGHT(get_record)(ht, slot);
 	if (record->next == slot)
 		return LIGHT(end);
 	while (1) {
@@ -431,8 +448,7 @@ LIGHT(find)(const struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE value)
 		slot = record->next;
 		if (slot == LIGHT(end))
 			return LIGHT(end);
-		record = (struct LIGHT(record) *)
-			matras_get(&ht->mtable, slot);
+		record = LIGHT(get_record)(ht, slot);
 	}
 	/* unreachable */
 	return LIGHT(end);
@@ -451,8 +467,7 @@ LIGHT(find_key)(const struct LIGHT(core) *ht, uint32_t hash, LIGHT_KEY_TYPE key)
 	if (ht->count == 0)
 		return LIGHT(end);
 	uint32_t slot = LIGHT(slot)(ht, hash);
-	struct LIGHT(record) *record = (struct LIGHT(record) *)
-		matras_get(&ht->mtable, slot);
+	struct LIGHT(record) *record = LIGHT(get_record)(ht, slot);
 	if (record->next == slot)
 		return LIGHT(end);
 	while (1) {
@@ -462,8 +477,7 @@ LIGHT(find_key)(const struct LIGHT(core) *ht, uint32_t hash, LIGHT_KEY_TYPE key)
 		slot = record->next;
 		if (slot == LIGHT(end))
 			return LIGHT(end);
-		record = (struct LIGHT(record) *)
-			matras_get(&ht->mtable, slot);
+		record = LIGHT(get_record)(ht, slot);
 	}
 	/* unreachable */
 	return LIGHT(end);
@@ -484,15 +498,13 @@ LIGHT(replace)(struct LIGHT(core) *ht, uint32_t hash,
 	if (ht->count == 0)
 		return LIGHT(end);
 	uint32_t slot = LIGHT(slot)(ht, hash);
-	struct LIGHT(record) *record = (struct LIGHT(record) *)
-		matras_get(&ht->mtable, slot);
+	struct LIGHT(record) *record = LIGHT(get_record)(ht, slot);
 	if (record->next == slot)
 		return LIGHT(end);
 	while (1) {
 		if (record->hash == hash
 		    && LIGHT_EQUAL((record->value), (value), (ht->arg))) {
-			record = (struct LIGHT(record) *)
-				matras_touch(&ht->mtable, slot);
+			record = LIGHT(touch_record)(ht, slot);
 			if (!record)
 				return LIGHT(end);
 			*replaced = record->value;
@@ -502,8 +514,7 @@ LIGHT(replace)(struct LIGHT(core) *ht, uint32_t hash,
 		slot = record->next;
 		if (slot == LIGHT(end))
 			return LIGHT(end);
-		record = (struct LIGHT(record) *)
-			matras_get(&ht->mtable, slot);
+		record = LIGHT(get_record)(ht, slot);
 	}
 	/* unreachable */
 	return LIGHT(end);
@@ -560,8 +571,8 @@ LIGHT(enqueue_empty)(struct LIGHT(core) *ht, uint32_t slot,
 {
 	record->next = slot;
 	if (ht->empty_slot != LIGHT(end)) {
-		struct LIGHT(record) *empty_record = (struct LIGHT(record) *)
-			matras_touch(&ht->mtable, ht->empty_slot);
+		struct LIGHT(record) *empty_record =
+			LIGHT(touch_record)(ht, ht->empty_slot);
 		if (!empty_record)
 			return -1;
 		LIGHT(set_empty_prev)(empty_record, slot);
@@ -581,17 +592,16 @@ static inline struct LIGHT(record) *
 LIGHT(detach_first_empty)(struct LIGHT(core) *ht)
 {
 	assert(ht->empty_slot != LIGHT(end));
-	struct LIGHT(record) *empty_record = (struct LIGHT(record) *)
-		matras_touch(&ht->mtable, ht->empty_slot);
+	struct LIGHT(record) *empty_record =
+		LIGHT(touch_record)(ht, ht->empty_slot);
 	if (!empty_record)
 		return 0;
-	assert(empty_record == (struct LIGHT(record) *)
-		       matras_get(&ht->mtable, ht->empty_slot));
+	assert(empty_record == LIGHT(get_record)(ht, ht->empty_slot));
 	assert(empty_record->next == ht->empty_slot);
 	uint32_t new_empty_slot = LIGHT(get_empty_next)(empty_record);
 	if (new_empty_slot != LIGHT(end)) {
-		struct LIGHT(record) *new_empty_record = (struct LIGHT(record) *)
-			matras_touch(&ht->mtable, new_empty_slot);
+		struct LIGHT(record) *new_empty_record =
+			LIGHT(touch_record)(ht, new_empty_slot);
 		if (!new_empty_record)
 			return 0;
 		LIGHT(set_empty_prev)(new_empty_record, LIGHT(end));
@@ -608,23 +618,20 @@ LIGHT(detach_first_empty)(struct LIGHT(core) *ht)
 static inline struct LIGHT(record) *
 LIGHT(detach_empty)(struct LIGHT(core) *ht, uint32_t slot)
 {
-	struct LIGHT(record) *record = (struct LIGHT(record) *)
-		matras_touch(&ht->mtable, slot);
+	struct LIGHT(record) *record = LIGHT(touch_record)(ht, slot);
 	if (!record)
 		return 0;
 	uint32_t prev_slot = LIGHT(get_empty_prev)(record);
 	uint32_t next_slot = LIGHT(get_empty_next)(record);
 	struct LIGHT(record) *prev_record = 0;
 	if (prev_slot != LIGHT(end)) {
-		prev_record = (struct LIGHT(record) *)
-			matras_touch(&ht->mtable, prev_slot);
+		prev_record = LIGHT(touch_record)(ht, prev_slot);
 		if (!prev_record)
 			return 0;
 	}
 	struct LIGHT(record) *next_record = 0;
 	if (next_slot != LIGHT(end)) {
-		next_record = (struct LIGHT(record) *)
-			matras_touch(&ht->mtable, next_slot);
+		next_record = LIGHT(touch_record)(ht, next_slot);
 		if (!next_record)
 			return 0;
 	}
@@ -680,8 +687,7 @@ LIGHT(grow)(struct LIGHT(core) *ht)
 		matras_alloc_range(&ht->mtable, &new_slot, LIGHT_GROW_INCREMENT);
 	if (!new_record) /* memory failure */
 		return -1;
-	new_record = (struct LIGHT(record) *)
-		matras_touch(&ht->mtable, new_slot);
+	new_record = LIGHT(touch_record)(ht, new_slot);
 	if (!new_record) { /* memory failure */
 		matras_dealloc_range(&ht->mtable, LIGHT_GROW_INCREMENT);
 		return -1;
@@ -695,9 +701,7 @@ LIGHT(grow)(struct LIGHT(core) *ht)
 	uint32_t split_diff_mask = ht->cover_mask ^ split_comm_mask;
 
 	uint32_t susp_slot = new_slot & split_comm_mask;
-	struct LIGHT(record) *susp_record = (struct LIGHT(record) *)
-		matras_touch(&ht->mtable, susp_slot);
-
+	struct LIGHT(record) *susp_record = LIGHT(touch_record)(ht, susp_slot);
 	if (!susp_record) {
 		matras_dealloc_range(&ht->mtable, LIGHT_GROW_INCREMENT);
 		ht->cover_mask = save_cover_mask;
@@ -735,9 +739,8 @@ LIGHT(grow)(struct LIGHT(core) *ht)
 					     & ((uint32_t)1);
 			if (test_flag != prev_flag) {
 				if (prev_slot != LIGHT(end))
-					prev_record = (struct LIGHT(record) *)
-					matras_touch(&ht->mtable,
-							     prev_slot);
+					prev_record = LIGHT(touch_record)(
+								ht, prev_slot);
 					/* TODO: check the result */
 				chain_tail[prev_flag] = prev_record;
 				if (chain_tail[test_flag]) {
@@ -753,16 +756,14 @@ LIGHT(grow)(struct LIGHT(core) *ht)
 			test_slot = test_record->next;
 			if (test_slot == LIGHT(end))
 				break;
-			test_record = (struct LIGHT(record) *)
-				matras_get(&ht->mtable, test_slot);
+			test_record = LIGHT(get_record)(ht, test_slot);
 		}
 		prev_flag = prev_flag ^ ((uint32_t)1);
 		if (chain_tail[prev_flag])
 			chain_tail[prev_flag]->next = LIGHT(end);
 
 		struct LIGHT(record) *last_empty_record =
-			(struct LIGHT(record) *)
-			matras_touch(&ht->mtable, last_empty_slot);
+			LIGHT(touch_record)(ht, last_empty_slot);
 		LIGHT(enqueue_empty)(ht, last_empty_slot, last_empty_record);
 	}
 	return 0;
@@ -788,8 +789,7 @@ LIGHT(insert)(struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE value)
 
 	ht->count++;
 	uint32_t slot = LIGHT(slot)(ht, hash);
-	struct LIGHT(record) *record = (struct LIGHT(record) *)
-		matras_touch(&ht->mtable, slot);
+	struct LIGHT(record) *record = LIGHT(touch_record)(ht, slot);
 	if (!record)
 		return LIGHT(end);
 
@@ -807,15 +807,12 @@ LIGHT(insert)(struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE value)
 	uint32_t chain_slot = LIGHT(slot)(ht, record->hash);
 	struct LIGHT(record) *chain = 0;
 	if (chain_slot != slot) {
-		chain = (struct LIGHT(record) *)
-			matras_get(&ht->mtable, chain_slot);
+		chain = LIGHT(get_record)(ht, chain_slot);
 		while (chain->next != slot) {
 			chain_slot = chain->next;
-			chain = (struct LIGHT(record) *)
-				matras_get(&ht->mtable, chain_slot);
+			chain = LIGHT(get_record)(ht, chain_slot);
 		}
-		chain = (struct LIGHT(record) *)
-			matras_touch(&ht->mtable, chain_slot);
+		chain = LIGHT(touch_record)(ht, chain_slot);
 		if (!chain)
 			return LIGHT(end);
 	}
@@ -855,19 +852,17 @@ LIGHT(delete)(struct LIGHT(core) *ht, uint32_t slot)
 	assert(slot < ht->table_size);
 	uint32_t empty_slot;
 	struct LIGHT(record) *empty_record;
-	struct LIGHT(record) *record = (struct LIGHT(record) *)
-		matras_touch(&ht->mtable, slot);
+	struct LIGHT(record) *record = LIGHT(touch_record)(ht, slot);
 	if (!record)
 		return -1;
 	assert(record->next != slot);
 	if (ht->empty_slot != LIGHT(end)) {
-		if (!matras_touch(&ht->mtable, ht->empty_slot))
+		if (!LIGHT(touch_record)(ht, ht->empty_slot))
 			return -1;
 	}
 	if (record->next != LIGHT(end)) {
 		empty_slot = record->next;
-		empty_record = (struct LIGHT(record) *)
-			matras_touch(&ht->mtable, empty_slot);
+		empty_record = LIGHT(touch_record)(ht, empty_slot);
 		if (!empty_record)
 			return -1;
 		*record = *empty_record;
@@ -877,19 +872,17 @@ LIGHT(delete)(struct LIGHT(core) *ht, uint32_t slot)
 		uint32_t chain_slot = LIGHT(slot)(ht, record->hash);
 		if (chain_slot != slot) {
 			/* deleting a last record of chain */
-			struct LIGHT(record) *chain = (struct LIGHT(record) *)
-				matras_get(&ht->mtable, chain_slot);
+			struct LIGHT(record) *chain =
+				LIGHT(get_record)(ht, chain_slot);
 			uint32_t chain_next_slot = chain->next;
 			assert(chain_next_slot != LIGHT(end));
 			while (chain_next_slot != slot) {
 				chain_slot = chain_next_slot;
-				chain = (struct LIGHT(record) *)
-					matras_get(&ht->mtable, chain_slot);
+				chain = LIGHT(get_record)(ht, chain_slot);
 				chain_next_slot = chain->next;
 				assert(chain_next_slot != LIGHT(end));
 			}
-			chain = (struct LIGHT(record) *)
-				matras_touch(&ht->mtable, chain_slot);
+			chain = LIGHT(touch_record)(ht, chain_slot);
 			if (!chain)
 				return -1;
 			chain->next = LIGHT(end);
@@ -913,8 +906,7 @@ LIGHT(delete_value)(struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE value
 	if (ht->count == 0)
 		return 1; /* not found */
 	uint32_t slot = LIGHT(slot)(ht, hash);
-	struct LIGHT(record) *record = (struct LIGHT(record) *)
-		matras_get(&ht->mtable, slot);
+	struct LIGHT(record) *record = LIGHT(get_record)(ht, slot);
 	if (record->next == slot)
 		return 1; /* not found */
 	uint32_t prev_slot = LIGHT(end);
@@ -928,21 +920,18 @@ LIGHT(delete_value)(struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE value
 		if (slot == LIGHT(end))
 			return 1; /* not found */
 		prev_record = record;
-		record = (struct LIGHT(record) *)
-			matras_get(&ht->mtable, slot);
+		record = LIGHT(get_record)(ht, slot);
 	}
-	record = (struct LIGHT(record) *)
-		matras_touch(&ht->mtable, slot);
+	record = LIGHT(touch_record)(ht, slot);
 	if (!record) {
 		return -1; /* mem fail */
 	}
 	if (ht->empty_slot != LIGHT(end)) {
-		if (!matras_touch(&ht->mtable, ht->empty_slot))
+		if (!LIGHT(touch_record)(ht, ht->empty_slot))
 			return -1; /* mem fail */
 	}
 	if (prev_record) {
-		prev_record = (struct LIGHT(record) *)
-			matras_touch(&ht->mtable, prev_slot);
+		prev_record = LIGHT(touch_record)(ht, prev_slot);
 		if (!prev_record)
 			return -1; /* mem fail */
 		prev_record->next = record->next;
@@ -956,8 +945,7 @@ LIGHT(delete_value)(struct LIGHT(core) *ht, uint32_t hash, LIGHT_DATA_TYPE value
 		return 0;
 	}
 	uint32_t next_slot = record->next;
-	struct LIGHT(record) *next_record = (struct LIGHT(record) *)
-		matras_touch(&ht->mtable, next_slot);
+	struct LIGHT(record) *next_record = LIGHT(touch_record)(ht, next_slot);
 	if (!next_record)
 		return -1; /* mem fail */
 	*record = *next_record;
@@ -976,8 +964,7 @@ static inline LIGHT_DATA_TYPE
 LIGHT(get)(struct LIGHT(core) *ht, uint32_t slotpos)
 {
 	assert(slotpos < ht->table_size);
-	struct LIGHT(record) *record = (struct LIGHT(record) *)
-		matras_get(&ht->mtable, slotpos);
+	struct LIGHT(record) *record = LIGHT(get_record)(ht, slotpos);
 	assert(record->next != slotpos);
 	return record->value;
 }
@@ -995,8 +982,7 @@ LIGHT(random)(const struct LIGHT(core) *ht, uint32_t rnd)
 		return LIGHT(end);
 	rnd %= (ht->table_size);
 	while (true) {
-		struct LIGHT(record) *record = (struct LIGHT(record) *)
-			matras_get(&ht->mtable, rnd);
+		struct LIGHT(record) *record = LIGHT(get_record)(ht, rnd);
 		if (record->next != rnd)
 			break;
 		rnd++;
@@ -1097,8 +1083,8 @@ LIGHT(selfcheck)(const struct LIGHT(core) *ht)
 	uint32_t empty_slot = ht->empty_slot;
 	uint32_t prev_empty_slot = LIGHT(end);
 	while (empty_slot != LIGHT(end)) {
-		struct LIGHT(record) *empty_record = (struct LIGHT(record) *)
-			matras_get(&ht->mtable, empty_slot);
+		struct LIGHT(record) *empty_record =
+			LIGHT(get_record)(ht, empty_slot);
 		if (empty_record->next != empty_slot)
 			res |= 2048;
 		if (LIGHT(get_empty_prev)(empty_record) != prev_empty_slot)
@@ -1107,14 +1093,12 @@ LIGHT(selfcheck)(const struct LIGHT(core) *ht)
 		empty_slot = LIGHT(get_empty_next)(empty_record);
 	}
 	for (uint32_t i = 0; i < ht->table_size; i++) {
-		struct LIGHT(record) *record = (struct LIGHT(record) *)
-			matras_get(&ht->mtable, i);
+		struct LIGHT(record) *record = LIGHT(get_record)(ht, i);
 		if (record->next == i) {
 			uint32_t empty_slot = ht->empty_slot;
 			while (empty_slot != LIGHT(end) && empty_slot != i) {
 				struct LIGHT(record) *empty_record =
-					(struct LIGHT(record) *)
-					matras_get(&ht->mtable, empty_slot);
+					LIGHT(get_record)(ht, empty_slot);
 				empty_slot = LIGHT(get_empty_next)(empty_record);
 			}
 			if (empty_slot != i)
@@ -1128,8 +1112,7 @@ LIGHT(selfcheck)(const struct LIGHT(core) *ht)
 			uint32_t chain_start_slot = slot;
 			do {
 				struct LIGHT(record) *chain_record =
-					(struct LIGHT(record) *)
-					matras_get(&ht->mtable, chain_slot);
+					LIGHT(get_record)(ht, chain_slot);
 				chain_slot = chain_record->next;
 				if (chain_slot >= ht->table_size) {
 					res |= 16; /* out of bounds (1) */
@@ -1149,8 +1132,7 @@ LIGHT(selfcheck)(const struct LIGHT(core) *ht)
 		} else {
 			do {
 				struct LIGHT(record) *record =
-					(struct LIGHT(record) *)
-					matras_get(&ht->mtable, slot);
+					LIGHT(get_record)(ht, slot);
 				if (LIGHT(slot)(ht, record->hash) != i)
 					res |= 2; /* wrong value in chain */
 				slot = record->next;
