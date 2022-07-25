@@ -753,6 +753,27 @@ g.test_default_body_decoders = function(_)
     t.assert_equals(type(httpc.decoders['application/msgpack']), 'function')
 end
 
+-- Each of the httpc instance contains an independent copy of decoders table.
+g.test_body_decoders = function(_)
+    local mime_type = "application/yaml"
+
+    local httpc1 = client:new()
+    t.assert_equals(type(httpc1.decoders), 'table')
+    t.assert_not_equals(httpc1.decoders[mime_type], nil)
+    httpc1.decoders[mime_type] = nil
+
+    local httpc2 = client:new()
+    t.assert_not_equals(httpc2.decoders[mime_type], nil)
+end
+
+g.test_default_body_decoders = function(_)
+    local httpc = client:new()
+    t.assert_equals(type(httpc.decoders), 'table')
+    t.assert_equals(type(httpc.decoders['application/json']), 'function')
+    t.assert_equals(type(httpc.decoders['application/yaml']), 'function')
+    t.assert_equals(type(httpc.decoders['application/msgpack']), 'function')
+end
+
 g.test_encode_body_method_post_content_type_camelcase = function(cg)
     local url = cg.url
     local content_type = 'Application/JSON'
@@ -845,4 +866,37 @@ g.test_encode_body_method_patch = function(cg)
     t.assert_equals(r.status, 200, 'HTTP code is not 200')
     t.assert_equals(r.body, json.encode(body))
     t.assert_equals(r.headers['content_type'], 'application/json')
+end
+
+g.test_decode_body = function(cg)
+    local url = cg.url
+    local opts = table.deepcopy(cg.opts)
+    opts.headers = {
+        ['content-type'] = 'application/json'
+    }
+    local body = {
+        Moscow = 1,
+    }
+    local http = client:new()
+    local r, _ = http:post(url, body, opts)
+    t.assert_equals(r.status, 200, 'HTTP code is not 200')
+    t.assert_equals(r.headers['content_type'], 'application/json')
+    t.assert_equals(r:decode(), body)
+end
+
+g.test_decode_body_with_content_type_camel_case = function(cg)
+    local url = cg.url
+    local content_type = 'Application/JSON' -- Camel case.
+    local opts = table.deepcopy(cg.opts)
+    opts.headers = {
+        ['content-type'] = content_type,
+    }
+    local body = {
+        Moscow = 1,
+    }
+    local http = client:new()
+    local r, _ = http:post(url, body, opts)
+    t.assert_equals(r.status, 200, 'HTTP code is not 200')
+    t.assert_equals(r.headers['content_type'], content_type)
+    t.assert_equals(r:decode(), body)
 end
