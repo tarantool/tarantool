@@ -46,6 +46,12 @@ local encoders = {
     ['application/msgpack'] = function(body, _content_type) return msgpack.encode(body) end,
 }
 
+local decoders = {
+    ['application/json'] = function(body, _content_type) return json.decode(body) end,
+    ['application/yaml'] = function(body, _content_type) return yaml.decode(body) end,
+    ['application/msgpack'] = function(body, _content_type) return msgpack.decode(body) end,
+}
+
 --
 --  <http> - create a new curl instance.
 --
@@ -69,6 +75,7 @@ local http_new = function(opts)
     return setmetatable({
         curl = curl,
         encoders = table.copy(encoders),
+        decoders = table.copy(decoders),
     }, curl_mt)
 end
 
@@ -319,6 +326,38 @@ local function encode_body(body, content_type, encoders)
     return raw_body
 end
 
+local default_decoder = function(raw_body, _content_type)
+    return json.decode(raw_body)
+end
+
+local function decode_body(response)
+    if response.body == nil then
+        error('Unable to decode body: body is empty')
+    end
+    local headers = response.headers or {}
+    local content_type = get_icase(headers, 'content-type')
+    local mime_type = extract_mime_type(content_type)
+    local decoder = default_decoder
+    if mime_type ~= nil then
+        mime_type = string_lower(mime_type)
+        decoder = response.decoders[mime_type]
+    end
+    if decoder == nil then
+        local msg = 'Unable to decode body: decode function is not found (%s)'
+        error(msg:format(content_type))
+    end
+    if type(decoder) ~= 'function' then
+        local msg = 'Unable to decode body: decode function is not a function (%s)'
+        error(msg:format(content_type))
+    end
+    local ok, res = pcall(decoder, response.body, content_type)
+    if not ok then
+        error(('Unable to decode body: %s'):format(res))
+    end
+
+    return res
+end
+
 --
 --  <request> This function does HTTP request
 --
@@ -435,7 +474,11 @@ curl_mt = {
                 resp.headers = process_headers(resp.headers)
             end
 
-            return resp
+            return setmetatable(resp, {
+                __index = {
+                    decode = decode_body,
+                },
+            })
         end,
 
         --
@@ -553,9 +596,11 @@ local http_default = http_new()
 local this_module = {
     new = http_new,
     encoders = table.copy(encoders),
+    decoders = table.copy(decoders),
     _internal = {
         default_content_type = default_content_type,
         encode_body = encode_body,
+        decode_body = decode_body,
         extract_mime_type = extract_mime_type,
         get_icase = get_icase,
     }

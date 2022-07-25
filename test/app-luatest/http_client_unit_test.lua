@@ -19,6 +19,7 @@ local driver = package.loaded.http.client -- luacheck: no unused
 
 local httpc = require("src.lua.httpc")
 local encode_body = httpc._internal.encode_body
+local decode_body = httpc._internal.decode_body
 local extract_mime_type = httpc._internal.extract_mime_type
 local get_icase = httpc._internal.get_icase
 local default_content_type = httpc._internal.default_content_type
@@ -27,6 +28,12 @@ local encoders = {
     ['application/json'] = function(body, _content_type) return json.encode(body) end,
     ['application/yaml'] = function(body, _content_type) return yaml.encode(body) end,
     ['application/msgpack'] = function(body, _content_type) return msgpack.encode(body) end,
+}
+
+local decoders = {
+    ['application/json'] = function(body, _content_type) return json.decode(body) end,
+    ['application/yaml'] = function(body, _content_type) return yaml.decode(body) end,
+    ['application/msgpack'] = function(body, _content_type) return msgpack.decode(body) end,
 }
 
 ffi.cdef[[
@@ -151,6 +158,136 @@ g.test_unit_encode_body_broken_encoder = function(cg)
     local ok, err = pcall(encode_body, body, content_type, encoders)
     t.assert_equals(ok, false)
     t.assert_str_contains(err, "Unable to encode body: Function is broken")
+end
+
+local body_decode_testcases = {
+    -- Fields: body, content_type, raw_body.
+    { { a = 1 }, "application/json", json.encode({ a = 1 }) },
+    { { a = 2 }, "application/msgpack", msgpack.encode({ a = 2 }) },
+    { { a = 3 }, "application/yaml", yaml.encode({ a = 3 }) },
+    { { a = 4 }, "application/json; charset=utf-8", json.encode({ a = 4 }) },
+    { { b = 5 }, "  application/json  ; charset=utf-8", json.encode({ b = 5 }) },
+}
+
+g.test_unit_decode_body = function(_)
+    for _, tc in pairs(body_decode_testcases) do
+        local body = tc[1]
+        local content_type = tc[2]
+        local raw_body = tc[3]
+        local resp = {
+            body = raw_body,
+            headers = {
+                ["content-type"] = content_type,
+            },
+            decoders = decoders,
+        }
+        local res = decode_body(resp)
+        t.assert_equals(res, body)
+    end
+end
+
+g.test_unit_decode_body_content_type_passed = function(_)
+    local content_type = "application/json; charset=utf-8"
+    local resp = {
+        body = "",
+        headers = {
+            ["content-type"] = content_type,
+        },
+        decoders = {
+            ['application/json'] = function(body, type_value)
+                assert(type_value == content_type)
+                return json.decode(body)
+            end,
+        },
+    }
+    local ok, err = pcall(decode_body, resp)
+    t.assert_equals(ok, false)
+    t.assert_not_str_contains(err, "assertion failed")
+end
+
+g.test_unit_decode_body_default_decoder_body_is_not_json = function(_)
+    local resp = {
+        body = "I am not a JSON body",
+        headers = {
+            ["content-type"] = nil,
+        }
+    }
+    local ok, res = pcall(decode_body, resp)
+    t.assert_equals(ok, false)
+    -- luacheck: ignore
+    t.assert_str_contains(res, "Unable to decode body: Expected value but found invalid token on")
+end
+
+g.test_unit_decode_body_default_decoder_body_is_json = function(_)
+    local resp = {
+        body = json.encode({ b = 6, c = 10 }),
+        headers = {
+            ["content-type"] = nil,
+        }
+    }
+    local res = decode_body(resp)
+    t.assert_items_equals(res, json.decode(resp.body))
+end
+
+g.test_unit_decode_body_unknown_decoder = function(_)
+    local resp = {
+        body = "Hey, I'm a body",
+        headers = {
+            ["content-type"] = "application/unknown",
+        },
+        decoders = decoders,
+    }
+    local ok, err = pcall(decode_body, resp)
+    t.assert_equals(ok, false)
+    t.assert_str_contains(err, "Unable to decode body: decode function is not found (application/unknown)")
+end
+
+g.before_test("test_unit_decode_body_custom_decoder", function()
+    decoders["application/tarantool"] = function(body, _content_type)
+        local decoded_body = json.decode(body)
+        decoded_body.b = 5 -- Set an additional key.
+        return decoded_body
+    end
+end)
+
+g.after_test("test_unit_decode_body_custom_decoder", function()
+    decoders["application/tarantool"] = nil
+end)
+
+g.test_unit_decode_body_custom_decoder = function(_)
+    local resp = {
+        body = json.encode({ a = 1 }),
+        headers = {
+            ["content-type"] = "application/tarantool",
+        },
+        decoders = decoders,
+    }
+    local ok, res = pcall(decode_body, resp)
+    t.assert_equals(ok, true)
+    t.assert_items_equals(res, {a = 1, b = 5})
+end
+
+g.before_test("test_unit_decode_body_broken_decoder", function()
+    decoders["application/broken"] = function(_body, _content_type)
+        error("Function is broken", 2)
+    end
+end)
+
+g.after_test("test_unit_decode_body_broken_decoder", function()
+    decoders["application/broken"] = nil
+end)
+
+g.test_unit_decode_body_broken_decoder = function(_)
+    local resp = {
+        body = "Hey, I'm a body",
+        headers = {
+            ["content-type"] = "application/broken",
+        },
+        decoders = decoders,
+    }
+    local ok, err = pcall(decode_body, resp)
+    t.assert_equals(ok, false)
+    t.assert_str_contains(err, "Unable to decode body: Function is broken")
 end
 
 g.test_unit_extract_mime_type = function(_)
