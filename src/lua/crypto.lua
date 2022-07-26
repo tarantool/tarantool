@@ -45,7 +45,7 @@ ffi.cdef[[
     int tnt_EVP_CIPHER_iv_length(const EVP_CIPHER *cipher);
     int tnt_EVP_CIPHER_key_length(const EVP_CIPHER *cipher);
 
-    int EVP_CIPHER_block_size(const EVP_CIPHER *cipher);
+    int tnt_EVP_CIPHER_block_size(const EVP_CIPHER *cipher);
     const EVP_CIPHER *EVP_get_cipherbyname(const char *name);
 ]]
 
@@ -242,7 +242,7 @@ local function cipher_new(cipher, key, iv, direction)
     local self = setmetatable({
         ctx = ctx,
         cipher = cipher,
-        block_size = ffi.C.EVP_CIPHER_block_size(cipher),
+        block_size = ffi.C.tnt_EVP_CIPHER_block_size(cipher),
         direction = direction,
         buf = buffer.ibuf(),
         initialized = false,

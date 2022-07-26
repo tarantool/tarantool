@@ -29,6 +29,11 @@ int tnt_EVP_CIPHER_iv_length(const EVP_CIPHER *cipher)
 	return EVP_CIPHER_iv_length(cipher);
 }
 
+int tnt_EVP_CIPHER_block_size(const EVP_CIPHER *cipher)
+{
+	return EVP_CIPHER_block_size(cipher);
+}
+
 EVP_MD_CTX *tnt_EVP_MD_CTX_new(void)
 {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)

@@ -353,6 +353,7 @@ title_set_interpretor_name
 title_set_script_name
 title_set_status
 title_update
+tnt_EVP_CIPHER_block_size
 tnt_EVP_CIPHER_iv_length
 tnt_EVP_CIPHER_key_length
 tnt_EVP_MD_CTX_free
