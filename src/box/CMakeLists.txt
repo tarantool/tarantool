@@ -217,6 +217,7 @@ set(box_sources
     merger.c
     ibuf.c
     watcher.c
+    decimal.c
     ${sql_sources}
     ${lua_sources}
     lua/init.c
