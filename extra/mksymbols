@@ -1,0 +1,76 @@
+#!/bin/sh
+#
+# Generate a C source file, which holds names and addresses
+# of functions and provides the accessor:
+#
+# void *
+# tnt_internal_symbol(const char *name);
+#
+# The list of functions is extracted from the library archives
+# pointed by the first argument of the script.
+#
+# Note: Only global functions are listed (T symbol in nm).
+# In future we can add data symbols as well.
+#
+# TODO: Mac OS support (can we use nm or should use otool?).
+#
+# $1 - in file(s), library archives
+# $2 - out file, C source
+
+set -e
+
+(
+    printf '#include <string.h>\n'
+    printf '\n'
+
+    # extern void foo(void);
+    # extern void bar(void);
+    for archive in $1; do
+        case "${archive}" in
+        *.a)
+            nm "${archive}" | awk '{if ($2 == "T") {print "extern void "$3"(void);"}}'
+            ;;
+        *)
+            false
+            ;;
+        esac
+    done
+    printf '\n'
+
+    printf 'struct symbol_def {\n'
+    printf '\tconst char *name;\n'
+    printf '\tvoid *addr;\n'
+    printf '};\n'
+    printf '\n'
+    printf 'static struct symbol_def symbols[] = {\n'
+
+    # {"foo", foo},
+    # {"bar", bar},
+    for archive in $1; do
+        case "${archive}" in
+        *.a)
+            nm "${archive}" | awk '{if ($2 == "T") {print "\t{\""$3"\", "$3"},"}}'
+            ;;
+        *)
+            false
+            ;;
+        esac
+    done
+
+    printf '\t{NULL, NULL}\n'
+    printf '};\n'
+    printf '\n'
+
+    printf 'void *\n'
+    printf 'tnt_internal_symbol(const char *name)\n'
+    printf '{\n'
+    printf '\tstruct symbol_def *def = &symbols[0];\n'
+    printf '\twhile (def->name != NULL) {\n'
+    printf '\t\tif (strcmp(name, def->name) == 0) {\n'
+    printf '\t\t\treturn def->addr;\n'
+    printf '\t\t}\n'
+    printf '\t\t++def;\n'
+    printf '\t}\n'
+    printf '\treturn NULL;\n'
+    printf '}\n'
+) > "$2"
