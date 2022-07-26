@@ -32,7 +32,7 @@
  */
 
 #include "diag.h"
-#include "decimal.h"
+#include "core/decimal.h"
 
 #if defined(__cplusplus)
 extern "C" {

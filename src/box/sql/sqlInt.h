@@ -76,7 +76,7 @@
 #include "box/txn.h"
 #include "trivia/util.h"
 
-#include "decimal.h"
+#include "core/decimal.h"
 #include "datetime.h"
 
 /*
