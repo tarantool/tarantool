@@ -110,7 +110,7 @@ decimal_zero(decimal_t *dec)
 }
 
 bool
-decimal_is_int(decimal_t *dec)
+decimal_is_int(const decimal_t *dec)
 {
 	return decNumberIsInt(dec);
 }
