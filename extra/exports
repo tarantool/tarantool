@@ -360,6 +360,9 @@ tnt_EVP_MD_CTX_free
 tnt_EVP_MD_CTX_new
 tnt_HMAC_CTX_free
 tnt_HMAC_CTX_new
+tnt_HMAC_Init_ex
+tnt_HMAC_Update
+tnt_HMAC_Final
 tnt_iconv
 tnt_iconv_close
 tnt_iconv_open
