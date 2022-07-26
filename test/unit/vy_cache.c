@@ -39,7 +39,8 @@ test_basic()
 	vy_cache_insert_templates_chain(&cache, format, chain1,
 					lengthof(chain1), &key_template,
 					ITER_GE);
-	is(cache.cache_tree.size, 6, "cache is filled with 6 statements");
+	is(vy_cache_tree_size(&cache.cache_tree), 6,
+	   "cache is filled with 6 statements");
 
 	const struct vy_stmt_template chain2[] = {
 		STMT_TEMPLATE(10, REPLACE, 1001),
@@ -52,7 +53,8 @@ test_basic()
 	vy_cache_insert_templates_chain(&cache, format, chain2,
 					lengthof(chain2), &key_template,
 					ITER_GE);
-	is(cache.cache_tree.size, 12, "cache is filled with 12 statements");
+	is(vy_cache_tree_size(&cache.cache_tree), 12,
+	   "cache is filled with 12 statements");
 
 	const struct vy_stmt_template chain3[] = {
 		STMT_TEMPLATE(16, REPLACE, 1107),
@@ -65,7 +67,8 @@ test_basic()
 	vy_cache_insert_templates_chain(&cache, format, chain3,
 					lengthof(chain3), &key_template,
 					ITER_GE);
-	is(cache.cache_tree.size, 18, "cache is filled with 18 statements");
+	is(vy_cache_tree_size(&cache.cache_tree), 18,
+	   "cache is filled with 18 statements");
 
 	/*
 	 * Try to restore opened and positioned iterator.

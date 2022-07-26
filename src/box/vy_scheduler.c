@@ -1352,7 +1352,7 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 		if (mem->generation > scheduler->dump_generation)
 			continue;
 		vy_mem_wait_pinned(mem);
-		if (mem->tree.size == 0) {
+		if (vy_mem_tree_size(&mem->tree) == 0) {
 			/*
 			 * The tree is empty so we can delete it
 			 * right away, without involving a worker.
