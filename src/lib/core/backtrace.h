@@ -50,6 +50,8 @@ struct fiber;
 /*
  * Collect call stack of `fiber` (only C/C++ frames) to `bt`.
  *
+ * It is guaranteed that if NULL passed as fiber argument, fiber
+ * module will not be used.
  * `skip_frames` determines the number of frames skipped, starting from the
  * frame of `backtrace_collect`. It is expected to have a non-negative value.
  * For example, if skip_frames is 0, then the backtrace will contain

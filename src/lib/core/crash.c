@@ -214,7 +214,7 @@ crash_collect(int signo, siginfo_t *siginfo, void *ucontext)
 
 #ifdef ENABLE_BACKTRACE
 	struct backtrace bt;
-	backtrace_collect(&bt, fiber(), 1);
+	backtrace_collect(&bt, NULL, 1);
 	backtrace_snprint(cinfo->backtrace_buf,
 			  sizeof(cinfo->backtrace_buf), &bt);
 #endif

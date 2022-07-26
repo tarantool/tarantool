@@ -98,6 +98,8 @@ collect_current_stack(struct backtrace *bt, void *stack)
 /*
  * Restore target fiber context (if needed) and call `collect_current_stack`
  * over it.
+ * It is guaranteed that if NULL passed as fiber argument, fiber
+ * module will not be used.
  */
 NOINLINE void
 backtrace_collect(struct backtrace *bt, const struct fiber *fiber,
@@ -107,7 +109,7 @@ backtrace_collect(struct backtrace *bt, const struct fiber *fiber,
 	/* The user should not see the frame of `collect_current_stack`. */
 	++skip_frames;
 
-	if (fiber == fiber()) {
+	if (fiber == NULL || fiber == fiber()) {
 		collect_current_stack(bt, NULL);
 		goto skip_frames;
 	}
