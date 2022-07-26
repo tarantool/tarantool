@@ -21,13 +21,15 @@ ffi.cdef[[
     int EVP_DigestFinal_ex(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *s);
     const EVP_MD *EVP_get_digestbyname(const char *name);
 
-    typedef struct {} HMAC_CTX;
-    HMAC_CTX *tnt_HMAC_CTX_new(void);
-    void tnt_HMAC_CTX_free(HMAC_CTX *ctx);
-    int HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int len,
-                 const EVP_MD *md, ENGINE *impl);
-    int HMAC_Update(HMAC_CTX *ctx, const unsigned char *data, size_t len);
-    int HMAC_Final(HMAC_CTX *ctx, unsigned char *md, unsigned int *len);
+    typedef struct {} tnt_HMAC_CTX;
+    tnt_HMAC_CTX *tnt_HMAC_CTX_new(void);
+    void tnt_HMAC_CTX_free(tnt_HMAC_CTX *ctx);
+    int tnt_HMAC_Init_ex(tnt_HMAC_CTX *ctx, const void *key, int len,
+                         const char *digest, const EVP_MD *md, ENGINE *impl);
+    int tnt_HMAC_Update(tnt_HMAC_CTX *ctx, const unsigned char *data,
+                        size_t len);
+    int tnt_HMAC_Final(tnt_HMAC_CTX *ctx, unsigned char *md, unsigned int *len,
+                       unsigned int size);
 
     typedef struct {} EVP_CIPHER_CTX;
     typedef struct {} EVP_CIPHER;
@@ -144,7 +146,7 @@ local function hmac_gc(ctx)
     ffi.C.tnt_HMAC_CTX_free(ctx)
 end
 
-local function hmac_new(digest, key)
+local function hmac_new(class, digest, key)
     if key == nil then
         return error('Key should be specified for HMAC operations')
     end
@@ -155,6 +157,7 @@ local function hmac_new(digest, key)
     ffi.gc(ctx, hmac_gc)
     local self = setmetatable({
         ctx = ctx,
+        class = class,
         digest = digest,
         buf = buffer.ibuf(64),
         initialized = false,
@@ -168,7 +171,8 @@ local function hmac_init(self, key)
     if self.ctx == nil then
         return error('HMAC context isn\'t usable')
     end
-    if ffi.C.HMAC_Init_ex(self.ctx, key, key:len(), self.digest, nil) ~= 1 then
+    if ffi.C.tnt_HMAC_Init_ex(self.ctx, key, key:len(), self.class,
+                              self.digest, nil) ~= 1 then
         return error('Can\'t init HMAC: ' .. openssl_err_str())
     end
     self.initialized = true
@@ -178,7 +182,7 @@ local function hmac_update(self, input)
     if not self.initialized then
         return error('HMAC not initialized')
     end
-    if ffi.C.HMAC_Update(self.ctx, input, input:len()) ~= 1 then
+    if ffi.C.tnt_HMAC_Update(self.ctx, input, input:len()) ~= 1 then
         return error('Can\'t update HMAC: ' .. openssl_err_str())
     end
 end
@@ -188,7 +192,8 @@ local function hmac_final(self)
         return error('HMAC not initialized')
     end
     self.initialized = false
-    if ffi.C.HMAC_Final(self.ctx, self.buf.wpos, self.outl) ~= 1 then
+    if ffi.C.tnt_HMAC_Final(self.ctx, self.buf.wpos, self.outl,
+                            self.buf:unused()) ~= 1 then
         return error('Can\'t finalize HMAC: ' .. openssl_err_str())
     end
     return ffi.string(self.buf.wpos, self.outl[0])
@@ -348,13 +353,13 @@ digest_api = setmetatable(digest_api,
 local hmac_api = {}
 for class, digest in pairs(hmacs) do
     hmac_api[class] = setmetatable({
-        new = function (key) return hmac_new(digest, key) end
+        new = function (key) return hmac_new(class, digest, key) end
     }, {
         __call = function (self, key, str)
             if type(str) ~= 'string' then
                 error("Usage: hmac."..class.."(key, string)")
             end
-            local ctx = hmac_new(digest, key)
+            local ctx = hmac_new(class, digest, key)
             ctx:update(str)
             local res = ctx:result()
             ctx:free()
