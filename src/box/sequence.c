@@ -302,6 +302,8 @@ access_check_sequence(struct sequence *seq)
 
 struct sequence_data_iterator {
 	struct snapshot_iterator base;
+	/** Frozen view of the data index. */
+	struct light_sequence_view view;
 	/** Iterator over the data index. */
 	struct light_sequence_iterator iter;
 	/** Last tuple returned by the iterator. */
@@ -318,9 +320,8 @@ sequence_data_iterator_next(struct snapshot_iterator *base,
 	struct sequence_data_iterator *iter =
 		(struct sequence_data_iterator *)base;
 
-	struct sequence_data *sd =
-		light_sequence_iterator_get_and_next(&sequence_data_index,
-						     &iter->iter);
+	struct sequence_data *sd = light_sequence_view_iterator_get_and_next(
+		&iter->view, &iter->iter);
 	if (sd == NULL) {
 		*data = NULL;
 		return 0;
@@ -343,7 +344,7 @@ sequence_data_iterator_free(struct snapshot_iterator *base)
 {
 	struct sequence_data_iterator *iter =
 		(struct sequence_data_iterator *)base;
-	light_sequence_iterator_destroy(&sequence_data_index, &iter->iter);
+	light_sequence_view_destroy(&iter->view);
 	TRASH(iter);
 	free(iter);
 }
@@ -362,8 +363,8 @@ sequence_data_iterator_create(void)
 	iter->base.free = sequence_data_iterator_free;
 	iter->base.next = sequence_data_iterator_next;
 
-	light_sequence_iterator_begin(&sequence_data_index, &iter->iter);
-	light_sequence_iterator_freeze(&sequence_data_index, &iter->iter);
+	light_sequence_view_create(&iter->view, &sequence_data_index);
+	light_sequence_view_iterator_begin(&iter->view, &iter->iter);
 	return &iter->base;
 }
 

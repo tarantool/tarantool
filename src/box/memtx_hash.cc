@@ -259,7 +259,7 @@ static void
 memtx_hash_index_update_def(struct index *base)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
-	index->hash_table.arg = index->base.def->key_def;
+	index->hash_table.common.arg = index->base.def->key_def;
 }
 
 static ssize_t
@@ -464,6 +464,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 struct hash_snapshot_iterator {
 	struct snapshot_iterator base;
 	struct memtx_hash_index *index;
+	struct light_index_view view;
 	struct light_index_iterator iterator;
 	struct memtx_tx_snapshot_cleaner cleaner;
 };
@@ -479,7 +480,7 @@ hash_snapshot_iterator_free(struct snapshot_iterator *iterator)
 	assert(iterator->free == hash_snapshot_iterator_free);
 	struct hash_snapshot_iterator *it =
 		(struct hash_snapshot_iterator *) iterator;
-	light_index_iterator_destroy(&it->index->hash_table, &it->iterator);
+	light_index_view_destroy(&it->view);
 	index_unref(&it->index->base);
 	memtx_tx_snapshot_cleaner_destroy(&it->cleaner);
 	free(iterator);
@@ -497,12 +498,10 @@ hash_snapshot_iterator_next(struct snapshot_iterator *iterator,
 	assert(iterator->free == hash_snapshot_iterator_free);
 	struct hash_snapshot_iterator *it =
 		(struct hash_snapshot_iterator *) iterator;
-	struct light_index_core *hash_table = &it->index->hash_table;
 
 	while (true) {
-		struct tuple **res =
-			light_index_iterator_get_and_next(hash_table,
-			                                  &it->iterator);
+		struct tuple **res = light_index_view_iterator_get_and_next(
+			&it->view, &it->iterator);
 		if (res == NULL) {
 			*data = NULL;
 			return 0;
@@ -540,8 +539,8 @@ memtx_hash_index_create_snapshot_iterator(struct index *base)
 	it->base.free = hash_snapshot_iterator_free;
 	it->index = index;
 	index_ref(base);
-	light_index_iterator_begin(&index->hash_table, &it->iterator);
-	light_index_iterator_freeze(&index->hash_table, &it->iterator);
+	light_index_view_create(&it->view, &index->hash_table);
+	light_index_view_iterator_begin(&it->view, &it->iterator);
 	return (struct snapshot_iterator *) it;
 }
 
