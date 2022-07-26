@@ -270,19 +270,22 @@ iterator_freeze_check()
 		while ((e = light_iterator_get_and_next(&ht, &iterator))) {
 			comp_buf[comp_buf_size++] = *e;
 		}
+		struct light_view v1;
+		light_view_create(&v1, &ht);
 		struct light_iterator iterator1;
-		light_iterator_begin(&ht, &iterator1);
-		light_iterator_freeze(&ht, &iterator1);
+		light_view_iterator_begin(&v1, &iterator1);
+		struct light_view v2;
+		light_view_create(&v2, &ht);
 		struct light_iterator iterator2;
-		light_iterator_begin(&ht, &iterator2);
-		light_iterator_freeze(&ht, &iterator2);
+		light_view_iterator_begin(&v2, &iterator2);
 		for (int j = 0; j < test_data_size; j++) {
 			hash_value_t val = rand() % test_data_mod;
 			hash_t h = hash(val);
 			light_insert(&ht, h, val);
 		}
 		int tested_count = 0;
-		while ((e = light_iterator_get_and_next(&ht, &iterator1))) {
+		while ((e = light_view_iterator_get_and_next(
+					&v1, &iterator1))) {
 			if (*e != comp_buf[tested_count]) {
 				fail("version restore failed (1)", "true");
 			}
@@ -291,7 +294,7 @@ iterator_freeze_check()
 				fail("version restore failed (2)", "true");
 			}
 		}
-		light_iterator_destroy(&ht, &iterator1);
+		light_view_destroy(&v1);
 		for (int j = 0; j < test_data_size; j++) {
 			hash_value_t val = rand() % test_data_mod;
 			hash_t h = hash(val);
@@ -301,7 +304,8 @@ iterator_freeze_check()
 		}
 
 		tested_count = 0;
-		while ((e = light_iterator_get_and_next(&ht, &iterator2))) {
+		while ((e = light_view_iterator_get_and_next(
+					&v2, &iterator2))) {
 			if (*e != comp_buf[tested_count]) {
 				fail("version restore failed (3)", "true");
 			}
@@ -310,7 +314,7 @@ iterator_freeze_check()
 				fail("version restore failed (4)", "true");
 			}
 		}
-
+		light_view_destroy(&v2);
 		light_destroy(&ht);
 	}
 
