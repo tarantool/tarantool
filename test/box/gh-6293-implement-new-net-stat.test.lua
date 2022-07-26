@@ -192,6 +192,10 @@ assert(
     total_t_call == request_count + service_total_msg_count and
     in_progress_t_call  == request_count + service_in_progress_msg_count
 );
+-- Check that box.stat.net.thread[i] does not crash for incorrect i
+test_run:cmd("eval test 'return box.stat.net.thread[0]'");
+test_run:cmd(string.format("eval test 'return box.stat.net.thread[%d]'", thread_count + 1));
+
 test_run:cmd("setopt delimiter ''");
 
 test_run:cmd("stop server test")

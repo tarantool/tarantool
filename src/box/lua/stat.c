@@ -242,7 +242,7 @@ static int
 lbox_stat_net_thread_index(struct lua_State *L)
 {
 	const int thread_id = luaL_checkinteger(L, -1) - 1;
-	if (thread_id < 0 || thread_id > iproto_threads_count)
+	if (thread_id < 0 || thread_id >= iproto_threads_count)
 		return 0;
 
 	lua_newtable(L);
