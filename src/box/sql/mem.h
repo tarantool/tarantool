@@ -31,7 +31,7 @@
  */
 #include "box/field_def.h"
 #include "datetime.h"
-#include "decimal.h"
+#include "core/decimal.h"
 #include "tt_uuid.h"
 
 struct sql;

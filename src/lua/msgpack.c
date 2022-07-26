@@ -42,7 +42,7 @@
 #include <small/region.h>
 #include <small/ibuf.h>
 
-#include "decimal.h" /* decimal_unpack() */
+#include "core/decimal.h" /* decimal_unpack() */
 #include "lua/decimal.h" /* lua_pushdecimal() */
 #include "mp_extension_types.h"
 #include "mp_uuid.h" /* mp_decode_uuid() */

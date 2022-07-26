@@ -40,7 +40,7 @@ extern "C" {
 #include <stdlib.h>
 
 #include "msgpuck.h"
-#include "decimal.h"
+#include "core/decimal.h"
 #include "mp_extension_types.h"
 #include "tt_uuid.h"
 #include "datetime.h"
