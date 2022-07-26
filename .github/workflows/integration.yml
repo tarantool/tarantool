@@ -40,7 +40,7 @@ jobs:
           contains(github.event.pull_request.labels.*.name, 'full-ci') ||
           contains(github.event.pull_request.labels.*.name, 'integration-ci') )
 
-    uses: tarantool/tarantool/.github/workflows/reusable_build.yml@master
+    uses: tarantool/tarantool/.github/workflows/reusable_build.yml@1.10
     with:
       ref: ${{ github.sha }}
       os: ubuntu
