@@ -412,7 +412,7 @@ local function test_tuple_field_by_path(test, module)
 end
 
 require('tap').test("module_api", function(test)
-    test:plan(39)
+    test:plan(40)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
