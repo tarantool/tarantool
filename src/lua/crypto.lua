@@ -7,7 +7,7 @@ ffi.cdef[[
     int tnt_openssl_init(void);
     /* from openssl/err.h */
     unsigned long ERR_get_error(void);
-    char *ERR_error_string(unsigned long e, char *buf);
+    char *ERR_reason_error_string(unsigned long e);
 
     /* from openssl/evp.h */
     typedef void ENGINE;
@@ -52,7 +52,7 @@ ffi.cdef[[
 ffi.C.tnt_openssl_init();
 
 local function openssl_err_str()
-  return ffi.string(ffi.C.ERR_error_string(ffi.C.ERR_get_error(), nil))
+  return ffi.string(ffi.C.ERR_reason_error_string(ffi.C.ERR_get_error()))
 end
 
 local digests = {}
