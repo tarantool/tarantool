@@ -1,5 +1,7 @@
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <module.h>
 
 #include <small/ibuf.h>
@@ -19,6 +21,19 @@
 #ifndef lengthof
 #define lengthof(array) (sizeof(array) / sizeof((array)[0]))
 #endif
+
+#define xalloc_impl(size, func, args...)					\
+	({									\
+		void *ret = func(args);						\
+		if (unlikely(ret == NULL)) {					\
+			fprintf(stderr, "Can't allocate %zu bytes at %s:%d",	\
+				(size_t)(size), __FILE__, __LINE__);		\
+			exit(EXIT_FAILURE);					\
+		}								\
+		ret;								\
+	})
+
+#define xmalloc(size)		xalloc_impl((size), malloc, (size))
 
 /* Test for constants */
 static const char *consts[] = {
@@ -2413,6 +2428,500 @@ tuple_field_by_path(struct lua_State *L)
 	return 1;
 }
 
+/* {{{ decimal */
+
+/**
+ * Check decimal value against expected one.
+ */
+static void
+check_decimal(const box_decimal_t *dec, const char *exp)
+{
+	/*
+	 * Ideally we shouldn't use anything from the decimal
+	 * library to validate its implementation. However we
+	 * use decimal_to_string() here for simplicity.
+	 */
+	char str[BOX_DECIMAL_STRING_BUFFER_SIZE];
+	box_decimal_to_string(dec, str);
+	assert(strcmp(str, exp) == 0);
+}
+
+enum {
+	POISON_SIZE = 16,
+};
+
+/**
+ * Allocate data buffer with poison values before and after.
+ */
+static void *
+poison_malloc(size_t size)
+{
+	char *raw = xmalloc(size + POISON_SIZE * 2 + sizeof(size_t));
+	*(size_t *)raw = size;
+
+	char *poison_before = raw + sizeof(size_t);
+	char *poison_after = raw + sizeof(size_t) + POISON_SIZE + size;
+	for (int i = 0; i < POISON_SIZE; ++i) {
+		poison_before[i] = '#';
+		poison_after[i] = '#';
+	}
+
+	return raw + sizeof(size_t) + POISON_SIZE;
+}
+
+/**
+ * Check poison values.
+ */
+static void
+poison_check(const void *data)
+{
+	const char *raw = (const char *)data - sizeof(size_t) - POISON_SIZE;
+	size_t size = *(size_t *)raw;
+
+	const char *poison_before = raw + sizeof(size_t);
+	const char *poison_after = raw + sizeof(size_t) + POISON_SIZE + size;
+
+	for (int i = 0; i < POISON_SIZE; ++i) {
+		assert(poison_before[i] == '#');
+		assert(poison_after[i] == '#');
+	}
+}
+
+/**
+ * Free data allocated by poison_malloc().
+ */
+static void
+poison_free(void *ptr)
+{
+	void *raw = (char *)ptr - sizeof(size_t) - POISON_SIZE;
+	free(raw);
+}
+
+/**
+ * Basic decimal test.
+ *
+ * Just call each function on some valid input.
+ * No corner, tricky and errorneous cases.
+ */
+static int
+test_decimal(struct lua_State *L)
+{
+	/* Storage for temporary values. */
+	box_decimal_storage_t storage_1;
+	box_decimal_storage_t storage_2;
+	box_decimal_storage_t storage_3;
+	/* Storage for values used in several test cases. */
+	box_decimal_storage_t pi_storage;
+	box_decimal_storage_t zero_storage;
+	box_decimal_storage_t zerooo_storage;
+	/* Pointers to those values. */
+	box_decimal_t *dec_1 = (box_decimal_t *)&storage_1;
+	box_decimal_t *dec_2 = (box_decimal_t *)&storage_2;
+	box_decimal_t *dec_3 = (box_decimal_t *)&storage_3;
+	box_decimal_t *pi = (box_decimal_t *)&pi_storage;
+	box_decimal_t *zero = (box_decimal_t *)&zero_storage;
+	box_decimal_t *zerooo = (box_decimal_t *)&zerooo_storage;
+	/* Initialize constants. */
+	box_decimal_from_string(pi, "3.14");
+	box_decimal_from_string(zero, "0");
+	box_decimal_from_string(zerooo, "0.00");
+
+	/* From string. */
+	box_decimal_t *p = box_decimal_from_string(pi, "3.14");
+	assert(p == pi);
+	check_decimal(pi, "3.14");
+
+	/* To string. */
+	char str[BOX_DECIMAL_STRING_BUFFER_SIZE];
+	box_decimal_to_string(pi, str);
+	assert(strcmp(str, "3.14") == 0);
+
+	/* Copy. */
+	box_decimal_t *pi_saved = dec_1;
+	p = box_decimal_copy(pi_saved, pi);
+	assert(p == pi_saved);
+	check_decimal(pi_saved, "3.14");
+
+	/*
+	 * Verify storage size/alignment and string buffer size
+	 * invariants.
+	 */
+	size_t storage_align = box_decimal_storage_align();
+	size_t storage_size = box_decimal_storage_size();
+	size_t string_buffer_size = box_decimal_string_buffer_size();
+	assert(storage_align <= alignof(box_decimal_storage_t));
+	assert(storage_size <= sizeof(box_decimal_storage_t));
+	assert(string_buffer_size <= BOX_DECIMAL_STRING_BUFFER_SIZE);
+	/*
+	 * Hold exact values to fail the test if they're changed.
+	 * It is to ensure that all values are changed in
+	 * correspondence.
+	 */
+	assert(storage_align == 4);
+	assert(storage_size == 36);
+	assert(string_buffer_size == 52);
+	/*
+	 * Another check that the decimal storage and the string
+	 * buffer size are correspond each other. While we use
+	 * decNumber, those calculations should work (at least
+	 * while we keep the DECDPUN value as 3).
+	 *
+	 * See notes in third_party/decNumber/decNumber.h.
+	 */
+	size_t digits = 38;
+	size_t unit_size = 2;
+	size_t unit_count = (digits + 2) / 3;
+	assert(storage_size == 10 + unit_size * unit_count);
+	assert(string_buffer_size == digits + 14);
+
+	/* Precision. */
+	int precision = box_decimal_precision(pi);
+	assert(precision == 3);
+	box_decimal_t *half = dec_1;
+	box_decimal_from_string(half, "0.5");
+	precision = box_decimal_precision(half);
+	assert(precision == 1);
+	box_decimal_from_string(half, "0.50");
+	precision = box_decimal_precision(half);
+	assert(precision == 2);
+
+	/* Scale. */
+	int scale = box_decimal_scale(pi);
+	assert(scale == 2);
+
+	/* Zero. */
+	p = box_decimal_zero(zero);
+	assert(p == zero);
+	check_decimal(zero, "0");
+
+	/* Is integer? */
+	bool is_int = box_decimal_is_int(pi);
+	assert(!is_int);
+	is_int = box_decimal_is_int(zero);
+	assert(is_int);
+
+	/* Is negative? */
+	box_decimal_t *mariana = dec_1;
+	box_decimal_from_string(mariana, "-10.9");
+	box_decimal_t *nzero = dec_2;
+	box_decimal_from_string(nzero, "-0");
+	bool is_neg = box_decimal_is_neg(pi);
+	assert(!is_neg);
+	is_neg = box_decimal_is_neg(zero);
+	assert(!is_neg);
+	is_neg = box_decimal_is_neg(nzero);
+	assert(!is_neg);
+	is_neg = box_decimal_is_neg(mariana);
+	assert(is_neg);
+
+	/* From double. */
+	box_decimal_t *guinness = dec_1;
+	p = box_decimal_from_double(guinness, 119.5);
+	assert(p == guinness);
+	check_decimal(guinness, "119.5");
+
+	/* From int64_t. */
+	box_decimal_t *celsius = dec_1;
+	p = box_decimal_from_int64(celsius, (int64_t)(-273));
+	assert(p == celsius);
+	check_decimal(celsius, "-273");
+
+	/* From uint64_t. */
+	box_decimal_t *vostok_1 = dec_1;
+	p = box_decimal_from_uint64(vostok_1, (uint64_t)1961);
+	assert(p == vostok_1);
+	check_decimal(vostok_1, "1961");
+
+	/* To int64_t. */
+	box_decimal_t *carthage = dec_1;
+	box_decimal_from_string(carthage, "-146");
+	int64_t carthage_64 = 0;
+	const box_decimal_t *cp = box_decimal_to_int64(carthage, &carthage_64);
+	assert(cp == carthage);
+	assert(carthage_64 == (int64_t)(-146));
+
+	/* To uint64_t. */
+	box_decimal_t *g = dec_1;
+	box_decimal_from_string(g, "9.81");
+	uint64_t g_u64 = 0;
+	cp = box_decimal_to_uint64(g, &g_u64);
+	assert(cp == g);
+	assert(g_u64 == (uint64_t)9);
+
+	/* Compare. */
+	box_decimal_t *five_1 = dec_1;
+	box_decimal_t *five_2 = dec_2;
+	box_decimal_t *six = dec_3;
+	box_decimal_from_string(five_1, "5");
+	box_decimal_from_string(five_2, "5");
+	box_decimal_from_string(six, "6");
+	int rc = box_decimal_compare(five_1, six);
+	assert(rc == -1);
+	rc = box_decimal_compare(five_1, five_2);
+	assert(rc == 0);
+	rc = box_decimal_compare(six, five_1);
+	assert(rc == 1);
+	rc = box_decimal_compare(zero, zerooo);
+	assert(rc == 0);
+
+	/*
+	 * Rounding (to nearest at given scale, half goes away
+	 * from zero).
+	 *
+	 * [+-]1.5 cases are to ensure that the mode is not 'half
+	 * to nearest odd' (it would be quite surprising, but
+	 * we're in a test: it is okay to do crazy suppositions).
+	 */
+	struct {
+		const char *input;
+		int scale;
+		const char *exp;
+	} round_cases[] = {
+		{"7.62",   1, "7.6"  }, /* AK-47 cartridge. */
+		{"7.62",   0, "8"    },
+		{"-38.83", 1, "-38.8"}, /* Mercury melting. */
+		{"-38.83", 0, "-39"  },
+		{"0.5",    0, "1"    },
+		{"-0.5",   0, "-1",  },
+		{"1.5",    0, "2"    },
+		{"-1.5",   0, "-2",  },
+	};
+	for (size_t i = 0; i < lengthof(round_cases); ++i) {
+		box_decimal_t *dec = dec_1;
+		box_decimal_from_string(dec, round_cases[i].input);
+		p = box_decimal_round(dec, round_cases[i].scale);
+		assert(p == dec);
+		check_decimal(dec, round_cases[i].exp);
+	}
+
+	/*
+	 * Floor (rounding toward zero).
+	 *
+	 * Interesting enough that I got floor(-0.5, 0) == -0
+	 * (in the string representation of decimal value). I
+	 * don't know why not just zero and how -0 is different
+	 * from just zero for decimals. OTOH, if -0 exists it is
+	 * a correct answer everywhere, where 0 is correct answer.
+	 * So I just hold it in the test.
+	 */
+	struct {
+		const char *input;
+		int scale;
+		const char *exp;
+	} floor_cases[] = {
+		{"7.62",   1, "7.6"  },
+		{"7.62",   0, "7"    },
+		{"-38.83", 1, "-38.8"},
+		{"-38.83", 0, "-38"  },
+		{"0.5",    0, "0"    },
+		{"-0.5",   0, "-0",  }, /* Hm. */
+		{"1.5",    0, "1"    },
+		{"-1.5",   0, "-1",  },
+	};
+	for (size_t i = 0; i < lengthof(floor_cases); ++i) {
+		box_decimal_t *dec = dec_1;
+		box_decimal_from_string(dec, floor_cases[i].input);
+		p = box_decimal_floor(dec, floor_cases[i].scale);
+		assert(p == dec);
+		check_decimal(dec, floor_cases[i].exp);
+	}
+
+	/* Trim trailing zeros. */
+	p = box_decimal_trim(zerooo);
+	assert(p == zerooo);
+	check_decimal(zerooo, "0");
+	box_decimal_t *percent = dec_1;
+	box_decimal_from_string(percent, "0.50");
+	check_decimal(percent, "0.50");
+	p = box_decimal_trim(percent);
+	assert(p == percent);
+	check_decimal(percent, "0.5");
+	/* Restore constants. */
+	box_decimal_from_string(zerooo, "0.00");
+	check_decimal(zerooo, "0.00");
+
+	/*
+	 * Rescale.
+	 *
+	 * Round or add fractional zeros if needed.
+	 */
+	box_decimal_t *circumference = dec_1;
+	box_decimal_from_string(circumference, "40075.017");
+	p = box_decimal_rescale(circumference, 2);
+	assert(p == circumference);
+	check_decimal(circumference, "40075.02");
+	box_decimal_t *radius = dec_1;
+	box_decimal_from_string(radius, "6378.137");
+	p = box_decimal_rescale(radius, 6);
+	assert(p == radius);
+	check_decimal(radius, "6378.137000");
+	box_decimal_t *mass = dec_1;
+	box_decimal_from_string(mass, "3e-6");
+	check_decimal(mass, "0.000003");
+	p = box_decimal_rescale(mass, 6);
+	assert(p == mass);
+	check_decimal(mass, "0.000003");
+
+	/* Unary operations. */
+	typedef box_decimal_t *
+		unary_op_t(box_decimal_t *res, const box_decimal_t *arg);
+	struct {
+		unary_op_t *op;
+		const char *arg;
+		const char *exp;
+	} unary_cases[] = {
+		{box_decimal_abs,   "-1",  "1" },
+		{box_decimal_abs,   "0",   "0" },
+		{box_decimal_abs,   "1",   "1" },
+		{box_decimal_minus, "-1",  "1" },
+		/* Interesting enough that here I got
+		 * minus(0) == 0, not minus zero as
+		 * above for floor(-0.5, 0).
+		 */
+		{box_decimal_minus, "0",   "0" },
+		{box_decimal_minus, "1",   "-1"},
+		{box_decimal_log10, "100", "2" },
+		{box_decimal_log10, "2",
+			/* Zero and 38 digits of the logarith. */
+			"0.30102999566398119521373889472449302677"},
+		{box_decimal_log10, "1",   "0" },
+		{box_decimal_ln,    "2",
+			/*
+			 * Zero and 37 digits of the logarith.
+			 *
+			 * Interesting that it should be
+			 * ...656808 (not ...656810) if we'll
+			 * round 'exact' value to 38 digits.
+			 *
+			 * I guess it is okay to have precision
+			 * loss near to DECIMAL_MAX_DIGITS digits
+			 * after period, so just hold the result
+			 * in the test.
+			 */
+			"0.6931471805599453094172321214581765681"},
+		{box_decimal_ln,    "1",   "0" },
+		{box_decimal_exp,   "0",   "1" },
+		{box_decimal_exp,   "1",
+			"2.7182818284590452353602874713526624978"},
+		{box_decimal_exp,   "2",
+			"7.3890560989306502272304274605750078132"},
+		{box_decimal_sqrt,  "4",   "2" },
+	};
+	for (size_t i = 0; i < lengthof(unary_cases); ++i) {
+		box_decimal_t *arg = dec_1;
+		box_decimal_t *res = dec_2;
+		box_decimal_from_string(arg, unary_cases[i].arg);
+		/* res = op(arg) */
+		p = unary_cases[i].op(res, arg);
+		assert(p == res);
+		check_decimal(arg, unary_cases[i].arg);
+		check_decimal(res, unary_cases[i].exp);
+		/* arg = op(arg) */
+		p = unary_cases[i].op(arg, arg);
+		assert(p == arg);
+		check_decimal(arg, unary_cases[i].exp);
+	}
+
+	/* Binary operations. */
+	typedef box_decimal_t *
+		binary_op_t(box_decimal_t *res, const box_decimal_t *arg_1,
+			    const box_decimal_t *arg_2);
+	struct {
+		binary_op_t *op;
+		const char *arg_1;
+		const char *arg_2;
+		const char *exp;
+	} binary_cases[] = {
+		{box_decimal_remainder, "7",    "2",   "1"   },
+		{box_decimal_remainder, "-7",   "3",   "-1"  },
+		{box_decimal_remainder, "36.6", "5",   "1.6" },
+		{box_decimal_remainder, "36.6", "0.5", "0.1" },
+		{box_decimal_add,       "6",    "7",   "13"  },
+		{box_decimal_sub,       "6",    "7",   "-1"  },
+		{box_decimal_mul,       "6",    "7",   "42"  },
+		{box_decimal_mul,
+			/*
+			 * Zero and three 38 times
+			 * (DECIMAL_MAX_DIGITS == 38).
+			 */
+			"0.33333333333333333333333333333333333333",
+			/* Zero and nine 38 times. */
+			"3",   "0.99999999999999999999999999999999999999"},
+		{box_decimal_div,       "7",    "2",   "3.5" },
+		{box_decimal_div,       "-7",   "3",
+			/* Two and three 37 times. */
+			"-2.3333333333333333333333333333333333333"},
+		{box_decimal_div,       "36.6", "5",   "7.32"},
+		{box_decimal_div,       "36.6", "0.5", "73.2"},
+		{box_decimal_pow,       "2",    "8",   "256" },
+		{box_decimal_pow,       "-2",   "8",   "256" },
+		/*
+		 * It is interesting: amount of trailing zeros
+		 * seems multiply of amount of them in the first
+		 * argument and value of the second argument.
+		 *
+		 * The API says nothing about how operations
+		 * should interpret trailing zeros in arguments.
+		 * So just hold those values in the test.
+		 */
+		{box_decimal_pow,       "2.0",  "8",   "256.00000000"},
+		{box_decimal_pow,       "2.0",  "8.0", "256.00000000"},
+		{box_decimal_pow,       "2",    "8.0", "256" },
+		{box_decimal_pow,       "2.00", "8",   "256.0000000000000000"},
+	};
+	for (size_t i = 0; i < lengthof(binary_cases); ++i) {
+		box_decimal_t *arg_1 = dec_1;
+		box_decimal_t *arg_2 = dec_2;
+		box_decimal_t *res = dec_3;
+		/* res = op(arg_1, arg_2) */
+		box_decimal_from_string(arg_1, binary_cases[i].arg_1);
+		box_decimal_from_string(arg_2, binary_cases[i].arg_2);
+		p = binary_cases[i].op(res, arg_1, arg_2);
+		assert(p == res);
+		check_decimal(arg_1, binary_cases[i].arg_1);
+		check_decimal(arg_2, binary_cases[i].arg_2);
+		check_decimal(res, binary_cases[i].exp);
+		/* arg_1 = op(arg_1, arg_2) */
+		p = binary_cases[i].op(arg_1, arg_1, arg_2);
+		assert(p == arg_1);
+		check_decimal(arg_1, binary_cases[i].exp);
+		/* Restore arg_1. */
+		box_decimal_from_string(arg_1, binary_cases[i].arg_1);
+		/* arg_2 = op(arg_1, arg_2) */
+		p = binary_cases[i].op(arg_2, arg_1, arg_2);
+		assert(p == arg_2);
+		check_decimal(arg_2, binary_cases[i].exp);
+	}
+
+	/* Encode to msgpack. */
+	box_decimal_t *ammonia = dec_1;
+	box_decimal_from_string(ammonia, "-77.73");
+	uint32_t mp_buffer_size = box_decimal_mp_sizeof(ammonia);
+	char *data = poison_malloc(mp_buffer_size);
+	char *data_end = box_decimal_mp_encode(ammonia, data);
+	assert(data_end - data == mp_buffer_size);
+	poison_check(data);
+	/* Verify the msgpack content. */
+	assert(mp_buffer_size == 6);
+	assert(memcmp(data, "\xd6\x01\x02\x07\x77\x3d", 6) == 0);
+	poison_free(data);
+
+	/* Decode from msgpack. */
+	const char *ammonia_msgpack = "\xd6\x01\x02\x07\x77\x3d";
+	uint32_t msgpack_size = 6;
+	box_decimal_t *ammonia_copy = dec_2;
+	const char *pos = ammonia_msgpack;
+	p = box_decimal_mp_decode(ammonia_copy, &pos);
+	assert(p == ammonia_copy);
+	assert(pos == ammonia_msgpack + msgpack_size);
+	check_decimal(ammonia_copy, "-77.73");
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+/* }}} decimal */
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -2457,6 +2966,7 @@ luaopen_module_api(lua_State *L)
 		{"tuple_validate_fmt", test_tuple_validate_formatted},
 		{"test_key_def_dup", test_key_def_dup},
 		{"tuple_field_by_path", tuple_field_by_path},
+		{"test_decimal", test_decimal},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
