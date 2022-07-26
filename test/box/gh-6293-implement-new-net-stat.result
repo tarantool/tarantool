@@ -269,6 +269,15 @@ assert(
 ---
 - true
 ...
+-- Check that box.stat.net.thread[i] does not crash for incorrect i
+test_run:cmd("eval test 'return box.stat.net.thread[0]'");
+---
+- [null]
+...
+test_run:cmd(string.format("eval test 'return box.stat.net.thread[%d]'", thread_count + 1));
+---
+- [null]
+...
 test_run:cmd("setopt delimiter ''");
 ---
 - true
