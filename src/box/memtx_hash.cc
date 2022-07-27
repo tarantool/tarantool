@@ -118,7 +118,6 @@ static int
 hash_iterator_gt_raw_base(struct iterator *ptr, struct tuple **ret)
 {
 	assert(ptr->free == hash_iterator_free);
-	ptr->next_raw = hash_iterator_ge_raw_base;
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
 	struct memtx_hash_index *index = (struct memtx_hash_index *)ptr->index;
 	struct tuple **res = light_index_iterator_get_and_next(&index->hash_table,
@@ -139,9 +138,13 @@ name(struct iterator *iterator, struct tuple **ret)				\
 	struct index *idx = iterator->index;					\
 	bool is_first = true;							\
 	do {									\
-		int rc = is_first ?						\
-			name##_base(iterator, ret) :				\
-			hash_iterator_ge_raw_base(iterator, ret);		\
+		int rc;								\
+		if (is_first) {							\
+			rc = name##_base(iterator, ret);			\
+			iterator->next_raw = hash_iterator_ge_raw;		\
+		} else {							\
+			rc = hash_iterator_ge_raw_base(iterator, ret);		\
+		}								\
 		if (rc != 0 || *ret == NULL)					\
 			return rc;						\
 		is_first = false;						\
