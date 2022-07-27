@@ -1525,6 +1525,7 @@ cord_create(struct cord *cord, const char *name)
 	}
 	cord_set_name(name);
 
+	trigger_init_in_thread();
 #if ENABLE_ASAN
 	/* Record stack extents */
 	tt_pthread_attr_getstack(cord->id, &cord->sched.stack,
@@ -1565,6 +1566,7 @@ cord_exit(struct cord *cord)
 {
 	assert(cord == cord());
 	(void)cord;
+	trigger_free_in_thread();
 }
 
 void

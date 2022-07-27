@@ -104,6 +104,8 @@ add_executable(prbuf.test prbuf.c)
 target_link_libraries(prbuf.test unit core)
 add_executable(clock_lowres.test clock_lowres.c core_test_utils.c)
 target_link_libraries(clock_lowres.test unit core)
+add_executable(trigger.test trigger.c core_test_utils.c)
+target_link_libraries(trigger.test unit core)
 
 if (NOT ENABLE_GCOV)
     # This test is known to be broken with GCOV

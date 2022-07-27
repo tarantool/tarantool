@@ -45,7 +45,10 @@ typedef void (*trigger_f0)(struct trigger *trigger);
 
 struct trigger
 {
+	/** A link in a list of all registered triggers. */
 	struct rlist link;
+	/** All execution lists which this trigger is part of. */
+	struct rlist run_links;
 	trigger_f run;
 	/**
 	 * Lua ref in case the trigger is used in Lua,
@@ -59,21 +62,23 @@ struct trigger
 	trigger_f0 destroy;
 };
 
-#define TRIGGER_INITIALIZER(run) {\
+#define TRIGGER_INITIALIZER(name, run) {\
 	RLIST_LINK_INITIALIZER,\
+	RLIST_HEAD_INITIALIZER((name).run_links),\
 	(run),\
 	NULL,\
 	NULL\
 }
 
 #define TRIGGER(name, run)\
-	struct trigger name = TRIGGER_INITIALIZER(run)
+	struct trigger name = TRIGGER_INITIALIZER(name, run)
 
 static inline void
 trigger_create(struct trigger *trigger, trigger_f run, void *data,
 	       trigger_f0 destroy)
 {
 	rlist_create(&trigger->link);
+	rlist_create(&trigger->run_links);
 	trigger->run = run;
 	trigger->data = data;
 	trigger->destroy = destroy;
@@ -105,12 +110,9 @@ trigger_add_unique(struct rlist *list, struct trigger *trigger)
 	trigger_add(list, trigger);
 }
 
-static inline void
-trigger_clear(struct trigger *trigger)
-{
-	rlist_del_entry(trigger, link);
-}
-
+/** Remove the trigger from any list it's in. */
+void
+trigger_clear(struct trigger *trigger);
 
 static inline void
 trigger_destroy(struct rlist *list)
@@ -151,6 +153,14 @@ trigger_run_reverse(struct rlist *list, void *event);
  */
 int
 trigger_fiber_run(struct rlist *list, void *event, double timeout);
+
+/** Initialize the thread-dependent part of trigger subsystem. */
+void
+trigger_init_in_thread(void);
+
+/** Free the thread-dependent part of trigger subsystem. */
+void
+trigger_free_in_thread(void);
 
 #if defined(__cplusplus)
 } /* extern "C" */
