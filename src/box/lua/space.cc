@@ -654,9 +654,7 @@ box_lua_space_new_or_delete(struct trigger *trigger, void *event)
 	return 0;
 }
 
-static struct trigger on_alter_space_in_lua = {
-	RLIST_LINK_INITIALIZER, box_lua_space_new_or_delete, NULL, NULL
-};
+static TRIGGER(on_alter_space_in_lua, box_lua_space_new_or_delete);
 
 /**
  * Make a tuple or a table Lua object by map.
