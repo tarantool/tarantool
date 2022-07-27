@@ -1124,9 +1124,7 @@ on_msgpack_serializer_update(struct trigger *trigger, void *event)
 	return 0;
 }
 
-static struct trigger on_alter_func_in_lua = {
-	RLIST_LINK_INITIALIZER, lbox_func_new_or_delete, NULL, NULL
-};
+static TRIGGER(on_alter_func_in_lua, lbox_func_new_or_delete);
 
 static const struct luaL_Reg boxlib_internal[] = {
 	{"call_loadproc",  lbox_call_loadproc},

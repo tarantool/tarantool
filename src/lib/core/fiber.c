@@ -1798,9 +1798,7 @@ cord_costart_thread_func(void *arg)
 	if (f == NULL)
 		return NULL;
 
-	struct trigger break_ev_loop = {
-		RLIST_LINK_INITIALIZER, break_ev_loop_f, NULL, NULL
-	};
+	TRIGGER(break_ev_loop, break_ev_loop_f);
 	/*
 	 * Got to be in a trigger, to break the loop even
 	 * in case of an exception.

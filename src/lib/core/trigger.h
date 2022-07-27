@@ -59,6 +59,16 @@ struct trigger
 	trigger_f0 destroy;
 };
 
+#define TRIGGER_INITIALIZER(run) {\
+	RLIST_LINK_INITIALIZER,\
+	(run),\
+	NULL,\
+	NULL\
+}
+
+#define TRIGGER(name, run)\
+	struct trigger name = TRIGGER_INITIALIZER(run)
+
 static inline void
 trigger_create(struct trigger *trigger, trigger_f run, void *data,
 	       trigger_f0 destroy)
