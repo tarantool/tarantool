@@ -4,7 +4,7 @@ local ffi = require('ffi')
 local buffer = require('buffer')
 local uri = require('uri')
 
-ffi.cdef[[
+local uri_cdef = [[
 struct uri_param {
     const char *name;
     int value_count;
@@ -46,6 +46,8 @@ uri_set_destroy(struct uri_set *uri_set);
 int
 uri_format(char *str, size_t len, struct uri *uri, bool write_password);
 ]]
+
+pcall(ffi.cdef, uri_cdef) -- Required for running unit tests.
 
 local builtin = ffi.C;
 local uri_stash = buffer.ffi_stash_new('struct uri')
@@ -169,8 +171,52 @@ local function format(uri, write_password)
     return str
 end
 
+local function encode_kv(key, values, res)
+    local val = values
+    if type(val) ~= "table" then
+        val = { val }
+    end
+
+    -- { a = {} } --> "a"
+    if next(val) == nil then
+        table.insert(res, key)
+    end
+
+    -- { a = { "b" } } --> "a=c"
+    for _, v in pairs(val) do
+        local kv = ("%s=%s"):format(key, v)
+        table.insert(res, kv)
+    end
+end
+
+-- Encode map to a string.
+local function params(opts)
+    if opts == nil then
+        return ""
+    end
+    if type(opts) ~= "table" then
+        error("Usage: uri.params(table)")
+    end
+    if next(opts) == nil then
+        return ""
+    end
+    local res = {}
+    for key, value in pairs(opts) do
+        if type(key) ~= "string" then
+            error("uri.params: keys must have a type 'string'")
+        end
+        encode_kv(key, value, res)
+    end
+
+    return table.concat(res, '&')
+end
+
 return {
     parse_many = parse_many,
     parse = parse,
     format = format,
+    _internal = {
+        params = params,
+        encode_kv = encode_kv,
+    },
 };
