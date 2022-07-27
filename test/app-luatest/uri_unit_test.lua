@@ -44,3 +44,25 @@ uri_encode_kv_g.test_encode_kv = function(cg)
     encode_kv(cg.params.key, cg.params.values, res)
     t.assert_items_equals(res, cg.params.res)
 end
+
+local uri_values_g = t.group("uri_values", {
+    { values = nil, encoded = {} },
+    { values = "test", encoded = {"test"} },
+    { values = "", encoded = {""} },
+    { values = "a", encoded = {"a"} },
+})
+
+uri_values_g.test_values = function(cg)
+    local values = uri.values(cg.params.values)
+    t.assert_equals(values, cg.params.encoded)
+end
+
+g.test_uri_values_multi_arg = function(_)
+    local values = uri.values("twedledee", "tweedledum")
+    t.assert_items_equals(values, {"twedledee", "tweedledum"})
+end
+
+g.test_uri_values_nil = function(_)
+    local values = uri.values()
+    t.assert_items_equals(values, {})
+end

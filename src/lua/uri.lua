@@ -211,10 +211,18 @@ local function params(opts)
     return table.concat(res, '&')
 end
 
+-- Function allows specify multivalue keys to be added to the query string with
+-- params option.
+-- { key = uri.values("param1", "param2") }
+local function values(...)
+    return {...}
+end
+
 return {
     parse_many = parse_many,
     parse = parse,
     format = format,
+    values = values,
     _internal = {
         params = params,
         encode_kv = encode_kv,
