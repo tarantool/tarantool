@@ -17,6 +17,7 @@ MAX_PROCS ?= 2048
 MAX_FILES ?= 4096
 
 VARDIR ?= /tmp/t
+TEST_RUN_JOBS ?= ${NPROC}
 TEST_RUN_PARAMS = --builddir ${PWD}/${BUILD_DIR}
 
 COVERITY_DIR = cov-int
@@ -54,7 +55,8 @@ install-test-deps:
 
 .PHONY: run-test
 run-test: install-test-deps
-	cd test && ${TEST_RUN_ENV} ./test-run.py --force --vardir ${VARDIR} ${TEST_RUN_PARAMS} ${TEST_RUN_EXTRA_PARAMS}
+	cd test && ${TEST_RUN_ENV} ./test-run.py --force --jobs ${TEST_RUN_JOBS} --vardir ${VARDIR} \
+		${TEST_RUN_PARAMS} ${TEST_RUN_EXTRA_PARAMS}
 
 ##############################
 # Linux                      #
