@@ -311,6 +311,15 @@ local function decode_body(response)
     return res
 end
 
+local function encode_url_params(params)
+    local query_encoder = require("uri")._internal.params
+    local ok, res = pcall(query_encoder, params)
+    if not ok then
+        error(res)
+    end
+    return res
+end
+
 --
 --  <request> This function does HTTP request
 --
@@ -371,6 +380,8 @@ end
 --
 --      accept_encoding - enables automatic decompression of HTTP responses;
 --
+--      params - a table with query parameters;
+--
 --  Returns:
 --      {
 --          status=NUMBER,
@@ -392,10 +403,28 @@ curl_mt = {
             if not method or not url then
                 error('request(method, url[, body, [options]])')
             end
+            method = method:upper()
 
             opts = opts or {}
             opts.headers = opts.headers or {}
-            method = method:upper()
+
+            local encoded_params
+            if opts.params then
+                encoded_params = encode_url_params(opts.params)
+            end
+            local url_with_params = url
+            if encoded_params then
+                if method == "GET" or
+                   method == "HEAD" or
+                   method == "DELETE" then
+                    url_with_params = ("%s?%s"):format(url, encoded_params)
+                elseif body then
+                    error('use either body or http params')
+                else
+                    body = encoded_params
+                end
+            end
+
             if method == 'PATCH' or
                method == 'POST' or
                method == 'PUT' then
@@ -411,13 +440,17 @@ curl_mt = {
                 end
                 body = encode_body(body, content_type, self.encoders)
             end
-            local resp = self.curl:request(method, url, body, opts or {})
+
+            local resp = self.curl:request(method, url_with_params, body, opts or {})
+
             if resp and resp.headers then
                 if resp.headers['set-cookie'] ~= nil then
                     resp.cookies = process_cookies(resp.headers['set-cookie'])
                 end
                 resp.headers = process_headers(resp.headers)
             end
+
+            resp.url = url_with_params
 
             return setmetatable(resp, {
                 __index = {
