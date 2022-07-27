@@ -1,6 +1,7 @@
 local client = require('http.client')
 local json = require('json')
 local fiber = require('fiber')
+local uri = require('uri')
 local os = require('os')
 local t = require('luatest')
 local g = t.group('http_client', {
@@ -899,4 +900,89 @@ g.test_decode_body_with_content_type_camel_case = function(cg)
     t.assert_equals(r.status, 200, 'HTTP code is not 200')
     t.assert_equals(r.headers['content_type'], content_type)
     t.assert_equals(r:decode(), body)
+end
+
+g.test_http_params_get = function(cg)
+    local opts = table.deepcopy(cg.opts)
+    opts.params = { a = "1", b = 2 }
+    opts.timeout = 0.1
+    local r = client.get(cg.url, opts)
+    t.assert_equals(r.status, 200)
+    t.assert_equals(r.body, "hello world")
+    t.assert_str_contains(r.url, "a=1&b=2")
+end
+
+g.test_http_params_head = function(cg)
+    local opts = table.deepcopy(cg.opts)
+    opts.params = { m = 2 }
+    opts.timeout = 0.1
+    local r = client.head(cg.url, opts)
+    t.assert_equals(r.status, 200)
+    t.assert_str_contains(r.url, "m=2")
+end
+
+g.test_http_params_delete = function(cg)
+    local opts = table.deepcopy(cg.opts)
+    opts.params = { h = "1" }
+    opts.timeout = 0.1
+    local r = client.delete(cg.url, opts)
+    t.assert_equals(r.status, 200)
+    t.assert_str_contains(r.url, "h=1")
+end
+
+g.test_http_params_post_body = function(cg)
+    local opts = table.deepcopy(cg.opts)
+    opts.params = { c = 2, m = uri.values("lango", "lungo") }
+    opts.timeout = 0.1
+    local r = client.post(cg.url, nil, opts)
+    t.assert_equals(r.status, 200)
+    t.assert_equals(r.body, "c=2&m=lango&m=lungo")
+end
+
+g.test_http_params_post_body_nil = function(cg)
+    local opts = table.deepcopy(cg.opts)
+    opts.params = { c = "2", d = 4 }
+    opts.timeout = 0.1
+    local ok, err = pcall(client.post, cg.url, "perfect body", opts)
+    t.assert_equals(ok, false)
+    t.assert_str_contains(err, "use either body or http params")
+end
+
+g.test_http_params_request_get = function(cg)
+    local http = client.new()
+    t.assert(http ~= nil, "client is created")
+
+    local opts = table.deepcopy(cg.opts)
+    opts.params = { key = "2" }
+
+    -- HTTP method in uppercase.
+    local resp = http:request("GET", cg.url, nil, opts)
+    t.assert_equals(resp.status, 200)
+    t.assert_equals(resp.body, "hello world")
+    t.assert_str_contains(resp.url, "key=2")
+
+    -- HTTP method in lowercase.
+    local resp = http:request("get", cg.url, nil, opts)
+    t.assert_equals(resp.status, 200)
+    t.assert_equals(resp.body, "hello world")
+    t.assert_str_contains(resp.url, "key=2")
+end
+
+g.test_http_params_request_post = function(cg)
+    local http = client.new()
+    t.assert(http ~= nil, "client is created")
+
+    local opts = table.deepcopy(cg.opts)
+    opts.params = { k = "2", v = uri.values("3", "4") }
+
+    -- HTTP method in uppercase.
+    local resp = http:request("POST", cg.url, nil, opts)
+    t.assert_equals(resp.status, 200)
+    t.assert_equals(resp.body, "k=2&v=3&v=4")
+
+    -- HTTP method in lowercase.
+    local resp = http:request("post", cg.url, nil, opts)
+    t.assert_equals(resp.status, 200)
+    t.assert_equals(resp.body, "k=2&v=3&v=4")
+    t.assert_equals(resp.headers['content_type'], "application/x-www-form-urlencoded")
 end
