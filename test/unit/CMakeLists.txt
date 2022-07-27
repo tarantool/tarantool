@@ -98,6 +98,8 @@ add_executable(func_cache.test func_cache.c box_test_utils.c)
 target_link_libraries(func_cache.test box unit)
 add_executable(prbuf.test prbuf.c)
 target_link_libraries(prbuf.test unit core)
+add_executable(trigger.test trigger.c core_test_utils.c)
+target_link_libraries(trigger.test unit core)
 
 if (NOT ENABLE_GCOV)
     # This test is known to be broken with GCOV
