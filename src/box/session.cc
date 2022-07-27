@@ -285,10 +285,8 @@ session_create_on_demand(void)
 	struct session *s = session_create(SESSION_TYPE_BACKGROUND);
 	if (s == NULL)
 		return NULL;
-	s->fiber_on_stop = {
-		RLIST_LINK_INITIALIZER, session_on_stop, NULL, NULL
-	};
 	/* Add a trigger to destroy session on fiber stop */
+	trigger_create(&s->fiber_on_stop, session_on_stop, NULL, NULL);
 	trigger_add(&fiber()->on_stop, &s->fiber_on_stop);
 	credentials_reset(&s->credentials, admin_user);
 	fiber_set_session(fiber(), s);

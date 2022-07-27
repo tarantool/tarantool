@@ -5868,68 +5868,20 @@ on_replace_dd_func_index(struct trigger *trigger, void *event)
 	return 0;
 }
 
-struct trigger alter_space_on_replace_space = {
-	RLIST_LINK_INITIALIZER, on_replace_dd_space, NULL, NULL
-};
-
-struct trigger alter_space_on_replace_index = {
-	RLIST_LINK_INITIALIZER, on_replace_dd_index, NULL, NULL
-};
-
-struct trigger on_replace_truncate = {
-	RLIST_LINK_INITIALIZER, on_replace_dd_truncate, NULL, NULL
-};
-
-struct trigger on_replace_schema = {
-	RLIST_LINK_INITIALIZER, on_replace_dd_schema, NULL, NULL
-};
-
-struct trigger on_replace_user = {
-	RLIST_LINK_INITIALIZER, on_replace_dd_user, NULL, NULL
-};
-
-struct trigger on_replace_func = {
-	RLIST_LINK_INITIALIZER, on_replace_dd_func, NULL, NULL
-};
-
-struct trigger on_replace_collation = {
-	RLIST_LINK_INITIALIZER, on_replace_dd_collation, NULL, NULL
-};
-
-struct trigger on_replace_priv = {
-	RLIST_LINK_INITIALIZER, on_replace_dd_priv, NULL, NULL
-};
-
-struct trigger on_replace_cluster = {
-	RLIST_LINK_INITIALIZER, on_replace_dd_cluster, NULL, NULL
-};
-
-struct trigger on_replace_sequence = {
-	RLIST_LINK_INITIALIZER, on_replace_dd_sequence, NULL, NULL
-};
-
-struct trigger on_replace_sequence_data = {
-	RLIST_LINK_INITIALIZER, on_replace_dd_sequence_data, NULL, NULL
-};
-
-struct trigger on_replace_space_sequence = {
-	RLIST_LINK_INITIALIZER, on_replace_dd_space_sequence, NULL, NULL
-};
-
-struct trigger on_replace_trigger = {
-	RLIST_LINK_INITIALIZER, on_replace_dd_trigger, NULL, NULL
-};
-
-struct trigger on_replace_fk_constraint = {
-	RLIST_LINK_INITIALIZER, on_replace_dd_fk_constraint, NULL, NULL
-};
-
-struct trigger on_replace_ck_constraint = {
-	RLIST_LINK_INITIALIZER, on_replace_dd_ck_constraint, NULL, NULL
-};
-
-struct trigger on_replace_func_index = {
-	RLIST_LINK_INITIALIZER, on_replace_dd_func_index, NULL, NULL
-};
-
+TRIGGER(alter_space_on_replace_space, on_replace_dd_space);
+TRIGGER(alter_space_on_replace_index, on_replace_dd_index);
+TRIGGER(on_replace_truncate, on_replace_dd_truncate);
+TRIGGER(on_replace_schema, on_replace_dd_schema);
+TRIGGER(on_replace_user, on_replace_dd_user);
+TRIGGER(on_replace_func, on_replace_dd_func);
+TRIGGER(on_replace_collation, on_replace_dd_collation);
+TRIGGER(on_replace_priv, on_replace_dd_priv);
+TRIGGER(on_replace_cluster, on_replace_dd_cluster);
+TRIGGER(on_replace_sequence, on_replace_dd_sequence);
+TRIGGER(on_replace_sequence_data, on_replace_dd_sequence_data);
+TRIGGER(on_replace_space_sequence, on_replace_dd_space_sequence);
+TRIGGER(on_replace_trigger, on_replace_dd_trigger);
+TRIGGER(on_replace_fk_constraint, on_replace_dd_fk_constraint);
+TRIGGER(on_replace_ck_constraint, on_replace_dd_ck_constraint);
+TRIGGER(on_replace_func_index, on_replace_dd_func_index);
 /* vim: set foldmethod=marker */

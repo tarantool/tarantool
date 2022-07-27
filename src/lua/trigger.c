@@ -211,9 +211,8 @@ lbox_trigger_reset(struct lua_State *L, int top, struct rlist *list,
 			trg = (struct lbox_trigger *) malloc(sizeof(*trg));
 			if (trg == NULL)
 				luaL_error(L, "failed to allocate trigger");
-			trg->base.run = lbox_trigger_run;
-			trg->base.data = NULL;
-			trg->base.destroy = lbox_trigger_destroy;
+			trigger_create(&trg->base, lbox_trigger_run, NULL,
+				       lbox_trigger_destroy);
 			trg->ref = LUA_NOREF;
 			trg->push_event = push_event;
 			trg->pop_event = pop_event;
