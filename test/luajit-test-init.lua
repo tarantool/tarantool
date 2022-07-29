@@ -1,12 +1,14 @@
 -- Disable strict for Tarantool.
+-- Required by: PUC-Rio-Lua-5.1-tests.
 require("strict").off()
 
--- XXX: lua-Harness test suite uses it's own tap.lua module
+-- XXX: tarantool-tests suite uses it's own tap.lua module
 -- that conflicts with the Tarantool's one.
+-- Required by: tarantool-tests.
 package.loaded.tap = nil
--- XXX: lua-Harness test suite checks that utf8 module presents
--- only in Lua5.3 or moonjit.
-utf8 = nil
+-- Use Tarantool specific profile for lua-Harness test suite.
+-- Required by: lua-Harness.
+pcall(require, 'profile_tarantool')
 
 -- There are some tests launching Lua interpreter, so strict need
 -- to be disabled for the child tests too. Hence `strict.off()` is
@@ -18,6 +20,7 @@ utf8 = nil
 -- * arg[N]  -- the script argument for all N in [1, #arg]
 -- The former one can be used to adjust the command to be used in
 -- child tests.
+-- Required by: PUC-Rio-Lua-5.1-tests, lua-Harness-tests.
 -- XXX: Quotes types are important.
 -- XXX: luacheck thinks that `arg` is read-only global variable.
 -- luacheck: no global
@@ -32,16 +35,22 @@ arg[-1] = arg[-1]..' -e "require[[strict]].off()"'
 -- variable, so evaluate this once and use later.
 local path_to_sources = arg[0]:gsub("[^/]+$", "")
 
+-- Required by: PUC-Rio-Lua-5.1-tests.
 -- luacheck: no global
 function _loadfile(filename)
   return loadfile(path_to_sources..filename)
 end
 
+-- Required by: PUC-Rio-Lua-5.1-tests, lua-Harness-tests.
 -- luacheck: no global
 function _dofile(filename)
   return dofile(path_to_sources..filename)
 end
 
--- This is workaround introduced for flaky macosx tests reported by
+-- GC-related tests might fail due to the garbage generated on
+-- Tarantool instance startup. Run full GC cycle to return it
+-- to the initial state. For more info see the issue below:
 -- https://github.com/tarantool/tarantool/issues/7058
+-- Required by: tarantool-tests, PUC-Rio-Lua-5.1-tests,
+--             LuaJIT-tests, lua-Harness-tests.
 collectgarbage('collect')
