@@ -1746,47 +1746,36 @@ memtx_tx_handle_gap_write(struct txn *txn, struct space *space,
 	uint64_t index_mask = 1ull << (ind & 63);
 	struct gap_item *item, *tmp;
 	rlist_foreach_entry_safe(item, list, in_nearby_gaps, tmp) {
-		bool is_split = false;
-		if (item->key == NULL) {
-			if (memtx_tx_track_read_story(item->txn, space, story,
-						      index_mask) != 0)
-				return -1;
-			is_split = true;
-		} else {
+		int cmp = 0;
+		if (item->key != NULL) {
 			struct key_def *def = index->def->key_def;
-			hint_t oh = def->key_hint(item->key, item->part_count, def);
+			hint_t oh =
+				def->key_hint(item->key, item->part_count, def);
 			hint_t kh = def->tuple_hint(tuple, def);
-			int cmp = def->tuple_compare_with_key(tuple, kh,
-							      item->key,
-							      item->part_count,
-							      oh, def);
-			int dir = iterator_direction(item->type);
-			if (cmp == 0 && (item->type == ITER_EQ ||
-					 item->type == ITER_REQ ||
-					 item->type == ITER_GE ||
-					 item->type == ITER_LE)) {
-				if (memtx_tx_track_read_story(item->txn, space,
-							      story,
-							      index_mask) != 0)
-					return -1;
-			}
-			if (cmp * dir > 0 &&
-			    item->type != ITER_EQ && item->type != ITER_REQ) {
-				if (memtx_tx_track_read_story(item->txn, space,
-							      story,
-							      index_mask) != 0)
-					return -1;
-				is_split = true;
-			}
-			if (cmp > 0 && dir < 0) {
-				/* The tracker must be moved to the left gap. */
-				rlist_del(&item->in_nearby_gaps);
-				rlist_add(&story->link[ind].nearby_gaps,
-					  &item->in_nearby_gaps);
-			}
+			cmp = def->tuple_compare_with_key(tuple, kh, item->key,
+							  item->part_count, oh,
+							  def);
 		}
-
-		if (is_split) {
+		int dir = iterator_direction(item->type);
+		bool is_full_key = item->part_count ==
+				   index->def->cmp_def->part_count;
+		bool is_eq = item->type == ITER_EQ || item->type == ITER_REQ;
+		bool is_e = item->type == ITER_LE || item->type == ITER_GE;
+		bool need_split = item->key == NULL ||
+				  (dir * cmp > 0 && !is_eq) ||
+				  (!is_full_key && cmp == 0 && (is_e || is_eq));
+		bool need_move = !need_split &&
+				 ((dir < 0 && cmp > 0) ||
+				  (cmp > 0 && item->type == ITER_EQ) ||
+				  (cmp == 0 && ((dir < 0 && is_full_key) ||
+						item->type == ITER_LT)));
+		bool need_track = need_split ||
+				  (is_full_key && cmp == 0 && is_e);
+		if (need_track && memtx_tx_track_read_story(item->txn, space,
+							    story,
+							    index_mask) != 0)
+			return -1;
+		if (need_split) {
 			/*
 			 * The insertion divided the gap into two parts.
 			 * Old tracker is left in one gap, let's copy tracker
@@ -1801,6 +1790,16 @@ memtx_tx_handle_gap_write(struct txn *txn, struct space *space,
 
 			rlist_add(&story->link[ind].nearby_gaps,
 				  &copy->in_nearby_gaps);
+		} else if (need_move) {
+			/* The tracker must be moved to the left gap. */
+			rlist_del(&item->in_nearby_gaps);
+			rlist_add(&story->link[ind].nearby_gaps,
+				  &item->in_nearby_gaps);
+		} else {
+			assert((dir > 0 && cmp < 0) ||
+			       (cmp < 0 && item->type == ITER_REQ) ||
+			       (cmp == 0 && ((dir > 0 && is_full_key) ||
+					     item->type == ITER_GT)));
 		}
 	}
 	return 0;
