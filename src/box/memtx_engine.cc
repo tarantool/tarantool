@@ -827,6 +827,7 @@ checkpoint_f(va_list ap)
 			if (checkpoint_write_tuple(&snap, entry->space_id,
 					entry->group_id, data, size) != 0)
 				goto fail;
+			fiber_gc();
 		}
 		if (rc != 0)
 			goto fail;
@@ -1077,6 +1078,7 @@ memtx_join_f(va_list ap)
 			if (memtx_join_send_tuple(ctx->stream, entry->space_id,
 						  data, size) != 0)
 				return -1;
+			fiber_gc();
 		}
 		if (rc != 0)
 			return -1;

@@ -32,6 +32,14 @@ memtx_tuple_decompress(struct tuple *tuple)
 	return tuple;
 }
 
+static inline const char *
+memtx_tuple_decompress_raw(const char *tuple, const char *tuple_end,
+			   uint32_t *p_size)
+{
+	*p_size = tuple_end - tuple;
+	return tuple;
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
