@@ -634,9 +634,6 @@ tree_iterator_set_next_method(struct tree_iterator<USE_HINT> *it)
 	case ITER_REQ:
 		it->base.next_raw = tree_iterator_prev_equal_raw<USE_HINT>;
 		break;
-	case ITER_ALL:
-		it->base.next_raw = tree_iterator_next_raw<USE_HINT>;
-		break;
 	case ITER_LT:
 	case ITER_LE:
 		it->base.next_raw = tree_iterator_prev_raw<USE_HINT>;
@@ -693,8 +690,7 @@ tree_iterator_start_raw(struct iterator *iterator, struct tuple **ret)
 		 * efficiently equals to the empty key. */
 		equals = memtx_tree_size(tree) != 0;
 	} else {
-		if (type == ITER_ALL || type == ITER_EQ ||
-		    type == ITER_GE || type == ITER_LT) {
+		if (type == ITER_EQ || type == ITER_GE || type == ITER_LT) {
 			it->tree_iterator =
 				memtx_tree_lower_bound(tree, &it->key_data,
 						       &equals);
@@ -747,8 +743,8 @@ tree_iterator_start_raw(struct iterator *iterator, struct tuple **ret)
 	if (key_is_full && !eq_match)
 		memtx_tx_track_point(txn, space, idx, it->key_data.key);
 	if (!key_is_full ||
-	    ((type == ITER_ALL || type == ITER_GE || type == ITER_LE) &&
-	     !equals) || (type == ITER_GT || type == ITER_LT))
+	    ((type == ITER_GE || type == ITER_LE) && !equals) ||
+	    (type == ITER_GT || type == ITER_LT))
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_track_gap(txn, space, idx, successor, type,
 				   it->key_data.key, it->key_data.part_count);
@@ -1442,6 +1438,9 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 		type = iterator_type_is_reverse(type) ? ITER_LE : ITER_GE;
 		key = NULL;
 	}
+
+	if (type == ITER_ALL)
+		type = ITER_GE;
 
 	struct tree_iterator<USE_HINT> *it = (struct tree_iterator<USE_HINT> *)
 		mempool_alloc(&memtx->iterator_pool);
