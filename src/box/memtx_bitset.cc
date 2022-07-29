@@ -411,6 +411,12 @@ memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 	}
 
 	tt_bitset_expr_destroy(&expr);
+
+/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
+	memtx_tx_track_full_scan(in_txn(), space_by_id(it->base.space_id),
+				 &index->base);
+/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
+
 	return (struct iterator *)it;
 fail:
 	tt_bitset_expr_destroy(&expr);

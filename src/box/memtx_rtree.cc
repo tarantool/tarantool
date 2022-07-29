@@ -224,6 +224,11 @@ memtx_rtree_index_get_raw(struct index *base, const char *key,
 	struct rtree_iterator iterator;
 	rtree_iterator_init(&iterator);
 
+/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
+	memtx_tx_track_full_scan(in_txn(), space_by_id(base->def->space_id),
+				 &index->base);
+/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
+
 	struct rtree_rect rect;
 	if (mp_decode_rect_from_key(&rect, index->dimension, key, part_count))
 		unreachable();
@@ -355,6 +360,12 @@ memtx_rtree_index_create_iterator(struct index *base,  enum iterator_type type,
 	it->base.next = memtx_iterator_next;
 	it->base.free = index_rtree_iterator_free;
 	rtree_iterator_init(&it->impl);
+
+/********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
+	memtx_tx_track_full_scan(in_txn(), space_by_id(it->base.space_id),
+				 &index->base);
+/*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
+
 	/*
 	 * We don't care if rtree_search() does or does not find anything
 	 * as far as we are fine anyway: iterator is initialized correctly
