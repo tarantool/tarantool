@@ -36,6 +36,7 @@
 #include "txn.h"
 #include "memtx_tx.h"
 #include "memtx_engine.h"
+#include "memtx_tuple_compression.h"
 #include "space.h"
 #include "schema.h" /* space_by_id(), space_cache_find() */
 #include "errinj.h"
@@ -518,7 +519,9 @@ hash_snapshot_iterator_next(struct snapshot_iterator *iterator,
 
 		if (tuple != NULL) {
 			*data = tuple_data_range(*res, size);
-			return 0;
+			*data = memtx_tuple_decompress_raw(
+				*data, *data + *size, size);
+			return *data == NULL ? -1 : 0;
 		}
 	}
 	return 0;
