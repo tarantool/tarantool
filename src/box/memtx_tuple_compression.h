@@ -28,17 +28,8 @@ memtx_tuple_compress(struct tuple *tuple)
 static inline struct tuple *
 memtx_tuple_decompress(struct tuple *tuple)
 {
-	(void)tuple;
-	unreachable();
-	return NULL;
-}
-
-static inline struct tuple *
-memtx_tuple_maybe_decompress(struct tuple *tuple)
-{
-        if (!tuple_is_compressed(tuple))
-                return tuple;
-        return memtx_tuple_decompress(tuple);
+	assert(!tuple_is_compressed(tuple));
+	return tuple;
 }
 
 #if defined(__cplusplus)
