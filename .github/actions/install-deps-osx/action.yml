@@ -16,6 +16,7 @@ runs:
               libiconv
               zlib
               cmake
+              ninja
               python@3.8
               autoconf
               automake

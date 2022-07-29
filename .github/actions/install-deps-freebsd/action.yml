@@ -11,6 +11,7 @@ runs:
         pkg install -y \
           cmake \
           gmake \
+          ninja \
           icu \
           libiconv \
           python38 \
