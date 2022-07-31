@@ -332,6 +332,11 @@ local function cmd_finish()
     return true, offset < 0 and hook_factory(offset - 1) or hook_finish
 end
 
+-- simply continue execution
+local function cmd_continue()
+    return true
+end
+
 local function cmd_print(expr)
     local env = local_bindings(1, true)
     local chunk = compile_chunk("return " .. expr, env)
@@ -468,63 +473,109 @@ local function cmd_locals()
     return false
 end
 
+local gen_commands
+
 local function cmd_help()
-    dbg.write(""
-        .. COLOR_BLUE .. "  <return>" .. GREEN_CARET .. "re-run last command\n"
-        .. COLOR_BLUE .. "  c" .. COLOR_YELLOW .. "(ontinue)" .. GREEN_CARET .. "continue execution\n"
-        .. COLOR_BLUE .. "  s" .. COLOR_YELLOW .. "(tep)" .. GREEN_CARET ..
-        "step forward by one line (into functions)\n"
-        ..
-        COLOR_BLUE .. "  n" ..
-        COLOR_YELLOW .. "(ext)" .. GREEN_CARET .. "step forward by one line (skipping over functions)\n"
-        .. COLOR_BLUE ..
-        "  f" .. COLOR_YELLOW .. "(inish)" .. GREEN_CARET .. "step forward until exiting the current function\n"
-        .. COLOR_BLUE .. "  u" .. COLOR_YELLOW .. "(p)" .. GREEN_CARET .. "move up the stack by one frame\n"
-        .. COLOR_BLUE .. "  d" .. COLOR_YELLOW .. "(own)" .. GREEN_CARET .. "move down the stack by one frame\n"
-        ..
-        COLOR_BLUE ..
-        "  w" ..
-        COLOR_YELLOW ..
-        "(here) " .. COLOR_BLUE .. "[line count]" .. GREEN_CARET .. "print source code around the current line\n"
-        .. COLOR_BLUE ..
-        "  e" .. COLOR_YELLOW .. "(val) " .. COLOR_BLUE .. "[statement]" .. GREEN_CARET .. "execute the statement\n"
-        ..
-        COLOR_BLUE ..
-        "  p" ..
-        COLOR_YELLOW ..
-        "(rint) " .. COLOR_BLUE .. "[expression]" .. GREEN_CARET .. "execute the expression and print the result\n"
-        .. COLOR_BLUE .. "  t" .. COLOR_YELLOW .. "(race)" .. GREEN_CARET .. "print the stack trace\n"
-        ..
-        COLOR_BLUE ..
-        "  l" .. COLOR_YELLOW .. "(ocals)" .. GREEN_CARET .. "print the function arguments, locals and upvalues.\n"
-        .. COLOR_BLUE .. "  h" .. COLOR_YELLOW .. "(elp)" .. GREEN_CARET .. "print this message\n"
-        .. COLOR_BLUE .. "  q" .. COLOR_YELLOW .. "(uit)" .. GREEN_CARET .. "halt execution\n"
-    )
+    for _, v in ipairs(gen_commands) do
+        local map = gen_commands[v]
+        if #map.aliases > 0 then
+            local fun = require 'fun'
+            local txt = ''
+            fun.each(function(x) txt = txt .. '|' .. color_yellow(x) end,
+                     map.aliases)
+            print(color_blue(v) .. '|' .. string.sub(txt, 2, #txt) .. ' ' ..
+                  (map.arg or ''))
+        else
+            print(color_blue(v) .. ' ' .. (map.arg or ''));
+        end
+        print('    - ' .. map.help)
+    end
     return false
 end
 
-local last_cmd = false
+local function cmd_quit()
+    dbg.exit(0)
+    return true
+end
 
-local commands = {
-    ["^c$"] = function() return true end,
-    ["^s$"] = cmd_step,
-    ["^n$"] = cmd_next,
-    ["^f$"] = cmd_finish,
-    ["^p%s+(.*)$"] = cmd_print,
-    ["^e%s+(.*)$"] = cmd_eval,
-    ["^u$"] = cmd_up,
-    ["^d$"] = cmd_down,
-    ["^w%s*(%d*)$"] = cmd_where,
-    ["^t$"] = cmd_trace,
-    ["^l$"] = cmd_locals,
-    ["^h$"] = cmd_help,
-    ["^q$"] = function() dbg.exit(0); return true end,
+local commands_help = {
+    {'c.ont.inue', 'continue execution', cmd_continue},
+    {'d.own', 'move down the stack by one frame',  cmd_down},
+    {'e.val $expression', 'execute the statement',  cmd_eval},
+    {'f.inish|step_out', 'step forward until exiting the current function',  cmd_finish},
+    {'h.elp|?', 'print this help message',  cmd_help},
+    {'l.ocals', 'print the function arguments, locals and upvalues',  cmd_locals},
+    {'n.ext|step_over', 'step forward by one line (skipping over functions)',  cmd_next},
+    {'p.rint $expression', 'execute the expression and print the result',  cmd_print},
+    {'q.uit', 'exit debugger', cmd_quit},
+    {'s.t.ep|step_into', 'step forward by one line (into functions)', cmd_step},
+    {'t.race|bt', 'print the stack trace',  cmd_trace},
+    {'u.p', 'move up the stack by one frame',  cmd_up},
+    {'w.here $linecount', 'print source code around the current line', cmd_where},
 }
 
+local function build_commands_map(commands)
+    local gen_commands = {}
+
+    for _, cmds in ipairs(commands) do
+        local c, h, f = unpack(cmds)
+        local first = true
+        local main_cmd
+        local pattern = '^[^%s]+%s+([^%s]+)'
+
+        for subcmds in c:gmatch('[^|]+') do
+            local arg = subcmds:match(pattern)
+            subcmds = subcmds:match('^([^%s]+)')
+            local cmd = ''
+            local gen = subcmds:gmatch('[^.]+')
+            local prefix = gen()
+            local suffix = ''
+            local segment = prefix
+
+            -- remember the first segment (main shortcut for command)
+            if first then
+                main_cmd = prefix
+            end
+
+            repeat
+                cmd = cmd .. segment
+                gen_commands[cmd] = {
+                    help = h,
+                    handler = f,
+                    first = first,
+                    suffix = suffix,
+                    aliases = {},
+                    arg = arg
+                }
+                if first then
+                    table.insert(gen_commands, main_cmd)
+                else
+                    assert(#main_cmd > 0)
+                    table.insert(gen_commands[main_cmd].aliases, cmd)
+                end
+                first = false
+                segment = gen()
+                suffix = suffix .. (segment or '')
+            until not segment
+        end
+    end
+    return gen_commands
+end
+
+gen_commands = build_commands_map(commands_help)
+
+local last_cmd = false
+
+-- Recognize a command, then return command handler,
+-- 1st argument passed, and flag what argument is expected.
 local function match_command(line)
-    for pat, func in pairs(commands) do
-        -- Return the matching command and capture argument.
-        if line:find(pat) then return func, line:match(pat) end
+    local gen = line:gmatch('[^%s]+')
+    local cmd = gen()
+    local arg1st = gen()
+    if not gen_commands[cmd] then
+        return nil
+    else
+        return gen_commands[cmd].handler, arg1st, gen_commands[cmd].arg
     end
 end
 
@@ -537,11 +588,18 @@ local function run_command(line)
     -- Re-execute the last command if you press return.
     if line == "" then line = last_cmd or "h" end
 
-    local command, command_arg = match_command(line)
-    if command then
-        last_cmd = line
-        -- unpack({...}) prevents tail call elimination so the stack frame indices are predictable.
-        return unpack({ command(command_arg) })
+    local handler, command_arg, arg_expected = match_command(line)
+    if handler then
+        if arg_expected and command_arg == nil then
+            dbg_writeln(color_red("Error:") ..
+                " command expects argument, but none received '%s'.\n" ..
+                "Type 'h' and press return for a command list.", line)
+            return false
+        else
+            last_cmd = line
+            -- unpack({...}) prevents tail call elimination so the stack frame indices are predictable.
+            return unpack({ handler(command_arg) })
+        end
     elseif dbg.cfg.auto_eval then
         return unpack({ cmd_eval(line) })
     else
