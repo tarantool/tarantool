@@ -57,19 +57,32 @@ Debugger Commands:
 
 If you have used other CLI debuggers, debugger.lua shouldn't be surprising. I didn't make a fancy parser, so the commands are just single letters. Since the debugger is pretty simple there are only a small handful of commands anwyay.
 
-	[return] - re-run last command
-	c(ontinue) - contiue execution
-	s(tep) - step forward by one line (into functions)
-	n(ext) - step forward by one line (skipping over functions)
-	p(rint) [expression] - execute the expression and print the result
-	f(inish) - step forward until exiting the current function
-	u(p) - move up the stack by one frame
-	d(own) - move down the stack by one frame
-	w(here) [line count] - print source code around the current line
-	t(race) - print the stack trace
-	l(ocals) - print the function arguments, locals and upvalues.
-	h(elp) - print this message
-	q(uit) - halt execution
+    c|cont|continue
+    - continue execution
+    d|down
+    - move down the stack by one frame
+    e|eval $expression
+    - execute the statement
+    f|finish|step_out
+    - step forward until exiting the current function
+    h|help|?
+    - print this help message
+    l|locals
+    - print the function arguments, locals and upvalues
+    n|next|step_over
+    - step forward by one line (skipping over functions)
+    p|print $expression
+    - execute the expression and print the result
+    q|quit
+    - exit debugger
+    s|st|step|step_into
+    - step forward by one line (into functions)
+    t|trace|bt
+    - print the stack trace
+    u|up
+    - move up the stack by one frame
+    w|where $linecount
+    - print source code around the current line
 
 If you've never used a command line debugger before, start a nice warm cozy fire, run tutorial.lua, and open it up in your favorite editor so you can follow along.
 
