@@ -1,0 +1,39 @@
+name: submodule_update
+
+on:
+  push:
+    branches:
+      - 'master'
+      - '2.10'
+
+jobs:
+  tarantool-ee:
+    runs-on: ubuntu-20.04-self-hosted
+    env:
+      SUBMODULE: 'tarantool'
+      REPOSITORY: 'tarantool/tarantool-ee'
+      FEATURE_BRANCH: 'TarantoolBot/update-tarantool-${{ github.ref_name }}'
+      CHECKOUT_BRANCH: ${{ github.ref_name }}
+      PR_AGAINST_BRANCH: ${{ github.ref_name }}
+      PR_TITLE_PREFIX: ${{ github.ref_name == 'master' && '' ||
+        format('[{0}] ', github.ref_name) }}
+      PR_TITLE: 'tarantool: bump to new version'
+      COMMIT_MESSAGE: |
+        tarantool: bump to new version
+
+        NO_DOC=submodule update
+        NO_TEST=submodule update
+        NO_CHANGELOG=submodule update
+
+    steps:
+      - name: Create PR with submodule update
+        uses: tarantool/actions/update-submodule@master
+        with:
+          github_token: ${{ secrets.EE_UPDATE_SUBMODULE_TOKEN }}
+          repository: ${{ env.REPOSITORY }}
+          submodule: ${{ env.SUBMODULE }}
+          checkout_branch: ${{ env.CHECKOUT_BRANCH }}
+          feature_branch: ${{ env.FEATURE_BRANCH }}
+          pr_against_branch: ${{ env.PR_AGAINST_BRANCH }}
+          pr_title: ${{ env.PR_TITLE_PREFIX }}${{ env.PR_TITLE }}
+          commit_message: ${{ env.COMMIT_MESSAGE }}
