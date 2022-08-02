@@ -8,16 +8,24 @@ on:
 
 jobs:
   tarantool-ee:
+    # Run on push to the 'master' and release branches in tarantool/tarantool
+    # repo only.
+    if: github.repository == 'tarantool/tarantool'
+
     runs-on: ubuntu-20.04-self-hosted
+
     env:
       SUBMODULE: 'tarantool'
       REPOSITORY: 'tarantool/tarantool-ee'
       FEATURE_BRANCH: 'TarantoolBot/update-tarantool-${{ github.ref_name }}'
       CHECKOUT_BRANCH: ${{ github.ref_name }}
       PR_AGAINST_BRANCH: ${{ github.ref_name }}
-      PR_TITLE_PREFIX: ${{ github.ref_name == 'master' && '' ||
-        format('[{0}] ', github.ref_name) }}
+      PR_TITLE_PREFIX: ${{ github.ref_name != 'master' &&
+        format('[{0}] ', github.ref_name) || '' }}
       PR_TITLE: 'tarantool: bump to new version'
+      PR_DESCRIPTION: >-
+        Just a regular auto-update of tarantool submodule to bring new features
+        and bug fixes into tarantool-ee.
       COMMIT_MESSAGE: |
         tarantool: bump to new version
 
@@ -36,4 +44,5 @@ jobs:
           feature_branch: ${{ env.FEATURE_BRANCH }}
           pr_against_branch: ${{ env.PR_AGAINST_BRANCH }}
           pr_title: ${{ env.PR_TITLE_PREFIX }}${{ env.PR_TITLE }}
+          pr_description: ${{ env.PR_DESCRIPTION }}
           commit_message: ${{ env.COMMIT_MESSAGE }}
