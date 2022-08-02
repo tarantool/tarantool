@@ -7,6 +7,8 @@
 
 #include "diag.h"
 #include "error.h"
+#include "schema_def.h"
+#include "identifier.h"
 #include "trivia/util.h"
 #include "salad/grp_alloc.h"
 #include "small/region.h"
@@ -118,6 +120,13 @@ tuple_constraint_def_decode(const char **data,
 		}
 		uint32_t str_len;
 		const char *str = mp_decode_str(data, &str_len);
+		if (str_len > BOX_NAME_MAX) {
+			diag_set(ClientError, errcode,
+				 "constraint name is too long");
+			return -1;
+		}
+		if (identifier_check(str, str_len) != 0)
+			return -1;
 		char *str_copy = region_alloc(region, str_len + 1);
 		if (str_copy == NULL) {
 			diag_set(OutOfMemory, str_len + 1, "region",
@@ -273,6 +282,13 @@ tuple_constraint_def_decode_fkey(const char **data,
 		}
 		uint32_t str_len;
 		const char *str = mp_decode_str(data, &str_len);
+		if (str_len > BOX_NAME_MAX) {
+			diag_set(ClientError, errcode,
+				 "foreign key name is too long");
+			return -1;
+		}
+		if (identifier_check(str, str_len) != 0)
+			return -1;
 		char *str_copy = region_alloc(region, str_len + 1);
 		if (str_copy == NULL) {
 			diag_set(OutOfMemory, bytes, "region",
