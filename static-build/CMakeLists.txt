@@ -34,10 +34,12 @@ set(BACKUP_STORAGE https://distrib.hb.bizmrg.com)
 # linker flag assumes that some compilation flag is set. We don't pass
 # CFLAGS from environment, so we should not do it for LDFLAGS too.
 set(DEPENDENCY_CFLAGS "")
+set(DEPENDENCY_CXXFLAGS "")
 set(DEPENDENCY_CPPFLAGS "")
 set(DEPENDENCY_LDFLAGS)
 if (APPLE)
     set(DEPENDENCY_CFLAGS   "${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT}")
+    set(DEPENDENCY_CXXFLAGS "${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT}")
     set(DEPENDENCY_CPPFLAGS "${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT}")
 endif()
 
@@ -85,6 +87,7 @@ ExternalProject_Add(icu
         CC=${CMAKE_C_COMPILER}
         CXX=${CMAKE_CXX_COMPILER}
         CFLAGS=${DEPENDENCY_CFLAGS}
+        CXXFLAGS=${DEPENDENCY_CXXFLAGS}
         CPPFLAGS=${DEPENDENCY_CPPFLAGS}
         LDFLAGS=${DEPENDENCY_LDFLAGS}
 
