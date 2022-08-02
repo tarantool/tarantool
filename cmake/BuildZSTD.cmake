@@ -9,6 +9,7 @@ macro(zstd_build)
         third_party/zstd/lib/common/debug.c
         third_party/zstd/lib/decompress/zstd_decompress.c
         third_party/zstd/lib/decompress/huf_decompress.c
+        third_party/zstd/lib/decompress/huf_decompress_amd64.S
         third_party/zstd/lib/decompress/zstd_ddict.c
         third_party/zstd/lib/decompress/zstd_decompress_block.c
         third_party/zstd/lib/compress/zstd_double_fast.c
