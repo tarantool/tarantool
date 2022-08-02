@@ -138,7 +138,8 @@ qsort_arg_mt_internal(void *a, size_t n, intptr_t es,
 	     int (*cmp)(const void *a, const void *b, void *arg), void *arg)
 {
 	char *pa, *pb, *pc, *pd, *pl, *pm, *pn;
-	intptr_t d, r, swaptype, presorted;
+	size_t d1, d2;
+	intptr_t r, swaptype, presorted;
 
 	loop:SWAPINIT(a, es);
 	if (n < 7)
@@ -167,7 +168,7 @@ qsort_arg_mt_internal(void *a, size_t n, intptr_t es,
 		pn = (char *) a + (n - 1) * es;
 		if (n > 40)
 		{
-			d = (n / 8) * es;
+			size_t d = (n / 8) * es;
 			pl = med3(pl, pl + d, pl + 2 * d, cmp, arg);
 			pm = med3(pm - d, pm, pm + d, cmp, arg);
 			pn = med3(pn - 2 * d, pn - d, pn, cmp, arg);
@@ -204,20 +205,42 @@ qsort_arg_mt_internal(void *a, size_t n, intptr_t es,
 		pc -= es;
 	}
 	pn = (char *) a + n * es;
-	r = min(pa - (char *) a, pb - pa);
-	vecswap((char*)a, pb - r, r);
-	r = min(pd - pc, pn - pd - es);
-	vecswap(pb, pn - r, r);
-	if ((r = pb - pa) > es) {
-#pragma omp task
-		qsort_arg_mt_internal(a, r / es, es, cmp, arg);
-	}
-	if ((r = pd - pc) > es)
+	d1 = min(pa - (char *) a, pb - pa);
+	vecswap(a, pb - d1, d1);
+	d1 = min(pd - pc, pn - pd - es);
+	vecswap(pb, pn - d1, d1);
+	d1 = pb - pa;
+	d2 = pd - pc;
+	if (d1 <= d2)
 	{
-		/* Iterate rather than recurse to save stack space */
-		a = pn - r;
-		n = r / es;
-		goto loop;
+		/* Recurse on left partition, then iterate on right partition */
+		if (d1 > es) {
+#pragma omp task
+			qsort_arg_mt_internal(a, d1 / es, es, cmp, arg);
+		}
+		if (d2 > es)
+		{
+			/* Iterate rather than recurse to save stack space */
+			/* qsort(pn - d2, d2 / es, es, cmp); */
+			a = pn - d2;
+			n = d2 / es;
+			goto loop;
+		}
+	}
+	else
+	{
+		/* Recurse on right partition, then iterate on left partition */
+		if (d2 > es) {
+#pragma omp task
+			qsort_arg_mt_internal(a, d1 / es, es, cmp, arg);
+		}
+		if (d1 > es)
+		{
+			/* Iterate rather than recurse to save stack space */
+			/* qsort(a, d1 / es, es, cmp); */
+			n = d1 / es;
+			goto loop;
+		}
 	}
 }
 
