@@ -217,6 +217,16 @@ g.test_wrong_tuple_constraint = function(cg)
             box.schema.create_space, 'test',
             {engine = engine, constraint = {check = "tuple_constr3"}})
 
+        t.assert_error_msg_content_equals(
+            "Wrong space options: constraint name is too long",
+            box.schema.create_space, 'test',
+            {engine = engine, constraint = {[string.rep('a', 66666)] = "tuple_constr1"}})
+
+        t.assert_error_msg_content_equals(
+            "Invalid identifier '' (expected printable symbols only or it is too long)",
+            box.schema.create_space, 'test',
+            {engine = engine, constraint = {[''] = "tuple_constr1"}})
+
         local s = box.schema.create_space('test', {engine = engine,
                                                    constraint = 'tuple_constr1'})
         t.assert_equals(s.constraint, {tuple_constr1 = box.func.tuple_constr1.id})
