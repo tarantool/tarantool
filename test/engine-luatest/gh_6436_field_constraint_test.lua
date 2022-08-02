@@ -268,6 +268,19 @@ g.test_wrong_field_constraint = function(cg)
                 box.space.test:format({{"id1", constraint = {"field_constr3"}}, {"id2"}})
             end)
 
+        t.assert_error_msg_content_equals(
+            "Wrong space format: constraint name is too long",
+            function()
+                box.space.test:format({{"id1", constraint = {[string.rep('a', 66666)] = "field_constr1"}},
+                                       {"id2"}})
+            end)
+
+        t.assert_error_msg_content_equals(
+            "Invalid identifier '' (expected printable symbols only or it is too long)",
+            function()
+                box.space.test:format({{"id1", constraint = {[''] = "field_constr1"}}, {"id2"}})
+            end)
+
         local func_id = box.func.field_constr1.id
         t.assert_equals(box.space.test:format(),
                         { {constraint = {field_constr1 = func_id},

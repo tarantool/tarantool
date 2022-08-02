@@ -98,6 +98,16 @@ g.test_bad_foreign_key = function(cg)
             "Illegal parameters, format[2]: foreign key: unexpected parameter 'mood'",
             function() box.schema.create_space('city', {engine=engine, format=fmt}) end
         )
+        fmt = gen_format({[string.rep('a', 66666)] = {space = 'country', field = 'id'}})
+        t.assert_error_msg_content_equals(
+            "Wrong space format: foreign key name is too long",
+            function() box.schema.create_space('city', {engine=engine, format=fmt}) end
+        )
+        fmt = gen_format({[''] = {space = 'country', field = 'id'}})
+        t.assert_error_msg_content_equals(
+            "Invalid identifier '' (expected printable symbols only or it is too long)",
+            function() box.schema.create_space('city', {engine=engine, format=fmt}) end
+        )
     end, {engine})
 end
 
