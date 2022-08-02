@@ -167,6 +167,8 @@ struct relay {
 	struct stailq pending_gc;
 	/** Time when last row was sent to peer. */
 	double last_row_time;
+	/** Time of last communication with the tx thread. */
+	double tx_seen_time;
 	/**
 	 * A time difference between the moment when we
 	 * wrote a transaction to the local WAL and when
@@ -297,18 +299,14 @@ relay_yield(struct xstream *stream)
 }
 
 static void
-relay_send_heartbeat(struct relay *relay);
+relay_send_heartbeat_on_timeout(struct relay *relay);
 
 /** A callback for recovery to send heartbeats while scanning a WAL. */
 static void
 relay_yield_and_send_heartbeat(struct xstream *stream)
 {
 	struct relay *relay = container_of(stream, struct relay, stream);
-	/* Check for a heartbeat timeout. */
-	if (ev_monotonic_now(loop()) - relay->last_row_time >
-	    replication_timeout) {
-		relay_send_heartbeat(relay);
-	}
+	relay_send_heartbeat_on_timeout(relay);
 	fiber_sleep(0);
 }
 
@@ -329,6 +327,7 @@ relay_start(struct relay *relay, struct iostream *io, uint64_t sync,
 	relay->state = RELAY_FOLLOW;
 	relay->sent_raft_term = sent_raft_term;
 	relay->last_row_time = ev_monotonic_now(loop());
+	relay->tx_seen_time = ev_monotonic_now(loop());
 }
 
 void
@@ -554,6 +553,8 @@ static void
 relay_status_update(struct cmsg *msg)
 {
 	msg->route = NULL;
+	struct relay_status_msg *status = (struct relay_status_msg *)msg;
+	status->relay->tx_seen_time = ev_monotonic_now(loop());
 }
 
 /**
@@ -733,7 +734,7 @@ relay_reader_f(va_list ap)
 /**
  * Send a heartbeat message over a connected relay.
  */
-static void
+static inline void
 relay_send_heartbeat(struct relay *relay)
 {
 	struct xrow_header row;
@@ -744,6 +745,31 @@ relay_send_heartbeat(struct relay *relay)
 		relay_set_error(relay, e);
 		fiber_cancel(fiber());
 	}
+}
+
+/**
+ * Check whether a new heartbeat message should be sent and send it
+ * in case it's required.
+ */
+static inline void
+relay_send_heartbeat_on_timeout(struct relay *relay)
+{
+	double now = ev_monotonic_now(loop());
+	/*
+	 * Do not send a message when it was just sent or when tx thread is
+	 * unresponsive.
+	 * Waiting for a replication_disconnect_timeout before declaring tx
+	 * thread unresponsive helps fight leader disruptions: followers start
+	 * counting down replication_disconnect_timeout only when the same
+	 * timeout already passes on the leader, meaning tx thread hang will be
+	 * noticed twice as late compared to a usual failure, like a crash or
+	 * network error. IOW transient hangs are tolerated without leader
+	 * switchover.
+	 */
+	if (now - relay->last_row_time <= replication_timeout ||
+	    now - relay->tx_seen_time >= replication_disconnect_timeout())
+		return;
+	relay_send_heartbeat(relay);
 }
 
 /** A message to set Raft enabled flag in TX thread from a relay thread. */
@@ -912,9 +938,7 @@ relay_subscribe_f(va_list ap)
 		if (inj == NULL || !inj->bparam)
 			cbus_process(&relay->tx_endpoint);
 		cbus_process(&relay->wal_endpoint);
-		/* Check for a heartbeat timeout. */
-		if (ev_monotonic_now(loop()) - relay->last_row_time > timeout)
-			relay_send_heartbeat(relay);
+		relay_send_heartbeat_on_timeout(relay);
 		/*
 		 * Check that the vclock has been updated and the previous
 		 * status message is delivered
@@ -931,7 +955,8 @@ relay_subscribe_f(va_list ap)
 		relay_schedule_pending_gc(relay, send_vclock);
 
 		if (vclock_sum(&relay->status_msg.vclock) ==
-		    vclock_sum(send_vclock))
+		    vclock_sum(send_vclock) &&
+		    ev_monotonic_now(loop()) - relay->tx_seen_time <= timeout)
 			continue;
 		static const struct cmsg_hop route[] = {
 			{tx_status_update, NULL}
