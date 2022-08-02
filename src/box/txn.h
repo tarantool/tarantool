@@ -788,6 +788,8 @@ static inline int
 txn_begin_ro_stmt(struct space *space, struct txn **txn,
 		  struct txn_ro_savepoint *svp)
 {
+	svp->region = &fiber()->gc;
+	svp->region_used = region_used(svp->region);
 	*txn = in_txn();
 	if (*txn != NULL) {
 		if ((*txn)->status == TXN_CONFLICTED) {
@@ -797,8 +799,6 @@ txn_begin_ro_stmt(struct space *space, struct txn **txn,
 		struct engine *engine = space->engine;
 		return txn_begin_in_engine(engine, *txn);
 	}
-	svp->region = &fiber()->gc;
-	svp->region_used = region_used(svp->region);
 	return 0;
 }
 
