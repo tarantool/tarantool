@@ -1,3 +1,3 @@
 ## feature/build
 
-* Stop support of Ubuntu Impish (21.10) builds.
+* Ubuntu 21.10 (Impish Indri) is no longer supported.
