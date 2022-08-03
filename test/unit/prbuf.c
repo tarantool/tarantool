@@ -239,6 +239,11 @@ test_buffer_empty(void)
 	prbuf_iterator_create(&buf, &iter);
 	int rc = prbuf_iterator_next(&iter, &entry);
 	is(rc, -1, "Buffer is empty");
+	rc = prbuf_open(&buf, mem);
+	is(rc, 0, "Opened empty buffer");
+	prbuf_iterator_create(&buf, &iter);
+	rc = prbuf_iterator_next(&iter, &entry);
+	is(rc, -1, "Buffer is empty");
 	footer();
 }
 
@@ -331,7 +336,7 @@ test_buffer_prepared_large(void)
 int
 main(void)
 {
-	plan(37);
+	plan(39);
 	payload_large_init();
 	test_buffer_foreach_size();
 	test_buffer_bad_version();
