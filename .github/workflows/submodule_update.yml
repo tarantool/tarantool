@@ -15,10 +15,11 @@ jobs:
     runs-on: ubuntu-20.04-self-hosted
 
     env:
-      SUBMODULE: 'tarantool'
       REPOSITORY: 'tarantool/tarantool-ee'
-      FEATURE_BRANCH: 'TarantoolBot/update-tarantool-${{ github.ref_name }}'
       CHECKOUT_BRANCH: ${{ github.ref_name }}
+      FEATURE_BRANCH: 'TarantoolBot/update-tarantool-${{ github.ref_name }}'
+      SUBMODULE: 'tarantool'
+      UPDATE_TO: ${{ github.ref_name }}
       PR_AGAINST_BRANCH: ${{ github.ref_name }}
       PR_TITLE_PREFIX: ${{ github.ref_name != 'master' &&
         format('[{0}] ', github.ref_name) || '' }}
@@ -39,9 +40,10 @@ jobs:
         with:
           github_token: ${{ secrets.EE_UPDATE_SUBMODULE_TOKEN }}
           repository: ${{ env.REPOSITORY }}
-          submodule: ${{ env.SUBMODULE }}
           checkout_branch: ${{ env.CHECKOUT_BRANCH }}
           feature_branch: ${{ env.FEATURE_BRANCH }}
+          submodule: ${{ env.SUBMODULE }}
+          update_to: ${{ env.UPDATE_TO }}
           pr_against_branch: ${{ env.PR_AGAINST_BRANCH }}
           pr_title: ${{ env.PR_TITLE_PREFIX }}${{ env.PR_TITLE }}
           pr_description: ${{ env.PR_DESCRIPTION }}
