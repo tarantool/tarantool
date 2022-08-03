@@ -126,7 +126,7 @@ static void
 sig_checkpoint(ev_loop * /* loop */, struct ev_signal * /* w */,
 	     int /* revents */)
 {
-	struct fiber *f = fiber_new("checkpoint", sig_checkpoint_f);
+	struct fiber *f = fiber_new_system("checkpoint", sig_checkpoint_f);
 	if (f == NULL) {
 		say_warn("failed to allocate checkpoint fiber");
 		return;
@@ -764,6 +764,7 @@ main(int argc, char **argv)
 		 */
 		struct fiber_attr attr;
 		fiber_attr_create(&attr);
+		attr.flags |= FIBER_IS_SYSTEM;
 		attr.flags &= ~FIBER_IS_CANCELLABLE;
 		on_shutdown_fiber = fiber_new_ex("on_shutdown",
 						 &attr,
