@@ -524,7 +524,7 @@ fiber_wakeup(struct fiber *f)
  * re-raised whenever (if) it is caught.
  */
 void
-fiber_cancel(struct fiber *f)
+fiber_cancel_system(struct fiber *f)
 {
 	/**
 	 * Do nothing if the fiber is dead, since cancelling
@@ -547,6 +547,16 @@ fiber_cancel(struct fiber *f)
 	 */
 	if ((f->flags & FIBER_IS_CANCELLABLE) != 0)
 		fiber_wakeup(f);
+}
+
+void
+fiber_cancel(struct fiber *f)
+{
+	/* Do nothing if the fiber is system. */
+	if ((f->flags & FIBER_IS_SYSTEM) != 0)
+		return;
+
+	fiber_cancel_system(f);
 }
 
 /**
@@ -1308,6 +1318,22 @@ struct fiber *
 fiber_new(const char *name, fiber_func f)
 {
 	return fiber_new_ex(name, &fiber_attr_default, f);
+}
+
+/**
+ * Create a new system fiber.
+ *
+ * Works the same way as fiber_new(), but uses fiber_attr_default
+ * supplemented by the FIBER_IS_SYSTEM flag in order to create a
+ * fiber.
+ */
+struct fiber *
+fiber_new_system(const char *name, fiber_func f)
+{
+	struct fiber_attr system_attrs;
+	fiber_attr_create(&system_attrs);
+	system_attrs.flags |= FIBER_IS_SYSTEM;
+	return fiber_new_ex(name, &system_attrs, f);
 }
 
 /** Free all fiber's resources. */
