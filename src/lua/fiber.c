@@ -667,6 +667,10 @@ static int
 lbox_fiber_cancel(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
+	if ((f->flags & FIBER_IS_SYSTEM) != 0) {
+		/* System fibers can't be cancelled from Lua. */
+		return 0;
+	}
 	fiber_cancel(f);
 	/*
 	 * Check if we're ourselves cancelled.
