@@ -2709,7 +2709,7 @@ luaT_netbox_transport_start(struct lua_State *L)
 	const char *name = tt_sprintf("%s:%s (net.box)",
 				      transport->opts.uri.host ?: "",
 				      transport->opts.uri.service ?: "");
-	transport->worker = fiber_new(name, netbox_worker_f);
+	transport->worker = fiber_new_system(name, netbox_worker_f);
 	if (transport->worker == NULL) {
 		luaL_unref(L, LUA_REGISTRYINDEX, transport->coro_ref);
 		transport->coro_ref = LUA_NOREF;

@@ -118,8 +118,8 @@ static void
 watchable_wakeup_worker(struct watchable *watchable)
 {
 	if (watchable->worker == NULL) {
-		watchable->worker = fiber_new("box.watchable",
-					      watchable_worker_f);
+		watchable->worker = fiber_new_system("box.watchable",
+						     watchable_worker_f);
 		if (watchable->worker == NULL) {
 			diag_log();
 			panic("failed to start box.watchable worker fiber");
