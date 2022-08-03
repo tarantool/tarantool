@@ -420,7 +420,7 @@ replica_on_applier_connect(struct replica *replica)
 			  tt_uuid_str(&orig->uuid),
 			  applier_uri_str(applier),
 			  applier_uri_str(orig->applier));
-		fiber_cancel(fiber());
+		fiber_cancel_system(fiber());
 		/*
 		 * Raise an exception to force the applier
 		 * to disconnect.

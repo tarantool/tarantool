@@ -163,9 +163,9 @@ applier_check_sync(struct applier *applier)
 
 /**
  * A helper function to create an applier fiber. Basically, it's a wrapper
- * around fiber_new_xc(), which appends the applier URI to the fiber name and
- * makes the new fiber joinable. Note, this function creates a new fiber, but
- * doesn't start it.
+ * around fiber_new_system_xc(), which appends the applier URI to the fiber name
+ * and makes the new fiber joinable. Note, this function creates a new fiber,
+ * but doesn't start it.
  */
 static struct fiber *
 applier_fiber_new(struct applier *applier, const char *name, fiber_func func)
@@ -173,7 +173,7 @@ applier_fiber_new(struct applier *applier, const char *name, fiber_func func)
 	char buf[FIBER_NAME_MAX];
 	int pos = snprintf(buf, sizeof(buf), "%s/", name);
 	uri_format(buf + pos, sizeof(buf) - pos, &applier->uri, false);
-	struct fiber *f = fiber_new_xc(buf, func);
+	struct fiber *f = fiber_new_system_xc(buf, func);
 	fiber_set_joinable(f, true);
 	return f;
 }
@@ -1407,7 +1407,7 @@ applier_on_rollback(struct trigger *trigger, void *event)
 			       diag_last_error(&replicaset.applier.diag));
 	}
 	/* Stop the applier fiber. */
-	fiber_cancel(applier->fiber);
+	fiber_cancel_system(applier->fiber);
 	return 0;
 }
 
@@ -1855,11 +1855,11 @@ applier_thread_detach_applier(struct cbus_call_msg *base)
 {
 	struct applier *applier = ((struct applier_cfg_msg *)base)->applier;
 	if (applier->thread.writer != NULL) {
-		fiber_cancel(applier->thread.writer);
+		fiber_cancel_system(applier->thread.writer);
 		fiber_join(applier->thread.writer);
 		applier->thread.writer = NULL;
 	}
-	fiber_cancel(applier->thread.reader);
+	fiber_cancel_system(applier->thread.reader);
 	fiber_join(applier->thread.reader);
 	applier->thread.reader = NULL;
 	lsregion_destroy(&applier->thread.lsr);
@@ -2293,7 +2293,7 @@ applier_stop(struct applier *applier)
 	struct fiber *f = applier->fiber;
 	if (f == NULL)
 		return;
-	fiber_cancel(f);
+	fiber_cancel_system(f);
 	fiber_join(f);
 	applier_set_state(applier, APPLIER_OFF);
 	applier->fiber = NULL;
