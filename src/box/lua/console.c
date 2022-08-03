@@ -692,6 +692,10 @@ tarantool_lua_console_init(struct lua_State *L)
 	lua_pushcclosure(L, lbox_console_readline, 1);
 	lua_setfield(L, -2, "readline");
 
+	/* Readline setup that provides timestamps and multiline history. */
+	history_comment_char = '#';
+	history_write_timestamps = 1;
+
 	serializer_yaml = lua_yaml_new_serializer(L);
 	serializer_yaml->encode_invalid_numbers = 1;
 	serializer_yaml->encode_load_metatables = 1;
