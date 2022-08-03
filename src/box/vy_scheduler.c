@@ -435,8 +435,8 @@ vy_scheduler_create(struct vy_scheduler *scheduler, int write_threads,
 	scheduler->run_env = run_env;
 	scheduler->quota = quota;
 
-	scheduler->scheduler_fiber = fiber_new("vinyl.scheduler",
-					       vy_scheduler_f);
+	scheduler->scheduler_fiber = fiber_new_system("vinyl.scheduler",
+						      vy_scheduler_f);
 	if (scheduler->scheduler_fiber == NULL)
 		panic("failed to allocate vinyl scheduler fiber");
 

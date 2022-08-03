@@ -1920,8 +1920,8 @@ swim_new(uint64_t generation)
 	rlist_create(&swim->dissemination_queue);
 	rlist_create(&swim->on_member_event);
 	stailq_create(&swim->event_queue);
-	swim->event_handler = fiber_new("SWIM event handler",
-					swim_event_handler_f);
+	swim->event_handler = fiber_new_system("SWIM event handler",
+					       swim_event_handler_f);
 	if (swim->event_handler == NULL) {
 		swim_delete(swim);
 		return NULL;

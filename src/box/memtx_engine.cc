@@ -1309,7 +1309,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	}
 
 	stailq_create(&memtx->gc_queue);
-	memtx->gc_fiber = fiber_new("memtx.gc", memtx_engine_gc_f);
+	memtx->gc_fiber = fiber_new_system("memtx.gc", memtx_engine_gc_f);
 	if (memtx->gc_fiber == NULL)
 		goto fail;
 
