@@ -105,7 +105,7 @@ timezone_alloc(const char * zonename)
 		tzfree(prev_tz);
 	prev_tz = tzalloc(zonename);
 	assert(strlen(zonename) < lengthof(prev_zonename));
-	strcpy(prev_zonename, zonename);
+	strlcpy(prev_zonename, zonename, sizeof prev_zonename);
 	return prev_tz;
 }
 

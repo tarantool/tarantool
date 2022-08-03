@@ -911,8 +911,7 @@ xlog_open(struct xlog *xlog, const char *name, const struct xlog_opts *opts)
 	if (xlog_init(xlog, opts) != 0)
 		goto err;
 
-	strncpy(xlog->filename, name, sizeof(xlog->filename));
-	xlog->filename[sizeof(xlog->filename) - 1] = '\0';
+	strlcpy(xlog->filename, name, sizeof(xlog->filename));
 
 	xlog->fd = open(xlog->filename, O_RDWR);
 	if (xlog->fd < 0) {

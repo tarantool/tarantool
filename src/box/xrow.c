@@ -2065,7 +2065,8 @@ greeting_decode(const char *greetingbuf, struct greeting *greeting)
 		}
 	} else if (greeting->version_id < version_id(1, 6, 7)) {
 		/* Tarantool < 1.6.7 doesn't add "(Binary)" to greeting */
-		strcpy(greeting->protocol, "Binary");
+		strlcpy(greeting->protocol, "Binary",
+			sizeof(greeting->protocol));
 	} else {
 		return -1; /* Sorry, don't want to parse this greeting */
 	}
