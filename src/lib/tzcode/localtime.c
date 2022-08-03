@@ -367,7 +367,9 @@ tzloadbody(char const *name, struct state *sp, bool doextend,
 		   would pull in stdio (and would fail if the
 		   resulting string length exceeded INT_MAX!).  */
 		memcpy(lsp->fullname, tzdirslash, sizeof tzdirslash);
-		strcpy(lsp->fullname + sizeof tzdirslash, name);
+		strncpy(lsp->fullname + sizeof tzdirslash, name,
+			sizeof(lsp->fullname) - sizeof(tzdirslash) - 1);
+		lsp->fullname[sizeof(lsp->fullname) - 1] = '\0';
 
 		/* Set doaccess if NAME contains a ".." file name
 		   component, as such a name could read a file outside
@@ -598,13 +600,16 @@ tzloadbody(char const *name, struct state *sp, bool doextend,
 				if (!(j < charcnt)) {
 					int tsabbrlen = strlen(tsabbr);
 					if (j + tsabbrlen < TZ_MAX_CHARS) {
-						strcpy(sp->chars + j, tsabbr);
+						strncpy(sp->chars + j, tsabbr,
+							sizeof(sp->chars)
+							- j - 1);
 						charcnt = j + tsabbrlen + 1;
 						ts->ttis[i].tt_desigidx = j;
 						gotabbr++;
 					}
 				}
 			}
+			sp->chars[sizeof(sp->chars) - 1] = '\0';
 			if (gotabbr == ts->typecnt) {
 				sp->charcnt = charcnt;
 
@@ -1351,7 +1356,8 @@ zoneinit(struct state *sp, char const *name)
 		sp->charcnt = 0;
 		sp->goback = sp->goahead = false;
 		init_ttinfo(&sp->ttis[0], 0, false, 0);
-		strcpy(sp->chars, gmt);
+		strncpy(sp->chars, gmt, sizeof(sp->chars) - 1);
+		sp->chars[sizeof(sp->chars) - 1] = '\0';
 		sp->defaulttype = 0;
 		return 0;
 	} else {

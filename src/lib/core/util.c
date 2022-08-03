@@ -211,9 +211,9 @@ abspath(const char *filename)
 	if (getcwd(abspath, PATH_MAX - strlen(filename) - 1) == NULL)
 		say_syserror("getcwd");
 	else {
-		strcat(abspath, "/");
+		strncat(abspath, "/", PATH_MAX - strlen(abspath));
 	}
-	strcat(abspath, filename);
+	strncat(abspath, filename, PATH_MAX - strlen(abspath));
 	return abspath;
 }
 

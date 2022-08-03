@@ -345,7 +345,8 @@ sql_ephemeral_space_new(const struct sql_space_info *info)
 	 * plus length of UINT32_MAX turned to string, which is 10 and plus 1
 	 * for '\0'.
 	 */
-	uint32_t size = names_indent + field_count * 19;
+	uint32_t max_len = 19;
+	uint32_t size = names_indent + field_count * max_len;
 
 	struct region *region = &fiber()->gc;
 	size_t svp = region_used(region);
@@ -364,7 +365,7 @@ sql_ephemeral_space_new(const struct sql_space_info *info)
 	for (uint32_t i = 0; i < info->field_count; ++i) {
 		fields[i] = field_def_default;
 		fields[i].name = names;
-		sprintf(names, "_COLUMN_%d", i);
+		snprintf(names, max_len, "_COLUMN_%d", i);
 		names += strlen(fields[i].name) + 1;
 		fields[i].is_nullable = true;
 		fields[i].nullable_action = ON_CONFLICT_ACTION_NONE;

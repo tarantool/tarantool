@@ -376,7 +376,8 @@ sio_uri_to_addr(const char *uri, struct sockaddr *addr, bool *is_host_empty)
 		struct sockaddr_un *un = (struct sockaddr_un *) addr;
 		if (strlen(u.service) + 1 > sizeof(un->sun_path))
 			goto invalid_uri;
-		strcpy(un->sun_path, u.service);
+		strncpy(un->sun_path, u.service, sizeof(un->sun_path) - 1);
+		un->sun_path[sizeof(un->sun_path) - 1] = '\0';
 		un->sun_family = AF_UNIX;
 		uri_destroy(&u);
 		return 0;

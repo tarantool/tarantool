@@ -229,8 +229,11 @@ sqlStartTable(Parse *pParse, Token *pName)
 	if (new_space == NULL)
 		goto cleanup;
 
-	strcpy(new_space->def->engine_name,
-	       sql_storage_engine_strs[current_session()->sql_default_engine]);
+	size_t max_len = sizeof(new_space->def->engine_name) - 1;
+	strncpy(new_space->def->engine_name,
+		sql_storage_engine_strs[current_session()->sql_default_engine],
+		max_len);
+	new_space->def->engine_name[max_len] = '\0';
 
 	if (!db->init.busy && (v = sqlGetVdbe(pParse)) != 0)
 		sql_set_multi_write(pParse, true);

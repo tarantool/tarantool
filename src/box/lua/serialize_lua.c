@@ -191,7 +191,8 @@ trace_nd_mask_str(unsigned int nd_mask)
 
 		int nd_len = strlen(nd_type_names[i]);
 		if (left >= nd_len + 1) {
-			strcpy(&mask_str[pos], nd_type_names[i]);
+			strncpy(&mask_str[pos], nd_type_names[i],
+				sizeof(mask_str) - pos - 1);
 			pos += nd_len;
 			mask_str[pos++] = '|';
 			left = sizeof(mask_str) - pos;
@@ -201,7 +202,7 @@ trace_nd_mask_str(unsigned int nd_mask)
 	if (pos != 0)
 		mask_str[--pos] = '\0';
 	else
-		strcpy(mask_str, "UNKNOWN");
+		strncpy(mask_str, "UNKNOWN", sizeof(mask_str) - 1);
 
 	return mask_str;
 }

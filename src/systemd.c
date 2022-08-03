@@ -118,6 +118,7 @@ int systemd_notify(const char *message) {
 	};
 
 	strncpy(sa.sun_path, sd_unix_path, sizeof(sa.sun_path) - 1);
+	sa.sun_path[sizeof(sa.sun_path) - 1] = '\0';
 	if (sa.sun_path[0] == '@')
 		sa.sun_path[0] = '\0';
 

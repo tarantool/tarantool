@@ -173,7 +173,7 @@ handle_new(struct popen_opts *opts)
 {
 	struct popen_handle *handle;
 	size_t size = 0, i;
-	char *pos;
+	char *pos, *pos_max;
 
 	assert(opts->argv != NULL && opts->nr_argv > 0);
 
@@ -204,13 +204,15 @@ handle_new(struct popen_opts *opts)
 	}
 
 	pos = handle->command = (void *)handle + sizeof(*handle);
+	pos_max = pos + size - 1;
+
 	for (i = 0; i < opts->nr_argv-1; i++) {
 		if (opts->argv[i] == NULL)
 			continue;
 		bool is_multiword = strchr(opts->argv[i], ' ') != NULL;
 		if (is_multiword)
 			*pos++ = '\'';
-		strcpy(pos, opts->argv[i]);
+		strncpy(pos, opts->argv[i], pos_max - pos);
 		pos += strlen(opts->argv[i]);
 		if (is_multiword)
 			*pos++ = '\'';
