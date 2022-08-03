@@ -1,4 +1,4 @@
-1..37
+1..39
 	*** test_buffer_foreach_copy_number ***
 ok 1 - prbuf(size=128, payload=4, iterations=16) has been validated
 ok 2 - prbuf(size=128, payload=4, iterations=32) has been validated
@@ -58,13 +58,15 @@ ok 31 - Failed to allocate too large entry
 	*** test_buffer_too_large_entry: done ***
 	*** test_buffer_empty ***
 ok 32 - Buffer is empty
+ok 33 - Opened empty buffer
+ok 34 - Buffer is empty
 	*** test_buffer_empty: done ***
 	*** test_buffer_prepared ***
-ok 33 - Prepare has not failed
-ok 34 - Entry count has decreased
+ok 35 - Prepare has not failed
+ok 36 - Entry count has decreased
 	*** test_buffer_prepared: done ***
 	*** test_buffer_prepared_large ***
-ok 35 - Prepare has not failed
-ok 36 - Buffer is empty
-ok 37 - Buffer is in correct state
+ok 37 - Prepare has not failed
+ok 38 - Buffer is empty
+ok 39 - Buffer is in correct state
 	*** test_buffer_prepared_large: done ***
