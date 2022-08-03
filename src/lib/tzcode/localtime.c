@@ -17,6 +17,7 @@
 #include "private.h"
 #include "tzfile.h"
 #include "tzcode.h"
+#include "trivia/util.h"
 
 #include <fcntl.h>
 
@@ -367,7 +368,8 @@ tzloadbody(char const *name, struct state *sp, bool doextend,
 		   would pull in stdio (and would fail if the
 		   resulting string length exceeded INT_MAX!).  */
 		memcpy(lsp->fullname, tzdirslash, sizeof tzdirslash);
-		strcpy(lsp->fullname + sizeof tzdirslash, name);
+		strlcpy(lsp->fullname + sizeof tzdirslash, name,
+			sizeof lsp->fullname - sizeof tzdirslash);
 
 		/* Set doaccess if NAME contains a ".." file name
 		   component, as such a name could read a file outside
@@ -598,7 +600,8 @@ tzloadbody(char const *name, struct state *sp, bool doextend,
 				if (!(j < charcnt)) {
 					int tsabbrlen = strlen(tsabbr);
 					if (j + tsabbrlen < TZ_MAX_CHARS) {
-						strcpy(sp->chars + j, tsabbr);
+						strlcpy(sp->chars + j, tsabbr,
+							sizeof sp->chars - j);
 						charcnt = j + tsabbrlen + 1;
 						ts->ttis[i].tt_desigidx = j;
 						gotabbr++;
@@ -1351,7 +1354,7 @@ zoneinit(struct state *sp, char const *name)
 		sp->charcnt = 0;
 		sp->goback = sp->goahead = false;
 		init_ttinfo(&sp->ttis[0], 0, false, 0);
-		strcpy(sp->chars, gmt);
+		strlcpy(sp->chars, gmt, sizeof sp->chars);
 		sp->defaulttype = 0;
 		return 0;
 	} else {

@@ -589,7 +589,7 @@ sql_expr_compile(sql *db, const char *expr, int expr_len)
 		diag_set(OutOfMemory, len + 1, "region_alloc", "stmt");
 		goto end;
 	}
-	sprintf(stmt, "%s%.*s", outer, expr_len, expr);
+	snprintf(stmt, len + 1, "%s%.*s", outer, expr_len, expr);
 
 	if (sqlRunParser(&parser, stmt) == 0 &&
 	    parser.parsed_ast_type == AST_TYPE_EXPR) {
