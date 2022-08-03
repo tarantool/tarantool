@@ -1296,6 +1296,22 @@ fiber_new(const char *name, fiber_func f)
 	return fiber_new_ex(name, &fiber_attr_default, f);
 }
 
+/*
+ * Create a new system fiber.
+ *
+ * Works the same way as fiber_new(), but uses fiber_attr_default
+ * supplemented by the FIBER_IS_SYSTEM flag in order to create a
+ * fiber.
+ */
+struct fiber *
+fiber_new_system(const char *name, fiber_func f)
+{
+	struct fiber_attr system_attrs;
+	fiber_attr_create(&system_attrs);
+	system_attrs.flags |= FIBER_IS_SYSTEM;
+	return fiber_new_ex(name, &system_attrs, f);
+}
+
 /**
  * Free as much memory as possible taken by the fiber.
  *

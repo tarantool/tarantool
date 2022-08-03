@@ -181,6 +181,10 @@ enum {
 	 * of fiber_pool.
 	 */
 	FIBER_IS_IDLE		= 1 << 7,
+	/**
+	 * This flag idicates, if the fiber can be killed from the Lua world.
+	 */
+	FIBER_IS_SYSTEM         = 1 << 9,
 	FIBER_DEFAULT_FLAGS = FIBER_IS_CANCELLABLE
 };
 
@@ -842,6 +846,20 @@ cord_is_main(void);
 void
 cord_collect_garbage(struct cord *cord);
 
+/**
+ * @brief Create a new system fiber.
+ *
+ * @details
+ * Works the same way as fiber_new(), but uses fiber_attr_default
+ * supplemented by the FIBER_IS_SYSTEM flag in order to create a
+ * fiber.
+ *
+ * @param name       string with fiber name
+ * @param fiber_func func for run inside fiber
+ */
+struct fiber *
+fiber_new_system(const char *name, fiber_func f);
+
 void
 fiber_init(int (*fiber_invoke)(fiber_func f, va_list ap));
 
@@ -924,19 +942,19 @@ fiber_top_disable(void);
 #endif /* ENABLE_FIBER_TOP */
 
 #ifdef ENABLE_BACKTRACE
-/*
+/**
  * Returns current value of fiber parent backtrace collection option.
  */
 bool
 fiber_parent_backtrace_is_enabled(void);
 
-/*
+/**
  * Enables collection of fiber parent's backtrace.
  */
 void
 fiber_parent_backtrace_enable(void);
 
-/*
+/**
  * Disables collection of fiber parent's backtrace.
  */
 void
@@ -953,7 +971,7 @@ fiber_c_invoke(fiber_func f, va_list ap)
 #if defined(__cplusplus)
 } /* extern "C" */
 
-/*
+/**
  * Test if this fiber is in a cancellable state and was indeed
  * cancelled, and raise an exception (FiberIsCancelled) if
  * that's the case.
@@ -976,6 +994,20 @@ static inline struct fiber *
 fiber_new_xc(const char *name, fiber_func func)
 {
 	struct fiber *f = fiber_new(name, func);
+	if (f == NULL) {
+		diag_raise();
+		unreachable();
+	}
+	return f;
+}
+
+/**
+ * The same as fiber_new_system(), but throws an exception
+ */
+static inline struct fiber *
+fiber_new_system_xc(const char *name, fiber_func func)
+{
+	struct fiber *f = fiber_new_system(name, func);
 	if (f == NULL) {
 		diag_raise();
 		unreachable();
