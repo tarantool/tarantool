@@ -767,8 +767,8 @@ vy_log_init(const char *dir)
 	diag_create(&vy_log.tx_diag);
 	wal_init_vy_log();
 	fiber_cond_create(&vy_log.flusher_cond);
-	vy_log.flusher = fiber_new("vinyl.vylog_flusher",
-				   vy_log_flusher_f);
+	vy_log.flusher = fiber_new_system("vinyl.vylog_flusher",
+					  vy_log_flusher_f);
 	if (vy_log.flusher == NULL)
 		panic("failed to allocate vylog flusher fiber");
 	fiber_wakeup(vy_log.flusher);

@@ -163,9 +163,9 @@ applier_check_sync(struct applier *applier)
 
 /**
  * A helper function to create an applier fiber. Basically, it's a wrapper
- * around fiber_new_xc(), which appends the applier URI to the fiber name and
- * makes the new fiber joinable. Note, this function creates a new fiber, but
- * doesn't start it.
+ * around fiber_new_system_xc(), which appends the applier URI to the fiber name
+ * and makes the new fiber joinable. Note, this function creates a new fiber,
+ * but doesn't start it.
  */
 static struct fiber *
 applier_fiber_new(struct applier *applier, const char *name, fiber_func func)
@@ -173,7 +173,7 @@ applier_fiber_new(struct applier *applier, const char *name, fiber_func func)
 	char buf[FIBER_NAME_MAX];
 	int pos = snprintf(buf, sizeof(buf), "%s/", name);
 	uri_format(buf + pos, sizeof(buf) - pos, &applier->uri, false);
-	struct fiber *f = fiber_new_xc(buf, func);
+	struct fiber *f = fiber_new_system_xc(buf, func);
 	fiber_set_joinable(f, true);
 	return f;
 }

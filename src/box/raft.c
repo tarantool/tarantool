@@ -155,7 +155,8 @@ box_raft_schedule_async(struct raft *raft)
 {
 	assert(raft == box_raft());
 	if (box_raft_worker == NULL) {
-		box_raft_worker = fiber_new("raft_worker", box_raft_worker_f);
+		box_raft_worker = fiber_new_system("raft_worker",
+						   box_raft_worker_f);
 		if (box_raft_worker == NULL) {
 			/*
 			 * XXX: should be handled properly, no need to panic.

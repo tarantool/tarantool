@@ -118,12 +118,12 @@ gc_init(void)
 	fiber_cond_create(&gc.cleanup_cond);
 	checkpoint_schedule_cfg(&gc.checkpoint_schedule, 0, 0);
 
-	gc.cleanup_fiber = fiber_new("gc", gc_cleanup_fiber_f);
+	gc.cleanup_fiber = fiber_new_system("gc", gc_cleanup_fiber_f);
 	if (gc.cleanup_fiber == NULL)
 		panic("failed to start garbage collection fiber");
 
-	gc.checkpoint_fiber = fiber_new("checkpoint_daemon",
-					gc_checkpoint_fiber_f);
+	gc.checkpoint_fiber = fiber_new_system("checkpoint_daemon",
+					       gc_checkpoint_fiber_f);
 	if (gc.checkpoint_fiber == NULL)
 		panic("failed to start checkpoint daemon fiber");
 
