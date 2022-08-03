@@ -353,12 +353,16 @@ title_set_interpretor_name
 title_set_script_name
 title_set_status
 title_update
+tnt_EVP_CIPHER_block_size
 tnt_EVP_CIPHER_iv_length
 tnt_EVP_CIPHER_key_length
 tnt_EVP_MD_CTX_free
 tnt_EVP_MD_CTX_new
 tnt_HMAC_CTX_free
 tnt_HMAC_CTX_new
+tnt_HMAC_Init_ex
+tnt_HMAC_Update
+tnt_HMAC_Final
 tnt_iconv
 tnt_iconv_close
 tnt_iconv_open

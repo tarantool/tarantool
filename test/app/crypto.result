@@ -141,13 +141,11 @@ bad_iv = '123456abcdefghij'
 ...
 ciph.decrypt(enc, bad_pass, iv)
 ---
-- error: 'builtin/crypto.lua:<line>"]: Can''t finalize cipher:error:06065064:digital envelope
-    routines:EVP_DecryptFinal_ex:bad decrypt'
+- error: 'builtin/crypto.lua:<line>"]: Can''t finalize cipher:bad decrypt'
 ...
 ciph.decrypt(enc, pass, bad_iv)
 ---
-- error: 'builtin/crypto.lua:<line>"]: Can''t finalize cipher:error:06065064:digital envelope
-    routines:EVP_DecryptFinal_ex:bad decrypt'
+- error: 'builtin/crypto.lua:<line>"]: Can''t finalize cipher:bad decrypt'
 ...
 test_run:cmd("clear filter")
 ---

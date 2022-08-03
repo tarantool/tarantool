@@ -88,7 +88,7 @@ tarantool-*.tar.gz
 test/lib/
 test/unit/*.test
 test/unit/fiob
-test/small
+test/small/*.test
 test/var
 test/luajit-tap
 third_party/luajit/src/luajit
