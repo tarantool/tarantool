@@ -1,4 +1,4 @@
 ## bugfix/core
 
-* Fixed incorrect number of a foreign key field returned by
-  `space_object:format()` or `space_object.foreign_key` (gh-7350).
+* Fixed `space_object:format()` and `space_object.foreign_key` returning
+  incorrect numbers of foreign key fields (gh-7350).

@@ -1,4 +1,4 @@
 ## bugfix/core
 
 * Fixed a crash when `box.stat.net.thread[i]` is called with invalid `i`
-  (gh-7196).
+  values (gh-7196).
