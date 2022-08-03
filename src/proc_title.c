@@ -361,7 +361,8 @@ proc_title_set(const char *format, ...)
 		if (ident_handle != INVALID_HANDLE_VALUE)
 			CloseHandle(ident_handle);
 
-		sprintf(name, "pgident(%d): %s", MyProcPid, ps_buffer);
+		snprintf(name, sizeof(name), "pgident(%d): %s", MyProcPid,
+			 ps_buffer);
 
 		ident_handle = CreateEvent(NULL, TRUE, FALSE, name);
 	}
