@@ -206,6 +206,8 @@ prbuf_check(struct prbuf *buf)
 		return false;
 	if (buf->header->end > prbuf_size(buf))
 		return false;
+	if (prbuf_is_empty(buf))
+		return true;
 	struct prbuf_record *current;
 	current = prbuf_first_record(buf);
 	uint32_t total_size = current->size;
