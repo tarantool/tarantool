@@ -229,8 +229,9 @@ sqlStartTable(Parse *pParse, Token *pName)
 	if (new_space == NULL)
 		goto cleanup;
 
-	strcpy(new_space->def->engine_name,
-	       sql_storage_engine_strs[current_session()->sql_default_engine]);
+	strlcpy(new_space->def->engine_name,
+		sql_storage_engine_strs[current_session()->sql_default_engine],
+		ENGINE_NAME_MAX + 1);
 
 	if (!db->init.busy && (v = sqlGetVdbe(pParse)) != 0)
 		sql_set_multi_write(pParse, true);
@@ -536,9 +537,8 @@ sqlAddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 				pParse->is_aborted = true;
 				return;
 			}
-			strncpy(field->default_value, pSpan->zStart,
-				default_length);
-			field->default_value[default_length] = '\0';
+			strlcpy(field->default_value, pSpan->zStart,
+				default_length + 1);
 		}
 	}
 	sql_expr_delete(db, pSpan->pExpr);

@@ -58,6 +58,7 @@ static char sccsid[] __attribute__((unused)) =
 #include "timelocal.h"
 #include "tzcode.h"
 #include "timezone.h"
+#include "trivia/util.h"
 
 enum flags {
 	FLAG_NONE = 1 << 0,
@@ -547,8 +548,7 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 				/* empty */;
 			if (cp - buf) {
 				zonestr = alloca(cp - buf + 1);
-				strncpy(zonestr, buf, cp - buf);
-				zonestr[cp - buf] = '\0';
+				strlcpy(zonestr, buf, cp - buf + 1);
 
 				const struct date_time_zone *zone;
 				size_t n = timezone_tm_lookup(zonestr, cp - buf,

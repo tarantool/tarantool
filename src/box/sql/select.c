@@ -5126,7 +5126,8 @@ selectExpander(Walker * pWalker, Select * p)
 			 * Rewrite old name with correct pointer.
 			 */
 			name = tt_sprintf("sql_sq_%llX", (long long)space);
-			sprintf(space->def->name, "%s", name);
+			snprintf(space->def->name, strlen(space->def->name) + 1,
+				 "%s", name);
 			while (pSel->pPrior) {
 				pSel = pSel->pPrior;
 			}
