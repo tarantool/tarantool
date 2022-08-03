@@ -363,7 +363,7 @@ memtx_space_replace_tuple(struct space *space, struct txn_stmt *stmt,
 	stmt->old_tuple = result;
 	if (stmt->old_tuple != NULL) {
 		struct tuple *orig_old_tuple = stmt->old_tuple;
-		stmt->old_tuple = memtx_tuple_maybe_decompress(stmt->old_tuple);
+		stmt->old_tuple = memtx_tuple_decompress(stmt->old_tuple);
 		if (stmt->old_tuple == NULL)
 			return -1;
 		tuple_ref(stmt->old_tuple);
@@ -464,7 +464,7 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 		return 0;
 	}
 
-	struct tuple *decompressed = memtx_tuple_maybe_decompress(old_tuple);
+	struct tuple *decompressed = memtx_tuple_decompress(old_tuple);
 	if (decompressed == NULL)
 		return -1;
 	tuple_bless(decompressed);
@@ -563,8 +563,7 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 			return -1;
 		tuple_ref(new_tuple);
 	} else {
-		struct tuple *decompressed =
-			memtx_tuple_maybe_decompress(old_tuple);
+		struct tuple *decompressed = memtx_tuple_decompress(old_tuple);
 		if (decompressed == NULL)
 			return -1;
 		tuple_bless(decompressed);

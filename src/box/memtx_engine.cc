@@ -852,6 +852,7 @@ checkpoint_f(va_list ap)
 			if (checkpoint_write_tuple(&snap, entry->space_id,
 					entry->group_id, data, size) != 0)
 				goto fail;
+			fiber_gc();
 		}
 		if (rc != 0)
 			goto fail;
@@ -1100,6 +1101,7 @@ memtx_join_f(va_list ap)
 			if (memtx_join_send_tuple(ctx->stream, entry->space_id,
 						  data, size) != 0)
 				return -1;
+			fiber_gc();
 		}
 		if (rc != 0)
 			return -1;
@@ -1246,11 +1248,9 @@ memtx_set_tuple_format_vtab(const char *allocator_name)
 int
 memtx_tuple_validate(struct tuple_format *format, struct tuple *tuple)
 {
-	if (tuple_is_compressed(tuple)) {
-		tuple = memtx_tuple_decompress(tuple);
-		if (tuple == NULL)
-			return -1;
-	}
+	tuple = memtx_tuple_decompress(tuple);
+	if (tuple == NULL)
+		return -1;
 	tuple_ref(tuple);
 	int rc = tuple_validate_raw(format, tuple_data(tuple));
 	tuple_unref(tuple);
@@ -1663,7 +1663,7 @@ int
 memtx_prepare_result_tuple(struct tuple **result)
 {
 	if (*result != NULL) {
-		*result = memtx_tuple_maybe_decompress(*result);
+		*result = memtx_tuple_decompress(*result);
 		if (*result == NULL)
 			return -1;
 		tuple_bless(*result);

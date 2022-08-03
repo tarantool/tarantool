@@ -458,12 +458,12 @@ tuple_field_go_to_key(const char **field, const char *key, int len)
 
 int
 tuple_go_to_path(const char **data, const char *path, uint32_t path_len,
-		 int multikey_idx)
+		 int index_base, int multikey_idx)
 {
 	int rc;
 	struct json_lexer lexer;
 	struct json_token token;
-	json_lexer_create(&lexer, path, path_len, TUPLE_INDEX_BASE);
+	json_lexer_create(&lexer, path, path_len, index_base);
 	while ((rc = json_lexer_next_token(&lexer, &token)) == 0) {
 		switch (token.type) {
 		case JSON_TOKEN_ANY:
@@ -492,7 +492,8 @@ tuple_go_to_path(const char **data, const char *path, uint32_t path_len,
 const char *
 tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
 			     const uint32_t *field_map, const char *path,
-			     uint32_t path_len, uint32_t path_hash)
+			     uint32_t path_len, uint32_t path_hash,
+			     int index_base)
 {
 	assert(path_len > 0);
 	uint32_t fieldno;
@@ -507,7 +508,7 @@ tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
 		return tuple_field_raw(format, tuple, field_map, fieldno);
 	struct json_lexer lexer;
 	struct json_token token;
-	json_lexer_create(&lexer, path, path_len, TUPLE_INDEX_BASE);
+	json_lexer_create(&lexer, path, path_len, index_base);
 	if (json_lexer_next_token(&lexer, &token) != 0)
 		return NULL;
 	switch(token.type) {
@@ -542,7 +543,7 @@ tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
 	return tuple_field_raw_by_path(format, tuple, field_map, fieldno,
 				       path + lexer.offset,
 				       path_len - lexer.offset,
-				       NULL, MULTIKEY_NONE);
+				       index_base, NULL, MULTIKEY_NONE);
 }
 
 uint32_t
@@ -556,6 +557,7 @@ tuple_raw_multikey_count(struct tuple_format *format, const char *data,
 					key_def->multikey_fieldno,
 					key_def->multikey_path,
 					key_def->multikey_path_len,
+					TUPLE_INDEX_BASE,
 					NULL, MULTIKEY_NONE);
 	if (array_raw == NULL)
 		return 0;
@@ -646,6 +648,24 @@ box_tuple_field(box_tuple_t *tuple, uint32_t fieldno)
 {
 	assert(tuple != NULL);
 	return tuple_field(tuple, fieldno);
+}
+
+const char *
+box_tuple_field_by_path(box_tuple_t *tuple, const char *path,
+			uint32_t path_len, int index_base)
+{
+	assert(tuple != NULL);
+	assert(path != NULL);
+
+	if (path_len == 0)
+		return NULL;
+
+	uint32_t path_hash = field_name_hash(path, path_len);
+	return tuple_field_raw_by_full_path(tuple_format(tuple),
+					    tuple_data(tuple),
+					    tuple_field_map(tuple),
+					    path, path_len, path_hash,
+					    index_base);
 }
 
 typedef struct tuple_iterator box_tuple_iterator_t;

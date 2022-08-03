@@ -53,19 +53,9 @@ g.test_bad_foreign_key = function(cg)
             "Illegal parameters, format[2]: foreign key definition must be a table with 'space' and 'field' members",
             function() box.schema.create_space('city', {engine=engine, format=fmt}) end
         )
-        fmt = gen_format({field = 'id'})
-        t.assert_error_msg_content_equals(
-            "Illegal parameters, format[2]: foreign key definition must be a table with 'space' and 'field' members",
-            function() box.schema.create_space('city', {engine=engine, format=fmt}) end
-        )
         fmt = gen_format({fkey={space = 'country'}})
         t.assert_error_msg_content_equals(
             "Illegal parameters, format[2]: foreign key: field must be specified",
-            function() box.schema.create_space('city', {engine=engine, format=fmt}) end
-        )
-        fmt = gen_format({fkey={field = 'id'}})
-        t.assert_error_msg_content_equals(
-            "Illegal parameters, format[2]: foreign key: space must be specified",
             function() box.schema.create_space('city', {engine=engine, format=fmt}) end
         )
         fmt = gen_format({space = 'planet', field = 'id'})
@@ -293,13 +283,12 @@ g.test_foreign_key_numeric = function(cg)
                      {name='country_code', type='string',
                       foreign_key={country={space=country.id, field=2}}},
                      {name='name', type='string'} }
+        local fmt_copy = table.deepcopy(fmt)
         local city = box.schema.create_space('city', {engine=engine, format=fmt})
-        -- Note that the format was normalized and field converted to zero-based.
-        t.assert_equals(city:format(),
-                        { { name = "id", type = "unsigned"},
-                          { foreign_key = {country = {field = 1, space = country.id}},
-                            name = "country_code", type = "string"},
-                          { name = "name", type = "string"} });
+        -- Check that fmt is not modified by create_space()
+        t.assert_equals(fmt_copy, fmt)
+        -- Check that format() returns one-based field number
+        t.assert_equals(city:format(), fmt)
         city:create_index('pk')
 
         t.assert_equals(country:select{}, {{1, 'ru', 'Russia'}, {2, 'fr', 'France'}})

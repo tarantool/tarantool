@@ -222,8 +222,197 @@ local function test_iscdata(test, module)
     end
 end
 
+-- Verify box_tuple_field_by_path() on several basic JSON path
+-- selectors.
+local function test_tuple_field_by_path(test, module)
+    local msgpack = require('msgpack')
+    local json = require('json')
+
+    local space = box.schema.space.create('messages', {
+        format = {
+            {name = 'id', type = 'unsigned'},
+            {name = 'from', type = 'map', is_nullable = true},
+            {name = 'body', type = 'string', is_nullable = true},
+            {name = 'tags', type = 'array', is_nullable = true},
+        },
+    })
+    space:create_index('primary', {
+        parts = {
+            {'id', 'unsigned'},
+        },
+    })
+    space:create_index('second_tag', {
+        parts = {
+            {'tags[2]', 'string'},
+        },
+    })
+
+    local cases = {
+        -- Malformed or invalid path, non existing field.
+        {
+            tuple = box.tuple.new({1, 2, 3}),
+            path = '[2][2]',
+            exp = nil,
+            description = 'no such field',
+        },
+        {
+            tuple = box.tuple.new({1, 2, 3}),
+            path = '',
+            exp = nil,
+            description = 'empty JSON path',
+        },
+        {
+            tuple = box.tuple.new({1, 2, 3}),
+            path = '[',
+            exp = nil,
+            description = 'malformed JSON path',
+        },
+        {
+            tuple = box.tuple.new({1, 2, 3}),
+            path = '[*]',
+            exp = nil,
+            description = 'multikey JSON path (outmost field)',
+        },
+        {
+            tuple = box.tuple.new({1, {2, 'x'}, 3}),
+            path = '[2][*]',
+            exp = nil,
+            description = 'multikey JSON path (nested field)',
+        },
+        {
+            tuple = box.tuple.new({1, 2, 3}),
+            path = '.[2]',
+            exp = nil,
+            description = 'a period at beginning of a numeric path',
+        },
+        -- Named fields.
+        {
+            tuple = box.tuple.new({1, {foo = 'x'}, 3}),
+            path = '[2].foo',
+            exp = 'x',
+            description = 'nested named field',
+        },
+        {
+            tuple = space:replace({1}),
+            path = 'id',
+            exp = 1,
+            description = 'outmost named field',
+        },
+        {
+            tuple = space:replace({1, {id = 5, username = 'x'}}),
+            path = 'from.username',
+            exp = 'x',
+            description = 'outmost and nested named fields',
+        },
+        {
+            tuple = space:replace({1, {id = 5, username = 'x'}}),
+            path = '.from.username',
+            exp = 'x',
+            description = 'a period at beginning',
+        },
+        -- Numeric selectors require extra attention in testing,
+        -- because the index_base argument (0 as in C or 1 as in
+        -- Lua) affects several code paths:
+        --
+        -- 1. How an outmost numeric field is interpreted.
+        -- 2. How a nested numeric field is interpreted.
+        -- 3. Usage of a precalculated field offset (for an
+        --    indexed field).
+        {
+            tuple = box.tuple.new({1, 2, 3}),
+            path = '[2]',
+            exp = 2,
+            description = 'outmost numeric field (no format)',
+        },
+        {
+            tuple = box.tuple.new({1, {2, 'x'}, 3}),
+            path = '[2][2]',
+            exp = 'x',
+            description = 'outmost and nested numeric fields (no format)',
+        },
+        {
+            tuple = space:replace({1, nil, 'hi'}),
+            path = '[3]',
+            exp = 'hi',
+            description = 'non-indexed outmost numeric field',
+        },
+        {
+            -- The path points to a field right before an indexed
+            -- one.
+            tuple = space:replace({1, nil, nil, {'a', 'b', 'c'}}),
+            path = '[4][1]',
+            exp = 'a',
+            description = 'non-indexed nested numeric field',
+        },
+        {
+            -- The path points to a field right after an indexed
+            -- one.
+            tuple = space:replace({1, nil, nil, {'a', 'b', 'c'}}),
+            path = '[4][3]',
+            exp = 'c',
+            description = 'non-indexed nested numeric field',
+        },
+        {
+            tuple = space:replace({1}),
+            path = '[1]',
+            exp = 1,
+            description = 'indexed outmost field',
+        },
+        {
+            tuple = space:replace({1, nil, nil, {'a', 'b', 'c'}}),
+            path = '[4][2]',
+            exp = 'b',
+            description = 'indexed nested field',
+        },
+    }
+
+    local function check(test, case)
+        local case_name = string.format(
+            'tuple: %s; path: %s; index_base: %d; exp: %s',
+            json.encode(case.tuple), case.path, case.index_base,
+            json.encode(case.exp))
+        local mp_field = module.tuple_field_by_path(case.tuple, case.path,
+            case.index_base)
+
+        local res
+        if case.exp == nil then
+            test:ok(mp_field == nil, case_name)
+        else
+            if mp_field == nil then
+                res = 'NULL'
+            else
+                res = msgpack.decode(mp_field)
+            end
+            test:is_deeply(res, case.exp, case_name)
+        end
+        if case.index_base == 1 then
+            test:is_deeply(res, case.tuple[case.path], 'consistency check')
+        end
+    end
+
+    test:plan(#cases)
+    for _, case in ipairs(cases) do
+        test:test(case.description, function(test)
+            test:plan(3)
+
+            case.index_base = 1
+            check(test, case)
+
+            -- The same, but with zero based numeric selectors.
+            case.index_base = 0
+            case.path = case.path:gsub('%[%d+%]', function(selector)
+                local num = tonumber(selector:sub(2, 2))
+                return ('[%d]'):format(num - 1)
+            end)
+            check(test, case)
+        end)
+    end
+
+    space:drop()
+end
+
 require('tap').test("module_api", function(test)
-    test:plan(38)
+    test:plan(39)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
@@ -252,6 +441,7 @@ require('tap').test("module_api", function(test)
     test:test("iscdata", test_iscdata, module)
     test:test("buffers", test_buffers, module)
     test:test("tuple_validate", test_tuple_validate, module)
+    test:test("tuple_field_by_path", test_tuple_field_by_path, module)
 
     space:drop()
 end)

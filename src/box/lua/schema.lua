@@ -248,7 +248,9 @@ end
  @param table - table with parameters
  @param template - table with expected types of expected parameters
   type could be comma separated string with lua types (number, string etc),
-  or 'any' if any type is allowed
+  or 'any' if any type is allowed. Instead of this string, function, which will
+  be used to check if the parameter is correct, can be used too. It should
+  accept option as an argument and return either true or false + expected_type.
  The function checks following:
  1)that parameters table is a table (or nil)
  2)all keys in parameters are present in template
@@ -259,7 +261,13 @@ end
  @example
  check_param_table(options, { user = 'string',
                               port = 'string, number',
-                              data = 'any'} )
+                              data = 'any',
+                              addr = function(opt)
+                                if not ffi.istype(addr_t, buf) then
+                                    return false, "struct addr"
+                                end
+                                return true
+                              end} )
 --]]
 local function check_param_table(table, template)
     if table == nil then
@@ -277,6 +285,13 @@ local function check_param_table(table, template)
         if template[k] == nil then
             box.error(box.error.ILLEGAL_PARAMS,
                       "unexpected option '" .. k .. "'")
+        elseif type(template[k]) == 'function' then
+            local res, expected_type = template[k](v)
+            if not res then
+                box.error(box.error.ILLEGAL_PARAMS,
+                          "options parameter '" .. k ..
+                          "' should be of type " .. expected_type)
+            end
         elseif template[k] == 'any' then -- luacheck: ignore
             -- any type is ok
         elseif (string.find(template[k], ',') == nil) then
@@ -523,38 +538,37 @@ end
 --  foreign field.
 -- If is_complex, field is expected to be a table with local field ->
 --  foreign field mapping.
-local function normalize_foreign_key_one(space_id, space_name, def,
-                                         error_prefix, is_complex)
-    if def.space == nil then
-        box.error(box.error.ILLEGAL_PARAMS,
-                  error_prefix .. "foreign key: space must be specified")
-    end
+-- If fkey_same_space, the foreign key refers to the same space.
+local function normalize_foreign_key_one(def, error_prefix, is_complex,
+                                         fkey_same_space)
     if def.field == nil then
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "foreign key: field must be specified")
     end
-    if type(def.space) ~= 'string' and type(def.space) ~= 'number' then
+    if def.space ~= nil and
+       type(def.space) ~= 'string' and type(def.space) ~= 'number' then
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "foreign key: space must be string or number")
     end
+    local field = def.field
     if not is_complex then
-        if type(def.field) ~= 'string' and type(def.field) ~= 'number' then
+        if type(field) ~= 'string' and type(field) ~= 'number' then
             box.error(box.error.ILLEGAL_PARAMS,
                       error_prefix .. "foreign key: field must be string or number")
         end
-        if type(def.field) == 'number' then
+        if type(field) == 'number' then
             -- convert to zero-based index.
-            def.field = def.field - 1
+            field = field - 1
         end
     else
-        if type(def.field) ~= 'table' then
+        if type(field) ~= 'table' then
             box.error(box.error.ILLEGAL_PARAMS,
                       error_prefix .. "foreign key: field must be a table " ..
                       "with local field -> foreign field mapping")
         end
         local count = 0
         local converted = {}
-        for k,v in pairs(def.field) do
+        for k,v in pairs(field) do
             count = count + 1
             if type(k) ~= 'string' and type(k) ~= 'number' then
                 box.error(box.error.ILLEGAL_PARAMS,
@@ -581,9 +595,8 @@ local function normalize_foreign_key_one(space_id, space_name, def,
                       error_prefix .. "foreign key: field must be a table " ..
                       "with local field -> foreign field mapping")
         end
-        def.field = setmap(converted)
+        field = setmap(converted)
     end
-    local fkey_same_space = (def.space == space_id or def.space == space_name)
     if not box.space[def.space] and not fkey_same_space then
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "foreign key: space " .. tostring(def.space)
@@ -597,9 +610,9 @@ local function normalize_foreign_key_one(space_id, space_name, def,
         end
     end
     if fkey_same_space then
-        return {space = space_id, field = def.field}
+        return {field = field}
     else
-        return {space = box.space[def.space].id, field = def.field}
+        return {space = box.space[def.space].id, field = field}
     end
 end
 
@@ -625,18 +638,17 @@ local function normalize_foreign_key(space_id, space_name, fkey, error_prefix,
         box.error(box.error.ILLEGAL_PARAMS,
                   error_prefix .. "foreign key must be a table")
     end
-    if fkey.space ~= nil and fkey.field ~= nil and
+    if fkey.field ~= nil and
         (type(fkey.space) ~= 'table' or type(fkey.field) ~= 'table') then
         -- the first, short form.
-        fkey = normalize_foreign_key_one(space_id, space_name, fkey,
-                                         error_prefix, is_complex)
-        local fkey_same_space = (fkey.space == space_id or
+        local fkey_same_space = (fkey.space == nil or
+                                 fkey.space == space_id or
                                  fkey.space == space_name)
-        if fkey_same_space then
-            return {[space_name] = fkey}
-        else
-            return {[box.space[fkey.space].name] = fkey}
-        end
+        fkey = normalize_foreign_key_one(fkey, error_prefix, is_complex,
+                                         fkey_same_space)
+        local fkey_name = fkey_same_space and space_name or
+                          box.space[fkey.space].name
+        return {[fkey_name] = fkey}
     end
     -- the second, detailed form.
     local result = {}
@@ -651,8 +663,11 @@ local function normalize_foreign_key(space_id, space_name, fkey, error_prefix,
                       error_prefix .. "foreign key definition must be a table "
                       .. "with 'space' and 'field' members")
         end
-        v = normalize_foreign_key_one(space_id, space_name, v, error_prefix,
-                                      is_complex)
+        local fkey_same_space = (v.space == nil or
+                                 v.space == space_id or
+                                 v.space == space_name)
+        v = normalize_foreign_key_one(v, error_prefix, is_complex,
+                                      fkey_same_space)
         result[k] = v
     end
     return result
@@ -711,6 +726,38 @@ local function normalize_format(space_id, space_name, format)
     return result
 end
 box.internal.space.normalize_format = normalize_format -- for space.upgrade
+
+local function denormalize_foreign_key_one(fkey)
+    assert(type(fkey.field) == 'string' or type(fkey.field) == 'number')
+    local result = fkey
+    if type(fkey.field) == 'number' then
+        -- convert to one-based index
+        result.field = result.field + 1
+    end
+    return result
+end
+
+local function denormalize_foreign_key(fkey)
+    local result = setmap{}
+    for k, v in pairs(fkey) do
+        result[k] = denormalize_foreign_key_one(v)
+    end
+    return result
+end
+
+-- Convert zero-based foreign key field numbers to one-based
+local function denormalize_format(format)
+    local result = setmetatable({}, { __serialize = 'seq' })
+    for i, f in ipairs(format) do
+        result[i] = f
+        for k, v in pairs(f) do
+            if k == 'foreign_key' then
+                result[i][k] = denormalize_foreign_key(v)
+            end
+        end
+    end
+    return result
+end
 
 box.schema.space = {}
 box.schema.space.create = function(name, options)
@@ -804,7 +851,7 @@ function box.schema.space.format(id, format)
     end
 
     if format == nil then
-        return tuple.format
+        return denormalize_format(tuple.format)
     else
         check_param(format, 'format', 'table')
         format = normalize_format(id, tuple.name, format)

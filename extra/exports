@@ -74,6 +74,7 @@ box_tuple_compare
 box_tuple_compare_with_key
 box_tuple_extract_key
 box_tuple_field
+box_tuple_field_by_path
 box_tuple_field_count
 box_tuple_format
 box_tuple_format_default
@@ -460,6 +461,7 @@ tnt_dt_year
 tnt_iconv
 tnt_iconv_close
 tnt_iconv_open
+tnt_internal_symbol
 tnt_interval_to_string
 tnt_interval_interval_sub
 tnt_interval_interval_add

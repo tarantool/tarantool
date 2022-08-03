@@ -1,4 +1,4 @@
-name: static_build_cmake_osx_15
+name: osx_12_static_cmake
 
 on:
   push:
@@ -32,14 +32,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  static_build_cmake_osx_15:
+  osx_12_static_cmake:
     # Run on push to the 'master' and release branches of tarantool/tarantool
     # or on pull request if the 'full-ci' label is set.
     if: github.repository == 'tarantool/tarantool' &&
         ( github.event_name != 'pull_request' ||
           contains(github.event.pull_request.labels.*.name, 'full-ci') )
 
-    runs-on: macos-10.15
+    runs-on: macos-12
 
     steps:
       - uses: tarantool/actions/cleanup@master
@@ -62,6 +62,6 @@ jobs:
         uses: actions/upload-artifact@v2
         if: failure()
         with:
-          name: static_build_cmake_osx_15
+          name: osx_12_static_cmake
           retention-days: 21
           path: ${{ env.VARDIR }}/artifacts

@@ -341,6 +341,9 @@ add_dependencies(tarantool build_bundled_libs preprocess_exports)
 # Re-link if exports changed
 set_target_properties(tarantool PROPERTIES LINK_DEPENDS ${exports_file})
 
+# TODO(gh-7424): Autogenerate the list of internal symbols.
+add_library(symbols STATIC symbols.c)
+
 # A note about linkers:
 # [GNU linker] When linking an *executable* visibility is ignored, and
 #              either nothing is exported (default), or any non-static
@@ -355,13 +358,13 @@ set_target_properties(tarantool PROPERTIES LINK_DEPENDS ${exports_file})
 #                from static libraries.
 #
 if (TARGET_OS_DARWIN)
-    target_link_libraries(tarantool box ${common_libraries})
+    target_link_libraries(tarantool box symbols ${common_libraries})
     set_target_properties(tarantool PROPERTIES
         LINK_FLAGS "-Wl,-exported_symbols_list,${exports_file}")
 else ()
     target_link_libraries(tarantool
                           -Wl,--whole-archive box ${reexport_libraries}
-                          salad -Wl,--no-whole-archive
+                          salad symbols -Wl,--no-whole-archive
                           ${common_libraries}
                           ${generic_libraries})
     set_target_properties(tarantool PROPERTIES
