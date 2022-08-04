@@ -265,6 +265,25 @@ strlcpy(char *dst, const char *src, size_t size)
 }
 #endif
 
+#ifndef HAVE_STRLCAT
+size_t
+strlcat(char *dst, const char *src, size_t size)
+{
+	size_t src1_len = strlen(dst);
+	size_t src2_len = strlen(src);
+
+	if (src1_len >= size)
+		return size + src2_len;
+
+	size_t len = src2_len < size - src1_len ?
+		     src2_len : size - src1_len - 1;
+
+	memcpy(dst + src1_len, src, len);
+	dst[src1_len + len] = '\0';
+	return src1_len + src2_len;
+}
+#endif
+
 int
 utf8_check_printable(const char *start, size_t length)
 {
