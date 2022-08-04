@@ -517,6 +517,21 @@ size_t
 strlcpy(char *dst, const char *src, size_t size);
 #endif
 
+#ifndef HAVE_STRLCAT
+/**
+ * Append the null-terminated string @a src to the end of @a dst string.
+ * Unlike @a strncat the resulting string is always null-terminated.
+ *
+ * @param dst destination buffer and the first input string
+ * @param src the second input string
+ * @param size destination buffer size
+ *
+ * @return the total length of the string, that it is trying to create
+ */
+size_t
+strlcat(char *dst, const char *src, size_t size);
+#endif
+
 /**
  * Check that @a str is valid utf-8 sequence and can be printed
  * unescaped.
