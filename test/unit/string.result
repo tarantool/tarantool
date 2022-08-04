@@ -1,0 +1,15 @@
+1..1
+	*** main ***
+    1..8
+	*** test_strlcat ***
+    ok 1 - normal: length
+    ok 2 - normal: string
+    ok 3 - overflow 1: length
+    ok 4 - overflow 1: string
+    ok 5 - overflow 2: length
+    ok 6 - overflow 2: string
+    ok 7 - overflow 3: length
+    ok 8 - overflow 3: string
+	*** test_strlcat: done ***
+ok 1 - subtests
+	*** main: done ***

@@ -50,7 +50,12 @@
 /**
  * Defined if strlcpy() string extension helper present.
  */
- #cmakedefine HAVE_STRLCPY 1
+#cmakedefine HAVE_STRLCPY 1
+
+/**
+ * Defined if strlcat() string extension helper present.
+ */
+ #cmakedefine HAVE_STRLCAT 1
 
 /*
  * Defined if gcov instrumentation should be enabled.

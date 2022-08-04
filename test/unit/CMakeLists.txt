@@ -302,3 +302,6 @@ target_link_libraries(watcher.test unit box)
 
 add_executable(grp_alloc.test grp_alloc.c box_test_utils.c)
 target_link_libraries(grp_alloc.test unit)
+
+add_executable(string.test string.c core_test_utils.c)
+target_link_libraries(string.test core unit)
