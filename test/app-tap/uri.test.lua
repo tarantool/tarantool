@@ -97,11 +97,16 @@ local function test_parse(test)
 end
 
 local function test_format(test)
-    test:plan(13)
+    test:plan(14)
     local u = uri.parse("user:password@localhost")
     test:is(uri.format(u), "user@localhost", "password removed")
     test:is(uri.format(u, false), "user@localhost", "password removed")
     test:is(uri.format(u, true), "user:password@localhost", "password kept")
+
+    -- URI with the specified port only.
+    -- This case is used, for example, to resolve a connection URI to the localhost by default.
+    u = uri.parse(3301)
+    test:is(uri.format(u), "3301", "URI format")
 
     -- URI with empty query
      u = uri.parse({"/tmp/unix.sock?"})
