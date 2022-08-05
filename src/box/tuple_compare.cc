@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "decimal.h"
+#include "core/decimal.h"
 #include "tuple_compare.h"
 #include "tuple.h"
 #include "coll/coll.h"

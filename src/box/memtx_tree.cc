@@ -362,6 +362,33 @@ tree_iterator_set_dummie(struct iterator *iterator)
 	iterator->next_raw = tree_iterator_dummie;
 }
 
+/*
+ * If the iterator's underlying tuple does not match its current tuple, it needs
+ * to be repositioned.
+ */
+template <bool USE_HINT>
+static void
+tree_iterator_prev_reposition(struct tree_iterator<USE_HINT> *iterator,
+			      struct memtx_tree_index<USE_HINT> *index)
+{
+	bool exact = false;
+	iterator->tree_iterator =
+		memtx_tree_lower_bound_elem(&index->tree, iterator->current,
+					    &exact);
+	if (exact) {
+		struct memtx_tree_data<USE_HINT> *successor =
+		memtx_tree_iterator_get_elem(&index->tree,
+					     &iterator->tree_iterator);
+		tree_iterator_set_current(iterator, successor);
+	}
+	/*
+	 * Since we previously clarified a tuple from the iterator
+	 * current tuple's story chain, a tuple with same primary key
+	 * must always exist in the index.
+	 */
+	assert(exact || in_txn() == NULL || !memtx_tx_manager_use_mvcc_engine);
+}
+
 template <bool USE_HINT>
 static int
 tree_iterator_next_raw_base(struct iterator *iterator, struct tuple **ret)
@@ -408,10 +435,8 @@ tree_iterator_prev_raw_base(struct iterator *iterator, struct tuple **ret)
 	assert(it->current.tuple != NULL);
 	struct memtx_tree_data<USE_HINT> *check =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
-	if (check == NULL || !memtx_tree_data_is_equal(check, &it->current)) {
-		it->tree_iterator = memtx_tree_lower_bound_elem(&index->tree,
-								it->current, NULL);
-	}
+	if (check == NULL || !memtx_tree_data_is_equal(check, &it->current))
+		tree_iterator_prev_reposition(it, index);
 	memtx_tree_iterator_prev(&index->tree, &it->tree_iterator);
 	struct tuple *successor = it->current.tuple;
 	tuple_ref(successor);
@@ -502,10 +527,8 @@ tree_iterator_prev_equal_raw_base(struct iterator *iterator, struct tuple **ret)
 	assert(it->current.tuple != NULL);
 	struct memtx_tree_data<USE_HINT> *check =
 		memtx_tree_iterator_get_elem(&index->tree, &it->tree_iterator);
-	if (check == NULL || !memtx_tree_data_is_equal(check, &it->current)) {
-		it->tree_iterator = memtx_tree_lower_bound_elem(&index->tree,
-								it->current, NULL);
-	}
+	if (check == NULL || !memtx_tree_data_is_equal(check, &it->current))
+		tree_iterator_prev_reposition(it, index);
 	memtx_tree_iterator_prev(&index->tree, &it->tree_iterator);
 	struct tuple *successor = it->current.tuple;
 	tuple_ref(successor);
@@ -576,7 +599,6 @@ name(struct iterator *iterator, struct tuple **ret)				\
 		}								\
 		*ret = memtx_tx_tuple_clarify(txn, space, *ret, idx, mk_index);	\
 	} while (*ret == NULL);							\
-	tree_iterator_set_current_tuple(it, *ret);				\
 	return 0;								\
 }										\
 struct forgot_to_add_semicolon
@@ -719,12 +741,8 @@ tree_iterator_start_raw(struct iterator *iterator, struct tuple **ret)
 		memtx_tx_track_gap(txn, space, idx, successor, type,
 				   it->key_data.key, it->key_data.part_count);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
-	if (res == NULL || !eq_match)
-		return 0;
-	if (*ret == NULL)
-		return iterator->next_raw(iterator, ret);
-	tree_iterator_set_current_tuple(it, *ret);
-	return 0;
+	return res == NULL || !eq_match || *ret != NULL ? 0 :
+	       iterator->next_raw(iterator, ret);
 }
 
 /* }}} */

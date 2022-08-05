@@ -16,6 +16,8 @@ if (APPLE)
         libSystem
         CoreFoundation
         libc++
+        # Required by bundled libcurl built with c-ares
+        libresolv
     )
 elseif(UNIX)
     set(ALLOWLIST
