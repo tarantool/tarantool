@@ -138,8 +138,8 @@ local function parse_connect_params(host_or_uri, ...) -- self? host_or_uri port?
                         type(host_or_uri) == 'number' or
                         type(host_or_uri) == 'table') then
         uri = host_or_uri
-    elseif type(host_or_uri) == 'string' and (type(port) == 'string' or
-                                              type(port) == 'number') then
+    elseif (type(host_or_uri) == 'string' or host_or_uri == nil) and
+            (type(port) == 'string' or type(port) == 'number') then
         uri = urilib.format({host = host_or_uri, service = tostring(port)})
     else
         box.error(E_PROC_LUA,
