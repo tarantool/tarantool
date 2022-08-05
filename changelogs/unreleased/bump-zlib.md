@@ -1,3 +1,3 @@
 ## feature/build
 
-* Updated zlib to version 1.2.12 for static build.
+* Updated zlib used for static builds to version 1.2.12.
