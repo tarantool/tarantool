@@ -157,53 +157,6 @@ local option_keys = {
     ["SameSite"] = true,
 }
 
---local function process_set_cookies(value, result)
---    local key_start, value_start
---    local key, val
---    local symbols = value:gmatch('.')
---    local options = {}
---    local cur = 0
---    for v in symbols do
---        cur = cur + 1
---        if v == ' ' or v == '\t' then
---            goto continue
---        end
---        key_start = cur
---        -- parse cookie name
---        while not special_characters[v] do
---            if v == nil then
---                return
---            end
---            v = symbols()
---            cur = cur + 1
---        end
---        key = value:sub(key_start, cur)
---        if not v or v ~= '=' then
---            -- invalid header
---            return
---        end
---        while v == ' ' do
---            v = symbols()
---            cur = cur + 1
---        end
---
---        if v == nil then
---            return
---        end
---
---        while v and v ~= ';' do
---            if v == nil then
---                break
---            end
---            v = symbols()
---            cur = cur + 1
---        end
---
---        result[key] = {val, options}
---        ::continue::
---    end
---end
-
 local function process_cookie(cookie, result)
     local vals = cookie:split(';')
     local val = vals[1]:split('=')
