@@ -342,8 +342,7 @@ end
 --
 --      proxy_port - set a port number the proxy listens on;
 --
---      proxy_user_pwd - set a user name and a password to use
---          in authentication;
+--      proxy_user_pwd - set a user name and a password to use in authentication;
 --
 --      no_proxy - disable proxy use for specific hosts;
 --
@@ -353,18 +352,13 @@ end
 --          non-universal keepalive knobs (Linux, AIX, HP-UX, more);
 --
 --      low_speed_time & low_speed_limit -
---          If the download receives less than
---          "low speed limit" bytes/second
---          during "low speed time" seconds,
---          the operations is aborted.
---          You could i.e if you have
---          a pretty high speed connection, abort if
---          it is less than 2000 bytes/sec
---          during 20 seconds;
+--          If the download receives less than "low speed limit" bytes/second
+--          during "low speed time" seconds, the operations is aborted.
+--          You could i.e if you have a pretty high speed connection, abort if
+--          it is less than 2000 bytes/sec during 20 seconds;
 --
 --      timeout - time-out the read operation and
---          waiting for the curl api request
---          after this amount of seconds;
+--          waiting for the curl api request after this amount of seconds;
 --
 --      max_header_name_length - maximum length of a response header;
 --
@@ -372,12 +366,10 @@ end
 --
 --      interface - source interface for outgoing traffic;
 --
---      follow_location - whether the client will follow
---          'Location' header that a server sends as part of an
---          3xx response;
+--      follow_location - whether the client will follow 'Location' header that
+--          a server sends as part of an 3xx response;
 --
---      accept_encoding - enables automatic decompression of HTTP
---          responses;
+--      accept_encoding - enables automatic decompression of HTTP responses;
 --
 --  Returns:
 --      {
