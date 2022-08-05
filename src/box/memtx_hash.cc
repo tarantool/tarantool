@@ -521,7 +521,7 @@ hash_snapshot_iterator_next(struct snapshot_iterator *iterator,
 		tuple = memtx_tx_snapshot_clarify(&it->cleaner, tuple);
 
 		if (tuple != NULL) {
-			*data = tuple_data_range(*res, size);
+			*data = tuple_data_range(tuple, size);
 			*data = memtx_tuple_decompress_raw(
 				*data, *data + *size, size);
 			return *data == NULL ? -1 : 0;
@@ -546,6 +546,9 @@ memtx_hash_index_create_snapshot_iterator(struct index *base)
 			 "memtx_hash_index", "iterator");
 		return NULL;
 	}
+
+	struct space *space = space_cache_find(base->def->space_id);
+	memtx_tx_snapshot_cleaner_create(&it->cleaner, space);
 
 	it->base.next = hash_snapshot_iterator_next;
 	it->base.free = hash_snapshot_iterator_free;
