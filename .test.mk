@@ -158,11 +158,13 @@ pretest-osx:
 test-osx-release: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON
 test-osx-release: prebuild-osx build run-luajit-test pretest-osx run-test
 
-# FIXME: Temporary target with reduced number of tests. Use 'test-release-osx' target
-# instead when all M1 issues https://github.com/tarantool/tarantool/issues/6068 are resolved.
+# FIXME: Temporary target without tests. Use 'test-release-osx' target instead
+# when all M1 issues are resolved:
+#   LuaJIT tests - https://github.com/tarantool/tarantool/issues/4819
+#   Tarantool tests - https://github.com/tarantool/tarantool/issues/6068
 .PHONY: test-osx-release-arm64
 test-osx-release-arm64: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_WERROR=ON
-test-osx-release-arm64: prebuild-osx build run-luajit-test
+test-osx-release-arm64: prebuild-osx build
 
 # Debug build
 
@@ -170,11 +172,13 @@ test-osx-release-arm64: prebuild-osx build run-luajit-test
 test-osx-debug: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=Debug
 test-osx-debug: prebuild-osx build run-luajit-test pretest-osx run-test
 
-# FIXME: Temporary target with reduced number of tests. Use 'test-release-osx' target
-# instead when all M1 issues https://github.com/tarantool/tarantool/issues/6068 are resolved.
+# FIXME: Temporary target without tests. Use 'test-release-osx' target instead
+# when all M1 issues are resolved:
+#   LuaJIT tests - https://github.com/tarantool/tarantool/issues/4819
+#   Tarantool tests - https://github.com/tarantool/tarantool/issues/6068
 .PHONY: test-osx-debug-arm64
 test-osx-debug-arm64: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=Debug
-test-osx-debug-arm64: prebuild-osx build run-luajit-test
+test-osx-debug-arm64: prebuild-osx build
 
 # Static build
 
