@@ -251,18 +251,22 @@ uri_format(char *str, int len, const struct uri *uri, bool write_password)
 	int total = 0;
 	if (uri->scheme != NULL)
 		SNPRINT(total, snprintf, str, len, "%s://", uri->scheme);
-	if (uri->host != NULL) {
-		if (uri->login != NULL) {
-			SNPRINT(total, snprintf, str, len, "%s", uri->login);
-			if (uri->password != NULL && write_password) {
-				SNPRINT(total, snprintf, str, len, ":%s",
-					uri->password);
-			}
-			SNPRINT(total, snprintf, str, len, "@");
+	if (uri->login != NULL) {
+		SNPRINT(total, snprintf, str, len, "%s", uri->login);
+		if (uri->password != NULL && write_password) {
+			SNPRINT(total, snprintf, str, len, ":%s",
+				uri->password);
 		}
+		SNPRINT(total, snprintf, str, len, "@");
+	}
+	if (uri->host != NULL) {
 		SNPRINT(total, snprintf, str, len, "%s", uri->host);
-		if (uri->service != 0) {
+	}
+	if (uri->service != NULL) {
+		if (uri->host != NULL) {
 			SNPRINT(total, snprintf, str, len, ":%s", uri->service);
+		} else {
+			SNPRINT(total, snprintf, str, len, "%s", uri->service);
 		}
 	}
 	if (uri->path != NULL) {
