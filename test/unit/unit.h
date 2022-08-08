@@ -136,6 +136,8 @@ int check_plan(void);
 
 #if UNIT_TAP_COMPATIBLE
 
+#include <stdarg.h> /* va_start(), va_end() */
+
 #define header()					\
 	do { 						\
 		_space(stdout);				\
