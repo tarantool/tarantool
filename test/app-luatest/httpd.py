@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import sys
+import tempfile
 from gevent.pywsgi import WSGIServer
 from gevent import spawn, sleep, socket
 
@@ -109,31 +110,35 @@ def handle(env, response) :
         return other_handle(env, response, method, "200 Ok")
     return other_handle(env, response, method, "400 Bad Request")
 
-def heartbeat():
+def heartbeat(sockname):
+    sockname_str = sockname
+    if type(sockname) == tuple:
+        sockname_str = "{}:{}".format(sockname[0], sockname[1])
     try:
         while True:
-            sys.stdout.write("heartbeat\n")
+            sys.stdout.write(sockname_str + "\n")
             sys.stdout.flush()
             sleep(1e-1)
     except IOError:
         sys.exit(1)
 
 def usage():
-    message = "Usage: {} {{ --inet HOST:PORT | --unix PATH }}\n".format(sys.argv[0])
+    message = "Usage: {} {{ --conn-type AF_INET | AF_UNIX }}\n".format(sys.argv[0])
     sys.stderr.write(message)
     sys.exit(1)
 
 if len(sys.argv) != 3:
     usage()
 
-if sys.argv[1] == "--inet":
-    host, port = sys.argv[2].split(":")
-    sock_family = socket.AF_INET
-    sock_addr = (host, int(port))
-elif sys.argv[1] == "--unix":
-    path = sys.argv[2]
-    sock_family = socket.AF_UNIX
-    sock_addr = path
+if sys.argv[1] == "--conn-type":
+    conn_type = sys.argv[2]
+    if conn_type == "AF_UNIX":
+        sock_family = socket.AF_UNIX
+        td = tempfile.TemporaryDirectory()
+        sock_addr = "{}/httpd.sock".format(td.name)
+    elif conn_type == "AF_INET":
+        sock_family = socket.AF_INET
+        sock_addr = ("127.0.0.1", 0)
 else:
     usage()
 
@@ -143,5 +148,5 @@ sock.bind(sock_addr)
 sock.listen(10)
 
 server = WSGIServer(sock, handle, log=None)
-spawn(heartbeat)
+spawn(heartbeat, sock.getsockname())
 server.serve_forever()
