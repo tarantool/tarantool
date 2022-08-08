@@ -306,12 +306,7 @@ struct sequence_data_iterator {
 	struct light_sequence_view view;
 	/** Iterator over the data index. */
 	struct light_sequence_iterator iter;
-	/** Last tuple returned by the iterator. */
-	char tuple[0];
 };
-
-#define SEQUENCE_TUPLE_BUF_SIZE		(mp_sizeof_array(2) + \
-					 2 * mp_sizeof_uint(UINT64_MAX))
 
 static int
 sequence_data_iterator_next(struct snapshot_iterator *base,
@@ -327,15 +322,18 @@ sequence_data_iterator_next(struct snapshot_iterator *base,
 		return 0;
 	}
 
-	char *buf_end = iter->tuple;
+	const size_t buf_size = mp_sizeof_array(2) +
+				2 * mp_sizeof_uint(UINT64_MAX);
+	char *buf = region_alloc(&fiber()->gc, buf_size);
+	char *buf_end = buf;
 	buf_end = mp_encode_array(buf_end, 2);
 	buf_end = mp_encode_uint(buf_end, sd->id);
 	buf_end = (sd->value >= 0 ?
 		   mp_encode_uint(buf_end, sd->value) :
 		   mp_encode_int(buf_end, sd->value));
-	assert(buf_end <= iter->tuple + SEQUENCE_TUPLE_BUF_SIZE);
-	*data = iter->tuple;
-	*size = buf_end - iter->tuple;
+	assert(buf_end <= buf + buf_size);
+	*data = buf;
+	*size = buf_end - buf;
 	return 0;
 }
 
@@ -352,13 +350,7 @@ sequence_data_iterator_free(struct snapshot_iterator *base)
 struct snapshot_iterator *
 sequence_data_iterator_create(void)
 {
-	struct sequence_data_iterator *iter = calloc(1, sizeof(*iter) +
-						     SEQUENCE_TUPLE_BUF_SIZE);
-	if (iter == NULL) {
-		diag_set(OutOfMemory, sizeof(*iter) + SEQUENCE_TUPLE_BUF_SIZE,
-			 "malloc", "sequence_data_iterator");
-		return NULL;
-	}
+	struct sequence_data_iterator *iter = xcalloc(1, sizeof(*iter));
 
 	iter->base.free = sequence_data_iterator_free;
 	iter->base.next = sequence_data_iterator_next;
