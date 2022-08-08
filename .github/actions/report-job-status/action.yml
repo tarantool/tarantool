@@ -1,0 +1,37 @@
+name: Send VK Teams notification on failure
+description: Send the message to VK Teams chat on failure
+
+inputs:
+  api-url:
+    required: true
+    description: VK Teams API URL
+  bot-token:
+    required: true
+    description: VK Teams bot token
+  chat-id:
+    required: true
+    description: VK Teams team chat ID
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set chat for reports
+      run: |
+        # Report failures occurred in the 'master' and release branches to
+        # the team chat. Report failures occurred in PRs and other branches
+        # to the personal chat.
+        if [[ ${{ github.ref }} == refs/heads/master ||
+              ${{ github.ref }} =~ refs/heads/[0-9].[0-9]+$ ]]; then
+          echo CHAT_ID="${{ inputs.chat-id }}" | tee -a $GITHUB_ENV
+        else
+          echo CHAT_ID="${{ inputs.chat-id }}_${{ github.actor }}" \
+            | tee -a $GITHUB_ENV
+        fi
+      shell: bash
+
+    - name: Send VK Teams message on failure
+      uses: tarantool/actions/report-job-status@master
+      with:
+        api-url: ${{ inputs.api-url }}
+        bot-token: ${{ inputs.bot-token }}
+        chat-id: ${{ env.CHAT_ID }}
