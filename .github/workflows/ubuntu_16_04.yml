@@ -60,12 +60,13 @@ jobs:
           DIST: 'xenial'
           GC64: ${{ matrix.build-type == 'gc64' }}
         uses: ./.github/actions/pack_and_deploy
-      - name: call action to send Telegram message on failure
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
-          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
-        uses: ./.github/actions/send-telegram-notify
+      - name: Send VK Teams message on failure
         if: failure()
+        uses: ./.github/actions/report-job-status
+        with:
+          api-url: ${{ secrets.VKTEAMS_API_URL }}
+          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
+          chat-id: ${{ secrets.VKTEAMS_CHAT_ID }}
       - name: artifacts
         uses: actions/upload-artifact@v2
         if: failure()
