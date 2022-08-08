@@ -167,12 +167,6 @@ struct vinyl_iterator {
 	struct trigger on_tx_destroy;
 };
 
-struct vinyl_snapshot_iterator {
-	struct snapshot_iterator base;
-	struct vy_read_view *rv;
-	struct vy_read_iterator iterator;
-};
-
 static const struct engine_vtab vinyl_engine_vtab;
 static const struct space_vtab vinyl_space_vtab;
 static const struct index_vtab vinyl_index_vtab;
@@ -2990,13 +2984,17 @@ vinyl_engine_end_recovery(struct engine *engine)
 /** {{{ Replication */
 
 struct vy_join_entry {
+	/** Link in vy_join_ctx::entries. */
 	struct rlist in_ctx;
-	uint32_t space_id;
-	struct snapshot_iterator *iterator;
+	/** Iterator over the primary index of the space. */
+	struct vy_read_iterator iterator;
 };
 
 struct vy_join_ctx {
+	/** List of spaces to relay. Linked by vy_join_entry::in_ctx. */
 	struct rlist entries;
+	/** Read view at the time when the initial join started. */
+	struct vy_read_view *rv;
 };
 
 static int
@@ -3010,18 +3008,22 @@ vy_join_add_space(struct space *space, void *arg)
 	struct index *pk = space_index(space, 0);
 	if (pk == NULL)
 		return 0;
+	struct vy_lsm *lsm = vy_lsm(pk);
 	struct vy_join_entry *entry = malloc(sizeof(*entry));
 	if (entry == NULL) {
 		diag_set(OutOfMemory, sizeof(*entry),
 			 "malloc", "struct vy_join_entry");
 		return -1;
 	}
-	entry->space_id = space_id(space);
-	entry->iterator = index_create_snapshot_iterator(pk);
-	if (entry->iterator == NULL) {
-		free(entry);
-		return -1;
-	}
+	vy_read_iterator_open(&entry->iterator, lsm, NULL, ITER_ALL,
+			      lsm->env->empty_key,
+			      (const struct vy_read_view **)&ctx->rv);
+	/*
+	 * The space can be dropped while initial join is in progress.
+	 * Take a reference to the index to make sure the iterator stays
+	 * valid.
+	 */
+	vy_lsm_ref(lsm);
 	rlist_add_tail_entry(&ctx->entries, entry, in_ctx);
 	return 0;
 }
@@ -3029,7 +3031,7 @@ vy_join_add_space(struct space *space, void *arg)
 static int
 vinyl_engine_prepare_join(struct engine *engine, void **arg)
 {
-	(void)engine;
+	struct vy_env *env = vy_env(engine);
 	struct vy_join_ctx *ctx = malloc(sizeof(*ctx));
 	if (ctx == NULL) {
 		diag_set(OutOfMemory, sizeof(*ctx),
@@ -3037,17 +3039,18 @@ vinyl_engine_prepare_join(struct engine *engine, void **arg)
 		return -1;
 	}
 	rlist_create(&ctx->entries);
-	if (space_foreach(vy_join_add_space, ctx) != 0) {
+	ctx->rv = vy_tx_manager_read_view(env->xm);
+	if (ctx->rv == NULL) {
 		free(ctx);
 		return -1;
 	}
 	*arg = ctx;
-	return 0;
+	return space_foreach(vy_join_add_space, ctx);
 }
 
 static int
 vy_join_send_tuple(struct xstream *stream, uint32_t space_id,
-		   const char *data, size_t size)
+		   struct tuple *tuple)
 {
 	struct request_replace_body body;
 	request_replace_body_create(&body, space_id);
@@ -3059,8 +3062,8 @@ vy_join_send_tuple(struct xstream *stream, uint32_t space_id,
 	row.bodycnt = 2;
 	row.body[0].iov_base = &body;
 	row.body[0].iov_len = sizeof(body);
-	row.body[1].iov_base = (char *)data;
-	row.body[1].iov_len = size;
+	row.body[1].iov_base = (char *)tuple_data(tuple);
+	row.body[1].iov_len = tuple_bsize(tuple);
 
 	return xstream_write(stream, &row);
 }
@@ -3071,15 +3074,15 @@ vinyl_engine_join(struct engine *engine, void *arg, struct xstream *stream)
 	(void)engine;
 	int loops = 0;
 	struct vy_join_ctx *ctx = arg;
-	struct vy_join_entry *entry;
-	rlist_foreach_entry(entry, &ctx->entries, in_ctx) {
-		struct snapshot_iterator *it = entry->iterator;
+	struct vy_join_entry *join_entry;
+	rlist_foreach_entry(join_entry, &ctx->entries, in_ctx) {
+		struct vy_read_iterator *it = &join_entry->iterator;
 		int rc;
-		uint32_t size;
-		const char *data;
-		while ((rc = it->next(it, &data, &size)) == 0 && data != NULL) {
-			if (vy_join_send_tuple(stream, entry->space_id,
-					       data, size) != 0)
+		struct vy_entry entry;
+		while ((rc = vy_read_iterator_next(it, &entry)) == 0 &&
+		       entry.stmt != NULL) {
+			if (vy_join_send_tuple(stream, it->lsm->space_id,
+					       entry.stmt) != 0)
 				return -1;
 		}
 		if (rc != 0)
@@ -3094,13 +3097,16 @@ vinyl_engine_join(struct engine *engine, void *arg, struct xstream *stream)
 static void
 vinyl_engine_complete_join(struct engine *engine, void *arg)
 {
-	(void)engine;
+	struct vy_env *env = vy_env(engine);
 	struct vy_join_ctx *ctx = arg;
 	struct vy_join_entry *entry, *next;
 	rlist_foreach_entry_safe(entry, &ctx->entries, in_ctx, next) {
-		entry->iterator->free(entry->iterator);
+		struct vy_lsm *lsm = entry->iterator.lsm;
+		vy_read_iterator_close(&entry->iterator);
+		vy_lsm_unref(lsm);
 		free(entry);
 	}
+	vy_tx_manager_destroy_read_view(env->xm, ctx->rv);
 	free(ctx);
 }
 
@@ -3766,66 +3772,6 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	vy_read_iterator_open(&it->iterator, lsm, tx, type, it->key,
 			      (const struct vy_read_view **)&tx->read_view);
 	return (struct iterator *)it;
-}
-
-static int
-vinyl_snapshot_iterator_next(struct snapshot_iterator *base,
-			     const char **data, uint32_t *size)
-{
-	assert(base->next == vinyl_snapshot_iterator_next);
-	struct vinyl_snapshot_iterator *it =
-		(struct vinyl_snapshot_iterator *)base;
-	struct vy_entry entry;
-	if (vy_read_iterator_next(&it->iterator, &entry) != 0)
-		return -1;
-	*data = entry.stmt != NULL ? tuple_data_range(entry.stmt, size) : NULL;
-	return 0;
-}
-
-static void
-vinyl_snapshot_iterator_free(struct snapshot_iterator *base)
-{
-	assert(base->free == vinyl_snapshot_iterator_free);
-	struct vinyl_snapshot_iterator *it =
-		(struct vinyl_snapshot_iterator *)base;
-	struct vy_lsm *lsm = it->iterator.lsm;
-	struct vy_env *env = vy_env(lsm->base.engine);
-	vy_read_iterator_close(&it->iterator);
-	vy_tx_manager_destroy_read_view(env->xm, it->rv);
-	vy_lsm_unref(lsm);
-	free(it);
-}
-
-static struct snapshot_iterator *
-vinyl_index_create_snapshot_iterator(struct index *base)
-{
-	struct vy_lsm *lsm = vy_lsm(base);
-	struct vy_env *env = vy_env(base->engine);
-
-	struct vinyl_snapshot_iterator *it = malloc(sizeof(*it));
-	if (it == NULL) {
-		diag_set(OutOfMemory, sizeof(*it), "malloc",
-			 "struct vinyl_snapshot_iterator");
-		return NULL;
-	}
-	it->base.next = vinyl_snapshot_iterator_next;
-	it->base.free = vinyl_snapshot_iterator_free;
-
-	it->rv = vy_tx_manager_read_view(env->xm);
-	if (it->rv == NULL) {
-		free(it);
-		return NULL;
-	}
-	vy_read_iterator_open(&it->iterator, lsm, NULL,
-			      ITER_ALL, lsm->env->empty_key,
-			      (const struct vy_read_view **)&it->rv);
-	/*
-	 * The index may be dropped while we are reading it.
-	 * The iterator must go on as if nothing happened.
-	 */
-	vy_lsm_ref(lsm);
-
-	return &it->base;
 }
 
 static int
@@ -4644,7 +4590,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .replace = */ generic_index_replace,
 	/* .create_iterator = */ vinyl_index_create_iterator,
 	/* .create_snapshot_iterator = */
-		vinyl_index_create_snapshot_iterator,
+		generic_index_create_snapshot_iterator,
 	/* .stat = */ vinyl_index_stat,
 	/* .compact = */ vinyl_index_compact,
 	/* .reset_stat = */ vinyl_index_reset_stat,
