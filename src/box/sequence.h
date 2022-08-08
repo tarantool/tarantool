@@ -43,8 +43,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct iterator;
-struct Vdbe;
+struct index;
+struct index_read_view;
 
 /** Sequence metadata. */
 struct sequence_def {
@@ -158,14 +158,14 @@ int
 access_check_sequence(struct sequence *seq);
 
 /**
- * Create an iterator over sequence data.
+ * Create a read view of sequence data.
  *
- * The iterator creates a snapshot of sequence data and walks
- * over it, i.e. updates done after the iterator was open are
- * invisible. Used to make a snapshot of _sequence_data space.
+ * This function creates a snapshot of sequence data such that updates done
+ * after the read view was created are invisible. Used to make a snapshot of
+ * _sequence_data space.
  */
-struct snapshot_iterator *
-sequence_data_iterator_create(void);
+struct index_read_view *
+sequence_data_read_view_create(struct index *index);
 
 /**
  * Get last element of given sequence.

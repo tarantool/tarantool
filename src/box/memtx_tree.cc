@@ -1668,40 +1668,65 @@ memtx_tree_index_end_build(struct index *base)
 	index->build_array_alloc_size = 0;
 }
 
+/** Read view implementation. */
 template <bool USE_HINT>
-struct tree_snapshot_iterator {
-	struct snapshot_iterator base;
+struct tree_read_view {
+	/** Base class. */
+	struct index_read_view base;
+	/** Read view index. Ref counter incremented. */
 	struct memtx_tree_index<USE_HINT> *index;
+	/** BPS tree read view. */
 	memtx_tree_view_t<USE_HINT> tree_view;
-	memtx_tree_iterator_t<USE_HINT> tree_iterator;
+	/** Used for clarifying read view tuples. */
 	struct memtx_tx_snapshot_cleaner cleaner;
+};
+
+/** Read view iterator implementation. */
+template <bool USE_HINT>
+struct tree_read_view_iterator {
+	/** Base class. */
+	struct index_read_view_iterator base;
+	/** Read view. */
+	struct tree_read_view<USE_HINT> *rv;
+	/** BPS tree iterator. */
+	memtx_tree_iterator_t<USE_HINT> tree_iterator;
 };
 
 template <bool USE_HINT>
 static void
-tree_snapshot_iterator_free(struct snapshot_iterator *iterator)
+tree_read_view_free(struct index_read_view *base)
 {
-	assert(iterator->free == &tree_snapshot_iterator_free<USE_HINT>);
-	struct tree_snapshot_iterator<USE_HINT> *it =
-		(struct tree_snapshot_iterator<USE_HINT> *)iterator;
-	memtx_tree_view_destroy(&it->tree_view);
-	index_unref(&it->index->base);
-	memtx_tx_snapshot_cleaner_destroy(&it->cleaner);
-	free(iterator);
+	struct tree_read_view<USE_HINT> *rv =
+		(struct tree_read_view<USE_HINT> *)base;
+	memtx_tree_view_destroy(&rv->tree_view);
+	index_unref(&rv->index->base);
+	memtx_tx_snapshot_cleaner_destroy(&rv->cleaner);
+	TRASH(rv);
+	free(rv);
 }
 
 template <bool USE_HINT>
-static int
-tree_snapshot_iterator_next(struct snapshot_iterator *iterator,
-			    const char **data, uint32_t *size)
+static void
+tree_read_view_iterator_free(struct index_read_view_iterator *iterator)
 {
-	assert(iterator->free == &tree_snapshot_iterator_free<USE_HINT>);
-	struct tree_snapshot_iterator<USE_HINT> *it =
-		(struct tree_snapshot_iterator<USE_HINT> *)iterator;
+	assert(iterator->free == &tree_read_view_iterator_free<USE_HINT>);
+	TRASH(iterator);
+	free(iterator);
+}
+
+/** Implementation of next_raw index_read_view_iterator callback. */
+template <bool USE_HINT>
+static int
+tree_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
+				 const char **data, uint32_t *size)
+{
+	assert(iterator->free == &tree_read_view_iterator_free<USE_HINT>);
+	struct tree_read_view_iterator<USE_HINT> *it =
+		(struct tree_read_view_iterator<USE_HINT> *)iterator;
 
 	while (true) {
 		struct memtx_tree_data<USE_HINT> *res =
-			memtx_tree_view_iterator_get_elem(&it->tree_view,
+			memtx_tree_view_iterator_get_elem(&it->rv->tree_view,
 							  &it->tree_iterator);
 
 		if (res == NULL) {
@@ -1709,11 +1734,11 @@ tree_snapshot_iterator_next(struct snapshot_iterator *iterator,
 			return 0;
 		}
 
-		memtx_tree_view_iterator_next(&it->tree_view,
+		memtx_tree_view_iterator_next(&it->rv->tree_view,
 					      &it->tree_iterator);
 
 		struct tuple *tuple = res->tuple;
-		tuple = memtx_tx_snapshot_clarify(&it->cleaner, tuple);
+		tuple = memtx_tx_snapshot_clarify(&it->rv->cleaner, tuple);
 
 		if (tuple != NULL) {
 			*data = tuple_data_range(tuple, size);
@@ -1726,37 +1751,51 @@ tree_snapshot_iterator_next(struct snapshot_iterator *iterator,
 	return 0;
 }
 
-/**
- * Create an ALL iterator with personal read view so further
- * index modifications will not affect the iteration results.
- * Must be destroyed by iterator->free after usage.
- */
+/** Implementation of create_iterator index_read_view callback. */
 template <bool USE_HINT>
-static struct snapshot_iterator *
-memtx_tree_index_create_snapshot_iterator(struct index *base)
+static struct index_read_view_iterator *
+tree_read_view_create_iterator(struct index_read_view *base,
+			       enum iterator_type type,
+			       const char *key, uint32_t part_count)
 {
+	assert(type == ITER_ALL);
+	assert(key == NULL);
+	assert(part_count == 0);
+	(void)type;
+	(void)key;
+	(void)part_count;
+	struct tree_read_view<USE_HINT> *rv =
+		(struct tree_read_view<USE_HINT> *)base;
+	struct tree_read_view_iterator<USE_HINT> *it =
+		(struct tree_read_view_iterator<USE_HINT> *)
+		xmalloc(sizeof(*it));
+	it->base.free = tree_read_view_iterator_free<USE_HINT>;
+	it->base.next_raw = tree_read_view_iterator_next_raw<USE_HINT>;
+	it->rv = rv;
+	it->tree_iterator = memtx_tree_view_first(&rv->tree_view);
+	return (struct index_read_view_iterator *)it;
+}
+
+/** Implementation of create_read_view index callback. */
+template <bool USE_HINT>
+static struct index_read_view *
+memtx_tree_index_create_read_view(struct index *base)
+{
+	static const struct index_read_view_vtab vtab = {
+		.free = tree_read_view_free<USE_HINT>,
+		.create_iterator = tree_read_view_create_iterator<USE_HINT>,
+	};
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
-	struct tree_snapshot_iterator<USE_HINT> *it =
-		(struct tree_snapshot_iterator<USE_HINT> *)
-		calloc(1, sizeof(*it));
-	if (it == NULL) {
-		diag_set(OutOfMemory,
-			 sizeof(struct tree_snapshot_iterator<USE_HINT>),
-			 "memtx_tree_index", "create_snapshot_iterator");
-		return NULL;
-	}
-
+	struct tree_read_view<USE_HINT> *rv =
+		(struct tree_read_view<USE_HINT> *)xmalloc(sizeof(*rv));
 	struct space *space = space_cache_find(base->def->space_id);
-	memtx_tx_snapshot_cleaner_create(&it->cleaner, space);
-
-	it->base.free = tree_snapshot_iterator_free<USE_HINT>;
-	it->base.next = tree_snapshot_iterator_next<USE_HINT>;
-	it->index = index;
+	memtx_tx_snapshot_cleaner_create(&rv->cleaner, space);
+	rv->base.vtab = &vtab;
+	rv->index = index;
 	index_ref(base);
-	memtx_tree_view_create(&it->tree_view, &index->tree);
-	it->tree_iterator = memtx_tree_view_first(&it->tree_view);
-	return (struct snapshot_iterator *) it;
+	memtx_tree_view_create(&rv->tree_view, &index->tree);
+	return (struct index_read_view *)rv;
 }
 
 /**
@@ -1785,8 +1824,7 @@ static const struct index_vtab memtx_tree_disabled_index_vtab = {
 	/* .get = */ generic_index_get,
 	/* .replace = */ disabled_index_replace,
 	/* .create_iterator = */ generic_index_create_iterator,
-	/* .create_snapshot_iterator = */
-		generic_index_create_snapshot_iterator,
+	/* .create_read_view = */ generic_index_create_read_view,
 	/* .stat = */ generic_index_stat,
 	/* .compact = */ generic_index_compact,
 	/* .reset_stat = */ generic_index_reset_stat,
@@ -1849,8 +1887,8 @@ get_memtx_tree_index_vtab(void)
 				 memtx_tree_index_replace<USE_HINT>,
 		/* .create_iterator = */
 			memtx_tree_index_create_iterator<USE_HINT>,
-		/* .create_snapshot_iterator = */
-			memtx_tree_index_create_snapshot_iterator<USE_HINT>,
+		/* .create_read_view = */
+			memtx_tree_index_create_read_view<USE_HINT>,
 		/* .stat = */ generic_index_stat,
 		/* .compact = */ generic_index_compact,
 		/* .reset_stat = */ generic_index_reset_stat,
