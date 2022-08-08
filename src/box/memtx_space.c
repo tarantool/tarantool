@@ -835,13 +835,6 @@ memtx_space_check_index_def(struct space *space, struct index_def *index_def)
 	return 0;
 }
 
-static struct snapshot_iterator *
-sequence_data_index_create_snapshot_iterator(struct index *index)
-{
-	(void)index;
-	return sequence_data_iterator_create();
-}
-
 static struct index *
 sequence_data_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
@@ -853,8 +846,7 @@ sequence_data_index_new(struct memtx_engine *memtx, struct index_def *def)
 	static bool vtab_initialized;
 	if (!vtab_initialized) {
 		vtab = *index->vtab;
-		vtab.create_snapshot_iterator =
-			sequence_data_index_create_snapshot_iterator;
+		vtab.create_read_view = sequence_data_read_view_create;
 		vtab_initialized = true;
 	}
 

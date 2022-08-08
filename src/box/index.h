@@ -45,6 +45,8 @@ struct tuple;
 struct engine;
 struct space;
 struct index;
+struct index_read_view;
+struct index_read_view_iterator;
 struct index_def;
 struct key_def;
 struct info_handler;
@@ -360,24 +362,6 @@ void
 iterator_delete(struct iterator *it);
 
 /**
- * Snapshot iterator.
- * \sa index::create_snapshot_iterator().
- */
-struct snapshot_iterator {
-	/**
-	 * Iterate to the next tuple in the snapshot.
-	 * Returns a pointer to the tuple data and its
-	 * size or NULL if EOF.
-	 */
-	int (*next)(struct snapshot_iterator *,
-		    const char **data, uint32_t *size);
-	/**
-	 * Destroy the iterator.
-	 */
-	void (*free)(struct snapshot_iterator *);
-};
-
-/**
  * Check that the key has correct part count and correct part size
  * for use in an index iterator.
  *
@@ -512,12 +496,8 @@ struct index_vtab {
 	struct iterator *(*create_iterator)(struct index *index,
 			enum iterator_type type,
 			const char *key, uint32_t part_count);
-	/**
-	 * Create an ALL iterator with personal read view so further
-	 * index modifications will not affect the iteration results.
-	 * Must be destroyed by iterator_delete() after usage.
-	 */
-	struct snapshot_iterator *(*create_snapshot_iterator)(struct index *);
+	/** Create an index read view. */
+	struct index_read_view *(*create_read_view)(struct index *index);
 	/** Introspection (index:stat()) */
 	void (*stat)(struct index *, struct info_handler *);
 	/**
@@ -565,6 +545,52 @@ struct index {
 	struct rlist nearby_gaps;
 	/** List of full scans of the index. @sa struct full_scan_item. */
 	struct rlist full_scans;
+};
+
+/** Index read view virtual function table. */
+struct index_read_view_vtab {
+	/** Free an index read view instance. */
+	void
+	(*free)(struct index_read_view *rv);
+	/** Create an index read view iterator. */
+	struct index_read_view_iterator *
+	(*create_iterator)(struct index_read_view *rv, enum iterator_type type,
+			   const char *key, uint32_t part_count);
+};
+
+/**
+ * Index read view.
+ *
+ * An index read view is a frozen image of the index at the time of the read
+ * view creation. It only has read-only methods. The API is similar to the API
+ * of an index, but a read view returns raw data (not wrapped in struct tuple).
+ *
+ * Note about multi-threading: a read view may only be created and destroyed in
+ * the tx thread, but it may be used in any other thread.
+ */
+struct index_read_view {
+	/** Virtual function table. */
+	const struct index_read_view_vtab *vtab;
+};
+
+/** Iterator over an index read view. */
+struct index_read_view_iterator {
+	/** Free an index read view iterator instance. */
+	void
+	(*free)(struct index_read_view_iterator *iterator);
+	/**
+	 * Iterate to the next tuple in the read view.
+	 *
+	 * The tuple data and size are returned in the data and size arguments.
+	 * Note, the tuple may be allocated from the fiber region so one should
+	 * call region_truncate after using the data. On EOF the data is set to
+	 * NULL.
+	 *
+	 * Returns 0 on success. On error returns -1 and sets diag.
+	 */
+	int
+	(*next_raw)(struct index_read_view_iterator *iterator,
+		    const char **data, uint32_t *size);
 };
 
 /**
@@ -747,10 +773,10 @@ index_create_iterator(struct index *index, enum iterator_type type,
 	return index->vtab->create_iterator(index, type, key, part_count);
 }
 
-static inline struct snapshot_iterator *
-index_create_snapshot_iterator(struct index *index)
+static inline struct index_read_view *
+index_create_read_view(struct index *index)
 {
-	return index->vtab->create_snapshot_iterator(index);
+	return index->vtab->create_read_view(index);
 }
 
 static inline void
@@ -795,6 +821,33 @@ index_end_build(struct index *index)
 	index->vtab->end_build(index);
 }
 
+static inline void
+index_read_view_delete(struct index_read_view *rv)
+{
+	rv->vtab->free(rv);
+}
+
+static inline struct index_read_view_iterator *
+index_read_view_create_iterator(struct index_read_view *rv,
+				enum iterator_type type,
+				const char *key, uint32_t part_count)
+{
+	return rv->vtab->create_iterator(rv, type, key, part_count);
+}
+
+static inline void
+index_read_view_iterator_delete(struct index_read_view_iterator *iterator)
+{
+	iterator->free(iterator);
+}
+
+static inline int
+index_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
+				  const char **data, uint32_t *size)
+{
+	return iterator->next_raw(iterator, data, size);
+}
+
 /*
  * Virtual method stubs.
  */
@@ -820,7 +873,8 @@ int generic_index_get(struct index *, const char *, uint32_t, struct tuple **);
 int generic_index_replace(struct index *, struct tuple *, struct tuple *,
 			  enum dup_replace_mode,
 			  struct tuple **, struct tuple **);
-struct snapshot_iterator *generic_index_create_snapshot_iterator(struct index *);
+struct index_read_view *
+generic_index_create_read_view(struct index *index);
 void generic_index_stat(struct index *, struct info_handler *);
 void generic_index_compact(struct index *);
 void generic_index_reset_stat(struct index *);

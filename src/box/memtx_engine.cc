@@ -654,7 +654,7 @@ checkpoint_write_tuple(struct xlog *l, uint32_t space_id, uint32_t group_id,
 struct checkpoint_entry {
 	uint32_t space_id;
 	uint32_t group_id;
-	struct snapshot_iterator *iterator;
+	struct index_read_view *rv;
 	struct rlist link;
 };
 
@@ -711,7 +711,7 @@ checkpoint_delete(struct checkpoint *ckpt)
 {
 	struct checkpoint_entry *entry, *tmp;
 	rlist_foreach_entry_safe(entry, &ckpt->entries, link, tmp) {
-		entry->iterator->free(entry->iterator);
+		index_read_view_delete(entry->rv);
 		free(entry);
 	}
 	memtx_allocators_close_read_view(ckpt->rv);
@@ -768,8 +768,8 @@ checkpoint_add_space(struct space *sp, void *data)
 
 	entry->space_id = space_id(sp);
 	entry->group_id = space_group_id(sp);
-	entry->iterator = index_create_snapshot_iterator(pk);
-	if (entry->iterator == NULL)
+	entry->rv = index_create_read_view(pk);
+	if (entry->rv == NULL)
 		return -1;
 
 	return 0;
@@ -827,13 +827,24 @@ checkpoint_f(va_list ap)
 		int rc;
 		uint32_t size;
 		const char *data;
-		struct snapshot_iterator *it = entry->iterator;
-		while ((rc = it->next(it, &data, &size)) == 0 && data != NULL) {
-			if (checkpoint_write_tuple(&snap, entry->space_id,
-					entry->group_id, data, size) != 0)
-				goto fail;
+		struct index_read_view_iterator *it =
+			index_read_view_create_iterator(entry->rv, ITER_ALL,
+							NULL, 0);
+		if (it == NULL)
+			goto fail;
+		while (true) {
+			rc = index_read_view_iterator_next_raw(it, &data,
+							       &size);
+			if (rc != 0 || data == NULL)
+				break;
+			rc = checkpoint_write_tuple(&snap, entry->space_id,
+						    entry->group_id,
+						    data, size);
+			if (rc != 0)
+				break;
 			fiber_gc();
 		}
+		index_read_view_iterator_delete(it);
 		if (rc != 0)
 			goto fail;
 	}
@@ -990,7 +1001,7 @@ memtx_engine_backup(struct engine *engine, const struct vclock *vclock,
 struct memtx_join_entry {
 	struct rlist in_ctx;
 	uint32_t space_id;
-	struct snapshot_iterator *iterator;
+	struct index_read_view *rv;
 };
 
 struct memtx_join_ctx {
@@ -1028,8 +1039,8 @@ memtx_join_add_space(struct space *space, void *arg)
 		return -1;
 	}
 	entry->space_id = space_id(space);
-	entry->iterator = index_create_snapshot_iterator(pk);
-	if (entry->iterator == NULL) {
+	entry->rv = index_create_read_view(pk);
+	if (entry->rv == NULL) {
 		free(entry);
 		return -1;
 	}
@@ -1084,16 +1095,26 @@ memtx_join_f(va_list ap)
 	struct memtx_join_ctx *ctx = va_arg(ap, struct memtx_join_ctx *);
 	struct memtx_join_entry *entry;
 	rlist_foreach_entry(entry, &ctx->entries, in_ctx) {
-		struct snapshot_iterator *it = entry->iterator;
+		struct index_read_view_iterator *it =
+			index_read_view_create_iterator(entry->rv, ITER_ALL,
+							NULL, 0);
+		if (it == NULL)
+			return -1;
 		int rc;
 		uint32_t size;
 		const char *data;
-		while ((rc = it->next(it, &data, &size)) == 0 && data != NULL) {
-			if (memtx_join_send_tuple(ctx->stream, entry->space_id,
-						  data, size) != 0)
-				return -1;
+		while (true) {
+			rc = index_read_view_iterator_next_raw(it, &data,
+							       &size);
+			if (rc != 0 || data == NULL)
+				break;
+			rc = memtx_join_send_tuple(ctx->stream, entry->space_id,
+						   data, size);
+			if (rc != 0)
+				break;
 			fiber_gc();
 		}
+		index_read_view_iterator_delete(it);
 		if (rc != 0)
 			return -1;
 	}
@@ -1129,7 +1150,7 @@ memtx_engine_complete_join(struct engine *engine, void *arg)
 	struct memtx_join_ctx *ctx = (struct memtx_join_ctx *)arg;
 	struct memtx_join_entry *entry, *next;
 	rlist_foreach_entry_safe(entry, &ctx->entries, in_ctx, next) {
-		entry->iterator->free(entry->iterator);
+		index_read_view_delete(entry->rv);
 		free(entry);
 	}
 	memtx_allocators_close_read_view(ctx->rv);

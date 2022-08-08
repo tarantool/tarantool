@@ -4589,8 +4589,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .get = */ vinyl_index_get,
 	/* .replace = */ generic_index_replace,
 	/* .create_iterator = */ vinyl_index_create_iterator,
-	/* .create_snapshot_iterator = */
-		generic_index_create_snapshot_iterator,
+	/* .create_read_view = */ generic_index_create_read_view,
 	/* .stat = */ vinyl_index_stat,
 	/* .compact = */ vinyl_index_compact,
 	/* .reset_stat = */ vinyl_index_reset_stat,

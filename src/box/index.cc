@@ -757,8 +757,8 @@ generic_index_create_iterator(struct index *base, enum iterator_type type,
 }
 
 
-struct snapshot_iterator *
-generic_index_create_snapshot_iterator(struct index *index)
+struct index_read_view *
+generic_index_create_read_view(struct index *index)
 {
 	diag_set(UnsupportedIndexFeature, index->def, "consistent read view");
 	return NULL;

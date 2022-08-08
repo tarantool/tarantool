@@ -300,23 +300,34 @@ access_check_sequence(struct sequence *seq)
 	return 0;
 }
 
-struct sequence_data_iterator {
-	struct snapshot_iterator base;
+/** Read view implementation. */
+struct sequence_data_read_view {
+	/** Base class. */
+	struct index_read_view base;
 	/** Frozen view of the data index. */
 	struct light_sequence_view view;
+};
+
+/** Read view iterator implementation. */
+struct sequence_data_iterator {
+	/** Base class. */
+	struct index_read_view_iterator base;
+	/** Read view. */
+	struct sequence_data_read_view *rv;
 	/** Iterator over the data index. */
 	struct light_sequence_iterator iter;
 };
 
+/** Implementation of next_raw index_read_view_iterator callback. */
 static int
-sequence_data_iterator_next(struct snapshot_iterator *base,
-			    const char **data, uint32_t *size)
+sequence_data_iterator_next_raw(struct index_read_view_iterator *base,
+				const char **data, uint32_t *size)
 {
 	struct sequence_data_iterator *iter =
 		(struct sequence_data_iterator *)base;
 
 	struct sequence_data *sd = light_sequence_view_iterator_get_and_next(
-		&iter->view, &iter->iter);
+		&iter->rv->view, &iter->iter);
 	if (sd == NULL) {
 		*data = NULL;
 		return 0;
@@ -338,26 +349,56 @@ sequence_data_iterator_next(struct snapshot_iterator *base,
 }
 
 static void
-sequence_data_iterator_free(struct snapshot_iterator *base)
+sequence_data_iterator_free(struct index_read_view_iterator *iter)
 {
-	struct sequence_data_iterator *iter =
-		(struct sequence_data_iterator *)base;
-	light_sequence_view_destroy(&iter->view);
 	TRASH(iter);
 	free(iter);
 }
 
-struct snapshot_iterator *
-sequence_data_iterator_create(void)
+/** Implementation of create_iterator index_read_view callback. */
+static struct index_read_view_iterator *
+sequence_data_iterator_create(struct index_read_view *base,
+			      enum iterator_type type,
+			      const char *key, uint32_t part_count)
 {
-	struct sequence_data_iterator *iter = xcalloc(1, sizeof(*iter));
-
+	assert(type == ITER_ALL);
+	assert(key == NULL);
+	assert(part_count == 0);
+	(void)type;
+	(void)key;
+	(void)part_count;
+	struct sequence_data_read_view *rv =
+		(struct sequence_data_read_view *)base;
+	struct sequence_data_iterator *iter = xmalloc(sizeof(*iter));
+	iter->base.next_raw = sequence_data_iterator_next_raw;
 	iter->base.free = sequence_data_iterator_free;
-	iter->base.next = sequence_data_iterator_next;
+	iter->rv = rv;
+	light_sequence_view_iterator_begin(&rv->view, &iter->iter);
+	return (struct index_read_view_iterator *)iter;
+}
 
-	light_sequence_view_create(&iter->view, &sequence_data_index);
-	light_sequence_view_iterator_begin(&iter->view, &iter->iter);
-	return &iter->base;
+static void
+sequence_data_read_view_free(struct index_read_view *base)
+{
+	struct sequence_data_read_view *rv =
+		(struct sequence_data_read_view *)base;
+	light_sequence_view_destroy(&rv->view);
+	TRASH(rv);
+	free(rv);
+}
+
+struct index_read_view *
+sequence_data_read_view_create(struct index *index)
+{
+	(void)index;
+	static const struct index_read_view_vtab vtab = {
+		.free = sequence_data_read_view_free,
+		.create_iterator = sequence_data_iterator_create,
+	};
+	struct sequence_data_read_view *rv = xmalloc(sizeof(*rv));
+	rv->base.vtab = &vtab;
+	light_sequence_view_create(&rv->view, &sequence_data_index);
+	return (struct index_read_view *)rv;
 }
 
 int
