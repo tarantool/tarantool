@@ -910,6 +910,13 @@ tarantool_lua_console_init(struct lua_State *L)
 	history_comment_char = '#';
 	history_write_timestamps = 1;
 
+	/*
+	 * Force disable readline bracketed paste in console, even if it's
+	 * set in the inputrc, is enabled by default (eg GNU Readline 8.1),
+	 * or by user.
+	 */
+	rl_variable_bind("enable-bracketed-paste", "off");
+
 	serializer_yaml = lua_yaml_new_serializer(L);
 	serializer_yaml->encode_invalid_numbers = 1;
 	serializer_yaml->encode_load_metatables = 1;
