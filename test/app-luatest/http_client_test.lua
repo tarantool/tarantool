@@ -1,7 +1,6 @@
 local client = require('http.client')
 local json = require('json')
 local fiber = require('fiber')
-local socketlib = require('socket')
 local os = require('os')
 local t = require('luatest')
 local g = t.group('http_client', {
@@ -22,60 +21,47 @@ local function merge(...)
     return res
 end
 
-local function start_server(sock_family, sock_addr)
-    local arg, url, opts
-    if sock_family == 'AF_INET' then
-        arg = string.format("--inet %s", sock_addr)
-        url = string.format("http://%s/", sock_addr)
-        opts = {}
-    elseif sock_family == 'AF_UNIX' then
-        arg = string.format("--unix %s", sock_addr)
-        url = "http://localhost/"
-        opts = {unix_socket = sock_addr}
-    else
+local function start_server(sock_family)
+    if not sock_family == 'AF_INET' and
+       not sock_family == 'AF_UNIX' then
         error(string.format('invalid socket family: %s', sock_family))
     end
+    local url
+    local client_opts = {}
     -- PYTHON_EXECUTABLE is set in http_client.skipcond.
     local python_executable = os.getenv('PYTHON_EXECUTABLE') or ''
     local cmd_prefix = (python_executable .. ' '):lstrip()
+    local arg = string.format("--conn-type %s", sock_family)
     local cmd = string.format("%s%s/test/app-luatest/httpd.py %s",
                               cmd_prefix, TARANTOOL_SRC_DIR, arg)
     local server = io.popen(cmd)
-    t.assert_equals(server:read("*l"), "heartbeat", "server started")
-    local r
-    for _=1,10 do
-        r = client.get(url, merge(opts, {timeout = 0.01}))
-        if r.status == 200 then
-            break
-        end
-        fiber.sleep(0.01)
+    t.assert_not_equals(server, nil, "Process descriptor is not nil")
+    local sock_addr
+    t.helpers.retrying({ timeout = 2, delay = 0.01 }, function()
+        sock_addr = server:read("*l")
+        t.assert_not_equals(sock_addr, nil, sock_addr)
+    end)
+    if sock_family == "AF_UNIX" then
+        client_opts.unix_socket = sock_addr
+        sock_addr = "localhost"
     end
-    t.assert_equals(r.status, 200, "connection is ok")
-    return server, url, opts
+    url = string.format("http://%s/", sock_addr)
+
+    t.helpers.retrying({}, function()
+        local ok, res = pcall(client.get, url, client_opts)
+        t.skip_if(not ok, "not supported")
+        t.assert_equals(res.status, 200, "connection is ok")
+    end)
+
+    return server, url, client_opts
 end
 
-g.before_all(function(cg)
+g.before_each(function(cg)
     local sock_family = cg.params.sock_family
-    local sock_addr
-    if sock_family == 'AF_INET' then
-        local s = socketlib('AF_INET', 'SOCK_STREAM', 0)
-        s:bind('127.0.0.1', 0)
-        sock_addr = string.format("%s:%d", s:name().host, s:name().port)
-        s:close()
-    else
-        assert(sock_family == 'AF_UNIX')
-        local path = os.tmpname()
-        os.remove(path)
-        local status = pcall(client.get, 'http://localhost/',
-                             {unix_socket = path})
-        t.skip_if(not status, "not supported")
-        sock_addr = path
-        cg.unix_socket_path = path
-    end
-    cg.server, cg.url, cg.opts = start_server(sock_family, sock_addr)
+    cg.server, cg.url, cg.opts = start_server(sock_family)
 end)
 
-g.after_all(function(cg)
+g.after_each(function(cg)
     cg.server:close()
     if cg.unix_socket_path then
         os.remove(cg.unix_socket_path)
