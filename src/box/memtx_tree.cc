@@ -350,17 +350,11 @@ tree_iterator_free(struct iterator *iterator)
 }
 
 static int
-tree_iterator_dummie(struct iterator *iterator, struct tuple **ret)
+tree_iterator_dummy(struct iterator *iterator, struct tuple **ret)
 {
 	(void)iterator;
 	*ret = NULL;
 	return 0;
-}
-
-void
-tree_iterator_set_dummie(struct iterator *iterator)
-{
-	iterator->next_raw = tree_iterator_dummie;
 }
 
 /*
@@ -392,7 +386,7 @@ tree_iterator_prev_reposition(struct tree_iterator<USE_HINT> *iterator,
 
 template <bool USE_HINT>
 static int
-tree_iterator_next_raw_base(struct iterator *iterator, struct tuple **ret)
+tree_iterator_next_base(struct iterator *iterator, struct tuple **ret)
 {
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)iterator->index;
@@ -413,7 +407,7 @@ tree_iterator_next_raw_base(struct iterator *iterator, struct tuple **ret)
 	struct index *idx = iterator->index;
 	struct space *space = space_by_id(iterator->space_id);
 	if (*ret == NULL) {
-		tree_iterator_set_dummie(iterator);
+		iterator->next_internal = tree_iterator_dummy;
 	} else {
 		struct txn *txn = in_txn();
 		bool is_multikey = iterator->index->def->key_def->is_multikey;
@@ -435,7 +429,7 @@ tree_iterator_next_raw_base(struct iterator *iterator, struct tuple **ret)
 
 template <bool USE_HINT>
 static int
-tree_iterator_prev_raw_base(struct iterator *iterator, struct tuple **ret)
+tree_iterator_prev_base(struct iterator *iterator, struct tuple **ret)
 {
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)iterator->index;
@@ -455,7 +449,7 @@ tree_iterator_prev_raw_base(struct iterator *iterator, struct tuple **ret)
 	struct index *idx = iterator->index;
 	struct space *space = space_by_id(iterator->space_id);
 	if (*ret == NULL) {
-		tree_iterator_set_dummie(iterator);
+		iterator->next_internal = tree_iterator_dummy;
 	} else {
 		struct txn *txn = in_txn();
 		bool is_multikey = iterator->index->def->key_def->is_multikey;
@@ -481,7 +475,7 @@ tree_iterator_prev_raw_base(struct iterator *iterator, struct tuple **ret)
 
 template <bool USE_HINT>
 static int
-tree_iterator_next_equal_raw_base(struct iterator *iterator, struct tuple **ret)
+tree_iterator_next_equal_base(struct iterator *iterator, struct tuple **ret)
 {
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)iterator->index;
@@ -507,7 +501,7 @@ tree_iterator_next_equal_raw_base(struct iterator *iterator, struct tuple **ret)
 				   it->key_data.hint,
 				   index->base.def->key_def) != 0) {
 		tree_iterator_set_current<USE_HINT>(it, NULL);
-		tree_iterator_set_dummie(iterator);
+		iterator->next_internal = tree_iterator_dummy;
 		*ret = NULL;
 		/*
 		 * Got end of key. Store gap from the previous tuple to the
@@ -541,7 +535,7 @@ tree_iterator_next_equal_raw_base(struct iterator *iterator, struct tuple **ret)
 
 template <bool USE_HINT>
 static int
-tree_iterator_prev_equal_raw_base(struct iterator *iterator, struct tuple **ret)
+tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 {
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)iterator->index;
@@ -566,7 +560,7 @@ tree_iterator_prev_equal_raw_base(struct iterator *iterator, struct tuple **ret)
 				   it->key_data.hint,
 				   index->base.def->key_def) != 0) {
 		tree_iterator_set_current<USE_HINT>(it, NULL);
-		tree_iterator_set_dummie(iterator);
+		iterator->next_internal = tree_iterator_dummy;
 		*ret = NULL;
 
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
@@ -608,17 +602,17 @@ name(struct iterator *iterator, struct tuple **ret)				\
 {										\
 	do {									\
 		int rc = name##_base<USE_HINT>(iterator, ret);			\
-		if (rc != 0 || iterator->next_raw == tree_iterator_dummie)	\
+		if (rc != 0 || iterator->next_internal == tree_iterator_dummy)	\
 			return rc;						\
 	} while (*ret == NULL);							\
 	return 0;								\
 }										\
 struct forgot_to_add_semicolon
 
-WRAP_ITERATOR_METHOD(tree_iterator_next_raw);
-WRAP_ITERATOR_METHOD(tree_iterator_prev_raw);
-WRAP_ITERATOR_METHOD(tree_iterator_next_equal_raw);
-WRAP_ITERATOR_METHOD(tree_iterator_prev_equal_raw);
+WRAP_ITERATOR_METHOD(tree_iterator_next);
+WRAP_ITERATOR_METHOD(tree_iterator_prev);
+WRAP_ITERATOR_METHOD(tree_iterator_next_equal);
+WRAP_ITERATOR_METHOD(tree_iterator_prev_equal);
 
 #undef WRAP_ITERATOR_METHOD
 
@@ -629,18 +623,18 @@ tree_iterator_set_next_method(struct tree_iterator<USE_HINT> *it)
 	assert(it->current.tuple != NULL);
 	switch (it->type) {
 	case ITER_EQ:
-		it->base.next_raw = tree_iterator_next_equal_raw<USE_HINT>;
+		it->base.next_internal = tree_iterator_next_equal<USE_HINT>;
 		break;
 	case ITER_REQ:
-		it->base.next_raw = tree_iterator_prev_equal_raw<USE_HINT>;
+		it->base.next_internal = tree_iterator_prev_equal<USE_HINT>;
 		break;
 	case ITER_LT:
 	case ITER_LE:
-		it->base.next_raw = tree_iterator_prev_raw<USE_HINT>;
+		it->base.next_internal = tree_iterator_prev<USE_HINT>;
 		break;
 	case ITER_GE:
 	case ITER_GT:
-		it->base.next_raw = tree_iterator_next_raw<USE_HINT>;
+		it->base.next_internal = tree_iterator_next<USE_HINT>;
 		break;
 	default:
 		/* The type was checked in initIterator */
@@ -651,13 +645,13 @@ tree_iterator_set_next_method(struct tree_iterator<USE_HINT> *it)
 
 template <bool USE_HINT>
 static int
-tree_iterator_start_raw(struct iterator *iterator, struct tuple **ret)
+tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 {
 	*ret = NULL;
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)iterator->index;
 	struct tree_iterator<USE_HINT> *it = get_tree_iterator<USE_HINT>(iterator);
-	tree_iterator_set_dummie(iterator);
+	iterator->next_internal = tree_iterator_dummy;
 	memtx_tree_t<USE_HINT> *tree = &index->tree;
 	enum iterator_type type = it->type;
 	struct txn *txn = in_txn();
@@ -750,7 +744,7 @@ tree_iterator_start_raw(struct iterator *iterator, struct tuple **ret)
 				   it->key_data.key, it->key_data.part_count);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	return res == NULL || !eq_match || *ret != NULL ? 0 :
-	       iterator->next_raw(iterator, ret);
+	       iterator->next_internal(iterator, ret);
 }
 
 /* }}} */
@@ -914,8 +908,8 @@ memtx_tree_index_count(struct index *base, enum iterator_type type,
 
 template <bool USE_HINT>
 static int
-memtx_tree_index_get_raw(struct index *base, const char *key,
-			 uint32_t part_count, struct tuple **result)
+memtx_tree_index_get_internal(struct index *base, const char *key,
+			      uint32_t part_count, struct tuple **result)
 {
 	assert(base->def->opts.is_unique &&
 	       part_count == base->def->key_def->part_count);
@@ -1451,7 +1445,7 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 	}
 	iterator_create(&it->base, base);
 	it->pool = &memtx->iterator_pool;
-	it->base.next_raw = tree_iterator_start_raw<USE_HINT>;
+	it->base.next_internal = tree_iterator_start<USE_HINT>;
 	it->base.next = memtx_iterator_next;
 	it->base.free = tree_iterator_free<USE_HINT>;
 	it->type = type;
@@ -1787,7 +1781,7 @@ static const struct index_vtab memtx_tree_disabled_index_vtab = {
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
 	/* .count = */ generic_index_count,
-	/* .get_raw = */ generic_index_get_raw,
+	/* .get_internal = */ generic_index_get_internal,
 	/* .get = */ generic_index_get,
 	/* .replace = */ disabled_index_replace,
 	/* .create_iterator = */ generic_index_create_iterator,
@@ -1848,7 +1842,7 @@ get_memtx_tree_index_vtab(void)
 		/* .max = */ generic_index_max,
 		/* .random = */ memtx_tree_index_random<USE_HINT>,
 		/* .count = */ memtx_tree_index_count<USE_HINT>,
-		/* .get_raw */ memtx_tree_index_get_raw<USE_HINT>,
+		/* .get_internal */ memtx_tree_index_get_internal<USE_HINT>,
 		/* .get = */ memtx_index_get,
 		/* .replace = */ is_mk ? memtx_tree_index_replace_multikey :
 				 is_func ? memtx_tree_func_index_replace :
