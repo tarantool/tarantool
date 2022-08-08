@@ -51,12 +51,13 @@ jobs:
         uses: ./.github/actions/install-deps-debian
       - name: test
         run: make -f .test.mk luacheck
-      - name: call action to send Telegram message on failure
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
-          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
-        uses: ./.github/actions/send-telegram-notify
+      - name: Send VK Teams message on failure
         if: failure()
+        uses: ./.github/actions/report-job-status
+        with:
+          api-url: ${{ secrets.VKTEAMS_API_URL }}
+          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
+          chat-id: ${{ secrets.VKTEAMS_CHAT_ID }}
 
   release-notes:
     # Run on push to the 'master' and release branches of tarantool/tarantool
@@ -79,12 +80,13 @@ jobs:
       #
       # [1]: https://github.com/actions/setup-python#using-setup-python-with-a-self-hosted-runner
       - run: ./tools/gen-release-notes
-      - name: call action to send Telegram message on failure
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
-          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
-        uses: ./.github/actions/send-telegram-notify
+      - name: Send VK Teams message on failure
         if: failure()
+        uses: ./.github/actions/report-job-status
+        with:
+          api-url: ${{ secrets.VKTEAMS_API_URL }}
+          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
+          chat-id: ${{ secrets.VKTEAMS_CHAT_ID }}
 
   checkpatch:
     # Run only if the workflow was triggered by a pull request for
@@ -105,9 +107,10 @@ jobs:
         uses: tarantool/checkpatch/.github/actions/checkpatch@master
         with:
           revision-range: HEAD~${{ github.event.pull_request.commits }}..HEAD
-      - name: call action to send Telegram message on failure
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_CORE_TOKEN }}
-          TELEGRAM_TO: ${{ secrets.TELEGRAM_CORE_TO }}
-        uses: ./.github/actions/send-telegram-notify
+      - name: Send VK Teams message on failure
         if: failure()
+        uses: ./.github/actions/report-job-status
+        with:
+          api-url: ${{ secrets.VKTEAMS_API_URL }}
+          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
+          chat-id: ${{ secrets.VKTEAMS_CHAT_ID }}
