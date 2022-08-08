@@ -486,7 +486,7 @@ box_index_compact(uint32_t space_id, uint32_t index_id)
 void
 iterator_create(struct iterator *it, struct index *index)
 {
-	it->next_raw = NULL;
+	it->next_internal = NULL;
 	it->next = NULL;
 	it->free = NULL;
 	it->space_cache_version = space_cache_version;
@@ -549,14 +549,14 @@ iterator_next(struct iterator *it, struct tuple **ret)
 }
 
 int
-iterator_next_raw(struct iterator *it, struct tuple **ret)
+iterator_next_internal(struct iterator *it, struct tuple **ret)
 {
-	assert(it->next_raw != NULL);
+	assert(it->next_internal != NULL);
 	if (!iterator_is_valid(it)) {
 		*ret = NULL;
 		return 0;
 	}
-	return it->next_raw(it, ret);
+	return it->next_internal(it, ret);
 }
 
 void
@@ -712,13 +712,13 @@ generic_index_count(struct index *index, enum iterator_type type,
 }
 
 int
-generic_index_get_raw(struct index *index, const char *key,
-		      uint32_t part_count, struct tuple **result)
+generic_index_get_internal(struct index *index, const char *key,
+			   uint32_t part_count, struct tuple **result)
 {
 	(void)key;
 	(void)part_count;
 	(void)result;
-	diag_set(UnsupportedIndexFeature, index->def, "get_raw()");
+	diag_set(UnsupportedIndexFeature, index->def, "get_internal()");
 	return -1;
 }
 

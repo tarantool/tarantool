@@ -104,7 +104,7 @@ hash_iterator_free(struct iterator *iterator)
 }
 
 static int
-hash_iterator_ge_raw_base(struct iterator *ptr, struct tuple **ret)
+hash_iterator_ge_base(struct iterator *ptr, struct tuple **ret)
 {
 	assert(ptr->free == hash_iterator_free);
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
@@ -116,7 +116,7 @@ hash_iterator_ge_raw_base(struct iterator *ptr, struct tuple **ret)
 }
 
 static int
-hash_iterator_gt_raw_base(struct iterator *ptr, struct tuple **ret)
+hash_iterator_gt_base(struct iterator *ptr, struct tuple **ret)
 {
 	assert(ptr->free == hash_iterator_free);
 	struct hash_iterator *it = (struct hash_iterator *) ptr;
@@ -142,9 +142,9 @@ name(struct iterator *iterator, struct tuple **ret)				\
 		int rc;								\
 		if (is_first) {							\
 			rc = name##_base(iterator, ret);			\
-			iterator->next_raw = hash_iterator_ge_raw;		\
+			iterator->next_internal = hash_iterator_ge;		\
 		} else {							\
-			rc = hash_iterator_ge_raw_base(iterator, ret);		\
+			rc = hash_iterator_ge_base(iterator, ret);		\
 		}								\
 		if (rc != 0 || *ret == NULL)					\
 			return rc;						\
@@ -155,24 +155,24 @@ name(struct iterator *iterator, struct tuple **ret)				\
 }										\
 struct forgot_to_add_semicolon
 
-WRAP_ITERATOR_METHOD(hash_iterator_ge_raw);
-WRAP_ITERATOR_METHOD(hash_iterator_gt_raw);
+WRAP_ITERATOR_METHOD(hash_iterator_ge);
+WRAP_ITERATOR_METHOD(hash_iterator_gt);
 
 #undef WRAP_ITERATOR_METHOD
 
 static int
-tree_iterator_dummie(MAYBE_UNUSED struct iterator *it, struct tuple **ret)
+hash_iterator_dummy(MAYBE_UNUSED struct iterator *it, struct tuple **ret)
 {
 	*ret = NULL;
 	return 0;
 }
 
 static int
-hash_iterator_raw_eq(struct iterator *it, struct tuple **ret)
+hash_iterator_eq(struct iterator *it, struct tuple **ret)
 {
-	it->next_raw = tree_iterator_dummie;
+	it->next_internal = hash_iterator_dummy;
 	/* always returns zero. */
-	hash_iterator_ge_raw_base(it, ret);
+	hash_iterator_ge_base(it, ret);
 	if (*ret == NULL)
 		return 0;
 	struct txn *txn = in_txn();
@@ -308,8 +308,8 @@ memtx_hash_index_count(struct index *base, enum iterator_type type,
 }
 
 static int
-memtx_hash_index_get_raw(struct index *base, const char *key,
-			 uint32_t part_count, struct tuple **result)
+memtx_hash_index_get_internal(struct index *base, const char *key,
+			      uint32_t part_count, struct tuple **result)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 
@@ -428,10 +428,10 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 		if (part_count != 0) {
 			light_index_iterator_key(&index->hash_table, &it->iterator,
 					key_hash(key, base->def->key_def), key);
-			it->base.next_raw = hash_iterator_gt_raw;
+			it->base.next_internal = hash_iterator_gt;
 		} else {
 			light_index_iterator_begin(&index->hash_table, &it->iterator);
-			it->base.next_raw = hash_iterator_ge_raw;
+			it->base.next_internal = hash_iterator_ge;
 		}
 		/* This iterator needs to be supported as a legacy. */
 		memtx_tx_track_full_scan(in_txn(),
@@ -440,7 +440,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 		break;
 	case ITER_ALL:
 		light_index_iterator_begin(&index->hash_table, &it->iterator);
-		it->base.next_raw = hash_iterator_ge_raw;
+		it->base.next_internal = hash_iterator_ge;
 		memtx_tx_track_full_scan(in_txn(),
 					 space_by_id(it->base.space_id),
 					 &index->base);
@@ -449,7 +449,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 		assert(part_count > 0);
 		light_index_iterator_key(&index->hash_table, &it->iterator,
 				key_hash(key, base->def->key_def), key);
-		it->base.next_raw = hash_iterator_raw_eq;
+		it->base.next_internal = hash_iterator_eq;
 		if (it->iterator.slotpos == light_index_end)
 			memtx_tx_track_point(in_txn(),
 					     space_by_id(it->base.space_id),
@@ -569,7 +569,7 @@ static const struct index_vtab memtx_hash_index_vtab = {
 	/* .max = */ generic_index_max,
 	/* .random = */ memtx_hash_index_random,
 	/* .count = */ memtx_hash_index_count,
-	/* .get_raw = */ memtx_hash_index_get_raw,
+	/* .get_internal = */ memtx_hash_index_get_internal,
 	/* .get = */ memtx_index_get,
 	/* .replace = */ memtx_hash_index_replace,
 	/* .create_iterator = */ memtx_hash_index_create_iterator,
