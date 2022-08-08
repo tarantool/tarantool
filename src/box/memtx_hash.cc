@@ -465,54 +465,66 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 	return (struct iterator *)it;
 }
 
-struct hash_snapshot_iterator {
-	struct snapshot_iterator base;
+/** Read view implementation. */
+struct hash_read_view {
+	/** Base class. */
+	struct index_read_view base;
+	/** Read view index. Ref counter incremented. */
 	struct memtx_hash_index *index;
+	/** Light read view. */
 	struct light_index_view view;
-	struct light_index_iterator iterator;
+	/** Used for clarifying read view tuples. */
 	struct memtx_tx_snapshot_cleaner cleaner;
 };
 
-/**
- * Destroy read view and free snapshot iterator.
- * Virtual method of snapshot iterator.
- * @sa index_vtab::create_snapshot_iterator.
- */
+/** Read view iterator implementation. */
+struct hash_read_view_iterator {
+	/** Base class. */
+	struct index_read_view_iterator base;
+	/** Read view. */
+	struct hash_read_view *rv;
+	/** Light iterator. */
+	struct light_index_iterator iterator;
+};
+
 static void
-hash_snapshot_iterator_free(struct snapshot_iterator *iterator)
+hash_read_view_free(struct index_read_view *base)
 {
-	assert(iterator->free == hash_snapshot_iterator_free);
-	struct hash_snapshot_iterator *it =
-		(struct hash_snapshot_iterator *) iterator;
-	light_index_view_destroy(&it->view);
-	index_unref(&it->index->base);
-	memtx_tx_snapshot_cleaner_destroy(&it->cleaner);
+	struct hash_read_view *rv = (struct hash_read_view *)base;
+	light_index_view_destroy(&rv->view);
+	index_unref(&rv->index->base);
+	memtx_tx_snapshot_cleaner_destroy(&rv->cleaner);
+	TRASH(rv);
+	free(rv);
+}
+
+static void
+hash_read_view_iterator_free(struct index_read_view_iterator *iterator)
+{
+	assert(iterator->free == hash_read_view_iterator_free);
+	TRASH(iterator);
 	free(iterator);
 }
 
-/**
- * Get next tuple from snapshot iterator.
- * Virtual method of snapshot iterator.
- * @sa index_vtab::create_snapshot_iterator.
- */
+/** Implementation of next_raw index_read_view_iterator callback. */
 static int
-hash_snapshot_iterator_next(struct snapshot_iterator *iterator,
-			    const char **data, uint32_t *size)
+hash_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
+				 const char **data, uint32_t *size)
 {
-	assert(iterator->free == hash_snapshot_iterator_free);
-	struct hash_snapshot_iterator *it =
-		(struct hash_snapshot_iterator *) iterator;
+	assert(iterator->free == hash_read_view_iterator_free);
+	struct hash_read_view_iterator *it =
+		(struct hash_read_view_iterator *)iterator;
 
 	while (true) {
 		struct tuple **res = light_index_view_iterator_get_and_next(
-			&it->view, &it->iterator);
+			&it->rv->view, &it->iterator);
 		if (res == NULL) {
 			*data = NULL;
 			return 0;
 		}
 
 		struct tuple *tuple = *res;
-		tuple = memtx_tx_snapshot_clarify(&it->cleaner, tuple);
+		tuple = memtx_tx_snapshot_clarify(&it->rv->cleaner, tuple);
 
 		if (tuple != NULL) {
 			*data = tuple_data_range(tuple, size);
@@ -524,33 +536,46 @@ hash_snapshot_iterator_next(struct snapshot_iterator *iterator,
 	return 0;
 }
 
-/**
- * Create an ALL iterator with personal read view so further
- * index modifications will not affect the iteration results.
- * Must be destroyed by iterator->free after usage.
- */
-static struct snapshot_iterator *
-memtx_hash_index_create_snapshot_iterator(struct index *base)
+/** Implementation of create_iterator index_read_view callback. */
+static struct index_read_view_iterator *
+hash_read_view_create_iterator(struct index_read_view *base,
+			       enum iterator_type type,
+			       const char *key, uint32_t part_count)
 {
+	assert(type == ITER_ALL);
+	assert(key == NULL);
+	assert(part_count == 0);
+	(void)type;
+	(void)key;
+	(void)part_count;
+	struct hash_read_view *rv = (struct hash_read_view *)base;
+	struct hash_read_view_iterator *it =
+		(struct hash_read_view_iterator *)xmalloc(sizeof(*it));
+	it->base.next_raw = hash_read_view_iterator_next_raw;
+	it->base.free = hash_read_view_iterator_free;
+	it->rv = rv;
+	light_index_view_iterator_begin(&rv->view, &it->iterator);
+	return (struct index_read_view_iterator *)it;
+}
+
+/** Implementation of create_read_view index callback. */
+static struct index_read_view *
+memtx_hash_index_create_read_view(struct index *base)
+{
+	static const struct index_read_view_vtab vtab = {
+		.free = hash_read_view_free,
+		.create_iterator = hash_read_view_create_iterator,
+	};
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
-	struct hash_snapshot_iterator *it = (struct hash_snapshot_iterator *)
-		calloc(1, sizeof(*it));
-	if (it == NULL) {
-		diag_set(OutOfMemory, sizeof(struct hash_snapshot_iterator),
-			 "memtx_hash_index", "iterator");
-		return NULL;
-	}
-
+	struct hash_read_view *rv =
+		(struct hash_read_view *)xmalloc(sizeof(*rv));
 	struct space *space = space_cache_find(base->def->space_id);
-	memtx_tx_snapshot_cleaner_create(&it->cleaner, space);
-
-	it->base.next = hash_snapshot_iterator_next;
-	it->base.free = hash_snapshot_iterator_free;
-	it->index = index;
+	memtx_tx_snapshot_cleaner_create(&rv->cleaner, space);
+	rv->base.vtab = &vtab;
+	rv->index = index;
 	index_ref(base);
-	light_index_view_create(&it->view, &index->hash_table);
-	light_index_view_iterator_begin(&it->view, &it->iterator);
-	return (struct snapshot_iterator *) it;
+	light_index_view_create(&rv->view, &index->hash_table);
+	return (struct index_read_view *)rv;
 }
 
 static const struct index_vtab memtx_hash_index_vtab = {
@@ -573,8 +598,7 @@ static const struct index_vtab memtx_hash_index_vtab = {
 	/* .get = */ memtx_index_get,
 	/* .replace = */ memtx_hash_index_replace,
 	/* .create_iterator = */ memtx_hash_index_create_iterator,
-	/* .create_snapshot_iterator = */
-		memtx_hash_index_create_snapshot_iterator,
+	/* .create_read_view = */ memtx_hash_index_create_read_view,
 	/* .stat = */ generic_index_stat,
 	/* .compact = */ generic_index_compact,
 	/* .reset_stat = */ generic_index_reset_stat,
