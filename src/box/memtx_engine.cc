@@ -134,7 +134,7 @@ memtx_build_secondary_index(struct index *index, struct index *pk)
 	int rc = 0;
 	while (true) {
 		struct tuple *tuple;
-		rc = iterator_next_raw(it, &tuple);
+		rc = iterator_next_internal(it, &tuple);
 		if (rc != 0)
 			break;
 		if (tuple == NULL)
@@ -1648,7 +1648,7 @@ int
 memtx_index_get(struct index *index, const char *key, uint32_t part_count,
 		struct tuple **result)
 {
-	if (index->vtab->get_raw(index, key, part_count, result) != 0)
+	if (index->vtab->get_internal(index, key, part_count, result) != 0)
 		return -1;
 	return memtx_prepare_result_tuple(result);
 }
@@ -1656,7 +1656,7 @@ memtx_index_get(struct index *index, const char *key, uint32_t part_count,
 int
 memtx_iterator_next(struct iterator *it, struct tuple **ret)
 {
-	if (it->next_raw(it, ret) != 0)
+	if (it->next_internal(it, ret) != 0)
 		return -1;
 	return memtx_prepare_result_tuple(ret);
 }

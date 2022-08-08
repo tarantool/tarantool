@@ -189,7 +189,7 @@ bitset_index_iterator_free(struct iterator *iterator)
 }
 
 static int
-bitset_index_iterator_next_raw(struct iterator *iterator, struct tuple **ret)
+bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
 {
 	assert(iterator->free == bitset_index_iterator_free);
 	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
@@ -354,7 +354,7 @@ memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 
 	iterator_create(&it->base, base);
 	it->pool = &memtx->iterator_pool;
-	it->base.next_raw = bitset_index_iterator_next_raw;
+	it->base.next_internal = bitset_index_iterator_next;
 	it->base.next = memtx_iterator_next;
 	it->base.free = bitset_index_iterator_free;
 
@@ -498,7 +498,7 @@ static const struct index_vtab memtx_bitset_index_vtab = {
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
 	/* .count = */ memtx_bitset_index_count,
-	/* .get_raw = */ generic_index_get_raw,
+	/* .get_internal = */ generic_index_get_internal,
 	/* .get = */ generic_index_get,
 	/* .replace = */ memtx_bitset_index_replace,
 	/* .create_iterator = */ memtx_bitset_index_create_iterator,

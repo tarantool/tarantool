@@ -421,7 +421,7 @@ memtx_space_execute_delete(struct space *space, struct txn *txn,
 	if (exact_key_validate(pk->def->key_def, key, part_count) != 0)
 		return -1;
 	struct tuple *old_tuple;
-	if (index_get_raw(pk, key, part_count, &old_tuple) != 0)
+	if (index_get_internal(pk, key, part_count, &old_tuple) != 0)
 		return -1;
 
 	if (old_tuple == NULL) {
@@ -456,7 +456,7 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 	if (exact_key_validate(pk->def->key_def, key, part_count) != 0)
 		return -1;
 	struct tuple *old_tuple;
-	if (index_get_raw(pk, key, part_count, &old_tuple) != 0)
+	if (index_get_internal(pk, key, part_count, &old_tuple) != 0)
 		return -1;
 
 	if (old_tuple == NULL) {
@@ -530,7 +530,7 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 
 	/* Try to find the tuple by primary key. */
 	struct tuple *old_tuple;
-	if (index_get_raw(index, key, part_count, &old_tuple) != 0)
+	if (index_get_internal(index, key, part_count, &old_tuple) != 0)
 		return -1;
 
 	struct tuple_format *format = space->format;
@@ -1004,7 +1004,8 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 	int rc;
 	struct tuple *tuple;
 	size_t count = 0;
-	while ((rc = iterator_next_raw(it, &tuple)) == 0 && tuple != NULL) {
+	while ((rc = iterator_next_internal(it, &tuple)) == 0 &&
+	       tuple != NULL) {
 		/*
 		 * Check that the tuple is OK according to the
 		 * new format.
@@ -1278,7 +1279,8 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	int rc;
 	struct tuple *tuple;
 	size_t count = 0;
-	while ((rc = iterator_next_raw(it, &tuple)) == 0 && tuple != NULL) {
+	while ((rc = iterator_next_internal(it, &tuple)) == 0 &&
+	       tuple != NULL) {
 		struct key_def *key_def = new_index->def->key_def;
 		if (!tuple_format_is_compatible_with_key_def(tuple_format(tuple),
 							     key_def)) {
