@@ -735,6 +735,7 @@ lbox_fiber_join(struct lua_State *L)
 	struct fiber *fiber = lbox_checkfiber(L, 1);
 	struct lua_State *child_L = fiber->storage.lua.stack;
 	struct error *e = NULL;
+	uint64_t fid = fiber->fid;
 	int num_ret = 0;
 	int coro_ref = 0;
 
@@ -747,7 +748,30 @@ lbox_fiber_join(struct lua_State *L)
 			luaL_error(L, "fiber:join(timeout): bad arguments");
 		}
 	}
-	int rc = fiber_join_timeout(fiber, timeout);
+	double deadline = fiber_clock() + timeout;
+
+	while (!fiber_is_dead(fiber)) {
+		bool exceeded = fiber_wait_on_deadline(fiber, deadline);
+		/*
+		 * At this point the fiber's struct may be already reused by
+		 * another fiber.
+		 */
+		if (exceeded) {
+			diag_set(TimedOut);
+			e = diag_last_error(&fiber()->diag);
+			lua_pushboolean(L, false);
+			luaT_pusherror(L, e);
+			return 2;
+		}
+		fiber = fiber_find(fid);
+		if (fiber == NULL) {
+			luaL_error(L, "the fiber is already joined "
+				      "by concurrent fiber:join()");
+		}
+	}
+
+	/* The fiber is already dead. */
+	int rc = fiber_join(fiber);
 
 	if (child_L != NULL) {
 		coro_ref = lua_tointeger(child_L, -1);
