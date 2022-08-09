@@ -275,6 +275,7 @@
 #cmakedefine ENABLE_AUDIT_LOG 1
 #cmakedefine ENABLE_FEEDBACK_DAEMON 1
 #cmakedefine ENABLE_WAL_EXT 1
+#cmakedefine ENABLE_READ_VIEW 1
 
 #cmakedefine EXPORT_LIBCURL_SYMBOLS 1
 
