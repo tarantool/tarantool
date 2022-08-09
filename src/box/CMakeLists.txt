@@ -265,6 +265,10 @@ if(ENABLE_WAL_EXT)
     list(APPEND box_sources ${WAL_EXT_SOURCES})
 endif()
 
+if(ENABLE_READ_VIEW)
+    list(APPEND box_sources ${READ_VIEW_SOURCES})
+endif()
+
 add_library(box STATIC ${box_sources})
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
