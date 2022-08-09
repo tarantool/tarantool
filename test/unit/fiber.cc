@@ -330,6 +330,31 @@ fiber_flags_respect_test(void)
 }
 
 static void
+fiber_wait_on_deadline_test()
+{
+	header();
+
+	struct fiber *fiber = fiber_new_xc("noop", noop_f);
+	fiber_set_joinable(fiber, true);
+	fiber_wakeup(fiber);
+	bool exceeded = fiber_wait_on_deadline(fiber, fiber_clock() + 100.0);
+	fail_if(exceeded);
+	fail_if(!fiber_is_dead(fiber));
+	fiber_join(fiber);
+
+	fiber = fiber_new_xc("cancel", cancel_f);
+	fiber_set_joinable(fiber, true);
+	fiber_wakeup(fiber);
+	exceeded = fiber_wait_on_deadline(fiber, fiber_clock() + 0.001);
+	fail_if(!exceeded);
+	fail_if(fiber_is_dead(fiber));
+	fiber_cancel(fiber);
+	fiber_join(fiber);
+
+	footer();
+}
+
+static void
 cord_cojoin_test(void)
 {
 	header();
@@ -361,6 +386,7 @@ main_f(va_list ap)
 	fiber_wakeup_dead_test();
 	fiber_dead_while_in_cache_test();
 	fiber_flags_respect_test();
+	fiber_wait_on_deadline_test();
 	cord_cojoin_test();
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
