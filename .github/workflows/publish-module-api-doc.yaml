@@ -8,8 +8,11 @@ jobs:
   publish-api-doc:
     runs-on: ubuntu-latest
     steps:
-      - name: Clone the module
-        uses: actions/checkout@v2
+      - uses: tarantool/actions/cleanup@master
+      - uses: actions/checkout@v2.3.4
+        with:
+          fetch-depth: 0
+          submodules: recursive
 
       - name: Setup Doxygen
         run: sudo apt install -y doxygen
@@ -22,6 +25,6 @@ jobs:
             doxygen Doxyfile.API
 
       - name: Publish generated API documentation to GitHub Pages
-        uses: JamesIves/github-pages-deploy-action@4.4.0
+        uses: JamesIves/github-pages-deploy-action@v4.4.0
         with:
           folder: doc/
