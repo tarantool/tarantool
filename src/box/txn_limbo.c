@@ -245,10 +245,10 @@ txn_limbo_wait_complete(struct txn_limbo *limbo, struct txn_limbo_entry *entry)
 		double deadline = start_time + replication_synchro_timeout;
 		double timeout = deadline - fiber_clock();
 		int rc = fiber_cond_wait_timeout(&limbo->wait_cond, timeout);
-		if (txn_limbo_is_frozen(limbo))
-			goto wait;
 		if (txn_limbo_entry_is_complete(entry))
 			goto complete;
+		if (txn_limbo_is_frozen(limbo))
+			goto wait;
 		if (rc != 0)
 			break;
 	}
