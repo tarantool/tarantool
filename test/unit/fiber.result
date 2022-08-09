@@ -25,3 +25,5 @@ OutOfMemory: Failed to allocate 42 bytes in allocator for exception
 	*** fiber_dead_while_in_cache_test: done ***
 	*** fiber_flags_respect_test ***
 	*** fiber_flags_respect_test: done ***
+	*** fiber_wait_on_deadline_test ***
+	*** fiber_wait_on_deadline_test: done ***

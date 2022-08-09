@@ -865,6 +865,20 @@ fiber_checkstack(void);
 bool
 fiber_yield_timeout(ev_tstamp delay);
 
+/**
+ * Yield and check for deadline.
+ * Return true if deadline exceeded.
+ */
+bool
+fiber_yield_deadline(ev_tstamp deadline);
+
+/**
+ * Add current fiber to f->wake and yield.
+ * Return true if deadline exceeded.
+ */
+bool
+fiber_wait_on_deadline(struct fiber *f, double deadline);
+
 void
 fiber_destroy_all(struct cord *cord);
 
