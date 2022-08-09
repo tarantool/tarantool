@@ -70,6 +70,25 @@ typedef uint64_t hint_t;
 #define HINT_NONE ((hint_t)UINT64_MAX)
 
 /**
+ * Compare two tuple hints.
+ *
+ * Returns:
+ *
+ *   -1 if the first tuple is less than the second tuple
+ *   +1 if the first tuple is greater than the second tuple
+ *    0 if the first tuple may be less than, equal to, or
+ *      greater than the second tuple, and a full tuple
+ *      comparison is needed to determine the order.
+ */
+static inline int
+hint_cmp(hint_t hint_a, hint_t hint_b)
+{
+	if (hint_a != HINT_NONE && hint_b != HINT_NONE && hint_a != hint_b)
+		return hint_a < hint_b ? -1 : 1;
+	return 0;
+}
+
+/**
  * Initialize comparator functions for the key_def.
  * @param key_def key definition
  */

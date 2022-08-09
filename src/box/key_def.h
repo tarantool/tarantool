@@ -959,6 +959,19 @@ tuple_extract_key_raw(const char *data, const char *data_end,
 }
 
 /**
+ * @brief Compare two fields parts using a type definition
+ * @param field_a field
+ * @param field_b field
+ * @param field_type field type definition
+ * @retval 0  if field_a == field_b
+ * @retval <0 if field_a < field_b
+ * @retval >0 if field_a > field_b
+ */
+int
+tuple_compare_field(const char *field_a, const char *field_b,
+		    int8_t type, struct coll *coll);
+
+/**
  * Compare keys using the key definition and comparison hints.
  * @param key_a key parts with MessagePack array header
  * @param key_a_hint comparison hint of @a key_a
