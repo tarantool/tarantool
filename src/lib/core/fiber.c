@@ -627,43 +627,37 @@ fiber_join(struct fiber *fiber)
 	return fiber_join_timeout(fiber, TIMEOUT_INFINITY);
 }
 
+bool
+fiber_wait_on_deadline(struct fiber *fiber, double deadline)
+{
+	rlist_add_tail_entry(&fiber->wake, fiber(), state);
+
+	return fiber_yield_deadline(deadline);
+}
+
 int
 fiber_join_timeout(struct fiber *fiber, double timeout)
 {
 	if ((fiber->flags & FIBER_IS_JOINABLE) == 0)
 		panic("the fiber is not joinable");
 
-	if (! fiber_is_dead(fiber)) {
-		bool exceeded = false;
-		do {
+	if (!fiber_is_dead(fiber)) {
+		double deadline = fiber_clock() + timeout;
+		while (!fiber_wait_on_deadline(fiber, deadline) &&
+		       !fiber_is_dead(fiber)) {
+		}
+		if (!fiber_is_dead(fiber)) {
 			/*
-			 * In case fiber is cancelled during yield
-			 * it will be removed from wake queue by a
-			 * wakeup following the cancel, so we have
-			 * to put it back in.
+			 * Not exactly the right error message for this place.
+			 * Error message is generated based on the ETIMEDOUT
+			 * code, that is used for network timeouts in linux. But
+			 * in other places, this type of error is always used
+			 * when the timeout expires, regardless of whether it is
+			 * related to the network (see cbus_call for example).
 			 */
-			rlist_add_tail_entry(&fiber->wake, fiber(), state);
-			if (timeout != TIMEOUT_INFINITY) {
-				double time = fiber_clock();
-				exceeded = fiber_yield_timeout(timeout);
-				timeout -= (fiber_clock() - time);
-			} else {
-				fiber_yield();
-			}
-		} while (! fiber_is_dead(fiber) && ! exceeded && timeout > 0);
-	}
-
-	if (! fiber_is_dead(fiber)) {
-		/*
-		 * Not exactly the right error message for this place. Error
-		 * message is generated based on the ETIMEDOUT code, that is
-		 * used for network timeouts in linux. But in other places,
-		 * this type of error is always used when the timeout expires,
-		 * regardless of whether it is related to the network (see
-		 * cbus_call for example).
-		 */
-		diag_set(TimedOut);
-		return -1;
+			diag_set(TimedOut);
+			return -1;
+		}
 	}
 	assert((fiber->flags & FIBER_IS_RUNNING) == 0);
 	assert((fiber->flags & FIBER_IS_JOINABLE) != 0);
