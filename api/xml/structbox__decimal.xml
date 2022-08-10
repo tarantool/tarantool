@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.8.17">
+  <compounddef id="structbox__decimal" kind="struct" language="C++" prot="public">
+    <compoundname>box_decimal</compoundname>
+    <includes refid="module_8h" local="no">module.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structbox__decimal_1ab3c586f1f723be9d150e20c67ff0fa9b" prot="public" static="no" mutable="no">
+        <type>uint64_t</type>
+        <definition>uint64_t box_decimal::internal[8]</definition>
+        <argsstring>[8]</argsstring>
+        <name>internal</name>
+        <briefdescription>
+<para>Decimal data. </para>
+        </briefdescription>
+        <detaileddescription>
+<para>The format is unspecified and can be changed.</para>
+<para>The tail of the array may be in an unallocated memory. Don&apos;t access this array directly. Use box_decimal_*() functions instead. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="src/module.h" line="2750" column="10" bodyfile="src/module.h" bodystart="2750" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+<para>public </para>
+    </briefdescription>
+    <detaileddescription>
+<para>See <ref refid="module_8h_1a90d26cf0c54dfa5e878e95ca0f73202a" kindref="member">box_decimal_t</ref>. </para>
+    </detaileddescription>
+    <location file="src/module.h" line="2740" column="18" bodyfile="src/module.h" bodystart="2740" bodyend="2751"/>
+    <listofallmembers>
+      <member refid="structbox__decimal_1ab3c586f1f723be9d150e20c67ff0fa9b" prot="public" virt="non-virtual"><scope>box_decimal</scope><name>internal</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

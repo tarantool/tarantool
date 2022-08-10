@@ -1,0 +1,130 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.8.17">
+  <compounddef id="unionPACKED" kind="union" language="C++" prot="public">
+    <compoundname>PACKED</compoundname>
+    <includes refid="module_8h" local="no">module.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="unionPACKED_1ab16a07e887ef727e6085637bad928d45" prot="public" static="no" mutable="no">
+        <type>uint32_t</type>
+        <definition>uint32_t PACKED::fieldno</definition>
+        <argsstring></argsstring>
+        <name>fieldno</name>
+        <briefdescription>
+<para>Index of a tuple field (zero based). </para>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="src/module.h" line="1639" column="10" bodyfile="src/module.h" bodystart="1639" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="unionPACKED_1a4c3fa9f54c4da8295b2cdf3ca5f843ac" prot="public" static="no" mutable="no">
+        <type>uint32_t</type>
+        <definition>uint32_t PACKED::flags</definition>
+        <argsstring></argsstring>
+        <name>flags</name>
+        <briefdescription>
+<para>Flags, e.g. </para>
+        </briefdescription>
+        <detaileddescription>
+<para>nullability. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="src/module.h" line="1641" column="10" bodyfile="src/module.h" bodystart="1641" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="unionPACKED_1ae1b4d9361929d8bc2b374a36a2133910" prot="public" static="no" mutable="no">
+        <type>const char *</type>
+        <definition>const char* PACKED::field_type</definition>
+        <argsstring></argsstring>
+        <name>field_type</name>
+        <briefdescription>
+<para>Type of the tuple field. </para>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="src/module.h" line="1643" column="12" bodyfile="src/module.h" bodystart="1643" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="unionPACKED_1abe5b199132aa0fc5215b5933e8b7c8c6" prot="public" static="no" mutable="no">
+        <type>const char *</type>
+        <definition>const char* PACKED::collation</definition>
+        <argsstring></argsstring>
+        <name>collation</name>
+        <briefdescription>
+<para>Collation name for string comparisons. </para>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="src/module.h" line="1645" column="12" bodyfile="src/module.h" bodystart="1645" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="unionPACKED_1a47de0769ba4faf0a06782fd5e8892555" prot="public" static="no" mutable="no">
+        <type>const char *</type>
+        <definition>const char* PACKED::path</definition>
+        <argsstring></argsstring>
+        <name>path</name>
+        <briefdescription>
+<para>JSON path to point a nested field. </para>
+        </briefdescription>
+        <detaileddescription>
+<para>Example:</para>
+<para>tuple: [1, {&quot;foo&quot;: &quot;bar&quot;}] key parts: [ { &quot;fieldno&quot;: 2, &quot;type&quot;: &quot;string&quot;, &quot;path&quot;: &quot;foo&quot; } ]</para>
+<para>=&gt; key: [&quot;bar&quot;]</para>
+<para>Note: When the path is given, &lt;field_type&gt; means type of the nested field. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="src/module.h" line="1665" column="12" bodyfile="src/module.h" bodystart="1665" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="unionPACKED_1a6edcf6b5ce400f83345c6c108c93da4d" prot="public" static="no" mutable="no">
+        <type>struct PACKED::@4</type>
+        <definition>struct PACKED::@4 PACKED::@5</definition>
+        <argsstring></argsstring>
+        <name>@5</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="src/module.h" line="1666" column="1"/>
+      </memberdef>
+      <memberdef kind="variable" id="unionPACKED_1a1782075c62f8d5e3b0f6a87c8382d373" prot="public" static="no" mutable="no">
+        <type>char</type>
+        <definition>char PACKED::padding[BOX_KEY_PART_DEF_T_SIZE]</definition>
+        <argsstring>[BOX_KEY_PART_DEF_T_SIZE]</argsstring>
+        <name>padding</name>
+        <briefdescription>
+<para>Padding to guarantee certain size across different tarantool versions. </para>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="src/module.h" line="1671" column="6" bodyfile="src/module.h" bodystart="1671" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+<para>Public representation of a key part definition. </para>
+    </briefdescription>
+    <detaileddescription>
+<para>Usage: Allocate an array of such key parts, initialize each key part (call &lt;box_key_part_def_create&gt;() and set necessary fields), pass the array into &lt;box_key_def_new_v2&gt;() function.</para>
+<para>Important: A module should call &lt;box_key_part_def_create&gt;() to initialize the structure with default values. There is no guarantee that all future default values for fields and flags will be remain the same.</para>
+<para>The idea of separation from internal &lt;struct key_part_def&gt; is to provide stable API and ABI for modules.</para>
+<para>New fields may be added into the end of the structure in later tarantool versions. Also new flags may be introduced within &lt;flags&gt; field. &lt;collation&gt; cannot be changed to a union (to reuse for some other value), because it is verified even for a non-string key part by &lt;box_key_def_new_v2&gt;().</para>
+<para>Fields that are unknown at given tarantool version are ignored in general, but filled with zeros when initialized. </para>
+    </detaileddescription>
+    <location file="src/module.h" line="1636" column="21" bodyfile="src/module.h" bodystart="1636" bodyend="1672"/>
+    <listofallmembers>
+      <member refid="unionPACKED_1abe5b199132aa0fc5215b5933e8b7c8c6" prot="public" virt="non-virtual"><scope>PACKED</scope><name>collation</name></member>
+      <member refid="unionPACKED_1ae1b4d9361929d8bc2b374a36a2133910" prot="public" virt="non-virtual"><scope>PACKED</scope><name>field_type</name></member>
+      <member refid="unionPACKED_1ab16a07e887ef727e6085637bad928d45" prot="public" virt="non-virtual"><scope>PACKED</scope><name>fieldno</name></member>
+      <member refid="unionPACKED_1a4c3fa9f54c4da8295b2cdf3ca5f843ac" prot="public" virt="non-virtual"><scope>PACKED</scope><name>flags</name></member>
+      <member refid="unionPACKED_1a1782075c62f8d5e3b0f6a87c8382d373" prot="public" virt="non-virtual"><scope>PACKED</scope><name>padding</name></member>
+      <member refid="unionPACKED_1a47de0769ba4faf0a06782fd5e8892555" prot="public" virt="non-virtual"><scope>PACKED</scope><name>path</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>
