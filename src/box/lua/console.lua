@@ -649,7 +649,7 @@ local function local_read(self)
             break
         end
         if delim == "" then
-            local lang = box.session.language
+            local lang = self.language
             if not lang or lang == 'lua' then
                 -- stop once a complete Lua statement is entered
                 if local_check_lua(buf) then
