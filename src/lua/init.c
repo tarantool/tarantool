@@ -921,16 +921,6 @@ run_script_f(va_list ap)
 	aux_loop_is_run = true;
 
 	int is_a_tty = isatty(STDIN_FILENO);
-	/*
-	 * Override return value of isatty(STDIN_FILENO) if
-	 * ERRINJ_STDIN_ISATTY enabled (iparam not set to default).
-	 * Use iparam in such case, standard return value otherwise.
-	 * Integer param of errinj is used in order to set different
-	 * return values.
-	*/
-	ERROR_INJECT_INT(ERRINJ_STDIN_ISATTY, inj->iparam >= 0, {
-		is_a_tty = inj->iparam;
-	});
 
 	if (path && strcmp(path, "-") != 0 && access(path, F_OK) == 0) {
 		/* Execute script. */

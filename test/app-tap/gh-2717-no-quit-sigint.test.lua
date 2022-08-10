@@ -19,7 +19,7 @@ local TARANTOOL_PATH = arg[-1]
 local test = tap.test('gh-2717-no-quit-sigint')
 
 test:plan(8)
-local cmd = 'ERRINJ_STDIN_ISATTY=1 INPUTRC=Pheiphe2 ' .. TARANTOOL_PATH .. ' -i 2>&1'
+local cmd = 'INPUTRC=Pheiphe2 ' .. TARANTOOL_PATH .. ' -i 2>&1'
 local ph = popen.new({cmd}, {
     shell = true,
     setsid = true,
@@ -61,7 +61,7 @@ ph:close()
 --
 -- gh-7109: Ctrl+C does not break multiline input.
 --
-cmd = 'ERRINJ_STDIN_ISATTY=1 ' .. TARANTOOL_PATH .. ' -i 2>&1'
+cmd = TARANTOOL_PATH .. ' -i 2>&1'
 ph = popen.new({cmd}, {
     shell = true,
     setsid = true,
@@ -150,7 +150,7 @@ local ph_server = popen.shell(TARANTOOL_PATH .. arg, 'r')
 local f = process_timeout.open_with_timeout(log_file, file_open_timeout)
 assert(f, 'error while opening ' .. log_file)
 
-cmd = 'ERRINJ_STDIN_ISATTY=1 ' .. TARANTOOL_PATH .. ' -i 2>&1'
+cmd = TARANTOOL_PATH .. ' -i 2>&1'
 local ph_client = popen.new({cmd}, {
     shell = true,
     setsid = true,
@@ -214,7 +214,7 @@ os.remove(snap_file)
 --
 -- Testing case when the client and instance are called in the same console.
 --
-cmd = 'ERRINJ_STDIN_ISATTY=1 INPUTRC=Pheiphe2 ' .. TARANTOOL_PATH .. ' -i 2>&1'
+cmd = 'INPUTRC=Pheiphe2 ' .. TARANTOOL_PATH .. ' -i 2>&1'
 ph = popen.new({cmd}, {
     shell = true,
     setsid = true,

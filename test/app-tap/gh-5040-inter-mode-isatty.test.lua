@@ -7,8 +7,7 @@ local fio = require('fio')
 
 --
 -- Tests to check if the tarantool binary enters
--- interactive mode or not using error injections
--- to change return value of isatty(stdin).
+-- interactive mode or not using `-i` flag.
 --
 
 local TARANTOOL_PATH = arg[-1]
@@ -28,7 +27,7 @@ local file_open_timeout = 60.0
 --  * empty_output - true if command should have empty output
 local testcases = {
     {
-        cmd_args = '',
+        cmd_args = ' -i',
         stdin = 'tty',
         interactive = true
     },
@@ -69,7 +68,6 @@ for _, cmd in pairs(testcases) do
     local full_cmd = ''
     if cmd.stdin == 'tty' then
         cmd.stdin = ''
-        full_cmd = 'ERRINJ_STDIN_ISATTY=1 '
     else
         cmd.stdin = '< ' .. cmd.stdin
     end
