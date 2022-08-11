@@ -140,6 +140,7 @@ raft_new_random_election_shift(const struct raft *raft)
 static inline bool
 raft_can_vote_for(const struct raft *raft, const struct vclock *v)
 {
+	assert(vclock_is_set(v));
 	int cmp = vclock_compare_ignore0(v, raft->vclock);
 	return cmp == 0 || cmp == 1;
 }
@@ -156,6 +157,36 @@ raft_add_vote(struct raft *raft, int src, int dst)
 	if (count > raft->max_vote)
 		raft->max_vote = count;
 	return true;
+}
+
+/**
+ * Vote can be revoked if it was volatile (not yet in WAL) and thus wasn't shown
+ * to any other instance yet.
+ */
+static void
+raft_revoke_vote(struct raft *raft)
+{
+	assert(raft->volatile_vote != 0);
+	assert(raft->vote == 0);
+	struct raft_vote *v = &raft->votes[raft->self];
+	assert(v->did_vote);
+	v->did_vote = false;
+	assert(raft->voted_count > 0);
+	--raft->voted_count;
+	v = &raft->votes[raft->volatile_vote];
+	assert(v->count > 0);
+	bool was_max = v->count == raft->max_vote;
+	--v->count;
+	if (was_max) {
+		--raft->max_vote;
+		for (int i = 0; i < VCLOCK_MAX; ++i) {
+			v = &raft->votes[i];
+			if (v->count > raft->max_vote)
+				raft->max_vote = v->count;
+		}
+	}
+	raft->volatile_vote = 0;
+	vclock_clear(&raft->candidate_vclock);
 }
 
 static bool
@@ -272,9 +303,18 @@ raft_sm_wait_election_end(struct raft *raft);
 static void
 raft_sm_schedule_new_term(struct raft *raft, uint64_t new_term);
 
-/** Bump volatile vote and schedule its flush to disk. */
+/**
+ * Set a volatile vote for the given candidate and schedule flush to disk if the
+ * vclock would be still acceptable for the current instance by that time.
+ */
 static void
-raft_sm_schedule_new_vote(struct raft *raft, uint32_t new_vote);
+raft_sm_schedule_new_vote(struct raft *raft, uint32_t candidate_id,
+			  const struct vclock *candidate_vclock);
+
+/** Try to schedule a vote for the given candidate if applicable. */
+static void
+raft_sm_try_new_vote(struct raft *raft, uint32_t candidate_id,
+		     const struct vclock *candidate_vclock);
 
 /**
  * Bump term and vote for self immediately. After that is persisted, the
@@ -531,17 +571,7 @@ raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 					 "already voted in this term");
 				break;
 			}
-			/* Vclock is not NULL, validated above. */
-			if (!raft_can_vote_for(raft, req->vclock)) {
-				say_info("RAFT: vote request is skipped - the "
-					 "vclock is not acceptable");
-				break;
-			}
-			/*
-			 * Either the term is new, or didn't vote in the current
-			 * term yet. Anyway can vote now.
-			 */
-			raft_sm_schedule_new_vote(raft, req->vote);
+			raft_sm_try_new_vote(raft, req->vote, req->vclock);
 			break;
 		case RAFT_STATE_CANDIDATE:
 			/* Check if this is a vote for a competing candidate. */
@@ -695,14 +725,46 @@ end_dump:
 				raft_sm_wait_election_end(raft);
 			} else {
 				/* No leaders, no votes. */
-				raft_sm_schedule_new_vote(raft, raft->self);
+				raft_sm_schedule_new_vote(raft, raft->self,
+							  raft->vclock);
 			}
 		}
 	} else {
 		memset(&req, 0, sizeof(req));
 		assert(raft->volatile_term >= raft->term);
-		req.term = raft->volatile_term;
+		if (raft->volatile_vote == 0)
+			goto do_dump;
+		/*
+		 * Vote and term bumps are persisted separately. This serves as
+		 * a flush of all transactions going to WAL right now so as the
+		 * current node could correctly compare its own vclock vs
+		 * candidate's one. Otherwise the local vclock can be <=
+		 * candidate's now, but that can change after the WAL queue is
+		 * flushed.
+		 */
+		if (raft->volatile_term > raft->term)
+			goto do_dump;
+		/*
+		 * Skip self. When vote was issued, own vclock could be smaller,
+		 * but that doesn't matter. Can always vote for self. Not having
+		 * this special case still works if the node is configured as a
+		 * candidate, but the node might log that it canceled a vote for
+		 * self, which is confusing.
+		 */
+		if (raft->volatile_vote == raft->self)
+			goto do_dump_with_vote;
+		if (!raft_can_vote_for(raft, &raft->candidate_vclock)) {
+			say_info("RAFT: vote request for %u is canceled - the "
+				 "vclock is not acceptable anymore",
+				 raft->volatile_vote);
+			raft_revoke_vote(raft);
+			assert(raft_is_fully_on_disk(raft));
+			goto end_dump;
+		}
+do_dump_with_vote:
 		req.vote = raft->volatile_vote;
+do_dump:
+		req.term = raft->volatile_term;
 		/*
 		 * Skip vclock. It is used only to be sent to network when vote
 		 * for self. It is a job of the vclock owner to persist it
@@ -826,6 +888,7 @@ raft_sm_schedule_new_term(struct raft *raft, uint64_t new_term)
 	raft->volatile_term = new_term;
 	/* New terms means completely new Raft state. */
 	raft->volatile_vote = 0;
+	vclock_clear(&raft->candidate_vclock);
 	if (raft->leader == raft->self) {
 		/*
 		 * Update leader_last_seen when resigning so that leader_idle
@@ -854,17 +917,34 @@ raft_sm_schedule_new_term(struct raft *raft, uint64_t new_term)
 }
 
 static void
-raft_sm_schedule_new_vote(struct raft *raft, uint32_t new_vote)
+raft_sm_schedule_new_vote(struct raft *raft, uint32_t candidate_id,
+			  const struct vclock *candidate_vclock)
 {
-	say_info("RAFT: vote for %u, follow", new_vote);
+	say_info("RAFT: vote for %u, follow", candidate_id);
+	assert(raft_can_vote_for(raft, candidate_vclock));
 	assert(raft->volatile_vote == 0);
+	assert(!vclock_is_set(&raft->candidate_vclock));
 	assert(raft->leader == 0);
 	assert(raft->state == RAFT_STATE_FOLLOWER);
 	assert(!raft->votes[raft->self].did_vote);
-	raft->volatile_vote = new_vote;
+	raft->volatile_vote = candidate_id;
+	vclock_copy(&raft->candidate_vclock, candidate_vclock);
 	raft_add_vote(raft, raft->self, raft->self);
 	raft_sm_pause_and_dump(raft);
 	/* Nothing visible is changed - no broadcast. */
+}
+
+static void
+raft_sm_try_new_vote(struct raft *raft, uint32_t candidate_id,
+		     const struct vclock *candidate_vclock)
+{
+	if (!raft_can_vote_for(raft, candidate_vclock)) {
+		assert(candidate_id != raft->self);
+		say_info("RAFT: vote request for %u is skipped - the vclock "
+			 "is not acceptable", candidate_id);
+		return;
+	}
+	raft_sm_schedule_new_vote(raft, candidate_id, candidate_vclock);
 }
 
 static void
@@ -874,7 +954,7 @@ raft_sm_schedule_new_election(struct raft *raft)
 	assert(raft->is_candidate);
 	/* Everyone is a follower until its vote for self is persisted. */
 	raft_sm_schedule_new_term(raft, raft->volatile_term + 1);
-	raft_sm_schedule_new_vote(raft, raft->self);
+	raft_sm_schedule_new_vote(raft, raft->self, raft->vclock);
 }
 
 static void
