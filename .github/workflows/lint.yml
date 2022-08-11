@@ -2,12 +2,6 @@ name: lint
 
 on:
   push:
-    branches:
-      - 'master'
-      - '[0-9].[0-9]+'
-    tags:
-      - '**'
-  pull_request:
   workflow_dispatch:
 
 concurrency:
@@ -91,9 +85,6 @@ jobs:
   checkpatch:
     # Run only if the workflow was triggered by a pull request for
     # tarantool/tarantool that doesn't have the 'notest' label.
-    if: github.repository == 'tarantool/tarantool' &&
-        ( github.event_name == 'pull_request' &&
-          !contains(github.event.pull_request.labels.*.name, 'notest') )
 
     runs-on: ubuntu-20.04-self-hosted
 

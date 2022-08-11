@@ -30,7 +30,7 @@ runs:
       shell: bash
 
     - name: Send VK Teams message on failure
-      uses: tarantool/actions/report-job-status@master
+      uses: tarantool/actions/report-job-status@fix-unexpected-identifier
       with:
         api-url: ${{ inputs.api-url }}
         bot-token: ${{ inputs.bot-token }}
