@@ -8,6 +8,10 @@ the `master` or release branch (`1.10`, `2.10`, etc);
 * a personal chat, created by the committer – if the job started on
 creating/updating a pull request or any event in other branches.
 
+__IMPORTANT__: The secrets are [not passed](https://docs.github.com/en/actions/security-guides/encrypted-secrets#using-encrypted-secrets-in-a-workflow)
+to workflows that are triggered by a pull request from a fork. Due to
+this limitation, this action will not work for pull requests from forks.
+
 ## How to create personal chat
 
 1. Create a new public chat in VK Teams (access can be limited by enabling
