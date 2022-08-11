@@ -25,7 +25,6 @@ sleep_f(va_list ap)
 {
 	struct latch *latch = va_arg(ap, struct latch *);
 	latch_lock(latch);
-	fiber_set_cancellable(true);
 
 	while (!fiber_is_cancelled())
 		fiber_sleep(0.001);

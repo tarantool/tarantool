@@ -724,12 +724,7 @@ static int
 lbox_fiber_wakeup(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
-	/*
-	 * It's unsafe to wakeup fibers which don't expect
-	 * it.
-	 */
-	if (f->flags & FIBER_IS_CANCELLABLE)
-		fiber_wakeup(f);
+	fiber_wakeup(f);
 	return 0;
 }
 
