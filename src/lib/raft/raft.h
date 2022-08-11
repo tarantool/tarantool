@@ -224,6 +224,12 @@ struct raft {
 	 * subsystems, such as Raft.
 	 */
 	const struct vclock *vclock;
+	/**
+	 * Vclock of the candidate which the current instance is trying to vote
+	 * for right now. It is used to double-check if the instance still can
+	 * vote for the given candidate after own WAL queue was flushed.
+	 */
+	struct vclock candidate_vclock;
 	/** State machine timed event trigger. */
 	struct ev_timer timer;
 	/** The moment of the last communication with the leader. */
