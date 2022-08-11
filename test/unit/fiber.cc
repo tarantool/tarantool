@@ -29,7 +29,6 @@ noop_f(va_list ap)
 static int
 cancel_f(va_list ap)
 {
-	fiber_set_cancellable(true);
 	while (true) {
 		fiber_sleep(0.001);
 		fiber_testcancel();
@@ -67,7 +66,6 @@ static int
 cancel_dead_f(va_list ap)
 {
 	note("cancel dead has started");
-	fiber_set_cancellable(true);
 	tnt_raise(OutOfMemory, 42, "allocator", "exception");
 	return 0;
 }
@@ -318,7 +316,7 @@ fiber_flags_respect_test(void)
 	/* Fibers taken from the cache need to respect the passed flags. */
 	struct fiber_attr attr;
 	fiber_attr_create(&attr);
-	uint32_t flags = FIBER_IS_JOINABLE | FIBER_IS_CANCELLABLE;
+	uint32_t flags = FIBER_IS_JOINABLE;
 	attr.flags |= flags;
 	f = fiber_new_ex("wait_cancel", &attr, wait_cancel_f);
 	fail_unless((f->flags & flags) == flags);

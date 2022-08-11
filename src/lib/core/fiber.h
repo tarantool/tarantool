@@ -122,17 +122,10 @@ enum {
 
 enum {
 	/**
-	 * It's safe to resume (wakeup) this fiber
-	 * with a spurious wakeup if it is suspended,
-	 * e.g. to force it to check that it's been
-	 * cancelled.
-	 */
-	FIBER_IS_CANCELLABLE	= 1 << 0,
-	/**
 	 * Indicates that a fiber has been requested to end
 	 * prematurely.
 	 */
-	FIBER_IS_CANCELLED	= 1 << 1,
+	FIBER_IS_CANCELLED	= 1 << 0,
 	/**
 	 * The fiber will garbage collect automatically
 	 * when fiber function ends. The alternative
@@ -140,41 +133,41 @@ enum {
 	 * the end of this fiber and garbage collect it
 	 * with fiber_join().
 	 */
-	FIBER_IS_JOINABLE = 1 << 2,
+	FIBER_IS_JOINABLE	= 1 << 1,
 	/**
 	 * The fiber is in cord->ready list or in
 	 * a call chain created by fiber_schedule_list().
 	 * The flag is set to help fiber_wakeup() avoid
 	 * double wakeup of an already scheduled fiber.
 	 */
-	FIBER_IS_READY = 1 << 3,
+	FIBER_IS_READY		= 1 << 2,
 	/**
 	 * This flag is set when fiber function ends and before
 	 * the fiber is recycled.
 	 */
-	FIBER_IS_DEAD		= 1 << 4,
+	FIBER_IS_DEAD		= 1 << 3,
 	/**
 	 * This flag is set when fiber uses custom stack size.
 	 */
-	FIBER_CUSTOM_STACK	= 1 << 5,
+	FIBER_CUSTOM_STACK	= 1 << 4,
 	/**
 	 * The flag is set for the fiber currently being executed by the cord.
 	 */
-	FIBER_IS_RUNNING	= 1 << 6,
+	FIBER_IS_RUNNING	= 1 << 5,
 	/**
 	 * This flag is set when fiber is in the idle list
 	 * of fiber_pool.
 	 */
-	FIBER_IS_IDLE		= 1 << 7,
+	FIBER_IS_IDLE		= 1 << 6,
 	/**
 	 * This flag is set when fiber has custom max slice.
 	 */
-	FIBER_CUSTOM_SLICE	= 1 << 8,
+	FIBER_CUSTOM_SLICE	= 1 << 7,
 	/**
 	 * This flag idicates, if the fiber can be killed from the Lua world.
 	 */
-	FIBER_IS_SYSTEM         = 1 << 9,
-	FIBER_DEFAULT_FLAGS = FIBER_IS_CANCELLABLE
+	FIBER_IS_SYSTEM         = 1 << 8,
+	FIBER_DEFAULT_FLAGS	= 0
 };
 
 /** \cond public */
@@ -299,12 +292,15 @@ API_EXPORT void
 fiber_wakeup(struct fiber *f);
 
 /**
- * Cancel the subject fiber. (set FIBER_IS_CANCELLED flag)
+ * Cancel the subject fiber.
  *
- * If target fiber's flag FIBER_IS_CANCELLABLE set, then it would
- * be woken up (maybe prematurely). Then current fiber yields
- * until the target fiber is dead (or is woken up by
- * \sa fiber_wakeup).
+ * Cancellation is asynchronous. Use fiber_join() to wait for the cancellation
+ * to complete.
+ *
+ * After fiber_cancel() is called, the fiber may or may not check whether it
+ * was cancelled. If the fiber does not check it, it cannot ever be cancelled.
+ * However, as long as most of the cooperative code calls fiber_testcancel(),
+ * most of the fibers are cancellable.
  *
  * \param f fiber to be cancelled
  */
@@ -312,11 +308,9 @@ API_EXPORT void
 fiber_cancel(struct fiber *f);
 
 /**
- * Make it possible or not possible to wakeup the current
- * fiber immediately when it's cancelled.
+ * Deprecated.
  *
- * @param yesno status to set
- * @return previous state.
+ * @return true
  */
 API_EXPORT bool
 fiber_set_cancellable(bool yesno);
