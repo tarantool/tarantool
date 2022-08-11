@@ -11,7 +11,9 @@ inputs:
   chat-id:
     required: true
     description: VK Teams team chat ID
-
+  job-steps:
+    required: false
+    description: job steps
 runs:
   using: 'composite'
   steps:
@@ -30,8 +32,9 @@ runs:
       shell: bash
 
     - name: Send VK Teams message on failure
-      uses: tarantool/actions/report-job-status@master
+      uses: tarantool/actions/report-job-status@fix-unexpected-identifier
       with:
         api-url: ${{ inputs.api-url }}
         bot-token: ${{ inputs.bot-token }}
         chat-id: ${{ env.CHAT_ID }}
+        job-steps: ${{ inputs.job-steps }}
