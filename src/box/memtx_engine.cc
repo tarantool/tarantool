@@ -53,6 +53,7 @@
 #include "txn_limbo.h"
 #include "memtx_allocator.h"
 #include "index.h"
+#include "read_view.h"
 #include "memtx_tuple_compression.h"
 #include "memtx_space.h"
 
@@ -482,6 +483,40 @@ memtx_engine_create_space(struct engine *engine, struct space_def *def,
 	return memtx_space_new(memtx, def, key_list);
 }
 
+/** Engine read view implementation. */
+struct memtx_read_view {
+	/** Base class. */
+	struct engine_read_view base;
+	/**
+	 * Allocator read view that prevents tuples referenced by index read
+	 * views from being freed.
+	 */
+	memtx_allocators_read_view allocators_rv;
+};
+
+static void
+memtx_engine_read_view_free(struct engine_read_view *base)
+{
+	struct memtx_read_view *rv = (struct memtx_read_view *)base;
+	memtx_allocators_close_read_view(rv->allocators_rv);
+	free(rv);
+}
+
+/** Implementation of create_read_view engine callback. */
+static struct engine_read_view *
+memtx_engine_create_read_view(struct engine *engine)
+{
+	static const struct engine_read_view_vtab vtab = {
+		.free = memtx_engine_read_view_free,
+	};
+	(void)engine;
+	struct memtx_read_view *rv =
+		(struct memtx_read_view *)xmalloc(sizeof(*rv));
+	rv->base.vtab = &vtab;
+	rv->allocators_rv = memtx_allocators_open_read_view({});
+	return (struct engine_read_view *)rv;
+}
+
 static int
 memtx_engine_begin(struct engine *engine, struct txn *txn)
 {
@@ -651,24 +686,9 @@ checkpoint_write_tuple(struct xlog *l, uint32_t space_id, uint32_t group_id,
 	return checkpoint_write_row(l, &row);
 }
 
-struct checkpoint_entry {
-	uint32_t space_id;
-	uint32_t group_id;
-	struct index_read_view *rv;
-	struct rlist link;
-};
-
 struct checkpoint {
-	/**
-	 * List of MemTX spaces to snapshot, with consistent
-	 * read view iterators.
-	 */
-	struct rlist entries;
-	/**
-	 * Allocator read view that prevents tuples referenced by
-	 * the snapshot iterators from being freed.
-	 */
-	memtx_allocators_read_view rv;
+	/** Database read view written to the snapshot file. */
+	struct read_view rv;
 	struct cord cord;
 	bool waiting_for_snap_thread;
 	/** The vclock of the snapshot file. */
@@ -683,6 +703,29 @@ struct checkpoint {
 	bool touch;
 };
 
+/** Space filter for checkpoint. */
+static bool
+checkpoint_space_filter(struct space *space, void *arg)
+{
+	(void)arg;
+	return space_is_memtx(space) &&
+		!space_is_temporary(space) &&
+		space_index(space, 0) != NULL;
+}
+
+/**
+ * In case of checkpoint and replica join, we're only interested in tuples
+ * stored in space so we don't need to include secondary indexes into the read
+ * view. This function filters out all secondary indexes.
+ */
+static bool
+primary_index_filter(struct space *space, struct index *index, void *arg)
+{
+	(void)space;
+	(void)arg;
+	return index->def->iid == 0;
+}
+
 static struct checkpoint *
 checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 {
@@ -692,7 +735,14 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 			 "struct checkpoint");
 		return NULL;
 	}
-	rlist_create(&ckpt->entries);
+	struct read_view_opts rv_opts;
+	read_view_opts_create(&rv_opts);
+	rv_opts.filter_space = checkpoint_space_filter;
+	rv_opts.filter_index = primary_index_filter;
+	if (read_view_open(&ckpt->rv, &rv_opts) != 0) {
+		free(ckpt);
+		return NULL;
+	}
 	ckpt->waiting_for_snap_thread = false;
 	struct xlog_opts opts = xlog_opts_default;
 	opts.rate_limit = snap_io_rate_limit;
@@ -709,12 +759,7 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 static void
 checkpoint_delete(struct checkpoint *ckpt)
 {
-	struct checkpoint_entry *entry, *tmp;
-	rlist_foreach_entry_safe(entry, &ckpt->entries, link, tmp) {
-		index_read_view_delete(entry->rv);
-		free(entry);
-	}
-	memtx_allocators_close_read_view(ckpt->rv);
+	read_view_close(&ckpt->rv);
 	xdir_destroy(&ckpt->dir);
 	free(ckpt);
 }
@@ -745,35 +790,6 @@ replica_join_cancel(struct cord *replica_join_cord)
 	tt_pthread_cancel(replica_join_cord->id);
 	tt_pthread_join(replica_join_cord->id, NULL);
 }
-
-static int
-checkpoint_add_space(struct space *sp, void *data)
-{
-	if (space_is_temporary(sp))
-		return 0;
-	if (!space_is_memtx(sp))
-		return 0;
-	struct index *pk = space_index(sp, 0);
-	if (!pk)
-		return 0;
-	struct checkpoint *ckpt = (struct checkpoint *)data;
-	struct checkpoint_entry *entry =
-		(struct checkpoint_entry *)malloc(sizeof(*entry));
-	if (entry == NULL) {
-		diag_set(OutOfMemory, sizeof(*entry),
-			 "malloc", "struct checkpoint_entry");
-		return -1;
-	}
-	rlist_add_tail_entry(&ckpt->entries, entry, link);
-
-	entry->space_id = space_id(sp);
-	entry->group_id = space_group_id(sp);
-	entry->rv = index_create_read_view(pk);
-	if (entry->rv == NULL)
-		return -1;
-
-	return 0;
-};
 
 static int
 checkpoint_write_raft(struct xlog *l, const struct raft_request *req)
@@ -822,13 +838,16 @@ checkpoint_f(va_list ap)
 
 	say_info("saving snapshot `%s'", snap.filename);
 	ERROR_INJECT_SLEEP(ERRINJ_SNAP_WRITE_DELAY);
-	struct checkpoint_entry *entry;
-	rlist_foreach_entry(entry, &ckpt->entries, link) {
+	struct space_read_view *space_rv;
+	read_view_foreach_space(space_rv, &ckpt->rv) {
 		int rc;
 		uint32_t size;
 		const char *data;
+		struct index_read_view *index_rv =
+			space_read_view_index(space_rv, 0);
+		assert(index_rv != NULL);
 		struct index_read_view_iterator *it =
-			index_read_view_create_iterator(entry->rv, ITER_ALL,
+			index_read_view_create_iterator(index_rv, ITER_ALL,
 							NULL, 0);
 		if (it == NULL)
 			goto fail;
@@ -837,8 +856,8 @@ checkpoint_f(va_list ap)
 							       &size);
 			if (rc != 0 || data == NULL)
 				break;
-			rc = checkpoint_write_tuple(&snap, entry->space_id,
-						    entry->group_id,
+			rc = checkpoint_write_tuple(&snap, space_rv->id,
+						    space_rv->group_id,
 						    data, size);
 			if (rc != 0)
 				break;
@@ -874,13 +893,6 @@ memtx_engine_begin_checkpoint(struct engine *engine, bool is_scheduled)
 					   memtx->snap_io_rate_limit);
 	if (memtx->checkpoint == NULL)
 		return -1;
-
-	if (space_foreach(checkpoint_add_space, memtx->checkpoint) != 0) {
-		checkpoint_delete(memtx->checkpoint);
-		memtx->checkpoint = NULL;
-		return -1;
-	}
-	memtx->checkpoint->rv = memtx_allocators_open_read_view({});
 	return 0;
 }
 
@@ -998,54 +1010,21 @@ memtx_engine_backup(struct engine *engine, const struct vclock *vclock,
 	return cb(filename, cb_arg);
 }
 
-struct memtx_join_entry {
-	struct rlist in_ctx;
-	uint32_t space_id;
-	struct index_read_view *rv;
-};
-
 struct memtx_join_ctx {
-	/**
-	 * List of MemTX spaces to snapshot, with consistent
-	 * read view iterators.
-	 */
-	struct rlist entries;
-	/**
-	 * Allocator read view that prevents tuples referenced by
-	 * the snapshot iterators from being freed.
-	 */
-	memtx_allocators_read_view rv;
+	/** Database read view sent to the replica. */
+	struct read_view rv;
 	struct xstream *stream;
 };
 
-static int
-memtx_join_add_space(struct space *space, void *arg)
+/** Space filter for replica join. */
+static bool
+memtx_join_space_filter(struct space *space, void *arg)
 {
-	struct memtx_join_ctx *ctx = (struct memtx_join_ctx *)arg;
-	if (!space_is_memtx(space))
-		return 0;
-	if (space_is_temporary(space))
-		return 0;
-	if (space_group_id(space) == GROUP_LOCAL)
-		return 0;
-	struct index *pk = space_index(space, 0);
-	if (pk == NULL)
-		return 0;
-	struct memtx_join_entry *entry =
-		(struct memtx_join_entry *)malloc(sizeof(*entry));
-	if (entry == NULL) {
-		diag_set(OutOfMemory, sizeof(*entry),
-			 "malloc", "struct memtx_join_entry");
-		return -1;
-	}
-	entry->space_id = space_id(space);
-	entry->rv = index_create_read_view(pk);
-	if (entry->rv == NULL) {
-		free(entry);
-		return -1;
-	}
-	rlist_add_tail_entry(&ctx->entries, entry, in_ctx);
-	return 0;
+	(void)arg;
+	return space_is_memtx(space) &&
+		!space_is_temporary(space) &&
+		space_group_id(space) != GROUP_LOCAL &&
+		space_index(space, 0) != NULL;
 }
 
 static int
@@ -1059,12 +1038,14 @@ memtx_engine_prepare_join(struct engine *engine, void **arg)
 			 "malloc", "struct memtx_join_ctx");
 		return -1;
 	}
-	rlist_create(&ctx->entries);
-	if (space_foreach(memtx_join_add_space, ctx) != 0) {
+	struct read_view_opts rv_opts;
+	read_view_opts_create(&rv_opts);
+	rv_opts.filter_space = memtx_join_space_filter;
+	rv_opts.filter_index = primary_index_filter;
+	if (read_view_open(&ctx->rv, &rv_opts) != 0) {
 		free(ctx);
 		return -1;
 	}
-	ctx->rv = memtx_allocators_open_read_view({});
 	*arg = ctx;
 	return 0;
 }
@@ -1093,10 +1074,13 @@ static int
 memtx_join_f(va_list ap)
 {
 	struct memtx_join_ctx *ctx = va_arg(ap, struct memtx_join_ctx *);
-	struct memtx_join_entry *entry;
-	rlist_foreach_entry(entry, &ctx->entries, in_ctx) {
+	struct space_read_view *space_rv;
+	read_view_foreach_space(space_rv, &ctx->rv) {
+		struct index_read_view *index_rv =
+			space_read_view_index(space_rv, 0);
+		assert(index_rv != NULL);
 		struct index_read_view_iterator *it =
-			index_read_view_create_iterator(entry->rv, ITER_ALL,
+			index_read_view_create_iterator(index_rv, ITER_ALL,
 							NULL, 0);
 		if (it == NULL)
 			return -1;
@@ -1108,7 +1092,7 @@ memtx_join_f(va_list ap)
 							       &size);
 			if (rc != 0 || data == NULL)
 				break;
-			rc = memtx_join_send_tuple(ctx->stream, entry->space_id,
+			rc = memtx_join_send_tuple(ctx->stream, space_rv->id,
 						   data, size);
 			if (rc != 0)
 				break;
@@ -1148,12 +1132,7 @@ memtx_engine_complete_join(struct engine *engine, void *arg)
 {
 	(void)engine;
 	struct memtx_join_ctx *ctx = (struct memtx_join_ctx *)arg;
-	struct memtx_join_entry *entry, *next;
-	rlist_foreach_entry_safe(entry, &ctx->entries, in_ctx, next) {
-		index_read_view_delete(entry->rv);
-		free(entry);
-	}
-	memtx_allocators_close_read_view(ctx->rv);
+	read_view_close(&ctx->rv);
 	free(ctx);
 }
 
@@ -1174,6 +1153,7 @@ memtx_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 static const struct engine_vtab memtx_engine_vtab = {
 	/* .shutdown = */ memtx_engine_shutdown,
 	/* .create_space = */ memtx_engine_create_space,
+	/* .create_read_view = */ memtx_engine_create_read_view,
 	/* .prepare_join = */ memtx_engine_prepare_join,
 	/* .join = */ memtx_engine_join,
 	/* .complete_join = */ memtx_engine_complete_join,
@@ -1381,6 +1361,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 
 	memtx->base.vtab = &memtx_engine_vtab;
 	memtx->base.name = "memtx";
+	memtx->base.flags = ENGINE_SUPPORTS_READ_VIEW;
 
 	memtx->func_key_format = simple_tuple_format_new(
 		&memtx_tuple_format_vtab, &memtx->base, NULL, 0);
