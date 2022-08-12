@@ -266,6 +266,14 @@ engine_reset_stat(void)
 
 /* {{{ Virtual method stubs */
 
+struct engine_read_view *
+generic_engine_create_read_view(struct engine *engine)
+{
+	(void)engine;
+	unreachable();
+	return NULL;
+}
+
 int
 generic_engine_prepare_join(struct engine *engine, void **ctx)
 {

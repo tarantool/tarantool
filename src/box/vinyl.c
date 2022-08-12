@@ -4520,6 +4520,7 @@ static struct trigger on_replace_vinyl_deferred_delete = {
 static const struct engine_vtab vinyl_engine_vtab = {
 	/* .shutdown = */ vinyl_engine_shutdown,
 	/* .create_space = */ vinyl_engine_create_space,
+	/* .create_read_view = */ generic_engine_create_read_view,
 	/* .prepare_join = */ vinyl_engine_prepare_join,
 	/* .join = */ vinyl_engine_join,
 	/* .complete_join = */ vinyl_engine_complete_join,
