@@ -122,6 +122,7 @@ static int
 coio_on_stop(void *data)
 {
 	(void) data;
+	cord_exit(cord());
 	cord_destroy(cord());
 	free(cord());
 	return 0;
