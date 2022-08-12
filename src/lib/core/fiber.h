@@ -756,6 +756,13 @@ extern __thread struct cord *cord_ptr;
 void
 cord_create(struct cord *cord, const char *name);
 
+/**
+ * Perform all the thread-specific deinitialization. Must be called in the
+ * exiting thread.
+ */
+void
+cord_exit(struct cord *cord);
+
 void
 cord_destroy(struct cord *cord);
 
