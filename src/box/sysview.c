@@ -562,6 +562,7 @@ sysview_engine_create_space(struct engine *engine, struct space_def *def,
 static const struct engine_vtab sysview_engine_vtab = {
 	/* .shutdown = */ sysview_engine_shutdown,
 	/* .create_space = */ sysview_engine_create_space,
+	/* .create_read_view = */ generic_engine_create_read_view,
 	/* .prepare_join = */ generic_engine_prepare_join,
 	/* .join = */ generic_engine_join,
 	/* .complete_join = */ generic_engine_complete_join,

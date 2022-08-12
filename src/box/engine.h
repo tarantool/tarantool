@@ -41,6 +41,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct engine;
+struct engine_read_view;
 struct txn;
 struct txn_stmt;
 struct space;
@@ -95,6 +96,19 @@ struct engine_vtab {
 	/** Allocate a new space instance. */
 	struct space *(*create_space)(struct engine *engine,
 			struct space_def *def, struct rlist *key_list);
+	/**
+	 * Create a read view of the data stored in the engine.
+	 *
+	 * This function is supposed to do the engine-wide work necessary for
+	 * creation of a read view, e.g. disable garbage collection. An index
+	 * read view is created by index_vtab::create_read_view. The caller
+	 * must not yield between calling this function and creation of the
+	 * corresponding index read views.
+	 *
+	 * May be called only if the engine has the ENGINE_SUPPORTS_READ_VIEW
+	 * flag set.
+	 */
+	struct engine_read_view *(*create_read_view)(struct engine *engine);
 	/**
 	 * Freeze a read view to feed to a new replica.
 	 * Setup and return a context that will be used
@@ -243,6 +257,10 @@ enum {
 	 * transactions w/o throwing ER_CROSS_ENGINE_TRANSACTION.
 	 */
 	ENGINE_BYPASS_TX = 1 << 0,
+	/**
+	 * Set if the engine supports creation of a read view.
+	 */
+	ENGINE_SUPPORTS_READ_VIEW = 1 << 1,
 };
 
 struct engine {
@@ -255,6 +273,25 @@ struct engine {
 	/** Engine flags. */
 	uint32_t flags;
 	/** Used for search for engine by name. */
+	struct rlist link;
+};
+
+/** Engine read view virtual function table. */
+struct engine_read_view_vtab {
+	/** Free an engine read view instance. */
+	void
+	(*free)(struct engine_read_view *rv);
+};
+
+/**
+ * Engine read view.
+ *
+ * Must not be freed until all corresponding index read views are closed.
+ */
+struct engine_read_view {
+	/** Virtual function table. */
+	const struct engine_read_view_vtab *vtab;
+	/** Link in read_view::engines. */
 	struct rlist link;
 };
 
@@ -288,6 +325,12 @@ engine_create_space(struct engine *engine, struct space_def *def,
 		    struct rlist *key_list)
 {
 	return engine->vtab->create_space(engine, def, key_list);
+}
+
+static inline struct engine_read_view *
+engine_create_read_view(struct engine *engine)
+{
+	return engine->vtab->create_read_view(engine);
 }
 
 static inline int
@@ -331,6 +374,12 @@ static inline int
 engine_check_space_def(struct engine *engine, struct space_def *def)
 {
 	return engine->vtab->check_space_def(def);
+}
+
+static inline void
+engine_read_view_delete(struct engine_read_view *rv)
+{
+	rv->vtab->free(rv);
 }
 
 /**
@@ -412,6 +461,8 @@ engine_reset_stat(void);
 /*
  * Virtual method stubs.
  */
+struct engine_read_view *
+generic_engine_create_read_view(struct engine *engine);
 int generic_engine_prepare_join(struct engine *, void **);
 int generic_engine_join(struct engine *, void *, struct xstream *);
 void generic_engine_complete_join(struct engine *, void *);
