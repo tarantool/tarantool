@@ -1561,6 +1561,13 @@ cord_add_garbage(struct cord *cord, struct fiber *f)
 }
 
 void
+cord_exit(struct cord *cord)
+{
+	assert(cord == cord());
+	(void)cord;
+}
+
+void
 cord_destroy(struct cord *cord)
 {
 	slab_cache_set_thread(&cord->slabc);
@@ -1625,6 +1632,9 @@ void *cord_thread_func(void *p)
 	                                            CORD_ON_EXIT_WONT_RUN);
 	if (!changed)
 		handler->callback(handler->argument);
+
+	cord_exit(cord());
+
 	return res;
 }
 
@@ -1874,6 +1884,7 @@ fiber_init(int (*invoke)(fiber_func f, va_list ap))
 void
 fiber_free(void)
 {
+	cord_exit(&main_cord);
 	cord_destroy(&main_cord);
 }
 
