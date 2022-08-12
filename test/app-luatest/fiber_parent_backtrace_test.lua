@@ -28,12 +28,15 @@ g.test_fiber_parent_backtrace = function()
 
         local bt_frames_cnt
         local bt_frames_str
-        local function fiber_child()
+        local function some_lua_fn_name()
             local fiber_info = fiber.info()[fiber.self():id()]
             local bt = fiber_info.backtrace
             t.fail_if(not bt, "nil backtrace table indicates unwinding error")
             bt_frames_cnt = #bt
             bt_frames_str = yaml.encode(bt)
+        end
+        local function fiber_child()
+            some_lua_fn_name()
         end
         local function fiber_parent()
             fiber.create(fiber_child)
@@ -46,14 +49,17 @@ g.test_fiber_parent_backtrace = function()
         local bt_frames_cnt_dflt = bt_frames_cnt
         t.assert_ge(bt_frames_cnt_dflt, 1)
 
-        -- Match `coro_init` or `coro_start`.
+        -- Match C function: `coro_init` or `coro_start`
         local coro_entry_fn_pattern = "coro_%a%a%a%a%a?"
+        -- Match Lua function
+        local lua_fn_pattern = "some_lua_fn_name"
 
         fiber:parent_backtrace_enable()
         fiber_grandparent()
         local bt_frames_cnt_w_parent_bt = bt_frames_cnt
         t.assert_ge(bt_frames_cnt_w_parent_bt, bt_frames_cnt_dflt)
         local coro_entry_fn_matches = 0
+        local lua_fn_matches = 0
         for _ in string.gmatch(bt_frames_str, coro_entry_fn_pattern) do
             coro_entry_fn_matches = coro_entry_fn_matches + 1
         end
@@ -69,5 +75,9 @@ g.test_fiber_parent_backtrace = function()
             coro_entry_fn_matches = coro_entry_fn_matches + 1
         end
         t.assert_equals(coro_entry_fn_matches, 1)
+        for _ in string.gmatch(bt_frames_str, lua_fn_pattern) do
+            lua_fn_matches = lua_fn_matches + 1
+        end
+        t.assert_equals(lua_fn_matches, 1)
     end)
 end
