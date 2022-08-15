@@ -515,16 +515,11 @@ hash_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 			*data = NULL;
 			return 0;
 		}
-
-		struct tuple *tuple = *res;
-		tuple = memtx_tx_snapshot_clarify(&it->rv->cleaner, tuple);
-
-		if (tuple != NULL) {
-			*data = tuple_data_range(tuple, size);
-			*data = memtx_tuple_decompress_raw(
-				*data, *data + *size, size);
-			return *data == NULL ? -1 : 0;
-		}
+		if (memtx_prepare_read_view_tuple(*res, &it->rv->cleaner,
+						  data, size) != 0)
+			return -1;
+		if (*data != NULL)
+			return 0;
 	}
 	return 0;
 }
