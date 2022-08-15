@@ -382,7 +382,7 @@ crash_report_feedback_daemon(struct crash_info *cinfo)
 	snprintf_safe("}");
 	snprintf_safe("}");
 
-	pr_debug("crash dump: %s", head);
+	pr_debug("crash dump for feedback daemon: %s", head);
 
 	char *exec_argv[7] = {
 		[0] = tarantool_path,
