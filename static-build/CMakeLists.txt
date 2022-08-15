@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.1)
 
 # Detect system compilers for further dependencies configuring to be
 # built with these compilers. This is used to build tarantool and
@@ -259,6 +259,7 @@ ExternalProject_Add(tarantool
         ${CMAKE_TARANTOOL_ARGS}
     STEP_TARGETS build
     BUILD_COMMAND $(MAKE)
+    BUILD_ALWAYS TRUE
 )
 
 enable_testing()
