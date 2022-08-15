@@ -103,7 +103,7 @@
       </memberdef>
       <memberdef kind="define" id="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" prot="public" static="no">
         <name>PACKAGE_VERSION</name>
-        <initializer>&quot;2.11.0-entrypoint-371-g16d6e9d2e&quot;</initializer>
+        <initializer>&quot;2.11.0-entrypoint-373-gfc11ce06d&quot;</initializer>
         <briefdescription>
 <para>A string with major-minor-patch-commit-id identifier of the release, e.g. </para>
         </briefdescription>
@@ -168,7 +168,7 @@
       </memberdef>
       <memberdef kind="define" id="module_8h_1a2863d95c06ae4d073ea443a8ae48c5b6" prot="public" static="no">
         <name>BUILD_OPTIONS</name>
-        <initializer>&quot;cmake . -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_BACKTRACE=ON&quot;</initializer>
+        <initializer>&quot;cmake . -DCMAKE_INSTALL_PREFIX=/usr/local -DENABLE_BACKTRACE=TRUE&quot;</initializer>
         <briefdescription>
 <para>Command line used to run CMake. </para>
         </briefdescription>
@@ -11963,7 +11963,7 @@ In case of an error set a diag and return NULL. </para>
 <codeline lineno="63"><highlight class="normal"></highlight></codeline>
 <codeline lineno="66" refid="module_8h_1abd1dbec4fd6761084d3e0c05afe2b138" refkind="member"><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_PATCH<sp/>0</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="67"><highlight class="normal"></highlight></codeline>
-<codeline lineno="71" refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" refkind="member"><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION<sp/>&quot;2.11.0-entrypoint-371-g16d6e9d2e&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="71" refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" refkind="member"><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION<sp/>&quot;2.11.0-entrypoint-373-gfc11ce06d&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="72"><highlight class="normal"></highlight></codeline>
 <codeline lineno="77" refid="module_8h_1adb6d1259777e8f56c6260be6faed183e" refkind="member"><highlight class="preprocessor">#define<sp/>SYSCONF_DIR<sp/>&quot;etc&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="78"><highlight class="normal"></highlight></codeline>
@@ -11973,7 +11973,7 @@ In case of an error set a diag and return NULL. </para>
 <codeline lineno="82"><highlight class="normal"></highlight></codeline>
 <codeline lineno="83" refid="module_8h_1ac8c9f90a1d4b7435c509fd2020e4aa88" refkind="member"><highlight class="preprocessor">#define<sp/>BUILD_INFO<sp/>&quot;Linux-x86_64-Debug&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="84"><highlight class="normal"></highlight></codeline>
-<codeline lineno="85" refid="module_8h_1a2863d95c06ae4d073ea443a8ae48c5b6" refkind="member"><highlight class="preprocessor">#define<sp/>BUILD_OPTIONS<sp/>&quot;cmake<sp/>.<sp/>-DCMAKE_INSTALL_PREFIX=/usr/local<sp/>-DENABLE_BACKTRACE=ON&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="85" refid="module_8h_1a2863d95c06ae4d073ea443a8ae48c5b6" refkind="member"><highlight class="preprocessor">#define<sp/>BUILD_OPTIONS<sp/>&quot;cmake<sp/>.<sp/>-DCMAKE_INSTALL_PREFIX=/usr/local<sp/>-DENABLE_BACKTRACE=TRUE&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="86"><highlight class="normal"></highlight></codeline>
 <codeline lineno="87" refid="module_8h_1a835dbb7b4216a8258c588d9781a3b66b" refkind="member"><highlight class="preprocessor">#define<sp/>COMPILER_INFO<sp/>&quot;/usr/bin/cc<sp/>/usr/bin/c++&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="88"><highlight class="normal"></highlight></codeline>
