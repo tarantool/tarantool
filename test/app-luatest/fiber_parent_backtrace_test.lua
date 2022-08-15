@@ -12,8 +12,7 @@ g.before_all = function()
 
         local _, _, enable_bt = string.find(tarantool.build.options,
                                             "-DENABLE_BACKTRACE=(%a+)")
-        local bt_enabled = enable_bt == "ON" or enable_bt == "TRUE"
-        t.skip_if(not bt_enabled, "requires backtrace feature")
+        t.skip_if(enable_bt == "FALSE", "requires backtrace feature")
     end)
 end
 
