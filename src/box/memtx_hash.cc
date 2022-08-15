@@ -161,16 +161,9 @@ WRAP_ITERATOR_METHOD(hash_iterator_gt);
 #undef WRAP_ITERATOR_METHOD
 
 static int
-hash_iterator_dummy(MAYBE_UNUSED struct iterator *it, struct tuple **ret)
-{
-	*ret = NULL;
-	return 0;
-}
-
-static int
 hash_iterator_eq(struct iterator *it, struct tuple **ret)
 {
-	it->next_internal = hash_iterator_dummy;
+	it->next_internal = exhausted_iterator_next;
 	/* always returns zero. */
 	hash_iterator_ge_base(it, ret);
 	if (*ret == NULL)

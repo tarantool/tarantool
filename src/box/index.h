@@ -891,6 +891,8 @@ int
 disabled_index_replace(struct index *index, struct tuple *old_tuple,
 		       struct tuple *new_tuple, enum dup_replace_mode mode,
 		       struct tuple **result, struct tuple **successor);
+int
+exhausted_iterator_next(struct iterator *it, struct tuple **ret);
 
 #if defined(__cplusplus)
 } /* extern "C" */

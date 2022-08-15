@@ -833,4 +833,12 @@ disabled_index_replace(struct index *index, struct tuple *old_tuple,
 	return 0;
 }
 
+int
+exhausted_iterator_next(struct iterator *it, struct tuple **ret)
+{
+	(void)it;
+	*ret = NULL;
+	return 0;
+}
+
 /* }}} */

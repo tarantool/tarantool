@@ -3537,14 +3537,6 @@ vinyl_iterator_on_tx_destroy(struct trigger *trigger, void *event)
 	return 0;
 }
 
-static int
-vinyl_iterator_last(struct iterator *base, struct tuple **ret)
-{
-	(void)base;
-	*ret = NULL;
-	return 0;
-}
-
 static void
 vinyl_iterator_close(struct vinyl_iterator *it)
 {
@@ -3563,7 +3555,7 @@ vinyl_iterator_close(struct vinyl_iterator *it)
 		trigger_clear(&it->on_tx_destroy);
 	}
 	it->tx = NULL;
-	it->base.next = vinyl_iterator_last;
+	it->base.next = exhausted_iterator_next;
 }
 
 /**
@@ -3709,7 +3701,7 @@ vinyl_iterator_free(struct iterator *base)
 {
 	assert(base->free == vinyl_iterator_free);
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
-	if (base->next != vinyl_iterator_last)
+	if (base->next != exhausted_iterator_next)
 		vinyl_iterator_close(it);
 	mempool_free(it->pool, it);
 }
