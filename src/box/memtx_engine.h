@@ -50,6 +50,7 @@ struct index;
 struct fiber;
 struct tuple;
 struct tuple_format;
+struct memtx_tx_snapshot_cleaner;
 
 /**
  * Recovery state of memtx engine.
@@ -277,6 +278,24 @@ memtx_set_tuple_format_vtab(const char *allocator_name);
  */
 int
 memtx_prepare_result_tuple(struct tuple **result);
+
+/**
+ * Prepares a tuple retrieved from a consistent index read view to be returned
+ * to the user.
+ *
+ * A pointer to the raw tuple data and its size are returned in the data and
+ * size out argument. The data may be allocated from the fiber region (e.g. if
+ * the original tuple is compressed) so the caller should clean up the region
+ * after using the data. If the tuple should be skipped (e.g. it's not visible
+ * from the read view, because it was dirty when the read view was created),
+ * the data is set to NULL.
+ *
+ * Returns 0 on success. On error returns -1 and sets diag.
+ */
+int
+memtx_prepare_read_view_tuple(struct tuple *tuple,
+			      struct memtx_tx_snapshot_cleaner *cleaner,
+			      const char **data, uint32_t *size);
 
 /**
  * Common function for all memtx indexes. Get tuple from memtx @a index
