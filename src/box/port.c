@@ -36,6 +36,7 @@
 #include <small/mempool.h>
 #include <fiber.h>
 #include "errinj.h"
+#include "mpstream/mpstream.h"
 
 /**
  * The pool is used by port_c to allocate entries and to store
@@ -242,6 +243,55 @@ port_c_dump_msgpack(struct port *base, struct obuf *out)
 	return 1;
 }
 
+/** Callback to forward and error from mpstream methods. */
+static inline void
+set_encode_error(void *error_ctx)
+{
+	*(bool *)error_ctx = true;
+}
+
+/** Method get_msgpack for struct port_c. */
+static const char *
+port_c_get_msgpack(struct port *base, uint32_t *size)
+{
+	struct port_c *port = (struct port_c *)base;
+	struct region *region = &fiber()->gc;
+	size_t used = region_used(region);
+	bool is_error = false;
+	struct mpstream stream;
+	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
+		      set_encode_error, &is_error);
+	mpstream_encode_array(&stream, port->size);
+	struct port_c_entry *pe;
+	for (pe = port->first; pe != NULL; pe = pe->next) {
+		const char *data;
+		uint32_t len;
+		if (pe->mp_size == 0) {
+			data = tuple_data(pe->tuple);
+			len = tuple_bsize(pe->tuple);
+		} else {
+			data = pe->mp;
+			len = pe->mp_size;
+		}
+		mpstream_memcpy(&stream, data, len);
+	}
+	mpstream_flush(&stream);
+	if (is_error) {
+		diag_set(OutOfMemory, stream.pos - stream.buf,
+			 "mpstream_flush", "stream");
+		return NULL;
+	}
+	*size = region_used(region) - used;
+	const char *res = region_join(region, *size);
+	if (res == NULL) {
+		region_truncate(region, used);
+		diag_set(OutOfMemory, *size, "region_join", "res");
+		return NULL;
+	}
+	mp_tuple_assert(res, res + *size);
+	return res;
+}
+
 extern void
 port_c_dump_lua(struct port *port, struct lua_State *L, bool is_flat);
 
@@ -253,7 +303,7 @@ const struct port_vtab port_c_vtab = {
 	.dump_msgpack_16 = port_c_dump_msgpack_16,
 	.dump_lua = port_c_dump_lua,
 	.dump_plain = NULL,
-	.get_msgpack = NULL,
+	.get_msgpack = port_c_get_msgpack,
 	.get_vdbemem = port_c_get_vdbemem,
 	.destroy = port_c_destroy,
 };
