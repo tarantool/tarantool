@@ -138,8 +138,12 @@ static int
 on_shutdown_f(va_list ap)
 {
 	(void) ap;
-	trigger_fiber_run(&box_on_shutdown_trigger_list, NULL,
-			  on_shutdown_trigger_timeout);
+	if (trigger_fiber_run(&box_on_shutdown_trigger_list, NULL,
+			      on_shutdown_trigger_timeout) != 0) {
+		say_error("on_shutdown triggers failed");
+		diag_log();
+		diag_clear(diag_get());
+	}
 	say_logger_free();
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
