@@ -86,6 +86,14 @@ local function wal_delay_start(server, countdown)
     end
 end
 
+local function wal_delay_wait(server)
+    luatest.helpers.retrying({}, server.exec, server, function()
+        if not box.error.injection.get('ERRINJ_WAL_DELAY') then
+            error('WAL still is not blocked')
+        end
+    end)
+end
+
 local function wal_delay_end(server)
     server:exec(function()
         box.error.injection.set('ERRINJ_WAL_DELAY', false)
@@ -97,6 +105,7 @@ local function cluster_init(g)
 
     g.box_cfg = {
         election_mode = 'off',
+        election_timeout = box.NULL,
         replication_timeout = 0.1,
         replication_synchro_timeout = 5,
         replication_synchro_quorum = 1,
@@ -207,6 +216,37 @@ g_common.test_raft_leader_promote = function(g)
 
     box_cfg_update({g.server_1}, {election_mode = 'off'})
     demote(g.server_1)
+end
+
+--
+-- If a node stopped being a candidate, its box.ctl.promote() should abort right
+-- away.
+--
+g_common.test_voter_during_promote = function(g)
+    box_cfg_update({g.server_1, g.server_2}, {
+        election_mode = 'manual',
+        election_timeout = 1000,
+        replication_synchro_quorum = 2,
+    })
+    wal_delay_start(g.server_1, 0)
+    local promote_fid = promote_start(g.server_2)
+    -- Server1 hangs on new term WAL write.
+    wal_delay_wait(g.server_1)
+    luatest.assert_equals(g.server_1:election_term(),
+                          g.server_2:election_term())
+
+    -- Server2 should stop the promotion without waiting for the term outcome
+    -- because it no longer can win anyway.
+    box_cfg_update({g.server_2}, {election_mode = 'voter'})
+    wal_delay_end(g.server_1)
+    fiber_join(g.server_2, promote_fid)
+
+    -- Nobody won.
+    local function get_election_state_f()
+        return box.info.election.state
+    end
+    luatest.assert_equals(g.server_1:exec(get_election_state_f), 'follower')
+    luatest.assert_equals(g.server_2:exec(get_election_state_f), 'follower')
 end
 
 -- Promoting and demoting should work when everything is ok.
