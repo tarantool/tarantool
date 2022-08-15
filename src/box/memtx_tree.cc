@@ -349,14 +349,6 @@ tree_iterator_free(struct iterator *iterator)
 	mempool_free(it->pool, it);
 }
 
-static int
-tree_iterator_dummy(struct iterator *iterator, struct tuple **ret)
-{
-	(void)iterator;
-	*ret = NULL;
-	return 0;
-}
-
 /*
  * If the iterator's underlying tuple does not match its current tuple, it needs
  * to be repositioned.
@@ -407,7 +399,7 @@ tree_iterator_next_base(struct iterator *iterator, struct tuple **ret)
 	struct index *idx = iterator->index;
 	struct space *space = space_by_id(iterator->space_id);
 	if (*ret == NULL) {
-		iterator->next_internal = tree_iterator_dummy;
+		iterator->next_internal = exhausted_iterator_next;
 	} else {
 		struct txn *txn = in_txn();
 		bool is_multikey = iterator->index->def->key_def->is_multikey;
@@ -449,7 +441,7 @@ tree_iterator_prev_base(struct iterator *iterator, struct tuple **ret)
 	struct index *idx = iterator->index;
 	struct space *space = space_by_id(iterator->space_id);
 	if (*ret == NULL) {
-		iterator->next_internal = tree_iterator_dummy;
+		iterator->next_internal = exhausted_iterator_next;
 	} else {
 		struct txn *txn = in_txn();
 		bool is_multikey = iterator->index->def->key_def->is_multikey;
@@ -501,7 +493,7 @@ tree_iterator_next_equal_base(struct iterator *iterator, struct tuple **ret)
 				   it->key_data.hint,
 				   index->base.def->key_def) != 0) {
 		tree_iterator_set_current<USE_HINT>(it, NULL);
-		iterator->next_internal = tree_iterator_dummy;
+		iterator->next_internal = exhausted_iterator_next;
 		*ret = NULL;
 		/*
 		 * Got end of key. Store gap from the previous tuple to the
@@ -560,7 +552,7 @@ tree_iterator_prev_equal_base(struct iterator *iterator, struct tuple **ret)
 				   it->key_data.hint,
 				   index->base.def->key_def) != 0) {
 		tree_iterator_set_current<USE_HINT>(it, NULL);
-		iterator->next_internal = tree_iterator_dummy;
+		iterator->next_internal = exhausted_iterator_next;
 		*ret = NULL;
 
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
@@ -602,7 +594,8 @@ name(struct iterator *iterator, struct tuple **ret)				\
 {										\
 	do {									\
 		int rc = name##_base<USE_HINT>(iterator, ret);			\
-		if (rc != 0 || iterator->next_internal == tree_iterator_dummy)	\
+		if (rc != 0 ||							\
+		    iterator->next_internal == exhausted_iterator_next)		\
 			return rc;						\
 	} while (*ret == NULL);							\
 	return 0;								\
@@ -651,7 +644,7 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)iterator->index;
 	struct tree_iterator<USE_HINT> *it = get_tree_iterator<USE_HINT>(iterator);
-	iterator->next_internal = tree_iterator_dummy;
+	iterator->next_internal = exhausted_iterator_next;
 	memtx_tree_t<USE_HINT> *tree = &index->tree;
 	enum iterator_type type = it->type;
 	struct txn *txn = in_txn();
