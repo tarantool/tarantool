@@ -74,13 +74,27 @@ trigger_run_reverse(struct rlist *list, void *event)
 	return 0;
 }
 
-void
+int
 trigger_fiber_run(struct rlist *list, void *event, double timeout)
 {
 	struct trigger *trigger, *tmp;
 	unsigned trigger_count = 0;
 	struct region *region = &fiber()->gc;
 	RegionGuard guard(region);
+
+	/* Calculating the total number of triggers. */
+	rlist_foreach_entry(trigger, list, link)
+		trigger_count++;
+
+	size_t sz;
+	struct fiber **fibers = (struct fiber **)
+		region_alloc_array(region, struct fiber *, trigger_count, &sz);
+	if (fibers == NULL) {
+		diag_set(OutOfMemory, sz, "region",
+			 "for trigger fiber pointers");
+		return -1;
+	}
+
 	bool expired = false;
 	struct ev_timer timer;
 	ev_timer_init(&timer, trigger_fiber_run_timeout, timeout, 0);
@@ -93,21 +107,6 @@ trigger_fiber_run(struct rlist *list, void *event, double timeout)
 	 */
 	ev_timer_start(loop(), &timer);
 
-	/*
-	 * Calculating the total number of triggers.
-	 */
-	rlist_foreach_entry(trigger, list, link)
-		trigger_count++;
-
-	struct fiber **fibers = (struct fiber **)
-		region_alloc(region, trigger_count * sizeof(struct fiber *));
-	if (fibers == NULL) {
-		say_error("Failed to allocate %lu bytes in region_alloc "
-			  "for fiber", trigger_count * sizeof(struct fiber));
-		ev_timer_stop(loop(), &timer);
-		return;
-	}
-
 	unsigned current_fiber = 0;
 	rlist_foreach_entry_safe(trigger, list, link, tmp) {
 		char name[FIBER_NAME_INLINE];
@@ -119,10 +118,8 @@ trigger_fiber_run(struct rlist *list, void *event, double timeout)
 			fiber_start(fibers[current_fiber], trigger, event);
 			current_fiber++;
 		} else {
-			diag_log();
-			diag_clear(diag_get());
 			ev_timer_stop(loop(), &timer);
-			return;
+			return -1;
 		}
 	}
 
@@ -137,8 +134,9 @@ trigger_fiber_run(struct rlist *list, void *event, double timeout)
 		}
 	}
 	if (expired) {
-		say_error("on_shutdown triggers are timed out: "
-			  "not all triggers might have finished yet");
+		diag_set(TimedOut);
+		return -1;
 	}
 	ev_timer_stop(loop(), &timer);
+	return 0;
 }
