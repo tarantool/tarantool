@@ -139,7 +139,7 @@ trigger_run_reverse(struct rlist *list, void *event);
  * If timeout has expired and function immediately stops,
  * without waiting for other triggers completion.
  */
-void
+int
 trigger_fiber_run(struct rlist *list, void *event, double timeout);
 
 #if defined(__cplusplus)
