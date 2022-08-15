@@ -437,8 +437,13 @@ box_raft_try_promote_f(struct trigger *trig, void *event)
 	 */
 	if (raft->volatile_term > ctx->term)
 		goto done;
-	/* Instance does not participate in terms anymore. */
-	if (!raft->is_enabled)
+	/*
+	 * Instance does not participate in terms as a candidate anymore. Can
+	 * happen not only if the node was a temporary candidate and the term
+	 * was bumped, but also if it was reconfigured during the waiting or it
+	 * lost the connection quorum.
+	 */
+	if (!raft->is_candidate)
 		goto done;
 	/* The term ended with a leader being found. */
 	if (raft->leader != REPLICA_ID_NIL)
@@ -469,11 +474,6 @@ box_raft_try_promote(void)
 	};
 	trigger_create(&trig, box_raft_try_promote_f, &ctx, NULL);
 	raft_on_update(raft, &trig);
-	/*
-	 * XXX: it is not a good idea not to have a timeout here. If all nodes
-	 * are voters, the term might never end with any result nor bump to a
-	 * new value.
-	 */
 	while (!fiber_is_cancelled() && !ctx.is_done)
 		fiber_yield();
 	trigger_clear(&trig);
@@ -493,7 +493,9 @@ box_raft_try_promote(void)
 		diag_set(ClientError, ER_OLD_TERM, (unsigned long long)ctx.term,
 			 (unsigned long long)raft->volatile_term);
 	} else {
-		assert(!raft->is_enabled);
+		assert(!raft->is_candidate);
+		assert(box_election_mode != ELECTION_MODE_MANUAL &&
+		       box_election_mode != ELECTION_MODE_CANDIDATE);
 		diag_set(ClientError, ER_ELECTION_DISABLED);
 	}
 	raft_restore(raft);
