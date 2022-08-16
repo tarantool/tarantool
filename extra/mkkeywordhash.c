@@ -210,7 +210,7 @@ static Keyword aKeywordTable[] = {
   { "ENABLE",                 "TK_ENABLE",      false },
   { "FETCH",                  "TK_STANDARD",    true  },
   { "FLOAT",                  "TK_STANDARD",    true  },
-  { "FUNCTION",               "TK_STANDARD",    true  },
+  { "FUNCTION",               "TK_FUNCTION_KW", true  },
   { "GET",                    "TK_STANDARD",    true  },
   { "GRANT",                  "TK_STANDARD",    true  },
   { "INT",                    "TK_INT",         true  },

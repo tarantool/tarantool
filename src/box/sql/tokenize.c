@@ -570,7 +570,7 @@ sqlRunParser(Parse * pParse, const char *zSql)
 struct Expr *
 sql_expr_compile(sql *db, const char *expr, int expr_len)
 {
-	const char *outer = "SELECT ";
+	const char *outer = "FUNCTION ";
 	int len = strlen(outer) + expr_len;
 
 	struct Parse parser;
@@ -582,6 +582,7 @@ sql_expr_compile(sql *db, const char *expr, int expr_len)
 	 */
 	parser.line_pos -= strlen(outer);
 	parser.parse_only = true;
+	parser.is_expr = true;
 
 	struct Expr *expression = NULL;
 	char *stmt = (char *)region_alloc(&parser.region, len + 1);
@@ -591,8 +592,8 @@ sql_expr_compile(sql *db, const char *expr, int expr_len)
 	}
 	snprintf(stmt, len + 1, "%s%.*s", outer, expr_len, expr);
 
-	if (sqlRunParser(&parser, stmt) == 0 &&
-	    parser.parsed_ast_type == AST_TYPE_EXPR) {
+	if (sqlRunParser(&parser, stmt) == 0) {
+		assert(parser.parsed_ast_type == AST_TYPE_EXPR);
 		expression = parser.parsed_ast.expr;
 		parser.parsed_ast.expr = NULL;
 	}
