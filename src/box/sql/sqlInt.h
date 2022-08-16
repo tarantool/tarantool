@@ -368,6 +368,14 @@ char *
 sql_stmt_result_to_msgpack(struct sql_stmt *stmt, uint32_t *tuple_size,
 			   struct region *region);
 
+/**
+ * Encode SQL function result in msgpack. The result is not packed into
+ * MP_ARRAY.
+ */
+char *
+sql_stmt_func_result_to_msgpack(struct sql_stmt *stmt, uint32_t *tuple_size,
+				struct region *region);
+
 /*
  * Terminate the current execution of an SQL statement and reset
  * it back to its starting state so that it can be reused.

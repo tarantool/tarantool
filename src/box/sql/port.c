@@ -354,6 +354,12 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out)
 	return 0;
 }
 
+static const char *
+port_sql_get_msgpack(struct port *base, uint32_t *size)
+{
+	return port_c_vtab.get_msgpack(base, size);
+}
+
 static void
 port_sql_destroy(struct port *base)
 {
@@ -368,7 +374,7 @@ const struct port_vtab port_sql_vtab = {
 	.dump_msgpack_16 = NULL,
 	.dump_lua = port_sql_dump_lua,
 	.dump_plain = NULL,
-	.get_msgpack = NULL,
+	.get_msgpack = port_sql_get_msgpack,
 	.get_vdbemem = NULL,
 	.destroy = port_sql_destroy,
 };

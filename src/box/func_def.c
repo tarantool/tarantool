@@ -34,7 +34,9 @@
 #include "diag.h"
 #include "error.h"
 
-const char *func_language_strs[] = {"LUA", "C", "SQL", "SQL_BUILTIN"};
+const char *func_language_strs[] = {
+	"LUA", "C", "SQL", "SQL_BUILTIN", "SQL_EXPR"
+};
 
 const char *func_aggregate_strs[] = {"none", "group"};
 

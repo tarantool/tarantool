@@ -918,6 +918,10 @@ mem_from_mp(struct Mem *mem, const char *buf, uint32_t *len);
 void
 mem_to_mpstream(const struct Mem *var, struct mpstream *stream);
 
+/** Encode MEM as msgpack value on region. */
+char *
+mem_to_mp(const struct Mem *mem, uint32_t *size, struct region *region);
+
 /**
  * Encode array of MEMs as msgpack array on region.
  *
