@@ -552,6 +552,19 @@ struct index_read_view_vtab {
 	/** Free an index read view instance. */
 	void
 	(*free)(struct index_read_view *rv);
+	/**
+	 * Look up a tuple by a full key in a read view.
+	 *
+	 * The tuple data and size are returned in the data and size arguments.
+	 * Note, the tuple may be allocated from the fiber region so one should
+	 * call region_truncate after using the data. If the key isn't found,
+	 * the data is set to NULL.
+	 *
+	 * Returns 0 on success. On error returns -1 and sets diag.
+	 */
+	int (*get_raw)(struct index_read_view *rv,
+		       const char *key, uint32_t part_count,
+		       const char **data, uint32_t *size);
 	/** Create an index read view iterator. */
 	struct index_read_view_iterator *
 	(*create_iterator)(struct index_read_view *rv, enum iterator_type type,
@@ -835,6 +848,14 @@ index_read_view_create(struct index_read_view *rv,
 /** Free an index read view instance. */
 void
 index_read_view_delete(struct index_read_view *rv);
+
+static inline int
+index_read_view_get_raw(struct index_read_view *rv,
+			const char *key, uint32_t part_count,
+			const char **data, uint32_t *size)
+{
+	return rv->vtab->get_raw(rv, key, part_count, data, size);
+}
 
 static inline struct index_read_view_iterator *
 index_read_view_create_iterator(struct index_read_view *rv,

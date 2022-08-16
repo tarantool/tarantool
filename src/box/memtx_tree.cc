@@ -1714,6 +1714,21 @@ tree_read_view_iterator_free(struct index_read_view_iterator *iterator)
 # include "memtx_tree_read_view.cc"
 #else /* !defined(ENABLE_READ_VIEW) */
 
+template <bool USE_HINT>
+static int
+tree_read_view_get_raw(struct index_read_view *rv,
+		       const char *key, uint32_t part_count,
+		       const char **data, uint32_t *size)
+{
+	(void)rv;
+	(void)key;
+	(void)part_count;
+	(void)data;
+	(void)size;
+	unreachable();
+	return 0;
+}
+
 /** Implementation of next_raw index_read_view_iterator callback. */
 template <bool USE_HINT>
 static int
@@ -1805,6 +1820,7 @@ memtx_tree_index_create_read_view(struct index *base)
 {
 	static const struct index_read_view_vtab vtab = {
 		.free = tree_read_view_free<USE_HINT>,
+		.get_raw = tree_read_view_get_raw<USE_HINT>,
 		.create_iterator = tree_read_view_create_iterator<USE_HINT>,
 	};
 	struct memtx_tree_index<USE_HINT> *index =

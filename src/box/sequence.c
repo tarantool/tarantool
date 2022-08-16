@@ -355,6 +355,21 @@ sequence_data_iterator_free(struct index_read_view_iterator *iter)
 	free(iter);
 }
 
+static inline int
+sequence_data_read_view_get_raw(struct index_read_view *rv,
+				const char *key, uint32_t part_count,
+				const char **data, uint32_t *size)
+{
+	(void)rv;
+	(void)key;
+	(void)part_count;
+	(void)data;
+	(void)size;
+	diag_set(ClientError, ER_UNSUPPORTED,
+		 "_sequence_data read view", "get()");
+	return -1;
+}
+
 /** Implementation of create_iterator index_read_view callback. */
 static struct index_read_view_iterator *
 sequence_data_iterator_create(struct index_read_view *base,
@@ -394,6 +409,7 @@ sequence_data_read_view_create(struct index *index)
 	(void)index;
 	static const struct index_read_view_vtab vtab = {
 		.free = sequence_data_read_view_free,
+		.get_raw = sequence_data_read_view_get_raw,
 		.create_iterator = sequence_data_iterator_create,
 	};
 	struct sequence_data_read_view *rv = xmalloc(sizeof(*rv));
