@@ -376,6 +376,8 @@ struct vdbe_field_ref {
 	uint32_t data_sz;
 	/** Count of fields in tuple. */
 	uint32_t field_count;
+	/** Format that match data in field data. */
+	struct tuple_format *format;
 	/**
 	 * Bitmask of initialized slots. The fieldno == 0 slot
 	 * must be initialized in vdbe_field_ref constructor.

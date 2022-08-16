@@ -36,6 +36,7 @@
 #include "port.h"
 #include "schema.h"
 #include "session.h"
+#include "sql/func.h"
 
 /**
  * Parsed symbol and package names.
@@ -392,6 +393,9 @@ func_new(struct func_def *def)
 		break;
 	case FUNC_LANGUAGE_LUA:
 		func = func_lua_new(def);
+		break;
+	case FUNC_LANGUAGE_SQL_EXPR:
+		func = func_sql_expr_new(def);
 		break;
 	default:
 		unreachable();

@@ -36,6 +36,8 @@
  */
 #include "sqlInt.h"
 #include "mem.h"
+#include "port.h"
+#include "func.h"
 #include "vdbeInt.h"
 #include "version.h"
 #include "coll/coll.h"
@@ -47,6 +49,9 @@
 #include <unicode/ucol.h>
 #include "box/coll_id_cache.h"
 #include "box/func_cache.h"
+#include "box/execute.h"
+#include "box/session.h"
+#include "box/tuple_format.h"
 #include "box/user.h"
 #include "assoc.h"
 
@@ -2097,7 +2102,7 @@ is_upcast(int op, enum field_type a, enum field_type b)
 static inline bool
 is_castable(int op, enum field_type a, enum field_type b)
 {
-	return is_upcast(op, a, b) || op == TK_VARIABLE ||
+	return is_upcast(op, a, b) || op == TK_VARIABLE || op == TK_ID ||
 	       (sql_type_is_numeric(a) && sql_type_is_numeric(b)) ||
 	       b == FIELD_TYPE_ANY;
 }
@@ -2335,4 +2340,135 @@ func_sql_builtin_destroy(struct func *func)
 static struct func_vtab func_sql_builtin_vtab = {
 	.call = func_sql_builtin_call_stub,
 	.destroy = func_sql_builtin_destroy,
+};
+
+/** Table of methods of SQL user-defined functions. */
+static struct func_vtab func_sql_expr_vtab;
+
+/** SQL user-defined function. */
+struct func_sql_expr {
+	/** Function object base class. */
+	struct func base;
+	/** Prepared SQL statement. */
+	struct Vdbe *stmt;
+};
+
+struct func *
+func_sql_expr_new(struct func_def *def)
+{
+	struct sql *db = sql_get();
+	const char *body = def->body;
+	uint32_t body_len = body == NULL ? 0 : strlen(body);
+	struct Expr *expr = sql_expr_compile(db, body, body_len);
+	if (expr == NULL)
+		return NULL;
+
+	struct Parse parser;
+	sql_parser_create(&parser, db, default_flags);
+	struct Vdbe *v = sqlGetVdbe(&parser);
+	if (v == NULL) {
+		sql_parser_destroy(&parser);
+		sql_expr_delete(db, expr);
+		return NULL;
+	}
+	int ref_reg = ++parser.nMem;
+	sqlVdbeAddOp2(v, OP_Variable, ++parser.nVar, ref_reg);
+	parser.vdbe_field_ref_reg = ref_reg;
+
+	sqlVdbeSetNumCols(v, 1);
+	vdbe_metadata_set_col_name(v, 0, def->name);
+	vdbe_metadata_set_col_type(v, 0, field_type_strs[def->returns]);
+	int res_reg = sqlExprCodeTarget(&parser, expr, ++parser.nMem);
+	sqlVdbeAddOp2(v, OP_ResultRow, res_reg, 1);
+
+	bool is_error = parser.is_aborted;
+	sql_finish_coding(&parser);
+	sql_parser_destroy(&parser);
+	sql_expr_delete(db, expr);
+
+	if (is_error) {
+		sql_stmt_finalize((struct sql_stmt *)v);
+		return NULL;
+	}
+	struct func_sql_expr *func = xmalloc(sizeof(*func));
+	func->stmt = v;
+	func->base.vtab = &func_sql_expr_vtab;
+	return &func->base;
+}
+
+int
+func_sql_expr_call(struct func *func, struct port *args, struct port *ret)
+{
+	struct func_sql_expr *func_sql = (struct func_sql_expr *)func;
+	struct sql_stmt *stmt = (struct sql_stmt *)func_sql->stmt;
+	const char *data;
+	uint32_t mp_size;
+	struct tuple_format *format;
+	if (args->vtab == &port_c_vtab && ((struct port_c *)args)->size == 2 &&
+	    ((struct port_c *)args)->first_entry.mp_format != NULL) {
+		/*
+		 * The only case where mp_format is not NULL is when the
+		 * function is used as a CHECK constraint.
+		 */
+		struct port_c_entry *pe = ((struct port_c *)args)->first;
+		data = pe->mp;
+		mp_size = pe->mp_size;
+		format = pe->mp_format;
+	} else {
+		diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
+			 "SQL functions");
+		return -1;
+	}
+
+	struct region *region = &fiber()->gc;
+	size_t svp = region_used(region);
+	port_sql_create(ret, stmt, DQL_EXECUTE, false);
+	/*
+	 * In SQL, we can only retrieve fields that have names. There is no
+	 * point to prepare slots for nameless fields.
+	 */
+	uint32_t count = format->min_field_count;
+	struct vdbe_field_ref *ref;
+	size_t size = sizeof(ref->slots[0]) * count + sizeof(*ref);
+	ref = region_aligned_alloc(region, size, alignof(*ref));
+	vdbe_field_ref_prepare_data(ref, data, mp_size);
+	ref->format = format;
+	if (sql_bind_ptr(stmt, 1, ref) != 0)
+		goto error;
+
+	if (sql_step(stmt) != SQL_ROW)
+		goto error;
+
+	uint32_t res_size;
+	char *pos = sql_stmt_func_result_to_msgpack(stmt, &res_size, region);
+	if (pos == NULL)
+		goto error;
+	int rc = port_c_add_mp(ret, pos, pos + res_size);
+	if (rc != 0)
+		goto error;
+
+	if (sql_step(stmt) != SQL_DONE)
+		goto error;
+
+	sql_stmt_reset(stmt);
+	region_truncate(region, svp);
+	return 0;
+error:
+	sql_stmt_reset(stmt);
+	region_truncate(region, svp);
+	port_destroy(ret);
+	return -1;
+}
+
+void
+func_sql_expr_destroy(struct func *base)
+{
+	struct func_sql_expr *func = (struct func_sql_expr *)base;
+	sql_stmt_finalize((struct sql_stmt *)func->stmt);
+	free(func);
+}
+
+static struct func_vtab func_sql_expr_vtab = {
+	.call = func_sql_expr_call,
+	.destroy = func_sql_expr_destroy,
 };

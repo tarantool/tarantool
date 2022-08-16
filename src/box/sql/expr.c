@@ -3816,6 +3816,19 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			return sqlExprCodeGetColumn(pParse, col, iTab, target,
 						    pExpr->op2);
 		}
+	case TK_ID:
+		assert(pParse->vdbe_field_ref_reg > 0);
+		int reg = pParse->vdbe_field_ref_reg;
+		sqlVdbeAddOp4(v, OP_Fetch, reg, 0, target,
+			      sqlDbStrDup(pParse->db, pExpr->u.zToken),
+			      P4_DYNAMIC);
+		return target;
+	case TK_DOT:
+		assert(pParse->vdbe_field_ref_reg > 0);
+		diag_set(ClientError, ER_UNSUPPORTED, "SQL expressions",
+			 "reference to spaces");
+		pParse->is_aborted = true;
+		return target;
 	case TK_INTEGER:{
 			expr_code_int(pParse, pExpr, false, target);
 			return target;
@@ -4206,6 +4219,12 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		}
 	case TK_EXISTS:
 	case TK_SELECT:{
+			if (pParse->vdbe_field_ref_reg > 0) {
+				diag_set(ClientError, ER_UNSUPPORTED,
+					 "SQL expressions", "subselects");
+				pParse->is_aborted = true;
+				return target;
+			}
 			int nCol;
 			if (op == TK_SELECT
 			    && (nCol = pExpr->x.pSelect->pEList->nExpr) != 1) {
