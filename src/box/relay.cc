@@ -717,9 +717,14 @@ relay_reader_f(va_list ap)
 			 * been written to WAL with our current realtime
 			 * clock value, thus when it get reported back we
 			 * can compute time spent regardless of the clock
-			 * value on remote replica.
+			 * value on remote replica. Update the lag only when the
+			 * timestamp corresponds to some transaction the replica
+			 * has just applied, i.e. received vclock is bigger than
+			 * the previous one.
 			 */
-			if (xrow.tm != 0)
+			if (xrow.tm != 0 &&
+			    vclock_get(&relay->status_msg.vclock, instance_id) <
+			    vclock_get(&relay->recv_vclock, instance_id))
 				relay->txn_lag = ev_now(loop()) - xrow.tm;
 			fiber_cond_signal(&relay->reader_cond);
 		}
