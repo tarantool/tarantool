@@ -553,7 +553,7 @@ int tarantoolsqlEphemeralClearTable(BtCursor *pCur)
 
 	struct iterator *it = index_create_iterator(*pCur->space->index,
 						    ITER_ALL, nil_key,
-						    0 /* part_count */);
+						    0 /* part_count */, NULL);
 	if (it == NULL) {
 		pCur->eState = CURSOR_INVALID;
 		return -1;
@@ -593,7 +593,8 @@ int tarantoolsqlClearTable(struct space *space, uint32_t *tuple_count)
 	request.type = IPROTO_DELETE;
 	request.space_id = space->def->id;
 	struct index *pk = space_index(space, 0 /* PK */);
-	struct iterator *iter = index_create_iterator(pk, ITER_ALL, nil_key, 0);
+	struct iterator *iter = index_create_iterator(pk, ITER_ALL, nil_key, 0,
+						      NULL);
 	if (iter == NULL)
 		return -1;
 	while (iterator_next(iter, &tuple) == 0 && tuple != NULL) {
@@ -930,7 +931,7 @@ cursor_seek(BtCursor *pCur, int *pRes)
 		return -1;
 	struct iterator *it =
 		index_create_iterator(pCur->index, pCur->iter_type, key,
-				      part_count);
+				      part_count, NULL);
 	if (it == NULL) {
 		if (txn != NULL)
 			txn_rollback_stmt(txn);

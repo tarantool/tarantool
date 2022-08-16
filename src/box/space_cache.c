@@ -93,7 +93,7 @@ space_foreach(int (*func)(struct space *sp, void *udata), void *udata)
 	struct index *pk = space ? space_index(space, 0) : NULL;
 	if (pk) {
 		struct iterator *it = index_create_iterator(pk, ITER_GE,
-							    key, 1);
+							    key, 1, NULL);
 		if (it == NULL)
 			return -1;
 		int rc;

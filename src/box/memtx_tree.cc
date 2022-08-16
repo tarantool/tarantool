@@ -1410,7 +1410,8 @@ end:
 template <bool USE_HINT>
 static struct iterator *
 memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
-				 const char *key, uint32_t part_count)
+				 const char *key, uint32_t part_count,
+				 const char *after)
 {
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
@@ -1421,6 +1422,10 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 	if (type > ITER_GT) {
 		diag_set(UnsupportedIndexFeature, base->def,
 			 "requested iterator type");
+		return NULL;
+	}
+	if (unlikely(after != NULL)) {
+		diag_set(UnsupportedIndexFeature, base->def, "pagination");
 		return NULL;
 	}
 

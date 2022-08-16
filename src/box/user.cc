@@ -349,7 +349,7 @@ user_reload_privs(struct user *user)
 		mp_encode_uint(key, user->def->uid);
 
 		struct iterator *it = index_create_iterator(index, ITER_EQ,
-							       key, 1);
+							       key, 1, NULL);
 		if (it == NULL)
 			return -1;
 		IteratorGuard iter_guard(it);

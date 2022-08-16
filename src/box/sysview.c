@@ -110,10 +110,15 @@ sysview_index_destroy(struct index *index)
 
 static struct iterator *
 sysview_index_create_iterator(struct index *base, enum iterator_type type,
-			      const char *key, uint32_t part_count)
+			      const char *key, uint32_t part_count,
+			      const char *after)
 {
 	struct sysview_index *index = (struct sysview_index *)base;
 	struct sysview_engine *sysview = (struct sysview_engine *)base->engine;
+	if (unlikely(after != NULL)) {
+		diag_set(UnsupportedIndexFeature, base->def, "pagination");
+		return NULL;
+	}
 
 	struct space *source = space_cache_find(index->source_space_id);
 	if (source == NULL)
@@ -140,7 +145,7 @@ sysview_index_create_iterator(struct index *base, enum iterator_type type,
 	it->base.next = sysview_iterator_next;
 	it->base.free = sysview_iterator_free;
 
-	it->source = index_create_iterator(pk, type, key, part_count);
+	it->source = index_create_iterator(pk, type, key, part_count, after);
 	if (it->source == NULL) {
 		mempool_free(&sysview->iterator_pool, it);
 		return NULL;

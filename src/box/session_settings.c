@@ -190,10 +190,14 @@ session_settings_index_destroy(struct index *index)
 static struct iterator *
 session_settings_index_create_iterator(struct index *base,
 				       enum iterator_type type, const char *key,
-				       uint32_t part_count)
+				       uint32_t part_count, const char *after)
 {
 	struct session_settings_index *index =
 		(struct session_settings_index *)base;
+	if (unlikely(after != NULL)) {
+		diag_set(UnsupportedIndexFeature, base->def, "pagination");
+		return NULL;
+	}
 	char *decoded_key = NULL;
 	if (part_count > 0) {
 		assert(part_count == 1);

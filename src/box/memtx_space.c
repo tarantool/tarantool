@@ -975,7 +975,8 @@ memtx_space_check_format(struct space *space, struct tuple_format *format)
 	if (index_size(pk) == 0)
 		return 0;
 
-	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
+	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0,
+						    NULL);
 	if (it == NULL)
 		return -1;
 
@@ -1226,7 +1227,8 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 	}
 
 	/* Now deal with any kind of add index during normal operation. */
-	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
+	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0,
+						    NULL);
 	if (it == NULL)
 		return -1;
 	/*

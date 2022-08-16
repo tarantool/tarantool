@@ -168,7 +168,8 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 		return -1;
 	}
 	mp_encode_str(key, name, len);
-	struct iterator *it = index_create_iterator(index, ITER_EQ, key, 1);
+	struct iterator *it = index_create_iterator(index, ITER_EQ, key, 1,
+						    NULL);
 	if (it == NULL) {
 		region_truncate(region, used);
 		return -1;
@@ -379,7 +380,8 @@ schema_find_grants(const char *type, uint32_t id, bool *out)
 	char key[GRANT_NAME_MAX + 10];
 	assert(strlen(type) <= GRANT_NAME_MAX);
 	mp_encode_uint(mp_encode_str(key, type, strlen(type)), id);
-	struct iterator *it = index_create_iterator(index, ITER_EQ, key, 2);
+	struct iterator *it = index_create_iterator(index, ITER_EQ, key, 2,
+						    NULL);
 	if (it == NULL)
 		return -1;
 	IteratorGuard iter_guard(it);

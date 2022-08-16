@@ -2533,7 +2533,7 @@ box_select(uint32_t space_id, uint32_t index_id,
 		return -1;
 
 	struct iterator *it = index_create_iterator(index, type,
-						    key, part_count);
+						    key, part_count, NULL);
 	if (it == NULL) {
 		txn_rollback_stmt(txn);
 		return -1;

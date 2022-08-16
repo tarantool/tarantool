@@ -494,8 +494,8 @@ struct index_vtab {
 		       struct tuple **result, struct tuple **successor);
 	/** Create an index iterator. */
 	struct iterator *(*create_iterator)(struct index *index,
-			enum iterator_type type,
-			const char *key, uint32_t part_count);
+			enum iterator_type type, const char *key,
+			uint32_t part_count, const char *after);
 	/** Create an index read view. */
 	struct index_read_view *(*create_read_view)(struct index *index);
 	/** Introspection (index:stat()) */
@@ -768,9 +768,10 @@ index_replace(struct index *index, struct tuple *old_tuple,
 
 static inline struct iterator *
 index_create_iterator(struct index *index, enum iterator_type type,
-		      const char *key, uint32_t part_count)
+		      const char *key, uint32_t part_count, const char *after)
 {
-	return index->vtab->create_iterator(index, type, key, part_count);
+	return index->vtab->create_iterator(index, type, key, part_count,
+					    after);
 }
 
 static inline struct index_read_view *
@@ -882,7 +883,8 @@ void generic_index_begin_build(struct index *);
 int generic_index_reserve(struct index *, uint32_t);
 struct iterator *
 generic_index_create_iterator(struct index *base, enum iterator_type type,
-			      const char *key, uint32_t part_count);
+			      const char *key, uint32_t part_count,
+			      const char *after);
 int generic_index_build_next(struct index *, struct tuple *);
 void generic_index_end_build(struct index *);
 int

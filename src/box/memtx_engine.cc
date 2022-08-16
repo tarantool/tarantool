@@ -127,7 +127,8 @@ memtx_build_secondary_index(struct index *index, struct index *pk)
 			 index->def->name);
 	}
 
-	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0);
+	struct iterator *it = index_create_iterator(pk, ITER_ALL, NULL, 0,
+						    NULL);
 	if (it == NULL)
 		return -1;
 
