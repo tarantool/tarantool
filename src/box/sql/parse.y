@@ -458,10 +458,13 @@ cmd ::= createkw(X) VIEW ifnotexists(E) nm(Y) eidlist_opt(C)
 //
 cmd ::= select(X).  {
   SelectDest dest = {SRT_Output, 0, 0, 0, 0, 0, 0};
-  if(!pParse->parse_only)
-          sqlSelect(pParse, X, &dest);
-  else
-          sql_expr_extract_select(pParse, X);
+  if(pParse->parse_only) {
+    diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+             "Failed to parse SQL expression");
+    pParse->is_aborted = true;
+    return;
+  }
+  sqlSelect(pParse, X, &dest);
   sql_select_delete(pParse->db, X);
 }
 
@@ -1610,6 +1613,16 @@ cmd ::= PRAGMA nm(X) LP nm(Y) RP.         {
 }
 cmd ::= PRAGMA nm(X) LP nm(Z) DOT nm(Y) RP.  {
     sqlPragma(pParse,&X,&Y,&Z);
+}
+cmd ::= FUNCTION_KW(T) expr(E). {
+  if (!pParse->is_expr) {
+    diag_set(ClientError, ER_SQL_SYNTAX_NEAR_TOKEN, pParse->line_count, T.n,
+             T.z);
+    pParse->is_aborted = true;
+    return;
+  }
+  pParse->parsed_ast_type = AST_TYPE_EXPR;
+  pParse->parsed_ast.expr = sqlExprDup(pParse->db, E.pExpr, 0);
 }
 //////////////////////////// The CREATE TRIGGER command /////////////////////
 

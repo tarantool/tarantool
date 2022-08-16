@@ -2090,6 +2090,8 @@ struct Parse {
 	bool initiateTTrans;	/* Initiate Tarantool transaction */
 	/** If set - do not emit byte code at all, just parse.  */
 	bool parse_only;
+	/** If true, then parsed_ast_type should be EXPR after parsing. */
+	bool is_expr;
 	/** Type of parsed_ast member. */
 	enum ast_type parsed_ast_type;
 	/** SQL options which were used to compile this VDBE. */
