@@ -326,3 +326,6 @@ target_link_libraries(tt_sigaction.test core unit pthread)
 
 add_executable(string.test string.c core_test_utils.c)
 target_link_libraries(string.test core unit)
+
+add_executable(position.test position.c box_test_utils.c)
+target_link_libraries(position.test box unit)

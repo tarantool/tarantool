@@ -1,0 +1,14 @@
+1..9
+	*** simple_check ***
+ok 1 - Position must be unpacked
+ok 2 - Keys must match
+ok 3 - Invalid position must not be unpacked
+ok 4 - Invalid position must not be unpacked
+	*** simple_check: done ***
+	*** unpack_invalid_check ***
+ok 5 - Empty position must not be packed
+ok 6 - Position which is not MP_BIN must not be unpacked
+ok 7 - Position which is not MP_MAP must not be unpacked
+ok 8 - Position with invalid map key must not be unpacked
+ok 9 - Position with key that isn't array must not be unpacked
+	*** unpack_invalid_check: done ***
