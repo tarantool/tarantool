@@ -1971,18 +1971,27 @@ op_column_out:
  * Interpret data P1 points at as an initialized vdbe_field_ref
  * object.
  *
- * Fetch the P2-th column from its tuple. The value extracted
- * is stored in register P3. If the column contains fewer than
- * P2 fields, then extract a NULL.
+ * If P4 is not a field name, extract the P2th field from the tuple. Otherwise,
+ * get the field with the given name. The retrieved value is stored in
+ * register P3.
  */
 case OP_Fetch: {
-	struct vdbe_field_ref *field_ref =
-		(struct vdbe_field_ref *) p->aMem[pOp->p1].u.p;
-	uint32_t field_idx = pOp->p2;
-	struct Mem *dest_mem = vdbe_prepare_null_out(p, pOp->p3);
-	if (vdbe_field_ref_fetch(field_ref, field_idx, dest_mem) != 0)
+	struct vdbe_field_ref *ref = p->aMem[pOp->p1].u.p;
+	uint32_t id = pOp->p2;
+	if (pOp->p4type == P4_DYNAMIC) {
+		const char *name = pOp->p4.z;
+		uint32_t len = strlen(name);
+		uint32_t hash = field_name_hash(name, len);
+		struct tuple_dictionary *dict = ref->format->dict;
+		if (tuple_fieldno_by_name(dict, name, len, hash, &id) != 0) {
+			diag_set(ClientError, ER_SQL_CANT_RESOLVE_FIELD, name);
+			goto abort_due_to_error;
+		}
+	}
+	struct Mem *res = vdbe_prepare_null_out(p, pOp->p3);
+	if (vdbe_field_ref_fetch(ref, id, res) != 0)
 		goto abort_due_to_error;
-	REGISTER_TRACE(p, pOp->p3, dest_mem);
+	REGISTER_TRACE(p, pOp->p3, res);
 	break;
 }
 

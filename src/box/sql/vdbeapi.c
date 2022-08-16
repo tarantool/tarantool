@@ -216,6 +216,15 @@ sql_stmt_result_to_msgpack(struct sql_stmt *stmt, uint32_t *tuple_size,
 				region);
 }
 
+char *
+sql_stmt_func_result_to_msgpack(struct sql_stmt *stmt, uint32_t *size,
+				struct region *region)
+{
+	struct Vdbe *vdbe = (struct Vdbe *)stmt;
+	assert(vdbe->nResColumn == 1);
+	return mem_to_mp(vdbe->pResultSet, size, region);
+}
+
 /*
  * Return the name of the Nth column of the result set returned by SQL
  * statement pStmt.

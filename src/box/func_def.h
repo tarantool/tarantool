@@ -48,6 +48,7 @@ enum func_language {
 	FUNC_LANGUAGE_C,
 	FUNC_LANGUAGE_SQL,
 	FUNC_LANGUAGE_SQL_BUILTIN,
+	FUNC_LANGUAGE_SQL_EXPR,
 	func_language_MAX,
 };
 

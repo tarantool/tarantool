@@ -3256,6 +3256,32 @@ mem_to_mpstream(const struct Mem *var, struct mpstream *stream)
 }
 
 char *
+mem_to_mp(const struct Mem *mem, uint32_t *size, struct region *region)
+{
+	size_t used = region_used(region);
+	bool is_error = false;
+	struct mpstream stream;
+	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
+		      set_encode_error, &is_error);
+	mem_to_mpstream(mem, &stream);
+	mpstream_flush(&stream);
+	if (is_error) {
+		region_truncate(region, used);
+		diag_set(OutOfMemory, stream.pos - stream.buf,
+			 "mpstream_flush", "stream");
+		return NULL;
+	}
+	*size = region_used(region) - used;
+	char *data = region_join(region, *size);
+	if (data == NULL) {
+		region_truncate(region, used);
+		diag_set(OutOfMemory, *size, "region_join", "data");
+		return NULL;
+	}
+	return data;
+}
+
+char *
 mem_encode_array(const struct Mem *mems, uint32_t count, uint32_t *size,
 		 struct region *region)
 {
