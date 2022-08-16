@@ -61,6 +61,10 @@
 #define MH_INCREMENTAL_RESIZE 1
 #endif
 
+#ifndef MH_FAST_MOD
+#define MH_FAST_MOD 1
+#endif /* MH_FAST_MOD */
+
 #include <assert.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -75,6 +79,27 @@
 
 #define mh_unlikely(x)  __builtin_expect((x),0)
 
+/* Modular multiplicative inverse computation. */
+#define mh_mmi(p) (UINT64_C(0xFFFFFFFFFFFFFFFF) / (p) + 1)
+
+#if MH_FAST_MOD && __SIZEOF_INT128__
+#define mh_mul_u64_u32(u64, u32) \
+	({ (uint32_t)(((__uint128_t)(u64) * (u32)) >> 64); })
+#define mh_mod(n, mmi, d) mh_mul_u64_u32((n) * (mmi), (d))
+#define mh_mod_const(n, d) mh_mul_u64_u32((n) * mh_mmi(d), (d))
+#define mh_mod_prime(n, p) \
+	mh_mod((n), __ac_primes_mmi_list[(p)], __ac_prime_list[(p)])
+#define mh_mod_prime_minus_one(n, p) \
+	mh_mod((n), __ac_primes_minus_one_mmi_list[(p)], \
+	       __ac_primes_minus_one_list[(p)])
+#else /* MH_FAST_MOD && __SIZEOF_INT128__ */
+#define mh_mod(n, mmi, d) ({ (n) % (d); })
+#define mh_mod_const(n, d) mh_mod((n), 0, (d))
+#define mh_mod_prime(n, p) mh_mod((n), 0, __ac_prime_list[(p)])
+#define mh_mod_prime_minus_one(n, p) \
+	mh_mod((n), 0, __ac_primes_minus_one_list[(p)])
+#endif /* MH_FAST_MOD */
+
 #ifndef MH_TYPEDEFS
 #define MH_TYPEDEFS 1
 typedef uint32_t mh_int_t;
@@ -82,6 +107,45 @@ typedef uint32_t mh_int_t;
 
 #ifndef MH_HEADER
 #define MH_HEADER
+
+#ifndef __ac_HASH_PRIME_SIZE
+#define __ac_HASH_PRIME_SIZE 31
+#define PRIMES_LIST(_) \
+	_(3ul),		 _(11ul),	  _(23ul),		_(53ul),\
+	_(97ul),	 _(193ul),	  _(389ul),		_(769ul),\
+	_(1543ul),	 _(3079ul),	  _(6151ul),		_(12289ul),\
+	_(24593ul),	 _(49157ul),	  _(98317ul),		_(196613ul),\
+	_(393241ul),	 _(786433ul),	  _(1572869ul),		_(3145739ul),\
+	_(6291469ul),	 _(12582917ul),	  _(25165843ul),	_(50331653ul),\
+	_(100663319ul),	 _(201326611ul),  _(402653189ul),	_(805306457ul),\
+	_(1610612741ul), _(3221225473ul), _(4294967291ul)
+#define PRIME(p) (p)
+static const mh_int_t __ac_prime_list[__ac_HASH_PRIME_SIZE] = {
+	PRIMES_LIST(PRIME)
+};
+
+#define PRIME_MINUS_ONE(p) ((p) - 1)
+static const mh_int_t __ac_primes_minus_one_list[__ac_HASH_PRIME_SIZE] = {
+	PRIMES_LIST(PRIME_MINUS_ONE)
+};
+
+#undef PRIME_MINUS_ONE
+#undef PRIME
+#if MH_FAST_MOD
+static const uint64_t __ac_primes_mmi_list[__ac_HASH_PRIME_SIZE] = {
+	PRIMES_LIST(mh_mmi)
+};
+
+#define PRIME_MINUS_ONE_MMI(p) mh_mmi((p) - 1)
+static const uint64_t __ac_primes_minus_one_mmi_list[__ac_HASH_PRIME_SIZE] = {
+	PRIMES_LIST(PRIME_MINUS_ONE_MMI)
+};
+
+#undef PRIME_MINUS_ONE_MMI
+#endif /* MH_FAST_MOD */
+#undef PRIMES_LIST
+#undef PRIMES_MINUS_ONE_LIST
+#endif /* __ac_HASH_PRIME_SIZE */
 
 #ifndef mh_bytemap
 #define mh_bytemap 0
@@ -94,7 +158,6 @@ struct _mh(t) {
 #else
 	uint8_t *b;
 #endif
-	mh_int_t n_buckets;
 	mh_int_t n_dirty;
 	mh_int_t size;
 	mh_int_t upper_bound;
@@ -118,7 +181,7 @@ struct _mh(t) {
 #else
 #define mh_exist(h, i)		({ h->b[i] & 0x7f; })
 #define mh_dirty(h, i)		({ h->b[i] & 0x80; })
-#define mh_gethk(hash)		({ (hash) % 127 + 1; })
+#define mh_gethk(hash)		({ mh_mod_const(hash, 127) + 1; })
 #define mh_mayeq(h, i, hk)	({ mh_exist(h, i) == hk; })
 
 #define mh_setfree(h, i)	({ h->b[i] &= 0x80; })
@@ -128,9 +191,9 @@ struct _mh(t) {
 
 #define mh_node(h, i)		((const mh_node_t *) &((h)->p[(i)]))
 #define mh_size(h)		({ (h)->size;		})
-#define mh_capacity(h)		({ (h)->n_buckets;	})
+#define mh_capacity(h)		({ __ac_prime_list[(h)->prime]; })
 #define mh_begin(h)		({ 0;			})
-#define mh_end(h)		({ (h)->n_buckets;	})
+#define mh_end(h)		({ __ac_prime_list[(h)->prime]; })
 
 #define mh_first(h) ({						\
 	mh_int_t i;						\
@@ -199,17 +262,17 @@ _mh(find)(struct _mh(t) *h, mh_key_t key, mh_arg_t arg)
 
 	mh_int_t k = mh_hash_key(key, arg);
 	uint8_t hk = mh_gethk(k); (void)hk;
-	mh_int_t i = k % h->n_buckets;
-	mh_int_t inc = 1 + k % (h->n_buckets - 1);
+	mh_int_t i = mh_mod_prime(k, h->prime);
+	mh_int_t inc = 1 + mh_mod_prime_minus_one(k, h->prime);
 	for (;;) {
 		if ((mh_mayeq(h, i, hk) &&
 		    !mh_cmp_key(key, mh_node(h, i), arg)))
 			return i;
 
 		if (!mh_dirty(h, i))
-			return h->n_buckets;
+			return mh_end(h);
 
-		i = _mh(next_slot)(i, inc, h->n_buckets);
+		i = _mh(next_slot)(i, inc, mh_capacity(h));
 	}
 }
 #endif
@@ -222,23 +285,23 @@ _mh(get)(struct _mh(t) *h, const mh_node_t *node,
 
 	mh_int_t k = mh_hash(node, arg);
 	uint8_t hk = mh_gethk(k); (void)hk;
-	mh_int_t i = k % h->n_buckets;
-	mh_int_t inc = 1 + k % (h->n_buckets - 1);
+	mh_int_t i = mh_mod_prime(k, h->prime);
+	mh_int_t inc = 1 + mh_mod_prime_minus_one(k, h->prime);
 	for (;;) {
 		if ((mh_mayeq(h, i, hk) && !mh_cmp(node, mh_node(h, i), arg)))
 			return i;
 
 		if (!mh_dirty(h, i))
-			return h->n_buckets;
+			return mh_end(h);
 
-		i = _mh(next_slot)(i, inc, h->n_buckets);
+		i = _mh(next_slot)(i, inc, mh_capacity(h));
 	}
 }
 
 static inline mh_int_t
 _mh(random)(struct _mh(t) *h, mh_int_t rnd)
 {
-	mh_int_t res = mh_next(h, rnd % mh_end(h));
+	mh_int_t res = mh_next(h, mh_mod_prime(rnd, h->prime));
 	if (res != mh_end(h))
 		return res;
 	return mh_first(h);
@@ -252,8 +315,9 @@ _mh(put_slot)(struct _mh(t) *h, const mh_node_t *node, int *exist,
 
 	mh_int_t k = mh_hash(node, arg); /* hash key */
 	uint8_t hk = mh_gethk(k); (void)hk;
-	mh_int_t i = k % h->n_buckets; /* offset in the hash table. */
-	mh_int_t inc = 1 + k % (h->n_buckets - 1); /* overflow chain increment. */
+	mh_int_t i = mh_mod_prime(k, h->prime); /* offset in the hash table. */
+	/* overflow chain increment. */
+	mh_int_t inc = 1 + mh_mod_prime_minus_one(k, h->prime);
 
 	*exist = 1;
 	/* Skip through all collisions. */
@@ -267,7 +331,7 @@ _mh(put_slot)(struct _mh(t) *h, const mh_node_t *node, int *exist,
 		 * links with collision chains of other keys.
 		 */
 		mh_setdirty(h, i);
-		i = _mh(next_slot)(i, inc, h->n_buckets);
+		i = _mh(next_slot)(i, inc, mh_capacity(h));
 	}
 	/*
 	 * Found an unused, but possibly dirty slot. Use it.
@@ -279,7 +343,7 @@ _mh(put_slot)(struct _mh(t) *h, const mh_node_t *node, int *exist,
 	 */
 	mh_int_t save_i = i;
 	while (mh_dirty(h, i)) {
-		i = _mh(next_slot)(i, inc, h->n_buckets);
+		i = _mh(next_slot)(i, inc, mh_capacity(h));
 
 		if (mh_mayeq(h, i, hk) && !mh_cmp(mh_node(h, i), node, arg))
 			return i;               /* Found a duplicate. */
@@ -308,22 +372,21 @@ _mh(put)(struct _mh(t) *h, const mh_node_t *node, mh_node_t **ret,
 	mh_int_t x = mh_end(h);
 	int exist;
 
-	assert(h->size < h->n_buckets);
+	assert(h->size < mh_capacity(h));
 
 #if MH_INCREMENTAL_RESIZE
 	if (mh_unlikely(h->resize_position > 0))
 		_mh(resize)(h, arg);
 	else if (mh_unlikely(h->n_dirty >= h->upper_bound)) {
-		_mh(start_resize)(h, h->n_buckets + 1, 0, arg);
+		_mh(start_resize)(h, mh_capacity(h) + 1, 0, arg);
 	}
 	if (h->resize_position)
 		_mh(put)(h->shadow, node, NULL, arg);
 #else
 	if (mh_unlikely(h->n_dirty >= h->upper_bound)) {
-		_mh(start_resize)(h, h->n_buckets + 1, h->size, arg);
+		_mh(start_resize)(h, mh_capacity(h) + 1, h->size, arg);
 	}
 #endif
-
 	x = put_slot(h, node, &exist, arg);
 
 	if (ret) {
@@ -340,7 +403,7 @@ static inline void
 _mh(del)(struct _mh(t) *h, mh_int_t x,
 	 mh_arg_t arg)
 {
-	if (x != h->n_buckets && mh_exist(h, x)) {
+	if (x != mh_end(h) && mh_exist(h, x)) {
 		mh_setfree(h, x);
 		h->size--;
 		if (!mh_dirty(h, x))
@@ -364,20 +427,6 @@ _mh(remove)(struct _mh(t) *h, const mh_node_t *node,
 
 #ifdef MH_SOURCE
 
-#ifndef __ac_HASH_PRIME_SIZE
-#define __ac_HASH_PRIME_SIZE 31
-static const mh_int_t __ac_prime_list[__ac_HASH_PRIME_SIZE] = {
-	3ul,		11ul,		23ul,		53ul,
-	97ul,		193ul,		389ul,		769ul,
-	1543ul,		3079ul,		6151ul,		12289ul,
-	24593ul,	49157ul,	98317ul,	196613ul,
-	393241ul,	786433ul,	1572869ul,	3145739ul,
-	6291469ul,	12582917ul,	25165843ul,	50331653ul,
-	100663319ul,	201326611ul,	402653189ul,	805306457ul,
-	1610612741ul,	3221225473ul,	4294967291ul
-};
-#endif /* __ac_HASH_PRIME_SIZE */
-
 NOINLINE void
 _mh(del_resize)(struct _mh(t) *h, mh_int_t x,
 		mh_arg_t arg)
@@ -395,14 +444,13 @@ _mh(new)()
 	struct _mh(t) *h = (struct _mh(t) *)xcalloc(1, sizeof(*h));
 	h->shadow = (struct _mh(t) *)xcalloc(1, sizeof(*h));
 	h->prime = 0;
-	h->n_buckets = __ac_prime_list[h->prime];
-	h->p = (mh_node_t *)xcalloc(h->n_buckets, sizeof(mh_node_t));
+	h->p = (mh_node_t *)xcalloc(mh_capacity(h), sizeof(mh_node_t));
 #if !mh_bytemap
-	h->b = (uint32_t *)xcalloc(h->n_buckets / 16 + 1, sizeof(uint32_t));
+	h->b = (uint32_t *)xcalloc(mh_capacity(h) / 16 + 1, sizeof(uint32_t));
 #else
-	h->b = (uint8_t *)xcalloc(h->n_buckets, sizeof(uint8_t));
+	h->b = (uint8_t *)xcalloc(mh_capacity(h), sizeof(uint8_t));
 #endif
-	h->upper_bound = h->n_buckets * MH_DENSITY;
+	h->upper_bound = mh_capacity(h) * MH_DENSITY;
 	return h;
 }
 
@@ -424,11 +472,10 @@ _mh(clear)(struct _mh(t) *h)
 	free(h->p);
 	free(h->b);
 	h->prime = 0;
-	h->n_buckets = n_buckets;
 	h->p = p;
 	h->b = b;
 	h->size = 0;
-	h->upper_bound = h->n_buckets * MH_DENSITY;
+	h->upper_bound = mh_capacity(h) * MH_DENSITY;
 }
 
 void
@@ -451,19 +498,19 @@ _mh(memsize)(struct _mh(t) *h)
 {
     size_t sz = 2 * sizeof(struct _mh(t));
 
-    sz += h->n_buckets * sizeof(mh_node_t);
+    sz += mh_capacity(h) * sizeof(mh_node_t);
 #if !mh_bytemap
-    sz += (h->n_buckets / 16 + 1) * sizeof(uint32_t);
+    sz += (mh_capacity(h) / 16 + 1) * sizeof(uint32_t);
 #else
-    sz += h->n_buckets;
+    sz += mh_capacity(h);
 #endif
     if (h->resize_position) {
 	    h = h->shadow;
-	    sz += h->n_buckets * sizeof(mh_node_t);
+	    sz += mh_capacity(h) * sizeof(mh_node_t);
 #if !mh_bytemap
-	    sz += (h->n_buckets / 16 + 1) * sizeof(uint32_t);
+	    sz += (mh_capacity(h) / 16 + 1) * sizeof(uint32_t);
 #else
-	    sz += h->n_buckets;
+	    sz += mh_capacity(h);
 #endif
     }
     return sz;
@@ -477,7 +524,7 @@ _mh(resize)(struct _mh(t) *h, mh_arg_t arg)
 #if MH_INCREMENTAL_RESIZE
 	mh_int_t  batch = h->batch;
 #endif
-	for (mh_int_t i = h->resize_position; i < h->n_buckets; i++) {
+	for (mh_int_t i = h->resize_position; i < mh_end(h); i++) {
 #if MH_INCREMENTAL_RESIZE
 		if (batch-- == 0) {
 			h->resize_position = i;
@@ -506,7 +553,7 @@ _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 		/* resize has already been started */
 		return;
 	}
-	if (buckets < h->n_buckets) {
+	if (buckets < mh_capacity(h)) {
 		/* hash size is already greater than requested */
 		return;
 	}
@@ -516,7 +563,7 @@ _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 			break;
 		new_prime += 1;
 	}
-	mh_int_t new_batch = batch > 0 ? batch : h->n_buckets / (256 * 1024);
+	mh_int_t new_batch = batch > 0 ? batch : mh_capacity(h) / (256 * 1024);
 	if (new_batch < 256) {
 		/*
 		 * Minimal batch must be greater or equal to
@@ -533,13 +580,12 @@ _mh(start_resize)(struct _mh(t) *h, mh_int_t buckets, mh_int_t batch,
 #else
 	uint8_t *b = (uint8_t *)xcalloc(n_buckets, sizeof(uint8_t));
 #endif
-	h->prime = new_prime;
 	h->batch = new_batch;
 	struct _mh(t) *s = h->shadow;
 	memcpy(s, h, sizeof(*h));
 	s->resize_position = 0;
-	s->n_buckets = n_buckets;
-	s->upper_bound = s->n_buckets * MH_DENSITY;
+	s->prime = new_prime;
+	s->upper_bound = mh_capacity(s) * MH_DENSITY;
 	s->n_dirty = 0;
 	s->size = 0;
 	s->p = p;
@@ -556,12 +602,12 @@ _mh(reserve)(struct _mh(t) *h, mh_int_t size,
 
 #ifndef mh_stat
 #define mh_stat(buf, h) ({						\
-		tbuf_printf(buf, "  n_buckets: %" PRIu32 CRLF		\
+		tbuf_printf(buf, "  capacity: %" PRIu32 CRLF		\
 			    "  n_dirty: %" PRIu32 CRLF			\
 			    "  size: %" PRIu32 CRLF			\
 			    "  resize_cnt: %" PRIu32 CRLF		\
 			    "  resize_position: %" PRIu32 CRLF,		\
-			    h->n_buckets,				\
+			    mh_capacity(h),				\
 			    h->n_dirty,					\
 			    h->size,					\
 			    h->resize_cnt,				\
@@ -575,7 +621,7 @@ _mh(dump)(struct _mh(t) *h)
 {
 	printf("slots:\n");
 	int k = 0;
-	for(int i = 0; i < h->n_buckets; i++) {
+	for (int i = 0; i < mh_end(h); i++) {
 		if (mh_dirty(h, i) || mh_exist(h, i)) {
 			printf("   [%i] ", i);
 			if (mh_exist(h, i)) {
