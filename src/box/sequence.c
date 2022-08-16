@@ -361,10 +361,11 @@ sequence_data_iterator_create(struct index_read_view *base,
 			      enum iterator_type type,
 			      const char *key, uint32_t part_count)
 {
-	assert(type == ITER_ALL);
-	assert(key == NULL);
-	assert(part_count == 0);
-	(void)type;
+	if (type != ITER_ALL) {
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 "_sequence_data read view", "requested iterator type");
+		return NULL;
+	}
 	(void)key;
 	(void)part_count;
 	struct sequence_data_read_view *rv =
