@@ -158,14 +158,6 @@ uint32_t
 sql_trigger_space_id(struct sql_trigger *trigger);
 
 /**
- * Store duplicate of a parsed expression into @a parser.
- * @param parser Parser context.
- * @param select Select to extract from.
- */
-void
-sql_expr_extract_select(struct Parse *parser, struct Select *select);
-
-/**
  * Given space_id and field number, return default value
  * for the field.
  * @param space_id Space ID.
