@@ -505,6 +505,7 @@ static const struct index_vtab memtx_bitset_index_vtab = {
 	/* .count = */ memtx_bitset_index_count,
 	/* .get_internal = */ generic_index_get_internal,
 	/* .get = */ generic_index_get,
+	/* .tuple_position = */ generic_index_tuple_position,
 	/* .replace = */ memtx_bitset_index_replace,
 	/* .create_iterator = */ memtx_bitset_index_create_iterator,
 	/* .create_read_view = */ generic_index_create_read_view,

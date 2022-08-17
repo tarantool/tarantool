@@ -601,6 +601,7 @@ static const struct index_vtab memtx_hash_index_vtab = {
 	/* .count = */ memtx_hash_index_count,
 	/* .get_internal = */ memtx_hash_index_get_internal,
 	/* .get = */ memtx_index_get,
+	/* .tuple_position = */ generic_index_tuple_position,
 	/* .replace = */ memtx_hash_index_replace,
 	/* .create_iterator = */ memtx_hash_index_create_iterator,
 	/* .create_read_view = */ memtx_hash_index_create_read_view,

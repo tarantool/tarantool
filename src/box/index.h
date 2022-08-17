@@ -479,6 +479,9 @@ struct index_vtab {
 			    uint32_t part_count, struct tuple **result);
 	int (*get)(struct index *index, const char *key,
 		   uint32_t part_count, struct tuple **result);
+	int (*tuple_position)(struct index *index, struct tuple *tuple,
+			      struct iterator *it, const char **pos,
+			      uint32_t *size);
 	/**
 	 * Main entrance point for changing data in index. Once built and
 	 * before deletion this is the only way to insert, replace and delete
@@ -758,6 +761,13 @@ index_get(struct index *index, const char *key,
 }
 
 static inline int
+index_tuple_position(struct index *index, struct tuple *tuple,
+		     struct iterator *it, const char **pos, uint32_t *size)
+{
+	return index->vtab->tuple_position(index, tuple, it, pos, size);
+}
+
+static inline int
 index_replace(struct index *index, struct tuple *old_tuple,
 	      struct tuple *new_tuple, enum dup_replace_mode mode,
 	      struct tuple **result, struct tuple **successor)
@@ -871,6 +881,9 @@ int
 generic_index_get_internal(struct index *index, const char *key,
 			   uint32_t part_count, struct tuple **result);
 int generic_index_get(struct index *, const char *, uint32_t, struct tuple **);
+int
+generic_index_tuple_position(struct index *, struct tuple *,
+			     struct iterator *, const char **, uint32_t *);
 int generic_index_replace(struct index *, struct tuple *, struct tuple *,
 			  enum dup_replace_mode,
 			  struct tuple **, struct tuple **);

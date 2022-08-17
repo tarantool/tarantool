@@ -390,6 +390,7 @@ static const struct index_vtab memtx_rtree_index_vtab = {
 	/* .count = */ memtx_rtree_index_count,
 	/* .get_internal = */ memtx_rtree_index_get_internal,
 	/* .get = */ memtx_index_get,
+	/* .tuple_position = */ generic_index_tuple_position,
 	/* .replace = */ memtx_rtree_index_replace,
 	/* .create_iterator = */ memtx_rtree_index_create_iterator,
 	/* .create_read_view = */ generic_index_create_read_view,
