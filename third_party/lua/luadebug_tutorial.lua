@@ -29,7 +29,7 @@ print [[
 
     Type 'w' to show 5 lines of surrounding code directly in
     the debugger. (w = Where) Type 'w 3' to show 3 lines, etc.
-    Alternatively, set dbg.auto_where to a number
+    Alternatively, set dbg.cfg.auto_where to a number
     to run it automatically every time the program advances.
 
     Once you've tried the where command, type 's' to step to

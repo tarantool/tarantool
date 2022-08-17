@@ -86,10 +86,10 @@ Using these you can customize the debugger to work in your environment. For inst
 
 There are also some goodies you can use to make debugging easier.
 * `dbg.writeln(format, ...)` - Basically the same as `dbg.write(string.format(format.."\n", ...))`
-* `dbg.pretty_depth = int` - Set how deep `dbg.pretty()` formats tables.
+* `dbg.cfg.pretty_depth = int` - Set how deep `dbg.pretty()` formats tables.
 * `dbg.pretty(obj)` - Will return a pretty print string of an object.
 * `dbg.pp(obj)` - Basically the same as `dbg.writeln(dbg.pretty(obj))`
-* `dbg.auto_where = int_or_false` - Set the where command to run automatically when the active line changes. The value is the number of context lines.
+* `dbg.cfg.auto_where = int_or_false` - Set the where command to run automatically when the active line changes. The value is the number of context lines.
 * `dbg.error(error, [level])` - Drop in replacement for `error()` that breaks in the debugger.
 * `dbg.assert(error, [message])` - Drop in replacement for `assert()` that breaks in the debugger.
 * `dbg.call(f, ...)` - Drop in replacement for `pcall()` that breaks in the debugger.
