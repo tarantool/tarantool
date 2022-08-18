@@ -25,6 +25,8 @@ struct space_read_view {
 	struct rlist link;
 	/** Space id. */
 	uint32_t id;
+	/** Space name. */
+	char *name;
 	/** Replication group id. See space_opts::group_id. */
 	uint32_t group_id;
 	/**
