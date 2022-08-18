@@ -61,15 +61,8 @@ macro(curl_build)
         list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_THREADED_RESOLVER=ON")
     endif()
     list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_ARES=${ENABLE_ARES}")
-
-    # Setup http2 and nghttp2 library path
-    if(BUNDLED_LIBCURL_USE_NGHTTP2)
-        set(USE_NGHTTP2 "ON")
-        list(APPEND LIBCURL_FIND_ROOT_PATH ${NGHTTP2_INSTALL_DIR})
-    else()
-        set(USE_NGHTTP2 "OFF")
-    endif()
-    list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_NGHTTP2=${USE_NGHTTP2}")
+    # NOTE: HTTP/2.0 implemented in 2.x and disabled in 1.10.
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_NGHTTP2=OFF")
 
     string(REPLACE ";" "$<SEMICOLON>" LIBCURL_FIND_ROOT_PATH_STR "${LIBCURL_FIND_ROOT_PATH}")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_FIND_ROOT_PATH=${LIBCURL_FIND_ROOT_PATH_STR}")
@@ -219,10 +212,6 @@ macro(curl_build)
         # Need to build ares first
         add_dependencies(bundled-libcurl-project bundled-ares)
     endif()
-    if (BUNDLED_LIBCURL_USE_NGHTTP2)
-        # Need to build nghttp2 first
-        add_dependencies(bundled-libcurl-project bundled-nghttp2)
-    endif()
     add_dependencies(bundled-libcurl bundled-libcurl-project)
 
     # Setup CURL_INCLUDE_DIRS & CURL_LIBRARIES for global use.
@@ -233,9 +222,6 @@ macro(curl_build)
         if (TARGET_OS_DARWIN)
             set(CURL_LIBRARIES ${CURL_LIBRARIES} resolv)
         endif()
-    endif()
-    if (BUNDLED_LIBCURL_USE_NGHTTP2)
-        set(CURL_LIBRARIES ${CURL_LIBRARIES} ${NGHTTP2_LIBRARIES})
     endif()
     if (TARGET_OS_LINUX OR TARGET_OS_FREEBSD)
         set(CURL_LIBRARIES ${CURL_LIBRARIES} rt)
