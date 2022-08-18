@@ -18,12 +18,12 @@ Cache Variables
   The paths to the libunwind libraries.
 #]========================================================================]
 
-macro(libunwind_build)
+macro(libunwind_build CFLAGS)
     set(LIBUNWIND_SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/libunwind)
     set(LIBUNWIND_BUILD_DIR ${PROJECT_BINARY_DIR}/build/libunwind)
     set(LIBUNWIND_BINARY_DIR ${LIBUNWIND_BUILD_DIR}/work)
     set(LIBUNWIND_INSTALL_DIR ${LIBUNWIND_BUILD_DIR}/dest)
-    set(LIBUNWIND_CFLAGS "-g -O2")
+    set(LIBUNWIND_CFLAGS "-g -O2 ${CFLAGS}")
     set(LIBUNWIND_CXXFLAGS "-g -O2")
 
     include(ExternalProject)

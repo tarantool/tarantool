@@ -1,11 +1,11 @@
 # A macro to build the bundled libcares
-macro(ares_build)
+macro(ares_build CFLAGS)
     set(ARES_SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/c-ares)
     set(ARES_BINARY_DIR ${PROJECT_BINARY_DIR}/build/ares/work)
     set(ARES_INSTALL_DIR ${PROJECT_BINARY_DIR}/build/ares/dest)
 
     # See BuildLibCURL.cmake for details.
-    set(ARES_CFLAGS "")
+    set(ARES_CFLAGS ${CFLAGS})
     if (TARGET_OS_DARWIN AND NOT "${CMAKE_OSX_SYSROOT}" STREQUAL "")
         set(ARES_CFLAGS "${ARES_CFLAGS} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT}")
     endif()
