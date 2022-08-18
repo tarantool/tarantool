@@ -92,6 +92,7 @@ t
   - once
   - prepare
   - priv
+  - read_view
   - rollback
   - rollback_to_savepoint
   - runtime

@@ -3672,4 +3672,10 @@ end
 
 setmetatable(box.space, { __serialize = box_space_mt })
 
+box.read_view = setmetatable({}, {
+    __index = function()
+        box.error(box.error.UNSUPPORTED, "Community edition", "read view")
+    end
+})
+
 box.NULL = msgpack.NULL
