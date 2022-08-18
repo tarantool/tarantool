@@ -40,6 +40,7 @@
 #include "space.h"
 #include "schema.h" /* space_by_id(), space_cache_find() */
 #include "errinj.h"
+#include "trivia/config.h"
 
 #include <small/mempool.h>
 
@@ -499,6 +500,10 @@ hash_read_view_iterator_free(struct index_read_view_iterator *iterator)
 	free(iterator);
 }
 
+#if defined(ENABLE_READ_VIEW)
+# include "memtx_hash_read_view.cc"
+#else /* !defined(ENABLE_READ_VIEW) */
+
 /** Implementation of next_raw index_read_view_iterator callback. */
 static int
 hash_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
@@ -524,11 +529,11 @@ hash_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 	return 0;
 }
 
-/** Implementation of create_iterator index_read_view callback. */
-static struct index_read_view_iterator *
-hash_read_view_create_iterator(struct index_read_view *base,
-			       enum iterator_type type,
-			       const char *key, uint32_t part_count)
+/** Positions the iterator to the given key. */
+static int
+hash_read_view_iterator_start(struct hash_read_view_iterator *it,
+			      enum iterator_type type,
+			      const char *key, uint32_t part_count)
 {
 	assert(type == ITER_ALL);
 	assert(key == NULL);
@@ -536,13 +541,30 @@ hash_read_view_create_iterator(struct index_read_view *base,
 	(void)type;
 	(void)key;
 	(void)part_count;
+	it->base.next_raw = hash_read_view_iterator_next_raw;
+	light_index_view_iterator_begin(&it->rv->view, &it->iterator);
+	return 0;
+}
+
+#endif /* !defined(ENABLE_READ_VIEW) */
+
+/** Implementation of create_iterator index_read_view callback. */
+static struct index_read_view_iterator *
+hash_read_view_create_iterator(struct index_read_view *base,
+			       enum iterator_type type,
+			       const char *key, uint32_t part_count)
+{
 	struct hash_read_view *rv = (struct hash_read_view *)base;
 	struct hash_read_view_iterator *it =
 		(struct hash_read_view_iterator *)xmalloc(sizeof(*it));
-	it->base.next_raw = hash_read_view_iterator_next_raw;
 	it->base.free = hash_read_view_iterator_free;
+	it->base.next_raw = exhausted_index_read_view_iterator_next_raw;
 	it->rv = rv;
 	light_index_view_iterator_begin(&rv->view, &it->iterator);
+	if (hash_read_view_iterator_start(it, type, key, part_count) != 0) {
+		index_read_view_iterator_delete(&it->base);
+		return NULL;
+	}
 	return (struct index_read_view_iterator *)it;
 }
 

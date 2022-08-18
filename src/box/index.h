@@ -902,6 +902,9 @@ disabled_index_replace(struct index *index, struct tuple *old_tuple,
 		       struct tuple **result, struct tuple **successor);
 int
 exhausted_iterator_next(struct iterator *it, struct tuple **ret);
+int
+exhausted_index_read_view_iterator_next_raw(struct index_read_view_iterator *it,
+					    const char **data, uint32_t *size);
 
 #if defined(__cplusplus)
 } /* extern "C" */

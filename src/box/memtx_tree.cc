@@ -40,6 +40,7 @@
 #include "tuple.h"
 #include "txn.h"
 #include "memtx_tx.h"
+#include "trivia/config.h"
 #include "trivia/util.h"
 #include <qsort_arg.h>
 #include <small/mempool.h>
@@ -1681,6 +1682,8 @@ struct tree_read_view_iterator {
 	struct index_read_view_iterator base;
 	/** Read view. */
 	struct tree_read_view<USE_HINT> *rv;
+	/** Iterator key. */
+	struct memtx_tree_key_data<USE_HINT> key_data;
 	/** BPS tree iterator. */
 	memtx_tree_iterator_t<USE_HINT> tree_iterator;
 };
@@ -1706,6 +1709,10 @@ tree_read_view_iterator_free(struct index_read_view_iterator *iterator)
 	TRASH(iterator);
 	free(iterator);
 }
+
+#if defined(ENABLE_READ_VIEW)
+# include "memtx_tree_read_view.cc"
+#else /* !defined(ENABLE_READ_VIEW) */
 
 /** Implementation of next_raw index_read_view_iterator callback. */
 template <bool USE_HINT>
@@ -1737,12 +1744,12 @@ tree_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 	}
 }
 
-/** Implementation of create_iterator index_read_view callback. */
+/** Positions the iterator to the given key. */
 template <bool USE_HINT>
-static struct index_read_view_iterator *
-tree_read_view_create_iterator(struct index_read_view *base,
-			       enum iterator_type type,
-			       const char *key, uint32_t part_count)
+static int
+tree_read_view_iterator_start(struct tree_read_view_iterator<USE_HINT> *it,
+			      enum iterator_type type,
+			      const char *key, uint32_t part_count)
 {
 	assert(type == ITER_ALL);
 	assert(key == NULL);
@@ -1750,15 +1757,37 @@ tree_read_view_create_iterator(struct index_read_view *base,
 	(void)type;
 	(void)key;
 	(void)part_count;
+	it->base.next_raw = tree_read_view_iterator_next_raw<USE_HINT>;
+	it->tree_iterator = memtx_tree_view_first(&it->rv->tree_view);
+	return 0;
+}
+
+#endif /* !defined(ENABLE_READ_VIEW) */
+
+/** Implementation of create_iterator index_read_view callback. */
+template <bool USE_HINT>
+static struct index_read_view_iterator *
+tree_read_view_create_iterator(struct index_read_view *base,
+			       enum iterator_type type,
+			       const char *key, uint32_t part_count)
+{
 	struct tree_read_view<USE_HINT> *rv =
 		(struct tree_read_view<USE_HINT> *)base;
 	struct tree_read_view_iterator<USE_HINT> *it =
 		(struct tree_read_view_iterator<USE_HINT> *)
 		xmalloc(sizeof(*it));
 	it->base.free = tree_read_view_iterator_free<USE_HINT>;
-	it->base.next_raw = tree_read_view_iterator_next_raw<USE_HINT>;
+	it->base.next_raw = exhausted_index_read_view_iterator_next_raw;
 	it->rv = rv;
-	it->tree_iterator = memtx_tree_view_first(&rv->tree_view);
+	it->key_data.key = NULL;
+	it->key_data.part_count = 0;
+	if (USE_HINT)
+		it->key_data.set_hint(HINT_NONE);
+	invalidate_tree_iterator(&it->tree_iterator);
+	if (tree_read_view_iterator_start(it, type, key, part_count) != 0) {
+		index_read_view_iterator_delete(&it->base);
+		return NULL;
+	}
 	return (struct index_read_view_iterator *)it;
 }
 
