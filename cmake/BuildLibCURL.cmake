@@ -1,9 +1,9 @@
 # A macro to build the bundled libcurl
-macro(curl_build)
+macro(curl_build CFLAGS)
     set(LIBCURL_SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/curl)
     set(LIBCURL_BINARY_DIR ${PROJECT_BINARY_DIR}/build/curl/work)
     set(LIBCURL_INSTALL_DIR ${PROJECT_BINARY_DIR}/build/curl/dest)
-    set(LIBCURL_CMAKE_FLAGS "")
+    set(LIBCURL_CFLAGS ${CFLAGS})
 
     get_filename_component(FOUND_ZLIB_ROOT_DIR ${ZLIB_INCLUDE_DIR} DIRECTORY)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DZLIB_ROOT=${FOUND_ZLIB_ROOT_DIR}")
@@ -14,16 +14,18 @@ macro(curl_build)
                     OUTPUT_VARIABLE OPENSSL_COMPILE_OPTIONS)
     # Add pthread library for openssl static library linking.
     if(NOT OPENSSL_COMPILE_OPTIONS MATCHES ".* -pthread .*")
-        list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_C_FLAGS=-pthread")
+        set(LIBCURL_CFLAGS "${LIBCURL_CFLAGS} -pthread")
     endif()
 
     # Add librt for clock_gettime function definition.
     if(${CMAKE_MAJOR_VERSION} VERSION_LESS "3")
         CHECK_LIBRARY_EXISTS (rt clock_gettime "" HAVE_LIBRT)
         if (HAVE_LIBRT)
-            list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_C_FLAGS=-lrt")
+            set(LIBCURL_CFLAGS "${LIBCURL_CFLAGS} -lrt")
         endif()
     endif()
+
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DCMAKE_C_FLAGS=${LIBCURL_CFLAGS}")
 
     # Switch on the static build.
     list(APPEND LIBCURL_CMAKE_FLAGS "-DCURL_STATICLIB=ON")
@@ -243,6 +245,7 @@ macro(curl_build)
 
     unset(FOUND_ZLIB_ROOT_DIR)
     unset(FOUND_OPENSSL_ROOT_DIR)
+    unset(LIBCURL_CFLAGS)
     unset(LIBCURL_INSTALL_DIR)
     unset(LIBCURL_BINARY_DIR)
     unset(LIBCURL_SOURCE_DIR)

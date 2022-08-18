@@ -7,6 +7,7 @@ cmake_minimum_required(VERSION 2.8)
 # linux machine).
 project(tarantool-static C CXX)
 
+include(FindPackageMessage)
 include(ExternalProject)
 set(LIBICU_VERSION release-71-1/icu4c-71_1)
 set(LIBICU_HASH e06ffc96f59762bd3c929b217445aaec)
@@ -21,6 +22,8 @@ set(NCURSES_HASH 2b7a0e31ebbd8144680f985d61f5bbd5)
 set(READLINE_VERSION 8.0)
 set(READLINE_HASH 7e6c1f16aee3244a69aba6e438295ca3)
 set(BACKUP_STORAGE https://distrib.hb.bizmrg.com)
+
+include(../cmake/os.cmake)
 
 # Pass -isysroot=<SDK_PATH> option on Mac OS to a preprocessor and a C
 # compiler to find header files installed with an SDK.
@@ -41,6 +44,24 @@ if (APPLE)
     set(DEPENDENCY_CFLAGS   "${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT}")
     set(DEPENDENCY_CXXFLAGS "${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT}")
     set(DEPENDENCY_CPPFLAGS "${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT}")
+endif()
+
+# LuaJIT in FreeBSD doesn't work with PIC (gh-7640),
+# ligomp.a for AArch64 CentOS is compiled without PIC support.
+if (TARGET_OS_FREEBSD OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
+    set(ENABLE_HARDENING_DEFAULT FALSE)
+else()
+    set(ENABLE_HARDENING_DEFAULT TRUE)
+endif()
+option(ENABLE_HARDENING "Enable compiler options that harden against memory corruption attacks" ${ENABLE_HARDENING_DEFAULT})
+if (ENABLE_HARDENING)
+    set(HARDENING_FLAGS "-Wformat -Wformat-security -Werror=format-security -fstack-protector-strong -fPIC")
+    if (NOT TARGET_OS_DARWIN)
+        set(HARDENING_LDFLAGS "-pie -z relro -z now")
+    endif()
+    set(DEPENDENCY_CFLAGS "${DEPENDENCY_CFLAGS} ${HARDENING_FLAGS}")
+    set(DEPENDENCY_CXXFLAGS "${DEPENDENCY_CXXFLAGS} ${HARDENING_FLAGS}")
+    set(DEPENDENCY_LDFLAGS "${DEPENDENCY_LDFLAGS} ${HARDENING_LDFLAGS}")
 endif()
 
 # Install all libraries required by tarantool at current build dir
@@ -124,6 +145,7 @@ ExternalProject_Add(ncurses
         CXX=${CMAKE_CXX_COMPILER}
         CFLAGS=${DEPENDENCY_CFLAGS}
         CPPFLAGS=${DEPENDENCY_CPPFLAGS}
+        CXXFLAGS=${DEPENDENCY_CXXFLAGS}
         LDFLAGS=${DEPENDENCY_LDFLAGS}
 
         --prefix=<INSTALL_DIR>
@@ -237,6 +259,7 @@ ExternalProject_Add(tarantool
         -DBUILD_STATIC=TRUE
         -DENABLE_DIST=TRUE
         -DENABLE_BACKTRACE=TRUE
+        -DENABLE_HARDENING=${ENABLE_HARDENING}
         -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
         -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
         ${CMAKE_TARANTOOL_ARGS}
