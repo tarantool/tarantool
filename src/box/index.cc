@@ -861,4 +861,14 @@ exhausted_iterator_next(struct iterator *it, struct tuple **ret)
 	return 0;
 }
 
+int
+exhausted_index_read_view_iterator_next_raw(struct index_read_view_iterator *it,
+					    const char **data, uint32_t *size)
+{
+	(void)it;
+	*data = NULL;
+	*size = 0;
+	return 0;
+}
+
 /* }}} */
