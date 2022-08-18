@@ -87,6 +87,11 @@ void
 box_lua_wal_ext_init(struct lua_State *L);
 #endif
 
+#if ENABLE_READ_VIEW
+void
+box_lua_read_view_init(struct lua_State *L);
+#endif
+
 extern char session_lua[],
 	tuple_lua[],
 	key_def_lua[],
@@ -104,6 +109,9 @@ extern char session_lua[],
 #endif
 #if ENABLE_FLIGHT_RECORDER
 	flightrec_lua[],
+#endif
+#if ENABLE_READ_VIEW
+	read_view_lua[],
 #endif
 	net_box_lua[],
 	upgrade_lua[],
@@ -134,6 +142,9 @@ static const char *lua_sources[] = {
 #endif
 #if ENABLE_FLIGHT_RECORDER
 	"box/flightrec", flightrec_lua,
+#endif
+#if ENABLE_READ_VIEW
+	"box/read_view", read_view_lua,
 #endif
 	"box/upgrade", upgrade_lua,
 	"box/net_box", net_box_lua,
@@ -525,6 +536,9 @@ box_lua_init(struct lua_State *L)
 #endif
 #ifdef ENABLE_WAL_EXT
 	box_lua_wal_ext_init(L);
+#endif
+#ifdef ENABLE_READ_VIEW
+	box_lua_read_view_init(L);
 #endif
 	luaopen_net_box(L);
 	lua_pop(L, 1);
