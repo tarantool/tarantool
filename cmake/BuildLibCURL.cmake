@@ -4,16 +4,6 @@ macro(curl_build)
     set(LIBCURL_BINARY_DIR ${PROJECT_BINARY_DIR}/build/curl/work)
     set(LIBCURL_INSTALL_DIR ${PROJECT_BINARY_DIR}/build/curl/dest)
 
-    if (BUILD_STATIC)
-        set(LIBZ_LIB_NAME libz.a)
-    else()
-        set(LIBZ_LIB_NAME z)
-    endif()
-    find_library(LIBZ_LIBRARY NAMES ${LIBZ_LIB_NAME})
-    if ("${LIBZ_LIBRARY}" STREQUAL "LIBZ_LIBRARY-NOTFOUND")
-        message(FATAL_ERROR "Unable to find zlib")
-    endif()
-
     # Use the same OpenSSL library for libcurl as is used for
     # tarantool itself.
     get_filename_component(FOUND_OPENSSL_ROOT_DIR ${OPENSSL_INCLUDE_DIR} DIRECTORY)
@@ -172,7 +162,7 @@ macro(curl_build)
     add_dependencies(bundled-libcurl bundled-libcurl-project)
 
     set(CURL_INCLUDE_DIRS ${LIBCURL_INSTALL_DIR}/include)
-    set(CURL_LIBRARIES bundled-libcurl ${LIBZ_LIBRARY})
+    set(CURL_LIBRARIES bundled-libcurl ${ZLIB_LIBRARIES})
     if (BUNDLED_LIBCURL_USE_ARES)
         set(CURL_LIBRARIES ${CURL_LIBRARIES} ${ARES_LIBRARIES})
     endif()
