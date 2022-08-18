@@ -1,12 +1,12 @@
 #
 # A macro to build the bundled nghttp2 library.
-macro(nghttp2_build)
+macro(nghttp2_build CFLAGS)
     set(NGHTTP2_SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/nghttp2)
     set(NGHTTP2_BINARY_DIR ${PROJECT_BINARY_DIR}/build/nghttp2/work)
     set(NGHTTP2_INSTALL_DIR ${PROJECT_BINARY_DIR}/build/nghttp2/dest)
 
     # See BuildLibCURL.cmake for details.
-    set(NGHTTP2_CFLAGS "")
+    set(NGHTTP2_CFLAGS ${CFLAGS})
     if (TARGET_OS_DARWIN AND NOT "${CMAKE_OSX_SYSROOT}" STREQUAL "")
         set(NGHTTP2_CFLAGS "${NGHTTP2_CFLAGS} ${CMAKE_C_SYSROOT_FLAG} ${CMAKE_OSX_SYSROOT}")
     endif()

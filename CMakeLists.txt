@@ -71,6 +71,26 @@ include(cmake/profile.cmake)
 include(cmake/module.cmake)
 include(cmake/thread.cmake)
 
+# Fuzzers are compiled without PIC support,
+# LuaJIT in FreeBSD doesn't work with PIC (gh-7640),
+# ligomp.a for AArch64 CentOS is compiled without PIC support.
+if (ENABLE_FUZZER OR TARGET_OS_FREEBSD OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
+    set(ENABLE_HARDENING_DEFAULT FALSE)
+else()
+    set(ENABLE_HARDENING_DEFAULT TRUE)
+endif()
+option(ENABLE_HARDENING "Enable compiler options that harden against memory corruption attacks" ${ENABLE_HARDENING_DEFAULT})
+set(HARDENING_FLAGS " ")
+set(HARDENING_LDFLAGS " ")
+if (ENABLE_HARDENING)
+    set(HARDENING_FLAGS "-Wformat -Wformat-security -Werror=format-security -fstack-protector-strong -fPIC")
+    if (NOT TARGET_OS_DARWIN)
+        set(HARDENING_LDFLAGS "-pie -z relro -z now")
+    endif()
+    add_compile_flags("C;CXX" ${HARDENING_FLAGS})
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${HARDENING_LDFLAGS}")
+endif()
+
 set(CMAKE_REQUIRED_DEFINITIONS "-D_GNU_SOURCE")
 
 check_symbol_exists(MAP_ANON sys/mman.h HAVE_MAP_ANON)
@@ -438,14 +458,14 @@ option(BUNDLED_LIBCURL_USE_NGHTTP2 "Build curl with bundled nghttp2"
 if (ENABLE_BUNDLED_LIBCURL)
     if(BUNDLED_LIBCURL_USE_ARES)
         include(BuildAres)
-        ares_build()
+        ares_build(${HARDENING_FLAGS})
     endif()
     if(BUNDLED_LIBCURL_USE_NGHTTP2)
         include(BuildNghttp2)
-        nghttp2_build()
+        nghttp2_build(${HARDENING_FLAGS})
     endif()
     include(BuildLibCURL)
-    curl_build()
+    curl_build(${HARDENING_FLAGS})
     add_dependencies(build_bundled_libs bundled-libcurl)
 else()
     set(CURL_FIND_REQUIRED ON)
@@ -522,7 +542,7 @@ if(ENABLE_BACKTRACE)
         endif()
 
         include(BuildLibUnwind)
-        libunwind_build()
+        libunwind_build(${HARDENING_FLAGS})
         add_dependencies(build_bundled_libs
                          bundled-libunwind
                          bundled-libunwind-platform)
@@ -744,6 +764,7 @@ set(options PACKAGE VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
     ENABLE_SSE2 ENABLE_AVX
     ENABLE_GCOV ENABLE_GPROF ENABLE_VALGRIND ENABLE_ASAN ENABLE_UB_SANITIZER ENABLE_FUZZER
     ENABLE_BACKTRACE
+    ENABLE_HARDENING
     ENABLE_DOC
     ENABLE_DIST
     ENABLE_BUNDLED_LIBCURL

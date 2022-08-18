@@ -91,9 +91,6 @@ BuildRequires: libunwind-devel
 %global debug_package %{nil}
 %global __os_install_post /usr/lib/rpm/brp-compress %{nil}
 %global __strip /bin/true
-# -fPIE break backtraces
-# https://github.com/tarantool/tarantool/issues/1262
-%undefine _hardened_build
 %endif
 
 # Set dependences for tests.
