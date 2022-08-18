@@ -1762,6 +1762,13 @@ tree_read_view_iterator_start(struct tree_read_view_iterator<USE_HINT> *it,
 	return 0;
 }
 
+template <bool USE_HINT>
+static void
+tree_read_view_reset_key_def(struct tree_read_view<USE_HINT> *rv)
+{
+	rv->tree_view.common.arg = NULL;
+}
+
 #endif /* !defined(ENABLE_READ_VIEW) */
 
 /** Implementation of create_iterator index_read_view callback. */
@@ -1813,6 +1820,7 @@ memtx_tree_index_create_read_view(struct index *base)
 	rv->index = index;
 	index_ref(base);
 	memtx_tree_view_create(&rv->tree_view, &index->tree);
+	tree_read_view_reset_key_def(rv);
 	return (struct index_read_view *)rv;
 }
 

@@ -546,6 +546,12 @@ hash_read_view_iterator_start(struct hash_read_view_iterator *it,
 	return 0;
 }
 
+static void
+hash_read_view_reset_key_def(struct hash_read_view *rv)
+{
+	rv->view.common.arg = NULL;
+}
+
 #endif /* !defined(ENABLE_READ_VIEW) */
 
 /** Implementation of create_iterator index_read_view callback. */
@@ -588,6 +594,7 @@ memtx_hash_index_create_read_view(struct index *base)
 	rv->index = index;
 	index_ref(base);
 	light_index_view_create(&rv->view, &index->hash_table);
+	hash_read_view_reset_key_def(rv);
 	return (struct index_read_view *)rv;
 }
 
