@@ -396,7 +396,10 @@ sequence_data_read_view_create(struct index *index)
 		.create_iterator = sequence_data_iterator_create,
 	};
 	struct sequence_data_read_view *rv = xmalloc(sizeof(*rv));
-	rv->base.vtab = &vtab;
+	if (index_read_view_create(&rv->base, &vtab, index->def) != 0) {
+		free(rv);
+		return NULL;
+	}
 	light_sequence_view_create(&rv->view, &sequence_data_index);
 	return (struct index_read_view *)rv;
 }

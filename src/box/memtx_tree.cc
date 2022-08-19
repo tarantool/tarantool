@@ -1782,9 +1782,12 @@ memtx_tree_index_create_read_view(struct index *base)
 		(struct memtx_tree_index<USE_HINT> *)base;
 	struct tree_read_view<USE_HINT> *rv =
 		(struct tree_read_view<USE_HINT> *)xmalloc(sizeof(*rv));
+	if (index_read_view_create(&rv->base, &vtab, base->def) != 0) {
+		free(rv);
+		return NULL;
+	}
 	struct space *space = space_cache_find(base->def->space_id);
 	memtx_tx_snapshot_cleaner_create(&rv->cleaner, space);
-	rv->base.vtab = &vtab;
 	rv->index = index;
 	index_ref(base);
 	memtx_tree_view_create(&rv->tree_view, &index->tree);
