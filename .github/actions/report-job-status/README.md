@@ -29,7 +29,5 @@ Add the following code to the running steps:
     if: failure()
     uses: ./.github/actions/report-job-status
     with:
-      api-url: ${{ secrets.VKTEAMS_API_URL }}
       bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
-      chat-id: ${{ secrets.VKTEAMS_CHAT_ID }}
 ```
