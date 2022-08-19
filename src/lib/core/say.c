@@ -88,6 +88,12 @@ say_format_syslog(struct log *log, char *buf, int len, int level,
 		  const char *filename, int line, const char *error,
 		  const char *format, va_list ap);
 
+/*
+ * Callbacks called before/after writing to stderr.
+ */
+static say_stderr_callback_t before_stderr_callback;
+static say_stderr_callback_t after_stderr_callback;
+
 /** Default logger used before logging subsystem is initialized. */
 static struct log log_boot = {
 	.fd = STDERR_FILENO,
@@ -1273,8 +1279,14 @@ log_vsay(struct log *log, int level, const char *filename, int line,
 	switch (log->type) {
 	case SAY_LOGGER_FILE:
 	case SAY_LOGGER_PIPE:
-	case SAY_LOGGER_STDERR:
 		write_to_file(log, total);
+		break;
+	case SAY_LOGGER_STDERR:
+		if (before_stderr_callback != NULL)
+			before_stderr_callback();
+		write_to_file(log, total);
+		if (after_stderr_callback != NULL)
+			after_stderr_callback();
 		break;
 	case SAY_LOGGER_SYSLOG:
 		write_to_syslog(log, total);
@@ -1283,8 +1295,12 @@ log_vsay(struct log *log, int level, const char *filename, int line,
 		break;
 	case SAY_LOGGER_BOOT:
 	{
+		if (before_stderr_callback != NULL)
+			before_stderr_callback();
 		ssize_t r = safe_write(STDERR_FILENO, buf, total);
 		(void) r;                       /* silence gcc warning */
+		if (after_stderr_callback != NULL)
+			after_stderr_callback();
 		break;
 	}
 	default:
@@ -1292,4 +1308,12 @@ log_vsay(struct log *log, int level, const char *filename, int line,
 	}
 	errno = errsv; /* Preserve the errno. */
 	return total;
+}
+
+void
+say_set_stderr_callback(say_stderr_callback_t before,
+			say_stderr_callback_t after)
+{
+	before_stderr_callback = before;
+	after_stderr_callback = after;
 }
