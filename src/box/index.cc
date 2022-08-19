@@ -603,6 +603,26 @@ index_delete(struct index *index)
 	index_def_delete(def);
 }
 
+int
+index_read_view_create(struct index_read_view *rv,
+		       const struct index_read_view_vtab *vtab,
+		       struct index_def *def)
+{
+	rv->vtab = vtab;
+	rv->def = index_def_dup(def);
+	if (rv->def == NULL)
+		return -1;
+	return 0;
+}
+
+void
+index_read_view_delete(struct index_read_view *rv)
+{
+	struct index_def *def = rv->def;
+	rv->vtab->free(rv);
+	index_def_delete(def);
+}
+
 /* }}} */
 
 /* {{{ Virtual method stubs */
