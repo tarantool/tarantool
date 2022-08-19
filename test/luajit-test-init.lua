@@ -42,6 +42,53 @@ function _dofile(filename)
   return dofile(path_to_sources..filename)
 end
 
+-- Tarantool has its own print() function.
+--
+-- There are tests, which check something around a Lua/C function
+-- and use print() as a well known example of such function. The
+-- easiest way to mitigate problems in the tests is to replace
+-- print() back to the original one.
+--
+-- Our own print() is a simple wrapper around the original print()
+-- and performs some extra actions only in the interactive mode.
+-- It seems more or less safe to skip testing of the wrapper on
+-- LuaJIT's test suites.
+--
+-- Examples from LuaJIT test suites that fail with tarantool's
+-- print() function:
+--
+--  | PUC-Rio-Lua-5.1-tests/db.lua
+--  | ----------------------------
+--  | local a = debug.getinfo(print)
+--  | assert(a.what == "C" and a.short_src == "[C]")
+--  | -- In tarantool: a.what == "Lua"
+--  | -- In tarantool: a.short_src == "builtin/internal.print.lua"
+--
+--  | lua-Harness-tests/301-basic.t
+--  | -----------------------------
+--  | setfenv(print, {})
+--  | -- Expected error: 'setfenv' cannot change environment of
+--  | -- given object.
+--  | -- In tarantool: success.
+--
+--  | lua-Harness-tests/304-string.t
+--  | ------------------------------
+--  | string.dump(print)
+--  | -- Expected error: unable to dump given function.
+--  | -- In tarantool: success.
+--
+--  | lua-Harness-tests/304-string.t
+--  | ------------------------------
+--  | tostring(print)
+--  | Expected: 'function: builtin#29' (or similar).
+--  | In tarantool: 'function: 0x40e88018' (or similar).
+local print_M = package.loaded['internal.print']
+if print_M ~= nil then
+    rawset(_G, 'print', print_M.raw_print)
+    assert(print ~= nil)
+    assert(type(print) == 'function')
+end
+
 -- This is workaround introduced for flaky macosx tests reported by
 -- https://github.com/tarantool/tarantool/issues/7058
 collectgarbage('collect')
