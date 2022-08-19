@@ -1806,44 +1806,6 @@ box_wait_quorum(uint32_t lead_id, int64_t target_lsn, int quorum,
 }
 
 /**
- * A helper to start new Raft election round and wait until the election results
- * are known.
- * Returns 0 in case this instance has won the elections, -1 otherwise.
- */
-static int
-box_run_elections(void)
-{
-	struct raft *raft = box_raft();
-	assert(raft->is_enabled);
-	assert(box_election_mode != ELECTION_MODE_VOTER);
-	/*
-	 * Make this instance a candidate and run until some leader, not
-	 * necessarily this instance, emerges.
-	 */
-	do {
-		raft_promote(raft);
-		if (box_raft_wait_term_outcome() != 0) {
-			raft_restore(raft);
-			return -1;
-		}
-	} while (raft->leader == 0 && replicaset_has_healthy_quorum());
-	if (raft->state != RAFT_STATE_LEADER) {
-		if (raft->leader != 0) {
-			diag_set(ClientError, ER_INTERFERING_PROMOTE,
-				 raft->leader);
-		} else {
-			int connected = replicaset.healthy_count;
-			int quorum = replicaset_healthy_quorum();
-			diag_set(ClientError, ER_NO_ELECTION_QUORUM,
-				 connected, quorum);
-		}
-		return -1;
-	}
-
-	return 0;
-}
-
-/**
  * Check whether the greatest promote term has changed since it was last read.
  * IOW check that a foreign PROMOTE arrived while we were sleeping.
  */
@@ -2062,7 +2024,7 @@ box_promote(void)
 		if (raft->state == RAFT_STATE_LEADER)
 			return 0;
 		is_in_box_promote = false;
-		return box_run_elections();
+		return box_raft_try_promote();
 	default:
 		unreachable();
 	}
@@ -4093,9 +4055,8 @@ box_cfg_xc(void)
 		 * should take the control over the situation and start a new
 		 * term immediately.
 		 */
-		raft_promote(raft);
-		int rc = box_raft_wait_term_outcome();
-		if (rc == 0 && raft->leader != instance_id) {
+		int rc = box_raft_try_promote();
+		if (raft->leader != instance_id && raft->leader != 0) {
 			/*
 			 * It was promoted and is a single registered node -
 			 * there can't be another leader or a new term bump.
@@ -4104,10 +4065,8 @@ box_cfg_xc(void)
 			      "leader. Leader is %u, term is %llu",
 			      raft->leader, (long long)raft->volatile_term);
 		}
-		if (rc != 0) {
-			raft_restore(raft);
-			diag_raise();
-		}
+		assert(rc == 0);
+		(void)rc;
 	}
 
 	/* box.cfg.read_only is not read yet. */

@@ -426,7 +426,7 @@ struct box_raft_watch_ctx {
 };
 
 static int
-box_raft_wait_term_outcome_f(struct trigger *trig, void *event)
+box_raft_try_promote_f(struct trigger *trig, void *event)
 {
 	struct raft *raft = event;
 	assert(raft == box_raft());
@@ -452,16 +452,22 @@ done:
 }
 
 int
-box_raft_wait_term_outcome(void)
+box_raft_try_promote(void)
 {
 	struct raft *raft = box_raft();
+	assert(raft->is_enabled);
+	assert(box_election_mode == ELECTION_MODE_MANUAL ||
+	       box_election_mode == ELECTION_MODE_CANDIDATE);
+
+	raft_promote(raft);
+
 	struct trigger trig;
 	struct box_raft_watch_ctx ctx = {
 		.is_done = false,
 		.term = raft->volatile_term,
 		.owner = fiber(),
 	};
-	trigger_create(&trig, box_raft_wait_term_outcome_f, &ctx, NULL);
+	trigger_create(&trig, box_raft_try_promote_f, &ctx, NULL);
 	raft_on_update(raft, &trig);
 	/*
 	 * XXX: it is not a good idea not to have a timeout here. If all nodes
@@ -471,15 +477,27 @@ box_raft_wait_term_outcome(void)
 	while (!fiber_is_cancelled() && !ctx.is_done)
 		fiber_yield();
 	trigger_clear(&trig);
-	if (fiber_is_cancelled()) {
+
+	if (raft->state == RAFT_STATE_LEADER)
+		return 0;
+
+	int connected = replicaset.healthy_count;
+	int quorum = replicaset_healthy_quorum();
+	if (!ctx.is_done) {
 		diag_set(FiberIsCancelled);
-		return -1;
-	}
-	if (!raft->is_enabled) {
+	} else if (raft->leader != 0) {
+		diag_set(ClientError, ER_INTERFERING_PROMOTE, raft->leader);
+	} else if (connected < quorum) {
+		diag_set(ClientError, ER_NO_ELECTION_QUORUM, connected, quorum);
+	} else if (ctx.term < raft->volatile_term) {
+		diag_set(ClientError, ER_OLD_TERM, (unsigned long long)ctx.term,
+			 (unsigned long long)raft->volatile_term);
+	} else {
+		assert(!raft->is_enabled);
 		diag_set(ClientError, ER_ELECTION_DISABLED);
-		return -1;
 	}
-	return 0;
+	raft_restore(raft);
+	return -1;
 }
 
 struct raft_wait_persisted_data {
