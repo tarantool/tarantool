@@ -34,6 +34,25 @@ if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_CLANG )
     CC_HAS_AVX_INTRINSICS)
 endif()
 
+#
+# Check compiler for AVX2 intrinsics
+#
+if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_CLANG )
+    set(CMAKE_REQUIRED_FLAGS "-mavx2")
+    check_c_source_runs("
+    #include <immintrin.h>
+
+    int main()
+    {
+    __m256i v0 = _mm256_set1_epi16(8);
+    __m256i v1 = _mm256_set1_epi16(17);
+
+    __m256i res = _mm256_add_epi16(v0, v1);
+    return 0;
+    }"
+    CC_HAS_AVX2_INTRINSICS)
+endif()
+
 if ((CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64") AND CC_HAS_SSE2_INTRINSICS)
     # any amd64 supports sse2 instructions
     set(ENABLE_SSE2_DEFAULT ON)
@@ -61,5 +80,15 @@ if (ENABLE_AVX)
         add_compile_flags("C;CXX" "-mavx")
         find_package_message(SSE2 "AVX is enabled - target CPU must support it"
             "${CC_HAS_AVX_INTRINSICS}")
+    endif()
+endif()
+
+if (ENABLE_AVX2)
+    if (!CC_HAS_AVX2_INTRINSICS)
+        message(SEND_ERROR "AVX2 is enabled")
+    else()
+        add_compile_flags("C;CXX" "-mavx2")
+        find_package_message(SSE2 "AVX2 is enabled - target CPU must support it"
+            "${CC_HAS_AVX2_INTRINSICS}")
     endif()
 endif()
