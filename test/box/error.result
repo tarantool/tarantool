@@ -463,6 +463,7 @@ t;
  |   242: box.error.NO_ELECTION_QUORUM
  |   243: box.error.SSL
  |   244: box.error.SPLIT_BRAIN
+ |   245: box.error.OLD_TERM
  | ...
 
 test_run:cmd("setopt delimiter ''");

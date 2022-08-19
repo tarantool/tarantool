@@ -108,9 +108,9 @@ box_raft_checkpoint_remote(struct raft_request *req);
 int
 box_raft_process(struct raft_request *req, uint32_t source);
 
-/** Block this fiber until the current term's outcome is known. */
+/** Try to elect this node as a leader in a new term bumped one time. */
 int
-box_raft_wait_term_outcome(void);
+box_raft_try_promote(void);
 
 /** Block this fiber until the current volatile term is persisted. */
 int
