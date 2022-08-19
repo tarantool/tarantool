@@ -562,9 +562,12 @@ memtx_hash_index_create_read_view(struct index *base)
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct hash_read_view *rv =
 		(struct hash_read_view *)xmalloc(sizeof(*rv));
+	if (index_read_view_create(&rv->base, &vtab, base->def) != 0) {
+		free(rv);
+		return NULL;
+	}
 	struct space *space = space_cache_find(base->def->space_id);
 	memtx_tx_snapshot_cleaner_create(&rv->cleaner, space);
-	rv->base.vtab = &vtab;
 	rv->index = index;
 	index_ref(base);
 	light_index_view_create(&rv->view, &index->hash_table);

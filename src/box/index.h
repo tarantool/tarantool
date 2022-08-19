@@ -571,6 +571,8 @@ struct index_read_view_vtab {
 struct index_read_view {
 	/** Virtual function table. */
 	const struct index_read_view_vtab *vtab;
+	/** Copy of the index definition. */
+	struct index_def *def;
 };
 
 /** Iterator over an index read view. */
@@ -821,11 +823,18 @@ index_end_build(struct index *index)
 	index->vtab->end_build(index);
 }
 
-static inline void
-index_read_view_delete(struct index_read_view *rv)
-{
-	rv->vtab->free(rv);
-}
+/**
+ * Initialize an index read view instance.
+ * Note, this function copies the given index definition.
+ */
+int
+index_read_view_create(struct index_read_view *rv,
+		       const struct index_read_view_vtab *vtab,
+		       struct index_def *def);
+
+/** Free an index read view instance. */
+void
+index_read_view_delete(struct index_read_view *rv);
 
 static inline struct index_read_view_iterator *
 index_read_view_create_iterator(struct index_read_view *rv,
