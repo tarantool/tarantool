@@ -55,9 +55,7 @@ jobs:
         if: failure()
         uses: ./.github/actions/report-job-status
         with:
-          api-url: ${{ secrets.VKTEAMS_API_URL }}
           bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
-          chat-id: ${{ secrets.VKTEAMS_CHAT_ID }}
 
   release-notes:
     # Run on push to the 'master' and release branches of tarantool/tarantool
@@ -84,9 +82,7 @@ jobs:
         if: failure()
         uses: ./.github/actions/report-job-status
         with:
-          api-url: ${{ secrets.VKTEAMS_API_URL }}
           bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
-          chat-id: ${{ secrets.VKTEAMS_CHAT_ID }}
 
   checkpatch:
     # Run only if the workflow was triggered by a pull request for
@@ -111,6 +107,4 @@ jobs:
         if: failure()
         uses: ./.github/actions/report-job-status
         with:
-          api-url: ${{ secrets.VKTEAMS_API_URL }}
           bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
-          chat-id: ${{ secrets.VKTEAMS_CHAT_ID }}
