@@ -2,18 +2,16 @@ name: Send VK Teams notification on failure
 description: Send the message to VK Teams chat on failure
 
 inputs:
-  api-url:
-    required: true
-    description: VK Teams API URL
   bot-token:
     required: true
     description: VK Teams bot token
   chat-id:
-    required: true
-    description: VK Teams team chat ID
+    required: false
+    default: tt_cicd_reports
+    description: VK Teams chat ID
 
 runs:
-  using: 'composite'
+  using: composite
   steps:
     - name: Set chat for reports
       run: |
@@ -32,6 +30,5 @@ runs:
     - name: Send VK Teams message on failure
       uses: tarantool/actions/report-job-status@master
       with:
-        api-url: ${{ inputs.api-url }}
         bot-token: ${{ inputs.bot-token }}
         chat-id: ${{ env.CHAT_ID }}
