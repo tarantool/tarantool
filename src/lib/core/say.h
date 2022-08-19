@@ -483,6 +483,20 @@ say_format_plain(struct log *log, char *buf, int len, int level,
 		 const char *filename, int line, const char *error,
 		 const char *format, va_list ap);
 
+/**
+ * A type defining a callback that is called before or after
+ * writing to stderr.
+ */
+typedef void
+(*say_stderr_callback_t)(void);
+
+/**
+ * Set callback functions called before/after writing to stderr.
+ */
+void
+say_set_stderr_callback(say_stderr_callback_t before,
+			say_stderr_callback_t after);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
