@@ -67,6 +67,7 @@
 #include "box/lua/key_def.h"
 #include "box/lua/merger.h"
 #include "box/lua/watcher.h"
+#include "box/lua/key_estimator.h"
 
 #include "mpstream/mpstream.h"
 
@@ -533,6 +534,8 @@ box_lua_init(struct lua_State *L)
 	luaopen_key_def(L);
 	lua_pop(L, 1);
 	luaopen_merger(L);
+	lua_pop(L, 1);
+	luaopen_key_estimator(L);
 	lua_pop(L, 1);
 
 	luamp_set_encode_extension(luamp_encode_extension_box);
