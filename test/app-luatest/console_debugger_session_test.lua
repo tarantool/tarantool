@@ -123,8 +123,11 @@ g.test_interactive_debugger_session = function()
 
             local result
             local clean_cmd = trim(cmd)
+            -- there should be empty stderr - check it before stdout
+            local errout = fh:read({ timeout = 0.05, stderr = true})
+            t.assert(errout == nil or trim(errout) == '')
             repeat
-                result = trim(unescape(fh:read({ timeout = 1.0 })))
+                result = trim(unescape(fh:read({ timeout = 0.5 })))
             until result ~= '' and result ~= clean_cmd
             if expected ~= '' then
                 t.assert_str_contains(result, expected, false)
