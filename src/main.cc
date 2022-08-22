@@ -147,6 +147,10 @@ on_shutdown_f(va_list ap)
 	if (ev_depth(loop()) == 0)
 		fiber_sleep(0.0);
 
+	/* Handle spurious wakeups. */
+	while (!is_shutting_down)
+		fiber_yield();
+
 	if (trigger_fiber_run(&box_on_shutdown_trigger_list, NULL,
 			      on_shutdown_trigger_timeout) != 0) {
 		say_error("on_shutdown triggers failed");
@@ -172,7 +176,7 @@ tarantool_exit(int code)
 	is_shutting_down = true;
 	exit_code = code;
 	box_broadcast_fmt("box.shutdown", "%b", true);
-	fiber_call(on_shutdown_fiber);
+	fiber_wakeup(on_shutdown_fiber);
 }
 
 static void
@@ -770,16 +774,9 @@ main(int argc, char **argv)
 		box_lua_init(tarantool_L);
 		/*
 		 * Reserve a fiber to run on_shutdown triggers.
-		 * Make sure the fiber is non-cancellable so that
-		 * it doesn't get woken up from Lua unintentionally.
 		 */
-		struct fiber_attr attr;
-		fiber_attr_create(&attr);
-		attr.flags |= FIBER_IS_SYSTEM;
-		attr.flags &= ~FIBER_IS_CANCELLABLE;
-		on_shutdown_fiber = fiber_new_ex("on_shutdown",
-						 &attr,
-						 on_shutdown_f);
+		on_shutdown_fiber = fiber_new_system("on_shutdown",
+						     on_shutdown_f);
 		if (on_shutdown_fiber == NULL)
 			diag_raise();
 
