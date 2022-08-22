@@ -1,8 +1,7 @@
 debugger.lua
 =
 
-A simple, embedabble debugger for Lua 5.x, and LuaJIT 2.x.
-
+A simple debugging console for the Tarantool.
 
 
 ![ExampleLog](luadebug.png)
