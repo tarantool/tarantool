@@ -262,6 +262,7 @@ local function compile_chunk(block, env)
 end
 
 local SOURCE_CACHE = {}
+local tnt = nil
 
 local function where(info, context_lines)
     local filesource = info.source
@@ -271,8 +272,7 @@ local function where(info, context_lines)
         -- Tarantool builtin module
         if filesource:match("@builtin/.*.lua") then
             pcall(function()
-                local tnt_debug = require('tarantool').debug
-                local lua_code = tnt_debug.getsources(filesource)
+                local lua_code = tnt.debug.getsources(filesource)
 
                 for line in string.gmatch(lua_code, "([^\n]*)\n?") do
                     table.insert(source, line)
@@ -610,7 +610,30 @@ local function run_command(line)
     end
 end
 
+local started = false
+
+local function motto()
+    -- Detect Tarantool version.
+    if not tnt then
+        tnt = require('tarantool')
+        assert(tnt ~= nil)
+    end
+    dbg_writeln(color_yellow(DEBUGGER .. ": ") .. "Loaded for " .. tnt.version)
+    jit.off()
+    jit.flush()
+end
+
+-- lazily perform repl initialization
+local function start_repl()
+    if started then
+        return
+    end
+    motto()
+    started = true
+end
+
 repl = function(reason)
+    start_repl()
     -- Skip frames without source info.
     while not frame_has_line(debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL - 3)) do
         stack_inspect_offset = stack_inspect_offset + 1
@@ -735,8 +758,5 @@ if color_maybe_supported and not os.getenv("DBG_NOCOLOR") then
     COLOR_RESET = string.char(27) .. "[0m"
     GREEN_CARET = string.char(27) .. "[92m => " .. COLOR_RESET
 end
-
--- Detect Lua/LuaJIT version.
-dbg_writeln(color_yellow(DEBUGGER .. ": ") .. "Loaded for " .. jit.version)
 
 return dbg
