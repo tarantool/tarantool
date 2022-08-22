@@ -87,7 +87,7 @@ struct lua_yaml_dumper {
    /** Global tag to label the result document by. */
    yaml_tag_directive_t begin_tag;
    /**
-    * - end_tag == &begin_tag - a document is not labeld with a
+    * - end_tag == &begin_tag - a document is not labeled with a
     * global tag.
     * - end_tag == &begin_tag + 1 - a document is labeled with a
     * global tag specified in begin_tag attribute. End_tag pointer
@@ -328,6 +328,16 @@ static void load_alias(struct lua_yaml_loader *loader) {
    }
 }
 
+/**
+ * Load YAML nodes.
+ *
+ * Process YAML events and put decoded values onto Lua stack.
+ *
+ * @param loader Literal to check.
+ *
+ * @retval -1 Error.
+ * @retval  1 Success.
+ */
 static int load_node(struct lua_yaml_loader *loader) {
    if (!do_parse(loader))
       return -1;
