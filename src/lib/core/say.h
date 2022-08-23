@@ -270,10 +270,10 @@ void
 say_set_log_format(enum say_format format);
 
 /**
- * Set callback function called on each log event.
+ * Set callback function called on each log event and its log level.
  */
 void
-say_set_log_callback(log_callback_t callback);
+say_set_log_callback(log_callback_t callback, int on_log_new_level);
 
 /**
  * Return say format by name.

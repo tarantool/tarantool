@@ -49,7 +49,17 @@
 #include <coio_task.h>
 
 pid_t log_pid = 0;
+/**
+ * It is calculated as MAX(level, on_log_level) where level - is log level
+ * value to be set.
+ */
 int log_level = S_INFO;
+/**
+ * Log level of log callback, i.e. if value of entry to be logger is greater
+ * than @a on_log_level - it is skipped. This is an internal symbol in contrast
+ * to @a log_level.
+ */
+static int on_log_level = S_FATAL;
 enum say_format log_format = SF_PLAIN;
 enum { SAY_SYSLOG_DEFAULT_PORT = 512 };
 
@@ -193,7 +203,7 @@ log_set_format(struct log *log, log_format_func_t format_func)
 void
 say_set_log_level(int new_level)
 {
-	log_level = new_level;
+	log_level = MAX(new_level, on_log_level);
 	log_set_level(log_default, (enum say_level) new_level);
 }
 
@@ -226,9 +236,11 @@ say_set_log_format(enum say_format format)
 }
 
 void
-say_set_log_callback(log_callback_t callback)
+say_set_log_callback(log_callback_t callback, int on_log_new_level)
 {
 	log_default->on_log = callback;
+	log_level = MAX(on_log_new_level, log_level);
+	on_log_level = on_log_new_level;
 }
 
 static const char *say_format_strs[] = {
