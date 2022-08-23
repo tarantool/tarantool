@@ -46,21 +46,11 @@ enum sql_info_key {
 	sql_info_key_MAX,
 };
 
-/**
- * One of possible formats used to dump msgpack/Lua.
- * For details see port_sql_dump_msgpack() and port_sql_dump_lua().
- */
-enum sql_serialization_format {
-	DQL_EXECUTE = 0,
-	DML_EXECUTE = 1,
-	DQL_PREPARE = 2,
-	DML_PREPARE = 3,
-};
-
 extern const char *sql_info_key_strs[];
 
 struct region;
 struct sql_bind;
+struct sql_stmt;
 
 int
 sql_unprepare(uint32_t stmt_id);
@@ -87,35 +77,6 @@ int
 sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 			uint32_t bind_count, struct port *port,
 			struct region *region);
-
-/**
- * Port implementation that is used to store SQL responses and
- * output them to obuf or Lua. This port implementation is
- * inherited from the port_c structure. This allows us to use
- * this structure in the port_c methods instead of port_c itself.
- *
- * The methods of port_c are called via explicit access to
- * port_c_vtab just like C++ does with BaseClass::method, when
- * it is called in a child method.
- */
-struct port_sql {
-	/** Base port struct. To be able to use port_c methods. */
-	struct port_c base;
-	/* Prepared SQL statement. */
-	struct sql_stmt *stmt;
-	/**
-	 * Serialization format depends on type of SQL query: DML or
-	 * DQL; and on type of SQL request: execute or prepare.
-	 */
-	uint8_t serialization_format;
-	/**
-	 * There's no need in clean-up in case of PREPARE request:
-	 * statement remains in cache and will be deleted later.
-	 */
-	bool do_finalize;
-};
-
-extern const struct port_vtab port_sql_vtab;
 
 int
 sql_stmt_finalize(struct sql_stmt *stmt);

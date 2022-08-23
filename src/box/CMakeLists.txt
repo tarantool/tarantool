@@ -60,6 +60,7 @@ set(sql_sources
     sql/printf.c
     sql/random.c
     sql/resolve.c
+    sql/port.c
     sql/select.c
     sql/tokenize.c
     sql/treeview.c
