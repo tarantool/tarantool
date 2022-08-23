@@ -126,6 +126,7 @@ read_view_open(struct read_view *rv, const struct read_view_opts *opts)
 			engine_create_read_view(engine);
 		if (engine_rv == NULL)
 			goto fail;
+		rlist_add_tail_entry(&rv->engines, engine_rv, link);
 	}
 	struct read_view_add_space_cb_arg add_space_cb_arg = {
 		.rv = rv,
