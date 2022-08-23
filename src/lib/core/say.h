@@ -417,62 +417,6 @@ enum {
 #define say_info_ratelimited(format, ...) \
         say_ratelimited(S_INFO, NULL, format, ##__VA_ARGS__)
 
-/**
- * Format and print a message to Tarantool log file.
- *
- * \param log (struct log *) - logger object
- * \param level (int) - log level (see enum \link say_level \endlink)
- * \param format (const char * ) - printf()-like format string
- * \param ... - format arguments
- * \sa printf()
- * \sa enum say_level
- */
-#define log_say_level(log, _level, format, ...) ({ 	\
-	if (_level <= log->level) 			\
-		log_say(log, _level, __FILE__, __LINE__,\
-		format, ##__VA_ARGS__); })
-
-
-/**
- * Format and print a message to specified logger.
- *
- * \param log (struct log *) - logger object
- * \param format (const char * ) - printf()-like format string
- * \param ... - format arguments
- * \sa printf()
- * \sa enum say_level
- * Example:
- * \code
- * log_say_info("Some useful information: %s", status);
- * \endcode
- */
-#define log_say_error(log, format, ...) \
-	log_say_level(log, S_ERROR, NULL, format, ##__VA_ARGS__)
-
-/** \copydoc log_say_error() */
-#define log_say_crit(log, format, ...) \
-	log_say_level(log, S_CRIT, NULL, format, ##__VA_ARGS__)
-
-/** \copydoc log_say_error() */
-#define log_say_warn(log, format, ...) \
-	log_say_level(log, S_WARN, NULL, format, ##__VA_ARGS__)
-
-/** \copydoc log_say_error() */
-#define log_say_info(log, format, ...) \
-	log_say_level(log, S_INFO, NULL, format, ##__VA_ARGS__)
-
-/** \copydoc log_say_error() */
-#define log_say_verbose(log, format, ...) \
-	log_say_level(log, S_VERBOSE, NULL, format, ##__VA_ARGS__)
-
-/** \copydoc log_say_error() */
-#define log_say_debug(log, format, ...) \
-	log_say_level(log, S_DEBUG, NULL, format, ##__VA_ARGS__)
-
-/** \copydoc log_say_error(). */
-#define log_say_syserror(log, format, ...) \
-	log_say_level(log, S_SYSERROR, strerror(errno), format, ##__VA_ARGS__)
-
 /* internals, for unit testing */
 
 /**
