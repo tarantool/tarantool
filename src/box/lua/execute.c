@@ -10,6 +10,7 @@
 #include "box/schema.h"
 #include "mpstream/mpstream.h"
 #include "box/sql/vdbeInt.h"
+#include "box/sql/port.h"
 
 /**
  * Serialize a description of the prepared statement.
