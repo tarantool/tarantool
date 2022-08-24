@@ -21,6 +21,20 @@ def find_value(sym):
     except Exception as exc:
         return None
 
+def equal_types(type1, type2):
+    return type1.code == type2.code and type1.tag == type2.tag
+
+def dump_type(type):
+    return 'tag={} code={}'.format(type.tag, type.code)
+
+def container_of(ptr, container_type, field):
+    return (ptr.cast(gdb.lookup_type('char').pointer()) - container_type[field].bitpos // 8).cast(container_type.pointer()).dereference()
+
+def type_has_field(type, field_name):
+    for field in type.fields():
+        if field.name == field_name:
+            return True
+    return False
 
 INT32_MAX = 2**31 - 1
 INT32_MIN = -2**31
@@ -427,6 +441,9 @@ class MsgPack(object):
     def to_string(self, depth=-1, maxlen=-1):
         s = self.to_string_data(InputStream(self.val), depth)
         return s if maxlen < 0 else s[:maxlen]
+
+    def __str__(self):
+        return self.to_string()
 
 
 class TtMsgPack(MsgPack):
@@ -1201,4 +1218,184 @@ Usage: tt-mp EXP [DEPTH [MAXLENGTH]]
             s = mp.to_string()
         gdb.write(s + '\n')
 
+
+class JsonTokenPrinter:
+    """Print a json_token object."""
+
+    JSON_TOKEN_NUM = gdb.parse_and_eval('JSON_TOKEN_NUM')
+    JSON_TOKEN_STR = gdb.parse_and_eval('JSON_TOKEN_STR')
+    JSON_TOKEN_ANY = gdb.parse_and_eval('JSON_TOKEN_ANY')
+    JSON_TOKEN_END = gdb.parse_and_eval('JSON_TOKEN_END')
+
+    tuple_field_type = gdb.lookup_type('tuple_field')
+
+    def __init__(self, val):
+        self.val = val
+
+    def to_string(self):
+        type = self.val['type']
+        hash = self.val['hash']
+
+        if type == self.JSON_TOKEN_NUM:
+            s_id = ' id=' + str(self.val['num'])
+        elif type == self.JSON_TOKEN_STR:
+            s_id = ' id=' + self.val['str'].string('utf-8', 'strict', int(self.val['len']))
+        else:
+            s_id = str()
+        s = 'type={}{} hash={} parent={} sibling_idx={}'.format(
+            int(type),
+            s_id,
+            int(hash),
+            str(self.val['parent']),
+            int(self.val['sibling_idx']),
+        )
+
+        if self.val['parent'] != 0:
+            field = container_of(self.val.address, self.tuple_field_type, 'token')
+            s += ' field_id={} field_type={} offset_slot={} is_key/multikey_part={}/{}'.format(
+                str(field['id']),
+                str(field['type']),
+                str(field['offset_slot']),
+                str(field['is_key_part']),
+                str(field['is_multikey_part']),
+            )
+
+        return s
+
+    def children(self):
+        for i in range(0, int(self.val['max_child_idx']) + 1):
+            yield str(i), self.val['children'][i].dereference()
+
+    def display_hint(self):
+        return 'array'
+
+pp.add_printer('JsonToken', '^json_token$', JsonTokenPrinter)
+
+
+class TuplePrinter:
+    """Print a tuple object."""
+
+    tuple_type = gdb.lookup_type('struct tuple')
+    support_compact = type_has_field(tuple_type, 'data_offset_bsize_raw')
+
+    tuple_formats_sym = gdb.lookup_global_symbol('tuple_formats')
+    if not tuple_formats_sym:
+        raise NameError('tuple_formats is missing')
+    tuple_formats = tuple_formats_sym.value()
+
+    ptr_char = gdb.lookup_type('char').pointer()
+    ptr_int32 = gdb.lookup_type('int32_t').pointer()
+    ptr_uint32 = gdb.lookup_type('uint32_t').pointer()
+    slot_extent_t = find_type('struct field_map_builder_slot_extent')
+
+    # Printer configuration.
+    mp_depth = -1
+    mp_maxlen = -1
+
+    def __init__(self, val):
+        if not equal_types(val.type, self.tuple_type):
+            raise gdb.GdbError("expression doesn't evaluate to tuple")
+        self.val = val
+
+    def is_compact(self): # tuple_is_compact
+        return self.support_compact and self.val['data_offset_bsize_raw'] & 0x8000
+
+    def format(self): # tuple_format
+        return self.tuple_formats[self.val['format_id']].dereference()
+
+    def data_offset(self): # tuple_data_offset
+        # prior to introducing of compact mode data offset was just stored
+        # in the corresponding field
+        if not self.support_compact:
+            return self.val['data_offset']
+        # after introducing support of compact mode offset is stored
+        # in a different way
+        res = self.val['data_offset_bsize_raw']
+        is_compact_bit = res >> 15
+        res = (res & 0x7fff) >> (is_compact_bit * 8)
+        return res
+
+    def data(self): # tuple_data
+        return self.val.address.cast(self.ptr_char) + self.data_offset()
+
+    def field_map(self):
+        slots = self.data().cast(self.ptr_int32)
+        num_slots = int(self.format()['field_map_size']) // slots.type.target().sizeof
+        fields = []
+        key_by_offset = lambda offs: '{}(+{})'.format(str(TtMsgPack(self.data() + offs)), offs)
+        for i in range(1, num_slots + 1):
+            field_offs = slots[-i]
+            key = str()
+            if field_offs > 0:
+                key = key_by_offset(field_offs)
+            elif field_offs < 0:
+                assert self.slot_extent_t is not None
+                ext = (self.data() + field_offs).cast(self.slot_extent_t.pointer()).dereference()
+                num_ext_keys = ext['size']
+                offsets = ext['offset']
+                key = '[{}-{}]:'.format(slots - ext.address.cast(slots.type), int(num_ext_keys))
+                for ikey in range(0, num_ext_keys):
+                    key += key_by_offset(offsets[ikey])
+            else:
+                key = 'missed'
+            fields.append('[{}]:{}'.format(i, key))
+
+        return ', '.join(fields)
+
+    def children(self):
+        for field in self.val.type.fields():
+            child_name = field.name
+            if field.name is None:
+                child_name = str()
+                child_val = (self.val.address.cast(self.ptr_char) + field.bitpos // 8).cast(field.type.pointer()).dereference()
+            elif field.name == 'flags':
+                child_val = '0x{:02x}'.format(int(self.val['flags']))
+            else:
+                child_val = self.val[field.name]
+            yield child_name, child_val
+        yield 'format', self.format()
+        yield 'field_map', self.field_map()
+        if self.support_compact:
+            yield 'is_compact', self.is_compact()
+        yield 'data_offset', self.data_offset()
+        yield 'data', TtMsgPack(self.data()).to_string(self.mp_depth, self.mp_maxlen)
+
+pp.add_printer('Tuple', '^tuple$', TuplePrinter)
+
+
+class TuplePrint(gdb.Command):
+    """
+Decode and print tuple referred by EXP
+Usage: tt-tuple EXP [MSGPACK_DEPTH [MSGPACK_MAXLENGTH]]
+    """
+    def __init__(self):
+        super(TuplePrint, self).__init__('tt-tuple', gdb.COMMAND_DATA)
+
+    def invoke(self, arg, from_tty):
+        argv = gdb.string_to_argv(arg)
+        argc = len(argv)
+        if argc < 1:
+            raise gdb.GdbError("tuple is missing")
+
+        val = gdb.parse_and_eval(argv[0])
+        if equal_types(val.type, TuplePrinter.tuple_type):
+            exp_modifier = ''
+        elif val.type.code == gdb.TYPE_CODE_PTR and equal_types(val.type.target(), TuplePrinter.tuple_type):
+            exp_modifier = '*'
+        else:
+            raise gdb.GdbError("'{}' doesn't refer to tuple".format(argv[0]))
+
+        try:
+            if argc > 1:
+                TuplePrinter.mp_depth = int(argv[1])
+            if argc > 2:
+                TuplePrinter.mp_maxlen = int(argv[2])
+            gdb.execute('print {}{}'.format(exp_modifier, argv[0]), False)
+
+        finally:
+            TuplePrinter.mp_depth = -1
+            TuplePrinter.mp_maxlen = -1
+
+
 MsgPackPrint()
+TuplePrint()
