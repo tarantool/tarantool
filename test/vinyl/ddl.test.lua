@@ -9,6 +9,8 @@ space:create_index('pk', {run_count_per_level = 0})
 space:create_index('pk', {run_size_ratio = 1})
 space:create_index('pk', {bloom_fpr = 0})
 space:create_index('pk', {bloom_fpr = 1.1})
+space:create_index('pk', {lookup_cost_coeff = 0})
+space:create_index('pk', {lookup_cost_coeff = 1.1})
 space:drop()
 
 -- space secondary index create

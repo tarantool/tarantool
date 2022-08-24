@@ -30,6 +30,7 @@
  */
 #include "vy_scheduler.h"
 
+#include <math.h>
 #include <assert.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -1116,6 +1117,140 @@ fail:
 	return -1;
 }
 
+/**
+ * Table of symbols:
+ * R - Worst-case zero-result point lookup cost (in runs);
+ * W_u - number of unfiltered runs;
+ * W_f - number of filtered runs;
+ * t_r - Adopted run_size_ratio_coeff.
+ *
+ * Note:
+ * We should consider the fact that
+ * current range doesn't yet contains newly created run.
+ *
+ * @param lsm
+ * @param range
+ * @param new_run_stmts_count statements count in the newly created after
+ * dump/compaction run
+ * @param W total number of runs in the range
+ * after operation (dump/compaction)
+ * @param total_stmts_count total number of statements in the range
+ * after operation (dump/compaction)
+ * @param skip_n number of runs to skip during the range traverse
+ * as they are compacted into one new run.
+ * @return optimally calculated bloom_fpr
+ */
+double
+vy_task_find_range_bloom_fpr(
+	struct vy_lsm *lsm,
+	struct vy_range *range,
+	uint64_t new_run_stmts_count,
+	int W,
+	uint64_t total_stmts_count,
+	int skip_n)
+{
+	double R = W * lsm->opts.lookup_cost_coeff;
+
+	if (new_run_stmts_count == total_stmts_count) {
+		/** By definition of R. May also look at formulas ahead.
+		 *  R <= 1 in this case as soon as W = 1.
+		 *  It also means that skip_n == range->slice_count.
+		 */
+		return R;
+	}
+
+	struct vy_slice *last_slice =
+		rlist_last_entry(&range->slices, struct vy_slice, in_range);
+	uint64_t last_slice_stmts_count = last_slice->count.rows;
+
+	if (new_run_stmts_count > last_slice_stmts_count) {
+		/** The only case is when the size of dumped run
+		 *  is bigger than the size of the last run.
+		 *  Returning default bloom_fpr value,
+		 *  cause otherwise formula breaks.
+		 *  update_compaction_priority will understand that
+		 *  major compaction must be called and compaciton will create
+		 *  new run with optimal bloom_fpr
+		 */
+		return lsm->opts.bloom_fpr;
+	}
+
+	uint64_t scnd_last_slice_stmts_count = 0;
+
+	if (skip_n == range->slice_count - 1) {
+		/** In both dump and compaction cases it means
+		 *  we only have the new run except the last run.
+		 */
+		scnd_last_slice_stmts_count = new_run_stmts_count;
+	} else {
+		struct vy_slice *scnd_last_slice = rlist_prev_entry(
+			last_slice, in_range);
+		scnd_last_slice_stmts_count = scnd_last_slice->count.rows;
+	}
+
+	int W_u = 0;
+	int W_f = 0;
+	double t_r = 0;
+
+	if (R <= (total_stmts_count / last_slice_stmts_count)) {
+		W_u = 0;
+	} else {
+		t_r = (double)scnd_last_slice_stmts_count /
+		      last_slice_stmts_count;
+		W_u = MAX(0, floor((R - t_r * W) / (1 - t_r)));
+	}
+	if (W_u == W) {
+		/** As soon as all runs should be unfiltered. */
+		return 1;
+	}
+	W_f = W - W_u;
+
+	int slice_number = 0;
+	uint64_t filtered_stmts_count_sum = new_run_stmts_count;
+	struct vy_slice *slice;
+	rlist_foreach_entry(slice, &range->slices, in_range) {
+		if (slice_number++ < skip_n) {
+			continue;
+		}
+
+		filtered_stmts_count_sum += slice->count.rows;
+
+		if (slice_number == W_f) {
+			break;
+		}
+	}
+
+	double bloom_fpr = (R - W_u) * new_run_stmts_count /
+			   filtered_stmts_count_sum;
+	return bloom_fpr;
+}
+
+/*
+ * Logic:
+ * Let's consider our dump is divided evenly into all lsm ranges.
+ * So everything we have to do is to find optimized bloom_fpr
+ * for small dump part in one of lsm ranges.
+ *
+ * @param lsm
+ * @param new_run_stmts_count statements count in the newly created after
+ * dump run
+ * @return optimally calculated bloom_fpr for dump
+ */
+double
+vy_task_find_lsm_bloom_fpr(
+	struct vy_lsm *lsm,
+	uint64_t new_run_stmts_count)
+{
+	struct vy_range *range = vy_range_tree_first(&lsm->range_tree);
+	uint64_t part_run_stmts_count = new_run_stmts_count / lsm->range_count;
+
+	int W = range->slice_count + 1;
+	int total_stmts_count = range->count.rows + part_run_stmts_count;
+	return vy_task_find_range_bloom_fpr(
+		lsm, range, part_run_stmts_count,
+		W, total_stmts_count, 0);
+}
+
 static int
 vy_task_dump_execute(struct vy_task *task)
 {
@@ -1348,7 +1483,9 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	 */
 	int64_t dump_lsn = -1;
 	struct vy_mem *mem, *next_mem;
+	uint64_t dump_stmts_count = 0;
 	rlist_foreach_entry_safe(mem, &lsm->sealed, in_sealed, next_mem) {
+		dump_stmts_count += mem->count.rows;
 		if (mem->generation > scheduler->dump_generation)
 			continue;
 		vy_mem_wait_pinned(mem);
@@ -1388,6 +1525,9 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	 * dump so we don't pass a deferred DELETE handler.
 	 */
 	struct vy_stmt_stream *wi;
+	/* In vy_task_compaction_new it is
+	 * (range->compaction_priority == range->slice_count.
+	 */
 	bool is_last_level = (lsm->run_count == 0);
 	wi = vy_write_iterator_new(task->cmp_def, lsm->index_id == 0,
 				   is_last_level, scheduler->read_views, NULL);
@@ -1402,7 +1542,9 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 
 	task->new_run = new_run;
 	task->wi = wi;
-	task->bloom_fpr = lsm->opts.bloom_fpr;
+	task->bloom_fpr = vy_task_find_lsm_bloom_fpr(
+		lsm,
+		dump_stmts_count);
 	task->page_size = lsm->opts.page_size;
 
 	lsm->is_dumping = true;
@@ -1675,6 +1817,7 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	struct vy_slice *slice;
 	int32_t dump_count = 0;
 	int n = range->compaction_priority;
+	uint64_t compacted_run_stmts_count = 0;
 	rlist_foreach_entry(slice, &range->slices, in_range) {
 		if (vy_write_iterator_new_slice(wi, slice,
 						lsm->disk_format) != 0)
@@ -1686,12 +1829,17 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 		if (task->first_slice == NULL)
 			task->first_slice = slice;
 		task->last_slice = slice;
-
+		compacted_run_stmts_count += slice->count.rows;
 		if (--n == 0)
 			break;
 	}
 	assert(n == 0);
 	assert(new_run->dump_lsn >= 0);
+
+	/*
+	 * If we are working with is_last_level.
+	 * See dump_count exploration in struct vy_run.
+	 */
 	if (range->compaction_priority == range->slice_count)
 		dump_count -= slice->run->dump_count;
 	/*
@@ -1709,7 +1857,11 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	task->range = range;
 	task->new_run = new_run;
 	task->wi = wi;
-	task->bloom_fpr = lsm->opts.bloom_fpr;
+	task->bloom_fpr = vy_task_find_range_bloom_fpr(
+		lsm, range, compacted_run_stmts_count,
+		range->slice_count - range->compaction_priority + 1,
+		range->count.rows,
+		range->compaction_priority);
 	task->page_size = lsm->opts.page_size;
 
 	/*

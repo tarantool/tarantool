@@ -64,6 +64,7 @@ local default_cfg = {
     vinyl_range_size          = nil, -- set automatically
     vinyl_page_size           = 8 * 1024,
     vinyl_bloom_fpr           = 0.05,
+    vinyl_lookup_cost_coeff   = 0.5,
 
     -- logging options are covered by
     -- a separate log module; they are
@@ -190,6 +191,7 @@ local template_cfg = {
     vinyl_range_size          = 'number',
     vinyl_page_size           = 'number',
     vinyl_bloom_fpr           = 'number',
+    vinyl_lookup_cost_coeff   = 'number',
 
     log                 = 'module',
     log_nonblock        = 'module',

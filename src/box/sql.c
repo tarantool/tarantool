@@ -1173,7 +1173,7 @@ sql_encode_index_opts(struct region *region, const struct index_opts *opts,
 	 * page_size etc.
 	 */
 	uint8_t current_engine = current_session()->sql_default_engine;
-	uint32_t map_sz = current_engine == SQL_STORAGE_ENGINE_VINYL ? 6 : 1;
+	uint32_t map_sz = current_engine == SQL_STORAGE_ENGINE_VINYL ? 7 : 1;
 	mpstream_encode_map(&stream, map_sz);
 	mpstream_encode_str(&stream, "unique");
 	mpstream_encode_bool(&stream, opts->is_unique);
@@ -1188,6 +1188,9 @@ sql_encode_index_opts(struct region *region, const struct index_opts *opts,
 		mpstream_encode_double(&stream, cfg_getd("vinyl_run_size_ratio"));
 		mpstream_encode_str(&stream, "bloom_fpr");
 		mpstream_encode_double(&stream, cfg_getd("vinyl_bloom_fpr"));
+		mpstream_encode_str(&stream, "lookup_cost_coeff");
+		mpstream_encode_double(&stream,
+				       cfg_getd("vinyl_lookup_cost_coeff"));
 	}
 	mpstream_flush(&stream);
 	if (is_error) {
