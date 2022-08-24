@@ -777,23 +777,6 @@ relay_send_heartbeat_on_timeout(struct relay *relay)
 	relay_send_heartbeat(relay);
 }
 
-/** A message to set Raft enabled flag in TX thread from a relay thread. */
-struct relay_is_raft_enabled_msg {
-	/** Base cbus message. */
-	struct cmsg base;
-	/**
-	 * First hop - TX thread, second hop - a relay thread, to notify about
-	 * the flag being set.
-	 */
-	struct cmsg_hop route[2];
-	/** Relay pointer to set the flag in. */
-	struct relay *relay;
-	/** New flag value. */
-	bool value;
-	/** Flag to wait for the flag being set, in a relay thread. */
-	bool is_finished;
-};
-
 static void
 relay_push_raft_msg(struct relay *relay)
 {
@@ -807,59 +790,27 @@ relay_push_raft_msg(struct relay *relay)
 	relay->tx.is_raft_push_pending = false;
 }
 
-/** TX thread part of the Raft flag setting, first hop. */
+/** A notification that relay thread is ready to process cbus messages. */
 static void
-tx_set_is_raft_enabled(struct cmsg *base)
+relay_thread_on_start(void *arg)
 {
-	struct relay_is_raft_enabled_msg *msg =
-		(struct relay_is_raft_enabled_msg *)base;
-	struct relay *relay  = msg->relay;
-	relay->tx.is_raft_enabled = msg->value;
-	/* Send saved raft message as soon as relay becomes operational. */
-	if (relay->tx.is_raft_push_pending)
-		relay_push_raft_msg(msg->relay);
-}
-
-/** Relay thread part of the Raft flag setting, second hop. */
-static void
-relay_set_is_raft_enabled(struct cmsg *base)
-{
-	struct relay_is_raft_enabled_msg *msg =
-		(struct relay_is_raft_enabled_msg *)base;
-	msg->is_finished = true;
-}
-
-/**
- * Set relay Raft enabled flag from a relay thread to be accessed by the TX
- * thread.
- */
-static void
-relay_send_is_raft_enabled(struct relay *relay,
-			   struct relay_is_raft_enabled_msg *msg, bool value)
-{
-	msg->route[0].f = tx_set_is_raft_enabled;
-	msg->route[0].pipe = &relay->relay_pipe;
-	msg->route[1].f = relay_set_is_raft_enabled;
-	msg->route[1].pipe = NULL;
-	msg->relay = relay;
-	msg->value = value;
-	msg->is_finished = false;
-	cmsg_init(&msg->base, msg->route);
-	cpipe_push(&relay->tx_pipe, &msg->base);
-	/*
-	 * cbus_call() can't be used, because it works only if the sender thread
-	 * is a simple cbus_process() loop. But the relay thread is not -
-	 * instead it calls cbus_process() manually when ready. And the thread
-	 * loop consists of the main fiber wakeup. So cbus_call() would just
-	 * hang, because cbus_process() wouldn't be called by the scheduler
-	 * fiber.
-	 */
-	while (!msg->is_finished) {
-		cbus_process(&relay->tx_endpoint);
-		if (msg->is_finished)
-			break;
-		fiber_yield();
+	struct relay *relay = (struct relay *)arg;
+	if (!relay->replica->anon && relay->version_id >= version_id(2, 6, 0)) {
+		relay->tx.is_raft_enabled = true;
+		/*
+		 * Send saved raft message as soon as relay becomes operational.
+		 */
+		if (relay->tx.is_raft_push_pending)
+			relay_push_raft_msg(relay);
 	}
+}
+
+/** A notification about relay detach from the cbus. */
+static void
+relay_thread_on_stop(void *arg)
+{
+	struct relay *relay = (struct relay *)arg;
+	relay->tx.is_raft_enabled = false;
 }
 
 /**
@@ -879,17 +830,12 @@ relay_subscribe_f(va_list ap)
 			     tt_sprintf("relay_tx_%p", relay),
 			     fiber_schedule_cb, fiber());
 	cbus_pair("tx", relay->tx_endpoint.name, &relay->tx_pipe,
-		  &relay->relay_pipe, NULL, NULL, cbus_process);
+		  &relay->relay_pipe, relay_thread_on_start, relay,
+		  cbus_process);
 
 	cbus_endpoint_create(&relay->wal_endpoint,
 			     tt_sprintf("relay_wal_%p", relay),
 			     fiber_schedule_cb, fiber());
-
-	struct relay_is_raft_enabled_msg raft_enabler;
-	if (!relay->replica->anon && relay->version_id >= version_id(2, 6, 0))
-		relay_send_is_raft_enabled(relay, &raft_enabler, true);
-	else
-		relay->sent_raft_term = UINT64_MAX;
 
 	/*
 	 * Setup garbage collection trigger.
@@ -973,9 +919,6 @@ relay_subscribe_f(va_list ap)
 		cpipe_push(&relay->tx_pipe, &relay->status_msg.msg);
 	}
 
-	if (!relay->replica->anon && relay->version_id >= version_id(2, 6, 0))
-		relay_send_is_raft_enabled(relay, &raft_enabler, false);
-
 	/*
 	 * Clear garbage collector trigger and WAL watcher.
 	 * trigger_clear() does nothing in case the triggers
@@ -990,7 +933,7 @@ relay_subscribe_f(va_list ap)
 
 	/* Destroy cpipe to tx. */
 	cbus_unpair(&relay->tx_pipe, &relay->relay_pipe,
-		    NULL, NULL, cbus_process);
+		    relay_thread_on_stop, relay, cbus_process);
 	cbus_endpoint_destroy(&relay->wal_endpoint, cbus_process);
 	cbus_endpoint_destroy(&relay->tx_endpoint, cbus_process);
 
@@ -1030,6 +973,8 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 		gc_delay_unref();
 	}
 
+	if (replica_version_id < version_id(2, 6, 0) || replica->anon)
+		sent_raft_term = UINT64_MAX;
 	relay_start(relay, io, sync, relay_send_row,
 		    relay_yield_and_send_heartbeat, sent_raft_term);
 	replica_on_relay_follow(replica);
