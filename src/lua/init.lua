@@ -62,7 +62,8 @@ local function exit(code)
     -- Make sure we yield even if the code after
     -- os.exit() never yields. After on_shutdown
     -- fiber completes, we will never wake up again.
-    while true do fiber.yield() end
+    local TIMEOUT_INFINITY = 500 * 365 * 86400
+    while true do fiber.sleep(TIMEOUT_INFINITY) end
 end
 rawset(os, "exit", exit)
 
