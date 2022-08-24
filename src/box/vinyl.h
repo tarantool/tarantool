@@ -58,6 +58,12 @@ void
 vinyl_engine_set_cache(struct engine *engine, size_t quota);
 
 /**
+ * Update vinyl page caches' general quota.
+ */
+void
+vinyl_engine_set_page_cache(struct engine *engine, size_t quota);
+
+/**
  * Update vinyl memory size.
  */
 int

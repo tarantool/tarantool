@@ -183,6 +183,7 @@ vy_run_env_create(struct vy_run_env *env, int read_threads)
 	mempool_create(&env->read_task_pool, cord_slab_cache(),
 		       sizeof(struct vy_page_read_task));
 	env->initial_join = false;
+	rlist_create(&env->pc_lru);
 }
 
 /**
@@ -235,6 +236,73 @@ vy_run_env_coio_call(struct vy_run_env *env, struct cbus_call_msg *msg,
 	return 0;
 }
 
+static struct vy_page *
+vy_page_new(const struct vy_page_info *page_info)
+{
+	struct vy_page *page = xmalloc(sizeof(*page));
+	page->unpacked_size = page_info->unpacked_size;
+	page->row_count = page_info->row_count;
+	page->row_index = xcalloc(page_info->row_count, sizeof(uint32_t));
+	page->data = xmalloc(page_info->unpacked_size);
+	return page;
+}
+
+static void
+vy_page_delete(struct vy_page *page)
+{
+	uint32_t *row_index = page->row_index;
+	char *data = page->data;
+#if !defined(NDEBUG)
+	memset(row_index, '#', sizeof(uint32_t) * page->row_count);
+	memset(data, '#', page->unpacked_size);
+	memset(page, '#', sizeof(*page));
+#endif /* !defined(NDEBUG) */
+	free(row_index);
+	free(data);
+	free(page);
+}
+
+/**
+ * Get xrow given a statement number
+ */
+static int
+vy_page_xrow(struct vy_page *page, uint32_t stmt_no,
+	     struct xrow_header *xrow)
+{
+	assert(stmt_no < page->row_count);
+	const char *data = page->data + page->row_index[stmt_no];
+	const char *data_end = stmt_no + 1 < page->row_count ?
+			       page->data + page->row_index[stmt_no + 1] :
+			       page->data + page->unpacked_size;
+	return xrow_header_decode(xrow, &data, data_end, false);
+}
+
+/**
+ * Include memory, occupied by the page, to page cache memory
+ * usage statistics.
+ */
+static inline void
+vy_page_cache_account_page_mem(struct vy_run_env *run_env,
+			       struct vy_page_info *page_info)
+{
+	run_env->pc_mem_used += (page_info->unpacked_size +
+			sizeof(struct vy_page) + page_info->row_count *
+			sizeof(*page_info->page->row_index));
+}
+
+/**
+ * Exclude memory, occupied by the page, from page cache memory
+ * usage statistics.
+ */
+static inline void
+vy_page_cache_unaccount_page_mem(struct vy_run_env *run_env,
+				 struct vy_page_info *page_info)
+{
+	run_env->pc_mem_used -= (page_info->unpacked_size +
+			sizeof(struct vy_page) + page_info->row_count *
+			sizeof(*page_info->page->row_index));
+}
+
 /**
  * Initialize page info struct
  *
@@ -246,6 +314,7 @@ vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
 		    const char *min_key, struct key_def *cmp_def)
 {
 	memset(page_info, 0, sizeof(*page_info));
+	rlist_create(&page_info->in_pc_lru);
 	page_info->offset = offset;
 	page_info->unpacked_size = 0;
 	page_info->min_key = vy_key_dup(min_key);
@@ -257,11 +326,18 @@ vy_page_info_create(struct vy_page_info *page_info, uint64_t offset,
 }
 
 /**
- * Destroy page info struct
+ * Destroy page info struct (relinks vy_run_env::pc_lru list nodes)
  */
 static void
-vy_page_info_destroy(struct vy_page_info *page_info)
+vy_page_info_destroy(struct vy_page_info *page_info,
+		     struct vy_run_env *run_env)
 {
+	if (page_info->page != NULL) {
+		vy_page_cache_unaccount_page_mem(run_env, page_info);
+		vy_page_delete(page_info->page);
+		rlist_del_entry(page_info, in_pc_lru);
+		page_info->page = NULL;
+	}
 	if (page_info->min_key != NULL)
 		free(page_info->min_key);
 }
@@ -291,7 +367,8 @@ vy_run_clear(struct vy_run *run)
 	if (run->page_info != NULL) {
 		uint32_t page_no;
 		for (page_no = 0; page_no < run->info.page_count; ++page_no)
-			vy_page_info_destroy(run->page_info + page_no);
+			vy_page_info_destroy(run->page_info + page_no,
+					     run->env);
 		free(run->page_info);
 	}
 	run->page_info = NULL;
@@ -698,63 +775,6 @@ vy_run_info_decode(struct vy_run_info *run_info,
 	return 0;
 }
 
-static struct vy_page *
-vy_page_new(const struct vy_page_info *page_info)
-{
-	struct vy_page *page = malloc(sizeof(*page));
-	if (page == NULL) {
-		diag_set(OutOfMemory, sizeof(*page),
-			 "load_page", "page cache");
-		return NULL;
-	}
-	page->unpacked_size = page_info->unpacked_size;
-	page->row_count = page_info->row_count;
-	page->row_index = calloc(page_info->row_count, sizeof(uint32_t));
-	if (page->row_index == NULL) {
-		diag_set(OutOfMemory, page_info->row_count * sizeof(uint32_t),
-			 "malloc", "page->row_index");
-		free(page);
-		return NULL;
-	}
-
-	page->data = (char *)malloc(page_info->unpacked_size);
-	if (page->data == NULL) {
-		diag_set(OutOfMemory, page_info->unpacked_size,
-			 "malloc", "page->data");
-		free(page->row_index);
-		free(page);
-		return NULL;
-	}
-	return page;
-}
-
-static void
-vy_page_delete(struct vy_page *page)
-{
-	uint32_t *row_index = page->row_index;
-	char *data = page->data;
-#if !defined(NDEBUG)
-	memset(row_index, '#', sizeof(uint32_t) * page->row_count);
-	memset(data, '#', page->unpacked_size);
-	memset(page, '#', sizeof(*page));
-#endif /* !defined(NDEBUG) */
-	free(row_index);
-	free(data);
-	free(page);
-}
-
-static int
-vy_page_xrow(struct vy_page *page, uint32_t stmt_no,
-	     struct xrow_header *xrow)
-{
-	assert(stmt_no < page->row_count);
-	const char *data = page->data + page->row_index[stmt_no];
-	const char *data_end = stmt_no + 1 < page->row_count ?
-			       page->data + page->row_index[stmt_no + 1] :
-			       page->data + page->unpacked_size;
-	return xrow_header_decode(xrow, &data, data_end, false);
-}
-
 /* {{{ vy_run_iterator vy_run_iterator support functions */
 
 /**
@@ -819,7 +839,7 @@ vy_page_find_key(struct vy_page *page, struct vy_entry key,
 }
 
 /**
- * End iteration and free cached data.
+ * End run iteration.
  */
 static void
 vy_run_iterator_stop(struct vy_run_iterator *itr)
@@ -827,12 +847,6 @@ vy_run_iterator_stop(struct vy_run_iterator *itr)
 	if (itr->curr.stmt != NULL) {
 		tuple_unref(itr->curr.stmt);
 		itr->curr = vy_entry_none();
-	}
-	if (itr->curr_page != NULL) {
-		vy_page_delete(itr->curr_page);
-		if (itr->prev_page != NULL)
-			vy_page_delete(itr->prev_page);
-		itr->curr_page = itr->prev_page = NULL;
 	}
 }
 
@@ -992,55 +1006,30 @@ vy_page_read_cb(struct cbus_call_msg *base)
 }
 
 /**
- * Read a page from disk given its number.
- * The function caches two most recently read pages.
+ * Read a page from the disk and attach it to the page_info cell.
  *
  * @retval 0 success
  * @retval -1 critical error
  */
 static NODISCARD int
-vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
-			  struct vy_entry key, enum iterator_type iterator_type,
-			  struct vy_page **result, uint32_t *pos_in_page,
-			  bool *equal_found)
+vy_page_load(struct vy_run_iterator *itr, struct vy_page_info *page_info,
+	     struct vy_entry key, enum iterator_type iterator_type,
+	     uint32_t *pos_in_page, bool *equal_found)
 {
-	struct vy_slice *slice = itr->slice;
-	struct vy_run_env *env = slice->run->env;
-
-	/* Check cache */
-	struct vy_page *page = NULL;
-	if (itr->curr_page != NULL &&
-	    itr->curr_page->page_no == page_no) {
-		page = itr->curr_page;
-	} else if (itr->prev_page != NULL &&
-		   itr->prev_page->page_no == page_no) {
-		SWAP(itr->prev_page, itr->curr_page);
-		page = itr->curr_page;
-	}
-	if (page != NULL) {
-		if (key.stmt != NULL)
-			*pos_in_page = vy_page_find_key(page, key, itr->cmp_def,
-							itr->format, iterator_type,
-							equal_found);
-		*result = page;
-		return 0;
-	}
-
-	/* Allocate buffers */
-	struct vy_page_info *page_info = vy_run_page_info(slice->run, page_no);
-	page = vy_page_new(page_info);
+	struct vy_run_env *run_env = itr->slice->run->env;
+	struct vy_page *page = vy_page_new(page_info);
 	if (page == NULL)
 		return -1;
 
-	/* Read page data from the disk */
-	struct vy_page_read_task *task = mempool_alloc(&env->read_task_pool);
+	struct vy_page_read_task *task =
+			mempool_alloc(&run_env->read_task_pool);
 	if (task == NULL) {
-		diag_set(OutOfMemory, sizeof(*task),
-			 "mempool", "vy_page_read_task");
+		diag_set(OutOfMemory, sizeof(*task), "mempool",
+			 "vy_page_read_task");
 		vy_page_delete(page);
 		return -1;
 	}
-	task->run = slice->run;
+	task->run = itr->slice->run;
 	task->page_info = page_info;
 	task->page = page;
 	task->key = key;
@@ -1050,31 +1039,140 @@ vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
 	task->pos_in_page = 0;
 	task->equal_found = false;
 
-	int rc = vy_run_env_coio_call(env, &task->base, vy_page_read_cb);
+	int rc = vy_run_env_coio_call(run_env, &task->base, vy_page_read_cb);
 
 	*pos_in_page = task->pos_in_page;
 	*equal_found = task->equal_found;
 
-	mempool_free(&env->read_task_pool, task);
+	mempool_free(&run_env->read_task_pool, task);
 	if (rc != 0) {
 		vy_page_delete(page);
 		return -1;
 	}
 
-	/* Update cache */
-	if (itr->prev_page != NULL)
-		vy_page_delete(itr->prev_page);
-	itr->prev_page = itr->curr_page;
-	itr->curr_page = page;
-	page->page_no = page_no;
+	page_info->page = page;
+	return 0;
+}
 
-	/* Update read statistics. */
+/**
+ * Delete memory-stored pages from page cache's LRU list until the amount of
+ * memory used by the cache fits in cache's memory quota. Pages are deleted
+ * starting from the least recently used one and further towards the head
+ * of the list.
+ */
+static void
+vy_page_cache_mem_cutback(struct vy_run_env *run_env)
+{
+	while (run_env->pc_mem_used > run_env->pc_mem_quota) {
+		assert(!rlist_empty(&run_env->pc_lru));
+		struct vy_page_info *tail_item =
+				rlist_shift_tail_entry(&run_env->pc_lru,
+						       struct vy_page_info,
+						       in_pc_lru);
+		vy_page_cache_unaccount_page_mem(run_env, tail_item);
+		vy_page_delete(tail_item->page);
+		tail_item->page = NULL;
+	}
+}
+
+/**
+ * Process the page-cache-stored page as a newly requested: move it to the
+ * head of page cache's LRU list and prepare it for reading.
+ * The requested page MUST be presented in the cache.
+ */
+static void
+vy_page_cache_get_page(struct vy_run_iterator *itr,
+		       struct vy_page_info *page_info, struct vy_entry key,
+		       enum iterator_type iterator_type, uint32_t *pos_in_page,
+		       bool *equal_found, struct vy_run_env *run_env)
+{
+	assert(page_info->page != NULL);
+	rlist_move_entry(&run_env->pc_lru, page_info, in_pc_lru);
+	if (key.stmt != NULL)
+		*pos_in_page = vy_page_find_key(page_info->page, key,
+						itr->cmp_def, itr->format,
+						iterator_type, equal_found);
+}
+
+/**
+ * Load a page to memory, attach it to the corresponding page_info cell,
+ * add it to the page cache.
+ *
+ * @retval 0 success
+ * @retval -1 critical error
+ */
+static NODISCARD int
+vy_page_cache_load_page(struct vy_run_iterator *itr,
+			struct vy_page_info *page_info, struct vy_entry key,
+			enum iterator_type iterator_type, uint32_t *pos_in_page,
+			bool *equal_found, struct vy_run_env *run_env)
+{
+	assert(page_info->page == NULL);
+
+	if (page_info->in_read) {
+		/* The page is being read from the disk in another fiber */
+		while (page_info->in_read)
+			fiber_sleep(0.0001);
+		if (page_info->page == NULL) {
+			return -1;
+		}
+		vy_page_cache_get_page(itr, page_info, key, iterator_type,
+				       pos_in_page, equal_found, run_env);
+		return 0;
+	}
+
+	page_info->in_read = true;
+	int rc = vy_page_load(itr, page_info, key, iterator_type, pos_in_page,
+			      equal_found);
+	page_info->in_read = false;
+	if (rc != 0)
+		return -1;
+
+	/* Check-in the new page to page cache */
+	rlist_add_entry(&run_env->pc_lru, page_info, in_pc_lru);
+	vy_page_cache_account_page_mem(run_env, page_info);
+
+	/* Update read statistics */
 	itr->stat->read.rows += page_info->row_count;
 	itr->stat->read.bytes += page_info->unpacked_size;
 	itr->stat->read.bytes_compressed += page_info->size;
-	itr->stat->read.pages++;
+	itr->stat->read.pages += 1;
 
-	*result = page;
+	return 0;
+}
+
+/**
+ * Get a page from the page cache or from the disk via run iterator.
+ *
+ * @retval 0 success
+ * @retval -1 critical error
+ */
+static NODISCARD int
+vy_run_iterator_load_page(struct vy_run_iterator *itr, uint32_t page_no,
+			  struct vy_entry key,
+			  enum iterator_type iterator_type,
+			  struct vy_page **result, uint32_t *pos_in_page,
+			  bool *equal_found)
+{
+	struct vy_run_env *run_env = itr->slice->run->env;
+	struct vy_page_info *page_info = vy_run_page_info(itr->slice->run,
+							  page_no);
+
+	if (page_info->page != NULL) {
+		/* Page is already stored in the page cache */
+		vy_page_cache_get_page(itr, page_info, key, iterator_type,
+				       pos_in_page, equal_found, run_env);
+		*result = page_info->page;
+		return 0;
+	}
+
+	/* Page is not stored in memory, read it from the disk */
+	vy_page_cache_mem_cutback(run_env);
+	if (vy_page_cache_load_page(itr, page_info, key, iterator_type,
+				    pos_in_page, equal_found, run_env) != 0)
+		return -1;
+
+	*result = page_info->page;
 	return 0;
 }
 
@@ -1476,8 +1574,6 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 
 	itr->curr = vy_entry_none();
 	itr->curr_pos.page_no = slice->run->info.page_count;
-	itr->curr_page = NULL;
-	itr->prev_page = NULL;
 	itr->search_started = false;
 
 	/*
@@ -2739,4 +2835,11 @@ vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
 	stream->cmp_def = cmp_def;
 	stream->format = format;
 	tuple_format_ref(format);
+}
+
+void
+vy_run_env_set_page_cache_quota(struct vy_run_env *run_env, uint64_t quota)
+{
+	run_env->pc_mem_quota = quota;
+	vy_page_cache_mem_cutback(run_env);
 }

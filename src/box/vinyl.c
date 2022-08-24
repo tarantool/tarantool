@@ -299,6 +299,7 @@ vy_info_append_memory(struct vy_env *env, struct info_handler *h)
 	info_append_int(h, "tuple_cache", env->cache_env.mem_used);
 	info_append_int(h, "page_index", env->lsm_env.page_index_size);
 	info_append_int(h, "bloom_filter", env->lsm_env.bloom_size);
+	info_append_int(h, "page_cache", env->run_env.pc_mem_used);
 	info_table_end(h); /* memory */
 }
 
@@ -2733,6 +2734,13 @@ vinyl_engine_set_cache(struct engine *engine, size_t quota)
 {
 	struct vy_env *env = vy_env(engine);
 	vy_cache_env_set_quota(&env->cache_env, quota);
+}
+
+void
+vinyl_engine_set_page_cache(struct engine *engine, size_t quota)
+{
+	struct vy_env *env = vy_env(engine);
+	vy_run_env_set_page_cache_quota(&env->run_env, quota);
 }
 
 int

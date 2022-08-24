@@ -82,6 +82,9 @@ box.cfg {
     -- How much memory Vinyl engine can use for caches, in bytes.
     vinyl_cache = 128 * 1024 * 1024; -- 128Mb
 
+    -- How much memory Vinyl engine can use for page caches, in bytes.
+    vinyl_page_cache = 128 * 1024 * 1024; -- 128Mb
+
     -- Size of the largest allocation unit, in bytes.
     -- It can be tuned up if it is necessary to store large tuples
     vinyl_max_tuple_size = 128 * 1024 * 1024; -- 128Mb

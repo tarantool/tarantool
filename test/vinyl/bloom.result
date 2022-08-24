@@ -38,8 +38,14 @@ stat.disk.iterator.bloom.miss -- 0
 s:drop()
 ---
 ...
--- Disable tuple cache to check bloom hit/miss ratio.
-box.cfg{vinyl_cache = 0}
+-- Disable caches to check bloom hit/miss ratio.
+vinyl_cache = box.cfg.vinyl_cache
+---
+...
+vinyl_page_cache = box.cfg.vinyl_page_cache
+---
+...
+box.cfg{vinyl_cache = 0, vinyl_page_cache = 0}
 ---
 ...
 s = box.schema.space.create('test', {engine = 'vinyl'})
@@ -185,11 +191,17 @@ new_seeks() < 20
 ---
 - true
 ...
+box.cfg{vinyl_cache = vinyl_cache, vinyl_page_cache = vinyl_page_cache}
+---
+...
 test_run:cmd('restart server default')
 vinyl_cache = box.cfg.vinyl_cache
 ---
 ...
-box.cfg{vinyl_cache = 0}
+vinyl_page_cache = box.cfg.vinyl_page_cache
+---
+...
+box.cfg{vinyl_cache = 0, vinyl_page_cache = 0}
 ---
 ...
 s = box.space.test
@@ -310,7 +322,7 @@ new_seeks() < 20
 s:drop()
 ---
 ...
-box.cfg{vinyl_cache = vinyl_cache}
+box.cfg{vinyl_cache = vinyl_cache, vinyl_page_cache = vinyl_page_cache}
 ---
 ...
 --
