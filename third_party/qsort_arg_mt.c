@@ -232,7 +232,7 @@ qsort_arg_mt_internal(void *a, size_t n, intptr_t es,
 		/* Recurse on right partition, then iterate on left partition */
 		if (d2 > es) {
 #pragma omp task
-			qsort_arg_mt_internal(a, d1 / es, es, cmp, arg);
+			qsort_arg_mt_internal(pn - d2, d2 / es, es, cmp, arg);
 		}
 		if (d1 > es)
 		{
