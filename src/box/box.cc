@@ -2829,6 +2829,16 @@ box_session_push(const char *data, const char *data_end)
 	return rc;
 }
 
+API_EXPORT int
+box_space_bsize(uint32_t space_id, size_t *result)
+{
+	struct space *space = space_cache_find(space_id);
+	if (space == NULL)
+		return -1;
+	*result = space_bsize(space);
+	return 0;
+}
+
 static inline void
 box_register_replica(uint32_t id, const struct tt_uuid *uuid)
 {

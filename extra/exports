@@ -101,6 +101,7 @@ box_sequence_next
 box_sequence_reset
 box_sequence_set
 box_session_push
+box_space_bsize
 box_space_id_by_name
 box_truncate
 box_tuple_bsize

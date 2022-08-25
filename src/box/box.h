@@ -558,6 +558,17 @@ box_sequence_reset(uint32_t seq_id);
 API_EXPORT int
 box_session_push(const char *data, const char *data_end);
 
+/**
+ * Returns space's bsize (see space_bsize() for details).
+ *
+ * \param space identifier
+ * \param[out] result size of space.
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ */
+API_EXPORT int
+box_space_bsize(uint32_t space_id, size_t *result);
+
 /** \endcond public */
 
 /**

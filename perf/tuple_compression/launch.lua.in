@@ -1,0 +1,94 @@
+#! @TARANTOOL_BINARY_DIR@/src/tarantool
+
+-- Benchmark is split into two sources: Lua (this one) and C. The reason is
+-- following: on the one hand C API does not provide convenient interface to
+-- create spaces and define its indexes and format. On the other hand Lua may
+-- spoil benchmark results e.g. due to the GC.
+
+local function greetings()
+    io.write("\n*****************************************************************\n")
+    io.write("\n*********          Tuple Compression Perf Test            *******\n")
+    io.write("\n*****************************************************************\n")
+end
+
+-- Tuple compression is available only in EE build.
+local function package_check()
+    local tarantool = require('tarantool')
+    if tarantool.package ~= "Tarantool Enterprise" then
+        io.write("Tuple compression performance test are available only in EE version!")
+        os.exit()
+    end
+end
+
+local bench_funcs = { "bench.run", "bench.print_header" }
+local compression_types = {"zstd", "none", "lz4"}
+
+local function bench_module_load()
+    for _, func_name in pairs(bench_funcs) do
+        box.schema.func.create(func_name, {language = "C"})
+        box.schema.user.grant('guest', 'execute', 'function', func_name)
+    end
+end
+
+local function bench_module_unload()
+    for _, func_name in pairs(bench_funcs) do
+        box.schema.user.revoke('guest', 'execute', 'function', func_name)
+        box.schema.func.drop(func_name)
+    end
+end
+
+local function schema_create()
+    for _, compression_type in pairs(compression_types) do
+        box.schema.space.create(compression_type)
+        box.space[compression_type]:create_index("primary")
+        box.space[compression_type]:format({
+            {name = 'A', type = 'unsigned'},
+            {name = 'B', type = 'string', compression = compression_type},
+            {name = 'C', type = 'unsigned'}
+        })
+    end
+end
+
+local function setup()
+    -- Cleanup remaining data in case any.
+    os.execute("rm -rf *xlog *snap *vylog")
+
+    box.cfg{
+        -- Turn off disk sync in order to make benchmark results cleaner.
+        wal_mode = 'none',
+        memtx_memory = 8 * 1024 * 1024 * 1024,
+        -- Do not spam logs with any auxiliary messages.
+        log_level = 0
+    }
+    bench_module_load()
+    schema_create()
+end
+
+local function schema_drop()
+    for _, compression_type in pairs(compression_types) do
+        box.space[compression_type]:drop()
+    end
+end
+
+local function cleanup()
+    bench_module_unload()
+    schema_drop()
+end
+
+local function bench_run()
+    box.func["bench.print_header"]:call()
+    for _, compression_type in pairs(compression_types) do
+        box.func["bench.run"]:call({compression_type, box.space[compression_type].id})
+    end
+end
+
+local function main()
+    package_check()
+    greetings()
+    setup()
+    bench_run()
+    cleanup()
+    os.exit()
+end
+
+main()
