@@ -328,3 +328,6 @@ target_link_libraries(tt_sigaction.test core unit pthread)
 
 add_executable(string.test string.c core_test_utils.c)
 target_link_libraries(string.test core unit)
+
+add_executable(qsort_arg.test qsort_arg.cc core_test_utils.c)
+target_link_libraries(qsort_arg.test misc unit)
