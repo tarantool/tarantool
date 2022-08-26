@@ -114,11 +114,31 @@ ffi.cdef[[
     void
     port_destroy(struct port *port);
 
+    struct position {
+	    uint32_t key_size;
+	    const char *key;
+    };
+
+    void
+    position_reset(struct position *pos);
+
+    int
+    position_unpack(const char *ptr, struct position *pos);
+
+    const char *
+    position_pack_on_gc(struct position *pos, uint32_t *size);
+
     int
     box_select(uint32_t space_id, uint32_t index_id,
                int iterator, uint32_t offset, uint32_t limit,
                const char *key, const char *key_end,
                struct port *port);
+
+    int
+    box_select_after(uint32_t space_id, uint32_t index_id,
+                     int iterator, uint32_t offset, uint32_t limit,
+                     const char *key, const char *key_end,
+                     struct position *pos, bool update_pos, struct port *port);
 
     void password_prepare(const char *password, int len,
                           char *out, int out_len);
@@ -1861,6 +1881,10 @@ end
 local port = ffi.new('struct port')
 local port_c = ffi.cast('struct port_c *', port)
 
+-- global struct position instance to use by select()/pairs()
+local position = ffi.new('struct position')
+local position_len = ffi.new('uint32_t[1]')
+
 -- Helper function to check space:method() usage
 local function check_space_arg(space, method)
     if type(space) ~= 'table' or space.id == nil then
@@ -2413,6 +2437,8 @@ local function check_select_opts(opts, key_is_nil)
     local limit = 4294967295
     local iterator = check_iterator_type(opts, key_is_nil)
     local fullscan = false
+    local after = ""
+    local fetch_pos = false
     if opts ~= nil and type(opts) == "table" then
         if opts.offset ~= nil then
             offset = opts.offset
@@ -2423,8 +2449,20 @@ local function check_select_opts(opts, key_is_nil)
         if opts.fullscan ~= nil then
             fullscan = opts.fullscan
         end
+        if opts.after ~= nil then
+            after = opts.after
+            if after == box.NULL then
+                after = ""
+            end
+            if type(after) ~= "string" then
+                box.error(box.error.INVALID_POSITION)
+            end
+        end
+        if opts.fetch_pos ~= nil then
+            fetch_pos = opts.fetch_pos
+        end
     end
-    return iterator, offset, limit, fullscan
+    return iterator, offset, limit, fullscan, after, fetch_pos
 end
 
 box.internal.check_select_opts = check_select_opts -- for net.box
@@ -2451,12 +2489,19 @@ base_index_mt.select_ffi = function(index, key, opts)
     local ibuf = cord_ibuf_take()
     local key, key_end = tuple_encode(ibuf, key)
     local key_is_nil = key + 1 >= key_end
-    local iterator, offset, limit, fullscan =
+    local iterator, offset, limit, fullscan, after, fetch_pos =
         check_select_opts(opts, key_is_nil)
     check_select_safety(index, key_is_nil, iterator, limit, offset, fullscan)
-
-    local nok = builtin.box_select(index.space_id, index.id, iterator, offset,
-                                   limit, key, key_end, port) ~= 0
+    if after ~= "" then
+        local rc = builtin.position_unpack(after, position)
+        if rc ~= 0 then
+            return box.error(box.error.INVALID_POSITION)
+        end
+    else
+        builtin.position_reset(position)
+    end
+    local nok = builtin.box_select_after(index.space_id, index.id, iterator, offset,
+                                   limit, key, key_end, position, fetch_pos, port) ~= 0
     cord_ibuf_put(ibuf)
     if nok then
         return box.error()
@@ -2469,6 +2514,11 @@ base_index_mt.select_ffi = function(index, key, opts)
         entry = entry.next
     end
     builtin.port_destroy(port);
+    if fetch_pos then
+        local new_pos = builtin.position_pack_on_gc(position, position_len)
+        new_pos = ffi.string(new_pos, position_len[0])
+        return ret, new_pos
+    end
     return ret
 end
 

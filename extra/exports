@@ -415,6 +415,9 @@ PMurHash32
 PMurHash32_Process
 PMurHash32_Result
 port_destroy
+position_pack_on_gc
+position_reset
+position_unpack
 prbuf_create
 prbuf_open
 prbuf_prepare

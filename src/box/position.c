@@ -1,6 +1,7 @@
 #include "position.h"
 #include "msgpuck.h"
 #include "trivia/util.h"
+#include "fiber.h"
 
 /*
  * Although the structure in C is very simple, it has a more
@@ -61,7 +62,7 @@ position_pack(struct position *pos, char *buffer)
 	memcpy(buffer, pos->key, pos->key_size);
 }
 
-int
+API_EXPORT int
 position_unpack(const char *ptr, struct position *pos)
 {
 	assert(ptr != NULL);
@@ -95,4 +96,32 @@ position_unpack(const char *ptr, struct position *pos)
 		}
 	}
 	return 0;
+}
+
+API_EXPORT const char *
+position_pack_on_gc(struct position *pos, uint32_t *size)
+{
+	assert(pos != NULL);
+	assert(size != NULL);
+	assert(cord() != NULL);
+
+	*size = position_pack_size(pos);
+	char *buf = region_alloc(&fiber()->gc, *size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, *size, "region",
+			 "tuple_extract_key_raw_sequential");
+		*size = 0;
+		return NULL;
+	}
+	position_pack(pos, buf);
+	return buf;
+}
+
+API_EXPORT void
+position_reset(struct position *pos)
+{
+	assert(pos != NULL);
+
+	pos->key = NULL;
+	pos->key_size = 0;
 }
