@@ -1,6 +1,8 @@
 #include "func_cache.h"
 #include "func.h"
 #include "trivia/util.h"
+
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
 int status;
@@ -195,9 +197,13 @@ func_cache_pin_test_several(void)
 int
 main(void)
 {
+	plan(4);
+	header();
 	func_cache_pin_test_one_holder();
 	func_cache_pin_test_fifo();
 	func_cache_pin_test_lifo();
 	func_cache_pin_test_several();
+	status |= check_plan();
+	footer();
 	return status;
 }
