@@ -61,7 +61,7 @@ ph:close()
 --
 -- gh-7109: Ctrl+C does not break multiline input.
 --
-cmd = TARANTOOL_PATH .. ' -i 2>&1'
+local cmd = 'INPUTRC=non_existent_file ' .. TARANTOOL_PATH .. ' -i 2>&1'
 ph = popen.new({cmd}, {
     shell = true,
     setsid = true,
