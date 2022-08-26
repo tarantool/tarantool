@@ -52,6 +52,7 @@ struct iostream;
 struct auth_request;
 struct space;
 struct vclock;
+struct position;
 
 /**
  * Pointer to TX thread local vclock.
@@ -330,6 +331,18 @@ box_select(uint32_t space_id, uint32_t index_id,
 	   int iterator, uint32_t offset, uint32_t limit,
 	   const char *key, const char *key_end,
 	   struct port *port);
+
+/**
+ * Version of box_select that supports pagination. If pos is NULL and
+ * update_pos is false, box_select_after has the same behaviour as box_select.
+ * Pre-requesites: if update_pos is true, pos must not be NULL.
+ * box_select_after is private and used only by FFI.
+ */
+API_EXPORT int
+box_select_after(uint32_t space_id, uint32_t index_id,
+		 int iterator, uint32_t offset, uint32_t limit,
+		 const char *key, const char *key_end,
+		 struct position *pos, bool update_pos, struct port *port);
 
 /** \cond public */
 

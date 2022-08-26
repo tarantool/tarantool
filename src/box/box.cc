@@ -89,6 +89,7 @@
 #include "mp_uuid.h"
 #include "flightrec.h"
 #include "wal_ext.h"
+#include "position.h"
 
 static char status[64] = "unknown";
 
@@ -2494,7 +2495,18 @@ box_select(uint32_t space_id, uint32_t index_id,
 	   const char *key, const char *key_end,
 	   struct port *port)
 {
+	return box_select_after(space_id, index_id, iterator, offset, limit,
+				key, key_end, NULL, false, port);
+}
+
+API_EXPORT int
+box_select_after(uint32_t space_id, uint32_t index_id,
+		 int iterator, uint32_t offset, uint32_t limit,
+		 const char *key, const char *key_end,
+		 struct position *pos, bool update_pos, struct port *port)
+{
 	(void)key_end;
+	assert(!update_pos || pos != NULL);
 
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 
@@ -2519,6 +2531,12 @@ box_select(uint32_t space_id, uint32_t index_id,
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
 	if (key_validate(index->def, type, key, part_count))
 		return -1;
+	const char *after = pos != NULL ? pos->key : NULL;
+	if (after != NULL) {
+		uint32_t after_size = mp_decode_array(&after);
+		if (position_validate(index->def, after, after_size) != 0)
+			return -1;
+	}
 
 	box_run_on_select(space, index, type, key_array);
 
@@ -2533,7 +2551,7 @@ box_select(uint32_t space_id, uint32_t index_id,
 		return -1;
 
 	struct iterator *it = index_create_iterator(index, type,
-						    key, part_count, NULL);
+						    key, part_count, after);
 	if (it == NULL) {
 		txn_rollback_stmt(txn);
 		return -1;
@@ -2567,15 +2585,27 @@ box_select(uint32_t space_id, uint32_t index_id,
 		 */
 		space = iterator_space(it);
 	}
-	iterator_delete(it);
 
 	if (rc != 0) {
-		port_destroy(port);
 		txn_rollback_stmt(txn);
-		return -1;
+		goto fail;
 	}
 	txn_commit_ro_stmt(txn, &svp);
+	/*
+	 * We should not update position if no tuple found - if pos was empty,
+	 * it must retain empty, and if no tuple greater then tuple with
+	 * position pos, we must retain it too.
+	 */
+	if (update_pos && found > 0 &&
+	    index_tuple_position(index, tuple, it, &pos->key,
+				 &pos->key_size) != 0)
+		goto fail;
+	iterator_delete(it);
 	return 0;
+fail:
+	iterator_delete(it);
+	port_destroy(port);
+	return -1;
 }
 
 API_EXPORT int
