@@ -1,6 +1,8 @@
 #include "memory.h"
 #include "fiber.h"
 #include "fiber_cond.h"
+
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
 static int
