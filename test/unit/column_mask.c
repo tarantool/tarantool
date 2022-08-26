@@ -1,11 +1,13 @@
 #include "column_mask.h"
 #include "xrow_update.h"
-#include "unit.h"
 #include "msgpuck.h"
 #include "trivia/util.h"
 #include "fiber.h"
 #include "memory.h"
 #include "tuple.h"
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 #define MAX_OPS 20
 #define MAX_FIELDS 100
