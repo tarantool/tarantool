@@ -1,6 +1,8 @@
 #include "exception.h"
 #include "memory.h"
 #include "cbus.h"
+
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
 static struct fiber *caller_fiber;
