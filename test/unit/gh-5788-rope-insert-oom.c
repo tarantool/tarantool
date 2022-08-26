@@ -1,5 +1,7 @@
-#include "unit.h"
 #include <string.h>
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 /** Counting the number of allocated nodes */
 static size_t allocated_count;
