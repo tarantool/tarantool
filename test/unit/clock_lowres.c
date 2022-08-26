@@ -1,9 +1,10 @@
-#include "unit.h"
-
 #include <math.h>
 #include <unistd.h>
 #include "clock_lowres.h"
 #include "clock.h"
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 /** Test duration in seconds. */
 #define TEST_LEN 1.5
