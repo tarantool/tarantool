@@ -153,6 +153,16 @@ exact_key_validate(struct key_def *key_def, const char *key,
 	return key_validate_parts(key_def, key, part_count, false, &key_end);
 }
 
+int
+position_validate(const struct index_def *index_def, const char *key,
+		  uint32_t part_count)
+{
+	int rc = exact_key_validate(index_def->cmp_def, key, part_count);
+	if (rc != 0)
+		diag_set(ClientError, ER_INVALID_POSITION);
+	return rc;
+}
+
 char *
 box_tuple_extract_key(box_tuple_t *tuple, uint32_t space_id, uint32_t index_id,
 		      uint32_t *key_size)

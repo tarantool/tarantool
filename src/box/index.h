@@ -388,6 +388,16 @@ exact_key_validate(struct key_def *key_def, const char *key,
 		   uint32_t part_count);
 
 /**
+ * Check that the supplied key is valid to uniquely identify
+ * iterator position.
+ * @retval 0  The key is valid.
+ * @retval -1 The key is invalid.
+ */
+int
+position_validate(const struct index_def *index_def, const char *key,
+		  uint32_t part_count);
+
+/**
  * The manner in which replace in a unique index must treat
  * duplicates (tuples with the same value of indexed key),
  * possibly present in the index.

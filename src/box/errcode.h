@@ -297,6 +297,7 @@ struct errcode_record {
 	/*242 */_(ER_NO_ELECTION_QUORUM,	"Not enough peers connected to start elections: %d out of minimal required %d")\
 	/*243 */_(ER_SSL,			"%s") \
 	/*244 */_(ER_SPLIT_BRAIN,		"Split-Brain discovered: %s") \
+	/*245 */_(ER_INVALID_POSITION,		"Position descriptor is invalid") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
