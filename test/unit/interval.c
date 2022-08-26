@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <assert.h>
 
-#include "unit.h"
 #include "string.h"
 #include "datetime.h"
 #include "mp_interval.h"
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 enum {
 	SIZE = 512,
