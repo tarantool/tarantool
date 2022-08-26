@@ -1033,7 +1033,7 @@ local function update_index_parts_1_6_0(parts)
             box.error(box.error.ILLEGAL_PARAMS,
                       "options.parts: expected field_no (number), type (string) pairs")
         end
-        table.insert(result, {field = parts[i] - 1, type = parts[i + 1]})
+        table.insert(result, {field = parts[i], type = parts[i + 1]})
         ::continue::
     end
     return result
@@ -1124,7 +1124,7 @@ local function update_index_parts(format, parts)
         if parts[3] == nil then
             parts = {parts} -- one part only
         else
-            return update_index_parts_1_6_0(parts), true
+            parts = update_index_parts_1_6_0(parts)
         end
     end
 
