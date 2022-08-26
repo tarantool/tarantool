@@ -4,8 +4,10 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "unit.h"
 #include "checkpoint_schedule.h"
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 static inline bool
 feq(double a, double b)
