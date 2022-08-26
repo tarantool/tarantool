@@ -12,8 +12,10 @@
 #include "msgpuck.h"
 #include "random.h"
 #include "ssl_error.h"
-#include "unit.h"
 #include "vclock/vclock.h"
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 #include <float.h>
 
