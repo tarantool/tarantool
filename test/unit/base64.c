@@ -1,7 +1,9 @@
 #include <base64.h>
-#include "unit.h"
 #include "trivia/util.h"
 #include <string.h>
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 static void
 base64_test(const char *str, int options, const char *no_symbols,
