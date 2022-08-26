@@ -28,8 +28,10 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "unit.h"
 #include "crc32.h"
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 static void
 test_alignment(void)
