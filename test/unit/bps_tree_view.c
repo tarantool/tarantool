@@ -1,5 +1,7 @@
 #include <stddef.h>
 #include "trivia/util.h"
+
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
 #define BPS_TREE_NAME test_tree
