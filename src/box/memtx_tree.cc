@@ -264,8 +264,14 @@ struct tree_iterator {
 	 */
 	memtx_tree_iterator_t<USE_HINT> tree_iterator;
 	enum iterator_type type;
+	/**
+	 * Key, from which the iteration starts. May be different from
+	 * @a key_data when using pagination.
+	 */
+	struct memtx_tree_key_data<USE_HINT> start_data;
 	struct memtx_tree_key_data<USE_HINT> key_data;
 	struct memtx_tree_data<USE_HINT> current;
+	bool skip_first;
 	/**
 	 * For functional indexes only: reference to the functional index key
 	 * at the current iterator position.
@@ -663,11 +669,11 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	 * The key is full - all parts a present. If key if full, EQ and REQ
 	 * queries can return no more than one tuple.
 	 */
-	bool key_is_full = it->key_data.part_count == cmp_def->part_count;
+	bool key_is_full = it->start_data.part_count == cmp_def->part_count;
 	/* The flag will be change to true if found tuple equals to the key. */
 	bool equals = false;
 	assert(it->current.tuple == NULL);
-	if (it->key_data.key == NULL) {
+	if (it->start_data.key == NULL) {
 		assert(type == ITER_GE || type == ITER_LE);
 		if (iterator_type_is_reverse(it->type))
 			/*
@@ -686,11 +692,11 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	} else {
 		if (type == ITER_EQ || type == ITER_GE || type == ITER_LT) {
 			it->tree_iterator =
-				memtx_tree_lower_bound(tree, &it->key_data,
+				memtx_tree_lower_bound(tree, &it->start_data,
 						       &equals);
 		} else { // ITER_GT, ITER_REQ, ITER_LE
 			it->tree_iterator =
-				memtx_tree_upper_bound(tree, &it->key_data,
+				memtx_tree_upper_bound(tree, &it->start_data,
 						       &equals);
 		}
 	}
@@ -725,6 +731,8 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	if (res != NULL && eq_match) {
 		tree_iterator_set_current(it, res);
 		tree_iterator_set_next_method(it);
+		if (it->skip_first) /* Do not need MVCC if we skip tuple */
+			return iterator->next_internal(iterator, ret);
 		bool is_multikey = iterator->index->def->key_def->is_multikey;
 		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
 		/*
@@ -735,13 +743,14 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 					      mk_index);
 	}
 	if (key_is_full && !eq_match)
-		memtx_tx_track_point(txn, space, idx, it->key_data.key);
+		memtx_tx_track_point(txn, space, idx, it->start_data.key);
 	if (!key_is_full ||
 	    ((type == ITER_GE || type == ITER_LE) && !equals) ||
 	    (type == ITER_GT || type == ITER_LT))
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_track_gap(txn, space, idx, successor, type,
-				   it->key_data.key, it->key_data.part_count);
+				   it->start_data.key,
+				   it->start_data.part_count);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	return res == NULL || !eq_match || *ret != NULL ? 0 :
 	       iterator->next_internal(iterator, ret);
@@ -935,6 +944,148 @@ memtx_tree_index_get_internal(struct index *base, const char *key,
 	uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
 	*result = memtx_tx_tuple_clarify(txn, space, res->tuple, base,
 					 mk_index);
+	return 0;
+}
+
+/**
+ * Create an iterator that points to position of last tuple that @it
+ * will return or have returned (does not depend on iterator position).
+ * @Note It is not guaranteed that iterator will point to the actual version of
+ * tuple with mvcc enabled, but we don't need it anyway because this function
+ * is used only to extract a key of last tuple.
+ */
+template <bool USE_HINT>
+static inline struct iterator *
+memtx_tree_index_iterator_last_position(struct index *base,
+					struct iterator *it)
+{
+	struct tree_iterator<USE_HINT> *tree_it =
+		get_tree_iterator<USE_HINT>(it);
+	int dir = iterator_direction(tree_it->type);
+	enum iterator_type iter;
+	const char *key = NULL;
+	int part_count = 0;
+	if (tree_it->type == ITER_EQ) {
+		iter = ITER_REQ;
+		key = tree_it->key_data.key;
+		part_count = tree_it->key_data.part_count;
+	} else if (tree_it->type == ITER_REQ) {
+		iter = ITER_EQ;
+		key = tree_it->key_data.key;
+		part_count = tree_it->key_data.part_count;
+	} else if (dir > 0) {
+		iter = ITER_LE;
+	} else /* dir < 0 */ {
+		iter = ITER_GE;
+	}
+	struct iterator *lookup_iter =
+		index_create_iterator(base, iter, key, part_count, NULL);
+	if (lookup_iter == NULL)
+		return NULL;
+	struct tuple *ret;
+	int rc = iterator_next(lookup_iter, &ret);
+	if (rc != 0) {
+		iterator_delete(lookup_iter);
+		return NULL;
+	}
+	return lookup_iter;
+}
+
+/**
+ * Find a tuple position (extracted cmp_def of tuple). If @a tuple is not NULL,
+ * @it is not used and can be NULL. Function returns NULL only if there are
+ * no tuples satisfying filters (key and iterator type).
+ */
+template <bool USE_HINT>
+static int
+memtx_tree_index_tuple_position(struct index *base, struct tuple *tuple,
+			        struct iterator *it, const char **pos,
+				uint32_t *size)
+{
+	assert(!base->def->key_def->is_multikey);
+	*pos = NULL;
+	*size = 0;
+	struct memtx_tree_index<USE_HINT> *index =
+		(struct memtx_tree_index<USE_HINT> *)base;
+	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
+	if (tuple == NULL) {
+		assert(it != NULL);
+		struct iterator *lookup_it =
+			memtx_tree_index_iterator_last_position<USE_HINT>(base,
+									  it);
+		struct tree_iterator<USE_HINT> *tree_lookup_it =
+			get_tree_iterator<USE_HINT>(lookup_it);
+		tuple = tree_lookup_it->current.tuple;
+		iterator_delete(lookup_it);
+		if (tuple == NULL)
+			return 0;
+		struct tree_iterator<USE_HINT> *tree_it =
+			get_tree_iterator<USE_HINT>(it);
+		int dir = iterator_direction(tree_it->type);
+		if (dir * tuple_compare_with_key(tuple, HINT_NONE,
+						  tree_it->key_data.key,
+						  tree_it->key_data.part_count,
+						  HINT_NONE, cmp_def) < 0)
+			return 0;
+	}
+	*pos = tuple_extract_key(tuple, cmp_def, MULTIKEY_NONE, size);
+	return 0;
+}
+
+/**
+ * Find a tuple position (extracted cmp_def of tuple) in multikey index.
+ * Argument @it is always used because we need to find tuple position in tree
+ * to find out its multikey index. Function returns NULL only if there are
+ * no tuples satisfying filters (key and iterator type).
+ */
+static int
+memtx_tree_index_tuple_position_multikey(struct index *base,
+					 struct tuple *tuple,
+					 struct iterator *it, const char **pos,
+					 uint32_t *size)
+{
+	assert(base->def->key_def->is_multikey);
+	*pos = NULL;
+	*size = 0;
+	if (it == NULL) {
+		diag_set(UnsupportedIndexFeature, base->def,
+			 "pagination without iteration context "
+			 "in multikey index");
+		return -1;
+	}
+	struct memtx_tree_index<true> *index =
+		(struct memtx_tree_index<true> *)base;
+	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
+	struct tree_iterator<true> *tree_it = get_tree_iterator<true>(it);
+	hint_t multikey_idx = HINT_NONE;
+	if (tuple == NULL) {
+		struct iterator *lookup_it =
+			memtx_tree_index_iterator_last_position<true>(base,
+								      it);
+		struct tree_iterator<true> *tree_lookup_it =
+			get_tree_iterator<true>(lookup_it);
+		tuple = tree_lookup_it->current.tuple;
+		multikey_idx = tree_lookup_it->current.hint;
+		iterator_delete(lookup_it);
+		if (tuple == NULL)
+			return 0;
+		int dir = iterator_direction(tree_it->type);
+		if (dir * tuple_compare_with_key(tuple, multikey_idx,
+						 tree_it->key_data.key,
+						 tree_it->key_data.part_count,
+						 tree_it->key_data.hint,
+						 cmp_def) < 0)
+			return 0;
+	} else {
+		/*
+		 * Update the tuple because we know multikey index
+		 * only of this one.
+		 */
+		assert(tree_it->current.tuple != NULL);
+		tuple = tree_it->current.tuple;
+		multikey_idx = tree_it->current.hint;
+	}
+	*pos = tuple_extract_key(tuple, cmp_def, multikey_idx, size);
 	return 0;
 }
 
@@ -1424,11 +1575,8 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 			 "requested iterator type");
 		return NULL;
 	}
-	if (unlikely(after != NULL)) {
-		diag_set(UnsupportedIndexFeature, base->def, "pagination");
-		return NULL;
-	}
-
+	if (type == ITER_ALL)
+		type = ITER_GE;
 	if (part_count == 0) {
 		/*
 		 * If no key is specified, downgrade equality
@@ -1437,9 +1585,6 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 		type = iterator_type_is_reverse(type) ? ITER_LE : ITER_GE;
 		key = NULL;
 	}
-
-	if (type == ITER_ALL)
-		type = ITER_GE;
 
 	struct tree_iterator<USE_HINT> *it = (struct tree_iterator<USE_HINT> *)
 		mempool_alloc(&memtx->iterator_pool);
@@ -1463,6 +1608,33 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 	if (USE_HINT)
 		it->current.set_hint(HINT_NONE);
 	it->current_func_key = NULL;
+	it->skip_first = false;
+	if (after != NULL) {
+		it->start_data.key = after;
+		it->start_data.part_count = cmp_def->part_count;
+		if (USE_HINT)
+			it->start_data.set_hint(
+				key_hint(after, cmp_def->part_count, cmp_def));
+		if (it->type != ITER_EQ && it->type != ITER_REQ) {
+			/*
+			 * If we want to start after specified position with
+			 * range iterator, we need to turn iterator with
+			 * non-strict inequality into its analogue with
+			 * strict inequality.
+			 */
+			it->type = iterator_type_is_reverse(it->type) ?
+						 ITER_LT :
+						 ITER_GT;
+		} else { /* ITER_EQ, ITER_REQ */
+			/*
+			 * If we want to start after specified position with
+			 * equality iterator, we need to skip first tuple.
+			 */
+			it->skip_first = true;
+		}
+	} else {
+		it->start_data = it->key_data;
+	}
 	return (struct iterator *)it;
 }
 
@@ -1888,7 +2060,8 @@ get_memtx_tree_index_vtab(void)
 		/* .count = */ memtx_tree_index_count<USE_HINT>,
 		/* .get_internal */ memtx_tree_index_get_internal<USE_HINT>,
 		/* .get = */ memtx_index_get,
-		/* .tuple_position = */ generic_index_tuple_position,
+		/* .tuple_position = */ is_mk ? memtx_tree_index_tuple_position_multikey :
+					memtx_tree_index_tuple_position<USE_HINT>,
 		/* .replace = */ is_mk ? memtx_tree_index_replace_multikey :
 				 is_func ? memtx_tree_func_index_replace :
 				 memtx_tree_index_replace<USE_HINT>,

@@ -66,6 +66,7 @@ box_index_len
 box_index_max
 box_index_min
 box_index_random
+box_index_tuple_position
 box_insert
 box_iterator_free
 box_iterator_next
