@@ -1,8 +1,10 @@
 #include "memory.h"
 #include "fiber.h"
-#include "unit.h"
 #include "trivia/util.h"
 #include "errinj.h"
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 static struct fiber_attr default_attr;
 
