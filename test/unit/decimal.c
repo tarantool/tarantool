@@ -1,4 +1,3 @@
-#include "unit.h"
 #include "decimal.h"
 #include "mp_decimal.h"
 #include "mp_extension_types.h"
@@ -7,6 +6,9 @@
 #include <string.h>
 #include <inttypes.h>
 #include <float.h> /* DBL_DIG */
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 #define success(x) x
 #define failure(x) NULL
