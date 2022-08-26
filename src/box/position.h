@@ -33,6 +33,9 @@ position_pack(struct position *pos, char *buffer);
 int
 position_unpack(const char *ptr, struct position *pos);
 
+const char *
+position_pack_on_gc(struct position *pos, uint32_t *size);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined __cplusplus */

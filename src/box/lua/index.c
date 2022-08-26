@@ -36,6 +36,7 @@
 #include "box/index.h"
 #include "box/lua/tuple.h"
 #include "box/lua/misc.h" /* lbox_encode_tuple_on_gc() */
+#include "box/position.h"
 
 /** {{{ box.index Lua library: access to spaces and indexes
  */
@@ -226,6 +227,26 @@ lbox_index_count(lua_State *L)
 	return 1;
 }
 
+static int
+lbox_index_tuple_pos(lua_State *L)
+{
+	if (lua_gettop(L) != 3 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+	    luaT_istuple(L, 3) == NULL)
+		return luaL_error(L, "Usage index.tuple_pos(space_id, "
+				     "index_id, tuple)");
+
+	uint32_t space_id = lua_tonumber(L, 1);
+	uint32_t index_id = lua_tonumber(L, 2);
+	struct tuple *tuple = luaT_istuple(L, 3);
+	struct position pos;
+	if (box_index_tuple_position(space_id, index_id, tuple, &pos) != 0)
+		luaT_error(L);
+	uint32_t pack_size;
+	const char *pos_str = position_pack_on_gc(&pos, &pack_size);
+	lua_pushlstring(L, pos_str, pack_size);
+	return 1;
+}
+
 static void
 box_index_init_iterator_types(struct lua_State *L, int idx)
 {
@@ -365,6 +386,7 @@ box_lua_index_init(struct lua_State *L)
 		{"truncate", lbox_truncate},
 		{"stat", lbox_index_stat},
 		{"compact", lbox_index_compact},
+		{"tuple_pos", lbox_index_tuple_pos},
 		{NULL, NULL}
 	};
 

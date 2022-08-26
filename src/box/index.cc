@@ -41,6 +41,7 @@
 #include "info/info.h"
 #include "memtx_tx.h"
 #include "box.h"
+#include "position.h"
 
 struct rlist box_on_select = RLIST_HEAD_INITIALIZER(box_on_select);
 
@@ -190,6 +191,18 @@ check_index(uint32_t space_id, uint32_t index_id,
 	if (*index == NULL)
 		return -1;
 	return 0;
+}
+
+int
+box_index_tuple_position(uint32_t space_id, uint32_t index_id,
+			 struct tuple *tuple, struct position *pos)
+{
+	struct space *space;
+	struct index *index;
+	if (check_index(space_id, index_id, &space, &index) != 0)
+		return -1;
+	return index_tuple_position(index, tuple, NULL, &pos->key,
+				    &pos->key_size);
 }
 
 /* }}} */

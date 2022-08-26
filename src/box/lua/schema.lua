@@ -129,6 +129,10 @@ ffi.cdef[[
     position_pack_on_gc(struct position *pos, uint32_t *size);
 
     int
+    box_index_tuple_position(uint32_t space_id, uint32_t index_id,
+                             box_tuple_t *tuple, struct position *pos);
+
+    int
     box_select(uint32_t space_id, uint32_t index_id,
                int iterator, uint32_t offset, uint32_t limit,
                const char *key, const char *key_end,
@@ -2453,8 +2457,7 @@ local function check_select_opts(opts, key_is_nil)
             after = opts.after
             if after == box.NULL then
                 after = ""
-            end
-            if type(after) ~= "string" then
+            elseif type(after) ~= "string" and not is_tuple(after) then
                 box.error(box.error.INVALID_POSITION)
             end
         end
@@ -2492,6 +2495,9 @@ base_index_mt.select_ffi = function(index, key, opts)
     local iterator, offset, limit, fullscan, after, fetch_pos =
         check_select_opts(opts, key_is_nil)
     check_select_safety(index, key_is_nil, iterator, limit, offset, fullscan)
+    if is_tuple(after) then
+        after = internal.tuple_pos(index.space_id, index.id, after)
+    end
     if after ~= "" then
         local rc = builtin.position_unpack(after, position)
         if rc ~= 0 then
@@ -2564,6 +2570,10 @@ base_index_mt.alter = function(index, options)
         box.error(box.error.PROC_LUA, "Usage: index:alter{opts}")
     end
     return box.schema.index.alter(index.space_id, index.id, options)
+end
+base_index_mt.tuple_pos = function(index, tuple)
+    check_index_arg(index, 'tuple_pos')
+    return internal.tuple_pos(index.space_id, index.id, tuple)
 end
 
 local read_ops = {'select', 'get', 'min', 'max', 'count', 'random', 'pairs'}
