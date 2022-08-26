@@ -48,7 +48,7 @@ jobs:
       - name: Build module API documentation using Doxygen
         run: |
             cmake .
-            make module_api
+            make api
             sed -e "s%@PROJECT_.\+_DIR@/%%" Doxyfile.API.in > Doxyfile.API
             doxygen Doxyfile.API
 
