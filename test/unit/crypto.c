@@ -31,10 +31,12 @@
 #include "crypto/crypto.h"
 #include "core/ssl.h"
 #include "core/random.h"
-#include "unit.h"
 #include "trivia/util.h"
 #include "memory.h"
 #include "fiber.h"
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 static void
 test_aes128_codec(void)
