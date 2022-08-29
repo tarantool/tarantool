@@ -1128,7 +1128,6 @@ local function update_index_parts(format, parts)
         end
     end
 
-    local parts_can_be_simplified = true
     local result = {}
     local i = 0
     for _ in pairs(parts) do
@@ -1158,10 +1157,8 @@ local function update_index_parts(format, parts)
                             "options.parts[" .. i .. "]: collation was not found by name '" .. v .. "'")
                     end
                     part[k] = coll[1]
-                    parts_can_be_simplified = false
                 elseif k == 'is_nullable' then
                     part[k] = v
-                    parts_can_be_simplified = false
                 elseif k == 'exclude_null' then
                     if type(v) ~= 'boolean' then
                         box.error(box.error.ILLEGAL_PARAMS,
@@ -1169,10 +1166,8 @@ local function update_index_parts(format, parts)
                                 "type (boolean) is expected")
                     end
                     part[k] = v
-                    parts_can_be_simplified = false
                 else
                     part[k] = v
-                    parts_can_be_simplified = false
                 end
             end
         end
@@ -1181,7 +1176,6 @@ local function update_index_parts(format, parts)
                                                    "options.parts[" .. i .. "]")
             part.field = idx
             part.path = path or part.path
-            parts_can_be_simplified = parts_can_be_simplified and part.path == nil
         else
             box.error(box.error.ILLEGAL_PARAMS, "options.parts[" .. i .. "]: " ..
                       "field (name or number) is expected")
@@ -1200,7 +1194,6 @@ local function update_index_parts(format, parts)
         if part.is_nullable == nil then
             if fmt and fmt.is_nullable then
                 part.is_nullable = true
-                parts_can_be_simplified = false
             end
         elseif type(part.is_nullable) ~= 'boolean' then
             box.error(box.error.ILLEGAL_PARAMS,
@@ -1217,7 +1210,6 @@ local function update_index_parts(format, parts)
         if part.action == nil then
             if fmt and fmt.action ~= nil then
                 part.action = fmt.action
-                parts_can_be_simplified = false
             end
         end
         if type(parts[i]) == "table" then
@@ -1235,19 +1227,21 @@ local function update_index_parts(format, parts)
         end
         table.insert(result, part)
     end
-    return result, parts_can_be_simplified
+    return result
 end
 
 --
 -- Convert index parts into 1.6.6 format if they
--- don't use collation, is_nullable and exclude_null options
+-- don't use any extra option beside type and field.
 --
-local function simplify_index_parts(parts)
+local function try_simplify_index_parts(parts)
     local new_parts = {}
     for i, part in pairs(parts) do
-        assert(part.collation == nil and part.is_nullable == nil
-                and part.exclude_null == nil,
-               "part is simple")
+        for k in pairs(part) do
+            if k ~= 'field' and k ~= 'type' then
+                return parts
+            end
+        end
         new_parts[i] = {part.field, part.type}
     end
     return new_parts
@@ -1591,8 +1585,7 @@ box.schema.index.create = function(space_id, name, options)
             end
         end
     end
-    local parts, parts_can_be_simplified =
-        update_index_parts(format, options.parts)
+    local parts = update_index_parts(format, options.parts)
     -- create_index() options contains type, parts, etc,
     -- stored separately. Remove these members from index_opts
     local index_opts = {
@@ -1623,9 +1616,7 @@ box.schema.index.create = function(space_id, name, options)
         end
     end
     -- save parts in old format if possible
-    if parts_can_be_simplified then
-        parts = simplify_index_parts(parts)
-    end
+    parts = try_simplify_index_parts(parts)
     if options.hint and is_multikey_index(parts) then
         box.error(box.error.MODIFY_INDEX, name, space.name,
                 "multikey index can't use hints")
@@ -1764,13 +1755,9 @@ box.schema.index.alter = function(space_id, index_id, options)
                 "functional index can't use hints")
     end
     if options.parts then
-        local parts_can_be_simplified
-        parts, parts_can_be_simplified =
-            update_index_parts(format, options.parts)
+        parts = update_index_parts(format, options.parts)
         -- save parts in old format if possible
-        if parts_can_be_simplified then
-            parts = simplify_index_parts(parts)
-        end
+        parts = try_simplify_index_parts(parts)
     end
     if options.hint and is_multikey_index(parts) then
         box.error(box.error.MODIFY_INDEX, space.index[index_id].name,
