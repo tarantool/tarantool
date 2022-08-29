@@ -1680,8 +1680,6 @@ template <bool USE_HINT>
 struct tree_read_view_iterator {
 	/** Base class. */
 	struct index_read_view_iterator base;
-	/** Read view. */
-	struct tree_read_view<USE_HINT> *rv;
 	/** Iterator key. */
 	struct memtx_tree_key_data<USE_HINT> key_data;
 	/** BPS tree iterator. */
@@ -1738,10 +1736,12 @@ tree_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 	assert(iterator->free == &tree_read_view_iterator_free<USE_HINT>);
 	struct tree_read_view_iterator<USE_HINT> *it =
 		(struct tree_read_view_iterator<USE_HINT> *)iterator;
+	struct tree_read_view<USE_HINT> *rv =
+		(struct tree_read_view<USE_HINT> *)iterator->index;
 
 	while (true) {
 		struct memtx_tree_data<USE_HINT> *res =
-			memtx_tree_view_iterator_get_elem(&it->rv->tree_view,
+			memtx_tree_view_iterator_get_elem(&rv->tree_view,
 							  &it->tree_iterator);
 
 		if (res == NULL) {
@@ -1749,9 +1749,9 @@ tree_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 			return 0;
 		}
 
-		memtx_tree_view_iterator_next(&it->rv->tree_view,
+		memtx_tree_view_iterator_next(&rv->tree_view,
 					      &it->tree_iterator);
-		if (memtx_prepare_read_view_tuple(res->tuple, &it->rv->cleaner,
+		if (memtx_prepare_read_view_tuple(res->tuple, &rv->cleaner,
 						  data, size) != 0)
 			return -1;
 		if (*data != NULL)
@@ -1772,8 +1772,10 @@ tree_read_view_iterator_start(struct tree_read_view_iterator<USE_HINT> *it,
 	(void)type;
 	(void)key;
 	(void)part_count;
+	struct tree_read_view<USE_HINT> *rv =
+		(struct tree_read_view<USE_HINT> *)it->base.index;
 	it->base.next_raw = tree_read_view_iterator_next_raw<USE_HINT>;
-	it->tree_iterator = memtx_tree_view_first(&it->rv->tree_view);
+	it->tree_iterator = memtx_tree_view_first(&rv->tree_view);
 	return 0;
 }
 
@@ -1793,14 +1795,12 @@ tree_read_view_create_iterator(struct index_read_view *base,
 			       enum iterator_type type,
 			       const char *key, uint32_t part_count)
 {
-	struct tree_read_view<USE_HINT> *rv =
-		(struct tree_read_view<USE_HINT> *)base;
 	struct tree_read_view_iterator<USE_HINT> *it =
 		(struct tree_read_view_iterator<USE_HINT> *)
 		xmalloc(sizeof(*it));
+	it->base.index = base;
 	it->base.free = tree_read_view_iterator_free<USE_HINT>;
 	it->base.next_raw = exhausted_index_read_view_iterator_next_raw;
-	it->rv = rv;
 	it->key_data.key = NULL;
 	it->key_data.part_count = 0;
 	if (USE_HINT)

@@ -312,8 +312,6 @@ struct sequence_data_read_view {
 struct sequence_data_iterator {
 	/** Base class. */
 	struct index_read_view_iterator base;
-	/** Read view. */
-	struct sequence_data_read_view *rv;
 	/** Iterator over the data index. */
 	struct light_sequence_iterator iter;
 };
@@ -325,9 +323,11 @@ sequence_data_iterator_next_raw(struct index_read_view_iterator *base,
 {
 	struct sequence_data_iterator *iter =
 		(struct sequence_data_iterator *)base;
+	struct sequence_data_read_view *rv =
+		(struct sequence_data_read_view *)base->index;
 
 	struct sequence_data *sd = light_sequence_view_iterator_get_and_next(
-		&iter->rv->view, &iter->iter);
+		&rv->view, &iter->iter);
 	if (sd == NULL) {
 		*data = NULL;
 		return 0;
@@ -386,9 +386,9 @@ sequence_data_iterator_create(struct index_read_view *base,
 	struct sequence_data_read_view *rv =
 		(struct sequence_data_read_view *)base;
 	struct sequence_data_iterator *iter = xmalloc(sizeof(*iter));
+	iter->base.index = base;
 	iter->base.next_raw = sequence_data_iterator_next_raw;
 	iter->base.free = sequence_data_iterator_free;
-	iter->rv = rv;
 	light_sequence_view_iterator_begin(&rv->view, &iter->iter);
 	return (struct index_read_view_iterator *)iter;
 }

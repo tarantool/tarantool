@@ -590,6 +590,8 @@ struct index_read_view {
 
 /** Iterator over an index read view. */
 struct index_read_view_iterator {
+	/** Pointer to the index read view. */
+	struct index_read_view *index;
 	/** Free an index read view iterator instance. */
 	void
 	(*free)(struct index_read_view_iterator *iterator);

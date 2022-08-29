@@ -475,8 +475,6 @@ struct hash_read_view {
 struct hash_read_view_iterator {
 	/** Base class. */
 	struct index_read_view_iterator base;
-	/** Read view. */
-	struct hash_read_view *rv;
 	/** Light iterator. */
 	struct light_index_iterator iterator;
 };
@@ -526,15 +524,16 @@ hash_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 	assert(iterator->free == hash_read_view_iterator_free);
 	struct hash_read_view_iterator *it =
 		(struct hash_read_view_iterator *)iterator;
+	struct hash_read_view *rv = (struct hash_read_view *)iterator->index;
 
 	while (true) {
 		struct tuple **res = light_index_view_iterator_get_and_next(
-			&it->rv->view, &it->iterator);
+			&rv->view, &it->iterator);
 		if (res == NULL) {
 			*data = NULL;
 			return 0;
 		}
-		if (memtx_prepare_read_view_tuple(*res, &it->rv->cleaner,
+		if (memtx_prepare_read_view_tuple(*res, &rv->cleaner,
 						  data, size) != 0)
 			return -1;
 		if (*data != NULL)
@@ -555,8 +554,9 @@ hash_read_view_iterator_start(struct hash_read_view_iterator *it,
 	(void)type;
 	(void)key;
 	(void)part_count;
+	struct hash_read_view *rv = (struct hash_read_view *)it->base.index;
 	it->base.next_raw = hash_read_view_iterator_next_raw;
-	light_index_view_iterator_begin(&it->rv->view, &it->iterator);
+	light_index_view_iterator_begin(&rv->view, &it->iterator);
 	return 0;
 }
 
@@ -577,9 +577,9 @@ hash_read_view_create_iterator(struct index_read_view *base,
 	struct hash_read_view *rv = (struct hash_read_view *)base;
 	struct hash_read_view_iterator *it =
 		(struct hash_read_view_iterator *)xmalloc(sizeof(*it));
+	it->base.index = base;
 	it->base.free = hash_read_view_iterator_free;
 	it->base.next_raw = exhausted_index_read_view_iterator_next_raw;
-	it->rv = rv;
 	light_index_view_iterator_begin(&rv->view, &it->iterator);
 	if (hash_read_view_iterator_start(it, type, key, part_count) != 0) {
 		index_read_view_iterator_delete(&it->base);
