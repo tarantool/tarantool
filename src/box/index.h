@@ -44,6 +44,7 @@ extern "C" {
 struct tuple;
 struct engine;
 struct space;
+struct space_read_view;
 struct index;
 struct index_read_view;
 struct index_read_view_iterator;
@@ -586,6 +587,8 @@ struct index_read_view {
 	const struct index_read_view_vtab *vtab;
 	/** Copy of the index definition. */
 	struct index_def *def;
+	/** Pointer to the space read view that owns this index. */
+	struct space_read_view *space;
 };
 
 /** Iterator over an index read view. */
