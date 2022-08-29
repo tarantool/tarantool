@@ -75,6 +75,18 @@ tuple_arena_create(struct slab_arena *arena, struct quota *quota,
 void
 tuple_arena_destroy(struct slab_arena *arena);
 
+/**
+ * Creates a new format for standalone tuples.
+ *
+ * Tuples created with the new format are allocated from the runtime arena.
+ * In contrast to the preallocated tuple_format_runtime, which has no field
+ * names, the new format uses the provided field name dictionary.
+ *
+ * On success, returns the new format. On error, returns NULL and sets diag.
+ */
+struct tuple_format *
+runtime_tuple_format_new(struct tuple_dictionary *dict);
+
 /** \cond public */
 
 typedef struct tuple_format box_tuple_format_t;
