@@ -49,8 +49,10 @@ space_read_view_delete(struct space_read_view *space_rv)
 {
 	for (uint32_t i = 0; i <= space_rv->index_id_max; i++) {
 		struct index_read_view *index_rv = space_rv->index_map[i];
-		if (index_rv != NULL)
+		if (index_rv != NULL) {
+			assert(index_rv->space == space_rv);
 			index_read_view_delete(index_rv);
+		}
 	}
 	TRASH(space_rv);
 	free(space_rv);
@@ -84,6 +86,7 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 		space_rv->index_map[i] = index_create_read_view(index);
 		if (space_rv->index_map[i] == NULL)
 			goto fail;
+		space_rv->index_map[i]->space = space_rv;
 	}
 	return space_rv;
 fail:

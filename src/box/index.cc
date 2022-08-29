@@ -612,6 +612,7 @@ index_read_view_create(struct index_read_view *rv,
 	rv->def = index_def_dup(def);
 	if (rv->def == NULL)
 		return -1;
+	rv->space = NULL;
 	return 0;
 }
 
