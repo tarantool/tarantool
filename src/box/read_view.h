@@ -27,6 +27,21 @@ struct space_read_view {
 	uint32_t id;
 	/** Space name. */
 	char *name;
+	/**
+	 * Runtime tuple format needed to access tuple field names by name.
+	 * Referenced (ref counter incremented).
+	 *
+	 * A new format is created only if read_view_opts::needs_field_names
+	 * is set, otherwise runtime_tuple_format is used.
+	 *
+	 * We can't just use the space tuple format as is because it allocates
+	 * tuples from the space engine arena, which is single-threaded, while
+	 * a read view may be used from threads other than tx. Good news is
+	 * runtime tuple formats are reusable so if we create more than one
+	 * read view of the same space, we will use just one tuple format for
+	 * them all.
+	 */
+	struct tuple_format *format;
 	/** Replication group id. See space_opts::group_id. */
 	uint32_t group_id;
 	/**
@@ -81,6 +96,13 @@ struct read_view_opts {
 	 * Argument passed to filter functions.
 	 */
 	void *filter_arg;
+	/**
+	 * If this flag is set, a new runtime tuple format will be created for
+	 * each read view space to support accessing tuple fields by name,
+	 * otherwise the preallocated name-less runtime tuple format will be
+	 * used instead.
+	 */
+	bool needs_field_names;
 };
 
 /** Sets read view options to default values. */
