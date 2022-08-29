@@ -284,6 +284,17 @@ tuple_bigref_tuple_count()
 	return tuple_uploaded_refs->size;
 }
 
+struct tuple_format *
+runtime_tuple_format_new(struct tuple_dictionary *dict)
+{
+	return tuple_format_new(&tuple_format_runtime_vtab, /*engine=*/NULL,
+				/*keys=*/NULL, /*key_count=*/0,
+				/*space_field_count=*/NULL,
+				/*exact_field_count=*/0, 0, dict,
+				/*is_temporary=*/false, /*is_reusable=*/true,
+				/*contraint_def=*/NULL, /*constraint_count=*/0);
+}
+
 int
 tuple_init(field_name_hash_f hash)
 {
@@ -292,9 +303,7 @@ tuple_init(field_name_hash_f hash)
 	/*
 	 * Create a format for runtime tuples
 	 */
-	tuple_format_runtime =
-		simple_tuple_format_new(&tuple_format_runtime_vtab,
-					NULL, NULL, 0);
+	tuple_format_runtime = runtime_tuple_format_new(/*dict=*/NULL);
 	if (tuple_format_runtime == NULL)
 		return -1;
 
