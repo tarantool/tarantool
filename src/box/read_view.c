@@ -18,6 +18,7 @@
 #include "space.h"
 #include "space_cache.h"
 #include "trivia/util.h"
+#include "tuple.h"
 
 static bool
 default_space_filter(struct space *space, void *arg)
@@ -42,6 +43,7 @@ read_view_opts_create(struct read_view_opts *opts)
 	opts->filter_space = default_space_filter;
 	opts->filter_index = default_index_filter;
 	opts->filter_arg = NULL;
+	opts->needs_field_names = false;
 }
 
 static void
@@ -54,6 +56,7 @@ space_read_view_delete(struct space_read_view *space_rv)
 			index_read_view_delete(index_rv);
 		}
 	}
+	tuple_format_unref(space_rv->format);
 	TRASH(space_rv);
 	free(space_rv);
 }
@@ -61,6 +64,24 @@ space_read_view_delete(struct space_read_view *space_rv)
 static struct space_read_view *
 space_read_view_new(struct space *space, const struct read_view_opts *opts)
 {
+	struct tuple_format *format = tuple_format_runtime;
+	if (opts->needs_field_names) {
+		/**
+		 * Sic: Even though a tuple dictionary has a reference counter,
+		 * we can't reuse the tuple dictionary used by the space tuple
+		 * format, because it may change when the space is altered, see
+		 * tuple_dictionary_swap.
+		 */
+		struct tuple_dictionary *dict = tuple_dictionary_new(
+			space->def->fields, space->def->field_count);
+		if (dict == NULL)
+			return NULL;
+		format = runtime_tuple_format_new(dict);
+		tuple_dictionary_unref(dict);
+		if (format == NULL)
+			return NULL;
+	}
+
 	struct space_read_view *space_rv;
 	size_t index_map_size = sizeof(*space_rv->index_map) *
 				(space->index_id_max + 1);
@@ -76,6 +97,8 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 
 	space_rv->id = space_id(space);
 	space_rv->group_id = space_group_id(space);
+	space_rv->format = format;
+	tuple_format_ref(format);
 	space_rv->index_id_max = space->index_id_max;
 	memset(space_rv->index_map, 0, index_map_size);
 	for (uint32_t i = 0; i <= space->index_id_max; i++) {
