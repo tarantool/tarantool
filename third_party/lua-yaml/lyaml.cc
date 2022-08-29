@@ -210,6 +210,7 @@ static void handle_anchor(struct lua_yaml_loader *loader) {
    lua_rawset(loader->L, loader->anchortable_index);
 }
 
+/*
 static void load_map(struct lua_yaml_loader *loader) {
    lua_createtable(loader->L, 0, 5);
    if (loader->cfg->decode_save_metatables)
@@ -218,11 +219,11 @@ static void load_map(struct lua_yaml_loader *loader) {
    handle_anchor(loader);
    while (1) {
       int r;
-      /* load key */
+      // load key
       if (load_node(loader) == 0 || loader->error)
          return;
 
-      /* load value */
+      // load value
       r = load_node(loader);
       if (loader->error)
          return;
@@ -231,7 +232,9 @@ static void load_map(struct lua_yaml_loader *loader) {
       lua_rawset(loader->L, -3);
    }
 }
+*/
 
+/*
 static void load_sequence(struct lua_yaml_loader *loader) {
    int index = 1;
 
@@ -243,6 +246,7 @@ static void load_sequence(struct lua_yaml_loader *loader) {
    while (load_node(loader) == 1 && !loader->error)
       lua_rawseti(loader->L, -2, index++);
 }
+*/
 
 static void load_scalar(struct lua_yaml_loader *loader) {
    const char *str = (char *)loader->event.data.scalar.value;
@@ -349,12 +353,43 @@ static int load_node(struct lua_yaml_loader *loader) {
          return 0;
 
       case YAML_MAPPING_START_EVENT:
-         load_map(loader);
+         //load_map(loader);
+         lua_createtable(loader->L, 0, 5);
+         if (loader->cfg->decode_save_metatables)
+            luaL_setmaphint(loader->L, -1);
+         handle_anchor(loader);
+         while (1) {
+            int r;
+            /* load key */
+            if (load_node(loader) == 0 || loader->error)
+               return 1;
+
+            /* load value */
+            r = load_node(loader);
+            if (loader->error)
+               return 1;
+            if (r != 1)
+               //RETURN_ERRMSG(loader, "unanticipated END event");
+               return 1;
+            lua_rawset(loader->L, -3);
+         }
          return 1;
 
       case YAML_SEQUENCE_START_EVENT:
-         load_sequence(loader);
+         // load_sequence(loader);
+         {
+         int index = 1;
+
+         lua_createtable(loader->L, 5, 0);
+         if (loader->cfg->decode_save_metatables)
+            luaL_setarrayhint(loader->L, -1);
+
+         handle_anchor(loader);
+         while (load_node(loader) == 1 && !loader->error)
+            lua_rawseti(loader->L, -2, index++);
+
          return 1;
+         }
 
       case YAML_SCALAR_EVENT:
          load_scalar(loader);
