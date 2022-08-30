@@ -35,6 +35,17 @@
 
 #define xmalloc(size)		xalloc_impl((size), malloc, (size))
 
+#define fail(expr, result) do {							\
+	fprintf(stderr, "Test failed: %s is %s at %s:%d, in function '%s'\n",	\
+		expr, result, __FILE__, __LINE__, __func__);			\
+	exit(EXIT_FAILURE);							\
+} while (0)
+
+#define fail_unless(expr) do {		\
+	if (!(expr))			\
+		fail(#expr, "false");	\
+} while (0)
+
 /* Test for constants */
 static const char *consts[] = {
 	PACKAGE_VERSION,
@@ -174,42 +185,40 @@ static int
 test_box_ibuf(lua_State *L)
 {
 	struct slab_cache *slabc = cord_slab_cache();
-	assert(slabc != NULL);
+	fail_unless(slabc != NULL);
 	box_ibuf_t ibuf;
 
 	ibuf_create(&ibuf, slabc, 16320);
-	assert(ibuf_used(&ibuf) == 0);
+	fail_unless(ibuf_used(&ibuf) == 0);
 	void *ptr = box_ibuf_reserve(&ibuf, 65536);
-	(void)ptr;
-	assert(ptr != NULL);
+	fail_unless(ptr != NULL);
 	char **rpos;
 	char **wpos;
 	box_ibuf_read_range(&ibuf, &rpos, &wpos);
 
 	ptr = ibuf_alloc(&ibuf, 10);
-	assert(ptr != NULL);
+	fail_unless(ptr != NULL);
 
-	assert(ibuf_used(&ibuf) == 10);
-	assert((*wpos - *rpos) == 10);
+	fail_unless(ibuf_used(&ibuf) == 10);
+	fail_unless((*wpos - *rpos) == 10);
 
 	/* let be a little bit paranoid and double check */
 	box_ibuf_read_range(&ibuf, &rpos, &wpos);
-	assert((*wpos - *rpos) == 10);
+	fail_unless((*wpos - *rpos) == 10);
 
 	ptr = ibuf_alloc(&ibuf, 10000);
-	assert(ptr);
-	assert(ibuf_used(&ibuf) == 10010);
-	assert((*wpos - *rpos) == 10010);
+	fail_unless(ptr != NULL);
+	fail_unless(ibuf_used(&ibuf) == 10010);
+	fail_unless((*wpos - *rpos) == 10010);
 
 	size_t unused = ibuf_unused(&ibuf);
-	(void)unused;
 	char **end;
 	box_ibuf_write_range(&ibuf, &wpos, &end);
-	assert((*end - *wpos) == (ptrdiff_t)unused);
+	fail_unless((*end - *wpos) == (ptrdiff_t)unused);
 
 	ibuf_reset(&ibuf);
-	assert(ibuf_used(&ibuf) == 0);
-	assert(*rpos == *wpos);
+	fail_unless(ibuf_used(&ibuf) == 0);
+	fail_unless(*rpos == *wpos);
 
 	lua_pushboolean(L, 1);
 	return 1;
@@ -303,7 +312,7 @@ static int
 test_cord(lua_State *L)
 {
 	struct slab_cache *slabc = cord_slab_cache();
-	assert(slabc != NULL);
+	fail_unless(slabc != NULL);
 	struct ibuf ibuf;
 	ibuf_create(&ibuf, slabc, 16320);
 	ibuf_destroy(&ibuf);
@@ -369,7 +378,7 @@ test_pushtuple(lua_State *L)
 	tuple_end = mp_encode_str(tuple_end, "a", 1);
 	tuple_end = mp_encode_str(tuple_end, "b", 1);
 	tuple_end = mp_encode_nil(tuple_end);
-	assert(tuple_end <= tuple_buf + sizeof(tuple_buf));
+	fail_unless(tuple_end <= tuple_buf + sizeof(tuple_buf));
 	box_tuple_format_t *fmt = box_tuple_format_default();
 	luaT_pushtuple(L, box_tuple_new(fmt, tuple_buf, tuple_end));
 	struct tuple *tuple = luaT_istuple(L, -1);
@@ -454,14 +463,12 @@ test_key_def_api(lua_State *L)
 static void
 string_check_equal(const char *a, const char *b)
 {
-	(void)a;
-	(void)b;
 	if (a == NULL) {
-		assert(b == NULL);
+		fail_unless(b == NULL);
 	} else {
-		assert(b != NULL);
-		assert(strlen(a) == strlen(b));
-		assert(strcmp(a, b) == 0);
+		fail_unless(b != NULL);
+		fail_unless(strlen(a) == strlen(b));
+		fail_unless(strcmp(a, b) == 0);
 	}
 }
 
@@ -474,12 +481,9 @@ string_check_equal(const char *a, const char *b)
 static void
 check_diag(const char *exp_err_type, const char *exp_err_msg)
 {
-	(void)exp_err_type;
-	(void)exp_err_msg;
 	box_error_t *e = box_error_last();
-	(void)e;
-	assert(strcmp(box_error_type(e), exp_err_type) == 0);
-	assert(strcmp(box_error_message(e), exp_err_msg) == 0);
+	fail_unless(strcmp(box_error_type(e), exp_err_type) == 0);
+	fail_unless(strcmp(box_error_message(e), exp_err_msg) == 0);
 }
 
 /**
@@ -493,7 +497,7 @@ new_runtime_tuple(const char *tuple_data, size_t tuple_size)
 	box_tuple_format_t *fmt = box_tuple_format_default();
 	const char *tuple_end = tuple_data + tuple_size;
 	box_tuple_t *tuple = box_tuple_new(fmt, tuple_data, tuple_end);
-	assert(tuple != NULL);
+	fail_unless(tuple != NULL);
 	box_tuple_ref(tuple);
 	return tuple;
 }
@@ -508,7 +512,7 @@ key_part_padding_offset(void)
 		return 32;
 	if (sizeof(void *) * CHAR_BIT == 32)
 		return 20;
-	assert(false);
+	fail_unless(false);
 }
 
 /**
@@ -566,17 +570,14 @@ key_part_def_set_nondefault(box_key_part_def_t *part)
 static void
 key_part_def_check_default(box_key_part_def_t *part)
 {
-	(void)part;
 	uint32_t known_flags = key_part_def_known_flags();
 	uint32_t default_flags = key_part_def_default_flags();
-	(void)known_flags;
-	(void)default_flags;
 
-	assert(part->fieldno == 0);
-	assert((part->flags & known_flags) == default_flags);
-	assert(part->field_type == NULL);
-	assert(part->collation == NULL);
-	assert(part->path == NULL);
+	fail_unless(part->fieldno == 0);
+	fail_unless((part->flags & known_flags) == default_flags);
+	fail_unless(part->field_type == NULL);
+	fail_unless(part->collation == NULL);
+	fail_unless(part->path == NULL);
 }
 
 /**
@@ -588,16 +589,14 @@ key_part_def_check_zeros(const box_key_part_def_t *part)
 {
 	size_t padding_offset = key_part_padding_offset();
 	uint32_t unknown_flags = ~key_part_def_known_flags();
-	(void)unknown_flags;
 
 	char *padding = ((char *) part) + padding_offset;
 	char *padding_end = ((char *) part) + sizeof(box_key_part_def_t);
 	for (char *p = padding; p < padding_end; ++p) {
-		(void)p;
-		assert(*p == 0);
+		fail_unless(*p == 0);
 	}
 
-	assert((part->flags & unknown_flags) == 0);
+	fail_unless((part->flags & unknown_flags) == 0);
 }
 
 /**
@@ -611,10 +610,9 @@ key_part_def_check_equal(const box_key_part_def_t *a,
 			 const box_key_part_def_t *b)
 {
 	uint32_t known_flags = key_part_def_known_flags();
-	(void)known_flags;
 
-	assert(a->fieldno == b->fieldno);
-	assert((a->flags & known_flags) == (b->flags & known_flags));
+	fail_unless(a->fieldno == b->fieldno);
+	fail_unless((a->flags & known_flags) == (b->flags & known_flags));
 	string_check_equal(a->field_type, b->field_type);
 	string_check_equal(a->collation, b->collation);
 	string_check_equal(a->path, b->path);
@@ -632,17 +630,17 @@ key_def_check_merge(box_key_part_def_t *a, uint32_t part_count_a,
 		    box_key_part_def_t *exp, uint32_t part_count_exp)
 {
 	box_key_def_t *key_def_a = box_key_def_new_v2(a, part_count_a);
-	assert(key_def_a != NULL);
+	fail_unless(key_def_a != NULL);
 	box_key_def_t *key_def_b = box_key_def_new_v2(b, part_count_b);
-	assert(key_def_b != NULL);
+	fail_unless(key_def_b != NULL);
 
 	box_key_def_t *key_def_res = box_key_def_merge(key_def_a, key_def_b);
 	uint32_t part_count_res;
 	box_key_part_def_t *res = box_key_def_dump_parts(key_def_res,
 							 &part_count_res);
-	assert(res != NULL);
+	fail_unless(res != NULL);
 
-	assert(part_count_res == part_count_exp);
+	fail_unless(part_count_res == part_count_exp);
 	for (uint32_t i = 0; i < part_count_exp; ++i) {
 		key_part_def_check_equal(&res[i], &exp[i]);
 	}
@@ -660,19 +658,19 @@ static int
 test_key_def_new_v2(struct lua_State *L)
 {
 	/* Verify <box_key_part_def_t> binary layout. */
-	assert(BOX_KEY_PART_DEF_T_SIZE == 64);
-	assert(sizeof(box_key_part_def_t) == BOX_KEY_PART_DEF_T_SIZE);
-	assert(offsetof(box_key_part_def_t, fieldno) == 0);
-	assert(offsetof(box_key_part_def_t, flags) == 4);
-	assert(offsetof(box_key_part_def_t, field_type) == 8);
+	fail_unless(BOX_KEY_PART_DEF_T_SIZE == 64);
+	fail_unless(sizeof(box_key_part_def_t) == BOX_KEY_PART_DEF_T_SIZE);
+	fail_unless(offsetof(box_key_part_def_t, fieldno) == 0);
+	fail_unless(offsetof(box_key_part_def_t, flags) == 4);
+	fail_unless(offsetof(box_key_part_def_t, field_type) == 8);
 	if (sizeof(void *) * CHAR_BIT == 64) {
-		assert(offsetof(box_key_part_def_t, collation) == 16);
-		assert(offsetof(box_key_part_def_t, path) == 24);
+		fail_unless(offsetof(box_key_part_def_t, collation) == 16);
+		fail_unless(offsetof(box_key_part_def_t, path) == 24);
 	} else if (sizeof(void *) * CHAR_BIT == 32) {
-		assert(offsetof(box_key_part_def_t, collation) == 12);
-		assert(offsetof(box_key_part_def_t, path) == 16);
+		fail_unless(offsetof(box_key_part_def_t, collation) == 12);
+		fail_unless(offsetof(box_key_part_def_t, path) == 16);
 	} else {
-		assert(false);
+		fail_unless(false);
 	}
 
 	/*
@@ -694,18 +692,18 @@ test_key_def_new_v2(struct lua_State *L)
 
 	/* Should not accept zero part count. */
 	key_def = box_key_def_new_v2(NULL, 0);
-	assert(key_def == NULL);
+	fail_unless(key_def == NULL);
 	check_diag("IllegalParams", "At least one key part is required");
 
 	/* Should not accept NULL as a <field_type>. */
 	key_def = box_key_def_new_v2(&part, 1);
-	assert(key_def == NULL);
+	fail_unless(key_def == NULL);
 	check_diag("IllegalParams", "Field type is mandatory");
 
 	/* Success case. */
 	part.field_type = "unsigned";
 	key_def = box_key_def_new_v2(&part, 1);
-	assert(key_def != NULL);
+	fail_unless(key_def != NULL);
 
 	/*
 	 * Prepare tuples to do some comparisons.
@@ -723,23 +721,22 @@ test_key_def_new_v2(struct lua_State *L)
 	 * exhaustive comparator test.
 	 */
 	int rc;
-	(void)rc;
 	rc = box_tuple_compare(tuple_1, tuple_1, key_def);
-	assert(rc == 0);
+	fail_unless(rc == 0);
 	rc = box_tuple_compare(tuple_2, tuple_2, key_def);
-	assert(rc == 0);
+	fail_unless(rc == 0);
 	rc = box_tuple_compare(tuple_1, tuple_2, key_def);
-	assert(rc < 0);
+	fail_unless(rc < 0);
 	rc = box_tuple_compare(tuple_2, tuple_1, key_def);
-	assert(rc > 0);
+	fail_unless(rc > 0);
 
 	/* The same idea, but perform comparisons against keys. */
 	rc = box_tuple_compare_with_key(tuple_1, "\x91\x00", key_def);
-	assert(rc > 0);
+	fail_unless(rc > 0);
 	rc = box_tuple_compare_with_key(tuple_1, "\x91\x01", key_def);
-	assert(rc == 0);
+	fail_unless(rc == 0);
 	rc = box_tuple_compare_with_key(tuple_1, "\x91\x02", key_def);
-	assert(rc < 0);
+	fail_unless(rc < 0);
 
 	/* Clean up. */
 	box_tuple_unref(tuple_1);
@@ -768,21 +765,21 @@ test_key_def_dump_parts(struct lua_State *L)
 	box_key_part_def_t part;
 	key_part_def_set_nondefault(&part);
 	key_def = box_key_def_new_v2(&part, 1);
-	assert(key_def != NULL);
+	fail_unless(key_def != NULL);
 
 	/*
 	 * Verify that the same values are dumped, but unknown
 	 * fields and flags are set to zeros.
 	 */
 	dump = box_key_def_dump_parts(key_def, &dump_part_count);
-	assert(dump != NULL);
-	assert(dump_part_count == 1);
+	fail_unless(dump != NULL);
+	fail_unless(dump_part_count == 1);
 	key_part_def_check_equal(&part, &dump[0]);
 	key_part_def_check_zeros(&dump[0]);
 
 	/* We can pass NULL as <part_count_ptr>. */
 	dump = box_key_def_dump_parts(key_def, NULL);
-	assert(dump != NULL);
+	fail_unless(dump != NULL);
 
 	/* Clean up. */
 	box_key_def_delete(key_def);
@@ -799,12 +796,12 @@ test_key_def_dump_parts(struct lua_State *L)
 	parts[1].collation = "unicode";
 	parts[1].flags |= BOX_KEY_PART_DEF_IS_NULLABLE;
 	key_def = box_key_def_new_v2(parts, 2);
-	assert(key_def != NULL);
+	fail_unless(key_def != NULL);
 
 	/* Verify how it'll be dumped. */
 	dump = box_key_def_dump_parts(key_def, &dump_part_count);
-	assert(dump != NULL);
-	assert(dump_part_count == 2);
+	fail_unless(dump != NULL);
+	fail_unless(dump_part_count == 2);
 	key_part_def_check_equal(&parts[0], &dump[0]);
 	key_part_def_check_equal(&parts[1], &dump[1]);
 
@@ -813,12 +810,12 @@ test_key_def_dump_parts(struct lua_State *L)
 
 	/* Can we again create a key_def from the dumped parts? */
 	key_def = box_key_def_new_v2(dump, dump_part_count);
-	assert(key_def != NULL);
+	fail_unless(key_def != NULL);
 
 	/* Verify this dump based key_def. */
 	dump = box_key_def_dump_parts(key_def, &dump_part_count);
-	assert(dump != NULL);
-	assert(dump_part_count == 2);
+	fail_unless(dump != NULL);
+	fail_unless(dump_part_count == 2);
 	key_part_def_check_equal(&parts[0], &dump[0]);
 	key_part_def_check_equal(&parts[1], &dump[1]);
 
@@ -832,10 +829,10 @@ test_key_def_dump_parts(struct lua_State *L)
 	 */
 	parts[1].collation = "none";
 	key_def = box_key_def_new_v2(parts, 2);
-	assert(key_def != NULL);
+	fail_unless(key_def != NULL);
 	dump = box_key_def_dump_parts(key_def, &dump_part_count);
-	assert(dump != NULL);
-	assert(dump_part_count == 2);
+	fail_unless(dump != NULL);
+	fail_unless(dump_part_count == 2);
 	/* Set to NULL just for ease verification. */
 	parts[1].collation = NULL;
 	key_part_def_check_equal(&parts[0], &dump[0]);
@@ -875,7 +872,7 @@ test_key_def_validate_tuple(struct lua_State *L)
 	parts[1].fieldno = 0;
 	parts[1].field_type = "unsigned";
 	box_key_def_t *key_def = box_key_def_new_v2(parts, 2);
-	assert(key_def != NULL);
+	fail_unless(key_def != NULL);
 
 	/*
 	 * Create tuples to validate them against given key_def.
@@ -924,15 +921,13 @@ test_key_def_validate_tuple(struct lua_State *L)
 
 	for (size_t i = 0; i < lengthof(tuples); ++i) {
 		int rc = box_key_def_validate_tuple(key_def, tuples[i]);
-		assert(rc == expected_results[i]);
-		(void)rc;
-		(void)expected_results;
+		fail_unless(rc == expected_results[i]);
 
 		if (expected_error_codes[i] != box_error_code_MAX) {
-			assert(rc != 0);
+			fail_unless(rc != 0);
 			box_error_t *e = box_error_last();
-			(void)e;
-			assert(box_error_code(e) == expected_error_codes[i]);
+			fail_unless(box_error_code(e) ==
+				    expected_error_codes[i]);
 		}
 	}
 
@@ -1084,23 +1079,20 @@ test_key_def_merge(struct lua_State *L)
 	size_t padding_offset = key_part_padding_offset();
 	size_t path_field_end = offsetof(box_key_part_def_t, path) +
 		sizeof(const char *);
-	assert(padding_offset == path_field_end);
-	(void)padding_offset;
-	(void)path_field_end;
+	fail_unless(padding_offset == path_field_end);
 
 	/* Non-conventional prerequisite: list of known flags. */
 	uint32_t known_flags = key_part_def_known_flags();
-	assert(known_flags == (BOX_KEY_PART_DEF_IS_NULLABLE |
-			       BOX_KEY_PART_DEF_EXCLUDE_NULL));
-	(void)known_flags;
+	fail_unless(known_flags == (BOX_KEY_PART_DEF_IS_NULLABLE |
+				    BOX_KEY_PART_DEF_EXCLUDE_NULL));
 
 	/* Non-conventional prerequisite: certain defaults. */
 	box_key_part_def_t tmp;
 	box_key_part_def_create(&tmp);
-	assert((tmp.flags & BOX_KEY_PART_DEF_IS_NULLABLE) == 0);
-	assert((tmp.flags & BOX_KEY_PART_DEF_EXCLUDE_NULL) == 0);
-	assert(tmp.collation == NULL);
-	assert(tmp.path == NULL);
+	fail_unless((tmp.flags & BOX_KEY_PART_DEF_IS_NULLABLE) == 0);
+	fail_unless((tmp.flags & BOX_KEY_PART_DEF_EXCLUDE_NULL) == 0);
+	fail_unless(tmp.collation == NULL);
+	fail_unless(tmp.path == NULL);
 
 	/*
 	 * The extra parentheses are necessary to initialize
@@ -1739,7 +1731,7 @@ test_key_def_extract_key(struct lua_State *L)
 	parts[1].fieldno = 0;
 	parts[1].field_type = "unsigned";
 	box_key_def_t *key_def = box_key_def_new_v2(parts, 2);
-	assert(key_def != NULL);
+	fail_unless(key_def != NULL);
 
 	/*
 	 * Create tuples to extract keys from them.
@@ -1771,15 +1763,11 @@ test_key_def_extract_key(struct lua_State *L)
 		uint32_t key_size = 0;
 		char *key = box_key_def_extract_key(key_def, tuples[i], -1,
 						    &key_size);
-		assert(key != NULL);
+		fail_unless(key != NULL);
 		uint32_t exp_key_size = expected_keys_1[i].key_size;
 		const char *exp_key = expected_keys_1[i].key;
-		assert(key_size == exp_key_size);
-		assert(memcmp(key, exp_key, exp_key_size) == 0);
-		(void)exp_key_size;
-		(void)exp_key;
-		(void)key_size;
-		(void)key;
+		fail_unless(key_size == exp_key_size);
+		fail_unless(memcmp(key, exp_key, exp_key_size) == 0);
 	}
 
 	/* Clean up. */
@@ -1805,7 +1793,7 @@ test_key_def_extract_key(struct lua_State *L)
 	part.field_type = "unsigned";
 	part.path = "[*]";
 	key_def = box_key_def_new_v2(&part, 1);
-	assert(key_def != NULL);
+	fail_unless(key_def != NULL);
 
 	/* [[7, 2, 1], 5, 4] */
 	box_tuple_t *tuple =
@@ -1824,15 +1812,11 @@ test_key_def_extract_key(struct lua_State *L)
 		uint32_t key_size = 0;
 		char *key = box_key_def_extract_key(key_def, tuple, i,
 						    &key_size);
-		assert(key != NULL);
+		fail_unless(key != NULL);
 		uint32_t exp_key_size = expected_keys_2[i].key_size;
 		const char *exp_key = expected_keys_2[i].key;
-		assert(key_size == exp_key_size);
-		assert(memcmp(key, exp_key, exp_key_size) == 0);
-		(void)exp_key_size;
-		(void)exp_key;
-		(void)key_size;
-		(void)key;
+		fail_unless(key_size == exp_key_size);
+		fail_unless(memcmp(key, exp_key, exp_key_size) == 0);
 	}
 
 	/* Clean up. */
@@ -1871,7 +1855,7 @@ test_key_def_validate_key(struct lua_State *L)
 	parts[1].field_type = "unsigned";
 	parts[1].flags |= BOX_KEY_PART_DEF_IS_NULLABLE;
 	box_key_def_t *key_def = box_key_def_new_v2(parts, 2);
-	assert(key_def != NULL);
+	fail_unless(key_def != NULL);
 
 	/*
 	 * Create keys to validate them against given key_def.
@@ -1933,14 +1917,12 @@ test_key_def_validate_key(struct lua_State *L)
 			const char *key = keys[i].data;
 			uint32_t key_size = 0;
 			int rc = funcs[f](key_def, key, &key_size);
-			assert(rc == exp_res);
-			(void)rc;
-			(void)exp_res;
+			fail_unless(rc == exp_res);
 
 			if (exp_err_code == box_error_code_MAX) {
 				/* Verify key_size. */
-				assert(key_size != 0);
-				assert(key_size == keys[i].size);
+				fail_unless(key_size != 0);
+				fail_unless(key_size == keys[i].size);
 
 				/*
 				 * Verify that no NULL pointer
@@ -1949,10 +1931,9 @@ test_key_def_validate_key(struct lua_State *L)
 				 */
 				box_key_def_validate_key(key_def, key, NULL);
 			} else {
-				assert(rc != 0);
+				fail_unless(rc != 0);
 				box_error_t *e = box_error_last();
-				(void)e;
-				assert(box_error_code(e) == exp_err_code);
+				fail_unless(box_error_code(e) == exp_err_code);
 			}
 		}
 	}
@@ -1974,13 +1955,13 @@ test_key_def_dup(lua_State *L)
 
 	key_part_def_set_nondefault(&part);
 	key_def = box_key_def_new_v2(&part, 1);
-	assert(key_def != NULL);
+	fail_unless(key_def != NULL);
 	box_key_def_t *key_def_dup = box_key_def_dup(key_def);
-	assert(key_def_dup != NULL);
+	fail_unless(key_def_dup != NULL);
 
 	dump = box_key_def_dump_parts(key_def_dup, &dump_part_count);
-	assert(dump != NULL);
-	assert(dump_part_count == 1);
+	fail_unless(dump != NULL);
+	fail_unless(dump_part_count == 1);
 
 	key_part_def_check_equal(&part, &dump[0]);
 	key_part_def_check_zeros(&dump[0]);
@@ -2005,8 +1986,8 @@ check_error(lua_State *L)
 static int
 test_call(lua_State *L)
 {
-	assert(luaL_loadbuffer(L, "", 0, "=eval") == 0);
-	assert(luaT_call(L, 0, LUA_MULTRET) == 0);
+	fail_unless(luaL_loadbuffer(L, "", 0, "=eval") == 0);
+	fail_unless(luaT_call(L, 0, LUA_MULTRET) == 0);
 	lua_pushboolean(L, true);
 	return 1;
 }
@@ -2021,8 +2002,7 @@ cpcall_handler(lua_State *L)
 static int
 test_cpcall(lua_State *L)
 {
-	assert(luaT_cpcall(L, cpcall_handler, 0) == 0);
-	(void)cpcall_handler;
+	fail_unless(luaT_cpcall(L, cpcall_handler, 0) == 0);
 	lua_pushboolean(L, true);
 	return 1;
 }
@@ -2031,8 +2011,7 @@ static int
 test_state(lua_State *L)
 {
 	lua_State *tarantool_L = luaT_state();
-	assert(lua_newthread(tarantool_L) != 0);
-	(void)tarantool_L;
+	fail_unless(lua_newthread(tarantool_L) != 0);
 	lua_pushboolean(L, true);
 	return 1;
 }
@@ -2054,22 +2033,22 @@ test_tostring(lua_State *L)
 	lua_setfield(L, -2, "__tostring");
 	/* setting metatable */
 	lua_setmetatable(L, -2);
-	assert(strcmp(luaT_tolstring(L, -1, NULL), "123") == 0);
+	fail_unless(strcmp(luaT_tolstring(L, -1, NULL), "123") == 0);
 
 	lua_pushnumber(L, 1);
-	assert(strcmp(luaT_tolstring(L, -1, NULL), "1") == 0);
+	fail_unless(strcmp(luaT_tolstring(L, -1, NULL), "1") == 0);
 
 	lua_createtable(L, 0, 0);
-	assert(strncmp(luaT_tolstring(L, -1, NULL), "table: ", 7) == 0);
+	fail_unless(strncmp(luaT_tolstring(L, -1, NULL), "table: ", 7) == 0);
 
 	lua_pushboolean(L, true);
-	assert(strcmp(luaT_tolstring(L, -1, NULL), "true") == 0);
+	fail_unless(strcmp(luaT_tolstring(L, -1, NULL), "true") == 0);
 
 	lua_pushboolean(L, false);
-	assert(strcmp(luaT_tolstring(L, -1, NULL), "false") == 0);
+	fail_unless(strcmp(luaT_tolstring(L, -1, NULL), "false") == 0);
 
 	lua_pushnil(L);
-	assert(strcmp(luaT_tolstring(L, -1, NULL), "nil") == 0);
+	fail_unless(strcmp(luaT_tolstring(L, -1, NULL), "nil") == 0);
 
 	lua_pushboolean(L, true);
 	return 1;
@@ -2087,19 +2066,19 @@ test_iscallable(lua_State *L)
 static int
 test_iscdata(struct lua_State *L)
 {
-	assert(lua_gettop(L) == 2);
+	fail_unless(lua_gettop(L) == 2);
 
 	int exp = lua_toboolean(L, 2);
 
 	/* Basic test. */
 	int res = luaL_iscdata(L, 1);
 	int ok = res == exp;
-	assert(lua_gettop(L) == 2);
+	fail_unless(lua_gettop(L) == 2);
 
 	/* Use negative index. */
 	res = luaL_iscdata(L, -2);
 	ok = ok && res == exp;
-	assert(lua_gettop(L) == 2);
+	fail_unless(lua_gettop(L) == 2);
 
 	lua_pushboolean(L, ok);
 	return 1;
@@ -2125,7 +2104,7 @@ test_box_region(struct lua_State *L)
 		char *ptr = box_region_alloc(size);
 
 		/* Verify box_region_used() after allocation. */
-		assert(box_region_used() - region_svp == size);
+		fail_unless(box_region_used() - region_svp == size);
 
 		/* Verify that data is accessible. */
 		for (char *p = ptr; p < ptr + size; ++p)
@@ -2142,7 +2121,7 @@ test_box_region(struct lua_State *L)
 	/* Verify truncation. */
 	for (ssize_t i = lengthof(region_svp_arr) - 1; i >= 0; --i) {
 		box_region_truncate(region_svp_arr[i]);
-		assert(box_region_used() == region_svp_arr[i]);
+		fail_unless(box_region_used() == region_svp_arr[i]);
 
 		/*
 		 * Verify that all data before this savepoint
@@ -2152,12 +2131,12 @@ test_box_region(struct lua_State *L)
 			size_t size = size_arr[j];
 			char *ptr = ptr_arr[j];
 			for (char *p = ptr; p < ptr + size; ++p) {
-				assert(*p == 'x' || *p == 'y');
+				fail_unless(*p == 'x' || *p == 'y');
 				*p = 'y';
 			}
 		}
 	}
-	assert(box_region_used() == region_svp_0);
+	fail_unless(box_region_used() == region_svp_0);
 
 	/* Verify aligned allocation. */
 	size_t a_size_arr[] = {1, 3, 5, 7, 11, 13, 17, 19};
@@ -2167,7 +2146,7 @@ test_box_region(struct lua_State *L)
 			size_t size = a_size_arr[s];
 			size_t alignment = alignment_arr[a];
 			char *ptr = box_region_aligned_alloc(size, alignment);
-			assert((uintptr_t) ptr % alignment == 0);
+			fail_unless((uintptr_t)ptr % alignment == 0);
 
 			/* Data is accessible. */
 			for (char *p = ptr; p < ptr + size; ++p)
@@ -2189,29 +2168,21 @@ test_box_region(struct lua_State *L)
 static void
 check_tuple_data(char *tuple_data, size_t tuple_size, int retvals)
 {
-	(void)tuple_data;
-	(void)tuple_size;
-	(void)retvals;
-	assert(tuple_size == 4);
-	assert(tuple_data != NULL);
-	assert(!strncmp(tuple_data, "\x93\x01\x02\x03", 4));
-	assert(retvals == 0);
+	fail_unless(tuple_size == 4);
+	fail_unless(tuple_data != NULL);
+	fail_unless(!strncmp(tuple_data, "\x93\x01\x02\x03", 4));
+	fail_unless(retvals == 0);
 }
 
 static void
 check_encode_error(char *tuple_data, int retvals, const char *exp_err_type,
 		   const char *exp_err_msg)
 {
-	(void)tuple_data;
-	(void)retvals;
-	(void)exp_err_type;
-	(void)exp_err_msg;
-	assert(tuple_data == NULL);
+	fail_unless(tuple_data == NULL);
 	box_error_t *e = box_error_last();
-	(void)e;
-	assert(strcmp(box_error_type(e), exp_err_type) == 0);
-	assert(strcmp(box_error_message(e), exp_err_msg) == 0);
-	assert(retvals == 0);
+	fail_unless(strcmp(box_error_type(e), exp_err_type) == 0);
+	fail_unless(strcmp(box_error_message(e), exp_err_msg) == 0);
+	fail_unless(retvals == 0);
 }
 
 /**
@@ -2244,7 +2215,7 @@ test_tuple_encode(struct lua_State *L)
 
 	/* Clean up. */
 	lua_pop(L, 2);
-	assert(lua_gettop(L) == 0);
+	fail_unless(lua_gettop(L) == 0);
 
 	/*
 	 * Case: a tuple on idx == -1 as an input.
@@ -2261,7 +2232,7 @@ test_tuple_encode(struct lua_State *L)
 
 	/* Clean up. */
 	lua_pop(L, 1);
-	assert(lua_gettop(L) == 0);
+	fail_unless(lua_gettop(L) == 0);
 
 	/*
 	 * Case: a Lua object of an unexpected type.
@@ -2278,7 +2249,7 @@ test_tuple_encode(struct lua_State *L)
 
 	/* Clean up. */
 	lua_pop(L, 1);
-	assert(lua_gettop(L) == 0);
+	fail_unless(lua_gettop(L) == 0);
 
 	/*
 	 * Case: unserializable item within a Lua table.
@@ -2296,7 +2267,7 @@ test_tuple_encode(struct lua_State *L)
 
 	/* Clean up. */
 	lua_pop(L, 1);
-	assert(lua_gettop(L) == 0);
+	fail_unless(lua_gettop(L) == 0);
 
 	box_region_truncate(region_svp);
 
@@ -2331,14 +2302,13 @@ test_tuple_new(struct lua_State *L)
 	size_t tuple_size = box_tuple_bsize(tuple);
 	char *tuple_data = box_region_alloc(tuple_size);
 	ssize_t rc = box_tuple_to_buf(tuple, tuple_data, tuple_size);
-	(void)rc;
-	assert(rc == (ssize_t)tuple_size);
+	fail_unless(rc == (ssize_t)tuple_size);
 	check_tuple_data(tuple_data, tuple_size, lua_gettop(L) - top);
 
 	/* Clean up. */
 	box_region_truncate(region_svp);
 	lua_pop(L, 1);
-	assert(lua_gettop(L) == 0);
+	fail_unless(lua_gettop(L) == 0);
 
 	lua_pushboolean(L, 1);
 	return 1;
@@ -2380,10 +2350,10 @@ test_tuple_validate_formatted(lua_State *L)
 		box_key_def_t *key_defs[] = {
 			box_key_def_new(fields, types, 1)
 		};
-		assert(key_defs[0] != NULL);
+		fail_unless(key_defs[0] != NULL);
 		struct tuple_format *format =
 			box_tuple_format_new(key_defs, 1);
-		assert(format);
+		fail_unless(format != NULL);
 
 		valid = box_tuple_validate(tuple, format) == 0;
 		box_tuple_format_unref(format);
@@ -2408,7 +2378,7 @@ test_tuple_validate_formatted(lua_State *L)
 static int
 tuple_field_by_path(struct lua_State *L)
 {
-	assert(lua_gettop(L) == 3);
+	fail_unless(lua_gettop(L) == 3);
 
 	box_tuple_t *tuple = luaT_istuple(L, 1);
 	size_t len;
@@ -2443,7 +2413,7 @@ check_decimal(const box_decimal_t *dec, const char *exp)
 	 */
 	char str[BOX_DECIMAL_STRING_BUFFER_SIZE];
 	box_decimal_to_string(dec, str);
-	assert(strcmp(str, exp) == 0);
+	fail_unless(strcmp(str, exp) == 0);
 }
 
 enum {
@@ -2482,8 +2452,8 @@ poison_check(const void *data)
 	const char *poison_after = raw + sizeof(size_t) + POISON_SIZE + size;
 
 	for (int i = 0; i < POISON_SIZE; ++i) {
-		assert(poison_before[i] == '#');
-		assert(poison_after[i] == '#');
+		fail_unless(poison_before[i] == '#');
+		fail_unless(poison_after[i] == '#');
 	}
 }
 
@@ -2509,46 +2479,46 @@ test_decimal(struct lua_State *L)
 	/* From string. */
 	box_decimal_t pi;
 	box_decimal_t *p = box_decimal_from_string(&pi, "3.14");
-	assert(p == &pi);
+	fail_unless(p == &pi);
 	check_decimal(&pi, "3.14");
 
 	/* To string. */
 	char str[BOX_DECIMAL_STRING_BUFFER_SIZE];
 	box_decimal_to_string(&pi, str);
-	assert(strcmp(str, "3.14") == 0);
+	fail_unless(strcmp(str, "3.14") == 0);
 
 	/* Copy. */
 	box_decimal_t pi_saved;
 	p = box_decimal_copy(&pi_saved, &pi);
-	assert(p == &pi_saved);
+	fail_unless(p == &pi_saved);
 	check_decimal(&pi_saved, "3.14");
 
 	/* Precision. */
 	int precision = box_decimal_precision(&pi);
-	assert(precision == 3);
+	fail_unless(precision == 3);
 	box_decimal_t half;
 	box_decimal_from_string(&half, "0.5");
 	precision = box_decimal_precision(&half);
-	assert(precision == 1);
+	fail_unless(precision == 1);
 	box_decimal_from_string(&half, "0.50");
 	precision = box_decimal_precision(&half);
-	assert(precision == 2);
+	fail_unless(precision == 2);
 
 	/* Scale. */
 	int scale = box_decimal_scale(&pi);
-	assert(scale == 2);
+	fail_unless(scale == 2);
 
 	/* Zero. */
 	box_decimal_t zero;
 	p = box_decimal_zero(&zero);
-	assert(p == &zero);
+	fail_unless(p == &zero);
 	check_decimal(&zero, "0");
 
 	/* Is integer? */
 	bool is_int = box_decimal_is_int(&pi);
-	assert(!is_int);
+	fail_unless(!is_int);
 	is_int = box_decimal_is_int(&zero);
-	assert(is_int);
+	fail_unless(is_int);
 
 	/* Is negative? */
 	box_decimal_t mariana;
@@ -2556,30 +2526,30 @@ test_decimal(struct lua_State *L)
 	box_decimal_t nzero;
 	box_decimal_from_string(&nzero, "-0");
 	bool is_neg = box_decimal_is_neg(&pi);
-	assert(!is_neg);
+	fail_unless(!is_neg);
 	is_neg = box_decimal_is_neg(&zero);
-	assert(!is_neg);
+	fail_unless(!is_neg);
 	is_neg = box_decimal_is_neg(&nzero);
-	assert(!is_neg);
+	fail_unless(!is_neg);
 	is_neg = box_decimal_is_neg(&mariana);
-	assert(is_neg);
+	fail_unless(is_neg);
 
 	/* From double. */
 	box_decimal_t guinness;
 	p = box_decimal_from_double(&guinness, 119.5);
-	assert(p == &guinness);
+	fail_unless(p == &guinness);
 	check_decimal(&guinness, "119.5");
 
 	/* From int64_t. */
 	box_decimal_t celsius;
 	p = box_decimal_from_int64(&celsius, (int64_t)(-273));
-	assert(p == &celsius);
+	fail_unless(p == &celsius);
 	check_decimal(&celsius, "-273");
 
 	/* From uint64_t. */
 	box_decimal_t vostok_1;
 	p = box_decimal_from_uint64(&vostok_1, (uint64_t)1961);
-	assert(p == &vostok_1);
+	fail_unless(p == &vostok_1);
 	check_decimal(&vostok_1, "1961");
 
 	/* To int64_t. */
@@ -2587,16 +2557,16 @@ test_decimal(struct lua_State *L)
 	box_decimal_from_string(&carthage, "-146");
 	int64_t carthage_64 = 0;
 	const box_decimal_t *cp = box_decimal_to_int64(&carthage, &carthage_64);
-	assert(cp == &carthage);
-	assert(carthage_64 == (int64_t)(-146));
+	fail_unless(cp == &carthage);
+	fail_unless(carthage_64 == (int64_t)(-146));
 
 	/* To uint64_t. */
 	box_decimal_t g;
 	box_decimal_from_string(&g, "9.81");
 	uint64_t g_u64 = 0;
 	cp = box_decimal_to_uint64(&g, &g_u64);
-	assert(cp == &g);
-	assert(g_u64 == (uint64_t)9);
+	fail_unless(cp == &g);
+	fail_unless(g_u64 == (uint64_t)9);
 
 	/* Compare. */
 	box_decimal_t five_1;
@@ -2606,16 +2576,16 @@ test_decimal(struct lua_State *L)
 	box_decimal_from_string(&five_2, "5");
 	box_decimal_from_string(&six, "6");
 	int rc = box_decimal_compare(&five_1, &six);
-	assert(rc == -1);
+	fail_unless(rc == -1);
 	rc = box_decimal_compare(&five_1, &five_2);
-	assert(rc == 0);
+	fail_unless(rc == 0);
 	rc = box_decimal_compare(&six, &five_1);
-	assert(rc == 1);
+	fail_unless(rc == 1);
 	box_decimal_t zerooo;
 	box_decimal_from_string(&zero, "0");
 	box_decimal_from_string(&zerooo, "0.00");
 	rc = box_decimal_compare(&zero, &zerooo);
-	assert(rc == 0);
+	fail_unless(rc == 0);
 
 	/*
 	 * Rounding (to nearest at given scale, half goes away
@@ -2643,7 +2613,7 @@ test_decimal(struct lua_State *L)
 		box_decimal_t dec;
 		box_decimal_from_string(&dec, round_cases[i].input);
 		p = box_decimal_round(&dec, round_cases[i].scale);
-		assert(p == &dec);
+		fail_unless(p == &dec);
 		check_decimal(&dec, round_cases[i].exp);
 	}
 
@@ -2675,7 +2645,7 @@ test_decimal(struct lua_State *L)
 		box_decimal_t dec;
 		box_decimal_from_string(&dec, floor_cases[i].input);
 		p = box_decimal_floor(&dec, floor_cases[i].scale);
-		assert(p == &dec);
+		fail_unless(p == &dec);
 		check_decimal(&dec, floor_cases[i].exp);
 	}
 
@@ -2683,13 +2653,13 @@ test_decimal(struct lua_State *L)
 	box_decimal_from_string(&zerooo, "0.00");
 	check_decimal(&zerooo, "0.00");
 	p = box_decimal_trim(&zerooo);
-	assert(p == &zerooo);
+	fail_unless(p == &zerooo);
 	check_decimal(&zerooo, "0");
 	box_decimal_t percent;
 	box_decimal_from_string(&percent, "0.50");
 	check_decimal(&percent, "0.50");
 	p = box_decimal_trim(&percent);
-	assert(p == &percent);
+	fail_unless(p == &percent);
 	check_decimal(&percent, "0.5");
 
 	/*
@@ -2700,18 +2670,18 @@ test_decimal(struct lua_State *L)
 	box_decimal_t circumference;
 	box_decimal_from_string(&circumference, "40075.017");
 	p = box_decimal_rescale(&circumference, 2);
-	assert(p == &circumference);
+	fail_unless(p == &circumference);
 	check_decimal(&circumference, "40075.02");
 	box_decimal_t radius;
 	box_decimal_from_string(&radius, "6378.137");
 	p = box_decimal_rescale(&radius, 6);
-	assert(p == &radius);
+	fail_unless(p == &radius);
 	check_decimal(&radius, "6378.137000");
 	box_decimal_t mass;
 	box_decimal_from_string(&mass, "3e-6");
 	check_decimal(&mass, "0.000003");
 	p = box_decimal_rescale(&mass, 6);
-	assert(p == &mass);
+	fail_unless(p == &mass);
 	check_decimal(&mass, "0.000003");
 
 	/* Unary operations. */
@@ -2765,11 +2735,11 @@ test_decimal(struct lua_State *L)
 		box_decimal_from_string(&arg, unary_cases[i].arg);
 		box_decimal_t res;
 		p = unary_cases[i].op(&res, &arg);
-		assert(p == &res);
+		fail_unless(p == &res);
 		check_decimal(&res, unary_cases[i].exp);
 		/* arg = op(arg) */
 		p = unary_cases[i].op(&arg, &arg);
-		assert(p == &arg);
+		fail_unless(p == &arg);
 		check_decimal(&arg, unary_cases[i].exp);
 	}
 
@@ -2828,17 +2798,17 @@ test_decimal(struct lua_State *L)
 		box_decimal_from_string(&arg_2, binary_cases[i].arg_2);
 		box_decimal_t res;
 		p = binary_cases[i].op(&res, &arg_1, &arg_2);
-		assert(p == &res);
+		fail_unless(p == &res);
 		check_decimal(&res, binary_cases[i].exp);
 		/* arg_1 = op(arg_1, arg_2) */
 		p = binary_cases[i].op(&arg_1, &arg_1, &arg_2);
-		assert(p == &arg_1);
+		fail_unless(p == &arg_1);
 		check_decimal(&arg_1, binary_cases[i].exp);
 		/* Restore arg_1. */
 		box_decimal_from_string(&arg_1, binary_cases[i].arg_1);
 		/* arg_2 = op(arg_1, arg_2) */
 		p = binary_cases[i].op(&arg_2, &arg_1, &arg_2);
-		assert(p == &arg_2);
+		fail_unless(p == &arg_2);
 		check_decimal(&arg_2, binary_cases[i].exp);
 	}
 
@@ -2848,11 +2818,11 @@ test_decimal(struct lua_State *L)
 	uint32_t mp_buffer_size = box_decimal_mp_sizeof(&ammonia);
 	char *data = poison_malloc(mp_buffer_size);
 	char *data_end = box_decimal_mp_encode(&ammonia, data);
-	assert(data_end - data == mp_buffer_size);
+	fail_unless(data_end - data == mp_buffer_size);
 	poison_check(data);
 	/* Verify the msgpack content. */
-	assert(mp_buffer_size == 6);
-	assert(memcmp(data, "\xd6\x01\x02\x07\x77\x3d", 6) == 0);
+	fail_unless(mp_buffer_size == 6);
+	fail_unless(memcmp(data, "\xd6\x01\x02\x07\x77\x3d", 6) == 0);
 	poison_free(data);
 
 	/* Decode from msgpack. */
@@ -2861,8 +2831,8 @@ test_decimal(struct lua_State *L)
 	box_decimal_t ammonia_copy;
 	const char *pos = ammonia_msgpack;
 	p = box_decimal_mp_decode(&ammonia_copy, &pos);
-	assert(p == &ammonia_copy);
-	assert(pos == ammonia_msgpack + msgpack_size);
+	fail_unless(p == &ammonia_copy);
+	fail_unless(pos == ammonia_msgpack + msgpack_size);
 	check_decimal(&ammonia_copy, "-77.73");
 
 	/* Decode from msgpack using box_decimal_mp_decode_data(). */
@@ -2871,8 +2841,8 @@ test_decimal(struct lua_State *L)
 	uint32_t data_size = msgpack_size - header_size;
 	pos = ammonia_msgpack + header_size;
 	p = box_decimal_mp_decode_data(&ammonia_copy_2, &pos, data_size);
-	assert(p == &ammonia_copy_2);
-	assert(pos == ammonia_msgpack + msgpack_size);
+	fail_unless(p == &ammonia_copy_2);
+	fail_unless(pos == ammonia_msgpack + msgpack_size);
 	check_decimal(&ammonia_copy_2, "-77.73");
 
 	lua_pushboolean(L, 1);
@@ -2891,7 +2861,7 @@ test_decimal(struct lua_State *L)
 static int
 test_decimal_mul(struct lua_State *L)
 {
-	assert(lua_gettop(L) == 2);
+	fail_unless(lua_gettop(L) == 2);
 
 	box_decimal_t arg_1;
 	box_decimal_from_string(&arg_1, lua_tostring(L, 1));
@@ -2901,7 +2871,7 @@ test_decimal_mul(struct lua_State *L)
 
 	box_decimal_t *res = luaT_newdecimal(L);
 	box_decimal_mul(res, &arg_1, &arg_2);
-	assert(lua_gettop(L) == 3);
+	fail_unless(lua_gettop(L) == 3);
 	return 1;
 }
 
@@ -2913,7 +2883,7 @@ test_decimal_mul(struct lua_State *L)
 static int
 test_decimal_div(struct lua_State *L)
 {
-	assert(lua_gettop(L) == 2);
+	fail_unless(lua_gettop(L) == 2);
 
 	box_decimal_t arg_1;
 	box_decimal_from_string(&arg_1, lua_tostring(L, 1));
@@ -2924,7 +2894,7 @@ test_decimal_div(struct lua_State *L)
 	box_decimal_t res;
 	box_decimal_div(&res, &arg_1, &arg_2);
 	luaT_pushdecimal(L, &res);
-	assert(lua_gettop(L) == 3);
+	fail_unless(lua_gettop(L) == 3);
 	return 1;
 }
 
@@ -2939,19 +2909,19 @@ test_decimal_div(struct lua_State *L)
 static int
 test_isdecimal(struct lua_State *L)
 {
-	assert(lua_gettop(L) == 2);
+	fail_unless(lua_gettop(L) == 2);
 
 	int exp = lua_toboolean(L, 2);
 
 	/* Basic test. */
 	int res = luaT_isdecimal(L, 1) != NULL;
 	int ok = res == exp;
-	assert(lua_gettop(L) == 2);
+	fail_unless(lua_gettop(L) == 2);
 
 	/* Use negative index. */
 	res = luaT_isdecimal(L, -2) != NULL;
 	ok = ok && res == exp;
-	assert(lua_gettop(L) == 2);
+	fail_unless(lua_gettop(L) == 2);
 
 	lua_pushboolean(L, ok);
 	return 1;
@@ -2971,9 +2941,9 @@ test_isdecimal(struct lua_State *L)
 static int
 test_isdecimal_ptr(struct lua_State *L)
 {
-	assert(lua_gettop(L) == 2);
+	fail_unless(lua_gettop(L) == 2);
 	box_decimal_t *dec = luaT_isdecimal(L, 1);
-	assert(lua_gettop(L) == 2);
+	fail_unless(lua_gettop(L) == 2);
 	const char *exp = lua_tostring(L, 2);
 
 	char str[BOX_DECIMAL_STRING_BUFFER_SIZE];
