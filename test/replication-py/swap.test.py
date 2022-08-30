@@ -43,7 +43,7 @@ master.uri = "{}:{}@{}".format(LOGIN, PASSWORD, master.iproto.uri)
 os.putenv("MASTER", master.uri)
 
 # replica server
-replica = TarantoolServer()
+replica = TarantoolServer(server.ini)
 replica.script = "replication-py/replica.lua"
 replica.vardir = server.vardir
 replica.deploy()
