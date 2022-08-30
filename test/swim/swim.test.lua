@@ -1,5 +1,6 @@
 fiber = require('fiber')
 swim = require('swim')
+uri_lib = require('uri')
 test_run = require('test_run').new()
 test_run:cmd("push filter '\\.lua.*:[0-9]+: ' to '.lua:<line>: '")
 test_run:cmd("push filter '127.0.0.1:[0-9]+$' to '127.0.0.1:<port>'")
@@ -75,6 +76,9 @@ s:delete()
 --
 s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01, generation = 0})
 s2 = swim.new({uuid = uuid(2), uri = listen_uri, heartbeat_rate = 0.01, generation = 0})
+
+listen_uri = s2:self():uri()
+listen_port = uri_lib.parse(listen_uri).service
 
 s1.broadcast()
 s1:broadcast('wrong port')
