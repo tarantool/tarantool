@@ -138,6 +138,14 @@ static int
 on_shutdown_f(va_list ap)
 {
 	(void) ap;
+	/*
+	 * If event loop is not running, that means that on_shutdown_f was
+	 * called from the end of main. Return control back to main, which
+	 * will start an event loop and reschedule this fiber.
+	 */
+	if (ev_depth(loop()) == 0)
+		fiber_sleep(0.0);
+
 	if (trigger_fiber_run(&box_on_shutdown_trigger_list, NULL,
 			      on_shutdown_trigger_timeout) != 0) {
 		say_error("on_shutdown triggers failed");
@@ -820,11 +828,14 @@ main(int argc, char **argv)
 	if (start_loop)
 		say_info("exiting the event loop");
 	/*
-	 * If Tarantool was stopped using Ctrl+D, then we need to
-	 * call on_shutdown triggers, because Ctrl+D  causes not
-	 * any signals.
+	 * If Tarantool was stopped by Ctrl+D or by reaching the end of the
+	 * init script, and there was neither os.exit nor SIGTERM, then call
+	 * tarantool_exit and start an event loop to run on_shutdown triggers.
 	 */
-	tarantool_exit(exit_code);
+	if (!is_shutting_down) {
+		tarantool_exit(exit_code);
+		ev_run(loop(), 0);
+	}
 	/* freeing resources */
 	tarantool_free();
 	return exit_code;
