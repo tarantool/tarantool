@@ -28,40 +28,63 @@ target_link_libraries(
         >
 )
 
-# Use PUBLIC to force 'fuzzer_config' for all dependent targets.
-add_executable(csv_fuzzer csv_fuzzer.c)
-target_link_libraries(csv_fuzzer PUBLIC csv fuzzer_config)
+set(FUZZ_TEST_TARGETS "")
 
-add_executable(uri_fuzzer uri_fuzzer.c)
-target_link_libraries(uri_fuzzer PUBLIC uri fuzzer_config)
+function(create_fuzz_test)
+  cmake_parse_arguments(
+    FUZZ
+    ""
+    "PREFIX"
+    "SOURCES;LIBRARIES"
+    ${ARGN}
+  )
+  message(STATUS "Creating fuzz test ${FUZZ_PREFIX}_fuzzer")
+  add_executable(${FUZZ_PREFIX}_fuzzer ${FUZZ_SOURCES})
+  # Use PUBLIC to force 'fuzzer_config' for all dependent targets.
+  target_link_libraries(${FUZZ_PREFIX}_fuzzer PUBLIC ${FUZZ_LIBRARIES})
+  set(FUZZ_TEST_TARGETS ${FUZZ_TEST_TARGETS} ${FUZZ_PREFIX}_fuzzer PARENT_SCOPE)
+endfunction()
 
-add_executable(http_parser_fuzzer http_parser_fuzzer.c)
-target_link_libraries(http_parser_fuzzer PUBLIC http_parser fuzzer_config)
+create_fuzz_test(PREFIX csv
+                 SOURCES csv_fuzzer.c
+                 LIBRARIES csv fuzzer_config
+)
 
-add_executable(swim_proto_member_fuzzer swim_proto_member_fuzzer.c)
-target_link_libraries(swim_proto_member_fuzzer PUBLIC swim fuzzer_config)
+create_fuzz_test(PREFIX uri
+                 SOURCES uri_fuzzer.c
+                 LIBRARIES uri fuzzer_config
+)
 
-add_executable(swim_proto_meta_fuzzer swim_proto_meta_fuzzer.c)
-target_link_libraries(swim_proto_meta_fuzzer PUBLIC swim fuzzer_config)
+create_fuzz_test(PREFIX http_parser
+                 SOURCES http_parser_fuzzer.c
+                 LIBRARIES http_parser fuzzer_config
+)
 
-add_executable(datetime_parse_full_fuzzer datetime_parse_full_fuzzer.c)
-target_link_libraries(datetime_parse_full_fuzzer PUBLIC core fuzzer_config)
+create_fuzz_test(PREFIX swim_proto_member
+                 SOURCES swim_proto_member_fuzzer.c
+                 LIBRARIES swim fuzzer_config
+)
 
-add_executable(datetime_strptime_fuzzer datetime_strptime_fuzzer.c)
-target_link_libraries(datetime_strptime_fuzzer PUBLIC core fuzzer_config)
+create_fuzz_test(PREFIX swim_proto_meta
+                 SOURCES swim_proto_meta_fuzzer.c
+                 LIBRARIES swim fuzzer_config
+)
 
-add_executable(mp_datetime_fuzzer mp_datetime_fuzzer.c)
-target_link_libraries(mp_datetime_fuzzer PUBLIC core fuzzer_config)
+create_fuzz_test(PREFIX datetime_parse_full
+                 SOURCES datetime_parse_full_fuzzer.c
+                 LIBRARIES core fuzzer_config
+)
 
-set(fuzzing_binaries csv_fuzzer
-                     datetime_parse_full_fuzzer
-                     datetime_strptime_fuzzer
-                     http_parser_fuzzer
-                     mp_datetime_fuzzer
-                     swim_proto_member_fuzzer
-                     swim_proto_meta_fuzzer
-                     uri_fuzzer)
+create_fuzz_test(PREFIX datetime_strptime
+                 SOURCES datetime_strptime_fuzzer.c
+                 LIBRARIES core fuzzer_config
+)
+
+create_fuzz_test(PREFIX mp_datetime
+                 SOURCES mp_datetime_fuzzer.c
+                 LIBRARIES core fuzzer_config
+)
 
 add_custom_target(fuzzers
-                  DEPENDS ${fuzzing_binaries}
+                  DEPENDS ${FUZZ_TEST_TARGETS}
                   COMMENT "Build fuzzers")
