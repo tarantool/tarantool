@@ -11,10 +11,25 @@ include_directories(${PROJECT_SOURCE_DIR}/src/box)
 include_directories(${PROJECT_SOURCE_DIR}/third_party)
 include_directories(${EXTRA_CORE_INCLUDE_DIRS})
 
-add_executable(tuple.perftest tuple.cc
-               ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c)
-target_link_libraries(tuple.perftest core box tuple benchmark::benchmark)
+function(create_perf_test)
+  cmake_parse_arguments(
+    PERF
+    ""
+    "PREFIX"
+    "SOURCES;LIBRARIES"
+    ${ARGN}
+  )
+  message(STATUS "Creating performance test ${PERF_PREFIX}.perftest")
+  add_executable(${PERF_PREFIX}.perftest ${PERF_SOURCES})
+  target_link_libraries(${PERF_PREFIX}.perftest PUBLIC ${PERF_LIBRARIES})
+endfunction()
 
-add_executable(light.perftest light.cc
-               ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c)
-target_link_libraries(light.perftest small benchmark::benchmark)
+create_perf_test(PREFIX tuple
+                 SOURCES tuple.cc ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c
+                 LIBRARIES core box tuple benchmark::benchmark
+)
+
+create_perf_test(PREFIX light
+                 SOURCES light.cc ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c
+                 LIBRARIES small benchmark::benchmark
+)
