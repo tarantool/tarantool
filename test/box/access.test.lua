@@ -359,7 +359,7 @@ c:close()
 session = box.session
 box.schema.user.create('test')
 box.schema.user.grant('test', 'read', 'space', '_collation')
---box.schema.user.grant('test', 'write', 'space', '_collation')
+box.schema.user.grant('test', 'write', 'space', '_collation')
 -- FIXME: granting create on 'collation' only doesn't work
 box.schema.user.grant('test', 'create', 'universe')
 session.su('test')

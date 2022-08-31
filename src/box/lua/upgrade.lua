@@ -1227,6 +1227,20 @@ local function upgrade_to_2_10_1()
 end
 --------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------------
+-- Tarantool 2.11.0
+--------------------------------------------------------------------------------
+local function revoke_write_access_on__collation_from_role_public()
+    local _priv = box.space[box.schema.PRIV_ID]
+    log.info("revoke write access on _collation space from public role")
+    _priv:delete{PUBLIC, 'space', box.schema.COLLATION_ID}
+end
+
+local function upgrade_to_2_11_0()
+    revoke_write_access_on__collation_from_role_public()
+end
+--------------------------------------------------------------------------------
+
 local handlers = {
     {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5, auto=true},
     {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6, auto = true},
@@ -1243,6 +1257,7 @@ local handlers = {
     {version = mkversion(2, 7, 1), func = upgrade_to_2_7_1, auto = true},
     {version = mkversion(2, 9, 1), func = upgrade_to_2_9_1, auto = true},
     {version = mkversion(2, 10, 1), func = upgrade_to_2_10_1, auto = true},
+    {version = mkversion(2, 11, 0), func = upgrade_to_2_11_0, auto = true},
 }
 
 -- Schema version of the snapshot.
