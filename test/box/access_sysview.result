@@ -150,11 +150,11 @@ box.session.su('guest')
 ...
 #box.space._vspace:select{}
 ---
-- 10
+- 9
 ...
 #box.space._vindex:select{}
 ---
-- 23
+- 21
 ...
 #box.space._vcollation:select{}
 ---
@@ -258,7 +258,7 @@ box.session.su('guest')
 ...
 #box.space._vpriv:select{}
 ---
-- 18
+- 17
 ...
 #box.space._vfunc:select{}
 ---
@@ -290,7 +290,7 @@ box.session.su('guest')
 ...
 #box.space._vpriv:select{}
 ---
-- 18
+- 17
 ...
 #box.space._vfunc:select{}
 ---
