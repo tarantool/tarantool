@@ -377,7 +377,7 @@ static int load_node(struct lua_yaml_loader *loader) {
          handle_anchor(loader);
 
          is_map++;
-         map_idx = 1;
+         map_idx = 0;
          /*
          while (1) {
             int r;
@@ -434,12 +434,13 @@ static int load_node(struct lua_yaml_loader *loader) {
             lua_rawseti(loader->L, -2, seq_idx++);
             continue;
          }
-         printf("YAML_SCALAR_EVENT\n");
          if (is_map > 0) {
             map_idx++;
-            printf("map_idx %d\n", map_idx);
-            if (map_idx % 2 == 0)
+            //printf("map_idx %d\n", map_idx);
+            if (map_idx % 2 == 0) {
                lua_rawset(loader->L, -3);
+            }
+            continue;
          }
          return 1;
 
