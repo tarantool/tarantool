@@ -2758,6 +2758,14 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 	if (old_space == NULL)
 		return -1;
 
+	/*
+	 * Check if a write privilege was given, return an error if not.
+	 * The check should precede initial recovery check to correctly
+	 * handle direct insert into _truncate systable.
+	 */
+	if (access_check_space(old_space, PRIV_W) != 0)
+		return -1;
+
 	if (stmt->row->type == IPROTO_INSERT) {
 		/*
 		 * Space creation during initial recovery -
@@ -2776,12 +2784,6 @@ on_replace_dd_truncate(struct trigger * /* trigger */, void *event)
 			  space_name(old_space));
 		return -1;
 	}
-
-	/*
-	 * Check if a write privilege was given, return an error if not.
-	 */
-	if (access_check_space(old_space, PRIV_W) != 0)
-		return -1;
 
 	if (space_check_pinned(old_space) != 0)
 		return -1;
