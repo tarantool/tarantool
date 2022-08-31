@@ -19,7 +19,7 @@ local TARANTOOL_PATH = arg[-1]
 local test = tap.test('gh-2717-no-quit-sigint')
 
 test:plan(8)
-local cmd = 'INPUTRC=Pheiphe2 ' .. TARANTOOL_PATH .. ' -i 2>&1'
+local cmd = 'INPUTRC=non_existent_file ' .. TARANTOOL_PATH .. ' -i 2>&1'
 local ph = popen.new({cmd}, {
     shell = true,
     setsid = true,
@@ -214,7 +214,7 @@ os.remove(snap_file)
 --
 -- Testing case when the client and instance are called in the same console.
 --
-cmd = 'INPUTRC=Pheiphe2 ' .. TARANTOOL_PATH .. ' -i 2>&1'
+cmd = 'INPUTRC=non_existent_file ' .. TARANTOOL_PATH .. ' -i 2>&1'
 ph = popen.new({cmd}, {
     shell = true,
     setsid = true,
