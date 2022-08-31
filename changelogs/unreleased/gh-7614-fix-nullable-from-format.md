@@ -1,4 +1,4 @@
 ## bugfix/box
 
-* Fixed inheriting format options when specifying index parts with 1.6 style
-  (like {<field>, <type>, ...}) (gh-7614).
+* Fixed inheritance of field options in indexes when index parts are
+  specified the old Tarantool 1.6 style: `{<field>, <type>, ...}` (gh-7614).

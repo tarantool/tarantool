@@ -1,3 +1,3 @@
 ## bugfix/core
 
-* Fixed crash in secondary index without hint (gh-7605)
+* Fixed a crash of secondary indexes without hints (gh-7605)
