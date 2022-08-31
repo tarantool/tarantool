@@ -343,14 +343,31 @@ static void load_alias(struct lua_yaml_loader *loader) {
  * @retval  1 Success.
  */
 static int load_node(struct lua_yaml_loader *loader) {
-   if (!do_parse(loader))
-      return -1;
+   int seq_idx;
+   int map_idx;
+   int is_seq = 0;
+   int is_map = 0;
 
+   while(1) {
+   if (!do_parse(loader))
+      return 1;
+
+   printf("%d\n", loader->event.type);
    switch (loader->event.type) {
       case YAML_DOCUMENT_END_EVENT:
+         return 1;
+
       case YAML_MAPPING_END_EVENT:
+         is_map--;
+         if (is_seq > 0 || is_map > 0)
+            continue;
+         return 1;
+
       case YAML_SEQUENCE_END_EVENT:
-         return 0;
+         is_seq--;
+         if (is_seq > 0 || is_map > 0)
+            continue;
+         return 1;
 
       case YAML_MAPPING_START_EVENT:
          //load_map(loader);
@@ -358,13 +375,15 @@ static int load_node(struct lua_yaml_loader *loader) {
          if (loader->cfg->decode_save_metatables)
             luaL_setmaphint(loader->L, -1);
          handle_anchor(loader);
+
+         is_map++;
+         map_idx = 1;
+         /*
          while (1) {
             int r;
-            /* load key */
             if (load_node(loader) == 0 || loader->error)
                return 1;
 
-            /* load value */
             r = load_node(loader);
             if (loader->error)
                return 1;
@@ -373,10 +392,13 @@ static int load_node(struct lua_yaml_loader *loader) {
                return 1;
             lua_rawset(loader->L, -3);
          }
-         return 1;
+         */
+         //return 1;
+         continue;
 
       case YAML_SEQUENCE_START_EVENT:
          // load_sequence(loader);
+         /*
          {
          int index = 1;
 
@@ -390,14 +412,45 @@ static int load_node(struct lua_yaml_loader *loader) {
 
          return 1;
          }
+         */
+
+         lua_createtable(loader->L, 5, 0);
+         if (loader->cfg->decode_save_metatables)
+            luaL_setarrayhint(loader->L, -1);
+
+         handle_anchor(loader);
+         is_seq++;
+         seq_idx = 1;
+
+         //while (load_node(loader) == 1 && !loader->error)
+         //   lua_rawseti(loader->L, -2, index++);
+
+         //return 1;
+         continue;
 
       case YAML_SCALAR_EVENT:
          load_scalar(loader);
+         if (is_seq > 0) {
+            lua_rawseti(loader->L, -2, seq_idx++);
+            continue;
+         }
+         printf("YAML_SCALAR_EVENT\n");
+         if (is_map > 0) {
+            map_idx++;
+            printf("map_idx %d\n", map_idx);
+            if (map_idx % 2 == 0)
+               lua_rawset(loader->L, -3);
+         }
          return 1;
 
       case YAML_ALIAS_EVENT:
          load_alias(loader);
+         if (is_seq > 0) {
+            lua_rawseti(loader->L, -2, seq_idx++);
+            continue;
+         }
          return 1;
+         //continue;
 
       case YAML_NO_EVENT:
          lua_pushliteral(loader->L, "libyaml returned YAML_NO_EVENT");
@@ -408,6 +461,7 @@ static int load_node(struct lua_yaml_loader *loader) {
          lua_pushliteral(loader->L, "invalid event");
          loader->error = 1;
          return -1;
+   }
    }
 }
 
@@ -490,13 +544,26 @@ static void load(struct lua_yaml_loader *loader) {
 
       if (!do_parse(loader))
          return;
+      /*
       if (loader->event.type != YAML_DOCUMENT_END_EVENT)
          RETURN_ERRMSG(loader, "expected DOCUMENT_END_EVENT");
+         */
 
-      /* reset anchor table */
       lua_newtable(loader->L);
       lua_replace(loader->L, loader->anchortable_index);
    }
+   /*
+   if (!do_parse(loader))
+      return;
+
+   if (loader->event.type == YAML_STREAM_END_EVENT)
+      return;
+
+   load_node(loader);
+
+   if (!do_parse(loader))
+      return;
+   */
 }
 
 /**
