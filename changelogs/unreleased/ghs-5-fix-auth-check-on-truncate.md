@@ -1,3 +1,3 @@
 ## bugfix/box
 
-* Fixed unauthorized inserts into \_truncate table (ghs-5).
+* Fixed unauthorized inserts into the `_truncate` space (ghs-5).
