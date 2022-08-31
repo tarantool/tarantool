@@ -558,3 +558,8 @@ create_unit_test(PREFIX iterator_position
                  SOURCES iterator_position.c box_test_utils.c
                  LIBRARIES unit box core
 )
+
+create_unit_test(PREFIX key_def
+                 SOURCES key_def.c box_test_utils.c
+                 LIBRARIES unit box core
+)

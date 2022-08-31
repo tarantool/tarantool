@@ -810,60 +810,82 @@ tuple_compare_with_key_slowpath(struct tuple *tuple, hint_t tuple_hint,
 	return 0;
 }
 
+/**
+ * Compare key parts and skip compared equally. After function call, keys
+ * will point to the first field that differ or to the end of key or
+ * part_count + 1 field in order.
+ * Key arguments must not be NULL, allowed to be NULL if dereferenced.
+ */
 template<bool is_nullable>
 static inline int
-key_compare_parts(const char *key_a, const char *key_b, uint32_t part_count,
-		  struct key_def *key_def)
+key_compare_and_skip_parts(const char **key_a, const char **key_b,
+			   uint32_t part_count, struct key_def *key_def)
 {
 	assert(is_nullable == key_def->is_nullable);
-	assert((key_a != NULL && key_b != NULL) || part_count == 0);
+	assert(key_a != NULL && key_b != NULL);
+	assert((*key_a != NULL && *key_b != NULL) || part_count == 0);
 	struct key_part *part = key_def->parts;
+	int rc;
 	if (likely(part_count == 1)) {
+		enum mp_type a_type = mp_typeof(**key_a);
+		enum mp_type b_type = mp_typeof(**key_b);
 		if (! is_nullable) {
-			return tuple_compare_field(key_a, key_b, part->type,
-						   part->coll);
-		}
-		enum mp_type a_type = mp_typeof(*key_a);
-		enum mp_type b_type = mp_typeof(*key_b);
-		if (a_type == MP_NIL) {
-			return b_type == MP_NIL ? 0 : -1;
+			rc = tuple_compare_field(*key_a, *key_b, part->type,
+						 part->coll);
+		} else if (a_type == MP_NIL) {
+			rc = b_type == MP_NIL ? 0 : -1;
 		} else if (b_type == MP_NIL) {
-			return 1;
+			rc = 1;
 		} else {
-			return tuple_compare_field_with_type(key_a, a_type,
-							     key_b, b_type,
-							     part->type,
-							     part->coll);
+			rc = tuple_compare_field_with_type(*key_a, a_type,
+							   *key_b, b_type,
+							   part->type,
+							   part->coll);
 		}
+		/* If key parts are equals, we must skip them. */
+		if (rc == 0) {
+			mp_next(key_a);
+			mp_next(key_b);
+		}
+		return rc;
 	}
 
 	struct key_part *end = part + part_count;
-	int rc;
-	for (; part < end; ++part, mp_next(&key_a), mp_next(&key_b)) {
+	for (; part < end; ++part, mp_next(key_a), mp_next(key_b)) {
 		if (! is_nullable) {
-			rc = tuple_compare_field(key_a, key_b, part->type,
+			rc = tuple_compare_field(*key_a, *key_b, part->type,
 						 part->coll);
 			if (rc != 0)
 				return rc;
 			else
 				continue;
 		}
-		enum mp_type a_type = mp_typeof(*key_a);
-		enum mp_type b_type = mp_typeof(*key_b);
+		enum mp_type a_type = mp_typeof(**key_a);
+		enum mp_type b_type = mp_typeof(**key_b);
 		if (a_type == MP_NIL) {
 			if (b_type != MP_NIL)
 				return -1;
 		} else if (b_type == MP_NIL) {
 			return 1;
 		} else {
-			rc = tuple_compare_field_with_type(key_a, a_type, key_b,
-							   b_type, part->type,
+			rc = tuple_compare_field_with_type(*key_a, a_type,
+							   *key_b, b_type,
+							   part->type,
 							   part->coll);
 			if (rc != 0)
 				return rc;
 		}
 	}
 	return 0;
+}
+
+template<bool is_nullable>
+static inline int
+key_compare_parts(const char *key_a, const char *key_b, uint32_t part_count,
+		  struct key_def *key_def)
+{
+	return key_compare_and_skip_parts<is_nullable>(&key_a, &key_b,
+						       part_count, key_def);
 }
 
 template<bool is_nullable, bool has_optional_parts>
@@ -1447,17 +1469,48 @@ func_index_compare_with_key(struct tuple *tuple, hint_t tuple_hint,
 			    const char *key, uint32_t part_count,
 			    hint_t key_hint, struct key_def *key_def)
 {
-	(void)tuple; (void)key_hint;
+	(void)key_hint;
 	assert(key_def->for_func_index);
 	assert(is_nullable == key_def->is_nullable);
 	const char *tuple_key = tuple_data((struct tuple *)tuple_hint);
 	assert(mp_typeof(*tuple_key) == MP_ARRAY);
 
 	uint32_t tuple_key_count = mp_decode_array(&tuple_key);
-	part_count = MIN(part_count, tuple_key_count);
+	uint32_t cmp_part_count = MIN(part_count, tuple_key_count);
+	cmp_part_count = MIN(cmp_part_count, key_def->part_count);
+	int rc = key_compare_and_skip_parts<is_nullable>(&tuple_key, &key,
+							 cmp_part_count,
+							 key_def);
+	if (rc != 0)
+		return rc;
+	/* Equals if nothing to compare. */
+	if (part_count == cmp_part_count ||
+	    key_def->part_count == cmp_part_count)
+		return 0;
+	/*
+	 * Now we know that tuple_key count is less than key part_count
+	 * and key_def part_count, so let's keep comparing, but with
+	 * original tuple fields. We will compare parts of primary key,
+	 * it cannot contain nullable parts so the code is simplified
+	 * correspondingly. Also, all the key parts, corresponding to
+	 * func key, were already skipped.
+	 */
+	const char *tuple_raw = tuple_data(tuple);
+	struct tuple_format *format = tuple_format(tuple);
+	const uint32_t *field_map = tuple_field_map(tuple);
+	const char *field;
 	part_count = MIN(part_count, key_def->part_count);
-	return key_compare_parts<is_nullable>(tuple_key, key, part_count,
-					      key_def);
+	for (uint32_t i = cmp_part_count; i < part_count; i++) {
+		struct key_part *part = &key_def->parts[i];
+		field = tuple_field_raw_by_part(format, tuple_raw, field_map,
+						part, MULTIKEY_NONE);
+		assert(field != NULL);
+		rc = tuple_compare_field(field, key, part->type, part->coll);
+		mp_next(&key);
+		if (rc != 0)
+			return rc;
+	}
+	return 0;
 }
 
 #undef KEY_COMPARATOR
