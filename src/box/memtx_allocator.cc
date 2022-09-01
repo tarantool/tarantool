@@ -31,6 +31,112 @@
 #include "memtx_allocator.h"
 #include "trivia/tuple.h"
 
+struct memtx_tuple_rv *
+memtx_tuple_rv_new(uint32_t version, struct rlist *list)
+{
+	assert(version > 0);
+	int count = 1;
+	struct memtx_tuple_rv *rv;
+	rlist_foreach_entry(rv, list, link)
+		count++;
+	struct memtx_tuple_rv *new_rv = (struct memtx_tuple_rv *)xmalloc(
+			sizeof(*new_rv) + count * sizeof(*new_rv->lists));
+	new_rv->count = count;
+	/* Create one list per each open read view. */
+	struct memtx_tuple_rv_list *l = &new_rv->lists[0];
+	uint32_t prev_version = 0;
+	rlist_foreach_entry(rv, list, link) {
+		l->version = memtx_tuple_rv_version(rv);
+		/* List must be sorted by read view version. */
+		assert(l->version > prev_version);
+		stailq_create(&l->tuples);
+		prev_version = l->version;
+		l++;
+	}
+	/* And one more list for self. */
+	assert(l == &new_rv->lists[count - 1]);
+	l->version = version;
+	assert(l->version > prev_version);
+	(void)prev_version;
+	stailq_create(&l->tuples);
+	rlist_add_tail_entry(list, new_rv, link);
+	return new_rv;
+}
+
+void
+memtx_tuple_rv_delete(struct memtx_tuple_rv *rv, struct rlist *list,
+		      struct stailq *tuples_to_free)
+{
+	struct memtx_tuple_rv *prev_rv = rlist_prev_entry_safe(rv, list, link);
+	uint32_t prev_version = prev_rv == nullptr ? 0 :
+				memtx_tuple_rv_version(prev_rv);
+	/*
+	 * Move tuples from lists with version <= prev_version to the list of
+	 * the previous read view and delete all other tuples.
+	 */
+	int i = 0;
+	int j = 0;
+	while (i < rv->count) {
+		struct memtx_tuple_rv_list *src = &rv->lists[i];
+		if (src->version <= prev_version) {
+			/*
+			 * The tuples were allocated before the previous read
+			 * view was opened. Move them to the previous read
+			 * view's list.
+			 */
+			assert(prev_rv != nullptr);
+			assert(j < prev_rv->count);
+			struct memtx_tuple_rv_list *dst = &prev_rv->lists[j];
+			/*
+			 * The previous read view may have more lists, because
+			 * some read views could have been closed by the time
+			 * this read view was open.  Skip them.
+			 */
+			while (dst->version != src->version) {
+				j++;
+				assert(j < prev_rv->count);
+				dst = &prev_rv->lists[j];
+			}
+			stailq_concat(&dst->tuples, &src->tuples);
+			j++;
+		} else {
+			/*
+			 * The tuples were allocated after the previous read
+			 * view was opened and freed before the next read view
+			 * was opened. Free them immediately.
+			 */
+			stailq_concat(tuples_to_free, &src->tuples);
+		}
+		i++;
+	}
+	rlist_del_entry(rv, link);
+	free(rv);
+}
+
+void
+memtx_tuple_rv_add(struct memtx_tuple_rv *rv, struct memtx_tuple *tuple)
+{
+	/*
+	 * Binary search the list with min version such that
+	 * list->version > tuple->version.
+	 */
+	int begin = 0;
+	int end = rv->count;
+	struct memtx_tuple_rv_list *found = nullptr;
+	while (begin != end) {
+		int middle = begin + (end - begin) / 2;
+		struct memtx_tuple_rv_list *l = &rv->lists[middle];
+		if (l->version <= tuple->version) {
+			begin = middle + 1;
+		} else {
+			found = l;
+			end = middle;
+		}
+	}
+	assert(found != nullptr);
+	stailq_add_entry(&found->tuples, tuple, in_gc);
+}
+
 void
 memtx_allocators_init(struct allocator_settings *settings)
 {
