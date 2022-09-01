@@ -129,6 +129,19 @@ memtx_tuple_rv_version(struct memtx_tuple_rv *rv)
 }
 
 /**
+ * Not all read views need to access all kinds of tuples. For example, snapshot
+ * isn't interested in temporary tuples. So we divide all tuples by type and
+ * for each type maintain an independent list.
+ */
+enum memtx_tuple_rv_type {
+	/** Tuples from non-temporary spaces. */
+	memtx_tuple_rv_default,
+	/** Tuples from temporary spaces. */
+	memtx_tuple_rv_temporary,
+	memtx_tuple_rv_type_MAX,
+};
+
+/**
  * Allocates a list array for a read view and initializes it using the list of
  * all open read views. Adds the new read view to the list.
  */
@@ -154,7 +167,13 @@ void
 memtx_tuple_rv_add(struct memtx_tuple_rv *rv, struct memtx_tuple *tuple);
 
 /** Memtx read view options. */
-struct memtx_read_view_opts {};
+struct memtx_read_view_opts {
+	/**
+	 * If set to true, creation of this read view will delay deletion of
+	 * tuples from temporary spaces.
+	 */
+	bool include_temporary_tuples = false;
+};
 
 template<class Allocator>
 class MemtxAllocator {
@@ -167,13 +186,14 @@ public:
 	 */
 	struct ReadView {
 		/** Lists of tuples owned by this read view. */
-		struct memtx_tuple_rv *rv;
+		struct memtx_tuple_rv *rv[memtx_tuple_rv_type_MAX];
 	};
 
 	static void create()
 	{
 		stailq_create(&gc);
-		rlist_create(&read_views);
+		for (int type = 0; type < memtx_tuple_rv_type_MAX; type++)
+			rlist_create(&read_views[type]);
 	}
 
 	static void destroy()
@@ -192,10 +212,15 @@ public:
 	 */
 	static ReadView *open_read_view(struct memtx_read_view_opts opts)
 	{
-		(void)opts;
 		read_view_version++;
-		ReadView *rv = (ReadView *)xmalloc(sizeof(*rv));
-		rv->rv = memtx_tuple_rv_new(read_view_version, &read_views);
+		ReadView *rv = (ReadView *)xcalloc(1, sizeof(*rv));
+		for (int type = 0; type < memtx_tuple_rv_type_MAX; type++) {
+			if (!opts.include_temporary_tuples &&
+			    type == memtx_tuple_rv_temporary)
+				continue;
+			rv->rv[type] = memtx_tuple_rv_new(read_view_version,
+							  &read_views[type]);
+		}
 		return rv;
 	}
 
@@ -204,7 +229,12 @@ public:
 	 */
 	static void close_read_view(ReadView *rv)
 	{
-		memtx_tuple_rv_delete(rv->rv, &read_views, &gc);
+		for (int type = 0; type < memtx_tuple_rv_type_MAX; type++) {
+			if (rv->rv[type] == nullptr)
+				continue;
+			memtx_tuple_rv_delete(rv->rv[type],
+					      &read_views[type], &gc);
+		}
 		TRASH(rv);
 		::free(rv);
 	}
@@ -280,13 +310,12 @@ private:
 	static struct memtx_tuple_rv *
 	tuple_rv_last(struct tuple *tuple)
 	{
-		/* Temporary tuples are freed immediately. */
-		if (tuple_has_flag(tuple, TUPLE_IS_TEMPORARY))
+		struct rlist *list = tuple_has_flag(tuple, TUPLE_IS_TEMPORARY) ?
+			&read_views[memtx_tuple_rv_temporary] :
+			&read_views[memtx_tuple_rv_default];
+		if (rlist_empty(list))
 			return nullptr;
-		if (rlist_empty(&read_views))
-			return nullptr;
-		return rlist_last_entry(&read_views,
-					struct memtx_tuple_rv, link);
+		return rlist_last_entry(list, struct memtx_tuple_rv, link);
 	}
 
 	/**
@@ -305,7 +334,7 @@ private:
 	 * List of memtx_tuple_rv objects, ordered by read view version,
 	 * ascending (the oldest read view comes first).
 	 */
-	static struct rlist read_views;
+	static struct rlist read_views[];
 };
 
 template<class Allocator>
@@ -315,7 +344,7 @@ template<class Allocator>
 uint32_t MemtxAllocator<Allocator>::read_view_version;
 
 template<class Allocator>
-struct rlist MemtxAllocator<Allocator>::read_views;
+struct rlist MemtxAllocator<Allocator>::read_views[memtx_tuple_rv_type_MAX];
 
 void
 memtx_allocators_init(struct allocator_settings *settings);
