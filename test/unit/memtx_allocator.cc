@@ -56,6 +56,14 @@ alloc_tuple()
 	return tuple;
 }
 
+static struct tuple *
+alloc_temp_tuple()
+{
+	struct tuple *tuple = alloc_tuple();
+	tuple_set_flag(tuple, TUPLE_IS_TEMPORARY);
+	return tuple;
+}
+
 static void
 free_tuple(struct tuple *tuple)
 {
@@ -200,9 +208,8 @@ test_free_not_delayed_if_temporary()
 	header();
 
 	is(alloc_tuple_count(), 0, "count before alloc");
-	struct tuple *tuple = alloc_tuple();
+	struct tuple *tuple = alloc_temp_tuple();
 	is(alloc_tuple_count(), 1, "count after alloc");
-	tuple_set_flag(tuple, TUPLE_IS_TEMPORARY);
 	memtx_allocators_read_view rv = memtx_allocators_open_read_view({});
 	free_tuple(tuple);
 	is(alloc_tuple_count(), 0, "count after free");
@@ -275,10 +282,97 @@ test_tuple_gc()
 	check_plan();
 }
 
+/**
+ * Checks that temporary tuples are freed as soon as the last read view opened
+ * with include_temporary_tuples flag is closed, even if there are still other
+ * read views that may see it.
+ */
+static void
+test_temp_tuple_gc()
+{
+	plan(10);
+	header();
+
+	struct memtx_read_view_opts opts;
+	opts.include_temporary_tuples = true;
+
+	is(alloc_tuple_count(), 0, "count before alloc");
+	struct tuple *temp_tuple11 = alloc_temp_tuple();
+	struct tuple *temp_tuple12 = alloc_temp_tuple();
+	struct tuple *temp_tuple13 = alloc_temp_tuple();
+	struct tuple *temp_tuple14 = alloc_temp_tuple();
+	struct tuple *tuple11 = alloc_tuple();
+	struct tuple *tuple12 = alloc_tuple();
+	struct tuple *tuple13 = alloc_tuple();
+	struct tuple *tuple14 = alloc_tuple();
+	memtx_allocators_read_view rv1 = memtx_allocators_open_read_view({});
+	is(alloc_tuple_count(), 8, "count after rv1 opened");
+	free_tuple(temp_tuple11);
+	free_tuple(tuple11);
+	struct tuple *temp_tuple22 = alloc_temp_tuple();
+	struct tuple *temp_tuple23 = alloc_temp_tuple();
+	struct tuple *temp_tuple24 = alloc_temp_tuple();
+	struct tuple *tuple22 = alloc_tuple();
+	struct tuple *tuple23 = alloc_tuple();
+	struct tuple *tuple24 = alloc_tuple();
+	memtx_allocators_read_view rv2 = memtx_allocators_open_read_view(opts);
+	/* temp_tuple11 is freed */
+	is(alloc_tuple_count(), 13, "count after rv2 opened");
+	free_tuple(temp_tuple12);
+	free_tuple(temp_tuple22);
+	free_tuple(tuple12);
+	free_tuple(tuple22);
+	struct tuple *temp_tuple33 = alloc_temp_tuple();
+	struct tuple *temp_tuple34 = alloc_temp_tuple();
+	struct tuple *tuple33 = alloc_tuple();
+	struct tuple *tuple34 = alloc_tuple();
+	memtx_allocators_read_view rv3 = memtx_allocators_open_read_view({});
+	is(alloc_tuple_count(), 17, "count after rv3 opened");
+	free_tuple(temp_tuple13);
+	free_tuple(temp_tuple23);
+	free_tuple(temp_tuple33);
+	free_tuple(tuple13);
+	free_tuple(tuple23);
+	free_tuple(tuple33);
+	struct tuple *temp_tuple44 = alloc_temp_tuple();
+	struct tuple *tuple44 = alloc_tuple();
+	memtx_allocators_read_view rv4 = memtx_allocators_open_read_view(opts);
+	/* temp_tuple33 is freed */
+	is(alloc_tuple_count(), 18, "count after rv4 opened");
+	free_tuple(temp_tuple14);
+	free_tuple(temp_tuple24);
+	free_tuple(temp_tuple34);
+	free_tuple(temp_tuple44);
+	free_tuple(tuple14);
+	free_tuple(tuple24);
+	free_tuple(tuple34);
+	free_tuple(tuple44);
+	is(alloc_tuple_count(), 18, "count before rv4 closed");
+	memtx_allocators_close_read_view(rv4);
+	/* temp_tuple34, temp_tuple44, tuple44 are freed */
+	is(alloc_tuple_count(), 15, "count after rv4 closed");
+	memtx_allocators_close_read_view(rv3);
+	/* tuple33 and tuple34 are freed */
+	is(alloc_tuple_count(), 13, "count after rv3 closed");
+	memtx_allocators_close_read_view(rv2);
+	/*
+	 * temp_tuple12, temp_tuple13, temp_tuple14,
+	 * temp_tuple22, temp_tuple23, temp_tuple24,
+	 * tuple22, tuple23, tuple24 are freed.
+	 */
+	is(alloc_tuple_count(), 4, "count after rv2 closed");
+	memtx_allocators_close_read_view(rv1);
+	/* tuple11, tuple12, tuple13, tuple14 are freed */
+	is(alloc_tuple_count(), 0, "count after rv1 closed");
+
+	footer();
+	check_plan();
+}
+
 static int
 test_main()
 {
-	plan(6);
+	plan(7);
 	header();
 
 	test_alloc_stats();
@@ -287,6 +381,7 @@ test_main()
 	test_free_not_delayed_if_alloc_after_read_view();
 	test_free_not_delayed_if_temporary();
 	test_tuple_gc();
+	test_temp_tuple_gc();
 
 	footer();
 	return check_plan();
