@@ -1,4 +1,4 @@
-1..6
+1..7
 	*** test_main ***
     1..5
 	*** test_alloc_stats ***
@@ -55,4 +55,18 @@ ok 5 - subtests
     ok 11 - count after rv3 closed
 	*** test_tuple_gc: done ***
 ok 6 - subtests
+    1..10
+	*** test_temp_tuple_gc ***
+    ok 1 - count before alloc
+    ok 2 - count after rv1 opened
+    ok 3 - count after rv2 opened
+    ok 4 - count after rv3 opened
+    ok 5 - count after rv4 opened
+    ok 6 - count before rv4 closed
+    ok 7 - count after rv4 closed
+    ok 8 - count after rv3 closed
+    ok 9 - count after rv2 closed
+    ok 10 - count after rv1 closed
+	*** test_temp_tuple_gc: done ***
+ok 7 - subtests
 	*** test_main: done ***
