@@ -35,6 +35,19 @@ struct memtx_tuple_rv *
 memtx_tuple_rv_new(uint32_t version, struct rlist *list)
 {
 	assert(version > 0);
+	/* Reuse the last read view if its version matches. */
+	struct memtx_tuple_rv *last_rv = rlist_empty(list) ? nullptr :
+		rlist_last_entry(list, struct memtx_tuple_rv, link);
+	if (last_rv != nullptr) {
+		uint32_t last_version = memtx_tuple_rv_version(last_rv);
+		assert(last_version <= version);
+		assert(last_rv->refs > 0);
+		if (last_version == version) {
+			last_rv->refs++;
+			return last_rv;
+		}
+	}
+	/* Proceed to creation of a new read view. */
 	int count = 1;
 	struct memtx_tuple_rv *rv;
 	rlist_foreach_entry(rv, list, link)
@@ -60,6 +73,7 @@ memtx_tuple_rv_new(uint32_t version, struct rlist *list)
 	(void)prev_version;
 	stailq_create(&l->tuples);
 	rlist_add_tail_entry(list, new_rv, link);
+	new_rv->refs = 1;
 	return new_rv;
 }
 
@@ -67,6 +81,9 @@ void
 memtx_tuple_rv_delete(struct memtx_tuple_rv *rv, struct rlist *list,
 		      struct stailq *tuples_to_free)
 {
+	assert(rv->refs > 0);
+	if (--rv->refs > 0)
+		return;
 	struct memtx_tuple_rv *prev_rv = rlist_prev_entry_safe(rv, list, link);
 	uint32_t prev_version = prev_rv == nullptr ? 0 :
 				memtx_tuple_rv_version(prev_rv);
