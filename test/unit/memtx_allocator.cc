@@ -212,10 +212,73 @@ test_free_not_delayed_if_temporary()
 	check_plan();
 }
 
+/**
+ * Checks that tuples are freed as soon as all read views that can access it
+ * are closed, even if other (newer or older) read views still exist.
+ */
+static void
+test_tuple_gc()
+{
+	plan(11);
+	header();
+
+	is(alloc_tuple_count(), 0, "count before alloc");
+	struct tuple *tuple11 = alloc_tuple();
+	struct tuple *tuple12 = alloc_tuple();
+	struct tuple *tuple13 = alloc_tuple();
+	struct tuple *tuple14 = alloc_tuple();
+	memtx_allocators_read_view rv1 = memtx_allocators_open_read_view({});
+	is(alloc_tuple_count(), 4, "count after rv1 opened");
+	free_tuple(tuple11);
+	struct tuple *tuple22 = alloc_tuple();
+	struct tuple *tuple23 = alloc_tuple();
+	struct tuple *tuple24 = alloc_tuple();
+	memtx_allocators_read_view rv2 = memtx_allocators_open_read_view({});
+	is(alloc_tuple_count(), 7, "count after rv2 opened");
+	free_tuple(tuple12);
+	free_tuple(tuple22);
+	struct tuple *tuple33 = alloc_tuple();
+	struct tuple *tuple34 = alloc_tuple();
+	memtx_allocators_read_view rv3 = memtx_allocators_open_read_view({});
+	is(alloc_tuple_count(), 9, "count after rv3 opened");
+	free_tuple(tuple13);
+	free_tuple(tuple23);
+	free_tuple(tuple33);
+	struct tuple *tuple44 = alloc_tuple();
+
+	is(alloc_tuple_count(), 10, "count before rv2 closed");
+	memtx_allocators_close_read_view(rv2);
+	/* tuple22 is freed */
+	is(alloc_tuple_count(), 9, "count after rv2 closed");
+
+	memtx_allocators_read_view rv4 = memtx_allocators_open_read_view({});
+	is(alloc_tuple_count(), 9, "count after rv4 opened");
+	free_tuple(tuple14);
+	free_tuple(tuple24);
+	free_tuple(tuple34);
+	free_tuple(tuple44);
+
+	is(alloc_tuple_count(), 9, "count before rv4 closed");
+	memtx_allocators_close_read_view(rv4);
+	/* tuple44 is freed */
+	is(alloc_tuple_count(), 8, "count after rv4 closed");
+
+	memtx_allocators_close_read_view(rv1);
+	/* tuple11 and tuple12 are freed */
+	is(alloc_tuple_count(), 6, "count after rv1 closed");
+
+	/* tuple13, tuple14, tuple23, tuple24, tuple33, tuple34 are freed */
+	memtx_allocators_close_read_view(rv3);
+	is(alloc_tuple_count(), 0, "count after rv3 closed");
+
+	footer();
+	check_plan();
+}
+
 static int
 test_main()
 {
-	plan(5);
+	plan(6);
 	header();
 
 	test_alloc_stats();
@@ -223,6 +286,7 @@ test_main()
 	test_free_delayed_until_all_read_views_closed();
 	test_free_not_delayed_if_alloc_after_read_view();
 	test_free_not_delayed_if_temporary();
+	test_tuple_gc();
 
 	footer();
 	return check_plan();
