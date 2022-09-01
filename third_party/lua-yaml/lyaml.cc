@@ -365,8 +365,10 @@ static int load_node(struct lua_yaml_loader *loader) {
 
       case YAML_SEQUENCE_END_EVENT:
          is_seq--;
-         if (is_seq > 0 || is_map > 0)
+         if (is_seq > 0 || is_map > 0) {
+            lua_rawset(loader->L, -3);
             continue;
+         }
          return 1;
 
       case YAML_MAPPING_START_EVENT:
@@ -419,6 +421,7 @@ static int load_node(struct lua_yaml_loader *loader) {
             luaL_setarrayhint(loader->L, -1);
 
          handle_anchor(loader);
+
          is_seq++;
          seq_idx = 1;
 
@@ -445,13 +448,10 @@ static int load_node(struct lua_yaml_loader *loader) {
          return 1;
 
       case YAML_ALIAS_EVENT:
+         printf("YAML_ALIAS_EVENT\n");
          load_alias(loader);
-         if (is_seq > 0) {
-            lua_rawseti(loader->L, -2, seq_idx++);
-            continue;
-         }
-         return 1;
-         //continue;
+         //return 1;
+         continue;
 
       case YAML_NO_EVENT:
          lua_pushliteral(loader->L, "libyaml returned YAML_NO_EVENT");
