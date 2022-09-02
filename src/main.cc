@@ -488,15 +488,9 @@ load_cfg(void)
 	 */
 	bool flightrec_is_enabled = cfg_getb("flightrec_enabled") == 1;
 	if (flightrec_is_enabled) {
-		flightrec_init(cfg_gets("memtx_dir"),
-			       cfg_geti64("flightrec_logs_size"),
-			       cfg_geti64("flightrec_logs_max_msg_size"),
-			       cfg_geti("flightrec_logs_log_level"),
-			       cfg_getd("flightrec_metrics_interval"),
-			       cfg_geti("flightrec_metrics_period"),
-			       cfg_geti("flightrec_requests_size"),
-			       cfg_geti("flightrec_requests_max_req_size"),
-			       cfg_geti("flightrec_requests_max_res_size"));
+		struct flight_recorder_cfg cfg_fr;
+		box_get_flightrec_cfg(&cfg_fr);
+		flightrec_init(&cfg_fr);
 	}
 
 	memtx_tx_manager_use_mvcc_engine = cfg_getb("memtx_use_mvcc_engine");
