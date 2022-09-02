@@ -213,7 +213,10 @@ local function test_api(test, s)
     end
 end
 
-tap.test("yaml", function(test)
+local test = tap.test("yaml")
+
+test:plan(1)
+test:test("yaml", function(test)
     local serializer = require('yaml')
     test:plan(12)
     test:test("unsigned", common.test_unsigned, serializer)
@@ -229,3 +232,5 @@ tap.test("yaml", function(test)
     test:test("tagged", test_tagged, serializer)
     test:test("api", test_api, serializer)
 end)
+
+os.exit(test:check() == true and 0 or 1)

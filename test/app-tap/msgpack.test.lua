@@ -263,7 +263,11 @@ local function test_decode_array_map_header(test, s)
     end
 end
 
-tap.test("msgpack", function(test)
+local test = tap.test("msgpack")
+
+test:plan(1)
+
+test:test("msgpack", function(test)
     local serializer = require('msgpack')
     test:plan(15)
     test:test("unsigned", common.test_unsigned, serializer)
@@ -282,3 +286,5 @@ tap.test("msgpack", function(test)
     test:test("decode_buffer", common.test_decode_buffer, serializer)
     test:test("error", common.test_error, serializer)
 end)
+
+os.exit(test:check() and 0 or 1)

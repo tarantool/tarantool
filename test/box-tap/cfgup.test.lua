@@ -26,6 +26,4 @@ test:ok(not status and
         result:match("Can't set option 'pid_file' dynamically"),
         'attempt to change immutable key (pid_file)')
 
-test:check()
-os.exit(0)
-
+os.exit(test:check() == true and 0 or 1)

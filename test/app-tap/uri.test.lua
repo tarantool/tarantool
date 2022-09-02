@@ -748,7 +748,10 @@ local function test_parse_invalid_uri_set_from_lua_table(test)
     test:is(tostring(error), expected_errmsg, "error message")
 end
 
-tap.test("uri", function(test)
+local test = tap.test("uri")
+
+test:plan(1)
+test:test("uri", function(test)
     test:plan(6)
     test:test("parse", test_parse)
     test:test("parse URI query params", test_parse_uri_query_params)
@@ -757,3 +760,5 @@ tap.test("uri", function(test)
     test:test("parse invalid URIs from lua table", test_parse_invalid_uri_set_from_lua_table)
     test:test("format", test_format)
 end)
+
+os.exit(test:check() and 0 or 1)

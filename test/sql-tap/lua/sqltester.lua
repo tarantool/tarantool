@@ -26,8 +26,7 @@ local function flatten(arr)
 end
 
 local function finish_test()
-    test:check()
-    os.exit()
+    os.exit(test:check() and 0 or 1)
 end
 test.finish_test = finish_test
 

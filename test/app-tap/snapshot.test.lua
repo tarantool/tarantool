@@ -148,5 +148,4 @@ test:ok(fio.stat(files[#files]) ~= nil, "Snapshot was recreated")
 
 box.space.test:drop()
 
-test:check()
-os.exit(0)
+os.exit(test:check() and 0 or 1)

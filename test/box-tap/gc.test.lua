@@ -28,6 +28,4 @@ if debug then
     box.error.injection.set("ERRINJ_SNAP_COMMIT_DELAY", false)
 end
 
-test:check()
-
-os.exit(0)
+os.exit(test:check() == true and 0 or 1)

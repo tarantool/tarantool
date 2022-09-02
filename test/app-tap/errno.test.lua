@@ -19,3 +19,5 @@ test:test("primary", function(test)
     test:is(errno.strerror(), "Invalid argument", "checking strerror without argument")
     test:is(errno.strerror(errno.EBADF), "Bad file descriptor", "checking strerror with argument")
 end)
+
+os.exit(test:check() and 0 or 1)

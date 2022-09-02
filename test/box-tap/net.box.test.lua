@@ -30,5 +30,4 @@ test:ok(not pcall(function() conn.space._vspace:insert() end), "error handling")
 -- cleanup
 conn:close()
 inspector:cmd('stop server second with cleanup=1')
-test:check()
-os.exit(0)
+os.exit(test:check() == true and 0 or 1)

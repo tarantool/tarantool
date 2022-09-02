@@ -1,8 +1,11 @@
 #!/usr/bin/env tarantool
 
 local tarantool = require('tarantool')
+local test = require('tap').test("info")
 
-require('tap').test("info", function(test)
+test:plan(1)
+
+test:test("info", function(test)
     test:plan(10)
     test:like(tarantool.version, '^[1-9]', "version")
     test:isstring(tarantool.package, "package")
@@ -17,3 +20,5 @@ require('tap').test("info", function(test)
     test:ok(tarantool.uptime() > 0, "uptime")
     test:ok(tarantool.pid() > 0, "pid")
 end)
+
+os.exit(test:check() and 0 or 1)

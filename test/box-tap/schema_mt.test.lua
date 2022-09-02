@@ -101,6 +101,4 @@ sp1:drop()
 sp2:drop()
 sp3:drop()
 
-test:check()
-
-os.exit(0)
+os.exit(test:check() == true and 0 or 1)

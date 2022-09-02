@@ -19,7 +19,11 @@ local function test_misc(test, s)
     test:ok(s.NULL == nil, '.NULL == nil')
 end
 
-tap.test("json", function(test)
+local test = tap.test("json")
+
+test:plan(1)
+
+test:test("json", function(test)
     local serializer = require('json')
     test:plan(58)
 
@@ -214,3 +218,5 @@ tap.test("json", function(test)
     local t_dec = serializer.decode(bigjson)
     test:is_deeply(t_dec, t, 'encode/decode big strings')
 end)
+
+os.exit(test:check() and 0 or 1)

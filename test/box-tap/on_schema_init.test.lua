@@ -26,6 +26,5 @@ str = ''
 box.schema.space.create("test")
 -- test that _space.on_replace trigger may be set in on_schema_init
 test:like(str, '_space:on_replace', 'can set on_replace')
-test:check()
 box.space.test:drop()
-os.exit(0)
+os.exit(test:check() == true and 0 or 1)

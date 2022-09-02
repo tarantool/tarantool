@@ -65,4 +65,4 @@ for _, env in ipairs({
     end
 end
 
-tap:check()
+os.exit(tap:check() and 0 or 1)
