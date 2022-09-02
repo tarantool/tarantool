@@ -760,7 +760,7 @@ end:
  * On error, returns LUA_NOREF and sets diag.
  */
 static int
-func_persistent_lua_load(struct func_def *def)
+func_persistent_lua_load(const struct func_def *def)
 {
 	assert(def->body != NULL);
 	int func_ref = LUA_NOREF;
@@ -832,7 +832,7 @@ end:
 }
 
 struct func *
-func_lua_new(struct func_def *def)
+func_lua_new(const struct func_def *def)
 {
 	assert(def->language == FUNC_LANGUAGE_LUA);
 	struct func_lua *func =
