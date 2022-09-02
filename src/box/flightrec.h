@@ -21,23 +21,41 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
+/** Flight recorder config options. */
+struct flight_recorder_cfg {
+	/**
+	 * Directory to store flight_records.ttfr file.
+	 */
+	const char *dir;
+	/** Total size of stored logs. */
+	int64_t logs_size;
+	/** Max size of one log message. */
+	int64_t log_max_msg_size;
+	/** Flight recorder log level; may be different from say log level. */
+	int logs_log_level;
+	/**
+	 * Time interval (in seconds) between metrics
+	 * dump to flight recorder.
+	 */
+	double metrics_interval;
+	/**
+	 * Period (in seconds) of metrics storage, i.e. how long
+	 * metrics are stored before being overwritten.
+	 */
+	int64_t metrics_period;
+	/** Total size of stored requests and responses. */
+	int64_t requests_size;
+	/** Max size per request. */
+	int64_t requests_max_req_size;
+	/** Max size per response. */
+	int64_t requests_max_res_size;
+};
+
 /** No-op in OS version. */
 static inline void
-flightrec_init(const char *fr_dirname, size_t logs_size,
-	       size_t logs_max_msg_size, int logs_log_level,
-	       double metrics_interval, size_t metrics_period,
-	       size_t requests_size, size_t requests_max_req_size,
-	       size_t requests_max_res_size)
+flightrec_init(const struct flight_recorder_cfg *cfg)
 {
-	(void)fr_dirname;
-	(void)logs_size;
-	(void)logs_max_msg_size;
-	(void)logs_log_level;
-	(void)metrics_interval;
-	(void)metrics_period;
-	(void)requests_size;
-	(void)requests_max_req_size;
-	(void)requests_max_res_size;
+	(void)cfg;
 	say_error("Flight recorder is not available in this build");
 }
 
@@ -49,20 +67,9 @@ flightrec_free(void)
 
 /** No-op in OS version. */
 static inline int
-flightrec_check_cfg(int64_t logs_size, int64_t logs_max_msg_size,
-		    int logs_log_level, double metrics_interval,
-		    int64_t metrics_period, int64_t requests_size,
-		    int64_t requests_max_req_size,
-		    int64_t requests_max_res_size)
+flightrec_check_cfg(const struct flight_recorder_cfg *cfg)
 {
-	(void)logs_size;
-	(void)logs_max_msg_size;
-	(void)logs_log_level;
-	(void)metrics_interval;
-	(void)metrics_period;
-	(void)requests_size;
-	(void)requests_max_req_size;
-	(void)requests_max_res_size;
+	(void)cfg;
 	return 0;
 }
 

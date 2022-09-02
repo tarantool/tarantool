@@ -789,21 +789,32 @@ box_check_audit(void)
 	}
 }
 
+void
+box_get_flightrec_cfg(struct flight_recorder_cfg *cfg)
+{
+	memset(cfg, 0, sizeof(*cfg));
+	cfg->dir = cfg_gets("memtx_dir");
+	cfg->logs_size = cfg_geti64("flightrec_logs_size");
+	cfg->log_max_msg_size = cfg_geti64("flightrec_logs_max_msg_size");
+	cfg->logs_log_level = cfg_geti("flightrec_logs_log_level");
+	cfg->metrics_interval = cfg_getd("flightrec_metrics_interval");
+	cfg->metrics_period = cfg_geti("flightrec_metrics_period");
+	cfg->requests_size = cfg_geti("flightrec_requests_size");
+	cfg->requests_max_req_size =
+		cfg_geti("flightrec_requests_max_req_size");
+	cfg->requests_max_res_size =
+		cfg_geti("flightrec_requests_max_res_size");
+}
+
 /**
  * Raises error if flight recorder configuration is incorrect.
  */
 static void
 box_check_flightrec(void)
 {
-	if (flightrec_check_cfg(
-			cfg_geti64("flightrec_logs_size"),
-			cfg_geti64("flightrec_logs_max_msg_size"),
-			cfg_geti("flightrec_logs_log_level"),
-			cfg_getd("flightrec_metrics_interval"),
-			cfg_geti64("flightrec_metrics_period"),
-			cfg_geti64("flightrec_requests_size"),
-			cfg_geti64("flightrec_requests_max_req_size"),
-			cfg_geti64("flightrec_requests_max_res_size")) != 0)
+	struct flight_recorder_cfg cfg;
+	box_get_flightrec_cfg(&cfg);
+	if (flightrec_check_cfg(&cfg) != 0)
 		diag_raise();
 }
 

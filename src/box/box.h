@@ -307,6 +307,12 @@ box_set_txn_isolation(void);
 int
 box_set_prepared_stmt_cache_size(void);
 
+/**
+ * Populate cfg from box.cfg.flightrec_* parameters.
+ */
+void
+box_get_flightrec_cfg(struct flight_recorder_cfg *cfg);
+
 extern "C" {
 #endif /* defined(__cplusplus) */
 
