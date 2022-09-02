@@ -14,6 +14,7 @@
 #include "trivia/util.h"
 #include "small/region.h"
 #include "fiber.h"
+#include "fiber_cond.h"
 #include "assoc.h"
 #include "coio.h"
 #include "iostream.h"
@@ -228,6 +229,8 @@ handle_new(struct popen_opts *opts)
 	for (i = 0; i < lengthof(handle->ios); i++)
 		iostream_clear(&handle->ios[i]);
 
+	fiber_cond_create(&handle->completion_cond);
+
 	say_debug("popen: alloc handle %p command '%s' flags %#x",
 		  handle, handle->command, opts->flags);
 	return handle;
@@ -235,11 +238,22 @@ handle_new(struct popen_opts *opts)
 
 /**
  * Free memory allocated for a handle. To pair with handle_new().
+ *
+ * Preconditions:
+ *
+ * - No fibers waiting for handle->completion_cond. It may be
+ *   achieved by calling fiber_cond_broadcast(). The waiting
+ *   fibers must be ready to observe a freed handle.
+ * - The handle is removed from the global hashmap of handles
+ *   (using popen_unregister()). popen_wait_timeout() leans on
+ *   this to don't access the freed memory.
  */
 static inline void
 handle_free(struct popen_handle *handle)
 {
 	say_debug("popen: handle free %p", handle);
+	fiber_cond_destroy(&handle->completion_cond);
+	TRASH(handle);
 	free(handle);
 }
 
@@ -614,6 +628,7 @@ popen_sigchld_handler(EV_P_ ev_child *w, int revents)
 			 */
 			popen_unregister(handle);
 			handle->pid = -1;
+			fiber_cond_broadcast(&handle->completion_cond);
 		}
 	}
 }
@@ -666,6 +681,44 @@ popen_state_str(unsigned int state)
 	};
 
 	return state < POPEN_STATE_MAX ? state_str[state] : "unknown";
+}
+
+int
+popen_wait_timeout(struct popen_handle *handle, ev_tstamp timeout)
+{
+	ev_tstamp deadline = ev_monotonic_now(loop()) + timeout;
+
+	/*
+	 * popen_delete() may be called in another fiber, so the
+	 * handle's memory will be freed. Use pid as the primary
+	 * identifier and access the handle's memory only if there
+	 * is a handle registered with this pid.
+	 *
+	 * This way we don't differentiate a completed process
+	 * with a valid handle from a process with a deleted
+	 * handle. We don't need it though.
+	 */
+	pid_t pid = handle->pid;
+	if (pid == -1)
+		return 0;
+
+	/*
+	 * Handle spurious wakeups as suggested by
+	 * fiber_cond_wait_timeout() description.
+	 *
+	 * fiber_wakeup() unblocks fiber_cond_wait_deadline() with
+	 * zero return value despite that fiber_cond_signal() or
+	 * fiber_cond_broadcast() is not called.
+	 */
+	int rc = 0;
+	while (rc == 0) {
+		handle = popen_find(pid);
+		if (handle == NULL || handle->pid == -1)
+			break;
+		rc = fiber_cond_wait_deadline(&handle->completion_cond,
+					      deadline);
+	}
+	return rc;
 }
 
 /**
@@ -838,6 +891,9 @@ popen_delete(struct popen_handle *handle)
 		ev_child_stop(EV_DEFAULT_ &handle->ev_sigchld);
 		popen_unregister(handle);
 	}
+
+	/* Unblock fibers waiting in popen_wait_timeout(). */
+	fiber_cond_broadcast(&handle->completion_cond);
 
 	rlist_del(&handle->list);
 	handle_free(handle);

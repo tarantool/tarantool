@@ -54,7 +54,6 @@ static const char *popen_handle_uname = "popen_handle";
 static const char *popen_handle_closed_uname = "popen_handle_closed";
 
 #define POPEN_LUA_READ_BUF_SIZE        4096
-#define POPEN_LUA_WAIT_DELAY           0.1
 #define POPEN_LUA_ENV_CAPACITY_DEFAULT 256
 
 /**
@@ -1603,7 +1602,10 @@ lbox_popen_kill(struct lua_State *L)
 /**
  * Wait until a child process get exited or signaled.
  *
- * @param handle  a handle of process to wait
+ * @param handle        a handle of process to wait
+ * @param opts          table of options
+ * @param opts.timeout  time quota in seconds
+ *                      (default: infinity)
  *
  * Raise an error on incorrect parameters or when the fiber is
  * cancelled:
@@ -1613,38 +1615,70 @@ lbox_popen_kill(struct lua_State *L)
  * - FiberIsCancelled: cancelled by an outside code.
  *
  * Return a process status table (the same as ph.status and
- * ph.info().status). @see lbox_popen_info() for the format
- * of the table.
+ * ph.info().status) at success. @see lbox_popen_info() for
+ * the format of the table.
+ *
+ * Return `nil, err` on a failure:
+ *
+ * - TimedOut:        @a timeout quota is exceeded.
+ * - ChannelIsClosed: @a handle was closed during the operation.
  */
 static int
 lbox_popen_wait(struct lua_State *L)
 {
-	/*
-	 * FIXME: Use trigger or fiber conds to sleep and wake up.
-	 * FIXME: Add timeout option: ph:wait({timeout = <...>})
-	 */
-	struct popen_handle *handle;
+	/* Extract handle. */
 	bool is_closed;
-	if ((handle = luaT_check_popen_handle(L, 1, &is_closed)) == NULL) {
-		diag_set(IllegalParams, "Bad params, use: ph:wait()");
-		return luaT_error(L);
-	}
+	struct popen_handle *handle = luaT_check_popen_handle(L, 1, &is_closed);
+	if (handle == NULL)
+		goto usage;
 	if (is_closed)
 		return luaT_popen_handle_closed_error(L);
 
-	int state;
-	int exit_code;
+	ev_tstamp timeout = TIMEOUT_INFINITY;
 
-	while (true) {
-		popen_state(handle, &state, &exit_code);
-		assert(state < POPEN_STATE_MAX);
-		if (state != POPEN_STATE_ALIVE)
-			break;
-		fiber_sleep(POPEN_LUA_WAIT_DELAY);
-		luaL_testcancel(L);
+	/* Extract options. */
+	if (!lua_isnoneornil(L, 2)) {
+		if (lua_type(L, 2) != LUA_TTABLE)
+			goto usage;
+
+		lua_getfield(L, 2, "timeout");
+		if (!lua_isnil(L, -1))
+			timeout = luaT_check_timeout(L, -1);
+		if (timeout < 0.0)
+			goto usage;
+		lua_pop(L, 1);
 	}
 
+	int rc = popen_wait_timeout(handle, timeout);
+	if (rc < 0) {
+		struct error *e = diag_last_error(diag_get());
+		if (e->type == &type_FiberIsCancelled)
+			return luaT_error(L);
+		return luaT_push_nil_and_error(L);
+	}
+
+	/*
+	 * The handle may be freed by call to :close() in another
+	 * fiber. We can't call popen_state() on a freed handle.
+	 */
+	handle = luaT_check_popen_handle(L, 1, &is_closed);
+	assert(handle != NULL);
+	if (is_closed) {
+		diag_set(ChannelIsClosed);
+		return luaT_push_nil_and_error(L);
+	}
+
+	int state;
+	int exit_code;
+	popen_state(handle, &state, &exit_code);
+	assert(state < POPEN_STATE_MAX);
+	assert(state != POPEN_STATE_ALIVE);
 	return luaT_push_popen_process_status(L, state, exit_code);
+
+usage:
+	diag_set(IllegalParams, "Bad params, use: ph:wait([{"
+		 "timeout = <number>}])");
+	return luaT_error(L);
 }
 
 /**
