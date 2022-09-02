@@ -412,7 +412,7 @@ static struct func *
 func_c_new(const struct func_def *def);
 
 struct func *
-func_new(struct func_def *def)
+func_new(const struct func_def *def)
 {
 	struct func *func;
 	switch (def->language) {
@@ -438,7 +438,7 @@ func_new(struct func_def *def)
 	}
 	if (func == NULL)
 		return NULL;
-	func->def = def;
+	func->def = func_def_dup(def);
 	rlist_create(&func->func_cache_pin_list);
 	/** Nobody has access to the function but the owner. */
 	memset(func->access, 0, sizeof(func->access));

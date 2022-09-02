@@ -3406,7 +3406,6 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		struct func *func = func_new(def);
 		if (func == NULL)
 			return -1;
-		def_guard.is_active = false;
 		func_cache_insert(func);
 		on_rollback->data = func;
 		txn_stmt_on_rollback(stmt, on_rollback);

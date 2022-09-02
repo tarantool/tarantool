@@ -145,6 +145,24 @@ func_def_cmp(const struct func_def *def1, const struct func_def *def2)
 	return func_opts_cmp(&def1->opts, &def2->opts);
 }
 
+struct func_def *
+func_def_dup(const struct func_def *def)
+{
+	struct func_def *copy = func_def_new(
+		def->fid, def->uid, def->name, def->name_len, def->language,
+		def->body, def->body != NULL ? strlen(def->body) : 0,
+		def->comment, def->comment != NULL ? strlen(def->comment) : 0);
+	copy->setuid = def->setuid;
+	copy->is_deterministic = def->is_deterministic;
+	copy->is_sandboxed = def->is_sandboxed;
+	copy->param_count = def->param_count;
+	copy->returns = def->returns;
+	copy->aggregate = def->aggregate;
+	copy->exports.all = def->exports.all;
+	copy->opts = def->opts;
+	return copy;
+}
+
 /**
  * Check if a function definition is valid.
  * @retval  0 the definition is correct
