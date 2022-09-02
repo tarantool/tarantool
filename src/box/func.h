@@ -85,9 +85,16 @@ schema_module_init(void);
 void
 schema_module_free(void);
 
+/**
+ * Allocates and initializes a function, given a function definition.
+ * Returns the new function on success. On error, returns NULL and sets diag.
+ * Note, this function copies the given function definition so it may be safely
+ * freed after calling this function.
+ */
 struct func *
-func_new(struct func_def *def);
+func_new(const struct func_def *def);
 
+/** Frees a function object. */
 void
 func_delete(struct func *func);
 

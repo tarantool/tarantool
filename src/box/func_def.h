@@ -160,7 +160,10 @@ func_def_delete(struct func_def *def);
 int
 func_def_cmp(const struct func_def *def1, const struct func_def *def2);
 
-/** Duplicate a given function defintion object. */
+/**
+ * Duplicates a given function definition object.
+ * This function never fails (never returns NULL).
+ */
 struct func_def *
 func_def_dup(const struct func_def *def);
 
