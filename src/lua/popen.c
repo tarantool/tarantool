@@ -1248,8 +1248,8 @@ luaT_popen_parse_mode(struct lua_State *L, int idx)
  *
  * Return `nil, err` on a failure. Possible reasons:
  *
- * - SystemError: dup(), fcntl(), pipe(), vfork() or close()
- *                fails in the parent process.
+ * - SystemError: dup(), fcntl(), pipe(), vfork(), close() or
+ *                getpgrp() fails in the parent process.
  * - SystemError: (temporary restriction) the parent process
  *                has closed stdin, stdout or stderr.
  * - OutOfMemory: unable to allocate the handle or a temporary
