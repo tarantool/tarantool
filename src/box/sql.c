@@ -55,6 +55,7 @@
 #include "fk_constraint.h"
 #include "mpstream/mpstream.h"
 #include "sql_stmt_cache.h"
+#include "box/tuple_constraint_def.h"
 
 static sql *db = NULL;
 
@@ -986,6 +987,48 @@ cursor_advance(BtCursor *pCur, int *pRes)
  * format data for certain fields in _space and _index.
  */
 
+/** Encode space constraints. */
+static void
+sql_mpstream_encode_constraints(struct mpstream *stream,
+				const struct tuple_constraint_def *cdefs,
+				uint32_t ck_count, uint32_t fk_count)
+{
+	if (fk_count > 0) {
+		mpstream_encode_str(stream, "foreign_key");
+		mpstream_encode_map(stream, fk_count);
+		uint32_t count = ck_count + fk_count;
+		for (uint32_t i = 0; i < count; ++i) {
+			if (cdefs[i].type != CONSTR_FKEY)
+				continue;
+			mpstream_encode_str(stream, cdefs[i].name);
+			const struct tuple_constraint_fkey_def *fkey =
+				&cdefs[i].fkey;
+			uint32_t space_id = fkey->space_id;
+			if (space_id != 0) {
+				mpstream_encode_map(stream, 2);
+				mpstream_encode_str(stream, "space");
+				mpstream_encode_uint(stream, space_id);
+			} else {
+				mpstream_encode_map(stream, 1);
+			}
+			mpstream_encode_str(stream, "field");
+			assert(fkey->field.name_len != 0);
+			mpstream_encode_str(stream, fkey->field.name);
+		}
+	}
+	if (ck_count > 0) {
+		mpstream_encode_str(stream, "constraint");
+		mpstream_encode_map(stream, ck_count);
+		uint32_t count = ck_count + fk_count;
+		for (uint32_t i = 0; i < count; ++i) {
+			if (cdefs[i].type != CONSTR_FUNC)
+				continue;
+			mpstream_encode_str(stream, cdefs[i].name);
+			mpstream_encode_uint(stream, cdefs[i].func.id);
+		}
+	}
+}
+
 char *
 sql_encode_table(struct region *region, struct space_def *def, uint32_t *size)
 {
@@ -1007,6 +1050,21 @@ sql_encode_table(struct region *region, struct space_def *def, uint32_t *size)
 			base_len += 1;
 		if (default_str != NULL)
 			base_len += 1;
+		uint32_t ck_count = 0;
+		uint32_t fk_count = 0;
+		struct tuple_constraint_def *cdefs = field->constraint_def;
+		for (uint32_t i = 0; i < field->constraint_count; ++i) {
+			assert(cdefs[i].type == CONSTR_FUNC ||
+			       cdefs[i].type == CONSTR_FKEY);
+			if (cdefs[i].type == CONSTR_FUNC)
+				++ck_count;
+			else
+				++fk_count;
+		}
+		if (ck_count > 0)
+			++base_len;
+		if (fk_count > 0)
+			++base_len;
 		mpstream_encode_map(&stream, base_len);
 		mpstream_encode_str(&stream, "name");
 		mpstream_encode_str(&stream, field->name);
@@ -1030,6 +1088,8 @@ sql_encode_table(struct region *region, struct space_def *def, uint32_t *size)
 			mpstream_encode_str(&stream, "default");
 			mpstream_encode_str(&stream, default_str);
 		}
+		sql_mpstream_encode_constraints(&stream, cdefs, ck_count,
+						fk_count);
 	}
 	mpstream_flush(&stream);
 	if (is_error) {
