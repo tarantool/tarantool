@@ -606,5 +606,4 @@ test:ok(not box.info.listen:match(':0'), 'real port in info.listen')
 box.cfg{listen = box.NULL}
 test:is(nil, box.info.listen, 'cfg.listen reset drops info.listen')
 
-test:check()
-os.exit(0)
+os.exit(test:check() == true and 0 or 1)

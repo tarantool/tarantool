@@ -115,7 +115,10 @@ local function test_other(test, s)
                  encode_max_depth = max_depth})
 end
 
-tap.test("msgpackffi", function(test)
+local test = tap.test("msgpackffi")
+
+test:plan(1)
+test:test("msgpackffi", function(test)
     local serializer = require('msgpackffi')
     test:plan(14)
     test:test("unsigned", common.test_unsigned, serializer)
@@ -135,3 +138,5 @@ tap.test("msgpackffi", function(test)
     test:test("decode_buffer", common.test_decode_buffer, serializer)
     test:test("error", common.test_error, serializer)
 end)
+
+os.exit(test:check() and 0 or 1)

@@ -12,3 +12,5 @@ test:ok(not pcall(box.internal.module_reload, ''),
         'expected error: no module')
 test:ok(not pcall(box.internal.module_reload, 'xxx'),
         'expected error: no module')
+
+os.exit(test:check() and 0 or 1)

@@ -32,5 +32,4 @@ test:ok(err == nil and log.cfg.level == 6, 'got verbose')
 _, err = pcall(log.cfg, {level='debug'})
 test:ok(err == nil and log.cfg.level == 7, 'got debug')
 
-test:check()
-os.exit()
+os.exit(test:check() and 0 or 1)

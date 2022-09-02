@@ -39,5 +39,4 @@ box.cfg{read_only=true}
 while f_ro:status() ~= "dead" do fiber.sleep(0.01) end
 test:is(f_ro:status(), "dead", "entered read-only mode")
 
-test:check()
-os.exit(0)
+os.exit(test:check() and 0 or 1)

@@ -133,4 +133,4 @@ local res = csv.load('929,N1XDN ,,"Enfield, CT",')
 local exp = {{'929', 'N1XDN', '', 'Enfield, CT', ''}}
 test:is_deeply(res, exp, 'gh-3489')
 
-test:check()
+os.exit(test:check() and 0 or 1)

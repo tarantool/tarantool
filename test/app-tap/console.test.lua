@@ -341,6 +341,4 @@ triggers_ran = nil
 os.remove(CONSOLE_SOCKET)
 os.remove(IPROTO_SOCKET)
 
-test:check()
-
-os.exit(0)
+os.exit(test:check() and 0 or 1)

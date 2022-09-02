@@ -314,5 +314,4 @@ events_expected = {
 
 test:is_deeply(actual.events, events_expected, "Events are counted correctly")
 
-test:check()
-os.exit(0)
+os.exit(test:check() == true and 0 or 1)

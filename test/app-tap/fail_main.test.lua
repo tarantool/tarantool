@@ -35,5 +35,4 @@ local _, output = run_script("error('Error in the main script')")
 test:ok(output:match("fatal error, exiting the event loop"),
         "main script error is handled gracefully")
 
-test:check()
-os.exit(0)
+os.exit(test:check() and 0 or 1)
