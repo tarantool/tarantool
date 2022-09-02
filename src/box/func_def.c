@@ -33,6 +33,13 @@
 #include "string.h"
 #include "diag.h"
 #include "error.h"
+#include "salad/grp_alloc.h"
+#include "trivia/util.h"
+
+#include <assert.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdlib.h>
 
 const char *func_language_strs[] = {
 	"LUA", "C", "SQL", "SQL_BUILTIN", "SQL_EXPR"
@@ -49,6 +56,48 @@ const struct opt_def func_opts_reg[] = {
 	OPT_DEF("is_multikey", OPT_BOOL, struct func_opts, is_multikey),
 	OPT_DEF("takes_raw_args", OPT_BOOL, struct func_opts, takes_raw_args),
 };
+
+struct func_def *
+func_def_new(uint32_t fid, uint32_t uid, const char *name, uint32_t name_len,
+	     enum func_language language, const char *body, uint32_t body_len,
+	     const char *comment, uint32_t comment_len)
+{
+	struct func_def *def;
+	struct grp_alloc all = grp_alloc_initializer();
+	grp_alloc_reserve_data(&all, sizeof(*def));
+	grp_alloc_reserve_str(&all, name_len);
+	if (body_len != 0)
+		grp_alloc_reserve_str(&all, body_len);
+	if (comment_len != 0)
+		grp_alloc_reserve_str(&all, comment_len);
+	grp_alloc_use(&all, xmalloc(grp_alloc_size(&all)));
+	def = grp_alloc_create_data(&all, sizeof(*def));
+	def->name = grp_alloc_create_str(&all, name, name_len);
+	def->name_len = name_len;
+	def->body = body_len == 0 ? NULL :
+		    grp_alloc_create_str(&all, body, body_len);
+	def->comment = comment_len == 0 ? NULL :
+		       grp_alloc_create_str(&all, comment, comment_len);
+	assert(grp_alloc_size(&all) == 0);
+	def->fid = fid;
+	def->uid = uid;
+	def->setuid = false;
+	def->is_deterministic = false;
+	def->is_sandboxed = false;
+	def->param_count = 0;
+	def->returns = FIELD_TYPE_ANY;
+	def->aggregate = FUNC_AGGREGATE_NONE;
+	def->language = language;
+	def->exports.all = 0;
+	func_opts_create(&def->opts);
+	return def;
+}
+
+void
+func_def_delete(struct func_def *def)
+{
+	free(def);
+}
 
 static int
 func_opts_cmp(const struct func_opts *o1, const struct func_opts *o2)

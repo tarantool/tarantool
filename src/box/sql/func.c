@@ -2256,32 +2256,19 @@ sql_built_in_functions_cache_init(void)
 		assert(dict != NULL);
 
 		uint32_t len = strlen(name);
-		uint32_t size = sizeof(struct func_def) + len + 1;
-		struct func_def *def = malloc(size);
-		if (def == NULL)
-			panic("Out of memory on creating SQL built-in");
-		def->fid = i;
-		def->uid = 1;
-		def->body = NULL;
-		def->comment = NULL;
+		struct func_def *def = func_def_new(i, ADMIN, name, len,
+						    FUNC_LANGUAGE_SQL_BUILTIN,
+						    NULL, 0, NULL, 0);
 		def->setuid = true;
 		def->is_deterministic = dict->is_deterministic;
-		def->is_sandboxed = false;
 		assert(desc->argc != -1 || dict->argc_min != dict->argc_max);
 		def->param_count = desc->argc;
 		def->returns = desc->result;
 		def->aggregate = (dict->flags & SQL_FUNC_AGG) == 0 ?
 				 FUNC_AGGREGATE_NONE : FUNC_AGGREGATE_GROUP;
-		def->language = FUNC_LANGUAGE_SQL_BUILTIN;
-		def->name_len = len;
 		def->exports.sql = true;
-		func_opts_create(&def->opts);
-		memcpy(def->name, name, len + 1);
 
-		struct func_sql_builtin *func = malloc(sizeof(*func));
-		if (func == NULL)
-			panic("Out of memory on creating SQL built-in");
-
+		struct func_sql_builtin *func = xmalloc(sizeof(*func));
 		func->base.def = def;
 		rlist_create(&func->base.func_cache_pin_list);
 		func->base.vtab = &func_sql_builtin_vtab;

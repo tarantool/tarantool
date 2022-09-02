@@ -3120,36 +3120,6 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 }
 
 /**
- * Check if the version of the data dictionary is lower than 2.9.0 and return
- * new func def if it is the case. If it is the case, then it is possible to
- * insert values with the "SQL_BUILTIN" language into _func, otherwise it is
- * prohibited. This is for upgradeability from 2.1.3 to 2.3.0. Since all we need
- * is to allow such inserts, we set func def to its default values.
- */
-static int
-func_def_create_sql_built_in(struct func_def *def)
-{
-	if (dd_version_id >= version_id(2, 9, 0)) {
-		diag_set(ClientError, ER_FUNCTION_LANGUAGE, "SQL_BUILTIN",
-			 def->name);
-		return -1;
-	}
-	def->body = NULL;
-	def->comment = NULL;
-	def->setuid = 1;
-	def->is_deterministic = false;
-	def->is_sandboxed = false;
-	def->param_count = 0;
-	def->returns = FIELD_TYPE_ANY;
-	def->aggregate = FUNC_AGGREGATE_NONE;
-	def->language = FUNC_LANGUAGE_LUA;
-	def->exports.lua = true;
-	def->exports.sql = true;
-	func_opts_create(&def->opts);
-	return 0;
-}
-
-/**
  * Get function identifiers from a tuple.
  *
  * @param tuple Tuple to get ids from.
@@ -3169,9 +3139,9 @@ static struct func_def *
 func_def_new_from_tuple(struct tuple *tuple)
 {
 	uint32_t field_count = tuple_field_count(tuple);
-	uint32_t name_len, body_len, comment_len;
-	const char *name, *body, *comment;
-	name = tuple_field_str(tuple, BOX_FUNC_FIELD_NAME, &name_len);
+	uint32_t name_len;
+	const char *name = tuple_field_str(tuple, BOX_FUNC_FIELD_NAME,
+					   &name_len);
 	if (name == NULL)
 		return NULL;
 	if (name_len > BOX_NAME_MAX) {
@@ -3182,6 +3152,31 @@ func_def_new_from_tuple(struct tuple *tuple)
 	}
 	if (identifier_check(name, name_len) != 0)
 		return NULL;
+	enum func_language language = FUNC_LANGUAGE_LUA;
+	if (field_count > BOX_FUNC_FIELD_LANGUAGE) {
+		const char *language_str =
+			tuple_field_cstr(tuple, BOX_FUNC_FIELD_LANGUAGE);
+		if (language_str == NULL)
+			return NULL;
+		language = STR2ENUM(func_language, language_str);
+		/*
+		 * 'SQL_BUILTIN' was dropped in 2.9, but to support upgrade
+		 * from previous versions, we allow to create such functions
+		 * if the data dictionary version is older.
+		 */
+		if (language == func_language_MAX ||
+		    language == FUNC_LANGUAGE_SQL ||
+		    (language == FUNC_LANGUAGE_SQL_BUILTIN &&
+		     dd_version_id >= version_id(2, 9, 0))) {
+			diag_set(ClientError, ER_FUNCTION_LANGUAGE,
+				 language_str, tt_cstr(name, name_len));
+			return NULL;
+		}
+	}
+	uint32_t body_len = 0;
+	const char *body = NULL;
+	uint32_t comment_len = 0;
+	const char *comment = NULL;
 	if (field_count > BOX_FUNC_FIELD_BODY) {
 		body = tuple_field_str(tuple, BOX_FUNC_FIELD_BODY, &body_len);
 		if (body == NULL)
@@ -3220,77 +3215,24 @@ func_def_new_from_tuple(struct tuple *tuple)
 				  "unsupported is_null_call value");
 			return NULL;
 		}
-	} else {
-		body = NULL;
-		body_len = 0;
-		comment = NULL;
-		comment_len = 0;
 	}
-	uint32_t body_offset, comment_offset;
-	uint32_t def_sz = func_def_sizeof(name_len, body_len, comment_len,
-					  &body_offset, &comment_offset);
-	struct func_def *def = (struct func_def *) malloc(def_sz);
-	if (def == NULL) {
-		diag_set(OutOfMemory, def_sz, "malloc", "def");
+	uint32_t fid, uid;
+	if (func_def_get_ids_from_tuple(tuple, &fid, &uid) != 0)
 		return NULL;
-	}
-	auto def_guard = make_scoped_guard([=] { free(def); });
-	if (func_def_get_ids_from_tuple(tuple, &def->fid, &def->uid) != 0)
-		return NULL;
-	if (def->fid > BOX_FUNCTION_MAX) {
+	if (fid > BOX_FUNCTION_MAX) {
 		diag_set(ClientError, ER_CREATE_FUNCTION,
 			  tt_cstr(name, name_len), "function id is too big");
 		return NULL;
 	}
-	func_opts_create(&def->opts);
-	memcpy(def->name, name, name_len);
-	def->name[name_len] = '\0';
-	def->name_len = name_len;
-	if (body_len > 0) {
-		def->body = (char *)def + body_offset;
-		memcpy(def->body, body, body_len);
-		def->body[body_len] = '\0';
-	} else {
-		def->body = NULL;
-	}
-	if (comment_len > 0) {
-		def->comment = (char *)def + comment_offset;
-		memcpy(def->comment, comment, comment_len);
-		def->comment[comment_len] = '\0';
-	} else {
-		def->comment = NULL;
-	}
+	struct func_def *def = func_def_new(fid, uid, name, name_len,
+					    language, body, body_len,
+					    comment, comment_len);
+	auto def_guard = make_scoped_guard([=] { func_def_delete(def); });
 	if (field_count > BOX_FUNC_FIELD_SETUID) {
 		uint32_t out;
 		if (tuple_field_u32(tuple, BOX_FUNC_FIELD_SETUID, &out) != 0)
 			return NULL;
 		def->setuid = out;
-	} else {
-		def->setuid = false;
-	}
-	if (field_count > BOX_FUNC_FIELD_LANGUAGE) {
-		const char *language =
-			tuple_field_cstr(tuple, BOX_FUNC_FIELD_LANGUAGE);
-		if (language == NULL)
-			return NULL;
-		def->language = STR2ENUM(func_language, language);
-		if (def->language == func_language_MAX ||
-		    def->language == FUNC_LANGUAGE_SQL) {
-			diag_set(ClientError, ER_FUNCTION_LANGUAGE,
-				  language, def->name);
-			return NULL;
-		}
-		if (def->language == FUNC_LANGUAGE_SQL_BUILTIN) {
-			if (func_def_create_sql_built_in(def) != 0)
-				return NULL;
-			if (func_def_check(def) != 0)
-				return NULL;
-			def_guard.is_active = false;
-			return def;
-		}
-	} else {
-		/* Lua is the default. */
-		def->language = FUNC_LANGUAGE_LUA;
 	}
 	if (field_count > BOX_FUNC_FIELD_BODY) {
 		if (tuple_field_bool(tuple, BOX_FUNC_FIELD_IS_DETERMINISTIC,
@@ -3389,14 +3331,8 @@ func_def_new_from_tuple(struct tuple *tuple)
 				ER_WRONG_SPACE_OPTIONS, NULL) != 0)
 			return NULL;
 	} else {
-		def->is_deterministic = false;
-		def->is_sandboxed = false;
-		def->returns = FIELD_TYPE_ANY;
-		def->aggregate = FUNC_AGGREGATE_NONE;
-		def->exports.all = 0;
 		/* By default export to Lua, but not other frontends. */
 		def->exports.lua = true;
-		def->param_count = 0;
 	}
 	if (func_def_check(def) != 0)
 		return NULL;
@@ -3457,7 +3393,9 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 		struct func_def *def = func_def_new_from_tuple(new_tuple);
 		if (def == NULL)
 			return -1;
-		auto def_guard = make_scoped_guard([=] { free(def); });
+		auto def_guard = make_scoped_guard([=] {
+			func_def_delete(def);
+		});
 		if (access_check_ddl(def->name, def->fid, def->uid, SC_FUNCTION,
 				 PRIV_C) != 0)
 			return -1;

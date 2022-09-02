@@ -380,6 +380,34 @@ restore_fail:
 	return -1;
 }
 
+static int
+func_dummy_call(struct func *func, struct port *args, struct port *ret)
+{
+	(void)func;
+	(void)args;
+	(void)ret;
+	diag_set(ClientError, ER_UNSUPPORTED, func->def->name, "call");
+	return -1;
+}
+
+static void
+func_dummy_destroy(struct func *func)
+{
+	free(func);
+}
+
+static struct func *
+func_dummy_new(void)
+{
+	static const struct func_vtab func_dummy_vtab = {
+		.call = func_dummy_call,
+		.destroy = func_dummy_destroy,
+	};
+	struct func *func = xmalloc(sizeof(*func));
+	func->vtab = &func_dummy_vtab;
+	return func;
+}
+
 static struct func *
 func_c_new(const struct func_def *def);
 
@@ -396,6 +424,14 @@ func_new(struct func_def *def)
 		break;
 	case FUNC_LANGUAGE_SQL_EXPR:
 		func = func_sql_expr_new(def);
+		break;
+	case FUNC_LANGUAGE_SQL_BUILTIN:
+		/*
+		 * 'SQL_BUILTIN' was dropped in 2.9, but we still need to
+		 * handle creation of such functions to support upgrade from
+		 * previous versions.
+		 */
+		func = func_dummy_new();
 		break;
 	default:
 		unreachable();
