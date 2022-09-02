@@ -163,15 +163,15 @@ func_def_sizeof(uint32_t name_len, uint32_t body_len, uint32_t comment_len,
 
 /** Compare two given function definitions. */
 int
-func_def_cmp(struct func_def *def1, struct func_def *def2);
+func_def_cmp(const struct func_def *def1, const struct func_def *def2);
 
 /** Duplicate a given function defintion object. */
 struct func_def *
-func_def_dup(struct func_def *def);
+func_def_dup(const struct func_def *def);
 
 /** Check if a non-empty function body is correct. */
 int
-func_def_check(struct func_def *def);
+func_def_check(const struct func_def *def);
 
 #ifdef __cplusplus
 }

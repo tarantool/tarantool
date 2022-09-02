@@ -50,8 +50,8 @@ const struct opt_def func_opts_reg[] = {
 	OPT_DEF("takes_raw_args", OPT_BOOL, struct func_opts, takes_raw_args),
 };
 
-int
-func_opts_cmp(struct func_opts *o1, struct func_opts *o2)
+static int
+func_opts_cmp(const struct func_opts *o1, const struct func_opts *o2)
 {
 	if (o1->is_multikey != o2->is_multikey)
 		return o1->is_multikey - o2->is_multikey;
@@ -61,7 +61,7 @@ func_opts_cmp(struct func_opts *o1, struct func_opts *o2)
 }
 
 int
-func_def_cmp(struct func_def *def1, struct func_def *def2)
+func_def_cmp(const struct func_def *def1, const struct func_def *def2)
 {
 	if (def1->fid != def2->fid)
 		return def1->fid - def2->fid;
@@ -103,7 +103,7 @@ func_def_cmp(struct func_def *def1, struct func_def *def2)
  *            diagnostics message is provided
  */
 int
-func_def_check(struct func_def *def)
+func_def_check(const struct func_def *def)
 {
 	switch (def->language) {
 	case FUNC_LANGUAGE_C:

@@ -60,7 +60,7 @@ box_lua_eval(const char *expr, uint32_t expr_len,
 
 /** Construct a Lua function object. */
 struct func *
-func_lua_new(struct func_def *def);
+func_lua_new(const struct func_def *def);
 
 #if defined(__cplusplus)
 } /* extern "C" */

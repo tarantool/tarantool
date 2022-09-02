@@ -14,7 +14,7 @@ struct func_def;
 
 /** Create new SQL user-defined function. */
 struct func *
-func_sql_expr_new(struct func_def *def);
+func_sql_expr_new(const struct func_def *def);
 
 #if defined(__cplusplus)
 } /* extern "C" */
