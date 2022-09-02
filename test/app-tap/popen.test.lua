@@ -589,6 +589,8 @@ test:test('methods_on_invalid_handle', test_methods_on_invalid_handle)
 --   - info: get both true and false for each opts.<...> boolean
 --     option
 --   - FiberIsCancelled is raised from read(), write() and wait()
+--     NB: It is verified for wait() in
+--     app-luatest/popen_wait_test.lua.
 --
 -- - verify dubious code paths
 --   - popen.new
