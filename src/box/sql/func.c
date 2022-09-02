@@ -2354,7 +2354,7 @@ struct func_sql_expr {
 };
 
 struct func *
-func_sql_expr_new(struct func_def *def)
+func_sql_expr_new(const struct func_def *def)
 {
 	struct sql *db = sql_get();
 	const char *body = def->body;
