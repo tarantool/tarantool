@@ -756,23 +756,26 @@ end:
 
 /**
  * Assemble a Lua function object by user-defined function body.
+ * On success, returns a Lua reference to the loaded function.
+ * On error, returns LUA_NOREF and sets diag.
  */
 static int
-func_persistent_lua_load(struct func_lua *func)
+func_persistent_lua_load(struct func_def *def)
 {
-	int rc = -1;
+	assert(def->body != NULL);
+	int func_ref = LUA_NOREF;
 	int top = lua_gettop(tarantool_L);
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	const char *load_pref = "return ";
 	uint32_t load_str_sz =
-		strlen(load_pref) + strlen(func->base.def->body) + 1;
+		strlen(load_pref) + strlen(def->body) + 1;
 	char *load_str = region_alloc(region, load_str_sz);
 	if (load_str == NULL) {
 		diag_set(OutOfMemory, load_str_sz, "region", "load_str");
-		return -1;
+		return LUA_NOREF;
 	}
-	snprintf(load_str, load_str_sz, "%s%s", load_pref, func->base.def->body);
+	snprintf(load_str, load_str_sz, "%s%s", load_pref, def->body);
 
 	/*
 	 * Perform loading of the persistent Lua function
@@ -783,8 +786,8 @@ func_persistent_lua_load(struct func_lua *func)
 	 */
 	lua_State *coro_L = luaT_newthread(tarantool_L);
 	if (coro_L == NULL)
-		return -1;
-	if (!func->base.def->is_sandboxed) {
+		return LUA_NOREF;
+	if (!def->is_sandboxed) {
 		/*
 		 * Keep the original env to apply to a non-sandboxed
 		 * persistent function. It is necessary since
@@ -799,35 +802,33 @@ func_persistent_lua_load(struct func_lua *func)
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	if (luaL_loadstring(coro_L, load_str) != 0 ||
 	    lua_pcall(coro_L, 0, 1, 0) != 0) {
-		diag_set(ClientError, ER_LOAD_FUNCTION, func->base.def->name,
+		diag_set(ClientError, ER_LOAD_FUNCTION, def->name,
 			 luaT_tolstring(coro_L, -1, NULL));
 		goto end;
 	}
 	if (!lua_isfunction(coro_L, -1)) {
-		diag_set(ClientError, ER_LOAD_FUNCTION, func->base.def->name,
+		diag_set(ClientError, ER_LOAD_FUNCTION, def->name,
 			 "given body doesn't define a function");
 		goto end;
 	}
 	lua_xmove(coro_L, tarantool_L, 1);
-	if (func->base.def->is_sandboxed) {
+	if (def->is_sandboxed) {
 		if (prepare_lua_sandbox(tarantool_L, default_sandbox_exports,
 					nelem(default_sandbox_exports)) != 0) {
 			diag_add(ClientError, ER_LOAD_FUNCTION,
-				 func->base.def->name,
-				 "can't prepare a Lua sandbox");
+				 def->name, "can't prepare a Lua sandbox");
 			goto end;
 		}
 	} else {
 		lua_insert(tarantool_L, -2);
 	}
 	lua_setfenv(tarantool_L, -2);
-	func->lua_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
-	rc = 0;
+	func_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 end:
 	lua_settop(tarantool_L, top);
 	region_truncate(region, region_svp);
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
-	return rc;
+	return func_ref;
 }
 
 struct func *
@@ -841,12 +842,12 @@ func_lua_new(struct func_def *def)
 		return NULL;
 	}
 	if (def->body != NULL) {
-		func->base.def = def;
-		func->base.vtab = &func_persistent_lua_vtab;
-		if (func_persistent_lua_load(func) != 0) {
+		func->lua_ref = func_persistent_lua_load(def);
+		if (func->lua_ref == LUA_NOREF) {
 			free(func);
 			return NULL;
 		}
+		func->base.vtab = &func_persistent_lua_vtab;
 	} else {
 		func->lua_ref = LUA_REFNIL;
 		func->base.vtab = &func_lua_vtab;
