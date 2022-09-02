@@ -11,6 +11,7 @@
 #include <sys/wait.h>
 
 #include "popen.h"
+#include "trivia/util.h"
 #include "fiber.h"
 #include "assoc.h"
 #include "coio.h"
@@ -21,6 +22,8 @@
 #ifdef TARGET_OS_DARWIN
 # include <sys/ioctl.h>
 #endif
+
+#define POPEN_WAIT_LEADERSHIP_DELAY 0.01
 
 /* A mapping to find popens by their pids in a signal handler */
 static struct mh_i32ptr_t *popen_pids_map = NULL;
@@ -1001,6 +1004,89 @@ signal_reset(void)
 	}
 }
 
+#ifdef TARGET_OS_DARWIN
+/**
+ * Wait until a child process will become a group leader or will
+ * complete.
+ *
+ * Normally vfork() suspends a parent process until a call to
+ * execve() in the child process or termination of the child.
+ * However Mac OS 12 (and newer) implements vfork() as usual
+ * fork(): the only difference is that it does not call
+ * pthread_atfork() handlers.
+ *
+ * So the parent process is not suspended on Mac OS and may
+ * observe an intermediate state of the child: before execve()
+ * call. It may be a problem, when ..._SETSID and ..._GROUP_SIGNAL
+ * parameters are set: if we'll call killpg() before the child
+ * will actually become the group leader, we'll get ESRCH.
+ *
+ * This function offers a simple solution: wait until such process
+ * will become a group leader or will be completed (what will occur
+ * first). The child process can't overrun the setsid()/setpgrp()
+ * call when the ..._SETSID parameter is set.
+ *
+ * The function does not yield, but may block the thread for a
+ * short time.
+ *
+ * Returns 0 at success or -1 at failure (and sets a diag).
+ *
+ * Possible errors:
+ *
+ * - SystemError: getpgid() failed due to a reason other than
+ *                the process completion.
+ */
+static int
+popen_wait_group_leadership(pid_t pid)
+{
+	assert(pid > 0);
+
+	while (true) {
+		pid_t gid = getpgid(pid);
+		assert(gid != 0);
+
+		/* The process is completed. */
+		if (gid < 0 && errno == ESRCH)
+			break;
+
+		/*
+		 * It is unclear from a man 2 getpgid, whether it
+		 * can return other errors aside of ESRCH. Let's
+		 * handle it accurately just in case.
+		 */
+		if (gid < 0) {
+			diag_set(SystemError, "getpgid failed");
+			return -1;
+		}
+
+		/* The process is the group leader! */
+		assert(gid > 0);
+		if (gid == pid)
+			break;
+
+		/*
+		 * The process is not completed and not a group
+		 * leader at the time being. Let's wait for a
+		 * short time and check again.
+		 */
+		assert(gid != pid);
+		thread_sleep(POPEN_WAIT_LEADERSHIP_DELAY);
+	}
+
+	return 0;
+}
+#else
+/**
+ * No-op.
+ */
+static int
+popen_wait_group_leadership(pid_t pid)
+{
+	(void)pid;
+	return 0;
+}
+#endif
+
 /**
  * Create new popen handle.
  *
@@ -1044,8 +1130,8 @@ signal_reset(void)
  *
  * - IllegalParams: a parameter check fails:
  *   - group signal is set, while setsid is not.
- * - SystemError: dup(), fcntl(), pipe(), vfork() or close() fails
- *   in the parent process.
+ * - SystemError: dup(), fcntl(), pipe(), vfork(), close() or
+ *   getpgid() fails in the parent process.
  * - SystemError: (temporary restriction) one of std{in,out,err}
  *   is closed in the parent process.
  * - OutOfMemory: unable to allocate handle.
@@ -1340,6 +1426,21 @@ exit_child:
 			log_set_fd(old_log_fd);
 		_exit(errno);
 		unreachable();
+	}
+
+	/*
+	 * Suspend the parent process (tx thread) execution until
+	 * setsid()/setpgrp() will be called in the child process
+	 * if vfork() doesn't suspend the parent on its own on
+	 * given platform.
+	 *
+	 * Otherwise killpg() in popen_send_signal() may get
+	 * ESRCH due to the race.
+	 */
+	if (handle->flags & POPEN_FLAG_SETSID) {
+		int rc = popen_wait_group_leadership(handle->pid);
+		if (rc < 0)
+			goto out_err;
 	}
 
 	for (i = 0; i < lengthof(pfd_map); i++) {
