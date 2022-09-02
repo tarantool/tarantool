@@ -145,7 +145,6 @@ on_shutdown_f(va_list ap)
 		diag_log();
 		diag_clear(diag_get());
 	}
-	say_logger_free();
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 }
@@ -588,6 +587,7 @@ tarantool_free(void)
 	memtx_tx_manager_free();
 	coll_free();
 	systemd_free();
+	say_logger_free();
 	fiber_free();
 	memory_free();
 	random_free();
