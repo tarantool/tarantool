@@ -343,8 +343,8 @@ static void load_alias(struct lua_yaml_loader *loader) {
  * @retval  1 Success.
  */
 static int load_node(struct lua_yaml_loader *loader) {
-   int seq_idx;
-   int map_idx;
+   int seq_idx = 0;
+   int map_idx = 0;
    int is_seq = 0;
    int is_map = 0;
 
