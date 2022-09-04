@@ -253,3 +253,5 @@ tap.test("yaml", function(test)
     test:test("tagged", test_tagged, serializer)
     test:test("api", test_api, serializer)
 end)
+
+os.exit(test:check() == true and 0 or 1)

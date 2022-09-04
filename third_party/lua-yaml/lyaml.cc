@@ -423,6 +423,16 @@ no_tags:
    return 1;
 }
 
+/*
+ * A valid sequence of events should obey the grammar:
+ *
+ * stream ::= STREAM-START document* STREAM-END
+ * document ::= DOCUMENT-START node DOCUMENT-END
+ * node ::= ALIAS | SCALAR | sequence | mapping
+ * sequence ::= SEQUENCE-START node* SEQUENCE-END
+ * mapping ::= MAPPING-START (node node)* MAPPING-END
+ *
+ */
 static void load(struct lua_yaml_loader *loader) {
    if (!do_parse(loader))
       return;
