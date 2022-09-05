@@ -45,6 +45,12 @@ enum iproto_feature_id {
 	 * IPROTO_WATCH, IPROTO_UNWATCH, IPROTO_EVENT commands.
 	 */
 	IPROTO_FEATURE_WATCHERS = 3,
+	/**
+	 * Pagination support:
+	 * IPROTO_AFTER_POSITION, IPROTO_AFTER_TUPLE, IPROTO_FETCH_POSITION
+	 * request fields and IPROTO_POSITION response field.
+	 */
+	IPROTO_FEATURE_PAGINATION = 4,
 	iproto_feature_id_MAX,
 };
 
@@ -60,7 +66,7 @@ struct iproto_features {
  * It should be incremented every time a new feature is added or removed.
  */
 enum {
-	IPROTO_CURRENT_VERSION = 3,
+	IPROTO_CURRENT_VERSION = 4,
 };
 
 /**

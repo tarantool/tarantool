@@ -293,9 +293,20 @@ test_request_str()
 	request.ops = pos;
 	pos = mp_encode_array(pos, 1);
 	pos = mp_encode_uint(pos, 400);
+
+	request.fetch_position = true;
+
+	request.after_position = pos;
+	pos = mp_encode_str(pos, "position", 8);
+	request.after_position_end = pos;
+
+	request.after_tuple = request.tuple;
+
 	is(strcmp("{type: 'SELECT', replica_id: 5, lsn: 100, "
 		  "space_id: 512, index_id: 1, "
-		  "key: [200], tuple: [300], ops: [400]}",
+		  "key: [200], tuple: [300], ops: [400], "
+		  "fetch_position: true, after_position: \"position\", "
+		  "after_tuple: [300]}",
 		  request_str(&request)), 0, "request_str");
 
 	check_plan();

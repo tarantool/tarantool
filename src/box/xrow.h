@@ -202,8 +202,18 @@ struct request {
 	const char *new_tuple;
 	/** End of @new_tuple. */
 	const char *new_tuple_end;
+	/** Packed iterator_position with MP_STR header. */
+	const char *after_position;
+	/** End of @after_position. */
+	const char *after_position_end;
+	/** Last selected tuple to start iteration after it. */
+	const char *after_tuple;
+	/** End of @after_tuple. */
+	const char *after_tuple_end;
 	/** Base field offset for UPDATE/UPSERT, e.g. 0 for C and 1 for Lua. */
 	int index_base;
+	/** Send position of last selected tuple in response if true. */
+	bool fetch_position;
 };
 
 /**
@@ -649,12 +659,37 @@ iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp)
 }
 
 /**
+ * Prepare the iproto header for a select result set and iterator position.
+ * It is just an alias fot iproto_prepare_select, it is needed for better
+ * code readability.
+ * @param buf Out buffer.
+ * @param svp Savepoint of the header beginning.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
+ */
+static inline int
+iproto_prepare_select_with_position(struct obuf *buf, struct obuf_svp *svp)
+{
+	return iproto_prepare_select(buf, svp);
+}
+
+/**
  * Write select header to a preallocated buffer.
  * This function doesn't throw (and we rely on this in iproto.cc).
  */
 void
 iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 		    uint32_t schema_version, uint32_t count);
+
+/**
+ * Write extended select header to a preallocated buffer.
+ */
+int
+iproto_reply_select_with_position(struct obuf *buf, struct obuf_svp *svp,
+				  uint64_t sync, uint32_t schema_version,
+				  uint32_t count, const char *packed_pos,
+				  const char *packed_pos_end);
 
 /**
  * Encode iproto header with IPROTO_OK response code.

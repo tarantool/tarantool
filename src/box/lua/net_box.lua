@@ -56,6 +56,7 @@ local IPROTO_FEATURE_NAMES = {
     [1]     = 'transactions',
     [2]     = 'error_extension',
     [3]     = 'watchers',
+    [4]     = 'pagination',
 }
 
 local REQUEST_OPTION_TYPES = {
