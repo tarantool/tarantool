@@ -18,6 +18,7 @@
 #include "small/rlist.h"
 #include "space.h"
 #include "space_cache.h"
+#include "space_upgrade.h"
 #include "trivia/util.h"
 #include "tuple.h"
 
@@ -45,6 +46,7 @@ read_view_opts_create(struct read_view_opts *opts)
 	opts->filter_index = default_index_filter;
 	opts->filter_arg = NULL;
 	opts->needs_field_names = false;
+	opts->needs_space_upgrade = false;
 }
 
 static void
@@ -57,6 +59,8 @@ space_read_view_delete(struct space_read_view *space_rv)
 			index_read_view_delete(index_rv);
 		}
 	}
+	if (space_rv->upgrade != NULL)
+		space_upgrade_read_view_delete(space_rv->upgrade);
 	tuple_format_unref(space_rv->format);
 	TRASH(space_rv);
 	free(space_rv);
@@ -82,6 +86,11 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 		if (format == NULL)
 			return NULL;
 	}
+	struct space_upgrade_read_view *upgrade = NULL;
+	if (opts->needs_space_upgrade && space->upgrade != NULL) {
+		upgrade = space_upgrade_read_view_new(space->upgrade);
+		assert(upgrade != NULL);
+	}
 
 	struct space_read_view *space_rv;
 	size_t index_map_size = sizeof(*space_rv->index_map) *
@@ -100,6 +109,7 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 	space_rv->group_id = space_group_id(space);
 	space_rv->format = format;
 	tuple_format_ref(format);
+	space_rv->upgrade = upgrade;
 	space_rv->index_id_max = space->index_id_max;
 	memset(space_rv->index_map, 0, index_map_size);
 	for (uint32_t i = 0; i <= space->index_id_max; i++) {
@@ -194,6 +204,16 @@ read_view_activate(struct read_view *rv)
 {
 	assert(rv->owner == NULL);
 	rv->owner = cord();
+	struct space_read_view *space_rv;
+	rlist_foreach_entry(space_rv, &rv->spaces, link) {
+		if (space_rv->upgrade != NULL) {
+			if (space_upgrade_read_view_activate(
+					space_rv->upgrade) != 0) {
+				read_view_deactivate(rv);
+				return -1;
+			}
+		}
+	}
 	return 0;
 }
 
@@ -202,6 +222,11 @@ read_view_deactivate(struct read_view *rv)
 {
 	assert(rv->owner == cord());
 	rv->owner = NULL;
+	struct space_read_view *space_rv;
+	rlist_foreach_entry(space_rv, &rv->spaces, link) {
+		if (space_rv->upgrade != NULL)
+			space_upgrade_read_view_deactivate(space_rv->upgrade);
+	}
 }
 
 #ifndef NDEBUG
@@ -211,3 +236,15 @@ index_read_view_check_owner(struct index_read_view *index_rv)
 	assert(index_rv->space->rv->owner == cord());
 }
 #endif
+
+struct tuple *
+read_view_process_result(struct space_read_view *space_rv, struct tuple *tuple)
+{
+	assert(tuple != NULL);
+	assert(space_rv->rv->owner == cord());
+	if (space_rv->upgrade != NULL) {
+		return space_upgrade_read_view_apply(space_rv->upgrade, tuple);
+	} else {
+		return tuple;
+	}
+}
