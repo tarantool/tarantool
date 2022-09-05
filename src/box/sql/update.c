@@ -456,13 +456,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 				      upd_cols_reg, (char *)reg, P4_INT32);
 			sqlVdbeChangeP5(v, pik_flags);
 		}
-		/*
-		 * Do any ON CASCADE, SET NULL or SET DEFAULT
-		 * operations required to handle rows that refer
-		 * via a foreign key to the row just updated.
-		 */
-		if (hasFK)
-			fk_constraint_emit_actions(pParse, space, regOldPk, aXRef);
 	}
 
 	vdbe_code_row_trigger(pParse, trigger, TK_UPDATE, pChanges,

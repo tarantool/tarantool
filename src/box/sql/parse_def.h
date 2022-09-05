@@ -291,8 +291,6 @@ struct create_trigger_def {
 
 struct create_constraint_def {
 	struct create_entity_def base;
-	/** One of DEFERRED, IMMEDIATE. */
-	bool is_deferred;
 };
 
 struct create_ck_def {
@@ -306,9 +304,6 @@ struct create_fk_def {
 	struct ExprList *child_cols;
 	struct Token *parent_name;
 	struct ExprList *parent_cols;
-	/** Encoded actions for ON DELETE and ON UPDATE clauses. */
-	int actions;
-	int match;
 };
 
 struct create_index_def {
@@ -365,12 +360,10 @@ create_entity_def_init(struct create_entity_def *create_def,
 static inline void
 create_constraint_def_init(struct create_constraint_def *constr_def,
 			   struct SrcList *parent_name, struct Token *name,
-			   bool if_not_exists, bool is_deferred,
-			   enum entity_type entity_type)
+			   bool if_not_exists, enum entity_type entity_type)
 {
 	create_entity_def_init(&constr_def->base, entity_type,
 			       parent_name, name, if_not_exists);
-	constr_def->is_deferred = is_deferred;
 }
 
 static inline void
@@ -448,7 +441,7 @@ create_ck_def_init(struct create_ck_def *ck_def, struct SrcList *table_name,
 		   struct Token *name, struct ExprSpan *expr)
 {
 	create_constraint_def_init(&ck_def->base, table_name, name, false,
-				   false, ENTITY_TYPE_CK);
+				   ENTITY_TYPE_CK);
 	ck_def->expr = expr;
 }
 
@@ -459,7 +452,7 @@ create_index_def_init(struct create_index_def *index_def,
 		      enum sort_order sort_order, bool if_not_exists)
 {
 	create_constraint_def_init(&index_def->base, table_name, name,
-				   if_not_exists, false, ENTITY_TYPE_INDEX);
+				   if_not_exists, ENTITY_TYPE_INDEX);
 	index_def->cols = cols;
 	index_def->idx_type = idx_type;
 	index_def->sort_order = sort_order;
@@ -468,16 +461,13 @@ create_index_def_init(struct create_index_def *index_def,
 static inline void
 create_fk_def_init(struct create_fk_def *fk_def, struct SrcList *table_name,
 		   struct Token *name, struct ExprList *child_cols,
-		   struct Token *parent_name, struct ExprList *parent_cols,
-		   int match, int actions, bool is_deferred)
+		   struct Token *parent_name, struct ExprList *parent_cols)
 {
 	create_constraint_def_init(&fk_def->base, table_name, name,
-				   false, is_deferred, ENTITY_TYPE_FK);
+				   false, ENTITY_TYPE_FK);
 	fk_def->child_cols = child_cols;
 	fk_def->parent_name = parent_name;
 	fk_def->parent_cols = parent_cols;
-	fk_def->actions = actions;
-	fk_def->match = match;
 }
 
 static inline void

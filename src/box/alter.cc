@@ -5058,41 +5058,6 @@ fk_constraint_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 	if (tuple_field_u32(tuple, BOX_FK_CONSTRAINT_FIELD_PARENT_ID,
 			    &(fk_def->parent_id)) != 0)
 		return NULL;
-	if (tuple_field_bool(tuple, BOX_FK_CONSTRAINT_FIELD_DEFERRED,
-			     &(fk_def->is_deferred)) != 0)
-		return NULL;
-	const char *match = tuple_field_str(tuple,
-		BOX_FK_CONSTRAINT_FIELD_MATCH, &name_len);
-	if (match == NULL)
-		return NULL;
-	fk_def->match = STRN2ENUM(fk_constraint_match, match, name_len);
-	if (fk_def->match == fk_constraint_match_MAX) {
-		diag_set(ClientError, errcode, fk_def->name,
-			  "unknown MATCH clause");
-		return NULL;
-	}
-	const char *on_delete_action = tuple_field_str(tuple,
-		BOX_FK_CONSTRAINT_FIELD_ON_DELETE, &name_len);
-	if (on_delete_action == NULL)
-		return NULL;
-	fk_def->on_delete = STRN2ENUM(fk_constraint_action,
-				      on_delete_action, name_len);
-	if (fk_def->on_delete == fk_constraint_action_MAX) {
-		diag_set(ClientError, errcode, fk_def->name,
-			  "unknown ON DELETE action");
-		return NULL;
-	}
-	const char *on_update_action = tuple_field_str(tuple,
-		BOX_FK_CONSTRAINT_FIELD_ON_UPDATE, &name_len);
-	if (on_update_action == NULL)
-		return NULL;
-	fk_def->on_update = STRN2ENUM(fk_constraint_action,
-				      on_update_action, name_len);
-	if (fk_def->on_update == fk_constraint_action_MAX) {
-		diag_set(ClientError, errcode, fk_def->name,
-			  "unknown ON UPDATE action");
-		return NULL;
-	}
 	def_guard.is_active = false;
 	return fk_def;
 }
@@ -5622,15 +5587,6 @@ on_replace_dd_ck_constraint(struct trigger * /* trigger*/, void *event)
 		return -1;
 
 	if (new_tuple != NULL) {
-		bool is_deferred;
-		if (tuple_field_bool(new_tuple,
-			BOX_CK_CONSTRAINT_FIELD_DEFERRED, &is_deferred) != 0)
-			return -1;
-		if (is_deferred) {
-			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
-				  "deferred ck constraints");
-			return -1;
-		}
 		/* Create or replace check constraint. */
 		struct ck_constraint_def *ck_def =
 			ck_constraint_def_new_from_tuple(new_tuple);

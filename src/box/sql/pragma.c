@@ -305,10 +305,6 @@ sql_pragma_foreign_key_list(struct Parse *parse_context, const char *table_name)
 		struct fk_constraint_def *fk_def = fk_c->def;
 		struct space *parent = space_by_id(fk_def->parent_id);
 		assert(parent != NULL);
-		const char *on_delete_action =
-			fk_constraint_action_strs[fk_def->on_delete];
-		const char *on_update_action =
-			fk_constraint_action_strs[fk_def->on_update];
 		for (uint32_t j = 0; j < fk_def->field_count; j++) {
 			uint32_t ch_fl = fk_def->links[j].child_field;
 			const char *child_col = space->def->fields[ch_fl].name;
@@ -317,8 +313,8 @@ sql_pragma_foreign_key_list(struct Parse *parse_context, const char *table_name)
 				parent->def->fields[pr_fl].name;
 			sqlVdbeMultiLoad(v, 1, "iissssss", i, j,
 					 parent->def->name, child_col,
-					 parent_col, on_delete_action,
-					 on_update_action, "NONE");
+					 parent_col, "no_action",
+					 "no_action", "NONE");
 			sqlVdbeAddOp2(v, OP_ResultRow, 1, 8);
 		}
 		++i;

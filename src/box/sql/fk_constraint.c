@@ -140,7 +140,6 @@
  * --------------------------------------
  *
  *   fk_constraint_emit_check()   - Check for foreign key violations.
- *   fk_constraint_emit_actions()  - Code triggers for ON UPDATE/ON DELETE actions.
  *
  * VDBE Calling Convention
  * -----------------------
@@ -212,8 +211,7 @@ fk_constraint_lookup_parent(struct Parse *parse_context, struct space *parent,
 	 * parent table.
 	 */
 	if (incr_count < 0) {
-		sqlVdbeAddOp2(v, OP_FkIfZero, fk_def->is_deferred,
-				  ok_label);
+		sqlVdbeAddOp2(v, OP_FkIfZero, false, ok_label);
 	}
 	struct field_link *link = fk_def->links;
 	for (uint32_t i = 0; i < fk_def->field_count; ++i, ++link) {
@@ -269,9 +267,7 @@ fk_constraint_lookup_parent(struct Parse *parse_context, struct space *parent,
 		sqlReleaseTempReg(parse_context, rec_reg);
 		sqlReleaseTempRange(parse_context, temp_regs, field_count);
 	}
-	if (!fk_def->is_deferred &&
-	    (parse_context->sql_flags & SQL_DeferFKs) == 0 &&
-	    parse_context->pToplevel == NULL && !parse_context->isMultiWrite) {
+	if (parse_context->pToplevel == NULL && !parse_context->isMultiWrite) {
 		/*
 		 * If this is an INSERT statement that will insert
 		 * exactly one row into the table, raise a
@@ -287,8 +283,7 @@ fk_constraint_lookup_parent(struct Parse *parse_context, struct space *parent,
 			      P4_STATIC);
 		sqlVdbeAddOp1(v, OP_Halt, -1);
 	} else {
-		sqlVdbeAddOp2(v, OP_FkCounter, fk_def->is_deferred,
-				  incr_count);
+		sqlVdbeAddOp2(v, OP_FkCounter, false, incr_count);
 	}
 	sqlVdbeResolveLabel(v, ok_label);
 	sqlVdbeAddOp1(v, OP_Close, cursor);
@@ -399,8 +394,7 @@ fk_constraint_scan_children(struct Parse *parser, struct SrcList *src,
 	struct Vdbe *v = sqlGetVdbe(parser);
 
 	if (incr_count < 0) {
-		fkifzero_label = sqlVdbeAddOp2(v, OP_FkIfZero,
-						   fk_def->is_deferred, 0);
+		fkifzero_label = sqlVdbeAddOp2(v, OP_FkIfZero, false, 0);
 	}
 
 	struct space *child_space = src->a[0].space;
@@ -473,7 +467,7 @@ fk_constraint_scan_children(struct Parse *parser, struct SrcList *src,
 	 */
 	struct WhereInfo *info =
 		sqlWhereBegin(parser, src, where, NULL, NULL, 0, 0);
-	sqlVdbeAddOp2(v, OP_FkCounter, fk_def->is_deferred, incr_count);
+	sqlVdbeAddOp2(v, OP_FkCounter, false, incr_count);
 	if (info != NULL)
 		sqlWhereEnd(info);
 
@@ -497,26 +491,6 @@ fk_constraint_is_modified(const struct fk_constraint_def *fk_def, int type,
 {
 	for (uint32_t i = 0; i < fk_def->field_count; ++i) {
 		if (changes[fk_def->links[i].fields[type]] >= 0)
-			return true;
-	}
-	return false;
-}
-
-/**
- * Return true if the parser passed as the first argument is
- * used to code a trigger that is really a "SET NULL" action.
- */
-static bool
-fk_constraint_action_is_set_null(struct Parse *parse_context,
-				 const struct fk_constraint *fk)
-{
-	struct Parse *top_parse = sqlParseToplevel(parse_context);
-	if (top_parse->pTriggerPrg != NULL) {
-		struct sql_trigger *trigger = top_parse->pTriggerPrg->trigger;
-		if ((trigger == fk->on_delete_trigger &&
-		     fk->def->on_delete == FKEY_ACTION_SET_NULL) ||
-		    (trigger == fk->on_update_trigger &&
-		     fk->def->on_update == FKEY_ACTION_SET_NULL))
 			return true;
 	}
 	return false;
@@ -559,7 +533,7 @@ fk_constraint_emit_check(struct Parse *parser, struct space *space, int reg_old,
 			fk_constraint_lookup_parent(parser, parent, fk_def, fk->index_id,
 						    reg_old, -1, is_update);
 		}
-		if (reg_new != 0 && !fk_constraint_action_is_set_null(parser, fk)) {
+		if (reg_new != 0) {
 			/*
 			 * A row is being added to the child
 			 * table. If a parent row cannot be found,
@@ -590,9 +564,7 @@ fk_constraint_emit_check(struct Parse *parser, struct space *space, int reg_old,
 		    !fk_constraint_is_modified(fk_def, FIELD_LINK_PARENT,
 					       changed_cols))
 			continue;
-		if (!fk_def->is_deferred &&
-		    (parser->sql_flags & SQL_DeferFKs) == 0 &&
-		    parser->pToplevel == NULL && !parser->isMultiWrite) {
+		if (parser->pToplevel == NULL && !parser->isMultiWrite) {
 			assert(reg_old == 0 && reg_new != 0);
 			/*
 			 * Inserting a single row into a parent
@@ -658,272 +630,4 @@ fk_constraint_is_required(struct space *space, const int *changes)
 			return true;
 	}
 	return false;
-}
-
-/**
- * Create a new expression representing two-part path
- * '<main>.<sub>'.
- * @param parser SQL Parser.
- * @param main First and main part of a result path. For example,
- *        a table name.
- * @param sub Second and last part of a result path. For example,
- *        a column name.
- * @retval Not NULL Success. An expression with two-part path.
- * @retval NULL Error. A diag message is set.
- */
-static inline struct Expr *
-sql_expr_new_2part_id(struct Parse *parser, const struct Token *main,
-		      const struct Token *sub)
-{
-	struct Expr *emain = sql_expr_new(parser->db, TK_ID, main);
-	struct Expr *esub = sql_expr_new(parser->db, TK_ID, sub);
-	if (emain == NULL || esub == NULL)
-		parser->is_aborted = true;
-	return sqlPExpr(parser, TK_DOT, emain, esub);
-}
-
-/**
- * This function is called when an UPDATE or DELETE operation is
- * being compiled on table pTab, which is the parent table of
- * foreign-key fk_constraint.
- * If the current operation is an UPDATE, then the pChanges
- * parameter is passed a pointer to the list of columns being
- * modified. If it is a DELETE, pChanges is passed a NULL pointer.
- *
- * It returns a pointer to a sql_trigger structure containing a
- * trigger equivalent to the ON UPDATE or ON DELETE action
- * specified by fk_constraint.
- * If the action is "NO ACTION" or "RESTRICT", then a NULL pointer
- * is returned (these actions require no special handling by the
- * triggers sub-system, code for them is created by
- * fk_constraint_scan_children()).
- *
- * For example, if fk_constraint is the foreign key and pTab is table "p"
- * in the following schema:
- *
- *   CREATE TABLE p(pk PRIMARY KEY);
- *   CREATE TABLE c(ck REFERENCES p ON DELETE CASCADE);
- *
- * then the returned trigger structure is equivalent to:
- *
- *   CREATE TRIGGER ... DELETE ON p BEGIN
- *     DELETE FROM c WHERE ck = old.pk;
- *   END;
- *
- * The returned pointer is cached as part of the foreign key
- * object. It is eventually freed along with the rest of the
- * foreign key object by fk_constraint_delete().
- *
- * @param pParse Parse context.
- * @param def Definition of space being updated or deleted from.
- * @param fk_constraint Foreign key to get action for.
- * @param is_update True if action is on update.
- *
- * @retval not NULL on success.
- * @retval NULL on failure.
- */
-static struct sql_trigger *
-fk_constraint_action_trigger(struct Parse *pParse, struct space_def *def,
-		    struct fk_constraint *fk, bool is_update)
-{
-	struct sql *db = pParse->db;
-	struct fk_constraint_def *fk_def = fk->def;
-	enum fk_constraint_action action = (is_update ? fk_def->on_update :
-					    fk_def->on_delete);
-	struct sql_trigger *trigger = is_update ? fk->on_update_trigger :
-						  fk->on_delete_trigger;
-	if (action == FKEY_NO_ACTION || trigger != NULL)
-		return trigger;
-	struct TriggerStep *step = NULL;
-	struct Expr *where = NULL, *when = NULL;
-	struct ExprList *list = NULL;
-	struct Select *select = NULL;
-	struct space *child_space = space_by_id(fk_def->child_id);
-	assert(child_space != NULL);
-	for (uint32_t i = 0; i < fk_def->field_count; ++i) {
-		/* Literal "old" token. */
-		struct Token t_old = { "old", 3, false };
-		/* Literal "new" token. */
-		struct Token t_new = { "new", 3, false };
-		/* Name of column in child table. */
-		struct Token t_from_col;
-		/* Name of column in parent table. */
-		struct Token t_to_col;
-		struct field_def *child_fields = child_space->def->fields;
-
-		uint32_t pcol = fk_def->links[i].parent_field;
-		sqlTokenInit(&t_to_col, def->fields[pcol].name);
-
-		uint32_t chcol = fk_def->links[i].child_field;
-		sqlTokenInit(&t_from_col, child_fields[chcol].name);
-
-		/*
-		 * Create the expression "old.to_col = from_col".
-		 * It is important that the "old.to_col" term is
-		 * on the LHS of the = operator, so that the
-		 * type and collation sequence associated with
-		 * the parent table are used for the comparison.
-		 */
-		struct Expr *new, *old =
-			sql_expr_new_2part_id(pParse, &t_old, &t_to_col);
-		struct Expr *from = sql_expr_new(db, TK_ID, &t_from_col);
-		struct Expr *eq = sqlPExpr(pParse, TK_EQ, old, from);
-		where = sql_and_expr_new(db, where, eq);
-		if (where == NULL || from == NULL)
-			pParse->is_aborted = true;
-		/*
-		 * For ON UPDATE, construct the next term of the
-		 * WHEN clause, which should return false in case
-		 * there is a reason to for a broken constrant in
-		 * a parent table:
-		 *     no_action_needed := `oldval` IS NULL OR
-		 *         (`newval` IS NOT NULL AND
-		 *             `newval` = `oldval`)
-		 *
-		 * The final WHEN clause will be like
-		 * this:
-		 *
-		 *    WHEN NOT( no_action_needed(col1) AND ...
-		 *        no_action_needed(colN))
-		 */
-		if (is_update) {
-			old = sql_expr_new_2part_id(pParse, &t_old, &t_to_col);
-			new = sql_expr_new_2part_id(pParse, &t_new, &t_to_col);
-			struct Expr *old_is_null =
-				sqlPExpr(pParse, TK_ISNULL,
-					 sqlExprDup(db, old, 0), NULL);
-			eq = sqlPExpr(pParse, TK_EQ, old,
-				      sqlExprDup(db, new, 0));
-			struct Expr *new_non_null =
-				sqlPExpr(pParse, TK_NOTNULL, new, NULL);
-			struct Expr *non_null_eq =
-				sqlPExpr(pParse, TK_AND, new_non_null, eq);
-			struct Expr *no_action_needed =
-				sqlPExpr(pParse, TK_OR, old_is_null,
-					     non_null_eq);
-			when = sql_and_expr_new(db, when, no_action_needed);
-			if (when == NULL)
-				pParse->is_aborted = true;
-		}
-
-		if (action != FKEY_ACTION_RESTRICT &&
-		    (action != FKEY_ACTION_CASCADE || is_update)) {
-			struct tuple_field *field = tuple_format_field(
-				child_space->format, chcol);
-			struct Expr *d = field->default_value_expr;
-			if (action == FKEY_ACTION_CASCADE) {
-				new = sql_expr_new_2part_id(pParse, &t_new,
-							    &t_to_col);
-			} else if (action == FKEY_ACTION_SET_DEFAULT &&
-				   d != NULL) {
-				new = sqlExprDup(db, d, 0);
-			} else {
-				new = sql_expr_new_anon(db, TK_NULL);
-				if (new == NULL)
-					pParse->is_aborted = true;
-			}
-			list = sql_expr_list_append(db, list, new);
-			sqlExprListSetName(pParse, list, &t_from_col, 0);
-		}
-	}
-
-	const char *space_name = child_space->def->name;
-	uint32_t name_len = strlen(space_name);
-
-	if (action == FKEY_ACTION_RESTRICT) {
-		struct Token err;
-		err.z = space_name;
-		err.n = name_len;
-		struct Expr *r = sql_expr_new_named(db, TK_RAISE, "FOREIGN "\
-						    "KEY constraint failed");
-		if (r == NULL)
-			pParse->is_aborted = true;
-		else
-			r->on_conflict_action = ON_CONFLICT_ACTION_ABORT;
-		struct SrcList *src_list = sql_src_list_append(db, NULL, &err);
-		if (src_list == NULL)
-			pParse->is_aborted = true;
-		select = sqlSelectNew(pParse, sql_expr_list_append(db, NULL, r),
-				      src_list, where, NULL, NULL, NULL, 0,
-				      NULL, NULL);
-		where = NULL;
-	}
-
-	trigger = (struct sql_trigger *) sqlDbMallocZero(db,
-							     sizeof(*trigger));
-	if (trigger != NULL) {
-		size_t step_size = sizeof(TriggerStep) + name_len + 1;
-		trigger->step_list = sqlDbMallocZero(db, step_size);
-		step = trigger->step_list;
-		step->zTarget = (char *) &step[1];
-		memcpy((char *) step->zTarget, space_name, name_len);
-
-		step->pWhere = sqlExprDup(db, where, EXPRDUP_REDUCE);
-		step->pExprList = sql_expr_list_dup(db, list, EXPRDUP_REDUCE);
-		step->pSelect = sqlSelectDup(db, select, EXPRDUP_REDUCE);
-		if (when != NULL) {
-			when = sqlPExpr(pParse, TK_NOT, when, 0);
-			trigger->pWhen =
-				sqlExprDup(db, when, EXPRDUP_REDUCE);
-		}
-	}
-
-	sql_expr_delete(db, where);
-	sql_expr_delete(db, when);
-	sql_expr_list_delete(db, list);
-	sql_select_delete(db, select);
-	if (db->mallocFailed) {
-		sql_trigger_delete(db, trigger);
-		return NULL;
-	}
-	assert(step != NULL);
-
-	switch (action) {
-	case FKEY_ACTION_RESTRICT:
-		step->op = TK_SELECT;
-		break;
-	case FKEY_ACTION_CASCADE:
-		if (! is_update) {
-			step->op = TK_DELETE;
-			break;
-		}
-		FALLTHROUGH;
-	default:
-		step->op = TK_UPDATE;
-	}
-
-	if (is_update) {
-		fk->on_update_trigger = trigger;
-		trigger->op = TK_UPDATE;
-	} else {
-		fk->on_delete_trigger = trigger;
-		trigger->op = TK_DELETE;
-	}
-	return trigger;
-}
-
-void
-fk_constraint_emit_actions(struct Parse *parser, struct space *space,
-			   int reg_old, const int *changes)
-{
-	/*
-	 * Iterate through all FKs that refer to table tab.
-	 * If there is an action associated with the FK for
-	 * this operation (either update or delete),
-	 * invoke the associated trigger sub-program.
-	 */
-	assert(space != NULL);
-	struct fk_constraint *fk;
-	rlist_foreach_entry(fk, &space->parent_fk_constraint, in_parent_space)  {
-		if (changes != NULL &&
-		    !fk_constraint_is_modified(fk->def, FIELD_LINK_PARENT, changes))
-			continue;
-		struct sql_trigger *pAct =
-			fk_constraint_action_trigger(parser, space->def, fk,
-					    changes != NULL);
-		if (pAct == NULL)
-			continue;
-		vdbe_code_row_trigger_direct(parser, pAct, space, reg_old,
-					     ON_CONFLICT_ACTION_ABORT, 0);
-	}
 }

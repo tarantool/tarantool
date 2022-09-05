@@ -341,16 +341,6 @@ struct txn_savepoint {
 	 * an empty transaction.
 	 */
 	struct stailq_entry *stmt;
-	/**
-	 * Each foreign key constraint is classified as either
-	 * immediate (by default) or deferred. In autocommit mode
-	 * they mean the same. Inside separate transaction,
-	 * deferred FK constraints are not checked until the
-	 * transaction tries to commit. For as long as
-	 * a transaction is open, it is allowed to exist in a
-	 * state violating any number of deferred FK constraints.
-	 */
-	uint32_t fk_deferred_count;
 	/** Organize savepoints into linked list. */
 	struct rlist link;
 	/**
@@ -503,18 +493,6 @@ struct txn {
 	struct trigger fiber_on_stop;
 	/** Commit and rollback triggers. */
 	struct rlist on_commit, on_rollback, on_wal_write;
-	/**
-	 * This member represents counter of deferred foreign key
-	 * violations within transaction. DEFERRED mode means
-	 * that until transaction is committed violations are
-	 * allowed to appear. However, transaction can't be
-	 * committed in presence of violations, i.e. if this
-	 * counter is not equal to zero. In the normal mode
-	 * violations of FK are checked at the end of each
-	 * statement processing. Note that at the moment it is
-	 * SQL specific property.
-	 */
-	uint32_t fk_deferred_count;
 	/** List of savepoints to find savepoint by name. */
 	struct rlist savepoints;
 	/**
