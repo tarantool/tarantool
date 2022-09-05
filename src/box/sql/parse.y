@@ -334,12 +334,10 @@ check_constraint_def ::= cconsname(N) CHECK LP expr(X) RP. {
   sql_create_check_contraint(pParse);
 }
 
-ccons ::= cconsname(N) REFERENCES nm(T) eidlist_opt(TA) matcharg(M) refargs(R). {
-  create_fk_def_init(&pParse->create_fk_def, NULL, &N, NULL, &T, TA, M, R,
-                     false);
+ccons ::= cconsname(N) REFERENCES nm(T) eidlist_opt(TA). {
+  create_fk_def_init(&pParse->create_fk_def, NULL, &N, NULL, &T, TA);
   sql_create_foreign_key(pParse);
 }
-ccons ::= defer_subclause(D).    {fk_constraint_change_defer_mode(pParse, D);}
 ccons ::= COLLATE id(C).        {sqlAddCollateType(pParse, &C);}
 
 // The optional AUTOINCREMENT keyword
@@ -347,43 +345,7 @@ ccons ::= COLLATE id(C).        {sqlAddCollateType(pParse, &C);}
 autoinc(X) ::= .          {X = 0;}
 autoinc(X) ::= AUTOINCR.  {X = 1;}
 
-// The next group of rules parses the arguments to a REFERENCES clause
-// that determine if the referential integrity checking is deferred or
-// or immediate and which determine what action to take if a ref-integ
-// check fails.
-//
-%type refargs {int}
-refargs(A) ::= refact_update(X) . { A = (X << 8); }
-refargs(A) ::= refact_delete(X) . { A = X; }
-refargs(A) ::= refact_delete(X) refact_update(Y) . { A = (Y << 8) | (X) ; }
-refargs(A) ::= refact_update(X) refact_delete(Y) . { A = (X << 8) | (Y) ; }
-refargs(A) ::= . { A = 0; }
-
-%type refact_update {int}
-refact_update(A) ::= ON UPDATE refact(X). { A = X; }
-%type refact_delete {int}
-refact_delete(A) ::= ON DELETE refact(X). { A = X; }
-
-%type matcharg {int}
-matcharg(A) ::= MATCH SIMPLE.  { A = FKEY_MATCH_SIMPLE; }
-matcharg(A) ::= MATCH PARTIAL. { A = FKEY_MATCH_PARTIAL; }
-matcharg(A) ::= MATCH FULL.    { A = FKEY_MATCH_FULL; }
-matcharg(A) ::= .              { A = FKEY_MATCH_SIMPLE; }
-
-%type refact {int}
-refact(A) ::= SET NULL.              { A = FKEY_ACTION_SET_NULL; }
-refact(A) ::= SET DEFAULT.           { A = FKEY_ACTION_SET_DEFAULT; }
-refact(A) ::= CASCADE.               { A = FKEY_ACTION_CASCADE; }
-refact(A) ::= RESTRICT.              { A = FKEY_ACTION_RESTRICT; }
-refact(A) ::= NO ACTION.             { A = FKEY_NO_ACTION; }
-%type defer_subclause {int}
-defer_subclause(A) ::= NOT DEFERRABLE init_deferred_pred_opt.     {A = 0;}
-defer_subclause(A) ::= DEFERRABLE init_deferred_pred_opt(X).      {A = X;}
-%type init_deferred_pred_opt {int}
-init_deferred_pred_opt(A) ::= .                       {A = 0;}
-init_deferred_pred_opt(A) ::= INITIALLY DEFERRED.     {A = 1;}
-init_deferred_pred_opt(A) ::= INITIALLY IMMEDIATE.    {A = 0;}
-
+// The next group of rules parses the arguments to a REFERENCES clause.
 tcons ::= cconsname(N) PRIMARY KEY LP col_list_with_autoinc(X) RP. {
   create_index_def_init(&pParse->create_index_def, NULL, &N, X,
                         SQL_INDEX_TYPE_CONSTRAINT_PK, SORT_ORDER_ASC, false);
@@ -397,13 +359,10 @@ tcons ::= cconsname(N) UNIQUE LP sortlist(X) RP. {
 }
 tcons ::= check_constraint_def .
 tcons ::= cconsname(N) FOREIGN KEY LP eidlist(FA) RP
-          REFERENCES nm(T) eidlist_opt(TA) matcharg(M) refargs(R) defer_subclause_opt(D). {
-  create_fk_def_init(&pParse->create_fk_def, NULL, &N, FA, &T, TA, M, R, D);
+          REFERENCES nm(T) eidlist_opt(TA). {
+  create_fk_def_init(&pParse->create_fk_def, NULL, &N, FA, &T, TA);
   sql_create_foreign_key(pParse);
 }
-%type defer_subclause_opt {int}
-defer_subclause_opt(A) ::= .                    {A = 0;}
-defer_subclause_opt(A) ::= defer_subclause(A).
 
 // The following is a non-standard extension that allows us to declare the
 // default behavior when there is a constraint conflict.
@@ -1826,9 +1785,8 @@ alter_column_def ::= alter_add_column(N) typedef(Y). {
 }
 
 cmd ::= alter_add_constraint(N) FOREIGN KEY LP eidlist(FA) RP REFERENCES
-        nm(T) eidlist_opt(TA) matcharg(M) refargs(R) defer_subclause_opt(D). {
-  create_fk_def_init(&pParse->create_fk_def, N.table_name, &N.name, FA, &T, TA,
-                     M, R, D);
+        nm(T) eidlist_opt(TA). {
+  create_fk_def_init(&pParse->create_fk_def, N.table_name, &N.name, FA, &T, TA);
   sql_create_foreign_key(pParse);
 }
 

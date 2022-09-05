@@ -29,7 +29,7 @@ box.execute("SELECT ROW_COUNT();")
   rows:
   - [0]
 ...
-box.execute("CREATE TABLE t2 (s1 VARCHAR(10) PRIMARY KEY, s2 VARCHAR(10) REFERENCES t1 ON DELETE CASCADE);")
+box.execute("CREATE TABLE t2 (s1 VARCHAR(10) PRIMARY KEY, s2 VARCHAR(10));")
 ---
 - row_count: 1
 ...
@@ -302,8 +302,7 @@ box.execute("EXPLAIN QUERY PLAN INSERT INTO t1 VALUES ('b'), ('c'), ('d');")
     type: integer
   - name: detail
     type: text
-  rows:
-  - [0, 0, 0, 'SCAN TABLE T2 (~262144 rows)']
+  rows: []
 ...
 box.execute("SELECT ROW_COUNT();")
 ---

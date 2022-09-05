@@ -342,8 +342,6 @@ int sqlVdbeSorterRewind(const VdbeCursor *, int *);
 int sqlVdbeSorterWrite(const VdbeCursor *, Mem *);
 int sqlVdbeSorterCompare(const VdbeCursor *, Mem *, int, int *);
 
-int sqlVdbeCheckFk(Vdbe *, int);
-
 int sqlVdbeMemTranslate(Mem *, u8);
 #ifdef SQL_DEBUG
 void sqlVdbePrintSql(Vdbe *);

@@ -1831,30 +1831,6 @@ sqlVdbeCloseStatement(Vdbe * p, int eOp)
 }
 
 /*
- * This function is called when a transaction opened by the database
- * handle associated with the VM passed as an argument is about to be
- * committed. If there are outstanding deferred foreign key constraint
- * violations, return -1. Otherwise, 0.
- *
- * If there are outstanding FK violations and this function returns
- * -1 and set an error.
- */
-int
-sqlVdbeCheckFk(Vdbe * p, int deferred)
-{
-	struct txn *txn = in_txn();
-	if ((deferred && txn != NULL && txn->fk_deferred_count > 0) ||
-	    (!deferred && p->nFkConstraint > 0)) {
-		p->is_aborted = true;
-		p->errorAction = ON_CONFLICT_ACTION_ABORT;
-		diag_set(ClientError, ER_SQL_EXECUTE, "FOREIGN KEY constraint "\
-			 "failed");
-		return -1;
-	}
-	return 0;
-}
-
-/*
  * This routine is called the when a VDBE tries to halt.  If the VDBE
  * has made changes and is in autocommit mode, then commit those
  * changes.  If a rollback is needed, then do the rollback.
@@ -1892,8 +1868,12 @@ sqlVdbeHalt(Vdbe * p)
 		int eStatementOp = 0;
 
 		/* Check for immediate foreign key violations. */
-		if (!p->is_aborted)
-			sqlVdbeCheckFk(p, 0);
+		if (!p->is_aborted && p->nFkConstraint > 0) {
+			p->is_aborted = true;
+			p->errorAction = ON_CONFLICT_ACTION_ABORT;
+			diag_set(ClientError, ER_SQL_EXECUTE, "FOREIGN KEY "
+				 "constraint failed");
+		}
 
 		/* If the auto-commit flag is set and this is the only active writer
 		 * VM, then we do either a commit or rollback of the current transaction.
@@ -1904,31 +1884,20 @@ sqlVdbeHalt(Vdbe * p)
 		if (p->auto_commit) {
 			if (!p->is_aborted
 			    || (p->errorAction == ON_CONFLICT_ACTION_FAIL)) {
-				rc = sqlVdbeCheckFk(p, 1);
-				if (rc != 0) {
-					/* Close all opened cursors if
-					 * they exist and free all
-					 * VDBE frames.
-					 */
-					if (NEVER(p->pDelFrame)) {
-						closeCursorsAndFree(p);
-						return -1;
-					}
-				} else {
-					/* The auto-commit flag is true, the vdbe program was successful
-					 * or hit an 'OR FAIL' constraint and there are no deferred foreign
-					 * key constraints to hold up the transaction. This means a commit
-					 * is required.
-					 */
-					rc = (in_txn() == NULL ||
-					      txn_commit(in_txn()) == 0) ?
-					      0 : -1;
-					closeCursorsAndFree(p);
-				}
+				/*
+				 * The auto-commit flag is true, the vdbe
+				 * program was successful or hit an 'OR FAIL'
+				 * constraint and there are no deferred foreign
+				 * key constraints to hold up the transaction.
+				 * This means a commit is required.
+				 */
+				rc = (in_txn() == NULL ||
+				      txn_commit(in_txn()) == 0) ?
+				      0 : -1;
+				closeCursorsAndFree(p);
 				if (rc != 0) {
 					p->is_aborted = true;
 					box_txn_rollback();
-					closeCursorsAndFree(p);
 					sqlRollbackAll(p);
 					p->nChange = 0;
 				}
