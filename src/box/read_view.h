@@ -19,6 +19,7 @@ struct cord;
 struct index;
 struct index_read_view;
 struct space;
+struct space_upgrade_read_view;
 
 /** Read view of a space. */
 struct space_read_view {
@@ -45,6 +46,12 @@ struct space_read_view {
 	 * them all.
 	 */
 	struct tuple_format *format;
+	/**
+	 * Upgrade function for this space read view or NULL if there wasn't
+	 * a space upgrade in progress at the time when this read view was
+	 * created or read_view_opts::needs_space_upgrade wasn't set.
+	 */
+	struct space_upgrade_read_view *upgrade;
 	/** Replication group id. See space_opts::group_id. */
 	uint32_t group_id;
 	/**
@@ -108,6 +115,13 @@ struct read_view_opts {
 	 * used instead.
 	 */
 	bool needs_field_names;
+	/**
+	 * If this flag is set and there's a space upgrade in progress at the
+	 * time when this read view is created, create an upgrade function that
+	 * can be applied to tuples retrieved from this read view. See also
+	 * space_read_view::upgrade.
+	 */
+	bool needs_space_upgrade;
 };
 
 /** Sets read view options to default values. */
@@ -151,6 +165,20 @@ read_view_activate(struct read_view *rv);
  */
 void
 read_view_deactivate(struct read_view *rv);
+
+/**
+ * Prepares a tuple retrieved from a read view to be returned to the user.
+ *
+ * This function applies the space upgrade function if the read view was open
+ * while the space upgrade was in progress. It may only be called in the thread
+ * that activated the read view, see read_view_activate().
+ *
+ * If the tuple doesn't need any processing, it's returned as is, otherwise
+ * a new tuple is allocated and pinned with tuple_bless. On error, NULL is
+ * returned and diag is set.
+ */
+struct tuple *
+read_view_process_result(struct space_read_view *space_rv, struct tuple *tuple);
 
 #if defined(__cplusplus)
 } /* extern "C" */
