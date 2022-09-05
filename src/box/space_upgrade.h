@@ -130,6 +130,82 @@ space_upgrade_check_alter(struct space *space, struct space_def *new_def);
 void
 space_upgrade_run(struct space *space);
 
+/**
+ * Allocates a space upgrade function for a read view.
+ * This function never fails (never returns NULL).
+ *
+ * The original space upgrade function may be dropped after calling this
+ * function - the read view function doesn't depend on it. The read view
+ * function may be used from any thread, but it must be activated with
+ * space_upgrade_read_view_activate() in that thread first.
+ */
+static inline struct space_upgrade_read_view *
+space_upgrade_read_view_new(struct space_upgrade *upgrade)
+{
+	(void)upgrade;
+	unreachable();
+	return NULL;
+}
+
+/**
+ * Frees a space upgrade read view function.
+ *
+ * The function must be deactivated, see space_upgrade_read_view_deactivate().
+ */
+static inline void
+space_upgrade_read_view_delete(struct space_upgrade_read_view *rv)
+{
+	(void)rv;
+	unreachable();
+}
+
+/**
+ * Activates a space upgrade read view function.
+ * Returns 0 on success, -1 on error.
+ *
+ * A space upgrade read view function may not be used unless it's activated.
+ * Once activated, it may only be used in the thread it was activated in.
+ */
+static inline int
+space_upgrade_read_view_activate(struct space_upgrade_read_view *rv)
+{
+	(void)rv;
+	unreachable();
+	return 0;
+}
+
+/**
+ * Deactivates a space upgrade read view function.
+ *
+ * This function must be called in the same thread where it was activated.
+ * It's okay to call this function on an inactive read view - it's a no-op
+ * then.
+ */
+static inline void
+space_upgrade_read_view_deactivate(struct space_upgrade_read_view *rv)
+{
+	(void)rv;
+	unreachable();
+}
+
+/**
+ * Applies a space upgrade function to a tuple retrieved from a read view.
+ * Returns the new tuple on success, NULL on error.
+ * The new tuple is referenced with tuple_bless.
+ *
+ * The space upgrade read view function must be activated in the current
+ * thread, see space_upgrade_read_view_activate().
+ */
+static inline struct tuple *
+space_upgrade_read_view_apply(struct space_upgrade_read_view *rv,
+			      struct tuple *tuple)
+{
+	(void)rv;
+	(void)tuple;
+	unreachable();
+	return NULL;
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
