@@ -15,6 +15,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct cord;
 struct index;
 struct index_read_view;
 struct space;
@@ -23,6 +24,8 @@ struct space;
 struct space_read_view {
 	/** Link in read_view::spaces. */
 	struct rlist link;
+	/** Read view that owns this space. */
+	struct read_view *rv;
 	/** Space id. */
 	uint32_t id;
 	/** Space name. */
@@ -69,6 +72,8 @@ struct read_view {
 	struct rlist engines;
 	/** List of space read views, linked by space_read_view::link. */
 	struct rlist spaces;
+	/** Thread that activated the read view, see read_view_activate(). */
+	struct cord *owner;
 };
 
 #define read_view_foreach_space(space_rv, rv) \
@@ -115,6 +120,9 @@ read_view_opts_create(struct read_view_opts *opts);
  *
  * Engines that don't support read view creation are silently skipped.
  *
+ * A read view must be activated before use, see read_view_activate(). After a
+ * read view is activated, it may only be use in the thread that activated it.
+ *
  * Returns 0 on success. On error, returns -1 and sets diag.
  */
 int
@@ -122,9 +130,27 @@ read_view_open(struct read_view *rv, const struct read_view_opts *opts);
 
 /**
  * Closes a database read view.
+ *
+ * The read view must be deactivated, see read_view_deactivate().
  */
 void
 read_view_close(struct read_view *rv);
+
+/**
+ * Activates a read view for use in the current thread.
+ *
+ * Returns 0 on success. On error, returns -1 and sets diag.
+ */
+int
+read_view_activate(struct read_view *rv);
+
+/**
+ * Deactivates a read view.
+ *
+ * A read view may only be deactivated by the thread that activated it.
+ */
+void
+read_view_deactivate(struct read_view *rv);
 
 #if defined(__cplusplus)
 } /* extern "C" */

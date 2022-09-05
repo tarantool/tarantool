@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "engine.h"
+#include "fiber.h"
 #include "index.h"
 #include "salad/grp_alloc.h"
 #include "small/rlist.h"
@@ -137,6 +138,7 @@ read_view_add_space_cb(struct space *space, void *arg_raw)
 	struct space_read_view *space_rv = space_read_view_new(space, opts);
 	if (space_rv == NULL)
 		return -1;
+	space_rv->rv = rv;
 	rlist_add_tail_entry(&rv->spaces, space_rv, link);
 	return 0;
 }
@@ -144,6 +146,7 @@ read_view_add_space_cb(struct space *space, void *arg_raw)
 int
 read_view_open(struct read_view *rv, const struct read_view_opts *opts)
 {
+	rv->owner = NULL;
 	rlist_create(&rv->engines);
 	rlist_create(&rv->spaces);
 	struct engine *engine;
@@ -171,9 +174,11 @@ fail:
 void
 read_view_close(struct read_view *rv)
 {
+	assert(rv->owner == NULL);
 	struct space_read_view *space_rv, *next_space_rv;
 	rlist_foreach_entry_safe(space_rv, &rv->spaces, link,
 				 next_space_rv) {
+		assert(space_rv->rv == rv);
 		space_read_view_delete(space_rv);
 	}
 	struct engine_read_view *engine_rv, *next_engine_rv;
@@ -183,3 +188,26 @@ read_view_close(struct read_view *rv)
 	}
 	TRASH(rv);
 }
+
+int
+read_view_activate(struct read_view *rv)
+{
+	assert(rv->owner == NULL);
+	rv->owner = cord();
+	return 0;
+}
+
+void
+read_view_deactivate(struct read_view *rv)
+{
+	assert(rv->owner == cord());
+	rv->owner = NULL;
+}
+
+#ifndef NDEBUG
+void
+index_read_view_check_owner(struct index_read_view *index_rv)
+{
+	assert(index_rv->space->rv->owner == cord());
+}
+#endif
