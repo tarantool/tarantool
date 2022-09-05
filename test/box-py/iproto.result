@@ -208,9 +208,9 @@ Invalid MsgPack - request body
 # Invalid features
 Invalid MsgPack - request body
 # Empty request body
-version=3, features=[0, 1, 2, 3]
+version=4, features=[0, 1, 2, 3, 4]
 # Unknown version and features
-version=3, features=[0, 1, 2, 3]
+version=4, features=[0, 1, 2, 3, 4]
 
 #
 # gh-6257 Watchers
@@ -258,3 +258,47 @@ box.broadcast('foo', nil)
 box.broadcast('bar', nil)
 ---
 ...
+space = box.schema.space.create('test', { id = 567 })
+---
+...
+index = space:create_index('primary', { type = 'tree' })
+---
+...
+box.schema.user.grant('guest', 'read,write,execute', 'space', 'test')
+---
+...
+Simple pagination with after_pos
+Page 1
+- [1, 1]
+- [2, 1]
+Page 2
+- [3, 1]
+- [4, 1]
+Page 3
+- [5, 1]
+- [6, 1]
+Page 4
+- [7, 1]
+- [8, 1]
+Page 5
+- [9, 1]
+- [10, 1]
+Page 6
+
+Position after last iteration must does not present in response: True
+Simple pagination with after_tuple
+Page 1
+- [1, 1]
+- [2, 1]
+Page 2
+- [3, 1]
+- [4, 1]
+Page 3
+- [5, 1]
+- [6, 1]
+Page 4
+- [7, 1]
+- [8, 1]
+Page 5
+- [9, 1]
+- [10, 1]

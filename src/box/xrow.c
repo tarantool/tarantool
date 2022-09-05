@@ -411,6 +411,10 @@ static const struct iproto_body_bin iproto_body_bin = {
 	0x81, IPROTO_DATA, 0xdd, 0
 };
 
+static const struct iproto_body_bin iproto_body_bin_with_position = {
+	0x82, IPROTO_DATA, 0xdd, 0
+};
+
 /** Return a 4-byte numeric error code, with status flags. */
 static inline uint32_t
 iproto_encode_error(uint32_t error)
@@ -664,19 +668,54 @@ iproto_prepare_header(struct obuf *buf, struct obuf_svp *svp, size_t size)
 	return 0;
 }
 
+/** Reply select with IPROTO_DATA. */
 void
 iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 		    uint32_t schema_version, uint32_t count)
 {
 	char *pos = (char *) obuf_svp_to_ptr(buf, svp);
 	iproto_header_encode(pos, IPROTO_OK, sync, schema_version,
-			        obuf_size(buf) - svp->used -
-				IPROTO_HEADER_LEN);
+			     obuf_size(buf) - svp->used -
+			     IPROTO_HEADER_LEN);
 
 	struct iproto_body_bin body = iproto_body_bin;
 	body.v_data_len = mp_bswap_u32(count);
 
 	memcpy(pos + IPROTO_HEADER_LEN, &body, sizeof(body));
+}
+
+/** Reply select with IPROTO_DATA and IPROTO_POSITION. */
+int
+iproto_reply_select_with_position(struct obuf *buf, struct obuf_svp *svp,
+				  uint64_t sync, uint32_t schema_version,
+				  uint32_t count, const char *packed_pos,
+				  const char *packed_pos_end)
+{
+	size_t packed_pos_size = packed_pos_end - packed_pos;
+	size_t key_size = mp_sizeof_uint(IPROTO_POSITION);
+	size_t alloc_size = key_size + mp_sizeof_strl(packed_pos_size);
+	char *ptr = obuf_alloc(buf, alloc_size);
+	if (ptr == NULL) {
+		diag_set(OutOfMemory, alloc_size, "obuf_alloc", "ptr");
+		return -1;
+	}
+	ptr = mp_encode_uint(ptr, IPROTO_POSITION);
+	mp_encode_strl(ptr, packed_pos_size);
+	if (obuf_dup(buf, packed_pos,
+		     packed_pos_size) != packed_pos_size) {
+		return -1;
+	}
+
+	char *pos = (char *)obuf_svp_to_ptr(buf, svp);
+	iproto_header_encode(pos, IPROTO_OK, sync, schema_version,
+			     obuf_size(buf) - svp->used -
+			     IPROTO_HEADER_LEN);
+
+	struct iproto_body_bin body = iproto_body_bin_with_position;
+	body.v_data_len = mp_bswap_u32(count);
+
+	memcpy(pos + IPROTO_HEADER_LEN, &body, sizeof(body));
+	return 0;
 }
 
 int
@@ -850,6 +889,9 @@ error:
 		case IPROTO_ITERATOR:
 			request->iterator = mp_decode_uint(&value);
 			break;
+		case IPROTO_FETCH_POSITION:
+			request->fetch_position = mp_decode_bool(&value);
+			break;
 		case IPROTO_TUPLE:
 			request->tuple = value;
 			request->tuple_end = data;
@@ -873,6 +915,14 @@ error:
 		case IPROTO_NEW_TUPLE:
 			request->new_tuple = value;
 			request->new_tuple_end = data;
+			break;
+		case IPROTO_AFTER_POSITION:
+			request->after_position = value;
+			request->after_position_end = data;
+			break;
+		case IPROTO_AFTER_TUPLE:
+			request->after_tuple = value;
+			request->after_tuple_end = data;
 			break;
 		default:
 			break;
@@ -920,6 +970,17 @@ request_snprint(char *buf, int size, const struct request *request)
 		SNPRINT(total, snprintf, buf, size, ", new_tuple: ");
 		SNPRINT(total, mp_snprint, buf, size, request->new_tuple);
 	}
+	if (request->fetch_position) {
+		SNPRINT(total, snprintf, buf, size, ", fetch_position: true");
+	}
+	if (request->after_position != NULL) {
+		SNPRINT(total, snprintf, buf, size, ", after_position: ");
+		SNPRINT(total, mp_snprint, buf, size, request->after_position);
+	}
+	if (request->after_tuple != NULL) {
+		SNPRINT(total, snprintf, buf, size, ", after_tuple: ");
+		SNPRINT(total, mp_snprint, buf, size, request->after_tuple);
+	}
 	SNPRINT(total, snprintf, buf, size, "}");
 	return total;
 }
@@ -937,6 +998,13 @@ int
 xrow_encode_dml(const struct request *request, struct region *region,
 		struct iovec *iov)
 {
+	assert(request != NULL);
+	/* Select is unexpected here. Hence, pagination option too. */
+	assert(request->header == NULL ||
+	       request->header->type != IPROTO_SELECT);
+	assert(request->after_position == NULL);
+	assert(request->after_tuple == NULL);
+	assert(!request->fetch_position);
 	int iovcnt = 1;
 	const int MAP_LEN_MAX = 40;
 	uint32_t key_len = request->key_end - request->key;

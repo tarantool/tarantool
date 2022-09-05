@@ -82,7 +82,7 @@ enum {
 	/**
 	 * IPROTO protocol version supported by the netbox connector.
 	 */
-	NETBOX_IPROTO_VERSION = 3,
+	NETBOX_IPROTO_VERSION = 4,
 };
 
 /**
@@ -2809,6 +2809,8 @@ luaopen_net_box(struct lua_State *L)
 			    IPROTO_FEATURE_ERROR_EXTENSION);
 	iproto_features_set(&NETBOX_IPROTO_FEATURES,
 			    IPROTO_FEATURE_WATCHERS);
+	iproto_features_set(&NETBOX_IPROTO_FEATURES,
+			    IPROTO_FEATURE_PAGINATION);
 
 	lua_pushcfunction(L, luaT_netbox_request_iterator_next);
 	luaT_netbox_request_iterator_next_ref = luaL_ref(L, LUA_REGISTRYINDEX);

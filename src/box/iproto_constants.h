@@ -80,8 +80,12 @@ enum iproto_key {
 	IPROTO_OFFSET = 0x13,
 	IPROTO_ITERATOR = 0x14,
 	IPROTO_INDEX_BASE = 0x15,
-
 	/* Leave a gap between integer values and other keys */
+	/**
+	 * Flag indicating the need to send position of
+	 * last selected tuple in response.
+	 */
+	IPROTO_FETCH_POSITION = 0x1f,
 	IPROTO_KEY = 0x20,
 	IPROTO_TUPLE = 0x21,
 	IPROTO_FUNCTION_NAME = 0x22,
@@ -108,8 +112,12 @@ enum iproto_key {
 	IPROTO_OLD_TUPLE = 0x2c,
 	/** New tuple (i.e. result of DML request). */
 	IPROTO_NEW_TUPLE = 0x2d,
+	/** Position of last selected tuple to start iteration after it. */
+	IPROTO_AFTER_POSITION = 0x2e,
+	/** Last selected tuple to start iteration after it. */
+	IPROTO_AFTER_TUPLE = 0x2f,
 
-	/* Leave a gap between request keys and response keys */
+	/** Response keys. */
 	IPROTO_DATA = 0x30,
 	IPROTO_ERROR_24 = 0x31,
 	/**
@@ -122,6 +130,8 @@ enum iproto_key {
 	IPROTO_METADATA = 0x32,
 	IPROTO_BIND_METADATA = 0x33,
 	IPROTO_BIND_COUNT = 0x34,
+	/** Position of last selected tuple in response. */
+	IPROTO_POSITION = 0x35,
 
 	/* Leave a gap between response keys and SQL keys. */
 	IPROTO_SQL_TEXT = 0x40,

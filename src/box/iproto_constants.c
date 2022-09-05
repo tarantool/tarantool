@@ -73,10 +73,10 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 		/* 0x1c */	MP_UINT,
 		/* 0x1d */	MP_UINT,
 		/* 0x1e */	MP_UINT,
-		/* 0x1f */	MP_UINT,
 	/* }}} */
 
 	/* {{{ body -- all keys */
+	/* 0x1f */	MP_BOOL,  /* IPROTO_FETCH_POSITION */
 	/* 0x20 */	MP_ARRAY, /* IPROTO_KEY */
 	/* 0x21 */	MP_ARRAY, /* IPROTO_TUPLE */
 	/* 0x22 */	MP_STR, /* IPROTO_FUNCTION_NAME */
@@ -91,11 +91,8 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x2b */	MP_MAP, /* IPROTO_OPTIONS */
 	/* 0x2c */	MP_ARRAY, /* IPROTO_OLD_TUPLE */
 	/* 0x2d */	MP_ARRAY, /* IPROTO_NEW_TUPLE */
-	/* }}} */
-
-	/* {{{ unused */
-	/* 0x2e */	MP_UINT,
-	/* 0x2f */	MP_UINT,
+	/* 0x2e */	MP_STR, /* IPROTO_AFTER_POSITION */
+	/* 0x2f */	MP_ARRAY, /* IPROTO_AFTER_TUPLE */
 	/* }}} */
 
 	/* {{{ body -- response keys */
@@ -104,10 +101,10 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x32 */	MP_ARRAY, /* IPROTO_METADATA */
 	/* 0x33 */	MP_ARRAY, /* IPROTO_BIND_METADATA */
 	/* 0x34 */	MP_UINT, /* IIPROTO_BIND_COUNT */
+	/* 0x35 */	MP_STR, /* IPROTO_POSITION */
 	/* }}} */
 
 	/* {{{ unused */
-	/* 0x35 */	MP_UINT,
 	/* 0x36 */	MP_UINT,
 	/* 0x37 */	MP_UINT,
 	/* 0x38 */	MP_UINT,

@@ -10,6 +10,7 @@ from tarantool import Connection
 from tarantool.request import Request, RequestInsert, RequestSelect, RequestUpdate, RequestUpsert
 from tarantool.response import Response
 from lib.tarantool_connection import TarantoolConnection
+from tarantool.error import DatabaseError
 
 # FIXME: Remove after the new constants are added to the Python connector.
 if not 'REQUEST_TYPE_ID' in locals():
@@ -23,6 +24,12 @@ if not 'REQUEST_TYPE_WATCH' in locals():
     REQUEST_TYPE_EVENT = 76
     IPROTO_EVENT_KEY = 0x57
     IPROTO_EVENT_DATA = 0x58
+
+if not 'IPROTO_AFTER_POSITION' in locals():
+    IPROTO_FETCH_POSITION = 0x1f
+    IPROTO_AFTER_POSITION = 0x2e
+    IPROTO_AFTER_TUPLE = 0x2f
+    IPROTO_POSITION = 0x35
 
 admin("box.schema.user.grant('guest', 'read,write,execute', 'universe')")
 
@@ -572,3 +579,68 @@ check_no_event()
 c.close()
 admin("box.broadcast('foo', nil)")
 admin("box.broadcast('bar', nil)")
+
+# Pagination
+admin("space = box.schema.space.create('test', { id = 567 })")
+admin("index = space:create_index('primary', { type = 'tree' })")
+admin("box.schema.user.grant('guest', 'read,write,execute', 'space', 'test')")
+
+c = Connection("localhost", server.iproto.port)
+c.connect()
+request = bytes()
+for i in range(1, 11):
+    request += bytes(RequestInsert(c, 567, [i, 1]))
+s = c._socket
+try:
+    s.send(request)
+except OSError as e:
+    print("   => ", "Failed to send request")
+c.close()
+
+class RequestSelectAfter(Request):
+    request_type = REQUEST_TYPE_SELECT
+
+    def __init__(self, conn, space_id, key, fetch_pos, after_tuple, after_pos):
+        super(RequestSelectAfter, self).__init__(conn)
+        body = {IPROTO_SPACE_ID: space_id, IPROTO_KEY: key, IPROTO_LIMIT: 2,
+                IPROTO_ITERATOR: 5, IPROTO_FETCH_POSITION: fetch_pos}
+        if after_tuple:
+            body[IPROTO_AFTER_TUPLE] = after_tuple
+        if after_pos:
+            body[IPROTO_AFTER_POSITION] = after_pos
+        self._body = msgpack.dumps(body)
+
+c = Connection("localhost", server.iproto.port)
+c.connect()
+s = c._socket
+pos = ""
+last_tuple = None
+fetch_pos = True
+space_id = 567
+key = [1]
+print("Simple pagination with after_pos")
+for i in range(1, 7):
+    request = bytes(RequestSelectAfter(c, space_id, key, fetch_pos, last_tuple, pos))
+    try:
+        s.send(request)
+    except OSError as e:
+        print("   => ", "Failed to send request")
+    response = Response(c, c._read_response())
+    print("Page", i)
+    print(response.__str__())
+    pos = response._body.get(IPROTO_POSITION, None)
+print("Position after last iteration must does not present in response:", pos is None)
+print("Simple pagination with after_tuple")
+pos = None
+fetch_pos = False
+for i in range(1, 6):
+    request = bytes(RequestSelectAfter(c, space_id, key, fetch_pos, last_tuple, pos))
+    try:
+        s.send(request)
+    except OSError as e:
+        print("   => ", "Failed to send request")
+    response = Response(c, c._read_response())
+    print("Page", i)
+    print(response.__str__())
+    last_tuple = response._body.get(IPROTO_DATA, None)[1]
+c.close()

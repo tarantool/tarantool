@@ -2081,19 +2081,40 @@ tx_process_select(struct cmsg *m)
 	struct port port;
 	int count;
 	int rc;
+	const char *packed_pos, *packed_pos_end;
+	bool reply_position;
 	struct request *req = &msg->dml;
+	uint32_t region_svp = region_used(&fiber()->gc);
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
 
 	tx_inject_delay();
+	packed_pos = req->after_position;
+	packed_pos_end = req->after_position_end;
+	if (packed_pos != NULL) {
+		mp_decode_strl(&packed_pos);
+	} else if (req->after_tuple != NULL) {
+		rc = box_index_tuple_position(req->space_id, req->index_id,
+					      req->after_tuple,
+					      req->after_tuple_end,
+					      &packed_pos, &packed_pos_end);
+		if (rc < 0)
+			goto error;
+	}
 	rc = box_select(req->space_id, req->index_id,
 			req->iterator, req->offset, req->limit,
-			req->key, req->key_end, NULL, NULL, false, &port);
+			req->key, req->key_end, &packed_pos, &packed_pos_end,
+			req->fetch_position, &port);
 	if (rc < 0)
 		goto error;
 
 	out = msg->connection->tx.p_obuf;
-	if (iproto_prepare_select(out, &svp) != 0) {
+	reply_position = req->fetch_position && packed_pos != NULL;
+	if (reply_position)
+		rc = iproto_prepare_select_with_position(out, &svp);
+	else
+		rc = iproto_prepare_select(out, &svp);
+	if (rc != 0) {
 		port_destroy(&port);
 		goto error;
 	}
@@ -2103,16 +2124,29 @@ tx_process_select(struct cmsg *m)
 	count = port_dump_msgpack_16(&port, out);
 	port_destroy(&port);
 	if (count < 0) {
-		/* Discard the prepared select. */
-		obuf_rollback_to_svp(out, &svp);
-		goto error;
+		goto discard;
 	}
-	iproto_reply_select(out, &svp, msg->header.sync,
-			    ::schema_version, count);
+	if (reply_position) {
+		assert(packed_pos != NULL);
+		if (iproto_reply_select_with_position(out, &svp,
+						      msg->header.sync,
+						      ::schema_version, count,
+						      packed_pos,
+						      packed_pos_end) != 0)
+			goto discard;
+	} else {
+		iproto_reply_select(out, &svp, msg->header.sync,
+				    ::schema_version, count);
+	}
+	region_truncate(&fiber()->gc, region_svp);
 	iproto_wpos_create(&msg->wpos, out);
 	tx_end_msg(msg, &svp);
 	return;
+discard:
+	/* Discard the prepared select. */
+	obuf_rollback_to_svp(out, &svp);
 error:
+	region_truncate(&fiber()->gc, region_svp);
 	out = msg->connection->tx.p_obuf;
 	svp = obuf_create_svp(out);
 	tx_reply_error(msg);
