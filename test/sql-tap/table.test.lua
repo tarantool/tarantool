@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(79)
+test:plan(75)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -731,7 +731,7 @@ test:do_catchsql_test(
     [[
         DROP TABLE t6;
         CREATE TABLE t4(a INT PRIMARY KEY);
-        CREATE TABLE t6(a INTEGER REFERENCES t4(a) MATCH PARTIAL primary key);
+        CREATE TABLE t6(a INTEGER REFERENCES t4(a) primary key);
     ]], {
         -- <table-10.2>
         0
@@ -739,32 +739,10 @@ test:do_catchsql_test(
     })
 
 test:do_catchsql_test(
-    "table-10.3",
-    [[
-        DROP TABLE t6;
-        CREATE TABLE t6(a INTEGER REFERENCES t4 MATCH FULL ON DELETE SET NULL NOT NULL primary key);
-    ]], {
-        -- <table-10.3>
-        0
-        -- </table-10.3>
-    })
-
-test:do_catchsql_test(
-    "table-10.4",
-    [[
-        DROP TABLE t6;
-        CREATE TABLE t6(a INT REFERENCES t4 MATCH FULL ON UPDATE SET DEFAULT DEFAULT 1 primary key);
-    ]], {
-        -- <table-10.4>
-        0
-        -- </table-10.4>
-    })
-
-test:do_catchsql_test(
     "table-10.5",
     [[
         DROP TABLE t6;
-        CREATE TABLE t6(a int NOT NULL NOT DEFERRABLE INITIALLY IMMEDIATE primary key);
+        CREATE TABLE t6(a int NOT NULL primary key);
     ]], {
         -- <table-10.5>
         0
@@ -772,22 +750,11 @@ test:do_catchsql_test(
     })
 
 test:do_catchsql_test(
-    "table-10.6",
-    [[
-        DROP TABLE t6;
-        CREATE TABLE t6(a int NOT NULL DEFERRABLE INITIALLY DEFERRED primary key);
-    ]], {
-        -- <table-10.6>
-        0
-        -- </table-10.6>
-    })
-
-test:do_catchsql_test(
     "table-10.7",
     [[
         DROP TABLE t6;
         CREATE TABLE t6(a int primary key,
-          FOREIGN KEY (a) REFERENCES t4(b) DEFERRABLE INITIALLY DEFERRED
+          FOREIGN KEY (a) REFERENCES t4(b)
         );
     ]], {
         -- <table-10.7>
@@ -796,25 +763,8 @@ test:do_catchsql_test(
     })
 
 test:do_catchsql_test(
-    "table-10.8",
-    [[
-        DROP TABLE IF EXISTS t6;
-        DROP TABLE IF EXISTS t4;
-        CREATE TABLE t4(x INT UNIQUE, y INT, PRIMARY KEY (x, y));
-        CREATE TABLE t6(a INT primary key,b INT,c INT,
-          FOREIGN KEY (b,c) REFERENCES t4(x,y) MATCH PARTIAL
-            ON UPDATE SET NULL ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
-        );
-    ]], {
-        -- <table-10.8>
-        0
-        -- </table-10.8>
-    })
-
-test:do_catchsql_test(
     "table-10.9",
     [[
-        DROP TABLE t6;
         CREATE TABLE t6(a int primary key,b int,c int,
           FOREIGN KEY (b,c) REFERENCES t4(x)
         );
@@ -863,7 +813,8 @@ test:do_test(
         ]]
     end, {
         -- <table-10.12>
-        1, [[Failed to create foreign key constraint 'fk_unnamed_T6_1': unknown column X in foreign key definition]]
+        1, [[Failed to create foreign key constraint 'fk_unnamed_T6_1': ]]..
+           [[foreign key refers to nonexistent field X]]
         -- </table-10.12>
     })
 
@@ -878,7 +829,8 @@ test:do_test(
         ]]
     end, {
         -- <table-10.13>
-        1, [[Failed to create foreign key constraint 'fk_unnamed_T6_1': unknown column X in foreign key definition]]
+        1, [[Failed to create foreign key constraint 'fk_unnamed_T6_1': ]]..
+           [[foreign key refers to nonexistent field X]]
         -- </table-10.13>
     })
 

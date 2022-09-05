@@ -564,7 +564,6 @@ txn_begin(void)
 	txn->signature = TXN_SIGNATURE_UNKNOWN;
 	txn->engine = NULL;
 	txn->engine_tx = NULL;
-	txn->fk_deferred_count = 0;
 	txn->is_schema_changed = false;
 	rlist_create(&txn->savepoints);
 	txn->fiber = NULL;
@@ -1028,15 +1027,6 @@ txn_prepare(struct txn *txn)
 		ev_timer_stop(loop(), txn->rollback_timer);
 		txn->rollback_timer = NULL;
 	}
-	/*
-	 * If transaction has been started in SQL, deferred
-	 * foreign key constraints must not be violated.
-	 * If not so, just rollback transaction.
-	 */
-	if (txn->fk_deferred_count != 0) {
-		diag_set(ClientError, ER_FOREIGN_KEY_CONSTRAINT);
-		return -1;
-	}
 
 	/*
 	 * Somebody else has written some value that we have read.
@@ -1479,7 +1469,6 @@ txn_savepoint_new(struct txn *txn, const char *name)
 	}
 	svp->stmt = stailq_last(&txn->stmts);
 	svp->in_sub_stmt = txn->in_sub_stmt;
-	svp->fk_deferred_count = txn->fk_deferred_count;
 	if (name != NULL) {
 		/*
 		 * If savepoint with given name already exists,
@@ -1547,7 +1536,6 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 	/* Discard from list all newer savepoints. */
 	RLIST_HEAD(discard);
 	rlist_cut_before(&discard, &txn->savepoints, &svp->link);
-	txn->fk_deferred_count = svp->fk_deferred_count;
 	return 0;
 }
 

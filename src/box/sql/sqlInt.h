@@ -3525,16 +3525,6 @@ sql_trigger_colmask(Parse *parser, struct sql_trigger *trigger,
 int sqlJoinType(Parse *, Token *, Token *, Token *);
 
 /**
- * Change defer mode of last FK constraint processed during
- * <CREATE TABLE> statement.
- *
- * @param parse_context Current parsing context.
- * @param is_deferred Change defer mode to this value.
- */
-void
-fk_constraint_change_defer_mode(struct Parse *parse_context, bool is_deferred);
-
-/**
  * Function called from parser to handle
  * <ALTER TABLE child ADD CONSTRAINT constraint
  *     FOREIGN KEY (child_cols) REFERENCES parent (parent_cols)>
@@ -4159,18 +4149,6 @@ void sqlWithPush(Parse *, With *, u8);
 void
 fk_constraint_emit_check(struct Parse *parser, struct space *space, int reg_old,
 		int reg_new, const int *changed_cols);
-
-/**
- * Emit VDBE code to do CASCADE, SET NULL or SET DEFAULT actions
- * when deleting or updating a row.
- * @param parser SQL parser.
- * @param space Space being updated or deleted from.
- * @param reg_old Register of the old record.
- * param changes Array of numbers of changed columns.
- */
-void
-fk_constraint_emit_actions(struct Parse *parser, struct space *space, int reg_old,
-		  const int *changes);
 
 /**
  * This function is called before generating code to update or

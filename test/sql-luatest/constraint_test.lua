@@ -135,3 +135,46 @@ g.test_constraints_2 = function()
         box.schema.func.drop('ck1')
     end)
 end
+
+--
+-- Make sure "reference trigger action", "constraint check time" and "match
+-- type" rules are disabled.
+--
+g.test_constraints_3 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+
+        local sql = [[CREATE TABLE t(i INT PRIMARY KEY, a INT REFERENCES t ]]..
+                    [[DEFERRABLE);]]
+        local _, err = box.execute(sql);
+        local res = [[Syntax error at line 1 near 'DEFERRABLE']]
+        t.assert_equals(err.message, res)
+
+        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a INT REFERENCES t ]]..
+              [[DEFERRABLE INITIALLY DEFERRED);]]
+        _, err = box.execute(sql);
+        t.assert_equals(err.message, res)
+
+        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a INT REFERENCES t ]]..
+              [[MATCH FULL);]]
+        _, err = box.execute(sql);
+        res = [[At line 1 at or near position 54: keyword 'MATCH' is ]]..
+              [[reserved. Please use double quotes if 'MATCH' is an ]]..
+              [[identifier.]]
+        t.assert_equals(err.message, res)
+
+        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a INT REFERENCES t ]]..
+              [[ON UPDATE SET DEFAULT);]]
+        _, err = box.execute(sql);
+        res = [[At line 1 at or near position 54: keyword 'ON' is reserved. ]]..
+              [[Please use double quotes if 'ON' is an identifier.]]
+        t.assert_equals(err.message, res)
+
+        sql = [[CREATE TABLE t(i INT PRIMARY KEY, a INT REFERENCES t ]]..
+              [[ON DELETE SET NULL);]]
+        _, err = box.execute(sql);
+        res = [[At line 1 at or near position 54: keyword 'ON' is reserved. ]]..
+              [[Please use double quotes if 'ON' is an identifier.]]
+        t.assert_equals(err.message, res)
+    end)
+end

@@ -24,8 +24,6 @@ box.space._ck_constraint:insert({513, 'CK_CONSTRAINT_01', false, 'SQL', 'X><5', 
 box.space._ck_constraint:insert({550, 'CK_CONSTRAINT_01', false, 'SQL', 'X<5', true})
 -- Pass integer instead of expression.
 box.space._ck_constraint:insert({513, 'CK_CONSTRAINT_01', false, 'SQL', 666, true})
--- Deferred CK constraints are not supported.
-box.space._ck_constraint:insert({513, 'CK_CONSTRAINT_01', true, 'SQL', 'X<5', true})
 -- The only supported language is SQL.
 box.space._ck_constraint:insert({513, 'CK_CONSTRAINT_01', false, 'LUA', 'X<5', true})
 

@@ -508,14 +508,6 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 	}
 
 	if (space != NULL) {
-		/* Do any ON CASCADE, SET NULL or SET DEFAULT
-		 * operations required to handle rows (possibly
-		 * in other tables) that refer via a foreign
-		 * key to the row just deleted.
-		 */
-
-		fk_constraint_emit_actions(parse, space, first_old_reg, NULL);
-
 		/* Invoke AFTER DELETE trigger programs. */
 		vdbe_code_row_trigger(parse, trigger_list, TK_DELETE, 0,
 				      TRIGGER_AFTER, space, first_old_reg,

@@ -40,32 +40,12 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct sql;
-
-enum fk_constraint_action {
-	FKEY_NO_ACTION = 0,
-	FKEY_ACTION_SET_NULL,
-	FKEY_ACTION_SET_DEFAULT,
-	FKEY_ACTION_CASCADE,
-	FKEY_ACTION_RESTRICT,
-	fk_constraint_action_MAX
-};
-
-enum fk_constraint_match {
-	FKEY_MATCH_SIMPLE = 0,
-	FKEY_MATCH_PARTIAL,
-	FKEY_MATCH_FULL,
-	fk_constraint_match_MAX
-};
-
 enum {
 	FIELD_LINK_PARENT = 0,
 	FIELD_LINK_CHILD = 1,
 };
 
 extern const char *fk_constraint_action_strs[];
-
-extern const char *fk_constraint_match_strs[];
 
 /** Structure describing field dependencies for foreign keys. */
 struct field_link {
@@ -90,14 +70,6 @@ struct fk_constraint_def {
 	uint32_t parent_id;
 	/** Number of fields in this key. */
 	uint32_t field_count;
-	/** True if constraint checking is deferred till COMMIT. */
-	bool is_deferred;
-	/** Match condition for foreign key. SIMPLE by default. */
-	enum fk_constraint_match match;
-	/** ON DELETE action. NO ACTION by default. */
-	enum fk_constraint_action on_delete;
-	/** ON UPDATE action. NO ACTION by default. */
-	enum fk_constraint_action on_update;
 	/** Mapping of fields in child to fields in parent. */
 	struct field_link *links;
 	/** Name of the constraint. */
@@ -109,9 +81,6 @@ struct fk_constraint {
 	struct fk_constraint_def *def;
 	/** Index id of referenced index in parent space. */
 	uint32_t index_id;
-	/** Triggers for actions. */
-	struct sql_trigger *on_delete_trigger;
-	struct sql_trigger *on_update_trigger;
 	/** Links for parent and child lists. */
 	struct rlist in_parent_space;
 	struct rlist in_child_space;
