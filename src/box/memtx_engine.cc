@@ -820,6 +820,7 @@ checkpoint_write_synchro(struct xlog *l, const struct synchro_request *req)
 static int
 checkpoint_f(va_list ap)
 {
+	int rc = 0;
 	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
 
 	if (ckpt->touch) {
@@ -838,9 +839,10 @@ checkpoint_f(va_list ap)
 
 	say_info("saving snapshot `%s'", snap.filename);
 	ERROR_INJECT_SLEEP(ERRINJ_SNAP_WRITE_DELAY);
+	if (read_view_activate(&ckpt->rv) != 0)
+		goto fail;
 	struct space_read_view *space_rv;
 	read_view_foreach_space(space_rv, &ckpt->rv) {
-		int rc;
 		uint32_t size;
 		const char *data;
 		struct index_read_view *index_rv =
@@ -849,8 +851,10 @@ checkpoint_f(va_list ap)
 		struct index_read_view_iterator *it =
 			index_read_view_create_iterator(index_rv, ITER_ALL,
 							NULL, 0);
-		if (it == NULL)
-			goto fail;
+		if (it == NULL) {
+			rc = -1;
+			break;
+		}
 		while (true) {
 			rc = index_read_view_iterator_next_raw(it, &data,
 							       &size);
@@ -865,8 +869,11 @@ checkpoint_f(va_list ap)
 		}
 		index_read_view_iterator_delete(it);
 		if (rc != 0)
-			goto fail;
+			break;
 	}
+	read_view_deactivate(&ckpt->rv);
+	if (rc != 0)
+		goto fail;
 	if (checkpoint_write_raft(&snap, &ckpt->raft) != 0)
 		goto fail;
 	if (checkpoint_write_synchro(&snap, &ckpt->synchro_state) != 0)
@@ -1073,7 +1080,10 @@ memtx_join_send_tuple(struct xstream *stream, uint32_t space_id,
 static int
 memtx_join_f(va_list ap)
 {
+	int rc = 0;
 	struct memtx_join_ctx *ctx = va_arg(ap, struct memtx_join_ctx *);
+	if (read_view_activate(&ctx->rv) != 0)
+		return -1;
 	struct space_read_view *space_rv;
 	read_view_foreach_space(space_rv, &ctx->rv) {
 		struct index_read_view *index_rv =
@@ -1082,9 +1092,10 @@ memtx_join_f(va_list ap)
 		struct index_read_view_iterator *it =
 			index_read_view_create_iterator(index_rv, ITER_ALL,
 							NULL, 0);
-		if (it == NULL)
-			return -1;
-		int rc;
+		if (it == NULL) {
+			rc = -1;
+			break;
+		}
 		uint32_t size;
 		const char *data;
 		while (true) {
@@ -1100,9 +1111,10 @@ memtx_join_f(va_list ap)
 		}
 		index_read_view_iterator_delete(it);
 		if (rc != 0)
-			return -1;
+			break;
 	}
-	return 0;
+	read_view_deactivate(&ctx->rv);
+	return rc;
 }
 
 static int
