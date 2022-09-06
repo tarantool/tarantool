@@ -424,6 +424,13 @@ BuildCryptoError(const char *file, unsigned line, const char *format, ...);
 struct error *
 BuildRaftError(const char *file, unsigned line, const char *format, ...);
 
+/**
+ * Builds an instance of HandleIsClosed error with the given
+ * message.
+ */
+struct error *
+BuildHandleIsClosed(const char *file, unsigned line, const char *format, ...);
+
 struct index_def;
 
 struct error *

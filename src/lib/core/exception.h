@@ -257,6 +257,22 @@ public:
 	virtual void raise() { throw this; }
 };
 
+class HandleIsClosed: public Exception {
+public:
+	HandleIsClosed(const char *file, unsigned line,
+		       const char *format, ...);
+
+	HandleIsClosed()
+		: HandleIsClosed(NULL, 0, "handle is closed")
+	{
+	}
+
+	virtual void raise()
+	{
+		throw this;
+	}
+};
+
 /**
  * Initialize the exception subsystem.
  */
