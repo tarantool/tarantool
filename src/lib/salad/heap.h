@@ -389,7 +389,7 @@ HEAP(reserve)(heap_t *heap)
 	void *harr = realloc(heap->harr, sizeof(struct heap_node *) * capacity);
 	if (harr == NULL)
 		return -1;
-	heap->harr = harr;
+	heap->harr = (struct heap_node **)harr;
 	heap->capacity = capacity;
 	return 0;
 }

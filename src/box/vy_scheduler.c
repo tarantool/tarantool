@@ -1122,7 +1122,7 @@ fail:
  * R - Worst-case zero-result point lookup cost (in runs);
  * W_u - number of unfiltered runs;
  * W_f - number of filtered runs;
- * t_r - Adopted run_size_ratio_coeff.
+ * t_r - Inversed adopted run_size_ratio_coeff (1 / adopted run_size_ratio_coeff).
  *
  * Note:
  * We should consider the fact that
