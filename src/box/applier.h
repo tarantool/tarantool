@@ -120,6 +120,8 @@ struct applier_ack_msg {
 	 * Set to replica::applier_txn_last_tm.
 	 */
 	double txn_last_tm;
+	/** Last known raft term. */
+	uint64_t term;
 	/** Replicaset vclock. */
 	struct vclock vclock;
 	/** The vclock sync this message corresponds to. */

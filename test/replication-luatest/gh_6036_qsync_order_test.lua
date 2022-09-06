@@ -1,6 +1,7 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
 local server = require('test.luatest_helpers.server')
+local fiber = require('fiber')
 
 local g = t.group('gh-6036')
 
@@ -184,6 +185,7 @@ g.test_promote_order = function(cg)
     -- insert{4}.
     cg.r1:exec(function() box.cfg{replication=""} end)
     cg.r2:exec(function()
+        box.cfg{replication = {}}
         box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 2)
         require('fiber').create(function() box.ctl.promote() end)
     end)
@@ -196,6 +198,11 @@ g.test_promote_order = function(cg)
     cg.r1:exec(function()
         box.space.test:insert{4}
     end)
+    cg.r2:exec(function(replication)
+        box.cfg{replication = replication}
+    end, {cg.box_cfg.replication})
+    -- Give r2 a chance to fetch the new tuple.
+    fiber.sleep(cg.box_cfg.replication_timeout + 0.1)
     cg.r2:exec(function()
         require('luatest').assert(box.info.synchro.queue.busy == true)
         box.error.injection.set('ERRINJ_WAL_DELAY', false)

@@ -572,6 +572,8 @@ struct applier_heartbeat {
 	struct vclock vclock;
 	/** Last vclock sync received from relay. */
 	uint64_t vclock_sync;
+	/** Replica's last known raft term. */
+	uint64_t term;
 };
 
 /** Encode applier heartbeat. */

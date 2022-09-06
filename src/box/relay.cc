@@ -67,6 +67,8 @@ struct relay_status_msg {
 	struct cmsg msg;
 	/** Relay instance */
 	struct relay *relay;
+	/** Replica's last known raft term. */
+	uint64_t term;
 	/** Replica vclock. */
 	struct vclock vclock;
 	/** Last replicated transaction timestamp. */
@@ -589,6 +591,15 @@ tx_status_update(struct cmsg *msg)
 	ack.vclock_sync = status->vclock_sync;
 	bool anon = status->relay->replica->anon;
 	/*
+	 * It is important to process the term first and freeze the limbo before
+	 * an ACK if the term was bumped. This is because majority of the
+	 * cluster might be already living in a new term and this ACK is coming
+	 * from one of such nodes. It means that the row was written on the
+	 * replica but can't CONFIRM/ROLLBACK - the old term has ended, new one
+	 * has no result yet, need a PROMOTE.
+	 */
+	raft_process_term(box_raft(), status->term, ack.source);
+	/*
 	 * Let pending synchronous transactions know, which of
 	 * them were successfully sent to the replica. Acks are
 	 * collected only by the transactions originator (which is
@@ -992,6 +1003,7 @@ relay_subscribe_f(va_list ap)
 		vclock_copy(&status_msg->vclock, send_vclock);
 		status_msg->txn_lag = relay->txn_lag;
 		status_msg->relay = relay;
+		status_msg->term = last_recv_ack->term;
 		status_msg->vclock_sync = last_recv_ack->vclock_sync;
 		cpipe_push(&relay->tx_pipe, &status_msg->msg);
 	}
