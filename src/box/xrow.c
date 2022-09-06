@@ -2056,9 +2056,11 @@ xrow_encode_applier_heartbeat(struct xrow_header *row,
 	 */
 	memset(row, 0, sizeof(*row));
 	size_t size = 0;
-	size_t map_size = 1;
+	size_t map_size = 2;
 	size += mp_sizeof_uint(IPROTO_VCLOCK);
 	size += mp_sizeof_vclock_ignore0(&req->vclock);
+	size += mp_sizeof_uint(IPROTO_TERM);
+	size += mp_sizeof_uint(req->term);
 	if (req->vclock_sync != 0) {
 		map_size += 1;
 		size += mp_sizeof_uint(IPROTO_VCLOCK_SYNC);
@@ -2074,6 +2076,8 @@ xrow_encode_applier_heartbeat(struct xrow_header *row,
 	data = mp_encode_map(data, map_size);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
 	data = mp_encode_vclock_ignore0(data, &req->vclock);
+	data = mp_encode_uint(data, IPROTO_TERM);
+	data = mp_encode_uint(data, req->term);
 	if (req->vclock_sync != 0) {
 		data = mp_encode_uint(data, IPROTO_VCLOCK_SYNC);
 		data = mp_encode_uint(data, req->vclock_sync);
@@ -2127,6 +2131,14 @@ xrow_decode_applier_heartbeat(const struct xrow_header *row,
 				return -1;
 			}
 			req->vclock_sync = mp_decode_uint(&d);
+			break;
+		case IPROTO_TERM:
+			if (mp_typeof(*d) != MP_UINT) {
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
+						   "invalid term");
+				return -1;
+			}
+			req->term = mp_decode_uint(&d);
 			break;
 		default:
 			mp_next(&d);

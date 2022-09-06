@@ -85,7 +85,10 @@ g.after_each(function(cg)
     cg.split_replica:stop()
     cg.split_replica:cleanup()
     -- Drop the replica's cluster entry, so that next one receives same id.
-    cg.main:exec(function() box.space._cluster:delete{2} end)
+    cg.main:exec(function()
+        box.ctl.promote()
+        box.space._cluster:delete{2}
+    end)
     cg.cluster.servers[2] = nil
 end)
 

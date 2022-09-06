@@ -119,6 +119,9 @@ test_run:cmd('stop server replica1')
 test_run:cmd('delete server replica1')
 test_run:cmd('stop server replica2')
 test_run:cmd('delete server replica2')
+-- Restore leadership to make the default instance writable.
+box.cfg{replication_synchro_quorum = 1}
+box.ctl.promote()
 s:drop()
 box.schema.user.revoke('guest', 'super')
 box.cfg{                                                                        \

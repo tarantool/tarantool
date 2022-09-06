@@ -255,6 +255,13 @@ test_run:cmd('delete server replica2')
  | ---
  | - true
  | ...
+-- Restore leadership to make the default instance writable.
+box.cfg{replication_synchro_quorum = 1}
+ | ---
+ | ...
+box.ctl.promote()
+ | ---
+ | ...
 s:drop()
  | ---
  | ...

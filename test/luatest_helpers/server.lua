@@ -6,8 +6,6 @@ local fio = require('fio')
 local fun = require('fun')
 local json = require('json')
 local errno = require('errno')
-local log = require('log')
-local yaml = require('yaml')
 -- Full name to avoid loading the built-in misc.
 local misc = require('test.luatest_helpers.misc')
 
@@ -24,6 +22,19 @@ local WAIT_TIMEOUT = 60
 local WAIT_DELAY = 0.1
 local SOURCE_DIR = fio.abspath(os.getenv('SOURCEDIR') or '.')
 local DEFAULT_COMMAND = fio.pathjoin(SOURCE_DIR, 'test/instances/default.lua')
+
+local function vclock_ge(a, b)
+    if a == nil then
+        return b == nil
+    end
+    for server_id, b_lsn in pairs(b) do
+        local a_lsn = a[server_id]
+        if a_lsn == nil or a_lsn < b_lsn then
+            return false
+        end
+    end
+    return true
+end
 
 -- Differences from luatest.Server:
 --
@@ -337,26 +348,34 @@ function Server:get_vclock()
     return self:exec(function() return box.info.vclock end)
 end
 
+function Server:get_downstream_vclock(id)
+    return self:exec(function(id)
+        local info = box.info.replication[id]
+        return info and info.downstream and info.downstream.vclock or nil
+    end, {id})
+end
+
 function Server:wait_vclock(to_vclock)
     while true do
-        local vclock = self:get_vclock()
-        local ok = true
-
-        for server_id, to_lsn in pairs(to_vclock) do
-            local lsn = vclock[server_id]
-            if lsn == nil or lsn < to_lsn then
-                ok = false
-                break
-            end
-        end
-
-        if ok then
+        if vclock_ge(self:get_vclock(), to_vclock) then
             return
         end
+        fiber.sleep(0.005)
+    end
+end
 
-        log.info("wait vclock: %s to %s",
-            yaml.encode(vclock), yaml.encode(to_vclock))
-        fiber.sleep(0.001)
+--
+-- Wait until all own data is replicated and confirmed by the given server.
+--
+function Server:wait_downstream_to(server)
+    local id = server:instance_id()
+    local vclock = server:get_vclock()
+    vclock[0] = nil
+    while true do
+        if vclock_ge(self:get_downstream_vclock(id), vclock) then
+            return
+        end
+        fiber.sleep(0.005)
     end
 end
 

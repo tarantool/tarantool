@@ -1374,6 +1374,7 @@ applier_signal_ack(struct applier *applier)
 		applier->ack_msg.txn_last_tm = (r == NULL ? 0 :
 						r->applier_txn_last_tm);
 		applier->ack_msg.vclock_sync = applier->last_vclock_sync;
+		applier->ack_msg.term = box_raft()->term;
 		vclock_copy(&applier->ack_msg.vclock, &replicaset.vclock);
 		cmsg_init(&applier->ack_msg.base, applier->ack_route);
 		cpipe_push(&applier->applier_thread->thread_pipe,
@@ -1397,6 +1398,7 @@ applier_thread_signal_ack(struct cmsg *base)
 	applier->thread.txn_last_tm = msg->txn_last_tm;
 	struct applier_heartbeat *ack = &applier->thread.next_ack;
 	ack->vclock_sync = msg->vclock_sync;
+	ack->term = msg->term;
 	vclock_copy(&ack->vclock, &msg->vclock);
 }
 
