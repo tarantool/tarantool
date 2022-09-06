@@ -470,6 +470,10 @@ vy_lsm_compaction_priority(struct vy_lsm *lsm);
 int64_t
 vy_lsm_range_size(struct vy_lsm *lsm);
 
+/** Return the size of bloom filters used by LSM tree. */
+size_t
+vy_lsm_bloom_size(struct vy_lsm *lsm);
+
 /** Add a run to the list of runs of an LSM tree. */
 void
 vy_lsm_add_run(struct vy_lsm *lsm, struct vy_run *run);

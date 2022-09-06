@@ -558,6 +558,19 @@ box_sequence_reset(uint32_t seq_id);
 API_EXPORT int
 box_session_push(const char *data, const char *data_end);
 
+/**
+ * Returns bsize of index bloom filter with index_id
+ * in space with given space_id (see vinyl_index_bsize() for details).
+ *
+ * \param space identifier
+ * \param index identifier
+ * \param[out] result size of bloom filter.
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ */
+API_EXPORT int
+box_index_bloom_bsize(uint32_t space_id, uint32_t index_id, size_t *result);
+
 /** \endcond public */
 
 /**

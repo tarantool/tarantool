@@ -89,6 +89,7 @@
 #include "mp_uuid.h"
 #include "flightrec.h"
 #include "wal_ext.h"
+#include "vy_lsm.h"
 
 static char status[64] = "unknown";
 
@@ -2832,6 +2833,29 @@ box_session_push(const char *data, const char *data_end)
 	int rc = session_push(session, base);
 	port_msgpack_destroy(base);
 	return rc;
+}
+
+API_EXPORT int
+box_index_bloom_bsize(uint32_t space_id, uint32_t index_id, size_t *result)
+{
+	struct space *space;
+	struct index *index;
+
+	/** See check_index() for explanation. */
+	space = space_cache_find(space_id);
+	if (space == NULL)
+		return -1;
+	if (access_check_space(space, PRIV_R) != 0)
+		return -1;
+	index = index_find(space, index_id);
+	if (index == NULL)
+		return -1;
+	struct vy_lsm *lsm = vy_lsm(index);
+	ssize_t bsize = vy_lsm_bloom_size(lsm);
+	if (bsize < 0)
+		return -1;
+	*result = bsize;
+	return 0;
 }
 
 static inline void
