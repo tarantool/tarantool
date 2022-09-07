@@ -1031,8 +1031,8 @@ memtx_join_space_filter(struct space *space, void *arg)
 {
 	(void)arg;
 	return space_is_memtx(space) &&
-		space_group_id(space) != GROUP_LOCAL &&
-		space_index(space, 0) != NULL;
+	       !space_is_local(space) &&
+	       space_index(space, 0) != NULL;
 }
 
 static int
