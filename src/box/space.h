@@ -290,7 +290,10 @@ space_on_final_recovery_complete(struct space *space, void *nothing);
 
 /** Get space ordinal number. */
 static inline uint32_t
-space_id(struct space *space) { return space->def->id; }
+space_id(const struct space *space)
+{
+	return space->def->id;
+}
 
 /** Get space name. */
 static inline const char *
@@ -301,14 +304,14 @@ space_name(const struct space *space)
 
 /** Return true if space is temporary. */
 static inline bool
-space_is_temporary(struct space *space)
+space_is_temporary(const struct space *space)
 {
 	return space->def->opts.is_temporary;
 }
 
 /** Return replication group id of a space. */
 static inline uint32_t
-space_group_id(struct space *space)
+space_group_id(const struct space *space)
 {
 	return space->def->opts.group_id;
 }
@@ -521,18 +524,24 @@ space_invalidate(struct space *space)
 }
 
 static inline bool
-space_is_memtx(struct space *space) { return space->engine->id == 0; }
+space_is_memtx(const struct space *space)
+{
+	return space->engine->id == 0;
+}
 
 /** Return true if space is run under vinyl engine. */
 static inline bool
-space_is_vinyl(struct space *space) { return strcmp(space->engine->name, "vinyl") == 0; }
+space_is_vinyl(const struct space *space)
+{
+	return strcmp(space->engine->name, "vinyl") == 0;
+}
 
 /**
  * Check that the space is a system space, which means that is has a special
  * meaning for tarantool and has predefined insert/remove triggers.
  */
 bool
-space_is_system(struct space *space);
+space_is_system(const struct space *space);
 
 struct field_def;
 /**
