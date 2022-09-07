@@ -353,7 +353,7 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 
 	/* space.group_id */
 	lua_pushstring(L, "is_local");
-	lua_pushboolean(L, space_group_id(space) == GROUP_LOCAL);
+	lua_pushboolean(L, space_is_local(space));
 	lua_settable(L, i);
 
 	/* space.is_temp */
@@ -373,7 +373,7 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 
 	/* space.is_sync */
 	lua_pushstring(L, "is_sync");
-	lua_pushboolean(L, space->def->opts.is_sync);
+	lua_pushboolean(L, space_is_sync(space));
 	lua_settable(L, i);
 
 	lua_pushstring(L, "enabled");

@@ -38,6 +38,7 @@
 #include "index.h"
 #include "error.h"
 #include "diag.h"
+#include "iproto_constants.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -309,11 +310,25 @@ space_is_temporary(const struct space *space)
 	return space->def->opts.is_temporary;
 }
 
+/** Return true if space is synchronous. */
+static inline bool
+space_is_sync(const struct space *space)
+{
+	return space->def->opts.is_sync;
+}
+
 /** Return replication group id of a space. */
 static inline uint32_t
 space_group_id(const struct space *space)
 {
 	return space->def->opts.group_id;
+}
+
+/** Return true if space is local. */
+static inline bool
+space_is_local(const struct space *space)
+{
+	return space_group_id(space) == GROUP_LOCAL;
 }
 
 void

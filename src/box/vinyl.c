@@ -3003,7 +3003,7 @@ vy_join_add_space(struct space *space, void *arg)
 	struct vy_join_ctx *ctx = arg;
 	if (!space_is_vinyl(space))
 		return 0;
-	if (space_group_id(space) == GROUP_LOCAL)
+	if (space_is_local(space))
 		return 0;
 	struct index *pk = space_index(space, 0);
 	if (pk == NULL)

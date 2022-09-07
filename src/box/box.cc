@@ -2448,7 +2448,7 @@ box_process1(struct request *request, box_tuple_t **result)
 	if (space == NULL)
 		return -1;
 	if (!space_is_temporary(space) &&
-	    space_group_id(space) != GROUP_LOCAL &&
+	    !space_is_local(space) &&
 	    box_check_writable() != 0)
 		return -1;
 	if (space_is_memtx(space)) {

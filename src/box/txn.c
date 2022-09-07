@@ -920,7 +920,7 @@ txn_journal_entry_new(struct txn *txn)
 		if (stmt->row->type != IPROTO_NOP) {
 			is_fully_nop = false;
 			is_sync = is_sync || (stmt->space != NULL &&
-					      stmt->space->def->opts.is_sync);
+					      space_is_sync(stmt->space));
 		}
 
 		if (stmt->row->replica_id == 0)
