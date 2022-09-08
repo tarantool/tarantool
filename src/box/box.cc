@@ -3201,24 +3201,21 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 {
 	assert(header->type == IPROTO_REGISTER);
 
-	struct tt_uuid instance_uuid;
-	struct vclock replica_vclock;
-	uint32_t replica_version_id;
-	xrow_decode_register_xc(header, &instance_uuid, &replica_vclock,
-				&replica_version_id);
+	struct register_request req;
+	xrow_decode_register_xc(header, &req);
 
 	if (!is_box_configured)
 		tnt_raise(ClientError, ER_LOADING);
 
-	if (tt_uuid_is_equal(&instance_uuid, &INSTANCE_UUID))
+	if (tt_uuid_is_equal(&req.instance_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
 	access_check_universe_xc(PRIV_R);
 	/* We only get register requests from anonymous instances. */
-	struct replica *replica = replica_by_uuid(&instance_uuid);
+	struct replica *replica = replica_by_uuid(&req.instance_uuid);
 	if (replica && replica->id != REPLICA_ID_NIL) {
 		tnt_raise(ClientError, ER_REPLICA_NOT_ANON,
-			  tt_uuid_str(&instance_uuid));
+			  tt_uuid_str(&req.instance_uuid));
 	}
 
 	if (replication_anon) {
@@ -3238,21 +3235,21 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	}
 
 	/* @sa box_process_subscribe(). */
-	vclock_reset(&replica_vclock, 0, vclock_get(&replicaset.vclock, 0));
-	struct gc_consumer *gc = gc_consumer_register(&replica_vclock,
-				"replica %s", tt_uuid_str(&instance_uuid));
+	vclock_reset(&req.vclock, 0, vclock_get(&replicaset.vclock, 0));
+	struct gc_consumer *gc = gc_consumer_register(
+		&req.vclock, "replica %s", tt_uuid_str(&req.instance_uuid));
 	if (gc == NULL)
 		diag_raise();
 	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
 
 	say_info("registering replica %s at %s",
-		 tt_uuid_str(&instance_uuid), sio_socketname(io->fd));
+		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
 
 	/**
 	 * Call the server-side hook which stores the replica uuid
 	 * in _cluster space.
 	 */
-	box_on_join(&instance_uuid);
+	box_on_join(&req.instance_uuid);
 
 	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
 
@@ -3262,10 +3259,10 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 
 	/*
 	 * Feed replica with WALs in range
-	 * (replica_vclock, stop_vclock) so that it gets its
+	 * (req.vclock, stop_vclock) so that it gets its
 	 * registration.
 	 */
-	relay_final_join(io, header->sync, &replica_vclock, &stop_vclock);
+	relay_final_join(io, header->sync, &req.vclock, &stop_vclock);
 	say_info("final data sent.");
 
 	struct xrow_header row;
@@ -3280,7 +3277,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	 * replica.
 	 */
 	gc_consumer_advance(gc, &stop_vclock);
-	replica = replica_by_uuid(&instance_uuid);
+	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
 	replica->gc = gc;
@@ -3334,17 +3331,15 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 
 	assert(header->type == IPROTO_JOIN);
 
-	/* Decode JOIN request */
-	struct tt_uuid instance_uuid;
-	uint32_t replica_version_id;
-	xrow_decode_join_xc(header, &instance_uuid, &replica_version_id);
+	struct join_request req;
+	xrow_decode_join_xc(header, &req);
 
 	/* Check that bootstrap has been finished */
 	if (!is_box_configured)
 		tnt_raise(ClientError, ER_LOADING);
 
 	/* Forbid connection to itself */
-	if (tt_uuid_is_equal(&instance_uuid, &INSTANCE_UUID))
+	if (tt_uuid_is_equal(&req.instance_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
 	/* Check permissions */
@@ -3361,7 +3356,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * is complete. Fail early if the caller does not have
 	 * appropriate access privileges.
 	 */
-	struct replica *replica = replica_by_uuid(&instance_uuid);
+	struct replica *replica = replica_by_uuid(&req.instance_uuid);
 	if (replica == NULL || replica->id == REPLICA_ID_NIL) {
 		box_check_writable_xc();
 		struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
@@ -3379,20 +3374,19 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * it can resume FINAL JOIN where INITIAL JOIN ends.
 	 */
 	struct gc_consumer *gc = gc_consumer_register(&replicaset.vclock,
-				"replica %s", tt_uuid_str(&instance_uuid));
+				"replica %s", tt_uuid_str(&req.instance_uuid));
 	if (gc == NULL)
 		diag_raise();
 	auto gc_guard = make_scoped_guard([&] { gc_consumer_unregister(gc); });
 
 	say_info("joining replica %s at %s",
-		 tt_uuid_str(&instance_uuid), sio_socketname(io->fd));
+		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
 
 	/*
 	 * Initial stream: feed replica with dirty data from engines.
 	 */
 	struct vclock start_vclock;
-	relay_initial_join(io, header->sync, &start_vclock,
-			   replica_version_id);
+	relay_initial_join(io, header->sync, &start_vclock, req.version_id);
 	say_info("initial data sent.");
 
 	/**
@@ -3401,7 +3395,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * sending OK - if the hook fails, the error reaches the
 	 * client.
 	 */
-	box_on_join(&instance_uuid);
+	box_on_join(&req.instance_uuid);
 
 	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
 
@@ -3431,7 +3425,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * FINAL JOIN ended and assign it to the replica.
 	 */
 	gc_consumer_advance(gc, &stop_vclock);
-	replica = replica_by_uuid(&instance_uuid);
+	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
 	replica->gc = gc;
@@ -3447,18 +3441,11 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	if (!is_box_configured)
 		tnt_raise(ClientError, ER_LOADING);
 
-	struct tt_uuid replica_uuid;
-	struct tt_uuid peer_replicaset_uuid;
-	struct vclock replica_clock;
-	uint32_t replica_version_id;
-	bool anon;
-	uint32_t id_filter;
-	xrow_decode_subscribe_xc(header, &peer_replicaset_uuid, &replica_uuid,
-				 &replica_clock, &replica_version_id, &anon,
-				 &id_filter);
+	struct subscribe_request req;
+	xrow_decode_subscribe_xc(header, &req);
 
 	/* Forbid connection to itself */
-	if (tt_uuid_is_equal(&replica_uuid, &INSTANCE_UUID))
+	if (tt_uuid_is_equal(&req.instance_uuid, &INSTANCE_UUID))
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 	/*
 	 * The peer should have bootstrapped from somebody since it tries to
@@ -3466,17 +3453,17 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * be ever found here, and would try to reconnect thinking its replica
 	 * ID wasn't replicated here yet. Prevent it right away.
 	 */
-	if (!tt_uuid_is_equal(&peer_replicaset_uuid, &REPLICASET_UUID)) {
+	if (!tt_uuid_is_equal(&req.replicaset_uuid, &REPLICASET_UUID)) {
 		tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
 			  tt_uuid_str(&REPLICASET_UUID),
-			  tt_uuid_str(&peer_replicaset_uuid));
+			  tt_uuid_str(&req.replicaset_uuid));
 	}
 
 	/*
 	 * Do not allow non-anonymous followers for anonymous
 	 * instances.
 	 */
-	if (replication_anon && !anon) {
+	if (replication_anon && !req.is_anon) {
 		tnt_raise(ClientError, ER_UNSUPPORTED, "Anonymous replica",
 			  "non-anonymous followers.");
 	}
@@ -3485,9 +3472,10 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	access_check_universe_xc(PRIV_R);
 
 	/* Check replica uuid */
-	struct replica *replica = replica_by_uuid(&replica_uuid);
+	struct replica *replica = replica_by_uuid(&req.instance_uuid);
 
-	if (!anon && (replica == NULL || replica->id == REPLICA_ID_NIL)) {
+	if (!req.is_anon &&
+	    (replica == NULL || replica->id == REPLICA_ID_NIL)) {
 		/*
 		 * The instance is not anonymous, and is registered (at least it
 		 * claims so), but its ID is not delivered to the current
@@ -3500,14 +3488,14 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		 * but still tries to subscribe. It won't have an ID here.
 		 */
 		tnt_raise(ClientError, ER_TOO_EARLY_SUBSCRIBE,
-			  tt_uuid_str(&replica_uuid));
+			  tt_uuid_str(&req.instance_uuid));
 	}
-	if (anon && replica != NULL && replica->id != REPLICA_ID_NIL) {
+	if (req.is_anon && replica != NULL && replica->id != REPLICA_ID_NIL) {
 		tnt_raise(ClientError, ER_PROTOCOL, "Can't subscribe an "
 			  "anonymous replica having an ID assigned");
 	}
 	if (replica == NULL)
-		replica = replicaset_add_anon(&replica_uuid);
+		replica = replicaset_add_anon(&req.instance_uuid);
 
 	/* Don't allow multiple relays for the same replica */
 	if (relay_get_state(replica->relay) == RELAY_FOLLOW) {
@@ -3520,10 +3508,6 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
 			  "wal_mode = 'none'");
 	}
-
-	struct vclock vclock;
-	vclock_create(&vclock);
-	vclock_copy(&vclock, &replicaset.vclock);
 	/*
 	 * Send a response to SUBSCRIBE request, tell
 	 * the replica how many rows we have in stock for it,
@@ -3537,8 +3521,12 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * Older versions not supporting replicaset UUID in the response will
 	 * just ignore the additional field (these are < 2.1.1).
 	 */
+	struct subscribe_response rsp;
+	memset(&rsp, 0, sizeof(rsp));
+	vclock_copy(&rsp.vclock, &replicaset.vclock);
+	rsp.replicaset_uuid = REPLICASET_UUID;
 	struct xrow_header row;
-	xrow_encode_subscribe_response_xc(&row, &REPLICASET_UUID, &vclock);
+	xrow_encode_subscribe_response_xc(&row, &rsp);
 	/*
 	 * Identify the message with the replica id of this
 	 * instance, this is the only way for a replica to find
@@ -3551,11 +3539,11 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	coio_write_xrow(io, &row);
 
 	say_info("subscribed replica %s at %s",
-		 tt_uuid_str(&replica_uuid), sio_socketname(io->fd));
+		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
 	say_info("remote vclock %s local vclock %s",
-		 vclock_to_string(&replica_clock), vclock_to_string(&vclock));
+		 vclock_to_string(&req.vclock), vclock_to_string(&rsp.vclock));
 	uint64_t sent_raft_term = 0;
-	if (replica_version_id >= version_id(2, 6, 0) && !anon) {
+	if (req.version_id >= version_id(2, 6, 0) && !req.is_anon) {
 		/*
 		 * Send out the current raft state of the instance. Don't do
 		 * that if the remote instance is old. It can be that a part of
@@ -3570,7 +3558,7 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 		sent_raft_term = req.term;
 	}
 	/*
-	 * Replica clock is used in gc state and recovery
+	 * Replica vclock is used in gc state and recovery
 	 * initialization, so we need to replace the remote 0-th
 	 * component with our own one. This doesn't break
 	 * recovery: it finds the WAL with a vclock strictly less
@@ -3585,7 +3573,7 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * Speaking of gc, remote instances' local vclock
 	 * components are not used by consumers at all.
 	 */
-	vclock_reset(&replica_clock, 0, vclock_get(&replicaset.vclock, 0));
+	vclock_reset(&req.vclock, 0, vclock_get(&replicaset.vclock, 0));
 	/*
 	 * Process SUBSCRIBE request via replication relay
 	 * Send current recovery vector clock as a marker
@@ -3598,8 +3586,8 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * a stall in updates (in this case replica may hang
 	 * indefinitely).
 	 */
-	relay_subscribe(replica, io, header->sync, &replica_clock,
-			replica_version_id, id_filter, sent_raft_term);
+	relay_subscribe(replica, io, header->sync, &req.vclock,
+			req.version_id, req.id_filter, sent_raft_term);
 }
 
 void

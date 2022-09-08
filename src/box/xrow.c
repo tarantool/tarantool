@@ -1705,88 +1705,99 @@ err:
 	return -1;
 }
 
-int
-xrow_encode_register(struct xrow_header *row,
-		     const struct tt_uuid *instance_uuid,
-		     const struct vclock *vclock)
-{
-	memset(row, 0, sizeof(*row));
-	size_t size = mp_sizeof_map(2) +
-		      mp_sizeof_uint(IPROTO_INSTANCE_UUID) +
-		      mp_sizeof_str(UUID_STR_LEN) +
-		      mp_sizeof_uint(IPROTO_VCLOCK) +
-		      mp_sizeof_vclock_ignore0(vclock);
-	char *buf = (char *) region_alloc(&fiber()->gc, size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "buf");
-		return -1;
-	}
-	char *data = buf;
-	data = mp_encode_map(data, 2);
-	data = mp_encode_uint(data, IPROTO_INSTANCE_UUID);
-	data = xrow_encode_uuid(data, instance_uuid);
-	data = mp_encode_uint(data, IPROTO_VCLOCK);
-	data = mp_encode_vclock_ignore0(data, vclock);
-	assert(data <= buf + size);
-	row->body[0].iov_base = buf;
-	row->body[0].iov_len = (data - buf);
-	row->bodycnt = 1;
-	row->type = IPROTO_REGISTER;
-	return 0;
-}
+/**
+ * A template which can represent any replication request - join, register,
+ * subscribe, etc. All fields are optional - when left NULL, they are not
+ * encoded. Each specific request simply uses a subset of these fields + its own
+ * iproto request type. Meaning of each field depends on the original request
+ * type, but the iproto keys are fixed.
+ */
+struct replication_request {
+	/** IPROTO_CLUSTER_UUID. */
+	struct tt_uuid *replicaset_uuid;
+	/** IPROTO_INSTANCE_UUID. */
+	struct tt_uuid *instance_uuid;
+	/** IPROTO_VCLOCK. */
+	struct vclock *vclock;
+	/** IPROTO_ID_FILTER. */
+	uint32_t *id_filter;
+	/** IPROTO_SERVER_VERSION. */
+	uint32_t *version_id;
+	/** IPROTO_REPLICA_ANON. */
+	bool *is_anon;
+};
 
-int
-xrow_encode_subscribe(struct xrow_header *row,
-		      const struct tt_uuid *replicaset_uuid,
-		      const struct tt_uuid *instance_uuid,
-		      const struct vclock *vclock, bool anon,
-		      uint32_t id_filter)
+/** Encode a replication request template. */
+static int
+xrow_encode_replication_request(struct xrow_header *row,
+				const struct replication_request *req,
+				uint16_t type)
 {
 	memset(row, 0, sizeof(*row));
-	size_t size = XROW_BODY_LEN_MAX +
-		      mp_sizeof_vclock_ignore0(vclock);
+	size_t size = XROW_BODY_LEN_MAX;
+	if (req->vclock != NULL)
+		size += mp_sizeof_vclock_ignore0(req->vclock);
 	char *buf = (char *) region_alloc(&fiber()->gc, size);
 	if (buf == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc", "buf");
 		return -1;
 	}
-	char *data = buf;
-	int filter_size = bit_count_u32(id_filter);
-	data = mp_encode_map(data, filter_size != 0 ? 6 : 5);
-	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
-	data = xrow_encode_uuid(data, replicaset_uuid);
-	data = mp_encode_uint(data, IPROTO_INSTANCE_UUID);
-	data = xrow_encode_uuid(data, instance_uuid);
-	data = mp_encode_uint(data, IPROTO_VCLOCK);
-	data = mp_encode_vclock_ignore0(data, vclock);
-	data = mp_encode_uint(data, IPROTO_SERVER_VERSION);
-	data = mp_encode_uint(data, tarantool_version_id());
-	data = mp_encode_uint(data, IPROTO_REPLICA_ANON);
-	data = mp_encode_bool(data, anon);
-	if (filter_size != 0) {
+	/* Skip one byte for future map header. */
+	char *data = buf + 1;
+	uint32_t map_size = 0;
+	if (req->replicaset_uuid != NULL) {
+		++map_size;
+		data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
+		data = xrow_encode_uuid(data, req->replicaset_uuid);
+	}
+	if (req->instance_uuid != NULL) {
+		++map_size;
+		data = mp_encode_uint(data, IPROTO_INSTANCE_UUID);
+		data = xrow_encode_uuid(data, req->instance_uuid);
+	}
+	if (req->vclock != NULL) {
+		++map_size;
+		data = mp_encode_uint(data, IPROTO_VCLOCK);
+		data = mp_encode_vclock_ignore0(data, req->vclock);
+	}
+	if (req->version_id != NULL) {
+		++map_size;
+		data = mp_encode_uint(data, IPROTO_SERVER_VERSION);
+		data = mp_encode_uint(data, *req->version_id);
+	}
+	if (req->is_anon != NULL) {
+		++map_size;
+		data = mp_encode_uint(data, IPROTO_REPLICA_ANON);
+		data = mp_encode_bool(data, *req->is_anon);
+	}
+	if (req->id_filter != NULL) {
+		++map_size;
+		uint32_t id_filter = *req->id_filter;
 		data = mp_encode_uint(data, IPROTO_ID_FILTER);
-		data = mp_encode_array(data, filter_size);
+		data = mp_encode_array(data, bit_count_u32(id_filter));
 		struct bit_iterator it;
-		bit_iterator_init(&it, &id_filter, sizeof(id_filter),
-				  true);
+		bit_iterator_init(&it, &id_filter, sizeof(id_filter), true);
 		for (size_t id = bit_iterator_next(&it); id < VCLOCK_MAX;
 		     id = bit_iterator_next(&it)) {
 			data = mp_encode_uint(data, id);
 		}
 	}
 	assert(data <= buf + size);
+	assert(map_size <= 15);
+	char *map_header_end = mp_encode_map(buf, map_size);
+	assert(map_header_end - buf == 1);
+	(void)map_header_end;
 	row->body[0].iov_base = buf;
 	row->body[0].iov_len = (data - buf);
 	row->bodycnt = 1;
-	row->type = IPROTO_SUBSCRIBE;
+	row->type = type;
 	return 0;
 }
 
-int
-xrow_decode_subscribe(const struct xrow_header *row,
-		      struct tt_uuid *replicaset_uuid,
-		      struct tt_uuid *instance_uuid, struct vclock *vclock,
-		      uint32_t *version_id, bool *anon, uint32_t *id_filter)
+/** Decode a replication request template. */
+static int
+xrow_decode_replication_request(const struct xrow_header *row,
+				struct replication_request *req)
 {
 	if (row->bodycnt == 0) {
 		diag_set(ClientError, ER_INVALID_MSGPACK, "request body");
@@ -1798,20 +1809,6 @@ xrow_decode_subscribe(const struct xrow_header *row,
 		xrow_on_decode_err(row, ER_INVALID_MSGPACK, "request body");
 		return -1;
 	}
-
-	if (replicaset_uuid != NULL)
-		*replicaset_uuid = uuid_nil;
-	if (instance_uuid != NULL)
-		*instance_uuid = uuid_nil;
-	if (vclock != NULL)
-		vclock_create(vclock);
-	if (version_id != NULL)
-		*version_id = 0;
-	if (anon != NULL)
-		*anon = false;
-	if (id_filter != NULL)
-		*id_filter = 0;
-
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(*d) != MP_UINT) {
@@ -1822,54 +1819,54 @@ xrow_decode_subscribe(const struct xrow_header *row,
 		uint8_t key = mp_decode_uint(&d);
 		switch (key) {
 		case IPROTO_CLUSTER_UUID:
-			if (replicaset_uuid == NULL)
+			if (req->replicaset_uuid == NULL)
 				goto skip;
-			if (xrow_decode_uuid(&d, replicaset_uuid) != 0) {
+			if (xrow_decode_uuid(&d, req->replicaset_uuid) != 0) {
 				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
-						   "UUID");
+						   "replicaset UUID");
 				return -1;
 			}
 			break;
 		case IPROTO_INSTANCE_UUID:
-			if (instance_uuid == NULL)
+			if (req->instance_uuid == NULL)
 				goto skip;
-			if (xrow_decode_uuid(&d, instance_uuid) != 0) {
+			if (xrow_decode_uuid(&d, req->instance_uuid) != 0) {
 				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
-						   "UUID");
+						   "instance UUID");
 				return -1;
 			}
 			break;
 		case IPROTO_VCLOCK:
-			if (vclock == NULL)
+			if (req->vclock == NULL)
 				goto skip;
-			if (mp_decode_vclock_ignore0(&d, vclock) != 0) {
+			if (mp_decode_vclock_ignore0(&d, req->vclock) != 0) {
 				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 						   "invalid VCLOCK");
 				return -1;
 			}
 			break;
 		case IPROTO_SERVER_VERSION:
-			if (version_id == NULL)
+			if (req->version_id == NULL)
 				goto skip;
 			if (mp_typeof(*d) != MP_UINT) {
 				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 						   "invalid VERSION");
 				return -1;
 			}
-			*version_id = mp_decode_uint(&d);
+			*req->version_id = mp_decode_uint(&d);
 			break;
 		case IPROTO_REPLICA_ANON:
-			if (anon == NULL)
+			if (req->is_anon == NULL)
 				goto skip;
 			if (mp_typeof(*d) != MP_BOOL) {
 				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 						   "invalid REPLICA_ANON flag");
 				return -1;
 			}
-			*anon = mp_decode_bool(&d);
+			*req->is_anon = mp_decode_bool(&d);
 			break;
 		case IPROTO_ID_FILTER:
-			if (id_filter == NULL)
+			if (req->id_filter == NULL)
 				goto skip;
 			if (mp_typeof(*d) != MP_ARRAY) {
 id_filter_decode_err:		xrow_on_decode_err(row, ER_INVALID_MSGPACK,
@@ -1883,7 +1880,7 @@ id_filter_decode_err:		xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 				uint64_t val = mp_decode_uint(&d);
 				if (val >= VCLOCK_MAX)
 					goto id_filter_decode_err;
-				*id_filter |= 1 << val;
+				*req->id_filter |= 1 << val;
 			}
 			break;
 		default: skip:
@@ -1894,30 +1891,82 @@ id_filter_decode_err:		xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 }
 
 int
-xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid)
+xrow_encode_register(struct xrow_header *row,
+		     const struct register_request *req)
 {
-	memset(row, 0, sizeof(*row));
+	struct register_request *cast = (struct register_request *)req;
+	const struct replication_request base_req = {
+		.instance_uuid = &cast->instance_uuid,
+		.vclock = &cast->vclock,
+	};
+	return xrow_encode_replication_request(row, &base_req, IPROTO_REGISTER);
+}
 
-	size_t size = 64;
-	char *buf = (char *) region_alloc(&fiber()->gc, size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "buf");
-		return -1;
-	}
-	char *data = buf;
-	data = mp_encode_map(data, 2);
-	data = mp_encode_uint(data, IPROTO_INSTANCE_UUID);
-	/* Greet the remote replica with our replica UUID */
-	data = xrow_encode_uuid(data, instance_uuid);
-	data = mp_encode_uint(data, IPROTO_SERVER_VERSION);
-	data = mp_encode_uint(data, tarantool_version_id());
-	assert(data <= buf + size);
+int
+xrow_decode_register(const struct xrow_header *row,
+		     struct register_request *req)
+{
+	memset(req, 0, sizeof(*req));
+	struct replication_request base_req = {
+		.instance_uuid = &req->instance_uuid,
+		.vclock = &req->vclock,
+	};
+	return xrow_decode_replication_request(row, &base_req);
+}
 
-	row->body[0].iov_base = buf;
-	row->body[0].iov_len = (data - buf);
-	row->bodycnt = 1;
-	row->type = IPROTO_JOIN;
-	return 0;
+int
+xrow_encode_subscribe(struct xrow_header *row,
+		      const struct subscribe_request *req)
+{
+	struct subscribe_request *cast = (struct subscribe_request *)req;
+	const struct replication_request base_req = {
+		.replicaset_uuid = &cast->replicaset_uuid,
+		.instance_uuid = &cast->instance_uuid,
+		.vclock = &cast->vclock,
+		.is_anon = &cast->is_anon,
+		.id_filter = &cast->id_filter,
+		.version_id = &cast->version_id,
+	};
+	return xrow_encode_replication_request(row, &base_req,
+					       IPROTO_SUBSCRIBE);
+}
+
+int
+xrow_decode_subscribe(const struct xrow_header *row,
+		      struct subscribe_request *req)
+{
+	memset(req, 0, sizeof(*req));
+	struct replication_request base_req = {
+		.replicaset_uuid = &req->replicaset_uuid,
+		.instance_uuid = &req->instance_uuid,
+		.vclock = &req->vclock,
+		.version_id = &req->version_id,
+		.is_anon = &req->is_anon,
+		.id_filter = &req->id_filter,
+	};
+	return xrow_decode_replication_request(row, &base_req);
+}
+
+int
+xrow_encode_join(struct xrow_header *row, const struct join_request *req)
+{
+	struct join_request *cast = (struct join_request *)req;
+	const struct replication_request base_req = {
+		.instance_uuid = &cast->instance_uuid,
+		.version_id = &cast->version_id,
+	};
+	return xrow_encode_replication_request(row, &base_req, IPROTO_JOIN);
+}
+
+int
+xrow_decode_join(const struct xrow_header *row, struct join_request *req)
+{
+	memset(req, 0, sizeof(*req));
+	struct replication_request base_req = {
+		.instance_uuid = &req->instance_uuid,
+		.version_id = &req->version_id,
+	};
+	return xrow_decode_replication_request(row, &base_req);
 }
 
 int
@@ -2016,33 +2065,46 @@ skip:
 }
 
 int
-xrow_encode_subscribe_response(struct xrow_header *row,
-			       const struct tt_uuid *replicaset_uuid,
-			       const struct vclock *vclock)
+xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 {
-	memset(row, 0, sizeof(*row));
-	size_t size = mp_sizeof_map(2) +
-		      mp_sizeof_uint(IPROTO_VCLOCK) +
-		      mp_sizeof_vclock_ignore0(vclock) +
-		      mp_sizeof_uint(IPROTO_CLUSTER_UUID) +
-		      mp_sizeof_str(UUID_STR_LEN);
-	char *buf = (char *) region_alloc(&fiber()->gc, size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "buf");
-		return -1;
-	}
-	char *data = buf;
-	data = mp_encode_map(data, 2);
-	data = mp_encode_uint(data, IPROTO_VCLOCK);
-	data = mp_encode_vclock_ignore0(data, vclock);
-	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
-	data = xrow_encode_uuid(data, replicaset_uuid);
-	assert(data <= buf + size);
-	row->body[0].iov_base = buf;
-	row->body[0].iov_len = (data - buf);
-	row->bodycnt = 1;
-	row->type = IPROTO_OK;
-	return 0;
+	const struct replication_request base_req = {
+		.vclock = (struct vclock *)vclock,
+	};
+	return xrow_encode_replication_request(row, &base_req, IPROTO_OK);
+}
+
+int
+xrow_decode_vclock(const struct xrow_header *row, struct vclock *vclock)
+{
+	vclock_create(vclock);
+	struct replication_request base_req = {
+		.vclock = vclock,
+	};
+	return xrow_decode_replication_request(row, &base_req);
+}
+
+int
+xrow_encode_subscribe_response(struct xrow_header *row,
+			       const struct subscribe_response *rsp)
+{
+	struct subscribe_response *cast = (struct subscribe_response *)rsp;
+	const struct replication_request base_req = {
+		.replicaset_uuid = &cast->replicaset_uuid,
+		.vclock = &cast->vclock,
+	};
+	return xrow_encode_replication_request(row, &base_req, IPROTO_OK);
+}
+
+int
+xrow_decode_subscribe_response(const struct xrow_header *row,
+			       struct subscribe_response *rsp)
+{
+	memset(rsp, 0, sizeof(*rsp));
+	struct replication_request base_req = {
+		.replicaset_uuid = &rsp->replicaset_uuid,
+		.vclock = &rsp->vclock,
+	};
+	return xrow_decode_replication_request(row, &base_req);
 }
 
 void

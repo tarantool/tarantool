@@ -463,106 +463,83 @@ xrow_decode_ballot(const struct xrow_header *row, struct ballot *ballot);
 void
 xrow_encode_vote(struct xrow_header *row);
 
-/**
- * Encode REGISTER command.
- * @param[out] Row.
- * @param instance_uuid Instance uuid.
- * @param vclock Replication clock.
- *
- * @retval 0 Success.
- * @retval -1 Memory error.
- */
+/** New replica REGISTER request. */
+struct register_request {
+	/** Replica's UUID. */
+	struct tt_uuid instance_uuid;
+	/** Replica's vclock. */
+	struct vclock vclock;
+};
+
+/** Encode REGISTER request. */
 int
 xrow_encode_register(struct xrow_header *row,
-		     const struct tt_uuid *instance_uuid,
-		     const struct vclock *vclock);
+		     const struct register_request *req);
 
-/**
- * Encode SUBSCRIBE command.
- * @param[out] Row.
- * @param replicaset_uuid Replica set uuid.
- * @param instance_uuid Instance uuid.
- * @param vclock Replication clock.
- * @param anon Whether it is an anonymous subscribe request or not.
- * @param id_filter A List of replica ids to skip rows from
- *		    when feeding a replica.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
- */
+/** Decode REGISTER request. */
+int
+xrow_decode_register(const struct xrow_header *row,
+		     struct register_request *req);
+
+/** SUBSCRIBE request from an already registered replica. */
+struct subscribe_request {
+	/** Replica's replicaset UUID. */
+	struct tt_uuid replicaset_uuid;
+	/** Replica's instance UUID. */
+	struct tt_uuid instance_uuid;
+	/** Replica's vclock. */
+	struct vclock vclock;
+	/** Mask to filter out replica IDs whose rows don't need to be sent. */
+	uint32_t id_filter;
+	/** Replica's version. */
+	uint32_t version_id;
+	/** Flag whether the replica is anon. */
+	bool is_anon;
+};
+
+/** Encode SUBSCRIBE request. */
 int
 xrow_encode_subscribe(struct xrow_header *row,
-		      const struct tt_uuid *replicaset_uuid,
-		      const struct tt_uuid *instance_uuid,
-		      const struct vclock *vclock, bool anon,
-		      uint32_t id_filter);
+		      const struct subscribe_request *req);
 
-/**
- * Decode SUBSCRIBE command.
- * @param row Row to decode.
- * @param[out] replicaset_uuid.
- * @param[out] instance_uuid.
- * @param[out] vclock.
- * @param[out] version_id.
- * @param[out] anon Whether it is an anonymous subscribe.
- * @param[out] id_filter A list of ids to skip rows from when
- *			 feeding a replica.
- *
- * @retval  0 Success.
- * @retval -1 Memory or format error.
- */
+/** Decode SUBSCRIBE request. */
 int
 xrow_decode_subscribe(const struct xrow_header *row,
-		      struct tt_uuid *replicaset_uuid,
-		      struct tt_uuid *instance_uuid, struct vclock *vclock,
-		      uint32_t *version_id, bool *anon, uint32_t *id_filter);
+		      struct subscribe_request *req);
 
-/**
- * Encode JOIN command.
- * @param[out] row Row to encode into.
- * @param instance_uuid.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
- */
+/** SUBSCRIBE response sent by master. */
+struct subscribe_response {
+	/** Master's replicaset UUID. */
+	struct tt_uuid replicaset_uuid;
+	/** Master's vclock. */
+	struct vclock vclock;
+};
+
+/** Encode SUBSCRIBE response. */
 int
-xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid);
+xrow_encode_subscribe_response(struct xrow_header *row,
+			       const struct subscribe_response *rsp);
 
-/**
- * Decode JOIN command.
- * @param row Row to decode.
- * @param[out] instance_uuid.
- * @param[out] version_id.
- *
- * @retval  0 Success.
- * @retval -1 Memory or format error.
- */
-static inline int
-xrow_decode_join(const struct xrow_header *row, struct tt_uuid *instance_uuid,
-		 uint32_t *version_id)
-{
-	return xrow_decode_subscribe(row, NULL, instance_uuid, NULL, version_id,
-				     NULL, NULL);
-}
+/** Decode SUBSCRIBE response. */
+int
+xrow_decode_subscribe_response(const struct xrow_header *row,
+			       struct subscribe_response *rsp);
 
-/**
- * Decode REGISTER request.
- * @param row Row to decode.
- * @param[out] instance_uuid Instance uuid.
- * @param[out] vclock Instance vclock.
- * @param[out] version_id Replica version id.
- *
- * @retval 0 Success.
- * @retval -1 Memory or format error.
- */
-static inline int
-xrow_decode_register(const struct xrow_header *row,
-		     struct tt_uuid *instance_uuid, struct vclock *vclock,
-		     uint32_t *version_id)
-{
-	return xrow_decode_subscribe(row, NULL, instance_uuid, vclock,
-				     version_id, NULL, NULL);
-}
+/** Request from a replica to JOIN the cluster. */
+struct join_request {
+	/** Replica's instance UUID. */
+	struct tt_uuid instance_uuid;
+	/** Replica's version. */
+	uint32_t version_id;
+};
+
+/** Encode JOIN request. */
+int
+xrow_encode_join(struct xrow_header *row, const struct join_request *req);
+
+/** Decode JOIN request. */
+int
+xrow_decode_join(const struct xrow_header *row, struct join_request *req);
 
 /**
  * Encode a heartbeat message.
@@ -590,65 +567,13 @@ int
 xrow_decode_heartbeat(const struct xrow_header *row, struct vclock *vclock,
 		      uint64_t *vclock_sync);
 
-/**
- * Encode a vclock.
- * @param row[out] Row to encode into.
- * @param vclock.
- *
- * @retval 0 Success.
- * @retval -1 Memory error.
- */
-static inline int
-xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
-{
-	return xrow_encode_heartbeat(row, vclock, 0);
-}
-
-/**
- * Decode a vclock.
- * @param row Row to decode.
- * @param vclock[out].
- *
- * @retval 0 Success.
- * @retval -1 Format error.
- */
-static inline int
-xrow_decode_vclock(const struct xrow_header *row, struct vclock *vclock)
-{
-	return xrow_decode_heartbeat(row, vclock, NULL);
-}
-
-/**
- * Encode a response to subscribe request.
- * @param row[out] Row to encode into.
- * @param replicaset_uuid.
- * @param vclock.
- *
- * @retval 0 Success.
- * @retval -1 Memory error.
- */
+/** Encode vclock. */
 int
-xrow_encode_subscribe_response(struct xrow_header *row,
-			      const struct tt_uuid *replicaset_uuid,
-			      const struct vclock *vclock);
+xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
 
-/**
- * Decode a response to subscribe request.
- * @param row Row to decode.
- * @param[out] replicaset_uuid.
- * @param[out] vclock.
- *
- * @retval 0 Success.
- * @retval -1 Memory or format error.
- */
-static inline int
-xrow_decode_subscribe_response(const struct xrow_header *row,
-			       struct tt_uuid *replicaset_uuid,
-			       struct vclock *vclock)
-{
-	return xrow_decode_subscribe(row, replicaset_uuid, NULL, vclock, NULL,
-				     NULL, NULL);
-}
+/** Decode vclock. */
+int
+xrow_decode_vclock(const struct xrow_header *row, struct vclock *vclock);
 
 /**
  * Encode any bodyless message.
@@ -1064,65 +989,52 @@ xrow_decode_ballot_xc(const struct xrow_header *row, struct ballot *ballot)
 /** @copydoc xrow_encode_register. */
 static inline void
 xrow_encode_register_xc(struct xrow_header *row,
-		       const struct tt_uuid *instance_uuid,
-		       const struct vclock *vclock)
+		       const struct register_request *req)
 {
-	if (xrow_encode_register(row, instance_uuid, vclock) != 0)
+	if (xrow_encode_register(row, req) != 0)
 		diag_raise();
 }
 
 /** @copydoc xrow_encode_subscribe. */
 static inline void
 xrow_encode_subscribe_xc(struct xrow_header *row,
-			 const struct tt_uuid *replicaset_uuid,
-			 const struct tt_uuid *instance_uuid,
-			 const struct vclock *vclock, bool anon,
-			 uint32_t id_filter)
+			 const struct subscribe_request *req)
 {
-	if (xrow_encode_subscribe(row, replicaset_uuid, instance_uuid,
-				  vclock, anon, id_filter) != 0)
+	if (xrow_encode_subscribe(row, req) != 0)
 		diag_raise();
 }
 
 /** @copydoc xrow_decode_subscribe. */
 static inline void
 xrow_decode_subscribe_xc(const struct xrow_header *row,
-			 struct tt_uuid *replicaset_uuid,
-			 struct tt_uuid *instance_uuid, struct vclock *vclock,
-			 uint32_t *replica_version_id, bool *anon,
-			 uint32_t *id_filter)
+			 struct subscribe_request *req)
 {
-	if (xrow_decode_subscribe(row, replicaset_uuid, instance_uuid,
-				  vclock, replica_version_id, anon,
-				  id_filter) != 0)
+	if (xrow_decode_subscribe(row, req) != 0)
 		diag_raise();
 }
 
 /** @copydoc xrow_encode_join. */
 static inline void
-xrow_encode_join_xc(struct xrow_header *row,
-		    const struct tt_uuid *instance_uuid)
+xrow_encode_join_xc(struct xrow_header *row, const struct join_request *req)
 {
-	if (xrow_encode_join(row, instance_uuid) != 0)
+	if (xrow_encode_join(row, req) != 0)
 		diag_raise();
 }
 
 /** @copydoc xrow_decode_join. */
 static inline void
-xrow_decode_join_xc(const struct xrow_header *row,
-		    struct tt_uuid *instance_uuid, uint32_t *version_id)
+xrow_decode_join_xc(const struct xrow_header *row, struct join_request *req)
 {
-	if (xrow_decode_join(row, instance_uuid, version_id) != 0)
+	if (xrow_decode_join(row, req) != 0)
 		diag_raise();
 }
 
 /** @copydoc xrow_decode_register. */
 static inline void
 xrow_decode_register_xc(const struct xrow_header *row,
-			struct tt_uuid *instance_uuid, struct vclock *vclock,
-			uint32_t *version_id)
+			struct register_request *req)
 {
-	if (xrow_decode_register(row, instance_uuid, vclock, version_id) != 0)
+	if (xrow_decode_register(row, req) != 0)
 		diag_raise();
 }
 
@@ -1163,20 +1075,18 @@ xrow_decode_vclock_xc(const struct xrow_header *row, struct vclock *vclock)
 /** @copydoc xrow_encode_subscribe_response. */
 static inline void
 xrow_encode_subscribe_response_xc(struct xrow_header *row,
-				  const struct tt_uuid *replicaset_uuid,
-				  const struct vclock *vclock)
+				  const struct subscribe_response *rsp)
 {
-	if (xrow_encode_subscribe_response(row, replicaset_uuid, vclock) != 0)
+	if (xrow_encode_subscribe_response(row, rsp) != 0)
 		diag_raise();
 }
 
 /** @copydoc xrow_decode_subscribe_response. */
 static inline void
 xrow_decode_subscribe_response_xc(const struct xrow_header *row,
-				  struct tt_uuid *replicaset_uuid,
-				  struct vclock *vclock)
+				  struct subscribe_response *rsp)
 {
-	if (xrow_decode_subscribe_response(row, replicaset_uuid, vclock) != 0)
+	if (xrow_decode_subscribe_response(row, rsp) != 0)
 		diag_raise();
 }
 

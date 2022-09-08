@@ -699,13 +699,11 @@ applier_register(struct applier *applier, bool was_anon)
 	/* Send REGISTER request */
 	struct iostream *io = &applier->io;
 	struct xrow_header row;
-
-	memset(&row, 0, sizeof(row));
-	/*
-	 * Send this instance's current vclock together
-	 * with REGISTER request.
-	 */
-	xrow_encode_register(&row, &INSTANCE_UUID, box_vclock);
+	struct register_request req;
+	memset(&req, 0, sizeof(req));
+	req.instance_uuid = INSTANCE_UUID;
+	vclock_copy(&req.vclock, box_vclock);
+	xrow_encode_register_xc(&row, &req);
 	row.type = IPROTO_REGISTER;
 	coio_write_xrow(io, &row);
 
@@ -732,8 +730,11 @@ applier_join(struct applier *applier)
 	struct iostream *io = &applier->io;
 	struct xrow_header row;
 	uint64_t row_count;
-
-	xrow_encode_join_xc(&row, &INSTANCE_UUID);
+	struct join_request req;
+	memset(&req, 0, sizeof(req));
+	req.instance_uuid = INSTANCE_UUID;
+	req.version_id = tarantool_version_id();
+	xrow_encode_join_xc(&row, &req);
 	coio_write_xrow(io, &row);
 
 	applier_set_state(applier, APPLIER_WAIT_SNAPSHOT);
@@ -1963,23 +1964,23 @@ applier_subscribe(struct applier *applier)
 	struct iostream *io = &applier->io;
 	struct ibuf *ibuf = &applier->ibuf;
 	struct xrow_header row;
-	struct tt_uuid cluster_id = uuid_nil;
 
-	struct vclock vclock;
-	vclock_create(&vclock);
-	vclock_copy(&vclock, &replicaset.vclock);
-
+	struct subscribe_request req;
+	memset(&req, 0, sizeof(req));
+	vclock_copy(&req.vclock, &replicaset.vclock);
 	ERROR_INJECT(ERRINJ_REPLICASET_VCLOCK, {
-		vclock_create(&vclock);
+		vclock_create(&req.vclock);
 	});
-
+	req.replicaset_uuid = REPLICASET_UUID;
+	req.instance_uuid = INSTANCE_UUID;
+	req.version_id = tarantool_version_id();
+	req.is_anon = replication_anon;
 	/*
 	 * Stop accepting local rows coming from a remote
 	 * instance as soon as local WAL starts accepting writes.
 	 */
-	uint32_t id_filter = box_is_orphan() ? 0 : 1 << instance_id;
-	xrow_encode_subscribe_xc(&row, &REPLICASET_UUID, &INSTANCE_UUID,
-				 &vclock, replication_anon, id_filter);
+	req.id_filter = box_is_orphan() ? 0 : 1 << instance_id;
+	xrow_encode_subscribe_xc(&row, &req);
 	coio_write_xrow(io, &row);
 
 	/* Read SUBSCRIBE response */
@@ -1995,29 +1996,29 @@ applier_subscribe(struct applier *applier)
 		 * In case of successful subscribe, the server
 		 * responds with its current vclock.
 		 *
-		 * Tarantool > 2.1.1 also sends its cluster id to
+		 * Tarantool > 2.1.1 also sends its replicaset UUID to
 		 * the replica, and replica has to check whether
-		 * its and master's cluster ids match.
+		 * its and master's replicaset UUIDs match.
 		 */
-		xrow_decode_subscribe_response_xc(&row, &cluster_id,
-					&applier->remote_vclock_at_subscribe);
+		struct subscribe_response rsp;
+		xrow_decode_subscribe_response_xc(&row, &rsp);
 		applier->instance_id = row.replica_id;
+		vclock_copy(&applier->remote_vclock_at_subscribe, &rsp.vclock);
 		/*
-		 * If master didn't send us its cluster id
+		 * If master didn't send us its replicaset UUID
 		 * assume that it has done all the checks.
-		 * In this case cluster_id will remain zero.
+		 * In this case replicaset UUID will remain zero.
 		 */
-		if (!tt_uuid_is_nil(&cluster_id) &&
-		    !tt_uuid_is_equal(&cluster_id, &REPLICASET_UUID)) {
+		if (!tt_uuid_is_nil(&rsp.replicaset_uuid) &&
+		    !tt_uuid_is_equal(&rsp.replicaset_uuid, &REPLICASET_UUID)) {
 			tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
-				  tt_uuid_str(&cluster_id),
+				  tt_uuid_str(&rsp.replicaset_uuid),
 				  tt_uuid_str(&REPLICASET_UUID));
 		}
-
 		say_info("subscribed");
 		say_info("remote vclock %s local vclock %s",
-			 vclock_to_string(&applier->remote_vclock_at_subscribe),
-			 vclock_to_string(&vclock));
+			 vclock_to_string(&rsp.vclock),
+			 vclock_to_string(&req.vclock));
 	}
 	/*
 	 * Tarantool < 1.6.7:
