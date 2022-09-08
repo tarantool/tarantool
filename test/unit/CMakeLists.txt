@@ -20,6 +20,7 @@ include_directories(${EXTRA_CORE_INCLUDE_DIRS})
 
 include(CMakeParseArguments)
 
+message(STATUS "Add unit tests")
 function(create_unit_test)
   cmake_parse_arguments(
     UNIT
@@ -28,11 +29,46 @@ function(create_unit_test)
     "SOURCES;LIBRARIES;COMPILE_DEFINITIONS"
     ${ARGN}
   )
-  message(STATUS "Creating unit test ${UNIT_PREFIX}.test")
   add_executable(${UNIT_PREFIX}.test ${UNIT_SOURCES})
   target_compile_definitions(${UNIT_PREFIX}.test PRIVATE ${UNIT_COMPILE_DEFINITIONS})
   target_link_libraries(${UNIT_PREFIX}.test ${UNIT_LIBRARIES})
   set(UNIT_TEST_TARGETS "${UNIT_TEST_TARGETS} ${UNIT_PREFIX}.test" PARENT_SCOPE)
+  # XXX: The call produces both test and target
+  # <${UNIT_PREFIX}.test-deps> as a side effect.
+  _add_test_suite_target(${UNIT_PREFIX}.test
+    LABELS unit
+    DEPENDS ${UNIT_LIBRARIES} ${UNIT_PREFIX}.test
+  )
+  # Every unit test is a self-contained program without
+  # dependencies that does not require a special test environment.
+  # Historically unit tests are running using test-run.py because
+  # some Tarantool unit tests produce a TAP output that is not
+  # actually a TAP-compliant and test-run.py cannot parse output
+  # from these tests. That's why we maintain .result files for
+  # unit tests and use diff-based approach here: it is needed
+  # a special tool for comparing actual test output and expected
+  # test output saved to .result file.
+  # However it is not required to have a special tools for running
+  # TAP-compliant tests and CTest would be more than enough.
+  # There is an open issue for fixing such unit tests and make
+  # output TAP-compliant,
+  # see https://github.com/tarantool/tarantool/issues/5000.
+  set(result_file ${CMAKE_CURRENT_BINARY_DIR}/${UNIT_PREFIX}.result)
+  set(test_path "$<TARGET_FILE:${UNIT_PREFIX}.test>")
+  if (EXISTS "${result_file}")
+    set(test_command ${PROJECT_SOURCE_DIR}/test/test-run.py
+                     --builddir=${PROJECT_BINARY_DIR}
+                     ${test_path})
+  else()
+    set(test_command ${test_path})
+  endif()
+  set(test_title test/unit/${UNIT_PREFIX}.test)
+  add_test(NAME ${test_title}
+           COMMAND ${test_command})
+  set_tests_properties(${test_title} PROPERTIES
+    LABELS unit
+    DEPENDS ${UNIT_PREFIX}.test-deps
+  )
 endfunction()
 
 add_library(unit STATIC unit.c)
@@ -533,6 +569,14 @@ create_unit_test(PREFIX snap_quorum_delay
                  SOURCES snap_quorum_delay.cc box_test_utils.c
                  LIBRARIES box core unit
 )
+# The commit 8c50e069e31
+# ("txn: remove TXN_IS_DONE check from txn_commit()") disables
+# snap_quorum_delay.test, which uses internal API of replication
+# and txn modules assuming the journal is initialized somewhere
+# inside. But now it is not, and it can't be fixed in a sane way
+# inside the test. It will be deleted/rewritten later.
+set_tests_properties(test/unit/snap_quorum_delay.test
+                     PROPERTIES DISABLED True)
 
 create_unit_test(PREFIX raft
                  SOURCES raft.c raft_test_utils.c core_test_utils.c

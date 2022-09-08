@@ -12,9 +12,10 @@ endif()
 # Parse command-line arguments into a semicolon-separated list.
 separate_arguments(BENCH_CMD_SEPARATE UNIX_COMMAND ${BENCH_CMD})
 
-add_subdirectory(lua)
-
 set(TARANTOOL_BIN $<TARGET_FILE:tarantool>)
+set(TEST_SUITE_NAME "performance-c")
+
+add_subdirectory(lua)
 
 find_package(benchmark QUIET)
 if (NOT ${benchmark_FOUND})
@@ -38,6 +39,7 @@ include_directories(${EXTRA_CORE_INCLUDE_DIRS})
 
 set(RUN_PERF_C_TESTS_LIST "")
 
+message(STATUS "Add performance tests (C/C++)")
 function(create_perf_test_target)
   set(prefix PERF)
   set(noValues)
@@ -51,7 +53,6 @@ function(create_perf_test_target)
                         "${singleValues}"
                         "${multiValues}"
                         ${ARGN})
-  message(STATUS "Creating C performance test ${PERF_TARGET}_perftest")
 
   set(BENCH_RESULT ${PERF_OUTPUT_DIR}/${PERF_TARGET}.json)
   set(BENCH_TARGET ${PERF_TARGET}_perftest)
@@ -76,6 +77,13 @@ function(create_perf_test_target)
 
   set(RUN_PERF_C_TESTS_LIST ${RUN_PERF_C_TESTS_LIST} ${BENCH_TARGET} PARENT_SCOPE)
   set(BENCH_RESULTS ${BENCH_RESULT_TARGET} ${BENCH_RESULTS} PARENT_SCOPE)
+  set(test_title "perf/${PERF_TARGET}.cc")
+  add_test(NAME ${test_title}
+           COMMAND "$<TARGET_FILE:${PERF_TARGET}.perftest>")
+  set_tests_properties(${test_title} PROPERTIES
+    LABELS ${TEST_SUITE_NAME}
+    DEPENDS ${PERF_TARGET}-deps
+  )
 endfunction()
 
 function(create_perf_test)
@@ -93,6 +101,12 @@ function(create_perf_test)
                         ${ARGN})
   add_executable(${PERF_NAME}.perftest ${PERF_SOURCES})
   target_link_libraries(${PERF_NAME}.perftest PUBLIC ${PERF_LIBRARIES})
+  # XXX: The call produces both test and target
+  # <${PERF_NAME}-deps> as a side effect.
+  _add_test_suite_target(${PERF_NAME}
+    LABELS ${TEST_SUITE_NAME}
+    DEPENDS ${PERF_LIBRARIES}
+  )
 endfunction()
 
 create_perf_test(NAME tuple
@@ -122,6 +136,7 @@ create_perf_test(NAME memtx
 create_perf_test_target(TARGET memtx)
 
 add_custom_target(test-c-perf
+                  COMMAND ${CMAKE_CTEST_COMMAND} -L ${TEST_SUITE_NAME} ${CTEST_FLAGS}
                   DEPENDS ${RUN_PERF_C_TESTS_LIST}
                   COMMENT "Running C performance tests"
 )

@@ -6,6 +6,8 @@ include_directories(${PROJECT_SOURCE_DIR}/src/box)
 # A special target with fuzzer and sanitizer flags.
 add_library(fuzzer_config INTERFACE)
 
+find_program(SHELL sh)
+
 target_compile_options(
     fuzzer_config
     INTERFACE
@@ -38,6 +40,36 @@ target_link_libraries(
 
 set(FUZZ_TEST_TARGETS "")
 
+set(DEFAULT_RUNS_NUMBER 5)
+
+string(JOIN " " DEFAULT_LIBFUZZER_OPTS
+  -max_total_time=60
+  -mutate_depth=20
+  -print_final_stats=1
+  -print_pcs=1
+  -reduce_inputs=1
+  -reload=1
+  -report_slow_units=5
+  -use_value_profile=1
+  -workers=${CMAKE_BUILD_PARALLEL_LEVEL}
+)
+
+function(BuildLibFuzzerOptions fuzz_name outvar)
+  set(opts ${DEFAULT_LIBFUZZER_OPTS})
+
+  set(dict_path ${PROJECT_SOURCE_DIR}/test/static/${fuzz_name}.dict)
+  if (EXISTS ${dict_path})
+    set(opts "${opts} -dict=${dict_path}")
+  endif()
+  set(corpus_dir "${PROJECT_SOURCE_DIR}/test/static/corpus/${fuzz_name}")
+  if (EXISTS ${corpus_path})
+    set(opts "${opts} ${corpus_path}")
+  endif()
+  set(opts "${outvar} -artifact_prefix=${outvar}_")
+  set(${outvar} ${opts} PARENT_SCOPE)
+endfunction()
+
+message(STATUS "Add fuzzing tests")
 function(create_fuzz_test)
   cmake_parse_arguments(
     FUZZ
@@ -46,11 +78,25 @@ function(create_fuzz_test)
     "SOURCES;LIBRARIES"
     ${ARGN}
   )
-  message(STATUS "Creating fuzz test ${FUZZ_PREFIX}_fuzzer")
   add_executable(${FUZZ_PREFIX}_fuzzer ${FUZZ_SOURCES})
+  # XXX: The call produces both test and target
+  # <${FUZZ_PREFIX}-deps> as a side effect.
+  _add_test_suite_target(${FUZZ_PREFIX}
+    LABELS fuzz
+    DEPENDS ${FUZZ_LIBRARIES} ${FUZZ_PREFIX}_fuzzer
+  )
   # Use PUBLIC to force 'fuzzer_config' for all dependent targets.
   target_link_libraries(${FUZZ_PREFIX}_fuzzer PUBLIC ${FUZZ_LIBRARIES})
   set(FUZZ_TEST_TARGETS ${FUZZ_TEST_TARGETS} ${FUZZ_PREFIX}_fuzzer PARENT_SCOPE)
+  BuildLibFuzzerOptions(LibFuzzerOpts ${FUZZ_PREFIX})
+  set(test_title test/fuzz/${FUZZ_PREFIX}_test)
+  add_test(NAME ${test_title}
+           COMMAND $<TARGET_FILE:${FUZZ_PREFIX}_fuzzer> ${LibFuzzerOpts}
+  )
+  set_tests_properties(${test_title} PROPERTIES
+    LABELS fuzz
+    DEPENDS ${FUZZ_PREFIX}-deps
+  )
 endfunction()
 
 create_fuzz_test(PREFIX csv
