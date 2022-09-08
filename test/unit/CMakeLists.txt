@@ -17,193 +17,366 @@ include_directories(${ICU_INCLUDE_DIRS})
 include_directories(${CURL_INCLUDE_DIRS})
 include_directories(${EXTRA_CORE_INCLUDE_DIRS})
 
+include(CMakeParseArguments)
+
+function(create_unit_test)
+  cmake_parse_arguments(
+    UNIT
+    ""
+    "PREFIX"
+    "SOURCES;LIBRARIES"
+    ${ARGN}
+  )
+  message(STATUS "Creating unit test ${UNIT_PREFIX}.test")
+  add_executable(${UNIT_PREFIX}.test ${UNIT_SOURCES})
+  target_link_libraries(${UNIT_PREFIX}.test ${UNIT_LIBRARIES})
+  set(UNIT_TEST_TARGETS "${UNIT_TEST_TARGETS} ${UNIT_PREFIX}.test")
+endfunction()
+
 add_library(unit STATIC unit.c)
 
-add_executable(heap.test heap.c)
-target_link_libraries(heap.test unit)
-add_executable(heap_iterator.test heap_iterator.c)
-target_link_libraries(heap_iterator.test unit)
-add_executable(stailq.test stailq.c)
-target_link_libraries(stailq.test unit)
-add_executable(uri_parser.test uri_parser.c unit.c)
-target_link_libraries(uri_parser.test uri unit)
-add_executable(uri.test uri.c unit.c)
-target_link_libraries(uri.test uri unit)
-add_executable(queue.test queue.c)
-add_executable(mhash.test mhash.c)
-target_link_libraries(mhash.test unit)
-add_executable(mhash_bytemap.test mhash_bytemap.c)
-target_link_libraries(mhash_bytemap.test unit)
-add_executable(rope_basic.test rope_basic.c)
-target_link_libraries(rope_basic.test salad)
-add_executable(gh-5788-rope-insert-oom.test gh-5788-rope-insert-oom.c)
-target_link_libraries(gh-5788-rope-insert-oom.test salad unit)
-add_executable(rope_avl.test rope_avl.c)
-target_link_libraries(rope_avl.test salad)
-add_executable(rope_stress.test rope_stress.c)
-target_link_libraries(rope_stress.test salad)
-add_executable(rope.test rope.c)
-target_link_libraries(rope.test salad)
-add_executable(int96.test int96.cc)
-add_executable(bit.test bit.c bit.c)
-target_link_libraries(bit.test bit)
-add_executable(bitset_basic.test bitset_basic.c)
-target_link_libraries(bitset_basic.test bitset)
-add_executable(bitset_iterator.test bitset_iterator.c)
-target_link_libraries(bitset_iterator.test bitset)
-add_executable(bitset_index.test bitset_index.c)
-target_link_libraries(bitset_index.test bitset)
-add_executable(base64.test base64.c)
-target_link_libraries(base64.test misc unit)
-add_executable(uuid.test uuid.c core_test_utils.c)
-target_link_libraries(uuid.test core unit)
-add_executable(random.test random.c core_test_utils.c)
-target_link_libraries(random.test core unit)
-add_executable(xmalloc.test xmalloc.c core_test_utils.c)
-target_link_libraries(xmalloc.test unit)
-add_executable(datetime.test datetime.c)
-target_link_libraries(datetime.test tzcode core cdt unit)
-add_executable(error.test error.c core_test_utils.c)
-target_link_libraries(error.test unit core box_error)
-add_executable(interval.test interval.c core_test_utils.c)
-target_link_libraries(interval.test core unit)
+create_unit_test(PREFIX heap
+                 SOURCES heap.c
+                 LIBRARIES unit
+)
+create_unit_test(PREFIX heap_iterator
+                 SOURCES heap_iterator.c
+                 LIBRARIES unit
+)
+create_unit_test(PREFIX stailq
+                 SOURCES stailq.c
+                 LIBRARIES unit
+)
+create_unit_test(PREFIX uri_parser
+                 SOURCES uri_parser.c unit.c
+                 LIBRARIES uri unit
+)
+create_unit_test(PREFIX uri
+                 SOURCES uri.c unit.c
+                 LIBRARIES uri unit
+)
+create_unit_test(PREFIX queue
+                 SOURCES queue.c
+                 LIBRARIES
+)
+create_unit_test(PREFIX mhash
+                 SOURCES mhash.c
+                 LIBRARIES unit
+)
+create_unit_test(PREFIX mhash_bytemap
+                 SOURCES mhash_bytemap.c
+                 LIBRARIES unit
+)
+create_unit_test(PREFIX rope_basic
+                 SOURCES rope_basic.c
+                 LIBRARIES salad
+)
+create_unit_test(PREFIX gh-5788-rope-insert-oom
+                 SOURCES gh-5788-rope-insert-oom.c
+                 LIBRARIES salad unit
+)
+create_unit_test(PREFIX rope_avl
+                 SOURCES rope_avl.c
+                 LIBRARIES salad
+)
+create_unit_test(PREFIX rope_stress
+                 SOURCES rope_stress.c
+                 LIBRARIES salad
+)
+create_unit_test(PREFIX rope
+                 SOURCES rope.c
+                 LIBRARIES salad
+)
+create_unit_test(PREFIX int96
+                 SOURCES int96.cc
+                 LIBRARIES
+)
+create_unit_test(PREFIX bit
+                 SOURCES bit.c
+                 LIBRARIES bit
+)
+create_unit_test(PREFIX bitset_basic
+                 SOURCES bitset_basic.c
+                 LIBRARIES bitset
+)
+create_unit_test(PREFIX bitset_iterator
+                 SOURCES bitset_iterator.c
+                 LIBRARIES bitset
+)
+create_unit_test(PREFIX bitset_index
+                 SOURCES bitset_index.c
+                 LIBRARIES bitset
+)
+create_unit_test(PREFIX base64
+                 SOURCES base64.c
+                 LIBRARIES misc unit
+)
+create_unit_test(PREFIX uuid
+                 SOURCES uuid.c core_test_utils.c
+                 LIBRARIES core unit
+)
+create_unit_test(PREFIX random
+                 SOURCES random.c core_test_utils.c
+                 LIBRARIES core unit
+)
+create_unit_test(PREFIX xmalloc
+                 SOURCES xmalloc.c core_test_utils.c
+                 LIBRARIES unit
+)
+create_unit_test(PREFIX datetime
+                 SOURCES datetime.c
+                 LIBRARIES tzcode core cdt unit
+)
+create_unit_test(PREFIX error
+                 SOURCES error.c core_test_utils.c
+                 LIBRARIES unit core box_error
+)
+create_unit_test(PREFIX interval
+                 SOURCES interval.c core_test_utils.c
+                 LIBRARIES core unit
+)
+create_unit_test(PREFIX bps_tree
+                 SOURCES bps_tree.cc
+                 LIBRARIES small misc
+)
+create_unit_test(PREFIX bps_tree_iterator
+                 SOURCES bps_tree_iterator.cc
+                 LIBRARIES small misc
+)
+create_unit_test(PREFIX bps_tree_view
+                 SOURCES bps_tree_view.c
+                 LIBRARIES small unit
+)
+create_unit_test(PREFIX rtree
+                 SOURCES rtree.cc
+                 LIBRARIES salad small
+)
+create_unit_test(PREFIX rtree_iterator
+                 SOURCES rtree_iterator.cc
+                 LIBRARIES salad small
+)
+create_unit_test(PREFIX rtree_multidim
+                 SOURCES rtree_multidim.cc
+                 LIBRARIES salad small
+)
+create_unit_test(PREFIX light
+                 SOURCES light.cc
+                 LIBRARIES small
+)
+create_unit_test(PREFIX light_view
+                 SOURCES light_view.c
+                 LIBRARIES small unit
+)
+create_unit_test(PREFIX bloom
+                 SOURCES bloom.cc
+                 LIBRARIES salad
+)
+create_unit_test(PREFIX vclock
+                 SOURCES vclock.cc
+                 LIBRARIES vclock unit
+)
+create_unit_test(PREFIX xrow
+                 SOURCES xrow.cc core_test_utils.c
+                 LIBRARIES xrow unit
+)
+create_unit_test(PREFIX decimal
+                 SOURCES decimal.c
+                 LIBRARIES core unit
+)
+create_unit_test(PREFIX mp_error
+                 SOURCES mp_error.cc core_test_utils.c
+                 LIBRARIES box_error core unit
+)
+create_unit_test(PREFIX fiber
+                 SOURCES fiber.cc core_test_utils.c
+                 LIBRARIES core unit
+)
 
-add_executable(bps_tree.test bps_tree.cc)
-target_link_libraries(bps_tree.test small misc)
-add_executable(bps_tree_iterator.test bps_tree_iterator.cc)
-target_link_libraries(bps_tree_iterator.test small misc)
-add_executable(bps_tree_view.test bps_tree_view.c)
-target_link_libraries(bps_tree_view.test small unit)
-add_executable(rtree.test rtree.cc)
-target_link_libraries(rtree.test salad small)
-add_executable(rtree_iterator.test rtree_iterator.cc)
-target_link_libraries(rtree_iterator.test salad small)
-add_executable(rtree_multidim.test rtree_multidim.cc)
-target_link_libraries(rtree_multidim.test salad small)
-add_executable(light.test light.cc)
-target_link_libraries(light.test small)
-add_executable(light_view.test light_view.c)
-target_link_libraries(light_view.test small unit)
-add_executable(bloom.test bloom.cc)
-target_link_libraries(bloom.test salad)
-add_executable(vclock.test vclock.cc)
-target_link_libraries(vclock.test vclock unit)
-add_executable(xrow.test xrow.cc core_test_utils.c)
-target_link_libraries(xrow.test xrow unit)
-add_executable(decimal.test decimal.c)
-target_link_libraries(decimal.test core unit)
-add_executable(mp_error.test mp_error.cc core_test_utils.c)
-target_link_libraries(mp_error.test box_error core unit)
-add_executable(fiber.test fiber.cc core_test_utils.c)
-target_link_libraries(fiber.test core unit)
-add_executable(fiber_stack.test fiber_stack.c core_test_utils.c)
-target_link_libraries(fiber_stack.test core unit)
-add_executable(func_cache.test func_cache.c box_test_utils.c)
-target_link_libraries(func_cache.test box unit)
-add_executable(prbuf.test prbuf.c)
-target_link_libraries(prbuf.test unit core)
-add_executable(clock_lowres.test clock_lowres.c core_test_utils.c)
-target_link_libraries(clock_lowres.test unit core)
-add_executable(trigger.test trigger.c core_test_utils.c)
-target_link_libraries(trigger.test unit core)
+if(NOT ${CMAKE_BUILD_TYPE} EQUAL "Release")
+    create_unit_test(PREFIX fiber_stack
+                     SOURCES fiber_stack.c core_test_utils.c
+                     LIBRARIES core unit
+    )
+endif()
+
+create_unit_test(PREFIX func_cache
+                 SOURCES func_cache.c box_test_utils.c
+                 LIBRARIES box unit
+)
+create_unit_test(PREFIX prbuf
+                 SOURCES prbuf.c
+                 LIBRARIES unit core
+)
+create_unit_test(PREFIX clock_lowres
+                 SOURCES clock_lowres.c core_test_utils.c
+                 LIBRARIES unit core
+)
+create_unit_test(PREFIX trigger
+                 SOURCES trigger.c core_test_utils.c
+                 LIBRARIES unit core
+)
 
 if (NOT ENABLE_GCOV)
     # This test is known to be broken with GCOV
-    add_executable(guard.test guard.cc core_test_utils.c)
-    target_link_libraries(guard.test core unit)
+    create_unit_test(PREFIX guard
+                     SOURCES guard.cc core_test_utils.c
+                     LIBRARIES core unit
+    )
 endif ()
 
-add_executable(fiber_stress.test fiber_stress.cc core_test_utils.c)
-target_link_libraries(fiber_stress.test core)
+create_unit_test(PREFIX fiber_stress
+                 SOURCES fiber_stress.cc core_test_utils.c
+                 LIBRARIES core
+)
+create_unit_test(PREFIX fiber_cond
+                 SOURCES fiber_cond.c unit.c core_test_utils.c
+                 LIBRARIES core
+)
+create_unit_test(PREFIX fiber_channel
+                 SOURCES fiber_channel.cc unit.c core_test_utils.c
+                 LIBRARIES core
+)
+create_unit_test(PREFIX fiber_channel_stress
+                 SOURCES fiber_channel_stress.cc core_test_utils.c
+                 LIBRARIES core
+)
 
-add_executable(fiber_cond.test fiber_cond.c unit.c core_test_utils.c)
-target_link_libraries(fiber_cond.test core)
+create_unit_test(PREFIX cbus_stress
+                 SOURCES cbus_stress.c core_test_utils.c
+                 LIBRARIES core stat
+)
 
-add_executable(fiber_channel.test fiber_channel.cc unit.c core_test_utils.c)
-target_link_libraries(fiber_channel.test core)
+create_unit_test(PREFIX cbus
+                 SOURCES cbus.c core_test_utils.c
+                 LIBRARIES core unit stat
+)
 
-add_executable(fiber_channel_stress.test fiber_channel_stress.cc core_test_utils.c)
-target_link_libraries(fiber_channel_stress.test core)
-
-add_executable(cbus_stress.test cbus_stress.c core_test_utils.c)
-target_link_libraries(cbus_stress.test core stat)
-
-add_executable(cbus.test cbus.c core_test_utils.c)
-target_link_libraries(cbus.test core unit stat)
-
-add_executable(cbus_call.test cbus_call.c core_test_utils.c)
-target_link_libraries(cbus_call.test core unit stat)
+create_unit_test(PREFIX cbus_call
+                 SOURCES cbus_call.c core_test_utils.c
+                 LIBRARIES core unit stat
+)
 
 include(CheckSymbolExists)
 check_symbol_exists(__GLIBC__ features.h GLIBC_USED)
 if (GLIBC_USED)
-    add_executable(cbus_hang.test cbus_hang.c core_test_utils.c)
-    target_link_libraries(cbus_hang.test core unit stat)
+    create_unit_test(PREFIX cbus_hang
+                     SOURCES cbus_hang.c core_test_utils.c
+                     LIBRARIES core unit stat
+    )
 endif ()
 
-add_executable(coio.test coio.cc core_test_utils.c)
-target_link_libraries(coio.test core eio bit uri unit)
+create_unit_test(PREFIX coio
+                 SOURCES coio.cc core_test_utils.c
+                 LIBRARIES core eio bit uri unit
+)
 
 if (ENABLE_BUNDLED_MSGPUCK)
     set(MSGPUCK_DIR ${PROJECT_SOURCE_DIR}/src/lib/msgpuck/)
-    add_executable(msgpack.test
-        ${MSGPUCK_DIR}/test/msgpuck.c
-        ${MSGPUCK_DIR}/test/test.c)
-
     set_source_files_properties(
         ${MSGPUCK_DIR}/test/msgpuck.c
         ${MSGPUCK_DIR}/test/test.c
         PROPERTIES COMPILE_FLAGS "-I${MSGPUCK_DIR}/test")
 
-    target_link_libraries(msgpack.test ${MSGPUCK_LIBRARIES})
+    create_unit_test(PREFIX msgpack
+                     SOURCES ${MSGPUCK_DIR}/test/msgpuck.c
+                             ${MSGPUCK_DIR}/test/test.c
+                     LIBRARIES ${MSGPUCK_LIBRARIES}
+    )
 endif ()
 
-add_executable(mp_print_unknown_ext.test mp_print_unknown_ext.c box_test_utils.c)
-target_link_libraries(mp_print_unknown_ext.test unit box core)
-
-add_executable(scramble.test scramble.c core_test_utils.c)
-target_link_libraries(scramble.test scramble)
-
-add_executable(guava.test guava.c)
-target_link_libraries(guava.test salad small)
-
-add_executable(crc32.test crc32.c)
-target_link_libraries(crc32.test unit crc32)
-
-add_executable(find_path.test find_path.c
-    ${PROJECT_SOURCE_DIR}/src/find_path.c
+create_unit_test(PREFIX mp_print_unknown_ext
+                 SOURCES mp_print_unknown_ext.c box_test_utils.c
+                 LIBRARIES core unit box core
 )
 
-add_executable(reflection_c.test reflection_c.c unit.c
-    ${PROJECT_SOURCE_DIR}/src/lib/core/reflection.c)
-add_executable(reflection_cxx.test reflection_cxx.cc unit.c
-    ${PROJECT_SOURCE_DIR}/src/lib/core/reflection.c)
-add_executable(csv.test csv.c)
-target_link_libraries(csv.test csv)
+create_unit_test(PREFIX scramble
+                 SOURCES scramble.c core_test_utils.c
+                 LIBRARIES scramble
+)
 
-add_executable(json.test json.c)
-target_link_libraries(json.test json unit ${ICU_LIBRARIES})
+create_unit_test(PREFIX guava
+                 SOURCES guava.c
+                 LIBRARIES salad small
+)
 
-add_executable(http_parser.test http_parser.c)
-target_link_libraries(http_parser.test unit http_parser)
+create_unit_test(PREFIX crc32
+                 SOURCES crc32.c
+                 LIBRARIES unit crc32
+)
 
-add_executable(rmean.test rmean.cc core_test_utils.c)
-target_link_libraries(rmean.test stat unit)
-add_executable(histogram.test histogram.c core_test_utils.c)
-target_link_libraries(histogram.test stat unit)
-add_executable(ratelimit.test ratelimit.c)
-target_link_libraries(ratelimit.test unit)
-add_executable(luaT_tuple_new.test luaT_tuple_new.c box_test_utils.c)
-target_link_libraries(luaT_tuple_new.test unit box server core misc
-    ${CURL_LIBRARIES} ${LIBYAML_LIBRARIES} ${READLINE_LIBRARIES}
-    ${ICU_LIBRARIES} ${LUAJIT_LIBRARIES})
-add_executable(luaL_iterator.test luaL_iterator.c)
-target_link_libraries(luaL_iterator.test unit server coll core misc
-    ${CURL_LIBRARIES} ${LIBYAML_LIBRARIES} ${READLINE_LIBRARIES}
-    ${ICU_LIBRARIES} ${LUAJIT_LIBRARIES} ${LIB_DL})
+create_unit_test(PREFIX find_path
+                 SOURCES find_path.c
+                         ${PROJECT_SOURCE_DIR}/src/find_path.c
+                 LIBRARIES
+)
 
-add_executable(say.test say.c core_test_utils.c)
-target_link_libraries(say.test core unit)
+create_unit_test(PREFIX reflection_c
+                 SOURCES reflection_c.c unit.c
+                         ${PROJECT_SOURCE_DIR}/src/lib/core/reflection.c
+                 LIBRARIES
+)
+
+create_unit_test(PREFIX reflection_cxx
+                 SOURCES reflection_cxx.cc unit.c
+                         ${PROJECT_SOURCE_DIR}/src/lib/core/reflection.c
+                 LIBRARIES
+)
+
+create_unit_test(PREFIX csv
+                 SOURCES csv.c
+                 LIBRARIES csv
+)
+
+create_unit_test(PREFIX json
+                 SOURCES json.c
+                 LIBRARIES json unit ${ICU_LIBRARIES}
+)
+
+create_unit_test(PREFIX http_parser
+                 SOURCES http_parser.c
+                 LIBRARIES unit http_parser
+)
+
+create_unit_test(PREFIX rmean
+                 SOURCES rmean.cc core_test_utils.c
+                 LIBRARIES stat unit
+)
+
+create_unit_test(PREFIX histogram
+                 SOURCES histogram.c core_test_utils.c
+                 LIBRARIES stat unit
+)
+
+create_unit_test(PREFIX ratelimit
+                 SOURCES ratelimit.c
+                 LIBRARIES unit
+)
+
+create_unit_test(PREFIX luaT_tuple_new
+                 SOURCES luaT_tuple_new.c box_test_utils.c
+                 LIBRARIES unit box server core misc
+                           ${CURL_LIBRARIES}
+                           ${LIBYAML_LIBRARIES}
+                           ${READLINE_LIBRARIES}
+                           ${ICU_LIBRARIES}
+                           ${LUAJIT_LIBRARIES}
+)
+
+create_unit_test(PREFIX luaL_iterator
+                 SOURCES luaL_iterator.c
+                 LIBRARIES unit server coll core misc
+                           ${CURL_LIBRARIES}
+                           ${LIBYAML_LIBRARIES}
+                           ${READLINE_LIBRARIES}
+                           ${ICU_LIBRARIES}
+                           ${LUAJIT_LIBRARIES}
+                           ${LIB_DL}
+)
+
+create_unit_test(PREFIX say
+                 SOURCES say.c core_test_utils.c
+                 LIBRARIES core unit
+)
 
 set(ITERATOR_TEST_SOURCES
     vy_iterators_helper.c
@@ -214,120 +387,169 @@ set(ITERATOR_TEST_SOURCES
     ${PROJECT_SOURCE_DIR}/src/box/vy_cache.c)
 set(ITERATOR_TEST_LIBS core tuple xrow unit)
 
-add_executable(vy_mem.test vy_mem.c ${ITERATOR_TEST_SOURCES} core_test_utils.c)
-target_link_libraries(vy_mem.test ${ITERATOR_TEST_LIBS} ${LIB_DL})
-
-add_executable(vy_point_lookup.test
-    vy_point_lookup.c
-    vy_iterators_helper.c
-    vy_log_stub.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_point_lookup.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_write_iterator.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_stmt.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_mem.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_run.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_range.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_tx.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_read_set.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_upsert.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_history.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_lsm.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_cache.c
-    ${PROJECT_SOURCE_DIR}/src/box/index_def.c
-    ${PROJECT_SOURCE_DIR}/src/box/schema_def.c
-    ${PROJECT_SOURCE_DIR}/src/box/identifier.c
-    core_test_utils.c
+create_unit_test(PREFIX vy_mem
+                 SOURCES vy_mem.c ${ITERATOR_TEST_SOURCES} core_test_utils.c
+                 LIBRARIES ${ITERATOR_TEST_LIBS} ${LIB_DL}
 )
-target_link_libraries(vy_point_lookup.test core tuple xrow xlog unit ${LIB_DL})
 
-add_executable(column_mask.test
-    column_mask.c
-    core_test_utils.c)
-target_link_libraries(column_mask.test tuple unit)
-
-add_executable(vy_write_iterator.test
-    vy_write_iterator.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_run.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_upsert.c
-    ${PROJECT_SOURCE_DIR}/src/box/vy_write_iterator.c
-    ${ITERATOR_TEST_SOURCES}
-    core_test_utils.c
+create_unit_test(PREFIX vy_point_lookup
+                 SOURCES vy_point_lookup.c
+                         vy_iterators_helper.c
+                         vy_log_stub.c
+                         ${PROJECT_SOURCE_DIR}/src/box/vy_point_lookup.c
+                         ${PROJECT_SOURCE_DIR}/src/box/vy_write_iterator.c
+                         ${PROJECT_SOURCE_DIR}/src/box/vy_stmt.c
+                         ${PROJECT_SOURCE_DIR}/src/box/vy_mem.c
+                         ${PROJECT_SOURCE_DIR}/src/box/vy_run.c
+                         ${PROJECT_SOURCE_DIR}/src/box/vy_range.c
+                         ${PROJECT_SOURCE_DIR}/src/box/vy_tx.c
+                         ${PROJECT_SOURCE_DIR}/src/box/vy_read_set.c
+                         ${PROJECT_SOURCE_DIR}/src/box/vy_upsert.c
+                         ${PROJECT_SOURCE_DIR}/src/box/vy_history.c
+                         ${PROJECT_SOURCE_DIR}/src/box/vy_lsm.c
+                         ${PROJECT_SOURCE_DIR}/src/box/vy_cache.c
+                         ${PROJECT_SOURCE_DIR}/src/box/index_def.c
+                         ${PROJECT_SOURCE_DIR}/src/box/schema_def.c
+                         ${PROJECT_SOURCE_DIR}/src/box/identifier.c
+                         core_test_utils.c
+                 LIBRARIES core tuple xrow xlog unit ${LIB_DL}
 )
-target_link_libraries(vy_write_iterator.test xlog ${ITERATOR_TEST_LIBS} ${LIB_DL})
 
-add_executable(vy_cache.test vy_cache.c ${ITERATOR_TEST_SOURCES} core_test_utils.c)
-target_link_libraries(vy_cache.test ${ITERATOR_TEST_LIBS} ${LIB_DL})
-
-add_executable(coll.test coll.cpp core_test_utils.c)
-target_link_libraries(coll.test coll unit misc ${LIB_DL})
-
-add_executable(tuple_bigref.test tuple_bigref.c core_test_utils.c)
-target_link_libraries(tuple_bigref.test tuple unit)
-
-add_executable(tuple_uint32_overflow.test tuple_uint32_overflow.c core_test_utils.c)
-target_link_libraries(tuple_uint32_overflow.test tuple unit)
-
-add_executable(checkpoint_schedule.test
-    checkpoint_schedule.c
-    ${PROJECT_SOURCE_DIR}/src/box/checkpoint_schedule.c
+create_unit_test(PREFIX column_mask
+                 SOURCES column_mask.c core_test_utils.c
+                 LIBRARIES tuple unit
 )
-target_link_libraries(checkpoint_schedule.test m unit)
 
-add_executable(sio.test sio.c core_test_utils.c)
-target_link_libraries(sio.test unit core)
+create_unit_test(PREFIX vy_write_iterator
+                 SOURCES vy_write_iterator.c
+                         ${PROJECT_SOURCE_DIR}/src/box/vy_run.c
+                         ${PROJECT_SOURCE_DIR}/src/box/vy_upsert.c
+                         ${PROJECT_SOURCE_DIR}/src/box/vy_write_iterator.c
+                         ${ITERATOR_TEST_SOURCES}
+                         core_test_utils.c
+                 LIBRARIES xlog ${ITERATOR_TEST_LIBS} ${LIB_DL}
+)
 
-add_executable(crypto.test crypto.c core_test_utils.c)
-target_link_libraries(crypto.test crypto unit)
+create_unit_test(PREFIX vy_cache
+                 SOURCES vy_cache.c ${ITERATOR_TEST_SOURCES} core_test_utils.c
+                 LIBRARIES ${ITERATOR_TEST_LIBS} ${LIB_DL}
+)
 
-add_executable(swim.test swim.c swim_test_transport.c swim_test_ev.c
-               swim_test_utils.c ${PROJECT_SOURCE_DIR}/src/version.c core_test_utils.c)
-target_link_libraries(swim.test unit fakesys swim)
+create_unit_test(PREFIX coll
+                 SOURCES coll.cpp core_test_utils.c
+                 LIBRARIES coll unit misc ${LIB_DL}
+)
 
-add_executable(swim_proto.test swim_proto.c swim_test_transport.c swim_test_ev.c
-               swim_test_utils.c ${PROJECT_SOURCE_DIR}/src/version.c core_test_utils.c)
-target_link_libraries(swim_proto.test unit fakesys swim)
+create_unit_test(PREFIX tuple_bigref
+                 SOURCES tuple_bigref.c core_test_utils.c
+                 LIBRARIES tuple unit
+)
 
-add_executable(swim_errinj.test swim_errinj.c swim_test_transport.c
-               swim_test_ev.c swim_test_utils.c
-               ${PROJECT_SOURCE_DIR}/src/version.c core_test_utils.c)
-target_link_libraries(swim_errinj.test unit fakesys swim)
+create_unit_test(PREFIX tuple_uint32_overflow
+                 SOURCES tuple_uint32_overflow.c core_test_utils.c
+                 LIBRARIES tuple unit
+)
 
-add_executable(merger.test merger.test.c box_test_utils.c)
-target_link_libraries(merger.test unit core box)
+create_unit_test(PREFIX checkpoint_schedule
+                 SOURCES checkpoint_schedule.c
+                         ${PROJECT_SOURCE_DIR}/src/box/checkpoint_schedule.c
+                 LIBRARIES m unit
+)
 
-add_executable(snap_quorum_delay.test snap_quorum_delay.cc box_test_utils.c)
-target_link_libraries(snap_quorum_delay.test box core unit)
+create_unit_test(PREFIX sio
+                 SOURCES sio.c core_test_utils.c
+                 LIBRARIES unit core
+)
 
-add_executable(raft.test raft.c raft_test_utils.c core_test_utils.c)
-target_link_libraries(raft.test vclock unit fakesys raft_algo)
+create_unit_test(PREFIX crypto
+                 SOURCES crypto.c core_test_utils.c
+                 LIBRARIES crypto unit
+)
+
+create_unit_test(PREFIX swim
+                 SOURCES swim.c swim_test_transport.c swim_test_ev.c
+                         swim_test_utils.c ${PROJECT_SOURCE_DIR}/src/version.c
+                         core_test_utils.c
+                 LIBRARIES unit fakesys swim
+)
+
+create_unit_test(PREFIX swim_proto
+                 SOURCES swim_proto.c swim_test_transport.c swim_test_ev.c
+                         swim_test_utils.c ${PROJECT_SOURCE_DIR}/src/version.c
+                         core_test_utils.c
+                 LIBRARIES unit fakesys swim
+)
+
+if(NOT ${CMAKE_BUILD_TYPE} EQUAL "Release")
+    create_unit_test(PREFIX swim_errinj
+                     SOURCES swim_errinj.c swim_test_transport.c swim_test_ev.c
+                             swim_test_utils.c ${PROJECT_SOURCE_DIR}/src/version.c
+                             core_test_utils.c
+                     LIBRARIES unit fakesys swim
+    )
+endif()
+
+create_unit_test(PREFIX merger
+                 SOURCES merger.test.c box_test_utils.c
+                 LIBRARIES unit core box
+)
+
+create_unit_test(PREFIX snap_quorum_delay
+                 SOURCES snap_quorum_delay.cc box_test_utils.c
+                 LIBRARIES box core unit
+)
+
+create_unit_test(PREFIX raft
+                 SOURCES raft.c raft_test_utils.c core_test_utils.c
+                 LIBRARIES vclock unit fakesys raft_algo
+)
 
 #
 # Client for popen.test
 add_executable(popen-child popen-child.c)
 
-add_executable(popen.test popen.c core_test_utils.c)
-target_link_libraries(popen.test misc unit core)
+create_unit_test(PREFIX popen
+                 SOURCES popen.c core_test_utils.c
+                 LIBRARIES misc unit core
+)
+add_dependencies(popen.test popen-child)
 
-add_executable(serializer.test serializer.c box_test_utils.c)
-target_link_libraries(serializer.test unit box ${LUAJIT_LIBRARIES})
+create_unit_test(PREFIX serializer
+                 SOURCES serializer.c box_test_utils.c
+                 LIBRARIES unit box ${LUAJIT_LIBRARIES}
+)
 
-add_executable(watcher.test watcher.c box_test_utils.c)
-target_link_libraries(watcher.test unit box)
+create_unit_test(PREFIX watcher
+                 SOURCES watcher.c box_test_utils.c
+                 LIBRARIES unit box
+)
 
-add_executable(grp_alloc.test grp_alloc.c box_test_utils.c)
-target_link_libraries(grp_alloc.test unit)
+create_unit_test(PREFIX grp_alloc
+                 SOURCES grp_alloc.c box_test_utils.c
+                 LIBRARIES unit
+)
 
-add_executable(latch.test latch.c core_test_utils.c)
-target_link_libraries(latch.test core unit stat)
+create_unit_test(PREFIX latch
+                 SOURCES latch.c core_test_utils.c
+                 LIBRARIES core unit stat
+)
 
-add_executable(memtx_allocator.test memtx_allocator.cc box_test_utils.c)
-target_link_libraries(memtx_allocator.test unit core box)
+create_unit_test(PREFIX memtx_allocator
+                 SOURCES memtx_allocator.cc box_test_utils.c
+                 LIBRARIES unit core box
+)
 
-add_executable(tt_sigaction.test tt_sigaction.c core_test_utils.c)
-target_link_libraries(tt_sigaction.test core unit pthread)
+create_unit_test(PREFIX tt_sigaction
+                 SOURCES tt_sigaction.c core_test_utils.c
+                 LIBRARIES core unit pthread
+)
 
-add_executable(string.test string.c core_test_utils.c)
-target_link_libraries(string.test core unit)
+create_unit_test(PREFIX string
+                 SOURCES string.c core_test_utils.c
+                 LIBRARIES core unit
+)
 
-add_executable(qsort_arg.test qsort_arg.cc core_test_utils.c)
-target_link_libraries(qsort_arg.test misc unit)
+create_unit_test(PREFIX qsort_arg
+                 SOURCES qsort_arg.cc core_test_utils.c
+                 LIBRARIES misc unit
+)

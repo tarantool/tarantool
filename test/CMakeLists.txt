@@ -35,6 +35,8 @@ if(POLICY CMP0037)
     endif()
 endif(POLICY CMP0037)
 
+set(UNIT_TEST_TARGETS "")
+
 add_subdirectory(app)
 add_subdirectory(app-tap)
 add_subdirectory(box)
@@ -68,6 +70,7 @@ add_custom_target(symlink_libsmall_test_binaries ALL
 
 add_custom_target(test-unit
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
+            ${UNIT_TEST_TARGETS}
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
         --builddir=${PROJECT_BINARY_DIR}
         small/
@@ -75,6 +78,7 @@ add_custom_target(test-unit
 
 add_custom_target(test-unit-force
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
+            ${UNIT_TEST_TARGETS}
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
         --builddir=${PROJECT_BINARY_DIR}
         --force
@@ -97,12 +101,14 @@ add_custom_target(test-func-force
 add_custom_target(test
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
             LuaJIT-test
+            ${UNIT_TEST_TARGETS}
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
         --builddir=${PROJECT_BINARY_DIR})
 
 add_custom_target(test-force
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/small
             LuaJIT-test
+            ${UNIT_TEST_TARGETS}
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
         --builddir=${PROJECT_BINARY_DIR}
         --force)
