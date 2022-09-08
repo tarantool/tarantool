@@ -13,6 +13,29 @@ local function is_array(s)
     return s:match("---[\n ]%[") or s:match("---[\n ]- ");
 end
 
+local function test_anchors(test, s)
+    test:plan(1)
+
+    local yaml_with_anchors = [[
+steps:
+  - step: &build
+      a: 1
+  - step: *build
+]]
+    local struct = {
+        steps = {
+             {
+                 ["step"] = { a = 1 },
+             },
+             {
+                 ["step"] = { a = 1},
+             },
+        },
+    }
+    local ss = s.new()
+    test:is_deeply(ss.decode(yaml_with_anchors), struct, "YAML document with anchors")
+end
+
 local function test_compact(test, s)
     test:plan(9)
 
@@ -213,9 +236,21 @@ local function test_api(test, s)
     end
 end
 
-tap.test("yaml", function(test)
+local function test_decode_stack_overflow(test, s)
+    test:plan(1)
+    local ok, _ = pcall(s.decode, string.rep('{', 1024*3))
+    test:is(ok, false)
+    --print(err)
+    -- did not find expected node content at document
+    --test:ok(err, "error: stack overflow")
+end
+
+local test = tap.test("yaml")
+
+test:plan(1)
+test:test("yaml", function(test)
     local serializer = require('yaml')
-    test:plan(12)
+    test:plan(13)
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
     test:test("double", common.test_double, serializer)
@@ -225,7 +260,11 @@ tap.test("yaml", function(test)
     test:test("table", common.test_table, serializer, is_array, is_map)
     test:test("ucdata", common.test_ucdata, serializer)
     test:test("compact", test_compact, serializer)
+    --test:test("anchors", test_anchors, serializer)
     test:test("output", test_output, serializer)
     test:test("tagged", test_tagged, serializer)
     test:test("api", test_api, serializer)
+    test:test("stack_overflow", test_decode_stack_overflow, serializer)
 end)
+
+os.exit(test:check() == true and 0 or 1)
