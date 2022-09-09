@@ -35,6 +35,24 @@ if(POLICY CMP0037)
     endif()
 endif(POLICY CMP0037)
 
+add_subdirectory(app)
+add_subdirectory(app-tap)
+add_subdirectory(box)
+add_subdirectory(box-tap)
+add_subdirectory(box-luatest)
+add_subdirectory(engine-luatest)
+add_subdirectory(sql-tap)
+add_subdirectory(sql-luatest)
+if(ENABLE_FUZZER)
+    add_subdirectory(fuzz)
+endif()
+add_subdirectory(unit)
+foreach(TEST_SUITE ${EXTRA_TEST_SUITES})
+    add_subdirectory(
+        "${EXTRA_TEST_SUITES_SOURCE_DIR}/${TEST_SUITE}"
+        "${EXTRA_TEST_SUITES_BINARY_DIR}/${TEST_SUITE}")
+endforeach()
+
 # The symlink is needed for out-of-source builds. In the case of in-source
 # builds ${CMAKE_CURRENT_BINARY_DIR} == ${PROJECT_SOURCE_DIR}/test and the
 # symlink already exists. It creates the symlink if the destination doesn't
@@ -88,21 +106,3 @@ add_custom_target(test-force
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
         --builddir=${PROJECT_BINARY_DIR}
         --force)
-
-add_subdirectory(app)
-add_subdirectory(app-tap)
-add_subdirectory(box)
-add_subdirectory(box-tap)
-add_subdirectory(box-luatest)
-add_subdirectory(engine-luatest)
-add_subdirectory(sql-tap)
-add_subdirectory(sql-luatest)
-if(ENABLE_FUZZER)
-    add_subdirectory(fuzz)
-endif()
-add_subdirectory(unit)
-foreach(TEST_SUITE ${EXTRA_TEST_SUITES})
-    add_subdirectory(
-        "${EXTRA_TEST_SUITES_SOURCE_DIR}/${TEST_SUITE}"
-        "${EXTRA_TEST_SUITES_BINARY_DIR}/${TEST_SUITE}")
-endforeach()
