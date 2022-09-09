@@ -397,8 +397,10 @@ lua_status
 lua_toboolean
 lua_tocfunction
 lua_tointeger
+lua_tointegerx
 lua_tolstring
 lua_tonumber
+lua_tonumberx
 lua_topointer
 lua_tothread
 lua_touserdata
