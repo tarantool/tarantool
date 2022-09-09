@@ -47,6 +47,7 @@ read_view_opts_create(struct read_view_opts *opts)
 	opts->filter_arg = NULL;
 	opts->needs_field_names = false;
 	opts->needs_space_upgrade = false;
+	opts->needs_temporary_spaces = false;
 }
 
 static void
@@ -143,6 +144,7 @@ read_view_add_space_cb(struct space *space, void *arg_raw)
 	struct read_view *rv = arg->rv;
 	const struct read_view_opts *opts = arg->opts;
 	if ((space->engine->flags & ENGINE_SUPPORTS_READ_VIEW) == 0 ||
+	    (space_is_temporary(space) && !opts->needs_temporary_spaces) ||
 	    !opts->filter_space(space, opts->filter_arg))
 		return 0;
 	struct space_read_view *space_rv = space_read_view_new(space, opts);
@@ -164,7 +166,7 @@ read_view_open(struct read_view *rv, const struct read_view_opts *opts)
 		if ((engine->flags & ENGINE_SUPPORTS_READ_VIEW) == 0)
 			continue;
 		struct engine_read_view *engine_rv =
-			engine_create_read_view(engine);
+			engine_create_read_view(engine, opts);
 		if (engine_rv == NULL)
 			goto fail;
 		rlist_add_tail_entry(&rv->engines, engine_rv, link);

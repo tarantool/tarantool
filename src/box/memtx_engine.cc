@@ -504,7 +504,8 @@ memtx_engine_read_view_free(struct engine_read_view *base)
 
 /** Implementation of create_read_view engine callback. */
 static struct engine_read_view *
-memtx_engine_create_read_view(struct engine *engine)
+memtx_engine_create_read_view(struct engine *engine,
+			      const struct read_view_opts *opts)
 {
 	static const struct engine_read_view_vtab vtab = {
 		.free = memtx_engine_read_view_free,
@@ -513,7 +514,9 @@ memtx_engine_create_read_view(struct engine *engine)
 	struct memtx_read_view *rv =
 		(struct memtx_read_view *)xmalloc(sizeof(*rv));
 	rv->base.vtab = &vtab;
-	rv->allocators_rv = memtx_allocators_open_read_view({});
+	struct memtx_read_view_opts memtx_opts;
+	memtx_opts.include_temporary_tuples = opts->needs_temporary_spaces;
+	rv->allocators_rv = memtx_allocators_open_read_view(memtx_opts);
 	return (struct engine_read_view *)rv;
 }
 
@@ -709,7 +712,6 @@ checkpoint_space_filter(struct space *space, void *arg)
 {
 	(void)arg;
 	return space_is_memtx(space) &&
-		!space_is_temporary(space) &&
 		space_index(space, 0) != NULL;
 }
 
@@ -1029,7 +1031,6 @@ memtx_join_space_filter(struct space *space, void *arg)
 {
 	(void)arg;
 	return space_is_memtx(space) &&
-		!space_is_temporary(space) &&
 		space_group_id(space) != GROUP_LOCAL &&
 		space_index(space, 0) != NULL;
 }

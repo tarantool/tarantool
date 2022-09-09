@@ -44,6 +44,7 @@ struct engine;
 struct engine_read_view;
 struct txn;
 struct txn_stmt;
+struct read_view_opts;
 struct space;
 struct space_def;
 struct vclock;
@@ -108,7 +109,8 @@ struct engine_vtab {
 	 * May be called only if the engine has the ENGINE_SUPPORTS_READ_VIEW
 	 * flag set.
 	 */
-	struct engine_read_view *(*create_read_view)(struct engine *engine);
+	struct engine_read_view *(*create_read_view)(
+		struct engine *engine, const struct read_view_opts *opts);
 	/**
 	 * Freeze a read view to feed to a new replica.
 	 * Setup and return a context that will be used
@@ -328,9 +330,10 @@ engine_create_space(struct engine *engine, struct space_def *def,
 }
 
 static inline struct engine_read_view *
-engine_create_read_view(struct engine *engine)
+engine_create_read_view(struct engine *engine,
+			const struct read_view_opts *opts)
 {
-	return engine->vtab->create_read_view(engine);
+	return engine->vtab->create_read_view(engine, opts);
 }
 
 static inline int
@@ -462,7 +465,8 @@ engine_reset_stat(void);
  * Virtual method stubs.
  */
 struct engine_read_view *
-generic_engine_create_read_view(struct engine *engine);
+generic_engine_create_read_view(struct engine *engine,
+				const struct read_view_opts *opts);
 int generic_engine_prepare_join(struct engine *, void **);
 int generic_engine_join(struct engine *, void *, struct xstream *);
 void generic_engine_complete_join(struct engine *, void *);
