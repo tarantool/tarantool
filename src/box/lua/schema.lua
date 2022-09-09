@@ -2514,6 +2514,25 @@ vinyl_index_mt.__ipairs = vinyl_index_mt.pairs
 memtx_index_mt.__pairs = memtx_index_mt.pairs
 memtx_index_mt.__ipairs = memtx_index_mt.pairs
 
+local function get_fieldno(space, field)
+    if param_type(field) == 'string' then
+        for k, v in pairs(space:format()) do
+            if field == v.name then
+                return k - 1
+            end
+        end
+        box.error(box.error.NO_SUCH_FIELD_NAME_IN_SPACE, field, space.name)
+    end
+    if param_type(field) ~= 'number' then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  "field should be a string or a number")
+    end
+    if field <= 0 then
+        box.error(box.error.ILLEGAL_PARAMS, "field (number) must be one-based")
+    end
+    return field - 1
+end
+
 local space_mt = {}
 space_mt.len = function(space)
     check_space_arg(space, 'len')
@@ -2660,6 +2679,63 @@ space_mt.run_triggers = function(space, yesno)
         box.error(box.error.NO_SUCH_SPACE, space.name)
     end
     builtin.space_run_triggers(s, yesno)
+end
+space_mt.drop_constraint = function(space, name, field)
+    check_space_arg(space, 'drop_constraint')
+    check_space_exists(space)
+    check_param(name, 'name', 'string')
+    if field == nil then
+        return internal.drop_constraint(space.id, name)
+    end
+    local fieldno = get_fieldno(space, field)
+    return internal.drop_constraint(space.id, name, fieldno)
+end
+space_mt.create_constraint = function(space, name, func, field)
+    check_space_arg(space, 'create_constraint')
+    check_space_exists(space)
+    check_param(name, 'name', 'string')
+    local constr
+    if func == nil then
+        constr = name
+    else
+        constr = {[name] = func}
+    end
+    constr = normalize_constraint(constr, '')
+    assert(constr ~= nil and type(constr) == 'table')
+    local func_id = constr[name]
+    if field == nil then
+        return internal.create_constraint(space.id, name, func_id)
+    end
+    local fieldno = get_fieldno(space, field)
+    return internal.create_constraint(space.id, name, func_id, fieldno)
+end
+space_mt.drop_foreign_key = function(space, name, field)
+    check_space_arg(space, 'drop_foreign_key')
+    check_space_exists(space)
+    check_param(name, 'name', 'string')
+    if field == nil then
+        return internal.drop_foreign_key(space.id, name)
+    end
+    local fieldno = get_fieldno(space, field)
+    internal.drop_foreign_key(space.id, name, fieldno)
+end
+space_mt.create_foreign_key = function(space, name, foreign, relation, field)
+    check_space_arg(space, 'create_foreign_key')
+    check_space_exists(space)
+    check_param(name, 'name', 'string')
+    local def = {[name] = {space = foreign, field = relation}}
+    local is_complex = field == nil
+    local fk = normalize_foreign_key(space.id, space.name, def, '', is_complex)
+    local foreign_id = fk[name].space or space.id
+    local foreign_field = fk[name].field
+    if not is_complex then
+        local fieldno = get_fieldno(space, field)
+        local foreign_fieldno = get_fieldno(box.space[foreign_id], relation)
+        return internal.create_foreign_key(space.id, name, foreign_id, fieldno,
+                                           foreign_fieldno)
+    end
+    local mapping = msgpack.encode(setmap(table.deepcopy(foreign_field)))
+    return internal.create_foreign_key(space.id, name, foreign_id, mapping)
 end
 space_mt.frommap = box.internal.space.frommap
 space_mt.__index = space_mt

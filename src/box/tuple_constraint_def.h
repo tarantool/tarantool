@@ -20,6 +20,8 @@ enum tuple_constraint_type {
 	CONSTR_FKEY,
 };
 
+extern const char *tuple_constraint_type_strs[];
+
 /**
  * Definition of a func.
  */

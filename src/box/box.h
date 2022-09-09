@@ -635,6 +635,49 @@ box_read_ffi_disable(void);
 void
 box_read_ffi_enable(void);
 
+/** Drop tuple constraint. */
+int
+box_tuple_constraint_drop(uint32_t space_id, const char *name,
+			  uint32_t name_len);
+
+/** Drop field constraint. */
+int
+box_field_constraint_drop(uint32_t space_id, const char *name,
+			  uint32_t name_len, uint32_t fieldno);
+
+/** Drop tuple foreign key. */
+int
+box_tuple_foreign_key_drop(uint32_t space_id, const char *name,
+			   uint32_t name_len);
+
+/** Drop field foreign key. */
+int
+box_field_foreign_key_drop(uint32_t space_id, const char *name,
+			   uint32_t name_len, uint32_t fieldno);
+
+/** Create tuple constraint. */
+int
+box_tuple_constraint_create(uint32_t space_id, const char *name,
+			    uint32_t name_len, uint32_t func_id);
+
+/** Create field constraint. */
+int
+box_field_constraint_create(uint32_t space_id, const char *name,
+			    uint32_t name_len, uint32_t fieldno,
+			    uint32_t func_id);
+
+/** Create tuple foreign key. */
+int
+box_tuple_foreign_key_create(uint32_t space_id, const char *name,
+			     uint32_t name_len, uint32_t parent_id,
+			     const char *mapping);
+
+/** Create field foreign key. */
+int
+box_field_foreign_key_create(uint32_t space_id, const char *name,
+			     uint32_t name_len, uint32_t fieldno,
+			     uint32_t parent_id, uint32_t parent_fieldno);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

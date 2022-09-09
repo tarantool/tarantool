@@ -731,6 +731,107 @@ usage_error:
 	return luaL_error(L, "Usage: space:frommap(map, opts)");
 }
 
+/**
+ * Lua C wrapper around box_tuple_constraint_create() and
+ * box_field_constraint_create() functions.
+ */
+static int
+lbox_space_create_constraint(struct lua_State *L)
+{
+	int argc = lua_gettop(L);
+	assert(argc == 3 || argc == 4);
+	uint32_t space_id = lua_tonumber(L, 1);
+	size_t len;
+	const char *name = lua_tolstring(L, 2, &len);
+	uint32_t func_id = lua_tonumber(L, 3);
+	if (argc == 3) {
+		if (box_tuple_constraint_create(space_id, name, len,
+						func_id) != 0)
+			return luaT_error(L);
+		return 0;
+	}
+	uint32_t fieldno = lua_tonumber(L, 4);
+	if (box_field_constraint_create(space_id, name, len, fieldno,
+					func_id) != 0)
+		return luaT_error(L);
+	return 0;
+}
+
+/**
+ * Lua C wrapper around box_tuple_constraint_drop() and
+ * box_field_constraint_drop() functions.
+ */
+static int
+lbox_space_drop_constraint(struct lua_State *L)
+{
+	int argc = lua_gettop(L);
+	assert(argc == 2 || argc == 3);
+	uint32_t space_id = lua_tonumber(L, 1);
+	size_t len;
+	const char *name = lua_tolstring(L, 2, &len);
+	if (argc == 2) {
+		if (box_tuple_constraint_drop(space_id, name, len) != 0)
+			return luaT_error(L);
+		return 0;
+	}
+	uint32_t fieldno = lua_tonumber(L, 3);
+	if (box_field_constraint_drop(space_id, name, len, fieldno) != 0)
+		return luaT_error(L);
+	return 0;
+}
+
+/**
+ * Lua C wrapper around box_tuple_foreign_key_create() and
+ * box_field_foreign_key_create() functions.
+ */
+static int
+lbox_space_create_foreign_key(struct lua_State *L)
+{
+	int argc = lua_gettop(L);
+	assert(argc == 4 || argc == 5);
+	uint32_t space_id = lua_tonumber(L, 1);
+	size_t len;
+	const char *name = lua_tolstring(L, 2, &len);
+	uint32_t foreign_id = lua_tonumber(L, 3);
+	if (argc == 4) {
+		size_t unused;
+		const char *mapping = lua_tolstring(L, 4, &unused);
+		if (box_tuple_foreign_key_create(space_id, name, len,
+						 foreign_id, mapping) != 0)
+			return luaT_error(L);
+		return 0;
+	}
+	uint32_t fieldno = lua_tonumber(L, 4);
+	uint32_t foreign_fieldno = lua_tonumber(L, 5);
+	if (box_field_foreign_key_create(space_id, name, len, fieldno,
+					 foreign_id, foreign_fieldno) != 0)
+		return luaT_error(L);
+	return 0;
+}
+
+/**
+ * Lua C wrapper around box_tuple_foreign_key_drop() and
+ * box_field_foreign_key_drop() functions.
+ */
+static int
+lbox_space_drop_foreign_key(struct lua_State *L)
+{
+	int argc = lua_gettop(L);
+	assert(argc == 2 || argc == 3);
+	uint32_t space_id = lua_tonumber(L, 1);
+	size_t len;
+	const char *name = lua_tolstring(L, 2, &len);
+	if (argc == 2) {
+		if (box_tuple_foreign_key_drop(space_id, name, len) != 0)
+			return luaT_error(L);
+		return 0;
+	}
+	uint32_t fieldno = lua_tonumber(L, 3);
+	if (box_field_foreign_key_drop(space_id, name, len, fieldno) != 0)
+		return luaT_error(L);
+	return 0;
+}
+
 void
 box_lua_space_init(struct lua_State *L)
 {
@@ -833,5 +934,15 @@ box_lua_space_init(struct lua_State *L)
 		{NULL, NULL}
 	};
 	luaL_register(L, "box.internal.space", space_internal_lib);
+	lua_pop(L, 1);
+
+	static const struct luaL_Reg boxlib_internal[] = {
+		{"create_constraint", lbox_space_create_constraint},
+		{"drop_constraint", lbox_space_drop_constraint},
+		{"create_foreign_key", lbox_space_create_foreign_key},
+		{"drop_foreign_key", lbox_space_drop_foreign_key},
+		{NULL, NULL}
+	};
+	luaL_register(L, "box.internal", boxlib_internal);
 	lua_pop(L, 1);
 }

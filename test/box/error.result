@@ -465,6 +465,7 @@ t;
  |   244: box.error.SPLIT_BRAIN
  |   245: box.error.OLD_TERM
  |   246: box.error.INTERFERING_ELECTIONS
+ |   247: box.error.NO_SUCH_FOREIGN_KEY
  | ...
 
 test_run:cmd("setopt delimiter ''");
