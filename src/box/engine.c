@@ -267,9 +267,11 @@ engine_reset_stat(void)
 /* {{{ Virtual method stubs */
 
 struct engine_read_view *
-generic_engine_create_read_view(struct engine *engine)
+generic_engine_create_read_view(struct engine *engine,
+				const struct read_view_opts *opts)
 {
 	(void)engine;
+	(void)opts;
 	unreachable();
 	return NULL;
 }

@@ -122,6 +122,11 @@ struct read_view_opts {
 	 * space_read_view::upgrade.
 	 */
 	bool needs_space_upgrade;
+	/**
+	 * Temporary spaces aren't included into this read view unless this
+	 * flag is set.
+	 */
+	bool needs_temporary_spaces;
 };
 
 /** Sets read view options to default values. */
