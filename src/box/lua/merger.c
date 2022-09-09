@@ -1025,6 +1025,10 @@ lbox_merge_source_gen(struct lua_State *L)
 		return luaL_error(L, "Bad params, use: lbox_merge_source_gen("
 				  "nil, merge_source)");
 
+#ifndef NDEBUG
+	int top = lua_gettop(L);
+#endif
+
 	struct tuple *tuple;
 	if (merge_source_next(source, NULL, &tuple) != 0)
 		return luaT_error(L);
@@ -1034,17 +1038,36 @@ lbox_merge_source_gen(struct lua_State *L)
 		return 2;
 	}
 
-	/* Push merge_source, tuple. */
-	*(struct merge_source **)
-		luaL_pushcdata(L, CTID_STRUCT_MERGE_SOURCE_REF) = source;
-	luaT_pushtuple(L, tuple);
+	/*
+	 * It is crucial to have the merge_source at the topmost
+	 * slot to actually return merge_source and tuple as the
+	 * result.
+	 *
+	 * Despite that merge_source_next() does not accept a Lua
+	 * state as an argument, it may use a temporary Lua state
+	 * internally. This state may be the same as L.
+	 *
+	 * merge_source_next() must return the Lua stack to the
+	 * original state if it uses the stack.
+	 */
+	assert(lua_gettop(L) == top);
+	/*
+	 * We want the consistent function behaviour in Debug and
+	 * Release builds. If the top value is not cdata
+	 * luaT_check_merge_source() will raise the error in Debug
+	 * build. So add the assert with luaL_iscdata() check.
+	 */
+	assert(luaL_iscdata(L, -1));
+	assert(luaT_check_merge_source(L, -1) == source);
 
 	/*
 	 * luaT_pushtuple() references the tuple, so we
 	 * unreference it on merger's side.
 	 */
+	luaT_pushtuple(L, tuple);
 	tuple_unref(tuple);
 
+	/* Return merge_source and tuple. */
 	return 2;
 }
 
