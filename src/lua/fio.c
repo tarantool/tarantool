@@ -322,12 +322,6 @@ lbox_fio_pushtimespec(struct lua_State *L, const struct timespec *ts)
 }
 #endif
 
-#define PUSHTABLE(name, method, value)	{	\
-	lua_pushliteral(L, name);		\
-	method(L, value);			\
-	lua_settable(L, -3);			\
-}
-
 #define DEF_STAT_METHOD(method_name, macro_name)		\
 	static int						\
 	lbox_fio_stat_##method_name(struct lua_State *L)		\
@@ -361,24 +355,24 @@ lbox_fio_pushstat(struct lua_State *L, int res, const struct stat *stat)
 		return lbox_fio_pushsyserror(L);
 	lua_newtable(L);
 
-	PUSHTABLE("dev", lua_pushinteger, stat->st_dev);
-	PUSHTABLE("inode", lua_pushinteger, stat->st_ino);
-	PUSHTABLE("mode", lua_pushinteger, stat->st_mode);
-	PUSHTABLE("nlink", lua_pushinteger, stat->st_nlink);
-	PUSHTABLE("uid", lua_pushinteger, stat->st_uid);
-	PUSHTABLE("gid", lua_pushinteger, stat->st_gid);
-	PUSHTABLE("rdev", lua_pushinteger, stat->st_rdev);
-	PUSHTABLE("size", lua_pushinteger, stat->st_size);
-	PUSHTABLE("blksize", lua_pushinteger, stat->st_blksize);
-	PUSHTABLE("blocks", lua_pushinteger, stat->st_blocks);
+	luaL_tablepush("dev", lua_pushinteger, stat->st_dev);
+	luaL_tablepush("inode", lua_pushinteger, stat->st_ino);
+	luaL_tablepush("mode", lua_pushinteger, stat->st_mode);
+	luaL_tablepush("nlink", lua_pushinteger, stat->st_nlink);
+	luaL_tablepush("uid", lua_pushinteger, stat->st_uid);
+	luaL_tablepush("gid", lua_pushinteger, stat->st_gid);
+	luaL_tablepush("rdev", lua_pushinteger, stat->st_rdev);
+	luaL_tablepush("size", lua_pushinteger, stat->st_size);
+	luaL_tablepush("blksize", lua_pushinteger, stat->st_blksize);
+	luaL_tablepush("blocks", lua_pushinteger, stat->st_blocks);
 	#if defined(__APPLE__)
-		PUSHTABLE("ctime", lbox_fio_pushtimespec, &stat->st_ctime);
-		PUSHTABLE("mtime", lbox_fio_pushtimespec, &stat->st_mtime);
-		PUSHTABLE("atime", lbox_fio_pushtimespec, &stat->st_atime);
+		luaL_tablepush("ctime", lbox_fio_pushtimespec, &stat->st_ctime);
+		luaL_tablepush("mtime", lbox_fio_pushtimespec, &stat->st_mtime);
+		luaL_tablepush("atime", lbox_fio_pushtimespec, &stat->st_atime);
 	#else
-		PUSHTABLE("ctime", lbox_fio_pushtimespec, &stat->st_ctim);
-		PUSHTABLE("mtime", lbox_fio_pushtimespec, &stat->st_mtim);
-		PUSHTABLE("atime", lbox_fio_pushtimespec, &stat->st_atim);
+		luaL_tablepush("ctime", lbox_fio_pushtimespec, &stat->st_ctim);
+		luaL_tablepush("mtime", lbox_fio_pushtimespec, &stat->st_mtim);
+		luaL_tablepush("atime", lbox_fio_pushtimespec, &stat->st_atim);
 	#endif
 
 
@@ -732,89 +726,89 @@ tarantool_lua_fio_init(struct lua_State *L)
 	lua_pushliteral(L, "flag");
 	lua_newtable(L);
 #ifdef O_APPEND
-	PUSHTABLE("O_APPEND", lua_pushinteger, O_APPEND);
+	luaL_tablepush("O_APPEND", lua_pushinteger, O_APPEND);
 #endif
 #ifdef O_ASYNC
-	PUSHTABLE("O_ASYNC", lua_pushinteger, O_ASYNC);
+	luaL_tablepush("O_ASYNC", lua_pushinteger, O_ASYNC);
 #endif
 #ifdef O_CLOEXEC
-	PUSHTABLE("O_CLOEXEC", lua_pushinteger, O_CLOEXEC);
+	luaL_tablepush("O_CLOEXEC", lua_pushinteger, O_CLOEXEC);
 #endif
 #ifdef O_CREAT
-	PUSHTABLE("O_CREAT", lua_pushinteger, O_CREAT);
+	luaL_tablepush("O_CREAT", lua_pushinteger, O_CREAT);
 #endif
 #ifdef O_DIRECT
-	PUSHTABLE("O_DIRECT", lua_pushinteger, O_DIRECT);
+	luaL_tablepush("O_DIRECT", lua_pushinteger, O_DIRECT);
 #endif
 #ifdef O_DIRECTORY
-	PUSHTABLE("O_DIRECTORY", lua_pushinteger, O_DIRECTORY);
+	luaL_tablepush("O_DIRECTORY", lua_pushinteger, O_DIRECTORY);
 #endif
 #ifdef O_EXCL
-	PUSHTABLE("O_EXCL", lua_pushinteger, O_EXCL);
+	luaL_tablepush("O_EXCL", lua_pushinteger, O_EXCL);
 #endif
 #ifdef O_LARGEFILE
-	PUSHTABLE("O_LARGEFILE", lua_pushinteger, O_LARGEFILE);
+	luaL_tablepush("O_LARGEFILE", lua_pushinteger, O_LARGEFILE);
 #endif
 #ifdef O_NOATIME
-	PUSHTABLE("O_NOATIME", lua_pushinteger, O_NOATIME);
+	luaL_tablepush("O_NOATIME", lua_pushinteger, O_NOATIME);
 #endif
 #ifdef O_NOCTTY
-	PUSHTABLE("O_NOCTTY", lua_pushinteger, O_NOCTTY);
+	luaL_tablepush("O_NOCTTY", lua_pushinteger, O_NOCTTY);
 #endif
 #ifdef O_NOFOLLOW
-	PUSHTABLE("O_NOFOLLOW", lua_pushinteger, O_NOFOLLOW);
+	luaL_tablepush("O_NOFOLLOW", lua_pushinteger, O_NOFOLLOW);
 #endif
 #ifdef O_NONBLOCK
-	PUSHTABLE("O_NONBLOCK", lua_pushinteger, O_NONBLOCK);
+	luaL_tablepush("O_NONBLOCK", lua_pushinteger, O_NONBLOCK);
 #endif
 #ifdef O_NDELAY
-	PUSHTABLE("O_NDELAY", lua_pushinteger, O_NDELAY);
+	luaL_tablepush("O_NDELAY", lua_pushinteger, O_NDELAY);
 #endif
 #ifdef O_PATH
-	PUSHTABLE("O_PATH", lua_pushinteger, O_PATH);
+	luaL_tablepush("O_PATH", lua_pushinteger, O_PATH);
 #endif
 #ifdef O_SYNC
-	PUSHTABLE("O_SYNC", lua_pushinteger, O_SYNC);
+	luaL_tablepush("O_SYNC", lua_pushinteger, O_SYNC);
 #endif
 #ifdef O_TMPFILE
-	PUSHTABLE("O_TMPFILE", lua_pushinteger, O_TMPFILE);
+	luaL_tablepush("O_TMPFILE", lua_pushinteger, O_TMPFILE);
 #endif
 #ifdef O_TRUNC
-	PUSHTABLE("O_TRUNC", lua_pushinteger, O_TRUNC);
+	luaL_tablepush("O_TRUNC", lua_pushinteger, O_TRUNC);
 #endif
-	PUSHTABLE("O_RDONLY", lua_pushinteger, O_RDONLY);
-	PUSHTABLE("O_WRONLY", lua_pushinteger, O_WRONLY);
-	PUSHTABLE("O_RDWR", lua_pushinteger, O_RDWR);
+	luaL_tablepush("O_RDONLY", lua_pushinteger, O_RDONLY);
+	luaL_tablepush("O_WRONLY", lua_pushinteger, O_WRONLY);
+	luaL_tablepush("O_RDWR", lua_pushinteger, O_RDWR);
 	lua_settable(L, -3);
 
 	lua_pushliteral(L, "mode");
 	lua_newtable(L);
-	PUSHTABLE("S_IRWXU", lua_pushinteger, S_IRWXU);
-	PUSHTABLE("S_IRUSR", lua_pushinteger, S_IRUSR);
-	PUSHTABLE("S_IWUSR", lua_pushinteger, S_IWUSR);
-	PUSHTABLE("S_IXUSR", lua_pushinteger, S_IXUSR);
-	PUSHTABLE("S_IRWXG", lua_pushinteger, S_IRWXG);
-	PUSHTABLE("S_IRGRP", lua_pushinteger, S_IRGRP);
-	PUSHTABLE("S_IWGRP", lua_pushinteger, S_IWGRP);
-	PUSHTABLE("S_IXGRP", lua_pushinteger, S_IXGRP);
-	PUSHTABLE("S_IRWXO", lua_pushinteger, S_IRWXO);
-	PUSHTABLE("S_IROTH", lua_pushinteger, S_IROTH);
-	PUSHTABLE("S_IWOTH", lua_pushinteger, S_IWOTH);
-	PUSHTABLE("S_IXOTH", lua_pushinteger, S_IXOTH);
+	luaL_tablepush("S_IRWXU", lua_pushinteger, S_IRWXU);
+	luaL_tablepush("S_IRUSR", lua_pushinteger, S_IRUSR);
+	luaL_tablepush("S_IWUSR", lua_pushinteger, S_IWUSR);
+	luaL_tablepush("S_IXUSR", lua_pushinteger, S_IXUSR);
+	luaL_tablepush("S_IRWXG", lua_pushinteger, S_IRWXG);
+	luaL_tablepush("S_IRGRP", lua_pushinteger, S_IRGRP);
+	luaL_tablepush("S_IWGRP", lua_pushinteger, S_IWGRP);
+	luaL_tablepush("S_IXGRP", lua_pushinteger, S_IXGRP);
+	luaL_tablepush("S_IRWXO", lua_pushinteger, S_IRWXO);
+	luaL_tablepush("S_IROTH", lua_pushinteger, S_IROTH);
+	luaL_tablepush("S_IWOTH", lua_pushinteger, S_IWOTH);
+	luaL_tablepush("S_IXOTH", lua_pushinteger, S_IXOTH);
 	lua_settable(L, -3);
 
 
 
 	lua_pushliteral(L, "seek");
 	lua_newtable(L);
-	PUSHTABLE("SEEK_SET", lua_pushinteger, SEEK_SET);
-	PUSHTABLE("SEEK_CUR", lua_pushinteger, SEEK_CUR);
-	PUSHTABLE("SEEK_END", lua_pushinteger, SEEK_END);
+	luaL_tablepush("SEEK_SET", lua_pushinteger, SEEK_SET);
+	luaL_tablepush("SEEK_CUR", lua_pushinteger, SEEK_CUR);
+	luaL_tablepush("SEEK_END", lua_pushinteger, SEEK_END);
 #ifdef SEEK_DATA
-	PUSHTABLE("SEEK_DATA", lua_pushinteger, SEEK_DATA);
+	luaL_tablepush("SEEK_DATA", lua_pushinteger, SEEK_DATA);
 #endif
 #ifdef SEEK_HOLE
-	PUSHTABLE("SEEK_HOLE", lua_pushinteger, SEEK_HOLE);
+	luaL_tablepush("SEEK_HOLE", lua_pushinteger, SEEK_HOLE);
 #endif
 	lua_settable(L, -3);
 
