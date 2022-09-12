@@ -1,11 +1,8 @@
 from __future__ import print_function
 
-import os
 import sys
-import re
 import yaml
 import uuid
-import glob
 from lib.tarantool_server import TarantoolServer
 
 ## Get cluster uuid
@@ -150,9 +147,8 @@ replica.admin("box.info.vclock[{}] == 1".format(replica_id))
 print("-------------------------------------------------------------")
 print("Connect master to replica")
 print("-------------------------------------------------------------")
-replication_source = yaml.safe_load(replica.admin("box.cfg.listen", silent = True))[0]
-sys.stdout.push_filter(replication_source, "<replication_source>")
-master.admin("box.cfg{{ replication_source = '{}' }}".format(replication_source))
+sys.stdout.push_filter(replica.iproto.uri, "<replication_source>")
+master.admin("box.cfg{{ replication_source = '{}' }}".format(replica.iproto.uri))
 master.wait_lsn(replica_id, replica.get_lsn(replica_id))
 
 print("-------------------------------------------------------------")
@@ -180,9 +176,8 @@ print("-------------------------------------------------------------")
 print("Master must not crash then receives orphan rows from replica")
 print("-------------------------------------------------------------")
 
-replication_source = yaml.safe_load(replica.admin("box.cfg.listen", silent = True))[0]
-sys.stdout.push_filter(replication_source, "<replication>")
-master.admin("box.cfg{{ replication = '{}' }}".format(replication_source))
+sys.stdout.push_filter(replica.iproto.uri, "<replication>")
+master.admin("box.cfg{{ replication = '{}' }}".format(replica.iproto.uri))
 
 master.wait_lsn(replica_id, replica.get_lsn(replica_id))
 master.admin("box.info.vclock[{}] == 2".format(replica_id))
@@ -203,10 +198,6 @@ print("-------------------------------------------------------------")
 master.admin("box.snapshot()")
 master.admin("box.info.vclock[{}] == 2".format(replica_id))
 
-replica = TarantoolServer(server.ini)
-replica.script = "replication-py/replica.lua"
-replica.vardir = server.vardir
-replica.rpl_master = master
 replica.deploy()
 replica.wait_lsn(master_id, master.get_lsn(master_id))
 # Check that replica_id was re-used
