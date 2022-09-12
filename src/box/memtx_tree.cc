@@ -925,9 +925,9 @@ memtx_tree_index_get_internal(struct index *base, const char *key,
 		memtx_tree_find(&index->tree, &key_data);
 	if (res == NULL) {
 		*result = NULL;
-		if (part_count == cmp_def->part_count)
+		assert(part_count == cmp_def->unique_part_count);
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
-			memtx_tx_track_point(txn, space, base, key);
+		memtx_tx_track_point(txn, space, base, key);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		return 0;
 	}
