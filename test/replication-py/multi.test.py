@@ -1,6 +1,5 @@
 from __future__ import print_function
 
-import sys
 import os
 from lib.tarantool_server import TarantoolServer
 import yaml
@@ -36,7 +35,7 @@ for i in range(REPLICA_N - 1):
 # Make a list of servers
 sources = []
 for server in cluster:
-    sources.append(yaml.safe_load(server.admin("box.cfg.listen", silent = True))[0])
+    sources.append(server.iproto.uri)
     server.id = server.get_param("id")
 
 print("done")
