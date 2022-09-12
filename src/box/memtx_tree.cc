@@ -889,8 +889,23 @@ memtx_tree_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 {
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
-	struct memtx_tree_data<USE_HINT> *res = memtx_tree_random(&index->tree, rnd);
-	*result = res != NULL ? res->tuple : NULL;
+	struct txn *txn = in_txn();
+	struct space *space = space_by_id(base->def->space_id);
+	bool is_multikey = base->def->key_def->is_multikey;
+	if (memtx_tree_index_size<USE_HINT>(base) == 0) {
+		*result = NULL;
+		memtx_tx_track_gap(txn, space, base, NULL, ITER_GE, NULL, 0);
+		return 0;
+	}
+
+	do {
+		struct memtx_tree_data<USE_HINT> *res =
+			memtx_tree_random(&index->tree, rnd++);
+		assert(res != NULL);
+		uint32_t mk_index = is_multikey ? (uint32_t)res->hint : 0;
+		*result = memtx_tx_tuple_clarify(txn, space, res->tuple,
+						 base, mk_index);
+	} while (*result == NULL);
 	return memtx_prepare_result_tuple(result);
 }
 

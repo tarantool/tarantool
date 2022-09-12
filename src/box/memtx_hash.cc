@@ -285,12 +285,25 @@ memtx_hash_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct light_index_core *hash_table = &index->hash_table;
-
-	*result = NULL;
-	uint32_t k = light_index_random(hash_table, rnd);
-	if (k == light_index_end)
+	struct txn *txn = in_txn();
+	struct space *space = space_by_id(base->def->space_id);
+	if (memtx_hash_index_size(base) == 0) {
+		*result = NULL;
+		memtx_tx_track_full_scan(txn, space, base);
 		return 0;
-	*result = light_index_get(hash_table, k);
+	}
+
+	do {
+		uint32_t k = light_index_random(hash_table, rnd++);
+		/*
+		 * `light_index_end` is returned only in case the space is
+		 * empty.
+		 */
+		assert(k != light_index_end);
+		*result = light_index_get(hash_table, k);
+		assert(*result != NULL);
+		*result = memtx_tx_tuple_clarify(txn, space, *result, base, 0);
+	} while (*result == NULL);
 	return memtx_prepare_result_tuple(result);
 }
 
