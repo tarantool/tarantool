@@ -425,6 +425,7 @@
     <member refid="module_8h_1a4a35d7a7fe53c673112e06ab78794216" kind="function"><name>box_on_shutdown</name></member>
     <member refid="module_8h_1a11d9d5dc245f23922392835e55fccba9" kind="function"><name>say_log_level_is_enabled</name></member>
     <member refid="module_8h_1aa0f14b4a77bc8ce8ba99c67004083d23" kind="function"><name>CFORMAT</name></member>
+    <member refid="module_8h_1a9bffd74e9753961e0568d85db8e2304b" kind="function"><name>_say_strerror</name></member>
     <member refid="module_8h_1a615728b106aa274514dea63a9a693fd1" kind="function"><name>fiber_attr_new</name></member>
     <member refid="module_8h_1ac4003e7d28985f1573cf3faf8b4d38ee" kind="function"><name>fiber_attr_delete</name></member>
     <member refid="module_8h_1a4f42c1a444922edf2163806c5433ae1a" kind="function"><name>fiber_attr_setstacksize</name></member>

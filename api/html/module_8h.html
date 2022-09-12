@@ -90,7 +90,6 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <div class="textblock"><code>#include &lt;stddef.h&gt;</code><br />
 <code>#include &lt;stdarg.h&gt;</code><br />
 <code>#include &lt;errno.h&gt;</code><br />
-<code>#include &lt;string.h&gt;</code><br />
 <code>#include &lt;stdint.h&gt;</code><br />
 <code>#include &lt;stdbool.h&gt;</code><br />
 <code>#include &lt;stdio.h&gt;</code><br />
@@ -122,7 +121,7 @@ Macros</h2></td></tr>
 #define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#abd1dbec4fd6761084d3e0c05afe2b138">PACKAGE_VERSION_PATCH</a>&#160;&#160;&#160;0</td></tr>
 <tr class="memdesc:abd1dbec4fd6761084d3e0c05afe2b138"><td class="mdescLeft">&#160;</td><td class="mdescRight">Package patch version - 7 for 1.6.7. <br /></td></tr>
 <tr class="separator:abd1dbec4fd6761084d3e0c05afe2b138"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;2.11.0-entrypoint-455-ge2207fdc4&quot;</td></tr>
+<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;2.11.0-entrypoint-456-g44f46dc8b&quot;</td></tr>
 <tr class="memdesc:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">A string with major-minor-patch-commit-id identifier of the release, e.g.  <a href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">More...</a><br /></td></tr>
 <tr class="separator:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adb6d1259777e8f56c6260be6faed183e"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#adb6d1259777e8f56c6260be6faed183e">SYSCONF_DIR</a>&#160;&#160;&#160;&quot;etc&quot;</td></tr>
@@ -1055,6 +1054,9 @@ static bool&#160;</td><td class="memItemRight" valign="bottom"><b>say_log_level_
 &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa0f14b4a77bc8ce8ba99c67004083d23">CFORMAT</a> (printf, 5, 6) extern <a class="el" href="module_8h.html#a24a548551bdc95d156210ec216ded4f9">sayfunc_t</a> _say</td></tr>
 <tr class="memdesc:aa0f14b4a77bc8ce8ba99c67004083d23"><td class="mdescLeft">&#160;</td><td class="mdescRight">Internal function used to implement <a class="el" href="module_8h.html#a5b2bb360001f6dfb4f946335950cabbf" title="Format and print a message to Tarantool log file.">say()</a> macros. <br /></td></tr>
 <tr class="separator:aa0f14b4a77bc8ce8ba99c67004083d23"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9bffd74e9753961e0568d85db8e2304b"><td class="memItemLeft" align="right" valign="top">const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a9bffd74e9753961e0568d85db8e2304b">_say_strerror</a> (int errnum)</td></tr>
+<tr class="memdesc:a9bffd74e9753961e0568d85db8e2304b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Internal function that implements MT-Safe strerror().  <a href="module_8h.html#a9bffd74e9753961e0568d85db8e2304b">More...</a><br /></td></tr>
+<tr class="separator:a9bffd74e9753961e0568d85db8e2304b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a615728b106aa274514dea63a9a693fd1"><td class="memItemLeft" align="right" valign="top">struct fiber_attr *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a615728b106aa274514dea63a9a693fd1">fiber_attr_new</a> (void)</td></tr>
 <tr class="memdesc:a615728b106aa274514dea63a9a693fd1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Create a new fiber attribute container and initialize it with default parameters.  <a href="module_8h.html#a615728b106aa274514dea63a9a693fd1">More...</a><br /></td></tr>
 <tr class="separator:a615728b106aa274514dea63a9a693fd1"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -1888,7 +1890,7 @@ int&#160;</td><td class="memItemRight" valign="bottom"><b>log_level</b></td></tr
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;2.11.0-entrypoint-455-ge2207fdc4&quot;</td>
+          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;2.11.0-entrypoint-456-g44f46dc8b&quot;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -2246,8 +2248,8 @@ enum <a class="el" href="module_8h.html#af667a90dfe6a8cc25b510af73d98bb82" title
         </tr>
       </table>
 </div><div class="memdoc">
-<b>Value:</b><div class="fragment"><div class="line">        <a class="code" href="module_8h.html#a5b2bb360001f6dfb4f946335950cabbf">say</a>(S_SYSERROR, strerror(errno), format, \</div>
-<div class="line">        ##__VA_ARGS__)</div>
+<b>Value:</b><div class="fragment"><div class="line">                                      <a class="code" href="module_8h.html#a5b2bb360001f6dfb4f946335950cabbf">say</a>(S_SYSERROR, <a class="code" href="module_8h.html#a9bffd74e9753961e0568d85db8e2304b">_say_strerror</a>(errno), \</div>
+<div class="line">                                      format, ##__VA_ARGS__)</div>
 </div><!-- fragment -->
 <p>Format and print a message to Tarantool log file. </p>
 <dl class="params"><dt>Parameters</dt><dd>
@@ -2623,6 +2625,27 @@ enum <a class="el" href="module_8h.html#af667a90dfe6a8cc25b510af73d98bb82" title
 </div>
 </div>
 <h2 class="groupheader">Function Documentation</h2>
+<a id="a9bffd74e9753961e0568d85db8e2304b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9bffd74e9753961e0568d85db8e2304b">&#9670;&nbsp;</a></span>_say_strerror()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const char* _say_strerror </td>
+          <td>(</td>
+          <td class="paramtype">int&#160;</td>
+          <td class="paramname"><em>errnum</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Internal function that implements MT-Safe strerror(). </p>
+<p>It is used by <a class="el" href="module_8h.html#a39929109aefade22a76048b9ac73bd8d" title="Format and print a message to Tarantool log file.">say_syserror()</a> macro. </p>
+
+</div>
+</div>
 <a id="a2a33cc8495c4fc3ef343bf4ffe767d81"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a2a33cc8495c4fc3ef343bf4ffe767d81">&#9670;&nbsp;</a></span>box_decimal_abs()</h2>
 
@@ -9268,18 +9291,19 @@ box_tuple_position(it) == box_tuple_field_count(tuple) if returned value is NULL
 </div>
 </div><!-- contents -->
 <div class="ttc" id="amodule_8h_html_ac24865c6c4138cd6a252f32c55c812c6"><div class="ttname"><a href="module_8h.html#ac24865c6c4138cd6a252f32c55c812c6">box_tuple_position</a></div><div class="ttdeci">uint32_t box_tuple_position(box_tuple_iterator_t *it)</div><div class="ttdoc">Return zero-based next position in iterator.</div></div>
-<div class="ttc" id="amodule_8h_html_a5b2bb360001f6dfb4f946335950cabbf"><div class="ttname"><a href="module_8h.html#a5b2bb360001f6dfb4f946335950cabbf">say</a></div><div class="ttdeci">#define say(level, error, format,...)</div><div class="ttdoc">Format and print a message to Tarantool log file.</div><div class="ttdef"><b>Definition:</b> module.h:484</div></div>
-<div class="ttc" id="amodule_8h_html_ae02d530f5d4ff18fd7786c3648dac2cf"><div class="ttname"><a href="module_8h.html#ae02d530f5d4ff18fd7786c3648dac2cf">say_info</a></div><div class="ttdeci">#define say_info(format,...)</div><div class="ttdoc">Format and print a message to Tarantool log file.</div><div class="ttdef"><b>Definition:</b> module.h:505</div></div>
+<div class="ttc" id="amodule_8h_html_a5b2bb360001f6dfb4f946335950cabbf"><div class="ttname"><a href="module_8h.html#a5b2bb360001f6dfb4f946335950cabbf">say</a></div><div class="ttdeci">#define say(level, error, format,...)</div><div class="ttdoc">Format and print a message to Tarantool log file.</div><div class="ttdef"><b>Definition:</b> module.h:490</div></div>
+<div class="ttc" id="amodule_8h_html_ae02d530f5d4ff18fd7786c3648dac2cf"><div class="ttname"><a href="module_8h.html#ae02d530f5d4ff18fd7786c3648dac2cf">say_info</a></div><div class="ttdeci">#define say_info(format,...)</div><div class="ttdoc">Format and print a message to Tarantool log file.</div><div class="ttdef"><b>Definition:</b> module.h:511</div></div>
 <div class="ttc" id="amodule_8h_html_a76dc6a76579c761e9c7b2b9ced89290a"><div class="ttname"><a href="module_8h.html#a76dc6a76579c761e9c7b2b9ced89290a">box_tuple_seek</a></div><div class="ttdeci">const char * box_tuple_seek(box_tuple_iterator_t *it, uint32_t fieldno)</div><div class="ttdoc">Seek the tuple iterator.</div></div>
 <div class="ttc" id="amodule_8h_html_a7b88a4ee472624416d875a906a82d99b"><div class="ttname"><a href="module_8h.html#a7b88a4ee472624416d875a906a82d99b">box_tuple_next</a></div><div class="ttdeci">const char * box_tuple_next(box_tuple_iterator_t *it)</div><div class="ttdoc">Return the next tuple field from tuple iterator.</div></div>
 <div class="ttc" id="amodule_8h_html_a1aabe2cc4f09abaa070664c6d7156cd1"><div class="ttname"><a href="module_8h.html#a1aabe2cc4f09abaa070664c6d7156cd1">box_tuple_iterator</a></div><div class="ttdeci">box_tuple_iterator_t * box_tuple_iterator(box_tuple_t *tuple)</div><div class="ttdoc">Allocate and initialize a new tuple iterator.</div></div>
 <div class="ttc" id="amodule_8h_html_af9433c7d42d7747f1f69b79a0d98df13"><div class="ttname"><a href="module_8h.html#af9433c7d42d7747f1f69b79a0d98df13">coio_call</a></div><div class="ttdeci">ssize_t coio_call(ssize_t(*func)(va_list),...)</div><div class="ttdoc">public</div></div>
-<div class="ttc" id="amodule_8h_html_afd049f7ad59dbe455f460807475c2841"><div class="ttname"><a href="module_8h.html#afd049f7ad59dbe455f460807475c2841">offsetof</a></div><div class="ttdeci">#define offsetof(type, member)</div><div class="ttdoc">The macro offsetof expands to an integral constant expression of type size_t, the value of which is t...</div><div class="ttdef"><b>Definition:</b> module.h:192</div></div>
+<div class="ttc" id="amodule_8h_html_afd049f7ad59dbe455f460807475c2841"><div class="ttname"><a href="module_8h.html#afd049f7ad59dbe455f460807475c2841">offsetof</a></div><div class="ttdeci">#define offsetof(type, member)</div><div class="ttdoc">The macro offsetof expands to an integral constant expression of type size_t, the value of which is t...</div><div class="ttdef"><b>Definition:</b> module.h:191</div></div>
 <div class="ttc" id="amodule_8h_html_aaa998b89aa550c51d8576d3b766d1a67"><div class="ttname"><a href="module_8h.html#aaa998b89aa550c51d8576d3b766d1a67">box_tuple_rewind</a></div><div class="ttdeci">void box_tuple_rewind(box_tuple_iterator_t *it)</div><div class="ttdoc">Rewind iterator to the initial position.</div></div>
+<div class="ttc" id="amodule_8h_html_a9bffd74e9753961e0568d85db8e2304b"><div class="ttname"><a href="module_8h.html#a9bffd74e9753961e0568d85db8e2304b">_say_strerror</a></div><div class="ttdeci">const char * _say_strerror(int errnum)</div><div class="ttdoc">Internal function that implements MT-Safe strerror().</div></div>
 <div class="ttc" id="amodule_8h_html_a6f7fe762b15009de313fdf915378429c"><div class="ttname"><a href="module_8h.html#a6f7fe762b15009de313fdf915378429c">box_iterator_free</a></div><div class="ttdeci">void box_iterator_free(box_iterator_t *iterator)</div><div class="ttdoc">Destroy and deallocate iterator.</div></div>
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Fri Sep 9 2022 15:34:10 for Tarantool by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Mon Sep 12 2022 08:45:50 for Tarantool by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.17
 </small></address>
