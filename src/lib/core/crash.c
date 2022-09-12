@@ -20,6 +20,7 @@
 #include "core/backtrace.h"
 #include "crash.h"
 #include "say.h"
+#include "tt_strerror.h"
 #include "tt_uuid.h"
 
 #define pr_fmt(fmt)		"crash: " fmt
@@ -400,9 +401,10 @@ crash_report_feedback_daemon(struct crash_info *cinfo)
 	int rc = posix_spawn(NULL, exec_argv[0], NULL, NULL, exec_argv, environ);
 	if (rc != 0) {
 		pr_crit("posix_spawn with "
-			"exec(%s,[%s,%s,%s,%s,%s,%s,%s]) failed: %s", exec_argv[0],
-			exec_argv[0], exec_argv[1], exec_argv[2], exec_argv[3],
-			exec_argv[4], exec_argv[5], exec_argv[6], strerror(rc));
+			"exec(%s,[%s,%s,%s,%s,%s,%s,%s]) failed: %s",
+			exec_argv[0], exec_argv[0], exec_argv[1], exec_argv[2],
+			exec_argv[3], exec_argv[4], exec_argv[5], exec_argv[6],
+			tt_strerror(rc));
 		return -1;
 	}
 
@@ -573,6 +575,6 @@ crash_signal_init(void)
 		if (sigaction(crash_signals[i], &sa, NULL) == 0)
 			continue;
 		pr_panic("sigaction %d (%s)", crash_signals[i],
-			 strerror(errno));
+			 tt_strerror(errno));
 	}
 }

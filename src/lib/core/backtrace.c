@@ -9,6 +9,7 @@
 #ifdef ENABLE_BACKTRACE
 #include "core/fiber.h"
 #include "core/tt_static.h"
+#include "core/tt_strerror.h"
 
 #ifdef __APPLE__
 #include <dlfcn.h>
@@ -308,7 +309,7 @@ backtrace_print(const struct backtrace *bt, int fd)
 					    frame->ip, proc_name, offset);
 		if (chars_written < 0) {
 			say_error("unwinding error: dprintf failed: %s",
-				  strerror(errno));
+				  tt_strerror(errno));
 			break;
 		}
 	}
