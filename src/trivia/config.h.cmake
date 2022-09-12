@@ -55,7 +55,12 @@
 /**
  * Defined if strlcat() string extension helper present.
  */
- #cmakedefine HAVE_STRLCAT 1
+#cmakedefine HAVE_STRLCAT 1
+
+/**
+ * Defined if this platform has GNU specific strerror_r().
+ */
+#cmakedefine HAVE_STRERROR_R_GNU 1
 
 /*
  * Defined if gcov instrumentation should be enabled.

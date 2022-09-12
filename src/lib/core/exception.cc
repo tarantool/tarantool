@@ -36,6 +36,7 @@
 
 #include "fiber.h"
 #include "reflection.h"
+#include "tt_strerror.h"
 
 extern "C" {
 
@@ -142,7 +143,7 @@ SystemError::SystemError(const char *file, unsigned line,
 	va_start(ap, format);
 	error_vformat_msg(this, format, ap);
 	va_end(ap);
-	error_append_msg(this, ": %s", strerror(saved_errno));
+	error_append_msg(this, ": %s", tt_strerror(saved_errno));
 }
 
 const struct type_info type_SocketError =
@@ -158,7 +159,7 @@ SocketError::SocketError(const char *file, unsigned line,
 	error_vformat_msg(this, format, ap);
 	va_end(ap);
 	error_append_msg(this, ", called on %s: %s", socketname,
-			 strerror(saved_errno));
+			 tt_strerror(saved_errno));
 }
 
 
@@ -347,7 +348,7 @@ BuildSystemError(const char *file, unsigned line, const char *format, ...)
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);
 	va_end(ap);
-	error_append_msg(e, ": %s", strerror(e->saved_errno));
+	error_append_msg(e, ": %s", tt_strerror(e->saved_errno));
 	return e;
 }
 
@@ -398,7 +399,7 @@ BuildSocketError(const char *file, unsigned line, const char *socketname,
 	error_vformat_msg(e, format, ap);
 	va_end(ap);
 	error_append_msg(e, ", called on %s: %s", socketname,
-			 strerror(e->saved_errno));
+			 tt_strerror(e->saved_errno));
 	return e;
 }
 

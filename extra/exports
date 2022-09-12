@@ -530,6 +530,7 @@ tnt_XXH64_copyState
 tnt_XXH64_digest
 tnt_XXH64_reset
 tnt_XXH64_update
+tt_strerror
 tt_uuid_bswap
 tt_uuid_compare
 tt_uuid_create
@@ -543,3 +544,4 @@ uri_set_destroy
 uuid_nil
 uuid_unpack
 _say
+_say_strerror

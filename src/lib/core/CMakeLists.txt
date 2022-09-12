@@ -39,6 +39,7 @@ set(core_sources
     mp_interval.c
     prbuf.c
     ssl_init.c
+    tt_strerror.c
 )
 
 if (ENABLE_BACKTRACE)

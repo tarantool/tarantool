@@ -125,6 +125,13 @@ check_symbol_exists(__get_cpuid cpuid.h HAVE_CPUID)
 check_symbol_exists(strlcpy string.h HAVE_STRLCPY)
 check_symbol_exists(strlcat string.h HAVE_STRLCAT)
 
+# On Linux the GNU version of strerror_r is used, because we define
+# the _GNU_SOURCE macro, see cmake/os.cmake.
+check_c_source_compiles("
+        #include <string.h>
+        int main() { return strerror_r(0, NULL, 0)[0] == 0; }
+    " HAVE_STRERROR_R_GNU)
+
 # Checks for libev
 include(CheckStructHasMember)
 check_struct_has_member("struct stat" "st_mtim" "sys/stat.h"

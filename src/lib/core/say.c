@@ -32,6 +32,7 @@
 #include "fiber.h"
 #include "errinj.h"
 #include "tt_static.h"
+#include "tt_strerror.h"
 
 #include <errno.h>
 #include <stdarg.h>
@@ -106,6 +107,12 @@ static struct log log_std;
 static struct log *log_default = &log_boot;
 
 sayfunc_t _say = say_default;
+
+const char *
+_say_strerror(int errnum)
+{
+	return tt_strerror(errnum);
+}
 
 static const char level_chars[] = {
 	[S_FATAL] = 'F',

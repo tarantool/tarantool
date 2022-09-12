@@ -40,6 +40,7 @@
 #include "small/rlist.h"
 #include "fiber_cond.h"
 #include "ratelimit.h"
+#include "tt_strerror.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -314,6 +315,13 @@ typedef void (*sayfunc_t)(int, const char *, int, const char *,
 CFORMAT(printf, 5, 6) extern sayfunc_t _say;
 
 /**
+ * Internal function that implements MT-Safe strerror().
+ * It is used by say_syserror() macro.
+ */
+const char *
+_say_strerror(int errnum);
+
+/**
  * Format and print a message to Tarantool log file.
  *
  * \param level (int) - log level (see enum \link say_level \endlink)
@@ -366,13 +374,16 @@ CFORMAT(printf, 5, 6) extern sayfunc_t _say;
 /** \copydoc say_error() */
 #define say_debug(format, ...) say(S_DEBUG, NULL, format, ##__VA_ARGS__)
 /** \copydoc say_error(). */
-#define say_syserror(format, ...) say(S_SYSERROR, strerror(errno), format, \
-	##__VA_ARGS__)
+#define say_syserror(format, ...) say(S_SYSERROR, _say_strerror(errno), \
+				      format, ##__VA_ARGS__)
 /** \endcond public */
 
 #define panic_status(status, ...)	({ say(S_FATAL, NULL, __VA_ARGS__); exit(status); })
 #define panic(...)			panic_status(EXIT_FAILURE, __VA_ARGS__)
-#define panic_syserror(...)		({ say(S_FATAL, strerror(errno), __VA_ARGS__); exit(EXIT_FAILURE); })
+#define panic_syserror(...)		({ \
+	say(S_FATAL, tt_strerror(errno), __VA_ARGS__); \
+	exit(EXIT_FAILURE); \
+})
 
 enum {
 	/* 10 messages per 5 seconds. */

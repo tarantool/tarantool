@@ -3,6 +3,7 @@
 #include <memory.h>
 #include "unit.h"
 #include "say.h"
+#include "tt_strerror.h"
 #include <pthread.h>
 #include <errinj.h>
 #include <coio_task.h>
@@ -203,7 +204,8 @@ int main()
 	char template[] = "/tmp/tmpdir.XXXXXX";
 	const char *tmp_dir = mkdtemp(template);
 	if (tmp_dir == NULL) {
-		diag("unit/say: failed to create temp dir: %s", strerror(errno));
+		diag("unit/say: failed to create temp dir: %s",
+		     tt_strerror(errno));
 		return check_plan();
 	}
 	char tmp_filename[30];

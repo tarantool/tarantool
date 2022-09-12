@@ -62,6 +62,7 @@
 #include "trivia/util.h"
 #include "backtrace.h"
 #include "tt_pthread.h"
+#include "tt_strerror.h"
 #include "lua/init.h"
 #include "box/flightrec.h"
 #include "box/box.h"
@@ -700,7 +701,8 @@ main(int argc, char **argv)
 		int save_errno = errno;
 		if (fd >= 0)
 			close(fd);
-		printf("Can't open script %s: %s\n", argv[1], strerror(save_errno));
+		printf("Can't open script %s: %s\n",
+		       argv[1], tt_strerror(save_errno));
 		return save_errno;
 	}
 
