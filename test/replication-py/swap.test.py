@@ -1,10 +1,7 @@
 from __future__ import print_function
 
 import os
-import tarantool
 from lib.tarantool_server import TarantoolServer
-import re
-import yaml
 
 REPEAT = 20
 ID_BEGIN = 0
