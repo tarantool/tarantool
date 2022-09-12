@@ -55,6 +55,7 @@
 #include "lua/serializer.h" /* luaL_setmaphint */
 #include "fiber.h"
 #include "sio.h"
+#include "tt_strerror.h"
 
 static void
 lbox_pushvclock(struct lua_State *L, const struct vclock *vclock)
@@ -80,7 +81,7 @@ lbox_push_replication_error_message(struct lua_State *L, struct error *e,
 	if (e->saved_errno == 0)
 		return;
 	lua_pushstring(L, "system_message");
-	lua_pushstring(L, strerror(e->saved_errno));
+	lua_pushstring(L, tt_strerror(e->saved_errno));
 	lua_settable(L, idx - 2);
 }
 

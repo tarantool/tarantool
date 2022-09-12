@@ -39,6 +39,7 @@
 #include <trivia/util.h>
 #include "exception.h"
 #include "iostream.h"
+#include "tt_strerror.h"
 #include "uri/uri.h"
 
 struct evio_service_entry {
@@ -401,14 +402,14 @@ evio_service_entry_stop(struct evio_service_entry *entry)
 		return;
 
 	if (close(service_fd) < 0)
-		say_error("Failed to close socket: %s", strerror(errno));
+		say_error("Failed to close socket: %s", tt_strerror(errno));
 
 	if (entry->addr.sa_family != AF_UNIX)
 		return;
 
 	if (unlink(((struct sockaddr_un *)&entry->addr)->sun_path) < 0) {
 		say_error("Failed to unlink unix "
-			  "socket path: %s", strerror(errno));
+			  "socket path: %s", tt_strerror(errno));
 	}
 }
 
