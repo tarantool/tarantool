@@ -1232,6 +1232,17 @@ memtx_tx_story_full_unlink(struct memtx_story *story)
 			 * index.
 			 */
 			if (story->del_psn > 0 && link->in_index != NULL) {
+				/*
+				 * Invariant that the top of the history chain
+				 * is always in the index: here we delete
+				 * (sic: not replace) a tuple from the index,
+				 * and  it must be the last story left in the
+				 * history chain, otherwise `link->older_story`
+				 * starts to be at the top of the history chain
+				 * and is not present in index, which violates
+				 * our invariant.
+				 */
+				assert(link->older_story == NULL);
 				struct index *index = link->in_index;
 				struct tuple *removed, *unused;
 				if (index_replace(index, story->tuple, NULL,
@@ -1296,6 +1307,18 @@ memtx_tx_story_gc_step()
 		rlist_entry(txm.traverse_all_stories, struct memtx_story,
 			    in_all_stories);
 	txm.traverse_all_stories = txm.traverse_all_stories->next;
+
+	if (story->link->newer_story == NULL && story->del_psn > 0 &&
+	    story->link[0].in_index != NULL &&
+	    story->link->older_story != NULL) {
+		/*
+		 * We would have to delete this story's tuple from the index,
+		 * but we cannot do it since `story->link->older_story` starts
+		 * to be at the top of the history chain and is not present in
+		 * index, which violates our invariant.
+		 */
+		return;
+	}
 
 	/**
 	 * The order in which conditions are checked is important,
