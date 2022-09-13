@@ -71,6 +71,14 @@ enum say_format {
 
 extern int log_level;
 
+/**
+ * This function is called for every log which log level is not less than
+ * log_level_flightrec.
+ */
+extern void
+(*log_write_flightrec)(int level, const char *filename, int line,
+		       const char *error, const char *format, va_list ap);
+
 static inline bool
 say_log_level_is_enabled(int level)
 {
@@ -141,10 +149,6 @@ typedef int (*log_format_func_t)(struct log *log, char *buf, int len, int level,
 				 const char *filename, int line, const char *error,
 				 const char *format, va_list ap);
 
-typedef void
-(*log_callback_t)(int level, const char *filename, int line,
-		  const char *error, const char *format, va_list ap);
-
 /**
  * A log object. There is a singleton for the default log.
  */
@@ -180,8 +184,6 @@ struct log {
 	int rotating_threads;
 	enum syslog_facility syslog_facility;
 	struct rlist in_log_list;
-	/** Callback called on log event. */
-	log_callback_t on_log;
 };
 
 /**
@@ -271,10 +273,10 @@ void
 say_set_log_format(enum say_format format);
 
 /**
- * Set callback function called on each log event and its log level.
+ * Set flight recorder log level.
  */
 void
-say_set_log_callback(log_callback_t callback, int on_log_new_level);
+say_set_flightrec_log_level(int new_level);
 
 /**
  * Return say format by name.
