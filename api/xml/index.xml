@@ -435,6 +435,8 @@
     <member refid="module_8h_1a8e8dbdb4656ce6c89ea1e3215c0d6adf" kind="function"><name>fiber_new_ex</name></member>
     <member refid="module_8h_1aaa5beb40f119b9400bb57b81820b24ff" kind="function"><name>fiber_yield</name></member>
     <member refid="module_8h_1abca18eb68ebf89507d4cf5eb3c402cb2" kind="function"><name>fiber_start</name></member>
+    <member refid="module_8h_1ac596a2d875dcfa8477bbfc1ccc7b809d" kind="function"><name>fiber_set_ctx</name></member>
+    <member refid="module_8h_1a292f6964c2f9336780175623c94f0be2" kind="function"><name>fiber_get_ctx</name></member>
     <member refid="module_8h_1a661de7f72aa265ff6ffcb8b3acfafe40" kind="function"><name>fiber_wakeup</name></member>
     <member refid="module_8h_1a9a5b700b2122f08e6bc1298ac7eb0435" kind="function"><name>fiber_cancel</name></member>
     <member refid="module_8h_1a4078cbddc22b0ed941548f86672224d9" kind="function"><name>fiber_set_cancellable</name></member>
