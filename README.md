@@ -2,6 +2,7 @@
 
 [![Actions Status][actions-badge]][actions-url]
 [![Code Coverage][coverage-badge]][coverage-url]
+[![OSS Fuzz][oss-fuzz-badge]][oss-fuzz-url]
 [![Telegram][telegram-badge]][telegram-url]
 [![GitHub Discussions][discussions-badge]][discussions-url]
 [![Stack Overflow][stackoverflow-badge]][stackoverflow-url]
@@ -72,6 +73,8 @@ Thank you for your interest in Tarantool!
 [discussions-url]: https://github.com/tarantool/tarantool/discussions
 [stackoverflow-badge]: https://img.shields.io/badge/stackoverflow-tarantool-orange.svg
 [stackoverflow-url]: https://stackoverflow.com/questions/tagged/tarantool
+[oss-fuzz-badge]: https://oss-fuzz-build-logs.storage.googleapis.com/badges/tarantool.svg
+[oss-fuzz-url]: https://oss-fuzz.com/coverage-report/job/libfuzzer_asan_tarantool/latest
 [tarantool-url]: https://www.tarantool.io/en/
 [license]: LICENSE
 [modules]: https://www.tarantool.io/en/download/rocks
