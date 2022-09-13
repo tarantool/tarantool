@@ -51,16 +51,24 @@
 
 pid_t log_pid = 0;
 /**
- * It is calculated as MAX(level, on_log_level) where level - is log level
- * value to be set.
+ * It is calculated as MAX(level, log_level_flightrec) where level - is log
+ * level value to be set.
  */
 int log_level = S_INFO;
 /**
- * Log level of log callback, i.e. if value of entry to be logger is greater
- * than @a on_log_level - it is skipped. This is an internal symbol in contrast
- * to @a log_level.
+ * Log level of flight recorder. Log is passed to flight recorder only if
+ * it's log level not less that this. -1 is used if we should not pass logs
+ * to flight recorder (it is currently disabled).
  */
-static int on_log_level = S_FATAL;
+static int log_level_flightrec = -1;
+/**
+ * This function is called for every log which log level is not less than
+ * log_level_flightrec.
+ */
+void
+(*log_write_flightrec)(int level, const char *filename, int line,
+		       const char *error, const char *format, va_list ap);
+
 enum say_format log_format = SF_PLAIN;
 enum { SAY_SYSLOG_DEFAULT_PORT = 512 };
 
@@ -104,7 +112,6 @@ static struct log log_boot = {
 	.format_func = say_format_boot,
 	.pid = 0,
 	.syslog_ident = NULL,
-	.on_log = NULL,
 };
 
 /** Default logger used after bootstrap. */
@@ -216,7 +223,7 @@ log_set_format(struct log *log, log_format_func_t format_func)
 void
 say_set_log_level(int new_level)
 {
-	log_level = MAX(new_level, on_log_level);
+	log_level = MAX(new_level, log_level_flightrec);
 	log_set_level(log_default, (enum say_level) new_level);
 }
 
@@ -249,11 +256,10 @@ say_set_log_format(enum say_format format)
 }
 
 void
-say_set_log_callback(log_callback_t callback, int on_log_new_level)
+say_set_flightrec_log_level(int new_level)
 {
-	log_default->on_log = callback;
-	log_level = MAX(on_log_new_level, log_level);
-	on_log_level = on_log_new_level;
+	log_level = MAX(new_level, log_default->level);
+	log_level_flightrec = new_level;
 }
 
 static const char *say_format_strs[] = {
@@ -666,7 +672,6 @@ log_create(struct log *log, const char *init_str, int nonblock)
 	log->format_func = NULL;
 	log->level = S_INFO;
 	log->rotating_threads = 0;
-	log->on_log = NULL;
 	fiber_cond_create(&log->rotate_cond);
 	ev_async_init(&log->log_async, log_rotate_async_cb);
 	setvbuf(stderr, NULL, _IONBF, 0);
@@ -1265,10 +1270,11 @@ log_vsay(struct log *log, int level, const char *filename, int line,
 	 const char *error, const char *format, va_list ap)
 {
 	int errsv = errno;
-	if (log->on_log != NULL) {
+	if (level <= log_level_flightrec) {
 		va_list ap_copy;
 		va_copy(ap_copy, ap);
-		log->on_log(level, filename, line, error, format, ap_copy);
+		log_write_flightrec(level, filename, line, error,
+				    format, ap_copy);
 		va_end(ap_copy);
 	}
 	if (level > log->level) {
