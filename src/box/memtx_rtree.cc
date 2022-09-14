@@ -295,12 +295,19 @@ memtx_rtree_index_reserve(struct index *base, uint32_t size_hint)
 	return memtx_index_extent_reserve(memtx, RESERVE_EXTENTS_BEFORE_REPLACE);
 }
 
+/** Implementation of create_iterator for memtx rtree index. */
 static struct iterator *
-memtx_rtree_index_create_iterator(struct index *base,  enum iterator_type type,
-				  const char *key, uint32_t part_count)
+memtx_rtree_index_create_iterator(struct index *base, enum iterator_type type,
+				  const char *key, uint32_t part_count,
+				  const char *pos)
 {
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+
+	if (pos != NULL) {
+		diag_set(UnsupportedIndexFeature, base->def, "pagination");
+		return NULL;
+	}
 
 	struct rtree_rect rect;
 	if (part_count == 0) {
@@ -357,6 +364,7 @@ memtx_rtree_index_create_iterator(struct index *base,  enum iterator_type type,
 	it->pool = &memtx->rtree_iterator_pool;
 	it->base.next_internal = index_rtree_iterator_next;
 	it->base.next = memtx_iterator_next;
+	it->base.position = generic_iterator_position;
 	it->base.free = index_rtree_iterator_free;
 	rtree_iterator_init(&it->impl);
 	/*
