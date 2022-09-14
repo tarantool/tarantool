@@ -187,13 +187,19 @@ session_settings_index_destroy(struct index *index)
 	free(index);
 }
 
+/** Implementation of create_iterator for session_settings. */
 static struct iterator *
 session_settings_index_create_iterator(struct index *base,
-				       enum iterator_type type, const char *key,
-				       uint32_t part_count)
+				       enum iterator_type type,
+				       const char *key, uint32_t part_count,
+				       const char *pos)
 {
 	struct session_settings_index *index =
 		(struct session_settings_index *)base;
+	if (pos != NULL) {
+		diag_set(UnsupportedIndexFeature, base->def, "pagination");
+		return NULL;
+	}
 	char *decoded_key = NULL;
 	if (part_count > 0) {
 		assert(part_count == 1);
@@ -216,6 +222,7 @@ session_settings_index_create_iterator(struct index *base,
 		return NULL;
 	}
 	iterator_create(&it->base, base);
+	it->base.position = generic_iterator_position;
 	it->base.free = session_settings_iterator_free;
 	it->key = decoded_key;
 	it->is_eq = type == ITER_EQ || type == ITER_REQ;

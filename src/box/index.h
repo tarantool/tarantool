@@ -289,6 +289,14 @@ struct iterator {
 	 * Returns 0 on success, -1 on error.
 	 */
 	int (*next)(struct iterator *it, struct tuple **ret);
+	/**
+	 * Get position of iterator - extracted cmp_def of last fetched
+	 * tuple (without MP_ARRAY header). If iterator is exhausted,
+	 * it returns position of last tuple, if there were no tuples
+	 * fetched, empty pos (NULL) is returned.
+	 * Returned position is allocated on current fiber's region.
+	 */
+	int (*position)(struct iterator *it, const char **pos, uint32_t *size);
 	/** Destroy the iterator. */
 	void (*free)(struct iterator *);
 	/** Space cache version at the time of the last index lookup. */
@@ -355,6 +363,16 @@ iterator_next(struct iterator *it, struct tuple **ret);
  */
 int
 iterator_next_internal(struct iterator *it, struct tuple **ret);
+
+/**
+ * Get position of iterator - extracted cmp_def of last fetched
+ * tuple (without MP_ARRAY header). If iterator is exhausted,
+ * it returns position of last tuple, if there were no tuples
+ * fetched, empty pos (NULL) is returned.
+ * Returned position is allocated on current fiber's region.
+ */
+int
+iterator_position(struct iterator *it, const char **pos, uint32_t *size);
 
 /**
  * Destroy an iterator instance and free associated memory.
@@ -493,10 +511,16 @@ struct index_vtab {
 	int (*replace)(struct index *index, struct tuple *old_tuple,
 		       struct tuple *new_tuple, enum dup_replace_mode mode,
 		       struct tuple **result, struct tuple **successor);
-	/** Create an index iterator. */
+	/**
+	 * Create an index iterator. Iterator can be placed right after
+	 * position, passed in pos argument. Argument pos is an extracted
+	 * cmp_def without MP_ARRAY header or NULL.
+	 */
 	struct iterator *(*create_iterator)(struct index *index,
-			enum iterator_type type,
-			const char *key, uint32_t part_count);
+					    enum iterator_type type,
+					    const char *key,
+					    uint32_t part_count,
+					    const char *pos);
 	/** Create an index read view. */
 	struct index_read_view *(*create_read_view)(struct index *index);
 	/** Introspection (index:stat()) */
@@ -787,10 +811,19 @@ index_replace(struct index *index, struct tuple *old_tuple,
 }
 
 static inline struct iterator *
+index_create_iterator_after(struct index *index, enum iterator_type type,
+			    const char *key, uint32_t part_count,
+			    const char *pos)
+{
+	return index->vtab->create_iterator(index, type, key, part_count,
+					    pos);
+}
+
+static inline struct iterator *
 index_create_iterator(struct index *index, enum iterator_type type,
 		      const char *key, uint32_t part_count)
 {
-	return index->vtab->create_iterator(index, type, key, part_count);
+	return index->vtab->create_iterator(index, type, key, part_count, NULL);
 }
 
 static inline struct index_read_view *
@@ -941,7 +974,8 @@ void generic_index_begin_build(struct index *);
 int generic_index_reserve(struct index *, uint32_t);
 struct iterator *
 generic_index_create_iterator(struct index *base, enum iterator_type type,
-			      const char *key, uint32_t part_count);
+			      const char *key, uint32_t part_count,
+			      const char *pos);
 int generic_index_build_next(struct index *, struct tuple *);
 void generic_index_end_build(struct index *);
 int
@@ -955,6 +989,10 @@ exhausted_iterator_next(struct iterator *it, struct tuple **ret);
 int
 exhausted_index_read_view_iterator_next_raw(struct index_read_view_iterator *it,
 					    const char **data, uint32_t *size);
+/** Unsupported feature error is returned. */
+int
+generic_iterator_position(struct iterator *it, const char **pos,
+			  uint32_t *size);
 
 #if defined(__cplusplus)
 } /* extern "C" */
