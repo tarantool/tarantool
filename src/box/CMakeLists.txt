@@ -223,6 +223,7 @@ set(box_sources
     watcher.c
     decimal.c
     read_view.c
+    key_estimator.c
     ${sql_sources}
     ${lua_sources}
     lua/init.c
@@ -248,6 +249,7 @@ set(box_sources
     lua/key_def.c
     lua/merger.c
     lua/watcher.c
+    lua/key_estimator.c
     ${bin_sources})
 
 if(ENABLE_AUDIT_LOG)

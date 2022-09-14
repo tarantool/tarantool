@@ -258,6 +258,19 @@ void
 luaL_register_module(struct lua_State *L, const char *modname,
 		     const struct luaL_Reg *methods);
 
+/**
+ * @brief Push a value with specified key into the table at the top
+ * of the Lua stack.
+ * @param name key for the value.
+ * @param method method that pushes the value on the Lua stack.
+ * @param value value.
+ */
+#define luaL_tablepush(name, method, value) do	{	\
+	lua_pushliteral(L, name);			\
+	method(L, value);				\
+	lua_settable(L, -3);				\
+ } while (0)
+
 /** \cond public */
 
 /**
