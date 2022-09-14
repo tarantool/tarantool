@@ -397,20 +397,25 @@ end
 
 box.internal.normalize_txn_isolation_level = normalize_txn_isolation_level
 
+local begin_options = {
+    timeout = function(timeout)
+        if type(timeout) ~= "number" or timeout <= 0 then
+            box.error(box.error.ILLEGAL_PARAMS,
+                      "timeout must be a number greater than 0")
+        end
+        return true
+    end,
+    txn_isolation = normalize_txn_isolation_level,
+}
+
 box.begin = function(options)
     local timeout
     local txn_isolation
     if options then
-        check_param(options, 'options', 'table')
+        check_param_table(options, begin_options)
         timeout = options.timeout
-        if timeout and (type(timeout) ~= "number" or timeout <= 0) then
-            box.error(box.error.ILLEGAL_PARAMS,
-                      "timeout must be a number greater than 0")
-        end
-        txn_isolation = options.txn_isolation
-        if txn_isolation ~= nil then
-            txn_isolation = normalize_txn_isolation_level(txn_isolation)
-        end
+        txn_isolation = options.txn_isolation and
+                        normalize_txn_isolation_level(options.txn_isolation)
     end
     if builtin.box_txn_begin() == -1 then
         box.error()
