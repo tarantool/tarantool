@@ -559,6 +559,20 @@ iterator_next_internal(struct iterator *it, struct tuple **ret)
 	return it->next_internal(it, ret);
 }
 
+int
+iterator_position(struct iterator *it, const char **pos, uint32_t *size)
+{
+	assert(it->position != NULL);
+	assert(pos != NULL);
+	assert(size != NULL);
+	if (!iterator_is_valid(it)) {
+		*pos = NULL;
+		*size = 0;
+		return 0;
+	}
+	return it->position(it, pos, size);
+}
+
 void
 iterator_delete(struct iterator *it)
 {
@@ -770,9 +784,13 @@ generic_index_replace(struct index *index, struct tuple *old_tuple,
 
 struct iterator *
 generic_index_create_iterator(struct index *base, enum iterator_type type,
-			      const char *key, uint32_t part_count)
+			      const char *key, uint32_t part_count,
+			      const char *pos)
 {
-	(void) type; (void) key; (void) part_count;
+	(void)type;
+	(void)key;
+	(void)part_count;
+	(void)pos;
 	diag_set(UnsupportedIndexFeature, base->def, "read view");
 	return NULL;
 }
@@ -870,6 +888,17 @@ exhausted_index_read_view_iterator_next_raw(struct index_read_view_iterator *it,
 	*data = NULL;
 	*size = 0;
 	return 0;
+}
+
+int
+generic_iterator_position(struct iterator *it, const char **pos,
+			  uint32_t *size)
+{
+	(void)it;
+	(void)pos;
+	(void)size;
+	diag_set(UnsupportedIndexFeature, it->index->def, "pagination");
+	return -1;
 }
 
 /* }}} */

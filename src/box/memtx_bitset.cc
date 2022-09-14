@@ -336,15 +336,21 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 	return 0;
 }
 
+/** Implementation of create_iterator for memtx bitset index. */
 static struct iterator *
 memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
-				   const char *key, uint32_t part_count)
+				   const char *key, uint32_t part_count,
+				   const char *pos)
 {
 	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
 
 	assert(part_count == 0 || key != NULL);
 	(void) part_count;
+	if (pos != NULL) {
+		diag_set(UnsupportedIndexFeature, base->def, "pagination");
+		return NULL;
+	}
 
 	struct bitset_index_iterator *it = (struct bitset_index_iterator *)
 		mempool_alloc(&memtx->iterator_pool);
@@ -358,6 +364,7 @@ memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 	it->pool = &memtx->iterator_pool;
 	it->base.next_internal = bitset_index_iterator_next;
 	it->base.next = memtx_iterator_next;
+	it->base.position = generic_iterator_position;
 	it->base.free = bitset_index_iterator_free;
 
 	tt_bitset_iterator_create(&it->bitset_it, realloc);

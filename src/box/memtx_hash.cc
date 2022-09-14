@@ -415,14 +415,20 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 	return 0;
 }
 
+/** Implementation of create_iterator for memtx hash index. */
 static struct iterator *
 memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
-				 const char *key, uint32_t part_count)
+				 const char *key, uint32_t part_count,
+				 const char *pos)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
 
 	assert(part_count == 0 || key != NULL);
+	if (pos != NULL) {
+		diag_set(UnsupportedIndexFeature, base->def, "pagination");
+		return NULL;
+	}
 
 	struct hash_iterator *it = (struct hash_iterator *)
 		mempool_alloc(&memtx->iterator_pool);
@@ -481,6 +487,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 		return NULL;
 	}
 	it->base.next = memtx_iterator_next;
+	it->base.position = generic_iterator_position;
 	return (struct iterator *)it;
 }
 
