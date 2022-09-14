@@ -356,6 +356,20 @@ iproto_type_name(uint16_t type)
 	}
 }
 
+/** Predefined replication group identifiers. */
+enum {
+	/**
+	 * Default replication group: changes made to the space
+	 * are replicated throughout the entire cluster.
+	 */
+	GROUP_DEFAULT = 0,
+	/**
+	 * Replica local space: changes made to the space are
+	 * not replicated.
+	 */
+	GROUP_LOCAL = 1,
+};
+
 /**
  * Returns IPROTO key name by @a key code.
  * @param key IPROTO key.
