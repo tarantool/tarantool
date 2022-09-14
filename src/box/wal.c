@@ -42,6 +42,7 @@
 #include "cbus.h"
 #include "coio_task.h"
 #include "replication.h"
+#include "iproto_constants.h"
 
 enum {
 	/**

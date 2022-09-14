@@ -42,6 +42,7 @@
 #include "session.h"
 #include "coio_file.h"
 #include "error.h"
+#include "iproto_constants.h"
 
 /*
  * Recovery subsystem
