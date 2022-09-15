@@ -33,6 +33,7 @@ local COLOR_BLUE = ""
 local COLOR_YELLOW = ""
 local COLOR_RESET = ""
 local GREEN_CARET = " => "
+local auto_listing = true
 
 local function pretty(obj, max_depth)
     if max_depth == nil then max_depth = dbg.pretty_depth end
@@ -383,6 +384,12 @@ local function cmd_where(context_lines)
     return (info and where(info, tonumber(context_lines) or 5))
 end
 
+local function cmd_listing(context_lines)
+    local offset = stack_inspect_offset + CMD_STACK_LEVEL - 2
+    local info = debug.getinfo(offset)
+    return (info and where(info, tonumber(context_lines) or 5))
+end
+
 local function cmd_trace()
     dbg_writeln("Inspecting frame %d", stack_inspect_offset - stack_top)
     local i = 0;
@@ -516,6 +523,9 @@ repl = function(reason)
     if tonumber(dbg.auto_where) then where(info, dbg.auto_where) end
 
     repeat
+        if auto_listing then
+            pcall(cmd_listing(3))
+        end
         local success, done, hook = pcall(run_command, dbg.read(COLOR_RED .. "luadebug.lua> " .. COLOR_RESET))
         if success then
             debug.sethook(hook and hook(0), "crl")
