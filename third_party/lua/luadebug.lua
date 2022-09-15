@@ -1,16 +1,16 @@
 --[[
 	Copyright (c) 2020 Scott Lembcke and Howling Moon Software
-	
+
 	Permission is hereby granted, free of charge, to any person obtaining a copy
 	of this software and associated documentation files (the "Software"), to deal
 	in the Software without restriction, including without limitation the rights
 	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 	copies of the Software, and to permit persons to whom the Software is
 	furnished to do so, subject to the following conditions:
-	
+
 	The above copyright notice and this permission notice shall be included in
 	all copies or substantial portions of the Software.
-	
+
 	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -18,7 +18,7 @@
 	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 	SOFTWARE.
-	
+
 	TODO:
 	* Print short function arguments as part of stack location.
 	* Properly handle being reentrant due to coroutines.
@@ -78,9 +78,6 @@ local stack_top = 0
 -- The current stack frame index.
 -- Changed using the up/down commands
 local stack_inspect_offset = 0
-
--- LuaJIT has an off by one bug when setting local variables.
-local LUA_JIT_SETLOCAL_WORKAROUND = 0
 
 -- Default dbg.read function
 local function dbg_read(prompt)
@@ -182,9 +179,7 @@ local function local_bindings(offset, include_globals)
     if #varargs > 0 then bindings["..."] = varargs end
 
     if include_globals then
-        -- In Lua 5.2, you have to get the environment table from the function's locals.
-        local env = (_VERSION <= "Lua 5.1" and getfenv(func) or bindings._ENV)
-        return setmetatable(bindings, { __index = env or _G })
+        return setmetatable(bindings, { __index = getfenv(func) or _G })
     else
         return bindings
     end
@@ -202,7 +197,7 @@ local function mutate_bindings(_, name, value)
             if name == var then
                 dbg_writeln(COLOR_YELLOW ..
                     "luadebug.lua" .. GREEN_CARET .. "Set local variable " .. COLOR_BLUE .. name .. COLOR_RESET)
-                return debug.setlocal(level + LUA_JIT_SETLOCAL_WORKAROUND, i, value)
+                return debug.setlocal(level, i, value)
             end
             i = i + 1
         until var == nil
@@ -231,17 +226,13 @@ end
 -- Compile an expression with the given variable bindings.
 local function compile_chunk(block, env)
     local source = "luadebug.lua REPL"
-    local chunk = nil
-
-    if _VERSION <= "Lua 5.1" then
-        chunk = loadstring(block, source)
-        if chunk then setfenv(chunk, env) end
+    local chunk = loadstring(block, source)
+    if chunk then
+        setfenv(chunk, env)
     else
-        -- The Lua 5.2 way is a bit cleaner
-        chunk = load(block, source, "t", env)
+        dbg_writeln(COLOR_RED .. "Error: Could not compile block:\n" ..
+            COLOR_RESET .. block)
     end
-
-    if not chunk then dbg_writeln(COLOR_RED .. "Error: Could not compile block:\n" .. COLOR_RESET .. block) end
     return chunk
 end
 
@@ -370,7 +361,6 @@ local function cmd_down()
         dbg_writeln("Inspecting frame: " .. format_stack_frame_info(info))
         if tonumber(dbg.auto_where) then where(info, dbg.auto_where) end
     else
-        info = debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL)
         dbg_writeln("Already at the bottom of the stack.")
     end
 
@@ -392,7 +382,6 @@ local function cmd_up()
         dbg_writeln("Inspecting frame: " .. format_stack_frame_info(info))
         if tonumber(dbg.auto_where) then where(info, dbg.auto_where) end
     else
-        info = debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL)
         dbg_writeln("Already at the top of the stack.")
     end
 
@@ -631,31 +620,10 @@ function dbg.msgh(...)
     return ...
 end
 
--- Assume stdin/out are TTYs unless we can use LuaJIT's FFI to properly check them.
-local stdin_isatty = true
-local stdout_isatty = true
+local ffi = require("ffi")
+ffi.cdef [[ int isatty(int); ]]
 
--- Conditionally enable the LuaJIT FFI.
-local ffi = (jit and require("ffi"))
-if ffi then
-    ffi.cdef [[
-		int isatty(int); // Unix
-		int _isatty(int); // Windows
-		void free(void *ptr);
-		
-		char *readline(const char *);
-		int add_history(const char *);
-	]]
-
-    local function get_func_or_nil(sym)
-        local success, func = pcall(function() return ffi.C[sym] end)
-        return success and func or nil
-    end
-
-    local isatty = get_func_or_nil("isatty") or get_func_or_nil("_isatty")
-    stdin_isatty = isatty(0)
-    stdout_isatty = isatty(1)
-end
+local stdout_isatty = ffi.C.isatty(1)
 
 -- Conditionally enable color support.
 local color_maybe_supported = (stdout_isatty and os.getenv("TERM") and os.getenv("TERM") ~= "dumb")
@@ -668,77 +636,8 @@ if color_maybe_supported and not os.getenv("DBG_NOCOLOR") then
     GREEN_CARET = string.char(27) .. "[92m => " .. COLOR_RESET
 end
 
-if stdin_isatty and not os.getenv("DBG_NOREADLINE") then
-    pcall(function()
-        local linenoise = require 'linenoise'
-
-        -- Load command history from ~/.lua_history
-        local hist_path = os.getenv('HOME') .. '/.lua_history'
-        linenoise.historyload(hist_path)
-        linenoise.historysetmaxlen(50)
-
-        local function autocomplete(env, input, matches)
-            for name, _ in pairs(env) do
-                if name:match('^' .. input .. '.*') then
-                    linenoise.addcompletion(matches, name)
-                end
-            end
-        end
-
-        -- Auto-completion for locals and globals
-        linenoise.setcompletion(function(matches, input)
-            -- First, check the locals and upvalues.
-            local env = local_bindings(1, true)
-            autocomplete(env, input, matches)
-
-            -- Then, check the implicit environment.
-            env = getmetatable(env).__index
-            autocomplete(env, input, matches)
-        end)
-
-        dbg.read = function(prompt)
-            local str = linenoise.linenoise(prompt)
-            if str and not str:match "^%s*$" then
-                linenoise.historyadd(str)
-                linenoise.historysave(hist_path)
-            end
-            return str
-        end
-        dbg_writeln(COLOR_YELLOW .. "luadebug.lua: " .. COLOR_RESET .. "Linenoise support enabled.")
-    end)
-
-    -- Conditionally enable LuaJIT readline support.
-    pcall(function()
-        if dbg.read == nil and ffi then
-            local readline = ffi.load("readline")
-            dbg.read = function(prompt)
-                local cstr = readline.readline(prompt)
-                if cstr ~= nil then
-                    local str = ffi.string(cstr)
-                    if string.match(str, "[^%s]+") then
-                        readline.add_history(cstr)
-                    end
-
-                    ffi.C.free(cstr)
-                    return str
-                else
-                    return nil
-                end
-            end
-            dbg_writeln(COLOR_YELLOW .. "luadebug.lua: " .. COLOR_RESET .. "Readline support enabled.")
-        end
-    end)
-end
-
--- Detect Lua version.
-if jit then -- LuaJIT
-    LUA_JIT_SETLOCAL_WORKAROUND = -1
-    dbg_writeln(COLOR_YELLOW .. "luadebug.lua: " .. COLOR_RESET .. "Loaded for " .. jit.version)
-elseif "Lua 5.1" <= _VERSION and _VERSION <= "Lua 5.4" then
-    dbg_writeln(COLOR_YELLOW .. "luadebug.lua: " .. COLOR_RESET .. "Loaded for " .. _VERSION)
-else
-    dbg_writeln(COLOR_YELLOW .. "luadebug.lua: " .. COLOR_RESET .. "Not tested against " .. _VERSION)
-    dbg_writeln("Please send me feedback!")
-end
+-- Detect Lua/LuaJIT version.
+dbg_writeln(COLOR_YELLOW .. "luadebug.lua: " .. COLOR_RESET .. "Loaded for " ..
+            jit.version)
 
 return dbg
