@@ -10,23 +10,12 @@ box.execute('CREATE TABLE t1 (i INT PRIMARY KEY);')
 test_run:cmd("setopt delimiter ';'");
 box.execute([[CREATE TABLE t2 (i INT, CONSTRAINT c CHECK (i > 0),
                                CONSTRAINT c PRIMARY KEY (i));]]);
-box.execute([[CREATE TABLE t2 (i INT,
-                               CONSTRAINT c FOREIGN KEY(i) REFERENCES t1(i),
-                               CONSTRAINT c PRIMARY KEY (i));]]);
 box.execute([[CREATE TABLE t2 (i INT PRIMARY KEY,
                                CONSTRAINT c CHECK (i > 0),
-                               CONSTRAINT c UNIQUE (i));]]);
-box.execute([[CREATE TABLE t2 (i INT PRIMARY KEY,
-                               CONSTRAINT c FOREIGN KEY(i) REFERENCES t1(i),
                                CONSTRAINT c UNIQUE (i));]]);
 box.execute([[CREATE TABLE t2 (i INT PRIMARY KEY,
                                CONSTRAINT c CHECK (i > 0),
                                CONSTRAINT c CHECK (i < 0));]]);
-box.execute([[CREATE TABLE t2 (i INT PRIMARY KEY,
-                               CONSTRAINT c FOREIGN KEY(i) REFERENCES t1(i),
-                               CONSTRAINT c CHECK (i > 0));]]);
-box.execute([[CREATE TABLE t2 (i INT PRIMARY KEY CONSTRAINT c REFERENCES t1(i),
-                               CONSTRAINT c FOREIGN KEY(i) REFERENCES t1(i))]]);
 test_run:cmd("setopt delimiter ''");
 
 --
@@ -36,7 +25,6 @@ test_run:cmd("setopt delimiter ''");
 box.execute('CREATE TABLE t2 (i INT CONSTRAINT c PRIMARY KEY);')
 box.execute('ALTER TABLE t2 ADD CONSTRAINT c CHECK(i > 0);')
 box.execute('ALTER TABLE t2 ADD CONSTRAINT c UNIQUE(i);')
-box.execute('ALTER TABLE t2 ADD CONSTRAINT c FOREIGN KEY(i) REFERENCES t1(i);')
 
 --
 -- Make sure that a constraint's name isn't kept after the
@@ -153,9 +141,6 @@ box.execute('ALTER TABLE t2 ADD CONSTRAINT ck_constraint CHECK(i > 0);')
 box.space.T2.ck_constraint.CK_CONSTRAINT ~= nil
 box.execute('ALTER TABLE t2 DROP CONSTRAINT ck_constraint;')
 box.space.T2.ck_constraint.CK_CONSTRAINT == nil
--- Drop FOREIGN KEY constraint.
-box.execute('ALTER TABLE t2 ADD CONSTRAINT fk FOREIGN KEY(i) REFERENCES t1(i);')
-box.execute('ALTER TABLE t2 DROP CONSTRAINT fk;')
 -- Drop non-existing constraint.
 box.execute('ALTER TABLE t2 DROP CONSTRAINT non_existing_constraint;')
 

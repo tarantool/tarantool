@@ -612,7 +612,7 @@ function execute_sql_string_and_return_result(stream, sql_string)
     end
 end$
 function monster_ddl(stream)
-    local _, err1, err2, err3, err4, err5, err6
+    local _, err1, err2, err3, err4, err5
     local stream_or_box = stream or box
     execute_sql_string(stream, [[CREATE TABLE t1(id INTEGER PRIMARY KEY,
                                                  a INTEGER,
@@ -644,16 +644,9 @@ function monster_ddl(stream)
                                  ck2 CHECK(a > 0);]])
     execute_sql_string(stream, 'ALTER TABLE t1 DROP CONSTRAINT ck1;')
 
-    execute_sql_string(stream, [[ALTER TABLE t1 ADD CONSTRAINT fk1 FOREIGN KEY
-                                 (a) REFERENCES t2(b);]])
-    execute_sql_string(stream, 'ALTER TABLE t1 DROP CONSTRAINT fk1;')
-
     _, err2 =
         execute_sql_string_and_return_result(stream, [[CREATE TABLE t1(id
                                                        INTEGER PRIMARY KEY);]])
-
-    execute_sql_string(stream, [[ALTER TABLE t1 ADD CONSTRAINT fk1 FOREIGN KEY
-                                 (a) REFERENCES t2(b);]])
 
     execute_sql_string(stream, [[CREATE TABLE
                                  trigger_catcher(id INTEGER PRIMARY
@@ -683,15 +676,12 @@ function monster_ddl(stream)
 
     execute_sql_string(stream, 'TRUNCATE TABLE t1;')
     _, err5 =
-        execute_sql_string_and_return_result(stream, 'TRUNCATE TABLE t2;')
-    _, err6 =
         execute_sql_string_and_return_result(stream, [[TRUNCATE TABLE
                                                        t_does_not_exist;]])
 
     execute_sql_string(stream, 'DROP TRIGGER t2t;')
 
-    return {'Finished ok, errors in the middle: ', err1, err2, err3, err4,
-            err5, err6}
+    return {'Finished ok, errors in the middle: ', err1, err2, err3, err4, err5}
 end$
 function monster_ddl_cmp_res(res1, res2)
     if json.encode(res1) == json.encode(res2) then
@@ -710,7 +700,7 @@ function monster_ddl_is_clean(stream)
     assert(stream_or_box.space.T_TO_RENAME == nil)
 end$
 function monster_ddl_check(stream)
-    local _, err1, err2, err3, err4, res
+    local _, err1, err2, err3, res
     local stream_or_box = stream or box
     _, err1 =
        execute_sql_string_and_return_result(stream, [[INSERT INTO t2
@@ -720,9 +710,6 @@ function monster_ddl_check(stream)
         execute_sql_string_and_return_result(stream, [[INSERT INTO t2
                                                        VALUES(2, 2, 1)]])
     _, err3 =
-        execute_sql_string_and_return_result(stream, [[INSERT INTO t1
-                                                       VALUES(1, 20, 1)]])
-    _, err4 =
         execute_sql_string_and_return_result(stream, [[INSERT INTO t1
                                                        VALUES(1, -1, 1)]])
     execute_sql_string(stream, 'INSERT INTO t1 VALUES (1, 1, 1)')
@@ -738,12 +725,11 @@ function monster_ddl_check(stream)
                                                            trigger_catcher]])
     end
     return {'Finished ok, errors and trigger catcher content: ', err1, err2,
-            err3, err4, res}
+            err3, res}
 end$
 function monster_ddl_clear(stream)
     execute_sql_string(stream, 'DROP TRIGGER IF EXISTS t1t;')
     execute_sql_string(stream, 'DROP TABLE IF EXISTS trigger_catcher;')
-    execute_sql_string(stream, 'ALTER TABLE t1 DROP CONSTRAINT fk1;')
     execute_sql_string(stream, 'DROP TABLE IF EXISTS t2')
     execute_sql_string(stream, 'DROP TABLE IF EXISTS t1')
     execute_sql_string(stream, 'DROP TABLE IF EXISTS t_renamed')

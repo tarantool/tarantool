@@ -227,8 +227,11 @@ struct create_ck_constraint_parse_def {
 struct create_fk_constraint_parse_def {
 	/** List of fk_constraint_parse_def objects. */
 	struct rlist fkeys;
-	/** Count of fk_constraint_parse_def objects. */
-	uint32_t count;
+	/**
+	 * True if a list of foreign keys is used and should be cleaned up
+	 * properly.
+	 */
+	bool is_used;
 };
 
 struct create_view_def {
@@ -499,7 +502,7 @@ static inline void
 create_fk_constraint_parse_def_init(struct create_fk_constraint_parse_def *def)
 {
 	rlist_create(&def->fkeys);
-	def->count = 0;
+	def->is_used = true;
 }
 
 static inline void
@@ -517,7 +520,7 @@ create_view_def_init(struct create_view_def *view_def, struct Token *name,
 static inline void
 create_fk_constraint_parse_def_destroy(struct create_fk_constraint_parse_def *d)
 {
-	if (d->count == 0)
+	if (!d->is_used)
 		return;
 	struct fk_constraint_parse *fk;
 	rlist_foreach_entry(fk, &d->fkeys, link)

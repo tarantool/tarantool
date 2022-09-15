@@ -113,7 +113,8 @@ test:do_catchsql_test(
 		CREATE TABLE t10(i INT PRIMARY KEY REFERENCES v0);
 	]], {
 		-- <sql-errors-1.10>
-		1,"Failed to create foreign key constraint 'fk_unnamed_T10_1': referenced space can't be VIEW"
+                1,"Failed to create foreign key constraint "..
+                "'fk_unnamed_T10_I_1': referenced space can't be VIEW"
 		-- </sql-errors-1.10>
 	})
 

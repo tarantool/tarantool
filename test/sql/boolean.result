@@ -442,14 +442,16 @@ CREATE TABLE t2 (a BOOLEAN PRIMARY KEY, b BOOLEAN REFERENCES t2(a));
 INSERT INTO t2 VALUES (false, true)
  | ---
  | - null
- | - 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+ | - 'Foreign key constraint ''fk_unnamed_T2_B_1'' failed for field ''2 (B)'': foreign
+ |   tuple was not found'
  | ...
 INSERT INTO t2 VALUES (true, false)
  | ---
  | - null
- | - 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+ | - 'Foreign key constraint ''fk_unnamed_T2_B_1'' failed for field ''2 (B)'': foreign
+ |   tuple was not found'
  | ...
-INSERT INTO t2 VALUES (true, true)
+INSERT INTO t2 VALUES (true, NULL)
  | ---
  | - row_count: 1
  | ...

@@ -99,9 +99,11 @@ box.session.su('tmp')
 
 box.execute('CREATE TABLE t3(a INTEGER PRIMARY KEY);')
 --
--- Error: Failed to create foreign key constraint.
+-- Error: Failed to drop referenced table.
 --
 box.execute('CREATE TABLE t4(x INTEGER PRIMARY KEY REFERENCES t3, a INT UNIQUE, c TEXT REFERENCES t3);')
+box.execute('DROP TABLE t3;')
+box.execute('DROP TABLE t4;')
 box.execute('DROP TABLE t3;')
 
 --

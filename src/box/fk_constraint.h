@@ -70,6 +70,8 @@ struct fk_constraint_def {
 	uint32_t parent_id;
 	/** Number of fields in this key. */
 	uint32_t field_count;
+	/** True if it is a field constraint, false otherwise. */
+	bool is_field_fk;
 	/** Mapping of fields in child to fields in parent. */
 	struct field_link *links;
 	/** Name of the constraint. */
