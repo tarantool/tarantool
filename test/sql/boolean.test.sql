@@ -116,7 +116,7 @@ INSERT INTO t1 VALUES (2, true);
 CREATE TABLE t2 (a BOOLEAN PRIMARY KEY, b BOOLEAN REFERENCES t2(a));
 INSERT INTO t2 VALUES (false, true)
 INSERT INTO t2 VALUES (true, false)
-INSERT INTO t2 VALUES (true, true)
+INSERT INTO t2 VALUES (true, NULL)
 INSERT INTO t2 VALUES (false, true)
 
 -- Check interactions with UNIQUE constraint.

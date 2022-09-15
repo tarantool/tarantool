@@ -168,17 +168,20 @@ ALTER TABLE fk_check ADD b INT REFERENCES t1(a);
 INSERT INTO fk_check VALUES (0, 1);
  | ---
  | - null
- | - 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+ | - 'Foreign key constraint ''fk_unnamed_FK_CHECK_B_1'' failed for field ''2 (B)'':
+ |   foreign tuple was not found'
  | ...
 INSERT INTO fk_check VALUES (2, 0);
  | ---
  | - null
- | - 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+ | - 'Foreign key constraint ''fk_unnamed_FK_CHECK_B_1'' failed for field ''2 (B)'':
+ |   foreign tuple was not found'
  | ...
 INSERT INTO fk_check VALUES (2, 1);
  | ---
  | - null
- | - 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+ | - 'Foreign key constraint ''fk_unnamed_FK_CHECK_B_1'' failed for field ''2 (B)'':
+ |   foreign tuple was not found'
  | ...
 INSERT INTO t1 VALUES (1, 1);
  | ---
@@ -208,25 +211,32 @@ ALTER TABLE self ADD b INT REFERENCES self(a)
  | ---
  | - row_count: 1
  | ...
-INSERT INTO self(a,b) VALUES(1, 1);
+INSERT INTO self(a,b) VALUES(1, NULL);
  | ---
  | - autoincrement_ids:
  |   - 1
  |   row_count: 1
  | ...
-UPDATE self SET a = 2, b = 2;
+INSERT INTO self(a,b) VALUES(2, 1);
  | ---
- | - row_count: 1
+ | - autoincrement_ids:
+ |   - 2
+ |   row_count: 1
+ | ...
+UPDATE self SET b = 2;
+ | ---
+ | - row_count: 2
  | ...
 UPDATE self SET b = 3;
  | ---
  | - null
- | - 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+ | - 'Foreign key constraint ''fk_unnamed_SELF_B_1'' failed for field ''3 (B)'': foreign
+ |   tuple was not found'
  | ...
 UPDATE self SET a = 3;
  | ---
  | - null
- | - 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+ | - 'Foreign key ''fk_unnamed_SELF_B_1'' integrity check failed: index was not found'
  | ...
 DROP TABLE self;
  | ---

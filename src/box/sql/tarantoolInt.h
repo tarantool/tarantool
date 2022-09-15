@@ -129,20 +129,16 @@ sql_encode_table_opts(struct region *region, struct space_def *def,
 		      uint32_t *size);
 
 /**
- * Encode links of given foreign key constraint into MsgPack on
- * @region.
- * @param region Wegion to use.
- * @param def FK def to encode links of.
- * @param type Links type to encode.
+ * Encode links of given foreign key constraint into MsgPack.
+ *
+ * @param fk FK def to encode links of.
  * @param[out] Size size of result allocation.
  *
  * @retval NULL Error.
  * @retval not NULL Pointer to msgpack on success.
  */
 char *
-fk_constraint_encode_links(struct region *region,
-			   const struct fk_constraint_def *def, int type,
-			   uint32_t *size);
+fk_constraint_encode_links(const struct fk_constraint_def *fk, uint32_t *size);
 
 /**
  * Drop the check constraint or foreign key. This function drops tuple and field
@@ -151,6 +147,24 @@ fk_constraint_encode_links(struct region *region,
  */
 int
 sql_constraint_drop(uint32_t space_id, const char *name);
+
+/**
+ * Create new foreign key.
+ *
+ * @param name Name of the foreign key.
+ * @param child_id ID of the child space.
+ * @param parent_id ID of the parent space.
+ * @param child_fieldno Fieldno of the field in the child space where the new
+ *        foreign key constraint will be created if mapping is NULL.
+ * @param parent_fieldno Fieldno of the field in the parent space that the field
+ *        constraint will refer to if mapping is NULL.
+ * @param mapping Mapping for tuple foreign key. If null, then a field
+ *        constraint is created.
+ */
+int
+sql_foreign_key_create(const char *name, uint32_t child_id, uint32_t parent_id,
+		       uint32_t child_fieldno, uint32_t parent_fieldno,
+		       const char *mapping);
 
 /**
  * Encode index parts of given foreign key constraint into

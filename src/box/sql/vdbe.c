@@ -2126,6 +2126,42 @@ case OP_Count: {         /* out2 */
 }
 
 /**
+ * Opcode: CreateForeignKey P1 * * P4 *
+ *
+ * Create a new foreign key. The foreign key name is stored in P4. Register
+ * r[P1] contains the ID of the child space, r[P1 + 1] contains the ID of the
+ * parent space. If the type of register r[P1 + 2] is VARBINARY, then register
+ * r[P1 + 2] contains the encoded mapping, otherwise register r[P1 + 2] contains
+ * the fieldno of the child field, and r[P1 + 3] contains the fieldno of the
+ * parent fields.
+ */
+case OP_CreateForeignKey: {
+	assert(pOp->p1 >= 0);
+	struct Mem *mems = &aMem[pOp->p1];
+	assert(mem_is_uint(&mems[0]) && mem_is_uint(&mems[1]));
+	uint32_t child_id = mems[0].u.u;
+	uint32_t parent_id = mems[1].u.u;
+	const char *name = pOp->p4.z;
+	const char *mapping = NULL;
+	uint32_t child_fieldno = 0;
+	uint32_t parent_fieldno = 0;
+	if (mem_is_uint(&mems[2])) {
+		assert(mem_is_uint(&mems[3]));
+		child_fieldno = mems[2].u.u;
+		parent_fieldno = mems[3].u.u;
+	} else {
+		assert(mem_is_map(&mems[2]));
+		mapping = mems[2].z;
+	}
+	if (sql_foreign_key_create(name, child_id, parent_id, child_fieldno,
+				   parent_fieldno, mapping) != 0)
+		goto abort_due_to_error;
+	if (p->nChange == 0)
+		p->nChange = 1;
+	break;
+}
+
+/**
  * Opcode: DropTupleConstraint P1 * * P4 *
  * Synopsis: Drop constraint from box.space[P1]
  *

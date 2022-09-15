@@ -917,7 +917,7 @@ box.execute("ALTER TABLE t ADD CONSTRAINT fk1 FOREIGN KEY (i) REFERENCES parent 
 box.execute("INSERT INTO t VALUES (1, 18446744073709551615);")
 ---
 - null
-- 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+- 'Foreign key constraint ''FK1'' failed: foreign tuple was not found'
 ...
 box.execute("INSERT INTO parent VALUES (2, 18446744073709551615);")
 ---
@@ -1366,7 +1366,7 @@ box.execute("ALTER TABLE t ADD CONSTRAINT fk1 FOREIGN KEY (v) REFERENCES parent 
 box.execute("INSERT INTO t VALUES (1, x'616263');")
 ---
 - null
-- 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+- 'Foreign key constraint ''FK1'' failed: foreign tuple was not found'
 ...
 box.execute("INSERT INTO parent VALUES (1, x'616263');")
 ---
@@ -1963,7 +1963,8 @@ box.execute("INSERT INTO t2 VALUES (1,1), (2,2.2), (100, 3.5), (4, 1);")
 box.execute("INSERT INTO t2 VALUES (5,10);")
 ---
 - null
-- 'Failed to execute SQL statement: FOREIGN KEY constraint failed'
+- 'Foreign key constraint ''fk_unnamed_T2_D_1'' failed for field ''2 (D)'': foreign
+  tuple was not found'
 ...
 box.execute("DROP TABLE t2;")
 ---

@@ -3636,6 +3636,10 @@ box.execute([[CREATE TABLE k2 (s1 INT PRIMARY KEY, s2 INT REFERENCES k1);]])
  | ---
  | - row_count: 1
  | ...
+box.execute([[CREATE INDEX i1 ON k2(s2);]])
+ | ---
+ | - row_count: 1
+ | ...
 box.execute([[CREATE TABLE k3 (c INTEGER PRIMARY KEY AUTOINCREMENT);]])
  | ---
  | - row_count: 1
