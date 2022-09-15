@@ -553,3 +553,8 @@ create_unit_test(PREFIX qsort_arg
                  SOURCES qsort_arg.cc core_test_utils.c
                  LIBRARIES misc unit
 )
+
+create_unit_test(PREFIX iterator_position
+                 SOURCES iterator_position.c box_test_utils.c
+                 LIBRARIES unit box core
+)

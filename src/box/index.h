@@ -364,6 +364,45 @@ iterator_next(struct iterator *it, struct tuple **ret);
 int
 iterator_next_internal(struct iterator *it, struct tuple **ret);
 
+/*
+ * Iterator position has complex format in MsgPack:
+ * +--------+--------+--------------+========================+
+ * | MP_BIN | MP_MAP | POSITION_KEY | KEY IN MP_ARRAY FORMAT |
+ * +--------+--------+--------------+========================+
+ * MP_BIN - needed to make the object opaque to users working
+ * directly with IPROTO.
+ * MP_MAP - needed for extensibility (at least, we have an idea
+ * to generate a digital signature to make sure that user did
+ * not modify the object).
+ * All the keys of map should be unsigned integer values to
+ * minimize the size of the object.
+ *
+ */
+
+/** Calculate length of packed iterator position. */
+uint32_t
+iterator_position_pack_size(const char *pos, const char *pos_end,
+			    uint32_t part_count);
+
+/**
+ * Pack iterator position to preallocated buffer. Buffer length must be
+ * more or equal than packed size of position.
+ */
+void
+iterator_position_pack(const char *pos, const char *pos_end,
+		       uint32_t part_count, char *packed_pos,
+		       const char *packed_pos_end);
+
+/**
+ * Unpack iterator position descriptor from MsgPack. Does not allocate memory,
+ * so lifetime of returned position is the same as lifetime of passed ptr.
+ * Returns 0 on success, -1 on failure, diag is set.
+ */
+int
+iterator_position_unpack(const char *packed_pos, const char *packed_pos_end,
+			 const char **pos, const char **pos_end,
+			 uint32_t *part_count);
+
 /**
  * Get position of iterator - extracted cmp_def of last fetched
  * tuple (without MP_ARRAY header). If iterator is exhausted,

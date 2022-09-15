@@ -299,6 +299,7 @@ struct errcode_record {
 	/*244 */_(ER_SPLIT_BRAIN,		"Split-Brain discovered: %s") \
 	/*245 */_(ER_OLD_TERM,			"The term is outdated: old - %llu, new - %llu") \
 	/*246 */_(ER_INTERFERING_ELECTIONS,	"Interfering elections started")\
+	/*247 */_(ER_ITERATOR_POSITION,		"Iterator position is invalid") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
