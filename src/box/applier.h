@@ -122,6 +122,8 @@ struct applier_ack_msg {
 	double txn_last_tm;
 	/** Replicaset vclock. */
 	struct vclock vclock;
+	/** The vclock sync this message corresponds to. */
+	uint64_t vclock_sync;
 };
 
 /** The underlying thread behind a number of appliers. */
@@ -159,6 +161,8 @@ struct applier {
 	uint32_t version_id;
 	/** Remote ballot at the time of connect. */
 	struct ballot ballot;
+	/** Last requested vclock sync. */
+	uint64_t last_vclock_sync;
 	/** Remote address */
 	union {
 		struct sockaddr addr;
@@ -250,6 +254,11 @@ struct applier {
 		 * timestamp. Sent in ACK messages. Updated by applier_ack_msg.
 		 */
 		double txn_last_tm;
+		/**
+		 * Last sync value known to applier thread. Sent in ACK
+		 * messages.
+		 */
+		uint64_t last_vclock_sync;
 		/**
 		 * Applier thread's copy of the node's vclock. Sent in ACK
 		 * messages and updated by applier_ack_msg.
