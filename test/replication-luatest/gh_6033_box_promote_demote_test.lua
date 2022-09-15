@@ -525,7 +525,7 @@ g_common.test_fail_limbo_ack_promote = function(g)
     end)
     box_cfg_update({g.server_1}, {replication_synchro_timeout = 0.01})
     local ok, err = fiber_join(g.server_1, f)
-    luatest.assert(not ok and err.code == box.error.QUORUM_WAIT,
+    luatest.assert(not ok and err.type == "TimedOut",
         'Promote failed because quorum wait timed out')
 
     box_cfg_update(g.cluster.servers, {replication_synchro_quorum = 2})

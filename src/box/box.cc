@@ -1787,7 +1787,11 @@ box_wait_quorum(uint32_t lead_id, int64_t target_lsn, int quorum,
 		t.waiter = fiber();
 		trigger_create(&t.base, box_quorum_on_ack_f, NULL, NULL);
 		trigger_add(&replicaset.on_ack, &t.base);
-		fiber_sleep(timeout);
+		double deadline = ev_monotonic_now(loop()) + timeout;
+		do {
+			if (fiber_yield_deadline(deadline))
+				break;
+		} while (!fiber_is_cancelled() && t.ack_count < t.quorum);
 		trigger_clear(&t.base);
 		ack_count = t.ack_count;
 	}
@@ -1798,14 +1802,11 @@ box_wait_quorum(uint32_t lead_id, int64_t target_lsn, int quorum,
 	 * which isn't appropriate when it's canceled.
 	 */
 	if (fiber_is_cancelled()) {
-		diag_set(ClientError, ER_QUORUM_WAIT, quorum,
-			 "fiber is canceled");
+		diag_set(FiberIsCancelled);
 		return -1;
 	}
 	if (ack_count < quorum) {
-		diag_set(ClientError, ER_QUORUM_WAIT, quorum, tt_sprintf(
-			 "timeout after %.2lf seconds, collected %d acks",
-			 timeout, ack_count));
+		diag_set(TimedOut);
 		return -1;
 	}
 	return 0;
