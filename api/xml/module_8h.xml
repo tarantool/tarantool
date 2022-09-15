@@ -97,7 +97,7 @@
       </memberdef>
       <memberdef kind="define" id="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" prot="public" static="no">
         <name>PACKAGE_VERSION</name>
-        <initializer>&quot;2.11.0-entrypoint-487-g4668db62e&quot;</initializer>
+        <initializer>&quot;2.11.0-entrypoint-488-ge6abe1c91&quot;</initializer>
         <briefdescription>
 <para>A string with major-minor-patch-commit-id identifier of the release, e.g. </para>
         </briefdescription>
@@ -186,7 +186,7 @@
       </memberdef>
       <memberdef kind="define" id="module_8h_1adc01d1a8b018ef75d112a8f51dde4e27" prot="public" static="no">
         <name>TARANTOOL_C_FLAGS</name>
-        <initializer>&quot; -fexceptions -funwind-tables -fno-common -fopenmp -msse2 -std=c11 -Wall -Wextra -Wno-strict-aliasing -Wno-char-subscripts -Wno-format-truncation -Wno-gnu-<ref refid="module_8h_1a3ed9482331696beaadb8ab2e6b4dfead" kindref="member">alignof</ref>-expression -fno-gnu89-inline -Wno-cast-function-type -Werror&quot;</initializer>
+        <initializer>&quot; -fexceptions -funwind-tables -fno-common -fopenmp -msse2 -Wformat -Wformat-security -Werror=format-security -fstack-protector-strong -fPIC -std=c11 -Wall -Wextra -Wno-strict-aliasing -Wno-char-subscripts -Wno-format-truncation -Wno-gnu-<ref refid="module_8h_1a3ed9482331696beaadb8ab2e6b4dfead" kindref="member">alignof</ref>-expression -fno-gnu89-inline -Wno-cast-function-type -Werror&quot;</initializer>
         <briefdescription>
 <para>C compile flags used to build Tarantool. </para>
         </briefdescription>
@@ -198,7 +198,7 @@
       </memberdef>
       <memberdef kind="define" id="module_8h_1a2118c0a1a997878f04f860b4049ca934" prot="public" static="no">
         <name>TARANTOOL_CXX_FLAGS</name>
-        <initializer>&quot; -fexceptions -funwind-tables -fno-common -fopenmp -msse2 -std=c++11 -Wall -Wextra -Wno-strict-aliasing -Wno-char-subscripts -Wno-format-truncation -Wno-invalid-<ref refid="module_8h_1afd049f7ad59dbe455f460807475c2841" kindref="member">offsetof</ref> -Wno-gnu-<ref refid="module_8h_1a3ed9482331696beaadb8ab2e6b4dfead" kindref="member">alignof</ref>-expression -Wno-cast-function-type -Werror&quot;</initializer>
+        <initializer>&quot; -fexceptions -funwind-tables -fno-common -fopenmp -msse2 -Wformat -Wformat-security -Werror=format-security -fstack-protector-strong -fPIC -std=c++11 -Wall -Wextra -Wno-strict-aliasing -Wno-char-subscripts -Wno-format-truncation -Wno-invalid-<ref refid="module_8h_1afd049f7ad59dbe455f460807475c2841" kindref="member">offsetof</ref> -Wno-gnu-<ref refid="module_8h_1a3ed9482331696beaadb8ab2e6b4dfead" kindref="member">alignof</ref>-expression -Wno-cast-function-type -Werror&quot;</initializer>
         <briefdescription>
 <para>CXX compile flags used to build Tarantool. </para>
         </briefdescription>
@@ -12044,7 +12044,7 @@ In case of an error set a diag and return NULL. </para>
 <codeline lineno="62"><highlight class="normal"></highlight></codeline>
 <codeline lineno="65" refid="module_8h_1abd1dbec4fd6761084d3e0c05afe2b138" refkind="member"><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_PATCH<sp/>0</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="66"><highlight class="normal"></highlight></codeline>
-<codeline lineno="70" refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" refkind="member"><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION<sp/>&quot;2.11.0-entrypoint-487-g4668db62e&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="70" refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" refkind="member"><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION<sp/>&quot;2.11.0-entrypoint-488-ge6abe1c91&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="71"><highlight class="normal"></highlight></codeline>
 <codeline lineno="76" refid="module_8h_1adb6d1259777e8f56c6260be6faed183e" refkind="member"><highlight class="preprocessor">#define<sp/>SYSCONF_DIR<sp/>&quot;etc&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="77"><highlight class="normal"></highlight></codeline>
@@ -12058,9 +12058,9 @@ In case of an error set a diag and return NULL. </para>
 <codeline lineno="85"><highlight class="normal"></highlight></codeline>
 <codeline lineno="86" refid="module_8h_1a835dbb7b4216a8258c588d9781a3b66b" refkind="member"><highlight class="preprocessor">#define<sp/>COMPILER_INFO<sp/>&quot;/usr/bin/cc<sp/>/usr/bin/c++&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="87"><highlight class="normal"></highlight></codeline>
-<codeline lineno="88" refid="module_8h_1adc01d1a8b018ef75d112a8f51dde4e27" refkind="member"><highlight class="preprocessor">#define<sp/>TARANTOOL_C_FLAGS<sp/>&quot;<sp/>-fexceptions<sp/>-funwind-tables<sp/>-fno-common<sp/>-fopenmp<sp/>-msse2<sp/>-std=c11<sp/>-Wall<sp/>-Wextra<sp/>-Wno-strict-aliasing<sp/>-Wno-char-subscripts<sp/>-Wno-format-truncation<sp/>-Wno-gnu-alignof-expression<sp/>-fno-gnu89-inline<sp/>-Wno-cast-function-type<sp/>-Werror&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="88" refid="module_8h_1adc01d1a8b018ef75d112a8f51dde4e27" refkind="member"><highlight class="preprocessor">#define<sp/>TARANTOOL_C_FLAGS<sp/>&quot;<sp/>-fexceptions<sp/>-funwind-tables<sp/>-fno-common<sp/>-fopenmp<sp/>-msse2<sp/>-Wformat<sp/>-Wformat-security<sp/>-Werror=format-security<sp/>-fstack-protector-strong<sp/>-fPIC<sp/>-std=c11<sp/>-Wall<sp/>-Wextra<sp/>-Wno-strict-aliasing<sp/>-Wno-char-subscripts<sp/>-Wno-format-truncation<sp/>-Wno-gnu-alignof-expression<sp/>-fno-gnu89-inline<sp/>-Wno-cast-function-type<sp/>-Werror&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="89"><highlight class="normal"></highlight></codeline>
-<codeline lineno="90" refid="module_8h_1a2118c0a1a997878f04f860b4049ca934" refkind="member"><highlight class="preprocessor">#define<sp/>TARANTOOL_CXX_FLAGS<sp/>&quot;<sp/>-fexceptions<sp/>-funwind-tables<sp/>-fno-common<sp/>-fopenmp<sp/>-msse2<sp/>-std=c++11<sp/>-Wall<sp/>-Wextra<sp/>-Wno-strict-aliasing<sp/>-Wno-char-subscripts<sp/>-Wno-format-truncation<sp/>-Wno-invalid-offsetof<sp/>-Wno-gnu-alignof-expression<sp/>-Wno-cast-function-type<sp/>-Werror&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="90" refid="module_8h_1a2118c0a1a997878f04f860b4049ca934" refkind="member"><highlight class="preprocessor">#define<sp/>TARANTOOL_CXX_FLAGS<sp/>&quot;<sp/>-fexceptions<sp/>-funwind-tables<sp/>-fno-common<sp/>-fopenmp<sp/>-msse2<sp/>-Wformat<sp/>-Wformat-security<sp/>-Werror=format-security<sp/>-fstack-protector-strong<sp/>-fPIC<sp/>-std=c++11<sp/>-Wall<sp/>-Wextra<sp/>-Wno-strict-aliasing<sp/>-Wno-char-subscripts<sp/>-Wno-format-truncation<sp/>-Wno-invalid-offsetof<sp/>-Wno-gnu-alignof-expression<sp/>-Wno-cast-function-type<sp/>-Werror&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="91"><highlight class="normal"></highlight></codeline>
 <codeline lineno="93" refid="module_8h_1a44bca7e3d39f063be25a9d61a0a9d421" refkind="member"><highlight class="preprocessor">#define<sp/>MODULE_LIBDIR<sp/>&quot;/usr/local/lib/tarantool&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="94"><highlight class="normal"></highlight></codeline>
