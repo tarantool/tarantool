@@ -120,7 +120,7 @@ test_run:cmd("setopt delimiter '$'")
 function monster_ddl()
 -- Try random errors inside this big batch of DDL to ensure, that
 -- they do not affect normal operation.
-    local _, err1, err2, err3, err4, err5, err6
+    local _, err1, err2, err3, err4, err5
     box.execute([[CREATE TABLE t1(id INTEGER PRIMARY KEY,
                                   a INTEGER,
                                   b INTEGER);]])
@@ -145,14 +145,7 @@ function monster_ddl()
     box.execute('ALTER TABLE t1 ADD CONSTRAINT ck2 CHECK(a > 0);')
     box.space.T1.ck_constraint.CK1:drop()
 
-    box.execute([[ALTER TABLE t1 ADD CONSTRAINT fk1 FOREIGN KEY
-                  (a) REFERENCES t2(b);]])
-    box.execute('ALTER TABLE t1 DROP CONSTRAINT fk1;')
-
     _, err2 = box.execute('CREATE TABLE t1(id INTEGER PRIMARY KEY);')
-
-    box.execute([[ALTER TABLE t1 ADD CONSTRAINT fk1 FOREIGN KEY
-                  (a) REFERENCES t2(b);]])
 
     box.execute([[CREATE TABLE trigger_catcher(id INTEGER PRIMARY
                                                KEY AUTOINCREMENT);]])
@@ -176,13 +169,12 @@ function monster_ddl()
     _, err4 = box.execute('CREATE INDEX t1a ON t1(a, b);')
 
     box.execute('TRUNCATE TABLE t1;')
-    _, err5 = box.execute('TRUNCATE TABLE t2;')
-    _, err6 = box.execute('TRUNCATE TABLE t_does_not_exist;')
+    box.execute('TRUNCATE TABLE t2;')
+    _, err5 = box.execute('TRUNCATE TABLE t_does_not_exist;')
 
     box.execute('DROP TRIGGER t2t;')
 
-    return {'Finished ok, errors in the middle: ', err1, err2, err3, err4,
-            err5, err6}
+    return {'Finished ok, errors in the middle: ', err1, err2, err3, err4, err5}
 end$
 function monster_ddl_cmp_res(res1, res2)
     if json.encode(res1) == json.encode(res2) then
@@ -200,19 +192,18 @@ function monster_ddl_is_clean()
     assert(box.space.T_TO_RENAME == nil)
 end$
 function monster_ddl_check()
-    local _, err1, err2, err3, err4, res
+    local _, err1, err2, err3, res
     _, err1 = box.execute('INSERT INTO t2 VALUES (1, 1, 101)')
     box.execute('INSERT INTO t2 VALUES (1, 1, 1)')
     _, err2 = box.execute('INSERT INTO t2 VALUES(2, 2, 1)')
-    _, err3 = box.execute('INSERT INTO t1 VALUES(1, 20, 1)')
-    _, err4 = box.execute('INSERT INTO t1 VALUES(1, -1, 1)')
+    _, err3 = box.execute('INSERT INTO t1 VALUES(1, -1, 1)')
     box.execute('INSERT INTO t1 VALUES (1, 1, 1)')
     res = box.execute('SELECT * FROM trigger_catcher')
     assert(box.space.T_RENAMED ~= nil)
     assert(box.space.T_RENAMED.index.T_TO_RENAME_A == nil)
     assert(box.space.T_TO_RENAME == nil)
     return {'Finished ok, errors and trigger catcher content: ', err1, err2,
-            err3, err4, res}
+            err3, res}
 end$
 function monster_ddl_clear()
     box.execute('DROP TRIGGER IF EXISTS t1t;')

@@ -12,7 +12,7 @@ prepare = nil
 test_run:cmd("setopt delimiter ';'")
 if is_remote then
     box.schema.user.grant('guest','read, write, execute', 'universe')
-    box.schema.user.grant('guest', 'create', 'space')
+    box.schema.user.grant('guest', 'create, alter', 'space')
     cn = remote.connect(box.cfg.listen)
     execute = function(...) return cn:execute(...) end
     prepare = function(...) return cn:prepare(...) end

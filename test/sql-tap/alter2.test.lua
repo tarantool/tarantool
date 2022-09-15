@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(24)
+test:plan(23)
 
 -- This suite is aimed to test ALTER TABLE ADD CONSTRAINT statement.
 --
@@ -8,10 +8,11 @@ test:plan(24)
 test:do_catchsql_test(
     "alter2-1.1",
     [[
-        CREATE TABLE t1(id INT PRIMARY KEY, a INT, b INT);
+        CREATE TABLE t1(id INT PRIMARY KEY, a INT UNIQUE, b INT);
         ALTER TABLE t1 ADD CONSTRAINT fk1 FOREIGN KEY (a) REFERENCES t1(id);
         ALTER TABLE t1 ADD CONSTRAINT fk2 FOREIGN KEY (a) REFERENCES t1;
-        INSERT INTO t1 VALUES(1, 1, 2);
+        INSERT INTO t1 VALUES(1, NULL, 2);
+        INSERT INTO t1 VALUES(0, 1, 2);
     ]], {
         -- <alter2-1.1>
         0
@@ -24,7 +25,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(2, 3, 2);
     ]], {
         -- <alter2-1.2>
-        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
+        1, "Foreign key constraint 'FK2' failed: foreign tuple was not found"
         -- </alter2-1.2>
     })
 
@@ -45,7 +46,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(2, 3, 2);
     ]], {
         -- <alter2-1.4>
-        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
+        1, "Foreign key constraint 'FK2' failed: foreign tuple was not found"
         -- </alter2-1.4>
     })
 
@@ -83,7 +84,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(4, 2, 1);
     ]], {
         -- <alter2-1.6>
-        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
+        1, "Foreign key constraint 'FK1' failed: foreign tuple was not found"
         -- </alter2-1.6>
     })
 
@@ -95,7 +96,7 @@ test:do_execsql_test(
         SELECT * FROM t1;
     ]], {
         -- <alter2-1.7>
-        3, 1, 1, 5, 2, 1
+        5, 2, 1
         -- </alter2-1.7>
     })
 
@@ -143,7 +144,7 @@ test:do_catchsql_test(
         INSERT INTO parent VALUES(1, 2, 3);
     ]], {
         -- <alter2-2.1>
-        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
+        1, "Foreign key constraint 'FK' failed: foreign tuple was not found"
         -- </alter2-2.1>
     })
 
@@ -154,7 +155,7 @@ test:do_catchsql_test(
         INSERT INTO child VALUES(2, 1, 1);
     ]], {
         -- <alter2-2.2>
-        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
+        1, "Foreign key constraint 'FK' failed: foreign tuple was not found"
         -- </alter2-2.2>
     })
 
@@ -165,7 +166,7 @@ test:do_catchsql_test(
         INSERT INTO parent VALUES(3, 4, 2);
     ]], {
         -- <alter2-2.3>
-        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
+        1, "Foreign key constraint 'FK' failed: foreign tuple was not found"
         -- </alter2-2.3>
     })
 
@@ -177,7 +178,7 @@ test:do_execsql_test(
         SELECT * FROM parent;
     ]], {
         -- <alter2-2.4>
-        1, 1, 2, 3, 4, 2
+        3, 4, 2
         -- </alter2-2.4>
     })
 
@@ -202,21 +203,10 @@ test:do_catchsql_test(
     })
 
 test:do_catchsql_test(
-    "alter2-5.1",
+    "alter2-5.2",
     [[
         DROP TABLE child;
         CREATE TABLE child (id INT PRIMARY KEY, a INT UNIQUE);
-        ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES child;
-        ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY (a) REFERENCES child;
-    ]], {
-        -- <alter2-5.1>
-        1, "FOREIGN KEY constraint 'FK' already exists in space 'CHILD'"
-        -- </alter2-5.1>
-    })
-
-test:do_catchsql_test(
-    "alter2-5.2",
-    [[
         ALTER TABLE child DROP CONSTRAINT fake;
     ]], {
         -- <alter2-5.2>

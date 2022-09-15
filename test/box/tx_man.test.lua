@@ -1170,6 +1170,7 @@ s:drop()
 -- flaw #1
 box.execute([[CREATE TABLE k1 (s1 INT PRIMARY KEY);]])
 box.execute([[CREATE TABLE k2 (s1 INT PRIMARY KEY, s2 INT REFERENCES k1);]])
+box.execute([[CREATE INDEX i1 ON k2(s2);]])
 box.execute([[CREATE TABLE k3 (c INTEGER PRIMARY KEY AUTOINCREMENT);]])
 box.execute([[CREATE TABLE k4 (s1 INT PRIMARY KEY);]])
 box.schema.user.grant('guest', 'read,write', 'space', 'K1', {if_not_exists=true})

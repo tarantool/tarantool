@@ -260,8 +260,8 @@ g.test_datetime_11 = function()
         local sql = [[INSERT INTO t SELECT
                       (SELECT dt from t2 LIMIT 1 OFFSET 1),
                       (SELECT dt from t2 LIMIT 1);]]
-        local res = [[Failed to execute SQL statement: ]]..
-                    [[FOREIGN KEY constraint failed]]
+        local res = [[Foreign key constraint 'fk_unnamed_T_DT_1' failed for ]]..
+                    [[field '2 (DT)': foreign tuple was not found]]
         local _, err = box.execute(sql)
         box.execute([[DROP TABLE t;]])
 

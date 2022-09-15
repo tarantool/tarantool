@@ -1161,29 +1161,22 @@ sql_encode_table_opts(struct region *region, struct space_def *def,
 }
 
 char *
-fk_constraint_encode_links(struct region *region, const struct fk_constraint_def *def,
-			   int type, uint32_t *size)
+fk_constraint_encode_links(const struct fk_constraint_def *fk, uint32_t *size)
 {
-	size_t used = region_used(region);
-	struct mpstream stream;
-	bool is_error = false;
-	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
-		      set_encode_error, &is_error);
-	uint32_t field_count = def->field_count;
-	mpstream_encode_array(&stream, field_count);
-	for (uint32_t i = 0; i < field_count && !is_error; ++i)
-		mpstream_encode_uint(&stream, def->links[i].fields[type]);
-	mpstream_flush(&stream);
-	if (is_error) {
-		diag_set(OutOfMemory, stream.pos - stream.buf,
-			 "mpstream_flush", "stream");
-		return NULL;
+	*size = mp_sizeof_map(fk->field_count);
+	for (uint32_t i = 0; i < fk->field_count; ++i) {
+		*size += mp_sizeof_uint(fk->links[i].child_field);
+		*size += mp_sizeof_uint(fk->links[i].parent_field);
 	}
-	*size = region_used(region) - used;
-	char *raw = region_join(region, *size);
-	if (raw == NULL)
-		diag_set(OutOfMemory, *size, "region_join", "raw");
-	return raw;
+	char *buf = sqlDbMallocRawNN(sql_get(), *size);
+	if (buf == NULL)
+		return NULL;
+	char *buf_end = mp_encode_map(buf, fk->field_count);
+	for (uint32_t i = 0; i < fk->field_count; ++i) {
+		buf_end = mp_encode_uint(buf_end, fk->links[i].child_field);
+		buf_end = mp_encode_uint(buf_end, fk->links[i].parent_field);
+	}
+	return buf;
 }
 
 char *
@@ -1602,6 +1595,127 @@ sql_constraint_drop(uint32_t space_id, const char *name)
 		return -1;
 	}
 	int rc = box_update(BOX_SPACE_ID, 0, key, key_end, ops, end, 0, NULL);
+	region_truncate(region, used);
+	return rc;
+}
+
+/**
+ * Create new constraint in space.
+ *
+ * @param name Name of the constraint.
+ * @param space_id ID of the space.
+ * @param path JSON-path of the new constraint.
+ * @param value Encoded value of the new constraint.
+ */
+static int
+sql_constraint_create(const char *name, uint32_t space_id, const char *path,
+		      const char *value)
+{
+	struct region *region = &fiber()->gc;
+	uint32_t used = region_used(region);
+	const int key_size = 16;
+	char key[key_size];
+	char *key_end = key + mp_format(key, key_size, "[%u]", space_id);
+	/*
+	 * Even if there were no constraints of this type, it is possible that
+	 * _space contains a non-empty field of this type with an empty map as
+	 * its value, which affects the update operation.
+	 */
+	struct tuple *tuple;
+	if (box_index_get(BOX_SPACE_ID, 0, key, key_end, &tuple) != 0)
+		goto error;
+	assert(tuple != NULL);
+	uint32_t path_len = strlen(path);
+	uint32_t path_hash = field_name_hash(path, path_len);
+	const char *field = tuple_field_raw_by_full_path(
+		tuple_format(tuple), tuple_data(tuple), tuple_field_map(tuple),
+		path, path_len, path_hash, TUPLE_INDEX_BASE);
+	bool is_empty = field == NULL;
+
+	const char *ops;
+	size_t ops_size;
+	if (is_empty) {
+		ops = mp_format_on_region(region, &ops_size, "[[%s%s{%s%p}]]",
+					  "!", path, name, value);
+	} else {
+		uint32_t size = strlen(path) + strlen(name) + 2;
+		char *buf = region_alloc(region, size);
+		if (buf == NULL) {
+			diag_set(OutOfMemory, size, "region_alloc", "buf");
+			goto error;
+		}
+		int len = snprintf(buf, size, "%s.%s", path, name);
+		assert(len >= 0 && (uint32_t)len < size);
+		(void)len;
+		ops = mp_format_on_region(region, &ops_size, "[[%s%s%p]]", "!",
+					  buf, value);
+	}
+	if (ops == NULL)
+		goto error;
+	const char *end = ops + ops_size;
+	if (box_update(BOX_SPACE_ID, 0, key, key_end, ops, end, 0, NULL) != 0)
+		goto error;
+	region_truncate(region, used);
+	return 0;
+error:
+	region_truncate(region, used);
+	return -1;
+}
+
+int
+sql_foreign_key_create(const char *name, uint32_t child_id, uint32_t parent_id,
+		       uint32_t child_fieldno, uint32_t parent_fieldno,
+		       const char *mapping)
+{
+	const struct space *child = space_by_id(child_id);
+	if (child == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
+		return -1;
+	}
+	struct tuple_constraint_def *cdefs;
+	uint32_t count;
+	const int buf_size = 64;
+	char buf[buf_size];
+	const char *path;
+	const char *value = NULL;
+
+	struct region *region = &fiber()->gc;
+	uint32_t used = region_used(region);
+	if (mapping == NULL) {
+		count = child->def->fields[child_fieldno].constraint_count;
+		cdefs = child->def->fields[child_fieldno].constraint_def;
+		int len = snprintf(buf, buf_size, "format[%u].foreign_key",
+				   child_fieldno + 1);
+		assert(len > 0 && len < buf_size);
+		(void)len;
+		path = buf;
+		size_t unused;
+		value = mp_format_on_region(region, &unused, "{%s%u%s%u}",
+					    "space", parent_id, "field",
+					    parent_fieldno);
+	} else {
+		count = child->def->opts.constraint_count;
+		cdefs = child->def->opts.constraint_def;
+		path = "flags.foreign_key";
+		size_t unused;
+		value = mp_format_on_region(region, &unused, "{%s%u%s%p}",
+					    "space", parent_id, "field",
+					    mapping);
+	}
+	if (value == NULL)
+		return -1;
+	assert(mp_typeof(*value) == MP_MAP);
+	for (uint32_t i = 0; i < count; ++i) {
+		if (cdefs[i].type != CONSTR_FKEY)
+			continue;
+		if (strcmp(name, cdefs[i].name) == 0) {
+			region_truncate(region, used);
+			diag_set(ClientError, ER_CONSTRAINT_EXISTS,
+				 "FOREIGN KEY", name, space_name(child));
+			return -1;
+		}
+	}
+	int rc = sql_constraint_create(name, child_id, path, value);
 	region_truncate(region, used);
 	return rc;
 }

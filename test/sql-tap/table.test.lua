@@ -798,7 +798,9 @@ test:do_test(
         ]]
     end, {
         -- <table-10.11>
-        1, "Failed to create foreign key constraint 'fk_unnamed_T6_1': number of columns in foreign key does not match the number of columns in the primary index of referenced table"
+        1, "Failed to create foreign key constraint 'fk_unnamed_T6_C_1': "..
+        "number of columns in foreign key does not match the number of "..
+        "columns in the primary index of referenced table"
         -- </table-10.11>
     })
 

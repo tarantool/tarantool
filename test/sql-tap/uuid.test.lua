@@ -163,13 +163,15 @@ test:do_catchsql_test(
     [[
         INSERT INTO t5f SELECT (SELECT u from t2 LIMIT 1 OFFSET 1), (SELECT u from t2 LIMIT 1);
     ]], {
-        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
+        1, "Foreign key constraint 'fk_unnamed_T5F_F_1' failed for field "..
+        "'2 (F)': foreign tuple was not found"
     })
 
 test:do_execsql_test(
     "uuid-5.1.2",
     [[
-        INSERT INTO t5f SELECT u, u from t2 LIMIT 1;
+        INSERT INTO t5f SELECT u, NULL from t2 LIMIT 1;
+        UPDATE t5f SET f = (SELECT u FROM t2 LIMIT 1);
         SELECT * from t5f;
     ]], {
         uuid1, uuid1
