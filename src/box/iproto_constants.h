@@ -154,6 +154,8 @@ enum iproto_key {
 	IPROTO_EVENT_DATA = 0x58,
 	/** Isolation level, is used only by IPROTO_BEGIN request. */
 	IPROTO_TXN_ISOLATION = 0x59,
+	/** A vclock synchronisation request identifier. */
+	IPROTO_VCLOCK_SYNC = 0x5a,
 	/*
 	 * Be careful to not extend iproto_key values over 0x7f.
 	 * iproto_keys are encoded in msgpack as positive fixnum, which ends at

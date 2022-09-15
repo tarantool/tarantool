@@ -565,28 +565,57 @@ xrow_decode_register(const struct xrow_header *row,
 }
 
 /**
- * Encode end of stream command (a response to JOIN command).
+ * Encode a heartbeat message.
  * @param row[out] Row to encode into.
- * @param vclock.
+ * @param vclock vclock.
+ * @param vclock_sync vclock synchronisation request id.
  *
- * @retval  0 Success.
+ * @retval 0 Success.
  * @retval -1 Memory error.
  */
 int
-xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
+xrow_encode_heartbeat(struct xrow_header *row, const struct vclock *vclock,
+		      uint64_t vclock_sync);
 
 /**
- * Decode end of stream command (a response to JOIN command).
+ * Decode a heartbeat message.
  * @param row Row to decode.
- * @param[out] vclock.
+ * @param vclock[out] Ack vclock.
+ * @param vclock_sync[out] vclock synchronisation request id.
  *
- * @retval  0 Success.
- * @retval -1 Memory or format error.
+ * @retval 0 Success.
+ * @retval -1 Format error.
+ */
+int
+xrow_decode_heartbeat(const struct xrow_header *row, struct vclock *vclock,
+		      uint64_t *vclock_sync);
+
+/**
+ * Encode a vclock.
+ * @param row[out] Row to encode into.
+ * @param vclock.
+ *
+ * @retval 0 Success.
+ * @retval -1 Memory error.
+ */
+static inline int
+xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
+{
+	return xrow_encode_heartbeat(row, vclock, 0);
+}
+
+/**
+ * Decode a vclock.
+ * @param row Row to decode.
+ * @param vclock[out].
+ *
+ * @retval 0 Success.
+ * @retval -1 Format error.
  */
 static inline int
 xrow_decode_vclock(const struct xrow_header *row, struct vclock *vclock)
 {
-	return xrow_decode_subscribe(row, NULL, NULL, vclock, NULL, NULL, NULL);
+	return xrow_decode_heartbeat(row, vclock, NULL);
 }
 
 /**
@@ -620,15 +649,6 @@ xrow_decode_subscribe_response(const struct xrow_header *row,
 	return xrow_decode_subscribe(row, replicaset_uuid, NULL, vclock, NULL,
 				     NULL, NULL);
 }
-
-/**
- * Encode a heartbeat message.
- * @param row[out] Row to encode into.
- * @param replica_id Instance id.
- * @param tm Time stamp.
- */
-void
-xrow_encode_timestamp(struct xrow_header *row, uint32_t replica_id, double tm);
 
 /**
  * Encode any bodyless message.
@@ -1103,6 +1123,24 @@ xrow_decode_register_xc(const struct xrow_header *row,
 			uint32_t *version_id)
 {
 	if (xrow_decode_register(row, instance_uuid, vclock, version_id) != 0)
+		diag_raise();
+}
+
+/** @copydoc xrow_encode_heartbeat. */
+static inline void
+xrow_encode_heartbeat_xc(struct xrow_header *row, const struct vclock *vclock,
+			 uint64_t vclock_sync)
+{
+	if (xrow_encode_heartbeat(row, vclock, vclock_sync) != 0)
+		diag_raise();
+}
+
+/** @copydoc xrow_decode_heartbeat. */
+static inline void
+xrow_decode_heartbeat_xc(const struct xrow_header *row, struct vclock *vclock,
+			 uint64_t *vclock_sync)
+{
+	if (xrow_decode_heartbeat(row, vclock, vclock_sync) != 0)
 		diag_raise();
 }
 

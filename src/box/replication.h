@@ -210,6 +210,8 @@ struct replication_ack {
 	uint32_t source;
 	/** Confirmed vclock. */
 	const struct vclock *vclock;
+	/** Vclock sync received with ACK. */
+	uint64_t vclock_sync;
 };
 
 /**

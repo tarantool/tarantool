@@ -71,6 +71,8 @@ struct relay_status_msg {
 	struct vclock vclock;
 	/** Last replicated transaction timestamp. */
 	double txn_lag;
+	/** Last vclock sync received in replica's response. */
+	uint64_t vclock_sync;
 };
 
 /**
@@ -110,6 +112,13 @@ struct relay {
 	struct iostream *io;
 	/** Request sync */
 	uint64_t sync;
+	/** Biggest vclock sync sent to the replica. */
+	uint64_t sent_vclock_sync;
+	/**
+	 * Biggest vclock sync received from the replica in response to sent
+	 * vclock sync.
+	 */
+	uint64_t recv_vclock_sync;
 	/** Recovery instance to read xlog from the disk */
 	struct recovery *r;
 	/** Xstream argument to recovery */
@@ -190,6 +199,8 @@ struct relay {
 		 * from TX thread only.
 		 */
 		double txn_lag;
+		/** Known vclock sync received in response from replica. */
+		uint64_t vclock_sync;
 		/**
 		 * True if the relay needs Raft updates. It can live fine
 		 * without sending Raft updates, if it is a relay to an
@@ -387,6 +398,7 @@ relay_stop(struct relay *relay)
 	 */
 	relay->txn_lag = 0;
 	relay->tx.txn_lag = 0;
+	relay->tx.vclock_sync = 0;
 }
 
 void
@@ -564,12 +576,15 @@ static void
 tx_status_update(struct cmsg *msg)
 {
 	struct relay_status_msg *status = (struct relay_status_msg *)msg;
-	vclock_copy(&status->relay->tx.vclock, &status->vclock);
-	status->relay->tx.txn_lag = status->txn_lag;
+	struct relay *relay = status->relay;
+	vclock_copy(&relay->tx.vclock, &status->vclock);
+	relay->tx.txn_lag = status->txn_lag;
+	relay->tx.vclock_sync = status->vclock_sync;
 
 	struct replication_ack ack;
 	ack.source = status->relay->replica->id;
 	ack.vclock = &status->vclock;
+	ack.vclock_sync = status->vclock_sync;
 	bool anon = status->relay->replica->anon;
 	/*
 	 * Let pending synchronous transactions know, which of
@@ -709,7 +724,8 @@ relay_reader_f(va_list ap)
 			struct xrow_header xrow;
 			coio_read_xrow_timeout_xc(relay->io, &ibuf, &xrow,
 					replication_disconnect_timeout());
-			xrow_decode_vclock_xc(&xrow, &relay->recv_vclock);
+			xrow_decode_heartbeat_xc(&xrow, &relay->recv_vclock,
+						 &relay->recv_vclock_sync);
 			/*
 			 * Replica send us last replicated transaction
 			 * timestamp which is needed for relay lag
@@ -743,8 +759,11 @@ static inline void
 relay_send_heartbeat(struct relay *relay)
 {
 	struct xrow_header row;
-	xrow_encode_timestamp(&row, instance_id, ev_now(loop()));
 	try {
+		uint64_t vclock_sync = ++relay->sent_vclock_sync;
+		xrow_encode_heartbeat_xc(&row, NULL, vclock_sync);
+		row.tm = ev_now(loop());
+		row.replica_id = instance_id;
 		relay_send(relay, &row);
 	} catch (Exception *e) {
 		relay_set_error(relay, e);
@@ -905,9 +924,10 @@ relay_subscribe_f(va_list ap)
 		/* Collect xlog files received by the replica. */
 		relay_schedule_pending_gc(relay, send_vclock);
 
+		double tx_idle = ev_monotonic_now(loop()) - relay->tx_seen_time;
 		if (vclock_sum(&relay->status_msg.vclock) ==
-		    vclock_sum(send_vclock) &&
-		    ev_monotonic_now(loop()) - relay->tx_seen_time <= timeout)
+		    vclock_sum(send_vclock) && tx_idle <= timeout &&
+		    relay->status_msg.vclock_sync == relay->recv_vclock_sync)
 			continue;
 		static const struct cmsg_hop route[] = {
 			{tx_status_update, NULL}
@@ -916,6 +936,7 @@ relay_subscribe_f(va_list ap)
 		vclock_copy(&relay->status_msg.vclock, send_vclock);
 		relay->status_msg.txn_lag = relay->txn_lag;
 		relay->status_msg.relay = relay;
+		relay->status_msg.vclock_sync = relay->recv_vclock_sync;
 		cpipe_push(&relay->tx_pipe, &relay->status_msg.msg);
 	}
 

@@ -207,7 +207,10 @@ applier_thread_writer_f(va_list ap)
 		try {
 			applier->thread.has_acks_to_send = false;
 			struct xrow_header xrow;
-			xrow_encode_vclock(&xrow, &applier->thread.ack_vclock);
+			uint64_t vclock_sync = applier->thread.last_vclock_sync;
+			struct vclock *ack_vclock = &applier->thread.ack_vclock;
+			xrow_encode_heartbeat_xc(&xrow, ack_vclock,
+						 vclock_sync);
 			xrow.tm = applier->thread.txn_last_tm;
 			coio_write_xrow(&applier->io, &xrow);
 			ERROR_INJECT(ERRINJ_APPLIER_SLOW_ACK, {
@@ -585,6 +588,8 @@ struct applier_tx_row {
 			struct raft_request req;
 			struct vclock vclock;
 		} raft;
+		/** The vclock sync decoded from master's heartbeat. */
+		uint64_t vclock_sync;
 	} req;
 };
 
@@ -793,7 +798,7 @@ applier_parse_tx_row(struct applier_tx_row *tx_row)
 			diag_raise();
 		}
 	} else if (type == IPROTO_OK) {
-		/* Nothing to do. */
+		xrow_decode_heartbeat_xc(row, NULL, &tx_row->req.vclock_sync);
 	} else {
 		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE, type);
 	}
@@ -1238,6 +1243,31 @@ applier_synchro_filter_tx(struct stailq *rows)
 }
 
 /**
+ * Remember the vclock sync coming with this heartbeat to use it in future ACKs.
+ */
+static inline int
+applier_process_heartbeat(struct applier *applier, struct applier_tx_row *txr)
+{
+	if (txr->row.type != IPROTO_OK) {
+		/* Not a heartbeat. Maybe a Raft message. */
+		return 0;
+	}
+	uint64_t vclock_sync = txr->req.vclock_sync;
+	/* The field may be omitted. */
+	if (vclock_sync == 0)
+		return 0;
+	if (applier->last_vclock_sync > vclock_sync) {
+		diag_set(ClientError, ER_PROTOCOL,
+			 tt_sprintf("Non-monotonic vclock sync value. Old: "
+				    "%" PRIu64 ", new: %" PRIu64,
+				    applier->last_vclock_sync, vclock_sync));
+		return -1;
+	}
+	applier->last_vclock_sync = vclock_sync;
+	return 0;
+}
+
+/**
  * Apply all rows in the rows queue as a single transaction.
  *
  * Return 0 for success or -1 in case of an error.
@@ -1342,6 +1372,7 @@ applier_signal_ack(struct applier *applier)
 		struct replica *r = replica_by_id(applier->instance_id);
 		applier->ack_msg.txn_last_tm = (r == NULL ? 0 :
 						r->applier_txn_last_tm);
+		applier->ack_msg.vclock_sync = applier->last_vclock_sync;
 		vclock_copy(&applier->ack_msg.vclock, &replicaset.vclock);
 		cmsg_init(&applier->ack_msg.base, applier->ack_route);
 		cpipe_push(&applier->applier_thread->thread_pipe,
@@ -1363,6 +1394,7 @@ applier_thread_signal_ack(struct cmsg *base)
 	fiber_cond_signal(&applier->thread.writer_cond);
 	applier->thread.has_acks_to_send = true;
 	applier->thread.txn_last_tm = msg->txn_last_tm;
+	applier->thread.last_vclock_sync = msg->vclock_sync;
 	vclock_copy(&applier->thread.ack_vclock, &msg->vclock);
 }
 
@@ -1495,12 +1527,14 @@ applier_process_batch(struct cmsg *base)
 	struct applier *applier = msg->base.applier;
 	struct applier_tx *tx;
 	stailq_foreach_entry(tx, &msg->txs, next) {
-		struct applier_tx_row *txr =
-			stailq_first_entry(&tx->rows, struct applier_tx_row,
-					    next);
+		struct applier_tx_row *last_txr =
+			stailq_last_entry(&tx->rows, struct applier_tx_row,
+					  next);
 		raft_process_heartbeat(box_raft(), applier->instance_id);
-		if (txr->row.lsn == 0) {
-			if (applier_handle_raft(applier, txr) != 0)
+		if (last_txr->row.lsn == 0) {
+			if (applier_process_heartbeat(applier, last_txr) != 0)
+				diag_raise();
+			if (applier_handle_raft(applier, last_txr) != 0)
 				diag_raise();
 			applier_signal_ack(applier);
 			applier_check_sync(applier);
@@ -1848,6 +1882,7 @@ applier_thread_attach_applier(struct cbus_call_msg *base)
 	applier_thread_ibuf_init(applier);
 	applier_thread_msgs_init(applier);
 	applier_thread_fiber_init(applier);
+	applier->thread.last_vclock_sync = 0;
 
 	return 0;
 }
@@ -2016,6 +2051,7 @@ applier_subscribe(struct applier *applier)
 	/* Re-enable warnings after successful execution of SUBSCRIBE */
 	applier->last_logged_errcode = 0;
 	applier->lag = TIMEOUT_INFINITY;
+	applier->last_vclock_sync = 0;
 
 	/** Attach the applier to a thread. */
 	struct applier_thread *thread = applier_thread_next();
