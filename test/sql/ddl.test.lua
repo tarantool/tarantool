@@ -126,8 +126,7 @@ function monster_ddl()
                                   b INTEGER);]])
     box.execute([[CREATE TABLE t2(id INTEGER PRIMARY KEY,
                                   a INTEGER,
-                                  b INTEGER UNIQUE,
-                                  CONSTRAINT ck1 CHECK(b < 100));]])
+                                  b INTEGER UNIQUE);]])
 
     box.execute('CREATE INDEX t1a ON t1(a);')
     box.execute('CREATE INDEX t2a ON t2(a);')
@@ -138,12 +137,7 @@ function monster_ddl()
 
     box.execute('CREATE INDEX t_to_rename_a ON t_to_rename(a);')
 
-    box.execute('ALTER TABLE t1 ADD CONSTRAINT ck1 CHECK(b > 0);')
-
     _, err1 = box.execute('ALTER TABLE t_to_rename RENAME TO t1;')
-
-    box.execute('ALTER TABLE t1 ADD CONSTRAINT ck2 CHECK(a > 0);')
-    box.space.T1.ck_constraint.CK1:drop()
 
     _, err2 = box.execute('CREATE TABLE t1(id INTEGER PRIMARY KEY);')
 
@@ -192,18 +186,15 @@ function monster_ddl_is_clean()
     assert(box.space.T_TO_RENAME == nil)
 end$
 function monster_ddl_check()
-    local _, err1, err2, err3, res
-    _, err1 = box.execute('INSERT INTO t2 VALUES (1, 1, 101)')
+    local _, err, res
     box.execute('INSERT INTO t2 VALUES (1, 1, 1)')
-    _, err2 = box.execute('INSERT INTO t2 VALUES(2, 2, 1)')
-    _, err3 = box.execute('INSERT INTO t1 VALUES(1, -1, 1)')
+    _, err = box.execute('INSERT INTO t2 VALUES(2, 2, 1)')
     box.execute('INSERT INTO t1 VALUES (1, 1, 1)')
     res = box.execute('SELECT * FROM trigger_catcher')
     assert(box.space.T_RENAMED ~= nil)
     assert(box.space.T_RENAMED.index.T_TO_RENAME_A == nil)
     assert(box.space.T_TO_RENAME == nil)
-    return {'Finished ok, errors and trigger catcher content: ', err1, err2,
-            err3, res}
+    return {'Finished ok, errors and trigger catcher content: ', err, res}
 end$
 function monster_ddl_clear()
     box.execute('DROP TRIGGER IF EXISTS t1t;')

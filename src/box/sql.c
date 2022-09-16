@@ -1294,26 +1294,6 @@ sql_debug_info(struct info_handler *h)
 	info_end(h);
 }
 
-int
-tarantoolSqlNextSeqId(uint64_t *max_id)
-{
-	char key[1];
-	struct tuple *tuple;
-	char *key_end = mp_encode_array(key, 0);
-	assert(key_end - key == 1);
-	if (box_index_max(BOX_SEQUENCE_ID, 0 /* PK */, key,
-			  key_end, &tuple) != 0)
-		return -1;
-
-	/* Index is empty  */
-	if (tuple == NULL) {
-		*max_id = 0;
-		return 0;
-	}
-
-	return tuple_field_u64(tuple, BOX_SEQUENCE_FIELD_ID, max_id);
-}
-
 struct Expr*
 space_column_default_expr(uint32_t space_id, uint32_t fieldno)
 {
@@ -1730,4 +1710,57 @@ sql_foreign_key_create(const char *name, uint32_t child_id, uint32_t parent_id,
 	int rc = sql_constraint_create(name, child_id, path, value);
 	region_truncate(region, used);
 	return rc;
+}
+
+int
+sql_check_create(const char *name, uint32_t space_id, uint32_t func_id,
+		 uint32_t fieldno, bool is_field_ck)
+{
+	const struct space *space = space_by_id(space_id);
+	if (space == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_SPACE, space_name(space));
+		return -1;
+	}
+	struct tuple_constraint_def *cdefs;
+	uint32_t count;
+	const char *path;
+	const int buf_size = 64;
+	char buf[buf_size];
+	const uint32_t value_size = 16;
+	char value[value_size];
+	assert(mp_sizeof_uint(func_id) < value_size);
+	mp_encode_uint(value, func_id);
+
+	if (is_field_ck) {
+		struct func *func = func_by_id(func_id);
+		assert(func != NULL);
+		const char *field_name = space->def->fields[fieldno].name;
+		if (!func_sql_expr_has_single_arg(func, field_name)) {
+			diag_set(ClientError, ER_CREATE_CK_CONSTRAINT, name,
+				 "wrong field name specified in the field "
+				 "check constraint");
+			return -1;
+		}
+		count = space->def->fields[fieldno].constraint_count;
+		cdefs = space->def->fields[fieldno].constraint_def;
+		int len = snprintf(buf, buf_size, "format[%u].constraint",
+				   fieldno + 1);
+		assert(len > 0 && len < buf_size);
+		(void)len;
+		path = buf;
+	} else {
+		count = space->def->opts.constraint_count;
+		cdefs = space->def->opts.constraint_def;
+		path = "flags.constraint";
+	}
+	for (uint32_t i = 0; i < count; ++i) {
+		if (cdefs[i].type != CONSTR_FUNC)
+			continue;
+		if (strcmp(name, cdefs[i].name) == 0) {
+			diag_set(ClientError, ER_CONSTRAINT_EXISTS, "CHECK",
+				 name, space_name(space));
+			return -1;
+		}
+	}
+	return sql_constraint_create(name, space_id, path, value);
 }

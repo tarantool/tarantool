@@ -152,8 +152,7 @@ g.test_interval_10 = function()
 
         local t = require('luatest')
         local sql = [[INSERT INTO t SELECT * from t0 LIMIT 1;]]
-        local res = [[Check constraint failed 'CK': CAST(itv as STRING) != ]]..
-                    [['+1 years, 2 months, 3 days, 4 hours']]
+        local res = [[Check constraint 'CK' failed for tuple]]
         local _, err = box.execute(sql)
         box.execute([[DROP TABLE t;]])
 

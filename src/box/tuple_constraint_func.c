@@ -57,7 +57,7 @@ tuple_constraint_func_verify(struct tuple_constraint *constr,
 		return -1;
 	}
 	if (func->def->language == FUNC_LANGUAGE_SQL_EXPR && is_field &&
-	    !func_sql_expr_has_single_arg(func)) {
+	    !func_sql_expr_has_single_arg(func, NULL)) {
 		diag_set(ClientError, ER_CREATE_CONSTRAINT, constr->def.name,
 			 constr->space->def->name, "Number of arguments in a "
 			 "SQL field constraint function is greater than one");

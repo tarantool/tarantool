@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(61)
+test:plan(59)
 
 --!./tcltestrunner.lua
 -- 2005 November 2
@@ -28,8 +28,8 @@ test:do_execsql_test(
     "check-1.1",
     [[
         CREATE TABLE t1(
-          x INTEGER CHECK( x<5 ),
-          y DOUBLE CHECK( y>x ),
+          x INTEGER, CHECK( x<5 ),
+          y DOUBLE, CHECK( y>x ),
           z  INT primary key
         );
     ]], {
@@ -55,7 +55,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(6,7, 2);
     ]], {
         -- <check-1.3>
-        1, "Check constraint failed 'ck_unnamed_T1_1': x<5"
+        1, "Check constraint 'ck_unnamed_T1_1' failed for tuple"
         -- </check-1.3>
     })
 
@@ -75,7 +75,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(4,3, 2);
     ]], {
         -- <check-1.5>
-        1, "Check constraint failed 'ck_unnamed_T1_2': y>x"
+        1, "Check constraint 'ck_unnamed_T1_2' failed for tuple"
         -- </check-1.5>
     })
 
@@ -95,7 +95,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(NULL,6, 4);
     ]], {
         -- <check-1.7>
-        0
+        1, "Check constraint 'ck_unnamed_T1_1' failed for tuple"
         -- </check-1.7>
     })
 
@@ -105,7 +105,7 @@ test:do_execsql_test(
         SELECT x, y FROM t1;
     ]], {
         -- <check-1.8>
-        3, 4.0, "", 6.0
+        3, 4.0
         -- </check-1.8>
     })
 
@@ -115,7 +115,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(2,NULL, 5);
     ]], {
         -- <check-1.9>
-        0
+        1, "Check constraint 'ck_unnamed_T1_2' failed for tuple"
         -- </check-1.9>
     })
 
@@ -125,7 +125,7 @@ test:do_execsql_test(
         SELECT x, y FROM t1;
     ]], {
         -- <check-1.10>
-        3, 4.0, "", 6.0, 2, ""
+        3, 4.0
         -- </check-1.10>
     })
 
@@ -147,7 +147,7 @@ test:do_catchsql_test(
         UPDATE t1 SET x=7 WHERE x==2
     ]], {
         -- <check-1.12>
-        1, "Check constraint failed 'ck_unnamed_T1_1': x<5"
+        1, "Check constraint 'ck_unnamed_T1_1' failed for tuple"
         -- </check-1.12>
     })
 
@@ -167,7 +167,7 @@ test:do_catchsql_test(
         UPDATE t1 SET x=5 WHERE x==2
     ]], {
         -- <check-1.14>
-        1, "Check constraint failed 'ck_unnamed_T1_1': x<5"
+        1, "Check constraint 'ck_unnamed_T1_1' failed for tuple"
         -- </check-1.14>
     })
 
@@ -244,7 +244,7 @@ test:do_catchsql_test(
         INSERT INTO t2 VALUES(3, 1.1, NULL, NULL);
     ]], {
         -- <check-2.4>
-        1, "Check constraint failed 'ONE': typeof(coalesce(x,0))=='integer'"
+        1, "Check constraint 'ONE' failed for field '2 (X)'"
         -- </check-2.4>
     })
 
@@ -265,7 +265,7 @@ test:do_catchsql_test(
         INSERT INTO t2 VALUES(5, NULL, NULL, 3.14159);
     ]], {
         -- <check-2.6>
-        1, "Check constraint failed 'THREE': typeof(coalesce(z,''))=='string'"
+        1, "Check constraint 'THREE' failed for field '4 (Z)'"
         -- </check-2.6>
     })
 
@@ -318,77 +318,14 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-3.1>
-        1, "Failed to create check constraint 'ck_unnamed_T3_1': Subqueries are prohibited in a ck constraint definition"
+        1, "SQL expressions does not support subselects"
         -- </check-3.1>
     })
-
-
---    MUST_WORK_TEST use smth instead of sql_master
---    test:do_execsql_test(
---        "check-3.2",
---        [[
---            SELECT name FROM sql_master ORDER BY name
---        ]], {
---            -- <check-3.2>
---            "t1", "t2"
---            -- </check-3.2>
---        })
-
-test:do_catchsql_test(
-    "check-3.3",
-    [[
-        CREATE TABLE t3(
-          x  INT primary key, y INT , z INT ,
-          CHECK( q<x )
-        );
-    ]], {
-        -- <check-3.3>
-        1, "Failed to create check constraint 'ck_unnamed_T3_1': Can’t resolve field 'Q'"
-        -- </check-3.3>
-    })
-
---    MUST_WORK_TEST use smth instead of sql_master
---    test:do_execsql_test(
---        "check-3.4",
---        [[
---            SELECT name FROM sql_master ORDER BY name
---        ]], {
---            -- <check-3.4>
---            "t1", "t2"
---            -- </check-3.4>
---        })
-
-test:do_catchsql_test(
-    "check-3.5",
-    [[
-        CREATE TABLE t3(
-          x  INT primary key, y INT , z INT ,
-          CHECK( t2.x<x )
-        );
-    ]], {
-        -- <check-3.5>
-        1, "Failed to create check constraint 'ck_unnamed_T3_1': Field 'X' was not found in space 'T2' format"
-        -- </check-3.5>
-    })
-
---    MUST_WORK_TEST use smth instead of sql_master
---    test:do_execsql_test(
---        "check-3.6",
---        [[
---            SELECT name FROM sql_master ORDER BY name
---        ]], {
---            -- <check-3.6>
---            "t1", "t2"
---            -- </check-3.6>
---        })
 
 test:do_catchsql_test(
     "check-3.7",
     [[
-        CREATE TABLE t3(
-          x  INT primary key, y INT , z INT ,
-          CHECK( t3.x<25 )
-        );
+        CREATE TABLE t3(x INT primary key, y INT, z INT, CHECK(x<25));
     ]], {
         -- <check-3.7>
         0
@@ -412,14 +349,14 @@ test:do_catchsql_test(
         INSERT INTO t3 VALUES(111,222,333);
     ]], {
         -- <check-3.9>
-        1, "Check constraint failed 'ck_unnamed_T3_1': t3.x<25"
+        1, "Check constraint 'ck_unnamed_T3_1' failed for tuple"
         -- </check-3.9>
     })
 
 test:do_execsql_test(
     "check-4.1",
     [[
-        CREATE TABLE t4(x INT UNIQUE, y INT, z INT PRIMARY KEY
+        CREATE TABLE t4(x INT UNIQUE, y INT, z INT PRIMARY KEY,
           CHECK (
                x+y==11
             OR x*y==12
@@ -483,7 +420,7 @@ test:do_catchsql_test(
         UPDATE t4 SET x=0, y=1;
     ]], {
         -- <check-4.6>
-        1, "Check constraint failed 'ck_unnamed_T4_1': x+y==11 OR x*y==12 OR x/y BETWEEN 5 AND 8 OR -x==y+10"
+        1, "Check constraint 'ck_unnamed_T4_1' failed for tuple"
         -- </check-4.6>
     })
 
@@ -503,7 +440,7 @@ test:do_catchsql_test(
         UPDATE t4 SET x=0, y=2;
     ]], {
         -- <check-4.9>
-        1, "Check constraint failed 'ck_unnamed_T4_1': x+y==11 OR x*y==12 OR x/y BETWEEN 5 AND 8 OR -x==y+10"
+        1, "Check constraint 'ck_unnamed_T4_1' failed for tuple"
         -- </check-4.9>
     })
 
@@ -515,7 +452,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-5.1>
-        1, "Failed to create check constraint 'ck_unnamed_T5_1': At line 1 at or near position 9: bindings are not allowed in DDL"
+        1, "At line 1 at or near position 9: bindings are not allowed in DDL"
         -- </check-5.1>
     })
 
@@ -527,7 +464,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-5.2>
-        1, "Failed to create check constraint 'ck_unnamed_T5_1': At line 1 at or near position 6: bindings are not allowed in DDL"
+        1, "At line 1 at or near position 6: bindings are not allowed in DDL"
         -- </check-5.2>
     })
 
@@ -580,7 +517,7 @@ test:do_catchsql_test(
         UPDATE OR FAIL t1 SET x=7-x, y=y+1;
     ]], {
         -- <check-6.5>
-        1, "Check constraint failed 'ck_unnamed_T1_1': x<5"
+        1, "Check constraint 'ck_unnamed_T1_1' failed for tuple"
         -- </check-6.5>
     })
 
@@ -602,7 +539,7 @@ test:do_catchsql_test(
         INSERT OR ROLLBACK INTO t1 VALUES(8,40.0, 10);
     ]], {
         -- <check-6.7>
-        1, "Check constraint failed 'ck_unnamed_T1_1': x<5"
+        1, "Check constraint 'ck_unnamed_T1_1' failed for tuple"
         -- </check-6.7>
     })
 
@@ -635,7 +572,7 @@ test:do_catchsql_test(
         REPLACE INTO t1 VALUES(6,7, 11);
     ]], {
         -- <check-6.12>
-        1, "Check constraint failed 'ck_unnamed_T1_1': x<5"
+        1, "Check constraint 'ck_unnamed_T1_1' failed for tuple"
         -- </check-6.12>
     })
 
@@ -700,7 +637,7 @@ test:do_catchsql_test(
     7.3,
     " INSERT INTO t6 VALUES(11) ", {
         -- <7.3>
-        1, "Check constraint failed 'ck_unnamed_T6_1': myfunc(a)"
+        1, "Check constraint 'ck_unnamed_T6_A_1' failed for field '1 (A)'"
         -- </7.3>
     })
 
@@ -765,7 +702,7 @@ end
 test:do_execsql_test(
     8.1,
     [[
-        CREATE TABLE t810(a  INT primary key, CHECK( t810.a>0 ));
+        CREATE TABLE t810(a INT primary key, CHECK(a > 0));
     ]], {
         -- <8.1>
 

@@ -167,6 +167,21 @@ sql_foreign_key_create(const char *name, uint32_t child_id, uint32_t parent_id,
 		       const char *mapping);
 
 /**
+ * Create new check constraint.
+ *
+ * @param name Name of the check constraint.
+ * @param space_id ID of the space.
+ * @param func_id ID of the constraint function.
+ * @param fieldno Fieldno of the field in the space where the new check
+ *        constraint will be created if is_field_ck is true.
+ * @param is_field_ck If true, then a field constraint is created, otherwise a
+ *        tuple constraint is created.
+ */
+int
+sql_check_create(const char *name, uint32_t space_id, uint32_t func_id,
+		 uint32_t fieldno, bool is_field_ck);
+
+/**
  * Encode index parts of given foreign key constraint into
  * MsgPack on @region.
  * @param region Region to use.
@@ -192,13 +207,3 @@ sql_encode_index_parts(struct region *region, const struct field_def *fields,
 char *
 sql_encode_index_opts(struct region *region, const struct index_opts *opts,
 		      uint32_t *size);
-
-/**
- * Extract next id from _sequence space.
- * If index is empty - return 0 in max_id and success status
- *
- * @param[out] max_id Fetched value.
- * @retval 0 on success, -1 otherwise.
- */
-int
-tarantoolSqlNextSeqId(uint64_t *max_id);

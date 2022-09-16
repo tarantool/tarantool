@@ -278,8 +278,7 @@ g.test_datetime_12 = function()
 
         local t = require('luatest')
         local sql = [[INSERT INTO t SELECT * from t1 LIMIT 1;]]
-        local res = [[Check constraint failed 'CK': ]]..
-                    [[CAST(dt as STRING) != '2001-01-01T01:00:00Z']]
+        local res = [[Check constraint 'CK' failed for tuple]]
         local _, err = box.execute(sql)
         box.execute([[DROP TABLE t;]])
 

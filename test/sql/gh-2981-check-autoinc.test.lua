@@ -23,3 +23,6 @@ box.execute("DROP TABLE t1")
 box.execute("DROP TABLE t2")
 box.execute("DROP TABLE t3")
 
+box.func.check_T1_ck_unnamed_T1_1:drop()
+box.func.check_T2_ck_unnamed_T2_1:drop()
+box.func.check_T3_ck_unnamed_T3_1:drop()

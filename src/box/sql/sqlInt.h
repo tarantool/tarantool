@@ -2719,9 +2719,10 @@ sqlAddPrimaryKey(struct Parse *parse);
  * Add a new CHECK constraint to the table currently under
  * construction.
  * @param parser Parsing context.
+ * @param is_field_ck True if this is a field constraint, false otherwise.
  */
 void
-sql_create_check_contraint(Parse *parser);
+sql_create_check_contraint(struct Parse *parser, bool is_field_ck);
 
 void sqlAddDefaultValue(Parse *, ExprSpan *);
 void sqlAddCollateType(Parse *, Token *);

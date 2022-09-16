@@ -220,8 +220,6 @@ struct create_column_def {
 struct create_ck_constraint_parse_def {
 	/** List of ck_constraint_parse_def objects. */
 	struct rlist checks;
-	/** Count of ck_constraint_parse_def objects. */
-	uint32_t count;
 };
 
 struct create_fk_constraint_parse_def {
@@ -495,7 +493,6 @@ static inline void
 create_ck_constraint_parse_def_init(struct create_ck_constraint_parse_def *def)
 {
 	rlist_create(&def->checks);
-	def->count = 0;
 }
 
 static inline void

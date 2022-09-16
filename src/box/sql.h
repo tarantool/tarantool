@@ -429,9 +429,12 @@ vdbe_field_ref_prepare_array(struct vdbe_field_ref *ref, uint32_t field_count,
 void
 vdbe_field_ref_create(struct vdbe_field_ref *ref, uint32_t capacity);
 
-/** Check if SQL_EXPR func has single arg. */
+/**
+ * Check if SQL_EXPR func has single arg. If the name is not NULL, also check
+ * that the name of the only argument is equal to it.
+ */
 bool
-func_sql_expr_has_single_arg(const struct func *base);
+func_sql_expr_has_single_arg(const struct func *base, const char *name);
 
 #if defined(__cplusplus)
 } /* extern "C" { */

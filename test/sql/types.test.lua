@@ -218,6 +218,7 @@ box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT CHECK (a > 1844674407370
 box.execute("INSERT INTO t1 VALUES (1, 18446744073709551611);")
 box.execute("INSERT INTO t1 VALUES (1, -1);")
 box.space.T1:drop()
+box.func.check_T1_ck_unnamed_T1_A_1:drop()
 
 box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT DEFAULT 18446744073709551615);")
 box.execute("INSERT INTO t1 (id) VALUES (1);")
@@ -323,6 +324,7 @@ box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a VARBINARY CHECK (a = x'61626
 box.execute("INSERT INTO t1 VALUES (1, x'006162');")
 box.execute("INSERT INTO t1 VALUES (1, x'616263');")
 box.space.T1:drop()
+box.func.check_T1_ck_unnamed_T1_A_1:drop()
 
 box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a VARBINARY DEFAULT x'616263');")
 box.execute("INSERT INTO t1 (id) VALUES (1);")
@@ -460,6 +462,7 @@ box.execute("INSERT INTO t3 VALUES (2, 9.999999);")
 box.execute("INSERT INTO t3 VALUES (3, 10.0000001);")
 box.execute("SELECT * FROM t3;")
 box.execute("DROP TABLE t3;")
+box.func.check_T3_ck_unnamed_T3_D_1:drop()
 
 box.execute("CREATE TABLE t4 (i INT PRIMARY KEY, d DOUBLE DEFAULT 1.2345);")
 box.execute("INSERT INTO t4(i) VALUES (1);")
