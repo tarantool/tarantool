@@ -144,7 +144,8 @@ space_init_constraints(struct space *space)
 		if (constr->check != tuple_constraint_noop_check)
 			continue;
 		if (constr->def.type == CONSTR_FUNC) {
-			if (tuple_constraint_func_init(constr, space) != 0)
+			if (tuple_constraint_func_init(constr, space,
+						       false) != 0)
 				return -1;
 		} else {
 			assert(constr->def.type == CONSTR_FKEY);
@@ -162,7 +163,8 @@ space_init_constraints(struct space *space)
 				continue;
 			if (constr->def.type == CONSTR_FUNC) {
 				if (tuple_constraint_func_init(constr,
-							       space) != 0)
+							       space,
+							       true) != 0)
 					return -1;
 			} else {
 				assert(constr->def.type == CONSTR_FKEY);

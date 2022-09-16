@@ -3851,7 +3851,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_ID:
 		assert(pParse->vdbe_field_ref_reg > 0);
 		int reg = pParse->vdbe_field_ref_reg;
-		sqlVdbeAddOp4(v, OP_Fetch, reg, 0, target,
+		sqlVdbeAddOp4(v, OP_FetchByName, reg, 0, target,
 			      sqlDbStrDup(pParse->db, pExpr->u.zToken),
 			      P4_DYNAMIC);
 		return target;

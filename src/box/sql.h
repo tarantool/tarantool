@@ -71,6 +71,7 @@ struct Select;
 struct Table;
 struct sql_trigger;
 struct space_def;
+struct func;
 
 /**
  * Perform parsing of provided expression. This is done by
@@ -416,9 +417,21 @@ void
 vdbe_field_ref_prepare_tuple(struct vdbe_field_ref *field_ref,
 			     struct tuple *tuple);
 
+/**
+ * Fill vdbe_field_ref instance with given data. The data will not be treated as
+ * an array.
+ */
+void
+vdbe_field_ref_prepare_array(struct vdbe_field_ref *ref, uint32_t field_count,
+			     const char *data, uint32_t data_sz);
+
 /** Initialize a new vdbe_field_ref instance. */
 void
 vdbe_field_ref_create(struct vdbe_field_ref *ref, uint32_t capacity);
+
+/** Check if SQL_EXPR func has single arg. */
+bool
+func_sql_expr_has_single_arg(const struct func *base);
 
 #if defined(__cplusplus)
 } /* extern "C" { */

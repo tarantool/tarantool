@@ -1386,17 +1386,15 @@ sql_template_space_new(Parse *parser, const char *name)
  */
 static void
 vdbe_field_ref_fill(struct vdbe_field_ref *field_ref, struct tuple *tuple,
-		    const char *data, uint32_t data_sz)
+		    uint32_t mp_count, const char *data, uint32_t data_sz)
 {
 	field_ref->tuple = tuple;
 	field_ref->data = data;
 	field_ref->data_sz = data_sz;
 
-	const char *field0 = data;
 	field_ref->format = NULL;
-	uint32_t mp_count = mp_decode_array(&field0);
 	field_ref->field_count = MIN(field_ref->field_capacity, mp_count);
-	field_ref->slots[0] = (uint32_t)(field0 - data);
+	field_ref->slots[0] = 0;
 	memset(&field_ref->slots[1], 0,
 	       field_ref->field_count * sizeof(field_ref->slots[0]));
 	field_ref->slot_bitmask = 0;
@@ -1407,15 +1405,29 @@ void
 vdbe_field_ref_prepare_data(struct vdbe_field_ref *field_ref, const char *data,
 			    uint32_t data_sz)
 {
-	vdbe_field_ref_fill(field_ref, NULL, data, data_sz);
+	const char *field0 = data;
+	uint32_t mp_count = mp_decode_array(&field0);
+	vdbe_field_ref_fill(field_ref, NULL, mp_count, field0,
+			    (uint32_t)(field0 - data) + data_sz);
 }
 
 void
 vdbe_field_ref_prepare_tuple(struct vdbe_field_ref *field_ref,
 			     struct tuple *tuple)
 {
-	vdbe_field_ref_fill(field_ref, tuple, tuple_data(tuple),
-			    tuple_bsize(tuple));
+	const char *data = tuple_data(tuple);
+	uint32_t data_sz = tuple_bsize(tuple);
+	const char *field0 = data;
+	uint32_t mp_count = mp_decode_array(&field0);
+	vdbe_field_ref_fill(field_ref, NULL, mp_count, field0,
+			    (uint32_t)(field0 - data) + data_sz);
+}
+
+void
+vdbe_field_ref_prepare_array(struct vdbe_field_ref *ref, uint32_t field_count,
+			     const char *data, uint32_t data_sz)
+{
+	return vdbe_field_ref_fill(ref, NULL, field_count, data, data_sz);
 }
 
 void

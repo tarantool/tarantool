@@ -2414,38 +2414,32 @@ func_sql_expr_call(struct func *func, struct port *args, struct port *ret)
 {
 	struct func_sql_expr *func_sql = (struct func_sql_expr *)func;
 	struct sql_stmt *stmt = (struct sql_stmt *)func_sql->stmt;
-	const char *data;
-	uint32_t mp_size;
-	struct tuple_format *format;
-	if (args->vtab == &port_c_vtab && ((struct port_c *)args)->size == 2 &&
-	    ((struct port_c *)args)->first_entry.mp_format != NULL) {
-		/*
-		 * The only case where mp_format is not NULL is when the
-		 * function is used as a CHECK constraint.
-		 */
-		struct port_c_entry *pe = ((struct port_c *)args)->first;
-		data = pe->mp;
-		mp_size = pe->mp_size;
-		format = pe->mp_format;
-	} else {
+	if (args->vtab != &port_c_vtab || ((struct port_c *)args)->size != 2) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
 			 "SQL functions");
 		return -1;
 	}
-
+	struct port_c_entry *pe = ((struct port_c *)args)->first;
+	const char *data = pe->mp;
+	uint32_t mp_size = pe->mp_size;
+	struct tuple_format *format = pe->mp_format;
 	struct region *region = &fiber()->gc;
 	size_t svp = region_used(region);
 	port_sql_create(ret, stmt, DQL_EXECUTE, false);
 	/*
-	 * In SQL, we can only retrieve fields that have names. There is no
-	 * point to prepare slots for nameless fields.
+	 * Currently, SQL EXPR functions can only be called in a tuple or field
+	 * constraint. If the format is NULL then it is a field constraint,
+	 * otherwise it is a tuple constraint.
 	 */
-	uint32_t count = format->total_field_count;
+	uint32_t count = format != NULL ? format->total_field_count : 1;
 	struct vdbe_field_ref *ref;
 	size_t size = sizeof(ref->slots[0]) * count + sizeof(*ref);
 	ref = region_aligned_alloc(region, size, alignof(*ref));
 	vdbe_field_ref_create(ref, count);
-	vdbe_field_ref_prepare_data(ref, data, mp_size);
+	if (format != NULL)
+		vdbe_field_ref_prepare_data(ref, data, mp_size);
+	else
+		vdbe_field_ref_prepare_array(ref, 1, data, mp_size);
 	ref->format = format;
 	if (sql_bind_ptr(stmt, 1, ref) != 0)
 		goto error;
@@ -2486,3 +2480,23 @@ static struct func_vtab func_sql_expr_vtab = {
 	.call = func_sql_expr_call,
 	.destroy = func_sql_expr_destroy,
 };
+
+bool
+func_sql_expr_has_single_arg(const struct func *base)
+{
+	assert(base->def->language == FUNC_LANGUAGE_SQL_EXPR);
+	struct func_sql_expr *func = (struct func_sql_expr *)base;
+	struct Vdbe *v = func->stmt;
+	const char *name = NULL;
+	for (int i = 0; i < v->nOp; ++i) {
+		if (v->aOp[i].opcode != OP_FetchByName)
+			continue;
+		if (name == NULL) {
+			name = v->aOp[i].p4.z;
+			continue;
+		}
+		if (strcmp(name, v->aOp[i].p4.z) != 0)
+			return false;
+	}
+	return true;
+}

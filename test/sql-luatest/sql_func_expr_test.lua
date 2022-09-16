@@ -11,7 +11,7 @@ g.after_all(function()
     g.server:stop()
 end)
 
--- Make sure CHECK constraint works as intended.
+-- Make sure SQL_EXPR function works correctly as a tuple or a field constraint.
 g.test_sql_func_expr_1 = function()
     g.server:exec(function()
         local t = require('luatest')
@@ -32,6 +32,31 @@ g.test_sql_func_expr_1 = function()
             function() s:insert{true, 2} end
         )
         box.space.test:drop()
+        box.schema.func.drop('abc')
+
+        def = {language = 'SQL_EXPR', is_deterministic = true,
+               body = 'x * x % 10 == 6'}
+        box.schema.func.create('abc', def)
+        format = {{name = 'A', type = 'integer', constraint = 'abc'}}
+        s = box.schema.space.create('test', {format = format})
+        s:create_index('i')
+        t.assert_equals(s:insert{4}, {4})
+        t.assert_error_msg_content_equals(
+            "Check constraint 'abc' failed for field '1 (A)'",
+            function() s:insert{1} end
+        )
+        box.space.test:drop()
+        box.schema.func.drop('abc')
+
+        def = {language = 'SQL_EXPR', is_deterministic = true,
+               body = 'x + y > 0'}
+        box.schema.func.create('abc', def)
+        format = {{name = 'A', type = 'integer', constraint = 'abc'}}
+        t.assert_error_msg_content_equals(
+            "Failed to create constraint 'abc' in space 'test': Number of "..
+            "arguments in a SQL field constraint function is greater than one",
+            function() box.schema.space.create('test', {format = format}) end
+        )
         box.schema.func.drop('abc')
     end)
 end
