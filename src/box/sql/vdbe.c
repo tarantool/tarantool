@@ -299,7 +299,7 @@ vdbe_field_ref_closest_slotno(struct vdbe_field_ref *field_ref,
 static const char *
 vdbe_field_ref_fetch_data(struct vdbe_field_ref *field_ref, uint32_t fieldno)
 {
-	if (field_ref->slots[fieldno] != 0)
+	if (field_ref->slots[fieldno] != 0 || fieldno == 0)
 		return field_ref->data + field_ref->slots[fieldno];
 
 	const char *field_begin;
@@ -1966,20 +1966,19 @@ op_column_out:
 	break;
 }
 
-/* Opcode: Fetch P1 P2 P3 * *
+/**
+ * Opcode: FetchByName P1 * P3 * P4
  * Synopsis: r[P3]=PX
  *
- * Interpret data P1 points at as an initialized vdbe_field_ref
- * object.
- *
- * If P4 is not a field name, extract the P2th field from the tuple. Otherwise,
- * get the field with the given name. The retrieved value is stored in
- * register P3.
+ * Interpret data P1 points at as an initialized vdbe_field_ref object.
+ * P4 contains the name of the field to retrieve. The retrieved value is stored
+ * in register P3.
  */
-case OP_Fetch: {
+case OP_FetchByName: {
 	struct vdbe_field_ref *ref = p->aMem[pOp->p1].u.p;
-	uint32_t id = pOp->p2;
-	if (pOp->p4type == P4_DYNAMIC) {
+	assert(pOp->p4type == P4_DYNAMIC);
+	uint32_t id;
+	if (ref->format != NULL) {
 		const char *name = pOp->p4.z;
 		uint32_t len = strlen(name);
 		uint32_t hash = field_name_hash(name, len);
@@ -1988,9 +1987,33 @@ case OP_Fetch: {
 			diag_set(ClientError, ER_SQL_CANT_RESOLVE_FIELD, name);
 			goto abort_due_to_error;
 		}
+	} else {
+		/*
+		 * If no format is specified, we assume that the vdbe_field_ref
+		 * contains one field for the field constraint, and assume that
+		 * this was already checked when the field constraint was
+		 * created.
+		 */
+		assert(ref->field_count == 1);
+		id = 0;
 	}
 	struct Mem *res = vdbe_prepare_null_out(p, pOp->p3);
 	if (vdbe_field_ref_fetch(ref, id, res) != 0)
+		goto abort_due_to_error;
+	REGISTER_TRACE(p, pOp->p3, res);
+	break;
+}
+
+/* Opcode: Fetch P1 P2 P3 * *
+ * Synopsis: r[P3]=PX
+ *
+ * Interpret data P1 points at as an initialized vdbe_field_ref object. Extract
+ * the P2th field from the tuple. The retrieved value is stored in register P3.
+ */
+case OP_Fetch: {
+	struct vdbe_field_ref *ref = p->aMem[pOp->p1].u.p;
+	struct Mem *res = vdbe_prepare_null_out(p, pOp->p3);
+	if (vdbe_field_ref_fetch(ref, pOp->p2, res) != 0)
 		goto abort_due_to_error;
 	REGISTER_TRACE(p, pOp->p3, res);
 	break;

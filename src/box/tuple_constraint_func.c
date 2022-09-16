@@ -4,6 +4,8 @@
  * Copyright 2010-2021, Tarantool AUTHORS, please see AUTHORS file.
  */
 
+#include <stdbool.h>
+
 #include "tuple_constraint_func.h"
 
 #include "engine.h"
@@ -15,6 +17,7 @@
 #include "tuple.h"
 #include "tt_static.h"
 #include "trivia/util.h"
+#include "sql.h"
 
 /**
  * Find and verify func in func cache.
@@ -40,7 +43,7 @@ tuple_constraint_func_find(struct tuple_constraint *constr)
  */
 static int
 tuple_constraint_func_verify(struct tuple_constraint *constr,
-			     struct func *func)
+			     struct func *func, bool is_field)
 {
 	const char *func_name = func->def->name;
 
@@ -51,6 +54,14 @@ tuple_constraint_func_verify(struct tuple_constraint *constr,
 			 tt_sprintf("constraint lua function '%s' "
 				    "must have persistent body",
 				    func_name));
+		return -1;
+	}
+	if (func->def->language == FUNC_LANGUAGE_SQL_EXPR && is_field &&
+	    !func_sql_expr_has_single_arg(func)) {
+		diag_set(ClientError, ER_CREATE_CONSTRAINT, constr->def.name,
+			 constr->space->def->name, "Number of arguments in a "
+			 "SQL field constraint function is greater than one");
+		constr->space = NULL;
 		return -1;
 	}
 	if (!func->def->is_deterministic) {
@@ -134,7 +145,7 @@ tuple_constraint_func_unpin(struct tuple_constraint *constr)
 
 int
 tuple_constraint_func_init(struct tuple_constraint *constr,
-			   struct space *space)
+			   struct space *space, bool is_field)
 {
 	assert(constr->def.type == CONSTR_FUNC);
 	constr->space = space;
@@ -148,7 +159,7 @@ tuple_constraint_func_init(struct tuple_constraint *constr,
 		return 0;
 	}
 	if (func == NULL ||
-	    tuple_constraint_func_verify(constr, func) != 0) {
+	    tuple_constraint_func_verify(constr, func, is_field) != 0) {
 		constr->space = NULL;
 		return -1;
 	}
