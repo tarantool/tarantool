@@ -360,6 +360,9 @@ box.execute("DROP TABLE t;")
 ---
 - row_count: 1
 ...
+box.func.check_T_ck_unnamed_T_A_1:drop()
+---
+...
 --
 -- gh-4363: make sure that row_count has increased in the case of
 -- ALTER TABLE <table> ADD CONSTRAINT <constraint> CHECK(<expr>);
@@ -375,4 +378,7 @@ box.execute('ALTER TABLE t1 ADD CONSTRAINT ck1 CHECK(id > 0);')
 box.execute('DROP TABLE t1;')
 ---
 - row_count: 1
+...
+box.func.check_T1_CK1:drop()
+---
 ...

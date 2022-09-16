@@ -58,6 +58,7 @@ ALTER TABLE ck_check ADD b INT CHECK (b > 0);
 INSERT INTO ck_check VALUES (1, 0);
 INSERT INTO ck_check VALUES (1, 1);
 DROP TABLE ck_check;
+DELETE FROM "_func" WHERE "name" == 'check_CK_CHECK_ck_unnamed_CK_CHECK_B_1';
 
 --
 -- Check FOREIGN KEY constraint works with an added column.

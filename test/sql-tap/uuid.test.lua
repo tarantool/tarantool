@@ -192,7 +192,7 @@ test:do_catchsql_test(
     [[
         INSERT INTO t5c SELECT 1, u FROM t2 LIMIT 1;
     ]], {
-        1, "Check constraint failed 'CK': CAST(f AS STRING) != '11111111-1111-1111-1111-111111111111'"
+        1, "Check constraint 'CK' failed for tuple"
     })
 
 test:do_execsql_test(

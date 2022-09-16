@@ -1550,10 +1550,10 @@ true_check_res = monster_ddl_check()
 true_check_res
 ---
 - - 'Finished ok, errors and trigger catcher content: '
-  - 'Check constraint failed ''CK1'': b < 100'
+  - Check constraint 'CK1' failed for tuple
   - Duplicate key exists in unique index "unique_unnamed_T2_2" in space "T2" with
     old tuple - [1, 1, 1] and new tuple - [2, 2, 1]
-  - 'Check constraint failed ''CK2'': a > 0'
+  - Check constraint 'CK2' failed for tuple
   - metadata:
     - name: ID
       type: integer

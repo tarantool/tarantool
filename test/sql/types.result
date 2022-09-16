@@ -944,14 +944,17 @@ box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT CHECK (a > 1844674407370
 box.execute("INSERT INTO t1 VALUES (1, 18446744073709551611);")
 ---
 - null
-- 'Check constraint failed ''ck_unnamed_T1_1'': a > 18446744073709551612'
+- Check constraint 'ck_unnamed_T1_A_1' failed for field '2 (A)'
 ...
 box.execute("INSERT INTO t1 VALUES (1, -1);")
 ---
 - null
-- 'Check constraint failed ''ck_unnamed_T1_1'': a > 18446744073709551612'
+- Check constraint 'ck_unnamed_T1_A_1' failed for field '2 (A)'
 ...
 box.space.T1:drop()
+---
+...
+box.func.check_T1_ck_unnamed_T1_A_1:drop()
 ---
 ...
 box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT DEFAULT 18446744073709551615);")
@@ -1393,13 +1396,16 @@ box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a VARBINARY CHECK (a = x'61626
 box.execute("INSERT INTO t1 VALUES (1, x'006162');")
 ---
 - null
-- 'Check constraint failed ''ck_unnamed_T1_1'': a = x''616263'''
+- Check constraint 'ck_unnamed_T1_A_1' failed for field '2 (A)'
 ...
 box.execute("INSERT INTO t1 VALUES (1, x'616263');")
 ---
 - row_count: 1
 ...
 box.space.T1:drop()
+---
+...
+box.func.check_T1_ck_unnamed_T1_A_1:drop()
 ---
 ...
 box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a VARBINARY DEFAULT x'616263');")
@@ -1989,7 +1995,7 @@ box.execute("INSERT INTO t3 VALUES (2, 9.999999);")
 box.execute("INSERT INTO t3 VALUES (3, 10.0000001);")
 ---
 - null
-- 'Check constraint failed ''ck_unnamed_T3_1'': d < 10'
+- Check constraint 'ck_unnamed_T3_D_1' failed for field '2 (D)'
 ...
 box.execute("SELECT * FROM t3;")
 ---
@@ -2005,6 +2011,9 @@ box.execute("SELECT * FROM t3;")
 box.execute("DROP TABLE t3;")
 ---
 - row_count: 1
+...
+box.func.check_T3_ck_unnamed_T3_D_1:drop()
+---
 ...
 box.execute("CREATE TABLE t4 (i INT PRIMARY KEY, d DOUBLE DEFAULT 1.2345);")
 ---

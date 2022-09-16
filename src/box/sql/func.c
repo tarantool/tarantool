@@ -2482,12 +2482,11 @@ static struct func_vtab func_sql_expr_vtab = {
 };
 
 bool
-func_sql_expr_has_single_arg(const struct func *base)
+func_sql_expr_has_single_arg(const struct func *base, const char *name)
 {
 	assert(base->def->language == FUNC_LANGUAGE_SQL_EXPR);
 	struct func_sql_expr *func = (struct func_sql_expr *)base;
 	struct Vdbe *v = func->stmt;
-	const char *name = NULL;
 	for (int i = 0; i < v->nOp; ++i) {
 		if (v->aOp[i].opcode != OP_FetchByName)
 			continue;

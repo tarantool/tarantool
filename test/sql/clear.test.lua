@@ -35,13 +35,3 @@ box.execute("DROP TABLE zoobar")
 --
 box.execute("CREATE TABLE t1(id INT PRIMARY KEY, CONSTRAINT ck1 CHECK(id > 0), CONSTRAINT ck1 CHECK(id < 0));")
 box.space.t1
-box.space._ck_constraint:select()
-
---
--- Make sure that keys for tuples inserted into system spaces were
--- not stored in temporary cells.
---
-box.execute("CREATE TABLE t3(id INT PRIMARY KEY, CONSTRAINT ck1 CHECK(id > 0), CONSTRAINT ck1 FOREIGN KEY(id) REFERENCES t3, CONSTRAINT fk1 FOREIGN KEY(id) REFERENCES t3, CONSTRAINT ck1 CHECK(id < 0));")
-box.space.t1
-box.space._ck_constraint:select()
-box.space._fk_constraint:select()

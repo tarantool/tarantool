@@ -1244,3 +1244,7 @@ DROP TABLE t1;
 DROP TABLE t0;
 DROP TABLE ts;
 DROP TABLE t;
+
+DELETE FROM "_func" WHERE "name" = 'check_T1_CK';
+DELETE FROM "_func" WHERE "name" = 'RETURN_TYPE';
+DELETE FROM "_func" WHERE "name" = 'IS_BOOLEAN';

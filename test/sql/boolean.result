@@ -431,7 +431,7 @@ INSERT INTO t1 VALUES (1, false);
 INSERT INTO t1 VALUES (2, true);
  | ---
  | - null
- | - 'Check constraint failed ''CK'': a != true'
+ | - Check constraint 'CK' failed for tuple
  | ...
 
 -- Check interactions with FOREIGN KEY constraint.
@@ -6274,6 +6274,19 @@ DROP TABLE ts;
  | - row_count: 1
  | ...
 DROP TABLE t;
+ | ---
+ | - row_count: 1
+ | ...
+
+DELETE FROM "_func" WHERE "name" = 'check_T1_CK';
+ | ---
+ | - row_count: 1
+ | ...
+DELETE FROM "_func" WHERE "name" = 'RETURN_TYPE';
+ | ---
+ | - row_count: 1
+ | ...
+DELETE FROM "_func" WHERE "name" = 'IS_BOOLEAN';
  | ---
  | - row_count: 1
  | ...

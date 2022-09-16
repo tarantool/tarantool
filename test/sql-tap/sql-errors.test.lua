@@ -315,7 +315,7 @@ test:do_catchsql_test(
 		CREATE TABLE t27 (i INT PRIMARY KEY, CHECK(i < (SELECT * FROM t0)));
 	]], {
 		-- <sql-errors-1.27>
-		1,"Failed to create check constraint 'ck_unnamed_T27_1': Subqueries are prohibited in a ck constraint definition"
+                1,"SQL expressions does not support subselects"
 		-- </sql-errors-1.27>
 	})
 

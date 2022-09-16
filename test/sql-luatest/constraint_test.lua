@@ -417,3 +417,71 @@ g.test_constraints_6 = function()
         box.execute([[DROP TABLE t0;]])
     end)
 end
+
+-- Make sure field check constraints are created properly.
+g.test_constraints_7 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+
+        box.execute([[CREATE TABLE t(i INT PRIMARY KEY, a INT CHECK(a > 10));]])
+        local res = {ck_unnamed_T_A_1 = box.func.check_T_ck_unnamed_T_A_1.id}
+        t.assert_equals(box.space.T:format()[2].constraint, res)
+        box.execute([[DROP TABLE t;]])
+        box.func.check_T_ck_unnamed_T_A_1:drop()
+
+        box.execute([[CREATE TABLE t(i INT PRIMARY KEY);]])
+        box.execute([[ALTER TABLE t ADD COLUMN a INT CHECK(a > 10);]])
+        res = {ck_unnamed_T_A_1 = box.func.check_T_ck_unnamed_T_A_1.id}
+        t.assert_equals(box.space.T:format()[2].constraint, res)
+        box.execute([[DROP TABLE t;]])
+        box.func.check_T_ck_unnamed_T_A_1:drop()
+
+        box.execute([[CREATE TABLE t(i INT PRIMARY KEY,
+                    a INT CONSTRAINT one CHECK(a > 10));]])
+        res = {ONE = box.func.check_T_ONE.id}
+        t.assert_equals(box.space.T:format()[2].constraint, res)
+        box.execute([[DROP TABLE t;]])
+        box.func.check_T_ONE:drop()
+
+        local sql = [[CREATE TABLE t(i INT PRIMARY KEY, a INT CHECK(i > 10));]]
+        local _, err = box.execute(sql)
+        res = [[Failed to create check constraint 'ck_unnamed_T_A_1': ]]..
+              [[wrong field name specified in the field check constraint]]
+        t.assert_equals(err.message, res)
+    end)
+end
+
+-- Make sure tuple check constraints are created properly.
+g.test_constraints_8 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        box.execute([[CREATE TABLE t(i INT PRIMARY KEY, a INT,
+                      CHECK(a > 10));]])
+        local res = {ck_unnamed_T_1 = box.func.check_T_ck_unnamed_T_1.id}
+        t.assert_equals(box.space.T.constraint, res)
+        box.execute([[DROP TABLE t;]])
+        box.func.check_T_ck_unnamed_T_1:drop()
+
+        box.execute([[CREATE TABLE t(i INT PRIMARY KEY);]])
+        box.execute([[ALTER TABLE t ADD CONSTRAINT two CHECK(a > 10);]])
+        res = {TWO = box.func.check_T_TWO.id}
+        t.assert_equals(box.space.T.constraint, res)
+        box.execute([[DROP TABLE t;]])
+        box.func.check_T_TWO:drop()
+
+        box.execute([[CREATE TABLE t(i INT PRIMARY KEY,
+                    a INT, CONSTRAINT one CHECK(a > 10));]])
+        res = {ONE = box.func.check_T_ONE.id}
+        t.assert_equals(box.space.T.constraint, res)
+        box.execute([[DROP TABLE t;]])
+        box.func.check_T_ONE:drop()
+
+        local sql = [[CREATE TABLE t(i INT PRIMARY KEY, a INT, CONSTRAINT ]]..
+                    [[one CHECK(a > 10), CONSTRAINT one CHECK(a < 100));]]
+        local _, err = box.execute(sql)
+        res = [[Function for the check constraint 'ONE' with name ]]..
+              [['check_T_ONE' already exists]]
+        t.assert_equals(err.message, res)
+        t.assert_equals(box.space._func.index[2]:get('check_T_ONE'), nil)
+    end)
+end

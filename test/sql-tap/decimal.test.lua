@@ -199,7 +199,7 @@ test:do_catchsql_test(
     [[
         INSERT INTO t5c SELECT 1, u FROM t2 LIMIT 1;
     ]], {
-        1, "Check constraint failed 'CK': f != 111"
+        1, "Check constraint 'CK' failed for tuple"
     })
 
 test:do_execsql_test(

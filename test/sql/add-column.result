@@ -143,13 +143,17 @@ ALTER TABLE ck_check ADD b INT CHECK (b > 0);
 INSERT INTO ck_check VALUES (1, 0);
  | ---
  | - null
- | - 'Check constraint failed ''ck_unnamed_CK_CHECK_1'': b > 0'
+ | - Check constraint 'ck_unnamed_CK_CHECK_B_1' failed for field '2 (B)'
  | ...
 INSERT INTO ck_check VALUES (1, 1);
  | ---
  | - row_count: 1
  | ...
 DROP TABLE ck_check;
+ | ---
+ | - row_count: 1
+ | ...
+DELETE FROM "_func" WHERE "name" == 'check_CK_CHECK_ck_unnamed_CK_CHECK_B_1';
  | ---
  | - row_count: 1
  | ...

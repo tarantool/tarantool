@@ -76,6 +76,10 @@ struct ck_constraint_def {
 	 * disabled (set to false) contraint won't be fired.
 	 */
 	bool is_enabled;
+	/** True if this is a field constraint, false otherwise. */
+	bool is_field_ck;
+	/** Fieldno of the field contains the constraint. */
+	uint32_t fieldno;
 	/** The language of ck constraint. */
 	enum ck_constraint_language language;
 	/**
