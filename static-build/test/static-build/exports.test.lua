@@ -72,7 +72,6 @@ local check_symbols = {
     'crc32_calc',
     'decimal_unpack',
 
-    'log_type',
     'say_set_log_level',
     'say_logrotate',
     'say_set_log_format',

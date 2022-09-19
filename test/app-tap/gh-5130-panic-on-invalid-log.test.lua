@@ -18,6 +18,6 @@ test:ok(ok)
 
 -- Dynamic reconfiguration - error, no info about invalid logger type
 _, err = pcall(log.cfg, {log=' :invalid'})
-test:like(err, "can't be set dynamically")
+test:like(err, "Can't set option 'log' dynamically")
 
 os.exit(test:check() and 0 or 1)

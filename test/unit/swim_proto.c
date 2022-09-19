@@ -257,7 +257,7 @@ main()
 	int fd = open("log.txt", O_TRUNC);
 	if (fd != -1)
 		close(fd);
-	say_logger_init("log.txt", 6, 1, "plain", 0);
+	say_logger_init("log.txt", 6, 1, "plain");
 
 	swim_test_member_def();
 	swim_test_meta();
