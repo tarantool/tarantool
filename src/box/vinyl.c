@@ -3842,21 +3842,25 @@ vinyl_index_get(struct index *index, const char *key,
 	struct vy_lsm *lsm = vy_lsm(index);
 	struct vy_env *env = vy_env(index->engine);
 	struct vy_tx *tx = in_txn() ? in_txn()->engine_tx : NULL;
-	const struct vy_read_view **rv = (tx != NULL ? vy_tx_read_view(tx) :
-					  &env->xm->p_global_read_view);
-
 	if (tx != NULL && tx->state == VINYL_TX_ABORT) {
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;
 	}
-
+	struct vy_tx tx_autocommit;
+	if (tx == NULL) {
+		tx = &tx_autocommit;
+		vy_tx_create(env->xm, tx);
+	}
 	/*
 	 * Make sure the LSM tree isn't deleted while we are
 	 * reading from it.
 	 */
 	vy_lsm_ref(lsm);
-	int rc = vy_get_by_raw_key(lsm, tx, rv, key, part_count, ret);
+	int rc = vy_get_by_raw_key(lsm, tx, vy_tx_read_view(tx),
+				   key, part_count, ret);
 	vy_lsm_unref(lsm);
+	if (tx == &tx_autocommit)
+		vy_tx_destroy(tx);
 	if (rc != 0)
 		return -1;
 	if (*ret != NULL) {

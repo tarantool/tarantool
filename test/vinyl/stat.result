@@ -407,7 +407,6 @@ stat_diff(istat(), st)
     put:
       rows: 1
       bytes: 1053
-  lookup: 1
   disk:
     iterator:
       read:
@@ -419,9 +418,13 @@ stat_diff(istat(), st)
       get:
         rows: 1
         bytes: 1053
+  txw:
+    iterator:
+      lookup: 1
   memory:
     iterator:
       lookup: 1
+  lookup: 1
   get:
     rows: 1
     bytes: 1053
@@ -444,6 +447,9 @@ stat_diff(istat(), st)
     get:
       rows: 1
       bytes: 1053
+  txw:
+    iterator:
+      lookup: 1
   lookup: 1
   get:
     rows: 1
@@ -491,13 +497,16 @@ stat_diff(istat(), st)
     put:
       rows: 1
       bytes: 1053
+  txw:
+    iterator:
+      lookup: 1
+  lookup: 1
   memory:
     iterator:
       lookup: 1
       get:
         rows: 1
         bytes: 1053
-  lookup: 1
   get:
     rows: 1
     bytes: 1053
