@@ -236,7 +236,7 @@ int
 main(int argc, char *argv[])
 {
 #if 0
-	say_logger_init(NULL, S_DEBUG, 0, "plain", 0);
+	say_logger_init(NULL, S_DEBUG, 0, "plain");
 #endif
 	memory_init();
 

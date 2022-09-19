@@ -87,6 +87,7 @@
 #include "ssl_cert_paths_discover.h"
 #include "core/errinj.h"
 #include "core/clock_lowres.h"
+#include "lua/utils.h"
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -428,7 +429,6 @@ load_cfg(void)
 
 	int background = cfg_geti("background");
 	const char *log = cfg_gets("log");
-	const char *log_format = cfg_gets("log_format");
 	pid_file = (char *)cfg_gets("pid_file");
 	if (pid_file != NULL) {
 		pid_file = abspath(pid_file);
@@ -476,11 +476,10 @@ load_cfg(void)
 	 * logger init must happen before daemonising in order for the error
 	 * to show and for the process to exit with a failure status
 	 */
-	say_logger_init(log,
-			cfg_geti("log_level"),
-			cfg_getb("log_nonblock"),
-			log_format,
-			background);
+	if (box_init_say() != 0) {
+		diag_log();
+		exit(EXIT_FAILURE);
+	}
 
 	/*
 	 * Initialize flight recorder after say logger as we might use

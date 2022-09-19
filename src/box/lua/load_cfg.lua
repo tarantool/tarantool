@@ -65,9 +65,10 @@ local default_cfg = {
     vinyl_page_size           = 8 * 1024,
     vinyl_bloom_fpr           = 0.05,
 
-    -- logging options are covered by
-    -- a separate log module; they are
-    -- 'log_' prefixed
+    log                 = log.cfg.log,
+    log_nonblock        = log.cfg.nonblock,
+    log_level           = log.cfg.level,
+    log_format          = log.cfg.format,
 
     audit_log           = nil,
     audit_nonblock      = true,
@@ -133,31 +134,6 @@ local default_cfg = {
     txn_isolation         = "best-effort",
 }
 
--- cfg variables which are covered by modules
-local module_cfg = {
-    -- logging
-    log                 = log.box_api,
-    log_nonblock        = log.box_api,
-    log_level           = log.box_api,
-    log_format          = log.box_api,
-}
-
--- cfg types for modules, probably better to
--- provide some API with type enumeration or
--- similar. Currently it has use for environment
--- processing only.
---
--- get_option_from_env() leans on the set of types
--- in use: don't forget to update it when add a new
--- type or a combination of types here.
-local module_cfg_type = {
-    -- logging
-    log                 = 'string',
-    log_nonblock        = 'boolean',
-    log_level           = 'number, string',
-    log_format          = 'string',
-}
-
 -- types of available options
 -- could be comma separated lua types or 'any' if any type is allowed
 --
@@ -191,10 +167,10 @@ local template_cfg = {
     vinyl_page_size           = 'number',
     vinyl_bloom_fpr           = 'number',
 
-    log                 = 'module',
-    log_nonblock        = 'module',
-    log_level           = 'module',
-    log_format          = 'module',
+    log                 = 'string',
+    log_nonblock        = 'boolean',
+    log_level           = 'number, string',
+    log_format          = 'string',
 
     audit_log           = 'string',
     audit_nonblock      = 'boolean',
@@ -332,8 +308,6 @@ end
 -- fact.
 local dynamic_cfg = {
     replication             = private.cfg_set_replication,
-    log_level               = log.box_api.cfg_set_log_level,
-    log_format              = log.box_api.cfg_set_log_format,
     io_collect_interval     = private.cfg_set_io_collect_interval,
     readahead               = private.cfg_set_readahead,
     too_long_threshold      = private.cfg_set_too_long_threshold,
@@ -423,6 +397,16 @@ local dynamic_cfg_modules = {
             flightrec_requests_max_res_size = true,
         },
     },
+    log = {
+        cfg = log.box_api.cfg,
+        options = {
+            log = true,
+            log_level = true,
+            log_format = true,
+            log_nonblock = true,
+        },
+        skip_at_load = true,
+    }
 }
 
 ifdef_feedback = nil -- luacheck: ignore
@@ -599,26 +583,25 @@ local function upgrade_cfg(cfg, translate_cfg)
     return result_cfg
 end
 
-local function update_module_cfg(cfg, module_cfg)
-    local module_cfg_backup = {}
-    for field, api in pairs(module_cfg) do
-        if cfg[field] ~= nil then
-            module_cfg_backup[field] = api.cfg_get(field) or box.NULL
-
-            local ok, msg = api.cfg_set(cfg, field, cfg[field])
-            if not ok then
-                -- restore back the old values for modules
-                for k, v in pairs(module_cfg_backup) do
-                    module_cfg[k].cfg_set(cfg, k, v)
-                end
-                box.error(box.error.CFG, field, msg)
-            end
+local function check_cfg_option_type(template, name, value)
+    if template == 'any' then
+        return
+    elseif (string.find(template, ',') == nil) then
+        if type(value) ~= template then
+            box.error(box.error.CFG, name, "should be of type " ..
+                      template)
+        end
+    else
+        local prepared_tmpl = ',' .. string.gsub(template, ' ', '') .. ','
+        local prepared_type = ',' .. type(value) .. ','
+        if string.find(prepared_tmpl, prepared_type) == nil then
+            box.error(box.error.CFG, name, "should be one of types " ..
+                      template)
         end
     end
 end
 
-local function prepare_cfg(cfg, default_cfg, template_cfg,
-                           module_cfg, modify_cfg, prefix)
+local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
     if cfg == nil then
         return {}
     end
@@ -629,39 +612,15 @@ local function prepare_cfg(cfg, default_cfg, template_cfg,
     if cfg.dont_check then
         return
     end
-    local readable_prefix = ''
-    if prefix ~= nil and prefix ~= '' then
-        readable_prefix = prefix .. '.'
-    end
     local new_cfg = {}
-    for k,v in pairs(cfg) do
-        local readable_name = readable_prefix .. k;
+    for k, v in pairs(cfg) do
         if template_cfg[k] == nil then
-            box.error(box.error.CFG, readable_name , "unexpected option")
+            box.error(box.error.CFG, k , "unexpected option")
         elseif v == "" or v == nil then
             -- "" and NULL = ffi.cast('void *', 0) set option to default value
             v = default_cfg[k]
-        elseif template_cfg[k] == 'any' then -- luacheck: ignore
-            -- any type is ok
-        elseif type(template_cfg[k]) == 'table' then
-            if type(v) ~= 'table' then
-                box.error(box.error.CFG, readable_name, "should be a table")
-            end
-            v = prepare_cfg(v, default_cfg[k], template_cfg[k],
-                            module_cfg[k], modify_cfg[k], readable_name)
-        elseif template_cfg[k] ~= 'module' and
-               (string.find(template_cfg[k], ',') == nil) then
-            -- one type
-            if type(v) ~= template_cfg[k] then
-                box.error(box.error.CFG, readable_name, "should be of type "..
-                    template_cfg[k])
-            end
-        elseif template_cfg[k] ~= 'module' then
-            local good_types = string.gsub(template_cfg[k], ' ', '');
-            if (string.find(',' .. good_types .. ',', ',' .. type(v) .. ',') == nil) then
-                box.error(box.error.CFG, readable_name, "should be one of types "..
-                    template_cfg[k])
-            end
+        else
+            check_cfg_option_type(template_cfg[k], k, v)
         end
         if modify_cfg ~= nil and type(modify_cfg[k]) == 'function' then
             v = modify_cfg[k](v)
@@ -683,17 +642,12 @@ local function apply_env_cfg(cfg, env_cfg)
     end
 end
 
-local function apply_default_cfg(cfg, default_cfg, module_cfg)
+local function merge_cfg(cfg, default_cfg)
     for k,v in pairs(default_cfg) do
         if cfg[k] == nil then
             cfg[k] = v
         elseif type(v) == 'table' then
-            apply_default_cfg(cfg[k], v)
-        end
-    end
-    for k in pairs(module_cfg) do
-        if cfg[k] == nil then
-            cfg[k] = module_cfg[k].cfg_get(k)
+            merge_cfg(cfg[k], v)
         end
     end
 end
@@ -786,8 +740,7 @@ end
 
 local function reload_cfg(oldcfg, cfg)
     cfg = upgrade_cfg(cfg, translate_cfg)
-    local newcfg = prepare_cfg(cfg, default_cfg, template_cfg,
-                               module_cfg, modify_cfg)
+    local newcfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
 
     local module_keys = {}
     -- iterate over original table because prepare_cfg() may store NILs
@@ -877,6 +830,12 @@ setmetatable(box, {
 -- Use locked() wrapper to obtain reliable results.
 local box_is_configured = false
 
+-- We need to track cfg changes done thru API of distinct modules (log.cfg of
+-- log module for example). We cannot use just box.cfg because it is not
+-- available before box.cfg() call and other modules can be configured before
+-- this moment.
+local pre_load_cfg = table.copy(default_cfg)
+
 local function load_cfg(cfg)
     -- A user may save box.cfg (this function) before box loading
     -- and call it afterwards. We should reconfigure box in the
@@ -891,18 +850,14 @@ local function load_cfg(cfg)
     -- Set options passed through environment variables.
     apply_env_cfg(cfg, box.internal.cfg.env)
 
-    cfg = prepare_cfg(cfg, default_cfg, template_cfg,
-                      module_cfg, modify_cfg)
-    apply_default_cfg(cfg, default_cfg, module_cfg);
+    cfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
+    merge_cfg(cfg, pre_load_cfg);
+
     -- Save new box.cfg
     box.cfg = cfg
     local status, err = pcall(private.cfg_check)
-    if status then
-        status, err = pcall(update_module_cfg, cfg, module_cfg)
-    end
     if not status then
         box.cfg = locked(load_cfg) -- restore original box.cfg
-        -- re-throw exception from check_cfg() or update_module_cfg()
         return error(err)
     end
 
@@ -995,11 +950,6 @@ local function get_option_from_env(option)
     local param_type = template_cfg[option]
     assert(type(param_type) == 'string')
 
-    if param_type == 'module' then
-        -- Parameter from module.
-        param_type = module_cfg_type[option]
-    end
-
     local env_var_name = 'TT_' .. option:upper()
     local raw_value = os.getenv(env_var_name)
 
@@ -1010,8 +960,8 @@ local function get_option_from_env(option)
     local err_msg_fmt = 'Environment variable %s has ' ..
         'incorrect value for option "%s": should be %s'
 
-    -- This code lean on the existing set of template_cfg and
-    -- module_cfg_type types for simplicity.
+    -- This code lean on the existing set of template_cfg
+    -- types for simplicity.
     if param_type:find('table') and raw_value:find(',') then
         assert(not param_type:find('boolean'))
         local res = {}
@@ -1043,9 +993,24 @@ local function get_option_from_env(option)
     end
 end
 
---
--- Read box configuration from environment variables.
---
+-- Used to propagate cfg changes done thru API of distinct modules (
+-- log.cfg of log module for example).
+local function update_cfg(option, value)
+    if box_is_configured then
+        rawset(box.cfg, option, value)
+    else
+        pre_load_cfg[option] = value
+    end
+end
+
+box.internal.prepare_cfg = prepare_cfg
+box.internal.merge_cfg = merge_cfg
+box.internal.check_cfg_option_type = check_cfg_option_type
+box.internal.update_cfg = update_cfg
+
+---
+--- Read box configuration from environment variables.
+---
 box.internal.cfg = setmetatable({}, {
     __index = function(self, key)
         if key == 'env' then
