@@ -1970,46 +1970,168 @@ xrow_decode_join(const struct xrow_header *row, struct join_request *req)
 }
 
 int
-xrow_encode_heartbeat(struct xrow_header *row, const struct vclock *vclock,
-		      uint64_t vclock_sync)
+xrow_encode_relay_heartbeat(struct xrow_header *row,
+			    const struct relay_heartbeat *req)
 {
+	/*
+	 * Not using replication_request, because heartbeats are too simple and
+	 * are used often.
+	 */
 	memset(row, 0, sizeof(*row));
 	row->type = IPROTO_OK;
 	size_t size = 0;
 	size_t map_size = 0;
-	if (vclock != NULL) {
-		map_size += 1;
-		size += mp_sizeof_uint(IPROTO_VCLOCK);
-		size += mp_sizeof_vclock_ignore0(vclock);
-	}
-	if (vclock_sync != 0) {
+	if (req->vclock_sync != 0) {
 		map_size += 1;
 		size += mp_sizeof_uint(IPROTO_VCLOCK_SYNC);
-		size += mp_sizeof_uint(vclock_sync);
+		size += mp_sizeof_uint(req->vclock_sync);
 	}
 	if (map_size == 0)
 		return 0;
 	size += mp_sizeof_map(map_size);
 	char *buf = (char *) region_alloc(&fiber()->gc, size);
 	if (buf == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc",
-			 "heartbeat message buf");
+		diag_set(OutOfMemory, size, "region_alloc", "buf");
 		return -1;
 	}
 	char *data = buf;
 	data = mp_encode_map(data, map_size);
-	if (vclock != NULL) {
-		data = mp_encode_uint(data, IPROTO_VCLOCK);
-		data = mp_encode_vclock_ignore0(data, vclock);
+	assert(req->vclock_sync != 0);
+	data = mp_encode_uint(data, IPROTO_VCLOCK_SYNC);
+	data = mp_encode_uint(data, req->vclock_sync);
+	assert(data <= buf + size);
+	row->body[0].iov_base = buf;
+	row->body[0].iov_len = (data - buf);
+	row->bodycnt = 1;
+	return 0;
+}
+
+int
+xrow_decode_relay_heartbeat(const struct xrow_header *row,
+			    struct relay_heartbeat *req)
+{
+	/*
+	 * Not using replication_request, because heartbeats are too simple and
+	 * are used often.
+	 */
+	memset(req, 0, sizeof(*req));
+	if (row->bodycnt == 0)
+		return 0;
+	const char *d = row->body[0].iov_base;
+	if (mp_typeof(*d) != MP_MAP) {
+		xrow_on_decode_err(row, ER_INVALID_MSGPACK, "request body");
+		return -1;
 	}
-	if (vclock_sync != 0) {
+	uint32_t map_size = mp_decode_map(&d);
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(*d) != MP_UINT) {
+			mp_next(&d);
+			mp_next(&d);
+			continue;
+		}
+		uint64_t key = mp_decode_uint(&d);
+		switch (key) {
+		case IPROTO_VCLOCK_SYNC:
+			if (mp_typeof(*d) != MP_UINT) {
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
+						   "invalid vclock sync");
+				return -1;
+			}
+			req->vclock_sync = mp_decode_uint(&d);
+			break;
+		default:
+			mp_next(&d);
+		}
+	}
+	return 0;
+}
+
+int
+xrow_encode_applier_heartbeat(struct xrow_header *row,
+			      const struct applier_heartbeat *req)
+{
+	/*
+	 * Not using replication_request, because heartbeats are too simple and
+	 * are used often.
+	 */
+	memset(row, 0, sizeof(*row));
+	size_t size = 0;
+	size_t map_size = 1;
+	size += mp_sizeof_uint(IPROTO_VCLOCK);
+	size += mp_sizeof_vclock_ignore0(&req->vclock);
+	if (req->vclock_sync != 0) {
+		map_size += 1;
+		size += mp_sizeof_uint(IPROTO_VCLOCK_SYNC);
+		size += mp_sizeof_uint(req->vclock_sync);
+	}
+	size += mp_sizeof_map(map_size);
+	char *buf = region_alloc(&fiber()->gc, size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc", "buf");
+		return -1;
+	}
+	char *data = buf;
+	data = mp_encode_map(data, map_size);
+	data = mp_encode_uint(data, IPROTO_VCLOCK);
+	data = mp_encode_vclock_ignore0(data, &req->vclock);
+	if (req->vclock_sync != 0) {
 		data = mp_encode_uint(data, IPROTO_VCLOCK_SYNC);
-		data = mp_encode_uint(data, vclock_sync);
+		data = mp_encode_uint(data, req->vclock_sync);
 	}
 	assert(data <= buf + size);
 	row->body[0].iov_base = buf;
 	row->body[0].iov_len = (data - buf);
 	row->bodycnt = 1;
+	row->type = IPROTO_OK;
+	return 0;
+}
+
+int
+xrow_decode_applier_heartbeat(const struct xrow_header *row,
+			      struct applier_heartbeat *req)
+{
+	/*
+	 * Not using replication_request, because heartbeats are too simple and
+	 * are used often.
+	 */
+	memset(req, 0, sizeof(*req));
+	if (row->bodycnt == 0) {
+		diag_set(ClientError, ER_INVALID_MSGPACK, "request body");
+		return -1;
+	}
+	const char *d = row->body[0].iov_base;
+	if (mp_typeof(*d) != MP_MAP) {
+		xrow_on_decode_err(row, ER_INVALID_MSGPACK, "request body");
+		return -1;
+	}
+	uint32_t map_size = mp_decode_map(&d);
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(*d) != MP_UINT) {
+			mp_next(&d);
+			mp_next(&d);
+			continue;
+		}
+		uint64_t key = mp_decode_uint(&d);
+		switch (key) {
+		case IPROTO_VCLOCK:
+			if (mp_decode_vclock_ignore0(&d, &req->vclock) != 0) {
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
+						   "invalid vclock");
+				return -1;
+			}
+			break;
+		case IPROTO_VCLOCK_SYNC:
+			if (mp_typeof(*d) != MP_UINT) {
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
+						   "invalid vclock sync");
+				return -1;
+			}
+			req->vclock_sync = mp_decode_uint(&d);
+			break;
+		default:
+			mp_next(&d);
+		}
+	}
 	return 0;
 }
 

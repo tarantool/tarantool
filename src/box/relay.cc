@@ -112,13 +112,10 @@ struct relay {
 	struct iostream *io;
 	/** Request sync */
 	uint64_t sync;
-	/** Biggest vclock sync sent to the replica. */
-	uint64_t sent_vclock_sync;
-	/**
-	 * Biggest vclock sync received from the replica in response to sent
-	 * vclock sync.
-	 */
-	uint64_t recv_vclock_sync;
+	/** Last ACK sent to the replica. */
+	struct relay_heartbeat last_sent_ack;
+	/** Last ACK received from the replica. */
+	struct applier_heartbeat last_recv_ack;
 	/** Recovery instance to read xlog from the disk */
 	struct recovery *r;
 	/** Xstream argument to recovery */
@@ -133,8 +130,6 @@ struct relay {
 	struct fiber_cond reader_cond;
 	/** Relay diagnostics. */
 	struct diag diag;
-	/** Vclock recieved from replica. */
-	struct vclock recv_vclock;
 	/** Replicatoin slave version. */
 	uint32_t version_id;
 	/**
@@ -544,7 +539,7 @@ relay_final_join(struct iostream *io, uint64_t sync,
 	/*
 	 * Save the first vclock as 'received'. Because it was really received.
 	 */
-	vclock_copy(&relay->recv_vclock, start_vclock);
+	vclock_copy(&relay->last_recv_ack.vclock, start_vclock);
 	relay->r = recovery_new(wal_dir(), false, start_vclock);
 	vclock_copy(&relay->stop_vclock, stop_vclock);
 
@@ -726,13 +721,14 @@ relay_reader_f(va_list ap)
 
 	struct ibuf ibuf;
 	ibuf_create(&ibuf, &cord()->slabc, 1024);
+	struct relay_status_msg *status_msg = &relay->status_msg;
+	struct applier_heartbeat *last_recv_ack = &relay->last_recv_ack;
 	try {
 		while (!fiber_is_cancelled()) {
 			struct xrow_header xrow;
 			coio_read_xrow_timeout_xc(relay->io, &ibuf, &xrow,
 					replication_disconnect_timeout());
-			xrow_decode_heartbeat_xc(&xrow, &relay->recv_vclock,
-						 &relay->recv_vclock_sync);
+			xrow_decode_applier_heartbeat_xc(&xrow, last_recv_ack);
 			/*
 			 * Replica send us last replicated transaction
 			 * timestamp which is needed for relay lag
@@ -746,8 +742,8 @@ relay_reader_f(va_list ap)
 			 * the previous one.
 			 */
 			if (xrow.tm != 0 &&
-			    vclock_get(&relay->status_msg.vclock, instance_id) <
-			    vclock_get(&relay->recv_vclock, instance_id))
+			    vclock_get(&status_msg->vclock, instance_id) <
+			    vclock_get(&last_recv_ack->vclock, instance_id))
 				relay->txn_lag = ev_now(loop()) - xrow.tm;
 			fiber_cond_signal(&relay->reader_cond);
 		}
@@ -769,8 +765,8 @@ relay_send_heartbeat(struct relay *relay)
 		return;
 	struct xrow_header row;
 	try {
-		uint64_t vclock_sync = ++relay->sent_vclock_sync;
-		xrow_encode_heartbeat_xc(&row, NULL, vclock_sync);
+		++relay->last_sent_ack.vclock_sync;
+		xrow_encode_relay_heartbeat_xc(&row, &relay->last_sent_ack);
 		row.tm = ev_now(loop());
 		row.replica_id = instance_id;
 		relay_send(relay, &row);
@@ -868,7 +864,7 @@ relay_trigger_vclock_sync_f(struct cbus_call_msg *msg)
 {
 	struct relay_trigger_vclock_sync_msg *m =
 		(struct relay_trigger_vclock_sync_msg *)msg;
-	m->vclock_sync = m->relay->sent_vclock_sync + 1;
+	m->vclock_sync = m->relay->last_sent_ack.vclock_sync + 1;
 	m->relay->need_new_vclock_sync = true;
 	return 0;
 }
@@ -943,6 +939,8 @@ relay_subscribe_f(va_list ap)
 	 */
 	relay_send_heartbeat(relay);
 
+	struct applier_heartbeat *last_recv_ack = &relay->last_recv_ack;
+	struct relay_status_msg *status_msg = &relay->status_msg;
 	/*
 	 * Run the event loop until the connection is broken
 	 * or an error occurs.
@@ -971,31 +969,31 @@ relay_subscribe_f(va_list ap)
 		 * Check that the vclock has been updated and the previous
 		 * status message is delivered
 		 */
-		if (relay->status_msg.msg.route != NULL)
+		if (status_msg->msg.route != NULL)
 			continue;
 		struct vclock *send_vclock;
 		if (relay->version_id < version_id(1, 7, 4))
 			send_vclock = &relay->r->vclock;
 		else
-			send_vclock = &relay->recv_vclock;
+			send_vclock = &last_recv_ack->vclock;
 
 		/* Collect xlog files received by the replica. */
 		relay_schedule_pending_gc(relay, send_vclock);
 
 		double tx_idle = ev_monotonic_now(loop()) - relay->tx_seen_time;
-		if (vclock_sum(&relay->status_msg.vclock) ==
+		if (vclock_sum(&status_msg->vclock) ==
 		    vclock_sum(send_vclock) && tx_idle <= timeout &&
-		    relay->status_msg.vclock_sync == relay->recv_vclock_sync)
+		    status_msg->vclock_sync == last_recv_ack->vclock_sync)
 			continue;
 		static const struct cmsg_hop route[] = {
 			{tx_status_update, NULL}
 		};
-		cmsg_init(&relay->status_msg.msg, route);
-		vclock_copy(&relay->status_msg.vclock, send_vclock);
-		relay->status_msg.txn_lag = relay->txn_lag;
-		relay->status_msg.relay = relay;
-		relay->status_msg.vclock_sync = relay->recv_vclock_sync;
-		cpipe_push(&relay->tx_pipe, &relay->status_msg.msg);
+		cmsg_init(&status_msg->msg, route);
+		vclock_copy(&status_msg->vclock, send_vclock);
+		status_msg->txn_lag = relay->txn_lag;
+		status_msg->relay = relay;
+		status_msg->vclock_sync = last_recv_ack->vclock_sync;
+		cpipe_push(&relay->tx_pipe, &status_msg->msg);
 	}
 
 	/*
@@ -1066,7 +1064,7 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 	/*
 	 * Save the first vclock as 'received'. Because it was really received.
 	 */
-	vclock_copy(&relay->recv_vclock, replica_clock);
+	vclock_copy(&relay->last_recv_ack.vclock, replica_clock);
 	relay->r = recovery_new(wal_dir(), false, replica_clock);
 	vclock_copy(&relay->tx.vclock, replica_clock);
 	relay->version_id = replica_version_id;
