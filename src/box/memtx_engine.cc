@@ -1277,7 +1277,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	 * architectures. So we silently overwrite the granularity if it's less
 	 * than the machine word size.
 	 */
-	granularity = MAX(granularity, sizeof(void *));
+	/* granularity = MAX(granularity, sizeof(void *)); */
 
 	int64_t snap_signature;
 	struct memtx_engine *memtx =

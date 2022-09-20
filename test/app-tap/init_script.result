@@ -54,7 +54,7 @@ replication_synchro_timeout:5
 replication_threads:1
 replication_timeout:1
 slab_alloc_factor:1.05
-slab_alloc_granularity:8
+slab_alloc_granularity:4
 sql_cache_size:5242880
 strip_core:true
 too_long_threshold:0.5

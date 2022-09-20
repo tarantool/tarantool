@@ -130,7 +130,7 @@ cfg_filter(box.cfg)
   - - slab_alloc_factor
     - 1.05
   - - slab_alloc_granularity
-    - 8
+    - 4
   - - sql_cache_size
     - 5242880
   - - strip_core
