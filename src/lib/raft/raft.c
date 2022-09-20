@@ -521,8 +521,7 @@ raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 	}
 
 	/* Term bump. */
-	if (req->term > raft->volatile_term)
-		raft_sm_schedule_new_term(raft, req->term);
+	raft_process_term(raft, req->term, source);
 
 	/* Notification from a remote node that it sees the current leader. */
 	raft_notify_is_leader_seen(raft, req->is_leader_seen, source);
@@ -1313,6 +1312,15 @@ void
 raft_new_term(struct raft *raft)
 {
 	raft_sm_schedule_new_term(raft, raft->volatile_term + 1);
+}
+
+void
+raft_process_term(struct raft *raft, uint64_t term, uint32_t source)
+{
+	if (term <= raft->volatile_term)
+		return;
+	say_info("RAFT: received a newer term from %u", (unsigned)source);
+	raft_sm_schedule_new_term(raft, term);
 }
 
 static void

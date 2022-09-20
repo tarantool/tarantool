@@ -412,6 +412,13 @@ void
 raft_new_term(struct raft *raft);
 
 /**
+ * Handle a term reported by the instance with the given ID. Might cause local
+ * term bump.
+ */
+void
+raft_process_term(struct raft *raft, uint64_t term, uint32_t source);
+
+/**
  * Save complete Raft state into a request to be sent to other instances of the
  * cluster. It is allowed to save anything here, not only persistent state.
  */
