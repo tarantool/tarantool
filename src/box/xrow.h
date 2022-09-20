@@ -542,30 +542,47 @@ int
 xrow_decode_join(const struct xrow_header *row, struct join_request *req);
 
 /**
- * Encode a heartbeat message.
- * @param row[out] Row to encode into.
- * @param vclock vclock.
- * @param vclock_sync vclock synchronisation request id.
- *
- * @retval 0 Success.
- * @retval -1 Memory error.
+ * Heartbeat from relay to applier. Follows the replication stream. Same
+ * direction.
  */
+struct relay_heartbeat {
+	/**
+	 * Relay's vclock sync. When applier receives the value, it should start
+	 * sending it in all own heartbeats. Thus confirming its receipt.
+	 */
+	uint64_t vclock_sync;
+};
+
+/** Encode relay heartbeat. */
 int
-xrow_encode_heartbeat(struct xrow_header *row, const struct vclock *vclock,
-		      uint64_t vclock_sync);
+xrow_encode_relay_heartbeat(struct xrow_header *row,
+			    const struct relay_heartbeat *req);
+
+/** Decode relay heartbeat. */
+int
+xrow_decode_relay_heartbeat(const struct xrow_header *row,
+			    struct relay_heartbeat *req);
 
 /**
- * Decode a heartbeat message.
- * @param row Row to decode.
- * @param vclock[out] Ack vclock.
- * @param vclock_sync[out] vclock synchronisation request id.
- *
- * @retval 0 Success.
- * @retval -1 Format error.
+ * Heartbeat from applier to relay. Goes against the replication stream
+ * direction.
  */
+struct applier_heartbeat {
+	/** Replica's vclock. */
+	struct vclock vclock;
+	/** Last vclock sync received from relay. */
+	uint64_t vclock_sync;
+};
+
+/** Encode applier heartbeat. */
 int
-xrow_decode_heartbeat(const struct xrow_header *row, struct vclock *vclock,
-		      uint64_t *vclock_sync);
+xrow_encode_applier_heartbeat(struct xrow_header *row,
+			      const struct applier_heartbeat *req);
+
+/** Decode applier heartbeat. */
+int
+xrow_decode_applier_heartbeat(const struct xrow_header *row,
+			      struct applier_heartbeat *req);
 
 /** Encode vclock. */
 int
@@ -1038,21 +1055,39 @@ xrow_decode_register_xc(const struct xrow_header *row,
 		diag_raise();
 }
 
-/** @copydoc xrow_encode_heartbeat. */
+/** @copydoc xrow_encode_applier_heartbeat. */
 static inline void
-xrow_encode_heartbeat_xc(struct xrow_header *row, const struct vclock *vclock,
-			 uint64_t vclock_sync)
+xrow_encode_applier_heartbeat_xc(struct xrow_header *row,
+				 const struct applier_heartbeat *req)
 {
-	if (xrow_encode_heartbeat(row, vclock, vclock_sync) != 0)
+	if (xrow_encode_applier_heartbeat(row, req) != 0)
 		diag_raise();
 }
 
-/** @copydoc xrow_decode_heartbeat. */
+/** @copydoc xrow_decode_applier_heartbeat. */
 static inline void
-xrow_decode_heartbeat_xc(const struct xrow_header *row, struct vclock *vclock,
-			 uint64_t *vclock_sync)
+xrow_decode_applier_heartbeat_xc(const struct xrow_header *row,
+				 struct applier_heartbeat *req)
 {
-	if (xrow_decode_heartbeat(row, vclock, vclock_sync) != 0)
+	if (xrow_decode_applier_heartbeat(row, req) != 0)
+		diag_raise();
+}
+
+/** @copydoc xrow_encode_relay_heartbeat. */
+static inline void
+xrow_encode_relay_heartbeat_xc(struct xrow_header *row,
+			       const struct relay_heartbeat *req)
+{
+	if (xrow_encode_relay_heartbeat(row, req) != 0)
+		diag_raise();
+}
+
+/** @copydoc xrow_decode_relay_heartbeat. */
+static inline void
+xrow_decode_relay_heartbeat_xc(const struct xrow_header *row,
+			       struct relay_heartbeat *req)
+{
+	if (xrow_decode_relay_heartbeat(row, req) != 0)
 		diag_raise();
 }
 

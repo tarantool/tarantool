@@ -207,10 +207,8 @@ applier_thread_writer_f(va_list ap)
 		try {
 			applier->thread.has_acks_to_send = false;
 			struct xrow_header xrow;
-			uint64_t vclock_sync = applier->thread.last_vclock_sync;
-			struct vclock *ack_vclock = &applier->thread.ack_vclock;
-			xrow_encode_heartbeat_xc(&xrow, ack_vclock,
-						 vclock_sync);
+			xrow_encode_applier_heartbeat_xc(
+				&xrow, &applier->thread.next_ack);
 			xrow.tm = applier->thread.txn_last_tm;
 			coio_write_xrow(&applier->io, &xrow);
 			ERROR_INJECT(ERRINJ_APPLIER_SLOW_ACK, {
@@ -799,7 +797,9 @@ applier_parse_tx_row(struct applier_tx_row *tx_row)
 			diag_raise();
 		}
 	} else if (type == IPROTO_OK) {
-		xrow_decode_heartbeat_xc(row, NULL, &tx_row->req.vclock_sync);
+		struct relay_heartbeat req;
+		xrow_decode_relay_heartbeat_xc(row, &req);
+		tx_row->req.vclock_sync = req.vclock_sync;
 	} else {
 		tnt_raise(ClientError, ER_UNKNOWN_REQUEST_TYPE, type);
 	}
@@ -1395,8 +1395,9 @@ applier_thread_signal_ack(struct cmsg *base)
 	fiber_cond_signal(&applier->thread.writer_cond);
 	applier->thread.has_acks_to_send = true;
 	applier->thread.txn_last_tm = msg->txn_last_tm;
-	applier->thread.last_vclock_sync = msg->vclock_sync;
-	vclock_copy(&applier->thread.ack_vclock, &msg->vclock);
+	struct applier_heartbeat *ack = &applier->thread.next_ack;
+	ack->vclock_sync = msg->vclock_sync;
+	vclock_copy(&ack->vclock, &msg->vclock);
 }
 
 /**
@@ -1883,7 +1884,7 @@ applier_thread_attach_applier(struct cbus_call_msg *base)
 	applier_thread_ibuf_init(applier);
 	applier_thread_msgs_init(applier);
 	applier_thread_fiber_init(applier);
-	applier->thread.last_vclock_sync = 0;
+	memset(&applier->thread.next_ack, 0, sizeof(applier->thread.next_ack));
 
 	return 0;
 }

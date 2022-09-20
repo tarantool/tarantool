@@ -255,15 +255,10 @@ struct applier {
 		 */
 		double txn_last_tm;
 		/**
-		 * Last sync value known to applier thread. Sent in ACK
-		 * messages.
+		 * Appler's next ACK to send to relay. Updated by
+		 * applier_ack_msg.
 		 */
-		uint64_t last_vclock_sync;
-		/**
-		 * Applier thread's copy of the node's vclock. Sent in ACK
-		 * messages and updated by applier_ack_msg.
-		 */
-		struct vclock ack_vclock;
+		struct applier_heartbeat next_ack;
 	} thread;
 };
 
