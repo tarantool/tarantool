@@ -49,18 +49,19 @@ local_secs(const struct datetime *date)
 
 /**
  * Resolve tzindex encoded timezone from @sa date using Olson facilities.
- * @param[in] date decode input datetime value.
+ * @param[in] epoch decode input epoch time (in seconds).
+ * @param[in] tzindex use timezone index for decode.
  * @param[out] gmtoff return resolved timezone offset (in seconds).
  * @param[out] isdst return resolved daylight saving time status for the zone.
  */
 static inline bool
-datetime_timezone_lookup(const struct datetime *date, long *gmtoff, int *isdst)
+epoch_timezone_lookup(int64_t epoch, int16_t tzindex, long *gmtoff, int *isdst)
 {
-	if (date->tzindex == 0)
+	if (tzindex == 0)
 		return false;
 
-	struct tnt_tm tm = {.tm_epoch = date->epoch};
-	if (!timezone_tzindex_lookup(date->tzindex, &tm))
+	struct tnt_tm tm = {.tm_epoch = epoch};
+	if (!timezone_tzindex_lookup(tzindex, &tm))
 		return false;
 
 	*gmtoff = tm.tm_gmtoff;
@@ -75,7 +76,8 @@ datetime_isdst(const struct datetime *date)
 	int isdst = 0;
 	long gmtoff = 0;
 
-	return datetime_timezone_lookup(date, &gmtoff, &isdst) && (isdst != 0);
+	epoch_timezone_lookup(date->epoch, date->tzindex, &gmtoff, &isdst);
+	return isdst != 0;
 }
 
 long
@@ -84,8 +86,7 @@ datetime_gmtoff(const struct datetime *date)
 	int isdst = 0;
 	long gmtoff = date->tzoffset * 60;
 
-	datetime_timezone_lookup(date, &gmtoff, &isdst);
-
+	epoch_timezone_lookup(date->epoch, date->tzindex, &gmtoff, &isdst);
 	return gmtoff;
 }
 
@@ -704,6 +705,7 @@ datetime_increment_by(struct datetime *self, int direction,
 	int64_t dt = local_dt(secs);
 	int nsec = self->nsec;
 	int offset = self->tzoffset;
+	int tzindex = self->tzindex;
 
 	bool is_ymd_updated = false;
 	int64_t years = ival->year;
@@ -789,9 +791,15 @@ datetime_increment_by(struct datetime *self, int direction,
 	if (rc != 0)
 		return rc;
 
+	if (tzindex != 0) {
+		int isdst = 0;
+		long gmtoff = offset * 60;
+		epoch_timezone_lookup(secs, tzindex, &gmtoff, &isdst);
+		offset = gmtoff / 60;
+	}
 	self->epoch = utc_secs(secs, offset);
 	self->nsec = nsec;
-	self->tzoffset = datetime_gmtoff(self) / 60;
+	self->tzoffset = offset;
 	return 0;
 }
 
