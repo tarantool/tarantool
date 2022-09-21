@@ -24,6 +24,10 @@ extern "C" {
 /** Flight recorder config options. */
 struct flight_recorder_cfg {
 	/**
+	 * Whether flight recorder should be enabled or disabled.
+	 */
+	bool enabled;
+	/**
 	 * Directory to store flight_records.ttfr file.
 	 */
 	const char *dir;
@@ -52,11 +56,13 @@ struct flight_recorder_cfg {
 };
 
 /** No-op in OS version. */
-static inline void
-flightrec_init(const struct flight_recorder_cfg *cfg)
+static inline int
+flightrec_cfg(const struct flight_recorder_cfg *cfg)
 {
 	(void)cfg;
-	say_error("Flight recorder is not available in this build");
+	if (cfg->enabled)
+		say_error("Flight recorder is not available in this build");
+	return 0;
 }
 
 /** No-op in OS version. */

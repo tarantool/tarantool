@@ -313,6 +313,12 @@ box_set_prepared_stmt_cache_size(void);
 void
 box_get_flightrec_cfg(struct flight_recorder_cfg *cfg);
 
+/**
+ * Configure flight recoder from box.cfg.flightrec_* parameters.
+ */
+int
+box_configure_flightrec(void);
+
 extern "C" {
 #endif /* defined(__cplusplus) */
 

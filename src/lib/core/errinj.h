@@ -85,6 +85,8 @@ struct errinj {
 	_(ERRINJ_DYN_MODULE_COUNT, ERRINJ_INT, {.iparam = 0}) \
 	_(ERRINJ_FIBER_MADVISE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_FIBER_MPROTECT, ERRINJ_INT, {.iparam = -1}) \
+	_(ERRINJ_FLIGHTREC_RECREATE_RENAME, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_FLIGHTREC_LOG_DELAY, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_HTTPC_EXECUTE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_HTTP_RESPONSE_ADD_WAIT, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_INDEX_ALLOC, ERRINJ_BOOL, {.bparam = false}) \
