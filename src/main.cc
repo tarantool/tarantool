@@ -483,14 +483,14 @@ load_cfg(void)
 			background);
 
 	/*
-	 * Initialize flight recorder after say logger: we might set on_log
-	 * callback to duplicate logs to flight recorder.
+	 * Initialize flight recorder after say logger as we might use
+	 * say API.
 	 */
-	bool flightrec_is_enabled = cfg_getb("flightrec_enabled") == 1;
-	if (flightrec_is_enabled) {
-		struct flight_recorder_cfg cfg_fr;
-		box_get_flightrec_cfg(&cfg_fr);
-		flightrec_init(&cfg_fr);
+	struct flight_recorder_cfg cfg_fr;
+	box_get_flightrec_cfg(&cfg_fr);
+	if (flightrec_cfg(&cfg_fr) != 0) {
+		diag_log();
+		exit(EXIT_FAILURE);
 	}
 
 	memtx_tx_manager_use_mvcc_engine = cfg_getb("memtx_use_mvcc_engine");

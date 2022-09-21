@@ -260,6 +260,8 @@ local template_cfg = {
     txn_timeout           = 'number',
 }
 
+local has_flightrec, flightrec = pcall(require, 'flightrec')
+
 local function normalize_uri_list_for_replication(port_list)
     if type(port_list) == 'table' then
         return port_list
@@ -405,6 +407,20 @@ local dynamic_cfg_modules = {
             feedback_crashinfo = true,
             feedback_host = true,
             feedback_interval = true,
+        },
+    },
+    flightrec = {
+        cfg = has_flightrec and flightrec.cfg or function() end,
+        options = {
+            flightrec_enabled = true,
+            flightrec_logs_size = true,
+            flightrec_logs_max_msg_size = true,
+            flightrec_logs_log_level = true,
+            flightrec_metrics_interval = true,
+            flightrec_metrics_period = true,
+            flightrec_requests_size = true,
+            flightrec_requests_max_req_size = true,
+            flightrec_requests_max_res_size = true,
         },
     },
 }
@@ -956,13 +972,6 @@ local function load_cfg(cfg)
     box_configured = nil
 
     box_is_configured = true
-
-    -- Setup flight recorder if available. Should be called after config
-    -- is loaded since it uses box.cfg parameters.
-    local has_flightrec, flightrec = pcall(require, 'flightrec')
-    if has_flightrec then
-        flightrec.start()
-    end
 
     -- Check if schema version matches Tarantool version and print
     -- warning if it's not (in case user forgot to call

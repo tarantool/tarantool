@@ -794,6 +794,7 @@ void
 box_get_flightrec_cfg(struct flight_recorder_cfg *cfg)
 {
 	memset(cfg, 0, sizeof(*cfg));
+	cfg->enabled = cfg_getb("flightrec_enabled");
 	cfg->dir = cfg_gets("memtx_dir");
 	cfg->logs_size = cfg_geti64("flightrec_logs_size");
 	cfg->log_max_msg_size = cfg_geti64("flightrec_logs_max_msg_size");
@@ -2554,6 +2555,20 @@ box_set_txn_isolation(void)
 	if (level == txn_isolation_level_MAX)
 		return -1;
 	txn_default_isolation = level;
+	return 0;
+}
+
+int
+box_configure_flightrec(void)
+{
+	struct flight_recorder_cfg cfg;
+	box_get_flightrec_cfg(&cfg);
+
+	if (flightrec_check_cfg(&cfg) != 0)
+		return -1;
+	if (flightrec_cfg(&cfg) != 0)
+		return -1;
+
 	return 0;
 }
 
