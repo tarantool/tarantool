@@ -1395,11 +1395,12 @@ Matrix of addition operands eligibility and their result type
 | table           |          |          |          |
 ]]
 test:test("Matrix of allowed time and interval additions", function(test)
-    test:plan(67)
+    test:plan(79)
 
     -- check arithmetic with leap dates
     local T1970 = date.new{year = 1970, month = 1, day = 1}
-    local T2000 = date.new{year = 2000, month = 1, day = 1}
+    local T2000 = date.new{year = 2000, month = 1, day = 1,
+                           tz = 'Europe/Moscow'}
 
     local I1 = date.interval.new{day = 1}
     local M2 = date.interval.new{month = 2}
@@ -1461,6 +1462,42 @@ test:test("Matrix of allowed time and interval additions", function(test)
     test:is(tostring(M2 + T1970), "1970-03-01T00:00:00Z", "value: M + T")
     test:is(tostring(Y1 + T1970), "1971-01-01T00:00:00Z", "value: Y + T")
     test:is(tostring(Y5 + Y1), "+6 years", "Y + Y")
+
+    -- Check winter/DST sensitive operations with intervals.
+    -- We use 2000 year here, because then Moscow still were
+    -- switching between winter and summer time.
+    local msk_offset = 180 -- expected winter time offset
+    local msd_offset = 240 -- expected daylight saving time offset
+
+    local res = T2000 + I1
+    test:is(tostring(res), "2000-01-02T00:00:00 Europe/Moscow",
+        "value: 2000 + I")
+    test:is(res.tzoffset, msk_offset, "2000-01-02T00:00:00 - winter")
+
+    res = T2000 + i1
+    test:is(tostring(res), "2000-01-02T00:00:00 Europe/Moscow",
+        "value: 2000 + i")
+    test:is(res.tzoffset, msk_offset, "2000-01-02T00:00:00 - winter")
+
+    res = T2000 + M2
+    test:is(tostring(res), "2000-03-01T00:00:00 Europe/Moscow",
+        "value: 2000 + 2M")
+    test:is(res.tzoffset, msk_offset, "2000-03-01T00:00:00 - winter")
+
+    res = T2000 + M2 + M2 + M2
+    test:is(tostring(res), "2000-07-01T00:00:00 Europe/Moscow",
+        "value: 2000 + 6M")
+    test:is(res.tzoffset, msd_offset, "2000-07-01T00:00:00 - summer")
+
+    res = T2000 + m2
+    test:is(tostring(res), "2000-03-01T00:00:00 Europe/Moscow",
+        "value: 2000 + 2m")
+    test:is(res.tzoffset, msk_offset, "2000-03-01T00:00:00 - winter")
+
+    res = T2000 + m2 + M2 + m2
+    test:is(tostring(res), "2000-07-01T00:00:00 Europe/Moscow",
+        "value: 2000 + 6m")
+    test:is(res.tzoffset, msd_offset, "2000-07-01T00:00:00 - summer")
 
     assert_raises_like(test, expected_interval_but,
                        function() return T1970 + 123 end)
