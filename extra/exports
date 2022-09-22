@@ -549,6 +549,8 @@ tt_uuid_to_string
 uri_destroy
 uri_format
 uri_set_destroy
+uri_escape
+uri_unescape
 uuid_nil
 uuid_unpack
 _say

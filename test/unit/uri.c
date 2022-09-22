@@ -164,6 +164,13 @@ struct uri_set_expected {
 	struct uri_expected uris[URI_MAX];
 };
 
+struct str_escape {
+	const char *str;
+	const char *escaped;
+	const char *unreserved;
+	bool plus;
+};
+
 static int
 uri_param_expected_check(const struct uri_param_expected *param,
 			       const struct uri *uri)
@@ -583,10 +590,197 @@ test_invalid_string_uri_set(void)
 	footer();
 }
 
+#define RFC3986_unreserved "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-._~"
+
+const struct str_escape escape_testcase[] = {
+	[0] = {
+		.str = "-._~",
+		.escaped = "-._~",
+		.unreserved = RFC3986_unreserved,
+		.plus = false,
+	},
+	[1] = {
+		.str = "0123456789",
+		.escaped = "0123456789",
+		.unreserved = RFC3986_unreserved,
+		.plus = false,
+	},
+	[2] = {
+		.str = "abcdefghijklm",
+		.escaped = "abcdefghijklm",
+		.unreserved = RFC3986_unreserved,
+		.plus = false,
+	},
+	[3] = {
+		.str = "nopqrstuvwxyz",
+		.escaped = "nopqrstuvwxyz",
+		.unreserved = RFC3986_unreserved,
+		.plus = false,
+	},
+	[4] = {
+		.str = "ABCDEFGHIJKLM",
+		.escaped = "ABCDEFGHIJKLM",
+		.unreserved = RFC3986_unreserved,
+		.plus = false,
+	},
+	[5] = {
+		.str = "NOPQRSTUVWXYZ",
+		.escaped = "NOPQRSTUVWXYZ",
+		.unreserved = RFC3986_unreserved,
+		.plus = false,
+	},
+	[6] = {
+		.str = "!$&'()*+,;=",
+		.escaped = "%21%24%26%27%28%29%2A%2B%2C%3B%3D",
+		.unreserved = RFC3986_unreserved,
+		.plus = false,
+	},
+};
+
+/**
+ * Builds an array with unreserved characters.
+ * uri.unreserved() implemented as a Lua function,
+ * unreserved_tbl() replaces Lua implementation for testing purposes.
+ */
+static void
+unreserved_tbl(const char *str, unsigned char unreserved[256])
+{
+	for (int i = 0; i < 256; i++)
+		unreserved[i] = 0;
+
+	for (; *str; str++) {
+		unsigned char ch = (unsigned char)*str;
+		unreserved[ch] = 1;
+	}
+}
+
+static void
+test_escape(void)
+{
+	header();
+	plan(lengthof(escape_testcase) * 3);
+	unsigned char unreserved[256];
+	for (unsigned i = 0; i < lengthof(escape_testcase); i++) {
+		const char *unescaped = escape_testcase[i].str;
+		const char *escaped = escape_testcase[i].escaped;
+		bool plus = escape_testcase[i].plus;
+		char *dst = xcalloc(strlen(unescaped) * 3 + 1, sizeof(char));
+		unreserved_tbl(escape_testcase[i].unreserved, unreserved);
+		size_t dst_size = uri_escape(unescaped, strlen(unescaped),
+					     dst, unreserved, plus);
+		is(dst_size, strlen(escaped),
+		   "escaped string ('%s') length != %ld", dst, strlen(escaped));
+		is(strlen(dst), strlen(escaped),
+		   "escaped string ('%s') length != %ld", dst, strlen(escaped));
+		is(memcmp(escaped, dst, dst_size), 0,
+		   "escape: '%s' == '%s'", escaped, dst);
+		free(dst);
+	}
+	check_plan();
+	footer();
+}
+
+static void
+test_unescape(void)
+{
+	header();
+	plan(lengthof(escape_testcase) * 3);
+	for (unsigned i = 0; i < lengthof(escape_testcase); i++) {
+		const char *unescaped = escape_testcase[i].str;
+		const char *escaped = escape_testcase[i].escaped;
+		bool decode_plus = escape_testcase[i].plus;
+		char *dst = xcalloc(strlen(unescaped) + 1, sizeof(char));
+		size_t dst_size = uri_unescape(escaped, strlen(escaped),
+					       dst, decode_plus);
+		is(dst_size, strlen(unescaped),
+		   "unescaped string ('%s') length != %ld", dst,
+		   strlen(unescaped));
+		is(strlen(dst), strlen(unescaped),
+		   "unescaped string ('%s') length != %ld", dst,
+		   strlen(unescaped));
+		is(memcmp(dst, unescaped, dst_size), 0,
+		   "unescape: '%s' == '%s'", unescaped, dst);
+		free(dst);
+	}
+	check_plan();
+	footer();
+}
+
+const struct str_escape unescape_testcase[] = {
+	/* Special case: %<non-hex><non-hex> */
+	[0] = {
+		.str = "%##",
+		.escaped = "%##",
+		.unreserved = "%%#",
+		.plus = false,
+	},
+	/* Special case: %<hex><non-hex> */
+	[1] = {
+		.str = "%A$",
+		.escaped = "%A$",
+		.unreserved = "%%A$",
+		.plus = false,
+	},
+	/* Special case: %<non-hex><hex> */
+	[2] = {
+		.str = "%$A",
+		.escaped = "%$A",
+		.unreserved = "%%$A",
+		.plus = false,
+	},
+	/* Special case: %<EOS> (<EOS> -- the end of a string) */
+	[3] = {
+		.str = "%",
+		.escaped = "%",
+		.unreserved = "%%",
+		.plus = false,
+	},
+	/* Special case: %<hex><EOS> (<EOS> -- the end of a string) */
+	[4] = {
+		.str = "%A",
+		.escaped = "%A",
+		.unreserved = "%%A",
+		.plus = false,
+	},
+	/* Special case: %<non-hex><EOS> (<EOS> -- the end of a string) */
+	[5] = {
+		.str = "%&",
+		.escaped = "%&",
+		.unreserved = "%%&",
+		.plus = false,
+	},
+};
+
+static void
+test_unescape_special_cases(void)
+{
+	header();
+	plan(lengthof(unescape_testcase) * 3);
+	for (unsigned i = 0; i < lengthof(unescape_testcase); i++) {
+		const char *unescaped = unescape_testcase[i].str;
+		const char *escaped = unescape_testcase[i].escaped;
+		bool decode_plus = escape_testcase[i].plus;
+		char *dst = xcalloc(strlen(unescaped) + 1, sizeof(char));
+		size_t dst_size = uri_unescape(escaped, strlen(escaped),
+					       dst, decode_plus);
+		is(dst_size, strlen(unescaped),
+		   "unescaped string ('%s') length != %ld", dst,
+		   strlen(unescaped));
+		is(strlen(dst), strlen(unescaped),
+		   "unescaped string ('%s') length != %ld", dst,
+		   strlen(unescaped));
+		is(memcmp(dst, unescaped, dst_size), 0,
+		   "unescape: '%s' == '%s'", unescaped, dst);
+		free(dst);
+	}
+	check_plan();
+	footer();
+}
+
 int
 main(void)
 {
-	plan(7);
+	plan(10);
 	test_copy_sample();
 	test_copy_empty();
 	test_move_sample();
@@ -594,5 +788,8 @@ main(void)
 	test_string_uri_with_query_params_parse();
 	test_string_uri_set_with_query_params_parse();
 	test_invalid_string_uri_set();
+	test_escape();
+	test_unescape();
+	test_unescape_special_cases();
 	return check_plan();
 }
