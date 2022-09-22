@@ -110,7 +110,7 @@ There are also some goodies you can use to make debugging easier.
 Environment Variables:
 -
 
-Want to disable ANSI color support or disable GNU readline? Set the `DBG_NOCOLOR` and/or `DBG_NOREADLINE` environment variables.
+Want to disable ANSI color support or disable GNU readline? Set the `NO_COLOR`.
 
 Known Issues:
 -
