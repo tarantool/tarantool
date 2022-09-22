@@ -3,6 +3,7 @@
  *
  * Copyright 2010-2021, Tarantool AUTHORS, please see AUTHORS file.
  */
+#include <ctype.h>
 #include "uri.h"
 #include "uri_parser.h"
 #include "trivia/util.h"
@@ -370,4 +371,68 @@ fail:
 	uri_set->uris = NULL;
 	uri_set->uri_count = 0;
 	return -1;
+}
+
+/**
+ * String percent-encoding.
+ */
+size_t
+uri_escape(const char *src, size_t src_size, char *dst,
+	   const unsigned char unreserved[256], bool encode_plus)
+{
+	int pos = 0;
+	const char *hex = "0123456789ABCDEF";
+	while (src_size--) {
+		unsigned char ch = (unsigned char)*src;
+		if ((ch == ' ') && encode_plus) {
+			dst[pos++] = '+';
+		} else if (!unreserved[(int)ch]) {
+			dst[pos++] = '%';
+			dst[pos++] = hex[ch >> 4];
+			dst[pos++] = hex[ch & 15];
+		} else {
+			dst[pos++] = *src;
+		}
+		src++;
+	}
+	return (size_t)pos;
+};
+
+/**
+ * Converts a hex character to its integer value.
+ */
+static char
+hex2ch(unsigned char ch)
+{
+	return isdigit(ch) ? ch - '0' : tolower(ch) - 'a' + 10;
+}
+
+/**
+ * String percent-decoding.
+ */
+size_t
+uri_unescape(const char *src, size_t src_size, char *dst, bool decode_plus)
+{
+	char *dst_buf = dst;
+	const char *src_end = src + src_size;
+	for (const char *p = src; p < src_end; ++p) {
+		if (*p == '%') {
+			bool is_hex_1 = p + 1 < src_end &&
+				isxdigit((unsigned char)p[1]);
+			bool is_hex_2 = p + 2 < src_end &&
+				isxdigit((unsigned char)p[2]);
+			if (is_hex_1 && is_hex_2) {
+				*dst_buf++ = hex2ch(p[1]) << 4 |
+						hex2ch(p[2]);
+				p += 2;
+			} else {
+				*dst_buf++ = '%';
+			}
+		} else if (decode_plus && *p == '+') {
+			*dst_buf++ = ' ';
+		} else {
+			*dst_buf++ = *p;
+		}
+	}
+	return (size_t)(dst_buf - dst);
 }

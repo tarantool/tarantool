@@ -47,6 +47,13 @@ uri_set_destroy(struct uri_set *uri_set);
 
 int
 uri_format(char *str, size_t len, struct uri *uri, bool write_password);
+
+size_t
+uri_escape(const char *src, size_t src_size, char *dst,
+           const unsigned char unreserved[256], bool encode_plus);
+
+size_t
+uri_unescape(const char *src, size_t src_size, char *dst, bool decode_plus);
 ]]
 
 pcall(ffi.cdef, uri_cdef) -- Required for running unit tests.
@@ -254,10 +261,6 @@ local function build_opts(opts)
     return options
 end
 
-local char_to_hex = function(c)
-    return string.format("%%%02X", string.byte(c))
-end
-
 -- Encodes a string into its escaped hexadecimal representation.
 local function escape(buf, opts)
     if type(buf) ~= "string" then
@@ -265,19 +268,12 @@ local function escape(buf, opts)
     end
     local options = build_opts(opts)
 
-    return (buf:gsub("(.)", function(ch)
-        if options.plus == true and ch == " " then
-            return "+"
-        elseif options.unreserved[string.byte(ch)] == 1 then
-            return ch
-        else
-            return char_to_hex(ch)
-        end
-    end))
-end
-
-local hex_to_char = function(x)
-    return string.char(tonumber(x, 16))
+    -- The worst case is when all characters are encoded.
+    local dst = ffi.new("char[?]", #buf * 3)
+    local dst_size = builtin.uri_escape(buf, #buf, dst,
+                                        options.unreserved,
+                                        options.plus)
+    return ffi.string(dst, dst_size)
 end
 
 -- Decodes an escaped hexadecimal string into its binary representation.
@@ -287,12 +283,10 @@ local function unescape(buf, opts)
     end
     local options = build_opts(opts)
 
-    local str = buf
-    if options.plus == true then
-        str = str:gsub("+", " ")
-    end
-    str = str:gsub("%%(%x%x)", hex_to_char)
-    return str
+    -- The worst case is when all characters were not decoded.
+    local dst = ffi.new("char[?]", #buf)
+    local dst_size = builtin.uri_unescape(buf, #buf, dst, options.plus)
+    return ffi.string(dst, dst_size)
 end
 
 local function encode_kv(key, values, res)

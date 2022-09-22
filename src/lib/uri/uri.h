@@ -141,6 +141,19 @@ uri_param(const struct uri *uri, const char *name, int idx);
 int
 uri_param_count(const struct uri *uri, const char *name);
 
+/**
+ * String percent-encoding.
+ */
+size_t
+uri_escape(const char *src, size_t src_size, char *dst,
+	   const unsigned char unreserved[256], bool encode_plus);
+
+/**
+ * String percent-decoding.
+ */
+size_t
+uri_unescape(const char *src, size_t src_size, char *dst, bool decode_plus);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
