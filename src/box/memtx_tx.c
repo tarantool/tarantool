@@ -1151,6 +1151,7 @@ memtx_tx_story_unlink_both(struct memtx_story *story, uint32_t idx)
 	struct memtx_story *newer_story = link->newer_story;
 	struct memtx_story *older_story = link->older_story;
 	if (link->newer_story == NULL) {
+		assert(link->in_index != NULL);
 		memtx_tx_story_unlink_top(story, idx);
 	} else {
 		memtx_tx_story_unlink(newer_story, story, idx);
@@ -1220,24 +1221,24 @@ memtx_tx_story_reorder(struct memtx_story *story,
 
 /**
  * Unlink @a story from all chains and remove corresponding tuple from
- * indexes if necessary.
+ * indexes if necessary: used in `memtx_tx_on_space_delete` — intentionally
+ * violates the top of the history chain invariant (see
+ * `memtx_tx_story_full_unlink_story_gc_step`), since all stories are deleted
+ * anyways.
  */
 static void
-memtx_tx_story_full_unlink(struct memtx_story *story)
+memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
 {
 	for (uint32_t i = 0; i < story->index_count; i++) {
 		struct memtx_story_link *link = &story->link[i];
 		if (link->newer_story == NULL) {
 			/*
 			 * We are at the top of the chain. That means
-			 * that story->tuple is in index. If the story
-			 * actually deletes the tuple, it must be deleted from
-			 * index.
+			 * that story->tuple might be in index. If the story
+			 * actually deletes the tuple and is present in index,
+			 * it must be deleted from index.
 			 */
 			if (story->del_psn > 0 && link->in_index != NULL) {
-				assert(!story->rollbacked ||
-				       link->older_story == NULL);
-
 				struct index *index = link->in_index;
 				struct tuple *removed, *unused;
 				if (index_replace(index, story->tuple, NULL,
@@ -1261,6 +1262,71 @@ memtx_tx_story_full_unlink(struct memtx_story *story)
 		} else {
 			/* Just unlink from list */
 			link->newer_story->link[i].older_story = link->older_story;
+			if (link->older_story != NULL)
+				link->older_story->link[i].newer_story =
+					link->newer_story;
+			link->older_story = NULL;
+			link->newer_story = NULL;
+		}
+	}
+}
+
+/**
+ * Unlink @a story from all chains and remove corresponding tuple from
+ * indexes if necessary: used in garbage collection step and preserves the top
+ * of the history chain invariant (as opposed to
+ * `memtx_tx_story_full_unlink_on_space_delete`).
+ */
+static void
+memtx_tx_story_full_unlink_story_gc_step(struct memtx_story *story)
+{
+	for (uint32_t i = 0; i < story->index_count; i++) {
+		struct memtx_story_link *link = &story->link[i];
+		if (link->newer_story == NULL) {
+			/*
+			 * We are at the top of the chain. That means
+			 * that story->tuple is in index or the story is a
+			 * rollbacked one. If the story actually deletes the
+			 * tuple and is present in index, it must be deleted
+			 * from index.
+			 */
+			assert(link->in_index != NULL || story->rollbacked);
+			/*
+			 * Invariant that the top of the history chain
+			 * is always in the index: here we delete
+			 * (sic: not replace) a tuple from the index,
+			 * and  it must be the last story left in the
+			 * history chain, otherwise `link->older_story`
+			 * starts to be at the top of the history chain
+			 * and is not present in index, which violates
+			 * our invariant.
+			 */
+			assert(link->older_story == NULL);
+			if (story->del_psn > 0 && link->in_index != NULL) {
+				struct index *index = link->in_index;
+				struct tuple *removed, *unused;
+				if (index_replace(index, story->tuple, NULL,
+						  DUP_INSERT,
+						  &removed, &unused) != 0) {
+					diag_log();
+					unreachable();
+					panic("failed to rollback change");
+				}
+				assert(story->tuple == removed);
+				link->in_index = NULL;
+				/*
+				 * All tuples in pk are referenced.
+				 * Once removed it must be unreferenced.
+				 */
+				if (i == 0)
+					memtx_tx_unref_from_primary(story);
+			}
+
+			memtx_tx_story_unlink(story, link->older_story, i);
+		} else {
+			/* Just unlink from list */
+			link->newer_story->link[i].older_story =
+				link->older_story;
 			if (link->older_story != NULL)
 				link->older_story->link[i].newer_story =
 					link->newer_story;
@@ -1320,7 +1386,25 @@ memtx_tx_story_gc_step()
 		return;
 	}
 	for (uint32_t i = 0; i < story->index_count; i++) {
-		if (!rlist_empty(&story->link[i].nearby_gaps)) {
+		struct memtx_story_link *link = &story->link[i];
+		if (link->newer_story == NULL) {
+			assert(link->in_index != NULL || story->rollbacked);
+			/*
+			 * We would have to unlink this tuple (and perhaps
+			 * delete it from index if story->del_psn > 0), but we
+			 * cannot do this since after that `link->older_story`
+			 * starts to be at the top of the history chain, and it
+			 * is not present in index, which violates our
+			 * invariant.
+			 */
+			if (link->older_story != NULL) {
+				assert(!story->rollbacked);
+				memtx_tx_story_set_status(story,
+							  MEMTX_TX_STORY_USED);
+				return;
+			}
+		}
+		if (!rlist_empty(&link->nearby_gaps)) {
 			memtx_tx_story_set_status(story,
 						  MEMTX_TX_STORY_TRACK_GAP);
 			/* The story is used for gap tracking. */
@@ -1329,7 +1413,7 @@ memtx_tx_story_gc_step()
 	}
 
 	/* Unlink and delete the story */
-	memtx_tx_story_full_unlink(story);
+	memtx_tx_story_full_unlink_story_gc_step(story);
 	memtx_tx_story_delete(story);
 }
 
@@ -2107,10 +2191,14 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 	for (uint32_t i = 0; i < story->index_count; i++) {
 		struct memtx_story_link *link = &story->link[i];
 		if (link->newer_story == NULL && link->older_story == NULL) {
+			assert(link->in_index != NULL);
 			story->rollbacked = true;
 			continue;
 		}
 		memtx_tx_story_unlink_both(story, i);
+		assert(link->newer_story == NULL &&
+		       link->older_story == NULL &&
+		       (link->in_index == NULL || story->rollbacked));
 	}
 	memtx_tx_story_unlink_added_by(story, stmt);
 	if (!story->rollbacked) {
@@ -2628,7 +2716,7 @@ memtx_tx_on_space_delete(struct space *space)
 			memtx_tx_history_remove_stmt(story->add_stmt);
 		if (story->del_stmt != NULL)
 			memtx_tx_history_remove_stmt(story->del_stmt);
-		memtx_tx_story_full_unlink(story);
+		memtx_tx_story_full_unlink_on_space_delete(story);
 		memtx_tx_story_delete(story);
 	}
 }
