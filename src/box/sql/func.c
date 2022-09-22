@@ -2385,6 +2385,7 @@ func_sql_expr_new(const struct func_def *def)
 	}
 	int ref_reg = ++parser.nMem;
 	sqlVdbeAddOp2(v, OP_Variable, ++parser.nVar, ref_reg);
+	v->is_sandboxed = 1;
 	parser.vdbe_field_ref_reg = ref_reg;
 
 	sqlVdbeSetNumCols(v, 1);

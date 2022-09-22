@@ -290,6 +290,11 @@ struct Vdbe {
 	bft explain:2;		/* True if EXPLAIN present on SQL command */
 	bft changeCntOn:1;	/* True to update the change-counter */
 	bft runOnlyOnce:1;	/* Automatically expire on reset */
+	/**
+	 * Do not expire this statement if true, because it is an expression and
+	 * does not use external resources other than bind variables.
+	 */
+	bft is_sandboxed : 1;
 	u32 aCounter[5];	/* Counters used by sql_stmt_status() */
 	char *zSql;		/* Text of the SQL statement that generated this */
 	void *pFree;		/* Free this when deleting the vdbe */
