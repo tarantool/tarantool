@@ -22,15 +22,15 @@ find_path(ICU_INCLUDE_DIR
     ${ICU_FIND_OPTS}
 )
 
-if(BUILD_STATIC)
+#if(BUILD_STATIC)
     set(ICU_I18N_LIB_NAME libicui18n.a)
     set(ICU_UC_LIB_NAME libicuuc.a)
     set(ICU_DATA_LIB_NAME libicudata.a)
-else()
-    set(ICU_I18N_LIB_NAME icui18n)
-    set(ICU_UC_LIB_NAME icuuc)
-    set(ICU_DATA_LIB_NAME icudata)
-endif()
+#else()
+#    set(ICU_I18N_LIB_NAME icui18n)
+#    set(ICU_UC_LIB_NAME icuuc)
+#    set(ICU_DATA_LIB_NAME icudata)
+#endif()
 
 find_library(ICU_LIBRARY_I18N NAMES ${ICU_I18N_LIB_NAME}
     HINTS ${ICU_FIND_LIBRARY_HINTS}
