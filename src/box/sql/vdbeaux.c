@@ -2165,7 +2165,7 @@ sqlExpirePreparedStatements(sql * db)
 {
 	Vdbe *p;
 	for (p = db->pVdbe; p; p = p->pNext) {
-		p->expired = 1;
+		p->expired = p->is_sandboxed == 0 ? 1 : 0;
 	}
 }
 
