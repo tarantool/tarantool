@@ -195,7 +195,7 @@ g.test_unit_decode_body_content_type_passed = function(_)
         },
         decoders = {
             ['application/json'] = function(body, type_value)
-                assert(type_value == content_type)
+                t.assert_equals(type_value, content_type)
                 return json.decode(body)
             end,
         },

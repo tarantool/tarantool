@@ -13,7 +13,7 @@ g.test_subscriptions_outside_box_cfg = function()
         local result_no = 0
         local watcher = box.watch(val,
                                   function(name, state)
-                                      assert(name == val)
+                                      t.assert_equals(name, val)
                                       result = state
                                       result_no = result_no + 1
                                   end)
@@ -68,7 +68,7 @@ g.test_box_status = function(cg)
     local result_no = 0
     local watcher = c:watch('box.status',
                             function(name, state)
-                                assert(name == 'box.status')
+                                t.assert_equals(name, 'box.status')
                                 result = state
                                 result_no = result_no + 1
                             end)
@@ -255,7 +255,7 @@ g.test_box_schema = function(cg)
 
     local watcher = c:watch('box.schema',
                             function(n, s)
-                                assert(n == 'box.schema')
+                                t.assert_equals(n, 'box.schema')
                                 version = s.version
                                 version_n = version_n + 1
                             end)
@@ -307,7 +307,7 @@ g.test_box_id = function(cg)
 
     local watcher = c:watch('box.id',
                             function(name, state)
-                                assert(name == 'box.id')
+                                t.assert_equals(name, 'box.id')
                                 result = state
                                 result_no = result_no + 1
                             end)

@@ -43,10 +43,9 @@ end end
 -- 'can not be called simultaneously'.
 local function force_demote(instance)
     t.helpers.retrying({}, function()
-        assert(instance:exec(function()
+        instance:exec(function()
             box.ctl.demote()
-            return true
-        end))
+        end)
     end)
 end
 
@@ -223,9 +222,9 @@ g.test_read_only_reason_synchro = function(g)
     end)
 
     t.helpers.retrying({}, function()
-        assert(g.replica:exec(function()
-            return box.info.synchro.queue.owner ~= 0
-        end))
+        t.assert_not_equals(g.replica:exec(function()
+            return box.info.synchro.queue.owner
+        end), 0)
     end)
 
     local ok, err = g.replica:exec(function()
@@ -287,9 +286,9 @@ g.test_read_only_reason_election_has_leader_no_uuid = function(g)
     end)
 
     t.helpers.retrying({}, function()
-        assert(g.replica:exec(function(leader_id)
-            return box.info.replication[leader_id] == nil
-        end, {leader_id}))
+        t.assert_equals(g.replica:exec(function(leader_id)
+            return box.info.replication[leader_id]
+        end, {leader_id}), nil)
     end)
 
     local ok, err = g.replica:exec(function()
@@ -330,10 +329,11 @@ g.test_read_only_reason_synchro_no_uuid = function(g)
 
     local leader_id = g.master:instance_id()
     t.helpers.retrying({}, function()
-        assert(g.replica:exec(function(leader_id)
-            return box.info.synchro.queue.owner ~= 0 and
-                   box.info.replication[leader_id] == nil
-        end, {leader_id}))
+        g.replica:exec(function(leader_id)
+            local t = require('luatest')
+            t.assert_not_equals(box.info.synchro.queue.owner, 0)
+            t.assert_equals(box.info.replication[leader_id], nil)
+        end, {leader_id})
     end)
 
     local ok, err = g.replica:exec(function()
