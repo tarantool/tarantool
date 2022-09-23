@@ -50,7 +50,7 @@ local function tx_gc(server, steps, related_changes)
     if related_changes then
         table_apply_change(current_stat, related_changes)
     end
-    assert(table.equals(current_stat, server:eval('return box.stat.memtx.tx()')))
+    t.assert_equals(server:eval('return box.stat.memtx.tx()'), current_stat)
 end
 
 local function tx_step(server, txn_name, op, related_changes)
@@ -58,7 +58,7 @@ local function tx_step(server, txn_name, op, related_changes)
     if related_changes then
         table_apply_change(current_stat, related_changes)
     end
-    assert(table.equals(current_stat, server:eval('return box.stat.memtx.tx()')))
+    t.assert_equals(server:eval('return box.stat.memtx.tx()'), current_stat)
 end
 
 g.before_each(function()
@@ -76,7 +76,7 @@ g.before_each(function()
     -- CREATING CURRENT STAT
     current_stat = g.server:eval('return box.stat.memtx.tx()')
     -- Check if txm use no memory
-    assert(table_values_are_zeros(current_stat))
+    t.assert(table_values_are_zeros(current_stat))
 end)
 
 g.after_each(function()
@@ -167,8 +167,7 @@ g.test_simple = function()
     }
     tx_step(g.server, 'tx2', "s:replace{2, 2}", diff)
     tx_gc(g.server, 100, nil)
-    local err = g.server:eval('return tx2:commit()')
-    assert(not err[1])
+    t.assert_equals(g.server:eval('return tx2:commit()'), '')
     diff = {
         ["txn"] = {
             ["statements"] = {
@@ -194,8 +193,7 @@ g.test_simple = function()
         }
     }
     tx_gc(g.server, 10, diff)
-    err = g.server:eval('return tx1:commit()')
-    assert(not err[1])
+    t.assert_equals(g.server:eval('return tx1:commit()'), '')
     diff = {
         ["txn"] = {
             ["statements"] = {
@@ -225,7 +223,7 @@ g.test_simple = function()
         }
     }
     tx_gc(g.server, 100, diff)
-    assert(table_values_are_zeros(current_stat))
+    t.assert(table_values_are_zeros(current_stat))
 end
 
 g.test_read_view = function()
@@ -236,7 +234,7 @@ g.test_read_view = function()
     g.server:eval('s:replace{1, 1}')
     g.server:eval('s:replace{2, 1}')
     g.server:eval('box.internal.memtx_tx_gc(10)')
-    assert(table_values_are_zeros(g.server:eval('return box.stat.memtx.tx()')))
+    t.assert(table_values_are_zeros(g.server:eval('return box.stat.memtx.tx()')))
     g.server:eval('tx1("s:get(1)")')
     g.server:eval('tx2("s:replace{1, 2}")')
     g.server:eval('tx2("s:replace{2, 2}")')
@@ -283,7 +281,7 @@ g.test_read_view_with_empty_space = function()
     g.server:eval('s:replace{1, 1}')
     g.server:eval('s:replace{2, 1}')
     g.server:eval('box.internal.memtx_tx_gc(10)')
-    assert(table_values_are_zeros(g.server:eval('return box.stat.memtx.tx()')))
+    t.assert(table_values_are_zeros(g.server:eval('return box.stat.memtx.tx()')))
     g.server:eval('tx1("s:get(1)")')
     g.server:eval('tx2("s:delete(1)")')
     g.server:eval('tx2("s:delete(2)")')
@@ -361,7 +359,7 @@ g.test_conflict = function()
     g.server:eval('tx1 = txn_proxy.new()')
     g.server:eval('tx2 = txn_proxy.new()')
     g.server:eval('box.internal.memtx_tx_gc(10)')
-    assert(table_values_are_zeros(g.server:eval('return box.stat.memtx.tx()')))
+    t.assert(table_values_are_zeros(g.server:eval('return box.stat.memtx.tx()')))
     g.server:eval('tx1:begin()')
     g.server:eval('tx2:begin()')
     g.server:eval('tx1("s:get(1)")')
@@ -421,8 +419,7 @@ g.test_user_data = function()
         },
     }
     tx_step(g.server, 'tx', 'ffi.C.box_txn_alloc(' .. alloc_size .. ')', diff)
-    local err = g.server:eval('return tx:commit()')
-    assert(not err[1])
+    t.assert_equals(g.server:eval('return tx:commit()'), '')
     diff = {
         ["txn"] = {
             ["user"] = {

@@ -411,7 +411,7 @@ g.test_request_headers = function(cg)
             t.assert(ok, case[1])
         else
             -- expect fail
-            assert(type(err) == 'string')
+            t.assert_type(err, 'string')
             err = err:gsub('^builtin/[a-z._]+.lua:[0-9]+: ', '')
             t.assert_equals({ok, err}, {false, case.exp_err}, case[1])
         end

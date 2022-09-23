@@ -14,10 +14,10 @@ ffi.cdef([[
 g.before_test('test_console_mem_leak', function()
     -- Replace stdin fd with a pipe fd so that we can emulate user input.
     local fd = ffi.new([[ int[2] ]])
-    assert(ffi.C.pipe(fd) == 0)
+    t.assert_equals(ffi.C.pipe(fd), 0)
     if fd[0] ~= 0 then
-        assert(ffi.C.dup2(fd[0], 0) == 0)
-        assert(ffi.C.close(fd[0]) == 0)
+        t.assert_equals(ffi.C.dup2(fd[0], 0), 0)
+        t.assert_equals(ffi.C.close(fd[0]), 0)
     end
     g.console_write_fd = fd[1]
     g.console_write = function(command)
@@ -26,8 +26,8 @@ g.before_test('test_console_mem_leak', function()
 end)
 
 g.after_test('test_console_mem_leak', function()
-    assert(ffi.C.close(g.console_write_fd) == 0)
-    assert(ffi.C.close(0) == 0)
+    t.assert_equals(ffi.C.close(g.console_write_fd), 0)
+    t.assert_equals(ffi.C.close(0), 0)
     g.console_write = nil
     g.console_write_fd = nil
 end)
