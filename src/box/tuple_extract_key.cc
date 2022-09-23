@@ -255,9 +255,13 @@ tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
 	assert(!key_def->for_func_index);
 	assert(mp_sizeof_nil() == 1);
 	/* allocate buffer with maximal possible size */
-	char *key = (char *) region_alloc(&fiber()->gc, data_end - data);
+	uint32_t potential_null_count = key_def->is_nullable ?
+		key_def->part_count : 0;
+	uint32_t alloc_size = (uint32_t)(data_end - data) +
+		potential_null_count * mp_sizeof_nil();
+	char *key = (char *)region_alloc(&fiber()->gc, alloc_size);
 	if (key == NULL) {
-		diag_set(OutOfMemory, data_end - data, "region",
+		diag_set(OutOfMemory, alloc_size, "region",
 			 "tuple_extract_key_raw");
 		return NULL;
 	}
@@ -352,10 +356,9 @@ tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
 		if (has_optional_parts && null_count != 0) {
 			memset(key_buf, MSGPACK_NULL, null_count);
 			key_buf += null_count * mp_sizeof_nil();
-		} else {
-			assert(key_buf - key <= data_end - data);
 		}
 	}
+	assert(key_buf - key <= alloc_size);
 	if (key_size != NULL)
 		*key_size = (uint32_t)(key_buf - key);
 	return key;
