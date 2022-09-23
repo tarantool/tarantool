@@ -50,6 +50,8 @@ local output_handlers = { }
 -- puts it inside of a stream.
 local output_eos = { ["yaml"] = '\n...\n', ["lua"] = ';' }
 
+local default_local_eos = ''
+
 output_handlers["yaml"] = function(status, _opts, ...)
     local err, ok, res
      -- Using pcall, because serializer can raise an exception
@@ -118,15 +120,24 @@ output_handlers["lua"] = function(status, opts, ...)
 end
 
 local function parse_output(value)
-    local fmt, opts
     if not value then
         return 'Specify output format: lua or yaml.'
     end
+    local fmt, opts, local_eos
     for _, v in ipairs(value:split(',')) do
         if v == 'yaml' or v == 'lua' then
             fmt = v
         elseif v == 'line' or v == 'block' then
             opts = v
+        elseif v:find('=') then
+            local pivot = v:find('=')
+            local lhs = v:sub(1, pivot - 1)
+            local rhs = v:sub(pivot + 1, -1)
+            if lhs == 'local_eos' then
+                local_eos = rhs
+            else
+                return ('Unknown "\\set output" option: %q'):format(lhs)
+            end
         else
             return ('Unknown "\\set output" option: %q'):format(v)
         end
@@ -134,10 +145,10 @@ local function parse_output(value)
     if fmt == nil then
         return 'Specify output format: lua or yaml.'
     end
-    if opts and fmt ~= 'lua' then
+    if (opts or local_eos) and fmt ~= 'lua' then
         return ("Invalid language %s, opts are available only in lua."):format(fmt)
     end
-    return nil, fmt, opts
+    return nil, fmt, opts, local_eos
 end
 
 local function set_default_output(value)
@@ -272,10 +283,13 @@ local function set_language(storage, value)
     return true
 end
 
-local function set_output(_storage, value)
-    local err, fmt, opts = parse_output(value)
+local function set_output(storage, value)
+    local err, fmt, opts, local_eos = parse_output(value)
     if err then
         return error(err)
+    end
+    if local_eos ~= nil then
+        storage.local_eos = local_eos
     end
     output_save(fmt, opts)
     return true
@@ -468,20 +482,33 @@ local text_connection_mt = {
                 -- Make sure it is exactly "\set output" command.
                 if operators[items[1]] == set_param and
                     param_handlers[items[2]] == set_output then
-                    local err, fmt = parse_output(items[3])
+                    local err, fmt, opts, local_eos = parse_output(items[3])
                     if not err then
                         self.fmt = fmt
                         self.eos = output_eos[fmt]
+                        if local_eos ~= nil then
+                            -- Rebuild the command without
+                            -- local_eos=<...>, because it is a client
+                            -- side option.
+                            self.local_eos = local_eos
+                            local server_cmd_opts = table.concat({fmt, opts},
+                                                                 ',')
+                            return ('\\set output %s'):format(server_cmd_opts)
+                        end
                     end
                 end
             end
+            return text
         end,
         --
         -- Write + Read.
         --
         eval = function(self, text)
-            self:preprocess_eval(text)
-            text = text..'$EOF$\n'
+            local server_cmd = self:preprocess_eval(text)
+            -- If `text` is a `\set output` command, server_cmd may be a cropped
+            -- version of it without some configuration, that server doesn't
+            -- need to get.
+            text = (server_cmd or text)..'$EOF$\n'
             local fmt = self.fmt or default_output_format["fmt"]
             if not self:write(text) then
                 error(self:set_error())
@@ -546,7 +573,8 @@ local function wrap_text_socket(connection, url, print_f)
         port = url.service,
         print_f = print_f,
         eos = current_eos(),
-        fmt = current_output()["fmt"]
+        fmt = current_output()["fmt"],
+        local_eos = default_local_eos
     }, text_connection_mt)
     --
     -- Prepare the connection: setup EOS symbol
@@ -649,6 +677,15 @@ end
 -- Print result to stdout
 --
 local function local_print(self, output)
+    if output:endswith(output_eos["lua"]) then
+        local new_local_eos
+        if self.remote ~= nil then
+            new_local_eos = self.remote.local_eos
+        else
+            new_local_eos = self.local_eos
+        end
+        output = output:sub(1, -#output_eos["lua"] - 1) .. new_local_eos
+    end
     print(output)
 end
 
@@ -696,6 +733,7 @@ local repl_mt = {
         print = local_print;
         completion = internal.completion_handler;
         ac = true;
+        local_eos = default_local_eos;
     };
 }
 
