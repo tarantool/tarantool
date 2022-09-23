@@ -614,6 +614,61 @@ t:update(ops)
 t:upsert(ops)
 
 --
+-- gh-7705: update of a map/array which was inserted into an existing map/array
+-- by a bar update could crash.
+--
+ops = {{'=', '[2].key1', {key11 = 1}}, {'=', '[2].key1.key12', {key21 = 2}}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'=', '[3][1]', {1000}}, {'=', '[3][1][2]', 2000}}
+t:update(ops)
+t:upsert(ops)
+
+-- Try more than 2 levels of nested insertions.
+ops = {{'=', '[2].key1', {key11 = 1}}, {'=', '[2].key1.key12', {key21 = 2}},    \
+       {'=', '[2].key1.key12.key22', {key31 = 3}},                              \
+       {'=', '[2].key1.key12.key22.key32', 4}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'=', '[3][1]', {1000}}, {'=', '[3][1][2]', {2000, 3000}},               \
+       {'=', '[3][1][2][3]', {4000, 5000, 6000}},                               \
+       {'=', '[3][1][2][3][4]', 7000}}
+t:update(ops)
+t:upsert(ops)
+
+-- Try the difference not on the first part of the path (not counting the first
+-- level of tuple).
+ops = {{'=', '[4][6].f', {g = 1}}, {'=', '[4][6].f.h', {k = 2}}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'=', '[4][4][5][6]', {1000}}, {'=', '[4][4][5][6][2]', 2000}}
+t:update(ops)
+t:upsert(ops)
+
+-- Try nesting a second op into the bar operand.
+ops = {{'=', '[4][6].f', {g = {h = 1}}}, {'=', '[4][6].f.g.k', {l = 2}}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'=', '[4][4][5][6]', {{1000}}}, {'=', '[4][4][5][6][1][2]', 2000}}
+t:update(ops)
+t:upsert(ops)
+
+-- Try nesting a second op into the bar operand more than once.
+ops = {{'=', '[4][6].f', {g = {h = 1}}}, {'=', '[4][6].f.g.k', {l = 2}},        \
+       {'=', '[4][6].f.g.m', {n = 3}}}
+t:update(ops)
+t:upsert(ops)
+
+ops = {{'=', '[4][4][5][6]', {{1000}}}, {'=', '[4][4][5][6][1][2]', 2000},        \
+       {'=', '[4][4][5][6][1][3]', 3000}}
+t:update(ops)
+t:upsert(ops)
+
+--
 -- Intersecting map updates.
 --
 t:update({{'=', '[4][6].c.d', 2300}, {'=', '[4][6].c.e', 2400}})
