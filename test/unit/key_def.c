@@ -225,13 +225,75 @@ test_func_compare_with_key(void)
 	check_plan();
 }
 
+static void
+test_check_tuple_extract_key_raw(struct key_def *key_def, struct tuple *tuple,
+				 const char *key)
+{
+	uint32_t tuple_size;
+	const char *tuple_data = tuple_data_range(tuple, &tuple_size);
+	const char *tuple_key =
+		tuple_extract_key_raw(tuple_data, tuple_data + tuple_size,
+				      key_def, MULTIKEY_NONE, NULL);
+	/*
+	 * Set zeroes next to extracted key to check if it has not gone
+	 * beyond the bounds of its memory.
+	 */
+	void *alloc = region_alloc(&fiber()->gc, 10);
+	memset(alloc, 0, 10);
+	ok(key_compare(tuple_key, HINT_NONE, key, HINT_NONE, key_def) == 0 &&
+	   mp_decode_array(&key) == mp_decode_array(&tuple_key),
+	   "Extracted key of tuple %s is %s, expected %s",
+	   tuple_str(tuple), mp_str(tuple_key), mp_str(key));
+}
+
+static void
+test_tuple_extract_key_raw_slowpath_nullable(void)
+{
+	plan(2);
+	header();
+
+	/* Create non-sequential key_defs to use slowpath implementation. */
+	struct key_def *def_nullable_end = test_key_def_new(
+		"[{%s%u%s%s}{%s%u%s%s%s%b}{%s%u%s%s%s%b}]",
+		"field", 0, "type", "unsigned",
+		"field", 2, "type", "unsigned", "is_nullable", 1,
+		"field", 5, "type", "unsigned", "is_nullable", 1);
+	struct key_def *def_nullable_begin = test_key_def_new(
+		"[{%s%u%s%s%s%b}{%s%u%s%s%s%b}{%s%u%s%s}]",
+		"field", 2, "type", "unsigned", "is_nullable", 1,
+		"field", 5, "type", "unsigned", "is_nullable", 1,
+		"field", 0, "type", "unsigned");
+	fail_if(def_nullable_end == NULL || def_nullable_begin == NULL);
+	struct tuple *tuple = test_tuple_new("[%u]", 10);
+	fail_if(tuple == NULL);
+	char *key_null_end = test_key_new("[%uNILNIL]", 10);
+	char *key_null_begin = test_key_new("[NILNIL%u]", 10);
+	fail_if(key_null_end == NULL || key_null_begin == NULL);
+
+	test_check_tuple_extract_key_raw(def_nullable_end, tuple,
+					 key_null_end);
+	test_check_tuple_extract_key_raw(def_nullable_begin, tuple,
+					 key_null_begin);
+
+	key_def_delete(def_nullable_end);
+	key_def_delete(def_nullable_begin);
+	tuple_delete(tuple);
+	free(key_null_end);
+	free(key_null_begin);
+	fiber_gc();
+
+	footer();
+	check_plan();
+}
+
 static int
 test_main(void)
 {
-	plan(1);
+	plan(2);
 	header();
 
 	test_func_compare_with_key();
+	test_tuple_extract_key_raw_slowpath_nullable();
 
 	footer();
 	return check_plan();
