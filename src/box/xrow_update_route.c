@@ -209,12 +209,13 @@ xrow_update_route_branch(struct xrow_update_field *field,
 		}
 		if (json_token_cmp(&old_token, &new_token) != 0)
 			break;
+		const char *next_pos = parent;
 		switch(new_token.type) {
 		case JSON_TOKEN_NUM:
-			rc = tuple_field_go_to_index(&parent, new_token.num);
+			rc = tuple_field_go_to_index(&next_pos, new_token.num);
 			break;
 		case JSON_TOKEN_STR:
-			rc = tuple_field_go_to_key(&parent, new_token.str,
+			rc = tuple_field_go_to_key(&next_pos, new_token.str,
 						   new_token.len);
 			break;
 		default:
@@ -229,11 +230,20 @@ xrow_update_route_branch(struct xrow_update_field *field,
 			xrow_update_err_double(new_op);
 			return NULL;
 		}
-		/*
-		 * Must always find a field, because the old
-		 * token already went that path.
-		 */
-		assert(rc == 0);
+		if (rc != 0) {
+			/*
+			 * Could fail only if the target location is inserted by
+			 * the bar operation as new. Then it won't be found in
+			 * the original parent container. In that case simply
+			 * branch right here so as the newly inserted field and
+			 * existing fields would be all visible together and the
+			 * branching could proceed.
+			 */
+			assert(field->type == XUPDATE_BAR);
+			assert(field->bar.op->opcode == '!');
+			break;
+		}
+		parent = next_pos;
 	} while (true);
 	enum mp_type type = mp_typeof(*parent);
 	/*
