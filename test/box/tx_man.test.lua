@@ -596,6 +596,23 @@ check()
 tx1:commit()
 tx2:commit()
 
+-- Check that rolled back story is accounted correctly.
+s:truncate()
+tx1:begin()
+tx1('s:replace{0, 0}')
+tx1:rollback()
+s:count()
+
+-- Check that invisible read-view story is accounted correctly.
+s:truncate()
+s:insert{0, 0}
+tx1:begin()
+tx1('s:select{0}')
+s:replace{0, 1}
+tx1:commit()
+s:delete{0}
+s:count()
+
 -- Check different orders
 s:truncate()
 tx1:begin()
@@ -1241,4 +1258,3 @@ tx1:commit()
 test_run:cmd("switch default")
 test_run:cmd("stop server tx_man")
 test_run:cmd("cleanup server tx_man")
-
