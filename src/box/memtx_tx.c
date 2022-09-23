@@ -788,7 +788,6 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple,
 	story->tuple_is_retained = false;
 	if (!tuple_is_referenced_to_pk)
 		memtx_tx_story_track_retained_tuple(story);
-	story->space = space;
 	story->index_count = index_count;
 	story->add_stmt = NULL;
 	story->add_psn = 0;
@@ -1022,8 +1021,8 @@ memtx_tx_story_link_top(struct memtx_story *new_top,
 	memtx_tx_story_link_top_light(new_top, old_top, idx);
 
 	/* Make the change in index. */
-	struct index *index = new_top->space->index[idx];
-	assert(old_top->link[idx].in_index == index);
+	struct index *index = old_top->link[idx].in_index;
+	assert(index != NULL);
 	assert(new_top->link[idx].in_index == NULL);
 	struct tuple *removed, *unused;
 	if (index_replace(index, old_top->tuple, new_top->tuple,
@@ -2097,8 +2096,6 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 	memtx_tx_history_remove_story_del_stmts(story);
 	for (uint32_t i = 0; i < story->index_count; i++)
 		memtx_tx_story_unlink_both(story, i);
-	/* The story is no more allowed to change indexes. */
-	stmt->add_story->space = NULL;
 	memtx_tx_story_unlink_added_by(story, stmt);
 }
 
@@ -2504,17 +2501,14 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
 	uint32_t res = 0;
 	struct memtx_story *story;
 	rlist_foreach_entry(story, &space->memtx_stories, in_space_stories) {
-		if (story->space == NULL) {
-			/* The story is unlinked. */
-			continue;
-		}
-		assert(story->space == space);
 		assert(index->dense_id < story->index_count);
 		struct memtx_story_link *link = &story->link[index->dense_id];
-		if (link->newer_story != NULL) {
-			/* The story is in chain, but not at top. */
+		/*
+		 * A history chain is represented by the top story, which is
+		 * stored in index.
+		 */
+		if (link->in_index == NULL)
 			continue;
-		}
 
 		struct tuple *visible = NULL;
 		bool is_prepared_ok = detect_whether_prepared_ok(txn);

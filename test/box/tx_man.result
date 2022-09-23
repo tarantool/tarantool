@@ -1914,6 +1914,60 @@ tx2:commit()
  | - - {'error': 'Transaction has been aborted by conflict'}
  | ...
 
+-- Check that rolled back story is accounted correctly.
+s:truncate()
+ | ---
+ | ...
+tx1:begin()
+ | ---
+ | - 
+ | ...
+tx1('s:replace{0, 0}')
+ | ---
+ | - - [0, 0]
+ | ...
+tx1:rollback()
+ | ---
+ | - 
+ | ...
+s:count()
+ | ---
+ | - 0
+ | ...
+
+-- Check that invisible read-view story is accounted correctly.
+s:truncate()
+ | ---
+ | ...
+s:insert{0, 0}
+ | ---
+ | - [0, 0]
+ | ...
+tx1:begin()
+ | ---
+ | - 
+ | ...
+tx1('s:select{0}')
+ | ---
+ | - - [[0, 0]]
+ | ...
+s:replace{0, 1}
+ | ---
+ | - [0, 1]
+ | ...
+tx1:commit()
+ | ---
+ | - 
+ | ...
+s:delete{0}
+ | ---
+ | - [0, 1]
+ | ...
+s:count()
+ | ---
+ | - 0
+ | ...
+
 -- Check different orders
 s:truncate()
  | ---
@@ -3832,4 +3886,3 @@ test_run:cmd("cleanup server tx_man")
  | ---
  | - true
  | ...
-
