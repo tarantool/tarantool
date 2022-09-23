@@ -35,6 +35,8 @@ g.before_all(function(cg)
     cg.cluster:start()
 
     cg.main:exec(function()
+        local t = require('luatest')
+
         box.ctl.promote()
         box.ctl.wait_rw()
         local s = box.schema.space.create('sync', {is_sync = true})
@@ -42,7 +44,7 @@ g.before_all(function(cg)
         s = box.schema.space.create('async')
         s:create_index('pk')
         -- Check the test correctness.
-        assert(box.info.id == 1)
+        t.assert_equals(box.info.id, 1)
     end)
 end)
 
@@ -209,7 +211,7 @@ local function fill_queue_and_write(server)
 end
 
 local function perform_rollback(server)
-    assert(server:exec(function() return box.info.synchro.queue.len end) > 0)
+    t.assert_gt(server:exec(function() return box.info.synchro.queue.len end), 0)
     server:exec(function() box.cfg{replication_synchro_timeout = 0.01} end)
     t.helpers.retrying({delay = 0.1}, server.exec, server, function()
         require('luatest').assert_equals(box.info.synchro.queue.len, 0,

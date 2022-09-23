@@ -102,7 +102,7 @@ TestConsole.__index.connect = function(self)
         -- write console fiber exit message
         self.och:put(true)
     end)
-    assert(on_start:get(3))
+    t.assert(on_start:get(3))
     if self.flavour.connect then
         self.flavour:connect(self)
     end
@@ -110,7 +110,7 @@ end
 
 TestConsole.__index.send = function(self, input)
     self.ich:put(input)
-    return assert(self.och:get(3))
+    return t.assert(self.och:get(3))
 end
 
 TestConsole.__index.disconnect = function(self)
@@ -119,7 +119,7 @@ TestConsole.__index.disconnect = function(self)
     end
     self.ich:close()
     -- read console fiber exit message
-    assert(self.och:get(3))
+    t.assert(self.och:get(3))
     self.och:close()
     self.ich = nil
     self.och = nil

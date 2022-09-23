@@ -65,10 +65,12 @@ g.test_split_vote = function(g)
     -- Wait for the votes to actually happen.
     t.helpers.retrying({timeout = wait_timeout}, function()
         local func = function()
-            return box.info.election.vote == box.info.id
+            local t = require('luatest')
+
+            t.assert_equals(box.info.election.vote, box.info.id)
         end
-        assert(g.node1:exec(func))
-        assert(g.node2:exec(func))
+        g.node1:exec(func)
+        g.node2:exec(func)
     end)
 
     -- Now let the nodes notice the split vote.
@@ -81,7 +83,7 @@ g.test_split_vote = function(g)
 
     t.helpers.retrying({timeout = wait_timeout}, function()
         local msg = 'split vote is discovered'
-        assert(g.node1:grep_log(msg) or g.node2:grep_log(msg))
+        t.assert(g.node1:grep_log(msg) or g.node2:grep_log(msg))
     end)
 
     -- Ensure a leader is eventually elected. Nothing is broken for good.
