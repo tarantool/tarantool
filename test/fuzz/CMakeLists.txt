@@ -93,6 +93,27 @@ create_fuzz_test(PREFIX mp_datetime
                  LIBRARIES core fuzzer_config
 )
 
+set(FUZZ_TEST_TARGETS ${FUZZ_TEST_TARGETS} lua_loadbuffer_fuzzer PARENT_SCOPE)
+
+# External dependencies
+include(ProtobufMutator)
+
+if(ENABLE_ASAN)
+    add_subdirectory(lua_fuzzer)
+else()
+    message(WARNING "LPM-based fuzzers are disabled without ASAN")
+endif()
+
+set(fuzzing_binaries csv_fuzzer
+                     datetime_parse_full_fuzzer
+                     datetime_strptime_fuzzer
+                     http_parser_fuzzer
+                     lua_fuzzer
+                     mp_datetime_fuzzer
+                     swim_proto_member_fuzzer
+                     swim_proto_meta_fuzzer
+                     uri_fuzzer)
+
 add_custom_target(fuzzers
                   DEPENDS ${FUZZ_TEST_TARGETS}
                   COMMENT "Build fuzzers")

@@ -1,0 +1,402 @@
+/*
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright 2022, Tarantool AUTHORS, please see AUTHORS file.
+ */
+
+/*
+ * Grammar is for Lua 5.1.
+ * Comments around message definitions are in eBNF notation.
+ * Strings defined using a long format enclosed by long brackets are NIY.
+ */
+syntax = "proto2";
+package lua_grammar;
+
+/* block ::= chunk */
+message Block {
+    required Chunk chunk = 1;
+}
+
+/*
+ * chunk ::= {stat [`;`]} [laststat [`;`]]
+ * Semicolon encapsulated in Statement and LastStatement.
+ */
+message Chunk {
+    repeated Statement stat = 1;
+    optional LastStatement laststat = 2;
+}
+
+/*
+ * stat ::= assignmentlist |
+ *         functioncall |
+ *         doblock |
+ *         whilecycle |
+ *         repeatcycle |
+ *         ifstat |
+ *         forcyclename |
+ *         forcyclelist |
+ *         function |
+ *         localfunc |
+ *         localnames
+ */
+message Statement {
+    oneof stat_oneof {
+        AssignmentList list = 1;
+        FunctionCall call = 2;
+        DoBlock block = 3;
+        WhileCycle whilecycle = 4;
+        RepeatCycle repeatcycle = 5;
+        IfStatement ifstat = 6;
+        ForCycleName forcyclename = 7;
+        ForCycleList forcyclelist = 8;
+        Function func = 9;
+        LocalFunc localfunc = 10;
+        LocalNames localnames = 11;
+    }
+    optional bool semicolon = 12;
+}
+
+/* assignmentlist ::= varlist `=` explist */
+message AssignmentList {
+    message VariableList {
+        required Variable var = 1;
+        repeated Variable vars = 2;
+    }
+
+    required VariableList varlist = 1;
+    required ExpressionList explist = 2;
+}
+
+/* functioncall ::= prefixexp args | prefixexp `:` Name args */
+message FunctionCall {
+    /* args ::=  `(` [explist] `)` | tableconstructor | String */
+    message Args {
+        oneof args_oneof {
+            OptionalExpressionList explist = 1;
+            TableConstructor tableconstructor = 2;
+            string str = 3;
+        }
+    }
+
+    /* prefixexp args */
+    message PrefixArgs {
+        required PrefixExpression prefixexp = 1;
+        required Args args = 2;
+    }
+
+    /* prefixexp `:` Name args */
+    message PrefixNamedArgs {
+        required PrefixExpression prefixexp = 1;
+        required Name name = 2;
+        required Args args = 3;
+    }
+
+    oneof call_oneof {
+        PrefixArgs prefArgs = 1;
+        PrefixNamedArgs namedArgs = 2;
+    }
+}
+
+/* doblock ::= `do` block `end` */
+message DoBlock {
+    required Block block = 1;
+}
+
+/* whilecycle ::= `while` exp `do` block `end` */
+message WhileCycle {
+    required Expression condition = 1;
+    required DoBlock doblock = 2;
+}
+
+/* repeatcycle ::= `repeat` block `until` exp */
+message RepeatCycle {
+    required Block block = 1;
+    required Expression condition = 2;
+}
+
+/*
+ * ifstat ::= `if` exp `then` block {`elseif` exp `then` block}
+ *              [`else` block] `end`
+ */
+message IfStatement {
+    message ElseIfBlock {
+        required Expression condition = 1;
+        required Block block = 2;
+    }
+
+    required Expression condition = 1;
+    required Block first = 2;
+    repeated ElseIfBlock clauses = 3;
+    optional Block last = 4;
+}
+
+/* forcyclename ::= `for` Name `=` exp `,` exp [`,` exp] doblock */
+message ForCycleName {
+    required Name name = 1;
+    required Expression startexp = 2;
+    required Expression stopexp = 3;
+    optional Expression stepexp = 4;
+    required DoBlock doblock = 5;
+}
+
+/* forcyclelist ::= `for` namelist `in` explist doblock */
+message ForCycleList {
+    required NameList names = 1;
+    required ExpressionList expressions = 2;
+    required DoBlock doblock = 3;
+}
+
+/* function ::= `function` funcname funcbody */
+message Function {
+    /* funcname ::= Name {`.` Name} [`:` Name] */
+    message FuncName {
+        required Name firstname = 1;
+        repeated Name names = 2;
+        optional Name lastname = 3;
+    }
+
+    required FuncName name = 1;
+    required FuncBody body = 2;
+}
+
+/* funcbody ::= `(` [parlist] `)` block `end` */
+message FuncBody {
+    /* namelistwithellipsis ::= namelist [`,` `...`] */
+    message NameListWithEllipsis {
+        required NameList namelist = 1;
+        optional string ellipsis = 2;
+    }
+
+    /* parlist ::= namelistwithellipsis | `...` */
+    message ParList {
+        oneof parlist_oneof {
+            NameListWithEllipsis namelist = 1;
+            string ellipsis = 2;
+        }
+    }
+
+    optional ParList parlist = 1;
+    required Block block = 2;
+}
+
+/* namelist ::= Name {`,` Name} */
+message NameList {
+    required Name firstname = 1;
+    repeated Name names = 2;
+}
+
+/* localfunc ::= `local` `function` Name funcbody */
+message LocalFunc {
+    required Name name = 1;
+    required FuncBody funcbody = 2;
+}
+
+/* localnames ::= `local` namelist [`=` explist] */
+message LocalNames {
+    required NameList namelist = 1;
+    optional ExpressionList explist = 2;
+}
+
+/* laststat ::= `return` [explist] | `break` */
+message LastStatement {
+    message ReturnOptionalExpressionList {
+        optional ExpressionList explist = 1;
+    }
+
+    oneof last_oneof {
+        ReturnOptionalExpressionList explist = 1;
+        uint32 break = 2;
+    }
+    optional bool semicolon = 3;
+}
+
+/* explist ::= {exp `,`} exp */
+message ExpressionList {
+    repeated Expression expressions = 1;
+    required Expression explast = 2;
+}
+
+message OptionalExpressionList {
+    optional ExpressionList explist = 1;
+}
+
+/* var ::=  Name | prefixexp `[` exp `]` | prefixexp `.` Name */
+message Variable {
+    /* prefixexp `[` exp `]` */
+    message IndexWithExpression {
+        required PrefixExpression prefixexp = 1;
+        required Expression exp = 2;
+    }
+
+    /* prefixexp `.` Name */
+    message IndexWithName {
+        required PrefixExpression prefixexp = 1;
+        required string Name = 2;
+    }
+
+    oneof var_oneof {
+        Name name = 1;
+        IndexWithExpression indexexpr = 2;
+        IndexWithName indexname = 3;
+    }
+}
+
+/* prefixexp ::= var | functioncall | `(` exp `)` */
+message PrefixExpression {
+    oneof prefix_oneof {
+        Variable var = 1;
+        FunctionCall functioncall = 2;
+        Expression exp = 3;
+    }
+}
+
+/*
+ * exp ::= nil |
+ *        false |
+ *        true |
+ *        Number |
+ *        String |
+ *        `...` |
+ *        anonfunction |
+ *        prefixexp |
+ *        tableconstructor |
+ *        exp binop exp |
+ *        unop exp
+ */
+message Expression {
+    /* anonfunction ::= `function` funcbod */
+    message AnonFunc {
+        required FuncBody body = 1;
+    }
+
+    /* exp binop exp */
+    message ExpBinaryOpExp {
+        required Expression leftexp = 1;
+        required BinaryOperator binop = 2;
+        required Expression rightexp = 3;
+    }
+
+    /* unop exp */
+    message UnaryOpExp {
+        required UnaryOperator unop = 1;
+        required Expression exp = 2;
+    }
+
+    oneof expr_oneof {
+        uint32 nil = 1;
+        uint32 false = 2;
+        uint32 true = 3;
+        double number = 4;
+        string str = 5;
+        string ellipsis = 6;
+        AnonFunc function = 7;
+        PrefixExpression prefixexp = 8;
+        TableConstructor tableconstructor = 9;
+        ExpBinaryOpExp binary = 10;
+        UnaryOpExp unary = 11;
+    }
+}
+
+/* tableconstructor ::= `{` [fieldlist] `}` */
+message TableConstructor {
+    optional FieldList fieldlist = 1;
+}
+
+/* fieldlist ::= field {fieldsep field} [fieldsep] */
+message FieldList {
+    /* fieldsep field */
+    message FieldWithFieldSep {
+        required Field field = 1;
+        required FieldSep sep = 2;
+    }
+
+    required Field firstField = 1;
+    repeated FieldWithFieldSep fields = 2;
+    optional FieldSep lastSep = 3;
+}
+
+/* field ::= `[` exp `]` `=` exp | Name `=` exp | exp */
+message Field {
+    /* `[` exp `]` `=` exp */
+    message ExpressionAssignment {
+        required Expression key = 1;
+        required Expression value = 2;
+    }
+
+    /* Name `=` exp */
+    message NameAssignment {
+        required Name name = 1;
+        required Expression value = 2;
+    }
+
+    oneof field_oneof {
+        ExpressionAssignment exprassign = 1;
+        NameAssignment namedassign = 2;
+        Expression expression = 3;
+    }
+}
+
+/* fieldsep ::= `,` | `;` */
+message FieldSep {
+    oneof sep_oneof {
+        uint32 comma = 1;
+        uint32 semicolon = 2;
+    }
+}
+
+/*
+ * binop ::= `+` |
+ *          `-` |
+ *          `*` |
+ *          `/` |
+ *          `^` |
+ *          `%` |
+ *          `..` |
+ *          `<` |
+ *          `<=` |
+ *          `>` |
+ *          `>=` |
+ *          `==` |
+ *          `~=` |
+ *          `and` |
+ *          `or`
+ */
+message BinaryOperator {
+    oneof binary_oneof {
+        /* Arithmetic operators. */
+        uint32 add = 1;
+        uint32 sub = 2;
+        uint32 mult = 3;
+        uint32 div = 4;
+        uint32 exp = 5;
+        uint32 mod = 6;
+
+        /* Concatenation. */
+        uint32 concat = 7;
+
+        /* Logical operators. */
+        uint32 less = 8;
+        uint32 lessEqual = 9;
+        uint32 greater = 10;
+        uint32 greaterEqual = 11;
+        uint32 equal = 12;
+        uint32 notEqual = 13;
+        uint32 and = 14;
+        uint32 or = 15;
+    }
+}
+
+/* unop ::= `-` | `not` | `#` */
+message UnaryOperator {
+    oneof unary_oneof {
+        uint32 negate = 1;
+        uint32 not = 2;
+        uint32 length = 3;
+    }
+}
+
+/* Name ::= <correct Lua Identifier> */
+message Name {
+    required string name = 1;
+    required uint32 num = 2;
+}
