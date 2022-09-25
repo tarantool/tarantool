@@ -93,6 +93,14 @@ create_fuzz_test(PREFIX mp_datetime
                  LIBRARIES core fuzzer_config
 )
 
+include(ProtobufMutator)
+
+# UndefinedBehaviorSanitizer is not supported in LuaJIT.
+# See https://github.com/tarantool/tarantool/issues/8473
+if (NOT ENABLE_UB_SANITIZER)
+    add_subdirectory(luaL_loadbuffer)
+endif()
+
 add_custom_target(fuzzers
                   DEPENDS ${FUZZ_TEST_TARGETS}
                   COMMENT "Build fuzzers")
