@@ -1403,6 +1403,15 @@ memtx_tx_story_gc_step()
 							  MEMTX_TX_STORY_USED);
 				return;
 			}
+		} else if (i > 0 && link->newer_story->add_stmt != NULL) {
+			/*
+			 * We need to retain the story since the newer story
+			 * can get rolled back (this is maintained by delete
+			 * statement list in case of primary index).
+			 */
+			memtx_tx_story_set_status(story,
+						  MEMTX_TX_STORY_USED);
+			return;
 		}
 		if (!rlist_empty(&link->nearby_gaps)) {
 			memtx_tx_story_set_status(story,
