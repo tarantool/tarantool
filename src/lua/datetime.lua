@@ -583,6 +583,9 @@ local function datetime_new(obj)
         if hms then
             error('timestamp is not allowed if hour/min/sec provided', 2)
         end
+        if type(ts) ~= 'number' then
+            error(("bad timestamp ('number' expected, got '%s')"):format(type(ts)))
+        end
         local fraction
         s, fraction = math_modf(ts)
         -- if there are separate nsec, usec, or msec provided then
