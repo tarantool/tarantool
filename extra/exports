@@ -66,6 +66,7 @@ box_index_len
 box_index_max
 box_index_min
 box_index_random
+box_index_tuple_position
 box_insert
 box_iterator_free
 box_iterator_next
@@ -86,6 +87,7 @@ box_latch_new
 box_latch_trylock
 box_latch_unlock
 box_on_shutdown
+box_read_ffi_disable
 box_read_ffi_is_disabled
 box_region_aligned_alloc
 box_region_alloc
