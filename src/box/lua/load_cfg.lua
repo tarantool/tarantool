@@ -329,7 +329,6 @@ end
 -- load_cfg() may report an error, but box will be configured in
 -- fact.
 local dynamic_cfg = {
-    listen                  = private.cfg_set_listen,
     replication             = private.cfg_set_replication,
     log_level               = log.box_api.cfg_set_log_level,
     log_format              = log.box_api.cfg_set_log_format,
@@ -350,10 +349,6 @@ local dynamic_cfg = {
     checkpoint_wal_threshold = private.cfg_set_checkpoint_wal_threshold,
     wal_queue_max_size      = private.cfg_set_wal_queue_max_size,
     worker_pool_threads     = private.cfg_set_worker_pool_threads,
-    feedback_enabled        = ifdef_feedback_set_params,
-    feedback_crashinfo      = ifdef_feedback_set_params,
-    feedback_host           = ifdef_feedback_set_params,
-    feedback_interval       = ifdef_feedback_set_params,
     -- do nothing, affects new replicas, which query this value on start
     wal_dir_rescan_delay    = function() end,
     wal_cleanup_delay       = private.cfg_set_wal_cleanup_delay,
@@ -382,20 +377,36 @@ local dynamic_cfg = {
     wal_ext                 = private.cfg_set_wal_ext
 }
 
--- dynamically settable options, which should be reverted in case
--- there change fails.
-local dynamic_cfg_revert = {
-    listen                  = private.cfg_set_listen,
-}
-
--- Values of dynamically settable options, the revert to which cannot fail.
--- If trying to change the value of dynamically settable option fails, we
--- try to rollback to previous value of this option. If rollback is also fails
--- we rollback to the value, which contains here. This table should contain
--- such values, that rollback for them can't fails. It's necessary to prevent
--- inconsistent state.
-local default_cfg_on_revert = {
-    listen                  = nil,
+-- The modules that can apply all new options with single call. The
+-- application should be atomic, that is if it fails the module should
+-- work as before. If `cfg` is not atomic then `revert_cfg` and
+-- `revert_fallback` should be set.
+--
+-- `revert_cfg` is used to revert config to the state before failed
+-- reconfiguration. If the reverting fails too then we try to revert
+-- to "safe" value given in `revert_fallback`. "safe" in sense that
+-- reverting to it should always be successful.
+local dynamic_cfg_modules = {
+    listen = {
+        cfg = private.cfg_set_listen,
+        options = {
+            listen = true,
+        },
+        skip_at_load = true,
+        revert_cfg = private.cfg_set_listen,
+        revert_fallback = {
+            listen = nil,
+        },
+    },
+    feedback = {
+        cfg = ifdef_feedback_set_params,
+        options = {
+            feedback_enabled = true,
+            feedback_crashinfo = true,
+            feedback_host = true,
+            feedback_interval = true,
+        },
+    },
 }
 
 ifdef_feedback = nil -- luacheck: ignore
@@ -451,7 +462,6 @@ local function sort_cfg_cb(l, r)
 end
 
 local dynamic_cfg_skip_at_load = {
-    listen                  = true,
     memtx_memory            = true,
     memtx_max_tuple_size    = true,
     vinyl_memory            = true,
@@ -480,6 +490,27 @@ local dynamic_cfg_skip_at_load = {
     net_msg_max             = true,
     readahead               = true,
 }
+
+-- Options that are not part of dynamic_cfg_modules and applied individually
+-- can be considered as modules with single option. Load all these options
+-- into dynamic_cfg_modules.
+for option, api in pairs(dynamic_cfg) do
+    assert(dynamic_cfg_modules[option] == nil,
+           'name clash in dynamic_cfg_modules and dynamic_cfg')
+    dynamic_cfg_modules[option] = {
+        cfg = api,
+        options = {[option] = true},
+        skip_at_load = dynamic_cfg_skip_at_load[option],
+    }
+end
+
+local option2module_name = {}
+
+for module, info in pairs(dynamic_cfg_modules) do
+    for option in pairs(info.options) do
+        option2module_name[option] = module
+    end
+end
 
 local function convert_gb(size)
     return math.floor(size * 1024 * 1024 * 1024)
@@ -662,53 +693,122 @@ local function compare_cfg(cfg1, cfg2)
     return table.equals(cfg1, cfg2)
 end
 
+local function rollback_module(module, oldcfg, keys, values)
+    for key in pairs(keys) do
+        rawset(oldcfg, key, values[key])
+    end
+    if module.revert_cfg == nil then
+        return
+    end
+    local save_err = box.error.last()
+    local result, err = pcall(module.revert_cfg)
+    if not result then
+        for key in pairs(keys) do
+            log.error("failed to revert '%s' configuration option: %s",
+                      key, err)
+        end
+
+        for key in pairs(module.options) do
+            rawset(oldcfg, key, module.revert_fallback[key])
+        end
+        -- Setting to this special value should not fail
+        assert(pcall(module.revert_cfg))
+    end
+    box.error.set(save_err)
+end
+
+local function log_changed_options(oldcfg, keys, log_basecfg)
+    for key in pairs(keys) do
+        local val = oldcfg[key]
+        if log_basecfg == nil or
+           not compare_cfg(val, log_basecfg[key]) then
+            if log_cfg_option[key] ~= nil then
+                val = log_cfg_option[key](val)
+            end
+            log.info("set '%s' configuration option to %s",
+                     key, json.encode(val))
+        end
+    end
+end
+
+-- Call dynamic config API for all config modules/options.
+--
+-- @oldcfg is current global config used by config API
+-- @newcfg if it is not nil then first apply it to @oldcfg
+-- @log_basecfg if it is not nil then only log option that differ from
+--      this cfg
+--
+local function reconfig_modules(module_keys, oldcfg, newcfg, log_basecfg)
+    local ordered = {}
+    for name in pairs(module_keys) do
+        table.insert(ordered, name)
+    end
+    table.sort(ordered, sort_cfg_cb)
+
+    for _, name in pairs(ordered) do
+        local oldvals
+        local keys = module_keys[name]
+        if newcfg ~= nil then
+            oldvals = {}
+            for key in pairs(keys) do
+                oldvals[key] = oldcfg[key]
+                rawset(oldcfg, key, newcfg[key])
+            end
+        end
+        local module = dynamic_cfg_modules[name]
+        local result = pcall(module.cfg)
+        if not result and oldvals ~= nil then
+            rollback_module(module, oldcfg, keys, oldvals)
+            return box.error()
+        end
+
+        log_changed_options(oldcfg, keys, log_basecfg)
+    end
+end
+
 local function reload_cfg(oldcfg, cfg)
     cfg = upgrade_cfg(cfg, translate_cfg)
     local newcfg = prepare_cfg(cfg, default_cfg, template_cfg,
                                module_cfg, modify_cfg)
-    local ordered_cfg = {}
+
+    local module_keys = {}
     -- iterate over original table because prepare_cfg() may store NILs
-    for key, val in pairs(cfg) do
-        if dynamic_cfg[key] == nil and oldcfg[key] ~= val then
-            box.error(box.error.RELOAD_CFG, key);
-        end
-        table.insert(ordered_cfg, key)
-    end
-    table.sort(ordered_cfg, sort_cfg_cb)
-    for _, key in pairs(ordered_cfg) do
-        local val = newcfg[key]
-        local oldval = oldcfg[key]
-        if not compare_cfg(val, oldval) then
-            rawset(oldcfg, key, val)
-            local result, err = pcall(dynamic_cfg[key])
-            if not result then
-                local save_err = err
-                rawset(oldcfg, key, oldval) -- revert the old value
-                if dynamic_cfg_revert[key] then
-                    result, err = pcall(dynamic_cfg_revert[key])
-                    if not result then
-                        log.error("failed to revert '%s' " ..
-                                  "configuration option: %s",
-                                  key, err)
-                        -- We set the value from special table, rollback to
-                        -- which cannot fail.
-                        rawset(oldcfg, key, default_cfg_on_revert[key])
-                        assert(pcall(dynamic_cfg_revert[key]))
-                    end
-                end
-                box.error.set(save_err)
-                return box.error() -- re-throw
+    for key in pairs(cfg) do
+        if not compare_cfg(oldcfg[key], newcfg[key]) then
+            local name = option2module_name[key]
+            if name == nil then
+                box.error(box.error.RELOAD_CFG, key);
             end
-            if log_cfg_option[key] ~= nil then
-                val = log_cfg_option[key](val)
+            if module_keys[name] == nil then
+                module_keys[name] = {}
             end
-            log.info("set '%s' configuration option to %s", key,
-                json.encode(val))
+            module_keys[name][key] = true
         end
     end
+
+    reconfig_modules(module_keys, oldcfg, newcfg, nil)
+
     if type(box.on_reload_configuration) == 'function' then
         box.on_reload_configuration()
     end
+end
+
+local function load_cfg_apply_dynamic(oldcfg)
+    local module_keys = {}
+    for name, module in pairs(dynamic_cfg_modules) do
+        if module.skip_at_load then
+            log_changed_options(oldcfg, module.options, default_cfg)
+        else
+            for key in pairs(module.options) do
+                if oldcfg[key] ~= nil then
+                    module_keys[name] = module.options
+                    break
+                end
+            end
+        end
+    end
+
+    reconfig_modules(module_keys, oldcfg, nil, default_cfg)
 end
 
 local box_cfg_guard_whitelist = {
@@ -832,20 +932,13 @@ local function load_cfg(cfg)
     -- This block does not raise an error: all necessary checks
     -- already performed in private.cfg_check(). See <dynamic_cfg>
     -- comment.
-    for key, fun in pairs(dynamic_cfg) do
-        local val = cfg[key]
-        if val ~= nil then
-            if not dynamic_cfg_skip_at_load[key] then
-                fun()
-            end
-            if not compare_cfg(val, default_cfg[key]) then
-                if log_cfg_option[key] ~= nil then
-                    val = log_cfg_option[key](val)
-                end
-                log.info("set '%s' configuration option to %s", key, json.encode(val))
-            end
-        end
-    end
+    --
+    -- FIXME we have issues here:
+    -- 1. private.cfg_check does not make all nessesery checks now
+    --    (it does not check invalid config for feedback_host for example).
+    -- 2. Configuring options can throw errors but we don't panic here
+    --    and thus end up with not complete configuration.
+    load_cfg_apply_dynamic(cfg)
 
     if not box.cfg.read_only and not box.cfg.replication and
        not box.error.injection.get('ERRINJ_AUTO_UPGRADE') then
