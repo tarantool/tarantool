@@ -332,12 +332,22 @@ box_promote_qsync(void);
 int
 box_wait_linearization_point(double timeout);
 
-/* box_select is private and used only by FFI */
-API_EXPORT int
+/**
+ * Select data, satisfying filters (key and iterator), and dump it to port.
+ * If packed_pos is not NULL and *packed_pos is not NULL, selection begins
+ * right after tuple with position, described by this argument.
+ * If update_pos is true, packed_pos and packed_pos_end are updated to
+ * position of last selected tuple. Returned position is allocated
+ * on the fiber region.
+ * Pre-requesites: if update_pos is true, packed_pos and packed_pos_end must
+ * not be NULL.
+ */
+int
 box_select(uint32_t space_id, uint32_t index_id,
 	   int iterator, uint32_t offset, uint32_t limit,
 	   const char *key, const char *key_end,
-	   struct port *port);
+	   const char **packed_pos, const char **packed_pos_end,
+	   bool update_pos, struct port *port);
 
 /** \cond public */
 

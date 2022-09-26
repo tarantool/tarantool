@@ -253,6 +253,16 @@ box_tuple_extract_key(box_tuple_t *tuple, uint32_t space_id,
 /** \endcond public */
 
 /**
+ * Get packed position of tuple in index to pass it to box_select
+ * (multikey and func indexes are not supported). Returned position
+ * is allocated on the fiber region.
+ */
+int
+box_index_tuple_position(uint32_t space_id, uint32_t index_id,
+			 const char *tuple, const char *tuple_end,
+			 const char **packed_pos, const char **packed_pos_end);
+
+/**
  * Index statistics (index:stat())
  *
  * \param space_id space identifier
@@ -444,6 +454,16 @@ key_validate(const struct index_def *index_def, enum iterator_type type,
 int
 exact_key_validate(struct key_def *key_def, const char *key,
 		   uint32_t part_count);
+
+/**
+ * Check that the supplied key is valid for representing iterator
+ * position (i.e. the key must be fully specified, but nulls are allowed).
+ * @retval 0  The key is valid.
+ * @retval -1 The key is invalid.
+ */
+int
+exact_key_validate_nullable(struct key_def *key_def, const char *key,
+			    uint32_t part_count);
 
 /**
  * The manner in which replace in a unique index must treat

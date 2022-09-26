@@ -2088,7 +2088,7 @@ tx_process_select(struct cmsg *m)
 	tx_inject_delay();
 	rc = box_select(req->space_id, req->index_id,
 			req->iterator, req->offset, req->limit,
-			req->key, req->key_end, &port);
+			req->key, req->key_end, NULL, NULL, false, &port);
 	if (rc < 0)
 		goto error;
 

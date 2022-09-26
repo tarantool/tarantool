@@ -153,6 +153,20 @@ exact_key_validate(struct key_def *key_def, const char *key,
 	return key_validate_parts(key_def, key, part_count, false, &key_end);
 }
 
+int
+exact_key_validate_nullable(struct key_def *key_def, const char *key,
+			    uint32_t part_count)
+{
+	assert(key != NULL || part_count == 0);
+	if (key_def->part_count != part_count) {
+		diag_set(ClientError, ER_EXACT_MATCH, key_def->part_count,
+			 part_count);
+		return -1;
+	}
+	const char *key_end;
+	return key_validate_parts(key_def, key, part_count, true, &key_end);
+}
+
 char *
 box_tuple_extract_key(box_tuple_t *tuple, uint32_t space_id, uint32_t index_id,
 		      uint32_t *key_size)
@@ -179,6 +193,50 @@ check_index(uint32_t space_id, uint32_t index_id,
 	*index = index_find(*space, index_id);
 	if (*index == NULL)
 		return -1;
+	return 0;
+}
+
+int
+box_index_tuple_position(uint32_t space_id, uint32_t index_id,
+			 const char *tuple, const char *tuple_end,
+			 const char **packed_pos, const char **packed_pos_end)
+{
+	struct space *space;
+	struct index *index;
+	if (check_index(space_id, index_id, &space, &index) != 0)
+		return -1;
+	if (index->def->key_def->for_func_index) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Functional index",
+			 "position by tuple");
+		return -1;
+	}
+	if (index->def->key_def->is_multikey) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Multikey index",
+			 "position by tuple");
+		return -1;
+	}
+	if (tuple_validate_raw(space->format, tuple) != 0)
+		return -1;
+	struct key_def *cmp_def = index->def->cmp_def;
+	uint32_t key_size;
+	const char *key = tuple_extract_key_raw(tuple, tuple_end, cmp_def,
+						MULTIKEY_NONE, &key_size);
+	if (key == NULL)
+		return -1;
+	const char *key_end = key + key_size;
+	mp_decode_array(&key);
+	uint32_t part_count = cmp_def->part_count;
+	uint32_t pack_size = iterator_position_pack_size(key, key_end,
+							 part_count);
+	char *buf = (char *)region_alloc(&fiber()->gc, pack_size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, pack_size, "region_alloc",
+			 "box_index_tuple_position");
+		return -1;
+	}
+	iterator_position_pack(key, key_end, part_count, buf, buf + pack_size);
+	*packed_pos = buf;
+	*packed_pos_end = buf + pack_size;
 	return 0;
 }
 

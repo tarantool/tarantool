@@ -66,6 +66,10 @@ ffi.cdef[[
                     const char *key, const char *key_end);
     /** \endcond public */
     /** \cond public */
+    size_t
+    box_region_used(void);
+    void
+    box_region_truncate(size_t size);
     bool
     box_txn();
     int64_t
@@ -113,10 +117,16 @@ ffi.cdef[[
     port_destroy(struct port *port);
 
     int
+    box_index_tuple_position(uint32_t space_id, uint32_t index_id,
+                             const char *tuple, const char *tuple_end,
+                             const char **pos, const char **pos_end);
+
+    int
     box_select(uint32_t space_id, uint32_t index_id,
                int iterator, uint32_t offset, uint32_t limit,
                const char *key, const char *key_end,
-               struct port *port);
+               const char **after, const char **after_end,
+               bool update_pos, struct port *port);
 
     void password_prepare(const char *password, int len,
                           char *out, int out_len);
@@ -2405,6 +2415,8 @@ local function check_select_opts(opts, key_is_nil)
     local limit = 4294967295
     local iterator = check_iterator_type(opts, key_is_nil)
     local fullscan = false
+    local after = box.NULL
+    local fetch_pos = false
     if opts ~= nil and type(opts) == "table" then
         if opts.offset ~= nil then
             offset = opts.offset
@@ -2415,8 +2427,20 @@ local function check_select_opts(opts, key_is_nil)
         if opts.fullscan ~= nil then
             fullscan = opts.fullscan
         end
+        if opts.after ~= nil then
+            after = opts.after
+            if after == "" then
+                after = box.NULL
+            elseif type(after) ~= "string" and type(after) ~= "table" and
+                    not is_tuple(after) then
+                box.error(box.error.INVALID_POSITION)
+            end
+        end
+        if opts.fetch_pos ~= nil then
+            fetch_pos = opts.fetch_pos
+        end
     end
-    return iterator, offset, limit, fullscan
+    return iterator, offset, limit, fullscan, after, fetch_pos
 end
 
 box.internal.check_select_opts = check_select_opts -- for net.box
@@ -2435,20 +2459,55 @@ local function check_select_safety(index, key_is_nil, itype, limit, offset,
     end
 end
 
+-- pointer to iterator position used by select() and tuple_pos()
+local iterator_pos = ffi.new('const char *[1]')
+local iterator_pos_end = ffi.new('const char *[1]')
+
+-- Argument pos must be a string, table or tuple, returns two C pointers:
+-- begin and end of position.
+local function normalize_position(index, pos, ret_pos, ret_pos_end)
+    if pos == nil then
+        ret_pos[0] = nil
+        ret_pos_end[0] = nil
+    elseif type(pos) == "string" then
+        ret_pos[0] = pos
+        ret_pos_end[0] = ret_pos[0] + #pos
+    else
+        local tuple_ibuf = cord_ibuf_take()
+        local tuple, tuple_end = tuple_encode(tuple_ibuf, pos)
+        local nok = builtin.box_index_tuple_position(index.space_id, index.id,
+                                                     tuple, tuple_end,
+                                                     ret_pos, ret_pos_end) ~= 0
+        cord_ibuf_put(tuple_ibuf)
+        if nok then
+            box.error()
+        end
+    end
+end
+
 base_index_mt.select_ffi = function(index, key, opts)
     if builtin.box_read_ffi_is_disabled then
         return index:select_luac(key, opts)
     end
+    local nok
     check_index_arg(index, 'select')
     local ibuf = cord_ibuf_take()
     local key, key_end = tuple_encode(ibuf, key)
     local key_is_nil = key + 1 >= key_end
-    local iterator, offset, limit, fullscan =
+    local new_position = nil
+    local iterator, offset, limit, fullscan, after, fetch_pos =
         check_select_opts(opts, key_is_nil)
     check_select_safety(index, key_is_nil, iterator, limit, offset, fullscan)
-
-    local nok = builtin.box_select(index.space_id, index.id, iterator, offset,
-                                   limit, key, key_end, port) ~= 0
+    local region_svp = builtin.box_region_used()
+    normalize_position(index, after, iterator_pos, iterator_pos_end)
+    nok = builtin.box_select(index.space_id, index.id, iterator, offset, limit,
+                             key, key_end, iterator_pos, iterator_pos_end,
+                             fetch_pos, port) ~= 0
+    if not nok and fetch_pos and iterator_pos[0] ~= nil then
+        new_position = ffi.string(iterator_pos[0],
+                                  iterator_pos_end[0] - iterator_pos[0])
+    end
+    builtin.box_region_truncate(region_svp)
     cord_ibuf_put(ibuf)
     if nok then
         return box.error()
@@ -2461,6 +2520,9 @@ base_index_mt.select_ffi = function(index, key, opts)
         entry = entry.next
     end
     builtin.port_destroy(port);
+    if fetch_pos then
+        return ret, new_position
+    end
     return ret
 end
 
@@ -2468,11 +2530,11 @@ base_index_mt.select_luac = function(index, key, opts)
     check_index_arg(index, 'select')
     local key = keify(key)
     local key_is_nil = #key == 0
-    local iterator, offset, limit, fullscan =
+    local iterator, offset, limit, fullscan, after, fetch_pos =
         check_select_opts(opts, key_is_nil)
     check_select_safety(index, key_is_nil, iterator, limit, offset, fullscan)
     return internal.select(index.space_id, index.id, iterator,
-        offset, limit, key)
+        offset, limit, key, after, fetch_pos)
 end
 
 base_index_mt.update = function(index, key, ops)
@@ -2506,6 +2568,26 @@ base_index_mt.alter = function(index, options)
         box.error(box.error.PROC_LUA, "Usage: index:alter{opts}")
     end
     return box.schema.index.alter(index.space_id, index.id, options)
+end
+base_index_mt.tuple_pos = function(index, tuple)
+    check_index_arg(index, 'tuple_pos')
+    if not tuple then
+        box.error(box.error.PROC_LUA, "Usage index:tuple_pos(tuple)")
+    end
+    local region_svp = builtin.box_region_used()
+    local ibuf = cord_ibuf_take()
+    local data, data_end = tuple_encode(ibuf, tuple)
+    local nok = builtin.box_index_tuple_position(index.space_id, index.id,
+                                                 data, data_end, iterator_pos,
+                                                 iterator_pos_end) ~= 0
+    cord_ibuf_put(ibuf)
+    if nok then
+        box.error()
+    end
+    local ret = ffi.string(iterator_pos[0],
+                           iterator_pos_end[0] - iterator_pos[0])
+    builtin.box_region_truncate(region_svp)
+    return ret
 end
 
 local read_ops = {'select', 'get', 'min', 'max', 'count', 'random', 'pairs'}

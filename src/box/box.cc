@@ -2708,13 +2708,15 @@ box_process1(struct request *request, box_tuple_t **result)
 	return box_process_rw(request, space, result);
 }
 
-API_EXPORT int
+int
 box_select(uint32_t space_id, uint32_t index_id,
 	   int iterator, uint32_t offset, uint32_t limit,
 	   const char *key, const char *key_end,
-	   struct port *port)
+	   const char **packed_pos, const char **packed_pos_end,
+	   bool update_pos, struct port *port)
 {
 	(void)key_end;
+	assert(!update_pos || (packed_pos != NULL && packed_pos_end != NULL));
 
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 
@@ -2739,6 +2741,20 @@ box_select(uint32_t space_id, uint32_t index_id,
 	uint32_t part_count = key ? mp_decode_array(&key) : 0;
 	if (key_validate(index->def, type, key, part_count))
 		return -1;
+	const char *pos, *pos_end;
+	if (packed_pos != NULL && *packed_pos != NULL) {
+		uint32_t pos_part_count;
+		if (iterator_position_unpack(*packed_pos, *packed_pos_end,
+					     &pos, &pos_end,
+					     &pos_part_count) != 0)
+			return -1;
+		if (exact_key_validate_nullable(index->def->cmp_def, pos,
+						pos_part_count) != 0)
+			return -1;
+	} else {
+		pos = NULL;
+		pos_end = NULL;
+	}
 
 	box_run_on_select(space, index, type, key_array);
 
@@ -2752,8 +2768,8 @@ box_select(uint32_t space_id, uint32_t index_id,
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
 		return -1;
 
-	struct iterator *it = index_create_iterator(index, type,
-						    key, part_count);
+	struct iterator *it = index_create_iterator_after(index, type, key,
+							  part_count, pos);
 	if (it == NULL) {
 		txn_rollback_stmt(txn);
 		return -1;
@@ -2787,15 +2803,42 @@ box_select(uint32_t space_id, uint32_t index_id,
 		 */
 		space = iterator_space(it);
 	}
-	iterator_delete(it);
 
 	if (rc != 0) {
-		port_destroy(port);
 		txn_rollback_stmt(txn);
-		return -1;
+		goto fail;
 	}
 	txn_commit_ro_stmt(txn, &svp);
+	if (update_pos) {
+		uint32_t pos_size;
+		if (iterator_position(it, &pos, &pos_size) != 0)
+			goto fail;
+		if (pos != NULL) {
+			pos_end = pos + pos_size;
+			uint32_t part_count = index->def->cmp_def->part_count;
+			uint32_t pack_size =
+				iterator_position_pack_size(pos, pos_end,
+							    part_count);
+			char *new_packed_pos =
+				(char *)region_alloc(&fiber()->gc, pack_size);
+			if (new_packed_pos == NULL)
+				goto fail;
+			iterator_position_pack(pos, pos_end, part_count,
+					       new_packed_pos,
+					       new_packed_pos + pack_size);
+			*packed_pos = new_packed_pos;
+			*packed_pos_end = new_packed_pos + pack_size;
+		} else {
+			*packed_pos = NULL;
+			*packed_pos_end = NULL;
+		}
+	}
+	iterator_delete(it);
 	return 0;
+fail:
+	iterator_delete(it);
+	port_destroy(port);
+	return -1;
 }
 
 API_EXPORT int

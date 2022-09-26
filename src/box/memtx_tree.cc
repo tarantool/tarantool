@@ -265,6 +265,7 @@ struct tree_iterator {
 	 */
 	memtx_tree_iterator_t<USE_HINT> tree_iterator;
 	enum iterator_type type;
+	struct memtx_tree_key_data<USE_HINT> after_data;
 	struct memtx_tree_key_data<USE_HINT> key_data;
 	/**
 	 * Data that was fetched last, needed to make iterators stable.
@@ -658,23 +659,36 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	struct tree_iterator<USE_HINT> *it = get_tree_iterator<USE_HINT>(iterator);
 	iterator->next_internal = exhausted_iterator_next;
 	memtx_tree_t<USE_HINT> *tree = &index->tree;
-	enum iterator_type type = it->type;
 	struct txn *txn = in_txn();
 	struct space *space = space_by_id(iterator->space_id);
 	assert(space != NULL || iterator->space_id == 0);
 	struct index *idx = iterator->index;
 	struct key_def *cmp_def = index->base.def->cmp_def;
+	struct memtx_tree_key_data<USE_HINT> start_data =
+		it->after_data.key != NULL ? it->after_data : it->key_data;
+	enum iterator_type type = it->type;
+	/*
+	 * Since iteration with equality iterators returns first found tuple,
+	 * we need a special flag for EQ and REQ if we want to start iteration
+	 * after specified key (this flag will affect the choice between
+	 * lower bound and upper bound for the above iterators).
+	 * As for range iterators with equality, we can simply change them
+	 * to their equivalents with inequality.
+	 */
+	bool skip_equal_tuple = it->after_data.key != NULL;
+	if (skip_equal_tuple && type != ITER_EQ && type != ITER_REQ)
+		type = iterator_type_is_reverse(type) ? ITER_LT : ITER_GT;
 	/*
 	 * The key is full - all parts a present. If key if full, EQ and REQ
 	 * queries can return no more than one tuple.
 	 */
-	bool key_is_full = it->key_data.part_count == cmp_def->part_count;
+	bool key_is_full = start_data.part_count == cmp_def->part_count;
 	/* The flag will be change to true if found tuple equals to the key. */
 	bool equals = false;
 	assert(it->last.tuple == NULL);
-	if (it->key_data.key == NULL) {
+	if (start_data.key == NULL) {
 		assert(type == ITER_GE || type == ITER_LE);
-		if (iterator_type_is_reverse(it->type))
+		if (iterator_type_is_reverse(type))
 			/*
 			 * For all reverse iterators we will step back,
 			 * see the and explanation code below.
@@ -689,13 +703,30 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 		 * efficiently equals to the empty key. */
 		equals = memtx_tree_size(tree) != 0;
 	} else {
-		if (type == ITER_EQ || type == ITER_GE || type == ITER_LT) {
+		/*
+		 * We use lower_bound on equality iterators instead of LE
+		 * because if iterator is reversed, we will take a step back.
+		 * Also it is used for LT iterator, and after a step back
+		 * iterator will point to a tuple lower than key.
+		 * So, lower_bound is used for EQ, GE and LT iterators,
+		 * upper_bound is used for REQ, GT, LE iterators.
+		 */
+		bool need_lower_bound = type == ITER_EQ || type == ITER_GE ||
+					type == ITER_LT;
+
+		/*
+		 * If we need to skip first tuple in EQ and REQ iterators,
+		 * let's just change lower_bound to upper_bound or vice-versa.
+		 */
+		if (skip_equal_tuple && (type == ITER_EQ || type == ITER_REQ))
+			need_lower_bound = !need_lower_bound;
+		if (need_lower_bound) {
 			it->tree_iterator =
-				memtx_tree_lower_bound(tree, &it->key_data,
+				memtx_tree_lower_bound(tree, &start_data,
 						       &equals);
-		} else { // ITER_GT, ITER_REQ, ITER_LE
+		} else {
 			it->tree_iterator =
-				memtx_tree_upper_bound(tree, &it->key_data,
+				memtx_tree_upper_bound(tree, &start_data,
 						       &equals);
 		}
 	}
@@ -721,6 +752,14 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 		 */
 		memtx_tree_iterator_prev(tree, &it->tree_iterator);
 		res = memtx_tree_iterator_get_elem(tree, &it->tree_iterator);
+	}
+	/* If we skip tuple, flag equals is not actual - need to refresh it. */
+	if (skip_equal_tuple && res != NULL &&
+	    (type == ITER_EQ || type == ITER_REQ) &&
+	    tuple_compare_with_key(res->tuple, res->hint, it->key_data.key,
+				   it->key_data.part_count, it->key_data.hint,
+				   index->base.def->key_def) != 0) {
+		equals = false;
 	}
 	/*
 	 * Equality iterators requires exact key match: if the result does not
@@ -750,7 +789,8 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	    (type == ITER_GT || type == ITER_LT))
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_track_gap(txn, space, idx, successor, type,
-				   it->key_data.key, it->key_data.part_count);
+				   start_data.key,
+				   start_data.part_count);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 	return res == NULL || !eq_match || *ret != NULL ? 0 :
 	       iterator->next_internal(iterator, ret);
@@ -963,6 +1003,91 @@ memtx_tree_index_get_internal(struct index *base, const char *key,
 	*result = memtx_tx_tuple_clarify(txn, space, res->tuple, base,
 					 mk_index);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
+	return 0;
+}
+
+/**
+ * Implementation of iterator position for general and multikey indexes.
+ */
+template <bool USE_HINT, bool IS_MULTIKEY>
+static int
+tree_iterator_position(struct iterator *it, const char **pos, uint32_t *size)
+{
+	static_assert(!IS_MULTIKEY || USE_HINT,
+		      "Multikey index actually uses hint.");
+	struct memtx_tree_index<USE_HINT> *index =
+		(struct memtx_tree_index<USE_HINT> *)it->index;
+	struct key_def *cmp_def = index->base.def->cmp_def;
+	struct tree_iterator<USE_HINT> *tree_it =
+		get_tree_iterator<USE_HINT>(it);
+	struct tuple *tuple = tree_it->last.tuple;
+	if (tuple == NULL) {
+		*pos = NULL;
+		*size = 0;
+		return 0;
+	}
+	int mk_idx = MULTIKEY_NONE;
+	if (IS_MULTIKEY)
+		mk_idx = (int)tree_it->last.hint;
+	const char *key = tuple_extract_key(tuple, cmp_def, mk_idx, size);
+	if (key == NULL)
+		return -1;
+	*pos = key;
+	mp_decode_array(pos);
+	*size -= *pos - key;
+	return 0;
+}
+
+/**
+ * Implementation of iterator position for functional indexes.
+ */
+static int
+tree_iterator_position_func(struct iterator *it, const char **pos,
+			    uint32_t *size)
+{
+	/*
+	 * Сmp_def in the functional index is the functional key and the
+	 * primary key right after it. So to extract cmp_def in func index,
+	 * we need to pack an array with concatenated func key and primary key.
+	 */
+	struct tree_iterator<true> *tree_it = get_tree_iterator<true>(it);
+	if (tree_it->last_func_key == NULL) {
+		*pos = NULL;
+		*size = 0;
+		return 0;
+	}
+	assert(tree_it->last.tuple != NULL);
+	/* Extract func key. */
+	uint32_t func_key_size;
+	const char *func_key = tuple_data_range(tree_it->last_func_key,
+						&func_key_size);
+	uint32_t func_key_len = mp_decode_array(&func_key);
+	/* Extract primary key. */
+	struct space *space = space_by_id(it->index->def->space_id);
+	assert(space != NULL);
+	struct index *pk = space->index[0];
+	assert(pk != NULL);
+	struct key_def *pk_def = pk->def->key_def;
+	uint32_t pk_size;
+	const char *pk_key = tuple_extract_key(tree_it->last.tuple, pk_def,
+					       MULTIKEY_NONE, &pk_size);
+	uint32_t pk_key_len = mp_decode_array(&pk_key);
+	/* Calculate allocation size and allocate buffer. */
+	func_key_size -= mp_sizeof_array(func_key_len);
+	pk_size -= mp_sizeof_array(pk_key_len);
+	uint32_t alloc_size = func_key_size + pk_size;
+	char *data = (char *)region_alloc(&fiber()->gc, alloc_size);
+	if (data == NULL) {
+		diag_set(OutOfMemory, alloc_size, "region",
+			 "memtx_tree_func_index_iterator_position");
+		return -1;
+	}
+	*size = alloc_size;
+	*pos = data;
+	/* Pack an array with concatenated func key and primary key. */
+	memcpy(data, func_key, func_key_size);
+	data += func_key_size;
+	memcpy(data, pk_key, pk_size);
 	return 0;
 }
 
@@ -1452,11 +1577,6 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 			 "requested iterator type");
 		return NULL;
 	}
-	if (pos != NULL) {
-		diag_set(UnsupportedIndexFeature, base->def, "pagination");
-		return NULL;
-	}
-
 	if (part_count == 0) {
 		/*
 		 * If no key is specified, downgrade equality
@@ -1480,8 +1600,16 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 	it->pool = &memtx->iterator_pool;
 	it->base.next_internal = tree_iterator_start<USE_HINT>;
 	it->base.next = memtx_iterator_next;
-	it->base.position = generic_iterator_position;
 	it->base.free = tree_iterator_free<USE_HINT>;
+	if (base->def->key_def->for_func_index) {
+		assert(USE_HINT);
+		it->base.position = tree_iterator_position_func;
+	} else if (base->def->key_def->is_multikey) {
+		assert(USE_HINT);
+		it->base.position = tree_iterator_position<true, true>;
+	} else {
+		it->base.position = tree_iterator_position<USE_HINT, false>;
+	}
 	it->type = type;
 	it->key_data.key = key;
 	it->key_data.part_count = part_count;
@@ -1492,6 +1620,15 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 	if (USE_HINT)
 		it->last.set_hint(HINT_NONE);
 	it->last_func_key = NULL;
+	if (pos != NULL) {
+		it->after_data.key = pos;
+		it->after_data.part_count = cmp_def->part_count;
+		if (USE_HINT)
+			it->after_data.set_hint(HINT_NONE);
+	} else {
+		it->after_data.key = NULL;
+		it->after_data.part_count = 0;
+	}
 	return (struct iterator *)it;
 }
 
