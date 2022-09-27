@@ -824,6 +824,7 @@ local box_cfg_guard_whitelist = {
     broadcast = true;
     txn_isolation_level = true;
     NULL = true;
+    info = true;
 };
 
 -- List of box members that requires full box loading.

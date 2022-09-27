@@ -90,7 +90,7 @@
 #include "flightrec.h"
 #include "wal_ext.h"
 
-static char status[64] = "unknown";
+static char status[64] = "unconfigured";
 
 /** box.stat rmean */
 struct rmean *rmean_box;
