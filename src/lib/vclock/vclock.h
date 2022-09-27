@@ -432,7 +432,7 @@ rb_proto(, vclockset_, vclockset_t, struct vclock);
  * @return a vclock that <= than \a key
  */
 static inline struct vclock *
-vclockset_match(vclockset_t *set, struct vclock *key)
+vclockset_match(vclockset_t *set, const struct vclock *key)
 {
 	struct vclock *match = vclockset_psearch(set, key);
 	/**

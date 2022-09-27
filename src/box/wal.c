@@ -794,7 +794,7 @@ wal_collect_garbage_f(struct cbus_call_msg *data)
 		 * required by registered consumers and delete all
 		 * older WAL files.
 		 */
-		vclock = vclockset_psearch(&writer->wal_dir.index, vclock);
+		vclock = vclockset_match(&writer->wal_dir.index, vclock);
 	}
 	if (vclock != NULL)
 		xdir_collect_garbage(&writer->wal_dir, vclock_sum(vclock),
