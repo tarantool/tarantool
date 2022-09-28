@@ -14,6 +14,11 @@
 #include "small/region.h"
 #include "msgpuck.h"
 
+const char *tuple_constraint_type_strs[] = {
+	/* [CONSTR_FUNC]        = */ "constraint",
+	/* [CONSTR_FKEY]        = */ "foreign_key",
+};
+
 /**
  * Compare two tuple_constraint_field_id objects.
  */

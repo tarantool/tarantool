@@ -2125,6 +2125,21 @@ case OP_Count: {         /* out2 */
 	break;
 }
 
+/**
+ * Opcode: DropTupleConstraint P1 * * P4 *
+ * Synopsis: Drop constraint from box.space[P1]
+ *
+ * Drop constraint named P4.z from space P1.
+ */
+case OP_DropTupleConstraint: {
+	assert(pOp->p1 >= 0 && pOp->p4.z != NULL);
+	if (sql_constraint_drop(pOp->p1, pOp->p4.z) != 0)
+		goto abort_due_to_error;
+	assert(p->nChange == 0);
+	p->nChange = 1;
+	break;
+}
+
 /* Opcode: Savepoint P1 * * P4 *
  *
  * Open, release or rollback the savepoint named by parameter P4, depending
