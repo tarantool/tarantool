@@ -145,6 +145,14 @@ fk_constraint_encode_links(struct region *region,
 			   uint32_t *size);
 
 /**
+ * Drop the check constraint or foreign key. This function drops tuple and field
+ * constraints. If there is more than one constraint with the given name, one of
+ * them will be dropped.
+ */
+int
+sql_constraint_drop(uint32_t space_id, const char *name);
+
+/**
  * Encode index parts of given foreign key constraint into
  * MsgPack on @region.
  * @param region Region to use.

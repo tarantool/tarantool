@@ -56,6 +56,7 @@
 #include "mpstream/mpstream.h"
 #include "sql_stmt_cache.h"
 #include "box/tuple_constraint_def.h"
+#include "mp_util.h"
 
 static sql *db = NULL;
 
@@ -1475,4 +1476,101 @@ index_field_tuple_est(const struct index_def *idx_def, uint32_t field)
 		return default_tuple_est[field + 1 >= 6 ? 6 : field];
 	}
 	return tnt_idx->def->opts.stat->tuple_log_est[field];
+}
+
+/**
+ * Find the constraint in space and return its JSON path in buffer allocated on
+ * region.
+ */
+static const char *
+sql_constraint_path(struct region *region, uint32_t space_id, const char *name)
+{
+	struct space *space = space_by_id(space_id);
+	if (space == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
+		return NULL;
+	}
+	uint32_t size = strlen(name) + 32;
+	char *path = region_alloc(region, size);
+	if (path == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc", "path");
+		return NULL;
+	}
+	struct tuple_constraint_def *cdefs = space->def->opts.constraint_def;
+	uint32_t count = space->def->opts.constraint_count;
+	for (uint32_t i = 0; i < count; ++i) {
+		if (strcmp(cdefs[i].name, name) != 0)
+			continue;
+		enum tuple_constraint_type type = cdefs[i].type;
+		uint32_t type_count = 0;
+		for (uint32_t j = 0; j < count; ++j) {
+			if (cdefs[j].type == type)
+				++type_count;
+		}
+		assert(type_count > 0);
+		const char *type_str = tuple_constraint_type_strs[type];
+		int len;
+		if (type_count == 1) {
+			len = snprintf(path, size, "flags.%s", type_str);
+		} else {
+			len = snprintf(path, size, "flags.%s.%s", type_str,
+				       name);
+		}
+		assert(len >= 0 && (uint32_t)len < size);
+		(void)len;
+		return path;
+	}
+	uint32_t field_count = space->def->field_count;
+	for (uint32_t i = 0; i < field_count; ++i) {
+		cdefs = space->def->fields[i].constraint_def;
+		count = space->def->fields[i].constraint_count;
+		for (uint32_t j = 0; j < count; ++j) {
+			if (strcmp(cdefs[j].name, name) != 0)
+				continue;
+			enum tuple_constraint_type type = cdefs[j].type;
+			uint32_t type_count = 0;
+			for (uint32_t k = 0; k < count; ++k) {
+				if (cdefs[k].type == type)
+					++type_count;
+			}
+			assert(type_count > 0);
+			const char *type_str = tuple_constraint_type_strs[type];
+			int len;
+			if (type_count == 1) {
+				len = snprintf(path, size, "format[%u].%s",
+					       i + 1, type_str);
+			} else {
+				len = snprintf(path, size, "format[%u].%s.%s",
+					       i + 1, type_str, name);
+			}
+			assert(len >= 0 && (uint32_t)len < size);
+			(void)len;
+			return path;
+		}
+	}
+	diag_set(ClientError, ER_NO_SUCH_CONSTRAINT, name, space->def->name);
+	return NULL;
+}
+
+int
+sql_constraint_drop(uint32_t space_id, const char *name)
+{
+	struct region *region = &fiber()->gc;
+	uint32_t used = region_used(region);
+	const char *path = sql_constraint_path(region, space_id, name);
+	if (path == NULL)
+		return -1;
+	char key[16];
+	char *key_end = key + mp_format(key, 16, "[%u]", space_id);
+	size_t size;
+	const char *ops = mp_format_on_region(region, &size, "[[%s%s%u]]", "#",
+					      path, 1);
+	const char *end = ops + size;
+	if (ops == NULL) {
+		region_truncate(region, used);
+		return -1;
+	}
+	int rc = box_update(BOX_SPACE_ID, 0, key, key_end, ops, end, 0, NULL);
+	region_truncate(region, used);
+	return rc;
 }

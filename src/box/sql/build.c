@@ -2337,10 +2337,18 @@ sql_drop_constraint(struct Parse *parse_context)
 		parse_context->is_aborted = true;
 		return;
 	}
+	struct Vdbe *v = sqlGetVdbe(parse_context);
+	assert(v != NULL);
 	struct constraint_id *id = space_find_constraint_id(space, name);
 	if (id == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_CONSTRAINT, name, table_name);
-		parse_context->is_aborted = true;
+		char *name_copy = sqlDbStrDup(parse_context->db, name);
+		if (name_copy == NULL) {
+			parse_context->is_aborted = true;
+			return;
+		}
+		sqlVdbeCountChanges(v);
+		sqlVdbeAddOp4(v, OP_DropTupleConstraint, space->def->id, 0, 0,
+			      name_copy, P4_DYNAMIC);
 		return;
 	}
 	/*
@@ -2349,8 +2357,6 @@ sql_drop_constraint(struct Parse *parse_context)
 	 * ALTER TABLE DROP CONSTRAINT statement, since whole
 	 * DROP TABLE always returns 1 (one) as a row count.
 	 */
-	struct Vdbe *v = sqlGetVdbe(parse_context);
-	assert(v != NULL);
 	assert(id->type < constraint_type_MAX);
 	switch (id->type) {
 	case CONSTRAINT_TYPE_PK:
