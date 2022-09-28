@@ -43,6 +43,7 @@
 #include "lua-yaml/lyaml.h"
 #include "main.h"
 #include "serialize_lua.h"
+#include "say.h"
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
@@ -50,6 +51,8 @@
 #include <readline/history.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <string.h>
+#include <strings.h>
 
 struct rlist on_console_eval = RLIST_HEAD_INITIALIZER(on_console_eval);
 
@@ -266,6 +269,192 @@ console_sigint_handler(ev_loop *loop, struct ev_signal *w, int revents)
 	fiber_wakeup(interactive_fb);
 }
 
+/* {{{ Show/hide prompt */
+
+/*
+ * The idea is borrowed from
+ * https://metacpan.org/dist/AnyEvent-ReadLine-Gnu/source/Gnu.pm
+ */
+
+static char *saved_prompt = NULL;
+static char *saved_line_buffer = NULL;
+static int saved_line_buffer_len = 0;
+static int saved_point = 0;
+
+static int console_hide_prompt_ref = LUA_NOREF;
+static int console_show_prompt_ref = LUA_NOREF;
+
+/**
+ * Don't attempt to hide/show prompt in certain readline states.
+ *
+ * There are readline states, where rl_message() is called
+ * internally. In this case an actual readline's line on the
+ * screen is not prompt + line buffer. Current code can't properly
+ * save and restore the line.
+ */
+static bool
+console_can_hide_show_prompt(void)
+{
+	if (RL_ISSTATE(RL_STATE_NSEARCH))
+		return false;
+	if (RL_ISSTATE(RL_STATE_ISEARCH))
+		return false;
+	if (RL_ISSTATE(RL_STATE_NUMERICARG))
+		return false;
+	return true;
+}
+
+/**
+ * Save and hide readline's output (prompt and current user
+ * input).
+ */
+static void
+console_hide_prompt(void)
+{
+	if (!console_can_hide_show_prompt())
+		return;
+
+	if (rl_prompt == NULL) {
+		saved_prompt = NULL;
+	} else {
+		saved_prompt = xstrdup(rl_prompt);
+	}
+	rl_set_prompt("");
+
+	saved_point = rl_point;
+
+	if (rl_line_buffer == NULL) {
+		saved_line_buffer = NULL;
+		saved_line_buffer_len = 0;
+	} else {
+		saved_line_buffer = xmalloc(rl_end + 1);
+		memcpy(saved_line_buffer, rl_line_buffer, rl_end);
+		saved_line_buffer[rl_end] = '\0';
+		saved_line_buffer_len = rl_end;
+	}
+	rl_replace_line("", 0);
+
+	rl_redisplay();
+}
+
+/**
+ * Show saved readline's output and free saved strings.
+ */
+static void
+console_show_prompt(void)
+{
+	if (!console_can_hide_show_prompt())
+		return;
+
+	rl_set_prompt(saved_prompt);
+	free(saved_prompt);
+	saved_prompt = NULL;
+
+	if (saved_line_buffer == NULL) {
+		rl_replace_line("", 0);
+	} else {
+		rl_replace_line(saved_line_buffer, saved_line_buffer_len);
+	}
+	free(saved_line_buffer);
+	saved_line_buffer = NULL;
+	saved_line_buffer_len = 0;
+
+	rl_point = saved_point;
+	saved_point = 0;
+
+	rl_redisplay();
+}
+
+static int
+lbox_console_hide_prompt(struct lua_State *L)
+{
+	(void)L;
+	console_hide_prompt();
+	return 0;
+}
+
+static int
+lbox_console_show_prompt(struct lua_State *L)
+{
+	(void)L;
+	console_show_prompt();
+	return 0;
+}
+
+/**
+ * Allow to disable hide/show prompt actions using an environment
+ * variable.
+ *
+ * It is not supposed to be a documented variable, but rather just
+ * a way to turn off the feature if something goes wrong.
+ */
+static bool
+console_hide_show_prompt_is_enabled(void)
+{
+	const char *envvar = getenv("TT_CONSOLE_HIDE_SHOW_PROMPT");
+
+	/* Enabled by default. */
+	if (envvar == NULL || *envvar == '\0')
+		return true;
+
+	/* Explicitly enabled or disabled. */
+	if (strcasecmp(envvar, "false") == 0)
+		return false;
+	if (strcasecmp(envvar, "true") == 0)
+		return true;
+
+	/* Accept 0/1 as boolean values. */
+	if (strcmp(envvar, "0") == 0)
+		return false;
+	if (strcmp(envvar, "1") == 0)
+		return true;
+
+	/* Can't parse the value, let's use the default. */
+	return true;
+}
+
+static void
+luaT_console_setup_write_cb(struct lua_State *L)
+{
+	if (!console_hide_show_prompt_is_enabled())
+		return;
+
+	say_set_stderr_callback(console_hide_prompt, console_show_prompt);
+
+	lua_getfield(L, LUA_GLOBALSINDEX, "package");
+	lua_getfield(L, -1, "loaded");
+	lua_getfield(L, -1, "internal.print");
+
+	lua_rawgeti(L, LUA_REGISTRYINDEX, console_hide_prompt_ref);
+	lua_setfield(L, -2, "before_cb");
+	lua_rawgeti(L, LUA_REGISTRYINDEX, console_show_prompt_ref);
+	lua_setfield(L, -2, "after_cb");
+
+	lua_pop(L, 3);
+}
+
+static void
+luaT_console_cleanup_write_cb(struct lua_State *L)
+{
+	if (!console_hide_show_prompt_is_enabled())
+		return;
+
+	say_set_stderr_callback(NULL, NULL);
+
+	lua_getfield(L, LUA_GLOBALSINDEX, "package");
+	lua_getfield(L, -1, "loaded");
+	lua_getfield(L, -1, "internal.print");
+
+	lua_pushnil(L);
+	lua_setfield(L, -2, "before_cb");
+	lua_pushnil(L);
+	lua_setfield(L, -2, "after_cb");
+
+	lua_pop(L, 3);
+}
+
+/* }}} Show/hide prompt */
+
 /* implements readline() Lua API */
 static int
 lbox_console_readline(struct lua_State *L)
@@ -301,6 +490,8 @@ lbox_console_readline(struct lua_State *L)
 
 	if (readline_L != NULL)
 		luaL_error(L, "readline(): earlier call didn't complete yet");
+
+	luaT_console_setup_write_cb(L);
 
 	readline_L = L;
 
@@ -344,6 +535,8 @@ lbox_console_readline(struct lua_State *L)
 				lua_pushstring(L, "");
 				lua_pushboolean(L, sigint_called);
 
+				luaT_console_cleanup_write_cb(L);
+
 				readline_L = NULL;
 				sigint_called = false;
 				set_sigint_cb(old_cb);
@@ -355,8 +548,10 @@ lbox_console_readline(struct lua_State *L)
 			 * we might spin here forever eating
 			 * the whole cpu time.
 			 */
-			if (fiber_is_cancelled())
+			if (fiber_is_cancelled()) {
+				luaT_console_cleanup_write_cb(L);
 				set_sigint_cb(old_cb);
+			}
 			luaL_testcancel(L);
 		}
 		rl_callback_read_char();
@@ -366,6 +561,7 @@ lbox_console_readline(struct lua_State *L)
 	/* Incidents happen. */
 #pragma GCC poison readline_L
 	rl_attempted_completion_function = NULL;
+	luaT_console_cleanup_write_cb(L);
 	set_sigint_cb(old_cb);
 	luaL_testcancel(L);
 	return 2;
@@ -744,6 +940,11 @@ tarantool_lua_console_init(struct lua_State *L)
 	};
 	session_vtab_registry[SESSION_TYPE_CONSOLE] = console_session_vtab;
 	session_vtab_registry[SESSION_TYPE_REPL] = console_session_vtab;
+
+	lua_pushcfunction(L, lbox_console_hide_prompt);
+	console_hide_prompt_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	lua_pushcfunction(L, lbox_console_show_prompt);
+	console_show_prompt_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 }
 
 /*
