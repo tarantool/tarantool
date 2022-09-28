@@ -159,7 +159,7 @@ vclock_inc(struct vclock *vclock, uint32_t replica_id)
 	/* Easier add each time than check. */
 	if (((vclock->map >> replica_id) & 0x01) == 0) {
 		vclock->lsn[replica_id] = 0;
-		vclock->map |= 1 << replica_id;
+		vclock->map |= 1U << replica_id;
 	}
 	vclock->signature++;
 	return ++vclock->lsn[replica_id];
@@ -182,11 +182,11 @@ vclock_reset(struct vclock *vclock, uint32_t replica_id, int64_t lsn)
 	assert(replica_id < VCLOCK_MAX);
 	vclock->signature -= vclock_get(vclock, replica_id);
 	if (lsn == 0) {
-		vclock->map &= ~(1 << replica_id);
+		vclock->map &= ~(1U << replica_id);
 		return;
 	}
 	vclock->lsn[replica_id] = lsn;
-	vclock->map |= 1 << replica_id;
+	vclock->map |= 1U << replica_id;
 	vclock->signature += lsn;
 }
 
