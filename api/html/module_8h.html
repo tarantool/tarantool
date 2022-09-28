@@ -121,7 +121,7 @@ Macros</h2></td></tr>
 #define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#abd1dbec4fd6761084d3e0c05afe2b138">PACKAGE_VERSION_PATCH</a>&#160;&#160;&#160;0</td></tr>
 <tr class="memdesc:abd1dbec4fd6761084d3e0c05afe2b138"><td class="mdescLeft">&#160;</td><td class="mdescRight">Package patch version - 7 for 1.6.7. <br /></td></tr>
 <tr class="separator:abd1dbec4fd6761084d3e0c05afe2b138"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;2.11.0-entrypoint-501-gdfa1142cf&quot;</td></tr>
+<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;2.11.0-entrypoint-512-gac89000db&quot;</td></tr>
 <tr class="memdesc:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">A string with major-minor-patch-commit-id identifier of the release, e.g.  <a href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">More...</a><br /></td></tr>
 <tr class="separator:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adb6d1259777e8f56c6260be6faed183e"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#adb6d1259777e8f56c6260be6faed183e">SYSCONF_DIR</a>&#160;&#160;&#160;&quot;etc&quot;</td></tr>
@@ -380,6 +380,8 @@ Enumerations</h2></td></tr>
 &#160;&#160;<a class="el" href="module_8h.html#af2d527c62a52f85cb173c79c31d20ce1ab2411f8d6a9d68367da464d9fcff932f">TXN_ISOLATION_READ_CONFIRMED</a>, 
 <br />
 &#160;&#160;<a class="el" href="module_8h.html#af2d527c62a52f85cb173c79c31d20ce1afa0bc338b3e678625a61d16254991c7b">TXN_ISOLATION_BEST_EFFORT</a>, 
+<br />
+&#160;&#160;<a class="el" href="module_8h.html#af2d527c62a52f85cb173c79c31d20ce1a6236950c80e86644457d27e158639b60">TXN_ISOLATION_LINEARIZABLE</a>, 
 <br />
 &#160;&#160;<a class="el" href="module_8h.html#af2d527c62a52f85cb173c79c31d20ce1a8e225c05de0c630a787eb113f64e3af4">txn_isolation_level_MAX</a>
 <br />
@@ -1898,7 +1900,7 @@ int&#160;</td><td class="memItemRight" valign="bottom"><b>log_level</b></td></tr
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;2.11.0-entrypoint-501-gdfa1142cf&quot;</td>
+          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;2.11.0-entrypoint-512-gac89000db&quot;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -2625,6 +2627,8 @@ enum <a class="el" href="module_8h.html#af667a90dfe6a8cc25b510af73d98bb82" title
 <tr><td class="fieldname"><a id="af2d527c62a52f85cb173c79c31d20ce1ab2411f8d6a9d68367da464d9fcff932f"></a>TXN_ISOLATION_READ_CONFIRMED&#160;</td><td class="fielddoc"><p>Allow to read only confirmed changes. </p>
 </td></tr>
 <tr><td class="fieldname"><a id="af2d527c62a52f85cb173c79c31d20ce1afa0bc338b3e678625a61d16254991c7b"></a>TXN_ISOLATION_BEST_EFFORT&#160;</td><td class="fielddoc"><p>Determine isolation level automatically. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="af2d527c62a52f85cb173c79c31d20ce1a6236950c80e86644457d27e158639b60"></a>TXN_ISOLATION_LINEARIZABLE&#160;</td><td class="fielddoc"><p>Allow to read only the changes confirmed on any cluster node. </p>
 </td></tr>
 <tr><td class="fieldname"><a id="af2d527c62a52f85cb173c79c31d20ce1a8e225c05de0c630a787eb113f64e3af4"></a>txn_isolation_level_MAX&#160;</td><td class="fielddoc"><p>Upper bound of valid values. </p>
 </td></tr>
@@ -9377,7 +9381,7 @@ box_tuple_position(it) == box_tuple_field_count(tuple) if returned value is NULL
 <div class="ttc" id="amodule_8h_html_a6f7fe762b15009de313fdf915378429c"><div class="ttname"><a href="module_8h.html#a6f7fe762b15009de313fdf915378429c">box_iterator_free</a></div><div class="ttdeci">void box_iterator_free(box_iterator_t *iterator)</div><div class="ttdoc">Destroy and deallocate iterator.</div></div>
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Tue Sep 27 2022 17:11:23 for Tarantool by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Wed Sep 28 2022 08:03:24 for Tarantool by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.17
 </small></address>

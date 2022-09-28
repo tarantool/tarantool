@@ -85,6 +85,7 @@
     <member refid="module_8h_1af2d527c62a52f85cb173c79c31d20ce1a351aceaaa55693a90f5e33103d051947" kind="enumvalue"><name>TXN_ISOLATION_READ_COMMITTED</name></member>
     <member refid="module_8h_1af2d527c62a52f85cb173c79c31d20ce1ab2411f8d6a9d68367da464d9fcff932f" kind="enumvalue"><name>TXN_ISOLATION_READ_CONFIRMED</name></member>
     <member refid="module_8h_1af2d527c62a52f85cb173c79c31d20ce1afa0bc338b3e678625a61d16254991c7b" kind="enumvalue"><name>TXN_ISOLATION_BEST_EFFORT</name></member>
+    <member refid="module_8h_1af2d527c62a52f85cb173c79c31d20ce1a6236950c80e86644457d27e158639b60" kind="enumvalue"><name>TXN_ISOLATION_LINEARIZABLE</name></member>
     <member refid="module_8h_1af2d527c62a52f85cb173c79c31d20ce1a8e225c05de0c630a787eb113f64e3af4" kind="enumvalue"><name>txn_isolation_level_MAX</name></member>
     <member refid="module_8h_1adf764cbdea00d65edcd07bb9953ad2b7" kind="enum"><name>@1</name></member>
     <member refid="module_8h_1adf764cbdea00d65edcd07bb9953ad2b7afdc4a3a1343ddde9cd823989746b952c" kind="enumvalue"><name>BOX_KEY_PART_DEF_IS_NULLABLE</name></member>
