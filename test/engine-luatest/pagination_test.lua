@@ -8,6 +8,9 @@ tree_g.before_all(function(cg)
         alias   = 'default',
     }
     cg.server:start()
+    cg.server:exec(function()
+        require('jit').off()
+    end)
     cg.server:exec(function(disable_ffi)
         local ffi = require('ffi')
         ffi.cdef("extern void box_read_ffi_disable(void);")
@@ -538,6 +541,9 @@ func_g.before_all(function()
         alias   = 'default',
     }
     func_g.server:start()
+    func_g.server:exec(function()
+        require('jit').off()
+    end)
 end)
 
 func_g.after_all(function()
@@ -758,6 +764,9 @@ no_sup.before_all(function(cg)
         alias   = 'default',
     }
     cg.server:start()
+    cg.server:exec(function()
+        require('jit').off()
+    end)
 end)
 
 no_sup.after_all(function(cg)
