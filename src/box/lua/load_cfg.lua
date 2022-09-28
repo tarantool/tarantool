@@ -757,8 +757,10 @@ local function reconfig_modules(module_keys, oldcfg, newcfg, log_basecfg)
         end
         local module = dynamic_cfg_modules[name]
         local result = pcall(module.cfg)
-        if not result and oldvals ~= nil then
-            rollback_module(module, oldcfg, keys, oldvals)
+        if not result then
+            if oldvals ~= nil then
+                rollback_module(module, oldcfg, keys, oldvals)
+            end
             return box.error()
         end
 
