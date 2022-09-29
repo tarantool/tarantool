@@ -297,9 +297,9 @@ end
 local space_metatable, index_metatable
 
 local function new_sm(uri, opts)
-    local parsed_uri = urilib.parse(uri)
+    local parsed_uri, err = urilib.parse(uri)
     if not parsed_uri then
-        box.error()
+        error(err)
     end
     if opts.user == nil and opts.password == nil then
         opts.user, opts.password = parsed_uri.login, parsed_uri.password
@@ -1256,7 +1256,7 @@ this_module.self = {
             call_loadproc, proc_name)
         if not status then
             rollback()
-            return box.error() -- re-throw
+            return error(proc) -- re-throw
         end
         if obj ~= nil then
             return handle_eval_result(pcall(proc, obj, unpack(args)))
