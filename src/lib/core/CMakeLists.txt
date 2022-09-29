@@ -42,6 +42,7 @@ set(core_sources
     ssl_init.c
     tt_sigaction.c
     tt_strerror.c
+    mp_util.c
 )
 
 if (ENABLE_BACKTRACE)

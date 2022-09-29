@@ -89,6 +89,7 @@
 #include "mp_uuid.h"
 #include "flightrec.h"
 #include "wal_ext.h"
+#include "mp_util.h"
 
 static char status[64] = "unknown";
 
@@ -2570,17 +2571,13 @@ boxk(int type, uint32_t space_id, const char *format, ...)
 	request.type = type;
 	request.space_id = space_id;
 	va_start(ap, format);
-	size_t buf_size = mp_vformat(NULL, 0, format, ap);
-	char *buf = (char *)region_alloc(&fiber()->gc, buf_size);
+	struct region *region = &fiber()->gc;
+	size_t size = 0;
+	const char *data = mp_vformat_on_region(region, &size, format, ap);
 	va_end(ap);
-	if (buf == NULL)
+	if (data == NULL)
 		return -1;
-	va_start(ap, format);
-	if (mp_vformat(buf, buf_size, format, ap) != buf_size)
-		assert(0);
-	va_end(ap);
-	const char *data = buf;
-	const char *data_end = buf + buf_size;
+	const char *data_end = data + size;
 	switch (type) {
 	case IPROTO_INSERT:
 	case IPROTO_REPLACE:
