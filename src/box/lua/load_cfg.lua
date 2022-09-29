@@ -772,12 +772,12 @@ local function reconfig_modules(module_keys, oldcfg, newcfg, log_basecfg)
             end
         end
         local module = dynamic_cfg_modules[name]
-        local result = pcall(module.cfg)
+        local result, err = pcall(module.cfg)
         if not result then
             if oldvals ~= nil then
                 rollback_module(module, oldcfg, keys, oldvals)
             end
-            return box.error()
+            error(err)
         end
 
         log_changed_options(oldcfg, keys, log_basecfg)
@@ -895,11 +895,14 @@ local function load_cfg(cfg)
     apply_default_cfg(cfg, default_cfg, module_cfg);
     -- Save new box.cfg
     box.cfg = cfg
-    if not pcall(private.cfg_check) or
-       not pcall(update_module_cfg, cfg, module_cfg)  then
+    local status, err = pcall(private.cfg_check)
+    if status then
+        status, err = pcall(update_module_cfg, cfg, module_cfg)
+    end
+    if not status then
         box.cfg = locked(load_cfg) -- restore original box.cfg
         -- re-throw exception from check_cfg() or update_module_cfg()
-        return box.error()
+        return error(err)
     end
 
     -- NB: After this point the function should not raise an
