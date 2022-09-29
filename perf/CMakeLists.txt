@@ -18,3 +18,5 @@ target_link_libraries(tuple.perftest core box tuple benchmark::benchmark)
 add_executable(light.perftest light.cc
                ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c)
 target_link_libraries(light.perftest small benchmark::benchmark)
+
+add_subdirectory(bloom_filter)

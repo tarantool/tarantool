@@ -4,7 +4,7 @@ test_run = require('test_run').new()
 -- Setting bloom_fpr to 1 disables bloom filter.
 --
 s = box.schema.space.create('test', {engine = 'vinyl'})
-_ = s:create_index('pk', {bloom_fpr = 1})
+_ = s:create_index('pk', {lookup_cost_coeff = 1})
 for i = 1, 10, 2 do s:insert{i} end
 box.snapshot()
 for i = 1, 10 do s:get{i} end
@@ -18,7 +18,7 @@ s:drop()
 box.cfg{vinyl_cache = 0}
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
-_ = s:create_index('pk', {parts = {1, 'unsigned', 2, 'unsigned', 3, 'unsigned', 4, 'unsigned'}})
+_ = s:create_index('pk', {lookup_cost_coeff = 0.05, parts = {1, 'unsigned', 2, 'unsigned', 3, 'unsigned', 4, 'unsigned'}})
 
 reflects = 0
 function cur_reflects() return box.space.test.index.pk:stat().disk.iterator.bloom.hit end
@@ -43,6 +43,10 @@ box.snapshot()
 -- This leaves us only (100*5 + 500*4 + 1000*3 + 1000*1) / ln(2) bits
 -- or 1172 bytes, and after rounding up to the block size (128 byte)
 -- we have 1280 bytes plus the header overhead.
+--
+-- As soon as replacing 1000 tuples after snapshot generates only
+-- one run, all calculations above are correct with lookup_cost_coeff selected with value
+-- of default bloom_fpr.
 --
 s.index.pk:stat().disk.bloom_size
 

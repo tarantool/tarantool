@@ -738,6 +738,12 @@ vy_lsm_range_size(struct vy_lsm *lsm)
 	return range_size;
 }
 
+size_t
+vy_lsm_bloom_size(struct vy_lsm *lsm)
+{
+	return lsm->bloom_size;
+}
+
 void
 vy_lsm_add_run(struct vy_lsm *lsm, struct vy_run *run)
 {

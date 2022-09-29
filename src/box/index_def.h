@@ -151,8 +151,16 @@ struct index_opts {
 	 * previous one.
 	 */
 	double run_size_ratio;
-	/* Bloom filter false positive rate. */
+	/* Bloom filter false positive rate.
+	 * Used only as default parameter when rebuilding index
+	 * See vy_run_rebuild_index()
+	 */
 	double bloom_fpr;
+    /* Coefficient of worst-case read scenario:
+     * the lower parameter, the higher read performance
+     * with more memory consumption.
+     */
+    double lookup_cost_coeff;
 	/**
 	 * LSN from the time of index creation.
 	 */
@@ -213,6 +221,8 @@ index_opts_cmp(const struct index_opts *o1, const struct index_opts *o2)
 		return o1->run_size_ratio < o2->run_size_ratio ? -1 : 1;
 	if (o1->bloom_fpr != o2->bloom_fpr)
 		return o1->bloom_fpr < o2->bloom_fpr ? -1 : 1;
+	if (o1->lookup_cost_coeff != o2->lookup_cost_coeff)
+		return o1->lookup_cost_coeff < o2->lookup_cost_coeff ? -1 : 1;
 	if (o1->func_id != o2->func_id)
 		return o1->func_id - o2->func_id;
 	if (o1->hint != o2->hint)

@@ -49,6 +49,8 @@ invalid('vinyl_run_count_per_level', 0)
 invalid('vinyl_run_size_ratio', 1)
 invalid('vinyl_bloom_fpr', 0)
 invalid('vinyl_bloom_fpr', 1.1)
+invalid('lookup_cost_coeff', 0)
+invalid('lookup_cost_coeff', 1.1)
 invalid('wal_queue_max_size', -1)
 
 local function invalid_combinations(name, val)

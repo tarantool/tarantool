@@ -244,6 +244,12 @@ index_opts_decode(struct index_opts *opts, const char *map,
 			 "less than or equal to 1");
 		return -1;
 	}
+	if (opts->lookup_cost_coeff <= 0 || opts->lookup_cost_coeff > 1) {
+		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+			 "lookup_cost_coeff must be greater than 0 and "
+			 "less than or equal to 1");
+		return -1;
+    }
 	return 0;
 }
 

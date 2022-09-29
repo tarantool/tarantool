@@ -257,7 +257,7 @@ vy_stmt_set_n_upserts(struct tuple *stmt, uint8_t n)
 static inline bool
 vy_stmt_is_key_format(const struct tuple_format *format)
 {
-	struct vy_stmt_env *env = format->engine;
+	struct vy_stmt_env *env = (struct vy_stmt_env *)format->engine;
 	return env->key_format == format;
 }
 

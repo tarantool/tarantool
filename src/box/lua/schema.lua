@@ -1465,6 +1465,7 @@ local index_options = {
     range_size = 'number',
     page_size = 'number',
     bloom_fpr = 'number',
+    lookup_cost_coeff = 'number',
     func = 'number, string',
     hint = 'boolean',
 }
@@ -1560,7 +1561,8 @@ box.schema.index.create = function(space_id, name, options)
             range_size = box.cfg.vinyl_range_size,
             run_count_per_level = box.cfg.vinyl_run_count_per_level,
             run_size_ratio = box.cfg.vinyl_run_size_ratio,
-            bloom_fpr = box.cfg.vinyl_bloom_fpr
+            bloom_fpr = box.cfg.vinyl_bloom_fpr,
+            lookup_cost_coeff = box.cfg.vinyl_lookup_cost_coeff
         }
     else
         options_defaults = {}
@@ -1612,6 +1614,7 @@ box.schema.index.create = function(space_id, name, options)
             run_count_per_level = options.run_count_per_level,
             run_size_ratio = options.run_size_ratio,
             bloom_fpr = options.bloom_fpr,
+            lookup_cost_coeff = options.lookup_cost_coeff,
             func = options.func,
             hint = options.hint,
     }

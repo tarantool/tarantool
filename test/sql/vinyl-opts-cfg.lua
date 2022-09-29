@@ -5,6 +5,7 @@
 --
 box.cfg {
     vinyl_bloom_fpr = 0.1,
+    vinyl_lookup_cost_coeff = 0.5,
     vinyl_page_size = 32 * 1024,
     vinyl_range_size = 512 * 1024 * 1024,
     vinyl_run_size_ratio = 5,

@@ -89,6 +89,7 @@
 #include "mp_uuid.h"
 #include "flightrec.h"
 #include "wal_ext.h"
+#include "vy_lsm.h"
 
 static char status[64] = "unknown";
 
@@ -1241,6 +1242,7 @@ box_check_vinyl_options(void)
 	int run_count_per_level = cfg_geti("vinyl_run_count_per_level");
 	double run_size_ratio = cfg_getd("vinyl_run_size_ratio");
 	double bloom_fpr = cfg_getd("vinyl_bloom_fpr");
+    double lookup_cost_coeff = cfg_getd("vinyl_lookup_cost_coeff");
 
 	if (box_check_memory_quota("vinyl_memory") < 0)
 		diag_raise();
@@ -1270,6 +1272,10 @@ box_check_vinyl_options(void)
 		tnt_raise(ClientError, ER_CFG, "vinyl_bloom_fpr",
 			  "must be greater than 0 and less than or equal to 1");
 	}
+	if (lookup_cost_coeff <= 0 || lookup_cost_coeff > 1) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_lookup_cost_coeff",
+			  "must be greater than 0 and less than or equal to 1");
+    }
 }
 
 static int
@@ -3090,6 +3096,29 @@ box_session_push(const char *data, const char *data_end)
 	int rc = session_push(session, base);
 	port_msgpack_destroy(base);
 	return rc;
+}
+
+API_EXPORT int
+box_index_bloom_bsize(uint32_t space_id, uint32_t index_id, size_t *result)
+{
+	struct space *space;
+	struct index *index;
+
+	/** See check_index() for explanation. */
+	space = space_cache_find(space_id);
+	if (space == NULL)
+		return -1;
+	if (access_check_space(space, PRIV_R) != 0)
+		return -1;
+	index = index_find(space, index_id);
+	if (index == NULL)
+		return -1;
+	struct vy_lsm *lsm = vy_lsm(index);
+	ssize_t bsize = vy_lsm_bloom_size(lsm);
+	if (bsize < 0)
+		return -1;
+	*result = bsize;
+	return 0;
 }
 
 static inline void
