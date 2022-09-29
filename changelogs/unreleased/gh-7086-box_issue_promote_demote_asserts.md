@@ -1,5 +1,5 @@
 ## bugfix/synchro
 
-* Fixed asserts in debug build/undefined behaviour in release when simulteneous
-  elections started/another instance promoted while instance was acquiring
-  or releasing synchro queue (gh-7086).
+* Fixed assertions in debug builds and undefined behaviour in release builds
+  when simultaneous elections started or another instance was promoted while
+  an instance was acquiring or releasing the synchro queue (gh-7086).

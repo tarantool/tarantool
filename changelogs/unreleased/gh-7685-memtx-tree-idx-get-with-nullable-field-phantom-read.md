@@ -1,4 +1,4 @@
 ## bugfix/memtx
 
-* Fixed possibility of phantom reads with `get` on TREE index containing
-  nullable part (gh-7685).
+* Fixed possible phantom reads with `get` on TREE indexes containing
+  nullable parts (gh-7685).
