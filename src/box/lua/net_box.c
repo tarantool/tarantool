@@ -111,7 +111,8 @@ enum netbox_method {
 	NETBOX_BEGIN       = 17,
 	NETBOX_COMMIT      = 18,
 	NETBOX_ROLLBACK    = 19,
-	NETBOX_INJECT      = 20,
+	NETBOX_SELECT_WITH_POS = 20,
+	NETBOX_INJECT      = 21,
 	netbox_method_MAX
 };
 
@@ -784,16 +785,26 @@ netbox_encode_eval(lua_State *L, int idx, struct mpstream *stream,
 	netbox_end_encode(stream, svp);
 }
 
+/* Encode select request. */
 static void
 netbox_encode_select(lua_State *L, int idx, struct mpstream *stream,
 		     uint64_t sync, uint64_t stream_id)
 {
-	/* Lua stack at idx: space_id, index_id, iterator, offset, limit, key */
+	/*
+	 * Lua stack at idx: space_id, index_id, iterator, offset, limit, key,
+	 * after, fetch_pos.
+	 */
 	size_t svp = netbox_begin_encode(stream, sync, IPROTO_SELECT,
 					 stream_id);
+	uint32_t map_size = 6;
 
-	mpstream_encode_map(stream, 6);
-
+	bool have_after = !lua_isnil(L, idx + 6);
+	if (have_after)
+		map_size++;
+	bool fetch_pos = lua_toboolean(L, idx + 7);
+	if (fetch_pos)
+		map_size++;
+	mpstream_encode_map(stream, map_size);
 	uint32_t space_id = lua_tonumber(L, idx);
 	uint32_t index_id = lua_tonumber(L, idx + 1);
 	int iterator = lua_tointeger(L, idx + 2);
@@ -823,6 +834,27 @@ netbox_encode_select(lua_State *L, int idx, struct mpstream *stream,
 	/* encode key */
 	mpstream_encode_uint(stream, IPROTO_KEY);
 	luamp_convert_key(L, cfg, stream, idx + 5);
+
+	/* encode after */
+	if (have_after) {
+		if (lua_isstring(L, idx + 6)) {
+			mpstream_encode_uint(stream, IPROTO_AFTER_POSITION);
+			size_t size;
+			const char *pos = lua_tolstring(L, idx + 6, &size);
+			mpstream_encode_strn(stream, pos, size);
+		} else {
+			assert(luaT_istuple(L, idx + 6) != NULL ||
+			       lua_istable(L, idx + 6));
+			mpstream_encode_uint(stream, IPROTO_AFTER_TUPLE);
+			luamp_encode_tuple(L, cfg, stream, idx + 6);
+		}
+	}
+
+	/* encode fetch_pos */
+	if (fetch_pos) {
+		mpstream_encode_uint(stream, IPROTO_FETCH_POSITION);
+		mpstream_encode_bool(stream, fetch_pos);
+	}
 
 	netbox_end_encode(stream, svp);
 }
@@ -1295,6 +1327,7 @@ netbox_encode_method(struct lua_State *L, int idx, enum netbox_method method,
 		[NETBOX_BEGIN]          = netbox_encode_begin,
 		[NETBOX_COMMIT]         = netbox_encode_commit,
 		[NETBOX_ROLLBACK]       = netbox_encode_rollback,
+		[NETBOX_SELECT_WITH_POS] = netbox_encode_select,
 		[NETBOX_INJECT]		= netbox_encode_inject,
 	};
 	struct mpstream stream;
@@ -1434,6 +1467,54 @@ netbox_decode_select(struct lua_State *L, const char **data,
 	} else {
 		netbox_decode_data(L, data, format);
 	}
+}
+
+/**
+ * Decodes Tarantool response body consisting of IPROTO_DATA and probably
+ * IPROTO_POSITION keys into array with array of tuple on the first place
+ * and position string on the second place, pushes it to Lua stack.
+ */
+static void
+netbox_decode_select_with_pos(struct lua_State *L, const char **data,
+			      const char *data_end, bool return_raw,
+			      struct tuple_format *format)
+{
+	(void)data_end;
+	assert(mp_typeof(**data) == MP_MAP);
+	uint32_t map_size = mp_decode_map(data);
+	/* Possible keys are DATA and POSITION. */
+	assert(map_size <= 2);
+	lua_createtable(L, map_size, 0);
+	uint32_t table_idx = lua_gettop(L);
+	bool has_iproto_data = false;
+	for (uint32_t i = 0; i < map_size; ++i) {
+		uint32_t key = mp_decode_uint(data);
+		switch (key) {
+		case IPROTO_DATA:
+			has_iproto_data = true;
+			if (return_raw) {
+				const char *data_begin = *data;
+				mp_next(data);
+				luamp_push(L, data_begin, *data);
+			} else {
+				netbox_decode_data(L, data, format);
+			}
+			lua_rawseti(L, table_idx, 1);
+			break;
+		case IPROTO_POSITION:
+			assert(mp_typeof(**data) == MP_STR);
+			uint32_t str_len;
+			const char *pos = mp_decode_str(data, &str_len);
+			assert(str_len != 0);
+			lua_pushlstring(L, pos, str_len);
+			lua_rawseti(L, table_idx, 2);
+			break;
+		default:
+			unreachable();
+		}
+	}
+	assert(has_iproto_data);
+	(void)has_iproto_data;
 }
 
 /**
@@ -1719,6 +1800,7 @@ netbox_decode_method(struct lua_State *L, enum netbox_method method,
 		[NETBOX_BEGIN]          = netbox_decode_nil,
 		[NETBOX_COMMIT]         = netbox_decode_nil,
 		[NETBOX_ROLLBACK]       = netbox_decode_nil,
+		[NETBOX_SELECT_WITH_POS] = netbox_decode_select_with_pos,
 		[NETBOX_INJECT]		= netbox_decode_table,
 	};
 	method_decoder[method](L, data, data_end, return_raw, format);
@@ -2314,6 +2396,70 @@ netbox_transport_on_event(struct netbox_transport *transport,
 }
 
 /**
+ * Argument data is the body of response, it must be an MP_MAP. Only two keys
+ * are expected to appear: IPROTO_DATA (necessarily, must be the first one)
+ * and IPROTO_POSITION (unnecessarily). The function writes response to
+ * passed ibuf. If skip_header flag is set, data is written without IPROTO_DATA
+ * header. If skip_header is true and response contains IPROTO_POSITION,
+ * position is not written to a buffer - the function returns a table with
+ * number of written bytes on the first place and position on the second one.
+ * Otherwise, number of bytes written is returned.
+ * An error is raised on failure.
+ */
+static inline void
+netbox_write_response_to_buffer(const char *data, const char *data_end,
+				struct lua_State *L, struct ibuf *buffer,
+				bool skip_header)
+{
+	/* Copy xrow.body to user-provided buffer. */
+	size_t data_len = data_end - data;
+	bool return_table = false;
+	if (skip_header) {
+		assert(mp_typeof(*data) == MP_MAP);
+		uint32_t map_size = mp_decode_map(&data);
+		uint32_t key = mp_decode_uint(&data);
+		assert(key == IPROTO_DATA);
+		(void)key;
+		if (map_size > 1) {
+			/*
+			 * The map has more than one element iff it
+			 * contains IPROTO_DATA and IPROTO_POSITION
+			 * and they are placed exactly in this order.
+			 */
+			assert(map_size == 2);
+			/* Find the end of IPROTO_DATA and its len. */
+			const char *iproto_position = data;
+			mp_next(&iproto_position);
+			data_len = iproto_position - data;
+			/* Create table to return 2 values. */
+			return_table = true;
+			lua_createtable(L, 2, 0);
+			/* Skip IPROTO_POSITION key. */
+			key = mp_decode_uint(&iproto_position);
+			assert(key == IPROTO_POSITION);
+			/* Check position length */
+			assert(mp_typeof(*iproto_position) == MP_STR);
+			uint32_t str_len = mp_decode_strl(&iproto_position);
+			if (str_len != 0) {
+				/* Set position to the 2nd place in table. */
+				lua_pushlstring(L, iproto_position, str_len);
+				lua_rawseti(L, -2, 2);
+			}
+		} else {
+			/* Update data_len if header is skipped. */
+			data_len = data_end - data;
+		}
+	}
+	void *wpos = ibuf_alloc(buffer, data_len);
+	if (wpos == NULL)
+		luaL_error(L, "out of memory");
+	memcpy(wpos, data, data_len);
+	lua_pushinteger(L, data_len);
+	if (return_table)
+		lua_rawseti(L, -2, 1);
+}
+
+/**
  * Given a netbox transport and a response header, decodes the response and
  * either completes the request or invokes the on-push trigger, depending on
  * the status.
@@ -2358,15 +2504,9 @@ netbox_transport_dispatch_response(struct netbox_transport *transport,
 	const char *data = hdr->body[0].iov_base;
 	const char *data_end = data + hdr->body[0].iov_len;
 	if (request->buffer != NULL) {
-		/* Copy xrow.body to user-provided buffer. */
-		if (request->skip_header)
-			netbox_skip_to_data(&data);
-		size_t data_len = data_end - data;
-		void *wpos = ibuf_alloc(request->buffer, data_len);
-		if (wpos == NULL)
-			luaL_error(L, "out of memory");
-		memcpy(wpos, data, data_len);
-		lua_pushinteger(L, data_len);
+		netbox_write_response_to_buffer(data, data_end, L,
+						request->buffer,
+						request->skip_header);
 	} else {
 		/* Decode xrow.body[DATA] to Lua objects. */
 		if (status == IPROTO_OK) {

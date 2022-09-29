@@ -19,6 +19,7 @@ local check_primary_index = box.internal.check_primary_index
 local check_param_table   = box.internal.check_param_table
 
 local ibuf_t = ffi.typeof('struct ibuf')
+local is_tuple = box.tuple.is
 
 local TIMEOUT_INFINITY = 500 * 365 * 86400
 
@@ -47,8 +48,9 @@ local M_COUNT       = 16
 local M_BEGIN       = 17
 local M_COMMIT      = 18
 local M_ROLLBACK    = 19
+local M_SELECT_FETCH_POS  = 20
 -- Injects raw data into connection. Used by tests.
-local M_INJECT      = 20
+local M_INJECT      = 21
 
 -- IPROTO feature id -> name
 local IPROTO_FEATURE_NAMES = {
@@ -69,6 +71,14 @@ local REQUEST_OPTION_TYPES = {
     return_raw  = "boolean",
     skip_header = "boolean",
     timeout     = "number",
+    fetch_pos   = "boolean",
+    after = function(after)
+        if after ~= nil and type(after) ~= "string" and type(after) ~= "table"
+                and not is_tuple(after) then
+            return false, "string, table, tuple"
+        end
+        return true
+    end,
     buffer = function(buf)
        if not ffi.istype(ibuf_t, buf) then
            return false, "struct ibuf"
@@ -1101,10 +1111,23 @@ index_metatable = function(remote)
         check_param_table(opts, REQUEST_OPTION_TYPES)
         local key_is_nil = (key == nil or
                             (type(key) == 'table' and #key == 0))
-        local iterator, offset, limit = check_select_opts(opts, key_is_nil)
-        return (remote:_request(M_SELECT, opts, self.space._format_cdata,
-                                self._stream_id, self.space.id, self.id,
-                                iterator, offset, limit, key))
+        local iterator, offset, limit, _, after, fetch_pos =
+            check_select_opts(opts, key_is_nil)
+        if (after ~= nil or fetch_pos)
+                and not remote.peer_protocol_features.pagination then
+            return box.error(box.error.UNSUPPORTED, "Remote server",
+                "pagination")
+        end
+
+        local res
+        local method = fetch_pos and M_SELECT_FETCH_POS or M_SELECT
+        res = (remote:_request(method, opts, self.space._format_cdata,
+                               self._stream_id, self.space.id, self.id,
+                               iterator, offset, limit, key, after, fetch_pos))
+        if type(res) ~= 'table' or not fetch_pos or opts and opts.is_async then
+            return res
+        end
+        return unpack(res)
     end
 
     function methods:get(key, opts)
@@ -1117,7 +1140,8 @@ index_metatable = function(remote)
                                                self.space._format_cdata,
                                                self._stream_id,
                                                self.space.id, self.id,
-                                               box.index.EQ, 0, 2, key))
+                                               box.index.EQ, 0, 2, key,
+                                               nil, false))
     end
 
     function methods:min(key, opts)
@@ -1130,7 +1154,8 @@ index_metatable = function(remote)
                                                self.space._format_cdata,
                                                self._stream_id,
                                                self.space.id, self.id,
-                                               box.index.GE, 0, 1, key))
+                                               box.index.GE, 0, 1, key,
+                                               nil, false))
     end
 
     function methods:max(key, opts)
@@ -1143,7 +1168,8 @@ index_metatable = function(remote)
                                                self.space._format_cdata,
                                                self._stream_id,
                                                self.space.id, self.id,
-                                               box.index.LE, 0, 1, key))
+                                               box.index.LE, 0, 1, key,
+                                               nil, false))
     end
 
     function methods:count(key, opts)

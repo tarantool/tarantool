@@ -70,7 +70,7 @@ static int
 lbox_normalize_position(lua_State *L, int idx, int space_id, int index_id,
 			const char **packed_pos, const char **packed_pos_end)
 {
-	if (luaL_isnull(L, idx)) {
+	if (lua_isnil(L, idx)) {
 		*packed_pos = NULL;
 		*packed_pos_end = NULL;
 	} else if (lua_isstring(L, idx)) {
