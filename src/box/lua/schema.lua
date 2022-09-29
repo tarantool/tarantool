@@ -2429,7 +2429,7 @@ local function check_select_opts(opts, key_is_nil)
     local limit = 4294967295
     local iterator = check_iterator_type(opts, key_is_nil)
     local fullscan = false
-    local after = box.NULL
+    local after = nil
     local fetch_pos = false
     if opts ~= nil and type(opts) == "table" then
         if opts.offset ~= nil then
