@@ -269,13 +269,13 @@ lbox_iterator_next(lua_State *L)
 {
 	/* first argument is key buffer */
 	if (lua_gettop(L) < 1 || lua_type(L, 1) != LUA_TCDATA)
-		return luaL_error(L, "usage: next(state)");
+		return luaL_error(L, "usage: next(param, state)");
 
 	assert(CTID_STRUCT_ITERATOR_PTR != 0);
 	uint32_t ctypeid;
 	void *data = luaL_checkcdata(L, 1, &ctypeid);
 	if (ctypeid != CTID_STRUCT_ITERATOR_PTR)
-		return luaL_error(L, "usage: next(state)");
+		return luaL_error(L, "usage: next(param, state)");
 
 	struct iterator *itr = *(struct iterator **) data;
 	struct tuple *tuple;
