@@ -11,6 +11,10 @@ target_compile_options(
     INTERFACE
         $<$<NOT:$<BOOL:${OSS_FUZZ}>>:
         -fsanitize=fuzzer
+        -fsanitize-coverage=trace-cmp
+        -fprofile-instr-generate
+        -fcoverage-mapping
+        -g
         >
         $<$<BOOL:${OSS_FUZZ}>:
         ${CXX}
@@ -22,6 +26,10 @@ target_link_libraries(
     INTERFACE
         $<$<NOT:$<BOOL:${OSS_FUZZ}>>:
         -fsanitize=fuzzer
+        -fsanitize-coverage=trace-cmp
+        -fprofile-instr-generate
+        -fcoverage-mapping
+        -g
         >
         $<$<BOOL:${OSS_FUZZ}>:
         $ENV{LIB_FUZZING_ENGINE}
