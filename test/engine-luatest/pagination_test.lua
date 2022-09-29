@@ -1,7 +1,11 @@
 local server = require('test.luatest_helpers.server')
 local t = require('luatest')
-local tree_g = t.group('Tree index tests',
-    t.helpers.matrix{engine={'memtx'}, disable_ffi={true, false}})
+local tree_g = t.group('Tree index tests', {
+    {engine = 'memtx', disable_ffi = true},
+    {engine = 'memtx', disable_ffi = false},
+    -- Vinyl doesn't use FFI.
+    {engine = 'vinyl', disable_ffi = false},
+})
 
 -- TODO(gh-7739): Enable Lua JIT on aarch64.
 local function start_server(server)
