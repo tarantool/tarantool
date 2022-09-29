@@ -1,5 +1,4 @@
 ## bugfix/raft
 
-* Fixed a bug when a replicaset could be split in parts if a node during
-  elections voted for another instance while having some local WAL writes not
-  finished (gh-7253).
+* Fixed a bug when a replicaset could be split into parts if a node voted
+  for another instance while having local WAL writes unfinished (gh-7253).

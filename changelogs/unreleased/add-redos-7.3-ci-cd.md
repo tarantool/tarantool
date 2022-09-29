@@ -1,3 +1,3 @@
 ## feature/build
 
-* Support RedOS 7.3 build.
+* RedOS 7.3 is now supported.
