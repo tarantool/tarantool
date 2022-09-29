@@ -2257,7 +2257,7 @@ base_index_mt.__len = base_index_mt.len
 -- min and max
 base_index_mt.min_ffi = function(index, key)
     if builtin.box_read_ffi_is_disabled then
-        return index:min_luac(key)
+        return base_index_mt.min_luac(index, key)
     end
     check_index_arg(index, 'min')
     local ibuf = cord_ibuf_take()
@@ -2280,7 +2280,7 @@ base_index_mt.min_luac = function(index, key)
 end
 base_index_mt.max_ffi = function(index, key)
     if builtin.box_read_ffi_is_disabled then
-        return index:max_luac(key)
+        return base_index_mt.max_luac(index, key)
     end
     check_index_arg(index, 'max')
     local ibuf = cord_ibuf_take()
@@ -2303,7 +2303,7 @@ base_index_mt.max_luac = function(index, key)
 end
 base_index_mt.random_ffi = function(index, rnd)
     if builtin.box_read_ffi_is_disabled then
-        return index:random_luac(rnd)
+        return base_index_mt.random_luac(index, rnd)
     end
     check_index_arg(index, 'random')
     rnd = rnd or math.random()
@@ -2373,7 +2373,7 @@ end
 
 base_index_mt.get_ffi = function(index, key)
     if builtin.box_read_ffi_is_disabled then
-        return index:get_luac(key)
+        return base_index_mt.get_luac(index, key)
     end
     check_index_arg(index, 'get')
     local ibuf = cord_ibuf_take()
@@ -2432,7 +2432,7 @@ end
 
 base_index_mt.select_ffi = function(index, key, opts)
     if builtin.box_read_ffi_is_disabled then
-        return index:select_luac(key, opts)
+        return base_index_mt.select_luac(index, key, opts)
     end
     check_index_arg(index, 'select')
     local ibuf = cord_ibuf_take()
