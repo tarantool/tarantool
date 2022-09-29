@@ -425,6 +425,7 @@
     <member refid="module_8h_1a923d13f137e4bdb8c852ea04637da58d" kind="typedef"><name>box_latch_t</name></member>
     <member refid="module_8h_1a90d26cf0c54dfa5e878e95ca0f73202a" kind="typedef"><name>box_decimal_t</name></member>
     <member refid="module_8h_1ab5a71c2541c377b3d5b34fdb35964c2e" kind="variable"><name>log_level</name></member>
+    <member refid="module_8h_1abfe1e6dda2fc92e77e64561cd3d4380f" kind="variable"><name>log_write_flightrec</name></member>
     <member refid="module_8h_1a4a35d7a7fe53c673112e06ab78794216" kind="function"><name>box_on_shutdown</name></member>
     <member refid="module_8h_1a11d9d5dc245f23922392835e55fccba9" kind="function"><name>say_log_level_is_enabled</name></member>
     <member refid="module_8h_1aa0f14b4a77bc8ce8ba99c67004083d23" kind="function"><name>CFORMAT</name></member>
