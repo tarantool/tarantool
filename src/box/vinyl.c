@@ -149,6 +149,12 @@ struct vinyl_iterator {
 	/** Memory pool the iterator was allocated from. */
 	struct mempool *pool;
 	/**
+	 * Iterator position for pagination. Set to none when
+	 * the iterator is created. Points to the last non-none
+	 * entry returned by the iterator.
+	 */
+	struct vy_entry pos;
+	/**
 	 * Points either to tx_autocommit for autocommit mode
 	 * or to a multi-statement transaction active when the
 	 * iterator was created.
@@ -3607,6 +3613,17 @@ vinyl_iterator_account_read(struct vinyl_iterator *it, double start_time,
 		vy_stmt_counter_acct_tuple(&lsm->stat.get, result);
 }
 
+/** Updates the iterator position returned by vinyl_iterator_position(). */
+static void
+vinyl_iterator_update_pos(struct vinyl_iterator *it, struct vy_entry entry)
+{
+	assert(entry.stmt != NULL);
+	if (it->pos.stmt != NULL)
+		tuple_unref(it->pos.stmt);
+	it->pos = entry;
+	tuple_ref(entry.stmt);
+}
+
 static int
 vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 {
@@ -3634,6 +3651,7 @@ vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 		/* EOF. Close the iterator immediately. */
 		vinyl_iterator_close(it);
 	} else {
+		vinyl_iterator_update_pos(it, entry);
 		tuple_bless(entry.stmt);
 	}
 	*ret = entry.stmt;
@@ -3685,6 +3703,7 @@ next:
 		goto next;
 	vy_read_iterator_cache_add(&it->iterator, entry);
 	vinyl_iterator_account_read(it, start_time, entry.stmt);
+	vinyl_iterator_update_pos(it, entry);
 	*ret = entry.stmt;
 	tuple_bless(*ret);
 	tuple_unref(*ret);
@@ -3697,6 +3716,34 @@ fail:
 	return -1;
 }
 
+/** Implementation of the iterator::position() method. */
+static int
+vinyl_iterator_position(struct iterator *base, const char **pos, uint32_t *size)
+{
+	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
+	/* Sic: can't use it->lsm here, because the iterator may be closed. */
+	struct vy_lsm *lsm = vy_lsm(base->index);
+	struct key_def *cmp_def = lsm->cmp_def;
+	struct vy_entry entry = it->pos;
+	if (entry.stmt == NULL) {
+		*pos = NULL;
+		*size = 0;
+		return 0;
+	}
+	const char *key = tuple_extract_key(
+			entry.stmt, cmp_def,
+			vy_entry_multikey_idx(entry, cmp_def), size);
+	if (key == NULL)
+		return -1;
+	*pos = key;
+	assert(mp_typeof(**pos) == MP_ARRAY);
+	uint32_t part_count = mp_decode_array(pos);
+	assert(part_count == cmp_def->part_count);
+	(void)part_count;
+	*size -= *pos - key;
+	return 0;
+}
+
 static void
 vinyl_iterator_free(struct iterator *base)
 {
@@ -3704,6 +3751,8 @@ vinyl_iterator_free(struct iterator *base)
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
 	if (base->next != exhausted_iterator_next)
 		vinyl_iterator_close(it);
+	if (it->pos.stmt != NULL)
+		tuple_unref(it->pos.stmt);
 	mempool_free(it->pool, it);
 }
 
@@ -3718,10 +3767,6 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	if (type > ITER_GT) {
 		diag_set(UnsupportedIndexFeature, base->def,
 			 "requested iterator type");
-		return NULL;
-	}
-	if (pos != NULL) {
-		diag_set(UnsupportedIndexFeature, base->def, "pagination");
 		return NULL;
 	}
 
@@ -3739,9 +3784,16 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	}
 	it->key = vy_entry_key_new(lsm->env->key_format, lsm->cmp_def,
 				   key, part_count);
-	if (it->key.stmt == NULL) {
-		mempool_free(&env->iterator_pool, it);
-		return NULL;
+	if (it->key.stmt == NULL)
+		goto err_key;
+	struct vy_entry last;
+	if (pos != NULL) {
+		last = vy_entry_key_new(lsm->env->key_format, lsm->cmp_def,
+					pos, lsm->cmp_def->part_count);
+		if (last.stmt == NULL)
+			goto err_pos;
+	} else {
+		last = vy_entry_none();
 	}
 
 	iterator_create(&it->base, base);
@@ -3749,9 +3801,10 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 		it->base.next = vinyl_iterator_primary_next;
 	else
 		it->base.next = vinyl_iterator_secondary_next;
-	it->base.position = generic_iterator_position;
+	it->base.position = vinyl_iterator_position;
 	it->base.free = vinyl_iterator_free;
 	it->pool = &env->iterator_pool;
+	it->pos = vy_entry_none();
 
 	if (tx != NULL) {
 		/*
@@ -3768,9 +3821,15 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	it->tx = tx;
 
 	lsm->stat.lookup++;
-	vy_read_iterator_open(&it->iterator, lsm, tx, type, it->key,
-			      (const struct vy_read_view **)&tx->read_view);
+	vy_read_iterator_open_after(
+		&it->iterator, lsm, tx, type, it->key, last,
+		(const struct vy_read_view **)&tx->read_view);
 	return (struct iterator *)it;
+err_key:
+	mempool_free(&env->iterator_pool, it);
+err_pos:
+	tuple_unref(it->key.stmt);
+	return NULL;
 }
 
 static int

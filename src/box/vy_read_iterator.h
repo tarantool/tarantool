@@ -63,6 +63,8 @@ struct vy_read_iterator {
 	 * checked to match the search key.
 	 */
 	bool need_check_eq;
+	/** Set to true on the first iteration. */
+	bool is_started;
 	/** Last statement returned by vy_read_iterator_next(). */
 	struct vy_entry last;
 	/**
@@ -128,12 +130,25 @@ struct vy_read_iterator {
  * @param iterator_type Type of the iterator that determines order
  *                      of the iteration.
  * @param key           Key for the iteration.
+ * @param last          Key to start the iteration after. Note, the iterator
+ *                      takes ownership of the entry: it will unref the entry
+ *                      when it's no longer needed.
  * @param rv            Read view.
  */
 void
+vy_read_iterator_open_after(struct vy_read_iterator *itr, struct vy_lsm *lsm,
+			    struct vy_tx *tx, enum iterator_type iterator_type,
+			    struct vy_entry key, struct vy_entry last,
+			    const struct vy_read_view **rv);
+
+static inline void
 vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_lsm *lsm,
 		      struct vy_tx *tx, enum iterator_type iterator_type,
-		      struct vy_entry key, const struct vy_read_view **rv);
+		      struct vy_entry key, const struct vy_read_view **rv)
+{
+	vy_read_iterator_open_after(itr, lsm, tx, iterator_type, key,
+				    vy_entry_none(), rv);
+}
 
 /**
  * Get the next statement with another key, or start the iterator,

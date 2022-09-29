@@ -488,12 +488,13 @@ vy_read_iterator_advance(struct vy_read_iterator *itr)
 	 * Restore the iterator position if the LSM tree has changed
 	 * since the last iteration or this is the first iteration.
 	 */
-	if (itr->last.stmt == NULL ||
+	if (!itr->is_started ||
 	    itr->mem_list_version != itr->lsm->mem_list_version ||
 	    itr->range_tree_version != itr->lsm->range_tree_version ||
 	    itr->range_version != itr->curr_range->version) {
 		vy_read_iterator_restore(itr);
 	}
+	itr->is_started = true;
 restart:
 	itr->prev_front_id = itr->front_id;
 	itr->front_id++;
@@ -705,9 +706,10 @@ vy_read_iterator_cleanup(struct vy_read_iterator *itr)
 }
 
 void
-vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_lsm *lsm,
-		      struct vy_tx *tx, enum iterator_type iterator_type,
-		      struct vy_entry key, const struct vy_read_view **rv)
+vy_read_iterator_open_after(struct vy_read_iterator *itr, struct vy_lsm *lsm,
+			    struct vy_tx *tx, enum iterator_type iterator_type,
+			    struct vy_entry key, struct vy_entry last,
+			    const struct vy_read_view **rv)
 {
 	memset(itr, 0, sizeof(*itr));
 
@@ -716,7 +718,7 @@ vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_lsm *lsm,
 	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->read_view = rv;
-	itr->last = vy_entry_none();
+	itr->last = last;
 	itr->last_cached = vy_entry_none();
 
 	if (vy_stmt_is_empty_key(key.stmt)) {
@@ -744,7 +746,6 @@ vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_lsm *lsm,
 		 */
 		itr->need_check_eq = true;
 	}
-
 }
 
 /**
