@@ -2169,8 +2169,7 @@ applier_f(va_list ap)
 				/* Connection to itself, stop applier */
 				applier_disconnect(applier, APPLIER_OFF);
 				return 0;
-			} else if (e->errcode() == ER_LOADING ||
-				   e->errcode() == ER_READONLY) {
+			} else if (e->errcode() == ER_LOADING) {
 				/* Autobootstrap */
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_LOADING);
