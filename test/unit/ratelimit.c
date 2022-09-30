@@ -1,5 +1,6 @@
 #include <time.h>
 
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 #include "ratelimit.h"
 
