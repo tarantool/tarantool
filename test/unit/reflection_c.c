@@ -1,5 +1,6 @@
 #include "reflection.h"
 
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
 static struct type_info type_Object = {
