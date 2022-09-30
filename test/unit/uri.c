@@ -1,4 +1,3 @@
-#include "unit.h"
 #include "uri/uri.h"
 #include "lua/utils.h"
 #include "trivia/util.h"
@@ -8,6 +7,9 @@
 #include "tt_static.h"
 
 #include <stdio.h>
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 #define URI_MAX 10
 #define URI_PARAM_MAX 10
