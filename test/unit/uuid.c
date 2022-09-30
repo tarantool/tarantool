@@ -1,10 +1,12 @@
-#include "unit.h"
 #include "core/random.h"
 #include "mp_uuid.h"
 #include "msgpuck/msgpuck.h"
 #include "mp_extension_types.h"
 #include "tt_uuid.h"
 #include <string.h>
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 static void
 uuid_test(struct tt_uuid a, struct tt_uuid b, int expected_result)
