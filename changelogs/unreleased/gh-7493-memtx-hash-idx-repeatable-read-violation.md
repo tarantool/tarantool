@@ -1,4 +1,4 @@
 ## bugfix/memtx
 
-* Fixed gap writes from different transaction incorrectly handled for hash index
-  full scans (gh-7493).
+* Fixed incorrect handling of transaction conflicts in full scans
+  by HASH indexes (gh-7493).
