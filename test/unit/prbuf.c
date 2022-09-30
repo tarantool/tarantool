@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 #include "core/prbuf.h"
 #include "trivia/util.h"
