@@ -1,6 +1,8 @@
 #include "string.h"
-#include "unit.h"
 #include "trivia/util.h"
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 static void
 test_strlcat(void)
