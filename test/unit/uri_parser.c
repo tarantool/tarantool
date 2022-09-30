@@ -1,6 +1,8 @@
-#include "unit.h"
 #include "uri/uri.h"
 #include <string.h>
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 int
 test(const char *s, const char *scheme, const char *login, const char *password,
