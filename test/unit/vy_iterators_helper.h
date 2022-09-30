@@ -32,13 +32,15 @@
  */
 
 #include <sys/uio.h>
-#include "unit.h"
 #include "vy_stmt.h"
 #include "small/rlist.h"
 #include "small/lsregion.h"
 #include "vy_mem.h"
 #include "vy_cache.h"
 #include "vy_read_view.h"
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 #define vyend 99999999
 #define MAX_FIELDS_COUNT 100
