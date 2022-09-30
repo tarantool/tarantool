@@ -1,9 +1,11 @@
 #include <lua.h>              /* lua_*() */
 #include <lauxlib.h>          /* luaL_*() */
 #include <lualib.h>           /* luaL_openlibs() */
-#include "unit.h"             /* plan, header, footer, is, ok */
 #include "lua/serializer.h"   /* functions to test */
 #include "mp_extension_types.h" /* enum mp_extension_type */
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"             /* plan, header, footer, is, ok */
 
 static int
 check_luaL_field(const struct luaL_field *field, const struct luaL_field *exp,
