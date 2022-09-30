@@ -1,6 +1,8 @@
 #include "memory.h"
 #include "fiber.h"
 #include "latch.h"
+
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
 const size_t num_fibers = 3;
