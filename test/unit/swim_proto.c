@@ -34,7 +34,6 @@
 #include "tt_uuid.h"
 #include "version.h"
 #include "msgpuck.h"
-#include "unit.h"
 #include "swim/swim_proto.h"
 #include "swim_test_utils.h"
 #include <fcntl.h>

@@ -32,7 +32,6 @@
  */
 #include <stdbool.h>
 #include "tt_uuid.h"
-#include "unit.h"
 #include "fiber.h"
 #include "uri/uri.h"
 #include "swim/swim.h"
@@ -40,6 +39,9 @@
 #include "swim/swim_proto.h"
 #include "fakesys/fakenet.h"
 #include "fakesys/fakeev.h"
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 struct swim_cluster;
 
