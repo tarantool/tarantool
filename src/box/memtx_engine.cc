@@ -841,8 +841,6 @@ checkpoint_f(va_list ap)
 
 	say_info("saving snapshot `%s'", snap.filename);
 	ERROR_INJECT_SLEEP(ERRINJ_SNAP_WRITE_DELAY);
-	if (read_view_activate(&ckpt->rv) != 0)
-		goto fail;
 	struct space_read_view *space_rv;
 	read_view_foreach_space(space_rv, &ckpt->rv) {
 		uint32_t size;
@@ -873,7 +871,6 @@ checkpoint_f(va_list ap)
 		if (rc != 0)
 			break;
 	}
-	read_view_deactivate(&ckpt->rv);
 	if (rc != 0)
 		goto fail;
 	if (checkpoint_write_raft(&snap, &ckpt->raft) != 0)
@@ -1083,8 +1080,6 @@ memtx_join_f(va_list ap)
 {
 	int rc = 0;
 	struct memtx_join_ctx *ctx = va_arg(ap, struct memtx_join_ctx *);
-	if (read_view_activate(&ctx->rv) != 0)
-		return -1;
 	struct space_read_view *space_rv;
 	read_view_foreach_space(space_rv, &ctx->rv) {
 		struct index_read_view *index_rv =
@@ -1114,7 +1109,6 @@ memtx_join_f(va_list ap)
 		if (rc != 0)
 			break;
 	}
-	read_view_deactivate(&ctx->rv);
 	return rc;
 }
 

@@ -79,7 +79,10 @@ struct read_view {
 	struct rlist engines;
 	/** List of space read views, linked by space_read_view::link. */
 	struct rlist spaces;
-	/** Thread that activated the read view, see read_view_activate(). */
+	/**
+	 * Thread that exclusively owns this read view or NULL if the read view
+	 * may be used by any thread.
+	 */
 	struct cord *owner;
 };
 
@@ -139,9 +142,6 @@ read_view_opts_create(struct read_view_opts *opts);
  *
  * Engines that don't support read view creation are silently skipped.
  *
- * A read view must be activated before use, see read_view_activate(). After a
- * read view is activated, it may only be use in the thread that activated it.
- *
  * Returns 0 on success. On error, returns -1 and sets diag.
  */
 int
@@ -149,41 +149,9 @@ read_view_open(struct read_view *rv, const struct read_view_opts *opts);
 
 /**
  * Closes a database read view.
- *
- * The read view must be deactivated, see read_view_deactivate().
  */
 void
 read_view_close(struct read_view *rv);
-
-/**
- * Activates a read view for use in the current thread.
- *
- * Returns 0 on success. On error, returns -1 and sets diag.
- */
-int
-read_view_activate(struct read_view *rv);
-
-/**
- * Deactivates a read view.
- *
- * A read view may only be deactivated by the thread that activated it.
- */
-void
-read_view_deactivate(struct read_view *rv);
-
-/**
- * Prepares a tuple retrieved from a read view to be returned to the user.
- *
- * This function applies the space upgrade function if the read view was open
- * while the space upgrade was in progress. It may only be called in the thread
- * that activated the read view, see read_view_activate().
- *
- * If the tuple doesn't need any processing, it's returned as is, otherwise
- * a new tuple is allocated and pinned with tuple_bless. On error, NULL is
- * returned and diag is set.
- */
-struct tuple *
-read_view_process_result(struct space_read_view *space_rv, struct tuple *tuple);
 
 #if defined(__cplusplus)
 } /* extern "C" */
