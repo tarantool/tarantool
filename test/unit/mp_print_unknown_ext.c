@@ -2,8 +2,10 @@
 #include "mp_extension_types.h"
 
 #include "trivia/util.h"
-#include "unit.h"
 #include <stdio.h>
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 static int
 test_mp_print(const char *sample, const char *ext_data)
