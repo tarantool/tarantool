@@ -16,10 +16,12 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct cord;
+struct field_def;
 struct index;
 struct index_read_view;
 struct space;
 struct space_upgrade_read_view;
+struct tuple_format;
 
 /** Read view of a space. */
 struct space_read_view {
@@ -31,6 +33,14 @@ struct space_read_view {
 	uint32_t id;
 	/** Space name. */
 	char *name;
+	/**
+	 * Tuple field definition array used by this space. Allocated only if
+	 * read_view_opts::needs_field_names is set, otherwise set to NULL.
+	 * Used for creation of space_read_view::format.
+	 */
+	struct field_def *fields;
+	/** Number of entries in the fields array. */
+	uint32_t field_count;
 	/**
 	 * Runtime tuple format needed to access tuple field names by name.
 	 * Referenced (ref counter incremented).
