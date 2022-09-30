@@ -1,8 +1,10 @@
 #include "memory.h"
 #include "fiber.h"
 #include "tuple.h"
-#include "unit.h"
 #include <stdio.h>
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 enum {
 	FEW_REFS = 10,
