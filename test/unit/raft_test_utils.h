@@ -33,6 +33,8 @@
 #include "fiber.h"
 #include "raft/raft.h"
 #include "raft/raft_ev.h"
+
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
 /** WAL simulation. It stores a list of rows which raft wanted to persist. */
