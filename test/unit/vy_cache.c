@@ -2,7 +2,6 @@
 #include "vy_iterators_helper.h"
 #include "vy_history.h"
 #include "fiber.h"
-#include "unit.h"
 
 const struct vy_stmt_template key_template = STMT_TEMPLATE(0, SELECT, vyend);
 

@@ -1,9 +1,0 @@
-	*** test_basic ***
-1..6
-ok 1 - cache is filled with 6 statements
-ok 2 - cache is filled with 12 statements
-ok 3 - cache is filled with 18 statements
-ok 4 - next_key * 4
-ok 5 - restore
-ok 6 - restore on position after last
-	*** test_basic: done ***
