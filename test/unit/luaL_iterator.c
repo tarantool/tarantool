@@ -1,13 +1,15 @@
 #include <lua.h>       /* lua_*() */
 #include <lauxlib.h>   /* luaL_*() */
 #include <lualib.h>    /* luaL_openlibs() */
-#include "unit.h"      /* plan, header, footer, is */
 #include "memory.h"    /* memory_init() */
 #include "fiber.h"     /* fiber_init() */
 #include "diag.h"      /* struct error, diag_*() */
 #include "exception.h" /* type_LuajitError */
 #include "lua/utils.h" /* luaL_iterator_*() */
 #include "lua/error.h" /* tarantool_lua_error_init() */
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"      /* plan, header, footer, is */
 
 extern char fun_lua[];
 
