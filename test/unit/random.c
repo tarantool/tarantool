@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
 static void
