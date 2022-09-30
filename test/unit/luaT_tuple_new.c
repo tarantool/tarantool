@@ -2,7 +2,6 @@
 #include <lua.h>              /* lua_*() */
 #include <lauxlib.h>          /* luaL_*() */
 #include <lualib.h>           /* luaL_openlibs() */
-#include "unit.h"             /* plan, header, footer, is, ok */
 #include "memory.h"           /* memory_init() */
 #include "fiber.h"            /* fiber_init() */
 #include "small/ibuf.h"       /* struct ibuf */
@@ -12,6 +11,9 @@
 #include "box/lua/tuple.h"    /* luaT_tuple_new() */
 #include "diag.h"             /* struct error, diag_*() */
 #include "exception.h"        /* type_IllegalParams */
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"             /* plan, header, footer, is, ok */
 
 /*
  * This test checks all usage cases of luaT_tuple_new():
