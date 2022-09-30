@@ -1278,8 +1278,45 @@ local function revoke_write_access_on__collation_from_role_public()
     _priv:delete{PUBLIC, 'space', box.schema.COLLATION_ID}
 end
 
+local function convert_sql_constraints_to_tuple_constraints()
+    local _space = box.space._space
+    local _fk = box.space[box.schema.FK_CONSTRAINT_ID]
+    local _ck = box.space[box.schema.CK_CONSTRAINT_ID]
+    log.info("convert constraints from _ck_constraint and _fk_constraint")
+    for _, v in _fk:pairs() do
+        local def = _space:get{v.child_id}
+        local mapping = setmap({})
+        for i, id in pairs(v.child_cols) do
+            mapping[id] = v.parent_cols[i]
+        end
+        local fk = def.flags.foreign_key or {}
+        fk[v.name] = {space = v.parent_id, field = mapping}
+        local new_def = def:totable()
+        new_def[6].foreign_key = fk
+        _space:replace(new_def)
+        _fk:delete({v.name, v.child_id})
+    end
+    for _, v in _ck:pairs() do
+        local _func = box.space._func
+        local def = _space:get{v.space_id}
+        local datetime = os.date("%Y-%m-%d %H:%M:%S")
+        local name = 'check_'..def.name.."_"..v.name
+        local t = _func:auto_increment({ADMIN, name, 1, 'SQL_EXPR', v.code,
+                                       'function', {}, 'any', 'none', 'none',
+                                        true, true, true, {'LUA'}, setmap({}),
+                                        '', datetime, datetime})
+        local ck = def.flags.constraint or {}
+        ck[v.name] = t.id
+        local new_def = def:totable()
+        new_def[6].constraint = ck
+        _space:replace(new_def)
+        _ck:delete({v.space_id, v.name})
+    end
+end
+
 local function upgrade_to_2_11_0()
     revoke_write_access_on__collation_from_role_public()
+    convert_sql_constraints_to_tuple_constraints()
 end
 --------------------------------------------------------------------------------
 

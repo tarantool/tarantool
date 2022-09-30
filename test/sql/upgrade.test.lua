@@ -63,11 +63,11 @@ i = box.space._index:select(s.id)
 i ~= nil
 i[1].opts.sql == nil
 box.space._space:get(s.id).flags.checks == nil
-check = box.space._ck_constraint:select()[1]
-check ~= nil
-check.name
-check.code
+name, func_id = next(box.space[s.id].constraint)
+name ~= nil
+name
 s:drop()
+box.space._func:delete(func_id).body
 
 test_run:switch('default')
 test_run:cmd('stop server upgrade210')

@@ -191,23 +191,23 @@ box.space._space:get(s.id).flags.checks == nil
 ---
 - true
 ...
-check = box.space._ck_constraint:select()[1]
+name, func_id = next(box.space[s.id].constraint)
 ---
 ...
-check ~= nil
+name ~= nil
 ---
 - true
 ...
-check.name
+name
 ---
 - CK_CONSTRAINT_1_T5
 ...
-check.code
----
-- x < 2
-...
 s:drop()
 ---
+...
+box.space._func:delete(func_id).body
+---
+- x < 2
 ...
 test_run:switch('default')
 ---

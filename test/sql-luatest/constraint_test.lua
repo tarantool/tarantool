@@ -5,10 +5,15 @@ local g = t.group()
 g.before_all(function()
     g.server = server:new({alias = 'constraints'})
     g.server:start()
+
+    local data_dir = 'test/sql-luatest/upgrade/2.10.0'
+    g.upgrade = server:new({alias = 'upgrade', datadir = data_dir})
+    g.upgrade:start()
 end)
 
 g.after_all(function()
     g.server:stop()
+    g.upgrade:stop()
 end)
 
 -- Make sure ALTER TABLE ADD COLUMN does not drop field constraints.
@@ -483,5 +488,35 @@ g.test_constraints_8 = function()
               [['check_T_ONE' already exists]]
         t.assert_equals(err.message, res)
         t.assert_equals(box.space._func.index[2]:get('check_T_ONE'), nil)
+    end)
+end
+
+--
+-- Make sure that the SQL foreign key and check constraints are correctly
+-- converted to core foreign key and check constraints during the upgrade.
+--
+g.test_constraints_9 = function()
+    g.upgrade:exec(function()
+        local t = require('luatest')
+
+        t.assert_equals(box.space._ck_constraint:select(), {})
+        t.assert_equals(box.space._fk_constraint:select(), {})
+
+        local s = box.space._space.index[2]:get('T')
+        local s1 = box.space._space.index[2]:get('T1')
+        local s2 = box.space._space.index[2]:get('T2')
+        t.assert_equals(s[6].constraint, nil)
+        local fk1 = {fk_unnamed_T_1 = {field = {0}, space = s.id}}
+        t.assert_equals(s[6].foreign_key, fk1)
+        t.assert_equals(s1[6].constraint, nil)
+        local fk2 = {fk_unnamed_T1_1 = {field = {0}, space = s.id},
+            fk_unnamed_T1_2 = {field = {[0] = 1, [1] = 0}, space = s.id}}
+        t.assert_equals(s1[6].foreign_key, fk2)
+        local ck = {}
+        ck.ck_unnamed_T2_1 = box.func.check_T2_ck_unnamed_T2_1.id
+        ck.ck_unnamed_T2_2 = box.func.check_T2_ck_unnamed_T2_2.id
+        ck.ck_unnamed_T2_3 = box.func.check_T2_ck_unnamed_T2_3.id
+        t.assert_equals(s2[6].constraint, ck)
+        t.assert_equals(s2[6].foreign_key, nil)
     end)
 end
