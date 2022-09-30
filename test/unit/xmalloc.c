@@ -1,3 +1,4 @@
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 #include "trivia/util.h"
 
