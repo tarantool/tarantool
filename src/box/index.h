@@ -946,29 +946,11 @@ index_read_view_create(struct index_read_view *rv,
 void
 index_read_view_delete(struct index_read_view *rv);
 
-#ifndef NDEBUG
-/**
- * Asserts that the caller is the read view owner thread.
- *
- * The function is declared extern to avoid extra header dependencies.
- * It's called from hot paths so we don't compile it in release builds.
- */
-void
-index_read_view_check_owner(struct index_read_view *index_rv);
-#else
-static inline void
-index_read_view_check_owner(struct index_read_view *index_rv)
-{
-	(void)index_rv;
-}
-#endif
-
 static inline int
 index_read_view_get_raw(struct index_read_view *rv,
 			const char *key, uint32_t part_count,
 			const char **data, uint32_t *size)
 {
-	index_read_view_check_owner(rv);
 	return rv->vtab->get_raw(rv, key, part_count, data, size);
 }
 
@@ -977,7 +959,6 @@ index_read_view_create_iterator(struct index_read_view *rv,
 				enum iterator_type type,
 				const char *key, uint32_t part_count)
 {
-	index_read_view_check_owner(rv);
 	return rv->vtab->create_iterator(rv, type, key, part_count);
 }
 
@@ -995,7 +976,6 @@ static inline int
 index_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 				  const char **data, uint32_t *size)
 {
-	index_read_view_check_owner(iterator->index);
 	return iterator->next_raw(iterator, data, size);
 }
 
