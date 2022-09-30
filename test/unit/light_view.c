@@ -1,6 +1,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "trivia/util.h"
+
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
 static const size_t extent_size = 1024;
