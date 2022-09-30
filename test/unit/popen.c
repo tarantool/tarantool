@@ -2,6 +2,8 @@
 #include <stdlib.h>
 
 #include "trivia/util.h"
+
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
 #include "coio.h"
