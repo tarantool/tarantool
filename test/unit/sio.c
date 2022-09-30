@@ -28,12 +28,14 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "unit.h"
 #include "memory.h"
 #include "fiber.h"
 #include <sys/un.h>
 #include <arpa/inet.h>
 #include "sio.h"
+
+#define UNIT_TAP_COMPATIBLE 1
+#include "unit.h"
 
 static void
 check_uri_to_addr(void)
