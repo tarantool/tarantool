@@ -1,6 +1,8 @@
 #include "salad/stailq.h"
 #include <stdio.h>
 #include <stdarg.h>
+
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
 #define PLAN		75
