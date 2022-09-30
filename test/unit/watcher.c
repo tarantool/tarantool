@@ -9,6 +9,8 @@
 #include "memory.h"
 #include "tarantool_ev.h"
 #include "trivia/util.h"
+
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
 #define TEST_TIMEOUT 5
