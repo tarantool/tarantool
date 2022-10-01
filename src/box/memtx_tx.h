@@ -516,8 +516,6 @@ memtx_tx_story_gc();
 /**
  * Clean a tuple if it's dirty - finds a visible tuple in history.
  *
- * NB: can trigger story garbage collection.
- *
  * @param txn - current transactions.
  * @param space - space in which the tuple was found.
  * @param tuple - tuple to clean.
@@ -535,7 +533,6 @@ memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 		return tuple;
 	if (!tuple_has_flag(tuple, TUPLE_IS_DIRTY)) {
 		memtx_tx_track_read(txn, space, tuple);
-		memtx_tx_story_gc();
 		return tuple;
 	}
 	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index);
