@@ -778,8 +778,10 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple,
 
 	const struct memtx_story **put_story =
 		(const struct memtx_story **) &story;
-	struct memtx_story **empty = NULL;
-	mh_history_put(txm.history, put_story, &empty, 0);
+	struct memtx_story *replaced = NULL;
+	struct memtx_story **preplaced = &replaced;
+	mh_history_put(txm.history, put_story, &preplaced, 0);
+	assert(preplaced == NULL);
 	tuple->is_dirty = true;
 	tuple_ref(tuple);
 	story->status = MEMTX_TX_STORY_USED;
@@ -2710,7 +2712,6 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 	struct tuple *res =
 		memtx_tx_tuple_clarify_impl(txn, space, tuple, index, mk_index,
 					    is_prepared_ok);
-	memtx_tx_story_gc();
 	return res;
 }
 
