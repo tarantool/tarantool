@@ -1052,41 +1052,11 @@ memtx_tx_story_link_top(struct memtx_story *new_top,
  * Unlink a @a story from history chain in @a index (in both directions),
  * where old_top was at the top of chain (that means that index itself
  * stores a pointer to story->tuple).
- * This is a light version of function, intended for the case when the
- * appropriate change in will be done later by caller.
- * In addition to unlinking from in list, this function also rebinds gap
- * records to the new top in history chain.
- */
-static void
-memtx_tx_story_unlink_top_light(struct memtx_story *story, uint32_t idx)
-{
-	assert(story != NULL);
-	assert(idx < story->index_count);
-	struct memtx_story_link *link = &story->link[idx];
-
-	assert(link->newer_story == NULL);
-
-	struct memtx_story *old_story = link->older_story;
-	if (old_story != NULL) {
-		memtx_tx_story_unlink(story, old_story, idx);
-
-		/* Rebind gap records to the new top of the list */
-		struct memtx_story_link *old_link = &old_story->link[idx];
-		rlist_splice(&old_link->nearby_gaps, &link->nearby_gaps);
-	}
-}
-
-/**
- * Unlink a @a story from history chain in @a index (in both directions),
- * where old_top was at the top of chain (that means that index itself
- * stores a pointer to story->tuple).
- * In addition to unlinking from in list, this function also rebinds gap
- * records to the new top in history chain.
  * This function makes also changes in the index, replacing old_top->tuple
  * with the correct tuple (the next in chain, maybe NULL).
  */
 static void
-memtx_tx_story_unlink_top(struct memtx_story *story, uint32_t idx)
+memtx_tx_story_unlink_top_common(struct memtx_story *story, uint32_t idx)
 {
 	assert(story != NULL);
 	assert(idx < story->index_count);
@@ -1128,8 +1098,100 @@ memtx_tx_story_unlink_top(struct memtx_story *story, uint32_t idx)
 			memtx_tx_ref_to_primary(old_story);
 		memtx_tx_unref_from_primary(story);
 	}
+}
 
-	memtx_tx_story_unlink_top_light(story, idx);
+/**
+ * Unlink a @a story from history chain in @a index (in both directions),
+ * where old_top was at the top of chain (that means that index itself
+ * stores a pointer to story->tuple).
+ * This is a light version of function, intended for the case when the
+ * appropriate change in the index will be done later by caller.
+ */
+static void
+memtx_tx_story_unlink_top_common_light(struct memtx_story *story, uint32_t idx)
+{
+	assert(story != NULL);
+	assert(idx < story->index_count);
+	struct memtx_story_link *link = &story->link[idx];
+	assert(link->newer_story == NULL);
+	struct memtx_story *old_story = link->older_story;
+	if (old_story != NULL)
+		memtx_tx_story_unlink(story, old_story, idx);
+}
+
+/**
+ * See description of `memtx_tx_story_unlink_top_common_light`.
+ * As opposed to `memtx_tx_story_unlink_top_on_space_delete_light`, also
+ * rebinds gap records to the new top in history chain.
+ */
+static void
+memtx_tx_story_unlink_top_on_rollback_light(struct memtx_story *story,
+					    uint32_t idx)
+{
+	assert(story != NULL);
+	assert(idx < story->index_count);
+	struct memtx_story_link *link = &story->link[idx];
+	assert(link->newer_story == NULL);
+	struct memtx_story *old_story = link->older_story;
+	memtx_tx_story_unlink_top_common_light(story, idx);
+	if (old_story != NULL) {
+		/* Rebind gap records to the new top of the list */
+		struct memtx_story_link *old_link = &old_story->link[idx];
+		rlist_splice(&old_link->nearby_gaps, &link->nearby_gaps);
+	}
+}
+
+/**
+ * See description of `memtx_tx_story_unlink_top_common`.
+ * As opposed to `memtx_tx_story_unlink_top_on_space_delete`, also rebinds gap
+ * records to the new top in history chain.
+ */
+static void
+memtx_tx_story_unlink_top_on_rollback(struct memtx_story *story, uint32_t idx)
+{
+	memtx_tx_story_unlink_top_common(story, idx);
+	memtx_tx_story_unlink_top_on_rollback_light(story, idx);
+}
+
+/**
+ * See description of `memtx_tx_story_unlink_top_common_light`.
+ * Since the space is being deleted, we need to simply unlink the story.
+ */
+static void
+memtx_tx_story_unlink_top_on_space_delete_light(struct memtx_story *story,
+						uint32_t idx)
+{
+	memtx_tx_story_unlink_top_common_light(story, idx);
+}
+
+/**
+ * See description of `memtx_tx_story_unlink_top_common`.
+ * Since the space is being deleted, we need to simply unlink the story.
+ */
+static void
+memtx_tx_story_unlink_top_on_space_delete(struct memtx_story *story,
+					  uint32_t idx)
+{
+	memtx_tx_story_unlink_top_common(story, idx);
+	memtx_tx_story_unlink_top_on_space_delete_light(story, idx);
+}
+
+/**
+ * Unlink a @a story from history chain in @a index in both directions.
+ * Handles case when the story is not on top of the history: simply remove from
+ * list.
+ */
+static void
+memtx_tx_story_unlink_both_common(struct memtx_story *story,
+				  uint32_t idx)
+{
+	assert(idx < story->index_count);
+	struct memtx_story_link *link = &story->link[idx];
+	struct memtx_story *newer_story = link->newer_story;
+	struct memtx_story *older_story = link->older_story;
+	memtx_tx_story_unlink(newer_story, story, idx);
+	memtx_tx_story_unlink(story, older_story, idx);
+	memtx_tx_story_link(newer_story, older_story, idx);
 }
 
 static int
@@ -1138,11 +1200,13 @@ memtx_tx_track_read_story_slow(struct txn *txn, struct memtx_story *story,
 
 /**
  * Unlink a @a story from history chain in @a index in both directions.
- * If the story was in the top of history chain - unlink from top.
- * Simply remove from list otherwise.
+ * If the story was in the top of history chain - unlink from top. Otherwise,
+ * see description of `memtx_tx_story_unlink_both_common`.
+ * As opposed to `memtx_tx_story_unlink_both_on_space_delete`, rebinds read
+ * trackers.
  */
 static void
-memtx_tx_story_unlink_both(struct memtx_story *story, uint32_t idx)
+memtx_tx_story_unlink_both_on_rollback(struct memtx_story *story, uint32_t idx)
 {
 	assert(story != NULL);
 	assert(idx < story->index_count);
@@ -1152,11 +1216,9 @@ memtx_tx_story_unlink_both(struct memtx_story *story, uint32_t idx)
 	struct memtx_story *older_story = link->older_story;
 	if (link->newer_story == NULL) {
 		assert(link->in_index != NULL);
-		memtx_tx_story_unlink_top(story, idx);
+		memtx_tx_story_unlink_top_on_rollback(story, idx);
 	} else {
-		memtx_tx_story_unlink(newer_story, story, idx);
-		memtx_tx_story_unlink(story, older_story, idx);
-		memtx_tx_story_link(newer_story, older_story, idx);
+		memtx_tx_story_unlink_both_common(story, idx);
 	}
 	/*
 	 * Rebind read trackers in order to conflict
@@ -1175,6 +1237,26 @@ memtx_tx_story_unlink_both(struct memtx_story *story, uint32_t idx)
 			rlist_del(&tracker->in_reader_list);
 			rlist_del(&tracker->in_read_set);
 		}
+	}
+}
+
+/**
+ * Unlink a @a story from history chain in @a index in both directions.
+ * If the story was in the top of history chain - unlink from top. Otherwise,
+ * see description of `memtx_tx_story_unlink_both_common`.
+ * Since the space is being deleted, we need to simply unlink the story.
+ */
+static void
+memtx_tx_story_unlink_both_on_space_delete(struct memtx_story *story,
+					   uint32_t idx)
+{
+	assert(idx < story->index_count);
+	struct memtx_story_link *link = &story->link[idx];
+	if (link->newer_story == NULL) {
+		assert(link->in_index != NULL);
+		memtx_tx_story_unlink_top_on_space_delete(story, idx);
+	} else {
+		memtx_tx_story_unlink_both_common(story, idx);
 	}
 }
 
@@ -2063,7 +2145,8 @@ fail:
 		for (uint32_t i = 0; i < add_story->index_count; i++) {
 			struct memtx_story_link *link = &add_story->link[i];
 			assert(link->newer_story == NULL); (void)link;
-			memtx_tx_story_unlink_top_light(add_story, i);
+			memtx_tx_story_unlink_top_on_rollback_light(add_story,
+								    i);
 		}
 		memtx_tx_story_delete(add_story);
 	}
@@ -2204,7 +2287,7 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 			story->rollbacked = true;
 			continue;
 		}
-		memtx_tx_story_unlink_both(story, i);
+		memtx_tx_story_unlink_both_on_rollback(story, i);
 		assert(link->newer_story == NULL &&
 		       link->older_story == NULL &&
 		       (link->in_index == NULL || story->rollbacked));
@@ -2251,7 +2334,7 @@ memtx_tx_history_remove_added_story(struct txn_stmt *stmt)
 	struct memtx_story *story = stmt->add_story;
 	memtx_tx_history_remove_story_del_stmts(story);
 	for (uint32_t i = 0; i < story->index_count; i++)
-		memtx_tx_story_unlink_both(story, i);
+		memtx_tx_story_unlink_both_on_space_delete(story, i);
 	memtx_tx_story_unlink_added_by(story, stmt);
 }
 
