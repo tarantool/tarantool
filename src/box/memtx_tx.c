@@ -2293,6 +2293,8 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 	memtx_tx_story_unlink_added_by(story, stmt);
 	if (!story->rollbacked) {
 		assert(rlist_empty(&story->reader_list));
+		for (uint32_t idx = 0; idx < story->index_count; ++idx)
+			assert(rlist_empty(&story->link[idx].nearby_gaps));
 		memtx_tx_story_delete(story);
 	}
 }
