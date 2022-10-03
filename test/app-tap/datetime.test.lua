@@ -12,7 +12,7 @@ local TZ = date.TZ
 --]]
 if jit.arch == 'arm64' then jit.off() end
 
-test:plan(38)
+test:plan(39)
 
 -- minimum supported date - -5879610-06-22
 local MIN_DATE_YEAR = -5879610
@@ -1255,6 +1255,20 @@ test:test("Time interval operations - different adjustments", function(test)
                     ('sub delta to %s with adjust %s'):format(tsbefore, adjust))
         end
     end
+end)
+
+test:test("Time interval operations - different timezones", function(test)
+    test:plan(8)
+    local d1_msk = date.new{tz = 'MSK'}
+    local d1_utc = date.new{tz = 'UTC'}
+    test:is(d1_msk.tzoffset, 180, 'MSK is +180')
+    test:is(d1_utc.tzoffset, 0, 'UTC is 0')
+    test:is(tostring(d1_msk), '1970-01-01T00:00:00 MSK', '1970-01-01 MSK')
+    test:is(tostring(d1_utc), '1970-01-01T00:00:00 UTC', '1970-01-01 UTC')
+    test:is(d1_utc > d1_msk, true, 'utc > msk')
+    test:is(tostring(d1_utc - d1_msk), '+180 minutes', 'utc - msk')
+    test:is(tostring(d1_msk - d1_utc), '-180 minutes', 'msk - utc')
+    test:is(d1_msk.epoch - d1_utc.epoch, -10800, '-10800')
 end)
 
 test:test("Time intervals creation - range checks", function(test)
