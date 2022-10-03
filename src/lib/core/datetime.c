@@ -844,6 +844,7 @@ datetime_datetime_sub(struct interval *res, const struct datetime *lhs,
 	struct interval inv_rhs;
 	datetime_totable(lhs, res);
 	datetime_totable(rhs, &inv_rhs);
+	res->min -= lhs->tzoffset - rhs->tzoffset;
 	return interval_interval_sub(res, &inv_rhs);
 }
 
