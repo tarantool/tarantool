@@ -443,7 +443,16 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 	light_index_iterator_begin(&index->hash_table, &it->iterator);
 
 	switch (type) {
-	case ITER_GT:
+	case ITER_GT: {
+		static bool warn_once = false;
+		if (!warn_once) {
+			warn_once = true;
+			say_warn("HASH index 'GT' iterator type is deprecated "
+				 "since Tarantool 2.11 and should not be "
+				 "used. It will be removed in a future "
+				 "Tarantool release.");
+		}
+
 		if (part_count != 0) {
 			light_index_iterator_key(&index->hash_table, &it->iterator,
 					key_hash(key, base->def->key_def), key);
@@ -459,6 +468,7 @@ memtx_hash_index_create_iterator(struct index *base, enum iterator_type type,
 					 &index->base);
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
 		break;
+	}
 	case ITER_ALL:
 		light_index_iterator_begin(&index->hash_table, &it->iterator);
 		it->base.next_internal = hash_iterator_ge;
