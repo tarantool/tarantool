@@ -2405,11 +2405,6 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 				continue;
 			if (test_stmt->del_story == story)
 				continue;
-			if (test_stmt->del_story != NULL &&
-			    test_stmt->del_story->add_stmt != NULL &&
-			    test_stmt->del_story->add_stmt->txn ==
-			    test_stmt->txn)
-				continue;
 			memtx_tx_handle_conflict(stmt->txn, test_stmt->txn);
 			/*
 			 * Note that it's a secondary index and there's no
