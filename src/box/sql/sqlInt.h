@@ -2743,9 +2743,8 @@ sqlEndTable(struct Parse *parse);
  * @param index_id index id. In future will be replaced with
  *        pointer to struct index.
  * @param space Pointer to space object.
- * @retval address of last opcode.
  */
-int
+void
 vdbe_emit_open_cursor(struct Parse *parse, int cursor, int index_id,
 		      struct space *space);
 
