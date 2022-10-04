@@ -866,7 +866,7 @@ sql_column_collation(struct space_def *def, uint32_t column, uint32_t *coll_id)
 	return field->coll;
 }
 
-int
+void
 vdbe_emit_open_cursor(struct Parse *parse_context, int cursor, int index_id,
 		      struct space *space)
 {
@@ -878,12 +878,12 @@ vdbe_emit_open_cursor(struct Parse *parse_context, int cursor, int index_id,
 			 "using non-TREE index type. Please, use " \
 			 "INDEXED BY clause to force using proper index.");
 		parse_context->is_aborted = true;
-		return -1;
+		return;
 	}
 	struct Vdbe *vdbe = parse_context->pVdbe;
 	int reg = ++parse_context->nMem;
 	sqlVdbeAddOp2(vdbe, OP_OpenSpace, reg, space->def->id);
-	return sqlVdbeAddOp3(vdbe, OP_IteratorOpen, cursor, index_id, reg);
+	sqlVdbeAddOp3(vdbe, OP_IteratorOpen, cursor, index_id, reg);
 }
 
 /*
