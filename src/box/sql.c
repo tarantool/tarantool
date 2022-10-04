@@ -1377,8 +1377,15 @@ vdbe_field_ref_create(struct vdbe_field_ref *field_ref, struct tuple *tuple,
 	field_ref->data_sz = data_sz;
 
 	const char *field0 = data;
-	field_ref->field_count = mp_decode_array((const char **) &field0);
 	field_ref->format = NULL;
+	uint32_t mp_count = mp_decode_array(&field0);
+	if (tuple != NULL) {
+		assert(tuple_format(tuple) != NULL);
+		uint32_t field_count = tuple_format(tuple)->total_field_count;
+		field_ref->field_count = MIN(field_count, mp_count);
+	} else {
+		field_ref->field_count = mp_count;
+	}
 	field_ref->slots[0] = (uint32_t)(field0 - data);
 	memset(&field_ref->slots[1], 0,
 	       field_ref->field_count * sizeof(field_ref->slots[0]));
