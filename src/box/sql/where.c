@@ -4606,10 +4606,10 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 					assert(wctrlFlags &
 					       WHERE_ONEPASS_DESIRED);
 					while (pJ->def->iid != idx_def->iid) {
-						iIndexCur++;
 						iid++;
 						pJ = pTabItem->space->index[iid];
 					}
+					iIndexCur++;
 				} else {
 					for(uint32_t i = 0;
 					    i < space->index_count; ++i) {
