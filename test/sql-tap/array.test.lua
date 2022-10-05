@@ -827,8 +827,7 @@ test:do_catchsql_test(
     [[
         SELECT NULLIF(1, a) FROM t;
     ]], {
-        1,
-        "Failed to execute SQL statement: wrong arguments for function NULLIF()"
+        1, "Type mismatch: can not convert array([123]) to scalar"
     })
 
 test:do_catchsql_test(
