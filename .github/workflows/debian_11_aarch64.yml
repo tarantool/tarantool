@@ -53,7 +53,7 @@ jobs:
           RWS_AUTH: ${{ secrets.RWS_AUTH }}
           OS: 'debian'
           DIST: 'bullseye'
-        uses: ./.github/actions/pack_and_deploy
+        uses: ./.github/actions/pack-and-deploy
       - name: Send VK Teams message on failure
         if: failure()
         uses: ./.github/actions/report-job-status
