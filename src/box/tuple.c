@@ -403,6 +403,18 @@ tuple_runtime_memory_used(void)
 	return data_stats.used;
 }
 
+void *
+runtime_memory_alloc(size_t size)
+{
+	return smalloc(&runtime_alloc, size);
+}
+
+void
+runtime_memory_free(void *ptr, size_t size)
+{
+	smfree(&runtime_alloc, ptr, size);
+}
+
 /* {{{ tuple_field_* getters */
 
 int

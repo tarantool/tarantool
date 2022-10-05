@@ -42,6 +42,7 @@
 #include "memtx_tx.h"
 #include "box.h"
 #include "base64.h"
+#include "scoped_guard.h"
 
 struct rlist box_on_select = RLIST_HEAD_INITIALIZER(box_on_select);
 
@@ -429,8 +430,9 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
 /* {{{ Iterators ************************************************/
 
 box_iterator_t *
-box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
-                   const char *key, const char *key_end)
+box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
+			 const char *key, const char *key_end,
+			 const char *packed_pos, const char *packed_pos_end)
 {
 	assert(key != NULL && key_end != NULL);
 	mp_tuple_assert(key, key_end);
@@ -449,19 +451,59 @@ box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
 	uint32_t part_count = mp_decode_array(&key);
 	if (key_validate(index->def, itype, key, part_count))
 		return NULL;
+	const char *pos, *pos_end;
+	char *pos_buf = NULL;
+	uint32_t pos_buf_size = 0;
+	auto pos_guard = make_scoped_guard([&pos_buf, &pos_buf_size] {
+		if (pos_buf != NULL)
+			runtime_memory_free(pos_buf, pos_buf_size);
+	});
+	if (packed_pos != NULL && packed_pos != packed_pos_end) {
+		pos_buf_size =
+			iterator_position_unpack_bufsize(packed_pos,
+							 packed_pos_end);
+		pos_buf = (char *)runtime_memory_alloc(pos_buf_size);
+		if (pos_buf == NULL) {
+			diag_set(OutOfMemory, pos_buf_size,
+				 "runtime_memory_alloc", "pos_buf");
+			return NULL;
+		}
+		if (iterator_position_unpack(packed_pos, packed_pos_end,
+					     pos_buf, pos_buf_size,
+					     &pos, &pos_end) != 0)
+			return NULL;
+		uint32_t pos_part_count = mp_decode_array(&pos);
+		if (exact_key_validate_nullable(index->def->cmp_def, pos,
+						pos_part_count) != 0)
+			return NULL;
+	} else {
+		pos = NULL;
+		pos_end = NULL;
+	}
 	box_run_on_select(space, index, itype, key_array);
 	struct txn *txn;
 	struct txn_ro_savepoint svp;
 	if (txn_begin_ro_stmt(space, &txn, &svp) != 0)
 		return NULL;
-	struct iterator *it = index_create_iterator(index, itype,
-						    key, part_count);
+	struct iterator *it = index_create_iterator_after(index, itype, key,
+							  part_count, pos);
 	txn_end_ro_stmt(txn, &svp);
 	if (it == NULL)
 		return NULL;
 	it->space = space;
+	it->pos_buf = pos_buf;
+	it->pos_buf_size = pos_buf_size;
+	pos_guard.is_active = false;
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 	return it;
+}
+
+box_iterator_t *
+box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
+		   const char *key, const char *key_end)
+{
+	return box_index_iterator_after(space_id, index_id, type, key, key_end,
+					NULL, NULL);
 }
 
 int
@@ -534,6 +576,8 @@ iterator_create(struct iterator *it, struct index *index)
 	it->index_id = index->def->iid;
 	it->index = index;
 	it->space = NULL;
+	it->pos_buf = NULL;
+	it->pos_buf_size = 0;
 }
 
 /**
@@ -689,6 +733,11 @@ fail:
 void
 iterator_delete(struct iterator *it)
 {
+	if (it->pos_buf != NULL) {
+		runtime_memory_free(it->pos_buf, it->pos_buf_size);
+		it->pos_buf = NULL;
+		it->pos_buf_size = 0;
+	}
 	assert(it->free != NULL);
 	it->free(it);
 }

@@ -35,7 +35,7 @@
 #include "box/box.h"
 #include "box/index.h"
 #include "box/lua/tuple.h"
-#include "box/lua/misc.h" /* lbox_encode_tuple_on_gc() */
+#include "box/lua/misc.h"
 #include "small/region.h"
 #include "fiber.h"
 
@@ -254,26 +254,39 @@ box_index_init_iterator_types(struct lua_State *L, int idx)
 static int
 lbox_index_iterator(lua_State *L)
 {
-	if (lua_gettop(L) != 4 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
+	if (lua_gettop(L) != 5 || !lua_isnumber(L, 1) || !lua_isnumber(L, 2) ||
 	    !lua_isnumber(L, 3))
-		return luaL_error(L, "usage index.iterator(space_id, index_id, type, key)");
+		return luaL_error(L, "usage index.iterator(space_id, index_id, "
+				     "type, key, after)");
 
+	uint32_t svp = region_used(&fiber()->gc);
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);
 	uint32_t iterator = lua_tonumber(L, 3);
 	size_t mpkey_len;
 	const char *mpkey = lua_tolstring(L, 4, &mpkey_len); /* Key encoded by Lua */
 	/* const char *key = lbox_encode_tuple_on_gc(L, 4, key_len); */
-	struct iterator *it = box_index_iterator(space_id, index_id, iterator,
-						 mpkey, mpkey + mpkey_len);
+	struct iterator *it = NULL;
+	struct iterator **ptr = NULL;
+	const char *packed_pos, *packed_pos_end;
+	if (lbox_normalize_position(L, 5, space_id, index_id, &packed_pos,
+				    &packed_pos_end) != 0)
+		goto error;
+	it = box_index_iterator_after(space_id, index_id, iterator, mpkey,
+				      mpkey + mpkey_len, packed_pos,
+				      packed_pos_end);
+
 	if (it == NULL)
-		return luaT_error(L);
+		goto error;
 
 	assert(CTID_STRUCT_ITERATOR_PTR != 0);
-	struct iterator **ptr = (struct iterator **) luaL_pushcdata(L,
-		CTID_STRUCT_ITERATOR_PTR);
+	ptr = (struct iterator **)luaL_pushcdata(L, CTID_STRUCT_ITERATOR_PTR);
 	*ptr = it; /* NULL handled by Lua, gc also set by Lua */
+	region_truncate(&fiber()->gc, svp);
 	return 1;
+error:
+	region_truncate(&fiber()->gc, svp);
+	return luaT_error(L);
 }
 
 static int

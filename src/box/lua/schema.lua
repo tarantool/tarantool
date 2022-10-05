@@ -34,16 +34,15 @@ ffi.cdef[[
     typedef struct tuple box_tuple_t;
     typedef struct iterator box_iterator_t;
 
-    /** \cond public */
     box_iterator_t *
-    box_index_iterator(uint32_t space_id, uint32_t index_id, int type,
-                       const char *key, const char *key_end);
+    box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
+                             const char *key, const char *key_end,
+                             const char *packed_pos,
+                             const char *packed_pos_end);
     int
     box_iterator_next(box_iterator_t *itr, box_tuple_t **result);
     void
     box_iterator_free(box_iterator_t *itr);
-    /** \endcond public */
-    /** \cond public */
     ssize_t
     box_index_len(uint32_t space_id, uint32_t index_id);
     ssize_t
@@ -63,8 +62,6 @@ ffi.cdef[[
     ssize_t
     box_index_count(uint32_t space_id, uint32_t index_id, int type,
                     const char *key, const char *key_end);
-    /** \endcond public */
-    /** \cond public */
     size_t
     box_region_used(void);
     void
@@ -79,11 +76,8 @@ ffi.cdef[[
     box_txn_set_timeout(double timeout);
     void
     memtx_tx_story_gc_step();
-    /** \endcond public */
-    /** \cond public */
     int
     box_sequence_current(uint32_t seq_id, int64_t *result);
-    /** \endcond public */
     typedef struct txn_savepoint box_txn_savepoint_t;
 
     box_txn_savepoint_t *
@@ -1969,6 +1963,47 @@ end
 
 internal.check_iterator_type = check_iterator_type
 
+local function check_pairs_opts(opts, key_is_nil)
+    local iterator = check_iterator_type(opts, key_is_nil)
+    local after = nil
+    if opts ~= nil and type(opts) == "table" then
+        if opts.after ~= nil then
+            after = opts.after
+            if after ~= nil and type(after) ~= "string" and type(after) ~= "table"
+              and not is_tuple(after) then
+                box.error(box.error.INVALID_POSITION)
+            end
+        end
+    end
+    return iterator, after
+end
+
+-- pointer to iterator position used by select(), pairs() and tuple_pos()
+local iterator_pos = ffi.new('const char *[1]')
+local iterator_pos_end = ffi.new('const char *[1]')
+
+-- Argument pos must be a string, table or tuple, returns two C pointers:
+-- begin and end of position.
+local function normalize_position(index, pos, ret_pos, ret_pos_end)
+    if pos == nil then
+        ret_pos[0] = nil
+        ret_pos_end[0] = nil
+    elseif type(pos) == "string" then
+        ret_pos[0] = pos
+        ret_pos_end[0] = ret_pos[0] + #pos
+    else
+        local tuple_ibuf = cord_ibuf_take()
+        local tuple, tuple_end = tuple_encode(tuple_ibuf, pos)
+        local nok = builtin.box_index_tuple_position(index.space_id, index.id,
+                                                     tuple, tuple_end,
+                                                     ret_pos, ret_pos_end) ~= 0
+        cord_ibuf_put(tuple_ibuf)
+        if nok then
+            box.error()
+        end
+    end
+end
+
 local base_index_mt = {}
 base_index_mt.__index = base_index_mt
 --
@@ -2364,13 +2399,16 @@ base_index_mt.pairs_ffi = function(index, key, opts)
     check_index_arg(index, 'pairs')
     local ibuf = cord_ibuf_take()
     local pkey, pkey_end = tuple_encode(ibuf, key)
-    local itype = check_iterator_type(opts, pkey + 1 >= pkey_end);
+    local svp = builtin.box_region_used()
+    local itype, after = check_pairs_opts(opts, pkey + 1 >= pkey_end)
+    normalize_position(index, after, iterator_pos, iterator_pos_end)
 
     local keybuf = ffi.string(pkey, pkey_end - pkey)
     cord_ibuf_put(ibuf)
     local pkeybuf = ffi.cast('const char *', keybuf)
-    local cdata = builtin.box_index_iterator(index.space_id, index.id,
-        itype, pkeybuf, pkeybuf + #keybuf);
+    local cdata = builtin.box_index_iterator_after(index.space_id, index.id,
+        itype, pkeybuf, pkeybuf + #keybuf, iterator_pos[0], iterator_pos_end[0]);
+    builtin.box_region_truncate(svp)
     if cdata == nil then
         box.error()
     end
@@ -2380,10 +2418,11 @@ end
 base_index_mt.pairs_luac = function(index, key, opts)
     check_index_arg(index, 'pairs')
     key = keify(key)
-    local itype = check_iterator_type(opts, #key == 0);
+    local itype, after = check_pairs_opts(opts, #key == 0)
     local keymp = msgpack.encode(key)
     local keybuf = ffi.string(keymp, #keymp)
-    local cdata = internal.iterator(index.space_id, index.id, itype, keymp);
+    local cdata = internal.iterator(index.space_id, index.id, itype, keymp,
+        after);
     return fun.wrap(iterator_gen_luac, keybuf,
         ffi.gc(cdata, builtin.box_iterator_free))
 end
@@ -2477,32 +2516,6 @@ local function check_select_safety(index, key_is_nil, itype, limit, offset,
        (not fullscan and window > 1000) then
         rl:log_crit("Potentially long select from space '%s' (%d)\n %s",
                     box.space[sid].name, sid, debug.traceback())
-    end
-end
-
--- pointer to iterator position used by select() and tuple_pos()
-local iterator_pos = ffi.new('const char *[1]')
-local iterator_pos_end = ffi.new('const char *[1]')
-
--- Argument pos must be a string, table or tuple, returns two C pointers:
--- begin and end of position.
-local function normalize_position(index, pos, ret_pos, ret_pos_end)
-    if pos == nil then
-        ret_pos[0] = nil
-        ret_pos_end[0] = nil
-    elseif type(pos) == "string" then
-        ret_pos[0] = pos
-        ret_pos_end[0] = ret_pos[0] + #pos
-    else
-        local tuple_ibuf = cord_ibuf_take()
-        local tuple, tuple_end = tuple_encode(tuple_ibuf, pos)
-        local nok = builtin.box_index_tuple_position(index.space_id, index.id,
-                                                     tuple, tuple_end,
-                                                     ret_pos, ret_pos_end) ~= 0
-        cord_ibuf_put(tuple_ibuf)
-        if nok then
-            box.error()
-        end
     end
 end
 

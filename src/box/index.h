@@ -254,6 +254,16 @@ box_tuple_extract_key(box_tuple_t *tuple, uint32_t space_id,
 /** \endcond public */
 
 /**
+ * Allocate and initialize iterator for space_id, index_id. If packed_pos is
+ * not NULL, iterator will start right after tuple with position, described by
+ * this argument. A returned iterator must be destroyed by box_iterator_free().
+ */
+box_iterator_t *
+box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
+			 const char *key, const char *key_end,
+			 const char *packed_pos, const char *packed_pos_end);
+
+/**
  * Get packed position of tuple in index to pass it to box_select
  * (multikey and func indexes are not supported). Returned position
  * is allocated on the fiber region.
@@ -316,6 +326,17 @@ struct iterator {
 	uint32_t space_id;
 	/** ID of the index the iterator is for. */
 	uint32_t index_id;
+	/**
+	 * Allocator that was used for allocation of fields pos_buf requires
+	 * its size on deallocation.
+	 */
+	uint32_t pos_buf_size;
+	/**
+	 * Pointer to a buffer which was allocated for start position with
+	 * runtime_alloc. Will be freed on iterator_delete.
+	 * Needed for box_index_iterator_after.
+	 */
+	char *pos_buf;
 	/**
 	 * Pointer to the index the iterator is for.
 	 * Guaranteed to be valid only if the schema

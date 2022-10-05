@@ -1449,6 +1449,20 @@ tuple_to_buf(struct tuple *tuple, char *buf, size_t size);
 size_t
 tuple_runtime_memory_used(void);
 
+/**
+ * Allocate size bytes on runtime_alloc.
+ * NB: Allocated memory will be accounted in runtime statisitcs
+ * as if it was allocated for tuples.
+ */
+void *
+runtime_memory_alloc(size_t size);
+
+/**
+ * Free memory of size bytes allocated on runtime_alloc.
+ */
+void
+runtime_memory_free(void *ptr, size_t size);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
