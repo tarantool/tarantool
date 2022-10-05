@@ -355,6 +355,12 @@ func_nullif(struct sql_context *ctx, int argc, const struct Mem *argv)
 {
 	assert(argc == 2);
 	(void)argc;
+	if (!mem_is_comparable(&argv[1])) {
+		ctx->is_aborted = true;
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(&argv[1]),
+			 "scalar");
+		return;
+	}
 	if (mem_cmp_scalar(&argv[0], &argv[1], ctx->coll) == 0)
 		return;
 	if (mem_copy(ctx->pOut, &argv[0]) != 0)
@@ -1954,8 +1960,27 @@ static struct sql_func_definition definitions[] = {
 	{"MIN", 1, {FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR, step_minmax, NULL},
 	{"NOW", 0, {}, FIELD_TYPE_DATETIME, func_now, NULL},
 
-	{"NULLIF", 2, {FIELD_TYPE_SCALAR, FIELD_TYPE_SCALAR}, FIELD_TYPE_SCALAR,
+	{"NULLIF", 2, {FIELD_TYPE_SCALAR, field_type_MAX}, FIELD_TYPE_SCALAR,
 	 func_nullif, NULL},
+	{"NULLIF", 2, {FIELD_TYPE_UNSIGNED, field_type_MAX},
+	 FIELD_TYPE_UNSIGNED, func_nullif, NULL},
+	{"NULLIF", 2, {FIELD_TYPE_STRING, field_type_MAX}, FIELD_TYPE_STRING,
+	 func_nullif, NULL},
+	{"NULLIF", 2, {FIELD_TYPE_DOUBLE, field_type_MAX}, FIELD_TYPE_DOUBLE,
+	 func_nullif, NULL},
+	{"NULLIF", 2, {FIELD_TYPE_INTEGER, field_type_MAX},
+	 FIELD_TYPE_INTEGER, func_nullif, NULL},
+	{"NULLIF", 2, {FIELD_TYPE_BOOLEAN, field_type_MAX},
+	 FIELD_TYPE_BOOLEAN, func_nullif, NULL},
+	{"NULLIF", 2, {FIELD_TYPE_VARBINARY, field_type_MAX},
+	 FIELD_TYPE_VARBINARY, func_nullif, NULL},
+	{"NULLIF", 2, {FIELD_TYPE_DECIMAL, field_type_MAX},
+	 FIELD_TYPE_DECIMAL, func_nullif, NULL},
+	{"NULLIF", 2, {FIELD_TYPE_UUID, field_type_MAX}, FIELD_TYPE_UUID,
+	 func_nullif, NULL},
+	{"NULLIF", 2, {FIELD_TYPE_DATETIME, field_type_MAX},
+	 FIELD_TYPE_DATETIME, func_nullif, NULL},
+
 	{"POSITION", 2, {FIELD_TYPE_STRING, FIELD_TYPE_STRING},
 	 FIELD_TYPE_INTEGER, func_position_characters, NULL},
 	{"POSITION", 2, {FIELD_TYPE_VARBINARY, FIELD_TYPE_VARBINARY},
