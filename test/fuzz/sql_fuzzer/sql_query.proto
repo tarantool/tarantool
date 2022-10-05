@@ -1,0 +1,696 @@
+/*
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright 2022, Tarantool AUTHORS, please see AUTHORS file.
+ */
+
+syntax = "proto2";
+
+package sql_query;
+
+/*
+ * Documentation for SQL grammar implementation in Tarantool may be found here:
+ * https://www.tarantool.io/en/doc/latest/reference/reference_sql/sql_statements_and_clauses/
+ * https://www.tarantool.io/en/doc/latest/reference/reference_sql/sql_user_guide/
+ * src/box/sql/parse.y
+ */
+
+/*
+ * sqlquery ::= [select | create_table]
+ */
+message SQLQuery {
+    oneof query_oneof {
+        Select select = 1;
+        CreateTable create_table = 2;
+    }
+}
+
+/* ~~~~SELECT~~~~ */
+
+/*
+ * select ::= [`DISTINCT` | `ALL`]
+ *            select_column {`,` select_column}
+ *            [`FROM` from_clause]
+ *            [select_where_expression]
+ *            [select_group_by_expression]
+ *            [select_having_expression]
+ *            [order_by]
+ *            [limit]
+ */
+message Select {
+    enum SelectOptionEnum {
+        DISTINCT = 0;
+        ALL = 1;
+        NONE = 2;
+    }
+    required SelectOptionEnum option = 1;
+    required SelectColumn column = 2;
+    repeated SelectColumn extra_columns = 3;
+    required SelectFromClause from_clause = 4;
+    required bool from_clause_present_flag = 5;
+    optional SelectWhereExpression where_expr = 6;
+    optional SelectGroupByExpression group_by_exr = 7;
+    optional SelectHavingExpression having_expr = 8;
+    optional OrderBy order_by = 9;
+    optional Limit limit = 10;
+}
+
+/*
+ * select_where_expression ::= `WHERE` predicate
+ */
+message SelectWhereExpression {
+    required PredicateExpression expr = 1;
+}
+
+/*
+ * select_group_by_expression ::= `GROUP BY` function_expression
+ */
+message SelectGroupByExpression {
+    required FunctionExpression expr = 1;
+}
+
+/*
+ * select_having_expression ::= `HAVING` predicate
+ */
+message SelectHavingExpression {
+    required PredicateExpression expr = 1;
+}
+
+/*
+ * select_column ::= `*` |
+ *                   table_name `.*` |
+ *                   column_as_expression
+ */
+message SelectColumn {
+    enum SelectColumnEnum {
+        COLUMN_ANY = 0;
+    }
+    oneof column_oneof {
+        TableName any_column_from_table = 1;
+        ColumnAsExpression select_column_expression = 2;
+    }
+    required SelectColumnEnum enum_fallback = 3;
+}
+
+/*
+ * column_as_expression ::= function_expression [`AS` column_name]
+ */
+message ColumnAsExpression {
+    required FunctionExpression expression = 1;
+    optional ColumnName column_name = 2;
+}
+
+/*
+ * select_from_clause ::= select_from_clause_option1 |
+ *                        select_from_clause_option2 |
+ *                        join_source
+ */
+message SelectFromClause {
+    oneof select_from_clause_oneof {
+        SelectFromClauseOption1 option1 = 1;
+        SelectFromClauseOption2 option2 = 2;
+    }
+    required JoinSource join_source_fallback = 3;
+}
+
+/*
+ * select_from_clause_option1_index_option ::= `NOT INDEXED` |
+ *                                             `INDEXED BY` index_name
+ * select_from_clause_option1 ::= table_name [table_name]
+ *                                select_from_clause_option1_index_option
+ */
+message SelectFromClauseOption1 {
+    required TableName table_name = 1;
+    optional TableName as_table_name = 2;
+    enum SelectFromClauseOption1Enum {
+        NOT_INDEXED = 0;
+    }
+    oneof indexed_oneof {
+        SelectFromClauseOption1Enum indexed_enum = 3;
+        IndexName index_name = 4;
+    }
+    /* If indexed_oneof is empty, nothing should be added, so there is no
+     * fallback option.
+     */
+}
+
+/*
+ * select_from_clause_option2 ::= `(` select `)` [[`AS`] table_name]
+ */
+message SelectFromClauseOption2 {
+    required Select select_statement = 1;
+    optional TableName table_name = 2;
+    required bool as_construction_present_flag = 3;
+}
+
+/*
+ * join_source ::= joined_table |
+ *                 table_name
+ */
+message JoinSource {
+    oneof join_source_oneof {
+        JoinedTable joined_table = 1;
+    }
+    required TableName table_name_fallback = 2;
+}
+
+/*
+ * joined_table ::= join_source join_operator join_source [join_specification]
+ */
+message JoinedTable {
+    required JoinSource left_join_source = 1;
+    required JoinOperator join_operator = 2;
+    required JoinSource right_join_source = 3;
+    optional JoinSpecification specification = 4;
+}
+
+/*
+ * left_join ::= [`NATURAL`] `LEFT` [`OUTER`] `JOIN`
+ */
+message LeftJoin {
+    required bool natural = 1;
+    required bool outer = 2;
+}
+
+/*
+ * inner_join ::= [`NATURAL`] `INNER JOIN`
+ */
+message InnerJoin {
+    required bool natural = 1;
+}
+
+/*
+ * join_operator ::= left_join |
+ *                   inner_join |
+ *                   `CROSS JOIN`
+ */
+message JoinOperator {
+    oneof join_operator_oneof {
+        LeftJoin left_join = 1;
+        InnerJoin inner_join = 2;
+    }
+    /* Default value is CROSS JOIN */
+}
+
+/*
+ * join_specification ::= join_specification_using |
+ *                        join_specification_on_expression
+ */
+message JoinSpecification {
+    oneof join_specification_oneof {
+        JoinSpecificationUsing using_specification = 1;
+    }
+    required JoinSpecificationOnExpression on_expr = 2;
+}
+
+/*
+ * join_specification_using ::= `USING` `(` column_name {`,` column_name} `)`
+ */
+message JoinSpecificationUsing {
+    required ColumnName column_name = 1;
+    repeated ColumnName extra_column_names = 2;
+}
+
+/*
+ * join_specification_on_expression ::= `ON` predicate
+ */
+message JoinSpecificationOnExpression {
+    required PredicateExpression expr = 1;
+}
+
+/*
+ * index_name
+ *
+ * This is not a part of SQL.
+ * This message helps to create a valid index name.
+ */
+message IndexName {
+    required uint32 code = 1;
+}
+
+/*
+ * order_by ::= `ORDER BY` order_by_expression {`,` order_by_expression}
+ *
+ * There is a simplification -- instead of complex expression, there is just
+ * ColumnName.
+ */
+message OrderBy {
+    required OrderByExpression expr = 1;
+    repeated OrderByExpression extra_exprs = 2;
+}
+
+/*
+ * order_by_expression ::= comn_name [`ASC` | `DESC`]
+ */
+message OrderByExpression {
+    required ColumnName column_name = 1;
+    enum OrderByExpressionEnum {
+        ASCENDING = 0;
+        DESCENDING = 1;
+        NONE = 2;
+    }
+    required OrderByExpressionEnum order = 2;
+}
+
+/*
+ * limit ::= int32 `OFFSET` int32 |
+ *           int32 `,` int32 |
+ *           int32
+ */
+message Limit {
+    required int32 limit = 1;
+    optional int32 offset = 2;
+    enum OffsetEnum {
+        OFFSET = 0;
+        COMMA = 1;
+    }
+    required OffsetEnum offset_symbol_enum = 3;
+}
+
+/* ~~~~CREATE TABLE~~~~ */
+
+/*
+ * create_table ::= `CREATE TABLE` [`IF NOT EXISTS`] table_name
+ *                  `(` dummy_column_definition {`,` create_table_option} `)`
+ *                  [engine]
+ */
+message CreateTable {
+    required bool if_not_exists = 1;
+    required TableName table_name = 2;
+    required DummyColumnDefinition dummy_definition = 3;
+    repeated CreateTableOption options = 4;
+    optional Engine engine = 5;
+}
+
+/*
+ * table_name
+ *
+ * This is not a part of SQL.
+ * This message helps to create a valid table name.
+ */
+message TableName {
+    required uint32 code = 1;
+}
+
+/*
+ * dummy_column_definition ::= `column0` data_type `PRIMARY KEY`
+ *
+ * First column definition only with PRIMARY KEY constraint to pass rule that
+ * any table in Tarantool must have primary key.
+ */
+message DummyColumnDefinition {
+    required DataType type = 1;
+}
+
+/*
+ * create_table_option ::= column_definition |
+ *                         table_constraint
+ */
+message CreateTableOption {
+    oneof option_oneof {
+        ColumnDefinition column_definition = 1;
+        TableConstraint table_constraint = 2;
+    }
+    required ColumnDefinition column_definition_fallback = 3;
+}
+
+/*
+ * column_definition ::= column_name data_type
+ *                       [column_constraint {`,` column_constraint}]
+ */
+message ColumnDefinition {
+    required ColumnName column_name = 1;
+    required DataType type = 2;
+    repeated ColumnConstraint constraints = 3;
+}
+
+/*
+ * column_name
+ *
+ * This is not a part of SQL.
+ * This message helps to create a valid column name.
+ */
+message ColumnName {
+    required uint32 code = 1;
+}
+
+/*
+ * data_type ::= `ANY` |
+ *               `ARRAY` |
+ *               `MAP` |
+ *               `BOOLEAN` |
+ *               `DECIMAL` |
+ *               `DOUBLE` |
+ *               `INTEGER` |
+ *               `NUMBER` |
+ *               `UNSIGNED` |
+ *               `UUID` |
+ *               `VARBINARY` |
+ *               collatable_data_type
+ */
+message DataType {
+    enum SpecialDataTypeEnum {
+        ANY = 0;
+        ARRAY = 1;
+        MAP = 2;
+    }
+    enum DataTypeEnum {
+        BOOLEAN = 0; /* same as BOOL */
+        DECIMAL = 1;
+        DOUBLE = 2;
+        INTEGER = 3; /* same as INT */
+        NUMBER = 4;
+        UNSIGNED = 5;
+        UUID = 6;
+        VARBINARY = 7;
+    }
+    oneof data_type_oneof {
+        SpecialDataTypeEnum special_type_enum = 1;
+        DataTypeEnum type_enum = 2;
+        CollatableDataType collatable_type = 3;
+    }
+    required DataTypeEnum type_enum_fallback = 4;
+}
+
+/*
+ * collatable_data_type_without_collate ::= `SCALAR` |
+ *                                          `STRING` |
+ *                                          `TEXT` |
+ *                                           varchar
+ * collatable_data_type ::= collatable_data_type_without_collate
+ *                          [collation_clause]
+ */
+message CollatableDataType {
+    enum CollatableDataTypeEnum {
+        SCALAR = 0;
+        STRING = 1;
+        TEXT = 2;
+    }
+    oneof collatable_data_type_oneof {
+        CollatableDataTypeEnum type_enum = 1;
+        VarChar varchar = 2;
+    }
+    required CollatableDataTypeEnum type_enum_fallback = 3;
+    optional CollationClause collation_clause = 4;
+}
+
+/*
+ * varchar ::= `VARCHAR` `(` uint32 `)`
+ */
+message VarChar {
+    required uint32 integer = 1;
+}
+
+/*
+ * collation_clause_option ::= `none` |
+ *                             `unicode` |
+ *                             `unicode_ci` |
+ *                             `binary`
+ * collation_clause ::= `COLLATE` `"` collation_clause_option `"`
+ */
+message CollationClause {
+    enum CollationClauseEnum {
+        none = 0;
+        unicode = 1;
+        unicode_ci = 2;
+        binary = 3;
+    }
+    required CollationClauseEnum collation_clause_enum = 1;
+}
+
+/*
+ * column_constraint ::= column_constraint_nullable |
+ *                       named_column_constraint |
+ *                       default_expression
+ */
+message ColumnConstraint {
+    oneof column_constraint_oneof {
+        ColumnConstraintNullable nullable = 1;
+        NamedColumnConstraint named_constraint = 2;
+    }
+    required DefaultExpression default_expression = 3;
+}
+
+/*
+ * column_constraint_name
+ *
+ * This is not a part of SQL.
+ * This message helps to create a valid column constraint name.
+ */
+message ColumnConstraintName {
+    required uint32 code = 1;
+}
+
+/*
+ * column_constraint_nullable ::= `NOT NULL` |
+ *                                `NULL`
+ */
+message ColumnConstraintNullable {
+    enum ColumnConstraintNullableEnum {
+        NOT_NULL = 0;
+        NULLABLE = 1;
+    }
+    required ColumnConstraintNullableEnum nullable_enum = 1;
+}
+
+/*
+ * named_column_constraint_options ::= reference_foreign_key_clause |
+ *                                     named_column_constraint_check |
+ *                                     `PRIMARY KEY` |
+ *                                     `UNIQUE`
+ * named_column_constraint ::= [`CONSTRAINT` column_constraint_name]
+ *                             named_column_constraint_options
+ */
+message NamedColumnConstraint {
+    enum NamedColumnConstraintEnum {
+        PRIMARY_KEY = 0;
+        UNIQUE = 1;
+    }
+    optional ColumnConstraintName constraint_name = 1;
+    oneof constraint_oneof {
+        ReferenceForeignKeyClause foreign_key_clause = 2;
+        NamedColumnConstraintCheck check_expression = 3;
+    }
+    required NamedColumnConstraintEnum enum_fallback = 4;
+}
+
+/*
+ * named_column_constraint_check ::= `CHECK` `(` predicate_expression `)`
+ */
+message NamedColumnConstraintCheck {
+    required PredicateExpression check_expression = 1;
+}
+
+/*
+ * predicate_expression ::= compare_expression |
+ *                          `TRUE` |
+ *                          `FALSE`
+ */
+message PredicateExpression {
+    oneof predicate_oneof {
+        CompareExpression compare = 1;
+    }
+    required bool bool_constant_fallback = 2;
+}
+
+/*
+ * comparator ::= `<`  |
+ *                `<=` |
+ *                `=`  |
+ *                `!=` |
+ *                `>=` |
+ *                `>`  |
+ *                `==` |
+ *                `<>`
+ * compare_expression ::= `(` term comparator term `)`
+ */
+message CompareExpression {
+    enum ComparatorEnum {
+        LESS = 0;
+        LESS_EQUAL = 1;
+        EQUAL = 2;
+        NOT_EQUAL = 3; /* != */
+        GREATER_EQUAL = 4;
+        GREATER = 5;
+        EQUAL_EQUAL = 6; /* == */
+        DIFFERENT = 7; /* <> */
+    }
+    required Term left_operand = 1;
+    required ComparatorEnum comparator = 2;
+    required Term right_operand = 3;
+}
+
+/*
+ * term ::= function_expression |
+ *          predicate_expression |
+ *          column_name |
+ *          constant_value
+ */
+message Term {
+    oneof term_oneof {
+        FunctionExpression func = 1;
+        PredicateExpression predicate = 2;
+        ColumnName column_name = 3;
+    }
+    required ConstantValue constant_fallback = 4;
+}
+
+/*
+ * function_expression ::= unary_operator_expression |
+ *                         binary_operator_expression
+ */
+message FunctionExpression {
+    oneof function_expression_oneof {
+        BinaryOperatorExpression binary_operator_expression = 1;
+    }
+    required UnaryOperatorExpression unary_operator_expression_fallback = 2;
+}
+
+/*
+ * left_unary_operator ::= `NOT` |
+ *                         `+`   |
+ *                         `-`
+ * right_unary_operator ::= `IS NULL` |
+ *                          `IS NOT NULL`
+ * unary_operator_expression ::= `(` term `)` |
+ *                               `(` left_unary_operator term `)` |
+ *                               `(` term right_unary_operator `)`
+ */
+message UnaryOperatorExpression {
+    enum UnaryOperatorEnum {
+        NOT = 0;
+        PLUS = 1;
+        MINUS = 2;
+        IS_NULL = 3;
+        IS_NOT_NULL = 4;
+        NO_OPERATOR = 5;
+    }
+    required UnaryOperatorEnum unary_operator = 1;
+    required Term term = 2;
+}
+
+/*
+ * binary_operator ::= '+'   |
+ *                     '-'   |
+ *                     'AND' |
+ *                     'OR'  |
+ *                     '&'   |
+ *                     '|'   |
+ *                     '*'   |
+ *                     '/'   |
+ *                     '%'
+ * binary_operator_expression ::= `(` term binary_operator term `)`
+ */
+message BinaryOperatorExpression {
+    enum BinaryOperatorEnum {
+        PLUS = 0;
+        MINUS = 1;
+        AND = 2;
+        OR = 3;
+        BINARY_AND = 4;
+        BINARY_OR = 5;
+        MULTIPLY = 6;
+        DIVISION = 7;
+        REMAINDER = 8;
+        /* TODO: not implemented: << >> */
+    }
+    required Term left_operand = 1;
+    required BinaryOperatorEnum binary_operator = 2;
+    required Term right_operand = 3;
+}
+
+/*
+ * constant_value
+ *
+ * This is not a part of SQL.
+ * This message helps to create a value of any type from uint64.
+ */
+message ConstantValue {
+    required uint64 value = 1;
+    required DataType type = 2;
+}
+
+/*
+ * reference_foreign_key_clause ::= `REFERENCES ` table_name
+ *                                  `(` column_name {`,` column_name} `)`
+ *                                  [`MATCH FULL`]
+ */
+message ReferenceForeignKeyClause {
+    required TableName table_name = 1;
+    required ColumnName column_name = 2;
+    repeated ColumnName extra_column_names = 3;
+    required bool match_full = 4;
+}
+
+/*
+ *  default_expression ::= `DEFAULT` expression
+ */
+message DefaultExpression {
+    required FunctionExpression expression = 1;
+}
+
+/*
+ * table_constraint ::= table_constraint_primary_key |
+ *                      table_constraint_check |
+ *                      table_constraint_foreign_key_clause |
+ *                      table_constraint_unique
+ */
+message TableConstraint {
+    oneof table_constraint_oneof {
+        /* Always produces errors because it's impossible to have two primary
+         * keys and one already always defined in DummyColumnDefinition.
+         */
+        TableConstraintPrimaryKey primary_key = 1;
+        TableConstraintCheck check_expression = 3;
+        TableConstraintForeignKeyClause foreign_key = 4;
+    }
+    required TableConstraintUnique unique_fallback = 2;
+}
+
+/*
+ * table_constraint_primary_key ::= `PRIMARY KEY`
+ *                                  `(` column_name {`,` column_name} `)`
+ */
+message TableConstraintPrimaryKey {
+    required ColumnName column_name = 1;
+    repeated ColumnName extra_column_names = 2;
+}
+
+/*
+ * table_constraint_unique ::= `UNIQUE` `(` column_name {`,` column_name} `)`
+ */
+message TableConstraintUnique {
+    required ColumnName column_name = 1;
+    repeated ColumnName extra_column_names = 2;
+}
+
+/*
+ * table_constraint_check ::= `CHECK` `(` predicate_expression `)`
+ */
+message TableConstraintCheck {
+    required PredicateExpression predicate = 1;
+}
+
+/*
+ * table_constraint_foreign_key_clause ::= `FOREIGN KEY`
+ *                                         `(` column_name {`,` column_name} `)`
+ *                                         reference_foreign_key_clause
+ */
+message TableConstraintForeignKeyClause {
+    required ColumnName column_name = 1;
+    repeated ColumnName extra_column_names = 2;
+    required ReferenceForeignKeyClause reference = 3;
+}
+
+/*
+ * engine_option ::= vinyl |
+ *                   memtx
+ * engine ::= `WITH ENGINE` engine_option
+ */
+message Engine {
+    enum EngineEnum {
+        vinyl = 0;
+        memtx = 1;
+    }
+    required EngineEnum engine_enum = 1;
+}

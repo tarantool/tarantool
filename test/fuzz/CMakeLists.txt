@@ -99,6 +99,7 @@ include(ProtobufMutator)
 # See https://github.com/tarantool/tarantool/issues/8473
 if (NOT ENABLE_UB_SANITIZER)
     add_subdirectory(luaL_loadbuffer)
+    add_subdirectory(sql_fuzzer)
 endif()
 
 add_custom_target(fuzzers
