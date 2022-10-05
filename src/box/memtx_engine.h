@@ -107,7 +107,7 @@ enum memtx_reserve_extents_num {
  * allocated for each iterator (except rtree index iterator that
  * is significantly bigger so has own pool).
  */
-#define MEMTX_ITERATOR_SIZE (168)
+#define MEMTX_ITERATOR_SIZE (176)
 
 struct memtx_engine {
 	struct engine base;

@@ -62,11 +62,7 @@ lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
 	return (char *) region_join_xc(gc, *p_len);
 }
 
-/**
- * Convert packed position, tuple or table from Lua to C packed position.
- * Returned position is allocated on the fiber region.
- */
-static int
+int
 lbox_normalize_position(lua_State *L, int idx, int space_id, int index_id,
 			const char **packed_pos, const char **packed_pos_end)
 {

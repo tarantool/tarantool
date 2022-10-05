@@ -543,6 +543,84 @@ tree_g.test_runtime_memory_leak = function(cg)
             s:select(0, {after=pos})
         end
         t.assert_le(box.runtime.info().used, runtime_used + delta)
+
+        for _ = 1, 1e3 do
+            s:pairs(0, {after={0, 0}})
+            s:pairs(0, {after=tuple})
+            s:pairs(0, {after=pos})
+        end
+        t.assert_le(box.runtime.info().used, runtime_used + delta)
+    end)
+end
+
+tree_g.test_pagination_pairs = function(cg)
+    cg.server:exec(function()
+        local t = require('luatest')
+        local s = box.space.s
+        s:create_index("pk", {type = "tree"})
+        s:create_index("sk", {parts = {2}, type = "tree", unique=false})
+        s:create_index("sk2", {parts = {3}, type = "tree", unique=false})
+        s:create_index("sk_unique", {parts = {4}, type = "tree", unique=true})
+
+        -- Fetch position in empty space
+        local indexes = {s.index.pk, s.index.sk, s.index.sk2, s.index.sk_unique}
+        for _, index in pairs(indexes) do
+            local tuples, pos = index:select(nil,
+                    {limit=2, fullscan=true, fetch_pos=true})
+            t.assert_equals(tuples, {})
+            t.assert(pos == nil)
+        end
+
+        for i = 1, 11 do
+            s:replace{i, 1, i, i}
+        end
+
+        local test_indexes = {s.index.pk, s.index.sk2, s.index.sk_unique}
+        math.randomseed(os.time())
+        for _, index in pairs(test_indexes) do
+            local i = math.random(0, 11)
+            local collected_tuples = {{}, {}}
+            for _, tuple in index:pairs(nil, {iterator='ALL', after={i, 1, i, i}}) do
+                table.insert(collected_tuples[1], tuple)
+            end
+            local pos = index:tuple_pos({i, 1, i, i})
+            for _, tuple in index:pairs(nil, {iterator='ALL', after=pos}) do
+                table.insert(collected_tuples[2], tuple)
+            end
+            local expected_tuples = index:select(i, {iterator='GT'})
+            t.assert_equals(collected_tuples[1], expected_tuples)
+            t.assert_equals(collected_tuples[2], expected_tuples)
+        end
+    end)
+end
+
+tree_g.test_concurrent_pairs = function(cg)
+    cg.server:exec(function()
+        local t = require('luatest')
+        local s = box.space.s
+        local index = s:create_index("pk", {type = "tree"})
+
+        for i = 1, 10 do
+            s:replace{i}
+        end
+
+        math.randomseed(os.time())
+        local i = math.random(0, 11)
+        local collected_tuples = {{}, {}}
+        local pairs_state = {index:pairs(nil, {iterator='ALL', after={i}})}
+        local j = math.random(1, 11)
+        if j == i then j = i - 1  end
+        for _, tuple in index:pairs(nil, {iterator='ALL', after={j}}) do
+            table.insert(collected_tuples[2], tuple)
+        end
+        for _, tuple in unpack(pairs_state) do
+            table.insert(collected_tuples[1], tuple)
+        end
+        local expected_tuples = {}
+        expected_tuples[1] = index:select(i, {iterator='GT'})
+        expected_tuples[2] = index:select(j, {iterator='GT'})
+        t.assert_equals(collected_tuples[1], expected_tuples[1])
+        t.assert_equals(collected_tuples[2], expected_tuples[2])
     end)
 end
 
