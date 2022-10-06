@@ -6,6 +6,5 @@ Action packs and deploys Tarantool packages.
 
 Add the following code to the running steps after checkout done:
 ```
-  - uses: ./.github/actions/pack_and_deploy
+  - uses: ./.github/actions/pack-and-deploy
 ```
-
