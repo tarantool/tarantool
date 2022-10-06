@@ -1,0 +1,473 @@
+#!/usr/bin/env tarantool
+
+local ffi = require('ffi')
+local fio = require('fio')
+local popen = require('popen')
+local yaml = require('yaml')
+
+ffi.cdef([[
+    int
+    isatty(int);
+]])
+
+local this_file = fio.abspath(debug.getinfo(1).source:match("@?(.*)"))
+local this_dir = fio.dirname(this_file)
+local repository_dir = fio.dirname(this_dir)
+
+-- {{{ General purpose helpers
+
+-- Transform a path relative to the repository root to an absolute
+-- path.
+local function repository_path(path)
+    return fio.pathjoin(repository_dir, path)
+end
+
+-- Returns -1, 0 or 1:
+--
+-- -1, if a < b
+-- 0, if a == b
+-- 1, if a > b
+local function compare_versions(a, b)
+    assert(#a == #b)
+    for i = 1, #a do
+        local an = tonumber(a[i])
+        local bn = tonumber(b[i])
+        if an ~= bn then
+            return an < bn and -1 or 1
+        end
+    end
+    return 0
+end
+
+local function colorize(color, fmt, ...)
+    local msg = fmt:format(...)
+
+    if os.getenv('NO_COLOR') ~= nil and os.getenv('NO_COLOR') ~= '' then
+        return msg
+    end
+
+    if ffi.C.isatty(1) == 0 then
+        return msg
+    end
+
+    local RESET_TERM = '\x1B[0m'
+    local COLORS = {
+        red = '\x1B[31m',
+        green = '\x1B[32m',
+    }
+    return table.concat({assert(COLORS[color]), msg, RESET_TERM})
+end
+
+-- }}} General purpose helpers
+
+-- {{{ Popen line reader
+
+local popen_reader_mt = {}
+popen_reader_mt.__index = popen_reader_mt
+
+local function popen_reader_new(ph, opts)
+    local read_timeout = 1
+    if opts ~= nil and opts.read_timeout ~= nil then
+        read_timeout = opts.read_timeout
+    end
+
+    return setmetatable({
+        _ph = ph,
+        _readahead_buffer = '',
+        _eof = false,
+        _read_timeout = read_timeout,
+    }, popen_reader_mt)
+end
+
+function popen_reader_mt.read_line(self)
+    if self._eof then
+        return ''
+    end
+
+    while not self._readahead_buffer:find('\n') do
+        local chunk, err = self._ph:read({timeout = self._read_timeout})
+        if chunk == nil then
+            error(err)
+        end
+        if chunk == '' then
+            self._eof = true
+            break
+        end
+        self._readahead_buffer = self._readahead_buffer .. chunk
+    end
+    if self._eof then
+        local line = self._readahead_buffer
+        self._readahead_buffer = ''
+        return line
+    end
+    local line, new_buffer = unpack(self._readahead_buffer:split('\n', 1))
+    self._readahead_buffer = new_buffer
+    return line
+end
+
+function popen_reader_mt.close(self)
+    self._ph:close()
+    table.clear(self)
+end
+
+-- }}} Popen line reader
+
+-- {{{ dependencies.yaml file
+
+-- Returns version of the given repository as written in the
+-- dependencies.yaml file.
+--
+-- The result may be a version string (X.Y.Z) or 40-character
+-- commit id.
+local function dependencies_yaml_info(repository_def)
+    local name = assert(repository_def.dependencies_yaml_name)
+
+    local path = repository_path('extra/dependencies.yaml')
+    local fh = assert(fio.open(path, {'O_RDONLY'}))
+    local raw = fh:read()
+    fh:close()
+
+    local dependencies = yaml.decode(raw)
+
+    local found_entry
+    for _, entry in ipairs(dependencies.dependencies) do
+        if entry.name == name then
+            found_entry = entry
+            break
+        end
+    end
+    assert(found_entry ~= nil)
+
+    return found_entry.version
+end
+
+-- }}} dependencies.yaml file
+
+-- {{{ Submodule repository type
+
+local function gen_tag_comparator(repository_def)
+    assert(repository_def.type == 'submodule')
+    local tag_to_version = repository_def.tag_to_version
+    return function(a, b)
+        local av = tag_to_version(a)
+        local bv = tag_to_version(b)
+        return compare_versions(av, bv)
+    end
+end
+
+-- Fetch annotated tags for the given repository and corresponding
+-- commit IDs.
+--
+-- There are several ways to obtain this information:
+--
+-- 1. Use GraphQL API (repository -> refs -> ...).
+-- 2. Use REST API (https://api.github.com/repos/{}/{}/tags).
+-- 3. Parse HTML from https://github.com/{}/{}/tags.
+-- 4. Use `git ls-remote`.
+--
+-- 1 -- requires personal access token, which is not very
+-- convenient.
+--
+-- 2 -- works without a token, but anonymous access is rate
+-- limited to 60 requests per hour per IP address, so
+-- unreliable.
+--
+-- 3 -- weird and also requires to implement pagination (10 tags
+-- per page is shown and it is less than needed to reach current
+-- tag for some of the submodules at the time of writing the
+-- script).
+--
+-- 4 -- just works.
+local function fetch_upstream_tags(repository_def)
+    assert(repository_def.type == 'submodule')
+
+    local filter_tag = repository_def.filter_tag
+    local function filter_tag_impl(tag)
+        if type(filter_tag) == 'function' then
+            return filter_tag(tag)
+        elseif type(filter_tag) == 'string' then
+            return (tag:match(filter_tag))
+        else
+            assert(false)
+        end
+    end
+
+    local remote_uri = ('https://github.com/%s.git'):format(
+        repository_def.upstream)
+
+    -- NB: `git ls-remote` depends on network conditions, so increase the
+    -- timeout.
+    local opts = {read_timeout = 10}
+    local command = ('git ls-remote --tags "%s"'):format(remote_uri)
+    local ph = popen_reader_new(popen.shell(command, 'r'), opts)
+
+    local commit2tag = {}
+    while true do
+        local line = ph:read_line()
+        if line == '' then
+            break
+        end
+
+        local object_id, ref = unpack(line:split('\t', 1))
+
+        -- Implied by --tags.
+        assert(ref:startswith('refs/tags/'))
+
+        -- A lightweight tag is shown once:
+        --
+        -- <commit_id> refs/tags/<tag_name>
+        --
+        -- An annotated tag is shown twice:
+        --
+        -- <tag object id> refs/tags/<tag_name>
+        -- <commit_id> refs/tags/<tag_name>^{}
+        --
+        -- Let's take only annotated tags into account, because
+        -- it works as expected for submodules we need. If we need
+        -- lightweight tags into account as well in a future, this
+        -- logic needs an adjustment.
+        if ref:endswith('^{}') then
+            local tag = ref:match('^refs/tags/(.-)%^{}$')
+            if filter_tag_impl(tag) then
+                commit2tag[object_id] = tag
+            end
+        end
+    end
+
+    ph:close()
+
+    assert(next(commit2tag) ~= nil)
+    return commit2tag
+end
+
+-- Collects upstream repository information.
+--
+-- Returns a table of this kind:
+--
+-- {
+--     commit2tag = <table of string to string>
+--     newest_tag = <string>,
+-- }
+local function submodule_upstream_info(repository_def)
+    assert(repository_def.type == 'submodule')
+
+    local commit2tag = fetch_upstream_tags(repository_def)
+
+    local newest_tag
+    local compare = gen_tag_comparator(repository_def)
+    for _commit, tag in pairs(commit2tag) do
+        if newest_tag == nil or compare(tag, newest_tag) > 0 then
+            newest_tag = tag
+        end
+    end
+    assert(newest_tag ~= nil)
+
+    return {
+        commit2tag = commit2tag,
+        newest_tag = newest_tag,
+    }
+end
+
+-- Collects local repository information.
+--
+-- Returns a first tag reachable from HEAD and commit count above
+-- it.
+--
+-- {
+--     closest_tag = <string>,
+--     commits_after_tag = <number>,
+--     head_commit_id = <string>,
+-- }
+local function submodule_local_info(repository_def, commit2tag)
+    assert(repository_def.type == 'submodule')
+
+    local path = repository_path(repository_def.path)
+    local command = ('git -C "%s" log --pretty=format:%%H'):format(path)
+    local ph = popen_reader_new(popen.shell(command, 'r'))
+
+    local closest_tag
+    local commits_after_tag = 0
+    local head_commit_id
+    while true do
+        local commit = ph:read_line()
+        if commit == '' then
+            break
+        end
+        assert(#commit == 40)
+        if head_commit_id == nil then
+            head_commit_id = commit
+        end
+        if commit2tag[commit] ~= nil then
+            closest_tag = commit2tag[commit]
+            break
+        end
+        commits_after_tag = commits_after_tag + 1
+    end
+
+    ph:close()
+
+    return {
+        closest_tag = closest_tag,
+        commits_after_tag = commits_after_tag,
+        head_commit_id = head_commit_id,
+    }
+end
+
+-- Returns a human readable status about necessarity to update
+-- the library or the dependencies.yaml file.
+--
+-- The result is an array-like table of the following shape:
+--
+-- [
+--     {
+--         success = <boolean>,
+--         message = <string>,
+--     },
+--     <...>
+-- ]
+local function submodule_status(repository_def)
+    assert(repository_def.type == 'submodule')
+
+    local compare = gen_tag_comparator(repository_def)
+
+    local upstream_info = submodule_upstream_info(repository_def)
+    local commit2tag = upstream_info.commit2tag
+    local newest_tag = upstream_info.newest_tag
+
+    local local_info = submodule_local_info(repository_def, commit2tag)
+    local local_closest_tag = local_info.closest_tag
+    local local_commits_after_tag = local_info.commits_after_tag
+    local local_commit_id = local_info.head_commit_id
+
+    -- Repository consistency check.
+    if local_closest_tag == nil then
+        local msg_fmt = 'WARN: Unable to determine local tag for %s\n'
+        io.stderr:write(msg_fmt:format(repository_def.upstream))
+        io.stderr:write(yaml.encode({
+            upstream_info = upstream_info,
+            local_info = local_info,
+        }) .. '\n')
+
+        local res = {}
+        local msg = 'cannot determine local tag'
+        table.insert(res, {success = false, message = msg})
+        return res
+    end
+
+    -- Compare upstream tag with the local one.
+    local res = {}
+    if local_closest_tag == newest_tag then
+        local msg = ('the submodule is up to date (%s)'):format(newest_tag)
+        table.insert(res, {success = true, message = msg})
+    elseif compare(local_closest_tag, newest_tag) < 0 then
+        local commits_after_tag_str = ''
+        if local_commits_after_tag > 0 then
+            commits_after_tag_str = (' (plus %d commits above)'):format(
+                local_commits_after_tag)
+        end
+        local msg = ('update from %s%s to %s is recommended'):format(
+            local_closest_tag, commits_after_tag_str, newest_tag)
+        table.insert(res, {success = false, message = msg})
+    else
+        assert(false)
+    end
+
+    -- Verify against extra/dependencies.yaml.
+    local dependencies_file_info = dependencies_yaml_info(repository_def)
+    if dependencies_file_info:len() == 40 then
+        -- Assume commit id if it is 40 character wide.
+        local dependencies_file_commit_id = dependencies_file_info
+        assert(dependencies_file_commit_id:match('^[0-9a-f]+$'))
+
+        if dependencies_file_commit_id == local_commit_id then
+            local msg = ('dependencies.yaml corresponds local commit id ' ..
+                '(%s)'):format(dependencies_file_commit_id)
+            table.insert(res, {success = true, message = msg})
+        else
+            local msg = ('dependencies.yaml differs from local commit id ' ..
+                '(%s vs %s)'):format(dependencies_file_commit_id,
+                local_commit_id)
+            table.insert(res, {success = false, message = msg})
+        end
+    else
+        -- Assume X.Y.Z version otherwise.
+        local dependencies_file_version_str = dependencies_file_info
+        assert(dependencies_file_version_str:match('^[0-9]+%.[0-9]+%.[0-9]+$'))
+        local dependencies_file_version =
+            dependencies_file_version_str:split('.')
+
+        local tag_to_version = repository_def.tag_to_version
+        local local_version = tag_to_version(local_closest_tag)
+
+        if compare_versions(local_version, dependencies_file_version) == 0 then
+            local msg = ('dependencies.yaml corresponds local version ' ..
+                '(%s)'):format(dependencies_file_version_str)
+            table.insert(res, {success = true, message = msg})
+        else
+            local msg = ('dependencies.yaml differs from local version ' ..
+                '(%s vs %s)'):format(dependencies_file_version_str,
+                table.concat(local_version, '.'))
+            table.insert(res, {success = false, message = msg})
+        end
+    end
+
+    return res
+end
+
+-- }}} Submodule repository type
+
+local dependencies_registry = {
+    {
+        type = 'submodule',
+        upstream = 'curl/curl',
+        path = 'third_party/curl',
+        dependencies_yaml_name = 'libcurl',
+        filter_tag = '^curl%-%d+_%d+_%d+$',
+        tag_to_version = function(tag)
+            return tag:gsub('^curl%-', ''):split('_')
+        end,
+    },
+    {
+        type = 'submodule',
+        upstream = 'c-ares/c-ares',
+        path = 'third_party/c-ares',
+        dependencies_yaml_name = 'c-ares',
+        -- There was a shift from cares-X_Y_Z to vX.Y.Z tag name
+        -- scheme. Accept both until the submodule is updated to
+        -- a newer tag.
+        filter_tag = function(tag)
+            if tag:startswith('cares-') then
+                return tag:match('^cares%-%d+_%d+_%d+$')
+            elseif tag:startswith('v') then
+                return tag:match('^v%d+%.%d+%.%d+$')
+            else
+                return false
+            end
+        end,
+        tag_to_version = function(tag)
+            if tag:startswith('cares-') then
+                return tag:gsub('^cares%-', ''):split('_')
+            elseif tag:startswith('v') then
+                return tag:gsub('^v', ''):split('.')
+            else
+                assert(false)
+            end
+        end,
+    },
+}
+
+for _, upstream_def in ipairs(dependencies_registry) do
+    -- NB: Currently only dependencies added as submodules are
+    -- supported. Other types (external source tarballs, copied
+    -- sources) may be added later.
+    assert(upstream_def.type == 'submodule')
+    local status = submodule_status(upstream_def)
+
+    for _, status_entry in ipairs(status) do
+        local color = status_entry.success and 'green' or 'red'
+        local message = status_entry.message
+        print(colorize(color, '%s\t%s', upstream_def.path, message))
+    end
+end
+
+-- vim: set ft=lua:
