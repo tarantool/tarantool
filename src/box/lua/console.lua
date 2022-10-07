@@ -278,6 +278,9 @@ local function set_language(storage, value)
         local msg = 'Invalid language "%s", supported languages: lua and sql.'
         return error(msg:format(value))
     end
+    if value == 'sql' and rawget(box, 'execute') == nil then
+        return error("Unable to set language to 'sql' with unconfigured box")
+    end
     storage.language = value
     return true
 end
