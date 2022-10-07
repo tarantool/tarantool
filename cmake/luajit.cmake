@@ -33,6 +33,8 @@ set(BUILDMODE static CACHE STRING
     "Build mode: build only static lib" FORCE)
 set(LUAJIT_ENABLE_GC64 ${LUAJIT_ENABLE_GC64} CACHE BOOL
     "GC64 mode for x64" FORCE)
+set(LUAJIT_ENABLE_CHECKHOOK ON CACHE BOOL
+    "Check instruction/line hooks for compiled code")
 set(LUAJIT_SMART_STRINGS ON CACHE BOOL
     "Harder string hashing function" FORCE)
 set(LUAJIT_TEST_BINARY $<TARGET_FILE:tarantool> CACHE STRING
