@@ -1228,6 +1228,31 @@ end
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
+-- Tarantool 2.10.4
+--------------------------------------------------------------------------------
+local function revoke_execute_access_to_lua_function_from_role_public()
+    local _priv = box.space[box.schema.PRIV_ID]
+    if box.func.LUA then
+        local row = _priv:get{PUBLIC, 'function', box.func.LUA.id}
+        if row and bit.band(row.privilege, box.priv.X) ~= 0 then
+            local privilege = bit.bxor(row.privilege, box.priv.X)
+            -- Note that X privilege sometimes implies R privilege,
+            -- for example executable functions are visible in _vfunc.
+            -- Let's make minimal changes, leaving R privilege instead of X.
+            privilege = bit.bor(privilege, box.priv.R)
+            log.info("revoke execute access to 'LUA' function from public role")
+            _priv:update({PUBLIC, 'function', box.func.LUA.id},
+                         {{'=', 'privilege', privilege}})
+        end
+    end
+end
+
+local function upgrade_to_2_10_4()
+    revoke_execute_access_to_lua_function_from_role_public()
+end
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
 -- Tarantool 2.11.0
 --------------------------------------------------------------------------------
 local function revoke_write_access_on__collation_from_role_public()
@@ -1257,6 +1282,7 @@ local handlers = {
     {version = mkversion(2, 7, 1), func = upgrade_to_2_7_1, auto = true},
     {version = mkversion(2, 9, 1), func = upgrade_to_2_9_1, auto = true},
     {version = mkversion(2, 10, 1), func = upgrade_to_2_10_1, auto = true},
+    {version = mkversion(2, 10, 4), func = upgrade_to_2_10_4, auto = true},
     {version = mkversion(2, 11, 0), func = upgrade_to_2_11_0, auto = true},
 }
 
