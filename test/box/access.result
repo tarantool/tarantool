@@ -2168,10 +2168,11 @@ session.su('guest')
 ...
 _ = box.schema.func.call("LUA", "return 1")
 ---
+- error: Execute access to function 'LUA' is denied for user 'guest'
 ...
 _ = box.schema.func.call("LUA", "return box.space._space:count()")
 ---
-- error: Read access to space '_space' is denied for user 'guest'
+- error: Execute access to function 'LUA' is denied for user 'guest'
 ...
 _ = box.schema.func.call("box.schema.user.info", 0)
 ---
@@ -2181,6 +2182,16 @@ _ = box.schema.func.call("box.schema.user.info", 1)
 - error: User '1' is not found
 ...
 session.su('admin')
+---
+...
+c = net.connect(LISTEN.host, LISTEN.service)
+---
+...
+c:call('LUA', {'return 1'})
+---
+- error: Execute access to function 'LUA' is denied for user 'guest'
+...
+c:close()
 ---
 ...
 -- gh-5389: make sure that granting privileges from guest does not lead

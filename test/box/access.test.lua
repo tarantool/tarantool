@@ -841,6 +841,9 @@ _ = box.schema.func.call("LUA", "return box.space._space:count()")
 _ = box.schema.func.call("box.schema.user.info", 0)
 _ = box.schema.func.call("box.schema.user.info", 1)
 session.su('admin')
+c = net.connect(LISTEN.host, LISTEN.service)
+c:call('LUA', {'return 1'})
+c:close()
 
 -- gh-5389: make sure that granting privileges from guest does not lead
 -- to crash or assertion fault.
