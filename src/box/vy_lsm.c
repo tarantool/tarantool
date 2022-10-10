@@ -965,7 +965,7 @@ vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
 		     struct vy_entry entry)
 {
 	assert(vy_stmt_type(entry.stmt) == IPROTO_UPSERT);
-	assert(vy_stmt_lsn(entry.stmt) < MAX_LSN);
+	assert(!vy_stmt_is_prepared(entry.stmt));
 	/*
 	 * UPSERT is enabled only for the spaces with the single
 	 * index.

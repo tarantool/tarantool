@@ -201,6 +201,13 @@ vy_stmt_set_lsn(struct tuple *stmt, int64_t lsn)
 	((struct vy_stmt *) stmt)->lsn = lsn;
 }
 
+/** Return true if the statement was prepared, but not yet written to WAL. */
+static inline bool
+vy_stmt_is_prepared(struct tuple *stmt)
+{
+	return vy_stmt_lsn(stmt) >= MAX_LSN;
+}
+
 /** Get type of the vinyl statement. */
 static inline enum iproto_type
 vy_stmt_type(struct tuple *stmt)
