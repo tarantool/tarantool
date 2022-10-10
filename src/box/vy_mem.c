@@ -295,6 +295,24 @@ vy_mem_iterator_step(struct vy_mem_iterator *itr)
 }
 
 /**
+ * Return true if the current statement should be skipped.
+ * Note, the function may update min_skipped_plsn.
+ */
+static inline bool
+vy_mem_iterator_should_skip_curr(struct vy_mem_iterator *itr)
+{
+	struct tuple *stmt = itr->curr.stmt;
+	if (vy_stmt_flags(stmt) & VY_STMT_SKIP_READ)
+		return true;
+	if (!itr->is_prepared_ok && vy_stmt_is_prepared(stmt)) {
+		itr->min_skipped_plsn = MIN(itr->min_skipped_plsn,
+					    vy_stmt_lsn(stmt));
+		return true;
+	}
+	return false;
+}
+
+/**
  * Find next record with lsn <= itr->lsn record.
  * Current position must be at the beginning of serie of records with the
  * same key it terms of direction of iterator (i.e. left for GE, right for LE)
@@ -312,7 +330,7 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 					       &itr->curr_pos)));
 	struct key_def *cmp_def = itr->mem->cmp_def;
 	while (vy_stmt_lsn(itr->curr.stmt) > (**itr->read_view).vlsn ||
-	       vy_stmt_flags(itr->curr.stmt) & VY_STMT_SKIP_READ) {
+	       vy_mem_iterator_should_skip_curr(itr)) {
 		if (vy_mem_iterator_step(itr) != 0 ||
 		    (itr->iterator_type == ITER_EQ &&
 		     vy_entry_compare(itr->key, itr->curr, cmp_def))) {
@@ -358,9 +376,7 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
 	itr->curr = *vy_mem_tree_iterator_get_elem(&itr->mem->tree,
 						   &itr->curr_pos);
-
-	/* Skip VY_STMT_SKIP_READ statements, if any. */
-	while (vy_stmt_flags(itr->curr.stmt) & VY_STMT_SKIP_READ) {
+	while (vy_mem_iterator_should_skip_curr(itr)) {
 		vy_mem_tree_iterator_next(&itr->mem->tree, &itr->curr_pos);
 		assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
 		itr->curr = *vy_mem_tree_iterator_get_elem(&itr->mem->tree,
@@ -441,7 +457,8 @@ vy_mem_iterator_seek(struct vy_mem_iterator *itr, struct vy_entry last)
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     struct vy_entry key, const struct vy_read_view **rv)
+		     struct vy_entry key, const struct vy_read_view **rv,
+		     bool is_prepared_ok)
 {
 	itr->stat = stat;
 
@@ -456,6 +473,8 @@ vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem_iterator_stat *s
 	itr->curr = vy_entry_none();
 
 	itr->search_started = false;
+	itr->is_prepared_ok = is_prepared_ok;
+	itr->min_skipped_plsn = INT64_MAX;
 }
 
 /*

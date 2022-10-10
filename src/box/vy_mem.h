@@ -364,6 +364,19 @@ struct vy_mem_iterator {
 
 	/* Is false until first .._next_.. method is called */
 	bool search_started;
+	/**
+	 * The iterator may return prepared (unconfirmed) statements only if
+	 * this flag is set. If any prepared statements are skipped because of
+	 * this flag, min_skipped_plsn will be set to the min LSN among all
+	 * skipped prepared statements. The transaction is supposed to update
+	 * its read view accordingly to guarantee serializability.
+	 */
+	bool is_prepared_ok;
+	/**
+	 * Initialized to INT64_MAX. Set to the min LSN among all skipped
+	 * prepared statements if is_prepared_ok is false.
+	 */
+	int64_t min_skipped_plsn;
 };
 
 /**
@@ -372,7 +385,8 @@ struct vy_mem_iterator {
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     struct vy_entry key, const struct vy_read_view **rv);
+		     struct vy_entry key, const struct vy_read_view **rv,
+		     bool is_prepared_ok);
 
 /**
  * Advance a mem iterator to the next key.
