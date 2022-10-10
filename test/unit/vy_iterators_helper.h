@@ -37,6 +37,7 @@
 #include "small/lsregion.h"
 #include "vy_mem.h"
 #include "vy_cache.h"
+#include "vy_history.h"
 #include "vy_read_view.h"
 
 #define UNIT_TAP_COMPATIBLE 1
@@ -56,6 +57,7 @@ STMT_TEMPLATE_FLAGS(lsn, type, VY_STMT_DEFERRED_DELETE, __VA_ARGS__)
 extern struct vy_stmt_env stmt_env;
 extern struct vy_mem_env mem_env;
 extern struct vy_cache_env cache_env;
+extern struct mempool history_node_pool;
 
 #if defined(__cplusplus)
 extern "C" {

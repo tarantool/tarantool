@@ -1,8 +1,10 @@
 #include <trivia/config.h>
 #include "memory.h"
 #include "fiber.h"
-#include "vy_history.h"
 #include "vy_iterators_helper.h"
+
+static struct key_def *key_def;
+static struct tuple_format *format;
 
 static void
 test_basic(void)
@@ -11,13 +13,7 @@ test_basic(void)
 
 	plan(9);
 
-	/* Create key_def */
-	uint32_t fields[] = { 0 };
-	uint32_t types[] = { FIELD_TYPE_UNSIGNED };
-	struct key_def *key_def = box_key_def_new(fields, types, 1);
-	assert(key_def != NULL);
 	struct vy_mem *mem = create_test_mem(key_def);
-
 	is(mem->dump_lsn, -1, "mem->dump_lsn on empty mem");
 	const struct vy_stmt_template stmts[] = {
 		STMT_TEMPLATE(100, REPLACE, 1), STMT_TEMPLATE(101, REPLACE, 1),
@@ -58,7 +54,6 @@ test_basic(void)
 
 	/* Clean up */
 	vy_mem_delete(mem);
-	key_def_delete(key_def);
 
 	fiber_gc();
 	footer();
@@ -67,36 +62,14 @@ test_basic(void)
 }
 
 static void
-test_iterator_restore_after_insertion()
+test_iterator_restore_after_insertion(void)
 {
 	header();
 
 	plan(1);
 
-	/* Create key_def */
-	uint32_t fields[] = { 0 };
-	uint32_t types[] = { FIELD_TYPE_UNSIGNED };
-	struct key_def *key_def = box_key_def_new(fields, types, 1);
-	assert(key_def != NULL);
-
-	/* Create format */
-	struct tuple_format *
-		format = vy_simple_stmt_format_new(&stmt_env, &key_def, 1);
-	assert(format != NULL);
-	tuple_format_ref(format);
-
-	/* Create lsregion */
-	struct lsregion lsregion;
-	struct slab_cache *slab_cache = cord_slab_cache();
-	lsregion_create(&lsregion, slab_cache->arena);
-
 	struct vy_entry select_key = vy_entry_key_new(stmt_env.key_format,
 						      key_def, NULL, 0);
-
-	struct mempool history_node_pool;
-	mempool_create(&history_node_pool, cord_slab_cache(),
-		       sizeof(struct vy_history_node));
-
 	uint64_t restore_on_value = 20;
 	uint64_t restore_on_value_reverse = 60;
 	char data[16];
@@ -204,7 +177,7 @@ test_iterator_restore_after_insertion()
 		vy_history_create(&history, &history_node_pool);
 		int rc = vy_mem_iterator_next(&itr, &history);
 		e = vy_history_last_stmt(&history);
-		assert(rc == 0);
+		fail_unless(rc == 0);
 		size_t j = 0;
 		while (e.stmt != NULL) {
 			if (j >= expected_count) {
@@ -225,7 +198,7 @@ test_iterator_restore_after_insertion()
 				break;
 			int rc = vy_mem_iterator_next(&itr, &history);
 			e = vy_history_last_stmt(&history);
-			assert(rc == 0);
+			fail_unless(rc == 0);
 		}
 		if (e.stmt == NULL && j != expected_count)
 			wrong_output = true;
@@ -297,7 +270,7 @@ test_iterator_restore_after_insertion()
 			j++;
 			int rc = vy_mem_iterator_next(&itr, &history);
 			e = vy_history_last_stmt(&history);
-			assert(rc == 0);
+			fail_unless(rc == 0);
 		}
 		if (j != expected_count)
 			wrong_output = true;
@@ -308,21 +281,14 @@ test_iterator_restore_after_insertion()
 
 		vy_history_cleanup(&history);
 		vy_mem_delete(mem);
-		lsregion_gc(&lsregion, 2);
 	}
 
 	ok(!wrong_output, "check wrong_output %d", i_fail);
 
 	/* Clean up */
-	mempool_destroy(&history_node_pool);
-
 	tuple_unref(select_key.stmt);
 	tuple_unref(restore_on_key.stmt);
 	tuple_unref(restore_on_key_reverse.stmt);
-
-	tuple_format_unref(format);
-	lsregion_destroy(&lsregion);
-	key_def_delete(key_def);
 
 	fiber_gc();
 
@@ -332,14 +298,26 @@ test_iterator_restore_after_insertion()
 }
 
 int
-main(int argc, char *argv[])
+main(void)
 {
 	vy_iterator_C_test_init(0);
 
 	plan(2);
+
+	uint32_t fields[] = { 0 };
+	uint32_t types[] = { FIELD_TYPE_UNSIGNED };
+	key_def = box_key_def_new(fields, types, 1);
+	fail_if(key_def == NULL);
+	format = vy_simple_stmt_format_new(&stmt_env, &key_def, 1);
+	fail_if(format == NULL);
+	tuple_format_ref(format);
+
 	test_basic();
 	test_iterator_restore_after_insertion();
 
+	tuple_format_unref(format);
+	key_def_delete(key_def);
 	vy_iterator_C_test_finish();
+
 	return check_plan();
 }

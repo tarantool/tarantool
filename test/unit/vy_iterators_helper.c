@@ -2,6 +2,7 @@
 #include "memory.h"
 #include "fiber.h"
 #include "say.h"
+#include "small/mempool.h"
 #include "tt_uuid.h"
 
 struct tt_uuid INSTANCE_UUID;
@@ -9,6 +10,7 @@ struct tt_uuid INSTANCE_UUID;
 struct vy_stmt_env stmt_env;
 struct vy_mem_env mem_env;
 struct vy_cache_env cache_env;
+struct mempool history_node_pool;
 
 void
 vy_iterator_C_test_init(size_t cache_size)
@@ -24,11 +26,14 @@ vy_iterator_C_test_init(size_t cache_size)
 	vy_cache_env_set_quota(&cache_env, cache_size);
 	size_t mem_size = 64 * 1024 * 1024;
 	vy_mem_env_create(&mem_env, mem_size);
+	mempool_create(&history_node_pool, cord_slab_cache(),
+		       sizeof(struct vy_history_node));
 }
 
 void
 vy_iterator_C_test_finish()
 {
+	mempool_destroy(&history_node_pool);
 	vy_mem_env_destroy(&mem_env);
 	vy_cache_env_destroy(&cache_env);
 	vy_stmt_env_destroy(&stmt_env);
