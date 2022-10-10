@@ -3417,7 +3417,7 @@ vy_squash_process(struct vy_squash *squash)
 		if (vy_entry_compare(result, mem_entry, lsm->cmp_def) != 0 ||
 		    vy_stmt_type(mem_entry.stmt) != IPROTO_UPSERT)
 			break;
-		assert(vy_stmt_lsn(mem_entry.stmt) >= MAX_LSN);
+		assert(vy_stmt_is_prepared(mem_entry.stmt));
 		vy_stmt_set_n_upserts(mem_entry.stmt, n_upserts);
 		if (n_upserts <= VY_UPSERT_THRESHOLD)
 			++n_upserts;
