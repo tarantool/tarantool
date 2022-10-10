@@ -33,25 +33,6 @@ local function demote(server)
     server:exec(function() box.ctl.demote() end)
 end
 
--- Allow WAL writes one by one until the synchro queue becomes busy. The
--- function is needed, because during box.ctl.promote() it is not known for sure
--- which WAL write is PROMOTE - first, second, third? Even if known, it might
--- change in the future.
-local function play_wal_until_synchro_queue_is_busy(server)
-    luatest.helpers.retrying({}, server.exec, server, function()
-        if not box.error.injection.get('ERRINJ_WAL_DELAY') then
-            error('WAL did not reach the delay yet')
-        end
-        if box.info.synchro.queue.busy then
-            return
-        end
-        -- Allow 1 more WAL write.
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-        box.error.injection.set('ERRINJ_WAL_DELAY', false)
-        error('Not busy yet')
-    end)
-end
-
 local function promote_start(server)
     return server:exec(function()
         local f = require('fiber').new(box.ctl.promote)
@@ -200,7 +181,7 @@ g_common.test_raft_leader_promote = function(g)
     wal_delay_start(g.server_1, 0)
     local term = g.server_1:election_term()
     local f = promote_start(g.server_1)
-    play_wal_until_synchro_queue_is_busy(g.server_1)
+    g.server_1:play_wal_until_synchro_queue_is_busy()
     g.server_1:wait_election_leader()
 
     local ok, err = g.server_1:exec(function()
