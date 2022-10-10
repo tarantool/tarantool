@@ -1,12 +1,11 @@
 #include "trivia/util.h"
 #include "vy_iterators_helper.h"
-#include "vy_history.h"
 #include "fiber.h"
 
 const struct vy_stmt_template key_template = STMT_TEMPLATE(0, SELECT, vyend);
 
 static void
-test_basic()
+test_basic(void)
 {
 	header();
 	plan(6);
@@ -19,10 +18,6 @@ test_basic()
 			  &format);
 	struct vy_entry select_all = vy_new_simple_stmt(format, key_def,
 							&key_template);
-
-	struct mempool history_node_pool;
-	mempool_create(&history_node_pool, cord_slab_cache(),
-		       sizeof(struct vy_history_node));
 
 	/*
 	 * Fill the cache with 3 chains.
@@ -127,8 +122,6 @@ test_basic()
 
 	vy_history_cleanup(&history);
 	vy_cache_iterator_close(&itr);
-
-	mempool_destroy(&history_node_pool);
 	tuple_unref(select_all.stmt);
 	destroy_test_cache(&cache, key_def, format);
 	check_plan();
@@ -136,12 +129,14 @@ test_basic()
 }
 
 int
-main()
+main(void)
 {
 	vy_iterator_C_test_init(1LLU * 1024LLU * 1024LLU * 1024LLU);
+
+	plan(1);
 
 	test_basic();
 
 	vy_iterator_C_test_finish();
-	return 0;
+	return check_plan();
 }
