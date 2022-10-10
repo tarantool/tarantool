@@ -97,7 +97,7 @@ vy_point_lookup_scan_mem(struct vy_lsm *lsm, struct vy_mem *mem,
 {
 	struct vy_mem_iterator mem_itr;
 	vy_mem_iterator_open(&mem_itr, &lsm->stat.memory.iterator,
-			     mem, ITER_EQ, key, rv);
+			     mem, ITER_EQ, key, rv, /*is_prepared_ok=*/true);
 	struct vy_history mem_history;
 	vy_history_create(&mem_history, &lsm->env->history_node_pool);
 	int rc = vy_mem_iterator_next(&mem_itr, &mem_history);

@@ -632,7 +632,8 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 	assert(lsm->mem != NULL);
 	sub_src = vy_read_iterator_add_src(itr);
 	vy_mem_iterator_open(&sub_src->mem_iterator, &lsm->stat.memory.iterator,
-			     lsm->mem, iterator_type, itr->key, itr->read_view);
+			     lsm->mem, iterator_type, itr->key, itr->read_view,
+			     /*is_prepared_ok=*/true);
 	/* Add sealed in-memory indexes. */
 	struct vy_mem *mem;
 	rlist_foreach_entry(mem, &lsm->sealed, in_sealed) {
@@ -640,7 +641,7 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 		vy_mem_iterator_open(&sub_src->mem_iterator,
 				     &lsm->stat.memory.iterator,
 				     mem, iterator_type, itr->key,
-				     itr->read_view);
+				     itr->read_view, /*is_prepared_ok=*/true);
 	}
 }
 
