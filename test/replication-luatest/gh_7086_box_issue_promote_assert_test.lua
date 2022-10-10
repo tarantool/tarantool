@@ -42,25 +42,6 @@ end
 
 g.before_all(cluster_init)
 
--- Allow WAL writes one by one until the synchro queue becomes busy. The
--- function is needed, because during box.ctl.promote() it is not known for sure
--- which WAL write is PROMOTE - first, second, third? Even if known, it might
--- change in the future.
-local function play_wal_until_synchro_queue_is_busy(server)
-    luatest.helpers.retrying({}, server.exec, server, function()
-        if not box.error.injection.get('ERRINJ_WAL_DELAY') then
-            error('WAL did not reach the delay yet')
-        end
-        if box.info.synchro.queue.busy then
-            return
-        end
-        -- Allow 1 more WAL write.
-        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
-        box.error.injection.set('ERRINJ_WAL_DELAY', false)
-        error('Not busy yet')
-    end)
-end
-
 local function wal_delay_start(server, countdown)
     if countdown == nil then
         server:exec(function()
@@ -114,12 +95,12 @@ g.test_new_volatile_term_in_box_issue_promote = function(g)
 
     wal_delay_start(g.server_2, 0)
     local f2 = promote_start(g.server_2)
-    play_wal_until_synchro_queue_is_busy(g.server_2)
+    g.server_2:play_wal_until_synchro_queue_is_busy()
     g.server_3:wait_election_term(g.server_2:election_term())
 
     wal_delay_start(g.server_3, 0)
     local f3 = promote_start(g.server_3)
-    play_wal_until_synchro_queue_is_busy(g.server_3)
+    g.server_3:play_wal_until_synchro_queue_is_busy()
     g.server_2:wait_election_term(g.server_3:election_term())
 
     wal_delay_end(g.server_1)
@@ -147,12 +128,12 @@ g.test_new_volatile_term_in_box_issue_demote = function(g)
 
     wal_delay_start(g.server_2, 0)
     local f2 = promote_start(g.server_2)
-    play_wal_until_synchro_queue_is_busy(g.server_2)
+    g.server_2:play_wal_until_synchro_queue_is_busy()
     g.server_3:wait_election_term(g.server_2:election_term())
 
     wal_delay_start(g.server_3, 0)
     local f3 = promote_start(g.server_3)
-    play_wal_until_synchro_queue_is_busy(g.server_3)
+    g.server_3:play_wal_until_synchro_queue_is_busy()
     g.server_2:wait_election_term(g.server_3:election_term())
 
     wal_delay_end(g.server_1)

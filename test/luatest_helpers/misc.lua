@@ -22,6 +22,7 @@ local function skip_if_enterprise()
 end
 
 return {
+    is_debug_build = is_debug_build,
     skip_if_not_debug = skip_if_not_debug,
     skip_if_enterprise = skip_if_enterprise,
 }
