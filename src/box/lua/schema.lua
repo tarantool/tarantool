@@ -241,6 +241,14 @@ local function revoke_object_privs(object_type, object_id)
     end
 end
 
+-- Check if schema version matches Tarantool version and raise an error if not.
+local function check_schema_version()
+    local needs_upgrade, msg = internal.schema_needs_upgrade()
+    if needs_upgrade then
+        box.error(box.error.DDL_NOT_ALLOWED, msg)
+    end
+end
+
 -- Same as type(), but returns 'number' if 'param' is
 -- of type 'cdata' and represents a 64-bit integer.
 local function param_type(param)
@@ -797,6 +805,7 @@ box.schema.space.create = function(name, options)
         temporary = false,
     }
     check_param_table(options, options_template)
+    check_schema_version()
     options = update_param_table(options, options_defaults)
     if options.engine == 'vinyl' then
         options = update_param_table(options, {
@@ -885,6 +894,7 @@ box.schema.space.drop = function(space_id, space_name, opts)
     check_param(space_id, 'space_id', 'number')
     opts = opts or {}
     check_param_table(opts, { if_exists = 'boolean' })
+    check_schema_version()
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
     local _trigger = box.space[box.schema.TRIGGER_ID]
@@ -956,6 +966,7 @@ box.schema.space.alter = function(space_id, options)
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
     end
     check_param_table(options, alter_space_template)
+    check_schema_version()
 
     local _space = box.space._space
     local tuple = _space:get({space.id})
@@ -1527,6 +1538,7 @@ box.schema.index.create = function(space_id, name, options)
     check_param(space_id, 'space_id', 'number')
     check_param(name, 'name', 'string')
     check_param_table(options, create_index_template)
+    check_schema_version()
     local space = box.space[space_id]
     if not space then
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
@@ -1656,6 +1668,7 @@ end
 box.schema.index.drop = function(space_id, index_id)
     check_param(space_id, 'space_id', 'number')
     check_param(index_id, 'index_id', 'number')
+    check_schema_version()
     if index_id == 0 then
         local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
         local sequence_tuple = _space_sequence:delete{space_id}
@@ -1696,6 +1709,7 @@ box.schema.index.alter = function(space_id, index_id, options)
     end
 
     check_param_table(options, alter_index_template)
+    check_schema_version()
 
     if type(space_id) ~= "number" then
         space_id = space.id
@@ -2885,6 +2899,7 @@ box.schema.sequence.create = function(name, opts)
     opts = opts or {}
     check_param(name, 'name', 'string')
     check_param_table(opts, create_sequence_options)
+    check_schema_version()
     local ascending = not opts.step or opts.step > 0
     local options_defaults = {
         step = 1,
@@ -2910,6 +2925,7 @@ end
 
 box.schema.sequence.alter = function(name, opts)
     check_param_table(opts, alter_sequence_options)
+    check_schema_version()
     local id, tuple = sequence_resolve(name)
     if id == nil then
         box.error(box.error.NO_SUCH_SEQUENCE, name)
@@ -2929,6 +2945,7 @@ end
 box.schema.sequence.drop = function(name, opts)
     opts = opts or {}
     check_param_table(opts, {if_exists = 'boolean'})
+    check_schema_version()
     local id = sequence_resolve(name)
     if id == nil then
         if not opts.if_exists then
@@ -3171,6 +3188,7 @@ box.schema.func.create = function(name, opts)
                               comment = 'string',
                               param_list = 'table', returns = 'string',
                               exports = 'table', opts = 'table' })
+    check_schema_version()
     local _func = box.space[box.schema.FUNC_ID]
     local _vfunc = box.space[box.schema.VFUNC_ID]
     local func = _vfunc.index.name:get{name}
@@ -3206,6 +3224,7 @@ end
 box.schema.func.drop = function(name, opts)
     opts = opts or {}
     check_param_table(opts, { if_exists = 'boolean' })
+    check_schema_version()
     local _func = box.space[box.schema.FUNC_ID]
     local _vfunc = box.space[box.schema.VFUNC_ID]
     local fid

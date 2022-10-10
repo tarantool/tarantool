@@ -300,6 +300,7 @@ struct errcode_record {
 	/*245 */_(ER_OLD_TERM,			"The term is outdated: old - %llu, new - %llu") \
 	/*246 */_(ER_INTERFERING_ELECTIONS,	"Interfering elections started")\
 	/*247 */_(ER_ITERATOR_POSITION,		"Iterator position is invalid") \
+	/*248 */_(ER_DDL_NOT_ALLOWED,		"DDL operations are not allowed: %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

@@ -667,6 +667,7 @@ end
 local function upgrade_priv_to_1_10_2()
     local _priv = box.space._priv
     local _vpriv = box.space._vpriv
+    local _index = box.space._index
     local format = _priv:format()
 
     format[4].type = 'scalar'
@@ -674,10 +675,15 @@ local function upgrade_priv_to_1_10_2()
     format = _vpriv:format()
     format[4].type = 'scalar'
     _vpriv:format(format)
-    _priv.index.primary:alter{parts={2, 'unsigned', 3, 'string', 4, 'scalar'}}
-    _vpriv.index.primary:alter{parts={2, 'unsigned', 3, 'string', 4, 'scalar'}}
-    _priv.index.object:alter{parts={3, 'string', 4, 'scalar'}}
-    _vpriv.index.object:alter{parts={3, 'string', 4, 'scalar'}}
+
+    _index:update({_priv.id, _priv.index.primary.id},
+                  {{'=', 'parts', {{1, 'unsigned'}, {2, 'string'}, {3, 'scalar'}}}})
+    _index:update({_vpriv.id, _vpriv.index.primary.id},
+                  {{'=', 'parts', {{1, 'unsigned'}, {2, 'string'}, {3, 'scalar'}}}})
+    _index:update({_priv.id, _priv.index.object.id},
+                  {{'=', 'parts', {{2, 'string'}, {3, 'scalar'}}}})
+    _index:update({_vpriv.id, _priv.index.object.id},
+                  {{'=', 'parts', {{2, 'string'}, {3, 'scalar'}}}})
 end
 
 local function create_vinyl_deferred_delete_space()
@@ -1079,8 +1085,9 @@ local function upgrade_func_to_2_2_1()
     format[18] = {name='created', type='string'}
     format[19] = {name='last_altered', type='string'}
     _func:format(format)
-    _func.index.name:alter({parts = {{'name', 'string',
-                                      collation = 'unicode_ci'}}})
+    box.space._index:update(
+        {_func.id, _func.index.name.id},
+        {{'=', 'parts', {{field = 2, type = 'string', collation = 2}}}})
 end
 
 local function create_func_index()
@@ -1146,7 +1153,8 @@ end
 
 local function drop_func_collation()
     local _func = box.space[box.schema.FUNC_ID]
-    _func.index.name:alter({parts = {{'name', 'string'}}})
+    box.space._index:update({_func.id, _func.index.name.id},
+                            {{'=', 'parts', {{2, 'string'}}}})
 end
 
 local function create_session_settings_space()
@@ -1306,7 +1314,11 @@ local function schema_needs_upgrade()
     local schema_version, schema_version_str = get_version()
     if schema_version ~= nil and
         handlers[#handlers].version > schema_version then
-        return true, schema_version_str
+        local msg = string.format(
+            'Your schema version is %s while Tarantool %s requires a more'..
+            ' recent schema version. Please, consider using box.'..
+            'schema.upgrade().', schema_version_str, box.info.version)
+        return true, msg
     end
     return false
 end
