@@ -8,6 +8,8 @@ local json = require('json')
 local errno = require('errno')
 local log = require('log')
 local yaml = require('yaml')
+-- Full name to avoid loading the built-in misc.
+local misc = require('test.luatest_helpers.misc')
 
 local checks = require('checks')
 local luatest = require('luatest')
@@ -149,6 +151,27 @@ function Server:wait_synchro_queue_term(term)
     return wait_cond('synchro queue term', self, self.exec, self, function(term)
         return box.info.synchro.queue.term >= term
     end, {term})
+end
+
+-- Allow WAL writes one by one until the synchro queue becomes busy. The
+-- function is needed, because during box.ctl.promote() it is not known for sure
+-- which WAL write is PROMOTE - first, second, third? Even if known, it might
+-- change in the future.
+-- WAL delay should already be started before the function is called.
+function Server:play_wal_until_synchro_queue_is_busy()
+    luatest.assert(misc.is_debug_build())
+    return wait_cond('synchro queue is busy', self, self.exec, self, function()
+        if not box.error.injection.get('ERRINJ_WAL_DELAY') then
+            return false
+        end
+        if box.info.synchro.queue.busy then
+            return true
+        end
+        -- Allow 1 more WAL write.
+        box.error.injection.set('ERRINJ_WAL_DELAY_COUNTDOWN', 0)
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
+        return false
+    end)
 end
 
 -- Unlike the original luatest.Server function it waits for
