@@ -40,7 +40,7 @@ s:delete({'b'})
  | ---
  | - error: _session_settings space does not support delete()
  | ...
-s:replace({'sql_defer_foreign_keys', true})
+s:replace({'sql_default_engine', 'memtx'})
  | ---
  | - error: _session_settings space does not support replace()
  | ...
@@ -53,7 +53,6 @@ s:replace({'sql_defer_foreign_keys', true})
 s:select()
  | ---
  | - - ['sql_default_engine', 'memtx']
- |   - ['sql_defer_foreign_keys', false]
  |   - ['sql_full_column_names', false]
  |   - ['sql_full_metadata', false]
  |   - ['sql_parser_debug', false]
@@ -111,7 +110,7 @@ check_sorting(s, t, 'sql_d')
 check_sorting(s, t, 'sql_v')
  | ---
  | ...
-check_sorting(s, t, 'sql_defer_foreign_keys')
+check_sorting(s, t, 'sql_full_column_names')
  | ---
  | ...
 
@@ -120,9 +119,9 @@ t:drop()
  | ...
 
 -- Check get() method of session_settings space.
-s:get({'sql_defer_foreign_keys'})
+s:get({'sql_full_column_names'})
  | ---
- | - ['sql_defer_foreign_keys', false]
+ | - ['sql_full_column_names', false]
  | ...
 s:get({'sql_recursive_triggers'})
  | ---
@@ -155,13 +154,13 @@ for key, value in s:pairs() do table.insert(t, {key, value}) end
 -- Check update() method of session_settings space.
 
 -- Correct updates.
-s:update('sql_defer_foreign_keys', {{'=', 'value', true}})
+s:update('sql_full_metadata', {{'=', 'value', true}})
  | ---
- | - ['sql_defer_foreign_keys', true]
+ | - ['sql_full_metadata', true]
  | ...
-s:update({'sql_defer_foreign_keys'}, {{'=', 2, false}})
+s:update({'sql_full_metadata'}, {{'=', 2, false}})
  | ---
- | - ['sql_defer_foreign_keys', false]
+ | - ['sql_full_metadata', false]
  | ...
 s:update('sql_default_engine', {{'=', 2, 'vinyl'}})
  | ---
@@ -176,114 +175,114 @@ s:update('a', {{'=', 2, 1}})
  | ...
 
 -- Inorrect updates.
-s:update({{'sql_defer_foreign_keys'}}, {{'=', 'value', true}})
+s:update({{'sql_full_metadata'}}, {{'=', 'value', true}})
  | ---
  | - error: 'Supplied key type of part 0 does not match index part type: expected string'
  | ...
 
-s:update('sql_defer_foreign_keys', {'=', 'value', true})
+s:update('sql_full_metadata', {'=', 'value', true})
  | ---
  | - error: Illegal parameters, update operation must be an array {op,..}
  | ...
-s:update('sql_defer_foreign_keys', {{'=', 'value', true}, {'=', 2, true}})
+s:update('sql_full_metadata', {{'=', 'value', true}, {'=', 2, true}})
  | ---
- | - ['sql_defer_foreign_keys', true]
+ | - ['sql_full_metadata', true]
  | ...
-s:update('sql_defer_foreign_keys', {{}})
+s:update('sql_full_metadata', {{}})
  | ---
  | - error: Illegal parameters, update operation must be an array {op,..}, got empty
  |     array
  | ...
-s:update('sql_defer_foreign_keys', {{'='}})
+s:update('sql_full_metadata', {{'='}})
  | ---
  | - error: 'Unknown UPDATE operation #1: wrong number of arguments, expected 3, got
  |     1'
  | ...
-s:update('sql_defer_foreign_keys', {{'=', 'value'}})
+s:update('sql_full_metadata', {{'=', 'value'}})
  | ---
  | - error: 'Unknown UPDATE operation #1: wrong number of arguments, expected 3, got
  |     2'
  | ...
-s:update('sql_defer_foreign_keys', {{'=', 'value', true, 1}})
+s:update('sql_full_metadata', {{'=', 'value', true, 1}})
  | ---
  | - error: 'Unknown UPDATE operation #1: wrong number of arguments, expected 3, got
  |     4'
  | ...
 
-s:update('sql_defer_foreign_keys', {{'+', 'value', 2}})
+s:update('sql_full_metadata', {{'+', 'value', 2}})
  | ---
  | - error: 'Argument type in operation ''+'' on field ''value'' does not match field
  |     type: expected a number'
  | ...
-s:update('sql_defer_foreign_keys', {{'-', 'value', 2}})
+s:update('sql_full_metadata', {{'-', 'value', 2}})
  | ---
  | - error: 'Argument type in operation ''-'' on field ''value'' does not match field
  |     type: expected a number'
  | ...
-s:update('sql_defer_foreign_keys', {{'&', 'value', 2}})
+s:update('sql_full_metadata', {{'&', 'value', 2}})
  | ---
  | - error: 'Argument type in operation ''&'' on field ''value'' does not match field
  |     type: expected a positive integer'
  | ...
-s:update('sql_defer_foreign_keys', {{'|', 'value', 2}})
+s:update('sql_full_metadata', {{'|', 'value', 2}})
  | ---
  | - error: 'Argument type in operation ''|'' on field ''value'' does not match field
  |     type: expected a positive integer'
  | ...
-s:update('sql_defer_foreign_keys', {{'^', 'value', 2}})
+s:update('sql_full_metadata', {{'^', 'value', 2}})
  | ---
  | - error: 'Argument type in operation ''^'' on field ''value'' does not match field
  |     type: expected a positive integer'
  | ...
-s:update('sql_defer_foreign_keys', {{'!', 'value', 2}})
+s:update('sql_full_metadata', {{'!', 'value', 2}})
  | ---
  | - error: Tuple field count 3 does not match space field count 2
  | ...
-s:update('sql_defer_foreign_keys', {{'#', 'value', 2}})
+s:update('sql_full_metadata', {{'#', 'value', 2}})
  | ---
  | - error: Tuple field count 1 does not match space field count 2
  | ...
-s:update('sql_defer_foreign_keys', {{1, 'value', true}})
+s:update('sql_full_metadata', {{1, 'value', true}})
  | ---
  | - error: Illegal parameters, update operation name must be a string
  | ...
-s:update('sql_defer_foreign_keys', {{{1}, 'value', true}})
+s:update('sql_full_metadata', {{{1}, 'value', true}})
  | ---
  | - error: Illegal parameters, update operation name must be a string
  | ...
 
-s:update('sql_defer_foreign_keys', {{'=', {'value'}, true}})
+s:update('sql_full_metadata', {{'=', {'value'}, true}})
  | ---
  | - error: Illegal parameters, field id must be a number or a string
  | ...
-s:update('sql_defer_foreign_keys', {{'=', 1, 'new_key'}})
+s:update('sql_full_metadata', {{'=', 1, 'new_key'}})
  | ---
  | - error: Attempt to modify a tuple field which is part of primary index in space '_session_settings'
  | ...
-s:update('sql_defer_foreign_keys', {{'=', 'name', 'new_key'}})
+s:update('sql_full_metadata', {{'=', 'name', 'new_key'}})
  | ---
  | - error: Attempt to modify a tuple field which is part of primary index in space '_session_settings'
  | ...
-s:update('sql_defer_foreign_keys', {{'=', 3, true}})
+s:update('sql_full_metadata', {{'=', 3, true}})
  | ---
  | - error: Tuple field count 3 does not match space field count 2
  | ...
-s:update('sql_defer_foreign_keys', {{'=', 'some text', true}})
+s:update('sql_full_metadata', {{'=', 'some text', true}})
  | ---
  | - error: Field 'some text' was not found in the tuple
  | ...
 
-s:update('sql_defer_foreign_keys', {{'=', 'value', 1}})
+s:update('sql_full_metadata', {{'=', 'value', 1}})
  | ---
- | - error: Session setting sql_defer_foreign_keys expected a value of type boolean
+ | - error: Session setting sql_full_metadata expected a value of type boolean
  | ...
-s:update('sql_defer_foreign_keys', {{'=', 'value', {1}}})
+s:update('sql_full_metadata', {{'=', 'value', {1}}})
  | ---
- | - error: Session setting sql_defer_foreign_keys expected a value of type boolean
+ | - error: Session setting sql_full_metadata expected a value of type boolean
  | ...
-s:update('sql_defer_foreign_keys', {{'=', 'value', '1'}})
+s:update('sql_full_metadata', {{'=', 'value', '1'}})
  | ---
- | - error: Session setting sql_defer_foreign_keys expected a value of type boolean
+ | - error: Session setting sql_full_metadata expected a value of type boolean
  | ...
 
 -- gh-4711: Provide a user-friendly frontend for accessing session settings.
@@ -310,18 +309,18 @@ s:get('sql_default_engine').value
  | ---
  | - memtx
  | ...
-settings.sql_defer_foreign_keys = true
+settings.sql_full_metadata = true
  | ---
  | ...
-s:get('sql_defer_foreign_keys').value
+s:get('sql_full_metadata').value
  | ---
  | - true
  | ...
-s:update('sql_defer_foreign_keys', {{'=', 2, false}})
+s:update('sql_full_metadata', {{'=', 2, false}})
  | ---
- | - ['sql_defer_foreign_keys', false]
+ | - ['sql_full_metadata', false]
  | ...
-settings.sql_defer_foreign_keys
+settings.sql_full_metadata
  | ---
  | - false
  | ...
@@ -342,19 +341,19 @@ s:get('sql_default_engine').value
  | ---
  | - memtx
  | ...
-box.execute([[set session "sql_defer_foreign_keys" = true]])
+box.execute([[set session "sql_full_metadata" = true]])
  | ---
  | - row_count: 1
  | ...
-s:get('sql_defer_foreign_keys').value
+s:get('sql_full_metadata').value
  | ---
  | - true
  | ...
-box.execute([[set session "sql_defer_foreign_keys" = false]])
+box.execute([[set session "sql_full_metadata" = false]])
  | ---
  | - row_count: 1
  | ...
-s:get('sql_defer_foreign_keys').value
+s:get('sql_full_metadata').value
  | ---
  | - false
  | ...
@@ -363,9 +362,9 @@ settings.sql_default_engine = true
  | ---
  | - error: Session setting sql_default_engine expected a value of type string
  | ...
-settings.sql_defer_foreign_keys = 'false'
+settings.sql_full_metadata = 'false'
  | ---
- | - error: Session setting sql_defer_foreign_keys expected a value of type boolean
+ | - error: Session setting sql_full_metadata expected a value of type boolean
  | ...
 settings.sql_parser_debug = 'string'
  | ---
@@ -390,8 +389,8 @@ box.execute([[set session "sql_default_engine" = true]])
  | - null
  | - Session setting sql_default_engine expected a value of type string
  | ...
-box.execute([[set session "sql_defer_foreign_keys" = 'true']])
+box.execute([[set session "sql_full_metadata" = 'true']])
  | ---
  | - null
- | - Session setting sql_defer_foreign_keys expected a value of type boolean
+ | - Session setting sql_full_metadata expected a value of type boolean
  | ...
