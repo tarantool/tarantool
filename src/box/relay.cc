@@ -541,11 +541,8 @@ relay_final_join(struct iostream *io, uint64_t sync,
 		relay_stop(relay);
 		relay_delete(relay);
 	});
-
 	/*
-	 * Save the first vclock as 'received'. Because firstly, it was really
-	 * received. Secondly, recv_vclock is used by recovery restart and must
-	 * always be valid.
+	 * Save the first vclock as 'received'. Because it was really received.
 	 */
 	vclock_copy(&relay->recv_vclock, start_vclock);
 	relay->r = recovery_new(wal_dir(), false, start_vclock);
@@ -1067,9 +1064,7 @@ relay_subscribe(struct replica *replica, struct iostream *io, uint64_t sync,
 
 	vclock_copy(&relay->local_vclock_at_subscribe, &replicaset.vclock);
 	/*
-	 * Save the first vclock as 'received'. Because firstly, it was really
-	 * received. Secondly, recv_vclock is used by recovery restart and must
-	 * always be valid.
+	 * Save the first vclock as 'received'. Because it was really received.
 	 */
 	vclock_copy(&relay->recv_vclock, replica_clock);
 	relay->r = recovery_new(wal_dir(), false, replica_clock);
@@ -1124,11 +1119,6 @@ relay_raft_msg_push(struct cmsg *base)
 	struct xrow_header row;
 	xrow_encode_raft(&row, &fiber()->gc, &msg->req);
 	try {
-		/*
-		 * Send the message before restarting the recovery. Otherwise
-		 * all the rows would be sent from under a non-leader role and
-		 * would be ignored again.
-		 */
 		relay_send(msg->relay, &row);
 		msg->relay->sent_raft_term = msg->req.term;
 	} catch (Exception *e) {
