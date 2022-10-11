@@ -142,6 +142,8 @@ write_set_search_key(write_set_t *tree, struct vy_lsm *lsm,
 struct vy_tx {
 	/** Link in vy_tx_manager::writers. */
 	struct rlist in_writers;
+	/** Link in vy_tx_manager::prepared. */
+	struct rlist in_prepared;
 	/** Transaction manager. */
 	struct vy_tx_manager *xm;
 	/**
@@ -223,14 +225,14 @@ struct vy_tx_manager {
 	 */
 	int64_t psn;
 	/**
-	 * The last prepared (but not committed) transaction,
-	 * or NULL if there are no prepared transactions.
-	 */
-	struct vy_tx *last_prepared_tx;
-	/**
 	 * List of rw transactions, linked by vy_tx::in_writers.
 	 */
 	struct rlist writers;
+	/**
+	 * List of prepared (but not committed) transaction,
+	 * sorted by PSN ascending, linked by vy_tx::in_prepared.
+	 */
+	struct rlist prepared;
 	/**
 	 * The list of TXs with a read view in order of vlsn.
 	 */
