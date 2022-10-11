@@ -43,7 +43,6 @@ struct session_setting session_settings[SESSION_SETTING_COUNT] = {};
 /** Corresponding names of session settings. */
 const char *session_setting_strs[SESSION_SETTING_COUNT] = {
 	"sql_default_engine",
-	"sql_defer_foreign_keys",
 	"sql_full_column_names",
 	"sql_full_metadata",
 	"sql_parser_debug",
