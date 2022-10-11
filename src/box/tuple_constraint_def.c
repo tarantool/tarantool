@@ -103,7 +103,7 @@ tuple_constraint_def_decode(const char **data,
 	if (*count == 0)
 		return 0;
 
-	int bytes;
+	size_t bytes;
 	*def = region_alloc_array(region, struct tuple_constraint_def,
 				  *count, &bytes);
 	if (*def == NULL) {
@@ -117,7 +117,7 @@ tuple_constraint_def_decode(const char **data,
 	for (size_t i = 0; i < map_size; i++)
 		new_def[i].type = CONSTR_FUNC;
 
-	for (size_t i = 0; i < map_size; i++) {
+	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(**data) != MP_STR) {
 			diag_set(ClientError, errcode,
 				 "constraint name is expected to be a string");
@@ -268,7 +268,7 @@ tuple_constraint_def_decode_fkey(const char **data,
 	if (*count == 0)
 		return 0;
 
-	int bytes;
+	size_t bytes;
 	*def = region_alloc_array(region, struct tuple_constraint_def,
 				  *count, &bytes);
 	if (*def == NULL) {
@@ -279,7 +279,7 @@ tuple_constraint_def_decode_fkey(const char **data,
 		(*def)[i] = old_def[i];
 	struct tuple_constraint_def *new_def = *def + old_count;
 
-	for (size_t i = 0; i < *count; i++) {
+	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(**data) != MP_STR) {
 			diag_set(ClientError, errcode,
 				 "foreign key name is expected to be a string");
