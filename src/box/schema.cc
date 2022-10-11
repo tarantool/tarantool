@@ -69,11 +69,16 @@ struct rlist on_alter_func = RLIST_HEAD_INITIALIZER(on_alter_func);
 
 struct entity_access entity_access;
 
-/** Return current schema version */
 uint32_t
 box_schema_version(void)
 {
 	return schema_version;
+}
+
+uint32_t
+box_dd_version_id(void)
+{
+	return dd_version_id;
 }
 
 static int
