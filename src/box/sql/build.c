@@ -3619,8 +3619,6 @@ struct sql_option_metadata
 static struct sql_option_metadata sql_session_opts[] = {
 	/** SESSION_SETTING_SQL_DEFAULT_ENGINE */
 	{FIELD_TYPE_STRING, 0},
-	/** SESSION_SETTING_SQL_DEFER_FOREIGN_KEYS */
-	{FIELD_TYPE_BOOLEAN, SQL_DeferFKs},
 	/** SESSION_SETTING_SQL_FULL_COLUMN_NAMES */
 	{FIELD_TYPE_BOOLEAN, SQL_FullColNames},
 	/** SESSION_SETTING_SQL_FULL_METADATA */

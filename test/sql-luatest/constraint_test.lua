@@ -178,3 +178,18 @@ g.test_constraints_3 = function()
         t.assert_equals(err.message, res)
     end)
 end
+
+-- Make sure "sql_defer_foreign_keys" session setting no longer exists.
+g.test_constraints_4 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local sql = [[SELECT * FROM "_session_settings" ]]..
+                    [[WHERE "name" = 'sql_defer_foreign_keys';]]
+        t.assert_equals(box.execute(sql).rows, {})
+
+        sql = [[SET SESSION "sql_defer_foreign_keys" = TRUE;]]
+        local _, err = box.execute(sql)
+        t.assert_equals(err.message,
+            [[Session setting sql_defer_foreign_keys doesn't exist]])
+    end)
+end
