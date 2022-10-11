@@ -49,8 +49,13 @@ extern uint32_t dd_version_id;
 /** Triggers invoked after schema initialization. */
 extern struct rlist on_schema_init;
 
+/** Return current monotonic schema version. */
 uint32_t
 box_schema_version(void);
+
+/** Return current persistent schema version. */
+uint32_t
+box_dd_version_id(void);
 
 /**
  * Try to look up object name by id and type of object.

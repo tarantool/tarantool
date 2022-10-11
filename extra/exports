@@ -12,6 +12,7 @@
 base64_bufsize
 base64_decode
 base64_encode
+box_dd_version_id
 box_decimal_abs
 box_decimal_add
 box_decimal_compare

@@ -3,6 +3,9 @@ local bit = require('bit')
 local json = require('json')
 local fio = require('fio')
 local xlog = require('xlog')
+local ffi = require('ffi')
+
+ffi.cdef('uint32_t box_dd_version_id(void);')
 
 -- Guest user id - the default user
 local GUEST = 0
@@ -1288,13 +1291,10 @@ local handlers = {
 
 -- Schema version of the snapshot.
 local function get_version()
-    local version = box.space._schema:get{'version'}
-    if version == nil then
-        error('Missing "version" in box.space._schema')
-    end
-    local major = version[2]
-    local minor = version[3]
-    local patch = version[4] or 0
+    local version = ffi.C.box_dd_version_id()
+    local major = bit.band(bit.rshift(version, 16), 0xff)
+    local minor = bit.band(bit.rshift(version, 8), 0xff)
+    local patch = bit.band(version, 0xff)
 
     return mkversion(major, minor, patch),
            string.format("%s.%s.%s", major, minor, patch)
@@ -1398,7 +1398,7 @@ local function upgrade(options)
     options = options or {}
     setmetatable(options, {__index = {auto = false}})
 
-    local version = get_version()
+    local version = options._initial_version or get_version()
     if version < mkversion(1, 6, 8) then
         log.warn('can upgrade from 1.6.8 only')
         return
@@ -1432,7 +1432,7 @@ local function bootstrap()
     -- insert initial schema
     initial_1_7_5()
     -- upgrade schema to the latest version
-    upgrade()
+    upgrade{_initial_version = mkversion(1, 7, 5)}
 
     set_system_triggers(true)
 
