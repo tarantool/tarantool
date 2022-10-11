@@ -109,6 +109,7 @@ vy_tx_manager_new(void)
 	}
 
 	rlist_create(&xm->writers);
+	rlist_create(&xm->prepared);
 	rlist_create(&xm->read_views);
 	vy_global_read_view_create((struct vy_read_view *)&xm->global_read_view,
 				   INT64_MAX);
@@ -164,13 +165,15 @@ vy_tx_manager_read_view(struct vy_tx_manager *xm)
 	 * Check if the last read view can be reused. Reference
 	 * and return it if it's the case.
 	 */
+	struct vy_tx *last_prepared_tx = rlist_empty(&xm->prepared) ? NULL :
+		rlist_last_entry(&xm->prepared, struct vy_tx, in_prepared);
 	if (!rlist_empty(&xm->read_views)) {
 		rv = rlist_last_entry(&xm->read_views, struct vy_read_view,
 				      in_read_views);
 		/** Reuse an existing read view */
-		if ((xm->last_prepared_tx == NULL && rv->vlsn == xm->lsn) ||
-		    (xm->last_prepared_tx != NULL &&
-		     rv->vlsn == MAX_LSN + xm->last_prepared_tx->psn)) {
+		if ((last_prepared_tx == NULL && rv->vlsn == xm->lsn) ||
+		    (last_prepared_tx != NULL &&
+		     rv->vlsn == MAX_LSN + last_prepared_tx->psn)) {
 
 			rv->refs++;
 			return  rv;
@@ -182,9 +185,9 @@ vy_tx_manager_read_view(struct vy_tx_manager *xm)
 			 "mempool", "read view");
 		return NULL;
 	}
-	if (xm->last_prepared_tx != NULL) {
-		rv->vlsn = MAX_LSN + xm->last_prepared_tx->psn;
-		xm->last_prepared_tx->read_view = rv;
+	if (last_prepared_tx != NULL) {
+		rv->vlsn = MAX_LSN + last_prepared_tx->psn;
+		last_prepared_tx->read_view = rv;
 		rv->refs = 2;
 	} else {
 		rv->vlsn = xm->lsn;
@@ -332,11 +335,14 @@ vy_tx_create(struct vy_tx_manager *xm, struct vy_tx *tx)
 	tx->psn = 0;
 	rlist_create(&tx->on_destroy);
 	rlist_create(&tx->in_writers);
+	rlist_create(&tx->in_prepared);
 }
 
 void
 vy_tx_destroy(struct vy_tx *tx)
 {
+	assert(rlist_empty(&tx->in_prepared));
+
 	trigger_run(&tx->on_destroy, NULL);
 	trigger_destroy(&tx->on_destroy);
 
@@ -765,7 +771,8 @@ vy_tx_prepare(struct vy_tx *tx)
 			return -1;
 		v->region_stmt = *region_stmt;
 	}
-	xm->last_prepared_tx = tx;
+	assert(rlist_empty(&tx->in_prepared));
+	rlist_add_tail_entry(&xm->prepared, tx, in_prepared);
 	return 0;
 }
 
@@ -777,11 +784,11 @@ vy_tx_commit(struct vy_tx *tx, int64_t lsn)
 
 	xm->stat.commit++;
 
-	if (xm->last_prepared_tx == tx)
-		xm->last_prepared_tx = NULL;
-
 	if (vy_tx_is_ro(tx))
 		goto out;
+
+	assert(!rlist_empty(&tx->in_prepared));
+	rlist_del_entry(tx, in_prepared);
 
 	assert(xm->lsn <= lsn);
 	xm->lsn = lsn;
@@ -813,28 +820,17 @@ vy_tx_rollback_after_prepare(struct vy_tx *tx)
 {
 	assert(tx->state == VINYL_TX_COMMIT);
 
-	struct vy_tx_manager *xm = tx->xm;
-
 	/*
 	 * There are two reasons of rollback_after_prepare:
 	 * 1) Fail in the middle of vy_tx_prepare call.
 	 * 2) Cascading rollback after WAL fail.
 	 *
-	 * If a TX is the latest prepared TX and the it is rollbacked,
-	 * it's certainly the case (2) and we should set xm->last_prepared_tx
-	 * to the previous prepared TX, if any.
-	 * But doesn't know the previous TX.
-	 * On the other hand we may expect that cascading rollback will
-	 * concern all the prepared TXs, all of them will be rollbacked
-	 * and xm->last_prepared_tx must be set to NULL in the end.
-	 * Thus we can set xm->last_prepared_tx to NULL now and it will be
-	 * correct in the end of the cascading rollback.
-	 *
-	 * We must not change xm->last_prepared_tx in all other cases,
-	 * it will be changed by the corresponding TX.
+	 * In the first case, the transaction isn't in the list of prepared
+	 * transactions hence there's no assertion that the tx->in_prepared
+	 * link must not be an empty list head (rlist_del is a no-op if the
+	 * link is an empty head).
 	 */
-	if (xm->last_prepared_tx == tx)
-		xm->last_prepared_tx = NULL;
+	rlist_del_entry(tx, in_prepared);
 
 	struct txv *v;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
