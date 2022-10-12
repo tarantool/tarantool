@@ -100,7 +100,14 @@ end)
 test_run:switch('replica')
 fiber = require('fiber')
 box.cfg{replication_synchro_timeout=1000}
-test_run:wait_cond(function() return box.space.sync:count() == 1 end)
+test_run:cmd("setopt delimiter ';'")
+test_run:wait_cond(function()
+    box.begin({txn_isolation = 'read-committed'})
+    local ret = box.space.sync:count()
+    box.commit()
+    return ret == 1
+end);
+test_run:cmd("setopt delimiter ''");
 ok, err = nil
 f = fiber.create(function() ok, err = pcall(box.snapshot) end)
 

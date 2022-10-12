@@ -355,7 +355,8 @@ vy_read_iterator_scan_cache(struct vy_read_iterator *itr,
 
 static NODISCARD int
 vy_read_iterator_scan_mem(struct vy_read_iterator *itr, uint32_t mem_src,
-			  struct vy_entry *next, bool *stop)
+			  struct vy_entry *next, bool *stop,
+			  int64_t *min_skipped_plsn)
 {
 	int rc;
 	struct vy_read_src *src = &itr->src[mem_src];
@@ -375,8 +376,8 @@ vy_read_iterator_scan_mem(struct vy_read_iterator *itr, uint32_t mem_src,
 	}
 	if (rc < 0)
 		return -1;
-
 	vy_read_iterator_evaluate_src(itr, src, next, stop);
+	*min_skipped_plsn = MIN(*min_skipped_plsn, src_itr->min_skipped_plsn);
 	return 0;
 }
 
@@ -514,12 +515,22 @@ restart:
 	if (stop)
 		goto done;
 
-	for (uint32_t i = itr->mem_src; i < itr->disk_src; i++) {
-		if (vy_read_iterator_scan_mem(itr, i, &next, &stop) != 0)
+	int64_t min_skipped_plsn = INT64_MAX;
+	for (uint32_t i = itr->mem_src; i < itr->disk_src && !stop; i++) {
+		if (vy_read_iterator_scan_mem(itr, i, &next, &stop,
+					      &min_skipped_plsn) != 0)
 			return -1;
-		if (stop)
-			goto done;
 	}
+	if (itr->tx != NULL && min_skipped_plsn != INT64_MAX) {
+		if (vy_tx_send_to_read_view(itr->tx, min_skipped_plsn) != 0)
+			return -1;
+		if (itr->tx->state == VINYL_TX_ABORT) {
+			diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+			return -1;
+		}
+	}
+	if (stop)
+		goto done;
 rescan_disk:
 	/* The following code may yield as it needs to access disk. */
 	vy_read_iterator_pin_slices(itr);
@@ -597,6 +608,7 @@ done:
 	return 0;
 }
 
+/** Add the transaction source to the read iterator. */
 static void
 vy_read_iterator_add_tx(struct vy_read_iterator *itr)
 {
@@ -609,19 +621,21 @@ vy_read_iterator_add_tx(struct vy_read_iterator *itr)
 			     iterator_type, itr->key);
 }
 
+/** Add the cache source to the read iterator. */
 static void
-vy_read_iterator_add_cache(struct vy_read_iterator *itr)
+vy_read_iterator_add_cache(struct vy_read_iterator *itr, bool is_prepared_ok)
 {
 	enum iterator_type iterator_type = (itr->iterator_type != ITER_REQ ?
 					    itr->iterator_type : ITER_LE);
 	struct vy_read_src *sub_src = vy_read_iterator_add_src(itr);
 	vy_cache_iterator_open(&sub_src->cache_iterator, &itr->lsm->cache,
 			       iterator_type, itr->key, itr->read_view,
-			       /*is_prepared_ok=*/true);
+			       is_prepared_ok);
 }
 
+/** Add the memory level source to the read iterator. */
 static void
-vy_read_iterator_add_mem(struct vy_read_iterator *itr)
+vy_read_iterator_add_mem(struct vy_read_iterator *itr, bool is_prepared_ok)
 {
 	enum iterator_type iterator_type = (itr->iterator_type != ITER_REQ ?
 					    itr->iterator_type : ITER_LE);
@@ -633,7 +647,7 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 	sub_src = vy_read_iterator_add_src(itr);
 	vy_mem_iterator_open(&sub_src->mem_iterator, &lsm->stat.memory.iterator,
 			     lsm->mem, iterator_type, itr->key, itr->read_view,
-			     /*is_prepared_ok=*/true);
+			     is_prepared_ok);
 	/* Add sealed in-memory indexes. */
 	struct vy_mem *mem;
 	rlist_foreach_entry(mem, &lsm->sealed, in_sealed) {
@@ -641,10 +655,11 @@ vy_read_iterator_add_mem(struct vy_read_iterator *itr)
 		vy_mem_iterator_open(&sub_src->mem_iterator,
 				     &lsm->stat.memory.iterator,
 				     mem, iterator_type, itr->key,
-				     itr->read_view, /*is_prepared_ok=*/true);
+				     itr->read_view, is_prepared_ok);
 	}
 }
 
+/** Add the disk level source to the read iterator. */
 static void
 vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 {
@@ -769,16 +784,18 @@ vy_read_iterator_restore(struct vy_read_iterator *itr)
 						    itr->last : itr->key);
 	itr->range_version = itr->curr_range->version;
 
+	bool is_prepared_ok = true;
 	if (itr->tx != NULL) {
+		is_prepared_ok = vy_tx_is_prepared_ok(itr->tx);
 		itr->txw_src = itr->src_count;
 		vy_read_iterator_add_tx(itr);
 	}
 
 	itr->cache_src = itr->src_count;
-	vy_read_iterator_add_cache(itr);
+	vy_read_iterator_add_cache(itr, is_prepared_ok);
 
 	itr->mem_src = itr->src_count;
-	vy_read_iterator_add_mem(itr);
+	vy_read_iterator_add_mem(itr, is_prepared_ok);
 
 	itr->disk_src = itr->src_count;
 	vy_read_iterator_add_disk(itr);

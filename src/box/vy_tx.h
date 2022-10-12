@@ -42,6 +42,7 @@
 #include "iterator_type.h"
 #include "salad/stailq.h"
 #include "trivia/util.h"
+#include "txn.h"
 #include "vy_entry.h"
 #include "vy_lsm.h"
 #include "vy_stat.h"
@@ -174,6 +175,8 @@ struct vy_tx {
 	 * the write set.
 	 */
 	size_t write_size;
+	/** Transaction isolation level. */
+	enum txn_isolation_level isolation;
 	/** Current state of the transaction.*/
 	enum tx_state state;
 	/** Set if the transaction was started by an applier. */
@@ -208,6 +211,23 @@ static inline const struct vy_read_view **
 vy_tx_read_view(struct vy_tx *tx)
 {
 	return (const struct vy_read_view **)&tx->read_view;
+}
+
+/** Return true if the transaction may see prepared statements. */
+static inline bool
+vy_tx_is_prepared_ok(struct vy_tx *tx)
+{
+	switch (tx->isolation) {
+	case TXN_ISOLATION_READ_COMMITTED:
+		return true;
+	case TXN_ISOLATION_READ_CONFIRMED:
+	case TXN_ISOLATION_LINEARIZABLE:
+		return false;
+	case TXN_ISOLATION_BEST_EFFORT:
+		return !rlist_empty(&tx->in_writers);
+	default:
+		unreachable();
+	}
 }
 
 /** Transaction manager object. */
@@ -291,9 +311,12 @@ vy_tx_manager_delete(struct vy_tx_manager *xm);
 size_t
 vy_tx_manager_mem_used(struct vy_tx_manager *xm);
 
-/** Create or reuse an instance of a read view. */
+/**
+ * Create or reuse an instance of a read view whose vlsn is less than the given
+ * prepared statement LSN. Returns NULL on memory allocation error.
+ */
 struct vy_read_view *
-vy_tx_manager_read_view(struct vy_tx_manager *xm);
+vy_tx_manager_read_view(struct vy_tx_manager *xm, int64_t plsn);
 
 /** Dereference and possibly destroy a read view. */
 void
@@ -330,7 +353,7 @@ vy_tx_destroy(struct vy_tx *tx);
 
 /** Begin a new transaction. */
 struct vy_tx *
-vy_tx_begin(struct vy_tx_manager *xm);
+vy_tx_begin(struct vy_tx_manager *xm, enum txn_isolation_level isolation);
 
 /** Prepare a transaction to be committed. */
 int
@@ -422,6 +445,15 @@ vy_tx_track_point(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry);
  */
 int
 vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt);
+
+/**
+ * Send an active transaction to a read view such that its vlsn is less than
+ * the given prepared statement LSN. Returns 0 on success, -1 on memory
+ * allocation error. The transaction is aborted immediately if it has any
+ * write statements.
+ */
+int
+vy_tx_send_to_read_view(struct vy_tx *tx, int64_t plsn);
 
 /**
  * Iterator over the write set of a transaction.

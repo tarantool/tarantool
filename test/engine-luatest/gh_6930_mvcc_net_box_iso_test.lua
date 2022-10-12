@@ -1,32 +1,35 @@
+local misc = require('test.luatest_helpers.misc')
 local server = require('test.luatest_helpers.server')
 local t = require('luatest')
 
-local g = t.group()
+local g = t.group(nil, {{engine = 'memtx'}, {engine = 'vinyl'}})
 
-g.before_all = function()
-    g.server = server:new{
+g.before_all(function(cg)
+    cg.server = server:new{
         alias   = 'default',
         box_cfg = {memtx_use_mvcc_engine = true}
     }
-    g.server:start()
-end
-
-g.after_all = function()
-    g.server:drop()
-end
-
-g.before_test('test_mvcc_netbox_isolation_level_basics', function()
-    g.server:exec(function()
-        local s = box.schema.space.create('test')
-        s:create_index('primary')
-        box.schema.user.grant('guest', 'read,write', 'space', 'test')
-    end)
+    cg.server:start()
 end)
 
-g.test_mvcc_netbox_isolation_level_basics = function()
+g.after_all(function(cg)
+    cg.server:drop()
+end)
+
+g.before_test('test_mvcc_netbox_isolation_level_basics', function(cg)
+    cg.server:exec(function(engine)
+        local s = box.schema.space.create('test', {engine = engine})
+        s:create_index('primary')
+        box.schema.user.grant('guest', 'read,write', 'space', 'test')
+    end, {cg.params.engine})
+end)
+
+g.test_mvcc_netbox_isolation_level_basics = function(cg)
+    misc.skip_if_not_debug()
+
     local t = require('luatest')
 
-    g.server:exec(function()
+    cg.server:exec(function()
         local s = box.space.test
         box.error.injection.set('ERRINJ_WAL_DELAY', true)
         local fiber = require('fiber')
@@ -38,7 +41,7 @@ g.test_mvcc_netbox_isolation_level_basics = function()
     end)
 
     local netbox = require('net.box')
-    local conn = netbox.connect(g.server.net_box_uri)
+    local conn = netbox.connect(cg.server.net_box_uri)
 
     t.assert_equals(conn.space.test:select(), {})
     local strm = conn:new_stream()
@@ -59,14 +62,14 @@ g.test_mvcc_netbox_isolation_level_basics = function()
     end
 
     for _,level in pairs(expect0) do
-        g.server:exec(function(cfg_level)
+        cg.server:exec(function(cfg_level)
             box.cfg{txn_isolation = cfg_level}
         end, {level})
         strm:begin()
         t.assert_equals(strm.space.test:select(), {})
         strm:commit()
     end
-    g.server:exec(function()
+    cg.server:exec(function()
         box.cfg{txn_isolation = 'best-effort'}
     end)
 
@@ -81,7 +84,7 @@ g.test_mvcc_netbox_isolation_level_basics = function()
     end
 
     for _,level in pairs(expect1) do
-        g.server:exec(function(cfg_level)
+        cg.server:exec(function(cfg_level)
             box.cfg{txn_isolation = cfg_level}
         end, {level})
         strm:begin()
@@ -91,7 +94,7 @@ g.test_mvcc_netbox_isolation_level_basics = function()
         -- which is always run as read-confirmed
         t.assert_equals(strm.space.test:select(), {})
     end
-    g.server:exec(function()
+    cg.server:exec(function()
         box.cfg{txn_isolation = 'best-effort'}
     end)
 
@@ -109,20 +112,20 @@ g.test_mvcc_netbox_isolation_level_basics = function()
     strm:begin{txn_isolation = 'read-committed'}
     t.assert_equals(strm.space.test:select{1}, {{1}})
     strm.space.test:replace{2}
-    g.server:exec(function()
+    cg.server:exec(function()
         box.error.injection.set('ERRINJ_WAL_DELAY', false)
     end)
     strm:commit()
 
     t.assert_equals(strm.space.test:select{}, {{1}, {2}})
 
-    g.server:exec(function()
+    cg.server:exec(function()
         rawget(_G, 'f'):join()
     end)
 end
 
-g.after_test('test_mvcc_netbox_isolation_level_basics', function()
-    g.server:exec(function()
+g.after_test('test_mvcc_netbox_isolation_level_basics', function(cg)
+    cg.server:exec(function()
         box.error.injection.set('ERRINJ_WAL_DELAY', false)
         local s = box.space.test
         if s then

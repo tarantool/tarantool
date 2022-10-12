@@ -1,22 +1,22 @@
 local server = require('test.luatest_helpers.server')
 local t = require('luatest')
 
-local g = t.group()
+local g = t.group(nil, {{engine = 'memtx'}, {engine = 'vinyl'}})
 
-g.before_all = function()
-    g.server = server:new{
+g.before_all(function(cg)
+    cg.server = server:new{
         alias   = 'default',
         box_cfg = {memtx_use_mvcc_engine = true}
     }
-    g.server:start()
-end
+    cg.server:start()
+end)
 
-g.after_all = function()
-    g.server:drop()
-end
+g.after_all(function(cg)
+    cg.server:drop()
+end)
 
-g.test_mvcc_isolation_level_errors = function()
-    g.server:exec(function()
+g.test_mvcc_isolation_level_errors = function(cg)
+    cg.server:exec(function()
         local t = require('luatest')
         t.assert_error_msg_content_equals(
             "Illegal parameters, txn_isolation must be one of " ..
@@ -49,15 +49,15 @@ g.test_mvcc_isolation_level_errors = function()
     end)
 end
 
-g.before_test('test_mvcc_isolation_level_basics', function()
-    g.server:exec(function()
-        local s = box.schema.space.create('test')
+g.before_test('test_mvcc_isolation_level_basics', function(cg)
+    cg.server:exec(function(engine)
+        local s = box.schema.space.create('test', {engine = engine})
         s:create_index('primary')
-    end)
+    end, {cg.params.engine})
 end)
 
-g.test_mvcc_isolation_level_basics = function()
-    g.server:exec(function()
+g.test_mvcc_isolation_level_basics = function(cg)
+    cg.server:exec(function()
         local t = require('luatest')
         local fiber = require('fiber')
         local s = box.space.test
@@ -168,8 +168,41 @@ g.test_mvcc_isolation_level_basics = function()
     end)
 end
 
-g.after_test('test_mvcc_isolation_level_basics', function()
-    g.server:exec(function()
+g.after_test('test_mvcc_isolation_level_basics', function(cg)
+    cg.server:exec(function()
+        local s = box.space.test
+        if s then
+            s:drop()
+        end
+    end)
+end)
+
+g.before_test('test_mvcc_best_effort_read_view', function(cg)
+    cg.server:exec(function(engine)
+        local s = box.schema.space.create('test', {engine = engine})
+        s:create_index('primary')
+    end, {cg.params.engine})
+end)
+
+g.test_mvcc_best_effort_read_view = function(cg)
+    cg.server:exec(function()
+        local t = require('luatest')
+        local fiber = require('fiber')
+        local s = box.space.test
+        local ch = fiber.channel(1)
+        fiber.create(function() s:replace{1} end)
+        fiber.create(function() s:replace{2} ch:put(true) end)
+        box.begin({txn_isolation = 'best-effort'})
+        t.assert_equals(s:select(2), {})
+        t.assert(ch:get(5))
+        t.assert_equals(s:select(1), {{1}})
+        box.commit()
+    end)
+end
+
+g.after_test('test_mvcc_best_effort_read_view', function(cg)
+    cg.server:exec(function()
+        box.error.injection.set('ERRINJ_WAL_DELAY', false)
         local s = box.space.test
         if s then
             s:drop()

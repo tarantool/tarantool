@@ -19,11 +19,20 @@ s:replace{3, 2}
 s:replace{2, 2}
 box.snapshot()
 
-c = fiber.channel(1)
+c1 = fiber.channel(1)
+c2 = fiber.channel(1)
 
 function do_write() s:replace{1, 2} end
-function init_read() end
-function do_read() local ret = sk:select{2} c:put(ret) end
+
+test_run:cmd("setopt delimiter ';'")
+function do_read()
+    c1:get()
+    c2:put(true)
+    box.begin({txn_isolation = 'read-committed'})
+    local ret = sk:select{2}
+    box.commit()
+    c2:put(ret)
+end;
 
 -- Since we have tuples stored on disk, read procedure may
 -- yield, opening window for WAL thread to commit or rollback
@@ -38,7 +47,6 @@ function do_read() local ret = sk:select{2} c:put(ret) end
 -- mem doesn't change and the statement is returned in the result set
 -- (i.e. dirty read takes place).
 --
-test_run:cmd("setopt delimiter ';'");
 -- is_tx_faster_than_wal determines whether wal thread has time
 -- to finish its routine or not. In the first case we add extra
 -- time gap to make sure that  WAL thread finished work and
@@ -46,10 +54,11 @@ test_run:cmd("setopt delimiter ';'");
 --
 function read_prepared_with_delay(is_tx_faster_than_wal)
     errinj.set("ERRINJ_WAL_DELAY", true)
-    fiber.create(do_write, s)
-    init_read()
+    fiber.create(do_write)
+    fiber.create(do_read)
     errinj.set("ERRINJ_VY_READ_PAGE_DELAY", true)
-    fiber.create(do_read, sk, c)
+    c1:put(true)
+    c2:get()
     errinj.set("ERRINJ_WAL_WRITE", true)
     if is_tx_faster_than_wal then
         errinj.set("ERRINJ_RELAY_FASTER_THAN_TX", true)
@@ -57,7 +66,7 @@ function read_prepared_with_delay(is_tx_faster_than_wal)
     errinj.set("ERRINJ_WAL_DELAY", false)
     fiber.sleep(0.1)
     errinj.set("ERRINJ_VY_READ_PAGE_DELAY", false)
-    local res = c:get()
+    local res = c2:get()
     errinj.set("ERRINJ_WAL_WRITE", false)
     if is_tx_faster_than_wal then
         errinj.set("ERRINJ_RELAY_FASTER_THAN_TX", false)
@@ -104,8 +113,19 @@ gen = nil
 param = nil
 state = nil
 function do_write() s:replace{3, 20} end
-function init_read() gen, param, state = sk:pairs({20}, {iterator = box.index.EQ}) gen(param, state) end
-function do_read() local _, ret = gen(param, state) c:put(ret) end
+
+test_run:cmd("setopt delimiter ';'")
+function do_read()
+    box.begin({txn_isolation = 'read-committed'})
+    gen, param, state = sk:pairs({20}, {iterator = box.index.EQ})
+    c1:get()
+    c2:put(true)
+    gen(param, state)
+    local _, ret = gen(param, state)
+    box.commit()
+    c2:put(ret)
+end;
+test_run:cmd("setopt delimiter ''");
 
 read_prepared_with_delay(false)
 -- All the same but test second scenario (WAL thread is not finished

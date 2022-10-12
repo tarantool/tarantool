@@ -824,7 +824,11 @@ test_run:cmd("setopt delimiter ';'")
 ---
 - true
 ...
-_ = fiber.create(function() ch:put(s:select()) end)
+_ = fiber.create(function()
+    box.begin({txn_isolation = 'read-committed'})
+    ch:put(s:select())
+    box.commit()
+end)
 s:upsert({10, 10}, {{'+', 2, 10}})
 test_run:cmd("setopt delimiter ''");
 ---

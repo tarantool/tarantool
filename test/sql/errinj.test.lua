@@ -48,6 +48,9 @@ box.execute('drop table test')
 -- policy, SQL responses could be corrupted, when DDL/DML is mixed
 -- with DQL. Same as gh-3255.
 --
+txn_isolation_default = box.cfg.txn_isolation
+box.cfg{txn_isolation = 'read-committed'}
+
 box.execute('CREATE TABLE test (id integer primary key)')
 cn = remote.connect(box.cfg.listen)
 
@@ -60,6 +63,7 @@ errinj.set("ERRINJ_IPROTO_TX_DELAY", false)
 
 box.execute('DROP TABLE test')
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+box.cfg{txn_isolation = txn_isolation_default}
 
 ----
 ---- gh-3273: Move SQL TRIGGERs into server.

@@ -29,7 +29,14 @@ end)
 
 test_run:switch('replica')
 fiber = require('fiber')
-test_run:wait_cond(function() return box.space.sync:count() == 1 end)
+test_run:cmd("setopt delimiter ';'")
+test_run:wait_cond(function()
+    box.begin({txn_isolation = 'read-committed'})
+    local ret = box.space.sync:count()
+    box.commit()
+    return ret == 1
+end);
+test_run:cmd("setopt delimiter ''");
 -- Snapshot will stuck in WAL thread on rotation before starting wait on the
 -- limbo.
 box.error.injection.set("ERRINJ_WAL_DELAY", true)
