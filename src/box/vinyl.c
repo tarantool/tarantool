@@ -2424,7 +2424,7 @@ vinyl_engine_begin(struct engine *engine, struct txn *txn)
 {
 	struct vy_env *env = vy_env(engine);
 	assert(txn->engine_tx == NULL);
-	txn->engine_tx = vy_tx_begin(env->xm);
+	txn->engine_tx = vy_tx_begin(env->xm, txn->isolation);
 	if (txn->engine_tx == NULL)
 		return -1;
 	return 0;
@@ -3045,7 +3045,7 @@ vinyl_engine_prepare_join(struct engine *engine, void **arg)
 		return -1;
 	}
 	rlist_create(&ctx->entries);
-	ctx->rv = vy_tx_manager_read_view(env->xm);
+	ctx->rv = vy_tx_manager_read_view(env->xm, /*plsn=*/INT64_MAX);
 	if (ctx->rv == NULL) {
 		free(ctx);
 		return -1;

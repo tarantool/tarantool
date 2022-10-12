@@ -158,42 +158,55 @@ vy_tx_manager_mem_used(struct vy_tx_manager *xm)
 }
 
 struct vy_read_view *
-vy_tx_manager_read_view(struct vy_tx_manager *xm)
+vy_tx_manager_read_view(struct vy_tx_manager *xm, int64_t plsn)
 {
+	assert(plsn >= MAX_LSN);
+	/* Look up the last read view with lsn less than the given one. */
 	struct vy_read_view *rv;
+	rlist_foreach_entry_reverse(rv, &xm->read_views, in_read_views) {
+		if (plsn > rv->vlsn)
+			break;
+	}
+	bool rv_exists = !rlist_entry_is_head(rv, &xm->read_views,
+					      in_read_views);
+	/* Look up the last prepared tx with lsn less than the given one. */
+	struct vy_tx *tx;
+	rlist_foreach_entry_reverse(tx, &xm->prepared, in_prepared) {
+		if (plsn > MAX_LSN + tx->psn)
+			break;
+	}
+	bool tx_exists = !rlist_entry_is_head(tx, &xm->prepared, in_prepared);
 	/*
 	 * Check if the last read view can be reused. Reference
 	 * and return it if it's the case.
 	 */
-	struct vy_tx *last_prepared_tx = rlist_empty(&xm->prepared) ? NULL :
-		rlist_last_entry(&xm->prepared, struct vy_tx, in_prepared);
-	if (!rlist_empty(&xm->read_views)) {
-		rv = rlist_last_entry(&xm->read_views, struct vy_read_view,
-				      in_read_views);
-		/** Reuse an existing read view */
-		if ((last_prepared_tx == NULL && rv->vlsn == xm->lsn) ||
-		    (last_prepared_tx != NULL &&
-		     rv->vlsn == MAX_LSN + last_prepared_tx->psn)) {
-
+	if (rv_exists) {
+		if ((!tx_exists && rv->vlsn == xm->lsn) ||
+		    (tx_exists && rv->vlsn == MAX_LSN + tx->psn)) {
 			rv->refs++;
-			return  rv;
+			return rv;
 		}
 	}
+	/*
+	 * Allocate a new read view and insert it into the read view list
+	 * preserving the order.
+	 */
+	struct vy_read_view *prev_rv = rv;
 	rv = mempool_alloc(&xm->read_view_mempool);
 	if (rv == NULL) {
 		diag_set(OutOfMemory, sizeof(*rv),
 			 "mempool", "read view");
 		return NULL;
 	}
-	if (last_prepared_tx != NULL) {
-		rv->vlsn = MAX_LSN + last_prepared_tx->psn;
-		last_prepared_tx->read_view = rv;
+	if (tx_exists) {
+		rv->vlsn = MAX_LSN + tx->psn;
+		tx->read_view = rv;
 		rv->refs = 2;
 	} else {
 		rv->vlsn = xm->lsn;
 		rv->refs = 1;
 	}
-	rlist_add_tail_entry(&xm->read_views, rv, in_read_views);
+	rlist_add_entry(&prev_rv->in_read_views, rv, in_read_views);
 	return rv;
 }
 
@@ -328,6 +341,7 @@ vy_tx_create(struct vy_tx_manager *xm, struct vy_tx *tx)
 	tx->write_set_version = 0;
 	tx->write_size = 0;
 	tx->xm = xm;
+	tx->isolation = TXN_ISOLATION_READ_CONFIRMED;
 	tx->state = VINYL_TX_READY;
 	tx->is_applier_session = false;
 	tx->read_view = (struct vy_read_view *)xm->p_global_read_view;
@@ -379,12 +393,32 @@ vy_tx_is_in_read_view(struct vy_tx *tx)
 	return tx->read_view->vlsn != INT64_MAX;
 }
 
+int
+vy_tx_send_to_read_view(struct vy_tx *tx, int64_t plsn)
+{
+	assert(plsn >= MAX_LSN);
+	assert(tx->state == VINYL_TX_READY);
+	if (tx->read_view->vlsn < plsn)
+		return 0;
+	if (!vy_tx_is_ro(tx)) {
+		vy_tx_abort(tx);
+		return 0;
+	}
+	struct vy_tx_manager *xm = tx->xm;
+	struct vy_read_view *rv = vy_tx_manager_read_view(xm, plsn);
+	if (rv == NULL)
+		return -1;
+	vy_tx_manager_destroy_read_view(xm, tx->read_view);
+	tx->read_view = rv;
+	return 0;
+}
+
 /**
  * Send to read view all transactions that are reading key @v
  * modified by transaction @tx and abort all transactions that are modifying it.
  */
 static int
-vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
+vy_tx_send_readers_to_read_view(struct vy_tx *tx, struct txv *v)
 {
 	struct vy_tx_conflict_iterator it;
 	vy_tx_conflict_iterator_init(&it, &v->lsm->read_set, v->entry);
@@ -396,17 +430,8 @@ vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
 		/* Abort only active TXs */
 		if (abort->state != VINYL_TX_READY)
 			continue;
-		/* already in (earlier) read view */
-		if (vy_tx_is_in_read_view(abort))
-			continue;
-		if (!vy_tx_is_ro(abort)) {
-			vy_tx_abort(abort);
-			continue;
-		}
-		struct vy_read_view *rv = vy_tx_manager_read_view(tx->xm);
-		if (rv == NULL)
+		if (vy_tx_send_to_read_view(abort, INT64_MAX) != 0)
 			return -1;
-		abort->read_view = rv;
 	}
 	return 0;
 }
@@ -433,8 +458,10 @@ vy_tx_abort_readers(struct vy_tx *tx, struct txv *v)
 }
 
 struct vy_tx *
-vy_tx_begin(struct vy_tx_manager *xm)
+vy_tx_begin(struct vy_tx_manager *xm, enum txn_isolation_level isolation)
 {
+	assert(isolation < txn_isolation_level_MAX &&
+	       isolation != TXN_ISOLATION_DEFAULT);
 	struct vy_tx *tx = mempool_alloc(&xm->tx_mempool);
 	if (unlikely(tx == NULL)) {
 		diag_set(OutOfMemory, sizeof(*tx), "mempool", "struct vy_tx");
@@ -446,6 +473,7 @@ vy_tx_begin(struct vy_tx_manager *xm)
 	if (session != NULL && session->type == SESSION_TYPE_APPLIER)
 		tx->is_applier_session = true;
 
+	tx->isolation = isolation;
 	return tx;
 }
 
@@ -678,7 +706,7 @@ vy_tx_prepare(struct vy_tx *tx)
 	struct write_set_iterator it;
 	write_set_ifirst(&tx->write_set, &it);
 	while ((v = write_set_inext(&it)) != NULL) {
-		if (vy_tx_send_to_read_view(tx, v))
+		if (vy_tx_send_readers_to_read_view(tx, v))
 			return -1;
 	}
 

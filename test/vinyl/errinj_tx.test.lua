@@ -4,6 +4,9 @@ txn_proxy = require('txn_proxy')
 create_iterator = require('utils').create_iterator
 errinj = box.error.injection
 
+txn_isolation_default = box.cfg.txn_isolation
+box.cfg{txn_isolation = 'read-committed'}
+
 --
 -- gh-1681: vinyl: crash in vy_rollback on ER_WAL_WRITE
 --
@@ -208,6 +211,7 @@ errinj.set('ERRINJ_WAL_DELAY', true)
 _ = fiber.create(function() pcall(s.replace, s, {1}) ch:put(true) end)
 
 -- Read the tuple from another transaction.
+box.begin({txn_isolation = 'read-committed'})
 itr = create_iterator(s)
 itr.next()
 
@@ -229,9 +233,12 @@ c('s:replace{1}')
 c:commit()
 
 itr = nil
+box.rollback()
 s:drop()
 
 -- Collect all iterators to make sure no read views are left behind,
 -- as they might disrupt the following test run.
 collectgarbage()
 box.stat.vinyl().tx.read_views -- 0
+
+box.cfg{txn_isolation = txn_isolation_default}

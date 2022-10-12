@@ -274,6 +274,7 @@ s:select{0}
 errinj.set("ERRINJ_WAL_DELAY", true)
 wait_replace = true
 _ = fiber.create(function() s:replace{1, 1} wait_replace = false end)
+box.begin({txn_isolation = 'read-committed'})
 gen,param,state = s:pairs({1}, {iterator = 'GE'})
 state, value = gen(param, state)
 value
@@ -281,6 +282,7 @@ errinj.set("ERRINJ_WAL_DELAY", false)
 while wait_replace do fiber.sleep(0.01) end
 state, value = gen(param, state)
 value
+box.commit()
 s:drop()
 
 --

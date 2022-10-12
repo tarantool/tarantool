@@ -74,12 +74,14 @@ vy_point_lookup_scan_txw(struct vy_lsm *lsm, struct vy_tx *tx,
  */
 static int
 vy_point_lookup_scan_cache(struct vy_lsm *lsm, const struct vy_read_view **rv,
-			   struct vy_entry key, struct vy_history *history)
+			   bool is_prepared_ok, struct vy_entry key,
+			   struct vy_history *history)
 {
 	lsm->cache.stat.lookup++;
 	struct vy_entry entry = vy_cache_get(&lsm->cache, key);
 
-	if (entry.stmt == NULL || vy_stmt_lsn(entry.stmt) > (*rv)->vlsn)
+	if (entry.stmt == NULL || vy_stmt_lsn(entry.stmt) > (*rv)->vlsn ||
+	    (!is_prepared_ok && vy_stmt_is_prepared(entry.stmt)))
 		return 0;
 
 	vy_stmt_counter_acct_tuple(&lsm->cache.stat.get, entry.stmt);
@@ -92,16 +94,18 @@ vy_point_lookup_scan_cache(struct vy_lsm *lsm, const struct vy_read_view **rv,
  */
 static int
 vy_point_lookup_scan_mem(struct vy_lsm *lsm, struct vy_mem *mem,
-			 const struct vy_read_view **rv,
-			 struct vy_entry key, struct vy_history *history)
+			 const struct vy_read_view **rv, bool is_prepared_ok,
+			 struct vy_entry key, struct vy_history *history,
+			 int64_t *min_skipped_plsn)
 {
 	struct vy_mem_iterator mem_itr;
 	vy_mem_iterator_open(&mem_itr, &lsm->stat.memory.iterator,
-			     mem, ITER_EQ, key, rv, /*is_prepared_ok=*/true);
+			     mem, ITER_EQ, key, rv, is_prepared_ok);
 	struct vy_history mem_history;
 	vy_history_create(&mem_history, &lsm->env->history_node_pool);
 	int rc = vy_mem_iterator_next(&mem_itr, &mem_history);
 	vy_history_splice(history, &mem_history);
+	*min_skipped_plsn = MIN(*min_skipped_plsn, mem_itr.min_skipped_plsn);
 	vy_mem_iterator_close(&mem_itr);
 	return rc;
 
@@ -112,17 +116,31 @@ vy_point_lookup_scan_mem(struct vy_lsm *lsm, struct vy_mem *mem,
  * Add found statements to the history list up to terminal statement.
  */
 static int
-vy_point_lookup_scan_mems(struct vy_lsm *lsm, const struct vy_read_view **rv,
+vy_point_lookup_scan_mems(struct vy_lsm *lsm, struct vy_tx *tx,
+			  const struct vy_read_view **rv, bool is_prepared_ok,
 			  struct vy_entry key, struct vy_history *history)
 {
 	assert(lsm->mem != NULL);
-	int rc = vy_point_lookup_scan_mem(lsm, lsm->mem, rv, key, history);
+	int64_t min_skipped_plsn = INT64_MAX;
+	if (vy_point_lookup_scan_mem(lsm, lsm->mem, rv, is_prepared_ok,
+				     key, history, &min_skipped_plsn) != 0)
+		return -1;
 	struct vy_mem *mem;
 	rlist_foreach_entry(mem, &lsm->sealed, in_sealed) {
-		if (rc != 0 || vy_history_is_terminal(history))
-			return rc;
-
-		rc = vy_point_lookup_scan_mem(lsm, mem, rv, key, history);
+		if (vy_history_is_terminal(history))
+			break;
+		if (vy_point_lookup_scan_mem(lsm, mem, rv, is_prepared_ok,
+					     key, history,
+					     &min_skipped_plsn) != 0)
+			return -1;
+	}
+	if (tx != NULL && min_skipped_plsn != INT64_MAX) {
+		if (vy_tx_send_to_read_view(tx, min_skipped_plsn) != 0)
+			return -1;
+		if (tx->state == VINYL_TX_ABORT) {
+			diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+			return -1;
+		}
 	}
 	return 0;
 }
@@ -214,12 +232,14 @@ vy_point_lookup(struct vy_lsm *lsm, struct vy_tx *tx,
 	if (rc != 0 || vy_history_is_terminal(&history))
 		goto done;
 
-	rc = vy_point_lookup_scan_cache(lsm, rv, key, &history);
+	bool is_prepared_ok = tx != NULL ? vy_tx_is_prepared_ok(tx) : false;
+	rc = vy_point_lookup_scan_cache(lsm, rv, is_prepared_ok, key, &history);
 	if (rc != 0 || vy_history_is_terminal(&history))
 		goto done;
 
 restart:
-	rc = vy_point_lookup_scan_mems(lsm, rv, key, &mem_history);
+	rc = vy_point_lookup_scan_mems(lsm, tx, rv, is_prepared_ok,
+				       key, &mem_history);
 	if (rc != 0 || vy_history_is_terminal(&mem_history))
 		goto done;
 
@@ -271,7 +291,8 @@ restart:
 		 * matching the search key.
 		 */
 		vy_history_cleanup(&mem_history);
-		rc = vy_point_lookup_scan_mems(lsm, rv, key, &mem_history);
+		rc = vy_point_lookup_scan_mems(lsm, tx, rv, is_prepared_ok,
+					       key, &mem_history);
 		if (rc != 0)
 			goto done;
 		if (vy_history_is_terminal(&mem_history))
@@ -306,11 +327,13 @@ vy_point_lookup_mem(struct vy_lsm *lsm, const struct vy_read_view **rv,
 	struct vy_history history;
 	vy_history_create(&history, &lsm->env->history_node_pool);
 
-	rc = vy_point_lookup_scan_cache(lsm, rv, key, &history);
+	rc = vy_point_lookup_scan_cache(lsm, rv, /*is_prepared_ok=*/true,
+					key, &history);
 	if (rc != 0 || vy_history_is_terminal(&history))
 		goto done;
 
-	rc = vy_point_lookup_scan_mems(lsm, rv, key, &history);
+	rc = vy_point_lookup_scan_mems(lsm, /*tx=*/NULL, rv,
+				       /*is_prepared_ok=*/true, key, &history);
 	if (rc != 0 || vy_history_is_terminal(&history))
 		goto done;
 
