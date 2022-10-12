@@ -124,8 +124,10 @@ luaT_key_def_set_part(struct lua_State *L, struct key_part_def *part,
 	/* Set part->type. */
 	lua_pushstring(L, "type");
 	lua_gettable(L, -2);
-	if (lua_isnil(L, -1)) {
-		diag_set(IllegalParams, "type must not be nil");
+	if (!lua_isstring(L, -1)) {
+		diag_set(IllegalParams,
+			 "Wrong field type: expected string, got %s",
+			 lua_typename(L, lua_type(L, -1)));
 		return -1;
 	}
 	size_t type_len;
