@@ -252,6 +252,11 @@ struct vy_cache_iterator {
 	uint32_t version;
 	/* Is false until first .._get or .._next_.. method is called */
 	bool search_started;
+	/**
+	 * The iterator may return prepared (unconfirmed) statements only if
+	 * this flag is set.
+	 */
+	bool is_prepared_ok;
 };
 
 /**
@@ -260,12 +265,13 @@ struct vy_cache_iterator {
  * @param cache - the cache.
  * @param iterator_type - iterator type (EQ, GT, GE, LT, LE or ALL)
  * @param key - search key data in terms of vinyl, vy_entry_compare argument
- * @param vlsn - LSN visibility, iterator shows values with lsn <= vlsn
+ * @param rv - read view.
+ * @param is_prepared_ok - if set, the iterator may return prepared statements.
  */
 void
 vy_cache_iterator_open(struct vy_cache_iterator *itr, struct vy_cache *cache,
 		       enum iterator_type iterator_type, struct vy_entry key,
-		       const struct vy_read_view **rv);
+		       const struct vy_read_view **rv, bool is_prepared_ok);
 
 /**
  * Advance a cache iterator to the next key.

@@ -616,6 +616,21 @@ vy_cache_iterator_step(struct vy_cache_iterator *itr)
 }
 
 /**
+ * Return true if the given statement is visible from the iterator
+ * read view.
+ */
+static inline bool
+vy_cache_iterator_stmt_is_visible(struct vy_cache_iterator *itr,
+				  struct tuple *stmt)
+{
+	if (vy_stmt_lsn(stmt) > (**itr->read_view).vlsn)
+		return false;
+	if (!itr->is_prepared_ok && vy_stmt_is_prepared(stmt))
+		return false;
+	return true;
+}
+
+/**
  * Skip all statements that are invisible in the read view
  * associated with the iterator.
  */
@@ -623,7 +638,7 @@ static void
 vy_cache_iterator_skip_to_read_view(struct vy_cache_iterator *itr, bool *stop)
 {
 	while (itr->curr.stmt != NULL &&
-	       vy_stmt_lsn(itr->curr.stmt) > (**itr->read_view).vlsn) {
+	       !vy_cache_iterator_stmt_is_visible(itr, itr->curr.stmt)) {
 		/*
 		 * The cache stores the latest tuple of the key,
 		 * but there could be older tuples in runs.
@@ -805,8 +820,8 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr, struct vy_entry last,
 			int cmp = dir * vy_entry_compare(node->entry, key, def);
 			if (cmp < 0 || (cmp == 0 && !key_belongs))
 				break;
-			if (vy_stmt_lsn(node->entry.stmt) <=
-					(**itr->read_view).vlsn) {
+			if (vy_cache_iterator_stmt_is_visible(
+					itr, node->entry.stmt)) {
 				itr->curr_pos = pos;
 				if (itr->curr.stmt != NULL)
 					tuple_unref(itr->curr.stmt);
@@ -843,7 +858,7 @@ vy_cache_iterator_close(struct vy_cache_iterator *itr)
 void
 vy_cache_iterator_open(struct vy_cache_iterator *itr, struct vy_cache *cache,
 		       enum iterator_type iterator_type, struct vy_entry key,
-		       const struct vy_read_view **rv)
+		       const struct vy_read_view **rv, bool is_prepared_ok)
 {
 	itr->cache = cache;
 	itr->iterator_type = iterator_type;
@@ -855,4 +870,5 @@ vy_cache_iterator_open(struct vy_cache_iterator *itr, struct vy_cache *cache,
 
 	itr->version = 0;
 	itr->search_started = false;
+	itr->is_prepared_ok = is_prepared_ok;
 }

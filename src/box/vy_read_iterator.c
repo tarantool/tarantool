@@ -615,9 +615,9 @@ vy_read_iterator_add_cache(struct vy_read_iterator *itr)
 	enum iterator_type iterator_type = (itr->iterator_type != ITER_REQ ?
 					    itr->iterator_type : ITER_LE);
 	struct vy_read_src *sub_src = vy_read_iterator_add_src(itr);
-	vy_cache_iterator_open(&sub_src->cache_iterator,
-			       &itr->lsm->cache, iterator_type,
-			       itr->key, itr->read_view);
+	vy_cache_iterator_open(&sub_src->cache_iterator, &itr->lsm->cache,
+			       iterator_type, itr->key, itr->read_view,
+			       /*is_prepared_ok=*/true);
 }
 
 static void
