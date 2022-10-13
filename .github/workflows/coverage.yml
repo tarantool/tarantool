@@ -58,10 +58,15 @@ jobs:
         run: make -f .test.mk test-coverage
 
       - name: Upload coverage results to coveralls.io
-        uses: coverallsapp/github-action@v1.1.2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path-to-lcov: ./coverage.info
+        run: |
+          coveralls-lcov \
+            --service-name=github \
+            --repo-token=${{ secrets.GITHUB_TOKEN }} \
+            --service-job-id=${{ github.run_id }} \
+            --branch=${{ github.ref }} \
+            ${{ github.event_name == 'pull_request' &&
+            format('--service-pull-request={0}', github.event.number) || '' }} \
+            ./coverage.info
 
       - name: Send VK Teams message on failure
         if: failure()
