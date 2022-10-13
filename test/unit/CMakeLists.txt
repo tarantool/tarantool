@@ -1,4 +1,4 @@
-add_compile_flags("C;CXX" "-Wno-unused" "-Wno-unused-result")
+	add_compile_flags("C;CXX" "-Wno-unused" "-Wno-unused-result")
 if(CC_HAS_WNO_TAUTOLOGICAL_COMPARE)
     add_compile_flags("C;CXX" "-Wno-tautological-compare")
 endif()
@@ -161,9 +161,9 @@ target_link_libraries(guava.test salad small)
 add_executable(crc32.test crc32.c)
 target_link_libraries(crc32.test unit crc32)
 
-add_executable(find_path.test find_path.c
-    ${PROJECT_SOURCE_DIR}/src/find_path.c
-)
+add_executable(find_path.test find_path.c core_test_utils.c
+    ${PROJECT_SOURCE_DIR}/src/find_path.c)
+target_link_libraries(find_path.test core)
 
 add_executable(reflection_c.test reflection_c.c unit.c
     ${PROJECT_SOURCE_DIR}/src/lib/core/reflection.c)
@@ -310,3 +310,6 @@ target_link_libraries(string.test core unit)
 
 add_executable(qsort_arg.test qsort_arg.cc core_test_utils.c)
 target_link_libraries(qsort_arg.test misc unit)
+
+add_executable(getenv_safe.test getenv_safe.c core_test_utils.c)
+target_link_libraries(getenv_safe.test unit core)

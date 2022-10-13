@@ -296,14 +296,15 @@ module_new(const char *package, size_t package_len,
 
 	memcpy(m->package, package, package_len);
 	m->package[package_len] = 0;
-
-	const char *tmpdir = getenv("TMPDIR");
-	if (tmpdir == NULL)
-		tmpdir = "/tmp";
+	char *tmpdir = getenv_safe("TMPDIR", NULL, 0);
+	char *print_dir = tmpdir;
+	if (print_dir == NULL)
+		print_dir = "/tmp";
 
 	char dir_name[PATH_MAX];
 	int rc = snprintf(dir_name, sizeof(dir_name),
-			  "%s/tntXXXXXX", tmpdir);
+			  "%s/tntXXXXXX", print_dir);
+	free(tmpdir);
 	if (rc < 0 || (size_t)rc >= sizeof(dir_name)) {
 		diag_set(SystemError, "failed to generate path to tmp dir");
 		goto error;

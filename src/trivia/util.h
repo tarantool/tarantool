@@ -455,7 +455,7 @@ gcov_flush(void)
 ssize_t
 fdprintf(int fd, const char *format, ...) __attribute__((format(printf, 2, 3)));
 
-char *
+const char *
 find_path(const char *argv0);
 
 char *
@@ -641,6 +641,32 @@ is_exp_of_two(unsigned n)
  */
 void
 thread_sleep(double sec);
+
+/**
+ * Returns the value associated with an environment variable \a name. The value
+ * is copied onto the buffer, which's either user-provided (when \a buf != NULL)
+ * or dynamically allocated.
+ *
+ * \return buf  in case \a buf != NULL, and strlen(value) < \a buf_size.
+ *         ptr  a pointer to dynamically allocated memory, which has to be freed
+ *              manually, in case \a buf == NULL and strlen(value) < internal
+ *              hard limit.
+ *         NULL in case no value is found.
+ *              in case buf != NULL and strlen(value) >= \a buf_size.
+ *              in case buf == NULL and strlen(value) >= internal limit.
+ *
+ * When a non-null pointer is returned, it's guaranteed to contain a
+ * null-terminated string. The string is a copy of the corresponding environment
+ * variable in all cases, except when `getenv_safe` is run concurrently with
+ * `setenv`.
+ * In that case the buffer might contain:
+ * - an old variable value,
+ * - a new value, truncated to not exceed old value length,
+ * - garbage, truncated to not exceed old value length
+ * Hence the user has to validate the returns.
+ */
+char *
+getenv_safe(const char *name, char *buf, size_t buf_size);
 
 #if !defined(__cplusplus) && !defined(static_assert)
 # define static_assert _Static_assert

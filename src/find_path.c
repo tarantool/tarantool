@@ -35,6 +35,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <trivia/util.h>
 
 #if defined(__APPLE__)
 	#include <mach-o/dyld.h>
@@ -74,7 +75,7 @@ find_path(const char *argv0)
 		rc = _NSGetExecutablePath(buf, &usize);
 #endif
 		if (rc == -1)
-			snprintf(buf, sizeof(buf) - 1, "%s", getenv("_"));
+			getenv_safe("_", buf, sizeof(buf));
 	}
 	if (realpath(buf, path) == NULL)
 		snprintf(path, sizeof(path), "%s", buf);

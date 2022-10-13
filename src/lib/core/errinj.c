@@ -72,9 +72,13 @@ int errinj_foreach(errinj_cb cb, void *cb_ctx) {
 void errinj_set_with_environment_vars(void) {
 	for (enum errinj_id i = 0; i < errinj_id_MAX; i++) {
 		struct errinj *inj = &errinjs[i];
-		const char *env_value = getenv(inj->name);
-		if (env_value == NULL || *env_value == '\0')
+		char *env_value = getenv_safe(inj->name, NULL, 0);
+		if (env_value == NULL)
 			continue;
+		if (*env_value == '\0') {
+			free(env_value);
+			continue;
+		}
 
 		if (inj->type == ERRINJ_INT) {
 			char *end;
@@ -101,5 +105,6 @@ void errinj_set_with_environment_vars(void) {
 				panic("Incorrect value for double %s: %s",
 				      inj->name, env_value);
 		}
+		free(env_value);
 	}
 }

@@ -570,11 +570,12 @@ fiber_backtracer(void *(*frame_writer)(int frame_no, void *addr))
 static void
 tarantool_lua_pushpath_env(struct lua_State *L, const char *envname)
 {
-	const char *path = getenv(envname);
+	char *path = getenv_safe(envname, NULL, 0);
 	if (path != NULL) {
 		const char *def = lua_tostring(L, -1);
-		path = luaL_gsub(L, path, ";;", ";\1;");
-		luaL_gsub(L, path, "\1", def);
+		const char *path_new = luaL_gsub(L, path, ";;", ";\1;");
+		free(path);
+		luaL_gsub(L, path_new, "\1", def);
 		lua_remove(L, -2);
 		lua_remove(L, -2);
 	}
@@ -587,7 +588,7 @@ tarantool_lua_pushpath_env(struct lua_State *L, const char *envname)
 static void
 tarantool_lua_setpaths(struct lua_State *L)
 {
-	const char *home = getenv("HOME");
+	char *home = getenv_safe("HOME", NULL, 0);
 	lua_getglobal(L, "package");
 	int top = lua_gettop(L);
 
@@ -612,6 +613,7 @@ tarantool_lua_setpaths(struct lua_State *L)
 		lua_pushliteral(L, "/.luarocks/lib/lua/5.1/?" MODULE_LIBSUFFIX ";");
 		lua_pushstring(L, home);
 		lua_pushliteral(L, "/.luarocks/lib/lua/?" MODULE_LIBSUFFIX ";");
+		free(home);
 	}
 	lua_pushliteral(L, MODULE_LIBPATH ";");
 	/* overwrite standard paths */
