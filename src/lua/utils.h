@@ -317,6 +317,13 @@ luaL_toint64(struct lua_State *L, int idx);
 LUA_API int
 luaT_call(lua_State *L, int nargs, int nreturns);
 
+/*
+ * Like luaL_dostring(), but in case of error sets fiber diag instead
+ * of putting error on stack.
+ */
+int
+luaT_dostring(struct lua_State *L, const char *str);
+
 /**
  * Like lua_cpcall(), but with the proper support of Tarantool errors.
  * \sa lua_cpcall()

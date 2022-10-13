@@ -568,3 +568,12 @@ create_unit_test(PREFIX getenv_safe
                  SOURCES getenv_safe.c core_test_utils.c
                  LIBRARIES unit core
 )
+
+create_unit_test(PREFIX lua_utils
+                 SOURCES lua_utils.c
+                 LIBRARIES unit core server
+                           ${LUAJIT_LIBRARIES}
+                           ${CURL_LIBRARIES}
+                           ${LIBYAML_LIBRARIES}
+                           ${READLINE_LIBRARIES}
+)
