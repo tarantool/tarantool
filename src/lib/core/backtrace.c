@@ -15,10 +15,6 @@
 #include <dlfcn.h>
 #endif /* __APPLE__ */
 
-#ifdef WITH_BRANCH_PROTECTION
-#include <execinfo.h>
-#endif /* WITH_BRANCH_PROTECTION */
-
 #include "cxx_abi.h"
 #include "proc_name_cache.h"
 
@@ -49,14 +45,8 @@ static NOINLINE void *
 collect_current_stack(struct backtrace *bt, void *stack)
 {
 #ifndef __APPLE__
-	int (*backtrace_alias)(void **, int);
-#ifndef WITH_BRANCH_PROTECTION
-	backtrace_alias = unw_backtrace;
-#else /* WITH_BRANCH_PROTECTION */
-	backtrace_alias = backtrace;
-#endif /* WITH_BRANCH_PROTECTION */
-	bt->frame_count = backtrace_alias((void **)bt->frames,
-					  BACKTRACE_FRAME_COUNT_MAX);
+	bt->frame_count = unw_backtrace((void **)bt->frames,
+					BACKTRACE_FRAME_COUNT_MAX);
 #else /* __APPLE__ */
 	/*
 	 * Unfortunately, glibc `backtrace` does not work on macOS.

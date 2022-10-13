@@ -73,12 +73,6 @@
 #cmakedefine ENABLE_BACKTRACE 1
 
 /*
- * Defined if configured with ENABLE_BACKTRACE on AARCH64 and
- * '-mbranch-protection' compile flag is passed.
- */
-#cmakedefine WITH_BRANCH_PROTECTION
-
-/*
  * Set if the system has bfd.h header and GNU bfd library.
  */
 #cmakedefine HAVE_BFD 1
