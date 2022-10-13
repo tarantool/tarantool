@@ -502,17 +502,19 @@ coio_do_tempdir(eio_req *req)
 }
 
 int
-coio_tempdir(char *path, size_t path_len)
+coio_tempdir(char *path, size_t path_size)
 {
 	INIT_COEIO_FILE(eio);
 
-	const char *tmpdir = getenv("TMPDIR");
-	if (tmpdir == NULL)
-		tmpdir = "/tmp";
-	int rc = snprintf(path, path_len, "%s/XXXXXX", tmpdir);
+	char *tmpdir = getenv_safe("TMPDIR", NULL, 0);
+	const char *append_dir = tmpdir;
+	if (append_dir == NULL)
+		append_dir = "/tmp";
+	int rc = snprintf(path, path_size, "%s/XXXXXX", append_dir);
+	free(tmpdir);
 	if (rc < 0)
 		return -1;
-	if ((size_t) rc >= path_len) {
+	if ((size_t)rc >= path_size) {
 		errno = ENOMEM;
 		return -1;
 	}

@@ -719,7 +719,7 @@ main(int argc, char **argv)
 	 *   such options (in script line) don't work
 	 */
 
-	char *tarantool_bin = find_path(argv[0]);
+	const char *tarantool_bin = find_path(argv[0]);
 	if (!tarantool_bin)
 		tarantool_bin = argv[0];
 	if (argc > 1) {

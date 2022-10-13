@@ -391,7 +391,9 @@ lbox_console_show_prompt(struct lua_State *L)
 static bool
 console_hide_show_prompt_is_enabled(void)
 {
-	const char *envvar = getenv("TT_CONSOLE_HIDE_SHOW_PROMPT");
+	char var_buf[10];
+	const char *envvar = getenv_safe("TT_CONSOLE_HIDE_SHOW_PROMPT", var_buf,
+					 sizeof(var_buf));
 
 	/* Enabled by default. */
 	if (envvar == NULL || *envvar == '\0')
