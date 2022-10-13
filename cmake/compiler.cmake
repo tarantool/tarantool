@@ -174,14 +174,6 @@ endif()
 
 add_compile_flags("C;CXX" "-fexceptions" "-funwind-tables")
 
-if(ENABLE_BACKTRACE)
-    string(FIND ${CMAKE_C_FLAGS} "-mbranch-protection"
-           WITH_BRANCH_PROTECTION)
-    if(WITH_BRANCH_PROTECTION EQUAL -1)
-        set(WITH_BRANCH_PROTECTION FALSE)
-    endif()
-endif()
-
 # In C a global variable without a storage specifier (static/extern) and
 # without an initialiser is called a ’tentative definition’. The
 # language permits multiple tentative definitions in the single
