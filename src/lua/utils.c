@@ -500,6 +500,18 @@ luaT_call(struct lua_State *L, int nargs, int nreturns)
 }
 
 int
+luaT_dostring(struct lua_State *L, const char *str)
+{
+	if (luaL_loadstring(L, str) != 0) {
+		diag_set(LuajitError, lua_tostring(L, -1));
+		return -1;
+	}
+	if (luaT_call(L, 0, LUA_MULTRET) != 0)
+		return -1;
+	return 0;
+}
+
+int
 luaT_cpcall(lua_State *L, lua_CFunction func, void *ud)
 {
 	if (lua_cpcall(L, func, ud))

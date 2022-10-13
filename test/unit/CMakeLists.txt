@@ -563,3 +563,12 @@ create_unit_test(PREFIX key_def
                  SOURCES key_def.c box_test_utils.c
                  LIBRARIES unit box core
 )
+
+create_unit_test(PREFIX lua_utils
+                 SOURCES lua_utils.c
+                 LIBRARIES unit core server
+                           ${LUAJIT_LIBRARIES}
+                           ${CURL_LIBRARIES}
+                           ${LIBYAML_LIBRARIES}
+                           ${READLINE_LIBRARIES}
+)
