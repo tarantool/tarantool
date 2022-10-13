@@ -219,9 +219,9 @@ field_type_by_name(const char *name, size_t len)
 	if (field_type != field_type_MAX)
 		return field_type;
 	/* 'num' and 'str' in _index are deprecated since Tarantool 1.7 */
-	if (strncasecmp(name, "num", len) == 0)
+	if (len == 3 && strncasecmp(name, "num", len) == 0)
 		return FIELD_TYPE_UNSIGNED;
-	else if (strncasecmp(name, "str", len) == 0)
+	else if (len == 3 && strncasecmp(name, "str", len) == 0)
 		return FIELD_TYPE_STRING;
 	else if (len == 1 && name[0] == '*')
 		return FIELD_TYPE_ANY;
