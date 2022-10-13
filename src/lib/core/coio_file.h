@@ -80,7 +80,9 @@ int     coio_sync(void);
 int     coio_fsync(int fd);
 int     coio_fdatasync(int fd);
 
-int	coio_tempdir(char *path, size_t path_len);
+/** A wrapper around mkdtemp. */
+int
+coio_tempdir(char *path, size_t path_size);
 
 int	coio_readdir(const char *path, char **buf);
 int	coio_copyfile(const char *source, const char *dest);

@@ -484,3 +484,44 @@ thread_sleep(double sec)
 	assert(rc == 0);
 	(void)rc;
 }
+
+/*
+ * 32 4 kilobyte pages seems to be the limit for a single environment variable
+ * or argv element set by the kernel. We use that to limit maximum buffer size
+ * allocated for an env variable.
+ */
+#define MAX_ENV_VAR_SIZE 131072
+
+char *
+getenv_safe(const char *name, char *buf, size_t buf_size)
+{
+	assert(buf != NULL || buf_size == 0);
+	assert(name != NULL);
+
+	char *var = getenv(name);
+	if (var == NULL)
+		return NULL;
+	if (buf == NULL)
+		buf_size = MAX_ENV_VAR_SIZE;
+	size_t var_len = strnlen(var, buf_size);
+	if (var_len >= buf_size) {
+		say_warn("Ignoring environment variable %s because its value "
+			 "is too long (>= %zu)", name, buf_size);
+		return NULL;
+	}
+	char *alloc_buf = NULL;
+	if (buf == NULL) {
+		alloc_buf = xmalloc(var_len + 1);
+		buf = alloc_buf;
+	}
+	memcpy(buf, var, var_len + 1);
+	/*
+	 * The value could have changed during copying so we reset the
+	 * terminating zero explicitly to avoid out-of-bounds access.
+	 * The returned value may still be malformed, intentionally, for
+	 * example, but there's nothing we can really do about it. The user must
+	 * check that the returned value is valid for his use.
+	 */
+	buf[var_len] = '\0';
+	return buf;
+}

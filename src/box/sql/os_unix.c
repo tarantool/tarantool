@@ -1433,14 +1433,16 @@ unixTempFileDir(void)
 		"/tmp",
 		"."
 	};
+	static char zbuf0[PATH_MAX];
+	static char zbuf1[PATH_MAX];
 	unsigned int i = 0;
 	struct stat buf;
 	const char *zDir = sql_temp_directory;
 
 	if (!azDirs[0])
-		azDirs[0] = getenv("SQL_TMPDIR");
+		azDirs[0] = getenv_safe("SQL_TMPDIR", zbuf0, sizeof(zbuf0));
 	if (!azDirs[1])
-		azDirs[1] = getenv("TMPDIR");
+		azDirs[1] = getenv_safe("TMPDIR", zbuf1, sizeof(zbuf1));
 	while (1) {
 		if (zDir != 0 && stat(zDir, &buf) == 0 &&
 		    S_ISDIR(buf.st_mode) && access(zDir, 03) == 0)

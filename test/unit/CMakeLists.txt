@@ -305,9 +305,9 @@ create_unit_test(PREFIX crc32
 )
 
 create_unit_test(PREFIX find_path
-                 SOURCES find_path.c
+                 SOURCES find_path.c core_test_utils.c
                          ${PROJECT_SOURCE_DIR}/src/find_path.c
-                 LIBRARIES
+                 LIBRARIES core
 )
 
 create_unit_test(PREFIX reflection_c
@@ -562,4 +562,9 @@ create_unit_test(PREFIX iterator_position
 create_unit_test(PREFIX key_def
                  SOURCES key_def.c box_test_utils.c
                  LIBRARIES unit box core
+)
+
+create_unit_test(PREFIX getenv_safe
+                 SOURCES getenv_safe.c core_test_utils.c
+                 LIBRARIES unit core
 )
