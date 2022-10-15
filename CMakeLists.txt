@@ -70,28 +70,12 @@ include(cmake/atomic.cmake)
 include(cmake/profile.cmake)
 include(cmake/module.cmake)
 include(cmake/thread.cmake)
+include(cmake/hardening.cmake)
 
-# Fuzzers are compiled without PIC support,
-# LuaJIT in FreeBSD doesn't work with PIC (gh-7640),
-# ligomp.a for AArch64 CentOS is compiled without PIC support.
-if (ENABLE_FUZZER OR TARGET_OS_FREEBSD OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
-    set(ENABLE_HARDENING_DEFAULT FALSE)
-else()
-    set(ENABLE_HARDENING_DEFAULT TRUE)
-endif()
-option(ENABLE_HARDENING "Enable compiler options that harden against memory corruption attacks" ${ENABLE_HARDENING_DEFAULT})
-set(HARDENING_FLAGS " ")
-set(HARDENING_LDFLAGS " ")
-if (ENABLE_HARDENING)
-    set(HARDENING_FLAGS "-Wformat -Wformat-security -Werror=format-security -fstack-protector-strong -fPIC")
-    if (NOT TARGET_OS_DARWIN)
-        set(HARDENING_LDFLAGS "-pie -z relro -z now")
-    endif()
-    add_compile_flags("C;CXX" ${HARDENING_FLAGS})
-    set(DEPENDENCY_CFLAGS "${DEPENDENCY_CFLAGS} ${HARDENING_FLAGS}")
-    set(DEPENDENCY_CXXFLAGS "${DEPENDENCY_CXXFLAGS} ${HARDENING_FLAGS}")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${HARDENING_LDFLAGS}")
-endif()
+add_compile_flags("C;CXX" ${HARDENING_FLAGS})
+set(DEPENDENCY_CFLAGS "${DEPENDENCY_CFLAGS} ${HARDENING_FLAGS}")
+set(DEPENDENCY_CXXFLAGS "${DEPENDENCY_CXXFLAGS} ${HARDENING_FLAGS}")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${HARDENING_LDFLAGS}")
 
 set(CMAKE_REQUIRED_DEFINITIONS "-D_GNU_SOURCE")
 
