@@ -1,9 +1,9 @@
 # A macro to build the bundled libcurl
-macro(curl_build CFLAGS)
+macro(curl_build)
     set(LIBCURL_SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/curl)
     set(LIBCURL_BINARY_DIR ${PROJECT_BINARY_DIR}/build/curl/work)
     set(LIBCURL_INSTALL_DIR ${PROJECT_BINARY_DIR}/build/curl/dest)
-    set(LIBCURL_CFLAGS ${CFLAGS})
+    set(LIBCURL_CFLAGS ${DEPENDENCY_CFLAGS})
 
     get_filename_component(FOUND_ZLIB_ROOT_DIR ${ZLIB_INCLUDE_DIR} DIRECTORY)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DZLIB_ROOT=${FOUND_ZLIB_ROOT_DIR}")
