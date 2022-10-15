@@ -26,13 +26,12 @@ macro(zstd_build)
         third_party/zstd/lib/compress/zstd_compress_sequences.c
         third_party/zstd/lib/compress/zstd_compress_literals.c
     )
-
+    set(zstd_cflags "${DEPENDENCY_CFLAGS} -Ofast")
     if (CC_HAS_WNO_IMPLICIT_FALLTHROUGH)
-        set_source_files_properties(${zstd_src}
-            PROPERTIES COMPILE_FLAGS -Wno-implicit-fallthrough)
+        set(zstd_cflags "${zstd_cflags} -Wno-implicit-fallthrough")
     endif()
     set_source_files_properties(${zstd_src}
-        PROPERTIES COMPILE_FLAGS -Ofast)
+        PROPERTIES COMPILE_FLAGS ${zstd_cflags})
 
     add_library(zstd STATIC ${zstd_src})
     set(ZSTD_LIBRARIES zstd)
