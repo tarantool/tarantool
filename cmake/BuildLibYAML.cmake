@@ -6,7 +6,7 @@ macro(libyaml_build)
 
     add_subdirectory(${PROJECT_SOURCE_DIR}/third_party/libyaml EXCLUDE_FROM_ALL)
     # See comments in BuildLibEV.cmake
-    set_target_properties(yaml PROPERTIES COMPILE_FLAGS "-w")
+    set_target_properties(yaml PROPERTIES COMPILE_FLAGS "${DEPENDENCY_CFLAGS} -w")
 
     find_package_message(LIBYAML
         "Using bundled libyaml"
@@ -14,4 +14,3 @@ macro(libyaml_build)
 
     unset(yaml_src)
 endmacro(libyaml_build)
-

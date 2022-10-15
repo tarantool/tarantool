@@ -7,7 +7,7 @@ macro(libccdt_build)
                      ${CMAKE_CURRENT_BINARY_DIR}/third_party/c-dt/build/)
     set_target_properties(cdt
         PROPERTIES COMPILE_FLAGS
-            "-DDT_NAMESPACE=tnt_ -DDT_PARSE_ISO_YEAR0 -DDT_PARSE_ISO_TNT"
+            "${DEPENDENCY_CFLAGS} -DDT_NAMESPACE=tnt_ -DDT_PARSE_ISO_YEAR0 -DDT_PARSE_ISO_TNT"
     )
     add_definitions("-DDT_NAMESPACE=tnt_")
 endmacro()

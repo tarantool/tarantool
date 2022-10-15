@@ -1,7 +1,7 @@
 #
 # A macro to build the bundled libeio
 macro(libeio_build)
-    set(eio_compile_flags)
+    set(eio_compile_flags ${DEPENDENCY_CFLAGS})
 
     # See comments in BuildLibEV.cmake
     set(eio_compile_flags "${eio_compile_flags} -w")

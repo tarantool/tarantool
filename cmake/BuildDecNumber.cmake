@@ -8,6 +8,7 @@ macro(decnumber_build)
     )
 
     add_library(decNumber STATIC ${decnumber_src})
+    set_target_properties(decNumber PROPERTIES COMPILE_FLAGS "${DEPENDENCY_CFLAGS}")
 
     set(DECNUMBER_INCLUDE_DIR ${PROJECT_BINARY_DIR}/third_party/decNumber)
     unset(decnumber_src)
