@@ -25,9 +25,12 @@ set(READLINE_VERSION 8.0)
 set(READLINE_HASH 7e6c1f16aee3244a69aba6e438295ca3)
 set(BACKUP_STORAGE https://distrib.hb.bizmrg.com)
 
+option(DEV_BUILD "Enable build options that make debugging more convenient" OFF)
+
 include(../cmake/os.cmake)
 include(../cmake/profile.cmake)
 include(../cmake/hardening.cmake)
+include(../cmake/prefix.cmake)
 
 # Pass -isysroot=<SDK_PATH> option on Mac OS to a preprocessor and a C
 # compiler to find header files installed with an SDK.
@@ -53,6 +56,9 @@ endif()
 set(DEPENDENCY_CFLAGS "${DEPENDENCY_CFLAGS} ${HARDENING_FLAGS}")
 set(DEPENDENCY_CXXFLAGS "${DEPENDENCY_CXXFLAGS} ${HARDENING_FLAGS}")
 set(DEPENDENCY_LDFLAGS "${DEPENDENCY_LDFLAGS} ${HARDENING_LDFLAGS}")
+
+set(DEPENDENCY_CFLAGS "${DEPENDENCY_CFLAGS} ${PREFIX_MAP_FLAGS}")
+set(DEPENDENCY_CXXFLAGS "${DEPENDENCY_CXXFLAGS} ${PREFIX_MAP_FLAGS}")
 
 # Install all libraries required by tarantool at current build dir
 

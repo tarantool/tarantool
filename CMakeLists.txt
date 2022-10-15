@@ -53,6 +53,8 @@ if(NOT EXISTS ${PROJECT_SOURCE_DIR}/src/lib/small/CMakeLists.txt)
     endif()
 endif()
 
+option(DEV_BUILD "Enable build options that make debugging more convenient" OFF)
+
 # Define GNU standard installation directories
 include(GNUInstallDirs)
 
@@ -71,11 +73,16 @@ include(cmake/profile.cmake)
 include(cmake/module.cmake)
 include(cmake/thread.cmake)
 include(cmake/hardening.cmake)
+include(cmake/prefix.cmake)
 
 add_compile_flags("C;CXX" ${HARDENING_FLAGS})
 set(DEPENDENCY_CFLAGS "${DEPENDENCY_CFLAGS} ${HARDENING_FLAGS}")
 set(DEPENDENCY_CXXFLAGS "${DEPENDENCY_CXXFLAGS} ${HARDENING_FLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${HARDENING_LDFLAGS}")
+
+add_compile_flags("C;CXX" ${PREFIX_MAP_FLAGS})
+set(DEPENDENCY_CFLAGS "${DEPENDENCY_CFLAGS} ${PREFIX_MAP_FLAGS}")
+set(DEPENDENCY_CXXFLAGS "${DEPENDENCY_CXXFLAGS} ${PREFIX_MAP_FLAGS}")
 
 set(CMAKE_REQUIRED_DEFINITIONS "-D_GNU_SOURCE")
 
