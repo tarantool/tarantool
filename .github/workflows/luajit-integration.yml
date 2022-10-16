@@ -10,13 +10,22 @@ name: LuaJIT integration testing
 on:
   workflow_call:
     inputs:
+      # FIXME: Remove this inputs entry when transition to
+      # CMAKE_EXTRA_PARAMS usage is finished.
       buildtype:
-        description: CMake build type value
+        description: CMake build type value (obsolete, use CMAKE_EXTRA_PARAMS)
         required: false
         type: string
         default: Debug
+      CMAKE_EXTRA_PARAMS:
+        description: CMake extra parameters
+        required: false
+        type: string
+        default: ''
+      # FIXME: Remove this inputs entry when transition to
+      # CMAKE_EXTRA_PARAMS usage is finished.
       GC64:
-        description: CMake option value to enable LuaJIT GC64 mode
+        description: CMake option value to enable LuaJIT GC64 mode (obsolete, use CMAKE_EXTRA_PARAMS)
         required: false
         type: string
         default: OFF
