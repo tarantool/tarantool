@@ -848,15 +848,14 @@ checkpoint_f(va_list ap)
 		struct index_read_view *index_rv =
 			space_read_view_index(space_rv, 0);
 		assert(index_rv != NULL);
-		struct index_read_view_iterator *it =
-			index_read_view_create_iterator(index_rv, ITER_ALL,
-							NULL, 0);
-		if (it == NULL) {
+		struct index_read_view_iterator it;
+		if (index_read_view_create_iterator(index_rv, ITER_ALL,
+						    NULL, 0, &it) != 0) {
 			rc = -1;
 			break;
 		}
 		while (true) {
-			rc = index_read_view_iterator_next_raw(it, &data,
+			rc = index_read_view_iterator_next_raw(&it, &data,
 							       &size);
 			if (rc != 0 || data == NULL)
 				break;
@@ -867,7 +866,7 @@ checkpoint_f(va_list ap)
 				break;
 			fiber_gc();
 		}
-		index_read_view_iterator_delete(it);
+		index_read_view_iterator_destroy(&it);
 		if (rc != 0)
 			break;
 	}
@@ -1085,17 +1084,16 @@ memtx_join_f(va_list ap)
 		struct index_read_view *index_rv =
 			space_read_view_index(space_rv, 0);
 		assert(index_rv != NULL);
-		struct index_read_view_iterator *it =
-			index_read_view_create_iterator(index_rv, ITER_ALL,
-							NULL, 0);
-		if (it == NULL) {
+		struct index_read_view_iterator it;
+		if (index_read_view_create_iterator(index_rv, ITER_ALL,
+						    NULL, 0, &it) != 0) {
 			rc = -1;
 			break;
 		}
 		uint32_t size;
 		const char *data;
 		while (true) {
-			rc = index_read_view_iterator_next_raw(it, &data,
+			rc = index_read_view_iterator_next_raw(&it, &data,
 							       &size);
 			if (rc != 0 || data == NULL)
 				break;
@@ -1105,7 +1103,7 @@ memtx_join_f(va_list ap)
 				break;
 			fiber_gc();
 		}
-		index_read_view_iterator_delete(it);
+		index_read_view_iterator_destroy(&it);
 		if (rc != 0)
 			break;
 	}

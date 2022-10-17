@@ -311,20 +311,25 @@ struct sequence_data_read_view {
 /** Read view iterator implementation. */
 struct sequence_data_iterator {
 	/** Base class. */
-	struct index_read_view_iterator base;
+	struct index_read_view_iterator_base base;
 	/** Iterator over the data index. */
 	struct light_sequence_iterator iter;
 };
 
+static_assert(sizeof(struct sequence_data_iterator) <=
+	      INDEX_READ_VIEW_ITERATOR_SIZE,
+	      "sizeof(struct sequence_data_iterator) must be less than or "
+	      "equal to INDEX_READ_VIEW_ITERATOR_SIZE");
+
 /** Implementation of next_raw index_read_view_iterator callback. */
 static int
-sequence_data_iterator_next_raw(struct index_read_view_iterator *base,
+sequence_data_iterator_next_raw(struct index_read_view_iterator *iterator,
 				const char **data, uint32_t *size)
 {
 	struct sequence_data_iterator *iter =
-		(struct sequence_data_iterator *)base;
+		(struct sequence_data_iterator *)iterator;
 	struct sequence_data_read_view *rv =
-		(struct sequence_data_read_view *)base->index;
+		(struct sequence_data_read_view *)iter->base.index;
 
 	struct sequence_data *sd = light_sequence_view_iterator_get_and_next(
 		&rv->view, &iter->iter);
@@ -348,13 +353,6 @@ sequence_data_iterator_next_raw(struct index_read_view_iterator *base,
 	return 0;
 }
 
-static void
-sequence_data_iterator_free(struct index_read_view_iterator *iter)
-{
-	TRASH(iter);
-	free(iter);
-}
-
 static inline int
 sequence_data_read_view_get_raw(struct index_read_view *rv,
 				const char *key, uint32_t part_count,
@@ -371,26 +369,27 @@ sequence_data_read_view_get_raw(struct index_read_view *rv,
 }
 
 /** Implementation of create_iterator index_read_view callback. */
-static struct index_read_view_iterator *
+static int
 sequence_data_iterator_create(struct index_read_view *base,
 			      enum iterator_type type,
-			      const char *key, uint32_t part_count)
+			      const char *key, uint32_t part_count,
+			      struct index_read_view_iterator *iterator)
 {
 	if (type != ITER_ALL) {
 		diag_set(ClientError, ER_UNSUPPORTED,
 			 "_sequence_data read view", "requested iterator type");
-		return NULL;
+		return -1;
 	}
 	(void)key;
 	(void)part_count;
 	struct sequence_data_read_view *rv =
 		(struct sequence_data_read_view *)base;
-	struct sequence_data_iterator *iter = xmalloc(sizeof(*iter));
+	struct sequence_data_iterator *iter =
+		(struct sequence_data_iterator *)iterator;
 	iter->base.index = base;
 	iter->base.next_raw = sequence_data_iterator_next_raw;
-	iter->base.free = sequence_data_iterator_free;
 	light_sequence_view_iterator_begin(&rv->view, &iter->iter);
-	return (struct index_read_view_iterator *)iter;
+	return 0;
 }
 
 static void

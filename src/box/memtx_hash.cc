@@ -516,10 +516,15 @@ struct hash_read_view {
 /** Read view iterator implementation. */
 struct hash_read_view_iterator {
 	/** Base class. */
-	struct index_read_view_iterator base;
+	struct index_read_view_iterator_base base;
 	/** Light iterator. */
 	struct light_index_iterator iterator;
 };
+
+static_assert(sizeof(struct hash_read_view_iterator) <=
+	      INDEX_READ_VIEW_ITERATOR_SIZE,
+	      "sizeof(struct hash_read_view_iterator) must be less than or "
+	      "equal to INDEX_READ_VIEW_ITERATOR_SIZE");
 
 static void
 hash_read_view_free(struct index_read_view *base)
@@ -530,14 +535,6 @@ hash_read_view_free(struct index_read_view *base)
 	memtx_tx_snapshot_cleaner_destroy(&rv->cleaner);
 	TRASH(rv);
 	free(rv);
-}
-
-static void
-hash_read_view_iterator_free(struct index_read_view_iterator *iterator)
-{
-	assert(iterator->free == hash_read_view_iterator_free);
-	TRASH(iterator);
-	free(iterator);
 }
 
 #if defined(ENABLE_READ_VIEW)
@@ -563,10 +560,9 @@ static int
 hash_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 				 const char **data, uint32_t *size)
 {
-	assert(iterator->free == hash_read_view_iterator_free);
 	struct hash_read_view_iterator *it =
 		(struct hash_read_view_iterator *)iterator;
-	struct hash_read_view *rv = (struct hash_read_view *)iterator->index;
+	struct hash_read_view *rv = (struct hash_read_view *)it->base.index;
 
 	while (true) {
 		struct tuple **res = light_index_view_iterator_get_and_next(
@@ -611,23 +607,19 @@ hash_read_view_reset_key_def(struct hash_read_view *rv)
 #endif /* !defined(ENABLE_READ_VIEW) */
 
 /** Implementation of create_iterator index_read_view callback. */
-static struct index_read_view_iterator *
+static int
 hash_read_view_create_iterator(struct index_read_view *base,
 			       enum iterator_type type,
-			       const char *key, uint32_t part_count)
+			       const char *key, uint32_t part_count,
+			       struct index_read_view_iterator *iterator)
 {
 	struct hash_read_view *rv = (struct hash_read_view *)base;
 	struct hash_read_view_iterator *it =
-		(struct hash_read_view_iterator *)xmalloc(sizeof(*it));
+		(struct hash_read_view_iterator *)iterator;
 	it->base.index = base;
-	it->base.free = hash_read_view_iterator_free;
 	it->base.next_raw = exhausted_index_read_view_iterator_next_raw;
 	light_index_view_iterator_begin(&rv->view, &it->iterator);
-	if (hash_read_view_iterator_start(it, type, key, part_count) != 0) {
-		index_read_view_iterator_delete(&it->base);
-		return NULL;
-	}
-	return (struct index_read_view_iterator *)it;
+	return hash_read_view_iterator_start(it, type, key, part_count);
 }
 
 /** Implementation of create_read_view index callback. */
