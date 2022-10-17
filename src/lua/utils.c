@@ -735,6 +735,30 @@ luaT_newthread(struct lua_State *L)
 	return L1;
 }
 
+/**
+ * A safer os.getenv() variant. The difference is that it returns the value only
+ * if it has sane length (see src/lib/core/utils.c for details).
+ */
+static int
+luaT_getenv(struct lua_State *L)
+{
+	const char *name = lua_tostring(L, 1);
+	if (name == NULL)
+		return luaL_error(L, "usage: os.getenv(name)");
+	char *envvar = getenv_safe(name, NULL, 0);
+	if (envvar != NULL) {
+		lua_pushstring(L, envvar);
+		free(envvar);
+	} else {
+		/*
+		 * Original getenv pushes nil onto the stack when no value is
+		 * found.
+		 */
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
 int
 tarantool_lua_utils_init(struct lua_State *L)
 {
@@ -799,6 +823,12 @@ tarantool_lua_utils_init(struct lua_State *L)
 	(void)rc;
 	CTID_INTERVAL = luaL_ctypeid(L, "struct interval");
 	assert(CTID_INTERVAL != 0);
+
+	/* Overload os.getenv() with our safe variant. */
+	lua_getglobal(L, "os");
+	lua_pushcfunction(L, luaT_getenv);
+	lua_setfield(L, -2, "getenv");
+	lua_pop(L, 1);
 
 	lua_pushcfunction(L, luaT_newthread_wrapper);
 	luaT_newthread_ref = luaL_ref(L, LUA_REGISTRYINDEX);
