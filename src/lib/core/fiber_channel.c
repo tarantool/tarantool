@@ -50,12 +50,27 @@ struct ipc_wait_pad {
 	enum fiber_channel_wait_status status;
 };
 
+/**
+ * If fiber channel should work in a graceful close mode,
+ * i.e. become write-closed instead of destroyed. When buffer
+ * is emptied by recipient, the channel is finally destroyed.
+ */
+static enum fiber_channel_close_mode fiber_channel_close_mode =
+	FIBER_CHANNEL_CLOSE_FORCEFUL;
+
+void
+fiber_channel_set_close_mode(enum fiber_channel_close_mode mode)
+{
+	fiber_channel_close_mode = mode;
+}
+
 void
 fiber_channel_create(struct fiber_channel *ch, uint32_t size)
 {
 	ch->size = size;
 	ch->count = 0;
 	ch->is_closed = false;
+	ch->is_destroyed = false;
 	rlist_create(&ch->waiters);
 	if (ch->size) {
 		ch->buf = (struct ipc_msg **) (char *) &ch[1];
@@ -164,7 +179,7 @@ fiber_channel_check_wait(struct fiber_channel *ch, ev_tstamp start_time,
 {
 	/*
 	 * Preconditions of waiting are:
-	 * - the channel is not closed,
+	 * - the channel is not destroyed,
 	 * - the current fiber has not been
 	 *   cancelled,
 	 * - the timeout has not expired.
@@ -173,7 +188,7 @@ fiber_channel_check_wait(struct fiber_channel *ch, ev_tstamp start_time,
 	 * caller, since ev_now() does not get updated without
 	 * a yield.
 	 */
-	if (ch->is_closed) {
+	if (ch->is_destroyed) {
 		diag_set(ChannelIsClosed);
 		return -1;
 	}
@@ -191,7 +206,49 @@ fiber_channel_check_wait(struct fiber_channel *ch, ev_tstamp start_time,
 void
 fiber_channel_close(struct fiber_channel *ch)
 {
-	if (ch->is_closed)
+	/*
+	 * When current value <fiber_channel_close_mode> equals to
+	 * FIBER_CHANNEL_CLOSE_FORCEFUL, just destroy the channel
+	 * with its contents. The channel is effectively dead as a
+	 * result of <fiber_channel_close>.
+	 */
+	if (fiber_channel_close_mode == FIBER_CHANNEL_CLOSE_FORCEFUL)
+		goto destroy;
+	/*
+	 * When current value <fiber_channel_close_mode> equals to
+	 * FIBER_CHANNEL_CLOSE_GRACEFUL, check whether the channel
+	 * is empty. In this case the channel can be also simply
+	 * destroyed. Otherwise, just mark the channel to make it
+	 * "read-only": no new messages can be added, but all
+	 * existing messages can be received.
+	 * All waiting writers receive an error in this case.
+	 */
+	if (fiber_channel_is_empty(ch))
+		goto destroy;
+	ch->is_closed = true;
+	/* Wake up all channel_put(), they will automatically cancel. */
+	struct fiber *f;
+	/*
+	 * There is a couple of reasons to process all waiters
+	 * unconditionally:
+	 * * A channel has either readers or writers (if any)
+	 *   simultaneously
+	 * * If the buffer has any message (see the condition
+	 *   above), the channel can't have a reader
+	 */
+	while (!rlist_empty(&ch->waiters)) {
+		f = rlist_first_entry(&ch->waiters, struct fiber, state);
+		fiber_channel_waiter_wakeup(f, FIBER_CHANNEL_WAIT_CLOSED);
+	}
+	return;
+destroy:
+	fiber_channel_destroy(ch);
+}
+
+void
+fiber_channel_destroy(struct fiber_channel *ch)
+{
+	if (ch->is_destroyed)
 		return;
 
 	while (ch->count) {
@@ -204,13 +261,9 @@ fiber_channel_close(struct fiber_channel *ch)
 		f = rlist_first_entry(&ch->waiters, struct fiber, state);
 		fiber_channel_waiter_wakeup(f, FIBER_CHANNEL_WAIT_CLOSED);
 	}
-	ch->is_closed = true;
-}
 
-void
-fiber_channel_destroy(struct fiber_channel *ch)
-{
-	fiber_channel_close(ch);
+	ch->is_closed = true;
+	ch->is_destroyed = true;
 }
 
 void
@@ -290,6 +343,11 @@ fiber_channel_put_msg_timeout(struct fiber_channel *ch,
 	ev_tstamp start_time = ev_monotonic_now(loop());
 
 	while (true) {
+		/* Exit if channel is already closed for writing. */
+		if (ch->is_closed) {
+			diag_set(ChannelIsClosed);
+			return -1;
+		}
 		/*
 		 * Check if there is a ready reader first, and
 		 * only if there is no reader try to put a message
@@ -304,10 +362,10 @@ fiber_channel_put_msg_timeout(struct fiber_channel *ch,
 			/*
 			 * There can be no reader if there is
 			 * a buffered message or the channel is
-			 * closed.
+			 * destroyed.
 			 */
 			assert(ch->count == 0);
-			assert(ch->is_closed == false);
+			assert(!ch->is_destroyed);
 
 			struct fiber *f = rlist_first_entry(&ch->waiters,
 							    struct fiber,
@@ -325,13 +383,11 @@ fiber_channel_put_msg_timeout(struct fiber_channel *ch,
 			 */
 
 			/*
-			 * Closed channels, are, well, closed,
-			 * even if there is space in the buffer.
+			 * Destroyed channels, are already closed,
+			 * thus, it will exit in the check above.
 			 */
-			if (ch->is_closed) {
-				diag_set(ChannelIsClosed);
-				return -1;
-			}
+			assert(!ch->is_destroyed);
+
 			fiber_channel_buffer_push(ch, msg);
 			return 0;
 		}
@@ -399,10 +455,10 @@ fiber_channel_get_msg_timeout(struct fiber_channel *ch,
 		if (ch->count > 0) {
 			/**
 			 * There can't be any buffered stuff in
-			 * a closed channel - everything is
-			 * destroyed at close.
+			 * a destroyed channel - everything is
+			 * destroyed too.
 			 */
-			assert(ch->is_closed == false);
+			assert(!ch->is_destroyed);
 
 			*msg = fiber_channel_buffer_pop(ch);
 
@@ -420,6 +476,8 @@ fiber_channel_get_msg_timeout(struct fiber_channel *ch,
 				fiber_channel_waiter_wakeup(f,
 					FIBER_CHANNEL_WAIT_DONE);
 			}
+			if (ch->count == 0 && ch->is_closed)
+				fiber_channel_destroy(ch);
 			return 0;
 		}
 		if (fiber_channel_has_writers(ch)) {

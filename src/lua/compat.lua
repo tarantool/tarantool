@@ -32,6 +32,18 @@ with some existing applications that rely on the old style.
 https://github.com/tarantool/tarantool/wiki/compat%3Ayaml_pretty_multiline
 ]]
 
+local FIBER_CHANNEL_GRACEFUL_CLOSE_BRIEF = [[
+Whether fiber channel should be marked read-only on close, instead of being
+destroyed. The new behavior allows user to mark the channel as read-only. This
+way if a message was in the buffer before close, it will remain accessible after
+close. The read-only channel will be closed automatically when the buffer
+becomes empty, or will be deleted by GC if all links to it are lost, as before.
+The new behavior can break code that relies on `ch:get()` returning `nil` after
+channel close.
+
+https://github.com/tarantool/tarantool/wiki/compat%3Afiber_channel_close_mode
+]]
+
 -- Contains options descriptions in following format:
 -- * default  (string)
 -- * brief    (string)
@@ -57,6 +69,12 @@ local options = {
         obsolete = nil,
         brief = YAML_PRETTY_MULTILINE_BRIEF,
         action = internal.yaml_pretty_multiline_toggle,
+    },
+    fiber_channel_close_mode = {
+        default = 'old',
+        obsolete = nil,
+        brief = FIBER_CHANNEL_GRACEFUL_CLOSE_BRIEF,
+        action = internal.fiber_channel_close_mode_toggle,
     },
 }
 
