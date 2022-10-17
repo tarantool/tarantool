@@ -1856,12 +1856,21 @@ struct tree_read_view {
 template <bool USE_HINT>
 struct tree_read_view_iterator {
 	/** Base class. */
-	struct index_read_view_iterator base;
+	struct index_read_view_iterator_base base;
 	/** Iterator key. */
 	struct memtx_tree_key_data<USE_HINT> key_data;
 	/** BPS tree iterator. */
 	memtx_tree_iterator_t<USE_HINT> tree_iterator;
 };
+
+static_assert(sizeof(struct tree_read_view_iterator<false>) <=
+	      INDEX_READ_VIEW_ITERATOR_SIZE,
+	      "sizeof(struct tree_read_view_iterator<false>) must be less than "
+	      "or equal to INDEX_READ_VIEW_ITERATOR_SIZE");
+static_assert(sizeof(struct tree_read_view_iterator<true>) <=
+	      INDEX_READ_VIEW_ITERATOR_SIZE,
+	      "sizeof(struct tree_read_view_iterator<true>) must be less than "
+	      "or equal to INDEX_READ_VIEW_ITERATOR_SIZE");
 
 template <bool USE_HINT>
 static void
@@ -1874,15 +1883,6 @@ tree_read_view_free(struct index_read_view *base)
 	memtx_tx_snapshot_cleaner_destroy(&rv->cleaner);
 	TRASH(rv);
 	free(rv);
-}
-
-template <bool USE_HINT>
-static void
-tree_read_view_iterator_free(struct index_read_view_iterator *iterator)
-{
-	assert(iterator->free == &tree_read_view_iterator_free<USE_HINT>);
-	TRASH(iterator);
-	free(iterator);
 }
 
 #if defined(ENABLE_READ_VIEW)
@@ -1910,11 +1910,10 @@ static int
 tree_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 				 const char **data, uint32_t *size)
 {
-	assert(iterator->free == &tree_read_view_iterator_free<USE_HINT>);
 	struct tree_read_view_iterator<USE_HINT> *it =
 		(struct tree_read_view_iterator<USE_HINT> *)iterator;
 	struct tree_read_view<USE_HINT> *rv =
-		(struct tree_read_view<USE_HINT> *)iterator->index;
+		(struct tree_read_view<USE_HINT> *)it->base.index;
 
 	while (true) {
 		struct memtx_tree_data<USE_HINT> *res =
@@ -1967,27 +1966,22 @@ tree_read_view_reset_key_def(struct tree_read_view<USE_HINT> *rv)
 
 /** Implementation of create_iterator index_read_view callback. */
 template <bool USE_HINT>
-static struct index_read_view_iterator *
+static int
 tree_read_view_create_iterator(struct index_read_view *base,
 			       enum iterator_type type,
-			       const char *key, uint32_t part_count)
+			       const char *key, uint32_t part_count,
+			       struct index_read_view_iterator *iterator)
 {
 	struct tree_read_view_iterator<USE_HINT> *it =
-		(struct tree_read_view_iterator<USE_HINT> *)
-		xmalloc(sizeof(*it));
+		(struct tree_read_view_iterator<USE_HINT> *)iterator;
 	it->base.index = base;
-	it->base.free = tree_read_view_iterator_free<USE_HINT>;
 	it->base.next_raw = exhausted_index_read_view_iterator_next_raw;
 	it->key_data.key = NULL;
 	it->key_data.part_count = 0;
 	if (USE_HINT)
 		it->key_data.set_hint(HINT_NONE);
 	invalidate_tree_iterator(&it->tree_iterator);
-	if (tree_read_view_iterator_start(it, type, key, part_count) != 0) {
-		index_read_view_iterator_delete(&it->base);
-		return NULL;
-	}
-	return (struct index_read_view_iterator *)it;
+	return tree_read_view_iterator_start(it, type, key, part_count);
 }
 
 /** Implementation of create_read_view index callback. */

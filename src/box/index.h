@@ -650,9 +650,10 @@ struct index_read_view_vtab {
 		       const char *key, uint32_t part_count,
 		       const char **data, uint32_t *size);
 	/** Create an index read view iterator. */
-	struct index_read_view_iterator *
+	int
 	(*create_iterator)(struct index_read_view *rv, enum iterator_type type,
-			   const char *key, uint32_t part_count);
+			   const char *key, uint32_t part_count,
+			   struct index_read_view_iterator *it);
 };
 
 /**
@@ -674,13 +675,10 @@ struct index_read_view {
 	struct space_read_view *space;
 };
 
-/** Iterator over an index read view. */
-struct index_read_view_iterator {
+/** Base class for iterator over an index read view. */
+struct index_read_view_iterator_base {
 	/** Pointer to the index read view. */
 	struct index_read_view *index;
-	/** Free an index read view iterator instance. */
-	void
-	(*free)(struct index_read_view_iterator *iterator);
 	/**
 	 * Iterate to the next tuple in the read view.
 	 *
@@ -694,6 +692,29 @@ struct index_read_view_iterator {
 	int
 	(*next_raw)(struct index_read_view_iterator *iterator,
 		    const char **data, uint32_t *size);
+};
+
+/** Size of the index_read_view_iterator struct. */
+#define INDEX_READ_VIEW_ITERATOR_SIZE 48
+
+static_assert(sizeof(struct index_read_view_iterator_base) <=
+	      INDEX_READ_VIEW_ITERATOR_SIZE,
+	      "sizeof(struct index_read_view_iterator_base) must be less than "
+	      "or equal to INDEX_READ_VIEW_ITERATOR_SIZE");
+
+/**
+ * Iterator over an index read view.
+ *
+ * Implemented as an opaque fixed-size structure so that it can be declared on
+ * stack for any kind of read view iterator.
+ */
+struct index_read_view_iterator {
+	union {
+		/* Base class. */
+		struct index_read_view_iterator_base base;
+		/* Implementation dependent content. */
+		char data[INDEX_READ_VIEW_ITERATOR_SIZE];
+	};
 };
 
 /**
@@ -954,29 +975,26 @@ index_read_view_get_raw(struct index_read_view *rv,
 	return rv->vtab->get_raw(rv, key, part_count, data, size);
 }
 
-static inline struct index_read_view_iterator *
+static inline int
 index_read_view_create_iterator(struct index_read_view *rv,
 				enum iterator_type type,
-				const char *key, uint32_t part_count)
+				const char *key, uint32_t part_count,
+				struct index_read_view_iterator *it)
 {
-	return rv->vtab->create_iterator(rv, type, key, part_count);
+	return rv->vtab->create_iterator(rv, type, key, part_count, it);
 }
 
 static inline void
-index_read_view_iterator_delete(struct index_read_view_iterator *iterator)
+index_read_view_iterator_destroy(struct index_read_view_iterator *iterator)
 {
-	/*
-	 * A read view iterator may be deleted after the read view is closed so
-	 * we don't check the read view ownership here.
-	 */
-	iterator->free(iterator);
+	TRASH(iterator);
 }
 
 static inline int
 index_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 				  const char **data, uint32_t *size)
 {
-	return iterator->next_raw(iterator, data, size);
+	return iterator->base.next_raw(iterator, data, size);
 }
 
 /*
