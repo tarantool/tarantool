@@ -104,15 +104,19 @@ ipc_value_new(void);
  *
  * A channel, once created is "open". I.e. anyone can read or
  * write to/from a channel. A channel can be closed at any time,
- * in which case, all messages currently buffered in a channel
- * are destroyed, waiting readers or writers awoken with an error.
+ * in which case, if `fiber_channel_close_mode` is set to
+ * FIBER_CHANNEL_CLOSE_GRACEFUL, it is marked as closed
+ * (read-only) and all messages currently buffered can be
+ * delivered, otherwise channel is marked as destroyed and all its
+ * contents are discarded, waiting readers or writers awoken with
+ * an error.
  *
  * Waiting for a message, a reader, or space in a buffer can also
  * return error in case of a wait timeout or cancellation (when the
  * waiting fiber is cancelled).
  *
  * Sending a message to a closed channel, as well as reading
- * a message from such channel, always fails.
+ * a message from destroyed channel, always fails.
  *
  * Channel memory layout
  * ---------------------
@@ -137,8 +141,16 @@ struct fiber_channel {
 	struct rlist waiters;
 	/** Ring buffer read position. */
 	uint32_t beg;
-	/* True if the channel is closed. */
+	/**
+	 * True if the channel is closed for writing and
+	 * is waiting to be destroyed or has been destroyed.
+	 */
 	bool is_closed;
+	/**
+	 * True if the channel forbids both reading and writing and
+	 * the buffer is no longer accessible.
+	 */
+	bool is_destroyed;
 	/** Channel buffer, if any. */
 	struct ipc_msg **buf;
 };
@@ -206,6 +218,55 @@ fiber_channel_is_empty(struct fiber_channel *ch)
 {
 	return ch->count == 0;
 }
+
+/** The fiber channel has two ways to end its life. */
+enum fiber_channel_close_mode {
+	/**
+	 * The forceful close mode means that fiber_channel_close()
+	 * discards all stored messages, wake ups all readers and
+	 * writers and forbids to read or write messages. The
+	 * channel is effectively died after closing.
+	 *
+	 * fiber_channel_close() works exactly as
+	 * fiber_channel_destroy() when this mode is in effect.
+	 *
+	 * This mode represents original behavior of the fiber
+	 * channel since its born and hence it is the default.
+	 */
+	FIBER_CHANNEL_CLOSE_FORCEFUL,
+	/**
+	 * The graceful close mode means that fiber_channel_close()
+	 * only marks the channel as read-only: no new messages can
+	 * be added, but all buffered messages can be received.
+	 * All waiting writers receive an error.
+	 *
+	 * A closed channel is automatically destroyed when all
+	 * buffered messages are read.
+	 *
+	 * This mode is considered as more safe and recommended for
+	 * users. The main idea behind it is to prevent accidental
+	 * data loss or, in other words, fit users' expectation that
+	 * all accepted messages will be delivered. This reflects
+	 * how channels work in other programming languages, for
+	 * example, in Go.
+	 */
+	FIBER_CHANNEL_CLOSE_GRACEFUL,
+};
+
+/**
+ * Choose how the channels end its life.
+ *
+ * Affects all channels.
+ *
+ * The behavior is unspecified for already created channels.
+ * Choose the mode at an early stage of application's
+ * initialization.
+ *
+ * @sa enum fiber_channel_close_mode
+ * @sa fiber_channel_close
+ */
+void
+fiber_channel_set_close_mode(enum fiber_channel_close_mode mode);
 
 /**
  * Check if the channel buffer is full.
@@ -351,15 +412,15 @@ fiber_channel_count(struct fiber_channel *ch)
 }
 
 /**
- * Close the channel. Discards all messages
- * and wakes up all readers and writers.
+ * Close the channel for writing. If `fiber_channel_close_mode` is
+ * FIBER_CHANNEL_CLOSE_FORCEFUL, discards all messages and wakes
+ * up all readers and writers.
  */
 void
 fiber_channel_close(struct fiber_channel *ch);
 
 /**
- * True if the channel is closed for both for reading
- * and writing.
+ * True if the channel is closed for writing or destroyed.
  */
 static inline bool
 fiber_channel_is_closed(struct fiber_channel *ch)

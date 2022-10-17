@@ -21,3 +21,46 @@ ok 5 - fiber_channel_get(1)
 ok 6 - fiber_channel_put(closed)
 ok 7 - fiber_channel_get(closed)
 	*** fiber_channel_get: done ***
+	*** fiber_channel_test_close ***
+1..40
+ok 1 - fiber_channel_put(msg_1)
+ok 2 - fiber_channel_put(msg_2)
+ok 3 - fiber_channel_get(1)
+ok 4 - is_closed
+ok 5 - is_destroyed
+ok 6 - not fiber_channel_put(msg_3)
+ok 7 - not fiber_channel_get(2)
+ok 8 - is_destroyed
+ok 9 - fiber_channel_put(msg_1)
+ok 10 - fiber_channel_put(msg_2)
+ok 11 - fiber_channel_get(1)
+ok 12 - is_closed
+ok 13 - not is_destroyed
+ok 14 - not fiber_channel_put(msg_3)
+ok 15 - fiber_channel_get(2)
+ok 16 - is_destroyed
+ok 17 - reader tries to read from the open channel
+ok 18 - is_closed
+ok 19 - reader fails to read a message from the zero-length channel
+ok 20 - reader hangs until channel is closed
+ok 21 - reader fails to read a message from the closed channel
+ok 22 - is_destroyed
+ok 23 - reader tries to read from the open channel
+ok 24 - is_closed
+ok 25 - reader fails to read a message from the zero-length channel
+ok 26 - reader hangs until channel is closed
+ok 27 - reader fails to read a message from the closed channel
+ok 28 - is_destroyed
+ok 29 - writer tries to write to the open channel
+ok 30 - is_closed
+ok 31 - writer fails to write a message to the zero-length channel
+ok 32 - writer hangs until channel is closed
+ok 33 - writer fails to write a message to the closed channel
+ok 34 - is_destroyed
+ok 35 - writer tries to write to the open channel
+ok 36 - is_closed
+ok 37 - writer fails to write a message to the zero-length channel
+ok 38 - writer hangs until channel is closed
+ok 39 - writer fails to write a message to the closed channel
+ok 40 - is_destroyed
+	*** fiber_channel_test_close: done ***
