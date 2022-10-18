@@ -7,6 +7,7 @@ local uri = require('uri')
 local uri_cdef = [[
 struct uri_param {
     const char *name;
+    int values_capacity;
     int value_count;
     const char **values;
 };
@@ -28,6 +29,7 @@ struct uri {
     const char *query;
     const char *fragment;
     int host_hint;
+    int params_capacity;
     int param_count;
     struct uri_param *params;
 };
