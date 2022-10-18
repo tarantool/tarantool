@@ -376,6 +376,8 @@ struct vdbe_field_ref {
 	uint32_t data_sz;
 	/** Count of fields in tuple. */
 	uint32_t field_count;
+	/** Number of allocated slots. */
+	uint32_t field_capacity;
 	/** Format that match data in field data. */
 	struct tuple_format *format;
 	/**
@@ -394,8 +396,8 @@ struct vdbe_field_ref {
 };
 
 /**
- * Initialize a new vdbe_field_ref instance with given tuple
- * data.
+ * Fill vdbe_field_ref instance with given tuple data.
+ *
  * @param field_ref The vdbe_field_ref instance to initialize.
  * @param data The tuple data.
  * @param data_sz The size of tuple data.
@@ -405,14 +407,18 @@ vdbe_field_ref_prepare_data(struct vdbe_field_ref *field_ref, const char *data,
 			    uint32_t data_sz);
 
 /**
- * Initialize a new vdbe_field_ref instance with given tuple
- * data.
+ * Fill vdbe_field_ref instance with given tuple data.
+ *
  * @param field_ref The vdbe_field_ref instance to initialize.
  * @param tuple The tuple object pointer.
  */
 void
 vdbe_field_ref_prepare_tuple(struct vdbe_field_ref *field_ref,
 			     struct tuple *tuple);
+
+/** Initialize a new vdbe_field_ref instance. */
+void
+vdbe_field_ref_create(struct vdbe_field_ref *ref, uint32_t capacity);
 
 #if defined(__cplusplus)
 } /* extern "C" { */
