@@ -113,3 +113,10 @@ g.test_msgpack_object_args = function()
     t.assert(g.server:eval('return box.func.check_persistent.takes_raw_args'))
     t.assert(g.server:eval('return box.func.decode_persistent.takes_raw_args'))
 end
+
+g.test_gh_7822_vfunc_format = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        t.assert_equals(box.space._vfunc:format(), box.space._func:format())
+    end)
+end
