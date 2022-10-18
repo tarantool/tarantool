@@ -63,7 +63,14 @@ box.space._space:select{}
         'type': 'string'}, {'name': 'last_altered', 'type': 'string'}]]
   - [297, 1, '_vfunc', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
         'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'setuid',
-        'type': 'unsigned'}]]
+        'type': 'unsigned'}, {'name': 'language', 'type': 'string'}, {'name': 'body',
+        'type': 'string'}, {'name': 'routine_type', 'type': 'string'}, {'name': 'param_list',
+        'type': 'array'}, {'name': 'returns', 'type': 'string'}, {'name': 'aggregate',
+        'type': 'string'}, {'name': 'sql_data_access', 'type': 'string'}, {'name': 'is_deterministic',
+        'type': 'boolean'}, {'name': 'is_sandboxed', 'type': 'boolean'}, {'name': 'is_null_call',
+        'type': 'boolean'}, {'name': 'exports', 'type': 'array'}, {'name': 'opts',
+        'type': 'map'}, {'name': 'comment', 'type': 'string'}, {'name': 'created',
+        'type': 'string'}, {'name': 'last_altered', 'type': 'string'}]]
   - [304, 1, '_user', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
         'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type',
         'type': 'string'}, {'name': 'auth', 'type': 'map'}]]

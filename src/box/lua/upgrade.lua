@@ -1258,8 +1258,14 @@ local function revoke_execute_access_to_lua_function_from_role_public()
     end
 end
 
+local function make_vfunc_same_format_as_func()
+    log.info("Make format of _vfunc the same as the format of _func")
+    box.space._vfunc:format(box.space._func:format())
+end
+
 local function upgrade_to_2_10_4()
     revoke_execute_access_to_lua_function_from_role_public()
+    make_vfunc_same_format_as_func()
 end
 --------------------------------------------------------------------------------
 
