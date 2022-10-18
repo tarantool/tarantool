@@ -15,6 +15,10 @@ extern "C" {
 
 struct uri_param;
 
+/**
+ * WARNING: this structure is exposed in Lua via FFI (see src/lua/uri.lua): any
+ * change  must be reflected in `ffi.cdef`.
+ */
 struct uri {
 	char *scheme;
 	char *login;
@@ -25,6 +29,11 @@ struct uri {
 	char *query;
 	char *fragment;
 	int host_hint;
+	/**
+	 * Capacity of URI parameters dynamic array (used for exponential
+	 * reallocation).
+	 */
+	int params_capacity;
 	/** Count of URI parameters */
 	int param_count;
 	/** Different URI parameters */

@@ -10,9 +10,18 @@
 #define XSTRDUP(s)      (s != NULL ? xstrdup(s) : NULL)
 #define XSTRNDUP(s, n)  (s != NULL ? xstrndup(s, n) : NULL)
 
+/**
+ * WARNING: this structure is exposed in Lua via FFI (see src/lua/uri.lua): any
+ * change  must be reflected in `ffi.cdef`.
+ */
 struct uri_param {
 	/** Name of URI parameter. */
 	char *name;
+	/**
+	 * Capacity of URI parameter values dynamic array (used for exponential
+	 * reallocation).
+	 */
+	int values_capacity;
 	/** Count of values for this parameter. */
 	int value_count;
 	/** Array of values for this parameter. */
@@ -38,8 +47,13 @@ uri_find_param(const struct uri *uri, const char *name)
 static void
 uri_param_add_value(struct uri_param *param, const char *value)
 {
-	size_t size = (param->value_count + 1) * sizeof(char *);
-	param->values = xrealloc(param->values, size);
+	assert(param->value_count <= param->values_capacity);
+	if (param->value_count == param->values_capacity) {
+		param->values_capacity = param->values_capacity == 0 ? 16 :
+					 param->values_capacity * 2;
+		size_t size = param->values_capacity * sizeof(char *);
+		param->values = xrealloc(param->values, size);
+	}
 	param->values[param->value_count++] = xstrdup(value);
 }
 
@@ -65,6 +79,7 @@ uri_param_create(struct uri_param *param, const char *name)
 	param->name = xstrdup(name);
 	param->values = NULL;
 	param->value_count = 0;
+	param->values_capacity = 0;
 }
 
 /**
@@ -74,9 +89,10 @@ static void
 uri_param_copy(struct uri_param *dst, const struct uri_param *src)
 {
 	dst->name = xstrdup(src->name);
+	dst->values_capacity = src->values_capacity;
 	dst->value_count = src->value_count;
-	dst->values = (src->value_count == 0 ? NULL :
-		       xmalloc(src->value_count * sizeof(*dst->values)));
+	dst->values = (src->values_capacity == 0 ? NULL :
+		       xmalloc(src->values_capacity * sizeof(*dst->values)));
 	for (int i = 0; i < src->value_count; i++)
 		dst->values[i] = xstrdup(src->values[i]);
 }
@@ -99,9 +115,14 @@ uri_add_param(struct uri *uri, const char *name, const char *value)
 {
 	struct uri_param *param = uri_find_param(uri, name);
 	if (param == NULL) {
-		size_t size = (uri->param_count + 1) *
-			sizeof(struct uri_param);
-		uri->params = xrealloc(uri->params, size);
+		assert(uri->param_count <= uri->params_capacity);
+		if (uri->param_count == uri->params_capacity) {
+			uri->params_capacity = uri->params_capacity == 0 ? 16 :
+					       uri->params_capacity * 2;
+			size_t size =
+				uri->params_capacity * sizeof(struct uri_param);
+			uri->params = xrealloc(uri->params, size);
+		}
 		param = &uri->params[uri->param_count++];
 		uri_param_create(param, name);
 	}
@@ -161,9 +182,10 @@ uri_copy(struct uri *dst, const struct uri *src)
 	dst->query = XSTRDUP(src->query);
 	dst->fragment = XSTRDUP(src->fragment);
 	dst->host_hint = src->host_hint;
+	dst->params_capacity = src->params_capacity;
 	dst->param_count = src->param_count;
-	dst->params = (src->param_count == 0 ? NULL :
-		       xmalloc(src->param_count * sizeof(*dst->params)));
+	dst->params = (src->params_capacity == 0 ? NULL :
+		       xmalloc(src->params_capacity * sizeof(*dst->params)));
 	for (int i = 0; i < src->param_count; i++)
 		uri_param_copy(&dst->params[i], &src->params[i]);
 }
