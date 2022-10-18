@@ -492,7 +492,7 @@ cn:is_connected()
 ...
 cn.error
 ---
-- User 'netbox' is not found
+- User not found or supplied credentials are invalid
 ...
 cn.state
 ---

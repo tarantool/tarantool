@@ -31,7 +31,7 @@ cn ~= nil, cn.state, cn.error
 ---
 - true
 - error
-- Incorrect password supplied for user 'netbox'
+- User not found or supplied credentials are invalid
 ...
 cn:close()
 ---
