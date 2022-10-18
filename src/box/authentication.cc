@@ -41,7 +41,14 @@ void
 authenticate(const char *user_name, uint32_t len, const char *salt,
 	     const char *tuple)
 {
-	struct user *user = user_find_by_name_xc(user_name, len);
+	struct user *user = user_find_by_name(user_name, len);
+	if (user == NULL) {
+		if (diag_get()->last->code == ER_NO_SUCH_USER) {
+			diag_clear(diag_get());
+			diag_set(ClientError, ER_CREDS_MISMATCH);
+		}
+		diag_raise();
+	}
 	struct session *session = current_session();
 	uint32_t part_count;
 	uint32_t scramble_len;
@@ -93,7 +100,7 @@ authenticate(const char *user_name, uint32_t len, const char *salt,
 		auth_res.is_authenticated = false;
 		if (session_run_on_auth_triggers(&auth_res) != 0)
 			diag_raise();
-		tnt_raise(ClientError, ER_PASSWORD_MISMATCH, user->def->name);
+		tnt_raise(ClientError, ER_CREDS_MISMATCH);
 	}
 ok:
 	/* check and run auth triggers on success */

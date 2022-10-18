@@ -99,7 +99,7 @@ struct errcode_record {
 	/* 44 */_(ER_DROP_USER,			"Failed to drop user or role '%s': %s") \
 	/* 45 */_(ER_NO_SUCH_USER,		"User '%s' is not found") \
 	/* 46 */_(ER_USER_EXISTS,		"User '%s' already exists") \
-	/* 47 */_(ER_PASSWORD_MISMATCH,		"Incorrect password supplied for user '%s'") \
+	/* 47 */_(ER_CREDS_MISMATCH,		"User not found or supplied credentials are invalid") \
 	/* 48 */_(ER_UNKNOWN_REQUEST_TYPE,	"Unknown request type %u") \
 	/* 49 */_(ER_UNKNOWN_SCHEMA_OBJECT,	"Unknown object type '%s'") \
 	/* 50 */_(ER_CREATE_FUNCTION,		"Failed to create function '%s': %s") \
