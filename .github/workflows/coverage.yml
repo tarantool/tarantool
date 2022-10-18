@@ -59,6 +59,12 @@ jobs:
 
       - name: Upload coverage results to coveralls.io
         run: |
+          # Create the src/src link to the src directory to avoid the following
+          # issue:
+          #   /var/lib/gems/2.7.0/gems/coveralls-lcov-1.7.0/lib/coveralls/lcov/converter.rb:64:
+          #   in `initialize': No such file or directory @ rb_sysopen -
+          #   /opt/actions-runner/_work/tarantool/tarantool/src/src/uri.rl (Errno::ENOENT)
+          ln -s $(pwd)/src ./src/src
           coveralls-lcov \
             --service-name=github \
             --repo-token=${{ secrets.GITHUB_TOKEN }} \
