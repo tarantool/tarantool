@@ -2443,6 +2443,7 @@ func_sql_expr_call(struct func *func, struct port *args, struct port *ret)
 	struct vdbe_field_ref *ref;
 	size_t size = sizeof(ref->slots[0]) * count + sizeof(*ref);
 	ref = region_aligned_alloc(region, size, alignof(*ref));
+	vdbe_field_ref_create(ref, count);
 	vdbe_field_ref_prepare_data(ref, data, mp_size);
 	ref->format = format;
 	if (sql_bind_ptr(stmt, 1, ref) != 0)
