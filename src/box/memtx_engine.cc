@@ -288,7 +288,7 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 		}
 	}
 	xlog_cursor_close(&cursor, false);
-	if (rc < 0 || is_space_system < 0)
+	if (rc < 0)
 		return -1;
 
 	/**
@@ -302,6 +302,13 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 		else
 			say_error("snapshot `%s' has no EOF marker", cursor.name);
 	}
+
+	/*
+	 * Snapshot entries are ordered by the space id, it means that if there
+	 * are no spaces, then all system spaces are definitely missing.
+	 */
+	if (is_space_system < 0)
+		panic("snapshot `%s' has no system spaces", cursor.name);
 
 	return 0;
 }
