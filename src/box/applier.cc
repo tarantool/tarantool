@@ -123,7 +123,7 @@ applier_log_error(struct applier *applier, struct error *e)
 	case ER_SYSTEM:
 	case ER_SSL:
 	case ER_UNKNOWN_REPLICA:
-	case ER_PASSWORD_MISMATCH:
+	case ER_CREDS_MISMATCH:
 	case ER_XLOG_GAP:
 	case ER_TOO_EARLY_SUBSCRIBE:
 	case ER_SYNC_QUORUM_TIMEOUT:
@@ -2203,7 +2203,7 @@ applier_f(va_list ap)
 			} else if (e->errcode() == ER_CFG ||
 				   e->errcode() == ER_ACCESS_DENIED ||
 				   e->errcode() == ER_NO_SUCH_USER ||
-				   e->errcode() == ER_PASSWORD_MISMATCH) {
+				   e->errcode() == ER_CREDS_MISMATCH) {
 				/* Invalid configuration */
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_LOADING);

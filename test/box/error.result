@@ -267,7 +267,7 @@ t;
  |   44: box.error.DROP_USER
  |   45: box.error.NO_SUCH_USER
  |   46: box.error.USER_EXISTS
- |   47: box.error.PASSWORD_MISMATCH
+ |   47: box.error.CREDS_MISMATCH
  |   48: box.error.UNKNOWN_REQUEST_TYPE
  |   49: box.error.UNKNOWN_SCHEMA_OBJECT
  |   50: box.error.CREATE_FUNCTION
