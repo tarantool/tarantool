@@ -200,6 +200,7 @@ ck_constraint_on_replace_trigger(struct trigger *trigger, void *event)
 			 "field_ref");
 		return -1;
 	}
+	vdbe_field_ref_create(field_ref, space->def->field_count);
 	vdbe_field_ref_prepare_tuple(field_ref, new_tuple);
 
 	struct ck_constraint *ck_constraint;

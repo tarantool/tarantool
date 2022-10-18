@@ -243,6 +243,7 @@ allocateCursor(
 		memset(pCx, 0, offsetof(VdbeCursor,uc));
 		pCx->eCurType = eCurType;
 		pCx->nField = nField;
+		vdbe_field_ref_create(&pCx->field_ref, nField);
 		if (eCurType==CURTYPE_TARANTOOL) {
 			pCx->uc.pCursor = (BtCursor*)&pMem->z[bt_offset];
 			sqlCursorZero(pCx->uc.pCursor);
