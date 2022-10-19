@@ -25,6 +25,9 @@ COVERITY_URL = https://scan.coverity.com/builds?project=tarantool%2Ftarantool
 CMAKE = ${CMAKE_ENV} cmake -S ${SRC_DIR} -B ${BUILD_DIR}
 CMAKE_BUILD = ${CMAKE_BUILD_ENV} cmake --build ${BUILD_DIR} --parallel ${NPROC}
 
+LUACOV_STATS ?= luacov.stats.out
+LUACOV_REPORT ?= luacov.report.out
+
 .PHONY: configure
 configure:
 	${CMAKE} ${CMAKE_PARAMS} ${CMAKE_EXTRA_PARAMS}
@@ -120,6 +123,13 @@ test-coverage: CMAKE_PARAMS = -G Ninja -DCMAKE_BUILD_TYPE=Debug -DENABLE_GCOV=ON
 test-coverage: TEST_RUN_PARAMS += --long
 test-coverage: OUTPUT_FILE = coverage.info
 test-coverage: build run-luajit-test run-test
+	# TODO: setup tarantool
+	# tarantool ${SRC_DIR}/tools/luacov_to_info.lua ${SRC_DIR}/luacov.stats.out > ${SRC_DIR}/luacov.report.out
+	# sed -i -e 's@'"$$(realpath .)"'/@@' $(LUACOV_STATS)
+	# luacov expirationd.lua
+	# grep -A999 '^Summary' $(LUACOV_REPORT)
+	# TODO: --add-tracefile
+	# TODO: setup luacov/cluacov
 	lcov --capture \
 	     --compat-libtool \
 	     --directory ${BUILD_DIR}/src/ \

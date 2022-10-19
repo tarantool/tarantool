@@ -30,6 +30,8 @@ Testing/
 ./build
 /build
 .idea/
+luacov.stats.out
+luacov.report.out
 # Ignore Makefile in the stupid way for `tar --exclude-vcs-ignores`
 /Makefile
 ./Makefile
