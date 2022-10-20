@@ -209,7 +209,7 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea55679bb71c755ac0257ca128a297a984" kind="enumvalue"><name>ER_DROP_USER</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea0c0deeaff648cf677945f747bd18ba7f" kind="enumvalue"><name>ER_NO_SUCH_USER</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcead4dff6d559cc784b715f1d877d49f843" kind="enumvalue"><name>ER_USER_EXISTS</name></member>
-    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceab1a4cc23e6ca3a9f7d40dbd4d043f38f" kind="enumvalue"><name>ER_PASSWORD_MISMATCH</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceafdd482d7d08269cf9bd8e8ea2dc60d3b" kind="enumvalue"><name>ER_CREDS_MISMATCH</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea9ea6d40263cfa80cce7fbb0f5dbd8ae6" kind="enumvalue"><name>ER_UNKNOWN_REQUEST_TYPE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea38d5a4bf290665417189dcb4f5de0e7d" kind="enumvalue"><name>ER_UNKNOWN_SCHEMA_OBJECT</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea00afe88d993452ecb57bd2f0be78606b" kind="enumvalue"><name>ER_CREATE_FUNCTION</name></member>
