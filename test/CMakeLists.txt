@@ -36,6 +36,10 @@ if(POLICY CMP0037)
 endif(POLICY CMP0037)
 
 set(UNIT_TEST_TARGETS "")
+set(TEST_RUN_FLAGS "")
+if (ENABLE_GCOV)
+    set(TEST_RUN_FLAGS "${TEST_RUN_FLAGS} --luacov")
+endif()
 
 add_subdirectory(app)
 add_subdirectory(app-tap)
@@ -87,12 +91,14 @@ add_custom_target(test-unit-force
 
 add_custom_target(test-func
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+        ${TEST_RUN_FLAGS}
         --builddir=${PROJECT_BINARY_DIR}
         --exclude small/
         --exclude unit/)
 
 add_custom_target(test-func-force
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+        ${TEST_RUN_FLAGS}
         --builddir=${PROJECT_BINARY_DIR}
         --exclude small/
         --exclude unit/
@@ -103,6 +109,7 @@ add_custom_target(test
             LuaJIT-test
             ${UNIT_TEST_TARGETS}
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+        ${TEST_RUN_FLAGS}
         --builddir=${PROJECT_BINARY_DIR})
 
 add_custom_target(test-force
@@ -110,5 +117,6 @@ add_custom_target(test-force
             LuaJIT-test
             ${UNIT_TEST_TARGETS}
     COMMAND ${PROJECT_SOURCE_DIR}/test/test-run.py
+        ${TEST_RUN_FLAGS}
         --builddir=${PROJECT_BINARY_DIR}
         --force)
