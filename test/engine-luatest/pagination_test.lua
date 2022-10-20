@@ -65,7 +65,7 @@ tree_g.test_tree_pagination = function(cg)
             local tuples, pos = index:select(nil,
                     {limit=2, fullscan=true, fetch_pos=true})
             t.assert_equals(tuples, {})
-            t.assert(pos == nil)
+            t.assert_equals(pos, nil)
         end
 
         for i = 1, 11 do
@@ -97,7 +97,7 @@ tree_g.test_tree_pagination = function(cg)
             tuples1, pos = index:select(nil,
                     {limit=2, fullscan=true, fetch_pos=true, after=pos})
             t.assert_equals(tuples1, {})
-            t.assert(pos == nil)
+            t.assert_equals(pos, nil)
         end
 
         -- Test pagination on range iterators
@@ -125,7 +125,7 @@ tree_g.test_tree_pagination = function(cg)
                 tuples1, pos = index:select(key,
                         {limit=2, iterator=iter, fetch_pos=true, after=pos})
                 t.assert_equals(tuples1, {})
-                t.assert(pos == nil)
+                t.assert_equals(pos, nil)
             end
         end
 
@@ -149,7 +149,7 @@ tree_g.test_tree_pagination = function(cg)
             tuples1, pos = s.index.sk:select(1,
                     {iterator=iter, limit=2, fetch_pos=true, after=pos})
             t.assert_equals(tuples1, {})
-            t.assert(pos == nil)
+            t.assert_equals(pos, nil)
         end
     end)
 end
@@ -167,7 +167,7 @@ tree_g.test_tree_multikey_pagination = function(cg)
         local tuples, pos = sk:select(nil,
                 {limit=2, fullscan=true, fetch_pos=true})
         t.assert_equals(tuples, {})
-        t.assert(pos == nil)
+        t.assert_equals(pos, nil)
 
         for i = 1, 3 do
             s:replace{i, {1, 2, 3}}
@@ -188,7 +188,7 @@ tree_g.test_tree_multikey_pagination = function(cg)
         tuples, pos = sk:select(nil,
                 {limit=2, fullscan=true, fetch_pos=true, after=pos})
         t.assert_equals(tuples, {})
-        t.assert(pos == nil)
+        t.assert_equals(pos, nil)
 
         -- Test pagination on range iterators
         local key_iter = {
@@ -209,7 +209,7 @@ tree_g.test_tree_multikey_pagination = function(cg)
             tuples, pos = sk:select(key,
                     {limit=2, iterator=iter, fetch_pos=true, after=pos})
             t.assert_equals(tuples, {})
-            t.assert(pos == nil)
+            t.assert_equals(pos, nil)
         end
 
         -- Test pagination on equality iterators
@@ -225,7 +225,7 @@ tree_g.test_tree_multikey_pagination = function(cg)
             tuples, pos = sk:select(2,
                     {iterator=iter, limit=2, fetch_pos=true, after=pos})
             t.assert_equals(tuples, {})
-            t.assert(pos == nil)
+            t.assert_equals(pos, nil)
         end
 
         -- Test that after with tuple in multikey index returns an error
@@ -260,7 +260,7 @@ tree_g.test_nullable_indexes = function(cg)
             local tuples, pos = index:select(nil,
                     {limit=2, fullscan=true, fetch_pos=true})
             t.assert_equals(tuples, {})
-            t.assert(pos == nil)
+            t.assert_equals(pos, nil)
         end
 
         for i = 1, 13 do
@@ -296,7 +296,7 @@ tree_g.test_nullable_indexes = function(cg)
             tuples1, pos = index:select(nil,
                     {limit=2, fullscan=true, fetch_pos=true, after=pos})
             t.assert_equals(tuples1, {})
-            t.assert(pos == nil)
+            t.assert_equals(pos, nil)
         end
 
         test_indexes = {s.index.sk3, s.index.sk4}
@@ -317,7 +317,7 @@ tree_g.test_nullable_indexes = function(cg)
             tuples1, pos = index:select(nil,
                     {limit=2, fullscan=true, fetch_pos=true, after=pos})
             t.assert_equals(tuples1, {})
-            t.assert(pos == nil)
+            t.assert_equals(pos, nil)
         end
     end)
 end
@@ -351,7 +351,7 @@ tree_g.test_no_tuples_satisfying_filters = function(cg)
         tuples, pos = s.index.sk:select(4,
                 {limit=1, iterator='GE', fetch_pos=true})
         t.assert_equals(tuples, {})
-        t.assert(pos == nil)
+        t.assert_equals(pos, nil)
     end)
 end
 
@@ -452,12 +452,12 @@ tree_g.test_tuple_pos_simple = function(cg)
             t.assert_equals(tuples[2][1], i * 2 + 2)
             t.assert_equals(tuples[3], nil)
             pos = s.index.pk:tuple_pos(tuples[2])
-            t.assert(pos == last_pos)
+            t.assert_equals(pos, last_pos)
         end
         tuples, pos = s:select(nil,
                 {limit=2, fullscan=true, fetch_pos=true, after=pos})
         t.assert_equals(tuples, {})
-        t.assert(pos == nil)
+        t.assert_equals(pos, nil)
 
         tuples = s:select(1)
         t.assert_error_msg_contains(
@@ -553,7 +553,7 @@ tree_g.test_empty_page_with_offset = function(cg)
         s:create_index("pk", {type = "tree"})
         s:replace{1}
         local _, pos = s:select(nil, {fullscan=true, offset=1, fetch_pos=true})
-        t.assert(pos == nil)
+        t.assert_equals(pos, nil)
     end)
 end
 
@@ -602,7 +602,7 @@ func_g.test_func_index_pagination = function()
         local tuples, pos = sk:select(nil,
                 {limit=2, fullscan=true, fetch_pos=true})
         t.assert_equals(tuples, {})
-        t.assert(pos == nil)
+        t.assert_equals(pos, nil)
 
         for i = 1, 6 do
             s:replace{i, i}
@@ -625,7 +625,7 @@ func_g.test_func_index_pagination = function()
         tuples, pos = sk:select(nil,
                 {limit=2, fullscan=true, fetch_pos=true, after=pos})
         t.assert_equals(tuples, {})
-        t.assert(pos == nil)
+        t.assert_equals(pos, nil)
 
         -- Test pagination on range iterators
         local key_iter = {
@@ -646,7 +646,7 @@ func_g.test_func_index_pagination = function()
             tuples, pos = sk:select(key,
                     {limit=2, iterator=iter, fetch_pos=true, after=pos})
             t.assert_equals(tuples, {})
-            t.assert(pos == nil)
+            t.assert_equals(pos, nil)
         end
 
         -- Test pagination on equality iterators
@@ -662,7 +662,7 @@ func_g.test_func_index_pagination = function()
             tuples, pos = sk:select(6,
                     {iterator=iter, limit=2, fetch_pos=true, after=pos})
             t.assert_equals(tuples, {})
-            t.assert(pos == nil)
+            t.assert_equals(pos, nil)
         end
         --[[ Test that after with tuple and tuple_pos in
              functional index returns an error ]]--
@@ -701,7 +701,7 @@ func_g.test_func_multikey_index_pagination = function()
         local tuples, pos = sk:select(nil,
                 {limit=2, fullscan=true, fetch_pos=true})
         t.assert_equals(tuples, {})
-        t.assert(pos == nil)
+        t.assert_equals(pos, nil)
 
         for i = 1, 3 do
             s:replace{i, i}
@@ -722,7 +722,7 @@ func_g.test_func_multikey_index_pagination = function()
         tuples, pos = sk:select(nil,
                 {limit=2, fullscan=true, fetch_pos=true, after=pos})
         t.assert_equals(tuples, {})
-        t.assert(pos == nil)
+        t.assert_equals(pos, nil)
 
         -- Test pagination on range iterators
         local key_iter = {
@@ -743,7 +743,7 @@ func_g.test_func_multikey_index_pagination = function()
             tuples, pos = sk:select(key,
                     {limit=2, iterator=iter, fetch_pos=true, after=pos})
             t.assert_equals(tuples, {})
-            t.assert(pos == nil)
+            t.assert_equals(pos, nil)
         end
 
         -- Test pagination on equality iterators
@@ -759,7 +759,7 @@ func_g.test_func_multikey_index_pagination = function()
             tuples, pos = sk:select(3,
                     {iterator=iter, limit=2, fetch_pos=true, after=pos})
             t.assert_equals(tuples, {})
-            t.assert(pos == nil)
+            t.assert_equals(pos, nil)
         end
 
         --[[ Test that after with tuple and tuple_pos in

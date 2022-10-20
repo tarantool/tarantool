@@ -3736,11 +3736,6 @@ vinyl_iterator_position(struct iterator *base, const char **pos, uint32_t *size)
 	if (key == NULL)
 		return -1;
 	*pos = key;
-	assert(mp_typeof(**pos) == MP_ARRAY);
-	uint32_t part_count = mp_decode_array(pos);
-	assert(part_count == cmp_def->part_count);
-	(void)part_count;
-	*size -= *pos - key;
 	return 0;
 }
 

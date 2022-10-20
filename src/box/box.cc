@@ -2765,6 +2765,7 @@ box_select(uint32_t space_id, uint32_t index_id,
 {
 	(void)key_end;
 	assert(!update_pos || (packed_pos != NULL && packed_pos_end != NULL));
+	assert(packed_pos == NULL || packed_pos_end != NULL);
 
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 
@@ -2790,12 +2791,17 @@ box_select(uint32_t space_id, uint32_t index_id,
 	if (key_validate(index->def, type, key, part_count))
 		return -1;
 	const char *pos, *pos_end;
-	if (packed_pos != NULL && *packed_pos != NULL) {
-		uint32_t pos_part_count;
+	if (packed_pos != NULL && *packed_pos != NULL &&
+	    *packed_pos != *packed_pos_end) {
+		uint32_t buf_size =
+			iterator_position_unpack_bufsize(*packed_pos,
+							 *packed_pos_end);
+		char *buf = (char *)xregion_alloc(&fiber()->gc, buf_size);
 		if (iterator_position_unpack(*packed_pos, *packed_pos_end,
-					     &pos, &pos_end,
-					     &pos_part_count) != 0)
+					     buf, buf_size,
+					     &pos, &pos_end) != 0)
 			return -1;
+		uint32_t pos_part_count = mp_decode_array(&pos);
 		if (exact_key_validate_nullable(index->def->cmp_def, pos,
 						pos_part_count) != 0)
 			return -1;
@@ -2867,19 +2873,12 @@ box_select(uint32_t space_id, uint32_t index_id,
 			goto fail;
 		if (pos != NULL && found > 0) {
 			pos_end = pos + pos_size;
-			uint32_t part_count = index->def->cmp_def->part_count;
-			uint32_t pack_size =
-				iterator_position_pack_size(pos, pos_end,
-							    part_count);
-			char *new_packed_pos =
-				(char *)region_alloc(&fiber()->gc, pack_size);
-			if (new_packed_pos == NULL)
-				goto fail;
-			iterator_position_pack(pos, pos_end, part_count,
-					       new_packed_pos,
-					       new_packed_pos + pack_size);
-			*packed_pos = new_packed_pos;
-			*packed_pos_end = new_packed_pos + pack_size;
+			uint32_t buf_size =
+				iterator_position_pack_bufsize(pos, pos_end);
+			char *buf =
+				(char *)xregion_alloc(&fiber()->gc, buf_size);
+			iterator_position_pack(pos, pos_end, buf, buf_size,
+					       packed_pos, packed_pos_end);
 		} else {
 			*packed_pos = NULL;
 			*packed_pos_end = NULL;
