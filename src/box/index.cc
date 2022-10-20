@@ -41,6 +41,7 @@
 #include "info/info.h"
 #include "memtx_tx.h"
 #include "box.h"
+#include "base64.h"
 
 struct rlist box_on_select = RLIST_HEAD_INITIALIZER(box_on_select);
 
@@ -224,19 +225,10 @@ box_index_tuple_position(uint32_t space_id, uint32_t index_id,
 	if (key == NULL)
 		return -1;
 	const char *key_end = key + key_size;
-	mp_decode_array(&key);
-	uint32_t part_count = cmp_def->part_count;
-	uint32_t pack_size = iterator_position_pack_size(key, key_end,
-							 part_count);
-	char *buf = (char *)region_alloc(&fiber()->gc, pack_size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, pack_size, "region_alloc",
-			 "box_index_tuple_position");
-		return -1;
-	}
-	iterator_position_pack(key, key_end, part_count, buf, buf + pack_size);
-	*packed_pos = buf;
-	*packed_pos_end = buf + pack_size;
+	uint32_t buf_size = iterator_position_pack_bufsize(key, key_end);
+	char *buf = (char *)xregion_alloc(&fiber()->gc, buf_size);
+	iterator_position_pack(key, key_end, buf, buf_size,
+			       packed_pos, packed_pos_end);
 	return 0;
 }
 
@@ -631,108 +623,73 @@ iterator_position(struct iterator *it, const char **pos, uint32_t *size)
 	return it->position(it, pos, size);
 }
 
-/** Keys for iterator position map. All the keys must be uint. */
-enum {
-	ITERATOR_POSITION_KEY = 0,
-};
+#define ITERATOR_POS_B64_OPTS (BASE64_NOPAD | BASE64_NOWRAP)
 
-uint32_t
-iterator_position_pack_size(const char *pos, const char *pos_end,
-			    uint32_t part_count)
+size_t
+iterator_position_pack_bufsize(const char *pos, const char *pos_end)
 {
 	assert(pos != NULL);
-	assert(part_count != 0);
-	uint32_t total = pos_end - pos;
-	total += mp_sizeof_array(part_count);
-	total += mp_sizeof_uint(ITERATOR_POSITION_KEY);
-	total += mp_sizeof_map(1);
-	total += mp_sizeof_binl(total);
-	return total;
+	return base64_bufsize(pos_end - pos, ITERATOR_POS_B64_OPTS);
 }
 
 void
 iterator_position_pack(const char *pos, const char *pos_end,
-		       uint32_t part_count, char *packed_pos,
-		       const char *packed_pos_end)
+		       char *buf, size_t buf_size,
+		       const char **packed_pos, const char **packed_pos_end)
 {
-	(void)packed_pos_end;
 	assert(pos != NULL);
 	assert(pos_end != NULL);
+	assert(buf != NULL);
+	assert(buf_size >= iterator_position_pack_bufsize(pos, pos_end));
+	int encoded_size = base64_encode(pos, pos_end - pos, buf, buf_size,
+					 ITERATOR_POS_B64_OPTS);
+	*packed_pos = buf;
+	*packed_pos_end = buf + encoded_size;
+}
+
+#undef ITERATOR_POS_B64_OPTS
+
+size_t
+iterator_position_unpack_bufsize(const char *packed_pos,
+				 const char *packed_pos_end)
+{
 	assert(packed_pos != NULL);
 	assert(packed_pos_end != NULL);
 	assert(packed_pos < packed_pos_end);
-	assert(packed_pos_end - packed_pos >=
-	       iterator_position_pack_size(pos, pos_end, part_count));
-
-	uint32_t map_len = pos_end - pos;
-	map_len += mp_sizeof_array(part_count);
-	map_len += mp_sizeof_uint(ITERATOR_POSITION_KEY);
-	map_len += mp_sizeof_map(1);
-	packed_pos = mp_encode_binl(packed_pos, map_len);
-	packed_pos = mp_encode_map(packed_pos, 1);
-	packed_pos = mp_encode_uint(packed_pos, ITERATOR_POSITION_KEY);
-	packed_pos = mp_encode_array(packed_pos, part_count);
-	memcpy(packed_pos, pos, pos_end - pos);
+	/* See description of base64_decode. */
+	return 3 * (packed_pos_end - packed_pos) / 4 + 1;
 }
 
 int
 iterator_position_unpack(const char *packed_pos, const char *packed_pos_end,
-			 const char **pos, const char **pos_end,
-			 uint32_t *part_count)
+			 char *buf, size_t buf_size, const char **pos,
+			 const char **pos_end)
 {
 	assert(packed_pos != NULL);
 	assert(packed_pos_end != NULL);
+	assert(buf != NULL);
 	assert(pos != NULL);
 	assert(pos_end != NULL);
-	assert(part_count != NULL);
 	assert(packed_pos_end > packed_pos);
+	assert(buf_size >=
+	       iterator_position_unpack_bufsize(packed_pos, packed_pos_end));
 
 	*pos = NULL;
 	*pos_end = NULL;
-	*part_count = 0;
-	uint32_t map_len = 0;
-	const char *array = NULL;
-	const char *packed_pos_check = packed_pos;
-	bool has_position = false;
-	if (mp_check(&packed_pos_check, packed_pos_end) != 0)
+	int decoded_size = base64_decode(packed_pos,
+					 packed_pos_end - packed_pos,
+					 buf, buf_size);
+	const char *decoded_pos = buf;
+	const char *decoded_pos_end = buf + decoded_size;
+	const char *decoded_pos_check = decoded_pos;
+	if (mp_check(&decoded_pos_check, decoded_pos_end) != 0)
 		goto fail;
-	if (packed_pos_check != packed_pos_end)
+	if (decoded_pos_check != decoded_pos_end)
 		goto fail;
-	if (mp_typeof(*packed_pos) != MP_BIN)
+	if (mp_typeof(*decoded_pos) != MP_ARRAY)
 		goto fail;
-	mp_decode_binl(&packed_pos);
-	packed_pos_check = packed_pos;
-	if (mp_check(&packed_pos_check, packed_pos_end) != 0)
-		goto fail;
-	if (mp_typeof(*packed_pos) != MP_MAP)
-		goto fail;
-	map_len = mp_decode_map(&packed_pos);
-	/* Cannot be empty. */
-	if (map_len < 1)
-		goto fail;
-	for (uint32_t i = 0; i < map_len; ++i) {
-		if (mp_typeof(*packed_pos) != MP_UINT)
-			goto fail;
-		uint32_t key = mp_decode_uint(&packed_pos);
-		switch (key) {
-		case ITERATOR_POSITION_KEY:
-			if (mp_typeof(*packed_pos) != MP_ARRAY)
-				goto fail;
-			has_position = true;
-			array = packed_pos;
-			*part_count = mp_decode_array(&packed_pos);
-			*pos = packed_pos;
-			mp_next(&array);
-			packed_pos = array;
-			*pos_end = packed_pos;
-			break;
-		default:
-			/* Ignore unknown keys for forward compatibility. */
-			break;
-		}
-	}
-	if (!has_position)
-		goto fail;
+	*pos = decoded_pos;
+	*pos_end = decoded_pos_end;
 	return 0;
 fail:
 	diag_set(ClientError, ER_ITERATOR_POSITION);

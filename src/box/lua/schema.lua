@@ -2443,9 +2443,7 @@ local function check_select_opts(opts, key_is_nil)
         end
         if opts.after ~= nil then
             after = opts.after
-            if after == "" then
-                after = box.NULL
-            elseif type(after) ~= "string" and type(after) ~= "table" and
+            if type(after) ~= "string" and type(after) ~= "table" and
                     not is_tuple(after) then
                 box.error(box.error.INVALID_POSITION)
             end

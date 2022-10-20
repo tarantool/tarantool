@@ -1034,8 +1034,6 @@ tree_iterator_position(struct iterator *it, const char **pos, uint32_t *size)
 	if (key == NULL)
 		return -1;
 	*pos = key;
-	mp_decode_array(pos);
-	*size -= *pos - key;
 	return 0;
 }
 
@@ -1076,7 +1074,8 @@ tree_iterator_position_func(struct iterator *it, const char **pos,
 	/* Calculate allocation size and allocate buffer. */
 	func_key_size -= mp_sizeof_array(func_key_len);
 	pk_size -= mp_sizeof_array(pk_key_len);
-	uint32_t alloc_size = func_key_size + pk_size;
+	uint32_t alloc_size = mp_sizeof_array(func_key_len + pk_key_len) +
+		func_key_size + pk_size;
 	char *data = (char *)region_alloc(&fiber()->gc, alloc_size);
 	if (data == NULL) {
 		diag_set(OutOfMemory, alloc_size, "region",
@@ -1086,6 +1085,7 @@ tree_iterator_position_func(struct iterator *it, const char **pos,
 	*size = alloc_size;
 	*pos = data;
 	/* Pack an array with concatenated func key and primary key. */
+	data = mp_encode_array(data, func_key_len + pk_key_len);
 	memcpy(data, func_key, func_key_size);
 	data += func_key_size;
 	memcpy(data, pk_key, pk_size);
