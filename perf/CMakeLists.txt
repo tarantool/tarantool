@@ -8,6 +8,7 @@ endif()
 
 include_directories(${MSGPUCK_INCLUDE_DIRS})
 include_directories(${PROJECT_SOURCE_DIR}/src/box)
+include_directories(${PROJECT_SOURCE_DIR}/src/lib/salad)
 include_directories(${PROJECT_SOURCE_DIR}/third_party)
 include_directories(${EXTRA_CORE_INCLUDE_DIRS})
 
@@ -18,3 +19,6 @@ target_link_libraries(tuple.perftest core box tuple benchmark::benchmark)
 add_executable(light.perftest light.cc
                ${PROJECT_SOURCE_DIR}/test/unit/box_test_utils.c)
 target_link_libraries(light.perftest small benchmark::benchmark)
+
+add_executable(hyperloglog.perftest hyperloglog.cc)
+target_link_libraries(hyperloglog.perftest salad tuple benchmark::benchmark)

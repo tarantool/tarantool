@@ -563,3 +563,8 @@ create_unit_test(PREFIX key_def
                  SOURCES key_def.c box_test_utils.c
                  LIBRARIES unit box core
 )
+
+create_unit_test(PREFIX hyperloglog
+                 SOURCES hyperloglog.c
+                 LIBRARIES unit m salad
+)
