@@ -380,7 +380,7 @@ fiber.sleep(0)
 ...
 s:format{{'key', 'unsigned'}, {'value', 'unsigned'}} -- must fail
 ---
-- error: Tuple field 2 required by space format is missing
+- error: Tuple field 2 (value) required by space format is missing
 ...
 s:select()
 ---

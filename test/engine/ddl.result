@@ -1567,7 +1567,7 @@ format[7] = {name = 'field7', type = 'unsigned'}
 -- Fail, the tuple {1, ... 1} is invalid for a new format.
 s:format(format)
 ---
-- error: Tuple field 7 required by space format is missing
+- error: Tuple field 7 (field7) required by space format is missing
 ...
 s:drop()
 ---

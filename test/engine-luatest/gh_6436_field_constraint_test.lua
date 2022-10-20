@@ -536,7 +536,7 @@ g.test_field_constraint_integrity = function(cg)
         t.assert_equals(s:replace{1, 2, 300}, {1, 2, 300})
 
         t.assert_error_msg_content_equals(
-            "Check constraint 'field_constr3' failed for field '3'",
+            "Check constraint 'field_constr3' failed for field '3 (id3)'",
             function() s:format{{"id1"},
                                 {"id2", constraint='field_constr2'},
                                 {"id3", constraint='field_constr3'}} end

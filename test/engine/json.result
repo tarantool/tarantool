@@ -59,7 +59,7 @@ format = {{'id', 'unsigned'}, {'meta', 'unsigned'}, {'data', 'array'}, {'age', '
 ...
 s:format(format)
 ---
-- error: Field 3 has type 'array' in one index, but type 'map' in another
+- error: Field 3 (data) has type 'array' in one index, but type 'map' in another
 ...
 format = {{'id', 'unsigned'}, {'meta', 'unsigned'}, {'data', 'map'}, {'age', 'unsigned'}, {'level', 'unsigned'}}
 ---
