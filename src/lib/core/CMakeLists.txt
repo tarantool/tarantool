@@ -43,6 +43,7 @@ set(core_sources
     tt_sigaction.c
     tt_strerror.c
     mp_util.c
+    cord_on_demand.cc
 )
 
 if (ENABLE_BACKTRACE)

@@ -18,6 +18,7 @@
 #include "unit.h"
 
 #include <float.h>
+#include <pthread.h>
 
 static void
 test_payload_field_str(void)
@@ -481,11 +482,46 @@ test_error_code(void)
 	footer();
 }
 
+static void *
+test_pthread_f(void *arg)
+{
+	(void)arg;
+	is(box_error_last(), NULL, "last error before set");
+	box_error_raise(ER_ILLEGAL_PARAMS, "Test %d", 42);
+	box_error_t *err = box_error_last();
+	isnt(err, NULL, "last error after set");
+	is(strcmp(box_error_type(err), "ClientError"), 0, "last error type");
+	is(box_error_code(err), ER_ILLEGAL_PARAMS, "last error code");
+	is(strcmp(box_error_message(err), "Test 42"), 0, "last error message");
+	box_error_clear();
+	is(box_error_last(), NULL, "last error after clear");
+	return NULL;
+}
+
+static void
+test_pthread(void)
+{
+	header();
+	plan(6);
+
+	pthread_attr_t attr;
+	fail_unless(pthread_attr_init(&attr) == 0);
+	fail_unless(pthread_attr_setdetachstate(
+			&attr, PTHREAD_CREATE_JOINABLE) == 0);
+
+	pthread_t thread;
+	fail_unless(pthread_create(&thread, &attr, test_pthread_f, NULL) == 0);
+	fail_unless(pthread_join(thread, NULL) == 0);
+
+	check_plan();
+	footer();
+}
+
 int
 main(void)
 {
 	header();
-	plan(10);
+	plan(11);
 
 	random_init();
 	memory_init();
@@ -501,6 +537,7 @@ main(void)
 	test_payload_clear();
 	test_payload_move();
 	test_error_code();
+	test_pthread();
 
 	fiber_free();
 	memory_free();

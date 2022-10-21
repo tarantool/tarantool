@@ -36,6 +36,7 @@
 #include <stdint.h>
 #include "tt_pthread.h"
 #include <tarantool_ev.h>
+#include "cord_on_demand.h"
 #include "diag.h"
 #include "trivia/util.h"
 #include "small/mempool.h"
@@ -783,7 +784,19 @@ struct cord {
 
 extern __thread struct cord *cord_ptr;
 
-#define cord() cord_ptr
+/**
+ * Returns a thread-local cord object.
+ *
+ * If the cord object wasn't initialized at thread start (cord_create()
+ * wasn't called), a cord object is created automatically and destroyed
+ * at thread exit.
+ */
+#define cord() ({							\
+	if (unlikely(cord_ptr == NULL))					\
+		cord_ptr = cord_on_demand();				\
+	cord_ptr;							\
+})
+
 #define fiber() cord()->fiber
 #define loop() (cord()->loop)
 
