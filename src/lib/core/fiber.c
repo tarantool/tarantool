@@ -1481,7 +1481,7 @@ box_region_truncate(size_t size)
 void
 cord_create(struct cord *cord, const char *name)
 {
-	cord() = cord;
+	cord_ptr = cord;
 	slab_cache_set_thread(&cord()->slabc);
 
 	cord->id = pthread_self();
