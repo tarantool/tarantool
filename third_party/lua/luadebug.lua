@@ -34,8 +34,9 @@ local COLOR_RED = ""
 local COLOR_BLUE = ""
 local COLOR_YELLOW = ""
 local COLOR_RESET = ""
-local GREEN_CARET = " => "
-local RED_BREAK = "  ● "
+local GREEN_CARET_SYM = "=>"
+local GREEN_CARET = " " .. GREEN_CARET_SYM .. " "
+local RED_BREAK_SYM = "●"
 local auto_listing = true
 
 local LJ_MAX_LINE = 0x7fffff00 -- Max. source code line number.
@@ -349,7 +350,26 @@ end
 local SOURCE_CACHE = {}
 local tnt = nil
 
-local function where(info, context_lines, as_break)
+local function code_listing(source, currentline, file, context_lines)
+    if source and source[currentline] then
+        local normfile = normalize_path(file)
+        for i = currentline - context_lines,
+                currentline + context_lines do
+            local break_at = breakpoints[normfile] and breakpoints[normfile][i]
+            local tab_or_caret = (i == currentline and GREEN_CARET_SYM or "  ")
+                                 .. (break_at and RED_BREAK_SYM or " ")
+            local line = source[i]
+            if line then
+                dbg_writeln(color_grey("% 4d") .. tab_or_caret .. "%s", i, line)
+            end
+        end
+    else
+        dbg_writeln(color_red("Error: Source not available for ") ..
+                    color_blue(q(file)))
+    end
+end
+
+local function where(info, context_lines)
     local filesource = info.source
     local source = SOURCE_CACHE[info.source]
     if not source then
@@ -381,20 +401,7 @@ local function where(info, context_lines, as_break)
         SOURCE_CACHE[info.source] = source
     end
 
-    if source and source[info.currentline] then
-        for i = info.currentline - context_lines,
-                info.currentline + context_lines do
-            local sep = as_break and RED_BREAK or GREEN_CARET
-            local tab_or_caret = i == info.currentline and sep or "    "
-            local line = source[i]
-            if line then
-                dbg_writeln(color_grey("% 4d") .. tab_or_caret .. "%s", i, line)
-            end
-        end
-    else
-        dbg_writeln(color_red("Error: Source not available for ") ..
-                    color_blue(q(info.source)))
-    end
+    code_listing(source, info.currentline, info.source, context_lines)
 
     return false
 end
@@ -1011,7 +1018,8 @@ if color_maybe_supported and not os.getenv("NO_COLOR") then
     COLOR_YELLOW = string.char(27) .. "[33m"
     COLOR_RESET = string.char(27) .. "[0m"
     GREEN_CARET = string.char(27) .. "[92m => " .. COLOR_RESET
-    RED_BREAK = string.char(27) .. "[91m  ● " .. COLOR_RESET
+    GREEN_CARET_SYM = string.char(27) .. "[92m=>" .. COLOR_RESET
+    RED_BREAK_SYM = string.char(27) .. "[91m●" .. COLOR_RESET
 end
 
 return dbg
