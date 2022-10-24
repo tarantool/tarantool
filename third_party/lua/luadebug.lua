@@ -526,7 +526,11 @@ local function cmd_list_breakpoints()
     return false
 end
 
-local function cmd_down()
+--[[
+    Go up the stack. This advances toward the outermost frame,
+    to frames that have existed longer.
+]]
+local function cmd_up()
     local offset = stack_inspect_offset
     local info
 
@@ -548,7 +552,11 @@ local function cmd_down()
     return false
 end
 
-local function cmd_up()
+--[[
+    Go down the stack. This advances toward the innermost frame,
+    to frames that were created more recently.
+]]
+local function cmd_down()
     local offset = stack_inspect_offset
     local info
 
