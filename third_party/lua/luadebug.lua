@@ -419,7 +419,10 @@ local function cmd_eval(code)
     return false
 end
 
-local function cmd_down()
+--[[
+    Go up the stack. It advances from the callee frame to the caller.
+]]
+local function cmd_up()
     local offset = stack_inspect_offset
     local info
 
@@ -441,7 +444,10 @@ local function cmd_down()
     return false
 end
 
-local function cmd_up()
+--[[
+    Go down the stack. It advances from the caller frame to the callee.
+]]
+local function cmd_down()
     local offset = stack_inspect_offset
     local info
 
