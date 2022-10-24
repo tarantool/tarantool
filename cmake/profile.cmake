@@ -18,15 +18,11 @@ if (ENABLE_GCOV)
          "ENABLE_GCOV option requested but gcov library is not found")
     endif()
 
-    add_compile_flags("C;CXX"
-        "-fprofile-arcs"
-        "-ftest-coverage"
-    )
+    set(CODE_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
+    add_compile_flags("C;CXX" "${CODE_COVERAGE_FLAGS}")
 
-    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-arcs")
-    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -ftest-coverage")
-    set (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fprofile-arcs")
-    set (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -ftest-coverage")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${CODE_COVERAGE_FLAGS}")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${CODE_COVERAGE_FLAGS}")
 
    # add_library(gcov SHARED IMPORTED)
 endif()

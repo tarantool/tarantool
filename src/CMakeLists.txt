@@ -124,7 +124,7 @@ add_library(crc32 STATIC
     crc32.c
     ${PROJECT_SOURCE_DIR}/third_party/crc32_impl.c
 )
-target_link_libraries(crc32 cpu_feature)
+target_link_libraries(crc32 cpu_feature ${CODE_COVERAGE_FLAGS})
 
 add_library(shutdown STATIC on_shutdown.c)
 

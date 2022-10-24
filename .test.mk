@@ -143,15 +143,9 @@ test-coverage: build run-luajit-test run-test
 	     --exclude '/usr/*' \
 	     --exclude '*/build/*' \
 	     --exclude '*/test/*' \
-	     --exclude 'third_party/base64.c' \
-	     --exclude 'third_party/base64.h' \
 	     --exclude 'third_party/c-ares' \
 	     --exclude 'third_party/c-dt' \
-	     --exclude 'third_party/clock_gettime.c' \
-	     --exclude 'third_party/compat' \
 	     --exclude 'third_party/coro' \
-	     --exclude 'third_party/crc32_impl.c' \
-	     --exclude 'third_party/crc32_impl.h' \
 	     --exclude 'third_party/curl' \
 	     --exclude 'third_party/decNumber' \
 	     --exclude 'third_party/libeio' \
@@ -161,30 +155,17 @@ test-coverage: build run-luajit-test run-test
 	     --exclude 'third_party/libyaml' \
 	     --exclude 'third_party/lua-cjson' \
 	     --exclude 'third_party/luafun' \
-	     --exclude 'third_party/luajit' \
 	     --exclude 'third_party/luarocks' \
-	     --exclude 'third_party/lua-yaml' \
 	     --exclude 'third_party/luazip' \
 	     --exclude 'third_party/lua-zlib' \
-	     --exclude 'third_party/memmem.c' \
-	     --exclude 'third_party/memrchr.c' \
 	     --exclude 'third_party/nghttp2' \
-	     --exclude 'third_party/PMurHash.c' \
-	     --exclude 'third_party/PMurHash.h' \
-	     --exclude 'third_party/qsort_arg.c' \
-	     --exclude 'third_party/qsort_arg.h' \
-	     --exclude 'third_party/qsort_arg_mt.c' \
-	     --exclude 'third_party/queue.h' \
-	     --exclude 'third_party/sha1.c' \
-	     --exclude 'third_party/sha1.h' \
-	     --exclude 'third_party/sptree.h' \
-	     --exclude 'third_party/tarantool_eio.c' \
-	     --exclude 'third_party/tarantool_eio.h' \
-	     --exclude 'third_party/tarantool_ev.c' \
-	     --exclude 'third_party/tarantool_ev.h' \
 	     --exclude 'third_party/tz' \
 	     --exclude 'third_party/xxHash' \
-	     --exclude 'third_party/zstd'
+	     --exclude 'third_party/zstd' \
+	     --exclude 'third_party/compat' \
+	     --exclude 'third_party/queue.h' \
+	     --exclude 'third_party/sptree.h' \
+	     --exclude 'third_party/lua-yaml'
 	lcov --list ${OUTPUT_FILE}
 
 ##############################

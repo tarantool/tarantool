@@ -53,6 +53,8 @@ if(NOT EXISTS ${PROJECT_SOURCE_DIR}/src/lib/small/CMakeLists.txt)
     endif()
 endif()
 
+set(CODE_COVERAGE_FLAGS "")
+
 option(DEV_BUILD "Enable build options that make debugging more convenient" OFF)
 
 # Define GNU standard installation directories

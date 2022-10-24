@@ -32,7 +32,7 @@ macro(libmisc_build)
     endif()
 
     add_library(misc STATIC ${misc_src})
-    set_target_properties(misc PROPERTIES COMPILE_FLAGS "${DEPENDENCY_CFLAGS}")
+    set_target_properties(misc PROPERTIES COMPILE_FLAGS "${DEPENDENCY_CFLAGS} ${CODE_COVERAGE_FLAGS}")
 
     if (HAVE_OPENMP)
         if(BUILD_STATIC)

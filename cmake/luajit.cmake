@@ -29,6 +29,9 @@ TestAndAppendFLag(CMAKE_C_FLAGS -Wno-misleading-indentation)
 TestAndAppendFLag(CMAKE_C_FLAGS -Wno-varargs)
 TestAndAppendFLag(CMAKE_C_FLAGS -Wno-implicit-fallthrough)
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CODE_COVERAGE_FLAGS}")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${CODE_COVERAGE_FLAGS}")
+
 set(BUILDMODE static CACHE STRING
     "Build mode: build only static lib" FORCE)
 set(LUAJIT_ENABLE_GC64 ${LUAJIT_ENABLE_GC64} CACHE BOOL

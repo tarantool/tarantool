@@ -2,6 +2,7 @@
 # A macro to build the bundled libev
 macro(libev_build)
     set(ev_compile_flags ${DEPENDENCY_CFLAGS})
+    set(ev_compile_flags ${CODE_COVERAGE_FLAGS})
     set(ev_link_libraries)
 # There are warnings in libev code which are impossible to selectively
 # turn off, see
