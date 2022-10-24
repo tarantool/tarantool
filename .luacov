@@ -1,0 +1,12 @@
+-- https://lunarmodules.github.io/luacov/doc/modules/luacov.defaults.html
+
+include = {
+   "src$",
+   "src%/.+$",
+   "third_party$",
+   "third_party%/.+$",
+}
+
+tick = true
+deletestats = true
+includeuntestedfiles = true
