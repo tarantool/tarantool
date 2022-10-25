@@ -1851,6 +1851,8 @@ struct tree_read_view {
 	memtx_tree_view_t<USE_HINT> tree_view;
 	/** Used for clarifying read view tuples. */
 	struct memtx_tx_snapshot_cleaner cleaner;
+	/** See read_view_opts::disable_decompression. */
+	bool disable_decompression;
 };
 
 /** Read view iterator implementation. */
@@ -1929,6 +1931,7 @@ tree_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 		memtx_tree_view_iterator_next(&rv->tree_view,
 					      &it->tree_iterator);
 		if (memtx_prepare_read_view_tuple(res->tuple, &rv->cleaner,
+						  rv->disable_decompression,
 						  data, size) != 0)
 			return -1;
 		if (*data != NULL)
@@ -1991,7 +1994,6 @@ static struct index_read_view *
 memtx_tree_index_create_read_view(struct index *base,
 				  const struct read_view_opts *opts)
 {
-	(void)opts;
 	static const struct index_read_view_vtab vtab = {
 		.free = tree_read_view_free<USE_HINT>,
 		.get_raw = tree_read_view_get_raw<USE_HINT>,
@@ -2007,6 +2009,7 @@ memtx_tree_index_create_read_view(struct index *base,
 	}
 	struct space *space = space_cache_find(base->def->space_id);
 	memtx_tx_snapshot_cleaner_create(&rv->cleaner, space);
+	rv->disable_decompression = opts->disable_decompression;
 	rv->index = index;
 	index_ref(base);
 	memtx_tree_view_create(&rv->tree_view, &index->tree);

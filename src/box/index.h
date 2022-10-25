@@ -642,9 +642,12 @@ struct index_read_view_vtab {
 	 * Look up a tuple by a full key in a read view.
 	 *
 	 * The tuple data and size are returned in the data and size arguments.
-	 * Note, the tuple may be allocated from the fiber region so one should
-	 * call region_truncate after using the data. If the key isn't found,
-	 * the data is set to NULL.
+	 * If the key isn't found, the data is set to NULL.
+	 *
+	 * Note, unless the read_view_opts::disable_decompression flag was set
+	 * at read_view_open, the returned data may be allocated on the fiber
+	 * region, and the user is supposed to call region_truncate after using
+	 * the data.
 	 *
 	 * Returns 0 on success. On error returns -1 and sets diag.
 	 */
@@ -685,9 +688,12 @@ struct index_read_view_iterator_base {
 	 * Iterate to the next tuple in the read view.
 	 *
 	 * The tuple data and size are returned in the data and size arguments.
-	 * Note, the tuple may be allocated from the fiber region so one should
-	 * call region_truncate after using the data. On EOF the data is set to
-	 * NULL.
+	 * On EOF the data is set to NULL.
+	 *
+	 * Note, unless the read_view_opts::disable_decompression flag was set
+	 * at read_view_open, the returned data may be allocated on the fiber
+	 * region, and the user is supposed to call region_truncate after using
+	 * the data.
 	 *
 	 * Returns 0 on success. On error returns -1 and sets diag.
 	 */

@@ -284,17 +284,23 @@ memtx_prepare_result_tuple(struct tuple **result);
  * to the user.
  *
  * A pointer to the raw tuple data and its size are returned in the data and
- * size out argument. The data may be allocated from the fiber region (e.g. if
- * the original tuple is compressed) so the caller should clean up the region
- * after using the data. If the tuple should be skipped (e.g. it's not visible
- * from the read view, because it was dirty when the read view was created),
- * the data is set to NULL.
+ * size out argument.
+ *
+ * This function performs two tasks:
+ *
+ *  1. Eliminates dirty tuples using the provided snapshot cleaner created
+ *     at read_view_open. If the given tuple should be skipped, the data is
+ *     set to NULL.
+ *
+ *  2. Decompresses tuples if required, unless the disable_decompression flag
+ *     is set. Decompressed tuple data is stored on the fiber region.
  *
  * Returns 0 on success. On error returns -1 and sets diag.
  */
 int
 memtx_prepare_read_view_tuple(struct tuple *tuple,
 			      struct memtx_tx_snapshot_cleaner *cleaner,
+			      bool disable_decompression,
 			      const char **data, uint32_t *size);
 
 /**

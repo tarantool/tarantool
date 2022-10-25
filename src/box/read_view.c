@@ -49,6 +49,7 @@ read_view_opts_create(struct read_view_opts *opts)
 	opts->enable_field_names = false;
 	opts->enable_space_upgrade = false;
 	opts->enable_temporary_spaces = false;
+	opts->disable_decompression = false;
 }
 
 static void
