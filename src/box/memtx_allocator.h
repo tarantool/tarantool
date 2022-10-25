@@ -32,6 +32,7 @@
 #include "allocator.h"
 #include "clock.h"
 #include "clock_lowres.h"
+#include "read_view.h"
 #include "salad/stailq.h"
 #include "small/rlist.h"
 #include "tuple.h"
@@ -173,15 +174,6 @@ memtx_tuple_rv_delete(struct memtx_tuple_rv *rv, struct rlist *list,
 void
 memtx_tuple_rv_add(struct memtx_tuple_rv *rv, struct memtx_tuple *tuple);
 
-/** Memtx read view options. */
-struct memtx_read_view_opts {
-	/**
-	 * If set to true, creation of this read view will delay deletion of
-	 * tuples from temporary spaces.
-	 */
-	bool include_temporary_tuples = false;
-};
-
 template<class Allocator>
 class MemtxAllocator {
 public:
@@ -222,7 +214,7 @@ public:
 	 * (allocated before the read view was created) won't be freed
 	 * until the read view is closed with close_read_view().
 	 */
-	static ReadView *open_read_view(struct memtx_read_view_opts opts)
+	static ReadView *open_read_view(const struct read_view_opts *opts)
 	{
 		if (!may_reuse_read_view) {
 			read_view_version++;
@@ -231,7 +223,7 @@ public:
 		}
 		ReadView *rv = (ReadView *)xcalloc(1, sizeof(*rv));
 		for (int type = 0; type < memtx_tuple_rv_type_MAX; type++) {
-			if (!opts.include_temporary_tuples &&
+			if (!opts->enable_temporary_spaces &&
 			    type == memtx_tuple_rv_temporary)
 				continue;
 			rv->rv[type] = memtx_tuple_rv_new(read_view_version,
@@ -432,7 +424,7 @@ using memtx_allocators_read_view =
 
 /** Opens a read view for each MemtxAllocator. */
 memtx_allocators_read_view
-memtx_allocators_open_read_view(struct memtx_read_view_opts opts);
+memtx_allocators_open_read_view(const struct read_view_opts *opts);
 
 /** Closes a read view for each MemtxAllocator. */
 void

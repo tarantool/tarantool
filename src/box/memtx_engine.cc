@@ -514,9 +514,7 @@ memtx_engine_create_read_view(struct engine *engine,
 	struct memtx_read_view *rv =
 		(struct memtx_read_view *)xmalloc(sizeof(*rv));
 	rv->base.vtab = &vtab;
-	struct memtx_read_view_opts memtx_opts;
-	memtx_opts.include_temporary_tuples = opts->enable_temporary_spaces;
-	rv->allocators_rv = memtx_allocators_open_read_view(memtx_opts);
+	rv->allocators_rv = memtx_allocators_open_read_view(opts);
 	return (struct engine_read_view *)rv;
 }
 
