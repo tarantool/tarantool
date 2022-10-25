@@ -46,9 +46,9 @@ read_view_opts_create(struct read_view_opts *opts)
 	opts->filter_space = default_space_filter;
 	opts->filter_index = default_index_filter;
 	opts->filter_arg = NULL;
-	opts->needs_field_names = false;
-	opts->needs_space_upgrade = false;
-	opts->needs_temporary_spaces = false;
+	opts->enable_field_names = false;
+	opts->enable_space_upgrade = false;
+	opts->enable_temporary_spaces = false;
 }
 
 static void
@@ -88,7 +88,7 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 
 	space_rv->id = space_id(space);
 	space_rv->group_id = space_group_id(space);
-	if (opts->needs_field_names && space->def->field_count > 0) {
+	if (opts->enable_field_names && space->def->field_count > 0) {
 		space_rv->fields = field_def_array_dup(space->def->fields,
 						       space->def->field_count);
 		assert(space_rv->fields != NULL);
@@ -98,7 +98,7 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 		space_rv->field_count = 0;
 	}
 	space_rv->format = NULL;
-	if (opts->needs_space_upgrade && space->upgrade != NULL) {
+	if (opts->enable_space_upgrade && space->upgrade != NULL) {
 		space_rv->upgrade = space_upgrade_read_view_new(space->upgrade);
 		assert(space_rv->upgrade != NULL);
 	} else {
@@ -137,7 +137,7 @@ read_view_add_space_cb(struct space *space, void *arg_raw)
 	struct read_view *rv = arg->rv;
 	const struct read_view_opts *opts = arg->opts;
 	if ((space->engine->flags & ENGINE_SUPPORTS_READ_VIEW) == 0 ||
-	    (space_is_temporary(space) && !opts->needs_temporary_spaces) ||
+	    (space_is_temporary(space) && !opts->enable_temporary_spaces) ||
 	    !opts->filter_space(space, opts->filter_arg))
 		return 0;
 	struct space_read_view *space_rv = space_read_view_new(space, opts);
