@@ -963,8 +963,10 @@ generic_index_create_iterator(struct index *base, enum iterator_type type,
 
 
 struct index_read_view *
-generic_index_create_read_view(struct index *index)
+generic_index_create_read_view(struct index *index,
+			       const struct read_view_opts *opts)
 {
+	(void)opts;
 	diag_set(UnsupportedIndexFeature, index->def, "consistent read view");
 	return NULL;
 }
