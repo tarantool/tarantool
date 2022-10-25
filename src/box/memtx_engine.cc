@@ -1652,6 +1652,7 @@ memtx_prepare_result_tuple(struct tuple **result)
 int
 memtx_prepare_read_view_tuple(struct tuple *tuple,
 			      struct memtx_tx_snapshot_cleaner *cleaner,
+			      bool disable_decompression,
 			      const char **data, uint32_t *size)
 {
 	tuple = memtx_tx_snapshot_clarify(cleaner, tuple);
@@ -1661,8 +1662,12 @@ memtx_prepare_read_view_tuple(struct tuple *tuple,
 		return 0;
 	}
 	*data = tuple_data_range(tuple, size);
-	*data = memtx_tuple_decompress_raw(*data, *data + *size, size);
-	return *data == NULL ? -1 : 0;
+	if (!disable_decompression) {
+		*data = memtx_tuple_decompress_raw(*data, *data + *size, size);
+		if (*data == NULL)
+			return -1;
+	}
+	return 0;
 }
 
 int

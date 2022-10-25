@@ -140,6 +140,15 @@ struct read_view_opts {
 	 * flag is set.
 	 */
 	bool enable_temporary_spaces;
+	/**
+	 * Memtx-specific. Disables decompression of tuples fetched from
+	 * the read view. Setting this flag makes the raw read view methods
+	 * (get_raw, next_raw) return a pointer to the data stored in
+	 * the read view as is, without any preprocessing or copying to
+	 * the fiber region. The user is supposed to decompress the data
+	 * encoded in the MP_COMPRESSION MsgPack extension manually.
+	 */
+	bool disable_decompression;
 };
 
 /** Sets read view options to default values. */
