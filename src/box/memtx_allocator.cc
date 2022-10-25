@@ -174,20 +174,20 @@ struct memtx_allocator_open_read_view {
 	/** Opens a read view for the specified MemtxAllocator. */
 	template<typename Allocator>
 	void invoke(memtx_allocators_read_view &rv_all,
-		    const struct memtx_read_view_opts &opts)
+		    const struct read_view_opts &opts)
 	{
 		util::get<typename Allocator::ReadView *>(rv_all) =
-			Allocator::open_read_view(opts);
+			Allocator::open_read_view(&opts);
 	}
 };
 
 memtx_allocators_read_view
-memtx_allocators_open_read_view(struct memtx_read_view_opts opts)
+memtx_allocators_open_read_view(const struct read_view_opts *opts)
 {
 	memtx_allocators_read_view rv;
 	foreach_memtx_allocator<memtx_allocator_open_read_view,
 				memtx_allocators_read_view &,
-				const struct memtx_read_view_opts &>(rv, opts);
+				const struct read_view_opts &>(rv, *opts);
 	return rv;
 }
 
