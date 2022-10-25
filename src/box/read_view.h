@@ -35,7 +35,7 @@ struct space_read_view {
 	char *name;
 	/**
 	 * Tuple field definition array used by this space. Allocated only if
-	 * read_view_opts::needs_field_names is set, otherwise set to NULL.
+	 * read_view_opts::enable_field_names is set, otherwise set to NULL.
 	 * Used for creation of space_read_view::format.
 	 */
 	struct field_def *fields;
@@ -45,7 +45,7 @@ struct space_read_view {
 	 * Runtime tuple format needed to access tuple field names by name.
 	 * Referenced (ref counter incremented).
 	 *
-	 * A new format is created only if read_view_opts::needs_field_names
+	 * A new format is created only if read_view_opts::enable_field_names
 	 * is set, otherwise runtime_tuple_format is used.
 	 *
 	 * We can't just use the space tuple format as is because it allocates
@@ -59,7 +59,7 @@ struct space_read_view {
 	/**
 	 * Upgrade function for this space read view or NULL if there wasn't
 	 * a space upgrade in progress at the time when this read view was
-	 * created or read_view_opts::needs_space_upgrade wasn't set.
+	 * created or read_view_opts::enable_space_upgrade wasn't set.
 	 */
 	struct space_upgrade_read_view *upgrade;
 	/** Replication group id. See space_opts::group_id. */
@@ -127,19 +127,19 @@ struct read_view_opts {
 	 * otherwise the preallocated name-less runtime tuple format will be
 	 * used instead.
 	 */
-	bool needs_field_names;
+	bool enable_field_names;
 	/**
 	 * If this flag is set and there's a space upgrade in progress at the
 	 * time when this read view is created, create an upgrade function that
 	 * can be applied to tuples retrieved from this read view. See also
 	 * space_read_view::upgrade.
 	 */
-	bool needs_space_upgrade;
+	bool enable_space_upgrade;
 	/**
 	 * Temporary spaces aren't included into this read view unless this
 	 * flag is set.
 	 */
-	bool needs_temporary_spaces;
+	bool enable_temporary_spaces;
 };
 
 /** Sets read view options to default values. */
