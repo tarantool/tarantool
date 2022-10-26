@@ -67,6 +67,7 @@
 #include "lua/swim.h"
 #include "lua/decimal.h"
 #include "lua/uri.h"
+#include "lua/builtin_modcache.h"
 #include "digest.h"
 #include "errinj.h"
 
@@ -433,19 +434,31 @@ static const char *lua_modules_preload[] = {
 static const char *
 tarantool_debug_getsources(const char *modname)
 {
-	for (size_t i = 0; lua_modules[i] != NULL; i += 2) {
-		const char *shortname = lua_modules[i];
-		const char *lua_code = lua_modules[i + 1];
-		assert(lua_code != NULL);
-		assert(strlen(shortname) + sizeof("@builtin/.lua") <=
-			MAX_MODNAME);
-		char fullname[MAX_MODNAME];
-		snprintf(fullname, sizeof(fullname), "@builtin/%s.lua",
-			 shortname);
-		if (!strcmp(shortname, modname) || !strcmp(fullname, modname))
-			return lua_code;
-	}
-	return NULL;
+	/* 1. process as short modname - fast path */
+	const char *lua_code = builtin_modcache_find(modname);
+	if (lua_code != NULL)
+		return lua_code;
+	size_t n = strlen(modname);
+	assert(n < MAX_MODNAME);
+	char fullname[MAX_MODNAME];
+	strlcpy(fullname, modname, n + 1);
+
+	/* 2. slow path: process as `@builtin/%s.lua` */
+	/* check prefix first */
+	const char *prefix = "@builtin/";
+	const size_t prefix_len = strlen(prefix);
+	if (strncmp(prefix, fullname, prefix_len) != 0)
+		return NULL;
+	const char *pshortname = fullname + prefix_len;
+
+	/* trim suffix 2nd */
+	const char *suffix = ".lua";
+	const size_t suffix_len = strlen(suffix);
+	if (strncmp(suffix, fullname + n - suffix_len, suffix_len) != 0)
+		return NULL;
+	fullname[n - suffix_len] = '\0';
+
+	return builtin_modcache_find(pshortname);
 }
 
 /*
@@ -827,6 +840,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 #if defined(ENABLE_BACKTRACE)
 	backtrace_lua_init();
 #endif /* defined(ENABLE_BACKTRACE) */
+	builtin_modcache_init();
 	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 	for (const char **s = lua_modules; *s; s += 2) {
 		const char *modname = *s;
@@ -844,6 +858,8 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 			lua_pop(L, 1); /* nil */
 		}
 		lua_pop(L, 1); /* chunkname */
+		builtin_modcache_put(modname, modsrc);
+
 	}
 	lua_pop(L, 1); /* _LOADED */
 
@@ -858,6 +874,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 			      modname, lua_tostring(L, -1));
 		lua_setfield(L, -3, modname); /* package.preload.modname = t */
 		lua_pop(L, 1); /* chunkname */
+		builtin_modcache_put(modname, modsrc);
 	}
 	lua_pop(L, 1); /* _PRELOAD */
 
@@ -1085,6 +1102,7 @@ tarantool_lua_run_script(char *path, bool interactive,
 void
 tarantool_lua_free()
 {
+	builtin_modcache_free();
 	tarantool_lua_utf8_free();
 	/*
 	 * Some part of the start script panicked, and called
