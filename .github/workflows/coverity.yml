@@ -19,7 +19,7 @@ jobs:
       options: '--init'
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v3
       - uses: ./.github/actions/environment
       - name: test
         run: make -f .test.mk test-coverity
