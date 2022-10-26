@@ -167,6 +167,7 @@ set (server_sources
      lua/decimal.c
      lua/uri.c
      lua/backtrace.c
+     lua/builtin_modcache.c
      ${lua_sources}
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/lyaml.cc
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/b64.c
