@@ -43,7 +43,7 @@ jobs:
 
     steps:
       - uses: tarantool/actions/cleanup@master
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
           submodules: recursive
@@ -70,7 +70,7 @@ jobs:
     steps:
       - uses: tarantool/actions/cleanup@master
       # We don't need neither deep fetch, nor submodules here.
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v3
       # Don't use actions/setup-python to don't bother with proper
       # setup of our self-hosted machines, see [1].
       #
@@ -95,7 +95,7 @@ jobs:
 
     steps:
       - uses: tarantool/actions/cleanup@master
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
