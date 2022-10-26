@@ -27,7 +27,7 @@ jobs:
       OS: ${{ inputs.os }}
       DIST: ${{ inputs.dist }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           ref: ${{ inputs.ref }}
           # Fetch the entire history for all branches and tags.
