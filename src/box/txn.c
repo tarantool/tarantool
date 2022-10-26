@@ -40,6 +40,7 @@
 #include "iproto_constants.h"
 #include "box.h"
 #include "session.h"
+#include "rmean.h"
 
 double too_long_threshold;
 
@@ -588,6 +589,7 @@ txn_begin(void)
 		txn_free(txn);
 		return NULL;
 	}
+	rmean_collect(rmean_box, IPROTO_BEGIN, 1);
 	return txn;
 }
 
@@ -804,6 +806,7 @@ txn_complete_fail(struct txn *txn)
 		trigger_destroy(&txn->on_commit);
 	}
 	txn_free_or_wakeup(txn);
+	rmean_collect(rmean_box, IPROTO_ROLLBACK, 1);
 }
 
 void
@@ -831,6 +834,7 @@ txn_complete_success(struct txn *txn)
 		trigger_destroy(&txn->on_rollback);
 	}
 	txn_free_or_wakeup(txn);
+	rmean_collect(rmean_box, IPROTO_COMMIT, 1);
 }
 
 /** Callback invoked when the transaction's journal write is finished. */
