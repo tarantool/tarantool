@@ -122,19 +122,24 @@ g.test_encode_decode_buffer = function()
 end
 
 g.test_invalid_msgpack = function()
+    local err = "msgpack.decode: invalid MsgPack"
+
     -- Invalid msgpack.
     local first_buffer = {1, 2, 3}
     local s = msgpack.encode(first_buffer)
     s = s:sub(1, -2)
-    t.assert_error_msg_content_equals(
-        "msgpack.decode: invalid MsgPack",
-        function() msgpack.decode(s) end)
+    t.assert_error_msg_content_equals(err, msgpack.decode, s)
 
     local buf = buffer.ibuf()
     t.assert_equals(msgpack.encode(first_buffer, buf), 4)
-    t.assert_error_msg_content_equals(
-        "msgpack.decode: invalid MsgPack",
-        function() msgpack.decode(buf.rpos, buf:size() - 1) end)
+    t.assert_error_msg_content_equals(err, msgpack.decode,
+                                      buf.rpos, buf:size() - 1)
+
+    -- 0xc1 cannot be used in a valid MsgPack.
+    t.assert_error_msg_content_equals(err, msgpack.decode, '\xc1')
+    t.assert_error_msg_content_equals(err, msgpack.decode, '\x91\xc1')
+    t.assert_error_msg_content_equals(err, msgpack.decode, '\x81\xff\xc1')
+    t.assert_error_msg_content_equals(err, msgpack.decode, '\x93\xff\xc1\xff')
 end
 
 g.test_encode_decode_struct_buffer = function()
