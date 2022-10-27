@@ -59,4 +59,16 @@ server.test_option("-e \"print(rawget(_G, 'log') == nil)\" " + \
                    script + \
                    " 1 2 3 --help")
 
+b_cmds = ["-b", "-bl -e ''", "-b -l -e ''", "-b -e '' output"]
+for cmd in b_cmds:
+    res = server.test_option_get(cmd, silent=True)
+    print(cmd)
+    print(res, end='')
+
+j_cmds = ["-jon -e ''", "-j on -e ''"]
+for cmd in j_cmds:
+    res = server.test_option_get(cmd, silent=True)
+    assert res == ""
+    print(cmd)
+
 sys.stdout.clear_all_filters()

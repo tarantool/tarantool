@@ -144,6 +144,8 @@ extern char minifio_lua[],
 	jit_dis_x86_lua[],
 	jit_dis_x64_lua[],
 	jit_dump_lua[],
+	dobytecode_lua[],
+	dojitcmd_lua[],
 	csv_lua[],
 	jit_v_lua[],
 	clock_lua[],
@@ -316,6 +318,8 @@ static const char *lua_modules[] = {
 	"jit.dis_x64", jit_dis_x64_lua,
 	"jit.dump", jit_dump_lua,
 	"jit.v", jit_v_lua,
+	"internal.dobytecode", dobytecode_lua,
+	"internal.dojitcmd", dojitcmd_lua,
 	/* Profiler */
 	"jit.p", jit_p_lua,
 	"jit.zone", jit_zone_lua,
@@ -962,6 +966,18 @@ tarantool_lua_slab_cache()
 }
 
 /**
+ * Import a lua module and push it on top of Lua stack.
+ */
+static int
+lua_require_lib(lua_State *L, const char *libname)
+{
+	assert(libname != NULL);
+	lua_getglobal(L, "require");
+	lua_pushstring(L, libname);
+	return luaT_call(L, 1, 1);
+}
+
+/**
  * Push argument and call a function on the top of Lua stack
  */
 static int
@@ -985,11 +1001,13 @@ run_script_f(va_list ap)
 {
 	struct lua_State *L = va_arg(ap, struct lua_State *);
 	const char *path = va_arg(ap, const char *);
-	bool interactive = va_arg(ap, int);
+	uint32_t opt_mask = va_arg(ap, uint32_t);
 	int optc = va_arg(ap, int);
 	const char **optv = va_arg(ap, const char **);
 	int argc = va_arg(ap, int);
 	char **argv = va_arg(ap, char **);
+	bool interactive = opt_mask & O_INTERACTIVE;
+	bool bytecode = opt_mask & O_BYTECODE;
 	/*
 	 * An error is returned via an external diag. A caller
 	 * can't use fiber_join(), because the script can call
@@ -1025,12 +1043,20 @@ run_script_f(va_list ap)
 			/*
 			 * Load library
 			 */
-			lua_getglobal(L, "require");
-			lua_pushstring(L, optv[i + 1]);
-			if (luaT_call(L, 1, 1) != 0)
+			if (lua_require_lib(L, optv[i + 1]) != 0)
 				goto error;
 			/* Non-standard: set name = require('name') */
 			lua_setglobal(L, optv[i + 1]);
+			lua_settop(L, 0);
+			break;
+		case 'j':
+			if (lua_require_lib(L, "internal.dojitcmd") != 0)
+				goto error;
+			lua_pushstring(L, "dojitcmd");
+			lua_gettable(L, -2);
+			lua_pushstring(L, optv[i + 1]);
+			if (luaT_call(L, 1, 1) != 0)
+				goto error;
 			lua_settop(L, 0);
 			break;
 		case 'e':
@@ -1059,6 +1085,19 @@ run_script_f(va_list ap)
 	aux_loop_is_run = true;
 
 	int is_a_tty = isatty(STDIN_FILENO);
+
+	if (bytecode) {
+		if (lua_require_lib(L, "internal.dobytecode") != 0)
+			goto error;
+		lua_pushstring(L, "dobytecode");
+		lua_gettable(L, -2);
+		for (int i = 0; i < argc; i++)
+			lua_pushstring(L, argv[i]);
+		if (luaT_call(L, argc, 1) != 0)
+			goto error;
+		lua_settop(L, 0);
+		goto end;
+	}
 
 	if (path && strcmp(path, "-") != 0 && access(path, F_OK) == 0) {
 		/* Execute script. */
@@ -1119,7 +1158,7 @@ error:
 }
 
 int
-tarantool_lua_run_script(char *path, bool interactive,
+tarantool_lua_run_script(char *path, uint32_t opt_mask,
 			 int optc, const char **optv, int argc, char **argv)
 {
 	const char *title = path ? basename(path) : "interactive";
@@ -1143,7 +1182,7 @@ tarantool_lua_run_script(char *path, bool interactive,
 	 */
 	struct diag script_diag;
 	diag_create(&script_diag);
-	fiber_start(script_fiber, tarantool_L, path, interactive,
+	fiber_start(script_fiber, tarantool_L, path, opt_mask,
 		    optc, optv, argc, argv, &script_diag);
 
 	/*
