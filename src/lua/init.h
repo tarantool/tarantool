@@ -75,6 +75,12 @@ tarantool_lua_run_script(char *path, bool force_interactive,
 			 int optc, const char **optv,
 			 int argc, char **argv);
 
+/**
+ * Dump bytecode for a specified Lua script.
+ */
+int
+tarantool_lua_dump_bytecode(char **argv);
+
 extern char *history;
 
 struct slab_cache *

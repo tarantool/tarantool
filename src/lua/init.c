@@ -637,6 +637,174 @@ fiber_backtracer(void *(*frame_writer)(int frame_no, void *addr))
 }
 #endif
 
+static void
+l_message(const char *msg)
+{
+	printf("%s\n", msg);
+	fflush(stdout);
+}
+
+/**
+ * This function gets an error message as its argument on
+ * the Lua stack and prints it to stdout. After that it
+ * pops the error message from the stack.
+ */
+static int
+report(lua_State *L, int status)
+{
+	if (status && !lua_isnil(L, -1)) {
+		const char *msg = lua_tostring(L, -1);
+		if (msg == NULL)
+			msg = "(error object is not a string)";
+		l_message(msg);
+		lua_pop(L, 1);
+	}
+	return status;
+}
+
+/**
+ * Load add-on module. This function has no
+ * effects on the Lua stack.
+ */
+static int
+loadjitmodule(lua_State *L)
+{
+	lua_getglobal(L, "require");
+	lua_pushliteral(L, "jit.");
+	lua_pushvalue(L, -3);
+	lua_concat(L, 2);
+	if (lua_pcall(L, 1, 1, 0) != LUA_OK) {
+		const char *msg = lua_tostring(L, -1);
+		if (msg && !strncmp(msg, "module ", 7))
+			goto nomodule;
+		return report(L, 1);
+	}
+	lua_getfield(L, -1, "start");
+	if (lua_isnil(L, -1)) {
+nomodule:
+		l_message("unknown luaJIT command or jit.*"
+			  "modules not installed");
+		return 1;
+	}
+	/* Drop module table. */
+	lua_remove(L, -2);
+	return 0;
+}
+
+/**
+ * This function dumps bytecode for Lua script.
+ * Has no effect on the Lua stack.
+ */
+int
+dobytecode(va_list ap)
+{
+	char **argv = va_arg(ap, char **);
+	struct diag *diag = va_arg(ap, struct diag *);
+
+	int narg = 0;
+	bool aux_loop_is_run = false;
+
+	lua_pushliteral(tarantool_L, "bcsave");
+	if (loadjitmodule(tarantool_L) != 0)
+		goto error;
+	if (argv[0][2]) {
+		narg++;
+		argv[0][1] = '-';
+		lua_pushstring(tarantool_L, argv[0] + 1);
+	}
+
+	/*
+	 * Return control to tarantool_lua_run_script.
+	 * tarantool_lua_run_script then will start an auxiliary event
+	 * loop and re-schedule this fiber.
+	 */
+	fiber_sleep(0.0);
+	aux_loop_is_run = true;
+
+	for (argv++; *argv != NULL; narg++, argv++)
+		lua_pushstring(tarantool_L, *argv);
+	int res = lua_pcall(tarantool_L, narg, 0, 0);
+	if (res != LUA_OK)
+		goto error;
+
+end:
+	/*
+	 * Auxiliary loop in tarantool_lua_run_script
+	 * should start (ev_run()) before this fiber
+	 * invokes ev_break().
+	 */
+	if (!aux_loop_is_run)
+		fiber_sleep(0.0);
+	ev_break(loop(), EVBREAK_ALL);
+	return 0;
+
+error:
+	diag_set(LuajitError, lua_tostring(tarantool_L, -1));
+	diag_move(diag_get(), diag);
+	goto end;
+}
+
+/**
+ * Runs jit module command with options.
+ * Has no effect on the Lua stack.
+ */
+static int
+runcmdopt(lua_State *L, const char *opt)
+{
+	int narg = 0;
+	if (opt && *opt) {
+		/* This loop splits args for jit module. */
+		for (;;) {
+			const char *p = strchr(opt, ',');
+			narg++;
+			if (!p)
+				break;
+			if (p == opt)
+				lua_pushnil(L);
+			else
+				lua_pushlstring(L, opt, (size_t)(p - opt));
+			opt = p + 1;
+		}
+		if (*opt)
+			lua_pushstring(L, opt);
+		else
+			lua_pushnil(L);
+	}
+	return report(L, lua_pcall(L, narg, 0, 0));
+}
+
+/**
+ * JIT engine control command: try jit
+ * library first or load add-on module.
+ * Removes jit module name from Lua stack.
+ */
+int
+dojitcmd(const char *cmd)
+{
+	const char *opt = strchr(cmd, '=');
+	lua_pushlstring(tarantool_L, cmd,
+			opt ? (size_t)(opt - cmd) : strlen(cmd));
+	lua_getfield(tarantool_L, LUA_REGISTRYINDEX, "_LOADED");
+	/* Get jit.* module table. */
+	lua_getfield(tarantool_L, -1, "jit");
+	lua_remove(tarantool_L, -2);
+	lua_pushvalue(tarantool_L, -2);
+	/* Lookup library function. */
+	lua_gettable(tarantool_L, -2);
+	if (!lua_isfunction(tarantool_L, -1)) {
+		/* Drop non-function and jit.* table, keep module name. */
+		lua_pop(tarantool_L, 2);
+	if (loadjitmodule(tarantool_L) != 0)
+		return 1;
+	} else {
+		/* Drop jit.* table. */
+		lua_remove(tarantool_L, -2);
+	}
+	/* Drop module name. */
+	lua_remove(tarantool_L, -2);
+	return runcmdopt(tarantool_L, opt ? opt + 1 : opt);
+}
+
 /**
  * Original LuaJIT/Lua logic: <luajit/src/lib_package.c - function setpath>
  *
@@ -1000,6 +1168,10 @@ run_script_f(va_list ap)
 			lua_setglobal(L, optv[i + 1]);
 			lua_settop(L, 0);
 			break;
+		case 'j':
+			if (dojitcmd(optv[i + 1]) != 0)
+				goto error;
+			break;
 		case 'e':
 			/*
 			 * Execute chunk
@@ -1122,6 +1294,44 @@ tarantool_lua_run_script(char *path, bool interactive,
 	script_fiber = NULL;
 	diag_move(&script_diag, diag_get());
 	diag_destroy(&script_diag);
+	/*
+	 * Result can't be obtained via fiber_join - script fiber
+	 * never dies if os.exit() was called. This is why diag
+	 * is checked explicitly.
+	 */
+	return diag_is_empty(diag_get()) ? 0 : -1;
+}
+
+int
+tarantool_lua_dump_bytecode(char **argv)
+{
+	/*
+	 * Tarantool has its own definition of os.exit() so running
+	 * lua code outside of a fiber causes panic.
+	 */
+	script_fiber = fiber_new("bcsave", dobytecode);
+	if (script_fiber == NULL)
+		panic("%s", diag_last_error(diag_get())->errmsg);
+	script_fiber->storage.lua.stack = tarantool_L;
+	/*
+	 * Create a new diag on the stack. Don't pass fiber's diag, because it
+	 * might be overwritten by libev callbacks invoked in the scheduler
+	 * fiber (which is this), and therefore can't be used as a sign of fail
+	 * in the script itself.
+	 */
+	struct diag bc_diag;
+	diag_create(&bc_diag);
+	fiber_start(script_fiber, argv, &bc_diag);
+	/*
+	 * Run an auxiliary event loop to re-schedule run_script fiber.
+	 * When this fiber finishes, it will call ev_break to stop the loop.
+	 */
+	if (start_loop)
+		ev_run(loop(), 0);
+	/* The fiber running the startup script has ended. */
+	script_fiber = NULL;
+	diag_move(&bc_diag, diag_get());
+	diag_destroy(&bc_diag);
 	/*
 	 * Result can't be obtained via fiber_join - script fiber
 	 * never dies if os.exit() was called. This is why diag
