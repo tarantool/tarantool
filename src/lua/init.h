@@ -43,6 +43,9 @@ extern bool start_loop;
 
 extern struct lua_State *tarantool_L;
 
+#define O_INTERACTIVE 0x1
+#define O_BYTECODE    0x2
+
 /**
  * Create an instance of Lua interpreter and load it with
  * Tarantool modules.  Creates a Lua state, imports global
@@ -71,7 +74,7 @@ tarantool_lua_free();
  *        error is set.
  */
 int
-tarantool_lua_run_script(char *path, bool force_interactive,
+tarantool_lua_run_script(char *path, uint32_t opt_mask,
 			 int optc, const char **optv,
 			 int argc, char **argv);
 

@@ -9,6 +9,8 @@ When no script name is provided, the server responds to:
   -v, --version			print program version and exit
   -e EXPR			execute string 'EXPR'
   -l NAME			require library 'NAME'
+  -j cmd			perform LuaJIT control command
+  -b ...			save or list bytecode
   -i				enter interactive mode after executing 'SCRIPT'
   --				stop handling options
   -				execute stdin and stop handling options
@@ -27,6 +29,8 @@ When no script name is provided, the server responds to:
   -v, --version			print program version and exit
   -e EXPR			execute string 'EXPR'
   -l NAME			require library 'NAME'
+  -j cmd			perform LuaJIT control command
+  -b ...			save or list bytecode
   -i				enter interactive mode after executing 'SCRIPT'
   --				stop handling options
   -				execute stdin and stop handling options
@@ -152,3 +156,28 @@ arg[2] => 2
 arg[3] => 3
 arg[4] => --help
 
+-b
+Save LuaJIT bytecode: luajit -b[options] input output
+  -l        Only list bytecode.
+  -s        Strip debug info (default).
+  -g        Keep debug info.
+  -n name   Set module name (default: auto-detect from input name).
+  -t type   Set output file type (default: auto-detect from output name).
+  -a arch   Override architecture for object files (default: native).
+  -o os     Override OS for object files (default: native).
+  -e chunk  Use chunk string as input.
+  --        Stop handling options.
+  -         Use stdin as input and/or stdout as output.
+
+File types: c h obj o raw (default)
+-bl -e ''
+-- BYTECODE -- "":0-1
+0001    RET0     0   1
+
+-b -l -e ''
+-- BYTECODE -- "":0-1
+0001    RET0     0   1
+
+-b -e '' output
+-jon -e ''
+-j on -e ''
