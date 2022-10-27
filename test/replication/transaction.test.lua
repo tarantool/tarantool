@@ -26,12 +26,11 @@ box.begin() s:insert({3, 'm'}) s:insert({4, 'm'}) box.commit()
 box.begin() s:insert({5, 'm'}) s:insert({6, 'm'}) s:insert({7, 'm'}) box.commit()
 
 test_run:cmd("switch replica")
+-- check replication status
+test_run:wait_upstream(1,{status = 'stopped', message_re = 'Duplicate key'})
 -- nothing was applied
 v1[1] == box.info.vclock[1]
 box.space.test:select()
--- check replication status
-box.info.replication[1].upstream.status
-box.info.replication[1].upstream.message
 -- set conflict to third transaction
 _ = box.space.test:delete({4})
 box.space.test:replace({6, 'r'})

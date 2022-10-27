@@ -62,6 +62,11 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
+-- check replication status
+test_run:wait_upstream(1,{status = 'stopped', message_re = 'Duplicate key'})
+---
+- true
+...
 -- nothing was applied
 v1[1] == box.info.vclock[1]
 ---
@@ -72,16 +77,6 @@ box.space.test:select()
 - - [1, 'm']
   - [2, 'm']
   - [4, 'r']
-...
--- check replication status
-box.info.replication[1].upstream.status
----
-- stopped
-...
-box.info.replication[1].upstream.message
----
-- Duplicate key exists in unique index "pk" in space "test" with old tuple - [4, "r"]
-  and new tuple - [4, "m"]
 ...
 -- set conflict to third transaction
 _ = box.space.test:delete({4})
