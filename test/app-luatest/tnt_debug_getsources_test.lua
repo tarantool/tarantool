@@ -15,6 +15,14 @@ local files = {
     'fiber',
     'env',
     'datetime',
+    'box/session',
+    'box/tuple',
+    'box/key_def',
+    'box/schema',
+    'box/xlog',
+    'box/net_box',
+    'box/console',
+    'box/merger',
 }
 
 -- calculate reporsitory root using directory of a current
@@ -32,6 +40,9 @@ g.test_tarantool_debug_getsources = function()
     local lua_src_dir = fio.pathjoin(git_root, '/src/lua')
     t.assert_is_not(lua_src_dir, nil)
     t.assert(fio.stat(lua_src_dir):is_dir())
+    local box_lua_dir = fio.pathjoin(git_root, '/src/box/lua')
+    t.assert_is_not(box_lua_dir, nil)
+    t.assert(fio.stat(box_lua_dir):is_dir())
 
     local tnt = require('tarantool')
     t.assert_is_not(tnt, nil)
@@ -39,7 +50,14 @@ g.test_tarantool_debug_getsources = function()
     t.assert_is_not(luadebug, nil)
 
     for _, file in pairs(files) do
-        local path = ('%s/%s.lua'):format(lua_src_dir, file)
+        local box_prefix = 'box/'
+        local path
+        if file:match(box_prefix) ~= nil then
+            path = ('%s/%s.lua'):format(box_lua_dir,
+                                        file:sub(#box_prefix + 1, #file))
+        else
+            path = ('%s/%s.lua'):format(lua_src_dir, file)
+        end
         local text = readfile(path)
         t.assert_is_not(text, nil)
         local source = luadebug.getsources(file)
