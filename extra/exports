@@ -428,6 +428,7 @@ prbuf_iterator_create
 prbuf_iterator_next
 random_bytes
 say_check_cfg
+say_from_lua
 say_logger_init
 say_logger_initialized
 say_logrotate
