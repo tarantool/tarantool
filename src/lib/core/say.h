@@ -146,7 +146,8 @@ enum syslog_facility {
 struct log;
 
 typedef int (*log_format_func_t)(struct log *log, char *buf, int len, int level,
-				 const char *filename, int line, const char *error,
+				 const char *module, const char *filename,
+				 int line, const char *error,
 				 const char *format, va_list ap);
 
 /**
@@ -201,8 +202,9 @@ log_destroy(struct log *log);
 
 /** A utility function to handle va_list from different varargs functions. */
 int
-log_vsay(struct log *log, int level, const char *filename, int line,
-	 const char *error, const char *format, va_list ap);
+log_vsay(struct log *log, int level, bool check_level, const char *module,
+	 const char *filename, int line, const char *error, const char *format,
+	 va_list ap);
 
 /** Perform log write. */
 static inline int
@@ -211,7 +213,8 @@ log_say(struct log *log, int level, const char *filename,
 {
 	va_list ap;
 	va_start(ap, format);
-	int total = log_vsay(log, level, filename, line, error, format, ap);
+	int total = log_vsay(log, level, true, NULL, filename, line, error,
+			     format, ap);
 	va_end(ap);
 	return total;
 }
@@ -479,6 +482,7 @@ say_free_syslog_opts(struct say_syslog_opts *opts);
  * @param buf buffer where the formatted message should be written to
  * @param len size of buffer
  * @param level log level of message
+ * @param module name of module where log was called
  * @param filename name of file where log was called
  * @param line name of file where log was called
  * @param error error in case of system errors
@@ -488,12 +492,12 @@ say_free_syslog_opts(struct say_syslog_opts *opts);
  */
 int
 say_format_json(struct log *log, char *buf, int len, int level,
-		const char *filename, int line, const char *error,
-		const char *format, va_list ap);
+		const char *module, const char *filename, int line,
+		const char *error, const char *format, va_list ap);
 int
 say_format_plain(struct log *log, char *buf, int len, int level,
-		 const char *filename, int line, const char *error,
-		 const char *format, va_list ap);
+		const char *module, const char *filename, int line,
+		const char *error, const char *format, va_list ap);
 
 /**
  * A type defining a callback that is called before or after

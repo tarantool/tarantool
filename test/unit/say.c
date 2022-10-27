@@ -53,12 +53,13 @@ parse_syslog_opts(const char *input)
 
 static int
 format_func_custom(struct log *log, char *buf, int len, int level,
-		   const char *filename, int line, const char *error,
-		   const char *format, va_list ap)
+		   const char *module, const char *filename, int line,
+		   const char *error, const char *format, va_list ap)
 {
 	int total = 0;
 	(void) log;
 	(void) level;
+	(void)module;
 	(void) filename;
 	(void) line;
 	(void) error;
