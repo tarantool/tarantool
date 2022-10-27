@@ -39,6 +39,7 @@
 #include "lua/utils.h" /* luaT_error() */
 #include "lua/trigger.h"
 #include "lua/msgpack.h"
+#include "lua/builtin_modcache.h"
 
 #include "box/box.h"
 #include "box/txn.h"
@@ -563,6 +564,7 @@ box_lua_init(struct lua_State *L)
 			panic("Error loading Lua module %s...: %s",
 			      modname, lua_tostring(L, -1));
 		lua_pop(L, 1); /* modfile */
+		builtin_modcache_put(modname, modsrc);
 	}
 
 	assert(lua_gettop(L) == 0);
