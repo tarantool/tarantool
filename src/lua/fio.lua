@@ -92,9 +92,15 @@ end
 -- pread(buf, size, offset) -> len
 fio_methods.pread = function(self, buf, size, offset)
     local tmpbuf
-    if not ffi.istype(const_char_ptr_t, buf) then
+    local has_buf = ffi.istype(const_char_ptr_t, buf)
+    if not has_buf then
         offset = size
         size = buf
+    end
+    if type(size) ~= 'number' or (type(offset) ~= 'number' and offset ~= nil) then
+        error('Usage: fh:pread(buf, size[, offset]) or fh:pread(size[, offset])')
+    end
+    if not has_buf then
         tmpbuf = buffer.ibuf()
         buf = tmpbuf:reserve(size)
     end
