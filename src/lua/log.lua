@@ -24,6 +24,10 @@ ffi.cdef[[
     extern bool
     say_logger_initialized(void);
 
+    extern void
+    say_from_lua(int level, const char *module, const char *filename, int line,
+                 const char *format, ...);
+
     extern sayfunc_t _say;
     extern struct ev_loop;
     extern struct ev_signal;
@@ -110,7 +114,7 @@ local function log_level_list()
 end
 
 -- Default options. The keys are part of
--- user API , so change with caution.
+-- user API, so change with caution.
 local default_cfg = {
     log             = nil,
     nonblock        = nil,
@@ -130,10 +134,19 @@ local log2box_keys = {
     ['format']          = 'log_format',
 }
 
+-- Return level as a number, level must be valid.
+local function log_normalize_level(level)
+    if type(level) == 'string' then
+        return log_level_keys[level]
+    end
+    return level
+end
+
 -- Main routine which pass data to C logging code.
-local function say(level, fmt, ...)
-    if ffi.C.log_level < level then
-        -- don't waste cycles on debug.getinfo()
+local function say(self, level, fmt, ...)
+    local name = self and self.name
+    local module_level = log_cfg.level
+    if level > log_normalize_level(module_level) then
         return
     end
     local type_fmt = type(fmt)
@@ -187,21 +200,21 @@ local function say(level, fmt, ...)
         file = frame.short_src or frame.src or 'eval'
     end
 
-    ffi.C._say(level, file, line, nil, format, msg)
+    ffi.C.say_from_lua(level, name, file, line, format, msg)
 end
 
 -- Just a syntactic sugar over say routine.
-local function say_closure(lvl)
+local function say_closure(self, lvl)
     return function (fmt, ...)
-        say(lvl, fmt, ...)
+        say(self, lvl, fmt, ...)
     end
 end
 
-local log_error = say_closure(S_ERROR)
-local log_warn = say_closure(S_WARN)
-local log_info = say_closure(S_INFO)
-local log_verbose = say_closure(S_VERBOSE)
-local log_debug = say_closure(S_DEBUG)
+local log_error = say_closure(nil, S_ERROR)
+local log_warn = say_closure(nil, S_WARN)
+local log_info = say_closure(nil, S_INFO)
+local log_verbose = say_closure(nil, S_VERBOSE)
+local log_debug = say_closure(nil, S_DEBUG)
 
 -- Rotate log (basically reopen the log file and
 -- start writting into it).
@@ -269,14 +282,14 @@ end
 function Ratelimit:log_check(lvl)
     local suppressed, ok = self:check()
     if lvl >= S_WARN and suppressed > 0 then
-        say(S_WARN, '%d messages suppressed due to rate limiting', suppressed)
+        log_warn('%d messages suppressed due to rate limiting', suppressed)
     end
     return ok
 end
 
 function Ratelimit:log(lvl, fmt, ...)
     if self:log_check(lvl) then
-        say(lvl, fmt, ...)
+        say(nil, lvl, fmt, ...)
     end
 end
 
@@ -300,9 +313,7 @@ local log_initialized = false
 -- Convert cfg options to types suitable for ffi say_ functions.
 local function log_C_cfg(cfg)
     local cfg_C = table.copy(cfg)
-    if type(cfg.level) == 'string' then
-        cfg_C.level = log_level_keys[cfg.level]
-    end
+    cfg_C.level = log_normalize_level(cfg.level)
     local nonblock
     if cfg.nonblock ~= nil then
         nonblock = cfg.nonblock and 1 or 0
@@ -313,13 +324,17 @@ local function log_C_cfg(cfg)
     return cfg_C
 end
 
--- Check cfg is valid and thus can be applied
-local function log_check_cfg(cfg)
-    if type(cfg.level) == 'string' and
-       log_level_keys[cfg.level] == nil then
+-- Check that level is a number or a valid string.
+local function log_check_level(level)
+    if type(level) == 'string' and log_level_keys[level] == nil then
         local err = ("expected %s"):format(log_level_list())
         box.error(box.error.CFG, "log_level", err)
     end
+end
+
+-- Check cfg is valid and thus can be applied.
+local function log_check_cfg(cfg)
+    log_check_level(cfg.level)
 
     if log_initialized then
         if log_cfg.log ~= cfg.log then
@@ -411,18 +426,39 @@ local compat_v16 = {
     logger_pid = function()
         if not compat_warning_said then
             compat_warning_said = true
-            say(S_WARN, 'logger_pid() is deprecated, please use pid() instead')
+            log_warn('logger_pid() is deprecated, please use pid() instead')
         end
         return log_pid()
     end;
 }
 
-local log = {
+-- Forward declaration.
+local log_main
+
+-- Create a logger with a custom name.
+local function log_new(name)
+    if type(name) ~= 'string' then
+        error('Illegal parameters, name should be a string')
+    end
+
+    local log = table.copy(log_main)
+    log.name = name
+    log.error = say_closure(log, S_ERROR)
+    log.warn = say_closure(log, S_WARN)
+    log.info = say_closure(log, S_INFO)
+    log.verbose = say_closure(log, S_VERBOSE)
+    log.debug = say_closure(log, S_DEBUG)
+    return log
+end
+
+-- Main logger, returned by the non-overloaded require('log')
+log_main = {
     warn = log_warn,
     info = log_info,
     verbose = log_verbose,
     debug = log_debug,
     error = log_error,
+    new = log_new,
     rotate = log_rotate,
     pid = log_pid,
     level = set_log_level,
@@ -443,7 +479,7 @@ local log = {
     }
 }
 
-setmetatable(log, {
+setmetatable(log_main, {
     __serialize = function(self)
         local res = table.copy(self)
         res.box_api = nil
@@ -452,4 +488,4 @@ setmetatable(log, {
     __index = compat_v16;
 })
 
-return log
+return log_main
