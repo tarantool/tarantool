@@ -271,6 +271,13 @@ int main()
 		ok(strstr(line, "<131>") != NULL, "syslog line");
 	}
 	log_destroy(&test_log);
+
+	/* Test gh-4450. */
+	log_create(&test_log, tmp_filename, false);
+	say_logrotate(NULL, NULL, 0);
+	coio_shutdown();
+	log_destroy(&test_log);
+
 	fiber_free();
 	memory_free();
 	unlink(tmp_filename);
