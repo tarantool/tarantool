@@ -162,9 +162,12 @@ box.space.sync:select{}
  | ...
 
 -- Check consistency on replica.
-test_run:cmd('switch replica')
+test_run:switch('replica')
  | ---
  | - true
+ | ...
+test_run:wait_lsn('replica', 'default')
+ | ---
  | ...
 box.space.sync:select{}
  | ---
@@ -256,6 +259,9 @@ test_run:switch('replica')
  | ---
  | - true
  | ...
+test_run:wait_lsn('replica', 'default')
+ | ---
+ | ...
 box.space.test:select{5}
  | ---
  | - - [5]
@@ -292,6 +298,9 @@ box.space.sync:select{6}
 test_run:switch('replica')
  | ---
  | - true
+ | ...
+test_run:wait_lsn('replica', 'default')
+ | ---
  | ...
 box.space.test:select{6}
  | ---
@@ -355,6 +364,9 @@ test_run:switch('replica')
  | ---
  | - true
  | ...
+test_run:wait_lsn('replica', 'default')
+ | ---
+ | ...
 box.space.sync:select{8}
  | ---
  | - - [8]
@@ -409,6 +421,9 @@ test_run:switch('replica')
  | ---
  | - true
  | ...
+test_run:wait_lsn('replica', 'default')
+ | ---
+ | ...
 box.space.sync:select{9}
  | ---
  | - []
@@ -459,6 +474,9 @@ test_run:switch('replica')
  | ---
  | - true
  | ...
+test_run:wait_lsn('replica', 'default')
+ | ---
+ | ...
 box.space.sync:select{10}
  | ---
  | - - [10]
@@ -495,6 +513,9 @@ assert(newlsn >= oldlsn + 2)
 test_run:switch('replica')
  | ---
  | - true
+ | ...
+test_run:wait_lsn('replica', 'default')
+ | ---
  | ...
 box.space.sync:select{7}
  | ---
@@ -543,6 +564,9 @@ box.space.sync:select{11}
 test_run:switch('replica')
  | ---
  | - true
+ | ...
+test_run:wait_lsn('replica', 'default')
+ | ---
  | ...
 box.space.sync:select{11}
  | ---
