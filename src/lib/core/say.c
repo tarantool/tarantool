@@ -330,10 +330,15 @@ static int
 logrotate_cb(struct coio_task *ptr)
 {
 	struct rotate_task *task = (struct rotate_task *) ptr;
-	if (log_rotate(task->log) < 0) {
+	struct log *log = task->log;
+	if (log_rotate(log) < 0)
 		diag_log();
-	}
-	ev_async_send(task->loop, &task->log->log_async);
+	tt_pthread_mutex_lock(&log->rotate_mutex);
+	assert(log->rotating_threads > 0);
+	log->rotating_threads--;
+	if (log->rotating_threads == 0)
+		tt_pthread_cond_signal(&log->rotate_cond);
+	tt_pthread_mutex_unlock(&log->rotate_mutex);
 	return 0;
 }
 
@@ -344,16 +349,6 @@ logrotate_cleanup_cb(struct coio_task *ptr)
 	coio_task_destroy(&task->base);
 	free(task);
 	return 0;
-}
-
-static void
-log_rotate_async_cb(struct ev_loop *loop, struct ev_async *watcher, int events)
-{
-	(void)loop;
-	(void)events;
-	struct log *log = container_of(watcher, struct log, log_async);
-	log->rotating_threads--;
-	fiber_cond_signal(&log->rotate_cond);
 }
 
 void
@@ -373,8 +368,9 @@ say_logrotate(struct ev_loop *loop, struct ev_signal *w, int revents)
 			diag_log();
 			continue;
 		}
-		ev_async_start(loop(), &log->log_async);
+		tt_pthread_mutex_lock(&log->rotate_mutex);
 		log->rotating_threads++;
+		tt_pthread_mutex_unlock(&log->rotate_mutex);
 		coio_task_create(&task->base, logrotate_cb, logrotate_cleanup_cb);
 		task->log = log;
 		task->loop = loop();
@@ -661,8 +657,8 @@ log_create(struct log *log, const char *init_str, int nonblock)
 	log->level = S_INFO;
 	log->rotating_threads = 0;
 	log->on_log = NULL;
-	fiber_cond_create(&log->rotate_cond);
-	ev_async_init(&log->log_async, log_rotate_async_cb);
+	tt_pthread_mutex_init(&log->rotate_mutex, NULL);
+	tt_pthread_cond_init(&log->rotate_cond, NULL);
 	setvbuf(stderr, NULL, _IONBF, 0);
 
 	if (init_str != NULL) {
@@ -1241,8 +1237,10 @@ void
 log_destroy(struct log *log)
 {
 	assert(log != NULL);
+	tt_pthread_mutex_lock(&log->rotate_mutex);
 	while(log->rotating_threads > 0)
-		fiber_cond_wait(&log->rotate_cond);
+		tt_pthread_cond_wait(&log->rotate_cond, &log->rotate_mutex);
+	tt_pthread_mutex_unlock(&log->rotate_mutex);
 	pm_atomic_store(&log->type, SAY_LOGGER_BOOT);
 
 	if (log->fd != -1)
@@ -1250,8 +1248,8 @@ log_destroy(struct log *log)
 	free(log->syslog_ident);
 	free(log->path);
 	rlist_del_entry(log, in_log_list);
-	ev_async_stop(loop(), &log->log_async);
-	fiber_cond_destroy(&log->rotate_cond);
+	tt_pthread_mutex_destroy(&log->rotate_mutex);
+	tt_pthread_cond_destroy(&log->rotate_cond);
 }
 
 int

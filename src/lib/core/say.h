@@ -168,16 +168,15 @@ struct log {
 	/* Application identifier used to group syslog messages. */
 	char *syslog_ident;
 	/**
-	 * Used to wake up the main logger thread from a eio thread.
+	 * Counter identifying number of threads executing log_rotate.
+	 * Protected by rotate_mutex as it is accessed from different
+	 * threads.
 	 */
-	ev_async log_async;
-	/**
-	 * Conditional variable securing variable below
-	 * from concurrent usage.
-	 */
-	struct fiber_cond rotate_cond;
-	/** Counter identifying number of threads executing log_rotate. */
 	int rotating_threads;
+	/** Mutex for accessing rotating_threads field. */
+	pthread_mutex_t rotate_mutex;
+	/** Condition that all rotation tasks are finished. */
+	pthread_cond_t rotate_cond;
 	enum syslog_facility syslog_facility;
 	struct rlist in_log_list;
 	/** Callback called on log event. */
