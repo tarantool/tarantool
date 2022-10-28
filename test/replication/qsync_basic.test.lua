@@ -65,7 +65,8 @@ box.space.sync:insert{3}
 box.space.sync:select{}
 
 -- Check consistency on replica.
-test_run:cmd('switch replica')
+test_run:switch('replica')
+test_run:wait_lsn('replica', 'default')
 box.space.sync:select{}
 
 -- Check consistency in recovered data.
@@ -105,6 +106,7 @@ f:status()
 s:select{5}
 box.space.sync:select{5}
 test_run:switch('replica')
+test_run:wait_lsn('replica', 'default')
 box.space.test:select{5}
 box.space.sync:select{5}
 -- Ensure sync rollback will affect all pending async transactions
@@ -116,6 +118,7 @@ f:status()
 s:select{6}
 box.space.sync:select{6}
 test_run:switch('replica')
+test_run:wait_lsn('replica', 'default')
 box.space.test:select{6}
 box.space.sync:select{6}
 
@@ -141,6 +144,7 @@ box.space.locallocal:select{8}
 box.space.test:select{8}
 
 test_run:switch('replica')
+test_run:wait_lsn('replica', 'default')
 box.space.sync:select{8}
 box.space.locallocal:select{8}
 box.space.test:select{8}
@@ -160,6 +164,7 @@ box.space.sync:select{9}
 box.space.locallocal:select{9}
 box.space.test:select{9}
 test_run:switch('replica')
+test_run:wait_lsn('replica', 'default')
 box.space.sync:select{9}
 box.space.locallocal:select{9}
 box.space.test:select{9}
@@ -183,6 +188,7 @@ box.space.sync:select{10}
 box.space.locallocal:select{10}
 
 test_run:switch('replica')
+test_run:wait_lsn('replica', 'default')
 box.space.sync:select{10}
 box.space.locallocal:select{10}
 
@@ -196,6 +202,7 @@ box.space.sync:replace{7}
 newlsn = box.info.lsn
 assert(newlsn >= oldlsn + 2)
 test_run:switch('replica')
+test_run:wait_lsn('replica', 'default')
 box.space.sync:select{7}
 
 --
@@ -214,6 +221,7 @@ test_run:wait_cond(function() return f:status() == 'dead' end)
 ok, err
 box.space.sync:select{11}
 test_run:switch('replica')
+test_run:wait_lsn('replica', 'default')
 box.space.sync:select{11}
 
 -- Test it is possible to early ACK a transaction with a new quorum.
