@@ -299,7 +299,7 @@ g_mode.test_fencing_mode = function(g)
         replication_timeout = timeout,
     })
 
-    local proxy = require('test.luatest_helpers.proxy.proxy'):new({
+    local proxy = require('luatest.replica_proxy'):new({
         client_socket_path = server.build_instance_uri('server_1_proxy'),
         server_socket_path = server.build_instance_uri('server_1'),
     })

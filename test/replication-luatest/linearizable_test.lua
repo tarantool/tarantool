@@ -1,8 +1,7 @@
 local t = require('luatest')
-local misc = require('test.luatest_helpers.misc')
 local cluster = require('test.luatest_helpers.cluster')
 local server = require('test.luatest_helpers.server')
-local proxy = require('test.luatest_helpers.proxy.proxy')
+local proxy = require('luatest.replica_proxy')
 local g = t.group('linearizable-read')
 
 local fiber = require('fiber')
@@ -84,7 +83,7 @@ g.test_wait_others = function(cg)
 end
 
 g.test_timeout = function(cg)
-    misc.skip_if_not_debug()
+    t.tarantool.skip_if_not_debug()
     cg.servers[1]:exec(function()
         local t = require('luatest')
         box.error.injection.set('ERRINJ_RELAY_FROM_TX_DELAY', true)

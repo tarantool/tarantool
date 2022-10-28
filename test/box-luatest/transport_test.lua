@@ -1,4 +1,3 @@
-local misc = require('test.luatest_helpers.misc')
 local net = require('net.box')
 local server = require('test.luatest_helpers.server')
 local t = require('luatest')
@@ -48,7 +47,7 @@ g.test_net_box = function()
 end
 
 g.test_listen_ssl = function()
-    misc.skip_if_enterprise()
+    t.tarantool.skip_if_enterprise()
     g.server:exec(function()
         local t = require('luatest')
         t.assert_error_msg_equals(
@@ -58,7 +57,7 @@ g.test_listen_ssl = function()
 end
 
 g.test_replication_ssl = function()
-    misc.skip_if_enterprise()
+    t.tarantool.skip_if_enterprise()
     g.server:exec(function()
         local t = require('luatest')
         t.assert_error_msg_equals(
@@ -68,7 +67,7 @@ g.test_replication_ssl = function()
 end
 
 g.test_net_box_ssl = function()
-    misc.skip_if_enterprise()
+    t.tarantool.skip_if_enterprise()
     t.assert_error_msg_equals(
         'SSL is not available in this build',
         net.connect, {g.server.net_box_uri, params = {transport = 'ssl'}})

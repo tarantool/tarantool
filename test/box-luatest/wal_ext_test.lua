@@ -1,10 +1,9 @@
-local misc = require('test.luatest_helpers.misc')
 local server = require('test.luatest_helpers.server')
 local t = require('luatest')
 local g = t.group()
 
 g.test_walext_unavailable = function()
-    misc.skip_if_enterprise()
+    t.tarantool.skip_if_enterprise()
     g.server = server:new({alias = 'master'})
     g.server:start()
     g.server:exec(function()

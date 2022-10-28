@@ -1,4 +1,3 @@
-local misc = require('test.luatest_helpers.misc')
 local server = require('test.luatest_helpers.server')
 local t = require('luatest')
 
@@ -25,7 +24,7 @@ g.before_test('test_mvcc_netbox_isolation_level_basics', function(cg)
 end)
 
 g.test_mvcc_netbox_isolation_level_basics = function(cg)
-    misc.skip_if_not_debug()
+    t.tarantool.skip_if_not_debug()
 
     local t = require('luatest')
 
