@@ -1,4 +1,3 @@
-local misc = require('test.luatest_helpers.misc')
 local server = require('test.luatest_helpers.server')
 local t = require('luatest')
 
@@ -28,7 +27,7 @@ end)
 --    because it's in read view.
 --
 g.test_abort_yielding_dml = function(cg)
-    misc.skip_if_not_debug()
+    t.tarantool.skip_if_not_debug()
     cg.server:exec(function()
         local fiber = require('fiber')
         local t = require('luatest')

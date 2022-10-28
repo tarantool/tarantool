@@ -1,4 +1,3 @@
-local misc = require('test.luatest_helpers.misc')
 local server = require('test.luatest_helpers.server')
 local t = require('luatest')
 local g = t.group()
@@ -63,7 +62,7 @@ end
 -- Checks session and user in box.on_rollback trigger callback in case
 -- transaction is rolled back on WAL error.
 g.test_session_on_wal_error_rollback = function()
-    misc.skip_if_not_debug()
+    t.tarantool.skip_if_not_debug()
     g.server:exec(function()
         local t = require('luatest')
         box.session.su('eve', function()

@@ -1,4 +1,3 @@
-local misc = require('test.luatest_helpers.misc')
 local server = require('test.luatest_helpers.server')
 local t = require('luatest')
 
@@ -131,7 +130,7 @@ g.after_test('test_wal_error', function(cg)
 end)
 
 g.test_wal_error = function(cg)
-    misc.skip_if_not_debug()
+    t.tarantool.skip_if_not_debug()
     cg.server:exec(function()
         local t = require('luatest')
         local function stat()
