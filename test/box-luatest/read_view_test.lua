@@ -1,4 +1,3 @@
-local misc = require('test.luatest_helpers.misc')
 local server = require('test.luatest_helpers.server')
 local t = require('luatest')
 local g = t.group()
@@ -13,7 +12,7 @@ g.after_all = function(cg)
 end
 
 g.test_read_view = function(cg)
-    misc.skip_if_enterprise()
+    t.tarantool.skip_if_enterprise()
     cg.server:exec(function()
         local t = require('luatest')
         t.assert_error_msg_equals(
