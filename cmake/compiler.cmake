@@ -77,10 +77,6 @@ check_cxx_source_compiles("int main(void) {
 }" HAVE_OPENMP)
 set(CMAKE_REQUIRED_FLAGS "")
 
-if (NOT HAVE_OPENMP)
-    add_compile_flags("C;CXX" -Wno-unknown-pragmas)
-endif()
-
 #
 # GCC started to warn for unused result starting from 4.2, and
 # this is when it introduced -Wno-unused-result
@@ -92,8 +88,6 @@ check_c_compiler_flag("-Wno-parentheses-equality" CC_HAS_WNO_PARENTHESES_EQUALIT
 check_c_compiler_flag("-Wno-tautological-compare" CC_HAS_WNO_TAUTOLOGICAL_COMPARE)
 check_c_compiler_flag("-Wno-misleading-indentation" CC_HAS_WNO_MISLEADING_INDENTATION)
 check_c_compiler_flag("-Wno-varargs" CC_HAS_WNO_VARARGS)
-check_c_compiler_flag("-Wno-char-subscripts" CC_HAS_WNO_CHAR_SUBSCRIPTS)
-check_c_compiler_flag("-Wno-format-truncation" CC_HAS_WNO_FORMAT_TRUNCATION)
 check_c_compiler_flag("-Wno-implicit-fallthrough" CC_HAS_WNO_IMPLICIT_FALLTHROUGH)
 check_c_compiler_flag("-Wno-cast-function-type" CC_HAS_WNO_CAST_FUNCTION_TYPE)
 
@@ -225,8 +219,12 @@ macro(enable_tnt_compile_flags)
     add_compile_flags("C;CXX"
         "-Wall"
         "-Wextra"
-        "-Wno-strict-aliasing"
     )
+    if (CMAKE_COMPILER_IS_GNUCC AND CMAKE_C_COMPILER_VERSION VERSION_LESS "8")
+        # Strict aliasing violation warnings cannot be disabled for libev with
+        # `system_header` pragma.
+        add_compile_flags("C" "-Wno-strict-aliasing")
+    endif()
 
     if (ENABLE_UB_SANITIZER)
         if (NOT CMAKE_COMPILER_IS_CLANG)
@@ -274,19 +272,6 @@ macro(enable_tnt_compile_flags)
 
             add_compile_flags("C;CXX" "${SANITIZE_FLAGS}")
         endif()
-    endif()
-
-    if (CMAKE_COMPILER_IS_CLANG AND CC_HAS_WNO_UNUSED_VALUE)
-        # False-positive warnings for ({ xx = ...; x; }) macroses
-        add_compile_flags("C;CXX" "-Wno-unused-value")
-    endif()
-
-    if (CC_HAS_WNO_CHAR_SUBSCRIPTS)
-        add_compile_flags("C;CXX" "-Wno-char-subscripts")
-    endif()
-
-    if (CC_HAS_WNO_FORMAT_TRUNCATION)
-        add_compile_flags("C;CXX" "-Wno-format-truncation")
     endif()
 
     if (CMAKE_COMPILER_IS_CLANG OR CMAKE_COMPILER_IS_GNUCXX)
