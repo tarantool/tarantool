@@ -192,8 +192,12 @@ mp_compare_double_any_number(double lhs, const char *rhs,
 	 * Both NaNs. Compare signaling and quiet NaNs by
 	 * 'quiet bit'.
 	 */
-	uint64_t lqbit = *((uint64_t *)&lhs) & (uint64_t)0x8000000000000;
-	uint64_t rqbit = *((uint64_t *)&v) & (uint64_t)0x8000000000000;
+	uint64_t lqbit;
+	memcpy(&lqbit, &lhs, sizeof(lhs));
+	lqbit &= UINT64_C(0x8000000000000);
+	uint64_t rqbit;
+	memcpy(&rqbit, &v, sizeof(v));
+	rqbit &= UINT64_C(0x8000000000000);
 	/*
 	 * Lets consider the quiet NaN (fraction first bit == 1)
 	 * to be bigger than signaling NaN (fraction first
