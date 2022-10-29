@@ -17,7 +17,8 @@ get_nan(box_function_ctx_t *ctx, const char *args, const char *args_end)
 	char res[BUF_SIZE];
 	memset(res, 0, BUF_SIZE);
 	double d;
-	*(uint64_t *)&d = 0xfff8000000000000;
+	uint64_t val = 0xfff8000000000000;
+	memcpy(&d, &val, sizeof(val));
 	assert(isnan(d));
 	char *end = mp_encode_double(res, d);
 	box_return_mp(ctx, res, end);
