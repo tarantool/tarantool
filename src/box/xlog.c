@@ -732,9 +732,26 @@ xdir_collect_inprogress(struct xdir *xdir)
 			continue;
 
 		char path[PATH_MAX];
-		snprintf(path, sizeof(path), "%s/%s", dirname, dent->d_name);
-		if (unlink(path) < 0)
-			say_syserror("error while removing %s", path);
+		int rc;
+		if ((size_t)snprintf(path, sizeof(path), "%s/%s", dirname,
+				     dent->d_name) >= sizeof(path)) {
+			/*
+			 * If we allocated a large enough buffer for the path,
+			 * unlink would fail with this error according to the
+			 * POSIX standard.
+			 */
+			errno = ENAMETOOLONG;
+			rc = -1;
+		} else {
+			rc = unlink(path);
+		}
+		if (rc < 0)
+			/*
+			 * In case the path got truncated, print the expected
+			 * path.
+			 */
+			say_syserror("error while removing %s/%s",
+				     dirname, dent->d_name);
 		else
 			say_info("removed %s", path);
 	}
