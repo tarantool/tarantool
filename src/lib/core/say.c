@@ -83,10 +83,6 @@ static int
 say_format_boot(struct log *log, char *buf, int len, int level,
 		const char *filename, int line, const char *error,
 		const char *format, va_list ap);
-static int
-say_format_syslog(struct log *log, char *buf, int len, int level,
-		  const char *filename, int line, const char *error,
-		  const char *format, va_list ap);
 
 /** Default logger used before logging subsystem is initialized. */
 static struct log log_boot = {
@@ -406,7 +402,6 @@ log_pipe_init(struct log *log, const char *init_str)
 	char args[] = { "-c" };
 	char *argv[] = { cmd, args, (char *) init_str, NULL };
 	log->type = SAY_LOGGER_PIPE;
-	log->format_func = say_format_plain;
 	sigset_t mask;
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGCHLD);
@@ -489,7 +484,6 @@ log_file_init(struct log *log, const char *init_str)
 	int fd;
 	log->path = abspath(init_str);
 	log->type = SAY_LOGGER_FILE;
-	log->format_func = say_format_plain;
 	if (log->path == NULL) {
 		diag_set(OutOfMemory, strlen(init_str), "malloc", "abspath");
 		return -1;
@@ -619,8 +613,6 @@ log_syslog_init(struct log *log, const char *init_str)
 {
 	struct say_syslog_opts opts;
 	log->type = SAY_LOGGER_SYSLOG;
-	/* syslog supports only one formatting function */
-	log->format_func = say_format_syslog;
 
 	if (say_parse_syslog_opts(init_str, &opts) < 0)
 		return -1;
@@ -668,7 +660,7 @@ log_create(struct log *log, const char *init_str, int nonblock)
 	log->pid = 0;
 	log->syslog_ident = NULL;
 	log->path = NULL;
-	log->format_func = NULL;
+	log->format_func = say_format_plain;
 	log->level = S_INFO;
 	log->rotating_threads = 0;
 	log->on_log = NULL;
@@ -812,18 +804,35 @@ say_format_boot(struct log *log, char *buf, int len, int level, const char *file
 }
 
 /**
- * The common helper for say_format_plain() and say_format_syslog()
+ * Format the log message in Tarantool format:
+ * YYYY-MM-DD hh:mm:ss.ms [PID]: CORD/FID/FIBERNAME LEVEL> MSG
  */
-static int
-say_format_plain_tail(char *buf, int len, int level, const char *filename,
-		      int line, const char *error, const char *format,
-		      va_list ap)
+int
+say_format_plain(struct log *log, char *buf, int len, int level,
+		 const char *filename, int line, const char *error,
+		 const char *format, va_list ap)
 {
 	int total = 0;
 
+	/*
+	 * Every message written to syslog has a header that contains
+	 * the current time and pid (see format_syslog_header) so we
+	 * exclude them from the message body.
+	 */
+	if (log->type != SAY_LOGGER_SYSLOG) {
+		struct tm tm;
+		double tm_sec;
+		get_current_time(&tm, &tm_sec);
+		/* Print time in format 2012-08-07 18:30:00.634 */
+		SNPRINT(total, strftime, buf, len, "%F %H:%M", &tm);
+		SNPRINT(total, snprintf, buf, len, ":%06.3f ", tm_sec);
+		/* Print pid */
+		SNPRINT(total, snprintf, buf, len, "[%i] ", getpid());
+	}
+
 	struct cord *cord = cord();
 	if (cord) {
-		SNPRINT(total, snprintf, buf, len, " %s", cord->name);
+		SNPRINT(total, snprintf, buf, len, "%s", cord->name);
 		if (fiber() && fiber()->fid != FIBER_ID_SCHED) {
 			SNPRINT(total, snprintf, buf, len, "/%llu/%s",
 				(long long)fiber()->fid,
@@ -849,34 +858,6 @@ say_format_plain_tail(char *buf, int len, int level, const char *filename,
 		SNPRINT(total, snprintf, buf, len, ": %s", error);
 
 	SNPRINT(total, snprintf, buf, len, "\n");
-	return total;
-}
-
-/**
- * Format the log message in Tarantool format:
- * YYYY-MM-DD hh:mm:ss.ms [PID]: CORD/FID/FIBERNAME LEVEL> MSG
- */
-int
-say_format_plain(struct log *log, char *buf, int len, int level, const char *filename, int line,
-		 const char *error, const char *format, va_list ap)
-{
-	(void) log;
-	struct tm tm;
-	double tm_sec;
-	get_current_time(&tm, &tm_sec);
-
-	/* Print time in format 2012-08-07 18:30:00.634 */
-	int total = strftime(buf, len, "%F %H:%M", &tm);
-	buf += total, len -= total;
-	SNPRINT(total, snprintf, buf, len, ":%06.3f", tm_sec);
-
-	/* Print pid */
-	SNPRINT(total, snprintf, buf, len, " [%i]", getpid());
-
-	/* Print remaining parts */
-	SNPRINT(total, say_format_plain_tail, buf, len, level, filename, line,
-		error, format, ap);
-
 	return total;
 }
 
@@ -965,8 +946,18 @@ say_format_json(struct log *log, char *buf, int len, int level, const char *file
 	return total;
 }
 
+/** Wrapper around log->format_func to be used with SNPRINT. */
+static int
+format_log_entry(char *buf, int len, struct log *log, int level,
+		 const char *filename, int line, const char *error,
+		 const char *format, va_list ap)
+{
+	return log->format_func(log, buf, len, level, filename, line, error,
+				format, ap);
+}
+
 /**
- * Format the log message in syslog format.
+ * Format the header of a log message in syslog format.
  *
  * See RFC 5424 and RFC 3164. RFC 3164 is compatible with RFC 5424,
  * so it is implemented.
@@ -979,8 +970,8 @@ say_format_json(struct log *log, char *buf, int len, int level, const char *file
  * - Identation is application name. By default it is "tarantool";
  */
 static int
-say_format_syslog(struct log *log, char *buf, int len, int level, const char *filename,
-		  int line, const char *error, const char *format, va_list ap)
+format_syslog_header(char *buf, int len, int level,
+		     enum syslog_facility facility, const char *ident)
 {
 	struct tm tm;
 	double tm_sec;
@@ -994,13 +985,10 @@ say_format_syslog(struct log *log, char *buf, int len, int level, const char *fi
 #define LOG_MAKEPRI(fac, pri)        (((fac) << 3) | (pri))
 #endif
 	SNPRINT(total, snprintf, buf, len, "<%d>",
-		LOG_MAKEPRI(8 * log->syslog_facility, prio));
+		LOG_MAKEPRI(8 * facility, prio));
 	SNPRINT(total, strftime, buf, len, "%h %e %T ", &tm);
-	SNPRINT(total, snprintf, buf, len, "%s[%d]:", log->syslog_ident, getpid());
-
-	/* Format message */
-	SNPRINT(total, say_format_plain_tail, buf, len, level, filename, line,
-		error, format, ap);
+	SNPRINT(total, snprintf, buf, len, "%s[%d]: ", ident,
+		getpid());
 	return total;
 }
 
@@ -1273,8 +1261,15 @@ log_vsay(struct log *log, int level, const char *filename, int line,
 	if (level > log->level) {
 		return 0;
 	}
-	int total = log->format_func(log, say_buf, sizeof(say_buf), level,
-				     filename, line, error, format, ap);
+	char *buf = say_buf;
+	int len = SAY_BUF_LEN_MAX;
+	int total = 0;
+	if (log->type == SAY_LOGGER_SYSLOG) {
+		SNPRINT(total, format_syslog_header, buf, len,
+			level, log->syslog_facility, log->syslog_ident);
+	}
+	SNPRINT(total, format_log_entry, buf, len, log, level, filename, line,
+		error, format, ap);
 	switch (log->type) {
 	case SAY_LOGGER_FILE:
 	case SAY_LOGGER_PIPE:
