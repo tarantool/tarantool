@@ -350,8 +350,10 @@ push_lua_args(lua_State *L, struct execute_lua_ctx *ctx)
 {
 	if (ctx->takes_raw_args) {
 		uint32_t size;
+		size_t region_svp = region_used(&fiber()->gc);
 		const char *data = port_get_msgpack(ctx->args, &size);
 		luamp_push(L, data, data + size);
+		region_truncate(&fiber()->gc, region_svp);
 	} else {
 		port_dump_lua(ctx->args, L, true);
 	}

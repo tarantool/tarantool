@@ -2753,6 +2753,7 @@ netbox_transport_process_requests(struct netbox_transport *transport,
 		netbox_transport_on_state_change(transport, L);
 	}
 	while (true) {
+		fiber_check_gc();
 		struct xrow_header hdr;
 		if (netbox_transport_send_and_recv(transport, &hdr) != 0)
 			luaT_error(L);

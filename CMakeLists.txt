@@ -726,6 +726,18 @@ elseif(IS_DIRECTORY .git AND GIT)
     )
 endif()
 
+option(TEST_BUILD "Abort if memory leak is found." OFF)
+set(ABORT_ON_LEAK_DEFAULT ${TEST_BUILD})
+option(ABORT_ON_LEAK "Abort if memory leak is found." ${ABORT_ON_LEAK_DEFAULT})
+
+# TODO Enable aarch64 when gh-7960 "Crash in libunwind when collecting
+# backtrace for fiber gc leak check" is fixed.
+if (ENABLE_BACKTRACE AND NOT ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
+    set(ENABLE_LEAK_BACKTRACE ON)
+else()
+    set(ENABLE_LEAK_BACKTRACE OFF)
+endif()
+
 #
 # tarantool info summary (used in server version output)
 #
@@ -755,6 +767,7 @@ set(options PACKAGE VERSION BUILD C_COMPILER CXX_COMPILER C_FLAGS CXX_FLAGS
     ENABLE_SSE2 ENABLE_AVX
     ENABLE_GCOV ENABLE_GPROF ENABLE_VALGRIND ENABLE_ASAN ENABLE_UB_SANITIZER ENABLE_FUZZER
     ENABLE_BACKTRACE
+    ABORT_ON_LEAK
     ENABLE_HARDENING
     ENABLE_DOC
     ENABLE_DIST

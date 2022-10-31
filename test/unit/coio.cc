@@ -289,6 +289,7 @@ main_f(va_list ap)
 	fclose(f);
 	(void) remove(filename);
 
+	coio_init();
 	coio_enable();
 	struct fiber *call_fiber = fiber_new_xc("coio_call wakeup", test_call_f);
 	fiber_set_joinable(call_fiber, true);

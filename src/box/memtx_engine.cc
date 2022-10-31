@@ -329,8 +329,8 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 			 (uint32_t) row->type);
 		return -1;
 	}
-	int rc;
 	struct request request;
+	RegionGuard region_guard(&fiber()->gc);
 	if (xrow_decode_dml(row, &request, dml_request_key_map(row->type)) != 0)
 		return -1;
 	*is_space_system = (request.space_id < BOX_SYSTEM_ID_MAX);
@@ -359,21 +359,13 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 	 * the synchronous transactions limbo.
 	 */
 	txn_set_flags(txn, TXN_FORCE_ASYNC);
-	rc = txn_commit(txn);
-	/*
-	 * Don't let gc pool grow too much. Yet to
-	 * it before reading the next row, to make
-	 * sure it's not freed along here.
-	 */
-	fiber_gc();
-	return rc;
+	return txn_commit(txn);
 rollback_stmt:
 	txn_rollback_stmt(txn);
 rollback:
 	txn_abort(txn);
 log_request:
 	say_error("error at request: %s", request_str(&request));
-	fiber_gc();
 	return -1;
 }
 
@@ -664,9 +656,7 @@ checkpoint_write_row(struct xlog *l, struct xrow_header *row)
 	row->lsn = l->rows + l->tx_rows;
 	row->sync = 0; /* don't write sync to wal */
 
-	ssize_t written = xlog_write_row(l, row);
-	fiber_gc();
-	if (written < 0)
+	if (xlog_write_row(l, row) < 0)
 		return -1;
 
 	if ((l->rows + l->tx_rows) % 100000 == 0) {
@@ -806,16 +796,12 @@ checkpoint_write_raft(struct xlog *l, const struct raft_request *req)
 {
 	struct xrow_header row;
 	struct region *region = &fiber()->gc;
-	uint32_t svp = region_used(region);
-	int rc = -1;
+	RegionGuard region_guard(&fiber()->gc);
 	if (xrow_encode_raft(&row, region, req) != 0)
-		goto finish;
+		return -1;
 	if (checkpoint_write_row(l, &row) != 0)
-		goto finish;
-	rc = 0;
-finish:
-	region_truncate(region, svp);
-	return rc;
+		return -1;
+	return 0;
 }
 
 static int
@@ -851,6 +837,7 @@ checkpoint_f(va_list ap)
 	ERROR_INJECT_SLEEP(ERRINJ_SNAP_WRITE_DELAY);
 	struct space_read_view *space_rv;
 	read_view_foreach_space(space_rv, &ckpt->rv) {
+		FiberGCChecker gc_check;
 		uint32_t size;
 		const char *data;
 		struct index_read_view *index_rv =
@@ -863,6 +850,7 @@ checkpoint_f(va_list ap)
 			break;
 		}
 		while (true) {
+			RegionGuard region_guard(&fiber()->gc);
 			rc = index_read_view_iterator_next_raw(&it, &data,
 							       &size);
 			if (rc != 0 || data == NULL)
@@ -872,7 +860,6 @@ checkpoint_f(va_list ap)
 						    data, size);
 			if (rc != 0)
 				break;
-			fiber_gc();
 		}
 		index_read_view_iterator_destroy(&it);
 		if (rc != 0)
@@ -1089,6 +1076,7 @@ memtx_join_f(va_list ap)
 	struct memtx_join_ctx *ctx = va_arg(ap, struct memtx_join_ctx *);
 	struct space_read_view *space_rv;
 	read_view_foreach_space(space_rv, &ctx->rv) {
+		FiberGCChecker gc_check;
 		struct index_read_view *index_rv =
 			space_read_view_index(space_rv, 0);
 		assert(index_rv != NULL);
@@ -1101,6 +1089,7 @@ memtx_join_f(va_list ap)
 		uint32_t size;
 		const char *data;
 		while (true) {
+			RegionGuard region_guard(&fiber()->gc);
 			rc = index_read_view_iterator_next_raw(&it, &data,
 							       &size);
 			if (rc != 0 || data == NULL)
@@ -1109,7 +1098,6 @@ memtx_join_f(va_list ap)
 						   data, size);
 			if (rc != 0)
 				break;
-			fiber_gc();
 		}
 		index_read_view_iterator_destroy(&it);
 		if (rc != 0)
@@ -1219,6 +1207,7 @@ memtx_engine_gc_f(va_list va)
 {
 	struct memtx_engine *memtx = va_arg(va, struct memtx_engine *);
 	while (!fiber_is_cancelled()) {
+		FiberGCChecker gc_check;
 		bool stop;
 		ERROR_INJECT_YIELD(ERRINJ_MEMTX_DELAY_GC);
 		memtx_engine_run_gc(memtx, &stop);

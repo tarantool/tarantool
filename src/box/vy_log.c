@@ -895,6 +895,7 @@ vy_log_flusher_f(va_list va)
 {
 	(void)va;
 	while (!fiber_is_cancelled()) {
+		fiber_check_gc();
 		/*
 		 * Disable writes during local recovery.
 		 * See vy_log_tx_commit().
@@ -957,9 +958,13 @@ vy_log_open(struct xlog *xlog)
 	struct vy_log_record record;
 	vy_log_record_init(&record);
 	record.type = VY_LOG_SNAPSHOT;
+	size_t region_svp = region_used(&fiber()->gc);
 	if (vy_log_record_encode(&record, &row) < 0 ||
-	    xlog_write_row(xlog, &row) < 0)
+	    xlog_write_row(xlog, &row) < 0) {
+		region_truncate(&fiber()->gc, region_svp);
 		goto fail_close_xlog;
+	}
+	region_truncate(&fiber()->gc, region_svp);
 
 	if (xlog_rename(xlog) < 0)
 		goto fail_close_xlog;
@@ -1051,10 +1056,14 @@ vy_log_last_entry_is_snapshot(void)
 	struct xrow_header row;
 	while ((rc = xlog_cursor_next(&cursor, &row, false)) == 0) {
 		struct vy_log_record record;
+		enum vy_log_record_type type;
+		size_t region_svp = region_used(&fiber()->gc);
 		rc = vy_log_record_decode(&record, &row);
+		type = record.type;
+		region_truncate(&fiber()->gc, region_svp);
 		if (rc < 0)
 			break;
-		if (record.type == VY_LOG_SNAPSHOT) {
+		if (type == VY_LOG_SNAPSHOT) {
 			rc = xlog_cursor_next(&cursor, &row, false);
 			if (rc <= 0)
 				break;
@@ -2391,8 +2400,10 @@ vy_recovery_new_f(va_list ap)
 
 	int rc;
 	struct xrow_header row;
+	size_t region_svp = region_used(&fiber()->gc);
 	while ((rc = xlog_cursor_next(&cursor, &row, false)) == 0) {
 		struct vy_log_record record;
+		region_truncate(&fiber()->gc, region_svp);
 		rc = vy_log_record_decode(&record, &row);
 		if (rc < 0)
 			break;
@@ -2406,9 +2417,8 @@ vy_recovery_new_f(va_list ap)
 		rc = vy_recovery_process_record(recovery, &record);
 		if (rc < 0)
 			break;
-		fiber_gc();
 	}
-	fiber_gc();
+	region_truncate(&fiber()->gc, region_svp);
 	if (rc < 0)
 		goto fail_close;
 
@@ -2521,11 +2531,16 @@ vy_log_append_record(struct xlog *xlog, struct vy_log_record *record)
 	say_verbose("save vylog record: %s", vy_log_record_str(record));
 
 	struct xrow_header row;
+	size_t region_svp = region_used(&fiber()->gc);
+	int ret = -1;
 	if (vy_log_record_encode(record, &row) < 0)
-		return -1;
+		goto cleanup;
 	if (xlog_write_row(xlog, &row) < 0)
-		return -1;
-	return 0;
+		goto cleanup;
+	ret = 0;
+cleanup:
+	region_truncate(&fiber()->gc, region_svp);
+	return ret;
 }
 
 /** Write all records corresponding to an LSM tree to vylog. */

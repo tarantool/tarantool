@@ -46,6 +46,7 @@
 #include "memtx_tuple_compression.h"
 #include "schema.h"
 #include "result.h"
+#include "small/region.h"
 
 /*
  * Yield every 1K tuples while building a new index or checking
@@ -476,6 +477,7 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 	uint32_t new_size = 0, bsize;
 	struct tuple_format *format = space->format;
 	const char *old_data = tuple_data_range(decompressed, &bsize);
+	size_t region_svp = region_used(&fiber()->gc);
 	const char *new_data =
 		xrow_update_execute(request->tuple, request->tuple_end,
 				    old_data, old_data + bsize, format,
@@ -486,6 +488,7 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 	struct tuple *new_tuple =
 		space->format->vtab.tuple_new(format, new_data,
 					      new_data + new_size);
+	region_truncate(&fiber()->gc, region_svp);
 	if (new_tuple == NULL)
 		return -1;
 	tuple_ref(new_tuple);
@@ -518,6 +521,7 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		return -1;
 
 	uint32_t part_count = index->def->key_def->part_count;
+	size_t region_svp = region_used(&fiber()->gc);
 	/* Extract the primary key from tuple. */
 	const char *key = tuple_extract_key_raw(request->tuple,
 						request->tuple_end,
@@ -530,7 +534,9 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 
 	/* Try to find the tuple by primary key. */
 	struct tuple *old_tuple;
-	if (index_get_internal(index, key, part_count, &old_tuple) != 0)
+	int rc = index_get_internal(index, key, part_count, &old_tuple);
+	region_truncate(&fiber()->gc, region_svp);
+	if (rc != 0)
 		return -1;
 
 	struct tuple_format *format = space->format;
@@ -580,6 +586,7 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		 * for the tuple.
 		 */
 		uint64_t column_mask = COLUMN_MASK_FULL;
+		size_t region_svp = region_used(&fiber()->gc);
 		const char *new_data =
 			xrow_upsert_execute(request->ops, request->ops_end,
 					    old_data, old_data + bsize,
@@ -592,6 +599,7 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		new_tuple =
 			space->format->vtab.tuple_new(format, new_data,
 						      new_data + new_size);
+		region_truncate(&fiber()->gc, region_svp);
 		if (new_tuple == NULL)
 			return -1;
 		tuple_ref(new_tuple);
@@ -1399,6 +1407,7 @@ memtx_space_new(struct memtx_engine *memtx,
 
 	/* Create a format from key and field definitions. */
 	int key_count = 0;
+	size_t region_svp = region_used(&fiber()->gc);
 	struct key_def **keys = index_def_to_key_def(key_list, &key_count);
 	if (keys == NULL) {
 		free(memtx_space);
@@ -1407,6 +1416,7 @@ memtx_space_new(struct memtx_engine *memtx,
 	struct tuple_format *format =
 		space_tuple_format_new(&memtx_tuple_format_vtab,
 				       memtx, keys, key_count, def);
+	region_truncate(&fiber()->gc, region_svp);
 	if (format == NULL) {
 		free(memtx_space);
 		return NULL;

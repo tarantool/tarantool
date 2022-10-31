@@ -2341,6 +2341,7 @@ tx_process_sql(struct cmsg *m)
 	const char *sql;
 	uint32_t len;
 	bool is_unprepare = false;
+	RegionGuard region_guard(&fiber()->gc);
 
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;

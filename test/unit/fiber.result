@@ -29,3 +29,9 @@ OutOfMemory: Failed to allocate 42 bytes in allocator for exception
 	*** fiber_wait_on_deadline_test: done ***
 	*** cord_cojoin_test ***
 	*** cord_cojoin_test: done ***
+	*** fiber_test_defaults ***
+	*** fiber_test_defaults: done ***
+	*** fiber_test_leak ***
+	*** fiber_test_leak: done ***
+	*** fiber_test_leak ***
+	*** fiber_test_leak: done ***

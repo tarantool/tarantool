@@ -539,6 +539,7 @@ sysview_engine_create_space(struct engine *engine, struct space_def *def,
 	 * same machinery to do selects from such views from Lua
 	 * land.
 	 */
+	size_t region_svp = region_used(&fiber()->gc);
 	struct key_def **keys = index_def_to_key_def(key_list, &key_count);
 	if (keys == NULL) {
 		free(space);
@@ -546,6 +547,7 @@ sysview_engine_create_space(struct engine *engine, struct space_def *def,
 	}
 	struct tuple_format *format =
 		space_tuple_format_new(NULL, NULL, keys, key_count, def);
+	region_truncate(&fiber()->gc, region_svp);
 	if (format == NULL) {
 		free(space);
 		return NULL;

@@ -44,6 +44,7 @@
 #include "small/rlist.h"
 #include "salad/stailq.h"
 #include "clock_lowres.h"
+#include "backtrace.h"
 
 #include <coro/coro.h>
 
@@ -459,24 +460,16 @@ cord_slab_cache(void);
  * internal structures may be changed in a future, but
  * <box_region_*>() functions will remain API and ABI compatible.
  *
- * Data allocated on the region are guaranteed to be valid until
- * a call of a function from the certain set:
- *
- * - Related to transactions.
- * - Ones that may cause box initialization (box.cfg()).
- * - Ones that may involve SQL execution.
- *
- * FIXME: Provide more strict list of functions, which may
- * invalidate the data: ones that may lead to calling of
- * fiber_gc().
- *
- * It is safe to call simple box APIs around tuples, key_defs and
- * so on -- they don't invalidate the allocated data.
- *
  * Each fiber has its own box region. It means that a call of,
  * say, <box_region_used>() will give its own value in different
  * fibers. It also means that a yield does not invalidate data in
  * the box region.
+ *
+ * Prior to version 2.11, the box region was implicitly cleaned up
+ * on transaction commit (see <box_txn_commit>()) so that
+ * <box_region_truncate>() wasn't strictly necessary. Starting from
+ * version 2.11, it isn't true anymore, and the client code must free
+ * all its allocations explicitly.
  */
 
 /** How much memory is used by the box region. */
@@ -584,8 +577,21 @@ struct fiber {
 	struct fiber_slice max_slice;
 	/** Valgrind stack id. */
 	unsigned int stack_id;
-	/* A garbage-collected memory pool. */
+	/** A garbage-collected memory pool. */
 	struct region gc;
+#ifdef ENABLE_LEAK_BACKTRACE
+	/**
+	 * Backtrace of the first fiber gc allocation that does not
+	 * truncated yet. NULL if backtrace is not supported by the
+	 * platform or fiber_leak_backtrace_enable == false.
+	 */
+	struct backtrace *first_alloc_bt;
+#endif
+	/**
+	 * This much size of fiber gc at the beginning is used for
+	 * fiber internal purpuses.
+	 */
+	size_t gc_initial_size;
 	/**
 	 * The fiber which should be scheduled when
 	 * this fiber yields.
@@ -1063,9 +1069,6 @@ void
 fiber_destroy_all(struct cord *cord);
 
 void
-fiber_gc(void);
-
-void
 fiber_call(struct fiber *callee);
 
 struct fiber *
@@ -1120,6 +1123,29 @@ fiber_c_invoke(fiber_func f, va_list ap)
 {
 	return f(ap);
 }
+
+#ifdef ENABLE_LEAK_BACKTRACE
+/**
+ * Whether leak backtrace is provided when leak is found or not.
+ *
+ * By default is true in debug build and false otherwise.
+ */
+extern bool fiber_leak_backtrace_enable;
+#endif
+
+/**
+ * Whether we should abort if leak is found.
+ *
+ * By default is true if compiled with ABORT_ON_LEAK and false otherwise.
+ */
+extern bool fiber_abort_on_gc_leak;
+
+/**
+ * Check if region gc has no allocations except for fiber itself internal
+ * usage.
+ */
+void
+fiber_check_gc(void);
 
 #if defined(__cplusplus)
 } /* extern "C" */
@@ -1178,17 +1204,16 @@ fiber_cxx_invoke(fiber_func f, va_list ap)
 	}
 }
 
+/**
+ * Helper to check fiber gc when exiting current scope.
+ */
+struct FiberGCChecker {
+	~FiberGCChecker()
+	{
+		fiber_check_gc();
+	}
+};
+
 #endif /* defined(__cplusplus) */
-
-static inline void *
-region_aligned_alloc_cb(void *ctx, size_t size)
-{
-	void *ptr = region_aligned_alloc((struct region *) ctx, size,
-					 alignof(uint64_t));
-	if (ptr == NULL)
-		diag_set(OutOfMemory, size, "region", "new slab");
-	return ptr;
-}
-
 
 #endif /* TARANTOOL_LIB_CORE_FIBER_H_INCLUDED */

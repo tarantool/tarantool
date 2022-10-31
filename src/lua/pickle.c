@@ -70,7 +70,6 @@ lbox_pack(struct lua_State *L)
 	 * Lua memory. In absence of external unwind, Lua C API
 	 * makes it painfully difficult to clean up resources
 	 * properly in case of error.
-	 * Hope for the best, fiber_gc() will be called eventually.
 	 */
 	size_t used = region_used(buf);
 

@@ -1176,7 +1176,6 @@ done:
 	} else {
 		assert(err_code == JOURNAL_ENTRY_ERR_UNKNOWN);
 	}
-	fiber_gc();
 	wal_notify_watchers(writer, WAL_EVENT_WRITE);
 	ERROR_INJECT_SLEEP(ERRINJ_RELAY_FASTER_THAN_TX);
 }

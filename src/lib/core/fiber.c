@@ -44,6 +44,7 @@
 #include "errinj.h"
 #include "clock.h"
 #include "tt_sigaction.h"
+#include "tt_static.h"
 
 extern void cord_on_yield(void);
 
@@ -193,6 +194,20 @@ fiber_mprotect(void *addr, size_t len, int prot)
 }
 
 static __thread bool fiber_top_enabled = false;
+
+#ifdef ENABLE_LEAK_BACKTRACE
+#ifndef NDEBUG
+bool fiber_leak_backtrace_enable = true;
+#else
+bool fiber_leak_backtrace_enable = false;
+#endif
+#endif
+
+#ifdef ABORT_ON_LEAK
+bool fiber_abort_on_gc_leak = true;
+#else
+bool fiber_abort_on_gc_leak = false;
+#endif
 
 #ifdef ENABLE_BACKTRACE
 static __thread bool fiber_parent_backtrace_enabled;
@@ -809,6 +824,7 @@ fiber_schedule_wakeup(ev_loop *loop, ev_async *watcher, int revents)
 	(void) watcher;
 	(void) revents;
 	struct cord *cord = cord();
+	fiber_check_gc();
 	fiber_schedule_list(&cord->ready);
 }
 
@@ -853,17 +869,6 @@ fiber_self(void)
 	return fiber();
 }
 
-void
-fiber_gc(void)
-{
-	if (region_used(&fiber()->gc) < 128 * 1024) {
-		region_reset(&fiber()->gc);
-		return;
-	}
-
-	region_free(&fiber()->gc);
-}
-
 /** Common part of fiber_new() and fiber_recycle(). */
 static void
 fiber_reset(struct fiber *fiber)
@@ -893,12 +898,93 @@ fiber_recycle(struct fiber *fiber)
 	fiber->storage.lua.fid_ref = FIBER_LUA_NOREF;
 	unregister_fid(fiber);
 	fiber->fid = 0;
+	/* Set before free to disable truncation system area check. */
+	fiber->gc_initial_size = 0;
 	region_free(&fiber->gc);
+#ifdef ENABLE_BACKTRACE
+	fiber->parent_bt = NULL;
+#endif
+#ifdef ENABLE_LEAK_BACKTRACE
+	fiber->first_alloc_bt = NULL;
+	region_set_callbacks(&fiber->gc, NULL, NULL, NULL);
+#endif
 	if (!has_custom_stack) {
 		rlist_move_entry(&cord()->dead, fiber, link);
 	} else {
 		cord_add_garbage(cord(), fiber);
 	}
+}
+
+#ifdef ENABLE_LEAK_BACKTRACE
+/**
+ * Called on allocation on region gc. Saves allocation caller backtrace
+ * to report it later if region gc leak is found.
+ */
+static void
+fiber_on_gc_alloc(struct region *region, size_t size, void *opaque)
+{
+	(void)region;
+	(void)size;
+	struct fiber *fiber = opaque;
+
+	assert(region_used(&fiber->gc) >= fiber->gc_initial_size);
+	if (region_used(&fiber->gc) == fiber->gc_initial_size) {
+		/* 1 is to skip not interesting frames. */
+		backtrace_collect(fiber->first_alloc_bt, NULL, 1);
+		assert(fiber->first_alloc_bt->frame_count > 0);
+	}
+}
+
+/**
+ * Called on region gc truncation. Resets previously saved backtrace so
+ * it won't be falsely reported in case of programmatic mistake.
+ */
+static void
+fiber_on_gc_truncate(struct region *region, size_t used, void *opaque)
+{
+	(void)region;
+	struct fiber *fiber = opaque;
+
+	assert(used >= fiber->gc_initial_size);
+	if (used == fiber->gc_initial_size)
+		fiber->first_alloc_bt->frame_count = 0;
+}
+#endif /* ENABLE_LEAK_BACKTRACE */
+
+void
+fiber_check_gc(void)
+{
+	struct fiber *fiber = fiber();
+
+	assert(region_used(&fiber->gc) >= fiber->gc_initial_size);
+	if (region_used(&fiber->gc) == fiber->gc_initial_size)
+		return;
+
+#ifdef ENABLE_LEAK_BACKTRACE
+	if (fiber->first_alloc_bt) {
+		char *buf = tt_static_buf();
+		int rc = snprintf(buf, TT_STATIC_BUF_LEN,
+				  "Fiber gc leak is found. "
+				  "First leaked fiber gc allocation"
+				  " backtrace:\n");
+		assert(rc > 0 && rc < TT_STATIC_BUF_LEN);
+		backtrace_snprint(buf + rc, TT_STATIC_BUF_LEN - rc,
+				  fiber->first_alloc_bt);
+		say_error("%s", buf);
+	} else {
+		say_error("Fiber gc leak is found. "
+			  "Leak backtrace is not available. "
+			  "Make sure fiber.leak_backtrace_enable() is called"
+			  " before starting this fiber to obtain "
+			  " the backtrace.");
+	}
+#else
+	say_error("Fiber gc leak is found. "
+		  "Leak backtrace is not available on your platform.");
+#endif
+
+	if (fiber_abort_on_gc_leak)
+		abort();
 }
 
 static void
@@ -910,6 +996,7 @@ fiber_loop(MAYBE_UNUSED void *data)
 
 		assert(fiber != NULL && fiber->f != NULL && fiber->fid != 0);
 		fiber->f_ret = fiber_invoke(fiber->f, fiber->f_data);
+		fiber_check_gc();
 		if (fiber->f_ret != 0) {
 			struct error *e = diag_last_error(&fiber->diag);
 			/* diag must not be empty on error */
@@ -1209,6 +1296,29 @@ fiber_stack_create(struct fiber *fiber, struct slab_cache *slabc,
 	return 0;
 }
 
+static void
+fiber_gc_checker_init(struct fiber *fiber)
+{
+#ifdef ENABLE_LEAK_BACKTRACE
+	if (!fiber_leak_backtrace_enable) {
+		fiber->first_alloc_bt = NULL;
+		fiber->gc_initial_size = 0;
+		return;
+	}
+
+	size_t size;
+	fiber->first_alloc_bt =
+		xregion_alloc_object(&fiber->gc,
+				     typeof(*fiber->first_alloc_bt), &size);
+	fiber->gc_initial_size = region_used(&fiber->gc);
+	region_set_callbacks(&fiber->gc,
+			     fiber_on_gc_alloc, fiber_on_gc_truncate,
+			     fiber);
+#else
+	fiber->gc_initial_size = 0;
+#endif
+}
+
 struct fiber *
 fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	     fiber_func f)
@@ -1264,6 +1374,7 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 #ifdef ENABLE_BACKTRACE
 	fiber->parent_bt = NULL;
 #endif /* ENABLE_BACKTRACE */
+	fiber_gc_checker_init(fiber);
 	cord->next_fid++;
 	assert(cord->next_fid > FIBER_ID_MAX_RESERVED);
 
@@ -1313,6 +1424,8 @@ fiber_destroy(struct cord *cord, struct fiber *f)
 	trigger_destroy(&f->on_stop);
 	rlist_del(&f->state);
 	rlist_del(&f->link);
+	/* Set before free to disable truncation system area check. */
+	f->gc_initial_size = 0;
 	region_destroy(&f->gc);
 	fiber_stack_destroy(f, &cord->slabc);
 	diag_destroy(&f->diag);
@@ -1502,6 +1615,7 @@ cord_create(struct cord *cord, const char *name)
 	fiber_reset(&cord->sched);
 	diag_create(&cord->sched.diag);
 	region_create(&cord->sched.gc, &cord->slabc);
+	fiber_gc_checker_init(&cord->sched);
 	cord->sched.name = NULL;
 	fiber_set_name(&cord->sched, "sched");
 	cord->fiber = &cord->sched;
@@ -1818,6 +1932,7 @@ cord_costart_thread_func(void *arg)
 	 */
 	assert(fiber_is_dead(f));
 	fiber()->f_ret = fiber_join(f);
+	fiber_check_gc();
 
 	return NULL;
 }

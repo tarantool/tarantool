@@ -36,6 +36,8 @@
 #include "box/index.h"
 #include "box/lua/tuple.h"
 #include "box/lua/misc.h" /* lbox_encode_tuple_on_gc() */
+#include "small/region.h"
+#include "fiber.h"
 
 /** {{{ box.index Lua library: access to spaces and indexes
  */
@@ -50,12 +52,13 @@ lbox_insert(lua_State *L)
 
 	uint32_t space_id = lua_tonumber(L, 1);
 	size_t tuple_len;
+	size_t region_svp = region_used(&fiber()->gc);
 	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
 
 	struct tuple *result;
-	if (box_insert(space_id, tuple, tuple + tuple_len, &result) != 0)
-		return luaT_error(L);
-	return luaT_pushtupleornil(L, result);
+	int rc = box_insert(space_id, tuple, tuple + tuple_len, &result);
+	region_truncate(&fiber()->gc, region_svp);
+	return rc == 0 ? luaT_pushtupleornil(L, result) : luaT_error(L);
 }
 
 static int
@@ -66,12 +69,13 @@ lbox_replace(lua_State *L)
 
 	uint32_t space_id = lua_tonumber(L, 1);
 	size_t tuple_len;
+	size_t region_svp = region_used(&fiber()->gc);
 	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
 
 	struct tuple *result;
-	if (box_replace(space_id, tuple, tuple + tuple_len, &result) != 0)
-		return luaT_error(L);
-	return luaT_pushtupleornil(L, result);
+	int rc = box_replace(space_id, tuple, tuple + tuple_len, &result);
+	region_truncate(&fiber()->gc, region_svp);
+	return rc == 0 ? luaT_pushtupleornil(L, result) : luaT_error(L);
 }
 
 static int
@@ -84,16 +88,17 @@ lbox_index_update(lua_State *L)
 
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);
+	size_t region_svp = region_used(&fiber()->gc);
 	size_t key_len;
 	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
 	size_t ops_len;
 	const char *ops = lbox_encode_tuple_on_gc(L, 4, &ops_len);
 
 	struct tuple *result;
-	if (box_update(space_id, index_id, key, key + key_len,
-		       ops, ops + ops_len, 1, &result) != 0)
-		return luaT_error(L);
-	return luaT_pushtupleornil(L, result);
+	int rc = box_update(space_id, index_id, key, key + key_len,
+			    ops, ops + ops_len, 1, &result);
+	region_truncate(&fiber()->gc, region_svp);
+	return rc == 0 ? luaT_pushtupleornil(L, result) : luaT_error(L);
 }
 
 static int
@@ -106,15 +111,16 @@ lbox_upsert(lua_State *L)
 
 	uint32_t space_id = lua_tonumber(L, 1);
 	size_t tuple_len;
+	size_t region_svp = region_used(&fiber()->gc);
 	const char *tuple = lbox_encode_tuple_on_gc(L, 2, &tuple_len);
 	size_t ops_len;
 	const char *ops = lbox_encode_tuple_on_gc(L, 3, &ops_len);
 
 	struct tuple *result;
-	if (box_upsert(space_id, 0, tuple, tuple + tuple_len,
-		       ops, ops + ops_len, 1, &result) != 0)
-		return luaT_error(L);
-	return luaT_pushtupleornil(L, result);
+	int rc = box_upsert(space_id, 0, tuple, tuple + tuple_len,
+			    ops, ops + ops_len, 1, &result);
+	region_truncate(&fiber()->gc, region_svp);
+	return rc == 0 ? luaT_pushtupleornil(L, result) : luaT_error(L);
 }
 
 static int
@@ -127,12 +133,13 @@ lbox_index_delete(lua_State *L)
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);
 	size_t key_len;
+	size_t region_svp = region_used(&fiber()->gc);
 	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
 
 	struct tuple *result;
-	if (box_delete(space_id, index_id, key, key + key_len, &result) != 0)
-		return luaT_error(L);
-	return luaT_pushtupleornil(L, result);
+	int rc = box_delete(space_id, index_id, key, key + key_len, &result);
+	region_truncate(&fiber()->gc, region_svp);
+	return rc == 0 ? luaT_pushtupleornil(L, result) : luaT_error(L);
 }
 
 static int
@@ -161,12 +168,13 @@ lbox_index_get(lua_State *L)
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);
 	size_t key_len;
+	size_t region_svp = region_used(&fiber()->gc);
 	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
 
 	struct tuple *tuple;
-	if (box_index_get(space_id, index_id, key, key + key_len, &tuple) != 0)
-		return luaT_error(L);
-	return luaT_pushtupleornil(L, tuple);
+	int rc = box_index_get(space_id, index_id, key, key + key_len, &tuple);
+	region_truncate(&fiber()->gc, region_svp);
+	return rc == 0 ? luaT_pushtupleornil(L, tuple) : luaT_error(L);
 }
 
 static int
@@ -178,12 +186,13 @@ lbox_index_min(lua_State *L)
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);
 	size_t key_len;
+	size_t region_svp = region_used(&fiber()->gc);
 	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
 
 	struct tuple *tuple;
-	if (box_index_min(space_id, index_id, key, key + key_len, &tuple) != 0)
-		return luaT_error(L);
-	return luaT_pushtupleornil(L, tuple);
+	int rc = box_index_min(space_id, index_id, key, key + key_len, &tuple);
+	region_truncate(&fiber()->gc, region_svp);
+	return rc == 0 ? luaT_pushtupleornil(L, tuple) : luaT_error(L);
 }
 
 static int
@@ -195,12 +204,13 @@ lbox_index_max(lua_State *L)
 	uint32_t space_id = lua_tonumber(L, 1);
 	uint32_t index_id = lua_tonumber(L, 2);
 	size_t key_len;
+	size_t region_svp = region_used(&fiber()->gc);
 	const char *key = lbox_encode_tuple_on_gc(L, 3, &key_len);
 
 	struct tuple *tuple;
-	if (box_index_max(space_id, index_id, key, key + key_len, &tuple) != 0)
-		return luaT_error(L);
-	return luaT_pushtupleornil(L, tuple);
+	int rc = box_index_max(space_id, index_id, key, key + key_len, &tuple);
+	region_truncate(&fiber()->gc, region_svp);
+	return rc == 0 ? luaT_pushtupleornil(L, tuple) : luaT_error(L);
 }
 
 static int
@@ -216,10 +226,12 @@ lbox_index_count(lua_State *L)
 	uint32_t index_id = lua_tonumber(L, 2);
 	uint32_t iterator = lua_tonumber(L, 3);
 	size_t key_len;
+	size_t region_svp = region_used(&fiber()->gc);
 	const char *key = lbox_encode_tuple_on_gc(L, 4, &key_len);
 
 	ssize_t count = box_index_count(space_id, index_id, iterator, key,
 					key + key_len);
+	region_truncate(&fiber()->gc, region_svp);
 	if (count == -1)
 		return luaT_error(L);
 	lua_pushinteger(L, count);

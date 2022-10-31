@@ -186,6 +186,7 @@ vy_point_lookup_scan_slices(struct vy_lsm *lsm, const struct vy_read_view **rv,
 	assert(range != NULL);
 	int slice_count = range->slice_count;
 	size_t size;
+	size_t region_svp = region_used(&fiber()->gc);
 	struct vy_slice **slices =
 		region_alloc_array(&fiber()->gc, typeof(slices[0]), slice_count,
 				   &size);
@@ -207,6 +208,7 @@ vy_point_lookup_scan_slices(struct vy_lsm *lsm, const struct vy_read_view **rv,
 							rv, key, history);
 		vy_slice_unpin(slices[i]);
 	}
+	region_truncate(&fiber()->gc, region_svp);
 	return rc;
 }
 

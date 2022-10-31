@@ -477,6 +477,10 @@ lbox_execute(struct lua_State *L)
 		return luaL_error(L, "Usage: box.execute(sqlstring[, params]) "
 				  "or box.execute(stmt_id[, params])");
 
+	if (lua_type(L, 1) != LUA_TSTRING && lua_tointeger(L, 1) < 0)
+		return luaL_error(L, "Statement id can't be negative");
+
+	size_t region_svp = region_used(&fiber()->gc);
 	if (top == 2) {
 		if (! lua_istable(L, 2))
 			return luaL_error(L, "Second argument must be a table");
@@ -492,19 +496,22 @@ lbox_execute(struct lua_State *L)
 		const char *sql = lua_tolstring(L, 1, &length);
 		if (sql_prepare_and_execute(sql, length, bind, bind_count, &port,
 					    &fiber()->gc) != 0)
-			return luaT_push_nil_and_error(L);
+			goto error;
 	} else {
 		assert(lua_type(L, 1) == LUA_TNUMBER);
 		lua_Integer query_id = lua_tointeger(L, 1);
-		if (query_id < 0)
-			return luaL_error(L, "Statement id can't be negative");
 		if (sql_execute_prepared(query_id, bind, bind_count, &port,
 					 &fiber()->gc) != 0)
-			return luaT_push_nil_and_error(L);
+			goto error;
 	}
 	port_dump_lua(&port, L, false);
 	port_destroy(&port);
+	region_truncate(&fiber()->gc, region_svp);
 	return 1;
+
+error:
+	region_truncate(&fiber()->gc, region_svp);
+	return luaT_push_nil_and_error(L);
 }
 
 /**

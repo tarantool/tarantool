@@ -10,7 +10,7 @@
 -- The test is not about this problem. Aside of the tuple leak,
 -- there was another problem in the fixed code: fiber's region
 -- memory that is used for serialization of the key is 'leaked'
--- as well (till fiber_gc()).
+-- as well.
 --
 -- The test verifies that the fiber region does not hold any extra
 -- memory after failed serialization of the key.
@@ -46,29 +46,19 @@ local tuple = box.tuple.new({'foo', 'bar'})
 --
 -- We should ensure that our 'large' key will be larger than a
 -- first slab that the fiber region will give to the mpstream (to
--- exhaust it and see the 'leak' in the 'used' statistics).
+-- exhaust it and see the 'leak' in the 'used' statistics). But
+-- we have no easy way to do it.
 --
--- The simplest way is to clean region's slab list: so the next
--- slab will be one with a minimal order. A slab with minimal
--- order for the fiber region is 4096 bytes (minus ~50 bytes for
--- the allocator itself).
+-- Well at this point current slab of region fiber should be as after
+-- the fiber initialization. Hopefully we won't have this
+-- slab very large because we need to deal with thousands of fibers. So
+-- I guess this slab (and it's unused area) is smaller than 1M.
 --
--- It does not look safe to call box_region_truncate(0), because
--- tarantool itself may hold something in the region's memory (in
--- theory). But while it works, it is okay for testing purposes.
+-- Unfortunatly if/when the above assumtion becomes false the test will stop
+-- testing the leak and will silently pass.
 --
--- At least it is easier to call region_truncate() rather than
--- check that &fiber()->gc.slabs is empty or have the first slab
--- with amount of unused memory that is lower than given constant
--- (say, 4096).
---
--- It seems, we should improve our memory statistics and/or
--- debugging tools in a future. This test case should not require
--- so much explanation of internals.
-ffi.C.box_region_truncate(0)
-
--- Serialization of this key should fail.
-local large_data = string.rep('x', 4096)
+-- Serialization of this key should fail because function is not serializable.
+local large_data = string.rep('x', 1048576)
 local key = {large_data, function() end}
 
 -- Verify that data allocated on the fiber region (&fiber()->gc)

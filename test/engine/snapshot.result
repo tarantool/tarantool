@@ -246,19 +246,22 @@ test_run:cmd('restart server default')
 fiber = require('fiber')
 ---
 ...
--- Should be 0.
-fiber.info()[fiber.self().id()].memory.used
+internal_usage = fiber.info()[fiber.self().id()].memory.used
 ---
-- 0
+...
+-- Should be 0.
+fiber.info()[fiber.self().id()].memory.used == internal_usage
+---
+- true
 ...
 box.snapshot()
 ---
 - ok
 ...
 -- Should be 0.
-fiber.info()[fiber.self().id()].memory.used
+fiber.info()[fiber.self().id()].memory.used == internal_usage
 ---
-- 0
+- true
 ...
 box.snapshot()
 ---
@@ -269,7 +272,7 @@ box.snapshot()
 - ok
 ...
 -- Should be 0.
-fiber.info()[fiber.self().id()].memory.used
+fiber.info()[fiber.self().id()].memory.used == internal_usage
 ---
-- 0
+- true
 ...

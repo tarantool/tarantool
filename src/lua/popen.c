@@ -754,9 +754,7 @@ luaT_popen_parse_env_entry(struct lua_State *L, int key_idx, int value_idx,
  * Strings and array of them are allocated on the provided
  * region. A caller should call region_used() before invoking
  * this function and call region_truncate() when the result
- * is not needed anymore. Alternatively a caller may assume
- * that fiber_gc() will collect this memory eventually, but
- * it is recommended to do so only for rare paths.
+ * is not needed anymore.
  *
  * Raise an error in case of the incorrect parameter.
  *

@@ -622,6 +622,7 @@ vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 		key_count++;
 	struct key_def **keys;
 	size_t size;
+	size_t region_svp = region_used(&fiber()->gc);
 	keys = region_alloc_array(&fiber()->gc, typeof(keys[0]), key_count,
 				  &size);
 	if (keys == NULL) {
@@ -635,6 +636,7 @@ vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 
 	struct tuple_format *format;
 	format = vy_space_stmt_format_new(&env->stmt_env, keys, key_count, def);
+	region_truncate(&fiber()->gc, region_svp);
 	if (format == NULL) {
 		free(space);
 		return NULL;
@@ -1934,6 +1936,7 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	uint32_t new_size, old_size;
 	const char *old_tuple = tuple_data_range(stmt->old_tuple, &old_size);
 	const char *old_tuple_end = old_tuple + old_size;
+	size_t region_svp = region_used(&fiber()->gc);
 	new_tuple = xrow_update_execute(request->tuple, request->tuple_end,
 					old_tuple, old_tuple_end,
 					pk->mem_format, &new_size,
@@ -1945,10 +1948,13 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 * Check that the new tuple matches the space format and
 	 * the primary key was not modified.
 	 */
-	if (tuple_validate_raw(pk->mem_format, new_tuple))
+	if (tuple_validate_raw(pk->mem_format, new_tuple)) {
+		region_truncate(&fiber()->gc, region_svp);
 		return -1;
+	}
 	stmt->new_tuple = vy_stmt_new_replace(pk->mem_format, new_tuple,
 					      new_tuple_end);
+	region_truncate(&fiber()->gc, region_svp);
 	if (stmt->new_tuple == NULL)
 		return -1;
 	if (vy_check_update(space, pk, stmt->old_tuple, stmt->new_tuple,
@@ -2188,6 +2194,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	old_tuple = tuple_data_range(stmt->old_tuple, &old_size);
 	old_tuple_end = old_tuple + old_size;
 
+	size_t region_svp = region_used(&fiber()->gc);
 	/* Apply upsert operations to the old tuple. */
 	new_tuple = xrow_upsert_execute(ops, ops_end, old_tuple, old_tuple_end,
 					pk->mem_format, &new_size, 0, false,
@@ -2198,11 +2205,14 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 * Check that the new tuple matched the space
 	 * format and the primary key was not modified.
 	 */
-	if (tuple_validate_raw(pk->mem_format, new_tuple))
+	if (tuple_validate_raw(pk->mem_format, new_tuple)) {
+		region_truncate(&fiber()->gc, region_svp);
 		return -1;
+	}
 	new_tuple_end = new_tuple + new_size;
 	stmt->new_tuple = vy_stmt_new_replace(pk->mem_format, new_tuple,
 					      new_tuple_end);
+	region_truncate(&fiber()->gc, region_svp);
 	if (stmt->new_tuple == NULL)
 		return -1;
 	if (vy_check_update(space, pk, stmt->old_tuple, stmt->new_tuple,
@@ -3485,6 +3495,7 @@ vy_squash_queue_f(va_list va)
 {
 	struct vy_squash_queue *sq = va_arg(va, struct vy_squash_queue *);
 	while (sq->fiber != NULL) {
+		fiber_check_gc();
 		if (stailq_empty(&sq->queue)) {
 			fiber_cond_wait(&sq->cond);
 			continue;

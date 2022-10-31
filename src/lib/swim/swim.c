@@ -1857,6 +1857,7 @@ swim_event_handler_f(va_list va)
 	struct swim *s = va_arg(va, struct swim *);
 	struct swim_on_member_event_ctx ctx;
 	while (! fiber_is_cancelled()) {
+		fiber_check_gc();
 		if (stailq_empty(&s->event_queue)) {
 			fiber_yield();
 			continue;

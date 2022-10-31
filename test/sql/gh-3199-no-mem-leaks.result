@@ -17,6 +17,9 @@ test_run:cmd('restart server default')
 fiber = require('fiber')
 ---
 ...
+internal_usage = fiber.info()[fiber.self().id()].memory.used
+---
+...
 box.execute('CREATE TABLE test (id INT PRIMARY KEY, x INTEGER, y INTEGER)')
 ---
 - row_count: 1
@@ -38,9 +41,9 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
   - [1, 1, 2]
   - [2, 2, 4]
 ...
-fiber.info()[fiber.self().id()].memory.used
+fiber.info()[fiber.self().id()].memory.used == internal_usage
 ---
-- 0
+- true
 ...
 box.execute('SELECT x, y, x + y FROM test ORDER BY y')
 ---
@@ -94,9 +97,9 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
   - [1, 1, 2]
   - [2, 2, 4]
 ...
-fiber.info()[fiber.self().id()].memory.used
+fiber.info()[fiber.self().id()].memory.used == internal_usage
 ---
-- 0
+- true
 ...
 box.execute('CREATE TABLE test2 (id INT PRIMARY KEY, a TEXT, b INTEGER)')
 ---
@@ -125,9 +128,9 @@ box.execute('SELECT a, id + 2, b FROM test2 WHERE b < id * 2 ORDER BY a ')
   - ['test', 5, 3]
   - ['xx', 6, 4]
 ...
-fiber.info()[fiber.self().id()].memory.used
+fiber.info()[fiber.self().id()].memory.used == internal_usage
 ---
-- 0
+- true
 ...
 box.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
 ---
@@ -174,9 +177,9 @@ box.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
   - ['test', 9, 'test']
   - ['xx', 12, 'xx']
 ...
-fiber.info()[fiber.self().id()].memory.used
+fiber.info()[fiber.self().id()].memory.used == internal_usage
 ---
-- 0
+- true
 ...
 box.execute('SELECT x, y + 3 * b, b FROM test2, test WHERE b = x')
 ---
@@ -217,9 +220,9 @@ box.execute('SELECT x, y + 3 * b, b FROM test2, test WHERE b = x')
   - [1, 4, 1]
   - [2, 8, 2]
 ...
-fiber.info()[fiber.self().id()].memory.used
+fiber.info()[fiber.self().id()].memory.used == internal_usage
 ---
-- 0
+- true
 ...
 -- Cleanup
 box.execute('DROP TABLE test')
