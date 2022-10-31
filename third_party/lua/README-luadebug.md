@@ -1,4 +1,4 @@
-debugger.lua
+luadebug.lua
 =
 
 A simple debugging console for the Tarantool.
@@ -6,7 +6,7 @@ A simple debugging console for the Tarantool.
 
 ![ExampleLog](luadebug.png)
 
-debugger.lua is a simple, single file, pure Lua debugger that is easy to integrate with any project. The lua-users wiki lists a [number of debuggers](http://lua-users.org/wiki/DebuggingLuaCode). clidebugger was closest to what I was looking for, but I ran into several compatibility issues, and the rest are pretty big libraries with a whole lot of dependencies. I just wanted something simple to integrate that would work through stdin/stdout. I also decided that it sounded fun to try and make my own!
+luadebug.lua is a simple, single file, pure Lua debugger that is easy to integrate with any project. The lua-users wiki lists a [number of debuggers](http://lua-users.org/wiki/DebuggingLuaCode). clidebugger was closest to what I was looking for, but I ran into several compatibility issues, and the rest are pretty big libraries with a whole lot of dependencies. I just wanted something simple to integrate that would work through stdin/stdout. I also decided that it sounded fun to try and make my own!
 
 Features
 -
@@ -26,7 +26,7 @@ Features
 Easy to use from C too!
 -
 
-debugger.lua can be easily integrated into an embedded project with just a .c and .h file. First though, you'll need to run `lua embed/debugger.c.lua`. This generates embed/debugger.c by inserting the lua code into a template .c file.
+luadebug.lua can be easily integrated into an embedded project with just a .c and .h file. First though, you'll need to run `lua embed/debugger.c.lua`. This generates embed/debugger.c by inserting the lua code into a template .c file.
 
 ```c
 int main(int argc, char **argv){
@@ -54,41 +54,70 @@ Now in your Lua code you can just use the global variable or `require` the modul
 Debugger Commands:
 -
 
-If you have used other CLI debuggers, debugger.lua shouldn't be surprising. I didn't make a fancy parser, so the commands are just single letters. Since the debugger is pretty simple there are only a small handful of commands anwyay.
+If you have used other CLI debuggers, luadebug.lua shouldn't be surprising.
+Majority of commands are single letters, but you could also use their full-name
+aliases.
 
-    c|cont|continue
-    - continue execution
-    d|down
-    - move down the stack by one frame
-    e|eval $expression
-    - execute the statement
-    f|finish|step_out
-    - step forward until exiting the current function
-    h|help|?
-    - print this help message
-    l|locals
-    - print the function arguments, locals and upvalues
-    n|next|step_over
-    - step forward by one line (skipping over functions)
-    p|print $expression
-    - execute the expression and print the result
-    q|quit
-    - exit debugger
-    s|st|step|step_into
-    - step forward by one line (into functions)
-    t|trace|bt
-    - print the stack trace
-    u|up
-    - move up the stack by one frame
-    w|where $linecount
-    - print source code around the current line
+| Commands/Aliases | Description |
+|------------------|-------------|
+| `b`, `break`, `breakpoint`, `add_break`, `add_breakpoint location` | Set new breakpoints at `module.lua+num` |
+| `bd`, `bdelete`, `delete_break`, `delete_breakpoint location` | Delete breakpoint |
+| `bl`, `blist`, `list_break`, `list_breakpoints` | List breakpoints |
+| `c`, `cont`, `continue` | Continue execution |
+| `d`, `down` | Move down the stack by one frame |
+| `e`, `eval $expression` | Execute the statement |
+| `f`, `finish`, `step_out` | Step forward until exiting the current function |
+| `h`, `help`, `?` | Print help message |
+| `l`, `locals` | Print the function arguments, locals and upvalues |
+| `n`, `next`, `step_over` | Step forward by one line (skipping over functions) |
+| `p`, `print $expression` | Execute the expression and print the result |
+| `q`, `quit` | Exit debugger |
+| `s`, `st`, `step`, `step_into` | Step forward by one line (into functions) |
+| `t`, `trace`, `bt` | Print the stack trace |
+| `u`, `up` | Move up the stack by one frame |
+| `w`, `where linecount` | Print source code around the current line |
 
-If you've never used a command line debugger before, start a nice warm cozy fire, run tutorial.lua, and open it up in your favorite editor so you can follow along.
+For example, for breakpoint addition you could either use single-letter command
+`b`, or their aliases `breakpoint`, `add_break`. You could step over current
+line of code using simple `n` or it's alias `next`. You could navigate one stack
+frame above using `u`, or `up` as alias. And so on.
+
+Breakpoints
+-
+
+One could set breakpoint either using full syntax `filename:linenumber` as:
+
+  break debug-target.lua:9
+
+Or using "short" syntax using only line numbers in a form `+NN` or `:NN`. In this
+case debugger will use current active script file as a base for such breakpoint.
+
+  b +9
+
+Both those syntaxes mentioned above are equivalent and should behave identically.
+
+If breakpoint(s) saved, then execution (command 'continue') will be slowed down a
+bit by calling to a debugger line hook for each executed line. If there is no any
+breakpoint activated then execution (via `continue`) will be at the speed near to
+native, without any visible slowdown.
+
+You could see all activated breakpoints via `bl` command:
+
+  blist
+
+Saved breakpoint could be deactivated via `bd` command:
+
+  bdelete +9
+
+If you need to remove all breakpoints and continue execution at full speed
+then there is special breakpoint location name `*` that could be used:
+
+  bd *
 
 Debugger API
 -
 
-There are several overloadable functions you can use to customize debugger.lua.
+There are several overloadable functions you can use to customize luadebug.lua.
 * `dbg.read(prompt)` - Show the prompt and block for user input. (Defaults to read from stdin)
 * `dbg.write(str)` - Write a string to the output. (Defaults to write to stdout)
 * `dbg.shorten_path(path)` - Return a shortened version of a path. (Defaults to simply return `path`)
