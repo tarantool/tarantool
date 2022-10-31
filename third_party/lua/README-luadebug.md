@@ -56,6 +56,12 @@ Debugger Commands:
 
 If you have used other CLI debuggers, debugger.lua shouldn't be surprising. I didn't make a fancy parser, so the commands are just single letters. Since the debugger is pretty simple there are only a small handful of commands anwyay.
 
+    b|break|breakpoint $address
+        - set new breakpoints at module.lua+num
+    bd|bdelete|delete_break|delete_breakpoints
+        - delete breakpoints
+    bl|blist|list_break|list_breakpoints
+    - list breakpoints
     c|cont|continue
     - continue execution
     d|down
@@ -83,7 +89,26 @@ If you have used other CLI debuggers, debugger.lua shouldn't be surprising. I di
     w|where $linecount
     - print source code around the current line
 
-If you've never used a command line debugger before, start a nice warm cozy fire, run tutorial.lua, and open it up in your favorite editor so you can follow along.
+If you've never used a command line debugger before, start a nice warm cozy fire, run luadebug_tutorial.lua, and open it up in your favorite editor so you can follow along.
+
+Breakpoints
+-
+
+One could set breakpoint either using full syntax as:
+
+  break debug-target.lua:9
+
+Or using "short" syntax using only line numbers in a form `+NN` or `:NN`. In this
+case debugger will use currently active script fil as a basic for such breakpoint.
+
+  b +9
+
+Both those syntaxes mentioned above are equivalent and should behave identically.
+
+If breakpoint(s) saved then execution (command 'continue') will be slowed down a
+bit for calling of debugger line hook at each executed line. If there is no any
+single breakpoint saved then execution (via `continue`) will be at the native speed,
+without any slowdown.
 
 Debugger API
 -
