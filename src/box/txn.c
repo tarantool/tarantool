@@ -66,7 +66,7 @@ const char *txn_isolation_level_aliases[txn_isolation_level_MAX] = {
 };
 
 /* Txn cache. */
-static struct stailq txn_cache = {NULL, &txn_cache.first};
+static STAILQ(txn_cache);
 
 static int
 txn_on_stop(struct trigger *trigger, void *event);

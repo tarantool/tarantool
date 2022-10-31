@@ -1263,16 +1263,6 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 bool dontdump, unsigned granularity,
 		 const char *allocator, float alloc_factor)
 {
-	/*
-	 * FIXME(gh-7422): We use the intrusive list pattern to organize memtx
-	 * tuples into a garbage collection list during snapshotting. Setting
-	 * the granularity to a value less than the machine word size can thus
-	 * result in unaligned pointer dereference, which may fail on certain
-	 * architectures. So we silently overwrite the granularity if it's less
-	 * than the machine word size.
-	 */
-	granularity = MAX(granularity, sizeof(void *));
-
 	int64_t snap_signature;
 	struct memtx_engine *memtx =
 		(struct memtx_engine *)calloc(1, sizeof(*memtx));

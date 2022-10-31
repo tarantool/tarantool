@@ -784,7 +784,6 @@ vy_log_tx_new(void)
 	}
 	region_create(&tx->region, cord_slab_cache());
 	stailq_create(&tx->records);
-	tx->in_pending.next = NULL;
 	return tx;
 }
 
