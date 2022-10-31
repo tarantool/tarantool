@@ -1012,7 +1012,7 @@ say_format_syslog(struct log *log, char *buf, int len, int level, const char *fi
  * some situations and set SAY_BUF_LEN_MAX to 16k for now.
  */
 enum { SAY_BUF_LEN_MAX = 16 * 1024 };
-static __thread char buf[SAY_BUF_LEN_MAX];
+static __thread char say_buf[SAY_BUF_LEN_MAX];
 
 /**
  * Wrapper over write which ensures, that writes not more than buffer size.
@@ -1036,7 +1036,7 @@ say_default(int level, const char *filename, int line, const char *error,
 	int total = log_vsay(log_default, level, filename,
 			     line, error, format, ap);
 	if (level == S_FATAL && log_default->fd != STDERR_FILENO) {
-		ssize_t r = safe_write(STDERR_FILENO, buf, total);
+		ssize_t r = safe_write(STDERR_FILENO, say_buf, total);
 		(void) r;                       /* silence gcc warning */
 	}
 
@@ -1054,7 +1054,7 @@ write_to_file(struct log *log, int total)
 	       log->type == SAY_LOGGER_PIPE ||
 	       log->type == SAY_LOGGER_STDERR);
 	assert(total >= 0);
-	ssize_t r = safe_write(log->fd, buf, total);
+	ssize_t r = safe_write(log->fd, say_buf, total);
 	(void) r;                               /* silence gcc warning */
 }
 
@@ -1066,7 +1066,7 @@ write_to_syslog(struct log *log, int total)
 {
 	assert(log->type == SAY_LOGGER_SYSLOG);
 	assert(total >= 0);
-	if (log->fd < 0 || safe_write(log->fd, buf, total) <= 0) {
+	if (log->fd < 0 || safe_write(log->fd, say_buf, total) <= 0) {
 		/*
 		 * Try to reconnect, if write to syslog has
 		 * failed. Syslog write can fail, if, for example,
@@ -1084,7 +1084,7 @@ write_to_syslog(struct log *log, int total)
 			 * it would block thread. Try to reconnect
 			 * on next vsay().
 			 */
-			ssize_t r = safe_write(log->fd, buf, total);
+			ssize_t r = safe_write(log->fd, say_buf, total);
 			(void) r;               /* silence gcc warning */
 		}
 	}
@@ -1266,7 +1266,7 @@ log_vsay(struct log *log, int level, const char *filename, int line,
 	if (level > log->level) {
 		return 0;
 	}
-	int total = log->format_func(log, buf, sizeof(buf), level,
+	int total = log->format_func(log, say_buf, sizeof(say_buf), level,
 				     filename, line, error, format, ap);
 	switch (log->type) {
 	case SAY_LOGGER_FILE:
@@ -1277,11 +1277,11 @@ log_vsay(struct log *log, int level, const char *filename, int line,
 	case SAY_LOGGER_SYSLOG:
 		write_to_syslog(log, total);
 		if (level == S_FATAL && log->fd != STDERR_FILENO)
-			(void) safe_write(STDERR_FILENO, buf, total);
+			(void)safe_write(STDERR_FILENO, say_buf, total);
 		break;
 	case SAY_LOGGER_BOOT:
 	{
-		ssize_t r = safe_write(STDERR_FILENO, buf, total);
+		ssize_t r = safe_write(STDERR_FILENO, say_buf, total);
 		(void) r;                       /* silence gcc warning */
 		break;
 	}
