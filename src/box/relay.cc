@@ -561,6 +561,10 @@ relay_final_join(struct iostream *io, uint64_t sync,
 	});
 }
 
+/** Check if status update is needed and send it if possible. */
+static void
+relay_check_status_needs_update(struct relay *relay);
+
 /**
  * The message which updated tx thread with a new vclock has returned back
  * to the relay.
@@ -570,7 +574,9 @@ relay_status_update(struct cmsg *msg)
 {
 	msg->route = NULL;
 	struct relay_status_msg *status = (struct relay_status_msg *)msg;
-	status->relay->tx_seen_time = ev_monotonic_now(loop());
+	struct relay *relay = status->relay;
+	relay->tx_seen_time = ev_monotonic_now(loop());
+	relay_check_status_needs_update(relay);
 }
 
 /**
@@ -897,6 +903,40 @@ relay_trigger_vclock_sync(struct relay *relay, uint64_t *vclock_sync,
 	return 0;
 }
 
+static void
+relay_check_status_needs_update(struct relay *relay)
+{
+	struct applier_heartbeat *last_recv_ack = &relay->last_recv_ack;
+	struct relay_status_msg *status_msg = &relay->status_msg;
+	if (status_msg->msg.route != NULL)
+		return;
+
+	struct vclock *send_vclock;
+	if (relay->version_id < version_id(1, 7, 4))
+		send_vclock = &relay->r->vclock;
+	else
+		send_vclock = &last_recv_ack->vclock;
+
+	/* Collect xlog files received by the replica. */
+	relay_schedule_pending_gc(relay, send_vclock);
+
+	double tx_idle = ev_monotonic_now(loop()) - relay->tx_seen_time;
+	if (vclock_sum(&status_msg->vclock) ==
+	    vclock_sum(send_vclock) && tx_idle <= replication_timeout &&
+	    status_msg->vclock_sync == last_recv_ack->vclock_sync)
+		return;
+	static const struct cmsg_hop route[] = {
+		{tx_status_update, NULL}
+	};
+	cmsg_init(&status_msg->msg, route);
+	vclock_copy(&status_msg->vclock, send_vclock);
+	status_msg->txn_lag = relay->txn_lag;
+	status_msg->relay = relay;
+	status_msg->term = last_recv_ack->term;
+	status_msg->vclock_sync = last_recv_ack->vclock_sync;
+	cpipe_push(&relay->tx_pipe, &status_msg->msg);
+}
+
 /**
  * A libev callback invoked when a relay client socket is ready
  * for read. This currently only happens when the client closes
@@ -950,8 +990,6 @@ relay_subscribe_f(va_list ap)
 	 */
 	relay_send_heartbeat(relay);
 
-	struct applier_heartbeat *last_recv_ack = &relay->last_recv_ack;
-	struct relay_status_msg *status_msg = &relay->status_msg;
 	/*
 	 * Run the event loop until the connection is broken
 	 * or an error occurs.
@@ -980,32 +1018,7 @@ relay_subscribe_f(va_list ap)
 		 * Check that the vclock has been updated and the previous
 		 * status message is delivered
 		 */
-		if (status_msg->msg.route != NULL)
-			continue;
-		struct vclock *send_vclock;
-		if (relay->version_id < version_id(1, 7, 4))
-			send_vclock = &relay->r->vclock;
-		else
-			send_vclock = &last_recv_ack->vclock;
-
-		/* Collect xlog files received by the replica. */
-		relay_schedule_pending_gc(relay, send_vclock);
-
-		double tx_idle = ev_monotonic_now(loop()) - relay->tx_seen_time;
-		if (vclock_sum(&status_msg->vclock) ==
-		    vclock_sum(send_vclock) && tx_idle <= timeout &&
-		    status_msg->vclock_sync == last_recv_ack->vclock_sync)
-			continue;
-		static const struct cmsg_hop route[] = {
-			{tx_status_update, NULL}
-		};
-		cmsg_init(&status_msg->msg, route);
-		vclock_copy(&status_msg->vclock, send_vclock);
-		status_msg->txn_lag = relay->txn_lag;
-		status_msg->relay = relay;
-		status_msg->term = last_recv_ack->term;
-		status_msg->vclock_sync = last_recv_ack->vclock_sync;
-		cpipe_push(&relay->tx_pipe, &status_msg->msg);
+		relay_check_status_needs_update(relay);
 	}
 
 	/*
