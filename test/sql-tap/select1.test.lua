@@ -1510,26 +1510,6 @@ test:do_execsql_test(
         -- </select1-8.3>
     })
 
--- TODO: This test is failing because f1 is now being loaded off the
--- disk as a vdbe integer, not a string. Hence the value of f1/(f1-11)
--- changes because of rounding. Disable the test for now.
-local is_gh_5737_closed = false
-if is_gh_5737_closed
- then
-    test:do_execsql_test(
-        "select1-8.4",
-        [[
-            SELECT coalesce(f1/(f1-11),'x'),
-                   coalesce(min(f1/(f1-11),5),'y'),
-                   coalesce(max(f1/(f1-33),6),'z')
-            FROM test1 ORDER BY f1
-        ]], {
-            -- <select1-8.4>
-            "x", "y", 6, 1.5, 1.5, "z"
-            -- </select1-8.4>
-        })
-
-end
 test:do_execsql_test(
     "select1-8.5",
     [[
