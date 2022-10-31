@@ -188,6 +188,21 @@ level_to_syslog_priority(int level)
 	}
 }
 
+/**
+ * Helper function that fills the given tm struct with the current local time.
+ * tm_sec is set to the number of seconds that passed since the last minute
+ * (0-60). Note, in contrast to tm.tm_sec, it has a fractional part.
+ */
+static void
+get_current_time(struct tm *tm, double *tm_sec)
+{
+	/* Don't use ev_now() since it requires a working event loop. */
+	ev_tstamp now = ev_time();
+	time_t now_seconds = (time_t)now;
+	localtime_r(&now_seconds, tm);
+	*tm_sec = now - now_seconds + tm->tm_sec;
+}
+
 enum say_logger_type
 log_type(void)
 {
@@ -872,17 +887,14 @@ say_format_plain(struct log *log, char *buf, int len, int level, const char *fil
 		 const char *error, const char *format, va_list ap)
 {
 	(void) log;
-	/* Don't use ev_now() since it requires a working event loop. */
-	ev_tstamp now = ev_time();
-	time_t now_seconds = (time_t) now;
 	struct tm tm;
-	localtime_r(&now_seconds, &tm);
+	double tm_sec;
+	get_current_time(&tm, &tm_sec);
 
 	/* Print time in format 2012-08-07 18:30:00.634 */
 	int total = strftime(buf, len, "%F %H:%M", &tm);
 	buf += total, len -= total;
-	SNPRINT(total, snprintf, buf, len, ":%06.3f",
-		now - now_seconds + tm.tm_sec);
+	SNPRINT(total, snprintf, buf, len, ":%06.3f", tm_sec);
 
 	/* Print pid */
 	SNPRINT(total, snprintf, buf, len, " [%i]", getpid());
@@ -909,15 +921,12 @@ say_format_json(struct log *log, char *buf, int len, int level, const char *file
 
 	SNPRINT(total, snprintf, buf, len, "{\"time\": \"");
 
-	/* Don't use ev_now() since it requires a working event loop. */
-	ev_tstamp now = ev_time();
-	time_t now_seconds = (time_t) now;
 	struct tm tm;
-	localtime_r(&now_seconds, &tm);
+	double tm_sec;
+	get_current_time(&tm, &tm_sec);
 	int written = strftime(buf, len, "%FT%H:%M", &tm);
 	buf += written, len -= written, total += written;
-	SNPRINT(total, snprintf, buf, len, ":%06.3f",
-			now - now_seconds + tm.tm_sec);
+	SNPRINT(total, snprintf, buf, len, ":%06.3f", tm_sec);
 	written = strftime(buf, len, "%z", &tm);
 	buf += written, len -= written, total += written;
 	SNPRINT(total, snprintf, buf, len, "\", ");
@@ -992,11 +1001,9 @@ static int
 say_format_syslog(struct log *log, char *buf, int len, int level, const char *filename,
 		  int line, const char *error, const char *format, va_list ap)
 {
-	/* Don't use ev_now() since it requires a working event loop. */
-	ev_tstamp now = ev_time();
-	time_t now_seconds = (time_t) now;
 	struct tm tm;
-	localtime_r(&now_seconds, &tm);
+	double tm_sec;
+	get_current_time(&tm, &tm_sec);
 
 	int total = 0;
 
