@@ -9,7 +9,7 @@
 
 #define ITEMS		7
 
-struct test {
+struct PACKED test {
 	char ch;
 	int  no;
 	struct stailq_entry next;

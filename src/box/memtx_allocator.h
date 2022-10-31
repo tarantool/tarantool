@@ -39,10 +39,8 @@
 
 /**
  * Memtx tuple sub-class.
- *
- * FIXME(gh-7422): Make this struct packed.
  */
-struct memtx_tuple {
+struct PACKED memtx_tuple {
 	/*
 	 * Sic: The header of the tuple is used to store a link in
 	 * a tuple garbage collection list. Please don't change it
