@@ -62,6 +62,7 @@ restart:
 			assert(f->caller->caller == &cord->sched);
 		}
 		cmsg_deliver(msg);
+		fiber_check_gc();
 		/*
 		 * Normally fibers die after their function
 		 * returns, and they call on_stop() triggers. The

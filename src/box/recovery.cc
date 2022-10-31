@@ -361,8 +361,6 @@ recover_current_wal:
 
 	if (stop_vclock != NULL && vclock_compare(&r->vclock, stop_vclock) != 0)
 		tnt_raise(XlogGapError, &r->vclock, stop_vclock);
-
-	region_free(&fiber()->gc);
 }
 
 void
@@ -472,7 +470,7 @@ hot_standby_f(va_list ap)
 	WalSubscription subscription(r->wal_dir.dirname);
 
 	while (! fiber_is_cancelled()) {
-
+		FiberGCChecker gc_check;
 		/*
 		 * Recover until there is no new stuff which appeared in
 		 * the log dir while recovery was running.

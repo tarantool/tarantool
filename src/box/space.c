@@ -467,6 +467,7 @@ space_before_replace(struct space *space, struct txn *txn,
 	uint32_t part_count = 0;
 	struct index *index = NULL;
 	struct tuple *old_tuple = NULL;
+	size_t region_svp = region_used(&fiber()->gc);
 
 	/*
 	 * Lookup the old tuple.
@@ -506,11 +507,12 @@ space_before_replace(struct space *space, struct txn *txn,
 		return 0;
 	}
 
-	if (exact_key_validate(index->def->key_def, key, part_count) != 0)
+	if (exact_key_validate(index->def->key_def, key, part_count) != 0 ||
+	    index_get(index, key, part_count, &old_tuple) != 0) {
+		region_truncate(&fiber()->gc, region_svp);
 		return -1;
-
-	if (index_get(index, key, part_count, &old_tuple) != 0)
-		return -1;
+	}
+	region_truncate(&fiber()->gc, region_svp);
 
 after_old_tuple_lookup:;
 
@@ -582,6 +584,7 @@ after_old_tuple_lookup:;
 	if (new_data != NULL) {
 		new_tuple = tuple_new(tuple_format_runtime,
 				      new_data, new_data_end);
+		region_truncate(&fiber()->gc, region_svp);
 		if (new_tuple == NULL)
 			return -1;
 		tuple_ref(new_tuple);

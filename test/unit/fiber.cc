@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "memory.h"
 #include "fiber.h"
@@ -10,6 +11,7 @@ static struct fiber_attr default_attr;
 
 static unsigned long page_size;
 #define PAGE_4K 4096
+#define BUF_SIZE 1024
 
 /** Total count of allocated fibers in the cord. Including dead ones. */
 static int
@@ -374,6 +376,120 @@ cord_cojoin_test(void)
 	footer();
 }
 
+static void
+fiber_test_defaults()
+{
+	header();
+
+#ifdef ENABLE_LEAK_BACKTRACE
+#ifndef NDEBUG
+	fail_if(!fiber_leak_backtrace_enable);
+#else
+	fail_if(fiber_leak_backtrace_enable);
+#endif
+#endif
+
+#ifdef ABORT_ON_LEAK
+	fail_if(!fiber_abort_on_gc_leak);
+#else
+	fail_if(fiber_abort_on_gc_leak);
+#endif
+
+	footer();
+}
+
+static NOINLINE int
+leaker_f(va_list ap)
+{
+	region_alloc(&fiber()->gc, 1);
+	return 0;
+}
+
+static void
+fiber_test_leak(bool backtrace_enabled)
+{
+	header();
+
+#ifdef ENABLE_LEAK_BACKTRACE
+	bool leak_save = fiber_leak_backtrace_enable;
+	fiber_leak_backtrace_enable = backtrace_enabled;
+#endif
+	bool abort_save = fiber_abort_on_gc_leak;
+	fiber_abort_on_gc_leak = false;
+
+	int fd = open("log.txt", O_RDONLY);
+	fail_if(fd == -1);
+	int rc = lseek(fd, 0, SEEK_END);
+	fail_if(rc == -1);
+
+	struct fiber *fiber = fiber_new_xc("leak", leaker_f);
+	fiber_set_joinable(fiber, true);
+	fiber_wakeup(fiber);
+	fiber_join(fiber);
+
+#ifdef ENABLE_LEAK_BACKTRACE
+	fiber_leak_backtrace_enable = leak_save;
+#endif
+	fiber_abort_on_gc_leak = abort_save;
+
+	char buf[BUF_SIZE];
+	rc = read(fd, buf, BUF_SIZE - 1);
+	close(fd);
+	fail_if(rc == -1);
+	buf[rc] = '\0';
+
+#ifdef ENABLE_LEAK_BACKTRACE
+	if (backtrace_enabled) {
+		const char *msg = "Fiber gc leak is found. "
+				  "First leaked fiber gc allocation"
+				  " backtrace:";
+		char *s = strstr(buf, msg);
+		fail_unless(s != NULL);
+		/*
+		 * Do not test for `region_alloc` frame as it is inlined
+		 * in release build.
+		 */
+		s = strstr(s, "leaker_f");
+		fail_unless(s != NULL);
+		s = strstr(s, "fiber_cxx_invoke");
+		fail_unless(s != NULL);
+	} else {
+		const char *msg =
+			"Fiber gc leak is found. "
+			"Leak backtrace is not available. "
+			"Make sure fiber.leak_backtrace_enable() is called"
+			" before starting this fiber to obtain "
+			" the backtrace.";
+		char *s = strstr(buf, msg);
+		fail_unless(s != NULL);
+	}
+#else
+	const char *msg =
+			"Fiber gc leak is found. "
+			"Leak backtrace is not available on your platform.";
+	char *s = strstr(buf, msg);
+	fail_unless(s != NULL);
+#endif
+
+	footer();
+}
+
+static void
+fiber_test_leak_modes()
+{
+	say_logger_init("log.txt", S_ERROR,
+			/* nonblock =*/ 0, "plain");
+
+	/*
+	 * Run two times even when ENABLE_LEAK_BACKTRACE is not defined as
+	 * we have .result file.
+	 */
+	fiber_test_leak(/* backtrace_enabled =*/ true);
+	fiber_test_leak(/* backtrace_enabled =*/ false);
+
+	say_logger_free();
+}
+
 static int
 main_f(va_list ap)
 {
@@ -386,6 +502,8 @@ main_f(va_list ap)
 	fiber_flags_respect_test();
 	fiber_wait_on_deadline_test();
 	cord_cojoin_test();
+	fiber_test_defaults();
+	fiber_test_leak_modes();
 	ev_break(loop(), EVBREAK_ALL);
 	return 0;
 }

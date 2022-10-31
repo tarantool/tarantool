@@ -615,6 +615,7 @@ cbus_loop(struct cbus_endpoint *endpoint)
 {
 	while (true) {
 		cbus_process(endpoint);
+		fiber_check_gc();
 		if (fiber_is_cancelled())
 			break;
 		fiber_yield();

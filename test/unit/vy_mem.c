@@ -55,7 +55,6 @@ test_basic(void)
 	/* Clean up */
 	vy_mem_delete(mem);
 
-	fiber_gc();
 	footer();
 
 	check_plan();
@@ -289,8 +288,6 @@ test_iterator_restore_after_insertion(void)
 	tuple_unref(select_key.stmt);
 	tuple_unref(restore_on_key.stmt);
 	tuple_unref(restore_on_key_reverse.stmt);
-
-	fiber_gc();
 
 	check_plan();
 

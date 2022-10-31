@@ -288,6 +288,7 @@ gc_cleanup_fiber_f(va_list ap)
 	 * Stage 2: a regular cleanup cycle.
 	 */
 	while (!fiber_is_cancelled()) {
+		fiber_check_gc();
 		int64_t delta = gc.cleanup_scheduled - gc.cleanup_completed;
 		if (delta == 0) {
 			/* No pending garbage collection. */
@@ -575,6 +576,7 @@ gc_checkpoint_fiber_f(va_list ap)
 
 	struct checkpoint_schedule *sched = &gc.checkpoint_schedule;
 	while (!fiber_is_cancelled()) {
+		fiber_check_gc();
 		double timeout = checkpoint_schedule_timeout(sched,
 					ev_monotonic_now(loop()));
 		if (timeout > 0) {

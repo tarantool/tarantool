@@ -31,6 +31,8 @@
 #include "service_engine.h"
 #include "tuple.h"
 #include "schema.h"
+#include "small/region.h"
+#include "fiber.h"
 
 extern const struct space_vtab session_settings_space_vtab;
 
@@ -61,6 +63,7 @@ service_engine_create_space(struct engine *engine, struct space_def *def,
 		return NULL;
 	}
 	int key_count = 0;
+	size_t region_svp = region_used(&fiber()->gc);
 	struct key_def **keys = index_def_to_key_def(key_list, &key_count);
 	if (keys == NULL) {
 		free(space);
@@ -69,6 +72,7 @@ service_engine_create_space(struct engine *engine, struct space_def *def,
 	struct tuple_format *format =
 		space_tuple_format_new(&tuple_format_runtime->vtab,
 				       NULL, keys, key_count, def);
+	region_truncate(&fiber()->gc, region_svp);
 	if (format == NULL) {
 		free(space);
 		return NULL;

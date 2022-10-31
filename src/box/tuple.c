@@ -737,10 +737,8 @@ box_tuple_update(box_tuple_t *tuple, const char *expr, const char *expr_end)
 	const char *new_data =
 		xrow_update_execute(expr, expr_end, old_data, old_data + bsize,
 				    format, &new_size, 1, NULL);
-	if (new_data == NULL) {
-		region_truncate(region, used);
+	if (new_data == NULL)
 		return NULL;
-	}
 	struct tuple *ret = tuple_new(format, new_data, new_data + new_size);
 	region_truncate(region, used);
 	if (ret != NULL)
@@ -759,10 +757,8 @@ box_tuple_upsert(box_tuple_t *tuple, const char *expr, const char *expr_end)
 	const char *new_data =
 		xrow_upsert_execute(expr, expr_end, old_data, old_data + bsize,
 				    format, &new_size, 1, false, NULL);
-	if (new_data == NULL) {
-		region_truncate(region, used);
+	if (new_data == NULL)
 		return NULL;
-	}
 
 	struct tuple *ret = tuple_new(format, new_data, new_data + new_size);
 	region_truncate(region, used);

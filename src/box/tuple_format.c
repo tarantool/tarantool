@@ -1016,6 +1016,7 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 
 	void *required_fields = NULL;
 	uint32_t required_fields_sz = BITMAP_SIZE(format->total_field_count);
+	size_t region_svp = region_svp = region_used(&fiber()->gc);
 
 	if (unlikely(defined_field_count == 0)) {
 		required_fields = format->required_fields;
@@ -1043,18 +1044,18 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 					 tuple_field_path(field, format),
 					 field_type_strs[field->type],
 					 mp_type_strs[mp_typeof(*pos)]);
-				return -1;
+				goto error;
 			}
 			if (tuple_field_check_constraint(field, pos,
 							 next_pos) != 0)
-				return -1;
+				goto error;
 			bit_clear(required_fields, field->id);
 		}
 		if (field->offset_slot != TUPLE_OFFSET_SLOT_NIL &&
 		    field_map_builder_set_slot(builder, field->offset_slot,
 					       pos - tuple, MULTIKEY_NONE,
 					       0, NULL) != 0) {
-			return -1;
+			goto error;
 		}
 	}
 
@@ -1062,8 +1063,13 @@ end:
 	if (!validate)
 		return 0;
 
-	return tuple_format_required_fields_validate(format, required_fields,
-						     required_fields_sz);
+	int ret = tuple_format_required_fields_validate(format, required_fields,
+							required_fields_sz);
+	region_truncate(&fiber()->gc, region_svp);
+	return ret;
+error:
+	region_truncate(&fiber()->gc, region_svp);
+	return -1;
 }
 
 /** @sa declaration for details. */

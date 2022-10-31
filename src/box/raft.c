@@ -139,6 +139,7 @@ box_raft_worker_f(va_list args)
 	struct raft *raft = fiber()->f_arg;
 	assert(raft == box_raft());
 	while (!fiber_is_cancelled()) {
+		fiber_check_gc();
 		box_raft_has_work = false;
 
 		raft_process_async(raft);

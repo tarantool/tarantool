@@ -330,6 +330,7 @@ watchable_worker_f(va_list ap)
 	struct watchable *watchable = fiber()->f_arg;
 	assert(watchable->worker == fiber());
 	while (!fiber_is_cancelled()) {
+		fiber_check_gc();
 		if (!watchable_run(watchable)) {
 			/* No more watchers to run, wait... */
 			fiber_sleep(TIMEOUT_INFINITY);

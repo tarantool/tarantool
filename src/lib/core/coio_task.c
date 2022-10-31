@@ -165,6 +165,7 @@ coio_on_feed(eio_req *req)
 	req->result = task->task_cb(task);
 	if (req->result)
 		diag_move(diag_get(), &task->diag);
+	fiber_check_gc();
 }
 
 /**

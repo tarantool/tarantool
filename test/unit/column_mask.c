@@ -130,6 +130,7 @@ check_update_result(const struct tuple_template *original,
 	uint32_t actual_len;
 	uint64_t column_mask;
 	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
 	const char *actual =
 		xrow_update_execute(ops, ops_end, old, old_end,
 				    box_tuple_format_default(),
@@ -138,7 +139,7 @@ check_update_result(const struct tuple_template *original,
 	is((int32_t)actual_len, new_end - new, "check result length");
 	is(memcmp(actual, new, actual_len), 0, "tuple update is correct");
 	is(column_mask, expected_mask, "column_mask is correct");
-	fiber_gc();
+	region_truncate(region, region_svp);
 
 	free(old);
 	free(new);

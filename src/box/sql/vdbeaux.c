@@ -2125,12 +2125,6 @@ sqlVdbeDelete(Vdbe * p)
 	p->magic = VDBE_MAGIC_DEAD;
 	p->db = 0;
 	free(p->var_pos);
-	/*
-	 * VDBE is responsible for releasing region after txn
-	 * was commited.
-	 */
-	if (in_txn() == NULL)
-		fiber_gc();
 	sqlDbFree(db, p);
 }
 

@@ -270,6 +270,7 @@ test_tuple_extract_key_raw_slowpath_nullable(void)
 	char *key_null_begin = test_key_new("[NILNIL%u]", 10);
 	fail_if(key_null_end == NULL || key_null_begin == NULL);
 
+	size_t region_svp = region_used(&fiber()->gc);
 	test_check_tuple_extract_key_raw(def_nullable_end, tuple,
 					 key_null_end);
 	test_check_tuple_extract_key_raw(def_nullable_begin, tuple,
@@ -280,7 +281,7 @@ test_tuple_extract_key_raw_slowpath_nullable(void)
 	tuple_delete(tuple);
 	free(key_null_end);
 	free(key_null_begin);
-	fiber_gc();
+	region_truncate(&fiber()->gc, region_svp);
 
 	footer();
 	check_plan();

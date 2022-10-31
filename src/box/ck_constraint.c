@@ -193,6 +193,7 @@ ck_constraint_on_replace_trigger(struct trigger *trigger, void *event)
 	struct vdbe_field_ref *field_ref;
 	size_t size = sizeof(field_ref->slots[0]) * space->def->field_count +
 		      sizeof(*field_ref);
+	size_t region_svp = region_used(&fiber()->gc);
 	field_ref = (struct vdbe_field_ref *)
 		region_aligned_alloc(&fiber()->gc, size, alignof(*field_ref));
 	if (field_ref == NULL) {
@@ -204,12 +205,16 @@ ck_constraint_on_replace_trigger(struct trigger *trigger, void *event)
 	vdbe_field_ref_prepare_tuple(field_ref, new_tuple);
 
 	struct ck_constraint *ck_constraint;
+	int rc = 0;
 	rlist_foreach_entry(ck_constraint, &space->ck_constraint, link) {
 		if (ck_constraint->def->is_enabled &&
-		    ck_constraint_program_run(ck_constraint, field_ref) != 0)
-			return -1;
+		    ck_constraint_program_run(ck_constraint, field_ref) != 0) {
+			rc = -1;
+			break;
+		}
 	}
-	return 0;
+	region_truncate(&fiber()->gc, region_svp);
+	return rc;
 }
 
 struct ck_constraint *

@@ -367,7 +367,11 @@ xrow_update_check_ops(const char *expr, const char *expr_end,
 {
 	struct xrow_update update;
 	xrow_update_init(&update, index_base);
-	return xrow_update_read_ops(&update, expr, expr_end, format->dict, 0);
+	size_t region_svp = region_used(&fiber()->gc);
+	int ret = xrow_update_read_ops(&update, expr, expr_end,
+				       format->dict, 0);
+	region_truncate(&fiber()->gc, region_svp);
+	return ret;
 }
 
 const char *
@@ -380,17 +384,26 @@ xrow_update_execute(const char *expr,const char *expr_end,
 	xrow_update_init(&update, index_base);
 	const char *header = old_data;
 	uint32_t field_count = mp_decode_array(&old_data);
+	size_t region_svp = region_used(&fiber()->gc);
 
 	if (xrow_update_read_ops(&update, expr, expr_end, format->dict,
 				 field_count) != 0)
-		return NULL;
+		goto error;
 	if (xrow_update_do_ops(&update, header, old_data, old_data_end,
 			       field_count) != 0)
-		return NULL;
+		goto error;
 	if (column_mask)
 		*column_mask = update.column_mask;
 
-	return xrow_update_finish(&update, format, p_tuple_len);
+	const char *ret = xrow_update_finish(&update, format, p_tuple_len);
+	if (ret == NULL)
+		goto error;
+
+	return ret;
+
+error:
+	region_truncate(&fiber()->gc, region_svp);
+	return NULL;
 }
 
 const char *
@@ -403,15 +416,24 @@ xrow_upsert_execute(const char *expr,const char *expr_end,
 	xrow_update_init(&update, index_base);
 	const char *header = old_data;
 	uint32_t field_count = mp_decode_array(&old_data);
+	size_t region_svp = region_used(&fiber()->gc);
 
 	if (xrow_update_read_ops(&update, expr, expr_end, format->dict,
 				 field_count) != 0)
-		return NULL;
+		goto error;
 	if (xrow_upsert_do_ops(&update, header, old_data, old_data_end,
 			       field_count, suppress_error) != 0)
-		return NULL;
+		goto error;
 	if (column_mask)
 		*column_mask = update.column_mask;
 
-	return xrow_update_finish(&update, format, p_tuple_len);
+	const char *ret = xrow_update_finish(&update, format, p_tuple_len);
+	if (ret == NULL)
+		goto error;
+
+	return ret;
+
+error:
+	region_truncate(&fiber()->gc, region_svp);
+	return NULL;
 }

@@ -71,6 +71,14 @@
  * showing fiber call stack.
  */
 #cmakedefine ENABLE_BACKTRACE 1
+/*
+ * Defined if configured with ABORT_ON_LEAK.
+ */
+#cmakedefine ABORT_ON_LEAK 1
+/*
+ * Defined if collecting leak backtrace have no issues.
+ */
+#cmakedefine ENABLE_LEAK_BACKTRACE 1
 
 /*
  * Set if the system has bfd.h header and GNU bfd library.

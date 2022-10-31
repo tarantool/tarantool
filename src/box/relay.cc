@@ -478,6 +478,7 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 
 	/* Respond to the JOIN request with the current vclock. */
 	struct xrow_header row;
+	RegionGuard region_guard(&fiber()->gc);
 	xrow_encode_vclock_xc(&row, vclock);
 	row.sync = sync;
 	coio_write_xrow(relay->io, &row);
@@ -742,6 +743,7 @@ relay_reader_f(va_list ap)
 	struct applier_heartbeat *last_recv_ack = &relay->last_recv_ack;
 	try {
 		while (!fiber_is_cancelled()) {
+			FiberGCChecker gc_check;
 			struct xrow_header xrow;
 			coio_read_xrow_timeout_xc(relay->io, &ibuf, &xrow,
 					replication_disconnect_timeout());
@@ -783,6 +785,7 @@ relay_send_heartbeat(struct relay *relay)
 	struct xrow_header row;
 	try {
 		++relay->last_sent_ack.vclock_sync;
+		RegionGuard region_guard(&fiber()->gc);
 		xrow_encode_relay_heartbeat_xc(&row, &relay->last_sent_ack);
 		row.tm = ev_now(loop());
 		row.replica_id = instance_id;
@@ -995,6 +998,7 @@ relay_subscribe_f(va_list ap)
 	 * or an error occurs.
 	 */
 	while (!fiber_is_cancelled()) {
+		FiberGCChecker gc_check;
 		double timeout = replication_timeout;
 		struct errinj *inj = errinj(ERRINJ_RELAY_REPORT_INTERVAL,
 					    ERRINJ_DOUBLE);
@@ -1120,7 +1124,6 @@ relay_send(struct relay *relay, struct xrow_header *packet)
 	packet->sync = relay->sync;
 	relay->last_row_time = ev_monotonic_now(loop());
 	coio_write_xrow(relay->io, packet);
-	fiber_gc();
 
 	struct errinj *inj = errinj(ERRINJ_RELAY_TIMEOUT, ERRINJ_DOUBLE);
 	if (inj != NULL && inj->dparam > 0)
@@ -1148,6 +1151,7 @@ relay_raft_msg_push(struct cmsg *base)
 {
 	struct relay_raft_msg *msg = (struct relay_raft_msg *)base;
 	struct xrow_header row;
+	RegionGuard region_guard(&fiber()->gc);
 	xrow_encode_raft(&row, &fiber()->gc, &msg->req);
 	try {
 		relay_send(msg->relay, &row);

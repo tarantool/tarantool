@@ -98,6 +98,7 @@ coio_read_xrow_timeout_xc(struct iostream *io, struct ibuf *in,
 void
 coio_write_xrow(struct iostream *io, const struct xrow_header *row)
 {
+	RegionGuard region_guard(&fiber()->gc);
 	struct iovec iov[XROW_IOVMAX];
 	int iovcnt = xrow_to_iovec_xc(row, iov);
 	if (coio_writev(io, iov, iovcnt, 0) < 0)

@@ -828,6 +828,7 @@ vy_deferred_delete_process_one(struct space *deferred_delete_space,
 			       struct vy_deferred_delete_stmt *stmt)
 {
 	int64_t lsn = vy_stmt_lsn(stmt->new_stmt);
+	int ret = -1;
 
 	struct tuple *delete;
 	delete = vy_stmt_new_surrogate_delete(format, stmt->old_stmt);
@@ -839,6 +840,7 @@ vy_deferred_delete_process_one(struct space *deferred_delete_space,
 
 	size_t buf_size = (mp_sizeof_array(3) + mp_sizeof_uint(space_id) +
 			   mp_sizeof_uint(lsn) + delete_data_size);
+	size_t region_svp = region_used(&fiber()->gc);
 	char *data = region_alloc(&fiber()->gc, buf_size);
 	if (data == NULL) {
 		diag_set(OutOfMemory, buf_size, "region", "buf");
@@ -865,15 +867,18 @@ vy_deferred_delete_process_one(struct space *deferred_delete_space,
 
 	struct txn *txn = in_txn();
 	if (txn_begin_stmt(txn, deferred_delete_space, request.type) != 0)
-		return -1;
+		goto cleanup;
 
 	struct tuple *unused;
 	if (space_execute_dml(deferred_delete_space, txn,
 			      &request, &unused) != 0) {
 		txn_rollback_stmt(txn);
-		return -1;
+		goto cleanup;
 	}
-	return txn_commit_stmt(txn, &request);
+	ret = txn_commit_stmt(txn, &request);
+cleanup:
+	region_truncate(&fiber()->gc, region_svp);
+	return ret;
 }
 
 /**
@@ -924,12 +929,10 @@ vy_deferred_delete_batch_process_f(struct cmsg *cmsg)
 
 	if (txn_commit(txn) != 0)
 		goto fail;
-	fiber_gc();
 	return;
 
 fail_rollback:
 	txn_abort(txn);
-	fiber_gc();
 fail:
 	batch->is_failed = true;
 	diag_move(diag_get(), &batch->diag);
@@ -2005,6 +2008,7 @@ vy_scheduler_f(va_list va)
 		struct vy_task *task, *next;
 		int tasks_failed = 0, tasks_done = 0;
 
+		fiber_check_gc();
 		/* Get the list of processed tasks. */
 		stailq_create(&processed_tasks);
 		stailq_concat(&processed_tasks, &scheduler->processed_tasks);

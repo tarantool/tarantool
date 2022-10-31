@@ -803,7 +803,6 @@ main(int argc, char **argv)
 		 * of start_loop can be set to false by signal_cb().
 		 */
 		start_loop = start_loop && ev_activecnt(loop()) > events;
-		region_free(&fiber()->gc);
 		if (start_loop) {
 			say_info("entering the event loop");
 			systemd_snotify("READY=1");

@@ -617,7 +617,6 @@ test_basic(void)
 				       deferred, deferred_count,
 				       vlsns, vlsns_count, true, false);
 }
-	fiber_gc();
 	footer();
 	check_plan();
 }

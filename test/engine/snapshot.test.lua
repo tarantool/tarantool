@@ -49,12 +49,15 @@ test_run:cmd('restart server default')
 -- Check that box.snapshot() doesn't leave garbage one the region.
 -- https://github.com/tarantool/tarantool/issues/3732
 fiber = require('fiber')
+
+internal_usage = fiber.info()[fiber.self().id()].memory.used
+
 -- Should be 0.
-fiber.info()[fiber.self().id()].memory.used
+fiber.info()[fiber.self().id()].memory.used == internal_usage
 box.snapshot()
 -- Should be 0.
-fiber.info()[fiber.self().id()].memory.used
+fiber.info()[fiber.self().id()].memory.used == internal_usage
 box.snapshot()
 box.snapshot()
 -- Should be 0.
-fiber.info()[fiber.self().id()].memory.used
+fiber.info()[fiber.self().id()].memory.used == internal_usage

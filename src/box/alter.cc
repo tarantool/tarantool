@@ -329,6 +329,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 		if (key_def != NULL)
 			key_def_delete(key_def);
 	});
+	RegionGuard region_guard(&fiber()->gc);
 	if (key_def_decode_parts(part_def, part_count, &parts,
 				 space->def->fields,
 				 space->def->field_count, &fiber()->gc) != 0)
@@ -460,6 +461,7 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 		return NULL;
 	struct field_def *fields = NULL;
 	uint32_t field_count;
+	RegionGuard region_guard(&fiber()->gc);
 	if (field_def_array_decode(&format, &fields, &field_count, region) != 0)
 		return NULL;
 	if (exact_field_count != 0 &&
@@ -2364,6 +2366,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 */
 		struct key_def **keys;
 		size_t bsize;
+		RegionGuard region_guard(&fiber()->gc);
 		keys = region_alloc_array(&fiber()->gc, typeof(keys[0]),
 					  old_space->index_count, &bsize);
 		if (keys == NULL) {
@@ -2653,6 +2656,7 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 		 */
 		struct key_def **keys;
 		size_t bsize;
+		RegionGuard region_guard(&fiber()->gc);
 		keys = region_alloc_array(&fiber()->gc, typeof(keys[0]),
 					  old_space->index_count, &bsize);
 		if (keys == NULL) {
@@ -4849,6 +4853,7 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 		if (tuple_field_u32(old_tuple, BOX_TRIGGER_FIELD_SPACE_ID,
 				    &space_id) != 0)
 			return -1;
+		RegionGuard region_guard(&fiber()->gc);
 		char *trigger_name = (char *)region_alloc(&fiber()->gc,
 							  trigger_name_len + 1);
 		if (trigger_name == NULL)
@@ -4878,6 +4883,7 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 			return -1;
 		struct space_opts opts;
 		struct region *region = &fiber()->gc;
+		RegionGuard region_guard(region);
 		if (space_opts_decode(&opts, space_opts, region) != 0)
 			return -1;
 		struct sql_trigger *new_trigger =
@@ -5015,6 +5021,7 @@ fk_constraint_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 	if (identifier_check(name, name_len) != 0)
 		return NULL;
 	uint32_t link_count;
+	RegionGuard region_guard(&fiber()->gc);
 	struct field_link *links = decode_fk_links(tuple, &link_count, name,
 						   name_len, errcode);
 	if (links == NULL)
