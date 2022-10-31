@@ -68,6 +68,7 @@ local default_cfg = {
     log                 = log.cfg.log,
     log_nonblock        = log.cfg.nonblock,
     log_level           = log.cfg.level,
+    log_modules         = log.cfg.modules,
     log_format          = log.cfg.format,
 
     audit_log           = nil,
@@ -170,6 +171,7 @@ local template_cfg = {
     log                 = 'string',
     log_nonblock        = 'boolean',
     log_level           = 'number, string',
+    log_modules         = 'table',
     log_format          = 'string',
 
     audit_log           = 'string',
@@ -402,6 +404,7 @@ local dynamic_cfg_modules = {
         options = {
             log = true,
             log_level = true,
+            log_modules = true,
             log_format = true,
             log_nonblock = true,
         },
@@ -642,8 +645,8 @@ local function apply_env_cfg(cfg, env_cfg)
     end
 end
 
-local function merge_cfg(cfg, default_cfg)
-    for k,v in pairs(default_cfg) do
+local function merge_cfg(cfg, cur_cfg)
+    for k,v in pairs(cur_cfg) do
         if cfg[k] == nil then
             cfg[k] = v
         elseif type(v) == 'table' then

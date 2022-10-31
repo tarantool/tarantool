@@ -119,6 +119,7 @@ local default_cfg = {
     log             = nil,
     nonblock        = nil,
     level           = S_INFO,
+    modules         = nil,
     format          = fmt_num2str[ffi.C.SF_PLAIN],
 }
 
@@ -131,6 +132,7 @@ local log2box_keys = {
     ['log']             = 'log',
     ['nonblock']        = 'log_nonblock',
     ['level']           = 'log_level',
+    ['modules']         = 'log_modules',
     ['format']          = 'log_format',
 }
 
@@ -145,7 +147,8 @@ end
 -- Main routine which pass data to C logging code.
 local function say(self, level, fmt, ...)
     local name = self and self.name
-    local module_level = log_cfg.level
+    local module_level = name and log_cfg.modules and log_cfg.modules[name] or
+                         log_cfg.level
     if level > log_normalize_level(module_level) then
         return
     end
@@ -284,6 +287,7 @@ local option_types = {
     log = 'string',
     nonblock = 'boolean',
     level = 'number, string',
+    modules = 'table',
     format = 'string',
 }
 
@@ -304,16 +308,33 @@ local function log_C_cfg(cfg)
 end
 
 -- Check that level is a number or a valid string.
-local function log_check_level(level)
+local function log_check_level(level, option_name)
     if type(level) == 'string' and log_level_keys[level] == nil then
         local err = ("expected %s"):format(log_level_list())
-        box.error(box.error.CFG, "log_level", err)
+        box.error(box.error.CFG, option_name, err)
+    end
+end
+
+-- Check that the 'modules' table contains valid log levels.
+local function log_check_modules(modules)
+    if modules == nil then
+        return
+    end
+    for name, level in pairs(modules) do
+        if type(name) ~= 'string' then
+            error('Illegal parameters, module name should be a string')
+        end
+        local option_name = 'log_modules.' .. name
+        box.internal.check_cfg_option_type(option_types.level, option_name,
+                                           level)
+        log_check_level(level, option_name)
     end
 end
 
 -- Check cfg is valid and thus can be applied.
 local function log_check_cfg(cfg)
-    log_check_level(cfg.level)
+    log_check_level(cfg.level, 'log_level')
+    log_check_modules(cfg.modules)
 
     if log_initialized then
         if log_cfg.log ~= cfg.log then
@@ -371,9 +392,11 @@ local function set_log_format(format)
     log_debug("log: format set to '%s'", format)
 end
 
-local function log_configure(self, cfg)
-    cfg = box.internal.prepare_cfg(cfg, default_cfg, option_types)
-    box.internal.merge_cfg(cfg, log_cfg);
+local function log_configure(self, cfg, box_api)
+    if not box_api then
+        cfg = box.internal.prepare_cfg(cfg, default_cfg, option_types)
+        box.internal.merge_cfg(cfg, log_cfg);
+    end
 
     log_check_cfg(cfg)
     local cfg_C = log_C_cfg(cfg)
@@ -395,6 +418,7 @@ local function box_to_log_cfg()
     return {
         log = box.cfg.log,
         level = box.cfg.log_level,
+        modules = box.cfg.log_modules,
         format = box.cfg.log_format,
         nonblock = box.cfg.log_nonblock,
     }
@@ -443,10 +467,10 @@ log_main = {
     level = set_log_level,
     log_format = set_log_format,
     cfg = setmetatable(log_cfg, {
-        __call = log_configure,
+        __call = function(self, cfg) log_configure(self, cfg, false) end,
     }),
     box_api = {
-        cfg = function() log_configure(log_cfg, box_to_log_cfg()) end,
+        cfg = function() log_configure(log_cfg, box_to_log_cfg(), true) end,
         cfg_check = function() log_check_cfg(box_to_log_cfg()) end,
     },
     internal = {
