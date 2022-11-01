@@ -219,12 +219,13 @@ sql_execute_prepared(uint32_t stmt_id, const struct sql_bind *bind,
 					       bind_count, port, region);
 	}
 	/*
-	 * Clear all set from previous execution cycle
-	 * values to be bound.
+	 * Clear all set from previous execution cycle values to be bound and
+	 * remove autoincrement IDs generated in that cycle.
 	 */
 	sql_unbind(stmt);
 	if (sql_bind(stmt, bind, bind_count) != 0)
 		return -1;
+	sql_reset_autoinc_id_list(stmt);
 	enum sql_serialization_format format = sql_column_count(stmt) > 0 ?
 					       DQL_EXECUTE : DML_EXECUTE;
 	port_sql_create(port, stmt, format, false);
