@@ -171,6 +171,9 @@ local curl_symbols = {
     'curl_version_info',
 }
 
+-- TODO gh-7640 LuaJIT: ffi.C.dlsym() doesn't work on FreeBSD
+jit.off()
+
 test:test('curl_symbols', function(t)
     t:plan(#curl_symbols)
     for _, sym in ipairs(curl_symbols) do
