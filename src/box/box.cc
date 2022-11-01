@@ -735,53 +735,43 @@ wal_stream_create(struct wal_stream *ctx)
 
 /* {{{ configuration bindings */
 
-/*
- * Check log configuration validity.
- *
- * Used thru Lua FFI.
- */
-extern "C" int
-say_check_cfg(const char *log,
-	      MAYBE_UNUSED int level,
-	      int nonblock,
-	      const char *format_str)
+static void
+box_check_say(void)
 {
-	enum say_logger_type type = SAY_LOGGER_STDERR;
+	enum say_logger_type type = SAY_LOGGER_STDERR; /* default */
+	const char *log = cfg_gets("log");
 	if (log != NULL && say_parse_logger_type(&log, &type) < 0) {
-		diag_set(ClientError, ER_CFG, "log",
-			 diag_last_error(diag_get())->errmsg);
-		return -1;
+		tnt_raise(ClientError, ER_CFG, "log",
+			  diag_last_error(diag_get())->errmsg);
 	}
 	if (type == SAY_LOGGER_SYSLOG) {
 		struct say_syslog_opts opts;
 		if (say_parse_syslog_opts(log, &opts) < 0) {
 			if (diag_last_error(diag_get())->type ==
-			    &type_IllegalParams)
-				diag_set(ClientError, ER_CFG, "log",
-					 diag_last_error(diag_get())->errmsg);
-			return -1;
+			    &type_IllegalParams) {
+				tnt_raise(ClientError, ER_CFG, "log",
+					  diag_last_error(diag_get())->errmsg);
+			}
+			diag_raise();
 		}
 		say_free_syslog_opts(&opts);
 	}
 
-	enum say_format format = say_format_by_name(format_str);
-	if (format == say_format_MAX) {
-		diag_set(ClientError, ER_CFG, "log_format",
+	const char *log_format = cfg_gets("log_format");
+	enum say_format format = say_format_by_name(log_format);
+	if (format == say_format_MAX)
+		tnt_raise(ClientError, ER_CFG, "log_format",
 			 "expected 'plain' or 'json'");
-		return -1;
-	}
 	if (type == SAY_LOGGER_SYSLOG && format == SF_JSON) {
-		diag_set(ClientError, ER_CFG, "log_format",
-			 "'json' can't be used with syslog logger");
-		return -1;
+		tnt_raise(ClientError, ER_CFG, "log_format",
+			  "'json' can't be used with syslog logger");
 	}
-	if (nonblock == 1 &&
+	int log_nonblock = cfg_getb("log_nonblock");
+	if (log_nonblock == 1 &&
 	    (type == SAY_LOGGER_FILE || type == SAY_LOGGER_STDERR)) {
-		diag_set(ClientError, ER_CFG, "log_nonblock",
-			 "the option is incompatible with file/stderr logger");
-		return -1;
+		tnt_raise(ClientError, ER_CFG, "log_nonblock",
+			  "the option is incompatible with file/stderr logger");
 	}
-	return 0;
 }
 
 /**
@@ -1407,26 +1397,6 @@ box_check_txn_isolation(void)
 		return txn_isolation_level_MAX;
 	}
 	return (enum txn_isolation_level)level;
-}
-
-static void
-box_check_say()
-{
-	if (luaT_dostring(tarantool_L,
-			  "require('log').box_api.cfg_check()") != 0)
-		diag_raise();
-}
-
-int
-box_init_say()
-{
-	if (luaT_dostring(tarantool_L, "require('log').box_api.cfg()") != 0)
-		return -1;
-
-	if (cfg_geti("background") && say_set_background() != 0)
-		return -1;
-
-	return 0;
 }
 
 void

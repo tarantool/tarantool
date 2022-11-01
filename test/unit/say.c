@@ -167,7 +167,7 @@ int main()
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	say_logger_init("/dev/null", S_INFO, 0, "plain");
+	say_logger_init("/dev/null", S_INFO, 0, "plain", 0);
 
 	plan(33);
 

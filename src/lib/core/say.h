@@ -297,19 +297,8 @@ say_logrotate(struct ev_loop *, struct ev_signal *, int /* revents */);
 void
 say_logger_init(const char *init_str,
 		int log_level, int nonblock,
-		const char *log_format);
-
-/**
- * Turn on background mode for logger. Should be called after say_logger_init.
- *
- * If logger is NULL (writes to stderr) then stdout and stderr will be
- * redirected to /dev/null.
- *
- * Otherwise (logger writes to file, pipe etc) stdout and stderr will be
- * redirected to logger fd.
- */
-int
-say_set_background(void);
+		const char *log_format,
+		int background);
 
 /** Test if logger is initialized. */
 bool

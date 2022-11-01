@@ -236,6 +236,7 @@ lbox_socket_nonblock
 log_format
 log_level
 log_pid
+log_type
 luaJIT_profile_dumpstack
 luaJIT_profile_start
 luaJIT_profile_stop
@@ -425,10 +426,10 @@ prbuf_commit
 prbuf_iterator_create
 prbuf_iterator_next
 random_bytes
-say_check_cfg
 say_logger_init
 say_logger_initialized
 say_logrotate
+say_parse_logger_type
 say_set_log_format
 say_set_log_level
 SHA1internal

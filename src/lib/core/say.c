@@ -81,7 +81,7 @@ static const char logger_syntax_reminder[] =
  * True if Tarantool process runs in background mode, i.e. has no
  * controlling terminal.
  */
-static bool log_background;
+static bool log_background = true;
 
 static void
 say_default(int level, const char *filename, int line, const char *error,
@@ -722,17 +722,14 @@ say_logger_initialized(void)
 
 void
 say_logger_init(const char *init_str, int level, int nonblock,
-		const char *format)
+		const char *format, int background)
 {
 	/*
 	 * The logger may be early configured
 	 * by hands without configuing the whole box.
 	 */
-	if (say_logger_initialized()) {
-		say_set_log_level(level);
-		say_set_log_format(say_format_by_name(format));
+	if (say_logger_initialized())
 		return;
-	}
 
 	if (log_create(&log_std, init_str, nonblock) < 0)
 		goto fail;
@@ -752,47 +749,31 @@ say_logger_init(const char *init_str, int level, int nonblock,
 	}
 	_say = say_default;
 	say_set_log_level(level);
+	log_background = background;
 	log_pid = log_default->pid;
 	say_set_log_format(say_format_by_name(format));
 
+	if (background) {
+		fflush(stderr);
+		fflush(stdout);
+		if (log_default->fd == STDERR_FILENO) {
+			int fd = open("/dev/null", O_WRONLY);
+			if (fd < 0) {
+				diag_set(SystemError, "open /dev/null");
+				goto fail;
+			}
+			dup2(fd, STDERR_FILENO);
+			dup2(fd, STDOUT_FILENO);
+			close(fd);
+		} else {
+			dup2(log_default->fd, STDERR_FILENO);
+			dup2(log_default->fd, STDOUT_FILENO);
+		}
+	}
 	return;
 fail:
 	diag_log();
 	panic("failed to initialize logging subsystem");
-}
-
-int
-say_set_background(void)
-{
-	assert(say_logger_initialized());
-
-	if (log_background)
-		return 0;
-
-	log_background = true;
-
-	fflush(stderr);
-	fflush(stdout);
-
-	int fd;
-	int fd_null = -1;
-	if (log_default->fd == STDERR_FILENO) {
-		fd_null = open("/dev/null", O_WRONLY);
-		if (fd_null < 0) {
-			diag_set(SystemError, "open(/dev/null)");
-			return -1;
-		}
-		fd = fd_null;
-	} else {
-		fd = log_default->fd;
-	}
-
-	dup2(fd, STDERR_FILENO);
-	dup2(fd, STDOUT_FILENO);
-	if (fd_null != -1)
-		close(fd_null);
-
-	return 0;
 }
 
 void

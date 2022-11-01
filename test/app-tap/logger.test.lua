@@ -1,90 +1,21 @@
 #!/usr/bin/env tarantool
 
-local log = require('log')
-
 local test = require('tap').test('log')
-test:plan(104)
-
-local function test_invalid_cfg(cfg_method, cfg, name, expected)
-    local _, err = pcall(cfg_method, cfg)
-    test:ok(tostring(err):find(expected) ~= nil, name)
-end
-
-local function test_allowed_types(cfg_method, cfg, name, allowed_types)
-    local prefix
-    if string.find(allowed_types, ',') then
-        prefix = 'should be one of types '
-    else
-        prefix = 'should be of type '
-    end
-    test_invalid_cfg(cfg_method, cfg, name, prefix .. allowed_types)
-end
-
--- Test allowed types for options
-test_allowed_types(log.cfg, {log =  1},
-                   'log.cfg allowed log types', 'string')
-test_allowed_types(log.cfg, {level = true},
-                   'log.cfg allowed level types', 'number, string')
-test_allowed_types(log.cfg, {format = true},
-                   'log.cfg allowed format types', 'string')
-test_allowed_types(log.cfg, {nonblock = 'hi'},
-                   'log.cfg allowed nonblock types', 'boolean')
-test_allowed_types(box.cfg, {log = 1},
-                   'box.cfg allowed log types', 'string')
-test_allowed_types(box.cfg,{log_level = true},
-                   'box.cfg allowed log_level types', 'number, string')
-test_allowed_types(box.cfg, {log_format = true},
-                   'box.cfg allowed log_format types', 'string')
-test_allowed_types(box.cfg, {log_nonblock = 'hi'},
-                   'box.cfg allowed log_nonblock types', 'boolean')
-
--- Test other invalid inputs
-
-test_invalid_cfg(log.cfg, {log = 'syslog:', format = 'json'},
-                 "log.cfg syslog and json",
-                 "'json' can't be used with syslog logger")
-test_invalid_cfg(box.cfg, {log = 'syslog:', log_format = 'json'},
-                 "box.cfg syslog and json",
-                 "'json' can't be used with syslog logger")
-
--- Don't check all invalid inputs for both box.cfg and log.cfg as
--- now they use same check function.
-
--- gh-7447
-test_invalid_cfg(log.cfg, {log = 'syslog:xxx'},
-                 "log.cfg invalid syslog",
-                 "bad option 'xxx'")
-
-test_invalid_cfg(log.cfg, {log = 'xxx:'},
-                 "log.cfg invalid logger prefix",
-                 "expecting a file name or a prefix, such as " ..
-                    "'|', 'pipe:', 'syslog:'")
-
-test_invalid_cfg(log.cfg, {format = 'xxx'},
-                 "log.cfg invalid format",
-                 "expected 'plain' or 'json'")
-
-test_invalid_cfg(log.cfg, {nonblock = true},
-                 "log.cfg nonblock and stderr",
-                 'the option is incompatible with file/stderr logger')
-
-test_invalid_cfg(log.cfg, {log = '1.log', nonblock = true},
-                 "log.cfg nonblock and file",
-                 'the option is incompatible with file/stderr logger')
-
-test_invalid_cfg(log.cfg, {format = 'xxx'},
-                 "log.cfg invalid format",
-                 "expected 'plain' or 'json'")
-
-test_invalid_cfg(log.cfg, {xxx = 1},
-                 "log.cfg unexpected option",
-                 'unexpected option')
+test:plan(64)
 
 --
 -- gh-5121: Allow to use 'json' output before box.cfg()
 --
+local log = require('log')
 local _, err = pcall(log.log_format, 'json')
 test:ok(err == nil)
+
+-- We're not allowed to use json with syslog though.
+_, err = pcall(log.cfg, {log='syslog:', format='json'})
+test:ok(tostring(err):find("can\'t be used with syslog logger") ~= nil)
+
+_, err = pcall(box.cfg, {log='syslog:', log_format='json'})
+test:ok(tostring(err):find("can\'t be used with syslog logger") ~= nil)
 
 -- switch back to plain to next tests
 log.log_format('plain')
@@ -140,14 +71,6 @@ local line = file:read()
 local s = json.decode(line)
 test:ok(s['message'] == message, "message match")
 
--- Try to change options that can't be changed on first box.cfg()
-test_invalid_cfg(box.cfg, {log = '2.log'},
-                 "reconfigure logger thru first box.cfg",
-                 "Can't set option 'log' dynamically")
-test_invalid_cfg(box.cfg, {log_nonblock = true},
-                 "reconfigure nonblock thru first box.cfg",
-                 "Can't set option 'log_nonblock' dynamically")
-
 -- Now switch to box.cfg interface
 box.cfg{
     log = filename,
@@ -160,41 +83,21 @@ verify_keys("box.cfg")
 
 -- Test symbolic names for loglevels
 log.cfg({level='fatal'})
-test:ok(log.cfg.level == 'fatal' and box.cfg.log_level == 'fatal',
-        'both got fatal')
+test:ok(log.cfg.level == 0 and box.cfg.log_level == 0, 'both got fatal')
 log.cfg({level='syserror'})
-test:ok(log.cfg.level == 'syserror' and box.cfg.log_level == 'syserror',
-        'both got syserror')
+test:ok(log.cfg.level == 1 and box.cfg.log_level == 1, 'both got syserror')
 log.cfg({level='error'})
-test:ok(log.cfg.level == 'error' and box.cfg.log_level == 'error',
-        'both got error')
+test:ok(log.cfg.level == 2 and box.cfg.log_level == 2, 'both got error')
 log.cfg({level='crit'})
-test:ok(log.cfg.level == 'crit' and box.cfg.log_level == 'crit',
-        'both got crit')
+test:ok(log.cfg.level == 3 and box.cfg.log_level == 3, 'both got crit')
 log.cfg({level='warn'})
-test:ok(log.cfg.level == 'warn' and box.cfg.log_level == 'warn',
-        'both got warn')
+test:ok(log.cfg.level == 4 and box.cfg.log_level == 4, 'both got warn')
 log.cfg({level='info'})
-test:ok(log.cfg.level == 'info' and box.cfg.log_level == 'info',
-        'both got info')
+test:ok(log.cfg.level == 5 and box.cfg.log_level == 5, 'both got info')
 log.cfg({level='verbose'})
-test:ok(log.cfg.level == 'verbose' and box.cfg.log_level == 'verbose',
-        'both got verbose')
+test:ok(log.cfg.level == 6 and box.cfg.log_level == 6, 'both got verbose')
 log.cfg({level='debug'})
-test:ok(log.cfg.level == 'debug' and box.cfg.log_level == 'debug',
-        'both got debug')
-
-log.cfg{level = 4}
-test:ok(log.cfg.level == 4, "log.cfg number level then read log.cfg")
-test:ok(box.cfg.log_level == 4, "log.cfg number level then read box.cfg")
-
-box.cfg{log_level = 5}
-test:ok(log.cfg.level == 5, "box.cfg number level then read log.cfg")
-test:ok(box.cfg.log_level == 5, "box.cfg number level then read box.cfg")
-
-box.cfg{log_level = 'warn'}
-test:ok(log.cfg.level == 'warn', "box.cfg string level then read log.cfg")
-test:ok(box.cfg.log_level == 'warn', "box.cfg string level then read box.cfg")
+test:ok(log.cfg.level == 7 and box.cfg.log_level == 7, 'both got debug')
 
 box.cfg{
     log = filename,
@@ -202,51 +105,24 @@ box.cfg{
     memtx_memory = 107374182,
 }
 
--- Try to change options that can't be changed on non-first box.cfg()
-test_invalid_cfg(box.cfg, {log = '2.log'},
-                 "reconfigure logger thru non-first box.cfg",
-                 "Can't set option 'log' dynamically")
+-- Now try to change a static field.
+_, err = pcall(box.cfg, {log_level = 5, log = "2.txt"})
+test:ok(tostring(err):find("Can't set option 'log' dynamically") ~= nil,
+        "box.cfg.log cannot be set dynamically")
 test:ok(box.cfg.log == filename, "filename match")
 test:ok(box.cfg.log_level == 6, "loglevel match")
 verify_keys("box.cfg static error")
 
-test_invalid_cfg(box.cfg, {log_nonblock = true},
-                 "reconfigure nonblock thru non-first box.cfg",
-                 "Can't set option 'log_nonblock' dynamically")
-
--- Test invalid values for setters
-
-_, err = pcall(log.log_format, {})
-test:ok(tostring(err):find('should be of type string') ~= nil,
-        "invalid format setter value type")
-
-_, err = pcall(log.level, {})
-test:ok(tostring(err):find('should be one of types number, string') ~= nil,
-        "invalid format setter value type")
-
 -- Change format and levels.
-
 _, err = pcall(log.log_format, 'json')
-test:ok(err == nil, "format setter result")
-test:ok(log.cfg.format == 'json', "format setter cfg")
-verify_keys("format setter verify keys")
-
+test:ok(err == nil, "change to json")
 _, err = pcall(log.level, 1)
-test:ok(err == nil, "level setter number result")
-test:ok(log.cfg.level == 1, "level setter number cfg")
-verify_keys("level setter number verify keys")
-
-_, err = pcall(log.level, 'warn')
 test:ok(err == nil, "change log level")
-test:ok(log.cfg.level == 'warn', "level setter string")
-verify_keys("level setter string verify keys")
+verify_keys("log change json and level")
 
--- Check reset works thru log.cfg
-log.cfg{level = box.NULL}
-test:ok(log.cfg.level == 5, "reset of level thru log.cfg")
-
-log.cfg{format = ""}
-test:ok(log.cfg.format == 'plain', "reset of plain thru log.cfg")
+-- Restore defaults
+log.log_format('plain')
+log.level(5)
 
 --
 -- Check that Tarantool creates ADMIN session for #! script

@@ -319,12 +319,6 @@ box_get_flightrec_cfg(struct flight_recorder_cfg *cfg);
 int
 box_configure_flightrec(void);
 
-/**
- * Initialize logger on box init.
- */
-int
-box_init_say();
-
 extern "C" {
 #endif /* defined(__cplusplus) */
 

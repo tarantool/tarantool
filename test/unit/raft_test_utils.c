@@ -627,7 +627,7 @@ raft_run_test(const char *log_file, fiber_func test)
 	int fd = open(log_file, O_TRUNC);
 	if (fd != -1)
 		close(fd);
-	say_logger_init(log_file, 5, 1, "plain");
+	say_logger_init(log_file, 5, 1, "plain", 0);
 	/* Print the seed to be able to reproduce a bug with the same seed. */
 	say_info("Random seed = %llu", (unsigned long long) seed);
 

@@ -499,7 +499,8 @@ test_main()
 int
 main()
 {
-	say_logger_init("/dev/null", S_INFO, /*nonblock=*/true, "plain");
+	say_logger_init("/dev/null", S_INFO, /*nonblock=*/true, "plain",
+			/*background=*/false);
 	clock_lowres_signal_init();
 	memory_init();
 	fiber_init(fiber_c_invoke);
