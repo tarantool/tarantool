@@ -198,16 +198,6 @@ Want to disable ANSI color support or disable GNU readline? Set the `NO_COLOR`.
 Known Issues:
 -
 
-- Debugger REPL is not yet compatible with Tarantool console, i.e. this
-  code will hang in terminal
-
-```lua
-tarantool> dbg = require 'luadebug'
-tarantool> dbg()
-```
-  One should call debugger activation only in their instrumented code, not
-  from interactive console.
-
 - Lua 5.1 lacks the API to access varargs. The workaround is to do something like `local args = {...}` and then use `unpack(args)` when you want to access them. In Lua 5.2+ and LuaJIT, you can simply use `...` in your expressions with the print command.
 - You can't add breakpoints to a running program or remove them. Currently the only way to set them is by explicitly calling the `dbg()` function explicitly in your code. (This is sort of by design and sort of because it's difficult/slow otherwise.)
 - Different interpreters (and versions) print out slightly different stack trace information.
