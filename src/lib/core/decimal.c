@@ -47,7 +47,7 @@ static __thread decContext decimal_context = {
 	/* Maximum precision during operations. */
 	DECIMAL_MAX_DIGITS,
 	/*
-	 * Maximum decimal lagarithm of the number.
+	 * Maximum decimal logarithm of the number.
 	 * Allows for precision = DECIMAL_MAX_DIGITS
 	 */
 	DECIMAL_MAX_DIGITS - 1,
@@ -62,7 +62,7 @@ static __thread decContext decimal_context = {
 	DECIMAL_ROUNDING,
 	/* Turn off signalling for failed operations. */
 	0,
-	/* Status holding occured events. Initially empty. */
+	/* Status holding occurred events. Initially empty. */
 	0,
 	/* Turn off exponent clamping. */
 	0
@@ -449,6 +449,33 @@ decimal_pack(char *data, const decimal_t *dec)
 	return data;
 }
 
+/*
+ * Amount of digits the structure can actually hold. Might be bigger than
+ * DECIMAL_MAX_DIGITS if DECIMAL_MAX_DIGITS is not divisible by DECDPUN.
+ */
+#define DECIMAL_DIGIT_CAPACITY (DECNUMUNITS * DECDPUN)
+static_assert(DECIMAL_DIGIT_CAPACITY >= DECIMAL_MAX_DIGITS,
+	      "DECIMAL_DIGIT_CAPACITY must be big enough to hold "
+	      "DECIMAL_MAX_DIGITS");
+
+/*
+ * Packed decimal representation is a BCD array (binary coded decimal),
+ * containing 2 digits per byte, except one last nibble containing the sign.
+ * So an input string of length L might fill up 2 * L - 1 digits.
+ *
+ * If DECIMAL_DIGIT_CAPACITY (CAP for short) is odd, we're fine. This is true
+ * for now, because CAP = DECDPUN(3) * DECNUMUNITS(13) = 39, and maximum string
+ * length (20) holds exactly 39 digits.
+ *
+ * OTOH, if CAP becomes even, this means max safe input will be of length
+ * (CAP + 1) / 2 == CAP / 2, allowing CAP - 1 digits at max. Hence
+ * CAP - 1 must be >= DECIMAL_MAX_DIGITS.
+ */
+static_assert(DECIMAL_DIGIT_CAPACITY % 2 == 1 ||
+	      DECIMAL_DIGIT_CAPACITY - 1 >= DECIMAL_MAX_DIGITS,
+	      "DECIMAL_DIGIT_CAPACITY got even, now it must be strictly "
+	      "greater than DECIMAL_MAX_DIGITS");
+
 decimal_t *
 decimal_unpack(const char **data, uint32_t len, decimal_t *dec)
 {
@@ -472,10 +499,23 @@ decimal_unpack(const char **data, uint32_t len, decimal_t *dec)
 	}
 
 	len -= *data - svp;
-	decimal_t *res = decPackedToNumber((uint8_t *)*data, len, &scale, dec);
-	if (res)
-		*data += len;
-	else
+	/* First check that there is enough space to strore the digits. */
+	if (len > (DECIMAL_DIGIT_CAPACITY + 1) / 2) {
 		*data = svp;
+		return NULL;
+	}
+	/* No digits to decode. */
+	if (len == 0) {
+		*data = svp;
+		return NULL;
+	}
+	decimal_t *res = decPackedToNumber((uint8_t *)*data, len, &scale, dec);
+	/* Now check that the resulting number fits in our limits. */
+	if (res != NULL && decimal_precision(res) <= DECIMAL_MAX_DIGITS) {
+		*data += len;
+	} else {
+		res = NULL;
+		*data = svp;
+	}
 	return res;
 }
