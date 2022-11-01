@@ -226,8 +226,6 @@ log_set_level(struct log *log, enum say_level level)
 void
 log_set_format(struct log *log, log_format_func_t format_func)
 {
-	assert(format_func == say_format_plain ||
-	       log->type != SAY_LOGGER_SYSLOG);
 	log->format_func = format_func;
 }
 
@@ -242,14 +240,6 @@ void
 say_set_log_format(enum say_format format)
 {
 	log_format_func_t format_func;
-	/*
-	 * SAY_LOGGER_SYSLOG type uses the well-documented and
-	 * *recommended* format described in the RFC below:
-	 * https://tools.ietf.org/html/rfc3164#section-4.1
-	 * Thereby format can't be changed for this type either.
-	 */
-	if (log_default->type == SAY_LOGGER_SYSLOG)
-		return;
 
 	switch (format) {
 	case SF_JSON:

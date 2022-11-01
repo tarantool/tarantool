@@ -770,11 +770,6 @@ say_check_cfg(const char *log,
 			 "expected 'plain' or 'json'");
 		return -1;
 	}
-	if (type == SAY_LOGGER_SYSLOG && format == SF_JSON) {
-		diag_set(ClientError, ER_CFG, "log_format",
-			 "'json' can't be used with syslog logger");
-		return -1;
-	}
 	if (nonblock == 1 &&
 	    (type == SAY_LOGGER_FILE || type == SAY_LOGGER_STDERR)) {
 		diag_set(ClientError, ER_CFG, "log_nonblock",

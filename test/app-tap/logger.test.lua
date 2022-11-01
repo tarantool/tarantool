@@ -3,7 +3,7 @@
 local log = require('log')
 
 local test = require('tap').test('log')
-test:plan(104)
+test:plan(102)
 
 local function test_invalid_cfg(cfg_method, cfg, name, expected)
     local _, err = pcall(cfg_method, cfg)
@@ -37,18 +37,6 @@ test_allowed_types(box.cfg, {log_format = true},
                    'box.cfg allowed log_format types', 'string')
 test_allowed_types(box.cfg, {log_nonblock = 'hi'},
                    'box.cfg allowed log_nonblock types', 'boolean')
-
--- Test other invalid inputs
-
-test_invalid_cfg(log.cfg, {log = 'syslog:', format = 'json'},
-                 "log.cfg syslog and json",
-                 "'json' can't be used with syslog logger")
-test_invalid_cfg(box.cfg, {log = 'syslog:', log_format = 'json'},
-                 "box.cfg syslog and json",
-                 "'json' can't be used with syslog logger")
-
--- Don't check all invalid inputs for both box.cfg and log.cfg as
--- now they use same check function.
 
 -- gh-7447
 test_invalid_cfg(log.cfg, {log = 'syslog:xxx'},
