@@ -130,6 +130,9 @@ local check_symbols = {
     'luaJIT_profile_dumpstack',
 }
 
+-- TODO gh-7640 LuaJIT: ffi.C.dlsym() doesn't work on FreeBSD
+jit.off()
+
 test:plan(#check_symbols)
 for _, sym in ipairs(check_symbols) do
     check_symbol(sym)
