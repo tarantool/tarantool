@@ -1122,15 +1122,6 @@ dbg = setmetatable({
             return
         end
 
-        --[[
-            Prevent debugger from running from inside of Tarantool console.
-            Check pointer, which Tarantool console stored to the console object
-            in the fiber.self().storage.console while inside of
-            REPL loop.
-        --]]
-        assert(require('fiber').self().storage.console == nil, DEBUGGER ..
-            ' is not yet compatible with interactive Tarantool console')
-
         top_offset = top_offset or 0
         stack_inspect_offset = top_offset
         stack_top = top_offset
