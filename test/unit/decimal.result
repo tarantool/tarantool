@@ -345,7 +345,7 @@ ok 278 - decimal_sqrt(-10) - error on wrong operands.
     ok 65 - Conversion of -607 to decimal and back to int64 successful
     ok 66 - Conversion back to int64 correct
 ok 279 - subtests
-    1..151
+    1..187
     ok 1 - decimal_len(0)
     ok 2 - decimal_len(0) == len(decimal_pack(0)
     ok 3 - decimal_unpack(decimal_pack(0))
@@ -497,6 +497,42 @@ ok 279 - subtests
     ok 149 - positive exponent number is packed/unpacked correctly
     ok 150 - unpack malformed decimal fails
     ok 151 - decode malformed decimal preserves buffer position
+    ok 152 - Decode failure
+    ok 153 - Canary is intact
+    ok 154 - Buffer position is restored
+    ok 155 - Decode success
+    ok 156 - Canary is intact
+    ok 157 - Whole string is processed
+    ok 158 - Decoding is correct
+    ok 159 - Decode failure
+    ok 160 - Canary is intact
+    ok 161 - Buffer position is restored
+    ok 162 - Decode failure
+    ok 163 - Canary is intact
+    ok 164 - Buffer position is restored
+    ok 165 - Decode success
+    ok 166 - Canary is intact
+    ok 167 - Whole string is processed
+    ok 168 - Decoding is correct
+    ok 169 - Decode success
+    ok 170 - Canary is intact
+    ok 171 - Whole string is processed
+    ok 172 - Decoding is correct
+    ok 173 - Decode failure
+    ok 174 - Canary is intact
+    ok 175 - Buffer position is restored
+    ok 176 - Decode failure
+    ok 177 - Canary is intact
+    ok 178 - Buffer position is restored
+    ok 179 - Decode failure
+    ok 180 - Canary is intact
+    ok 181 - Buffer position is restored
+    ok 182 - Decode failure
+    ok 183 - Canary is intact
+    ok 184 - Buffer position is restored
+    ok 185 - Decode failure
+    ok 186 - Canary is intact
+    ok 187 - Buffer position is restored
 ok 280 - subtests
     1..216
     ok 1 - mp_sizeof_decimal(0)

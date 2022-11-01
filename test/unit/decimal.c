@@ -89,7 +89,7 @@
 			  #end);\
 })
 
-char buf[32];
+char buf[64];
 
 #define test_mpdec(str) ({\
 	decimal_t dec;\
@@ -146,10 +146,37 @@ char buf[32];
 	is(val, num, "Conversion back to "#type" correct");\
 })
 
+struct canary {
+	decimal_t dec;
+	uint32_t val;
+};
+
+const uint32_t magic = 0xdecdecde;
+
+#define test_unpack(str, len, expected, exp_val) ({\
+	struct canary canary = {\
+		.dec = {0},\
+		.val = magic,\
+	};\
+	const char *bb = str;\
+	is(decimal_unpack((const char **)&bb, len, &canary.dec),\
+	   expected(&canary.dec), "Decode "#expected);\
+	is(canary.val, magic, "Canary is intact");\
+	if (expected(&canary.dec) != NULL) {\
+		is(bb, str + len, "Whole string is processed");\
+		decimal_t dec;\
+		decimal_from_string(&dec, exp_val);\
+		is(decimal_compare(&canary.dec, &dec), 0,\
+		   "Decoding is correct");\
+	} else {\
+		is(bb, str, "Buffer position is restored");\
+	} \
+})
+
 static int
 test_pack_unpack(void)
 {
-	plan(151);
+	plan(187);
 
 	test_decpack("0");
 	test_decpack("-0");
@@ -191,6 +218,51 @@ test_pack_unpack(void)
 	is(decimal_unpack(&bb, 3, &dec), NULL, "unpack malformed decimal fails");
 	is(bb, buf, "decode malformed decimal preserves buffer position");
 
+	/* Test buffer overflows on unpack. */
+	/* Only scale, no digits. */
+	b = "\x00";
+	test_unpack(b, 1, failure, "");
+	b = "\x00\x9c";
+	test_unpack(b, 2, success, "9");
+	/*     V - scale 39 overflows any number. */
+	b = "\x27\x0c";
+	test_unpack(b, 2, failure, "");
+	/*     V   V - scale -38 overflows any number */
+	b = "\xd0\xda\x0c";
+	test_unpack(b, 3, failure, "");
+	b = "\x26\x09\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x9c";
+	test_unpack(b, 21, success, "0.99999999999999999999999999999999999999");
+	b = "\x00\x09\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x9c";
+	test_unpack(b, 21, success, "99999999999999999999999999999999999999");
+	/* Missing nibble. */
+	b = "\x00\x09\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99";
+	test_unpack(b, 21, failure, "");
+	/*         V - 39th digit overflows the buffer. */
+	b = "\x00\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x9c";
+	test_unpack(b, 21, failure, "");
+	/*     V - scale -1 multiplies the number by 10 and overflows. */
+	b = "\xff\x09\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x9c";
+	test_unpack(b, 21, failure, "");
+	/* Too long, non-empty. */
+	b = "\x00\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x99\x99\x99"
+	    "\x99\x99\x99\x99\x99\x9c";
+	test_unpack(b, 22, failure, "");
+	/* Too long, empty. Still fails. */
+	b = "\x00\x00\x00\x00\x00\x00\x00\x00"
+	    "\x00\x00\x00\x00\x00\x00\x00\x00"
+	    "\x00\x00\x00\x00\x00\x0c";
+	test_unpack(b, 22, failure, "");
 	return check_plan();
 }
 
