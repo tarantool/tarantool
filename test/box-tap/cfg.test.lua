@@ -6,7 +6,7 @@ local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
 local msgpack = require('msgpack')
-test:plan(109)
+test:plan(108)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -57,7 +57,6 @@ local function invalid_combinations(name, val)
 end
 
 invalid_combinations("log, log_nonblock", {log = "1.log", log_nonblock = true})
-invalid_combinations("log, log_format", {log = "syslog:identity=tarantool", log_format = 'json'})
 invalid_combinations("log, log_nonblock", {log_nonblock = true})
 
 test:is(type(box.cfg), 'function', 'box is not started')

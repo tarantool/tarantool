@@ -754,10 +754,6 @@ box_check_say(void)
 	if (format == say_format_MAX)
 		tnt_raise(ClientError, ER_CFG, "log_format",
 			 "expected 'plain' or 'json'");
-	if (type == SAY_LOGGER_SYSLOG && format == SF_JSON) {
-		tnt_raise(ClientError, ER_CFG, "log_format",
-			  "'json' can't be used with syslog logger");
-	}
 	int log_nonblock = cfg_getb("log_nonblock");
 	if (log_nonblock == 1 &&
 	    (type == SAY_LOGGER_FILE || type == SAY_LOGGER_STDERR)) {

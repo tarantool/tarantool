@@ -234,13 +234,6 @@ local function verify_format(key, name, cfg)
         log_type = parse_format(cfg['log'])
     end
 
-    if fmt_str2num[name] == ffi.C.SF_JSON then
-        if log_type == ffi.C.SAY_LOGGER_SYSLOG then
-            local m = "%s can't be used with syslog logger"
-            return false, m:format(fmt_num2str[ffi.C.SF_JSON])
-        end
-    end
-
     return true
 end
 

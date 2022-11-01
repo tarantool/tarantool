@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 
 local test = require('tap').test('log')
-test:plan(64)
+test:plan(62)
 
 --
 -- gh-5121: Allow to use 'json' output before box.cfg()
@@ -9,13 +9,6 @@ test:plan(64)
 local log = require('log')
 local _, err = pcall(log.log_format, 'json')
 test:ok(err == nil)
-
--- We're not allowed to use json with syslog though.
-_, err = pcall(log.cfg, {log='syslog:', format='json'})
-test:ok(tostring(err):find("can\'t be used with syslog logger") ~= nil)
-
-_, err = pcall(box.cfg, {log='syslog:', log_format='json'})
-test:ok(tostring(err):find("can\'t be used with syslog logger") ~= nil)
 
 -- switch back to plain to next tests
 log.log_format('plain')
