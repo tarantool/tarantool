@@ -25,8 +25,6 @@ set(READLINE_VERSION 8.0)
 set(READLINE_HASH 7e6c1f16aee3244a69aba6e438295ca3)
 set(BACKUP_STORAGE https://distrib.hb.bizmrg.com)
 
-option(DEV_BUILD "Enable build options that make debugging more convenient" OFF)
-
 include(../cmake/os.cmake)
 include(../cmake/profile.cmake)
 include(../cmake/hardening.cmake)
