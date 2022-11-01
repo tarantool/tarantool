@@ -748,7 +748,9 @@ tarantoolsqlIdxKeyCompare(struct BtCursor *cursor,
 	format = tuple_format(tuple);
 	field_map = tuple_field_map(tuple);
 	field_count = tuple_format_field_count(format);
-	field0 = base; mp_decode_array(&field0); p = field0;
+	field0 = base;
+	uint32_t base_len = mp_decode_array(&field0);
+	p = field0;
 	for (i = 0; i < n; i++) {
 		/*
 		 * Tuple contains offset map to make it possible to
@@ -761,8 +763,19 @@ tarantoolsqlIdxKeyCompare(struct BtCursor *cursor,
 		 *  (3) field maps are rebuilt lazily when a new index
 		 *      is added, i.e. it is possible to encounter a
 		 *      tuple with an incomplete offset map.
+		 *  (4) it is possible that the length of the tuple data will be
+		 *      less than the given fieldno of the part, in which case
+		 *      we should just compare the mem from unpacked with NULL.
 		 */
 		uint32_t fieldno = key_def->parts[i].fieldno;
+		struct Mem *mem = &unpacked->aMem[i];
+		struct key_part *part = &unpacked->key_def->parts[i];
+		if (fieldno >= base_len) {
+			if (mem_is_null(mem))
+				continue;
+			rc = part->sort_order == SORT_ORDER_ASC ? -1 : 1;
+			goto out;
+		}
 
 		if (fieldno != next_fieldno) {
 			struct tuple_field *field =
@@ -784,8 +797,6 @@ tarantoolsqlIdxKeyCompare(struct BtCursor *cursor,
 			}
 		}
 		next_fieldno = fieldno + 1;
-		struct key_part *part = &unpacked->key_def->parts[i];
-		struct Mem *mem = unpacked->aMem + i;
 		struct coll *coll = part->coll;
 		if (mem_cmp_msgpack(mem, &p, &rc, coll) != 0)
 			rc = 0;
