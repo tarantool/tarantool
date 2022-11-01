@@ -436,6 +436,13 @@ sql_unbind(struct sql_stmt *stmt)
 	}
 }
 
+void
+sql_reset_autoinc_id_list(struct sql_stmt *stmt)
+{
+	struct Vdbe *v = (struct Vdbe *)stmt;
+	stailq_create(&v->autoinc_id_list);
+}
+
 int
 sql_bind_double(sql_stmt * pStmt, int i, double rValue)
 {

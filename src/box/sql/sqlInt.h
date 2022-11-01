@@ -525,6 +525,13 @@ sql_vfs_register(sql_vfs *, int makeDflt);
 void
 sql_unbind(struct sql_stmt *stmt);
 
+/**
+ * Reset the list of identifiers generated during the auto-increment of this
+ * prepared statement.
+ */
+void
+sql_reset_autoinc_id_list(struct sql_stmt *stmt);
+
 int
 sql_bind_double(sql_stmt *, int, double);
 
