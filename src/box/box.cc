@@ -3147,7 +3147,9 @@ box_register_replica(uint32_t id, const struct tt_uuid *uuid)
 	if (boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "[%u%s]",
 		 (unsigned) id, tt_uuid_str(uuid)) != 0)
 		diag_raise();
-	assert(replica_by_uuid(uuid)->id == id);
+	struct replica *new_replica = replica_by_uuid(uuid);
+	if (new_replica == NULL || new_replica->id != id)
+		say_warn("Replica ID is changed by a trigger");
 }
 
 /**
@@ -3280,6 +3282,9 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 
 	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
 
+	replica = replica_by_uuid(&req.instance_uuid);
+	if (replica == NULL)
+		tnt_raise(ClientError, ER_CANNOT_REGISTER);
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
 	vclock_copy(&stop_vclock, &replicaset.vclock);
@@ -3305,7 +3310,6 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	 * replica.
 	 */
 	gc_consumer_advance(gc, &stop_vclock);
-	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
 	replica->gc = gc;
@@ -3427,6 +3431,10 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 
 	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
 
+	replica = replica_by_uuid(&req.instance_uuid);
+	if (replica == NULL)
+		tnt_raise(ClientError, ER_CANNOT_REGISTER);
+
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
 	vclock_copy(&stop_vclock, &replicaset.vclock);
@@ -3454,7 +3462,6 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * FINAL JOIN ended and assign it to the replica.
 	 */
 	gc_consumer_advance(gc, &stop_vclock);
-	replica = replica_by_uuid(&req.instance_uuid);
 	if (replica->gc != NULL)
 		gc_consumer_unregister(replica->gc);
 	replica->gc = gc;
