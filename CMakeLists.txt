@@ -53,8 +53,6 @@ if(NOT EXISTS ${PROJECT_SOURCE_DIR}/src/lib/small/CMakeLists.txt)
     endif()
 endif()
 
-option(DEV_BUILD "Enable build options that make debugging more convenient" OFF)
-
 # Define GNU standard installation directories
 include(GNUInstallDirs)
 
