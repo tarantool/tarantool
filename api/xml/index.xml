@@ -486,6 +486,7 @@
     <member refid="module_8h_1a20e035148bc707412c054291f9b51855" kind="function"><name>luaL_touint64</name></member>
     <member refid="module_8h_1a31727f17a0a09ff7fb92ac3d2eaa2dce" kind="function"><name>luaL_toint64</name></member>
     <member refid="module_8h_1a4c95f4e99d2f7b5be64ca3918fdc4ccf" kind="function"><name>luaT_call</name></member>
+    <member refid="module_8h_1aa1a5310ad259a9b8ea40603a3d7f1946" kind="function"><name>luaT_dostring</name></member>
     <member refid="module_8h_1a08aafb8aaa59640f2b7130e9281e53ec" kind="function"><name>luaT_cpcall</name></member>
     <member refid="module_8h_1adcc2559396474f5dff737adf04edc382" kind="function"><name>luaT_state</name></member>
     <member refid="module_8h_1acb0f168f5234ddb59713defe03029118" kind="function"><name>luaT_tolstring</name></member>
