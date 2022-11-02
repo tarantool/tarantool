@@ -546,6 +546,17 @@ tree_g.test_runtime_memory_leak = function(cg)
     end)
 end
 
+tree_g.test_empty_page_with_offset = function(cg)
+    cg.server:exec(function()
+        local t = require('luatest')
+        local s = box.space.s
+        s:create_index("pk", {type = "tree"})
+        s:replace{1}
+        local _, pos = s:select(nil, {fullscan=true, offset=1, fetch_pos=true})
+        t.assert(pos == nil)
+    end)
+end
+
 -- Tests for memtx tree features, such as functional index
 local func_g = t.group('Memtx tree func index tests')
 
