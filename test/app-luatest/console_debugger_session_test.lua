@@ -8,7 +8,7 @@ local function normalize_path(s)
 end
 
 local function unescape(s)
-    return s:gsub('[\27\155][][()#;?%d]*[A-PRZcf-ntqry=><~]', '')
+    return s and s:gsub('[\27\155][][()#;?%d]*[A-PRZcf-ntqry=><~]', '') or ''
 end
 
 local function trim(s)
