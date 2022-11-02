@@ -2864,9 +2864,13 @@ box_select(uint32_t space_id, uint32_t index_id,
 	txn_commit_ro_stmt(txn, &svp);
 	if (update_pos) {
 		uint32_t pos_size;
+		/*
+		 * Iterator position is extracted even if no tuples were found
+		 * to check if pagination is supported by index.
+		 */
 		if (iterator_position(it, &pos, &pos_size) != 0)
 			goto fail;
-		if (pos != NULL) {
+		if (pos != NULL && found > 0) {
 			pos_end = pos + pos_size;
 			uint32_t part_count = index->def->cmp_def->part_count;
 			uint32_t pack_size =
