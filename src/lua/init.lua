@@ -29,6 +29,120 @@ local LUA_TEMPLATES = { '?.lua', '?/init.lua' }
 local ROCKS_LIB_TEMPLATES = { ROCKS_LIB_PATH .. '/?.'..soext }
 local ROCKS_LUA_TEMPLATES = { ROCKS_LUA_PATH .. '/?.lua', ROCKS_LUA_PATH .. '/?/init.lua' }
 
+-- A wrapper with a unique name, used in the call stack traversing.
+local function __tarantool__internal__require__wrapper__()
+    -- This require() may be overloaded.
+    return require('log.get_callstack')
+end
+
+-- Calculate how many times the standard require() function was overloaded.
+-- E.g. if there are three user overloads, the call stack returned by
+-- get_callstack will look like:
+-- 7. the place where require('log') was called
+-- 6. require('log') -- overloaded in this file
+-- 5. __tarantool__internal__require__wrapper__
+-- 4. require('log.get_callstack') -- overloaded in user module 3
+-- 3. require('log.get_callstack') -- overloaded in user module 2
+-- 2. require('log.get_callstack') -- overloaded in user module 1
+-- 1. require('log.get_callstack') -- overloaded in this file
+local function get_require_overload_count(stack)
+    local wrapper_name = '__tarantool__internal__require__wrapper__'
+    local count = 0
+    for _, f in pairs(stack) do
+        if f.name ~= nil and string.find(f.name, wrapper_name) ~= nil then
+            return count + 1
+        end
+        count = count + 1
+    end
+    return 0
+end
+
+-- Make path relative to the current directory.
+local function remove_root_directory(path)
+    local pwd = os.getenv("PWD")
+    if pwd == nil then
+        return path
+    end
+    local cur_dir = pwd .. '/'
+    local start_len = #path
+
+    while #cur_dir > 0 and start_len == #path do
+        if cur_dir == '/' then
+            if path:sub(1, 1) == '/' then
+                path = path:sub(2)
+            end
+            break
+        end
+        path = path:gsub(cur_dir, '')
+        local ind = cur_dir:find('[^/]+/$')
+        cur_dir = cur_dir:sub(1, ind - 1)
+    end
+    return path
+end
+
+-- Obtain the module name from the file name by removing:
+-- 1. builtin/ prefixes
+-- 2. path prefixes contained in package.path, package.cpath
+-- 3. subpaths to the current directory
+-- 4. ROCKS_LIB_PATH, ROCKS_LUA_PATH
+-- 5. /init.lua and .lua suffixes
+-- and by replacing all `/` with `.`
+local function module_name_from_filename(filename)
+    local paths = package.path .. package.cpath
+    local result = filename:gsub('builtin/', '')
+    for path in paths:gmatch'/([A-Za-z\\/\\.0-9]+)\\?' do
+        result = result:gsub('/' .. path, '');
+    end
+    result = result:gsub('/init.lua', '');
+    result = result:gsub('%.lua', '');
+    result = remove_root_directory(result)
+    result = result:gsub(ROCKS_LIB_PATH .. '/', '');
+    result = result:gsub(ROCKS_LUA_PATH .. '/', '');
+    result = result:gsub('/', '.');
+    return result
+end
+
+-- Take the function level in the call stack as input and return
+-- the name of the module in which the function is defined.
+local function module_name_by_callstack_level(level)
+    local info = debug.getinfo(level + 1)
+    if info ~= nil and info.source:sub(1, 1) == '@' then
+        local src_name = info.source:sub(2)
+        return module_name_from_filename(src_name)
+    end
+    -- require('log') called from the interactive mode or `tarantool -e`
+    return 'tarantool'
+end
+
+-- Return current call stack.
+local function get_callstack()
+    local i = 2
+    local stack = {}
+    local info = debug.getinfo(i)
+    while info ~= nil do
+        stack[i] = info
+        i = i + 1
+        info = debug.getinfo(i)
+    end
+    return stack
+end
+
+-- Overload the require() function to set the module name during require('log')
+-- Note that the standard require() function may be already overloaded in a user
+-- module, also there can be multiple overloads.
+local real_require = require
+require = function(modname) -- luacheck: ignore
+    if modname == 'log' then
+        local callstack = __tarantool__internal__require__wrapper__()
+        local overload_count = get_require_overload_count(callstack)
+        local name = module_name_by_callstack_level(overload_count + 2)
+        return real_require('log').new(name)
+    elseif modname == 'log.get_callstack' then
+        return get_callstack()
+    end
+    return real_require(modname)
+end
+
 local package_searchroot
 
 local function searchroot()

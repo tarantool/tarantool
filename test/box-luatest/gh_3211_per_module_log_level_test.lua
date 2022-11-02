@@ -164,3 +164,15 @@ g2.test_per_module_log_level = function(cg)
     find_in_log(cg, 'info from module3', true)
     find_in_log(cg, 'debug from module3', true)
 end
+
+-- Test automatic module name deduction.
+g1.test_modname_deduction = function(cg)
+    -- Check that consequent calls to require('log') return the same logger.
+    t.assert(require('log') == require('log'))
+
+    cg.server:exec(function()
+        local module = require('test.box-luatest.gh_3211_module.testmod')
+        module.say_hello()
+    end)
+    find_in_log(cg, 'testmod I> hello', true)
+end
