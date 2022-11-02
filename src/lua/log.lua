@@ -212,26 +212,12 @@ local function parse_format(log)
 end
 
 -- Test if format is valid.
-local function verify_format(key, name, cfg)
+local function verify_format(key, name)
     assert(log_cfg[key] ~= nil)
 
     if not fmt_str2num[name] then
         local m = "expected %s"
         return false, m:format(fmt_list())
-    end
-
-    local log_type = ffi.C.log_type()
-
-    -- When comes from log.cfg{} or box.cfg{}
-    -- initial call we might be asked to setup
-    -- syslog with json which is not allowed.
-    --
-    -- Note the cfg table comes from two places:
-    -- box api interface and log module itself.
-    -- The good thing that we're only needed log
-    -- entry which is the same key for both.
-    if cfg ~= nil and cfg['log'] ~= nil then
-        log_type = parse_format(cfg['log'])
     end
 
     return true
@@ -469,7 +455,7 @@ local function box_api_cfg_get(key)
 end
 
 -- Set value to log from box.cfg{}.
-local function box_api_cfg_set(cfg, key, value)
+local function box_api_cfg_set(key, value)
     local log_key = box2log_keys[key]
 
     -- a special case where we need to restore
@@ -479,7 +465,7 @@ local function box_api_cfg_set(cfg, key, value)
         return true
     end
 
-    local ok, msg = verify_option(log_key, value, cfg)
+    local ok, msg = verify_option(log_key, value)
     if not ok then
         return false, msg
     end
@@ -552,7 +538,7 @@ local function load_cfg(self, cfg)
     end
 
     if cfg.format ~= nil then
-        local ok, msg = verify_option('format', cfg.format, cfg)
+        local ok, msg = verify_option('format', cfg.format)
         if not ok then
             local m = "log.cfg: \'%s\' %s"
             error(m:format('format', msg))

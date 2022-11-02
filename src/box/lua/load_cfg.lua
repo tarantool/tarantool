@@ -539,11 +539,11 @@ local function update_module_cfg(cfg, module_cfg)
         if cfg[field] ~= nil then
             module_cfg_backup[field] = api.cfg_get(field) or box.NULL
 
-            local ok, msg = api.cfg_set(cfg, field, cfg[field])
+            local ok, msg = api.cfg_set(field, cfg[field])
             if not ok then
                 -- restore back the old values for modules
                 for k, v in pairs(module_cfg_backup) do
-                    module_cfg[k].cfg_set(cfg, k, v)
+                    module_cfg[k].cfg_set(k, v)
                 end
                 box.error(box.error.CFG, field, msg)
             end
