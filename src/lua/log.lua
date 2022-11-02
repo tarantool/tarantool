@@ -456,6 +456,9 @@ local compat_v16 = {
     end;
 }
 
+-- Log registry. It stores loggers, created by log_new, each of them having a
+-- custom name. Allows to return same logger on consequent require('log') calls.
+local log_registry = {}
 -- Forward declaration.
 local log_main
 
@@ -465,6 +468,10 @@ local function log_new(name)
         error('Illegal parameters, name should be a string')
     end
 
+    if log_registry[name] ~= nil then
+        return log_registry[name]
+    end
+
     local log = table.copy(log_main)
     log.name = name
     log.error = say_closure(log, S_ERROR)
@@ -472,6 +479,7 @@ local function log_new(name)
     log.info = say_closure(log, S_INFO)
     log.verbose = say_closure(log, S_VERBOSE)
     log.debug = say_closure(log, S_DEBUG)
+    log_registry[name] = log
     return log
 end
 

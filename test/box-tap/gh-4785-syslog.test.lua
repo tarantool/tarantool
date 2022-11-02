@@ -18,7 +18,8 @@ box.cfg{
 
 -- Syslog format:
 --
--- <PRI><TIMESTAMP> IDENTITY[PID]: CORD/FID/FILE FACILITY>
+-- <PRI><TIMESTAMP> IDENTITY[PID]: CORD/FID/FILE/MODULE FACILITY>
+-- (FILE and MODULE are optional)
 local patterns = {
     '<%d+>',                         -- PRI
     '%u%l%l  ?%d?%d %d%d:%d%d:%d%d', -- TIMESTAMP
@@ -29,7 +30,7 @@ local patterns = {
     '[%l%d-_.]+',                    -- FILE
     '%u',                            -- FACILITY
 }
-local pattern = ('%s%s %s%s: %s/%s/%s %s>'):format(unpack(patterns))
+local pattern = ('%s%s %s%s: %s/%s/%s.* %s>'):format(unpack(patterns))
 
 local test = tap.test('gh-4785-syslog')
 test:plan(4)
@@ -38,7 +39,7 @@ test:plan(4)
 local ok = true
 local logs = {}
 while true do
-    local entry = unix_socket:recv(100)
+    local entry = unix_socket:recv(128)
     if entry == nil then break end
     ok = ok and entry:match(pattern)
     table.insert(logs, entry)
@@ -47,7 +48,7 @@ test:ok(ok, 'box.cfg() log entries are in syslog format', {logs = logs})
 
 -- Verify a log entry written by log.info().
 log.info('hello')
-local entry = unix_socket:recv(100)
+local entry = unix_socket:recv(128)
 test:like(entry, pattern, 'log.info() log entry is in syslog format',
           {logs = {entry}})
 
@@ -57,7 +58,7 @@ test:ok(ok, "log.log_format('plain') is ignored with syslog")
 
 -- Verify log format again after log.log_format().
 log.info('world')
-local entry = unix_socket:recv(100)
+local entry = unix_socket:recv(128)
 test:like(entry, pattern, 'log.info() log entry after log_format',
           {logs = {entry}})
 

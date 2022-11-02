@@ -49,6 +49,7 @@ g.before_all(function(cg)
             line = 28,
             level = 'WARN',
             message = expected_msg,
+            module = "test.box-luatest.gh_7860_syslog_json_test",
             pid = cg.pid,
         })
     end
@@ -59,7 +60,8 @@ g.before_all(function(cg)
         t.assert_str_matches(
             hdr,
             '<%d+>%a+%s+%d%d?%s+%d%d:%d%d:%d%d%s+tt%[' .. cg.pid .. '%]:%s' ..
-            'main/%d+/main%sgh_7860_syslog_json_test%.lua:28')
+            'main/%d+/main/test%.box%-luatest%.gh_7860_syslog_json_test%s' ..
+            'gh_7860_syslog_json_test%.lua:28')
         t.assert_equals(msg, expected_msg .. '\n')
     end
 end)
