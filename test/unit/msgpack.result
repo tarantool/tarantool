@@ -2112,7 +2112,7 @@ ok 19 - subtests
     ok 5 - str is correct
     # *** test_mp_print_ext: done ***
 ok 20 - subtests
-    1..69
+    1..71
     # *** test_mp_check ***
     ok 1 - invalid fixmap 1
     ok 2 - invalid fixmap 2
@@ -2175,14 +2175,16 @@ ok 20 - subtests
     ok 59 - invalid array32 2
     ok 60 - invalid map16 1
     ok 61 - invalid map16 2
-    ok 62 - invalid map16 2
-    ok 63 - invalid map32 1
-    ok 64 - invalid map32 2
-    ok 65 - invalid map32 3
-    ok 66 - invalid header 1
-    ok 67 - invalid header 2
-    ok 68 - invalid header 3
-    ok 69 - invalid header 4
+    ok 62 - invalid map16 3
+    ok 63 - invalid map16 4
+    ok 64 - invalid map32 1
+    ok 65 - invalid map32 2
+    ok 66 - invalid map32 3
+    ok 67 - invalid map32 4
+    ok 68 - invalid header 1
+    ok 69 - invalid header 2
+    ok 70 - invalid header 3
+    ok 71 - invalid header 4
     # *** test_mp_check: done ***
 ok 21 - subtests
     1..24
