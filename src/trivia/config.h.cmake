@@ -243,8 +243,8 @@
 #define BUILD_INFO "@TARANTOOL_BUILD@"
 /** Command line used to run CMake */
 #define BUILD_OPTIONS "cmake . @TARANTOOL_OPTIONS@"
-/** Pathes to C and CXX compilers */
-#define COMPILER_INFO "@CMAKE_C_COMPILER@ @CMAKE_CXX_COMPILER@"
+/** Compiler ID and version, assuming the C and C++ compiler IDs are equal. */
+#define COMPILER_INFO "@CMAKE_C_COMPILER_ID@-@CMAKE_C_COMPILER_VERSION@"
 /** C compile flags used to build Tarantool */
 #define TARANTOOL_C_FLAGS "@TARANTOOL_C_FLAGS@"
 /** CXX compile flags used to build Tarantool */
