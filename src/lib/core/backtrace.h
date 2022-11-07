@@ -71,6 +71,8 @@ backtrace_collect(struct backtrace *bt, const struct fiber *fiber,
  *
  * Returns pointer to a temporary buffer storing the demangled function name:
  * the caller is responsible for making a copy of it.
+ *
+ * May return NULL on resolving failure.
  */
 const char *
 backtrace_frame_resolve(const struct backtrace_frame *frame,

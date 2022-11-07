@@ -246,11 +246,15 @@ backtrace_frame_resolve(const struct backtrace_frame *frame,
 #ifndef __APPLE__
 	unw_accessors_t *acc = unw_get_accessors(unw_local_addr_space);
 	assert(acc->get_proc_name != NULL);
-	char *proc_name_buf = tt_static_buf();
+	char proc_name_buf[128];
 	int rc = acc->get_proc_name(unw_local_addr_space, (unw_word_t)frame->ip,
-				    proc_name_buf, TT_STATIC_BUF_LEN, offset,
-				    NULL);
-	if (rc != 0) {
+				    proc_name_buf, sizeof(proc_name_buf),
+				    offset, NULL);
+	/*
+	 * In case result does not fit into buffer we got UNW_ENOMEM and
+	 * result will be truncated.
+	 */
+	if (rc != 0 && rc != -UNW_ENOMEM) {
 		say_error("unwinding error: `get_proc_name` accessor failed: "
 			  "%s", unw_strerror(rc));
 		return NULL;

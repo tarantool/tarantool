@@ -16,8 +16,10 @@ extern "C" {
  * Wrapper around `abi::__cxa_demangle` from the C++ ABI, for details see:
  * https://gcc.gnu.org/onlinedocs/libstdc++/libstdc++-html-USERS-4.3/a01696.html.
  *
- * Returns pointer to a temporary buffer storing the demangled function name:
- * the caller is responsible for making a copy of it.
+ * Returns pointer to demangled function name. Pointer is stored on a buffer
+ * with thread local lifetime semantic.
+ *
+ * On demangle failures just return mangled name.
  */
 const char *
 cxx_abi_demangle(const char *mangled_name);
