@@ -53,12 +53,21 @@ cxx_abi_demangle(const char *mangled_name)
 	if (status != 0 && status != -2) {
 		say_error("abi::__cxa_demangle failed with "
 			  "status: %d", status);
-		return mangled_name;
+		demangled_proc_name = nullptr;
 	}
 	if (demangled_proc_name != nullptr) {
 		DemangleBuf::instance().buf = demangled_proc_name;
-		mangled_name = demangled_proc_name;
+		return demangled_proc_name;
 	}
-	return mangled_name;
+
+	size_t len = strlen(mangled_name) + 1;
+	if (DemangleBuf::instance().len < len) {
+		char *buf = (char *)xrealloc(DemangleBuf::instance().buf, len);
+		DemangleBuf::instance().len = len;
+		DemangleBuf::instance().buf = buf;
+	}
+
+	memcpy(DemangleBuf::instance().buf, mangled_name, len);
+	return DemangleBuf::instance().buf;
 }
 #endif /* ENABLE_BACKTRACE */
