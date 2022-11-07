@@ -73,17 +73,12 @@ lbox_session_create(struct lua_State *L)
 }
 
 /**
- * Return a unique monotonic session
- * identifier. The identifier can be used
- * to check whether or not a session is alive.
- * 0 means there is no session (e.g.
- * a procedure is running in a detached
- * fiber).
+ * Lua wrapper for `box_session_id`.
  */
 static int
 lbox_session_id(struct lua_State *L)
 {
-	lua_pushnumber(L, current_session()->id);
+	luaL_pushuint64(L, box_session_id());
 	return 1;
 }
 
