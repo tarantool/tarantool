@@ -52,6 +52,8 @@ jobs:
         uses: ./.github/actions/install-deps-debian
       - name: test
         run: make -f .test.mk test-release-asan
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Send VK Teams message on failure
         if: failure()
         uses: ./.github/actions/report-job-status
