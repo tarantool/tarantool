@@ -71,6 +71,11 @@ extern double on_shutdown_trigger_timeout;
 extern struct rlist box_on_shutdown_trigger_list;
 
 /**
+ * Triggers invoked during initial `box.cfg` call on various recovery stages.
+ */
+extern struct rlist box_on_recovery_state;
+
+/**
  * Timeout during which the transaction must complete,
  * otherwise it will be rolled back.
  */
