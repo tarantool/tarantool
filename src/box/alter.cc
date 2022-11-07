@@ -343,7 +343,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	if (index_def == NULL)
 		return NULL;
 	auto index_def_guard = make_scoped_guard([=] { index_def_delete(index_def); });
-	if (!index_def_is_valid(index_def, space_name(space)))
+	if (index_def_check(index_def, space_name(space)) != 0)
 		return NULL;
 	if (space_check_index_def(space, index_def) != 0)
 		return NULL;
