@@ -2848,7 +2848,7 @@ sql_create_index(struct Parse *parse) {
 	}
 	index->def->key_def->part_count = new_part_count;
 
-	if (!index_def_is_valid(index->def, def->name)) {
+	if (index_def_check(index->def, def->name) != 0) {
 		parse->is_aborted = true;
 		goto exit_create_index;
 	}

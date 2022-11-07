@@ -268,46 +268,45 @@ index_def_to_key_def(struct rlist *index_defs, int *size)
 	return keys;
 }
 
-bool
-index_def_is_valid(struct index_def *index_def, const char *space_name)
-
+int
+index_def_check(struct index_def *index_def, const char *space_name)
 {
 	if (index_def->iid >= BOX_INDEX_MAX) {
 		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
 			 space_name, "index id too big");
-		return false;
+		return -1;
 	}
 	if (index_def->iid == 0 && index_def->opts.is_unique == false) {
 		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
 			 space_name, "primary key must be unique");
-		return false;
+		return -1;
 	}
 	if (index_def->key_def->part_count == 0) {
 		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
 			 space_name, "part count must be positive");
-		return false;
+		return -1;
 	}
 	if (index_def->key_def->part_count > BOX_INDEX_PART_MAX) {
 		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
 			 space_name, "too many key parts");
-		return false;
+		return -1;
 	}
 	if (index_def->iid == 0 && index_def->key_def->is_multikey) {
 		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
 			 space_name, "primary key cannot be multikey");
-		return false;
+		return -1;
 	}
 	if (index_def->iid == 0 && index_def->key_def->for_func_index) {
 		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
 			space_name, "primary key can not use a function");
-		return false;
+		return -1;
 	}
 	for (uint32_t i = 0; i < index_def->key_def->part_count; i++) {
 		assert(index_def->key_def->parts[i].type < field_type_MAX);
 		if (index_def->key_def->parts[i].fieldno > BOX_INDEX_FIELD_MAX) {
 			diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
 				 space_name, "field no is too big");
-			return false;
+			return -1;
 		}
 		for (uint32_t j = 0; j < i; j++) {
 			/*
@@ -323,9 +322,9 @@ index_def_is_valid(struct index_def *index_def, const char *space_name)
 				diag_set(ClientError, ER_MODIFY_INDEX,
 					 index_def->name, space_name,
 					 "same key part is indexed twice");
-				return false;
+				return -1;
 			}
 		}
 	}
-	return true;
+	return 0;
 }

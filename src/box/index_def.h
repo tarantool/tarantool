@@ -400,11 +400,13 @@ index_def_cmp(const struct index_def *key1, const struct index_def *key2);
 /**
  * Check a key definition for violation of various limits.
  *
- * @param index_def   index definition
- * @param old_space   space definition
+ * @param index_def index definition
+ * @param old_space space definition
+ * @retval 0 Success.
+ * @retval -1 Error. Diag is set.
  */
-bool
-index_def_is_valid(struct index_def *index_def, const char *space_name);
+int
+index_def_check(struct index_def *index_def, const char *space_name);
 
 #if defined(__cplusplus)
 } /* extern "C" */
@@ -421,7 +423,7 @@ index_def_dup_xc(const struct index_def *def)
 static inline void
 index_def_check_xc(struct index_def *index_def, const char *space_name)
 {
-	if (! index_def_is_valid(index_def, space_name))
+	if (index_def_check(index_def, space_name) != 0)
 		diag_raise();
 }
 
