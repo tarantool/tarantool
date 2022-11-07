@@ -28,7 +28,6 @@ local INT64_MAX = tonumber64('9223372036854775807')
 ffi.cdef[[
     extern bool box_read_ffi_is_disabled;
     struct space *space_by_id(uint32_t id);
-    extern uint32_t box_schema_version();
     void space_run_triggers(struct space *space, bool yesno);
     size_t space_bsize(struct space *space);
 
@@ -1924,7 +1923,14 @@ local function check_ck_constraint_arg(ck_constraint, method)
 end
 box.internal.check_ck_constraint_arg = check_ck_constraint_arg
 
-box.internal.schema_version = builtin.box_schema_version
+local internal_schema_version_warn_once = false
+box.internal.schema_version = function()
+    if not internal_schema_version_warn_once then
+        internal_schema_version_warn_once = true
+        log.warn('box.internal.schema_version will be removed, please use box.info.schema_version instead')
+    end
+    return box.info.schema_version
+end
 
 local function check_iterator_type(opts, key_is_nil)
     local opts_type = type(opts)

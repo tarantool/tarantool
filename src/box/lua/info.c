@@ -51,6 +51,7 @@
 #include "box/box.h"
 #include "box/raft.h"
 #include "box/txn_limbo.h"
+#include "box/schema.h"
 #include "lua/utils.h"
 #include "lua/serializer.h" /* luaL_setmaphint */
 #include "fiber.h"
@@ -656,6 +657,12 @@ lbox_info_synchro(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_schema_version(struct lua_State *L)
+{
+	luaL_pushuint64(L, box_schema_version());
+	return 1;
+}
 
 static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"id", lbox_info_id},
@@ -678,6 +685,7 @@ static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"listen", lbox_info_listen},
 	{"election", lbox_info_election},
 	{"synchro", lbox_info_synchro},
+	{"schema_version", lbox_schema_version},
 	{NULL, NULL}
 };
 

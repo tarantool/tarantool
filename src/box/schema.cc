@@ -69,7 +69,7 @@ struct rlist on_alter_func = RLIST_HEAD_INITIALIZER(on_alter_func);
 
 struct entity_access entity_access;
 
-uint64_t
+API_EXPORT uint64_t
 box_schema_version(void)
 {
 	return schema_version;

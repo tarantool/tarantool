@@ -141,25 +141,24 @@ s:drop()
 -- gh-3414: do not increase schema_version on space:truncate()
 --
 -- update schema_version on space.create()
-sch_ver = box.internal.schema_version
-v = sch_ver()
+v = box.info.schema_version
 s = box.schema.create_space('test')
-v + 1 == sch_ver()
+v + 1 == box.info.schema_version
 -- update schema_version on space:create_index()
 prim = s:create_index("primary")
-v + 2 == sch_ver()
+v + 2 == box.info.schema_version
 -- do not change schema_version on space.truncate()
 s:truncate()
-v + 2 == sch_ver()
+v + 2 == box.info.schema_version
 -- update schema_version on index.alter()
 prim:alter{name="new_primary"}
-v + 3 == sch_ver()
+v + 3 == box.info.schema_version
 -- update schema_version on index.drop()
 box.schema.index.drop(s.id, 0)
-v + 4 == sch_ver()
+v + 4 == box.info.schema_version
 -- update schema_version on space.drop()
 s:drop()
-v + 5 == sch_ver()
+v + 5 == box.info.schema_version
 
 --
 -- gh-3229: update optionality if a space format is changed too,

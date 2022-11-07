@@ -277,8 +277,8 @@ somefunc = nil
 cn:close()
 ---
 ...
--- box.internal.schema_version()
-schema_version = box.internal.schema_version()
+-- box.info.schema_version
+schema_version = box.info.schema_version
 ---
 ...
 schema_version > 0
@@ -288,7 +288,7 @@ schema_version > 0
 bump_schema_version()
 ---
 ...
-box.internal.schema_version() == schema_version + 1
+box.info.schema_version == schema_version + 1
 ---
 - true
 ...

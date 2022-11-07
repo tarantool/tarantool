@@ -389,16 +389,13 @@ s:drop()
 -- gh-3414: do not increase schema_version on space:truncate()
 --
 -- update schema_version on space.create()
-sch_ver = box.internal.schema_version
----
-...
-v = sch_ver()
+v = box.info.schema_version
 ---
 ...
 s = box.schema.create_space('test')
 ---
 ...
-v + 1 == sch_ver()
+v + 1 == box.info.schema_version
 ---
 - true
 ...
@@ -406,7 +403,7 @@ v + 1 == sch_ver()
 prim = s:create_index("primary")
 ---
 ...
-v + 2 == sch_ver()
+v + 2 == box.info.schema_version
 ---
 - true
 ...
@@ -414,7 +411,7 @@ v + 2 == sch_ver()
 s:truncate()
 ---
 ...
-v + 2 == sch_ver()
+v + 2 == box.info.schema_version
 ---
 - true
 ...
@@ -422,7 +419,7 @@ v + 2 == sch_ver()
 prim:alter{name="new_primary"}
 ---
 ...
-v + 3 == sch_ver()
+v + 3 == box.info.schema_version
 ---
 - true
 ...
@@ -430,7 +427,7 @@ v + 3 == sch_ver()
 box.schema.index.drop(s.id, 0)
 ---
 ...
-v + 4 == sch_ver()
+v + 4 == box.info.schema_version
 ---
 - true
 ...
@@ -438,7 +435,7 @@ v + 4 == sch_ver()
 s:drop()
 ---
 ...
-v + 5 == sch_ver()
+v + 5 == box.info.schema_version
 ---
 - true
 ...

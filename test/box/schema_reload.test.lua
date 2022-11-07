@@ -136,11 +136,11 @@ somefunc = nil
 cn:close()
 
 
--- box.internal.schema_version()
-schema_version = box.internal.schema_version()
+-- box.info.schema_version
+schema_version = box.info.schema_version
 schema_version > 0
 bump_schema_version()
-box.internal.schema_version() == schema_version + 1
+box.info.schema_version == schema_version + 1
 
 if box.space.bump_schema_version ~= nil then box.space.bump_schema_version:drop() end
 box.schema.user.revoke('guest', 'execute', 'universe')
