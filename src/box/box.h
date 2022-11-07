@@ -599,6 +599,12 @@ box_sequence_reset(uint32_t seq_id);
 API_EXPORT int
 box_session_push(const char *data, const char *data_end);
 
+/**
+ * \return current session's unique monotonic identifier (\sa box.session.id)
+ */
+API_EXPORT uint64_t
+box_session_id(void);
+
 /** \endcond public */
 
 /**

@@ -488,8 +488,16 @@ local function test_box_schema_version_matches(test, module)
     s:drop()
 end
 
+local function test_box_session_id_matches(test, module)
+    test:plan(1)
+
+    test:ok(module.box_session_id_matches(box.session.id()),
+            'verify that Lua/C current session identifier APIs return the ' ..
+            'same value')
+end
+
 require('tap').test("module_api", function(test)
-    test:plan(44)
+    test:plan(45)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
@@ -522,6 +530,7 @@ require('tap').test("module_api", function(test)
     test:test("pushdecimal", test_pushdecimal, module)
     test:test("isdecimal", test_isdecimal, module)
     test:test("box_schema_version_matches", test_box_schema_version_matches, module)
+    test:test("box_session_id_matches", test_box_session_id_matches, module)
 
     space:drop()
 end)

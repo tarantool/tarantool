@@ -3201,6 +3201,12 @@ box_session_push(const char *data, const char *data_end)
 	return rc;
 }
 
+API_EXPORT uint64_t
+box_session_id(void)
+{
+	return current_session()->id;
+}
+
 static inline void
 box_register_replica(uint32_t id, const struct tt_uuid *uuid)
 {

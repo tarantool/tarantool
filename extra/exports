@@ -104,6 +104,7 @@ box_sequence_current
 box_sequence_next
 box_sequence_reset
 box_sequence_set
+box_session_id
 box_session_push
 box_space_id_by_name
 box_truncate

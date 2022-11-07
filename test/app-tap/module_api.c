@@ -2994,6 +2994,19 @@ test_box_schema_version(struct lua_State *L)
 
 /* }}} Helpers for schema version Lua/C API test cases */
 
+/* {{{ Helpers for current session identifier Lua/C API test cases */
+
+static int
+test_box_session_id(struct lua_State *L)
+{
+	fail_unless(lua_gettop(L) == 1);
+	fail_unless(lua_isnumber(L, 1));
+	lua_pushboolean(L, luaL_touint64(L, 1) == box_session_id());
+	return 1;
+}
+
+/* }}} Helpers for current session identifier Lua/C API test cases */
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -3045,6 +3058,7 @@ luaopen_module_api(lua_State *L)
 		{"isdecimal", test_isdecimal},
 		{"isdecimal_ptr", test_isdecimal_ptr},
 		{"box_schema_version_matches", test_box_schema_version},
+		{"box_session_id_matches", test_box_session_id},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
