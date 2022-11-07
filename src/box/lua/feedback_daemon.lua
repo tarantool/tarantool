@@ -212,7 +212,7 @@ local cached_schema_version = 0
 local cached_schema_features = {}
 
 local function fill_in_schema_stats(features)
-    local schema_version = box.internal.schema_version()
+    local schema_version = box.info.schema_version
     if cached_schema_version < schema_version then
         local schema = {}
         fill_in_schema_stats_impl(schema)

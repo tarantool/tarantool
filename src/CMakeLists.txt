@@ -211,6 +211,7 @@ set(api_headers
     ${PROJECT_SOURCE_DIR}/src/box/field_def.h
     ${PROJECT_SOURCE_DIR}/src/box/tuple_format.h
     ${PROJECT_SOURCE_DIR}/src/box/schema_def.h
+    ${PROJECT_SOURCE_DIR}/src/box/schema.h
     ${PROJECT_SOURCE_DIR}/src/box/box.h
     ${PROJECT_SOURCE_DIR}/src/box/index.h
     ${PROJECT_SOURCE_DIR}/src/box/iterator_type.h

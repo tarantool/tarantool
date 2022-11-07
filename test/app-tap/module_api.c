@@ -2981,6 +2981,19 @@ test_isdecimal_ptr(struct lua_State *L)
 
 /* }}} Helpers for decimal Lua/C API test cases */
 
+/* {{{ Helpers for schema version Lua/C API test cases */
+
+static int
+test_box_schema_version(struct lua_State *L)
+{
+	fail_unless(lua_gettop(L) == 1);
+	fail_unless(lua_isnumber(L, 1));
+	lua_pushboolean(L, luaL_touint64(L, 1) == box_schema_version());
+	return 1;
+}
+
+/* }}} Helpers for schema version Lua/C API test cases */
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -3031,6 +3044,7 @@ luaopen_module_api(lua_State *L)
 		{"decimal_div", test_decimal_div},
 		{"isdecimal", test_isdecimal},
 		{"isdecimal_ptr", test_isdecimal_ptr},
+		{"box_schema_version_matches", test_box_schema_version},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);

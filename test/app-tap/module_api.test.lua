@@ -475,8 +475,21 @@ local function test_isdecimal(test, module)
     test:ok(ok, 'verify pointer from luaT_isdecimal()')
 end
 
+local function test_box_schema_version_matches(test, module)
+    test:plan(3)
+
+    test:ok(module.box_schema_version_matches(box.info.schema_version),
+            'verify that schema version Lua/C APIs return the same value before DDL')
+    local old_schema_version = box.info.schema_version
+    local s = box.schema.space.create('s')
+    test:isnt(box.info.schema_version, old_schema_version, 'verify that schema version changes after DDL')
+    test:ok(module.box_schema_version_matches(box.info.schema_version),
+            'verify that schema version Lua/C APIs return the same value after DDL')
+    s:drop()
+end
+
 require('tap').test("module_api", function(test)
-    test:plan(43)
+    test:plan(44)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
@@ -508,6 +521,7 @@ require('tap').test("module_api", function(test)
     test:test("tuple_field_by_path", test_tuple_field_by_path, module)
     test:test("pushdecimal", test_pushdecimal, module)
     test:test("isdecimal", test_isdecimal, module)
+    test:test("box_schema_version_matches", test_box_schema_version_matches, module)
 
     space:drop()
 end)

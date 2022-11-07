@@ -86,6 +86,7 @@ t
   - replication
   - replication_anon
   - ro
+  - schema_version
   - signature
   - sql
   - status
