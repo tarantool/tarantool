@@ -109,6 +109,9 @@ enum memtx_reserve_extents_num {
  */
 #define MEMTX_ITERATOR_SIZE (168)
 
+typedef void
+(*memtx_on_indexes_built_cb)(void);
+
 struct memtx_engine {
 	struct engine base;
 	/** Engine recovery state, see enum memtx_recovery_state description. */
@@ -126,6 +129,11 @@ struct memtx_engine {
 	 * needed to be able to cancel it on shutdown.
 	 */
 	struct cord *replica_join_cord;
+	/**
+	 * A callback run once memtx engine builds secondary indexes for the
+	 * data.
+	 */
+	memtx_on_indexes_built_cb on_indexes_built_cb;
 	/** Common quota for tuples and indexes. */
 	struct quota quota;
 	/**
@@ -209,7 +217,8 @@ struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
 		 bool dontdump, unsigned granularity,
-		 const char *allocator, float alloc_factor);
+		 const char *allocator, float alloc_factor,
+		 memtx_on_indexes_built_cb on_indexes_built);
 
 int
 memtx_engine_recover_snapshot(struct memtx_engine *memtx,
@@ -341,13 +350,14 @@ static inline struct memtx_engine *
 memtx_engine_new_xc(const char *snap_dirname, bool force_recovery,
 		    uint64_t tuple_arena_max_size, uint32_t objsize_min,
 		    bool dontdump, unsigned granularity,
-		    const char *allocator, float alloc_factor)
+		    const char *allocator, float alloc_factor,
+		    memtx_on_indexes_built_cb on_indexes_built)
 {
 	struct memtx_engine *memtx;
 	memtx = memtx_engine_new(snap_dirname, force_recovery,
-				 tuple_arena_max_size,
-				 objsize_min, dontdump,
-				 granularity, allocator, alloc_factor);
+				 tuple_arena_max_size, objsize_min, dontdump,
+				 granularity, allocator, alloc_factor,
+				 on_indexes_built);
 	if (memtx == NULL)
 		diag_raise();
 	return memtx;

@@ -428,6 +428,7 @@ memtx_engine_begin_final_recovery(struct engine *engine)
 		memtx->state = MEMTX_OK;
 		if (space_foreach(memtx_build_secondary_keys, memtx) != 0)
 			return -1;
+		memtx->on_indexes_built_cb();
 	}
 	return 0;
 }
@@ -446,6 +447,7 @@ memtx_engine_begin_hot_standby(struct engine *engine)
 		memtx->state = MEMTX_OK;
 		if (space_foreach(memtx_build_secondary_keys, memtx) != 0)
 			return -1;
+		memtx->on_indexes_built_cb();
 	}
 	return 0;
 }
@@ -465,6 +467,7 @@ memtx_engine_end_recovery(struct engine *engine)
 		memtx->state = MEMTX_OK;
 		if (space_foreach(memtx_build_secondary_keys, memtx) != 0)
 			return -1;
+		memtx->on_indexes_built_cb();
 	}
 	xdir_collect_inprogress(&memtx->snap_dir);
 
@@ -632,7 +635,10 @@ memtx_engine_bootstrap(struct engine *engine)
 			break;
 	}
 	xlog_cursor_close(&cursor, false);
-	return rc < 0 ? -1 : 0;
+	if (rc < 0)
+		return -1;
+	memtx->on_indexes_built_cb();
+	return 0;
 }
 
 static int
@@ -1256,7 +1262,8 @@ struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
 		 bool dontdump, unsigned granularity,
-		 const char *allocator, float alloc_factor)
+		 const char *allocator, float alloc_factor,
+		 memtx_on_indexes_built_cb on_indexes_built)
 {
 	int64_t snap_signature;
 	struct memtx_engine *memtx =
@@ -1362,6 +1369,8 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		panic("failed to create functional index key format");
 	}
 	tuple_format_ref(memtx->func_key_format);
+
+	memtx->on_indexes_built_cb = on_indexes_built;
 
 	fiber_start(memtx->gc_fiber, memtx);
 	return memtx;

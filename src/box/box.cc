@@ -166,6 +166,62 @@ static struct fiber_pool tx_fiber_pool;
  */
 static struct cbus_endpoint tx_prio_endpoint;
 
+RLIST_HEAD(box_on_recovery_state);
+
+/**
+ * Recovery states supported by on_recovery_state triggers.
+ * Are positioned in the order of appearance during initial box.cfg().
+ * The only exception are WAL_RECOVERED and INDEXES_BUILT, which might come in
+ * any order, since the moment when secondary indexes are built depends on
+ * box.cfg.force_recovery and box.cfg.memtx_use_mvcc_engine.
+ */
+enum box_recovery_state {
+	/**
+	 * The node has either recovered the snapshot from the disk, received
+	 * the snapshot from the remote master as part of initial join stage or
+	 * has bootstrapped the cluster.
+	 */
+	RECOVERY_STATE_SNAPSHOT_RECOVERED,
+	/**
+	 * The node has either recovered the local WAL files, received the WALs
+	 * from the remote master as part of final join or has bootstrapped the
+	 * cluster.
+	 */
+	RECOVERY_STATE_WAL_RECOVERED,
+	/**
+	 * The node has built secondary indexes for memtx spaces.
+	 */
+	RECOVERY_STATE_INDEXES_BUILT,
+	/**
+	 * The node has synced with remote peers. IOW, it has transitioned from
+	 * "orphan" to "running".
+	 */
+	RECOVERY_STATE_SYNCED,
+	box_recovery_state_MAX,
+};
+
+static const char *box_recovery_state_strs[box_recovery_state_MAX] = {
+	/* [RECOVERY_STATE_SNAPSHOT_RECOVERED] = */
+	"snapshot_recovered",
+	/* [RECOVERY_STATE_WAL_RECOVERED] = */
+	"wal_recovered",
+	/* [RECOVERY_STATE_INDEXES_BUILT] = */
+	"indexes_built",
+	/* [RECOVERY_STATE_SYNCED] = */
+	"synced",
+};
+
+/** Whether the triggers for "synced" recovery stage have already run. */
+static bool recovery_state_synced_is_reached;
+
+static int
+box_run_on_recovery_state(enum box_recovery_state state)
+{
+	assert(state >= 0 && state < box_recovery_state_MAX);
+	return trigger_run(&box_on_recovery_state,
+			   (char *)box_recovery_state_strs[state]);
+}
+
 static void
 builtin_events_init(void);
 
@@ -407,6 +463,10 @@ box_do_set_orphan(bool orphan)
 {
 	is_orphan = orphan;
 	box_update_ro_summary();
+	if (!is_orphan && !recovery_state_synced_is_reached) {
+		box_run_on_recovery_state(RECOVERY_STATE_SYNCED);
+		recovery_state_synced_is_reached = true;
+	}
 }
 
 void
@@ -3679,6 +3739,13 @@ box_free(void)
 		sql_built_in_functions_cache_free();
 		port_free();
 	}
+	trigger_destroy(&box_on_recovery_state);
+}
+
+static void
+box_on_indexes_built(void)
+{
+	box_run_on_recovery_state(RECOVERY_STATE_INDEXES_BUILT);
 }
 
 static void
@@ -3698,7 +3765,8 @@ engine_init()
 				    cfg_geti("strip_core"),
 				    cfg_geti("slab_alloc_granularity"),
 				    cfg_gets("memtx_allocator"),
-				    cfg_getd("slab_alloc_factor"));
+				    cfg_getd("slab_alloc_factor"),
+				    box_on_indexes_built);
 	engine_register((struct engine *)memtx);
 	box_set_memtx_max_tuple_size();
 
@@ -3767,6 +3835,12 @@ bootstrap_master(const struct tt_uuid *replicaset_uuid)
 	/* Make the initial checkpoint */
 	if (gc_checkpoint() != 0)
 		panic("failed to create a checkpoint");
+
+	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
+	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
+	assert(!recovery_state_synced_is_reached);
+	box_run_on_recovery_state(RECOVERY_STATE_SYNCED);
+	recovery_state_synced_is_reached = true;
 }
 
 /**
@@ -3816,6 +3890,8 @@ bootstrap_from_master(struct replica *master)
 					APPLIER_FINAL_JOIN;
 	applier_resume_to_state(applier, wait_state, TIMEOUT_INFINITY);
 
+	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
+
 	/*
 	 * Process final data (WALs).
 	 */
@@ -3849,6 +3925,8 @@ bootstrap_from_master(struct replica *master)
 	/* Make the initial checkpoint */
 	if (gc_checkpoint() != 0)
 		panic("failed to create a checkpoint");
+
+	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
 
 	return true;
 }
@@ -4046,6 +4124,8 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	 */
 	memtx_engine_recover_snapshot_xc(memtx, checkpoint_vclock);
 
+	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
+
 	engine_begin_final_recovery_xc();
 	recover_remaining_wals(recovery, &wal_stream.base, NULL, false);
 	if (wal_stream_has_tx(&wal_stream)) {
@@ -4148,6 +4228,8 @@ local_recovery(const struct tt_uuid *instance_uuid,
 			  tt_uuid_str(replicaset_uuid),
 			  tt_uuid_str(&REPLICASET_UUID));
 	}
+
+	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
 }
 
 static void
