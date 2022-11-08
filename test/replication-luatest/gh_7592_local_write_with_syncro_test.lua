@@ -1,5 +1,5 @@
 local t = require('luatest')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local cluster = require('test.luatest_helpers.cluster')
 local fiber = require('fiber')
 
@@ -13,8 +13,8 @@ g.before_each(function(cg)
         replication_timeout = 0.1,
         election_mode = 'off',
         replication = {
-            server.build_instance_uri('master'),
-            server.build_instance_uri('replica'),
+            server.build_listen_uri('master'),
+            server.build_listen_uri('replica'),
         },
     }
     cg.master = cg.cluster:build_and_add_server{
@@ -33,7 +33,7 @@ g.before_each(function(cg)
         box.schema.space.create('loc', {is_local = true})
         box.space.loc:create_index('pk')
     end)
-    cg.replica:wait_vclock_of(cg.master)
+    cg.replica:wait_for_vclock_of(cg.master)
 end)
 
 g.after_each(function(cg)

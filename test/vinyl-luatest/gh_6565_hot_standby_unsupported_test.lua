@@ -1,5 +1,5 @@
 local fio = require('fio')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local t = require('luatest')
 
 local g = t.group()
@@ -29,7 +29,7 @@ g.test_panic_if_vinyl_space_exists = function(cg)
         box.schema.create_space('test', {engine = 'vinyl'})
         box.space.test:create_index('pk')
     end)
-    cg.replica:start({wait_for_readiness = false})
+    cg.replica:start({wait_until_ready = false})
     t.helpers.retrying({}, function()
         t.assert(cg.replica:grep_log("Entering hot standby mode",
                                      nil, {filename = cg.replica_log}))
@@ -39,7 +39,7 @@ g.test_panic_if_vinyl_space_exists = function(cg)
 end
 
 g.test_panic_if_vinyl_space_is_created = function(cg)
-    cg.replica:start({wait_for_readiness = false})
+    cg.replica:start({wait_until_ready = false})
     t.helpers.retrying({}, function()
         t.assert(cg.replica:grep_log("Entering hot standby mode",
                                      nil, {filename = cg.replica_log}))

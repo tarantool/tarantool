@@ -1,4 +1,4 @@
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local t = require('luatest')
 local urilib = require('uri')
 
@@ -37,7 +37,7 @@ g.test_before_replace_alter_replica_id = function(cg)
     else
         -- We cannot wait until ready because server2 will not be started at all,
         -- so we will retry until we find a log entry we need.
-        server2:start({wait_for_readiness=false})
+        server2:start({wait_until_ready=false})
         t.helpers.retrying({}, function()
             local msg = server1:grep_log('Replica ID is changed by a trigger', 1024)
             if msg == nil then
@@ -50,7 +50,7 @@ g.test_before_replace_alter_replica_id = function(cg)
         server2:drop()
     else
         -- Cannot drop server because it was not started.
-        server2:cleanup()
+        server2:clean()
     end
     server1:drop()
 end

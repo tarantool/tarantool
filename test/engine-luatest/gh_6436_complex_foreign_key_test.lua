@@ -1,5 +1,5 @@
 -- https://github.com/tarantool/tarantool/issues/6436 Foreign keys
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local t = require('luatest')
 local g = t.group('gh-6436-foreign-key-test', {{engine = 'memtx'}, {engine = 'vinyl'}})
 

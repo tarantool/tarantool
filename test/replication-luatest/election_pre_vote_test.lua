@@ -1,6 +1,6 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 
 local g = t.group('pre-vote')
 
@@ -17,9 +17,9 @@ g.before_all(function()
     g.cluster = cluster:new({})
     g.cfg = {
         replication = {
-            server.build_instance_uri('node1'),
-            server.build_instance_uri('node2'),
-            server.build_instance_uri('node3'),
+            server.build_listen_uri('node1'),
+            server.build_listen_uri('node2'),
+            server.build_listen_uri('node3'),
         },
         election_mode = 'candidate',
         replication_timeout = REPLICATION_TIMEOUT,
@@ -58,8 +58,8 @@ g.test_no_direct_connection = function(g)
     g.follower1:exec(function(cfg) box.cfg(cfg) end,
         {{
             replication = {
-               server.build_instance_uri(g.follower1.alias),
-               server.build_instance_uri(g.follower2.alias),
+               server.build_listen_uri(g.follower1.alias),
+               server.build_listen_uri(g.follower2.alias),
             }
         }})
     t.helpers.retrying({}, function()
@@ -91,8 +91,8 @@ g.test_no_quorum = function(g)
     g.follower1:exec(function(cfg) box.cfg(cfg) end,
         {{
             replication = {
-               server.build_instance_uri(g.follower1.alias),
-               server.build_instance_uri(g.follower2.alias),
+               server.build_listen_uri(g.follower1.alias),
+               server.build_listen_uri(g.follower2.alias),
             }
         }})
     t.assert_equals(g.follower1:exec(get_election_term), term,

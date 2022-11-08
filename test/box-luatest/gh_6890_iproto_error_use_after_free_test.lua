@@ -1,5 +1,5 @@
 local msgpack = require('msgpack')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local socket = require('socket')
 local uri = require('uri')
 local t = require('luatest')

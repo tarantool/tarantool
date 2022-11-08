@@ -1,5 +1,5 @@
 local t = require('luatest')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local cluster = require('test.luatest_helpers.cluster')
 local fiber = require('fiber')
 
@@ -11,10 +11,10 @@ local function wait_pair_sync(server1, server2)
     -- Without retrying it fails sometimes when vclocks are empty and both
     -- instances are in 'connect' state instead of 'follow'.
     t.helpers.retrying({timeout = wait_timeout}, function()
-        server1:wait_vclock_of(server2)
-        server2:wait_vclock_of(server1)
-        server1:assert_follows_upstream(server2:instance_id())
-        server2:assert_follows_upstream(server1:instance_id())
+        server1:wait_for_vclock_of(server2)
+        server2:wait_for_vclock_of(server1)
+        server1:assert_follows_upstream(server2:get_instance_id())
+        server2:assert_follows_upstream(server1:get_instance_id())
     end)
 end
 
@@ -66,9 +66,9 @@ g.before_all(function(g)
         replication_synchro_quorum = 2,
         replication_timeout = 0.1,
         replication = {
-            server.build_instance_uri('server1'),
-            server.build_instance_uri('server2'),
-            server.build_instance_uri('server3'),
+            server.build_listen_uri('server1'),
+            server.build_listen_uri('server2'),
+            server.build_listen_uri('server3'),
         },
     }
     box_cfg.election_mode = 'manual'
@@ -122,7 +122,7 @@ g.test_fence_during_confirm_wal_write = function(g)
     --
     -- Server2 sends a new term to server1.
     --
-    local term = g.server1:election_term()
+    local term = g.server1:get_election_term()
     fiber.create(g.server2.exec, g.server2, function()
         box.cfg{
             election_mode = 'manual',
@@ -132,7 +132,7 @@ g.test_fence_during_confirm_wal_write = function(g)
         -- below.
         pcall(box.ctl.promote)
     end)
-    g.server1:wait_election_term(term + 1)
+    g.server1:wait_for_election_term(term + 1)
     --
     -- Server1 finishes CONFIRM WAL write and sees that the synchro queue was
     -- frozen during the WAL write. Shouldn't affect the result.
@@ -190,7 +190,7 @@ g.test_vote_during_txn_wal_write = function(g)
     --
     -- Server3 tries to become a leader by requesting a vote from server2.
     --
-    local term = g.server2:election_term()
+    local term = g.server2:get_election_term()
     fiber.create(g.server3.exec, g.server3, function()
         box.cfg{
             election_mode = 'manual',
@@ -198,7 +198,7 @@ g.test_vote_during_txn_wal_write = function(g)
         }
         pcall(box.ctl.promote)
     end)
-    g.server2:wait_election_term(term + 1)
+    g.server2:wait_for_election_term(term + 1)
     --
     -- Server2 shouldn't have persisted a vote yet. Instead, when it finishes
     -- the txn WAL write, it sees that its vclock is > server3's one and it
@@ -208,8 +208,8 @@ g.test_vote_during_txn_wal_write = function(g)
     --
     -- Server1 gets the new term via server2.
     --
-    g.server1:wait_election_term(term + 1)
-    g.server3:wait_vclock_of(g.server2)
+    g.server1:wait_for_election_term(term + 1)
+    g.server3:wait_for_vclock_of(g.server2)
     t.assert_equals(server_get_election_state(g.server1), 'follower')
     t.assert_equals(server_get_election_state(g.server2), 'follower')
     t.assert_not_equals(server_get_election_state(g.server3), 'leader')

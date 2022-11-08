@@ -1,6 +1,6 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local wait_timeout = 120
 
 --
@@ -16,8 +16,8 @@ local wait_timeout = 120
 --
 local function make_create_cluster(g) return function()
     g.cluster = cluster:new({})
-    local master_uri = server.build_instance_uri('master')
-    local replica_uri = server.build_instance_uri('replica')
+    local master_uri = server.build_listen_uri('master')
+    local replica_uri = server.build_listen_uri('replica')
     local replication = {master_uri, replica_uri}
     local box_cfg = {
         listen = master_uri,
@@ -95,7 +95,7 @@ end
 -- Read-only because is an orphan.
 --
 g.test_read_only_reason_orphan = function(g)
-    local fake_uri = server.build_instance_uri('fake')
+    local fake_uri = server.build_listen_uri('fake')
     local old_timeout, ok, err = g.master:exec(function(fake_uri)
         -- Make connect-quorum impossible to satisfy using a fake instance.
         local old_timeout = box.cfg.replication_connect_timeout
@@ -174,8 +174,8 @@ g.test_read_only_reason_election_has_leader = function(g)
     g.replica:exec(function()
         box.cfg{election_mode = 'voter'}
     end)
-    g.master:wait_election_leader()
-    g.replica:wait_election_leader_found()
+    g.master:wait_for_election_leader()
+    g.replica:wait_until_election_leader_found()
 
     local ok, err = g.replica:exec(function()
         local ok, err = pcall(box.schema.create_space, 'test')
@@ -192,8 +192,8 @@ g.test_read_only_reason_election_has_leader = function(g)
     t.assert_covers(err, {
         reason = 'election',
         state = 'follower',
-        leader_id = g.master:instance_id(),
-        leader_uuid = g.master:instance_uuid(),
+        leader_id = g.master:get_instance_id(),
+        leader_uuid = g.master:get_instance_uuid(),
         code = box.error.READONLY,
         type = 'ClientError'
     }, 'reason is election, has leader')
@@ -241,8 +241,8 @@ g.test_read_only_reason_synchro = function(g)
     end), "synchro", "ro reason synchro");
     t.assert_covers(err, {
         reason = 'synchro',
-        queue_owner_id = g.master:instance_id(),
-        queue_owner_uuid = g.master:instance_uuid(),
+        queue_owner_id = g.master:get_instance_id(),
+        queue_owner_uuid = g.master:get_instance_uuid(),
         code = box.error.READONLY,
         type = 'ClientError'
     }, 'reason is synchro, has owner')
@@ -276,9 +276,9 @@ g.test_read_only_reason_election_has_leader_no_uuid = function(g)
             replication_synchro_quorum = 2
         }
     end)
-    g.master:wait_election_leader()
-    g.replica:wait_election_leader_found()
-    local leader_id = g.master:instance_id()
+    g.master:wait_for_election_leader()
+    g.replica:wait_until_election_leader_found()
+    local leader_id = g.master:get_instance_id()
 
     g.master:exec(function()
         box.space._cluster:run_triggers(false)
@@ -327,7 +327,7 @@ g.test_read_only_reason_synchro_no_uuid = function(g)
         box.space._cluster:delete{box.info.id}
     end)
 
-    local leader_id = g.master:instance_id()
+    local leader_id = g.master:get_instance_id()
     t.helpers.retrying({}, function()
         g.replica:exec(function(leader_id)
             local t = require('luatest')

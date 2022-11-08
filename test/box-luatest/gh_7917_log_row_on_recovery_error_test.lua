@@ -1,5 +1,5 @@
 local fio = require('fio')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local t = require('luatest')
 
 local g = t.group(nil, {{type = 'xlog'}, {type = 'snap'}})
@@ -10,7 +10,7 @@ g.before_each(function(cg)
         datadir = fio.pathjoin('test/box-luatest/gh_7917_data',
                                cg.params.type),
     })
-    cg.server:start({wait_for_readiness = false})
+    cg.server:start({wait_until_ready = false})
     cg.log_filename = fio.pathjoin(cg.server.workdir, cg.server.alias .. '.log')
 end)
 
@@ -24,5 +24,5 @@ g.test_log_row_on_recovery_error = function(cg)
 end
 
 g.after_each(function(cg)
-    cg.server:cleanup()
+    cg.server:clean()
 end)

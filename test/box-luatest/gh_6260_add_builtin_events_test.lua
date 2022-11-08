@@ -1,7 +1,7 @@
 local t = require('luatest')
 local net = require('net.box')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 
 local g = t.group('gh_6260')
 
@@ -86,8 +86,8 @@ g.test_box_status = function(cg)
             replication_connect_timeout = 0.001,
             replication_timeout = 0.001,
         }
-    end, {{server.build_instance_uri('master'),
-           server.build_instance_uri('replica')}})
+    end, {{server.build_listen_uri('master'),
+           server.build_listen_uri('replica')}})
     -- here we have 2 notifications: entering ro when can't connect
     -- to master and the second one when going orphan
     t.helpers.retrying({}, function() t.assert_equals(result_no, 3) end)
@@ -140,9 +140,9 @@ g.before_test('test_box_election', function(cg)
 
     local box_cfg = {
         replication = {
-            server.build_instance_uri('instance_1'),
-            server.build_instance_uri('instance_2'),
-            server.build_instance_uri('instance_3'),
+            server.build_listen_uri('instance_1'),
+            server.build_listen_uri('instance_2'),
+            server.build_listen_uri('instance_3'),
         },
         replication_connect_quorum = 0,
         election_mode = 'off',
@@ -199,15 +199,15 @@ g.test_box_election = function(cg)
 
     -- wait for elections to complete, verify leader is the instance_1
     -- trying to avoid the exact number of term - it can vary
-    local instance1_id = cg.instance_1:instance_id()
+    local instance1_id = cg.instance_1:get_instance_id()
 
     cg.instance_1:exec(function() box.cfg{election_mode='candidate'} end)
     cg.instance_2:exec(function() box.cfg{election_mode='voter'} end)
     cg.instance_3:exec(function() box.cfg{election_mode='voter'} end)
 
-    cg.instance_1:wait_election_leader_found()
-    cg.instance_2:wait_election_leader_found()
-    cg.instance_3:wait_election_leader_found()
+    cg.instance_1:wait_until_election_leader_found()
+    cg.instance_2:wait_until_election_leader_found()
+    cg.instance_3:wait_until_election_leader_found()
 
     t.assert_covers(res[1],
                     {leader = instance1_id, is_ro = false, role = 'leader'})

@@ -1,4 +1,4 @@
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local t = require('luatest')
 
 local g = t.group()
@@ -68,7 +68,7 @@ g.before_test('test_replication', function(cg)
     cg.replica = server:new({
         alias = 'replica',
         box_cfg = {
-            replication = server.build_instance_uri('default'),
+            replication = server.build_listen_uri('default'),
         },
     })
 end)
@@ -108,7 +108,7 @@ g.test_replication = function(cg)
         box.rollback()
         return box.info.vclock
     end)
-    cg.replica:wait_vclock(vclock)
+    cg.replica:wait_for_vclock(vclock)
     cg.replica:exec(function()
         local t = require('luatest')
         local function stat()
