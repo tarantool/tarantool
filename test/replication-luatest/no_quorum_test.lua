@@ -1,23 +1,22 @@
 local t = require('luatest')
 local log = require('log')
 local Cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 
 local pg = t.group('no_quorum', {{engine = 'memtx'}, {engine = 'vinyl'}})
 
 pg.before_each(function(cg)
-    local engine = cg.params.engine
     cg.cluster = Cluster:new({})
-    cg.master = cg.cluster:build_server({alias = 'master', engine = engine})
+    cg.master = cg.cluster:build_server({alias = 'master'})
     local box_cfg = {
-        listen = server.build_instance_uri('no_quorum'),
-        replication = server.build_instance_uri('master'),
+        listen = server.build_listen_uri('no_quorum'),
+        replication = server.build_listen_uri('master'),
         memtx_memory = 107374182,
         replication_connect_quorum = 0,
         replication_timeout = 0.1,
     }
     cg.replica = cg.cluster:build_server(
-        {alias = 'no_quorum', engine = engine, box_cfg = box_cfg})
+        {alias = 'no_quorum', box_cfg = box_cfg})
 
     pcall(log.cfg, {level = 6})
 end)
@@ -54,7 +53,7 @@ pg.test_replication_no_quorum = function(cg)
     -- Check that replica is able to reconnect, case was broken with earlier quorum "fix".
     cg.master:eval("return box.cfg{listen = os.getenv('TARANTOOL_LISTEN')}")
     t.assert_equals(cg.master:eval("return space:insert{2}"), {2})
-    cg.replica:wait_vclock_of(cg.master)
+    cg.replica:wait_for_vclock_of(cg.master)
     t.assert_str_matches(
         cg.replica:eval('return box.info.status'), 'running')
     t.assert_equals(cg.master:eval("return space:select()"), {{1}, {2}})
