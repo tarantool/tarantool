@@ -80,6 +80,15 @@ stailq_create(struct stailq *head)
 }
 
 /**
+ * return TRUE if list is empty
+ */
+static inline int
+stailq_empty(struct stailq *head)
+{
+	return head->first.value == NULL;
+}
+
+/**
  * Add an item to list head
  */
 inline static void
@@ -97,6 +106,7 @@ stailq_add(struct stailq *head, struct stailq_entry *item)
 inline static struct stailq_entry *
 stailq_shift(struct stailq *head)
 {
+	assert(!stailq_empty(head));
 	struct stailq_entry_ptr shift = head->first;
 	head->first = head->first.value->next;
 	if (head->first.value == NULL)
@@ -154,15 +164,6 @@ inline static struct stailq_entry *
 stailq_next(struct stailq_entry *item)
 {
 	return item->next.value;
-}
-
-/**
- * return TRUE if list is empty
- */
-inline static int
-stailq_empty(struct stailq *head)
-{
-	return head->first.value == NULL;
 }
 
 /*
