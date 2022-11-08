@@ -957,9 +957,9 @@ say_format_json(struct log *log, char *buf, int len, int level, const char *file
 
 /** Wrapper around log->format_func to be used with SNPRINT. */
 static int
-format_log_entry(char *buf, int len, struct log *log, int level,
-		 const char *filename, int line, const char *error,
-		 const char *format, va_list ap)
+format_func_adapter(char *buf, int len, struct log *log, int level,
+		    const char *filename, int line, const char *error,
+		    const char *format, va_list ap)
 {
 	return log->format_func(log, buf, len, level, filename, line, error,
 				format, ap);
@@ -1024,6 +1024,7 @@ static __thread char say_buf[SAY_BUF_LEN_MAX];
 static ssize_t
 safe_write(int fd, const char *buf, int size)
 {
+	assert(size >= 0);
 	/* Writes at most SAY_BUF_LEN_MAX - 1
 	 * (1 byte was taken for 0 byte in vsnprintf).
 	 */
@@ -1039,7 +1040,8 @@ say_default(int level, const char *filename, int line, const char *error,
 	va_start(ap, format);
 	int total = log_vsay(log_default, level, filename,
 			     line, error, format, ap);
-	if (level == S_FATAL && log_default->fd != STDERR_FILENO) {
+	if (total > 0 &&
+	    level == S_FATAL && log_default->fd != STDERR_FILENO) {
 		ssize_t r = safe_write(STDERR_FILENO, say_buf, total);
 		(void) r;                       /* silence gcc warning */
 	}
@@ -1256,11 +1258,34 @@ log_destroy(struct log *log)
 	tt_pthread_cond_destroy(&log->rotate_cond);
 }
 
+/**
+ * Format a line of log.
+ */
+static int
+format_log_entry(struct log *log, int level, const char *filename,
+		 int line, const char *error, const char *format,
+		 va_list ap)
+{
+	int total = 0;
+	char *buf = say_buf;
+	int len = SAY_BUF_LEN_MAX;
+
+	if (log->type == SAY_LOGGER_SYSLOG) {
+		SNPRINT(total, format_syslog_header, buf, len,
+			level, log->syslog_facility, log->syslog_ident);
+	}
+	SNPRINT(total, format_func_adapter, buf, len, log, level, filename,
+		line, error, format, ap);
+
+	return total;
+}
+
 int
 log_vsay(struct log *log, int level, const char *filename, int line,
 	 const char *error, const char *format, va_list ap)
 {
 	int errsv = errno;
+	int total = 0;
 	if (level <= log_level_flightrec) {
 		va_list ap_copy;
 		va_copy(ap_copy, ap);
@@ -1268,18 +1293,14 @@ log_vsay(struct log *log, int level, const char *filename, int line,
 				    format, ap_copy);
 		va_end(ap_copy);
 	}
-	if (level > log->level) {
-		return 0;
-	}
-	char *buf = say_buf;
-	int len = SAY_BUF_LEN_MAX;
-	int total = 0;
-	if (log->type == SAY_LOGGER_SYSLOG) {
-		SNPRINT(total, format_syslog_header, buf, len,
-			level, log->syslog_facility, log->syslog_ident);
-	}
-	SNPRINT(total, format_log_entry, buf, len, log, level, filename, line,
-		error, format, ap);
+	if (level > log->level)
+		goto out;
+
+	total = format_log_entry(log, level, filename, line, error,
+				 format, ap);
+	if (total <= 0)
+		goto out;
+
 	switch (log->type) {
 	case SAY_LOGGER_FILE:
 	case SAY_LOGGER_PIPE:
@@ -1310,6 +1331,7 @@ log_vsay(struct log *log, int level, const char *filename, int line,
 	default:
 		unreachable();
 	}
+out:
 	errno = errsv; /* Preserve the errno. */
 	return total;
 }
