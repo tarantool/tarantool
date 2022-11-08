@@ -1,6 +1,6 @@
 local t = require('luatest')
+local server = require('luatest.server')
 
-local server = require('test.luatest_helpers.server')
 local common = require('test.vinyl-luatest.common')
 
 local g = t.group()

@@ -2,7 +2,7 @@ local checks = require('checks')
 local fio = require('fio')
 local luatest = require('luatest')
 
-local Server = require('test.luatest_helpers.server')
+local Server = require('luatest.server')
 
 local Cluster = {}
 
@@ -42,7 +42,7 @@ function Cluster:drop()
     for _, server in ipairs(self.servers) do
         if server ~= nil then
             server:stop()
-            server:cleanup()
+            server:clean()
         end
     end
 end
@@ -77,27 +77,28 @@ end
 function Cluster:start(opts)
     for _, server in ipairs(self.servers) do
         if not server.process then
-            server:start({wait_for_readiness = false})
+            server:start({wait_until_ready = false})
         end
     end
 
     -- The option is true by default.
-    local wait_for_readiness = true
-    if opts ~= nil and opts.wait_for_readiness ~= nil then
-        wait_for_readiness = opts.wait_for_readiness
+    local wait_until_ready = true
+    if opts ~= nil and opts.wait_until_ready ~= nil then
+        wait_until_ready = opts.wait_until_ready
     end
 
-    if wait_for_readiness then
+    if wait_until_ready then
         for _, server in ipairs(self.servers) do
-            server:wait_for_readiness()
+            server:wait_until_ready()
         end
     end
 end
 
 function Cluster:build_server(server_config, instance_file)
-    instance_file = instance_file or 'default.lua'
+    instance_file = instance_file or 'server_instance.lua'
     server_config = table.deepcopy(server_config)
-    server_config.command = fio.pathjoin(ROOT, 'test/instances/', instance_file)
+    server_config.command = fio.pathjoin(ROOT, 'test-run/lib/luatest/luatest',
+        instance_file)
     assert(server_config.alias, 'Either replicaset.alias or server.alias must be given')
     local server = Server:new(server_config)
     table.insert(self.built_servers, server)
@@ -126,9 +127,9 @@ function Cluster:get_leader()
     end
 end
 
-function Cluster:exec_on_leader(bootstrap_function)
+function Cluster:exec_on_leader(bootstrap_function, ...)
     local leader = self:get_leader()
-    return leader:exec(bootstrap_function)
+    return leader:exec(bootstrap_function, ...)
 end
 
 function Cluster:wait_fullmesh(params)

@@ -3,7 +3,7 @@ local g = t.group('gh-5501', {{engine = 'memtx'},
                               {engine = 'vinyl'}})
 
 g.before_all(function(cg)
-    local server = require('test.luatest_helpers.server')
+    local server = require('luatest.server')
     cg.server = server:new({alias = 'master'})
     cg.server:start()
 end)

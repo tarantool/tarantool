@@ -1,4 +1,4 @@
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local t = require('luatest')
 local g = t.group()
 local fio = require('fio')
@@ -6,11 +6,11 @@ local fio = require('fio')
 g.before_test('test_panic_without_force_recovery', function()
     g.server = server:new({alias = 'master-test_panic',
                            datadir = 'test/box-luatest/gh_6794_data'})
-    g.server:start({wait_for_readiness = false})
+    g.server:start({wait_until_ready = false})
 end)
 
 g.after_test("test_panic_without_force_recovery", function()
-    g.server:cleanup()
+    g.server:clean()
 end)
 
 g.before_test('test_ignore_with_force_recovery', function()

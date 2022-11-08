@@ -1,6 +1,6 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 
 local g = t.group('gh-5295')
 
@@ -62,8 +62,8 @@ g.before_each(function(cg)
 
     test_id = test_id + 1
     cg.box_cfg.replication = {
-            server.build_instance_uri('main'),
-            server.build_instance_uri('split_replica'..test_id),
+            server.build_listen_uri('main'),
+            server.build_listen_uri('split_replica'..test_id),
     }
     cg.split_replica = cg.cluster:build_and_add_server{
         alias = 'split_replica'..test_id,
@@ -83,7 +83,7 @@ end)
 -- Drop the partitioned server after each case of split-brain.
 g.after_each(function(cg)
     cg.split_replica:stop()
-    cg.split_replica:cleanup()
+    cg.split_replica:clean()
     -- Drop the replica's cluster entry, so that next one receives same id.
     cg.main:exec(function() box.space._cluster:delete{2} end)
     cg.cluster.servers[2] = nil
@@ -96,14 +96,14 @@ end)
 
 local function partition_replica(cg)
     -- Each partitioning starts on synced servers.
-    cg.split_replica:wait_vclock_of(cg.main)
-    cg.main:wait_vclock_of(cg.split_replica)
+    cg.split_replica:wait_for_vclock_of(cg.main)
+    cg.main:wait_for_vclock_of(cg.split_replica)
     cg.split_replica:exec(update_replication, {})
     cg.main:exec(update_replication, {})
 end
 
 local function reconnect_and_check_split_brain(srv)
-    srv:exec(update_replication, {server.build_instance_uri('main')})
+    srv:exec(update_replication, {server.build_listen_uri('main')})
     t.helpers.retrying({}, srv.exec, srv, function()
         local upstream = box.info.replication[1].upstream
         local t = require('luatest')

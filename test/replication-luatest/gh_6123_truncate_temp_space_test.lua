@@ -1,35 +1,33 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 
 local g = t.group('gh_6123', {{engine = 'memtx'}, {engine = 'vinyl'}})
 
 g.before_each(function(cg)
-    local engine = cg.params.engine
-
     cg.cluster = cluster:new({})
 
     local box_cfg = {
         replication         = {
-            server.build_instance_uri('master')
+            server.build_listen_uri('master')
         },
         replication_timeout = 1,
         read_only           = false
     }
 
-    cg.master = cg.cluster:build_server({alias = 'master', engine = engine, box_cfg = box_cfg})
+    cg.master = cg.cluster:build_server({alias = 'master', box_cfg = box_cfg})
 
     local box_cfg = {
         replication         = {
-            server.build_instance_uri('master'),
-            server.build_instance_uri('replica')
+            server.build_listen_uri('master'),
+            server.build_listen_uri('replica')
         },
         replication_timeout = 1,
         replication_connect_timeout = 4,
         read_only           = true
     }
 
-    cg.replica = cg.cluster:build_server({alias = 'replica', engine = engine, box_cfg = box_cfg})
+    cg.replica = cg.cluster:build_server({alias = 'replica', box_cfg = box_cfg})
 
     cg.cluster:add_server(cg.master)
     cg.cluster:add_server(cg.replica)
@@ -57,7 +55,7 @@ g.test_truncate_is_local_transaction = function(cg)
 
     -- Checking that replica has received the last transaction,
     -- and that replication isn't broken.
-    cg.replica:wait_vclock_of(cg.master)
+    cg.replica:wait_for_vclock_of(cg.master)
 
     t.assert_equals(cg.replica:eval("return box.space._schema:select{'smth'}"), {{'smth'}})
     t.assert_equals(cg.replica:eval("return box.info.replication[1].upstream.status"), 'follow')

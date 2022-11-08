@@ -9,7 +9,7 @@ local script = os.getenv('SOURCEDIR') .. '/test/box-luatest/gh_7434_child.lua'
 local output_file
 
 g.before_all(function(cg)
-    local server = require('test.luatest_helpers.server')
+    local server = require('luatest.server')
     cg.server = server:new({alias = 'master'})
     output_file = cg.server.workdir .. '/on_shutdown_completed.txt'
 end)

@@ -1,4 +1,4 @@
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local buffer = require('buffer')
 local net = require('net.box')
 local t = require('luatest')

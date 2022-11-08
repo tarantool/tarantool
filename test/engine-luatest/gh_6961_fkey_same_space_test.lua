@@ -1,6 +1,6 @@
 -- https://github.com/tarantool/tarantool/issues/6961
 -- Can't create space with foreign key pointing to itself
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local t = require('luatest')
 local g = t.group('gh-6961-fkey-same-space-test',
                   {{engine = 'memtx'}, {engine = 'vinyl'}})

@@ -3,7 +3,7 @@ local g = t.group()
 local fio = require('fio')
 local popen = require('popen')
 local net_box = require('net.box')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 
 -- Create test instance.
 g.before_all = function()
