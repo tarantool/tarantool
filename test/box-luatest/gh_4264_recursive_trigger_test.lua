@@ -1,5 +1,5 @@
 local t = require('luatest')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local fio = require('fio')
 
 local g = t.group('gh-4264')
@@ -73,7 +73,7 @@ g2.before_test('test_on_shutdown_trigger_clear', function(cg)
 end)
 
 g2.after_test('test_on_shutdown_trigger_clear', function(cg)
-    cg.server:cleanup()
+    cg.server:clean()
 end)
 
 g2.test_on_shutdown_trigger_clear = function(cg)

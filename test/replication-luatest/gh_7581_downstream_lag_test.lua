@@ -1,6 +1,6 @@
 local fiber = require("fiber")
 local t = require("luatest")
-local server = require("test.luatest_helpers.server")
+local server = require("luatest.server")
 local cluster = require("test.luatest_helpers.cluster")
 
 local g = t.group("downstream-lag-after-master-switch")
@@ -17,8 +17,8 @@ g.before_each(function(g)
     local box_cfg = {
         replication_timeout = POLL_TIMEOUT,
         replication = {
-            server.build_instance_uri("server1"),
-            server.build_instance_uri("server2"),
+            server.build_listen_uri("server1"),
+            server.build_listen_uri("server2"),
         },
     }
     g.server1 = g.cluster:build_and_add_server({
@@ -41,7 +41,7 @@ g.after_each(function(g)
 end)
 
 local function get_downstream_lag(master, replica)
-    local id = replica:instance_id()
+    local id = replica:get_instance_id()
     return master:exec(function(id)
         return require("luatest").helpers.retrying({}, function()
             return box.info.replication[id].downstream.lag
@@ -50,7 +50,7 @@ local function get_downstream_lag(master, replica)
 end
 
 local function wait_downstream_updated(master, replica)
-    local id = replica:instance_id()
+    local id = replica:get_instance_id()
     t.helpers.retrying({}, function()
         master:exec(function(id)
             local t = require("luatest")
@@ -65,7 +65,7 @@ g.test_downstream_lag = function(g)
     g.server1:exec(function()
         box.space.test:insert{1}
     end)
-    g.server2:wait_vclock_of(g.server1)
+    g.server2:wait_for_vclock_of(g.server1)
     wait_downstream_updated(g.server1, g.server2)
     local lag = get_downstream_lag(g.server1, g.server2)
     t.assert(lag ~= 0, "Real lag value is updated")
@@ -80,7 +80,7 @@ g.test_downstream_lag = function(g)
     end)
     -- Wait for relay -> tx status update on server 1. It shouldn"t spoil the
     -- downstream lag.
-    g.server1:wait_vclock_of(g.server2)
+    g.server1:wait_for_vclock_of(g.server2)
     wait_downstream_updated(g.server1, g.server2)
     t.assert_equals(lag, get_downstream_lag(g.server1, g.server2),
                     "Lag doesn't change when there are updates from remote \

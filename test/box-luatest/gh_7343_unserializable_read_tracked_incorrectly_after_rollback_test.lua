@@ -1,4 +1,4 @@
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local t = require('luatest')
 
 local pg = t.group(nil, t.helpers.matrix({op = {'get', 'delete', 'update'}}))

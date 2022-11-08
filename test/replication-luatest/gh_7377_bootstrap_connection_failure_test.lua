@@ -1,6 +1,6 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local proxy = require('luatest.replica_proxy')
 
 local fio = require('fio')
@@ -15,9 +15,9 @@ g.before_all(function(cg)
     cg.servers = {}
     local box_cfg = {
         replication = {
-            server.build_instance_uri('server_1'),
-            server.build_instance_uri('server_2'),
-            server.build_instance_uri('server_3'),
+            server.build_listen_uri('server_1'),
+            server.build_listen_uri('server_2'),
+            server.build_listen_uri('server_3'),
         },
         replication_timeout = timeout,
     }
@@ -29,14 +29,14 @@ g.before_all(function(cg)
 
     -- Connection server_3 -> server_1 is proxied, others are not.
     cg.proxy = proxy:new{
-        client_socket_path = server.build_instance_uri('server_1_proxy'),
-        server_socket_path = server.build_instance_uri('server_1'),
+        client_socket_path = server.build_listen_uri('server_1_proxy'),
+        server_socket_path = server.build_listen_uri('server_1'),
     }
     t.assert(cg.proxy:start{force = true}, 'Proxy started successfully')
     for i = 1, 3 do
         box_cfg.instance_uuid = cg.uuids[i]
         if i == 3 then
-            box_cfg.replication[1] = server.build_instance_uri('server_1_proxy')
+            box_cfg.replication[1] = server.build_listen_uri('server_1_proxy')
         end
         cg.servers[i] = cg.cluster:build_and_add_server({
             alias = 'server_' .. i,
@@ -79,7 +79,7 @@ end
 -- bootstrap leader as everyone else.
 g.test_bootstrap_with_bad_connection = function(cg)
     cg.proxy:pause()
-    cg.cluster:start{wait_for_readiness = false}
+    cg.cluster:start{wait_until_ready = false}
     wait_bootstrapped(cg.servers[1], cg.uuids[2])
     fiber.sleep(timeout)
     local logfile = fio.pathjoin(cg.servers[3].workdir, 'server_3.log')

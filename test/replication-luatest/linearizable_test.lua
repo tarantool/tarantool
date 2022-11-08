@@ -1,6 +1,6 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local proxy = require('luatest.replica_proxy')
 local g = t.group('linearizable-read')
 
@@ -9,7 +9,7 @@ local fiber = require('fiber')
 local function build_replication(num_instances)
     local t = {}
     for i = 1, num_instances do
-        table.insert(t, server.build_instance_uri('server_' .. i .. '_proxy'))
+        table.insert(t, server.build_listen_uri('server_' .. i .. '_proxy'))
     end
     return t
 end
@@ -30,7 +30,7 @@ g.before_all(function(cg)
     })
     -- Servers 2 and 3 are interconnected without a proxy.
     for i = 2, num_servers do
-        cg.box_cfg.replication[i] = server.build_instance_uri('server_' .. i)
+        cg.box_cfg.replication[i] = server.build_listen_uri('server_' .. i)
     end
     for i = 2, num_servers do
         cg.servers[i] = cg.cluster:build_and_add_server({
@@ -41,8 +41,9 @@ g.before_all(function(cg)
     cg.proxies = {}
     for i = 1, num_servers do
         cg.proxies[i] = proxy:new({
-            client_socket_path = server.build_instance_uri('server_' .. i .. '_proxy'),
-            server_socket_path = server.build_instance_uri('server_' .. i),
+            client_socket_path = server.build_listen_uri('server_' .. i ..
+                '_proxy'),
+            server_socket_path = server.build_listen_uri('server_' .. i),
         })
         cg.proxies[i]:start({force = true})
     end
@@ -52,8 +53,8 @@ g.before_all(function(cg)
         box.schema.space.create('sync', {is_sync=true})
         box.space.sync:create_index('pk')
     end)
-    cg.servers[2]:wait_vclock_of(cg.servers[1])
-    cg.servers[3]:wait_vclock_of(cg.servers[1])
+    cg.servers[2]:wait_for_vclock_of(cg.servers[1])
+    cg.servers[3]:wait_for_vclock_of(cg.servers[1])
 end)
 
 g.after_all(function(cg)
@@ -104,25 +105,25 @@ g.before_test('test_no_dirty_reads', function(cg)
         box.space._cluster:insert{4, tostring(uuid.new())}
         box.space._cluster:insert{5, tostring(uuid.new())}
     end)
-    cg.servers[2]:wait_vclock_of(cg.servers[1])
+    cg.servers[2]:wait_for_vclock_of(cg.servers[1])
     cg.servers[2]:exec(function()
         box.ctl.promote()
     end)
-    cg.servers[1]:wait_vclock_of(cg.servers[2])
-    cg.servers[3]:wait_vclock_of(cg.servers[2])
+    cg.servers[1]:wait_for_vclock_of(cg.servers[2])
+    cg.servers[3]:wait_for_vclock_of(cg.servers[2])
 end)
 
 g.after_test('test_no_dirty_reads', function(cg)
     cg.servers[2]:exec(function()
         box.ctl.demote()
     end)
-    cg.servers[1]:wait_vclock_of(cg.servers[2])
+    cg.servers[1]:wait_for_vclock_of(cg.servers[2])
     cg.servers[1]:exec(function()
         box.space._cluster:delete{4}
         box.space._cluster:delete{5}
     end)
-    cg.servers[2]:wait_vclock_of(cg.servers[1])
-    cg.servers[3]:wait_vclock_of(cg.servers[1])
+    cg.servers[2]:wait_for_vclock_of(cg.servers[1])
+    cg.servers[3]:wait_for_vclock_of(cg.servers[1])
 end)
 
 g.test_no_dirty_reads = function(cg)
@@ -192,8 +193,8 @@ g.test_leader_change = function(cg)
     cg.servers[1]:exec(function()
         box.ctl.promote()
     end)
-    cg.servers[2]:wait_vclock_of(cg.servers[1])
-    cg.servers[3]:wait_vclock_of(cg.servers[1])
+    cg.servers[2]:wait_for_vclock_of(cg.servers[1])
+    cg.servers[3]:wait_for_vclock_of(cg.servers[1])
     for i = 1, num_servers do
         cg.proxies[i]:pause()
     end
@@ -222,7 +223,7 @@ g.test_leader_change = function(cg)
         local _, owner, get = fiber.join(fiber.find(fid))
         return owner, get
     end, {fid})
-    t.assert_equals(owner, cg.servers[2]:instance_id(),
+    t.assert_equals(owner, cg.servers[2]:get_instance_id(),
                     'leader change is noticed in box.begin()')
     t.assert_equals(get, {2}, 'Transaction committed by new leader is seen')
 end

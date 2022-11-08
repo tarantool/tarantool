@@ -1,6 +1,6 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 
 local g = t.group('gh-5272')
 
@@ -16,16 +16,16 @@ g.before_all(function(cg)
     cg.server = cg.cluster:build_and_add_server({
         alias = 'server',
         env = {
-            ['TARANTOOL_RUN_BEFORE_CFG'] = run_before_cfg,
+            ['TARANTOOL_RUN_BEFORE_BOX_CFG'] = run_before_cfg,
         },
     })
     cg.replica = cg.cluster:build_and_add_server({
         alias = 'replica',
         box_cfg = {
-            replication = server.build_instance_uri('server'),
+            replication = server.build_listen_uri('server'),
         },
         env = {
-            ['TARANTOOL_RUN_BEFORE_CFG'] = run_before_cfg,
+            ['TARANTOOL_RUN_BEFORE_BOX_CFG'] = run_before_cfg,
         },
     })
 end)
@@ -83,8 +83,8 @@ g.test_recovery_stages = function(cg)
         replication_connect_timeout = 0.1,
         replication_timeout = 0.1,
         replication = {
-            server.build_instance_uri('server'),
-            server.build_instance_uri('non-existent-uri'),
+            server.build_listen_uri('server'),
+            server.build_listen_uri('non-existent-uri'),
         },
     }
     cg.replica:start()

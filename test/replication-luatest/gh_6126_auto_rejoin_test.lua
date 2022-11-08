@@ -1,6 +1,6 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local fio = require('fio')
 
 local g = t.group('gh_6126')
@@ -10,7 +10,7 @@ g.before_each(function(cg)
 
     local box_cfg = {
         replication = {
-            server.build_instance_uri('instance_1'),
+            server.build_listen_uri('instance_1'),
         },
         instance_uuid = t.helpers.uuid('b'),
     }
@@ -19,8 +19,8 @@ g.before_each(function(cg)
 
     box_cfg = {
         replication = {
-            server.build_instance_uri('anon'),
-            server.build_instance_uri('instance_1'),
+            server.build_listen_uri('anon'),
+            server.build_listen_uri('instance_1'),
         },
         instance_uuid = t.helpers.uuid('a'),
         read_only = true,
@@ -31,9 +31,9 @@ g.before_each(function(cg)
 
     box_cfg = {
         replication = {
-            server.build_instance_uri('anon'),
-            server.build_instance_uri('instance_1'),
-            server.build_instance_uri('instance_2'),
+            server.build_listen_uri('anon'),
+            server.build_listen_uri('instance_1'),
+            server.build_listen_uri('instance_2'),
         },
         instance_uuid = t.helpers.uuid('c'),
     }
@@ -49,7 +49,7 @@ g.test_auto_rejoin = function(cg)
     cg.instance_1:start()
     cg.instance_1:exec(function() box.cfg{read_only = true} end)
     cg.anon:start()
-    cg.instance_2:start({wait_for_readiness = false})
+    cg.instance_2:start({wait_until_ready = false})
 
     local logfile = fio.pathjoin(cg.instance_2.workdir, 'instance_2.log')
     t.helpers.retrying({}, function()
@@ -77,7 +77,7 @@ g.test_auto_rejoin = function(cg)
         s2:replace{4}
     end)
 
-    cg.instance_2:wait_for_readiness()
+    cg.instance_2:wait_until_ready()
     t.helpers.retrying({}, function()
         t.assert(cg.instance_1:exec(function()
             return box.space._cluster:count() == 2

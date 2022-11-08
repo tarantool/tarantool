@@ -1,6 +1,6 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 
 local fio = require('fio')
 
@@ -14,8 +14,8 @@ g.before_all(function(cg)
         replication_timeout = 0.1,
         replication_synchro_quorum = 1,
         replication = {
-            server.build_instance_uri('node1'),
-            server.build_instance_uri('node2'),
+            server.build_listen_uri('node1'),
+            server.build_listen_uri('node2'),
         },
     }
     cg.node1 = cg.cluster:build_and_add_server{
@@ -29,7 +29,7 @@ g.before_all(function(cg)
     }
     cg.cluster:start()
 
-    cg.unique_filename = server.build_instance_uri('unique_filename')
+    cg.unique_filename = server.build_listen_uri('unique_filename')
     fio.unlink(cg.unique_filename)
 end)
 
@@ -51,7 +51,7 @@ g.test_leader_hang_notice = function(cg)
     cg.node2:exec(function()
         box.cfg{election_mode='candidate'}
     end)
-    local term = cg.node2:election_term()
+    local term = cg.node2:get_election_term()
     cg.node1:exec(block, {cg.unique_filename})
     t.helpers.retrying({}, server.exec, cg.node2, function(term)
         local t = require('luatest')

@@ -1,6 +1,6 @@
 local luatest = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local g_async = luatest.group('fencing_async', {
     {election_mode = 'manual'}, {election_mode = 'candidate'}})
 local g_sync = luatest.group('fencing_sync')
@@ -22,7 +22,7 @@ local function wait_sync(leader, servers)
     local vclock = leader:get_vclock()
     vclock[0] = nil
     for _, server in ipairs(servers) do
-        server:wait_vclock(vclock)
+        server:wait_for_vclock(vclock)
     end
 end
 
@@ -33,7 +33,7 @@ local function wait_disconnected(node_1, node_2)
             return replica.downstream.status == 'stopped' or
                    replica.upstream == nil or
                    replica.upstream.status == 'disconnected'
-        end, {node_2:instance_id()}))
+        end, {node_2:get_instance_id()}))
     end)
 end
 
@@ -43,7 +43,7 @@ local function wait_connected(node_1, node_2)
             local replica = box.info.replication[i]
             return replica.downstream.status == 'follow' and
                    replica.upstream.status == 'follow'
-        end, {node_2:instance_id()}))
+        end, {node_2:get_instance_id()}))
     end)
 end
 
@@ -64,9 +64,9 @@ local function start(g)
         election_mode = 'manual',
         election_timeout = SHORT_TIMEOUT,
         replication = {
-            server.build_instance_uri('server_1'),
-            server.build_instance_uri('server_2'),
-            server.build_instance_uri('server_3'),
+            server.build_listen_uri('server_1'),
+            server.build_listen_uri('server_2'),
+            server.build_listen_uri('server_3'),
         },
         replication_synchro_quorum = 2,
         replication_synchro_timeout = SHORT_TIMEOUT,
@@ -207,7 +207,7 @@ g_sync.test_fencing = function(g)
     -- replicate previously "frozen" synchronous transactions and confirm them.
     box_cfg_update({g.server_2}, {replication = g.box_cfg.replication})
     wait_connected(g.server_1, g.server_2)
-    g.server_1:wait_election_leader()
+    g.server_1:wait_for_election_leader()
     wait_sync(g.server_1, {g.server_2})
     luatest.helpers.retrying({}, function()
         luatest.assert(g.server_1:exec(function()
@@ -300,14 +300,14 @@ g_mode.test_fencing_mode = function(g)
     })
 
     local proxy = require('luatest.replica_proxy'):new({
-        client_socket_path = server.build_instance_uri('server_1_proxy'),
-        server_socket_path = server.build_instance_uri('server_1'),
+        client_socket_path = server.build_listen_uri('server_1_proxy'),
+        server_socket_path = server.build_listen_uri('server_1'),
     })
     proxy:start({force = true})
 
     local proxied_replication = {
-        server.build_instance_uri('server_1_proxy'),
-        server.build_instance_uri('server_2'),
+        server.build_listen_uri('server_1_proxy'),
+        server.build_listen_uri('server_2'),
     }
 
     box_cfg_update({g.server_2}, {replication = {}})
@@ -316,7 +316,7 @@ g_mode.test_fencing_mode = function(g)
     wait_connected(g.server_1, g.server_2)
 
     promote(g.server_1)
-    local leader_id = g.server_1:instance_id()
+    local leader_id = g.server_1:get_instance_id()
     wait_sync(g.server_1, {g.server_2})
 
     box_cfg_update({g.server_2}, {
@@ -326,7 +326,7 @@ g_mode.test_fencing_mode = function(g)
 
     proxy:pause()
 
-    g.server_1:wait_election_state('follower')
+    g.server_1:wait_for_election_state('follower')
 
     -- Give folower some time to notice leader disconnection.
     require('fiber').sleep(timeout / 10)

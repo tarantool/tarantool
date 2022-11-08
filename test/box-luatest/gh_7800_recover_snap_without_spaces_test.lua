@@ -2,14 +2,14 @@ local t = require('luatest')
 local g = t.group('gh-7800')
 
 g.before_all(function()
-    local server = require('test.luatest_helpers.server')
+    local server = require('luatest.server')
     g.server = server:new({alias = 'master',
                            datadir = 'test/box-luatest/gh_7800_data'})
-    g.server:start({wait_for_readiness = false})
+    g.server:start({wait_until_ready = false})
 end)
 
 g.after_all(function()
-    g.server:cleanup()
+    g.server:clean()
 end)
 
 g.test_recovery = function()

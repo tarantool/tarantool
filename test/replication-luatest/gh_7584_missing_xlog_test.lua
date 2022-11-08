@@ -1,6 +1,6 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 
 local g = t.group('gh-7584')
 
@@ -16,7 +16,7 @@ g.before_all(function(cg)
         alias = 'replica',
         box_cfg = {
             replication = {
-                server.build_instance_uri('master'),
+                server.build_listen_uri('master'),
             },
         },
     }

@@ -1,5 +1,5 @@
 local luatest = require('luatest')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local cluster = require('test.luatest_helpers.cluster')
 
 local wait_timeout = 120
@@ -13,8 +13,8 @@ local function cluster_create(g)
         replication_synchro_quorum = 2,
         replication_synchro_timeout = 1000,
         replication = {
-            server.build_instance_uri('server1'),
-            server.build_instance_uri('server2'),
+            server.build_listen_uri('server1'),
+            server.build_listen_uri('server2'),
         },
     }
     g.server1 = g.cluster:build_and_add_server({
@@ -62,8 +62,8 @@ g.after_each(function(g)
             box.space.test:drop()
         end
     end)
-    g.server1:wait_vclock_of(g.server2)
-    g.server2:wait_vclock_of(g.server1)
+    g.server1:wait_for_vclock_of(g.server2)
+    g.server2:wait_for_vclock_of(g.server1)
 end)
 
 --
@@ -136,7 +136,7 @@ g.test_local_txn_during_remote_promote = function(g)
     end)
     -- Deliver server 1 promotion to 2. Otherwise server 2 might fail trying to
     -- start its own promotion simultaneously.
-    g.server2:wait_vclock_of(g.server1)
+    g.server2:wait_for_vclock_of(g.server1)
 
     -- Server 2 sends PROMOTE to server 1.
     g.server2:exec(function()
@@ -170,13 +170,13 @@ g.test_local_txn_during_remote_promote = function(g)
                           'error is read-only')
 
     -- Server 1 correctly processed the remote PROMOTE.
-    wait_synchro_owner(g.server1, g.server2:instance_id())
+    wait_synchro_owner(g.server1, g.server2:get_instance_id())
 
     -- The synchronous replication is functional - new owner can use the queue.
     g.server2:exec(function()
         box.space.test:replace{3}
     end)
-    g.server1:wait_vclock_of(g.server2)
+    g.server1:wait_for_vclock_of(g.server2)
     local content = g.server1:exec(function()
         return box.space.test:select{}
     end)
@@ -264,7 +264,7 @@ g.test_remote_promote_during_local_txn_including_it = function(g)
     g.server2:exec(function()
         box.space.test:replace{3}
     end)
-    g.server1:wait_vclock_of(g.server2)
+    g.server1:wait_for_vclock_of(g.server2)
     rows = g.server1:exec(function()
         return box.space.test:select{}
     end)
@@ -304,7 +304,7 @@ g.test_remote_promote_during_local_txn_not_including_it = function(g)
     end)
     -- Deliver server 1 promotion to 2. Otherwise server 2 might fail trying to
     -- start its own promotion simultaneously.
-    g.server2:wait_vclock_of(g.server1)
+    g.server2:wait_for_vclock_of(g.server1)
 
     -- Server 2 sends a PROMOTE not covering the txns to server 1.
     g.server2:exec(function()
@@ -335,8 +335,8 @@ g.test_remote_promote_during_local_txn_not_including_it = function(g)
 
     -- Wait until the stale txns (written before promotion) arrive to server2.
     -- It should simply ignore them.
-    g.server2:wait_vclock_of(g.server1)
-    wait_upstream_status(g.server2, g.server1:instance_id(), 'follow')
+    g.server2:wait_for_vclock_of(g.server1)
+    wait_upstream_status(g.server2, g.server1:get_instance_id(), 'follow')
     rows = g.server2:exec(function()
         return box.space.test:select()
     end)

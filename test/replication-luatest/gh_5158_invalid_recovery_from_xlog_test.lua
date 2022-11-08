@@ -1,6 +1,6 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local fio = require('fio')
 
 local g = t.group('gh_5158')
@@ -17,7 +17,7 @@ g.before_each(function(cg)
         alias = 'replica',
         box_cfg = {
             replication = {
-                server.build_instance_uri('master'),
+                server.build_listen_uri('master'),
             },
         },
     }
@@ -38,7 +38,7 @@ g.test_invalid_recovery_from_xlog = function(cg)
 
     -- Wait until everything is replicated from the master to the replica
     t.helpers.retrying({}, function()
-        cg.replica:wait_vclock_of(cg.master)
+        cg.replica:wait_for_vclock_of(cg.master)
     end)
 
     -- Delete all *.xlogs on the replica
@@ -71,7 +71,7 @@ g.test_invalid_recovery_from_xlog = function(cg)
         box.cfg{wal_queue_max_size = 1}
         box.cfg{replication = uri, replication_sync_timeout = 0.1}
         box.error.injection.set('ERRINJ_WAL_DELAY', false)
-    end, {server.build_instance_uri('master')})
+    end, {server.build_listen_uri('master')})
 
     -- Check that the master isn't dead
     t.assert_equals(cg.master:exec(function()

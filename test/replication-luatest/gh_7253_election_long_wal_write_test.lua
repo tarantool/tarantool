@@ -1,5 +1,5 @@
 local t = require('luatest')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local cluster = require('test.luatest_helpers.cluster')
 local fiber = require('fiber')
 
@@ -11,10 +11,10 @@ local function wait_pair_sync(server1, server2)
     -- Without retrying it fails sometimes when vclocks are empty and both
     -- instances are in 'connect' state instead of 'follow'.
     t.helpers.retrying({timeout = wait_timeout}, function()
-        server1:wait_vclock_of(server2)
-        server2:wait_vclock_of(server1)
-        server1:assert_follows_upstream(server2:instance_id())
-        server2:assert_follows_upstream(server1:instance_id())
+        server1:wait_for_vclock_of(server2)
+        server2:wait_for_vclock_of(server1)
+        server1:assert_follows_upstream(server2:get_instance_id())
+        server2:assert_follows_upstream(server1:get_instance_id())
     end)
 end
 
@@ -74,9 +74,9 @@ g.before_all(function(g)
         election_timeout = 1000,
         election_fencing_enabled = false,
         replication = {
-            server.build_instance_uri('server1'),
-            server.build_instance_uri('server2'),
-            server.build_instance_uri('server3'),
+            server.build_listen_uri('server1'),
+            server.build_listen_uri('server2'),
+            server.build_listen_uri('server3'),
         },
     }
     box_cfg.election_mode = 'manual'
@@ -130,7 +130,7 @@ g.test_fence_during_confirm_wal_write = function(g)
     --
     -- Server2 sends a new term to server1.
     --
-    local term = g.server1:election_term()
+    local term = g.server1:get_election_term()
     fiber.create(g.server2.exec, g.server2, function()
         box.cfg{
             election_mode = 'manual',
@@ -140,7 +140,7 @@ g.test_fence_during_confirm_wal_write = function(g)
         -- below.
         pcall(box.ctl.promote)
     end)
-    g.server1:wait_election_term(term + 1)
+    g.server1:wait_for_election_term(term + 1)
     --
     -- Server1 finishes CONFIRM WAL write and sees that the synchro queue was
     -- frozen during the WAL write. Shouldn't affect the result.
@@ -166,7 +166,7 @@ g.test_fence_during_confirm_wal_write = function(g)
     g.server1:exec(function()
         box.ctl.promote()
     end)
-    g.server1:wait_election_leader()
+    g.server1:wait_for_election_leader()
     g.server1:exec(function()
         box.space.test:truncate()
     end)
@@ -202,7 +202,7 @@ g.test_vote_during_txn_wal_write = function(g)
     --
     -- Server3 tries to become a leader by requesting a vote from server2.
     --
-    local term = g.server2:election_term()
+    local term = g.server2:get_election_term()
     fiber.create(g.server3.exec, g.server3, function()
         box.cfg{
             election_mode = 'manual',
@@ -210,7 +210,7 @@ g.test_vote_during_txn_wal_write = function(g)
         }
         pcall(box.ctl.promote)
     end)
-    g.server2:wait_election_term(term + 1)
+    g.server2:wait_for_election_term(term + 1)
     --
     -- Server2 shouldn't have persisted a vote yet. Instead, when it finishes
     -- the txn WAL write, it sees that its vclock is > server3's one and it
@@ -220,8 +220,8 @@ g.test_vote_during_txn_wal_write = function(g)
     --
     -- Server1 gets the new term via server2.
     --
-    g.server1:wait_election_term(term + 1)
-    g.server3:wait_vclock_of(g.server2)
+    g.server1:wait_for_election_term(term + 1)
+    g.server3:wait_for_vclock_of(g.server2)
     t.assert_equals(server_get_election_state(g.server1), 'follower')
     t.assert_equals(server_get_election_state(g.server2), 'follower')
     t.assert_not_equals(server_get_election_state(g.server3), 'leader')
@@ -257,7 +257,7 @@ g.test_vote_during_txn_wal_write = function(g)
         box.cfg{replication = _G.old_replication}
         _G.old_replication = nil
     end)
-    g.server1:wait_election_leader()
+    g.server1:wait_for_election_leader()
     g.server1:exec(function()
         box.space.test:truncate()
     end)
@@ -281,8 +281,8 @@ g.test_old_leader_txn_during_promote_write = function(g)
     -- Build the topology:
     --   server1  server2 <-> server3
     --
-    local server2_uri = server.build_instance_uri('server2')
-    local server3_uri = server.build_instance_uri('server3')
+    local server2_uri = server.build_listen_uri('server2')
+    local server3_uri = server.build_listen_uri('server3')
     server_set_replication(g.server1, {})
     server_set_replication(g.server2, {server2_uri, server3_uri})
     server_set_replication(g.server3, {server2_uri, server3_uri})
@@ -301,7 +301,7 @@ g.test_old_leader_txn_during_promote_write = function(g)
         return info.election.term, info.synchro.queue.term
     end)
     t.assert_equals(old_term + 1, new_term)
-    g.server2:wait_election_term(new_term)
+    g.server2:wait_for_election_term(new_term)
     --
     -- Server1 doesn't see the new term yet and makes an attempt to do a sync
     -- transaction.
@@ -317,7 +317,7 @@ g.test_old_leader_txn_during_promote_write = function(g)
     --
     -- Server2 gets the bad txn.
     --
-    g.server1:wait_downstream_to(g.server2)
+    g.server1:wait_for_downstream_to(g.server2)
     t.assert_equals(g.server2:exec(function()
         return box.space.test:count()
     end), 1)
@@ -329,7 +329,7 @@ g.test_old_leader_txn_during_promote_write = function(g)
     local ok, err = f_promote:join()
     t.assert_equals(err, nil)
     t.assert(ok)
-    g.server3:wait_election_leader()
+    g.server3:wait_for_election_leader()
     --
     -- Server1 gets the PROMOTE and fails its rogue txn.
     --
@@ -350,7 +350,7 @@ g.test_old_leader_txn_during_promote_write = function(g)
     g.server1:exec(function()
         box.ctl.promote()
     end)
-    g.server1:wait_election_leader()
+    g.server1:wait_for_election_leader()
     wait_fullmesh(g)
 end
 
@@ -370,11 +370,11 @@ end
 -- forwards the bad txn.
 --
 g.test_old_leader_txn_during_promote_write_complex = function(g)
-    local server1_uri = server.build_instance_uri('server1')
-    local server2_uri = server.build_instance_uri('server2')
-    local server3_uri = server.build_instance_uri('server3')
-    local server4_uri = server.build_instance_uri('server4')
-    local server5_uri = server.build_instance_uri('server5')
+    local server1_uri = server.build_listen_uri('server1')
+    local server2_uri = server.build_listen_uri('server2')
+    local server3_uri = server.build_listen_uri('server3')
+    local server4_uri = server.build_listen_uri('server4')
+    local server5_uri = server.build_listen_uri('server5')
     --
     -- Build the topology:
     --   server4 <- fullmesh(server1, server2, server3)
@@ -413,7 +413,7 @@ g.test_old_leader_txn_during_promote_write_complex = function(g)
     --
     -- Server3 bumps raft term, gets stuck writing PROMOTE to WAL.
     --
-    local old_term = g.server3:election_term()
+    local old_term = g.server3:get_election_term()
     server_block_next_wal_write(g.server3)
     local f_promote = fiber.new(g.server3.exec, g.server3, function()
         box.cfg{election_mode = 'manual'}
@@ -422,7 +422,7 @@ g.test_old_leader_txn_during_promote_write_complex = function(g)
     f_promote:set_joinable(true)
     g.server3:play_wal_until_synchro_queue_is_busy()
     local new_term = old_term + 1
-    t.assert_equals(g.server2:election_term(), new_term)
+    t.assert_equals(g.server2:get_election_term(), new_term)
     --
     -- Server1 doesn't see the new term yet and makes an attempt to do a sync
     -- transaction.
@@ -438,11 +438,11 @@ g.test_old_leader_txn_during_promote_write_complex = function(g)
     --
     -- Server4 gets the transaction.
     --
-    g.server4:wait_vclock_of(g.server1)
+    g.server4:wait_for_vclock_of(g.server1)
     t.assert_equals(g.server4:exec(function()
         return box.space.test:count()
     end), 1)
-    t.assert_equals(g.server4:election_term(), old_term)
+    t.assert_equals(g.server4:get_election_term(), old_term)
     --
     -- Build the topology:
     --   server1  server2 <-> server3 <-> server5
@@ -451,7 +451,7 @@ g.test_old_leader_txn_during_promote_write_complex = function(g)
     --
     -- Server4 gets new term from server2.
     server_set_replication(g.server4, {server2_uri})
-    g.server4:wait_election_term(new_term)
+    g.server4:wait_for_election_term(new_term)
     --
     -- Build the topology:
     --   server1  server2 <-> server3 <-> server5
@@ -461,7 +461,7 @@ g.test_old_leader_txn_during_promote_write_complex = function(g)
     --
     -- Server2 gets bad txn from server4 which has a new term too.
     server_set_replication(g.server2, {server3_uri, server4_uri})
-    g.server2:wait_vclock_of(g.server4)
+    g.server2:wait_for_vclock_of(g.server4)
     t.assert_equals(g.server2:exec(function()
         return box.space.test:count()
     end), 1)
@@ -471,12 +471,12 @@ g.test_old_leader_txn_during_promote_write_complex = function(g)
     --
     server_set_replication(g.server4, {})
     server_set_replication(g.server2, {server1_uri, server3_uri})
-    g.server1:wait_downstream_to(g.server2)
+    g.server1:wait_for_downstream_to(g.server2)
     --
     -- Server3 ends PROMOTE. All should be fine and dandy.
     --
     server_unblock_wal_write(g.server3)
-    g.server3:wait_election_leader()
+    g.server3:wait_for_election_leader()
     --
     -- Restore the original topology.
     --
@@ -497,11 +497,11 @@ g.test_old_leader_txn_during_promote_write_complex = function(g)
     --
     -- Cleanup.
     --
-    local server4_id = g.server4:instance_id()
-    local server5_id = g.server5:instance_id()
+    local server4_id = g.server4:get_instance_id()
+    local server5_id = g.server5:get_instance_id()
     for _, s in pairs({g.server4, g.server5}) do
         s:stop()
-        s:cleanup()
+        s:clean()
         g.cluster:delete_server(s)
         g[s.alias] = nil
     end
@@ -518,7 +518,7 @@ g.test_old_leader_txn_during_promote_write_complex = function(g)
         box.cfg{replication_synchro_quorum = 2}
         box.ctl.promote()
     end)
-    g.server1:wait_election_leader()
+    g.server1:wait_for_election_leader()
     g.server1:exec(function(server4_id, server5_id)
         box.space._cluster:delete(server4_id)
         box.space._cluster:delete(server5_id)

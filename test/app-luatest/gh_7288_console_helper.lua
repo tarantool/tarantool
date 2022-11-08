@@ -1,7 +1,7 @@
 local console = require('console')
 local fiber = require('fiber')
 local fio = require('fio')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local string = require('string')
 local t = require('luatest')
 

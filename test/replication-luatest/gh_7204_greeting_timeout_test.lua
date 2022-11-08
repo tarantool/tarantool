@@ -1,5 +1,5 @@
 local fiber = require('fiber')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local socket = require('socket')
 local t = require('luatest')
 
@@ -21,7 +21,7 @@ g.after_all(function(g)
 end)
 
 g.test_greeting_timeout = function(g)
-    local uri = server.build_instance_uri('server')
+    local uri = server.build_listen_uri('server')
     local s = socket.tcp_server('unix/', uri, {
         handler = function() fiber.sleep(9000) end
     })
