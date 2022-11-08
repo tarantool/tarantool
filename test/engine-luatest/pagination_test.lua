@@ -1,4 +1,4 @@
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local t = require('luatest')
 local tree_g = t.group('Tree index tests', {
     {engine = 'memtx', disable_ffi = true},

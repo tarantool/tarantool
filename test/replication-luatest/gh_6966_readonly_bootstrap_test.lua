@@ -1,6 +1,6 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 
 local fio = require('fio')
 
@@ -11,7 +11,7 @@ g.before_all(function(cg)
 
     local cfg = {
         replication_timeout = 0.1,
-        replication = server.build_instance_uri('master'),
+        replication = server.build_listen_uri('master'),
     }
     -- XXX: the order of add_server() is important. First add replica, then
     -- master. This way they are stopped by cluster:stop() in correct order,
@@ -36,7 +36,7 @@ end)
 -- once it becomes writeable.
 g.test_ro_bootstrap = function(cg)
     cg.master:eval('box.cfg{read_only = true}')
-    cg.replica:start({wait_for_readiness = false})
+    cg.replica:start({wait_until_ready = false})
     -- The replica isn't booted yet so any attempts to eval box.cfg.log on it
     -- result in an error (net_box is not connected).
     local logfile = fio.pathjoin(cg.replica.workdir, 'replica.log')
@@ -49,7 +49,7 @@ g.test_ro_bootstrap = function(cg)
                                   'No join while master is read-only')
     end)
     cg.master:eval('box.cfg{read_only = false}')
-    cg.replica:wait_for_readiness()
+    cg.replica:wait_until_ready()
     t.helpers.retrying({}, function()
         cg.master:exec(function()
             require('luatest').assert(box.space._cluster:count() == 2,

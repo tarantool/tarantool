@@ -1,6 +1,6 @@
 local luatest = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local g = luatest.group('gh-6754-promote-before-new-term')
 
 g.before_all(function(g)
@@ -12,8 +12,8 @@ g.before_all(function(g)
         replication_synchro_quorum = 1,
         replication_timeout = 0.1,
         replication = {
-            server.build_instance_uri('server_1'),
-            server.build_instance_uri('server_2'),
+            server.build_listen_uri('server_1'),
+            server.build_listen_uri('server_2'),
         },
     }
 
@@ -47,13 +47,13 @@ g.test_promote_new_term_order = function(g)
         end)
     end)
 
-    local election_term = g.server_2:election_term()
-    local synchro_queue_term = g.server_2:synchro_queue_term()
+    local election_term = g.server_2:get_election_term()
+    local synchro_queue_term = g.server_2:get_synchro_queue_term()
 
     g.server_1:exec(function()
         box.error.injection.set('ERRINJ_RELAY_FROM_TX_DELAY', false)
     end)
-    g.server_2:wait_election_term(synchro_queue_term)
+    g.server_2:wait_for_election_term(synchro_queue_term)
 
     luatest.assert_le(synchro_queue_term, election_term,
         'new term always arrives before promote')

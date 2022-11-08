@@ -1,6 +1,6 @@
 local t = require('luatest')
 local g = t.group('gh-5940')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 
 g.before_all = function()
     g.server = server:new{alias = 'default'}

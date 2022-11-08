@@ -1,5 +1,5 @@
 local luatest = require('luatest')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local cluster = require('test.luatest_helpers.cluster')
 local g_common = luatest.group('gh-6033-box-promote-demote')
 local g_unconfigured = luatest.group('gh-6033-box-promote-demote-unconfigured')
@@ -15,8 +15,8 @@ local function wait_sync(servers)
     for _, server_1 in ipairs(servers) do
         for _, server_2 in ipairs(servers) do
             if server_1 ~= server_2 then
-                server_1:wait_election_term(server_2:election_term())
-                server_1:wait_vclock_of(server_2)
+                server_1:wait_for_election_term(server_2:get_election_term())
+                server_1:wait_for_vclock_of(server_2)
             end
         end
     end
@@ -91,8 +91,8 @@ local function cluster_init(g)
         replication_synchro_timeout = 5,
         replication_synchro_quorum = 1,
         replication = {
-            server.build_instance_uri('server_1'),
-            server.build_instance_uri('server_2'),
+            server.build_listen_uri('server_1'),
+            server.build_listen_uri('server_2'),
         },
     }
 
@@ -179,10 +179,10 @@ g_common.test_raft_leader_promote = function(g)
     -- Promote server, but get stuck while writing PROMOTE
     -- (become RAFT leader without obtaining synchro queue)
     wal_delay_start(g.server_1, 0)
-    local term = g.server_1:election_term()
+    local term = g.server_1:get_election_term()
     local f = promote_start(g.server_1)
     g.server_1:play_wal_until_synchro_queue_is_busy()
-    g.server_1:wait_election_leader()
+    g.server_1:wait_for_election_leader()
 
     local ok, err = g.server_1:exec(function()
         return pcall(box.ctl.promote)
@@ -192,7 +192,7 @@ g_common.test_raft_leader_promote = function(g)
 
     wal_delay_end(g.server_1)
     fiber_join(g.server_1, f)
-    g.server_1:wait_synchro_queue_term(term + 1)
+    g.server_1:wait_for_synchro_queue_term(term + 1)
     wait_sync(g.cluster.servers)
 
     box_cfg_update({g.server_1}, {election_mode = 'off'})
@@ -213,8 +213,8 @@ g_common.test_voter_during_promote = function(g)
     local promote_fid = promote_start(g.server_2)
     -- Server1 hangs on new term WAL write.
     wal_delay_wait(g.server_1)
-    luatest.assert_equals(g.server_1:election_term(),
-                          g.server_2:election_term())
+    luatest.assert_equals(g.server_1:get_election_term(),
+                          g.server_2:get_election_term())
 
     -- Server2 should stop the promotion without waiting for the term outcome
     -- because it no longer can win anyway.
@@ -266,9 +266,9 @@ end
 g_common.test_simultaneous = function(g)
     wal_delay_start(g.server_1)
 
-    local term = g.server_1:election_term()
+    local term = g.server_1:get_election_term()
     local f = promote_start(g.server_1)
-    g.server_1:wait_election_term(term + 1)
+    g.server_1:wait_for_election_term(term + 1)
 
     local ok, err = g.server_1:exec(function()
         return pcall(box.ctl.promote)
@@ -284,7 +284,7 @@ g_common.test_simultaneous = function(g)
 
     wal_delay_end(g.server_1)
     fiber_join(g.server_1, f)
-    g.server_1:wait_synchro_queue_term(term + 1)
+    g.server_1:wait_for_synchro_queue_term(term + 1)
     wait_sync(g.cluster.servers)
     demote(g.server_1)
 end
@@ -307,14 +307,14 @@ g_common.test_wal_interfering_promote = function(g)
     -- prevent persisting new term immediately (without yielding in
     -- box_raft_wait_term_persisted).
     wal_delay_start(g.server_1)
-    local term = g.server_1:election_term()
+    local term = g.server_1:get_election_term()
     local f = promote_start(g.server_1)
 
     -- Volotile term gets incremented while promote fiber is yeilding in
     -- box_raft_wait_term_persisted. We continue yeilding in
     -- box_raft_wait_term_persisted but unblock WAL to write PROMOTE from
     -- server_2.
-    g.server_1:wait_election_term(term + 1)
+    g.server_1:wait_for_election_term(term + 1)
     g.server_1:exec(function()
         box.error.injection.set('ERRINJ_RAFT_WAIT_TERM_PERSISTED_DELAY', true)
     end)
@@ -322,9 +322,9 @@ g_common.test_wal_interfering_promote = function(g)
 
     -- Promote server_2 and wait until new (interfering synchro queue term
     -- arrives to server_1, causing ongoing promote to fail.
-    g.server_2:wait_election_term(term + 1)
+    g.server_2:wait_for_election_term(term + 1)
     promote(g.server_2)
-    g.server_1:wait_synchro_queue_term(term + 2)
+    g.server_1:wait_for_synchro_queue_term(term + 2)
     g.server_1:exec(function()
         box.error.injection.set('ERRINJ_RAFT_WAIT_TERM_PERSISTED_DELAY', false)
     end)
@@ -336,10 +336,10 @@ g_common.test_wal_interfering_promote = function(g)
 
     -- server_1 incremented term and then failed it's promote.
     -- server_2 isn't leader in new term, but still limbo owner.
-    term = g.server_1:synchro_queue_term()
+    term = g.server_1:get_synchro_queue_term()
     promote(g.server_1)
     demote(g.server_1)
-    g.server_2:wait_synchro_queue_term(term + 2)
+    g.server_2:wait_for_synchro_queue_term(term + 2)
 end
 
 -- Demoting should fail if it is interrupted from another server
@@ -349,17 +349,17 @@ g_common.test_wal_interfering_demote = function(g)
     wait_sync(g.cluster.servers)
 
     wal_delay_start(g.server_1)
-    local term = g.server_1:election_term()
+    local term = g.server_1:get_election_term()
     local f = demote_start(g.server_1)
 
-    g.server_1:wait_election_term(term + 1)
+    g.server_1:wait_for_election_term(term + 1)
     g.server_1:exec(function()
         box.error.injection.set('ERRINJ_RAFT_WAIT_TERM_PERSISTED_DELAY', true)
     end)
     wal_delay_end(g.server_1)
 
     promote(g.server_2)
-    g.server_1:wait_synchro_queue_term(g.server_2:synchro_queue_term())
+    g.server_1:wait_for_synchro_queue_term(g.server_2:get_synchro_queue_term())
     g.server_1:exec(function()
         box.error.injection.set('ERRINJ_RAFT_WAIT_TERM_PERSISTED_DELAY', false)
     end)
@@ -386,9 +386,9 @@ g_common.test_limbo_full_interfering_promote = function(g)
     -- server_2 will interrupt server_1, while server_3 is leader
     local box_cfg = table.copy(g.box_cfg)
     box_cfg.replication = {
-        server.build_instance_uri('server_1'),
-        server.build_instance_uri('server_2'),
-        server.build_instance_uri('server_3'),
+        server.build_listen_uri('server_1'),
+        server.build_listen_uri('server_2'),
+        server.build_listen_uri('server_3'),
     }
 
     local server_3 = g.cluster:build_server(
@@ -416,9 +416,9 @@ g_common.test_limbo_full_interfering_promote = function(g)
     wait_sync({g.server_1, g.server_2, server_3})
 
     local f = promote_start(g.server_1)
-    local term = g.server_2:election_term()
+    local term = g.server_2:get_election_term()
     promote(g.server_2)
-    g.server_1:wait_synchro_queue_term(term + 1)
+    g.server_1:wait_for_synchro_queue_term(term + 1)
 
     local ok, err = fiber_join(g.server_1, f)
     luatest.assert(not ok and err.code == box.error.INTERFERING_PROMOTE,
@@ -460,9 +460,9 @@ g_common.test_limbo_full_interfering_demote = function(g)
 
     -- Start demoting server_1 and interrupt it from server_2
     local f = demote_start(g.server_1)
-    local term = g.server_1:synchro_queue_term()
+    local term = g.server_1:get_synchro_queue_term()
     g.server_2:exec(function() pcall(box.ctl.promote) end)
-    g.server_1:wait_synchro_queue_term(term + 1)
+    g.server_1:wait_for_synchro_queue_term(term + 1)
 
     local ok, err = fiber_join(g.server_1, f)
     luatest.assert(not ok and err.code == box.error.INTERFERING_PROMOTE,
@@ -502,7 +502,8 @@ g_common.test_fail_limbo_ack_promote = function(g)
     local f = promote_start(g.server_1)
     luatest.helpers.retrying({}, function()
         luatest.assert_not_equals(nil, g.server_1:grep_log(string.format(
-            'RAFT: persisted state {term: %d}', g.server_1:election_term())))
+            'RAFT: persisted state {term: %d}', g.server_1:get_election_term()))
+        )
     end)
     box_cfg_update({g.server_1}, {replication_synchro_timeout = 0.01})
     local ok, err = fiber_join(g.server_1, f)

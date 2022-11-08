@@ -1,4 +1,4 @@
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local g = require('luatest').group()
 
 g.before_all = function()

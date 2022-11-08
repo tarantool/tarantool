@@ -1,5 +1,5 @@
 -- https://github.com/tarantool/tarantool/issues/7645
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local t = require('luatest')
 local g = t.group('gh-7645-ck-fk-constraints', {{engine = 'memtx'},
                                                 {engine = 'vinyl'}})

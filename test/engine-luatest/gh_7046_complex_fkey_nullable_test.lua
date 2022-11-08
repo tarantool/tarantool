@@ -1,6 +1,6 @@
 -- https://github.com/tarantool/tarantool/issues/7046
 -- Complex foreign keys do not work with nullable fields
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local t = require('luatest')
 local g = t.group('gh-7046-complex-fkey-nullable-test',
                   {{engine = 'memtx'}, {engine = 'vinyl'}})

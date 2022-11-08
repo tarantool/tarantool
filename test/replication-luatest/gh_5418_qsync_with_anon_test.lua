@@ -1,28 +1,26 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 
 local g = t.group('gh-5418', {{engine = 'memtx'}, {engine = 'vinyl'}})
 
 g.before_each(function(cg)
-    local engine = cg.params.engine
-
     cg.cluster = cluster:new({})
 
     local box_cfg = {
         replication         = {
-            server.build_instance_uri('master')
+            server.build_listen_uri('master')
         },
         replication_synchro_quorum = 2,
         replication_timeout = 1
     }
 
-    cg.master = cg.cluster:build_server({alias = 'master', engine = engine, box_cfg = box_cfg})
+    cg.master = cg.cluster:build_server({alias = 'master', box_cfg = box_cfg})
 
     local box_cfg = {
         replication         = {
-            server.build_instance_uri('master'),
-            server.build_instance_uri('replica')
+            server.build_listen_uri('master'),
+            server.build_listen_uri('replica')
         },
         replication_timeout = 1,
         replication_connect_timeout = 4,
@@ -30,7 +28,7 @@ g.before_each(function(cg)
         replication_anon    = true
     }
 
-    cg.replica = cg.cluster:build_server({alias = 'replica', engine = engine, box_cfg = box_cfg})
+    cg.replica = cg.cluster:build_server({alias = 'replica', box_cfg = box_cfg})
 
     cg.cluster:add_server(cg.master)
     cg.cluster:add_server(cg.replica)
@@ -53,7 +51,7 @@ g.test_qsync_with_anon = function(cg)
         function() cg.master:eval("return box.space.sync:insert{1}") end)
 
     -- Wait until everything is replicated from the master to the replica
-    cg.replica:wait_vclock_of(cg.master)
+    cg.replica:wait_for_vclock_of(cg.master)
 
     t.assert_equals(cg.master:eval("return box.space.sync:select()"), {})
     t.assert_equals(cg.replica:eval("return box.space.sync:select()"), {})

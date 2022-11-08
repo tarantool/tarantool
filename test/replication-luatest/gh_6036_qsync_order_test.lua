@@ -1,6 +1,6 @@
 local t = require('luatest')
 local cluster = require('test.luatest_helpers.cluster')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local fiber = require('fiber')
 
 local g = t.group('gh-6036')
@@ -10,8 +10,8 @@ g.before_all(function(cg)
 
     cg.box_cfg = {
         replication = {
-            server.build_instance_uri('r1'),
-            server.build_instance_uri('r2'),
+            server.build_listen_uri('r1'),
+            server.build_listen_uri('r2'),
         },
         replication_timeout         = 0.1,
         replication_connect_quorum  = 1,
@@ -61,7 +61,7 @@ end
 --
 -- The test requires 3rd replica to graft in.
 g.before_test("test_qsync_order", function(cg)
-    cg.box_cfg.replication[3] = server.build_instance_uri("r3")
+    cg.box_cfg.replication[3] = server.build_listen_uri("r3")
     cg.r3 = cg.cluster:build_and_add_server({
         alias = 'r3',
         box_cfg = cg.box_cfg
@@ -78,8 +78,8 @@ g.test_qsync_order = function(cg)
         box.space.test:insert{1}
     end)
 
-    cg.r1:wait_vclock_of(cg.r3)
-    cg.r2:wait_vclock_of(cg.r3)
+    cg.r1:wait_for_vclock_of(cg.r3)
+    cg.r2:wait_for_vclock_of(cg.r3)
 
     t.assert_equals(cg.r1:exec(select), {{1}})
     t.assert_equals(cg.r2:exec(select), {{1}})
@@ -88,15 +88,15 @@ g.test_qsync_order = function(cg)
     --
     -- Drop connection between r3 and r2.
     cg.r3:exec(update_replication, {
-        server.build_instance_uri("r1"),
-        server.build_instance_uri("r3"),
+        server.build_listen_uri("r1"),
+        server.build_listen_uri("r3"),
     })
 
     --
     -- Drop connection between r2 and r3.
     cg.r2:exec(update_replication, {
-        server.build_instance_uri("r1"),
-        server.build_instance_uri("r2"),
+        server.build_listen_uri("r1"),
+        server.build_listen_uri("r2"),
     })
 
     --
@@ -162,7 +162,7 @@ g.after_test("test_qsync_order", function(cg)
     cg.r1:exec(update_replication, cg.box_cfg.replication)
     cg.r2:exec(update_replication, cg.box_cfg.replication)
     cg.r3:stop()
-    cg.r3:cleanup()
+    cg.r3:clean()
     cg.r3 = nil
 end)
 
@@ -177,7 +177,7 @@ g.test_promote_order = function(cg)
         box.ctl.promote()
         box.ctl.wait_rw()
     end)
-    cg.r2:wait_vclock_of(cg.r1)
+    cg.r2:wait_for_vclock_of(cg.r1)
 
     --
     -- Drop connection between r1 and the rest of the cluster.

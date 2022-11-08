@@ -1,7 +1,7 @@
 local fiber = require('fiber')
 local net = require('net.box')
 local popen = require('popen')
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local t = require('luatest')
 local g = t.group()
 

@@ -1,5 +1,5 @@
 -- https://github.com/tarantool/tarantool/issues/6436 Constraints
-local server = require('test.luatest_helpers.server')
+local server = require('luatest.server')
 local netbox = require('net.box')
 local t = require('luatest')
 local g = t.group('gh-6436-field-constraint-test', {{engine = 'memtx'}, {engine = 'vinyl'}})
@@ -587,7 +587,7 @@ g.test_constraint_replication = function(cg)
     end, {engine})
 
     local replica_cfg = {
-        replication = server.build_instance_uri('master'),
+        replication = server.build_listen_uri('master'),
     }
     local replica = server:new({alias = 'replica', box_cfg = replica_cfg})
     replica:start()
