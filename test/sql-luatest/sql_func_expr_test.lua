@@ -95,3 +95,24 @@ g.test_sql_func_expr_3 = function()
         box.schema.func.drop('abc')
     end)
 end
+
+-- Make sure CHECK constraint works as intended when last field is nullable.
+g.test_sql_func_expr_4 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local def = {language = 'SQL_EXPR', is_deterministic = true,
+                     body = 'a * b > 10'}
+        box.schema.func.create('abc', def)
+        local format = {{'A', 'integer'}, {'B', 'integer', is_nullable = true}}
+        local s = box.schema.space.create('test', {format = format})
+        s:create_index('i')
+        s:alter{constraint='abc'}
+        t.assert_equals(s:insert{3, 4}, {3, 4})
+        t.assert_error_msg_content_equals(
+            "Check constraint 'abc' failed for tuple",
+            function() s:insert{1, 2} end
+        )
+        box.space.test:drop()
+        box.schema.func.drop('abc')
+    end)
+end

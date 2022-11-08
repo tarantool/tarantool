@@ -2439,7 +2439,7 @@ func_sql_expr_call(struct func *func, struct port *args, struct port *ret)
 	 * In SQL, we can only retrieve fields that have names. There is no
 	 * point to prepare slots for nameless fields.
 	 */
-	uint32_t count = format->min_field_count;
+	uint32_t count = format->total_field_count;
 	struct vdbe_field_ref *ref;
 	size_t size = sizeof(ref->slots[0]) * count + sizeof(*ref);
 	ref = region_aligned_alloc(region, size, alignof(*ref));
