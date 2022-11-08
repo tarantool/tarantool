@@ -45,6 +45,7 @@ extern struct lua_State *tarantool_L;
 
 #define O_INTERACTIVE 0x1
 #define O_BYTECODE    0x2
+#define O_DEBUGGING   0x4
 
 /**
  * Create tarantool_L and initialize built-in Lua modules.
@@ -66,9 +67,12 @@ tarantool_lua_free();
 /**
  * Load and execute start-up file
  *
- * @param interactive force interactive mode
- * @param argc argc the number of command line arguments
- * @param argv argv command line arguments
+ * @param path path to the script to be run
+ * @param opt_mask mask for forcing of an interactive or debugging mode
+ * @param optc the number of lua interpreter command line arguments
+ * @param optv separate list of arguments for lua interpreter
+ * @param argc argc the number of command line arguments, beyond those in optc
+ * @param argv argv command line arguments, beyond those in optv
  *
  * @retval 0 The script is successfully finished.
  * @retval -1 Error during the script execution. Diagnostics area

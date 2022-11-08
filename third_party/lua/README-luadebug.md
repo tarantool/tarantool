@@ -51,6 +51,29 @@ int main(int argc, char **argv){
 
 Now in your Lua code you can just use the global variable or `require` the module name you passed to the `dbg_setup()` call.
 
+Debugger activation
+-
+
+Debugger could be activated either from inside of debuggee code itself:
+
+```lua
+local dbg = require 'luadebug'
+dbg()
+```
+
+Or from command-line using option `-d`:
+
+```
+$ tarantool -d debug-target.lua
+Tarantool debugger 2.11.0-entrypoint-852-g9e6ed28ae
+type 'help' for interactive help
+luadebug: Loaded for 2.11.0-entrypoint-852-g9e6ed28ae
+break via debug-target.lua => debug-target.lua:1 in chunk at debug-target.lua:0
+   1 => local date = require 'datetime'
+   4
+luadebug>
+```
+
 Debugger Commands:
 -
 
