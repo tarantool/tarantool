@@ -915,10 +915,13 @@ tarantool_lua_slab_cache()
  * Push argument and call a function on the top of Lua stack
  */
 static int
-lua_main(lua_State *L, int argc, char **argv)
+lua_main(lua_State *L, bool debugging, int argc, char **argv)
 {
 	assert(lua_isfunction(L, -1));
 	lua_checkstack(L, argc - 1);
+	assert(argc >= 1 || !debugging);
+	if (debugging)
+		lua_pushstring(L, argv[0]);
 	for (int i = 1; i < argc; i++)
 		lua_pushstring(L, argv[i]);
 	int rc = luaT_call(L, lua_gettop(L) - 1, 0);
@@ -936,6 +939,7 @@ run_script_f(va_list ap)
 	struct lua_State *L = va_arg(ap, struct lua_State *);
 	const char *path = va_arg(ap, const char *);
 	bool interactive = va_arg(ap, int);
+	bool debugging = va_arg(ap, int);
 	int optc = va_arg(ap, int);
 	const char **optv = va_arg(ap, const char **);
 	int argc = va_arg(ap, int);
@@ -996,18 +1000,23 @@ run_script_f(va_list ap)
 
 	int is_a_tty = isatty(STDIN_FILENO);
 
-	if (path && strcmp(path, "-") != 0 && access(path, F_OK) == 0) {
+	if (debugging) {
+		if (!path || access(path, F_OK) != 0) {
+			diag_set(SystemError, "Expected script name");
+			goto error;
+		}
+	} else if (path && strcmp(path, "-") != 0 && access(path, F_OK) == 0) {
 		/* Execute script. */
 		if (luaL_loadfile(L, path) != 0)
 			goto luajit_error;
-		if (lua_main(L, argc, argv) != 0)
+		if (lua_main(L, false, argc, argv) != 0)
 			goto error;
 	} else if ((!interactive && !is_a_tty) ||
 			(path && strcmp(path, "-") == 0)) {
 		/* Execute stdin */
 		if (luaL_loadfile(L, NULL) != 0)
 			goto luajit_error;
-		if (lua_main(L, argc, argv) != 0)
+		if (lua_main(L, false, argc, argv) != 0)
 			goto error;
 	} else if (!is_option_e_ran) {
 		interactive = true;
@@ -1018,17 +1027,19 @@ run_script_f(va_list ap)
 	 * - it was explicitly requested by "-i" option;
 	 * - stdin is TTY and there are no script (-e is considered as a script).
 	 */
-	if (interactive) {
-		say_crit("%s %s\ntype 'help' for interactive help",
-			 tarantool_package(), tarantool_version());
+	if (interactive || debugging) {
+		say_crit("%s%s %s\ntype 'help' for interactive help",
+			 tarantool_package(),
+			 debugging ? " debugger" : "",
+			 tarantool_version());
 		/* get console.start from package.loaded */
 		lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-		lua_getfield(L, -1, "console");
+		lua_getfield(L, -1, debugging ? "luadebug" : "console");
 		lua_getfield(L, -1, "start");
 		lua_remove(L, -2); /* remove package.loaded.console */
 		lua_remove(L, -2); /* remove package.loaded */
 		start_loop = false;
-		if (lua_main(L, argc, argv) != 0)
+		if (lua_main(L, debugging, argc, argv) != 0)
 			goto error;
 	}
 	/*
@@ -1054,7 +1065,7 @@ error:
 }
 
 int
-tarantool_lua_run_script(char *path, bool interactive,
+tarantool_lua_run_script(char *path, bool interactive, bool debugging,
 			 int optc, const char **optv, int argc, char **argv)
 {
 	const char *title = path ? basename(path) : "interactive";
@@ -1078,7 +1089,7 @@ tarantool_lua_run_script(char *path, bool interactive,
 	 */
 	struct diag script_diag;
 	diag_create(&script_diag);
-	fiber_start(script_fiber, tarantool_L, path, interactive,
+	fiber_start(script_fiber, tarantool_L, path, interactive, debugging,
 		    optc, optv, argc, argv, &script_diag);
 
 	/*

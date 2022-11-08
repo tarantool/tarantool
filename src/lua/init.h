@@ -71,7 +71,7 @@ tarantool_lua_free();
  *        error is set.
  */
 int
-tarantool_lua_run_script(char *path, bool force_interactive,
+tarantool_lua_run_script(char *path, bool force_interactive, bool debugging,
 			 int optc, const char **optv,
 			 int argc, char **argv);
 

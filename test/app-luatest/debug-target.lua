@@ -1,5 +1,3 @@
-local debugger = require 'luadebug'
-debugger()
 local date = require 'datetime'
 
 local T = date.new{hour = 3, tzoffset = '+0300'}

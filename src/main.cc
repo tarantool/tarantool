@@ -643,6 +643,8 @@ main(int argc, char **argv)
 
 	/* Enter interactive mode after executing 'script' */
 	bool interactive = false;
+	/* Debugging shell */
+	bool debugging = false;
 	/* Lua interpeter options, e.g. -e and -l */
 	int optc = 0;
 	const char **optv = NULL;
@@ -655,7 +657,7 @@ main(int argc, char **argv)
 		{"version", no_argument, 0, 'v'},
 		{NULL, 0, 0, 0},
 	};
-	static const char *opts = "+hVvie:l:";
+	static const char *opts = "+hVvie:l:d";
 
 	int ch;
 	while ((ch = getopt_long(argc, argv, opts, longopts, NULL)) != -1) {
@@ -670,6 +672,9 @@ main(int argc, char **argv)
 		case 'i':
 			/* Force interactive mode */
 			interactive = true;
+			break;
+		case 'd':
+			debugging = true;
 			break;
 		case 'l':
 		case 'e':
@@ -794,8 +799,9 @@ main(int argc, char **argv)
 		 * is why script must run only after the server was fully
 		 * initialized.
 		 */
-		if (tarantool_lua_run_script(script, interactive, optc, optv,
-					     main_argc, main_argv) != 0)
+		if (tarantool_lua_run_script(script, interactive, debugging,
+					     optc, optv, main_argc,
+					     main_argv) != 0)
 			diag_raise();
 		/*
 		 * Start event loop after executing Lua script if signal_cb()
