@@ -11,6 +11,7 @@ When no script name is provided, the server responds to:
   -l NAME			require library 'NAME'
   -j cmd			perform LuaJIT control command
   -b ...			save or list bytecode
+  -d				activate debugging session for 'SCRIPT'
   -i				enter interactive mode after executing 'SCRIPT'
   --				stop handling options
   -				execute stdin and stop handling options
@@ -31,6 +32,7 @@ When no script name is provided, the server responds to:
   -l NAME			require library 'NAME'
   -j cmd			perform LuaJIT control command
   -b ...			save or list bytecode
+  -d				activate debugging session for 'SCRIPT'
   -i				enter interactive mode after executing 'SCRIPT'
   --				stop handling options
   -				execute stdin and stop handling options

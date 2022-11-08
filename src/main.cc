@@ -627,6 +627,7 @@ print_help(const char *program)
 	puts("  -l NAME\t\t\trequire library 'NAME'");
 	puts("  -j cmd\t\t\tperform LuaJIT control command");
 	puts("  -b ...\t\t\tsave or list bytecode");
+	puts("  -d\t\t\t\tactivate debugging session for 'SCRIPT'");
 	puts("  -i\t\t\t\tenter interactive mode after executing 'SCRIPT'");
 	puts("  --\t\t\t\tstop handling options");
 	puts("  -\t\t\t\texecute stdin and stop handling options");
@@ -659,7 +660,7 @@ main(int argc, char **argv)
 		{"version", no_argument, 0, 'v'},
 		{NULL, 0, 0, 0},
 	};
-	static const char *opts = "+hVvb::ij:e:l:";
+	static const char *opts = "+hVvb::ij:e:l:d";
 
 	int ch;
 	bool lj_arg = false;
@@ -675,6 +676,9 @@ main(int argc, char **argv)
 		case 'i':
 			/* Force interactive mode */
 			opt_mask |= O_INTERACTIVE;
+			break;
+		case 'd':
+			opt_mask |= O_DEBUGGING;
 			break;
 		case 'b':
 			opt_mask |= O_BYTECODE;
