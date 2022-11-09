@@ -639,12 +639,13 @@ local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
 end
 
 -- Transfer options from env_cfg to cfg.
-local function apply_env_cfg(cfg, env_cfg)
+-- If skip_cfg is given then skip transferring options from this set.
+local function apply_env_cfg(cfg, env_cfg, skip_cfg)
     -- Add options passed through environment variables.
     -- Here we only add options without overloading the ones set
     -- by the user.
     for k, v in pairs(env_cfg) do
-        if cfg[k] == nil then
+        if cfg[k] == nil and (skip_cfg == nil or skip_cfg[k] == nil) then
             cfg[k] = v
         end
     end
@@ -844,6 +845,12 @@ local box_is_configured = false
 -- this moment.
 local pre_load_cfg = table.copy(default_cfg)
 
+-- On first box.cfg{} we need to know options that were already configured
+-- in standalone modules (like log module). We should not apply env vars
+-- for these options. pre_load_cfg is not suitable for this purpose because
+-- of nil values.
+local pre_load_cfg_is_set = {}
+
 local function load_cfg(cfg)
     -- A user may save box.cfg (this function) before box loading
     -- and call it afterwards. We should reconfigure box in the
@@ -856,7 +863,7 @@ local function load_cfg(cfg)
     cfg = upgrade_cfg(cfg, translate_cfg)
 
     -- Set options passed through environment variables.
-    apply_env_cfg(cfg, box.internal.cfg.env)
+    apply_env_cfg(cfg, box.internal.cfg.env, pre_load_cfg_is_set)
 
     cfg = prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
     merge_cfg(cfg, pre_load_cfg);
@@ -1001,6 +1008,15 @@ local function get_option_from_env(option)
     end
 end
 
+-- Get options from env vars for given set.
+local function env_cfg(options)
+    local cfg = {}
+    for option in pairs(options) do
+        cfg[option] = get_option_from_env(option)
+    end
+    return cfg
+end
+
 -- Used to propagate cfg changes done thru API of distinct modules (
 -- log.cfg of log module for example).
 local function update_cfg(option, value)
@@ -1008,13 +1024,16 @@ local function update_cfg(option, value)
         rawset(box.cfg, option, value)
     else
         pre_load_cfg[option] = value
+        pre_load_cfg_is_set[option] = true
     end
 end
 
 box.internal.prepare_cfg = prepare_cfg
+box.internal.apply_env_cfg = apply_env_cfg
 box.internal.merge_cfg = merge_cfg
 box.internal.check_cfg_option_type = check_cfg_option_type
 box.internal.update_cfg = update_cfg
+box.internal.env_cfg = env_cfg
 
 ---
 --- Read box configuration from environment variables.
@@ -1022,11 +1041,7 @@ box.internal.update_cfg = update_cfg
 box.internal.cfg = setmetatable({}, {
     __index = function(self, key)
         if key == 'env' then
-            local res = {}
-            for option, _ in pairs(template_cfg) do
-                res[option] = get_option_from_env(option)
-            end
-            return res
+            return env_cfg(template_cfg)
         end
         assert(false)
     end,

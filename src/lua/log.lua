@@ -144,6 +144,12 @@ local function log_normalize_level(level)
     return level
 end
 
+local box2log_keys = {}
+
+for kl, kb in pairs(log2box_keys) do
+    box2log_keys[kb] = kl
+end
+
 -- Main routine which pass data to C logging code.
 local function say(self, level, fmt, ...)
     local name = self and self.name
@@ -328,6 +334,14 @@ local function log_C_cfg(cfg)
     return cfg_C
 end
 
+local function box_to_log_cfg(box_cfg)
+    local log_cfg = {}
+    for kl, kb in pairs(log2box_keys) do
+        log_cfg[kl] = box_cfg[kb]
+    end
+    return log_cfg
+end
+
 -- Check that level is a number or a valid string.
 local function log_check_level(level, option_name)
     if type(level) == 'string' and log_level_keys[level] == nil then
@@ -415,6 +429,10 @@ end
 
 local function log_configure(self, cfg, box_api)
     if not box_api then
+        if not log_initialized then
+            local env_cfg = box.internal.env_cfg(box2log_keys)
+            box.internal.apply_env_cfg(cfg, box_to_log_cfg(env_cfg))
+        end
         cfg = box.internal.prepare_cfg(cfg, default_cfg, option_types)
         box.internal.merge_cfg(cfg, log_cfg);
     end
@@ -433,16 +451,6 @@ local function log_configure(self, cfg, box_api)
 
     log_debug("log.cfg({log=%s, level=%s, nonblock=%s, format=%s})",
               cfg.log, cfg.level, cfg.nonblock, cfg.format)
-end
-
-local function box_to_log_cfg()
-    return {
-        log = box.cfg.log,
-        level = box.cfg.log_level,
-        modules = box.cfg.log_modules,
-        format = box.cfg.log_format,
-        nonblock = box.cfg.log_nonblock,
-    }
 end
 
 local compat_warning_said = false
@@ -499,8 +507,10 @@ log_main = {
         __call = function(self, cfg) log_configure(self, cfg, false) end,
     }),
     box_api = {
-        cfg = function() log_configure(log_cfg, box_to_log_cfg(), true) end,
-        cfg_check = function() log_check_cfg(box_to_log_cfg()) end,
+        cfg = function()
+            log_configure(log_cfg, box_to_log_cfg(box.cfg), true)
+        end,
+        cfg_check = function() log_check_cfg(box_to_log_cfg(box.cfg)) end,
     },
     internal = {
         ratelimit = {
