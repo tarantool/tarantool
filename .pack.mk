@@ -27,10 +27,24 @@ prepare:
 
 package: prepare
 	if [ "${TARANTOOL_SERIES}" != "1.10" ]; then \
-		if [ -n "${GIT_TAG}" ]; then \
-			export VERSION="$$(echo ${GIT_TAG} | sed 's/-/~/')"; \
+		if [ "${OS}" = "alpine" ]; then \
+			if [ -n "${GIT_TAG}" ]; then \
+				export VERSION="$$(echo ${GIT_TAG} | sed 's/-/_/' | sed 's/entrypoint/alpha0/')"; \
+			else \
+				RELEASE="$(word 1, $(subst -, ,${GIT_DESCRIBE}))"; \
+				TYPE="$(word 2, $(subst -, ,${GIT_DESCRIBE}))"; \
+				PATCH="$(word 3, $(subst -, ,${GIT_DESCRIBE}))"; \
+				if [ "$${TYPE}" = "entrypoint" ]; then \
+					TYPE="alpha0"; \
+				fi; \
+				export VERSION="$${RELEASE}_$${TYPE}_p$${PATCH}"; \
+			fi; \
 		else \
-			export VERSION="$$(echo ${GIT_DESCRIBE} | sed ${SED_REPLACE_VERSION_REGEX} | sed 's/-/~/').dev"; \
+			if [ -n "${GIT_TAG}" ]; then \
+				export VERSION="$$(echo ${GIT_TAG} | sed 's/-/~/')"; \
+			else \
+				export VERSION="$$(echo ${GIT_DESCRIBE} | sed ${SED_REPLACE_VERSION_REGEX} | sed 's/-/~/').dev"; \
+			fi; \
 		fi; \
 		echo VERSION=$${VERSION}; \
 	fi; \

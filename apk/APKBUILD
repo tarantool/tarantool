@@ -1,15 +1,15 @@
 pkgname="tarantool"
-pkgver="1.7.6"
+pkgver=""
 pkgrel="0"
-pkgdesc="Tarantool is an in-memory database and application server"
+pkgdesc="Tarantool is an in-memory computing platform consisting of a database and an application server"
 maintainer="Ilya Konyukhov <i.konyukhov@tarantool.org>"
 license="BSD-2-Clause"
 arch="all"
 source=""
 giturl="https://github.com/tarantool/tarantool.git"
 url="https://github.com/tarantool/tarantool"
-depends="libstdc++ readline libressl yaml lz4 binutils ncurses libgomp lua curl tar zip libunwind libcurl icu"
-makedepends="perl gcc cmake readline-dev libressl-dev yaml-dev lz4-dev binutils-dev ncurses-dev lua-dev musl-dev make git libunwind-dev autoconf automake libtool linux-headers go curl-dev icu-dev"
+depends="g++ libstdc++ readline openssl yaml lz4 binutils ncurses libgomp lua tar zip zlib libunwind icu ca-certificates"
+makedepends="gcc cmake file readline-dev openssl-dev yaml-dev bsd-compat-headers lz4-dev zlib-dev binutils-dev ncurses-dev lua-dev musl-dev make git libunwind-dev autoconf automake libtool linux-headers icu-dev"
 
 subpackages="$pkgname-dev $pkgname-dbg $pkgname-doc"
 
@@ -22,9 +22,15 @@ prepare() {
 build() {
     cd "$builddir"
 
+    if [ "${GC64}" = "true" ]; then
+        GC64=ON
+    fi
+
     cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DENABLE_BACKTRACE:BOOL=ON \
           -DENABLE_DIST:BOOL=ON \
+          -DLUAJIT_DISABLE_SYSPROF:BOOL=ON \
+          -DLUAJIT_ENABLE_GC64:BOOL=${GC64:-OFF} \
           -DCMAKE_INSTALL_PREFIX=/usr \
           -DCMAKE_INSTALL_SYSCONFDIR=/etc \
           -DCMAKE_INSTALL_LOCALSTATEDIR=/var \
