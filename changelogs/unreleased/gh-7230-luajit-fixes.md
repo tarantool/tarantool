@@ -8,6 +8,7 @@ activity, the following issues have been resolved:
 * Fix recording of `tonumber()` with cdata argument for failed conversions
   (gh-7655).
 * Fix concatenation operation on cdata. It always raises an error now.
+* Fix stack top for error message when raising the OOM error (gh-3840).
 
 ## feature/luajit
 Backported patches from vanilla LuaJIT trunk (gh-7230). In the scope of this
