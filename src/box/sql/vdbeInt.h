@@ -238,7 +238,7 @@ struct Vdbe {
 	int iStatement;		/* Statement number (or 0 if has not opened stmt) */
 	i64 iCurrentTime;	/* Value of julianday('now') for this statement */
 	i64 nFkConstraint;	/* Number of imm. FK constraints this VM */
-	uint32_t schema_ver;	/* Schema version at the moment of VDBE creation. */
+	uint64_t schema_ver;	/* Schema version at the moment of VDBE creation. */
 
 	/*
 	 * In recursive triggers we can execute INSERT/UPDATE OR IGNORE

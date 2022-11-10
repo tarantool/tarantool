@@ -43,14 +43,17 @@ extern "C" {
 
 struct func;
 
-extern uint32_t schema_version;
+/**
+ * See `box_schema_version`.
+ */
+extern uint64_t schema_version;
 extern uint32_t dd_version_id;
 
 /** Triggers invoked after schema initialization. */
 extern struct rlist on_schema_init;
 
 /** Return current monotonic schema version. */
-uint32_t
+uint64_t
 box_schema_version(void);
 
 /** Return current persistent schema version. */

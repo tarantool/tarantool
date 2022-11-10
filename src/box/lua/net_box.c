@@ -2493,7 +2493,7 @@ netbox_transport_do_auth(struct netbox_transport *transport,
  */
 static uint32_t
 netbox_transport_fetch_schema(struct netbox_transport *transport,
-			      struct lua_State *L, uint32_t schema_version)
+			      struct lua_State *L, uint64_t schema_version)
 {
 	if (!transport->opts.fetch_schema) {
 		return schema_version;
@@ -2603,7 +2603,7 @@ restart:
  */
 static uint32_t
 netbox_transport_process_requests(struct netbox_transport *transport,
-				  struct lua_State *L, uint32_t schema_version)
+				  struct lua_State *L, uint64_t schema_version)
 {
 	if (transport->state != NETBOX_ACTIVE &&
 	    transport->state != NETBOX_GRACEFUL_SHUTDOWN) {
@@ -2633,7 +2633,7 @@ netbox_connection_handler_f(struct lua_State *L)
 	struct netbox_transport *transport = (void *)lua_topointer(L, 1);
 	netbox_transport_do_id(transport, L);
 	netbox_transport_do_auth(transport, L);
-	uint32_t schema_version = 0;
+	uint64_t schema_version = 0;
 	while (true) {
 		schema_version = netbox_transport_fetch_schema(
 			transport, L, schema_version);

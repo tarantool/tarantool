@@ -161,7 +161,7 @@ struct errcode_record {
 	/*106 */_(ER_WRONG_INDEX_RECORD,	"Wrong record in _index space: got {%s}, expected {%s}") \
 	/*107 */_(ER_WRONG_INDEX_PARTS,		"Wrong index parts: %s") \
 	/*108 */_(ER_WRONG_INDEX_OPTIONS,	"Wrong index options: %s") \
-	/*109 */_(ER_WRONG_SCHEMA_VERSION,	"Wrong schema version, current: %d, in request: %u") \
+	/*109 */_(ER_WRONG_SCHEMA_VERSION,	"Wrong schema version, current: %d, in request: %llu") \
 	/*110 */_(ER_MEMTX_MAX_TUPLE_SIZE,	"Failed to allocate %u bytes for tuple: tuple is too large. Check 'memtx_max_tuple_size' configuration option.") \
 	/*111 */_(ER_WRONG_SPACE_OPTIONS,	"Wrong space options: %s") \
 	/*112 */_(ER_UNSUPPORTED_INDEX_FEATURE,	"Index '%s' (%s) of space '%s' (%s) does not support %s") \

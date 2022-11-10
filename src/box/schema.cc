@@ -57,7 +57,7 @@
 static struct mh_i32ptr_t *sequences;
 /** Public change counter. On its update clients need to fetch
  *  new space data from the instance. */
-uint32_t schema_version = 0;
+uint64_t schema_version = 0;
 
 /** Persistent version of the schema, stored in _schema["version"]. */
 uint32_t dd_version_id = 0;
@@ -69,7 +69,7 @@ struct rlist on_alter_func = RLIST_HEAD_INITIALIZER(on_alter_func);
 
 struct entity_access entity_access;
 
-uint32_t
+uint64_t
 box_schema_version(void)
 {
 	return schema_version;
