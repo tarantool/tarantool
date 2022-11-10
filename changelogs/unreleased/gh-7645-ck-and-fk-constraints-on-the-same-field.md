@@ -1,4 +1,4 @@
 ## bugfix/core
 
-* Fixed creation of a space with check and foreign constraints on the same
+* Fixed creation of spaces with a constraint and a foreign key on the same
   field (gh-7645).

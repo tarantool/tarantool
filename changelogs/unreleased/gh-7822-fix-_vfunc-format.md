@@ -1,3 +1,3 @@
 ## bugfix/box
 
-* Format of _vfunc is now the same as the format of _func (gh-7822).
+* The `_vfunc` system space now has the same format as `_func` (gh-7822).

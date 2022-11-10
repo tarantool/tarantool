@@ -1,3 +1,3 @@
 ## bugfix/box
 
-* Revoked execute access rights from public role to `LUA` function (ghs-14).
+* Revoked execute access rights to the `LUA` function from the public role (ghs-14).

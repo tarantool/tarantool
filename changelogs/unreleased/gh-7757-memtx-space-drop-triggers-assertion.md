@@ -1,3 +1,3 @@
 ## bugfix/memtx
 
-* Fixed assertion being triggered on `space:drop` (gh-7757).
+* Fixed an assertion being triggered on `space:drop` (gh-7757).
