@@ -336,15 +336,16 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 	*is_space_system = (request.space_id < BOX_SYSTEM_ID_MAX);
 	struct space *space = space_cache_find(request.space_id);
 	if (space == NULL)
-		return -1;
+		goto log_request;
 	/* memtx snapshot must contain only memtx spaces */
 	if (space->engine != (struct engine *)memtx) {
 		diag_set(ClientError, ER_CROSS_ENGINE_TRANSACTION);
-		return -1;
+		goto log_request;
 	}
-	struct txn *txn = txn_begin();
+	struct txn *txn;
+	txn = txn_begin();
 	if (txn == NULL)
-		return -1;
+		goto log_request;
 	if (txn_begin_stmt(txn, space, request.type) != 0)
 		goto rollback;
 	/* no access checks here - applier always works with admin privs */
@@ -370,6 +371,8 @@ rollback_stmt:
 	txn_rollback_stmt(txn);
 rollback:
 	txn_abort(txn);
+log_request:
+	say_error("error at request: %s", request_str(&request));
 	fiber_gc();
 	return -1;
 }
