@@ -45,7 +45,7 @@ on:
 
 jobs:
   luajit-integration:
-    runs-on: ${{ inputs.host }}
+    runs-on: [ self-hosted, '${{ inputs.host }}' ]
     steps:
       - name: Prepare checkout
         uses: tarantool/actions/prepare-checkout@master
