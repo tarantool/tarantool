@@ -804,6 +804,13 @@ void
 cord_create(struct cord *cord, const char *name);
 
 /**
+ * Should be called at main thread shutdown start to prevent cord from
+ * starting any new thread, since the context provided can be invalid.
+ */
+void
+cord_shutdown_is_started(void);
+
+/**
  * Perform all the thread-specific deinitialization. Must be called in the
  * exiting thread.
  */

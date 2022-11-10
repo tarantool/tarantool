@@ -50,6 +50,11 @@ extern void cord_on_yield(void);
 static struct fiber_slice zero_slice = {.warn = 0.0, .err = 0.0};
 static struct fiber_slice default_slice = {.warn = 0.5, .err = 1.0};
 
+/**
+ * A flag to prevent new threads creation during Tarantool shutdown.
+ */
+static bool is_shutting_down = false;
+
 static inline void
 clock_stat_add_delta(struct clock_stat *stat, uint64_t clock_delta)
 {
@@ -1562,6 +1567,12 @@ cord_add_garbage(struct cord *cord, struct fiber *f)
 }
 
 void
+cord_shutdown_is_started(void)
+{
+	is_shutting_down = true;
+}
+
+void
 cord_exit(struct cord *cord)
 {
 	assert(cord == cord());
@@ -1607,6 +1618,8 @@ struct cord_thread_arg
 void *cord_thread_func(void *p)
 {
 	struct cord_thread_arg *ct_arg = (struct cord_thread_arg *) p;
+	if (is_shutting_down)
+		return NULL;
 	cord_create(ct_arg->cord, (ct_arg->name));
 	/** Can't possibly be the main thread */
 	assert(cord()->id != main_thread_id);
@@ -1632,7 +1645,12 @@ void *cord_thread_func(void *p)
 	changed = pm_atomic_compare_exchange_strong(&cord()->on_exit,
 	                                            &handler,
 	                                            CORD_ON_EXIT_WONT_RUN);
-	if (!changed)
+	/*
+	 * In case of main thread is shutting down it can invalidate
+	 * the context provided. Since on_exit is used to notify the
+	 * main thread's fiber there's no point in it during shutdown.
+	 */
+	if (!changed && !is_shutting_down)
 		handler->callback(handler->argument);
 
 	cord_exit(cord());
@@ -1644,6 +1662,8 @@ int
 cord_start(struct cord *cord, const char *name, void *(*f)(void *), void *arg)
 {
 	int res = -1;
+	if (is_shutting_down)
+		return res;
 	struct cord_thread_arg ct_arg = { cord, name, f, arg, false,
 		PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER };
 	tt_pthread_mutex_lock(&ct_arg.start_mutex);

@@ -176,6 +176,7 @@ tarantool_exit(int code)
 		return;
 	}
 	is_shutting_down = true;
+	cord_shutdown_is_started();
 	exit_code = code;
 	box_broadcast_fmt("box.shutdown", "%b", true);
 	fiber_wakeup(on_shutdown_fiber);
