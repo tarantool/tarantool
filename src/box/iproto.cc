@@ -1793,7 +1793,7 @@ net_finish_destroy(struct cmsg *m)
 
 
 static int
-tx_check_schema(uint32_t new_schema_version)
+tx_check_schema(uint64_t new_schema_version)
 {
 	if (new_schema_version && new_schema_version != schema_version) {
 		diag_set(ClientError, ER_WRONG_SCHEMA_VERSION,

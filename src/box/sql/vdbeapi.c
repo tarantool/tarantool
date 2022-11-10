@@ -276,7 +276,7 @@ sql_column_span(sql_stmt *stmt, int n) {
 	return p->metadata[n].span;
 }
 
-uint32_t
+uint64_t
 sql_stmt_schema_version(const struct sql_stmt *stmt)
 {
 	struct Vdbe *v = (struct Vdbe *) stmt;
