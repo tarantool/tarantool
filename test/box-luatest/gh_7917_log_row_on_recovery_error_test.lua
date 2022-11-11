@@ -6,7 +6,7 @@ local g = t.group(nil, {{type = 'xlog'}, {type = 'snap'}})
 
 g.before_each(function(cg)
     cg.server = server:new({
-        alias = 'master',
+        alias = 'gh_7917_' .. cg.params.type,
         datadir = fio.pathjoin('test/box-luatest/gh_7917_data',
                                cg.params.type),
     })
