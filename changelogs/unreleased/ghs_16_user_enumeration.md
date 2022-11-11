@@ -1,4 +1,4 @@
 ## bugfix/core
 
-* Now the same error is returned when invalid password or login is entered
-  during authorization to prevent user enumeration (ghs-16).
+* Now the same error is returned when a password or a username provided
+  during authorization is incorrect. This prevents user enumeration (ghs-16).

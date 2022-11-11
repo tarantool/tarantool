@@ -2,8 +2,8 @@
 
 * Fixed subtractions for datetimes with different timezones (gh-7698).
 
-  We used to ignore timezone difference (im `tzoffset`) for
-  datetime subtraction operation:
+  Preivously, the timezone difference (`tzoffset`) was ignored in
+  datetime subtraction operations:
 
   ```
   tarantool> datetime.new{tz='MSK'} - datetime.new{tz='UTC'}
@@ -17,8 +17,8 @@
   ...
   ```
 
-  Now we accumulate that difference to the minute component of
-  a resultant interval:
+  Now this difference is accumulated in the minute component of
+  the resulting interval:
 
   ```
   tarantool> datetime.new{tz='MSK'} - datetime.new{tz='UTC'}

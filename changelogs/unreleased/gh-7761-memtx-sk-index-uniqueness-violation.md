@@ -1,4 +1,4 @@
 ## bugfix/memtx
 
-* Fixed possibility of secondary index uniqueness violation with transaction
+* Fixed possible violation of the secondary index uniqueness with the transaction
   manager enabled (gh-7761).

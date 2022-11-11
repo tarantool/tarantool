@@ -1,4 +1,3 @@
 ## feature/sql
 
-* Now the type of result of NULLIF() is the same as the type of the first
-  argument (gh-6989).
+* Now `NULLIF()` call results have the same type as its first argument (gh-6989).

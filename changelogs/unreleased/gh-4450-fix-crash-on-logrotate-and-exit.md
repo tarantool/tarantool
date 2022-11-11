@@ -1,3 +1,3 @@
 ## bugfix/core
 
-* Fixed crash on log rotate and immediate application exit (gh-4450).
+* Fixed a crash that could occur during log rotation and application exit (gh-4450).
