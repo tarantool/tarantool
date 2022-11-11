@@ -2,10 +2,9 @@
 
 * Fixed interval arithmetic for boundaries crossing DST (gh-7700).
 
-  We did not take into consideration the fact that
-  as result of date/time arithmetic we could get
-  in a different timezone, if DST boundary has been
-  crossed during operation.
+  Results of datetime arithmetic operations could get a
+  different timezone if the DST boundary has been
+  crossed during the operation:
 
   ```
   tarantool> datetime.new{year=2008, month=1, day=1,
@@ -15,5 +14,6 @@
   - 2008-07-01T01:00:00 Europe/Moscow
   ...
   ```
-  Now we resolve tzoffset at the end of operation if
-  tzindex is not 0.
+
+  Now we resolve `tzoffset` at the end of operation if
+  `tzindex` is not 0.

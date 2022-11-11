@@ -1,3 +1,3 @@
 ## bugfix/sql
 
-* Fixed assertion in JOIN in case of using unsupported index (gh-5678).
+* Fixed an assertion in `JOIN` when using an unsupported index (gh-5678).

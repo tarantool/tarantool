@@ -1,4 +1,4 @@
 ## bugfix/luajit
 
-Fix Lua stack dump command (`lj-stack`), since unpacking arguments within the
-list initialization is not supported in Python 2 (gh-7458).
+* Fixed the Lua stack dump command (`lj-stack`) to support Python 2: unpacking
+  arguments within the list initialization is not supported in it (gh-7458).

@@ -1,3 +1,3 @@
 ## bugfix/sql
 
-* An error is now thrown when creating too many indexes in SQL (gh-5526).
+* An error is now thrown if too many indexes were created in SQL (gh-5526).
