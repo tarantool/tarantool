@@ -98,12 +98,7 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 			goto type_mismatch_err;
 		str = mp_decode_str(val, &str_len);
 		if (str_len > 0) {
-			ptr = (char *) region_alloc(region, str_len + 1);
-			if (ptr == NULL) {
-				diag_set(OutOfMemory, str_len + 1, "region",
-					 "opt string");
-				return -1;
-			}
+			ptr = xregion_alloc(region, str_len + 1);
 			memcpy(ptr, str, str_len);
 			ptr[str_len] = '\0';
 			assert (strlen(ptr) == str_len);

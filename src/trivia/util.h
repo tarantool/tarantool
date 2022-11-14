@@ -130,6 +130,9 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
 #define xregion_alloc(p, size)	xalloc_impl((size), region_alloc, (p), (size))
 #define xregion_alloc_object(region, T, size) \
 		xalloc_impl(size, region_alloc_object, region, T, size)
+#define xregion_alloc_array(p, T, count, size)				\
+	xalloc_impl(sizeof(T) * (count), region_alloc_array, (p), T,	\
+		    (count), (size))
 
 /** \cond public */
 
