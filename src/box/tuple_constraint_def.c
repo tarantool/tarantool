@@ -104,12 +104,8 @@ tuple_constraint_def_decode(const char **data,
 		return 0;
 
 	size_t bytes;
-	*def = region_alloc_array(region, struct tuple_constraint_def,
-				  *count, &bytes);
-	if (*def == NULL) {
-		diag_set(OutOfMemory, bytes, "region", "array of constraints");
-		return -1;
-	}
+	*def = xregion_alloc_array(region, struct tuple_constraint_def,
+				   *count, &bytes);
 	for (uint32_t i = 0; i < old_count; i++)
 		(*def)[i] = old_def[i];
 	struct tuple_constraint_def *new_def = *def + old_count;
@@ -132,13 +128,7 @@ tuple_constraint_def_decode(const char **data,
 		}
 		if (identifier_check(str, str_len) != 0)
 			return -1;
-		char *str_copy = region_alloc(region, str_len + 1);
-		if (str_copy == NULL) {
-			diag_set(OutOfMemory, str_len + 1, "region",
-				 i % 2 == 0 ? "constraint name"
-					    : "constraint func");
-			return -1;
-		}
+		char *str_copy = xregion_alloc(region, str_len + 1);
 		memcpy(str_copy, str, str_len);
 		str_copy[str_len] = 0;
 		new_def[i].name = str_copy;
@@ -185,12 +175,7 @@ field_id_decode(const char **data, struct tuple_constraint_field_id *def,
 		def->name_len = 0;
 	} else if (mp_typeof(**data) == MP_STR) {
 		const char *str = mp_decode_str(data, &def->name_len);
-		char *str_copy = region_alloc(region, def->name_len + 1);
-		if (str_copy == NULL) {
-			diag_set(OutOfMemory, def->name_len + 1,
-				 "region", "string");
-			return -1;
-		}
+		char *str_copy = xregion_alloc(region, def->name_len + 1);
 		memcpy(str_copy, str, def->name_len);
 		str_copy[def->name_len] = 0;
 		def->name = str_copy;
@@ -226,14 +211,9 @@ field_mapping_decode(const char **data,
 	}
 	fkey->field_mapping_size = mapping_size;
 	size_t sz;
-	fkey->field_mapping =
-		region_alloc_array(region,
-				   struct tuple_constraint_fkey_field_mapping,
-				   mapping_size, &sz);
-	if (fkey->field_mapping == NULL) {
-		diag_set(OutOfMemory, sz, "region", "field mapping");
-		return -1;
-	}
+	fkey->field_mapping = xregion_alloc_array(
+		region, struct tuple_constraint_fkey_field_mapping,
+		mapping_size, &sz);
 	for (uint32_t i = 0 ; i < 2 * mapping_size; i++) {
 		struct tuple_constraint_field_id *def = i % 2 == 0 ?
 			&fkey->field_mapping[i / 2].local_field :
@@ -269,12 +249,8 @@ tuple_constraint_def_decode_fkey(const char **data,
 		return 0;
 
 	size_t bytes;
-	*def = region_alloc_array(region, struct tuple_constraint_def,
-				  *count, &bytes);
-	if (*def == NULL) {
-		diag_set(OutOfMemory, bytes, "region", "array of constraints");
-		return -1;
-	}
+	*def = xregion_alloc_array(region, struct tuple_constraint_def,
+				   *count, &bytes);
 	for (uint32_t i = 0; i < old_count; i++)
 		(*def)[i] = old_def[i];
 	struct tuple_constraint_def *new_def = *def + old_count;
@@ -294,12 +270,7 @@ tuple_constraint_def_decode_fkey(const char **data,
 		}
 		if (identifier_check(str, str_len) != 0)
 			return -1;
-		char *str_copy = region_alloc(region, str_len + 1);
-		if (str_copy == NULL) {
-			diag_set(OutOfMemory, bytes, "region",
-				 "constraint name");
-			return -1;
-		}
+		char *str_copy = xregion_alloc(region, str_len + 1);
 		memcpy(str_copy, str, str_len);
 		str_copy[str_len] = 0;
 		new_def[i].name = str_copy;
