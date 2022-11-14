@@ -42,24 +42,15 @@ space_upgrade_def_decode(const char **data, struct region *region);
  * The copy is allocated on malloc. It's okay to pass NULL to this
  * function, in which case it returns NULL. The function never fails.
  */
-static inline struct space_upgrade_def *
-space_upgrade_def_dup(const struct space_upgrade_def *def)
-{
-	assert(def == NULL);
-	(void)def;
-	return NULL;
-}
+struct space_upgrade_def *
+space_upgrade_def_dup(const struct space_upgrade_def *def);
 
 /**
  * Frees memory occupied by a space_upgrade_def object.
  * It's okay to pass NULL to this function.
  */
-static inline void
-space_upgrade_def_delete(struct space_upgrade_def *def)
-{
-	assert(def == NULL);
-	(void)def;
-}
+void
+space_upgrade_def_delete(struct space_upgrade_def *def);
 
 /**
  * Creates a space upgrade state from a definition, space name, primary key

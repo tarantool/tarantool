@@ -18,23 +18,46 @@
 # error unimplemented
 #endif
 
+static struct space_upgrade_def {} dummy_def;
+
 struct space_upgrade_def *
 space_upgrade_def_decode(const char **data, struct region *region)
 {
-	(void)data;
 	(void)region;
-	diag_set(ClientError, ER_UNSUPPORTED,
-		 "Community edition", "space upgrade");
-	return NULL;
+	/**
+	 * Option decoder may only fail with IllegalParams error so we return
+	 * a non-NULL ptr here and abort later, in space_upgrade_check_alter.
+	 */
+	mp_next(data);
+	return &dummy_def;
+}
+
+struct space_upgrade_def *
+space_upgrade_def_dup(const struct space_upgrade_def *def)
+{
+	assert(def == NULL || def == &dummy_def);
+	return def != NULL ? &dummy_def : NULL;
+}
+
+void
+space_upgrade_def_delete(struct space_upgrade_def *def)
+{
+	assert(def == NULL || def == &dummy_def);
+	(void)def;
 }
 
 int
 space_upgrade_check_alter(struct space *space, struct space_def *new_def)
 {
 	assert(space->upgrade == NULL);
-	assert(new_def->opts.upgrade_def == NULL);
+	assert(new_def->opts.upgrade_def == NULL ||
+	       new_def->opts.upgrade_def == &dummy_def);
 	(void)space;
-	(void)new_def;
+	if (new_def->opts.upgrade_def != NULL) {
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 "Community edition", "space upgrade");
+		return -1;
+	}
 	return 0;
 }
 
