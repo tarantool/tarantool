@@ -427,10 +427,14 @@ g.test_old_leader_txn_during_promote_write_complex = function(g)
     -- Server1 doesn't see the new term yet and makes an attempt to do a sync
     -- transaction.
     --
+    local lsn = g.server1:exec(function() return box.info.lsn end)
     local f_insert = fiber.new(g.server1.exec, g.server1, function()
         box.space.test:replace{1}
     end)
     f_insert:set_joinable(true)
+    t.helpers.retrying({}, function()
+        assert(g.server1:exec(function() return box.info.lsn end) > lsn)
+    end)
     --
     -- Server4 gets the transaction.
     --
