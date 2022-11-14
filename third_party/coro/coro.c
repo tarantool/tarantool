@@ -289,7 +289,8 @@ trampoline (int sig)
        #elif __aarch64__
 
          #define NUM_SAVED 20
-         "\tsub x2, sp, #8 * 20\n"
+         "\tsub sp, sp, #8 * 20\n"
+         "\tmov x2, sp\n"
          "\tstp x19, x20, [x2, #16 * 0]\n"
          "\tstp x21, x22, [x2, #16 * 1]\n"
          "\tstp x23, x24, [x2, #16 * 2]\n"
