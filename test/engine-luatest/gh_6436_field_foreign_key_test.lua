@@ -105,7 +105,7 @@ g.test_bad_foreign_key = function(cg)
         )
         fmt = gen_format({[''] = {space = 'country', field = 'id'}})
         t.assert_error_msg_content_equals(
-            "Invalid identifier '' (expected printable symbols only or it is too long)",
+            "Wrong space format: foreign key name isn't a valid identifier",
             function() box.schema.create_space('city', {engine=engine, format=fmt}) end
         )
     end, {engine})

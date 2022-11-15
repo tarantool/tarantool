@@ -276,7 +276,7 @@ g.test_wrong_field_constraint = function(cg)
             end)
 
         t.assert_error_msg_content_equals(
-            "Invalid identifier '' (expected printable symbols only or it is too long)",
+            "Wrong space format: constraint name isn't a valid identifier",
             function()
                 box.space.test:format({{"id1", constraint = {[''] = "field_constr1"}}, {"id2"}})
             end)

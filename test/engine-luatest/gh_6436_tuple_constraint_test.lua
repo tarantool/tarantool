@@ -223,7 +223,7 @@ g.test_wrong_tuple_constraint = function(cg)
             {engine = engine, constraint = {[string.rep('a', 66666)] = "tuple_constr1"}})
 
         t.assert_error_msg_content_equals(
-            "Invalid identifier '' (expected printable symbols only or it is too long)",
+            "Wrong space options: constraint name isn't a valid identifier",
             box.schema.create_space, 'test',
             {engine = engine, constraint = {[''] = "tuple_constr1"}})
 

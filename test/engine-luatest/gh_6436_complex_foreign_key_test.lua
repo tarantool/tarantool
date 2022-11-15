@@ -70,7 +70,7 @@ g.test_bad_complex_foreign_key = function(cg)
         )
         opts = space_opts({['']={space='country',field={p_id='planet_id', c_id='country_id'}}})
         t.assert_error_msg_content_equals(
-            "Invalid identifier '' (expected printable symbols only or it is too long)",
+            "Wrong space options: foreign key name isn't a valid identifier",
             function() box.schema.create_space('city', opts) end
         )
         opts = space_opts({cntr={space='country',field={p_id='planet_id', c_id='country_id'}}})
