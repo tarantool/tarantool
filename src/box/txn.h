@@ -848,6 +848,13 @@ txn_end_ro_stmt(struct txn *txn, struct txn_ro_savepoint *svp)
 bool
 txn_is_distributed(struct txn *txn);
 
+static inline bool
+txn_is_fully_local(const struct txn *txn)
+{
+	return txn->n_new_rows == txn->n_local_rows &&
+	       txn->n_applier_rows == 0;
+}
+
 /**
  * End a statement. In autocommit mode, end
  * the current transaction as well.
