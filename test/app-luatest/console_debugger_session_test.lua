@@ -37,6 +37,10 @@ local function dbg_failed_range(v)
             format(v, 1, 0x7fffff00)
 end
 
+local function debuglog(...)
+    print('--', ...)
+end
+
 local cmd_aliases = {
     ['b'] = 'b|break|breakpoint|add_break|add_breakpoint',
     ['bd'] = 'bd|bdelete|delete_break|delete_breakpoint',
@@ -197,12 +201,14 @@ local function run_debug_session(cmdline, sequence, header)
                     cmd = cmd .. '\n'
                 end
                 fh:write(cmd)
+                debuglog('Execute command: "'..trim(cmd)..'"')
             end
 
             local result
             local clean_cmd = trim(cmd)
             -- there should be empty stderr - check it before stdout
             local errout = fh:read({ timeout = 0.05, stderr = true})
+            debuglog('stderr output: ', trim(errout))
             if first and errout then
                 -- we do not expect anything on stderr
                 -- with exception of initial debugger header
@@ -213,6 +219,7 @@ local function run_debug_session(cmdline, sequence, header)
             end
             repeat
                 result = trim(unescape(fh:read({ timeout = 0.5 })))
+                debuglog('stdout output:', result)
             until result ~= '' or result ~= clean_cmd
             if expected ~= '' then
                 t.assert_str_contains(result, expected, false)
