@@ -1105,6 +1105,25 @@ txn_commit_nop(struct txn *txn)
 	return false;
 }
 
+/**
+ * Try to place the transaction inside the synchronous transaction queue. This
+ * must be done before the WAL write, because nothing should fail after the WAL
+ * write completes.
+ */
+static int
+txn_add_limbo_entry(struct txn *txn, const struct journal_entry *req)
+{
+	/*
+	 * Remote rows, if any, come before local rows, so check for originating
+	 * instance id in the first row.
+	 */
+	uint32_t origin_id = req->rows[0]->replica_id;
+	txn->limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn);
+	if (txn->limbo_entry == NULL)
+		return -1;
+	return 0;
+}
+
 int
 txn_commit_try_async(struct txn *txn)
 {
@@ -1126,13 +1145,9 @@ txn_commit_try_async(struct txn *txn)
 	if (req == NULL)
 		goto rollback;
 
-	bool is_sync = txn_has_flag(txn, TXN_WAIT_SYNC);
-	if (is_sync) {
-		/* See txn_commit(). */
-		uint32_t origin_id = req->rows[0]->replica_id;
-		txn->limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn);
-		if (txn->limbo_entry == NULL)
-			goto rollback;
+	if (txn_has_flag(txn, TXN_WAIT_SYNC) &&
+	    txn_add_limbo_entry(txn, req) != 0) {
+		goto rollback;
 	}
 
 	fiber_set_txn(fiber(), NULL);
@@ -1154,7 +1169,6 @@ int
 txn_commit(struct txn *txn)
 {
 	struct journal_entry *req;
-	struct txn_limbo_entry *limbo_entry = NULL;
 
 	txn->fiber = fiber();
 
@@ -1176,22 +1190,9 @@ txn_commit(struct txn *txn)
 	 * confirmed. Then they turn the async transaction into just a plain
 	 * txn not waiting for anything.
 	 */
-	if (txn_has_flag(txn, TXN_WAIT_SYNC)) {
-		/*
-		 * Remote rows, if any, come before local rows, so
-		 * check for originating instance id here.
-		 */
-		uint32_t origin_id = req->rows[0]->replica_id;
-
-		/*
-		 * Append now. Before even WAL write is done.
-		 * After WAL write nothing should fail, even OOM
-		 * wouldn't be acceptable.
-		 */
-		limbo_entry = txn_limbo_append(&txn_limbo, origin_id, txn);
-		if (limbo_entry == NULL)
-			goto rollback_abort;
-		txn->limbo_entry = limbo_entry;
+	if (txn_has_flag(txn, TXN_WAIT_SYNC) &&
+	    txn_add_limbo_entry(txn, req) != 0) {
+		goto rollback_abort;
 	}
 
 	fiber_set_txn(fiber(), NULL);
@@ -1202,6 +1203,7 @@ txn_commit(struct txn *txn)
 		goto rollback_io;
 	}
 	if (txn_has_flag(txn, TXN_WAIT_SYNC)) {
+		struct txn_limbo_entry *limbo_entry = txn->limbo_entry;
 		assert(limbo_entry->lsn > 0);
 		/*
 		 * XXX: ACK should be done on WAL write too. But it can make
