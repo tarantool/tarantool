@@ -126,8 +126,11 @@ tuple_constraint_def_decode(const char **data,
 				 "constraint name is too long");
 			return -1;
 		}
-		if (identifier_check(str, str_len) != 0)
+		if (identifier_check(str, str_len) != 0) {
+			diag_set(ClientError, errcode,
+				 "constraint name isn't a valid identifier");
 			return -1;
+		}
 		char *str_copy = xregion_alloc(region, str_len + 1);
 		memcpy(str_copy, str, str_len);
 		str_copy[str_len] = 0;
@@ -268,8 +271,11 @@ tuple_constraint_def_decode_fkey(const char **data,
 				 "foreign key name is too long");
 			return -1;
 		}
-		if (identifier_check(str, str_len) != 0)
+		if (identifier_check(str, str_len) != 0) {
+			diag_set(ClientError, errcode,
+				 "foreign key name isn't a valid identifier");
 			return -1;
+		}
 		char *str_copy = xregion_alloc(region, str_len + 1);
 		memcpy(str_copy, str, str_len);
 		str_copy[str_len] = 0;
