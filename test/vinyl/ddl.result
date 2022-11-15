@@ -537,7 +537,7 @@ pk = space:create_index('primary')
 ...
 index = space:create_index('test', { type = 'tree', parts = { 2, 'nosuchtype' }})
 ---
-- error: 'Wrong index parts: unknown field type'
+- error: 'Wrong index part 1: unknown field type'
 ...
 index = space:create_index('test', { type = 'tree', parts = { 2, 'any' }})
 ---

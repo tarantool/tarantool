@@ -159,6 +159,10 @@ key_def_set_func(struct key_def *def)
 	key_def_set_extract_func(def);
 }
 
+#define key_def_error(part_no, errmsg)				\
+	diag_set(ClientError, ER_WRONG_INDEX_PARTS,			\
+		 (unsigned)((part_no) + TUPLE_INDEX_BASE), (errmsg))
+
 static int
 key_def_set_part_path(struct key_def *def, uint32_t part_no, const char *path,
 		      uint32_t path_len, char **path_pool)
@@ -203,8 +207,7 @@ key_def_set_part_path(struct key_def *def, uint32_t part_no, const char *path,
 		   json_path_cmp(path, multikey_path_len, def->multikey_path,
 				 def->multikey_path_len,
 				 TUPLE_INDEX_BASE) != 0) {
-		diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-			 "incompatible multikey index path");
+		key_def_error(part_no, "incompatible multikey index path");
 		return -1;
 	}
 
@@ -223,9 +226,8 @@ key_def_set_part_path(struct key_def *def, uint32_t part_no, const char *path,
 				      multikey_path_suffix_len,
 				      TUPLE_INDEX_BASE) !=
 	    multikey_path_suffix_len) {
-		diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-			 "no more than one array index placeholder [*] is "
-			 "allowed in JSON path");
+		key_def_error(part_no, "no more than one array index "
+			      "placeholder [*] is allowed in JSON path");
 		return -1;
 	}
 	return 0;
@@ -282,8 +284,7 @@ key_def_new(const struct key_part_def *parts, uint32_t part_count,
 		if (part->coll_id != COLL_NONE) {
 			struct coll_id *coll_id = coll_by_id(part->coll_id);
 			if (coll_id == NULL) {
-				diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-					 "collation was not found by ID");
+				key_def_error(i, "collation not found by id");
 				goto error;
 			}
 			coll = coll_id->coll;
@@ -860,31 +861,26 @@ key_def_decode_parts_166(struct key_part_def *parts, uint32_t part_count,
 	for (uint32_t i = 0; i < part_count; i++) {
 		struct key_part_def *part = &parts[i];
 		if (mp_typeof(**data) != MP_ARRAY) {
-			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-				 "expected an array");
+			key_def_error(i, "expected an array");
 			return -1;
 		}
 		uint32_t item_count = mp_decode_array(data);
 		if (item_count < 1) {
-			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-				 "expected a non-empty array");
+			key_def_error(i, "expected a non-empty array");
 			return -1;
 		}
 		if (item_count < 2) {
-			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-				 "a field type is missing");
+			key_def_error(i, "field type is missing");
 			return -1;
 		}
 		if (mp_typeof(**data) != MP_UINT) {
-			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-				 "field id must be an integer");
+			key_def_error(i, "field id must be an integer");
 			return -1;
 		}
 		*part = key_part_def_default;
 		part->fieldno = (uint32_t) mp_decode_uint(data);
 		if (mp_typeof(**data) != MP_STR) {
-			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-				 "field type must be a string");
+			key_def_error(i, "field type must be a string");
 			return -1;
 		}
 		uint32_t len;
@@ -893,8 +889,7 @@ key_def_decode_parts_166(struct key_part_def *parts, uint32_t part_count,
 			mp_next(data);
 		part->type = field_type_by_name(str, len);
 		if (part->type == field_type_MAX) {
-			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-				 "unknown field type");
+			key_def_error(i, "unknown field type");
 			return -1;
 		}
 		part->is_nullable = (part->fieldno < field_count ?
@@ -919,8 +914,7 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 	for (uint32_t i = 0; i < part_count; i++) {
 		struct key_part_def *part = &parts[i];
 		if (mp_typeof(**data) != MP_MAP) {
-			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-				 "index part is expected to be a map");
+			key_def_error(i, "expected a map");
 			return -1;
 		}
 		int opts_count = mp_decode_map(data);
@@ -929,16 +923,16 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 		uint32_t  action_literal_len = strlen("nullable_action");
 		for (int j = 0; j < opts_count; ++j) {
 			if (mp_typeof(**data) != MP_STR) {
-				diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-					 "key must be a string");
+				key_def_error(
+					i, "expected a map with string keys");
 				return -1;
 			}
 			uint32_t key_len;
 			const char *key = mp_decode_str(data, &key_len);
 			if (opts_parse_key(part, part_def_reg, key, key_len,
 					   data, region, false) != 0) {
-				diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-					 diag_last_error(diag_get())->errmsg);
+				key_def_error(
+					i, diag_last_error(diag_get())->errmsg);
 				return -1;
 			}
 			if (is_action_missing &&
@@ -953,16 +947,14 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 				: ON_CONFLICT_ACTION_DEFAULT;
 		}
 		if (part->type == field_type_MAX) {
-			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-				 "unknown field type");
+			key_def_error(i, "unknown field type");
 			return -1;
 		}
 		if (part->coll_id != COLL_NONE &&
 		    part->type != FIELD_TYPE_STRING &&
 		    part->type != FIELD_TYPE_SCALAR) {
-			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-				 "collation is reasonable only for "
-				 "string and scalar parts");
+			key_def_error(i, "collation is only reasonable for "
+				      "'string' and 'scalar' parts");
 			return -1;
 		}
 		if (!((part->is_nullable && part->nullable_action ==
@@ -970,21 +962,18 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 		      || (!part->is_nullable
 			  && part->nullable_action !=
 			  ON_CONFLICT_ACTION_NONE))) {
-			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-				 "conflicting nullability and "
-				 "nullable action properties");
+			key_def_error(i, "conflicting nullability and "
+				      "nullable action properties");
 			return -1;
 		}
 		if (part->sort_order == sort_order_MAX) {
-			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-				 "unknown sort order");
+			key_def_error(i, "unknown sort order");
 			return -1;
 		}
 		if (part->path != NULL &&
 		    json_path_validate(part->path, strlen(part->path),
 				       TUPLE_INDEX_BASE) != 0) {
-			diag_set(ClientError, ER_WRONG_INDEX_PARTS,
-				 "invalid path");
+			key_def_error(i, "invalid path");
 			return -1;
 		}
 	}

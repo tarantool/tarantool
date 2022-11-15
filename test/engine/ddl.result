@@ -303,7 +303,7 @@ pk = space:create_index('pk', {parts={{field = 0, type = 'unsigned'}}})
 ...
 pk = space:create_index('pk', {parts={{field = 1, type = 'const char *'}}})
 ---
-- error: 'Wrong index parts: unknown field type'
+- error: 'Wrong index part 1: unknown field type'
 ...
 pk = space:create_index('pk', {parts={{field = 1, type = 'unsigned'}}})
 ---

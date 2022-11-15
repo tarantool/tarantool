@@ -429,7 +429,7 @@ index = s:create_index('test', { type = 'hash', parts = {}})
 -- unknown field type
 index = s:create_index('test', { type = 'hash', parts = { 2, 'nosuchtype' }})
 ---
-- error: 'Wrong index parts: unknown field type'
+- error: 'Wrong index part 1: unknown field type'
 ...
 index = s:create_index('test', { type = 'hash', parts = { 2, 'any' }})
 ---
@@ -448,7 +448,7 @@ index = s:create_index('test', { type = 'hash', parts = { 2, 'map' }})
 ...
 index = s:create_index('test', { type = 'rtree', parts = { 2, 'nosuchtype' }})
 ---
-- error: 'Wrong index parts: unknown field type'
+- error: 'Wrong index part 1: unknown field type'
 ...
 index = s:create_index('test', { type = 'rtree', parts = { 2, 'any' }})
 ---

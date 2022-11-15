@@ -863,7 +863,7 @@ test:do_catchsql_test(
     [[
         CREATE TABLE t11_5 (i INT, a INT, PRIMARY KEY(a, i COLLATE "unicode_ci" AUTOINCREMENT));
     ]], {
-        1, "Wrong index parts: collation is reasonable only for string and scalar parts"
+        1, "Wrong index part 2: collation is only reasonable for 'string' and 'scalar' parts"
     })
 
 test:do_catchsql_test(
