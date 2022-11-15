@@ -647,14 +647,14 @@ format = { { name = long } }
 ...
 s = box.schema.space.create('test', { engine = engine, format = format })
 ---
-- error: 'Wrong space format: field 1 name is too long'
+- error: 'Wrong space format field 1: field name is too long'
 ...
 format = { { name = 'id', type = '100' } }
 ---
 ...
 s = box.schema.space.create('test', { engine = engine, format = format })
 ---
-- error: 'Wrong space format: field 1 has unknown field type'
+- error: 'Wrong space format field 1: unknown field type'
 ...
 format = { setmetatable({}, { __serialize = 'map' }) }
 ---
