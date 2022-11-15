@@ -1062,6 +1062,21 @@ box_check_replication_threads(void)
 	return 0;
 }
 
+/** Check bootstrap_strategy option validity. */
+static enum bootstrap_strategy
+box_check_bootstrap_strategy(void)
+{
+	const char *strategy = cfg_gets("bootstrap_strategy");
+	if (strcmp(strategy, "auto") == 0)
+		return BOOTSTRAP_STRATEGY_AUTO;
+	if (strcmp(strategy, "legacy") == 0)
+		return BOOTSTRAP_STRATEGY_LEGACY;
+	diag_set(ClientError, ER_CFG, "bootstrap_strategy",
+		 "the value should be one of the following: "
+		 "'auto', 'legacy'");
+	return BOOTSTRAP_STRATEGY_INVALID;
+}
+
 static int
 box_check_listen(void)
 {
@@ -1589,6 +1604,8 @@ box_check_config(void)
 	if (box_check_replication_threads() < 0)
 		diag_raise();
 	box_check_replication_sync_timeout();
+	if (box_check_bootstrap_strategy() == BOOTSTRAP_STRATEGY_INVALID)
+		diag_raise();
 	box_check_readahead(cfg_geti("readahead"));
 	box_check_checkpoint_count(cfg_geti("checkpoint_count"));
 	box_check_wal_max_size(cfg_geti64("wal_max_size"));
@@ -1697,7 +1714,13 @@ box_restart_replication(void)
 static inline void
 box_update_replication(void)
 {
-	const bool do_quorum = false;
+	/*
+	 * In legacy mode proceed as soon as `replication_connect_quorum` remote
+	 * peers are connected.
+	 * In auto mode, try to connect to everyone during the given time
+	 * period, but do not fail even if no connections were established.
+	 */
+	const bool do_quorum = bootstrap_strategy != BOOTSTRAP_STRATEGY_LEGACY;
 	const bool do_reuse = true;
 	box_sync_replication(do_quorum, do_reuse);
 }
@@ -1748,6 +1771,16 @@ box_set_replication_connect_quorum(void)
 	replication_connect_quorum = box_check_replication_connect_quorum();
 	if (is_box_configured)
 		replicaset_check_quorum();
+}
+
+int
+box_set_bootstrap_strategy(void)
+{
+	enum bootstrap_strategy strategy = box_check_bootstrap_strategy();
+	if (strategy == BOOTSTRAP_STRATEGY_INVALID)
+		return -1;
+	bootstrap_strategy = strategy;
+	return 0;
 }
 
 void
@@ -3923,6 +3956,34 @@ bootstrap_journal_write(struct journal *base, struct journal_entry *entry)
 }
 
 /**
+ * Wait until every remote peer that managed to connect chooses this node as its
+ * bootstrap leader and fail otherwise.
+ */
+static void
+check_bootstrap_unanimity(void)
+{
+	replicaset_foreach(replica) {
+		struct applier *applier = replica->applier;
+		if (applier == NULL || applier->state != APPLIER_CONNECTED)
+			continue;
+		struct ballot *ballot = &applier->ballot;
+		const char *replica_str =
+			tt_sprintf("%s at %s", tt_uuid_str(&applier->uuid),
+				   applier_uri_str(applier));
+		say_info("Checking if %s chose this instance as bootstrap "
+			 "leader", replica_str);
+		if (tt_uuid_is_nil(&ballot->bootstrap_leader_uuid))
+			applier_wait_bootstrap_leader_uuid_is_set(applier);
+		if (tt_uuid_compare(&ballot->bootstrap_leader_uuid,
+				    &INSTANCE_UUID) != 0) {
+			tnt_raise(ClientError, ER_BOOTSTRAP_NOT_UNANIMOUS,
+				  tt_uuid_str(&replica->uuid),
+				  tt_uuid_str(&ballot->bootstrap_leader_uuid));
+		}
+	}
+}
+
+/**
  * Initialize the first replica of a new replica set.
  */
 static void
@@ -3932,6 +3993,12 @@ bootstrap_master(const struct tt_uuid *replicaset_uuid)
 	if (cfg_geti("read_only") == 1) {
 		tnt_raise(ClientError, ER_BOOTSTRAP_READONLY);
 	}
+	/*
+	 * With "auto" bootstrap strategy refuse to boot unless everyone agrees
+	 * this node is the bootstrap leader.
+	 */
+	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_AUTO)
+		check_bootstrap_unanimity();
 	engine_bootstrap_xc();
 
 	uint32_t replica_id = 1;
@@ -4065,6 +4132,7 @@ bootstrap(const struct tt_uuid *instance_uuid,
 	else
 		tt_uuid_create(&INSTANCE_UUID);
 
+	replicaset_state = REPLICASET_BOOTSTRAP;
 	box_broadcast_id();
 	box_broadcast_ballot();
 	say_info("instance uuid %s", tt_uuid_str(&INSTANCE_UUID));
@@ -4149,6 +4217,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 {
 	/* Check instance UUID. */
 	assert(!tt_uuid_is_nil(&INSTANCE_UUID));
+	replicaset_state = REPLICASET_RECOVERY;
 	if (!tt_uuid_is_nil(instance_uuid) &&
 	    !tt_uuid_is_equal(instance_uuid, &INSTANCE_UUID)) {
 		tnt_raise(ClientError, ER_INSTANCE_UUID_MISMATCH,
@@ -4410,8 +4479,11 @@ box_cfg_xc(void)
 	box_set_readahead();
 	box_set_too_long_threshold();
 	box_set_replication_timeout();
+	if (box_set_bootstrap_strategy() != 0)
+		diag_raise();
 	box_set_replication_connect_timeout();
-	box_set_replication_connect_quorum();
+	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_LEGACY)
+		box_set_replication_connect_quorum();
 	box_set_replication_sync_lag();
 	if (box_set_replication_synchro_quorum() != 0)
 		diag_raise();
@@ -4461,6 +4533,7 @@ box_cfg_xc(void)
 		bootstrap(&instance_uuid, &replicaset_uuid,
 			  &is_bootstrap_leader);
 	}
+	replicaset_state = REPLICASET_READY;
 
 	/*
 	 * replicaset.applier.vclock is filled with real

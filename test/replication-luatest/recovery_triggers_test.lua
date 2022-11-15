@@ -86,6 +86,7 @@ g.test_recovery_stages = function(cg)
             server.build_listen_uri('server'),
             server.build_listen_uri('non-existent-uri'),
         },
+        bootstrap_strategy = 'legacy',
     }
     cg.replica:start()
     wait_state(cg.replica, 'snapshot_recovered')

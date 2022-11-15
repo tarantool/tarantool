@@ -20,6 +20,7 @@ g.before_all(function(cg)
             server.build_listen_uri('server_3'),
         },
         replication_timeout = timeout,
+        bootstrap_strategy = 'legacy',
     }
     cg.uuids = {
         'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',

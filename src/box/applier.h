@@ -339,6 +339,10 @@ applier_resume(struct applier *applier);
 void
 applier_pause(struct applier *applier);
 
+/** Wait until the remote node's bootstrap leader uuid is known. */
+void
+applier_wait_bootstrap_leader_uuid_is_set(struct applier *applier);
+
 /**
  * Return string, which represent remote URI for this
  * @a applier. This function uses `tt_static_buf` to

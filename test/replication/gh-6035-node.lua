@@ -25,7 +25,8 @@ else
         replication = {
             unix_socket("master"),
         },
-        election_mode = 'voter'
+        election_mode = 'voter',
+        bootstrap_strategy = 'legacy',
     })
 end
 

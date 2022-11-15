@@ -313,6 +313,9 @@ struct errcode_record {
 	/*258 */_(ER_AUTH_REQUIRED,		"Authentication required") \
 	/*259 */_(ER_SQL_SEQ_SCAN,		"Scanning is not allowed for %s") \
 	/*260 */_(ER_NO_SUCH_EVENT,		"Unknown event %s") \
+	/*261 */_(ER_BOOTSTRAP_NOT_UNANIMOUS,	"Replica %s chose a different bootstrap leader %s") \
+	/*262 */_(ER_CANT_CHECK_BOOTSTRAP_LEADER, "Can't check who replica %s chose its bootstrap leader") \
+	/*263 */_(ER_BOOTSTRAP_CONNECTION_NOT_TO_ALL, "Some replica set members were not specified in box.cfg.replication") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

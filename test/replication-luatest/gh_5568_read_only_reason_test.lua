@@ -24,6 +24,7 @@ local function make_create_cluster(g) return function()
         replication = replication,
         -- To speed up new term when try to elect a new leader.
         replication_timeout = 0.1,
+        bootstrap_strategy = 'legacy',
     }
     g.master = g.cluster:build_server({alias = 'master', box_cfg = box_cfg})
 
