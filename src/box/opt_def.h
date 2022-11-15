@@ -70,13 +70,11 @@ typedef int64_t (*opt_def_to_enum_cb)(const char *str, uint32_t len);
  * @param str encoded data pointer (next to MsgPack ARRAY header).
  * @param len array length (items count).
  * @param [out] opt pointer to store resulting value.
- * @param errcode Code of error to set if something is wrong.
  * @retval 0 on success.
- * @retval -1 on error.
+ * @retval -1 on error (diag is set to IllegalParams).
  */
 typedef int
-(*opt_def_to_array_cb)(const char **str, uint32_t len, char *opt,
-		       uint32_t errcode);
+(*opt_def_to_array_cb)(const char **str, uint32_t len, char *opt);
 
 struct region;
 
@@ -85,13 +83,11 @@ struct region;
  * @param str - encoded data pointer.
  * @param [out] opt pointer to store resulting value.
  * @param region Allocator for internal allocation.
- * @param errcode Code of error to set if something is wrong.
  * @retval 0 on success.
- * @retval -1 on error.
+ * @retval -1 on error (diag is set to IllegalParams).
  */
 typedef int
-(*opt_def_custom_cb)(const char **str, void *opts, struct region *region,
-		     uint32_t errcode);
+(*opt_def_custom_cb)(const char **str, void *opts, struct region *region);
 
 struct opt_def {
 	const char *name;
@@ -118,17 +114,17 @@ struct opt_def {
 	{ key, type, offsetof(opts, field), sizeof(((opts *)0)->field), \
 	  NULL, 0, NULL, 0, {NULL} }
 
-#define OPT_DEF_ENUM(key, enum_name, opts, field, to_enum) \
+#define OPT_DEF_ENUM(key, enum_name, opts, field, to_enum_cb) \
 	{ key, OPT_ENUM, offsetof(opts, field), sizeof(int), #enum_name, \
 	  sizeof(enum enum_name), enum_name##_strs, enum_name##_MAX, \
-	  {(void *)to_enum} }
+	  { .to_enum = to_enum_cb } }
 
-#define OPT_DEF_ARRAY(key, opts, field, to_array) \
+#define OPT_DEF_ARRAY(key, opts, field, to_array_cb) \
 	 { key, OPT_ARRAY, offsetof(opts, field), sizeof(((opts *)0)->field), \
-	   NULL, 0, NULL, 0, {(void *)to_array} }
+	   NULL, 0, NULL, 0, { .to_array = to_array_cb } }
 
-#define OPT_DEF_CUSTOM(key, custom_decoder) \
-	{ key, OPT_CUSTOM, 0, 0, NULL, 0, NULL, 0, { (void *)custom_decoder} }
+#define OPT_DEF_CUSTOM(key, custom_cb) \
+	{ key, OPT_CUSTOM, 0, 0, NULL, 0, NULL, 0, { .custom = custom_cb } }
 
 #define OPT_DEF_LEGACY(key) \
 	{ key, OPT_LEGACY, 0, 0, NULL, 0, NULL, 0, {NULL} }
@@ -139,11 +135,12 @@ struct region;
 
 /**
  * Populate key options from their msgpack-encoded representation
- * (msgpack map).
+ * (msgpack map). Returns 0 on success. On error, returns -1 and
+ * sets diag. We use the IllegalParams error for invalid input.
  */
 int
 opts_decode(void *opts, const struct opt_def *reg, const char **map,
-	    uint32_t errcode, struct region *region);
+	    struct region *region);
 
 /**
  * Decode one option and store it into @a opts struct as a field.
@@ -152,16 +149,17 @@ opts_decode(void *opts, const struct opt_def *reg, const char **map,
  * @param key Name of an option.
  * @param key_len Length of @a key.
  * @param data Option value.
- * @param errcode Code of error to set if something is wrong.
  * @param region Region to allocate OPT_STRPTR option.
  * @param skip_unknown_options If true, do not set error, if an
  *        option is unknown. Useful, when it is neccessary to
  *        allow to store custom fields in options.
+ * @retval 0 on success.
+ * @retval -1 on error (diag is set to IllegalParams).
  */
 int
 opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
-	       uint32_t key_len, const char **data, uint32_t errcode,
-	       struct region *region, bool skip_unknown_options);
+	       uint32_t key_len, const char **data, struct region *region,
+	       bool skip_unknown_options);
 
 #if defined(__cplusplus)
 } /* extern "C" */

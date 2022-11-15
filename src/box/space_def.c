@@ -57,7 +57,7 @@ const struct space_opts space_opts_default = {
  */
 static int
 space_opts_parse_constraint(const char **data, void *vopts,
-			    struct region *region, uint32_t errcode);
+			    struct region *region);
 
 /**
  * Callback to parse a value with 'foreign_key' key in msgpack space opts
@@ -65,7 +65,7 @@ space_opts_parse_constraint(const char **data, void *vopts,
  */
 static int
 space_opts_parse_foreign_key(const char **data, void *vopts,
-			     struct region *region, uint32_t errcode);
+			     struct region *region);
 
 /**
  * Callback to parse a value with 'upgrade' key in msgpack space opts
@@ -73,7 +73,7 @@ space_opts_parse_foreign_key(const char **data, void *vopts,
  */
 static int
 space_opts_parse_upgrade(const char **data, void *vopts,
-			 struct region *region, uint32_t errcode);
+			 struct region *region);
 
 const struct opt_def space_opts_reg[] = {
 	OPT_DEF("group_id", OPT_UINT32, struct space_opts, group_id),
@@ -202,17 +202,16 @@ space_def_delete(struct space_def *def)
  * By convention @a opts must point to corresponding struct space_opts.
  * Allocate a temporary constraint array on @a region and set pointer to it
  *  as field_def->constraint, also setting field_def->constraint_count.
- * Return 0 on success or -1 on error (diag is set to @a errcode).
+ * Return 0 on success or -1 on error (diag is set to IllegalParams).
  */
 int
 space_opts_parse_constraint(const char **data, void *vopts,
-			    struct region *region, uint32_t errcode)
+			    struct region *region)
 {
 	/* Expected normal form of constraints: {name1=func1, name2=func2..}. */
 	struct space_opts *opts = (struct space_opts *)vopts;
 	return tuple_constraint_def_decode(data, &opts->constraint_def,
-					   &opts->constraint_count, region,
-					   errcode);
+					   &opts->constraint_count, region);
 }
 
 /**
@@ -222,24 +221,23 @@ space_opts_parse_constraint(const char **data, void *vopts,
  * By convention @a opts must point to corresponding struct space_opts.
  * Allocate a temporary constraint array on @a region and set pointer to it
  *  as field_def->constraint, also setting field_def->constraint_count.
- * Return 0 on success or -1 on error (diag is set to @a errcode).
+ * Return 0 on success or -1 on error (diag is set to IllegalParams).
  */
 int
 space_opts_parse_foreign_key(const char **data, void *vopts,
-			     struct region *region, uint32_t errcode)
+			     struct region *region)
 {
 	/* Expected normal form of constraints: {name1={space=.., field=..}.. */
 	struct space_opts *opts = (struct space_opts *)vopts;
 	return tuple_constraint_def_decode_fkey(data, &opts->constraint_def,
 						&opts->constraint_count,
-						region, errcode, true);
+						region, true);
 }
 
 static int
 space_opts_parse_upgrade(const char **data, void *vopts,
-			 struct region *region, uint32_t errcode)
+			 struct region *region)
 {
-	(void)errcode;
 	struct space_opts *opts = (struct space_opts *)vopts;
 	opts->upgrade_def = space_upgrade_def_decode(data, region);
 	return opts->upgrade_def == NULL ? -1 : 0;

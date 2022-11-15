@@ -51,11 +51,10 @@ const char *opt_type_strs[] = {
 
 static int
 opt_set(void *opts, const struct opt_def *def, const char **val,
-	struct region *region, uint32_t errcode)
+	struct region *region)
 {
 	int64_t ival;
 	uint64_t uval;
-	char *errmsg = tt_static_buf();
 	double dval;
 	uint32_t str_len;
 	const char *str;
@@ -139,14 +138,14 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 			goto type_mismatch_err;
 		ival = mp_decode_array(val);
 		assert(def->to_array != NULL);
-		if (def->to_array(val, ival, opt, errcode) != 0)
+		if (def->to_array(val, ival, opt) != 0)
 			return -1;
 		break;
 	case OPT_CUSTOM:
 #ifndef NDEBUG
 		str = *val;
 #endif
-		if (def->custom(val, opts, region, errcode) != 0)
+		if (def->custom(val, opts, region) != 0)
 			return -1;
 #ifndef NDEBUG
 		mp_next(&str);
@@ -162,29 +161,26 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 	return 0;
 
 type_mismatch_err:
-	snprintf(errmsg, TT_STATIC_BUF_LEN, "'%s' must be %s", def->name,
-		 opt_type_strs[def->type]);
-	diag_set(ClientError, errcode, errmsg);
+	diag_set(IllegalParams, tt_sprintf("'%s' must be %s", def->name,
+					   opt_type_strs[def->type]));
 	return -1;
 }
 
 int
 opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
-	       uint32_t key_len, const char **data, uint32_t errcode,
-	       struct region *region, bool skip_unknown_options)
+	       uint32_t key_len, const char **data, struct region *region,
+	       bool skip_unknown_options)
 {
 	for (const struct opt_def *def = reg; def->name != NULL; def++) {
 		if (key_len != strlen(def->name) ||
 		    memcmp(key, def->name, key_len) != 0)
 			continue;
 
-		return opt_set(opts, def, data, region, errcode);
+		return opt_set(opts, def, data, region);
 	}
 	if (! skip_unknown_options) {
-		char *errmsg = tt_static_buf();
-		snprintf(errmsg, TT_STATIC_BUF_LEN, "unexpected option '%.*s'",
-			 key_len, key);
-		diag_set(ClientError, errcode, errmsg);
+		diag_set(IllegalParams, tt_sprintf("unexpected option '%.*s'",
+						   key_len, key));
 		return -1;
 	}
 	mp_next(data);
@@ -197,7 +193,7 @@ opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
  */
 int
 opts_decode(void *opts, const struct opt_def *reg, const char **map,
-	    uint32_t errcode, struct region *region)
+	    struct region *region)
 {
 	assert(mp_typeof(**map) == MP_MAP);
 
@@ -208,12 +204,12 @@ opts_decode(void *opts, const struct opt_def *reg, const char **map,
 	uint32_t map_size = mp_decode_map(map);
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(**map) != MP_STR) {
-			diag_set(ClientError, errcode, "key must be a string");
+			diag_set(IllegalParams, "key must be a string");
 			return -1;
 		}
 		uint32_t key_len;
 		const char *key = mp_decode_str(map, &key_len);
-		if (opts_parse_key(opts, reg, key, key_len, map, errcode,
+		if (opts_parse_key(opts, reg, key, key_len, map,
 				   region, false) != 0)
 			return -1;
 	}
