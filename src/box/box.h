@@ -310,6 +310,7 @@ int box_set_crash(void);
 int box_set_txn_timeout(void);
 int box_set_txn_isolation(void);
 int box_set_auth_type(void);
+int box_set_bootstrap_strategy(void);
 
 /**
  * Populate cfg from box.cfg.flightrec_* parameters.

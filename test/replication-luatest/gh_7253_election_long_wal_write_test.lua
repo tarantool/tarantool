@@ -78,6 +78,7 @@ g.before_all(function(g)
             server.build_listen_uri('server2'),
             server.build_listen_uri('server3'),
         },
+        bootstrap_strategy = 'legacy',
     }
     box_cfg.election_mode = 'manual'
     g.server1 = g.cluster:build_and_add_server({

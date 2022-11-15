@@ -21,7 +21,7 @@ g.before_each(function()
 end)
 
 g.after_each(function()
-    g.cluster:stop()
+    g.cluster:drop()
 end)
 
 -- Test that appliers aren't recreated upon replication reconfiguration.
@@ -33,7 +33,7 @@ g.test_applier_connection_on_reconfig = function(g)
             replication = {
                 box.cfg.listen,
                 box.cfg.replication[1],
-                "%s/replica2.iproto",
+                "%s/replica2.sock",
             }
         }]]):format(server.vardir))
     g.replica:eval([[

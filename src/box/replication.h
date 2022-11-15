@@ -100,6 +100,25 @@ static const int REPLICATION_CONNECT_QUORUM_ALL = INT_MAX;
 
 enum { REPLICATION_THREADS_MAX = 1000 };
 
+enum bootstrap_strategy {
+	BOOTSTRAP_STRATEGY_INVALID = -1,
+	BOOTSTRAP_STRATEGY_AUTO,
+	BOOTSTRAP_STRATEGY_LEGACY,
+};
+
+/** Instance's bootstrap strategy. Controls replication reconfiguration. */
+extern enum bootstrap_strategy bootstrap_strategy;
+
+enum replicaset_state {
+	REPLICASET_BOOTSTRAP,
+	REPLICASET_JOIN,
+	REPLICASET_RECOVERY,
+	REPLICASET_READY,
+};
+
+/** Replica set state. */
+extern enum replicaset_state replicaset_state;
+
 /**
  * Network timeout. Determines how often master and slave exchange
  * heartbeat messages. Set by box.cfg.replication_timeout.

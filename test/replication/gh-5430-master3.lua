@@ -9,4 +9,5 @@ box.cfg({
     },
     replication_synchro_quorum = 3,
     replication_timeout = 0.5,
+    bootstrap_strategy = 'legacy',
 })

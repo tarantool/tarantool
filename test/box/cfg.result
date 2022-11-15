@@ -19,6 +19,8 @@ cfg_filter(box.cfg)
  |     - chap-sha1
  |   - - background
  |     - false
+ |   - - bootstrap_strategy
+ |     - auto
  |   - - checkpoint_count
  |     - 2
  |   - - checkpoint_interval
@@ -156,6 +158,8 @@ cfg_filter(box.cfg)
  |     - chap-sha1
  |   - - background
  |     - false
+ |   - - bootstrap_strategy
+ |     - auto
  |   - - checkpoint_count
  |     - 2
  |   - - checkpoint_interval

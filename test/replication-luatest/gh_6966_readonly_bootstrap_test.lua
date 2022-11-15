@@ -11,18 +11,17 @@ g.before_all(function(cg)
 
     local cfg = {
         replication_timeout = 0.1,
-        replication = server.build_listen_uri('master'),
+        replication = {
+            server.build_listen_uri('master'),
+        },
     }
-    -- XXX: the order of add_server() is important. First add replica, then
-    -- master. This way they are stopped by cluster:stop() in correct order,
-    -- and the test runs 3 seconds faster. See gh-6820 (comment) for details:
-    -- https://github.com/tarantool/tarantool/issues/6820#issuecomment-1082914500
-    cg.replica = cg.cluster:build_and_add_server({
-        alias = 'replica',
-        box_cfg = cfg
-    })
     cg.master = cg.cluster:build_and_add_server({
         alias = 'master',
+        box_cfg = cfg
+    })
+    cfg.replication[2] = server.build_listen_uri('replica')
+    cg.replica = cg.cluster:build_and_add_server({
+        alias = 'replica',
         box_cfg = cfg
     })
     cg.master:start()

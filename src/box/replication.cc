@@ -66,6 +66,10 @@ struct rlist replicaset_on_quorum_gain =
 struct rlist replicaset_on_quorum_loss =
 	RLIST_HEAD_INITIALIZER(replicaset_on_quorum_loss);
 
+enum bootstrap_strategy bootstrap_strategy = BOOTSTRAP_STRATEGY_INVALID;
+
+enum replicaset_state replicaset_state = REPLICASET_BOOTSTRAP;
+
 static int
 replica_compare_by_uuid(const struct replica *a, const struct replica *b)
 {
@@ -91,13 +95,83 @@ replication_disconnect_timeout(void)
 }
 
 /**
+ * Effective connect quorum values for bootstrap_strategy = "auto" on various
+ * stages of replicaset life. Regardless of the returned quorum value, instance
+ * mustn't settle with connecting to a quorum, unless it has already tried to
+ * connect to everyone.
+ */
+static int
+replicaset_connect_quorum_auto(int total)
+{
+	switch (replicaset_state) {
+	/**
+	 * When bootstrapping a replica set, fail unless a majority of peers is
+	 * reached.
+	 */
+	case REPLICASET_BOOTSTRAP:
+		return total / 2 + 1;
+	/**
+	 * When joining to an existing replica set, one connection to the
+	 * bootstrap master is enough.
+	 */
+	case REPLICASET_JOIN:
+		return 1;
+	/**
+	 * A recovered instance may be the only one alive. Do not demand any
+	 * connections.
+	 */
+	case REPLICASET_RECOVERY:
+	case REPLICASET_READY:
+		return 0;
+	default:
+		unreachable();
+	}
+}
+
+/** Return the number of replicas that have to be connected. */
+static int
+replicaset_connect_quorum(int total)
+{
+	switch (bootstrap_strategy) {
+	case BOOTSTRAP_STRATEGY_LEGACY:
+		return MIN(total, replication_connect_quorum);
+	case BOOTSTRAP_STRATEGY_AUTO:
+		return replicaset_connect_quorum_auto(total);
+	default:
+		unreachable();
+	}
+}
+
+/**
+ * Effective quorum value determining how many nodes to sync with (we sync with
+ * every node to which we connected successfully).
+ * Used for every bootstrap_strategy, except "legacy". "Legacy" simply uses
+ * replication_connect_quorum.
+ */
+static int replication_sync_quorum_auto;
+
+/**
  * Return the number of replicas that have to be synchronized
  * in order to form a quorum in the replica set.
  */
-static inline int
-replicaset_quorum(void)
+static int
+replicaset_sync_quorum(void)
 {
-	return MIN(replication_connect_quorum, replicaset.applier.total);
+	switch (bootstrap_strategy) {
+	case BOOTSTRAP_STRATEGY_LEGACY:
+		return MIN(replication_connect_quorum,
+			   replicaset.applier.total);
+	case BOOTSTRAP_STRATEGY_AUTO:
+		return replication_sync_quorum_auto;
+	default:
+		unreachable();
+	}
+}
+
+static void
+replicaset_set_sync_quorum(void)
+{
+	replication_sync_quorum_auto = replicaset.applier.connected;
 }
 
 void
@@ -602,6 +676,8 @@ replicaset_update(struct applier **appliers, int count, bool keep_connect)
 		}
 	});
 
+	struct tt_uuid registered_uuids[VCLOCK_MAX];
+	int uuid_count = 0;
 	/* Check for duplicate UUID */
 	for (int i = 0; i < count; i++) {
 		applier = appliers[i];
@@ -632,8 +708,46 @@ replicaset_update(struct applier **appliers, int count, bool keep_connect)
 				  "duplicate connection to the same replica");
 		}
 		replica_hash_insert(&uniq, replica);
+		if (replicaset_state != REPLICASET_JOIN)
+			continue;
+		int ballot_size = applier->ballot.registered_replica_uuids_size;
+		struct tt_uuid *uuids =
+			applier->ballot.registered_replica_uuids;
+		for (int i = 0; i < ballot_size; i++) {
+			struct tt_uuid *uuid = &uuids[i];
+			for (int j = 0; j < uuid_count; j++) {
+				if (tt_uuid_compare(uuid, &registered_uuids[j]) == 0)
+					goto next;
+			}
+			registered_uuids[uuid_count++] = *uuid;
+			if (uuid_count >= VCLOCK_MAX) {
+				say_warn("Too many registered replicas discovered");
+				tnt_raise(ClientError,
+					  ER_BOOTSTRAP_CONNECTION_NOT_TO_ALL);
+			}
+next:
+		; /* nop */
+		}
 	}
 
+	if (replicaset_state == REPLICASET_JOIN &&
+	    uuid_count > count) {
+		say_warn("Not all replica set members listed in "
+			 "box.cfg.replication");
+		struct replica key;
+		for (int i = 0; i < uuid_count; i++) {
+			key.uuid = registered_uuids[i];
+			if (replica_hash_search(&uniq, &key) != NULL)
+				continue;
+
+			say_warn("No connection to %s", tt_uuid_str(&key.uuid));
+		}
+		if (bootstrap_strategy == BOOTSTRAP_STRATEGY_AUTO &&
+		    !replication_anon) {
+			tnt_raise(ClientError,
+				  ER_BOOTSTRAP_CONNECTION_NOT_TO_ALL);
+		}
+	}
 	/*
 	 * All invariants and conditions are checked, now it is safe to
 	 * apply the new configuration. Nothing can fail after this point.
@@ -728,6 +842,11 @@ replicaset_update(struct applier **appliers, int count, bool keep_connect)
 			replica_delete(replica);
 		}
 	}
+	/*
+	 * Remember how many appliers are connected to check
+	 * replicaset_sync_quorum later on.
+	 */
+	replicaset_set_sync_quorum();
 }
 
 /**
@@ -817,7 +936,6 @@ replicaset_connect(struct applier **appliers, int count,
 	fiber_cond_create(&state.wakeup);
 
 	double timeout = replication_connect_timeout;
-	int quorum = MIN(count, replication_connect_quorum);
 
 	/* Add triggers and start simulations connection to remote peers */
 	for (int i = 0; i < count; i++) {
@@ -844,12 +962,14 @@ replicaset_connect(struct applier **appliers, int count,
 		 * bootstrap a replicaset - all nodes would start
 		 * immediately and choose different cluster UUIDs.
 		 */
-		if (state.connected >= quorum && !connect_quorum)
+		if (state.connected >= replicaset_connect_quorum(count) &&
+		    !connect_quorum) {
 			break;
+		}
 		double wait_start = ev_monotonic_now(loop());
 		if (fiber_cond_wait_timeout(&state.wakeup, timeout) != 0)
 			break;
-		if (count - state.failed < quorum)
+		if (count - state.failed < replicaset_connect_quorum(count))
 			break;
 		timeout -= ev_monotonic_now(loop()) - wait_start;
 	}
@@ -857,7 +977,8 @@ replicaset_connect(struct applier **appliers, int count,
 		say_crit("failed to connect to %d out of %d replicas",
 			 count - state.connected, count);
 		/* Timeout or connection failure. */
-		if (connect_quorum && state.connected < quorum) {
+		if (state.connected < replicaset_connect_quorum(count) &&
+		    connect_quorum) {
 			diag_set(ClientError, ER_CFG, "replication",
 				 "failed to connect to one or more replicas");
 			goto error;
@@ -975,7 +1096,7 @@ replicaset_follow(void)
 void
 replicaset_sync(void)
 {
-	int quorum = replicaset_quorum();
+	int quorum = replicaset_sync_quorum();
 
 	if (quorum == 0) {
 		/*
@@ -1020,7 +1141,7 @@ replicaset_sync(void)
 void
 replicaset_check_quorum(void)
 {
-	if (replicaset.applier.synced >= replicaset_quorum())
+	if (replicaset.applier.synced >= replicaset_sync_quorum())
 		box_set_orphan(false);
 }
 

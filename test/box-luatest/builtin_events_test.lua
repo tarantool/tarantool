@@ -50,7 +50,12 @@ end
 
 g.before_test('test_box_status', function(cg)
     cg.replica_set = replica_set:new({})
-    cg.master = cg.replica_set:build_server({alias = 'master'})
+    cg.master = cg.replica_set:build_server({
+        alias = 'master',
+        box_cfg = {
+            bootstrap_strategy = 'legacy',
+        },
+    })
     cg.replica_set:add_server(cg.master)
     cg.replica_set:start()
 end)

@@ -18,4 +18,5 @@ box.cfg({
     replication         = repl_list,
     memtx_memory        = 107374182,
     replication_timeout = 0.1,
+    bootstrap_strategy  = "legacy",
 })

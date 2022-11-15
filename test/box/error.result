@@ -479,6 +479,9 @@ t;
  |   258: box.error.AUTH_REQUIRED
  |   259: box.error.SQL_SEQ_SCAN
  |   260: box.error.NO_SUCH_EVENT
+ |   261: box.error.BOOTSTRAP_NOT_UNANIMOUS
+ |   262: box.error.CANT_CHECK_BOOTSTRAP_LEADER
+ |   263: box.error.BOOTSTRAP_CONNECTION_NOT_TO_ALL
  | ...
 
 test_run:cmd("setopt delimiter ''");

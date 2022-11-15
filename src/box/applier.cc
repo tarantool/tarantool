@@ -369,9 +369,23 @@ applier_connection_init(struct iostream *io, const struct uri *uri,
 	}
 }
 
+/**
+ * Determine if the remote peer is already booted, in which case this is not a
+ * bootstrap but rather a join to an existing replica set.
+ */
+static void
+applier_check_join(const struct applier *applier)
+{
+	if (replicaset_state == REPLICASET_BOOTSTRAP &&
+	    applier->ballot.is_booted) {
+		replicaset_state = REPLICASET_JOIN;
+	}
+}
+
 static void
 applier_run_ballot_triggers(struct applier *applier, bool success)
 {
+	applier_check_join(applier);
 	trigger_run(&applier->on_ballot_update, &success);
 }
 
@@ -509,21 +523,25 @@ applier_ballot_watcher_f(va_list ap)
 	return 0;
 }
 
-/** Trigger data for waiting for the first ballot update. */
+/** Trigger data for waiting for specific ballot updates. */
 struct applier_ballot_data {
 	/** Diagnostics set in case of error. */
 	struct diag diag;
 	/** The fiber waiting for the ballot update. */
 	struct fiber *fiber;
+	/** The applier this trigger is for. */
+	const struct applier *applier;
 	/** Whether the ballot was updated. */
 	bool done;
 };
 
 static void
-applier_ballot_data_create(struct applier_ballot_data *data)
+applier_ballot_data_create(struct applier_ballot_data *data,
+			   const struct applier *applier)
 {
 	diag_create(&data->diag);
 	data->fiber = fiber();
+	data->applier = applier;
 	data->done = false;
 }
 
@@ -546,7 +564,7 @@ applier_wait_first_ballot(struct applier *applier)
 {
 	struct trigger on_ballot_update;
 	struct applier_ballot_data data;
-	applier_ballot_data_create(&data);
+	applier_ballot_data_create(&data, applier);
 	trigger_create(&on_ballot_update, applier_on_first_ballot_update_f,
 		       &data, NULL);
 	trigger_add(&applier->on_ballot_update, &on_ballot_update);
@@ -561,6 +579,54 @@ applier_wait_first_ballot(struct applier *applier)
 		diag_move(&data.diag, diag_get());
 		diag_raise();
 	}
+}
+
+static int
+applier_on_bootstrap_leader_uuid_set_f(struct trigger *trigger, void *event)
+{
+	struct applier_ballot_data *data =
+		(struct applier_ballot_data *)trigger->data;
+	const struct applier *applier = data->applier;
+	bool success = *(bool *)event;
+	if (!success)
+		diag_move(diag_get(), &data->diag);
+	else if (tt_uuid_is_nil(&applier->ballot.bootstrap_leader_uuid))
+		return 0;
+	data->done = true;
+	fiber_wakeup(data->fiber);
+	return 0;
+}
+
+void
+applier_wait_bootstrap_leader_uuid_is_set(struct applier *applier)
+{
+	/* The ballot watcher is dead and we aren't going to revive it. */
+	if (applier->ballot_watcher == NULL)
+		goto err;
+	struct trigger trigger;
+	struct applier_ballot_data data;
+	applier_ballot_data_create(&data, applier);
+	trigger_create(&trigger, applier_on_bootstrap_leader_uuid_set_f,
+		       &data, NULL);
+	trigger_add(&applier->on_ballot_update, &trigger);
+	while (!data.done && !fiber_is_cancelled())
+		fiber_yield();
+	trigger_clear(&trigger);
+	if (fiber_is_cancelled()) {
+		diag_set(FiberIsCancelled);
+		goto err;
+	}
+	if (!diag_is_empty(&data.diag)) {
+		diag_move(&data.diag, diag_get());
+		goto err;
+	}
+	return;
+err:
+	const char *replica = tt_sprintf("%s at %s",
+					 tt_uuid_str(&applier->uuid),
+					 applier_uri_str(applier));
+	diag_add(ClientError, ER_CANT_CHECK_BOOTSTRAP_LEADER, replica);
+	diag_raise();
 }
 
 /**

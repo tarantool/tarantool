@@ -17,7 +17,6 @@ require('console').listen(os.getenv('ADMIN'))
 
 box.cfg({
     listen = instance_uri(INSTANCE_ID);
---    log_level = 7;
     replication = {
         instance_uri(1);
         instance_uri(2);

@@ -176,6 +176,7 @@ local default_cfg = {
     replication_skip_conflict = false,
     replication_anon      = false,
     replication_threads   = 1,
+    bootstrap_strategy    = "auto",
     feedback_enabled      = ifdef_feedback(true),
     feedback_crashinfo    = ifdef_feedback(true),
     feedback_host         = ifdef_feedback("https://feedback.tarantool.io"),
@@ -291,6 +292,7 @@ local template_cfg = {
     replication_skip_conflict = 'boolean',
     replication_anon      = 'boolean',
     replication_threads   = 'number',
+    bootstrap_strategy    = 'string',
     feedback_enabled      = ifdef_feedback('boolean'),
     feedback_crashinfo    = ifdef_feedback('boolean'),
     feedback_host         = ifdef_feedback('string'),
@@ -396,6 +398,7 @@ local dynamic_cfg = {
     replication_synchro_timeout = private.cfg_set_replication_synchro_timeout,
     replication_skip_conflict = private.cfg_set_replication_skip_conflict,
     replication_anon        = private.cfg_set_replication_anon,
+    bootstrap_strategy      = private.cfg_set_bootstrap_strategy,
     instance_uuid           = check_instance_uuid,
     replicaset_uuid         = check_replicaset_uuid,
     net_msg_max             = private.cfg_set_net_msg_max,
@@ -498,6 +501,9 @@ local dynamic_cfg_order = {
     replication_synchro_timeout = 150,
     replication_connect_timeout = 150,
     replication_connect_quorum  = 150,
+    -- Apply bootstrap_strategy before replication, but after
+    -- replication_connect_quorum. The latter might influence its value.
+    bootstrap_strategy      = 175,
     replication             = 200,
     -- Anon is set after `replication` as a temporary workaround
     -- for the problem, that `replication` and `replication_anon`
@@ -542,6 +548,7 @@ local dynamic_cfg_skip_at_load = {
     replication_synchro_timeout = true,
     replication_skip_conflict = true,
     replication_anon        = true,
+    bootstrap_strategy      = true,
     wal_dir_rescan_delay    = true,
     custom_proc_title       = true,
     force_recovery          = true,
@@ -610,6 +617,13 @@ local translate_cfg = {
         if new ~= nil then return nil, new
         elseif old == false then return nil, 'off'
         elseif old == true then return nil, 'soft'
+        end
+    end},
+    replication_connect_quorum = {'bootstrap_strategy', function(old, new)
+        if new ~= nil then
+            return old, new
+        elseif old ~= nil then
+            return old, 'legacy'
         end
     end},
 }
