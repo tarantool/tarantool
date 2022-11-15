@@ -500,7 +500,7 @@ memtx_tx_statistics_collect(struct memtx_tx_statistics *stats)
 }
 
 int
-memtx_tx_register_tx(struct txn *tx)
+memtx_tx_register_txn(struct txn *tx)
 {
 	int size = 0;
 	tx->memtx_tx_alloc_stats =
@@ -958,7 +958,7 @@ memtx_tx_story_link(struct memtx_story *story,
 }
 
 /**
- * Unlink a @a story with @ old_story in @a index (in both directions).
+ * Unlink a @a story with @a old_story in @a index (in both directions).
  * Older story is allowed to be NULL.
  */
 static void
@@ -1673,12 +1673,12 @@ point_hole_storage_find(struct index *index, struct tuple *tuple)
 
 /**
  * Check for possible conflicts during inserting @a new tuple, and given
- * that it was real insertion, not the replacement of existion tuple.
+ * that it was real insertion, not the replacement of existing tuple.
  * It's the moment where we can search for stored point hole trackers
  * and detect conflicts.
- * Since the insertions in not completed succesfully, we better store
+ * Since the insertions are not completed successfully, we better store
  * conflicts to the special temporary storage @a collected_conflicts in
- * other to become real conflint only when insertion success is inevitable.
+ * other to become real conflict only when insertion success is inevitable.
  */
 static int
 check_hole(struct space *space, uint32_t index,
@@ -3037,7 +3037,7 @@ point_hole_storage_delete(struct point_hole_item *object)
 
 /**
  * Record in TX manager that a transaction @a txn have read a nothing
- * from @a space and @ a index with @ key.
+ * from @a space and @a index with @a key.
  * The key is expected to be full, that is has part count equal to part
  * count in unique cmp_key of the index.
  * @return 0 on success, -1 on memory error.
@@ -3097,10 +3097,10 @@ memtx_tx_gap_item_new(struct txn *txn, enum iterator_type type,
 
 /**
  * Record in TX manager that a transaction @a txn have read nothing
- * from @a space and @ a index with @ key, somewhere from interval between
+ * from @a space and @a index with @a key, somewhere from interval between
  * some unknown predecessor and @a successor.
  * This function must be used for ordered indexes, such as TREE, for queries
- * when interation type is not EQ or when the key is not full (otherwise
+ * when iteration type is not EQ or when the key is not full (otherwise
  * it's faster to use memtx_tx_track_point).
  *
  * @return 0 on success, -1 on memory error.
@@ -3164,9 +3164,9 @@ memtx_tx_full_scan_item_new(struct txn *txn)
 }
 
 /**
- * Record in TX manager that a transaction @a txn have read full @ a index.
+ * Record in TX manager that a transaction @a txn have read full @a index.
  * This function must be used for unordered indexes, such as HASH, for queries
- * when interation type is ALL.
+ * when iteration type is ALL.
  *
  * @return 0 on success, -1 on memory error.
  */

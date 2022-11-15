@@ -276,7 +276,7 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 	 * Don't use MVCC engine for ephemeral in any case.
 	 * MVCC engine requires txn to be present as a storage for
 	 * reads/writes/conflicts.
-	 * Also now there's not way to MVCC engine off: once MVCC engine
+	 * Also, now there's no way to turn MVCC engine off: once MVCC engine
 	 * starts to manage a space - direct access to it must be prohibited.
 	 * Since modification of ephemeral spaces are allowed without txn,
 	 * we must not use MVCC for those spaces even if txn is present now.

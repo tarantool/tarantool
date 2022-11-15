@@ -42,7 +42,7 @@ extern "C" {
 
 /**
  * Global flag that enables mvcc engine.
- * If set, memtx starts to apply statements through txm history mechanism
+ * If set, memtx starts to apply statements through txn history mechanism
  * and tx manager itself transaction reads in order to detect conflicts.
  */
 extern bool memtx_tx_manager_use_mvcc_engine;
@@ -235,7 +235,7 @@ struct memtx_tx_snapshot_cleaner {
  * Cell of stats with total and count statistics.
  */
 struct memtx_tx_stats {
-	/* Total over all measurements. */
+	/* Total memory over all objects. */
 	size_t total;
 	/* Number of measured objects. */
 	size_t count;
@@ -255,11 +255,18 @@ struct memtx_tx_statistics {
 	size_t txn_count;
 };
 
+/**
+ * Collect MVCC memory usage statics.
+ */
 void
 memtx_tx_statistics_collect(struct memtx_tx_statistics *stats);
 
+/**
+ * Initialize MVCC part of a transaction.
+ * Must be called even if MVCC engine is not enabled in config.
+ */
 int
-memtx_tx_register_tx(struct txn *tx);
+memtx_tx_register_txn(struct txn *txn);
 
 /**
  * Initialize memtx transaction manager.
@@ -419,7 +426,7 @@ memtx_tx_track_point_slow(struct txn *txn, struct index *index,
 
 /**
  * Record in TX manager that a transaction @a txn have read a nothing
- * from @a space and @ a index with @ key.
+ * from @a space and @a index with @a key.
  * The key is expected to be full, that is has part count equal to part
  * count in unique cmp_key of the index.
  *
@@ -451,10 +458,10 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 
 /**
  * Record in TX manager that a transaction @a txn have read nothing
- * from @a space and @ a index with @ key, somewhere from interval between
+ * from @a space and @a index with @a key, somewhere from interval between
  * some unknown predecessor and @a successor.
  * This function must be used for ordered indexes, such as TREE, for queries
- * when interation type is not EQ or when the key is not full (otherwise
+ * when iteration type is not EQ or when the key is not full (otherwise
  * it's faster to use memtx_tx_track_point).
  *
  * NB: can trigger story garbage collection.
@@ -484,10 +491,10 @@ int
 memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index);
 
 /**
- * Record in TX manager that a transaction @a txn have read full @ a index
+ * Record in TX manager that a transaction @a txn have read full @a index
  * from @a space.
  * This function must be used for unordered indexes, such as HASH, for queries
- * when interation type is ALL.
+ * when iteration type is ALL.
  *
  * NB: can trigger story garbage collection.
  *
@@ -562,7 +569,7 @@ memtx_tx_index_invisible_count(struct txn *txn,
 }
 
 /**
- * Clean memtx_tx part of @a txm.
+ * Clean memtx_tx part of @a txn.
  *
  * NB: can trigger story garbage collection.
  */

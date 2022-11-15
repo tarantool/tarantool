@@ -548,12 +548,12 @@ txn_begin(void)
 	trigger_create(&txn->fiber_on_stop, txn_on_stop, NULL, NULL);
 	trigger_add(&fiber()->on_stop, &txn->fiber_on_stop);
 	/*
-	 * By default all transactions may yield.
+	 * By default, all transactions may yield.
 	 * It's a responsibility of an engine to disable yields
 	 * if they are not supported.
 	 */
 	txn_set_flags(txn, TXN_CAN_YIELD);
-	int rc = memtx_tx_register_tx(txn);
+	int rc = memtx_tx_register_txn(txn);
 	if (rc == -1) {
 		txn_free(txn);
 		return NULL;
