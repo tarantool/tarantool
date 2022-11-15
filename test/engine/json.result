@@ -18,7 +18,7 @@ s:create_index('test1', {parts = {{2, 'number'}, {3, 'str', path = 'FIO["fname"]
 ...
 s:create_index('test1', {parts = {{2, 'number'}, {3, 'str', path = 666}, {3, 'str', path = '["FIO"]["fname"]'}}})
 ---
-- error: 'Wrong index parts: ''path'' must be string'
+- error: 'Wrong index part 2: ''path'' must be string'
 ...
 s:create_index('test1', {parts = {{2, 'number'}, {3, 'map', path = 'FIO'}}})
 ---
@@ -40,7 +40,7 @@ s:create_index('test1', {parts = {{2, 'number'}, {3, 'str', path = '[1].sname'},
 ...
 s:create_index('test1', {parts = {{2, 'number'}, {3, 'str', path = 'FIO....fname'}}})
 ---
-- error: 'Wrong index parts: invalid path'
+- error: 'Wrong index part 2: invalid path'
 ...
 idx = s:create_index('test1', {parts = {{2, 'number'}, {3, 'str', path = 'FIO.fname', is_nullable = false}, {3, 'str', path = '["FIO"]["sname"]'}}})
 ---

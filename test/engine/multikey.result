@@ -22,16 +22,16 @@ pk = s:create_index('pk')
 -- Test incompatible multikey index parts.
 _ = s:create_index('idx3', {parts = {{3, 'str', path = '[*].fname'}, {3, 'str', path = '["data"][*].sname'}}})
 ---
-- error: 'Wrong index parts: incompatible multikey index path'
+- error: 'Wrong index part 2: incompatible multikey index path'
 ...
 _ = s:create_index('idx2', {parts = {{3, 'str', path = '[*].fname'}, {3, 'str', path = '[*].sname[*].a'}}})
 ---
-- error: 'Wrong index parts: no more than one array index placeholder [*] is allowed
+- error: 'Wrong index part 2: no more than one array index placeholder [*] is allowed
     in JSON path'
 ...
 _ = s:create_index('idx2', {parts = {{2, 'str', path = '[*]'}, {3, 'str', path = '[*]'}}})
 ---
-- error: 'Wrong index parts: incompatible multikey index path'
+- error: 'Wrong index part 2: incompatible multikey index path'
 ...
 idx0 = s:create_index('idx0', {parts = {{3, 'str', path = '[1].fname'}}})
 ---

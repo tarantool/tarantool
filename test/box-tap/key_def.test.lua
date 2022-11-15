@@ -17,7 +17,7 @@ local usage_error = 'Bad params, use: key_def.new({' ..
 
 local function coll_not_found(collation)
     if type(collation) == 'number' then
-        return 'Wrong index parts: collation was not found by ID'
+        return 'Wrong index part 1: collation not found by id'
     end
 
     return ('Unknown collation: "%s"'):format(collation)

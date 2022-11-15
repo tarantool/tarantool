@@ -588,11 +588,11 @@ box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'unsigned'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{2, 'time'}}}
 ---
-- error: 'Wrong index parts: unknown field type'
+- error: 'Wrong index part 1: unknown field type'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{'no','time'}}}
 ---
-- error: 'Wrong index parts: field id must be an integer'
+- error: 'Wrong index part 1: field id must be an integer'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, distance = 'lobachevsky'}, {{2, 'array'}}}
 ---
@@ -604,7 +604,7 @@ box.space._index:insert{s.id, 2, 's', 'rtee', {unique = false}, {{2, 'array'}}}
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{}}}
 ---
-- error: 'Wrong index parts: expected a non-empty array'
+- error: 'Wrong index part 1: expected a non-empty array'
 ...
 -- unknown args checked
 f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, holy = 'cow'}, {{2, 'array'}}})
@@ -614,7 +614,7 @@ f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false, holy = 'cow'},
 -- unknown part args are no more ignored (#2649)
 f(box.space._index:insert{s.id, 2, 's', 'rtree', {unique = false}, {{field=2, type='array', part = 'opts'}}})
 ---
-- error: 'Wrong index parts: unexpected option ''part'''
+- error: 'Wrong index part 1: unexpected option ''part'''
 ...
 -- alter
 i = s:create_index('s', {type = 'rtree', parts = {2, 'array'}})

@@ -159,7 +159,7 @@ struct errcode_record {
 	/*104 */_(ER_PROTOCOL,			"%s") \
 	/*105 */_(ER_UPSERT_UNIQUE_SECONDARY_KEY, "Space %s has a unique secondary index and does not support UPSERT") \
 	/*106 */_(ER_WRONG_INDEX_RECORD,	"Wrong record in _index space: got {%s}, expected {%s}") \
-	/*107 */_(ER_WRONG_INDEX_PARTS,		"Wrong index parts: %s") \
+	/*107 */_(ER_WRONG_INDEX_PARTS,		"Wrong index part %u: %s") \
 	/*108 */_(ER_WRONG_INDEX_OPTIONS,	"Wrong index options: %s") \
 	/*109 */_(ER_WRONG_SCHEMA_VERSION,	"Wrong schema version, current: %d, in request: %llu") \
 	/*110 */_(ER_MEMTX_MAX_TUPLE_SIZE,	"Failed to allocate %u bytes for tuple: tuple is too large. Check 'memtx_max_tuple_size' configuration option.") \
