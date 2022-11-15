@@ -321,7 +321,8 @@ function Server:grep_log(what, bytes, opts)
                     line = table.concat(buf)
                     buf = nil
                 end
-                if string.match(line, "Starting instance") and not noreset then
+                if string.match(line, "Tarantool %d+.%d+.%d+-.*%d+-g.*") and
+                   not noreset then
                     found = nil -- server was restarted, reset search
                 else
                     found = string.match(line, what) or found
