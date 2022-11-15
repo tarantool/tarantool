@@ -2594,8 +2594,7 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt)
 
 	if (stmt->add_story != NULL) {
 		memtx_tx_history_prepare_insert_stmt(stmt);
-	} else {
-		assert(stmt->del_story != NULL);
+	} else if (stmt->del_story != NULL) {
 		memtx_tx_history_prepare_delete_stmt(stmt);
 	}
 
