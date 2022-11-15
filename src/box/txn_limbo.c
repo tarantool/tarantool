@@ -112,7 +112,7 @@ txn_limbo_append(struct txn_limbo *limbo, uint32_t id, struct txn *txn)
 	if  (limbo->owner_id == REPLICA_ID_NIL) {
 		diag_set(ClientError, ER_SYNC_QUEUE_UNCLAIMED);
 		return NULL;
-	} else if (limbo->owner_id != id) {
+	} else if (limbo->owner_id != id && !txn_is_fully_local(txn)) {
 		if (txn_limbo_is_empty(limbo)) {
 			diag_set(ClientError, ER_SYNC_QUEUE_FOREIGN,
 				 limbo->owner_id);
