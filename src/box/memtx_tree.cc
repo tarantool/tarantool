@@ -741,14 +741,14 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	struct tuple *successor = res == NULL ? NULL : res->tuple;
 	if (iterator_type_is_reverse(type)) {
 		/*
-		 * Because of limitations of tree search API we use use
-		 * lower_bound for LT search and upper_bound for LE
-		 * and REQ searches. Thus we found position to the
+		 * Because of limitations of tree search API we use
+		 * lower_bound for LT search and upper_bound for LE and
+		 * REQ searches. In both cases we find a position to the
 		 * right of the target one. Let's make a step to the
 		 * left to reach target position.
 		 * If we found an invalid iterator all the elements in
 		 * the tree are less (less or equal) to the key, and
-		 * iterator_next call will convert the iterator to the
+		 * iterator_prev call will convert the iterator to the
 		 * last position in the tree, that's what we need.
 		 */
 		memtx_tree_iterator_prev(tree, &it->tree_iterator);
