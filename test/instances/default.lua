@@ -38,6 +38,12 @@ end
 -- such bad tests hang and fail.
 box.ctl.set_on_shutdown_timeout(TIMEOUT_INFINITY)
 
+local exec_arg = os.getenv('TARANTOOL_RUN_BEFORE_CFG')
+if exec_arg then
+    local run_before_cfg = loadstring(exec_arg)
+    run_before_cfg()
+end
+
 box.cfg(box_cfg())
 box.schema.user.grant('guest', 'super', nil, nil, {if_not_exists = true})
 
