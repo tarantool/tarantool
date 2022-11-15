@@ -456,31 +456,6 @@ txn_free(struct txn *txn)
 	if (txn->rollback_timer != NULL)
 		ev_timer_stop(loop(), txn->rollback_timer);
 	memtx_tx_clean_txn(txn);
-	struct tx_read_tracker *tracker, *tmp;
-	rlist_foreach_entry_safe(tracker, &txn->read_set,
-				 in_read_set, tmp) {
-		rlist_del(&tracker->in_reader_list);
-		rlist_del(&tracker->in_read_set);
-	}
-	assert(rlist_empty(&txn->read_set));
-
-	struct tx_conflict_tracker *entry, *next;
-	rlist_foreach_entry_safe(entry, &txn->conflict_list,
-				 in_conflict_list, next) {
-		rlist_del(&entry->in_conflict_list);
-		rlist_del(&entry->in_conflicted_by_list);
-	}
-	rlist_foreach_entry_safe(entry, &txn->conflicted_by_list,
-				 in_conflicted_by_list, next) {
-		rlist_del(&entry->in_conflict_list);
-		rlist_del(&entry->in_conflicted_by_list);
-	}
-	assert(rlist_empty(&txn->conflict_list));
-	assert(rlist_empty(&txn->conflicted_by_list));
-
-	rlist_del(&txn->in_read_view_txs);
-	rlist_del(&txn->in_all_txs);
-
 	struct txn_stmt *stmt;
 	stailq_foreach_entry(stmt, &txn->stmts, next)
 		txn_stmt_destroy(stmt);
@@ -1028,25 +1003,6 @@ txn_prepare(struct txn *txn)
 		if (engine_prepare(txn->engine, txn) != 0)
 			return -1;
 	}
-
-	struct tx_conflict_tracker *entry, *next;
-	/* Handle conflicts. */
-	rlist_foreach_entry_safe(entry, &txn->conflict_list,
-				 in_conflict_list, next) {
-		assert(entry->breaker == txn);
-		memtx_tx_handle_conflict(txn, entry->victim);
-		rlist_del(&entry->in_conflict_list);
-		rlist_del(&entry->in_conflicted_by_list);
-	}
-	/* Just free conflict list - we don't need it anymore. */
-	rlist_foreach_entry_safe(entry, &txn->conflicted_by_list,
-				 in_conflicted_by_list, next) {
-		assert(entry->victim == txn);
-		rlist_del(&entry->in_conflict_list);
-		rlist_del(&entry->in_conflicted_by_list);
-	}
-	assert(rlist_empty(&txn->conflict_list));
-	assert(rlist_empty(&txn->conflicted_by_list));
 
 	trigger_clear(&txn->fiber_on_stop);
 	trigger_clear(&txn->fiber_on_yield);
