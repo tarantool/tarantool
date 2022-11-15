@@ -267,6 +267,10 @@ field_def_parse_foreign_key(const char **data, void *opts,
 						region, false);
 }
 
+#define field_def_error(fieldno, errmsg)				\
+	diag_set(ClientError, ER_WRONG_SPACE_FORMAT,			\
+		 (unsigned)((fieldno) + TUPLE_INDEX_BASE), (errmsg))
+
 /**
  * Decode field definition from MessagePack map. Format:
  * {name: <string>, type: <string>}. Type is optional.
@@ -280,9 +284,7 @@ field_def_decode(struct field_def *field, const char **data,
 		 uint32_t fieldno, struct region *region)
 {
 	if (mp_typeof(**data) != MP_MAP) {
-		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
-			 tt_sprintf("field %d is not map",
-				    fieldno + TUPLE_INDEX_BASE));
+		field_def_error(fieldno, "expected a map");
 		return -1;
 	}
 	int count = mp_decode_map(data);
@@ -291,18 +293,16 @@ field_def_decode(struct field_def *field, const char **data,
 	uint32_t action_literal_len = strlen("nullable_action");
 	for (int i = 0; i < count; ++i) {
 		if (mp_typeof(**data) != MP_STR) {
-			diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
-				 tt_sprintf("field %d format is not map "
-					    "with string keys",
-					    fieldno + TUPLE_INDEX_BASE));
+			field_def_error(fieldno,
+					"expected a map with string keys");
 			return -1;
 		}
 		uint32_t key_len;
 		const char *key = mp_decode_str(data, &key_len);
 		if (opts_parse_key(field, field_def_reg, key, key_len, data,
 				   region, true) != 0) {
-			diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
-				 diag_last_error(diag_get())->errmsg);
+			field_def_error(fieldno,
+					diag_last_error(diag_get())->errmsg);
 			return -1;
 		}
 		if (is_action_missing &&
@@ -316,56 +316,42 @@ field_def_decode(struct field_def *field, const char **data,
 					 ON_CONFLICT_ACTION_DEFAULT;
 	}
 	if (field->name == NULL) {
-		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
-			 tt_sprintf("field %d name is not specified",
-				    fieldno + TUPLE_INDEX_BASE));
+		field_def_error(fieldno, "field name is missing");
 		return -1;
 	}
 	size_t field_name_len = strlen(field->name);
 	if (field_name_len > BOX_NAME_MAX) {
-		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
-			 tt_sprintf("field %d name is too long",
-				    fieldno + TUPLE_INDEX_BASE));
+		field_def_error(fieldno, "field name is too long");
 		return -1;
 	}
 	if (identifier_check(field->name, field_name_len) != 0)
 		return -1;
 	if (field->type == field_type_MAX) {
-		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
-			 tt_sprintf("field %d has unknown field type",
-				    fieldno + TUPLE_INDEX_BASE));
+		field_def_error(fieldno, "unknown field type");
 		return -1;
 	}
 	if (field->nullable_action == on_conflict_action_MAX) {
-		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
-			 tt_sprintf("field %d has unknown field on conflict "
-				    "nullable action",
-				    fieldno + TUPLE_INDEX_BASE));
+		field_def_error(fieldno, "unknown nullable action");
 		return -1;
 	}
 	if (!((field->is_nullable &&
 	       field->nullable_action == ON_CONFLICT_ACTION_NONE) ||
 	      (!field->is_nullable &&
 	       field->nullable_action != ON_CONFLICT_ACTION_NONE))) {
-		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
-			 tt_sprintf("field %d has conflicting nullability and "
-				    "nullable action properties",
-				    fieldno + TUPLE_INDEX_BASE));
+		field_def_error(fieldno, "conflicting nullability and "
+				"nullable action properties");
 		return -1;
 	}
 	if (field->coll_id != COLL_NONE &&
 	    field->type != FIELD_TYPE_STRING &&
 	    field->type != FIELD_TYPE_SCALAR &&
 	    field->type != FIELD_TYPE_ANY) {
-		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
-			 tt_sprintf("collation is reasonable only for "
-				    "string, scalar and any fields"));
+		field_def_error(fieldno, "collation is reasonable only for "
+				"'string', 'scalar', and 'any' fields");
 		return -1;
 	}
 	if (field->compression_type == compression_type_MAX) {
-		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
-			 tt_sprintf("field %d has unknown compression type",
-				    fieldno + TUPLE_INDEX_BASE));
+		field_def_error(fieldno, "unknown compression type");
 		return -1;
 	}
 	return 0;
@@ -375,11 +361,7 @@ int
 field_def_array_decode(const char **data, struct field_def **fields,
 		       uint32_t *field_count, struct region *region)
 {
-	if (mp_typeof(**data) != MP_ARRAY) {
-		diag_set(ClientError, ER_WRONG_SPACE_FORMAT,
-			 "expected an array");
-		return -1;
-	}
+	assert(mp_typeof(**data) == MP_ARRAY);
 	uint32_t count = mp_decode_array(data);
 	*field_count = count;
 	if (count == 0) {

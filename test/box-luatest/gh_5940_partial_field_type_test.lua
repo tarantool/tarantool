@@ -15,7 +15,7 @@ g.test_ddl_ops = function()
     g.server:exec(function()
         local t = require('luatest')
         local field_types = { '', 'n', 'nu', 's', 'st' }
-        local error_msg = 'Wrong space format: field 1 has unknown field type'
+        local error_msg = 'Wrong space format field 1: unknown field type'
 
         for _, type in pairs(field_types) do
             t.assert_error_msg_content_equals(error_msg, function()

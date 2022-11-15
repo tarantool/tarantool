@@ -100,12 +100,12 @@ g.test_bad_foreign_key = function(cg)
         )
         fmt = gen_format({[string.rep('a', 66666)] = {space = 'country', field = 'id'}})
         t.assert_error_msg_content_equals(
-            "Wrong space format: foreign key name is too long",
+            "Wrong space format field 2: foreign key name is too long",
             function() box.schema.create_space('city', {engine=engine, format=fmt}) end
         )
         fmt = gen_format({[''] = {space = 'country', field = 'id'}})
         t.assert_error_msg_content_equals(
-            "Wrong space format: foreign key name isn't a valid identifier",
+            "Wrong space format field 2: foreign key name isn't a valid identifier",
             function() box.schema.create_space('city', {engine=engine, format=fmt}) end
         )
     end, {engine})

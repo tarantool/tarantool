@@ -44,7 +44,7 @@ format[2].is_nullable = 100
 ...
 s:format(format) -- Fail.
 ---
-- error: 'Wrong space format: ''is_nullable'' must be boolean'
+- error: 'Wrong space format field 2: ''is_nullable'' must be boolean'
 ...
 -- Primary can not be nullable.
 parts = {}
@@ -770,7 +770,7 @@ format[2].nullable_action = 'none'
 ...
 s:format(format) -- Fail.
 ---
-- error: 'Wrong space format: field 2 has conflicting nullability and nullable action
+- error: 'Wrong space format field 2: conflicting nullability and nullable action
     properties'
 ...
 format[2].is_nullable = false
@@ -817,7 +817,7 @@ format[2].nullable_action = 'none'
 ...
 s:format(format) -- Fail.
 ---
-- error: 'Wrong space format: field 2 has conflicting nullability and nullable action
+- error: 'Wrong space format field 2: conflicting nullability and nullable action
     properties'
 ...
 parts = {}
