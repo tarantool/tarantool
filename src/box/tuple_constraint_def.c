@@ -87,11 +87,11 @@ tuple_constraint_def_cmp(const struct tuple_constraint_def *def1,
 int
 tuple_constraint_def_decode(const char **data,
 			    struct tuple_constraint_def **def, uint32_t *count,
-			    struct region *region, uint32_t errcode)
+			    struct region *region)
 {
 	/* Expected normal form of constraints: {name1=func1, name2=func2..}. */
 	if (mp_typeof(**data) != MP_MAP) {
-		diag_set(ClientError, errcode,
+		diag_set(IllegalParams,
 			 "constraint field is expected to be a MAP");
 		return -1;
 	}
@@ -115,19 +115,19 @@ tuple_constraint_def_decode(const char **data,
 
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(**data) != MP_STR) {
-			diag_set(ClientError, errcode,
+			diag_set(IllegalParams,
 				 "constraint name is expected to be a string");
 			return -1;
 		}
 		uint32_t str_len;
 		const char *str = mp_decode_str(data, &str_len);
 		if (str_len > BOX_NAME_MAX) {
-			diag_set(ClientError, errcode,
+			diag_set(IllegalParams,
 				 "constraint name is too long");
 			return -1;
 		}
 		if (identifier_check(str, str_len) != 0) {
-			diag_set(ClientError, errcode,
+			diag_set(IllegalParams,
 				 "constraint name isn't a valid identifier");
 			return -1;
 		}
@@ -138,7 +138,7 @@ tuple_constraint_def_decode(const char **data,
 		new_def[i].name_len = str_len;
 
 		if (mp_typeof(**data) != MP_UINT) {
-			diag_set(ClientError, errcode,
+			diag_set(IllegalParams,
 				 "constraint function ID "
 				 "is expected to be a number");
 			return -1;
@@ -152,11 +152,10 @@ tuple_constraint_def_decode(const char **data,
  * Decode space_id from msgpack and set a proper diag if failed.
  */
 static int
-space_id_decode(const char **data, uint32_t *space_id,
-		uint32_t errcode)
+space_id_decode(const char **data, uint32_t *space_id)
 {
 	if (mp_typeof(**data) != MP_UINT) {
-		diag_set(ClientError, errcode,
+		diag_set(IllegalParams,
 			 "foreign key: space must be a number");
 		return -1;
 	}
@@ -170,7 +169,7 @@ space_id_decode(const char **data, uint32_t *space_id,
  */
 static int
 field_id_decode(const char **data, struct tuple_constraint_field_id *def,
-		struct region *region, uint32_t errcode)
+		struct region *region)
 {
 	if (mp_typeof(**data) == MP_UINT) {
 		def->id = mp_decode_uint(data);
@@ -184,7 +183,7 @@ field_id_decode(const char **data, struct tuple_constraint_field_id *def,
 		def->name = str_copy;
 		def->id = 0;
 	} else {
-		diag_set(ClientError, errcode,
+		diag_set(IllegalParams,
 			 "foreign key: field must be number or string");
 		return -1;
 	}
@@ -199,16 +198,16 @@ field_id_decode(const char **data, struct tuple_constraint_field_id *def,
 static int
 field_mapping_decode(const char **data,
 		     struct tuple_constraint_fkey_def *fkey,
-		     struct region *region, uint32_t errcode)
+		     struct region *region)
 {
 	if (mp_typeof(**data) != MP_MAP) {
-		diag_set(ClientError, errcode,
+		diag_set(IllegalParams,
 			 "field mapping is expected to be a map");
 		return -1;
 	}
 	uint32_t mapping_size = mp_decode_map(data);
 	if (mapping_size == 0) {
-		diag_set(ClientError, errcode,
+		diag_set(IllegalParams,
 			 "field mapping is expected to be a map");
 		return -1;
 	}
@@ -221,7 +220,7 @@ field_mapping_decode(const char **data,
 		struct tuple_constraint_field_id *def = i % 2 == 0 ?
 			&fkey->field_mapping[i / 2].local_field :
 			&fkey->field_mapping[i / 2].foreign_field;
-		int rc = field_id_decode(data, def, region, errcode);
+		int rc = field_id_decode(data, def, region);
 		if (rc != 0)
 			return rc;
 	}
@@ -232,14 +231,14 @@ int
 tuple_constraint_def_decode_fkey(const char **data,
 				 struct tuple_constraint_def **def,
 				 uint32_t *count, struct region *region,
-				 uint32_t errcode, bool is_complex)
+				 bool is_complex)
 {
 	/*
 	 * Expected normal form of foreign keys: {name1=data1, name2=data2..},
 	 * where dataX has form: {field=id/name} or {space=id, field=id/name}
 	 */
 	if (mp_typeof(**data) != MP_MAP) {
-		diag_set(ClientError, errcode,
+		diag_set(IllegalParams,
 			 "foreign key field is expected to be a MAP");
 		return -1;
 	}
@@ -260,19 +259,19 @@ tuple_constraint_def_decode_fkey(const char **data,
 
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(**data) != MP_STR) {
-			diag_set(ClientError, errcode,
+			diag_set(IllegalParams,
 				 "foreign key name is expected to be a string");
 			return -1;
 		}
 		uint32_t str_len;
 		const char *str = mp_decode_str(data, &str_len);
 		if (str_len > BOX_NAME_MAX) {
-			diag_set(ClientError, errcode,
+			diag_set(IllegalParams,
 				 "foreign key name is too long");
 			return -1;
 		}
 		if (identifier_check(str, str_len) != 0) {
-			diag_set(ClientError, errcode,
+			diag_set(IllegalParams,
 				 "foreign key name isn't a valid identifier");
 			return -1;
 		}
@@ -283,7 +282,7 @@ tuple_constraint_def_decode_fkey(const char **data,
 		new_def[i].name_len = str_len;
 		new_def[i].type = CONSTR_FKEY;
 		if (mp_typeof(**data) != MP_MAP) {
-			diag_set(ClientError, errcode,
+			diag_set(IllegalParams,
 				 "foreign key definition "
 				 "is expected to be a map");
 			return -1;
@@ -294,7 +293,7 @@ tuple_constraint_def_decode_fkey(const char **data,
 		struct tuple_constraint_fkey_def *fk = &new_def[i].fkey;
 		for (size_t j = 0; j < def_size; j++) {
 			if (mp_typeof(**data) != MP_STR) {
-				diag_set(ClientError, errcode,
+				diag_set(IllegalParams,
 					 "foreign key definition key "
 					 "is expected to be a string");
 				return -1;
@@ -311,28 +310,25 @@ tuple_constraint_def_decode_fkey(const char **data,
 				is_space = false;
 				has_field = true;
 			} else {
-				diag_set(ClientError, errcode,
+				diag_set(IllegalParams,
 					 "foreign key definition is expected "
 					 "to be {[space=..,] field=..}");
 				return -1;
 			}
 			int rc;
 			if (is_space)
-				rc = space_id_decode(data, &fk->space_id,
-						     errcode);
+				rc = space_id_decode(data, &fk->space_id);
 			else if (!is_complex)
-				rc = field_id_decode(data, &fk->field, region,
-						     errcode);
+				rc = field_id_decode(data, &fk->field, region);
 			else
-				rc = field_mapping_decode(data, fk,
-							  region, errcode);
+				rc = field_mapping_decode(data, fk, region);
 			if (rc != 0)
 				return rc;
 		}
 		if (!has_space)
 			fk->space_id = 0;
 		if (!has_field) {
-			diag_set(ClientError, errcode,
+			diag_set(IllegalParams,
 				 "foreign key definition is expected "
 				 "to be {[space=..,] field=..}");
 			return -1;

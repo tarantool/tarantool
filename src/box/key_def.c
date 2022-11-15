@@ -936,9 +936,11 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 			uint32_t key_len;
 			const char *key = mp_decode_str(data, &key_len);
 			if (opts_parse_key(part, part_def_reg, key, key_len,
-					   data, ER_WRONG_INDEX_PARTS,
-					   region, false) != 0)
+					   data, region, false) != 0) {
+				diag_set(ClientError, ER_WRONG_INDEX_PARTS,
+					 diag_last_error(diag_get())->errmsg);
 				return -1;
+			}
 			if (is_action_missing &&
 			    key_len == action_literal_len &&
 			    memcmp(key, "nullable_action",

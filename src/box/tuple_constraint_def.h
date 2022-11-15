@@ -115,12 +115,12 @@ tuple_constraint_def_cmp(const struct tuple_constraint_def *def1,
  *
  * Return:
  *   0 - success.
- *  -1 - failure, diag is set (ClientError with given @a errcode).
+ *  -1 - failure, diag is set (IllegalParams).
  */
 int
 tuple_constraint_def_decode(const char **data,
 			    struct tuple_constraint_def **def, uint32_t *count,
-			    struct region *region, uint32_t errcode);
+			    struct region *region);
 
 /**
  * Parse constraint array from msgpack @a *data with the following format:
@@ -137,13 +137,13 @@ tuple_constraint_def_decode(const char **data,
  *
  * Return:
  *   0 - success.
- *  -1 - failure, diag is set (ClientError with given @a errcode).
+ *  -1 - failure, diag is set (IllegalParams).
  */
 int
 tuple_constraint_def_decode_fkey(const char **data,
 				 struct tuple_constraint_def **def,
 				 uint32_t *count, struct region *region,
-				 uint32_t errcode, bool is_complex);
+				 bool is_complex);
 
 /**
  * Allocate a single memory block needed for given @a count of constraint

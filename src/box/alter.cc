@@ -213,9 +213,11 @@ index_opts_decode(struct index_opts *opts, const char *map,
 		  struct region *region)
 {
 	index_opts_create(opts);
-	if (opts_decode(opts, index_opts_reg, &map, ER_WRONG_INDEX_OPTIONS,
-			region) != 0)
+	if (opts_decode(opts, index_opts_reg, &map, region) != 0) {
+		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
+			 diag_last_error(diag_get())->errmsg);
 		return -1;
+	}
 	if (opts->distance == rtree_index_distance_type_MAX) {
 		diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
 			 "distance must be either 'euclid' or 'manhattan'");
@@ -389,8 +391,12 @@ space_opts_decode(struct space_opts *opts, const char *map,
 		  struct region *region)
 {
 	space_opts_create(opts);
-	return opts_decode(opts, space_opts_reg, &map, ER_WRONG_SPACE_OPTIONS,
-			   region);
+	if (opts_decode(opts, space_opts_reg, &map, region) != 0) {
+		diag_set(ClientError, ER_WRONG_SPACE_OPTIONS,
+			 diag_last_error(diag_get())->errmsg);
+		return -1;
+	}
+	return 0;
 }
 
 /**
@@ -3340,9 +3346,11 @@ func_def_new_from_tuple(struct tuple *tuple)
 		}
 		def->param_count = argc;
 		const char *opts = tuple_field(tuple, BOX_FUNC_FIELD_OPTS);
-		if (opts_decode(&def->opts, func_opts_reg, &opts,
-				ER_WRONG_SPACE_OPTIONS, NULL) != 0)
+		if (opts_decode(&def->opts, func_opts_reg, &opts, NULL) != 0) {
+			diag_set(ClientError, ER_WRONG_SPACE_OPTIONS,
+				 diag_last_error(diag_get())->errmsg);
 			return NULL;
+		}
 	} else {
 		/* By default export to Lua, but not other frontends. */
 		def->exports.lua = true;
@@ -3550,9 +3558,11 @@ coll_id_def_new_from_tuple(struct tuple *tuple, struct coll_id_def *def)
 					BOX_COLLATION_FIELD_OPTIONS, MP_MAP);
 	if (options == NULL)
 		return -1;
-	if (opts_decode(&base->icu, coll_icu_opts_reg, &options,
-			ER_WRONG_COLLATION_OPTIONS, NULL) != 0)
+	if (opts_decode(&base->icu, coll_icu_opts_reg, &options, NULL) != 0) {
+		diag_set(ClientError, ER_WRONG_COLLATION_OPTIONS,
+			 diag_last_error(diag_get())->errmsg);
 		return -1;
+	}
 
 	if (base->icu.french_collation == coll_icu_on_off_MAX) {
 		diag_set(ClientError, ER_CANT_CREATE_COLLATION,
