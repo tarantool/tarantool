@@ -535,10 +535,12 @@ static int
 memtx_engine_prepare(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
-	struct txn_stmt *stmt;
-	stailq_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->add_story != NULL || stmt->del_story != NULL)
+	if (memtx_tx_manager_use_mvcc_engine) {
+		struct txn_stmt *stmt;
+		stailq_foreach_entry(stmt, &txn->stmts, next) {
+			assert(stmt->space->engine == engine);
 			memtx_tx_history_prepare_stmt(stmt);
+		}
 	}
 	if (txn->is_schema_changed)
 		memtx_tx_abort_all_for_ddl(txn);
@@ -549,9 +551,9 @@ static void
 memtx_engine_commit(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
-	struct txn_stmt *stmt;
-	stailq_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->add_story != NULL || stmt->del_story != NULL) {
+	if (memtx_tx_manager_use_mvcc_engine) {
+		struct txn_stmt *stmt;
+		stailq_foreach_entry(stmt, &txn->stmts, next) {
 			assert(stmt->space->engine == engine);
 			struct memtx_space *mspace =
 				(struct memtx_space *)stmt->space;
