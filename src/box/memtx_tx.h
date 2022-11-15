@@ -98,131 +98,6 @@ enum memtx_tx_story_status {
 extern const char *memtx_tx_story_status_strs[];
 
 /**
- * Record that links two transactions, breaker and victim.
- * See memtx_tx_cause_conflict for details.
- */
-struct tx_conflict_tracker {
-	/** TX that aborts victim on commit. */
-	struct txn *breaker;
-	/** TX that will be aborted on breaker's commit. */
-	struct txn *victim;
-	/** Link in breaker->conflict_list. */
-	struct rlist in_conflict_list;
-	/** Link in victim->conflicted_by_list. */
-	struct rlist in_conflicted_by_list;
-};
-
-/**
- * Record that links transaction and a story that the transaction have read.
- */
-struct tx_read_tracker {
-	/** The TX that read story. */
-	struct txn *reader;
-	/** The story that was read by reader. */
-	struct memtx_story *story;
-	/** Link in story->reader_list. */
-	struct rlist in_reader_list;
-	/** Link in reader->read_set. */
-	struct rlist in_read_set;
-	/** Bit field of indexes in which the data was tread by reader. */
-	uint64_t index_mask;
-};
-
-/**
- * Link that connects a memtx_story with older and newer stories of the same
- * key in index.
- */
-struct memtx_story_link {
-	/** Story that was happened after that story was ended. */
-	struct memtx_story *newer_story;
-	/** Story that was happened before that story was started. */
-	struct memtx_story *older_story;
-	/** List of interval items @sa gap_item. */
-	struct rlist nearby_gaps;
-	/**
-	 * If the tuple of story is physically in index, here the pointer
-	 * to that index is stored.
-	 */
-	struct index *in_index;
-};
-
-/**
- * A part of a history of a value in space.
- * It's a story about a tuple, from the point it was added to space to the
- * point when it was deleted from a space.
- * All stories are linked into a list of stories of the same key of each index.
- */
-struct memtx_story {
-	/** The story is about this tuple. The tuple is referenced. */
-	struct tuple *tuple;
-	/**
-	 * Statement that introduced this story. Is set to NULL when the
-	 * statement's transaction becomes committed. Can also be NULL if we
-	 * don't know who introduced that story, the tuple was added by a
-	 * transaction that was completed and destroyed some time ago.
-	 */
-	struct txn_stmt *add_stmt;
-	/**
-	 * Prepare sequence number of add_stmt's transaction. Is set when
-	 * the transaction is prepared. Can be 0 if the transaction is
-	 * in progress or we don't know who introduced that story.
-	 */
-	int64_t add_psn;
-	/**
-	 * Statement that ended this story. Is set to NULL when the statement's
-	 * transaction becomes committed. Can also be NULL if the tuple has not
-	 * been deleted yet.
-	 */
-	struct txn_stmt *del_stmt;
-	/**
-	 * Prepare sequence number of del_stmt's transaction. Is set when
-	 * the transaction is prepared. Can be 0 if the transaction is
-	 * in progress or if nobody has deleted the tuple.
-	 */
-	int64_t del_psn;
-	/**
-	 * List of trackers - transactions that has read this tuple.
-	 */
-	struct rlist reader_list;
-	/**
-	 * Link in tx_manager::all_stories
-	 */
-	struct rlist in_all_stories;
-	/**
-	 * Link in space::memtx_tx_stories.
-	 */
-	struct rlist in_space_stories;
-	/**
-	 * Number of indexes in this space - and the count of link[].
-	 */
-	uint32_t index_count;
-	/**
-	 * Status of story, describes the reason why story cannot be deleted.
-	 * It is initialized in memtx_story constructor and is changed only in
-	 * memtx_tx_story_gc.
-	 */
-	enum memtx_tx_story_status status;
-	/**
-	 * Flag is set when @a tuple is not placed in primary key and
-	 * the story is the only reason why @a tuple cannot be deleted.
-	 */
-	bool tuple_is_retained;
-	/*
-	 * Transaction that added this story was rollbacked: this story is
-	 * absolutely invisible — its only purpose is to retain the reader list.
-	 * It is present at the end of some history chains and completely
-	 * unlinked from others, which also implies it is not present in the
-	 * corresponding indexes.
-	 */
-	bool rollbacked;
-	/**
-	 * Link with older and newer stories (and just tuples) for each
-	 * index respectively.
-	 */
-	struct memtx_story_link link[];
-};
-
-/**
  * Snapshot cleaner is a short part of history that is supposed to clarify
  * tuples in a index snapshot. It's also supposed to be used in another
  * thread while common clarify would probably crash in that case.
@@ -300,41 +175,6 @@ void
 memtx_tx_abort_all_for_ddl(struct txn *ddl_owner);
 
 /**
- * Notify TX manager that if transaction @a breaker is committed then the
- * transaction @a victim must be aborted due to conflict. It is achieved
- * by adding corresponding entry (of tx_conflict_tracker type) to @a breaker
- * conflict list. In case there's already such entry, then move it to the head
- * of the list in order to optimize next invocations of this function.
- * For example: there's two rw transaction in progress, one have read
- * some value while the second is about to overwrite it. If the second
- * is committed first, the first must be aborted.
- *
- * NB: can trigger story garbage collection.
- *
- * @return 0 on success, -1 on memory error.
- */
-int
-memtx_tx_cause_conflict(struct txn *breaker, struct txn *victim);
-
-/**
- * Handle conflict when @a victim has read and @a breaker has written the same
- * key, and @a breaker is prepared. The functions must be called in two cases:
- * 1. @a breaker becomes prepared for every victim with non-empty intersection
- * of victim read set / breaker write set.
- * 2. @a victim has to read confirmed value and skips the value that prepared
- * @a breaker wrote.
- * If @a victim is read-only or hasn't made any changes, it should be sent
- * to read view, in which is will not see @a breaker's changes. If @a victim
- * is already in a read view - a read view that does not see every breaker
- * changes is chosen.
- * Otherwise @a victim must be marked as conflicted and aborted on occasion.
- *
- * NB: can trigger story garbage collection.
- */
-void
-memtx_tx_handle_conflict(struct txn *breaker, struct txn *victim);
-
-/**
  * @brief Add a statement to transaction manager's history.
  * Until unlinking or releasing the space could internally contain
  * wrong tuples and must be cleaned through memtx_tx_tuple_clarify call.
@@ -391,6 +231,16 @@ void
 memtx_tx_history_prepare_stmt(struct txn_stmt *stmt);
 
 /**
+ * Finish preparing of a transaction.
+ * Must be called for entire transaction after `memtx_tx_history_rollback_stmt`
+ * was called for each transaction statement.
+ *
+ * NB: can trigger story garbage collection.
+ */
+void
+memtx_tx_prepare_finalize(struct txn *txn);
+
+/**
  * @brief Commit statement in history.
  * Make the statement's changes permanent. It becomes visible to all.
  *
@@ -407,17 +257,6 @@ struct tuple *
 memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 			    struct tuple *tuples, struct index *index,
 			    uint32_t mk_index);
-
-/**
- * Record in TX manager that a transaction @txn have read a @tuple in @space.
- *
- * NB: can trigger story garbage collection.
- *
- * @return 0 on success, -1 on memory error.
- */
-int
-memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple);
-
 
 /** Helper of memtx_tx_track_point */
 int
@@ -538,10 +377,6 @@ memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return tuple;
-	if (!tuple_has_flag(tuple, TUPLE_IS_DIRTY)) {
-		memtx_tx_track_read(txn, space, tuple);
-		return tuple;
-	}
 	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index);
 }
 
