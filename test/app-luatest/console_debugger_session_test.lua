@@ -1,7 +1,6 @@
 local t = require('luatest')
 local popen = require('popen')
 local tnt = require('tarantool')
-local g = t.group()
 
 local function normalize_path(s)
     return s:gsub("^@", ""):gsub("[^/]+$", "")
@@ -54,7 +53,12 @@ local cmd_aliases = {
     ['w'] = 'w|where',
 }
 
-local MAX_ALIASES_COUNT = 4
+--[[
+    repeat 4 times to check all possible command aliases
+--]]
+local g = t.group('aliases',
+                  verbose and {{n = 1}} or
+                  {{n = 1}, {n = 2}, {n = 3}, {n = 4}})
 
 local function get_cmd_alias(cmd, number)
     if not cmd_aliases[cmd] then
@@ -108,60 +112,55 @@ local sequence = {
     { ['c'] = '' },
 }
 
-local function debug_session(sequence)
+local function debug_session(i, sequence)
     local cmd = { TARANTOOL_PATH, '-d', debug_target_script }
-    --[[
-        repeat multiple times to check all command aliases
-    ]]
-    for i = 1, MAX_ALIASES_COUNT do
-        local fh = popen.new(cmd, {
-            stdout = popen.opts.PIPE,
-            stderr = popen.opts.PIPE,
-            stdin = popen.opts.PIPE,
-        })
-        t.assert_is_not(fh, nil)
-        local first = true
-        for _, row in pairs(sequence) do
-            local cmd, expected = next(row)
-            if cmd ~= '\t' then
-                if cmd ~= '' then
-                    local key, arg = get_key_arg_pair(cmd)
-                    arg = arg and (' ' .. arg) or ''
-                    cmd = get_cmd_alias(key, i) .. arg .. '\n'
-                else -- '' empty command - repeat prior one
-                    cmd = cmd .. '\n'
-                end
-                fh:write(cmd)
-                debuglog('cmd: "'..trim(cmd)..'"')
+    local fh = popen.new(cmd, {
+        stdout = popen.opts.PIPE,
+        stderr = popen.opts.PIPE,
+        stdin = popen.opts.PIPE,
+    })
+    t.assert_is_not(fh, nil)
+    local first = true
+    for _, row in pairs(sequence) do
+        local cmd, expected = next(row)
+        if cmd ~= '\t' then
+            if cmd ~= '' then
+                local key, arg = get_key_arg_pair(cmd)
+                arg = arg and (' ' .. arg) or ''
+                cmd = get_cmd_alias(key, i) .. arg .. '\n'
+            else -- '' empty command - repeat prior one
+                cmd = cmd .. '\n'
             end
-
-            local result
-            local clean_cmd = trim(cmd)
-            -- there should be empty stderr - check it before stdout
-            local errout = fh:read({ timeout = 0.05, stderr = true})
-            debuglog('errout:', trim(errout))
-            if first and errout then
-                -- we do not expect anything on stderr
-                -- with exception of initial debugger header
-                t.assert_str_contains(trim(errout), dbg_header, false)
-                first = false
-            else
-                t.assert(errout == nil or trim(errout) == '')
-            end
-            repeat
-                result = trim(unescape(fh:read({ timeout = 0.5 })))
-                debuglog('result:', result)
-            until result ~= '' and result ~= clean_cmd
-            if expected ~= '' then
-                t.assert_str_contains(result, expected, false)
-            end
+            fh:write(cmd)
+            debuglog('cmd: "'..trim(cmd)..'"')
         end
-        fh:close()
+
+        local result
+        local clean_cmd = trim(cmd)
+        -- there should be empty stderr - check it before stdout
+        local errout = fh:read({ timeout = 0.05, stderr = true})
+        debuglog('errout:', trim(errout))
+        if first and errout then
+            -- we do not expect anything on stderr
+            -- with exception of initial debugger header
+            t.assert_str_contains(trim(errout), dbg_header, false)
+            first = false
+        else
+            t.assert(errout == nil or trim(errout) == '')
+        end
+        repeat
+            result = trim(unescape(fh:read({ timeout = 0.5 })))
+            debuglog('result:', result)
+        until result ~= '' and result ~= clean_cmd
+        if expected ~= '' then
+            t.assert_str_contains(result, expected, false)
+        end
     end
+    fh:close()
 end
 
-g.test_interactive_debugger_session = function()
-    debug_session(sequence)
+g.test_interactive_debugger_session = function(cg)
+    debug_session(cg.params.n, sequence)
 end
 
 local breakpoints_sequence = {
@@ -174,6 +173,6 @@ local breakpoints_sequence = {
     { ['c'] = '' },
 }
 
-g.test_interactive_debugger_breakpoints = function()
-    debug_session(breakpoints_sequence)
+g.test_interactive_debugger_breakpoints = function(cg)
+    debug_session(cg.params.n, breakpoints_sequence)
 end
