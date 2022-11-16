@@ -1960,7 +1960,7 @@ update_view_references(struct Select *select, int update_value,
 			if (! suppress_error) {
 				assert(not_found_space != NULL);
 				*not_found_space = tt_sprintf("%s", space_name);
-				sqlSrcListDelete(sql_get(), list);
+				sqlSrcListDelete(list);
 				return -1;
 			}
 			continue;
@@ -1968,7 +1968,7 @@ update_view_references(struct Select *select, int update_value,
 		assert(space->def->view_ref_count > 0 || update_value > 0);
 		space->def->view_ref_count += update_value;
 	}
-	sqlSrcListDelete(sql_get(), list);
+	sqlSrcListDelete(list);
 	return 0;
 }
 
@@ -1981,7 +1981,7 @@ on_create_view_commit(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct Select *select = (struct Select *)trigger->data;
-	sql_select_delete(sql_get(), select);
+	sql_select_delete(select);
 	return 0;
 }
 
@@ -1996,7 +1996,7 @@ on_create_view_rollback(struct trigger *trigger, void *event)
 	(void) event;
 	struct Select *select = (struct Select *)trigger->data;
 	update_view_references(select, -1, true, NULL);
-	sql_select_delete(sql_get(), select);
+	sql_select_delete(select);
 	return 0;
 }
 
@@ -2010,7 +2010,7 @@ on_drop_view_commit(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct Select *select = (struct Select *)trigger->data;
-	sql_select_delete(sql_get(), select);
+	sql_select_delete(select);
 	return 0;
 }
 
@@ -2025,7 +2025,7 @@ on_drop_view_rollback(struct trigger *trigger, void *event)
 	(void) event;
 	struct Select *select = (struct Select *)trigger->data;
 	update_view_references(select, 1, true, NULL);
-	sql_select_delete(sql_get(), select);
+	sql_select_delete(select);
 	return 0;
 }
 
@@ -2166,12 +2166,11 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			return -1;
 		txn_stmt_on_rollback(stmt, on_rollback);
 		if (def->opts.is_view) {
-			struct Select *select = sql_view_compile(sql_get(),
-								 def->opts.sql);
+			struct Select *select = sql_view_compile(def->opts.sql);
 			if (select == NULL)
 				return -1;
 			auto select_guard = make_scoped_guard([=] {
-				sql_select_delete(sql_get(), select);
+				sql_select_delete(select);
 			});
 			const char *disappeared_space;
 			if (update_view_references(select, 1, false,
@@ -2281,12 +2280,11 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		txn_stmt_on_rollback(stmt, on_rollback);
 		if (old_space->def->opts.is_view) {
 			struct Select *select =
-				sql_view_compile(sql_get(),
-						 old_space->def->opts.sql);
+				sql_view_compile(old_space->def->opts.sql);
 			if (select == NULL)
 				return -1;
 			auto select_guard = make_scoped_guard([=] {
-				sql_select_delete(sql_get(), select);
+				sql_select_delete(select);
 			});
 			struct trigger *on_commit_view =
 				txn_alter_trigger_new(on_drop_view_commit,
@@ -4782,7 +4780,7 @@ on_create_trigger_rollback(struct trigger *trigger, void * /* event */)
 	(void)rc;
 	assert(rc == 0);
 	assert(new_trigger == old_trigger);
-	sql_trigger_delete(sql_get(), new_trigger);
+	sql_trigger_delete(new_trigger);
 	return 0;
 }
 
@@ -4815,7 +4813,7 @@ on_replace_trigger_rollback(struct trigger *trigger, void * /* event */)
 				sql_trigger_space_id(old_trigger),
 				old_trigger, &new_trigger) != 0)
 		panic("Out of memory on insertion into trigger hash");
-	sql_trigger_delete(sql_get(), new_trigger);
+	sql_trigger_delete(new_trigger);
 	return 0;
 }
 
@@ -4827,7 +4825,7 @@ static int
 on_replace_trigger_commit(struct trigger *trigger, void * /* event */)
 {
 	struct sql_trigger *old_trigger = (struct sql_trigger *)trigger->data;
-	sql_trigger_delete(sql_get(), old_trigger);
+	sql_trigger_delete(old_trigger);
 	return 0;
 }
 
@@ -4893,13 +4891,12 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 		RegionGuard region_guard(region);
 		if (space_opts_decode(&opts, space_opts, region) != 0)
 			return -1;
-		struct sql_trigger *new_trigger =
-			sql_trigger_compile(sql_get(), opts.sql);
+		struct sql_trigger *new_trigger = sql_trigger_compile(opts.sql);
 		if (new_trigger == NULL)
 			return -1;
 
 		auto new_trigger_guard = make_scoped_guard([=] {
-		    sql_trigger_delete(sql_get(), new_trigger);
+			sql_trigger_delete(new_trigger);
 		});
 
 		const char *trigger_name = sql_trigger_name(new_trigger);

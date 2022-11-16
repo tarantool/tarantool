@@ -198,7 +198,7 @@ allocateCursor(
 
 	assert(iCur>=0 && iCur<p->nCursor);
 	if (p->apCsr[iCur]) { /*OPTIMIZATION-IF-FALSE*/
-		sqlVdbeFreeCursor(p, p->apCsr[iCur]);
+		sqlVdbeFreeCursor(p->apCsr[iCur]);
 		p->apCsr[iCur] = 0;
 	}
 	if (sqlVdbeMemClearAndResize(pMem, nByte) == 0) {
@@ -376,7 +376,8 @@ int sqlVdbeExec(Vdbe *p)
 	Op *pOrigOp;               /* Value of pOp at the top of the loop */
 #endif
 	int rc = 0;        /* Value to return */
-	sql *db = p->db;       /* The database */
+	/* The database */
+	struct sql *db = sql_get();
 	int iCompare = 0;          /* Result of last comparison */
 	unsigned nVmStep = 0;      /* Number of virtual machine steps */
 	Mem *aMem = p->aMem;       /* Copy of p->aMem */
@@ -677,7 +678,7 @@ case OP_Halt: {
 		pFrame = p->pFrame;
 		p->pFrame = pFrame->pParent;
 		p->nFrame--;
-		sqlVdbeSetChanges(db, p->nChange);
+		sqlVdbeSetChanges(p->nChange);
 		pcx = sqlVdbeFrameRestore(pFrame);
 		if (pOp->p2 == ON_CONFLICT_ACTION_IGNORE) {
 			/* Instruction pcx is the OP_Program that invoked the sub-program
@@ -777,9 +778,8 @@ case OP_String8: {         /* same as TK_STRING, out2 */
 	pOp->opcode = OP_String;
 	pOp->p1 = sqlStrlen30(pOp->p4.z);
 
-	if (pOp->p1>db->aLimit[SQL_LIMIT_LENGTH]) {
+	if (pOp->p1 > SQL_MAX_LENGTH)
 		goto too_big;
-	}
 	assert(rc == 0);
 	/* Fall through to the next case, OP_String */
 	FALLTHROUGH;
@@ -1642,7 +1642,7 @@ case OP_Compare: {
 
 	struct key_def *def = sql_key_info_to_key_def(pOp->p4.key_info);
 	if (def == NULL)
-		goto no_mem;
+		goto abort_due_to_error;
 #if SQL_DEBUG
 	if (aPermute) {
 		int mx = 0;
@@ -2092,7 +2092,7 @@ case OP_MakeRecord: {
 	char *tuple = mem_encode_array(pData0, nField, &tuple_size, region);
 	if (tuple == NULL)
 		goto abort_due_to_error;
-	if ((int64_t)tuple_size > db->aLimit[SQL_LIMIT_LENGTH])
+	if (tuple_size > SQL_MAX_LENGTH)
 		goto too_big;
 
 	/* In case of ephemeral space, it is possible to save some memory
@@ -2406,7 +2406,7 @@ case OP_IteratorOpen: {
 			     space->def->exact_field_count,
 			     CURTYPE_TARANTOOL);
 	if (cur == NULL)
-		goto no_mem;
+		goto abort_due_to_error;
 	struct BtCursor *bt_cur = cur->uc.pCursor;
 	bt_cur->curFlags |= space->def->id == 0 ? BTCF_TEphemCursor :
 				BTCF_TaCursor;
@@ -2474,11 +2474,13 @@ case OP_SorterOpen: {
 	assert(pOp->p1>=0);
 	assert(pOp->p2>=0);
 	struct key_def *def = sql_key_info_to_key_def(pOp->p4.key_info);
-	if (def == NULL) goto no_mem;
+	if (def == NULL)
+		goto abort_due_to_error;
 	pCx = allocateCursor(p, pOp->p1, pOp->p2, CURTYPE_SORTER);
-	if (pCx==0) goto no_mem;
+	if (pCx == NULL)
+		goto abort_due_to_error;
 	pCx->key_def = def;
-	if (sqlVdbeSorterInit(db, pCx) != 0)
+	if (sqlVdbeSorterInit(pCx) != 0)
 		goto abort_due_to_error;
 	break;
 }
@@ -2523,7 +2525,8 @@ case OP_OpenPseudo: {
 	assert(pOp->p1>=0);
 	assert(pOp->p3>=0);
 	pCx = allocateCursor(p, pOp->p1, pOp->p3, CURTYPE_PSEUDO);
-	if (pCx==0) goto no_mem;
+	if (pCx == NULL)
+		goto abort_due_to_error;
 	pCx->nullRow = 1;
 	pCx->uc.pseudoTableReg = pOp->p2;
 	assert(pOp->p5==0);
@@ -2537,7 +2540,7 @@ case OP_OpenPseudo: {
  */
 case OP_Close: {
 	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
-	sqlVdbeFreeCursor(p, p->apCsr[pOp->p1]);
+	sqlVdbeFreeCursor(p->apCsr[pOp->p1]);
 	p->apCsr[pOp->p1] = 0;
 	break;
 }
@@ -2836,8 +2839,8 @@ case OP_Found: {        /* jump, in3 */
 		pIdxKey = &r;
 		pFree = 0;
 	} else {
-		pFree = pIdxKey = sqlVdbeAllocUnpackedRecord(db, pC->key_def);
-		if (pIdxKey==0) goto no_mem;
+		pIdxKey = sqlVdbeAllocUnpackedRecord(pC->key_def);
+		pFree = pIdxKey;
 		assert(mem_is_bin(pIn3));
 		sqlVdbeRecordUnpackMsgpack(pC->key_def,
 					       pIn3->z, pIdxKey);
@@ -2861,7 +2864,7 @@ case OP_Found: {        /* jump, in3 */
 	rc = sql_cursor_seek(pC->uc.pCursor, pIdxKey->aMem, pIdxKey->nField,
 			     &res);
 	if (pFree != NULL)
-		sqlDbFree(db, pFree);
+		sql_xfree(pFree);
 	if (rc != 0)
 		goto abort_due_to_error;
 	pC->seekResult = res;
@@ -3056,7 +3059,7 @@ case OP_Delete: {
  * This is used by trigger programs.
  */
 case OP_ResetCount: {
-	sqlVdbeSetChanges(db, p->nChange);
+	sqlVdbeSetChanges(p->nChange);
 	p->nChange = 0;
 	p->ignoreRaised = 0;
 	break;
@@ -3174,9 +3177,8 @@ case OP_RowData: {
 	assert(pCrsr->curFlags & BTCF_TaCursor ||
 	       pCrsr->curFlags & BTCF_TEphemCursor);
 	tarantoolsqlPayloadFetch(pCrsr, &n);
-	if (n>(u32)db->aLimit[SQL_LIMIT_LENGTH]) {
+	if (n > SQL_MAX_LENGTH)
 		goto too_big;
-	}
 
 	char *buf = region_alloc(&fiber()->gc, n);
 	if (buf == NULL) {
@@ -3409,7 +3411,7 @@ case OP_SorterNext: {  /* jump */
 	pC = p->apCsr[pOp->p1];
 	assert(isSorter(pC));
 	res = 0;
-	if (sqlVdbeSorterNext(db, pC, &res) != 0)
+	if (sqlVdbeSorterNext(pC, &res) != 0)
 		goto abort_due_to_error;
 	goto next_tail;
 case OP_PrevIfOpen:    /* jump */
@@ -3876,7 +3878,7 @@ case OP_ResetSorter: {
 	pC = p->apCsr[pOp->p1];
 	assert(pC!=0);
 	if (isSorter(pC)) {
-		sqlVdbeSorterReset(db, pC->uc.pSorter);
+		sqlVdbeSorterReset(pC->uc.pSorter);
 	} else {
 		assert(pC->eCurType==CURTYPE_TARANTOOL);
 		assert(pC->uc.pCursor->curFlags & BTCF_TEphemCursor);
@@ -3901,7 +3903,7 @@ case OP_ResetSorter: {
 case OP_RenameTable: {
 	uint32_t space_id;
 	struct space *space;
-	const char *zOldTableName;
+	char *zOldTableName;
 	const char *zNewTableName;
 
 	space_id = pOp->p1;
@@ -3909,11 +3911,9 @@ case OP_RenameTable: {
 	assert(space);
 	/* Rename space op doesn't change triggers. */
 	struct sql_trigger *triggers = space->sql_triggers;
-	zOldTableName = space_name(space);
-	assert(zOldTableName);
+	assert(space->def->name != NULL);
 	zNewTableName = pOp->p4.z;
-	zOldTableName = sqlDbStrNDup(db, zOldTableName,
-					 sqlStrlen30(zOldTableName));
+	zOldTableName = sql_xstrdup(space_name(space));
 	if (sql_rename_table(space_id, zNewTableName) != 0)
 		goto abort_due_to_error;
 	/*
@@ -3936,7 +3936,7 @@ case OP_RenameTable: {
 			goto abort_due_to_error;
 		trigger = next_trigger;
 	}
-	sqlDbFree(db, (void*)zOldTableName);
+	sql_xfree(zOldTableName);
 	break;
 }
 
@@ -4007,7 +4007,7 @@ case OP_Program: {        /* jump */
 		break;
 	}
 
-	if (p->nFrame>=db->aLimit[SQL_LIMIT_TRIGGER_DEPTH]) {
+	if (p->nFrame >= SQL_MAX_TRIGGER_DEPTH) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "too many levels of "\
 			 "trigger recursion");
 		goto abort_due_to_error;
@@ -4030,10 +4030,7 @@ case OP_Program: {        /* jump */
 		nByte = ROUND8(sizeof(VdbeFrame))
 			+ nMem * sizeof(Mem)
 			+ pProgram->nCsr * sizeof(VdbeCursor *);
-		pFrame = sqlDbMallocZero(db, nByte);
-		if (!pFrame) {
-			goto no_mem;
-		}
+		pFrame = sql_xmalloc0(nByte);
 		mem_set_frame(pRt, pFrame);
 
 		pFrame->v = p;
@@ -4064,7 +4061,7 @@ case OP_Program: {        /* jump */
 	p->nFrame++;
 	pFrame->pParent = p->pFrame;
 	pFrame->nChange = p->nChange;
-	pFrame->nDbChange = p->db->nChange;
+	pFrame->nDbChange = db->nChange;
 	p->nChange = 0;
 	p->pFrame = pFrame;
 	p->aMem = aMem = VdbeFrameMem(pFrame);
@@ -4298,7 +4295,7 @@ case OP_AggFinal: {
  */
 case OP_Expire: {
 	if (!pOp->p1) {
-		sqlExpirePreparedStatements(db);
+		sqlExpirePreparedStatements();
 	} else {
 		p->expired = 1;
 	}
@@ -4344,7 +4341,7 @@ case OP_Init: {          /* jump */
 	 * received from the parent.
 	 */
 	if (p->pFrame == NULL && sql_vdbe_prepare(p) != 0) {
-		sqlDbFree(db, p);
+		sql_xfree(p);
 		rc = -1;
 		break;
 	}
@@ -4509,11 +4506,5 @@ vdbe_return:
 	 */
 too_big:
 	diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
-	goto abort_due_to_error;
-
-	/* Jump to here if a malloc() fails.
-	 */
-no_mem:
-	sqlOomFault(db);
 	goto abort_due_to_error;
 }

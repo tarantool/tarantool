@@ -249,7 +249,6 @@ static int
 port_sql_dump_msgpack(struct port *port, struct obuf *out)
 {
 	assert(port->vtab == &port_sql_vtab);
-	sql *db = sql_get();
 	struct port_sql *sql_port = (struct port_sql *)port;
 	struct sql_stmt *stmt = sql_port->stmt;
 	switch (sql_port->serialization_format) {
@@ -293,7 +292,7 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out)
 		pos = mp_encode_uint(pos, IPROTO_SQL_INFO);
 		pos = mp_encode_map(pos, map_size);
 		uint64_t id_count = 0;
-		int changes = db->nChange;
+		int changes = sql_get()->nChange;
 		size = mp_sizeof_uint(SQL_INFO_ROW_COUNT) +
 		       mp_sizeof_uint(changes);
 		if (!stailq_empty(autoinc_id_list)) {

@@ -69,13 +69,13 @@ static const uint32_t default_sql_flags = SQL_EnableTrigger
 static Expr *
 sql_expr_compile_cb(const char *expr, int expr_len)
 {
-	return sql_expr_compile(sql_get(), expr, expr_len);
+	return sql_expr_compile(expr, expr_len);
 }
 
 static void
 sql_expr_delete_cb(struct Expr *expr)
 {
-	sql_expr_delete(sql_get(), expr);
+	sql_expr_delete(expr);
 }
 
 void
@@ -272,11 +272,7 @@ sql_space_info_new(uint32_t field_count, uint32_t part_count)
 	uint32_t size = info_size + field_size + colls_size + parts_size +
 			sort_orders_size;
 
-	struct sql_space_info *info = sqlDbMallocRawNN(sql_get(), size);
-	if (info == NULL) {
-		diag_set(OutOfMemory, size, "sqlDbMallocRawNN", "info");
-		return NULL;
-	}
+	struct sql_space_info *info = sql_xmalloc(size);
 	info->types = (enum field_type *)((char *)info + info_size);
 	info->coll_ids = (uint32_t *)((char *)info->types + field_size);
 	info->parts = part_count == 0 ? NULL :
@@ -678,7 +674,7 @@ int tarantoolsqlRenameTrigger(const char *trig_name,
 	memcpy(trigger_stmt, trigger_stmt_old, trigger_stmt_len);
 	trigger_stmt[trigger_stmt_len] = '\0';
 	bool is_quoted = false;
-	trigger_stmt = rename_trigger(db, trigger_stmt, new_table_name, &is_quoted);
+	trigger_stmt = rename_trigger(trigger_stmt, new_table_name, &is_quoted);
 
 	uint32_t trigger_stmt_new_len = trigger_stmt_len + new_table_name_len -
 					old_table_name_len + 2 * (!is_quoted);
@@ -1168,9 +1164,7 @@ fk_constraint_encode_links(const struct fk_constraint_def *fk, uint32_t *size)
 		*size += mp_sizeof_uint(fk->links[i].child_field);
 		*size += mp_sizeof_uint(fk->links[i].parent_field);
 	}
-	char *buf = sqlDbMallocRawNN(sql_get(), *size);
-	if (buf == NULL)
-		return NULL;
+	char *buf = sql_xmalloc(*size);
 	char *buf_end = mp_encode_map(buf, fk->field_count);
 	for (uint32_t i = 0; i < fk->field_count; ++i) {
 		buf_end = mp_encode_uint(buf_end, fk->links[i].child_field);

@@ -47,13 +47,9 @@ void
 sql_emit_table_types(struct Vdbe *v, struct space_def *def, int reg)
 {
 	assert(reg > 0);
-	struct sql *db = sqlVdbeDb(v);
 	uint32_t field_count = def->field_count;
 	size_t sz = (field_count + 1) * sizeof(enum field_type);
-	enum field_type *colls_type =
-		(enum field_type *) sqlDbMallocZero(db, sz);
-	if (colls_type == NULL)
-		return;
+	enum field_type *colls_type = sql_xmalloc0(sz);
 	for (uint32_t i = 0; i < field_count; ++i)
 		colls_type[i] = def->fields[i].type;
 	colls_type[field_count] = field_type_MAX;
@@ -239,7 +235,6 @@ sqlInsert(Parse * pParse,	/* Parser context */
 	      IdList * pColumn,	/* Column names corresponding to IDLIST. */
 	      enum on_conflict_action on_error)
 {
-	sql *db;		/* The main database structure */
 	char *zTab;		/* Name of the table into which we are inserting */
 	int i, j;		/* Loop counters */
 	Vdbe *v;		/* Generate code into this virtual machine */
@@ -263,11 +258,9 @@ sqlInsert(Parse * pParse,	/* Parser context */
 	struct sql_trigger *trigger;
 	int tmask;		/* Mask of trigger times */
 
-	db = pParse->db;
 	memset(&dest, 0, sizeof(dest));
-	if (pParse->is_aborted || db->mallocFailed) {
+	if (pParse->is_aborted)
 		goto insert_cleanup;
-	}
 
 	/* If the Select object is really just a simple VALUES() list with a
 	 * single row (the common case) then keep that one row of values
@@ -277,7 +270,7 @@ sqlInsert(Parse * pParse,	/* Parser context */
 	    && pSelect->pPrior == 0) {
 		pList = pSelect->pEList;
 		pSelect->pEList = 0;
-		sql_select_delete(db, pSelect);
+		sql_select_delete(pSelect);
 		pSelect = 0;
 	}
 
@@ -319,8 +312,6 @@ sqlInsert(Parse * pParse,	/* Parser context */
 
 	/* Allocate a VDBE. */
 	v = sqlGetVdbe(pParse);
-	if (v == NULL)
-		goto insert_cleanup;
 	sqlVdbeCountChanges(v);
 	sql_set_multi_write(pParse, pSelect != NULL || trigger != NULL);
 
@@ -420,7 +411,7 @@ sqlInsert(Parse * pParse,	/* Parser context */
 		dest.nSdst = space_def->field_count;
 		rc = sqlSelect(pParse, pSelect, &dest);
 		regFromSelect = dest.iSdst;
-		if (rc || db->mallocFailed || pParse->is_aborted)
+		if (rc != 0 || pParse->is_aborted)
 			goto insert_cleanup;
 		sqlVdbeEndCoroutine(v, regYield);
 		sqlVdbeJumpHere(v, addrTop - 1);	/* label B: */
@@ -785,11 +776,11 @@ sqlInsert(Parse * pParse,	/* Parser context */
 	}
 
  insert_cleanup:
-	sqlSrcListDelete(db, pTabList);
-	sql_expr_list_delete(db, pList);
-	sql_select_delete(db, pSelect);
-	sqlIdListDelete(db, pColumn);
-	sqlDbFree(db, aRegIdx);
+	sqlSrcListDelete(pTabList);
+	sql_expr_list_delete(pList);
+	sql_select_delete(pSelect);
+	sqlIdListDelete(pColumn);
+	sql_xfree(aRegIdx);
 }
 
 void
@@ -799,17 +790,15 @@ vdbe_emit_ck_constraint(struct Parse *parser, struct Expr *expr,
 {
 	parser->vdbe_field_ref_reg = vdbe_field_ref_reg;
 	struct Vdbe *v = sqlGetVdbe(parser);
-	const char *ck_constraint_name = sqlDbStrDup(parser->db, name);
-	VdbeNoopComment((v, "BEGIN: ck constraint %s test",
-			ck_constraint_name));
+	VdbeNoopComment((v, "BEGIN: ck constraint %s test", name));
 	int check_is_passed = sqlVdbeMakeLabel(v);
 	sqlExprIfTrue(parser, expr, check_is_passed, SQL_JUMPIFNULL);
 	const char *fmt = tnt_errcode_desc(ER_CK_CONSTRAINT_FAILED);
-	const char *error_msg = tt_sprintf(fmt, ck_constraint_name, expr_str);
+	const char *error_msg = tt_sprintf(fmt, name, expr_str);
 	sqlVdbeAddOp4(v, OP_SetDiag, ER_CK_CONSTRAINT_FAILED, 0, 0,
-		      sqlDbStrDup(parser->db, error_msg), P4_DYNAMIC);
+		      sql_xstrdup(error_msg), P4_DYNAMIC);
 	sqlVdbeAddOp2(v, OP_Halt, -1, ON_CONFLICT_ACTION_ABORT);
-	VdbeNoopComment((v, "END: ck constraint %s test", ck_constraint_name));
+	VdbeNoopComment((v, "END: ck constraint %s test", name));
 	sqlVdbeResolveLabel(v, check_is_passed);
 }
 

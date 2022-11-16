@@ -3608,7 +3608,7 @@ PRIVATE int translate_code(struct lemon *lemp, struct rule *rp){
     lhsdirect = 1;
     if( has_destructor(rp->rhs[0],lemp) ){
       append_str(0,0,0,0);
-      append_str("  yy_destructor(yypParser,%d,&yymsp[%d].minor);\n", 0,
+      append_str("  yy_destructor(%d,&yymsp[%d].minor);\n", 0,
                  rp->rhs[0]->index,1-rp->nrhs);
       rp->codePrefix = Strsafe(append_str(0,0,0,0));
       rp->noCode = 0;
@@ -3744,7 +3744,7 @@ PRIVATE int translate_code(struct lemon *lemp, struct rule *rp){
         lemp->errorcnt++;
       }
     }else if( i>0 && has_destructor(rp->rhs[i],lemp) ){
-      append_str("  yy_destructor(yypParser,%d,&yymsp[%d].minor);\n", 0,
+      append_str("  yy_destructor(%d,&yymsp[%d].minor);\n", 0,
          rp->rhs[i]->index,i-rp->nrhs+1);
     }
   }

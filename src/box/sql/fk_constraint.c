@@ -293,7 +293,6 @@ fk_constraint_lookup_parent(struct Parse *parse_context, struct space *parent,
  * Build an expression that refers to a memory register
  * corresponding to @a column of given space.
  *
- * @param db SQL context.
  * @param def Definition of space whose content starts from
  *        @a reg_base register.
  * @param reg_base Index of a first element in an array of
@@ -301,15 +300,11 @@ fk_constraint_lookup_parent(struct Parse *parse_context, struct space *parent,
  *        reg_base + i holds an i-th column, i >= 1.
  * @param column Index of a first table column to point at.
  * @retval Not NULL Success. An expression representing register.
- * @retval NULL Error. A diag message is set.
  */
 static struct Expr *
-sql_expr_new_register(struct sql *db, struct space_def *def, int reg_base,
-		      uint32_t column)
+sql_expr_new_register(struct space_def *def, int reg_base, uint32_t column)
 {
-	struct Expr *expr = sql_expr_new_anon(db, TK_REGISTER);
-	if (expr == NULL)
-		return NULL;
+	struct Expr *expr = sql_expr_new_anon(TK_REGISTER);
 	expr->iTable = reg_base + column + 1;
 	expr->type = def->fields[column].type;
 	return expr;
@@ -318,20 +313,16 @@ sql_expr_new_register(struct sql *db, struct space_def *def, int reg_base,
 /**
  * Return an Expr object that refers to column of space_def which
  * has cursor cursor.
- * @param db The database connection.
+ *
  * @param def space definition.
  * @param cursor The open cursor on the table.
  * @param column The column that is wanted.
  * @retval not NULL on success.
- * @retval NULL on error.
  */
 static struct Expr *
-sql_expr_new_column_by_cursor(struct sql *db, struct space_def *def,
-			      int cursor, int column)
+sql_expr_new_column_by_cursor(struct space_def *def, int cursor, int column)
 {
-	struct Expr *expr = sql_expr_new_anon(db, TK_COLUMN_REF);
-	if (expr == NULL)
-		return NULL;
+	struct Expr *expr = sql_expr_new_anon(TK_COLUMN_REF);
 	expr->space_def = def;
 	expr->iTable = cursor;
 	expr->iColumn = column;
@@ -387,7 +378,6 @@ fk_constraint_scan_children(struct Parse *parser, struct SrcList *src,
 		   int reg_data, int incr_count)
 {
 	assert(incr_count == -1 || incr_count == 1);
-	struct sql *db = parser->db;
 	struct Expr *where = NULL;
 	/* Address of OP_FkIfZero. */
 	int fkifzero_label = 0;
@@ -413,14 +403,12 @@ fk_constraint_scan_children(struct Parse *parser, struct SrcList *src,
 	for (uint32_t i = 0; i < fk_def->field_count; i++) {
 		uint32_t fieldno = fk_def->links[i].parent_field;
 		struct Expr *pexpr =
-			sql_expr_new_register(db, def, reg_data, fieldno);
+			sql_expr_new_register(def, reg_data, fieldno);
 		fieldno = fk_def->links[i].child_field;
 		const char *field_name = child_space->def->fields[fieldno].name;
-		struct Expr *chexpr = sql_expr_new_named(db, TK_ID, field_name);
+		struct Expr *chexpr = sql_expr_new_named(TK_ID, field_name);
 		struct Expr *eq = sqlPExpr(parser, TK_EQ, pexpr, chexpr);
-		where = sql_and_expr_new(db, where, eq);
-		if (where == NULL || chexpr == NULL || pexpr == NULL)
-			parser->is_aborted = true;
+		where = sql_and_expr_new(where, eq);
 	}
 
 	/*
@@ -436,20 +424,15 @@ fk_constraint_scan_children(struct Parse *parser, struct SrcList *src,
 		struct Expr *expr = NULL, *pexpr, *chexpr, *eq;
 		for (uint32_t i = 0; i < fk_def->field_count; i++) {
 			uint32_t fieldno = fk_def->links[i].parent_field;
-			pexpr = sql_expr_new_register(db, def, reg_data,
-						      fieldno);
+			pexpr = sql_expr_new_register(def, reg_data, fieldno);
 			int cursor = src->a[0].iCursor;
-			chexpr = sql_expr_new_column_by_cursor(db, def, cursor,
+			chexpr = sql_expr_new_column_by_cursor(def, cursor,
 							       fieldno);
 			eq = sqlPExpr(parser, TK_EQ, pexpr, chexpr);
-			expr = sql_and_expr_new(db, expr, eq);
-			if (expr == NULL || chexpr == NULL || pexpr == NULL)
-				parser->is_aborted = true;
+			expr = sql_and_expr_new(expr, eq);
 		}
 		struct Expr *pNe = sqlPExpr(parser, TK_NOT, expr, 0);
-		where = sql_and_expr_new(db, where, pNe);
-		if (where == NULL)
-			parser->is_aborted = true;
+		where = sql_and_expr_new(where, pNe);
 	}
 
 	/* Resolve the references in the WHERE clause. */
@@ -472,7 +455,7 @@ fk_constraint_scan_children(struct Parse *parser, struct SrcList *src,
 		sqlWhereEnd(info);
 
 	/* Clean up the WHERE clause constructed above. */
-	sql_expr_delete(db, where);
+	sql_expr_delete(where);
 	if (fkifzero_label != 0)
 		sqlVdbeJumpHere(v, fkifzero_label);
 }
@@ -501,7 +484,6 @@ fk_constraint_emit_check(struct Parse *parser, struct space *space, int reg_old,
 			 int reg_new, const int *changed_cols)
 {
 	bool is_update = changed_cols != NULL;
-	struct sql *db = parser->db;
 
 	/*
 	 * Exactly one of reg_old and reg_new should be non-zero.
@@ -580,16 +562,12 @@ fk_constraint_emit_check(struct Parse *parser, struct space *space, int reg_old,
 		 * table. We need the child table as a SrcList for
 		 * sqlWhereBegin().
 		 */
-		struct SrcList *src = sql_src_list_append(db, NULL, NULL);
-		if (src == NULL) {
-			parser->is_aborted = true;
-			return;
-		}
+		struct SrcList *src = sql_src_list_append(NULL, NULL);
 		struct SrcList_item *item = src->a;
 		struct space *child = space_by_id(fk->def->child_id);
 		assert(child != NULL);
 		item->space = child;
-		item->zName = sqlDbStrDup(db, child->def->name);
+		item->zName = sql_xstrdup(child->def->name);
 		item->iCursor = parser->nTab++;
 
 		if (reg_new != 0) {
@@ -600,7 +578,7 @@ fk_constraint_emit_check(struct Parse *parser, struct space *space, int reg_old,
 			fk_constraint_scan_children(parser, src, space->def,
 						    fk->def, reg_old, 1);
 		}
-		sqlSrcListDelete(db, src);
+		sqlSrcListDelete(src);
 	}
 }
 

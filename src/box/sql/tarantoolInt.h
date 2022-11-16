@@ -134,7 +134,6 @@ sql_encode_table_opts(struct region *region, struct space_def *def,
  * @param fk FK def to encode links of.
  * @param[out] Size size of result allocation.
  *
- * @retval NULL Error.
  * @retval not NULL Pointer to msgpack on success.
  */
 char *

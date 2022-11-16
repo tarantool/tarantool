@@ -44,8 +44,9 @@
  * know that the profile callback is defined and needs to be invoked.
  */
 static SQL_NOINLINE void
-invokeProfileCallback(sql * db, Vdbe * p)
+invokeProfileCallback(struct Vdbe *p)
 {
+	struct sql *db = sql_get();
 	sql_int64 iNow;
 	sql_int64 iElapse;
 	assert(p->startTime > 0);
@@ -65,13 +66,6 @@ invokeProfileCallback(sql * db, Vdbe * p)
 }
 
 /*
- * The checkProfileCallback(DB,P) macro checks to see if a profile callback
- * is needed, and it invokes the callback if it is needed.
- */
-#define checkProfileCallback(DB,P) \
-   if( ((P)->startTime)>0 ){ invokeProfileCallback(DB,P); }
-
-/*
  * The following routine destroys a virtual machine that is created by
  * the sql_stmt_compile() routine. The integer returned is an SQL_
  * success/failure code that describes the result of executing the virtual
@@ -83,9 +77,8 @@ sql_stmt_finalize(sql_stmt * pStmt)
 	if (pStmt == NULL)
 		return 0;
 	Vdbe *v = (Vdbe *) pStmt;
-	sql *db = v->db;
-	assert(db != NULL);
-	checkProfileCallback(db, v);
+	if (v->startTime > 0)
+		invokeProfileCallback(v);
 	return sqlVdbeFinalize(v);
 }
 
@@ -94,8 +87,8 @@ sql_stmt_reset(sql_stmt *pStmt)
 {
 	assert(pStmt != NULL);
 	struct Vdbe *v = (Vdbe *) pStmt;
-	struct sql *db = v->db;
-	checkProfileCallback(db, v);
+	if (v->startTime > 0)
+		invokeProfileCallback(v);
 	int rc = sqlVdbeReset(v);
 	sqlVdbeRewind(v);
 	return rc;
@@ -119,19 +112,12 @@ sql_metadata_is_full()
 static int
 sqlStep(Vdbe * p)
 {
-	sql *db;
+	struct sql *db = sql_get();
 	int rc;
 
 	assert(p);
 	if (p->magic != VDBE_MAGIC_RUN)
 		sql_stmt_reset((sql_stmt *) p);
-
-	/* Check that malloc() has not failed. If it has, return early. */
-	db = p->db;
-	if (db->mallocFailed) {
-		p->is_aborted = true;
-		return -1;
-	}
 
 	if (p->pc <= 0 && p->expired) {
 		p->is_aborted = true;
@@ -158,8 +144,8 @@ sqlStep(Vdbe * p)
 	}
 
 	/* If the statement completed successfully, invoke the profile callback */
-	if (rc != SQL_ROW)
-		checkProfileCallback(db, p);
+	if (rc != SQL_ROW && p->startTime > 0)
+		invokeProfileCallback(p);
 
 	if (rc != SQL_ROW && rc != SQL_DONE) {
 		/* If this statement was prepared using sql_prepare(), and an
@@ -648,24 +634,11 @@ sqlTransferBindings(sql_stmt * pFromStmt, sql_stmt * pToStmt)
 	Vdbe *pFrom = (Vdbe *) pFromStmt;
 	Vdbe *pTo = (Vdbe *) pToStmt;
 	int i;
-	assert(pTo->db == pFrom->db);
 	assert(pTo->nVar == pFrom->nVar);
 	for (i = 0; i < pFrom->nVar; i++) {
 		mem_move(&pTo->aVar[i], &pFrom->aVar[i]);
 	}
 	return 0;
-}
-
-/*
- * Return the sql* database handle to which the prepared statement given
- * in the argument belongs.  This is the same database handle that was
- * the first argument to the sql_prepare() that was used to create
- * the statement in the first place.
- */
-sql *
-sql_db_handle(sql_stmt * pStmt)
-{
-	return pStmt ? ((Vdbe *) pStmt)->db : 0;
 }
 
 int
@@ -674,24 +647,6 @@ sql_stmt_busy(const struct sql_stmt *stmt)
 	assert(stmt != NULL);
 	const struct Vdbe *v = (const struct Vdbe *) stmt;
 	return v->magic == VDBE_MAGIC_RUN && v->pc >= 0;
-}
-
-/*
- * Return a pointer to the next prepared statement after pStmt associated
- * with database connection pDb.  If pStmt is NULL, return the first
- * prepared statement for the database connection.  Return NULL if there
- * are no more.
- */
-sql_stmt *
-sql_next_stmt(sql * pDb, sql_stmt * pStmt)
-{
-	sql_stmt *pNext;
-	if (pStmt == 0) {
-		pNext = (sql_stmt *) pDb->pVdbe;
-	} else {
-		pNext = (sql_stmt *) ((Vdbe *) pStmt)->pNext;
-	}
-	return pNext;
 }
 
 /*
@@ -721,7 +676,7 @@ sql_sql(sql_stmt * pStmt)
 /*
  * Return the SQL associated with a prepared statement with
  * bound parameters expanded.  Space to hold the returned string is
- * obtained from sql_malloc().  The caller is responsible for
+ * obtained from malloc(). The caller is responsible for
  * freeing the returned string by passing it to sql_free().
  */
 char *

@@ -66,15 +66,10 @@ void
 sql_materialize_view(struct Parse *parse, const char *name, struct Expr *where,
 		     int cursor)
 {
-	struct sql *db = parse->db;
-	struct SrcList *from = sql_src_list_append(db, NULL, NULL);
-	if (from == NULL) {
-		parse->is_aborted = true;
-		return;
-	}
-	where = sqlExprDup(db, where, 0);
+	struct SrcList *from = sql_src_list_append(NULL, NULL);
+	where = sqlExprDup(where, 0);
 	assert(from->nSrc == 1);
-	from->a[0].zName = sqlDbStrDup(db, name);
+	from->a[0].zName = sql_xstrdup(name);
 	assert(from->a[0].pOn == NULL);
 	assert(from->a[0].pUsing == NULL);
 	struct Select *select = sqlSelectNew(parse, NULL, from, where, NULL,
@@ -82,7 +77,7 @@ sql_materialize_view(struct Parse *parse, const char *name, struct Expr *where,
 	struct SelectDest dest;
 	sqlSelectDestInit(&dest, SRT_EphemTab, cursor, ++parse->nMem);
 	sqlSelect(parse, select, &dest);
-	sql_select_delete(db, select);
+	sql_select_delete(select);
 }
 
 void
@@ -91,9 +86,6 @@ sql_table_truncate(struct Parse *parse, struct SrcList *tab_list)
 	assert(tab_list->nSrc == 1);
 
 	struct Vdbe *v = sqlGetVdbe(parse);
-	if (v == NULL)
-		goto cleanup;
-
 	const char *tab_name = tab_list->a->zName;
 	struct space *space = space_by_name(tab_name);
 	if (space == NULL) {
@@ -115,21 +107,20 @@ sql_table_truncate(struct Parse *parse, struct SrcList *tab_list)
 		goto tarantool_error;
 	}
 	sqlVdbeAddOp2(v, OP_Clear, space->def->id, true);
-cleanup:
-	sqlSrcListDelete(parse->db, tab_list);
+	sqlSrcListDelete(tab_list);
 	return;
 
 tarantool_error:
 	parse->is_aborted = true;
-	goto cleanup;
+	sqlSrcListDelete(tab_list);
+	return;
 }
 
 void
 sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		      struct Expr *where)
 {
-	struct sql *db = parse->db;
-	if (parse->is_aborted || db->mallocFailed)
+	if (parse->is_aborted)
 		goto delete_from_cleanup;
 
 	assert(tab_list->nSrc == 1);
@@ -177,9 +168,6 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 
 	/* Begin generating code.  */
 	struct Vdbe *v = sqlGetVdbe(parse);
-	if (v == NULL)
-		goto delete_from_cleanup;
-
 	sqlVdbeCountChanges(v);
 	sql_set_multi_write(parse, true);
 
@@ -407,8 +395,8 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	}
 
  delete_from_cleanup:
-	sqlSrcListDelete(db, tab_list);
-	sql_expr_delete(db, where);
+	sqlSrcListDelete(tab_list);
+	sql_expr_delete(where);
 }
 
 void

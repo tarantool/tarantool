@@ -87,51 +87,48 @@ incrAggFunctionDepth(Expr * pExpr, int N)
  * zero but it might be more if the alias is contained within a subquery
  * of the original expression.  The Expr.op2 field of TK_AGG_FUNCTION
  * structures must be increased by the nSubquery amount.
+ *
+ * @param pEList A result set.
+ * @param iCol A column in the result set.  0..pEList->nExpr-1.
+ * @param pExpr Transform this into an alias to the result set.
+ * @param zType "GROUP" or "ORDER" or "".
+ * @param nSubquery Number of subqueries that the label is moving.
  */
 static void
-resolveAlias(Parse * pParse,	/* Parsing context */
-	     ExprList * pEList,	/* A result set */
-	     int iCol,		/* A column in the result set.  0..pEList->nExpr-1 */
-	     Expr * pExpr,	/* Transform this into an alias to the result set */
-	     const char *zType,	/* "GROUP" or "ORDER" or "" */
-	     int nSubquery	/* Number of subqueries that the label is moving */
-    )
+resolveAlias(struct ExprList *pEList, int iCol, struct Expr *pExpr,
+	     const char *zType, int nSubquery)
 {
 	Expr *pOrig;		/* The iCol-th column of the result set */
 	Expr *pDup;		/* Copy of pOrig */
-	sql *db;		/* The database connection */
 
 	assert(iCol >= 0 && iCol < pEList->nExpr);
 	pOrig = pEList->a[iCol].pExpr;
 	assert(pOrig != 0);
-	db = pParse->db;
-	pDup = sqlExprDup(db, pOrig, 0);
+	pDup = sqlExprDup(pOrig, 0);
 	if (pDup == 0)
 		return;
 	if (zType[0] != 'G')
 		incrAggFunctionDepth(pDup, nSubquery);
-	if (pExpr->op == TK_COLLATE) {
-		pDup =
-		    sqlExprAddCollateString(pParse, pDup, pExpr->u.zToken);
-	}
+	if (pExpr->op == TK_COLLATE)
+		pDup = sqlExprAddCollateString(pDup, pExpr->u.zToken);
 	ExprSetProperty(pDup, EP_Alias);
 
 	/* Before calling sql_expr_delete(), set the EP_Static flag. This
 	 * prevents ExprDelete() from deleting the Expr structure itself,
 	 * allowing it to be repopulated by the memcpy() on the following line.
 	 * The pExpr->u.zToken might point into memory that will be freed by the
-	 * sqlDbFree(db, pDup) on the last line of this block, so be sure to
-	 * make a copy of the token before doing the sqlDbFree().
+	 * sql_xfree(pDup) on the last line of this block, so be sure to
+	 * make a copy of the token before doing the sql_xfree().
 	 */
 	ExprSetProperty(pExpr, EP_Static);
-	sql_expr_delete(db, pExpr);
+	sql_expr_delete(pExpr);
 	memcpy(pExpr, pDup, sizeof(*pExpr));
 	if (!ExprHasProperty(pExpr, EP_IntValue) && pExpr->u.zToken != 0) {
 		assert((pExpr->flags & (EP_Reduced | EP_TokenOnly)) == 0);
-		pExpr->u.zToken = sqlDbStrDup(db, pExpr->u.zToken);
+		pExpr->u.zToken = sql_xstrdup(pExpr->u.zToken);
 		pExpr->flags |= EP_MemToken;
 	}
-	sqlDbFree(db, pDup);
+	sql_xfree(pDup);
 }
 
 /*
@@ -214,7 +211,6 @@ lookupName(Parse * pParse,	/* The parsing context */
 	int cnt = 0;		/* Number of matching column names */
 	int cntTab = 0;		/* Number of matching table names */
 	int nSubquery = 0;	/* How many levels of subquery */
-	sql *db = pParse->db;	/* The database connection */
 	struct SrcList_item *pItem;	/* Use for looping over pSrcList items */
 	struct SrcList_item *pMatch = 0;	/* The matching pSrcList item */
 	NameContext *pTopNC = pNC;	/* First namecontext in the list */
@@ -393,8 +389,8 @@ lookupName(Parse * pParse,	/* The parsing context */
 						pParse->is_aborted = true;
 						return WRC_Abort;
 					}
-					resolveAlias(pParse, pEList, j, pExpr,
-						     "", nSubquery);
+					resolveAlias(pEList, j, pExpr, "",
+						     nSubquery);
 					cnt = 1;
 					pMatch = 0;
 					assert(zTab == 0);
@@ -456,9 +452,9 @@ lookupName(Parse * pParse,	/* The parsing context */
 
 	/* Clean up and return
 	 */
-	sql_expr_delete(db, pExpr->pLeft);
+	sql_expr_delete(pExpr->pLeft);
 	pExpr->pLeft = 0;
-	sql_expr_delete(db, pExpr->pRight);
+	sql_expr_delete(pExpr->pRight);
 	pExpr->pRight = 0;
 	pExpr->op = (isTrigger ? TK_TRIGGER : TK_COLUMN_REF);
  lookupname_end:
@@ -481,12 +477,9 @@ lookupName(Parse * pParse,	/* The parsing context */
 }
 
 struct Expr *
-sql_expr_new_column(struct sql *db, struct SrcList *src_list, int src_idx,
-		    int column)
+sql_expr_new_column(struct SrcList *src_list, int src_idx, int column)
 {
-	struct Expr *expr = sql_expr_new_anon(db, TK_COLUMN_REF);
-	if (expr == NULL)
-		return NULL;
+	struct Expr *expr = sql_expr_new_anon(TK_COLUMN_REF);
 	struct SrcList_item *item = &src_list->a[src_idx];
 	expr->space_def = item->space->def;
 	expr->iTable = item->iCursor;
@@ -718,8 +711,6 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 	case TK_GT:
 	case TK_GE:{
 			int nLeft, nRight;
-			if (pParse->db->mallocFailed)
-				break;
 			assert(pExpr->pLeft != 0);
 			nLeft = sqlExprVectorSize(pExpr->pLeft);
 			if (pExpr->op == TK_BETWEEN) {
@@ -744,8 +735,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			break;
 		}
 	}
-	return (pParse->is_aborted
-		|| pParse->db->mallocFailed) ? WRC_Abort : WRC_Continue;
+	return pParse->is_aborted ? WRC_Abort : WRC_Continue;
 }
 
 /*
@@ -863,18 +853,16 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 	int i;
 	ExprList *pOrderBy;
 	ExprList *pEList;
-	sql *db;
 	int moreToDo = 1;
 
 	pOrderBy = pSelect->pOrderBy;
 	if (pOrderBy == 0)
 		return 0;
-	db = pParse->db;
 #if SQL_MAX_COLUMN
-	if (pOrderBy->nExpr > db->aLimit[SQL_LIMIT_COLUMN]) {
+	if (pOrderBy->nExpr > SQL_MAX_COLUMN) {
 		diag_set(ClientError, ER_SQL_PARSER_LIMIT,
 			 "The number of terms in ORDER BY clause",
-			 pOrderBy->nExpr, db->aLimit[SQL_LIMIT_COLUMN]);
+			 pOrderBy->nExpr, SQL_MAX_COLUMN);
 		pParse->is_aborted = true;
 		return 1;
 	}
@@ -915,14 +903,11 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 			} else {
 				iCol = resolveAsName(pParse, pEList, pE);
 				if (iCol == 0) {
-					pDup = sqlExprDup(db, pE, 0);
-					if (!db->mallocFailed) {
-						assert(pDup);
-						iCol =
-						    resolveOrderByTermToExprList
-						    (pParse, pSelect, pDup);
-					}
-					sql_expr_delete(db, pDup);
+					pDup = sqlExprDup(pE, 0);
+					assert(pDup != NULL);
+					iCol = resolveOrderByTermToExprList(
+						pParse, pSelect, pDup);
+					sql_expr_delete(pDup);
 				}
 			}
 			if (iCol > 0) {
@@ -930,11 +915,7 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 				 * taking care to preserve the COLLATE clause if it exists
 				 */
 				struct Expr *pNew =
-					sql_expr_new_anon(db, TK_INTEGER);
-				if (pNew == NULL) {
-					pParse->is_aborted = true;
-					return 1;
-				}
+					sql_expr_new_anon(TK_INTEGER);
 				pNew->flags |= EP_IntValue;
 				pNew->u.iValue = iCol;
 				pNew->type = FIELD_TYPE_INTEGER;
@@ -948,7 +929,7 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 					assert(pParent->pLeft == pE);
 					pParent->pLeft = pNew;
 				}
-				sql_expr_delete(db, pE);
+				sql_expr_delete(pE);
 				pItem->u.x.iOrderByCol = (u16) iCol;
 				pItem->done = 1;
 			} else {
@@ -988,18 +969,17 @@ sqlResolveOrderGroupBy(Parse * pParse,	/* Parsing context.  Leave error messages
     )
 {
 	int i;
-	sql *db = pParse->db;
 	ExprList *pEList;
 	struct ExprList_item *pItem;
 
-	if (pOrderBy == 0 || pParse->db->mallocFailed)
+	if (pOrderBy == NULL)
 		return 0;
 #if SQL_MAX_COLUMN
-	if (pOrderBy->nExpr > db->aLimit[SQL_LIMIT_COLUMN]) {
+	if (pOrderBy->nExpr > SQL_MAX_COLUMN) {
 		const char *err = tt_sprintf("The number of terms in %s BY "\
 					     "clause", zType);
 		diag_set(ClientError, ER_SQL_PARSER_LIMIT, err,
-			 pOrderBy->nExpr, db->aLimit[SQL_LIMIT_COLUMN]);
+			 pOrderBy->nExpr, SQL_MAX_COLUMN);
 		pParse->is_aborted = true;
 		return 1;
 	}
@@ -1019,7 +999,7 @@ sqlResolveOrderGroupBy(Parse * pParse,	/* Parsing context.  Leave error messages
 				pParse->is_aborted = true;
 				return 1;
 			}
-			resolveAlias(pParse, pEList, pItem->u.x.iOrderByCol - 1,
+			resolveAlias(pEList, pItem->u.x.iOrderByCol - 1,
 				     pItem->pExpr, zType, 0);
 		}
 	}
@@ -1122,7 +1102,6 @@ resolveSelectStep(Walker * pWalker, Select * p)
 	int i;			/* Loop counter */
 	ExprList *pGroupBy;	/* The GROUP BY clause */
 	Select *pLeftmost;	/* Left-most of SELECT of a compound */
-	sql *db;		/* Database connection */
 
 	assert(p != 0);
 	if (p->selFlags & SF_Resolved) {
@@ -1130,7 +1109,6 @@ resolveSelectStep(Walker * pWalker, Select * p)
 	}
 	pOuterNC = pWalker->u.pNC;
 	pParse = pWalker->pParse;
-	db = pParse->db;
 
 	/* Normally sqlSelectExpand() will be called first and will have
 	 * already expanded this SELECT.  However, if this is a subquery within
@@ -1142,8 +1120,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
 	 */
 	if ((p->selFlags & SF_Expanded) == 0) {
 		sqlSelectPrep(pParse, p, pOuterNC);
-		return (pParse->is_aborted
-			|| db->mallocFailed) ? WRC_Abort : WRC_Prune;
+		return pParse->is_aborted ? WRC_Abort : WRC_Prune;
 	}
 
 	isCompound = p->pPrior != 0;
@@ -1199,7 +1176,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
 				sqlResolveSelectNames(pParse,
 							  pItem->pSelect,
 							  pOuterNC);
-				if (pParse->is_aborted || db->mallocFailed)
+				if (pParse->is_aborted)
 					return WRC_Abort;
 
 				for (pNC = pOuterNC; pNC; pNC = pNC->pNext)
@@ -1297,11 +1274,8 @@ resolveSelectStep(Walker * pWalker, Select * p)
 			 * LIMIT but there is no reason to
 			 * restrict it directly).
 			 */
-			sql_expr_delete(db, p->pLimit);
-			p->pLimit = sql_expr_new(db, TK_INTEGER,
-						 &sqlIntTokens[1]);
-			if (p->pLimit == NULL)
-				pParse->is_aborted = true;
+			sql_expr_delete(p->pLimit);
+			p->pLimit = sql_expr_new(TK_INTEGER, &sqlIntTokens[1]);
 		} else {
 			if (sqlResolveExprNames(&sNC, p->pHaving))
 				return WRC_Abort;
@@ -1353,9 +1327,6 @@ resolveSelectStep(Walker * pWalker, Select * p)
 		    ) {
 			return WRC_Abort;
 		}
-		if (db->mallocFailed) {
-			return WRC_Abort;
-		}
 
 		/* Resolve the GROUP BY clause.  At the same time, make sure
 		 * the GROUP BY clause does not contain aggregate functions.
@@ -1363,10 +1334,9 @@ resolveSelectStep(Walker * pWalker, Select * p)
 		if (pGroupBy) {
 			struct ExprList_item *pItem;
 
-			if (resolveOrderGroupBy(&sNC, p, pGroupBy, "GROUP")
-			    || db->mallocFailed) {
+			if (resolveOrderGroupBy(&sNC, p, pGroupBy,
+						"GROUP") != 0)
 				return WRC_Abort;
-			}
 			const char *err_msg = "aggregate functions are not "\
 					      "allowed in the GROUP BY clause";
 			for (i = 0, pItem = pGroupBy->a; i < pGroupBy->nExpr;

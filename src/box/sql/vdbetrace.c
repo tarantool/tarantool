@@ -70,7 +70,7 @@ findNextHostParameter(const char *zSql, int *pnToken)
 
 /*
  * This function returns a pointer to a nul-terminated string in memory
- * obtained from sqlDbMalloc(). If sql.nVdbeExec is 1, then the
+ * obtained from sql_xmalloc(). If sql.nVdbeExec is 1, then the
  * string contains a copy of zRawSql but with host parameters expanded to
  * their current bindings. Or, if sql.nVdbeExec is greater than 1,
  * then the returned string holds a copy of zRawSql with "-- " prepended
@@ -92,7 +92,6 @@ sqlVdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
 		     const char *zRawSql	/* Raw text of the SQL statement */
     )
 {
-	sql *db;		/* The database connection */
 	int idx = 0;		/* Index of a host parameter */
 	int nextIndex = 1;	/* Index of next ? host parameter */
 	int n;			/* Length of a token prefix */
@@ -100,10 +99,8 @@ sqlVdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
 	StrAccum out;		/* Accumulate the output here */
 	char zBase[100];	/* Initial working space */
 
-	db = p->db;
-	sqlStrAccumInit(&out, 0, zBase, sizeof(zBase),
-			    db->aLimit[SQL_LIMIT_LENGTH]);
-	if (db->nVdbeExec > 1) {
+	sqlStrAccumInit(&out, zBase, sizeof(zBase), SQL_MAX_LENGTH);
+	if (sql_get()->nVdbeExec > 1) {
 		while (*zRawSql) {
 			const char *zStart = zRawSql;
 			while (*(zRawSql++) != '\n' && *zRawSql) ;

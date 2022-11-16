@@ -53,13 +53,10 @@ Vdbe *
 sqlVdbeCreate(Parse * pParse)
 {
 	assert(!pParse->parse_only);
-	sql *db = pParse->db;
+	sql *db = sql_get();
 	Vdbe *p;
-	p = sqlDbMallocRawNN(db, sizeof(Vdbe));
-	if (p == 0)
-		return 0;
+	p = sql_xmalloc(sizeof(Vdbe));
 	memset(p, 0, sizeof(Vdbe));
-	p->db = db;
 	stailq_create(&p->autoinc_id_list);
 	if (db->pVdbe) {
 		db->pVdbe->pPrev = p;
@@ -96,7 +93,7 @@ sqlVdbeSetSql(Vdbe * p, const char *z, int n)
 	if (p == 0)
 		return;
 	assert(p->zSql == 0);
-	p->zSql = sqlDbStrNDup(p->db, z, n);
+	p->zSql = sql_xstrndup(z, n);
 }
 
 /*
@@ -107,7 +104,6 @@ sqlVdbeSwap(Vdbe * pA, Vdbe * pB)
 {
 	Vdbe tmp, *pTmp;
 	char *zTmp;
-	assert(pA->db == pB->db);
 	tmp = *pA;
 	*pA = *pB;
 	*pB = tmp;
@@ -155,14 +151,12 @@ growOpArray(Vdbe * v, int nOp)
 
 	assert((unsigned)nOp <= (1024 / sizeof(Op)));
 	assert(nNew >= (p->nOpAlloc + nOp));
-	pNew = sqlDbRealloc(p->db, v->aOp, nNew * sizeof(Op));
-	if (pNew) {
-		p->szOpAlloc = sqlDbMallocSize(p->db, pNew);
-		p->nOpAlloc = p->szOpAlloc / sizeof(Op);
-		v->aOp = pNew;
-		return 0;
-	}
-	return -1;
+	size_t size = nNew * sizeof(Op);
+	pNew = sql_xrealloc(v->aOp, size);
+	p->szOpAlloc = size;
+	p->nOpAlloc = p->szOpAlloc / sizeof(Op);
+	v->aOp = pNew;
+	return 0;
 }
 
 #ifdef SQL_DEBUG
@@ -332,9 +326,8 @@ sqlVdbeAddOp4Dup8(Vdbe * p,	/* Add the opcode to this VM */
 		      int p4type	/* P4 operand type */
     )
 {
-	char *p4copy = sqlDbMallocRawNN(sqlVdbeDb(p), 8);
-	if (p4copy)
-		memcpy(p4copy, zP4, 8);
+	char *p4copy = sql_xmalloc(8);
+	memcpy(p4copy, zP4, 8);
 	return sqlVdbeAddOp4(p, op, p1, p2, p3, p4copy, p4type);
 }
 
@@ -350,11 +343,9 @@ sqlVdbeAddOp4Int(Vdbe * p,	/* Add the opcode to this VM */
 		     int p4)	/* The P4 operand as an integer */
 {
 	int addr = sqlVdbeAddOp3(p, op, p1, p2, p3);
-	if (p->db->mallocFailed == 0) {
-		VdbeOp *pOp = &p->aOp[addr];
-		pOp->p4type = P4_INT32;
-		pOp->p4.i = p4;
-	}
+	VdbeOp *pOp = &p->aOp[addr];
+	pOp->p4type = P4_INT32;
+	pOp->p4.i = p4;
 	return addr;
 }
 
@@ -396,9 +387,8 @@ sqlVdbeMakeLabel(Vdbe * v)
 	int i = p->nLabel++;
 	assert(v->magic == VDBE_MAGIC_INIT);
 	if ((i & (i - 1)) == 0) {
-		p->aLabel = sqlDbReallocOrFree(p->db, p->aLabel,
-						   (i * 2 +
-						    1) * sizeof(p->aLabel[0]));
+		p->aLabel = sql_xrealloc(p->aLabel,
+					 (i * 2 + 1) * sizeof(p->aLabel[0]));
 	}
 	if (p->aLabel) {
 		p->aLabel[i] = -1;
@@ -492,7 +482,7 @@ resolveP2Values(Vdbe * p)
 			break;
 		pOp--;
 	}
-	sqlDbFree(p->db, pParse->aLabel);
+	sql_xfree(pParse->aLabel);
 	pParse->aLabel = 0;
 	pParse->nLabel = 0;
 }
@@ -520,7 +510,7 @@ struct VdbeOp *
 sqlVdbeTakeOpArray(struct Vdbe *p, int *pnOp)
 {
 	VdbeOp *aOp = p->aOp;
-	assert(aOp && !p->db->mallocFailed);
+	assert(aOp != NULL);
 
 	resolveP2Values(p);
 	*pnOp = p->nOp;
@@ -559,7 +549,7 @@ sqlVdbeChangeP3(Vdbe * p, u32 addr, int val)
 void
 sqlVdbeChangeP5(Vdbe * p, int p5)
 {
-	assert(p->nOp > 0 || p->db->mallocFailed);
+	assert(p->nOp > 0);
 	if (p->nOp > 0)
 		p->aOp[p->nOp - 1].p5 = p5;
 }
@@ -574,12 +564,16 @@ sqlVdbeJumpHere(Vdbe * p, int addr)
 	sqlVdbeChangeP2(p, addr, p->nOp);
 }
 
-static void vdbeFreeOpArray(sql *, Op *, int);
+/**
+ * Free the space allocated for aOp and any p4 values allocated for the opcodes
+ * contained within. If aOp is not NULL it is assumed to contain nOp entries.
+ */
+static void
+vdbeFreeOpArray(struct VdbeOp *aOp, int nOp);
 
 static void
-freeP4(sql * db, int p4type, void *p4)
+freeP4(int p4type, void *p4)
 {
-	assert(db);
 	switch (p4type) {
 	case P4_FUNCCTX:{
 			sql_context_delete(p4);
@@ -591,7 +585,7 @@ freeP4(sql * db, int p4type, void *p4)
 	case P4_UINT64:
 	case P4_DYNAMIC:
 	case P4_INTARRAY:{
-			sqlDbFree(db, p4);
+			sql_xfree(p4);
 			break;
 		}
 	case P4_KEYINFO:
@@ -605,25 +599,20 @@ freeP4(sql * db, int p4type, void *p4)
 	}
 }
 
-/*
- * Free the space allocated for aOp and any p4 values allocated for the
- * opcodes contained within. If aOp is not NULL it is assumed to contain
- * nOp entries.
- */
 static void
-vdbeFreeOpArray(sql * db, Op * aOp, int nOp)
+vdbeFreeOpArray(struct VdbeOp *aOp, int nOp)
 {
 	if (aOp) {
 		Op *pOp;
 		for (pOp = aOp; pOp < &aOp[nOp]; pOp++) {
 			if (pOp->p4type)
-				freeP4(db, pOp->p4type, pOp->p4.p);
+				freeP4(pOp->p4type, pOp->p4.p);
 #ifdef SQL_ENABLE_EXPLAIN_COMMENTS
-			sqlDbFree(db, pOp->zComment);
+			sql_xfree(pOp->zComment);
 #endif
 		}
 	}
-	sqlDbFree(db, aOp);
+	sql_xfree(aOp);
 }
 
 /*
@@ -645,11 +634,9 @@ int
 sqlVdbeChangeToNoop(Vdbe * p, int addr)
 {
 	VdbeOp *pOp;
-	if (p->db->mallocFailed)
-		return 0;
 	assert(addr >= 0 && addr < p->nOp);
 	pOp = &p->aOp[addr];
-	freeP4(p->db, pOp->p4type, pOp->p4.p);
+	freeP4(pOp->p4type, pOp->p4.p);
 	pOp->p4type = P4_NOTUSED;
 	pOp->p4.z = 0;
 	pOp->opcode = OP_Noop;
@@ -674,7 +661,7 @@ sqlVdbeDeletePriorOpcode(Vdbe * p, u8 op)
  * Change the value of the P4 operand for a specific instruction.
  *
  * If n>=0 then the P4 operand is dynamic, meaning that a copy of
- * the string is made into memory obtained from sql_malloc().
+ * the string is made into memory obtained from malloc().
  * A value of n==0 means copy bytes of zP4 up to and including the
  * first null byte.  If n>0 then copy n+1 bytes of zP4.
  *
@@ -688,7 +675,7 @@ static void SQL_NOINLINE
 vdbeChangeP4Full(Vdbe * p, Op * pOp, const char *zP4, int n)
 {
 	if (pOp->p4type) {
-		freeP4(p->db, pOp->p4type, pOp->p4.p);
+		freeP4(pOp->p4type, pOp->p4.p);
 		pOp->p4type = 0;
 		pOp->p4.p = 0;
 	}
@@ -697,7 +684,7 @@ vdbeChangeP4Full(Vdbe * p, Op * pOp, const char *zP4, int n)
 	} else {
 		if (n == 0)
 			n = sqlStrlen30(zP4);
-		pOp->p4.z = sqlDbStrNDup(p->db, zP4, n);
+		pOp->p4.z = sql_xstrndup(zP4, n);
 		pOp->p4type = P4_DYNAMIC;
 	}
 }
@@ -706,15 +693,9 @@ void
 sqlVdbeChangeP4(Vdbe * p, int addr, const char *zP4, int n)
 {
 	Op *pOp;
-	sql *db;
 	assert(p != 0);
-	db = p->db;
 	assert(p->magic == VDBE_MAGIC_INIT);
-	assert(p->aOp != 0 || db->mallocFailed);
-	if (db->mallocFailed) {
-		freeP4(db, n, (void *)*(char **)&zP4);
-		return;
-	}
+	assert(p->aOp != 0);
 	assert(p->nOp > 0);
 	assert(addr < p->nOp);
 	if (addr < 0) {
@@ -756,16 +737,12 @@ sqlVdbeAppendP4(Vdbe * p, void *pP4, int n)
 	VdbeOp *pOp;
 	assert(n != P4_INT32);
 	assert(n <= 0);
-	if (p->db->mallocFailed) {
-		freeP4(p->db, n, pP4);
-	} else {
-		assert(pP4 != 0);
-		assert(p->nOp > 0);
-		pOp = &p->aOp[p->nOp - 1];
-		assert(pOp->p4type == P4_NOTUSED);
-		pOp->p4type = n;
-		pOp->p4.p = pP4;
-	}
+	assert(pP4 != 0);
+	assert(p->nOp > 0);
+	pOp = &p->aOp[p->nOp - 1];
+	assert(pOp->p4type == P4_NOTUSED);
+	pOp->p4type = n;
+	pOp->p4.p = pP4;
 }
 
 #ifdef SQL_ENABLE_EXPLAIN_COMMENTS
@@ -781,9 +758,8 @@ vdbeVComment(Vdbe * p, const char *zFormat, va_list ap)
 	assert(p->nOp > 0 || p->aOp == 0);
 	if (p->nOp) {
 		assert(p->aOp);
-		sqlDbFree(p->db, p->aOp[p->nOp - 1].zComment);
-		p->aOp[p->nOp - 1].zComment =
-		    sqlVMPrintf(p->db, zFormat, ap);
+		sql_xfree(p->aOp[p->nOp - 1].zComment);
+		p->aOp[p->nOp - 1].zComment = sqlVMPrintf(zFormat, ap);
 	}
 }
 
@@ -814,33 +790,16 @@ sqlVdbeNoopComment(Vdbe * p, const char *zFormat, ...)
 /*
  * Return the opcode for a given address.  If the address is -1, then
  * return the most recently inserted opcode.
- *
- * If a memory allocation error has occurred prior to the calling of this
- * routine, then a pointer to a dummy VdbeOp will be returned.  That opcode
- * is readable but not writable, though it is cast to a writable value.
- * The return of a dummy opcode allows the call to continue functioning
- * after an OOM fault without having to check to see if the return from
- * this routine is a valid pointer.  But because the dummy.opcode is 0,
- * dummy will never be written to.  This is verified by code inspection and
- * by running with Valgrind.
  */
 VdbeOp *
 sqlVdbeGetOp(Vdbe * p, int addr)
 {
-	/* C89 specifies that the constant "dummy" will be initialized to all
-	 * zeros, which is correct.
-	 */
-	static VdbeOp dummy;
 	assert(p->magic == VDBE_MAGIC_INIT);
 	if (addr < 0) {
 		addr = p->nOp - 1;
 	}
-	assert((addr >= 0 && addr < p->nOp) || p->db->mallocFailed);
-	if (p->db->mallocFailed) {
-		return (VdbeOp *) & dummy;
-	} else {
-		return &p->aOp[addr];
-	}
+	assert(addr >= 0 && addr < p->nOp);
+	return &p->aOp[addr];
 }
 
 #if defined(SQL_ENABLE_EXPLAIN_COMMENTS)
@@ -991,7 +950,7 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 	char *zP4 = zTemp;
 	StrAccum x;
 	assert(nTemp >= 20);
-	sqlStrAccumInit(&x, 0, zTemp, nTemp, 0);
+	sqlStrAccumInit(&x, zTemp, nTemp, 0);
 	switch (pOp->p4type) {
 	case P4_KEYINFO:{
 			struct key_def *def = NULL;
@@ -1146,11 +1105,10 @@ sqlVdbeFrameDelete(VdbeFrame * p)
 	int i;
 	Mem *aMem = VdbeFrameMem(p);
 	VdbeCursor **apCsr = (VdbeCursor **) & aMem[p->nChildMem];
-	for (i = 0; i < p->nChildCsr; i++) {
-		sqlVdbeFreeCursor(p->v, apCsr[i]);
-	}
+	for (i = 0; i < p->nChildCsr; i++)
+		sqlVdbeFreeCursor(apCsr[i]);
 	releaseMemArray(aMem, p->nChildMem);
-	sqlDbFree(p->v->db, p);
+	sql_xfree(p);
 }
 
 /*
@@ -1285,12 +1243,10 @@ sqlVdbeList(Vdbe * p)
 		mem_set_int(pMem, pOp->p3, pOp->p3 < 0);
 		pMem++;
 
-		char *buf = sqlDbMallocRaw(sql_get(), 256);
-		if (buf == NULL)
-			return -1;
-		zP4 = displayP4(pOp, buf, sqlDbMallocSize(sql_get(), buf));
+		char *buf = sql_xmalloc(256);
+		zP4 = displayP4(pOp, buf, 256);
 		if (zP4 != buf) {
-			sqlDbFree(sql_get(), buf);
+			sql_xfree(buf);
 			mem_set_str0_ephemeral(pMem, zP4);
 		} else {
 			mem_set_str0_allocated(pMem, zP4);
@@ -1298,17 +1254,13 @@ sqlVdbeList(Vdbe * p)
 		pMem++;
 
 		if (p->explain == 1) {
-			buf = sqlDbMallocRaw(sql_get(), 4);
-			if (buf == NULL)
-				return -1;
+			buf = sql_xmalloc(4);
 			sql_snprintf(3, buf, "%.2x", pOp->p5);
 			mem_set_str0_allocated(pMem, buf);
 			pMem++;
 
 #ifdef SQL_ENABLE_EXPLAIN_COMMENTS
-			buf = sqlDbMallocRaw(sql_get(), 500);
-			if (buf == NULL)
-				return -1;
+			buf = sql_xmalloc(500);
 			displayComment(pOp, zP4, buf, 500);
 			mem_set_str0_allocated(pMem, buf);
 #else
@@ -1398,9 +1350,6 @@ allocSpace(struct ReusableSpace *p,	/* Bulk memory available for allocation */
 void
 sqlVdbeRewind(Vdbe * p)
 {
-#if defined(SQL_DEBUG)
-	int i;
-#endif
 	assert(p != 0);
 	assert(p->magic == VDBE_MAGIC_INIT || p->magic == VDBE_MAGIC_RESET);
 
@@ -1411,11 +1360,6 @@ sqlVdbeRewind(Vdbe * p)
 	/* Set the magic to VDBE_MAGIC_RUN sooner rather than later. */
 	p->magic = VDBE_MAGIC_RUN;
 
-#ifdef SQL_DEBUG
-	for (i = 0; i < p->nMem; i++) {
-		assert(p->aMem[i].db == p->db);
-	}
-#endif
 	p->pc = -1;
 	p->is_aborted = false;
 	p->ignoreRaised = 0;
@@ -1449,7 +1393,6 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 		     Parse * pParse	/* Parsing context */
     )
 {
-	sql *db;		/* The database connection */
 	int nVar;		/* Number of parameters */
 	int nMem;		/* Number of VM memory registers */
 	int nCursor;		/* Number of cursors required */
@@ -1461,8 +1404,6 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 	assert(pParse != 0);
 	assert(p->magic == VDBE_MAGIC_INIT);
 	assert(pParse == p->pParse);
-	db = p->db;
-	assert(db->mallocFailed == 0);
 	nVar = pParse->nVar;
 	nMem = pParse->nMem;
 	nCursor = pParse->nTab;
@@ -1511,45 +1452,36 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 		    allocSpace(&x, p->apCsr, nCursor * sizeof(VdbeCursor *));
 		if (x.nNeeded == 0)
 			break;
-		x.pSpace = p->pFree = sqlDbMallocRawNN(db, x.nNeeded);
+		x.pSpace = sql_xmalloc(x.nNeeded);
+		p->pFree = x.pSpace;
 		x.nFree = x.nNeeded;
-	} while (!db->mallocFailed);
+	} while (true);
 
 	p->pVList = pParse->pVList;
 	pParse->pVList = 0;
 	p->explain = pParse->explain;
-	if (db->mallocFailed) {
-		p->nVar = 0;
-		p->nCursor = 0;
-		p->nMem = 0;
-	} else {
-		p->nCursor = nCursor;
-		p->nVar = (ynVar) nVar;
-		for (int i = 0; i < nVar; ++i)
-			mem_create(&p->aVar[i]);
-		p->nMem = nMem;
-		for (int i = 0; i < nMem; ++i) {
-			mem_create(&p->aMem[i]);
-			mem_set_invalid(&p->aMem[i]);
-		}
-		memset(p->apCsr, 0, nCursor * sizeof(VdbeCursor *));
+	p->nCursor = nCursor;
+	p->nVar = nVar;
+	for (int i = 0; i < nVar; ++i)
+		mem_create(&p->aVar[i]);
+	p->nMem = nMem;
+	for (int i = 0; i < nMem; ++i) {
+		mem_create(&p->aMem[i]);
+		mem_set_invalid(&p->aMem[i]);
 	}
+	memset(p->apCsr, 0, nCursor * sizeof(VdbeCursor *));
 	sqlVdbeRewind(p);
 }
 
-/*
- * Close a VDBE cursor and release all the resources that cursor
- * happens to hold.
- */
 void
-sqlVdbeFreeCursor(Vdbe * p, VdbeCursor * pCx)
+sqlVdbeFreeCursor(struct VdbeCursor *pCx)
 {
 	if (pCx == 0) {
 		return;
 	}
 	switch (pCx->eCurType) {
 	case CURTYPE_SORTER:{
-			sqlVdbeSorterClose(p->db, pCx);
+			sqlVdbeSorterClose(pCx);
 			break;
 		}
 	case CURTYPE_TARANTOOL:{
@@ -1571,7 +1503,7 @@ closeCursorsInFrame(Vdbe * p)
 		for (i = 0; i < p->nCursor; i++) {
 			VdbeCursor *pC = p->apCsr[i];
 			if (pC) {
-				sqlVdbeFreeCursor(p, pC);
+				sqlVdbeFreeCursor(pC);
 				p->apCsr[i] = 0;
 			}
 		}
@@ -1595,7 +1527,7 @@ sqlVdbeFrameRestore(VdbeFrame * pFrame)
 	v->apCsr = pFrame->apCsr;
 	v->nCursor = pFrame->nCursor;
 	v->nChange = pFrame->nChange;
-	v->db->nChange = pFrame->nDbChange;
+	sql_get()->nChange = pFrame->nDbChange;
 	return pFrame->pc;
 }
 
@@ -1778,6 +1710,7 @@ vdbe_metadata_set_col_span(struct Vdbe *p, int idx, const char *span)
 	return 0;
 }
 
+#ifndef NDEBUG
 /*
  * This routine checks that the sql.nVdbeActive count variable
  * matches the number of vdbe's in the list sql.pVdbe that are
@@ -1787,23 +1720,22 @@ vdbe_metadata_set_col_span(struct Vdbe *p, int idx, const char *span)
  *
  * This is a no-op if NDEBUG is defined.
  */
-#ifndef NDEBUG
 static void
-checkActiveVdbeCnt(sql * db)
+checkActiveVdbeCnt(void)
 {
 	Vdbe *p;
 	int cnt = 0;
-	p = db->pVdbe;
+	p = sql_get()->pVdbe;
 	while (p) {
 		if (sql_stmt_busy((sql_stmt *) p)) {
 			cnt++;
 		}
 		p = p->pNext;
 	}
-	assert(cnt == db->nVdbeActive);
+	assert(cnt == sql_get()->nVdbeActive);
 }
 #else
-#define checkActiveVdbeCnt(x)
+#define checkActiveVdbeCnt()
 #endif
 
 /*
@@ -1845,21 +1777,18 @@ int
 sqlVdbeHalt(Vdbe * p)
 {
 	int rc;			/* Used to store transient return codes */
-	sql *db = p->db;
+	sql *db = sql_get();
 
 	/* This function contains the logic that determines if a statement or
 	 * transaction will be committed or rolled back as a result of the
 	 * execution of this virtual machine.
 	 */
 
-	if (db->mallocFailed) {
-		p->is_aborted = true;
-	}
 	closeTopFrameCursors(p);
 	if (p->magic != VDBE_MAGIC_RUN) {
 		return 0;
 	}
-	checkActiveVdbeCnt(db);
+	checkActiveVdbeCnt();
 
 	/* No commit or rollback needed if the program never started or if the
 	 * SQL statement does not read or write a database file.
@@ -1948,7 +1877,7 @@ sqlVdbeHalt(Vdbe * p)
 		 * Other statements should return 0 (zero).
 		 */
 		if (p->changeCntOn) {
-			sqlVdbeSetChanges(db, p->nChange);
+			sqlVdbeSetChanges(p->nChange);
 			p->nChange = 0;
 		} else {
 			db->nChange = 0;
@@ -1962,9 +1891,7 @@ sqlVdbeHalt(Vdbe * p)
 		db->nVdbeActive--;
 	}
 	p->magic = VDBE_MAGIC_HALT;
-	checkActiveVdbeCnt(db);
-	if (db->mallocFailed)
-		p->is_aborted = true;
+	checkActiveVdbeCnt();
 
 	assert(db->nVdbeActive > 0 || box_txn() ||
 	       p->anonymous_savepoint == NULL);
@@ -2050,24 +1977,23 @@ sqlVdbeFinalize(Vdbe * p)
  * VdbeDelete() also unlinks the Vdbe from the list of VMs associated with
  * the database connection and frees the object itself.
  */
-void
-sqlVdbeClearObject(sql * db, Vdbe * p)
+static void
+sqlVdbeClearObject(struct Vdbe *p)
 {
 	SubProgram *pSub, *pNext;
-	assert(p->db == 0 || p->db == db);
 	vdbe_metadata_delete(p);
 	for (pSub = p->pProgram; pSub; pSub = pNext) {
 		pNext = pSub->pNext;
-		vdbeFreeOpArray(db, pSub->aOp, pSub->nOp);
-		sqlDbFree(db, pSub);
+		vdbeFreeOpArray(pSub->aOp, pSub->nOp);
+		sql_xfree(pSub);
 	}
 	if (p->magic != VDBE_MAGIC_INIT) {
 		releaseMemArray(p->aVar, p->nVar);
-		sqlDbFree(db, p->pVList);
-		sqlDbFree(db, p->pFree);
+		sql_xfree(p->pVList);
+		sql_xfree(p->pFree);
 	}
-	vdbeFreeOpArray(db, p->aOp, p->nOp);
-	sqlDbFree(db, p->zSql);
+	vdbeFreeOpArray(p->aOp, p->nOp);
+	sql_xfree(p->zSql);
 }
 
 /*
@@ -2076,52 +2002,32 @@ sqlVdbeClearObject(sql * db, Vdbe * p)
 void
 sqlVdbeDelete(Vdbe * p)
 {
-	sql *db;
-
 	if (NEVER(p == 0))
 		return;
-	db = p->db;
-	sqlVdbeClearObject(db, p);
+	sqlVdbeClearObject(p);
 	if (p->pPrev) {
 		p->pPrev->pNext = p->pNext;
 	} else {
-		assert(db->pVdbe == p);
-		db->pVdbe = p->pNext;
+		assert(sql_get()->pVdbe == p);
+		sql_get()->pVdbe = p->pNext;
 	}
 	if (p->pNext) {
 		p->pNext->pPrev = p->pPrev;
 	}
 	p->magic = VDBE_MAGIC_DEAD;
-	p->db = 0;
 	free(p->var_pos);
-	sqlDbFree(db, p);
+	sql_xfree(p);
 }
 
-/*
- * This routine is used to allocate sufficient space for an UnpackedRecord
- * structure large enough to be used with sqlVdbeRecordUnpack() if
- * the first argument is a pointer to key_def structure.
- *
- * The space is either allocated using sqlDbMallocRaw() or from within
- * the unaligned buffer passed via the second and third arguments (presumably
- * stack space). If the former, then *ppFree is set to a pointer that should
- * be eventually freed by the caller using sqlDbFree(). Or, if the
- * allocation comes from the pSpace/szSpace buffer, *ppFree is set to NULL
- * before returning.
- *
- * If an OOM error occurs, NULL is returned.
- */
-UnpackedRecord *
-sqlVdbeAllocUnpackedRecord(struct sql *db, struct key_def *key_def)
+struct UnpackedRecord *
+sqlVdbeAllocUnpackedRecord(struct key_def *key_def)
 {
 	UnpackedRecord *p;	/* Unpacked record to return */
 	int nByte;		/* Number of bytes required for *p */
 	nByte =
 	    ROUND8(sizeof(UnpackedRecord)) + sizeof(Mem) * (key_def->part_count +
 							    1);
-	p = (UnpackedRecord *) sqlDbMallocRaw(db, nByte);
-	if (!p)
-		return 0;
+	p = sql_xmalloc(nByte);
 	p->aMem = (Mem *) & ((char *)p)[ROUND8(sizeof(UnpackedRecord))];
 	for (uint32_t i = 0; i < key_def->part_count + 1; ++i)
 		mem_create(&p->aMem[i]);
@@ -2130,14 +2036,10 @@ sqlVdbeAllocUnpackedRecord(struct sql *db, struct key_def *key_def)
 	return p;
 }
 
-/*
- * This routine sets the value to be returned by subsequent calls to
- * sql_changes() on the database handle 'db'.
- */
 void
-sqlVdbeSetChanges(sql * db, int nChange)
+sqlVdbeSetChanges(int nChange)
 {
-	db->nChange = nChange;
+	sql_get()->nChange = nChange;
 }
 
 /*
@@ -2150,32 +2052,21 @@ sqlVdbeCountChanges(Vdbe * v)
 	v->changeCntOn = 1;
 }
 
-/*
- * Mark every prepared statement associated with a database connection
- * as expired.
+/**
+ * Mark every prepared statement as expired.
  *
- * An expired statement means that recompilation of the statement is
- * recommend.  Statements expire when things happen that make their
- * programs obsolete.  Removing user-defined functions or collating
- * sequences, or changing an authorization function are the types of
- * things that make prepared statements obsolete.
+ * An expired statement means that recompilation of the statement is recommend.
+ * Statements expire when things happen that make their programs obsolete.
+ * Removing user-defined functions or collating sequences, or changing an
+ * authorization function are the types of things that make prepared statements
+ * obsolete.
  */
 void
-sqlExpirePreparedStatements(sql * db)
+sqlExpirePreparedStatements(void)
 {
 	Vdbe *p;
-	for (p = db->pVdbe; p; p = p->pNext) {
+	for (p = sql_get()->pVdbe; p; p = p->pNext)
 		p->expired = p->is_sandboxed == 0 ? 1 : 0;
-	}
-}
-
-/*
- * Return the database associated with the Vdbe.
- */
-sql *
-sqlVdbeDb(Vdbe * v)
-{
-	return v->db;
 }
 
 const struct Mem *

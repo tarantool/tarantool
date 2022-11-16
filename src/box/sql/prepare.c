@@ -43,13 +43,11 @@ int
 sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 		 sql_stmt **ppStmt, const char **pzTail)
 {
-	struct sql *db = sql_get();
 	int rc = 0;	/* Result code */
 	Parse sParse;		/* Parsing context */
-	sql_parser_create(&sParse, db, current_session()->sql_flags);
+	sql_parser_create(&sParse, current_session()->sql_flags);
 	sParse.pReprepare = pReprepare;
 	*ppStmt = NULL;
-	/* assert( !db->mallocFailed ); // not true with SQL_USE_ALLOCA */
 
 	/* Check to verify that it is possible to get a read lock on all
 	 * database schemas.  The inability to get a read lock indicates that
@@ -69,18 +67,18 @@ sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 	 */
 	if (nBytes >= 0 && (nBytes == 0 || zSql[nBytes - 1] != 0)) {
 		char *zSqlCopy;
-		int mxLen = db->aLimit[SQL_LIMIT_SQL_LENGTH];
+		int mxLen = SQL_MAX_SQL_LENGTH;
 		if (nBytes > mxLen) {
 			diag_set(ClientError, ER_SQL_PARSER_LIMIT,
 				 "SQL command length", nBytes, mxLen);
 			rc = -1;
 			goto end_prepare;
 		}
-		zSqlCopy = sqlDbStrNDup(db, zSql, nBytes);
+		zSqlCopy = sql_xstrndup(zSql, nBytes);
 		if (zSqlCopy) {
 			sqlRunParser(&sParse, zSqlCopy);
 			sParse.zTail = &zSql[sParse.zTail - zSqlCopy];
-			sqlDbFree(db, zSqlCopy);
+			sql_xfree(zSqlCopy);
 		} else {
 			sParse.zTail = &zSql[nBytes];
 		}
@@ -89,8 +87,6 @@ sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 	}
 	assert(0 == sParse.nQueryLoop || sParse.is_aborted);
 
-	if (db->mallocFailed)
-		sParse.is_aborted = true;
 	if (pzTail) {
 		*pzTail = sParse.zTail;
 	}
@@ -143,11 +139,11 @@ sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 		}
 	}
 
-	if (db->init.busy == 0) {
+	if (sql_get()->init.busy == 0) {
 		Vdbe *pVdbe = sParse.pVdbe;
 		sqlVdbeSetSql(pVdbe, zSql, (int)(sParse.zTail - zSql));
 	}
-	if (sParse.pVdbe != NULL && (rc != 0 || db->mallocFailed)) {
+	if (sParse.pVdbe != NULL && rc != 0) {
 		sqlVdbeFinalize(sParse.pVdbe);
 		assert(!(*ppStmt));
 	} else {
@@ -158,7 +154,7 @@ sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 	while (sParse.pTriggerPrg) {
 		TriggerPrg *pT = sParse.pTriggerPrg;
 		sParse.pTriggerPrg = pT->pNext;
-		sqlDbFree(db, pT);
+		sql_xfree(pT);
 	}
 
  end_prepare:
@@ -191,10 +187,9 @@ sqlReprepare(Vdbe * p)
 }
 
 void
-sql_parser_create(struct Parse *parser, struct sql *db, uint32_t sql_flags)
+sql_parser_create(struct Parse *parser, uint32_t sql_flags)
 {
 	memset(parser, 0, sizeof(struct Parse));
-	parser->db = db;
 	parser->sql_flags = sql_flags;
 	parser->line_count = 1;
 	parser->line_pos = 1;
@@ -207,27 +202,23 @@ sql_parser_destroy(Parse *parser)
 {
 	assert(parser != NULL);
 	assert(!parser->parse_only || parser->pVdbe == NULL);
-	sql *db = parser->db;
-	sqlDbFree(db, parser->aLabel);
-	sql_expr_list_delete(db, parser->pConstExpr);
+	sql_xfree(parser->aLabel);
+	sql_expr_list_delete(parser->pConstExpr);
 	struct create_fk_constraint_parse_def *create_fk_constraint_parse_def =
 		&parser->create_fk_constraint_parse_def;
 	create_fk_constraint_parse_def_destroy(create_fk_constraint_parse_def);
-	if (db != NULL) {
-		assert(db->lookaside.bDisable >=
-		       parser->disableLookaside);
-		db->lookaside.bDisable -= parser->disableLookaside;
-	}
+	assert(sql_get()->lookaside.bDisable >= parser->disableLookaside);
+	sql_get()->lookaside.bDisable -= parser->disableLookaside;
 	parser->disableLookaside = 0;
 	switch (parser->parsed_ast_type) {
 	case AST_TYPE_SELECT:
-		sql_select_delete(db, parser->parsed_ast.select);
+		sql_select_delete(parser->parsed_ast.select);
 		break;
 	case AST_TYPE_EXPR:
-		sql_expr_delete(db, parser->parsed_ast.expr);
+		sql_expr_delete(parser->parsed_ast.expr);
 		break;
 	case AST_TYPE_TRIGGER:
-		sql_trigger_delete(db, parser->parsed_ast.trigger);
+		sql_trigger_delete(parser->parsed_ast.trigger);
 		break;
 	default:
 		assert(parser->parsed_ast_type == AST_TYPE_UNDEFINED);

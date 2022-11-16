@@ -137,26 +137,18 @@ sql_normalize_name(char *dst, int dst_size, const char *src, int src_len)
 }
 
 char *
-sql_normalized_name_db_new(struct sql *db, const char *name, int len)
+sql_normalized_name_new(const char *name, int len)
 {
 	int size = len + 1;
-	ERROR_INJECT(ERRINJ_SQL_NAME_NORMALIZATION, {
-		diag_set(OutOfMemory, size, "sqlDbMallocRawNN", "res");
-		return NULL;
-	});
-	char *res = sqlDbMallocRawNN(db, size);
-	if (res == NULL)
-		return NULL;
+	char *res = sql_xmalloc(size);
 	int rc = sql_normalize_name(res, size, name, len);
 	if (rc <= size)
 		return res;
 
 	size = rc;
-	res = sqlDbReallocOrFree(db, res, size);
-	if (res == NULL)
-		return NULL;
-	if (sql_normalize_name(res, size, name, len) > size)
-		unreachable();
+	res = sql_xrealloc(res, size);
+	rc = sql_normalize_name(res, size, name, len);
+	assert(rc <= size);
 	return res;
 }
 
@@ -906,28 +898,17 @@ sqlHexToInt(int h)
 	return (u8) (h & 0xf);
 }
 
-/*
- * Convert a BLOB literal of the form "x'hhhhhh'" into its binary
- * value.  Return a pointer to its binary value.  Space to hold the
- * binary value has been obtained from malloc and must be freed by
- * the calling routine.
- */
 void *
-sqlHexToBlob(sql * db, const char *z, int n)
+sqlHexToBlob(const char *z, int n)
 {
 	char *zBlob;
 	int i;
 
-	zBlob = (char *)sqlDbMallocRawNN(db, n / 2 + 1);
+	zBlob = sql_xmalloc(n / 2 + 1);
 	n--;
-	if (zBlob) {
-		for (i = 0; i < n; i += 2) {
-			zBlob[i / 2] =
-			    (sqlHexToInt(z[i]) << 4) |
-			    sqlHexToInt(z[i + 1]);
-		}
-		zBlob[i / 2] = 0;
-	}
+	for (i = 0; i < n; i += 2)
+		zBlob[i / 2] = (sqlHexToInt(z[i]) << 4) | sqlHexToInt(z[i + 1]);
+	zBlob[i / 2] = 0;
 	return zBlob;
 }
 
@@ -1193,49 +1174,8 @@ sqlLogEstToInt(LogEst x)
 	return x >= 3 ? (n + 8) << (x - 3) : (n + 8) >> (3 - x);
 }
 
-/*
- * Add a new name/number pair to a VList.  This might require that the
- * VList object be reallocated, so return the new VList.  If an OOM
- * error occurs, the original VList returned and the
- * db->mallocFailed flag is set.
- *
- * A VList is really just an array of integers.  To destroy a VList,
- * simply pass it to sqlDbFree().
- *
- * The first integer is the number of integers allocated for the whole
- * VList.  The second integer is the number of integers actually used.
- * Each name/number pair is encoded by subsequent groups of 3 or more
- * integers.
- *
- * Each name/number pair starts with two integers which are the numeric
- * value for the pair and the size of the name/number pair, respectively.
- * The text name overlays one or more following integers.  The text name
- * is always zero-terminated.
- *
- * Conceptually:
- *
- *    struct VList {
- *      int nAlloc;   // Number of allocated slots
- *      int nUsed;    // Number of used slots
- *      struct VListEntry {
- *        int iValue;    // Value for this entry
- *        int nSlot;     // Slots used by this entry
- *        // ... variable name goes here
- *      } a[0];
- *    }
- *
- * During code generation, pointers to the variable names within the
- * VList are taken.  When that happens, nAlloc is set to zero as an
- * indication that the VList may never again be enlarged, since the
- * accompanying realloc() would invalidate the pointers.
- */
-VList *
-sqlVListAdd(sql * db,	/* The database connection used for malloc() */
-		VList * pIn,	/* The input VList.  Might be NULL */
-		const char *zName,	/* Name of symbol to add */
-		int nName,	/* Bytes of text in zName */
-		int iVal	/* Value to associate with zName */
-    )
+int *
+sqlVListAdd(int *pIn, const char *zName, int nName, int iVal)
 {
 	int nInt;		/* number of sizeof(int) objects needed for zName */
 	char *z;		/* Pointer to where zName will be stored */
@@ -1246,9 +1186,7 @@ sqlVListAdd(sql * db,	/* The database connection used for malloc() */
 	if (pIn == 0 || pIn[1] + nInt > pIn[0]) {
 		/* Enlarge the allocation */
 		int nAlloc = (pIn ? pIn[0] * 2 : 10) + nInt;
-		VList *pOut = sqlDbRealloc(db, pIn, nAlloc * sizeof(int));
-		if (pOut == 0)
-			return pIn;
+		VList *pOut = sql_xrealloc(pIn, nAlloc * sizeof(int));
 		if (pIn == 0)
 			pOut[1] = 2;
 		pIn = pOut;

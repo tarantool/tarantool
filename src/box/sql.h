@@ -78,7 +78,7 @@ struct func;
  * surrounding the expression w/ 'SELECT ' prefix and perform
  * convetional parsing. Then extract result expression value from
  * stuct Select and return it.
- * @param db SQL context handle.
+ *
  * @param expr Expression to parse.
  * @param expr_len Length of @an expr.
  *
@@ -86,18 +86,17 @@ struct func;
  * @retval not NULL Expr AST pointer on success.
  */
 struct Expr *
-sql_expr_compile(struct sql *db, const char *expr, int expr_len);
+sql_expr_compile(const char *expr, int expr_len);
 
 /**
  * This routine executes parser on 'CREATE VIEW ...' statement
  * and loads content of SELECT into internal structs as result.
  *
- * @param db Current SQL context.
  * @param view_stmt String containing 'CREATE VIEW' statement.
  * @retval AST of SELECT statement on success, NULL otherwise.
  */
 struct Select *
-sql_view_compile(struct sql *db, const char *view_stmt);
+sql_view_compile(const char *view_stmt);
 
 /**
  * Perform parsing of provided SQL request and construct trigger AST.
@@ -108,15 +107,15 @@ sql_view_compile(struct sql *db, const char *view_stmt);
  * @retval not NULL sql_trigger AST pointer on success.
  */
 struct sql_trigger *
-sql_trigger_compile(struct sql *db, const char *sql);
+sql_trigger_compile(const char *sql);
 
 /**
  * Free AST pointed by trigger.
- * @param db SQL handle.
+ *
  * @param trigger AST object.
  */
 void
-sql_trigger_delete(struct sql *db, struct sql_trigger *trigger);
+sql_trigger_delete(struct sql_trigger *trigger);
 
 /**
  * Get server triggers list by space_id.
@@ -190,27 +189,12 @@ int
 sql_expr_sizeof(struct Expr *p, int flags);
 
 /**
- * This function is similar to sqlExprDup(), except that if pzBuffer
- * is not NULL then *pzBuffer is assumed to point to a buffer large enough
- * to store the copy of expression p, the copies of p->u.zToken
- * (if applicable), and the copies of the p->pLeft and p->pRight expressions,
- * if any. Before returning, *pzBuffer is set to the first byte past the
- * portion of the buffer copied into by this function.
- * @param db SQL handle.
- * @param p Root of expression's AST.
- * @param dupFlags EXPRDUP_REDUCE or 0.
- * @param pzBuffer If not NULL, then buffer to store duplicate.
- */
-struct Expr *
-sql_expr_dup(struct sql *db, struct Expr *p, int flags, char **buffer);
-
-/**
  * Free AST pointed by expr.
- * @param db SQL handle.
+ *
  * @param expr Root pointer of ASR
  */
 void
-sql_expr_delete(struct sql *db, struct Expr *expr);
+sql_expr_delete(struct Expr *expr);
 
 /**
  * Create and initialize a new template space object.
@@ -229,34 +213,32 @@ sql_template_space_new(struct Parse *parser, const char *name);
  * returned is a truncated version of the usual Expr structure
  * that will be stored as part of the in-memory representation of
  * the database schema.
- * @param db The database connection.
+ *
  * @param p The ExprList to duplicate.
  * @param flags EXPRDUP_XXX flags.
- * @retval NULL on memory allocation error.
+ * @retval NULL if original expr list is NULL.
  * @retval not NULL on success.
  */
 struct ExprList *
-sql_expr_list_dup(struct sql *db, struct ExprList *p, int flags);
+sql_expr_list_dup(struct ExprList *p, int flags);
 
 /**
  * Free AST pointed by expr list.
- * @param db SQL handle.
+ *
  * @param expr_list Root pointer of ExprList.
  */
 void
-sql_expr_list_delete(struct sql *db, struct ExprList *expr_list);
+sql_expr_list_delete(struct ExprList *expr_list);
 
 /**
  * Add a new element to the end of an expression list.
- * @param db SQL handle.
+ *
  * @param expr_list List to which to append. Might be NULL.
  * @param expr Expression to be appended. Might be NULL.
- * @retval NULL on memory allocation error. The list is freed.
  * @retval not NULL on success.
  */
 struct ExprList *
-sql_expr_list_append(struct sql *db, struct ExprList *expr_list,
-		     struct Expr *expr);
+sql_expr_list_append(struct ExprList *expr_list, struct Expr *expr);
 
 /**
  * Resolve names in expressions that can only reference a single
@@ -281,11 +263,10 @@ sql_resolve_self_reference(struct Parse *parser, struct space_def *def,
  * A number of service allocations are performed on the region,
  * which is also cleared in the destroy function.
  * @param parser object to initialize.
- * @param db sql object.
  * @param sql_flags flags to control parser behaviour.
  */
 void
-sql_parser_create(struct Parse *parser, struct sql *db, uint32_t sql_flags);
+sql_parser_create(struct Parse *parser, uint32_t sql_flags);
 
 /**
  * Release the parser object resources.
@@ -298,11 +279,10 @@ sql_parser_destroy(struct Parse *parser);
  * Release memory allocated for given SELECT and all of its
  * substructures. It accepts NULL pointers.
  *
- * @param db Database handler.
  * @param select Select to be freed.
  */
 void
-sql_select_delete(struct sql *db, struct Select *select);
+sql_select_delete(struct Select *select);
 
 /**
  * Collect all table names within given select, including
@@ -352,7 +332,7 @@ sql_src_list_entry_name(const struct SrcList *list, int i);
 
 /** Delete an entire SrcList including all its substructure. */
 void
-sqlSrcListDelete(struct sql *db, struct SrcList *list);
+sqlSrcListDelete(struct SrcList *list);
 
 /**
  * Auxiliary VDBE structure to speed-up tuple data field access.

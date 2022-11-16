@@ -171,7 +171,6 @@ port_sql_dump_lua(struct port *port, struct lua_State *L, bool is_flat)
 	(void) is_flat;
 	assert(is_flat == false);
 	assert(port->vtab == &port_sql_vtab);
-	struct sql *db = sql_get();
 	struct port_sql *port_sql = (struct port_sql *)port;
 	struct sql_stmt *stmt = port_sql->stmt;
 	switch (port_sql->serialization_format) {
@@ -189,7 +188,7 @@ port_sql_dump_lua(struct port *port, struct lua_State *L, bool is_flat)
 			vdbe_autoinc_id_list((struct Vdbe *) stmt);
 		lua_createtable(L, 0, stailq_empty(autoinc_id_list) ? 1 : 2);
 
-		luaL_pushuint64(L, db->nChange);
+		luaL_pushuint64(L, sql_get()->nChange);
 		lua_setfield(L, -2, sql_info_key_strs[SQL_INFO_ROW_COUNT]);
 
 		if (!stailq_empty(autoinc_id_list)) {
