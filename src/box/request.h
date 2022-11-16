@@ -38,6 +38,7 @@ extern "C" {
 struct request;
 struct space;
 struct tuple;
+struct region;
 
 /**
  * Given old and new tuples, initialize the corresponding
@@ -47,6 +48,7 @@ struct tuple;
  * @param space - space corresponding to request
  * @param old_tuple - the old tuple
  * @param new_tuple - the new tuple
+ * @param region - region where request parts will be allocated
  *
  * If old_tuple and new_tuple are the same, the request is turned into NOP.
  * If new_tuple is NULL, the request is turned into DELETE(old_tuple).
@@ -54,7 +56,8 @@ struct tuple;
  */
 int
 request_create_from_tuple(struct request *request, struct space *space,
-			  struct tuple *old_tuple, struct tuple *new_tuple);
+			  struct tuple *old_tuple, struct tuple *new_tuple,
+			  struct region *region);
 
 /**
  * Convert a request accessing a secondary key to a primary
@@ -65,19 +68,23 @@ request_create_from_tuple(struct request *request, struct space *space,
  * @param request - request to fix
  * @param space - space corresponding to request
  * @param found_tuple - tuple found by secondary key
+ * @param region - region where request key will be allocated
  */
 void
 request_rebind_to_primary_key(struct request *request, struct space *space,
-			      struct tuple *found_tuple);
+			      struct tuple *found_tuple,
+			      struct region *region);
 
 /**
  * Handle INSERT/REPLACE in a space with a sequence attached.
  *
  * @param request - request to fix
  * @param space - space corresponding to request
+ * @param region -region where sequence value will be allocated
  */
 int
-request_handle_sequence(struct request *request, struct space *space);
+request_handle_sequence(struct request *request, struct space *space,
+			struct region *region);
 
 #if defined(__cplusplus)
 } /* extern "C" */

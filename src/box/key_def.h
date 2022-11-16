@@ -37,6 +37,7 @@
 #include "field_def.h"
 #include "coll_id.h"
 #include "tuple_compare.h"
+#include "fiber.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -150,13 +151,15 @@ typedef int (*tuple_compare_t)(struct tuple *tuple_a,
 typedef char *(*tuple_extract_key_t)(struct tuple *tuple,
 				     struct key_def *key_def,
 				     int multikey_idx,
-				     uint32_t *key_size);
+				     uint32_t *key_size,
+				     struct region *region);
 /** @copydoc tuple_extract_key_raw() */
 typedef char *(*tuple_extract_key_raw_t)(const char *data,
 					 const char *data_end,
 					 struct key_def *key_def,
 					 int multikey_idx,
-					 uint32_t *key_size);
+					 uint32_t *key_size,
+					 struct region *region);
 /** @copydoc tuple_hash() */
 typedef uint32_t (*tuple_hash_t)(struct tuple *tuple,
 				 struct key_def *key_def);
@@ -916,8 +919,20 @@ int
 tuple_validate_key_parts(struct key_def *key_def, struct tuple *tuple);
 
 /**
+ * Same as tuple_extract_key but accept region to allocate result on.
+ */
+static inline char *
+tuple_extract_key_to_region(struct tuple *tuple, struct key_def *key_def,
+			    int multikey_idx, uint32_t *key_size,
+			    struct region *region)
+{
+	return key_def->tuple_extract_key(tuple, key_def, multikey_idx,
+					  key_size, region);
+}
+
+/**
  * Extract key from tuple by given key definition and return
- * buffer allocated on box_txn_alloc with this key. This function
+ * it on fiber gc. This function
  * has O(n) complexity, where n is the number of key parts.
  * @param tuple - tuple from which need to extract key
  * @param key_def - definition of key that need to extract
@@ -931,8 +946,20 @@ static inline char *
 tuple_extract_key(struct tuple *tuple, struct key_def *key_def,
 		  int multikey_idx, uint32_t *key_size)
 {
-	return key_def->tuple_extract_key(tuple, key_def, multikey_idx,
-					  key_size);
+	return tuple_extract_key_to_region(tuple, key_def, multikey_idx,
+					   key_size, &fiber()->gc);
+}
+
+/**
+ * Same as tuple_extract_key_raw but accept region to allocate result on.
+ */
+static inline char *
+tuple_extract_key_raw_to_region(const char *data, const char *data_end,
+				struct key_def *key_def, int multikey_idx,
+				uint32_t *key_size, struct region *region)
+{
+	return key_def->tuple_extract_key_raw(data, data_end, key_def,
+					      multikey_idx, key_size, region);
 }
 
 /**
@@ -954,8 +981,9 @@ tuple_extract_key_raw(const char *data, const char *data_end,
 		      struct key_def *key_def, int multikey_idx,
 		      uint32_t *key_size)
 {
-	return key_def->tuple_extract_key_raw(data, data_end, key_def,
-					      multikey_idx, key_size);
+	return tuple_extract_key_raw_to_region(data, data_end, key_def,
+					       multikey_idx, key_size,
+					       &fiber()->gc);
 }
 
 /**
