@@ -3,7 +3,7 @@ local net = require('net.box')
 local replica_set = require('luatest.replica_set')
 local server = require('luatest.server')
 
-local g = t.group('gh_6260')
+local g = t.group('builtin_events')
 
 g.test_subscriptions_outside_box_cfg = function()
     local sys_events = {'box.id', 'box.status', 'box.election', 'box.schema'}
@@ -318,4 +318,87 @@ g.test_box_id = function(cg)
 
     watcher:unregister()
     c:close()
+end
+
+g.before_test('test_internal_ballot', function(cg)
+    cg.replica_set = replica_set:new({})
+    cg.master = cg.replica_set:build_and_add_server({
+        alias = 'master',
+        box_cfg = {
+            replication_timeout = 0.1,
+        },
+    })
+    cg.replica = cg.replica_set:build_and_add_server({
+        alias = 'replica',
+        box_cfg = {
+            replication = server.build_listen_uri('master'),
+            replication_timeout = 0.1,
+            replication_anon = true,
+            read_only = true,
+            checkpoint_count = 1,
+        },
+        env = {
+            ['TARANTOOL_RUN_BEFORE_BOX_CFG'] = [[
+                rawset(_G, 'ballot', {})
+                rawset(_G, 't', require('luatest'))
+                box.watch('internal.ballot', function(key, event)
+                    assert(key == 'internal.ballot', 'Event key is correct')
+                    local tbl = event[box.iproto.key.BALLOT] or event
+                    ballot = table.deepcopy(tbl)
+                end)
+            ]],
+        },
+    })
+    cg.replica_set:start()
+end)
+
+g.after_test('test_internal_ballot', function(cg)
+    cg.replica_set:drop()
+end)
+
+local function wait_ballot_updated_to(expected)
+    _G.t.helpers.retrying({}, function(expected)
+        _G.t.assert_equals(_G.ballot, expected, 'Ballot is up to date')
+    end, expected)
+end
+
+g.test_internal_ballot = function(cg)
+    local old_vclock = cg.master:get_vclock()
+    local vclock = cg.master:exec(function()
+        box.schema.space.create('test')
+        box.space.test:create_index('pk')
+        box.space.test:insert{1}
+        return box.info.vclock
+    end)
+    local ballot_key = box.iproto.ballot_key
+    local expected = {
+        [ballot_key.IS_RO_CFG] = true,
+        [ballot_key.VCLOCK] = vclock,
+        [ballot_key.GC_VCLOCK] = old_vclock,
+        [ballot_key.IS_RO] = true,
+        [ballot_key.IS_ANON] = true,
+        [ballot_key.IS_BOOTED] = true,
+        [ballot_key.CAN_LEAD] = false,
+    }
+    cg.replica:exec(wait_ballot_updated_to, {expected})
+
+    cg.replica:exec(function() box.snapshot() end)
+    expected[ballot_key.GC_VCLOCK] = vclock
+    cg.replica:exec(wait_ballot_updated_to, {expected})
+
+    cg.replica:exec(function() box.cfg{replication_anon = false} end)
+    expected[ballot_key.IS_ANON] = false
+    -- Replica registration bumps vclock.
+    expected[ballot_key.VCLOCK] = cg.master:get_vclock()
+    cg.replica:exec(wait_ballot_updated_to, {expected})
+
+    cg.replica:exec(function() box.cfg{read_only = false} end)
+    expected[ballot_key.IS_RO_CFG] = false
+    expected[ballot_key.IS_RO] = false
+    cg.replica:exec(wait_ballot_updated_to, {expected})
+
+    cg.replica:exec(function() box.cfg{election_mode = 'manual'} end)
+    expected[ballot_key.CAN_LEAD] = true
+    expected[ballot_key.IS_RO] = true
+    cg.replica:exec(wait_ballot_updated_to, {expected})
 end

@@ -102,7 +102,7 @@ gc_checkpoint_delete(struct gc_checkpoint *checkpoint)
 }
 
 void
-gc_init(void)
+gc_init(on_garbage_collection_f on_garbage_collection)
 {
 	/* Don't delete any files until recovery is complete. */
 	gc.min_checkpoint_count = INT_MAX;
@@ -126,6 +126,8 @@ gc_init(void)
 					       gc_checkpoint_fiber_f);
 	if (gc.checkpoint_fiber == NULL)
 		panic("failed to start checkpoint daemon fiber");
+
+	gc.on_garbage_collection = on_garbage_collection;
 
 	fiber_start(gc.cleanup_fiber);
 	fiber_start(gc.checkpoint_fiber);
@@ -236,6 +238,7 @@ gc_run_cleanup(void)
 		engine_collect_garbage(&checkpoint->vclock);
 	if (run_wal_gc)
 		wal_collect_garbage(&min_vclock);
+	gc.on_garbage_collection();
 }
 
 static int
@@ -403,6 +406,7 @@ gc_advance(const struct vclock *vclock)
 		consumer = next;
 	}
 	gc_schedule_cleanup();
+	gc.on_garbage_collection();
 }
 
 void

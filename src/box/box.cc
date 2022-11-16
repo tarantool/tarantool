@@ -108,6 +108,8 @@ const struct vclock *box_vclock = &replicaset.vclock;
 
 const char *box_auth_type;
 
+const char *box_ballot_event_key = "internal.ballot";
+
 /**
  * Set if backup is in progress, i.e. box_backup_start() was
  * called but box_backup_stop() hasn't been yet.
@@ -235,6 +237,49 @@ box_storage_init(void);
 static void
 box_broadcast_status(void);
 
+/** Broadcast this instance's ballot. */
+static void
+box_broadcast_ballot(void);
+
+/**
+ * A timer to broadcast the updated vclock. Doing this on each vclock update
+ * would be too expensive.
+ */
+static ev_timer box_broadcast_ballot_timer;
+
+/** Set a new interval for vclock updates in ballot. */
+static void
+box_update_broadcast_ballot_interval(double interval)
+{
+	static double ballot_broadcast_interval;
+	/* Do the broadcast at least once a second. */
+	interval = MIN(interval, 1.0);
+	if (interval == ballot_broadcast_interval)
+		return;
+	double timeout = ev_timer_remaining(loop(),
+					    &box_broadcast_ballot_timer);
+	timeout -= ballot_broadcast_interval;
+	timeout += interval;
+	ev_timer_stop(loop(), &box_broadcast_ballot_timer);
+	ev_timer_set(&box_broadcast_ballot_timer, timeout, interval);
+	ev_timer_start(loop(), &box_broadcast_ballot_timer);
+	ballot_broadcast_interval = interval;
+}
+
+/** A callback to broadcast updated vclock in ballot by timeout. */
+static void
+box_broadcast_ballot_on_timeout(ev_loop *loop, ev_timer *timer, int events)
+{
+	(void)loop;
+	(void)timer;
+	(void)events;
+	static struct vclock broadcast_vclock;
+	if (vclock_compare_ignore0(&broadcast_vclock, &replicaset.vclock) == 0)
+		return;
+	box_broadcast_ballot();
+	vclock_copy(&broadcast_vclock, &replicaset.vclock);
+}
+
 /**
  * Generate and update the instance status title
  */
@@ -263,6 +308,7 @@ box_update_ro_summary(void)
 	fiber_cond_broadcast(&ro_cond);
 	box_broadcast_status();
 	box_broadcast_election();
+	box_broadcast_ballot();
 }
 
 const char *
@@ -1582,6 +1628,7 @@ box_set_election_mode(void)
 	if (mode == ELECTION_MODE_INVALID)
 		return -1;
 	box_raft_cfg_election_mode(mode);
+	box_broadcast_ballot();
 	return 0;
 }
 
@@ -1683,6 +1730,7 @@ box_set_replication_timeout(void)
 {
 	replication_timeout = box_check_replication_timeout();
 	raft_cfg_death_timeout(box_raft(), replication_disconnect_timeout());
+	box_update_broadcast_ballot_interval(replication_timeout);
 }
 
 void
@@ -1793,6 +1841,7 @@ box_set_replication_anon(void)
 		});
 		/* Turn anonymous instance into a normal one. */
 		replication_anon = anon;
+		box_broadcast_ballot();
 		/*
 		 * Reset all appliers. This will interrupt
 		 * anonymous follow they're in so that one of
@@ -1824,6 +1873,7 @@ box_set_replication_anon(void)
 		guard.is_active = false;
 	} else if (!is_box_configured) {
 		replication_anon = anon;
+		box_broadcast_ballot();
 	} else {
 		/*
 		 * It is forbidden to turn a normal replica into
@@ -1833,7 +1883,6 @@ box_set_replication_anon(void)
 			  "cannot be turned on after bootstrap"
 			  " has finished");
 	}
-
 }
 
 /** Trigger to catch ACKs from all nodes when need to wait for quorum. */
@@ -4005,6 +4054,7 @@ bootstrap(const struct tt_uuid *instance_uuid,
 		tt_uuid_create(&INSTANCE_UUID);
 
 	box_broadcast_id();
+	box_broadcast_ballot();
 	say_info("instance uuid %s", tt_uuid_str(&INSTANCE_UUID));
 
 	/*
@@ -4121,6 +4171,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	 */
 	recovery_scan(recovery, &replicaset.vclock, &gc.vclock,
 		      &wal_stream.base);
+	box_broadcast_ballot();
 	say_info("instance vclock %s", vclock_to_string(&replicaset.vclock));
 
 	if (wal_dir_lock >= 0) {
@@ -4433,6 +4484,7 @@ box_cfg_xc(void)
 	replicaset_follow();
 
 	is_box_configured = true;
+	box_broadcast_ballot();
 	/*
 	 * Fill in leader election parameters after bootstrap. Before it is not
 	 * possible - there may be relevant data to recover from WAL and
@@ -4596,6 +4648,15 @@ builtin_events_init(void)
 	box_broadcast_fmt("box.schema", "{}");
 	box_broadcast_fmt("box.status", "{}");
 	box_broadcast_fmt("box.election", "{}");
+	box_broadcast_fmt(box_ballot_event_key, "{}");
+	ev_timer_init(&box_broadcast_ballot_timer,
+		      box_broadcast_ballot_on_timeout, 0, 0);
+}
+
+static void
+builtin_events_free(void)
+{
+	ev_timer_stop(loop(), &box_broadcast_ballot_timer);
 }
 
 void
@@ -4670,6 +4731,21 @@ box_broadcast_schema(void)
 	assert((size_t)(w - buf) < sizeof(buf));
 }
 
+static void
+box_broadcast_ballot(void)
+{
+	char buf[1024];
+	char *w = buf;
+	struct ballot ballot;
+	box_process_vote(&ballot);
+	w = mp_encode_ballot(w, &ballot);
+
+	box_broadcast(box_ballot_event_key, strlen(box_ballot_event_key), buf,
+		      w);
+
+	assert(mp_sizeof_ballot_max(&ballot) < sizeof(buf));
+}
+
 void
 box_read_ffi_disable(void)
 {
@@ -4688,6 +4764,12 @@ box_read_ffi_enable(void)
 }
 
 static void
+on_garbage_collection(void)
+{
+	box_broadcast_ballot();
+}
+
+static void
 box_storage_init(void)
 {
 	assert(!is_storage_initialized);
@@ -4702,7 +4784,7 @@ box_storage_init(void)
 	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
 	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);
 
-	gc_init();
+	gc_init(on_garbage_collection);
 	engine_init();
 	schema_init();
 	replication_init(cfg_geti_default("replication_threads", 1));
@@ -4776,6 +4858,7 @@ void
 box_free(void)
 {
 	box_storage_free();
+	builtin_events_free();
 	security_free();
 	auth_free();
 	wal_ext_free();

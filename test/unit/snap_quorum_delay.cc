@@ -231,12 +231,18 @@ test_snap_delay(va_list ap)
 }
 } /* end of anonymous namespace */
 
+void
+on_garbage_collection(void)
+{
+	/* no-op. */
+}
+
 int
 main(void)
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	gc_init();
+	gc_init(on_garbage_collection);
 	txn_limbo_init();
 	instance_id = 1;
 
