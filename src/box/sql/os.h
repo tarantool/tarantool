@@ -145,7 +145,7 @@ int sqlOsCurrentTimeInt64(sql_vfs *, sql_int64 *);
 
 /*
  * Convenience functions for opening and closing files using
- * sql_malloc() to obtain space for the file-handle structure.
+ * malloc() to obtain space for the file-handle structure.
  */
 int sqlOsOpenMalloc(sql_vfs *, const char *, sql_file **, int,
 			int *);

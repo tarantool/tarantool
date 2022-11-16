@@ -63,13 +63,13 @@ sqlHashClear(Hash * pH)
 	assert(pH != 0);
 	elem = pH->first;
 	pH->first = 0;
-	sql_free(pH->ht);
+	free(pH->ht);
 	pH->ht = 0;
 	pH->htsize = 0;
 	while (elem) {
 		HashElem *next_elem = elem->next;
 		free(elem->pKey);
-		sql_free(elem);
+		free(elem);
 		elem = next_elem;
 	}
 	pH->count = 0;
@@ -130,12 +130,7 @@ insertElement(Hash * pH,	/* The complete hash table */
 	}
 }
 
-/* Resize the hash table so that it cantains "new_size" buckets.
- *
- * The hash table might fail to resize if sql_malloc() fails or
- * if the new size is the same as the prior size.
- * Return TRUE if the resize occurs and false if not.
- */
+/** Resize the hash table to contain "new_size" buckets. */
 static int
 rehash(Hash * pH, unsigned int new_size)
 {
@@ -149,13 +144,10 @@ rehash(Hash * pH, unsigned int new_size)
 	if (new_size == pH->htsize)
 		return 0;
 #endif
-	new_ht = (struct _ht *)sqlMalloc(new_size * sizeof(struct _ht));
-
-	if (new_ht == 0)
-		return 0;
-	sql_free(pH->ht);
+	new_ht = xmalloc(new_size * sizeof(struct _ht));
+	free(pH->ht);
 	pH->ht = new_ht;
-	pH->htsize = new_size = sqlMallocSize(new_ht) / sizeof(struct _ht);
+	pH->htsize = new_size;
 	memset(new_ht, 0, new_size * sizeof(struct _ht));
 	for (elem = pH->first, pH->first = 0; elem; elem = next_elem) {
 		unsigned int h = strHash(elem->pKey) % new_size;
@@ -228,7 +220,7 @@ removeElementGivenHash(Hash * pH,	/* The pH containing "elem" */
 		assert(pEntry->count >= 0);
 	}
 	free(elem->pKey);
-	sql_free(elem);
+	free(elem);
 	pH->count--;
 	if (pH->count == 0) {
 		assert(pH->first == 0);
@@ -261,8 +253,7 @@ sqlHashFind(const Hash * pH, const char *pKey)
  *
  * If another element already exists with the same key, then the
  * new data replaces the old data and the old data is returned.
- * The key is not copied in this instance.  If a malloc fails, then
- * the new data is returned and the hash table is unchanged.
+ * The key is not copied in this instance.
  *
  * If the "data" parameter to this function is NULL, then the
  * element corresponding to "key" is removed from the hash table.
@@ -290,14 +281,8 @@ sqlHashInsert(Hash * pH, const char *pKey, void *data)
 	}
 	if (data == 0)
 		return 0;
-	new_elem = (HashElem *) sqlMalloc(sizeof(HashElem));
-	if (new_elem == 0)
-		return data;
-	new_elem->pKey = strdup(pKey);
-	if (new_elem->pKey == NULL) {
-		sql_free(new_elem);
-		return data;
-	}
+	new_elem = xmalloc(sizeof(HashElem));
+	new_elem->pKey = xstrdup(pKey);
 	new_elem->data = data;
 	pH->count++;
 	if (pH->count >= 10 && pH->count > 2 * pH->htsize) {

@@ -46,8 +46,9 @@
 #include "box/coll_id_cache.h"
 #include "box/schema.h"
 
-/* Forward declaration of methods */
-static int whereLoopResize(sql *, WhereLoop *, int);
+/** Increase the memory allocation for p->aLTerm[] to be at least n. */
+static void
+whereLoopResize(struct WhereLoop *p, int n);
 
 /* Test variable that can be set to enable WHERE tracing */
 #ifdef SQL_DEBUG
@@ -789,11 +790,7 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 			Bitmask cMask =
 			    iCol >= BMS ? MASKBIT(BMS - 1) : MASKBIT(iCol);
 			if ((idxCols & cMask) == 0) {
-				if (whereLoopResize
-				    (pParse->db, pLoop, nKeyCol + 1)) {
-					pParse->is_aborted = true;
-					return;
-				}
+				whereLoopResize(pLoop, nKeyCol + 1);
 				pLoop->aLTerm[nKeyCol++] = pTerm;
 				idxCols |= cMask;
 			}
@@ -960,13 +957,15 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
  * into the aSample[] array - it is an index into a virtual set of samples
  * based on the contents of aSample[] and the number of fields in record
  * pRec.
+ *
+ * @param idx_def Definition of index.
+ * @param pRec Vector of values to consider.
+ * @param roundUp Round up if true.  Round down if false.
+ * @param[out] aStat stats written here.
  */
 static int
-whereKeyStats(Parse * pParse,	/* Database connection */
-	      struct index_def *idx_def,
-	      UnpackedRecord * pRec,	/* Vector of values to consider */
-	      int roundUp,	/* Round up if true.  Round down if false */
-	      tRowcnt * aStat)	/* OUT: stats written here */
+whereKeyStats(struct index_def *idx_def, struct UnpackedRecord *pRec,
+	      int roundUp, unsigned *aStat)
 {
 	struct space *space = space_by_id(idx_def->space_id);
 	assert(space != NULL);
@@ -985,9 +984,6 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 	int nField;		/* Number of fields in pRec */
 	tRowcnt iLower = 0;	/* anLt[] + anEq[] of largest sample pRec is > */
 
-#ifndef SQL_DEBUG
-	UNUSED_PARAMETER(pParse);
-#endif
 	assert(pRec != 0);
 	assert(pRec->nField > 0);
 
@@ -1083,45 +1079,41 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 	 * above found the right answer. This block serves no purpose other
 	 * than to invoke the asserts.
 	 */
-	if (pParse->db->mallocFailed == 0) {
-		if (res == 0) {
-			/* If (res==0) is true, then pRec must be equal to sample i. */
-			assert(i < (int) sample_count);
-			assert(iCol == nField - 1);
-			pRec->nField = nField;
-			assert(0 ==
-			       sqlVdbeRecordCompareMsgpack(samples[i].sample_key,
-							       pRec)
-			       || pParse->db->mallocFailed);
-		} else {
-			/* Unless i==pIdx->nSample, indicating that pRec is larger than
-			 * all samples in the aSample[] array, pRec must be smaller than the
-			 * (iCol+1) field prefix of sample i.
-			 */
-			assert(i <= (int) sample_count && i >= 0);
-			pRec->nField = iCol + 1;
-			assert(i == (int) sample_count ||
-			       sqlVdbeRecordCompareMsgpack(samples[i].sample_key,
-							       pRec) > 0
-			       || pParse->db->mallocFailed);
+	if (res == 0) {
+		/* If res == 0, then pRec must be equal to sample i. */
+		assert(i < (int)sample_count);
+		assert(iCol == nField - 1);
+		pRec->nField = nField;
+		assert(sqlVdbeRecordCompareMsgpack(samples[i].sample_key,
+						   pRec) == 0);
+	} else {
+		/*
+		 * Unless i == pIdx->nSample, indicating that pRec is larger
+		 * than all samples in the aSample[] array, pRec must be smaller
+		 * than the iCol + 1 field prefix of sample i.
+		 */
+		assert(i <= (int)sample_count && i >= 0);
+		pRec->nField = iCol + 1;
+		assert(i == (int)sample_count ||
+		       sqlVdbeRecordCompareMsgpack(samples[i].sample_key,
+						   pRec) > 0);
 
-			/* if i==0 and iCol==0, then record pRec is smaller than all samples
-			 * in the aSample[] array. Otherwise, if (iCol>0) then pRec must
-			 * be greater than or equal to the (iCol) field prefix of sample i.
-			 * If (i>0), then pRec must also be greater than sample (i-1).
-			 */
-			if (iCol > 0) {
-				pRec->nField = iCol;
-				assert(sqlVdbeRecordCompareMsgpack
-				       (samples[i].sample_key, pRec) <= 0
-				       || pParse->db->mallocFailed);
-			}
-			if (i > 0) {
-				pRec->nField = nField;
-				assert(sqlVdbeRecordCompareMsgpack
-				       (samples[i - 1].sample_key, pRec) < 0 ||
-				       pParse->db->mallocFailed);
-			}
+		/*
+		 * if i == 0 and iCol == 0, then record pRec is smaller than all
+		 * samples in the aSample[] array. Otherwise, if iCol > 0 then
+		 * pRec must be greater than or equal to the iCol field prefix
+		 * of sample i. If i > 0, then pRec must also be greater than
+		 * sample i - 1.
+		 */
+		if (iCol > 0) {
+			pRec->nField = iCol;
+			assert(sqlVdbeRecordCompareMsgpack(
+				samples[i].sample_key, pRec) <= 0);
+		}
+		if (i > 0) {
+			pRec->nField = nField;
+			assert(sqlVdbeRecordCompareMsgpack(
+				samples[i - 1].sample_key, pRec) < 0);
 		}
 	}
 #endif				/* ifdef SQL_DEBUG */
@@ -1236,7 +1228,6 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 	struct index *index = space_index(space, p->iid);
 	assert(index != NULL && index->def->opts.stat != NULL);
 	int nEq = pLoop->nEq;
-	sql *db = pParse->db;
 	int nLower = -1;
 	int nUpper = index->def->opts.stat->sample_count + 1;
 	int rc = 0;
@@ -1261,19 +1252,12 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 	if (p1 || p2) {
 		int i;
 		int nDiff;
-		struct index_sample *samples = index->def->opts.stat->samples;
 		uint32_t sample_count = index->def->opts.stat->sample_count;
-		for (i = 0; rc == 0 && i < (int) sample_count; i++) {
-			rc = sql_stat4_column(db, samples[i].sample_key, nEq,
-					      &pVal);
-			if (rc == 0 && p1 != NULL) {
-				if (mem_cmp_scalar(p1, pVal, coll) >= 0)
-					nLower++;
-			}
-			if (rc == 0 && p2 != NULL) {
-				if (mem_cmp_scalar(p2, pVal, coll) >= 0)
-					nUpper++;
-			}
+		for (i = 0; i < (int)sample_count; i++) {
+			if (p1 != NULL && mem_cmp_scalar(p1, pVal, coll) >= 0)
+				nLower++;
+			if (p2 != NULL && mem_cmp_scalar(p2, pVal, coll) >= 0)
+				nUpper++;
 		}
 		nDiff = (nUpper - nLower);
 		if (nDiff <= 0)
@@ -1419,7 +1403,7 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 				/* Note: this call could be optimized away - since the same values must
 				 * have been requested when testing key $P in whereEqualScanEst().
 				 */
-				whereKeyStats(pParse, p, pRec, 0, a);
+				whereKeyStats(p, pRec, 0, a);
 				iLower = a[0];
 				iUpper = a[0] + a[1];
 			}
@@ -1447,9 +1431,7 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 					u16 mask = WO_GT | WO_LE;
 					if (sqlExprVectorSize(pExpr) > n)
 						mask = (WO_LE | WO_LT);
-					iLwrIdx =
-					    whereKeyStats(pParse, p, pRec, 0,
-							  a);
+					iLwrIdx = whereKeyStats(p, pRec, 0, a);
 					iNew =
 					    a[0] +
 					    ((pLower->
@@ -1473,9 +1455,7 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 					u16 mask = WO_GT | WO_LE;
 					if (sqlExprVectorSize(pExpr) > n)
 						mask = (WO_LE | WO_LT);
-					iUprIdx =
-					    whereKeyStats(pParse, p, pRec, 1,
-							  a);
+					iUprIdx = whereKeyStats(p, pRec, 1, a);
 					iNew =
 					    a[0] +
 					    ((pUpper->
@@ -1589,7 +1569,7 @@ whereEqualScanEst(Parse * pParse,	/* Parsing & code generating context */
 	assert(bOk != 0);
 	pBuilder->nRecValid = nEq;
 
-	whereKeyStats(pParse, p, pRec, 0, a);
+	whereKeyStats(p, pRec, 0, a);
 	WHERETRACE(0x10, ("equality scan regions %s(%d): %d\n", p->name,
 		   nEq - 1, (int)a[1]));
 	*pnRow = a[1];
@@ -1774,49 +1754,37 @@ whereLoopClearUnion(WhereLoop * p)
  * Deallocate internal memory used by a WhereLoop object
  */
 static void
-whereLoopClear(sql * db, WhereLoop * p)
+whereLoopClear(struct WhereLoop *p)
 {
 	if (p->aLTerm != p->aLTermSpace)
-		sqlDbFree(db, p->aLTerm);
+		sql_xfree(p->aLTerm);
 	whereLoopClearUnion(p);
 	whereLoopInit(p);
 }
 
-/*
- * Increase the memory allocation for pLoop->aLTerm[] to be at least n.
- */
-static int
-whereLoopResize(sql * db, WhereLoop * p, int n)
+static void
+whereLoopResize(struct WhereLoop *p, int n)
 {
 	WhereTerm **paNew;
 	if (p->nLSlot >= n)
-		return 0;
+		return;
 	n = (n + 7) & ~7;
-	paNew = sqlDbMallocRawNN(db, sizeof(p->aLTerm[0]) * n);
-	if (paNew == 0)
-		return -1;
+	paNew = sql_xmalloc(sizeof(p->aLTerm[0]) * n);
 	memcpy(paNew, p->aLTerm, sizeof(p->aLTerm[0]) * p->nLSlot);
 	if (p->aLTerm != p->aLTermSpace)
-		sqlDbFree(db, p->aLTerm);
+		sql_xfree(p->aLTerm);
 	p->aLTerm = paNew;
 	p->nLSlot = n;
-	return 0;
 }
 
 /*
  * Transfer content from the second pLoop into the first.
  */
 static int
-whereLoopXfer(sql * db, WhereLoop * pTo, WhereLoop * pFrom)
+whereLoopXfer(struct WhereLoop *pTo, struct WhereLoop *pFrom)
 {
 	whereLoopClearUnion(pTo);
-	if (whereLoopResize(db, pTo, pFrom->nLTerm)) {
-		pTo->nEq = 0;
-		pTo->nBtm = 0;
-		pTo->nTop = 0;
-		pTo->index_def = NULL;
-		return -1;
-	}
+	whereLoopResize(pTo, pFrom->nLTerm);
 	memcpy(pTo, pFrom, WHERE_LOOP_XFER_SZ);
 	memcpy(pTo->aLTerm, pFrom->aLTerm,
 	       pTo->nLTerm * sizeof(pTo->aLTerm[0]));
@@ -1829,17 +1797,17 @@ whereLoopXfer(sql * db, WhereLoop * pTo, WhereLoop * pFrom)
  * Delete a WhereLoop object
  */
 static void
-whereLoopDelete(sql * db, WhereLoop * p)
+whereLoopDelete(struct WhereLoop *p)
 {
-	whereLoopClear(db, p);
-	sqlDbFree(db, p);
+	whereLoopClear(p);
+	sql_xfree(p);
 }
 
 /*
  * Free a WhereInfo structure
  */
 static void
-whereInfoFree(sql * db, WhereInfo * pWInfo)
+whereInfoFree(struct WhereInfo *pWInfo)
 {
 	if (ALWAYS(pWInfo)) {
 		int i;
@@ -1847,16 +1815,16 @@ whereInfoFree(sql * db, WhereInfo * pWInfo)
 			WhereLevel *pLevel = &pWInfo->a[i];
 			if (pLevel->pWLoop
 			    && (pLevel->pWLoop->wsFlags & WHERE_IN_ABLE)) {
-				sqlDbFree(db, pLevel->u.in.aInLoop);
+				sql_xfree(pLevel->u.in.aInLoop);
 			}
 		}
 		sqlWhereClauseClear(&pWInfo->sWC);
 		while (pWInfo->pLoops) {
 			WhereLoop *p = pWInfo->pLoops;
 			pWInfo->pLoops = p->pNextLoop;
-			whereLoopDelete(db, p);
+			whereLoopDelete(p);
 		}
-		sqlDbFree(db, pWInfo);
+		sql_xfree(pWInfo);
 	}
 }
 
@@ -2068,7 +2036,6 @@ whereLoopInsert(WhereLoopBuilder * pBuilder, WhereLoop * pTemplate)
 {
 	WhereLoop **ppPrev, *p;
 	WhereInfo *pWInfo = pBuilder->pWInfo;
-	sql *db = pWInfo->pParse->db;
 	int rc;
 
 	/* If pBuilder->pOrSet is defined, then only keep track of the costs
@@ -2130,9 +2097,8 @@ whereLoopInsert(WhereLoopBuilder * pBuilder, WhereLoop * pTemplate)
 #endif
 	if (p == 0) {
 		/* Allocate a new WhereLoop to add to the end of the list */
-		*ppPrev = p = sqlDbMallocRawNN(db, sizeof(WhereLoop));
-		if (p == 0)
-			return -1;
+		p = sql_xmalloc(sizeof(struct WhereLoop));
+		*ppPrev = p;
 		whereLoopInit(p);
 		p->pNextLoop = 0;
 	} else {
@@ -2156,10 +2122,10 @@ whereLoopInsert(WhereLoopBuilder * pBuilder, WhereLoop * pTemplate)
 				whereLoopPrint(pToDel, pBuilder->pWC);
 			}
 #endif
-			whereLoopDelete(db, pToDel);
+			whereLoopDelete(pToDel);
 		}
 	}
-	rc = whereLoopXfer(db, p, pTemplate);
+	rc = whereLoopXfer(p, pTemplate);
 	struct index_def *idx = p->index_def;
 	if (idx != NULL && idx->space_id == 0)
 		p->index_def = NULL;
@@ -2340,7 +2306,6 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 {
 	WhereInfo *pWInfo = pBuilder->pWInfo;	/* WHERE analyse context */
 	Parse *pParse = pWInfo->pParse;	/* Parsing context */
-	sql *db = pParse->db;	/* Database connection malloc context */
 	WhereLoop *pNew;	/* Template WhereLoop under construction */
 	WhereTerm *pTerm;	/* A WhereTerm under consideration */
 	int opMask;		/* Valid operators for constraints */
@@ -2360,8 +2325,6 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 	uint32_t probe_part_count = probe->key_def->part_count;
 
 	pNew = pBuilder->pNew;
-	if (db->mallocFailed)
-		return -1;
 	WHERETRACE(0x800, ("BEGIN addBtreeIdx(%s), nEq=%d\n",
 			   probe->name, pNew->nEq));
 
@@ -2444,8 +2407,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 		pNew->nBtm = saved_nBtm;
 		pNew->nTop = saved_nTop;
 		pNew->nLTerm = saved_nLTerm;
-		if (whereLoopResize(db, pNew, pNew->nLTerm + 1))
-			break;	/* OOM */
+		whereLoopResize(pNew, pNew->nLTerm + 1);
 		pNew->aLTerm[pNew->nLTerm++] = pTerm;
 		pNew->prereq =
 		    (saved_prereq | pTerm->prereqRight) & ~pNew->maskSelf;
@@ -2518,8 +2480,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 				       pTerm->pWC->nTerm);
 				assert(pTop->wtFlags & TERM_LIKEOPT);
 				assert(pTop->eOperator == WO_LT);
-				if (whereLoopResize(db, pNew, pNew->nLTerm + 1))
-					break;	/* OOM */
+				whereLoopResize(pNew, pNew->nLTerm + 1);
 				pNew->aLTerm[pNew->nLTerm++] = pTop;
 				pNew->wsFlags |= WHERE_TOP_LIMIT;
 				pNew->nTop = 1;
@@ -2675,8 +2636,8 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 	if (saved_nEq == saved_nSkip && saved_nEq + 1U < probe_part_count &&
 	    stat->skip_scan_enabled == true &&
 	    /* TUNING: Minimum for skip-scan */
-	    index_field_tuple_est(probe, saved_nEq + 1) >= 42 &&
-	    (rc = whereLoopResize(db, pNew, pNew->nLTerm + 1)) == 0) {
+	    index_field_tuple_est(probe, saved_nEq + 1) >= 42) {
+		whereLoopResize(pNew, pNew->nLTerm + 1);
 		LogEst nIter;
 		pNew->nEq++;
 		pNew->nSkip++;
@@ -3117,7 +3078,6 @@ whereLoopAddAll(WhereLoopBuilder * pBuilder)
 	SrcList *pTabList = pWInfo->pTabList;
 	struct SrcList_item *pItem;
 	struct SrcList_item *pEnd = &pTabList->a[pWInfo->nLevel];
-	sql *db = pWInfo->pParse->db;
 	int rc = 0;
 	WhereLoop *pNew;
 	u8 priorJointype = 0;
@@ -3144,11 +3104,11 @@ whereLoopAddAll(WhereLoopBuilder * pBuilder)
 		if (rc == 0)
 			rc = whereLoopAddOr(pBuilder, mPrereq, mUnusable);
 		mPrior |= pNew->maskSelf;
-		if (rc || db->mallocFailed)
+		if (rc != 0)
 			break;
 	}
 
-	whereLoopClear(db, pNew);
+	whereLoopClear(pNew);
 	return rc;
 }
 
@@ -3195,7 +3155,6 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 	WhereTerm *pTerm;	/* A single term of the WHERE clause */
 	Expr *pOBExpr;		/* An expression from the ORDER BY clause */
 	struct index_def *idx_def;
-	sql *db = pWInfo->pParse->db;	/* Database connection */
 	Bitmask obSat = 0;	/* Mask of ORDER BY terms satisfied so far */
 	Bitmask obDone;		/* Mask of all ORDER BY terms */
 	Bitmask orderDistinctMask;	/* Mask of all well-ordered loops */
@@ -3220,7 +3179,7 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 	 */
 
 	assert(pOrderBy != 0);
-	if (nLoop && OptimizationDisabled(db, SQL_OrderByIdxJoin))
+	if (nLoop && OptimizationDisabled(SQL_OrderByIdxJoin))
 		return 0;
 
 	nOrderBy = pOrderBy->nExpr;
@@ -3595,7 +3554,6 @@ wherePathSolver(WhereInfo * pWInfo, LogEst nRowEst)
 	int mxChoice;		/* Maximum number of simultaneous paths tracked */
 	int nLoop;		/* Number of terms in the join */
 	Parse *pParse;		/* Parsing context */
-	sql *db;		/* The database connection */
 	int iLoop;		/* Loop counter over the terms of the join */
 	int ii, jj;		/* Loop counters */
 	int mxI = 0;		/* Index of next entry to replace */
@@ -3614,7 +3572,6 @@ wherePathSolver(WhereInfo * pWInfo, LogEst nRowEst)
 	int nSpace;		/* Bytes of space allocated at pSpace */
 
 	pParse = pWInfo->pParse;
-	db = pParse->db;
 	nLoop = pWInfo->nLevel;
 	/* TUNING: For simple queries, only the best path is tracked.
 	 * For 2-way joins, the 5 best paths are followed.
@@ -3640,9 +3597,7 @@ wherePathSolver(WhereInfo * pWInfo, LogEst nRowEst)
 	nSpace =
 	    (sizeof(WherePath) + sizeof(WhereLoop *) * nLoop) * mxChoice * 2;
 	nSpace += sizeof(LogEst) * nOrderBy;
-	pSpace = sqlDbMallocRawNN(db, nSpace);
-	if (pSpace == 0)
-		return -1;
+	pSpace = sql_xmalloc(nSpace);
 	aTo = (WherePath *) pSpace;
 	aFrom = aTo + mxChoice;
 	memset(aFrom, 0, sizeof(aFrom[0]));
@@ -4014,7 +3969,7 @@ wherePathSolver(WhereInfo * pWInfo, LogEst nRowEst)
 	pWInfo->nRowOut = pFrom->nRow;
 
 	/* Free temporary memory and return success */
-	sqlDbFree(db, pSpace);
+	sql_xfree(pSpace);
 	return 0;
 }
 
@@ -4251,7 +4206,6 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 	WhereLevel *pLevel;	/* A single level in pWInfo->a[] */
 	WhereLoop *pLoop;	/* Pointer to a single WhereLoop object */
 	int ii;			/* Loop counter */
-	sql *db;		/* Database connection */
 	int rc;			/* Return code */
 	u8 bFordelete = 0;	/* OPFLAG_FORDELETE or zero, as appropriate */
 
@@ -4273,7 +4227,6 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 	       || (wctrlFlags & WHERE_USE_LIMIT) == 0);
 
 	/* Variable initialization */
-	db = pParse->db;
 	memset(&sWLB, 0, sizeof(sWLB));
 
 	/* An ORDER/GROUP BY clause of more than 63 terms cannot be optimized */
@@ -4284,7 +4237,7 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 	/* Disable the DISTINCT optimization if SQL_DistinctOpt is set via
 	 * sql_test_ctrl(SQL_TESTCTRL_OPTIMIZATIONS,...)
 	 */
-	if (OptimizationDisabled(db, SQL_DistinctOpt)) {
+	if (OptimizationDisabled(SQL_DistinctOpt)) {
 		wctrlFlags &= ~WHERE_WANT_DISTINCT;
 	}
 
@@ -4314,12 +4267,7 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 	 */
 	nByteWInfo =
 	    ROUND8(sizeof(WhereInfo) + (nTabList - 1) * sizeof(WhereLevel));
-	pWInfo = sqlDbMallocRawNN(db, nByteWInfo + sizeof(WhereLoop));
-	if (db->mallocFailed) {
-		sqlDbFree(db, pWInfo);
-		pWInfo = 0;
-		goto whereBeginError;
-	}
+	pWInfo = sql_xmalloc(nByteWInfo + sizeof(WhereLoop));
 	pWInfo->pParse = pParse;
 	pWInfo->pTabList = pTabList;
 	pWInfo->pOrderBy = pOrderBy;
@@ -4402,8 +4350,6 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 
 	/* Analyze all of the subexpressions. */
 	sqlWhereExprAnalyze(pTabList, &pWInfo->sWC);
-	if (db->mallocFailed)
-		goto whereBeginError;
 
 	if (wctrlFlags & WHERE_WANT_DISTINCT) {
 		if (isDistinctRedundant
@@ -4453,21 +4399,15 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 #endif
 
 		wherePathSolver(pWInfo, 0);
-		if (db->mallocFailed)
-			goto whereBeginError;
-		if (pWInfo->pOrderBy) {
+		if (pWInfo->pOrderBy != NULL)
 			wherePathSolver(pWInfo, pWInfo->nRowOut + 1);
-			if (db->mallocFailed)
-				goto whereBeginError;
-		}
 	}
 	if (pWInfo->pOrderBy == 0 &&
 	    (pParse->sql_flags & SQL_ReverseOrder) != 0) {
 		pWInfo->revMask = ALLBITS;
 	}
-	if (pParse->is_aborted || NEVER(db->mallocFailed)) {
+	if (pParse->is_aborted)
 		goto whereBeginError;
-	}
 #ifdef SQL_DEBUG
 	if (sqlWhereTrace) {
 		sqlDebugPrintf("---- Solution nRow=%d", pWInfo->nRowOut);
@@ -4496,9 +4436,8 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 	}
 #endif
 	/* Attempt to omit tables from the join that do not effect the result */
-	if (pWInfo->nLevel >= 2
-	    && pDistinctSet != 0 && OptimizationEnabled(db, SQL_OmitNoopJoin)
-	    ) {
+	if (pWInfo->nLevel >= 2 && pDistinctSet != 0 &&
+	    OptimizationEnabled(SQL_OmitNoopJoin)) {
 		Bitmask tabUsed =
 		    sqlWhereExprListUsage(pMaskSet, pDistinctSet);
 		if (sWLB.pOrderBy) {
@@ -4649,8 +4588,6 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 		}
 	}
 	pWInfo->iTop = sqlVdbeCurrentAddr(v);
-	if (db->mallocFailed)
-		goto whereBeginError;
 
 	/* Generate the code to do the search.  Each iteration of the for
 	 * loop below generates code for a single nested loop of the VM
@@ -4663,8 +4600,6 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 			constructAutomaticIndex(pParse, &pWInfo->sWC,
 						&pTabList->a[pLevel->iFrom],
 						notReady, pLevel);
-			if (db->mallocFailed)
-				goto whereBeginError;
 		}
 		sqlWhereExplainOneScan(pParse, pTabList, pLevel, ii,
 					       pLevel->iFrom, wctrlFlags);
@@ -4680,7 +4615,7 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
  whereBeginError:
 	if (pWInfo) {
 		pParse->nQueryLoop = pWInfo->savedNQueryLoop;
-		whereInfoFree(db, pWInfo);
+		whereInfoFree(pWInfo);
 	}
 	return 0;
 }
@@ -4698,7 +4633,6 @@ sqlWhereEnd(WhereInfo * pWInfo)
 	WhereLevel *pLevel;
 	WhereLoop *pLoop;
 	SrcList *pTabList = pWInfo->pTabList;
-	sql *db = pParse->db;
 
 	/* Generate loop termination code.
 	 */
@@ -4778,7 +4712,7 @@ sqlWhereEnd(WhereInfo * pWInfo)
 		/* For a co-routine, change all OP_Column references to the table of
 		 * the co-routine into OP_Copy of result contained in a register.
 		 */
-		if (pTabItem->fg.viaCoroutine && !db->mallocFailed) {
+		if (pTabItem->fg.viaCoroutine != 0) {
 			translateColumnToCopy(v, pLevel->addrBody,
 					      pLevel->iTabCur,
 					      pTabItem->regResult);
@@ -4802,7 +4736,7 @@ sqlWhereEnd(WhereInfo * pWInfo)
 		} else if (pLoop->wsFlags & WHERE_MULTI_OR) {
 			def = pLevel->u.pCovidx;
 		}
-		if (def != NULL && !db->mallocFailed) {
+		if (def != NULL) {
 			last = sqlVdbeCurrentAddr(v);
 			k = pLevel->addrBody;
 			pOp = sqlVdbeGetOp(v, k);
@@ -4846,6 +4780,6 @@ sqlWhereEnd(WhereInfo * pWInfo)
 	/* Final cleanup
 	 */
 	pParse->nQueryLoop = pWInfo->savedNQueryLoop;
-	whereInfoFree(db, pWInfo);
+	whereInfoFree(pWInfo);
 	return;
 }

@@ -365,11 +365,9 @@ void *ParseAlloc(void *(*mallocProc)(YYMALLOCARGTYPE)){
 ** directives of the input grammar.
 */
 static void yy_destructor(
-  yyParser *yypParser,    /* The parser */
   YYCODETYPE yymajor,     /* Type code for object to destroy */
   YYMINORTYPE *yypminor   /* The object to be destroyed */
 ){
-  ParseARG_FETCH;
   switch( yymajor ){
     /* Here is inserted the actions which take place when a
     ** terminal or non-terminal is destroyed.  This can happen
@@ -406,7 +404,7 @@ static void yy_pop_parser_stack(yyParser *pParser){
       yyTokenName[yytos->major]);
   }
 #endif
-  yy_destructor(pParser, yytos->major, &yytos->minor);
+  yy_destructor(yytos->major, &yytos->minor);
 }
 
 /* 
@@ -875,7 +873,7 @@ void Parse(
              yyTracePrompt,yyTokenName[yymajor]);
         }
 #endif
-        yy_destructor(yypParser, (YYCODETYPE)yymajor, &yyminorunion);
+        yy_destructor((YYCODETYPE)yymajor, &yyminorunion);
         yymajor = YYNOCODE;
       }else{
         while( yypParser->yytos >= yypParser->yystack
@@ -887,7 +885,7 @@ void Parse(
           yy_pop_parser_stack(yypParser);
         }
         if( yypParser->yytos < yypParser->yystack || yymajor==0 ){
-          yy_destructor(yypParser,(YYCODETYPE)yymajor,&yyminorunion);
+          yy_destructor((YYCODETYPE)yymajor, &yyminorunion);
           yy_parse_failed(yypParser);
 #ifndef YYNOERRORRECOVERY
           yypParser->yyerrcnt = -1;
@@ -908,7 +906,7 @@ void Parse(
       ** they intend to abandon the parse upon the first syntax error seen.
       */
       yy_syntax_error(yypParser,yymajor, yyminor);
-      yy_destructor(yypParser,(YYCODETYPE)yymajor,&yyminorunion);
+      yy_destructor((YYCODETYPE)yymajor, &yyminorunion);
       yymajor = YYNOCODE;
       
 #else  /* YYERRORSYMBOL is not defined */
@@ -925,7 +923,7 @@ void Parse(
         yy_syntax_error(yypParser,yymajor, yyminor);
       }
       yypParser->yyerrcnt = 3;
-      yy_destructor(yypParser,(YYCODETYPE)yymajor,&yyminorunion);
+      yy_destructor((YYCODETYPE)yymajor, &yyminorunion);
       if( yyendofinput ){
         yy_parse_failed(yypParser);
 #ifndef YYNOERRORRECOVERY

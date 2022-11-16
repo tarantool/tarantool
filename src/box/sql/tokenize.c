@@ -448,13 +448,12 @@ sql_token(const char *z, int *type, bool *is_reserved)
  * Note that this functions can't be called on ordinary
  * space object. It's purpose is to clean-up parser->new_space.
  *
- * @param db Database handler.
  * @param space Space to be deleted.
  */
 static void
-parser_space_delete(struct sql *db, struct space *space)
+parser_space_delete(struct space *space)
 {
-	if (space == NULL || db == NULL)
+	if (space == NULL)
 		return;
 	assert(space->def->opts.is_ephemeral);
 	struct space *altered_space = space_by_name(space->def->name);
@@ -467,6 +466,12 @@ parser_space_delete(struct sql *db, struct space *space)
 		i = altered_space->index_count;
 	for (; i < space->index_count; ++i)
 		index_def_delete(space->index[i]->def);
+}
+
+static void *
+new_xmalloc(size_t n)
+{
+	return xmalloc(n);
 }
 
 /**
@@ -484,19 +489,12 @@ sqlRunParser(Parse * pParse, const char *zSql)
 	void *pEngine;		/* The LEMON-generated LALR(1) parser */
 	int tokenType;		/* type of the next token */
 	int lastTokenParsed = -1;	/* type of the previous token */
-	sql *db = pParse->db;	/* The database connection */
-	int mxSqlLen;		/* Max length of an SQL string */
 
 	assert(zSql != 0);
-	mxSqlLen = db->aLimit[SQL_LIMIT_SQL_LENGTH];
 	pParse->zTail = zSql;
 	i = 0;
 	/* sqlParserTrace(stdout, "parser: "); */
-	pEngine = sqlParserAlloc(sqlMalloc);
-	if (pEngine == 0) {
-		sqlOomFault(db);
-		return -1;
-	}
+	pEngine = sqlParserAlloc(new_xmalloc);
 	assert(pParse->create_table_def.new_space == NULL);
 	assert(pParse->parsed_ast.trigger == NULL);
 	assert(pParse->nVar == 0);
@@ -509,9 +507,10 @@ sqlRunParser(Parse * pParse, const char *zSql)
 			    sql_token(&zSql[i], &tokenType,
 				      &pParse->sLastToken.isReserved);
 			i += pParse->sLastToken.n;
-			if (i > mxSqlLen) {
+			if (i > SQL_MAX_SQL_LENGTH) {
 				diag_set(ClientError, ER_SQL_PARSER_LIMIT,
-					 "SQL command length", i, mxSqlLen);
+					 "SQL command length", i,
+					 SQL_MAX_SQL_LENGTH);
 				pParse->is_aborted = true;
 				break;
 			}
@@ -546,35 +545,33 @@ sqlRunParser(Parse * pParse, const char *zSql)
 			sqlParser(pEngine, tokenType, pParse->sLastToken,
 				      pParse);
 			lastTokenParsed = tokenType;
-			if (pParse->is_aborted || db->mallocFailed)
+			if (pParse->is_aborted)
 				break;
 		}
 		pParse->line_pos += pParse->sLastToken.n;
 	}
 	pParse->zTail = &zSql[i];
-	sqlParserFree(pEngine, sql_free);
-	if (db->mallocFailed)
-		pParse->is_aborted = true;
+	sqlParserFree(pEngine, free);
 	if (pParse->pVdbe != NULL && pParse->is_aborted) {
 		sqlVdbeDelete(pParse->pVdbe);
 		pParse->pVdbe = 0;
 	}
-	parser_space_delete(db, pParse->create_column_def.space);
+	parser_space_delete(pParse->create_column_def.space);
 
 	if (pParse->pWithToFree)
-		sqlWithDelete(db, pParse->pWithToFree);
-	sqlDbFree(db, pParse->pVList);
+		sqlWithDelete(pParse->pWithToFree);
+	sql_xfree(pParse->pVList);
 	return pParse->is_aborted ? -1 : 0;
 }
 
 struct Expr *
-sql_expr_compile(sql *db, const char *expr, int expr_len)
+sql_expr_compile(const char *expr, int expr_len)
 {
 	const char *outer = "FUNCTION ";
 	int len = strlen(outer) + expr_len;
 
 	struct Parse parser;
-	sql_parser_create(&parser, db, default_flags);
+	sql_parser_create(&parser, default_flags);
 	/*
 	 * Since SELECT token is added to the original expression,
 	 * to make error message display correct position we should
@@ -603,10 +600,10 @@ end:
 }
 
 struct Select *
-sql_view_compile(struct sql *db, const char *view_stmt)
+sql_view_compile(const char *view_stmt)
 {
 	struct Parse parser;
-	sql_parser_create(&parser, db, default_flags);
+	sql_parser_create(&parser, default_flags);
 	parser.parse_only = true;
 
 	struct Select *select = NULL;
@@ -624,10 +621,10 @@ sql_view_compile(struct sql *db, const char *view_stmt)
 }
 
 struct sql_trigger *
-sql_trigger_compile(struct sql *db, const char *sql)
+sql_trigger_compile(const char *sql)
 {
 	struct Parse parser;
-	sql_parser_create(&parser, db, default_flags);
+	sql_parser_create(&parser, default_flags);
 	parser.parse_only = true;
 	struct sql_trigger *trigger = NULL;
 	if (sqlRunParser(&parser, sql) == 0 &&

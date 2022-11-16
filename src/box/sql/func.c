@@ -111,11 +111,7 @@ step_avg(struct sql_context *ctx, int argc, const struct Mem *argv)
 	uint32_t *count;
 	if (mem_is_null(ctx->pOut)) {
 		uint32_t size = sizeof(struct Mem) + sizeof(uint32_t);
-		mem = sqlDbMallocRawNN(sql_get(), size);
-		if (mem == NULL) {
-			ctx->is_aborted = true;
-			return;
-		}
+		mem = sql_xmalloc(size);
 		count = (uint32_t *)(mem + 1);
 		mem_create(mem);
 		*count = 1;
@@ -310,14 +306,7 @@ func_lower_upper(struct sql_context *ctx, int argc, const struct Mem *argv)
 		return mem_set_str0_static(ctx->pOut, "");
 	const char *str = arg->z;
 	int32_t len = arg->n;
-	struct sql *db = sql_get();
-	char *res = sqlDbMallocRawNN(db, len);
-	if (res == NULL) {
-		ctx->is_aborted = true;
-		return;
-	}
-	int32_t size = sqlDbMallocSize(db, res);
-	assert(size >= len);
+	char *res = sql_xmalloc(len);
 	UErrorCode status = U_ZERO_ERROR;
 	const char *locale = NULL;
 	if (ctx->coll != NULL && ctx->coll->type == COLL_TYPE_ICU) {
@@ -329,16 +318,12 @@ func_lower_upper(struct sql_context *ctx, int argc, const struct Mem *argv)
 	assert(ctx->func->def->name[0] == 'U' ||
 	       ctx->func->def->name[0] == 'L');
 	bool is_upper = ctx->func->def->name[0] == 'U';
-	int32_t new_len =
+	int32_t size =
 		is_upper ?
-		ucasemap_utf8ToUpper(cm, res, size, str, len, &status) :
-		ucasemap_utf8ToLower(cm, res, size, str, len, &status);
-	if (new_len > size) {
-		res = sqlDbRealloc(db, res, new_len);
-		if (db->mallocFailed != 0) {
-			ctx->is_aborted = true;
-			return;
-		}
+		ucasemap_utf8ToUpper(cm, res, len, str, len, &status) :
+		ucasemap_utf8ToLower(cm, res, len, str, len, &status);
+	if (size > len) {
+		res = sql_xrealloc(res, size);
 		status = U_ZERO_ERROR;
 		if (is_upper)
 			ucasemap_utf8ToUpper(cm, res, size, str, len, &status);
@@ -346,7 +331,7 @@ func_lower_upper(struct sql_context *ctx, int argc, const struct Mem *argv)
 			ucasemap_utf8ToLower(cm, res, size, str, len, &status);
 	}
 	ucasemap_close(cm);
-	mem_set_str_allocated(ctx->pOut, res, new_len);
+	mem_set_str_allocated(ctx->pOut, res, size);
 }
 
 /** Implementation of the NULLIF() function. */
@@ -789,12 +774,7 @@ func_char(struct sql_context *ctx, int argc, const struct Mem *argv)
 		len += U8_LENGTH(buf[i]);
 	}
 
-	char *str = sqlDbMallocRawNN(sql_get(), len);
-	if (str == NULL) {
-		region_truncate(region, svp);
-		ctx->is_aborted = true;
-		return;
-	}
+	char *str = sql_xmalloc(len);
 	int pos = 0;
 	for (int i = 0; i < argc; ++i) {
 		UBool is_error = false;
@@ -860,11 +840,7 @@ func_hex(struct sql_context *ctx, int argc, const struct Mem *argv)
 		return mem_set_str0_static(ctx->pOut, "");
 
 	uint32_t size = 2 * arg->n;
-	char *str = sqlDbMallocRawNN(sql_get(), size);
-	if (str == NULL) {
-		ctx->is_aborted = true;
-		return;
-	}
+	char *str = sql_xmalloc(size);
 	for (int i = 0; i < arg->n; ++i) {
 		char c = arg->z[i];
 		str[2 * i] = hexdigits[(c >> 4) & 0xf];
@@ -906,8 +882,7 @@ func_printf(struct sql_context *ctx, int argc, const struct Mem *argv)
 	pargs.nArg = argc - 1;
 	pargs.nUsed = 0;
 	pargs.apArg = argv + 1;
-	struct sql *db = sql_get();
-	sqlStrAccumInit(&acc, db, 0, 0, db->aLimit[SQL_LIMIT_LENGTH]);
+	sqlStrAccumInit(&acc, NULL, 0, SQL_MAX_LENGTH);
 	acc.printfFlags = SQL_PRINTF_SQLFUNC;
 	sqlXPrintf(&acc, format, &pargs);
 	mem_set_str_allocated(ctx->pOut, sqlStrAccumFinish(&acc), acc.nChar);
@@ -946,11 +921,7 @@ func_randomblob(struct sql_context *ctx, int argc, const struct Mem *argv)
 	if (arg->u.u == 0)
 		return mem_set_bin_static(ctx->pOut, "", 0);
 	uint64_t len = arg->u.u;
-	char *res = sqlDbMallocRawNN(sql_get(), len);
-	if (res == NULL) {
-		ctx->is_aborted = true;
-		return;
-	}
+	char *res = sql_xmalloc(len);
 	sql_randomness(len, res);
 	mem_set_bin_allocated(ctx->pOut, res, len);
 }
@@ -973,11 +944,7 @@ func_zeroblob(struct sql_context *ctx, int argc, const struct Mem *argv)
 	if (arg->u.u == 0)
 		return mem_set_bin_static(ctx->pOut, "", 0);
 	uint64_t len = arg->u.u;
-	char *res = sqlDbMallocZero(sql_get(), len);
-	if (res == NULL) {
-		ctx->is_aborted = true;
-		return;
-	}
+	char *res = sql_xmalloc0(len);
 	mem_set_bin_allocated(ctx->pOut, res, len);
 }
 
@@ -1523,11 +1490,7 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 		char *buf = NULL;
 		int size = mp_snprint(buf, 0, argv[0].z) + 1;
 		assert(size > 0);
-		buf = sqlDbMallocRawNN(sql_get(), size);
-		if (buf == NULL) {
-			context->is_aborted = true;
-			return;
-		}
+		buf = sql_xmalloc(size);
 		mp_snprint(buf, size, argv[0].z);
 		mem_set_str0_allocated(context->pOut, buf);
 		break;
@@ -1536,11 +1499,7 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 		const char *zBlob = argv[0].z;
 		int nBlob = argv[0].n;
 		uint32_t size = 2 * nBlob + 3;
-		char *zText = sqlDbMallocRawNN(sql_get(), size);
-		if (zText == NULL) {
-			context->is_aborted = true;
-			return;
-		}
+		char *zText = sql_xmalloc(size);
 		for (int i = 0; i < nBlob; i++) {
 			zText[(i * 2) + 2] = hexdigits[(zBlob[i] >> 4) & 0x0F];
 			zText[(i * 2) + 3] = hexdigits[(zBlob[i]) & 0x0F];
@@ -1561,11 +1520,7 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 		}
 		uint32_t size = len + count + 2;
 
-		char *res = sqlDbMallocRawNN(sql_get(), size);
-		if (res == NULL) {
-			context->is_aborted = true;
-			return;
-		}
+		char *res = sql_xmalloc(size);
 		res[0] = '\'';
 		for (uint32_t i = 0, j = 1; i < len; ++i) {
 			res[j++] = str[i];
@@ -1626,27 +1581,15 @@ replaceFunc(struct sql_context *context, int argc, const struct Mem *argv)
 	zRep = (const unsigned char *)argv[2].z;
 	nRep = argv[2].n;
 	nOut = nStr + 1;
-	struct sql *db = sql_get();
-	zOut = sqlDbMallocRawNN(db, nOut);
-	if (zOut == NULL) {
-		context->is_aborted = true;
-		return;
-	}
+	zOut = sql_xmalloc(nOut);
 	loopLimit = nStr - nPattern;
 	for (i = j = 0; i <= loopLimit; i++) {
 		if (zStr[i] != zPattern[0]
 		    || memcmp(&zStr[i], zPattern, nPattern)) {
 			zOut[j++] = zStr[i];
 		} else {
-			u8 *zOld;
 			nOut += nRep - nPattern;
-			zOld = zOut;
-			zOut = sqlDbRealloc(db, zOut, nOut);
-			if (zOut == NULL) {
-				context->is_aborted = true;
-				sqlDbFree(db, zOld);
-				return;
-			}
+			zOut = sql_xrealloc(zOut, nOut);
 			memcpy(&zOut[j], zRep, nRep);
 			j += nRep;
 			i += nPattern - 1;
@@ -2368,21 +2311,15 @@ struct func_sql_expr {
 struct func *
 func_sql_expr_new(const struct func_def *def)
 {
-	struct sql *db = sql_get();
 	const char *body = def->body;
 	uint32_t body_len = body == NULL ? 0 : strlen(body);
-	struct Expr *expr = sql_expr_compile(db, body, body_len);
+	struct Expr *expr = sql_expr_compile(body, body_len);
 	if (expr == NULL)
 		return NULL;
 
 	struct Parse parser;
-	sql_parser_create(&parser, db, default_flags);
+	sql_parser_create(&parser, default_flags);
 	struct Vdbe *v = sqlGetVdbe(&parser);
-	if (v == NULL) {
-		sql_parser_destroy(&parser);
-		sql_expr_delete(db, expr);
-		return NULL;
-	}
 	int ref_reg = ++parser.nMem;
 	sqlVdbeAddOp2(v, OP_Variable, ++parser.nVar, ref_reg);
 	v->is_sandboxed = 1;
@@ -2397,7 +2334,7 @@ func_sql_expr_new(const struct func_def *def)
 	bool is_error = parser.is_aborted;
 	sql_finish_coding(&parser);
 	sql_parser_destroy(&parser);
-	sql_expr_delete(db, expr);
+	sql_expr_delete(expr);
 
 	if (is_error) {
 		sql_stmt_finalize((struct sql_stmt *)v);

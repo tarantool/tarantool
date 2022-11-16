@@ -120,7 +120,8 @@ struct SubProgram {
  * Allowed values of VdbeOp.p4type
  */
 #define P4_NOTUSED    0		/* The P4 parameter is not used */
-#define P4_DYNAMIC  (-1)	/* Pointer to a string obtained from sqlMalloc() */
+/* Pointer to a string obtained from sql_xmalloc(). */
+#define P4_DYNAMIC  (-1)
 #define P4_STATIC   (-2)	/* Pointer to a static string */
 #define P4_COLLSEQ  (-3)	/* P4 is a pointer to a CollSeq structure */
 /** P4 is a pointer to a func structure. */
@@ -216,7 +217,6 @@ void
 vdbe_metadata_delete(struct Vdbe *v);
 
 void sqlVdbeDelete(Vdbe *);
-void sqlVdbeClearObject(sql *, Vdbe *);
 void sqlVdbeMakeReady(Vdbe *, Parse *);
 int sqlVdbeFinalize(Vdbe *);
 void sqlVdbeResolveLabel(Vdbe *, int);
@@ -254,7 +254,6 @@ const struct Mem *
 vdbe_get_bound_value(struct Vdbe *vdbe, int id);
 
 void sqlVdbeCountChanges(Vdbe *);
-sql *sqlVdbeDb(Vdbe *);
 void sqlVdbeSetSql(Vdbe *, const char *z, int n);
 void sqlVdbeSwap(Vdbe *, Vdbe *);
 
@@ -274,10 +273,23 @@ void sqlVdbeRecordUnpackMsgpack(struct key_def *key_def,
 				    const void *msgpack,
 				    struct UnpackedRecord *dest);
 
-int sqlVdbeRecordCompare(struct sql *db, int key_count,
-			     const void *key1, UnpackedRecord *key2);
-UnpackedRecord *sqlVdbeAllocUnpackedRecord(struct sql *,
-					       struct key_def *);
+/**
+ * This routine is used to allocate sufficient space for an UnpackedRecord
+ * structure large enough to be used with sqlVdbeRecordUnpack() if
+ * the first argument is a pointer to key_def structure.
+ *
+ * The space is either allocated using sql_xmalloc() or from within
+ * the unaligned buffer passed via the second and third arguments (presumably
+ * stack space). If the former, then *ppFree is set to a pointer that should
+ * be eventually freed by the caller using sql_xfree(). Or, if the
+ * allocation comes from the pSpace/szSpace buffer, *ppFree is set to NULL
+ * before returning.
+ *
+ * Does not return NULL.
+ */
+struct UnpackedRecord *
+sqlVdbeAllocUnpackedRecord(struct key_def *key_def);
+
 void sqlVdbeLinkSubProgram(Vdbe *, SubProgram *);
 
 /* Use SQL_ENABLE_COMMENTS to enable generation of extra comments on

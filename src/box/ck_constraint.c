@@ -86,7 +86,7 @@ ck_constraint_resolve_field_names(struct Expr *expr,
 				  struct space_def *space_def)
 {
 	struct Parse parser;
-	sql_parser_create(&parser, sql_get(), default_flags);
+	sql_parser_create(&parser, default_flags);
 	parser.parse_only = true;
 	sql_resolve_self_reference(&parser, space_def, NC_IsCheck, expr);
 	int rc = parser.is_aborted ? -1 : 0;
@@ -113,16 +113,9 @@ static struct sql_stmt *
 ck_constraint_program_compile(struct ck_constraint_def *ck_constraint_def,
 			      struct Expr *expr)
 {
-	struct sql *db = sql_get();
 	struct Parse parser;
-	sql_parser_create(&parser, db, default_flags);
+	sql_parser_create(&parser, default_flags);
 	struct Vdbe *v = sqlGetVdbe(&parser);
-	if (v == NULL) {
-		sql_parser_destroy(&parser);
-		diag_set(OutOfMemory, sizeof(struct Vdbe), "sqlGetVdbe",
-			 "vdbe");
-		return NULL;
-	}
 	/*
 	 * Generate a prologue code that introduces variables to
 	 * bind vdbe_field_ref before execution.
@@ -236,7 +229,7 @@ ck_constraint_new(struct ck_constraint_def *ck_constraint_def,
 	ck_constraint->stmt = NULL;
 	rlist_create(&ck_constraint->link);
 	struct Expr *expr =
-		sql_expr_compile(sql_get(), ck_constraint_def->expr_str,
+		sql_expr_compile(ck_constraint_def->expr_str,
 				 strlen(ck_constraint_def->expr_str));
 	if (expr == NULL ||
 	    ck_constraint_resolve_field_names(expr, space_def) != 0) {
@@ -250,11 +243,11 @@ ck_constraint_new(struct ck_constraint_def *ck_constraint_def,
 	if (ck_constraint->stmt == NULL)
 		goto error;
 
-	sql_expr_delete(sql_get(), expr);
+	sql_expr_delete(expr);
 	ck_constraint->def = ck_constraint_def;
 	return ck_constraint;
 error:
-	sql_expr_delete(sql_get(), expr);
+	sql_expr_delete(expr);
 	ck_constraint_delete(ck_constraint);
 	return NULL;
 }

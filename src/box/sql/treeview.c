@@ -49,9 +49,7 @@ static TreeView *
 sqlTreeViewPush(TreeView * p, u8 moreToFollow)
 {
 	if (p == 0) {
-		p = sql_malloc64(sizeof(*p));
-		if (p == 0)
-			return 0;
+		p = xmalloc(sizeof(*p));
 		memset(p, 0, sizeof(*p));
 	} else {
 		p->iLevel++;
@@ -72,7 +70,7 @@ sqlTreeViewPop(TreeView * p)
 		return;
 	p->iLevel--;
 	if (p->iLevel < 0)
-		sql_free(p);
+		free(p);
 }
 
 /*
@@ -86,7 +84,7 @@ sqlTreeViewLine(TreeView * p, const char *zFormat, ...)
 	int i;
 	StrAccum acc;
 	char zBuf[500];
-	sqlStrAccumInit(&acc, 0, zBuf, sizeof(zBuf), 0);
+	sqlStrAccumInit(&acc, zBuf, sizeof(zBuf), 0);
 	if (p) {
 		for (i = 0;
 		     i < p->iLevel && (unsigned int)i < sizeof(p->bLine) - 1;
@@ -140,7 +138,7 @@ sqlTreeViewWith(TreeView * pView, const With * pWith)
 			StrAccum x;
 			char zLine[1000];
 			const struct Cte *pCte = &pWith->a[i];
-			sqlStrAccumInit(&x, 0, zLine, sizeof(zLine), 0);
+			sqlStrAccumInit(&x, zLine, sizeof(zLine), 0);
 			sqlXPrintf(&x, "%s", pCte->zName);
 			if (pCte->pCols && pCte->pCols->nExpr > 0) {
 				char cSep = '(';
@@ -216,8 +214,7 @@ sqlTreeViewSelect(TreeView * pView, const Select * p, u8 moreToFollow)
 				struct SrcList_item *pItem = &p->pSrc->a[i];
 				StrAccum x;
 				char zLine[100];
-				sqlStrAccumInit(&x, 0, zLine, sizeof(zLine),
-						    0);
+				sqlStrAccumInit(&x, zLine, sizeof(zLine), 0);
 				sqlXPrintf(&x, "{%d,*}", pItem->iCursor);
 				if (pItem->zName) {
 					sqlXPrintf(&x, " %s", pItem->zName);

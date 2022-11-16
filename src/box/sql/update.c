@@ -56,7 +56,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	int addrTop = 0;	/* VDBE instruction address of the start of the loop */
 	WhereInfo *pWInfo;	/* Information about the WHERE clause */
 	Vdbe *v;		/* The virtual database engine */
-	sql *db;		/* The database structure */
 	int *aXRef = 0;		/* aXRef[i] is the index in pChanges->a[] of the
 				 * an expression for the i-th column of the table.
 				 * aXRef[i]==-1 if the i-th column is not changed.
@@ -84,10 +83,8 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	/* Count of changed rows. Match aXRef items != -1. */
 	int upd_cols_cnt = 0;
 
-	db = pParse->db;
-	if (pParse->is_aborted || db->mallocFailed) {
+	if (pParse->is_aborted)
 		goto update_cleanup;
-	}
 	assert(pTabList->nSrc == 1);
 
 	/* Locate the table which we want to update.
@@ -438,9 +435,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 
 			/* Prepare array of changed fields. */
 			uint32_t upd_cols_sz = upd_cols_cnt * sizeof(uint32_t);
-			uint32_t *upd_cols = sqlDbMallocRaw(db, upd_cols_sz);
-			if (upd_cols == NULL)
-				goto update_cleanup;
+			uint32_t *upd_cols = sql_xmalloc(upd_cols_sz);
 			upd_cols_cnt = 0;
 			for (uint32_t i = 0; i < def->field_count; i++) {
 				if (aXRef[i] == -1)
@@ -474,8 +469,8 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	sqlVdbeResolveLabel(v, labelBreak);
 
  update_cleanup:
-	sqlSrcListDelete(db, pTabList);
-	sql_expr_list_delete(db, pChanges);
-	sql_expr_delete(db, pWhere);
+	sqlSrcListDelete(pTabList);
+	sql_expr_list_delete(pChanges);
+	sql_expr_delete(pWhere);
 	return;
 }

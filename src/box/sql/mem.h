@@ -93,7 +93,6 @@ struct Mem {
 	char *zMalloc;		/* Space to hold MEM_Str or MEM_Blob if szMalloc>0 */
 	int szMalloc;		/* Size of the zMalloc allocation */
 	u32 uTemp;		/* Transient storage for serial_type in OP_MakeRecord */
-	sql *db;		/* The associated database connection */
 #ifdef SQL_DEBUG
 	Mem *pScopyFrom;	/* This Mem is a shallow copy of pScopyFrom */
 	void *pFiller;		/* So that sizeof(Mem) is a multiple of 8 */
@@ -300,7 +299,7 @@ mem_snprintf(char *buf, uint32_t size, const struct Mem *mem);
 
 /**
  * Returns a NULL-terminated string representation of a MEM. Memory for the
- * result was allocated using sqlDbMallocRawNN() and should be freed.
+ * result was allocated using sql_xmalloc() and should be freed.
  */
 char *
 mem_strdup(const struct Mem *mem);
@@ -855,7 +854,6 @@ int sqlVdbeCheckMemInvariants(struct Mem *);
 int sqlVdbeMemClearAndResize(struct Mem * pMem, int n);
 
 void sqlValueFree(struct Mem *);
-struct Mem *sqlValueNew(struct sql *);
 
 /*
  * Release an array of N Mem elements

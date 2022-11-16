@@ -184,9 +184,7 @@ sql_emit_args_types(struct Vdbe *v, int reg, struct func *base, uint32_t argc)
 	}
 	assert(func->base.def->param_count == -1);
 	uint32_t size = argc * sizeof(enum field_type);
-	enum field_type *types = sqlDbMallocRawNN(sql_get(), size);
-	if (types == NULL)
-		return -1;
+	enum field_type *types = sql_xmalloc(size);
 	enum field_type type = func->param_list[0];
 	for (uint32_t i = 0; i < argc; ++i)
 		types[i] = type;
@@ -195,57 +193,37 @@ sql_emit_args_types(struct Vdbe *v, int reg, struct func *base, uint32_t argc)
 }
 
 enum field_type *
-field_type_sequence_dup(struct Parse *parse, enum field_type *types,
-			uint32_t len)
+field_type_sequence_dup(enum field_type *types, uint32_t len)
 {
 	uint32_t sz = (len + 1) * sizeof(enum field_type);
-	enum field_type *ret_types = sqlDbMallocRaw(parse->db, sz);
-	if (ret_types == NULL)
-		return NULL;
+	enum field_type *ret_types = sql_xmalloc(sz);
 	memcpy(ret_types, types, sz);
 	ret_types[len] = field_type_MAX;
 	return ret_types;
 }
 
-/*
- * Set the collating sequence for expression pExpr to be the collating
- * sequence named by pToken.   Return a pointer to a new Expr node that
- * implements the COLLATE operator.
- *
- * If a memory allocation error occurs, that fact is recorded in pParse->db
- * and the pExpr parameter is returned unchanged.
- */
-Expr *
-sqlExprAddCollateToken(Parse * pParse,	/* Parsing context */
-			   Expr * pExpr,	/* Add the "COLLATE" clause to this expression */
-			   const Token * pCollName,	/* Name of collating sequence */
-			   int dequote	/* True to dequote pCollName */
-    )
+struct Expr *
+sqlExprAddCollateToken(struct Expr *pExpr, const Token *pCollName, int dequote)
 {
 	if (pCollName->n == 0)
 		return pExpr;
 	struct Expr *new_expr;
-	struct sql *db = pParse->db;
 	if (dequote)
-		new_expr = sql_expr_new_dequoted(db, TK_COLLATE, pCollName);
+		new_expr = sql_expr_new_dequoted(TK_COLLATE, pCollName);
 	else
-		new_expr = sql_expr_new(db, TK_COLLATE, pCollName);
-	if (new_expr == NULL) {
-		pParse->is_aborted = true;
-		return pExpr;
-	}
+		new_expr = sql_expr_new(TK_COLLATE, pCollName);
 	new_expr->pLeft = pExpr;
 	new_expr->flags |= EP_Collate | EP_Skip;
 	return new_expr;
 }
 
-Expr *
-sqlExprAddCollateString(Parse * pParse, Expr * pExpr, const char *zC)
+struct Expr *
+sqlExprAddCollateString(struct Expr *pExpr, const char *zC)
 {
 	Token s;
 	assert(zC != 0);
 	sqlTokenInit(&s, (char *)zC);
-	return sqlExprAddCollateToken(pParse, pExpr, &s, 0);
+	return sqlExprAddCollateToken(pExpr, &s, 0);
 }
 
 /*
@@ -700,7 +678,7 @@ sqlExprForVectorField(Parse * pParse,	/* Parsing context */
 	} else {
 		if (pVector->op == TK_VECTOR)
 			pVector = pVector->x.pList->a[iField].pExpr;
-		pRet = sqlExprDup(pParse->db, pVector, 0);
+		pRet = sqlExprDup(pVector, 0);
 	}
 	return pRet;
 }
@@ -857,10 +835,9 @@ codeVectorCompare(Parse * pParse,	/* Code generator context */
 int
 sqlExprCheckHeight(Parse * pParse, int nHeight)
 {
-	int mxHeight = pParse->db->aLimit[SQL_LIMIT_EXPR_DEPTH];
-	if (nHeight > mxHeight) {
+	if (nHeight > SQL_MAX_EXPR_DEPTH) {
 		diag_set(ClientError, ER_SQL_PARSER_LIMIT, "Number of nodes "\
-			 "in expression tree", nHeight, mxHeight);
+			 "in expression tree", nHeight, SQL_MAX_EXPR_DEPTH);
 		pParse->is_aborted = true;
 		return -1;
 	}
@@ -984,7 +961,7 @@ sqlExprSetHeightAndFlags(Parse * pParse, Expr * p)
 /**
  * Allocate a new empty expression object with reserved extra
  * memory.
- * @param db SQL context.
+ *
  * @param op Expression value type.
  * @param extra_size Extra size, needed to be allocated together
  *        with the expression.
@@ -992,13 +969,9 @@ sqlExprSetHeightAndFlags(Parse * pParse, Expr * p)
  * @retval NULL Error. A diag message is set.
  */
 static struct Expr *
-sql_expr_new_empty(struct sql *db, int op, int extra_size)
+sql_expr_new_empty(int op, int extra_size)
 {
-	struct Expr *e = sqlDbMallocRawNN(db, sizeof(*e) + extra_size);
-	if (e == NULL) {
-		diag_set(OutOfMemory, sizeof(*e), "sqlDbMallocRawNN", "e");
-		return NULL;
-	}
+	struct Expr *e = sql_xmalloc(sizeof(*e) + extra_size);
 	memset(e, 0, sizeof(*e));
 	e->op = (u8)op;
 	e->iAgg = -1;
@@ -1027,29 +1000,27 @@ sql_expr_token_to_int(int op, const struct Token *token, int *res)
 
 /** Create an expression of a constant integer. */
 static inline struct Expr *
-sql_expr_new_int(struct sql *db, int value)
+sql_expr_new_int(int value)
 {
-	struct Expr *e = sql_expr_new_empty(db, TK_INTEGER, 0);
-	if (e != NULL) {
-		e->type = FIELD_TYPE_INTEGER;
-		e->flags |= EP_IntValue;
-		e->u.iValue = value;
-	}
+	struct Expr *e = sql_expr_new_empty(TK_INTEGER, 0);
+	e->type = FIELD_TYPE_INTEGER;
+	e->flags |= EP_IntValue;
+	e->u.iValue = value;
 	return e;
 }
 
 struct Expr *
-sql_expr_new(struct sql *db, int op, const struct Token *token)
+sql_expr_new(int op, const struct Token *token)
 {
 	int extra_sz = 0;
 	if (token != NULL) {
 		int val;
 		if (sql_expr_token_to_int(op, token, &val) == 0)
-			return sql_expr_new_int(db, val);
+			return sql_expr_new_int(val);
 		extra_sz = token->n + 1;
 	}
-	struct Expr *e = sql_expr_new_empty(db, op, extra_sz);
-	if (e == NULL || token == NULL)
+	struct Expr *e = sql_expr_new_empty(op, extra_sz);
+	if (token == NULL)
 		return e;
 	e->u.zToken = (char *) &e[1];
 	assert(token->z != NULL || token->n == 0);
@@ -1059,18 +1030,18 @@ sql_expr_new(struct sql *db, int op, const struct Token *token)
 }
 
 struct Expr *
-sql_expr_new_dequoted(struct sql *db, int op, const struct Token *token)
+sql_expr_new_dequoted(int op, const struct Token *token)
 {
 	int extra_size = 0, rc;
 	if (token != NULL) {
 		int val;
 		assert(token->z != NULL || token->n == 0);
 		if (sql_expr_token_to_int(op, token, &val) == 0)
-			return sql_expr_new_int(db, val);
+			return sql_expr_new_int(val);
 		extra_size = token->n + 1;
 	}
-	struct Expr *e = sql_expr_new_empty(db, op, extra_size);
-	if (e == NULL || token == NULL || token->n == 0)
+	struct Expr *e = sql_expr_new_empty(op, extra_size);
+	if (token == NULL || token->n == 0)
 		return e;
 	e->u.zToken = (char *) &e[1];
 	if (token->z[0] == '"')
@@ -1082,9 +1053,7 @@ sql_expr_new_dequoted(struct sql *db, int op, const struct Token *token)
 	} else if ((rc = sql_normalize_name(e->u.zToken, extra_size, token->z,
 					    token->n)) > extra_size) {
 		extra_size = rc;
-		e = sqlDbReallocOrFree(db, e, sizeof(*e) + extra_size);
-		if (e == NULL)
-			return NULL;
+		e = sql_xrealloc(e, sizeof(*e) + extra_size);
 		e->u.zToken = (char *) &e[1];
 		if (sql_normalize_name(e->u.zToken, extra_size, token->z,
 				       token->n) > extra_size)
@@ -1093,39 +1062,27 @@ sql_expr_new_dequoted(struct sql *db, int op, const struct Token *token)
 	return e;
 }
 
-/*
- * Attach subtrees pLeft and pRight to the Expr node pRoot.
- *
- * If pRoot==NULL that means that a memory allocation error has occurred.
- * In that case, delete the subtrees pLeft and pRight.
- */
 void
-sqlExprAttachSubtrees(sql * db,
-			  Expr * pRoot, Expr * pLeft, Expr * pRight)
+sqlExprAttachSubtrees(struct Expr *pRoot, struct Expr *pLeft,
+		      struct Expr *pRight)
 {
-	if (pRoot == 0) {
-		assert(db->mallocFailed);
-		sql_expr_delete(db, pLeft);
-		sql_expr_delete(db, pRight);
-	} else {
-		if (pRight) {
-			pRoot->pRight = pRight;
-			pRoot->flags |= EP_Propagate & pRight->flags;
-		}
-		if (pLeft) {
-			pRoot->pLeft = pLeft;
-			pRoot->flags |= EP_Propagate & pLeft->flags;
-		}
-		exprSetHeight(pRoot);
+	assert(pRoot != NULL);
+	if (pRight != NULL) {
+		pRoot->pRight = pRight;
+		pRoot->flags |= EP_Propagate & pRight->flags;
 	}
+	if (pLeft != NULL) {
+		pRoot->pLeft = pLeft;
+		pRoot->flags |= EP_Propagate & pLeft->flags;
+	}
+	exprSetHeight(pRoot);
 }
 
 /*
  * Allocate an Expr node which joins as many as two subtrees.
  *
  * One or both of the subtrees can be NULL.  Return a pointer to the new
- * Expr node.  Or, if an OOM error occurs, set pParse->db->mallocFailed,
- * free the subtrees and return NULL.
+ * Expr node.
  */
 Expr *
 sqlPExpr(Parse * pParse,	/* Parsing context */
@@ -1140,21 +1097,15 @@ sqlPExpr(Parse * pParse,	/* Parsing context */
 		 * Take advantage of short-circuit false
 		 * optimization for AND.
 		 */
-		p = sql_and_expr_new(pParse->db, pLeft, pRight);
-		if (p == NULL)
-			pParse->is_aborted = true;
+		p = sql_and_expr_new(pLeft, pRight);
 	} else {
-		p = sqlDbMallocRawNN(pParse->db, sizeof(Expr));
-		if (p) {
-			memset(p, 0, sizeof(Expr));
-			p->op = op & TKFLG_MASK;
-			p->iAgg = -1;
-		}
-		sqlExprAttachSubtrees(pParse->db, p, pLeft, pRight);
+		p = sql_xmalloc(sizeof(Expr));
+		memset(p, 0, sizeof(Expr));
+		p->op = op & TKFLG_MASK;
+		p->iAgg = -1;
+		sqlExprAttachSubtrees(p, pLeft, pRight);
 	}
-	if (p) {
-		sqlExprCheckHeight(pParse, p->nHeight);
-	}
+	sqlExprCheckHeight(pParse, p->nHeight);
 	return p;
 }
 
@@ -1165,14 +1116,10 @@ sqlPExpr(Parse * pParse,	/* Parsing context */
 void
 sqlPExprAddSelect(Parse * pParse, Expr * pExpr, Select * pSelect)
 {
-	if (pExpr) {
-		pExpr->x.pSelect = pSelect;
-		ExprSetProperty(pExpr, EP_xIsSelect | EP_Subquery);
-		sqlExprSetHeightAndFlags(pParse, pExpr);
-	} else {
-		assert(pParse->db->mallocFailed);
-		sql_select_delete(pParse->db, pSelect);
-	}
+	assert(pExpr != NULL);
+	pExpr->x.pSelect = pSelect;
+	ExprSetProperty(pExpr, EP_xIsSelect | EP_Subquery);
+	sqlExprSetHeightAndFlags(pParse, pExpr);
 }
 
 /**
@@ -1197,23 +1144,22 @@ exprAlwaysFalse(Expr * p)
 }
 
 struct Expr *
-sql_and_expr_new(struct sql *db, struct Expr *left_expr,
-		 struct Expr *right_expr)
+sql_and_expr_new(struct Expr *left_expr, struct Expr *right_expr)
 {
+	assert(left_expr != NULL || right_expr != NULL);
 	if (left_expr == NULL) {
 		return right_expr;
 	} else if (right_expr == NULL) {
 		return left_expr;
 	} else if (exprAlwaysFalse(left_expr) || exprAlwaysFalse(right_expr)) {
-		sql_expr_delete(db, left_expr);
-		sql_expr_delete(db, right_expr);
-		struct Expr *f = sql_expr_new_anon(db, TK_FALSE);
-		if (f != NULL)
-			f->type = FIELD_TYPE_BOOLEAN;
+		sql_expr_delete(left_expr);
+		sql_expr_delete(right_expr);
+		struct Expr *f = sql_expr_new_anon(TK_FALSE);
+		f->type = FIELD_TYPE_BOOLEAN;
 		return f;
 	} else {
-		struct Expr *new_expr = sql_expr_new_anon(db, TK_AND);
-		sqlExprAttachSubtrees(db, new_expr, left_expr, right_expr);
+		struct Expr *new_expr = sql_expr_new_anon(TK_AND);
+		sqlExprAttachSubtrees(new_expr, left_expr, right_expr);
 		return new_expr;
 	}
 }
@@ -1225,14 +1171,8 @@ sql_and_expr_new(struct sql *db, struct Expr *left_expr,
 Expr *
 sqlExprFunction(Parse * pParse, ExprList * pList, Token * pToken)
 {
-	struct sql *db = pParse->db;
 	assert(pToken != NULL);
-	struct Expr *new_expr = sql_expr_new_dequoted(db, TK_FUNCTION, pToken);
-	if (new_expr == NULL) {
-		sql_expr_list_delete(db, pList);
-		pParse->is_aborted = true;
-		return NULL;
-	}
+	struct Expr *new_expr = sql_expr_new_dequoted(TK_FUNCTION, pToken);
 	new_expr->x.pList = pList;
 	assert(!ExprHasProperty(new_expr, EP_xIsSelect));
 	sqlExprSetHeightAndFlags(pParse, new_expr);
@@ -1258,7 +1198,6 @@ sqlExprFunction(Parse * pParse, ExprList * pList, Token * pToken)
 void
 sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 {
-	sql *db = pParse->db;
 	const char *z;
 	ynVar x;
 
@@ -1319,8 +1258,7 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 			}
 		}
 		if (doAdd) {
-			pParse->pVList =
-			    sqlVListAdd(db, pParse->pVList, z, n, x);
+			pParse->pVList = sqlVListAdd(pParse->pVList, z, n, x);
 		}
 	}
 	pExpr->iColumn = x;
@@ -1361,9 +1299,7 @@ expr_new_variable(struct Parse *parse, const struct Token *spec,
 		}
 		len += id->n;
 	}
-	struct Expr *expr = sql_expr_new_empty(parse->db, TK_VARIABLE, len + 1);
-	if (expr == NULL)
-		return NULL;
+	struct Expr *expr = sql_expr_new_empty(TK_VARIABLE, len + 1);
 	expr->type = FIELD_TYPE_BOOLEAN;
 	expr->flags = EP_Leaf;
 	expr->u.zToken = (char *)(expr + 1);
@@ -1380,7 +1316,7 @@ expr_new_variable(struct Parse *parse, const struct Token *spec,
  * Recursively delete an expression tree.
  */
 static SQL_NOINLINE void
-sqlExprDeleteNN(sql *db, Expr *p)
+sqlExprDeleteNN(struct Expr *p)
 {
 	assert(p != 0);
 	/* Sanity check: Assert that the IntValue is non-negative if it exists */
@@ -1396,26 +1332,26 @@ sqlExprDeleteNN(sql *db, Expr *p)
 		/* The Expr.x union is never used at the same time as Expr.pRight */
 		assert(p->x.pList == 0 || p->pRight == 0);
 		if (p->pLeft && p->op != TK_SELECT_COLUMN)
-			sqlExprDeleteNN(db, p->pLeft);
-		sql_expr_delete(db, p->pRight);
+			sqlExprDeleteNN(p->pLeft);
+		sql_expr_delete(p->pRight);
 		if (ExprHasProperty(p, EP_xIsSelect)) {
-			sql_select_delete(db, p->x.pSelect);
+			sql_select_delete(p->x.pSelect);
 		} else {
-			sql_expr_list_delete(db, p->x.pList);
+			sql_expr_list_delete(p->x.pList);
 		}
 	}
 	if (ExprHasProperty(p, EP_MemToken))
-		sqlDbFree(db, p->u.zToken);
+		sql_xfree(p->u.zToken);
 	if (!ExprHasProperty(p, EP_Static)) {
-		sqlDbFree(db, p);
+		sql_xfree(p);
 	}
 }
 
 void
-sql_expr_delete(sql *db, Expr *expr)
+sql_expr_delete(Expr *expr)
 {
 	if (expr != NULL)
-		sqlExprDeleteNN(db, expr);
+		sqlExprDeleteNN(expr);
 }
 
 /*
@@ -1521,14 +1457,25 @@ sql_expr_sizeof(struct Expr *p, int flags)
 	return size;
 }
 
-struct Expr *
-sql_expr_dup(struct sql *db, struct Expr *p, int flags, char **buffer)
+/**
+ * This function is similar to sqlExprDup(), except that if pzBuffer
+ * is not NULL then *pzBuffer is assumed to point to a buffer large enough
+ * to store the copy of expression p, the copies of p->u.zToken
+ * (if applicable), and the copies of the p->pLeft and p->pRight expressions,
+ * if any. Before returning, *pzBuffer is set to the first byte past the
+ * portion of the buffer copied into by this function.
+ *
+ * @param p Root of expression's AST.
+ * @param dupFlags EXPRDUP_REDUCE or 0.
+ * @param pzBuffer If not NULL, then buffer to store duplicate.
+ */
+static struct Expr *
+sql_expr_dup(struct Expr *p, int flags, char **buffer)
 {
 	Expr *pNew;		/* Value to return */
 	u32 staticFlag;         /* EP_Static if space not obtained from malloc */
 	char *zAlloc;		/* Memory space from which to build Expr object */
 
-	assert(db != 0);
 	assert(p);
 	assert(flags == 0 || flags == EXPRDUP_REDUCE);
 
@@ -1537,90 +1484,79 @@ sql_expr_dup(struct sql *db, struct Expr *p, int flags, char **buffer)
 		zAlloc = *buffer;
 		staticFlag = EP_Static;
 	} else {
-		zAlloc = sqlDbMallocRawNN(db,
-					      sql_expr_sizeof(p, flags));
+		zAlloc = sql_xmalloc(sql_expr_sizeof(p, flags));
 		staticFlag = 0;
 	}
+	assert(zAlloc != NULL);
 	pNew = (Expr *) zAlloc;
 
-	if (pNew) {
-		/* Set nNewSize to the size allocated for the structure pointed to
-		 * by pNew. This is either EXPR_FULLSIZE, EXPR_REDUCEDSIZE or
-		 * EXPR_TOKENONLYSIZE. nToken is set to the number of bytes consumed
-		 * by the copy of the p->u.zToken string (if any).
-		 */
-		const unsigned nStructSize = dupedExprStructSize(p, flags);
-		const int nNewSize = nStructSize & 0xfff;
-		int nToken;
-		if (!ExprHasProperty(p, EP_IntValue) && p->u.zToken)
-			nToken = sqlStrlen30(p->u.zToken) + 1;
+	/*
+	 * Set nNewSize to the size allocated for the structure pointed to
+	 * by pNew. This is either EXPR_FULLSIZE, EXPR_REDUCEDSIZE or
+	 * EXPR_TOKENONLYSIZE. nToken is set to the number of bytes consumed
+	 * by the copy of the p->u.zToken string (if any).
+	 */
+	const unsigned nStructSize = dupedExprStructSize(p, flags);
+	const int nNewSize = nStructSize & 0xfff;
+	int nToken;
+	if (!ExprHasProperty(p, EP_IntValue) && p->u.zToken)
+		nToken = sqlStrlen30(p->u.zToken) + 1;
+	else
+		nToken = 0;
+	if (flags != 0) {
+		assert(ExprHasProperty(p, EP_Reduced) == 0);
+		memcpy(zAlloc, p, nNewSize);
+	} else {
+		size_t nSize = exprStructSize(p);
+		memcpy(zAlloc, p, nSize);
+		if (nSize < EXPR_FULLSIZE)
+			memset(&zAlloc[nSize], 0, EXPR_FULLSIZE - nSize);
+	}
+
+	/*
+	 * Set the EP_Reduced, EP_TokenOnly, and EP_Static flags appropriately.
+	 */
+	pNew->flags &= ~(EP_Reduced | EP_TokenOnly | EP_Static | EP_MemToken);
+	pNew->flags |= nStructSize & (EP_Reduced | EP_TokenOnly);
+	pNew->flags |= staticFlag;
+
+	/* Copy the p->u.zToken string, if any. */
+	if (nToken != 0) {
+		pNew->u.zToken = &zAlloc[nNewSize];
+		memcpy(pNew->u.zToken, p->u.zToken, nToken);
+	}
+
+	if (((p->flags | pNew->flags) & (EP_TokenOnly | EP_Leaf)) == 0) {
+		/* Fill in the pNew->x.pSelect or pNew->x.pList member. */
+		if (ExprHasProperty(p, EP_xIsSelect))
+			pNew->x.pSelect = sqlSelectDup(p->x.pSelect, flags);
 		else
-			nToken = 0;
-		if (flags) {
-			assert(ExprHasProperty(p, EP_Reduced) == 0);
-			memcpy(zAlloc, p, nNewSize);
-		} else {
-			u32 nSize = (u32) exprStructSize(p);
-			memcpy(zAlloc, p, nSize);
-			if (nSize < EXPR_FULLSIZE) {
-				memset(&zAlloc[nSize], 0,
-				       EXPR_FULLSIZE - nSize);
-			}
+			pNew->x.pList = sql_expr_list_dup(p->x.pList, flags);
+	}
+
+	/* Fill in pNew->pLeft and pNew->pRight. */
+	if (ExprHasProperty(pNew, EP_Reduced | EP_TokenOnly)) {
+		zAlloc += dupedExprNodeSize(p, flags);
+		if (!ExprHasProperty(pNew, EP_TokenOnly | EP_Leaf)) {
+			pNew->pLeft = p->pLeft != NULL ?
+				      sql_expr_dup(p->pLeft, EXPRDUP_REDUCE,
+						   &zAlloc) : NULL;
+			pNew->pRight = p->pRight != NULL ?
+				       sql_expr_dup(p->pRight, EXPRDUP_REDUCE,
+						    &zAlloc) : NULL;
 		}
-
-		/* Set the EP_Reduced, EP_TokenOnly, and EP_Static flags appropriately. */
-		pNew->flags &=
-		    ~(EP_Reduced | EP_TokenOnly | EP_Static | EP_MemToken);
-		pNew->flags |= nStructSize & (EP_Reduced | EP_TokenOnly);
-		pNew->flags |= staticFlag;
-
-		/* Copy the p->u.zToken string, if any. */
-		if (nToken) {
-			char *zToken = pNew->u.zToken =
-			    (char *)&zAlloc[nNewSize];
-			memcpy(zToken, p->u.zToken, nToken);
-		}
-
-		if (0 == ((p->flags | pNew->flags) & (EP_TokenOnly | EP_Leaf))) {
-			/* Fill in the pNew->x.pSelect or pNew->x.pList member. */
-			if (ExprHasProperty(p, EP_xIsSelect)) {
-				pNew->x.pSelect =
-				    sqlSelectDup(db, p->x.pSelect,
-						     flags);
+		if (buffer != NULL)
+			*buffer = zAlloc;
+	} else {
+		if (!ExprHasProperty(p, EP_TokenOnly | EP_Leaf)) {
+			if (pNew->op == TK_SELECT_COLUMN) {
+				pNew->pLeft = p->pLeft;
+				assert(p->iColumn == 0 || p->pRight == 0);
+				assert(p->pRight == 0 || p->pRight == p->pLeft);
 			} else {
-				pNew->x.pList =
-					sql_expr_list_dup(db, p->x.pList, flags);
+				pNew->pLeft = sqlExprDup(p->pLeft, 0);
 			}
-		}
-
-		/* Fill in pNew->pLeft and pNew->pRight. */
-		if (ExprHasProperty(pNew, EP_Reduced | EP_TokenOnly)) {
-			zAlloc += dupedExprNodeSize(p, flags);
-			if (!ExprHasProperty(pNew, EP_TokenOnly | EP_Leaf)) {
-				pNew->pLeft = p->pLeft ?
-				    sql_expr_dup(db, p->pLeft, EXPRDUP_REDUCE,
-						 &zAlloc) : 0;
-				pNew->pRight =
-				    p->pRight ? sql_expr_dup(db, p->pRight,
-							     EXPRDUP_REDUCE,
-							     &zAlloc) : 0;
-			}
-			if (buffer)
-				*buffer = zAlloc;
-		} else {
-			if (!ExprHasProperty(p, EP_TokenOnly | EP_Leaf)) {
-				if (pNew->op == TK_SELECT_COLUMN) {
-					pNew->pLeft = p->pLeft;
-					assert(p->iColumn == 0
-					       || p->pRight == 0);
-					assert(p->pRight == 0
-					       || p->pRight == p->pLeft);
-				} else {
-					pNew->pLeft =
-					    sqlExprDup(db, p->pLeft, 0);
-				}
-				pNew->pRight = sqlExprDup(db, p->pRight, 0);
-			}
+			pNew->pRight = sqlExprDup(p->pRight, 0);
 		}
 	}
 	return pNew;
@@ -1628,83 +1564,52 @@ sql_expr_dup(struct sql *db, struct Expr *p, int flags, char **buffer)
 
 /*
  * Create and return a deep copy of the object passed as the second
- * argument. If an OOM condition is encountered, NULL is returned
- * and the db->mallocFailed flag set.
+ * argument.
  */
-static With *
-withDup(sql * db, With * p)
+static struct With *
+withDup(struct With *p)
 {
-	With *pRet = 0;
-	if (p) {
-		int nByte = sizeof(*p) + sizeof(p->a[0]) * (p->nCte - 1);
-		pRet = sqlDbMallocZero(db, nByte);
-		if (pRet) {
-			int i;
-			pRet->nCte = p->nCte;
-			for (i = 0; i < p->nCte; i++) {
-				pRet->a[i].pSelect =
-				    sqlSelectDup(db, p->a[i].pSelect, 0);
-				pRet->a[i].pCols =
-				    sql_expr_list_dup(db, p->a[i].pCols, 0);
-				pRet->a[i].zName =
-				    sqlDbStrDup(db, p->a[i].zName);
-			}
-		}
+	if (p == NULL)
+		return NULL;
+	int nByte = sizeof(*p) + sizeof(p->a[0]) * (p->nCte - 1);
+	With *pRet = sql_xmalloc0(nByte);
+	pRet->nCte = p->nCte;
+	for (int i = 0; i < p->nCte; i++) {
+		pRet->a[i].pSelect = sqlSelectDup(p->a[i].pSelect, 0);
+		pRet->a[i].pCols = sql_expr_list_dup(p->a[i].pCols, 0);
+		pRet->a[i].zName = sql_xstrdup(p->a[i].zName);
 	}
 	return pRet;
 }
 
-/*
- * The following group of routines make deep copies of expressions,
- * expression lists, ID lists, and select statements.  The copies can
- * be deleted (by being passed to their respective ...Delete() routines)
- * without effecting the originals.
- *
- * The expression list, ID, and source lists return by sql_expr_list_dup(),
- * sqlIdListDup(), and sqlSrcListDup() can not be further expanded
- * by subsequent calls to sql*ListAppend() routines.
- *
- * Any tables that the SrcList might point to are not duplicated.
- *
- * The flags parameter contains a combination of the EXPRDUP_XXX flags.
- * If the EXPRDUP_REDUCE flag is set, then the structure returned is a
- * truncated version of the usual Expr structure that will be stored as
- * part of the in-memory representation of the database schema.
- */
-Expr *
-sqlExprDup(sql * db, Expr * p, int flags)
+struct Expr *
+sqlExprDup(struct Expr *p, int flags)
 {
 	assert(flags == 0 || flags == EXPRDUP_REDUCE);
-	return p ? sql_expr_dup(db, p, flags, 0) : 0;
+	return p != NULL ? sql_expr_dup(p, flags, 0) : NULL;
 }
 
 struct ExprList *
-sql_expr_list_dup(struct sql *db, struct ExprList *p, int flags)
+sql_expr_list_dup(struct ExprList *p, int flags)
 {
 	struct ExprList_item *pItem, *pOldItem;
 	int i;
 	Expr *pPriorSelectCol = NULL;
-	assert(db != NULL);
 	if (p == NULL)
 		return NULL;
-	ExprList *pNew = sqlDbMallocRawNN(db, sizeof(*pNew));
-	if (pNew == NULL)
-		return NULL;
+	ExprList *pNew = sql_xmalloc(sizeof(*pNew));
 	pNew->nExpr = i = p->nExpr;
 	if ((flags & EXPRDUP_REDUCE) == 0) {
 		for (i = 1; i < p->nExpr; i += i) {
 		}
 	}
-	pNew->a = pItem = sqlDbMallocRawNN(db, i * sizeof(p->a[0]));
-	if (pItem == NULL) {
-		sqlDbFree(db, pNew);
-		return NULL;
-	}
+	pItem = sql_xmalloc(i * sizeof(p->a[0]));
+	pNew->a = pItem;
 	pOldItem = p->a;
 	for (i = 0; i < p->nExpr; i++, pItem++, pOldItem++) {
 		Expr *pOldExpr = pOldItem->pExpr;
 		Expr *pNewExpr;
-		pItem->pExpr = sqlExprDup(db, pOldExpr, flags);
+		pItem->pExpr = sqlExprDup(pOldExpr, flags);
 		if (pOldExpr != NULL && pOldExpr->op == TK_SELECT_COLUMN &&
 		    (pNewExpr = pItem->pExpr) != NULL) {
 			assert(pNewExpr->iColumn == 0 || i > 0);
@@ -1722,8 +1627,8 @@ sql_expr_list_dup(struct sql *db, struct ExprList *p, int flags)
 				pNewExpr->pLeft = pPriorSelectCol;
 			}
 		}
-		pItem->zName = sqlDbStrDup(db, pOldItem->zName);
-		pItem->zSpan = sqlDbStrDup(db, pOldItem->zSpan);
+		pItem->zName = sql_xstrdup(pOldItem->zName);
+		pItem->zSpan = sql_xstrdup(pOldItem->zSpan);
 		pItem->sort_order = pOldItem->sort_order;
 		pItem->done = 0;
 		pItem->bSpanIsTab = pOldItem->bSpanIsTab;
@@ -1738,66 +1643,55 @@ sql_expr_list_dup(struct sql *db, struct ExprList *p, int flags)
  * sqlSelectDup(), can be called. sqlSelectDup() is sometimes
  * called with a NULL argument.
  */
-SrcList *
-sqlSrcListDup(sql * db, SrcList * p, int flags)
+static struct SrcList *
+sqlSrcListDup(struct SrcList *p, int flags)
 {
 	SrcList *pNew;
 	int i;
 	int nByte;
-	assert(db != 0);
 	if (p == 0)
 		return 0;
 	nByte =
 	    sizeof(*p) + (p->nSrc > 0 ? sizeof(p->a[0]) * (p->nSrc - 1) : 0);
-	pNew = sqlDbMallocRawNN(db, nByte);
-	if (pNew == 0)
-		return 0;
+	pNew = sql_xmalloc(nByte);
 	pNew->nSrc = pNew->nAlloc = p->nSrc;
 	for (i = 0; i < p->nSrc; i++) {
 		struct SrcList_item *pNewItem = &pNew->a[i];
 		struct SrcList_item *pOldItem = &p->a[i];
-		pNewItem->zName = sqlDbStrDup(db, pOldItem->zName);
-		pNewItem->zAlias = sqlDbStrDup(db, pOldItem->zAlias);
+		pNewItem->zName = sql_xstrdup(pOldItem->zName);
+		pNewItem->zAlias = sql_xstrdup(pOldItem->zAlias);
 		pNewItem->fg = pOldItem->fg;
 		pNewItem->iCursor = pOldItem->iCursor;
 		pNewItem->addrFillSub = pOldItem->addrFillSub;
 		pNewItem->regReturn = pOldItem->regReturn;
 		if (pNewItem->fg.isIndexedBy) {
 			pNewItem->u1.zIndexedBy =
-			    sqlDbStrDup(db, pOldItem->u1.zIndexedBy);
+				sql_xstrdup(pOldItem->u1.zIndexedBy);
 		}
 		pNewItem->pIBIndex = pOldItem->pIBIndex;
 		if (pNewItem->fg.isTabFunc) {
 			pNewItem->u1.pFuncArg =
-			    sql_expr_list_dup(db, pOldItem->u1.pFuncArg, flags);
+				sql_expr_list_dup(pOldItem->u1.pFuncArg, flags);
 		}
 		pNewItem->space = pOldItem->space;
-		pNewItem->pSelect =
-		    sqlSelectDup(db, pOldItem->pSelect, flags);
-		pNewItem->pOn = sqlExprDup(db, pOldItem->pOn, flags);
-		pNewItem->pUsing = sqlIdListDup(db, pOldItem->pUsing);
+		pNewItem->pSelect = sqlSelectDup(pOldItem->pSelect, flags);
+		pNewItem->pOn = sqlExprDup(pOldItem->pOn, flags);
+		pNewItem->pUsing = sqlIdListDup(pOldItem->pUsing);
 		pNewItem->colUsed = pOldItem->colUsed;
 	}
 	return pNew;
 }
 
-IdList *
-sqlIdListDup(sql * db, IdList * p)
+struct IdList *
+sqlIdListDup(struct IdList *p)
 {
 	IdList *pNew;
 	int i;
-	assert(db != 0);
 	if (p == 0)
 		return 0;
-	pNew = sqlDbMallocRawNN(db, sizeof(*pNew));
-	if (pNew == 0)
-		return 0;
+	pNew = sql_xmalloc(sizeof(*pNew));
 	pNew->nId = p->nId;
-	pNew->a = sqlDbMallocRawNN(db, p->nId * sizeof(p->a[0]));
-	if (pNew->a == 0) {
-		sqlDbFree(db, pNew);
-		return 0;
-	}
+	pNew->a = sql_xmalloc(p->nId * sizeof(p->a[0]));
 	/*
 	 * Note that because the size of the allocation for p->a[]
 	 * is not necessarily a power of two, sql_id_list_append()
@@ -1807,67 +1701,56 @@ sqlIdListDup(sql * db, IdList * p)
 	for (i = 0; i < p->nId; i++) {
 		struct IdList_item *pNewItem = &pNew->a[i];
 		struct IdList_item *pOldItem = &p->a[i];
-		pNewItem->zName = sqlDbStrDup(db, pOldItem->zName);
+		pNewItem->zName = sql_xstrdup(pOldItem->zName);
 		pNewItem->idx = pOldItem->idx;
 	}
 	return pNew;
 }
 
-Select *
-sqlSelectDup(sql * db, Select * p, int flags)
+struct Select *
+sqlSelectDup(struct Select *p, int flags)
 {
 	Select *pNew, *pPrior;
-	assert(db != 0);
 	if (p == 0)
 		return 0;
-	pNew = sqlDbMallocRawNN(db, sizeof(*p));
-	if (pNew == 0)
-		return 0;
-	pNew->pEList = sql_expr_list_dup(db, p->pEList, flags);
-	pNew->pSrc = sqlSrcListDup(db, p->pSrc, flags);
-	pNew->pWhere = sqlExprDup(db, p->pWhere, flags);
-	pNew->pGroupBy = sql_expr_list_dup(db, p->pGroupBy, flags);
-	pNew->pHaving = sqlExprDup(db, p->pHaving, flags);
-	pNew->pOrderBy = sql_expr_list_dup(db, p->pOrderBy, flags);
+	pNew = sql_xmalloc(sizeof(*p));
+	pNew->pEList = sql_expr_list_dup(p->pEList, flags);
+	pNew->pSrc = sqlSrcListDup(p->pSrc, flags);
+	pNew->pWhere = sqlExprDup(p->pWhere, flags);
+	pNew->pGroupBy = sql_expr_list_dup(p->pGroupBy, flags);
+	pNew->pHaving = sqlExprDup(p->pHaving, flags);
+	pNew->pOrderBy = sql_expr_list_dup(p->pOrderBy, flags);
 	pNew->op = p->op;
-	pNew->pPrior = pPrior = sqlSelectDup(db, p->pPrior, flags);
+	pPrior = sqlSelectDup(p->pPrior, flags);
+	pNew->pPrior = pPrior;
 	if (pPrior)
 		pPrior->pNext = pNew;
 	pNew->pNext = 0;
-	pNew->pLimit = sqlExprDup(db, p->pLimit, flags);
-	pNew->pOffset = sqlExprDup(db, p->pOffset, flags);
+	pNew->pLimit = sqlExprDup(p->pLimit, flags);
+	pNew->pOffset = sqlExprDup(p->pOffset, flags);
 	pNew->iLimit = 0;
 	pNew->iOffset = 0;
 	pNew->selFlags = p->selFlags & ~SF_UsesEphemeral;
 	pNew->addrOpenEphm[0] = -1;
 	pNew->addrOpenEphm[1] = -1;
 	pNew->nSelectRow = p->nSelectRow;
-	pNew->pWith = withDup(db, p->pWith);
+	pNew->pWith = withDup(p->pWith);
 	sqlSelectSetName(pNew, p->zSelName);
 	return pNew;
 }
 
 struct ExprList *
-sql_expr_list_append(struct sql *db, struct ExprList *expr_list,
-		     struct Expr *expr)
+sql_expr_list_append(struct ExprList *expr_list, struct Expr *expr)
 {
-	assert(db != NULL);
 	if (expr_list == NULL) {
-		expr_list = sqlDbMallocRawNN(db, sizeof(ExprList));
-		if (expr_list == NULL)
-			goto no_mem;
+		expr_list = sql_xmalloc(sizeof(ExprList));
 		expr_list->nExpr = 0;
-		expr_list->a =
-			sqlDbMallocRawNN(db, sizeof(expr_list->a[0]));
-		if (expr_list->a == NULL)
-			goto no_mem;
+		expr_list->a = sql_xmalloc(sizeof(expr_list->a[0]));
 	} else if ((expr_list->nExpr & (expr_list->nExpr - 1)) == 0) {
 		struct ExprList_item *a;
 		assert(expr_list->nExpr > 0);
-		a = sqlDbRealloc(db, expr_list->a, expr_list->nExpr * 2 *
-				     sizeof(expr_list->a[0]));
-		if (a == NULL)
-			goto no_mem;
+		a = sql_xrealloc(expr_list->a, expr_list->nExpr * 2 *
+				 sizeof(expr_list->a[0]));
 		expr_list->a = a;
 	}
 	assert(expr_list->a != NULL);
@@ -1875,12 +1758,6 @@ sql_expr_list_append(struct sql *db, struct ExprList *expr_list,
 	memset(pItem, 0, sizeof(*pItem));
 	pItem->pExpr = expr;
 	return expr_list;
-
- no_mem:
-	/* Avoid leaking memory if malloc has failed. */
-	sql_expr_delete(db, expr);
-	sql_expr_list_delete(db, expr_list);
-	return NULL;
 }
 
 /*
@@ -1901,7 +1778,6 @@ sqlExprListAppendVector(Parse * pParse,	/* Parsing context */
 			    Expr * pExpr	/* Vector expression to be appended. Might be NULL */
     )
 {
-	sql *db = pParse->db;
 	int n;
 	int i;
 	int iFirst = pList ? pList->nExpr : 0;
@@ -1929,12 +1805,10 @@ sqlExprListAppendVector(Parse * pParse,	/* Parsing context */
 
 	for (i = 0; i < pColumns->nId; i++) {
 		Expr *pSubExpr = sqlExprForVectorField(pParse, pExpr, i);
-		pList = sql_expr_list_append(pParse->db, pList, pSubExpr);
-		if (pList) {
-			assert(pList->nExpr == iFirst + i + 1);
-			pList->a[pList->nExpr - 1].zName = pColumns->a[i].zName;
-			pColumns->a[i].zName = 0;
-		}
+		pList = sql_expr_list_append(pList, pSubExpr);
+		assert(pList->nExpr == iFirst + i + 1);
+		pList->a[pList->nExpr - 1].zName = pColumns->a[i].zName;
+		pColumns->a[i].zName = 0;
 	}
 
 	if (pExpr->op == TK_SELECT) {
@@ -1956,8 +1830,8 @@ sqlExprListAppendVector(Parse * pParse,	/* Parsing context */
 	}
 
  vector_append_error:
-	sql_expr_delete(db, pExpr);
-	sqlIdListDelete(db, pColumns);
+	sql_expr_delete(pExpr);
+	sqlIdListDelete(pColumns);
 	return pList;
 }
 
@@ -1979,8 +1853,7 @@ sqlExprListSetSortOrder(struct ExprList *p, enum sort_order sort_order)
  * on the expression list.
  *
  * pList might be NULL following an OOM error.  But pName should never be
- * NULL.  If a memory allocation fails, the pParse->db->mallocFailed flag
- * is set.
+ * NULL.
  */
 void
 sqlExprListSetName(Parse * pParse,	/* Parsing context */
@@ -1989,74 +1862,54 @@ sqlExprListSetName(Parse * pParse,	/* Parsing context */
 		       int dequote	/* True to cause the name to be dequoted */
     )
 {
-	struct sql *db = pParse->db;
-	assert(pList != NULL || db->mallocFailed != 0);
+	assert(pList != NULL);
 	if (pList == NULL || pName->n == 0)
 		return;
 	assert(pList->nExpr > 0);
 	struct ExprList_item *item = &pList->a[pList->nExpr - 1];
 	assert(item->zName == NULL);
 	if (dequote) {
-		item->zName = sql_normalized_name_db_new(db, pName->z, pName->n);
-		if (item->zName == NULL)
-			pParse->is_aborted = true;
+		item->zName = sql_normalized_name_new(pName->z, pName->n);
 	} else {
-		item->zName = sqlDbStrNDup(db, pName->z, pName->n);
+		item->zName = sql_xstrndup(pName->z, pName->n);
 	}
-	if (item->zName != NULL)
-		sqlCheckIdentifierName(pParse, item->zName);
+	sqlCheckIdentifierName(pParse, item->zName);
 }
 
-/*
- * Set the ExprList.a[].zSpan element of the most recently added item
- * on the expression list.
- *
- * pList might be NULL following an OOM error.  But pSpan should never be
- * NULL.  If a memory allocation fails, the pParse->db->mallocFailed flag
- * is set.
- */
 void
-sqlExprListSetSpan(Parse * pParse,	/* Parsing context */
-		       ExprList * pList,	/* List to which to add the span. */
-		       ExprSpan * pSpan	/* The span to be added */
-    )
+sqlExprListSetSpan(struct ExprList *pList, struct ExprSpan *pSpan)
 {
-	sql *db = pParse->db;
-	assert(pList != 0 || db->mallocFailed != 0);
-	if (pList) {
-		struct ExprList_item *pItem = &pList->a[pList->nExpr - 1];
-		assert(pList->nExpr > 0);
-		assert(db->mallocFailed || pItem->pExpr == pSpan->pExpr);
-		sqlDbFree(db, pItem->zSpan);
-		pItem->zSpan = sqlDbStrNDup(db, (char *)pSpan->zStart,
-						(int)(pSpan->zEnd -
-						      pSpan->zStart));
-	}
+	assert(pList != NULL);
+	struct ExprList_item *pItem = &pList->a[pList->nExpr - 1];
+	assert(pList->nExpr > 0);
+	assert(pItem->pExpr == pSpan->pExpr);
+	sql_xfree(pItem->zSpan);
+	pItem->zSpan = sql_xstrndup(pSpan->zStart, pSpan->zEnd - pSpan->zStart);
 }
 
 /*
  * Delete an entire expression list.
  */
 static SQL_NOINLINE void
-exprListDeleteNN(sql * db, ExprList * pList)
+exprListDeleteNN(struct ExprList *pList)
 {
 	int i;
 	struct ExprList_item *pItem;
 	assert(pList->a != 0 || pList->nExpr == 0);
 	for (pItem = pList->a, i = 0; i < pList->nExpr; i++, pItem++) {
-		sql_expr_delete(db, pItem->pExpr);
-		sqlDbFree(db, pItem->zName);
-		sqlDbFree(db, pItem->zSpan);
+		sql_expr_delete(pItem->pExpr);
+		sql_xfree(pItem->zName);
+		sql_xfree(pItem->zSpan);
 	}
-	sqlDbFree(db, pList->a);
-	sqlDbFree(db, pList);
+	sql_xfree(pList->a);
+	sql_xfree(pList);
 }
 
 void
-sql_expr_list_delete(sql *db, ExprList *expr_list)
+sql_expr_list_delete(struct ExprList *expr_list)
 {
 	if (expr_list != NULL)
-		exprListDeleteNN(db, expr_list);
+		exprListDeleteNN(expr_list);
 }
 
 /*
@@ -2520,7 +2373,6 @@ sqlFindInIndex(Parse * pParse,	/* Parsing context */
 	 * ephemeral table.
 	 */
 	if (!pParse->is_aborted && (p = isCandidateForInOpt(pX)) != 0) {
-		sql *db = pParse->db;	/* Database connection */
 		ExprList *pEList = p->pEList;
 		int nExpr = pEList->nExpr;
 
@@ -2621,12 +2473,11 @@ sqlFindInIndex(Parse * pParse,	/* Parsing context */
 				if (colUsed == (MASKBIT(nExpr) - 1)) {
 					/* If we reach this point, that means the index pIdx is usable */
 					int iAddr = sqlVdbeAddOp0(v, OP_Once);
-					sqlVdbeAddOp4(v, OP_Explain,
-							  0, 0, 0,
-							  sqlMPrintf(db,
-							  "USING INDEX %s FOR IN-OPERATOR",
-							  idx->def->name),
-							  P4_DYNAMIC);
+					char *str = sqlMPrintf("USING INDEX %s "
+						"FOR IN-OPERATOR",
+						idx->def->name);
+					sqlVdbeAddOp4(v, OP_Explain, 0, 0, 0,
+						      str, P4_DYNAMIC);
 					vdbe_emit_open_cursor(pParse, iTab,
 							      idx->def->iid,
 							      space);
@@ -2702,10 +2553,10 @@ sqlFindInIndex(Parse * pParse,	/* Parsing context */
  * the types to be used for each column of the comparison.
  *
  * It is the responsibility of the caller to ensure that the returned
- * string is eventually freed using sqlDbFree().
+ * string is eventually freed using sql_xfree().
  */
 static enum field_type *
-expr_in_type(Parse *pParse, Expr *pExpr)
+expr_in_type(struct Expr *pExpr)
 {
 	Expr *pLeft = pExpr->pLeft;
 	int nVal = sqlExprVectorSize(pLeft);
@@ -2713,22 +2564,19 @@ expr_in_type(Parse *pParse, Expr *pExpr)
 
 	assert(pExpr->op == TK_IN);
 	uint32_t sz = (nVal + 1) * sizeof(enum field_type);
-	enum field_type *zRet = sqlDbMallocZero(pParse->db, sz);
-	if (zRet) {
-		int i;
-		for (i = 0; i < nVal; i++) {
-			Expr *pA = sqlVectorFieldSubexpr(pLeft, i);
-			enum field_type lhs = sql_expr_type(pA);
-			if (pSelect) {
-				struct Expr *e = pSelect->pEList->a[i].pExpr;
-				enum field_type rhs = sql_expr_type(e);
-				zRet[i] = sql_type_result(rhs, lhs);
-			} else {
-				zRet[i] = lhs;
-			}
+	enum field_type *zRet = sql_xmalloc0(sz);
+	for (int i = 0; i < nVal; i++) {
+		Expr *pA = sqlVectorFieldSubexpr(pLeft, i);
+		enum field_type lhs = sql_expr_type(pA);
+		if (pSelect != NULL) {
+			struct Expr *e = pSelect->pEList->a[i].pExpr;
+			enum field_type rhs = sql_expr_type(e);
+			zRet[i] = sql_type_result(rhs, lhs);
+		} else {
+			zRet[i] = lhs;
 		}
-		zRet[nVal] = field_type_MAX;
 	}
+	zRet[nVal] = field_type_MAX;
 	return zRet;
 }
 
@@ -2764,8 +2612,6 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 	int jmpIfDynamic = -1;	/* One-time test address */
 	int rReg = 0;		/* Register storing resulting */
 	Vdbe *v = sqlGetVdbe(pParse);
-	if (NEVER(v == 0))
-		return 0;
 	sqlExprCachePush(pParse);
 
 	/* The evaluation of the IN/EXISTS/SELECT must be repeated every time it
@@ -2781,11 +2627,10 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 	if (!ExprHasProperty(pExpr, EP_VarSelect))
 		jmpIfDynamic = sqlVdbeAddOp0(v, OP_Once);
 	if (pParse->explain == 2) {
-		char *zMsg =
-		    sqlMPrintf(pParse->db, "EXECUTE %s%s SUBQUERY %d",
-				   jmpIfDynamic >= 0 ? "" : "CORRELATED ",
-				   pExpr->op == TK_IN ? "LIST" : "SCALAR",
-				   pParse->iNextSelectId);
+		char *zMsg = sqlMPrintf("EXECUTE %s%s SUBQUERY %d",
+					jmpIfDynamic >= 0 ? "" : "CORRELATED ",
+					pExpr->op == TK_IN ? "LIST" : "SCALAR",
+					pParse->iNextSelectId);
 		sqlVdbeAddOp4(v, OP_Explain, pParse->iSelectId, 0, 0, zMsg,
 				  P4_DYNAMIC);
 	}
@@ -2838,19 +2683,16 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 					int i;
 					sqlSelectDestInit(&dest, SRT_Set,
 							      pExpr->iTable, reg_eph);
-					dest.dest_type =
-						expr_in_type(pParse, pExpr);
+					dest.dest_type = expr_in_type(pExpr);
 					assert((pExpr->iTable & 0x0000FFFF) ==
 					       pExpr->iTable);
 					pSelect->iLimit = 0;
 					if (sqlSelect
 					    (pParse, pSelect, &dest)) {
-						sqlDbFree(pParse->db,
-							      dest.dest_type);
+						sql_xfree(dest.dest_type);
 						return 0;
 					}
-					sqlDbFree(pParse->db,
-						      dest.dest_type);
+					sql_xfree(dest.dest_type);
 					assert(pEList != 0);
 					assert(pEList->nExpr > 0);
 					for (i = 0; i < nVal; i++) {
@@ -2954,15 +2796,9 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 				VdbeComment((v, "Init EXISTS result"));
 			}
 			if (pSel->pLimit == NULL) {
-				pSel->pLimit =
-					sql_expr_new(pParse->db, TK_INTEGER,
-						     &sqlIntTokens[1]);
-				if (pSel->pLimit == NULL) {
-					pParse->is_aborted = true;
-				} else {
-					ExprSetProperty(pSel->pLimit,
-							EP_System);
-				}
+				pSel->pLimit = sql_expr_new(TK_INTEGER,
+							    &sqlIntTokens[1]);
+				ExprSetProperty(pSel->pLimit, EP_System);
 			}
 			pSel->selFlags |= SF_SingleRow;
 			pSel->iLimit = 0;
@@ -3066,14 +2902,9 @@ sqlExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	if (sqlExprCheckIN(pParse, pExpr))
 		return;
 	/* Type sequence for comparisons. */
-	enum field_type *zAff = expr_in_type(pParse, pExpr);
+	enum field_type *zAff = expr_in_type(pExpr);
 	nVector = sqlExprVectorSize(pExpr->pLeft);
-	aiMap =
-	    (int *)sqlDbMallocZero(pParse->db,
-				       nVector * (sizeof(int) + sizeof(char)) +
-				       1);
-	if (pParse->db->mallocFailed)
-		goto sqlExprCodeIN_oom_error;
+	aiMap = sql_xmalloc0(nVector * (sizeof(int) + sizeof(char)) + 1);
 
 	/* Attempt to compute the RHS. After this step, if anything other than
 	 * IN_INDEX_NOOP is returned, the table opened ith cursor pExpr->iTable
@@ -3269,9 +3100,8 @@ sqlExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 		sqlReleaseTempReg(pParse, rLhs);
 	sqlExprCachePop(pParse);
 	VdbeComment((v, "end IN expr"));
- sqlExprCodeIN_oom_error:
-	sqlDbFree(pParse->db, aiMap);
-	sqlDbFree(pParse->db, zAff);
+	sql_xfree(aiMap);
+	sql_xfree(zAff);
 }
 
 /*
@@ -3301,9 +3131,7 @@ expr_code_dec(struct Parse *parser, struct Expr *expr, bool is_neg, int reg)
 {
 	const char *str = expr->u.zToken;
 	assert(str != NULL);
-	decimal_t *value = sqlDbMallocRawNN(sql_get(), sizeof(*value));
-	if (value == NULL)
-		goto error;
+	decimal_t *value = sql_xmalloc(sizeof(*value));
 	if (is_neg) {
 		decimal_t dec;
 		if (decimal_from_string(&dec, str) == NULL)
@@ -3316,7 +3144,7 @@ expr_code_dec(struct Parse *parser, struct Expr *expr, bool is_neg, int reg)
 		      P4_DEC);
 	return;
 error:
-	sqlDbFree(sql_get(), value);
+	sql_xfree(value);
 	parser->is_aborted = true;
 }
 
@@ -3508,14 +3336,14 @@ sqlExprCacheStore(Parse * pParse, int iTab, int iCol, int iReg)
 	struct yColCache *p;
 
 	/* Unless an error has occurred, register numbers are always positive. */
-	assert(iReg > 0 || pParse->is_aborted || pParse->db->mallocFailed);
+	assert(iReg > 0 || pParse->is_aborted);
 	assert(iCol >= -1 && iCol < 32768);	/* Finite column numbers */
 
 	/* The SQL_ColumnCache flag disables the column cache.  This is used
 	 * for testing only - to verify that sql always gets the same answer
 	 * with and without the column cache.
 	 */
-	if (OptimizationDisabled(pParse->db, SQL_ColumnCache))
+	if (OptimizationDisabled(SQL_ColumnCache))
 		return;
 
 	/* First replace any existing entry.
@@ -3795,10 +3623,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	Expr tempX;		/* Temporary expression node */
 
 	assert(target > 0 && target <= pParse->nMem);
-	if (v == 0) {
-		assert(pParse->db->mallocFailed);
-		return 0;
-	}
+	assert(v != NULL);
 
 	if (pExpr == 0) {
 		op = TK_NULL;
@@ -3852,8 +3677,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		assert(pParse->vdbe_field_ref_reg > 0);
 		int reg = pParse->vdbe_field_ref_reg;
 		sqlVdbeAddOp4(v, OP_FetchByName, reg, 0, target,
-			      sqlDbStrDup(pParse->db, pExpr->u.zToken),
-			      P4_DYNAMIC);
+			      sql_xstrdup(pExpr->u.zToken), P4_DYNAMIC);
 		return target;
 	case TK_DOT:
 		assert(pParse->vdbe_field_ref_reg > 0);
@@ -3899,7 +3723,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			z = &pExpr->u.zToken[2];
 			n = sqlStrlen30(z) - 1;
 			assert(z[n] == '\'');
-			zBlob = sqlHexToBlob(sqlVdbeDb(v), z, n);
+			zBlob = sqlHexToBlob(z, n);
 			sqlVdbeAddOp4(v, OP_Blob, n / 2, target, 0, zBlob,
 					  P4_DYNAMIC);
 			return target;
@@ -4239,8 +4063,7 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			} else {
 				sqlVdbeAddOp4(v, OP_FunctionByName, nFarg,
 					      r1, target,
-					      sqlDbStrNDup(pParse->db,
-							   func->def->name,
+					      sql_xstrndup(func->def->name,
 							   func->def->name_len),
 					      P4_DYNAMIC);
 			}
@@ -4462,15 +4285,10 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			} else {
 				sqlVdbeAddOp2(v, OP_Null, 0, target);
 			}
-			assert(pParse->db->mallocFailed || pParse->is_aborted
+			assert(pParse->is_aborted
 			       || pParse->iCacheLevel == iCacheLevel);
 			sqlVdbeResolveLabel(v, endLabel);
-			enum field_type *type =
-				sqlDbMallocZero(pParse->db, sizeof(*type));
-			if (type == NULL) {
-				pParse->is_aborted = true;
-				break;
-			}
+			enum field_type *type = sql_xmalloc0(sizeof(*type));
 			type[0] = sql_expr_type(pExpr);
 			sqlVdbeAddOp4(v, OP_ApplyType, target, 1, 0,
 				      (char *)type, P4_DYNAMIC);
@@ -4517,13 +4335,10 @@ sqlExprCodeAtInit(Parse * pParse,	/* Parsing context */
 	ExprList *p;
 	assert(ConstFactorOk(pParse));
 	p = pParse->pConstExpr;
-	pExpr = sqlExprDup(pParse->db, pExpr, 0);
-	p = sql_expr_list_append(pParse->db, p, pExpr);
-	if (p) {
-		struct ExprList_item *pItem = &p->a[p->nExpr - 1];
-		pItem->u.iConstExprReg = regDest;
-		pItem->reusable = reusable;
-	}
+	p = sql_expr_list_append(p, sqlExprDup(pExpr, 0));
+	struct ExprList_item *pItem = &p->a[p->nExpr - 1];
+	pItem->u.iConstExprReg = regDest;
+	pItem->reusable = reusable;
 	pParse->pConstExpr = p;
 }
 
@@ -4591,7 +4406,7 @@ sqlExprCode(Parse * pParse, Expr * pExpr, int target)
 				  target);
 	} else {
 		inReg = sqlExprCodeTarget(pParse, pExpr, target);
-		assert(pParse->pVdbe != 0 || pParse->db->mallocFailed);
+		assert(pParse->pVdbe != 0);
 		if (inReg != target && pParse->pVdbe) {
 			sqlVdbeAddOp2(pParse->pVdbe, OP_SCopy, inReg,
 					  target);
@@ -5280,13 +5095,11 @@ sqlFunctionUsesThisSrc(Expr * pExpr, SrcList * pSrcList)
  * the new element.  Return a negative number if malloc fails.
  */
 static int
-addAggInfoColumn(sql * db, AggInfo * pInfo)
+addAggInfoColumn(struct AggInfo *pInfo)
 {
 	int i;
-	pInfo->aCol = sqlArrayAllocate(db,
-					   pInfo->aCol,
-					   sizeof(pInfo->aCol[0]),
-					   &pInfo->nColumn, &i);
+	pInfo->aCol = sqlArrayAllocate(pInfo->aCol, sizeof(pInfo->aCol[0]),
+				       &pInfo->nColumn, &i);
 	return i;
 }
 
@@ -5295,13 +5108,11 @@ addAggInfoColumn(sql * db, AggInfo * pInfo)
  * the new element.  Return a negative number if malloc fails.
  */
 static int
-addAggInfoFunc(sql * db, AggInfo * pInfo)
+addAggInfoFunc(struct AggInfo *pInfo)
 {
 	int i;
-	pInfo->aFunc = sqlArrayAllocate(db,
-					    pInfo->aFunc,
-					    sizeof(pInfo->aFunc[0]),
-					    &pInfo->nFunc, &i);
+	pInfo->aFunc = sqlArrayAllocate(pInfo->aFunc, sizeof(pInfo->aFunc[0]),
+					&pInfo->nFunc, &i);
 	return i;
 }
 
@@ -5354,8 +5165,7 @@ analyzeAggregate(Walker * pWalker, Expr * pExpr)
 						if ((k >= pAggInfo->nColumn)
 						    && (k =
 							addAggInfoColumn
-							(pParse->db,
-							 pAggInfo)) >= 0) {
+							(pAggInfo)) >= 0) {
 							pCol =
 							    &pAggInfo->aCol[k];
 							pCol->space_def =
@@ -5453,8 +5263,7 @@ analyzeAggregate(Walker * pWalker, Expr * pExpr)
 				if (i >= pAggInfo->nFunc) {
 					/* pExpr is original.  Make a new entry in pAggInfo->aFunc[]
 					 */
-					i = addAggInfoFunc(pParse->db,
-							   pAggInfo);
+					i = addAggInfoFunc(pAggInfo);
 					if (i >= 0) {
 						assert(!ExprHasProperty
 						       (pExpr, EP_xIsSelect));

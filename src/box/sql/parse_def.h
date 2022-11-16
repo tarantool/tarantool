@@ -521,7 +521,7 @@ create_fk_constraint_parse_def_destroy(struct create_fk_constraint_parse_def *d)
 		return;
 	struct fk_constraint_parse *fk;
 	rlist_foreach_entry(fk, &d->fkeys, link)
-		sql_expr_list_delete(sql_get(), fk->selfref_cols);
+		sql_expr_list_delete(fk->selfref_cols);
 }
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */

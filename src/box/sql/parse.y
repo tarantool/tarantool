@@ -70,12 +70,6 @@
 #define YYPARSEFREENEVERNULL 1
 
 /*
-** Alternative datatype for the argument to the malloc() routine passed
-** into sqlParserAlloc().  The default is size_t.
-*/
-#define YYMALLOCARGTYPE  u64
-
-/*
  * Stop the parser if an error occurs. This macro adds an
  * additional check that allows the parser to be stopped if any
  * error was noticed.
@@ -108,7 +102,7 @@ struct TrigEvent { int a; IdList * b; };
 */
 static void disableLookaside(Parse *pParse){
   pParse->disableLookaside++;
-  pParse->db->lookaside.bDisable++;
+  sql_get()->lookaside.bDisable++;
 }
 
 } // end %include
@@ -203,12 +197,10 @@ engine_opts ::= ENGINE EQ STRING(A). {
     return;
   }
   /* Need to dequote name. */
-  char *normalized_name = sql_name_from_token(pParse->db, &A);
-  if (normalized_name == NULL)
-    return;
+  char *normalized_name = sql_name_from_token(&A);
   memcpy(pParse->create_table_def.new_space->def->engine_name, normalized_name,
          strlen(normalized_name) + 1);
-  sqlDbFree(pParse->db, normalized_name);
+  sql_xfree(normalized_name);
 }
 
 create_table_end ::= . { sqlEndTable(pParse); }
@@ -219,7 +211,7 @@ create_table_end ::= . { sqlEndTable(pParse); }
  *
  * create_table_args ::= AS select(S). {
  *   sqlEndTable(pParse);
- *   sql_select_delete(pParse->db, S);
+ *   sql_select_delete(S);
  * }
  */
 
@@ -425,21 +417,21 @@ cmd ::= select(X).  {
     return;
   }
   sqlSelect(pParse, X, &dest);
-  sql_select_delete(pParse->db, X);
+  sql_select_delete(X);
 }
 
 %type select {Select*}
-%destructor select {sql_select_delete(pParse->db, $$);}
+%destructor select {sql_select_delete($$);}
 %type selectnowith {Select*}
-%destructor selectnowith {sql_select_delete(pParse->db, $$);}
+%destructor selectnowith {sql_select_delete($$);}
 %type oneselect {Select*}
-%destructor oneselect {sql_select_delete(pParse->db, $$);}
+%destructor oneselect {sql_select_delete($$);}
 
 %include {
   /**
    * For a compound SELECT statement, make sure
    * p->pPrior->pNext==p for all elements in the list. And make
-   * sure list length does not exceed SQL_LIMIT_COMPOUND_SELECT.
+   * sure list length does not exceed SQL_MAX_COMPOUND_SELECT.
    */
   static void parserDoubleLinkSelect(Parse *pParse, Select *p){
     if( p->pPrior ){
@@ -449,13 +441,12 @@ cmd ::= select(X).  {
         pLoop->pNext = pNext;
         pLoop->selFlags |= SF_Compound;
       }
-      if( (p->selFlags & SF_MultiValue)==0 && 
-        (mxSelect = pParse->db->aLimit[SQL_LIMIT_COMPOUND_SELECT])>0 &&
-        cnt>mxSelect
-      ){
-         diag_set(ClientError, ER_SQL_PARSER_LIMIT, "The number of UNION or "\
-                  "EXCEPT or INTERSECT operations", cnt,
-                  pParse->db->aLimit[SQL_LIMIT_COMPOUND_SELECT]);
+      if((p->selFlags & SF_MultiValue) == 0 &&
+         (mxSelect = sql_get()->aLimit[SQL_LIMIT_COMPOUND_SELECT]) > 0 &&
+         cnt > mxSelect) {
+          diag_set(ClientError, ER_SQL_PARSER_LIMIT, "The number of UNION or "\
+                   "EXCEPT or INTERSECT operations", cnt,
+                   sql_get()->aLimit[SQL_LIMIT_COMPOUND_SELECT]);
          pParse->is_aborted = true;
       }
     }
@@ -468,7 +459,7 @@ select(A) ::= with(W) selectnowith(X). {
     p->pWith = W;
     parserDoubleLinkSelect(pParse, p);
   }else{
-    sqlWithDelete(pParse->db, W);
+    sqlWithDelete(W);
   }
   A = p; /*A-overwrites-W*/
 }
@@ -493,7 +484,7 @@ selectnowith(A) ::= selectnowith(A) multiselect_op(Y) oneselect(Z).  {
     pRhs->selFlags &= ~SF_MultiValue;
     if( Y!=TK_ALL ) pParse->hasCompound = 1;
   }else{
-    sql_select_delete(pParse->db, pLhs);
+    sql_select_delete(pLhs);
   }
   A = pRhs;
 }
@@ -536,7 +527,7 @@ oneselect(A) ::= SELECT(S) distinct(D) selcollist(W) from(X) where_opt(Y)
 oneselect(A) ::= values(A).
 
 %type values {Select*}
-%destructor values {sql_select_delete(pParse->db, $$);}
+%destructor values {sql_select_delete($$);}
 values(A) ::= VALUES LP nexprlist(X) RP. {
   A = sqlSelectNew(pParse,X,0,0,0,0,0,SF_Values,0,0);
 }
@@ -567,33 +558,24 @@ distinct(A) ::= .           {A = 0;}
 // opcode of TK_ASTERISK.
 //
 %type selcollist {ExprList*}
-%destructor selcollist {sql_expr_list_delete(pParse->db, $$);}
+%destructor selcollist {sql_expr_list_delete($$);}
 %type sclp {ExprList*}
-%destructor sclp {sql_expr_list_delete(pParse->db, $$);}
+%destructor sclp {sql_expr_list_delete($$);}
 sclp(A) ::= selcollist(A) COMMA.
 sclp(A) ::= .                                {A = 0;}
 selcollist(A) ::= sclp(A) expr(X) as(Y).     {
-   A = sql_expr_list_append(pParse->db, A, X.pExpr);
+   A = sql_expr_list_append(A, X.pExpr);
    if( Y.n>0 ) sqlExprListSetName(pParse, A, &Y, 1);
-   sqlExprListSetSpan(pParse,A,&X);
+   sqlExprListSetSpan(A, &X);
 }
 selcollist(A) ::= sclp(A) STAR. {
-  struct Expr *p = sql_expr_new_anon(pParse->db, TK_ASTERISK);
-  if (p == NULL) {
-    pParse->is_aborted = true;
-    return;
-  }
-  A = sql_expr_list_append(pParse->db, A, p);
+  A = sql_expr_list_append(A, sql_expr_new_anon(TK_ASTERISK));
 }
 selcollist(A) ::= sclp(A) nm(X) DOT STAR. {
-  struct Expr *pLeft = sql_expr_new_dequoted(pParse->db, TK_ID, &X);
-  if (pLeft == NULL) {
-    pParse->is_aborted = true;
-    return;
-  }
+  struct Expr *pLeft = sql_expr_new_dequoted(TK_ID, &X);
   Expr *pRight = sqlPExpr(pParse, TK_ASTERISK, 0, 0);
   Expr *pDot = sqlPExpr(pParse, TK_DOT, pLeft, pRight);
-  A = sql_expr_list_append(pParse->db,A, pDot);
+  A = sql_expr_list_append(A, pDot);
 }
 
 // An option "AS <id>" phrase that can follow one of the expressions that
@@ -606,15 +588,15 @@ as(X) ::= .            {X.n = 0; X.z = 0;}
 
 
 %type seltablist {SrcList*}
-%destructor seltablist {sqlSrcListDelete(pParse->db, $$);}
+%destructor seltablist {sqlSrcListDelete($$);}
 %type stl_prefix {SrcList*}
-%destructor stl_prefix {sqlSrcListDelete(pParse->db, $$);}
+%destructor stl_prefix {sqlSrcListDelete($$);}
 %type from {SrcList*}
-%destructor from {sqlSrcListDelete(pParse->db, $$);}
+%destructor from {sqlSrcListDelete($$);}
 
 // A complete FROM clause.
 //
-from(A) ::= .                {A = sqlDbMallocZero(pParse->db, sizeof(*A));}
+from(A) ::= .                {A = sql_xmalloc0(sizeof(*A));}
 from(A) ::= FROM seltablist(X). {
   A = X;
   sqlSrcListShiftJoinType(A);
@@ -630,12 +612,12 @@ stl_prefix(A) ::= .                           {A = 0;}
 seltablist(A) ::= stl_prefix(A) nm(Y) as(Z) indexed_opt(I)
                   on_opt(N) using_opt(U). {
   A = sqlSrcListAppendFromTerm(pParse,A,&Y,&Z,0,N,U);
-  sqlSrcListIndexedBy(pParse, A, &I);
+  sqlSrcListIndexedBy(A, &I);
 }
 seltablist(A) ::= stl_prefix(A) nm(Y) LP exprlist(E) RP as(Z)
                   on_opt(N) using_opt(U). {
   A = sqlSrcListAppendFromTerm(pParse,A,&Y,&Z,0,N,U);
-  sqlSrcListFuncArgs(pParse, A, E);
+  sqlSrcListFuncArgs(A, E);
 }
 seltablist(A) ::= stl_prefix(A) LP select(S) RP
                   as(Z) on_opt(N) using_opt(U). {
@@ -655,7 +637,7 @@ seltablist(A) ::= stl_prefix(A) LP seltablist(F) RP
       pOld->zName =  0;
       pOld->pSelect = 0;
     }
-    sqlSrcListDelete(pParse->db, F);
+    sqlSrcListDelete(F);
   }else{
     Select *pSubquery;
     sqlSrcListShiftJoinType(F);
@@ -665,14 +647,10 @@ seltablist(A) ::= stl_prefix(A) LP seltablist(F) RP
 }
 
 %type fullname {SrcList*}
-%destructor fullname {sqlSrcListDelete(pParse->db, $$);}
+%destructor fullname {sqlSrcListDelete($$);}
 fullname(A) ::= nm(X). {
   /* A-overwrites-X. */
-  A = sql_src_list_append(pParse->db,0,&X);
-  if (A == NULL) {
-    pParse->is_aborted = true;
-    return;
-  }
+  A = sql_src_list_append(NULL ,&X);
 }
 
 %type joinop {int}
@@ -688,7 +666,7 @@ joinop(X) ::= JOIN_KW(A) join_nm(B) join_nm(C) JOIN.
                   {X = sqlJoinType(pParse,&A,&B,&C);/*X-overwrites-A*/}
 
 %type on_opt {Expr*}
-%destructor on_opt {sql_expr_delete(pParse->db, $$);}
+%destructor on_opt {sql_expr_delete($$);}
 on_opt(N) ::= ON expr(E).   {N = E.pExpr;}
 on_opt(N) ::= .             {N = 0;}
 
@@ -708,30 +686,30 @@ indexed_opt(A) ::= INDEXED BY nm(X). {A = X;}
 indexed_opt(A) ::= NOT INDEXED.      {A.z=0; A.n=1;}
 
 %type using_opt {IdList*}
-%destructor using_opt {sqlIdListDelete(pParse->db, $$);}
+%destructor using_opt {sqlIdListDelete($$);}
 using_opt(U) ::= USING LP idlist(L) RP.  {U = L;}
 using_opt(U) ::= .                        {U = 0;}
 
 
 %type orderby_opt {ExprList*}
-%destructor orderby_opt {sql_expr_list_delete(pParse->db, $$);}
+%destructor orderby_opt {sql_expr_list_delete($$);}
 
 // the sortlist non-terminal stores a list of expression where each
 // expression is optionally followed by ASC or DESC to indicate the
 // sort order.
 //
 %type sortlist {ExprList*}
-%destructor sortlist {sql_expr_list_delete(pParse->db, $$);}
+%destructor sortlist {sql_expr_list_delete($$);}
 
 orderby_opt(A) ::= .                          {A = 0;}
 orderby_opt(A) ::= ORDER BY sortlist(X).      {A = X;}
 sortlist(A) ::= sortlist(A) COMMA expr(Y) sortorder(Z). {
-  A = sql_expr_list_append(pParse->db,A,Y.pExpr);
+  A = sql_expr_list_append(A, Y.pExpr);
   sqlExprListSetSortOrder(A,Z);
 }
 sortlist(A) ::= expr(Y) sortorder(Z). {
   /* A-overwrites-Y. */
-  A = sql_expr_list_append(pParse->db,NULL,Y.pExpr);
+  A = sql_expr_list_append(NULL, Y.pExpr);
   sqlExprListSetSortOrder(A,Z);
 }
 
@@ -740,7 +718,7 @@ sortlist(A) ::= expr(Y) sortorder(Z). {
  * declaration.
  */
 %type col_list_with_autoinc {ExprList*}
-%destructor col_list_with_autoinc {sql_expr_list_delete(pParse->db, $$);}
+%destructor col_list_with_autoinc {sql_expr_list_delete($$);}
 
 col_list_with_autoinc(A) ::= col_list_with_autoinc(A) COMMA expr(Y)
                              autoinc(I). {
@@ -751,7 +729,7 @@ col_list_with_autoinc(A) ::= col_list_with_autoinc(A) COMMA expr(Y)
     if (sql_add_autoincrement(pParse, fieldno) != 0)
       return;
   }
-  A = sql_expr_list_append(pParse->db, A, Y.pExpr);
+  A = sql_expr_list_append(A, Y.pExpr);
 }
 
 col_list_with_autoinc(A) ::= expr(Y) autoinc(I). {
@@ -763,7 +741,7 @@ col_list_with_autoinc(A) ::= expr(Y) autoinc(I). {
       return;
   }
   /* A-overwrites-Y. */
-  A = sql_expr_list_append(pParse->db, NULL, Y.pExpr);
+  A = sql_expr_list_append(NULL, Y.pExpr);
 }
 
 %type enable {bool}
@@ -777,12 +755,12 @@ sortorder(A) ::= DESC.          {A = SORT_ORDER_DESC;}
 sortorder(A) ::= .              {A = SORT_ORDER_UNDEF;}
 
 %type groupby_opt {ExprList*}
-%destructor groupby_opt {sql_expr_list_delete(pParse->db, $$);}
+%destructor groupby_opt {sql_expr_list_delete($$);}
 groupby_opt(A) ::= .                      {A = 0;}
 groupby_opt(A) ::= GROUP BY nexprlist(X). {A = X;}
 
 %type having_opt {Expr*}
-%destructor having_opt {sql_expr_delete(pParse->db, $$);}
+%destructor having_opt {sql_expr_delete($$);}
 having_opt(A) ::= .                {A = 0;}
 having_opt(A) ::= HAVING expr(X).  {A = X.pExpr;}
 
@@ -796,8 +774,8 @@ having_opt(A) ::= HAVING expr(X).  {A = X.pExpr;}
 // except as a transient.  So there is never anything to destroy.
 //
 //%destructor limit_opt {
-//  sqlExprDelete(pParse->db, $$.pLimit);
-//  sqlExprDelete(pParse->db, $$.pOffset);
+//  sqlExprDelete($$.pLimit);
+//  sqlExprDelete($$.pOffset);
 //}
 limit_opt(A) ::= .                    {A.pLimit = 0; A.pOffset = 0;}
 limit_opt(A) ::= LIMIT expr(X).       {A.pLimit = X.pExpr; A.pOffset = 0;}
@@ -810,7 +788,7 @@ limit_opt(A) ::= LIMIT expr(X) COMMA expr(Y).
 //
 cmd ::= with(C) DELETE FROM fullname(X) indexed_opt(I) where_opt(W). {
   sqlWithPush(pParse, C, 1);
-  sqlSrcListIndexedBy(pParse, X, &I);
+  sqlSrcListIndexedBy(X, &I);
   sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
   /* Instruct SQL to initate Tarantool's transaction.  */
   pParse->initiateTTrans = true;
@@ -825,7 +803,7 @@ cmd ::= TRUNCATE TABLE fullname(X). {
 }
 
 %type where_opt {Expr*}
-%destructor where_opt {sql_expr_delete(pParse->db, $$);}
+%destructor where_opt {sql_expr_delete($$);}
 
 where_opt(A) ::= .                    {A = 0;}
 where_opt(A) ::= WHERE expr(X).       {A = X.pExpr;}
@@ -835,10 +813,10 @@ where_opt(A) ::= WHERE expr(X).       {A = X.pExpr;}
 cmd ::= with(C) UPDATE orconf(R) fullname(X) indexed_opt(I) SET setlist(Y)
         where_opt(W).  {
   sqlWithPush(pParse, C, 1);
-  sqlSrcListIndexedBy(pParse, X, &I);
-  if (Y != NULL && Y->nExpr > pParse->db->aLimit[SQL_LIMIT_COLUMN]) {
+  sqlSrcListIndexedBy(X, &I);
+  if (Y != NULL && Y->nExpr > SQL_MAX_COLUMN) {
     diag_set(ClientError, ER_SQL_PARSER_LIMIT, "The number of columns in set "\
-             "list", Y->nExpr, pParse->db->aLimit[SQL_LIMIT_COLUMN]);
+             "list", Y->nExpr, SQL_MAX_COLUMN);
     pParse->is_aborted = true;
   }
   sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
@@ -848,17 +826,17 @@ cmd ::= with(C) UPDATE orconf(R) fullname(X) indexed_opt(I) SET setlist(Y)
 }
 
 %type setlist {ExprList*}
-%destructor setlist {sql_expr_list_delete(pParse->db, $$);}
+%destructor setlist {sql_expr_list_delete($$);}
 
 setlist(A) ::= setlist(A) COMMA nm(X) EQ expr(Y). {
-  A = sql_expr_list_append(pParse->db, A, Y.pExpr);
+  A = sql_expr_list_append(A, Y.pExpr);
   sqlExprListSetName(pParse, A, &X, 1);
 }
 setlist(A) ::= setlist(A) COMMA LP idlist(X) RP EQ expr(Y). {
   A = sqlExprListAppendVector(pParse, A, X, Y.pExpr);
 }
 setlist(A) ::= nm(X) EQ expr(Y). {
-  A = sql_expr_list_append(pParse->db, NULL, Y.pExpr);
+  A = sql_expr_list_append(NULL, Y.pExpr);
   sqlExprListSetName(pParse, A, &X, 1);
 }
 setlist(A) ::= LP idlist(X) RP EQ expr(Y). {
@@ -888,35 +866,27 @@ insert_cmd(A) ::= INSERT orconf(R).   {A = R;}
 insert_cmd(A) ::= REPLACE.            {A = ON_CONFLICT_ACTION_REPLACE;}
 
 %type idlist_opt {IdList*}
-%destructor idlist_opt {sqlIdListDelete(pParse->db, $$);}
+%destructor idlist_opt {sqlIdListDelete($$);}
 %type idlist {IdList*}
-%destructor idlist {sqlIdListDelete(pParse->db, $$);}
+%destructor idlist {sqlIdListDelete($$);}
 
 idlist_opt(A) ::= .                       {A = 0;}
 idlist_opt(A) ::= LP idlist(X) RP.    {A = X;}
 idlist(A) ::= idlist(A) COMMA nm(Y). {
-  A = sql_id_list_append(pParse->db,A,&Y);
-  if (A == NULL) {
-    pParse->is_aborted = true;
-    return;
-  }
+  A = sql_id_list_append(A, &Y);
 }
 idlist(A) ::= nm(Y). {
   /* A-overwrites-Y. */
-  A = sql_id_list_append(pParse->db,0,&Y);
-  if (A == NULL) {
-    pParse->is_aborted = true;
-    return;
-  }
+  A = sql_id_list_append(NULL, &Y);
 }
 
 /////////////////////////// Expression Processing /////////////////////////////
 //
 
 %type expr {ExprSpan}
-%destructor expr {sql_expr_delete(pParse->db, $$.pExpr);}
+%destructor expr {sql_expr_delete($$.pExpr);}
 %type term {ExprSpan}
-%destructor term {sql_expr_delete(pParse->db, $$.pExpr);}
+%destructor term {sql_expr_delete($$.pExpr);}
 
 %include {
   /* This is a utility routine used to set the ExprSpan.zStart and
@@ -932,56 +902,50 @@ idlist(A) ::= nm(Y). {
   ** new Expr to populate pOut.  Set the span of pOut to be the identifier
   ** that created the expression.
   */
-  static void spanExpr(ExprSpan *pOut, Parse *pParse, int op, Token t){
+  static void spanExpr(struct ExprSpan *pOut, int op, Token t){
     struct Expr *p = NULL;
     int name_sz = t.n + 1;
-    p = sqlDbMallocRawNN(pParse->db, sizeof(Expr) + name_sz);
-    if( p ){
-      memset(p, 0, sizeof(Expr));
-      switch (op) {
-      case TK_STRING:
-        p->type = FIELD_TYPE_STRING;
-        break;
-      case TK_BLOB:
-        p->type = FIELD_TYPE_VARBINARY;
-        break;
-      case TK_INTEGER:
-        p->type = FIELD_TYPE_INTEGER;
-        break;
-      case TK_FLOAT:
-        p->type = FIELD_TYPE_DOUBLE;
-        break;
-      case TK_DECIMAL:
-        p->type = FIELD_TYPE_DECIMAL;
-        break;
-      case TK_TRUE:
-      case TK_FALSE:
-      case TK_UNKNOWN:
-        p->type = FIELD_TYPE_BOOLEAN;
-        break;
-      default:
-        p->type = FIELD_TYPE_SCALAR;
-        break;
-      }
-      p->op = (u8)op;
-      p->flags = EP_Leaf;
-      p->iAgg = -1;
-      p->u.zToken = (char*)&p[1];
-      int rc = sql_normalize_name(p->u.zToken, name_sz, t.z, t.n);
-      if (rc > name_sz) {
-        name_sz = rc;
-        p = sqlDbReallocOrFree(pParse->db, p, sizeof(*p) + name_sz);
-        if (p == NULL) {
-          pParse->is_aborted = true;
-          return;
-        }
-        p->u.zToken = (char *)&p[1];
-        sql_normalize_name(p->u.zToken, name_sz, t.z, t.n);
-      }
-#if SQL_MAX_EXPR_DEPTH>0
-      p->nHeight = 1;
-#endif  
+    p = sql_xmalloc(sizeof(Expr) + name_sz);
+    memset(p, 0, sizeof(Expr));
+    switch (op) {
+    case TK_STRING:
+      p->type = FIELD_TYPE_STRING;
+      break;
+    case TK_BLOB:
+      p->type = FIELD_TYPE_VARBINARY;
+      break;
+    case TK_INTEGER:
+      p->type = FIELD_TYPE_INTEGER;
+      break;
+    case TK_FLOAT:
+      p->type = FIELD_TYPE_DOUBLE;
+      break;
+    case TK_DECIMAL:
+      p->type = FIELD_TYPE_DECIMAL;
+      break;
+    case TK_TRUE:
+    case TK_FALSE:
+    case TK_UNKNOWN:
+      p->type = FIELD_TYPE_BOOLEAN;
+      break;
+    default:
+      p->type = FIELD_TYPE_SCALAR;
+      break;
     }
+    p->op = (u8)op;
+    p->flags = EP_Leaf;
+    p->iAgg = -1;
+    p->u.zToken = (char*)&p[1];
+    int rc = sql_normalize_name(p->u.zToken, name_sz, t.z, t.n);
+    if (rc > name_sz) {
+      name_sz = rc;
+      p = sql_xrealloc(p, sizeof(*p) + name_sz);
+      p->u.zToken = (char *)&p[1];
+      sql_normalize_name(p->u.zToken, name_sz, t.z, t.n);
+    }
+#if SQL_MAX_EXPR_DEPTH>0
+    p->nHeight = 1;
+#endif  
     pOut->pExpr = p;
     pOut->zStart = t.z;
     pOut->zEnd = &t.z[t.n];
@@ -992,37 +956,24 @@ idlist(A) ::= nm(Y). {
 expr(A) ::= term(A).
 expr(A) ::= LP(B) expr(X) RP(E).
             {spanSet(&A,&B,&E); /*A-overwrites-B*/  A.pExpr = X.pExpr;}
-term(A) ::= NULL(X).        {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
-expr(A) ::= id(X).          {spanExpr(&A,pParse,TK_ID,X); /*A-overwrites-X*/}
-expr(A) ::= JOIN_KW(X).     {spanExpr(&A,pParse,TK_ID,X); /*A-overwrites-X*/}
+term(A) ::= NULL(X).        {spanExpr(&A, @X, X);/*A-overwrites-X*/}
+expr(A) ::= id(X).          {spanExpr(&A, TK_ID, X); /*A-overwrites-X*/}
+expr(A) ::= JOIN_KW(X).     {spanExpr(&A, TK_ID, X); /*A-overwrites-X*/}
 expr(A) ::= nm(X) DOT nm(Y). {
-  struct Expr *temp1 = sql_expr_new_dequoted(pParse->db, TK_ID, &X);
-  if (temp1 == NULL) {
-    pParse->is_aborted = true;
-    return;
-  }
-  struct Expr *temp2 = sql_expr_new_dequoted(pParse->db, TK_ID, &Y);
-  if (temp2 == NULL) {
-    sql_expr_delete(pParse->db, temp1);
-    pParse->is_aborted = true;
-    return;
-  }
+  struct Expr *temp1 = sql_expr_new_dequoted(TK_ID, &X);
+  struct Expr *temp2 = sql_expr_new_dequoted(TK_ID, &Y);
   spanSet(&A,&X,&Y); /*A-overwrites-X*/
   A.pExpr = sqlPExpr(pParse, TK_DOT, temp1, temp2);
 }
-term(A) ::= FLOAT|BLOB(X). {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
-term(A) ::= STRING(X).     {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
-term(A) ::= FALSE(X) . {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
-term(A) ::= TRUE(X) . {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
-term(A) ::= UNKNOWN(X) . {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
-term(A) ::= DECIMAL(X) . {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
+term(A) ::= FLOAT|BLOB(X). {spanExpr(&A, @X, X);/*A-overwrites-X*/}
+term(A) ::= STRING(X).     {spanExpr(&A, @X, X);/*A-overwrites-X*/}
+term(A) ::= FALSE(X) . {spanExpr(&A, @X, X);/*A-overwrites-X*/}
+term(A) ::= TRUE(X) . {spanExpr(&A, @X, X);/*A-overwrites-X*/}
+term(A) ::= UNKNOWN(X) . {spanExpr(&A, @X, X);/*A-overwrites-X*/}
+term(A) ::= DECIMAL(X) . {spanExpr(&A, @X, X);/*A-overwrites-X*/}
 
 term(A) ::= INTEGER(X). {
-  A.pExpr = sql_expr_new_dequoted(pParse->db, TK_INTEGER, &X);
-  if (A.pExpr == NULL) {
-    pParse->is_aborted = true;
-    return;
-  }
+  A.pExpr = sql_expr_new_dequoted(TK_INTEGER, &X);
   A.pExpr->type = FIELD_TYPE_INTEGER;
   A.zStart = X.z;
   A.zEnd = X.z + X.n;
@@ -1041,29 +992,20 @@ expr(A) ::= COLON|VARIABLE(X) INTEGER(Y).     {
   spanSet(&A, &X, &Y);
 }
 expr(A) ::= expr(A) COLLATE id(C). {
-  A.pExpr = sqlExprAddCollateToken(pParse, A.pExpr, &C, 1);
+  A.pExpr = sqlExprAddCollateToken(A.pExpr, &C, 1);
   A.zEnd = &C.z[C.n];
 }
 
 expr(A) ::= CAST(X) LP expr(E) AS typedef(T) RP(Y). {
   spanSet(&A,&X,&Y); /*A-overwrites-X*/
-  A.pExpr = sql_expr_new_dequoted(pParse->db, TK_CAST, NULL);
-  if (A.pExpr == NULL) {
-    pParse->is_aborted = true;
-    return;
-  }
+  A.pExpr = sql_expr_new_dequoted(TK_CAST, NULL);
   A.pExpr->type = T.type;
-  sqlExprAttachSubtrees(pParse->db, A.pExpr, E.pExpr, 0);
+  sqlExprAttachSubtrees(A.pExpr, E.pExpr, 0);
 }
 
 expr(A) ::= expr(X) LB getlist(Y) RB(E). {
-  struct Expr *expr = sql_expr_new_anon(pParse->db, TK_GETITEM);
-  if (expr == NULL) {
-    sql_expr_list_delete(pParse->db, Y);
-    pParse->is_aborted = true;
-    return;
-  }
-  Y = sql_expr_list_append(pParse->db, Y, X.pExpr);
+  struct Expr *expr = sql_expr_new_anon(TK_GETITEM);
+  Y = sql_expr_list_append(Y, X.pExpr);
   expr->x.pList = Y;
   expr->type = FIELD_TYPE_ANY;
   sqlExprSetHeightAndFlags(pParse, expr);
@@ -1073,22 +1015,17 @@ expr(A) ::= expr(X) LB getlist(Y) RB(E). {
 }
 
 getlist(A) ::= getlist(A) RB LB expr(X). {
-  A = sql_expr_list_append(pParse->db, A, X.pExpr);
+  A = sql_expr_list_append(A, X.pExpr);
 }
 getlist(A) ::= expr(X). {
-  A = sql_expr_list_append(pParse->db, NULL, X.pExpr);
+  A = sql_expr_list_append(NULL, X.pExpr);
 }
 
 %type getlist {ExprList *}
-%destructor getlist {sql_expr_list_delete(pParse->db, $$);}
+%destructor getlist {sql_expr_list_delete($$);}
 
 expr(A) ::= LB(X) exprlist(Y) RB(E). {
-  struct Expr *expr = sql_expr_new_anon(pParse->db, TK_ARRAY);
-  if (expr == NULL) {
-    sql_expr_list_delete(pParse->db, Y);
-    pParse->is_aborted = true;
-    return;
-  }
+  struct Expr *expr = sql_expr_new_anon(TK_ARRAY);
   expr->x.pList = Y;
   expr->type = FIELD_TYPE_ARRAY;
   sqlExprSetHeightAndFlags(pParse, expr);
@@ -1097,13 +1034,7 @@ expr(A) ::= LB(X) exprlist(Y) RB(E). {
 }
 
 expr(A) ::= LCB(X) maplist(Y) RCB(E). {
-  struct sql *db = pParse->db;
-  struct Expr *expr = sql_expr_new_anon(db, TK_MAP);
-  if (expr == NULL) {
-    sql_expr_list_delete(db, Y);
-    pParse->is_aborted = true;
-    return;
-  }
+  struct Expr *expr = sql_expr_new_anon(TK_MAP);
   expr->x.pList = Y;
   expr->type = FIELD_TYPE_MAP;
   sqlExprSetHeightAndFlags(pParse, expr);
@@ -1116,18 +1047,18 @@ maplist(A) ::= . {
   A = NULL;
 }
 nmaplist(A) ::= nmaplist(A) COMMA expr(X) COLON expr(Y). {
-  A = sql_expr_list_append(pParse->db, A, X.pExpr);
-  A = sql_expr_list_append(pParse->db, A, Y.pExpr);
+  A = sql_expr_list_append(A, X.pExpr);
+  A = sql_expr_list_append(A, Y.pExpr);
 }
 nmaplist(A) ::= expr(X) COLON expr(Y). {
-  A = sql_expr_list_append(pParse->db, NULL, X.pExpr);
-  A = sql_expr_list_append(pParse->db, A, Y.pExpr);
+  A = sql_expr_list_append(NULL, X.pExpr);
+  A = sql_expr_list_append(A, Y.pExpr);
 }
 
 %type maplist {ExprList *}
-%destructor maplist {sql_expr_list_delete(pParse->db, $$);}
+%destructor maplist {sql_expr_list_delete($$);}
 %type nmaplist {ExprList *}
-%destructor nmaplist {sql_expr_list_delete(pParse->db, $$);}
+%destructor nmaplist {sql_expr_list_delete($$);}
 
 expr(A) ::= TRIM(X) LP trim_operands(Y) RP(E). {
   A.pExpr = sqlExprFunction(pParse, Y, &X);
@@ -1135,40 +1066,36 @@ expr(A) ::= TRIM(X) LP trim_operands(Y) RP(E). {
 }
 
 %type trim_operands {struct ExprList *}
-%destructor trim_operands {sql_expr_list_delete(pParse->db, $$);}
+%destructor trim_operands {sql_expr_list_delete($$);}
 
 trim_operands(A) ::= trim_specification(N) expr(Z) FROM expr(Y). {
-  A = sql_expr_list_append(pParse->db, NULL, Y.pExpr);
-  struct Expr *p = sql_expr_new_dequoted(pParse->db, TK_INTEGER,
-                                         &sqlIntTokens[N]);
-  A = sql_expr_list_append(pParse->db, A, p);
-  A = sql_expr_list_append(pParse->db, A, Z.pExpr);
+  A = sql_expr_list_append(NULL, Y.pExpr);
+  struct Expr *p = sql_expr_new_dequoted(TK_INTEGER, &sqlIntTokens[N]);
+  A = sql_expr_list_append(A, p);
+  A = sql_expr_list_append(A, Z.pExpr);
 }
 
 trim_operands(A) ::= trim_specification(N) FROM expr(Y). {
-  A = sql_expr_list_append(pParse->db, NULL, Y.pExpr);
-  struct Expr *p = sql_expr_new_dequoted(pParse->db, TK_INTEGER,
-                                         &sqlIntTokens[N]);
-  A = sql_expr_list_append(pParse->db, A, p);
+  A = sql_expr_list_append(NULL, Y.pExpr);
+  struct Expr *p = sql_expr_new_dequoted(TK_INTEGER, &sqlIntTokens[N]);
+  A = sql_expr_list_append(A, p);
 }
 
 trim_operands(A) ::= expr(Z) FROM expr(Y). {
-  A = sql_expr_list_append(pParse->db, NULL, Y.pExpr);
-  struct Expr *p = sql_expr_new_dequoted(pParse->db, TK_INTEGER,
-                                         &sqlIntTokens[TRIM_BOTH]);
-  A = sql_expr_list_append(pParse->db, A, p);
-  A = sql_expr_list_append(pParse->db, A, Z.pExpr);
+  A = sql_expr_list_append(NULL, Y.pExpr);
+  struct Expr *p = sql_expr_new_dequoted(TK_INTEGER, &sqlIntTokens[TRIM_BOTH]);
+  A = sql_expr_list_append(A, p);
+  A = sql_expr_list_append(A, Z.pExpr);
 }
 
 trim_operands(A) ::= expr(Y). {
-  A = sql_expr_list_append(pParse->db, NULL, Y.pExpr);
-  struct Expr *p = sql_expr_new_dequoted(pParse->db, TK_INTEGER,
-                                         &sqlIntTokens[TRIM_BOTH]);
-  A = sql_expr_list_append(pParse->db, A, p);
+  A = sql_expr_list_append(NULL, Y.pExpr);
+  struct Expr *p = sql_expr_new_dequoted(TK_INTEGER, &sqlIntTokens[TRIM_BOTH]);
+  A = sql_expr_list_append(A, p);
 }
 
 %type expr_optional {struct Expr *}
-%destructor expr_optional {sql_expr_delete(pParse->db, $$);}
+%destructor expr_optional {sql_expr_delete($$);}
 
 expr_optional(A) ::= .        { A = NULL; }
 expr_optional(A) ::= expr(X). { A = X.pExpr; }
@@ -1180,11 +1107,11 @@ trim_specification(A) ::= TRAILING. { A = TRIM_TRAILING; }
 trim_specification(A) ::= BOTH.     { A = TRIM_BOTH; }
 
 expr(A) ::= id(X) LP distinct(D) exprlist(Y) RP(E). {
-  if( Y && Y->nExpr>pParse->db->aLimit[SQL_LIMIT_FUNCTION_ARG] ){
+  if (Y != NULL && Y->nExpr > SQL_MAX_FUNCTION_ARG){
     const char *err =
       tt_sprintf("Number of arguments to function %.*s", X.n, X.z);
     diag_set(ClientError, ER_SQL_PARSER_LIMIT, err, Y->nExpr,
-             pParse->db->aLimit[SQL_LIMIT_FUNCTION_ARG]);
+             SQL_MAX_FUNCTION_ARG);
     pParse->is_aborted = true;
   }
   A.pExpr = sqlExprFunction(pParse, Y, &X);
@@ -1200,11 +1127,11 @@ expr(A) ::= id(X) LP distinct(D) exprlist(Y) RP(E). {
  */
 type_func(A) ::= CHAR(A) .
 expr(A) ::= type_func(X) LP distinct(D) exprlist(Y) RP(E). {
-  if( Y && Y->nExpr>pParse->db->aLimit[SQL_LIMIT_FUNCTION_ARG] ){
+  if (Y != NULL && Y->nExpr > SQL_MAX_FUNCTION_ARG){
     const char *err =
       tt_sprintf("Number of arguments to function %.*s", X.n, X.z);
     diag_set(ClientError, ER_SQL_PARSER_LIMIT, err, Y->nExpr,
-             pParse->db->aLimit[SQL_LIMIT_FUNCTION_ARG]);
+             SQL_MAX_FUNCTION_ARG);
     pParse->is_aborted = true;
   }
   A.pExpr = sqlExprFunction(pParse, Y, &X);
@@ -1250,13 +1177,13 @@ expr(A) ::= id(X) LP STAR RP(E). {
 }
 
 expr(A) ::= LP(L) nexprlist(X) COMMA expr(Y) RP(R). {
-  ExprList *pList = sql_expr_list_append(pParse->db, X, Y.pExpr);
+  ExprList *pList = sql_expr_list_append(X, Y.pExpr);
   A.pExpr = sqlPExpr(pParse, TK_VECTOR, 0, 0);
   if( A.pExpr ){
     A.pExpr->x.pList = pList;
     spanSet(&A, &L, &R);
   }else{
-    sql_expr_list_delete(pParse->db, pList);
+    sql_expr_list_delete(pList);
   }
 }
 
@@ -1279,8 +1206,8 @@ expr(A) ::= expr(A) likeop(OP) expr(Y).  [LIKE_KW]  {
   ExprList *pList;
   int bNot = OP.n & 0x80000000;
   OP.n &= 0x7fffffff;
-  pList = sql_expr_list_append(pParse->db,NULL, Y.pExpr);
-  pList = sql_expr_list_append(pParse->db,pList, A.pExpr);
+  pList = sql_expr_list_append(NULL, Y.pExpr);
+  pList = sql_expr_list_append(pList, A.pExpr);
   A.pExpr = sqlExprFunction(pParse, pList, &OP);
   exprNot(pParse, bNot, &A);
   A.zEnd = Y.zEnd;
@@ -1290,9 +1217,9 @@ expr(A) ::= expr(A) likeop(OP) expr(Y) ESCAPE expr(E).  [LIKE_KW]  {
   ExprList *pList;
   int bNot = OP.n & 0x80000000;
   OP.n &= 0x7fffffff;
-  pList = sql_expr_list_append(pParse->db,NULL, Y.pExpr);
-  pList = sql_expr_list_append(pParse->db,pList, A.pExpr);
-  pList = sql_expr_list_append(pParse->db,pList, E.pExpr);
+  pList = sql_expr_list_append(NULL, Y.pExpr);
+  pList = sql_expr_list_append(pList, A.pExpr);
+  pList = sql_expr_list_append(pList, E.pExpr);
   A.pExpr = sqlExprFunction(pParse, pList, &OP);
   exprNot(pParse, bNot, &A);
   A.zEnd = E.zEnd;
@@ -1351,13 +1278,13 @@ expr(A) ::= PLUS(B) expr(X). [BITNOT]
 between_op(A) ::= BETWEEN.     {A = 0;}
 between_op(A) ::= NOT BETWEEN. {A = 1;}
 expr(A) ::= expr(A) between_op(N) expr(X) AND expr(Y). [BETWEEN] {
-  ExprList *pList = sql_expr_list_append(pParse->db,NULL, X.pExpr);
-  pList = sql_expr_list_append(pParse->db,pList, Y.pExpr);
+  ExprList *pList = sql_expr_list_append(NULL, X.pExpr);
+  pList = sql_expr_list_append(pList, Y.pExpr);
   A.pExpr = sqlPExpr(pParse, TK_BETWEEN, A.pExpr, 0);
   if( A.pExpr ){
     A.pExpr->x.pList = pList;
   }else{
-    sql_expr_list_delete(pParse->db, pList);
+    sql_expr_list_delete(pList);
   } 
   exprNot(pParse, N, &A);
   A.zEnd = Y.zEnd;
@@ -1375,13 +1302,9 @@ expr(A) ::= expr(A) in_op(N) LP exprlist(Y) RP(E). [IN] {
     ** simplify to constants 0 (false) and 1 (true), respectively,
     ** regardless of the value of expr1.
     */
-    sql_expr_delete(pParse->db, A.pExpr);
+    sql_expr_delete(A.pExpr);
     int tk = N == 0 ? TK_FALSE : TK_TRUE;
-    A.pExpr = sql_expr_new_anon(pParse->db, tk);
-    if (A.pExpr == NULL) {
-      pParse->is_aborted = true;
-      return;
-    }
+    A.pExpr = sql_expr_new_anon(tk);
     A.pExpr->type = FIELD_TYPE_BOOLEAN;
   }else if( Y->nExpr==1 ){
     /* Expressions of the form:
@@ -1397,7 +1320,7 @@ expr(A) ::= expr(A) in_op(N) LP exprlist(Y) RP(E). [IN] {
     */
     Expr *pRHS = Y->a[0].pExpr;
     Y->a[0].pExpr = 0;
-    sql_expr_list_delete(pParse->db, Y);
+    sql_expr_list_delete(Y);
     A.pExpr = sqlPExpr(pParse, N ? TK_NE : TK_EQ, A.pExpr, pRHS);
   }else{
     A.pExpr = sqlPExpr(pParse, TK_IN, A.pExpr, 0);
@@ -1405,7 +1328,7 @@ expr(A) ::= expr(A) in_op(N) LP exprlist(Y) RP(E). [IN] {
       A.pExpr->x.pList = Y;
       sqlExprSetHeightAndFlags(pParse, A.pExpr);
     }else{
-      sql_expr_list_delete(pParse->db, Y);
+      sql_expr_list_delete(Y);
     }
     exprNot(pParse, N, &A);
   }
@@ -1423,13 +1346,10 @@ expr(A) ::= expr(A) in_op(N) LP select(Y) RP(E).  [IN] {
   A.zEnd = &E.z[E.n];
 }
 expr(A) ::= expr(A) in_op(N) nm(Y) paren_exprlist(E). [IN] {
-  struct SrcList *pSrc = sql_src_list_append(pParse->db, 0,&Y);
-  if (pSrc == NULL) {
-    pParse->is_aborted = true;
-    return;
-  }
+  struct SrcList *pSrc = sql_src_list_append(NULL, &Y);
   Select *pSelect = sqlSelectNew(pParse, 0,pSrc,0,0,0,0,0,0,0);
-  if( E )  sqlSrcListFuncArgs(pParse, pSelect ? pSrc : 0, E);
+  if(E != NULL)
+    sqlSrcListFuncArgs(pSelect != NULL ? pSrc : NULL, E);
   A.pExpr = sqlPExpr(pParse, TK_IN, A.pExpr, 0);
   sqlPExprAddSelect(pParse, A.pExpr, pSelect);
   exprNot(pParse, N, &A);
@@ -1447,44 +1367,44 @@ expr(A) ::= CASE(C) expr_optional(X) case_exprlist(Y) case_else(Z) END(E). {
   spanSet(&A,&C,&E);  /*A-overwrites-C*/
   A.pExpr = sqlPExpr(pParse, TK_CASE, X, 0);
   if( A.pExpr ){
-    A.pExpr->x.pList = Z ? sql_expr_list_append(pParse->db,Y,Z) : Y;
+    A.pExpr->x.pList = Z ? sql_expr_list_append(Y, Z) : Y;
     sqlExprSetHeightAndFlags(pParse, A.pExpr);
   }else{
-    sql_expr_list_delete(pParse->db, Y);
-    sql_expr_delete(pParse->db, Z);
+    sql_expr_list_delete(Y);
+    sql_expr_delete(Z);
   }
 }
 %type case_exprlist {ExprList*}
-%destructor case_exprlist {sql_expr_list_delete(pParse->db, $$);}
+%destructor case_exprlist {sql_expr_list_delete($$);}
 case_exprlist(A) ::= case_exprlist(A) WHEN expr(Y) THEN expr(Z). {
-  A = sql_expr_list_append(pParse->db,A, Y.pExpr);
-  A = sql_expr_list_append(pParse->db,A, Z.pExpr);
+  A = sql_expr_list_append(A, Y.pExpr);
+  A = sql_expr_list_append(A, Z.pExpr);
 }
 case_exprlist(A) ::= WHEN expr(Y) THEN expr(Z). {
-  A = sql_expr_list_append(pParse->db,NULL, Y.pExpr);
-  A = sql_expr_list_append(pParse->db,A, Z.pExpr);
+  A = sql_expr_list_append(NULL, Y.pExpr);
+  A = sql_expr_list_append(A, Z.pExpr);
 }
 %type case_else {Expr*}
-%destructor case_else {sql_expr_delete(pParse->db, $$);}
+%destructor case_else {sql_expr_delete($$);}
 case_else(A) ::=  ELSE expr(X).         {A = X.pExpr;}
 case_else(A) ::=  .                     {A = 0;} 
 
 %type exprlist {ExprList*}
-%destructor exprlist {sql_expr_list_delete(pParse->db, $$);}
+%destructor exprlist {sql_expr_list_delete($$);}
 %type nexprlist {ExprList*}
-%destructor nexprlist {sql_expr_list_delete(pParse->db, $$);}
+%destructor nexprlist {sql_expr_list_delete($$);}
 
 exprlist(A) ::= nexprlist(A).
 exprlist(A) ::= .                            {A = 0;}
 nexprlist(A) ::= nexprlist(A) COMMA expr(Y).
-    {A = sql_expr_list_append(pParse->db,A,Y.pExpr);}
+    {A = sql_expr_list_append(A, Y.pExpr);}
 nexprlist(A) ::= expr(Y).
-    {A = sql_expr_list_append(pParse->db,NULL,Y.pExpr); /*A-overwrites-Y*/}
+    {A = sql_expr_list_append(NULL, Y.pExpr); /*A-overwrites-Y*/}
 
 /* A paren_exprlist is an optional expression list contained inside
 ** of parenthesis */
 %type paren_exprlist {ExprList*}
-%destructor paren_exprlist {sql_expr_list_delete(pParse->db, $$);}
+%destructor paren_exprlist {sql_expr_list_delete($$);}
 paren_exprlist(A) ::= .   {A = 0;}
 paren_exprlist(A) ::= LP exprlist(X) RP.  {A = X;}
 
@@ -1493,11 +1413,7 @@ paren_exprlist(A) ::= LP exprlist(X) RP.  {A = X;}
 //
 cmd ::= createkw uniqueflag(U) INDEX ifnotexists(NE) nm(X)
         ON nm(Y) LP sortlist(Z) RP. {
-  struct SrcList *src_list = sql_src_list_append(pParse->db,0,&Y);
-  if (src_list == NULL) {
-    pParse->is_aborted = true;
-    return;
-  }
+  struct SrcList *src_list = sql_src_list_append(NULL ,&Y);
   create_index_def_init(&pParse->create_index_def, src_list, &X, Z, U,
                         SORT_ORDER_ASC, NE);
   pParse->initiateTTrans = true;
@@ -1518,9 +1434,9 @@ uniqueflag(A) ::= .        {A = SQL_INDEX_TYPE_NON_UNIQUE;}
 // used for the arguments to an index.  That is just an historical accident.
 //
 %type eidlist {ExprList*}
-%destructor eidlist {sql_expr_list_delete(pParse->db, $$);}
+%destructor eidlist {sql_expr_list_delete($$);}
 %type eidlist_opt {ExprList*}
-%destructor eidlist_opt {sql_expr_list_delete(pParse->db, $$);}
+%destructor eidlist_opt {sql_expr_list_delete($$);}
 
 %include {
   /* Add a single new term to an ExprList that is used to store a
@@ -1533,7 +1449,7 @@ uniqueflag(A) ::= .        {A = SQL_INDEX_TYPE_NON_UNIQUE;}
     ExprList *pPrior,
     Token *pIdToken
   ){
-    ExprList *p = sql_expr_list_append(pParse->db, pPrior, NULL);
+    ExprList *p = sql_expr_list_append(pPrior, NULL);
     sqlExprListSetName(pParse, p, pIdToken, 1);
     return p;
   }
@@ -1582,7 +1498,7 @@ cmd ::= FUNCTION_KW(T) expr(E). {
     return;
   }
   pParse->parsed_ast_type = AST_TYPE_EXPR;
-  pParse->parsed_ast.expr = sqlExprDup(pParse->db, E.pExpr, 0);
+  pParse->parsed_ast.expr = sqlExprDup(E.pExpr, 0);
 }
 //////////////////////////// The CREATE TRIGGER command /////////////////////
 
@@ -1610,7 +1526,7 @@ trigger_time(A) ::= INSTEAD OF.  { A = TK_INSTEAD;}
 trigger_time(A) ::= .            { A = TK_BEFORE; }
 
 %type trigger_event {struct TrigEvent}
-%destructor trigger_event {sqlIdListDelete(pParse->db, $$.b);}
+%destructor trigger_event {sqlIdListDelete($$.b);}
 trigger_event(A) ::= DELETE|INSERT(X).   {A.a = @X; /*A-overwrites-X*/ A.b = 0;}
 trigger_event(A) ::= UPDATE(X).          {A.a = @X; /*A-overwrites-X*/ A.b = 0;}
 trigger_event(A) ::= UPDATE OF idlist(X).{A.a = TK_UPDATE; A.b = X;}
@@ -1624,12 +1540,12 @@ foreach_clause ::= . {
 foreach_clause ::= FOR EACH ROW.
 
 %type when_clause {Expr*}
-%destructor when_clause {sql_expr_delete(pParse->db, $$);}
+%destructor when_clause {sql_expr_delete($$);}
 when_clause(A) ::= .             { A = 0; }
 when_clause(A) ::= WHEN expr(X). { A = X.pExpr; }
 
 %type trigger_cmd_list {TriggerStep*}
-%destructor trigger_cmd_list {sqlDeleteTriggerStep(pParse->db, $$);}
+%destructor trigger_cmd_list {sqlDeleteTriggerStep($$);}
 trigger_cmd_list(A) ::= trigger_cmd_list(A) trigger_cmd(X) SEMI. {
   assert( A!=0 );
   A->pLast->pNext = X;
@@ -1675,11 +1591,11 @@ tridxby ::= NOT INDEXED. {
 
 
 %type trigger_cmd {TriggerStep*}
-%destructor trigger_cmd {sqlDeleteTriggerStep(pParse->db, $$);}
+%destructor trigger_cmd {sqlDeleteTriggerStep($$);}
 // UPDATE 
 trigger_cmd(A) ::=
    UPDATE orconf(R) trnm(X) tridxby SET setlist(Y) where_opt(Z). {
-     A = sql_trigger_update_step(pParse->db, &X, Y, Z, R);
+     A = sql_trigger_update_step(&X, Y, Z, R);
      if (A == NULL) {
         pParse->is_aborted = true;
         return;
@@ -1689,30 +1605,18 @@ trigger_cmd(A) ::=
 // INSERT
 trigger_cmd(A) ::= insert_cmd(R) INTO trnm(X) idlist_opt(F) select(S). {
   /*A-overwrites-R. */
-  A = sql_trigger_insert_step(pParse->db, &X, F, S, R);
-  if (A == NULL) {
-    pParse->is_aborted = true;
-    return;
-  }
+  A = sql_trigger_insert_step(&X, F, S, R);
 }
 
 // DELETE
 trigger_cmd(A) ::= DELETE FROM trnm(X) tridxby where_opt(Y). {
-  A = sql_trigger_delete_step(pParse->db, &X, Y);
-  if (A == NULL) {
-    pParse->is_aborted = true;
-    return;
-  }
+  A = sql_trigger_delete_step(&X, Y);
 }
 
 // SELECT
 trigger_cmd(A) ::= select(X). {
   /* A-overwrites-X. */
-  A = sql_trigger_select_step(pParse->db, X);
-  if (A == NULL) {
-    pParse->is_aborted = true;
-    return;
-  }
+  A = sql_trigger_select_step(X);
 }
 
 // The special RAISE expression that may occur in trigger programs
@@ -1725,11 +1629,7 @@ expr(A) ::= RAISE(X) LP IGNORE RP(Y).  {
 }
 expr(A) ::= RAISE(X) LP raisetype(T) COMMA STRING(Z) RP(Y).  {
   spanSet(&A,&X,&Y);  /*A-overwrites-X*/
-  A.pExpr = sql_expr_new_dequoted(pParse->db, TK_RAISE, &Z);
-  if(A.pExpr == NULL) {
-    pParse->is_aborted = true;
-    return;
-  }
+  A.pExpr = sql_expr_new_dequoted(TK_RAISE, &Z);
   A.pExpr->on_conflict_action = (enum on_conflict_action) T;
 }
 
@@ -1827,8 +1727,8 @@ cmd ::= alter_table_start(A) enable(E) CHECK CONSTRAINT nm(Z). {
 //////////////////////// COMMON TABLE EXPRESSIONS ////////////////////////////
 %type with {With*}
 %type wqlist {With*}
-%destructor with {sqlWithDelete(pParse->db, $$);}
-%destructor wqlist {sqlWithDelete(pParse->db, $$);}
+%destructor with {sqlWithDelete($$);}
+%destructor wqlist {sqlWithDelete($$);}
 
 with(A) ::= . {A = 0;}
 with(A) ::= WITH wqlist(W).              { A = W; }
