@@ -660,9 +660,13 @@ after_old_tuple_lookup:;
 	 * BEFORE triggers changed the resulting tuple.
 	 * Fix the request to conform.
 	 */
-	if (request_changed)
+	if (request_changed) {
+		struct region *txn_region = tx_region_acquire(txn);
 		rc = request_create_from_tuple(request, space,
-					       old_tuple, new_tuple);
+					       old_tuple, new_tuple,
+					       txn_region);
+		tx_region_release(txn, TX_ALLOC_SYSTEM);
+	}
 out:
 	if (new_tuple != NULL)
 		tuple_unref(new_tuple);
@@ -682,7 +686,10 @@ space_execute_dml(struct space *space, struct txn *txn,
 		 * we should replace it with the next sequence
 		 * value.
 		 */
-		if (request_handle_sequence(request, space) != 0)
+		struct region *txn_region = tx_region_acquire(txn);
+		int rc = request_handle_sequence(request, space, txn_region);
+		tx_region_release(txn, TX_ALLOC_SYSTEM);
+		if (rc != 0)
 			return -1;
 	}
 
@@ -725,15 +732,22 @@ space_execute_dml(struct space *space, struct txn *txn,
 			 * for cases when tuple is NULL, since the leader
 			 * will be unable to certify such updates correctly.
 			 */
-			request_rebind_to_primary_key(request, space, *result);
+			struct region *txn_region = tx_region_acquire(txn);
+			request_rebind_to_primary_key(request, space, *result,
+						      txn_region);
+			tx_region_release(txn, TX_ALLOC_SYSTEM);
 		}
 		break;
 	case IPROTO_DELETE:
 		if (space->vtab->execute_delete(space, txn,
 						request, result) != 0)
 			return -1;
-		if (*result != NULL && request->index_id != 0)
-			request_rebind_to_primary_key(request, space, *result);
+		if (*result != NULL && request->index_id != 0) {
+			struct region *txn_region = tx_region_acquire(txn);
+			request_rebind_to_primary_key(request, space, *result,
+						      txn_region);
+			tx_region_release(txn, TX_ALLOC_SYSTEM);
+		}
 		break;
 	case IPROTO_UPSERT:
 		*result = NULL;

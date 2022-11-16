@@ -44,6 +44,7 @@
 #include "tuple.h"
 #include "xrow.h"
 #include "iproto_constants.h"
+#include "txn.h"
 
 /**
  * Whenever we update a request, we must update its header as well.
@@ -56,12 +57,13 @@
  * try to apply the same row again on reconnect.
  */
 static int
-request_update_header(struct request *request, struct xrow_header *row)
+request_update_header(struct request *request, struct xrow_header *row,
+		      struct region *region)
 {
 	if (row == NULL)
 		return 0;
 	row->type = request->type;
-	row->bodycnt = xrow_encode_dml(request, &fiber()->gc, row->body);
+	row->bodycnt = xrow_encode_dml(request, region, row->body);
 	if (row->bodycnt < 0)
 		return -1;
 	request->header = row;
@@ -70,7 +72,8 @@ request_update_header(struct request *request, struct xrow_header *row)
 
 int
 request_create_from_tuple(struct request *request, struct space *space,
-			  struct tuple *old_tuple, struct tuple *new_tuple)
+			  struct tuple *old_tuple, struct tuple *new_tuple,
+			  struct region *region)
 {
 	struct xrow_header *row = request->header;
 	memset(request, 0, sizeof(*request));
@@ -81,7 +84,7 @@ request_create_from_tuple(struct request *request, struct space *space,
 		 * turn this request into no-op.
 		 */
 		request->type = IPROTO_NOP;
-		return request_update_header(request, row);
+		return request_update_header(request, row, region);
 	}
 	/*
 	 * Space pointer may be zero in case of NOP, in which case
@@ -91,9 +94,10 @@ request_create_from_tuple(struct request *request, struct space *space,
 	if (new_tuple == NULL) {
 		uint32_t size, key_size;
 		const char *data = tuple_data_range(old_tuple, &size);
-		request->key = tuple_extract_key_raw(data, data + size,
-				space->index[0]->def->key_def, MULTIKEY_NONE,
-				&key_size);
+		request->key = tuple_extract_key_raw_to_region(
+					data, data + size,
+					space->index[0]->def->key_def,
+					MULTIKEY_NONE, &key_size, region);
 		if (request->key == NULL)
 			return -1;
 		request->key_end = request->key + key_size;
@@ -108,7 +112,7 @@ request_create_from_tuple(struct request *request, struct space *space,
 		 * current transaction ends while we need to write
 		 * the tuple data to WAL on commit.
 		 */
-		char *buf = region_alloc(&fiber()->gc, size);
+		char *buf = region_alloc(region, size);
 		if (buf == NULL) {
 			diag_set(OutOfMemory, size, "region_alloc", "tuple");
 			return -1;
@@ -118,18 +122,20 @@ request_create_from_tuple(struct request *request, struct space *space,
 		request->tuple_end = buf + size;
 		request->type = IPROTO_REPLACE;
 	}
-	return request_update_header(request, row);
+	return request_update_header(request, row, region);
 }
 
 void
 request_rebind_to_primary_key(struct request *request, struct space *space,
-			      struct tuple *found_tuple)
+			      struct tuple *found_tuple,
+			      struct region *region)
 {
 	struct index *pk = space_index(space, 0);
 	assert(pk != NULL);
 	uint32_t key_len;
-	char *key = tuple_extract_key(found_tuple, pk->def->key_def,
-				      MULTIKEY_NONE, &key_len);
+	char *key = tuple_extract_key_to_region(
+			found_tuple, pk->def->key_def, MULTIKEY_NONE,
+			&key_len, region);
 	assert(key != NULL);
 	request->key = key;
 	request->key_end = key + key_len;
@@ -139,7 +145,8 @@ request_rebind_to_primary_key(struct request *request, struct space *space,
 }
 
 int
-request_handle_sequence(struct request *request, struct space *space)
+request_handle_sequence(struct request *request, struct space *space,
+			struct region *region)
 {
 	struct sequence *seq = space->sequence;
 
@@ -201,7 +208,7 @@ request_handle_sequence(struct request *request, struct space *space)
 
 		size_t buf_size = (request->tuple_end - request->tuple) +
 						mp_sizeof_uint(UINT64_MAX);
-		char *tuple = region_alloc(&fiber()->gc, buf_size);
+		char *tuple = region_alloc(region, buf_size);
 		if (tuple == NULL) {
 			diag_set(OutOfMemory, buf_size, "region_alloc", "tuple");
 			return -1;
@@ -237,5 +244,5 @@ request_handle_sequence(struct request *request, struct space *space)
 		if (likely(mp_read_int64(&key, &value) == 0))
 			return sequence_update(seq, value);
 	}
-	return request_update_header(request, request->header);
+	return request_update_header(request, request->header, region);
 }

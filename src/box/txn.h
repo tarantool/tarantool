@@ -929,6 +929,20 @@ void
 txn_savepoint_release(struct txn_savepoint *svp);
 
 /**
+ * Method to get txn's region to pass it outside the transaction manager.
+ * Do not use txn->region, use this method to track txn's allocations!
+ * Return region to txn with tx_region_release.
+ */
+struct region *
+tx_region_acquire(struct txn *txn);
+
+/**
+ * Method to return region to txn and account new allocations.
+ */
+void
+tx_region_release(struct txn *txn, enum tx_alloc_type alloc_type);
+
+/**
  * FFI bindings: do not throw exceptions, do not accept extra
  * arguments
  */

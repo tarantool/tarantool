@@ -203,12 +203,7 @@ tx_region_aligned_alloc(struct txn *txn, size_t size, size_t alignment,
 	return allocation;
 }
 
-/**
- * Method to get txn's region to pass it outside the transaction manager.
- * Do not use txn->region, use this method to track txn's allocations!
- * Return region to txn with tx_region_release.
- */
-static inline struct region *
+struct region *
 tx_region_acquire(struct txn *txn)
 {
 	assert(txn != NULL);
@@ -219,10 +214,7 @@ tx_region_acquire(struct txn *txn)
 	return txn_region;
 }
 
-/**
- * Method to return region to txn and account new allocations.
- */
-static inline void
+void
 tx_region_release(struct txn *txn, enum tx_alloc_type alloc_type)
 {
 	assert(txn != NULL);

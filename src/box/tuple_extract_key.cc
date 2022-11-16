@@ -38,7 +38,7 @@ template <bool has_optional_parts>
 static char *
 tuple_extract_key_sequential_raw(const char *data, const char *data_end,
 				 struct key_def *key_def, int multikey_idx,
-				 uint32_t *key_size)
+				 uint32_t *key_size, struct region *region)
 {
 	(void)multikey_idx;
 	assert(!has_optional_parts || key_def->is_nullable);
@@ -64,7 +64,7 @@ tuple_extract_key_sequential_raw(const char *data, const char *data_end,
 	assert(field_end - field_start <= data_end - data);
 	bsize += field_end - field_start;
 
-	char *key = (char *) region_alloc(&fiber()->gc, bsize);
+	char *key = (char *)region_alloc(region, bsize);
 	if (key == NULL) {
 		diag_set(OutOfMemory, bsize, "region",
 			"tuple_extract_key_raw_sequential");
@@ -89,7 +89,8 @@ tuple_extract_key_sequential_raw(const char *data, const char *data_end,
 template <bool has_optional_parts>
 static inline char *
 tuple_extract_key_sequential(struct tuple *tuple, struct key_def *key_def,
-			     int multikey_idx, uint32_t *key_size)
+			     int multikey_idx, uint32_t *key_size,
+			     struct region *region)
 {
 	assert(key_def_is_sequential(key_def));
 	assert(!has_optional_parts || key_def->is_nullable);
@@ -100,7 +101,8 @@ tuple_extract_key_sequential(struct tuple *tuple, struct key_def *key_def,
 								    data_end,
 								    key_def,
 								    multikey_idx,
-								    key_size);
+								    key_size,
+								    region);
 }
 
 /**
@@ -111,7 +113,8 @@ template <bool contains_sequential_parts, bool has_optional_parts,
 	  bool has_json_paths, bool is_multikey>
 static char *
 tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
-			   int multikey_idx, uint32_t *key_size)
+			   int multikey_idx, uint32_t *key_size,
+			   struct region *region)
 {
 	assert(has_json_paths == key_def->has_json_paths);
 	assert(!has_optional_parts || key_def->is_nullable);
@@ -176,7 +179,7 @@ tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
 		bsize += end - field;
 	}
 
-	char *key = (char *) region_alloc(&fiber()->gc, bsize);
+	char *key = (char *)region_alloc(region, bsize);
 	if (key == NULL) {
 		diag_set(OutOfMemory, bsize, "region", "tuple_extract_key");
 		return NULL;
@@ -246,7 +249,7 @@ template <bool has_optional_parts, bool has_json_paths>
 static char *
 tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
 			       struct key_def *key_def, int multikey_idx,
-			       uint32_t *key_size)
+			       uint32_t *key_size, struct region *region)
 {
 	assert(has_json_paths == key_def->has_json_paths);
 	assert(!has_optional_parts || key_def->is_nullable);
@@ -259,7 +262,7 @@ tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
 		key_def->part_count : 0;
 	uint32_t alloc_size = (uint32_t)(data_end - data) +
 		potential_null_count * mp_sizeof_nil();
-	char *key = (char *)region_alloc(&fiber()->gc, alloc_size);
+	char *key = (char *)region_alloc(region, alloc_size);
 	if (key == NULL) {
 		diag_set(OutOfMemory, alloc_size, "region",
 			 "tuple_extract_key_raw");
@@ -410,9 +413,11 @@ key_def_set_extract_func_json(struct key_def *def)
 
 static char *
 tuple_extract_key_stub(struct tuple *tuple, struct key_def *key_def,
-			     int multikey_idx, uint32_t *key_size)
+		       int multikey_idx, uint32_t *key_size,
+		       struct region *region)
 {
 	(void)tuple; (void)key_def; (void)multikey_idx; (void)key_size;
+	(void)region;
 	unreachable();
 	return NULL;
 }
@@ -420,10 +425,11 @@ tuple_extract_key_stub(struct tuple *tuple, struct key_def *key_def,
 static char *
 tuple_extract_key_raw_stub(const char *data, const char *data_end,
 			   struct key_def *key_def, int multikey_idx,
-			   uint32_t *key_size)
+			   uint32_t *key_size, struct region *region)
 {
 	(void)data; (void)data_end;
 	(void)key_def; (void)multikey_idx; (void)key_size;
+	(void)region;
 	unreachable();
 	return NULL;
 }
