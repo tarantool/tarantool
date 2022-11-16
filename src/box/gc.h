@@ -101,10 +101,15 @@ struct gc_consumer {
 
 typedef rb_tree(struct gc_consumer) gc_tree_t;
 
+typedef void
+(*on_garbage_collection_f)(void);
+
 /** Garbage collection state. */
 struct gc_state {
 	/** VClock of the oldest WAL row available on the instance. */
 	struct vclock vclock;
+	/** A callback invoked whenever gc.vclock is updated. */
+	on_garbage_collection_f on_garbage_collection;
 	/**
 	 * Minimal number of checkpoints to preserve.
 	 * Configured by box.cfg.checkpoint_count.
@@ -216,7 +221,7 @@ gc_last_checkpoint(void)
  * Initialize the garbage collection state.
  */
 void
-gc_init(void);
+gc_init(on_garbage_collection_f on_garbage_collection);
 
 /**
  * Destroy the garbage collection state.

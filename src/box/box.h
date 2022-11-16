@@ -87,6 +87,9 @@ extern struct rlist box_on_recovery_state;
  */
 extern double txn_timeout_default;
 
+/** "internal.ballot" built-in event key. */
+extern const char *box_ballot_event_key;
+
 /*
  * Initialize box library
  * @throws C++ exception
