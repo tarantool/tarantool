@@ -161,14 +161,16 @@ vy_cache_insert_templates_chain(struct vy_cache *cache,
 	struct tuple *key = vy_new_simple_stmt(format, key_templ);
 	struct tuple *prev_stmt = NULL;
 	struct tuple *stmt = NULL;
+	bool is_first = true;
 
 	for (uint i = 0; i < length; ++i) {
 		stmt = vy_new_simple_stmt(format, &chain[i]);
-		vy_cache_add(cache, stmt, prev_stmt, key, order);
+		vy_cache_add(cache, stmt, prev_stmt, is_first, key, order);
 		if (i != 0)
 			tuple_unref(prev_stmt);
 		prev_stmt = stmt;
 		stmt = NULL;
+		is_first = false;
 	}
 	tuple_unref(key);
 	if (prev_stmt != NULL)

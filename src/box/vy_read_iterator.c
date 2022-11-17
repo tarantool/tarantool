@@ -719,6 +719,7 @@ vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_lsm *lsm,
 	itr->iterator_type = iterator_type;
 	itr->key = key;
 	itr->read_view = rv;
+	itr->is_first_cached = true;
 
 	if (vy_stmt_is_empty_key(key)) {
 		/*
@@ -933,12 +934,13 @@ vy_read_iterator_cache_add(struct vy_read_iterator *itr, struct tuple *stmt)
 		return;
 	}
 	vy_cache_add(&itr->lsm->cache, stmt, itr->last_cached_stmt,
-		     itr->key, itr->iterator_type);
+		     itr->is_first_cached, itr->key, itr->iterator_type);
 	if (stmt != NULL)
 		tuple_ref(stmt);
 	if (itr->last_cached_stmt != NULL)
 		tuple_unref(itr->last_cached_stmt);
 	itr->last_cached_stmt = stmt;
+	itr->is_first_cached = false;
 }
 
 /**

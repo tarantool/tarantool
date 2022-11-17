@@ -1358,7 +1358,7 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 	}
 
 	if ((*rv)->vlsn == INT64_MAX)
-		vy_cache_add(&lsm->pk->cache, *result, NULL, tuple, ITER_EQ);
+		vy_cache_add_point(&lsm->pk->cache, *result, tuple);
 
 	vy_stmt_counter_acct_tuple(&lsm->pk->stat.get, *result);
 	return 0;
@@ -1412,7 +1412,7 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 			*result = tuple;
 		}
 		if ((*rv)->vlsn == INT64_MAX)
-			vy_cache_add(&lsm->cache, *result, NULL, key, ITER_EQ);
+			vy_cache_add_point(&lsm->cache, *result, key);
 		goto out;
 	}
 

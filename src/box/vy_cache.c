@@ -228,9 +228,11 @@ vy_cache_env_set_quota(struct vy_cache_env *env, size_t quota)
 
 void
 vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
-	     struct tuple *prev_stmt, const struct tuple *key,
-	     enum iterator_type order)
+	     struct tuple *prev_stmt, bool is_first,
+	     const struct tuple *key, enum iterator_type order)
 {
+	assert(!is_first || prev_stmt == NULL);
+
 	if (cache->env->mem_quota == 0) {
 		/* Cache is disabled. */
 		return;
@@ -243,9 +245,6 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 		/* Do not store a statement from write set of a tx */
 		return;
 	}
-
-	/* The case of the first or the last result in key+order query */
-	bool is_boundary = (stmt != NULL) != (prev_stmt != NULL);
 
 	if (prev_stmt != NULL && vy_stmt_lsn(prev_stmt) == INT64_MAX) {
 		/* Previous statement is from tx write set, can't store it */
@@ -264,7 +263,7 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	 */
 	uint8_t boundary_level = cache->cmp_def->part_count;
 	if (stmt != NULL) {
-		if (is_boundary) {
+		if (is_first) {
 			/**
 			 * That means that the stmt is the first in a result.
 			 * Regardless of order, the statement is the first in

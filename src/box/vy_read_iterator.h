@@ -62,6 +62,12 @@ struct vy_read_iterator {
 	 * checked to match the search key.
 	 */
 	bool need_check_eq;
+	/**
+	 * Set to true if the statement that is about to be added to
+	 * the cache is the first one matching the iteration criteria.
+	 * See vy_read_iterator_cache_add().
+	 */
+	bool is_first_cached;
 	/** Last statement returned by vy_read_iterator_next(). */
 	struct tuple *last_stmt;
 	/**
