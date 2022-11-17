@@ -1373,10 +1373,8 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 		goto out;
 	}
 
-	if ((*rv)->vlsn == INT64_MAX) {
-		vy_cache_add(&lsm->pk->cache, pk_entry,
-			     vy_entry_none(), key, ITER_EQ);
-	}
+	if ((*rv)->vlsn == INT64_MAX)
+		vy_cache_add_point(&lsm->pk->cache, pk_entry, key);
 
 	vy_stmt_counter_acct_tuple(&lsm->pk->stat.get, pk_entry.stmt);
 	*result = full_entry;
@@ -1435,10 +1433,8 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 		} else {
 			entry = partial;
 		}
-		if ((*rv)->vlsn == INT64_MAX) {
-			vy_cache_add(&lsm->cache, entry,
-				     vy_entry_none(), key, ITER_EQ);
-		}
+		if ((*rv)->vlsn == INT64_MAX)
+			vy_cache_add_point(&lsm->cache, entry, key);
 		goto out;
 	}
 

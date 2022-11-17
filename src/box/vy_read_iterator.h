@@ -65,6 +65,12 @@ struct vy_read_iterator {
 	bool need_check_eq;
 	/** Set to true on the first iteration. */
 	bool is_started;
+	/**
+	 * Set to true if the statement that is about to be added to
+	 * the cache is the first one matching the iteration criteria.
+	 * See vy_read_iterator_cache_add().
+	 */
+	bool is_first_cached;
 	/** Last statement returned by vy_read_iterator_next(). */
 	struct vy_entry last;
 	/**
