@@ -732,6 +732,7 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 			txn->space_on_replace_triggers_depth--;
 			if (rc != 0)
 				goto fail;
+			assert(txn->in_sub_stmt > 0);
 		}
 	}
 	--txn->in_sub_stmt;
@@ -1235,6 +1236,7 @@ txn_rollback_stmt(struct txn *txn)
 {
 	if (txn == NULL || txn->in_sub_stmt == 0)
 		return;
+	assert(txn->in_sub_stmt > 0);
 	txn->in_sub_stmt--;
 	txn_rollback_to_svp(txn, txn->sub_stmt_begin[txn->in_sub_stmt]);
 }

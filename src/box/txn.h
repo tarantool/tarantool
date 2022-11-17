@@ -802,8 +802,11 @@ txn_begin_ro_stmt(struct space *space, struct txn **txn,
 	return 0;
 }
 
+/**
+ * End a read-only statement.
+ */
 static inline void
-txn_commit_ro_stmt(struct txn *txn, struct txn_ro_savepoint *svp)
+txn_end_ro_stmt(struct txn *txn, struct txn_ro_savepoint *svp)
 {
 	assert(txn == in_txn());
 	if (txn) {

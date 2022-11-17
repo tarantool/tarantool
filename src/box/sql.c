@@ -942,14 +942,12 @@ cursor_seek(BtCursor *pCur, int *pRes)
 	struct iterator *it =
 		index_create_iterator(pCur->index, pCur->iter_type, key,
 				      part_count);
+	if (txn != NULL)
+		txn_end_ro_stmt(txn, &svp);
 	if (it == NULL) {
-		if (txn != NULL)
-			txn_rollback_stmt(txn);
 		pCur->eState = CURSOR_INVALID;
 		return -1;
 	}
-	if (txn != NULL)
-		txn_commit_ro_stmt(txn, &svp);
 	pCur->iter = it;
 	pCur->eState = CURSOR_VALID;
 
