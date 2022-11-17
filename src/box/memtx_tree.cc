@@ -1590,6 +1590,11 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 	if (type == ITER_ALL)
 		type = ITER_GE;
 
+	ERROR_INJECT(ERRINJ_INDEX_ITERATOR_NEW, {
+		diag_set(ClientError, ER_INJECTION, "iterator fail");
+		return NULL;
+	});
+
 	struct tree_iterator<USE_HINT> *it = (struct tree_iterator<USE_HINT> *)
 		mempool_alloc(&memtx->iterator_pool);
 	if (it == NULL) {

@@ -2825,7 +2825,7 @@ box_select(uint32_t space_id, uint32_t index_id,
 	struct iterator *it = index_create_iterator_after(index, type, key,
 							  part_count, pos);
 	if (it == NULL) {
-		txn_rollback_stmt(txn);
+		txn_end_ro_stmt(txn, &svp);
 		return -1;
 	}
 
@@ -2858,11 +2858,10 @@ box_select(uint32_t space_id, uint32_t index_id,
 		space = iterator_space(it);
 	}
 
-	if (rc != 0) {
-		txn_rollback_stmt(txn);
+	txn_end_ro_stmt(txn, &svp);
+	if (rc != 0)
 		goto fail;
-	}
-	txn_commit_ro_stmt(txn, &svp);
+
 	if (update_pos) {
 		uint32_t pos_size;
 		/*

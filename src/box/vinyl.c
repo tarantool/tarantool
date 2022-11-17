@@ -3771,6 +3771,11 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 		return NULL;
 	}
 
+	ERROR_INJECT(ERRINJ_INDEX_ITERATOR_NEW, {
+		diag_set(ClientError, ER_INJECTION, "iterator fail");
+		return NULL;
+	});
+
 	struct vinyl_iterator *it = mempool_alloc(&env->iterator_pool);
 	if (it == NULL) {
 	        diag_set(OutOfMemory, sizeof(struct vinyl_iterator),
