@@ -68,6 +68,7 @@
 #include "box/lua/key_def.h"
 #include "box/lua/merger.h"
 #include "box/lua/watcher.h"
+#include "box/lua/iproto.h"
 
 #include "mpstream/mpstream.h"
 
@@ -529,6 +530,7 @@ box_lua_init(struct lua_State *L)
 	box_lua_xlog_init(L);
 	box_lua_sql_init(L);
 	box_lua_watcher_init(L);
+	box_lua_iproto_init(L);
 #ifdef ENABLE_SPACE_UPGRADE
 	box_lua_space_upgrade_init(L);
 #endif

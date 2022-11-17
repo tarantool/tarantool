@@ -49,7 +49,10 @@ enum {
 	XLOG_FIXHEADER_SIZE = 19
 };
 
-/** IPROTO_FLAGS bitfield constants. */
+/**
+ * IPROTO_FLAGS bitfield constants.
+ * `box.iproto.flag` needs to be updated correspondingly.
+ */
 enum {
 	/** Set for the last xrow in a transaction. */
 	IPROTO_FLAG_COMMIT = 0x01,
@@ -59,6 +62,9 @@ enum {
 	IPROTO_FLAG_WAIT_ACK = 0x04,
 };
 
+/**
+ * `box.iproto.key` needs to be updated correspondingly.
+ */
 enum iproto_key {
 	IPROTO_REQUEST_TYPE = 0x00,
 	IPROTO_SYNC = 0x01,
@@ -179,6 +185,7 @@ enum iproto_key {
  * Keys, stored in IPROTO_METADATA. They can not be received
  * in a request. Only sent as response, so no necessity in _strs
  * or _key_type arrays.
+ * `box.iproto.metadata_key` needs to be updated correspondingly.
  */
 enum iproto_metadata_key {
 	IPROTO_FIELD_NAME = 0,
@@ -189,6 +196,9 @@ enum iproto_metadata_key {
 	IPROTO_FIELD_SPAN = 5,
 };
 
+/**
+ * `box.iproto.ballot_key` needs to be updated correspondingly.
+ */
 enum iproto_ballot_key {
 	IPROTO_BALLOT_IS_RO_CFG = 0x01,
 	IPROTO_BALLOT_VCLOCK = 0x02,
@@ -208,7 +218,8 @@ iproto_key_bit(unsigned char key)
 extern const unsigned char iproto_key_type[IPROTO_KEY_MAX];
 
 /**
- * IPROTO command codes
+ * IPROTO command codes.
+ * `box.iproto.type` needs to be updated correspondingly.
  */
 enum iproto_type {
 	/** Acknowledgement that request or command is successful */
@@ -320,6 +331,9 @@ enum iproto_type {
 /** IPROTO type name by code */
 extern const char *iproto_type_strs[];
 
+/**
+ * `box.iproto.raft_key` needs to be updated correspondingly.
+ */
 enum iproto_raft_keys {
 	IPROTO_RAFT_TERM = 0,
 	IPROTO_RAFT_VOTE = 1,
