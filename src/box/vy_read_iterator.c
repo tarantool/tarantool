@@ -736,7 +736,7 @@ vy_read_iterator_open_after(struct vy_read_iterator *itr, struct vy_lsm *lsm,
 	itr->read_view = rv;
 	itr->last = last;
 	itr->last_cached = vy_entry_none();
-	itr->is_first_cached = true;
+	itr->is_first_cached = (itr->last.stmt == NULL);
 
 	if (vy_stmt_is_empty_key(key.stmt)) {
 		/*

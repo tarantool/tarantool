@@ -557,6 +557,34 @@ tree_g.test_empty_page_with_offset = function(cg)
     end)
 end
 
+tree_g.before_test('test_gh_7943', function(cg)
+    -- Vinyl tuple cache must be enabled to reproduce the issue.
+    cg.server:exec(function()
+        rawset(_G, 'vinyl_cache', box.cfg.vinyl_cache)
+        box.cfg({vinyl_cache = 1024 * 1024})
+    end)
+end)
+
+tree_g.after_test('test_gh_7943', function(cg)
+    cg.server:exec(function()
+        box.cfg({vinyl_cache = rawget(_G, 'vinyl_cache')})
+        rawset(_G, 'vinyl_cache', nil)
+    end)
+end)
+
+tree_g.test_gh_7943 = function(cg)
+    cg.server:exec(function()
+        local t = require('luatest')
+        local s = box.space.s
+        s:create_index('pk')
+        s:replace({1})
+        s:replace({2})
+        s:replace({3})
+        t.assert_equals(s:select(nil, {fullscan=true, after={2}}), {{3}})
+        t.assert_equals(s:select(nil, {fullscan=true, after={1}}), {{2}, {3}})
+    end)
+end
+
 -- Tests for memtx tree features, such as functional index
 local func_g = t.group('Memtx tree func index tests')
 
