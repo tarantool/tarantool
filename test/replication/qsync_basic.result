@@ -636,6 +636,9 @@ test_run:cmd('switch replica')
  | ---
  | - true
  | ...
+test_run:wait_lsn('replica', 'default')
+ | ---
+ | ...
 box.space.sync:count()
  | ---
  | - 100
@@ -658,6 +661,9 @@ for i = 1, 100 do box.space.sync:delete{i} end
 test_run:cmd('switch replica')
  | ---
  | - true
+ | ...
+test_run:wait_lsn('replica', 'default')
+ | ---
  | ...
 box.space.sync:count()
  | ---

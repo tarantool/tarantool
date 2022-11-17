@@ -247,6 +247,7 @@ test_run:switch('default')
 box.cfg{replication_synchro_timeout = 1000}
 for i = 1, 100 do box.space.sync:replace{i} end
 test_run:cmd('switch replica')
+test_run:wait_lsn('replica', 'default')
 box.space.sync:count()
 -- Rows could be corrupted during WAL writes. Restart should
 -- reveal the problem during recovery.
@@ -255,6 +256,7 @@ box.space.sync:count()
 test_run:cmd('switch default')
 for i = 1, 100 do box.space.sync:delete{i} end
 test_run:cmd('switch replica')
+test_run:wait_lsn('replica', 'default')
 box.space.sync:count()
 
 --
