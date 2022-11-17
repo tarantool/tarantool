@@ -195,15 +195,25 @@ vy_cache_destroy(struct vy_cache *cache);
  * @param cache - pointer to tuple cache.
  * @param curr - statement that was recently read and should be added to the
  * cache.
- * @param prev - previous statement that was read by the reader in one
+ * @param prev - previous statement that was added to the cache
+ * @param is_first - if set, this is the first statement matching the iteration
+ * criteria.
  * sequence (by one iterator).
  * @param direction - direction in which the reader (iterator) observes data,
  *  +1 - forward, -1 - backward.
  */
 void
 vy_cache_add(struct vy_cache *cache, struct vy_entry curr,
-	     struct vy_entry prev, struct vy_entry key,
-	     enum iterator_type order);
+	     struct vy_entry prev, bool is_first,
+	     struct vy_entry key, enum iterator_type order);
+
+static inline void
+vy_cache_add_point(struct vy_cache *cache, struct vy_entry entry,
+		   struct vy_entry key)
+{
+	vy_cache_add(cache, entry, /*prev=*/vy_entry_none(),
+		     /*is_first=*/true, key, ITER_EQ);
+}
 
 /**
  * Find value in cache.
