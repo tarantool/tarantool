@@ -17,6 +17,8 @@ extern "C" {
 
 /**
  * IPROTO protocol feature ids returned by the IPROTO_ID command.
+ * `box.iproto.protocol_features` and `box.iproto.feature` need to be updated
+ * correspondingly.
  */
 enum iproto_feature_id {
 	/**
@@ -64,6 +66,7 @@ struct iproto_features {
 /**
  * Current IPROTO protocol version returned by the IPROTO_ID command.
  * It should be incremented every time a new feature is added or removed.
+ * `box.iproto.protocol_version` needs to be updated correspondingly.
  */
 enum {
 	IPROTO_CURRENT_VERSION = 4,
