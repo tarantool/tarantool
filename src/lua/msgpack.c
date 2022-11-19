@@ -72,6 +72,13 @@ struct luamp_object {
 	const char *data;
 	/** Pointer to the end of msgpack data. */
 	const char *data_end;
+	/**
+	 * Upon first indexation the MsgPack data is completely decoded,
+	 * pushed to Lua stack and referenced: the Lua stack reference is saved
+	 * to this field.
+	 * Initially set to `LUA_NOREF`.
+	 */
+	int decoded_ref;
 };
 
 static const char luamp_object_typename[] = "msgpack.object";
@@ -665,6 +672,7 @@ luamp_new_object(struct lua_State *L, size_t data_len)
 	obj->data_ref = LUA_NOREF;
 	obj->data = (char *)obj + sizeof(*obj);
 	obj->data_end = obj->data + data_len;
+	obj->decoded_ref = LUA_NOREF;
 	luaL_getmetatable(L, luamp_object_typename);
 	lua_setmetatable(L, -2);
 	return obj;
@@ -766,6 +774,7 @@ luamp_object_gc(struct lua_State *L)
 	struct luamp_object *obj = luamp_check_object(L, 1);
 	luaL_unref(L, LUA_REGISTRYINDEX, obj->cfg_ref);
 	luaL_unref(L, LUA_REGISTRYINDEX, obj->data_ref);
+	luaL_unref(L, LUA_REGISTRYINDEX, obj->decoded_ref);
 	return 0;
 }
 
@@ -806,6 +815,67 @@ luamp_object_iterator(struct lua_State *L)
 	lua_setmetatable(L, -2);
 	lua_insert(L, 1);
 	it->source_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	return 1;
+}
+
+/**
+ * Takes a `msgpack.object` and an indexation key as the arguments, indexes
+ * the MsgPack stored in the `msgpack.object` and pushes the result to Lua stack
+ * or, if the MsgPack data type is not indexable, pushes nil.
+ */
+static int
+luamp_object_get(struct lua_State *L)
+{
+	struct luamp_object *obj = luamp_check_object(L, 1);
+	enum mp_type type = mp_typeof(*obj->data);
+	if (type != MP_MAP && type != MP_ARRAY)
+		return luaL_error(L, "not an array or map");
+	if (obj->decoded_ref == LUA_NOREF) {
+		const char *data = obj->data;
+		luamp_decode(L, obj->cfg, &data);
+		assert(data == obj->data_end);
+		obj->decoded_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	}
+	/* Pushes the decoded MsgPack data on top of the stack. */
+	lua_rawgeti(L, LUA_REGISTRYINDEX, obj->decoded_ref);
+	/* Pushes the indexing key on top of the stack. */
+	lua_pushvalue(L, -2);
+	/* Indexes the decoded MsgPack data and pops the key. */
+	lua_rawget(L, -2);
+	return 1;
+}
+
+/**
+ * Takes a `msgpack.object` and an indexation key as the arguments: if the key
+ * is of string type, first tries to match it with `msgpack.object` methods,
+ * and, in case the match occurs, pushes the matched method to Lua stack —
+ * otherwise, delegates indexation to `msgpack.object:get`.
+ */
+static int
+luamp_object_index(struct lua_State *L)
+{
+	luamp_check_object(L, 1);
+	if (lua_type(L, 2) != LUA_TSTRING)
+		return luamp_object_get(L);
+	lua_getmetatable(L, 1);
+	lua_pushvalue(L, 2);
+	lua_rawget(L, -2);
+	if (lua_isnil(L, -1)) {
+		/* Pop the nil and the metatable. */
+		lua_pop(L, 2);
+		return luamp_object_get(L);
+	}
+	return 1;
+}
+
+/**
+ * Push a table of `msgpack.object` methods for console autocompletion.
+ */
+static int
+luamp_object_autocomplete(struct lua_State *L)
+{
+	luamp_check_object(L, 1);
+	lua_getmetatable(L, 1);
 	return 1;
 }
 
@@ -1015,8 +1085,11 @@ luaopen_msgpack(lua_State *L)
 	static const struct luaL_Reg luamp_object_meta[] = {
 		{ "__gc", luamp_object_gc },
 		{ "__tostring", luamp_object_tostring },
+		{ "__index", luamp_object_index },
+		{ "__autocomplete", luamp_object_autocomplete },
 		{ "decode", luamp_object_decode },
 		{ "iterator", luamp_object_iterator },
+		{ "get", luamp_object_get },
 		{ NULL, NULL }
 	};
 	luaL_register_type(L, luamp_object_typename, luamp_object_meta);

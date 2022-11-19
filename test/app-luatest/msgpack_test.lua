@@ -1,4 +1,5 @@
 local buffer = require('buffer')
+local console = require('console')
 local msgpack = require('msgpack')
 local ffi = require('ffi')
 local t = require('luatest')
@@ -444,4 +445,103 @@ g.test_object_misc = function()
     t.assert_not(msgpack.is_object())
     t.assert_not(msgpack.is_object(it))
     t.assert_not(msgpack.is_object({mp}))
+end
+
+local test_array = {true, 1, '2', -2, 3.0, {1, 2, 3}, {a = 1, b = 2, c = 3},
+                    'decode', 'iterator', 'get'}
+local test_map = {a = nil, [1] = true, ['1'] = 1, b = '2', [-2] = 3.0,
+                  ['-2'] = 4, [2.5] = 5, [true] = 6, c = {a = 7, b = 8, c = 9},
+                  decode = 10, iterator = 11, get = 12}
+
+-- Checks that `msgpack.object:get` method works correctly.
+g.test_object_get = function()
+    local mp = msgpack.object(test_array)
+    for i, v in ipairs(test_array) do
+        t.assert_equals(mp:get(i), v)
+    end
+
+    mp = msgpack.object(test_map)
+    for k, v in pairs(test_map) do
+        t.assert_equals(mp:get(k), v)
+    end
+
+    -- Checks that unsigned key is compared correctly with MP_INT.
+    mp = msgpack.object_from_raw('\x81\xd0\x01\xc3')
+    t.assert(mp:get(1))
+
+    mp = msgpack.object(1)
+    t.assert_error_msg_content_equals('not an array or map',
+                                      function() return mp:get(1)  end)
+    t.assert_error_msg_content_equals('not an array or map',
+                                      function() return mp:get('1')  end)
+    t.assert_error_msg_content_equals('not an array or map',
+                                      function() return mp:get('a')  end)
+
+    local array = {1}
+    local mp_array = msgpack.object(array)
+    local map = {a = 1, [1] = 2, ['2'] = 3, [-3] = 4}
+    local mp_map = msgpack.object(map)
+
+    t.assert_equals(mp_array:get(nil), nil)
+    t.assert_equals(mp_map:get(nil), nil)
+    t.assert_equals(mp_array:get(1.1), nil)
+    t.assert_equals(mp_map:get(1.1), nil)
+
+    t.assert_equals(mp_array:get(0), nil)
+    t.assert_equals(mp_array:get(2), nil)
+    t.assert_equals(mp_array:get(-1), nil)
+
+    -- Checks that keys of different lengths are compared correctly.
+    t.assert_equals(mp_map:get('aa'), nil)
+
+    -- Checks that empty string key is handled correctly.
+    t.assert_equals(mp_map:get(''), nil)
+
+    t.assert_equals(mp_array:get('a'), nil)
+
+    t.assert_equals(mp_map:get('b'), nil)
+    t.assert_equals(mp_map:get('1'), nil)
+    t.assert_equals(mp_map:get(2), nil)
+    t.assert_equals(mp_map:get(-1), nil)
+
+    t.assert_error_msg_content_equals("bad argument #1 to '?' " ..
+                                      "(msgpack.object expected, got number)",
+                                      function()
+                                          return mp.__index(1, 'key')
+                                      end)
+    t.assert_error_msg_content_equals("bad argument #1 to '?' " ..
+                                      "(msgpack.object expected, got number)",
+                                      function()
+                                          return mp.__autocomplete(1, 'key')
+                                      end)
+end
+
+-- Checks that `msgpack.object:__index` metamethod works correctly, correctly
+-- resolving collisions in favor of `msgpack.object` methods.
+g.test_object_index = function()
+    local mp = msgpack.object(test_array)
+    for i, v in ipairs(test_array) do
+        t.assert_equals(mp[i], v)
+    end
+
+    local methods = {decode = true, iterator = true, get = true}
+    mp = msgpack.object(test_map)
+    for k, v in pairs(test_map) do
+        if methods[k] then
+            t.assert_type(mp[k], 'function')
+        else
+           t.assert_equals(mp[k], v)
+        end
+    end
+end
+
+local function tabcomplete(s)
+    return console.completion_handler(s, 0, #s)
+end
+
+-- Checks that `msgpack.object` console autocompletion works correctly.
+g.test_object_autocomplete = function()
+    rawset(_G, 'mp', msgpack.object({}))
+    local r = tabcomplete('mp:')
+    t.assert_equals(r, {'mp:', 'mp:get(', 'mp:decode(', 'mp:iterator('})
 end
