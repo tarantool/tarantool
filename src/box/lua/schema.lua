@@ -1191,6 +1191,9 @@ local function update_index_parts(format, parts)
             box.error(box.error.ILLEGAL_PARAMS,
                       "options.parts[" .. i .. "]: type (string) is expected")
         end
+        if part.collation == nil and fmt then
+            part.collation = fmt.collation
+        end
         if part.is_nullable == nil then
             if fmt and fmt.is_nullable then
                 part.is_nullable = true
