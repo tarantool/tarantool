@@ -6,6 +6,7 @@ g.before_all(function()
     g.server = server:new({alias = 'interval'})
     g.server:start()
     g.server:exec(function()
+        box.execute([[SET SESSION "sql_seq_scan" = true;]])
         local itv = require('datetime').interval
         local itv1 = itv.new({year = 1, month = 2, day = 3, hour = 4})
         local itv2 = itv.new({min = 5, sec = 6, nsec = 7})

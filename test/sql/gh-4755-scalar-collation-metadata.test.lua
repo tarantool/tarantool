@@ -9,7 +9,7 @@ test_run:cmd("setopt delimiter ';'");
 box.execute([[SET SESSION "sql_full_metadata" = true;]]);
 box.execute([[CREATE TABLE test (a SCALAR COLLATE "unicode_ci" PRIMARY KEY,
                                  b STRING COLLATE "unicode_ci");]]);
-box.execute("SELECT * FROM test;");
+box.execute("SELECT * FROM SEQSCAN test;");
 
 --
 -- Cleanup.

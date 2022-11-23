@@ -1,5 +1,6 @@
 env = require('test_run')
 test_run = env.new()
+box.execute([[SET SESSION "sql_seq_scan" = true;]])
 
 -- gh-3018: typeless columns are prohibited.
 --

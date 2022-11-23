@@ -45,6 +45,10 @@ test_run:cmd("setopt delimiter ''");
  | ---
  | - true
  | ...
+execute([[SET SESSION "sql_seq_scan" = true;]])
+ | ---
+ | - row_count: 1
+ | ...
 
 execute([[UPDATE "_session_settings" SET "value" = true WHERE "name" = 'sql_full_metadata';]])
  | ---

@@ -1,4 +1,9 @@
 -- test-run result file version 2
+
+SET SESSION "sql_seq_scan" = true;
+ | ---
+ | - row_count: 1
+ | ...
 --
 -- gh-3075: Check <ALTER TABLE table ADD COLUMN column> statement.
 --

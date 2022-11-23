@@ -10,6 +10,10 @@ engine = test_run:get_cfg('engine')
 _ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 ---
 ...
+box.execute([[SET SESSION "sql_seq_scan" = true;]])
+---
+- row_count: 1
+...
 -- create space
 box.execute("CREATE TABLE foobar (foo INT PRIMARY KEY, bar TEXT)")
 ---
@@ -355,6 +359,10 @@ box.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
   - [161]
 ...
 test_run:cmd('restart server default');
+box.execute([[SET SESSION "sql_seq_scan" = true;]])
+---
+- row_count: 1
+...
 -- prove that trigger survived
 box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
 ---

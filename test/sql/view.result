@@ -7,6 +7,10 @@ engine = test_run:get_cfg('engine')
 _ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 ---
 ...
+box.execute([[SET SESSION "sql_seq_scan" = true;]])
+---
+- row_count: 1
+...
 -- Verify that constraints on 'view' option are working.
 -- box.cfg()
 -- Create space and view.
@@ -294,6 +298,10 @@ box.execute("CREATE VIEW v2 AS SELECT * FROM t2;")
 - row_count: 1
 ...
 test_run:cmd('restart server default')
+box.execute([[SET SESSION "sql_seq_scan" = true;]])
+---
+- row_count: 1
+...
 box.execute("DROP TABLE t2;")
 ---
 - null

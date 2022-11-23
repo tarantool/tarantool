@@ -12,6 +12,7 @@ _ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 -- gh-4750.
 test_run:cmd('restart server default')
 fiber = require('fiber')
+box.execute([[SET SESSION "sql_seq_scan" = true;]])
 
 internal_usage = fiber.info()[fiber.self().id()].memory.used
 

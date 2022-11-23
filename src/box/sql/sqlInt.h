@@ -1012,6 +1012,9 @@ struct sql {
 					 * (nullability, autoincrement, alias)
 					 * in metadata.
 					 */
+enum {
+	SQL_SeqScan = 0x00000008,
+};
 
 /* Bits of the sql.dbOptFlags field. */
 #define SQL_QueryFlattener 0x0001	/* Query flattening */
@@ -1607,6 +1610,13 @@ struct SrcList {
 			unsigned isCorrelated:1;	/* True if sub-query is correlated */
 			unsigned viaCoroutine:1;	/* Implemented as a co-routine */
 			unsigned isRecursive:1;	/* True for recursive reference in WITH */
+			/**
+			 * Flag indicating whether scanning is allowed for the
+			 * source. By default, scanning is allowed, as this
+			 * structure is used in SELECT, DELETE, and UPDATE, but
+			 * only in SELECT scanning can be prohibited.
+			 */
+			unsigned disallow_scan:1;
 		} fg;
 		u8 iSelectId;	/* If pSelect!=0, the id of the sub-select in EQP */
 		int iCursor;	/* The VDBE cursor number used to access this table */
@@ -2866,8 +2876,24 @@ sql_src_list_new(void);
 struct SrcList *
 sql_src_list_append(struct SrcList *list, struct Token *name_token);
 
-SrcList *sqlSrcListAppendFromTerm(Parse *, SrcList *, Token *,
-				      Token *, Select *, Expr *, IdList *);
+/**
+ * This routine is called by the parser to add a new term to the end of a
+ * growing FROM clause. The "p" parameter is the part of the FROM clause that
+ * has already been constructed. "p" is NULL if this is the first term of the
+ * FROM clause. "pTable" is the name of the table in the FROM clause term. If
+ * the term has an alias, then "pAlias" points to the alias token. If the term
+ * is a subquery, then "pSubquery" is the SELECT statement that the subquery
+ * encodes. The "pTable" is NULL for subqueries. The "pOn" and "pUsing"
+ * parameters are the content of the ON and USING clauses. Flag disallow_scan
+ * shows if scannig SELECT can be executed for this source.
+ *
+ * Return a new SrcList that encodes FROM with the new term added.
+ */
+struct SrcList *
+sqlSrcListAppendFromTerm(struct Parse *pParse, struct SrcList *p,
+			 struct Token *pTable, struct Token *pAlias,
+			 struct Select *pSubquery, struct Expr *pOn,
+			 struct IdList *pUsing, int disallow_scan);
 
 /**
  * Add an INDEXED BY or NOT INDEXED clause to the most recently added element of

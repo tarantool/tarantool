@@ -1,3 +1,5 @@
+SET SESSION "sql_seq_scan" = true;
+
 -- Create table for tests
 CREATE TABLE t (a BOOLEAN PRIMARY KEY);
 INSERT INTO t VALUES (true), (false);

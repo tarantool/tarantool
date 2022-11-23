@@ -2,6 +2,7 @@ remote = require('net.box')
 test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 _ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
+box.execute([[SET SESSION "sql_seq_scan" = true;]])
 errinj = box.error.injection
 fiber = require('fiber')
 

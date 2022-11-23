@@ -765,13 +765,13 @@ conn = require('net.box').connect(box.cfg.listen)
 
 box.execute([[INSERT INTO u VALUES (1, 20);]])
 box.execute([[START TRANSACTION;]])
-box.execute([[SELECT * FROM u;]])
+box.execute([[SELECT * FROM SEQSCAN u;]])
 
 conn:execute([[UPDATE u SET column2 = 21;]])
 
 box.execute([[UPDATE u SET column2 = 22;]])
 box.execute([[COMMIT;]])
-box.execute([[SELECT * FROM u;]])
+box.execute([[SELECT * FROM SEQSCAN u;]])
 
 box.execute([[DROP TABLE u ;]])
 
@@ -1190,9 +1190,9 @@ box.execute([[COMMIT;]])
 box.execute([[DELETE FROM k2;]])
 box.execute([[DELETE FROM k1;]])
 tx1:begin()
-tx1('box.execute([[SELECT COUNT() from k1]])')
+tx1('box.execute([[SELECT COUNT() FROM SEQSCAN k1]])')
 box.execute([[INSERT INTO k1 VALUES (1);]])
-tx1('box.execute([[SELECT COUNT() from k1]])')
+tx1('box.execute([[SELECT COUNT() FROM SEQSCAN k1]])')
 tx1:commit()
 
 box.execute([[DROP TABLE k4;]])

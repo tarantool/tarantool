@@ -718,10 +718,11 @@ function monster_ddl_check(stream)
         assert(stream_or_box.space.T_RENAMED.index.T_TO_RENAME_A == nil)
         assert(stream_or_box.space.T_TO_RENAME == nil)
         res = execute_sql_string_and_return_result(stream, [[SELECT * FROM
+                                                             SEQSCAN
                                                              trigger_catcher]])
     else
         _, res =
-            execute_sql_string_and_return_result(stream, [[SELECT * FROM
+            execute_sql_string_and_return_result(stream, [[SELECT * FROM SEQSCAN
                                                            trigger_catcher]])
     end
     return {'Finished ok, errors and trigger catcher content: ', err1, err2,

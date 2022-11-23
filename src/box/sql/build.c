@@ -2976,31 +2976,11 @@ sqlSrcListDelete(struct SrcList *pList)
 	sql_xfree(pList);
 }
 
-/*
- * This routine is called by the parser to add a new term to the
- * end of a growing FROM clause.  The "p" parameter is the part of
- * the FROM clause that has already been constructed.  "p" is NULL
- * if this is the first term of the FROM clause.  pTable and pDatabase
- * are the name of the table and database named in the FROM clause term.
- * pDatabase is NULL if the database name qualifier is missing - the
- * usual case.  If the term has an alias, then pAlias points to the
- * alias token.  If the term is a subquery, then pSubquery is the
- * SELECT statement that the subquery encodes.  The pTable and
- * pDatabase parameters are NULL for subqueries.  The pOn and pUsing
- * parameters are the content of the ON and USING clauses.
- *
- * Return a new SrcList which encodes is the FROM with the new
- * term added.
- */
-SrcList *
-sqlSrcListAppendFromTerm(Parse * pParse,	/* Parsing context */
-			     SrcList * p,	/* The left part of the FROM clause already seen */
-			     Token * pTable,	/* Name of the table to add to the FROM clause */
-			     Token * pAlias,	/* The right-hand side of the AS subexpression */
-			     Select * pSubquery,	/* A subquery used in place of a table name */
-			     Expr * pOn,	/* The ON clause of a join */
-			     IdList * pUsing	/* The USING clause of a join */
-    )
+struct SrcList *
+sqlSrcListAppendFromTerm(struct Parse *pParse, struct SrcList *p,
+			 struct Token *pTable, struct Token *pAlias,
+			 struct Select *pSubquery, struct Expr *pOn,
+			 struct IdList *pUsing, int disallow_scan)
 {
 	struct SrcList_item *pItem;
 	if (!p && (pOn || pUsing)) {
@@ -3020,6 +3000,7 @@ sqlSrcListAppendFromTerm(Parse * pParse,	/* Parsing context */
 	pItem->pSelect = pSubquery;
 	pItem->pOn = pOn;
 	pItem->pUsing = pUsing;
+	pItem->fg.disallow_scan = disallow_scan;
 	return p;
 
  append_from_error:
@@ -3315,6 +3296,8 @@ static struct sql_option_metadata sql_session_opts[] = {
 	/** SESSION_SETTING_SQL_SELECT_DEBUG */
 	{FIELD_TYPE_BOOLEAN,
 	 SQL_SqlTrace | SQL_SelectTrace | SQL_WhereTrace},
+	/** SESSION_SETTING_SQL_SEQ_SCAN */
+	{FIELD_TYPE_BOOLEAN, SQL_SeqScan},
 	/** SESSION_SETTING_SQL_VDBE_DEBUG */
 	{FIELD_TYPE_BOOLEAN,
 	 SQL_SqlTrace | SQL_VdbeListing | SQL_VdbeTrace},

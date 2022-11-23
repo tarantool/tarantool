@@ -5,6 +5,7 @@ box.execute("INSERT INTO supersecret2 VALUES(1, 'very big secret 2');")
 box.execute("CREATE VIEW supersecret_leak AS  SELECT * FROM supersecret, supersecret2;")
 remote = require 'net.box'
 cn = remote.connect(box.cfg.listen)
+cn:execute([[SET SESSION "sql_seq_scan" = true;]])
 
 box.schema.user.grant('guest','read', 'space', 'SUPERSECRET_LEAK')
 cn:execute('SELECT * FROM SUPERSECRET_LEAK')

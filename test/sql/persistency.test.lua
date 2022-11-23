@@ -2,6 +2,7 @@ env = require('test_run')
 test_run = env.new()
 engine = test_run:get_cfg('engine')
 _ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
+box.execute([[SET SESSION "sql_seq_scan" = true;]])
 
 -- create space
 box.execute("CREATE TABLE foobar (foo INT PRIMARY KEY, bar TEXT)")
@@ -59,6 +60,7 @@ box.execute("WITH RECURSIVE cnt(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM cnt W
 box.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
 
 test_run:cmd('restart server default');
+box.execute([[SET SESSION "sql_seq_scan" = true;]])
 
 -- prove that trigger survived
 box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");

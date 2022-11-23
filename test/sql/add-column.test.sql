@@ -1,3 +1,5 @@
+
+SET SESSION "sql_seq_scan" = true;
 --
 -- gh-3075: Check <ALTER TABLE table ADD COLUMN column> statement.
 --

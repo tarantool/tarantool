@@ -11,7 +11,7 @@ box.execute([[CREATE TABLE t(id int PRIMARY KEY)]])
 box.execute([[INSERT INTO t (id) VALUES (1)]])
 
 -- Sanity check
-box.execute([[SELECT * FROM t]])
+box.execute([[SELECT * FROM SEQSCAN t]])
 
 test_run:cmd('restart server default');
 
@@ -21,7 +21,7 @@ c = require('net.box').connect(os.getenv("LISTEN"))
 -- This segfaults due to gh-2483 since
 -- before the patch sql schema was read on-demand.
 -- Which could obviously lead to access denied error.
-c:eval([[ return box.execute('SELECT * FROM t') ]])
+c:eval([[ return box.execute('SELECT * FROM SEQSCAN t') ]])
 -- sql.execute([[SELECT * FROM t]])
 
 box.execute([[DROP TABLE t]])
