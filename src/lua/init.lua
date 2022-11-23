@@ -322,8 +322,35 @@ rawset(package, "setsearchroot", setsearchroot)
 local compat = require('compat')
 package.loaded.compat = nil
 
+-- Execute scripts or load modules pointed by TT_PRELOAD
+-- environment variable.
+local function run_preload()
+    local tt_preload = os.getenv('TT_PRELOAD') or ''
+    if #tt_preload == 0 then
+        return
+    end
+    for _, script in ipairs(tt_preload:split(';')) do
+        -- luacheck: ignore 542 empty if branch
+        if #script == 0 then
+            -- Ignore empty entries to allow duplicated semicolons
+            -- and leading/trailing semicolons.
+            --
+            -- It simplifies construction of the environment
+            -- variable value using concatenation.
+        elseif script:endswith('.lua') then
+            local fn = assert(loadfile(script))
+            fn(script)
+        else
+            require(script)
+        end
+    end
+end
+
 return {
     uptime = uptime;
     pid = pid;
-    compat = compat
+    compat = compat;
+    _internal = {
+        run_preload = run_preload,
+    };
 }

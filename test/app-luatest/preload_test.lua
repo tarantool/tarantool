@@ -1,0 +1,355 @@
+local fun = require('fun')
+local fio = require('fio')
+local log = require('log')
+local json = require('json')
+local popen = require('popen')
+
+local t = require('luatest')
+local g = t.group()
+
+-- Find an item in an array table and return its index.
+--
+-- array_find('b', {'a', 'b', 'c'}) -> 2
+-- array_find('x', {'a', 'b', 'c'}) -> nil
+local function array_find(needle, array)
+    for i, item in ipairs(array) do
+        if item == needle then
+            return i
+        end
+    end
+    return nil
+end
+
+-- All Lua files produced by the test write a JSON object to
+-- stdout. This object contains everything we want to know
+-- about the context of the script execution.
+--
+-- First of all, we should ensure that given script was executed.
+-- So we output a script file name.
+--
+-- Next, we should define what is passed to the script as `...`
+-- (dots).
+--
+-- We should also inspect `arg` content to freeze certain
+-- behavior.
+--
+-- Note: In order to serialize `arg` into JSON it is split into
+-- `arg[-1]`, `arg[0]` and `arg[]`. The latter means an array of
+-- all items from 1 to the end.
+local SCRIPT_TEMPLATE = [[
+print(require('json').encode({
+    ['script'] = '<script>',
+    ['...'] = {...},
+    ['arg[-1]'] = arg[-1],
+    ['arg[0]'] = arg[0],
+    ['arg[]'] = setmetatable(arg, {__serialize = 'seq'}),
+}))
+]]
+
+local tempdirs = {}
+
+-- Remove all temporary directories created by the test
+-- unless KEEP_DATA environment variable is set to a
+-- non-empty value.
+g.after_all = function()
+    local dirs = table.copy(tempdirs)
+    tempdirs = {}
+
+    local keep_data = (os.getenv('KEEP_DATA') or '') ~= ''
+
+    for _, dir in ipairs(dirs) do
+        if keep_data then
+            log.info(('Left intact due to KEEP_DATA env var: %s'):format(dir))
+        else
+            log.info(('Recursively removing: %s'):format(dir))
+            fio.rmtree(dir)
+        end
+    end
+end
+
+-- Generate a script that follows SCRIPT_TEMPLATE and
+-- write it at given script file path in given directory.
+local function write_script(dir, script)
+    local script_abspath = fio.pathjoin(dir, script)
+    local flags = {'O_CREAT', 'O_WRONLY', 'O_TRUNC'}
+    local mode = tonumber('644', 8)
+    local fh = fio.open(script_abspath, flags, mode)
+
+    log.info(('Writing a script: %s'):format(script_abspath))
+    fh:write(SCRIPT_TEMPLATE:gsub('<(.-)>', {
+        script = script,
+    }))
+
+    fh:close()
+end
+
+-- Create a temporary directory with given scripts.
+-- The scripts are generated using the SCRIPT_TEMPLATE template.
+--
+-- Example for {'foo/bar.lua', 'baz.lua'}:
+--
+-- /
+-- + tmp/
+--   + rfbWOJ/
+--     + foo/
+--     | + bar.lua
+--     + baz.lua
+--
+-- The return value is '/tmp/rfbWOJ' for this example.
+local function prepare_directory(scripts)
+    assert(type(scripts) == 'table')
+
+    local dir = fio.tempdir()
+    table.insert(tempdirs, dir)
+
+    for _, script in ipairs(scripts) do
+        local script_abspath = fio.pathjoin(dir, script)
+        local scriptdir_abspath = fio.dirname(script_abspath)
+        log.info(('Creating a directory: %s'):format(scriptdir_abspath))
+        fio.mktree(scriptdir_abspath)
+        write_script(dir, script)
+    end
+
+    return dir
+end
+
+-- Run tarantool in given directory with given environment and
+-- command line arguments and catch its output.
+local function run_tarantool(dir, env, args)
+    assert(type(dir) == 'string')
+    assert(type(env) == 'table')
+    assert(type(args) == 'table')
+
+    local tarantool_exe = arg[-1]
+    -- Use popen.shell() instead of popen.new() due to lack of
+    -- cwd option in popen (gh-5633).
+    local env_str = table.concat(fun.iter(env):map(function(k, v)
+        return ('%s=%q'):format(k, v)
+    end):totable(), ' ')
+    local command = ('cd %s && %s %s %s'):format(dir, env_str, tarantool_exe,
+                                                 table.concat(args, ' '))
+    log.info(('Running a command: %s'):format(command))
+    local ph = popen.shell(command, 'r')
+
+    -- Read everything until EOF.
+    local chunks = {}
+    while true do
+        local chunk, err = ph:read()
+        if chunk == nil then
+            ph:close()
+            error(err)
+        end
+        if chunk == '' then -- EOF
+            break
+        end
+        table.insert(chunks, chunk)
+    end
+
+    local exit_code = ph:wait().exit_code
+    ph:close()
+
+    -- If an error occurs, discard the output and return only the
+    -- exit code.
+    if exit_code ~= 0 then
+        return {exit_code = exit_code}
+    end
+
+    -- Glue all chunks, strip trailing newline.
+    local res = table.concat(chunks):rstrip()
+    log.info(('Command output:\n%s'):format(res))
+
+    -- Decode JSON object per line into array of tables.
+    local decoded = fun.iter(res:split('\n')):map(json.decode):totable()
+    return {
+        exit_code = exit_code,
+        stdout = decoded,
+    }
+end
+
+-- Generate output expected from tarantool running in given
+-- directory with given scripts (generated by the SCRIPT_TEMPLATE
+-- template) with given environment and given command line
+-- arguments.
+--
+-- It is the test oracle.
+local function expected_output(scripts, env, args)
+    assert(type(scripts) == 'table')
+    assert(type(env) == 'table')
+    assert(type(args) == 'table')
+
+    local script_args = table.copy(args)
+    table.remove(script_args, 1)
+
+    local res = {}
+
+    -- TT_PRELOAD entries.
+    for _, entry in ipairs(env['TT_PRELOAD']:split(';')) do
+        local script
+        if #entry == 0 then
+            -- Ignore empty entries.
+            goto continue
+        elseif entry:endswith('.lua') then
+            -- The entry is a script file.
+            script = entry
+        else
+            -- The entry is a module to `require`.
+            script = entry:gsub('%.', '/') .. '.lua'
+            -- Handle the special case, when LUA_PATH has one
+            -- entry. Adjust script name to one written into
+            -- the script itself.
+            if env['LUA_PATH'] ~= nil then
+                local module_dir = env['LUA_PATH']:match('^(.-)/%?%.lua;;$')
+                assert(module_dir ~= nil)
+                assert(module_dir:find(';') == nil)
+                script = fio.pathjoin(module_dir, script)
+            end
+        end
+
+        -- A negative scenario: there is no file that corresponds
+        -- the preload entry.
+        --
+        -- Don't check stdout/stderr (extra logic, more fragile
+        -- test), just ensure that tarantool exits with an error.
+        if not array_find(script, scripts) then
+            return {
+                exit_code = 1,
+            }
+        end
+
+        table.insert(res, {
+            ['script'] = script,
+            ['...'] = {entry},
+            ['arg[-1]'] = arg[-1],
+            ['arg[0]'] = args[1],
+            ['arg[]'] = script_args,
+        })
+
+        ::continue::
+    end
+
+    -- The main script.
+    table.insert(res, {
+        ['script'] = args[1],
+        ['...'] = script_args,
+        ['arg[-1]'] = arg[-1],
+        ['arg[0]'] = args[1],
+        ['arg[]'] = script_args,
+    })
+
+    return {
+        exit_code = 0,
+        stdout = res,
+    }
+end
+
+-- Define a couple of situations to verify. Each situation is
+-- defined as a working directory description (a list of scripts)
+-- and parameters to run tarantool in this working directory
+-- (environment and command line arguments).
+--
+-- The test oracle is defined by the `expected_output()`
+-- function.
+for _, case in ipairs({
+    -- Successful cases.
+    {
+        'test_script',
+        scripts = {'foo.lua', 'main.lua'},
+        env = {TT_PRELOAD = 'foo.lua'},
+        args = {'main.lua'},
+    },
+    {
+        'test_script_nested',
+        scripts = {'foo/bar.lua', 'main.lua'},
+        env = {TT_PRELOAD = 'foo/bar.lua'},
+        args = {'main.lua'},
+    },
+    {
+        'test_args',
+        scripts = {'foo.lua', 'main.lua'},
+        env = {TT_PRELOAD = 'foo.lua'},
+        args = {'main.lua', 'a', 'b', 'c'},
+    },
+    {
+        'test_module',
+        scripts = {'foo.lua', 'main.lua'},
+        env = {TT_PRELOAD = 'foo'},
+        args = {'main.lua'},
+    },
+    {
+        'test_module_nested',
+        scripts = {'foo/bar.lua', 'main.lua'},
+        env = {TT_PRELOAD = 'foo.bar'},
+        args = {'main.lua'},
+    },
+    {
+        'test_module_args',
+        scripts = {'foo.lua', 'main.lua'},
+        env = {TT_PRELOAD = 'foo'},
+        args = {'main.lua', 'a', 'b', 'c'},
+    },
+    {
+        'test_lua_path',
+        scripts = {'foo/bar.lua', 'main.lua'},
+        env = {
+            LUA_PATH = 'foo/?.lua;;',
+            TT_PRELOAD = 'bar',
+        },
+        args = {'main.lua'},
+    },
+    {
+        'test_semicolon_separated',
+        scripts = {'foo.lua', 'bar.lua', 'main.lua'},
+        env = {TT_PRELOAD = 'foo.lua;bar'},
+        args = {'main.lua'},
+    },
+    {
+        'test_leading_semicolon',
+        scripts = {'foo.lua', 'bar.lua', 'main.lua'},
+        env = {TT_PRELOAD = ';foo.lua;bar'},
+        args = {'main.lua'},
+    },
+    {
+        'test_trailing_semicolon',
+        scripts = {'foo.lua', 'bar.lua', 'main.lua'},
+        env = {TT_PRELOAD = 'foo.lua;bar;'},
+        args = {'main.lua'},
+    },
+    {
+        'test_duplicated_semicolon',
+        scripts = {'foo.lua', 'bar.lua', 'main.lua'},
+        env = {TT_PRELOAD = 'foo.lua;;bar'},
+        args = {'main.lua'},
+    },
+    {
+        'test_only_semicolons',
+        scripts = {'main.lua'},
+        env = {TT_PRELOAD = ';;;'},
+        args = {'main.lua'},
+    },
+    -- Negative cases.
+    {
+        'test_nonexisting_script',
+        scripts = {'foo.lua', 'main.lua'},
+        env = {TT_PRELOAD = 'foo.lua;pigeons_milk.lua'},
+        args = {'main.lua'},
+    },
+    {
+        'test_nonexisting_module',
+        scripts = {'foo.lua', 'main.lua'},
+        env = {TT_PRELOAD = 'foo;pigeons_milk'},
+        args = {'main.lua'},
+    },
+    {
+        'test_hyphen_is_not_accepted',
+        scripts = {'main.lua'},
+        env = {TT_PRELOAD = '-'},
+        args = {'main.lua'},
+    },
+}) do
+    g[case[1]] = function()
+        local dir = prepare_directory(case.scripts)
+        local res = run_tarantool(dir, case.env, case.args)
+        local exp = expected_output(case.scripts, case.env, case.args)
+        t.assert_equals(res, exp)
+    end
+end
