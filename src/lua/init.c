@@ -955,6 +955,19 @@ run_script_f(va_list ap)
 	bool is_option_e_ran = false;
 
 	/*
+	 * Execute scripts or modules pointed by TT_PRELOAD
+	 * environment variable.
+	 */
+	lua_getfield(L, LUA_GLOBALSINDEX, "package");
+	lua_getfield(L, -1, "loaded");
+	lua_getfield(L, -1, "tarantool");
+	lua_getfield(L, -1, "_internal");
+	lua_getfield(L, -1, "run_preload");
+	if (luaT_call(L, 0, 0) != 0)
+		goto error;
+	lua_settop(L, 0);
+
+	/*
 	 * Load libraries and execute chunks passed by -l and -e
 	 * command line options
 	 */
