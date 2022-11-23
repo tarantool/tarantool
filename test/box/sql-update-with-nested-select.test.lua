@@ -13,7 +13,7 @@ box.execute("INSERT INTO t1 VALUES(2,5,7);");
 box.execute("UPDATE t1 SET e=e+1 WHERE b IN (SELECT b FROM t1);");
 
 -- Check
-box.execute("SELECT e FROM t1");
+box.execute("SELECT e FROM SEQSCAN t1");
 
 -- Cleanup
 box.execute("DROP TABLE t1;");

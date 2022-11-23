@@ -1,6 +1,7 @@
 test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 _ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
+box.execute([[SET SESSION "sql_seq_scan" = true;]])
 
 -- Verify that constraints on 'view' option are working.
 
@@ -111,6 +112,7 @@ box.snapshot()
 box.execute("CREATE TABLE t2 (id INT PRIMARY KEY);")
 box.execute("CREATE VIEW v2 AS SELECT * FROM t2;")
 test_run:cmd('restart server default')
+box.execute([[SET SESSION "sql_seq_scan" = true;]])
 
 box.execute("DROP TABLE t2;")
 box.execute("SELECT * FROM v2;")

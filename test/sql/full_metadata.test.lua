@@ -22,6 +22,7 @@ else
     end
 end;
 test_run:cmd("setopt delimiter ''");
+execute([[SET SESSION "sql_seq_scan" = true;]])
 
 execute([[UPDATE "_session_settings" SET "value" = true WHERE "name" = 'sql_full_metadata';]])
 -- Make sure collation is presented in extended metadata.

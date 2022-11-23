@@ -4,6 +4,10 @@ netbox = require('net.box')
 test_run = require('test_run').new()
 ---
 ...
+box.execute([[SET SESSION "sql_seq_scan" = true;]])
+---
+- row_count: 1
+...
 box.execute('CREATE TABLE test (id INT PRIMARY KEY, a NUMBER, b TEXT)')
 ---
 - row_count: 1

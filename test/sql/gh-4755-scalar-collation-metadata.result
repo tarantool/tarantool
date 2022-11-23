@@ -23,7 +23,7 @@ box.execute([[CREATE TABLE test (a SCALAR COLLATE "unicode_ci" PRIMARY KEY,
  | ---
  | - row_count: 1
  | ...
-box.execute("SELECT * FROM test;");
+box.execute("SELECT * FROM SEQSCAN test;");
  | ---
  | - metadata:
  |   - span: A

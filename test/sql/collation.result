@@ -10,6 +10,10 @@ engine = test_run:get_cfg('engine')
 _ = box.space._session_settings:update('sql_default_engine', {{'=', 2, engine}})
 ---
 ...
+box.execute([[SET SESSION "sql_seq_scan" = true;]])
+---
+- row_count: 1
+...
 -- gh-3010: COLLATE after LIMIT should throw an error
 -- All of these tests should throw error "near "COLLATE": syntax error"
 box.execute("SELECT 1 LIMIT 1 COLLATE BINARY;")

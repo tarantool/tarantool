@@ -473,7 +473,7 @@ selectnowith(A) ::= selectnowith(A) multiselect_op(Y) oneselect(Z).  {
     Token x;
     x.n = 0;
     parserDoubleLinkSelect(pParse, pRhs);
-    pFrom = sqlSrcListAppendFromTerm(pParse,0,0,&x,pRhs,0,0);
+    pFrom = sqlSrcListAppendFromTerm(pParse,0,0,&x,pRhs,0,0,false);
     pRhs = sqlSelectNew(pParse,0,pFrom,0,0,0,0,0,0,0);
   }
   if( pRhs ){
@@ -585,6 +585,9 @@ as(X) ::= AS nm(Y).    {X = Y;}
 as(X) ::= ids(X).
 as(X) ::= .            {X.n = 0; X.z = 0;}
 
+%type seqscan {int}
+seqscan(X) ::= SEQSCAN.     {X = 0;}
+seqscan(X) ::= .            {X = 1;}
 
 %type seltablist {SrcList*}
 %destructor seltablist {sqlSrcListDelete($$);}
@@ -608,26 +611,26 @@ stl_prefix(A) ::= seltablist(A) joinop(Y).    {
    if( ALWAYS(A && A->nSrc>0) ) A->a[A->nSrc-1].fg.jointype = (u8)Y;
 }
 stl_prefix(A) ::= .                           {A = 0;}
-seltablist(A) ::= stl_prefix(A) nm(Y) as(Z) indexed_opt(I)
+seltablist(A) ::= stl_prefix(A) seqscan(X) nm(Y) as(Z) indexed_opt(I)
                   on_opt(N) using_opt(U). {
-  A = sqlSrcListAppendFromTerm(pParse,A,&Y,&Z,0,N,U);
+  A = sqlSrcListAppendFromTerm(pParse,A,&Y,&Z,0,N,U,X);
   sqlSrcListIndexedBy(A, &I);
 }
-seltablist(A) ::= stl_prefix(A) nm(Y) LP exprlist(E) RP as(Z)
+seltablist(A) ::= stl_prefix(A) seqscan(X) nm(Y) LP exprlist(E) RP as(Z)
                   on_opt(N) using_opt(U). {
-  A = sqlSrcListAppendFromTerm(pParse,A,&Y,&Z,0,N,U);
+  A = sqlSrcListAppendFromTerm(pParse,A,&Y,&Z,0,N,U,X);
   sqlSrcListFuncArgs(A, E);
 }
 seltablist(A) ::= stl_prefix(A) LP select(S) RP
                   as(Z) on_opt(N) using_opt(U). {
-  A = sqlSrcListAppendFromTerm(pParse,A,0,&Z,S,N,U);
+  A = sqlSrcListAppendFromTerm(pParse,A,0,&Z,S,N,U,false);
 }
 seltablist(A) ::= stl_prefix(A) LP seltablist(F) RP
                   as(Z) on_opt(N) using_opt(U). {
   if( A==0 && Z.n==0 && N==0 && U==0 ){
     A = F;
   }else if( F->nSrc==1 ){
-    A = sqlSrcListAppendFromTerm(pParse,A,0,&Z,0,N,U);
+    A = sqlSrcListAppendFromTerm(pParse,A,0,&Z,0,N,U,false);
     if( A ){
       struct SrcList_item *pNew = &A->a[A->nSrc-1];
       struct SrcList_item *pOld = F->a;
@@ -641,7 +644,7 @@ seltablist(A) ::= stl_prefix(A) LP seltablist(F) RP
     Select *pSubquery;
     sqlSrcListShiftJoinType(F);
     pSubquery = sqlSelectNew(pParse,0,F,0,0,0,0,SF_NestedFrom,0,0);
-    A = sqlSrcListAppendFromTerm(pParse,A,0,&Z,pSubquery,N,U);
+    A = sqlSrcListAppendFromTerm(pParse,A,0,&Z,pSubquery,N,U,false);
   }
 }
 

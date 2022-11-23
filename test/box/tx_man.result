@@ -2405,7 +2405,7 @@ box.execute([[START TRANSACTION;]])
  | ---
  | - row_count: 0
  | ...
-box.execute([[SELECT * FROM u;]])
+box.execute([[SELECT * FROM SEQSCAN u;]])
  | ---
  | - metadata:
  |   - name: COLUMN1
@@ -2431,7 +2431,7 @@ box.execute([[COMMIT;]])
  | - null
  | - Transaction has been aborted by conflict
  | ...
-box.execute([[SELECT * FROM u;]])
+box.execute([[SELECT * FROM SEQSCAN u;]])
  | ---
  | - metadata:
  |   - name: COLUMN1
@@ -3698,7 +3698,7 @@ tx1:begin()
  | ---
  | - 
  | ...
-tx1('box.execute([[SELECT COUNT() from k1]])')
+tx1('box.execute([[SELECT COUNT() FROM SEQSCAN k1]])')
  | ---
  | - - {'rows': [[0]], 'metadata': [{'type': 'integer', 'name': 'COLUMN_1'}]}
  | ...
@@ -3706,7 +3706,7 @@ box.execute([[INSERT INTO k1 VALUES (1);]])
  | ---
  | - row_count: 1
  | ...
-tx1('box.execute([[SELECT COUNT() from k1]])')
+tx1('box.execute([[SELECT COUNT() FROM SEQSCAN k1]])')
  | ---
  | - - {'rows': [[0]], 'metadata': [{'type': 'integer', 'name': 'COLUMN_1'}]}
  | ...

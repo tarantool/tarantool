@@ -6,6 +6,7 @@ g.before_all(function()
     g.server = server:new({alias = 'datetime'})
     g.server:start()
     g.server:exec(function()
+        box.execute([[SET SESSION "sql_seq_scan" = true;]])
         local fmt1 = {{'I', 'integer'}, {'DT', 'datetime'}}
         local t1 = box.schema.space.create('T1', {format = fmt1})
         box.space.T1:create_index('I')

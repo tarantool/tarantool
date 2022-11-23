@@ -24,7 +24,7 @@ INSERT INTO t VALUES (1), (NULL), (10), (NULL), (NULL), (3), (NULL);
  |   - 13
  |   row_count: 7
  | ...
-SELECT * FROM t;
+SELECT * FROM SEQSCAN t;
  | ---
  | - metadata:
  |   - name: I

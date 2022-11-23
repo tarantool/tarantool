@@ -42,6 +42,7 @@ else
 end;
 
 test_run:cmd("setopt delimiter ''");
+execute([[SET SESSION "sql_seq_scan" = true;]])
 
 -- Check default cache statistics.
 --
@@ -256,9 +257,10 @@ ok = nil
 res = nil
 _ = fiber.create(function()
     for i = 1, 5 do
-        pcall(prepare, string.format("SELECT * FROM test WHERE a = %d;", i))
+        pcall(prepare, string.format("SELECT * FROM SEQSCAN test WHERE a = %d;",
+                                     i))
     end
-    ok, res = pcall(prepare, "SELECT * FROM test WHERE b = '6';")
+    ok, res = pcall(prepare, "SELECT * FROM SEQSCAN test WHERE b = '6';")
 end);
 while ok == nil do fiber.sleep(0.00001) end;
 assert(ok == false);
@@ -282,11 +284,11 @@ box.schema.func.create('SLEEP', {language = 'Lua',
     body = 'function () fiber.sleep(0.3) return 1 end',
     exports = {'LUA', 'SQL'}});
 
-s = prepare("SELECT id, SLEEP() FROM test;");
+s = prepare("SELECT id, SLEEP() FROM SEQSCAN test;");
 assert(s ~= nil);
 
 function implicit_yield()
-    s = prepare("SELECT id, SLEEP() FROM test;")
+    s = prepare("SELECT id, SLEEP() FROM SEQSCAN test;")
     execute(s.stmt_id)
 end;
 
@@ -306,7 +308,7 @@ unprepare(s.stmt_id);
 function invalidate_schema_and_prepare()
     sp = box.schema.create_space("s")
     sp:drop()
-    s = prepare("SELECT id, SLEEP() FROM test;")
+    s = prepare("SELECT id, SLEEP() FROM SEQSCAN test;")
     assert(s ~= nil)
     unprepare(s.stmt_id)
 end;

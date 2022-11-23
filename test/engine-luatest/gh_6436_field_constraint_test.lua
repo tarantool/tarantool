@@ -645,7 +645,7 @@ g.test_field_sql_netbox_access = function(cg)
             t.assert_equals(s:get{1}.id2, 2)
             t.assert_equals(s:get{1}.id3, 3)
 
-            t.assert_equals(box.execute[[SELECT * FROM "test"]],
+            t.assert_equals(box.execute[[SELECT * FROM SEQSCAN "test"]],
             { metadata = { {name = "id1", type = "any"},
                            {name = "id2", type = "any"},
                            {name = "id3", type = "any"} },
@@ -660,7 +660,7 @@ g.test_field_sql_netbox_access = function(cg)
         t.assert_equals(s:get{1}.id2, 2)
         t.assert_equals(s:get{1}.id3, 3)
 
-        t.assert_equals(c:execute[[SELECT * FROM "test"]],
+        t.assert_equals(c:execute[[SELECT * FROM SEQSCAN "test"]],
         { metadata = { {name = "id1", type = "any"},
                        {name = "id2", type = "any"},
                        {name = "id3", type = "any"} },

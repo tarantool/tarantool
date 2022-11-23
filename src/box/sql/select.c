@@ -4605,8 +4605,8 @@ convertCompoundSelectToSubquery(Walker * pWalker, Select * p)
 	pParse = pWalker->pParse;
 	pNew = sql_xmalloc0(sizeof(*pNew));
 	memset(&dummy, 0, sizeof(dummy));
-	pNewSrc =
-	    sqlSrcListAppendFromTerm(pParse, 0, 0, &dummy, pNew, 0, 0);
+	pNewSrc = sqlSrcListAppendFromTerm(pParse, 0, 0, &dummy, pNew, 0, 0,
+					   false);
 	if (pNewSrc == 0)
 		return WRC_Abort;
 	*pNew = *p;

@@ -173,33 +173,41 @@ sqlWhereExplainOneScan(Parse * pParse,	/* Parse context */
 			   int iFrom,		/* Value for "from" column of output */
 			   u16 wctrlFlags)	/* Flags passed to sqlWhereBegin() */
 {
+	/* The controlling WhereLoop object. */
+	struct WhereLoop *pLoop = pLevel->pWLoop;
+	/* Flags that describe this loop. */
+	uint32_t flags = pLoop->wsFlags;
+	if ((flags & WHERE_MULTI_OR) || (wctrlFlags & WHERE_OR_SUBCLAUSE))
+		return 0;
+	/* True for a SEARCH. False for SCAN. */
+	bool is_search = (flags & (WHERE_BTM_LIMIT | WHERE_TOP_LIMIT)) != 0 ||
+			 (pLoop->nEq > 0) ||
+			 ((wctrlFlags &
+			   (WHERE_ORDERBY_MIN | WHERE_ORDERBY_MAX)) != 0);
+	struct SrcList_item *pItem = &pTabList->a[pLevel->iFrom];
+	assert(pItem->zName != NULL || pItem->pSelect != NULL);
+	if (pParse->explain == 0 && !is_search && pItem->fg.disallow_scan &&
+	    (pParse->sql_flags & SQL_SeqScan) == 0) {
+		const char *obj = pItem->zName == NULL ? "subselect" :
+				  tt_sprintf("'%s'", pItem->zName);
+		diag_set(ClientError, ER_SQL_SEQ_SCAN, obj);
+		pParse->is_aborted = true;
+		return 0;
+	}
+
 	int ret = 0;
 #if !defined(SQL_DEBUG)
 	if (pParse->explain == 2)
 #endif
 	{
-		struct SrcList_item *pItem = &pTabList->a[pLevel->iFrom];
 		Vdbe *v = pParse->pVdbe;	/* VM being constructed */
 		int iId = pParse->iSelectId;	/* Select id (left-most output column) */
-		int isSearch;	/* True for a SEARCH. False for SCAN. */
-		WhereLoop *pLoop;	/* The controlling WhereLoop object */
-		u32 flags;	/* Flags that describe this loop */
 		char *zMsg;	/* Text to add to EQP output */
 		StrAccum str;	/* EQP output string */
 		char zBuf[100];	/* Initial space for EQP output string */
 
-		pLoop = pLevel->pWLoop;
-		flags = pLoop->wsFlags;
-		if ((flags & WHERE_MULTI_OR)
-		    || (wctrlFlags & WHERE_OR_SUBCLAUSE))
-			return 0;
-
-		isSearch = (flags & (WHERE_BTM_LIMIT | WHERE_TOP_LIMIT)) != 0
-		    || (pLoop->nEq > 0)
-		    || (wctrlFlags & (WHERE_ORDERBY_MIN | WHERE_ORDERBY_MAX));
-
 		sqlStrAccumInit(&str, zBuf, sizeof(zBuf), SQL_MAX_LENGTH);
-		sqlStrAccumAppendAll(&str, isSearch ? "SEARCH" : "SCAN");
+		sqlStrAccumAppendAll(&str, is_search ? "SEARCH" : "SCAN");
 		if (pItem->pSelect) {
 			sqlXPrintf(&str, " SUBQUERY %d", pItem->iSelectId);
 		} else {
@@ -220,9 +228,8 @@ sqlWhereExplainOneScan(Parse * pParse,	/* Parse context */
 			if ((flags & WHERE_AUTO_INDEX) != 0) {
 				zFmt = "EPHEMERAL INDEX";
 			} else if (idx_def->iid == 0) {
-				if (isSearch) {
+				if (is_search)
 					zFmt = "PRIMARY KEY";
-				}
 			} else if (flags & WHERE_IDX_ONLY) {
 				zFmt = "COVERING INDEX %s";
 			} else {

@@ -24,6 +24,10 @@ remote = require 'net.box'
 cn = remote.connect(box.cfg.listen)
 ---
 ...
+cn:execute([[SET SESSION "sql_seq_scan" = true;]])
+---
+- row_count: 1
+...
 box.schema.user.grant('guest','read', 'space', 'SUPERSECRET_LEAK')
 ---
 ...

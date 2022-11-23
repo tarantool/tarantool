@@ -49,6 +49,7 @@ const char *session_setting_strs[SESSION_SETTING_COUNT] = {
 	"sql_recursive_triggers",
 	"sql_reverse_unordered_selects",
 	"sql_select_debug",
+	"sql_seq_scan",
 	"sql_vdbe_debug",
 };
 

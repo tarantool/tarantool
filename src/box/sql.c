@@ -61,9 +61,8 @@ static sql *db = NULL;
 
 static const char nil_key[] = { 0x90 }; /* Empty MsgPack array. */
 
-static const uint32_t default_sql_flags = SQL_EnableTrigger
-					  | SQL_AutoIndex
-					  | SQL_RecTriggers;
+static const uint32_t default_sql_flags = SQL_EnableTrigger | SQL_AutoIndex |
+					  SQL_RecTriggers | SQL_SeqScan;
 
 static Expr *
 sql_expr_compile_cb(const char *expr, int expr_len)

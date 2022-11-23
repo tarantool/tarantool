@@ -1,5 +1,6 @@
 netbox = require('net.box')
 test_run = require('test_run').new()
+box.execute([[SET SESSION "sql_seq_scan" = true;]])
 
 box.execute('CREATE TABLE test (id INT PRIMARY KEY, a NUMBER, b TEXT)')
 box.space.TEST:replace{1, 2, '3'}

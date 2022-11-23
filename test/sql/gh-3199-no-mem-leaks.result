@@ -17,6 +17,10 @@ test_run:cmd('restart server default')
 fiber = require('fiber')
 ---
 ...
+box.execute([[SET SESSION "sql_seq_scan" = true;]])
+---
+- row_count: 1
+...
 internal_usage = fiber.info()[fiber.self().id()].memory.used
 ---
 ...

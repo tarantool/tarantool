@@ -477,6 +477,7 @@ t;
  |   256: box.error.PASSWORD_EXPIRED
  |   257: box.error.AUTH_DELAY
  |   258: box.error.AUTH_REQUIRED
+ |   259: box.error.SQL_SEQ_SCAN
  | ...
 
 test_run:cmd("setopt delimiter ''");

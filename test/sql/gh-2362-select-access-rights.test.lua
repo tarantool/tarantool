@@ -10,17 +10,17 @@ box.execute("INSERT INTO t2 VALUES (1);")
 
 box.schema.user.grant('guest','read', 'space', 'T1')
 c = nb.connect(box.cfg.listen)
-c:execute("SELECT * FROM t1;")
+c:execute("SELECT * FROM SEQSCAN t1;")
 
 box.schema.user.revoke('guest','read', 'space', 'T1')
 c = nb.connect(box.cfg.listen)
-c:execute("SELECT * FROM t1;")
+c:execute("SELECT * FROM SEQSCAN t1;")
 
 box.schema.user.grant('guest','read', 'space', 'T2')
 c = nb.connect(box.cfg.listen)
-c:execute('SELECT * FROM t1, t2 WHERE t1.s1 = t2.s1')
+c:execute('SELECT * FROM SEQSCAN t1, SEQSCAN t2 WHERE t1.s1 = t2.s1')
 
-box.execute("CREATE VIEW v AS SELECT * FROM t1")
+box.execute("CREATE VIEW v AS SELECT * FROM SEQSCAN t1")
 
 box.schema.user.grant('guest','read', 'space', 'V')
 v = nb.connect(box.cfg.listen)
