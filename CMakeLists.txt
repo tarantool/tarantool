@@ -408,8 +408,18 @@ endif()
 #
 # ZLIB
 #
-set(ZLIB_FIND_REQUIRED ON)
-find_package(ZLIB)
+
+#
+# If tarantool is built as a part of enterpirse version,
+# zlib package will be found there and the second attempt
+# to find it will cause an error. Search for it only if it
+# has not been found before.
+#
+
+if (NOT ZLIB_FOUND)
+    set(ZLIB_FIND_REQUIRED ON)
+    find_package(ZLIB)
+endif()
 
 #
 # ZZIP
