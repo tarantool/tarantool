@@ -266,24 +266,45 @@ local function say(level, fmt, ...)
     end
     local type_fmt = type(fmt)
     local format = "%s"
+    local msg
     if select('#', ...) ~= 0 then
         local stat
-        stat, fmt = pcall(string.format, fmt, ...)
+        stat, msg = pcall(string.format, fmt, ...)
         if not stat then
-            error(fmt, 3)
+            error(msg, 3)
         end
     elseif type_fmt == 'table' then
-        -- ignore internal keys
-        for _, field in ipairs(special_fields) do
-            fmt[field] = nil
-        end
-        fmt = json.encode(fmt)
+        msg = table.copy(fmt)
         if ffi.C.log_format == ffi.C.SF_JSON then
+            -- use serialization function from the metatable, if any
+            local msg_mt = getmetatable(msg)
+            if msg_mt and type(msg_mt.__serialize) == 'function' then
+                msg = msg_mt.__serialize(msg)
+                if type(msg) ~= 'table' then
+                    msg = { message = tostring(msg) }
+                end
+            end
+            -- ignore internal keys
+            for _, field in ipairs(special_fields) do
+                msg[field] = nil
+            end
+            -- return empty string for an empty table
+            if next(msg) == nil then
+                msg.message = ''
+            end
+            -- set 'message' field if it is absent
+            if msg.message == nil then
+                msg.message = msg[1]
+                msg[1] = nil
+            end
+            -- always encode tables as maps
+            setmetatable(msg, json.map_mt)
             -- indicate that message is already encoded in JSON
             format = fmt_num2str[ffi.C.SF_JSON]
         end
-    elseif type_fmt ~= 'string' then
-        fmt = tostring(fmt)
+        msg = json.encode(msg)
+    else
+        msg = tostring(fmt)
     end
 
     local debug = require('debug')
@@ -294,7 +315,7 @@ local function say(level, fmt, ...)
         file = frame.short_src or frame.src or 'eval'
     end
 
-    ffi.C._say(level, file, line, nil, format, fmt)
+    ffi.C._say(level, file, line, nil, format, msg)
 end
 
 -- Just a syntactic sugar over say routine.
