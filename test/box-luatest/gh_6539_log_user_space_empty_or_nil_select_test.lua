@@ -119,9 +119,11 @@ for _, eng in pairs{'memtx', 'vinyl'} do
         for _, call_fmt in pairs(dangerous_call_fmts) do
             local call = call_fmt:format(space)
             g.server:eval(call)
-            t.assert(g.server:grep_log(expected_log_entry, grep_log_bytes),
-                     ('log must contain a critical entry ' ..
-                      'about `%s` call on a %s user space'):format(call, eng))
+            t.helpers.retrying({}, function()
+                t.assert(g.server:grep_log(expected_log_entry, grep_log_bytes),
+                         ('log must contain a critical entry ' ..
+                          'about `%s` call on a %s user space'):format(call, eng))
+            end)
             fio.truncate(log_file)
         end
     end
