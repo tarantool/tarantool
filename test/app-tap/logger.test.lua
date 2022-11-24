@@ -3,7 +3,7 @@
 local log = require('log')
 
 local test = require('tap').test('log')
-test:plan(102)
+test:plan(119)
 
 local function test_invalid_cfg(cfg_method, cfg, name, expected)
     local _, err = pcall(cfg_method, cfg)
@@ -267,11 +267,23 @@ test:is(file:read():match('I>%s+(.*)'), "gh-2340: %s %D", "formatting without ar
 
 log.info({key="value"})
 test:is(file:read():match('I>%s+(.*)'), '{"key":"value"}', "table is handled as json")
+
+log.info({"Hello", 123456, key1 = "val1", key2 = "val2", level = "bad"})
+line = file:read():match('I>%s+(.*)')
+test:is(line, '{"1":"Hello","2":123456,"key1":"val1","key2":"val2","level":"bad"}',
+        "table is handled as json")
 --
 --gh-2923 dropping message field
 --
 log.info({message="value"})
-test:is(file:read():match('I>%s+(.*)'), '{"message":"value"}', "table is handled as json")
+test:is(file:read():match('I>%s+(.*)'), '{"message":"value"}', "message not dropped")
+--
+-- gh-3853 log.info spoils input (plain format)
+--
+local gh3853 = {file = 'c://autorun.bat'}
+log.info(gh3853)
+test:is(gh3853.file, "c://autorun.bat", "gh3853 is not modified")
+file:read() -- skip line
 
 local function help() log.info("gh-2340: %s %s", 'help') end
 
@@ -327,6 +339,51 @@ test:is(message.message, "this is \"", "check message with escaped character")
 log.info(string.rep('a', 32000))
 line = file:read()
 test:ok(line:len() < 20000, "big line truncated")
+
+-- gh-3853 log.info spoils input (json format)
+local gh3853 = {file = 'c://autorun.bat'}
+log.info(gh3853)
+test:is(gh3853.file, "c://autorun.bat", "gh3853 is not modified")
+local line = file:read()
+
+-- gh-7955 assertion in say_format_json
+log.info({"Hello"})
+message = json.decode(file:read())
+test:is(message.message, "Hello", "table without keys")
+
+log.info({nil, 2, 3})
+message = json.decode(file:read())
+test:is(message.message, nil, "nil first element")
+
+log.info({})
+message = json.decode(file:read())
+test:is(message.message, "", "message is empty")
+
+log.info({message = "My message"})
+message = json.decode(file:read())
+test:is(message.message, "My message", "message is correct")
+
+log.info({"Hello", 123456, key1 = "val1", key2 = "val2", level = "bad"})
+message = json.decode(file:read())
+test:is(message.message, "Hello", "message is correct")
+test:is(message['2'], 123456, "message['2'] is correct")
+test:is(message.key1, "val1", "message.key1 is correct")
+test:is(message.key2, "val2", "message.key2 is correct")
+test:is(message.level, "INFO", "internal key is not affected")
+
+local gh7955 = { param = 42 }
+setmetatable(gh7955, {__serialize = function() return "gh7955 <param: 42>" end})
+log.info(gh7955)
+message = json.decode(file:read())
+test:is(message.message, "gh7955 <param: 42>", "__serialize returns string")
+test:is(message.param, nil, "__serialize overrides gh7955 fields")
+
+setmetatable(gh7955, {__serialize = function() return { 111, 112 } end})
+log.info(gh7955)
+message = json.decode(file:read())
+test:is(message.message, 111, "__serialize returns array")
+test:is(message['2'], 112, "message['2'] is correct")
+test:is(message.param, nil, "__serialize overrides gh7955 fields")
 
 log.info("json")
 local line = file:read()
