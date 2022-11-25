@@ -115,13 +115,12 @@ backtrace_collect(struct backtrace *bt, const struct fiber *fiber,
 	}
 	/*
 	 * 1. Save current fiber context on stack.
-	 * 2. Setup arguments for `backtrace_collect_current_stack` call.
+	 * 2. Setup arguments for `collect_current_stack` call.
 	 * 3. Restore target fiber context.
 	 * 4. Setup current frame information (CFI) and call
-	 *    `backtrace_collect_current_stack`.
-	 * 5. Restore original stack pointer from
-	 *    `backtrace_collect_current_stack`'s return value and restore
-	 *    original fiber context.
+	 *    `collect_current_stack`.
+	 * 5. Restore original stack pointer from `collect_current_stack`'s
+	 *    return value and restore original fiber context.
 	 */
 #ifdef __x86_64__
 __asm__ volatile(
@@ -172,20 +171,22 @@ __asm__ volatile(
 	  "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)");
 #elif __aarch64__
 __asm__ volatile(
-	/* Setup second function argument and save current fiber context. */
-	"\tsub x1, sp, #8 * 20\n"
-	"\tstp x19, x20, [x1, #16 * 0]\n"
-	"\tstp x21, x22, [x1, #16 * 1]\n"
-	"\tstp x23, x24, [x1, #16 * 2]\n"
-	"\tstp x25, x26, [x1, #16 * 3]\n"
-	"\tstp x27, x28, [x1, #16 * 4]\n"
-	"\tstp x29, x30, [x1, #16 * 5]\n"
-	"\tstp d8,  d9,  [x1, #16 * 6]\n"
-	"\tstp d10, d11, [x1, #16 * 7]\n"
-	"\tstp d12, d13, [x1, #16 * 8]\n"
-	"\tstp d14, d15, [x1, #16 * 9]\n"
+	/* Save current fiber context. */
+	"\tsub sp, sp, #8 * 20\n"
+	"\tstp x19, x20, [sp, #16 * 0]\n"
+	"\tstp x21, x22, [sp, #16 * 1]\n"
+	"\tstp x23, x24, [sp, #16 * 2]\n"
+	"\tstp x25, x26, [sp, #16 * 3]\n"
+	"\tstp x27, x28, [sp, #16 * 4]\n"
+	"\tstp x29, x30, [sp, #16 * 5]\n"
+	"\tstp d8,  d9,  [sp, #16 * 6]\n"
+	"\tstp d10, d11, [sp, #16 * 7]\n"
+	"\tstp d12, d13, [sp, #16 * 8]\n"
+	"\tstp d14, d15, [sp, #16 * 9]\n"
 	/* Setup first function argument. */
-	"\tldr x0, %1\n"
+	"\tmov x0, %1\n"
+	/* Setup second function argument. */
+	"\tmov x1, sp\n"
 	/* Restore target fiber context. */
 	"\tldr x2, [%2]\n"
 	"\tmov sp, x2\n"
@@ -219,7 +220,7 @@ __asm__ volatile(
 	"\tldp d14, d15, [x0, #16 * 9]\n"
 	"\tadd sp, x0, #8 * 20\n"
 	: "=m" (*bt)
-	: "m" (bt), "r" (&fiber->ctx), "S" (collect_current_stack)
+	: "r" (bt), "r" (&fiber->ctx), "S" (collect_current_stack)
 	: "x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10",
 	  "x11", "x12", "x13", "x14", "x15", "x16", "x17",
 #ifndef __APPLE__
