@@ -12,8 +12,18 @@ extern "C" {
 
 struct lua_State;
 
+/**
+ * Initializes `box.iproto` submodule for working with Tarantool network
+ * subsystem.
+ */
 void
 box_lua_iproto_init(struct lua_State *L);
+
+/**
+ * Frees `box.iproto` submodule.
+ */
+void
+box_lua_iproto_free(void);
 
 #if defined(__cplusplus)
 } /* extern "C" */

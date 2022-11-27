@@ -3250,6 +3250,24 @@ box_session_id(void)
 	return current_session()->id;
 }
 
+API_EXPORT int
+box_iproto_send(uint64_t sid,
+		const char *header, const char *header_end,
+		const char *body, const char *body_end)
+{
+	struct session *session = session_find(sid);
+	if (session == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_SESSION, sid);
+		return -1;
+	}
+	if (session->type != SESSION_TYPE_BINARY) {
+		diag_set(ClientError, ER_WRONG_SESSION_TYPE,
+			 session_type_strs[session->type]);
+		return -1;
+	}
+	return iproto_session_send(session, header, header_end, body, body_end);
+}
+
 static inline void
 box_register_replica(uint32_t id, const struct tt_uuid *uuid)
 {

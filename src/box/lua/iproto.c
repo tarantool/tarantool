@@ -6,10 +6,29 @@
 
 #include "box/lua/iproto.h"
 
+#include "box/box.h"
 #include "box/iproto_constants.h"
 #include "box/iproto_features.h"
 
-#include <lua.h>
+#include "core/assoc.h"
+#include "core/fiber.h"
+#include "core/tt_static.h"
+
+#include "lua/msgpack.h"
+#include "lua/utils.h"
+
+#include "mpstream/mpstream.h"
+
+#include "small/region.h"
+
+#include <ctype.h>
+#include <lauxlib.h>
+
+/**
+ * Translation table for `box.iproto.key` constants encoding: used in
+ * `luamp_encode_with_translation`.
+ */
+static struct mh_strnu32_t *iproto_key_translation;
 
 /**
  * IPROTO constant from `src/box/iproto_{constants, features}.h`.
@@ -119,6 +138,22 @@ push_iproto_key_enum(struct lua_State *L)
 		{"VCLOCK_SYNC", IPROTO_VCLOCK_SYNC},
 	};
 	push_iproto_constant_subnamespace(L, "key", keys, lengthof(keys));
+	for (size_t i = 0; i < lengthof(keys); ++i) {
+		size_t len = strlen(keys[i].name);
+		char *lowercase = strtolowerdup(keys[i].name);
+		struct mh_strnu32_node_t translation = {
+			.str = lowercase,
+			.len = len,
+			.hash = lua_hash(lowercase, len),
+			.val = keys[i].val,
+		};
+		mh_strnu32_put(iproto_key_translation, &translation,
+			       NULL, NULL);
+		translation.str = xstrdup(keys[i].name);
+		translation.hash = lua_hash(translation.str, len);
+		mh_strnu32_put(iproto_key_translation, &translation,
+			       NULL, NULL);
+	}
 }
 
 /**
@@ -269,15 +304,111 @@ push_iproto_protocol_features(struct lua_State *L)
 }
 
 /**
+ * Encodes a packet header/body argument to MsgPack: if the argument is a
+ * string, then no encoding is needed — otherwise the argument must be a Lua
+ * table. The Lua table is encoded to MsgPack using IPROTO key translation
+ * table.
+ * In both cases, the result is stored on the fiber region.
+ */
+static const char *
+encode_packet(struct lua_State *L, int idx, size_t *mp_len)
+{
+	int packet_part_type = lua_type(L, idx);
+	struct region *gc = &fiber()->gc;
+	if (packet_part_type == LUA_TSTRING) {
+		const char *arg = lua_tolstring(L, idx, mp_len);
+		char *mp = xregion_alloc(gc, *mp_len);
+		return memcpy(mp, arg, *mp_len);
+	}
+	assert(packet_part_type == LUA_TTABLE);
+	/*
+	 * FIXME(gh-7939): `luamp_error` and `luamp_encode_with_translation` can
+	 * throw a Lua exception, which we cannot catch, and cause the fiber
+	 * region to leak.
+	 */
+	struct mpstream stream;
+	mpstream_init(&stream, gc, region_reserve_cb, region_alloc_cb,
+		      luamp_error, L);
+	size_t used = region_used(gc);
+	luamp_encode_with_translation(L, luaL_msgpack_default, &stream, idx,
+				      iproto_key_translation);
+	mpstream_flush(&stream);
+	*mp_len = region_used(gc) - used;
+	return xregion_join(gc, *mp_len);
+}
+
+/**
+ * Sends an IPROTO packet consisting of a header (second argument) and an
+ * optional body (third argument) over the IPROTO session identified by first
+ * argument.
+ */
+static int
+lbox_iproto_send(struct lua_State *L)
+{
+	int n_args = lua_gettop(L);
+	if (n_args < 2 || n_args > 3)
+		return luaL_error(L, "Usage: "
+				     "box.iproto.send(sid, header[, body])");
+	uint64_t sid = luaL_checkuint64(L, 1);
+	int header_type = lua_type(L, 2);
+	if (header_type != LUA_TSTRING && header_type != LUA_TTABLE)
+		return luaL_error(L, "expected table or string as 2 argument");
+	if (n_args == 3) {
+		int body_type = lua_type(L, 3);
+		if (body_type != LUA_TSTRING && body_type != LUA_TTABLE)
+			return luaL_error(
+				L, "expected table or string as 3 argument");
+	}
+
+	struct region *gc = &fiber()->gc;
+	size_t used = region_used(gc);
+	size_t header_len;
+	const char *header = encode_packet(L, 2, &header_len);
+	size_t body_len = 0;
+	const char *body = NULL;
+	if (n_args == 3)
+		body = encode_packet(L, 3, &body_len);
+	int rc = box_iproto_send(sid,
+				 header, header + header_len,
+				 body, body + body_len);
+	region_truncate(gc, used);
+	return (rc == 0) ? 0 : luaT_error(L);
+}
+
+/**
  * Initializes module for working with Tarantool's network subsystem.
  */
 void
 box_lua_iproto_init(struct lua_State *L)
 {
+	iproto_key_translation = mh_strnu32_new();
+
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 	lua_newtable(L);
+
 	push_iproto_constants(L);
 	push_iproto_protocol_features(L);
+
+	const struct luaL_Reg iproto_methods[] = {
+		{"send", lbox_iproto_send},
+		{NULL, NULL}
+	};
+	luaL_register(L, NULL, iproto_methods);
+
 	lua_setfield(L, -2, "iproto");
 	lua_pop(L, 1);
+}
+
+/**
+ * Deletes the IPROTO key translation and all its dynamically allocated key
+ * strings.
+ */
+void
+box_lua_iproto_free(void)
+{
+	struct mh_strnu32_t *h = iproto_key_translation;
+	mh_int_t k;
+	mh_foreach(h, k)
+		free((void *)mh_strnu32_node(h, k)->str);
+	mh_strnu32_delete(iproto_key_translation);
 }

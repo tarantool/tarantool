@@ -2,8 +2,13 @@
 
 local ffi = require('ffi')
 local fio = require('fio')
+local msgpack = require('msgpack')
+local socket = require('socket')
+local uri = require('uri')
 
-box.cfg{log = "tarantool.log"}
+local listen_sock_path = './tarantool.sock'
+os.remove(listen_sock_path)
+box.cfg{listen = "unix/:" .. listen_sock_path, log = "tarantool.log"}
 -- Use BUILDDIR passed from test-run or cwd when run w/o
 -- test-run to find test/app-tap/module_api.{so,dylib}.
 local build_path = os.getenv("BUILDDIR") or '.'
@@ -496,8 +501,82 @@ local function test_box_session_id_matches(test, module)
             'same value')
 end
 
+-- Basic test of `box_iproto_send` correctness: main functional testing is done
+-- in test/box-luatest/gh_7897_sending_arbitrary_iproto_packets_test.lua.
+local function test_box_iproto_send(test, module)
+    test:plan(9)
+
+    local sid
+    local on_connect = function() sid = box.session.id() end
+    box.session.on_connect(on_connect)
+    -- Connect to the server.
+    local u = uri.parse(box.cfg.listen)
+    local s, err = socket.tcp_connect(u.host, u.service)
+    if s == nil then
+        test:diag('Failed to connect to server: ' .. err)
+        return
+    end
+    -- Skip the greeting.
+    if #s:read(128) ~= 128 then
+        test:diag('Tarantool greeting message size is not 128')
+        return
+    end
+    box.session.on_connect(nil, on_connect)
+
+    local mp_header = msgpack.encode({a = 1})
+    local mp_body = msgpack.encode({b = 1})
+
+    local mp
+    local mp_len
+    local packet_size
+    local packet_len
+    local _ -- luacheck: no unused
+    local packet_header
+    local packet_body
+    local next
+
+    -- Checks that packet consisting only of header is sent correctly.
+    box.iproto.send(sid, mp_header)
+    packet_size = 5 + #mp_header
+    mp = s:read(packet_size)
+    mp_len = #mp
+    test:is(mp_len, packet_size,
+            'packet size for packet consisting only of header is correct')
+    packet_len, next = msgpack.decode(mp)
+    test:is(mp_len - next + 1, packet_len,
+            'packet length for packet consisting only of header is correct')
+    _, next = msgpack.decode(mp, next)
+    packet_header = mp:sub(1, next)
+    test:is(next, mp_len + 1, 'packet consisting only of header is correct')
+    test:like(packet_header, mp_header,
+              'packet header for packet consisting only of header is correct')
+
+    -- Checks that packet consisting header and body is sent correctly.
+    module.box_iproto_send(sid, mp_header, mp_body)
+    packet_size = 5 + #mp_header + #mp_body
+    mp = s:read(packet_size)
+    mp_len = #mp
+    test:is(mp_len, packet_size,
+            'packet size for packet consisting of header and body is correct')
+    packet_len, next = msgpack.decode(mp)
+    test:is(mp_len - next + 1, packet_len,
+            'packet length for packet consisting of header and body is correct')
+    _, next = msgpack.decode(mp, next)
+    packet_header = mp:sub(1, next)
+    local packet_body_begin = next
+    _, next = msgpack.decode(mp, next)
+    test:is(next, mp_len + 1,
+            'packet consisting of header and body is correct')
+    packet_body = mp:sub(packet_body_begin, mp_len)
+    test:like(packet_header, mp_header,
+              'packet header for packet consisting of header and body is ' ..
+              'correct')
+    test:like(packet_body, mp_body,
+              'packet body for packet consisting of header and body is correct')
+end
+
 require('tap').test("module_api", function(test)
-    test:plan(45)
+    test:plan(46)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
@@ -531,6 +610,7 @@ require('tap').test("module_api", function(test)
     test:test("isdecimal", test_isdecimal, module)
     test:test("box_schema_version_matches", test_box_schema_version_matches, module)
     test:test("box_session_id_matches", test_box_session_id_matches, module)
+    test:test("box_iproto_send", test_box_iproto_send, module)
 
     space:drop()
 end)

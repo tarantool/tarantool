@@ -557,6 +557,7 @@ tarantool_free(void)
 	/* Shutdown worker pool. Waits until threads terminate. */
 	coio_shutdown();
 
+	box_lua_free();
 	box_free();
 
 	title_free(main_argc, main_argv);

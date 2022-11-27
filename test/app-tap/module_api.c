@@ -3009,6 +3009,26 @@ test_box_session_id(struct lua_State *L)
 
 /* }}} Helpers for current session identifier Lua/C API test cases */
 
+/* {{{ Helpers for `box_iproto_send` Lua/C API test cases */
+
+static int
+test_box_iproto_send(struct lua_State *L)
+{
+	int n_args = lua_gettop(L);
+	fail_unless(n_args == 2 || n_args == 3);
+	uint64_t sid = luaL_checkuint64(L, 1);
+	size_t header_len;
+	const char *header = luaL_checklstring(L, 2, &header_len);
+	size_t body_len = 0;
+	const char *body =
+		(n_args == 2) ? NULL : luaL_checklstring(L, 3, &body_len);
+	fail_unless(box_iproto_send(sid, header, header + header_len,
+				    body, body + body_len) == 0);
+	return 1;
+}
+
+/* }}} Helpers for `box_iproto_send` Lua/C API test cases */
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -3061,6 +3081,7 @@ luaopen_module_api(lua_State *L)
 		{"isdecimal_ptr", test_isdecimal_ptr},
 		{"box_schema_version_matches", test_box_schema_version},
 		{"box_session_id_matches", test_box_session_id},
+		{"box_iproto_send", test_box_iproto_send},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);
