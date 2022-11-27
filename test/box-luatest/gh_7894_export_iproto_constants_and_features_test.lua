@@ -178,6 +178,12 @@ g.test_iproto_constants_and_features_export = function(cg)
     cg.server:exec(function(reference_table)
         local t = require('luatest')
 
-        t.assert_equals(box.iproto, reference_table)
+        for k, v in pairs(box.iproto) do
+            local v_type = type(v)
+            if v_type ~= 'function' and v_type ~= 'thread' and
+               v_type ~= 'userdata' then
+                t.assert_equals(v, reference_table[k])
+            end
+        end
     end, {reference_table})
 end

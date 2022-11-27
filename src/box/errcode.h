@@ -306,6 +306,8 @@ struct errcode_record {
 	/*251 */_(ER_INVALID_AUTH_REQUEST,	"Invalid '%s' request: %s") \
 	/*252 */_(ER_WEAK_PASSWORD,		"Password doesn't meet security requirements: %s") \
 	/*253 */_(ER_OLD_PASSWORD,		"Password must differ from last %d passwords") \
+	/*254 */_(ER_NO_SUCH_SESSION,		"Session %llu does not exist") \
+	/*255 */_(ER_WRONG_SESSION_TYPE,	"Session '%s' is not supported") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

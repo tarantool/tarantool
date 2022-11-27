@@ -39,6 +39,12 @@ struct lua_State;
 void
 box_lua_init(struct lua_State *L);
 
+/**
+ * Frees `box` module.
+ */
+void
+box_lua_free(void);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

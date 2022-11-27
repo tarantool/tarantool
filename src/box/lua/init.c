@@ -585,3 +585,9 @@ box_lua_init(struct lua_State *L)
 
 	assert(lua_gettop(L) == 0);
 }
+
+void
+box_lua_free(void)
+{
+	box_lua_iproto_free();
+}

@@ -601,6 +601,25 @@ box_session_push(const char *data, const char *data_end);
 API_EXPORT uint64_t
 box_session_id(void);
 
+/**
+ * Sends a packet with the given header and body over the IPROTO session's
+ * socket.
+ *
+ * NB: yields.
+ *
+ * \param sid IPROTO session identifier
+ * \param header MsgPack encoded header
+ * \param header_end MsgPack encoded header end
+ * \param body MsgPack encoded body
+ * \param body_end MsgPack encoded body end
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ */
+API_EXPORT int
+box_iproto_send(uint64_t sid,
+		const char *header, const char *header_end,
+		const char *body, const char *body_end);
+
 /** \endcond public */
 
 /**

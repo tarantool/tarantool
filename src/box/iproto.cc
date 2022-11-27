@@ -3299,6 +3299,42 @@ iproto_set_msg_max(int new_iproto_msg_max)
 	}
 }
 
+int
+iproto_session_send(struct session *session,
+		    const char *header, const char *header_end,
+		    const char *body, const char *body_end)
+{
+	assert(session->type == SESSION_TYPE_BINARY);
+	struct iproto_connection *con =
+		(struct iproto_connection *)session->meta.connection;
+	if (con->state != IPROTO_CONNECTION_ALIVE) {
+		diag_set(ClientError, ER_SESSION_CLOSED);
+		return -1;
+	}
+
+	ptrdiff_t header_size = header_end - header;
+	ptrdiff_t body_size = body_end - body;
+	ptrdiff_t packet_size = 5 + header_size + body_size;
+	char *buf = (char *)obuf_alloc(con->tx.p_obuf, packet_size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, packet_size, "obuf_alloc", "buf");
+		return -1;
+	}
+	char *p = buf;
+	*(p++) = INT8_C(0xce);
+	p = mp_store_u32(p, packet_size - 5);
+	memcpy(p, header, header_size);
+	p += header_size;
+	memcpy(p, body, body_size);
+	tx_push(con);
+	/*
+	 * The control yield is solely for enforcing the fact this function
+	 * yields — in the future we may implement back pressure based on this.
+	 */
+	fiber_sleep(0);
+	return 0;
+}
+
 void
 iproto_free(void)
 {

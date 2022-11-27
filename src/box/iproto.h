@@ -34,6 +34,7 @@
 #include <stddef.h>
 
 struct uri_set;
+struct session;
 
 #if defined(__cplusplus)
 extern "C" {
@@ -130,6 +131,18 @@ iproto_listen(const struct uri_set *uri_set);
 
 void
 iproto_set_msg_max(int iproto_msg_max);
+
+/**
+ * Sends a packet with the given header and body over the IPROTO session's
+ * socket.
+ * On success, a packet is written to the session's output buffer, which is
+ * flushed asynchronously using Kharon.
+ * Returns 0 on success, a non-zero value otherwise (diagnostic is set).
+ */
+int
+iproto_session_send(struct session *session,
+		    const char *header, const char *header_end,
+		    const char *body, const char *body_end);
 
 void
 iproto_free(void);

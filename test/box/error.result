@@ -472,6 +472,8 @@ t;
  |   251: box.error.INVALID_AUTH_REQUEST
  |   252: box.error.WEAK_PASSWORD
  |   253: box.error.OLD_PASSWORD
+ |   254: box.error.NO_SUCH_SESSION
+ |   255: box.error.WRONG_SESSION_TYPE
  | ...
 
 test_run:cmd("setopt delimiter ''");
