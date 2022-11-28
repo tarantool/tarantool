@@ -1016,7 +1016,7 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 
 	void *required_fields = NULL;
 	uint32_t required_fields_sz = BITMAP_SIZE(format->total_field_count);
-	size_t region_svp = region_svp = region_used(&fiber()->gc);
+	size_t region_svp = region_used(&fiber()->gc);
 
 	if (unlikely(defined_field_count == 0)) {
 		required_fields = format->required_fields;
