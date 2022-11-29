@@ -22,6 +22,11 @@ g.before_all(function(cg)
         },
     })
     cg.server:start()
+    cg.server:exec(function()
+        local ffi = require('ffi')
+        ffi.cdef('bool ggg_debug;')
+        ffi.C.ggg_debug = true;
+    end)
     cg.pid = tonumber(cg.server.process.pid)
     cg.log = function(msg)
         cg.server:exec(function(msg)

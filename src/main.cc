@@ -89,6 +89,7 @@
 #include "core/clock_lowres.h"
 #include "lua/utils.h"
 
+bool ggg_debug;
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
 static char *script = NULL;

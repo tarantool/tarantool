@@ -9,6 +9,7 @@
 #
 # To sort symbols use `LC_COLLATE="C" sort -f`.
 
+ggg_debug
 base64_bufsize
 base64_decode
 base64_encode

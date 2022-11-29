@@ -16,6 +16,7 @@ typedef int32_t pid_t;
 pid_t getpid(void);
 void
 tarantool_exit(int);
+bool ggg_debug;
 ]]
 
 local fio = require("fio")
@@ -80,6 +81,12 @@ local function remove_root_directory(path)
     return path
 end
 
+local function ggg_print(msg)
+    if ffi.C.ggg_debug then
+        print(msg)
+    end
+end
+
 -- Obtain the module name from the file name by removing:
 -- 1. builtin/ prefixes
 -- 2. path prefixes contained in package.path, package.cpath
@@ -89,16 +96,25 @@ end
 -- and by replacing all `/` with `.`
 local function module_name_from_filename(filename)
     local paths = package.path .. package.cpath
+    ggg_print('!!! paths = ' .. paths)
     local result = filename:gsub('builtin/', '')
+    ggg_print('!!! result = ' .. result)
     for path in paths:gmatch'/([A-Za-z\\/\\.0-9]+)\\?' do
         result = result:gsub('/' .. path, '');
+        ggg_print('!!! result = ' .. result)
     end
     result = result:gsub('/init.lua', '');
+    ggg_print('!!! result = ' .. result)
     result = result:gsub('%.lua', '');
+    ggg_print('!!! result = ' .. result)
     result = remove_root_directory(result)
+    ggg_print('!!! result = ' .. result)
     result = result:gsub(ROCKS_LIB_PATH .. '/', '');
+    ggg_print('!!! result = ' .. result)
     result = result:gsub(ROCKS_LUA_PATH .. '/', '');
+    ggg_print('!!! result = ' .. result)
     result = result:gsub('/', '.');
+    ggg_print('!!! result = ' .. result)
     return result
 end
 
@@ -108,6 +124,7 @@ local function module_name_by_callstack_level(level)
     local info = debug.getinfo(level + 1)
     if info ~= nil and info.source:sub(1, 1) == '@' then
         local src_name = info.source:sub(2)
+        ggg_print('!!! src_name = ' .. src_name)
         return module_name_from_filename(src_name)
     end
     -- require('log') called from the interactive mode or `tarantool -e`
