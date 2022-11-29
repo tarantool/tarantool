@@ -29,36 +29,13 @@
  * SUCH DAMAGE.
  */
 #include "tuple_dictionary.h"
+#include "assoc.h"
 #include "error.h"
 #include "diag.h"
 
 #include "PMurHash.h"
 
 field_name_hash_f field_name_hash;
-
-#define mh_name _strnu32
-struct mh_strnu32_key_t {
-	const char *str;
-	size_t len;
-	uint32_t hash;
-};
-#define mh_key_t struct mh_strnu32_key_t *
-struct mh_strnu32_node_t {
-	const char *str;
-	size_t len;
-	uint32_t hash;
-	uint32_t val;
-};
-#define mh_node_t struct mh_strnu32_node_t
-
-#define mh_arg_t void *
-#define mh_hash(a, arg) ((a)->hash)
-#define mh_hash_key(a, arg) mh_hash(a, arg)
-#define mh_cmp(a, b, arg) ((a)->len != (b)->len || \
-			   memcmp((a)->str, (b)->str, (a)->len))
-#define mh_cmp_key(a, b, arg) mh_cmp(a, b, arg)
-#define MH_SOURCE 1
-#include "salad/mhash.h" /* Create mh_strnu32_t hash. */
 
 /** Free names hash and its content. */
 static inline void

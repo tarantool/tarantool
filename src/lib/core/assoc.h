@@ -134,8 +134,60 @@ mh_strnptr_find_str(struct mh_strnptr_t *h, const char *str, uint32_t len)
 	uint32_t hash = mh_strn_hash(str, len);
 	struct mh_strnptr_key_t key = {str, len, hash};
 	return mh_strnptr_find(h, &key, NULL);
+}
+
+/*
+ * Map: (char * with length) => (uint32_t)
+ */
+#define mh_name _strnu32
+/**
+ * Key of `mh_strnu32_node_t` hash table.
+ */
+struct mh_strnu32_key_t {
+	/* Key string. */
+	const char *str;
+	/* Key length. */
+	size_t len;
+	/* Key hash calculated using `mh_strn_hash`. */
+	uint32_t hash;
 };
 
+#define mh_key_t struct mh_strnu32_key_t *
+
+/**
+ * Node of `mh_strnu32_node_t` hash table.
+ */
+struct mh_strnu32_node_t {
+	/* Key string. */
+	const char *str;
+	/* Key length. */
+	size_t len;
+	/* Key hash calculated using `mh_strn_hash`. */
+	uint32_t hash;
+	/* Mapped value. */
+	uint32_t val;
+};
+
+#define mh_node_t struct mh_strnu32_node_t
+
+#define mh_arg_t void *
+#define mh_hash(a, arg) ((a)->hash)
+#define mh_hash_key(a, arg) mh_hash(a, arg)
+#define mh_cmp(a, b, arg) ((a)->len != (b)->len || \
+			   memcmp((a)->str, (b)->str, (a)->len))
+#define mh_cmp_key(a, b, arg) mh_cmp(a, b, arg)
+#include "salad/mhash.h"
+
+/**
+ * Helper for looking up strings in `mh_strnu32_t` hash table.
+ */
+static inline mh_int_t
+mh_strnu32_find_str(struct mh_strnu32_t *h, const char *str, uint32_t len)
+{
+	uint32_t hash = mh_strn_hash(str, len);
+	struct mh_strnu32_key_t key = {str, len, hash};
+	return mh_strnu32_find(h, &key, NULL);
+}
 
 #if defined(__cplusplus)
 } /* extern "C" */
