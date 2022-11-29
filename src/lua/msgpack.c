@@ -42,6 +42,7 @@
 #include <small/region.h>
 #include <small/ibuf.h>
 
+#include "core/assoc.h"
 #include "core/decimal.h" /* decimal_unpack() */
 #include "lua/decimal.h" /* luaT_newdecimal() */
 #include "mp_extension_types.h"
@@ -162,9 +163,29 @@ luamp_set_decode_extension(luamp_decode_extension_f handler)
 	}
 }
 
+/**
+ * Tries to translate MP_MAP key to an unsigned integer from the translation
+ * table.
+ */
+static void
+translate_map_key_field(struct luaL_field *field, struct mh_strnu32_t *translation)
+{
+	mh_int_t key = mh_strnu32_find_str(translation,
+					   field->sval.data,
+					   field->sval.len);
+	if (key != mh_end(translation)) {
+		field->type = MP_UINT;
+		field->ival = (int64_t)mh_strnu32_node(translation, key)->val;
+	}
+}
+
 enum mp_type
-luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg,
-	       struct mpstream *stream, struct luaL_field *field, int level)
+luamp_encode_with_translation_r(struct lua_State *L,
+				struct luaL_serializer *cfg,
+				struct mpstream *stream,
+				struct luaL_field *field,
+				int level,
+				struct mh_strnu32_t *translation)
 {
 	int top = lua_gettop(L);
 	enum mp_type type;
@@ -213,11 +234,16 @@ restart: /* used by MP_EXT of unidentified subtype */
 			lua_pushvalue(L, -2); /* push a copy of key to top */
 			if (luaL_tofield(L, cfg, lua_gettop(L), field) < 0)
 				return luaT_error(L);
-			luamp_encode_r(L, cfg, stream, field, level + 1);
+			if (translation != NULL && level == 0 &&
+			    field->type == MP_STR)
+				translate_map_key_field(field, translation);
+			luamp_encode_with_translation_r(L, cfg, stream, field,
+							level + 1, translation);
 			lua_pop(L, 1); /* pop a copy of key */
 			if (luaL_tofield(L, cfg, lua_gettop(L), field) < 0)
 				return luaT_error(L);
-			luamp_encode_r(L, cfg, stream, field, level + 1);
+			luamp_encode_with_translation_r(L, cfg, stream, field,
+							level + 1, translation);
 			lua_pop(L, 1); /* pop value */
 		}
 		assert(lua_gettop(L) == top);
@@ -238,7 +264,8 @@ restart: /* used by MP_EXT of unidentified subtype */
 			lua_rawgeti(L, top, i + 1);
 			if (luaL_tofield(L, cfg, top + 1, field) < 0)
 				return luaT_error(L);
-			luamp_encode_r(L, cfg, stream, field, level + 1);
+			luamp_encode_with_translation_r(L, cfg, stream, field,
+							level + 1, translation);
 			lua_pop(L, 1);
 		}
 		assert(lua_gettop(L) == top);
@@ -288,8 +315,9 @@ convert:
 }
 
 enum mp_type
-luamp_encode(struct lua_State *L, struct luaL_serializer *cfg,
-	     struct mpstream *stream, int index)
+luamp_encode_with_translation(struct lua_State *L, struct luaL_serializer *cfg,
+			      struct mpstream *stream, int index,
+			      struct mh_strnu32_t *translation)
 {
 	int top = lua_gettop(L);
 	if (index < 0)
@@ -303,7 +331,9 @@ luamp_encode(struct lua_State *L, struct luaL_serializer *cfg,
 	struct luaL_field field;
 	if (luaL_tofield(L, cfg, lua_gettop(L), &field) < 0)
 		return luaT_error(L);
-	enum mp_type top_type = luamp_encode_r(L, cfg, stream, &field, 0);
+	enum mp_type top_type =
+		luamp_encode_with_translation_r(L, cfg, stream, &field, 0,
+						translation);
 
 	if (!on_top) {
 		lua_remove(L, top + 1); /* remove a value copy */

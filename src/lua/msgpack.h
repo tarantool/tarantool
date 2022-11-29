@@ -44,6 +44,7 @@ extern "C" {
 struct luaL_field;
 struct luaL_serializer;
 struct mpstream;
+struct mh_strnu32_t;
 
 /**
  * Default instance of msgpack serializer (msgpack = require('msgpack')).
@@ -76,14 +77,41 @@ luamp_push(struct lua_State *L, const char *data, const char *data_end);
 const char *
 luamp_get(struct lua_State *L, int idx, size_t *data_len);
 
-/* low-level function needed for execute_lua_call() */
+/**
+ * Recursive version of `luamp_encode_with_translation`.
+ */
 enum mp_type
-luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg,
-	       struct mpstream *stream, struct luaL_field *field, int level);
+luamp_encode_with_translation_r(struct lua_State *L,
+				struct luaL_serializer *cfg,
+				struct mpstream *stream,
+				struct luaL_field *field, int level,
+				struct mh_strnu32_t *translation);
 
+static inline enum mp_type
+luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg,
+	       struct mpstream *stream, struct luaL_field *field, int level)
+{
+	return luamp_encode_with_translation_r(L, cfg, stream, field,
+					       level, NULL);
+}
+
+/**
+ * Recursion base for `luamp_encode_with_tranlsation_r`: recursively encodes Lua
+ * value at the top of the stack, using a translation table: if a  first-level
+ * `MP_MAP` key has `MP_STRING` type, tries to look it up in the translation
+ * table and replace it with the translation, if found.
+ */
 enum mp_type
+luamp_encode_with_translation(struct lua_State *L, struct luaL_serializer *cfg,
+			      struct mpstream *stream, int index,
+			      struct mh_strnu32_t *translation);
+
+static inline enum mp_type
 luamp_encode(struct lua_State *L, struct luaL_serializer *cfg,
-	     struct mpstream *stream, int index);
+	     struct mpstream *stream, int index)
+{
+	return luamp_encode_with_translation(L, cfg, stream, index, NULL);
+}
 
 void
 luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
