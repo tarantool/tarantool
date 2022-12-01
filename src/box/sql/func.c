@@ -2155,6 +2155,8 @@ find_compatible(struct Expr *expr, struct sql_func_dictionary *dict,
 		bool is_match = true;
 		for (int j = 0; j < n && is_match; ++j) {
 			struct Expr *e = expr->x.pList->a[j].pExpr;
+			while (e->op == TK_COLLATE)
+				e = e->pLeft;
 			enum field_type a = types[argc != -1 ? j : 0];
 			enum field_type b = sql_expr_type(e);
 			switch (check) {
