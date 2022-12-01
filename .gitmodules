@@ -59,7 +59,7 @@
 [submodule "third_party/libunwind"]
 	path = third_party/libunwind
 	url = https://github.com/tarantool/libunwind.git
-	branch = libunwind-f67ef28-tarantool
+	branch = libunwind-1.6.2-tarantool
 [submodule "third_party/tz"]
 	path = third_party/tz
 	url = https://github.com/tarantool/tz.git
