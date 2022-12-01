@@ -37,6 +37,7 @@ macro(libunwind_build)
                         DOWNLOAD_COMMAND ""
 
                         CONFIGURE_COMMAND
+                        autoreconf -i <SOURCE_DIR> &&
                         <SOURCE_DIR>/configure
                         AR=${CMAKE_AR}
                         CC=${CMAKE_C_COMPILER}
@@ -69,7 +70,6 @@ macro(libunwind_build)
                         # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L319-L334
                         --disable-zlibdebuginfo
 
-                        LOG_CONFIGURE TRUE
                         LOG_BUILD TRUE
                         LOG_INSTALL TRUE
                         LOG_MERGED_STDOUTERR TRUE

@@ -112,6 +112,11 @@ BuildRequires: tzdata
 # Install prove to run LuaJIT tests.
 BuildRequires: perl-Test-Harness
 
+# For third-party subprojects that are built with autotools.
+BuildRequires: autoconf
+BuildRequires: automake
+BuildRequires: libtool
+
 Name: tarantool
 # ${major}.${major}.${minor}.${patch}, e.g. 1.6.8.175
 # Version is updated automaically using git describe --long --always
