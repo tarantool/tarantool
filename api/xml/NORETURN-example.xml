@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8' standalone='no'?>
-<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.8.17">
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
   <compounddef id="NORETURN-example" kind="example">
     <compoundname>NORETURN</compoundname>
     <briefdescription>
@@ -9,5 +9,6 @@
 <para>A function declared as NORETURN shall not return to its caller.The compiler will generate a diagnostic for a function declared as NORETURN that appears to be capable of returning to its caller.</para>
 <para>void abort(); <programlisting filename="NORETURN"></programlisting> </para>
     </detaileddescription>
+    <location file="src/module.h"/>
   </compounddef>
 </doxygen>

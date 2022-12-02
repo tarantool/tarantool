@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8' standalone='no'?>
-<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.8.17">
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
   <compounddef id="struct-example" kind="example">
     <compoundname>struct</compoundname>
     <briefdescription>
@@ -10,5 +10,6 @@
 <para>Sic: alignas() doesn&apos;t work on anonymous structs on gcc &lt; 4.9</para>
 <para>obuf { int a; int b; alignas(16) int c; }; <programlisting filename="struct"></programlisting> </para>
     </detaileddescription>
+    <location file="src/module.h"/>
   </compounddef>
 </doxygen>

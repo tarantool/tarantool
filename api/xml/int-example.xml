@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8' standalone='no'?>
-<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.8.17">
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.1" xml:lang="en-US">
   <compounddef id="int-example" kind="example">
     <compoundname>int</compoundname>
     <briefdescription>
@@ -16,5 +16,6 @@
 {{{ Function Attributes The MAYBE_UNUSED function attribute can be used to silence -Wunused diagnostics when the entity cannot be removed. For instance, a local variable may exist solely for use in an assert() statement, which makes the local variable unused when NDEBUG is defined.</para>
 <para>fun(MAYBE_UNUSED int unused_arg); <programlisting filename="int"></programlisting> </para>
     </detaileddescription>
+    <location file="src/module.h"/>
   </compounddef>
 </doxygen>

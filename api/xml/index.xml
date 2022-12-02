@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8' standalone='no'?>
-<doxygenindex xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="index.xsd" version="1.8.17">
+<doxygenindex xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="index.xsd" version="1.9.1" xml:lang="en-US">
   <compound refid="structbox__decimal" kind="struct"><name>box_decimal</name>
     <member refid="structbox__decimal_1ab3c586f1f723be9d150e20c67ff0fa9b" kind="variable"><name>internal</name></member>
   </compound>
@@ -629,6 +629,8 @@
   </compound>
   <compound refid="dir_68267d1309a1af8e8297ef4c3efbcdba" kind="dir"><name>src</name>
   </compound>
+  <compound refid="struct-example" kind="example"><name>struct</name>
+  </compound>
   <compound refid="int-example" kind="example"><name>int</name>
   </compound>
   <compound refid="NODISCARD-example" kind="example"><name>NODISCARD</name>
@@ -636,7 +638,5 @@
   <compound refid="NOINLINE-example" kind="example"><name>NOINLINE</name>
   </compound>
   <compound refid="NORETURN-example" kind="example"><name>NORETURN</name>
-  </compound>
-  <compound refid="struct-example" kind="example"><name>struct</name>
   </compound>
 </doxygenindex>
