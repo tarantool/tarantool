@@ -13,6 +13,7 @@ activity, the following issues have been resolved:
 * Fixed `emit_loadi()` on x86/x64 emitting xor between condition check
   and jump instructions.
 * Fix stack top for error message when raising the OOM error (gh-3840).
+* Fix assembling of type-check-only variant of `IR_SLOAD`.
 
 ## feature/luajit
 Backported patches from vanilla LuaJIT trunk (gh-7230). In the scope of this
