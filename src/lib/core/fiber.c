@@ -2033,6 +2033,7 @@ fiber_init(int (*invoke)(fiber_func f, va_list ap))
 void
 fiber_free(void)
 {
+	assert(pm_atomic_load(&cord_count) == 0);
 	cord_exit(&main_cord);
 	cord_destroy(&main_cord);
 }

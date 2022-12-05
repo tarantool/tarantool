@@ -133,6 +133,7 @@ static int box_read_ffi_disable_count;
  * and began receiving updates from it.
  */
 static bool is_box_configured = false;
+static bool is_storage_initialized = false;
 static bool is_ro = true;
 static fiber_cond ro_cond;
 
@@ -223,7 +224,7 @@ box_run_on_recovery_state(enum box_recovery_state state)
 }
 
 static void
-builtin_events_init(void);
+box_storage_init(void);
 
 /**
  * Broadcast the current instance status
@@ -3724,39 +3725,6 @@ box_set_replicaset_uuid(const struct tt_uuid *replicaset_uuid)
 		diag_raise();
 }
 
-void
-box_free(void)
-{
-	/*
-	 * See gh-584 "box_free() is called even if box is not
-	 * initialized
-	 */
-	if (is_box_configured) {
-#if 0
-		session_free();
-		user_cache_free();
-		schema_free();
-		schema_module_free();
-		tuple_free();
-#endif
-		auth_free();
-		wal_ext_free();
-		box_watcher_free();
-		box_raft_free();
-		iproto_free();
-		replication_free();
-		sequence_free();
-		gc_free();
-		engine_shutdown();
-		wal_free();
-		flightrec_free();
-		audit_log_free();
-		sql_built_in_functions_cache_free();
-		port_free();
-	}
-	trigger_destroy(&box_on_recovery_state);
-}
-
 static void
 box_on_indexes_built(void)
 {
@@ -4280,38 +4248,6 @@ on_wal_checkpoint_threshold(void)
 	gc_trigger_checkpoint();
 }
 
-void
-box_init(void)
-{
-	msgpack_init();
-	fiber_cond_create(&ro_cond);
-
-	auth_init();
-	user_cache_init();
-	/*
-	 * The order is important: to initialize sessions,
-	 * we need to access the admin user, which is used
-	 * as a default session user when running triggers.
-	 */
-	session_init();
-	schema_module_init();
-
-	if (tuple_init(lua_hash) != 0)
-		diag_raise();
-
-	txn_limbo_init();
-	sequence_init();
-	box_raft_init();
-	box_watcher_init();
-	wal_ext_init();
-
-	/*
-	 * Default built-in events to help users distinguish an event
-	 * being not supported from box.cfg not being called yet.
-	 */
-	builtin_events_init();
-}
-
 bool
 box_is_configured(void)
 {
@@ -4321,34 +4257,7 @@ box_is_configured(void)
 static void
 box_cfg_xc(void)
 {
-	/* Join the cord interconnect as "tx" endpoint. */
-	fiber_pool_create(&tx_fiber_pool, "tx",
-			  IPROTO_MSG_MAX_MIN * IPROTO_FIBER_POOL_SIZE_FACTOR,
-			  FIBER_POOL_IDLE_TIMEOUT);
-	/* Add an extra endpoint for WAL wake up/rollback messages. */
-	cbus_endpoint_create(&tx_prio_endpoint, "tx_prio", tx_prio_cb, &tx_prio_endpoint);
-
-	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
-	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);
-
-	gc_init();
-	engine_init();
-	schema_init();
-	replication_init(cfg_geti_default("replication_threads", 1));
-	port_init();
-	iproto_init(cfg_geti("iproto_threads"));
-	sql_init();
-	audit_log_init(cfg_gets("audit_log"), cfg_geti("audit_nonblock"),
-		       cfg_gets("audit_format"), cfg_gets("audit_filter"));
-
-	int64_t wal_max_size = box_check_wal_max_size(cfg_geti64("wal_max_size"));
-	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
-	if (wal_init(wal_mode, cfg_gets("wal_dir"), wal_max_size,
-		     &INSTANCE_UUID, on_wal_garbage_collection,
-		     on_wal_checkpoint_threshold) != 0) {
-		diag_raise();
-	}
-
+	box_storage_init();
 	title("loading");
 
 	struct tt_uuid instance_uuid, replicaset_uuid;
@@ -4710,4 +4619,103 @@ box_read_ffi_enable(void)
 	assert(box_read_ffi_disable_count > 0);
 	if (--box_read_ffi_disable_count == 0)
 		box_read_ffi_is_disabled = false;
+}
+
+static void
+box_storage_init(void)
+{
+	assert(!is_storage_initialized);
+	/* Join the cord interconnect as "tx" endpoint. */
+	fiber_pool_create(&tx_fiber_pool, "tx",
+			  IPROTO_MSG_MAX_MIN * IPROTO_FIBER_POOL_SIZE_FACTOR,
+			  FIBER_POOL_IDLE_TIMEOUT);
+	/* Add an extra endpoint for WAL wake up/rollback messages. */
+	cbus_endpoint_create(&tx_prio_endpoint, "tx_prio", tx_prio_cb,
+			     &tx_prio_endpoint);
+
+	rmean_box = rmean_new(iproto_type_strs, IPROTO_TYPE_STAT_MAX);
+	rmean_error = rmean_new(rmean_error_strings, RMEAN_ERROR_LAST);
+
+	gc_init();
+	engine_init();
+	schema_init();
+	replication_init(cfg_geti_default("replication_threads", 1));
+	port_init();
+	iproto_init(cfg_geti("iproto_threads"));
+	sql_init();
+	audit_log_init(cfg_gets("audit_log"), cfg_geti("audit_nonblock"),
+		       cfg_gets("audit_format"), cfg_gets("audit_filter"));
+
+	int64_t wal_max_size = box_check_wal_max_size(
+		cfg_geti64("wal_max_size"));
+	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
+	if (wal_init(wal_mode, cfg_gets("wal_dir"), wal_max_size,
+		     &INSTANCE_UUID, on_wal_garbage_collection,
+		     on_wal_checkpoint_threshold) != 0) {
+		diag_raise();
+	}
+	is_storage_initialized = true;
+}
+
+static void
+box_storage_free(void)
+{
+	if (!is_storage_initialized)
+		return;
+	iproto_free();
+	replication_free();
+	gc_free();
+	engine_shutdown();
+	/* schema_free(); */
+	wal_free();
+	flightrec_free();
+	audit_log_free();
+	sql_built_in_functions_cache_free();
+	port_free();
+	/* fiber_pool_destroy(&tx_fiber_pool); */
+	is_storage_initialized = false;
+}
+
+void
+box_init(void)
+{
+	msgpack_init();
+	fiber_cond_create(&ro_cond);
+	auth_init();
+	user_cache_init();
+	/*
+	 * The order is important: to initialize sessions, we need to access the
+	 * admin user, which is used as a default session user when running
+	 * triggers.
+	 */
+	session_init();
+	schema_module_init();
+	if (tuple_init(lua_hash) != 0)
+		diag_raise();
+	txn_limbo_init();
+	sequence_init();
+	box_raft_init();
+	box_watcher_init();
+	wal_ext_init();
+	/*
+	 * Default built-in events to help users distinguish an event being not
+	 * supported from box.cfg not being called yet.
+	 */
+	builtin_events_init();
+}
+
+void
+box_free(void)
+{
+	box_storage_free();
+	auth_free();
+	wal_ext_free();
+	box_watcher_free();
+	box_raft_free();
+	sequence_free();
+	trigger_destroy(&box_on_recovery_state);
+	/* tuple_free(); */
+	/* schema_module_free(); */
+	/* session_free(); */
+	/* user_cache_free(); */
 }
