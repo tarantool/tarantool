@@ -712,6 +712,10 @@ print_help(FILE *stream)
 		"\n"
 		"    Perform LuaJIT control command <cmd>.\n"
 		"\n"
+		"-t<cmd>\n"
+		"\n"
+		"    Execute tool.\n"
+		"\n"
 		"-b <...>\n"
 		"\n"
 		"    Save or list bytecode.\n"
@@ -780,7 +784,7 @@ main(int argc, char **argv)
 		{"failover", no_argument, 0, 'O'},
 		{NULL, 0, 0, 0},
 	};
-	static const char *opts = "+hVvb::ij:e:l:dc:n:";
+	static const char *opts = "+hVvb::t:ij:e:l:dc:n:";
 
 	int ch;
 	bool lj_arg = false;
@@ -845,6 +849,16 @@ main(int argc, char **argv)
 				"only in Tarantool Enterprise Edition\n");
 			return EX_USAGE;
 #endif
+		case 't':
+			opt_mask |= O_TOOL;
+			/*
+			 * The tool option is met --
+			 * all subsequent options are
+			 * treated as its suboptions.
+			 */
+			lj_arg = true;
+			optind--;
+			break;
 		case 'e':
 			opt_mask |= O_EXECUTE;
 			FALLTHROUGH;
@@ -886,7 +900,7 @@ main(int argc, char **argv)
 	 * since it is present in `bcsave.lua` module, which
 	 * performs the bytecode dump.
 	 */
-	if (!(opt_mask & O_BYTECODE) && argc > 1 &&
+	if (!(opt_mask & O_BYTECODE) && !(opt_mask & O_TOOL) && argc > 1 &&
 	    strcmp(argv[1], "-") && access(argv[1], R_OK) != 0) {
 		/*
 		 * Somebody made a mistake in the file

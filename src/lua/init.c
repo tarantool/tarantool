@@ -146,6 +146,7 @@ extern char minifio_lua[],
 	jit_dump_lua[],
 	dobytecode_lua[],
 	dojitcmd_lua[],
+	dotoolcmd_lua[],
 	csv_lua[],
 	jit_v_lua[],
 	clock_lua[],
@@ -319,6 +320,7 @@ static const char *lua_modules[] = {
 	"jit.v", jit_v_lua,
 	"internal.dobytecode", dobytecode_lua,
 	"internal.dojitcmd", dojitcmd_lua,
+	"internal.dotoolcmd", dotoolcmd_lua,
 	/* Profiler */
 	"jit.p", jit_p_lua,
 	"jit.zone", jit_zone_lua,
@@ -1105,6 +1107,7 @@ run_script_f(va_list ap)
 	bool debugging = opt_mask & O_DEBUGGING;
 	bool help_env_list = opt_mask & O_HELP_ENV_LIST;
 	bool failover = opt_mask & O_FAILOVER;
+	bool tool = opt_mask & O_TOOL;
 	/*
 	 * An error is returned via an external diag. A caller
 	 * can't use fiber_join(), because the script can call
@@ -1252,6 +1255,20 @@ run_script_f(va_list ap)
 		lua_settop(L, 0);
 		goto end;
 	}
+
+	if (tool) {
+		if (lua_require_lib(L, "internal.dotoolcmd") != 0)
+			goto error;
+		lua_pushstring(L, "dotoolcmd");
+		lua_gettable(L, -2);
+		for (int i = 0; i < argc; i++)
+			lua_pushstring(L, argv[i]);
+		if (luaT_call(L, argc, 1) != 0)
+			goto error;
+		lua_settop(L, 0);
+		goto end;
+	}
+
 	if (debugging) {
 		if (path == NULL || access(path, F_OK) != 0) {
 			diag_set(SystemError, "Expected script name");

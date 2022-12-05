@@ -89,6 +89,10 @@ The following modifier options are applicable to actions.
 
     Perform LuaJIT control command <cmd>.
 
+-t<cmd>
+
+    Execute tool.
+
 -b <...>
 
     Save or list bytecode.
@@ -198,6 +202,10 @@ The following modifier options are applicable to actions.
 -j <cmd>
 
     Perform LuaJIT control command <cmd>.
+
+-t<cmd>
+
+    Execute tool.
 
 -b <...>
 
