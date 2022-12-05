@@ -42,7 +42,8 @@ jobs:
     runs-on: freebsd-13-mcs
 
     steps:
-      - uses: tarantool/actions/cleanup@master
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0

@@ -38,8 +38,8 @@ jobs:
   luajit-integration:
     runs-on: ${{ inputs.host }}
     steps:
-      - name: Prepare workspace
-        uses: tarantool/actions/cleanup@master
+      - name: Prepare checkout
+        uses: tarantool/actions/prepare-checkout@master
 
       - name: Checkout
         uses: actions/checkout@v3
