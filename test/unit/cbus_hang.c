@@ -138,7 +138,7 @@ main_f(va_list ap)
 	tt_pthread_mutex_unlock(&(hang_endpoint.mutex));
 	/* Hack end */
 
-	tt_pthread_join(canceled_worker.id, NULL);
+	cord_join(&canceled_worker);
 
 	unsigned join_timeout = 5;
 	signal(SIGALRM, join_fail); // For exit in a hang case

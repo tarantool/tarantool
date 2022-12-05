@@ -778,10 +778,8 @@ checkpoint_cancel(struct checkpoint *ckpt)
 	 * for it to terminate so as to eliminate the possibility
 	 * of use-after-free.
 	 */
-	if (ckpt->waiting_for_snap_thread) {
-		tt_pthread_cancel(ckpt->cord.id);
-		tt_pthread_join(ckpt->cord.id, NULL);
-	}
+	if (ckpt->waiting_for_snap_thread)
+		cord_cancel_and_join(&ckpt->cord);
 	checkpoint_delete(ckpt);
 }
 
@@ -793,8 +791,7 @@ replica_join_cancel(struct cord *replica_join_cord)
 	 * running and wait for it to terminate so as to
 	 * eliminate the possibility of use-after-free.
 	 */
-	tt_pthread_cancel(replica_join_cord->id);
-	tt_pthread_join(replica_join_cord->id, NULL);
+	cord_cancel_and_join(replica_join_cord);
 }
 
 static int

@@ -365,8 +365,7 @@ vy_worker_pool_stop(struct vy_worker_pool *pool)
 	assert(pool->workers != NULL);
 	for (int i = 0; i < pool->size; i++) {
 		struct vy_worker *worker = &pool->workers[i];
-		tt_pthread_cancel(worker->cord.id);
-		tt_pthread_join(worker->cord.id, NULL);
+		cord_cancel_and_join(&worker->cord);
 	}
 	free(pool->workers);
 	pool->workers = NULL;

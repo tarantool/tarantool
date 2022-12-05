@@ -50,6 +50,8 @@ extern void cord_on_yield(void);
 
 static struct fiber_slice zero_slice = {.warn = 0.0, .err = 0.0};
 static struct fiber_slice default_slice = {.warn = 0.5, .err = 1.0};
+/** Number of cord-threads still running right now. */
+static int cord_count = 0;
 
 static inline void
 clock_stat_add_delta(struct clock_stat *stat, uint64_t clock_delta)
@@ -1684,6 +1686,8 @@ cord_exit(struct cord *cord)
 void
 cord_destroy(struct cord *cord)
 {
+	assert(cord->id == 0 || pthread_equal(cord->id, pthread_self()));
+	cord->id = 0;
 	slab_cache_set_thread(&cord->slabc);
 	if (cord->loop)
 		ev_loop_destroy(cord->loop);
@@ -1769,6 +1773,7 @@ cord_start(struct cord *cord, const char *name, void *(*f)(void *), void *arg)
 		diag_set(SystemError, "failed to create thread");
 		goto end;
 	}
+	pm_atomic_fetch_add(&cord_count, 1);
 	res = 0;
 	while (! ct_arg.is_started)
 		tt_pthread_cond_wait(&ct_arg.start_cond, &ct_arg.start_mutex);
@@ -1788,10 +1793,16 @@ end:
 int
 cord_join(struct cord *cord)
 {
-	assert(cord() != cord); /* Can't join self. */
+	assert(cord() != cord);
+	assert(cord->id != 0);
+
 	void *retval = NULL;
 	int res = tt_pthread_join(cord->id, &retval);
 	if (res == 0) {
+		int old_cord_count = pm_atomic_fetch_sub(&cord_count, 1);
+		assert(old_cord_count > 0);
+		(void)old_cord_count;
+		cord->id = 0;
 		struct fiber *f = cord->fiber;
 		if (f->f_ret != 0) {
 			assert(!diag_is_empty(&f->diag));
@@ -1842,7 +1853,8 @@ cord_cojoin_wakeup(struct ev_loop *loop, struct ev_async *ev, int revents)
 int
 cord_cojoin(struct cord *cord)
 {
-	assert(cord() != cord); /* Can't join self. */
+	assert(cord() != cord);
+	assert(cord->id != 0);
 
 	struct cord_cojoin_ctx ctx;
 	ctx.loop = loop();
@@ -1878,6 +1890,7 @@ cord_cojoin(struct cord *cord)
 		 * cord_cojoin_wakeup, waking up this fiber again.
 		 */
 		do {
+			assert(cord->id != 0);
 			fiber_yield();
 		} while (!ctx.task_complete);
 	}
@@ -1974,6 +1987,29 @@ struct slab_cache *
 cord_slab_cache(void)
 {
 	return &cord()->slabc;
+}
+
+void
+cord_cancel_and_join(struct cord *cord)
+{
+	assert(cord->id != 0);
+	tt_pthread_cancel(cord->id);
+	if (tt_pthread_join(cord->id, NULL) != 0)
+		panic("failed to join a canceled thread");
+	int old_cord_count = pm_atomic_fetch_sub(&cord_count, 1);
+	assert(old_cord_count > 0);
+	(void)old_cord_count;
+	/*
+	 * Can't destroy the cord safely. The cancellation could even happen
+	 * before the cord was properly initialized in its own thread. It might
+	 * be fixed if cord would be initialized before its thread is started.
+	 *
+	 * Also obviously even if the creation would be fine, the destruction
+	 * can't free everything. The cord could have some resources allocated
+	 * on the heap with pointers not stored anywhere in struct cord - they
+	 * can't be possibly located.
+	 */
+	memset(cord, 0, sizeof(*cord));
 }
 
 static NOINLINE int

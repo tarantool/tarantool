@@ -1801,8 +1801,7 @@ applier_free(void)
 {
 	for (int i = 0; i < replication_threads; i++) {
 		struct applier_thread *thread = applier_threads[i];
-		tt_pthread_cancel(thread->cord.id);
-		tt_pthread_join(thread->cord.id, NULL);
+		cord_cancel_and_join(&thread->cord);
 		free(thread);
 	}
 	free(applier_threads);
