@@ -2956,31 +2956,25 @@ user_def_new_from_tuple(struct tuple *tuple)
 			  "user name is too long");
 		return NULL;
 	}
-	size_t size = user_def_sizeof(name_len);
-	/* Use calloc: in case user password is empty, fill it with \0 */
-	struct user_def *user = (struct user_def *) malloc(size);
-	if (user == NULL) {
-		diag_set(OutOfMemory, size, "malloc", "user");
+	uint32_t uid;
+	if (tuple_field_u32(tuple, BOX_USER_FIELD_ID, &uid) != 0)
 		return NULL;
-	}
-	auto def_guard = make_scoped_guard([=] { free(user); });
-	if (tuple_field_u32(tuple, BOX_USER_FIELD_ID, &(user->uid)) != 0)
+	uint32_t owner;
+	if (tuple_field_u32(tuple, BOX_USER_FIELD_UID, &owner) != 0)
 		return NULL;
-	if (tuple_field_u32(tuple, BOX_USER_FIELD_UID, &(user->owner)) != 0)
+	const char *type_str = tuple_field_cstr(tuple, BOX_USER_FIELD_TYPE);
+	if (type_str == NULL)
 		return NULL;
-	const char *user_type = tuple_field_cstr(tuple, BOX_USER_FIELD_TYPE);
-	if (user_type == NULL)
-		return NULL;
-	user->type = schema_object_type(user_type);
-	memcpy(user->name, name, name_len);
-	user->name[name_len] = 0;
-	if (user->type != SC_ROLE && user->type != SC_USER) {
+	enum schema_object_type type = schema_object_type(type_str);
+	if (type != SC_ROLE && type != SC_USER) {
 		diag_set(ClientError, ER_CREATE_USER,
-			  user->name, "unknown user type");
+			 tt_cstr(name, name_len), "unknown user type");
 		return NULL;
 	}
-	if (identifier_check(user->name, name_len) != 0)
+	if (identifier_check(name, name_len) != 0)
 		return NULL;
+	struct user_def *user = user_def_new(uid, owner, type, name, name_len);
+	auto def_guard = make_scoped_guard([=] { user_def_delete(user); });
 	/*
 	 * AUTH_DATA field in _user space should contain
 	 * chap-sha1 -> base64_encode(sha1(sha1(password), 0).
@@ -3032,7 +3026,7 @@ user_cache_alter_user(struct trigger *trigger, void * /* event */)
 	struct user_def *user = user_def_new_from_tuple(tuple);
 	if (user == NULL)
 		return -1;
-	auto def_guard = make_scoped_guard([=] { free(user); });
+	auto def_guard = make_scoped_guard([=] { user_def_delete(user); });
 	/* Can throw if, e.g. too many users. */
 	try {
 		user_cache_replace(user);
@@ -3066,7 +3060,9 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		if (access_check_ddl(user->name, user->uid, user->owner, user->type,
 				 PRIV_C) != 0)
 			return -1;
-		auto def_guard = make_scoped_guard([=] { free(user); });
+		auto def_guard = make_scoped_guard([=] {
+			user_def_delete(user);
+		});
 		try {
 			(void) user_cache_replace(user);
 		} catch (Exception *e) {
@@ -3122,7 +3118,9 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
 		if (access_check_ddl(user->name, user->uid, user->uid,
 				 old_user->def->type, PRIV_A) != 0)
 			return -1;
-		auto def_guard = make_scoped_guard([=] { free(user); });
+		auto def_guard = make_scoped_guard([=] {
+			user_def_delete(user);
+		});
 		try {
 			user_cache_replace(user);
 		} catch (Exception *e) {

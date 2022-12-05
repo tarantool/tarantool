@@ -179,7 +179,7 @@ user_destroy(struct user *user)
 	 * all privileges from them first.
 	 */
 	region_destroy(&user->pool);
-	free(user->def);
+	user_def_delete(user->def);
 	memset(user, 0, sizeof(*user));
 }
 
@@ -470,7 +470,7 @@ user_cache_replace(struct user_def *def)
 		struct mh_i32ptr_node_t node = { def->uid, user };
 		mh_i32ptr_put(user_registry, &node, NULL, NULL);
 	} else {
-		free(user->def);
+		user_def_delete(user->def);
 	}
 	user->def = def;
 	return user;
@@ -555,16 +555,11 @@ user_cache_init(void)
 	 * for 'guest' and 'admin' users here, they will be
 	 * updated with snapshot contents during recovery.
 	 */
-	size_t name_len = strlen("guest");
-	size_t sz = user_def_sizeof(name_len);
-	struct user_def *def = (struct user_def *) calloc(1, sz);
-	if (def == NULL)
-		tnt_raise(OutOfMemory, sz, "malloc", "def");
+	const char *name = "guest";
+	struct user_def *def = user_def_new(GUEST, ADMIN, SC_USER,
+					    name, strlen(name));
 	/* Free def in a case of exception. */
-	auto guest_def_guard = make_scoped_guard([=] { free(def); });
-	memcpy(def->name, "guest", name_len);
-	def->owner = ADMIN;
-	def->type = SC_USER;
+	auto guest_def_guard = make_scoped_guard([=] { user_def_delete(def); });
 	struct user *user = user_cache_replace(def);
 	/* Now the user cache owns the def. */
 	guest_def_guard.is_active = false;
@@ -572,15 +567,9 @@ user_cache_init(void)
 	assert(user->def->uid == GUEST && user->auth_token == GUEST);
 	(void) user;
 
-	name_len = strlen("admin");
-	sz = user_def_sizeof(name_len);
-	def = (struct user_def *) calloc(1, sz);
-	if (def == NULL)
-		tnt_raise(OutOfMemory, sz, "malloc", "def");
-	auto admin_def_guard = make_scoped_guard([=] { free(def); });
-	memcpy(def->name, "admin", name_len);
-	def->uid = def->owner = ADMIN;
-	def->type = SC_USER;
+	name = "admin";
+	def = user_def_new(ADMIN, ADMIN, SC_USER, name, strlen(name));
+	auto admin_def_guard = make_scoped_guard([=] { user_def_delete(def); });
 	user = user_cache_replace(def);
 	admin_def_guard.is_active = false;
 	/*
