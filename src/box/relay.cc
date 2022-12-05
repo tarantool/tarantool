@@ -353,9 +353,8 @@ relay_cancel(struct relay *relay)
 {
 	/* Check that the thread is running first. */
 	if (relay->cord.id != 0) {
-		if (tt_pthread_cancel(relay->cord.id) == ESRCH)
-			return;
-		tt_pthread_join(relay->cord.id, NULL);
+		cord_cancel_and_join(&relay->cord);
+		relay->cord.id = 0;
 	}
 }
 
@@ -382,6 +381,11 @@ relay_exit(struct relay *relay)
 static void
 relay_stop(struct relay *relay)
 {
+	/*
+	 * The thread has to be already stopped or it could use the destroyed
+	 * data below.
+	 */
+	assert(relay->cord.id == 0);
 	struct relay_gc_msg *gc_msg, *next_gc_msg;
 	stailq_foreach_entry_safe(gc_msg, next_gc_msg,
 				  &relay->pending_gc, in_pending) {
@@ -393,12 +397,6 @@ relay_stop(struct relay *relay)
 		recovery_delete(relay->r);
 	relay->r = NULL;
 	relay->state = RELAY_STOPPED;
-	/*
-	 * Needed to track whether relay thread is running or not
-	 * for relay_cancel(). Id is reset to a positive value
-	 * upon cord_create().
-	 */
-	relay->cord.id = 0;
 	/*
 	 * If relay is stopped then lag statistics should
 	 * be updated on next new ACK packets obtained.

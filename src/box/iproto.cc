@@ -3302,8 +3302,7 @@ void
 iproto_free(void)
 {
 	for (int i = 0; i < iproto_threads_count; i++) {
-		tt_pthread_cancel(iproto_threads[i].net_cord.id);
-		tt_pthread_join(iproto_threads[i].net_cord.id, NULL);
+		cord_cancel_and_join(&iproto_threads[i].net_cord);
 		/*
 		 * Close socket descriptor to prevent hot standby instance
 		 * failing to bind in case it tries to bind before socket

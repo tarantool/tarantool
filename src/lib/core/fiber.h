@@ -896,6 +896,15 @@ void
 cord_collect_garbage(struct cord *cord);
 
 /**
+ * Pthread-cancel the thread and join it in a blocking way, without yielding.
+ * That way is the only possible one if the event loop is already destroyed.
+ * Should only be used as an emergency, because all the cord resources simply
+ * leak.
+ */
+void
+cord_cancel_and_join(struct cord *cord);
+
+/**
  * @brief Create a new system fiber.
  *
  * @details
