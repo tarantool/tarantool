@@ -3250,7 +3250,8 @@ box_process_auth(struct auth_request *request, const char *salt)
 
 	const char *user = request->user_name;
 	uint32_t len = mp_decode_strl(&user);
-	authenticate(user, len, salt, request->scramble);
+	if (authenticate(user, len, salt, request->scramble) != 0)
+		diag_raise();
 }
 
 void

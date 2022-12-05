@@ -446,13 +446,6 @@ generic_session_sync(struct session *session);
 #include "diag.h"
 
 static inline void
-access_check_session_xc(struct user *user)
-{
-	if (access_check_session(user) != 0)
-		diag_raise();
-}
-
-static inline void
 access_check_universe_xc(user_access_t access)
 {
 	if (access_check_universe(access) != 0)

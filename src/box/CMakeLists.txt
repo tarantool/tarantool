@@ -205,7 +205,7 @@ set(box_sources
     checkpoint_schedule.c
     user_def.c
     user.cc
-    authentication.cc
+    authentication.c
     replication.cc
     recovery.cc
     xstream.cc
