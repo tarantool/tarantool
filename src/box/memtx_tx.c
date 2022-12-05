@@ -1671,29 +1671,62 @@ memtx_tx_story_gc()
 }
 
 /**
- * Check if a @a story is visible for transaction @a txn. Return visible tuple
- * to @a visible_tuple (can be set to NULL).
- * @param is_prepared_ok - whether prepared (not committed) change is acceptable.
+ * Check whether the beginning of a @a story (that is insertion of its tuple)
+ * is visible for transaction @a txn.
+ * @param is_prepared_ok - whether prepared, not confirmed change is acceptable.
  * @param own_change - return true if the change was made by @txn itself.
- * @return true if the story is visible, false otherwise.
+ * @return true if the story beginning is visible, false otherwise.
  */
 static bool
-memtx_tx_story_is_visible(struct memtx_story *story, struct txn *txn,
-			  bool is_prepared_ok, struct tuple **visible_tuple,
-			  bool *is_own_change)
+memtx_tx_story_insert_is_visible(struct memtx_story *story, struct txn *txn,
+				 bool is_prepared_ok, bool *is_own_change)
 {
 	*is_own_change = false;
-	*visible_tuple = NULL;
 
 	if (story->rollbacked)
 		return false;
+
+	if (story->add_stmt != NULL && story->add_stmt->txn == txn) {
+		/* Tuple is added by us (@txn). */
+		*is_own_change = true;
+		return true;
+	}
 
 	int64_t rv_psn = INT64_MAX;
 	if (txn != NULL && txn->rv_psn != 0)
 		rv_psn = txn->rv_psn;
 
-	struct txn_stmt *dels = story->del_stmt;
+	if (is_prepared_ok && story->add_psn != 0 && story->add_psn < rv_psn)
+		return true; /* Tuple is added by another prepared TX. */
+
+	if (story->add_psn != 0 && story->add_stmt == NULL &&
+	    story->add_psn < rv_psn)
+		return true; /* Tuple is added by committed TX. */
+
+	if (story->add_psn == 0 && story->add_stmt == NULL)
+		return true; /* Added long time ago. */
+
+	return false;
+}
+
+/**
+ * Check whether the end of a @a story (that is deletion of its tuple) is
+ * visible for transaction @a txn.
+ * @param is_prepared_ok - whether prepared, not confirmed change is acceptable.
+ * @param own_change - return true if the change was made by @txn itself.
+ * @return true if the story end is visible, false otherwise.
+ */
+static bool
+memtx_tx_story_delete_is_visible(struct memtx_story *story, struct txn *txn,
+				 bool is_prepared_ok, bool *is_own_change)
+{
+	*is_own_change = false;
+
+	if (story->rollbacked)
+		return false;
+
 	bool was_deleted_by_prepared = false;
+	struct txn_stmt *dels = story->del_stmt;
 	while (dels != NULL) {
 		if (dels->txn == txn) {
 			/* Tuple is deleted by us (@txn). */
@@ -1704,38 +1737,18 @@ memtx_tx_story_is_visible(struct memtx_story *story, struct txn *txn,
 			was_deleted_by_prepared = true;
 		dels = dels->next_in_del_list;
 	}
-	if (is_prepared_ok && story->del_psn != 0 && story->del_psn < rv_psn) {
-		/* Tuple is deleted by prepared TX. */
-		return true;
-	}
-	if (story->del_psn != 0 && !was_deleted_by_prepared &&
-	    story->del_psn < rv_psn) {
-		/* Tuple is deleted by committed TX. */
-		return true;
-	}
 
-	if (story->add_stmt != NULL && story->add_stmt->txn == txn) {
-		/* Tuple is added by us (@txn). */
-		*visible_tuple = story->tuple;
-		*is_own_change = true;
-		return true;
-	}
-	if (is_prepared_ok && story->add_psn != 0 && story->add_psn < rv_psn) {
-		/* Tuple is added by another prepared TX. */
-		*visible_tuple = story->tuple;
-		return true;
-	}
-	if (story->add_psn != 0 && story->add_stmt == NULL &&
-	    story->add_psn < rv_psn) {
-		/* Tuple is added by committed TX. */
-		*visible_tuple = story->tuple;
-		return true;
-	}
-	if (story->add_psn == 0 && story->add_stmt == NULL) {
-		/* added long time ago. */
-		*visible_tuple = story->tuple;
-		return true;
-	}
+	int64_t rv_psn = INT64_MAX;
+	if (txn != NULL && txn->rv_psn != 0)
+		rv_psn = txn->rv_psn;
+
+	if (is_prepared_ok && story->del_psn != 0 && story->del_psn < rv_psn)
+		return true; /* Tuple is deleted by prepared TX. */
+
+	if (story->del_psn != 0 && !was_deleted_by_prepared &&
+	    story->del_psn < rv_psn)
+		return true; /* Tuple is deleted by committed TX. */
+
 	return false;
 }
 
@@ -1780,9 +1793,16 @@ memtx_tx_story_find_visible_tuple(struct memtx_story *story, struct txn *tnx,
 {
 	for (; story != NULL; story = story->link[index].older_story) {
 		assert(index < story->index_count);
-		if (memtx_tx_story_is_visible(story, tnx, is_prepared_ok,
-					      visible_tuple, is_own_change))
+		if (memtx_tx_story_delete_is_visible(story, tnx, is_prepared_ok,
+						     is_own_change)) {
+			*visible_tuple = NULL;
 			return;
+		}
+		if (memtx_tx_story_insert_is_visible(story, tnx, is_prepared_ok,
+						     is_own_change)) {
+			*visible_tuple = story->tuple;
+			return;
+		}
 	}
 	*visible_tuple = NULL;
 }
@@ -2826,9 +2846,16 @@ memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
 	struct tuple *result = NULL;
 
 	while (true) {
-		if (memtx_tx_story_is_visible(story, txn, is_prepared_ok,
-					      &result, &own_change))
+		if (memtx_tx_story_delete_is_visible(story, txn, is_prepared_ok,
+						     &own_change)) {
+			result = NULL;
 			break;
+		}
+		if (memtx_tx_story_insert_is_visible(story, txn, is_prepared_ok,
+						     &own_change)) {
+			result = story->tuple;
+			break;
+		}
 		if (story->add_psn != 0 && story->add_stmt != NULL &&
 		    txn != NULL) {
 			assert(story->add_psn == story->add_stmt->txn->psn);
