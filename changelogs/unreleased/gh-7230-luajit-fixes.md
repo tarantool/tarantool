@@ -12,3 +12,7 @@ activity, the following issues have been resolved:
 * Fixed `emit_loadi()` on x86/x64 emitting xor between condition check
   and jump instructions.
 * Fix stack top for error message when raising the OOM error (gh-3840).
+* Disabled math.modf compilation due to its rare usage and difficulties with
+  proper implementation of the corresponding JIT machinery.
+* Fixed inconsistent behaviour on signed zeros for JIT-compiled unary minus
+  (gh-6976).
