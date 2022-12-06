@@ -23,6 +23,8 @@ ignore = {
     "432",
     -- Unused variable with `_` prefix.
     "212/_.*",
+    -- Unused loop variable with `_` prefix.
+    "213/_.*",
 }
 
 include_files = {
