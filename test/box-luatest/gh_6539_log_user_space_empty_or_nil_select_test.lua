@@ -9,6 +9,8 @@ g.before_all(function()
     g.server:start()
     g.server:exec(function()
         require("log").internal.ratelimit.disable()
+        -- Workaround for #8011
+        if jit.arch == 'arm64' then jit.off() end
     end)
 end)
 
@@ -18,7 +20,7 @@ end)
 
 local expected_log_entry_fmt =
     "C> Potentially long select from space '%s' %%(%d%%)"
-local grep_log_bytes = 256
+local grep_log_bytes = 1024
 local dangerous_call_fmts = {
     'box.space.%s:select(nil)',
     'box.space.%s:select({})',
