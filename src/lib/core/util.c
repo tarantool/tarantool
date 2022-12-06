@@ -30,6 +30,7 @@
  */
 #include "trivia/util.h"
 
+#include <ctype.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -524,4 +525,23 @@ getenv_safe(const char *name, char *buf, size_t buf_size)
 	 */
 	buf[var_len] = '\0';
 	return buf;
+}
+
+char *
+strtolower(char *s)
+{
+	for (size_t i = 0; s[i] != '\0'; ++i)
+		s[i] = (char)tolower(s[i]);
+	return s;
+}
+
+char *
+strtolowerdup(const char *s)
+{
+	size_t len = strlen(s);
+	char *lowercase = xmalloc(len + 1);
+	for (size_t i = 0; i < len; ++i)
+		lowercase[i] = (char)tolower(s[i]);
+	lowercase[len] = '\0';
+	return lowercase;
 }
