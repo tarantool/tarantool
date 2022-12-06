@@ -677,6 +677,19 @@ thread_sleep(double sec);
 char *
 getenv_safe(const char *name, char *buf, size_t buf_size);
 
+/**
+ * Returns the null-terminated string converted to lower case in-place.
+ */
+char *
+strtolower(char *s);
+
+/**
+ * Returns a copy of the null-terminated string converted to lower case: the
+ * result is dynamically allocated using `xmalloc`.
+ */
+char *
+strtolowerdup(const char *s);
+
 #if !defined(__cplusplus) && !defined(static_assert)
 # define static_assert _Static_assert
 #endif

@@ -4,6 +4,11 @@
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
+static const char *const test_lower_case_conv_expected = "str";
+static const char *const test_lower_case_conv_input[] = {
+	"str", "Str", "sTr", "stR", "STr", "sTR", "StR", "STR"
+};
+
 static void
 test_strlcat(void)
 {
@@ -41,13 +46,55 @@ test_strlcat(void)
 	check_plan();
 }
 
+static void
+test_strtolowerdup(void)
+{
+	header();
+	plan(lengthof(test_lower_case_conv_input) * 2);
+
+	for (size_t i = 0; i < lengthof(test_lower_case_conv_input); ++i) {
+		char *test = strtolowerdup(test_lower_case_conv_input[i]);
+		isnt(test, test_lower_case_conv_input[i],
+		     "a copy of %s is returned", test_lower_case_conv_input[i]);
+		is(strcmp(test_lower_case_conv_expected, test), 0,
+		   "%s is converted to lower case correctly",
+		   test_lower_case_conv_input[i]);
+		free(test);
+	}
+
+	footer();
+	check_plan();
+}
+
+static void
+test_strtolower(void)
+{
+	header();
+	plan(lengthof(test_lower_case_conv_input) * 2);
+
+	for (size_t i = 0; i < lengthof(test_lower_case_conv_input); ++i) {
+		char *cp = xstrdup(test_lower_case_conv_input[i]);
+		char *test = strtolower(cp);
+		is(test, cp, "%s is converted in-place", cp);
+		is(strcmp(test_lower_case_conv_expected, test), 0,
+		   "%s is converted to lower case correctly",
+		   test_lower_case_conv_input[i]);
+		free(cp);
+	}
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(1);
+	plan(3);
 	header();
 
 	test_strlcat();
+	test_strtolowerdup();
+	test_strtolower();
 
 	footer();
 	return check_plan();
