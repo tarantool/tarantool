@@ -35,8 +35,6 @@
 #include "error.h"
 #include <base64.h>
 
-static char zero_hash[SCRAMBLE_SIZE];
-
 void
 authenticate(const char *user_name, uint32_t len, const char *salt,
 	     const char *tuple)
@@ -55,20 +53,13 @@ authenticate(const char *user_name, uint32_t len, const char *salt,
 	const char *scramble;
 	struct on_auth_trigger_ctx auth_res = { user->def->name, true };
 	/*
-	 * Allow authenticating back to GUEST user without
-	 * checking a password. This is useful for connection
-	 * pooling.
+	 * Allow authenticating back to the guest user without a password,
+	 * because the guest user isn't allowed to have a password, anyway.
+	 * This is useful for connection pooling.
 	 */
 	part_count = mp_decode_array(&tuple);
-	if (part_count == 0 && user->def->uid == GUEST) {
-		if (memcmp(user->def->hash2, zero_hash, SCRAMBLE_SIZE) == 0)
-			goto ok; /* no password is set, OK */
-		char hash2[SCRAMBLE_SIZE];
-		base64_decode(CHAP_SHA1_EMPTY_PASSWORD, SCRAMBLE_BASE64_SIZE,
-			      hash2, SCRAMBLE_SIZE);
-		if (memcmp(user->def->hash2, hash2, SCRAMBLE_SIZE) == 0)
-			goto ok; /* empty password is set, OK */
-	}
+	if (part_count == 0 && user->def->uid == GUEST)
+		goto ok;
 
 	access_check_session_xc(user);
 
