@@ -533,7 +533,6 @@ if(ENABLE_BACKTRACE)
         endif()
 
         include(BuildLibUnwind)
-        libunwind_build()
         add_dependencies(build_bundled_libs
                          bundled-libunwind
                          bundled-libunwind-platform)

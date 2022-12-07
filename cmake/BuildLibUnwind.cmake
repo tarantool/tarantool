@@ -9,100 +9,73 @@ Result Variables
   Include directory needed to use libunwind.
 ``LIBUNWIND_LIBRARIES``
   Libraries needed to link to libunwind.
-
-Cache Variables
-^^^^^^^^^^^^^^^
-``LIBUNWIND_INCLUDE_DIR``
-  The directory containing ``libunwind.h``.
-``LIBUNWIND_LIBRARIES``
-  The paths to the libunwind libraries.
 #]========================================================================]
 
-macro(libunwind_build)
-    set(LIBUNWIND_SOURCE_DIR ${PROJECT_SOURCE_DIR}/third_party/libunwind)
-    set(LIBUNWIND_BUILD_DIR ${PROJECT_BINARY_DIR}/build/libunwind)
-    set(LIBUNWIND_BINARY_DIR ${LIBUNWIND_BUILD_DIR}/work)
-    set(LIBUNWIND_INSTALL_DIR ${LIBUNWIND_BUILD_DIR}/dest)
-    set(LIBUNWIND_CFLAGS "${DEPENDENCY_CFLAGS} -g -O2")
-    set(LIBUNWIND_CXXFLAGS "-g -O2")
+include(ext_project_autotools)
 
-    include(ExternalProject)
-    ExternalProject_Add(bundled-libunwind-project
-                        TMP_DIR ${LIBUNWIND_BUILD_DIR}/tmp
-                        STAMP_DIR ${LIBUNWIND_BUILD_DIR}/stamp
-                        SOURCE_DIR ${LIBUNWIND_SOURCE_DIR}
-                        BINARY_DIR ${LIBUNWIND_BINARY_DIR}
-                        INSTALL_DIR ${LIBUNWIND_INSTALL_DIR}
+set(LIBUNWIND_CFLAGS "${DEPENDENCY_CFLAGS} -g -O2")
+set(LIBUNWIND_CXXFLAGS "-g -O2")
 
-                        DOWNLOAD_COMMAND ""
+ext_project_autotools(libunwind-build
+    DIR
+        third_party/libunwind
+    CONFIGURE
+        AR=${CMAKE_AR}
+        CC=${CMAKE_C_COMPILER}
+        CXX=${CMAKE_CXX_COMPILER}
+        CFLAGS=${LIBUNWIND_CFLAGS}
+        CXXFLAGS=${LIBUNWIND_CXXFLAGS}
+        # Bundled libraries are linked statically.
+        --disable-shared
+        # Ditto.
+        --enable-static
+        # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L122-L125.
+        --disable-coredump
+        # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L130-L133.
+        --disable-ptrace
+        # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L138-L141.
+        --disable-setjmp
+        # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L143-L145
+        --disable-documentation
+        # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L147-L149
+        --disable-tests
+        # By default libunwind provides a weak alias to
+        # `backtrace` function: this can lead to a conflict with
+        # glibc's `backtrace`, see https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L151-L153
+        --disable-weak-backtrace
+        # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L155-L157
+        --disable-unwind-header
+        # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L302-L317
+        --disable-minidebuginfo
+        # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L319-L334
+        --disable-zlibdebuginfo
+    BYPRODUCTS
+        src/.libs/libunwind.a
+        src/.libs/libunwind-${CMAKE_SYSTEM_PROCESSOR}.a
+)
+unset(LIBUNWIND_CFLAGS)
+unset(LIBUNWIND_CXXFLAGS)
 
-                        CONFIGURE_COMMAND
-                        autoreconf -i <SOURCE_DIR> &&
-                        <SOURCE_DIR>/configure
-                        AR=${CMAKE_AR}
-                        CC=${CMAKE_C_COMPILER}
-                        CXX=${CMAKE_CXX_COMPILER}
-                        CFLAGS=${LIBUNWIND_CFLAGS}
-                        CXXFLAGS=${LIBUNWIND_CXXFLAGS}
-                        --prefix=<INSTALL_DIR>
-                        # Bundled libraries are linked statically.
-                        --disable-shared
-                        # Ditto.
-                        --enable-static
-                        # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L122-L125.
-                        --disable-coredump
-                        # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L130-L133.
-                        --disable-ptrace
-                        # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L138-L141.
-                        --disable-setjmp
-                        # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L143-L145
-                        --disable-documentation
-                        # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L147-L149
-                        --disable-tests
-                        # By default libunwind provides a weak alias to
-                        # `backtrace` function: this can lead to a conflict with
-                        # glibc's `backtrace`, see https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L151-L153
-                        --disable-weak-backtrace
-                        # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L155-L157
-                        --disable-unwind-header
-                        # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L302-L317
-                        --disable-minidebuginfo
-                        # See https://github.com/libunwind/libunwind/blob/e07b43c02d5cf1ea060c018fdf2e2ad34b7c7d80/configure.ac#L319-L334
-                        --disable-zlibdebuginfo
+set(LIBUNWIND_BUILD_DIR ${CMAKE_BINARY_DIR}/third_party/libunwind)
 
-                        LOG_BUILD TRUE
-                        LOG_INSTALL TRUE
-                        LOG_MERGED_STDOUTERR TRUE
-                        LOG_OUTPUT_ON_FAILURE TRUE
+add_library(bundled-libunwind STATIC IMPORTED GLOBAL)
+set_target_properties(bundled-libunwind PROPERTIES
+          IMPORTED_LOCATION
+          ${LIBUNWIND_BUILD_DIR}/src/.lib/libunwind.a)
+add_dependencies(bundled-libunwind libunwind-build)
 
-                        EXCLUDE_FROM_ALL
+add_library(bundled-libunwind-platform STATIC IMPORTED GLOBAL)
+set_target_properties(bundled-libunwind-platform PROPERTIES
+          IMPORTED_LOCATION
+          ${LIBUNWIND_BUILD_DIR}/src/.lib/libunwind-${CMAKE_SYSTEM_PROCESSOR}.a)
+add_dependencies(bundled-libunwind-platform libunwind-build)
 
-                        BUILD_BYPRODUCTS ${LIBUNWIND_INSTALL_DIR}/lib/libunwind-x86_64.a
-                        BUILD_BYPRODUCTS ${LIBUNWIND_INSTALL_DIR}/lib/libunwind.a)
-    unset(LIBUNWIND_CFLAGS)
-    unset(LIBUNWIND_CXXFLAGS)
+set(LIBUNWIND_INCLUDE_DIR
+    ${LIBUNWIND_BUILD_DIR}/include
+    ${CMAKE_SOURCE_DIR}/third_party/libunwind/include)
+set(LIBUNWIND_LIBRARIES
+    ${LIBUNWIND_BUILD_DIR}/src/.libs/libunwind-${CMAKE_SYSTEM_PROCESSOR}.a
+    ${LIBUNWIND_BUILD_DIR}/src/.libs/libunwind.a)
 
-    add_library(bundled-libunwind STATIC IMPORTED GLOBAL)
-    set_target_properties(bundled-libunwind PROPERTIES
-                          IMPORTED_LOCATION
-                          ${LIBUNWIND_INSTALL_DIR}/lib/libunwind.a)
-    add_dependencies(bundled-libunwind bundled-libunwind-project)
-
-    add_library(bundled-libunwind-platform STATIC IMPORTED GLOBAL)
-    set_target_properties(bundled-libunwind-platform PROPERTIES
-                          IMPORTED_LOCATION
-                          ${LIBUNWIND_INSTALL_DIR}/lib/libunwind-${CMAKE_SYSTEM_PROCESSOR}.a)
-    add_dependencies(bundled-libunwind-platform bundled-libunwind-project)
-
-    set(LIBUNWIND_INCLUDE_DIR ${LIBUNWIND_INSTALL_DIR}/include)
-    set(LIBUNWIND_LIBRARIES
-        ${LIBUNWIND_INSTALL_DIR}/lib/libunwind-${CMAKE_SYSTEM_PROCESSOR}.a
-        ${LIBUNWIND_INSTALL_DIR}/lib/libunwind.a)
-
-    message(STATUS "Using bundled libunwind")
-
-    unset(LIBUNWIND_SOURCE_DIR)
-    unset(LIBUNWIND_BUILD_DIR)
-    unset(LIBUNWIND_BINARY_DIR)
-    unset(LIBUNWIND_INSTALL_DIR)
-endmacro()
+unset(LIBUNWIND_BUILD_DIR)
+message(STATUS "Using bundled libunwind")
