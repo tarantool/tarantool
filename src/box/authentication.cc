@@ -36,22 +36,25 @@
 #include <base64.h>
 
 void
-authenticate(const char *user_name, uint32_t len, const char *salt,
-	     const char *tuple)
+authenticate(const char *user_name, uint32_t user_name_len,
+	     const char *salt, const char *tuple)
 {
-	struct user *user = user_find_by_name(user_name, len);
+	struct on_auth_trigger_ctx auth_res = {
+		.user_name = user_name,
+		.user_name_len = user_name_len,
+		.is_authenticated = true,
+	};
+	struct user *user = user_find_by_name(user_name, user_name_len);
 	if (user == NULL) {
 		if (diag_get()->last->code == ER_NO_SUCH_USER) {
 			diag_clear(diag_get());
-			diag_set(ClientError, ER_CREDS_MISMATCH);
+			goto fail;
 		}
 		diag_raise();
 	}
-	struct session *session = current_session();
 	uint32_t part_count;
 	uint32_t scramble_len;
 	const char *scramble;
-	struct on_auth_trigger_ctx auth_res = { user->def->name, true };
 	/*
 	 * Allow authenticating back to the guest user without a password,
 	 * because the guest user isn't allowed to have a password, anyway.
@@ -88,6 +91,7 @@ authenticate(const char *user_name, uint32_t len, const char *salt,
 	}
 
 	if (scramble_check(scramble, salt, user->def->hash2)) {
+fail:
 		auth_res.is_authenticated = false;
 		if (session_run_on_auth_triggers(&auth_res) != 0)
 			diag_raise();
@@ -98,5 +102,5 @@ ok:
 	if (! rlist_empty(&session_on_auth) &&
 	    session_run_on_auth_triggers(&auth_res) != 0)
 		diag_raise();
-	credentials_reset(&session->credentials, user);
+	credentials_reset(&current_session()->credentials, user);
 }
