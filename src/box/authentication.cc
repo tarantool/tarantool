@@ -45,13 +45,13 @@ authenticate(const char *user_name, uint32_t user_name_len,
 		.is_authenticated = true,
 	};
 	struct user *user = user_find_by_name(user_name, user_name_len);
-	if (user == NULL) {
-		if (diag_get()->last->code == ER_NO_SUCH_USER) {
-			diag_clear(diag_get());
-			goto fail;
-		}
+	if (user == NULL && diag_get()->last->code != ER_NO_SUCH_USER)
 		diag_raise();
-	}
+	/*
+	 * Check the request body as usual even if the user doesn't exist
+	 * to prevent user enumeration by analyzing error codes.
+	 */
+	diag_clear(diag_get());
 	uint32_t part_count;
 	uint32_t scramble_len;
 	const char *scramble;
@@ -61,10 +61,8 @@ authenticate(const char *user_name, uint32_t user_name_len,
 	 * This is useful for connection pooling.
 	 */
 	part_count = mp_decode_array(&tuple);
-	if (part_count == 0 && user->def->uid == GUEST)
+	if (part_count == 0 && user != NULL && user->def->uid == GUEST)
 		goto ok;
-
-	access_check_session_xc(user);
 
 	if (part_count < 2) {
 		/* Expected at least: authentication mechanism and data. */
@@ -89,14 +87,14 @@ authenticate(const char *user_name, uint32_t user_name_len,
 		tnt_raise(ClientError, ER_INVALID_MSGPACK,
 			   "invalid scramble size");
 	}
-
-	if (scramble_check(scramble, salt, user->def->hash2)) {
-fail:
+	if (user == NULL ||
+	    scramble_check(scramble, salt, user->def->hash2) != 0) {
 		auth_res.is_authenticated = false;
 		if (session_run_on_auth_triggers(&auth_res) != 0)
 			diag_raise();
 		tnt_raise(ClientError, ER_CREDS_MISMATCH);
 	}
+	access_check_session_xc(user);
 ok:
 	/* check and run auth triggers on success */
 	if (! rlist_empty(&session_on_auth) &&
