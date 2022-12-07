@@ -19,6 +19,7 @@ activity, the following issues have been resolved:
   proper implementation of the corresponding JIT machinery.
 * Fixed inconsistent behaviour on signed zeros for JIT-compiled unary minus
   (gh-6976).
+* Fixed `IR_HREF` hash calculations for non-string GC objects for GC64.
 
 ## feature/luajit
 Backported patches from vanilla LuaJIT trunk (gh-7230). In the scope of this
