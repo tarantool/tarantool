@@ -554,6 +554,7 @@
     <member refid="module_8h_1ac2243f60e2773d3522a540103f645110" kind="function"><name>box_sequence_set</name></member>
     <member refid="module_8h_1a8f9c3210df64b1f6fd89eb2c5e088e94" kind="function"><name>box_sequence_reset</name></member>
     <member refid="module_8h_1a0e9c91d463ce4aca081e5bd376aac1d9" kind="function"><name>box_session_push</name></member>
+    <member refid="module_8h_1a14a6ea7f0c101d1986f27de9f8ec25c8" kind="function"><name>box_session_id</name></member>
     <member refid="module_8h_1aab8b69829c8d89799a9fb0e5d360e84b" kind="function"><name>box_index_iterator</name></member>
     <member refid="module_8h_1ae4361728e6abe6243e7f02b098e7b347" kind="function"><name>box_iterator_next</name></member>
     <member refid="module_8h_1a6f7fe762b15009de313fdf915378429c" kind="function"><name>box_iterator_free</name></member>
