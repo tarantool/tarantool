@@ -35,6 +35,7 @@
 #include "lua/utils.h"
 #include "lua/msgpack.h"
 
+#include "box/authentication.h"
 #include "box/box.h"
 #include "box/port.h"
 #include "box/tuple.h"
@@ -43,6 +44,7 @@
 #include "box/xrow.h"
 #include "box/txn.h"
 #include "mpstream/mpstream.h"
+#include "tt_static.h"
 
 static uint32_t CTID_STRUCT_TUPLE_FORMAT_PTR;
 
@@ -200,6 +202,41 @@ port_msgpack_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 	uint32_t arg_count = mp_decode_array(&args);
 	for (uint32_t i = 0; i < arg_count; i++)
 		luamp_decode(L, luaL_msgpack_default, &args);
+}
+
+/* }}} */
+
+/** {{{ Helper that generates user auth data. **/
+
+/**
+ * Takes authentication method name (e.g. 'chap-sha1') and a password.
+ * Returns authentication data that can be stored in the _user space.
+ * Raises Lua error if the specified authentication method doesn't exist.
+ */
+static int
+lbox_prepare_auth(lua_State *L)
+{
+	size_t method_name_len;
+	const char *method_name = luaL_checklstring(L, 1, &method_name_len);
+	size_t password_len;
+	const char *password = luaL_checklstring(L, 2, &password_len);
+	const struct auth_method *method = auth_method_by_name(method_name,
+							       method_name_len);
+	if (method == NULL) {
+		diag_set(ClientError, ER_UNKNOWN_AUTH_METHOD,
+			 tt_cstr(method_name, method_name_len));
+		return luaT_error(L);
+	}
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	const char *auth_data, *auth_data_end;
+	auth_data_prepare(method, password, password_len,
+			  &auth_data, &auth_data_end);
+	luamp_decode(L, luaL_msgpack_default, &auth_data);
+	assert(auth_data == auth_data_end);
+	(void)auth_data_end;
+	region_truncate(region, region_svp);
+	return 1;
 }
 
 /* }}} */
@@ -388,6 +425,7 @@ void
 box_lua_misc_init(struct lua_State *L)
 {
 	static const struct luaL_Reg boxlib_internal[] = {
+		{"prepare_auth", lbox_prepare_auth},
 		{"select", lbox_select},
 		{"new_tuple_format", lbox_tuple_format_new},
 		{"txn_set_isolation", lbox_txn_set_isolation},

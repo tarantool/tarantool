@@ -3739,6 +3739,7 @@ box_free(void)
 		schema_module_free();
 		tuple_free();
 #endif
+		auth_free();
 		wal_ext_free();
 		box_watcher_free();
 		box_raft_free();
@@ -4285,6 +4286,7 @@ box_init(void)
 	msgpack_init();
 	fiber_cond_create(&ro_cond);
 
+	auth_init();
 	user_cache_init();
 	/*
 	 * The order is important: to initialize sessions,

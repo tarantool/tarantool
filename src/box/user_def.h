@@ -8,7 +8,6 @@
 #include <stdint.h>
 
 #include "schema_def.h" /* for SCHEMA_OBJECT_TYPE */
-#include "scramble.h" /* for SCRAMBLE_SIZE */
 #define RB_COMPACT 1
 #include "small/rb.h"
 #include "small/rlist.h"
@@ -17,10 +16,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-/**
- * chap-sha1 of empty string, i.e. base64_encode(sha1(sha1(""), 0)
- */
-extern const char *CHAP_SHA1_EMPTY_PASSWORD;
+struct authenticator;
 
 typedef uint16_t user_access_t;
 /**
@@ -141,8 +137,15 @@ struct user_def {
 	uint32_t owner;
 	/** 'user' or 'role' */
 	enum schema_object_type type;
-	/** User password - hash2 */
-	char hash2[SCRAMBLE_SIZE];
+	/**
+	 * Authentication data or NULL if auth method is unset.
+	 *
+	 * XXX: Strictly speaking, this doesn't belong here.
+	 * Ideally, we should store raw authentication data in
+	 * the user_def struct while the authenticator should
+	 * reside in the user struct.
+	 */
+	struct authenticator *auth;
 	/** User name - for error messages and debugging */
 	char *name;
 };

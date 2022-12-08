@@ -95,13 +95,17 @@ g.test_user_enum_on_malformed_auth = function()
             box.error.INVALID_MSGPACK,
             'Invalid MsgPack - authentication request body',
         }, msg)
+        t.assert_equals(auth(uri, user, {'foobar', 'foobar'}), {
+            box.error.UNKNOWN_AUTH_METHOD,
+            "Unknown authentication method 'foobar'",
+        }, msg)
         t.assert_equals(auth(uri, user, {'chap-sha1', 42}), {
-            box.error.INVALID_MSGPACK,
-            'Invalid MsgPack - authentication scramble',
+            box.error.INVALID_AUTH_REQUEST,
+            "Invalid 'chap-sha1' request: scramble must be string",
         }, msg)
         t.assert_equals(auth(uri, user, {'chap-sha1', 'foobar'}), {
-            box.error.INVALID_MSGPACK,
-            'Invalid MsgPack - invalid scramble size',
+            box.error.INVALID_AUTH_REQUEST,
+            "Invalid 'chap-sha1' request: invalid scramble size",
         }, msg)
         t.assert_equals(auth(uri, user, {'chap-sha1', string.rep('x', 20)}), {
             box.error.CREDS_MISMATCH,

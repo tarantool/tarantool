@@ -416,17 +416,18 @@ xrow_decode_auth(const struct xrow_header *row, struct auth_request *request);
 /**
  * Encode AUTH command.
  * @param[out] Row.
- * @param salt Salt from IPROTO greeting.
- * @param salt_len Length of @salt.
  * @param login User login.
  * @param login_len Length of @login.
- * @param password User password.
- * @param password_len Length of @password.
-*/
+ * @param method Authentication method.
+ * @param method_len Length of @method.
+ * @param data Authentication request data.
+ * @param data_end End of @data.
+ */
 void
-xrow_encode_auth(struct xrow_header *row, const char *salt, size_t salt_len,
-		 const char *login, size_t login_len, const char *password,
-		 size_t password_len);
+xrow_encode_auth(struct xrow_header *row,
+		 const char *login, size_t login_len,
+		 const char *method, size_t method_len,
+		 const char *data, const char *data_end);
 
 /** Reply to IPROTO_VOTE request. */
 struct ballot {

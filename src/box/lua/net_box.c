@@ -38,10 +38,8 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#include <small/ibuf.h>
-#include <msgpuck.h> /* mp_store_u32() */
-#include "scramble.h"
-
+#include "box/authentication.h"
+#include "box/errcode.h"
 #include "box/iproto_constants.h"
 #include "box/iproto_features.h"
 #include "box/lua/tuple.h" /* luamp_convert_tuple() / luamp_convert_key() */
@@ -51,18 +49,18 @@
 #include "box/error.h"
 #include "box/schema_def.h"
 
-#include "lua/msgpack.h"
-#include <base64.h>
-
 #include "assoc.h"
 #include "coio.h"
 #include "fiber.h"
 #include "fiber_cond.h"
 #include "iostream.h"
-#include "box/errcode.h"
 #include "lua/fiber.h"
 #include "lua/fiber_cond.h"
+#include "lua/msgpack.h"
 #include "lua/uri.h"
+#include "msgpuck.h"
+#include "small/ibuf.h"
+#include "small/region.h"
 #include "mpstream/mpstream.h"
 #include "misc.h" /* lbox_check_tuple_format() */
 #include "uri/uri.h"
@@ -687,9 +685,14 @@ static void
 netbox_encode_auth(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
 		   const char *user, const char *password, const char *salt)
 {
-	char scramble[SCRAMBLE_SIZE];
-	scramble_prepare(scramble, salt, password != NULL ? password : "",
-			 password != NULL ? strlen(password) : 0);
+	if (password == NULL)
+		password = "";
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	const struct auth_method *method = AUTH_METHOD_DEFAULT;
+	const char *auth_request, *auth_request_end;
+	auth_request_prepare(method, password, strlen(password), salt,
+			     &auth_request, &auth_request_end);
 	struct mpstream stream;
 	mpstream_init(&stream, ibuf, ibuf_reserve_cb, ibuf_alloc_cb,
 		      luamp_error, L);
@@ -699,9 +702,10 @@ netbox_encode_auth(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
 	mpstream_encode_strn(&stream, user, strlen(user));
 	mpstream_encode_uint(&stream, IPROTO_TUPLE);
 	mpstream_encode_array(&stream, 2);
-	mpstream_encode_str(&stream, "chap-sha1");
-	mpstream_encode_strn(&stream, scramble, SCRAMBLE_SIZE);
+	mpstream_encode_str(&stream, method->name);
+	mpstream_memcpy(&stream, auth_request, auth_request_end - auth_request);
 	netbox_end_encode(&stream, svp);
+	region_truncate(region, region_svp);
 }
 
 /**
