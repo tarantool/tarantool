@@ -121,9 +121,6 @@ ffi.cdef[[
                const char **after, const char **after_end,
                bool update_pos, struct port *port);
 
-    void password_prepare(const char *password, int len,
-                          char *out, int out_len);
-
     enum priv_type {
         PRIV_R = 1,
         PRIV_W = 2,
@@ -3376,20 +3373,16 @@ end
 box.schema.user = {}
 
 box.schema.user.password = function(password)
-    local BUF_SIZE = 128
-    local ibuf = cord_ibuf_take()
-    local buf = ibuf:alloc(BUF_SIZE)
-    builtin.password_prepare(password, #password, buf, BUF_SIZE)
-    buf = ffi.string(buf)
-    cord_ibuf_put(ibuf)
-    return buf
+    return internal.prepare_auth('chap-sha1', password)
+end
+
+local function prepare_auth_list(password)
+    return {['chap-sha1'] = internal.prepare_auth('chap-sha1', password)}
 end
 
 local function chpasswd(uid, new_password)
     local _user = box.space[box.schema.USER_ID]
-    local auth_mech_list = {}
-    auth_mech_list["chap-sha1"] = box.schema.user.password(new_password)
-    _user:update({uid}, {{"=", 5, auth_mech_list}})
+    _user:update({uid}, {{"=", 5, prepare_auth_list(new_password)}})
 end
 
 box.schema.user.passwd = function(name, new_password)
@@ -3420,12 +3413,14 @@ box.schema.user.create = function(name, opts)
         end
         return
     end
-    local auth_mech_list = setmap({})
+    local auth_list
     if opts.password then
-        auth_mech_list["chap-sha1"] = box.schema.user.password(opts.password)
+        auth_list = prepare_auth_list(opts.password)
+    else
+        auth_list = setmap({})
     end
     local _user = box.space[box.schema.USER_ID]
-    uid = _user:auto_increment{session.euid(), name, 'user', auth_mech_list}.id
+    uid = _user:auto_increment{session.euid(), name, 'user', auth_list}.id
     -- grant role 'public' to the user
     box.schema.user.grant(uid, 'public')
     -- Grant privilege 'alter' on itself, so that it can

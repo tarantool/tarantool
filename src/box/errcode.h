@@ -301,6 +301,9 @@ struct errcode_record {
 	/*246 */_(ER_INTERFERING_ELECTIONS,	"Interfering elections started")\
 	/*247 */_(ER_ITERATOR_POSITION,		"Iterator position is invalid") \
 	/*248 */_(ER_DDL_NOT_ALLOWED,		"DDL operations are not allowed: %s") \
+	/*249 */_(ER_UNKNOWN_AUTH_METHOD,	"Unknown authentication method '%s'") \
+	/*250 */_(ER_INVALID_AUTH_DATA,		"Invalid '%s' data: %s") \
+	/*251 */_(ER_INVALID_AUTH_REQUEST,	"Invalid '%s' request: %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

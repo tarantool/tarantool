@@ -1530,30 +1530,26 @@ error:
 }
 
 void
-xrow_encode_auth(struct xrow_header *packet, const char *salt, size_t salt_len,
+xrow_encode_auth(struct xrow_header *packet,
 		 const char *login, size_t login_len,
-		 const char *password, size_t password_len)
+		 const char *method, size_t method_len,
+		 const char *data, const char *data_end)
 {
 	assert(login != NULL);
+	assert(data != NULL);
 	memset(packet, 0, sizeof(*packet));
-
-	size_t buf_size = XROW_BODY_LEN_MAX + login_len + SCRAMBLE_SIZE;
+	size_t data_size = data_end - data;
+	size_t buf_size = XROW_BODY_LEN_MAX + login_len + data_size;
 	char *buf = xregion_alloc(&fiber()->gc, buf_size);
 	char *d = buf;
-	d = mp_encode_map(d, password != NULL ? 2 : 1);
+	d = mp_encode_map(d, 2);
 	d = mp_encode_uint(d, IPROTO_USER_NAME);
 	d = mp_encode_str(d, login, login_len);
-	if (password != NULL) { /* password can be omitted */
-		assert(salt_len >= SCRAMBLE_SIZE); /* greetingbuf_decode */
-		(void) salt_len;
-		char scramble[SCRAMBLE_SIZE];
-		scramble_prepare(scramble, salt, password, password_len);
-		d = mp_encode_uint(d, IPROTO_TUPLE);
-		d = mp_encode_array(d, 2);
-		d = mp_encode_str(d, "chap-sha1", strlen("chap-sha1"));
-		d = mp_encode_str(d, scramble, SCRAMBLE_SIZE);
-	}
-
+	d = mp_encode_uint(d, IPROTO_TUPLE);
+	d = mp_encode_array(d, 2);
+	d = mp_encode_str(d, method, method_len);
+	memcpy(d, data, data_size);
+	d += data_size;
 	assert(d <= buf + buf_size);
 	packet->body[0].iov_base = buf;
 	packet->body[0].iov_len = (d - buf);

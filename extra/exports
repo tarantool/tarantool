@@ -415,7 +415,6 @@ lua_upvaluejoin
 lua_xmove
 lua_yield
 memtx_tx_story_gc_step
-password_prepare
 PMurHash32
 PMurHash32_Process
 PMurHash32_Result

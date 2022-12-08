@@ -59,6 +59,7 @@
 #include "constraint_id.h"
 #include "space_upgrade.h"
 #include "box.h"
+#include "authentication.h"
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -2883,11 +2884,9 @@ user_has_data(struct user *user, bool *has_data)
 }
 
 /**
- * Supposedly a user may have many authentication mechanisms
- * defined, but for now we only support chap-sha1. Get
- * password of chap-sha1 from the _user space.
+ * Initialize the user authenticator from the _user space data.
  */
-int
+static int
 user_def_fill_auth_data(struct user_def *user, const char *auth_data)
 {
 	uint8_t type = mp_typeof(*auth_data);
@@ -2908,35 +2907,36 @@ user_def_fill_auth_data(struct user_def *user, const char *auth_data)
 			  "use box.schema.user.passwd() to reset password");
 		return -1;
 	}
-	uint32_t mech_count = mp_decode_map(&auth_data);
-	for (uint32_t i = 0; i < mech_count; i++) {
+	uint32_t method_count = mp_decode_map(&auth_data);
+	for (uint32_t i = 0; i < method_count; i++) {
 		if (mp_typeof(*auth_data) != MP_STR) {
 			mp_next(&auth_data);
 			mp_next(&auth_data);
 			continue;
 		}
-		uint32_t len;
-		const char *mech_name = mp_decode_str(&auth_data, &len);
-		if (strncasecmp(mech_name, "chap-sha1", 9) != 0) {
-			mp_next(&auth_data);
+		uint32_t method_name_len;
+		const char *method_name = mp_decode_str(&auth_data,
+							&method_name_len);
+		const char *auth_data_end = auth_data;
+		mp_next(&auth_data_end);
+		const struct auth_method *method = auth_method_by_name(
+						method_name, method_name_len);
+		if (method == NULL) {
+			auth_data = auth_data_end;
 			continue;
 		}
-		const char *hash2_base64 = mp_decode_str(&auth_data, &len);
-		if (len != 0 && len != SCRAMBLE_BASE64_SIZE) {
-			diag_set(ClientError, ER_CREATE_USER,
-				  user->name, "invalid user password");
+		struct authenticator *auth = authenticator_new(
+				method, auth_data, auth_data_end);
+		if (auth == NULL)
+			return -1;
+		/* The guest user may only have an empty password. */
+		if (user->uid == GUEST &&
+		    !authenticate_password(auth, "", 0)) {
+			authenticator_delete(auth);
+			diag_set(ClientError, ER_GUEST_USER_PASSWORD);
 			return -1;
 		}
-		if (user->uid == GUEST) {
-			/** Guest user is permitted to have empty password */
-			if (strncmp(hash2_base64, CHAP_SHA1_EMPTY_PASSWORD, len)) {
-				diag_set(ClientError, ER_GUEST_USER_PASSWORD);
-				return -1;
-			}
-		}
-
-		base64_decode(hash2_base64, len, user->hash2,
-			      sizeof(user->hash2));
+		user->auth = auth;
 		break;
 	}
 	return 0;
@@ -2981,9 +2981,8 @@ user_def_new_from_tuple(struct tuple *tuple)
 	 * Check for trivial errors when a plain text
 	 * password is saved in this field instead.
 	 */
-	if (tuple_field_count(tuple) > BOX_USER_FIELD_AUTH_MECH_LIST) {
-		const char *auth_data =
-			tuple_field(tuple, BOX_USER_FIELD_AUTH_MECH_LIST);
+	if (tuple_field_count(tuple) > BOX_USER_FIELD_AUTH) {
+		const char *auth_data = tuple_field(tuple, BOX_USER_FIELD_AUTH);
 		const char *tmp = auth_data;
 		bool is_auth_empty;
 		if (mp_typeof(*auth_data) == MP_ARRAY &&

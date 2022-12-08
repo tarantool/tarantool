@@ -5,20 +5,53 @@
  */
 #include "authentication.h"
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
 
+#include "assoc.h"
+#include "auth_chap_sha1.h"
 #include "base64.h"
 #include "diag.h"
 #include "errcode.h"
 #include "error.h"
+#include "fiber.h"
 #include "msgpuck.h"
 #include "scramble.h"
 #include "session.h"
+#include "small/region.h"
+#include "tt_static.h"
 #include "user.h"
 #include "user_def.h"
+
+const struct auth_method *AUTH_METHOD_DEFAULT;
+
+/** Map of all registered authentication methods: name -> auth_method. */
+static struct mh_strnptr_t *auth_methods = NULL;
+
+bool
+authenticate_password(const struct authenticator *auth,
+		      const char *password, int password_len)
+{
+	/*
+	 * We don't really need to zero the salt here, because any salt would
+	 * do as long as we use the same salt in auth_request_prepare and
+	 * authenticate_request. We zero it solely to avoid address sanitizer
+	 * complaints about usage of uninitialized memory.
+	 */
+	const char salt[SCRAMBLE_SIZE] = {0};
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	const char *auth_request, *auth_request_end;
+	auth_request_prepare(auth->method, password, password_len, salt,
+			     &auth_request, &auth_request_end);
+	bool ret = authenticate_request(auth, salt, auth_request,
+					auth_request_end);
+	region_truncate(region, region_svp);
+	return ret;
+}
 
 int
 authenticate(const char *user_name, uint32_t user_name_len,
@@ -37,46 +70,42 @@ authenticate(const char *user_name, uint32_t user_name_len,
 	 * to prevent user enumeration by analyzing error codes.
 	 */
 	diag_clear(diag_get());
-	uint32_t part_count;
-	uint32_t scramble_len;
-	const char *scramble;
 	/*
 	 * Allow authenticating back to the guest user without a password,
 	 * because the guest user isn't allowed to have a password, anyway.
 	 * This is useful for connection pooling.
 	 */
-	part_count = mp_decode_array(&tuple);
+	uint32_t part_count = mp_decode_array(&tuple);
 	if (part_count == 0 && user != NULL && user->def->uid == GUEST)
 		goto ok;
-
+	/* Expected: authentication method name and data. */
 	if (part_count < 2) {
-		/* Expected at least: authentication mechanism and data. */
 		diag_set(ClientError, ER_INVALID_MSGPACK,
 			 "authentication request body");
 		return -1;
 	}
-	mp_next(&tuple); /* Skip authentication mechanism. */
-	if (mp_typeof(*tuple) == MP_STR) {
-		scramble = mp_decode_str(&tuple, &scramble_len);
-	} else if (mp_typeof(*tuple) == MP_BIN) {
-		/*
-		 * scramble is not a character stream, so some
-		 * codecs automatically pack it as MP_BIN
-		 */
-		scramble = mp_decode_bin(&tuple, &scramble_len);
-	} else {
+	if (mp_typeof(*tuple) != MP_STR) {
 		diag_set(ClientError, ER_INVALID_MSGPACK,
-			 "authentication scramble");
+			 "authentication request body");
 		return -1;
 	}
-	if (scramble_len != SCRAMBLE_SIZE) {
-		/* Authentication mechanism, data. */
-		diag_set(ClientError, ER_INVALID_MSGPACK,
-			 "invalid scramble size");
+	uint32_t method_name_len;
+	const char *method_name = mp_decode_str(&tuple, &method_name_len);
+	const struct auth_method *method = auth_method_by_name(
+					method_name, method_name_len);
+	if (method == NULL) {
+		diag_set(ClientError, ER_UNKNOWN_AUTH_METHOD,
+			 tt_cstr(method_name, method_name_len));
 		return -1;
 	}
-	if (user == NULL ||
-	    scramble_check(scramble, salt, user->def->hash2) != 0) {
+	const char *auth_request = tuple;
+	const char *auth_request_end = tuple;
+	mp_next(&auth_request_end);
+	if (auth_request_check(method, auth_request, auth_request_end) != 0)
+		return -1;
+	if (user == NULL || user->def->auth == NULL ||
+	    !authenticate_request(user->def->auth, salt,
+				  auth_request, auth_request_end)) {
 		auth_res.is_authenticated = false;
 		if (session_run_on_auth_triggers(&auth_res) != 0)
 			return -1;
@@ -92,4 +121,49 @@ ok:
 		return -1;
 	credentials_reset(&current_session()->credentials, user);
 	return 0;
+}
+
+const struct auth_method *
+auth_method_by_name(const char *name, uint32_t name_len)
+{
+	struct mh_strnptr_t *h = auth_methods;
+	mh_int_t i = mh_strnptr_find_str(h, name, name_len);
+	return i != mh_end(h) ? mh_strnptr_node(h, i)->val : NULL;
+}
+
+void
+auth_method_register(struct auth_method *method)
+{
+	struct mh_strnptr_t *h = auth_methods;
+	const char *name = method->name;
+	uint32_t name_len = strlen(name);
+	uint32_t name_hash = mh_strn_hash(name, name_len);
+	struct mh_strnptr_node_t n = {name, name_len, name_hash, method};
+	struct mh_strnptr_node_t prev;
+	struct mh_strnptr_node_t *prev_ptr = &prev;
+	mh_strnptr_put(h, &n, &prev_ptr, NULL);
+	assert(prev_ptr == NULL);
+}
+
+void
+auth_init(void)
+{
+	auth_methods = mh_strnptr_new();
+	struct auth_method *method = auth_chap_sha1_new();
+	AUTH_METHOD_DEFAULT = method;
+	auth_method_register(method);
+}
+
+void
+auth_free(void)
+{
+	struct mh_strnptr_t *h = auth_methods;
+	auth_methods = NULL;
+	AUTH_METHOD_DEFAULT = NULL;
+	mh_int_t i;
+	mh_foreach(h, i) {
+		struct auth_method *method = mh_strnptr_node(h, i)->val;
+		method->auth_method_delete(method);
+	}
+	mh_strnptr_delete(h);
 }

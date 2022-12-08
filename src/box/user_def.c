@@ -8,12 +8,10 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 
+#include "authentication.h"
 #include "salad/grp_alloc.h"
 #include "trivia/util.h"
-
-const char *CHAP_SHA1_EMPTY_PASSWORD = "vhvewKp0tNyweZQ+cFKAlsyphfg=";
 
 const char *
 priv_name(user_access_t access)
@@ -54,7 +52,7 @@ user_def_new(uint32_t uid, uint32_t owner, enum schema_object_type type,
 	def->uid = uid;
 	def->owner = owner;
 	def->type = type;
-	memset(def->hash2, 0, sizeof(def->hash2));
+	def->auth = NULL;
 	def->name = grp_alloc_create_str(&all, name, name_len);
 	assert(grp_alloc_size(&all) == 0);
 	return def;
@@ -63,6 +61,8 @@ user_def_new(uint32_t uid, uint32_t owner, enum schema_object_type type,
 void
 user_def_delete(struct user_def *def)
 {
+	if (def->auth != NULL)
+		authenticator_delete(def->auth);
 	TRASH(def);
 	free(def);
 }

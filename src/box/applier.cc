@@ -32,6 +32,7 @@
 
 #include <msgpuck.h>
 
+#include "authentication.h"
 #include "xlog.h"
 #include "fiber.h"
 #include "fiber_cond.h"
@@ -429,11 +430,17 @@ applier_connect(struct applier *applier)
 
 	/* Authenticate */
 	applier_set_state(applier, APPLIER_AUTH);
+	const char *password = uri->password;
+	if (password == NULL)
+		password = "";
 	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_auth(&row, greeting.salt, greeting.salt_len, uri->login,
-			 strlen(uri->login),
-			 uri->password != NULL ? uri->password : "",
-			 uri->password != NULL ? strlen(uri->password) : 0);
+	const struct auth_method *method = AUTH_METHOD_DEFAULT;
+	const char *auth_request, *auth_request_end;
+	auth_request_prepare(method, password, strlen(password), greeting.salt,
+			     &auth_request, &auth_request_end);
+	xrow_encode_auth(&row, uri->login, strlen(uri->login),
+			 method->name, strlen(method->name),
+			 auth_request, auth_request_end);
 	coio_write_xrow(io, &row);
 	coio_read_xrow(io, ibuf, &row);
 	applier->last_row_time = ev_monotonic_now(loop());
