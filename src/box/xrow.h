@@ -471,6 +471,23 @@ struct ballot {
 };
 
 /**
+ * Calculate the size taken by an encoded ballot.
+ * @param ballot The ballot to estimate the encoded size of.
+ * @retval An upper bound on encoded ballot size.
+ */
+size_t
+mp_sizeof_ballot_max(const struct ballot *ballot);
+
+/**
+ * Encode a ballot to the provided buffer.
+ * @param data Buffer to encode to.
+ * @param ballot Ballot to encode.
+ * @retval A pointer after the end of encoded data.
+ */
+char *
+mp_encode_ballot(char *data, const struct ballot *ballot);
+
+/**
  * Decode ballot response to IPROTO_VOTE from MessagePack.
  * @param row Row to decode.
  * @param[out] ballot Where to store the decoded ballot.
