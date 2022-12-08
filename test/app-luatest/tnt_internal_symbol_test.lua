@@ -24,6 +24,7 @@ g.test_fiber_channel = function()
         'fiber_channel_put_timeout',
         'ipc_value_delete',
         'ipc_value_new',
+        'fiber_lua_state',
     }
     -- Verify only that we can get the address. The functions are
     -- provided 'as is' and we don't guarantee anything regarding

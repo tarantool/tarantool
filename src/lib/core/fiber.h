@@ -1156,6 +1156,12 @@ extern bool fiber_abort_on_gc_leak;
 void
 fiber_check_gc(void);
 
+/**
+ * Return fiber's Lua state or NULL if it doesn't exist.
+ */
+struct lua_State *
+fiber_lua_state(struct fiber *f);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

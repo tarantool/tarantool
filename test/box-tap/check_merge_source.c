@@ -1,10 +1,8 @@
+#include <assert.h>
 #include <lua.h>
 #include <lauxlib.h>
-#include "lib/core/diag.h"
-#include "fiber.h"
-#include "lua/utils.h"
+#include <module.h>
 #include "box/merger.h"
-#include "box/error.h"
 
 /**
  * Verify whether a temporary fiber-local Lua state has the same
@@ -25,6 +23,21 @@
  * module, but the stub that imitates usage of a merge source from
  * tarantool code.
  */
+
+/*
+ * Here we're going the dark way. We should verify a property of
+ * an object that is not reachable through the public C API.
+ */
+void *
+tnt_internal_symbol(const char *name);
+
+/*
+ * The idea of the `call_next()` check is to verify properties of
+ * the fiber's Lua state. Let's define a pointer to the accessor
+ * function.
+ */
+static struct lua_State *
+(*fiber_lua_state)(struct fiber *f) = NULL;
 
 /**
  * Extract a merge source from the Lua stack.
@@ -73,7 +86,7 @@ lbox_check_merge_source_call_next(struct lua_State *L)
 	 * implementation detail and the test looks more clean
 	 * when we don't lean on this fact.
 	 */
-	struct lua_State *temporary_L = fiber_self()->storage.lua.stack;
+	struct lua_State *temporary_L = fiber_lua_state(fiber_self());
 	assert(temporary_L != NULL);
 
 	struct tuple *tuple;
@@ -89,7 +102,7 @@ lbox_check_merge_source_call_next(struct lua_State *L)
 	if (rc == 0)
 		lua_pushnil(L);
 	else
-		lua_pushstring(L, e->errmsg);
+		lua_pushstring(L, box_error_message(e));
 	lua_pushboolean(L, is_stack_even);
 	return 3;
 }
@@ -100,6 +113,9 @@ lbox_check_merge_source_call_next(struct lua_State *L)
 LUA_API int
 luaopen_check_merge_source(struct lua_State *L)
 {
+	fiber_lua_state = tnt_internal_symbol("fiber_lua_state");
+	assert(fiber_lua_state != NULL);
+
 	static const struct luaL_Reg meta[] = {
 		{"call_next", lbox_check_merge_source_call_next},
 		{NULL, NULL}
