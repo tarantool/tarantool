@@ -523,33 +523,29 @@ iproto_reply_vclock(struct obuf *out, const struct vclock *vclock,
 	return 0;
 }
 
-int
-iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
-		  uint64_t sync, uint64_t schema_version)
+size_t
+mp_sizeof_ballot_max(const struct ballot *ballot)
 {
-	size_t max_size = IPROTO_HEADER_LEN + mp_sizeof_map(1) +
-		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_map(6) +
-		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_bool(ballot->is_ro_cfg) +
-		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_bool(ballot->is_ro) +
-		mp_sizeof_uint(IPROTO_BALLOT_IS_ANON) +
-		mp_sizeof_bool(ballot->is_anon) +
-		mp_sizeof_uint(IPROTO_BALLOT_IS_BOOTED) +
-		mp_sizeof_bool(ballot->is_booted) +
-		mp_sizeof_uint(UINT32_MAX) +
-		mp_sizeof_vclock_ignore0(&ballot->vclock) +
-		mp_sizeof_uint(UINT32_MAX) +
-		mp_sizeof_vclock_ignore0(&ballot->gc_vclock) +
-		mp_sizeof_uint(IPROTO_BALLOT_CAN_LEAD) +
-		mp_sizeof_bool(ballot->can_lead);
+	return mp_sizeof_map(1) + mp_sizeof_uint(IPROTO_BALLOT) +
+	       mp_sizeof_map(7) + mp_sizeof_uint(IPROTO_BALLOT_IS_RO_CFG) +
+	       mp_sizeof_bool(ballot->is_ro_cfg) +
+	       mp_sizeof_uint(IPROTO_BALLOT_IS_RO) +
+	       mp_sizeof_bool(ballot->is_ro) +
+	       mp_sizeof_uint(IPROTO_BALLOT_IS_ANON) +
+	       mp_sizeof_bool(ballot->is_anon) +
+	       mp_sizeof_uint(IPROTO_BALLOT_IS_BOOTED) +
+	       mp_sizeof_bool(ballot->is_booted) +
+	       mp_sizeof_uint(IPROTO_BALLOT_VCLOCK) +
+	       mp_sizeof_vclock_ignore0(&ballot->vclock) +
+	       mp_sizeof_uint(IPROTO_BALLOT_GC_VCLOCK) +
+	       mp_sizeof_vclock_ignore0(&ballot->gc_vclock) +
+	       mp_sizeof_uint(IPROTO_BALLOT_CAN_LEAD) +
+	       mp_sizeof_bool(ballot->can_lead);
+}
 
-	char *buf = obuf_reserve(out, max_size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, max_size,
-			 "obuf_alloc", "buf");
-		return -1;
-	}
-
-	char *data = buf + IPROTO_HEADER_LEN;
+char *
+mp_encode_ballot(char *data, const struct ballot *ballot)
+{
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_BALLOT);
 	data = mp_encode_map(data, 7);
@@ -567,6 +563,23 @@ iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
 	data = mp_encode_vclock_ignore0(data, &ballot->gc_vclock);
 	data = mp_encode_uint(data, IPROTO_BALLOT_CAN_LEAD);
 	data = mp_encode_bool(data, ballot->can_lead);
+	return data;
+}
+
+int
+iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
+		  uint64_t sync, uint64_t schema_version)
+{
+	size_t max_size = IPROTO_HEADER_LEN + mp_sizeof_ballot_max(ballot);
+
+	char *buf = obuf_reserve(out, max_size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, max_size, "obuf_alloc", "buf");
+		return -1;
+	}
+
+	char *data = buf + IPROTO_HEADER_LEN;
+	data = mp_encode_ballot(data, ballot);
 	size_t size = data - buf;
 	assert(size <= max_size);
 
