@@ -381,7 +381,7 @@ fiber_test_defaults()
 {
 	header();
 
-#ifdef ENABLE_LEAK_BACKTRACE
+#ifdef ENABLE_BACKTRACE
 #ifndef NDEBUG
 	fail_if(!fiber_leak_backtrace_enable);
 #else
@@ -410,7 +410,7 @@ fiber_test_leak(bool backtrace_enabled)
 {
 	header();
 
-#ifdef ENABLE_LEAK_BACKTRACE
+#ifdef ENABLE_BACKTRACE
 	bool leak_save = fiber_leak_backtrace_enable;
 	fiber_leak_backtrace_enable = backtrace_enabled;
 #endif
@@ -427,7 +427,7 @@ fiber_test_leak(bool backtrace_enabled)
 	fiber_wakeup(fiber);
 	fiber_join(fiber);
 
-#ifdef ENABLE_LEAK_BACKTRACE
+#ifdef ENABLE_BACKTRACE
 	fiber_leak_backtrace_enable = leak_save;
 #endif
 	fiber_abort_on_gc_leak = abort_save;
@@ -438,7 +438,7 @@ fiber_test_leak(bool backtrace_enabled)
 	fail_if(rc == -1);
 	buf[rc] = '\0';
 
-#ifdef ENABLE_LEAK_BACKTRACE
+#ifdef ENABLE_BACKTRACE
 	if (backtrace_enabled) {
 		const char *msg = "Fiber gc leak is found. "
 				  "First leaked fiber gc allocation"
@@ -481,7 +481,7 @@ fiber_test_leak_modes()
 			/* nonblock =*/ 0, "plain");
 
 	/*
-	 * Run two times even when ENABLE_LEAK_BACKTRACE is not defined as
+	 * Run two times even when ENABLE_BACKTRACE is not defined as
 	 * we have .result file.
 	 */
 	fiber_test_leak(/* backtrace_enabled =*/ true);

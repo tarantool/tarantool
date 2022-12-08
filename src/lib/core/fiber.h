@@ -579,7 +579,7 @@ struct fiber {
 	unsigned int stack_id;
 	/** A garbage-collected memory pool. */
 	struct region gc;
-#ifdef ENABLE_LEAK_BACKTRACE
+#ifdef ENABLE_BACKTRACE
 	/**
 	 * Backtrace of the first fiber gc allocation that does not
 	 * truncated yet. NULL if backtrace is not supported by the
@@ -1124,7 +1124,7 @@ fiber_c_invoke(fiber_func f, va_list ap)
 	return f(ap);
 }
 
-#ifdef ENABLE_LEAK_BACKTRACE
+#ifdef ENABLE_BACKTRACE
 /**
  * Whether leak backtrace is provided when leak is found or not.
  *
