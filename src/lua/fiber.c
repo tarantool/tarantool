@@ -341,9 +341,7 @@ lbox_fiber_parent_backtrace_disable(struct lua_State *L)
 	fiber_parent_backtrace_disable();
 	return 0;
 }
-#endif /* ENABLE_BACKTRACE */
 
-#ifdef ENABLE_LEAK_BACKTRACE
 static int
 lbox_fiber_leak_backtrace_enable(struct lua_State *L)
 {
@@ -359,7 +357,7 @@ lbox_fiber_leak_backtrace_disable(struct lua_State *L)
 	fiber_leak_backtrace_enable = false;
 	return 0;
 }
-#endif /* ENABLE_LEAK_BACKTRACE */
+#endif /* ENABLE_BACKTRACE */
 
 /**
  * Return fiber statistics.
@@ -952,11 +950,9 @@ static const struct luaL_Reg fiberlib[] = {
 #ifdef ENABLE_BACKTRACE
 	{"parent_backtrace_enable", lbox_fiber_parent_backtrace_enable},
 	{"parent_backtrace_disable", lbox_fiber_parent_backtrace_disable},
-#endif /* ENABLE_BACKTRACE */
-#ifdef ENABLE_LEAK_BACKTRACE
 	{"leak_backtrace_enable", lbox_fiber_leak_backtrace_enable},
 	{"leak_backtrace_disable", lbox_fiber_leak_backtrace_disable},
-#endif
+#endif /* ENABLE_BACKTRACE */
 	{"sleep", lbox_fiber_sleep},
 	{"yield", lbox_fiber_yield},
 	{"self", lbox_fiber_self},

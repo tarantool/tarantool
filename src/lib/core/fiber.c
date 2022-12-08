@@ -195,7 +195,7 @@ fiber_mprotect(void *addr, size_t len, int prot)
 
 static __thread bool fiber_top_enabled = false;
 
-#ifdef ENABLE_LEAK_BACKTRACE
+#ifdef ENABLE_BACKTRACE
 #ifndef NDEBUG
 bool fiber_leak_backtrace_enable = true;
 #else
@@ -903,8 +903,6 @@ fiber_recycle(struct fiber *fiber)
 	region_free(&fiber->gc);
 #ifdef ENABLE_BACKTRACE
 	fiber->parent_bt = NULL;
-#endif
-#ifdef ENABLE_LEAK_BACKTRACE
 	fiber->first_alloc_bt = NULL;
 	region_set_callbacks(&fiber->gc, NULL, NULL, NULL);
 #endif
@@ -915,7 +913,7 @@ fiber_recycle(struct fiber *fiber)
 	}
 }
 
-#ifdef ENABLE_LEAK_BACKTRACE
+#ifdef ENABLE_BACKTRACE
 /**
  * Called on allocation on region gc. Saves allocation caller backtrace
  * to report it later if region gc leak is found.
@@ -949,7 +947,7 @@ fiber_on_gc_truncate(struct region *region, size_t used, void *opaque)
 	if (used == fiber->gc_initial_size)
 		fiber->first_alloc_bt->frame_count = 0;
 }
-#endif /* ENABLE_LEAK_BACKTRACE */
+#endif /* ENABLE_BACKTRACE */
 
 void
 fiber_check_gc(void)
@@ -960,7 +958,7 @@ fiber_check_gc(void)
 	if (region_used(&fiber->gc) == fiber->gc_initial_size)
 		return;
 
-#ifdef ENABLE_LEAK_BACKTRACE
+#ifdef ENABLE_BACKTRACE
 	if (fiber->first_alloc_bt) {
 		char *buf = tt_static_buf();
 		int rc = snprintf(buf, TT_STATIC_BUF_LEN,
@@ -1299,7 +1297,7 @@ fiber_stack_create(struct fiber *fiber, struct slab_cache *slabc,
 static void
 fiber_gc_checker_init(struct fiber *fiber)
 {
-#ifdef ENABLE_LEAK_BACKTRACE
+#ifdef ENABLE_BACKTRACE
 	if (!fiber_leak_backtrace_enable) {
 		fiber->first_alloc_bt = NULL;
 		fiber->gc_initial_size = 0;
