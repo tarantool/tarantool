@@ -110,6 +110,20 @@ set (CMAKE_CXX_FLAGS_RELWITHDEBINFO
 
 unset(CC_DEBUG_OPT)
 
+# Set flags for all include files: those maintained by us and
+# coming from third parties.
+# Since we began using luajit, which uses gcc stack unwind
+# internally, we also need to make sure all code is compiled
+# with unwind info.
+add_compile_flags("C;CXX" "-fexceptions" "-funwind-tables")
+
+# Enable emission of the DWARF CFI (Call Frame Information) directives to the
+# assembler. This option is enabled by default on most compilers, but on GCC 7
+# for AArch64 and older it wasn't, so turn it on explicitly. When enabled, the
+# compiler emits .cfi_* directives that are required for the stack unwinding,
+# and defines __GCC_HAVE_DWARF2_CFI_ASM, which is checked below.
+add_compile_flags("C;CXX" "-fasynchronous-unwind-tables")
+
 check_c_source_compiles(
     "
     #if defined(__x86_64__) && !__has_attribute(force_align_arg_pointer)
@@ -157,16 +171,6 @@ if(BUILD_STATIC AND NOT TARGET_OS_DARWIN)
     # Static linking for c++ routines
     add_compile_flags("C;CXX" "-static-libstdc++")
 endif()
-
-#
-# Set flags for all include files: those maintained by us and
-# coming from third parties.
-# Since we began using luajit, which uses gcc stack unwind
-# internally, we also need to make sure all code is compiled
-# with unwind info.
-#
-
-add_compile_flags("C;CXX" "-fexceptions" "-funwind-tables")
 
 # In C a global variable without a storage specifier (static/extern) and
 # without an initialiser is called a ’tentative definition’. The
