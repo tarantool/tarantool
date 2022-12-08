@@ -276,8 +276,6 @@ space_create(struct space *space, struct engine *engine,
 	if (space_init_constraints(space) != 0)
 		goto fail_free_indexes;
 
-	rlist_create(&space->parent_fk_constraint);
-	rlist_create(&space->child_fk_constraint);
 	rlist_create(&space->ck_constraint);
 
 	/*
@@ -393,8 +391,6 @@ space_delete(struct space *space)
 	assert(mh_size(space->constraint_ids) == 0);
 	mh_strnptr_delete(space->constraint_ids);
 	assert(space->sql_triggers == NULL);
-	assert(rlist_empty(&space->parent_fk_constraint));
-	assert(rlist_empty(&space->child_fk_constraint));
 	assert(rlist_empty(&space->ck_constraint));
 	assert(rlist_empty(&space->space_cache_pin_list));
 	space->vtab->destroy(space);

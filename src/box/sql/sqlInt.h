@@ -4205,56 +4205,6 @@ sqlWithDelete(struct With *pWith);
 void sqlWithPush(Parse *, With *, u8);
 
 /*
- * This function is called when inserting, deleting or updating a
- * row of table tab to generate VDBE code to perform foreign key
- * constraint processing for the operation.
- *
- * For a DELETE operation, parameter reg_old is passed the index
- * of the first register in an array of (tab->def->field_count +
- * 1) registers containing the PK of the row being deleted,
- * followed by each of the column values of the row being deleted,
- * from left to right. Parameter reg_new is passed zero in this
- * case.
- *
- * For an INSERT operation, reg_old is passed zero and reg_new is
- * passed the first register of an array of
- * (tab->def->field_count + 1) registers containing the new row
- * data.
- *
- * For an UPDATE operation, this function is called twice. Once
- * before the original record is deleted from the table using the
- * calling convention described for DELETE. Then again after the
- * original record is deleted but before the new record is
- * inserted using the INSERT convention.
- *
- * @param parser SQL parser.
- * @param space Space from which the row is deleted.
- * @param reg_old Register with deleted row.
- * @param reg_new Register with inserted row.
- * @param changed_cols Array of updated columns. Can be NULL.
- */
-void
-fk_constraint_emit_check(struct Parse *parser, struct space *space, int reg_old,
-		int reg_new, const int *changed_cols);
-
-/**
- * This function is called before generating code to update or
- * delete a row contained in given space. If the operation is
- * a DELETE, then parameter changes is passed a NULL value.
- * For an UPDATE, changes points to an array of size N, where N
- * is the number of columns in table. If the i'th column is not
- * modified by the UPDATE, then the corresponding entry in the
- * changes[] array is set to -1. If the column is modified,
- * the value is 0 or greater.
- *
- * @param space Space to be modified.
- * @param changes Array of modified fields for UPDATE.
- * @retval True, if any foreign key processing will be required.
- */
-bool
-fk_constraint_is_required(struct space *space, const int *changes);
-
-/*
  * Allowed return values from sqlFindInIndex()
  */
 #define IN_INDEX_EPH          2	/* Search an ephemeral b-tree */

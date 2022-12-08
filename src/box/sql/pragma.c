@@ -34,7 +34,6 @@
  */
 #include "box/index.h"
 #include "box/tuple.h"
-#include "box/fk_constraint.h"
 #include "box/schema.h"
 #include "box/coll_id_cache.h"
 #include "sqlInt.h"
@@ -44,7 +43,6 @@
 #include "box/schema.h"
 #include "box/session.h"
 #include "pragma.h"
-#include "tarantoolInt.h"
 
 /** Set result column names and types for a pragma. */
 static void
@@ -291,34 +289,9 @@ sql_pragma_index_list(struct Parse *parse, const char *tbl_name)
 static void
 sql_pragma_foreign_key_list(struct Parse *parse_context, const char *table_name)
 {
-	if (table_name == NULL)
-		return;
-	struct space *space = space_by_name(table_name);
-	if (space == NULL)
-		return;
-	struct Vdbe *v = sqlGetVdbe(parse_context);
-	assert(v != NULL);
-	int i = 0;
-	parse_context->nMem = 8;
-	struct fk_constraint *fk_c;
-	rlist_foreach_entry(fk_c, &space->child_fk_constraint, in_child_space) {
-		struct fk_constraint_def *fk_def = fk_c->def;
-		struct space *parent = space_by_id(fk_def->parent_id);
-		assert(parent != NULL);
-		for (uint32_t j = 0; j < fk_def->field_count; j++) {
-			uint32_t ch_fl = fk_def->links[j].child_field;
-			const char *child_col = space->def->fields[ch_fl].name;
-			uint32_t pr_fl = fk_def->links[j].parent_field;
-			const char *parent_col =
-				parent->def->fields[pr_fl].name;
-			sqlVdbeMultiLoad(v, 1, "iissssss", i, j,
-					 parent->def->name, child_col,
-					 parent_col, "no_action",
-					 "no_action", "NONE");
-			sqlVdbeAddOp2(v, OP_ResultRow, 1, 8);
-		}
-		++i;
-	}
+	(void)parse_context;
+	(void)table_name;
+	return;
 }
 
 void

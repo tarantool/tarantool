@@ -49,7 +49,6 @@ set(sql_sources
     sql/date.c
     sql/delete.c
     sql/expr.c
-    sql/fk_constraint.c
     sql/func.c
     sql/global.c
     sql/hash.c
@@ -187,7 +186,6 @@ set(box_sources
     space_def.c
     sequence.c
     ck_constraint.c
-    fk_constraint.c
     constraint_id.c
     func.c
     func_cache.c

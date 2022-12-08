@@ -38,7 +38,6 @@ extern "C" {
 enum constraint_type {
 	CONSTRAINT_TYPE_PK = 0,
 	CONSTRAINT_TYPE_UNIQUE,
-	CONSTRAINT_TYPE_FK,
 	CONSTRAINT_TYPE_CK,
 	constraint_type_MAX,
 };

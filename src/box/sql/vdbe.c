@@ -41,7 +41,6 @@
  */
 #include "box/box.h"
 #include "box/error.h"
-#include "box/fk_constraint.h"
 #include "box/txn.h"
 #include "box/tuple.h"
 #include "box/port.h"
@@ -141,10 +140,7 @@ updateMaxBlobsize(Mem *p)
 
 /*
  * The next global variable is incremented each time the OP_Found opcode
- * is executed. This is used to test whether or not the foreign key
- * operation implemented using OP_FkIsZero is working. This variable
- * has no function other than to help verify the correct operation of the
- * library.
+ * is executed.
  */
 #ifdef SQL_TEST
 int sql_found_count = 0;
@@ -4094,37 +4090,6 @@ case OP_Param: {           /* out2 */
 	pFrame = p->pFrame;
 	pIn = &pFrame->aMem[pOp->p1 + pFrame->aOp[pFrame->pc].p1];
 	mem_copy_as_ephemeral(pOut, pIn);
-	break;
-}
-
-/* Opcode: FkCounter P1 P2 * * *
- * Synopsis: fkctr[P1]+=P2
- *
- * Increment a "constraint counter" by P2 (P2 may be negative or positive).
- * If P1 is non-zero, the database constraint counter is incremented
- * (deferred foreign key constraints). Otherwise, if P1 is zero, the
- * statement counter is incremented (immediate foreign key constraints).
- */
-case OP_FkCounter: {
-	p->nFkConstraint += pOp->p2;
-	break;
-}
-
-/* Opcode: FkIfZero P1 P2 * * *
- * Synopsis: if fkctr[P1]==0 goto P2
- *
- * This opcode tests if a foreign key constraint-counter is currently zero.
- * If so, jump to instruction P2. Otherwise, fall through to the next
- * instruction.
- *
- * If P1 is non-zero, then the jump is taken if the database constraint-counter
- * is zero (the one that counts deferred constraint violations). If P1 is
- * zero, the jump is taken if the statement constraint-counter is zero
- * (immediate foreign key constraint violations).
- */
-case OP_FkIfZero: {         /* jump */
-	if (p->nFkConstraint == 0)
-		goto jump_to_p2;
 	break;
 }
 

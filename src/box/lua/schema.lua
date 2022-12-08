@@ -891,7 +891,6 @@ box.schema.space.drop = function(space_id, space_name, opts)
     local _vindex = box.space[box.schema.VINDEX_ID]
     local _truncate = box.space[box.schema.TRUNCATE_ID]
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
-    local _fk_constraint = box.space[box.schema.FK_CONSTRAINT_ID]
     local _ck_constraint = box.space[box.schema.CK_CONSTRAINT_ID]
     local _func_index = box.space[box.schema.FUNC_INDEX_ID]
     local sequence_tuple = _space_sequence:delete{space_id}
@@ -901,9 +900,6 @@ box.schema.space.drop = function(space_id, space_name, opts)
     end
     for _, t in _trigger.index.space_id:pairs({space_id}) do
         _trigger:delete({t.name})
-    end
-    for _, t in _fk_constraint.index.child_id:pairs({space_id}) do
-        _fk_constraint:delete({t.name, space_id})
     end
     for _, t in _ck_constraint.index.primary:pairs({space_id}) do
         _ck_constraint:delete({space_id, t.name})

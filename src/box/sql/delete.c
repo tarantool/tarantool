@@ -92,13 +92,6 @@ sql_table_truncate(struct Parse *parse, struct SrcList *tab_list)
 		diag_set(ClientError, ER_NO_SUCH_SPACE, tab_name);
 		goto tarantool_error;
 	}
-	if (! rlist_empty(&space->parent_fk_constraint)) {
-		const char *err = "can not truncate space '%s' because other "
-				  "objects depend on it";
-		diag_set(ClientError, ER_SQL_EXECUTE,
-			 tt_sprintf(err, space->def->name));
-		goto tarantool_error;
-	}
 	if (space->def->opts.is_view) {
 		const char *err_msg =
 			tt_sprintf("can not truncate space '%s' because space "\
@@ -143,7 +136,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		goto delete_from_cleanup;
 	trigger_list = sql_triggers_exist(space->def, TK_DELETE,
 					  NULL, parse->sql_flags, NULL);
-	bool is_complex = trigger_list != NULL || fk_constraint_is_required(space, NULL);
+	bool is_complex = trigger_list != NULL;
 	bool is_view = space->def->opts.is_view;
 
 	/* If table is really a view, make sure it has been
@@ -425,8 +418,7 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 	/* If there are any triggers to fire, allocate a range of registers to
 	 * use for the old.* references in the triggers.
 	 */
-	if (space != NULL &&
-	   (fk_constraint_is_required(space, NULL) || trigger_list != NULL)) {
+	if (space != NULL && trigger_list != NULL) {
 		/* Mask of OLD.* columns in use */
 		/* TODO: Could use temporary registers here. */
 		uint64_t mask =
@@ -434,7 +426,6 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 					    TRIGGER_BEFORE | TRIGGER_AFTER,
 					    space, onconf);
 		assert(space != NULL);
-		mask |= space->fk_constraint_mask;
 		first_old_reg = parse->nMem + 1;
 		parse->nMem += (1 + (int)space->def->field_count);
 
@@ -466,13 +457,6 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 			sqlVdbeAddOp4Int(v, OP_NotFound, cursor, label,
 					     reg_pk, npk);
 		}
-
-		/* Do FK processing. This call checks that any FK
-		 * constraints that refer to this table (i.e.
-		 * constraints attached to other tables) are not
-		 * violated by deleting this row.
-		 */
-		fk_constraint_emit_check(parse, space, first_old_reg, 0, NULL);
 	}
 
 	/* Delete the index and table entries. Skip this step if
