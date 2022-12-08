@@ -312,6 +312,7 @@ struct errcode_record {
 	/*257 */_(ER_AUTH_DELAY,		"Too many authentication attempts") \
 	/*258 */_(ER_AUTH_REQUIRED,		"Authentication required") \
 	/*259 */_(ER_SQL_SEQ_SCAN,		"Scanning is not allowed for %s") \
+	/*260 */_(ER_NO_SUCH_EVENT,		"Unknown event %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

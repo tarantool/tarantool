@@ -1481,6 +1481,23 @@ error:
 	return 0;
 }
 
+void
+xrow_encode_watch_key(struct xrow_header *row, const char *key, uint16_t type)
+{
+	memset(row, 0, sizeof(*row));
+	size_t size = mp_sizeof_map(1) +
+		      mp_sizeof_uint(IPROTO_EVENT_KEY) +
+		      mp_sizeof_str(strlen(key));
+	char *buf = xregion_alloc(&fiber()->gc, size);
+	row->body[0].iov_base = buf;
+	buf = mp_encode_map(buf, 1);
+	buf = mp_encode_uint(buf, IPROTO_EVENT_KEY);
+	buf = mp_encode_str0(buf, key);
+	row->body[0].iov_len = buf - (char *)row->body[0].iov_base;
+	row->bodycnt = 1;
+	row->type = type;
+}
+
 int
 xrow_decode_watch(const struct xrow_header *row, struct watch_request *request)
 {
@@ -1821,6 +1838,25 @@ mp_decode_ballot(const char *data, const char *end,
 		default:
 			mp_next(&data);
 		}
+	}
+	return 0;
+}
+
+int
+xrow_decode_ballot_event(const struct watch_request *req,
+			 struct ballot *ballot, bool *is_empty)
+{
+	assert(req->data != NULL);
+	assert(req->data_end > req->data);
+	/*
+	 * Note that in contrary to xrow_decode_ballot() we do not nullify the
+	 * ballot here. If some of the fields are omitted in the event, their
+	 * previous values hold.
+	 */
+	if (mp_decode_ballot(req->data, req->data_end, ballot, is_empty) < 0) {
+		diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
+		dump_row_hex(req->data, req->data_end);
+		return -1;
 	}
 	return 0;
 }

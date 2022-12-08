@@ -161,8 +161,12 @@ struct applier {
 	struct uri uri;
 	/** Remote version encoded as a number, see version_id() macro */
 	uint32_t version_id;
+	/** Remote instance features. */
+	struct iproto_features features;
 	/** Remote ballot at the time of connect. */
 	struct ballot ballot;
+	/** The fiber responsible for ballot updates. */
+	struct fiber *ballot_watcher;
 	/** Last requested vclock sync. */
 	uint64_t last_vclock_sync;
 	/** Remote address */
@@ -180,6 +184,8 @@ struct applier {
 	struct ibuf ibuf;
 	/** Triggers invoked on state change */
 	struct rlist on_state;
+	/** Triggers invoked on ballot update. */
+	struct rlist on_ballot_update;
 	/**
 	 * Set if the applier was paused (see applier_pause()) and is now
 	 * waiting on resume_cond to be resumed (see applier_resume()).

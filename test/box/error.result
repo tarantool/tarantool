@@ -478,6 +478,7 @@ t;
  |   257: box.error.AUTH_DELAY
  |   258: box.error.AUTH_REQUIRED
  |   259: box.error.SQL_SEQ_SCAN
+ |   260: box.error.NO_SUCH_EVENT
  | ...
 
 test_run:cmd("setopt delimiter ''");

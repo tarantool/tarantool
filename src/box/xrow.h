@@ -410,6 +410,15 @@ int
 xrow_decode_watch(const struct xrow_header *row, struct watch_request *request);
 
 /**
+ * Encode a WATCH/UNWATCH request.
+ * @param[out] row Row to encode to.
+ * @param key The key to start/stop watching for.
+ * @param type Request type (WATCH or UNWATCH).
+ */
+void
+xrow_encode_watch_key(struct xrow_header *row, const char *key, uint16_t type);
+
+/**
  * AUTH request
  */
 struct auth_request {
@@ -494,6 +503,16 @@ mp_encode_ballot(char *data, const struct ballot *ballot);
  */
 int
 xrow_decode_ballot(const struct xrow_header *row, struct ballot *ballot);
+
+/**
+ * Decode ballot as received in response to an IPROTO_WATCH request.
+ * @param req a decoded notification.
+ * @param[out] ballot Where to store the decoded ballot.
+ * @param[out] is_empty Whether the ballot is empty.
+ */
+int
+xrow_decode_ballot_event(const struct watch_request *req,
+			 struct ballot *ballot, bool *is_empty);
 
 /**
  * Encode an instance vote request.
@@ -1037,11 +1056,29 @@ xrow_decode_auth_xc(const struct xrow_header *row,
 		diag_raise();
 }
 
+/** @copydoc xrow_decode_watch. */
+static inline void
+xrow_decode_watch_xc(const struct xrow_header *row,
+		     struct watch_request *request)
+{
+	if (xrow_decode_watch(row, request) != 0)
+		diag_raise();
+}
+
 /** @copydoc xrow_decode_ballot. */
 static inline void
 xrow_decode_ballot_xc(const struct xrow_header *row, struct ballot *ballot)
 {
 	if (xrow_decode_ballot(row, ballot) != 0)
+		diag_raise();
+}
+
+/** @copydoc xrow_decode_ballot_event. */
+static inline void
+xrow_decode_ballot_event_xc(const struct watch_request *req,
+			    struct ballot *ballot, bool *is_empty)
+{
+	if (xrow_decode_ballot_event(req, ballot, is_empty) != 0)
 		diag_raise();
 }
 
