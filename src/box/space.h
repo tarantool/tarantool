@@ -226,21 +226,6 @@ struct space {
 	/** Trigger that performs ck constraint validation. */
 	struct trigger *ck_constraint_trigger;
 	/**
-	 * Lists of foreign key constraints. In SQL terms child
-	 * space is the "from" table i.e. the table that contains
-	 * the REFERENCES clause. Parent space is "to" table, in
-	 * other words the table that is named in the REFERENCES
-	 * clause.
-	 */
-	struct rlist parent_fk_constraint;
-	struct rlist child_fk_constraint;
-	/**
-	 * Mask indicates which fields are involved in foreign
-	 * key constraint checking routine. Includes fields
-	 * of parent constraints as well as child ones.
-	 */
-	uint64_t fk_constraint_mask;
-	/**
 	 * Hash table with constraint identifiers hashed by name.
 	 */
 	struct mh_strnptr_t *constraint_ids;

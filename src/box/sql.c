@@ -52,7 +52,6 @@
 #include "session.h"
 #include "xrow.h"
 #include "iproto_constants.h"
-#include "fk_constraint.h"
 #include "mpstream/mpstream.h"
 #include "sql_stmt_cache.h"
 #include "box/tuple_constraint_def.h"

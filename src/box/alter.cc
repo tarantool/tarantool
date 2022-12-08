@@ -36,7 +36,6 @@
 #include "user.h"
 #include "space.h"
 #include "index.h"
-#include "fk_constraint.h"
 #include "func.h"
 #include "coll_id_cache.h"
 #include "coll_id_def.h"
@@ -532,17 +531,6 @@ space_swap_triggers(struct space *new_space, struct space *old_space)
 	old_space->sql_triggers = new_value;
 }
 
-/** The same as for triggers - swap lists of FK constraints. */
-static void
-space_swap_fk_constraints(struct space *new_space, struct space *old_space)
-{
-	rlist_swap(&new_space->child_fk_constraint,
-		   &old_space->child_fk_constraint);
-	rlist_swap(&new_space->parent_fk_constraint,
-		   &old_space->parent_fk_constraint);
-	SWAP(new_space->fk_constraint_mask, old_space->fk_constraint_mask);
-}
-
 static void
 space_swap_constraint_ids(struct space *new_space, struct space *old_space)
 {
@@ -876,7 +864,6 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 	 * constraints.
 	 */
 	space_swap_triggers(alter->new_space, alter->old_space);
-	space_swap_fk_constraints(alter->new_space, alter->old_space);
 	space_swap_constraint_ids(alter->new_space, alter->old_space);
 	space_cache_replace(alter->new_space, alter->old_space);
 	alter_space_delete(alter);
@@ -991,7 +978,6 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	 * constraints.
 	 */
 	space_swap_triggers(alter->new_space, alter->old_space);
-	space_swap_fk_constraints(alter->new_space, alter->old_space);
 	space_swap_constraint_ids(alter->new_space, alter->old_space);
 	/*
 	 * The new space is ready. Time to update the space
@@ -2234,19 +2220,6 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  "other views depend on this space");
 			return -1;
 		}
-		/*
-		 * No need to check existence of parent keys,
-		 * since if we went so far, space would'n have
-		 * any indexes. But referenced space has at least
-		 * one referenced index which can't be dropped
-		 * before constraint itself.
-		 */
-		if (!rlist_empty(&old_space->child_fk_constraint)) {
-			diag_set(ClientError, ER_DROP_SPACE,
-				  space_name(old_space),
-				  "the space has foreign key constraints");
-			return -1;
-		}
 		if (!rlist_empty(&old_space->ck_constraint)) {
 			diag_set(ClientError, ER_DROP_SPACE,
 				  space_name(old_space),
@@ -2411,28 +2384,6 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 }
 
 /**
- * Check whether given index is referenced by some foreign key
- * constraint or not.
- * @param fk_list List of FK constraints belonging to parent
- *                  space.
- * @param iid Index id which belongs to parent space and to be
- *        tested.
- *
- * @retval True if at least one FK constraint references this
- *         index; false otherwise.
- */
-static inline bool
-index_is_used_by_fk_constraint(struct rlist *fk_list, uint32_t iid)
-{
-	struct fk_constraint *fk;
-	rlist_foreach_entry(fk, fk_list, in_parent_space) {
-		if (fk->index_id == iid)
-			return true;
-	}
-	return false;
-}
-
-/**
  * Just like with _space, 3 major cases:
  *
  * - insert a tuple = addition of a new index. The
@@ -2563,17 +2514,6 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	 */
 	/* Case 1: drop the index, if it is dropped. */
 	if (old_index != NULL && new_tuple == NULL) {
-		/*
-		 * Can't drop index if foreign key constraints
-		 * references this index.
-		 */
-		if (index_is_used_by_fk_constraint(&old_space->parent_fk_constraint,
-						   iid)) {
-			diag_set(ClientError, ER_ALTER_SPACE,
-				  space_name(old_space),
-				  "can not drop a referenced index");
-			return -1;
-		}
 		if (alter_space_move_indexes(alter, 0, iid) != 0)
 			return -1;
 		try {
@@ -2696,13 +2636,6 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 
 		} else if (index_def_change_requires_rebuild(old_index,
 							     index_def)) {
-			if (index_is_used_by_fk_constraint(&old_space->parent_fk_constraint,
-							   iid)) {
-				diag_set(ClientError, ER_ALTER_SPACE,
-					  space_name(old_space),
-					  "can not alter a referenced index");
-				return -1;
-			}
 			/*
 			 * Operation demands an index rebuild.
 			 */
@@ -4946,499 +4879,6 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 	return 0;
 }
 
-/**
- * Decode MsgPack arrays of links. They are stored as two
- * separate arrays filled with unsigned fields numbers.
- *
- * @param tuple Tuple to be inserted into _fk_constraints.
- * @param[out] out_count Count of links.
- * @param constraint_name Constraint name to use in error
- *        messages.
- * @param constraint_len Length of constraint name.
- * @param errcode Errcode for client errors.
- * @retval Array of links.
- */
-static struct field_link *
-decode_fk_links(struct tuple *tuple, uint32_t *out_count,
-		const char *constraint_name, uint32_t constraint_len,
-		uint32_t errcode)
-{
-	const char *parent_cols = tuple_field_with_type(tuple,
-		BOX_FK_CONSTRAINT_FIELD_PARENT_COLS, MP_ARRAY);
-	if (parent_cols == NULL)
-		return NULL;
-	uint32_t count = mp_decode_array(&parent_cols);
-	if (count == 0) {
-		diag_set(ClientError, errcode,
-			  tt_cstr(constraint_name, constraint_len),
-			  "at least one link must be specified");
-		return NULL;
-	}
-	const char *child_cols = tuple_field_with_type(tuple,
-		BOX_FK_CONSTRAINT_FIELD_CHILD_COLS, MP_ARRAY);
-	if (child_cols == NULL)
-		return NULL;
-	if (mp_decode_array(&child_cols) != count) {
-		diag_set(ClientError, errcode,
-			  tt_cstr(constraint_name, constraint_len),
-			  "number of referenced and referencing fields "
-			  "must be the same");
-		return NULL;
-	}
-	*out_count = count;
-	size_t size;
-	struct field_link *region_links =
-		region_alloc_array(&fiber()->gc, typeof(region_links[0]), count,
-				   &size);
-	if (region_links == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_array",
-			 "region_links");
-		return NULL;
-	}
-	memset(region_links, 0, size);
-	for (uint32_t i = 0; i < count; ++i) {
-		if (mp_typeof(*parent_cols) != MP_UINT ||
-		    mp_typeof(*child_cols) != MP_UINT) {
-			diag_set(ClientError, errcode,
-				  tt_cstr(constraint_name, constraint_len),
-				  tt_sprintf("value of %d link is not unsigned",
-					     i));
-			return NULL;
-		}
-		region_links[i].parent_field = mp_decode_uint(&parent_cols);
-		region_links[i].child_field = mp_decode_uint(&child_cols);
-	}
-	return region_links;
-}
-
-/** Create an instance of foreign key def constraint from tuple. */
-static struct fk_constraint_def *
-fk_constraint_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
-{
-	uint32_t name_len;
-	const char *name = tuple_field_str(tuple,
-		BOX_FK_CONSTRAINT_FIELD_NAME, &name_len);
-	if (name == NULL)
-		return NULL;
-	if (name_len > BOX_NAME_MAX) {
-		diag_set(ClientError, errcode,
-			  tt_cstr(name, BOX_INVALID_NAME_MAX),
-			  "constraint name is too long");
-		return NULL;
-	}
-	if (identifier_check(name, name_len) != 0)
-		return NULL;
-	uint32_t link_count;
-	RegionGuard region_guard(&fiber()->gc);
-	struct field_link *links = decode_fk_links(tuple, &link_count, name,
-						   name_len, errcode);
-	if (links == NULL)
-		return NULL;
-	uint32_t links_offset;
-	size_t fk_def_sz = fk_constraint_def_sizeof(link_count, name_len,
-						    &links_offset);
-	struct fk_constraint_def *fk_def =
-		(struct fk_constraint_def *) malloc(fk_def_sz);
-	if (fk_def == NULL) {
-		diag_set(OutOfMemory, fk_def_sz, "malloc",
-			  "struct fk_constraint_def");
-		return NULL;
-	}
-	auto def_guard = make_scoped_guard([=] { free(fk_def); });
-	memcpy(fk_def->name, name, name_len);
-	fk_def->name[name_len] = '\0';
-	fk_def->links = (struct field_link *)((char *)fk_def + links_offset);
-	memcpy(fk_def->links, links, link_count * sizeof(struct field_link));
-	fk_def->field_count = link_count;
-	if (tuple_field_u32(tuple, BOX_FK_CONSTRAINT_FIELD_CHILD_ID,
-			    &(fk_def->child_id )) != 0)
-		return NULL;
-	if (tuple_field_u32(tuple, BOX_FK_CONSTRAINT_FIELD_PARENT_ID,
-			    &(fk_def->parent_id)) != 0)
-		return NULL;
-	def_guard.is_active = false;
-	return fk_def;
-}
-
-/**
- * Remove FK constraint from child's and parent's lists and
- * return it. Entries in child list are supposed to be
- * unique by their name.
- *
- * @param list List of child FK constraints.
- * @param fk_constraint_name Name of constraint to be removed.
- * @retval FK being removed.
- */
-static struct fk_constraint *
-fk_constraint_remove(struct rlist *child_fk_list, const char *fk_name)
-{
-	struct fk_constraint *fk;
-	rlist_foreach_entry(fk, child_fk_list, in_child_space) {
-		if (strcmp(fk_name, fk->def->name) == 0) {
-			rlist_del_entry(fk, in_child_space);
-			rlist_del_entry(fk, in_parent_space);
-			return fk;
-		}
-	}
-	unreachable();
-	return NULL;
-}
-
-/**
- * Set bits of @mask which correspond to fields involved in
- * given foreign key constraint.
- *
- * @param fk Links of this FK constraint are used to update mask.
- * @param[out] mask Mask to be updated.
- * @param type Type of links to be used to update mask:
- *             parent or child.
- */
-static inline void
-fk_constraint_set_mask(const struct fk_constraint *fk, uint64_t *mask, int type)
-{
-	for (uint32_t i = 0; i < fk->def->field_count; ++i)
-		column_mask_set_fieldno(mask, fk->def->links[i].fields[type]);
-}
-
-/**
- * When we discard FK constraint (due to drop or rollback
- * trigger), we can't simply unset appropriate bits in mask,
- * since other constraints may refer to them as well. Thus,
- * we have nothing left to do but completely rebuild mask.
- */
-static void
-space_reset_fk_constraint_mask(struct space *space)
-{
-	space->fk_constraint_mask = 0;
-	struct fk_constraint *fk;
-	rlist_foreach_entry(fk, &space->child_fk_constraint, in_child_space) {
-
-		fk_constraint_set_mask(fk, &space->fk_constraint_mask,
-				       FIELD_LINK_CHILD);
-	}
-	rlist_foreach_entry(fk, &space->parent_fk_constraint, in_parent_space) {
-
-		fk_constraint_set_mask(fk, &space->fk_constraint_mask,
-				       FIELD_LINK_PARENT);
-	}
-}
-
-/**
- * On rollback of creation we remove FK constraint from DD, i.e.
- * from parent's and child's lists of constraints and
- * release memory.
- */
-static int
-on_create_fk_constraint_rollback(struct trigger *trigger, void *event)
-{
-	(void) event;
-	struct fk_constraint *fk = (struct fk_constraint *)trigger->data;
-	rlist_del_entry(fk, in_parent_space);
-	rlist_del_entry(fk, in_child_space);
-	struct space *child = space_by_id(fk->def->child_id);
-	assert(child != NULL);
-	space_delete_constraint_id(child, fk->def->name);
-	space_reset_fk_constraint_mask(space_by_id(fk->def->parent_id));
-	space_reset_fk_constraint_mask(child);
-	fk_constraint_delete(fk);
-	return 0;
-}
-
-/** Return old FK and release memory for the new one. */
-static int
-on_replace_fk_constraint_rollback(struct trigger *trigger, void *event)
-{
-	(void) event;
-	struct fk_constraint *old_fk = (struct fk_constraint *)trigger->data;
-	struct space *parent = space_by_id(old_fk->def->parent_id);
-	struct space *child = space_by_id(old_fk->def->child_id);
-	struct fk_constraint *new_fk =
-		fk_constraint_remove(&child->child_fk_constraint,
-				     old_fk->def->name);
-	fk_constraint_delete(new_fk);
-	rlist_add_entry(&child->child_fk_constraint, old_fk, in_child_space);
-	rlist_add_entry(&parent->parent_fk_constraint, old_fk, in_parent_space);
-	space_reset_fk_constraint_mask(parent);
-	space_reset_fk_constraint_mask(child);
-	return 0;
-}
-
-/** On rollback of drop simply return back FK to DD. */
-static int
-on_drop_fk_constraint_rollback(struct trigger *trigger, void *event)
-{
-	(void) event;
-	struct fk_constraint *old_fk = (struct fk_constraint *)trigger->data;
-	struct space *parent = space_by_id(old_fk->def->parent_id);
-	struct space *child = space_by_id(old_fk->def->child_id);
-	if (space_insert_constraint_id(child, CONSTRAINT_TYPE_FK,
-				       old_fk->def->name) != 0) {
-		panic("Can't recover after FK constraint drop rollback (out of "
-		      "memory)");
-	}
-	rlist_add_entry(&child->child_fk_constraint, old_fk, in_child_space);
-	rlist_add_entry(&parent->parent_fk_constraint, old_fk, in_parent_space);
-	fk_constraint_set_mask(old_fk, &child->fk_constraint_mask,
-			       FIELD_LINK_CHILD);
-	fk_constraint_set_mask(old_fk, &parent->fk_constraint_mask,
-			       FIELD_LINK_PARENT);
-	return 0;
-}
-
-/**
- * On commit of drop or replace we have already deleted old
- * foreign key entry from both (parent's and child's) lists,
- * so just release memory.
- */
-static int
-on_drop_or_replace_fk_constraint_commit(struct trigger *trigger, void *event)
-{
-	(void) event;
-	fk_constraint_delete((struct fk_constraint *) trigger->data);
-	return 0;
-}
-
-/**
- * ANSI SQL doesn't allow list of referenced fields to contain
- * duplicates. Firstly, we try to follow the easiest way:
- * if all referenced fields numbers are less than 63, we can
- * use bit mask. Otherwise, fall through slow check where we
- * use O(field_cont^2) simple nested cycle iterations.
- */
-static int
-fk_constraint_check_dup_links(struct fk_constraint_def *fk_def)
-{
-	uint64_t field_mask = 0;
-	for (uint32_t i = 0; i < fk_def->field_count; ++i) {
-		uint32_t parent_field = fk_def->links[i].parent_field;
-		if (parent_field > 63)
-			goto slow_check;
-		parent_field = ((uint64_t) 1) << parent_field;
-		if ((field_mask & parent_field) != 0)
-			goto error;
-		field_mask |= parent_field;
-	}
-	return 0;
-slow_check:
-	for (uint32_t i = 0; i < fk_def->field_count; ++i) {
-		uint32_t parent_field = fk_def->links[i].parent_field;
-		for (uint32_t j = i + 1; j < fk_def->field_count; ++j) {
-			if (parent_field == fk_def->links[j].parent_field)
-				goto error;
-		}
-	}
-	return 0;
-error:
-	diag_set(ClientError, ER_CREATE_FK_CONSTRAINT, fk_def->name,
-		  "referenced fields can not contain duplicates");
-	return -1;
-}
-
-/** A trigger invoked on replace in the _fk_constraint space. */
-static int
-on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
-{
-	struct txn *txn = (struct txn *) event;
-	struct txn_stmt *stmt = txn_current_stmt(txn);
-	struct tuple *old_tuple = stmt->old_tuple;
-	struct tuple *new_tuple = stmt->new_tuple;
-	if (new_tuple != NULL) {
-		/* Create or replace foreign key. */
-		struct fk_constraint_def *fk_def =
-			fk_constraint_def_new_from_tuple(new_tuple,
-							 ER_CREATE_FK_CONSTRAINT);
-		if (fk_def == NULL)
-			return -1;
-		auto fk_def_guard = make_scoped_guard([=] { free(fk_def); });
-		struct space *child_space = space_cache_find(fk_def->child_id);
-		if (child_space == NULL)
-			return -1;
-		if (child_space->def->opts.is_view) {
-			diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
-				  fk_def->name,
-				  "referencing space can't be VIEW");
-			return -1;
-		}
-		struct space *parent_space = space_cache_find(fk_def->parent_id);
-		if (parent_space == NULL)
-			return -1;
-		if (parent_space->def->opts.is_view) {
-			diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
-				  fk_def->name,
-				  "referenced space can't be VIEW");
-			return -1;
-		}
-		/*
-		 * FIXME: until SQL triggers are completely
-		 * integrated into server (i.e. we are able to
-		 * invoke triggers even if DML occurred via Lua
-		 * interface), it makes no sense to provide any
-		 * checks on existing data in space.
-		 */
-		struct index *pk = space_index(child_space, 0);
-		if (pk != NULL && index_size(pk) > 0) {
-			diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
-				  fk_def->name,
-				  "referencing space must be empty");
-			return -1;
-		}
-		/* Check types of referenced fields. */
-		for (uint32_t i = 0; i < fk_def->field_count; ++i) {
-			uint32_t child_fieldno = fk_def->links[i].child_field;
-			uint32_t parent_fieldno = fk_def->links[i].parent_field;
-			if (child_fieldno >= child_space->def->field_count ||
-			    parent_fieldno >= parent_space->def->field_count) {
-				diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
-					  fk_def->name, "foreign key refers to "
-							"nonexistent field");
-				return -1;
-			}
-			struct field_def *child_field =
-				&child_space->def->fields[child_fieldno];
-			struct field_def *parent_field =
-				&parent_space->def->fields[parent_fieldno];
-			if (! field_type1_contains_type2(parent_field->type,
-							 child_field->type)) {
-				diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
-					  fk_def->name, "field type mismatch");
-				return -1;
-			}
-			if (child_field->coll_id != parent_field->coll_id) {
-				diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
-					  fk_def->name,
-					  "field collation mismatch");
-				return -1;
-			}
-		}
-		if (fk_constraint_check_dup_links(fk_def) != 0)
-			return -1;
-		/*
-		 * Search for suitable index in parent space:
-		 * it must be unique and consist exactly from
-		 * referenced columns (but order may be
-		 * different).
-		 */
-		struct index *fk_index = NULL;
-		for (uint32_t i = 0; i < parent_space->index_count; ++i) {
-			struct index *idx = space_index(parent_space, i);
-			if (!idx->def->opts.is_unique)
-				continue;
-			if (idx->def->key_def->part_count !=
-			    fk_def->field_count)
-				continue;
-			uint32_t j;
-			for (j = 0; j < fk_def->field_count; ++j) {
-				if (key_def_find_by_fieldno(idx->def->key_def,
-							    fk_def->links[j].
-							    parent_field) ==
-							    NULL)
-					break;
-			}
-			if (j != fk_def->field_count)
-				continue;
-			fk_index = idx;
-			break;
-		}
-		if (fk_index == NULL) {
-			diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
-				  fk_def->name, "referenced fields don't "
-						"compose unique index");
-			return -1;
-		}
-		struct fk_constraint *fk =
-			(struct fk_constraint *) malloc(sizeof(*fk));
-		if (fk == NULL) {
-			diag_set(OutOfMemory, sizeof(*fk),
-				  "malloc", "struct fk_constraint");
-			return -1;
-		}
-		auto fk_guard = make_scoped_guard([=] { free(fk); });
-		memset(fk, 0, sizeof(*fk));
-		fk->def = fk_def;
-		fk->index_id = fk_index->def->iid;
-		if (old_tuple == NULL) {
-			struct trigger *on_rollback =
-				txn_alter_trigger_new(on_create_fk_constraint_rollback,
-						      fk);
-			if (on_rollback == NULL)
-				return -1;
-			if (space_insert_constraint_id(child_space,
-						       CONSTRAINT_TYPE_FK,
-						       fk_def->name) != 0)
-				return -1;
-			rlist_add_entry(&child_space->child_fk_constraint,
-					fk, in_child_space);
-			rlist_add_entry(&parent_space->parent_fk_constraint,
-					fk, in_parent_space);
-			txn_stmt_on_rollback(stmt, on_rollback);
-			fk_constraint_set_mask(fk,
-					       &parent_space->fk_constraint_mask,
-					       FIELD_LINK_PARENT);
-			fk_constraint_set_mask(fk,
-					       &child_space->fk_constraint_mask,
-					       FIELD_LINK_CHILD);
-		} else {
-			struct fk_constraint *old_fk =
-				fk_constraint_remove(&child_space->child_fk_constraint,
-						     fk_def->name);
-			rlist_add_entry(&child_space->child_fk_constraint, fk,
-					in_child_space);
-			rlist_add_entry(&parent_space->parent_fk_constraint, fk,
-					in_parent_space);
-			struct trigger *on_rollback =
-				txn_alter_trigger_new(on_replace_fk_constraint_rollback,
-						      old_fk);
-			if (on_rollback == NULL)
-				return -1;
-			txn_stmt_on_rollback(stmt, on_rollback);
-			struct trigger *on_commit =
-				txn_alter_trigger_new(on_drop_or_replace_fk_constraint_commit,
-						      old_fk);
-			if (on_commit == NULL)
-				return -1;
-			txn_stmt_on_commit(stmt, on_commit);
-			space_reset_fk_constraint_mask(child_space);
-			space_reset_fk_constraint_mask(parent_space);
-		}
-		fk_def_guard.is_active = false;
-		fk_guard.is_active = false;
-	} else if (new_tuple == NULL && old_tuple != NULL) {
-		/* Drop foreign key. */
-		struct fk_constraint_def *fk_def =
-			fk_constraint_def_new_from_tuple(old_tuple,
-						ER_DROP_FK_CONSTRAINT);
-		if (fk_def == NULL)
-			return -1;
-		auto fk_def_guard = make_scoped_guard([=] { free(fk_def); });
-		struct space *child_space = space_cache_find(fk_def->child_id);
-		if (child_space == NULL)
-			return -1;
-		struct space *parent_space = space_cache_find(fk_def->parent_id);
-		if (parent_space == NULL)
-			return -1;
-		struct fk_constraint *old_fk=
-			fk_constraint_remove(&child_space->child_fk_constraint,
-					     fk_def->name);
-		struct trigger *on_commit =
-			txn_alter_trigger_new(on_drop_or_replace_fk_constraint_commit,
-					      old_fk);
-		if (on_commit == NULL)
-			return -1;
-		txn_stmt_on_commit(stmt, on_commit);
-		struct trigger *on_rollback =
-			txn_alter_trigger_new(on_drop_fk_constraint_rollback,
-					      old_fk);
-		if (on_rollback == NULL)
-			return -1;
-		space_delete_constraint_id(child_space, fk_def->name);
-		txn_stmt_on_rollback(stmt, on_rollback);
-		space_reset_fk_constraint_mask(child_space);
-		space_reset_fk_constraint_mask(parent_space);
-	}
-	box_schema_version_bump();
-	return 0;
-}
-
 /** Create an instance of check constraint definition by tuple. */
 static struct ck_constraint_def *
 ck_constraint_def_new_from_tuple(struct tuple *tuple)
@@ -5800,7 +5240,6 @@ TRIGGER(on_replace_sequence, on_replace_dd_sequence);
 TRIGGER(on_replace_sequence_data, on_replace_dd_sequence_data);
 TRIGGER(on_replace_space_sequence, on_replace_dd_space_sequence);
 TRIGGER(on_replace_trigger, on_replace_dd_trigger);
-TRIGGER(on_replace_fk_constraint, on_replace_dd_fk_constraint);
 TRIGGER(on_replace_ck_constraint, on_replace_dd_ck_constraint);
 TRIGGER(on_replace_func_index, on_replace_dd_func_index);
 /* vim: set foldmethod=marker */

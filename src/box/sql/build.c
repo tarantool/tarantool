@@ -49,7 +49,6 @@
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
 #include "box/ck_constraint.h"
-#include "box/fk_constraint.h"
 #include "box/sequence.h"
 #include "box/session.h"
 #include "box/identifier.h"
@@ -1162,8 +1161,7 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 }
 
 /**
- * Generate opcodes to serialize foreign key into MsgPack and
- * insert produced tuple into _fk_constraint space.
+ * Generate opcodes to create foreign key constraint.
  *
  * @param parse_context Parsing context.
  * @param fk Foreign key to be created.
@@ -1201,7 +1199,7 @@ vdbe_emit_fk_constraint_create(struct Parse *parse_context,
 		sqlVdbeAddOp2(vdbe, OP_SCopy, fk->child_id, regs);
 	else
 		sqlVdbeAddOp2(vdbe, OP_Integer, fk->child_id, regs);
-	if (!is_alter_add_constr && fk_constraint_is_self_referenced(fk))
+	if (!is_alter_add_constr && fk->child_id == fk->parent_id)
 		sqlVdbeAddOp2(vdbe, OP_SCopy, fk->parent_id, regs + 1);
 	else
 		sqlVdbeAddOp2(vdbe, OP_Integer, fk->parent_id, regs + 1);
@@ -1601,36 +1599,6 @@ vdbe_emit_index_drop(struct Parse *parse_context, const char *name,
 }
 
 /**
- * Generate VDBE program to remove entry from _fk_constraint space.
- *
- * @param parse_context Parsing context.
- * @param constraint_name Name of FK constraint to be dropped.
- * @param child_def Def of table which constraint belongs to.
- */
-static void
-vdbe_emit_fk_constraint_drop(struct Parse *parse_context,
-			     const char *constraint_name,
-			     struct space_def *child_def)
-{
-	struct Vdbe *vdbe = sqlGetVdbe(parse_context);
-	assert(vdbe != NULL);
-	int key_reg = sqlGetTempRange(parse_context, 3);
-	sqlVdbeAddOp4(vdbe, OP_String8, 0, key_reg, 0,
-		      sql_xstrdup(constraint_name), P4_DYNAMIC);
-	sqlVdbeAddOp2(vdbe, OP_Integer, child_def->id, key_reg + 1);
-	const char *error_msg =
-		tt_sprintf(tnt_errcode_desc(ER_NO_SUCH_CONSTRAINT),
-			   constraint_name, child_def->name);
-	vdbe_emit_halt_with_presence_test(parse_context, BOX_FK_CONSTRAINT_ID,
-					  0, key_reg, 2, ER_NO_SUCH_CONSTRAINT,
-					  error_msg, false, OP_Found);
-	sqlVdbeAddOp3(vdbe, OP_MakeRecord, key_reg, 2, key_reg + 2);
-	sqlVdbeAddOp2(vdbe, OP_SDelete, BOX_FK_CONSTRAINT_ID, key_reg + 2);
-	VdbeComment((vdbe, "Delete FK constraint %s", constraint_name));
-	sqlReleaseTempRange(parse_context, key_reg, 3);
-}
-
-/**
  * Generate VDBE program to remove entry from _ck_constraint space.
  *
  * @param parser Parsing context.
@@ -1774,13 +1742,6 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 			VdbeComment((v, "Delete entry from _sequence"));
 		}
 	}
-	/* Delete all child FK constraints. */
-	struct fk_constraint *child_fk;
-	rlist_foreach_entry(child_fk, &space->child_fk_constraint,
-			    in_child_space) {
-		vdbe_emit_fk_constraint_drop(parse_context, child_fk->def->name,
-					     space->def);
-	}
 	/* Delete all CK constraints. */
 	struct ck_constraint *ck_constraint;
 	rlist_foreach_entry(ck_constraint, &space->ck_constraint, link) {
@@ -1873,30 +1834,6 @@ sql_drop_table(struct Parse *parse_context)
 		parse_context->is_aborted = true;
 		goto exit_drop_table;
 	}
-	/*
-	 * Generate code to remove the table from Tarantool
-	 * and internal SQL tables. Basically, it consists
-	 * from 2 stages:
-	 * 1. In case of presence of FK constraints, i.e. current
-	 *    table is child or parent, then start new transaction
-	 *    and erase from table all data row by row. On each
-	 *    deletion check whether any FK violations have
-	 *    occurred. If ones take place, then rollback
-	 *    transaction and halt VDBE.
-	 * 2. Drop table by truncating (if step 1 was skipped),
-	 *    removing indexes from _index space and eventually
-	 *    tuple with corresponding space_id from _space.
-	 */
-	struct fk_constraint *fk;
-	rlist_foreach_entry(fk, &space->parent_fk_constraint, in_parent_space) {
-
-		if (! fk_constraint_is_self_referenced(fk->def)) {
-			diag_set(ClientError, ER_DROP_SPACE, space_name,
-				 "other objects depend on it");
-			parse_context->is_aborted = true;
-			goto exit_drop_table;
-		}
-	}
 	sql_code_drop_table(parse_context, space, is_view);
 
  exit_drop_table:
@@ -1958,6 +1895,29 @@ sql_fk_unique_name_new(struct Parse *parse)
 			++n;
 	}
 	return sqlMPrintf("fk_unnamed_%s_%s_%u", space_name, field_name, n);
+}
+
+/**
+ * Alongside with struct fk_constraint_def itself, we reserve memory for
+ * string containing its name and for array of links.
+ * Memory layout:
+ * +----------------------------------+ <- Allocated memory starts here
+ * |     struct fk_constraint_def     |
+ * |----------------------------------|
+ * |             name + \0            |
+ * |----------------------------------|
+ * |       memory align padding       |
+ * |----------------------------------|
+ * |             links                |
+ * +----------------------------------+
+ */
+static inline size_t
+fk_constraint_def_sizeof(uint32_t link_count, uint32_t name_len,
+			 uint32_t *links_offset)
+{
+	*links_offset = small_align(sizeof(struct fk_constraint_def) +
+				    name_len + 1, alignof(struct field_link));
+	return *links_offset + link_count * sizeof(struct field_link);
 }
 
 void
@@ -2231,9 +2191,6 @@ sql_drop_constraint(struct Parse *parse_context)
 				     ER_NO_SUCH_CONSTRAINT, false);
 		break;
 	}
-	case CONSTRAINT_TYPE_FK:
-		vdbe_emit_fk_constraint_drop(parse_context, name, space->def);
-		break;
 	case CONSTRAINT_TYPE_CK:
 		vdbe_emit_ck_constraint_drop(parse_context, name, space->def);
 		break;

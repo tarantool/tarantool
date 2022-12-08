@@ -55,7 +55,6 @@
 //
 %include {
 #include "sqlInt.h"
-#include "box/fk_constraint.h"
 
 /*
 ** Disable all error recovery processing in the parser push-down

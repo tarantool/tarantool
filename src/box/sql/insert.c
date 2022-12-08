@@ -748,7 +748,6 @@ sqlInsert(Parse * pParse,	/* Parser context */
 		 */
 		vdbe_emit_constraint_checks(pParse, space, regIns + 1,
 					    on_error, endOfLoop, 0);
-		fk_constraint_emit_check(pParse, space, 0, regIns, 0);
 		vdbe_emit_insertion_completion(v, reg, regIns + 1,
 					       space->def->field_count,
 					       on_error, autoinc_reg);
@@ -1156,13 +1155,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	 */
 	if (!rlist_empty(&dest->ck_constraint) ||
 	    !rlist_empty(&src->ck_constraint))
-		return 0;
-	/* Disallow the transfer optimization if the destination table constains
-	 * any foreign key constraints.  This is more restrictive than necessary.
-	 * So the extra complication to make this rule less restrictive is probably
-	 * not worth the effort.  Ticket [6284df89debdfa61db8073e062908af0c9b6118e]
-	 */
-	if (!rlist_empty(&dest->child_fk_constraint))
 		return 0;
 
 	/* If we get this far, it means that the xfer optimization is at

@@ -32,7 +32,6 @@
  */
 #include <assert.h>
 
-#include "box/fk_constraint.h"
 #include "box/key_def.h"
 #include "box/sql.h"
 

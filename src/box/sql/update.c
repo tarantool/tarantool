@@ -62,7 +62,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 				 */
 	NameContext sNC;	/* The name-context to resolve expressions in */
 	int okOnePass;		/* True for one-pass algorithm without the FIFO */
-	int hasFK;		/* True if foreign key processing is required */
 	int labelBreak;		/* Jump here to break out of UPDATE loop */
 	int labelContinue;	/* Jump here to continue next step of UPDATE loop */
 
@@ -175,8 +174,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	 */
 	pTabList->a[0].colUsed = 0;
 
-	hasFK = fk_constraint_is_required(space, aXRef);
-
 	/* Begin generating code. */
 	v = sqlGetVdbe(pParse);
 	if (v == NULL)
@@ -187,7 +184,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	/* Allocate required registers. */
 	regOldPk = regNewPk = ++pParse->nMem;
 
-	if (is_pk_modified || trigger != NULL || hasFK != 0) {
+	if (is_pk_modified || trigger != NULL) {
 		regOld = pParse->nMem + 1;
 		pParse->nMem += def->field_count;
 		regNewPk = ++pParse->nMem;
@@ -297,18 +294,18 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	 * then regNewPk is the same register as regOldPk, which is
 	 * already populated.
 	 */
-	assert(is_pk_modified || trigger != NULL || hasFK != 0 ||
-	       regOldPk == regNewPk);
+	assert(is_pk_modified || trigger != NULL || regOldPk == regNewPk);
 
 	/* Compute the old pre-UPDATE content of the row being changed, if that
 	 * information is needed
 	 */
-	if (is_pk_modified || hasFK != 0 || trigger != NULL) {
+	if (is_pk_modified || trigger != NULL) {
 		assert(space != NULL);
-		uint64_t oldmask = hasFK ? space->fk_constraint_mask : 0;
-		oldmask |= sql_trigger_colmask(pParse, trigger, pChanges, 0,
-					       TRIGGER_BEFORE | TRIGGER_AFTER,
-					       space, on_error);
+		uint64_t oldmask = sql_trigger_colmask(pParse, trigger,
+						       pChanges, 0,
+						       TRIGGER_BEFORE |
+						       TRIGGER_AFTER, space,
+						       on_error);
 		for (i = 0; i < (int)def->field_count; i++) {
 			if (column_mask_fieldno_is_set(oldmask, i) ||
 			    sql_space_column_is_in_pk(space, i)) {
@@ -397,10 +394,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 		assert(regOldPk > 0);
 		vdbe_emit_constraint_checks(pParse, space, regNewPk + 1,
 					    on_error, labelContinue, aXRef);
-		/* Do FK constraint checks. */
-		if (hasFK) {
-			fk_constraint_emit_check(pParse, space, regOldPk, 0, aXRef);
-		}
 		if (on_error == ON_CONFLICT_ACTION_REPLACE) {
 			/*
 			 * Delete the index entries associated with the
@@ -413,9 +406,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 			assert(regNew == regNewPk + 1);
 			sqlVdbeAddOp2(v, OP_Delete, pk_cursor, 0);
 			sqlVdbeJumpHere(v, not_found_lbl);
-		}
-		if (hasFK) {
-			fk_constraint_emit_check(pParse, space, 0, regNewPk, aXRef);
 		}
 		if (on_error == ON_CONFLICT_ACTION_REPLACE) {
 			vdbe_emit_insertion_completion(v, reg, regNew,

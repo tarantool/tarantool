@@ -8,7 +8,38 @@
 
 #include <stdint.h>
 
-struct fk_constraint_def;
+/** Structure describing field dependencies for foreign keys. */
+struct field_link {
+	/**
+	 * There are two ways to access parent/child fields -
+	 * as array of two elements and as named fields.
+	 */
+	union {
+		struct {
+			/** Fieldno of the parent field. */
+			uint32_t parent_field;
+			/** Fieldno of the child field. */
+			uint32_t child_field;
+		};
+		uint32_t fields[2];
+	};
+};
+
+/** Definition of foreign key constraint. */
+struct fk_constraint_def {
+	/** Id of space containing the REFERENCES clause (child). */
+	uint32_t child_id;
+	/** Id of space that the key points to (parent). */
+	uint32_t parent_id;
+	/** Number of fields in this key. */
+	uint32_t field_count;
+	/** True if it is a field constraint, false otherwise. */
+	bool is_field_fk;
+	/** Mapping of fields in child to fields in parent. */
+	struct field_link *links;
+	/** Name of the constraint. */
+	char name[0];
+};
 
 /* Storage interface. */
 const void *tarantoolsqlPayloadFetch(BtCursor * pCur, u32 * pAmt);
