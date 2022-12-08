@@ -296,7 +296,7 @@ schema_init(void)
 	key_parts[1].fieldno = 1; /* constraint name */
 	key_parts[1].type = FIELD_TYPE_STRING;
 	sc_space_new(BOX_CK_CONSTRAINT_ID, "_ck_constraint", key_parts, 2,
-		     &on_replace_ck_constraint);
+		     NULL);
 
 	/* _func_index - check constraints. */
 	key_parts[0].fieldno = 0; /* space id */

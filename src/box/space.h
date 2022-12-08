@@ -52,7 +52,6 @@ struct request;
 struct port;
 struct tuple;
 struct tuple_format;
-struct ck_constraint;
 struct constraint_id;
 struct space_upgrade;
 struct space_wal_ext;
@@ -218,13 +217,6 @@ struct space {
 	 * fields is guaranteed by another unique index.
 	 */
 	void *check_unique_constraint_map;
-	/**
-	 * List of check constraints linked with
-	 * ck_constraint::link.
-	 */
-	struct rlist ck_constraint;
-	/** Trigger that performs ck constraint validation. */
-	struct trigger *ck_constraint_trigger;
 	/**
 	 * Hash table with constraint identifiers hashed by name.
 	 */
@@ -580,22 +572,6 @@ space_dump_def(const struct space *space, struct rlist *key_list);
 /** Rebuild index map in a space after a series of swap index. */
 void
 space_fill_index_map(struct space *space);
-
-/**
- * Add a new ck constraint to the space. A ck constraint check
- * trigger is created, if this is a first ck in this space. The
- * space takes ownership of this object.
- */
-int
-space_add_ck_constraint(struct space *space, struct ck_constraint *ck);
-
-/**
- * Remove a ck constraint from the space. A ck constraint check
- * trigger is deleted, if this is a last ck in this space. This
- * object may be deleted manually after the call.
- */
-void
-space_remove_ck_constraint(struct space *space, struct ck_constraint *ck);
 
 /** Find a constraint identifier by name. */
 struct constraint_id *

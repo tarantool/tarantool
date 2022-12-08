@@ -743,10 +743,6 @@ col_list_with_autoinc(A) ::= expr(Y) autoinc(I). {
   A = sql_expr_list_append(NULL, Y.pExpr);
 }
 
-%type enable {bool}
-enable(A) ::= ENABLE.           {A = true;}
-enable(A) ::= DISABLE.          {A = false;}
-
 %type sortorder {int}
 
 sortorder(A) ::= ASC.           {A = SORT_ORDER_ASC;}
@@ -1715,12 +1711,6 @@ cmd ::= ALTER TABLE fullname(X) DROP CONSTRAINT nm(Z). {
   drop_constraint_def_init(&pParse->drop_constraint_def, X, &Z, false);
   pParse->initiateTTrans = true;
   sql_drop_constraint(pParse);
-}
-
-cmd ::= alter_table_start(A) enable(E) CHECK CONSTRAINT nm(Z). {
-    enable_entity_def_init(&pParse->enable_entity_def, ENTITY_TYPE_CK, A,
-                           &Z, E);
-    sql_alter_ck_constraint_enable(pParse);
 }
 
 //////////////////////// COMMON TABLE EXPRESSIONS ////////////////////////////

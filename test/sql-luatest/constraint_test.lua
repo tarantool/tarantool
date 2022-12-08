@@ -520,3 +520,43 @@ g.test_constraints_9 = function()
         t.assert_equals(s2[6].foreign_key, nil)
     end)
 end
+
+--
+-- Make sure that check constraints can no longer be created through inserting
+-- into _ck_constraint.
+--
+g.test_constraints_10 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        box.execute([[CREATE TABLE t(i INT PRIMARY KEY);]])
+        local s = box.space.T
+        local rec = {s.id, 'one', false, 'SQL', 'I > 10', true}
+        t.assert_equals(box.space._ck_constraint:insert(rec), rec)
+        t.assert_equals(s.constraint, nil)
+        t.assert_equals(s:format()[1].constraint, nil)
+        t.assert_equals(s:insert({1}), {1})
+        s:drop()
+        box.space._ck_constraint:delete({s.id, 'one'})
+    end)
+end
+
+-- Make sure that check constraints can no longer be ENABLED or DISABLED.
+g.test_constraints_11 = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        box.execute([[CREATE TABLE t(i INT PRIMARY KEY,
+                                     CONSTRAINT one CHECK (i > 10));]])
+        local _, err = box.execute([[INSERT INTO t VALUES (1);]])
+        t.assert_equals(err.message, "Check constraint 'ONE' failed for tuple")
+        _, err = box.execute([[ALTER TABLE t DISABLE CHECK CONSTRAINT one;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near 'DISABLE'")
+        _, err = box.execute([[INSERT INTO t VALUES (1);]])
+        t.assert_equals(err.message, "Check constraint 'ONE' failed for tuple")
+        _, err = box.execute([[ALTER TABLE t ENABLE CHECK CONSTRAINT one;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near 'ENABLE'")
+        _, err = box.execute([[INSERT INTO t VALUES (1);]])
+        t.assert_equals(err.message, "Check constraint 'ONE' failed for tuple")
+
+        box.execute([[DROP TABLE t;]])
+    end)
+end
