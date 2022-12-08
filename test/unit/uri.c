@@ -1,10 +1,5 @@
 #include "uri/uri.h"
-#include "lua/utils.h"
 #include "trivia/util.h"
-#include "diag.h"
-#include "memory.h"
-#include "fiber.h"
-#include "tt_static.h"
 
 #include <stdio.h>
 
