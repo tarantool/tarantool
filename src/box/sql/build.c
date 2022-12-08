@@ -48,7 +48,6 @@
 #include "mem.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
-#include "box/ck_constraint.h"
 #include "box/sequence.h"
 #include "box/session.h"
 #include "box/identifier.h"
@@ -701,6 +700,36 @@ sql_ck_unique_name_new(struct Parse *parse, bool is_field_ck)
 	return sqlMPrintf("ck_unnamed_%s_%s_%u", space_name, field_name, n);
 }
 
+/**
+ * Calculate check constraint definition memory size and fields
+ * offsets for given arguments.
+ *
+ * Alongside with struct ck_constraint_def itself, we reserve
+ * memory for string containing its name and expression string.
+ *
+ * Memory layout:
+ * +-----------------------------+ <- Allocated memory starts here
+ * |   struct ck_constraint_def  |
+ * |-----------------------------|
+ * |          name + \0          |
+ * |-----------------------------|
+ * |        expr_str + \0        |
+ * +-----------------------------+
+ *
+ * @param name_len The length of the name.
+ * @param expr_str_len The length of the expr_str.
+ * @param[out] expr_str_offset The offset of the expr_str string.
+ * @return The size of the ck constraint definition object for
+ *         given parameters.
+ */
+static inline uint32_t
+ck_constraint_def_sizeof(uint32_t name_len, uint32_t expr_str_len,
+			 uint32_t *expr_str_offset)
+{
+	*expr_str_offset = sizeof(struct ck_constraint_def) + name_len + 1;
+	return *expr_str_offset + expr_str_len + 1;
+}
+
 void
 sql_create_check_contraint(struct Parse *parser, bool is_field_ck)
 {
@@ -771,7 +800,6 @@ sql_create_check_contraint(struct Parse *parser, bool is_field_ck)
 		ck_def->fieldno = 0;
 	}
 	ck_def->expr_str = (char *)ck_def + expr_str_offset;
-	ck_def->language = CK_CONSTRAINT_LANGUAGE_SQL;
 	ck_def->space_id = BOX_ID_NIL;
 	trim_space_snprintf(ck_def->expr_str, expr_str, expr_str_len);
 	memcpy(ck_def->name, name, name_len);
@@ -1599,35 +1627,6 @@ vdbe_emit_index_drop(struct Parse *parse_context, const char *name,
 }
 
 /**
- * Generate VDBE program to remove entry from _ck_constraint space.
- *
- * @param parser Parsing context.
- * @param ck_name Name of CK constraint to be dropped.
- * @param space_def Def of table which constraint belongs to.
- */
-static void
-vdbe_emit_ck_constraint_drop(struct Parse *parser, const char *ck_name,
-			     struct space_def *space_def)
-{
-	struct Vdbe *v = sqlGetVdbe(parser);
-	assert(v != NULL);
-	int key_reg = sqlGetTempRange(parser, 3);
-	sqlVdbeAddOp2(v, OP_Integer, space_def->id, key_reg);
-	sqlVdbeAddOp4(v, OP_String8, 0, key_reg + 1, 0, sql_xstrdup(ck_name),
-		      P4_DYNAMIC);
-	const char *error_msg =
-		tt_sprintf(tnt_errcode_desc(ER_NO_SUCH_CONSTRAINT), ck_name,
-			   space_def->name);
-	vdbe_emit_halt_with_presence_test(parser, BOX_CK_CONSTRAINT_ID, 0,
-					  key_reg, 2, ER_NO_SUCH_CONSTRAINT,
-					  error_msg, false, OP_Found);
-	sqlVdbeAddOp3(v, OP_MakeRecord, key_reg, 2, key_reg + 2);
-	sqlVdbeAddOp2(v, OP_SDelete, BOX_CK_CONSTRAINT_ID, key_reg + 2);
-	VdbeComment((v, "Delete CK constraint %s", ck_name));
-	sqlReleaseTempRange(parser, key_reg, 3);
-}
-
-/**
  * Generate VDBE program to revoke all
  * privileges associated with the given object.
  *
@@ -1741,13 +1740,6 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 				      idx_rec_reg);
 			VdbeComment((v, "Delete entry from _sequence"));
 		}
-	}
-	/* Delete all CK constraints. */
-	struct ck_constraint *ck_constraint;
-	rlist_foreach_entry(ck_constraint, &space->ck_constraint, link) {
-		vdbe_emit_ck_constraint_drop(parse_context,
-					     ck_constraint->def->name,
-					     space->def);
 	}
 	/*
 	 * Drop all _space and _index entries that refer to the
@@ -2183,20 +2175,10 @@ sql_drop_constraint(struct Parse *parse_context)
 	 * ALTER TABLE DROP CONSTRAINT statement, since whole
 	 * DROP TABLE always returns 1 (one) as a row count.
 	 */
-	assert(id->type < constraint_type_MAX);
-	switch (id->type) {
-	case CONSTRAINT_TYPE_PK:
-	case CONSTRAINT_TYPE_UNIQUE: {
-		vdbe_emit_index_drop(parse_context, name, space->def,
-				     ER_NO_SUCH_CONSTRAINT, false);
-		break;
-	}
-	case CONSTRAINT_TYPE_CK:
-		vdbe_emit_ck_constraint_drop(parse_context, name, space->def);
-		break;
-	default:
-		unreachable();
-	}
+	assert(id->type == CONSTRAINT_TYPE_PK ||
+	       id->type == CONSTRAINT_TYPE_UNIQUE);
+	vdbe_emit_index_drop(parse_context, name, space->def,
+			     ER_NO_SUCH_CONSTRAINT, false);
 	sqlVdbeCountChanges(v);
 	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 }
@@ -2381,7 +2363,7 @@ index_fill_def(struct Parse *parse, struct index *index,
 	}
 	for (int i = 0; i < expr_list->nExpr; i++) {
 		struct Expr *expr = expr_list->a[i].pExpr;
-		sql_resolve_self_reference(parse, space_def, NC_IdxExpr, expr);
+		sql_resolve_self_reference(parse, space_def, expr);
 		if (parse->is_aborted)
 			goto cleanup;
 

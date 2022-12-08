@@ -185,7 +185,6 @@ set(box_sources
     space_cache.c
     space_def.c
     sequence.c
-    ck_constraint.c
     constraint_id.c
     func.c
     func_cache.c

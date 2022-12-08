@@ -892,7 +892,6 @@ box.schema.space.drop = function(space_id, space_name, opts)
     local _vindex = box.space[box.schema.VINDEX_ID]
     local _truncate = box.space[box.schema.TRUNCATE_ID]
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
-    local _ck_constraint = box.space[box.schema.CK_CONSTRAINT_ID]
     local _func_index = box.space[box.schema.FUNC_INDEX_ID]
     local sequence_tuple = _space_sequence:delete{space_id}
     if sequence_tuple ~= nil and sequence_tuple.is_generated == true then
@@ -901,9 +900,6 @@ box.schema.space.drop = function(space_id, space_name, opts)
     end
     for _, t in _trigger.index.space_id:pairs({space_id}) do
         _trigger:delete({t.name})
-    end
-    for _, t in _ck_constraint.index.primary:pairs({space_id}) do
-        _ck_constraint:delete({space_id, t.name})
     end
     for _, t in _func_index.index.primary:pairs({space_id}) do
         _func_index:delete({space_id, t.index_id})
@@ -1905,15 +1901,6 @@ local function check_primary_index(space)
 end
 box.internal.check_primary_index = check_primary_index -- for net.box
 
--- Helper function to check ck_constraint:method() usage
-local function check_ck_constraint_arg(ck_constraint, method)
-    if type(ck_constraint) ~= 'table' or ck_constraint.name == nil then
-        local fmt = 'Use ck_constraint:%s(...) instead of ck_constraint.%s(...)'
-        error(string.format(fmt, method, method))
-    end
-end
-box.internal.check_ck_constraint_arg = check_ck_constraint_arg
-
 local internal_schema_version_warn_once = false
 box.internal.schema_version = function()
     if not internal_schema_version_warn_once then
@@ -2715,16 +2702,6 @@ space_mt.auto_increment = function(space, tuple)
     table.insert(tuple, 1, max + 1)
     return space:insert(tuple)
 end
--- Manage space ck constraints
-space_mt.create_check_constraint = function(space, name, code)
-    check_space_arg(space, 'create_constraint')
-    if name == nil or code == nil then
-        box.error(box.error.PROC_LUA,
-                  "Usage: space:create_constraint(name, code)")
-    end
-    box.space._ck_constraint:insert({space.id, name, false, 'SQL', code, true})
-    return space.ck_constraint[name]
-end
 space_mt.pairs = function(space, key, opts)
     check_space_arg(space, 'pairs')
     local pk = space.index[0]
@@ -2779,26 +2756,6 @@ end
 space_mt.frommap = box.internal.space.frommap
 space_mt.__index = space_mt
 
-local ck_constraint_mt = {}
-ck_constraint_mt.drop = function(ck_constraint)
-    check_ck_constraint_arg(ck_constraint, 'drop')
-    box.space._ck_constraint:delete({ck_constraint.space_id, ck_constraint.name})
-end
-ck_constraint_mt.enable = function(ck_constraint, yesno)
-    check_ck_constraint_arg(ck_constraint, 'enable')
-    local s = builtin.space_by_id(ck_constraint.space_id)
-    if s == nil then
-        box.error(box.error.NO_SUCH_SPACE, tostring(ck_constraint.space_id))
-    end
-    local t = box.space._ck_constraint:get({ck_constraint.space_id,
-                                            ck_constraint.name})
-    if t == nil then
-        box.error(box.error.NO_SUCH_CONSTRAINT, tostring(ck_constraint.name))
-    end
-    box.space._ck_constraint:update({ck_constraint.space_id, ck_constraint.name},
-                                    {{'=', 6, yesno}})
-end
-
 box.schema.index_mt = base_index_mt
 box.schema.memtx_index_mt = memtx_index_mt
 box.schema.vinyl_index_mt = vinyl_index_mt
@@ -2845,11 +2802,6 @@ function box.schema.space.bless(space)
         for j, index in pairs(space.index) do
             if type(j) == 'number' then
                 setmetatable(index, wrap_schema_object_mt(index_mt_name))
-            end
-        end
-        for j, ck_constraint in pairs(space.ck_constraint) do
-            if type(j) == 'string' then
-                setmetatable(ck_constraint, {__index = ck_constraint_mt})
             end
         end
     end

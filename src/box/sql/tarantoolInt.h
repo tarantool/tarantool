@@ -41,6 +41,20 @@ struct fk_constraint_def {
 	char name[0];
 };
 
+/** Check constraint definition. */
+struct ck_constraint_def {
+	/** The 0-terminated string that defines check constraint expression. */
+	char *expr_str;
+	/** The id of the space this check constraint is defined for. */
+	uint32_t space_id;
+	/** True if this is a field constraint, false otherwise. */
+	bool is_field_ck;
+	/** Fieldno of the field contains the constraint. */
+	uint32_t fieldno;
+	/** The 0-terminated string, a name of the check constraint. */
+	char name[0];
+};
+
 /* Storage interface. */
 const void *tarantoolsqlPayloadFetch(BtCursor * pCur, u32 * pAmt);
 

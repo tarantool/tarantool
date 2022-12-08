@@ -679,12 +679,6 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			if (ExprHasProperty(pExpr, EP_xIsSelect)) {
 				int nRef = pNC->nRef;
 				assert((pNC->ncFlags & NC_IdxExpr) == 0);
-				if (pNC->ncFlags & NC_IsCheck) {
-					diag_set(ClientError,
-						 ER_CK_DEF_UNSUPPORTED,
-						 "Subqueries");
-					pParse->is_aborted = true;
-				}
 				sqlWalkSelect(pWalker, pExpr->x.pSelect);
 				assert(pNC->nRef >= nRef);
 				if (nRef != pNC->nRef) {
@@ -695,7 +689,6 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			break;
 		}
 	case TK_VARIABLE:{
-			assert((pNC->ncFlags & NC_IsCheck) == 0);
 			if (pNC->ncFlags & NC_IdxExpr) {
 				diag_set(ClientError, ER_INDEX_DEF_UNSUPPORTED,
 					 "Parameter markers");
@@ -1530,14 +1523,13 @@ sqlResolveSelectNames(Parse * pParse,	/* The parser context */
 
 void
 sql_resolve_self_reference(struct Parse *parser, struct space_def *def,
-			   int type, struct Expr *expr)
+			   struct Expr *expr)
 {
 	/* Fake SrcList for parser->create_table_def */
 	SrcList sSrc;
 	/* Name context for parser->create_table_def  */
 	NameContext sNC;
 
-	assert(type == NC_IsCheck || type == NC_IdxExpr);
 	memset(&sNC, 0, sizeof(sNC));
 	memset(&sSrc, 0, sizeof(sSrc));
 	sSrc.nSrc = 1;
@@ -1549,6 +1541,6 @@ sql_resolve_self_reference(struct Parse *parser, struct space_def *def,
 	sSrc.a[0].iCursor = -1;
 	sNC.pParse = parser;
 	sNC.pSrcList = &sSrc;
-	sNC.ncFlags = type;
+	sNC.ncFlags = NC_IdxExpr;
 	sqlResolveExprNames(&sNC, expr);
 }

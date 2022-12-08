@@ -1707,7 +1707,6 @@ struct NameContext {
  *
  */
 #define NC_AllowAgg  0x0001	/* Aggregate functions are allowed here */
-#define NC_IsCheck   0x0004	/* True if resolving names in a CHECK constraint */
 #define NC_InAggFunc 0x0008	/* True if analyzing arguments to an agg func */
 #define NC_HasAgg    0x0010	/* One or more aggregate functions seen */
 #define NC_IdxExpr   0x0020	/* True if resolving columns of CREATE INDEX */
@@ -3206,8 +3205,6 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
  *                         Triggers are fired, foreign keys
  *                         constraints are checked.
  *
- *  CHECK       REPLACE    Illegal. Results in an exception.
- *
  * @param parse_context Current parsing context.
  * @param space The space being inserted or updated.
  * @param new_tuple_reg First register in a range holding values
@@ -3223,25 +3220,6 @@ vdbe_emit_constraint_checks(struct Parse *parse_context,
 			    struct space *space, int new_tuple_reg,
 			    enum on_conflict_action on_conflict,
 			    int ignore_label, int *upd_cols);
-
-/**
- * Gnerate code to make check constraints tests on tuple insertion
- * on INSERT, REPLACE or UPDATE operations.
- * @param parser Current parsing context.
- * @param expr Check constraint AST.
- * @param name Check constraint name to raise an informative
- *             error.
- * @param expr_str Ck constraint expression source string to
- *                 raise an informative error.
- * @param vdbe_field_ref_reg The VDBE register with prepared
- *                           vdbe_field_ref_reg pointer inside is
- *                           initialized with a tuple to be
- *                           inserted.
- */
-void
-vdbe_emit_ck_constraint(struct Parse *parser, struct Expr *expr,
-			const char *name, const char *expr_str,
-			int vdbe_field_ref_reg);
 
 /**
  * This routine generates code to finish the INSERT or UPDATE operation that was
@@ -3896,15 +3874,6 @@ extern int sqlPendingByte;
  */
 void
 sql_alter_table_rename(struct Parse *parse);
-
-/**
- * Generate code to implement the "ALTER TABLE xxx ENABLE/DISABLE
- * CHECK CONSTRAINT" command.
- *
- * @param parse Current parsing context.
- */
-void
-sql_alter_ck_constraint_enable(struct Parse *parse);
 
 /**
  * Return the length (in bytes) of the token that begins at z[0].

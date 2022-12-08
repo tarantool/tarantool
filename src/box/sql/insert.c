@@ -37,7 +37,6 @@
 #include "tarantoolInt.h"
 #include "mem.h"
 #include "vdbeInt.h"
-#include "box/ck_constraint.h"
 #include "bit/bit.h"
 #include "box/box.h"
 #include "box/schema.h"
@@ -783,25 +782,6 @@ sqlInsert(Parse * pParse,	/* Parser context */
 }
 
 void
-vdbe_emit_ck_constraint(struct Parse *parser, struct Expr *expr,
-			const char *name, const char *expr_str,
-			int vdbe_field_ref_reg)
-{
-	parser->vdbe_field_ref_reg = vdbe_field_ref_reg;
-	struct Vdbe *v = sqlGetVdbe(parser);
-	VdbeNoopComment((v, "BEGIN: ck constraint %s test", name));
-	int check_is_passed = sqlVdbeMakeLabel(v);
-	sqlExprIfTrue(parser, expr, check_is_passed, SQL_JUMPIFNULL);
-	const char *fmt = tnt_errcode_desc(ER_CK_CONSTRAINT_FAILED);
-	const char *error_msg = tt_sprintf(fmt, name, expr_str);
-	sqlVdbeAddOp4(v, OP_SetDiag, ER_CK_CONSTRAINT_FAILED, 0, 0,
-		      sql_xstrdup(error_msg), P4_DYNAMIC);
-	sqlVdbeAddOp2(v, OP_Halt, -1, ON_CONFLICT_ACTION_ABORT);
-	VdbeNoopComment((v, "END: ck constraint %s test", name));
-	sqlVdbeResolveLabel(v, check_is_passed);
-}
-
-void
 vdbe_emit_constraint_checks(struct Parse *parse_context, struct space *space,
 			    int new_tuple_reg,
 			    enum on_conflict_action on_conflict,
@@ -1149,13 +1129,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		if (pSrcIdx == NULL)
 			return 0;
 	}
-	/*
-	 * Dissallow the transfer optimization if the are check
-	 * constraints.
-	 */
-	if (!rlist_empty(&dest->ck_constraint) ||
-	    !rlist_empty(&src->ck_constraint))
-		return 0;
 
 	/* If we get this far, it means that the xfer optimization is at
 	 * least a possibility, though it might only work if the destination
