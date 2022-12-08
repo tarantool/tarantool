@@ -17,6 +17,11 @@
  * Tarantool 2.8.
  *
  * [1]: https://github.com/picodata/tarantool-module
+ *
+ * fiber_lua_state() is used in [2] to eliminate dependency from
+ * fiber.h. See gh-8025.
+ *
+ * [2]: test/box-tap/check_merge_source.c
  */
 
 extern void
@@ -45,6 +50,8 @@ extern void
 ipc_value_delete(void);
 extern void
 ipc_value_new(void);
+extern void
+fiber_lua_state(void);
 
 /** Symbol definition. */
 struct symbol_def {
@@ -68,6 +75,7 @@ static struct symbol_def symbols[] = {
 	{"fiber_channel_put_timeout", fiber_channel_put_timeout},
 	{"ipc_value_delete", ipc_value_delete},
 	{"ipc_value_new", ipc_value_new},
+	{"fiber_lua_state", fiber_lua_state},
 	{NULL, NULL}
 };
 

@@ -2096,3 +2096,9 @@ int fiber_stat(fiber_stat_cb cb, void *cb_ctx)
 	}
 	return 0;
 }
+
+struct lua_State *
+fiber_lua_state(struct fiber *f)
+{
+	return f->storage.lua.stack;
+}
