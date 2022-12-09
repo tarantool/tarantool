@@ -75,7 +75,6 @@ Requires(preun): initscripts
 %undefine __cc
 
 %if %{with backtrace}
-BuildRequires: libunwind-devel
 #
 # Disable stripping of /usr/bin/tarantool to allow the debug symbols
 # in runtime. Tarantool uses the debug symbols to display fiber's stack
