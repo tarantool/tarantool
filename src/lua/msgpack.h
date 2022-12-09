@@ -63,11 +63,22 @@ luamp_error(void *);
 enum { LUAMP_ALLOC_FACTOR = 256 };
 
 /**
- * Pushes to the Lua stack a new msgpack object and stores the given msgpack
- * data in it. The new object uses the default serializer for decoding.
+ * Pushes a new MsgPack object and stores the given MsgPack data in it.
+ * The new object uses the default serializer for decoding.
+ * Passes a translation table to the MsgPack object which contains aliases for
+ * string keys used during indexation.
+ * The translation table must use `lua_hash` as the hash function.
  */
 void
-luamp_push(struct lua_State *L, const char *data, const char *data_end);
+luamp_push_with_translation(struct lua_State *L, const char *data,
+			    const char *data_end,
+			    struct mh_strnu32_t *translation);
+
+static inline void
+luamp_push(struct lua_State *L, const char *data, const char *data_end)
+{
+	luamp_push_with_translation(L, data, data_end, NULL);
+}
 
 /**
  * Returns a pointer to the msgpack data and writes the length of the data to
