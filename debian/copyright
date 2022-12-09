@@ -291,11 +291,6 @@ Files: third_party/lua-yaml/*
 Copyright: 2009, Andrew Danforth <acd@weirdness.net>
 License: Expat
 
-Files: ./third_party/sha1.*
-Copyright: Steve Reid <steve@edmweb.com>
-License: Public-Domain
- Public Domain.
-
 Files: third_party/zstd/*
 Copyright: 2014-2015, Yann Collet
 License: BSD-2-Clause
