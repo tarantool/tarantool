@@ -37,9 +37,6 @@
 extern "C" {
 #endif
 
-unsigned char *
-SHA1internal(const unsigned char *d, size_t n, unsigned char *md);
-
 struct lua_State;
 
 void

@@ -31,7 +31,6 @@
 
 #include <string.h>
 #include <lua/digest.h>
-#include <sha1.h>
 #include <openssl/evp.h>
 #include <coio_task.h>
 #include <lua.h>
@@ -40,20 +39,6 @@
 #include "crc32.h"
 
 #define PBKDF2_MAX_DIGEST_SIZE 128
-
-unsigned char *
-SHA1internal(const unsigned char *d, size_t n, unsigned char *md)
-{
-	static __thread unsigned char result[20];
-	SHA1_CTX ctx;
-	SHA1Init(&ctx);
-	SHA1Update(&ctx, d, n);
-	SHA1Final(result, &ctx);
-
-	if (md)
-		memcpy(md, result, 20);
-	return result;
-}
 
 static ssize_t
 digest_pbkdf2_f(va_list ap)

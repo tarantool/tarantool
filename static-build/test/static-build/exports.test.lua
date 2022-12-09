@@ -29,7 +29,6 @@ local check_symbols = {
     'cord_ibuf_drop',
     'cord_ibuf_put',
     'cord_ibuf_take',
-    'SHA1internal',
     'random_bytes',
     'fiber_time',
     'ibuf_create',

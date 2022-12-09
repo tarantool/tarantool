@@ -28,7 +28,7 @@ digest.md5()
 ...
 digest.sha1()
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.sha1(string)'
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha1(string)'
 ...
 digest.sha224()
 ---
@@ -87,7 +87,7 @@ digest.md5(12345LL)
 ...
 digest.sha1(12345LL)
 ---
-- error: 'builtin/digest.lua:<line>"]: Usage: digest.sha1(string)'
+- error: 'builtin/crypto.lua:<line>"]: Usage: digest.sha1(string)'
 ...
 digest.sha224(12345LL)
 ---

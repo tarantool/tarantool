@@ -8,9 +8,6 @@ local cord_ibuf_take = buffer.internal.cord_ibuf_take
 local cord_ibuf_put = buffer.internal.cord_ibuf_put
 
 ffi.cdef[[
-    /* internal implementation */
-    unsigned char *SHA1internal(const unsigned char *d, size_t n, unsigned char *md);
-
     /* from libc */
     int snprintf(char *str, size_t size, const char *format, ...);
 
@@ -85,6 +82,7 @@ local BASE64_NOWRAP = 2
 local BASE64_URLSAFE = 7
 
 local digest_shortcuts = {
+    sha1    = 'SHA1',
     sha224  = 'SHA224',
     sha256  = 'SHA256',
     sha384  = 'SHA384',
@@ -249,22 +247,6 @@ local m = {
             error("Usage: digest.crc32_update(string)")
         end
         return builtin.crc32_calc(tonumber(crc), str, string.len(str))
-    end,
-
-    sha1 = function(str)
-        if type(str) ~= 'string' then
-            error("Usage: digest.sha1(string)")
-        end
-        local r = builtin.SHA1internal(str, #str, nil)
-        return ffi.string(r, 20)
-    end,
-
-    sha1_hex = function(str)
-        if type(str) ~= 'string' then
-            error("Usage: digest.sha1_hex(string)")
-        end
-        local r = builtin.SHA1internal(str, #str, nil)
-        return string.hex(ffi.string(r, 20))
     end,
 
     guava = function(state, buckets)
