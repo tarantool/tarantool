@@ -227,8 +227,11 @@ test_xrow_header_encode_decode()
 		header.is_commit = opt_idx & 0x01;
 		header.wait_sync = opt_idx >> 1 & 0x01;
 		header.wait_ack = opt_idx >> 2 & 0x01;
+		int iovcnt;
 		struct iovec vec[1];
-		is(1, xrow_header_encode(&header, sync, vec, 200), "encode");
+		xrow_header_encode(&header, sync, /*fixheader_len=*/200,
+				   vec, &iovcnt);
+		is(1, iovcnt, "encode");
 		int fixheader_len = 200;
 		pos = (char *)vec[0].iov_base + fixheader_len;
 		uint32_t exp_map_size = 6;
@@ -375,8 +378,10 @@ test_xrow_encode_dml(void)
 	r.new_tuple = "new tuple";
 	r.new_tuple_end = r.new_tuple + strlen(r.new_tuple);
 
+	int iovcnt;
 	struct iovec iov[1];
-	is(xrow_encode_dml(&r, &fiber()->gc, iov), 1, "xrow_encode_dml rc");
+	xrow_encode_dml(&r, &fiber()->gc, iov, &iovcnt);
+	is(iovcnt, 1, "xrow_encode_dml rc");
 	const char *data = (const char *)iov[0].iov_base;
 	int map_size = mp_decode_map(&data);
 	is(map_size, 9, "decoded request map");

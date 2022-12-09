@@ -393,8 +393,7 @@ box_raft_write(struct raft *raft, const struct raft_msg *msg)
 	struct journal_entry *entry = (struct journal_entry *)buf;
 	entry->rows[0] = &row;
 
-	if (xrow_encode_raft(&row, region, &req) != 0)
-		goto fail;
+	xrow_encode_raft(&row, region, &req);
 	journal_entry_create(entry, 1, xrow_approx_len(&row),
 			     journal_entry_fiber_wakeup_cb, fiber());
 	bool is_err = journal_write(entry) != 0;

@@ -479,7 +479,7 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
 	/* Respond to the JOIN request with the current vclock. */
 	struct xrow_header row;
 	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_vclock_xc(&row, vclock);
+	xrow_encode_vclock(&row, vclock);
 	row.sync = sync;
 	coio_write_xrow(relay->io, &row);
 
@@ -786,7 +786,7 @@ relay_send_heartbeat(struct relay *relay)
 	try {
 		++relay->last_sent_ack.vclock_sync;
 		RegionGuard region_guard(&fiber()->gc);
-		xrow_encode_relay_heartbeat_xc(&row, &relay->last_sent_ack);
+		xrow_encode_relay_heartbeat(&row, &relay->last_sent_ack);
 		row.tm = ev_now(loop());
 		row.replica_id = instance_id;
 		relay_send(relay, &row);

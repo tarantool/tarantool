@@ -803,8 +803,7 @@ checkpoint_write_raft(struct xlog *l, const struct raft_request *req)
 	struct xrow_header row;
 	struct region *region = &fiber()->gc;
 	RegionGuard region_guard(&fiber()->gc);
-	if (xrow_encode_raft(&row, region, req) != 0)
-		return -1;
+	xrow_encode_raft(&row, region, req);
 	if (checkpoint_write_row(l, &row) != 0)
 		return -1;
 	return 0;
