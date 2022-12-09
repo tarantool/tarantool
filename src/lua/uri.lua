@@ -289,41 +289,45 @@ local function unescape(buf, opts)
     return ffi.string(dst, dst_size)
 end
 
-local function encode_kv(key, values, res)
+local function encode_kv(key, values, res, escape_opts)
     local val = values
     if type(val) ~= "table" then
         val = { val }
     end
+    local key_escaped= escape(tostring(key), escape_opts)
 
     -- { a = {} } --> "a"
     if next(val) == nil then
-        table.insert(res, key)
+        table.insert(res, key_escaped)
     end
 
     -- { a = { "b" } } --> "a=c"
     for _, v in pairs(val) do
-        local kv = ("%s=%s"):format(key, v)
+        local val_escaped = escape(tostring(v), escape_opts)
+        local kv = ("%s=%s"):format(key_escaped, val_escaped)
         table.insert(res, kv)
     end
 end
 
--- Encode map to a string.
-local function params(opts)
+-- Encode map to a string and perform escaping of keys and values in
+-- parameters.
+local function params(opts, escape_opts)
     if opts == nil then
         return ""
     end
     if type(opts) ~= "table" then
-        error("Usage: uri.params(table)")
+        error("Usage: uri.params(table[, escape_opts])")
     end
     if next(opts) == nil then
         return ""
     end
     local res = {}
     for key, value in pairs(opts) do
-        if type(key) ~= "string" then
-            error("uri.params: keys must have a type 'string'")
+        if type(key) ~= "string" and
+           type(key) ~= "number" then
+            error("uri.params: keys must have a type 'string' or 'number'")
         end
-        encode_kv(key, value, res)
+        encode_kv(key, value, res, escape_opts)
     end
 
     return table.concat(res, '&')
