@@ -19,17 +19,19 @@ local function recursive_rmdir(path)
     end
     for _, file in ipairs(path_content) do
         local stat = fio.stat(file)
-        if stat:is_dir() then
-            recursive_rmdir(file)
-        else
-            if fio.unlink(file) == false then
-                print(string.format('!!! failed to unlink file "%s"', file))
-                print(string.format('!!! [errno %s]: %s', errno(), errno.strerror()))
+        if stat ~= nil then
+            if stat:is_dir() then
+                recursive_rmdir(file)
+            else
+                if fio.unlink(file) == false then
+                    print(string.format('!!! failed to unlink file "%s"', file))
+                    print(string.format('!!! [errno %s]: %s', errno(), errno.strerror()))
+                end
             end
         end
     end
     if fio.rmdir(path) == false then
-        print(string.format('!!! failed to rmdir path "%s"', file))
+        print(string.format('!!! failed to rmdir path "%s"', path))
         print(string.format('!!! [errno %s]: %s', errno(), errno.strerror()))
     end
 end
