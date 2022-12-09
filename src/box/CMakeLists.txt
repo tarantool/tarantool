@@ -98,7 +98,7 @@ target_link_libraries(box_error core stat mpstream vclock)
 
 add_library(xrow STATIC xrow.c iproto_constants.c iproto_features.c)
 target_link_libraries(xrow server core small vclock misc box_error
-                      scramble ${MSGPUCK_LIBRARIES})
+                      ${MSGPUCK_LIBRARIES})
 
 set(tuple_sources
     tuple.c
@@ -324,7 +324,7 @@ add_custom_command(OUTPUT ${SQL_BIN_DIR}/opcodes.c
     DEPENDS ${SQL_SRC_DIR}/vdbe.c ${EXT_SRC_DIR}/mkopcodec.sh ${SQL_BIN_DIR}/parse.h
         ${SQL_BIN_DIR}/opcodes.h)
 
-target_link_libraries(box box_error tuple stat xrow xlog vclock crc32 scramble
-                      raft ${common_libraries})
+target_link_libraries(box box_error tuple stat xrow xlog vclock crc32 raft
+                      ${common_libraries})
 
 add_dependencies(box build_bundled_libs generate_sql_files)

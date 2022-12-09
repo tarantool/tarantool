@@ -116,9 +116,6 @@ endif()
 add_library(stat STATIC rmean.c latency.c histogram.c)
 target_link_libraries(stat core)
 
-add_library(scramble STATIC scramble.c)
-target_link_libraries(scramble core misc)
-
 add_library(cpu_feature STATIC cpu_feature.c)
 
 add_library(crc32 STATIC

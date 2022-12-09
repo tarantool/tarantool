@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "authentication.h"
 #include "base64.h"
@@ -17,9 +18,38 @@
 #include "error.h"
 #include "fiber.h"
 #include "msgpuck.h"
-#include "scramble.h"
+#include "sha1.h"
 #include "small/region.h"
 #include "trivia/util.h"
+
+/**
+ * These are the core bits of the built-in Tarantool
+ * authentication. They implement the same algorithm as
+ * in MySQL 4.1 authentication:
+ *
+ * SERVER:  seed = create_random_string()
+ *          send(seed)
+ *
+ * CLIENT:  recv(seed)
+ *          hash1 = sha1("password")
+ *          hash2 = sha1(hash1)
+ *          reply = xor(hash1, sha1(seed, hash2))
+ *
+ *          ^^ these steps are done in scramble_prepare()
+ *
+ *          send(reply)
+ *
+ *
+ * SERVER:  recv(reply)
+ *
+ *          hash1 = xor(reply, sha1(seed, hash2))
+ *          candidate_hash2 = sha1(hash1)
+ *          check(candidate_hash2 == hash2)
+ *
+ *          ^^ these steps are done in scramble_check()
+ */
+
+enum { SCRAMBLE_SIZE = 20, SCRAMBLE_BASE64_SIZE = 28 };
 
 static_assert((int)SCRAMBLE_SIZE <= (int)AUTH_SALT_SIZE,
 	      "SCRAMBLE_SIZE must be less than or equal to AUTH_SALT_SIZE");
@@ -33,6 +63,94 @@ struct auth_chap_sha1_authenticator {
 	/** sha1(sha1(password)). */
 	char hash2[SCRAMBLE_SIZE];
 };
+
+static void
+xor(unsigned char *to, unsigned const char *left,
+    unsigned const char *right, uint32_t len)
+{
+	const uint8_t *end = to + len;
+	while (to < end)
+		*to++ = *left++ ^ *right++;
+}
+
+/**
+ * Prepare a scramble (cipher) to send over the wire
+ * to the server for authentication.
+ */
+static void
+scramble_prepare(void *out, const void *salt, const void *password,
+		 int password_len)
+{
+	unsigned char hash1[SCRAMBLE_SIZE];
+	unsigned char hash2[SCRAMBLE_SIZE];
+	SHA1_CTX ctx;
+
+	SHA1Init(&ctx);
+	SHA1Update(&ctx, password, password_len);
+	SHA1Final(hash1, &ctx);
+
+	SHA1Init(&ctx);
+	SHA1Update(&ctx, hash1, SCRAMBLE_SIZE);
+	SHA1Final(hash2, &ctx);
+
+	SHA1Init(&ctx);
+	SHA1Update(&ctx, salt, SCRAMBLE_SIZE);
+	SHA1Update(&ctx, hash2, SCRAMBLE_SIZE);
+	SHA1Final(out, &ctx);
+
+	xor(out, hash1, out, SCRAMBLE_SIZE);
+}
+
+/**
+ * Verify a password.
+ *
+ * @retval 0  passwords do match
+ * @retval !0 passwords do not match
+ */
+static int
+scramble_check(const void *scramble, const void *salt, const void *hash2)
+{
+	SHA1_CTX ctx;
+	unsigned char candidate_hash2[SCRAMBLE_SIZE];
+
+	SHA1Init(&ctx);
+	SHA1Update(&ctx, salt, SCRAMBLE_SIZE);
+	SHA1Update(&ctx, hash2, SCRAMBLE_SIZE);
+	SHA1Final(candidate_hash2, &ctx);
+
+	xor(candidate_hash2, candidate_hash2, scramble, SCRAMBLE_SIZE);
+	/*
+	 * candidate_hash2 now supposedly contains hash1, turn it
+	 * into hash2
+	 */
+	SHA1Init(&ctx);
+	SHA1Update(&ctx, candidate_hash2, SCRAMBLE_SIZE);
+	SHA1Final(candidate_hash2, &ctx);
+
+	return memcmp(hash2, candidate_hash2, SCRAMBLE_SIZE);
+}
+
+/**
+ * Prepare a password hash as is stored in the _user space.
+ * @pre out must be at least SCRAMBLE_BASE64_SIZE
+ * @post out contains base64_encode(sha1(sha1(password)), 0)
+ */
+static void
+password_prepare(const char *password, int len, char *out, int out_len)
+{
+	unsigned char hash2[SCRAMBLE_SIZE];
+	SHA1_CTX ctx;
+
+	SHA1Init(&ctx);
+	SHA1Update(&ctx, (const unsigned char *)password, len);
+	SHA1Final(hash2, &ctx);
+
+	SHA1Init(&ctx);
+	SHA1Update(&ctx, hash2, SCRAMBLE_SIZE);
+	SHA1Final(hash2, &ctx);
+
+	base64_encode((char *)hash2, SCRAMBLE_SIZE, out, out_len, 0);
+}
 
 /** auth_method::auth_method_delete */
 static void

@@ -19,7 +19,6 @@
 #include "error.h"
 #include "fiber.h"
 #include "msgpuck.h"
-#include "scramble.h"
 #include "session.h"
 #include "small/region.h"
 #include "tt_static.h"

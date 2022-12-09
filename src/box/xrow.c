@@ -41,11 +41,16 @@
 #include "tt_static.h"
 #include "error.h"
 #include "mp_error.h"
-#include "scramble.h"
 #include "iproto_constants.h"
 #include "iproto_features.h"
 #include "mpstream/mpstream.h"
 #include "errinj.h"
+
+/**
+ * Min length of the salt sent in a greeting message.
+ * Since it's used for authentication, it must be >= AUTH_SALT_SIZE.
+ */
+enum { GREETING_SALT_LEN_MIN = 20 };
 
 static_assert(IPROTO_DATA < 0x7f && IPROTO_METADATA < 0x7f &&
 	      IPROTO_SQL_INFO < 0x7f, "encoded IPROTO_BODY keys must fit into "\
@@ -2358,7 +2363,8 @@ greeting_decode(const char *greetingbuf, struct greeting *greeting)
 	greeting->salt_len = base64_decode(greetingbuf + h, h - 1,
 					   greeting->salt,
 					   sizeof(greeting->salt));
-	if (greeting->salt_len < SCRAMBLE_SIZE || greeting->salt_len >= (uint32_t)h)
+	if (greeting->salt_len < GREETING_SALT_LEN_MIN ||
+	    greeting->salt_len >= (uint32_t)h)
 		return -1;
 
 	return 0;
