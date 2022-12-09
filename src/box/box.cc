@@ -3240,8 +3240,12 @@ box_on_join(const tt_uuid *instance_uuid)
 }
 
 void
-box_process_auth(struct auth_request *request, const char *salt)
+box_process_auth(struct auth_request *request,
+		 const char *salt, uint32_t salt_len)
 {
+	assert(salt_len >= AUTH_SALT_SIZE);
+	(void)salt_len;
+
 	rmean_collect(rmean_box, IPROTO_AUTH, 1);
 
 	/* Check that bootstrap has been finished */

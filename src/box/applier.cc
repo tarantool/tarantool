@@ -436,6 +436,7 @@ applier_connect(struct applier *applier)
 	RegionGuard region_guard(&fiber()->gc);
 	const struct auth_method *method = AUTH_METHOD_DEFAULT;
 	const char *auth_request, *auth_request_end;
+	assert(greeting.salt_len >= AUTH_SALT_SIZE);
 	auth_request_prepare(method, password, strlen(password), greeting.salt,
 			     &auth_request, &auth_request_end);
 	xrow_encode_auth(&row, uri->login, strlen(uri->login),

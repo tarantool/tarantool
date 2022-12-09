@@ -21,6 +21,9 @@
 #include "small/region.h"
 #include "trivia/util.h"
 
+static_assert((int)SCRAMBLE_SIZE <= (int)AUTH_SALT_SIZE,
+	      "SCRAMBLE_SIZE must be less than or equal to AUTH_SALT_SIZE");
+
 #define AUTH_CHAP_SHA1_NAME "chap-sha1"
 
 /** chap-sha1 authenticator implementation. */

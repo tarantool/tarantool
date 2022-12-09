@@ -14,6 +14,9 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+/** Size of salt used for authentication. */
+enum { AUTH_SALT_SIZE = 20 };
+
 struct auth_method;
 
 /** Default authentication method. */

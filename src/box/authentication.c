@@ -41,7 +41,7 @@ authenticate_password(const struct authenticator *auth,
 	 * authenticate_request. We zero it solely to avoid address sanitizer
 	 * complaints about usage of uninitialized memory.
 	 */
-	const char salt[SCRAMBLE_SIZE] = {0};
+	const char salt[AUTH_SALT_SIZE] = {0};
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	const char *auth_request, *auth_request_end;

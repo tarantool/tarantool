@@ -683,8 +683,11 @@ netbox_encode_id(struct lua_State *L, struct ibuf *ibuf, uint64_t sync)
  */
 static void
 netbox_encode_auth(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
-		   const char *user, const char *password, const char *salt)
+		   const char *user, const char *password, const char *salt,
+		   uint32_t salt_len)
 {
+	assert(salt_len >= AUTH_SALT_SIZE);
+	(void)salt_len;
 	if (password == NULL)
 		password = "";
 	struct region *region = &fiber()->gc;
@@ -2619,7 +2622,8 @@ netbox_transport_do_auth(struct netbox_transport *transport,
 		return;
 	netbox_encode_auth(L, &transport->send_buf, transport->next_sync++,
 			   opts->user, opts->password,
-			   transport->greeting.salt);
+			   transport->greeting.salt,
+			   transport->greeting.salt_len);
 	struct xrow_header hdr;
 	if (netbox_transport_send_and_recv(transport, &hdr) != 0)
 		luaT_error(L);

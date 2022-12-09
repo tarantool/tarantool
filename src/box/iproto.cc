@@ -2280,7 +2280,8 @@ tx_process_misc(struct cmsg *m)
 		header = obuf_create_svp(out);
 		switch (msg->header.type) {
 		case IPROTO_AUTH:
-			box_process_auth(&msg->auth, con->salt);
+			box_process_auth(&msg->auth, con->salt,
+					 IPROTO_SALT_SIZE);
 			iproto_reply_ok_xc(out, msg->header.sync,
 					   ::schema_version);
 			break;
