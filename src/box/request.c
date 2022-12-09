@@ -56,18 +56,15 @@
  * the master's component of the replica's vclock and hence won't
  * try to apply the same row again on reconnect.
  */
-static int
+static void
 request_update_header(struct request *request, struct xrow_header *row,
 		      struct region *region)
 {
 	if (row == NULL)
-		return 0;
+		return;
 	row->type = request->type;
-	row->bodycnt = xrow_encode_dml(request, region, row->body);
-	if (row->bodycnt < 0)
-		return -1;
+	xrow_encode_dml(request, region, row->body, &row->bodycnt);
 	request->header = row;
-	return 0;
 }
 
 int
@@ -84,7 +81,8 @@ request_create_from_tuple(struct request *request, struct space *space,
 		 * turn this request into no-op.
 		 */
 		request->type = IPROTO_NOP;
-		return request_update_header(request, row, region);
+		request_update_header(request, row, region);
+		return 0;
 	}
 	/*
 	 * Space pointer may be zero in case of NOP, in which case
@@ -122,7 +120,8 @@ request_create_from_tuple(struct request *request, struct space *space,
 		request->tuple_end = buf + size;
 		request->type = IPROTO_REPLACE;
 	}
-	return request_update_header(request, row, region);
+	request_update_header(request, row, region);
+	return 0;
 }
 
 void
@@ -244,5 +243,6 @@ request_handle_sequence(struct request *request, struct space *space,
 		if (likely(mp_read_int64(&key, &value) == 0))
 			return sequence_update(seq, value);
 	}
-	return request_update_header(request, request->header, region);
+	request_update_header(request, request->header, region);
+	return 0;
 }

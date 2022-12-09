@@ -134,18 +134,17 @@ xrow_approx_len(const struct xrow_header *row)
  * Encode xrow into a binary packet
  *
  * @param header xrow
+ * @param sync request sync number
+ * @param fixheader_len number of bytes to reserve for fixheader
  * @param[out] out iovec to store encoded packet
- * @param fixheader_len the number of bytes to reserve for fixheader
- *
- * @retval > 0 the number of iovector components used (<= XROW_IOVMAX)
- * @retval -1 on error (check diag)
+ * @param[out] iovcnt size of the out iovec array
  *
  * @pre out iovec must have space at least for XROW_IOVMAX members
- * @post retval <= XROW_IOVMAX
+ * @post iovcnt <= XROW_IOVMAX
  */
-int
+void
 xrow_header_encode(const struct xrow_header *header, uint64_t sync,
-		   struct iovec *out, size_t fixheader_len);
+		   size_t fixheader_len, struct iovec *out, int *iovcnt);
 
 /**
  * Decode xrow from a binary packet
@@ -239,14 +238,12 @@ xrow_decode_dml(struct xrow_header *xrow, struct request *request,
  * Encode the request fields to iovec using region_alloc().
  * @param request request to encode
  * @param region region to encode
- * @param copy_tuple if true then tuple is going to be copied to the region
- * @param iov[out] iovec to fill
- * @retval -1 on error, see diag
- * @retval > 0 the number of iovecs used
+ * @param[out] iov iovec to fill
+ * @param[out] iovcnt size of the out iovec array
  */
-int
+void
 xrow_encode_dml(const struct request *request, struct region *region,
-		struct iovec *iov);
+		struct iovec *iov, int *iovcnt);
 
 /**
  * IPROTO_ID request/response.
@@ -340,7 +337,7 @@ struct raft_request {
 	const struct vclock *vclock;
 };
 
-int
+void
 xrow_encode_raft(struct xrow_header *row, struct region *region,
 		 const struct raft_request *r);
 
@@ -425,11 +422,8 @@ xrow_decode_auth(const struct xrow_header *row, struct auth_request *request);
  * @param login_len Length of @login.
  * @param password User password.
  * @param password_len Length of @password.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
 */
-int
+void
 xrow_encode_auth(struct xrow_header *row, const char *salt, size_t salt_len,
 		 const char *login, size_t login_len, const char *password,
 		 size_t password_len);
@@ -483,7 +477,7 @@ struct register_request {
 };
 
 /** Encode REGISTER request. */
-int
+void
 xrow_encode_register(struct xrow_header *row,
 		     const struct register_request *req);
 
@@ -509,7 +503,7 @@ struct subscribe_request {
 };
 
 /** Encode SUBSCRIBE request. */
-int
+void
 xrow_encode_subscribe(struct xrow_header *row,
 		      const struct subscribe_request *req);
 
@@ -527,7 +521,7 @@ struct subscribe_response {
 };
 
 /** Encode SUBSCRIBE response. */
-int
+void
 xrow_encode_subscribe_response(struct xrow_header *row,
 			       const struct subscribe_response *rsp);
 
@@ -545,7 +539,7 @@ struct join_request {
 };
 
 /** Encode JOIN request. */
-int
+void
 xrow_encode_join(struct xrow_header *row, const struct join_request *req);
 
 /** Decode JOIN request. */
@@ -565,7 +559,7 @@ struct relay_heartbeat {
 };
 
 /** Encode relay heartbeat. */
-int
+void
 xrow_encode_relay_heartbeat(struct xrow_header *row,
 			    const struct relay_heartbeat *req);
 
@@ -588,7 +582,7 @@ struct applier_heartbeat {
 };
 
 /** Encode applier heartbeat. */
-int
+void
 xrow_encode_applier_heartbeat(struct xrow_header *row,
 			      const struct applier_heartbeat *req);
 
@@ -598,7 +592,7 @@ xrow_decode_applier_heartbeat(const struct xrow_header *row,
 			      struct applier_heartbeat *req);
 
 /** Encode vclock. */
-int
+void
 xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
 
 /** Decode vclock. */
@@ -882,12 +876,10 @@ greeting_decode(const char *greetingbuf, struct greeting *greeting);
  *
  * @param row Record to encode.
  * @param[out] out Encoded record.
- *
- * @retval >= 0 Used iovector components.
- * @retval   -1 Error.
+ * @param[out] iovcnt size of the out iovec array
  */
-int
-xrow_to_iovec(const struct xrow_header *row, struct iovec *out);
+void
+xrow_to_iovec(const struct xrow_header *row, struct iovec *out, int *iovcnt);
 
 /**
  * Decode ERROR and set it to diagnostics area.
@@ -966,16 +958,6 @@ xrow_header_decode_xc(struct xrow_header *header, const char **pos,
 		diag_raise();
 }
 
-/** @copydoc xrow_to_iovec. */
-static inline int
-xrow_to_iovec_xc(const struct xrow_header *row, struct iovec *out)
-{
-	int rc = xrow_to_iovec(row, out);
-	if (rc < 0)
-		diag_raise();
-	return rc;
-}
-
 /** @copydoc xrow_decode_error. */
 static inline void
 xrow_decode_error_xc(const struct xrow_header *row)
@@ -991,17 +973,6 @@ xrow_decode_dml_xc(struct xrow_header *row, struct request *request,
 {
 	if (xrow_decode_dml(row, request, key_map) != 0)
 		diag_raise();
-}
-
-/** @copydoc xrow_encode_dml. */
-static inline int
-xrow_encode_dml_xc(const struct request *request, struct region *region,
-		   struct iovec *iov)
-{
-	int iovcnt = xrow_encode_dml(request, region, iov);
-	if (iovcnt < 0)
-		diag_raise();
-	return iovcnt;
 }
 
 /** @copydoc xrow_decode_call. */
@@ -1022,40 +993,11 @@ xrow_decode_auth_xc(const struct xrow_header *row,
 		diag_raise();
 }
 
-/** @copydoc xrow_encode_auth. */
-static inline void
-xrow_encode_auth_xc(struct xrow_header *row, const char *salt, size_t salt_len,
-		    const char *login, size_t login_len, const char *password,
-		    size_t password_len)
-{
-	if (xrow_encode_auth(row, salt, salt_len, login, login_len, password,
-			     password_len) != 0)
-		diag_raise();
-}
-
 /** @copydoc xrow_decode_ballot. */
 static inline void
 xrow_decode_ballot_xc(const struct xrow_header *row, struct ballot *ballot)
 {
 	if (xrow_decode_ballot(row, ballot) != 0)
-		diag_raise();
-}
-
-/** @copydoc xrow_encode_register. */
-static inline void
-xrow_encode_register_xc(struct xrow_header *row,
-		       const struct register_request *req)
-{
-	if (xrow_encode_register(row, req) != 0)
-		diag_raise();
-}
-
-/** @copydoc xrow_encode_subscribe. */
-static inline void
-xrow_encode_subscribe_xc(struct xrow_header *row,
-			 const struct subscribe_request *req)
-{
-	if (xrow_encode_subscribe(row, req) != 0)
 		diag_raise();
 }
 
@@ -1065,14 +1007,6 @@ xrow_decode_subscribe_xc(const struct xrow_header *row,
 			 struct subscribe_request *req)
 {
 	if (xrow_decode_subscribe(row, req) != 0)
-		diag_raise();
-}
-
-/** @copydoc xrow_encode_join. */
-static inline void
-xrow_encode_join_xc(struct xrow_header *row, const struct join_request *req)
-{
-	if (xrow_encode_join(row, req) != 0)
 		diag_raise();
 }
 
@@ -1093,30 +1027,12 @@ xrow_decode_register_xc(const struct xrow_header *row,
 		diag_raise();
 }
 
-/** @copydoc xrow_encode_applier_heartbeat. */
-static inline void
-xrow_encode_applier_heartbeat_xc(struct xrow_header *row,
-				 const struct applier_heartbeat *req)
-{
-	if (xrow_encode_applier_heartbeat(row, req) != 0)
-		diag_raise();
-}
-
 /** @copydoc xrow_decode_applier_heartbeat. */
 static inline void
 xrow_decode_applier_heartbeat_xc(const struct xrow_header *row,
 				 struct applier_heartbeat *req)
 {
 	if (xrow_decode_applier_heartbeat(row, req) != 0)
-		diag_raise();
-}
-
-/** @copydoc xrow_encode_relay_heartbeat. */
-static inline void
-xrow_encode_relay_heartbeat_xc(struct xrow_header *row,
-			       const struct relay_heartbeat *req)
-{
-	if (xrow_encode_relay_heartbeat(row, req) != 0)
 		diag_raise();
 }
 
@@ -1129,28 +1045,11 @@ xrow_decode_relay_heartbeat_xc(const struct xrow_header *row,
 		diag_raise();
 }
 
-/** @copydoc xrow_encode_vclock. */
-static inline void
-xrow_encode_vclock_xc(struct xrow_header *row, const struct vclock *vclock)
-{
-	if (xrow_encode_vclock(row, vclock) != 0)
-		diag_raise();
-}
-
 /** @copydoc xrow_decode_vclock. */
 static inline void
 xrow_decode_vclock_xc(const struct xrow_header *row, struct vclock *vclock)
 {
 	if (xrow_decode_vclock(row, vclock) != 0)
-		diag_raise();
-}
-
-/** @copydoc xrow_encode_subscribe_response. */
-static inline void
-xrow_encode_subscribe_response_xc(struct xrow_header *row,
-				  const struct subscribe_response *rsp)
-{
-	if (xrow_encode_subscribe_response(row, rsp) != 0)
 		diag_raise();
 }
 

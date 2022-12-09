@@ -295,11 +295,9 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 	if (space != NULL && space->wal_ext != NULL)
 		space_wal_ext_process_request(space->wal_ext, stmt, request);
 	struct region *txn_region = tx_region_acquire(txn);
-	row->bodycnt = xrow_encode_dml(request, txn_region, row->body);
+	xrow_encode_dml(request, txn_region, row->body, &row->bodycnt);
 	tx_region_release(txn, TX_ALLOC_SYSTEM);
 	txn_region = NULL;
-	if (row->bodycnt < 0)
-		return -1;
 	stmt->row = row;
 	return 0;
 }

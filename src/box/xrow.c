@@ -247,18 +247,13 @@ xrow_decode_uuid(const char **pos, struct tt_uuid *out)
 	return 0;
 }
 
-int
+void
 xrow_header_encode(const struct xrow_header *header, uint64_t sync,
-		   struct iovec *out, size_t fixheader_len)
+		   size_t fixheader_len, struct iovec *out, int *iovcnt)
 {
 	/* allocate memory for sign + header */
-	out->iov_base = region_alloc(&fiber()->gc, XROW_HEADER_LEN_MAX +
-				     fixheader_len);
-	if (out->iov_base == NULL) {
-		diag_set(OutOfMemory, XROW_HEADER_LEN_MAX + fixheader_len,
-			 "gc arena", "xrow header encode");
-		return -1;
-	}
+	out->iov_base = xregion_alloc(&fiber()->gc, XROW_HEADER_LEN_MAX +
+				      fixheader_len);
 	char *data = (char *) out->iov_base + fixheader_len;
 
 	/* Header */
@@ -347,8 +342,8 @@ xrow_header_encode(const struct xrow_header *header, uint64_t sync,
 	out++;
 
 	memcpy(out, header->body, sizeof(*out) * header->bodycnt);
-	assert(1 + header->bodycnt <= XROW_IOVMAX);
-	return 1 + header->bodycnt; /* new iovcnt */
+	*iovcnt = 1 + header->bodycnt;
+	assert(*iovcnt <= XROW_IOVMAX);
 }
 
 static inline char *
@@ -994,9 +989,9 @@ request_str(const struct request *request)
 	return buf;
 }
 
-int
+void
 xrow_encode_dml(const struct request *request, struct region *region,
-		struct iovec *iov)
+		struct iovec *iov, int *iovcnt)
 {
 	assert(request != NULL);
 	/* Select is unexpected here. Hence, pagination option too. */
@@ -1005,7 +1000,6 @@ xrow_encode_dml(const struct request *request, struct region *region,
 	assert(request->after_position == NULL);
 	assert(request->after_tuple == NULL);
 	assert(!request->fetch_position);
-	int iovcnt = 1;
 	const int MAP_LEN_MAX = 40;
 	uint32_t key_len = request->key_end - request->key;
 	uint32_t ops_len = request->ops_end - request->ops;
@@ -1015,11 +1009,7 @@ xrow_encode_dml(const struct request *request, struct region *region,
 	uint32_t new_tuple_len = request->new_tuple_end - request->new_tuple;
 	uint32_t len = MAP_LEN_MAX + key_len + ops_len + tuple_meta_len +
 		       tuple_len + old_tuple_len + new_tuple_len;
-	char *begin = (char *) region_alloc(region, len);
-	if (begin == NULL) {
-		diag_set(OutOfMemory, len, "region_alloc", "begin");
-		return -1;
-	}
+	char *begin = xregion_alloc(region, len);
 	char *pos = begin + 1;     /* skip 1 byte for MP_MAP */
 	int map_size = 0;
 	if (request->space_id) {
@@ -1074,15 +1064,16 @@ xrow_encode_dml(const struct request *request, struct region *region,
 		map_size++;
 	}
 
-	if (map_size == 0)
-		return 0;
+	if (map_size == 0) {
+		*iovcnt = 0;
+		return;
+	}
 
 	assert(pos <= begin + len);
 	mp_encode_map(begin, map_size);
 	iov[0].iov_base = begin;
 	iov[0].iov_len = pos - begin;
-
-	return iovcnt;
+	*iovcnt = 1;
 }
 
 int
@@ -1212,7 +1203,7 @@ xrow_decode_synchro(const struct xrow_header *row, struct synchro_request *req)
 	return 0;
 }
 
-int
+void
 xrow_encode_raft(struct xrow_header *row, struct region *region,
 		 const struct raft_request *r)
 {
@@ -1250,11 +1241,7 @@ xrow_encode_raft(struct xrow_header *row, struct region *region,
 	}
 	size += mp_sizeof_map(map_size);
 
-	char *buf = region_alloc(region, size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "buf");
-		return -1;
-	}
+	char *buf = xregion_alloc(region, size);
 	memset(row, 0, sizeof(*row));
 	row->type = IPROTO_RAFT;
 	row->body[0].iov_base = buf;
@@ -1286,7 +1273,6 @@ xrow_encode_raft(struct xrow_header *row, struct region *region,
 		buf = mp_encode_vclock_ignore0(buf, r->vclock);
 	}
 	row->body[0].iov_len = buf - begin;
-	return 0;
 }
 
 int
@@ -1353,15 +1339,13 @@ bad_msgpack:
 	return -1;
 }
 
-int
-xrow_to_iovec(const struct xrow_header *row, struct iovec *out)
+void
+xrow_to_iovec(const struct xrow_header *row, struct iovec *out, int *iovcnt)
 {
 	assert(mp_sizeof_uint(UINT32_MAX) == 5);
-	int iovcnt = xrow_header_encode(row, row->sync, out, 5);
-	if (iovcnt < 0)
-		return -1;
+	xrow_header_encode(row, row->sync, /*fixheader_len=*/5, out, iovcnt);
 	ssize_t len = -5;
-	for (int i = 0; i < iovcnt; i++)
+	for (int i = 0; i < *iovcnt; i++)
 		len += out[i].iov_len;
 
 	/* Encode length */
@@ -1369,8 +1353,7 @@ xrow_to_iovec(const struct xrow_header *row, struct iovec *out)
 	*(data++) = 0xce; /* MP_UINT32 */
 	store_u32(data, mp_bswap_u32(len));
 
-	assert(iovcnt <= XROW_IOVMAX);
-	return iovcnt;
+	assert(*iovcnt <= XROW_IOVMAX);
 }
 
 int
@@ -1546,7 +1529,7 @@ error:
 	return 0;
 }
 
-int
+void
 xrow_encode_auth(struct xrow_header *packet, const char *salt, size_t salt_len,
 		 const char *login, size_t login_len,
 		 const char *password, size_t password_len)
@@ -1555,12 +1538,7 @@ xrow_encode_auth(struct xrow_header *packet, const char *salt, size_t salt_len,
 	memset(packet, 0, sizeof(*packet));
 
 	size_t buf_size = XROW_BODY_LEN_MAX + login_len + SCRAMBLE_SIZE;
-	char *buf = (char *) region_alloc(&fiber()->gc, buf_size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, buf_size, "region_alloc", "buf");
-		return -1;
-	}
-
+	char *buf = xregion_alloc(&fiber()->gc, buf_size);
 	char *d = buf;
 	d = mp_encode_map(d, password != NULL ? 2 : 1);
 	d = mp_encode_uint(d, IPROTO_USER_NAME);
@@ -1581,7 +1559,6 @@ xrow_encode_auth(struct xrow_header *packet, const char *salt, size_t salt_len,
 	packet->body[0].iov_len = (d - buf);
 	packet->bodycnt = 1;
 	packet->type = IPROTO_AUTH;
-	return 0;
 }
 
 void
@@ -1796,7 +1773,7 @@ struct replication_request {
 };
 
 /** Encode a replication request template. */
-static int
+static void
 xrow_encode_replication_request(struct xrow_header *row,
 				const struct replication_request *req,
 				uint16_t type)
@@ -1805,11 +1782,7 @@ xrow_encode_replication_request(struct xrow_header *row,
 	size_t size = XROW_BODY_LEN_MAX;
 	if (req->vclock != NULL)
 		size += mp_sizeof_vclock_ignore0(req->vclock);
-	char *buf = (char *) region_alloc(&fiber()->gc, size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "buf");
-		return -1;
-	}
+	char *buf = xregion_alloc(&fiber()->gc, size);
 	/* Skip one byte for future map header. */
 	char *data = buf + 1;
 	uint32_t map_size = 0;
@@ -1859,7 +1832,6 @@ xrow_encode_replication_request(struct xrow_header *row,
 	row->body[0].iov_len = (data - buf);
 	row->bodycnt = 1;
 	row->type = type;
-	return 0;
 }
 
 /** Decode a replication request template. */
@@ -1958,7 +1930,7 @@ id_filter_decode_err:		xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 	return 0;
 }
 
-int
+void
 xrow_encode_register(struct xrow_header *row,
 		     const struct register_request *req)
 {
@@ -1967,7 +1939,7 @@ xrow_encode_register(struct xrow_header *row,
 		.instance_uuid = &cast->instance_uuid,
 		.vclock = &cast->vclock,
 	};
-	return xrow_encode_replication_request(row, &base_req, IPROTO_REGISTER);
+	xrow_encode_replication_request(row, &base_req, IPROTO_REGISTER);
 }
 
 int
@@ -1982,7 +1954,7 @@ xrow_decode_register(const struct xrow_header *row,
 	return xrow_decode_replication_request(row, &base_req);
 }
 
-int
+void
 xrow_encode_subscribe(struct xrow_header *row,
 		      const struct subscribe_request *req)
 {
@@ -1995,8 +1967,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 		.id_filter = &cast->id_filter,
 		.version_id = &cast->version_id,
 	};
-	return xrow_encode_replication_request(row, &base_req,
-					       IPROTO_SUBSCRIBE);
+	xrow_encode_replication_request(row, &base_req, IPROTO_SUBSCRIBE);
 }
 
 int
@@ -2015,7 +1986,7 @@ xrow_decode_subscribe(const struct xrow_header *row,
 	return xrow_decode_replication_request(row, &base_req);
 }
 
-int
+void
 xrow_encode_join(struct xrow_header *row, const struct join_request *req)
 {
 	struct join_request *cast = (struct join_request *)req;
@@ -2023,7 +1994,7 @@ xrow_encode_join(struct xrow_header *row, const struct join_request *req)
 		.instance_uuid = &cast->instance_uuid,
 		.version_id = &cast->version_id,
 	};
-	return xrow_encode_replication_request(row, &base_req, IPROTO_JOIN);
+	xrow_encode_replication_request(row, &base_req, IPROTO_JOIN);
 }
 
 int
@@ -2037,7 +2008,7 @@ xrow_decode_join(const struct xrow_header *row, struct join_request *req)
 	return xrow_decode_replication_request(row, &base_req);
 }
 
-int
+void
 xrow_encode_relay_heartbeat(struct xrow_header *row,
 			    const struct relay_heartbeat *req)
 {
@@ -2055,13 +2026,9 @@ xrow_encode_relay_heartbeat(struct xrow_header *row,
 		size += mp_sizeof_uint(req->vclock_sync);
 	}
 	if (map_size == 0)
-		return 0;
+		return;
 	size += mp_sizeof_map(map_size);
-	char *buf = (char *) region_alloc(&fiber()->gc, size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "buf");
-		return -1;
-	}
+	char *buf = xregion_alloc(&fiber()->gc, size);
 	char *data = buf;
 	data = mp_encode_map(data, map_size);
 	assert(req->vclock_sync != 0);
@@ -2071,7 +2038,6 @@ xrow_encode_relay_heartbeat(struct xrow_header *row,
 	row->body[0].iov_base = buf;
 	row->body[0].iov_len = (data - buf);
 	row->bodycnt = 1;
-	return 0;
 }
 
 int
@@ -2114,7 +2080,7 @@ xrow_decode_relay_heartbeat(const struct xrow_header *row,
 	return 0;
 }
 
-int
+void
 xrow_encode_applier_heartbeat(struct xrow_header *row,
 			      const struct applier_heartbeat *req)
 {
@@ -2135,11 +2101,7 @@ xrow_encode_applier_heartbeat(struct xrow_header *row,
 		size += mp_sizeof_uint(req->vclock_sync);
 	}
 	size += mp_sizeof_map(map_size);
-	char *buf = region_alloc(&fiber()->gc, size);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "buf");
-		return -1;
-	}
+	char *buf = xregion_alloc(&fiber()->gc, size);
 	char *data = buf;
 	data = mp_encode_map(data, map_size);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
@@ -2155,7 +2117,6 @@ xrow_encode_applier_heartbeat(struct xrow_header *row,
 	row->body[0].iov_len = (data - buf);
 	row->bodycnt = 1;
 	row->type = IPROTO_OK;
-	return 0;
 }
 
 int
@@ -2266,13 +2227,13 @@ skip:
 	return 0;
 }
 
-int
+void
 xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 {
 	const struct replication_request base_req = {
 		.vclock = (struct vclock *)vclock,
 	};
-	return xrow_encode_replication_request(row, &base_req, IPROTO_OK);
+	xrow_encode_replication_request(row, &base_req, IPROTO_OK);
 }
 
 int
@@ -2285,7 +2246,7 @@ xrow_decode_vclock(const struct xrow_header *row, struct vclock *vclock)
 	return xrow_decode_replication_request(row, &base_req);
 }
 
-int
+void
 xrow_encode_subscribe_response(struct xrow_header *row,
 			       const struct subscribe_response *rsp)
 {
@@ -2294,7 +2255,7 @@ xrow_encode_subscribe_response(struct xrow_header *row,
 		.replicaset_uuid = &cast->replicaset_uuid,
 		.vclock = &cast->vclock,
 	};
-	return xrow_encode_replication_request(row, &base_req, IPROTO_OK);
+	xrow_encode_replication_request(row, &base_req, IPROTO_OK);
 }
 
 int

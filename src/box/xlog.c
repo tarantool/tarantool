@@ -1351,11 +1351,9 @@ xlog_write_row(struct xlog *log, const struct xrow_header *packet)
 	struct iovec iov[XROW_IOVMAX];
 	/** don't write sync to the disk */
 	size_t region_svp = region_used(&fiber()->gc);
-	int iovcnt = xrow_header_encode(packet, 0, iov, 0);
-	if (iovcnt < 0) {
-		obuf_rollback_to_svp(&log->obuf, &svp);
-		return -1;
-	}
+	int iovcnt;
+	xrow_header_encode(packet, /*sync=*/0, /*fixheader_len=*/0,
+			   iov, &iovcnt);
 	for (int i = 0; i < iovcnt; ++i) {
 		struct errinj *inj = errinj(ERRINJ_WAL_WRITE_PARTIAL,
 					    ERRINJ_INT);

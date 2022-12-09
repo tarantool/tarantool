@@ -99,8 +99,9 @@ void
 coio_write_xrow(struct iostream *io, const struct xrow_header *row)
 {
 	RegionGuard region_guard(&fiber()->gc);
+	int iovcnt;
 	struct iovec iov[XROW_IOVMAX];
-	int iovcnt = xrow_to_iovec_xc(row, iov);
+	xrow_to_iovec(row, iov, &iovcnt);
 	if (coio_writev(io, iov, iovcnt, 0) < 0)
 		diag_raise();
 }

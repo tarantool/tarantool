@@ -209,7 +209,7 @@ applier_thread_writer_f(va_list ap)
 			applier->thread.has_acks_to_send = false;
 			struct xrow_header xrow;
 			RegionGuard region_guard(&fiber()->gc);
-			xrow_encode_applier_heartbeat_xc(
+			xrow_encode_applier_heartbeat(
 				&xrow, &applier->thread.next_ack);
 			xrow.tm = applier->thread.txn_last_tm;
 			coio_write_xrow(&applier->io, &xrow);
@@ -430,10 +430,10 @@ applier_connect(struct applier *applier)
 	/* Authenticate */
 	applier_set_state(applier, APPLIER_AUTH);
 	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_auth_xc(&row, greeting.salt, greeting.salt_len, uri->login,
-			    strlen(uri->login),
-			    uri->password != NULL ? uri->password : "",
-			    uri->password != NULL ? strlen(uri->password) : 0);
+	xrow_encode_auth(&row, greeting.salt, greeting.salt_len, uri->login,
+			 strlen(uri->login),
+			 uri->password != NULL ? uri->password : "",
+			 uri->password != NULL ? strlen(uri->password) : 0);
 	coio_write_xrow(io, &row);
 	coio_read_xrow(io, ibuf, &row);
 	applier->last_row_time = ev_monotonic_now(loop());
@@ -702,7 +702,7 @@ applier_register(struct applier *applier, bool was_anon)
 	req.instance_uuid = INSTANCE_UUID;
 	vclock_copy(&req.vclock, box_vclock);
 	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_register_xc(&row, &req);
+	xrow_encode_register(&row, &req);
 	row.type = IPROTO_REGISTER;
 	coio_write_xrow(io, &row);
 
@@ -734,7 +734,7 @@ applier_join(struct applier *applier)
 	req.instance_uuid = INSTANCE_UUID;
 	req.version_id = tarantool_version_id();
 	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_join_xc(&row, &req);
+	xrow_encode_join(&row, &req);
 	coio_write_xrow(io, &row);
 
 	applier_set_state(applier, APPLIER_WAIT_SNAPSHOT);
@@ -1981,7 +1981,7 @@ applier_subscribe(struct applier *applier)
 	 */
 	req.id_filter = box_is_orphan() ? 0 : 1 << instance_id;
 	RegionGuard region_guard(&fiber()->gc);
-	xrow_encode_subscribe_xc(&row, &req);
+	xrow_encode_subscribe(&row, &req);
 	coio_write_xrow(io, &row);
 
 	/* Read SUBSCRIBE response */
