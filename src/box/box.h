@@ -225,8 +225,10 @@ box_reset_stat(void);
 #if defined(__cplusplus)
 } /* extern "C" */
 
+/** Process an authentication request. */
 void
-box_process_auth(struct auth_request *request, const char *salt);
+box_process_auth(struct auth_request *request,
+		 const char *salt, uint32_t salt_len);
 
 /** Send current read view to the replica. */
 void
