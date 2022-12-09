@@ -107,10 +107,48 @@ test_translation_in_encoding(lua_State *L)
 	check_plan();
 }
 
+/**
+ * Checks that MsgPack object with dictionaries work correctly.
+ */
+static void
+test_translation_in_indexation(struct lua_State *L)
+{
+	plan(1);
+	header();
+
+	struct mh_strnu32_t *translation = mh_strnu32_new();
+	const char *alias = "alias";
+	uint32_t key = 0;
+	struct mh_strnu32_node_t node = {
+		.str = alias,
+		.len = strlen(alias),
+		.hash = lua_hash(alias, strlen(alias)),
+		.val = key,
+	};
+	mh_strnu32_put(translation, &node, NULL, NULL);
+
+	char buf[64];
+
+	char *w = mp_encode_map(buf, 1);
+
+	w = mp_encode_uint(w, key);
+	w = mp_encode_bool(w, true);
+	luamp_push_with_translation(L, buf, w, translation);
+	lua_getfield(L, -1, alias);
+	ok(lua_toboolean(L, -1), "string key is aliased");
+	lua_pop(L, 2);
+
+	lua_gc(L, LUA_GCCOLLECT, 0);
+	mh_strnu32_delete(translation);
+
+	footer();
+	check_plan();
+}
+
 int
 main(void)
 {
-	plan(1);
+	plan(2);
 	header();
 
 	struct lua_State *L = luaL_newstate();
@@ -123,6 +161,7 @@ main(void)
 	lua_pop(L, 1);
 
 	test_translation_in_encoding(L);
+	test_translation_in_indexation(L);
 
 	fiber_free();
 	memory_free();

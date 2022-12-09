@@ -80,6 +80,13 @@ struct luamp_object {
 	 * Initially set to `LUA_NOREF`.
 	 */
 	int decoded_ref;
+	/**
+	 * Translation table containing string key aliases. If present, used
+	 * during indexation.
+	 * Must use `lua_hash` as the hash function.
+	 * Initially set to NULL.
+	 */
+	struct mh_strnu32_t *translation;
 };
 
 static const char luamp_object_typename[] = "msgpack.object";
@@ -709,18 +716,22 @@ luamp_new_object(struct lua_State *L, size_t data_len)
 	obj->data = (char *)obj + sizeof(*obj);
 	obj->data_end = obj->data + data_len;
 	obj->decoded_ref = LUA_NOREF;
+	obj->translation = NULL;
 	luaL_getmetatable(L, luamp_object_typename);
 	lua_setmetatable(L, -2);
 	return obj;
 }
 
 void
-luamp_push(struct lua_State *L, const char *data, const char *data_end)
+luamp_push_with_translation(struct lua_State *L, const char *data,
+			    const char *data_end,
+			    struct mh_strnu32_t *translation)
 {
 	size_t data_len = data_end - data;
 	struct luamp_object *obj = luamp_new_object(L, data_len);
 	memcpy((char *)obj->data, data, data_len);
 	assert(mp_check(&data, data_end) == 0 && data == data_end);
+	obj->translation = translation;
 }
 
 /**
@@ -878,6 +889,25 @@ luamp_object_get(struct lua_State *L)
 	lua_pushvalue(L, -2);
 	/* Indexes the decoded MsgPack data and pops the key. */
 	lua_rawget(L, -2);
+	if (!lua_isnil(L, -1) || obj->translation == NULL ||
+	    lua_type(L, -3) != LUA_TSTRING)
+		return 1;
+
+	size_t len;
+	const char *alias = lua_tolstring(L, -3, &len);
+	struct mh_strnu32_key_t key = {
+		.str = alias,
+		.len = len,
+		.hash = lua_hashstring(L, -3),
+	};
+	mh_int_t k = mh_strnu32_find(obj->translation, &key, NULL);
+	if (k != mh_end(obj->translation)) {
+		lua_pop(L, 1);
+		struct mh_strnu32_node_t *node =
+			mh_strnu32_node(obj->translation, k);
+		luaL_pushuint64(L, node->val);
+		lua_rawget(L, -2);
+	}
 	return 1;
 }
 
