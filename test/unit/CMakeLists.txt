@@ -289,11 +289,6 @@ create_unit_test(PREFIX mp_print_unknown_ext
                  LIBRARIES core unit box core
 )
 
-create_unit_test(PREFIX scramble
-                 SOURCES scramble.c core_test_utils.c
-                 LIBRARIES scramble
-)
-
 create_unit_test(PREFIX guava
                  SOURCES guava.c
                  LIBRARIES salad small
