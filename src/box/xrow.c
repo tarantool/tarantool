@@ -1712,6 +1712,11 @@ xrow_encode_vote(struct xrow_header *row)
 	row->type = IPROTO_VOTE;
 }
 
+/** Decode the remote instance's IPROTO_VOTE response body. */
+static int
+mp_decode_ballot(const char *data, const char *end,
+		 struct ballot *ballot, bool *is_empty);
+
 int
 xrow_decode_ballot(const struct xrow_header *row, struct ballot *ballot)
 {
@@ -1721,6 +1726,7 @@ xrow_decode_ballot(const struct xrow_header *row, struct ballot *ballot)
 	ballot->is_anon = false;
 	ballot->is_booted = true;
 	vclock_create(&ballot->vclock);
+	vclock_create(&ballot->gc_vclock);
 
 	if (row->bodycnt == 0)
 		goto err;
@@ -1728,8 +1734,23 @@ xrow_decode_ballot(const struct xrow_header *row, struct ballot *ballot)
 
 	const char *data = (const char *)row->body[0].iov_base;
 	const char *end = data + row->body[0].iov_len;
+
+	bool is_empty;
+	if (mp_decode_ballot(data, end, ballot, &is_empty) < 0) {
+err:
+		xrow_on_decode_err(row, ER_INVALID_MSGPACK, "packet body");
+		return -1;
+	}
+	return 0;
+}
+
+static int
+mp_decode_ballot(const char *data, const char *end,
+		 struct ballot *ballot, bool *is_empty)
+{
+	*is_empty = true;
 	if (mp_typeof(*data) != MP_MAP)
-		goto err;
+		return -1;
 
 	/* Find BALLOT key. */
 	uint32_t map_size = mp_decode_map(&data);
@@ -1757,47 +1778,51 @@ xrow_decode_ballot(const struct xrow_header *row, struct ballot *ballot)
 		switch (key) {
 		case IPROTO_BALLOT_IS_RO_CFG:
 			if (mp_typeof(*data) != MP_BOOL)
-				goto err;
+				return -1;
 			ballot->is_ro_cfg = mp_decode_bool(&data);
+			*is_empty = false;
 			break;
 		case IPROTO_BALLOT_IS_RO:
 			if (mp_typeof(*data) != MP_BOOL)
-				goto err;
+				return -1;
 			ballot->is_ro = mp_decode_bool(&data);
+			*is_empty = false;
 			break;
 		case IPROTO_BALLOT_IS_ANON:
 			if (mp_typeof(*data) != MP_BOOL)
-				goto err;
+				return -1;
 			ballot->is_anon = mp_decode_bool(&data);
+			*is_empty = false;
 			break;
 		case IPROTO_BALLOT_VCLOCK:
 			if (mp_decode_vclock_ignore0(&data,
 						     &ballot->vclock) != 0)
-				goto err;
+				return -1;
+			*is_empty = false;
 			break;
 		case IPROTO_BALLOT_GC_VCLOCK:
 			if (mp_decode_vclock_ignore0(&data,
 						     &ballot->gc_vclock) != 0)
-				goto err;
+				return -1;
+			*is_empty = false;
 			break;
 		case IPROTO_BALLOT_IS_BOOTED:
 			if (mp_typeof(*data) != MP_BOOL)
-				goto err;
+				return -1;
 			ballot->is_booted = mp_decode_bool(&data);
+			*is_empty = false;
 			break;
 		case IPROTO_BALLOT_CAN_LEAD:
 			if (mp_typeof(*data) != MP_BOOL)
-				goto err;
+				return -1;
 			ballot->can_lead = mp_decode_bool(&data);
+			*is_empty = false;
 			break;
 		default:
 			mp_next(&data);
 		}
 	}
 	return 0;
-err:
-	xrow_on_decode_err(row, ER_INVALID_MSGPACK, "packet body");
-	return -1;
 }
 
 /**
