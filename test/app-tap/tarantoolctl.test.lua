@@ -31,7 +31,7 @@ local function recursive_rmdir(path)
         end
     end
     if fio.rmdir(path) == false then
-        print(string.format('!!! failed to rmdir path "%s"', file))
+        print(string.format('!!! failed to rmdir path "%s"', path))
         print(string.format('!!! [errno %s]: %s', errno(), errno.strerror()))
     end
 end
