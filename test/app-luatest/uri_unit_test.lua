@@ -19,7 +19,7 @@ local uri_params_g = t.group("uri_params", {
     { params = { boolean_type = true }, query_string = "boolean_type=true" },
     { params = { integer_type = 50 }, query_string = "integer_type=50" },
     { params = { decimal_type = decimal.new(10) }, query_string = "decimal_type=10" },
-    { params = { datetime_type = datetime.new() }, query_string = "datetime_type=1970-01-01T00:00:00Z" },
+    { params = { datetime_type = datetime.new() }, query_string = "datetime_type=1970-01-01T00%3A00%3A00Z" },
     { params = { int64_type = tonumber64(-1LL) }, query_string = "int64_type=-1LL" },
     { params = { key = {""} }, query_string = "key=" },
     { params = { key = "test" }, query_string = "key=test" },
@@ -30,6 +30,16 @@ local uri_params_g = t.group("uri_params", {
 uri_params_g.test_params = function(cg)
     local uri_params = uri._internal.params
     t.assert_equals(uri_params(cg.params.params), cg.params.query_string)
+end
+
+g.test_params_escaping = function(_)
+    local uri_params = uri._internal.params
+    local params = {
+        [1] = {"ы", "d&" },
+        ["k%"] = "d%"
+    }
+    t.assert_equals(uri_params(params, uri.RFC3986),
+                    "1=%D1%8B&1=d%26&k%25=d%25")
 end
 
 local uri_encode_kv_g = t.group("uri_encode_kv", {
@@ -43,6 +53,13 @@ uri_encode_kv_g.test_encode_kv = function(cg)
     local res = {}
     encode_kv(cg.params.key, cg.params.values, res)
     t.assert_items_equals(res, cg.params.res)
+end
+
+g.test_encode_kv_escaping = function(_)
+    local encode_kv = uri._internal.encode_kv
+    local res = {}
+    encode_kv("т", { "б", "д" }, res, uri.RFC3986)
+    t.assert_items_equals(res, { "%D1%82=%D0%B1", "%D1%82=%D0%B4" })
 end
 
 local uri_values_g = t.group("uri_values", {
