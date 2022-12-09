@@ -65,6 +65,9 @@ lua_source(lua_sources lua/datetime.lua datetime_lua)
 lua_source(lua_sources lua/timezones.lua timezones_lua)
 lua_source(lua_sources lua/print.lua print_lua)
 lua_source(lua_sources lua/compat.lua compat_lua)
+if (ENABLE_COMPRESS_MODULE)
+    lua_source(lua_sources ${COMPRESS_MODULE_LUA_SOURCE} compress_lua)
+endif()
 
 # 3rd party lua sources
 lua_source(lua_sources ../third_party/luafun/fun.lua fun_lua)
@@ -172,6 +175,7 @@ set (server_sources
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/b64.c
      ${PROJECT_SOURCE_DIR}/third_party/lua-cjson/lua_cjson.c
      ${PROJECT_SOURCE_DIR}/third_party/lua-cjson/strbuf.c
+     ${COMPRESS_MODULE_SOURCES}
 )
 
 if(EMBED_LUAZLIB)

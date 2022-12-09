@@ -92,6 +92,11 @@ LUALIB_API int
 luaopen_zip(lua_State *L);
 #endif
 
+#if defined(ENABLE_COMPRESS_MODULE)
+void
+tarantool_lua_compress_init(lua_State *L);
+#endif
+
 #define MAX_MODNAME 64
 
 /**
@@ -163,6 +168,9 @@ extern char strict_lua[],
 	timezones_lua[],
 	print_lua[],
 	luadebug_lua[]
+#if defined(ENABLE_COMPRESS_MODULE)
+	, compress_lua[]
+#endif
 #if defined(EMBED_LUAROCKS)
 	, luarocks_core_hardcoded_lua[],
 	luarocks_admin_cache_lua[],
@@ -292,6 +300,9 @@ static const char *lua_modules[] = {
 	"http.client", httpc_lua,
 	"iconv", iconv_lua,
 	"swim", swim_lua,
+#if defined(ENABLE_COMPRESS_MODULE)
+	"compress", compress_lua,
+#endif
 	/* jit.* library */
 	"jit.vmdef", jit_vmdef_lua,
 	"jit.bc", jit_bc_lua,
@@ -814,6 +825,9 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_swim_init(L);
 	tarantool_lua_decimal_init(L);
 	tarantool_lua_compat_init(L);
+#if defined(ENABLE_COMPRESS_MODULE)
+	tarantool_lua_compress_init(L);
+#endif
 #ifdef ENABLE_BACKTRACE
 	luaM_sysprof_set_backtracer(fiber_backtracer);
 #endif
