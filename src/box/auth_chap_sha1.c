@@ -6,6 +6,7 @@
 #include "auth_chap_sha1.h"
 
 #include <assert.h>
+#include <openssl/sha.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -18,7 +19,6 @@
 #include "error.h"
 #include "fiber.h"
 #include "msgpuck.h"
-#include "sha1.h"
 #include "small/region.h"
 #include "trivia/util.h"
 
@@ -51,6 +51,8 @@
 
 enum { SCRAMBLE_SIZE = 20, SCRAMBLE_BASE64_SIZE = 28 };
 
+static_assert((int)SCRAMBLE_SIZE == (int)SHA_DIGEST_LENGTH,
+	      "SCRAMBLE_SIZE must be equal to SHA_DIGEST_LENGTH");
 static_assert((int)SCRAMBLE_SIZE <= (int)AUTH_SALT_SIZE,
 	      "SCRAMBLE_SIZE must be less than or equal to AUTH_SALT_SIZE");
 
@@ -82,22 +84,11 @@ scramble_prepare(void *out, const void *salt, const void *password,
 		 int password_len)
 {
 	unsigned char hash1[SCRAMBLE_SIZE];
-	unsigned char hash2[SCRAMBLE_SIZE];
-	SHA1_CTX ctx;
-
-	SHA1Init(&ctx);
-	SHA1Update(&ctx, password, password_len);
-	SHA1Final(hash1, &ctx);
-
-	SHA1Init(&ctx);
-	SHA1Update(&ctx, hash1, SCRAMBLE_SIZE);
-	SHA1Final(hash2, &ctx);
-
-	SHA1Init(&ctx);
-	SHA1Update(&ctx, salt, SCRAMBLE_SIZE);
-	SHA1Update(&ctx, hash2, SCRAMBLE_SIZE);
-	SHA1Final(out, &ctx);
-
+	SHA1(password, password_len, hash1);
+	unsigned char salted_hash2[2 * SCRAMBLE_SIZE];
+	memcpy(salted_hash2, salt, SCRAMBLE_SIZE);
+	SHA1(hash1, SCRAMBLE_SIZE, salted_hash2 + SCRAMBLE_SIZE);
+	SHA1(salted_hash2, 2 * SCRAMBLE_SIZE, out);
 	xor(out, hash1, out, SCRAMBLE_SIZE);
 }
 
@@ -110,23 +101,17 @@ scramble_prepare(void *out, const void *salt, const void *password,
 static int
 scramble_check(const void *scramble, const void *salt, const void *hash2)
 {
-	SHA1_CTX ctx;
+	unsigned char salted_hash2[2 * SCRAMBLE_SIZE];
+	memcpy(salted_hash2, salt, SCRAMBLE_SIZE);
+	memcpy(salted_hash2 + SCRAMBLE_SIZE, hash2, SCRAMBLE_SIZE);
 	unsigned char candidate_hash2[SCRAMBLE_SIZE];
-
-	SHA1Init(&ctx);
-	SHA1Update(&ctx, salt, SCRAMBLE_SIZE);
-	SHA1Update(&ctx, hash2, SCRAMBLE_SIZE);
-	SHA1Final(candidate_hash2, &ctx);
-
+	SHA1(salted_hash2, 2 * SCRAMBLE_SIZE, candidate_hash2);
 	xor(candidate_hash2, candidate_hash2, scramble, SCRAMBLE_SIZE);
 	/*
 	 * candidate_hash2 now supposedly contains hash1, turn it
 	 * into hash2
 	 */
-	SHA1Init(&ctx);
-	SHA1Update(&ctx, candidate_hash2, SCRAMBLE_SIZE);
-	SHA1Final(candidate_hash2, &ctx);
-
+	SHA1(candidate_hash2, SCRAMBLE_SIZE, candidate_hash2);
 	return memcmp(hash2, candidate_hash2, SCRAMBLE_SIZE);
 }
 
@@ -139,16 +124,8 @@ static void
 password_prepare(const char *password, int len, char *out, int out_len)
 {
 	unsigned char hash2[SCRAMBLE_SIZE];
-	SHA1_CTX ctx;
-
-	SHA1Init(&ctx);
-	SHA1Update(&ctx, (const unsigned char *)password, len);
-	SHA1Final(hash2, &ctx);
-
-	SHA1Init(&ctx);
-	SHA1Update(&ctx, hash2, SCRAMBLE_SIZE);
-	SHA1Final(hash2, &ctx);
-
+	SHA1((unsigned char *)password, len, hash2);
+	SHA1(hash2, SCRAMBLE_SIZE, hash2);
 	base64_encode((char *)hash2, SCRAMBLE_SIZE, out, out_len, 0);
 }
 
