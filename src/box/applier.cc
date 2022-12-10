@@ -323,21 +323,14 @@ apply_nop(struct xrow_header *row)
 	return process_nop(&request);
 }
 
-/**
- * Connect to a remote host and authenticate the client.
- */
-void
-applier_connect(struct applier *applier)
+/** Common part of connection initialization. */
+static void
+applier_connection_init(struct iostream *io, const struct uri *uri,
+			struct sockaddr *addr, socklen_t *addr_len,
+			struct iostream_ctx *io_ctx, struct greeting *greeting)
 {
-	RegionGuard region_guard(&fiber()->gc);
-	struct iostream *io = &applier->io;
-	struct ibuf *ibuf = &applier->ibuf;
-	if (iostream_is_initialized(io))
-		return;
+	assert(!iostream_is_initialized(io));
 	char greetingbuf[IPROTO_GREETING_SIZE];
-	struct xrow_header row;
-
-	struct uri *uri = &applier->uri;
 	/*
 	 * coio_connect() stores resolved address to \a &applier->addr
 	 * on success. &applier->addr_len is a value-result argument which
@@ -346,15 +339,12 @@ applier_connect(struct applier *applier)
 	 * DNS resolution under the hood it is theoretically possible that
 	 * applier->addr_len will be different even for same uri.
 	 */
-	applier->addr_len = sizeof(applier->addrstorage);
-	applier_set_state(applier, APPLIER_CONNECT);
 	int fd = coio_connect(uri->host != NULL ? uri->host : "",
 			      uri->service != NULL ? uri->service : "",
-			      uri->host_hint, &applier->addr,
-			      &applier->addr_len);
+			      uri->host_hint, addr, addr_len);
 	if (fd < 0)
 		diag_raise();
-	if (iostream_create(io, fd, &applier->io_ctx) != 0) {
+	if (iostream_create(io, fd, io_ctx) != 0) {
 		close(fd);
 		diag_raise();
 	}
@@ -368,17 +358,40 @@ applier_connect(struct applier *applier)
 	if (coio_readn_timeout(io, greetingbuf, IPROTO_GREETING_SIZE,
 			       replication_disconnect_timeout()) < 0)
 		diag_raise();
-	applier->last_row_time = ev_monotonic_now(loop());
 
 	/* Decode instance version and name from greeting */
-	struct greeting greeting;
-	if (greeting_decode(greetingbuf, &greeting) != 0)
+	if (greeting_decode(greetingbuf, greeting) != 0)
 		tnt_raise(LoggedError, ER_PROTOCOL, "Invalid greeting");
 
-	if (strcmp(greeting.protocol, "Binary") != 0) {
+	if (strcmp(greeting->protocol, "Binary") != 0) {
 		tnt_raise(LoggedError, ER_PROTOCOL,
 			  "Unsupported protocol for replication");
 	}
+}
+
+/**
+ * Connect to a remote host and authenticate the client.
+ */
+static void
+applier_connect(struct applier *applier)
+{
+	RegionGuard region_guard(&fiber()->gc);
+	struct iostream *io = &applier->io;
+	struct ibuf *ibuf = &applier->ibuf;
+	struct xrow_header row;
+	struct greeting greeting;
+	const struct uri *uri = &applier->uri;
+
+	if (iostream_is_initialized(io))
+		return;
+
+	applier_set_state(applier, APPLIER_CONNECT);
+	applier->addr_len = sizeof(applier->addrstorage);
+	applier_connection_init(io, &applier->uri, &applier->addr,
+				&applier->addr_len, &applier->io_ctx,
+				&greeting);
+
+	applier->last_row_time = ev_monotonic_now(loop());
 
 	if (applier->version_id != greeting.version_id) {
 		say_info("remote master %s at %s running Tarantool %u.%u.%u",
