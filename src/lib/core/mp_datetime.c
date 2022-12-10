@@ -85,6 +85,8 @@ return_validated:
 	return date;
 }
 
+EXPORT_SYMBOL(datetime_unpack, tnt_datetime_unpack)
+
 struct datetime *
 mp_decode_datetime(const char **data, struct datetime *date)
 {

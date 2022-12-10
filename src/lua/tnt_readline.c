@@ -31,9 +31,6 @@
 
 #include <stdio.h>
 #include <readline/readline.h>
+#include "../trivia/util.h"
 
-void
-tnt_rl_get_screen_size(int *rows, int *cols)
-{
-	return rl_get_screen_size(rows, cols);
-}
+EXPORT_SYMBOL(rl_get_screen_size, tnt_rl_get_screen_size)

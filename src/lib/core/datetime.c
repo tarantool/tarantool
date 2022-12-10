@@ -80,6 +80,8 @@ datetime_isdst(const struct datetime *date)
 	return isdst != 0;
 }
 
+EXPORT_SYMBOL(datetime_isdst, tnt_datetime_isdst)
+
 long
 datetime_gmtoff(const struct datetime *date)
 {
@@ -122,6 +124,8 @@ datetime_strftime(const struct datetime *date, char *buf, size_t len,
 	datetime_to_tm(date, &tm);
 	return tnt_strftime(buf, len, fmt, &tm);
 }
+
+EXPORT_SYMBOL(datetime_strftime, tnt_datetime_strftime)
 
 bool
 tm_to_datetime(struct tnt_tm *tm, struct datetime *date)
@@ -175,6 +179,8 @@ datetime_strptime(struct datetime *date, const char *buf, const char *fmt)
 	return ret - buf;
 }
 
+EXPORT_SYMBOL(datetime_strptime, tnt_datetime_strptime)
+
 void
 datetime_now(struct datetime *now)
 {
@@ -187,6 +193,8 @@ datetime_now(struct datetime *now)
 	localtime_r(&tv.tv_sec, &tm);
 	now->tzoffset = tm.tm_gmtoff / 60;
 }
+
+EXPORT_SYMBOL(datetime_now, tnt_datetime_now)
 
 void
 datetime_ev_now(struct datetime *now)
@@ -263,6 +271,8 @@ datetime_to_string(const struct datetime *date, char *buf, ssize_t len)
 	}
 	return sz;
 }
+
+EXPORT_SYMBOL(datetime_to_string, tnt_datetime_to_string)
 
 static inline int64_t
 dt_epoch(dt_t dt)
@@ -367,6 +377,8 @@ exit:
 	return str - svp;
 }
 
+EXPORT_SYMBOL(datetime_parse_full, tnt_datetime_parse_full)
+
 ssize_t
 datetime_parse_tz(const char *str, size_t len, time_t base, int16_t *tzoffset,
 		  int16_t *tzindex)
@@ -379,6 +391,8 @@ datetime_parse_tz(const char *str, size_t len, time_t base, int16_t *tzoffset,
 	*tzoffset = offset;
 	return l;
 }
+
+EXPORT_SYMBOL(datetime_parse_tz, tnt_datetime_parse_tz)
 
 int
 datetime_compare(const struct datetime *lhs, const struct datetime *rhs)
@@ -553,6 +567,8 @@ datetime_totable(const struct datetime *date, struct interval *out)
 	return true;
 }
 
+EXPORT_SYMBOL(datetime_totable, tnt_datetime_totable)
+
 /**
  * Interval support functions: stringization and operations
  */
@@ -630,6 +646,8 @@ interval_to_string(const struct interval *ival, char *buf, ssize_t len)
 	}
 	return sz;
 }
+
+EXPORT_SYMBOL(interval_to_string, tnt_interval_to_string)
 
 /**
  * Normalize seconds and nanoseconds:
@@ -803,6 +821,8 @@ datetime_increment_by(struct datetime *self, int direction,
 	return 0;
 }
 
+EXPORT_SYMBOL(datetime_increment_by, tnt_datetime_increment_by)
+
 /**
  * Check attributes of interval record after prior operation
  */
@@ -848,6 +868,8 @@ datetime_datetime_sub(struct interval *res, const struct datetime *lhs,
 	return interval_interval_sub(res, &inv_rhs);
 }
 
+EXPORT_SYMBOL(datetime_datetime_sub, tnt_datetime_datetime_sub)
+
 int
 interval_interval_sub(struct interval *lhs, const struct interval *rhs)
 {
@@ -864,6 +886,8 @@ interval_interval_sub(struct interval *lhs, const struct interval *rhs)
 	return interval_check_args(lhs);
 }
 
+EXPORT_SYMBOL(interval_interval_sub, tnt_interval_interval_sub)
+
 int
 interval_interval_add(struct interval *lhs, const struct interval *rhs)
 {
@@ -879,6 +903,8 @@ interval_interval_add(struct interval *lhs, const struct interval *rhs)
 	lhs->nsec += rhs->nsec;
 	return interval_check_args(lhs);
 }
+
+EXPORT_SYMBOL(interval_interval_add, tnt_interval_interval_add)
 
 /** This structure contains information about the given date and time fields. */
 struct dt_fields {

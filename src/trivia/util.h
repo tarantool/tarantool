@@ -679,6 +679,30 @@ getenv_safe(const char *name, char *buf, size_t buf_size);
 # define static_assert _Static_assert
 #endif
 
+#define EXPORT_SYMBOL(name, alias) _EXPORT_SYMBOL(name, alias)
+
+#if defined(__arm64__) || defined(__arm__) || defined(__aarch64__)
+#  define JMP "b "
+#else
+#  define JMP "jmp "
+#endif
+
+#ifdef __APPLE__
+#  define _U_ "_"
+#  define _PLT_
+#else
+#  define _U_
+#  define _PLT_ "@PLT"
+#endif
+
+#define _EXPORT_SYMBOL(name, aliasname) \
+	static void *ref_fun_##aliasname __attribute__((used)) = \
+		(void *)name; \
+	__asm__("\t.text\n" \
+		"\t.globl " _U_ #aliasname "\n" \
+		_U_ #aliasname ": " JMP _U_ #name _PLT_ "\n");\
+	extern __typeof(name) aliasname;
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
