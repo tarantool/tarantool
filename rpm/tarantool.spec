@@ -1,5 +1,5 @@
 # Enable systemd for on RHEL >= 7 and Fedora >= 15
-%if (0%{?fedora} >= 15 || 0%{?rhel} >= 7 || 0%{?sle_version} >= 1500)
+%if (0%{?fedora} >= 15 || 0%{?rhel} >= 7)
 %bcond_without systemd
 %else
 %bcond_with systemd
@@ -24,7 +24,7 @@ BuildRequires: cmake >= 3.2
 %endif
 
 BuildRequires: make
-%if (0%{?fedora} >= 22 || 0%{?rhel} >= 7 || 0%{?sle_version} >= 1500)
+%if (0%{?fedora} >= 22 || 0%{?rhel} >= 7)
 BuildRequires: gcc >= 4.5
 BuildRequires: gcc-c++ >= 4.5
 %endif
@@ -69,12 +69,6 @@ Requires(preun): initscripts
 %bcond_without backtrace
 %endif
 
-# openSuSE sets its own build directory in its macros, but we
-# want to use in-source build there to simplify the RPM spec.
-%if (0%{?sle_version} >= 1500)
-%global __builddir .
-%endif
-
 %if %{with backtrace}
 BuildRequires: libunwind-devel
 #
@@ -95,11 +89,7 @@ BuildRequires: libunwind-devel
 BuildRequires: python3
 BuildRequires: python3-six
 BuildRequires: python3-gevent
-%if (0%{?sle_version} >= 1500)
-BuildRequires: python3-PyYAML
-%else
 BuildRequires: python3-pyyaml
-%endif
 
 # Install prove to run LuaJIT tests.
 BuildRequires: perl-Test-Harness
@@ -123,7 +113,7 @@ Requires: /etc/services
 # Deps for built-in package manager
 # https://github.com/tarantool/tarantool/issues/2612
 Requires: openssl
-%if (0%{?fedora} >= 22 || 0%{?rhel} >= 8 || 0%{?sle_version} >= 1500)
+%if (0%{?fedora} >= 22 || 0%{?rhel} >= 8)
 # RHEL <= 7 doesn't support Recommends:
 Recommends: tarantool-devel
 Recommends: git-core
