@@ -866,7 +866,7 @@ void cord_on_yield(void)
 		 * world and one can obtain the corresponding Lua
 		 * coroutine from the fiber storage.
 		 */
-		struct lua_State *L = fiber()->storage.lua.stack;
+		struct lua_State *L = gco2th(gcref(g->cur_L));
 		assert(L != NULL);
 		snprintf(buf, sizeof(buf),
 			 "fiber %llu is switched while running the"
@@ -899,7 +899,7 @@ void cord_on_yield(void)
 	 */
 	if (unlikely(g->hookmask & HOOK_GC)) {
 		char buf[128];
-		struct lua_State *L = fiber()->storage.lua.stack;
+		struct lua_State *L = gco2th(gcref(g->cur_L));
 		assert(L != NULL);
 		snprintf(buf, sizeof(buf),
 			 "fiber %llu is switched while running GC"
