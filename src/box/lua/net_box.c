@@ -140,6 +140,8 @@ static const char *netbox_state_str[] = {
 struct netbox_options {
 	/** Remote server URI. */
 	struct uri uri;
+	/** Authentication method. */
+	const struct auth_method *auth_method;
 	/** User credentials. */
 	char *user;
 	char *password;
@@ -470,6 +472,7 @@ netbox_options_create(struct netbox_options *opts)
 {
 	memset(opts, 0, sizeof(*opts));
 	uri_create(&opts->uri, NULL);
+	opts->auth_method = AUTH_METHOD_DEFAULT;
 	opts->callback_ref = LUA_NOREF;
 	opts->connect_timeout = NETBOX_DEFAULT_CONNECT_TIMEOUT;
 	opts->fetch_schema = true;
@@ -683,8 +686,8 @@ netbox_encode_id(struct lua_State *L, struct ibuf *ibuf, uint64_t sync)
  */
 static void
 netbox_encode_auth(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
-		   const char *user, const char *password, const char *salt,
-		   uint32_t salt_len)
+		   const struct auth_method *method, const char *user,
+		   const char *password, const char *salt, uint32_t salt_len)
 {
 	assert(salt_len >= AUTH_SALT_SIZE);
 	(void)salt_len;
@@ -692,7 +695,6 @@ netbox_encode_auth(struct lua_State *L, struct ibuf *ibuf, uint64_t sync,
 		password = "";
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
-	const struct auth_method *method = AUTH_METHOD_DEFAULT;
 	const char *auth_request, *auth_request_end;
 	auth_request_prepare(method, password, strlen(password), salt,
 			     &auth_request, &auth_request_end);
@@ -2128,12 +2130,12 @@ luaT_netbox_request_pairs(struct lua_State *L)
  * Takes the following arguments: uri (string, number, or table),
  * user (string or nil), password (string or nil), callback (function),
  * connect_timeout (number or nil), reconnect_after (number or nil),
- * fetch_schema (boolean or nil).
+ * fetch_schema (boolean or nil), auth_type (string or nil).
  */
 static int
 luaT_netbox_new_transport(struct lua_State *L)
 {
-	assert(lua_gettop(L) == 7);
+	assert(lua_gettop(L) == 8);
 	/* Create a transport object. */
 	struct netbox_transport *transport;
 	transport = lua_newuserdata(L, sizeof(*transport));
@@ -2157,6 +2159,16 @@ luaT_netbox_new_transport(struct lua_State *L)
 		opts->reconnect_after = luaL_checknumber(L, 6);
 	if (!lua_isnil(L, 7))
 		opts->fetch_schema = lua_toboolean(L, 7);
+	if (!lua_isnil(L, 8)) {
+		size_t len;
+		const char *s = luaL_checklstring(L, 8, &len);
+		opts->auth_method = auth_method_by_name(s, len);
+		if (opts->auth_method == NULL) {
+			diag_set(ClientError, ER_UNKNOWN_AUTH_METHOD,
+				 tt_cstr(s, len));
+			return luaT_error(L);
+		}
+	}
 	if (opts->user == NULL && opts->password != NULL) {
 		diag_set(ClientError, ER_PROC_LUA,
 			 "net.box: user is not defined");
@@ -2621,7 +2633,7 @@ netbox_transport_do_auth(struct netbox_transport *transport,
 	if (opts->user == NULL)
 		return;
 	netbox_encode_auth(L, &transport->send_buf, transport->next_sync++,
-			   opts->user, opts->password,
+			   opts->auth_method, opts->user, opts->password,
 			   transport->greeting.salt,
 			   transport->greeting.salt_len);
 	struct xrow_header hdr;
