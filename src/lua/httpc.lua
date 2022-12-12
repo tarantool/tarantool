@@ -311,9 +311,18 @@ local function decode_body(response)
     return res
 end
 
-local function encode_url_params(params)
-    local query_encoder = require("uri")._internal.params
-    local ok, res = pcall(query_encoder, params)
+local function encode_url_params(params, http_method)
+    assert(http_method ~= nil)
+    local uri = require("uri")
+    local uri_escape_opts = uri.FORM_URLENCODED
+    if http_method == "GET" or
+       http_method == "HEAD" or
+       http_method == "DELETE" then
+        uri_escape_opts = uri.QUERY_PART
+    end
+
+    local query_encoder = uri._internal.params
+    local ok, res = pcall(query_encoder, params, uri_escape_opts)
     if not ok then
         error(res)
     end
@@ -410,7 +419,7 @@ curl_mt = {
 
             local encoded_params
             if opts.params then
-                encoded_params = encode_url_params(opts.params)
+                encoded_params = encode_url_params(opts.params, method)
             end
             local url_with_params = url
             if encoded_params then
