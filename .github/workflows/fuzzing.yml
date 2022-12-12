@@ -1,19 +1,20 @@
 name: fuzzing
 
 on:
-  push:
-    branches:
-      - 'master'
-      - '[0-9].[0-9]+'
-    tags:
-      - '**'
-    paths:
-      - '.github/workflows/**'
-      - 'src/**'
-      - 'test/fuzz/**'
-      - 'test/static/corpus/**'
-  pull_request:
-    types: [opened, reopened, synchronize, labeled]
+#  push:
+#    branches:
+#      - 'master'
+#      - '[0-9].[0-9]+'
+#    tags:
+#      - '**'
+#    paths:
+#      - '.github/workflows/**'
+#      - 'src/**'
+#      - 'test/fuzz/**'
+#      - 'test/static/corpus/**'
+#  pull_request:
+#    types: [opened, reopened, synchronize, labeled]
+  workflow_dispatch:
 
 concurrency:
   # Update of a developer branch cancels the previously scheduled workflow

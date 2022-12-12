@@ -1,9 +1,9 @@
 name: source
 
 on:
-  push:
-    tags:
-      - '**'
+#  push:
+#    tags:
+#      - '**'
   workflow_dispatch:
 
 env:

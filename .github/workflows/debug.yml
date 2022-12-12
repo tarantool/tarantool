@@ -1,13 +1,13 @@
 name: debug
 
 on:
-  push:
-    branches:
-      - 'master'
-      - '[0-9].[0-9]+'
-    tags:
-      - '**'
-  pull_request:
+#  push:
+#    branches:
+#      - 'master'
+#      - '[0-9].[0-9]+'
+#    tags:
+#      - '**'
+#  pull_request:
   workflow_dispatch:
 
 concurrency:

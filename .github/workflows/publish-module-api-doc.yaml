@@ -1,10 +1,10 @@
 name: Publish module API documentation
 
 on:
-  push:
-    branches: [master]
-  pull_request:
-    types: [opened, reopened, synchronize, labeled]
+#  push:
+#    branches: [master]
+#  pull_request:
+#    types: [opened, reopened, synchronize, labeled]
   workflow_dispatch:
 
 concurrency:

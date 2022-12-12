@@ -1,14 +1,14 @@
 name: centos_7_aarch64
 
 on:
-  push:
-    branches:
-      - 'master'
-      - '[0-9].[0-9]+'
-    tags:
-      - '**'
-  pull_request:
-    types: [opened, reopened, synchronize, labeled]
+#  push:
+#    branches:
+#      - 'master'
+#      - '[0-9].[0-9]+'
+#    tags:
+#      - '**'
+#  pull_request:
+#    types: [opened, reopened, synchronize, labeled]
   workflow_dispatch:
 
 concurrency:
