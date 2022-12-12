@@ -967,15 +967,25 @@ box_check_uri_set(const char *option_name)
 	int rc = 0;
 	for (int i = 0; i < uri_set.uri_count; i++) {
 		const struct uri *uri = &uri_set.uris[i];
+		const char *auth_type = uri_param(uri, "auth_type", 0);
+		const char *errmsg;
 		if (uri->service == NULL) {
-			char *uristr = tt_static_buf();
-			uri_format(uristr, TT_STATIC_BUF_LEN, uri, false);
-			diag_set(ClientError, ER_CFG, option_name,
-				 tt_sprintf("bad URI '%s': expected host:service "
-				 "or /unix.socket", uristr));
-			rc = -1;
-			break;
+			errmsg = "expected host:service or /unix.socket";
+			goto bad_uri;
 		}
+		if (auth_type != NULL &&
+		    auth_method_by_name(auth_type, strlen(auth_type)) == NULL) {
+			errmsg = "unknown authentication method";
+			goto bad_uri;
+		}
+		continue;
+bad_uri:;
+		char *uristr = tt_static_buf();
+		uri_format(uristr, TT_STATIC_BUF_LEN, uri, false);
+		diag_set(ClientError, ER_CFG, option_name,
+			 tt_sprintf("bad URI '%s': %s", uristr, errmsg));
+		rc = -1;
+		break;
 	}
 	uri_set_destroy(&uri_set);
 	return rc;

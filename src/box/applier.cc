@@ -434,7 +434,11 @@ applier_connect(struct applier *applier)
 	if (password == NULL)
 		password = "";
 	RegionGuard region_guard(&fiber()->gc);
-	const struct auth_method *method = AUTH_METHOD_DEFAULT;
+	const char *method_name = uri_param(uri, "auth_type", 0);
+	const struct auth_method *method = method_name != NULL ?
+		auth_method_by_name(method_name, strlen(method_name)) :
+		AUTH_METHOD_DEFAULT;
+	assert(method != NULL);
 	const char *auth_request, *auth_request_end;
 	assert(greeting.salt_len >= AUTH_SALT_SIZE);
 	auth_request_prepare(method, password, strlen(password), greeting.salt,
