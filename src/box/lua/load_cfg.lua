@@ -76,6 +76,8 @@ local default_cfg = {
     audit_format        = 'json',
     audit_filter        = 'compatibility',
 
+    auth_type           = 'chap-sha1',
+
     flightrec_enabled = false,
     flightrec_logs_size = 10485760,
     flightrec_logs_max_msg_size = 4096,
@@ -178,6 +180,8 @@ local template_cfg = {
     audit_nonblock      = 'boolean',
     audit_format        = 'string',
     audit_filter        = 'string',
+
+    auth_type           = 'string',
 
     flightrec_enabled = 'boolean',
     flightrec_logs_size = 'number',
@@ -352,6 +356,7 @@ local dynamic_cfg = {
     sql_cache_size          = private.cfg_set_sql_cache_size,
     txn_timeout             = private.cfg_set_txn_timeout,
     txn_isolation           = private.cfg_set_txn_isolation,
+    auth_type               = private.cfg_set_auth_type,
     wal_ext                 = private.cfg_set_wal_ext
 }
 

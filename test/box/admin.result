@@ -33,6 +33,8 @@ cfg_filter(box.cfg)
     - json
   - - audit_nonblock
     - true
+  - - auth_type
+    - chap-sha1
   - - background
     - false
   - - checkpoint_count

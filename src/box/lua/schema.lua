@@ -3373,11 +3373,13 @@ end
 box.schema.user = {}
 
 box.schema.user.password = function(password)
-    return internal.prepare_auth('chap-sha1', password)
+    return internal.prepare_auth(box.cfg.auth_type, password)
 end
 
 local function prepare_auth_list(password)
-    return {['chap-sha1'] = internal.prepare_auth('chap-sha1', password)}
+    return {
+        [box.cfg.auth_type] = internal.prepare_auth(box.cfg.auth_type, password)
+    }
 end
 
 local function chpasswd(uid, new_password)
