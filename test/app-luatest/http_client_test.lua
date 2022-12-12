@@ -986,3 +986,39 @@ g.test_http_params_request_post = function(cg)
     t.assert_equals(resp.body, "k=2&v=3&v=4")
     t.assert_equals(resp.headers['content_type'], "application/x-www-form-urlencoded")
 end
+
+g.test_http_params_escaped_request_post = function(cg)
+    local http = client.new()
+    t.assert(http ~= nil, "client is created")
+
+    local opts = table.deepcopy(cg.opts)
+    opts.params = {
+        [2] = 4,
+        ["k&"] = "&2",
+        ["v&"] = uri.values("3", "4", "5=", "6 ")
+    }
+
+    -- HTTP method in uppercase.
+    local resp = http:request("POST", cg.url, nil, opts)
+    t.assert_equals(resp.status, 200)
+    local expected_body = "2=4&k%26=%262&v%26=3&v%26=4&v%26=5%3D&v%26=6+"
+    t.assert_equals(resp.body, expected_body)
+end
+
+g.test_http_params_escaped_request_get = function(cg)
+    local http = client.new()
+    t.assert(http ~= nil, "client is created")
+
+    local opts = table.deepcopy(cg.opts)
+    opts.params = {
+        [2] = 4,
+        ["k&"] = "&2",
+        ["v&"] = uri.values("5=", "6 "),
+    }
+
+    local resp = http:request("GET", cg.url, nil, opts)
+    t.assert_equals(resp.status, 200)
+    t.assert_equals(resp.body, "hello world")
+    local expected_query_path = "?2=4&k%26=%262&v%26=5%3D&v%26=6%20"
+    t.assert_str_contains(resp.url, expected_query_path)
+end
