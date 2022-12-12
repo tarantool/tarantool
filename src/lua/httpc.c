@@ -33,6 +33,7 @@
  * Unique name for userdata metatables
  */
 #define DRIVER_LUA_UDATA_NAME	"httpc"
+#define IO_LUA_UDATA_NAME       "httpc_io"
 
 #include "http_parser/http_parser.h"
 #include <httpc.h>
@@ -40,6 +41,22 @@
 #include "lua/utils.h"
 #include "lua/httpc.h"
 #include "core/fiber.h"
+
+/** Internal util types
+ * {{{
+ */
+
+/**
+ * The stream input/output request.
+ */
+struct httpc_io {
+	/** HTTP request. */
+	struct httpc_request *req;
+};
+
+/**
+ * }}}
+ */
 
 /** Internal util functions
  * {{{
@@ -50,6 +67,36 @@ luaT_httpc_checkenv(lua_State *L)
 {
 	return (struct httpc_env *)
 			luaL_checkudata(L, 1, DRIVER_LUA_UDATA_NAME);
+}
+
+static inline struct httpc_io*
+luaT_httpc_checkio(lua_State *L)
+{
+	return (struct httpc_io *)
+			luaL_checkudata(L, 1, IO_LUA_UDATA_NAME);
+}
+
+static inline int
+httpc_io_create(lua_State *L, struct httpc_request *req)
+{
+	struct httpc_io *io = (struct httpc_io *)
+			lua_newuserdata(L, sizeof(struct httpc_io));
+	if (io == NULL)
+		return luaL_error(L, "lua_newuserdata failed: httpc_io");
+	memset(io, 0, sizeof(*io));
+	io->req = req;
+
+	luaL_getmetatable(L, IO_LUA_UDATA_NAME);
+	lua_setmetatable(L, -2);
+
+	return 1;
+}
+
+static inline int
+httpc_io_destroy(struct httpc_io *io)
+{
+	httpc_request_delete(io->req);
+	return 0;
 }
 
 static inline void
@@ -155,15 +202,12 @@ luaT_httpc_request(lua_State *L)
 	if (req == NULL)
 		return luaT_error(L);
 
+	const char *body = NULL;
+	size_t body_len = 0;
 	double timeout = TIMEOUT_INFINITY;
 	int max_header_name_length = MAX_HTTP_HEADER_NAME_LEN;
 	if (lua_isstring(L, 4)) {
-		size_t len = 0;
-		const char *body = lua_tolstring(L, 4, &len);
-		if (len > 0 && httpc_set_body(req, body, len) != 0) {
-			httpc_request_delete(req);
-			return luaT_error(L);
-		}
+		body = lua_tolstring(L, 4, &body_len);
 	} else if (!lua_isnil(L, 4)) {
 		httpc_request_delete(req);
 		return luaL_error(L, "fourth argument must be a string");
@@ -320,20 +364,76 @@ luaT_httpc_request(lua_State *L)
 		httpc_set_accept_encoding(req, lua_tostring(L, -1));
 	lua_pop(L, 1);
 
-	if (httpc_execute(req, timeout) != 0) {
-		httpc_request_delete(req);
-		return luaT_error(L);
+	bool chunked = false;
+	lua_getfield(L, 5, "chunked");
+	if (!lua_isnil(L, -1) && lua_isboolean(L, -1))
+		chunked = lua_toboolean(L, -1);
+	lua_pop(L, 1);
+
+	if (chunked) {
+		if (httpc_set_io(req, method) != 0) {
+			httpc_request_delete(req);
+			return luaT_error(L);
+		}
+
+		if (httpc_request_start(req, timeout) != 0) {
+			httpc_request_delete(req);
+			return luaT_error(L);
+		}
+
+		if (body_len > 0 && httpc_request_io_write(req, body, body_len,
+							   timeout) == -1) {
+			httpc_request_delete(req);
+			return luaT_error(L);
+		}
+
+		lua_newtable(L);
+
+		lua_pushstring(L, "_internal");
+
+		lua_newtable(L);
+		lua_pushstring(L, "io");
+		httpc_io_create(L, req);
+		lua_settable(L, -3);
+
+		lua_settable(L, -3);
+	} else {
+		if (body_len > 0 && httpc_set_body(req, body, body_len) != 0) {
+			httpc_request_delete(req);
+			return luaT_error(L);
+		}
+
+		if (httpc_execute(req, timeout) != 0) {
+			httpc_request_delete(req);
+			return luaT_error(L);
+		}
+
+		lua_newtable(L);
+
+		size_t rbody_len = region_used(&req->recv);
+		if (rbody_len > 0) {
+			char *rbody = region_join(&req->recv, rbody_len);
+			if (rbody == NULL) {
+				diag_set(OutOfMemory, rbody_len, "region",
+					 "body");
+				httpc_request_delete(req);
+				return luaT_error(L);
+			}
+			lua_pushstring(L, "body");
+			lua_pushlstring(L, rbody, rbody_len);
+			lua_settable(L, -3);
+		}
 	}
 
-	lua_newtable(L);
+	if (!req->curl_request.in_progress) {
+		lua_pushstring(L, "status");
+		lua_pushinteger(L, req->status);
+		lua_settable(L, -3);
 
-	lua_pushstring(L, "status");
-	lua_pushinteger(L, req->status);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, "reason");
-	lua_pushstring(L, req->reason);
-	lua_settable(L, -3);
+		lua_pushstring(L, "reason");
+		lua_pushstring(L, req->reason);
+		lua_settable(L, -3);
+	}
 
 	size_t headers_len = region_used(&req->resp_headers);
 	if (headers_len > 0) {
@@ -344,25 +444,15 @@ luaT_httpc_request(lua_State *L)
 			return luaT_error(L);
 		}
 		if (parse_headers(L, headers, headers_len,
-				  max_header_name_length) < 0)
+			max_header_name_length) < 0)
 			diag_log();
 	}
 
-	size_t body_len = region_used(&req->resp_body);
-	if (body_len > 0) {
-		char *body = region_join(&req->resp_body, body_len);
-		if (body == NULL) {
-			diag_set(OutOfMemory, body_len, "region", "body");
-			httpc_request_delete(req);
-			return luaT_error(L);
-		}
-		lua_pushstring(L, "body");
-		lua_pushlstring(L, body, body_len);
-		lua_settable(L, -3);
+	if (!chunked) {
+		/* clean up immediately */
+		httpc_request_delete(req);
 	}
 
-	/* clean up */
-	httpc_request_delete(req);
 	return 1;
 }
 
@@ -425,6 +515,109 @@ luaT_httpc_cleanup(lua_State *L)
 	return 2;
 }
 
+/**
+ * Read from a stream input/output request.
+ */
+static int
+luaT_httpc_io_read(lua_State *L)
+{
+	struct httpc_io *io = luaT_httpc_checkio(L);
+	struct httpc_request *req = io->req;
+	uint32_t ctypeid = 0;
+	char *buf = *(char **)luaL_checkcdata(L, 2, &ctypeid);
+	ssize_t len = luaL_checkinteger(L, 3);
+	double timeout = luaL_checknumber(L, 4);
+
+	if (len <= 0) {
+		diag_set(IllegalParams, "io: payload length must be >= 0");
+		return luaT_error(L);
+	}
+
+	if (timeout < 0) {
+		diag_set(IllegalParams, "io: timeout must be >= 0");
+		return luaT_error(L);
+	}
+
+	ssize_t res = httpc_request_io_read(req, buf, len, timeout);
+	if (res < 0) {
+		return luaT_error(L);
+	}
+
+	lua_pushinteger(L, res);
+	return 1;
+}
+
+/**
+ * Write to a stream input/output request.
+ */
+static int
+luaT_httpc_io_write(lua_State *L)
+{
+	struct httpc_io *io = luaT_httpc_checkio(L);
+	const char *buf = lua_tostring(L, 2);
+	uint32_t ctypeid = 0;
+	if (buf == NULL)
+		buf = *(const char **)luaL_checkcdata(L, 2, &ctypeid);
+	ssize_t len = lua_tonumber(L, 3);
+	double timeout = luaL_checknumber(L, 4);
+
+	if (len < 0) {
+		diag_set(IllegalParams, "io: payload length must be >= 0");
+		return luaT_error(L);
+	}
+
+	if (timeout < 0) {
+		diag_set(IllegalParams, "io: timeout must be >= 0");
+		return luaT_error(L);
+	}
+
+	struct httpc_request *req = io->req;
+	ssize_t res = httpc_request_io_write(req, buf, len, timeout);
+	if (res < 0)
+		return luaT_error(L);
+
+	lua_pushinteger(L, res);
+	return 1;
+}
+
+/**
+ * Close a stream input/output request.
+ */
+static int
+luaT_httpc_io_finish(lua_State *L)
+{
+	struct httpc_io *io = luaT_httpc_checkio(L);
+	double timeout = luaL_checknumber(L, 2);
+
+	if (timeout < 0) {
+		diag_set(IllegalParams, "io: timeout must be >= 0");
+		return luaT_error(L);
+	}
+
+	httpc_request_io_finish(io->req, timeout);
+
+	lua_pushinteger(L, io->req->status);
+	lua_pushstring(L, io->req->reason);
+	return 2;
+}
+
+/**
+ * GC cleanup a stream input/output request.
+ */
+static int
+luaT_httpc_io_cleanup(lua_State *L)
+{
+	httpc_io_destroy(luaT_httpc_checkio(L));
+
+	/** remove all methods operating on io */
+	lua_newtable(L);
+	lua_setmetatable(L, -2);
+
+	lua_pushboolean(L, true);
+	lua_pushinteger(L, 0);
+	return 2;
+}
+
 /*
  * }}}
  */
@@ -445,6 +638,14 @@ static const struct luaL_Reg Client[] = {
 	{NULL, NULL}
 };
 
+static const struct luaL_Reg Io[] = {
+	{"read", luaT_httpc_io_read},
+	{"write", luaT_httpc_io_write},
+	{"finish", luaT_httpc_io_finish},
+	{"__gc", luaT_httpc_io_cleanup},
+	{NULL, NULL}
+};
+
 /*
  * Lib initializer
  */
@@ -452,6 +653,7 @@ LUA_API int
 luaopen_http_client_driver(lua_State *L)
 {
 	luaL_register_type(L, DRIVER_LUA_UDATA_NAME, Client);
+	luaL_register_type(L, IO_LUA_UDATA_NAME, Io);
 	luaT_newmodule(L, "http.client.lib", Module);
 	return 1;
 }

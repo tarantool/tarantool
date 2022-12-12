@@ -31,11 +31,17 @@
 
 local driver = require('http.client.lib')
 
+local ffi = require('ffi')
+local buffer = require('buffer')
+local fiber = require('fiber')
 local json = require('json')
 local yaml = require('yaml')
 local msgpack = require('msgpack')
 
 local curl_mt
+
+local IO_TIMEOUT_DEFAULT = 10
+local IO_CHUNK_DEFAULT = 2147483647
 
 local default_content_type = 'application/json'
 
@@ -328,6 +334,122 @@ local function encode_url_params(params, http_method)
     return res
 end
 
+local function check_limit(self, limit)
+    if self._internal.rbuf:size() >= limit then
+        return limit
+    end
+    return nil
+end
+
+local function check_delimiter(self, limit, eols)
+    if limit == 0 then
+        return 0
+    end
+    local rbuf = self._internal.rbuf
+    if rbuf:size() == 0 then
+        return nil
+    end
+
+    local shortest
+    for _, eol in ipairs(eols) do
+        local data = ffi.C.memmem(rbuf.rpos, rbuf:size(), eol, #eol)
+        if data ~= nil then
+            local len = ffi.cast('char *', data) - rbuf.rpos + #eol
+            if shortest == nil or shortest > len then
+                shortest = len
+            end
+        end
+    end
+    if shortest ~= nil and shortest <= limit then
+        return shortest
+    elseif limit <= rbuf:size() then
+        return limit
+    end
+    return nil
+end
+
+local function io_read(self, opts, timeout)
+    timeout = timeout or IO_TIMEOUT_DEFAULT
+    local chunk
+    local delimiter
+    local check
+    if type(opts) == 'number' then
+        chunk = opts
+        check = check_limit
+    elseif type(opts) == 'string' then
+        chunk = IO_CHUNK_DEFAULT
+        delimiter = {opts}
+        check = check_delimiter
+    elseif type(opts) == 'table' then
+        chunk = opts.chunk or IO_CHUNK_DEFAULT
+        delimiter = opts.delimiter
+        if delimiter == nil then
+            check = check_limit
+        elseif type(delimiter) == 'string' then
+            delimiter = {delimiter}
+            check = check_delimiter
+        elseif type(delimiter) == 'table' then
+            check = check_delimiter
+        end
+    else
+        error('Usage: io:read(delimiter|chunk|{delimiter = x, chunk = x}, timeout)')
+    end
+
+    if chunk < 0 then
+        error('io:read(): chunk can not be negative')
+    end
+
+    chunk = math.min(chunk, IO_CHUNK_DEFAULT)
+    local rbuf = self._internal.rbuf
+    if rbuf == nil then
+        rbuf = buffer.ibuf()
+        self._internal.rbuf = rbuf
+    end
+
+    local len = check(self, chunk, delimiter)
+    if len ~= nil then
+        local data = ffi.string(rbuf.rpos, len)
+        rbuf.rpos = rbuf.rpos + len
+        return data
+    end
+
+    local deadline = fiber.clock() + timeout
+    repeat
+        local to_read = math.min(chunk - rbuf:size(), buffer.READAHEAD)
+        local data = rbuf:reserve(to_read)
+
+        local res = self._internal.io:read(data, rbuf:unused(), timeout)
+        if res == 0 then -- eof
+            self._errno = nil
+            local len = rbuf:size()
+            local data = ffi.string(rbuf.rpos, len)
+            rbuf.rpos = rbuf.rpos + len
+            return data
+        else
+            rbuf.wpos = rbuf.wpos + res
+            local len = check(self, chunk, delimiter)
+            if len ~= nil then
+                self._errno = nil
+                local data = ffi.string(rbuf.rpos, len)
+                rbuf.rpos = rbuf.rpos + len
+                return data
+            end
+        end
+        timeout = deadline - fiber.clock()
+    until timeout < 0
+    return nil
+end
+
+local function io_write(self, data, timeout)
+    timeout = timeout or IO_TIMEOUT_DEFAULT
+    return self._internal.io:write(data, #data, timeout)
+end
+
+local function io_finish(self, timeout)
+    timeout = timeout or IO_TIMEOUT_DEFAULT
+    self["status"], self["reason"] = self._internal.io:finish(timeout)
+end
+
 --
 --  <request> This function does HTTP request
 --
@@ -388,17 +510,21 @@ end
 --
 --      accept_encoding - enables automatic decompression of HTTP responses;
 --
+--      chunked - enables chunked io interface;
+--
 --      params - a table with query parameters;
 --
 --  Returns:
 --      {
---          status=NUMBER,
---          reason=ERRMSG
---          body=STRING,
+--          status=NUMBER (if the request is completed),
+--          reason=ERRMSG (if the request is completed),
+--          body=STRING (if !opts.chunked == false),
 --          headers=STRING,
---          errmsg=STRING
+--          errmsg=STRING (if the request is completed),
+--          write=FUNCTION (if opts.chunked == true),
+--          read=FUNCTION (if opts.chunked == true),
+--          finish=FUNCTION (if opts.chunked == true),
 --      }
---
 --  Raises error() on invalid arguments and OOM
 --
 
@@ -448,7 +574,6 @@ curl_mt = {
                 end
                 body = encode_body(body, content_type, self.encoders)
             end
-
             local resp = self.curl:request(method, url_with_params, body, opts or {})
 
             if resp and resp.headers then
@@ -458,13 +583,22 @@ curl_mt = {
                 resp.headers = process_headers(resp.headers)
             end
 
-            resp.url = url_with_params
-
-            return setmetatable(resp, {
-                __index = {
-                    decode = decode_body,
-                },
-            })
+            if not opts.chunked then
+                resp.url = url_with_params
+                return setmetatable(resp, {
+                    __index = {
+                        decode = decode_body,
+                    },
+                })
+            else
+                return setmetatable(resp, {
+                    __index = {
+                        read = io_read,
+                        write = io_write,
+                        finish = io_finish,
+                    },
+                })
+            end
         end,
 
         --

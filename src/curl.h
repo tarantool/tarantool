@@ -63,6 +63,12 @@ struct curl_env {
 };
 
 /**
+ * CURL request completed handler
+ */
+typedef void
+(*curl_done_handler)(void *arg);
+
+/**
  * CURL Request
  */
 struct curl_request {
@@ -77,6 +83,15 @@ struct curl_request {
 	 * until the handler (callback function) gives a signal within variable.
 	 * */
 	struct fiber_cond cond;
+	/**
+	 * The curl-driver calls the handler after the request execution has
+	 * been completed.
+	 */
+	curl_done_handler done_handler;
+	/**
+	 * The argument for done_handler.
+	 */
+	void *done_handler_arg;
 };
 
 /**
@@ -113,13 +128,22 @@ void
 curl_request_destroy(struct curl_request *curl_request);
 
 /**
- * Execute CURL request
+ * Start executing the CURL request
+ * @param curl_request request
+ * @param env environment
+ * @param curl_request request
+ */
+CURLMcode
+curl_request_start(struct curl_request *curl_request, struct curl_env *env);
+
+/**
+ * Wait for the CURL request to be completed or aborts the request by timeout
  * @param curl_request request
  * @param env environment
  * @param timeout - timeout of waiting for libcurl api
  */
 CURLMcode
-curl_execute(struct curl_request *curl_request, struct curl_env *env,
-	     double timeout);
+curl_request_finish(struct curl_request *curl_request, struct curl_env *env,
+		    double timeout);
 
 #endif /* TARANTOOL_CURL_H_INCLUDED */

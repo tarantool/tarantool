@@ -1023,3 +1023,261 @@ g.test_http_params_escaped_request_get = function(cg)
     local expected_query_path = "?2=4&k%26=%262&v%26=5%3D&v%26=6%20"
     t.assert_str_contains(resp.url, expected_query_path)
 end
+
+g.test_http_client_io_get = function(cg)
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    opts.chunked = true
+
+    local io = client.get(url, opts)
+    t.assert_type(io.read, 'function', 'read')
+    t.assert_type(io.write, 'function', 'write')
+    t.assert_type(io.finish, 'function', 'close')
+    t.assert_not(io.body, 'body')
+    t.assert_equals(io.proto[1], 1, 'proto major http 1.1')
+    t.assert_equals(io.proto[2], 1, 'proto minor http 1.1')
+    local len = tonumber(io.headers['content-length'])
+    t.assert_gt(len, 0, 'content-length > 0')
+
+    local data = io:read(len)
+    io:finish()
+
+    t.assert_str_contains(data, 'hello', 'data')
+    t.assert_equals(io.status, 200, 'io')
+    t.assert_equals(io.reason, 'Ok', '200 - Ok')
+end
+
+g.test_http_client_io_get_delimiter = function(cg)
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    opts.chunked = true
+
+    local io = client.get(url, opts)
+    local len = tonumber(io.headers['content-length'])
+    t.assert_gt(len, 0, 'content-length > 0')
+
+    local data = io:read(' ')
+    io:finish()
+
+    t.assert_equals(data, 'hello ', 'data')
+    t.assert_equals(io.status, 200, 'io')
+    t.assert_equals(io.reason, 'Ok', '200 - Ok')
+end
+
+g.test_http_client_io_read_invalid_arg = function(cg)
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    opts.chunked = true
+
+    local io = client.get(url, opts)
+    local len = tonumber(io.headers['content-length'])
+    t.assert_gt(len, 0, 'content-length > 0')
+
+    local ok, err = pcall(io.read, io, -1)
+    t.assert_not(ok, 'an error expected', 'first arg error')
+    t.assert_str_contains(err, 'chunk can not be negative')
+
+    local ok, err = pcall(io.read, io, function() end)
+    t.assert_not(ok, 'an error expected')
+    t.assert_str_contains(err, 'Usage:')
+
+    local ok, err = pcall(io.read, io, {chunk = -1})
+    t.assert_not(ok, 'an error expected')
+    t.assert_str_contains(err, 'chunk can not be negative')
+    io:finish()
+end
+
+g.test_http_client_io_get_parts = function(cg)
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    opts.chunked = true
+
+    local io = client.get(url, opts)
+    local len = tonumber(io.headers['content-length'])
+    t.assert_gt(len, 0, 'content-length > 0')
+    local first_len = math.floor(len / 2)
+    local second_len = len - first_len
+    local first_part = io:read(first_len)
+    local second_part = io:read(second_len)
+
+    io:finish()
+
+    t.assert_str_contains(first_part .. second_part, 'hello', 'data')
+    t.assert_equals(io.status, 200, 'io')
+    t.assert_equals(io.reason, 'Ok', '200 - Ok')
+end
+
+g.test_http_client_io_get_write = function(cg)
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    opts.chunked = true
+
+    local io = client.get(url, opts)
+    local ok, err = pcall(io.write, io, 'any data', 1)
+    t.assert_equals(ok, false, 'an error expected')
+    local expected = 'io: HTTP request method with no body to send'
+    t.assert_str_contains(json.encode(err), expected, 'write error')
+    io:finish()
+end
+
+g.test_http_client_io_get_read_closed = function(cg)
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    opts.chunked = true
+
+    local io = client.get(url, opts)
+    io:finish()
+
+    local len = tonumber(io.headers['content-length'])
+    t.assert_gt(len, 0, 'content-length > 0')
+
+    local data = io:read(len)
+    local closed_data = io:read(len)
+
+    t.assert_str_contains(data, 'hello', 'data')
+    t.assert_str_contains(closed_data, '', 'read after close')
+    t.assert_equals(io.status, 200, 'io')
+    t.assert_equals(io.reason, 'Ok', '200 - Ok')
+end
+
+g.test_http_client_io_finish = function(cg)
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    opts.chunked = true
+
+    local io = client.get(url, opts)
+
+    t.assert_error_msg_equals("io: timeout must be >= 0", function()
+        io:finish(-1)
+    end)
+    io:finish()
+    io:finish()
+    io:finish(0)
+    io:finish(100000)
+
+    local len = tonumber(io.headers['content-length'])
+    t.assert_gt(len, 0, 'content-length > 0')
+    t.assert_equals(io.status, 200, 'io')
+    t.assert_equals(io.reason, 'Ok', '200 - Ok')
+end
+
+g.test_http_client_io_finish_timeout = function(cg)
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    opts.chunked = true
+
+    local io = client.post(url .. 'long_query', nil, opts)
+    io:finish(0.000001)
+
+    t.assert_equals(io.status, 408, "Timeout check - status")
+    t.assert_str_contains(io.reason, "Timeout", "Timeout check - reason")
+end
+
+g.test_http_client_io_get_fast = function(cg)
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    opts.chunked = true
+
+    local io = client.get(url .. 'this/page/not/exists', opts)
+    t.assert_equals(io.status, 404, 'status')
+    t.assert_equals(io.reason, 'Unknown', "reason")
+    io:finish()
+    t.assert_equals(io.status, 404, 'status')
+    t.assert_equals(io.reason, 'Unknown', "reason")
+end
+
+g.test_http_client_io_error = function(cg)
+    local opts = table.deepcopy(cg.opts)
+    opts.chunked = true
+
+    local status, err = pcall(client.get, 'htp://mail.ru', opts)
+    t.assert_not(status, 'GET: exception on bad protocol - status')
+    t.assert_str_contains(json.encode(err), 'Unsupported protocol',
+                          'GET: exception on bad protocol - error')
+end
+
+g.test_http_client_io_post = function(cg)
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local data = 'any data'
+    opts.chunked = true
+    opts.headers = {['Content-Length'] = tostring(string.len(data))}
+
+    local io = client.post(url, nil, opts)
+    t.assert_type(io.read, 'function', 'read')
+    t.assert_type(io.write, 'function', 'write')
+    t.assert_type(io.finish, 'function', 'close')
+    t.assert_not(io.body, 'body')
+
+    local written = io:write(data, 1)
+    t.assert_equals(written, string.len(data), 'written')
+    io:finish()
+
+    local read = io:read(string.len(data))
+    t.assert_equals(read, data, 'read == post')
+    t.assert_equals(io.status, 200, 'io')
+    t.assert_equals(io.reason, 'Ok', '200 - Ok')
+end
+
+g.test_http_client_io_post_more_than_content_length = function(cg)
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local data = 'any data'
+    opts.chunked = true
+    opts.headers = {['Content-Length'] = tostring(string.len(data))}
+
+    local io = client.post(url, nil, opts)
+    local written = io:write(data, 1)
+    t.assert_equals(written, string.len(data), 'written')
+    written = io:write(data, 1)
+    t.assert_equals(written, string.len(data), 'written')
+    io:finish()
+
+    local read = io:read(string.len(data) * 2)
+    t.assert_equals(read, data .. data, 'read == post')
+    t.assert_equals(io.status, 200, 'io')
+    t.assert_equals(io.reason, 'Ok', '200 - Ok')
+end
+
+g.test_http_client_io_post_send_close = function(cg)
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local data = 'any data'
+    opts.chunked = true
+    opts.headers = {['Content-Length'] = tostring(string.len(data))}
+
+    local io = client.post(url, nil, opts)
+    local written = io:write(data)
+    t.assert_equals(written, string.len(data), 'written')
+    written = io:write('')
+    t.assert_equals(written, 0, 'written')
+    written = io:write(data)
+    t.assert_equals(written, 0, 'written')
+
+    local read = io:read(string.len(data))
+    t.assert_equals(read, data, 'read == post')
+    io:finish()
+    t.assert_equals(io.status, 200, 'io')
+    t.assert_equals(io.reason, 'Ok', '200 - Ok')
+end
+
+g.test_http_client_io_post_post_read = function(cg)
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local data = 'any data'
+    opts.chunked = true
+    opts.headers = {['Content-Length'] = tostring(string.len(data))}
+
+    local io = client.post(url, nil, opts)
+    local ok, err = pcall(io.read, io, 1, 0.0001)
+    t.assert_equals(ok, false, 'an error expected')
+    t.assert_str_contains(json.encode(err), 'timed out', 'timeout')
+    io:finish()
+    t.assert_equals(io.status, 200, 'io')
+    t.assert_equals(io.reason, 'Ok', '200 - Ok')
+end
+
+g.test_http_client_io_post_parts = function(cg)
+    local url, opts = cg.url, table.deepcopy(cg.opts)
+    local first_part = 'any'
+    local second_part = 'data'
+    local total_len = string.len(first_part) + string.len(second_part)
+    opts.chunked = true
+
+    local io = client.post(url, first_part, opts)
+    local written = io:write(second_part)
+    t.assert_equals(written, string.len(second_part), 'written')
+    io:finish()
+
+    local read = io:read(total_len)
+    t.assert_equals(read, first_part .. second_part, 'read == post')
+    t.assert_equals(io.status, 200, 'io')
+    t.assert_equals(io.reason, 'Ok', '200 - Ok')
+end
