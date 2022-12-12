@@ -111,6 +111,13 @@ const char *box_auth_type;
 const char *box_ballot_event_key = "internal.ballot";
 
 /**
+ * UUID of the node this instance bootstrapped from.
+ * Is only set during the bootstrap and left untouched during automatic
+ * rebootstrap and anonymous replica register.
+ */
+static struct tt_uuid bootstrap_leader_uuid;
+
+/**
  * Set if backup is in progress, i.e. box_backup_start() was
  * called but box_backup_stop() hasn't been yet.
  */
@@ -3827,6 +3834,7 @@ box_process_vote(struct ballot *ballot)
 	ballot->is_booted = is_box_configured;
 	vclock_copy(&ballot->vclock, &replicaset.vclock);
 	vclock_copy(&ballot->gc_vclock, &gc.vclock);
+	ballot->bootstrap_leader_uuid = bootstrap_leader_uuid;
 }
 
 /** Insert a new cluster into _schema */
@@ -4091,6 +4099,10 @@ bootstrap(const struct tt_uuid *instance_uuid,
 	while (true) {
 		box_restart_replication();
 		master = replicaset_find_join_master();
+		bootstrap_leader_uuid = master == NULL ? INSTANCE_UUID :
+							 master->uuid;
+		box_broadcast_ballot();
+
 		if (master == NULL ||
 		    tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID)) {
 			bootstrap_master(replicaset_uuid);
@@ -4184,6 +4196,8 @@ local_recovery(const struct tt_uuid *instance_uuid,
 		bool say_once = false;
 
 		while (replicaset_needs_rejoin(&master)) {
+			bootstrap_leader_uuid = master->uuid;
+			box_broadcast_ballot();
 			if (!say_once) {
 				say_crit("replica is too old, initiating "
 					 "rebootstrap");

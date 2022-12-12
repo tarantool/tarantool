@@ -191,6 +191,8 @@ push_iproto_ballot_key_enum(struct lua_State *L)
         	{"IS_ANON", IPROTO_BALLOT_IS_ANON},
         	{"IS_BOOTED", IPROTO_BALLOT_IS_BOOTED},
         	{"CAN_LEAD", IPROTO_BALLOT_CAN_LEAD},
+		{"BOOTSTRAP_LEADER_UUID",
+		 IPROTO_BALLOT_BOOTSTRAP_LEADER_UUID},
 	};
 	push_iproto_constant_subnamespace(L, "ballot_key", ballot_keys,
 					  lengthof(ballot_keys));

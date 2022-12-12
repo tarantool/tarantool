@@ -527,7 +527,7 @@ size_t
 mp_sizeof_ballot_max(const struct ballot *ballot)
 {
 	return mp_sizeof_map(1) + mp_sizeof_uint(IPROTO_BALLOT) +
-	       mp_sizeof_map(7) + mp_sizeof_uint(IPROTO_BALLOT_IS_RO_CFG) +
+	       mp_sizeof_map(8) + mp_sizeof_uint(IPROTO_BALLOT_IS_RO_CFG) +
 	       mp_sizeof_bool(ballot->is_ro_cfg) +
 	       mp_sizeof_uint(IPROTO_BALLOT_IS_RO) +
 	       mp_sizeof_bool(ballot->is_ro) +
@@ -540,7 +540,9 @@ mp_sizeof_ballot_max(const struct ballot *ballot)
 	       mp_sizeof_uint(IPROTO_BALLOT_GC_VCLOCK) +
 	       mp_sizeof_vclock_ignore0(&ballot->gc_vclock) +
 	       mp_sizeof_uint(IPROTO_BALLOT_CAN_LEAD) +
-	       mp_sizeof_bool(ballot->can_lead);
+	       mp_sizeof_bool(ballot->can_lead) +
+	       mp_sizeof_uint(IPROTO_BALLOT_BOOTSTRAP_LEADER_UUID) +
+	       mp_sizeof_str(UUID_STR_LEN);
 }
 
 char *
@@ -548,7 +550,7 @@ mp_encode_ballot(char *data, const struct ballot *ballot)
 {
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_BALLOT);
-	data = mp_encode_map(data, 7);
+	data = mp_encode_map(data, 8);
 	data = mp_encode_uint(data, IPROTO_BALLOT_IS_RO_CFG);
 	data = mp_encode_bool(data, ballot->is_ro_cfg);
 	data = mp_encode_uint(data, IPROTO_BALLOT_IS_RO);
@@ -563,6 +565,8 @@ mp_encode_ballot(char *data, const struct ballot *ballot)
 	data = mp_encode_vclock_ignore0(data, &ballot->gc_vclock);
 	data = mp_encode_uint(data, IPROTO_BALLOT_CAN_LEAD);
 	data = mp_encode_bool(data, ballot->can_lead);
+	data = mp_encode_uint(data, IPROTO_BALLOT_BOOTSTRAP_LEADER_UUID);
+	data = xrow_encode_uuid(data, &ballot->bootstrap_leader_uuid);
 	return data;
 }
 
@@ -1835,6 +1839,13 @@ mp_decode_ballot(const char *data, const char *end,
 			ballot->can_lead = mp_decode_bool(&data);
 			*is_empty = false;
 			break;
+		case IPROTO_BALLOT_BOOTSTRAP_LEADER_UUID: {
+			struct tt_uuid *uuid = &ballot->bootstrap_leader_uuid;
+			if (xrow_decode_uuid(&data, uuid) != 0)
+				return -1;
+			*is_empty = false;
+			break;
+		}
 		default:
 			mp_next(&data);
 		}

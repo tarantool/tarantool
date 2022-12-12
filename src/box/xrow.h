@@ -477,6 +477,8 @@ struct ballot {
 	struct vclock vclock;
 	/** Oldest vclock available on the instance. */
 	struct vclock gc_vclock;
+	/** The uuid of the instance this node considers a bootstrap leader. */
+	struct tt_uuid bootstrap_leader_uuid;
 };
 
 /**
