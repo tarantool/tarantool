@@ -34,10 +34,16 @@ concurrency:
 jobs:
   debian_10:
     # Run on push to the 'master' and release branches of tarantool/tarantool
-    # or on pull request if the 'full-ci' label is set.
-    if: github.repository == 'tarantool/tarantool' &&
-        ( github.event_name != 'pull_request' ||
-          contains(github.event.pull_request.labels.*.name, 'full-ci') )
+    # or on pull request if the 'full-ci' label is set or already exists.
+    if: |
+      github.repository == 'tarantool/tarantool' && (
+        github.event_name != 'pull_request' || (
+          ( github.event.action == 'labeled' &&
+            github.event.label.name == 'full-ci' ) ||
+          ( github.event.action != 'labeled' &&
+            contains(github.event.pull_request.labels.*.name, 'full-ci') )
+        )
+      )
 
     runs-on: ubuntu-20.04-self-hosted
 
