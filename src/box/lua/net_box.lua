@@ -96,6 +96,7 @@ local CONNECT_OPTION_TYPES = {
     console                     = "boolean",
     connect_timeout             = "number",
     fetch_schema                = "boolean",
+    auth_type                   = "string",
     required_protocol_version   = "number",
     required_protocol_features  = "table",
     _disable_graceful_shutdown  = "boolean",
@@ -315,6 +316,10 @@ local function new_sm(uri, opts)
     if opts.user == nil and opts.password == nil then
         opts.user, opts.password = parsed_uri.login, parsed_uri.password
     end
+    if opts.auth_type == nil and parsed_uri.params ~= nil and
+       parsed_uri.params.auth_type ~= nil then
+        opts.auth_type = parsed_uri.params.auth_type[1]
+    end
     local host, port = parsed_uri.host, parsed_uri.service
     local user, password = opts.user, opts.password; opts.password = nil
     local last_reconnect_error
@@ -450,7 +455,7 @@ local function new_sm(uri, opts)
     local transport = internal.new_transport(
             uri, user, password, weak_callback,
             opts.connect_timeout, opts.reconnect_after,
-            opts.fetch_schema)
+            opts.fetch_schema, opts.auth_type)
     weak_refs.transport = transport
     remote._transport = transport
     remote._gc_hook = ffi.gc(ffi.new('char[1]'), function()
