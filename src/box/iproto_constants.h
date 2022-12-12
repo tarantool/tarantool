@@ -214,6 +214,7 @@ enum iproto_ballot_key {
 	IPROTO_BALLOT_IS_ANON = 0x05,
 	IPROTO_BALLOT_IS_BOOTED = 0x06,
 	IPROTO_BALLOT_CAN_LEAD = 0x07,
+	IPROTO_BALLOT_BOOTSTRAP_LEADER_UUID = 0x08,
 };
 
 static inline uint64_t

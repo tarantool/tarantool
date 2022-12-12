@@ -379,6 +379,7 @@ g.test_internal_ballot = function(cg)
         [ballot_key.IS_ANON] = true,
         [ballot_key.IS_BOOTED] = true,
         [ballot_key.CAN_LEAD] = false,
+        [ballot_key.BOOTSTRAP_LEADER_UUID] = cg.master:get_instance_uuid(),
     }
     cg.replica:exec(wait_ballot_updated_to, {expected})
 

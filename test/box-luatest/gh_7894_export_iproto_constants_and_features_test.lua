@@ -100,6 +100,7 @@ local reference_table = {
         IS_ANON = 0x05,
         IS_BOOTED = 0x06,
         CAN_LEAD = 0x07,
+        BOOTSTRAP_LEADER_UUID = 0x08,
     },
 
     -- `iproto_type` enumeration.
