@@ -6,6 +6,7 @@ box.cfg
 audit_filter:compatibility
 audit_format:json
 audit_nonblock:true
+auth_type:chap-sha1
 background:false
 checkpoint_count:2
 checkpoint_interval:3600

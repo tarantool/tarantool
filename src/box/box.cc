@@ -849,6 +849,23 @@ box_check_audit(void)
 	}
 }
 
+/**
+ * Returns the authentication method corresponding to box.cfg.auth_type.
+ * If not found, sets diag and returns NULL.
+ */
+static const struct auth_method *
+box_check_auth_type(void)
+{
+	const char *auth_type = cfg_gets("auth_type");
+	const struct auth_method *method =
+		auth_method_by_name(auth_type, strlen(auth_type));
+	if (method == NULL) {
+		diag_set(ClientError, ER_CFG, "auth_type", auth_type);
+		return NULL;
+	}
+	return method;
+}
+
 void
 box_get_flightrec_cfg(struct flight_recorder_cfg *cfg)
 {
@@ -1487,6 +1504,8 @@ box_check_config(void)
 	box_check_flightrec();
 	if (box_check_listen() != 0)
 		diag_raise();
+	if (box_check_auth_type() == NULL)
+		diag_raise();
 	box_check_instance_uuid(&uuid);
 	box_check_replicaset_uuid(&uuid);
 	if (box_check_election_mode() == ELECTION_MODE_INVALID)
@@ -1531,6 +1550,19 @@ box_check_config(void)
 		diag_raise();
 	if (box_check_txn_isolation() == txn_isolation_level_MAX)
 		diag_raise();
+}
+
+int
+box_set_auth_type(void)
+{
+	const struct auth_method *method = box_check_auth_type();
+	if (method == NULL)
+		return -1;
+	/*
+	 * Nothing else to do, because the value is only used in Lua where
+	 * it can be accessed via box.cfg.auth_type.
+	 */
+	return 0;
 }
 
 int
