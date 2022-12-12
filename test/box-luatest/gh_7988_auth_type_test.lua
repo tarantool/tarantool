@@ -64,3 +64,40 @@ g.test_net_box = function(cg)
     t.assert_equals(conn.error, nil)
     conn:close()
 end
+
+g.before_test('test_replication', function(cg)
+    cg.replica = server:new({
+        alias = 'replica',
+        box_cfg = {
+            replication = server.build_listen_uri('master'),
+        },
+    })
+    cg.replica:start()
+end)
+
+g.after_test('test_replication', function(cg)
+    cg.replica:drop()
+end)
+
+g.test_replication = function(cg)
+    cg.replica:exec(function(uri)
+        local t = require('luatest')
+        local urilib = require('uri')
+        local parsed_uri = urilib.parse(uri)
+        parsed_uri.login = 'test'
+        parsed_uri.password = 'secret'
+        parsed_uri.params = parsed_uri.params or {}
+        parsed_uri.params.auth_type = {'chap-sha128'}
+        uri = urilib.format(parsed_uri, true)
+        box.cfg({replication = {}})
+        t.assert_error_msg_matches(
+            "Incorrect value for option 'replication': " ..
+            "bad URI '.*%?auth_type=chap%-sha128': " ..
+            "unknown authentication method",
+            box.cfg, {replication = uri})
+        parsed_uri.params.auth_type = {'chap-sha1'}
+        uri = urilib.format(parsed_uri, true)
+        box.cfg({replication = uri})
+        t.assert_equals(box.info.replication[1].upstream.status, 'follow')
+    end, {server.build_listen_uri('master')})
+end
