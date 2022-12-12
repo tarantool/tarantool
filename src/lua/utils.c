@@ -696,7 +696,7 @@ void cord_on_yield(void)
 		 * world and one can obtain the corresponding Lua
 		 * coroutine from the fiber storage.
 		 */
-		struct lua_State *L = fiber()->storage.lua.stack;
+		struct lua_State *L = gco2th(gcref(g->cur_L));
 		assert(L != NULL);
 		lua_pushfstring(L, "fiber %d is switched while running the"
 				" compiled code (it's likely a function with"
@@ -726,7 +726,7 @@ void cord_on_yield(void)
 	 * GC hook is active and the platform is forced to stop.
 	 */
 	if (unlikely(g->hookmask & HOOK_GC)) {
-		struct lua_State *L = fiber()->storage.lua.stack;
+		struct lua_State *L = gco2th(gcref(g->cur_L));
 		assert(L != NULL);
 		lua_pushfstring(L, "fiber %d is switched while running GC"
 				" finalizer (i.e. __gc metamethod)",
