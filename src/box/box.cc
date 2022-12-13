@@ -71,6 +71,7 @@
 #include "xrow_io.h"
 #include "xstream.h"
 #include "authentication.h"
+#include "security.h"
 #include "path_lock.h"
 #include "gc.h"
 #include "sql.h"
@@ -4728,6 +4729,7 @@ box_init(void)
 	msgpack_init();
 	fiber_cond_create(&ro_cond);
 	auth_init();
+	security_init();
 	user_cache_init();
 	/*
 	 * The order is important: to initialize sessions, we need to access the
@@ -4754,6 +4756,7 @@ void
 box_free(void)
 {
 	box_storage_free();
+	security_free();
 	auth_free();
 	wal_ext_free();
 	box_watcher_free();

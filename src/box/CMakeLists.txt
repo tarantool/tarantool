@@ -276,6 +276,10 @@ if(ENABLE_READ_VIEW)
     list(APPEND box_sources ${READ_VIEW_SOURCES})
 endif()
 
+if(ENABLE_SECURITY)
+    list(APPEND box_sources ${SECURITY_SOURCES})
+endif()
+
 add_library(box STATIC ${box_sources})
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
