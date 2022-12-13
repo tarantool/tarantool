@@ -2673,6 +2673,18 @@ memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
 			result = NULL;
 			break;
 		}
+		if (story->del_psn != 0 && story->del_stmt != NULL &&
+		    txn != NULL) {
+			assert(story->del_psn == story->del_stmt->txn->psn);
+			/*
+			 * If we skip deletion of a tuple by prepared
+			 * transaction then the transaction must be before
+			 * prepared in serialization order.
+			 * That can be a read view or conflict already.
+			 */
+			memtx_tx_handle_conflict(story->del_stmt->txn, txn);
+		}
+
 		if (memtx_tx_story_insert_is_visible(story, txn, is_prepared_ok,
 						     &own_change)) {
 			result = story->tuple;
@@ -2682,24 +2694,17 @@ memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
 		    txn != NULL) {
 			assert(story->add_psn == story->add_stmt->txn->psn);
 			/*
-			 * If we skip prepared story then the transaction
-			 * must be before prepared in serialization order.
+			 * If we skip addition of a tuple by prepared
+			 * transaction then the transaction must be before
+			 * prepared in serialization order.
 			 * That can be a read view or conflict already.
 			 */
 			memtx_tx_handle_conflict(story->add_stmt->txn, txn);
 		}
+
 		if (story->link[index->dense_id].older_story == NULL)
 			break;
 		story = story->link[index->dense_id].older_story;
-	}
-	if (story->del_psn != 0 && story->del_stmt != NULL && txn != NULL) {
-		assert(story->del_psn == story->del_stmt->txn->psn);
-		/*
-		 * If we see a tuple that is deleted by prepared transaction
-		 * then the transaction must be before prepared in serialization
-		 * order. That can be a read view or conflict already.
-		 */
-		memtx_tx_handle_conflict(story->del_stmt->txn, txn);
 	}
 	if (!own_change) {
 		/*
