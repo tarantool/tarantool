@@ -308,18 +308,6 @@ point_hole_storage_key_equal(const struct point_hole_key *key,
 #include "salad/mhash.h"
 
 /**
- * Temporary (allocated on region) struct that stores a conflicting TX.
- */
-struct memtx_tx_conflict {
-	/* The transaction that will conflict us upon commit. */
-	struct txn *breaker;
-	/* The transaction that will conflicted by upon commit. */
-	struct txn *victim;
-	/* Link in single-linked list. */
-	struct memtx_tx_conflict *next;
-};
-
-/**
  * Collect an allocation to memtx_tx_stats.
  */
 static inline void
@@ -422,10 +410,6 @@ memtx_tx_region_object_to_type(enum memtx_tx_alloc_object alloc_obj)
 {
 	enum memtx_tx_alloc_type alloc_type = MEMTX_TX_ALLOC_TYPE_MAX;
 	switch (alloc_obj) {
-	case MEMTX_TX_OBJECT_CONFLICT:
-		alloc_type = MEMTX_TX_ALLOC_CONFLICT;
-		break;
-
 	case MEMTX_TX_OBJECT_CONFLICT_TRACKER:
 	case MEMTX_TX_OBJECT_READ_TRACKER:
 		alloc_type = MEMTX_TX_ALLOC_TRACKER;
@@ -450,10 +434,6 @@ memtx_tx_region_alloc_object(struct txn *txn,
 	enum memtx_tx_alloc_type alloc_type =
 		memtx_tx_region_object_to_type(alloc_obj);
 	switch (alloc_obj) {
-	case MEMTX_TX_OBJECT_CONFLICT:
-		alloc = region_alloc_object(&txn->region,
-					    struct memtx_tx_conflict, &size);
-		break;
 	case MEMTX_TX_OBJECT_CONFLICT_TRACKER:
 		alloc = region_alloc_object(&txn->region,
 					    struct tx_conflict_tracker, &size);
@@ -1753,31 +1733,6 @@ memtx_tx_story_delete_is_visible(struct memtx_story *story, struct txn *txn,
 }
 
 /**
- * Save @a breaker in list with head @a conflicts_head. New list node is
- * allocated on a region of @a breaker.
- * @return 0 on success, -1 on memory error.
- */
-static int
-memtx_tx_save_conflict(struct txn *breaker, struct txn *victim,
-		       struct memtx_tx_conflict **conflicts_head)
-{
-	assert(breaker != victim);
-	struct memtx_tx_conflict *next_conflict;
-	next_conflict = memtx_tx_region_alloc_object(breaker,
-						     MEMTX_TX_OBJECT_CONFLICT);
-	if (next_conflict == NULL) {
-		diag_set(OutOfMemory, sizeof(*next_conflict), "txn_region",
-			 "txn conflict");
-		return -1;
-	}
-	next_conflict->breaker = breaker;
-	next_conflict->victim = victim;
-	next_conflict->next = *conflicts_head;
-	*conflicts_head = next_conflict;
-	return 0;
-}
-
-/**
  * Scan a history starting with @a story in @a index for a @a visible_tuple.
  * If @a is_prepared_ok is true that prepared statements are visible for
  * that lookup, and not visible otherwise.
@@ -1828,7 +1783,7 @@ memtx_tx_check_dup(struct tuple *new_tuple, struct tuple *old_tuple,
 		} else {
 			diag_set(ClientError, errcode, space_name(space));
 		}
-		 return -1;
+		return -1;
 	}
 	return 0;
 }
@@ -1846,18 +1801,14 @@ point_hole_storage_find(struct index *index, struct tuple *tuple)
 }
 
 /**
- * Check for possible conflicts during inserting @a new tuple, and given
- * that it was real insertion, not the replacement of existing tuple.
- * It's the moment where we can search for stored point hole trackers
- * and detect conflicts.
- * Since the insertions are not completed successfully, we better store
- * conflicts to the special temporary storage @a collected_conflicts in
- * other to become real conflict only when insertion success is inevitable.
+ * Check for possible conflict relations during insertion of @a new tuple,
+ * and given that it was a real insertion, not the replacement of existing
+ * tuple. It's the moment where we can search for stored point hole trackers
+ * and find conflict causes.
  */
 static int
 check_hole(struct space *space, uint32_t index,
-	   struct tuple *new_tuple, struct txn *inserter,
-	   struct memtx_tx_conflict **collected_conflicts)
+	   struct tuple *new_tuple, struct txn *inserter)
 {
 	struct point_hole_item *list =
 		point_hole_storage_find(space->index[index], new_tuple);
@@ -1867,12 +1818,10 @@ check_hole(struct space *space, uint32_t index,
 	struct point_hole_item *item = list;
 	do {
 		if (inserter != item->txn &&
-		    memtx_tx_save_conflict(inserter, item->txn,
-					   collected_conflicts) != 0)
+		    memtx_tx_cause_conflict(inserter, item->txn) != 0)
 			return -1;
 		item = rlist_entry(item->ring.next,
 				   struct point_hole_item, ring);
-
 	} while (item != list);
 	return 0;
 }
@@ -1890,106 +1839,31 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple);
 /**
  * Check that replaced tuples in space's indexes does not violate common
  * replace rules. See memtx_space_replace_all_keys comment.
- * (!) Version for the case when replaced tuple in the primary index is
- * either NULL or clean.
- * @return 0 on success or -1 on fail.
- */
-static int
-check_dup_clean(struct txn_stmt *stmt, struct tuple *new_tuple,
-		struct tuple **replaced, struct tuple **old_tuple,
-		enum dup_replace_mode mode,
-		struct memtx_tx_conflict **collected_conflicts)
-{
-	assert(replaced[0] == NULL ||
-	       !tuple_has_flag(replaced[0], TUPLE_IS_DIRTY));
-	struct space *space = stmt->space;
-	struct txn *txn = stmt->txn;
-
-	if (memtx_tx_check_dup(new_tuple, *old_tuple, replaced[0],
-			       mode, space->index[0], space) != 0) {
-		if (replaced[0] != NULL)
-			memtx_tx_track_read(txn, space, replaced[0]);
-		return -1;
-	}
-
-	if (replaced[0] == NULL)
-		check_hole(space, 0, new_tuple, stmt->txn,
-			   collected_conflicts);
-
-	for (uint32_t i = 1; i < space->index_count; i++) {
-		/*
-		 * Check that visible tuple is NULL or the same as in the
-		 * primary index, namely replaced[0].
-		 */
-		if (replaced[i] == NULL) {
-			/* NULL is OK. */
-			check_hole(space, i, new_tuple, stmt->txn,
-				   collected_conflicts);
-			continue;
-		}
-		if (!tuple_has_flag(replaced[i], TUPLE_IS_DIRTY)) {
-			/* Check like there's no mvcc. */
-			if (memtx_tx_check_dup(new_tuple, replaced[0],
-					       replaced[i], DUP_INSERT,
-					       space->index[i], space) != 0) {
-				memtx_tx_track_read(txn, space, replaced[i]);
-				return -1;
-			}
-			continue;
-		}
-
-		/*
-		 * The replaced tuple is dirty. A chain of changes cannot lead
-		 * to clean tuple, but in can lead to NULL, that's the only
-		 * chance to be OK.
-		 */
-		struct memtx_story *second_story = memtx_tx_story_get(replaced[i]);
-		struct tuple *check_visible;
-		bool unused;
-		memtx_tx_story_find_visible_tuple(second_story, txn, i,
-						  true, &check_visible,
-						  &unused);
-
-		if (memtx_tx_check_dup(new_tuple, replaced[0], check_visible,
-				       DUP_INSERT, space->index[i], space) != 0) {
-			memtx_tx_track_read(txn, space, check_visible);
-			return -1;
-		}
-
-		if (check_visible == NULL)
-			check_hole(space, i, new_tuple, stmt->txn,
-				   collected_conflicts);
-	}
-
-	*old_tuple = replaced[0];
-	return 0;
-}
-
-/**
- * Check that replaced tuples in space's indexes does not violate common
- * replace rules. See memtx_space_replace_all_keys comment.
- * (!) Version for the case when replaced tuple is dirty.
  * @return 0 on success or -1 on fail.
  *
  * `is_own_change` is set to true iff `old_tuple` was modified (either
  * added or deleted) by `stmt`'s transaction.
  */
 static int
-check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
-		struct tuple **replaced, struct tuple **old_tuple,
-		enum dup_replace_mode mode,
-		struct memtx_tx_conflict **collected_conflicts,
-		bool *is_own_change)
+check_dup(struct txn_stmt *stmt, struct tuple *new_tuple,
+	  struct tuple **directly_replaced, struct tuple **old_tuple,
+	  enum dup_replace_mode mode, bool *is_own_change)
 {
-	assert(replaced[0] != NULL &&
-	       tuple_has_flag(replaced[0], TUPLE_IS_DIRTY));
 	struct space *space = stmt->space;
 	struct txn *txn = stmt->txn;
 
-	struct memtx_story *old_story = memtx_tx_story_get(replaced[0]);
 	struct tuple *visible_replaced;
-	memtx_tx_story_find_visible_tuple(old_story, txn, 0, true,
-					  &visible_replaced, is_own_change);
+	if (directly_replaced[0] == NULL ||
+	    !tuple_has_flag(directly_replaced[0], TUPLE_IS_DIRTY)) {
+		*is_own_change = false;
+		visible_replaced = directly_replaced[0];
+	} else {
+		struct memtx_story *story =
+			memtx_tx_story_get(directly_replaced[0]);
+		memtx_tx_story_find_visible_tuple(story, txn, 0, true,
+						  &visible_replaced,
+						  is_own_change);
+	}
 
 	if (memtx_tx_check_dup(new_tuple, *old_tuple, visible_replaced,
 			       mode, space->index[0], space) != 0) {
@@ -1997,81 +1871,41 @@ check_dup_dirty(struct txn_stmt *stmt, struct tuple *new_tuple,
 		return -1;
 	}
 
-	if (visible_replaced == NULL)
-		check_hole(space, 0, new_tuple, stmt->txn,
-			   collected_conflicts);
-
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		/*
 		 * Check that visible tuple is NULL or the same as in the
-		 * primary index, namely visible_replaced.
+		 * primary index, namely replaced[0].
 		 */
-		if (replaced[i] == NULL) {
-			/* NULL is OK. */
-			check_hole(space, i, new_tuple, stmt->txn,
-				   collected_conflicts);
-			continue;
-		}
-		if (!tuple_has_flag(replaced[i], TUPLE_IS_DIRTY)) {
+		if (directly_replaced[i] == NULL)
+			continue; /* NULL is OK in any case. */
+
+		struct tuple *visible;
+		if (!tuple_has_flag(directly_replaced[i], TUPLE_IS_DIRTY)) {
+			visible = directly_replaced[i];
+		} else {
 			/*
-			 * Non-null clean tuple cannot be NULL or
-			 * visible_replaced since visible_replaced is dirty.
+			 * The replaced tuple is dirty. A chain of changes
+			 * cannot lead to clean tuple, but in can lead to NULL,
+			 * that's the only chance to be OK.
 			 */
-			diag_set(ClientError, ER_TUPLE_FOUND,
-				 space->index[i]->def->name,
-				 space_name(space),
-				 tuple_str(replaced[i]),
-				 tuple_str(new_tuple));
-			return -1;
+			struct memtx_story *story =
+				memtx_tx_story_get(directly_replaced[i]);
+			bool unused;
+			memtx_tx_story_find_visible_tuple(story, txn,
+							  i, true, &visible,
+							  &unused);
 		}
 
-		struct memtx_story *second_story = memtx_tx_story_get(replaced[i]);
-		struct tuple *check_visible;
-		bool unused;
-		memtx_tx_story_find_visible_tuple(second_story, txn, i, true,
-						  &check_visible, &unused);
-
-		if (memtx_tx_check_dup(new_tuple, visible_replaced,
-				       check_visible, DUP_INSERT,
-				       space->index[i], space) != 0) {
-			memtx_tx_track_read(txn, space, visible_replaced);
+		if (memtx_tx_check_dup(new_tuple, visible_replaced, visible,
+				       DUP_INSERT, space->index[i],
+				       space) != 0) {
+			memtx_tx_track_read(txn, space, visible);
 			return -1;
 		}
-
-		if (check_visible == NULL)
-			check_hole(space, i, new_tuple, stmt->txn,
-				   collected_conflicts);
 	}
 
 	*old_tuple = visible_replaced;
 	return 0;
-}
-
-/**
- * Check that replaced tuples in space's indexes does not violate common
- * replace rules. See memtx_space_replace_all_keys comment.
- * Call check_dup_clean or check_dup_dirty depending on situation.
- * @return 0 on success or -1 on fail.
- *
- * `is_own_change` is set to true iff `old_tuple` was modified (either
- * added or deleted) by `stmt`'s transaction.
- */
-static int
-check_dup_common(struct txn_stmt *stmt, struct tuple *new_tuple,
-		 struct tuple **directly_replaced, struct tuple **old_tuple,
-		 enum dup_replace_mode mode,
-		 struct memtx_tx_conflict **collected_conflicts,
-		 bool *is_own_change)
-{
-	struct tuple *replaced = directly_replaced[0];
-	if (replaced == NULL || !tuple_has_flag(replaced, TUPLE_IS_DIRTY))
-		return check_dup_clean(stmt, new_tuple, directly_replaced,
-				       old_tuple, mode,
-				       collected_conflicts);
-	else
-		return check_dup_dirty(stmt, new_tuple, directly_replaced,
-				       old_tuple, mode,
-				       collected_conflicts, is_own_change);
 }
 
 static struct gap_item *
@@ -2198,12 +2032,6 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	struct memtx_story *add_story = NULL;
 	struct memtx_story *created_story = NULL, *replaced_story = NULL;
 
-	/*
-	 * List of transactions that will conflict us once one of them
-	 * become committed.
-	 */
-	struct memtx_tx_conflict *collected_conflicts = NULL;
-
 	struct tuple *directly_replaced[space->index_count];
 	struct tuple *direct_successor[space->index_count];
 	uint32_t directly_replaced_count = 0;
@@ -2225,9 +2053,8 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 
 	/* Check overwritten tuple */
 	bool is_own_change = false;
-	int rc = check_dup_common(stmt, new_tuple, directly_replaced,
-				  &old_tuple, mode,
-				  &collected_conflicts, &is_own_change);
+	int rc = check_dup(stmt, new_tuple, directly_replaced,
+			   &old_tuple, mode, &is_own_change);
 	if (rc != 0)
 		goto fail;
 
@@ -2262,12 +2089,10 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 			goto fail;
 	}
 
-	/* Purge found conflicts. */
-	while (collected_conflicts != NULL) {
-		if (memtx_tx_cause_conflict(collected_conflicts->breaker,
-					    collected_conflicts->victim) != 0)
+	/* Collect point phantom read conflicts. */
+	for (uint32_t i = 0; i < space->index_count; i++) {
+		if (check_hole(space, i, new_tuple, stmt->txn) != 0)
 			goto fail;
-		collected_conflicts = collected_conflicts->next;
 	}
 
 	if (replaced_story != NULL)
