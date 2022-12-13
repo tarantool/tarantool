@@ -60,7 +60,9 @@ extern const char *memtx_tx_alloc_type_strs[];
  */
 enum memtx_tx_alloc_object {
 	/**
-	 * Object of type struct memtx_tx_conflict.
+	 * Deprecated object of type struct memtx_tx_conflict.
+	 * Left for statistics compatibility.
+	 * TODO: remove it considering monitoring module.
 	 */
 	MEMTX_TX_OBJECT_CONFLICT = 0,
 	/**

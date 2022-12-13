@@ -11,7 +11,6 @@ local SIZE_OF_STORY = 144
 local SIZE_OF_TUPLE = 9
 -- Size of xrow for tuples with 2 number fields
 local SIZE_OF_XROW = 147
-local SIZE_OF_CONFLICT = 24
 -- Tracker can allocate additional memory, be careful!
 local SIZE_OF_READ_TRACKER = 56
 local SIZE_OF_CONFLICT_TRACKER = 48
@@ -386,9 +385,9 @@ g.test_conflict = function()
                 ["total"] = trackers_used,
             },
             ["conflicts"] = {
-                ["max"] = SIZE_OF_CONFLICT,
-                ["avg"] = math.floor(SIZE_OF_CONFLICT / 2),
-                ["total"] = SIZE_OF_CONFLICT,
+                ["max"] = 0,
+                ["avg"] = 0,
+                ["total"] = 0,
             },
             ["tuples"] = {
                 ["used"] = {
