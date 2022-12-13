@@ -58,9 +58,9 @@ int log_level = S_INFO;
 /**
  * Log level of flight recorder. Log is passed to flight recorder only if
  * it's log level not less that this. -1 is used if we should not pass logs
- * to flight recorder (it is currently disabled).
+ * to flight recorder (it is currently disabled). Used in Lua via FFI.
  */
-static int log_level_flightrec = -1;
+int log_level_flightrec = -1;
 /**
  * This function is called for every log which log level is not less than
  * log_level_flightrec.
@@ -1071,6 +1071,16 @@ say_default(int level, const char *filename, int line, const char *error,
 {
 	va_list ap;
 	va_start(ap, format);
+	if (level <= log_level_flightrec) {
+		assert(log_write_flightrec != NULL);
+		int errsv = errno;
+		va_list ap_copy;
+		va_copy(ap_copy, ap);
+		log_write_flightrec(level, filename, line, error, format,
+				    ap_copy);
+		va_end(ap_copy);
+		errno = errsv; /* Preserve the errno. */
+	}
 	say_internal(level, true, NULL, filename, line, error, format, ap);
 	va_end(ap);
 }
@@ -1089,6 +1099,22 @@ say_from_lua(int level, const char *module, const char *filename, int line,
 	va_list ap;
 	va_start(ap, format);
 	say_internal(level, false, module, filename, line, NULL, format, ap);
+	va_end(ap);
+}
+
+/**
+ * A variadic wrapper over log_write_flightrec(), used by Lua say().
+ */
+void
+log_write_flightrec_from_lua(int level, const char *filename, int line, ...)
+{
+	assert(log_write_flightrec != NULL);
+	int errsv = errno;
+	va_list ap;
+	va_start(ap, line);
+	/* ap contains a single string, which is already formatted. */
+	log_write_flightrec(level, filename, line, NULL, "%s", ap);
+	errno = errsv; /* Preserve the errno. */
 	va_end(ap);
 }
 
@@ -1329,13 +1355,6 @@ log_vsay(struct log *log, int level, bool check_level, const char *module,
 {
 	int errsv = errno;
 	int total = 0;
-	if (level <= log_level_flightrec) {
-		va_list ap_copy;
-		va_copy(ap_copy, ap);
-		log_write_flightrec(level, filename, line, error,
-				    format, ap_copy);
-		va_end(ap_copy);
-	}
 	if (check_level && level > log->level)
 		goto out;
 
