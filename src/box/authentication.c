@@ -103,6 +103,7 @@ authenticate(const char *user_name, uint32_t user_name_len,
 	if (auth_request_check(method, auth_request, auth_request_end) != 0)
 		return -1;
 	if (user == NULL || user->def->auth == NULL ||
+	    user->def->auth->method != method ||
 	    !authenticate_request(user->def->auth, salt,
 				  auth_request, auth_request_end)) {
 		auth_res.is_authenticated = false;
