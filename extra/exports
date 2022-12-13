@@ -237,7 +237,9 @@ lbox_socket_local_resolve
 lbox_socket_nonblock
 log_format
 log_level
+log_level_flightrec
 log_pid
+log_write_flightrec_from_lua
 luaJIT_profile_dumpstack
 luaJIT_profile_start
 luaJIT_profile_stop

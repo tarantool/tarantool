@@ -53,6 +53,11 @@ ffi.cdef[[
     pid_t log_pid;
     extern int log_level;
     extern int log_format;
+
+    extern int log_level_flightrec;
+    extern void
+    log_write_flightrec_from_lua(int level, const char *filename, int line,
+                                 ...);
 ]]
 
 local S_CRIT = ffi.C.S_CRIT
@@ -155,7 +160,8 @@ local function say(self, level, fmt, ...)
     local name = self and self.name
     local module_level = name and log_cfg.modules and log_cfg.modules[name] or
                          log_cfg.level
-    if level > log_normalize_level(module_level) then
+    if level > log_normalize_level(module_level) and
+       level > ffi.C.log_level_flightrec then
         return
     end
     local type_fmt = type(fmt)
@@ -209,7 +215,12 @@ local function say(self, level, fmt, ...)
         file = frame.short_src or frame.src or 'eval'
     end
 
-    ffi.C.say_from_lua(level, name, file, line, format, msg)
+    if level <= ffi.C.log_level_flightrec then
+        ffi.C.log_write_flightrec_from_lua(level, file, line, msg)
+    end
+    if level <= log_normalize_level(module_level) then
+        ffi.C.say_from_lua(level, name, file, line, format, msg)
+    end
 end
 
 -- Just a syntactic sugar over say routine.
