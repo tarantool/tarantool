@@ -19,7 +19,7 @@ jobs:
       CHECKOUT_BRANCH: ${{ github.ref_name }}
       FEATURE_BRANCH: 'TarantoolBot/update-tarantool-${{ github.ref_name }}'
       SUBMODULE: 'tarantool'
-      UPDATE_TO: ${{ github.ref_name }}
+      UPDATE_TO: origin/${{ github.ref_name }}
       PR_AGAINST_BRANCH: ${{ github.ref_name }}
       PR_TITLE_PREFIX: ${{ github.ref_name != 'master' &&
         format('[{0}] ', github.ref_name) || '' }}
