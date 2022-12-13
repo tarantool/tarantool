@@ -957,12 +957,12 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct vy_entry prev,
 		 * compaction.
 		 */
 		struct tuple *copy = vy_stmt_dup(rv->entry.stmt);
+		if (copy == NULL)
+			return -1;
 		if (is_first_insert)
 			vy_stmt_set_type(copy, IPROTO_INSERT);
 		else
 			vy_stmt_set_type(copy, IPROTO_REPLACE);
-		if (copy == NULL)
-			return -1;
 		vy_stmt_set_lsn(copy, vy_stmt_lsn(rv->entry.stmt));
 		vy_stmt_unref_if_possible(rv->entry.stmt);
 		rv->entry.stmt = copy;
