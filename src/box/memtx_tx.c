@@ -2120,6 +2120,10 @@ memtx_tx_handle_gap_write(struct txn *txn, struct space *space,
 						item->type == ITER_LT)));
 		bool need_track = need_split ||
 				  (is_full_key && cmp == 0 && is_e);
+		/* There's no need to track read of own change. */
+		if (story->add_stmt != NULL &&
+		    story->add_stmt->txn == item->txn)
+			need_track = false;
 		if (need_track && memtx_tx_track_read_story(item->txn, space,
 							    story,
 							    index_mask) != 0)
