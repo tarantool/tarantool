@@ -2095,8 +2095,7 @@ memtx_tx_handle_gap_write(struct txn *txn, struct space *space,
 	uint64_t index_mask = 1ull << (ind & 63);
 	rlist_foreach_entry_safe(fsc_item, fsc_list, in_full_scans, fsc_tmp) {
 		if (fsc_item->txn != txn &&
-		    (memtx_tx_cause_conflict(txn, fsc_item->txn) != 0 ||
-		     memtx_tx_track_read_story(fsc_item->txn, space, story,
+		    (memtx_tx_track_read_story(fsc_item->txn, space, story,
 					       index_mask) != 0))
 			return -1;
 	}
