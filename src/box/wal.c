@@ -1519,19 +1519,3 @@ wal_notify_watchers(struct wal_writer *writer, unsigned events)
 	rlist_foreach_entry(watcher, &writer->watchers, next)
 		wal_watcher_notify(watcher, events);
 }
-
-
-/**
- * After fork, the WAL writer thread disappears.
- * Make sure that atexit() handlers in the child do
- * not try to stop a non-existent thread or write
- * a second EOF marker to an open file.
- */
-void
-wal_atfork(void)
-{
-	if (xlog_is_open(&wal_writer_singleton.current_wal))
-		xlog_atfork(&wal_writer_singleton.current_wal);
-	if (xlog_is_open(&vy_log_writer.xlog))
-		xlog_atfork(&vy_log_writer.xlog);
-}

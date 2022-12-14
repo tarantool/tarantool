@@ -871,14 +871,14 @@ xlog_create(struct xlog *xlog, const char *name, int flags,
 		goto err;
 	}
 
-	flags |= O_RDWR | O_CREAT | O_EXCL;
+	flags |= O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC;
 
 	/*
 	 * Open the <lsn>.<suffix>.inprogress file.
 	 * If it exists, open will fail. Always open/create
 	 * a file with .inprogress suffix: for snapshots,
 	 * the rename is done when the snapshot is complete.
-	 * Fox xlogs, we can rename only when we have written
+	 * For xlogs, we can rename only when we have written
 	 * the log file header, otherwise replication relay
 	 * may think that this is a corrupt file and stop
 	 * replication.
@@ -930,7 +930,7 @@ xlog_open(struct xlog *xlog, const char *name, const struct xlog_opts *opts)
 
 	strlcpy(xlog->filename, name, sizeof(xlog->filename));
 
-	xlog->fd = open(xlog->filename, O_RDWR);
+	xlog->fd = open(xlog->filename, O_RDWR | O_CLOEXEC);
 	if (xlog->fd < 0) {
 		say_syserror("open, [%s]", name);
 		diag_set(SystemError, "failed to open file '%s'", name);
@@ -1520,22 +1520,6 @@ xlog_close(struct xlog *l, bool reuse_fd)
 
 	xlog_destroy(l);
 	return rc;
-}
-
-/**
- * Free xlog memory and destroy it cleanly, without side
- * effects (for use in the atfork handler).
- */
-void
-xlog_atfork(struct xlog *xlog)
-{
-	/*
-	 * Close the file descriptor STDIO buffer does not
-	 * make its way into the respective file in
-	 * fclose().
-	 */
-	close(xlog->fd);
-	xlog->fd = -1;
 }
 
 /* }}} */
