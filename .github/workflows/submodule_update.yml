@@ -12,7 +12,7 @@ jobs:
     # repo only.
     if: github.repository == 'tarantool/tarantool'
 
-    runs-on: ubuntu-20.04-self-hosted
+    runs-on: [ self-hosted, Linux, x86_64, flavor-1-2 ]
 
     env:
       REPOSITORY: 'tarantool/tarantool-ee'
