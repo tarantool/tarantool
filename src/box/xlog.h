@@ -558,13 +558,6 @@ xlog_sync(struct xlog *l);
 int
 xlog_close(struct xlog *l, bool reuse_fd);
 
-/**
- * atfork() handler function to close the log pointed
- * at by xlog in the child.
- */
-void
-xlog_atfork(struct xlog *xlog);
-
 /* {{{ xlog_tx_cursor - iterate over rows in xlog transaction */
 
 /**
