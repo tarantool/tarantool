@@ -102,12 +102,6 @@ box_cfg(void);
 bool
 box_is_configured(void);
 
-/**
- * A pthread_atfork() callback for box
- */
-void
-box_atfork(void);
-
 void
 box_set_ro(void);
 
