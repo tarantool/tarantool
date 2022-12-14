@@ -1,6 +1,6 @@
 local t = require('luatest')
 local net = require('net.box')
-local cluster = require('test.luatest_helpers.cluster')
+local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 
 local g = t.group('gh_6260')
@@ -32,7 +32,6 @@ g.before_test('test_sys_events_no_override', function(cg)
 end)
 
 g.after_test('test_sys_events_no_override', function(cg)
-    cg.cluster.servers = nil
     cg.cluster:drop()
 end)
 
@@ -57,7 +56,6 @@ g.before_test('test_box_status', function(cg)
 end)
 
 g.after_test('test_box_status', function(cg)
-    cg.cluster.servers = nil
     cg.cluster:drop()
 end)
 
@@ -164,12 +162,11 @@ g.before_test('test_box_election', function(cg)
     cg.cluster:add_server(cg.instance_1)
     cg.cluster:add_server(cg.instance_2)
     cg.cluster:add_server(cg.instance_3)
-    cg.cluster:start({cg.instance_1, cg.instance_2, cg.instance_3})
+    cg.cluster:start()
 end)
 
 g.after_test('test_box_election', function(cg)
-    cg.cluster.servers = nil
-    cg.cluster:drop({cg.instance_1, cg.instance_2, cg.instance_3})
+    cg.cluster:drop()
 end)
 
 g.test_box_election = function(cg)
@@ -244,7 +241,6 @@ g.before_test('test_box_schema', function(cg)
 end)
 
 g.after_test('test_box_schema', function(cg)
-    cg.cluster.servers = nil
     cg.cluster:drop()
 end)
 
@@ -295,7 +291,6 @@ g.before_test('test_box_id', function(cg)
 end)
 
 g.after_test('test_box_id', function(cg)
-    cg.cluster.servers = nil
     cg.cluster:drop()
 end)
 

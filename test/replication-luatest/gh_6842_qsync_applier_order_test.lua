@@ -1,6 +1,6 @@
 local luatest = require('luatest')
 local server = require('luatest.server')
-local cluster = require('test.luatest_helpers.cluster')
+local cluster = require('luatest.replica_set')
 
 local wait_timeout = 120
 

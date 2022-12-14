@@ -1,5 +1,5 @@
 local luatest = require('luatest')
-local cluster = require('test.luatest_helpers.cluster')
+local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 local g_async = luatest.group('fencing_async', {
     {election_mode = 'manual'}, {election_mode = 'candidate'}})
@@ -91,7 +91,7 @@ local function start(g)
         {alias = 'server_3', box_cfg = g.box_cfg})
 
     g.cluster:start()
-    g.cluster:wait_fullmesh()
+    g.cluster:wait_for_fullmesh()
     promote(g.server_1)
     wait_sync(g.server_1, g.cluster.servers)
 end

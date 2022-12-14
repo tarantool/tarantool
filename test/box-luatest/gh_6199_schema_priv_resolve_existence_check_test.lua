@@ -1,4 +1,4 @@
-local cluster = require('test.luatest_helpers.cluster')
+local cluster = require('luatest.replica_set')
 local t = require('luatest')
 
 local g = t.group('gh-6199-schema-priv-resolve-existence-check')

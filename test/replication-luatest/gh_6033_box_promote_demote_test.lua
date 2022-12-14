@@ -1,6 +1,6 @@
 local luatest = require('luatest')
 local server = require('luatest.server')
-local cluster = require('test.luatest_helpers.cluster')
+local cluster = require('luatest.replica_set')
 local g_common = luatest.group('gh-6033-box-promote-demote')
 local g_unconfigured = luatest.group('gh-6033-box-promote-demote-unconfigured')
 
@@ -101,7 +101,7 @@ local function cluster_init(g)
     g.server_2 = g.cluster:build_and_add_server(
         {alias = 'server_2', box_cfg = g.box_cfg})
     g.cluster:start()
-    g.cluster:wait_fullmesh()
+    g.cluster:wait_for_fullmesh()
 end
 
 local function cluster_reinit(g)
