@@ -1,5 +1,5 @@
 local t = require('luatest')
-local cluster = require('test.luatest_helpers.cluster')
+local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 
 local g = t.group('gh_6123', {{engine = 'memtx'}, {engine = 'vinyl'}})
@@ -36,7 +36,6 @@ end)
 
 
 g.after_each(function(cg)
-    cg.cluster.servers = nil
     cg.cluster:drop()
 end)
 

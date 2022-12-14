@@ -1,6 +1,6 @@
 local t = require('luatest')
 local server = require('luatest.server')
-local cluster = require('test.luatest_helpers.cluster')
+local cluster = require('luatest.replica_set')
 local fiber = require('fiber')
 
 local g = t.group('gh-7592')

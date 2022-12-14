@@ -1,5 +1,5 @@
 local t = require('luatest')
-local cluster = require('test.luatest_helpers.cluster')
+local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 
 local g = t.group('pre-vote')
@@ -36,7 +36,7 @@ g.before_each(function()
     t.assert(g.leader ~= nil, 'Cluster elected a leader')
     g.follower1 = g.node1 ~= g.leader and g.node1 or g.node2
     g.follower2 = g.node3 ~= g.leader and g.node3 or g.node2
-    g.cluster:wait_fullmesh()
+    g.cluster:wait_for_fullmesh()
 end)
 
 local function get_election_term()

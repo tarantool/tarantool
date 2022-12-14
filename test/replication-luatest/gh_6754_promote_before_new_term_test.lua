@@ -1,5 +1,5 @@
 local luatest = require('luatest')
-local cluster = require('test.luatest_helpers.cluster')
+local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 local g = luatest.group('gh-6754-promote-before-new-term')
 
@@ -25,7 +25,7 @@ g.before_all(function(g)
     g.server_2 = g.cluster:build_and_add_server(
         {alias = 'server_2', box_cfg = g.box_cfg})
     g.cluster:start()
-    g.cluster:wait_fullmesh()
+    g.cluster:wait_for_fullmesh()
 end)
 
 g.after_all(function(g)

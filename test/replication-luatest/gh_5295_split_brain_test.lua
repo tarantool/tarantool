@@ -1,5 +1,5 @@
 local t = require('luatest')
-local cluster = require('test.luatest_helpers.cluster')
+local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 
 local g = t.group('gh-5295')
@@ -91,7 +91,6 @@ end)
 
 g.after_all(function(cg)
     cg.cluster:drop()
-    cg.cluster.servers = nil
 end)
 
 local function partition_replica(cg)
