@@ -1,6 +1,6 @@
 local t = require('luatest')
 local log = require('log')
-local Cluster =  require('test.luatest_helpers.cluster')
+local Cluster =  require('luatest.replica_set')
 local server = require('luatest.server')
 local json = require('json')
 
@@ -29,7 +29,6 @@ pg.before_each(function(cg)
 end)
 
 pg.after_each(function(cg)
-    cg.cluster.servers = nil
     cg.cluster:drop()
 end)
 
@@ -41,12 +40,8 @@ pg.before_test('test_master_master_works', function(cg)
         box.schema.space.create('test', {engine = params.engine})
         box.space.test:create_index('primary')
     end
-    cg.cluster:exec_on_leader(bootstrap_function, {cg.params})
+    cg.cluster:get_leader():exec(bootstrap_function, {cg.params})
 
-end)
-
-pg.after_test('test_master_master_works', function(cg)
-    cg.cluster:drop({cg.master_quorum1, cg.master_quorum2})
 end)
 
 pg.test_master_master_works = function(cg)

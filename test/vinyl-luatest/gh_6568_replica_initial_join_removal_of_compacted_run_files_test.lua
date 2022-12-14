@@ -1,4 +1,4 @@
-local cluster = require('test.luatest_helpers.cluster')
+local cluster = require('luatest.replica_set')
 local fio = require('fio')
 local t = require('luatest')
 

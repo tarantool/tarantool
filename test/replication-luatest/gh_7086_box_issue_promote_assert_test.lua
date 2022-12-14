@@ -1,6 +1,6 @@
 local luatest = require('luatest')
 local server = require('luatest.server')
-local cluster = require('test.luatest_helpers.cluster')
+local cluster = require('luatest.replica_set')
 local g = luatest.group('gh-7086')
 
 -- On every server in cluster wait until its vclock is up to date with others
@@ -37,7 +37,7 @@ local function cluster_init(g)
     g.server_3 = g.cluster:build_and_add_server(
         {alias = 'server_3', box_cfg = g.box_cfg})
     g.cluster:start()
-    g.cluster:wait_fullmesh()
+    g.cluster:wait_for_fullmesh()
 end
 
 g.before_all(cluster_init)

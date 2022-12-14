@@ -1,7 +1,7 @@
 local t = require('luatest')
 local log = require('log')
 local fio = require('fio')
-local Cluster =  require('test.luatest_helpers.cluster')
+local Cluster =  require('luatest.replica_set')
 local server = require('luatest.server')
 local COUNT = 100
 
@@ -40,16 +40,11 @@ pg.before_each(function(cg)
 end)
 
 pg.after_each(function(cg)
-    cg.cluster.servers = nil
     cg.cluster:drop()
 end)
 
 pg.before_test('test_quorum_during_reconfiguration', function(cg)
     cg.cluster:add_server(cg.replica_quorum)
-end)
-
-pg.after_test('test_quorum_during_reconfiguration', function(cg)
-    cg.cluster:drop({cg.replica_quorum})
 end)
 
 pg.test_quorum_during_reconfiguration = function(cg)
@@ -89,8 +84,8 @@ function(cg)
         box.schema.space.create('test', {engine = params.engine})
         box.space.test:create_index('primary')
     end
-    cg.cluster:exec_on_leader(bootstrap_function, {cg.params})
-    cg.cluster:wait_fullmesh()
+    cg.cluster:get_leader():exec(bootstrap_function, {cg.params})
+    cg.cluster:wait_for_fullmesh()
     t.helpers.retrying({timeout = 10},
         function()
             cg.quorum2:eval(

@@ -1,6 +1,6 @@
 local t = require('luatest')
 local server = require('luatest.server')
-local cluster = require('test.luatest_helpers.cluster')
+local cluster = require('luatest.replica_set')
 local fiber = require('fiber')
 
 local wait_timeout = 50
@@ -502,7 +502,7 @@ g.test_old_leader_txn_during_promote_write_complex = function(g)
     for _, s in pairs({g.server4, g.server5}) do
         s:stop()
         s:clean()
-        g.cluster:delete_server(s)
+        g.cluster:delete_server(s.alias)
         g[s.alias] = nil
     end
     g.server3:exec(function()
