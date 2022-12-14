@@ -1,6 +1,6 @@
 local t = require('luatest')
 local log = require('log')
-local Cluster =  require('test.luatest_helpers.cluster')
+local Cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 
 local pg = t.group('quorum_orphan', {{engine = 'memtx'}, {engine = 'vinyl'}})
@@ -29,7 +29,6 @@ pg.before_each(function(cg)
 end)
 
 pg.after_each(function(cg)
-    cg.cluster.servers = nil
     cg.cluster:drop()
 end)
 
@@ -42,7 +41,7 @@ pg.before_test('test_replica_is_orphan_after_restart', function(cg)
         box.schema.space.create('test', {engine = params.engine})
         box.space.test:create_index('primary')
     end
-   cg.cluster:exec_on_leader(bootstrap_function, {cg.params})
+   cg.cluster:get_leader():exec(bootstrap_function, {cg.params})
 
 end)
 
@@ -55,7 +54,7 @@ pg.test_replica_is_orphan_after_restart = function(cg)
     -- * reconfigure replication
     -- * reset box.cfg.replication_connect_quorum
     -- * wait until a quorum is formed asynchronously
-    cg.cluster:wait_fullmesh()
+    cg.cluster:wait_for_fullmesh()
     cg.quorum1:stop()
     cg.quorum2:restart()
     t.assert_equals(cg.quorum2.net_box.state, 'active')
@@ -114,5 +113,4 @@ pg.test_replica_is_orphan_after_restart = function(cg)
     cg.quorum2:eval('return box.ctl.wait_rw()')
     t.assert_not(cg.quorum2:eval('return box.info.ro'))
     t.assert_str_matches(cg.quorum2:eval('return box.info.status'), 'running')
-
 end

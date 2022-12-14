@@ -1,6 +1,6 @@
 local t = require('luatest')
 local log = require('log')
-local Cluster = require('test.luatest_helpers.cluster')
+local Cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 
 local pg = t.group('no_quorum', {{engine = 'memtx'}, {engine = 'vinyl'}})
@@ -20,11 +20,6 @@ pg.before_each(function(cg)
 
     pcall(log.cfg, {level = 6})
 end)
-
-pg.after_each(function(cg)
-    cg.cluster.servers = nil
-end)
-
 
 pg.before_test('test_replication_no_quorum', function(cg)
     local engine = cg.params.engine
@@ -59,5 +54,4 @@ pg.test_replication_no_quorum = function(cg)
     t.assert_equals(cg.master:eval("return space:select()"), {{1}, {2}})
     t.assert_equals(
         cg.replica:eval('return box.space.test:select()'), {{1}, {2}})
-
 end
