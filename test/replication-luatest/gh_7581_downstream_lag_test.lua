@@ -1,7 +1,7 @@
 local fiber = require("fiber")
 local t = require("luatest")
 local server = require("luatest.server")
-local cluster = require("test.luatest_helpers.cluster")
+local cluster = require("luatest.replica_set")
 
 local g = t.group("downstream-lag-after-master-switch")
 
