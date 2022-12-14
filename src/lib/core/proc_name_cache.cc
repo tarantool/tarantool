@@ -4,10 +4,12 @@
  * Copyright 2010-2022, Tarantool AUTHORS, please see AUTHORS file.
  */
 
-#include "assoc.h"
-#include "fiber.h"
 #include "proc_name_cache.h"
 
+#include <stdint.h>
+
+#include "assoc.h"
+#include "fiber.h"
 #include "small/region.h"
 
 enum {
@@ -19,7 +21,7 @@ struct proc_name_cache_entry {
 	/* Demangled procedure name. */
 	char name[PROC_NAME_MAX];
 	/* Procedure offset. */
-	unw_word_t offset;
+	uintptr_t offset;
 };
 
 /*
@@ -55,11 +57,11 @@ private:
 };
 
 const char *
-proc_name_cache_find(unw_word_t ip, unw_word_t *offs)
+proc_name_cache_find(void *ip, uintptr_t *offs)
 {
 	mh_i64ptr_t *proc_name_cache =
 		ProcNameCache::instance().proc_name_cache;
-	mh_int_t k = mh_i64ptr_find(proc_name_cache, ip, nullptr);
+	mh_int_t k = mh_i64ptr_find(proc_name_cache, (uintptr_t)ip, nullptr);
 	if (k == mh_end(proc_name_cache))
 		return nullptr;
 	void *val = mh_i64ptr_node(proc_name_cache, k)->val;
@@ -69,7 +71,7 @@ proc_name_cache_find(unw_word_t ip, unw_word_t *offs)
 }
 
 void
-proc_name_cache_insert(unw_word_t ip, const char *name, unw_word_t offs)
+proc_name_cache_insert(void *ip, const char *name, uintptr_t offs)
 {
 	region *proc_name_cache_entry_region =
 		&ProcNameCache::instance().proc_name_cache_entry_region;
@@ -81,7 +83,7 @@ proc_name_cache_insert(unw_word_t ip, const char *name, unw_word_t offs)
 		return;
 	entry->offset = offs;
 	strlcpy(entry->name, name, PROC_NAME_MAX);
-	mh_i64ptr_node_t node = {ip, entry};
+	mh_i64ptr_node_t node = {(uintptr_t)ip, entry};
 	mh_i64ptr_t *proc_name_cache =
 		ProcNameCache::instance().proc_name_cache;
 	mh_i64ptr_put(proc_name_cache, &node, nullptr, nullptr);

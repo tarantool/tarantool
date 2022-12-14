@@ -9,9 +9,10 @@
 #include "trivia/config.h"
 
 #ifdef ENABLE_BACKTRACE
-#include "trivia/util.h"
 
-#include "libunwind.h"
+#include <inttypes.h>
+
+#include "trivia/util.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,7 +20,7 @@ extern "C" {
 /*
  * Format for printing C/C++ frames.
  */
-#define C_FRAME_STR_FMT "#%-2d %p in %s+%zu"
+#define C_FRAME_STR_FMT "#%-2d %p in %s+%" PRIuPTR
 
 enum {
 	/* Maximal number of frames collected. */
@@ -76,7 +77,7 @@ backtrace_collect(struct backtrace *bt, const struct fiber *fiber,
  */
 const char *
 backtrace_frame_resolve(const struct backtrace_frame *frame,
-			unw_word_t *offset);
+			uintptr_t *offset);
 
 /*
  * Dump collected C/C++ frames to `buf`, is `SNPRINT`-compatible
