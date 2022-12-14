@@ -10,6 +10,8 @@
 #include "core/fiber.h"
 #include "core/tt_static.h"
 
+#include "libunwind.h"
+
 #include "lua.h"
 
 /*
@@ -164,7 +166,7 @@ backtrace_lua_stack_push(const struct backtrace_lua *bt, struct lua_State *L)
 		const char *frame_str;
 		switch (frame->type) {
 		case BACKTRACE_LUA_FRAME_C: {
-			unw_word_t offset = 0;
+			uintptr_t offset = 0;
 			const char *proc_name =
 				backtrace_frame_resolve(&frame->c, &offset);
 			proc_name = proc_name != NULL ? proc_name : "??";

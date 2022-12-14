@@ -3,13 +3,6 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_BINARY_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/src/box)
 
-# fiber.h may require libunwind.h. Add proper header search paths.
-function(add_libunwind_include_directory target)
-  if (ENABLE_BACKTRACE AND ENABLE_BUNDLED_LIBUNWIND)
-    target_include_directories(${target} SYSTEM PRIVATE ${LIBUNWIND_INCLUDE_DIR})
-  endif()
-endfunction()
-
 # A special target with fuzzer and sanitizer flags.
 add_library(fuzzer_config INTERFACE)
 
@@ -47,11 +40,9 @@ target_link_libraries(http_parser_fuzzer PUBLIC http_parser fuzzer_config)
 
 add_executable(swim_proto_member_fuzzer swim_proto_member_fuzzer.c)
 target_link_libraries(swim_proto_member_fuzzer PUBLIC swim fuzzer_config)
-add_libunwind_include_directory(swim_proto_member_fuzzer)
 
 add_executable(swim_proto_meta_fuzzer swim_proto_meta_fuzzer.c)
 target_link_libraries(swim_proto_meta_fuzzer PUBLIC swim fuzzer_config)
-add_libunwind_include_directory(swim_proto_meta_fuzzer)
 
 add_executable(datetime_parse_full_fuzzer datetime_parse_full_fuzzer.c)
 target_link_libraries(datetime_parse_full_fuzzer PUBLIC core fuzzer_config)

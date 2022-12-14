@@ -15,6 +15,8 @@
 #include <dlfcn.h>
 #endif /* __APPLE__ */
 
+#include "libunwind.h"
+
 #include "cxx_abi.h"
 #include "proc_name_cache.h"
 
@@ -239,18 +241,19 @@ skip_frames:
 
 const char *
 backtrace_frame_resolve(const struct backtrace_frame *frame,
-			unw_word_t *offset)
+			uintptr_t *offset)
 {
-	const char *name = proc_name_cache_find((unw_word_t)frame->ip, offset);
+	const char *name = proc_name_cache_find(frame->ip, offset);
 	if (name != NULL)
 		return name;
 #ifndef __APPLE__
 	unw_accessors_t *acc = unw_get_accessors(unw_local_addr_space);
 	assert(acc->get_proc_name != NULL);
 	char proc_name_buf[128];
+	unw_word_t unw_offset;
 	int rc = acc->get_proc_name(unw_local_addr_space, (unw_word_t)frame->ip,
 				    proc_name_buf, sizeof(proc_name_buf),
-				    offset, NULL);
+				    &unw_offset, NULL);
 	/*
 	 * In case result does not fit into buffer we got UNW_ENOMEM and
 	 * result will be truncated.
@@ -260,6 +263,7 @@ backtrace_frame_resolve(const struct backtrace_frame *frame,
 			  "%s", unw_strerror(rc));
 		return NULL;
 	}
+	*offset = (uintptr_t)unw_offset;
 #else /* __APPLE__ */
 	Dl_info dli;
 	if (dladdr(frame->ip, &dli) == 0) {
@@ -267,11 +271,11 @@ backtrace_frame_resolve(const struct backtrace_frame *frame,
 		return NULL;
 	}
 
-	*offset = (unw_word_t)frame->ip - (unw_word_t)dli.dli_saddr;
+	*offset = (uintptr_t)frame->ip - (uintptr_t)dli.dli_saddr;
 	const char *proc_name_buf = dli.dli_sname;
 #endif /* __APPLE__ */
 	const char *demangled_name = cxx_abi_demangle(proc_name_buf);
-	proc_name_cache_insert((unw_word_t)frame->ip, demangled_name, *offset);
+	proc_name_cache_insert(frame->ip, demangled_name, *offset);
 	return demangled_name;
 }
 
@@ -282,7 +286,7 @@ backtrace_snprint(char *buf, int buf_len, const struct backtrace *bt)
 	int total = 0;
 	for (const struct backtrace_frame *frame = bt->frames;
 	     frame != &bt->frames[bt->frame_count]; ++frame, ++frame_no) {
-		unw_word_t offset = 0;
+		uintptr_t offset = 0;
 		const char *proc_name = backtrace_frame_resolve(frame, &offset);
 		proc_name = proc_name != NULL ? proc_name : "??";
 		SNPRINT(total, snprintf, buf, buf_len, C_FRAME_STR_FMT "\n",
@@ -297,7 +301,7 @@ backtrace_print(const struct backtrace *bt, int fd)
 	int frame_no = 1;
 	for (const struct backtrace_frame *frame = bt->frames;
 	     frame != &bt->frames[bt->frame_count]; ++frame, ++frame_no) {
-		unw_word_t offset = 0;
+		uintptr_t offset = 0;
 		const char *proc_name = backtrace_frame_resolve(frame, &offset);
 		proc_name = proc_name != NULL ? proc_name : "??";
 		int chars_written = dprintf(fd, C_FRAME_STR_FMT "\n", frame_no,

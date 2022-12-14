@@ -16,14 +16,6 @@ include_directories(${PROJECT_SOURCE_DIR}/third_party)
 include_directories(${ICU_INCLUDE_DIRS})
 include_directories(${CURL_INCLUDE_DIRS})
 
-# There are many unit tests that include fiber.h, which may
-# transitively include libunwind.h. When libunwind is built as
-# part of tarantool's build process, we should add libunwind's
-# headers directory into the search path.
-if (ENABLE_BACKTRACE AND ENABLE_BUNDLED_LIBUNWIND)
-  include_directories(SYSTEM ${LIBUNWIND_INCLUDE_DIR})
-endif()
-
 include_directories(${EXTRA_CORE_INCLUDE_DIRS})
 
 include(CMakeParseArguments)
