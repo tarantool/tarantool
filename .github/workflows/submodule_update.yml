@@ -4,50 +4,95 @@ on:
   push:
     branches:
       - 'master'
-      - '2.10'
+      - '[2-9].\d+'
+
+env:
+  EE_FEATURE_BRANCH: 'TarantoolBot/update-tarantool-${{ github.ref_name }}'
+  SDK_FEATURE_BRANCH: 'TarantoolBot/test-ce-${{ github.ref_name }}'
 
 jobs:
-  tarantool-ee:
+  update-ee:
     # Run on push to the 'master' and release branches in tarantool/tarantool
     # repo only.
     if: github.repository == 'tarantool/tarantool'
 
     runs-on: ubuntu-20.04-self-hosted
 
+    outputs:
+      commit-sha: ${{ steps.update-ee.outputs.sha }}
+
     env:
-      REPOSITORY: 'tarantool/tarantool-ee'
-      CHECKOUT_BRANCH: ${{ github.ref_name }}
-      FEATURE_BRANCH: 'TarantoolBot/update-tarantool-${{ github.ref_name }}'
-      SUBMODULE: 'tarantool'
-      UPDATE_TO: ${{ github.ref_name }}
-      PR_AGAINST_BRANCH: ${{ github.ref_name }}
       PR_TITLE_PREFIX: ${{ github.ref_name != 'master' &&
         format('[{0}] ', github.ref_name) || '' }}
       PR_TITLE: 'tarantool: bump to new version'
-      PR_DESCRIPTION: >-
-        Just a regular auto-update of tarantool submodule to bring new features
-        and bug fixes into tarantool-ee.
-      COMMIT_MESSAGE: |
-        tarantool: bump to new version
-
-        NO_DOC=submodule update
-        NO_TEST=submodule update
-        NO_CHANGELOG=submodule update
 
     steps:
-      - name: Create PR with submodule update
+      - name: Update submodule tarantool in tarantool/tarantool-ee@${{ github.ref_name }}
         uses: tarantool/actions/update-submodule@master
+        id: update-ee
         with:
+          repository: 'tarantool/tarantool-ee'
           github_token: ${{ secrets.EE_UPDATE_SUBMODULE_TOKEN }}
-          repository: ${{ env.REPOSITORY }}
-          checkout_branch: ${{ env.CHECKOUT_BRANCH }}
-          feature_branch: ${{ env.FEATURE_BRANCH }}
-          submodule: ${{ env.SUBMODULE }}
-          update_to: ${{ env.UPDATE_TO }}
-          pr_against_branch: ${{ env.PR_AGAINST_BRANCH }}
+          # checkout `master` or versioned stable branch
+          checkout_branch: ${{ github.ref_name }}
+          feature_branch: ${{ env.EE_FEATURE_BRANCH }}
+          submodule: 'tarantool'
+          update_to: ${{ github.sha }}
+          pr_against_branch: ${{ github.ref_name }}
           pr_title: ${{ env.PR_TITLE_PREFIX }}${{ env.PR_TITLE }}
-          pr_description: ${{ env.PR_DESCRIPTION }}
-          commit_message: ${{ env.COMMIT_MESSAGE }}
+          pr_description: >-
+            Just a regular auto-update of tarantool submodule to bring new features
+            and bug fixes into tarantool-ee.
+          commit_message: |
+            tarantool: bump to new version
+
+            NO_DOC=submodule update
+            NO_TEST=submodule update
+            NO_CHANGELOG=submodule update
+
+      - name: Send VK Teams message on failure
+        if: failure()
+        uses: ./.github/actions/report-job-status
+        with:
+          bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
+
+  test-sdk:
+    # Run on push to the 'master' and release branches in tarantool/tarantool
+    # repo only.
+    if: github.repository == 'tarantool/tarantool'
+
+    runs-on: [ self-hosted, Linux, x86_64, flavor-1-2 ]
+
+    needs: update-ee
+
+    env:
+      EE_SHA: ${{ needs.update-ee.outputs.commit-sha }}
+
+    steps:
+      - name: Update submodule tarantool-${{ github.ref_name }} in tarantool/sdk@${{ env.SDK_FEATURE_BRANCH }}
+        uses: tarantool/actions/update-submodule@master
+        id: test-sdk
+        with:
+          repository: 'tarantool/sdk'
+          github_token: ${{ secrets.EE_UPDATE_SUBMODULE_TOKEN }}
+          checkout_branch: 'master'
+          # Same branch name pattern as used in sdk_test workflow
+          feature_branch: ${{ env.SDK_FEATURE_BRANCH }}
+          submodule: 'tarantool-${{ github.ref_name }}'
+          update_to: ${{ env.EE_SHA }}
+          create_pr: 'false'
+          commit_message: |
+            integration-test: tarantool-${{ github.ref_name }}@${{ github.ref_name }}
+
+            bump submodule tarantool-${{ github.ref_name }} to commit
+            tarantool/tarantool-ee@${{ env.EE_SHA }},
+            which is the HEAD of branch
+            tarantool/tarantool-ee@${{ env.EE_FEATURE_BRANCH }},
+            just updated with commit
+            tarantool/tarantool@${{ github.sha }}
+            which is the HEAD of branch
+            tarantool/tarantool@${{ github.ref_name }}.
+
       - name: Send VK Teams message on failure
         if: failure()
         uses: ./.github/actions/report-job-status
