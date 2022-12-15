@@ -588,6 +588,7 @@ g.test_constraint_replication = function(cg)
 
     local replica_cfg = {
         replication = server.build_listen_uri('master'),
+        replication_sync_timeout = 300,
     }
     local replica = server:new({alias = 'replica', box_cfg = replica_cfg})
     replica:start()

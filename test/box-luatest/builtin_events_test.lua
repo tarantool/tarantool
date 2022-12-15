@@ -146,6 +146,7 @@ g.before_test('test_box_election', function(cg)
         election_mode = 'off',
         replication_synchro_quorum = 2,
         replication_synchro_timeout = 1,
+        replication_sync_timeout = 300,
         replication_timeout = 0.25,
         election_timeout = 0.25,
     }
