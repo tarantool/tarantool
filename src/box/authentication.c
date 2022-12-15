@@ -18,6 +18,7 @@
 #include "errcode.h"
 #include "error.h"
 #include "fiber.h"
+#include "iostream.h"
 #include "msgpuck.h"
 #include "session.h"
 #include "small/region.h"
@@ -120,6 +121,20 @@ ok:
 	    session_run_on_auth_triggers(&auth_res) != 0)
 		return -1;
 	credentials_reset(&current_session()->credentials, user);
+	return 0;
+}
+
+int
+auth_method_check_io(const struct auth_method *method,
+		     const struct iostream *io)
+{
+	if ((method->flags & AUTH_METHOD_REQUIRES_ENCRYPTION) != 0 &&
+	    (io->flags & IOSTREAM_IS_ENCRYPTED) == 0) {
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 tt_sprintf("Authentication method '%s'", method->name),
+			 "unencrypted connection");
+		return -1;
+	}
 	return 0;
 }
 

@@ -18,6 +18,7 @@ extern "C" {
 enum { AUTH_SALT_SIZE = 20 };
 
 struct auth_method;
+struct iostream;
 
 /** Default authentication method. */
 extern const struct auth_method *AUTH_METHOD_DEFAULT;
@@ -45,6 +46,15 @@ struct authenticator {
 	const struct auth_method *method;
 };
 
+/** Possible values of auth_method::flags. */
+enum auth_method_flag {
+	/**
+	 * Set if the authentication method may be used only if the
+	 * communication channel is encrypted (e.g. with SSL/TLS).
+	 */
+	AUTH_METHOD_REQUIRES_ENCRYPTION = 1 << 0,
+};
+
 /**
  * Abstract authentication method class.
  *
@@ -54,6 +64,8 @@ struct authenticator {
 struct auth_method {
 	/** Unique authentication method name. */
 	const char *name;
+	/** Bitwise combination of auth_method_flag. */
+	unsigned flags;
 	/** Destroys an authentication method object. */
 	void
 	(*auth_method_delete)(struct auth_method *method);
@@ -218,6 +230,15 @@ authenticate_password(const struct authenticator *auth,
 int
 authenticate(const char *user_name, uint32_t user_name_len,
 	     const char *salt, const char *tuple);
+
+/**
+ * Checks if an authentication method may be used over an IO stream.
+ *
+ * Returns 0 on success. On error, sets diag and returns -1.
+ */
+int
+auth_method_check_io(const struct auth_method *method,
+		     const struct iostream *io);
 
 /**
  * Looks up an authentication method by name.
