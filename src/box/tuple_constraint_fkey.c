@@ -494,19 +494,6 @@ done:
 }
 
 /**
- * Destructor that unpins space from space_cache.
- */
-static void
-tuple_constraint_fkey_unpin(struct tuple_constraint *constr)
-{
-	assert(constr->destroy == tuple_constraint_fkey_unpin);
-	space_cache_unpin(&constr->space_cache_holder);
-	constr->check = tuple_constraint_noop_check;
-	constr->destroy = tuple_constraint_noop_destructor;
-	constr->space = NULL;
-}
-
-/**
  * Find and set foreign_field_no amd foreign_index fkey member of @a constraint.
  * If something was not found - foreign_index is set to -1.
  */
@@ -580,6 +567,58 @@ tuple_constraint_fkey_space_cache_on_replace(struct space_cache_holder *holder,
 	tuple_constraint_fkey_update_foreign(constr);
 }
 
+/**
+ * Unpin space from space_cache, remove check.
+ */
+static void
+tuple_constraint_fkey_detach(struct tuple_constraint *constr)
+{
+	assert(constr->detach == tuple_constraint_fkey_detach);
+	/* Check that constraint has not been detached yet. */
+	assert(constr->check != tuple_constraint_noop_check);
+	space_cache_unpin(&constr->space_cache_holder);
+	constr->check = tuple_constraint_noop_check;
+}
+
+/**
+ * Put space back to space_cache, put check back.
+ */
+static void
+tuple_constraint_fkey_reattach(struct tuple_constraint *constr)
+{
+	assert(constr->reattach == tuple_constraint_fkey_reattach);
+	/* Check that constraint has been detached. */
+	assert(constr->check == tuple_constraint_noop_check);
+	struct space *space = constr->space;
+	bool fkey_same_space = constr->def.fkey.space_id == 0 ||
+			       constr->def.fkey.space_id == space->def->id;
+	uint32_t space_id = fkey_same_space ? space->def->id :
+			    constr->def.fkey.space_id;
+	struct space *foreign_space = space_by_id(space_id);
+	enum space_cache_holder_type type = SPACE_HOLDER_FOREIGN_KEY;
+	space_cache_pin(foreign_space, &constr->space_cache_holder,
+			tuple_constraint_fkey_space_cache_on_replace,
+			type, fkey_same_space);
+	constr->check = tuple_constraint_fkey_check;
+}
+
+/**
+ * Destructor. Detaches constraint if it has not been detached before and
+ * deinitializes its fields.
+ */
+static void
+tuple_constraint_fkey_destroy(struct tuple_constraint *constr)
+{
+	assert(constr->destroy == tuple_constraint_fkey_destroy);
+	/** Detach constraint if it has not been detached before. */
+	if (constr->check != tuple_constraint_noop_check)
+		tuple_constraint_fkey_detach(constr);
+	constr->detach = tuple_constraint_noop_alter;
+	constr->reattach = tuple_constraint_noop_alter;
+	constr->destroy = tuple_constraint_noop_alter;
+	constr->space = NULL;
+}
+
 int
 tuple_constraint_fkey_init(struct tuple_constraint *constr,
 			   struct space *space, int32_t field_no)
@@ -603,7 +642,9 @@ tuple_constraint_fkey_init(struct tuple_constraint *constr,
 				type, fkey_same_space);
 		tuple_constraint_fkey_update_foreign(constr);
 		constr->check = tuple_constraint_fkey_check;
-		constr->destroy = tuple_constraint_fkey_unpin;
+		constr->destroy = tuple_constraint_fkey_destroy;
+		constr->detach = tuple_constraint_fkey_detach;
+		constr->reattach = tuple_constraint_fkey_reattach;
 		return 0;
 	}
 	if (recovery_state >= FINAL_RECOVERY) {

@@ -32,10 +32,10 @@ typedef int
 		      const struct tuple_field *field);
 
 /**
- * Type of constraint destructor.
+ * Type of constraint alter (destroy, detach, reattach).
  */
 typedef void
-(*tuple_constraint_destroy_f)(struct tuple_constraint *constraint);
+(*tuple_constraint_alter_f)(struct tuple_constraint *constraint);
 
 /**
  * Additional data for each local/foreign field pair in foreign key constraint.
@@ -115,8 +115,15 @@ struct tuple_constraint {
 	struct tuple_constraint_def def;
 	/** The constraint check function. */
 	tuple_constraint_f check;
-	/** Destructor. Expected to be reentrant - it's ok to call it twice.*/
-	tuple_constraint_destroy_f destroy;
+	/** Detach constraint from space, but do not delete it. */
+	tuple_constraint_alter_f detach;
+	/** Reattach constraint to space. */
+	tuple_constraint_alter_f reattach;
+	/**
+	 * Destructor. Expected to be reentrant - it's ok to call it twice.
+	 * Detaches the constraint if it has not beed detached before.
+	 */
+	tuple_constraint_alter_f destroy;
 	/** Space in which the constraint is. */
 	struct space *space;
 	/** Various data for different states of constraint. */
@@ -140,10 +147,10 @@ tuple_constraint_noop_check(const struct tuple_constraint *constraint,
 			    const struct tuple_field *field);
 
 /**
- * No-op destructor of constraint. Used as a default.
+ * No-op alter (destroy, detach, reattach) of constraint. Used as a default.
  */
 void
-tuple_constraint_noop_destructor(struct tuple_constraint *constr);
+tuple_constraint_noop_alter(struct tuple_constraint *constr);
 
 /**
  * Compare two constraint objects, return 0 if they are equal.
