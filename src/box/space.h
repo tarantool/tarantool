@@ -252,6 +252,18 @@ struct space {
 	struct space_upgrade *upgrade;
 };
 
+/**
+ * Detach constraints from space. They can be reattached or deleted then.
+ */
+void
+space_detach_constraints(struct space *space);
+
+/**
+ * Reattach space constraints.
+ */
+void
+space_reattach_constraints(struct space *space);
+
 /** Initialize a base space instance. */
 int
 space_create(struct space *space, struct engine *engine,

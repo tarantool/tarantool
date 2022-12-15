@@ -176,6 +176,46 @@ space_init_constraints(struct space *space)
 }
 
 /**
+ * Detach constraints that are defined in @a space format.
+ */
+void
+space_detach_constraints(struct space *space)
+{
+	struct tuple_format *format = space->format;
+	for (size_t j = 0; j < format->constraint_count; j++) {
+		struct tuple_constraint *constr = &format->constraint[j];
+		constr->detach(constr);
+	}
+	for (size_t i = 0; i < tuple_format_field_count(format); i++) {
+		struct tuple_field *field = tuple_format_field(format, i);
+		for (size_t j = 0; j < field->constraint_count; j++) {
+			struct tuple_constraint *constr = &field->constraint[j];
+			constr->detach(constr);
+		}
+	}
+}
+
+/**
+ * Reattach constraints that are defined in @a space format.
+ */
+void
+space_reattach_constraints(struct space *space)
+{
+	struct tuple_format *format = space->format;
+	for (size_t j = 0; j < format->constraint_count; j++) {
+		struct tuple_constraint *constr = &format->constraint[j];
+		constr->reattach(constr);
+	}
+	for (size_t i = 0; i < tuple_format_field_count(format); i++) {
+		struct tuple_field *field = tuple_format_field(format, i);
+		for (size_t j = 0; j < field->constraint_count; j++) {
+			struct tuple_constraint *constr = &field->constraint[j];
+			constr->reattach(constr);
+		}
+	}
+}
+
+/**
  * Destroy constraints that are defined in @a space format.
  */
 static int

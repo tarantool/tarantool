@@ -21,7 +21,7 @@ tuple_constraint_noop_check(const struct tuple_constraint *constr,
 }
 
 void
-tuple_constraint_noop_destructor(struct tuple_constraint *constr)
+tuple_constraint_noop_alter(struct tuple_constraint *constr)
 {
 	(void)constr;
 }
@@ -58,7 +58,9 @@ tuple_constraint_array_new(const struct tuple_constraint_def *defs,
 	grp_alloc_use(&all, res + count);
 	for (size_t i = 0; i < count; i++) {
 		res[i].check = tuple_constraint_noop_check;
-		res[i].destroy = tuple_constraint_noop_destructor;
+		res[i].destroy = tuple_constraint_noop_alter;
+		res[i].detach = tuple_constraint_noop_alter;
+		res[i].reattach = tuple_constraint_noop_alter;
 		if (defs[i].type != CONSTR_FKEY) {
 			res[i].fkey = NULL;
 			continue;

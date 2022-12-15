@@ -120,15 +120,46 @@ tuple_constraint_call_func(const struct tuple_constraint *constr,
 }
 
 /**
- * Destructor that unpins func from func_cache.
+ * Unpin func from func_cache, removes check.
  */
 static void
-tuple_constraint_func_unpin(struct tuple_constraint *constr)
+tuple_constraint_func_detach(struct tuple_constraint *constr)
 {
-	assert(constr->destroy == tuple_constraint_func_unpin);
+	assert(constr->detach == tuple_constraint_func_detach);
+	/* Check that constraint has not been detached yet. */
+	assert(constr->check != tuple_constraint_noop_check);
 	func_unpin(&constr->func_cache_holder);
 	constr->check = tuple_constraint_noop_check;
-	constr->destroy = tuple_constraint_noop_destructor;
+}
+
+/**
+ * Pin func to func_cache, set check.
+ */
+static void
+tuple_constraint_func_reattach(struct tuple_constraint *constr)
+{
+	assert(constr->reattach == tuple_constraint_func_reattach);
+	/* Check that constraint has been detached. */
+	assert(constr->check == tuple_constraint_noop_check);
+	struct func *func = tuple_constraint_func_find(constr);
+	func_pin(func, &constr->func_cache_holder, FUNC_HOLDER_CONSTRAINT);
+	constr->check = tuple_constraint_call_func;
+}
+
+/**
+ * Destructor. Detaches constraint if it has not been detached before and
+ * deinitializes its fields.
+ */
+static void
+tuple_constraint_func_destroy(struct tuple_constraint *constr)
+{
+	assert(constr->destroy == tuple_constraint_func_destroy);
+	/** Detach constraint if it has not been detached before. */
+	if (constr->check != tuple_constraint_noop_check)
+		tuple_constraint_func_detach(constr);
+	constr->detach = tuple_constraint_noop_alter;
+	constr->reattach = tuple_constraint_noop_alter;
+	constr->destroy = tuple_constraint_noop_alter;
 	constr->space = NULL;
 }
 
@@ -154,6 +185,8 @@ tuple_constraint_func_init(struct tuple_constraint *constr,
 	}
 	func_pin(func, &constr->func_cache_holder, FUNC_HOLDER_CONSTRAINT);
 	constr->check = tuple_constraint_call_func;
-	constr->destroy = tuple_constraint_func_unpin;
+	constr->destroy = tuple_constraint_func_destroy;
+	constr->detach = tuple_constraint_func_detach;
+	constr->reattach = tuple_constraint_func_reattach;
 	return 0;
 }
