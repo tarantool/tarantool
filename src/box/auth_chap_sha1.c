@@ -273,6 +273,7 @@ auth_chap_sha1_new(void)
 {
 	struct auth_method *method = xmalloc(sizeof(*method));
 	method->name = AUTH_CHAP_SHA1_NAME;
+	method->flags = 0;
 	method->auth_method_delete = auth_chap_sha1_delete;
 	method->auth_data_prepare = auth_chap_sha1_data_prepare;
 	method->auth_request_prepare = auth_chap_sha1_request_prepare;

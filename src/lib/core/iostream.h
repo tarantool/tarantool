@@ -65,6 +65,14 @@ enum iostream_status {
 	IOSTREAM_WANT_WRITE = -3,
 };
 
+/** Possible values of iostream::flags. */
+enum iostream_flag {
+	/**
+	 * Set if the iostream is encrypted (e.g. with SSL/TLS).
+	 */
+	IOSTREAM_IS_ENCRYPTED = 1 << 0,
+};
+
 /**
  * Returns libev events corresponding to a status.
  */
@@ -108,6 +116,8 @@ struct iostream {
 	void *data;
 	/** File descriptor used for IO. Set to -1 on destruction. */
 	int fd;
+	/** Bitwise combination of iostream_flag. */
+	unsigned flags;
 #ifndef NDEBUG
 	/** Thread currently doing an IO operation on this IO stream. */
 	struct cord *owner;
@@ -123,6 +133,7 @@ iostream_clear(struct iostream *io)
 	io->vtab = NULL;
 	io->data = NULL;
 	io->fd = -1;
+	io->flags = 0;
 #ifndef NDEBUG
 	io->owner = NULL;
 #endif

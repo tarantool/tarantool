@@ -2632,6 +2632,8 @@ netbox_transport_do_auth(struct netbox_transport *transport,
 	struct netbox_options *opts = &transport->opts;
 	if (opts->user == NULL)
 		return;
+	if (auth_method_check_io(opts->auth_method, &transport->io) != 0)
+		luaT_error(L);
 	netbox_encode_auth(L, &transport->send_buf, transport->next_sync++,
 			   opts->auth_method, opts->user, opts->password,
 			   transport->greeting.salt,

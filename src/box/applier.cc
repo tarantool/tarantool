@@ -439,6 +439,8 @@ applier_connect(struct applier *applier)
 		auth_method_by_name(method_name, strlen(method_name)) :
 		AUTH_METHOD_DEFAULT;
 	assert(method != NULL);
+	if (auth_method_check_io(method, io) != 0)
+		diag_raise();
 	const char *auth_request, *auth_request_end;
 	assert(greeting.salt_len >= AUTH_SALT_SIZE);
 	auth_request_prepare(method, password, strlen(password), greeting.salt,
