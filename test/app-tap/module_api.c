@@ -1974,6 +1974,7 @@ test_key_def_validate_key(struct lua_State *L)
 static int
 test_key_def_dup(lua_State *L)
 {
+	size_t region_svp = box_region_used();
 	box_key_def_t *key_def = NULL;
 	box_key_part_def_t part;
 	box_key_part_def_t *dump = NULL;
@@ -1994,6 +1995,7 @@ test_key_def_dup(lua_State *L)
 
 	box_key_def_delete(key_def_dup);
 	box_key_def_delete(key_def);
+	box_region_truncate(region_svp);
 
 	lua_pushboolean(L, 1);
 	return 1;
