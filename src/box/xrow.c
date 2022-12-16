@@ -1126,6 +1126,30 @@ error:
 }
 
 void
+xrow_encode_id(struct xrow_header *row)
+{
+	memset(row, 0, sizeof(*row));
+	row->type = IPROTO_ID;
+	size_t size = mp_sizeof_map(2);
+	size += mp_sizeof_uint(IPROTO_VERSION) +
+		mp_sizeof_uint(IPROTO_CURRENT_VERSION);
+	size += mp_sizeof_uint(IPROTO_FEATURES) +
+		mp_sizeof_iproto_features(&IPROTO_CURRENT_FEATURES);
+	char *buf = xregion_alloc(&fiber()->gc, size);
+	char *p = buf;
+	p = mp_encode_map(p, 2);
+	p = mp_encode_uint(p, IPROTO_VERSION);
+	p = mp_encode_uint(p, IPROTO_CURRENT_VERSION);
+	p = mp_encode_uint(p, IPROTO_FEATURES);
+	p = mp_encode_iproto_features(p, &IPROTO_CURRENT_FEATURES);
+	assert((size_t)(p - buf) == size);
+	(void)p;
+	row->bodycnt = 1;
+	row->body[0].iov_base = buf;
+	row->body[0].iov_len = size;
+}
+
+void
 xrow_encode_synchro(struct xrow_header *row, char *body,
 		    const struct synchro_request *req)
 {
