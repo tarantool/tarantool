@@ -380,6 +380,7 @@ g.test_internal_ballot = function(cg)
         [ballot_key.IS_BOOTED] = true,
         [ballot_key.CAN_LEAD] = false,
         [ballot_key.BOOTSTRAP_LEADER_UUID] = cg.master:get_instance_uuid(),
+        [ballot_key.REGISTERED_REPLICA_UUIDS] = {cg.master:get_instance_uuid()},
     }
     cg.replica:exec(wait_ballot_updated_to, {expected})
 
@@ -391,6 +392,9 @@ g.test_internal_ballot = function(cg)
     expected[ballot_key.IS_ANON] = false
     -- Replica registration bumps vclock.
     expected[ballot_key.VCLOCK] = cg.master:get_vclock()
+    table.insert(expected[ballot_key.REGISTERED_REPLICA_UUIDS],
+                 cg.replica:get_instance_uuid())
+    table.sort(expected[ballot_key.REGISTERED_REPLICA_UUIDS])
     cg.replica:exec(wait_ballot_updated_to, {expected})
 
     cg.replica:exec(function() box.cfg{read_only = false} end)

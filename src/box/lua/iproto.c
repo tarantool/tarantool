@@ -193,6 +193,8 @@ push_iproto_ballot_key_enum(struct lua_State *L)
         	{"CAN_LEAD", IPROTO_BALLOT_CAN_LEAD},
 		{"BOOTSTRAP_LEADER_UUID",
 		 IPROTO_BALLOT_BOOTSTRAP_LEADER_UUID},
+		{"REGISTERED_REPLICA_UUIDS",
+		 IPROTO_BALLOT_REGISTERED_REPLICA_UUIDS},
 	};
 	push_iproto_constant_subnamespace(L, "ballot_key", ballot_keys,
 					  lengthof(ballot_keys));
