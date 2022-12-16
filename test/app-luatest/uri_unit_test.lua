@@ -66,3 +66,49 @@ g.test_uri_values_nil = function(_)
     local values = uri.values()
     t.assert_items_equals(values, {})
 end
+
+g.test_uri_escape_plus_enabled = function(_)
+    local opts = {
+        plus = true,
+    }
+    t.assert_equals(uri.escape(" ", opts), "+")
+end
+
+g.test_uri_escape_plus_disabled = function(_)
+    local opts = {
+        plus = false,
+    }
+    t.assert_equals(uri.escape(" ", opts), "%20")
+end
+
+g.test_uri_escape_reserved = function(_)
+    local opts = {
+        unreserved = uri.unreserved("B"),
+    }
+    t.assert_equals(uri.escape("B", opts), "B")
+end
+
+g.test_uri_escape_unreserved = function(_)
+    local opts = {
+        unreserved = uri.unreserved("A"), -- Non-default unreserved symbols.
+    }
+    t.assert_equals(uri.escape("B", opts), "%42")
+end
+
+g.test_uri_unescape = function(_)
+    t.assert_equals(uri.unescape("%42"), "B")
+end
+
+g.test_uri_unescape_plus_enabled = function(_)
+    local opts = {
+        plus = true
+    }
+    t.assert_equals(uri.unescape("+", opts), " ")
+end
+
+g.test_uri_unescape_plus_disabled = function(_)
+    local opts = {
+        plus = false
+    }
+    t.assert_equals(uri.unescape("+", opts), "+")
+end
