@@ -62,6 +62,67 @@ local uri_set_stash = buffer.ffi_stash_new('struct uri_set')
 local uri_set_stash_take = uri_set_stash.take
 local uri_set_stash_put = uri_set_stash.put
 
+local function unreserved(str)
+    if type(str) ~= "string" then
+        error("Usage: uri.unreserved(str)")
+    end
+    local pattern = "^[" .. str .. "]$"
+    local unreserved_tbl = ffi.new("unsigned char[256]")
+    for i = 0, 255 do
+        -- By default symbol is reserved.
+        unreserved_tbl[i] = 0
+        -- i-th symbol in the extended ASCII table.
+        local ch = string.char(i)
+        if ch:match(pattern) then
+            unreserved_tbl[i] = 1
+        end
+    end
+    return unreserved_tbl
+end
+
+-- Some characters, called magic characters, have special meanings when used in
+-- a pattern. The magic characters are: % - ^
+-- These characters must be escaped in patterns with unreserved symbols.
+
+local ALPHA = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+local DIGIT = "0123456789"
+local ALNUM = ALPHA .. DIGIT
+
+local RFC3986 = {
+    unreserved = unreserved(ALNUM .. "%-._~"),
+    plus = false,
+}
+
+local PATH = {
+    unreserved = unreserved(ALNUM .. "%-._~" .. "!$&'()*+,;=" .. "/" .. ":@"),
+    plus = false,
+}
+
+local PATH_PART = {
+    unreserved = unreserved(ALNUM .. "%-._~" .. "!$&'()*+,;=" .. ":@"),
+    plus = false,
+}
+
+local QUERY = {
+    unreserved = unreserved(ALNUM .. "%-._~" .. "!$&'()*+,;=" .. "/?"),
+    plus = false,
+}
+
+local QUERY_PART = {
+    unreserved = unreserved(ALNUM .. "%-._~" .. "!$'()*+,;" .. "/?"),
+    plus = false,
+}
+
+local FRAGMENT = {
+    unreserved = unreserved(ALNUM .. "%-._~" .. "!$&'()*+,;=" .. "/?"),
+    plus = false,
+}
+
+local FORM_URLENCODED = {
+    unreserved = unreserved(ALNUM .. "%-._" .. "*"),
+    plus = true,
+}
+
 local function parse_uribuf(uribuf)
     local result = {}
     for _, k in ipairs({ 'scheme', 'login', 'password', 'host', 'service',
@@ -173,6 +234,67 @@ local function format(uri, write_password)
     return str
 end
 
+local function build_opts(opts)
+    if opts and type(opts) ~= "table" then
+        error("opts must be a table")
+    end
+    -- Attention: setting RFC3986.plus to true will break expression with
+    -- choosing user and default value below.
+    assert(RFC3986.plus == false)
+    local options = {
+        unreserved = (opts and opts.unreserved) or RFC3986.unreserved,
+        plus = (opts and opts.plus) or RFC3986.plus,
+    }
+    if options.unreserved ~= nil and type(options.unreserved) ~= "cdata" then
+        error("use uri.unreserved for building opts.unreserved")
+    end
+    if type(options.plus) ~= "boolean" then
+        error("opts.plus must be a boolean")
+    end
+    return options
+end
+
+local char_to_hex = function(c)
+    return string.format("%%%02X", string.byte(c))
+end
+
+-- Encodes a string into its escaped hexadecimal representation.
+local function escape(buf, opts)
+    if type(buf) ~= "string" then
+        error("Usage: uri.escape(string, [opts])")
+    end
+    local options = build_opts(opts)
+
+    return (buf:gsub("(.)", function(ch)
+        if options.plus == true and ch == " " then
+            return "+"
+        elseif options.unreserved[string.byte(ch)] == 1 then
+            return ch
+        else
+            return char_to_hex(ch)
+        end
+    end))
+end
+
+local hex_to_char = function(x)
+    return string.char(tonumber(x, 16))
+end
+
+-- Decodes an escaped hexadecimal string into its binary representation.
+local function unescape(buf, opts)
+    if type(buf) ~= "string" then
+        error("Usage: uri.unescape(string, [opts])")
+    end
+    local options = build_opts(opts)
+
+    local str = buf
+    if options.plus == true then
+        str = str:gsub("+", " ")
+    end
+    str = str:gsub("%%(%x%x)", hex_to_char)
+    return str
+end
+
 local function encode_kv(key, values, res)
     local val = values
     if type(val) ~= "table" then
@@ -229,4 +351,15 @@ return {
         params = params,
         encode_kv = encode_kv,
     },
+    escape = escape,
+    unescape = unescape,
+    unreserved = unreserved,
+
+    RFC3986 = RFC3986,
+    PATH = PATH,
+    PATH_PART = PATH_PART,
+    QUERY = QUERY,
+    QUERY_PART = QUERY_PART,
+    FRAGMENT = FRAGMENT,
+    FORM_URLENCODED = FORM_URLENCODED,
 };
