@@ -106,6 +106,8 @@ struct rlist box_on_shutdown_trigger_list =
 
 const struct vclock *box_vclock = &replicaset.vclock;
 
+const char *box_auth_type;
+
 /**
  * Set if backup is in progress, i.e. box_backup_start() was
  * called but box_backup_stop() hasn't been yet.
@@ -1569,10 +1571,7 @@ box_set_auth_type(void)
 	const struct auth_method *method = box_check_auth_type();
 	if (method == NULL)
 		return -1;
-	/*
-	 * Nothing else to do, because the value is only used in Lua where
-	 * it can be accessed via box.cfg.auth_type.
-	 */
+	box_auth_type = method->name;
 	return 0;
 }
 
@@ -4327,6 +4326,11 @@ box_cfg_xc(void)
 	box_set_replication_sync_timeout();
 	box_set_replication_skip_conflict();
 	box_set_replication_anon();
+	/*
+	 * Must be set before opening the server port, because it may be
+	 * requested by a client before the configuration is completed.
+	 */
+	box_set_auth_type();
 
 	struct gc_checkpoint *checkpoint = gc_last_checkpoint();
 

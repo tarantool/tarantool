@@ -437,8 +437,11 @@ iproto_reply_ok(struct obuf *out, uint64_t sync, uint64_t schema_version)
 }
 
 int
-iproto_reply_id(struct obuf *out, uint64_t sync, uint64_t schema_version)
+iproto_reply_id(struct obuf *out, const char *auth_type,
+		uint64_t sync, uint64_t schema_version)
 {
+	assert(auth_type != NULL);
+	uint32_t auth_type_len = strlen(auth_type);
 	unsigned version = IPROTO_CURRENT_VERSION;
 	struct iproto_features *features = &IPROTO_CURRENT_FEATURES;
 
@@ -461,11 +464,13 @@ iproto_reply_id(struct obuf *out, uint64_t sync, uint64_t schema_version)
 #endif
 
 	size_t size = IPROTO_HEADER_LEN;
-	size += mp_sizeof_map(2);
+	size += mp_sizeof_map(3);
 	size += mp_sizeof_uint(IPROTO_VERSION);
 	size += mp_sizeof_uint(version);
 	size += mp_sizeof_uint(IPROTO_FEATURES);
 	size += mp_sizeof_iproto_features(features);
+	size += mp_sizeof_uint(IPROTO_AUTH_TYPE);
+	size += mp_sizeof_str(auth_type_len);
 
 	char *buf = obuf_alloc(out, size);
 	if (buf == NULL) {
@@ -474,11 +479,13 @@ iproto_reply_id(struct obuf *out, uint64_t sync, uint64_t schema_version)
 	}
 
 	char *data = buf + IPROTO_HEADER_LEN;
-	data = mp_encode_map(data, 2);
+	data = mp_encode_map(data, 3);
 	data = mp_encode_uint(data, IPROTO_VERSION);
 	data = mp_encode_uint(data, version);
 	data = mp_encode_uint(data, IPROTO_FEATURES);
 	data = mp_encode_iproto_features(data, features);
+	data = mp_encode_uint(data, IPROTO_AUTH_TYPE);
+	data = mp_encode_str(data, auth_type, auth_type_len);
 	assert(size == (size_t)(data - buf));
 
 	iproto_header_encode(buf, IPROTO_OK, sync, schema_version,
@@ -1096,6 +1103,8 @@ xrow_decode_id(const struct xrow_header *row, struct id_request *request)
 
 	request->version = 0;
 	iproto_features_create(&request->features);
+	request->auth_type = NULL;
+	request->auth_type_len = 0;
 
 	uint32_t map_size = mp_decode_map(&p);
 	for (uint32_t i = 0; i < map_size; i++) {
@@ -1113,6 +1122,10 @@ xrow_decode_id(const struct xrow_header *row, struct id_request *request)
 			if (mp_decode_iproto_features(
 					&p, &request->features) != 0)
 				goto error;
+			break;
+		case IPROTO_AUTH_TYPE:
+			request->auth_type = mp_decode_str(
+					&p, &request->auth_type_len);
 			break;
 		default:
 			/* Ignore unknown keys for forward compatibility. */

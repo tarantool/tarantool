@@ -64,6 +64,12 @@ struct vclock;
  */
 extern const struct vclock *box_vclock;
 
+/**
+ * Name of the authentication method that is currently used on
+ * the server (value of box.cfg.auth_type).
+ */
+extern const char *box_auth_type;
+
 /** Time to wait for shutdown triggers finished */
 extern double on_shutdown_trigger_timeout;
 

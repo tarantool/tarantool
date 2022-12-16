@@ -253,6 +253,14 @@ struct id_request {
 	uint64_t version;
 	/** IPROTO protocol features. */
 	struct iproto_features features;
+	/**
+	 * Name of the authentication type that is currently used on
+	 * the server (value of box.cfg.auth_type). Not null-terminated.
+	 * May be NULL. Set only in response.
+	 */
+	const char *auth_type;
+	/** Length of auth_type. */
+	uint32_t auth_type_len;
 };
 
 /**
@@ -710,6 +718,7 @@ iproto_reply_ok(struct obuf *out, uint64_t sync, uint64_t schema_version);
  * Encode iproto header with IPROTO_OK response code and protocol features
  * in the body.
  * @param out Encode to.
+ * @param auth_type Authentication type.
  * @param sync Request sync.
  * @param schema_version.
  *
@@ -717,7 +726,8 @@ iproto_reply_ok(struct obuf *out, uint64_t sync, uint64_t schema_version);
  * @retval -1 Memory error.
  */
 int
-iproto_reply_id(struct obuf *out, uint64_t sync, uint64_t schema_version);
+iproto_reply_id(struct obuf *out, const char *auth_type,
+		uint64_t sync, uint64_t schema_version);
 
 /**
  * Encode iproto header with IPROTO_OK response code and vclock
@@ -1088,9 +1098,10 @@ iproto_reply_ok_xc(struct obuf *out, uint64_t sync, uint64_t schema_version)
 
 /** @copydoc iproto_reply_id. */
 static inline void
-iproto_reply_id_xc(struct obuf *out, uint64_t sync, uint64_t schema_version)
+iproto_reply_id_xc(struct obuf *out, const char *auth_type,
+		   uint64_t sync, uint64_t schema_version)
 {
-	if (iproto_reply_id(out, sync, schema_version) != 0)
+	if (iproto_reply_id(out, auth_type, sync, schema_version) != 0)
 		diag_raise();
 }
 
