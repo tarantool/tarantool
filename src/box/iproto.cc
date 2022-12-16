@@ -2291,7 +2291,7 @@ tx_process_misc(struct cmsg *m)
 			break;
 		case IPROTO_ID:
 			tx_process_id(con, &msg->id);
-			iproto_reply_id_xc(out, msg->header.sync,
+			iproto_reply_id_xc(out, box_auth_type, msg->header.sync,
 					   ::schema_version);
 			break;
 		case IPROTO_VOTE_DEPRECATED:

@@ -172,6 +172,13 @@ enum iproto_key {
 	IPROTO_TXN_ISOLATION = 0x59,
 	/** A vclock synchronisation request identifier. */
 	IPROTO_VCLOCK_SYNC = 0x5a,
+	/**
+	 * Name of the authentication method that is currently used on
+	 * the server (value of box.cfg.auth_type). It's sent in reply
+	 * to IPROTO_ID request. A client can use it as the default
+	 * authentication method.
+	 */
+	IPROTO_AUTH_TYPE = 0x5b,
 	/*
 	 * Be careful to not extend iproto_key values over 0x7f.
 	 * iproto_keys are encoded in msgpack as positive fixnum, which ends at

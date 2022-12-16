@@ -497,6 +497,7 @@ local dynamic_cfg_skip_at_load = {
     replicaset_uuid         = true,
     net_msg_max             = true,
     readahead               = true,
+    auth_type               = true,
 }
 
 -- Options that are not part of dynamic_cfg_modules and applied individually
