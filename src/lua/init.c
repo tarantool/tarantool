@@ -167,6 +167,7 @@ extern char strict_lua[],
 	datetime_lua[],
 	timezones_lua[],
 	print_lua[],
+	pairs_lua[],
 	luadebug_lua[]
 #if defined(ENABLE_COMPRESS_MODULE)
 	, compress_lua[]
@@ -329,6 +330,7 @@ static const char *lua_modules[] = {
 	"timezones", timezones_lua,
 	"datetime", datetime_lua,
 	"internal.print", print_lua,
+	"internal.pairs", pairs_lua,
 	"luadebug", luadebug_lua,
 	NULL
 };

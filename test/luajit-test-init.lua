@@ -89,6 +89,18 @@ if print_M ~= nil then
     assert(type(print) == 'function')
 end
 
+-- Tarantool has its own pairs() function.
+--
+-- There is a test (PUC-Rio-Lua-5.1-tests/db.lua) in LuaJIT regression suite,
+-- that become broken with patched version of pairs().
+-- Here we replace patched version by original one.
+local pairs_M = package.loaded['internal.pairs']
+if pairs_M ~= nil then
+    rawset(_G, 'pairs', pairs_M.builtin_pairs)
+    assert(pairs ~= nil)
+    assert(type(pairs) == 'function')
+end
+
 -- This is workaround introduced for flaky macosx tests reported by
 -- https://github.com/tarantool/tarantool/issues/7058
 collectgarbage('collect')
