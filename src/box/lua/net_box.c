@@ -140,7 +140,7 @@ static const char *netbox_state_str[] = {
 struct netbox_options {
 	/** Remote server URI. */
 	struct uri uri;
-	/** Authentication method. */
+	/** Authentication method. NULL if unspecified. */
 	const struct auth_method *auth_method;
 	/** User credentials. */
 	char *user;
@@ -221,6 +221,8 @@ struct netbox_transport {
 	struct greeting greeting;
 	/** Features supported by the server as reported by IPROTO_ID. */
 	struct iproto_features features;
+	/** Default authentication method reported by IPROTO_ID. */
+	const struct auth_method *auth_method_default;
 	/** Connection state. */
 	enum netbox_state state;
 	/**
@@ -472,7 +474,7 @@ netbox_options_create(struct netbox_options *opts)
 {
 	memset(opts, 0, sizeof(*opts));
 	uri_create(&opts->uri, NULL);
-	opts->auth_method = AUTH_METHOD_DEFAULT;
+	opts->auth_method = NULL;
 	opts->callback_ref = LUA_NOREF;
 	opts->connect_timeout = NETBOX_DEFAULT_CONNECT_TIMEOUT;
 	opts->fetch_schema = true;
@@ -493,6 +495,7 @@ netbox_transport_create(struct netbox_transport *transport)
 	netbox_options_create(&transport->opts);
 	memset(&transport->greeting, 0, sizeof(transport->greeting));
 	iproto_features_create(&transport->features);
+	transport->auth_method_default = AUTH_METHOD_DEFAULT;
 	transport->state = NETBOX_INITIAL;
 	transport->is_closing = false;
 	transport->last_error = NULL;
@@ -2573,6 +2576,8 @@ netbox_transport_do_id(struct netbox_transport *transport, struct lua_State *L)
 	struct id_request id;
 	id.version = 0;
 	iproto_features_create(&id.features);
+	id.auth_type = NULL;
+	id.auth_type_len = 0;
 	ERROR_INJECT(ERRINJ_NETBOX_DISABLE_ID, goto out);
 	if (peer_version_id < version_id(2, 10, 0))
 		goto unsupported;
@@ -2591,6 +2596,12 @@ netbox_transport_do_id(struct netbox_transport *transport, struct lua_State *L)
 		luaT_error(L);
 out:
 	transport->features = id.features;
+	if (id.auth_type != NULL) {
+		transport->auth_method_default = auth_method_by_name(
+					id.auth_type, id.auth_type_len);
+		if (transport->auth_method_default == NULL)
+			transport->auth_method_default = AUTH_METHOD_DEFAULT;
+	}
 	/* Invoke the 'handshake' callback. */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, transport->opts.callback_ref);
 	lua_pushliteral(L, "handshake");
@@ -2632,10 +2643,12 @@ netbox_transport_do_auth(struct netbox_transport *transport,
 	struct netbox_options *opts = &transport->opts;
 	if (opts->user == NULL)
 		return;
-	if (auth_method_check_io(opts->auth_method, &transport->io) != 0)
+	const struct auth_method *method = opts->auth_method != NULL ?
+			opts->auth_method : transport->auth_method_default;
+	if (auth_method_check_io(method, &transport->io) != 0)
 		luaT_error(L);
 	netbox_encode_auth(L, &transport->send_buf, transport->next_sync++,
-			   opts->auth_method, opts->user, opts->password,
+			   method, opts->user, opts->password,
 			   transport->greeting.salt,
 			   transport->greeting.salt_len);
 	struct xrow_header hdr;
