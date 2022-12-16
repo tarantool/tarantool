@@ -329,6 +329,7 @@ apply_nop(struct xrow_header *row)
 void
 applier_connect(struct applier *applier)
 {
+	RegionGuard region_guard(&fiber()->gc);
 	struct iostream *io = &applier->io;
 	struct ibuf *ibuf = &applier->ibuf;
 	if (iostream_is_initialized(io))
@@ -396,6 +397,28 @@ applier_connect(struct applier *applier)
 	diag_clear(&fiber()->diag);
 
 	/*
+	 * Send an IPROTO_ID request if it's supported by the master.
+	 *
+	 * On error, log it and carry on, because information returned
+	 * in reply to IPROTO_ID is optional. Without it, we assume that
+	 * the master doesn't support any extra features.
+	 */
+	if (applier->version_id >= version_id(2, 10, 0)) {
+		xrow_encode_id(&row);
+		coio_write_xrow(io, &row);
+		coio_read_xrow(io, ibuf, &row);
+		if (row.type == IPROTO_OK) {
+			struct id_request id;
+			xrow_decode_id_xc(&row, &id);
+		} else {
+			xrow_decode_error(&row);
+			diag_log();
+			diag_clear(&fiber()->diag);
+			say_error("IPROTO_ID failed");
+		}
+	}
+
+	/*
 	 * Send an IPROTO_VOTE request to fetch the master's ballot
 	 * before proceeding to "join". It will be used for leader
 	 * election on bootstrap.
@@ -433,7 +456,6 @@ applier_connect(struct applier *applier)
 	const char *password = uri->password;
 	if (password == NULL)
 		password = "";
-	RegionGuard region_guard(&fiber()->gc);
 	const char *method_name = uri_param(uri, "auth_type", 0);
 	const struct auth_method *method = method_name != NULL ?
 		auth_method_by_name(method_name, strlen(method_name)) :

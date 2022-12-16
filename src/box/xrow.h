@@ -266,6 +266,13 @@ int
 xrow_decode_id(const struct xrow_header *xrow, struct id_request *request);
 
 /**
+ * Encode IPROTO_ID request on the fiber region.
+ * @param[out] row request header.
+ */
+void
+xrow_encode_id(struct xrow_header *row);
+
+/**
  * Synchronous replication request - confirmation or rollback of
  * pending synchronous transactions.
  */
@@ -973,6 +980,14 @@ xrow_decode_dml_xc(struct xrow_header *row, struct request *request,
 		   uint64_t key_map)
 {
 	if (xrow_decode_dml(row, request, key_map) != 0)
+		diag_raise();
+}
+
+/** @copydoc xrow_decode_id. */
+static inline void
+xrow_decode_id_xc(const struct xrow_header *row, struct id_request *request)
+{
+	if (xrow_decode_id(row, request) != 0)
 		diag_raise();
 }
 
