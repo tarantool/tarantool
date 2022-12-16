@@ -46,8 +46,6 @@ space:drop()
 box.cfg{snap_io_rate_limit=0}
 box.cfg{io_collect_interval=0}
 box.cfg{too_long_threshold=0.5}
-box.cfg.snap_io_rate_limit = nil
-box.cfg.io_collect_interval = nil
 
 box.cfg { too_long_threshold = too_long_threshold_default }
 box.cfg { io_collect_interval = io_collect_interval_default }

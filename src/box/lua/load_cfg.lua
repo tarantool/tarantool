@@ -971,12 +971,14 @@ setmetatable(box, {
      end
 })
 
+local raw_cfg
+
 local function load_cfg(cfg)
     -- A user may save box.cfg (this function) before box loading
     -- and call it afterwards. We should reconfigure box in the
     -- case.
     if box_is_configured then
-        reload_cfg(box.cfg, cfg)
+        reload_cfg(raw_cfg, cfg)
         return
     end
 
@@ -1011,13 +1013,49 @@ local function load_cfg(cfg)
             box[k] = v
         end
     end
+
     setmetatable(box, nil)
-    box.cfg = setmetatable(cfg,
+    -- There is only a single way for setting a value to a box option -
+    -- call 'box.cfg{ option_name=option_value }'. Direct modifications
+    -- of table box.cfg are not allowed. On attempt to make a direct
+    -- modifications (setting a new option or updating an existing one) we raise
+    -- an error. For implementation this we are using metamethods __newindex
+    -- and __index. Both __index and __newindex are relevant only when the
+    -- index does not exist in the table. The only way to catch all accesses to
+    -- a table is to keep it empty. So we use an empty proxy table and proxying
+    -- setting and reading to another table.
+    raw_cfg = table.copy(cfg)
+    local proxy_table = {}
+    box.cfg = setmetatable(proxy_table,
         {
-            __newindex = function(table, index) -- luacheck: no unused args
+            -- tarantoolctl (extra/dist/tarantoolctl.in) expects a metatable
+            -- with metamethods, not a string. Thus we couldn't use __metatable
+            -- instead.
+            __name = 'box_cfg',
+            __index = raw_cfg,
+            __newindex = function(self, key, value) -- luacheck: no unused args
+                if template_cfg[key] ~= nil then
+                    local v = '<...>'
+                    local t = type(value)
+                    if t == 'boolean' or
+                       t == 'nil' or
+                       t == 'number' or
+                       t == 'string' then
+                        v = value
+                    end
+                    local err_msg_fmt = 'Use box.cfg{%s = %s} for update'
+                    error(err_msg_fmt:format(key, v))
+                end
                 error('Attempt to modify a read-only table')
             end,
-            __call = locked(reload_cfg),
+            __call = function(self, ...)
+                assert(next(proxy_table) == nil,
+                       'length of proxy table is not zero')
+                return locked(reload_cfg)(raw_cfg, ...)
+            end,
+            __serialize = function()
+                return raw_cfg
+            end,
         })
 
     -- Check schema version of the snapshot we're about to recover, if any.
@@ -1050,7 +1088,7 @@ local function load_cfg(cfg)
     --    (it does not check invalid config for feedback_host for example).
     -- 2. Configuring options can throw errors but we don't panic here
     --    and thus end up with not complete configuration.
-    load_cfg_apply_dynamic(cfg)
+    load_cfg_apply_dynamic(raw_cfg)
 
     -- Restore box members that requires full box loading.
     for k, v in pairs(box_configured) do
@@ -1140,7 +1178,7 @@ end
 -- log.cfg of log module for example).
 local function update_cfg(option, value)
     if box_is_configured then
-        rawset(box.cfg, option, value)
+        rawset(raw_cfg, option, value)
     else
         pre_load_cfg[option] = value
         pre_load_cfg_is_set[option] = true
