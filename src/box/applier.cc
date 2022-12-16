@@ -403,6 +403,7 @@ applier_connect(struct applier *applier)
 	 * in reply to IPROTO_ID is optional. Without it, we assume that
 	 * the master doesn't support any extra features.
 	 */
+	const struct auth_method *method_default = NULL;
 	if (applier->version_id >= version_id(2, 10, 0)) {
 		xrow_encode_id(&row);
 		coio_write_xrow(io, &row);
@@ -410,6 +411,10 @@ applier_connect(struct applier *applier)
 		if (row.type == IPROTO_OK) {
 			struct id_request id;
 			xrow_decode_id_xc(&row, &id);
+			if (id.auth_type != NULL) {
+				method_default = auth_method_by_name(
+					id.auth_type, id.auth_type_len);
+			}
 		} else {
 			xrow_decode_error(&row);
 			diag_log();
@@ -417,6 +422,8 @@ applier_connect(struct applier *applier)
 			say_error("IPROTO_ID failed");
 		}
 	}
+	if (method_default == NULL)
+		method_default = AUTH_METHOD_DEFAULT;
 
 	/*
 	 * Send an IPROTO_VOTE request to fetch the master's ballot
@@ -459,7 +466,7 @@ applier_connect(struct applier *applier)
 	const char *method_name = uri_param(uri, "auth_type", 0);
 	const struct auth_method *method = method_name != NULL ?
 		auth_method_by_name(method_name, strlen(method_name)) :
-		AUTH_METHOD_DEFAULT;
+		method_default;
 	assert(method != NULL);
 	if (auth_method_check_io(method, io) != 0)
 		diag_raise();
