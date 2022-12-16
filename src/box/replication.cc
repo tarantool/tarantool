@@ -288,6 +288,7 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 		 replica->id, tt_uuid_str(&replica->uuid));
 	replica->anon = false;
 	box_update_replication_synchro_quorum();
+	box_broadcast_ballot();
 }
 
 void
@@ -341,6 +342,7 @@ replica_clear_id(struct replica *replica)
 		replica_delete(replica);
 	}
 	box_update_replication_synchro_quorum();
+	box_broadcast_ballot();
 }
 
 bool

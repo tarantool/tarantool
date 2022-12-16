@@ -729,6 +729,10 @@ box_broadcast_election(void);
 void
 box_broadcast_schema(void);
 
+/** Broadcast this instance's ballot. */
+void
+box_broadcast_ballot(void);
+
 /**
  * True if FFI must not be used for calling box read operations from Lua, see
  * box/lua/schema.lua.

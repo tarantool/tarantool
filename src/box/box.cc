@@ -244,10 +244,6 @@ box_storage_init(void);
 static void
 box_broadcast_status(void);
 
-/** Broadcast this instance's ballot. */
-static void
-box_broadcast_ballot(void);
-
 /**
  * A timer to broadcast the updated vclock. Doing this on each vclock update
  * would be too expensive.
@@ -3835,6 +3831,14 @@ box_process_vote(struct ballot *ballot)
 	vclock_copy(&ballot->vclock, &replicaset.vclock);
 	vclock_copy(&ballot->gc_vclock, &gc.vclock);
 	ballot->bootstrap_leader_uuid = bootstrap_leader_uuid;
+	int i = 0;
+	replicaset_foreach(replica) {
+		if (replica->id != 0)
+			ballot->registered_replica_uuids[i++] = replica->uuid;
+	}
+	assert(i < VCLOCK_MAX);
+
+	ballot->registered_replica_uuids_size = i;
 }
 
 /** Insert a new cluster into _schema */
@@ -4745,10 +4749,10 @@ box_broadcast_schema(void)
 	assert((size_t)(w - buf) < sizeof(buf));
 }
 
-static void
+void
 box_broadcast_ballot(void)
 {
-	char buf[1024];
+	char buf[2048];
 	char *w = buf;
 	struct ballot ballot;
 	box_process_vote(&ballot);
