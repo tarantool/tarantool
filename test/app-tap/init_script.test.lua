@@ -24,19 +24,8 @@ print[[
 -- Access to box.cfg from init script
 --
 ]]
-local t = {}
+print('box.cfg.memtx_memory = ' .. tostring(box.cfg.memtx_memory))
 
-for k,v in pairs(box.cfg) do
-    if k == 'listen' then
-        v = 'port'
-    end
-    if type(v) ~= 'table' and type(v) ~= 'function' then
-        table.insert(t,k..':'..tostring(v))
-    end
-end
-table.sort(t)
-print('box.cfg')
-for _,v in pairs(t) do print(v) end
 --
 -- Insert tests
 --

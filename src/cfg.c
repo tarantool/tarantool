@@ -76,14 +76,11 @@ cfg_isnumber(const char *param)
 	return ret;
 }
 
-int
+bool
 cfg_getb(const char *param)
 {
 	cfg_get(param);
-	int val;
-	if (lua_isnil(tarantool_L, -1))
-		return -1;
-	val = lua_toboolean(tarantool_L, -1);
+	bool val = lua_toboolean(tarantool_L, -1);
 	lua_pop(tarantool_L, 1);
 	return val;
 }

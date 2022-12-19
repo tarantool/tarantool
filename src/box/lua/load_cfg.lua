@@ -23,18 +23,49 @@ local function locked(f)
 end
 
 --
--- When feedback is disabled, every single mentioning of it should
--- be eliminated. Even box.cfg{} should not accept any
--- 'feedback_*' parameters as valid. This is why they are set to
--- nil, when the daemon does not exist.
+-- When a feature is disabled, every single mentioning of it should
+-- be eliminated. Even box.cfg{} should not accept any parameters
+-- related to the feature as valid. This is why they are set to nil
+-- when the feature is disabled.
 --
+
+-- Feedback daemon.
 local function ifdef_feedback(value)
-    return private.feedback_daemon ~= nil and value or nil
+    if private.feedback_daemon ~= nil then
+        return value
+    end
 end
 
 local ifdef_feedback_set_params =
     private.feedback_daemon ~= nil and
     private.feedback_daemon.set_feedback_params or nil
+
+-- Audit log.
+local has_audit = pcall(require, 'audit')
+
+local function ifdef_audit(value)
+    if has_audit then
+        return value
+    end
+end
+
+-- Flight recorder.
+local has_flightrec, flightrec = pcall(require, 'flightrec')
+
+local function ifdef_flightrec(value)
+    if has_flightrec then
+        return value
+    end
+end
+
+local ifdef_flightrec_set_params = has_flightrec and flightrec.cfg or nil
+
+-- WAL extensions.
+local function ifdef_wal_ext(value)
+    if private.cfg_set_wal_ext ~= nil then
+        return value
+    end
+end
 
 -- all available options
 local default_cfg = {
@@ -71,22 +102,22 @@ local default_cfg = {
     log_modules         = log.cfg.modules,
     log_format          = log.cfg.format,
 
-    audit_log           = nil,
-    audit_nonblock      = true,
-    audit_format        = 'json',
-    audit_filter        = 'compatibility',
+    audit_log           = ifdef_audit(nil),
+    audit_nonblock      = ifdef_audit(true),
+    audit_format        = ifdef_audit('json'),
+    audit_filter        = ifdef_audit('compatibility'),
 
     auth_type           = 'chap-sha1',
 
-    flightrec_enabled = false,
-    flightrec_logs_size = 10485760,
-    flightrec_logs_max_msg_size = 4096,
-    flightrec_logs_log_level = 6,
-    flightrec_metrics_interval = 1.0,
-    flightrec_metrics_period = 60 * 3,
-    flightrec_requests_size = 10485760,
-    flightrec_requests_max_req_size = 16384,
-    flightrec_requests_max_res_size = 16384,
+    flightrec_enabled = ifdef_flightrec(false),
+    flightrec_logs_size = ifdef_flightrec(10485760),
+    flightrec_logs_max_msg_size = ifdef_flightrec(4096),
+    flightrec_logs_log_level = ifdef_flightrec(6),
+    flightrec_metrics_interval = ifdef_flightrec(1.0),
+    flightrec_metrics_period = ifdef_flightrec(60 * 3),
+    flightrec_requests_size = ifdef_flightrec(10485760),
+    flightrec_requests_max_req_size = ifdef_flightrec(16384),
+    flightrec_requests_max_res_size = ifdef_flightrec(16384),
 
     io_collect_interval = nil,
     readahead           = 16320,
@@ -97,7 +128,7 @@ local default_cfg = {
     wal_dir_rescan_delay= 2,
     wal_queue_max_size  = 16 * 1024 * 1024,
     wal_cleanup_delay   = 4 * 3600,
-    wal_ext             = nil,
+    wal_ext             = ifdef_wal_ext(nil),
     force_recovery      = false,
     replication         = nil,
     instance_uuid       = nil,
@@ -176,22 +207,22 @@ local template_cfg = {
     log_modules         = 'table',
     log_format          = 'string',
 
-    audit_log           = 'string',
-    audit_nonblock      = 'boolean',
-    audit_format        = 'string',
-    audit_filter        = 'string',
+    audit_log           = ifdef_audit('string'),
+    audit_nonblock      = ifdef_audit('boolean'),
+    audit_format        = ifdef_audit('string'),
+    audit_filter        = ifdef_audit('string'),
 
     auth_type           = 'string',
 
-    flightrec_enabled = 'boolean',
-    flightrec_logs_size = 'number',
-    flightrec_logs_max_msg_size = 'number',
-    flightrec_logs_log_level = 'number',
-    flightrec_metrics_interval = 'number',
-    flightrec_metrics_period = 'number',
-    flightrec_requests_size = 'number',
-    flightrec_requests_max_req_size = 'number',
-    flightrec_requests_max_res_size = 'number',
+    flightrec_enabled = ifdef_flightrec('boolean'),
+    flightrec_logs_size = ifdef_flightrec('number'),
+    flightrec_logs_max_msg_size = ifdef_flightrec('number'),
+    flightrec_logs_log_level = ifdef_flightrec('number'),
+    flightrec_metrics_interval = ifdef_flightrec('number'),
+    flightrec_metrics_period = ifdef_flightrec('number'),
+    flightrec_requests_size = ifdef_flightrec('number'),
+    flightrec_requests_max_req_size = ifdef_flightrec('number'),
+    flightrec_requests_max_res_size = ifdef_flightrec('number'),
 
     io_collect_interval = 'number',
     readahead           = 'number',
@@ -201,7 +232,7 @@ local template_cfg = {
     wal_max_size        = 'number',
     wal_dir_rescan_delay= 'number',
     wal_cleanup_delay   = 'number',
-    wal_ext             = 'table',
+    wal_ext             = ifdef_wal_ext('table'),
     force_recovery      = 'boolean',
     replication         = 'string, number, table',
     instance_uuid       = 'string',
@@ -241,8 +272,6 @@ local template_cfg = {
     sql_cache_size        = 'number',
     txn_timeout           = 'number',
 }
-
-local has_flightrec, flightrec = pcall(require, 'flightrec')
 
 local function normalize_uri_list_for_replication(port_list)
     if type(port_list) == 'table' then
@@ -293,16 +322,6 @@ end
 local function check_replicaset_uuid()
     if box.cfg.replicaset_uuid ~= box.info.cluster.uuid then
         box.error(box.error.RELOAD_CFG, 'replicaset_uuid')
-    end
-end
-
--- Stub implementation of the WAL extension configuration function.
-if private.cfg_set_wal_ext == nil then
-    private.cfg_set_wal_ext = function()
-        if box.cfg.wal_ext ~= nil then
-            box.error(box.error.UNSUPPORTED, "Community edition",
-                      "WAL extensions")
-        end
     end
 end
 
@@ -391,7 +410,7 @@ local dynamic_cfg_modules = {
         },
     },
     flightrec = {
-        cfg = has_flightrec and flightrec.cfg or function() end,
+        cfg = ifdef_flightrec_set_params,
         options = {
             flightrec_enabled = true,
             flightrec_logs_size = true,
@@ -416,9 +435,6 @@ local dynamic_cfg_modules = {
         skip_at_load = true,
     }
 }
-
-ifdef_feedback = nil -- luacheck: ignore
-ifdef_feedback_set_params = nil -- luacheck: ignore
 
 --
 -- For some options it is important in which order they are set.
