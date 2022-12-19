@@ -11,10 +11,9 @@ local tree_g = t.group('Tree index tests', {
 local function start_server(server)
     server:start()
     server:exec(function()
-        local jit = require('jit')
-        local tarantool = require('tarantool')
-        if string.find(tarantool.build.target, '-aarch64-') then
+        if jit.arch == 'arm64' then
             jit.off()
+            jit.flush()
         end
     end)
 end
