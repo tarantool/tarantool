@@ -470,6 +470,7 @@ t;
  |   249: box.error.UNKNOWN_AUTH_METHOD
  |   250: box.error.INVALID_AUTH_DATA
  |   251: box.error.INVALID_AUTH_REQUEST
+ |   252: box.error.WEAK_PASSWORD
  | ...
 
 test_run:cmd("setopt delimiter ''");

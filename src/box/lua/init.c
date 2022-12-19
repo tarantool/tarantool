@@ -115,6 +115,9 @@ extern char session_lua[],
 #if ENABLE_READ_VIEW
 	read_view_lua[],
 #endif
+#if ENABLE_SECURITY
+	security_lua[],
+#endif
 	net_box_lua[],
 	upgrade_lua[],
 	console_lua[],
@@ -147,6 +150,9 @@ static const char *lua_sources[] = {
 #endif
 #if ENABLE_READ_VIEW
 	"box/read_view", read_view_lua,
+#endif
+#if ENABLE_SECURITY
+	"box/security", security_lua,
 #endif
 	"box/upgrade", upgrade_lua,
 	"box/net_box", net_box_lua,
