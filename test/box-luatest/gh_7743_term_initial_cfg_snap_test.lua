@@ -12,6 +12,7 @@ local g = t.group('gh-7743')
 --
 g.test_sigterm_during_initial_snapshot = function()
     t.tarantool.skip_if_not_debug()
+    t.skip('https://github.com/tarantool/tarantool-qa/issues/297')
     g.server = server:new({
         alias = 'master',
         env = {
