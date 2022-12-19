@@ -10,7 +10,10 @@ local TZ = date.TZ
     Workaround for #6599 where we may randomly fail on AWS Graviton machines,
     while it's working properly when jit disabled.
 --]]
-if jit.arch == 'arm64' then jit.off() end
+if jit.arch == 'arm64' then
+    jit.off()
+    jit.flush()
+end
 
 test:plan(39)
 
