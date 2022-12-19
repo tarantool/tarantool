@@ -3382,8 +3382,15 @@ local function prepare_auth_list(password)
     }
 end
 
+local function check_password(password)
+    if internal.check_password ~= nil then
+        internal.check_password(password)
+    end
+end
+
 local function chpasswd(uid, new_password)
     local _user = box.space[box.schema.USER_ID]
+    check_password(new_password)
     _user:update({uid}, {{"=", 5, prepare_auth_list(new_password)}})
 end
 
@@ -3417,6 +3424,7 @@ box.schema.user.create = function(name, opts)
     end
     local auth_list
     if opts.password then
+        check_password(opts.password)
         auth_list = prepare_auth_list(opts.password)
     else
         auth_list = setmap({})

@@ -304,6 +304,7 @@ struct errcode_record {
 	/*249 */_(ER_UNKNOWN_AUTH_METHOD,	"Unknown authentication method '%s'") \
 	/*250 */_(ER_INVALID_AUTH_DATA,		"Invalid '%s' data: %s") \
 	/*251 */_(ER_INVALID_AUTH_REQUEST,	"Invalid '%s' request: %s") \
+	/*252 */_(ER_WEAK_PASSWORD,		"Password doesn't meet security requirements: %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

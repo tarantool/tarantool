@@ -8,6 +8,8 @@ local math = require('math')
 local fiber = require('fiber')
 local fio = require('fio')
 
+local function nop() end
+
 -- Function decorator that is used to prevent box.cfg() from
 -- being called concurrently by different fibers.
 local lock = fiber.channel(1)
@@ -67,6 +69,13 @@ local function ifdef_wal_ext(value)
     end
 end
 
+-- Security enhancements.
+local function ifdef_security(value)
+    if private.check_password ~= nil then
+        return value
+    end
+end
+
 -- all available options
 local default_cfg = {
     listen              = nil,
@@ -108,6 +117,11 @@ local default_cfg = {
     audit_filter        = ifdef_audit('compatibility'),
 
     auth_type           = 'chap-sha1',
+    password_min_length = ifdef_security(0),
+    password_enforce_uppercase = ifdef_security(false),
+    password_enforce_lowercase = ifdef_security(false),
+    password_enforce_digits = ifdef_security(false),
+    password_enforce_specialchars = ifdef_security(false),
 
     flightrec_enabled = ifdef_flightrec(false),
     flightrec_logs_size = ifdef_flightrec(10485760),
@@ -213,6 +227,11 @@ local template_cfg = {
     audit_filter        = ifdef_audit('string'),
 
     auth_type           = 'string',
+    password_min_length = ifdef_security('number'),
+    password_enforce_uppercase = ifdef_security('boolean'),
+    password_enforce_lowercase = ifdef_security('boolean'),
+    password_enforce_digits = ifdef_security('boolean'),
+    password_enforce_specialchars = ifdef_security('boolean'),
 
     flightrec_enabled = ifdef_flightrec('boolean'),
     flightrec_logs_size = ifdef_flightrec('number'),
@@ -344,19 +363,19 @@ local dynamic_cfg = {
     vinyl_max_tuple_size    = private.cfg_set_vinyl_max_tuple_size,
     vinyl_cache             = private.cfg_set_vinyl_cache,
     vinyl_timeout           = private.cfg_set_vinyl_timeout,
-    vinyl_defer_deletes     = function() end,
+    vinyl_defer_deletes     = nop,
     checkpoint_count        = private.cfg_set_checkpoint_count,
     checkpoint_interval     = private.cfg_set_checkpoint_interval,
     checkpoint_wal_threshold = private.cfg_set_checkpoint_wal_threshold,
     wal_queue_max_size      = private.cfg_set_wal_queue_max_size,
     worker_pool_threads     = private.cfg_set_worker_pool_threads,
     -- do nothing, affects new replicas, which query this value on start
-    wal_dir_rescan_delay    = function() end,
+    wal_dir_rescan_delay    = nop,
     wal_cleanup_delay       = private.cfg_set_wal_cleanup_delay,
     custom_proc_title       = function()
         require('title').update(box.cfg.custom_proc_title)
     end,
-    force_recovery          = function() end,
+    force_recovery          = nop,
     election_mode           = private.cfg_set_election_mode,
     election_timeout        = private.cfg_set_election_timeout,
     election_fencing_mode = private.cfg_set_election_fencing_mode,
@@ -376,6 +395,11 @@ local dynamic_cfg = {
     txn_timeout             = private.cfg_set_txn_timeout,
     txn_isolation           = private.cfg_set_txn_isolation,
     auth_type               = private.cfg_set_auth_type,
+    password_min_length     = ifdef_security(nop),
+    password_enforce_uppercase = ifdef_security(nop),
+    password_enforce_lowercase = ifdef_security(nop),
+    password_enforce_digits = ifdef_security(nop),
+    password_enforce_specialchars = ifdef_security(nop),
     wal_ext                 = private.cfg_set_wal_ext
 }
 
