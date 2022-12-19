@@ -6,7 +6,6 @@
 #pragma once
 
 #include "trivia/config.h"
-#include "say.h"
 
 #if defined(ENABLE_WAL_EXT)
 # include "wal_ext_impl.h"

@@ -57,9 +57,9 @@ cfg_isnumber(const char *param);
 
 /**
  * Gets boolean parameter of cfg.
- * Returns -1 in case of nil
+ * Returns false in case of nil
  */
-int
+bool
 cfg_getb(const char *param);
 
 int

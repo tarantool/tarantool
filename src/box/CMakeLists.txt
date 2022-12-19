@@ -254,8 +254,6 @@ set(box_sources
 
 if(ENABLE_AUDIT_LOG)
     list(APPEND box_sources ${AUDIT_LOG_SOURCES})
-else()
-    list(APPEND box_sources audit.c)
 endif()
 
 if(ENABLE_SPACE_UPGRADE)

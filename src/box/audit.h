@@ -11,6 +11,9 @@
 # include "audit_impl.h"
 #else /* !defined(ENABLE_AUDIT_LOG) */
 
+#include <assert.h>
+#include <stddef.h>
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -29,9 +32,16 @@ audit_log_check_filter(const char *filter)
 	return 0;
 }
 
-void
+static inline void
 audit_log_init(const char *init_str, int log_nonblock, const char *format,
-	       const char *filter);
+	       const char *filter)
+{
+	assert(init_str == NULL);
+	(void)init_str;
+	(void)log_nonblock;
+	(void)format;
+	(void)filter;
+}
 
 static inline void
 audit_log_free(void) {}

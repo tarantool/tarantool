@@ -6,7 +6,6 @@
 #pragma once
 
 #include "trivia/config.h"
-#include "say.h"
 
 #if defined(ENABLE_FLIGHT_RECORDER)
 # include "flightrec_impl.h"
@@ -16,6 +15,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+#include <assert.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -59,9 +59,8 @@ struct flight_recorder_cfg {
 static inline int
 flightrec_cfg(const struct flight_recorder_cfg *cfg)
 {
+	assert(!cfg->enabled);
 	(void)cfg;
-	if (cfg->enabled)
-		say_error("Flight recorder is not available in this build");
 	return 0;
 }
 
@@ -75,6 +74,7 @@ flightrec_free(void)
 static inline int
 flightrec_check_cfg(const struct flight_recorder_cfg *cfg)
 {
+	assert(!cfg->enabled);
 	(void)cfg;
 	return 0;
 }
