@@ -2616,6 +2616,12 @@ memtx_tx_history_prepare_stmt(struct txn_stmt *stmt)
 	memtx_tx_story_gc();
 }
 
+/**
+ * Clean and clear all read lists of @a txn.
+ */
+static void
+memtx_tx_clear_txn_read_lists(struct txn *txn);
+
 void
 memtx_tx_prepare_finalize(struct txn *txn)
 {
@@ -2628,15 +2634,8 @@ memtx_tx_prepare_finalize(struct txn *txn)
 		rlist_del(&entry->in_conflict_list);
 		rlist_del(&entry->in_conflicted_by_list);
 	}
-	/* Just free conflict list - we don't need it anymore. */
-	rlist_foreach_entry_safe(entry, &txn->conflicted_by_list,
-				 in_conflicted_by_list, next) {
-		assert(entry->victim == txn);
-		rlist_del(&entry->in_conflict_list);
-		rlist_del(&entry->in_conflicted_by_list);
-	}
-	assert(rlist_empty(&txn->conflict_list));
-	assert(rlist_empty(&txn->conflicted_by_list));
+	/* Just free all other lists - we don't need 'em anymore. */
+	memtx_tx_clear_txn_read_lists(txn);
 }
 
 void
@@ -3231,10 +3230,10 @@ memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index)
 }
 
 /**
- * Clean memtx_tx part of @a txm.
+ * Clean and clear all read lists of @a txn.
  */
-void
-memtx_tx_clean_txn(struct txn *txn)
+static void
+memtx_tx_clear_txn_read_lists(struct txn *txn)
 {
 	while (!rlist_empty(&txn->point_holes_list)) {
 		struct point_hole_item *object =
@@ -3281,6 +3280,16 @@ memtx_tx_clean_txn(struct txn *txn)
 	assert(rlist_empty(&txn->conflicted_by_list));
 
 	rlist_del(&txn->in_read_view_txs);
+}
+
+/**
+ * Clean memtx_tx part of @a txm.
+ */
+void
+memtx_tx_clean_txn(struct txn *txn)
+{
+	memtx_tx_clear_txn_read_lists(txn);
+
 	rlist_del(&txn->in_all_txs);
 
 	memtx_tx_story_gc();
