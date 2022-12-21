@@ -118,6 +118,7 @@ struct errinj {
 	_(ERRINJ_RELAY_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_REPLICASET_VCLOCK, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_REPLICA_JOIN_DELAY, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_SIGILL_MAIN_THREAD, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SIO_READ_MAX, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_SNAP_COMMIT_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SNAP_COMMIT_FAIL, ERRINJ_BOOL, {.bparam = false}) \
@@ -244,6 +245,7 @@ void errinj_set_with_environment_vars(void);
 #define ERROR_INJECT_SLEEP(ID) ERROR_INJECT_WHILE(ID, usleep(1000))
 #define ERROR_INJECT_YIELD(ID) ERROR_INJECT_WHILE(ID, fiber_sleep(0.001))
 #define ERROR_INJECT_TERMINATE(ID) ERROR_INJECT(ID, assert(0))
+#define ERROR_INJECT_SIGILL(ID) ERROR_INJECT(ID, illegal_instruction())
 #define ERROR_INJECT_INT(ID, COND, CODE) ERROR_INJECT_COND(ID, ERRINJ_INT, COND, CODE)
 #define ERROR_INJECT_DOUBLE(ID, COND, CODE) ERROR_INJECT_COND(ID, ERRINJ_DOUBLE, COND, CODE)
 

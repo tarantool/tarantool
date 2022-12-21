@@ -681,6 +681,27 @@ getenv_safe(const char *name, char *buf, size_t buf_size);
 # define static_assert _Static_assert
 #endif
 
+#ifndef NDEBUG
+/**
+ * Execute a CPU instruction that results in the SIGILL signal.
+ */
+static inline void
+illegal_instruction(void)
+{
+	#ifdef __x86_64__
+		__asm__("ud2");
+	#elif __aarch64__
+		/*
+		 * GNU Assembler older than 2.35 doesn't support the "udf #0"
+		 * mnemonic, thus use the machine code of that instruction.
+		 */
+		__asm__(".inst 0x00000000");
+	#else
+		#error unsupported architecture
+	#endif
+}
+#endif
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
