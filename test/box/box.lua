@@ -39,6 +39,7 @@ local _enterprise_keys = {
     password_enforce_lowercase = true,
     password_enforce_digits = true,
     password_enforce_specialchars = true,
+    password_history_length = true,
     wal_ext = true,
 }
 

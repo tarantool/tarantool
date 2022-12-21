@@ -471,6 +471,7 @@ t;
  |   250: box.error.INVALID_AUTH_DATA
  |   251: box.error.INVALID_AUTH_REQUEST
  |   252: box.error.WEAK_PASSWORD
+ |   253: box.error.OLD_PASSWORD
  | ...
 
 test_run:cmd("setopt delimiter ''");
