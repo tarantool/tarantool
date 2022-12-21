@@ -122,6 +122,7 @@ local default_cfg = {
     password_enforce_lowercase = ifdef_security(false),
     password_enforce_digits = ifdef_security(false),
     password_enforce_specialchars = ifdef_security(false),
+    password_history_length = ifdef_security(0),
 
     flightrec_enabled = ifdef_flightrec(false),
     flightrec_logs_size = ifdef_flightrec(10485760),
@@ -232,6 +233,7 @@ local template_cfg = {
     password_enforce_lowercase = ifdef_security('boolean'),
     password_enforce_digits = ifdef_security('boolean'),
     password_enforce_specialchars = ifdef_security('boolean'),
+    password_history_length = ifdef_security('number'),
 
     flightrec_enabled = ifdef_flightrec('boolean'),
     flightrec_logs_size = ifdef_flightrec('number'),
@@ -400,6 +402,7 @@ local dynamic_cfg = {
     password_enforce_lowercase = ifdef_security(nop),
     password_enforce_digits = ifdef_security(nop),
     password_enforce_specialchars = ifdef_security(nop),
+    password_history_length = ifdef_security(nop),
     wal_ext                 = private.cfg_set_wal_ext
 }
 

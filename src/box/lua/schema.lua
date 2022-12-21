@@ -3383,17 +3383,26 @@ local function prepare_auth_list(password)
     }
 end
 
-local function check_password(password)
+local function prepare_auth_history(uid)
+    if internal.prepare_auth_history ~= nil then
+        return internal.prepare_auth_history(uid)
+    else
+        return {}
+    end
+end
+
+local function check_password(password, auth_history)
     if internal.check_password ~= nil then
-        internal.check_password(password)
+        internal.check_password(password, auth_history)
     end
 end
 
 local function chpasswd(uid, new_password)
     local _user = box.space[box.schema.USER_ID]
-    check_password(new_password)
+    local auth_history = prepare_auth_history(uid)
+    check_password(new_password, auth_history)
     _user:update({uid}, {{'=', 5, prepare_auth_list(new_password)},
-                         {'=', 6, {}},
+                         {'=', 6, auth_history},
                          {'=', 7, math.floor(fiber.time())}})
 end
 
