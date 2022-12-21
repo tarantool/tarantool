@@ -53,6 +53,7 @@ user_def_new(uint32_t uid, uint32_t owner, enum schema_object_type type,
 	def->owner = owner;
 	def->type = type;
 	def->auth = NULL;
+	def->last_modified = 0;
 	def->name = grp_alloc_create_str(&all, name, name_len);
 	assert(grp_alloc_size(&all) == 0);
 	return def;

@@ -146,6 +146,11 @@ struct user_def {
 	 * reside in the user struct.
 	 */
 	struct authenticator *auth;
+	/**
+	 * Last modification timestamp (seconds since UNIX epoch)
+	 * or 0 if unknown.
+	 */
+	uint64_t last_modified;
 	/** User name - for error messages and debugging */
 	char *name;
 };

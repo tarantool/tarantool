@@ -1333,9 +1333,28 @@ local function convert_sql_constraints_to_tuple_constraints()
     end
 end
 
+local function add_user_auth_history_and_last_modified()
+    log.info("add auth_history and last_modified fields to space _user")
+    local _space = box.space[box.schema.SPACE_ID]
+    local _user = box.space[box.schema.USER_ID]
+    local _vuser = box.space[box.schema.VUSER_ID]
+    for _, v in _user:pairs() do
+        if #v == 5 then
+            _user:update(v[1], {{'=', 6, {}}, {'=', 7, 0}})
+        end
+    end
+    local ops = {
+        {'=', '[7][6]', {name = 'auth_history', type = 'array'}},
+        {'=', '[7][7]', {name = 'last_modified', type = 'unsigned'}},
+    }
+    _space:update({_user.id}, ops)
+    _space:update({_vuser.id}, ops)
+end
+
 local function upgrade_to_2_11_0()
     revoke_write_access_on__collation_from_role_public()
     convert_sql_constraints_to_tuple_constraints()
+    add_user_auth_history_and_last_modified()
 end
 --------------------------------------------------------------------------------
 

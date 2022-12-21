@@ -33,6 +33,19 @@ session.su('admin')
 box.schema.user.grant('test', 'write', 'space', '_space')
 
 test_run:cmd("setopt delimiter ';'")
+function delete_user(uid_or_name)
+    local t
+    if type(uid_or_name) == 'string' then
+        t = box.space._user.index.name:delete({uid_or_name})
+    else
+        t = box.space._user:delete({uid_or_name})
+    end
+    if box.tuple.is(t) and type(t[7]) == 'number' then
+        t = t:totable()
+        t[7] = 0
+    end
+    return t
+end;
 function usermax()
     local i = 1
     while true do
@@ -57,9 +70,9 @@ session.su('rich')
 uid = session.uid()
 box.schema.func.create('dummy')
 session.su('admin')
-box.space['_user']:delete{uid}
+delete_user(uid)
 box.schema.func.drop('dummy')
-box.space['_user']:delete{uid}
+delete_user(uid)
 box.schema.user.revoke('rich', 'public')
 box.schema.user.revoke('rich', 'read,write', 'space', '_func')
 box.schema.user.revoke('rich', 'alter', 'user', 'rich')
@@ -67,7 +80,7 @@ box.schema.user.revoke('rich', 'create', 'function')
 box.schema.user.disable("rich")
 -- test double disable is a no op
 box.schema.user.disable("rich")
-box.space['_user']:delete{uid}
+delete_user(uid)
 box.schema.user.drop('test')
 
 -- gh-944 name is too long
@@ -156,6 +169,38 @@ box.schema.user.grant('testus', 'write', 'space', 'admin_space')
 s:drop()
 box.snapshot()
 test_run:cmd('restart server default')
+test_run:cmd("setopt delimiter ';'")
+function delete_user(uid_or_name)
+    local t
+    if type(uid_or_name) == 'string' then
+        t = box.space._user.index.name:delete({uid_or_name})
+    else
+        t = box.space._user:delete({uid_or_name})
+    end
+    if box.tuple.is(t) and type(t[7]) == 'number' then
+        t = t:totable()
+        t[7] = 0
+    end
+    return t
+end;
+function select_user(uid_or_name)
+    local ret
+    if type(uid_or_name) == 'string' then
+        ret = box.space._user.index.name:select({uid_or_name})
+    else
+        ret = box.space._user:select({uid_or_name})
+    end
+    local ret2 = {}
+    for _, t in ipairs(ret) do
+        if box.tuple.is(t) and type(t[7]) == 'number' then
+            t = t:totable()
+            t[7] = 0
+        end
+        table.insert(ret2, t)
+    end
+    return ret2
+end;
+test_run:cmd("setopt delimiter ''");
 net = require('net.box')
 box.schema.user.drop('testus')
 -- ------------------------------------------------------------
@@ -199,21 +244,21 @@ box.schema.user.drop('grantor')
 -- guest can't read _user table, add a test case
 -- ----------------------------------------------------------
 session.su('guest')
-box.space._user:select{0}
-box.space._user:select{1}
+select_user(0)
+select_user(1)
 session.su('admin')
 -- ----------------------------------------------------------
 -- A test case for gh-358 Change user does not work from lua
 -- Correct the update syntax in schema.lua
 -- ----------------------------------------------------------
 box.schema.user.create('user1')
-box.space._user.index.name:select{'user1'}
+select_user('user1')
 session.su('user1')
 box.schema.user.passwd('new_password')
 session.su('admin')
-box.space._user.index.name:select{'user1'}
+select_user('user1')
 box.schema.user.passwd('user1', 'extra_new_password')
-box.space._user.index.name:select{'user1'}
+select_user('user1')
 box.schema.user.passwd('invalid_user', 'some_password')
 box.schema.user.passwd()
 session.su('user1')
@@ -221,7 +266,7 @@ session.su('user1')
 box.schema.user.passwd('admin', 'xxx')
 session.su('admin')
 box.schema.user.drop('user1')
-box.space._user.index.name:select{'user1'}
+select_user('user1')
 -- ----------------------------------------------------------
 -- A test case for gh-421 Granting a privilege revokes an
 -- existing grant
@@ -246,8 +291,8 @@ box.space._priv:select{id}
 -- Be a bit more rigorous in what is accepted in space _user
 -- -----------------------------------------------------------
 utils = require('utils')
-box.space._user:insert{10, 1, 'name', 'strange-object-type', utils.setmap({})}
-box.space._user:insert{10, 1, 'name', 'role', utils.setmap{'password'}}
+box.space._user:insert{10, 1, 'name', 'strange-object-type', utils.setmap({}), {}, 0}
+box.space._user:insert{10, 1, 'name', 'role', utils.setmap{'password'}, {}, 0}
 session = nil
 -- -----------------------------------------------------------
 -- admin can't manage grants on not owned objects
@@ -317,23 +362,23 @@ box.schema.user.passwd('guest', 'sesame')
 -- gh-1205 box.schema.user.info fails
 box.schema.user.drop('guest')
 box.schema.role.drop('guest')
-box.space._user.index.name:delete{'guest'}
-box.space._user:delete{box.schema.GUEST_ID}
+delete_user('guest')
+delete_user(box.schema.GUEST_ID)
 #box.schema.user.info('guest') > 0
 box.schema.user.drop('admin')
 box.schema.role.drop('admin')
-box.space._user.index.name:delete{'admin'}
-box.space._user:delete{box.schema.ADMIN_ID}
+delete_user('admin')
+delete_user(box.schema.ADMIN_ID)
 #box.schema.user.info('admin') > 0
 box.schema.user.drop('public')
 box.schema.role.drop('public')
-box.space._user.index.name:delete{'public'}
-box.space._user:delete{box.schema.PUBLIC_ROLE_ID}
+delete_user('public')
+delete_user(box.schema.PUBLIC_ROLE_ID)
 #box.schema.role.info('public') > 0
 box.schema.role.drop('super')
 box.schema.user.drop('super')
-box.space._user.index.name:delete{'super'}
-box.space._user:delete{box.schema.SUPER_ROLE_ID}
+delete_user('super')
+delete_user(box.schema.SUPER_ROLE_ID)
 #box.schema.role.info('super') > 0
 
 -- gh-944 name is too long
@@ -785,20 +830,20 @@ box.schema.user.create("user2")
 box.schema.user.create("user3")
 box.schema.user.grant("user1", "write", "space", "_user")
 box.schema.user.grant("user1", "read", "space", "_user")
-box.space._user:select{}
+select_user()
 box.session.su("user1")
 -- can alter itself, but can't alter others without privileges.
 box.schema.user.passwd("user1", "abcd")
 box.schema.user.passwd("user2", "abcd")
 box.session.su("admin")
-box.space._user:select{}
+select_user()
 box.schema.user.grant("user1", "alter", "user", "user2")
 box.session.su("user1")
 box.schema.user.passwd("user2", "abcd")
 -- still fails
 box.schema.user.passwd("user3", "qewr")
 box.session.su("admin")
-box.space._user:select{}
+select_user()
 box.schema.user.drop("user1")
 box.schema.user.drop("user2")
 box.schema.user.drop("user3")

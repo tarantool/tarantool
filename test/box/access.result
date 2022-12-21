@@ -74,6 +74,21 @@ test_run:cmd("setopt delimiter ';'")
 ---
 - true
 ...
+function delete_user(uid_or_name)
+    local t
+    if type(uid_or_name) == 'string' then
+        t = box.space._user.index.name:delete({uid_or_name})
+    else
+        t = box.space._user:delete({uid_or_name})
+    end
+    if box.tuple.is(t) and type(t[7]) == 'number' then
+        t = t:totable()
+        t[7] = 0
+    end
+    return t
+end;
+---
+...
 function usermax()
     local i = 1
     while true do
@@ -125,14 +140,14 @@ box.schema.func.create('dummy')
 session.su('admin')
 ---
 ...
-box.space['_user']:delete{uid}
+delete_user(uid)
 ---
 - error: 'Failed to drop user or role ''rich'': the user has objects'
 ...
 box.schema.func.drop('dummy')
 ---
 ...
-box.space['_user']:delete{uid}
+delete_user(uid)
 ---
 - error: 'Failed to drop user or role ''rich'': the user has objects'
 ...
@@ -155,9 +170,9 @@ box.schema.user.disable("rich")
 box.schema.user.disable("rich")
 ---
 ...
-box.space['_user']:delete{uid}
+delete_user(uid)
 ---
-- [33, 1, 'rich', 'user', {}]
+- [33, 1, 'rich', 'user', {}, [], 0]
 ...
 box.schema.user.drop('test')
 ---
@@ -353,6 +368,48 @@ box.snapshot()
 - ok
 ...
 test_run:cmd('restart server default')
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function delete_user(uid_or_name)
+    local t
+    if type(uid_or_name) == 'string' then
+        t = box.space._user.index.name:delete({uid_or_name})
+    else
+        t = box.space._user:delete({uid_or_name})
+    end
+    if box.tuple.is(t) and type(t[7]) == 'number' then
+        t = t:totable()
+        t[7] = 0
+    end
+    return t
+end;
+---
+...
+function select_user(uid_or_name)
+    local ret
+    if type(uid_or_name) == 'string' then
+        ret = box.space._user.index.name:select({uid_or_name})
+    else
+        ret = box.space._user:select({uid_or_name})
+    end
+    local ret2 = {}
+    for _, t in ipairs(ret) do
+        if box.tuple.is(t) and type(t[7]) == 'number' then
+            t = t:totable()
+            t[7] = 0
+        end
+        table.insert(ret2, t)
+    end
+    return ret2
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 net = require('net.box')
 ---
 ...
@@ -449,11 +506,11 @@ box.schema.user.drop('grantor')
 session.su('guest')
 ---
 ...
-box.space._user:select{0}
+select_user(0)
 ---
 - error: Read access to space '_user' is denied for user 'guest'
 ...
-box.space._user:select{1}
+select_user(1)
 ---
 - error: Read access to space '_user' is denied for user 'guest'
 ...
@@ -467,9 +524,9 @@ session.su('admin')
 box.schema.user.create('user1')
 ---
 ...
-box.space._user.index.name:select{'user1'}
+select_user('user1')
 ---
-- - [32, 1, 'user1', 'user', {}]
+- - [32, 1, 'user1', 'user', {}, [], 0]
 ...
 session.su('user1')
 ---
@@ -480,16 +537,16 @@ box.schema.user.passwd('new_password')
 session.su('admin')
 ---
 ...
-box.space._user.index.name:select{'user1'}
+select_user('user1')
 ---
-- - [32, 1, 'user1', 'user', {'chap-sha1': 'CRO/LiziDOIb+xlhrxJNSSBFjl8='}]
+- - [32, 1, 'user1', 'user', {'chap-sha1': 'CRO/LiziDOIb+xlhrxJNSSBFjl8='}, [], 0]
 ...
 box.schema.user.passwd('user1', 'extra_new_password')
 ---
 ...
-box.space._user.index.name:select{'user1'}
+select_user('user1')
 ---
-- - [32, 1, 'user1', 'user', {'chap-sha1': 'nMc3F1oaUtz37IYbgGYYPZawmfE='}]
+- - [32, 1, 'user1', 'user', {'chap-sha1': 'nMc3F1oaUtz37IYbgGYYPZawmfE='}, [], 0]
 ...
 box.schema.user.passwd('invalid_user', 'some_password')
 ---
@@ -513,7 +570,7 @@ session.su('admin')
 box.schema.user.drop('user1')
 ---
 ...
-box.space._user.index.name:select{'user1'}
+select_user('user1')
 ---
 - []
 ...
@@ -595,11 +652,11 @@ box.space._priv:select{id}
 utils = require('utils')
 ---
 ...
-box.space._user:insert{10, 1, 'name', 'strange-object-type', utils.setmap({})}
+box.space._user:insert{10, 1, 'name', 'strange-object-type', utils.setmap({}), {}, 0}
 ---
 - error: 'Failed to create user ''name'': unknown user type'
 ...
-box.space._user:insert{10, 1, 'name', 'role', utils.setmap{'password'}}
+box.space._user:insert{10, 1, 'name', 'role', utils.setmap{'password'}, {}, 0}
 ---
 - error: 'Failed to create role ''name'': authentication data can not be set for a
     role'
@@ -806,11 +863,11 @@ box.schema.role.drop('guest')
 ---
 - error: Role 'guest' is not found
 ...
-box.space._user.index.name:delete{'guest'}
+delete_user('guest')
 ---
 - error: 'Failed to drop user or role ''guest'': the user or the role is a system'
 ...
-box.space._user:delete{box.schema.GUEST_ID}
+delete_user(box.schema.GUEST_ID)
 ---
 - error: 'Failed to drop user or role ''guest'': the user or the role is a system'
 ...
@@ -826,11 +883,11 @@ box.schema.role.drop('admin')
 ---
 - error: Role 'admin' is not found
 ...
-box.space._user.index.name:delete{'admin'}
+delete_user('admin')
 ---
 - error: 'Failed to drop user or role ''admin'': the user or the role is a system'
 ...
-box.space._user:delete{box.schema.ADMIN_ID}
+delete_user(box.schema.ADMIN_ID)
 ---
 - error: 'Failed to drop user or role ''admin'': the user or the role is a system'
 ...
@@ -846,11 +903,11 @@ box.schema.role.drop('public')
 ---
 - error: 'Failed to drop user or role ''public'': the user or the role is a system'
 ...
-box.space._user.index.name:delete{'public'}
+delete_user('public')
 ---
 - error: 'Failed to drop user or role ''public'': the user or the role is a system'
 ...
-box.space._user:delete{box.schema.PUBLIC_ROLE_ID}
+delete_user(box.schema.PUBLIC_ROLE_ID)
 ---
 - error: 'Failed to drop user or role ''public'': the user or the role is a system'
 ...
@@ -866,11 +923,11 @@ box.schema.user.drop('super')
 ---
 - error: User 'super' is not found
 ...
-box.space._user.index.name:delete{'super'}
+delete_user('super')
 ---
 - error: 'Failed to drop user or role ''super'': the user or the role is a system'
 ...
-box.space._user:delete{box.schema.SUPER_ROLE_ID}
+delete_user(box.schema.SUPER_ROLE_ID)
 ---
 - error: 'Failed to drop user or role ''super'': the user or the role is a system'
 ...
@@ -2035,16 +2092,16 @@ box.schema.user.grant("user1", "write", "space", "_user")
 box.schema.user.grant("user1", "read", "space", "_user")
 ---
 ...
-box.space._user:select{}
+select_user()
 ---
-- - [0, 1, 'guest', 'user', {'chap-sha1': 'vhvewKp0tNyweZQ+cFKAlsyphfg='}]
-  - [1, 1, 'admin', 'user', {}]
-  - [2, 1, 'public', 'role', {}]
-  - [3, 1, 'replication', 'role', {}]
-  - [31, 1, 'super', 'role', {}]
-  - [32, 1, 'user1', 'user', {}]
-  - [33, 1, 'user2', 'user', {}]
-  - [34, 1, 'user3', 'user', {}]
+- - [0, 1, 'guest', 'user', {'chap-sha1': 'vhvewKp0tNyweZQ+cFKAlsyphfg='}, [], 0]
+  - [1, 1, 'admin', 'user', {}, [], 0]
+  - [2, 1, 'public', 'role', {}, [], 0]
+  - [3, 1, 'replication', 'role', {}, [], 0]
+  - [31, 1, 'super', 'role', {}, [], 0]
+  - [32, 1, 'user1', 'user', {}, [], 0]
+  - [33, 1, 'user2', 'user', {}, [], 0]
+  - [34, 1, 'user3', 'user', {}, [], 0]
 ...
 box.session.su("user1")
 ---
@@ -2060,16 +2117,16 @@ box.schema.user.passwd("user2", "abcd")
 box.session.su("admin")
 ---
 ...
-box.space._user:select{}
+select_user()
 ---
-- - [0, 1, 'guest', 'user', {'chap-sha1': 'vhvewKp0tNyweZQ+cFKAlsyphfg='}]
-  - [1, 1, 'admin', 'user', {}]
-  - [2, 1, 'public', 'role', {}]
-  - [3, 1, 'replication', 'role', {}]
-  - [31, 1, 'super', 'role', {}]
-  - [32, 1, 'user1', 'user', {'chap-sha1': 'oVTFJWXp5/lL/Aih/nAmJO2O/9o='}]
-  - [33, 1, 'user2', 'user', {}]
-  - [34, 1, 'user3', 'user', {}]
+- - [0, 1, 'guest', 'user', {'chap-sha1': 'vhvewKp0tNyweZQ+cFKAlsyphfg='}, [], 0]
+  - [1, 1, 'admin', 'user', {}, [], 0]
+  - [2, 1, 'public', 'role', {}, [], 0]
+  - [3, 1, 'replication', 'role', {}, [], 0]
+  - [31, 1, 'super', 'role', {}, [], 0]
+  - [32, 1, 'user1', 'user', {'chap-sha1': 'oVTFJWXp5/lL/Aih/nAmJO2O/9o='}, [], 0]
+  - [33, 1, 'user2', 'user', {}, [], 0]
+  - [34, 1, 'user3', 'user', {}, [], 0]
 ...
 box.schema.user.grant("user1", "alter", "user", "user2")
 ---
@@ -2088,16 +2145,16 @@ box.schema.user.passwd("user3", "qewr")
 box.session.su("admin")
 ---
 ...
-box.space._user:select{}
+select_user()
 ---
-- - [0, 1, 'guest', 'user', {'chap-sha1': 'vhvewKp0tNyweZQ+cFKAlsyphfg='}]
-  - [1, 1, 'admin', 'user', {}]
-  - [2, 1, 'public', 'role', {}]
-  - [3, 1, 'replication', 'role', {}]
-  - [31, 1, 'super', 'role', {}]
-  - [32, 1, 'user1', 'user', {'chap-sha1': 'oVTFJWXp5/lL/Aih/nAmJO2O/9o='}]
-  - [33, 1, 'user2', 'user', {'chap-sha1': 'oVTFJWXp5/lL/Aih/nAmJO2O/9o='}]
-  - [34, 1, 'user3', 'user', {}]
+- - [0, 1, 'guest', 'user', {'chap-sha1': 'vhvewKp0tNyweZQ+cFKAlsyphfg='}, [], 0]
+  - [1, 1, 'admin', 'user', {}, [], 0]
+  - [2, 1, 'public', 'role', {}, [], 0]
+  - [3, 1, 'replication', 'role', {}, [], 0]
+  - [31, 1, 'super', 'role', {}, [], 0]
+  - [32, 1, 'user1', 'user', {'chap-sha1': 'oVTFJWXp5/lL/Aih/nAmJO2O/9o='}, [], 0]
+  - [33, 1, 'user2', 'user', {'chap-sha1': 'oVTFJWXp5/lL/Aih/nAmJO2O/9o='}, [], 0]
+  - [34, 1, 'user3', 'user', {}, [], 0]
 ...
 box.schema.user.drop("user1")
 ---

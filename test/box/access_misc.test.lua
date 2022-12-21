@@ -152,7 +152,7 @@ session.su('testuser')
 testuser_uid = session.uid()
 _ = box.space._user:delete(2)
 box.space._user:select(1)
-uid = box.space._user:insert{maxuid+1, session.uid(), 'someone', 'user', EMPTY_MAP}[1]
+uid = box.space._user:insert{maxuid+1, session.uid(), 'someone', 'user', EMPTY_MAP, {}, 0}[1]
 _ = box.space._user:delete(uid)
 
 session.su('admin')
