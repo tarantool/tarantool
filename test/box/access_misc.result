@@ -270,7 +270,7 @@ box.space.admin_space:select()
 ...
 box.space._user:select(1)
 ---
-- - [1, 1, 'admin', 'user', {}]
+- - [1, 1, 'admin', 'user', {}, [], 0]
 ...
 box.space._space:select(280)
 ---
@@ -367,7 +367,7 @@ box.space._user:select(1)
 ---
 - error: Read access to space '_user' is denied for user 'testuser'
 ...
-uid = box.space._user:insert{maxuid+1, session.uid(), 'someone', 'user', EMPTY_MAP}[1]
+uid = box.space._user:insert{maxuid+1, session.uid(), 'someone', 'user', EMPTY_MAP, {}, 0}[1]
 ---
 ...
 _ = box.space._user:delete(uid)
@@ -378,7 +378,7 @@ session.su('admin')
 ...
 box.space._user:select(1)
 ---
-- - [1, 1, 'admin', 'user', {}]
+- - [1, 1, 'admin', 'user', {}, [], 0]
 ...
 _ = box.space._user:delete(testuser_uid)
 ---
@@ -402,7 +402,7 @@ _  = box.space._user:delete(2)
 ...
 box.space._user:select(1)
 ---
-- - [1, 1, 'admin', 'user', {}]
+- - [1, 1, 'admin', 'user', {}, [], 0]
 ...
 box.space._user:insert{uid, session.uid(), 'someone2', 'user'}
 ---

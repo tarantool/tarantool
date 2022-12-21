@@ -210,7 +210,7 @@ c:close()
 ...
 box.space._user:replace(u)
 ---
-- [1, 1, 'admin', 'user', {}]
+- [1, 1, 'admin', 'user', {}, [], 0]
 ...
 --
 -- gh-2763: test that universal access of an authenticated session

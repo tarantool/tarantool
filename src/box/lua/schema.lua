@@ -5,6 +5,7 @@ local msgpack = require('msgpack')
 local fun = require('fun')
 local log = require('log')
 local buffer = require('buffer')
+local fiber = require('fiber')
 local session = box.session
 local internal = require('box.internal')
 local utf8 = require('utf8')
@@ -3391,7 +3392,9 @@ end
 local function chpasswd(uid, new_password)
     local _user = box.space[box.schema.USER_ID]
     check_password(new_password)
-    _user:update({uid}, {{"=", 5, prepare_auth_list(new_password)}})
+    _user:update({uid}, {{'=', 5, prepare_auth_list(new_password)},
+                         {'=', 6, {}},
+                         {'=', 7, math.floor(fiber.time())}})
 end
 
 box.schema.user.passwd = function(name, new_password)
@@ -3430,7 +3433,8 @@ box.schema.user.create = function(name, opts)
         auth_list = setmap({})
     end
     local _user = box.space[box.schema.USER_ID]
-    uid = _user:auto_increment{session.euid(), name, 'user', auth_list}.id
+    uid = _user:auto_increment{session.euid(), name, 'user', auth_list, {},
+                               math.floor(fiber.time())}.id
     -- grant role 'public' to the user
     box.schema.user.grant(uid, 'public')
     -- Grant privilege 'alter' on itself, so that it can
@@ -3697,7 +3701,8 @@ box.schema.role.create = function(name, opts)
         return
     end
     local _user = box.space[box.schema.USER_ID]
-    _user:auto_increment{session.euid(), name, 'role', setmap({})}
+    _user:auto_increment{session.euid(), name, 'role', setmap({}), {},
+                         math.floor(fiber.time())}
 end
 
 box.schema.role.drop = function(name, opts)

@@ -3001,6 +3001,10 @@ user_def_new_from_tuple(struct tuple *tuple)
 		if (user_def_fill_auth_data(user, auth_data) != 0)
 			return NULL;
 	}
+	if (tuple_field_count(tuple) > BOX_USER_FIELD_LAST_MODIFIED &&
+	    tuple_field_u64(tuple, BOX_USER_FIELD_LAST_MODIFIED,
+			    &user->last_modified) != 0)
+		return NULL;
 	def_guard.is_active = false;
 	return user;
 }
