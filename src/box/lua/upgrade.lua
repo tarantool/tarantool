@@ -91,6 +91,23 @@ local function set_system_triggers(val)
     foreach_system_space(function(s) s:run_triggers(val) end)
 end
 
+-- Clears formats of all system spaces. It is used to disable system space
+-- format checking before creation of a bootstrap snapshot.
+local function clear_system_formats()
+    foreach_system_space(function(s)
+        box.space._space:update({s.id}, {{'=', 7, {}}})
+    end)
+end
+
+-- Applies no-op update to all system space records to run system triggers.
+-- It is used to re-enable system space format checking after creation of
+-- a bootstrap snapshot.
+local function reset_system_formats()
+    foreach_system_space(function(s)
+        box.space._space:update({s.id}, {})
+    end)
+end
+
 local function version_from_tuple(tuple)
     local major, minor, patch = tuple:unpack(2, 4)
     patch = patch or 0
@@ -336,7 +353,6 @@ local function initial_1_7_5()
     local _cluster = box.space[box.schema.CLUSTER_ID]
     local _truncate = box.space[box.schema.TRUNCATE_ID]
     local MAP = setmap({})
-    local datetime = os.date("%Y-%m-%d %H:%M:%S")
 
     --
     -- _schema
@@ -481,8 +497,8 @@ local function initial_1_7_5()
     -- Create users
     --
     log.info("create user guest")
-    _user:insert{GUEST, ADMIN, 'guest', 'user', MAP}
-    box.schema.user.passwd('guest', '')
+    _user:insert{GUEST, ADMIN, 'guest', 'user',
+                 {['chap-sha1'] = 'vhvewKp0tNyweZQ+cFKAlsyphfg='}}
     log.info("create user admin")
     _user:insert{ADMIN, ADMIN, 'admin', 'user', MAP}
     log.info("create role public")
@@ -511,9 +527,7 @@ local function initial_1_7_5()
 
     -- create "box.schema.user.info" function
     log.info('create function "box.schema.user.info" with setuid')
-    _func:replace({1, ADMIN, 'box.schema.user.info', 1, 'LUA', '', 'function',
-                  {}, 'any', 'none', 'none', false, false, true, {'LUA'},
-                  MAP, '', datetime, datetime})
+    _func:replace{1, ADMIN, 'box.schema.user.info', 1, 'LUA'}
 
     -- grant 'public' role access to 'box.schema.user.info' function
     log.info('grant execute on function "box.schema.user.info" to public')
@@ -654,7 +668,8 @@ end
 --------------------------------------------------------------------------------
 local function create_vsequence_space()
     create_sysview(box.schema.SEQUENCE_ID, box.schema.VSEQUENCE_ID)
-    box.space._vsequence:format(sequence_format)
+    box.space._space:update({box.schema.VSEQUENCE_ID},
+                            {{'=', 7, sequence_format}})
 end
 
 local function upgrade_to_1_10_0()
@@ -667,23 +682,18 @@ end
 local function upgrade_priv_to_1_10_2()
     local _priv = box.space._priv
     local _vpriv = box.space._vpriv
+    local _space = box.space._space
     local _index = box.space._index
-    local format = _priv:format()
-
-    format[4].type = 'scalar'
-    _priv:format(format)
-    format = _vpriv:format()
-    format[4].type = 'scalar'
-    _vpriv:format(format)
-
+    _space:update({_priv.id}, {{'=', '[7][4].type', 'scalar'}})
+    _space:update({_vpriv.id}, {{'=', '[7][4].type', 'scalar'}})
     _index:update({_priv.id, _priv.index.primary.id},
-                  {{'=', 'parts', {{1, 'unsigned'}, {2, 'string'}, {3, 'scalar'}}}})
+                  {{'=', 6, {{1, 'unsigned'}, {2, 'string'}, {3, 'scalar'}}}})
     _index:update({_vpriv.id, _vpriv.index.primary.id},
-                  {{'=', 'parts', {{1, 'unsigned'}, {2, 'string'}, {3, 'scalar'}}}})
+                  {{'=', 6, {{1, 'unsigned'}, {2, 'string'}, {3, 'scalar'}}}})
     _index:update({_priv.id, _priv.index.object.id},
-                  {{'=', 'parts', {{2, 'string'}, {3, 'scalar'}}}})
+                  {{'=', 6, {{2, 'string'}, {3, 'scalar'}}}})
     _index:update({_vpriv.id, _priv.index.object.id},
-                  {{'=', 'parts', {{2, 'string'}, {3, 'scalar'}}}})
+                  {{'=', 6, {{2, 'string'}, {3, 'scalar'}}}})
 end
 
 local function create_vinyl_deferred_delete_space()
@@ -785,7 +795,7 @@ local function upgrade_to_2_1_0()
     local format = {}
     format[1] = {type='string', name='key'}
     format[2] = {type='any', name='value', is_nullable=true}
-    box.space._schema:format(format)
+    _space:update({box.schema.SCHEMA_ID}, {{'=', 7, format}})
 
     box.space._collation:replace{0, "none", ADMIN, "BINARY", "", setmap{}}
     box.space._collation:replace{3, "binary", ADMIN, "BINARY", "", setmap{}}
@@ -800,7 +810,7 @@ end
 local function upgrade_to_2_1_1()
     local _index = box.space[box.schema.INDEX_ID]
     for _, index in _index:pairs() do
-        local opts = index.opts
+        local opts = index[5]
         if opts['sql'] ~= nil then
             opts['sql'] = nil
             _index:replace(box.tuple.new({index.id, index.iid, index.name,
@@ -956,6 +966,7 @@ end
 -- Add sequence field to _space_sequence table
 local function upgrade_sequence_to_2_2_1()
     log.info("add sequence field to space _space_sequence")
+    local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
     for _, v in _space_sequence:pairs() do
@@ -977,10 +988,10 @@ local function upgrade_sequence_to_2_2_1()
         _space_sequence:insert(t)
         ::continue::
     end
-    local format = _space_sequence:format()
-    format[4] = {name = 'field', type = 'unsigned'}
-    format[5] = {name = 'path', type = 'string'}
-    _space_sequence:format(format)
+    _space:update({_space_sequence.id}, {
+        {'=', '[7][4]', {name = 'field', type = 'unsigned'}},
+        {'=', '[7][5]', {name = 'path', type = 'string'}},
+    })
 end
 
 local function upgrade_ck_constraint_to_2_2_1()
@@ -1004,27 +1015,27 @@ local function upgrade_ck_constraint_to_2_2_1()
                   {unique = true}, {{0, 'unsigned'}, {1, 'string'}}}
 
     for _, space in _space:pairs() do
-        local flags = space.flags
+        local id = space[1]
+        local name = space[3]
+        local flags = space[6]
         if flags.checks then
             for i, check in pairs(flags.checks) do
                 local expr_str = check.expr
                 local check_name = check.name or
-                                   "CK_CONSTRAINT_"..i.."_"..space.name
-                _ck_constraint:insert({space.id, check_name, false,
-                                       'SQL', expr_str})
+                                   "CK_CONSTRAINT_" .. i .. "_" .. name
+                _ck_constraint:insert({id, check_name, false, 'SQL', expr_str})
             end
             flags.checks = nil
-            _space:replace({space.id, space.owner, space.name, space.engine,
-                            space.field_count, flags, space.format})
+            _space:update({id}, {{'=', 6, flags}})
         end
     end
 end
 
 local function create_vcollation_space()
-    local _collation = box.space._collation
-    local format = _collation:format()
+    local _space = box.space._space
+    local format = _space:get({box.schema.COLLATION_ID})[7]
     create_sysview(box.schema.COLLATION_ID, box.schema.VCOLLATION_ID)
-    box.space[box.schema.VCOLLATION_ID]:format(format)
+    _space:update({box.schema.VCOLLATION_ID}, {{'=', 7, format}})
 end
 
 local function upgrade_func_to_2_2_1()
@@ -1033,10 +1044,9 @@ local function upgrade_func_to_2_2_1()
     local _priv = box.space[box.schema.PRIV_ID]
     local datetime = os.date("%Y-%m-%d %H:%M:%S")
     for _, v in box.space._func:pairs() do
-        box.space._func:replace({v.id, v.owner, v.name, v.setuid, v[5] or 'LUA',
-                                 '', 'function', {}, 'any', 'none', 'none',
-                                 false, false, true, v[15] or {'LUA'},
-                                 setmap({}), '', datetime, datetime})
+        _func:replace({v[1], v[2], v[3], v[4], v[5] or 'LUA', '', 'function',
+                      {}, 'any', 'none', 'none', false, false, true,
+                      v[15] or {'LUA'}, setmap({}), '', datetime, datetime})
     end
     local sql_builtin_list = {
         "TRIM", "TYPEOF", "PRINTF", "UNICODE", "CHAR", "HEX", "VERSION",
@@ -1056,14 +1066,14 @@ local function upgrade_func_to_2_2_1()
                                        'function', {}, 'any', 'none', 'none',
                                         false, false, true, {}, setmap({}), '',
                                         datetime, datetime})
-        _priv:replace{ADMIN, PUBLIC, 'function', t.id, box.priv.X}
+        _priv:replace{ADMIN, PUBLIC, 'function', t[1], box.priv.X}
     end
     local t = _func:auto_increment({ADMIN, 'LUA', 1, 'LUA',
                         'function(code) return assert(loadstring(code))() end',
                         'function', {'string'}, 'any', 'none', 'none',
                         false, false, true, {'LUA', 'SQL'},
                         setmap({}), '', datetime, datetime})
-    _priv:replace{ADMIN, PUBLIC, 'function', t.id, box.priv.X}
+    _priv:replace{ADMIN, PUBLIC, 'function', t[1], box.priv.X}
     local format = {}
     format[1] = {name='id', type='unsigned'}
     format[2] = {name='owner', type='unsigned'}
@@ -1084,10 +1094,10 @@ local function upgrade_func_to_2_2_1()
     format[17] = {name='comment', type='string'}
     format[18] = {name='created', type='string'}
     format[19] = {name='last_altered', type='string'}
-    _func:format(format)
+    box.space._space:update({_func.id}, {{'=', 7, format}})
     box.space._index:update(
         {_func.id, _func.index.name.id},
-        {{'=', 'parts', {{field = 2, type = 'string', collation = 2}}}})
+        {{'=', 6, {{field = 2, type = 'string', collation = 2}}}})
 end
 
 local function create_func_index()
@@ -1121,6 +1131,7 @@ end
 
 local function upgrade_to_2_3_0()
     log.info("Create GREATEST and LEAST SQL Builtins")
+    local _space = box.space[box.schema.SPACE_ID]
     local _func = box.space[box.schema.FUNC_ID]
     local _priv = box.space[box.schema.PRIV_ID]
     local datetime = os.date("%Y-%m-%d %H:%M:%S")
@@ -1130,7 +1141,7 @@ local function upgrade_to_2_3_0()
                                        'function', {}, 'any', 'none', 'none',
                                         false, false, true, {}, setmap({}), '',
                                         datetime, datetime})
-        _priv:replace{ADMIN, PUBLIC, 'function', t.id, box.priv.X}
+        _priv:replace{ADMIN, PUBLIC, 'function', t[1], box.priv.X}
     end
 
     log.info("Extend _ck_constraint space format with is_enabled field")
@@ -1144,7 +1155,7 @@ local function upgrade_to_2_3_0()
                     {name='language', type='str'},
                     {name='code', type='str'},
                     {name='is_enabled', type='boolean'}}
-    _ck_constraint:format(format)
+    _space:update({_ck_constraint.id}, {{'=', 7, format}})
 end
 
 --------------------------------------------------------------------------------
@@ -1154,7 +1165,7 @@ end
 local function drop_func_collation()
     local _func = box.space[box.schema.FUNC_ID]
     box.space._index:update({_func.id, _func.index.name.id},
-                            {{'=', 'parts', {{2, 'string'}}}})
+                            {{'=', 6, {{2, 'string'}}}})
 end
 
 local function create_session_settings_space()
@@ -1187,7 +1198,7 @@ local function function_access()
     for _, name in pairs(funcs_to_change) do
         local func = _func.index['name']:get(name)
         if func ~= nil and func.setuid ~= 0 then
-            local id = func.id
+            local id = func[1]
             log.info('remove old function "'..name..'"')
             _priv:delete({2, 'function', id})
             _func:delete({id})
@@ -1212,9 +1223,11 @@ local function remove_sql_builtin_functions_from_func()
     local _func = box.space._func
     local _priv = box.space._priv
     for _, v in _func:pairs() do
-        if v.language == "SQL_BUILTIN" then
-            _priv:delete({2, 'function', v.id})
-            _func:delete({v.id})
+        local id = v[1]
+        local language = v[5]
+        if language == "SQL_BUILTIN" then
+            _priv:delete({2, 'function', id})
+            _func:delete({id})
         end
     end
 end
@@ -1245,22 +1258,24 @@ local function revoke_execute_access_to_lua_function_from_role_public()
     local _priv = box.space[box.schema.PRIV_ID]
     if box.func.LUA then
         local row = _priv:get{PUBLIC, 'function', box.func.LUA.id}
-        if row and bit.band(row.privilege, box.priv.X) ~= 0 then
-            local privilege = bit.bxor(row.privilege, box.priv.X)
+        local privilege = row and row[5] or nil
+        if privilege and bit.band(privilege, box.priv.X) ~= 0 then
+            local privilege = bit.bxor(privilege, box.priv.X)
             -- Note that X privilege sometimes implies R privilege,
             -- for example executable functions are visible in _vfunc.
             -- Let's make minimal changes, leaving R privilege instead of X.
             privilege = bit.bor(privilege, box.priv.R)
             log.info("revoke execute access to 'LUA' function from public role")
             _priv:update({PUBLIC, 'function', box.func.LUA.id},
-                         {{'=', 'privilege', privilege}})
+                         {{'=', 5, privilege}})
         end
     end
 end
 
 local function make_vfunc_same_format_as_func()
     log.info("Make format of _vfunc the same as the format of _func")
-    box.space._vfunc:format(box.space._func:format())
+    local format = box.space._space:get({box.schema.FUNC_ID})[7]
+    box.space._space:update({box.schema.VFUNC_ID}, {{'=', 7, format}})
 end
 
 local function upgrade_to_2_10_4()
@@ -1284,33 +1299,37 @@ local function convert_sql_constraints_to_tuple_constraints()
     local _ck = box.space[box.schema.CK_CONSTRAINT_ID]
     log.info("convert constraints from _ck_constraint and _fk_constraint")
     for _, v in _fk:pairs() do
-        local def = _space:get{v.child_id}
+        local name = v[1]
+        local child_id = v[2]
+        local parent_id = v[3]
+        local child_cols = v[8]
+        local parent_cols = v[9]
+        local def = _space:get{child_id}
         local mapping = setmap({})
-        for i, id in pairs(v.child_cols) do
-            mapping[id] = v.parent_cols[i]
+        for i, id in pairs(child_cols) do
+            mapping[id] = parent_cols[i]
         end
-        local fk = def.flags.foreign_key or {}
-        fk[v.name] = {space = v.parent_id, field = mapping}
-        local new_def = def:totable()
-        new_def[6].foreign_key = fk
-        _space:replace(new_def)
-        _fk:delete({v.name, v.child_id})
+        local fk = def[6].foreign_key or {}
+        fk[name] = {space = parent_id, field = mapping}
+        _space:update({child_id}, {{'=', '[6].foreign_key', fk}})
+        _fk:delete({name, child_id})
     end
     for _, v in _ck:pairs() do
+        local space_id = v[1]
+        local name = v[2]
+        local code = v[5]
         local _func = box.space._func
-        local def = _space:get{v.space_id}
+        local def = _space:get{space_id}
         local datetime = os.date("%Y-%m-%d %H:%M:%S")
-        local name = 'check_'..def.name.."_"..v.name
-        local t = _func:auto_increment({ADMIN, name, 1, 'SQL_EXPR', v.code,
+        local func_name = 'check_' .. def[3] .. '_' .. name
+        local t = _func:auto_increment({ADMIN, func_name, 1, 'SQL_EXPR', code,
                                        'function', {}, 'any', 'none', 'none',
                                         true, true, true, {'LUA'}, setmap({}),
                                         '', datetime, datetime})
         local ck = def.flags.constraint or {}
-        ck[v.name] = t.id
-        local new_def = def:totable()
-        new_def[6].constraint = ck
-        _space:replace(new_def)
-        _ck:delete({v.space_id, v.name})
+        ck[name] = t[1]
+        _space:update({space_id}, {{'=', '[6].constraint', ck}})
+        _ck:delete({space_id, name})
     end
 end
 
@@ -1480,6 +1499,11 @@ local function upgrade(options)
 end
 
 local function bootstrap()
+    -- Disabling system triggers doesn't turn off space format checks.
+    -- Since a system space format may be updated during the bootstrap
+    -- sequence, we clear all formats so that we can insert any data
+    -- into system spaces and reset them back after we're done.
+    clear_system_formats()
     set_system_triggers(false)
 
     -- erase current schema
@@ -1490,6 +1514,7 @@ local function bootstrap()
     upgrade{_initial_version = mkversion(1, 7, 5)}
 
     set_system_triggers(true)
+    reset_system_formats()
 
     -- save new bootstrap.snap
     box.snapshot()
