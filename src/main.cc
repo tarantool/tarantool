@@ -812,6 +812,7 @@ main(int argc, char **argv)
 		panic("unknown exception");
 	}
 
+	ERROR_INJECT_SIGILL(ERRINJ_SIGILL_MAIN_THREAD);
 	if (start_loop)
 		say_info("exiting the event loop");
 	/*
