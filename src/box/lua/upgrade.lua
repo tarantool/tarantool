@@ -4,6 +4,7 @@ local json = require('json')
 local fio = require('fio')
 local xlog = require('xlog')
 local ffi = require('ffi')
+local fun = require('fun')
 
 ffi.cdef('uint32_t box_dd_version_id(void);')
 
@@ -24,6 +25,9 @@ local SUPER = 31
 -- Utils
 --------------------------------------------------------------------------------
 
+-- Used to give a hint that the table should be serialized in MsgPack as map
+-- and not as a array. Typical use is to give hint for empty table when it is
+-- not possible to infer type from table content.
 local function setmap(tab)
     return setmetatable(tab, { __serialize = 'map' })
 end
@@ -39,6 +43,15 @@ function mkversion.new(major, minor, patch)
     self.patch = patch
     self.id = bit.bor(bit.lshift(bit.bor(bit.lshift(major, 8), minor), 8), patch)
     return self
+end
+
+-- Parse string with version in format 'A.B.C' to version object.
+function mkversion.parse(version)
+    local major, minor, patch = version:match('^(%d+)%.(%d+)%.(%d+)$')
+    if major == nil then
+        error('version should be in format A.B.C')
+    end
+    return mkversion.new(tonumber(major), tonumber(minor), tonumber(patch))
 end
 
 function mkversion.__tostring(self)
@@ -1242,8 +1255,8 @@ end
 local function grant_rw_access_on__session_settings_to_role_public()
     local _priv = box.space[box.schema.PRIV_ID]
     log.info("grant read,write access on _session_settings space to public role")
-    _priv:insert({ADMIN, PUBLIC, 'space', box.schema.SESSION_SETTINGS_ID,
-                  box.priv.R + box.priv.W})
+    _priv:replace({ADMIN, PUBLIC, 'space', box.schema.SESSION_SETTINGS_ID,
+                   box.priv.R + box.priv.W})
 end
 
 local function upgrade_to_2_10_1()
@@ -1517,6 +1530,408 @@ local function upgrade()
     upgrade_from(get_version())
 end
 
+--------------------------------------------------------------------------------
+-- Downgrade part
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- Tarantool 2.9.1
+--------------------------------------------------------------------------------
+
+-- See remove_sql_builtin_functions_from_func and upgrades adding
+-- SQL_BUILTIN functions.
+local function restore_sql_builtin_functions(issue_handler)
+    if issue_handler.dry_run then
+        return
+    end
+    local sql_builtin_list = {
+        "TRIM", "TYPEOF", "PRINTF", "UNICODE", "CHAR", "HEX", "VERSION",
+        "QUOTE", "REPLACE", "SUBSTR", "GROUP_CONCAT", "JULIANDAY", "DATE",
+        "TIME", "DATETIME", "STRFTIME", "CURRENT_TIME", "CURRENT_TIMESTAMP",
+        "CURRENT_DATE", "LENGTH", "POSITION", "ROUND", "UPPER", "LOWER",
+        "IFNULL", "RANDOM", "CEIL", "CEILING", "CHARACTER_LENGTH",
+        "CHAR_LENGTH", "FLOOR", "MOD", "OCTET_LENGTH", "ROW_COUNT", "COUNT",
+        "LIKE", "ABS", "EXP", "LN", "POWER", "SQRT", "SUM", "TOTAL", "AVG",
+        "RANDOMBLOB", "NULLIF", "ZEROBLOB", "MIN", "MAX", "COALESCE", "EVERY",
+        "EXISTS", "EXTRACT", "SOME", "GREATER", "LESSER", "SOUNDEX",
+        "LIKELIHOOD", "LIKELY", "UNLIKELY", "_sql_stat_get", "_sql_stat_push",
+        "_sql_stat_init", "GREATEST", "LEAST",
+    }
+    local datetime = os.date("%Y-%m-%d %H:%M:%S")
+    local _func = box.space._func
+    -- Otherwise we can't insert SQL_BUILTIN function. It is prohibited
+    -- to add since 2.9.0.
+    set_system_triggers(false)
+    for _, func in ipairs(sql_builtin_list) do
+        if _func.index.name:get(func) == nil then
+            local t = _func:auto_increment{
+                ADMIN, func, 1, 'SQL_BUILTIN', '', 'function', {}, 'any',
+                'none', 'none', false, false, true, {}, setmap({}), '',
+                datetime, datetime}
+            box.space._priv:replace{ADMIN, PUBLIC, 'function', t.id,
+                                    box.priv.X}
+        end
+    end
+    set_system_triggers(true)
+end
+
+local function downgrade_from_2_9_1(issue_handler)
+    restore_sql_builtin_functions(issue_handler)
+end
+
+--------------------------------------------------------------------------------
+-- Tarantool 2.10.0
+--------------------------------------------------------------------------------
+
+-- See tarantool 2.10.0-beta2-169-gb9f6d3858.
+local function remove_deferred_deletes(issue_handler)
+    if issue_handler.dry_run then
+        return
+    end
+    log.info("remove defer_deletes from space options")
+    for _, space in box.space._space:pairs() do
+        local new_flags = table.copy(space.flags)
+        if new_flags.defer_deletes ~= nil then
+            new_flags.defer_deletes = nil
+            setmap(new_flags)
+            box.space._space:update(space.id, {{'=', 'flags', new_flags}})
+        end
+    end
+end
+
+-- See tarantool-ee 2.10.0-beta2-97-g042a213.
+local function disable_background_space_upgrade(issue_handler)
+    for _, space in box.space._space:pairs() do
+        if space.flags.upgrade then
+            issue_handler(
+                "Background update is active in space '%s'. " ..
+                "It is supported starting from version 2.10.0.",
+                space.name)
+        end
+    end
+end
+
+-- See tarantool 2.10.0-beta2-140-ga51313a45.
+local function disable_tuple_compression(issue_handler)
+    for _, space in box.space._space:pairs() do
+        for _, format in pairs(space.format) do
+            if format.compression then
+                issue_handler(
+                    "Tuple compression is found in space '%s', field '%s'. " ..
+                    "It is supported starting from version 2.10.0.",
+                    space.name, format.name)
+            end
+        end
+    end
+end
+
+-- See tarantool 2.10.0-beta2-200-gd950fdde4.
+local function disable_core_field_foreign_key_constraints(issue_handler)
+    for _, space in box.space._space:pairs() do
+        for _, format in pairs(space.format) do
+            if format.foreign_key then
+                issue_handler(
+                    "Foreign key constraint is found in space '%s'," ..
+                    " field '%s'. It is supported starting from" ..
+                    " version 2.10.0.",
+                    space.name, format.name)
+            end
+        end
+    end
+end
+
+-- See tarantool 2.10.0-beta2-201-g1150adf2e.
+local function disable_core_tuple_foreign_key_constraints(issue_handler)
+    for _, space in box.space._space:pairs() do
+        if space.flags.foreign_key then
+            issue_handler(
+                "Foreign key constraint is found in space '%s'. " ..
+                "It is supported starting from version 2.10.0.",
+                space.name)
+        end
+    end
+end
+
+-- See tarantool 2.10.0-beta2-194-ged9b982d3.
+local function disable_core_field_constraints(issue_handler)
+    for _, space in box.space._space:pairs() do
+        for _, format in pairs(space.format) do
+            if format.constraint then
+                issue_handler(
+                    "Field constraint is found in space '%s', field '%s'. " ..
+                    "It is supported starting from version 2.10.0.",
+                    space.name, format.name)
+            end
+        end
+    end
+end
+
+-- See tarantool 2.10.0-beta2-196-g53f5d4e79.
+local function disable_core_tuple_constraints(issue_handler)
+    for _, space in box.space._space:pairs() do
+        if space.flags.constraint then
+            issue_handler(
+                "Tuple constraint is found in space '%s'. " ..
+                "It is supported starting from version 2.10.0.",
+                space.name)
+        end
+    end
+end
+
+local function downgrade_from_2_10_0(issue_handler)
+    remove_deferred_deletes(issue_handler)
+    disable_background_space_upgrade(issue_handler)
+    disable_tuple_compression(issue_handler)
+    disable_core_field_foreign_key_constraints(issue_handler)
+    disable_core_tuple_foreign_key_constraints(issue_handler)
+    disable_core_field_constraints(issue_handler)
+    disable_core_tuple_constraints(issue_handler)
+end
+
+--------------------------------------------------------------------------------
+-- Tarantool 2.10.5
+--------------------------------------------------------------------------------
+
+-- See create_vspace_sequence_space.
+local function drop_vspace_sequence_space(issue_handler)
+    if issue_handler.dry_run then
+        return
+    end
+    log.info("revoke grants for 'public' role for _vspace_sequence")
+    box.space._priv:delete{PUBLIC, 'space', box.schema.VSPACE_SEQUENCE_ID}
+    local indexes = box.space._index:select(box.schema.VSPACE_SEQUENCE_ID)
+    -- Otherwise we can't drop neither the primary index nor the space.
+    set_system_triggers(false)
+    for _, index in pairs(indexes) do
+        log.info("drop index %s on _vspace_sequence", index[3])
+        box.space._index:delete{index[1], index[2]}
+    end
+    log.info("drop view _vspace_sequence")
+    box.space._space:delete{box.schema.VSPACE_SEQUENCE_ID}
+    set_system_triggers(true)
+end
+
+local function downgrade_from_2_10_5(issue_handler)
+    drop_vspace_sequence_space(issue_handler)
+end
+
+--------------------------------------------------------------------------------
+-- Tarantool 2.11.0
+--------------------------------------------------------------------------------
+
+-- See tarantool-ee 2.11.0-entrypoint-97-g67fccd4.
+local function disable_zlib_tuple_compression(issue_handler)
+    for _, space in box.space._space:pairs() do
+        for _, format in pairs(space.format) do
+            if format.compression and format.compression == 'zlib' then
+                issue_handler(
+                    "Tuple compression with 'zlib' algo is found in" ..
+                    " space '%s', field '%s'. " ..
+                    "It is supported starting from version 2.11.0.",
+                    space.name, format.name)
+            end
+        end
+    end
+end
+
+-- See tarantool 2.11.0-entrypoint-409-g0dea6493f.
+local function disable_sql_expr_functions(issue_handler)
+    for _, func in box.space._func:pairs() do
+        if func.language == 'SQL_EXPR' then
+            issue_handler(
+                "Function '%s' has language type SQL_EXPR. " ..
+                "It is supported starting from version 2.11.0.",
+                func.name)
+        end
+    end
+end
+
+-- See tarantool-ee 2.11.0-entrypoint-104-ga005915.
+local function disable_pap_sha256_auth_method(issue_handler)
+    for _, user in box.space._user:pairs() do
+        for k in pairs(user.auth) do
+            if k == "pap-sha256" then
+                issue_handler(
+                    "Auth type 'pap-sha256' is found for user '%s'. " ..
+                    "It is supported starting from version 2.11.0.",
+                    user.name)
+            end
+        end
+    end
+end
+
+-- Check corresponding upgrade's add_user_auth_history_and_last_modified.
+-- See also tarantool 2.11.0-entrypoint-821-g1c33484d5.
+local function remove_user_auth_history_and_last_modified(issue_handler)
+    if issue_handler.dry_run then
+        return
+    end
+    log.info("remove auth_history and last_modified fields from space _user")
+    local ops = {{'#', '[7][6]', 2}}
+    if box.space._space:get(box.space._user.id)[7][6] ~= nil then
+        box.space._space:update(box.space._user.id, ops)
+    end
+    if box.space._space:get(box.space._vuser.id)[7][6] ~= nil then
+        box.space._space:update(box.space._vuser.id, ops)
+    end
+    for _, user in box.space._user:pairs() do
+        if #user == 7 then
+            box.space._user:update(user[1], {{'#', 6, 2}})
+        end
+    end
+end
+
+local function downgrade_from_2_11_0(issue_handler)
+    disable_zlib_tuple_compression(issue_handler)
+    disable_sql_expr_functions(issue_handler)
+    disable_pap_sha256_auth_method(issue_handler)
+    remove_user_auth_history_and_last_modified(issue_handler)
+end
+
+-- Versions should be ordered from newer to older.
+--
+-- Every step can be called in 2 modes. In dry_run mode (issue_handler.dry_run
+-- is set) step should only check for downgrade issues that cannot be handled
+-- without client help. In this mode step should NOT apply any changes.
+-- In regular mode (issue_handler.dry_run is not set) step should actually
+-- apply the required changes.
+--
+-- NOTICE: all downgrade steps SHOULD be idempotent.
+--
+-- We require steps to be idempotent because downgrade steps are run not
+-- considering current schema version. For example when downgrade('2.10.0') is
+-- run on Tarantool version 2.11.0 then step for 2.10.5 will be applied.
+-- It will be applied if schema version is 2.11.0 and it will be applied
+-- if schema version is 2.10.0.
+--
+local downgrade_handlers = {
+    {version = mkversion(2, 11, 0), func = downgrade_from_2_11_0},
+    {version = mkversion(2, 10, 5), func = downgrade_from_2_10_5},
+    {version = mkversion(2, 10, 0), func = downgrade_from_2_10_0},
+    {version = mkversion(2, 9, 1), func = downgrade_from_2_9_1},
+}
+
+-- This downgrade issue handler is used to raise an error when issue is
+-- encountered.
+local downgrade_raise_error = {}
+
+local downgrade_raise_error_mt = {
+    __call = function(self, fmt, ...)
+        error(string.format(fmt, ...))
+    end
+}
+
+downgrade_raise_error.new = function()
+    local handler = {}
+    return setmetatable(handler, downgrade_raise_error_mt)
+end
+
+-- This downgrade issue handler is used to collect all downgrade issues.
+local downgrade_list_issue = {}
+
+local downgrade_list_issue_mt = {
+    __call = function(self, fmt, ...)
+        table.insert(self.list, string.format(fmt, ...))
+    end
+}
+
+downgrade_list_issue.new = function()
+    local handler = {}
+    handler.list = {}
+    handler.dry_run = true
+    return setmetatable(handler, downgrade_list_issue_mt)
+end
+
+-- Find schema version which does not require upgrade for given application
+-- version. For example:
+--
+-- app2schema_version(mkversion('2.10.3')) == mkversion('2.10.1')
+-- app2schema_version(mkversion('2.10.0')) == mkversion('2.9.1')
+local function app2schema_version(app_version)
+    local schema_version
+    for _, handler in ipairs(handlers) do
+        if handler.version > app_version then
+            break
+        end
+        schema_version = handler.version
+    end
+    return schema_version
+end
+
+-- Call required downgrade step given application version we downgrade to.
+-- Version should have mkversion type.
+local function downgrade_steps(version, issue_handler)
+    for _, handler in ipairs(downgrade_handlers) do
+        if handler.version < version then
+            break
+        end
+        if handler.version ~= version then
+            handler.func(issue_handler)
+        end
+    end
+end
+
+-- List of all Tarantool releases we can downgrade to.
+local downgrade_versions = {
+    "2.8.2",
+    "2.8.3",
+    "2.8.4",
+    "2.10.0",
+    "2.10.1",
+    "2.10.2",
+    "2.10.3",
+    "2.10.4",
+    "2.11.0",
+}
+
+-- Downgrade or list downgrade issues depending of dry_run argument value.
+--
+-- If dry_run is true then list downgrade issues.  if dry_run is false then
+-- downgrade.
+--
+-- In case of downgrade check for issues is done before making any changes.
+-- If any issue is found then downgrade is failed and no any changes are done.
+local function downgrade_impl(version_str, dry_run)
+    box.internal.check_param(version_str, 'version_str', 'string')
+    local version = mkversion.parse(version_str)
+    if fun.index(version_str, downgrade_versions) == nil then
+        error("Downgrade is only possible to version listed in" ..
+              " box.schema.downgrade_versions().")
+    end
+
+    local schema_version_cur = get_version()
+    local schema_version_dst = app2schema_version(version)
+    if schema_version_cur < schema_version_dst then
+        local err = "Cannot downgrade as current schema version %s is older" ..
+                    " then schema version %s for Tarantool %s"
+        error(err:format(schema_version_cur, schema_version_dst, version))
+    end
+
+    local issue_handler = downgrade_list_issue.new()
+    downgrade_steps(version, issue_handler)
+    if dry_run then
+        return issue_handler.list
+    end
+
+    if #issue_handler.list > 0 then
+        local err = issue_handler.list[1]
+        if #issue_handler.list > 1 then
+            local more = " There are more downgrade issues. To list them" ..
+                         " all call box.schema.downgrade_issues."
+            err = err .. more
+        end
+        error(err)
+    end
+
+    downgrade_steps(version, downgrade_raise_error.new())
+
+    log.info("set schema version to %s", version)
+    box.space._schema:replace{'version',
+                              schema_version_dst.major,
+                              schema_version_dst.minor,
+                              schema_version_dst.patch}
+end
+
 local function bootstrap()
     -- Disabling system triggers doesn't turn off space format checks.
     -- Since a system space format may be updated during the bootstrap
@@ -1539,7 +1954,14 @@ local function bootstrap()
     box.snapshot()
 end
 
-box.schema.upgrade = upgrade;
+box.schema.upgrade = upgrade
+box.schema.downgrade_versions = function()
+    return table.copy(downgrade_versions)
+end
+box.schema.downgrade = function(version) downgrade_impl(version, false) end
+box.schema.downgrade_issues = function(version)
+    return downgrade_impl(version, true)
+end
 box.internal.bootstrap = bootstrap;
 box.internal.schema_needs_upgrade = schema_needs_upgrade;
 box.internal.get_snapshot_version = get_snapshot_version;
