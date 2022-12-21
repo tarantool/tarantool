@@ -354,9 +354,9 @@ crash_report_feedback_daemon(struct crash_info *cinfo)
 			snprintf_safe("\"si_code_str\":\"%s\",",
 				      "SEGV_ACCERR");
 		}
-		snprintf_safe("\"si_addr\":\"0x%llx\",",
-			      (long long)cinfo->siaddr);
 	}
+	snprintf_safe("\"si_addr\":\"0x%llx\",",
+		      (long long)cinfo->siaddr);
 
 #ifdef ENABLE_BACKTRACE
 	snprintf_safe("\"backtrace\":\"");
@@ -418,9 +418,20 @@ crash_report_feedback_daemon(struct crash_info *cinfo)
 static void
 crash_report_stderr(struct crash_info *cinfo)
 {
-	if (cinfo->signo == SIGSEGV) {
+	const char *signal_code_repr = NULL;
+
+	switch (cinfo->signo) {
+	case SIGILL:
+		fprintf(stderr, "Illegal instruction\n");
+		break;
+	case SIGBUS:
+		fprintf(stderr, "Bus error\n");
+		break;
+	case SIGFPE:
+		fprintf(stderr, "Floating-point error\n");
+		break;
+	case SIGSEGV:
 		fprintf(stderr, "Segmentation fault\n");
-		const char *signal_code_repr = NULL;
 
 		switch (cinfo->sicode) {
 		case SEGV_MAPERR:
@@ -430,20 +441,22 @@ crash_report_stderr(struct crash_info *cinfo)
 			signal_code_repr = "SEGV_ACCERR";
 			break;
 		}
-
-		if (signal_code_repr != NULL)
-			fprintf(stderr, "  code: %s\n", signal_code_repr);
-		else
-			fprintf(stderr, "  code: %d\n", cinfo->sicode);
-		/*
-		 * fprintf is used instead of fdprintf, because
-		 * fdprintf does not understand %p
-		 */
-		fprintf(stderr, "  addr: %p\n", cinfo->siaddr);
-	} else {
-		fprintf(stderr, "Got a fatal signal %d\n", cinfo->signo);
+		break;
+	default:
+		fprintf(stderr, "Got an unexpected fatal signal %d\n",
+			cinfo->signo);
+		break;
 	}
 
+	if (signal_code_repr != NULL)
+		fprintf(stderr, "  code: %s\n", signal_code_repr);
+	else
+		fprintf(stderr, "  code: %d\n", cinfo->sicode);
+	/*
+	 * fprintf is used instead of fdprintf, because
+	 * fdprintf does not understand %p
+	 */
+	fprintf(stderr, "  addr: %p\n", cinfo->siaddr);
 	fprintf(stderr, "  context: %p\n", cinfo->context_addr);
 	fprintf(stderr, "  siginfo: %p\n", cinfo->siginfo_addr);
 
@@ -538,7 +551,7 @@ crash_signal_cb(int signo, siginfo_t *siginfo, void *context)
 /**
  * Fatal signals we generate crash on.
  */
-static const int crash_signals[] = { SIGSEGV, SIGFPE };
+static const int crash_signals[] = { SIGILL, SIGBUS, SIGFPE, SIGSEGV };
 
 void
 crash_signal_reset(void)
