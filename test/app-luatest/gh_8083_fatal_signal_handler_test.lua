@@ -1,5 +1,6 @@
 local t = require('luatest')
-local g = t.group('gh-8083', {{errinj = 'ERRINJ_SIGILL_MAIN_THREAD'}})
+local g = t.group('gh-8083', {{errinj = 'ERRINJ_SIGILL_MAIN_THREAD'},
+                              {errinj = 'ERRINJ_SIGILL_NONMAIN_THREAD'}})
 
 g.before_each(function(cg)
     local server = require('luatest.server')

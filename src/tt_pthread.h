@@ -264,12 +264,18 @@
 	tt_pthread_error(e__);			\
 })
 
-/** Make sure the created thread blocks all signals,
- * they are handled in the main thread.
+/**
+ * Make sure the created thread blocks all signals, they are handled in the main
+ * thread. Except SIGILL, SIGBUS, SIGFPE and SIGSEGV, that cannot be blocked and
+ * are handled by the thread that triggered them (see crash_signal_init).
  */
 #define tt_pthread_create(thread, attr, run, arg)	\
 ({	sigset_t set, oldset;				\
 	sigfillset(&set);				\
+	sigdelset(&set, SIGILL);			\
+	sigdelset(&set, SIGBUS);			\
+	sigdelset(&set, SIGFPE);			\
+	sigdelset(&set, SIGSEGV);			\
 	pthread_sigmask(SIG_BLOCK, &set, &oldset);	\
 	int e__ = pthread_create(thread, attr, run, arg);\
 	pthread_sigmask(SIG_SETMASK, &oldset, NULL);	\
