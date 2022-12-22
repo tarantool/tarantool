@@ -1732,6 +1732,7 @@ void *cord_thread_func(void *p)
 	ct_arg->is_started = true;
 	tt_pthread_cond_signal(&ct_arg->start_cond);
 	tt_pthread_mutex_unlock(&ct_arg->start_mutex);
+	ERROR_INJECT_SIGILL(ERRINJ_SIGILL_NONMAIN_THREAD);
 	void *res = f(arg);
 	/*
 	 * cord()->on_exit initially holds NULL. This field is
