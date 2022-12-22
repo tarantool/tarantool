@@ -415,6 +415,7 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceab7e5aaead63564d8ea582774ca74d551" kind="enumvalue"><name>ER_INVALID_AUTH_DATA</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceac486e673abf714f37a4e4b8a7fcbd591" kind="enumvalue"><name>ER_INVALID_AUTH_REQUEST</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaebc20044d48764367ec15e54161dd67c" kind="enumvalue"><name>ER_WEAK_PASSWORD</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcead92218f2962283ee58422b6a1ff1f236" kind="enumvalue"><name>ER_OLD_PASSWORD</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
