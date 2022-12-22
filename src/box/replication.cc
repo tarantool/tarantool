@@ -649,6 +649,11 @@ replicaset_update(struct applier **appliers, int count, bool keep_connect)
 	replicaset.applier.connected = 0;
 	replicaset.applier.loading = 0;
 	replicaset.applier.synced = 0;
+
+	struct applier *appliers_for_delete[VCLOCK_MAX] = {};
+	int appliers_for_delete_count = 0;
+	int csw = fiber()->csw;
+
 	replicaset_foreach(replica) {
 		if (replica->applier == NULL)
 			continue;
@@ -671,6 +676,15 @@ replicaset_update(struct applier **appliers, int count, bool keep_connect)
 			replica_clear_applier(replica);
 			replica->applier_sync_state = APPLIER_DISCONNECTED;
 		}
+		appliers_for_delete[appliers_for_delete_count++] = applier;
+	}
+
+	/* Above-mentioned replicaset_foreach shouldn't yield. See gh-7590 */
+	assert(csw == fiber()->csw);
+	(void)csw;
+
+	for (int i = 0; i < appliers_for_delete_count; ++i) {
+		applier = appliers_for_delete[i];
 		applier_stop(applier);
 		applier_delete(applier);
 	}
