@@ -1913,6 +1913,11 @@ applier_thread_data_destroy(struct applier *applier)
 		 */
 		return;
 	}
+	ERROR_INJECT(ERRINJ_APPLIER_DESTROY_DELAY, {
+		say_warn("applier data destruction is delayed");
+		ERROR_INJECT_YIELD(ERRINJ_APPLIER_DESTROY_DELAY);
+		say_warn("applier data destruction is continued");
+	});
 
 	applier_thread_data_do_destroy(&msg->base);
 }
@@ -2300,6 +2305,7 @@ applier_stop(struct applier *applier)
 		return;
 	fiber_cancel(f);
 	fiber_join(f);
+	ERROR_INJECT_YIELD(ERRINJ_APPLIER_STOP_DELAY);
 	applier_set_state(applier, APPLIER_OFF);
 	applier->fiber = NULL;
 }
