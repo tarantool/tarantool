@@ -2447,6 +2447,8 @@ tx_process_replication(struct cmsg *m)
 	struct iostream *io = &con->io;
 	assert(!in_txn());
 	try {
+		if (tx_check_msg(msg) != 0)
+			diag_raise();
 		switch (msg->header.type) {
 		case IPROTO_JOIN:
 			/*
