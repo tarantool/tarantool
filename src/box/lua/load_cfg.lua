@@ -71,7 +71,7 @@ end
 
 -- Security enhancements.
 local function ifdef_security(value)
-    if private.check_password ~= nil then
+    if private.cfg_set_security ~= nil then
         return value
     end
 end
@@ -117,6 +117,9 @@ local default_cfg = {
     audit_filter        = ifdef_audit('compatibility'),
 
     auth_type           = 'chap-sha1',
+    auth_delay          = ifdef_security(0),
+    disable_guest       = ifdef_security(false),
+    password_lifetime_days = ifdef_security(0),
     password_min_length = ifdef_security(0),
     password_enforce_uppercase = ifdef_security(false),
     password_enforce_lowercase = ifdef_security(false),
@@ -228,6 +231,9 @@ local template_cfg = {
     audit_filter        = ifdef_audit('string'),
 
     auth_type           = 'string',
+    auth_delay          = ifdef_security('number'),
+    disable_guest       = ifdef_security('boolean'),
+    password_lifetime_days = ifdef_security('number'),
     password_min_length = ifdef_security('number'),
     password_enforce_uppercase = ifdef_security('boolean'),
     password_enforce_lowercase = ifdef_security('boolean'),
@@ -397,6 +403,9 @@ local dynamic_cfg = {
     txn_timeout             = private.cfg_set_txn_timeout,
     txn_isolation           = private.cfg_set_txn_isolation,
     auth_type               = private.cfg_set_auth_type,
+    auth_delay              = private.cfg_set_security,
+    disable_guest           = private.cfg_set_security,
+    password_lifetime_days  = private.cfg_set_security,
     password_min_length     = ifdef_security(nop),
     password_enforce_uppercase = ifdef_security(nop),
     password_enforce_lowercase = ifdef_security(nop),
@@ -541,6 +550,9 @@ local dynamic_cfg_skip_at_load = {
     net_msg_max             = true,
     readahead               = true,
     auth_type               = true,
+    auth_delay              = ifdef_security(true),
+    disable_guest           = ifdef_security(true),
+    password_lifetime_days  = ifdef_security(true),
 }
 
 -- Options that are not part of dynamic_cfg_modules and applied individually

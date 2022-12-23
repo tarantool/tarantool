@@ -308,6 +308,9 @@ struct errcode_record {
 	/*253 */_(ER_OLD_PASSWORD,		"Password must differ from last %d passwords") \
 	/*254 */_(ER_NO_SUCH_SESSION,		"Session %llu does not exist") \
 	/*255 */_(ER_WRONG_SESSION_TYPE,	"Session '%s' is not supported") \
+	/*256 */_(ER_PASSWORD_EXPIRED,		"Password expired") \
+	/*257 */_(ER_AUTH_DELAY,		"Too many authentication attempts") \
+	/*258 */_(ER_AUTH_REQUIRED,		"Authentication required") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
