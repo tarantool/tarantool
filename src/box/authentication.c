@@ -20,6 +20,7 @@
 #include "fiber.h"
 #include "iostream.h"
 #include "msgpuck.h"
+#include "security.h"
 #include "session.h"
 #include "small/region.h"
 #include "tt_static.h"
@@ -103,6 +104,8 @@ authenticate(const char *user_name, uint32_t user_name_len,
 	mp_next(&auth_request_end);
 	if (auth_request_check(method, auth_request, auth_request_end) != 0)
 		return -1;
+	if (security_check_auth_pre(user_name, user_name_len) != 0)
+		return -1;
 	if (user == NULL || user->def->auth == NULL ||
 	    user->def->auth->method != method ||
 	    !authenticate_request(user->def->auth, salt,
@@ -113,6 +116,8 @@ authenticate(const char *user_name, uint32_t user_name_len,
 		diag_set(ClientError, ER_CREDS_MISMATCH);
 		return -1;
 	}
+	if (security_check_auth_post(user) != 0)
+		return -1;
 	if (access_check_session(user) != 0)
 		return -1;
 ok:

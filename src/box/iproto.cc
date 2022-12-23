@@ -71,6 +71,7 @@
 #include "txn.h"
 #include "on_shutdown.h"
 #include "flightrec.h"
+#include "security.h"
 
 enum {
 	IPROTO_SALT_SIZE = 32,
@@ -1900,6 +1901,11 @@ tx_check_msg(struct iproto_msg *msg)
 			 new_schema_version, schema_version);
 		return -1;
 	}
+	enum iproto_type type = (enum iproto_type)msg->header.type;
+	if (type != IPROTO_AUTH && type != IPROTO_PING && type != IPROTO_ID &&
+	    type != IPROTO_VOTE && type != IPROTO_VOTE_DEPRECATED &&
+	    security_check_session() != 0)
+		return -1;
 	return 0;
 }
 

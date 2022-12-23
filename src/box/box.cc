@@ -4704,6 +4704,7 @@ box_storage_init(void)
 	sql_init();
 	audit_log_init(cfg_gets("audit_log"), cfg_geti("audit_nonblock"),
 		       cfg_gets("audit_format"), cfg_gets("audit_filter"));
+	security_cfg();
 
 	int64_t wal_max_size = box_check_wal_max_size(
 		cfg_geti64("wal_max_size"));
