@@ -1792,17 +1792,6 @@ net_finish_destroy(struct cmsg *m)
 }
 
 
-static int
-tx_check_schema(uint64_t new_schema_version)
-{
-	if (new_schema_version && new_schema_version != schema_version) {
-		diag_set(ClientError, ER_WRONG_SCHEMA_VERSION,
-			 new_schema_version, schema_version);
-		return -1;
-	}
-	return 0;
-}
-
 static void
 net_discard_input(struct cmsg *m)
 {
@@ -1898,6 +1887,22 @@ tx_accept_msg(struct cmsg *m)
 	return msg;
 }
 
+/**
+ * Check if the tx thread may continue with processing an accepted message.
+ * If something's wrong, returns -1 and sets diag, otherwise returns 0.
+ */
+static int
+tx_check_msg(struct iproto_msg *msg)
+{
+	uint64_t new_schema_version = msg->header.schema_version;
+	if (new_schema_version != 0 && new_schema_version != schema_version) {
+		diag_set(ClientError, ER_WRONG_SCHEMA_VERSION,
+			 new_schema_version, schema_version);
+		return -1;
+	}
+	return 0;
+}
+
 static inline void
 tx_end_msg(struct iproto_msg *msg, struct obuf_svp *svp)
 {
@@ -1958,7 +1963,7 @@ tx_process_begin(struct cmsg *m)
 	struct obuf_svp header;
 	uint32_t txn_isolation = msg->begin.txn_isolation;
 
-	if (tx_check_schema(msg->header.schema_version))
+	if (tx_check_msg(msg) != 0)
 		goto error;
 
 	if (box_txn_begin() != 0)
@@ -1997,7 +2002,7 @@ tx_process_commit(struct cmsg *m)
 	struct obuf *out;
 	struct obuf_svp header;
 
-	if (tx_check_schema(msg->header.schema_version))
+	if (tx_check_msg(msg) != 0)
 		goto error;
 
 	if (box_txn_commit() != 0)
@@ -2023,7 +2028,7 @@ tx_process_rollback(struct cmsg *m)
 	struct obuf *out;
 	struct obuf_svp header;
 
-	if (tx_check_schema(msg->header.schema_version))
+	if (tx_check_msg(msg) != 0)
 		goto error;
 
 	if (box_txn_rollback() != 0)
@@ -2046,7 +2051,7 @@ static void
 tx_process1(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
-	if (tx_check_schema(msg->header.schema_version))
+	if (tx_check_msg(msg) != 0)
 		goto error;
 
 	struct tuple *tuple;
@@ -2085,7 +2090,7 @@ tx_process_select(struct cmsg *m)
 	bool reply_position;
 	struct request *req = &msg->dml;
 	uint32_t region_svp = region_used(&fiber()->gc);
-	if (tx_check_schema(msg->header.schema_version))
+	if (tx_check_msg(msg) != 0)
 		goto error;
 
 	tx_inject_delay();
@@ -2168,7 +2173,7 @@ static void
 tx_process_call(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
-	if (tx_check_schema(msg->header.schema_version))
+	if (tx_check_msg(msg) != 0)
 		goto error;
 
 	/*
@@ -2272,7 +2277,7 @@ tx_process_misc(struct cmsg *m)
 	struct obuf *out = con->tx.p_obuf;
 	struct obuf_svp header;
 	assert(!(msg->header.type != IPROTO_PING && in_txn()));
-	if (tx_check_schema(msg->header.schema_version))
+	if (tx_check_msg(msg) != 0)
 		goto error;
 
 	try {
@@ -2344,7 +2349,7 @@ tx_process_sql(struct cmsg *m)
 	bool is_unprepare = false;
 	RegionGuard region_guard(&fiber()->gc);
 
-	if (tx_check_schema(msg->header.schema_version))
+	if (tx_check_msg(msg) != 0)
 		goto error;
 	assert(msg->header.type == IPROTO_EXECUTE ||
 	       msg->header.type == IPROTO_PREPARE);
