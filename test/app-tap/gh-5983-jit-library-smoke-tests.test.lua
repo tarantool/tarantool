@@ -24,11 +24,11 @@ if #arg == 0 then
   local proc = io.popen(cmd)
   local got = proc:read('*all'):gsub('^%s+', ''):gsub('%s+$', '')
   local expected = table.concat({
-      '---- TRACE %d start',
-      '---- TRACE %d IR',
-      '---- TRACE %d mcode',
-      '---- TRACE %d stop',
-      '---- TRACE %d exit',
+      '---- TRACE 1 start',
+      '---- TRACE 1 IR',
+      '---- TRACE 1 mcode',
+      '---- TRACE 1 stop',
+      '---- TRACE 1 exit',
   }, '.+')
 
   test:like(got, expected , 'jit.dump smoke tests')
@@ -40,5 +40,7 @@ end
 require('jit.dump').start('+tbisrmXaT')
 -- Tune JIT engine to make the test faster and more robust.
 jit.opt.start('hotloop=1')
+-- Purge all existing traces generated on Tarantool startup.
+jit.flush()
 -- Record primitive loop.
 for _ = 1, 3 do end
