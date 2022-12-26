@@ -100,6 +100,8 @@ luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg,
  * value at the top of the stack, using a translation table: if a  first-level
  * `MP_MAP` key has `MP_STRING` type, tries to look it up in the translation
  * table and replace it with the translation, if found.
+ *
+ * The translation table must use `lua_hash` as the hash function.
  */
 enum mp_type
 luamp_encode_with_translation(struct lua_State *L, struct luaL_serializer *cfg,

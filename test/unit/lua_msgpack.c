@@ -35,7 +35,7 @@ test_translation_in_encoding(lua_State *L)
 	struct mh_strnu32_node_t node = {
 		.str = alias,
 		.len = strlen(alias),
-		.hash = mh_strn_hash(alias, strlen(alias)),
+		.hash = lua_hash(alias, strlen(alias)),
 		.val = 0
 	};
 	mh_strnu32_put(translation, &node, NULL, NULL);

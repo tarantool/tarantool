@@ -175,14 +175,18 @@ luamp_set_decode_extension(luamp_decode_extension_f handler)
  * table.
  */
 static void
-translate_map_key_field(struct luaL_field *field, struct mh_strnu32_t *translation)
+translate_map_key_field(struct luaL_field *field, uint32_t hash,
+			struct mh_strnu32_t *translation)
 {
-	mh_int_t key = mh_strnu32_find_str(translation,
-					   field->sval.data,
-					   field->sval.len);
-	if (key != mh_end(translation)) {
+	struct mh_strnu32_key_t key = {
+		.str = field->sval.data,
+		.len = field->sval.len,
+		.hash = hash,
+	};
+	mh_int_t k = mh_strnu32_find(translation, &key, NULL);
+	if (k != mh_end(translation)) {
 		field->type = MP_UINT;
-		field->ival = (int64_t)mh_strnu32_node(translation, key)->val;
+		field->ival = (int64_t)mh_strnu32_node(translation, k)->val;
 	}
 }
 
@@ -243,7 +247,9 @@ restart: /* used by MP_EXT of unidentified subtype */
 				return luaT_error(L);
 			if (translation != NULL && level == 0 &&
 			    field->type == MP_STR)
-				translate_map_key_field(field, translation);
+				translate_map_key_field(field,
+							lua_hashstring(L, -1),
+							translation);
 			luamp_encode_with_translation_r(L, cfg, stream, field,
 							level + 1, translation);
 			lua_pop(L, 1); /* pop a copy of key */
