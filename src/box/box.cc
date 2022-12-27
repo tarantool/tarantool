@@ -4613,7 +4613,7 @@ box_broadcast_id(void)
 
 	box_broadcast("box.id", strlen("box.id"), buf, w);
 
-	assert((size_t)(w - buf) < 1024);
+	assert((size_t)(w - buf) < sizeof(buf));
 }
 
 static void
@@ -4631,7 +4631,7 @@ box_broadcast_status(void)
 
 	box_broadcast("box.status", strlen("box.status"), buf, w);
 
-	assert((size_t)(w - buf) < 1024);
+	assert((size_t)(w - buf) < sizeof(buf));
 }
 
 void
@@ -4653,7 +4653,7 @@ box_broadcast_election(void)
 
 	box_broadcast("box.election", strlen("box.election"), buf, w);
 
-	assert((size_t)(w - buf) < 1024);
+	assert((size_t)(w - buf) < sizeof(buf));
 }
 
 void
@@ -4667,7 +4667,7 @@ box_broadcast_schema(void)
 
 	box_broadcast("box.schema", strlen("box.schema"), buf, w);
 
-	assert((size_t)(w - buf) < 1024);
+	assert((size_t)(w - buf) < sizeof(buf));
 }
 
 void
