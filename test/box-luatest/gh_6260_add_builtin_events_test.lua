@@ -1,6 +1,6 @@
 local t = require('luatest')
 local net = require('net.box')
-local cluster = require('luatest.replica_set')
+local replica_set = require('luatest.replica_set')
 local server = require('luatest.server')
 
 local g = t.group('gh_6260')
@@ -25,14 +25,14 @@ g.test_subscriptions_outside_box_cfg = function()
 end
 
 g.before_test('test_sys_events_no_override', function(cg)
-    cg.cluster = cluster:new({})
-    cg.master = cg.cluster:build_server({alias = 'master'})
-    cg.cluster:add_server(cg.master)
-    cg.cluster:start()
+    cg.replica_set = replica_set:new({})
+    cg.master = cg.replica_set:build_server({alias = 'master'})
+    cg.replica_set:add_server(cg.master)
+    cg.replica_set:start()
 end)
 
 g.after_test('test_sys_events_no_override', function(cg)
-    cg.cluster:drop()
+    cg.replica_set:drop()
 end)
 
 g.test_sys_events_no_override = function(cg)
@@ -49,14 +49,14 @@ g.test_sys_events_no_override = function(cg)
 end
 
 g.before_test('test_box_status', function(cg)
-    cg.cluster = cluster:new({})
-    cg.master = cg.cluster:build_server({alias = 'master'})
-    cg.cluster:add_server(cg.master)
-    cg.cluster:start()
+    cg.replica_set = replica_set:new({})
+    cg.master = cg.replica_set:build_server({alias = 'master'})
+    cg.replica_set:add_server(cg.master)
+    cg.replica_set:start()
 end)
 
 g.after_test('test_box_status', function(cg)
-    cg.cluster:drop()
+    cg.replica_set:drop()
 end)
 
 g.test_box_status = function(cg)
@@ -134,7 +134,7 @@ g.test_box_status = function(cg)
 end
 
 g.before_test('test_box_election', function(cg)
-    cg.cluster = cluster:new({})
+    cg.replica_set = replica_set:new({})
 
     local box_cfg = {
         replication = {
@@ -150,23 +150,23 @@ g.before_test('test_box_election', function(cg)
         election_timeout = 0.25,
     }
 
-    cg.instance_1 = cg.cluster:build_server(
+    cg.instance_1 = cg.replica_set:build_server(
         {alias = 'instance_1', box_cfg = box_cfg})
 
-    cg.instance_2 = cg.cluster:build_server(
+    cg.instance_2 = cg.replica_set:build_server(
         {alias = 'instance_2', box_cfg = box_cfg})
 
-    cg.instance_3 = cg.cluster:build_server(
+    cg.instance_3 = cg.replica_set:build_server(
         {alias = 'instance_3', box_cfg = box_cfg})
 
-    cg.cluster:add_server(cg.instance_1)
-    cg.cluster:add_server(cg.instance_2)
-    cg.cluster:add_server(cg.instance_3)
-    cg.cluster:start()
+    cg.replica_set:add_server(cg.instance_1)
+    cg.replica_set:add_server(cg.instance_2)
+    cg.replica_set:add_server(cg.instance_3)
+    cg.replica_set:start()
 end)
 
 g.after_test('test_box_election', function(cg)
-    cg.cluster:drop()
+    cg.replica_set:drop()
 end)
 
 g.test_box_election = function(cg)
@@ -234,14 +234,14 @@ g.test_box_election = function(cg)
 end
 
 g.before_test('test_box_schema', function(cg)
-    cg.cluster = cluster:new({})
-    cg.master = cg.cluster:build_server({alias = 'master'})
-    cg.cluster:add_server(cg.master)
-    cg.cluster:start()
+    cg.replica_set = replica_set:new({})
+    cg.master = cg.replica_set:build_server({alias = 'master'})
+    cg.replica_set:add_server(cg.master)
+    cg.replica_set:start()
 end)
 
 g.after_test('test_box_schema', function(cg)
-    cg.cluster:drop()
+    cg.replica_set:drop()
 end)
 
 g.test_box_schema = function(cg)
@@ -278,20 +278,23 @@ g.test_box_schema = function(cg)
 end
 
 g.before_test('test_box_id', function(cg)
-    cg.cluster = cluster:new({})
+    cg.replica_set = replica_set:new({})
 
     local box_cfg = {
         replicaset_uuid = t.helpers.uuid('ab', 1),
         instance_uuid = t.helpers.uuid('1', '2', '3')
     }
 
-    cg.instance = cg.cluster:build_server({alias = 'master', box_cfg = box_cfg})
-    cg.cluster:add_server(cg.instance)
-    cg.cluster:start()
+    cg.instance = cg.replica_set:build_server({
+        alias = 'master',
+        box_cfg = box_cfg,
+    })
+    cg.replica_set:add_server(cg.instance)
+    cg.replica_set:start()
 end)
 
 g.after_test('test_box_id', function(cg)
-    cg.cluster:drop()
+    cg.replica_set:drop()
 end)
 
 g.test_box_id = function(cg)
