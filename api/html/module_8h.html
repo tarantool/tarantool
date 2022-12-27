@@ -121,7 +121,7 @@ Macros</h2></td></tr>
 #define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#abd1dbec4fd6761084d3e0c05afe2b138">PACKAGE_VERSION_PATCH</a>&#160;&#160;&#160;0</td></tr>
 <tr class="memdesc:abd1dbec4fd6761084d3e0c05afe2b138"><td class="mdescLeft">&#160;</td><td class="mdescRight">Package patch version - 7 for 1.6.7. <br /></td></tr>
 <tr class="separator:abd1dbec4fd6761084d3e0c05afe2b138"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;2.11.0-entrypoint-832-g7ec826746&quot;</td></tr>
+<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;2.11.0-entrypoint-836-gb98922470&quot;</td></tr>
 <tr class="memdesc:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">A string with major-minor-patch-commit-id identifier of the release, e.g.  <a href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">More...</a><br /></td></tr>
 <tr class="separator:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adb6d1259777e8f56c6260be6faed183e"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#adb6d1259777e8f56c6260be6faed183e">SYSCONF_DIR</a>&#160;&#160;&#160;&quot;etc&quot;</td></tr>
@@ -1054,6 +1054,10 @@ Enumerations</h2></td></tr>
 , <br />
 &#160;&#160;<b>ER_OLD_PASSWORD</b>
 , <br />
+&#160;&#160;<b>ER_NO_SUCH_SESSION</b>
+, <br />
+&#160;&#160;<b>ER_WRONG_SESSION_TYPE</b>
+, <br />
 &#160;&#160;<b>box_error_code_MAX</b>
 <br />
  }</td></tr>
@@ -1455,6 +1459,9 @@ void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="modu
 <tr class="separator:a0e9c91d463ce4aca081e5bd376aac1d9"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a14a6ea7f0c101d1986f27de9f8ec25c8"><td class="memItemLeft" align="right" valign="top">uint64_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a14a6ea7f0c101d1986f27de9f8ec25c8">box_session_id</a> (void)</td></tr>
 <tr class="separator:a14a6ea7f0c101d1986f27de9f8ec25c8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abcef363e704e69cb0cc4efb80c6a648e"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#abcef363e704e69cb0cc4efb80c6a648e">box_iproto_send</a> (uint64_t sid, const char *header, const char *header_end, const char *body, const char *body_end)</td></tr>
+<tr class="memdesc:abcef363e704e69cb0cc4efb80c6a648e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sends a packet with the given header and body over the IPROTO session's socket.  <a href="module_8h.html#abcef363e704e69cb0cc4efb80c6a648e">More...</a><br /></td></tr>
+<tr class="separator:abcef363e704e69cb0cc4efb80c6a648e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aab8b69829c8d89799a9fb0e5d360e84b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="module_8h.html#a2b04d0397e455b7ed42b530c1c1ea9e6">box_iterator_t</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aab8b69829c8d89799a9fb0e5d360e84b">box_index_iterator</a> (uint32_t space_id, uint32_t index_id, int type, const char *key, const char *key_end)</td></tr>
 <tr class="memdesc:aab8b69829c8d89799a9fb0e5d360e84b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocate and initialize iterator for space_id, index_id.  <a href="module_8h.html#aab8b69829c8d89799a9fb0e5d360e84b">More...</a><br /></td></tr>
 <tr class="separator:aab8b69829c8d89799a9fb0e5d360e84b"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -1927,7 +1934,7 @@ void(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="mo
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;2.11.0-entrypoint-832-g7ec826746&quot;</td>
+          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;2.11.0-entrypoint-836-gb98922470&quot;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -4978,6 +4985,72 @@ decimal result (@res) </dd></dl>
 </dl>
 <dl class="section see"><dt>See also</dt><dd><div class="fragment"><div class="line">box.space[space_id]:insert(tuple) </div>
 </div><!-- fragment --> </dd></dl>
+
+</div>
+</div>
+<a id="abcef363e704e69cb0cc4efb80c6a648e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#abcef363e704e69cb0cc4efb80c6a648e">&#9670;&nbsp;</a></span>box_iproto_send()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int box_iproto_send </td>
+          <td>(</td>
+          <td class="paramtype">uint64_t&#160;</td>
+          <td class="paramname"><em>sid</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const char *&#160;</td>
+          <td class="paramname"><em>header</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const char *&#160;</td>
+          <td class="paramname"><em>header_end</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const char *&#160;</td>
+          <td class="paramname"><em>body</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const char *&#160;</td>
+          <td class="paramname"><em>body_end</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Sends a packet with the given header and body over the IPROTO session's socket. </p>
+<p>NB: yields.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">sid</td><td>IPROTO session identifier </td></tr>
+    <tr><td class="paramname">header</td><td>MsgPack encoded header </td></tr>
+    <tr><td class="paramname">header_end</td><td>MsgPack encoded header end </td></tr>
+    <tr><td class="paramname">body</td><td>MsgPack encoded body </td></tr>
+    <tr><td class="paramname">body_end</td><td>MsgPack encoded body end </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="retval"><dt>Return values</dt><dd>
+  <table class="retval">
+    <tr><td class="paramname">-1</td><td>on error (check <a class="el" href="module_8h.html#af8f82c313ba49fc97782663ffba71f58" title="Get the information about the last API call error.">box_error_last()</a>) </td></tr>
+    <tr><td class="paramname">0</td><td>on success </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>
@@ -9441,7 +9514,7 @@ box_tuple_position(it) == box_tuple_field_count(tuple) if returned value is NULL
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Mon Dec 26 2022 06:16:35 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Tue Dec 27 2022 16:31:46 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>

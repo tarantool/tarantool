@@ -416,6 +416,8 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceac486e673abf714f37a4e4b8a7fcbd591" kind="enumvalue"><name>ER_INVALID_AUTH_REQUEST</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaebc20044d48764367ec15e54161dd67c" kind="enumvalue"><name>ER_WEAK_PASSWORD</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcead92218f2962283ee58422b6a1ff1f236" kind="enumvalue"><name>ER_OLD_PASSWORD</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea28b46886771b03d96f60c7f7dd1116d1" kind="enumvalue"><name>ER_NO_SUCH_SESSION</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaa26c4b9db0c28b7d483674781cdab096" kind="enumvalue"><name>ER_WRONG_SESSION_TYPE</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
@@ -560,6 +562,7 @@
     <member refid="module_8h_1a8f9c3210df64b1f6fd89eb2c5e088e94" kind="function"><name>box_sequence_reset</name></member>
     <member refid="module_8h_1a0e9c91d463ce4aca081e5bd376aac1d9" kind="function"><name>box_session_push</name></member>
     <member refid="module_8h_1a14a6ea7f0c101d1986f27de9f8ec25c8" kind="function"><name>box_session_id</name></member>
+    <member refid="module_8h_1abcef363e704e69cb0cc4efb80c6a648e" kind="function"><name>box_iproto_send</name></member>
     <member refid="module_8h_1aab8b69829c8d89799a9fb0e5d360e84b" kind="function"><name>box_index_iterator</name></member>
     <member refid="module_8h_1ae4361728e6abe6243e7f02b098e7b347" kind="function"><name>box_iterator_next</name></member>
     <member refid="module_8h_1a6f7fe762b15009de313fdf915378429c" kind="function"><name>box_iterator_free</name></member>
