@@ -1220,6 +1220,16 @@ box_txn_id(void)
 		return -1;
 }
 
+int
+box_txn_isolation(void)
+{
+	struct txn *txn = in_txn();
+	if (txn != NULL)
+		return txn->isolation;
+	else
+		return -1;
+}
+
 bool
 box_txn(void)
 {

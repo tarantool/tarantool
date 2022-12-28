@@ -140,6 +140,7 @@ box_txn_alloc
 box_txn_begin
 box_txn_commit
 box_txn_id
+box_txn_isolation
 box_txn_rollback
 box_txn_rollback_to_savepoint
 box_txn_savepoint

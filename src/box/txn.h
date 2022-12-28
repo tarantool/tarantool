@@ -964,6 +964,14 @@ API_EXPORT int64_t
 box_txn_id(void);
 
 /**
+ * Get isolation level of current transaction, one of enum txn_isolation_level
+ * values (but cannot be TXN_ISOLATION_DEFAULT (which is zero) by design).
+ * -1 if there is no current transaction.
+ */
+API_EXPORT int
+box_txn_isolation(void);
+
+/**
  * Return true if there is an active transaction.
  */
 API_EXPORT bool
