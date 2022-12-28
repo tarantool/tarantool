@@ -203,9 +203,6 @@ sqlVdbeAddOp3(Vdbe * p, int op, int p1, int p2, int p3)
 {
 	int i;
 	VdbeOp *pOp;
-	struct session MAYBE_UNUSED *user_session;
-	user_session = current_session();
-
 	i = p->nOp;
 	assert(p->magic == VDBE_MAGIC_INIT);
 	assert(op >= 0 && op < 0xff);

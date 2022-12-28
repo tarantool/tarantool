@@ -499,10 +499,9 @@ int tarantoolsqlEphemeralDelete(BtCursor *pCur)
 	return 0;
 }
 
-int tarantoolsqlDelete(BtCursor *pCur, u8 flags)
+int
+tarantoolsqlDelete(struct BtCursor *pCur)
 {
-	(void)flags;
-
 	assert(pCur->curFlags & BTCF_TaCursor);
 	assert(pCur->iter != NULL);
 	assert(pCur->last_tuple != NULL);

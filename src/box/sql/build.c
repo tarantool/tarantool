@@ -740,7 +740,6 @@ sql_create_check_contraint(struct Parse *parser, bool is_field_ck)
 	struct alter_entity_def *alter_def =
 		(struct alter_entity_def *) create_ck_def;
 	assert(alter_def->entity_type == ENTITY_TYPE_CK);
-	(void) alter_def;
 	struct space *space = parser->create_column_def.space;
 	if (space == NULL)
 		space = parser->create_table_def.new_space;

@@ -70,7 +70,10 @@ int tarantoolsqlInsert(struct space *space, const char *tuple,
 			   const char *tuple_end);
 int tarantoolsqlReplace(struct space *space, const char *tuple,
 			    const char *tuple_end);
-int tarantoolsqlDelete(BtCursor * pCur, u8 flags);
+
+/** Execute one DELETE operation. */
+int
+tarantoolsqlDelete(struct BtCursor *pCur);
 
 int
 sql_cursor_seek(struct BtCursor *cur, struct Mem *mems, uint32_t len, int *res);
