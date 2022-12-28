@@ -101,6 +101,7 @@ local sequences = {
         { ['n'] = dbg_prompt },
         { ['p ymd'] = 'ymd => false' },
         { ['w'] = 'local hms = false' },
+        { ['bogus;'] = 'is not recognized.' },
         { ['h'] = dbg_prompt },
         { ['t'] = '=> builtin/datetime.lua' },
         { ['u'] = 'debug-target.lua:5 in chunk at' },

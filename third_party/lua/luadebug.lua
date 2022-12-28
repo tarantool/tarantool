@@ -136,6 +136,16 @@ local function color_grey(text)
     return COLOR_GRAY .. text .. COLOR_RESET
 end
 
+-- report error highlighted in color
+local function dbg_write_error(str, ...)
+    dbg_writeln(color_red('Error: ') .. str, ...)
+end
+
+-- report non-fatal warnings highlighted in color
+local function dbg_write_warn(str, ...)
+    dbg_writeln(color_yellow('Warning: ') .. str, ...)
+end
+
 local function q(text)
     return "'" .. text .. "'"
 end
@@ -342,8 +352,7 @@ local function compile_chunk(block, env)
     if chunk then
         setfenv(chunk, env)
     else
-        dbg_writeln(COLOR_RED .. "Error: Could not compile block:\n" ..
-            COLOR_RESET .. block)
+        dbg_write_error("Could not compile block: %s", q(block))
     end
     return chunk
 end
@@ -352,8 +361,8 @@ local SOURCE_CACHE = {}
 local tnt = nil
 
 local function code_listing(source, currentline, file, context_lines)
+    local normfile = normalize_path(file)
     if source and source[currentline] then
-        local normfile = normalize_path(file)
         for i = currentline - context_lines,
                 currentline + context_lines do
             local break_at = breakpoints[normfile] and breakpoints[normfile][i]
@@ -365,8 +374,8 @@ local function code_listing(source, currentline, file, context_lines)
             end
         end
     else
-        dbg_writeln(color_red("Error: Source not available for ") ..
-                    color_blue(q(file)))
+        dbg_write_warn("No source code is available for %s:%d",
+                       color_blue(normfile), currentline or 0)
     end
 end
 
@@ -444,7 +453,7 @@ local function cmd_print(expr)
 
     -- The first result is the pcall error.
     if not results[1] then
-        dbg_writeln(color_red("Error:") .. " " .. results[2])
+        dbg_write_error(results[2])
     else
         local output = ""
         for i = 2, results.n do
@@ -471,7 +480,7 @@ local function cmd_eval(code)
     -- Call the chunk and collect the results.
     local success, err = pcall(chunk, unpack(rawget(env, "...") or {}))
     if not success then
-        dbg_writeln(color_red("Error:") .. " " .. tostring(err))
+        dbg_write_error(tostring(err))
     end
 
     return false
@@ -493,26 +502,22 @@ local function parse_bp(expr)
 end
 
 local function _bp_format_expected()
-    dbg_writeln(color_red("Error:") ..
-        " command expects argument in format filename:NN or" ..
-        " filename+NN, where NN should be a positive number."
-    )
+    dbg_write_error("command expects argument in format filename:NN or " ..
+                    "filename+NN, where NN should be a positive number.")
 end
 
 -- check range to fit in boundaries {from, to}
 local function check_line_max(v, from, to)
     if type(v) ~= 'number' then
-        dbg_writeln(color_red("Error:") ..
-                    " numeric value expected as line number, but received %s",
-                    type(v))
+        dbg_write_error("numeric value expected as line number, " ..
+                        "but received %s", type(v))
         return false
     end
     if v >= from and v <= to then
         return true
     end
-    dbg_writeln(color_red("Error:") ..
-                " line number %d is out of allowed range [%d, %d]",
-                v, from, to)
+    dbg_write_error("line number %d is out of allowed range [%d, %d]",
+                    v, from, to)
     return false
 end
 
@@ -549,10 +554,8 @@ local function cmd_add_breakpoint(bps)
 end
 
 local function _bpd_format_expected()
-    dbg_writeln(color_red("Error:") ..
-        " command expects argument specifying breakpoint or" ..
-        " * for all breakpoints."
-    )
+    dbg_write_error(" command expects argument specifying breakpoint or" ..
+                    " * for all breakpoints.")
 end
 
 local function cmd_remove_breakpoint(bps)
@@ -587,7 +590,8 @@ local function cmd_remove_breakpoint(bps)
     if removed then
         dbg_writeln("Removed breakpoint %s:%d.", color_blue(normfile), line)
     else
-        dbg_writeln("No breakpoint defined in %s:%d.", color_blue(normfile), line)
+        dbg_write_warn("No breakpoint defined in %s:%d.",
+                       color_blue(normfile), line)
     end
     return false
 end
@@ -610,7 +614,7 @@ local function cmd_list_breakpoints()
             end
         end
     else
-        dbg_writeln("No active breakpoints defined.")
+        dbg_write_warn("No active breakpoints defined.")
     end
     return false
 end
@@ -634,7 +638,7 @@ local function cmd_up()
             where(info, dbg.cfg.auto_where)
         end
     else
-        dbg_writeln("Already at the bottom of the stack.")
+        dbg_write_warn("Already at the bottom of the stack.")
     end
 
     return false
@@ -660,7 +664,7 @@ local function cmd_down()
             where(info, dbg.cfg.auto_where)
         end
     else
-        dbg_writeln("Already at the top of the stack.")
+        dbg_write_warn("Already at the top of the stack.")
     end
 
     return false
@@ -841,9 +845,9 @@ local function run_command(line)
     local handler, command_arg, arg_expected = match_command(line)
     if handler then
         if arg_expected and command_arg == nil then
-            dbg_writeln(color_red("Error:") ..
-                " command '%s' expects argument, but none received.\n" ..
-                "Type 'h' and press return for a command list.", line)
+            dbg_write_error("command '%s' expects argument, but none received.\n" ..
+                            "Type 'h' and press return for a command list.",
+                            line)
             return false
         else
             last_cmd = line
@@ -853,9 +857,9 @@ local function run_command(line)
     elseif dbg.cfg.auto_eval then
         return unpack({ cmd_eval(line) })
     else
-        dbg_writeln(color_red("Error:") ..
-            " command '%s' is not recognized.\n" ..
-            "Type 'h' and press return for a command list.", line)
+        dbg_write_error("command '%s' is not recognized.\n" ..
+                        "Type 'h' and press return for a command list.",
+                        line)
         return false
     end
 end
@@ -965,7 +969,7 @@ local lua_error, lua_assert = error, assert
 -- Works like error(), but invokes the debugger.
 function dbg.error(err, level)
     level = level or 1
-    dbg_writeln(color_red("ERROR: ") .. pretty(err))
+    dbg_write_error(pretty(err))
     dbg(false, level, "dbg.error()")
 
     lua_error(err, level)
@@ -974,7 +978,7 @@ end
 -- Works like assert(), but invokes the debugger on a failure.
 function dbg.assert(condition, message)
     if not condition then
-        dbg_writeln(color_red("ERROR:") .. message)
+        dbg_write_error(message)
         dbg(false, 1, "dbg.assert()")
     end
 
@@ -984,7 +988,7 @@ end
 -- Works like pcall(), but invokes the debugger on an error.
 function dbg.call(f, ...)
     return xpcall(f, function(err)
-        dbg_writeln(color_red("ERROR: ") .. pretty(err))
+        dbg_write_error(pretty(err))
         dbg(false, 1, "dbg.call()")
 
         return err
@@ -994,10 +998,10 @@ end
 -- Error message handler that can be used with lua_pcall().
 function dbg.msgh(...)
     if debug.getinfo(2) then
-        dbg_writeln(color_red("ERROR: ") .. pretty(...))
+        dbg_write_error(pretty(...))
         dbg(false, 1, "dbg.msgh()")
     else
-        dbg_writeln(color_red(DEBUGGER .. ": ") ..
+        dbg_write_error(DEBUGGER .. ": " ..
                     "Error did not occur in Lua code. " ..
                     "Execution will continue after dbg_pcall().")
     end
