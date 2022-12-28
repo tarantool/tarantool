@@ -2053,7 +2053,6 @@ case OP_ApplyType: {
  */
 case OP_MakeRecord: {
 	Mem *pData0;           /* First field to be combined into the record */
-	Mem MAYBE_UNUSED *pLast;  /* Last field of the record */
 	int nField;            /* Number of fields in the record */
 	u8 bIsEphemeral;
 
@@ -2076,7 +2075,6 @@ case OP_MakeRecord: {
 	assert(nField>0 && pOp->p2>0 && pOp->p2+nField<=(p->nMem+1 - p->nCursor)+1);
 	pData0 = &aMem[nField];
 	nField = pOp->p2;
-	pLast = &pData0[nField-1];
 
 	/* Identify the output register */
 	assert(pOp->p3<pOp->p1 || pOp->p3>=pOp->p1+pOp->p2);
@@ -3032,7 +3030,7 @@ case OP_Delete: {
 	assert(pBtCur->eState == CURSOR_VALID);
 
 	if (pBtCur->curFlags & BTCF_TaCursor) {
-		rc = tarantoolsqlDelete(pBtCur, 0);
+		rc = tarantoolsqlDelete(pBtCur);
 	} else if (pBtCur->curFlags & BTCF_TEphemCursor) {
 		rc = tarantoolsqlEphemeralDelete(pBtCur);
 	} else {
@@ -3730,7 +3728,7 @@ case OP_IdxDelete: {
 	if (res==0) {
 		assert(pCrsr->eState == CURSOR_VALID);
 		if (pCrsr->curFlags & BTCF_TaCursor) {
-			if (tarantoolsqlDelete(pCrsr, 0) != 0)
+			if (tarantoolsqlDelete(pCrsr) != 0)
 				goto abort_due_to_error;
 		} else if (pCrsr->curFlags & BTCF_TEphemCursor) {
 			if (tarantoolsqlEphemeralDelete(pCrsr) != 0)
