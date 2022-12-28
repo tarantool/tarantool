@@ -200,7 +200,7 @@ local function hook_factory(level)
     return function(reason)
         return function(event, _)
             -- Skip events that don't have line information.
-            local info = debug.getinfo(2, "Snl")
+            local info = debug.getinfo(2, "Sl")
             local file = normalize_path(info.source)
 
             if not frame_has_line(info) or file == myself then
@@ -239,7 +239,7 @@ end
 local function hook_check_bps()
     return function(event, _)
         -- Skip events that don't have line information.
-        local info = debug.getinfo(2, "Snl")
+        local info = debug.getinfo(2, "Sl")
         local file = normalize_path(info.source)
         if not frame_has_line(info) then
             return
@@ -666,13 +666,13 @@ local function cmd_down()
 end
 
 local function cmd_where(context_lines)
-    local info = debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL, "Snl")
+    local info = debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL, "Sl")
     return (info and where(info, tonumber(context_lines) or 5))
 end
 
 local function cmd_listing(context_lines)
     local offset = stack_inspect_offset + CMD_STACK_LEVEL - 2
-    local info = debug.getinfo(offset, "Snl")
+    local info = debug.getinfo(offset, "Sl")
     return (info and where(info, tonumber(context_lines) or 5))
 end
 
@@ -885,7 +885,7 @@ repl = function(reason)
     start_repl()
     -- Skip frames without source info.
     while not frame_has_line(debug.getinfo(stack_inspect_offset +
-                                           CMD_STACK_LEVEL - 3, "Snl")) do
+                                           CMD_STACK_LEVEL - 3, "l")) do
         stack_inspect_offset = stack_inspect_offset + 1
     end
 
