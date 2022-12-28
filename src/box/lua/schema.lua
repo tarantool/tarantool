@@ -72,6 +72,8 @@ ffi.cdef[[
     int64_t
     box_txn_id();
     int
+    box_txn_isolation();
+    int
     box_txn_begin();
     int
     box_txn_set_timeout(double timeout);
@@ -459,6 +461,11 @@ box.txn_id = function()
     return tonumber(id)
 end
 
+box.internal.txn_isolation = function()
+    local lvl = builtin.box_txn_isolation()
+    return lvl ~= -1 and lvl or nil
+end
+
 box.savepoint = function()
     local csavepoint = builtin.box_txn_savepoint()
     if csavepoint == nil then
@@ -476,9 +483,24 @@ local function atomic_tail(status, ...)
      return ...
 end
 
-box.atomic = function(fun, ...)
-    box.begin()
-    return atomic_tail(pcall(fun, ...))
+box.atomic = function(arg0, arg1, ...)
+    -- There are two cases:
+    -- 1. arg0 is a function (callable in general) while arg1,... are arguments.
+    -- 2. arg0 is an options table, arg1 - a function and ... are arguments.
+    -- The simplest way to distinguish that cases (without any other checks
+    -- for correctness) is to check that arg0 is not a callable table.
+    local arg0_is_noncallable_table = false
+    if type(arg0) == 'table' then
+        local mt = debug.getmetatable(arg0)
+        arg0_is_noncallable_table = mt == nil or mt.__call == nil
+    end
+    if arg0_is_noncallable_table then
+        box.begin(arg0)
+        return atomic_tail(pcall(arg1, ...))
+    else
+        box.begin()
+        return atomic_tail(pcall(arg0, arg1, ...))
+    end
 end
 
 -- box.commit yields, so it's defined as Lua/C binding
