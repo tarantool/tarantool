@@ -31,12 +31,13 @@ local DEBUGGER = 'luadebug.lua'
 -- Use ANSI color codes in the prompt by default.
 local COLOR_GRAY = ""
 local COLOR_RED = ""
+local COLOR_GREEN
 local COLOR_BLUE = ""
 local COLOR_YELLOW = ""
 local COLOR_RESET = ""
-local GREEN_CARET_SYM = "=>"
-local GREEN_CARET = " " .. GREEN_CARET_SYM .. " "
-local RED_BREAK_SYM = "●"
+local CARET_SYM = "=>"
+local CARET = " " .. CARET_SYM .. " "
+local BREAK_SYM = "●"
 local auto_listing = true
 
 local LJ_MAX_LINE = 0x7fffff00 -- Max. source code line number.
@@ -306,7 +307,7 @@ local function mutate_bindings(_, name, value)
         repeat
             local var = debug.getlocal(level, i)
             if name == var then
-                dbg_writeln(color_yellow(DEBUGGER) .. GREEN_CARET ..
+                dbg_writeln(color_yellow(DEBUGGER) .. CARET ..
                             "Set local variable " .. color_blue(name))
                 return debug.setlocal(level, i, value)
             end
@@ -356,8 +357,8 @@ local function code_listing(source, currentline, file, context_lines)
         for i = currentline - context_lines,
                 currentline + context_lines do
             local break_at = breakpoints[normfile] and breakpoints[normfile][i]
-            local tab_or_caret = (i == currentline and GREEN_CARET_SYM or "  ")
-                                 .. (break_at and RED_BREAK_SYM or " ")
+            local tab_or_caret = (i == currentline and CARET_SYM or "  ")
+                                 .. (break_at and BREAK_SYM or " ")
             local line = source[i]
             if line then
                 dbg_writeln(color_grey("% 4d") .. tab_or_caret .. "%s", i, line)
@@ -451,7 +452,7 @@ local function cmd_print(expr)
         end
 
         if output == "" then output = "<no result>" end
-        dbg_writeln(color_blue(expr) .. GREEN_CARET .. output)
+        dbg_writeln(color_blue(expr) .. CARET .. output)
     end
 
     return false
@@ -684,7 +685,7 @@ local function cmd_trace()
         if not info then break end
 
         local is_current_frame = (i + stack_top == stack_inspect_offset)
-        local tab_or_caret = (is_current_frame and GREEN_CARET or "    ")
+        local tab_or_caret = (is_current_frame and CARET or "    ")
         dbg_writeln(color_grey("% 4d") .. tab_or_caret .. "%s",
                     i, format_stack_frame_info(info))
         i = i + 1
@@ -706,7 +707,7 @@ local function cmd_locals()
 
         -- Skip the debugger object itself, "(*internal)" values, and Lua 5.2's _ENV object.
         if not rawequal(v, dbg) and k ~= "_ENV" and not k:match("%(.*%)") then
-            dbg_writeln("  " .. color_blue(k) .. GREEN_CARET .. pretty(v))
+            dbg_writeln("  " .. color_blue(k) .. CARET .. pretty(v))
         end
     end
 
@@ -892,7 +893,7 @@ repl = function(reason)
     local info = debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL - 3,
                                "Snl")
     reason = reason and (color_yellow("break via ") .. color_red(reason) ..
-             GREEN_CARET) or ""
+             CARET) or ""
     dbg_writeln(reason .. format_stack_frame_info(info))
 
     if tonumber(dbg.cfg.auto_where) then
@@ -1014,12 +1015,14 @@ local color_maybe_supported = (stdout_isatty and os.getenv("TERM") and os.getenv
 if color_maybe_supported and not os.getenv("NO_COLOR") then
     COLOR_GRAY = string.char(27) .. "[90m"
     COLOR_RED = string.char(27) .. "[91m"
+    COLOR_GREEN = string.char(27) .. "[92m"
     COLOR_BLUE = string.char(27) .. "[94m"
     COLOR_YELLOW = string.char(27) .. "[33m"
     COLOR_RESET = string.char(27) .. "[0m"
-    GREEN_CARET = string.char(27) .. "[92m => " .. COLOR_RESET
-    GREEN_CARET_SYM = string.char(27) .. "[92m=>" .. COLOR_RESET
-    RED_BREAK_SYM = string.char(27) .. "[91m●" .. COLOR_RESET
+
+    CARET_SYM = COLOR_GREEN .. "=>" .. COLOR_RESET
+    CARET = " " .. CARET_SYM .. " "
+    BREAK_SYM = COLOR_RED .. "●" .. COLOR_RESET
 end
 
 return dbg
