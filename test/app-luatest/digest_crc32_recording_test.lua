@@ -167,10 +167,10 @@ jit.off(bucket_id_strcrc32_2)
 
 -- }}} from vshard
 
-g.before_all = function()
+g.before_all(function()
     g.server = server:new({alias = 'master'})
     g.server:start()
-end
+end)
 
 local conn
 local function r()

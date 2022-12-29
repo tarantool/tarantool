@@ -3,7 +3,7 @@ local server = require('luatest.server')
 local t = require('luatest')
 local g = t.group()
 
-g.before_all = function()
+g.before_all(function()
     g.server = server:new({alias = 'master'})
     g.server:start()
     g.server:exec(function()
@@ -15,11 +15,11 @@ g.before_all = function()
             rawset(_G, 'peer', box.session.peer())
         end)
     end)
-end
+end)
 
-g.after_all = function()
+g.after_all(function()
     g.server:drop()
-end
+end)
 
 g.test_session_disconnect_peer = function()
     local c = net.connect(g.server.net_box_uri,

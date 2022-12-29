@@ -42,7 +42,7 @@ local function auth(sock_path, user, tuple)
     }
 end
 
-g.before_all = function()
+g.before_all(function()
     g.server = server:new({alias = 'master'})
     g.server:start()
     g.server:exec(function()
@@ -50,11 +50,11 @@ g.before_all = function()
         box.schema.user.create('disabled')
         box.schema.user.revoke('disabled', 'session', 'universe')
     end)
-end
+end)
 
-g.after_all = function()
+g.after_all(function()
     g.server:stop()
-end
+end)
 
 -- If we raise different errors in case of entering an invalid password and
 -- entering the login of a non-existent user during authorization, it will

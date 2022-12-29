@@ -51,7 +51,7 @@ local tempdirs = {}
 -- Remove all temporary directories created by the test
 -- unless KEEP_DATA environment variable is set to a
 -- non-empty value.
-g.after_all = function()
+g.after_all(function()
     local dirs = table.copy(tempdirs)
     tempdirs = {}
 

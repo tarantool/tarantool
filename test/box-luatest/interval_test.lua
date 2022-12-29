@@ -2,14 +2,14 @@ local server = require('luatest.server')
 local t = require('luatest')
 local g = t.group()
 
-g.before_all = function()
+g.before_all(function()
     g.server = server:new({alias = 'master'})
     g.server:start()
-end
+end)
 
-g.after_all = function()
+g.after_all(function()
     g.server:stop()
-end
+end)
 
 g.test_interval_create_space = function()
     g.server:exec(function()

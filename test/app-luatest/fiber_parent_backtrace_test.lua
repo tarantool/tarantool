@@ -3,7 +3,7 @@ local t = require('luatest')
 
 local g = t.group()
 
-g.before_all = function()
+g.before_all(function()
     g.dflt = server:new({alias = 'dflt'})
     g.dflt:start()
     g.dflt:exec(function()
@@ -14,11 +14,11 @@ g.before_all = function()
                                             "-DENABLE_BACKTRACE=(%a+)")
         t.skip_if(enable_bt == "FALSE", "requires backtrace feature")
     end)
-end
+end)
 
-g.after_all = function()
+g.after_all(function()
     g.dflt:drop()
-end
+end)
 
 g.test_fiber_parent_backtrace = function()
     g.dflt:exec(function()

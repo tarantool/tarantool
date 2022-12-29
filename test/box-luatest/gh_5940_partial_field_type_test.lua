@@ -2,14 +2,14 @@ local t = require('luatest')
 local g = t.group('gh-5940')
 local server = require('luatest.server')
 
-g.before_all = function()
+g.before_all(function()
     g.server = server:new{alias = 'default'}
     g.server:start()
-end
+end)
 
-g.after_all = function()
+g.after_all(function()
     g.server:drop()
-end
+end)
 
 g.test_ddl_ops = function()
     g.server:exec(function()

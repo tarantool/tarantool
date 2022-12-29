@@ -6,14 +6,14 @@ local urilib = require('uri')
 local t = require('luatest')
 local g = t.group()
 
-g.before_all = function()
+g.before_all(function()
     g.server = server:new({alias = 'master'})
     g.server:start()
-end
+end)
 
-g.after_all = function()
+g.after_all(function()
     g.server:stop()
-end
+end)
 
 g.before_test('test_msgpack_object_args', function()
     g.server:eval('function echo(...) return ... end')

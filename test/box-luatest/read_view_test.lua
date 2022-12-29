@@ -2,14 +2,14 @@ local server = require('luatest.server')
 local t = require('luatest')
 local g = t.group()
 
-g.before_all = function(cg)
+g.before_all(function(cg)
     cg.server = server:new({alias = 'master'})
     cg.server:start()
-end
+end)
 
-g.after_all = function(cg)
+g.after_all(function(cg)
     cg.server:stop()
-end
+end)
 
 g.test_read_view = function(cg)
     t.tarantool.skip_if_enterprise()

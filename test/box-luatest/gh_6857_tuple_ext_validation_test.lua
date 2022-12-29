@@ -12,7 +12,7 @@ local decimal = require('decimal')
 local uuid = require('uuid')
 local datetime = require('datetime')
 
-g.before_all = function()
+g.before_all(function()
     g.cluster = cluster:new({})
     local box_cfg = {
         log_level = 6,
@@ -23,11 +23,11 @@ g.before_all = function()
     })
     g.cluster:start()
     g.server:eval('function test(val) return true end')
-end
+end)
 
-g.after_all = function()
+g.after_all(function()
     g.cluster:drop()
-end
+end)
 
 -- Iproto keys to encode custom call request.
 local IPROTO_REQUEST_TYPE = 0x00
