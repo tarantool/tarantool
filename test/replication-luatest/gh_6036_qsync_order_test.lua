@@ -4,8 +4,10 @@ local server = require('luatest.server')
 local fiber = require('fiber')
 
 local g = t.group('gh-6036')
+local failed = false
 
 g.before_all(function(cg)
+    failed = true
     cg.cluster = cluster:new({})
 
     cg.box_cfg = {
@@ -38,6 +40,7 @@ g.before_all(function(cg)
         local s = box.schema.create_space('test', {is_sync = true})
         s:create_index('pk')
     end)
+    failed = false
 end)
 
 g.after_each(function(cg)
@@ -46,7 +49,9 @@ g.after_each(function(cg)
 end)
 
 g.after_all(function(cg)
+    if not failed then
     cg.cluster:drop()
+    end
 end)
 
 local function update_replication(...)
@@ -60,6 +65,7 @@ end
 --
 -- The test requires 3rd replica to graft in.
 g.before_test("test_qsync_order", function(cg)
+    failed = true
     cg.box_cfg.replication[3] = server.build_listen_uri("r3")
     cg.r3 = cg.cluster:build_and_add_server({
         alias = 'r3',
@@ -68,9 +74,11 @@ g.before_test("test_qsync_order", function(cg)
     cg.r3:start()
     cg.r1:exec(update_replication, cg.box_cfg.replication)
     cg.r2:exec(update_replication, cg.box_cfg.replication)
+    failed = false
 end)
 
 g.test_qsync_order = function(cg)
+    failed = true
     cg.r3:exec(function()
         box.ctl.promote()
         box.ctl.wait_rw()
@@ -152,20 +160,24 @@ g.test_qsync_order = function(cg)
     end)
 
     t.assert_equals(cg.r1:exec(select), {{1},{2}})
+    failed = false
 end
 
 --
 -- Drop the r3 replica, since it is no longer needed for this test.
 g.after_test("test_qsync_order", function(cg)
+    failed = true
     cg.box_cfg.replication[3] = nil
     cg.r1:exec(update_replication, cg.box_cfg.replication)
     cg.r2:exec(update_replication, cg.box_cfg.replication)
     cg.r3:stop()
     cg.r3:clean()
     cg.r3 = nil
+    failed = false
 end)
 
 g.test_promote_order = function(cg)
+    failed = true
     --
     -- Make sure that while we're processing PROMOTE no other records
     -- get sneaked in via applier code from other replicas. For this
@@ -209,4 +221,5 @@ g.test_promote_order = function(cg)
     end)
 
     t.assert_equals(cg.r2:exec(select), {})
+    failed = false
 end
