@@ -3,7 +3,6 @@
  *
  * Copyright 2010-2021, Tarantool AUTHORS, please see AUTHORS file.
  */
-#include <ctype.h>
 #include "uri.h"
 #include "uri_parser.h"
 #include "trivia/util.h"
@@ -27,6 +26,33 @@ struct uri_param {
 	int value_count;
 	/** Array of values for this parameter. */
 	char **values;
+};
+
+/**
+ * A helper table to convert a hex character to its integer value.
+ *
+ * '0', ..., '9' ->  0, ...,  9
+ * 'A', ..., 'F' -> 10, ..., 15
+ * 'a', ..., 'f' -> 10, ..., 15
+ * Otherwise     -> -1
+ */
+static int xdigit2int[] = {
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, -1, -1, -1, -1, -1, -1,
+	-1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 };
 
 /**
@@ -399,15 +425,6 @@ uri_escape(const char *src, size_t src_size, char *dst,
 };
 
 /**
- * Converts a hex character to its integer value.
- */
-static char
-hex2ch(unsigned char ch)
-{
-	return isdigit(ch) ? ch - '0' : tolower(ch) - 'a' + 10;
-}
-
-/**
  * String percent-decoding.
  */
 size_t
@@ -417,13 +434,16 @@ uri_unescape(const char *src, size_t src_size, char *dst, bool decode_plus)
 	const char *src_end = src + src_size;
 	for (const char *p = src; p < src_end; ++p) {
 		if (*p == '%') {
-			bool is_hex_1 = p + 1 < src_end &&
-				isxdigit((unsigned char)p[1]);
-			bool is_hex_2 = p + 2 < src_end &&
-				isxdigit((unsigned char)p[2]);
-			if (is_hex_1 && is_hex_2) {
-				*dst_buf++ = hex2ch(p[1]) << 4 |
-						hex2ch(p[2]);
+			int hex_1 = -1;
+			int hex_2 = -1;
+
+			if (p + 2 < src_end) {
+				hex_1 = xdigit2int[(unsigned char)p[1]];
+				hex_2 = xdigit2int[(unsigned char)p[2]];
+			}
+
+			if (hex_1 >= 0 && hex_2 >= 0) {
+				*dst_buf++ = hex_1 << 4 | hex_2;
 				p += 2;
 			} else {
 				*dst_buf++ = '%';
