@@ -332,7 +332,12 @@ enum iproto_type {
 	/**
 	 * Error codes = (IPROTO_TYPE_ERROR | ER_XXX from errcode.h)
 	 */
-	IPROTO_TYPE_ERROR = 1 << 15
+	IPROTO_TYPE_ERROR = 1 << 15,
+
+	/**
+	 * Used for overriding the unknown request handler.
+	 */
+	IPROTO_UNKNOWN = -1,
 };
 
 /** IPROTO type name by code */
@@ -368,6 +373,14 @@ iproto_type_name(uint16_t type)
 		return iproto_type_strs[type];
 
 	switch (type) {
+	case IPROTO_JOIN:
+		return "JOIN";
+	case IPROTO_FETCH_SNAPSHOT:
+		return "FETCH_SNAPSHOT";
+	case IPROTO_REGISTER:
+		return "REGISTER";
+	case IPROTO_SUBSCRIBE:
+		return "SUBSCRIBE";
 	case IPROTO_RAFT:
 		return "RAFT";
 	case IPROTO_RAFT_PROMOTE:

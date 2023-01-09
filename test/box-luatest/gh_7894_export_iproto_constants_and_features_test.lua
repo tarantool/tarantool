@@ -141,6 +141,7 @@ local reference_table = {
         EVENT = 76,
         CHUNK = 128,
         TYPE_ERROR = bit.lshift(1, 15),
+        UNKNOWN = -1,
     },
 
     -- `iproto_raft_keys` enumeration

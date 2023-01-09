@@ -33,6 +33,8 @@
 
 #include <stddef.h>
 
+#include "box/box.h"
+
 struct uri_set;
 struct session;
 
@@ -119,6 +121,16 @@ iproto_rmean_foreach(void *cb, void *cb_ctx);
  */
 int
 iproto_thread_rmean_foreach(int thread_id, void *cb, void *cb_ctx);
+
+/**
+ * Sets an IPROTO request handler with the provided callback, destructor and
+ * context for the given request type.
+ * Passing a NULL callback resets the corresponding request handler.
+ * Returns 0 on success, a non-zero value on error (diagnostic is set).
+ */
+int
+iproto_override(uint32_t req_type, iproto_handler_t cb,
+		iproto_handler_destroy_t destroy, void *ctx);
 
 #if defined(__cplusplus)
 } /* extern "C" */
