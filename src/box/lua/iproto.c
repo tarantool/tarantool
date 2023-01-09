@@ -7,6 +7,8 @@
 #include "box/lua/iproto.h"
 
 #include "box/box.h"
+#include "box/error.h"
+#include "box/iproto.h"
 #include "box/iproto_constants.h"
 #include "box/iproto_features.h"
 
@@ -25,8 +27,8 @@
 #include <lauxlib.h>
 
 /**
- * Translation table for `box.iproto.key` constants encoding: used in
- * `luamp_encode_with_translation`.
+ * Translation table for `box.iproto.key` constants encoding and aliasing: used
+ * in `luamp_encode_with_translation` and `luamp_push_with_translation`.
  */
 static struct mh_strnu32_t *iproto_key_translation;
 
@@ -238,6 +240,7 @@ push_iproto_type_enum(struct lua_State *L)
 		{"EVENT", IPROTO_EVENT},
 		{"CHUNK", IPROTO_CHUNK},
 		{"TYPE_ERROR", IPROTO_TYPE_ERROR},
+		{"UNKNOWN", IPROTO_UNKNOWN},
 	};
 	push_iproto_constant_subnamespace(L, "type", types,
 					  lengthof(types));
@@ -376,6 +379,81 @@ lbox_iproto_send(struct lua_State *L)
 }
 
 /**
+ * Lua request handler callback: creates new Lua execution context, gets the Lua
+ * callback function, pushes the request header and body as MsgPack objects and
+ * calls the Lua callback.
+ */
+static enum iproto_handler_status
+lua_req_handler_cb(const char *header, const char *header_end,
+		   const char *body, const char *body_end,
+		   void *ctx)
+{
+	struct lua_State *L = luaT_newthread(tarantool_L);
+	if (L == NULL)
+		return IPROTO_HANDLER_ERROR;
+	int cb_ref = (int)(uintptr_t)ctx;
+	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_ref);
+	luamp_push_with_translation(L, header, header_end,
+				    iproto_key_translation);
+	luamp_push_with_translation(L, body, body_end,
+				    iproto_key_translation);
+	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
+	if (luaT_call(L, 2, 1) != 0)
+		return IPROTO_HANDLER_ERROR;
+	if (!lua_isboolean(L, 1)) {
+		diag_set(ClientError, ER_PROC_LUA,
+			 tt_sprintf("Invalid Lua IPROTO handler return type "
+				    "'%s' (expected boolean)",
+				    luaL_typename(L, 1)));
+		return IPROTO_HANDLER_ERROR;
+	}
+	bool ok = lua_toboolean(L, 1);
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
+	return ok ? IPROTO_HANDLER_OK : IPROTO_HANDLER_FALLBACK;
+}
+
+/**
+ * Lua request handler destructor: unreferences the request handler's Lua
+ * callback function.
+ */
+static void
+lua_req_handler_destroy(void *ctx)
+{
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, (int)(uintptr_t)ctx);
+}
+
+/**
+ * Sets IPROTO request handler callback (second argument) for the given request
+ * type (first argument): the Lua callback function is referenced in Lua and
+ * unreferenced in `lua_req_handler_destroy`.
+ * Passing nil as the callback resets the corresponding request handler.
+ */
+static int
+lbox_iproto_override(struct lua_State *L)
+{
+	int n_args = lua_gettop(L);
+	if (n_args != 2)
+		return luaL_error(L, "Usage: "
+				     "box.iproto.override(request_type, "
+				     "callback)");
+	uint32_t req_type = luaL_checkuint64(L, 1);
+	if (lua_isnil(L, 2)) {
+		if (iproto_override(req_type, NULL, NULL, NULL) != 0)
+			return luaT_error(L);
+		return 0;
+	}
+	luaL_checktype(L, 2, LUA_TFUNCTION);
+	int cb_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	if (iproto_override(req_type, lua_req_handler_cb,
+			    lua_req_handler_destroy,
+			    (void *)(uintptr_t)cb_ref) != 0) {
+		luaL_unref(L, LUA_REGISTRYINDEX, cb_ref);
+		return luaT_error(L);
+	}
+	return 0;
+}
+
+/**
  * Initializes module for working with Tarantool's network subsystem.
  */
 void
@@ -391,6 +469,7 @@ box_lua_iproto_init(struct lua_State *L)
 
 	const struct luaL_Reg iproto_methods[] = {
 		{"send", lbox_iproto_send},
+		{"override", lbox_iproto_override},
 		{NULL, NULL}
 	};
 	luaL_register(L, NULL, iproto_methods);

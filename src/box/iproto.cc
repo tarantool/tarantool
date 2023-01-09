@@ -171,6 +171,12 @@ struct iproto_thread {
 	struct cmsg_hop push_route[2];
 	struct cmsg_hop *dml_route[IPROTO_TYPE_STAT_MAX];
 	struct cmsg_hop connect_route[2];
+	struct cmsg_hop override_route[2];
+	/*
+	 * Set of overridden request handlers. Used by IPROTO thread to skip
+	 * request preprocessing and use the 'override' route.
+	 */
+	mh_i32_t *req_handlers;
 	/*
 	 * Iproto thread memory pools
 	 */
@@ -258,6 +264,24 @@ unsigned iproto_readahead = 16320;
 
 /* The maximal number of iproto messages in fly. */
 static int iproto_msg_max = IPROTO_MSG_MAX_MIN;
+
+/**
+ * Request handler meta information.
+ */
+struct iproto_req_handler {
+	/** Request handler callback. */
+	iproto_handler_t cb;
+	/** Request handler destructor, can be NULL. */
+	iproto_handler_destroy_t destroy;
+	/** Context passed to request handler callback and destructor. */
+	void *ctx;
+};
+
+/**
+ * Request handler table used in TX thread for processing requests with
+ * overridden handlers.
+ */
+static mh_i32ptr_t *tx_req_handlers;
 
 int
 iproto_addr_count(void)
@@ -1552,11 +1576,13 @@ iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend,
 		   bool *stop_input)
 {
 	uint64_t stream_id;
-	uint8_t type;
+	uint32_t type;
 	bool request_is_not_for_stream;
 	bool request_is_only_for_stream;
 	bool is_replication_request;
 	struct iproto_thread *iproto_thread = msg->connection->iproto_thread;
+	mh_i32_t *handlers = iproto_thread->req_handlers;
+	mh_int_t handler;
 	struct cmsg_hop *route;
 	int rc;
 
@@ -1591,14 +1617,27 @@ iproto_msg_prepare(struct iproto_msg *msg, const char **pos, const char *reqend,
 	if (is_replication_request)
 		*stop_input = true;
 
+	handler = mh_i32_find(handlers, type, NULL);
+	if (handler != mh_end(handlers)) {
+		assert(!is_replication_request);
+		cmsg_init(&msg->base, iproto_thread->override_route);
+		return;
+	}
+
 	rc = iproto_msg_decode(msg, &route);
 	if (rc == 0) {
 		assert(route != NULL);
 		cmsg_init(&msg->base, route);
 		return;
 	}
-	if (route == NULL)
+	if (route == NULL) {
+		handler = mh_i32_find(handlers, IPROTO_UNKNOWN, NULL);
+		if (handler != mh_end(handlers)) {
+			cmsg_init(&msg->base, iproto_thread->override_route);
+			return;
+		}
 		diag_set(ClientError, ER_UNKNOWN_REQUEST_TYPE, (uint32_t)type);
+	}
 error:
 	/** Log and send the error. */
 	diag_log();
@@ -1610,7 +1649,7 @@ error:
 static int
 iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 {
-	uint8_t type = msg->header.type;
+	uint32_t type = msg->header.type;
 	struct iproto_thread *iproto_thread = msg->connection->iproto_thread;
 	switch (type) {
 	case IPROTO_SELECT:
@@ -2526,6 +2565,67 @@ tx_process_replication(struct cmsg *m)
 	tx_end_msg(msg, &empty);
 }
 
+/**
+ * Process a request using the overridden handler (or the unknown request
+ * handler as a last resort). We assume that the IPROTO thread checked the
+ * handler availability.
+ */
+static void
+tx_process_override(struct cmsg *m)
+{
+	struct iproto_msg *msg = tx_accept_msg(m);
+	mh_int_t k = mh_i32ptr_find(tx_req_handlers, msg->header.type, NULL);
+	if (k == mh_end(tx_req_handlers)) {
+		k = mh_i32ptr_find(tx_req_handlers, IPROTO_UNKNOWN, NULL);
+		assert(k != mh_end(tx_req_handlers));
+	}
+	struct mh_i32ptr_node_t *node = mh_i32ptr_node(tx_req_handlers, k);
+	struct iproto_req_handler *handler =
+		(struct iproto_req_handler *)node->val;
+	const char *header = msg->reqstart;
+	mp_decode_uint(&header);
+
+	const char *header_end = msg->reqstart + msg->len;
+	const char *body = "\x80"; /* Empty MsgPack map encoding. */
+	const char *body_end = body + 1;
+	if (msg->header.bodycnt != 0) {
+		assert(msg->header.bodycnt == 1);
+		header_end -= msg->header.body[0].iov_len;
+		body = (const char *)msg->header.body[0].iov_base;
+		body_end = body + msg->header.body[0].iov_len;
+	}
+
+	struct cmsg_hop *route = NULL;
+	switch (handler->cb(header, header_end, body, body_end, handler->ctx)) {
+	case IPROTO_HANDLER_OK: {
+		struct obuf *out = msg->connection->tx.p_obuf;
+		iproto_wpos_create(&msg->wpos, out);
+		struct obuf_svp empty = obuf_create_svp(out);
+		tx_end_msg(msg, &empty);
+		return;
+	}
+	case IPROTO_HANDLER_FALLBACK: {
+		int rc = iproto_msg_decode(msg, &route);
+		assert(route != NULL);
+		if (rc != 0)
+			route = NULL;
+		FALLTHROUGH;
+	}
+	case IPROTO_HANDLER_ERROR:
+		break;
+	default:
+		unreachable();
+	}
+	if (route != NULL) {
+		assert(m->hop[1].f == route[1].f);
+		route->f(m);
+		return;
+	}
+	struct obuf_svp svp = obuf_create_svp(msg->connection->tx.p_obuf);
+	tx_reply_error(msg);
+	tx_end_msg(msg, &svp);
+}
+
 static void
 iproto_msg_finish_processing_in_stream(struct iproto_msg *msg)
 {
@@ -3018,12 +3118,16 @@ iproto_thread_init_routes(struct iproto_thread *iproto_thread)
 	iproto_thread->connect_route[0] =
 		{ tx_process_connect, &iproto_thread->net_pipe };
 	iproto_thread->connect_route[1] = { net_send_greeting, NULL };
+	iproto_thread->override_route[0] =
+		{ tx_process_override, &iproto_thread->net_pipe };
+	iproto_thread->override_route[1] = { net_send_msg, NULL };
 };
 
 static inline int
 iproto_thread_init(struct iproto_thread *iproto_thread)
 {
 	iproto_thread_init_routes(iproto_thread);
+	iproto_thread->req_handlers = mh_i32_new();
 	slab_cache_create(&iproto_thread->net_slabc, &runtime);
 	/* Init statistics counter */
 	iproto_thread->rmean = rmean_new(rmean_net_strings, RMEAN_NET_LAST);
@@ -3073,6 +3177,7 @@ iproto_init(int threads_count)
 
 		if (cord_costart(&iproto_thread->net_cord, "iproto",
 				 net_cord_f, iproto_thread)) {
+			mh_i32_delete(iproto_thread->req_handlers);
 			rmean_delete(iproto_thread->rmean);
 			rmean_delete(iproto_thread->tx.rmean);
 			slab_cache_destroy(&iproto_thread->net_slabc);
@@ -3087,6 +3192,7 @@ iproto_init(int threads_count)
 				    iproto_msg_max / 2);
 	}
 
+	tx_req_handlers = mh_i32ptr_new();
 	session_vtab_registry[SESSION_TYPE_BINARY] = iproto_session_vtab;
 
 	if (box_on_shutdown(NULL, iproto_on_shutdown_f, NULL) != 0)
@@ -3118,6 +3224,11 @@ enum iproto_cfg_op {
 	 * Command code do get statistic from iproto thread
 	 */
 	IPROTO_CFG_STAT,
+	/**
+	 * Command code to notify IPROTO threads a new handler has been set or
+	 * reset.
+	 */
+	IPROTO_CFG_OVERRIDE,
 };
 
 /**
@@ -3137,6 +3248,12 @@ struct iproto_cfg_msg: public cbus_call_msg
 		struct evio_service *binary;
 		/** New iproto max message count. */
 		int iproto_msg_max;
+		struct {
+			/** Overridden request type. */
+			uint32_t req_type;
+			/** Whether the request handler is set or reset. */
+			bool is_set;
+		} override;
 	};
 	struct iproto_thread *iproto_thread;
 };
@@ -3172,6 +3289,7 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 	struct iproto_cfg_msg *cfg_msg = (struct iproto_cfg_msg *) m;
 	int old;
 	struct iproto_thread *iproto_thread = cfg_msg->iproto_thread;
+	struct mh_i32_t *req_handlers = iproto_thread->req_handlers;
 	struct evio_service *binary = &iproto_thread->binary;
 	struct errinj *inj;
 
@@ -3209,6 +3327,23 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 			break;
 		case IPROTO_CFG_STAT:
 			iproto_fill_stat(iproto_thread, cfg_msg);
+			break;
+		case IPROTO_CFG_OVERRIDE:
+			if (cfg_msg->override.is_set) {
+				uint32_t old;
+				uint32_t *replaced = &old;
+				mh_i32_put(req_handlers,
+					   &cfg_msg->override.req_type,
+					   &replaced, NULL);
+				assert(replaced == NULL);
+			} else {
+				mh_int_t k =
+					mh_i32_find(req_handlers,
+						    cfg_msg->override.req_type,
+						    NULL);
+				assert(k != mh_end(req_handlers));
+				mh_i32_del(req_handlers, k, NULL);
+			}
 			break;
 		default:
 			unreachable();
@@ -3342,6 +3477,20 @@ iproto_set_msg_max(int new_iproto_msg_max)
 	}
 }
 
+/**
+ * Notifies IPROTO threads that a new request handler has been set.
+ */
+static void
+iproto_cfg_override(uint32_t req_type, bool is_set)
+{
+	struct iproto_cfg_msg cfg_msg;
+	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_OVERRIDE);
+	cfg_msg.override.req_type = req_type;
+	cfg_msg.override.is_set = is_set;
+	for (int i = 0; i < iproto_threads_count; ++i)
+		iproto_do_cfg_crit(&iproto_threads[i], &cfg_msg);
+}
+
 int
 iproto_session_send(struct session *session,
 		    const char *header, const char *header_end,
@@ -3378,11 +3527,24 @@ iproto_session_send(struct session *session,
 	return 0;
 }
 
+/**
+ * Calls the IPROTO request handler's destructor, if there is one, and
+ * deallocates the handler.
+ */
+static void
+iproto_req_handler_delete(struct iproto_req_handler *handler)
+{
+	if (handler->destroy != NULL)
+		handler->destroy(handler->ctx);
+	free(handler);
+}
+
 void
 iproto_free(void)
 {
 	for (int i = 0; i < iproto_threads_count; i++) {
 		cord_cancel_and_join(&iproto_threads[i].net_cord);
+		mh_i32_delete(iproto_threads[i].req_handlers);
 		/*
 		 * Close socket descriptor to prevent hot standby instance
 		 * failing to bind in case it tries to bind before socket
@@ -3394,6 +3556,16 @@ iproto_free(void)
 		slab_cache_destroy(&iproto_threads[i].net_slabc);
 	}
 	free(iproto_threads);
+
+	mh_int_t i;
+	mh_foreach(tx_req_handlers, i) {
+		struct mh_i32ptr_node_t *node =
+			mh_i32ptr_node(tx_req_handlers, i);
+		struct iproto_req_handler *handler =
+			(struct iproto_req_handler *)node->val;
+		iproto_req_handler_delete(handler);
+	}
+	mh_i32ptr_delete(tx_req_handlers);
 
 	/*
 	 * Here we close sockets and unlink all unix socket paths.
@@ -3473,4 +3645,54 @@ iproto_thread_rmean_foreach(int thread_id, void *cb, void *cb_ctx)
 					cb, cb_ctx) != 0)
 		rc = 1;
 	return rc;
+}
+
+int
+iproto_override(uint32_t req_type, iproto_handler_t cb,
+		iproto_handler_destroy_t destroy, void *ctx)
+{
+	if (req_type == IPROTO_JOIN || req_type == IPROTO_FETCH_SNAPSHOT ||
+	    req_type == IPROTO_REGISTER || req_type == IPROTO_SUBSCRIBE) {
+		const char *feature = tt_sprintf("%s request type",
+						 iproto_type_name(req_type));
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 "IPROTO request handler overriding", feature);
+		return -1;
+	}
+
+	if (cb == NULL) {
+		mh_int_t k = mh_i32ptr_find(tx_req_handlers, req_type, NULL);
+		if (k != mh_end(tx_req_handlers)) {
+			struct mh_i32ptr_node_t *node =
+				mh_i32ptr_node(tx_req_handlers, k);
+			struct iproto_req_handler *old =
+				(struct iproto_req_handler *)node->val;
+			iproto_cfg_override(req_type, false);
+			iproto_req_handler_delete(old);
+			mh_i32ptr_del(tx_req_handlers, k, NULL);
+		}
+		return 0;
+	}
+
+	struct iproto_req_handler *handler =
+		(struct iproto_req_handler *)xmalloc(sizeof(*handler));
+	*handler = (struct iproto_req_handler) {
+		/* .handler = */ cb,
+		/* .destroy = */ destroy,
+		/* .ctx = */ ctx,
+	};
+	struct mh_i32ptr_node_t node = {
+		/* .key = */ req_type,
+		/* .val = */ handler,
+	};
+	struct mh_i32ptr_node_t old;
+	struct mh_i32ptr_node_t *replaced = &old;
+	mh_i32ptr_put(tx_req_handlers, &node, &replaced, NULL);
+	if (replaced != NULL) {
+		handler = (struct iproto_req_handler *)replaced->val;
+		iproto_req_handler_delete(handler);
+		return 0;
+	}
+	iproto_cfg_override(req_type, true);
+	return 0;
 }

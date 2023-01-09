@@ -3029,6 +3029,98 @@ test_box_iproto_send(struct lua_State *L)
 
 /* }}} Helpers for `box_iproto_send` Lua/C API test cases */
 
+/* {{{ Helpers for `box_iproto_override` Lua/C API test cases */
+
+enum {
+	IPROTO_SYNC = 0x01,
+	IPROTO_DATA = 0x30,
+};
+
+static void *handler_ctx;
+
+static enum iproto_handler_status
+cb(const char *header, const char *header_end,
+   const char *body, const char *body_end, void *ctx)
+{
+	fail_unless(ctx == handler_ctx);
+	const char *it = header;
+	fail_unless(mp_check(&it, header_end) == 0);
+	it = body;
+	fail_unless(mp_check(&it, body_end) == 0);
+
+	it = header;
+	fail_unless(mp_typeof(*it) == MP_MAP);
+	uint32_t size = mp_decode_map(&it);
+	fail_unless(size == 2);
+	bool header_is_ok = false;
+	for (uint32_t i = 0; i < size; ++i, mp_next(&it)) {
+		fail_unless(mp_typeof(*it) == MP_UINT);
+		uint64_t key = mp_decode_uint(&it);
+		if (key == IPROTO_SYNC) {
+			fail_unless(mp_typeof(*it) == MP_UINT);
+			uint64_t sync = mp_decode_uint(&it);
+			if (sync == 1)
+				header_is_ok = true;
+			break;
+		}
+	}
+	fail_unless(header_is_ok);
+	it = body;
+	fail_unless(mp_typeof(*it) == MP_MAP);
+	size = mp_decode_map(&it);
+	fail_unless(size == 1);
+	fail_unless(mp_typeof(*it) == MP_UINT);
+	fail_unless(mp_decode_uint(&it) == IPROTO_DATA);
+	fail_unless(mp_typeof(*it) == MP_UINT);
+	fail_unless(mp_decode_uint(&it) == 2);
+	box_iproto_send(box_session_id(), header, header_end, body, body_end);
+	return IPROTO_HANDLER_OK;
+}
+
+static void
+cb_destroy(void *ctx)
+{
+	fail_unless(ctx == handler_ctx);
+}
+
+static enum iproto_handler_status
+cb_err(const char *header, const char *header_end,
+       const char *body, const char *body_end, void *ctx)
+{
+	(void)header;
+	(void)header_end;
+	(void)body;
+	(void)body_end;
+	(void)ctx;
+	box_error_raise(777, "test");
+	return IPROTO_HANDLER_ERROR;
+}
+
+iproto_handler_t handlers[] = {cb, cb_err};
+
+static int
+test_box_iproto_override_set(struct lua_State *L)
+{
+	fail_unless(lua_gettop(L) == 2);
+	uint64_t rq_type = luaL_checkuint64(L, 1);
+	uint64_t handler_id = luaL_checkuint64(L, 2);
+	fail_unless(handler_id <= 1);
+	fail_unless(box_iproto_override(rq_type, handlers[handler_id],
+					cb_destroy, handler_ctx) == 0);
+	return 1;
+}
+
+static int
+test_box_iproto_override_reset(struct lua_State *L)
+{
+	fail_unless(lua_gettop(L) == 1);
+	uint64_t rq_type = luaL_checkuint64(L, 1);
+	fail_unless(box_iproto_override(rq_type, NULL, NULL, NULL) == 0);
+	return 1;
+}
+
+/* }}} Helpers for `box_iproto_override` Lua/C API test cases */
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -3082,6 +3174,8 @@ luaopen_module_api(lua_State *L)
 		{"box_schema_version_matches", test_box_schema_version},
 		{"box_session_id_matches", test_box_session_id},
 		{"box_iproto_send", test_box_iproto_send},
+		{"box_iproto_override_set", test_box_iproto_override_set},
+		{"box_iproto_override_reset", test_box_iproto_override_reset},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);

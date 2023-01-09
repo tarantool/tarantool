@@ -62,7 +62,8 @@ struct region;
 struct xrow_header {
 	/* (!) Please update txn_add_redo() after changing members */
 
-	uint16_t type;
+	/** Request type. */
+	uint32_t type;
 	uint32_t replica_id;
 	/**
 	 * Replication group identifier. 0 - replicaset,

@@ -575,8 +575,90 @@ local function test_box_iproto_send(test, module)
               'packet body for packet consisting of header and body is correct')
 end
 
+-- Basic test of `box_iproto_override` correctness: main functional testing is
+-- done in test/box-luatest/gh_7901_iproto_request_handlers_overriding_test.lua.
+local function test_box_iproto_override(test, module)
+    test:plan(8)
+
+    -- Connect to the server.
+    local u = uri.parse(box.cfg.listen)
+    local s, err = socket.tcp_connect(u.host, u.service)
+    if s == nil then
+        test:diag('Failed to connect to server: ' .. err)
+        return
+    end
+    -- Skip the greeting.
+    if #s:read(128) ~= 128 then
+        test:diag('Tarantool greeting message size is not 128')
+        return
+    end
+
+    local header = setmetatable(
+            {
+                [box.iproto.key.SYNC] = 1,
+            }, {__serialize = 'map'})
+    local body = setmetatable(
+            {
+                [box.iproto.key.DATA] = 2,
+            }, {__serialize = 'map'})
+    local mp_header
+    local mp_body = msgpack.encode(body)
+    local mp_packet_len
+    local mp
+    local mp_len
+    local packet
+    local packet_size
+    local packet_len
+    local packet_header
+    local packet_body
+    local next
+    local _ -- luacheck: no unused
+
+    module.box_iproto_override_set(box.iproto.type.PING, 0)
+    header[box.iproto.key.REQUEST_TYPE] = box.iproto.type.PING
+    mp_header = msgpack.encode(header)
+    mp_packet_len = msgpack.encode(#mp_header + #mp_body)
+    mp = mp_packet_len .. mp_header .. mp_body
+    s:write(mp)
+    mp_len = 5 + #mp_header + #mp_body
+    packet = s:read(mp_len)
+    packet_size = #packet
+    test:is(packet_size, mp_len, 'size of response packet from overridden ' ..
+            'request handler is correct')
+    packet_len, next = msgpack.decode(packet)
+    test:is(packet_size - next + 1, packet_len, 'response packet length ' ..
+            'from overridden request handler is correct')
+    packet_header, next = msgpack.decode(packet, next)
+    packet_body, next = msgpack.decode(packet, next)
+    test:is(next, packet_size + 1, 'response packet from overridden request ' ..
+            'handler is correct')
+    test:is_deeply(packet_header, header, 'response packet header from ' ..
+                   'overridden request handler is correct')
+    test:is_deeply(packet_body, body, 'response packet body from overridden ' ..
+                   'request handler is correct')
+    module.box_iproto_override_reset(box.iproto.type.PING)
+
+    module.box_iproto_override_set(box.iproto.type.PING, 1)
+    s:write(mp)
+    s:readable()
+    packet = s:recv()
+    packet_size = #packet
+    packet_len, next = msgpack.decode(packet)
+    test:is(packet_size - next + 1, packet_len, 'error response packet ' ..
+            'length from overridden request handler is correct')
+    packet_header, next = msgpack.decode(packet, next)
+    _, next = msgpack.decode(packet, next)
+    test:is(next, packet_size + 1, 'error response packet from overridden' ..
+            'request handler is correct')
+    test:is(packet_header[box.iproto.key.REQUEST_TYPE],
+            bit.bor(box.iproto.type.TYPE_ERROR, 777),
+            'error response packet header request type from overridden ' ..
+            'request handler is correct')
+    module.box_iproto_override_reset(box.iproto.type.PING)
+end
+
 require('tap').test("module_api", function(test)
-    test:plan(46)
+    test:plan(47)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
@@ -611,6 +693,7 @@ require('tap').test("module_api", function(test)
     test:test("box_schema_version_matches", test_box_schema_version_matches, module)
     test:test("box_session_id_matches", test_box_session_id_matches, module)
     test:test("box_iproto_send", test_box_iproto_send, module)
+    test:test("box_iproto_override", test_box_iproto_override, module)
 
     space:drop()
 end)

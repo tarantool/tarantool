@@ -3268,6 +3268,13 @@ box_iproto_send(uint64_t sid,
 	return iproto_session_send(session, header, header_end, body, body_end);
 }
 
+API_EXPORT int
+box_iproto_override(uint32_t req_type, iproto_handler_t handler,
+		    iproto_handler_destroy_t destroy, void *ctx)
+{
+	return iproto_override(req_type, handler, destroy, ctx);
+}
+
 static inline void
 box_register_replica(uint32_t id, const struct tt_uuid *uuid)
 {

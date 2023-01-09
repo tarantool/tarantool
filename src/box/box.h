@@ -376,6 +376,44 @@ box_select(uint32_t space_id, uint32_t index_id,
 typedef struct box_function_ctx box_function_ctx_t;
 
 /**
+ * Return codes for IPROTO request handlers.
+ */
+enum iproto_handler_status {
+	/** Success, no further actions needed. */
+	IPROTO_HANDLER_OK,
+	/** Error, diagnostic must be set by handler via box_error_set(). */
+	IPROTO_HANDLER_ERROR,
+	/** Fallback to system handler. */
+	IPROTO_HANDLER_FALLBACK,
+};
+
+/**
+ * IPROTO request handler signature: receives MsgPack encoded header and body,
+ * a context provided by box_iproto_override(), and must return one of the
+ * status codes from iproto_handler_status.
+ *
+ * \param header Msgpack encoded header
+ * \param header_end end of Msgpack encoded header
+ * \param body Msgpack encoded body
+ * \param body_end end of Msgpack encoded body
+ * \param ctx context provided by box_iproto_override()
+ * \returns a status code
+ */
+typedef enum iproto_handler_status
+(*iproto_handler_t)(const char *header, const char *header_end,
+		    const char *body, const char *body_end,
+		    void *ctx);
+
+/**
+ * IPROTO request handler destructor called when the corresponding handler is
+ * removed.
+ *
+ * \param ctx context provided by box_iproto_override()
+ */
+typedef void
+(*iproto_handler_destroy_t)(void *ctx);
+
+/**
  * Return a tuple from stored C procedure.
  *
  * Returned tuple is automatically reference counted by Tarantool.
@@ -619,6 +657,27 @@ API_EXPORT int
 box_iproto_send(uint64_t sid,
 		const char *header, const char *header_end,
 		const char *body, const char *body_end);
+
+/**
+ * Sets an IPROTO request handler with the provided context for the
+ * given request type.
+ *
+ * NB: yields.
+ *
+ * \param req_type request type code from iproto_type enumeration
+ *                 (src/box/iproto_constants.h);
+ *                 use IPROTO_UNKNOWN for overriding the handler of unknown
+ *                 request types;
+ * \param handler IPROTO request handler; passing NULL resets the corresponding
+ *                handler
+ * \param destroy IPROTO request handler destructor
+ * \param ctx context passed to handler
+ * \retval -1 on error (check box_error_last())
+ * \retval 0 on success
+ */
+API_EXPORT int
+box_iproto_override(uint32_t req_type, iproto_handler_t handler,
+		    iproto_handler_destroy_t destroy, void *ctx);
 
 /** \endcond public */
 
