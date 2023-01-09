@@ -2510,3 +2510,24 @@ func_sql_expr_has_single_arg(const struct func *base, const char *name)
 	}
 	return true;
 }
+
+bool
+func_sql_expr_check_fields(const struct func *base, const struct space_def *def)
+{
+	assert(base->def->language == FUNC_LANGUAGE_SQL_EXPR);
+	struct func_sql_expr *func = (struct func_sql_expr *)base;
+	struct Vdbe *v = func->stmt;
+	for (int i = 0; i < v->nOp; ++i) {
+		if (v->aOp[i].opcode != OP_FetchByName)
+			continue;
+		const char *name = v->aOp[i].p4.z;
+		bool is_exists = false;
+		for (size_t j = 0; j < def->field_count && !is_exists; ++j) {
+			const char *field_name = def->fields[j].name;
+			is_exists = strcmp(name, field_name) == 0;
+		}
+		if (!is_exists)
+			return false;
+	}
+	return true;
+}

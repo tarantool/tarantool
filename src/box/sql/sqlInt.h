@@ -2504,6 +2504,13 @@ sql_normalized_name_new(const char *name, int len);
 char *
 sql_normalized_name_region_new(struct region *r, const char *name, int len);
 
+/**
+ * Return an escaped version of the original name in memory allocated with
+ * sql_xmalloc().
+ */
+char *
+sql_escaped_name_new(const char *name);
+
 int sqlKeywordCode(const unsigned char *, int);
 int sqlRunParser(Parse *, const char *);
 
@@ -2650,6 +2657,18 @@ u32 sqlExprListFlags(const ExprList *);
 void
 sqlPragma(struct Parse *pParse, struct Token *pragma, struct Token *table,
 	  struct Token *index);
+
+/** Emit VDBE instructions for "SHOW CREATE TABLE table_name;" statement. */
+void
+sql_emit_show_create_table_one(struct Parse *parse, struct Token *name);
+
+/** Emit VDBE instructions for "SHOW CREATE TABLE;" statement. */
+void
+sql_emit_show_create_table_all(struct Parse *parse);
+
+/** Generate a CREATE TABLE statement for the space with the given ID. */
+void
+sql_show_create_table(uint32_t space_id, struct Mem *ret, struct Mem *err);
 
 /**
  * Return true if given column is part of primary key.

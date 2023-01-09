@@ -64,6 +64,7 @@ set(sql_sources
     sql/resolve.c
     sql/port.c
     sql/select.c
+    sql/show.c
     sql/tokenize.c
     sql/treeview.c
     sql/trigger.c

@@ -255,7 +255,7 @@ columnlist ::= tcons.
   CONFLICT DEFERRED END ENGINE FAIL
   IGNORE INITIALLY INSTEAD NO MATCH PLAN
   QUERY KEY OFFSET RAISE RELEASE REPLACE RESTRICT
-  RENAME CTIME_KW IF ENABLE DISABLE UUID
+  RENAME CTIME_KW IF ENABLE DISABLE UUID SHOW
   .
 %wildcard WILDCARD.
 
@@ -1498,6 +1498,15 @@ cmd ::= FUNCTION_KW(T) expr(E). {
   pParse->parsed_ast_type = AST_TYPE_EXPR;
   pParse->parsed_ast.expr = sqlExprDup(E.pExpr, 0);
 }
+
+//////////////////////////// The SHOW CREATE TABLE command /////////////////////
+cmd ::= SHOW CREATE TABLE nm(X). {
+  sql_emit_show_create_table_one(pParse, &X);
+}
+cmd ::= SHOW CREATE TABLE. {
+  sql_emit_show_create_table_all(pParse);
+}
+
 //////////////////////////// The CREATE TRIGGER command /////////////////////
 
 cmd ::= createkw trigger_decl(A) BEGIN trigger_cmd_list(S) END(Z). {
