@@ -1244,3 +1244,25 @@ sqlVListNameToNum(VList * pIn, const char *zName, int nName)
 	} while (i < mx);
 	return 0;
 }
+
+char *
+sql_escaped_name_new(const char *name)
+{
+	size_t len = strlen(name);
+	size_t count = 0;
+	for (size_t i = 0; i < len; ++i) {
+		if (name[i] == '"')
+			++count;
+	}
+	size_t size = len + count + 2;
+	char *buf = sql_xmalloc(size + 1);
+	buf[0] = '"';
+	for (size_t i = 0, j = 1; i < len; ++i) {
+		buf[j++] = name[i];
+		if (name[i] == '"')
+			buf[j++] = '"';
+	}
+	buf[size - 1] = '"';
+	buf[size] = '\0';
+	return buf;
+}
