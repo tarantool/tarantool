@@ -1111,14 +1111,14 @@ box_eval_replication_synchro_quorum(int nr_replicas)
 {
 	assert(nr_replicas > 0 && nr_replicas < VCLOCK_MAX);
 
-	const char fmt[] =
-		"local expr = [[%s]]\n"
+	const char loadable[] =
+		"local expr, N = ...\n"
 		"local f, err = loadstring('return ('..expr..')')\n"
 		"if not f then "
 			"error(string.format('Failed to load \%\%s:"
 			"\%\%s', expr, err)) "
 		"end\n"
-		"setfenv(f, {N = %d, math = {"
+		"setfenv(f, {N = N, math = {"
 			"ceil = math.ceil,"
 			"floor = math.floor,"
 			"abs = math.abs,"
@@ -1135,23 +1135,11 @@ box_eval_replication_synchro_quorum(int nr_replicas)
 		"return math.floor(res)\n";
 	const char *expr = cfg_gets("replication_synchro_quorum");
 
-	/*
-	 * cfg_gets uses static buffer as well so we need a local
-	 * one, 1K should be enough to carry arbitrary but sane
-	 * formula.
-	 */
-	char buf[1024];
-	int len = snprintf(buf, sizeof(buf), fmt, expr,
-			   nr_replicas);
-	if (len >= (int)sizeof(buf)) {
-		diag_set(ClientError, ER_CFG,
-			 "replication_synchro_quorum",
-			 "the formula is too big");
-		return -1;
-	}
+	luaL_loadstring(tarantool_L, loadable);
+	lua_pushstring(tarantool_L, expr);
+	lua_pushinteger(tarantool_L, nr_replicas);
 
-	luaL_loadstring(tarantool_L, buf);
-	if (lua_pcall(tarantool_L, 0, 1, 0) != 0) {
+	if (lua_pcall(tarantool_L, 2, 1, 0) != 0) {
 		diag_set(ClientError, ER_CFG,
 			 "replication_synchro_quorum",
 			 lua_tostring(tarantool_L, -1));
