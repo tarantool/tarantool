@@ -39,7 +39,7 @@ jobs:
         ( github.event_name != 'pull_request' ||
           contains(github.event.pull_request.labels.*.name, 'full-ci') )
 
-    runs-on: macos-11-m1
+    runs-on: [ macos-11-self-hosted, aarch64 ]
 
     steps:
       - name: Prepare checkout
