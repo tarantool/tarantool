@@ -1604,7 +1604,6 @@ xrow_decode_error(const struct xrow_header *row)
 {
 	uint32_t code = row->type & (IPROTO_TYPE_ERROR - 1);
 
-	char error[DIAG_ERRMSG_MAX] = { 0 };
 	const char *pos;
 	uint32_t map_size;
 
@@ -1632,8 +1631,8 @@ xrow_decode_error(const struct xrow_header *row)
 			uint32_t len;
 			const char *str = mp_decode_str(&pos, &len);
 			if (!is_stack_parsed) {
-				snprintf(error, sizeof(error), "%.*s", len, str);
-				box_error_set(__FILE__, __LINE__, code, error);
+				box_error_set(__FILE__, __LINE__, code, "%.*s",
+					      len, str);
 			}
 		} else if (key == IPROTO_ERROR) {
 			struct error *e = error_unpack_unsafe(&pos);
@@ -1649,7 +1648,7 @@ xrow_decode_error(const struct xrow_header *row)
 	return;
 
 error:
-	box_error_set(__FILE__, __LINE__, code, error);
+	box_error_set(__FILE__, __LINE__, code, "");
 }
 
 int
