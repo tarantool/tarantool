@@ -1917,9 +1917,10 @@ tx_end_msg(struct iproto_msg *msg, struct obuf_svp *svp)
 		msg->stream->txn = txn_detach();
 	}
 	msg->connection->iproto_thread->tx.requests_in_progress--;
-	/* Log response to the flight recorder. */
 	struct obuf *out = msg->connection->tx.p_obuf;
-	flightrec_write_response(out, svp);
+	if (msg->connection->tx.p_obuf->used != svp->used)
+		/* Log response to the flight recorder. */
+		flightrec_write_response(out, svp);
 }
 
 /**
