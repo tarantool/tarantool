@@ -22,7 +22,7 @@ old_synchro_timeout = box.cfg.replication_synchro_timeout
 box.cfg{replication_synchro_quorum = "aaa"}
  | ---
  | - error: 'Incorrect value for option ''replication_synchro_quorum'': [string "local
- |     expr = [[aaa]]..."]:7: Expression should return a number'
+ |     expr, N = ......"]:7: Expression should return a number'
  | ...
 
 -- Test out of bounds values
