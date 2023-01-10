@@ -1526,7 +1526,13 @@ xlog_close(struct xlog *l, bool reuse_fd)
 
 /* {{{ struct xlog_cursor */
 
-#define XLOG_READ_AHEAD		(1 << 14)
+enum {
+	/**
+	 * Min and max values for xlog_cursor::read_ahead.
+	 */
+	XLOG_READ_AHEAD_MIN = XLOG_TX_AUTOCOMMIT_THRESHOLD,
+	XLOG_READ_AHEAD_MAX = 8 * 1024 * 1024,
+};
 
 /**
  * Ensure that at least count bytes are in read buffer
@@ -1545,7 +1551,7 @@ xlog_cursor_ensure(struct xlog_cursor *cursor, size_t count)
 		return 1;
 
 	size_t to_load = count - ibuf_used(&cursor->rbuf);
-	to_load += XLOG_READ_AHEAD;
+	to_load += cursor->read_ahead;
 
 	void *dst = ibuf_reserve(&cursor->rbuf, to_load);
 	if (dst == NULL) {
@@ -1567,9 +1573,25 @@ xlog_cursor_ensure(struct xlog_cursor *cursor, size_t count)
 			 cursor->name);
 		return -1;
 	}
-	/* ibuf_reserve() has been called above, ibuf_alloc() must not fail */
 	assert((size_t)readen <= to_load);
+	/* ibuf_reserve() has been called above, ibuf_alloc() must not fail */
 	ibuf_alloc(&cursor->rbuf, readen);
+	/* Shrink the read buffer to reduce the memory consumption. */
+	if (cursor->need_rbuf_shrink) {
+		ibuf_shrink(&cursor->rbuf);
+		cursor->need_rbuf_shrink = false;
+	}
+	/*
+	 * Grow readahead size if the requested number of bytes was successfully
+	 * read, and decrease it to the minimum otherwise.
+	 */
+	if ((size_t)readen == to_load) {
+		if (cursor->read_ahead * 2 <= XLOG_READ_AHEAD_MAX)
+			cursor->read_ahead *= 2;
+	} else {
+		cursor->need_rbuf_shrink = true;
+		cursor->read_ahead = XLOG_READ_AHEAD_MIN;
+	}
 	cursor->read_offset += readen;
 	return ibuf_used(&cursor->rbuf) >= count ? 0: 1;
 }
@@ -1982,6 +2004,7 @@ xlog_cursor_openfd(struct xlog_cursor *i, int fd, const char *name)
 {
 	memset(i, 0, sizeof(*i));
 	i->fd = fd;
+	i->read_ahead = XLOG_READ_AHEAD_MIN;
 	ibuf_create(&i->rbuf, &cord()->slabc,
 		    XLOG_TX_AUTOCOMMIT_THRESHOLD << 1);
 
