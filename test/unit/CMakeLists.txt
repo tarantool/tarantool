@@ -180,6 +180,10 @@ create_unit_test(PREFIX xrow
                  SOURCES xrow.cc core_test_utils.c
                  LIBRARIES xrow unit
 )
+create_unit_test(PREFIX xlog
+                 SOURCES xlog.c core_test_utils.c
+                 LIBRARIES xlog xrow unit
+)
 create_unit_test(PREFIX decimal
                  SOURCES decimal.c
                  LIBRARIES core unit

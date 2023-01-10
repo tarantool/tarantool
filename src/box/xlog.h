@@ -661,6 +661,10 @@ struct xlog_cursor {
 	char name[PATH_MAX];
 	/** file read buffer */
 	struct ibuf rbuf;
+	/** whether the buffer needs to be shrunk */
+	bool need_rbuf_shrink;
+	/** how many additional bytes are read to the buffer */
+	size_t read_ahead;
 	/** file read position */
 	off_t read_offset;
 	/** cursor for current tx */
