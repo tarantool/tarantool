@@ -38,10 +38,10 @@ stream:begin()
 space:replace({1})
 space:select({}) -- [1]
 _ = test_run:eval("test", string.format("sleep_with_timeout(%f)", txn_timeout + 0.1))
-space:select({}) -- []
+space:select({})
 space:replace({2})
 fiber.yield()
-space:select({}) -- []
+space:select({})
 stream:commit() -- transaction was aborted by timeout
 
 -- Check that transaction aborted by timeout, which
@@ -50,10 +50,10 @@ stream:begin({timeout = txn_timeout})
 space:replace({1})
 space:select({}) -- [1]
 _= test_run:eval("test", string.format("sleep_with_timeout(%f)", txn_timeout + 0.1))
-space:select({}) -- []
+space:select({})
 space:replace({2})
 fiber.yield()
-space:select({}) -- []
+space:select({})
 stream:commit() -- transaction was aborted by timeout
 
 -- Check that transaction is not rollback until timeout expired.

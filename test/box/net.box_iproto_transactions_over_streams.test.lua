@@ -144,11 +144,7 @@ conn, stream, space = start_server_and_init(false)
 stream:begin()
 test_run:wait_cond(function () return get_current_stream_count() == 1 end)
 space:replace({1})
--- Empty select, transaction was not commited and
--- is not visible from requests not belonging to the
--- transaction.
-space:select{}
--- Select is empty, because memtx_use_mvcc_engine is false
+-- Select fails, because memtx_use_mvcc_engine is false
 space:select({})
 test_run:switch("test")
 -- Select is empty, transaction was not commited
@@ -167,7 +163,7 @@ stream:commit()
 -- Same checks for `call` end `eval` functions.
 stream:call('box.begin')
 stream:call('s:replace', {{1}})
--- Select is empty, because memtx_use_mvcc_engine is false
+-- Select fails, because memtx_use_mvcc_engine is false
 space:select({})
 stream:call('s:select', {})
 test_run:switch("test")
@@ -183,7 +179,7 @@ space:select{}
 -- begin and commit transaction.
 stream:execute('START TRANSACTION')
 stream:call('s:replace', {{1}})
--- Select is empty, because memtx_use_mvcc_engine is false
+-- Select fails, because memtx_use_mvcc_engine is false
 space:select({})
 stream:call('s:select', {})
 test_run:switch("test")
