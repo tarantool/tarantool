@@ -218,10 +218,6 @@ enum txn_status {
 	 */
 	TXN_PREPARED,
 	/**
-	 * The TX was aborted when other TX was committed due to conflict.
-	 */
-	TXN_CONFLICTED,
-	/**
 	 * The TX was read_only, has a conflict and was sent to read view.
 	 * Read-only and does not participate in conflict resolution ever more.
 	 * This transaction can only see a state of the database at some fixed
@@ -233,7 +229,8 @@ enum txn_status {
 	 */
 	TXN_COMMITTED,
 	/**
-	 * The TX was aborted.
+	 * The TX was aborted, either explicitly, by box.rollback(), or
+	 * automatically, by conflict or timeout.
 	 */
 	TXN_ABORTED,
 };
@@ -547,12 +544,6 @@ txn_has_flag(const struct txn *txn, enum txn_flag flag)
 	return (txn->flags & flag) != 0;
 }
 
-static inline bool
-txn_has_any_of_flags(struct txn *txn, unsigned int flags)
-{
-	return (txn->flags & flags) != 0;
-}
-
 static inline void
 txn_set_flags(struct txn *txn, unsigned int flags)
 {
@@ -587,9 +578,7 @@ txn_flags_to_error_code(struct txn *txn)
 static inline int
 txn_check_can_continue(struct txn *txn)
 {
-	unsigned int flags = TXN_IS_CONFLICTED | TXN_IS_ABORTED_BY_YIELD |
-			     TXN_IS_ABORTED_BY_TIMEOUT;
-	if (txn_has_any_of_flags(txn, flags)) {
+	if (txn->status == TXN_ABORTED) {
 		diag_set(ClientError, txn_flags_to_error_code(txn));
 		return -1;
 	}
