@@ -593,7 +593,7 @@ txn_begin_stmt(struct txn *txn, struct space *space, uint16_t type)
 
 	if (txn->status == TXN_IN_READ_VIEW) {
 		rlist_del(&txn->in_read_view_txs);
-		txn->status = TXN_CONFLICTED;
+		txn->status = TXN_ABORTED;
 		txn_set_flags(txn, TXN_IS_CONFLICTED);
 	}
 
@@ -1549,6 +1549,7 @@ txn_on_timeout(ev_loop *loop, ev_timer *watcher, int revents)
 	(void) revents;
 	struct txn *txn = (struct txn *)watcher->data;
 	txn_rollback_to_svp(txn, NULL);
+	txn->status = TXN_ABORTED;
 	txn_set_flags(txn, TXN_IS_ABORTED_BY_TIMEOUT);
 }
 
@@ -1576,9 +1577,9 @@ txn_on_yield(struct trigger *trigger, void *event)
 	(void) event;
 	struct txn *txn = in_txn();
 	assert(txn != NULL);
-	enum txn_flag flags = TXN_CAN_YIELD | TXN_IS_ABORTED_BY_YIELD;
-	if (!txn_has_any_of_flags(txn, flags)) {
+	if (txn->status != TXN_ABORTED && !txn_has_flag(txn, TXN_CAN_YIELD)) {
 		txn_rollback_to_svp(txn, NULL);
+		txn->status = TXN_ABORTED;
 		txn_set_flags(txn, TXN_IS_ABORTED_BY_YIELD);
 		say_warn("Transaction has been aborted by a fiber yield");
 		return 0;
