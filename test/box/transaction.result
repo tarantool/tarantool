@@ -211,9 +211,14 @@ box.commit();
 box.begin() s:insert{1, 'Must be rolled back'};
 ---
 ...
--- nothing - the transaction was rolled back
--- nothing to commit because of yield
-while s:get{1} ~= nil do fiber.sleep(0) end
+fiber.yield();
+---
+...
+-- error - the transaction was rolled back by yield
+s:get{1};
+---
+- error: Transaction has been aborted by a fiber yield
+...
 box.commit();
 ---
 - error: Transaction has been aborted by a fiber yield

@@ -117,9 +117,9 @@ s:select({}) -- [1]
 fiber.sleep(txn_timeout + 0.1)
 ---
 ...
-s:select({}) --[]
+s:select({})
 ---
-- []
+- error: Transaction has been aborted by timeout
 ...
 s:replace({2})
 ---
@@ -128,9 +128,9 @@ s:replace({2})
 fiber.yield()
 ---
 ...
-s:select({}) -- []
+s:select({})
 ---
-- []
+- error: Transaction has been aborted by timeout
 ...
 box.commit() -- Transaction has been aborted by timeout
 ---
@@ -152,9 +152,9 @@ s:select({}) -- [1]
 fiber.sleep(txn_timeout  / 2 + 0.1)
 ---
 ...
-s:select({}) --[]
+s:select({})
 ---
-- []
+- error: Transaction has been aborted by timeout
 ...
 s:replace({2})
 ---
@@ -163,9 +163,9 @@ s:replace({2})
 fiber.yield()
 ---
 ...
-s:select({}) -- []
+s:select({})
 ---
-- []
+- error: Transaction has been aborted by timeout
 ...
 box.commit() -- Transaction has been aborted by timeout
 ---

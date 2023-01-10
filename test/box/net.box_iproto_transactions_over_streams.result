@@ -273,17 +273,10 @@ space:replace({1})
 ---
 - [1]
 ...
--- Empty select, transaction was not commited and
--- is not visible from requests not belonging to the
--- transaction.
-space:select{}
----
-- []
-...
--- Select is empty, because memtx_use_mvcc_engine is false
+-- Select fails, because memtx_use_mvcc_engine is false
 space:select({})
 ---
-- []
+- error: Transaction has been aborted by a fiber yield
 ...
 test_run:switch("test")
 ---
@@ -329,14 +322,14 @@ stream:call('s:replace', {{1}})
 ---
 - [1]
 ...
--- Select is empty, because memtx_use_mvcc_engine is false
+-- Select fails, because memtx_use_mvcc_engine is false
 space:select({})
 ---
-- []
+- error: Transaction has been aborted by a fiber yield
 ...
 stream:call('s:select', {})
 ---
-- []
+- error: Transaction has been aborted by a fiber yield
 ...
 test_run:switch("test")
 ---
@@ -371,14 +364,14 @@ stream:call('s:replace', {{1}})
 ---
 - [1]
 ...
--- Select is empty, because memtx_use_mvcc_engine is false
+-- Select fails, because memtx_use_mvcc_engine is false
 space:select({})
 ---
-- []
+- error: Transaction has been aborted by a fiber yield
 ...
 stream:call('s:select', {})
 ---
-- []
+- error: Transaction has been aborted by a fiber yield
 ...
 test_run:switch("test")
 ---

@@ -567,7 +567,7 @@ txn_has_flag(struct txn *txn, enum txn_flag flag)
 }
 
 static inline bool
-txn_has_any_of_flags(struct txn *txn, enum txn_flag flags)
+txn_has_any_of_flags(struct txn *txn, unsigned int flags)
 {
 	return (txn->flags & flags) != 0;
 }
@@ -582,6 +582,37 @@ static inline void
 txn_clear_flags(struct txn *txn, unsigned int flags)
 {
 	txn->flags &= ~flags;
+}
+
+/**
+ * Returns the code of the error that caused abort of the given transaction.
+ */
+static inline enum box_error_code
+txn_flags_to_error_code(struct txn *txn)
+{
+	if (txn_has_flag(txn, TXN_IS_CONFLICTED))
+		return ER_TRANSACTION_CONFLICT;
+	else if (txn_has_flag(txn, TXN_IS_ABORTED_BY_YIELD))
+		return ER_TRANSACTION_YIELD;
+	else if (txn_has_flag(txn, TXN_IS_ABORTED_BY_TIMEOUT))
+		return ER_TRANSACTION_TIMEOUT;
+	return ER_UNKNOWN;
+}
+
+/**
+ * Checks if new statements can be executed in the given transaction.
+ * Returns 0 if true. Otherwise, sets diag and returns -1.
+ */
+static inline int
+txn_check_can_continue(struct txn *txn)
+{
+	unsigned int flags = TXN_IS_CONFLICTED | TXN_IS_ABORTED_BY_YIELD |
+			     TXN_IS_ABORTED_BY_TIMEOUT;
+	if (txn_has_any_of_flags(txn, flags)) {
+		diag_set(ClientError, txn_flags_to_error_code(txn));
+		return -1;
+	}
+	return 0;
 }
 
 /* Pointer to the current transaction (if any) */
@@ -792,10 +823,8 @@ txn_begin_ro_stmt(struct space *space, struct txn **txn,
 	svp->region_used = region_used(svp->region);
 	*txn = in_txn();
 	if (*txn != NULL) {
-		if ((*txn)->status == TXN_CONFLICTED) {
-			diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+		if (txn_check_can_continue(*txn) != 0)
 			return -1;
-		}
 		struct engine *engine = space->engine;
 		return txn_begin_in_engine(engine, *txn);
 	}

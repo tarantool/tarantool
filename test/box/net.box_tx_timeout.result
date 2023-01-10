@@ -102,9 +102,9 @@ space:select({}) -- [1]
 _ = test_run:eval("test", string.format("sleep_with_timeout(%f)", txn_timeout + 0.1))
 ---
 ...
-space:select({}) -- []
+space:select({})
 ---
-- []
+- error: Transaction has been aborted by timeout
 ...
 space:replace({2})
 ---
@@ -113,9 +113,9 @@ space:replace({2})
 fiber.yield()
 ---
 ...
-space:select({}) -- []
+space:select({})
 ---
-- []
+- error: Transaction has been aborted by timeout
 ...
 stream:commit() -- transaction was aborted by timeout
 ---
@@ -137,9 +137,9 @@ space:select({}) -- [1]
 _= test_run:eval("test", string.format("sleep_with_timeout(%f)", txn_timeout + 0.1))
 ---
 ...
-space:select({}) -- []
+space:select({})
 ---
-- []
+- error: Transaction has been aborted by timeout
 ...
 space:replace({2})
 ---
@@ -148,9 +148,9 @@ space:replace({2})
 fiber.yield()
 ---
 ...
-space:select({}) -- []
+space:select({})
 ---
-- []
+- error: Transaction has been aborted by timeout
 ...
 stream:commit() -- transaction was aborted by timeout
 ---

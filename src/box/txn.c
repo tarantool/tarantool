@@ -234,31 +234,6 @@ tx_region_release(struct txn *txn, enum tx_alloc_type alloc_type)
 		tx_track_allocation(txn, new_alloc_size, alloc_type);
 }
 
-static inline enum box_error_code
-txn_flags_to_error_code(struct txn *txn)
-{
-	if (txn_has_flag(txn, TXN_IS_CONFLICTED))
-		return ER_TRANSACTION_CONFLICT;
-	else if (txn_has_flag(txn, TXN_IS_ABORTED_BY_YIELD))
-		return ER_TRANSACTION_YIELD;
-	else if (txn_has_flag(txn, TXN_IS_ABORTED_BY_TIMEOUT))
-		return ER_TRANSACTION_TIMEOUT;
-	return ER_UNKNOWN;
-}
-
-static inline int
-txn_check_can_continue(struct txn *txn)
-{
-	enum txn_flag flags =
-		TXN_IS_CONFLICTED | TXN_IS_ABORTED_BY_YIELD |
-		TXN_IS_ABORTED_BY_TIMEOUT;
-	if (txn_has_any_of_flags(txn, flags)) {
-		diag_set(ClientError, txn_flags_to_error_code(txn));
-		return -1;
-	}
-	return 0;
-}
-
 static inline void
 txn_set_timeout(struct txn *txn, double timeout)
 {
