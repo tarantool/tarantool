@@ -99,9 +99,9 @@ box.begin();
 -- back a transction with no statements.
 box.commit();
 box.begin() s:insert{1, 'Must be rolled back'};
--- nothing - the transaction was rolled back
-while s:get{1} ~= nil do fiber.sleep(0) end
--- nothing to commit because of yield
+fiber.yield();
+-- error - the transaction was rolled back by yield
+s:get{1};
 box.commit();
 -- Test background fiber
 --

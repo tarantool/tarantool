@@ -46,10 +46,10 @@ box.begin()
 s:replace({1})
 s:select({}) -- [1]
 fiber.sleep(txn_timeout + 0.1)
-s:select({}) --[]
+s:select({})
 s:replace({2})
 fiber.yield()
-s:select({}) -- []
+s:select({})
 box.commit() -- Transaction has been aborted by timeout
 
 -- Check that transaction aborted by timeout, which
@@ -58,10 +58,10 @@ box.begin({timeout = txn_timeout})
 s:replace({1})
 s:select({}) -- [1]
 fiber.sleep(txn_timeout  / 2 + 0.1)
-s:select({}) --[]
+s:select({})
 s:replace({2})
 fiber.yield()
-s:select({}) -- []
+s:select({})
 box.commit() -- Transaction has been aborted by timeout
 
 -- Check that transaction is not rollback until timeout expired.
