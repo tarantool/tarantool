@@ -532,7 +532,7 @@ memtx_tx_abort_all_for_ddl(struct txn *ddl_owner)
 		if (to_be_aborted->status != TXN_INPROGRESS &&
 		    to_be_aborted->status != TXN_IN_READ_VIEW)
 			continue;
-		to_be_aborted->status = TXN_CONFLICTED;
+		to_be_aborted->status = TXN_ABORTED;
 		txn_set_flags(to_be_aborted, TXN_IS_CONFLICTED);
 		say_warn("Transaction committing DDL (id=%lld) has aborted "
 			 "another TX (id=%lld)", (long long) ddl_owner->id,
@@ -655,7 +655,7 @@ memtx_tx_handle_conflict(struct txn *breaker, struct txn *victim)
 		/* Mark as conflicted. */
 		if (victim->status == TXN_IN_READ_VIEW)
 			rlist_del(&victim->in_read_view_txs);
-		victim->status = TXN_CONFLICTED;
+		victim->status = TXN_ABORTED;
 		txn_set_flags(victim, TXN_IS_CONFLICTED);
 	}
 }
