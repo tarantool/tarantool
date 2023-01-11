@@ -58,6 +58,9 @@ bool replication_skip_conflict = false;
 bool replication_anon = false;
 int replication_threads = 1;
 
+struct tt_uuid cfg_bootstrap_leader_uuid;
+struct uri cfg_bootstrap_leader_uri;
+
 struct replicaset replicaset;
 
 struct rlist replicaset_on_quorum_gain =
@@ -137,6 +140,17 @@ replicaset_connect_quorum(int total)
 		return MIN(total, replication_connect_quorum);
 	case BOOTSTRAP_STRATEGY_AUTO:
 		return replicaset_connect_quorum_auto(total);
+	case BOOTSTRAP_STRATEGY_CONFIG:
+		/*
+		 * During the replica set bootstrap and join we don't care about
+		 * connected node count, we only care about reaching the
+		 * configured bootstrap leader, which is checked separately.
+		 *
+		 * When this is recovery or replication reconfiguration, all
+		 * other nodes might be dead, so none of the connections is
+		 * critical.
+		 */
+		return 0;
 	default:
 		unreachable();
 	}
@@ -162,6 +176,7 @@ replicaset_sync_quorum(void)
 		return MIN(replication_connect_quorum,
 			   replicaset.applier.total);
 	case BOOTSTRAP_STRATEGY_AUTO:
+	case BOOTSTRAP_STRATEGY_CONFIG:
 		return replication_sync_quorum_auto;
 	default:
 		unreachable();
@@ -890,11 +905,53 @@ applier_on_connect_f(struct trigger *trigger, void *event)
 	return 0;
 }
 
+/** Check if the applier is connected to the configured bootstrap leader. */
+static bool
+applier_is_bootstrap_leader(const struct applier *applier)
+{
+	if (bootstrap_strategy != BOOTSTRAP_STRATEGY_CONFIG)
+		return false;
+	if (!tt_uuid_is_nil(&cfg_bootstrap_leader_uuid)) {
+		return tt_uuid_compare(&applier->uuid,
+				       &cfg_bootstrap_leader_uuid) == 0;
+	}
+	if (!uri_is_nil(&cfg_bootstrap_leader_uri)) {
+		return uri_addr_is_equal(&applier->uri,
+					 &cfg_bootstrap_leader_uri);
+	}
+	return false;
+}
+
+/**
+ * A helper to determine if the applier to the configured bootstrap leader is
+ * connected.
+ */
+static bool
+bootstrap_leader_is_connected(struct applier **appliers, int count)
+{
+	for (int i = 0; i < count; i++) {
+		struct applier *applier = appliers[i];
+		if (applier->state == APPLIER_CONNECTED &&
+		    applier_is_bootstrap_leader(applier)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 /** A helper determining whether any more connection attempts are needed. */
 static bool
-replicaset_is_connected(struct replicaset_connect_state *state, int count,
+replicaset_is_connected(struct replicaset_connect_state *state,
+			struct applier **appliers, int count,
 			bool connect_quorum)
 {
+	if (replicaset_state == REPLICASET_BOOTSTRAP ||
+	    replicaset_state == REPLICASET_JOIN) {
+		if (bootstrap_strategy == BOOTSTRAP_STRATEGY_CONFIG &&
+		    bootstrap_leader_is_connected(appliers, count)) {
+			return true;
+		}
+	}
 	if (state->connected == count)
 		return true;
 	/*
@@ -975,7 +1032,8 @@ replicaset_connect(struct applier **appliers, int count,
 		applier_start(applier);
 	}
 
-	while (!replicaset_is_connected(&state, count, connect_quorum)) {
+	while (!replicaset_is_connected(&state, appliers, count,
+					connect_quorum)) {
 		double wait_start = ev_monotonic_now(loop());
 		if (fiber_cond_wait_timeout(&state.wakeup, timeout) != 0)
 			break;
@@ -1220,8 +1278,9 @@ replicaset_next(struct replica *replica)
 	return replica_hash_next(&replicaset.hash, replica);
 }
 
-struct replica *
-replicaset_find_join_master(void)
+/** \sa replicaset_find_join_master. */
+static struct replica *
+replicaset_find_join_master_auto(void)
 {
 	struct replica *leader = NULL;
 	int leader_score = -1;
@@ -1285,6 +1344,43 @@ elect:
 		leader_score = score;
 	}
 	return leader;
+}
+
+/**
+ * Out of all the replicas find the one which's told to be the bootstrap_leader
+ * by the config.
+ */
+static struct replica *
+replicaset_find_join_master_cfg(void)
+{
+	struct replica *leader = NULL;
+	replicaset_foreach(replica) {
+		struct applier *applier = replica->applier;
+		if (applier == NULL)
+			continue;
+		if (applier_is_bootstrap_leader(applier))
+			leader = replica;
+	}
+	if (leader == NULL && !tt_uuid_is_equal(&cfg_bootstrap_leader_uuid,
+						&INSTANCE_UUID)) {
+		tnt_raise(ClientError, ER_CFG, "bootstrap_leader",
+			  "failed to connect to the bootstrap leader");
+	}
+	return leader;
+}
+
+struct replica *
+replicaset_find_join_master(void)
+{
+	switch (bootstrap_strategy) {
+	case BOOTSTRAP_STRATEGY_LEGACY:
+	case BOOTSTRAP_STRATEGY_AUTO:
+		return replicaset_find_join_master_auto();
+	case BOOTSTRAP_STRATEGY_CONFIG:
+		return replicaset_find_join_master_cfg();
+	default:
+		unreachable();
+	}
 }
 
 struct replica *

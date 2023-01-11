@@ -984,7 +984,7 @@ box_check_election_fencing_mode(void)
 
 /** A helper to check validity of a single uri. */
 static int
-check_uri(const struct uri *uri, const char *option_name)
+check_uri(const struct uri *uri, const char *option_name, bool set_diag)
 {
 	const char *auth_type = uri_param(uri, "auth_type", 0);
 	const char *errmsg;
@@ -999,10 +999,31 @@ check_uri(const struct uri *uri, const char *option_name)
 	}
 	return 0;
 bad_uri:;
-	char *uristr = tt_static_buf();
-	uri_format(uristr, TT_STATIC_BUF_LEN, uri, false);
-	diag_set(ClientError, ER_CFG, option_name,
-		 tt_sprintf("bad URI '%s': %s", uristr, errmsg));
+	if (set_diag) {
+		char *uristr = tt_static_buf();
+		uri_format(uristr, TT_STATIC_BUF_LEN, uri, false);
+		diag_set(ClientError, ER_CFG, option_name,
+			 tt_sprintf("bad URI '%s': %s", uristr, errmsg));
+	}
+	return -1;
+}
+
+/** Check validity of a uri passed in configuration option. */
+static int
+box_check_uri(struct uri *uri, const char *option_name, bool set_diag)
+{
+	const char *source = cfg_gets(option_name);
+	if (source == NULL) {
+		uri_create(uri, NULL);
+		return 0;
+	}
+	if (uri_create(uri, source) == 0)
+		return check_uri(uri, option_name, set_diag);
+	if (set_diag) {
+		diag_set(ClientError, ER_CFG, option_name,
+			 tt_sprintf("bad URI '%s': expected host:service or "
+				    "/unix.socket", source));
+	}
 	return -1;
 }
 
@@ -1018,7 +1039,7 @@ box_check_uri_set(const char *option_name)
 	int rc = 0;
 	for (int i = 0; i < uri_set.uri_count; i++) {
 		const struct uri *uri = &uri_set.uris[i];
-		if (check_uri(uri, option_name) != 0) {
+		if (check_uri(uri, option_name, true) != 0) {
 			rc = -1;
 			break;
 		}
@@ -1055,9 +1076,11 @@ box_check_bootstrap_strategy(void)
 		return BOOTSTRAP_STRATEGY_AUTO;
 	if (strcmp(strategy, "legacy") == 0)
 		return BOOTSTRAP_STRATEGY_LEGACY;
+	if (strcmp(strategy, "config") == 0)
+		return BOOTSTRAP_STRATEGY_CONFIG;
 	diag_set(ClientError, ER_CFG, "bootstrap_strategy",
 		 "the value should be one of the following: "
-		 "'auto', 'legacy'");
+		 "'auto', 'config', 'legacy'");
 	return BOOTSTRAP_STRATEGY_INVALID;
 }
 
@@ -1236,20 +1259,24 @@ box_check_replication_sync_timeout(void)
 	return timeout;
 }
 
+/** Check validity of a uuid passed in a configuration option. */
 static inline int
-box_check_uuid(struct tt_uuid *uuid, const char *name)
+box_check_uuid(struct tt_uuid *uuid, const char *name, bool set_diag)
 {
 	*uuid = uuid_nil;
 	const char *uuid_str = cfg_gets(name);
 	if (uuid_str == NULL)
 		return 0;
 	if (tt_uuid_from_string(uuid_str, uuid) != 0) {
-		diag_set(ClientError, ER_CFG, name, uuid_str);
+		if (set_diag)
+			diag_set(ClientError, ER_CFG, name, uuid_str);
 		return -1;
 	}
 	if (tt_uuid_is_nil(uuid)) {
-		diag_set(ClientError, ER_CFG, name,
-			 tt_sprintf("nil UUID is reserved"));
+		if (set_diag) {
+			diag_set(ClientError, ER_CFG, name,
+				 tt_sprintf("nil UUID is reserved"));
+		}
 		return -1;
 	}
 	return 0;
@@ -1284,13 +1311,46 @@ box_check_replication_anon(void)
 static int
 box_check_instance_uuid(struct tt_uuid *uuid)
 {
-	return box_check_uuid(uuid, "instance_uuid");
+	return box_check_uuid(uuid, "instance_uuid", true);
 }
 
 static int
 box_check_replicaset_uuid(struct tt_uuid *uuid)
 {
-	return box_check_uuid(uuid, "replicaset_uuid");
+	return box_check_uuid(uuid, "replicaset_uuid", true);
+}
+
+/** Check bootstrap_leader option validity. */
+static int
+box_check_bootstrap_leader(struct uri *uri, struct tt_uuid *uuid)
+{
+	*uuid = uuid_nil;
+	uri_create(uri, NULL);
+	const char *source = cfg_gets("bootstrap_leader");
+	enum bootstrap_strategy strategy = box_check_bootstrap_strategy();
+	if (strategy != BOOTSTRAP_STRATEGY_CONFIG) {
+		if (source == NULL) {
+			/* Nothing to do. */
+			return 0;
+		}
+		diag_set(ClientError, ER_CFG, "bootstrap_leader",
+			 "the option takes no effect when bootstrap strategy "
+			 "is not 'config'");
+		return -1;
+	} else if (source == NULL) {
+		diag_set(ClientError, ER_CFG, "bootstrap_leader",
+			 "the option can't be empty when bootstrap strategy "
+			 "is 'config'");
+		return -1;
+	}
+	if (box_check_uri(uri, "bootstrap_leader", false) == 0)
+		return 0;
+	/* Not a uri. Try uuid then. */
+	if (box_check_uuid(uuid, "bootstrap_leader", false) == 0)
+		return 0;
+	diag_set(ClientError, ER_CFG, "bootstrap_leader",
+		 "the value must be either a uri or a uuid");
+	return -1;
 }
 
 static enum wal_mode
@@ -1552,6 +1612,7 @@ void
 box_check_config(void)
 {
 	struct tt_uuid uuid;
+	struct uri uri;
 	box_check_say();
 	box_check_audit();
 	if (box_check_flightrec() != 0)
@@ -1584,6 +1645,8 @@ box_check_config(void)
 		diag_raise();
 	box_check_replication_sync_timeout();
 	if (box_check_bootstrap_strategy() == BOOTSTRAP_STRATEGY_INVALID)
+		diag_raise();
+	if (box_check_bootstrap_leader(&uri, &uuid) != 0)
 		diag_raise();
 	box_check_readahead(cfg_geti("readahead"));
 	box_check_checkpoint_count(cfg_geti("checkpoint_count"));
@@ -1696,7 +1759,7 @@ box_update_replication(void)
 	/*
 	 * In legacy mode proceed as soon as `replication_connect_quorum` remote
 	 * peers are connected.
-	 * In auto mode, try to connect to everyone during the given time
+	 * In every other mode, try to connect to everyone during the given time
 	 * period, but do not fail even if no connections were established.
 	 */
 	const bool do_quorum = bootstrap_strategy != BOOTSTRAP_STRATEGY_LEGACY;
@@ -1760,6 +1823,13 @@ box_set_bootstrap_strategy(void)
 		return -1;
 	bootstrap_strategy = strategy;
 	return 0;
+}
+
+static int
+box_set_bootstrap_leader(void)
+{
+	return box_check_bootstrap_leader(&cfg_bootstrap_leader_uri,
+					  &cfg_bootstrap_leader_uuid);
 }
 
 void
@@ -4700,6 +4770,8 @@ box_cfg_xc(void)
 	box_set_too_long_threshold();
 	box_set_replication_timeout();
 	if (box_set_bootstrap_strategy() != 0)
+		diag_raise();
+	if (box_set_bootstrap_leader() != 0)
 		diag_raise();
 	box_set_replication_connect_timeout();
 	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_LEGACY)
