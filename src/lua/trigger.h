@@ -38,8 +38,10 @@ extern "C" {
 struct lua_State;
 
 /**
- * The job of lbox_push_event_f is to push trigger arguments
- * to Lua stack.
+ * If not NULL, lbox_push_event_f will be called before execution
+ * of the trigger callback. It's supposed to push trigger arguments
+ * to Lua stack and return the number of pushed values on success.
+ * On error, it should set diag and return a negative number.
  */
 typedef int
 (*lbox_push_event_f)(struct lua_State *L, void *event);
