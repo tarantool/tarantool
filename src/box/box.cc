@@ -2452,6 +2452,13 @@ box_feedback_report_crash(struct crash_info *cinfo)
 static void
 box_crash_callback(struct crash_info *cinfo)
 {
+	if (cinfo->signo == SIGBUS &&
+	    flightrec_is_mmapped_address(cinfo->siaddr)) {
+		fprintf(stderr, "error accessing flightrec file\n");
+		fflush(stderr);
+		_exit(EXIT_FAILURE);
+	}
+
 	crash_report_stderr(cinfo);
 
 	if (box_feedback_crash_enabled &&

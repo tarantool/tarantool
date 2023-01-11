@@ -85,6 +85,17 @@ flightrec_write_response(struct obuf *buf, struct obuf_svp *svp)
 	(void)svp;
 }
 
+/**
+ * This function is called in SIGBUS handler to check whether accessed address
+ * belongs to flightrec file.
+ */
+static inline bool
+flightrec_is_mmapped_address(void *addr)
+{
+	(void)addr;
+	return false;
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
