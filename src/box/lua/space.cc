@@ -57,13 +57,22 @@ extern "C" {
 #include "vclock/vclock.h"
 
 /**
- * Trigger function for all spaces
+ * Function invoked before execution of a before_replace or on_replace trigger.
+ * It pushes the current transaction statement to Lua stack to be passed to
+ * the trigger callback.
  */
 static int
 lbox_push_txn_stmt(struct lua_State *L, void *event)
 {
-	struct txn_stmt *stmt = txn_current_stmt((struct txn *) event);
-
+	struct txn *txn = (struct txn *)event;
+	/*
+	 * The transaction could be aborted while the previous trigger was
+	 * running (e.g. if the trigger callback yielded).
+	 */
+	if (txn_check_can_continue(txn) != 0)
+		return -1;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	assert(stmt != NULL);
 	if (stmt->old_tuple) {
 		luaT_pushtuple(L, stmt->old_tuple);
 	} else {
@@ -81,11 +90,34 @@ lbox_push_txn_stmt(struct lua_State *L, void *event)
 	return 4;
 }
 
+/**
+ * Function invoked upon successful execution of a before_replace trigger.
+ * It resets the current transaction statement to the tuple returned by
+ * the trigger callback.
+ */
 static int
 lbox_pop_txn_stmt(struct lua_State *L, int nret, void *event)
 {
-	struct txn_stmt *stmt = txn_current_stmt((struct txn *) event);
-
+	struct txn *txn = (struct txn *)event;
+	/*
+	 * The transaction could be aborted while the trigger was running
+	 * (e.g. if the trigger callback yielded).
+	 */
+	if (txn_check_can_continue(txn) != 0)
+		return -1;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	assert(stmt != NULL);
+	/*
+	 * Tuple returned by a before_replace trigger callback must
+	 * match the space format.
+	 *
+	 * Since upgrade from pre-1.7.5 versions passes tuple with not
+	 * suitable format to before_replace triggers during recovery,
+	 * we need to disable format validation until box is configured.
+	 */
+	if (box_is_configured() && stmt->new_tuple != NULL &&
+	    tuple_validate(stmt->space->format, stmt->new_tuple) != 0)
+		return -1;
 	if (nret < 1) {
 		/* No return value - nothing to do. */
 		return 0;
@@ -106,25 +138,6 @@ lbox_pop_txn_stmt(struct lua_State *L, int nret, void *event)
 		tuple_unref(stmt->new_tuple);
 	stmt->new_tuple = result;
 	return 0;
-}
-
-/**
- * Wrapper over lbox_pop_txn_stmt that checks tuple's format.
- */
-static int
-lbox_pop_txn_stmt_and_check_format(struct lua_State *L, int nret, void *event)
-{
-	struct txn_stmt *stmt = txn_current_stmt((struct txn *) event);
-	struct tuple *tuple = stmt->new_tuple;
-	/*
-	 * Since upgrade from pre-1.7.5 versions passes tuple with not suitable
-	 * format to before_replace triggers during recovery, we need to disable
-	 * format validation until box is configured.
-	 */
-	if (box_is_configured() && tuple != NULL &&
-	    tuple_validate(stmt->space->format, tuple) != 0)
-		return -1;
-	return lbox_pop_txn_stmt(L, nret, event);
 }
 
 /**
@@ -166,8 +179,7 @@ lbox_space_before_replace(struct lua_State *L)
 	lua_pop(L, 1);
 
 	return lbox_trigger_reset(L, 3, &space->before_replace,
-				  lbox_push_txn_stmt,
-				  lbox_pop_txn_stmt_and_check_format);
+				  lbox_push_txn_stmt, lbox_pop_txn_stmt);
 }
 
 /**

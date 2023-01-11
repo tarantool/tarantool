@@ -68,6 +68,7 @@ static int
 lbox_trigger_run(struct trigger *ptr, void *event)
 {
 	struct lbox_trigger *trigger = (struct lbox_trigger *) ptr;
+	int rc = -1;
 	/*
 	 * Create a new coro and reference it. Remove it
 	 * from tarantool_L stack, which is a) scarce
@@ -77,11 +78,11 @@ lbox_trigger_run(struct trigger *ptr, void *event)
 	 * it is on.
 	 */
 	lua_State *L;
-	int coro_ref;
+	int coro_ref = LUA_NOREF;
 	if (fiber()->storage.lua.stack == NULL) {
 		L = luaT_newthread(tarantool_L);
 		if (L == NULL)
-			return -1;
+			goto out;
 		coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
 	} else {
 		L = fiber()->storage.lua.stack;
@@ -92,6 +93,8 @@ lbox_trigger_run(struct trigger *ptr, void *event)
 	int nargs = 0;
 	if (trigger->push_event != NULL) {
 		nargs = trigger->push_event(L, event);
+		if (nargs < 0)
+			goto out;
 	}
 	/*
 	 * There are two cases why we can't access `trigger` after
@@ -105,24 +108,23 @@ lbox_trigger_run(struct trigger *ptr, void *event)
 	 */
 	lbox_pop_event_f pop_event = trigger->pop_event;
 	trigger = NULL;
-	if (luaT_call(L, nargs, LUA_MULTRET)) {
-		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
-		return -1;
-	}
+	if (luaT_call(L, nargs, LUA_MULTRET))
+		goto out;
 	int nret = lua_gettop(L) - top;
 	if (pop_event != NULL &&
 	    pop_event(L, nret, event) != 0) {
 		lua_settop(L, top);
-		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
-		return -1;
+		goto out;
 	}
 	/*
 	 * Clear the stack after pop_event saves all
 	 * the needed return values.
 	 */
 	lua_settop(L, top);
+	rc = 0;
+out:
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
-	return 0;
+	return rc;
 }
 
 static struct lbox_trigger *
