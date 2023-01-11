@@ -147,6 +147,10 @@
     <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a03e08a677af627a4199839a08b9020e8" kind="enumvalue"><name>BOX_SESSION_SETTINGS_ID</name></member>
     <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04abb87df1b61192ee3aea178534071b9cd" kind="enumvalue"><name>BOX_SYSTEM_ID_MAX</name></member>
     <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a4816eb59cfbc3b8d480e61cab1cf26d4" kind="enumvalue"><name>BOX_ID_NIL</name></member>
+    <member refid="module_8h_1a4dab01cb6470a8177e9618558523ff7b" kind="enum"><name>iproto_handler_status</name></member>
+    <member refid="module_8h_1a4dab01cb6470a8177e9618558523ff7ba964fc0581c3169c5047abaebcbc6a190" kind="enumvalue"><name>IPROTO_HANDLER_OK</name></member>
+    <member refid="module_8h_1a4dab01cb6470a8177e9618558523ff7ba3838e3dc0206744064024e6948f5f214" kind="enumvalue"><name>IPROTO_HANDLER_ERROR</name></member>
+    <member refid="module_8h_1a4dab01cb6470a8177e9618558523ff7badb3e2b86bb68c8ef55af839fc59a63a5" kind="enumvalue"><name>IPROTO_HANDLER_FALLBACK</name></member>
     <member refid="module_8h_1a2693ce4bd8fa71e8ac1e5272fc64d17e" kind="enum"><name>iterator_type</name></member>
     <member refid="module_8h_1a2693ce4bd8fa71e8ac1e5272fc64d17ea8396fa34bbd5b7136bbbb9686f5e5615" kind="enumvalue"><name>ITER_EQ</name></member>
     <member refid="module_8h_1a2693ce4bd8fa71e8ac1e5272fc64d17ea99186231b0ac5ec676a71afc0612b934" kind="enumvalue"><name>ITER_REQ</name></member>
@@ -432,6 +436,8 @@
     <member refid="module_8h_1acfbe4043908ad1b4a106689ad2da8814" kind="typedef"><name>box_key_def_t</name></member>
     <member refid="module_8h_1a302d3f85cf14f03ace911e9541c95c4d" kind="typedef"><name>box_key_part_def_t</name></member>
     <member refid="module_8h_1aa37ca06842be0fe827d5272493e2311f" kind="typedef"><name>box_function_ctx_t</name></member>
+    <member refid="module_8h_1a19dc8ff47cfc25ee92d0f74cdf459070" kind="typedef"><name>iproto_handler_t</name></member>
+    <member refid="module_8h_1aa9eb59c79a9b32bb8a23204e89bced9d" kind="typedef"><name>iproto_handler_destroy_t</name></member>
     <member refid="module_8h_1a2b04d0397e455b7ed42b530c1c1ea9e6" kind="typedef"><name>box_iterator_t</name></member>
     <member refid="module_8h_1ad49d5e355555804f6b46b79513715be8" kind="typedef"><name>box_error_t</name></member>
     <member refid="module_8h_1a923d13f137e4bdb8c852ea04637da58d" kind="typedef"><name>box_latch_t</name></member>
@@ -567,6 +573,7 @@
     <member refid="module_8h_1a0e9c91d463ce4aca081e5bd376aac1d9" kind="function"><name>box_session_push</name></member>
     <member refid="module_8h_1a14a6ea7f0c101d1986f27de9f8ec25c8" kind="function"><name>box_session_id</name></member>
     <member refid="module_8h_1abcef363e704e69cb0cc4efb80c6a648e" kind="function"><name>box_iproto_send</name></member>
+    <member refid="module_8h_1a6f6d1752bccac95ed2d154a98c3fe9c7" kind="function"><name>box_iproto_override</name></member>
     <member refid="module_8h_1aab8b69829c8d89799a9fb0e5d360e84b" kind="function"><name>box_index_iterator</name></member>
     <member refid="module_8h_1ae4361728e6abe6243e7f02b098e7b347" kind="function"><name>box_iterator_next</name></member>
     <member refid="module_8h_1a6f7fe762b15009de313fdf915378429c" kind="function"><name>box_iterator_free</name></member>

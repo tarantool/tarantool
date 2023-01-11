@@ -5,9 +5,9 @@ var indexSectionsWithContent =
   2: "m",
   3: "_bcfl",
   4: "cfilp",
-  5: "bfs",
+  5: "bfis",
   6: "bfist",
-  7: "bct",
+  7: "bcit",
   8: "_abcdfilmopstu"
 };
 

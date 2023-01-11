@@ -121,7 +121,7 @@ Macros</h2></td></tr>
 #define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#abd1dbec4fd6761084d3e0c05afe2b138">PACKAGE_VERSION_PATCH</a>&#160;&#160;&#160;0</td></tr>
 <tr class="memdesc:abd1dbec4fd6761084d3e0c05afe2b138"><td class="mdescLeft">&#160;</td><td class="mdescRight">Package patch version - 7 for 1.6.7. <br /></td></tr>
 <tr class="separator:abd1dbec4fd6761084d3e0c05afe2b138"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;2.11.0-entrypoint-854-ga82c24628&quot;</td></tr>
+<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;2.11.0-entrypoint-858-g998964c8b&quot;</td></tr>
 <tr class="memdesc:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">A string with major-minor-patch-commit-id identifier of the release, e.g.  <a href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">More...</a><br /></td></tr>
 <tr class="separator:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adb6d1259777e8f56c6260be6faed183e"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#adb6d1259777e8f56c6260be6faed183e">SYSCONF_DIR</a>&#160;&#160;&#160;&quot;etc&quot;</td></tr>
@@ -317,6 +317,12 @@ typedef struct key_def&#160;</td><td class="memItemRight" valign="bottom"><a cla
 typedef struct box_function_ctx&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa37ca06842be0fe827d5272493e2311f">box_function_ctx_t</a></td></tr>
 <tr class="memdesc:aa37ca06842be0fe827d5272493e2311f"><td class="mdescLeft">&#160;</td><td class="mdescRight">public <br /></td></tr>
 <tr class="separator:aa37ca06842be0fe827d5272493e2311f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a19dc8ff47cfc25ee92d0f74cdf459070"><td class="memItemLeft" align="right" valign="top">typedef enum <a class="el" href="module_8h.html#a4dab01cb6470a8177e9618558523ff7b">iproto_handler_status</a>(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a19dc8ff47cfc25ee92d0f74cdf459070">iproto_handler_t</a>) (const char *header, const char *header_end, const char *body, const char *body_end, void *ctx)</td></tr>
+<tr class="memdesc:a19dc8ff47cfc25ee92d0f74cdf459070"><td class="mdescLeft">&#160;</td><td class="mdescRight">IPROTO request handler signature: receives MsgPack encoded header and body, a context provided by <a class="el" href="module_8h.html#a6f6d1752bccac95ed2d154a98c3fe9c7" title="Sets an IPROTO request handler with the provided context for the given request type.">box_iproto_override()</a>, and must return one of the status codes from iproto_handler_status.  <a href="module_8h.html#a19dc8ff47cfc25ee92d0f74cdf459070">More...</a><br /></td></tr>
+<tr class="separator:a19dc8ff47cfc25ee92d0f74cdf459070"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa9eb59c79a9b32bb8a23204e89bced9d"><td class="memItemLeft" align="right" valign="top">typedef void(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa9eb59c79a9b32bb8a23204e89bced9d">iproto_handler_destroy_t</a>) (void *ctx)</td></tr>
+<tr class="memdesc:aa9eb59c79a9b32bb8a23204e89bced9d"><td class="mdescLeft">&#160;</td><td class="mdescRight">IPROTO request handler destructor called when the corresponding handler is removed.  <a href="module_8h.html#aa9eb59c79a9b32bb8a23204e89bced9d">More...</a><br /></td></tr>
+<tr class="separator:aa9eb59c79a9b32bb8a23204e89bced9d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2b04d0397e455b7ed42b530c1c1ea9e6"><td class="memItemLeft" align="right" valign="top"><a id="a2b04d0397e455b7ed42b530c1c1ea9e6"></a>
 typedef struct iterator&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a2b04d0397e455b7ed42b530c1c1ea9e6">box_iterator_t</a></td></tr>
 <tr class="memdesc:a2b04d0397e455b7ed42b530c1c1ea9e6"><td class="mdescLeft">&#160;</td><td class="mdescRight">public <br /></td></tr>
@@ -515,6 +521,16 @@ Enumerations</h2></td></tr>
  }</td></tr>
 <tr class="memdesc:abc6126af1d45847bc59afa0aa3216b04"><td class="mdescLeft">&#160;</td><td class="mdescRight">public  <a href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04">More...</a><br /></td></tr>
 <tr class="separator:abc6126af1d45847bc59afa0aa3216b04"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4dab01cb6470a8177e9618558523ff7b"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a4dab01cb6470a8177e9618558523ff7b">iproto_handler_status</a> { <br />
+&#160;&#160;<a class="el" href="module_8h.html#a4dab01cb6470a8177e9618558523ff7ba964fc0581c3169c5047abaebcbc6a190">IPROTO_HANDLER_OK</a>
+, <br />
+&#160;&#160;<a class="el" href="module_8h.html#a4dab01cb6470a8177e9618558523ff7ba3838e3dc0206744064024e6948f5f214">IPROTO_HANDLER_ERROR</a>
+, <br />
+&#160;&#160;<a class="el" href="module_8h.html#a4dab01cb6470a8177e9618558523ff7badb3e2b86bb68c8ef55af839fc59a63a5">IPROTO_HANDLER_FALLBACK</a>
+<br />
+ }</td></tr>
+<tr class="memdesc:a4dab01cb6470a8177e9618558523ff7b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return codes for IPROTO request handlers.  <a href="module_8h.html#a4dab01cb6470a8177e9618558523ff7b">More...</a><br /></td></tr>
+<tr class="separator:a4dab01cb6470a8177e9618558523ff7b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2693ce4bd8fa71e8ac1e5272fc64d17e"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a2693ce4bd8fa71e8ac1e5272fc64d17e">iterator_type</a> { <br />
 &#160;&#160;<b>ITER_EQ</b> = 0
 , <br />
@@ -1470,6 +1486,9 @@ void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="modu
 <tr class="memitem:abcef363e704e69cb0cc4efb80c6a648e"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#abcef363e704e69cb0cc4efb80c6a648e">box_iproto_send</a> (uint64_t sid, const char *header, const char *header_end, const char *body, const char *body_end)</td></tr>
 <tr class="memdesc:abcef363e704e69cb0cc4efb80c6a648e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sends a packet with the given header and body over the IPROTO session's socket.  <a href="module_8h.html#abcef363e704e69cb0cc4efb80c6a648e">More...</a><br /></td></tr>
 <tr class="separator:abcef363e704e69cb0cc4efb80c6a648e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6f6d1752bccac95ed2d154a98c3fe9c7"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a6f6d1752bccac95ed2d154a98c3fe9c7">box_iproto_override</a> (uint32_t req_type, <a class="el" href="module_8h.html#a19dc8ff47cfc25ee92d0f74cdf459070">iproto_handler_t</a> handler, <a class="el" href="module_8h.html#aa9eb59c79a9b32bb8a23204e89bced9d">iproto_handler_destroy_t</a> destroy, void *ctx)</td></tr>
+<tr class="memdesc:a6f6d1752bccac95ed2d154a98c3fe9c7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sets an IPROTO request handler with the provided context for the given request type.  <a href="module_8h.html#a6f6d1752bccac95ed2d154a98c3fe9c7">More...</a><br /></td></tr>
+<tr class="separator:a6f6d1752bccac95ed2d154a98c3fe9c7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aab8b69829c8d89799a9fb0e5d360e84b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="module_8h.html#a2b04d0397e455b7ed42b530c1c1ea9e6">box_iterator_t</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aab8b69829c8d89799a9fb0e5d360e84b">box_index_iterator</a> (uint32_t space_id, uint32_t index_id, int type, const char *key, const char *key_end)</td></tr>
 <tr class="memdesc:aab8b69829c8d89799a9fb0e5d360e84b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocate and initialize iterator for space_id, index_id.  <a href="module_8h.html#aab8b69829c8d89799a9fb0e5d360e84b">More...</a><br /></td></tr>
 <tr class="separator:aab8b69829c8d89799a9fb0e5d360e84b"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -1942,7 +1961,7 @@ void(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="mo
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;2.11.0-entrypoint-854-ga82c24628&quot;</td>
+          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;2.11.0-entrypoint-858-g998964c8b&quot;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -2500,6 +2519,55 @@ enum <a class="el" href="module_8h.html#af667a90dfe6a8cc25b510af73d98bb82" title
 
 </div>
 </div>
+<a id="aa9eb59c79a9b32bb8a23204e89bced9d"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa9eb59c79a9b32bb8a23204e89bced9d">&#9670;&nbsp;</a></span>iproto_handler_destroy_t</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">typedef void(* iproto_handler_destroy_t) (void *ctx)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>IPROTO request handler destructor called when the corresponding handler is removed. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">ctx</td><td>context provided by <a class="el" href="module_8h.html#a6f6d1752bccac95ed2d154a98c3fe9c7" title="Sets an IPROTO request handler with the provided context for the given request type.">box_iproto_override()</a> </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="a19dc8ff47cfc25ee92d0f74cdf459070"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a19dc8ff47cfc25ee92d0f74cdf459070">&#9670;&nbsp;</a></span>iproto_handler_t</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">typedef enum <a class="el" href="module_8h.html#a4dab01cb6470a8177e9618558523ff7b">iproto_handler_status</a>(* iproto_handler_t) (const char *header, const char *header_end, const char *body, const char *body_end, void *ctx)</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>IPROTO request handler signature: receives MsgPack encoded header and body, a context provided by <a class="el" href="module_8h.html#a6f6d1752bccac95ed2d154a98c3fe9c7" title="Sets an IPROTO request handler with the provided context for the given request type.">box_iproto_override()</a>, and must return one of the status codes from iproto_handler_status. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">header</td><td>Msgpack encoded header </td></tr>
+    <tr><td class="paramname">header_end</td><td>end of Msgpack encoded header </td></tr>
+    <tr><td class="paramname">body</td><td>Msgpack encoded body </td></tr>
+    <tr><td class="paramname">body_end</td><td>end of Msgpack encoded body </td></tr>
+    <tr><td class="paramname">ctx</td><td>context provided by <a class="el" href="module_8h.html#a6f6d1752bccac95ed2d154a98c3fe9c7" title="Sets an IPROTO request handler with the provided context for the given request type.">box_iproto_override()</a> </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>a status code </dd></dl>
+
+</div>
+</div>
 <h2 class="groupheader">Enumeration Type Documentation</h2>
 <a id="a06fc87d81c62e9abb8790b6e5713c55b"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a06fc87d81c62e9abb8790b6e5713c55b">&#9670;&nbsp;</a></span>anonymous enum</h2>
@@ -2609,6 +2677,30 @@ enum <a class="el" href="module_8h.html#af667a90dfe6a8cc25b510af73d98bb82" title
 <tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a03e08a677af627a4199839a08b9020e8"></a>BOX_SESSION_SETTINGS_ID&#160;</td><td class="fielddoc"><p>Space id of _session_settings. </p>
 </td></tr>
 <tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04abb87df1b61192ee3aea178534071b9cd"></a>BOX_SYSTEM_ID_MAX&#160;</td><td class="fielddoc"><p>End of the reserved range of system spaces. </p>
+</td></tr>
+</table>
+
+</div>
+</div>
+<a id="a4dab01cb6470a8177e9618558523ff7b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4dab01cb6470a8177e9618558523ff7b">&#9670;&nbsp;</a></span>iproto_handler_status</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum <a class="el" href="module_8h.html#a4dab01cb6470a8177e9618558523ff7b">iproto_handler_status</a></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Return codes for IPROTO request handlers. </p>
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="a4dab01cb6470a8177e9618558523ff7ba964fc0581c3169c5047abaebcbc6a190"></a>IPROTO_HANDLER_OK&#160;</td><td class="fielddoc"><p>Success, no further actions needed. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a4dab01cb6470a8177e9618558523ff7ba3838e3dc0206744064024e6948f5f214"></a>IPROTO_HANDLER_ERROR&#160;</td><td class="fielddoc"><p>Error, diagnostic must be set by handler via <a class="el" href="module_8h.html#aa6e6803bc4309c3f59b93e2709cb418b" title="Set the last error.">box_error_set()</a>. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="a4dab01cb6470a8177e9618558523ff7badb3e2b86bb68c8ef55af839fc59a63a5"></a>IPROTO_HANDLER_FALLBACK&#160;</td><td class="fielddoc"><p>Fallback to system handler. </p>
 </td></tr>
 </table>
 
@@ -4993,6 +5085,65 @@ decimal result (@res) </dd></dl>
 </dl>
 <dl class="section see"><dt>See also</dt><dd><div class="fragment"><div class="line">box.space[space_id]:insert(tuple) </div>
 </div><!-- fragment --> </dd></dl>
+
+</div>
+</div>
+<a id="a6f6d1752bccac95ed2d154a98c3fe9c7"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6f6d1752bccac95ed2d154a98c3fe9c7">&#9670;&nbsp;</a></span>box_iproto_override()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int box_iproto_override </td>
+          <td>(</td>
+          <td class="paramtype">uint32_t&#160;</td>
+          <td class="paramname"><em>req_type</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="module_8h.html#a19dc8ff47cfc25ee92d0f74cdf459070">iproto_handler_t</a>&#160;</td>
+          <td class="paramname"><em>handler</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="module_8h.html#aa9eb59c79a9b32bb8a23204e89bced9d">iproto_handler_destroy_t</a>&#160;</td>
+          <td class="paramname"><em>destroy</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname"><em>ctx</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Sets an IPROTO request handler with the provided context for the given request type. </p>
+<p>NB: yields.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">req_type</td><td>request type code from iproto_type enumeration (src/box/iproto_constants.h); use IPROTO_UNKNOWN for overriding the handler of unknown request types; </td></tr>
+    <tr><td class="paramname">handler</td><td>IPROTO request handler; passing NULL resets the corresponding handler </td></tr>
+    <tr><td class="paramname">destroy</td><td>IPROTO request handler destructor </td></tr>
+    <tr><td class="paramname">ctx</td><td>context passed to handler </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="retval"><dt>Return values</dt><dd>
+  <table class="retval">
+    <tr><td class="paramname">-1</td><td>on error (check <a class="el" href="module_8h.html#af8f82c313ba49fc97782663ffba71f58" title="Get the information about the last API call error.">box_error_last()</a>) </td></tr>
+    <tr><td class="paramname">0</td><td>on success </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>
@@ -9522,7 +9673,7 @@ box_tuple_position(it) == box_tuple_field_count(tuple) if returned value is NULL
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Wed Jan 11 2023 09:44:55 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Wed Jan 11 2023 14:54:55 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>
