@@ -1918,6 +1918,7 @@ tx_end_msg(struct iproto_msg *msg, struct obuf_svp *svp)
 	}
 	msg->connection->iproto_thread->tx.requests_in_progress--;
 	/* Log response to the flight recorder. */
+	assert(msg->wpos.obuf == msg->connection->tx.p_obuf);
 	struct obuf *out = msg->connection->tx.p_obuf;
 	flightrec_write_response(out, svp);
 }
@@ -2492,8 +2493,8 @@ tx_process_replication(struct cmsg *m)
 	} catch (Exception *e) {
 		iproto_write_error(io, e, ::schema_version, msg->header.sync);
 	}
-	struct obuf_svp empty = obuf_create_svp(msg->connection->tx.p_obuf);
-	tx_end_msg(msg, &empty);
+//	struct obuf_svp empty = obuf_create_svp(msg->connection->tx.p_obuf);
+//	tx_end_msg(msg, &empty);
 }
 
 static void
