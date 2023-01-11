@@ -16,6 +16,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 #include <stddef.h>
+#include <stdbool.h>
 
 struct obuf;
 struct obuf_svp;
@@ -65,6 +66,17 @@ static inline int
 box_set_flightrec(void)
 {
 	return 0;
+}
+
+/**
+ * This function is called in SIGBUS handler to check whether accessed address
+ * belongs to flightrec file.
+ */
+static inline bool
+flightrec_is_mmapped_address(void *addr)
+{
+	(void)addr;
+	return false;
 }
 
 #if defined(__cplusplus)
