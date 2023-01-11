@@ -8,9 +8,12 @@ _G.print = function(...)
     if M.before_cb ~= nil then
         M.before_cb()
     end
-    M.raw_print(...)
+    local ok, err = pcall(M.raw_print, ...)
     if M.after_cb ~= nil then
         M.after_cb()
+    end
+    if not ok then
+        error(err)
     end
 end
 
