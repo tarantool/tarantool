@@ -104,6 +104,7 @@ enum bootstrap_strategy {
 	BOOTSTRAP_STRATEGY_INVALID = -1,
 	BOOTSTRAP_STRATEGY_AUTO,
 	BOOTSTRAP_STRATEGY_LEGACY,
+	BOOTSTRAP_STRATEGY_CONFIG,
 };
 
 /** Instance's bootstrap strategy. Controls replication reconfiguration. */
@@ -115,6 +116,18 @@ enum replicaset_state {
 	REPLICASET_RECOVERY,
 	REPLICASET_READY,
 };
+
+/**
+ * The uuid of the bootstrap leader configured via the bootstrap_leader
+ * configuration option.
+ */
+extern struct tt_uuid cfg_bootstrap_leader_uuid;
+
+/**
+ * The uri of the bootstrap leader configured via the bootstrap_leader
+ * configuration option.
+ */
+extern struct uri cfg_bootstrap_leader_uri;
 
 /** Replica set state. */
 extern enum replicaset_state replicaset_state;
