@@ -4134,6 +4134,22 @@ on_replace_dd_cluster(struct trigger *trigger, void *event)
 			return -1;
 		if (replica_check_id(replica_id) != 0)
 			return -1;
+		/*
+		 * It's okay to update the instance id (drop, then insert) while
+		 * it is joining to a cluster as long as the id is set by the
+		 * time bootstrap is complete, which is checked in box_cfg()
+		 * anyway.
+		 *
+		 * For example, the replica could be deleted from the _cluster
+		 * space on the master manually before rebootstrap, in which
+		 * case it will replay this operation during the final join
+		 * stage.
+		 */
+		if (!replicaset.is_joining && replica_id == instance_id) {
+			diag_set(ClientError, ER_LOCAL_INSTANCE_ID_IS_READ_ONLY,
+				 (unsigned)replica_id);
+			return -1;
+		}
 		tt_uuid replica_uuid;
 		if (tuple_field_uuid(old_tuple, BOX_CLUSTER_FIELD_UUID,
 				    &replica_uuid) != 0)

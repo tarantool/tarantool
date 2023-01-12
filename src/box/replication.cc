@@ -251,21 +251,6 @@ replica_check_id(uint32_t replica_id)
 			  (unsigned) replica_id);
 		return -1;
 	}
-	/*
-	 * It's okay to update the instance id while it is joining to
-	 * a cluster as long as the id is set by the time bootstrap is
-	 * complete, which is checked in box_cfg() anyway.
-	 *
-	 * For example, the replica could be deleted from the _cluster
-	 * space on the master manually before rebootstrap, in which
-	 * case it will replay this operation during the final join
-	 * stage.
-	 */
-	if (!replicaset.is_joining && replica_id == instance_id) {
-		diag_set(ClientError, ER_LOCAL_INSTANCE_ID_IS_READ_ONLY,
-			  (unsigned) replica_id);
-		return -1;
-	}
 	return 0;
 }
 
@@ -401,7 +386,6 @@ replica_clear_id(struct replica *replica)
 	--replicaset.registered_count;
 	gc_delay_unref();
 	if (replica->id == instance_id) {
-		/* See replica_check_id(). */
 		assert(replicaset.is_joining);
 		instance_id = REPLICA_ID_NIL;
 		box_broadcast_id();
