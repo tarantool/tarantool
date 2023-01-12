@@ -1907,7 +1907,7 @@ xrow_decode_ballot_event(const struct watch_request *req,
  * type, but the iproto keys are fixed.
  */
 struct replication_request {
-	/** IPROTO_CLUSTER_UUID. */
+	/** IPROTO_REPLICASET_UUID. */
 	struct tt_uuid *replicaset_uuid;
 	/** IPROTO_INSTANCE_UUID. */
 	struct tt_uuid *instance_uuid;
@@ -1937,7 +1937,7 @@ xrow_encode_replication_request(struct xrow_header *row,
 	uint32_t map_size = 0;
 	if (req->replicaset_uuid != NULL) {
 		++map_size;
-		data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
+		data = mp_encode_uint(data, IPROTO_REPLICASET_UUID);
 		data = xrow_encode_uuid(data, req->replicaset_uuid);
 	}
 	if (req->instance_uuid != NULL) {
@@ -2007,7 +2007,7 @@ xrow_decode_replication_request(const struct xrow_header *row,
 		}
 		uint8_t key = mp_decode_uint(&d);
 		switch (key) {
-		case IPROTO_CLUSTER_UUID:
+		case IPROTO_REPLICASET_UUID:
 			if (req->replicaset_uuid == NULL)
 				goto skip;
 			if (xrow_decode_uuid(&d, req->replicaset_uuid) != 0) {
