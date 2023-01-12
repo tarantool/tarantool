@@ -116,40 +116,27 @@ output_handlers["lua"] = function(status, opts, ...)
     return table.concat(collect, ', ') .. output_eos["lua"]
 end
 
-local function output_verify_opts(fmt, opts)
-    if opts == nil then
-        return nil
-    end
-    if fmt == "lua" then
-        if opts ~= "line" and opts ~= "block" then
-            local msg = 'Wrong option "%s", expecting: line or block.'
-            return msg:format(opts)
-        end
-    end
-    return nil
-end
-
 local function parse_output(value)
     local fmt, opts
     if not value then
         return 'Specify output format: lua or yaml.'
     end
-    if value:match("([^,]+),([^,]+)") ~= nil then
-        fmt, opts = value:match("([^,]+),([^,]+)")
-    else
-        fmt = value
-    end
-    for k, _ in pairs(output_handlers) do
-        if k == fmt then
-            local err = output_verify_opts(fmt, opts)
-            if err then
-                return err
-            end
-            return nil, fmt, opts
+    for _, v in ipairs(value:split(',')) do
+        if v == 'yaml' or v == 'lua' then
+            fmt = v
+        elseif v == 'line' or v == 'block' then
+            opts = v
+        else
+            return ('Unknown "\\set output" option: %q'):format(v)
         end
     end
-    local msg = 'Invalid format "%s", supported languages: lua and yaml.'
-    return msg:format(value)
+    if fmt == nil then
+        return 'Specify output format: lua or yaml.'
+    end
+    if opts and fmt ~= 'lua' then
+        return ("Invalid language %s, opts are available only in lua."):format(fmt)
+    end
+    return nil, fmt, opts
 end
 
 local function set_default_output(value)
