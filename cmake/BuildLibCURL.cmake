@@ -187,6 +187,7 @@ macro(curl_build)
     list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_CURLDEBUG=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_DEBUG=OFF")
     list(APPEND LIBCURL_CMAKE_FLAGS "-DUSE_MSH3=OFF")
+    list(APPEND LIBCURL_CMAKE_FLAGS "-DENABLE_WEBSOCKETS=OFF")
 
     # We need PIC at least to enable build for Fedora on
     # ARM64 CPU. Without it configuration with Fedora
