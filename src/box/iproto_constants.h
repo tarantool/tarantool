@@ -105,7 +105,7 @@ enum iproto_key {
 	 * the USER_NAME key.
 	 */
 	IPROTO_INSTANCE_UUID = 0x24,
-	IPROTO_CLUSTER_UUID = 0x25,
+	IPROTO_REPLICASET_UUID = 0x25,
 	IPROTO_VCLOCK = 0x26,
 
 	/* Also request keys. See the comment above. */

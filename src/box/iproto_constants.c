@@ -82,7 +82,7 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x22 */	MP_STR, /* IPROTO_FUNCTION_NAME */
 	/* 0x23 */	MP_STR, /* IPROTO_USER_NAME */
 	/* 0x24 */	MP_STR, /* IPROTO_INSTANCE_UUID */
-	/* 0x25 */	MP_STR, /* IPROTO_CLUSTER_UUID */
+	/* 0x25 */	MP_STR, /* IPROTO_REPLICASET_UUID */
 	/* 0x26 */	MP_MAP, /* IPROTO_VCLOCK */
 	/* 0x27 */	MP_STR, /* IPROTO_EXPR */
 	/* 0x28 */	MP_ARRAY, /* IPROTO_OPS */
@@ -236,7 +236,7 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"function name",    /* 0x22 */
 	"user name",        /* 0x23 */
 	"instance uuid",    /* 0x24 */
-	"cluster uuid",     /* 0x25 */
+	"replicaset uuid",  /* 0x25 */
 	"vector clock",     /* 0x26 */
 	"expression",       /* 0x27 */
 	"operations",       /* 0x28 */
