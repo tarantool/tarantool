@@ -58,36 +58,63 @@ local function traverse_path(path)
     return paths
 end
 
--- Generate a search function, which performs searching through
--- templates setup in options.
+-- Generate a path builder function, which yields the set of the
+-- paths to be searched through for the desired module.
 --
--- @param path_fn function which returns a base path for the
---     resulting template
+-- @param basepath_fn function which returns a base path for the
+--     resulting path set
 -- @param templates table with lua search templates
 -- @param need_traverse bool flag which tells search function to
 --     build multiple paths by expanding base path up to the
 --     root ('/')
--- @return a searcher function which builds a path template and
---     calls package.searchpath
-local function gen_search_func(path_fn, templates, need_traverse)
-    assert(type(path_fn) == 'function', 'path_fn must be a function')
+-- @return a path builder function which builds and yields the
+--     resulting path set
+local function gen_path_builder(basepath_fn, templates, need_traverse)
+    assert(type(basepath_fn) == 'function', 'basepath_fn must be a function')
     assert(type(templates) == 'table', 'templates must be a table')
 
-    return function(name)
-        local path = path_fn() or '.'
-        local paths = need_traverse and traverse_path(path) or { path }
+    return function()
+        local base = basepath_fn() or '.'
+        local dirs = need_traverse and traverse_path(base) or { base }
 
         local searchpaths = {}
 
-        for _, path in ipairs(paths) do
+        for _, dir in ipairs(dirs) do
             for _, template in pairs(templates) do
-                table.insert(searchpaths, minifio.pathjoin(path, template))
+                table.insert(searchpaths, minifio.pathjoin(dir, template))
             end
         end
 
-        local searchpath = table.concat(searchpaths, ';')
+        return table.concat(searchpaths, ';')
+    end
+end
 
-        return package.searchpath(name, searchpath)
+local path = {
+    package = function() return package.path end,
+    cwd = {
+        dot = gen_path_builder(searchroot, LUA_TEMPLATES),
+        rocks = gen_path_builder(searchroot, ROCKS_LUA_TEMPLATES, true),
+    }
+}
+
+local cpath = {
+    package = function() return package.cpath end,
+    cwd = {
+        dot = gen_path_builder(searchroot, LIB_TEMPLATES),
+        rocks = gen_path_builder(searchroot, ROCKS_LIB_TEMPLATES, true),
+    }
+}
+
+local function gen_file_searcher(loader, pathogen)
+    assert(type(loader) == 'function', '<loader> must be a function')
+    assert(type(pathogen) == 'function', '<pathogen> must be a function')
+
+    return function(name)
+        local path, errmsg = package.searchpath(name, pathogen())
+        if not path then
+            return errmsg
+        end
+        return loader, path
     end
 end
 
@@ -118,45 +145,58 @@ rawset(searchers, 'builtin', function(name)
     return ("\n\tno field loaders.builtin['%s']"):format(name)
 end)
 
+rawset(searchers, 'path.package', gen_file_searcher(load_lua, path.package))
+rawset(searchers, 'cpath.package', gen_file_searcher(load_lib, cpath.package))
+rawset(searchers, 'path.cwd.dot', gen_file_searcher(load_lua, path.cwd.dot))
+rawset(searchers, 'cpath.cwd.dot', gen_file_searcher(load_lib, cpath.cwd.dot))
+rawset(searchers, 'path.cwd.rocks', gen_file_searcher(load_lua, path.cwd.rocks))
+rawset(searchers, 'cpath.cwd.rocks', gen_file_searcher(load_lib, cpath.cwd.rocks))
+
 -- Compose a loader function from options.
 --
--- @param search_fn function will be used to search a file from
+-- @param searcher function will be used to search a file from
 --     path template
--- @param load_fn function will be used to load a file, found by
---     search function
 -- @return function a loader, which first search for the file and
 --     then loads it
-local function gen_loader_func(search_fn, load_fn)
-    assert(type(search_fn) == 'function', 'search_fn must be defined')
-    assert(type(load_fn) == 'function', 'load_fn must be defined')
+local function gen_file_loader(searcher)
+    assert(type(searcher) == 'function', '<searcher> must be defined')
 
     return function(name)
         if not name then
             return "empty name of module"
         end
-        local file, err = search_fn(name)
-        if not file then
-            return err
+        local loader, data = searcher(name)
+        -- XXX: <loader> (i.e. the first return value) contains
+        -- error message in this case. Just propagate it to the
+        -- <require> frame...
+        if not data then
+           return loader
         end
-        local loaded, err = load_fn(file, name)
+        -- XXX: ... Otherwise, this is a valid module loader.
+        -- Load the given <data> and return the result.
+        local loaded, err = loader(data, name)
         local message = ("error loading module '%s' from file '%s':\n\t%s")
-                        :format(name, file, err)
+                        :format(name, data, err)
         return assert(loaded, message)
     end
 end
 
-local search_lua = gen_search_func(searchroot, LUA_TEMPLATES)
-local search_lib = gen_search_func(searchroot, LIB_TEMPLATES)
-local search_rocks_lua = gen_search_func(searchroot, ROCKS_LUA_TEMPLATES, true)
-local search_rocks_lib = gen_search_func(searchroot, ROCKS_LIB_TEMPLATES, true)
-
+-- XXX: Though <package.search> looks like a handy public
+-- function, it's only the helper used for searching Tarantool
+-- C modules. Hence, despite it uses the same searchers as loaders
+-- for Lua modules do, it follows its own semantics ignoring
+-- preload, override, builtin modules, and application specific
+-- locations.
+-- FIXME: Lua paths look really odd in the list, since the
+-- function is used to load only C modules. However, these paths
+-- are left to avoid breaking change.
 local search_funcs = {
-    search_lua,
-    search_lib,
-    search_rocks_lua,
-    search_rocks_lib,
-    function(name) return package.searchpath(name, package.path) end,
-    function(name) return package.searchpath(name, package.cpath) end,
+    searchers['path.cwd.dot'],
+    searchers['cpath.cwd.dot'],
+    searchers['path.cwd.rocks'],
+    searchers['cpath.cwd.rocks'],
+    searchers['path.package'],
+    searchers['cpath.package'],
 }
 
 local function search(name)
@@ -164,8 +204,8 @@ local function search(name)
         return "empty name of module"
     end
     for _, searcher in ipairs(search_funcs) do
-        local file = searcher(name)
-        if file ~= nil then
+        local loader, file = searcher(name)
+        if type(loader) == 'function' then
             return file
         end
     end
@@ -239,10 +279,10 @@ local function chain_loaders(subloaders)
 end
 
 -- loader_preload 1
-table.insert(package.loaders, 2, gen_loader_func(search_lua, load_lua))
-table.insert(package.loaders, 3, gen_loader_func(search_lib, load_lib))
-table.insert(package.loaders, 4, gen_loader_func(search_rocks_lua, load_lua))
-table.insert(package.loaders, 5, gen_loader_func(search_rocks_lib, load_lib))
+table.insert(package.loaders, 2, gen_file_loader(searchers['path.cwd.dot']))
+table.insert(package.loaders, 3, gen_file_loader(searchers['cpath.cwd.dot']))
+table.insert(package.loaders, 4, gen_file_loader(searchers['path.cwd.rocks']))
+table.insert(package.loaders, 5, gen_file_loader(searchers['cpath.cwd.rocks']))
 -- package.path   6
 -- package.cpath  7
 -- croot          8
@@ -263,12 +303,19 @@ if script ~= nil and script ~= '-' then
     end
 
     -- Search non-recursively, only next to the script.
-    local search_app_lua = gen_search_func(script_dir_fn, LUA_TEMPLATES)
-    local search_app_lib = gen_search_func(script_dir_fn, LIB_TEMPLATES)
-    local search_app_rocks_lua = gen_search_func(script_dir_fn,
-        ROCKS_LUA_TEMPLATES)
-    local search_app_rocks_lib = gen_search_func(script_dir_fn,
-        ROCKS_LIB_TEMPLATES)
+    path.app = {
+        dot = gen_path_builder(script_dir_fn, LUA_TEMPLATES),
+        rocks = gen_path_builder(script_dir_fn, ROCKS_LUA_TEMPLATES),
+    }
+    cpath.app = {
+        dot = gen_path_builder(script_dir_fn, LIB_TEMPLATES),
+        rocks = gen_path_builder(script_dir_fn, ROCKS_LIB_TEMPLATES)
+    }
+
+    rawset(searchers, 'path.app.dot', gen_file_searcher(load_lua, path.app.dot))
+    rawset(searchers, 'cpath.app.dot', gen_file_searcher(load_lib, cpath.app.dot))
+    rawset(searchers, 'path.app.rocks', gen_file_searcher(load_lua, path.app.rocks))
+    rawset(searchers, 'cpath.app.rocks', gen_file_searcher(load_lib, cpath.app.rocks))
 
     -- Mix the script directory loaders into corresponding
     -- searchroot based loaders. It allows to avoid changing
@@ -287,19 +334,19 @@ if script ~= nil and script ~= '-' then
     -- do that for all the logic at once.
     package.loaders[2] = chain_loaders({
         package.loaders[2],
-        gen_loader_func(search_app_lua, load_lua),
+        gen_file_loader(searchers['path.app.dot']),
     })
     package.loaders[3] = chain_loaders({
         package.loaders[3],
-        gen_loader_func(search_app_lib, load_lib),
+        gen_file_loader(searchers['cpath.app.dot']),
     })
     package.loaders[4] = chain_loaders({
         package.loaders[4],
-        gen_loader_func(search_app_rocks_lua, load_lua),
+        gen_file_loader(searchers['path.app.rocks']),
     })
     package.loaders[5] = chain_loaders({
         package.loaders[5],
-        gen_loader_func(search_app_rocks_lib, load_lib),
+        gen_file_loader(searchers['cpath.app.rocks']),
     })
 end
 
