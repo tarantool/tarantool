@@ -826,10 +826,10 @@ end
 local function update_collation_strength_field()
     local _collation = box.space[box.schema.COLLATION_ID]
     for _, collation in _collation:pairs() do
-        if collation.type == 'ICU' and collation.opts.strength == nil then
+        if collation[4] == 'ICU' and collation[6].strength == nil then
             local new_collation = collation:totable()
             new_collation[6].strength = 'tertiary'
-            _collation:delete{collation.id}
+            _collation:delete{collation[1]}
             _collation:insert(new_collation)
         end
     end
