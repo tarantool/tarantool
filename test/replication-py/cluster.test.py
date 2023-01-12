@@ -89,6 +89,9 @@ server.admin("box.space._cluster:replace{1, require('uuid').str()}")
 # Update of tail is OK
 server.admin("box.space._cluster:update(1, {{'=', 3, 'test'}})")
 
+# Self-delete is not ok.
+server.admin("box.space._cluster:delete(1)")
+
 print("-------------------------------------------------------------")
 print("gh-1140: Assertion if replace _cluster tuple for remote server")
 print("-------------------------------------------------------------")
