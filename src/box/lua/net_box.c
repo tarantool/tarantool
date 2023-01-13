@@ -2510,8 +2510,8 @@ netbox_transport_fetch_schema(struct netbox_transport *transport,
 	transport->state = NETBOX_FETCH_SCHEMA;
 	netbox_transport_on_state_change(transport, L);
 	uint32_t peer_version_id = transport->greeting.version_id;
-	/* _vcollation view was added in 2.2.0-389-g3e3ef182f */
 	bool peer_has_vcollation = peer_version_id >= version_id(2, 2, 1);
+	bool peer_has_vspace_sequence = peer_version_id >= version_id(2, 10, 5);
 restart:
 	lua_newtable(L);
 	int schema_table_idx = lua_gettop(L);
@@ -2525,9 +2525,15 @@ restart:
 	if (peer_has_vcollation)
 		netbox_encode_select_all(L, &transport->send_buf,
 					 vcollation_sync, BOX_VCOLLATION_ID);
+	uint64_t vspace_sequence_sync = transport->next_sync++;
+	if (peer_has_vspace_sequence)
+		netbox_encode_select_all(L, &transport->send_buf,
+					 vspace_sequence_sync,
+					 BOX_VSPACE_SEQUENCE_ID);
 	bool got_vspace = false;
 	bool got_vindex = false;
 	bool got_vcollation = false;
+	bool got_vspace_sequence = false;
 	schema_version = 0;
 	do {
 		struct xrow_header hdr;
@@ -2535,20 +2541,22 @@ restart:
 			luaT_error(L);
 		if (hdr.sync != vspace_sync &&
 		    hdr.sync != vindex_sync &&
-		    hdr.sync != vcollation_sync) {
+		    hdr.sync != vcollation_sync &&
+		    hdr.sync != vspace_sequence_sync) {
 			netbox_transport_dispatch_response(transport, L, &hdr);
 			continue;
 		}
 		if (iproto_type_is_error(hdr.type)) {
 			uint32_t errcode = hdr.type & (IPROTO_TYPE_ERROR - 1);
-			if (errcode == ER_NO_SUCH_SPACE &&
-			    hdr.sync == vcollation_sync) {
-				/*
-				 * No _vcollation space
-				 * (server has old schema version).
-				 */
-				peer_has_vcollation = false;
-				continue;
+			if (errcode == ER_NO_SUCH_SPACE) {
+				/* Server may have old dd version. */
+				if (hdr.sync == vcollation_sync) {
+					peer_has_vcollation = false;
+					continue;
+				} else if (hdr.sync == vspace_sequence_sync) {
+					peer_has_vspace_sequence = false;
+					continue;
+				}
 			}
 			xrow_decode_error(&hdr);
 			luaT_error(L);
@@ -2575,6 +2583,9 @@ restart:
 		} else if (hdr.sync == vcollation_sync) {
 			key = BOX_VCOLLATION_ID;
 			got_vcollation = true;
+		} else if (hdr.sync == vspace_sequence_sync) {
+			key = BOX_VSPACE_SEQUENCE_ID;
+			got_vspace_sequence = true;
 		} else {
 			unreachable();
 		}
@@ -2582,7 +2593,8 @@ restart:
 				    tuple_format_runtime);
 		lua_rawseti(L, schema_table_idx, key);
 	} while (!(got_vspace && got_vindex &&
-		   (got_vcollation || !peer_has_vcollation)));
+		   (got_vcollation || !peer_has_vcollation) &&
+		   (got_vspace_sequence || !peer_has_vspace_sequence)));
 	/* Invoke the 'did_fetch_schema' callback. */
 	lua_rawgeti(L, LUA_REGISTRYINDEX, transport->opts.callback_ref);
 	lua_pushliteral(L, "did_fetch_schema");
@@ -2590,7 +2602,8 @@ restart:
 	lua_rawgeti(L, schema_table_idx, BOX_VSPACE_ID);
 	lua_rawgeti(L, schema_table_idx, BOX_VINDEX_ID);
 	lua_rawgeti(L, schema_table_idx, BOX_VCOLLATION_ID);
-	lua_call(L, 5, 0);
+	lua_rawgeti(L, schema_table_idx, BOX_VSPACE_SEQUENCE_ID);
+	lua_call(L, 6, 0);
 	/* Pop the schema table. */
 	lua_pop(L, 1);
 	return schema_version;
