@@ -936,7 +936,7 @@ function remote_methods:wait_state(state, timeout)
 end
 
 function remote_methods:_install_schema(schema_version, spaces, indices,
-                                        collations)
+                                        collations, space_sequences)
     local sl, space_mt, index_mt = {}, self._space_mt, self._index_mt
     for _, space in pairs(spaces) do
         local name = space[3]
@@ -975,6 +975,13 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
 
         sl[id] = s
         sl[name] = s
+    end
+
+    local seql = {}
+    if space_sequences ~= nil then
+        for _, seq in ipairs(space_sequences) do
+            seql[seq[1]] = seq
+        end
     end
 
     for _, index in pairs(indices) do
@@ -1031,6 +1038,17 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
                 idx.parts[k] = pk
             end
             idx.unique = not not index[OPTS].unique
+        end
+
+        if idx.id == 0 then
+            local seq = seql[idx.space]
+            if seq ~= nil then
+                idx.sequence_id = seq[2]
+                idx.sequence_fieldno = seq[4] + 1
+                if seq[5] ~= '' then
+                    idx.sequence_path = seq[5]
+                end
+            end
         end
 
         if sl[idx.space] ~= nil then

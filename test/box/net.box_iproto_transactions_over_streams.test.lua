@@ -120,11 +120,10 @@ IPROTO_REQUEST_TYPE       = 0x00
 IPROTO_SYNC               = 0x01
 IPROTO_AUTH               = 7
 IPROTO_STREAM_ID          = 0x0a
-next_request_id           = 10
 test_run:cmd("setopt delimiter ';'")
 header = msgpack.encode({
     [IPROTO_REQUEST_TYPE] = IPROTO_AUTH,
-    [IPROTO_SYNC] = next_request_id,
+    [IPROTO_SYNC] = conn:_next_sync(),
     [IPROTO_STREAM_ID] = 1,
 });
 body = msgpack.encode({nil});
