@@ -723,6 +723,8 @@ box_lua_space_init(struct lua_State *L)
 	lua_setfield(L, -2, "VSEQUENCE_ID");
 	lua_pushnumber(L, BOX_SPACE_SEQUENCE_ID);
 	lua_setfield(L, -2, "SPACE_SEQUENCE_ID");
+	lua_pushnumber(L, BOX_VSPACE_SEQUENCE_ID);
+	lua_setfield(L, -2, "VSPACE_SEQUENCE_ID");
 	lua_pushnumber(L, BOX_FUNC_INDEX_ID);
 	lua_setfield(L, -2, "FUNC_INDEX_ID");
 	lua_pushnumber(L, BOX_SESSION_SETTINGS_ID);

@@ -1249,7 +1249,6 @@ end
 local function upgrade_to_2_10_1()
     grant_rw_access_on__session_settings_to_role_public()
 end
---------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 -- Tarantool 2.10.4
@@ -1282,7 +1281,17 @@ local function upgrade_to_2_10_4()
     revoke_execute_access_to_lua_function_from_role_public()
     make_vfunc_same_format_as_func()
 end
+
 --------------------------------------------------------------------------------
+-- Tarantool 2.10.5
+--------------------------------------------------------------------------------
+local function create_vspace_sequence_space()
+    create_sysview(box.schema.SPACE_SEQUENCE_ID, box.schema.VSPACE_SEQUENCE_ID)
+end
+
+local function upgrade_to_2_10_5()
+    create_vspace_sequence_space()
+end
 
 --------------------------------------------------------------------------------
 -- Tarantool 2.11.0
@@ -1375,6 +1384,7 @@ local handlers = {
     {version = mkversion(2, 9, 1), func = upgrade_to_2_9_1, auto = true},
     {version = mkversion(2, 10, 1), func = upgrade_to_2_10_1, auto = true},
     {version = mkversion(2, 10, 4), func = upgrade_to_2_10_4, auto = true},
+    {version = mkversion(2, 10, 5), func = upgrade_to_2_10_5, auto = true},
     {version = mkversion(2, 11, 0), func = upgrade_to_2_11_0, auto = true},
 }
 
