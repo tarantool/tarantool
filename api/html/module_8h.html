@@ -121,7 +121,7 @@ Macros</h2></td></tr>
 #define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#abd1dbec4fd6761084d3e0c05afe2b138">PACKAGE_VERSION_PATCH</a>&#160;&#160;&#160;0</td></tr>
 <tr class="memdesc:abd1dbec4fd6761084d3e0c05afe2b138"><td class="mdescLeft">&#160;</td><td class="mdescRight">Package patch version - 7 for 1.6.7. <br /></td></tr>
 <tr class="separator:abd1dbec4fd6761084d3e0c05afe2b138"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;2.11.0-entrypoint-874-g9d1cbda53&quot;</td></tr>
+<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;2.11.0-entrypoint-877-g457b293cb&quot;</td></tr>
 <tr class="memdesc:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">A string with major-minor-patch-commit-id identifier of the release, e.g.  <a href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">More...</a><br /></td></tr>
 <tr class="separator:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adb6d1259777e8f56c6260be6faed183e"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#adb6d1259777e8f56c6260be6faed183e">SYSCONF_DIR</a>&#160;&#160;&#160;&quot;etc&quot;</td></tr>
@@ -505,6 +505,8 @@ Enumerations</h2></td></tr>
 &#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a41c61daeecfce31f01f55ac6eb971f72">BOX_TRUNCATE_ID</a> = 330
 , <br />
 &#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04ad4db1b50b1f6446f75a8db82e0327374">BOX_SPACE_SEQUENCE_ID</a> = 340
+, <br />
+&#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04abe8471169b17b8ad853f4bd201c71785">BOX_VSPACE_SEQUENCE_ID</a> = 341
 , <br />
 &#160;&#160;<a class="el" href="module_8h.html#abc6126af1d45847bc59afa0aa3216b04a99e954bd1de658ba6586d7354fe06378">BOX_FK_CONSTRAINT_ID</a> = 356
 , <br />
@@ -1964,7 +1966,7 @@ void(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="mo
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;2.11.0-entrypoint-874-g9d1cbda53&quot;</td>
+          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;2.11.0-entrypoint-877-g457b293cb&quot;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -2670,6 +2672,8 @@ enum <a class="el" href="module_8h.html#af667a90dfe6a8cc25b510af73d98bb82" title
 <tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a41c61daeecfce31f01f55ac6eb971f72"></a>BOX_TRUNCATE_ID&#160;</td><td class="fielddoc"><p>Space id of _truncate. </p>
 </td></tr>
 <tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04ad4db1b50b1f6446f75a8db82e0327374"></a>BOX_SPACE_SEQUENCE_ID&#160;</td><td class="fielddoc"><p>Space id of _space_sequence. </p>
+</td></tr>
+<tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04abe8471169b17b8ad853f4bd201c71785"></a>BOX_VSPACE_SEQUENCE_ID&#160;</td><td class="fielddoc"><p>Space id of _vspace_sequence. </p>
 </td></tr>
 <tr><td class="fieldname"><a id="abc6126af1d45847bc59afa0aa3216b04a99e954bd1de658ba6586d7354fe06378"></a>BOX_FK_CONSTRAINT_ID&#160;</td><td class="fielddoc"><p>Space id of _fk_constraint. </p>
 </td></tr>
@@ -9697,7 +9701,7 @@ box_tuple_position(it) == box_tuple_field_count(tuple) if returned value is NULL
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Fri Jan 13 2023 07:41:49 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Fri Jan 13 2023 15:20:53 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>

@@ -141,6 +141,7 @@
     <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04add17b7c9ec4c6322a8344e00e8c25c62" kind="enumvalue"><name>BOX_TRIGGER_ID</name></member>
     <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a41c61daeecfce31f01f55ac6eb971f72" kind="enumvalue"><name>BOX_TRUNCATE_ID</name></member>
     <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04ad4db1b50b1f6446f75a8db82e0327374" kind="enumvalue"><name>BOX_SPACE_SEQUENCE_ID</name></member>
+    <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04abe8471169b17b8ad853f4bd201c71785" kind="enumvalue"><name>BOX_VSPACE_SEQUENCE_ID</name></member>
     <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a99e954bd1de658ba6586d7354fe06378" kind="enumvalue"><name>BOX_FK_CONSTRAINT_ID</name></member>
     <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04ae97c7da44f193fcfea35afe2dfe98dc8" kind="enumvalue"><name>BOX_CK_CONSTRAINT_ID</name></member>
     <member refid="module_8h_1abc6126af1d45847bc59afa0aa3216b04a5590980099004e7b53cd73cd5418f98b" kind="enumvalue"><name>BOX_FUNC_INDEX_ID</name></member>
