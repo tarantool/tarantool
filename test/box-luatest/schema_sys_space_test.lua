@@ -24,3 +24,19 @@ g.test_cluster_uuid_update_ban = function(lg)
         _schema:replace{'cluster', box.info.cluster.uuid}
     end)
 end
+
+g.test_version_transactional = function(lg)
+    lg.server:exec(function()
+        local ffi = require('ffi')
+        ffi.cdef('uint32_t box_dd_version_id(void);')
+        local dd_version = ffi.C.box_dd_version_id()
+
+        box.begin()
+        box.space._schema:update({'version'}, {{'+', 'value', 1}})
+        local dd_version_in_tx = ffi.C.box_dd_version_id()
+        box.rollback()
+
+        t.assert_equals(dd_version, dd_version_in_tx)
+        t.assert_equals(dd_version, ffi.C.box_dd_version_id())
+    end)
+end
