@@ -150,11 +150,11 @@ box.session.su('guest')
 ...
 #box.space._vspace:select{}
 ---
-- 9
+- 10
 ...
 #box.space._vindex:select{}
 ---
-- 21
+- 23
 ...
 #box.space._vcollation:select{}
 ---
@@ -246,11 +246,11 @@ box.session.su('guest')
 ...
 #box.space._vspace:select{}
 ---
-- 26
+- 27
 ...
 #box.space._vindex:select{}
 ---
-- 54
+- 56
 ...
 #box.space._vuser:select{}
 ---
@@ -258,7 +258,7 @@ box.session.su('guest')
 ...
 #box.space._vpriv:select{}
 ---
-- 17
+- 18
 ...
 #box.space._vfunc:select{}
 ---
@@ -282,7 +282,7 @@ box.session.su('guest')
 ...
 #box.space._vindex:select{}
 ---
-- 54
+- 56
 ...
 #box.space._vuser:select{}
 ---
@@ -290,7 +290,7 @@ box.session.su('guest')
 ...
 #box.space._vpriv:select{}
 ---
-- 17
+- 18
 ...
 #box.space._vfunc:select{}
 ---

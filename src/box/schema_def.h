@@ -108,6 +108,8 @@ enum {
 	BOX_TRUNCATE_ID = 330,
 	/** Space id of _space_sequence. */
 	BOX_SPACE_SEQUENCE_ID = 340,
+	/** Space id of _vspace_sequence. */
+	BOX_VSPACE_SEQUENCE_ID = 341,
 	/** Space id of _fk_constraint. */
 	BOX_FK_CONSTRAINT_ID = 356,
 	/** Space id of _ck_contraint. */
