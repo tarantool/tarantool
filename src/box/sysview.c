@@ -457,6 +457,11 @@ sysview_space_create_index(struct space *space, struct index_def *def)
 		source_index_id = def->iid;
 		filter = vsequence_filter;
 		break;
+	case BOX_VSPACE_SEQUENCE_ID:
+		source_space_id = BOX_SPACE_SEQUENCE_ID;
+		source_index_id = def->iid;
+		filter = vspace_filter;
+		break;
 	case BOX_VCOLLATION_ID:
 		source_space_id = BOX_COLLATION_ID;
 		source_index_id = def->iid;

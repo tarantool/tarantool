@@ -233,6 +233,8 @@ _index:select{}
   - [330, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [340, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [340, 1, 'sequence', 'tree', {'unique': false}, [[1, 'unsigned']]]
+  - [341, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
+  - [341, 1, 'sequence', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [356, 0, 'primary', 'tree', {'unique': true}, [[0, 'string'], [1, 'unsigned']]]
   - [356, 1, 'child_id', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [364, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'string']]]

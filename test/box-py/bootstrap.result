@@ -4,7 +4,7 @@ box.internal.bootstrap()
 box.space._schema:select{}
 ---
 - - ['max_id', 511]
-  - ['version', 2, 10, 4]
+  - ['version', 2, 10, 5]
 ...
 box.space._cluster:select{}
 ---
@@ -92,6 +92,9 @@ box.space._space:select{}
   - [340, 1, '_space_sequence', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'},
       {'name': 'sequence_id', 'type': 'unsigned'}, {'name': 'is_generated', 'type': 'boolean'},
       {'name': 'field', 'type': 'unsigned'}, {'name': 'path', 'type': 'string'}]]
+  - [341, 1, '_vspace_sequence', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'},
+      {'name': 'sequence_id', 'type': 'unsigned'}, {'name': 'is_generated', 'type': 'boolean'},
+      {'name': 'field', 'type': 'unsigned'}, {'name': 'path', 'type': 'string'}]]
   - [356, 1, '_fk_constraint', 'memtx', 0, {}, [{'name': 'name', 'type': 'string'},
       {'name': 'child_id', 'type': 'unsigned'}, {'name': 'parent_id', 'type': 'unsigned'},
       {'name': 'is_deferred', 'type': 'boolean'}, {'name': 'match', 'type': 'string'},
@@ -157,6 +160,8 @@ box.space._index:select{}
   - [330, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [340, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [340, 1, 'sequence', 'tree', {'unique': false}, [[1, 'unsigned']]]
+  - [341, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
+  - [341, 1, 'sequence', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [356, 0, 'primary', 'tree', {'unique': true}, [[0, 'string'], [1, 'unsigned']]]
   - [356, 1, 'child_id', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [364, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'string']]]
@@ -193,6 +198,7 @@ box.space._priv:select{}
   - [1, 2, 'space', 305, 1]
   - [1, 2, 'space', 313, 1]
   - [1, 2, 'space', 330, 2]
+  - [1, 2, 'space', 341, 1]
   - [1, 2, 'space', 380, 3]
   - [1, 3, 'space', 320, 2]
   - [1, 3, 'universe', 0, 1]
