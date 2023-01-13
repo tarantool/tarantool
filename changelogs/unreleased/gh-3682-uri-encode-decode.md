@@ -1,3 +1,4 @@
 ## feature/lua/uri
 
-* Added functions for percent-encoding and decoding of URI's parts (gh-3682).
+* Added functions `uri.escape()` and `uri.unescape()` for percent-encoding
+  and decoding URI parts (gh-3682).
