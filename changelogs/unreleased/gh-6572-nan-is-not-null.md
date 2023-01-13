@@ -1,3 +1,3 @@
 ## bugfix/sql
 
-* Now NaN is always considered NULL (gh-6572).
+* Now `NaN` is always considered `NULL` (gh-6572).

@@ -1,4 +1,0 @@
-## feature/yaml
-
-* Lua-yaml readability improvement is introduced as a new compat option:
-  multiline strings can be encoded in literal-scalar style (gh-3012).

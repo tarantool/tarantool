@@ -1,4 +1,4 @@
 ## feature/box
 
-* Env variables are taken into account if log is configured before box thru
-  log.cfg call (gh-6011).
+* Environment variables (TT_LOG, TT_LOG_LEVEL, and other) are taken into account
+  if logging is configured using `log.cfg` before `box.cfg` is called (gh-6011).

@@ -1,4 +1,3 @@
 ## bugfix/box
 
-* **[Breaking change]** Now the "execute" field is not available until box is
-  configured (gh-4726).
+* **[Breaking change]** Now `box.execute` cannot be called before `box.cfg` (gh-4726).
