@@ -513,6 +513,7 @@
     <member refid="module_8h_1aa1740670301221218d3780f2a4df33c6" kind="function"><name>luaT_push_nil_and_error</name></member>
     <member refid="module_8h_1aff9f0f763644cd5edc43ac632078b471" kind="function"><name>luaT_pusherror</name></member>
     <member refid="module_8h_1a94bf484fef1147b9e53323cd5082b505" kind="function"><name>box_txn_id</name></member>
+    <member refid="module_8h_1ab434c9ba079ac5578be4699220b1860f" kind="function"><name>box_txn_isolation</name></member>
     <member refid="module_8h_1af44f82b5dd34b12026c33baf63ba3fee" kind="function"><name>box_txn</name></member>
     <member refid="module_8h_1a88346fff21ac55ecf5e8e7e8750093ce" kind="function"><name>box_txn_begin</name></member>
     <member refid="module_8h_1a541c69864552de6ae21c4edce2bbf949" kind="function"><name>box_txn_commit</name></member>

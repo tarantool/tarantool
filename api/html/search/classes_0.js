@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['box_5fdecimal_304',['box_decimal',['../structbox__decimal.html',1,'']]]
+  ['box_5fdecimal_305',['box_decimal',['../structbox__decimal.html',1,'']]]
 ];

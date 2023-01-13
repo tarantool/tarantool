@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['internal_507',['internal',['../structbox__decimal.html#ab3c586f1f723be9d150e20c67ff0fa9b',1,'box_decimal']]]
+  ['internal_509',['internal',['../structbox__decimal.html#ab3c586f1f723be9d150e20c67ff0fa9b',1,'box_decimal']]]
 ];

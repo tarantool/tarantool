@@ -121,7 +121,7 @@ Macros</h2></td></tr>
 #define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#abd1dbec4fd6761084d3e0c05afe2b138">PACKAGE_VERSION_PATCH</a>&#160;&#160;&#160;0</td></tr>
 <tr class="memdesc:abd1dbec4fd6761084d3e0c05afe2b138"><td class="mdescLeft">&#160;</td><td class="mdescRight">Package patch version - 7 for 1.6.7. <br /></td></tr>
 <tr class="separator:abd1dbec4fd6761084d3e0c05afe2b138"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;2.11.0-entrypoint-864-g97a3af1bb&quot;</td></tr>
+<tr class="memitem:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">PACKAGE_VERSION</a>&#160;&#160;&#160;&quot;2.11.0-entrypoint-874-g9d1cbda53&quot;</td></tr>
 <tr class="memdesc:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="mdescLeft">&#160;</td><td class="mdescRight">A string with major-minor-patch-commit-id identifier of the release, e.g.  <a href="module_8h.html#aa326a05d5e30f9e9a4bb0b4469d5d0c0">More...</a><br /></td></tr>
 <tr class="separator:aa326a05d5e30f9e9a4bb0b4469d5d0c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adb6d1259777e8f56c6260be6faed183e"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#adb6d1259777e8f56c6260be6faed183e">SYSCONF_DIR</a>&#160;&#160;&#160;&quot;etc&quot;</td></tr>
@@ -1305,6 +1305,9 @@ void&#160;</td><td class="memItemRight" valign="bottom"><b>luaT_pusherror</b> (s
 <tr class="memitem:a94bf484fef1147b9e53323cd5082b505"><td class="memItemLeft" align="right" valign="top">int64_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#a94bf484fef1147b9e53323cd5082b505">box_txn_id</a> (void)</td></tr>
 <tr class="memdesc:a94bf484fef1147b9e53323cd5082b505"><td class="mdescLeft">&#160;</td><td class="mdescRight">public  <a href="module_8h.html#a94bf484fef1147b9e53323cd5082b505">More...</a><br /></td></tr>
 <tr class="separator:a94bf484fef1147b9e53323cd5082b505"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab434c9ba079ac5578be4699220b1860f"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#ab434c9ba079ac5578be4699220b1860f">box_txn_isolation</a> (void)</td></tr>
+<tr class="memdesc:ab434c9ba079ac5578be4699220b1860f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get isolation level of current transaction, one of enum txn_isolation_level values (but cannot be TXN_ISOLATION_DEFAULT (which is zero) by design).  <a href="module_8h.html#ab434c9ba079ac5578be4699220b1860f">More...</a><br /></td></tr>
+<tr class="separator:ab434c9ba079ac5578be4699220b1860f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af44f82b5dd34b12026c33baf63ba3fee"><td class="memItemLeft" align="right" valign="top"><a id="af44f82b5dd34b12026c33baf63ba3fee"></a>
 bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="module_8h.html#af44f82b5dd34b12026c33baf63ba3fee">box_txn</a> (void)</td></tr>
 <tr class="memdesc:af44f82b5dd34b12026c33baf63ba3fee"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return true if there is an active transaction. <br /></td></tr>
@@ -1961,7 +1964,7 @@ void(*&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="mo
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;2.11.0-entrypoint-864-g97a3af1bb&quot;</td>
+          <td class="memname">#define PACKAGE_VERSION&#160;&#160;&#160;&quot;2.11.0-entrypoint-874-g9d1cbda53&quot;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -7452,6 +7455,27 @@ box_tuple_position(it) == box_tuple_field_count(tuple) if returned value is NULL
 
 </div>
 </div>
+<a id="ab434c9ba079ac5578be4699220b1860f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab434c9ba079ac5578be4699220b1860f">&#9670;&nbsp;</a></span>box_txn_isolation()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int box_txn_isolation </td>
+          <td>(</td>
+          <td class="paramtype">void&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Get isolation level of current transaction, one of enum txn_isolation_level values (but cannot be TXN_ISOLATION_DEFAULT (which is zero) by design). </p>
+<p>-1 if there is no current transaction. </p>
+
+</div>
+</div>
 <a id="a59188d28eb2a8cd892d48f74041fec45"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a59188d28eb2a8cd892d48f74041fec45">&#9670;&nbsp;</a></span>box_txn_rollback()</h2>
 
@@ -9673,7 +9697,7 @@ box_tuple_position(it) == box_tuple_field_count(tuple) if returned value is NULL
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Thu Jan 12 2023 11:49:20 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Fri Jan 13 2023 07:41:49 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>
