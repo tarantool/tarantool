@@ -3878,6 +3878,26 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 
 /* {{{ cluster configuration */
 
+/** Set replicaset UUID on _schema commit. */
+static int
+on_commit_replicaset_uuid(struct trigger *trigger, void * /* event */)
+{
+	const struct tt_uuid *uuid = (typeof(uuid))trigger->data;
+	if (tt_uuid_is_equal(&REPLICASET_UUID, uuid))
+		return 0;
+	REPLICASET_UUID = *uuid;
+	box_broadcast_id();
+	say_info("replicaset uuid %s", tt_uuid_str(uuid));
+	return 0;
+}
+
+static int
+on_commit_dd_version(struct trigger *trigger, void * /* event */)
+{
+	dd_version_id = (uint32_t)(uintptr_t)trigger->data;
+	return 0;
+}
+
 /**
  * This trigger implements the "last write wins" strategy for
  * "bootstrap_leader_uuid" tuple of space _schema. Comparison is performed by
@@ -3983,10 +4003,16 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 			diag_set(ClientError, ER_REPLICASET_UUID_IS_RO);
 			return -1;
 		}
-		REPLICASET_UUID = uu;
-		box_broadcast_id();
-		say_info("cluster uuid %s", tt_uuid_str(&uu));
+		struct tt_uuid *uuid_copy = xregion_alloc_object(
+			&txn->region, typeof(*uuid_copy));
+		*uuid_copy = uu;
+		struct trigger *on_commit = txn_alter_trigger_new(
+			on_commit_replicaset_uuid, (void *)uuid_copy);
+		if (on_commit == NULL)
+			return -1;
+		txn_stmt_on_commit(stmt, on_commit);
 	} else if (strcmp(key, "version") == 0) {
+		uint32_t version = 0;
 		if (new_tuple != NULL) {
 			uint32_t major, minor, patch;
 			if (tuple_field_u32(new_tuple, 1, &major) != 0 ||
@@ -3997,15 +4023,20 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 			/* Version can be major.minor with no patch. */
 			if (tuple_field_u32(new_tuple, 3, &patch) != 0)
 				patch = 0;
-			dd_version_id = version_id(major, minor, patch);
+			version = version_id(major, minor, patch);
 		} else {
 			assert(old_tuple != NULL);
 			/*
 			 * _schema:delete({'version'}) for
 			 * example, for box.internal.bootstrap().
 			 */
-			dd_version_id = tarantool_version_id();
+			version = tarantool_version_id();
 		}
+		struct trigger *on_commit = txn_alter_trigger_new(
+			on_commit_dd_version, (void *)(uintptr_t)version);
+		if (on_commit == NULL)
+			return -1;
+		txn_stmt_on_commit(stmt, on_commit);
 	} else if (strcmp(key, "bootstrap_leader_uuid") == 0) {
 		struct tt_uuid *uuid = xregion_alloc_object(&txn->region,
 							    typeof(*uuid));
