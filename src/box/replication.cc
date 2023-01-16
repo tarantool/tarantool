@@ -39,6 +39,7 @@
 #include "box.h"
 #include "gc.h"
 #include "error.h"
+#include "node_name.h"
 #include "raft.h"
 #include "relay.h"
 #include "sio.h"
@@ -46,6 +47,7 @@
 uint32_t instance_id = REPLICA_ID_NIL;
 struct tt_uuid INSTANCE_UUID;
 struct tt_uuid REPLICASET_UUID;
+char CLUSTER_NAME[NODE_NAME_SIZE_MAX];
 
 struct uri_set replication_uris;
 double replication_timeout = 1.0; /* seconds */

@@ -152,6 +152,7 @@ local default_cfg = {
     replication         = nil,
     instance_uuid       = nil,
     replicaset_uuid     = nil,
+    cluster_name        = nil,
     custom_proc_title   = nil,
     pid_file            = nil,
     background          = false,
@@ -342,6 +343,7 @@ local template_cfg = {
     replication         = 'string, number, table',
     instance_uuid       = 'string',
     replicaset_uuid     = 'string',
+    cluster_name        = 'string',
     custom_proc_title   = 'string',
     pid_file            = 'string',
     background          = 'boolean',
@@ -392,9 +394,21 @@ local function normalize_uri_list_for_replication(port_list)
     return {port_list}
 end
 
+local function normalize_node_name(name)
+    if name == nil then
+        return nil
+    end
+    -- Node names are DNS-friendly. Those are case-insensitive. Here instead of
+    -- storing the names as is they are converted to the lowercase. It makes
+    -- possible to use normal comparison functions and display also always
+    -- lowercase.
+    return string.lower(name)
+end
+
 -- options that require special handling
 local modify_cfg = {
     replication        = normalize_uri_list_for_replication,
+    cluster_name       = normalize_node_name,
 }
 
 local function purge_password_from_uri(uri)
@@ -484,6 +498,7 @@ local dynamic_cfg = {
     bootstrap_strategy      = private.cfg_set_bootstrap_strategy,
     instance_uuid           = check_instance_uuid,
     replicaset_uuid         = check_replicaset_uuid,
+    cluster_name            = private.cfg_set_cluster_name,
     net_msg_max             = private.cfg_set_net_msg_max,
     sql_cache_size          = private.cfg_set_sql_cache_size,
     txn_timeout             = private.cfg_set_txn_timeout,
@@ -581,6 +596,7 @@ local dynamic_cfg_modules = {
 -- changed.
 --
 local dynamic_cfg_order = {
+    force_recovery          = 50,
     listen                  = 100,
     -- Order of replication_* options does not matter. The only
     -- rule - apply before replication itself.
@@ -644,6 +660,7 @@ local dynamic_cfg_skip_at_load = {
     force_recovery          = true,
     instance_uuid           = true,
     replicaset_uuid         = true,
+    cluster_name            = true,
     net_msg_max             = true,
     readahead               = true,
     auth_type               = true,

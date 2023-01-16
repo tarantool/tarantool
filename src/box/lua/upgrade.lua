@@ -1951,8 +1951,19 @@ local function store_replicaset_uuid_in_old_way(issue_handler)
     change_replicaset_uuid_key('replicaset_uuid', 'cluster')
 end
 
+-- Global names are stored in spaces. Can't silently delete them. It might break
+-- the cluster. The user has to do it manually and carefully.
+local function check_names_are_not_set(issue_handler)
+    local _schema = box.space._schema
+    local msg_suffix = 'name is set. It is supported from version 3.0.0'
+    if _schema:get{'cluster_name'} ~= nil then
+        issue_handler('Cluster %s', msg_suffix)
+    end
+end
+
 local function downgrade_from_3_0_0(issue_handler)
     store_replicaset_uuid_in_old_way(issue_handler)
+    check_names_are_not_set(issue_handler)
 end
 
 -- Versions should be ordered from newer to older.

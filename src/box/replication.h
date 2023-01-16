@@ -239,6 +239,8 @@ extern uint32_t instance_id;
 extern struct tt_uuid INSTANCE_UUID;
 /** UUID of the replica set. */
 extern struct tt_uuid REPLICASET_UUID;
+/** Name of the entire cluster with all its replicasets. */
+extern char CLUSTER_NAME[];
 
 typedef rb_tree(struct replica) replica_hash_t;
 

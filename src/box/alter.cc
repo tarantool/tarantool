@@ -58,6 +58,7 @@
 #include "space_upgrade.h"
 #include "box.h"
 #include "authentication.h"
+#include "node_name.h"
 
 /* {{{ Auxiliary functions and methods. */
 
@@ -246,6 +247,35 @@ index_opts_decode(struct index_opts *opts, const char *map,
 		return -1;
 	}
 	return 0;
+}
+
+/** Decode an optional node name field from the tuple. */
+static int
+tuple_field_node_name(char *out, struct tuple *tuple, uint32_t fieldno,
+		      const char *field_name)
+{
+	const char *name, *field;
+	uint32_t len;
+	if (tuple == NULL)
+		goto nil;
+	field = tuple_field(tuple, fieldno);
+	if (field == NULL || mp_typeof(*field) == MP_NIL)
+		goto nil;
+	if (mp_typeof(*field) != MP_STR)
+		goto error;
+	name = mp_decode_str(&field, &len);
+	if (!node_name_is_valid_n(name, len))
+		goto error;
+	memcpy(out, name, len);
+	out[len] = 0;
+	return 0;
+nil:
+	*out = 0;
+	return 0;
+error:
+	diag_set(ClientError, ER_FIELD_TYPE, field_name, "a valid name",
+		 "a bad name");
+	return -1;
 }
 
 /**
@@ -3898,6 +3928,19 @@ on_commit_dd_version(struct trigger *trigger, void * /* event */)
 	return 0;
 }
 
+/** Set cluster name on _schema commit. */
+static int
+on_commit_cluster_name(struct trigger *trigger, void * /* event */)
+{
+	const char *name = (typeof(name))trigger->data;
+	if (strcmp(CLUSTER_NAME, name) == 0)
+		return 0;
+	strlcpy(CLUSTER_NAME, name, NODE_NAME_SIZE_MAX);
+	box_broadcast_id();
+	say_info("cluster name: %s", node_name_str(name));
+	return 0;
+}
+
 /**
  * This trigger implements the "last write wins" strategy for
  * "bootstrap_leader_uuid" tuple of space _schema. Comparison is performed by
@@ -4073,6 +4116,31 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 		if (on_commit == NULL)
 			return -1;
 		txn_on_commit(txn, on_commit);
+	} else if (strcmp(key, "cluster_name") == 0) {
+		char name[NODE_NAME_SIZE_MAX];
+		const char *field_name = "_schema['cluster_name'].value";
+		if (tuple_field_node_name(name, new_tuple,
+					  BOX_SCHEMA_FIELD_VALUE,
+					  field_name) != 0)
+			return -1;
+		if (box_is_configured() && *CLUSTER_NAME != 0 &&
+		    strcmp(name, CLUSTER_NAME) != 0) {
+			if (!box_is_force_recovery) {
+				diag_set(ClientError, ER_UNSUPPORTED,
+					 "Tarantool", "cluster name change "
+					 "(without 'force_recovery')");
+				return -1;
+			}
+			say_info("cluster rename allowed by 'force_recovery'");
+		}
+		size_t size = strlen(name) + 1;
+		char *name_copy = (char *)xregion_alloc(&txn->region, size);
+		memcpy(name_copy, name, size);
+		struct trigger *on_commit = txn_alter_trigger_new(
+			on_commit_cluster_name, name_copy);
+		if (on_commit == NULL)
+			return -1;
+		txn_stmt_on_commit(stmt, on_commit);
 	}
 	return 0;
 }

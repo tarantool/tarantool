@@ -909,3 +909,22 @@ g.test_downgrade_replicaset_uuid_key = function(cg)
         end
     end)
 end
+
+g.test_downgrade_global_names = function(cg)
+    cg.server:exec(function()
+        local helper = require('test.box-luatest.downgrade_helper')
+        box.cfg{
+            force_recovery = true,
+            cluster_name = 'test'
+        }
+        local prev_version = helper.prev_version(helper.app_version('3.0.0'))
+        local issues = box.schema.downgrade_issues(prev_version)
+        t.assert_str_contains(issues[1], 'Cluster name is set')
+        box.space._schema:delete{'cluster_name'}
+        box.cfg{
+            cluster_name = box.NULL,
+            force_recovery = false,
+        }
+        box.schema.downgrade(prev_version)
+    end)
+end
