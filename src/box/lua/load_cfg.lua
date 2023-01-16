@@ -468,7 +468,7 @@ local dynamic_cfg = {
     custom_proc_title       = function()
         require('title').update(box.cfg.custom_proc_title)
     end,
-    force_recovery          = nop,
+    force_recovery          = private.cfg_set_force_recovery,
     election_mode           = private.cfg_set_election_mode,
     election_timeout        = private.cfg_set_election_timeout,
     election_fencing_mode = private.cfg_set_election_fencing_mode,

@@ -98,6 +98,9 @@ extern const char *box_ballot_event_key;
  */
 extern struct tt_uuid bootstrap_leader_uuid;
 
+/** box.cfg.force_recovery. */
+extern bool box_is_force_recovery;
+
 /*
  * Initialize box library
  * @throws C++ exception
@@ -299,6 +302,7 @@ void box_set_vinyl_memory(void);
 void box_set_vinyl_max_tuple_size(void);
 void box_set_vinyl_cache(void);
 void box_set_vinyl_timeout(void);
+void box_set_force_recovery(void);
 int box_set_election_mode(void);
 int box_set_election_timeout(void);
 int box_set_election_fencing_mode(void);
