@@ -152,6 +152,13 @@ rawset(searchers, 'cpath.cwd.dot', gen_file_searcher(load_lib, cpath.cwd.dot))
 rawset(searchers, 'path.cwd.rocks', gen_file_searcher(load_lua, path.cwd.rocks))
 rawset(searchers, 'cpath.cwd.rocks', gen_file_searcher(load_lib, cpath.cwd.rocks))
 
+-- Indices in <searchers> table must represent the order of the
+-- functions in <package.loaders> below.
+rawset(searchers, 2, searchers['path.cwd.dot'])
+rawset(searchers, 3, searchers['cpath.cwd.dot'])
+rawset(searchers, 4, searchers['path.cwd.rocks'])
+rawset(searchers, 5, searchers['cpath.cwd.rocks'])
+
 -- Compose a loader function from options.
 --
 -- @param searcher function will be used to search a file from
@@ -278,14 +285,36 @@ local function chain_loaders(subloaders)
     end
 end
 
--- loader_preload 1
-table.insert(package.loaders, 2, gen_file_loader(searchers['path.cwd.dot']))
-table.insert(package.loaders, 3, gen_file_loader(searchers['cpath.cwd.dot']))
-table.insert(package.loaders, 4, gen_file_loader(searchers['path.cwd.rocks']))
-table.insert(package.loaders, 5, gen_file_loader(searchers['cpath.cwd.rocks']))
--- package.path   6
--- package.cpath  7
--- croot          8
+-- Accept an array of searchers and return a searcher, whose
+-- effect is equivalent to calling the searchers in a row.
+local function chain_searchers(subsearchers)
+    return function(name)
+        -- Error accumulator.
+        local err = ''
+
+        for _, searcher in ipairs(subsearchers) do
+            local loader, data = searcher(name)
+            -- Whether the module found? Let's return it.
+            --
+            -- <loader> is a function, which implements loading
+            -- routine for particular <data> module.
+            if type(loader) == 'function' then
+                return loader, data
+            end
+            -- If the module is not found and the searcher
+            -- function returns an error, add the error into the
+            -- accumulator.
+            if type(loader) == 'string' then
+                err = err .. loader
+            end
+            -- Ignore any other return value: require() does the
+            -- same.
+        end
+
+        return err
+    end
+end
+
 
 -- Search for modules next to the main script.
 --
@@ -317,38 +346,48 @@ if script ~= nil and script ~= '-' then
     rawset(searchers, 'path.app.rocks', gen_file_searcher(load_lua, path.app.rocks))
     rawset(searchers, 'cpath.app.rocks', gen_file_searcher(load_lib, cpath.app.rocks))
 
-    -- Mix the script directory loaders into corresponding
-    -- searchroot based loaders. It allows to avoid changing
-    -- ordinals of the loaders and also makes the override
-    -- loader search here.
+    -- Mix the script directory searchers into corresponding
+    -- searchroot based searchers. It allows to avoid changing
+    -- ordinals of the searchers (and hence package.loaders) and
+    -- also makes the override loader search here.
     --
     -- We can just add more paths to package.path/package.cpath,
     -- but:
     --
     -- * Search for override modules is implemented as a loader.
-    -- * Search inside .rocks in implemented as a loaders.
+    -- * Search inside .rocks directory is implemented as a
+    --   separate searchers.
     --
     -- And it is simpler to wrap this logic rather than repeat.
     -- It is possible (and maybe even desirable) to reimplement
-    -- all the loaders logic as paths generation, but we should
+    -- all the searchers logic as paths generation, but we should
     -- do that for all the logic at once.
-    package.loaders[2] = chain_loaders({
-        package.loaders[2],
-        gen_file_loader(searchers['path.app.dot']),
-    })
-    package.loaders[3] = chain_loaders({
-        package.loaders[3],
-        gen_file_loader(searchers['cpath.app.dot']),
-    })
-    package.loaders[4] = chain_loaders({
-        package.loaders[4],
-        gen_file_loader(searchers['path.app.rocks']),
-    })
-    package.loaders[5] = chain_loaders({
-        package.loaders[5],
-        gen_file_loader(searchers['cpath.app.rocks']),
-    })
+    rawset(searchers, 2, chain_searchers({
+        searchers[2],
+        searchers['path.app.dot'],
+    }))
+    rawset(searchers, 3, chain_searchers({
+        searchers[3],
+        searchers['cpath.app.dot'],
+    }))
+    rawset(searchers, 4, chain_searchers({
+        searchers[4],
+        searchers['path.app.rocks'],
+    }))
+    rawset(searchers, 5, chain_searchers({
+        searchers[5],
+        searchers['cpath.app.rocks'],
+    }))
 end
+
+-- loader_preload 1
+table.insert(package.loaders, 2, gen_file_loader(searchers[2]))
+table.insert(package.loaders, 3, gen_file_loader(searchers[3]))
+table.insert(package.loaders, 4, gen_file_loader(searchers[4]))
+table.insert(package.loaders, 5, gen_file_loader(searchers[5]))
+-- package.path   6
+-- package.cpath  7
+-- croot          8
 
 local function getenv_boolean(varname, default)
     local envvar = os.getenv(varname)
