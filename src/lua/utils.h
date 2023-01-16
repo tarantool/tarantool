@@ -258,6 +258,31 @@ void
 luaL_register_module(struct lua_State *L, const char *modname,
 		     const struct luaL_Reg *methods);
 
+/**
+ * Create a table with functions and register it as a built-in
+ * tarantool module.
+ *
+ * Leave the table on top of the stack.
+ *
+ * Pseudocode:
+ *
+ *  | local function newmodule(modname, funcs)
+ *  |     assert(modname ~= nil and funcs ~= nil)
+ *  |     assert(package.loaded[modname] == nil)
+ *  |     local mod = {}
+ *  |     setfuncs(mod, funcs)
+ *  |     package.loaded[modname] = mod
+ *  |     return mod
+ *  | end
+ *
+ * Unlike luaL_register() it is very straightforward: no recursive
+ * search, no _G pollution, no branching around using a stack
+ * top/find a table/create a new table.
+ */
+int
+luaT_newmodule(struct lua_State *L, const char *modname,
+	       const struct luaL_Reg *funcs);
+
 /** \cond public */
 
 /**

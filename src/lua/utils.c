@@ -40,6 +40,7 @@
 #include <fiber.h>
 #include "tt_uuid.h"
 #include "core/datetime.h"
+#include "core/say.h"
 
 int luaL_nil_ref = LUA_REFNIL;
 
@@ -285,7 +286,6 @@ luaL_setcdatagc(struct lua_State *L, int idx)
 	lua_pop(L, 1);
 }
 
-
 /**
  * A helper to register a single type metatable.
  */
@@ -303,7 +303,7 @@ luaL_register_type(struct lua_State *L, const char *type_name,
 	lua_setfield(L, -2, "__index");
 	lua_pushstring(L, type_name);
 	lua_setfield(L, -2, "__metatable");
-	luaL_register(L, NULL, methods);
+	luaL_setfuncs(L, methods, 0);
 	lua_pop(L, 1);
 }
 
@@ -328,7 +328,48 @@ luaL_register_module(struct lua_State *L, const char *modname,
 			luaL_error(L, "Failed to register library");
 	}
 	lua_remove(L, -2);  /* remove _LOADED table */
-	luaL_register(L, NULL, methods);
+	luaL_setfuncs(L, methods, 0);
+}
+
+int
+luaT_newmodule(struct lua_State *L, const char *modname,
+	       const struct luaL_Reg *funcs)
+{
+	say_debug("%s(%s)", __func__, modname);
+	assert(modname != NULL && funcs != NULL);
+
+	/* Get package.loaded. */
+	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+
+#ifndef NDEBUG
+	/* Verify that the module is not already registered. */
+	lua_getfield(L, -1, modname);
+	assert(lua_isnil(L, -1));
+	lua_pop(L, 1);
+#endif
+
+	/* Create a module table. */
+	lua_newtable(L);
+
+	/* Fill the module table with functions. */
+	luaL_setfuncs(L, funcs, 0);
+
+	/* Copy the module table. */
+	lua_pushvalue(L, -1);
+
+	/* package.loaded[modname] = <module table> */
+	lua_setfield(L, -3, modname);
+
+	/* Stack: package.loaded, module table. */
+
+	/*
+	 * Drop package.loaded to leave the stack in its original
+	 * state.
+	 */
+	lua_remove(L, -2);
+
+	say_debug("%s(%s): success", __func__, modname);
+	return 1;
 }
 
 /*
