@@ -324,7 +324,7 @@ tarantool_lua_uri_init(struct lua_State *L)
 	static const struct luaL_Reg uri_methods[] = {
 		{NULL, NULL}
 	};
-	luaL_register_module(L, "uri", uri_methods);
+	luaT_newmodule(L, "uri", uri_methods);
 
 	/* internal table */
 	lua_pushliteral(L, "internal");
@@ -334,7 +334,7 @@ tarantool_lua_uri_init(struct lua_State *L)
 		{"uri_set_create", luaT_uri_set_create_internal},
 		{NULL, NULL}
 	};
-	luaL_register(L, NULL, uri_internal_methods);
+	luaL_setfuncs(L, uri_internal_methods, 0);
 	lua_settable(L, -3);
 
 	lua_pop(L, 1);

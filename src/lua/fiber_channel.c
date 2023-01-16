@@ -290,11 +290,18 @@ tarantool_lua_fiber_channel_init(struct lua_State *L)
 	};
 	luaL_register_type(L, channel_typename, channel_meta);
 
+	/* Get fiber module. */
+	lua_getfield(L, LUA_GLOBALSINDEX, "require");
+	lua_pushstring(L, "fiber");
+	lua_call(L, 1, 1);
+
 	static const struct luaL_Reg ipc_lib[] = {
 		{"channel",	luaT_fiber_channel},
 		{NULL, NULL}
 	};
 
-	luaL_register_module(L, "fiber", ipc_lib);
+	luaL_setfuncs(L, ipc_lib, 0);
+
+	/* Pop fiber module. */
 	lua_pop(L, 1);
 }

@@ -984,7 +984,7 @@ static const struct luaL_Reg fiberlib[] = {
 void
 tarantool_lua_fiber_init(struct lua_State *L)
 {
-	luaL_register_module(L, fiberlib_name, fiberlib);
+	luaT_newmodule(L, fiberlib_name, fiberlib);
 	lua_pop(L, 1);
 	luaL_register_type(L, fiberlib_name, lbox_fiber_meta);
 }

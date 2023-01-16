@@ -10,12 +10,10 @@ local ffi = require("ffi")
 
 local g = t.group('http_client_unit')
 
-package.loaded.http = {
-    client = {
-        new = function() return end
-    }
+package.loaded['http.client'] = {
+    new = function() return end
 }
-local driver = package.loaded.http.client -- luacheck: no unused
+local driver = package.loaded['http.client'] -- luacheck: no unused
 
 local httpc = require("src.lua.httpc")
 local encode_body = httpc._internal.encode_body

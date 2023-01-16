@@ -402,7 +402,7 @@ lbox_fio_pushstat(struct lua_State *L, int res, const struct stat *stat)
 #endif
 		{ NULL,			NULL				}
 	};
-	luaL_register(L, NULL, stat_methods);
+	luaL_setfuncs(L, stat_methods, 0);
 	lua_settable(L, -3);
 
 	lua_setmetatable(L, top);
@@ -699,7 +699,7 @@ tarantool_lua_fio_init(struct lua_State *L)
 		{ NULL,			NULL				}
 	};
 
-	luaL_register_module(L, "fio", fio_methods);
+	luaT_newmodule(L, "fio", fio_methods);
 
 	/* internal table */
 	lua_pushliteral(L, "internal");
@@ -721,7 +721,7 @@ tarantool_lua_fio_init(struct lua_State *L)
 		{ "utime",		lbox_fio_utime			},
 		{ NULL,			NULL				}
 	};
-	luaL_register(L, NULL, internal_methods);
+	luaL_setfuncs(L, internal_methods, 0);
 	lua_settable(L, -3);
 
 

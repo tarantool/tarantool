@@ -276,6 +276,6 @@ tarantool_lua_pickle_init(struct lua_State *L)
 		{ NULL, NULL}
 	};
 
-	luaL_register_module(L, "pickle", picklelib);
+	luaT_newmodule(L, "pickle", picklelib);
 	lua_pop(L, 1);
 }
