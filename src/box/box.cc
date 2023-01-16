@@ -121,6 +121,8 @@ const char *box_ballot_event_key = "internal.ballot";
  */
 static struct tt_uuid bootstrap_leader_uuid;
 
+bool box_is_force_recovery = false;
+
 /**
  * Set if backup is in progress, i.e. box_backup_start() was
  * called but box_backup_stop() hasn't been yet.
@@ -2671,6 +2673,12 @@ box_set_vinyl_timeout(void)
 }
 
 void
+box_set_force_recovery(void)
+{
+	box_is_force_recovery = cfg_geti("force_recovery");
+}
+
+void
 box_set_net_msg_max(void)
 {
 	int new_iproto_msg_max = cfg_geti("net_msg_max");
@@ -4084,7 +4092,7 @@ engine_init()
 	 */
 	struct memtx_engine *memtx;
 	memtx = memtx_engine_new_xc(cfg_gets("memtx_dir"),
-				    cfg_geti("force_recovery"),
+				    box_is_force_recovery,
 				    cfg_getd("memtx_memory"),
 				    cfg_geti("memtx_min_tuple_size"),
 				    cfg_geti("strip_core"),
@@ -4109,7 +4117,7 @@ engine_init()
 				    cfg_geti64("vinyl_memory"),
 				    cfg_geti("vinyl_read_threads"),
 				    cfg_geti("vinyl_write_threads"),
-				    cfg_geti("force_recovery"));
+				    box_is_force_recovery);
 	engine_register((struct engine *)vinyl);
 	box_set_vinyl_max_tuple_size();
 	box_set_vinyl_cache();
@@ -4409,12 +4417,8 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	auto stream_guard = make_scoped_guard([&]{
 		wal_stream_abort(&wal_stream);
 	});
-
-	struct recovery *recovery;
-	bool is_force_recovery = cfg_geti("force_recovery");
-	recovery = recovery_new(wal_dir(), is_force_recovery,
-				checkpoint_vclock);
-
+	struct recovery *recovery = recovery_new(
+		wal_dir(), box_is_force_recovery, checkpoint_vclock);
 	/*
 	 * Make sure we report the actual recovery position
 	 * in box.info while local recovery is in progress.
@@ -4501,7 +4505,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 		diag_set(XlogError, "found a not finished transaction "
 			 "in the log");
 		wal_stream_abort(&wal_stream);
-		if (!is_force_recovery)
+		if (!box_is_force_recovery)
 			diag_raise();
 		diag_log();
 	}
@@ -4528,7 +4532,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 			diag_set(XlogError, "found a not finished transaction "
 				 "in the log in hot standby mode");
 			wal_stream_abort(&wal_stream);
-			if (!is_force_recovery)
+			if (!box_is_force_recovery)
 				diag_raise();
 			diag_log();
 		}
@@ -4568,7 +4572,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 				   "recovered data %s",
 				   vclock_to_string(&replicaset.vclock),
 				   vclock_to_string(&recovery->vclock));
-		if (is_force_recovery) {
+		if (box_is_force_recovery) {
 			say_warn("%s: ignoring, because 'force_recovery' "
 				 "configuration option is set.", mismatch_str);
 			vclock_copy(&replicaset.vclock, &recovery->vclock);
@@ -4643,6 +4647,7 @@ box_is_configured(void)
 static void
 box_cfg_xc(void)
 {
+	box_set_force_recovery();
 	box_storage_init();
 	title("loading");
 
