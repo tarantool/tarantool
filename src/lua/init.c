@@ -731,10 +731,15 @@ luaopen_tarantool(lua_State *L)
 	lua_pushstring(L, tarantool_version());
 	lua_setfield(L, LUA_GLOBALSINDEX, "_TARANTOOL");
 
-	static const struct luaL_Reg initlib[] = {
-		{NULL, NULL}
-	};
-	luaL_register_module(L, "tarantool", initlib);
+	/*
+	 * Get tarantool module.
+	 *
+	 * src/lua/init.lua is already registered as tarantool
+	 * module, so we `require` it here, not create.
+	 */
+	lua_getfield(L, LUA_GLOBALSINDEX, "require");
+	lua_pushstring(L, "tarantool");
+	lua_call(L, 1, 1);
 
 	/* package */
 	lua_pushstring(L, tarantool_package());

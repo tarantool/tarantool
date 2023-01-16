@@ -459,8 +459,9 @@ tarantool_lua_utf8_init(struct lua_State *L)
 	unicode_ci_coll = coll_new(&def);
 	if (unicode_ci_coll == NULL)
 		goto error_coll;
-	luaL_register(L, "utf8", utf8_lib);
-	lua_pop(L, 1);
+	luaT_newmodule(L, "utf8", utf8_lib);
+	/* Assign to _G.utf8 for compatibility with Lua 5.3. */
+	lua_setfield(L, LUA_GLOBALSINDEX, "utf8");
 	return;
 error_coll:
 	tarantool_lua_utf8_free();

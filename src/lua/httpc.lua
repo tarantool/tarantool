@@ -29,8 +29,7 @@
 --  SUCH DAMAGE.
 --
 
-local driver = package.loaded.http.client
-package.loaded.http = nil
+local driver = require('http.client')
 
 local json = require('json')
 local yaml = require('yaml')

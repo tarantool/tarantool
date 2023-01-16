@@ -146,11 +146,18 @@ tarantool_lua_fiber_cond_init(struct lua_State *L)
 	};
 	luaL_register_type(L, cond_typename, cond_meta);
 
+	/* Get fiber module. */
+	lua_getfield(L, LUA_GLOBALSINDEX, "require");
+	lua_pushstring(L, "fiber");
+	lua_call(L, 1, 1);
+
 	static const struct luaL_Reg cond_lib[] = {
 		{"cond",	luaT_fiber_cond_new},
 		{NULL, NULL}
 	};
 
-	luaL_register_module(L, "fiber", cond_lib);
+	luaL_setfuncs(L, cond_lib, 0);
+
+	/* Pop fiber module. */
 	lua_pop(L, 1);
 }

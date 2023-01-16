@@ -163,6 +163,6 @@ tarantool_lua_digest_init(struct lua_State *L)
 	lua_pushcfunction(L, luaopen_crc32_internal);
 	lua_setfield(L, -2, "crc32.internal");
 	lua_pop(L, 1);
-	luaL_register_module(L, "digest", lua_digest_methods);
+	luaT_newmodule(L, "digest", lua_digest_methods);
 	lua_pop(L, 1);
 };

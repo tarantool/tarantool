@@ -439,7 +439,7 @@ tarantool_lua_decimal_init(struct lua_State *L)
 			      "} decimal_t;");
 	assert(rc == 0);
 	(void)rc;
-	luaL_register_module(L, "decimal", ldecimal_lib);
+	luaT_newmodule(L, "decimal", ldecimal_lib);
 	lua_pop(L, 1);
 	/*
 	 * luaL_metatype is similar to luaL_ctypeid +

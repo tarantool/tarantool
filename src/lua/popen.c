@@ -2487,7 +2487,7 @@ tarantool_lua_popen_init(struct lua_State *L)
 		{"shell",	lbox_popen_shell,	},
 		{NULL, NULL},
 	};
-	luaL_register_module(L, "popen", popen_methods);
+	luaT_newmodule(L, "popen", popen_methods);
 
 	/*
 	 * Popen handle methods and metamethods.
