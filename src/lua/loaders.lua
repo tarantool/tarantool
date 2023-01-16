@@ -247,15 +247,15 @@ local function prefix_searcher(prefix, subsearcher)
     end
 end
 
--- Accept a loader and return the same loader, but enabled only
--- when given condition (a function return value) is true.
-local function conditional_loader(subloader, onoff)
+-- Accept a searcher and return the same searcher, but enabled
+-- only when given condition (a function return value) is true.
+local function conditional_searcher(subsearcher, onoff)
     assert(type(onoff) == 'function')
     return function(name)
         if onoff(name) then
-            return subloader(name)
+            return subsearcher(name)
         end
-        -- It is okay to return nothing, require() ignores it.
+        -- It is okay to return nothing, <require> ignores it.
     end
 end
 
@@ -431,14 +431,14 @@ local function override_searcher_onoff(_name)
     return getenv_boolean('TT_OVERRIDE_BUILTIN', true)
 end
 
-local override_loader = conditional_loader(gen_file_loader(chain_searchers({
+local override_loader = gen_file_loader(conditional_searcher(chain_searchers({
     prefix_searcher('override', searchers[2]),
     prefix_searcher('override', searchers[3]),
     prefix_searcher('override', searchers[4]),
     prefix_searcher('override', searchers[5]),
     prefix_searcher('override', searchers[6]),
     prefix_searcher('override', searchers[7]),
-})), override_searcher_onoff)
+}), override_searcher_onoff))
 
 
 local function dummy_loader(searcher, sentinel)
