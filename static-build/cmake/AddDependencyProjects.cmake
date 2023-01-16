@@ -103,6 +103,14 @@ ExternalProject_Add(icu
         --prefix=<INSTALL_DIR>
         --disable-shared
         --enable-static
+        --disable-renaming
+        --disable-tests
+        --disable-samples
+    INSTALL_COMMAND
+        $(MAKE) install &&
+        ${CMAKE_COMMAND} -E touch <BINARY_DIR>/uconfig.h &&
+        cat <BINARY_DIR>/uconfig.h.prepend <INSTALL_DIR>/include/unicode/uconfig.h >> <BINARY_DIR>/uconfig.h &&
+        ${CMAKE_COMMAND} -E copy_if_different <BINARY_DIR>/uconfig.h <INSTALL_DIR>/include/unicode/uconfig.h
 )
 set(TARANTOOL_DEPENDS icu ${TARANTOOL_DEPENDS})
 
