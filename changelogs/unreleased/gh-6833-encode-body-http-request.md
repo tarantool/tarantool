@@ -1,6 +1,7 @@
 ## feature/lua/http client
 
-* HTTP client is able to encode Lua objects automatically when it is possible.
-  Encoding depends on content type passed to HTTP request and following types
-  are supported: "application/json", "application/yaml" and
-  "application/msgpack". Now user can define his own encoding function (gh-6833).
+* Now the HTTP client is able to encode Lua objects automatically when it is possible.
+  The encoding format depends on the request content type. The following
+  content types are supported by default: `application/json`, `application/yaml`,
+  `application/msgpack`. Users can define encoding rules for other content types
+  by writing their own encoding functions. (gh-6833).

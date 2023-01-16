@@ -1,3 +1,3 @@
 ## bugfix/sql
 
-* Now ROUND() with big precision works properly (gh-6650).
+* Now the `ROUND()` functions works correctly on arguments with big precision (gh-6650).

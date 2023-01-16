@@ -1,7 +1,7 @@
 ## feature/lua/http client
 
-* New method "response:decode()" has been introduced. It allows to decode body
-  to a Lua object when decoding function is available. Decode function depends
-  on content type and following content types are supported by default:
-  "application/json", "application/yaml" and "application/msgpack". Now user can
-  define his own decode function (gh-6833).
+* Added a new method `response:decode()`. It decodes an HTTP response body to
+  a Lua object. The decoding result depends on the response content type. The following
+  content types are supported by default: `application/json`, `application/yaml`,
+  `application/msgpack`. Users can define decoding rules for other content types
+  by writing their own decoding functions. (gh-6833).
