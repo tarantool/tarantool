@@ -57,27 +57,30 @@ local function get_require_overload_count(stack)
     return 0
 end
 
--- Make path relative to the current directory.
-local function remove_root_directory(path)
-    local pwd = os.getenv("PWD")
-    if pwd == nil then
+-- Return longest common subpath of two paths.
+local function get_common_subpath(path1, path2)
+    local result = '/'
+    path1 = path1:split('/')
+    path2 = path2:split('/')
+    for i = 1, math.min(#path1, #path2) do
+        if path1[i] == path2[i] then
+            result = fio.pathjoin(result, path1[i])
+        else
+            goto finish
+        end
+    end
+::finish::
+    return result == '/' and '/' or result .. '/'
+end
+
+-- Strip a common part of cwd and path from the path.
+local function strip_cwd_from_path(cwd, path)
+    if not cwd or cwd:sub(1, 1) ~= '/' or
+       not path or path:sub(1, 1) ~= '/' then
         return path
     end
-    local cur_dir = pwd .. '/'
-    local start_len = #path
-
-    while #cur_dir > 0 and start_len == #path do
-        if cur_dir == '/' then
-            if path:sub(1, 1) == '/' then
-                path = path:sub(2)
-            end
-            break
-        end
-        path = path:gsub(cur_dir, '')
-        local ind = cur_dir:find('[^/]+/$')
-        cur_dir = cur_dir:sub(1, ind - 1)
-    end
-    return path
+    local common = get_common_subpath(cwd, path)
+    return path:sub(#common + 1)
 end
 
 -- Obtain the module name from the file name by removing:
@@ -97,7 +100,7 @@ local function module_name_from_filename(filename)
     end
     result = result:gsub('/init.lua', '')
     result = result:gsub('%.lua', '')
-    result = remove_root_directory(result)
+    result = strip_cwd_from_path(fio.cwd(), result)
     result = result:gsub(ROCKS_LIB_PATH .. '/', '')
     result = result:gsub(ROCKS_LUA_PATH .. '/', '')
     result = result:gsub('/', '.')
@@ -351,6 +354,8 @@ return {
     pid = pid;
     compat = compat;
     _internal = {
+        strip_cwd_from_path = strip_cwd_from_path,
+        module_name_from_filename = module_name_from_filename,
         run_preload = run_preload,
     };
 }
