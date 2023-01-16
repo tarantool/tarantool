@@ -158,6 +158,8 @@ rawset(searchers, 2, searchers['path.cwd.dot'])
 rawset(searchers, 3, searchers['cpath.cwd.dot'])
 rawset(searchers, 4, searchers['path.cwd.rocks'])
 rawset(searchers, 5, searchers['cpath.cwd.rocks'])
+rawset(searchers, 6, searchers['path.package'])
+rawset(searchers, 7, searchers['cpath.package'])
 
 -- Compose a loader function from options.
 --
@@ -219,19 +221,21 @@ local function search(name)
     return nil
 end
 
--- Accept a loader and return a loader, which search by a prefixed
--- module name.
+-- Accept a searcher and return a searcher, which search by a
+-- prefixed module name.
 --
 -- The module receives the original (unprefixed) module name in
 -- the argument (three dots).
-local function prefix_loader(prefix, subloader)
+local function prefix_searcher(prefix, subsearcher)
     return function(name)
         local prefixed_name = prefix .. '.' .. name
         -- On success the return value is a function, which
-        -- executes module's initialization code. require() calls
-        -- it with one argument: the module name (it can be
+        -- implements loading mechanism for particular file.
+        -- If the file is loaded successfully, the loader yields
+        -- module initialization function that is called by
+        -- <require> with one argument: the module name (it can be
         -- received in the module using three dots). Since
-        -- require() knows nothing about our prefixing it passes
+        -- <require> knows nothing about our prefixing, it passes
         -- the original name there.
         --
         -- It is expected behavior in our case. The prefixed
@@ -239,7 +243,7 @@ local function prefix_loader(prefix, subloader)
         -- we would add more package.{path,cpath} entries. It
         -- shouldn't change the string passed to the module's
         -- initialization code.
-        return subloader(prefixed_name)
+        return subsearcher(prefixed_name)
     end
 end
 
@@ -414,27 +418,27 @@ local function getenv_boolean(varname, default)
 end
 
 -- true/false if explicitly enabled or disabled, nil otherwise.
-local override_loader_is_enabled
+local override_searcher_is_enabled
 
 -- Whether the override loader is enabled.
-local function override_loader_onoff(_name)
+local function override_searcher_onoff(_name)
     -- Follow the switch if it is explicitly enabled or disabled.
-    if override_loader_is_enabled ~= nil then
-        return override_loader_is_enabled
+    if override_searcher_is_enabled ~= nil then
+        return override_searcher_is_enabled
     end
 
     -- Follow the environment variable otherwise.
     return getenv_boolean('TT_OVERRIDE_BUILTIN', true)
 end
 
-local override_loader = conditional_loader(chain_loaders({
-    prefix_loader('override', package.loaders[2]),
-    prefix_loader('override', package.loaders[3]),
-    prefix_loader('override', package.loaders[4]),
-    prefix_loader('override', package.loaders[5]),
-    prefix_loader('override', package.loaders[6]),
-    prefix_loader('override', package.loaders[7]),
-}), override_loader_onoff)
+local override_loader = conditional_loader(gen_file_loader(chain_searchers({
+    prefix_searcher('override', searchers[2]),
+    prefix_searcher('override', searchers[3]),
+    prefix_searcher('override', searchers[4]),
+    prefix_searcher('override', searchers[5]),
+    prefix_searcher('override', searchers[6]),
+    prefix_searcher('override', searchers[7]),
+})), override_searcher_onoff)
 
 
 local function dummy_loader(searcher, sentinel)
@@ -499,10 +503,10 @@ return {
     ROCKS_LUA_PATH = ROCKS_LUA_PATH,
     builtin = builtin_modules,
     override_builtin_enable = function()
-        override_loader_is_enabled = true
+        override_searcher_is_enabled = true
     end,
     override_builtin_disable = function()
-        override_loader_is_enabled = false
+        override_searcher_is_enabled = false
     end,
     -- It is `true` during tarantool initialization, but once all
     -- the built-in modules are ready, will be set to `nil`.
