@@ -52,6 +52,7 @@
 #include "box/raft.h"
 #include "box/txn_limbo.h"
 #include "box/schema.h"
+#include "box/node_name.h"
 #include "lua/utils.h"
 #include "lua/serializer.h" /* luaL_setmaphint */
 #include "fiber.h"
@@ -396,7 +397,12 @@ lbox_info_cluster(struct lua_State *L)
 {
 	if (!box_info_cluster_new_meaning)
 		return lbox_info_replicaset(L);
-	lua_createtable(L, 0, 0);
+	lua_createtable(L, 0, 1);
+	if (*CLUSTER_NAME == 0)
+		luaL_pushnull(L);
+	else
+		lua_pushstring(L, CLUSTER_NAME);
+	lua_setfield(L, -2, "name");
 	return 1;
 }
 
