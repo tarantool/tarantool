@@ -10,17 +10,10 @@ name: LuaJIT integration testing
 on:
   workflow_call:
     inputs:
-      # FIXME: Make this inputs entry obligatory when transition
-      # to arch + os parameters is finished.
       arch:
         description: Name of the arch family to be used as a runner label
-        required: false
+        required: true
         type: string
-        # XXX: Temporary ugly hack: use 'self-hosted' as a default
-        # value to fool GitHub Actions machinery choosing the
-        # appropriate runner for the workflow (since the empty
-        # string is not a valid parameter).
-        default: self-hosted
       # FIXME: Remove this inputs entry when transition to
       # CMAKE_EXTRA_PARAMS usage is finished.
       buildtype:
@@ -40,28 +33,10 @@ on:
         required: false
         type: string
         default: OFF
-      # FIXME: Remove this inputs entry when transition to
-      # arch + os parameters is finished.
-      host:
-        description: Type of machine to run the GitHub job on
-        required: false
-        type: string
-        # XXX: Temporary ugly hack: use 'self-hosted' as a default
-        # value to fool GitHub Actions machinery choosing the
-        # appropriate runner for the workflow (since the empty
-        # string is not a valid parameter).
-        default: self-hosted
-      # FIXME: Make this inputs entry obligatory when transition
-      # to arch + os parameters is finished.
       os:
         description: Name of the OS family to be used as a runner label
-        required: false
+        required: true
         type: string
-        # XXX: Temporary ugly hack: use 'self-hosted' as a default
-        # value to fool GitHub Actions machinery choosing the
-        # appropriate runner for the workflow (since the empty
-        # string is not a valid parameter).
-        default: self-hosted
       release:
         description: Git revision from tarantool/tarantool repository
         required: false
@@ -74,7 +49,7 @@ on:
 
 jobs:
   luajit-integration:
-    runs-on: [regular, '${{ inputs.os }}', '${{ inputs.arch }}', '${{ inputs.host }}']
+    runs-on: [self-hosted, regular, '${{ inputs.os }}', '${{ inputs.arch }}']
     steps:
       - name: Prepare checkout
         uses: tarantool/actions/prepare-checkout@master
@@ -111,23 +86,17 @@ jobs:
       - name: Set environment
         uses: ./.github/actions/environment
 
-      - name: Get machine platform and arch
-        run: |
-          echo PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]') | \
-            tee -a ${GITHUB_ENV}
-          echo ARCH=$(uname -m) | tee -a ${GITHUB_ENV}
-
       - name: Install deps on Linux
         uses: ./.github/actions/install-deps-debian
-        if: ${{ env.PLATFORM == 'linux' }}
+        if: ${{ inputs.os == 'Linux' }}
 
       - name: Install deps on Darwin
         uses: ./.github/actions/install-deps-osx
-        if: ${{ env.PLATFORM == 'darwin' }}
+        if: ${{ inputs.os == 'macOS' }}
 
       - name: Run tests
         env:
           CMAKE_EXTRA_PARAMS: >
             -DCMAKE_BUILD_TYPE=${{ inputs.buildtype }}
             -DLUAJIT_ENABLE_GC64=${{ inputs.GC64 }}
-        run: make -f .test.mk test-luajit-${{ env.PLATFORM }}-${{ env.ARCH }}
+        run: make -f .test.mk test-luajit-${{ inputs.os }}-${{ inputs.arch }}
