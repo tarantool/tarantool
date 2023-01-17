@@ -517,11 +517,16 @@ box_lua_init(struct lua_State *L)
 	CTID_STRUCT_TXN_SAVEPOINT_PTR = luaL_ctypeid(L,
 						     "struct txn_savepoint*");
 
-	/* Use luaL_register() to set _G.box */
-	luaL_register(L, "box", boxlib);
-	lua_pop(L, 1);
+	/*
+	 * Create a table and expose it as require('box') and
+	 * as _G.box.
+	 */
+	luaT_newmodule(L, "box", boxlib);
+	lua_setfield(L, LUA_GLOBALSINDEX, "box");
 
-	luaL_register(L, "box.backup", boxlib_backup);
+	/* box.backup = {<...>} */
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.backup", 0);
+	luaL_setfuncs(L, boxlib_backup, 0);
 	lua_pop(L, 1);
 
 	box_lua_error_init(L);

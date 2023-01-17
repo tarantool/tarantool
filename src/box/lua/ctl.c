@@ -166,6 +166,7 @@ static const struct luaL_Reg lbox_ctl_lib[] = {
 void
 box_lua_ctl_init(struct lua_State *L)
 {
-	luaL_register_module(L, "box.ctl", lbox_ctl_lib);
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.ctl", 0);
+	luaL_setfuncs(L, lbox_ctl_lib, 0);
 	lua_pop(L, 1);
 }

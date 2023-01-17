@@ -781,6 +781,7 @@ box_lua_space_init(struct lua_State *L)
 		{"frommap", lbox_space_frommap},
 		{NULL, NULL}
 	};
-	luaL_register(L, "box.internal.space", space_internal_lib);
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal.space", 0);
+	luaL_setfuncs(L, space_internal_lib, 0);
 	lua_pop(L, 1);
 }

@@ -293,10 +293,7 @@ lbox_errinj_info(struct lua_State *L)
 
 void
 box_lua_error_init(struct lua_State *L) {
-	static const struct luaL_Reg errorlib[] = {
-		{NULL, NULL}
-	};
-	luaL_register_module(L, "box.error", errorlib);
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.error", 0);
 	for (int i = 0; i < box_error_code_MAX; i++) {
 		const char *name = box_error_codes[i].errstr;
 		if (strstr(name, "UNUSED") || strstr(name, "RESERVED"))
@@ -340,7 +337,7 @@ box_lua_error_init(struct lua_State *L) {
 		{"get", lbox_errinj_get},
 		{NULL, NULL}
 	};
-	/* box.error.injection is not set by register_module */
-	luaL_register_module(L, "box.error.injection", errinjlib);
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.error.injection", 0);
+	luaL_setfuncs(L, errinjlib, 0);
 	lua_pop(L, 1);
 }

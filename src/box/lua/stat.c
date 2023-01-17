@@ -452,39 +452,29 @@ box_lua_stat_init(struct lua_State *L)
 		{NULL, NULL}
 	};
 
-	luaL_register_module(L, "box.stat", statlib);
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.stat", 0);
+	luaL_setfuncs(L, statlib, 0);
 
 	lua_newtable(L);
-	luaL_register(L, NULL, lbox_stat_meta);
+	luaL_setfuncs(L, lbox_stat_meta, 0);
 	lua_setmetatable(L, -2);
 	lua_pop(L, 1); /* stat module */
 
-	static const struct luaL_Reg netstatlib [] = {
-		{NULL, NULL}
-	};
-
-	luaL_register_module(L, "box.stat.net", netstatlib);
-
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.stat.net", 0);
 	lua_newtable(L);
-	luaL_register(L, NULL, lbox_stat_net_meta);
+	luaL_setfuncs(L, lbox_stat_net_meta, 0);
 	lua_setmetatable(L, -2);
 	lua_pop(L, 1); /* stat net module */
 
-	luaL_register_module(L, "box.stat.net.thread", netstatlib);
-
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.stat.net.thread", 0);
 	lua_newtable(L);
-	luaL_register(L, NULL, lbox_stat_net_thread_meta);
+	luaL_setfuncs(L, lbox_stat_net_thread_meta, 0);
 	lua_setmetatable(L, -2);
 	lua_pop(L, 1); /* stat net module */
 
-	static const struct luaL_Reg memtx_mvcc_statlib[] = {
-		{NULL, NULL}
-	};
-
-	luaL_register_module(L, "box.stat.memtx.tx", memtx_mvcc_statlib);
-
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.stat.memtx.tx", 0);
 	lua_newtable(L);
-	luaL_register(L, NULL, lbox_stat_memtx_mvcc_meta);
+	luaL_setfuncs(L, lbox_stat_memtx_mvcc_meta, 0);
 	lua_setmetatable(L, -2);
 	lua_pop(L, 1); /* stat tx module */
 

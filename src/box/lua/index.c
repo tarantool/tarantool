@@ -365,12 +365,8 @@ box_lua_index_init(struct lua_State *L)
 	CTID_STRUCT_ITERATOR_PTR = luaL_ctypeid(L, "struct iterator*");
 	assert(CTID_STRUCT_ITERATOR_PTR != 0);
 
-	static const struct luaL_Reg indexlib [] = {
-		{NULL, NULL}
-	};
-
 	/* box.index */
-	luaL_register_module(L, "box.index", indexlib);
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.index", 0);
 	box_index_init_iterator_types(L, -2);
 	lua_pop(L, 1);
 
@@ -393,6 +389,7 @@ box_lua_index_init(struct lua_State *L)
 		{NULL, NULL}
 	};
 
-	luaL_register(L, "box.internal", boxlib_internal);
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal", 0);
+	luaL_setfuncs(L, boxlib_internal, 0);
 	lua_pop(L, 1);
 }

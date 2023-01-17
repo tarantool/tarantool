@@ -4,7 +4,7 @@ local ffi = require('ffi')
 local msgpackffi = require('msgpackffi')
 local fun = require('fun')
 local buffer = require('buffer')
-local internal = require('box.internal')
+local internal = box.internal
 local cord_ibuf_take = buffer.internal.cord_ibuf_take
 local cord_ibuf_put = buffer.internal.cord_ibuf_put
 

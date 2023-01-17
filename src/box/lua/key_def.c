@@ -517,6 +517,6 @@ luaopen_key_def(struct lua_State *L)
 		{"totable", lbox_key_def_to_table},
 		{NULL, NULL}
 	};
-	luaL_register_module(L, "key_def", meta);
+	luaT_newmodule(L, "key_def", meta);
 	return 1;
 }

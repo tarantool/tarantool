@@ -578,7 +578,8 @@ box_lua_lib_init(struct lua_State *L)
 		{ "load",		lbox_module_load	},
 		{ NULL, NULL },
 	};
-	luaL_register(L, "box.lib", top_methods);
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.lib", 0);
+	luaL_setfuncs(L, top_methods, 0);
 	lua_pop(L, 1);
 
 	static const struct luaL_Reg lbox_module_methods[] = {

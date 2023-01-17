@@ -328,7 +328,7 @@ box_lua_xlog_init(struct lua_State *L)
 	CTID_STRUCT_XLOG_CURSOR_REF = luaL_ctypeid(L, "struct xlog_cursor&");
 	assert(CTID_STRUCT_XLOG_CURSOR_REF != 0);
 
-	luaL_register_module(L, xloglib_name, lbox_xlog_parser_lib);
+	luaT_newmodule(L, xloglib_name, lbox_xlog_parser_lib);
 
 	lua_newtable(L);
 	lua_setmetatable(L, -2);
