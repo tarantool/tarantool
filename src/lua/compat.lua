@@ -4,7 +4,7 @@
 local NEW = true
 local OLD = false
 
-local internal = require('internal.compat')
+local internal = require('internal.compat.lib')
 
 local options_format = {
     default        = 'string',
