@@ -1145,7 +1145,8 @@ box_lua_call_init(struct lua_State *L)
 	trigger_add(&luaL_msgpack_default->on_update,
 		    &call_serializer_no_error_ext.update_trigger);
 
-	luaL_register(L, "box.internal", boxlib_internal);
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal", 0);
+	luaL_setfuncs(L, boxlib_internal, 0);
 	lua_pop(L, 1);
 	/*
 	 * Register the trigger that will push persistent

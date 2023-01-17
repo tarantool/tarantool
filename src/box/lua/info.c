@@ -757,19 +757,14 @@ lbox_info_call(struct lua_State *L)
 void
 box_lua_info_init(struct lua_State *L)
 {
-	static const struct luaL_Reg infolib [] = {
-		{NULL, NULL}
-	};
-
-	luaL_register_module(L, "box.info", infolib);
-
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.info", 0);
 	lua_newtable(L);		/* metatable for info */
 
 	lua_pushstring(L, "__index");
 
 	lua_newtable(L); /* table for __index */
-	luaL_register(L, NULL, lbox_info_dynamic_meta);
-	luaL_register(L, NULL, lbox_info_dynamic_meta_v16);
+	luaL_setfuncs(L, lbox_info_dynamic_meta, 0);
+	luaL_setfuncs(L, lbox_info_dynamic_meta_v16, 0);
 	lua_pushcclosure(L, lbox_info_index, 1);
 	lua_settable(L, -3);
 

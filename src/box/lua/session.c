@@ -544,7 +544,8 @@ box_lua_session_init(struct lua_State *L)
 		{"run_on_auth", lbox_session_run_on_auth},
 		{NULL, NULL}
 	};
-	luaL_register(L, "box.internal.session", session_internal_lib);
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal.session", 0);
+	luaL_setfuncs(L, session_internal_lib, 0);
 	lua_pop(L, 1);
 
 	static const struct luaL_Reg sessionlib[] = {
@@ -566,7 +567,8 @@ box_lua_session_init(struct lua_State *L)
 		{"push", lbox_session_push},
 		{NULL, NULL}
 	};
-	luaL_register_module(L, sessionlib_name, sessionlib);
+	luaL_findtable(L, LUA_GLOBALSINDEX, sessionlib_name, 0);
+	luaL_setfuncs(L, sessionlib, 0);
 	lbox_session_settings_init(L);
 	lua_pop(L, 1);
 }

@@ -18,7 +18,7 @@ ffi.cdef[[
 ]]
 
 local internal = require('console')
-local session_internal = require('box.internal.session')
+local session_internal = box.internal.session
 local fiber = require('fiber')
 local socket = require('socket')
 local log = require('log')
@@ -26,7 +26,6 @@ local errno = require('errno')
 local urilib = require('uri')
 local yaml = require('yaml')
 local net_box = require('net.box')
-local box_internal = require('box.internal')
 local help = require('help').help
 
 local DEFAULT_CONNECT_TIMEOUT = 10
@@ -199,7 +198,7 @@ local function current_output()
 end
 
 -- Used by console_session_push.
-box_internal.format_lua_push = function(value)
+box.internal.format_lua_push = function(value)
     local internal_opts = gen_lua_opts(current_output()["opts"])
     value = format_lua_value(true, internal_opts, value)
     return '-- Push\n' .. value .. ';'

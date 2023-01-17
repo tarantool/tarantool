@@ -483,6 +483,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{NULL, NULL}
 	};
 
-	luaL_register(L, "box.internal", cfglib_internal);
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal", 0);
+	luaL_setfuncs(L, cfglib_internal, 0);
 	lua_pop(L, 1);
 }

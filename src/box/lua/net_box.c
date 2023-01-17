@@ -3041,12 +3041,6 @@ luaopen_net_box(struct lua_State *L)
 		{ "new_transport",  luaT_netbox_new_transport },
 		{ NULL, NULL}
 	};
-	/* luaL_register_module polutes _G */
-	lua_newtable(L);
-	luaL_openlib(L, NULL, net_box_lib, 0);
-	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-	lua_pushvalue(L, -2);
-	lua_setfield(L, -2, "net.box.lib");
-	lua_remove(L, -1);
+	luaT_newmodule(L, "net.box.lib", net_box_lib);
 	return 1;
 }

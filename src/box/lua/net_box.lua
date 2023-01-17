@@ -1302,8 +1302,7 @@ this_module.self = {
         check_call_args(args)
         args = args or {}
         proc_name = tostring(proc_name)
-        local status, proc, obj = pcall(package.loaded['box.internal'].
-            call_loadproc, proc_name)
+        local status, proc, obj = pcall(box.internal.call_loadproc, proc_name)
         if not status then
             rollback()
             return error(proc) -- re-throw

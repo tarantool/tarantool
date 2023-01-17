@@ -740,12 +740,13 @@ box_lua_tuple_init(struct lua_State *L)
 	/* export C functions to Lua */
 	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal", 1);
 	luaL_newmetatable(L, tuplelib_name);
-	luaL_register(L, NULL, lbox_tuple_meta);
+	luaL_setfuncs(L, lbox_tuple_meta, 0);
 	lua_setfield(L, -2, "tuple");
 	lua_pop(L, 1); /* box.internal */
 	luaL_register_type(L, tuple_iteratorlib_name,
 			   lbox_tuple_iterator_meta);
-	luaL_register_module(L, tuplelib_name, lbox_tuplelib);
+	luaL_findtable(L, LUA_GLOBALSINDEX, tuplelib_name, 0);
+	luaL_setfuncs(L, lbox_tuplelib, 0);
 	lua_pop(L, 1);
 
 	tuple_serializer_update_options();

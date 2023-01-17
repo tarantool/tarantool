@@ -2,7 +2,7 @@
 
 local log = require('log')
 local json = require('json')
-local private = require('box.internal')
+local private = box.internal
 local urilib = require('uri')
 local math = require('math')
 local fiber = require('fiber')

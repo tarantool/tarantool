@@ -1288,7 +1288,7 @@ luaopen_merger(struct lua_State *L)
 		{"new", lbox_merger_new},
 		{NULL, NULL}
 	};
-	luaL_register_module(L, "merger", meta);
+	luaT_newmodule(L, "merger", meta);
 
 	/* Add internal.{select,ipairs}(). */
 	lua_newtable(L); /* merger.internal */

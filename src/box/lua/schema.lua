@@ -7,7 +7,7 @@ local log = require('log')
 local buffer = require('buffer')
 local fiber = require('fiber')
 local session = box.session
-local internal = require('box.internal')
+local internal = box.internal
 local utf8 = require('utf8')
 local function setmap(table)
     return setmetatable(table, { __serialize = 'map' })

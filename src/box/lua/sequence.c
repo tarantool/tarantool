@@ -178,7 +178,8 @@ box_lua_sequence_init(struct lua_State *L)
 		{"reset", lbox_sequence_reset},
 		{NULL, NULL}
 	};
-	luaL_register(L, "box.internal.sequence", sequence_internal_lib);
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal.sequence", 0);
+	luaL_setfuncs(L, sequence_internal_lib, 0);
 	lua_pop(L, 1);
 
 	static struct trigger on_alter_sequence_in_lua;
