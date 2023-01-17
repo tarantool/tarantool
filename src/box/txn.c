@@ -362,6 +362,25 @@ txn_rollback_one_stmt(struct txn *txn, struct txn_stmt *stmt)
 	}
 }
 
+/**
+ * Assign's a PSN to a RW transaction that wasn't yet prepared.
+ */
+static void
+txn_assign_psn(struct txn *txn)
+{
+	if (txn->psn == 0) {
+		if (txn->status == TXN_IN_READ_VIEW) {
+			assert(stailq_empty(&txn->stmts));
+		} else {
+			assert(txn->status == TXN_INPROGRESS ||
+			       txn->status == TXN_ABORTED);
+			txn->psn = ++txn_last_psn;
+		}
+	} else {
+		assert(txn->status == TXN_PREPARED);
+	}
+}
+
 /*
  * Begins the rollback to savepoint process by assigning a PSN to the
  * transaction (rolled back statements require a PSN).
@@ -369,7 +388,7 @@ txn_rollback_one_stmt(struct txn *txn, struct txn_stmt *stmt)
 static void
 txn_rollback_to_svp_begin(struct txn *txn)
 {
-	txn->psn = ++txn_last_psn;
+	txn_assign_psn(txn);
 }
 
 /*
@@ -379,7 +398,8 @@ txn_rollback_to_svp_begin(struct txn *txn)
 static void
 txn_rollback_to_svp_finish(struct txn *txn)
 {
-	txn->psn = 0;
+	if (txn->status != TXN_PREPARED)
+		txn->psn = 0;
 }
 
 static void
@@ -969,10 +989,10 @@ txn_journal_entry_new(struct txn *txn)
 static int
 txn_prepare(struct txn *txn)
 {
-	txn->psn = ++txn_last_psn;
-
 	if (txn_check_can_continue(txn) != 0)
 		return -1;
+
+	txn_assign_psn(txn);
 
 	if (txn->rollback_timer != NULL) {
 		ev_timer_stop(loop(), txn->rollback_timer);
@@ -988,13 +1008,6 @@ txn_prepare(struct txn *txn)
 		txn->psn = 0;
 		return -1;
 	}
-
-	/*
-	 * Somebody else has written some value that we have read.
-	 * The RW transaction is not possible.
-	 */
-	if (txn->status == TXN_IN_READ_VIEW)
-		assert(stailq_empty(&txn->stmts));
 
 	/*
 	 * Perform transaction conflict resolution. Engine == NULL when
@@ -1183,7 +1196,7 @@ txn_rollback(struct txn *txn)
 	/*
 	 * Rolled back statements require a PSN.
 	 */
-	txn->psn = ++txn_last_psn;
+	txn_assign_psn(txn);
 	txn->status = TXN_ABORTED;
 	trigger_clear(&txn->fiber_on_stop);
 	trigger_clear(&txn->fiber_on_yield);
