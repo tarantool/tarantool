@@ -5,7 +5,7 @@ local LIMIT_INFINITY = 2147483647
 
 local ffi = require('ffi')
 local boxerrno = require('errno')
-local internal = require('socket')
+local internal = require('socket.lib')
 local fiber = require('fiber')
 local fio = require('fio')
 local log = require('log')

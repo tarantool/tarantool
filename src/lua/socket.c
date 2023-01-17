@@ -1035,7 +1035,7 @@ tarantool_lua_socket_init(struct lua_State *L)
 		{ NULL,			NULL			}
 	};
 
-	luaT_newmodule(L, "socket", internal_methods);
+	luaT_newmodule(L, "socket.lib", internal_methods);
 
 	/* domains table */
 	lua_pushliteral(L, "DOMAIN");

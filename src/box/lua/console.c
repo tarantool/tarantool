@@ -886,7 +886,7 @@ tarantool_lua_console_init(struct lua_State *L)
 		{"run_on_eval",		lbox_console_run_on_eval},
 		{NULL, NULL}
 	};
-	luaT_newmodule(L, "console", consolelib);
+	luaT_newmodule(L, "console.lib", consolelib);
 
 	/* readline() func needs a ref to completion_handler (in upvalue) */
 	lua_getfield(L, -1, "completion_handler");

@@ -117,6 +117,6 @@ tarantool_lua_swim_init(struct lua_State *L)
 		{"swim_on_member_event", lua_swim_on_member_event},
 		{NULL, NULL}
 	};
-	luaT_newmodule(L, "swim", lua_swim_internal_methods);
+	luaT_newmodule(L, "swim.lib", lua_swim_internal_methods);
 	lua_pop(L, 1);
 }

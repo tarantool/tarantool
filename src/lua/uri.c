@@ -301,7 +301,7 @@ luaT_uri_create_internal(lua_State *L)
 {
 	struct uri *uri = (struct uri *)lua_topointer(L, 1);
 	if (uri == NULL)
-		luaL_error(L, "Usage: uri.internal.uri_create(string|table)");
+		luaL_error(L, "Usage: uri_lib.uri_create(string|table)");
 	if (luaT_uri_create(L, 2, uri) != 0)
 		luaT_error(L);
 	return 0;
@@ -312,7 +312,7 @@ luaT_uri_set_create_internal(lua_State *L)
 {
 	struct uri_set *uri_set = (struct uri_set *)lua_topointer(L, 1);
 	if (uri_set == NULL)
-		luaL_error(L, "Usage: uri.internal.uri_set_create(string|table)");
+		luaL_error(L, "Usage: uri_lib.uri_set_create(string|table)");
 	if (luaT_uri_set_create(L, 2, uri_set) != 0)
 		luaT_error(L);
 	return 0;
@@ -321,21 +321,12 @@ luaT_uri_set_create_internal(lua_State *L)
 void
 tarantool_lua_uri_init(struct lua_State *L)
 {
-	static const struct luaL_Reg uri_methods[] = {
-		{NULL, NULL}
-	};
-	luaT_newmodule(L, "uri", uri_methods);
-
 	/* internal table */
-	lua_pushliteral(L, "internal");
-	lua_newtable(L);
-	static const struct luaL_Reg uri_internal_methods[] = {
+	static const struct luaL_Reg uri_methods[] = {
 		{"uri_create", luaT_uri_create_internal},
 		{"uri_set_create", luaT_uri_set_create_internal},
 		{NULL, NULL}
 	};
-	luaL_setfuncs(L, uri_internal_methods, 0);
-	lua_settable(L, -3);
-
+	luaT_newmodule(L, "uri.lib", uri_methods);
 	lua_pop(L, 1);
 };

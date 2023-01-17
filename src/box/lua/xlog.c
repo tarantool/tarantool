@@ -47,7 +47,6 @@
 /* {{{ Helpers */
 
 static uint32_t CTID_STRUCT_XLOG_CURSOR_REF = 0;
-static const char *xloglib_name = "xlog";
 
 static int
 lbox_pushcursor(struct lua_State *L, struct xlog_cursor *cur)
@@ -328,7 +327,7 @@ box_lua_xlog_init(struct lua_State *L)
 	CTID_STRUCT_XLOG_CURSOR_REF = luaL_ctypeid(L, "struct xlog_cursor&");
 	assert(CTID_STRUCT_XLOG_CURSOR_REF != 0);
 
-	luaT_newmodule(L, xloglib_name, lbox_xlog_parser_lib);
+	luaT_newmodule(L, "xlog.lib", lbox_xlog_parser_lib);
 
 	lua_newtable(L);
 	lua_setmetatable(L, -2);

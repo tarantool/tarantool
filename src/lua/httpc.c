@@ -452,6 +452,6 @@ LUA_API int
 luaopen_http_client_driver(lua_State *L)
 {
 	luaL_register_type(L, DRIVER_LUA_UDATA_NAME, Client);
-	luaT_newmodule(L, "http.client", Module);
+	luaT_newmodule(L, "http.client.lib", Module);
 	return 1;
 }
