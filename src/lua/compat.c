@@ -85,6 +85,6 @@ static const struct luaL_Reg internal_compat[] = {
 int
 tarantool_lua_compat_init(struct lua_State *L)
 {
-	luaT_newmodule(L, "internal.compat", internal_compat);
+	luaT_newmodule(L, "internal.compat.lib", internal_compat);
 	return 1;
 }

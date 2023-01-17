@@ -2,6 +2,8 @@
 -- init.lua -- internal file
 
 local ffi = require('ffi')
+local compat = require('internal.compat')
+
 ffi.cdef[[
 struct method_info;
 
@@ -321,9 +323,6 @@ table.insert(package.loaders, 5, gen_loader_func(search_rocks_lib, load_lib))
 rawset(package, "search", search)
 rawset(package, "searchroot", searchroot)
 rawset(package, "setsearchroot", setsearchroot)
-
-local compat = require('compat')
-package.loaded.compat = nil
 
 -- Execute scripts or load modules pointed by TT_PRELOAD
 -- environment variable.
