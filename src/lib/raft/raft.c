@@ -1164,9 +1164,11 @@ raft_stop_candidate(struct raft *raft)
 	} else {
 		/*
 		 * Leader is seen and node is waiting for its death. Do not stop
-		 * the timer.
+		 * the timer. If there is a write in progress the timer is
+		 * stopped now, but will be re-started once the write completes.
 		 */
-		assert(raft_ev_timer_is_active(&raft->timer));
+		assert(raft_ev_timer_is_active(&raft->timer) ||
+		       raft->is_write_in_progress);
 	}
 	raft->state = RAFT_STATE_FOLLOWER;
 	raft_schedule_broadcast(raft);

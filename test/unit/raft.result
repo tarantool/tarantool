@@ -1,5 +1,5 @@
 	*** main_f ***
-1..19
+1..20
 	*** raft_test_leader_election ***
     1..26
     ok 1 - 1 pending message at start
@@ -411,4 +411,10 @@ ok 18 - subtests
     ok 2 - resigned from leader state
 ok 19 - subtests
 	*** raft_test_resign: done ***
+	*** raft_test_candidate_disable_during_wal_write ***
+    1..2
+    ok 1 - Leader is seen, but wal write is in progress
+    ok 2 - State is persisted
+ok 20 - subtests
+	*** raft_test_candidate_disable_during_wal_write: done ***
 	*** main_f: done ***
