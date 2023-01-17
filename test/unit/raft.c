@@ -2347,10 +2347,52 @@ raft_test_resign(void)
 	raft_finish_test();
 }
 
+static void
+raft_test_candidate_disable_during_wal_write(void)
+{
+	raft_start_test(2);
+	/*
+	 * There was a false-positive assertion failure in a special case: the
+	 * node has just received a is_leader notification and is currently
+	 * writing it on disk. At the same time it is configured as voter
+	 * (gh-8169).
+	 */
+	struct raft_node node;
+	raft_node_create(&node);
+	raft_node_cfg_is_candidate(&node, true);
+	raft_node_block(&node);
+	raft_node_send_leader(&node, 2, 2);
+	ok(raft_node_check_full_state(
+		&node,
+		RAFT_STATE_FOLLOWER /* State. */,
+		2 /* Leader. */,
+		1 /* Term. */,
+		0 /* Vote. */,
+		2 /* Volatile term. */,
+		0 /* Volatile vote. */,
+		"{}" /* Vclock. */
+	), "Leader is seen, but wal write is in progress");
+	raft_node_cfg_is_candidate(&node, false);
+	raft_node_unblock(&node);
+	ok(raft_node_check_full_state(
+		&node,
+		RAFT_STATE_FOLLOWER /* State. */,
+		2 /* Leader. */,
+		2 /* Term. */,
+		0 /* Vote. */,
+		2 /* Volatile term. */,
+		0 /* Volatile vote. */,
+		"{0: 1}" /* Vclock. */
+	), "State is persisted");
+
+	raft_node_destroy(&node);
+	raft_finish_test();
+}
+
 static int
 main_f(va_list ap)
 {
-	raft_start_test(19);
+	raft_start_test(20);
 
 	(void) ap;
 	fakeev_init();
@@ -2374,6 +2416,7 @@ main_f(va_list ap)
 	raft_test_split_vote();
 	raft_test_pre_vote();
 	raft_test_resign();
+	raft_test_candidate_disable_during_wal_write();
 
 	fakeev_free();
 
