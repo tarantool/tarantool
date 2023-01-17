@@ -985,6 +985,7 @@ txn_prepare(struct txn *txn)
 	 */
 	if (txn->fk_deferred_count != 0) {
 		diag_set(ClientError, ER_FOREIGN_KEY_CONSTRAINT);
+		txn->psn = 0;
 		return -1;
 	}
 
@@ -1000,8 +1001,10 @@ txn_prepare(struct txn *txn)
 	 * we have a bunch of IPROTO_NOP statements.
 	 */
 	if (txn->engine != NULL) {
-		if (engine_prepare(txn->engine, txn) != 0)
+		if (engine_prepare(txn->engine, txn) != 0) {
+			txn->psn = 0;
 			return -1;
+		}
 	}
 
 	trigger_clear(&txn->fiber_on_stop);
