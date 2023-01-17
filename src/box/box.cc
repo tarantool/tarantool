@@ -4213,19 +4213,16 @@ box_process_vote(struct ballot *ballot)
 	ballot->registered_replica_uuids_size = i;
 }
 
-/** Insert a new cluster into _schema */
 static void
-box_set_replicaset_uuid(const struct tt_uuid *replicaset_uuid)
+box_set_replicaset_uuid(void)
 {
-	tt_uuid uu;
-	/* Use UUID from the config or generate a new one */
-	if (!tt_uuid_is_nil(replicaset_uuid))
-		uu = *replicaset_uuid;
-	else
-		tt_uuid_create(&uu);
-	/* Save replica set UUID in _schema */
+	struct tt_uuid replicaset_uuid;
+	if (box_check_replicaset_uuid(&replicaset_uuid) != 0)
+		diag_raise();
+	if (tt_uuid_is_nil(&replicaset_uuid))
+		tt_uuid_create(&replicaset_uuid);
 	if (boxk(IPROTO_INSERT, BOX_SCHEMA_ID, "[%s%s]", "cluster",
-		 tt_uuid_str(&uu)))
+		 tt_uuid_str(&replicaset_uuid)))
 		diag_raise();
 }
 
@@ -4326,7 +4323,7 @@ check_bootstrap_unanimity(void)
  * Initialize the first replica of a new replica set.
  */
 static void
-bootstrap_master(const struct tt_uuid *replicaset_uuid)
+bootstrap_master(void)
 {
 	/* Do not allow to bootstrap a readonly instance as master. */
 	if (cfg_geti("read_only") == 1) {
@@ -4347,7 +4344,7 @@ bootstrap_master(const struct tt_uuid *replicaset_uuid)
 	assert(replica_by_uuid(&INSTANCE_UUID)->id == 1);
 
 	/* Set UUID of a new replica set */
-	box_set_replicaset_uuid(replicaset_uuid);
+	box_set_replicaset_uuid();
 	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_SUPERVISED)
 		box_set_bootstrap_leader_record();
 
@@ -4462,14 +4459,18 @@ bootstrap_from_master(struct replica *master)
  *                                  the leader of a new cluster
  */
 static void
-bootstrap(const struct tt_uuid *instance_uuid,
-	  const struct tt_uuid *replicaset_uuid,
-	  bool *is_bootstrap_leader)
+bootstrap(bool *is_bootstrap_leader)
 {
-	/* Initialize instance UUID. */
+	struct tt_uuid instance_uuid;
+	if (box_check_instance_uuid(&instance_uuid) != 0)
+		diag_raise();
+	struct tt_uuid replicaset_uuid;
+	if (box_check_replicaset_uuid(&replicaset_uuid) != 0)
+		diag_raise();
+
 	assert(tt_uuid_is_nil(&INSTANCE_UUID));
-	if (!tt_uuid_is_nil(instance_uuid))
-		INSTANCE_UUID = *instance_uuid;
+	if (!tt_uuid_is_nil(&instance_uuid))
+		INSTANCE_UUID = instance_uuid;
 	else
 		tt_uuid_create(&INSTANCE_UUID);
 
@@ -4518,16 +4519,16 @@ bootstrap(const struct tt_uuid *instance_uuid,
 
 		if (master == NULL ||
 		    tt_uuid_is_equal(&master->uuid, &INSTANCE_UUID)) {
-			bootstrap_master(replicaset_uuid);
+			bootstrap_master();
 			*is_bootstrap_leader = true;
 			break;
 		}
 
 		bool is_bootstrapped = bootstrap_from_master(master);
-		if (is_bootstrapped && !tt_uuid_is_nil(replicaset_uuid) &&
-		    !tt_uuid_is_equal(replicaset_uuid, &REPLICASET_UUID)) {
+		if (is_bootstrapped && !tt_uuid_is_nil(&replicaset_uuid) &&
+		    !tt_uuid_is_equal(&replicaset_uuid, &REPLICASET_UUID)) {
 			tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
-				  tt_uuid_str(replicaset_uuid),
+				  tt_uuid_str(&replicaset_uuid),
 				  tt_uuid_str(&REPLICASET_UUID));
 		}
 		if (is_bootstrapped) {
@@ -4552,17 +4553,21 @@ bootstrap(const struct tt_uuid *instance_uuid,
  * to be rebootstrapped.
  */
 static void
-local_recovery(const struct tt_uuid *instance_uuid,
-	       const struct tt_uuid *replicaset_uuid,
-	       const struct vclock *checkpoint_vclock)
+local_recovery(const struct vclock *checkpoint_vclock)
 {
-	/* Check instance UUID. */
 	assert(!tt_uuid_is_nil(&INSTANCE_UUID));
+	struct tt_uuid instance_uuid;
+	if (box_check_instance_uuid(&instance_uuid) != 0)
+		diag_raise();
+	struct tt_uuid replicaset_uuid;
+	if (box_check_replicaset_uuid(&replicaset_uuid) != 0)
+		diag_raise();
+
 	replicaset_state = REPLICASET_RECOVERY;
-	if (!tt_uuid_is_nil(instance_uuid) &&
-	    !tt_uuid_is_equal(instance_uuid, &INSTANCE_UUID)) {
+	if (!tt_uuid_is_nil(&instance_uuid) &&
+	    !tt_uuid_is_equal(&instance_uuid, &INSTANCE_UUID)) {
 		tnt_raise(ClientError, ER_INSTANCE_UUID_MISMATCH,
-			  tt_uuid_str(instance_uuid),
+			  tt_uuid_str(&instance_uuid),
 			  tt_uuid_str(&INSTANCE_UUID));
 	}
 
@@ -4751,10 +4756,10 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	engine_end_recovery_xc();
 
 	/* Check replica set UUID. */
-	if (!tt_uuid_is_nil(replicaset_uuid) &&
-	    !tt_uuid_is_equal(replicaset_uuid, &REPLICASET_UUID)) {
+	if (!tt_uuid_is_nil(&replicaset_uuid) &&
+	    !tt_uuid_is_equal(&replicaset_uuid, &REPLICASET_UUID)) {
 		tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
-			  tt_uuid_str(replicaset_uuid),
+			  tt_uuid_str(&replicaset_uuid),
 			  tt_uuid_str(&REPLICASET_UUID));
 	}
 
@@ -4806,12 +4811,6 @@ box_cfg_xc(void)
 	box_set_force_recovery();
 	box_storage_init();
 	title("loading");
-
-	struct tt_uuid instance_uuid, replicaset_uuid;
-	if (box_check_instance_uuid(&instance_uuid) != 0)
-		diag_raise();
-	if (box_check_replicaset_uuid(&replicaset_uuid) != 0)
-		diag_raise();
 
 	if (box_set_prepared_stmt_cache_size() != 0)
 		diag_raise();
@@ -4868,12 +4867,10 @@ box_cfg_xc(void)
 	bool is_bootstrap_leader = false;
 	if (checkpoint != NULL) {
 		/* Recover the instance from the local directory */
-		local_recovery(&instance_uuid, &replicaset_uuid,
-			       &checkpoint->vclock);
+		local_recovery(&checkpoint->vclock);
 	} else {
 		/* Bootstrap a new instance */
-		bootstrap(&instance_uuid, &replicaset_uuid,
-			  &is_bootstrap_leader);
+		bootstrap(&is_bootstrap_leader);
 	}
 	replicaset_state = REPLICASET_READY;
 
