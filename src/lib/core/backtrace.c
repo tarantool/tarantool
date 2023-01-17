@@ -57,13 +57,13 @@ collect_current_stack(struct backtrace *bt, void *stack)
 	unw_context_t unw_ctx;
 	int rc = unw_getcontext(&unw_ctx);
 	if (rc != 0) {
-		say_error("unwinding error: unw_getcontext failed");
+		say_debug("unwinding error: unw_getcontext failed");
 		return stack;
 	}
 	unw_cursor_t unw_cur;
 	rc = unw_init_local(&unw_cur, &unw_ctx);
 	if (rc != 0) {
-		say_error("unwinding error: unw_init_local failed");
+		say_debug("unwinding error: unw_init_local failed");
 		return stack;
 	}
 	for (unsigned frame_no = 0; frame_no < BACKTRACE_FRAME_COUNT_MAX;
@@ -71,7 +71,7 @@ collect_current_stack(struct backtrace *bt, void *stack)
 		unw_word_t ip;
 		rc = unw_get_reg(&unw_cur, UNW_REG_IP, &ip);
 		if (rc != 0) {
-			say_error("unwinding error: unw_get_reg failed with "
+			say_debug("unwinding error: unw_get_reg failed with "
 				  "status: %d", rc);
 			return stack;
 		}
@@ -79,7 +79,7 @@ collect_current_stack(struct backtrace *bt, void *stack)
 		rc = unw_step(&unw_cur);
 		if (rc <= 0) {
 			if (rc < 0)
-				say_error("unwinding error: unw_step failed "
+				say_debug("unwinding error: unw_step failed "
 					  "with status: %d", rc);
 			break;
 		}
@@ -259,7 +259,7 @@ backtrace_frame_resolve(const struct backtrace_frame *frame,
 	 * result will be truncated.
 	 */
 	if (rc != 0 && rc != -UNW_ENOMEM) {
-		say_error("unwinding error: `get_proc_name` accessor failed: "
+		say_debug("unwinding error: `get_proc_name` accessor failed: "
 			  "%s", unw_strerror(rc));
 		return NULL;
 	}
@@ -267,7 +267,7 @@ backtrace_frame_resolve(const struct backtrace_frame *frame,
 #else /* __APPLE__ */
 	Dl_info dli;
 	if (dladdr(frame->ip, &dli) == 0) {
-		say_error("unwinding error: `dladdr` failed");
+		say_debug("unwinding error: `dladdr` failed");
 		return NULL;
 	}
 
@@ -307,7 +307,7 @@ backtrace_print(const struct backtrace *bt, int fd)
 		int chars_written = dprintf(fd, C_FRAME_STR_FMT "\n", frame_no,
 					    frame->ip, proc_name, offset);
 		if (chars_written < 0) {
-			say_error("unwinding error: dprintf failed: %s",
+			say_debug("unwinding error: dprintf failed: %s",
 				  tt_strerror(errno));
 			break;
 		}
