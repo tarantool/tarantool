@@ -46,7 +46,7 @@ function(ext_project_autotools name)
         file(
             GLOB_RECURSE autotool_files_am
             CONFIGURE_DEPENDS
-            RELATIVE "${CMAKE_SOURCE_DIR}"
+            RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
             "${ARGS_DIR}/*.am"
         )
 
@@ -55,18 +55,18 @@ function(ext_project_autotools name)
         file(
             GLOB_RECURSE config_files_in
             CONFIGURE_DEPENDS
-            RELATIVE "${CMAKE_SOURCE_DIR}"
+            RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
             "${ARGS_DIR}/*.in"
         )
     endif()
 
     list_add_prefix(ARGS_BYPRODUCTS "${ARGS_DIR}/" byproducts)
 
-    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/${ARGS_DIR})
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${ARGS_DIR})
 
     add_custom_command(
-        OUTPUT ${CMAKE_SOURCE_DIR}/${ARGS_DIR}/configure
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/${ARGS_DIR}
+        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${ARGS_DIR}/configure
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${ARGS_DIR}
         COMMAND
             autoreconf -i
         COMMAND
@@ -80,7 +80,8 @@ function(ext_project_autotools name)
     add_custom_command(
         OUTPUT ${ARGS_DIR}/Makefile
         WORKING_DIRECTORY ${ARGS_DIR}
-        COMMAND ${CMAKE_SOURCE_DIR}/${ARGS_DIR}/configure ${ARGS_CONFIGURE}
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/${ARGS_DIR}/configure
+                ${ARGS_CONFIGURE}
         DEPENDS ${ARGS_DIR}/configure
     )
 

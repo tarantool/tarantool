@@ -56,7 +56,7 @@ ext_project_autotools(libunwind-build
 unset(LIBUNWIND_CFLAGS)
 unset(LIBUNWIND_CXXFLAGS)
 
-set(LIBUNWIND_BUILD_DIR ${CMAKE_BINARY_DIR}/third_party/libunwind)
+set(LIBUNWIND_BUILD_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/libunwind)
 
 add_library(bundled-libunwind STATIC IMPORTED GLOBAL)
 set_target_properties(bundled-libunwind PROPERTIES
