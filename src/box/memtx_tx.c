@@ -2323,8 +2323,14 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 static void
 memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 {
-	assert(stmt->del_story != NULL);
-	memtx_tx_story_unlink_deleted_by(stmt->del_story, stmt);
+	struct memtx_story *story = stmt->del_story;
+	/*
+	 * There can be no more than one prepared statement deleting a story at
+	 * any point in time.
+	 */
+	assert(story->del_psn == 0 || story->del_psn == stmt->txn->psn);
+	story->del_psn = 0;
+	memtx_tx_story_unlink_deleted_by(story, stmt);
 }
 
 void
