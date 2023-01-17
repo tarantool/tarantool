@@ -29,7 +29,7 @@
 --  SUCH DAMAGE.
 --
 
-local driver = require('http.client')
+local driver = require('http.client.lib')
 
 local json = require('json')
 local yaml = require('yaml')

@@ -1,5 +1,5 @@
 local ffi = require('ffi')
-local errno_list = require('errno')
+local errno_list = require('errno.lib')
 
 ffi.cdef[[
     const char *tt_strerror(int errnum);

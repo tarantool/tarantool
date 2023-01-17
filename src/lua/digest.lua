@@ -90,7 +90,7 @@ local digest_shortcuts = {
     md5     = 'MD5',
     md4     = 'MD4',
 }
-local internal = require("digest")
+local internal = require("digest.lib")
 
 local PMurHash
 local PMurHash_methods = {

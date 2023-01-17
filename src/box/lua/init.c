@@ -159,11 +159,11 @@ static const char *lua_sources[] = {
 #if ENABLE_SECURITY
 	"box/security", security_lua,
 #endif
+	"box/xlog", xlog_lua,
 	"box/upgrade", upgrade_lua,
 	"box/net_box", net_box_lua,
 	"box/console", console_lua,
 	"box/load_cfg", load_cfg_lua,
-	"box/xlog", xlog_lua,
 	"box/key_def", key_def_lua,
 	"box/merger", merger_lua,
 	NULL

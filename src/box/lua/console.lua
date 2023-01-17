@@ -17,7 +17,7 @@ ffi.cdef[[
     console_set_output_format(enum output_format output_format);
 ]]
 
-local internal = require('console')
+local internal = require('console.lib')
 local session_internal = box.internal.session
 local fiber = require('fiber')
 local socket = require('socket')

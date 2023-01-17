@@ -2,7 +2,7 @@
 
 local ffi = require('ffi')
 local buffer = require('buffer')
-local uri = require('uri')
+local internal = require('uri.lib')
 
 local uri_cdef = [[
 struct uri_param {
@@ -165,7 +165,7 @@ local function parse(str)
         error("Usage: uri.parse(string|table)")
     end
     local uribuf = uri_stash_take()
-    local status, errmsg = pcall(uri.internal.uri_create, uribuf, str)
+    local status, errmsg = pcall(internal.uri_create, uribuf, str)
     if not status then
         uri_stash_put(uribuf)
         return nil, errmsg
@@ -181,7 +181,7 @@ local function parse_many(str)
         error("Usage: uri.parse_many(string|table)")
     end
     local uri_set_buf = uri_set_stash_take()
-    local status, errmsg = pcall(uri.internal.uri_set_create, uri_set_buf, str)
+    local status, errmsg = pcall(internal.uri_set_create, uri_set_buf, str)
     if not status then
         uri_set_stash_put(uri_set_buf)
         return nil, errmsg
