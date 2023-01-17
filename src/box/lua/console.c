@@ -274,6 +274,9 @@ console_sigint_handler(ev_loop *loop, struct ev_signal *w, int revents)
 /*
  * The idea is borrowed from
  * https://metacpan.org/dist/AnyEvent-ReadLine-Gnu/source/Gnu.pm
+ *
+ * Since this feature is not thread-safe, it will work only when logging occurs
+ * from main (transaction) thread.
  */
 
 static char *saved_prompt = NULL;
@@ -311,7 +314,7 @@ console_can_hide_show_prompt(void)
 static void
 console_hide_prompt(void)
 {
-	if (!console_can_hide_show_prompt())
+	if (!console_can_hide_show_prompt() || !cord_is_main())
 		return;
 
 	if (rl_prompt == NULL) {
@@ -343,7 +346,7 @@ console_hide_prompt(void)
 static void
 console_show_prompt(void)
 {
-	if (!console_can_hide_show_prompt())
+	if (!console_can_hide_show_prompt() || !cord_is_main())
 		return;
 
 	rl_set_prompt(saved_prompt);
