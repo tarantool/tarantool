@@ -251,10 +251,10 @@ test-coverity: build-coverity
 # LuaJIT integration testing #
 ##############################
 
-test-luajit-linux-x86_64: build run-luajit-test run-test
+test-luajit-Linux-x86_64: build run-luajit-test run-test
 
-test-luajit-linux-aarch64: build run-luajit-test run-test
+test-luajit-Linux-ARM64: build run-luajit-test run-test
 
-test-luajit-darwin-x86_64: prebuild-osx build run-luajit-test pretest-osx run-test
+test-luajit-macOS-x86_64: prebuild-osx build run-luajit-test pretest-osx run-test
 
-test-luajit-darwin-arm64: prebuild-osx build run-luajit-test
+test-luajit-macOS-ARM64: prebuild-osx build run-luajit-test
