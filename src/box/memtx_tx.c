@@ -2409,14 +2409,6 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 	uint32_t index_count = story->index_count;
 	memtx_tx_history_sink_story(story);
 
-	struct memtx_story *old_story = story->link[0].older_story;
-	if (stmt->del_story == NULL)
-		assert(old_story == NULL || old_story->rollbacked ||
-		       old_story->del_psn != 0);
-	else
-		assert(old_story != NULL &&
-		       (old_story->rollbacked || stmt->del_story == old_story));
-
 	if (stmt->del_story == NULL) {
 		/*
 		 * This statement replaced nothing. That means that before
@@ -2449,15 +2441,26 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		}
 	}
 
-	if (old_story != NULL && old_story->rollbacked) {
-		assert(old_story->link[0].older_story == NULL);
-		old_story = NULL;
+	struct memtx_story *old_story = story->link[0].older_story;
+	if (stmt->del_story == NULL)
+		assert(old_story == NULL || old_story->rollbacked ||
+		       old_story->del_psn != 0);
+	else
+		assert(old_story != NULL &&
+		       (old_story->rollbacked || stmt->del_story == old_story));
+	if (old_story != NULL) {
+		if (old_story->rollbacked) {
+			assert(old_story->link[0].older_story == NULL);
+			old_story = NULL;
+		} else if (old_story->del_psn != 0) {
+			assert(stmt->del_story == NULL);
+			old_story = NULL;
+		}
 	}
-
 	if (old_story != NULL) {
 		/*
 		 * There can be some transactions that want to delete old_story.
-		 * It can be this transaction, or some other prepared TX.
+		 * It can be this transaction.
 		 * All other transactions must be aborted or relinked to delete
 		 * this tuple.
 		 */
