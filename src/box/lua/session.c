@@ -509,10 +509,7 @@ session_storage_cleanup(int sid)
 	int top = lua_gettop(L);
 
 	if (ref == LUA_REFNIL) {
-		lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-		if (!lua_istable(L, -1))
-			goto exit;
-		lua_getfield(L, -1, "box");
+		lua_getfield(L, LUA_GLOBALSINDEX, "box");
 		if (!lua_istable(L, -1))
 			goto exit;
 		lua_getfield(L, -1, "session");

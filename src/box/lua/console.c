@@ -424,18 +424,29 @@ luaT_console_setup_write_cb(struct lua_State *L)
 	if (!console_hide_show_prompt_is_enabled())
 		return;
 
-	say_set_stderr_callback(console_hide_prompt, console_show_prompt);
-
-	lua_getfield(L, LUA_GLOBALSINDEX, "package");
-	lua_getfield(L, -1, "loaded");
-	lua_getfield(L, -1, "internal.print");
+	/*
+	 * Set the print callback first, because technically
+	 * luaT_call() may fail, and then set the logger callback.
+	 * If the former will fail, things will be consistent:
+	 * no callbacks are set.
+	 *
+	 * In fact, the require call may fail only if a user
+	 * removes the internal module from package.loaded
+	 * manually. A user shouldn't do that.
+	 */
+	lua_getfield(L, LUA_GLOBALSINDEX, "require");
+	lua_pushstring(L, "internal.print");
+	if (luaT_call(L, 1, 1) != 0)
+		return;
 
 	lua_rawgeti(L, LUA_REGISTRYINDEX, console_hide_prompt_ref);
 	lua_setfield(L, -2, "before_cb");
 	lua_rawgeti(L, LUA_REGISTRYINDEX, console_show_prompt_ref);
 	lua_setfield(L, -2, "after_cb");
 
-	lua_pop(L, 3);
+	lua_pop(L, 1);
+
+	say_set_stderr_callback(console_hide_prompt, console_show_prompt);
 }
 
 static void
@@ -444,18 +455,20 @@ luaT_console_cleanup_write_cb(struct lua_State *L)
 	if (!console_hide_show_prompt_is_enabled())
 		return;
 
-	say_set_stderr_callback(NULL, NULL);
-
-	lua_getfield(L, LUA_GLOBALSINDEX, "package");
-	lua_getfield(L, -1, "loaded");
-	lua_getfield(L, -1, "internal.print");
+	/* See a comment in luaT_console_setup_write_cb(). */
+	lua_getfield(L, LUA_GLOBALSINDEX, "require");
+	lua_pushstring(L, "internal.print");
+	if (luaT_call(L, 1, 1) != 0)
+		return;
 
 	lua_pushnil(L);
 	lua_setfield(L, -2, "before_cb");
 	lua_pushnil(L);
 	lua_setfield(L, -2, "after_cb");
 
-	lua_pop(L, 3);
+	lua_pop(L, 1);
+
+	say_set_stderr_callback(NULL, NULL);
 }
 
 /* }}} Show/hide prompt */

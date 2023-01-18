@@ -977,9 +977,10 @@ run_script_f(va_list ap)
 	 * Execute scripts or modules pointed by TT_PRELOAD
 	 * environment variable.
 	 */
-	lua_getfield(L, LUA_GLOBALSINDEX, "package");
-	lua_getfield(L, -1, "loaded");
-	lua_getfield(L, -1, "tarantool");
+	lua_getfield(L, LUA_GLOBALSINDEX, "require");
+	lua_pushstring(L, "tarantool");
+	if (luaT_call(L, 1, 1) != 0)
+		goto error;
 	lua_getfield(L, -1, "_internal");
 	lua_getfield(L, -1, "run_preload");
 	if (luaT_call(L, 0, 0) != 0)
@@ -1057,12 +1058,13 @@ run_script_f(va_list ap)
 	if (interactive) {
 		say_crit("%s %s\ntype 'help' for interactive help",
 			 tarantool_package(), tarantool_version());
-		/* get console.start from package.loaded */
-		lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-		lua_getfield(L, -1, "console");
+		/* get console.start */
+		lua_getfield(L, LUA_GLOBALSINDEX, "require");
+		lua_pushstring(L, "console");
+		if (luaT_call(L, 1, 1) != 0)
+			goto error;
 		lua_getfield(L, -1, "start");
-		lua_remove(L, -2); /* remove package.loaded.console */
-		lua_remove(L, -2); /* remove package.loaded */
+		lua_remove(L, -2); /* remove console */
 		start_loop = false;
 		if (lua_main(L, argc, argv) != 0)
 			goto error;
