@@ -427,6 +427,10 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaf8a8e24a9c3604258184e579acd96a04" kind="enumvalue"><name>ER_AUTH_DELAY</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea00c31e2286976c43dee405d67c578efe" kind="enumvalue"><name>ER_AUTH_REQUIRED</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea20bfc0ebaf39178141ab4addc752a405" kind="enumvalue"><name>ER_SQL_SEQ_SCAN</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea731bfc3c0f47a9d995a22a402f8cdc0f" kind="enumvalue"><name>ER_NO_SUCH_EVENT</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaae4b8d23aada5db104d86038f5b7d2ba" kind="enumvalue"><name>ER_BOOTSTRAP_NOT_UNANIMOUS</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea4ff4ad2803bfb403673099d627fee475" kind="enumvalue"><name>ER_CANT_CHECK_BOOTSTRAP_LEADER</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea608ad73b6ce310712bd9e0bc29f0eb4c" kind="enumvalue"><name>ER_BOOTSTRAP_CONNECTION_NOT_TO_ALL</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
