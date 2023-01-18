@@ -114,12 +114,7 @@ const char *box_auth_type;
 
 const char *box_ballot_event_key = "internal.ballot";
 
-/**
- * UUID of the node this instance bootstrapped from.
- * Is only set during the bootstrap and left untouched during automatic
- * rebootstrap and anonymous replica register.
- */
-static struct tt_uuid bootstrap_leader_uuid;
+struct tt_uuid bootstrap_leader_uuid;
 
 /**
  * Set if backup is in progress, i.e. box_backup_start() was
@@ -1082,9 +1077,11 @@ box_check_bootstrap_strategy(void)
 		return BOOTSTRAP_STRATEGY_LEGACY;
 	if (strcmp(strategy, "config") == 0)
 		return BOOTSTRAP_STRATEGY_CONFIG;
+	if (strcmp(strategy, "supervised") == 0)
+		return BOOTSTRAP_STRATEGY_SUPERVISED;
 	diag_set(ClientError, ER_CFG, "bootstrap_strategy",
 		 "the value should be one of the following: "
-		 "'auto', 'config', 'legacy'");
+		 "'auto', 'config', 'supervised', 'legacy'");
 	return BOOTSTRAP_STRATEGY_INVALID;
 }
 
@@ -1836,6 +1833,48 @@ box_set_bootstrap_leader(void)
 {
 	return box_check_bootstrap_leader(&cfg_bootstrap_leader_uri,
 					  &cfg_bootstrap_leader_uuid);
+}
+
+/** Persist this instance as the bootstrap leader in _schema space. */
+static int
+box_set_bootstrap_leader_record(void)
+{
+	assert(instance_id != REPLICA_ID_NIL);
+	assert(!tt_uuid_is_nil(&INSTANCE_UUID));
+	return boxk(IPROTO_REPLACE, BOX_SCHEMA_ID,
+		    "[%s%s%" PRIu64 "%" PRIu32 "]", "bootstrap_leader_uuid",
+		    tt_uuid_str(&INSTANCE_UUID), fiber_time64(), instance_id);
+}
+
+int
+box_make_bootstrap_leader(void)
+{
+	if (tt_uuid_is_nil(&INSTANCE_UUID)) {
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 "box.ctl.make_bootstrap_leader()",
+			 "promoting this instance before box.cfg() is called");
+		return -1;
+	}
+	/* Bootstrap strategy is read by the time instance uuid is known. */
+	assert(bootstrap_strategy != BOOTSTRAP_STRATEGY_INVALID);
+	if (bootstrap_strategy != BOOTSTRAP_STRATEGY_SUPERVISED) {
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 tt_sprintf("bootstrap_strategy = '%s'",
+				    cfg_gets("bootstrap_strategy")),
+			 "promoting the bootstrap leader via "
+			 "box.ctl.make_bootstrap_leader()");
+		return -1;
+	}
+	if (is_box_configured) {
+		if (box_check_writable() != 0)
+			return -1;
+		/* Ballot broadcast will happen in an on_commit trigger. */
+		return box_set_bootstrap_leader_record();
+	} else {
+		bootstrap_leader_uuid = INSTANCE_UUID;
+		box_broadcast_ballot();
+		return 0;
+	}
 }
 
 void
@@ -4301,6 +4340,8 @@ bootstrap_master(const struct tt_uuid *replicaset_uuid)
 
 	/* Set UUID of a new replica set */
 	box_set_replicaset_uuid(replicaset_uuid);
+	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_SUPERVISED)
+		box_set_bootstrap_leader_record();
 
 	/* Enable WAL subsystem. */
 	if (wal_enable() != 0)

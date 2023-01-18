@@ -3879,6 +3879,78 @@ on_replace_dd_priv(struct trigger * /* trigger */, void *event)
 /* {{{ cluster configuration */
 
 /**
+ * This trigger implements the "last write wins" strategy for
+ * "bootstrap_leader_uuid" tuple of space _schema. Comparison is performed by
+ * a timestamp and replica_id of the node which authored the change.
+ */
+static int
+before_replace_dd_schema(struct trigger * /* trigger */, void *event)
+{
+	struct txn *txn = (struct txn *)event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct tuple *old_tuple = stmt->old_tuple;
+	struct tuple *new_tuple = stmt->new_tuple;
+	const char *key = tuple_field_cstr(new_tuple != NULL ?
+					   new_tuple : old_tuple,
+					   BOX_SCHEMA_FIELD_KEY);
+	if (key == NULL)
+		return -1;
+	if (strcmp(key, "bootstrap_leader_uuid") == 0) {
+		uint64_t old_ts = 0;
+		uint32_t old_id = 0;
+		uint64_t new_ts = UINT64_MAX;
+		uint32_t new_id = UINT32_MAX;
+		int ts_field = BOX_SCHEMA_FIELD_VALUE + 1;
+		int id_field = BOX_SCHEMA_FIELD_VALUE + 2;
+		/*
+		 * Assume anything can be stored in old_tuple, so do not require
+		 * it to have a timestamp or replica_id. In contrary to that,
+		 * always require new tuple to have a valid timestamp and
+		 * replica_id.
+		 */
+		if (old_tuple != NULL) {
+			const char *field = tuple_field(old_tuple, ts_field);
+			if (field != NULL && mp_typeof(*field) == MP_UINT)
+				old_ts = mp_decode_uint(&field);
+			field = tuple_field(old_tuple, id_field);
+			if (field != NULL && mp_typeof(*field) == MP_UINT)
+				old_id = mp_decode_uint(&field);
+		}
+		if (new_tuple != NULL &&
+		    (tuple_field_u64(new_tuple, ts_field, &new_ts) != 0 ||
+		     tuple_field_u32(new_tuple, id_field, &new_id) != 0)) {
+			return -1;
+		}
+		if (new_ts < old_ts || (new_ts == old_ts && new_id < old_id)) {
+			say_info("Ignore the replace of tuple %s with %s in "
+				 "space _schema: the former has a newer "
+				 "timestamp", tuple_str(old_tuple),
+				 tuple_str(new_tuple));
+			goto return_old;
+		}
+	}
+	return 0;
+return_old:
+	if (new_tuple != NULL)
+		tuple_unref(new_tuple);
+	if (old_tuple != NULL)
+		tuple_ref(old_tuple);
+	stmt->new_tuple = old_tuple;
+	return 0;
+}
+
+/** An on_commit trigger to update bootstrap leader uuid. */
+static int
+on_commit_schema_set_bootstrap_leader_uuid(struct trigger *trigger, void *event)
+{
+	(void)event;
+	struct tt_uuid *uuid = (struct tt_uuid *)trigger->data;
+	bootstrap_leader_uuid = *uuid;
+	box_broadcast_ballot();
+	return 0;
+}
+
+/**
  * This trigger is invoked only upon initial recovery, when
  * reading contents of the system spaces from the snapshot.
  *
@@ -3895,7 +3967,7 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	const char *key = tuple_field_cstr(new_tuple ? new_tuple : old_tuple,
-					      BOX_SCHEMA_FIELD_KEY);
+					   BOX_SCHEMA_FIELD_KEY);
 	if (key == NULL)
 		return -1;
 	if (strcmp(key, "cluster") == 0) {
@@ -3929,6 +4001,20 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 			 */
 			dd_version_id = tarantool_version_id();
 		}
+	} else if (strcmp(key, "bootstrap_leader_uuid") == 0) {
+		struct tt_uuid *uuid = xregion_alloc_object(&txn->region,
+							    typeof(*uuid));
+		if (!new_tuple) {
+			*uuid = uuid_nil;
+		} else if (tuple_field_uuid(new_tuple, BOX_SCHEMA_FIELD_VALUE,
+					    uuid) != 0) {
+			return -1;
+		}
+		struct trigger *on_commit = txn_alter_trigger_new(
+			on_commit_schema_set_bootstrap_leader_uuid, uuid);
+		if (on_commit == NULL)
+			return -1;
+		txn_on_commit(txn, on_commit);
 	}
 	return 0;
 }
@@ -4863,6 +4949,7 @@ TRIGGER(alter_space_on_replace_space, on_replace_dd_space);
 TRIGGER(alter_space_on_replace_index, on_replace_dd_index);
 TRIGGER(on_replace_truncate, on_replace_dd_truncate);
 TRIGGER(on_replace_schema, on_replace_dd_schema);
+TRIGGER(before_replace_schema, before_replace_dd_schema);
 TRIGGER(on_replace_user, on_replace_dd_user);
 TRIGGER(on_replace_func, on_replace_dd_func);
 TRIGGER(on_replace_collation, on_replace_dd_collation);

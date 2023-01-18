@@ -2,6 +2,8 @@ local t = require('luatest')
 local server = require('luatest.server')
 local replica_set = require('luatest.replica_set')
 local fio = require('fio')
+local fiber = require('fiber')
+local socket = require('socket')
 
 local g_auto = t.group('gh-5272-bootstrap-strategy-auto')
 
@@ -445,4 +447,251 @@ g_config_fail.test_bad_uri_or_uuid = function()
             bootstrap_leader = leader
         })
     end
+end
+
+local g_supervised = t.group('gh-8509-bootstrap-strategy-supervised')
+
+local server2_admin
+local SOCKET_TIMEOUT = 5
+
+local function make_bootstrap_leader_initial(sockname)
+    local sock, err = socket.tcp_connect('unix/', sockname)
+    t.assert_equals(err, nil, 'Connection successful')
+    local greeting = sock:read(128, SOCKET_TIMEOUT)
+    t.assert_str_contains(greeting, 'Tarantool', 'Connected to console')
+    t.assert_str_contains(greeting, 'Lua console', 'Connected to console')
+    sock:write('box.ctl.make_bootstrap_leader()\n', SOCKET_TIMEOUT)
+    local response = sock:read(8, SOCKET_TIMEOUT)
+    t.assert_equals(response, '---\n...\n', 'The call succeeded')
+    sock:close()
+end
+
+g_supervised.after_each(function(cg)
+    cg.replica_set:drop()
+end)
+
+g_supervised.before_test('test_bootstrap', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.box_cfg = {
+        bootstrap_strategy = 'supervised',
+        replication = {
+            server.build_listen_uri('server1', cg.replica_set.id),
+            server.build_listen_uri('server2', cg.replica_set.id),
+        },
+        replication_timeout = 0.1,
+    }
+    for i = 1, 2 do
+        local alias = 'server' .. i
+        cg[alias] = cg.replica_set:build_and_add_server{
+            alias = alias,
+            box_cfg = cg.box_cfg,
+        }
+    end
+    cg.server1.box_cfg.instance_uuid = uuid1
+    cg.server2.box_cfg.instance_uuid = uuid2
+    server2_admin = fio.pathjoin(cg.server2.workdir, 'server2.admin')
+    local run_before_cfg = string.format([[
+        local console = require('console')
+        console.listen('unix/:%s')
+    ]], server2_admin)
+
+    cg.server2.env.TARANTOOL_RUN_BEFORE_BOX_CFG = run_before_cfg
+end)
+
+g_supervised.test_bootstrap = function(cg)
+    cg.replica_set:start{wait_until_ready = false}
+    t.helpers.retrying({}, make_bootstrap_leader_initial, server2_admin)
+    cg.server1:wait_until_ready()
+    cg.server2:wait_until_ready()
+    t.assert_equals(cg.server2:get_instance_id(), 1,
+                    'Server 2 is the bootstrap leader');
+    cg.server2:exec(function()
+        local tup = box.space._schema:get{'bootstrap_leader_uuid'}
+        t.assert(tup ~= nil, 'Bootstrap leader uuid is persisted')
+        t.assert_equals(tup[2], box.info.uuid,
+                        'Bootstrap leader uuid is correct')
+    end)
+    t.helpers.retrying({}, cg.server1.assert_follows_upstream, cg.server1, 1)
+
+    cg.server3 = cg.replica_set:build_and_add_server{
+        alias = 'server3',
+        box_cfg = cg.box_cfg,
+    }
+    cg.server3:start()
+    local query = string.format('bootstrapping replica from %s',
+                                uuid2:gsub('%-', '%%-'))
+    t.assert(cg.server3:grep_log(query), 'Server3 bootstrapped from server2')
+
+    cg.server1:exec(function()
+        box.ctl.make_bootstrap_leader()
+        local tup = box.space._schema:get{'bootstrap_leader_uuid'}
+        t.assert_equals(tup[2], box.info.uuid,
+                        'Bootstrap leader is updated')
+    end)
+    cg.server4 = cg.replica_set:build_and_add_server{
+        alias = 'server4',
+        box_cfg = cg.box_cfg,
+    }
+    cg.server4:start()
+    query = string.format('bootstrapping replica from %s',
+                          uuid1:gsub('%-', '%%-'))
+    t.assert(cg.server4:grep_log(query), 'Server4 bootstrapped from server1')
+
+end
+
+g_supervised.before_test('test_schema_triggers', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.server1 = cg.replica_set:build_and_add_server{alias = 'server1'}
+end)
+
+g_supervised.test_schema_triggers = function(cg)
+    cg.replica_set:start{}
+    cg.server1:exec(function()
+        local uuid2 = '22222222-2222-2222-2222-222222222222'
+        local uuid3 = '33333333-3333-3333-3333-333333333333'
+        box.cfg{bootstrap_strategy = 'supervised'}
+        box.ctl.make_bootstrap_leader()
+        local old_tuple = box.space._schema:get{'bootstrap_leader_uuid'}
+        local new_tuple = old_tuple:update{{'=', 2, 'not a uuid'}}
+        t.assert_error_msg_contains('Invalid UUID', function()
+            box.space._schema:replace(new_tuple)
+        end)
+        new_tuple = old_tuple:update{{'=', 3, 'not a timestamp'}}
+        t.assert_error_msg_contains('expected unsigned, got string', function()
+            box.space._schema:replace(new_tuple)
+        end)
+        new_tuple = old_tuple:update{{'=', 4, 'not a replica id'}}
+        t.assert_error_msg_contains('expected unsigned, got string', function()
+            box.space._schema:replace(new_tuple)
+        end)
+        new_tuple = old_tuple:update{{'-', 3, 1}}
+        box.space._schema:replace(new_tuple)
+        t.assert_equals(box.space._schema:get{'bootstrap_leader_uuid'},
+                        old_tuple, 'Last write wins by timestamp - old tuple')
+        new_tuple = old_tuple:update{{'-', 4, 1}}
+        box.space._schema:replace(new_tuple)
+        t.assert_equals(box.space._schema:get{'bootstrap_leader_uuid'},
+                        old_tuple, 'Last write wins by replica id - old tuple')
+        new_tuple = old_tuple:update{{'+', 3, 1}}
+        box.space._schema:replace(new_tuple)
+        t.assert_equals(box.space._schema:get{'bootstrap_leader_uuid'},
+                        new_tuple, 'Last write wins by timestamp - new tuple')
+        old_tuple = new_tuple
+        new_tuple = old_tuple:update{{'+', 4, 1}}
+        box.space._schema:replace(new_tuple)
+        t.assert_equals(box.space._schema:get{'bootstrap_leader_uuid'},
+                        new_tuple, 'Last write wins by replica id - new tuple')
+
+        local ballot_uuid
+        local watcher = box.watch('internal.ballot', function(_, ballot)
+                local ballot_key = box.iproto.key.BALLOT
+                local uuid_key = box.iproto.ballot_key.BOOTSTRAP_LEADER_UUID
+                ballot_uuid = ballot[ballot_key][uuid_key]
+        end)
+        t.helpers.retrying({}, function()
+            t.assert_equals(ballot_uuid, new_tuple[2],
+                            'Ballot stores correct uuid')
+        end)
+        old_tuple = new_tuple
+        new_tuple = old_tuple:update{{'=', 2, uuid2}, {'-', 3, 1}}
+        box.space._schema:replace(new_tuple)
+        t.assert_equals(ballot_uuid, old_tuple[2],
+                        "Ballot isn't updated if the tuple is rejected")
+        new_tuple = new_tuple:update{{'+', 3, 1}}
+        box.space._schema:replace(new_tuple)
+        t.helpers.retrying({}, function()
+            t.assert_equals(ballot_uuid, new_tuple[2],
+                            'Ballot updates the uuid')
+        end)
+        old_tuple = new_tuple
+        new_tuple = new_tuple:update{{'=', 2, uuid3}}
+        box.begin()
+        box.space._schema:replace(new_tuple)
+        local new_uuid = ballot_uuid
+        box.commit()
+        t.assert_equals(new_uuid, old_tuple[2],
+                        "Ballot isn't updated before commit")
+        t.helpers.retrying({}, function()
+            t.assert_equals(ballot_uuid, new_tuple[2],
+                            "Ballot is updated on commit")
+        end)
+        watcher:unregister()
+    end)
+end
+
+local function assert_not_booted(server)
+    local logfile = fio.pathjoin(server.workdir, server.alias .. '.log')
+    t.helpers.retrying({}, function()
+        t.assert_equals(server:grep_log('ready to accept requests', nil,
+                                        {filename = logfile}), nil,
+                        server.alias .. 'does not bootstrap')
+    end)
+end
+
+g_supervised.before_test('test_wait_for_bootstrap_leader', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.box_cfg = {
+        bootstrap_strategy = 'supervised',
+        replication_timeout = 0.1,
+        replication = {
+            server.build_listen_uri('server1', cg.replica_set.id),
+            server.build_listen_uri('server2', cg.replica_set.id),
+        },
+        replication_connect_timeout = 1000,
+    }
+    for i = 1, 2 do
+        local alias = 'server' .. i
+        cg[alias] = cg.replica_set:build_and_add_server{
+            alias = alias,
+            box_cfg = cg.box_cfg,
+        }
+    end
+end)
+
+local function wait_master_is_seen(replica, master, rs_id)
+    local addr = server.build_listen_uri(master.alias, rs_id)
+    local logfile = fio.pathjoin(replica.workdir, replica.alias .. '.log')
+    local query = string.format('remote master .* at unix/:%s',
+                                addr:gsub('%-', '%%-'))
+    t.helpers.retrying({}, function()
+        t.assert(replica:grep_log(query, nil, {filename = logfile}),
+                 replica.alias .. ' sees ' .. addr)
+    end)
+end
+
+g_supervised.test_wait_for_bootstrap_leader = function(cg)
+    cg.replica_set:start{wait_until_ready = false}
+
+    wait_master_is_seen(cg.server1, cg.server1, cg.replica_set.id)
+    wait_master_is_seen(cg.server1, cg.server2, cg.replica_set.id)
+    wait_master_is_seen(cg.server2, cg.server1, cg.replica_set.id)
+    wait_master_is_seen(cg.server2, cg.server2, cg.replica_set.id)
+
+    fiber.sleep(cg.box_cfg.replication_timeout)
+
+    assert_not_booted(cg.server1)
+    assert_not_booted(cg.server2)
+end
+
+g_supervised.before_test('test_no_bootstrap_without_replication', function(cg)
+    cg.replica_set = replica_set:new{}
+    cg.server1 = cg.replica_set:build_and_add_server{
+        alias = 'server1',
+        box_cfg = {
+            bootstrap_strategy = 'supervised',
+        },
+    }
+end)
+
+g_supervised.test_no_bootstrap_without_replication = function(cg)
+    cg.server1:start{wait_until_ready = false}
+    local logfile = fio.pathjoin(cg.server1.workdir, 'server1.log')
+    local query = "can't initialize storage"
+    t.helpers.retrying({}, function()
+        t.assert(cg.server1:grep_log(query, nil, {filename = logfile}),
+                 'Server fails to boot')
+    end)
+    query = 'failed to connect to the bootstrap leader'
+    t.assert(cg.server1:grep_log(query, nil, {filename = logfile}),
+             'Bootstrap leader not found')
 end

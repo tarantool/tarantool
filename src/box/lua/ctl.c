@@ -118,6 +118,14 @@ lbox_ctl_demote(struct lua_State *L)
 }
 
 static int
+lbox_ctl_make_bootstrap_leader(struct lua_State *L)
+{
+	if (box_make_bootstrap_leader() != 0)
+		return luaT_error(L);
+	return 0;
+}
+
+static int
 lbox_ctl_is_recovery_finished(struct lua_State *L)
 {
 	struct memtx_engine *memtx;
@@ -158,6 +166,7 @@ static const struct luaL_Reg lbox_ctl_lib[] = {
 	/* An old alias. */
 	{"clear_synchro_queue", lbox_ctl_promote},
 	{"demote", lbox_ctl_demote},
+	{"make_bootstrap_leader", lbox_ctl_make_bootstrap_leader},
 	{"is_recovery_finished", lbox_ctl_is_recovery_finished},
 	{"set_on_shutdown_timeout", lbox_ctl_set_on_shutdown_timeout},
 	{NULL, NULL}
