@@ -1569,7 +1569,7 @@ raft_test_too_long_wal_write(void)
 static void
 raft_test_promote_restore(void)
 {
-	raft_start_test(12);
+	raft_start_test(21);
 	struct raft_node node;
 	raft_node_create(&node);
 
@@ -1616,6 +1616,41 @@ raft_test_promote_restore(void)
 	/* Restore takes into account if Raft is enabled. */
 	raft_node_restore(&node);
 	ok(!node.raft.is_candidate, "not a candidate");
+
+	/*
+	 * The node doesn't schedule new elections in the next round after
+	 * promotion.
+	 */
+	raft_node_cfg_is_candidate(&node, false);
+	raft_node_cfg_is_enabled(&node, true);
+	raft_node_cfg_election_quorum(&node, 2);
+	raft_node_promote(&node);
+
+	is(node.raft.state, RAFT_STATE_CANDIDATE, "became candidate");
+	is(node.raft.term, 5, "new term");
+
+	/* Wait for the election timeout. */
+	double ts = raft_time();
+	raft_run_next_event();
+	ok(raft_time() - ts >= node.raft.election_timeout,
+	   "election timeout passed");
+	is(node.raft.state, RAFT_STATE_CANDIDATE, "still a candidate");
+	is(node.raft.term, 5, "do not bump term");
+
+	is(raft_node_send_leader(
+		&node,
+		5 /* Term. */,
+		2 /* Source. */
+	), 0, "another leader is accepted");
+
+	is(raft_node_send_follower(
+		&node,
+		5 /* Term. */,
+		2 /* Source. */
+	), 0, "leader resign is accepted");
+
+	is(node.raft.state, RAFT_STATE_FOLLOWER, "stay follower");
+	is(node.raft.term, 5, "do not bump term");
 
 	raft_node_destroy(&node);
 	raft_finish_test();
