@@ -137,6 +137,16 @@ local function gen_croot_searcher(searcher)
     end
 end
 
+local function yield_builtin_loader(loader, sentinel)
+    return function(data)
+        if data == sentinel then
+            return loader
+        end
+        return ('%s loader is used to load %s module'):format(sentinel, data)
+    end, sentinel
+
+end
+
 -- Lua table with "package searchers".
 local searchers = debug.getregistry()._TARANTOOL_PACKAGE_SEARCHERS
 
@@ -145,7 +155,7 @@ rawset(searchers, 'preload', function(name)
            "'package.preload' must be a table")
     local loader = package.preload[name]
     if loader ~= nil then
-        return loader, ':preload:'
+        return yield_builtin_loader(loader, ':preload:')
     end
     return ("\n\tno field package.preload['%s']"):format(name)
 end)
@@ -159,7 +169,7 @@ local builtin_modules = debug.getregistry()._TARANTOOL_BUILTIN
 rawset(searchers, 'builtin', function(name)
     local module = builtin_modules[name]
     if module ~= nil then
-        return function(_name) return module end, ':builtin:'
+        return yield_builtin_loader(function(_) return module end, ':builtin:')
     end
     return ("\n\tno field loaders.builtin['%s']"):format(name)
 end)
@@ -200,7 +210,7 @@ rawset(searchers, 8, searchers['croot.cwd'])
 --     path template
 -- @return function a loader, which first search for the file and
 --     then loads it
-local function gen_file_loader(searcher)
+local function gen_legacy_loader(searcher)
     assert(type(searcher) == 'function', '<searcher> must be defined')
 
     return function(name)
@@ -289,36 +299,6 @@ local function conditional_searcher(subsearcher, onoff)
             return subsearcher(name)
         end
         -- It is okay to return nothing, <require> ignores it.
-    end
-end
-
--- Accept an array of loaders and return a loader, whose effect is
--- equivalent to calling the loaders in a row.
-local function chain_loaders(subloaders)
-    return function(name)
-        -- Error accumulator.
-        local err = ''
-
-        for _, loader in ipairs(subloaders) do
-            local loaded = loader(name)
-            -- Whether the module found? Let's return it.
-            --
-            -- loaded is a function, which executes module's
-            -- initialization code.
-            if type(loaded) == 'function' then
-                return loaded
-            end
-            -- If the module is not found and the loader function
-            -- returns an error, add the error into the
-            -- accumulator.
-            if type(loaded) == 'string' then
-                err = err .. loaded
-            end
-            -- Ignore any other return value: require() does the
-            -- same.
-        end
-
-        return err
     end
 end
 
@@ -418,10 +398,10 @@ if script ~= nil and script ~= '-' then
 end
 
 -- loader_preload 1
-table.insert(package.loaders, 2, gen_file_loader(searchers[2]))
-table.insert(package.loaders, 3, gen_file_loader(searchers[3]))
-table.insert(package.loaders, 4, gen_file_loader(searchers[4]))
-table.insert(package.loaders, 5, gen_file_loader(searchers[5]))
+table.insert(package.loaders, 2, gen_legacy_loader(searchers[2]))
+table.insert(package.loaders, 3, gen_legacy_loader(searchers[3]))
+table.insert(package.loaders, 4, gen_legacy_loader(searchers[4]))
+table.insert(package.loaders, 5, gen_legacy_loader(searchers[5]))
 -- package.path   6
 -- package.cpath  7
 -- croot          8
@@ -464,7 +444,7 @@ local function override_searcher_onoff(_name)
     return getenv_boolean('TT_OVERRIDE_BUILTIN', true)
 end
 
-local override_loader = gen_file_loader(conditional_searcher(chain_searchers({
+rawset(searchers, 'override', conditional_searcher(chain_searchers({
     prefix_searcher('override', searchers[2]),
     prefix_searcher('override', searchers[3]),
     prefix_searcher('override', searchers[4]),
@@ -473,38 +453,24 @@ local override_loader = gen_file_loader(conditional_searcher(chain_searchers({
     prefix_searcher('override', searchers[7]),
 }), override_searcher_onoff))
 
-
-local function dummy_loader(searcher, sentinel)
-    return function(name)
-        local loader, data = searcher(name)
-        -- XXX: <loader> (i.e. the first return value) contains
-        -- error message in this case. Just propagate it to the
-        -- <require> frame...
-        if not data then
-           return loader
-        end
-        -- XXX: ... Otherwise, this is a valid module loader.
-        -- Check the <data> and return the <loader> function.
-        assert(data == sentinel, 'Invalid searcher')
-        return loader
-    end
-end
-
--- Add two loaders:
+-- Join three searchers:
 --
--- - Search for override.<module_name> module. It is necessary for
---   overriding built-in modules.
--- - Search for a built-in module (compiled into tarantool's
+-- - Searcher for preload LuaJIT modules.
+-- - Searcher for override.<module_name> module. It is necessary
+--   for overriding built-in modules.
+-- - Searcher for a built-in module (compiled into tarantool's
 --   executable).
 --
--- Those two loaders are mixed into the first loader to don't
--- change ordinals of the loaders 2-8. It is possible that someone
--- has a logic based on those loader positions.
-package.loaders[1] = chain_loaders({
-    dummy_loader(searchers['preload'], ':preload:'),
-    override_loader,
-    dummy_loader(searchers['builtin'], ':builtin:'),
-})
+-- Those three searchers are mixed into the first searcher to
+-- don't change ordinals of the searchers (and hence, loaders)
+-- 2-8. It is possible that someone has a logic based on those
+-- loader positions.
+rawset(searchers, 1, chain_searchers({
+    searchers['preload'],
+    searchers['override'],
+    searchers['builtin'],
+}))
+rawset(package.loaders, 1, gen_legacy_loader(searchers[1]))
 
 rawset(package, "search", search)
 rawset(package, "searchroot", searchroot)
