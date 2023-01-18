@@ -42,18 +42,15 @@ set(sql_sources
     sql/opcodes.c
     sql/parse.c
     sql/alter.c
-    sql/analyze.c
     sql/cursor.c
     sql/build.c
     sql/callback.c
-    sql/date.c
     sql/delete.c
     sql/expr.c
     sql/func.c
     sql/global.c
     sql/hash.c
     sql/insert.c
-    sql/legacy.c
     sql/main.c
     sql/malloc.c
     sql/mem.c
@@ -75,7 +72,6 @@ set(sql_sources
     sql/vdbe.c
     sql/vdbeapi.c
     sql/vdbeaux.c
-    sql/vdbemem.c
     sql/vdbesort.c
     sql/vdbetrace.c
     sql/walker.c
