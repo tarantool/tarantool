@@ -333,7 +333,12 @@ raft_sm_schedule_new_election(struct raft *raft);
 static inline void
 raft_sm_election_update(struct raft *raft)
 {
-	if (!raft->is_candidate)
+	/*
+	 * The node might be promoted for current term, in which case
+	 * is_candidate would be true. But it's not enough. If is_cfg_candidate
+	 * is false, the node would give up as soon as new term starts.
+	 */
+	if (!raft->is_cfg_candidate)
 		return;
 	/*
 	 * Pre-vote protection. Every node must agree that the leader is gone.
@@ -615,8 +620,10 @@ raft_process_msg(struct raft *raft, const struct raft_msg *req, uint32_t source)
 			/*
 			 * No need for pre-vote checks when the leader
 			 * deliberately told us it's resigning.
+			 * Note, the only case when automatic elections are
+			 * allowed is when the node is configured candidate.
 			 */
-			if (raft->is_candidate)
+			if (raft->is_cfg_candidate)
 				raft_sm_schedule_new_election(raft);
 		}
 		return 0;
@@ -951,7 +958,7 @@ static void
 raft_sm_schedule_new_election(struct raft *raft)
 {
 	say_info("RAFT: begin new election round");
-	assert(raft->is_candidate);
+	assert(raft->is_cfg_candidate);
 	/* Everyone is a follower until its vote for self is persisted. */
 	raft_sm_schedule_new_term(raft, raft->volatile_term + 1);
 	raft_sm_schedule_new_vote(raft, raft->self, raft->vclock);

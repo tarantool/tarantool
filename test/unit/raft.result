@@ -265,7 +265,7 @@ ok 13 - subtests
 ok 14 - subtests
 	*** raft_test_too_long_wal_write: done ***
 	*** raft_test_promote_restore ***
-    1..12
+    1..21
     ok 1 - became leader after promotion
     ok 2 - restore drops a non-candidate leader to a follower
     ok 3 - became leader after promotion
@@ -278,6 +278,15 @@ ok 14 - subtests
     ok 10 - still old term
     ok 11 - not a candidate
     ok 12 - not a candidate
+    ok 13 - became candidate
+    ok 14 - new term
+    ok 15 - election timeout passed
+    ok 16 - still a candidate
+    ok 17 - do not bump term
+    ok 18 - another leader is accepted
+    ok 19 - leader resign is accepted
+    ok 20 - stay follower
+    ok 21 - do not bump term
 ok 15 - subtests
 	*** raft_test_promote_restore: done ***
 	*** raft_test_bump_term_before_cfg ***
