@@ -566,7 +566,7 @@ set(ENABLE_BUNDLED_LUAJIT ON)
 set(LUAJIT_ENABLE_GC64_DEFAULT OFF)
 
 if(NOT ENABLE_BACKTRACE)
-    set(LUAJIT_DISABLE_SYSPROF ON)
+    option(LUAJIT_DISABLE_SYSPROF "Tarantool platform and Lua profiler support" ON)
     message(STATUS "Sysprof is not available without backtrace.")
 endif()
 if (TARGET_OS_DARWIN)
