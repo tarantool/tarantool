@@ -204,20 +204,26 @@ rawset(searchers, 6, searchers['path.package'])
 rawset(searchers, 7, searchers['cpath.package'])
 rawset(searchers, 8, searchers['croot.cwd'])
 
--- Compose a loader function from options.
+-- Compose a loader function from options. The function accepts
+-- the table with the searchers and the index, so the user can
+-- override the particular searcher.
 --
--- @param searcher function will be used to search a file from
---     path template
+-- @param searchers table with the searcher function to be used
+--     to search a file from path template
+-- @param index in searchers table to be used in the loader to be
+--     generated
 -- @return function a loader, which first search for the file and
 --     then loads it
-local function gen_legacy_loader(searcher)
-    assert(type(searcher) == 'function', '<searcher> must be defined')
+local function gen_legacy_loader(searchers, index)
+    assert(type(searchers) == 'table', '<searchers> must be defined')
+    assert(type(searchers[index]) == 'function',
+           'searchers[index] must be a function')
 
     return function(name)
         if not name then
             return "empty name of module"
         end
-        local loader, data = searcher(name)
+        local loader, data = searchers[index](name)
         -- XXX: <loader> (i.e. the first return value) contains
         -- error message in this case. Just propagate it to the
         -- <require> frame...
@@ -397,15 +403,6 @@ if script ~= nil and script ~= '-' then
     }))
 end
 
--- loader_preload 1
-table.insert(package.loaders, 2, gen_legacy_loader(searchers[2]))
-table.insert(package.loaders, 3, gen_legacy_loader(searchers[3]))
-table.insert(package.loaders, 4, gen_legacy_loader(searchers[4]))
-table.insert(package.loaders, 5, gen_legacy_loader(searchers[5]))
--- package.path   6
--- package.cpath  7
--- croot          8
-
 local function getenv_boolean(varname, default)
     local envvar = os.getenv(varname)
 
@@ -470,7 +467,25 @@ rawset(searchers, 1, chain_searchers({
     searchers['override'],
     searchers['builtin'],
 }))
-rawset(package.loaders, 1, gen_legacy_loader(searchers[1]))
+
+-- XXX: The default LuaJIT loaders are:
+-- [1]: preload
+-- [2]: package.path
+-- [3]: package.cpath
+-- [4]: croot
+--
+-- Tarantool loaders just maps the <searchers> table:
+-- [1]: preload -> override -> builtin
+-- [2]: path.cwd.dot -> [path.app.dot]
+-- [3]: cpath.cwd.dot -> [cpath.app.dot]
+-- [4]: path.cwd.rocks -> [path.app.rocks]
+-- [5]: cpath.cwd.rocks -> [cpath.app.rocks]
+-- [6]: package.path
+-- [7]: package.cpath
+-- [8]: croot
+for index, _ in ipairs(searchers) do
+    rawset(package.loaders, index, gen_legacy_loader(searchers, index))
+end
 
 rawset(package, "search", search)
 rawset(package, "searchroot", searchroot)
@@ -501,6 +516,7 @@ return {
     ROCKS_LIB_PATH = ROCKS_LIB_PATH,
     ROCKS_LUA_PATH = ROCKS_LUA_PATH,
     builtin = builtin_modules,
+    searchers = searchers,
     override_builtin_enable = function()
         override_searcher_is_enabled = true
     end,
