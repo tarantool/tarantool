@@ -105,6 +105,7 @@ enum bootstrap_strategy {
 	BOOTSTRAP_STRATEGY_AUTO,
 	BOOTSTRAP_STRATEGY_LEGACY,
 	BOOTSTRAP_STRATEGY_CONFIG,
+	BOOTSTRAP_STRATEGY_SUPERVISED,
 };
 
 /** Instance's bootstrap strategy. Controls replication reconfiguration. */

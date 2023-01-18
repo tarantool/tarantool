@@ -32,6 +32,8 @@
  */
 #include "trigger.h"
 
+extern struct trigger before_replace_schema;
+
 extern struct trigger alter_space_on_replace_space;
 extern struct trigger alter_space_on_replace_index;
 extern struct trigger on_replace_truncate;

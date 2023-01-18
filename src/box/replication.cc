@@ -142,6 +142,7 @@ replicaset_connect_quorum(int total)
 	case BOOTSTRAP_STRATEGY_AUTO:
 		return replicaset_connect_quorum_auto(total);
 	case BOOTSTRAP_STRATEGY_CONFIG:
+	case BOOTSTRAP_STRATEGY_SUPERVISED:
 		/*
 		 * During the replica set bootstrap and join we don't care about
 		 * connected node count, we only care about reaching the
@@ -178,6 +179,7 @@ replicaset_sync_quorum(void)
 			   replicaset.applier.total);
 	case BOOTSTRAP_STRATEGY_AUTO:
 	case BOOTSTRAP_STRATEGY_CONFIG:
+	case BOOTSTRAP_STRATEGY_SUPERVISED:
 		return replication_sync_quorum_auto;
 	default:
 		unreachable();
@@ -910,6 +912,7 @@ applier_on_connect_f(struct trigger *trigger, void *event)
 	struct replicaset_connect_state *state = on_connect->state;
 	struct applier *applier = (struct applier *)event;
 
+	fiber_cond_signal(&state->wakeup);
 	if (on_connect->seen_state == applier->state)
 		return 0;
 	on_connect->seen_state = applier->state;
@@ -918,7 +921,6 @@ applier_on_connect_f(struct trigger *trigger, void *event)
 	    applier->state != APPLIER_CONNECTED) {
 		return 0;
 	}
-	fiber_cond_signal(&state->wakeup);
 	applier_pause(applier);
 	return 0;
 }
@@ -927,15 +929,19 @@ applier_on_connect_f(struct trigger *trigger, void *event)
 static bool
 applier_is_bootstrap_leader(const struct applier *applier)
 {
-	if (bootstrap_strategy != BOOTSTRAP_STRATEGY_CONFIG)
-		return false;
-	if (!tt_uuid_is_nil(&cfg_bootstrap_leader_uuid)) {
-		return tt_uuid_compare(&applier->uuid,
-				       &cfg_bootstrap_leader_uuid) == 0;
-	}
-	if (!uri_is_nil(&cfg_bootstrap_leader_uri)) {
-		return uri_addr_is_equal(&applier->uri,
-					 &cfg_bootstrap_leader_uri);
+	assert(!tt_uuid_is_nil(&applier->uuid));
+	if (bootstrap_strategy == BOOTSTRAP_STRATEGY_CONFIG) {
+		if (!tt_uuid_is_nil(&cfg_bootstrap_leader_uuid)) {
+			return tt_uuid_is_equal(&applier->uuid,
+						&cfg_bootstrap_leader_uuid);
+		}
+		if (!uri_is_nil(&cfg_bootstrap_leader_uri)) {
+			return uri_addr_is_equal(&applier->uri,
+						 &cfg_bootstrap_leader_uri);
+		}
+	} else if (bootstrap_strategy == BOOTSTRAP_STRATEGY_SUPERVISED) {
+		return tt_uuid_is_equal(&applier->ballot.bootstrap_leader_uuid,
+					&applier->uuid);
 	}
 	return false;
 }
@@ -965,6 +971,18 @@ replicaset_is_connected(struct replicaset_connect_state *state,
 {
 	if (replicaset_state == REPLICASET_BOOTSTRAP ||
 	    replicaset_state == REPLICASET_JOIN) {
+		/*
+		 * With "supervised" strategy we may continue only once the
+		 * bootstrap leader appears.
+		 */
+		if (bootstrap_strategy == BOOTSTRAP_STRATEGY_SUPERVISED)
+			return bootstrap_leader_is_connected(appliers, count);
+		/*
+		 * With "config" strategy we may continue either when the leader
+		 * appears or when there are no more connections to wait for.
+		 * If none of them is the configured bootstrap_leader, there's
+		 * no point to wait for one.
+		 */
 		if (bootstrap_strategy == BOOTSTRAP_STRATEGY_CONFIG &&
 		    bootstrap_leader_is_connected(appliers, count)) {
 			return true;
@@ -1421,6 +1439,28 @@ replicaset_find_join_master_cfg(void)
 	return leader;
 }
 
+/**
+ * Out of all the replicas find the one which was promoted via
+ * box.ctl.make_bootstrap_leader()
+ */
+static struct replica *
+replicaset_find_join_master_supervised(void)
+{
+	struct replica *leader = NULL;
+	replicaset_foreach(replica) {
+		struct applier *applier = replica->applier;
+		if (applier == NULL)
+			continue;
+		if (applier_is_bootstrap_leader(applier))
+			leader = replica;
+	}
+	if (leader == NULL) {
+		tnt_raise(ClientError, ER_CFG, "bootstrap_strategy",
+			  "failed to connect to the bootstrap leader");
+	}
+	return leader;
+}
+
 struct replica *
 replicaset_find_join_master(void)
 {
@@ -1430,6 +1470,8 @@ replicaset_find_join_master(void)
 		return replicaset_find_join_master_auto();
 	case BOOTSTRAP_STRATEGY_CONFIG:
 		return replicaset_find_join_master_cfg();
+	case BOOTSTRAP_STRATEGY_SUPERVISED:
+		return replicaset_find_join_master_supervised();
 	default:
 		unreachable();
 	}

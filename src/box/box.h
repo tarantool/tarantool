@@ -91,6 +91,13 @@ extern double txn_timeout_default;
 /** "internal.ballot" built-in event key. */
 extern const char *box_ballot_event_key;
 
+/**
+ * UUID of the node this instance considers the bootstrap leader. Is broadcast
+ * to replicas via the ballot and influences the replica's choice of the
+ * bootstrap leader.
+ */
+extern struct tt_uuid bootstrap_leader_uuid;
+
 /*
  * Initialize box library
  * @throws C++ exception
@@ -367,6 +374,12 @@ box_iterator_position_unpack(const char *packed_pos,
 			     struct key_def *cmp_def, const char *key,
 			     uint32_t key_part_count, int iterator,
 			     const char **pos, const char **pos_end);
+
+/**
+ * For bootstrap_strategy = "supervised", set this node as the bootstrap leader.
+ */
+int
+box_make_bootstrap_leader(void);
 
 /**
  * Select data, satisfying filters (key and iterator), and dump it to port.

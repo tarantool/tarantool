@@ -222,6 +222,9 @@ schema_init(void)
 	key_parts[0].type = FIELD_TYPE_STRING;
 	sc_space_new(BOX_SCHEMA_ID, "_schema", key_parts, 1,
 		     &on_replace_schema);
+	struct space *schema = space_by_id(BOX_SCHEMA_ID);
+	assert(schema != NULL);
+	trigger_add(&schema->before_replace, &before_replace_schema);
 
 	/* _collation - collation description. */
 	key_parts[0].fieldno = 0;
