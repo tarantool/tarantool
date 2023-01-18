@@ -56,7 +56,7 @@ ext_project_autotools(libunwind-build
 unset(LIBUNWIND_CFLAGS)
 unset(LIBUNWIND_CXXFLAGS)
 
-set(LIBUNWIND_BUILD_DIR ${CMAKE_BINARY_DIR}/third_party/libunwind)
+set(LIBUNWIND_BUILD_DIR ${PROJECT_BINARY_DIR}/third_party/libunwind)
 
 add_library(bundled-libunwind STATIC IMPORTED GLOBAL)
 set_target_properties(bundled-libunwind PROPERTIES
@@ -72,7 +72,7 @@ add_dependencies(bundled-libunwind-platform libunwind-build)
 
 set(LIBUNWIND_INCLUDE_DIR
     ${LIBUNWIND_BUILD_DIR}/include
-    ${CMAKE_SOURCE_DIR}/third_party/libunwind/include)
+    ${PROJECT_SOURCE_DIR}/third_party/libunwind/include)
 set(LIBUNWIND_LIBRARIES
     ${LIBUNWIND_BUILD_DIR}/src/.libs/libunwind-${CMAKE_SYSTEM_PROCESSOR}.a
     ${LIBUNWIND_BUILD_DIR}/src/.libs/libunwind.a)
