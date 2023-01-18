@@ -1957,6 +1957,20 @@ tx_accept_msg(struct cmsg *m)
 }
 
 /**
+ * Check if the watch request key is in the white list which doesn't need
+ * additional checks.
+ * The only allowed subscription is to "internal.ballot" event - the one used by
+ * replication instead of IPROTO_VOTE on Tarantool 2.11+.
+ */
+static bool
+check_watch_key(const char *key, uint32_t len)
+{
+	if (len != strlen(box_ballot_event_key))
+		return false;
+	return strncmp(key, box_ballot_event_key, len) == 0;
+}
+
+/**
  * Check if the tx thread may continue with processing an accepted message.
  * If something's wrong, returns -1 and sets diag, otherwise returns 0.
  */
@@ -1972,6 +1986,8 @@ tx_check_msg(struct iproto_msg *msg)
 	enum iproto_type type = (enum iproto_type)msg->header.type;
 	if (type != IPROTO_AUTH && type != IPROTO_PING && type != IPROTO_ID &&
 	    type != IPROTO_VOTE && type != IPROTO_VOTE_DEPRECATED &&
+	    (type != IPROTO_WATCH ||
+	     !check_watch_key(msg->watch.key, msg->watch.key_len)) &&
 	    security_check_session() != 0)
 		return -1;
 	return 0;
