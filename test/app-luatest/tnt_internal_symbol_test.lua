@@ -2,12 +2,12 @@ local ffi = require('ffi')
 local t = require('luatest')
 local g = t.group()
 
-g.before_all = function()
+g.before_all(function()
     ffi.cdef([[
         void *
         tnt_internal_symbol(const char *name);
     ]])
-end
+end)
 
 g.test_fiber_channel = function()
     local symbols = {

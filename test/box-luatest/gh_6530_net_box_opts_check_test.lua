@@ -4,7 +4,7 @@ local net = require('net.box')
 local t = require('luatest')
 local g = t.group()
 
-g.before_all = function()
+g.before_all(function()
     g.server = server:new{alias = 'default'}
     g.server:start()
     g.server:exec(function()
@@ -18,9 +18,9 @@ g.before_all = function()
     end)
 
     g.conn = net.connect(g.server.net_box_uri)
-end
+end)
 
-g.after_all = function()
+g.after_all(function()
     g.server:exec(function()
         if box.space.test then
             box.space.test:drop()
@@ -29,7 +29,7 @@ g.after_all = function()
 
     g.conn:close()
     g.server:drop()
-end
+end)
 
 g.test_netbox_connect_opts = function()
     t.assert_error_msg_contains("unexpected option 'some_opt'", function()

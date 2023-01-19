@@ -1,14 +1,14 @@
 local server = require('luatest.server')
 local g = require('luatest').group()
 
-g.before_all = function()
+g.before_all(function()
     g.server = server:new{alias = 'default'}
     g.server:start()
-end
+end)
 
-g.after_all = function()
+g.after_all(function()
     g.server:drop()
-end
+end)
 
 g.test_system_fibers = function()
     g.server:exec(function(uri)

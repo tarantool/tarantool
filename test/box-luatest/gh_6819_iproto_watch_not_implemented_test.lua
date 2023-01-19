@@ -4,14 +4,14 @@ local server = require('luatest.server')
 local t = require('luatest')
 local g = t.group()
 
-g.before_all = function()
+g.before_all(function()
     g.server = server:new({alias = 'master'})
     g.server:start()
-end
+end)
 
-g.after_all = function()
+g.after_all(function()
     g.server:drop()
-end
+end)
 
 g.before_test('test_iproto_watch_not_reported', function()
     g.server:exec(function()
