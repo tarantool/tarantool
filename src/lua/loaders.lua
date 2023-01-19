@@ -118,6 +118,25 @@ local function gen_file_searcher(loader, pathogen)
     end
 end
 
+local function gen_croot_searcher(searcher)
+    assert(type(searcher) == 'function', '<searcher> must be a function')
+
+    return function(name)
+        local path = name:match('[^.]+')
+        local loader, data = searcher(path)
+        -- XXX: <loader> (i.e. the first return value) contains
+        -- error message in this case. Just propagate it to the
+        -- <require> frame...
+        if not data then
+           return loader
+        end
+        -- XXX: ... Otherwise, there is a croot module found.
+        -- Yield the C module loader with the found croot module.
+        assert(loader == load_lib, 'Invalid searcher provided')
+        return loader, data
+    end
+end
+
 -- Lua table with "package searchers".
 local searchers = debug.getregistry()._TARANTOOL_PACKAGE_SEARCHERS
 
@@ -152,6 +171,19 @@ rawset(searchers, 'cpath.cwd.dot', gen_file_searcher(load_lib, cpath.cwd.dot))
 rawset(searchers, 'path.cwd.rocks', gen_file_searcher(load_lua, path.cwd.rocks))
 rawset(searchers, 'cpath.cwd.rocks', gen_file_searcher(load_lib, cpath.cwd.rocks))
 
+-- FIXME: There are two problems with croot problems in Tarantool:
+--   1. Since Tarantool uses original croot loader from LuaJIT, it
+--      ignores all paths except ones specified in <package.path>.
+--      However, there might be some croot-like modules in the
+--      Tarantool-specific cpaths (cwd or application root).
+--      It looks like croot machinery is not widely used, if this
+--      bug bothers nobody, but it's still need to be fixed.
+--   2. Similar situation relates to the overriding mechanism,
+--      that was recently introduced: there is no "prefixed" croot
+--      loader and all libraries using croot loading machinery are
+--      ignored for the overridden paths as a result.
+rawset(searchers, 'croot.cwd', gen_croot_searcher(searchers['cpath.package']))
+
 -- Indices in <searchers> table must represent the order of the
 -- functions in <package.loaders> below.
 rawset(searchers, 2, searchers['path.cwd.dot'])
@@ -160,6 +192,7 @@ rawset(searchers, 4, searchers['path.cwd.rocks'])
 rawset(searchers, 5, searchers['cpath.cwd.rocks'])
 rawset(searchers, 6, searchers['path.package'])
 rawset(searchers, 7, searchers['cpath.package'])
+rawset(searchers, 8, searchers['croot.cwd'])
 
 -- Compose a loader function from options.
 --
