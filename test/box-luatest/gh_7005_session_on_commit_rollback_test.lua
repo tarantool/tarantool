@@ -2,7 +2,7 @@ local server = require('luatest.server')
 local t = require('luatest')
 local g = t.group()
 
-g.before_all = function()
+g.before_all(function()
     g.server = server:new({alias = 'master'})
     g.server:start()
     g.server:exec(function()
@@ -11,11 +11,11 @@ g.before_all = function()
         box.schema.user.create('eve')
         box.schema.user.grant('eve', 'write', 'space', 'T')
     end)
-end
+end)
 
-g.after_all = function()
+g.after_all(function()
     g.server:drop()
-end
+end)
 
 -- Checks session and user in box.on_commit trigger callback.
 g.test_session_on_commit = function()

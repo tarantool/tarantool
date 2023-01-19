@@ -3,7 +3,7 @@ local t = require('luatest')
 
 local g = t.group()
 
-g.before_all = function()
+g.before_all(function()
     g.server = server:new{
         alias  = 'default',
         box_cfg = {
@@ -11,11 +11,11 @@ g.before_all = function()
         }
     }
     g.server:start()
-end
+end)
 
-g.after_all = function()
+g.after_all(function()
     g.server:drop()
-end
+end)
 
 -- Test of box.atomic with or without options.
 g.test_atomic_options = function()

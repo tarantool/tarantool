@@ -6,19 +6,19 @@ local net_box = require('net.box')
 local server = require('luatest.server')
 
 -- Create test instance.
-g.before_all = function()
+g.before_all(function()
     g.server = server:new({alias = 'test-gh-7479'})
     g.server:start()
     -- Get port for connection testing.
     g.server_port = g.server:exec(function()
         return require('console').listen(0):name()['port']
     end)
-end
+end)
 
 -- Stop test instance.
-g.after_all = function()
+g.after_all(function()
     g.server:stop()
-end
+end)
 
 -- Checks whether it is possible to specify only port for tarantoolctl connect.
 g.test_tarantoolctl_connect = function()

@@ -2,18 +2,18 @@ local server = require('luatest.server')
 local t = require('luatest')
 local g = t.group()
 
-g.before_all = function(cg)
+g.before_all(function(cg)
     cg.server = server:new({alias = 'master'})
     cg.server:start()
     cg.server:exec(function()
         box.schema.user.create('criminal')
         box.schema.user.passwd('criminal', '123')
     end)
-end
+end)
 
-g.after_all = function(cg)
+g.after_all(function(cg)
     cg.server:stop()
-end
+end)
 
 g.test_no__collation_in_public_access = function(cg)
     cg.server:exec(function()
