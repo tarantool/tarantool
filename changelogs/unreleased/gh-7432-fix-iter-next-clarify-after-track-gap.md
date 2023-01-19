@@ -1,4 +1,4 @@
 ## bugfix/memtx
 
-* Fixed `select` with `LE` iterator in **memtx** **TREE** index returning
-  deleted tuple (gh-7432).
+* Fixed `select` with the `LE` iterator in the memtx ``TREE`` index returning
+  deleted tuples (gh-7432).

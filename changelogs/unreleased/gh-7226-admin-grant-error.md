@@ -1,5 +1,5 @@
 ## bugfix/box
 
-* Fixed internal error on granting rights to admin user. Now granting still
-fail but for proper reason and proper error message like "right is already
-granted" (gh-7226).
+* Fixed an incorrect error message on granting privileges to the `admin` user.
+  Such attempts now fail with proper error messages such as "User 'admin'
+  already has read access on universe" (gh-7226).

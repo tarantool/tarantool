@@ -1,5 +1,4 @@
 ## bugfix/sql
 
-* Rules "reference trigger action", "constraint check time" and "match type"
-  were dropped.
-* Session setting "sql_defer_foreign_keys" was dropped (gh-6986).
+* Dropped the session setting `sql_defer_foreign_keys` and rules `reference
+  trigger action`, `constraint check time`, and `match type` (gh-6986).

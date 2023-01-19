@@ -1,3 +1,3 @@
 ## bugfix/core
 
-* Export forgotten fiber_join_timeout symbol (gh-7125).
+* Added the `fiber_join_timeout` symbol to exports (gh-7125).

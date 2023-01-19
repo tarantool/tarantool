@@ -1,20 +1,21 @@
 ## feature/debugger
 
-* Created a console debugger `luadebug.lua` for debugging of external and
-  builtin Lua modules;
-* New Lua API created `tarantool.debug.getsources()` which allows
-  to see sources of builtin modules in any external debugger;
+* Introduced a new console debugger `luadebug.lua` for debugging external and
+  builtin Lua modules.
 
-NB! Debugger REPL is not yet compatible with Tarantool console, i.e. this
-code will hang in terminal
+> Note: the debugger REPL is not yet compatible with Tarantool console.
+> This means that this code will hang in the console:
+>
+>```lua
+>tarantool> dbg = require 'luadebug'
+>---
+>...
+>
+>tarantool> dbg()
+>---
+>```
+> Users should call debugger activation only in their instrumented code, not
+> from the interactive console.
 
-```lua
-tarantool> dbg = require 'luadebug'
----
-...
-
-tarantool> dbg()
----
-```
-One should call debugger activation only in their instrumented code, not
-from interactive console.
+* Introduced a new Lua API `tarantool.debug.getsources()` which allows
+  seeing sources of builtin modules in any external debugger.

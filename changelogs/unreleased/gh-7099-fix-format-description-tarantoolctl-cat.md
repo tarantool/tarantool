@@ -1,3 +1,3 @@
 ## bugfix/tarantoolctl
 
-* Fix missing description for the `--format` flag of the tarantoolctl cat command.
+* Added a description for the `--format` flag of the `tarantoolctl cat` command.

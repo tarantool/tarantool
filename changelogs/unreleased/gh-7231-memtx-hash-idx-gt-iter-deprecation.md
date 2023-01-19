@@ -1,3 +1,3 @@
 ## bugfix/memtx
 
-* Deprecated HASH index 'GT' iterator type (gh-7231).
+* Deprecated the `GT` iterator type for `HASH` indexes (gh-7231).

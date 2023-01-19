@@ -1,4 +1,5 @@
 ## feature/sql
 
-* A new SEQSCAN keyword has been introduced and a new restrictions on scanning
-  SELECTs can now be applied (gh-7747).
+* Introduced a new `SEQSCAN` keyword for usage in scanning `SELECT` queries.
+  A new session setting `sql_seq_scan` can be used to allow or restrict scanning
+  queries without `SEQSCAN` (gh-7747).
