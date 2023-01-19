@@ -308,7 +308,8 @@ box.execute("SELECT 'abc' COLLATE \"binary\" UNION SELECT 'ABC' COLLATE \"unicod
 - null
 - Illegal mix of collations
 ...
-box.execute("SELECT 'abc' COLLATE \"unicode_ci\" UNION SELECT 'ABC' COLLATE binary")
+box.execute([[SELECT 'abc' COLLATE "unicode_ci" UNION ]]..\
+            [[SELECT 'ABC' COLLATE "binary"]])
 ---
 - null
 - Illegal mix of collations

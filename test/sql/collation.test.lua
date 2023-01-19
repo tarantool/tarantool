@@ -90,7 +90,8 @@ box.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = substr();")
 -- Hence, rules for collations compatibilities are the same.
 --
 box.execute("SELECT 'abc' COLLATE \"binary\" UNION SELECT 'ABC' COLLATE \"unicode_ci\"")
-box.execute("SELECT 'abc' COLLATE \"unicode_ci\" UNION SELECT 'ABC' COLLATE binary")
+box.execute([[SELECT 'abc' COLLATE "unicode_ci" UNION ]]..\
+            [[SELECT 'ABC' COLLATE "binary"]])
 box.execute("SELECT c FROM t UNION SELECT b FROM t;")
 box.execute("SELECT b FROM t UNION SELECT a FROM t;")
 box.execute("SELECT a FROM t UNION SELECT c FROM t;")
