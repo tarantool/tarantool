@@ -388,6 +388,11 @@ lbox_info_replicaset(struct lua_State *L)
 	lua_pushliteral(L, "uuid");
 	luaT_pushuuidstr(L, &REPLICASET_UUID);
 	lua_settable(L, -3);
+	if (*REPLICASET_NAME == 0)
+		luaL_pushnull(L);
+	else
+		lua_pushstring(L, REPLICASET_NAME);
+	lua_setfield(L, -2, "name");
 	return 1;
 }
 

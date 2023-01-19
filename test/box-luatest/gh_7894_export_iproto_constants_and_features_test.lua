@@ -80,6 +80,7 @@ local reference_table = {
         TXN_ISOLATION = 0x59,
         VCLOCK_SYNC = 0x5a,
         AUTH_TYPE = 0x5b,
+        REPLICASET_NAME = 0x5c,
     },
 
     -- `iproto_metadata_key` enumeration.

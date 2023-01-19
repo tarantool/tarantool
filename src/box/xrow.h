@@ -37,6 +37,7 @@
 
 #include "diag.h"
 #include "iproto_features.h"
+#include "node_name.h"
 #include "tt_uuid.h"
 #include "vclock/vclock.h"
 
@@ -49,7 +50,7 @@ enum {
 	XROW_BODY_IOVMAX = 2,
 	XROW_IOVMAX = XROW_HEADER_IOVMAX + XROW_BODY_IOVMAX,
 	XROW_HEADER_LEN_MAX = 52,
-	XROW_BODY_LEN_MAX = 256,
+	XROW_BODY_LEN_MAX = 512,
 	XROW_SYNCHRO_BODY_LEN_MAX = 32,
 	IPROTO_HEADER_LEN = 32,
 	/** 7 = sizeof(iproto_body_bin). */
@@ -549,6 +550,8 @@ xrow_decode_register(const struct xrow_header *row,
 struct subscribe_request {
 	/** Replica's replicaset UUID. */
 	struct tt_uuid replicaset_uuid;
+	/** Replica's replicaset name. */
+	char replicaset_name[NODE_NAME_SIZE_MAX];
 	/** Replica's instance UUID. */
 	struct tt_uuid instance_uuid;
 	/** Replica's vclock. */
@@ -575,6 +578,8 @@ xrow_decode_subscribe(const struct xrow_header *row,
 struct subscribe_response {
 	/** Master's replicaset UUID. */
 	struct tt_uuid replicaset_uuid;
+	/** Master's replicaset name. */
+	char replicaset_name[NODE_NAME_SIZE_MAX];
 	/** Master's vclock. */
 	struct vclock vclock;
 };
