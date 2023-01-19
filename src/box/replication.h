@@ -237,8 +237,10 @@ replication_free(void);
 extern uint32_t instance_id;
 /** UUID of the instance. */
 extern struct tt_uuid INSTANCE_UUID;
-/** UUID of the replica set. */
+/** UUID of the replicaset. */
 extern struct tt_uuid REPLICASET_UUID;
+/** Name of the replicaset. */
+extern char REPLICASET_NAME[];
 /** Name of the entire cluster with all its replicasets. */
 extern char CLUSTER_NAME[];
 

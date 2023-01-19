@@ -3921,6 +3921,19 @@ on_commit_replicaset_uuid(struct trigger *trigger, void * /* event */)
 	return 0;
 }
 
+/** Set replicaset name on _schema commit. */
+static int
+on_commit_replicaset_name(struct trigger *trigger, void * /* event */)
+{
+	const char *name = (typeof(name))trigger->data;
+	if (strcmp(REPLICASET_NAME, name) == 0)
+		return 0;
+	strlcpy(REPLICASET_NAME, name, NODE_NAME_SIZE_MAX);
+	box_broadcast_id();
+	say_info("replicaset name: %s", node_name_str(name));
+	return 0;
+}
+
 static int
 on_commit_dd_version(struct trigger *trigger, void * /* event */)
 {
@@ -4138,6 +4151,32 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 		memcpy(name_copy, name, size);
 		struct trigger *on_commit = txn_alter_trigger_new(
 			on_commit_cluster_name, name_copy);
+		if (on_commit == NULL)
+			return -1;
+		txn_stmt_on_commit(stmt, on_commit);
+	} else if (strcmp(key, "replicaset_name") == 0) {
+		char name[NODE_NAME_SIZE_MAX];
+		const char *field_name = "_schema['replicaset_name'].value";
+		if (tuple_field_node_name(name, new_tuple,
+					  BOX_SCHEMA_FIELD_VALUE,
+					  field_name) != 0)
+			return -1;
+		if (box_is_configured() && *REPLICASET_NAME != 0 &&
+		    strcmp(name, REPLICASET_NAME) != 0) {
+			if (!box_is_force_recovery) {
+				diag_set(ClientError, ER_UNSUPPORTED,
+					 "Tarantool", "replicaset name change "
+					 "(without 'force_recovery')");
+				return -1;
+			}
+			say_info("replicaset name mismatch, "
+				 "ignore due to 'force_recovery'");
+		}
+		size_t size = strlen(name) + 1;
+		char *name_copy = (char *)xregion_alloc(&txn->region, size);
+		memcpy(name_copy, name, size);
+		struct trigger *on_commit = txn_alter_trigger_new(
+			on_commit_replicaset_name, name_copy);
 		if (on_commit == NULL)
 			return -1;
 		txn_stmt_on_commit(stmt, on_commit);

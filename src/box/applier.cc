@@ -2313,6 +2313,7 @@ applier_subscribe(struct applier *applier)
 		vclock_create(&req.vclock);
 	});
 	req.replicaset_uuid = REPLICASET_UUID;
+	strlcpy(req.replicaset_name, REPLICASET_NAME, NODE_NAME_SIZE_MAX);
 	req.instance_uuid = INSTANCE_UUID;
 	req.version_id = tarantool_version_id();
 	req.is_anon = box_is_anon();
@@ -2356,6 +2357,20 @@ applier_subscribe(struct applier *applier)
 			tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
 				  tt_uuid_str(&rsp.replicaset_uuid),
 				  tt_uuid_str(&REPLICASET_UUID));
+		}
+		if (*REPLICASET_NAME != 0 &&
+		    strcmp(rsp.replicaset_name, REPLICASET_NAME) != 0) {
+			if (!box_is_force_recovery) {
+				const char *expected = node_name_str(
+					REPLICASET_NAME);
+				const char *got = node_name_str(
+					rsp.replicaset_name);
+				tnt_raise(ClientError,
+					  ER_REPLICASET_NAME_MISMATCH, expected,
+					  got);
+			}
+			say_info("replicaset name mismatch allowed by "
+				 "'force_recovery'");
 		}
 		say_info("subscribed");
 		say_info("remote vclock %s local vclock %s",

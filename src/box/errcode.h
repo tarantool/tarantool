@@ -320,6 +320,7 @@ struct errcode_record {
 	/*265 */_(ER_WRONG_FUNCTION_OPTIONS,	"Wrong function options: %s") \
 	/*266 */_(ER_MISSING_SYSTEM_SPACES,	"Snapshot has no system spaces") \
 	/*267 */_(ER_CLUSTER_NAME_MISMATCH,	"Cluster name mismatch: expected %s, got %s") \
+	/*268 */_(ER_REPLICASET_NAME_MISMATCH,	"Replicaset name mismatch: expected %s, got %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

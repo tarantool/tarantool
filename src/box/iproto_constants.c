@@ -152,6 +152,7 @@ const unsigned char iproto_key_type[iproto_key_MAX] =
 	/* 0x59 */	MP_UINT, /* IPROTO_TXN_ISOLATION */
 	/* 0x5a */	MP_UINT, /* IPROTO_VCLOCK_SYNC */
 	/* 0x5b */	MP_STR, /* IPROTO_AUTH_TYPE */
+	/* 0x5c */	MP_STR, /* IPROTO_REPLICASET_NAME */
 	/* }}} */
 };
 

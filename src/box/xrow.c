@@ -252,6 +252,22 @@ xrow_decode_uuid(const char **pos, struct tt_uuid *out)
 	return 0;
 }
 
+/** Decode an optional node name. */
+static inline int
+xrow_decode_node_name(const char **pos, char *out)
+{
+	enum mp_type type = mp_typeof(**pos);
+	if (type != MP_STR)
+		return -1;
+	uint32_t len;
+	const char *str = mp_decode_str(pos, &len);
+	if (!node_name_is_valid_n(str, len))
+		return -1;
+	memcpy(out, str, len);
+	out[len] = 0;
+	return 0;
+}
+
 void
 xrow_header_encode(const struct xrow_header *header, uint64_t sync,
 		   size_t fixheader_len, struct iovec *out, int *iovcnt)
@@ -1914,6 +1930,8 @@ xrow_decode_ballot_event(const struct watch_request *req,
 struct replication_request {
 	/** IPROTO_REPLICASET_UUID. */
 	struct tt_uuid *replicaset_uuid;
+	/** IPROTO_REPLICASET_NAME. */
+	char *replicaset_name;
 	/** IPROTO_INSTANCE_UUID. */
 	struct tt_uuid *instance_uuid;
 	/** IPROTO_VCLOCK. */
@@ -1944,6 +1962,11 @@ xrow_encode_replication_request(struct xrow_header *row,
 		++map_size;
 		data = mp_encode_uint(data, IPROTO_REPLICASET_UUID);
 		data = xrow_encode_uuid(data, req->replicaset_uuid);
+	}
+	if (req->replicaset_name != NULL && *req->replicaset_name != 0) {
+		++map_size;
+		data = mp_encode_uint(data, IPROTO_REPLICASET_NAME);
+		data = mp_encode_str0(data, req->replicaset_name);
 	}
 	if (req->instance_uuid != NULL) {
 		++map_size;
@@ -2018,6 +2041,16 @@ xrow_decode_replication_request(const struct xrow_header *row,
 			if (xrow_decode_uuid(&d, req->replicaset_uuid) != 0) {
 				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
 						   "replicaset UUID");
+				return -1;
+			}
+			break;
+		case IPROTO_REPLICASET_NAME:
+			if (req->replicaset_name == NULL)
+				goto skip;
+			if (xrow_decode_node_name(
+				&d, req->replicaset_name) != 0) {
+				xrow_on_decode_err(row, ER_INVALID_MSGPACK,
+						   "invalid REPLICASET_NAME");
 				return -1;
 			}
 			break;
@@ -2115,6 +2148,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 	struct subscribe_request *cast = (struct subscribe_request *)req;
 	const struct replication_request base_req = {
 		.replicaset_uuid = &cast->replicaset_uuid,
+		.replicaset_name = cast->replicaset_name,
 		.instance_uuid = &cast->instance_uuid,
 		.vclock = &cast->vclock,
 		.is_anon = &cast->is_anon,
@@ -2131,6 +2165,7 @@ xrow_decode_subscribe(const struct xrow_header *row,
 	memset(req, 0, sizeof(*req));
 	struct replication_request base_req = {
 		.replicaset_uuid = &req->replicaset_uuid,
+		.replicaset_name = req->replicaset_name,
 		.instance_uuid = &req->instance_uuid,
 		.vclock = &req->vclock,
 		.version_id = &req->version_id,
@@ -2407,6 +2442,7 @@ xrow_encode_subscribe_response(struct xrow_header *row,
 	struct subscribe_response *cast = (struct subscribe_response *)rsp;
 	const struct replication_request base_req = {
 		.replicaset_uuid = &cast->replicaset_uuid,
+		.replicaset_name = cast->replicaset_name,
 		.vclock = &cast->vclock,
 	};
 	xrow_encode_replication_request(row, &base_req, IPROTO_OK);
@@ -2419,6 +2455,7 @@ xrow_decode_subscribe_response(const struct xrow_header *row,
 	memset(rsp, 0, sizeof(*rsp));
 	struct replication_request base_req = {
 		.replicaset_uuid = &rsp->replicaset_uuid,
+		.replicaset_name = rsp->replicaset_name,
 		.vclock = &rsp->vclock,
 	};
 	return xrow_decode_replication_request(row, &base_req);

@@ -1959,6 +1959,9 @@ local function check_names_are_not_set(issue_handler)
     if _schema:get{'cluster_name'} ~= nil then
         issue_handler('Cluster %s', msg_suffix)
     end
+    if _schema:get{'replicaset_name'} ~= nil then
+        issue_handler('Replicaset %s', msg_suffix)
+    end
 end
 
 local function downgrade_from_3_0_0(issue_handler)

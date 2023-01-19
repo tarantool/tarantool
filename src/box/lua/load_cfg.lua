@@ -152,6 +152,7 @@ local default_cfg = {
     replication         = nil,
     instance_uuid       = nil,
     replicaset_uuid     = nil,
+    replicaset_name     = nil,
     cluster_name        = nil,
     custom_proc_title   = nil,
     pid_file            = nil,
@@ -343,6 +344,7 @@ local template_cfg = {
     replication         = 'string, number, table',
     instance_uuid       = 'string',
     replicaset_uuid     = 'string',
+    replicaset_name     = 'string',
     cluster_name        = 'string',
     custom_proc_title   = 'string',
     pid_file            = 'string',
@@ -408,6 +410,7 @@ end
 -- options that require special handling
 local modify_cfg = {
     replication        = normalize_uri_list_for_replication,
+    replicaset_name    = normalize_node_name,
     cluster_name       = normalize_node_name,
 }
 
@@ -498,6 +501,7 @@ local dynamic_cfg = {
     bootstrap_strategy      = private.cfg_set_bootstrap_strategy,
     instance_uuid           = check_instance_uuid,
     replicaset_uuid         = check_replicaset_uuid,
+    replicaset_name         = private.cfg_set_replicaset_name,
     cluster_name            = private.cfg_set_cluster_name,
     net_msg_max             = private.cfg_set_net_msg_max,
     sql_cache_size          = private.cfg_set_sql_cache_size,
@@ -660,6 +664,7 @@ local dynamic_cfg_skip_at_load = {
     force_recovery          = true,
     instance_uuid           = true,
     replicaset_uuid         = true,
+    replicaset_name         = true,
     cluster_name            = true,
     net_msg_max             = true,
     readahead               = true,

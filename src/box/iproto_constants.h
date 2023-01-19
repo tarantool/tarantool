@@ -193,6 +193,7 @@ extern const size_t iproto_flag_constants_size;
 	 * authentication method.
 	 */								\
 	_(IPROTO_AUTH_TYPE, 0x5b)					\
+	_(IPROTO_REPLICASET_NAME, 0x5c)					\
 
 ENUM(iproto_key, IPROTO_KEYS);
 /**

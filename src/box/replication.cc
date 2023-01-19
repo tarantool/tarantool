@@ -47,6 +47,7 @@
 uint32_t instance_id = REPLICA_ID_NIL;
 struct tt_uuid INSTANCE_UUID;
 struct tt_uuid REPLICASET_UUID;
+char REPLICASET_NAME[NODE_NAME_SIZE_MAX];
 char CLUSTER_NAME[NODE_NAME_SIZE_MAX];
 
 struct uri_set replication_uris;

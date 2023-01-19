@@ -923,6 +923,13 @@ g.test_downgrade_global_names = function(cg)
         box.space._schema:delete{'cluster_name'}
         box.cfg{
             cluster_name = box.NULL,
+            replicaset_name = 'test'
+        }
+        issues = box.schema.downgrade_issues(prev_version)
+        t.assert_str_contains(issues[1], 'Replicaset name is set')
+        box.space._schema:delete{'replicaset_name'}
+        box.cfg{
+            replicaset_name = box.NULL,
             force_recovery = false,
         }
         box.schema.downgrade(prev_version)
