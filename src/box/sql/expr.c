@@ -292,7 +292,7 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 		if (op == TK_COLLATE ||
 		    (op == TK_REGISTER && p->op2 == TK_COLLATE)) {
 			*coll = sql_get_coll_seq(parse, p->u.zToken, coll_id);
-			if (coll == NULL)
+			if (*coll == NULL)
 				return -1;
 			*is_explicit_coll = true;
 			break;
