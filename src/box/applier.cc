@@ -1382,6 +1382,7 @@ apply_plain_tx(uint32_t replica_id, struct stailq *rows,
 	struct applier_tx_row *item;
 	if (txn == NULL)
 		 return -1;
+	txn->isolation = TXN_ISOLATION_READ_COMMITTED;
 
 	stailq_foreach_entry(item, rows, next) {
 		struct xrow_header *row = &item->row;
