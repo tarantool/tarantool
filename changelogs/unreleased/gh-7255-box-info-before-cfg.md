@@ -1,3 +1,3 @@
 ## feature/core
 
-* box.info() can be called before box.cfg() (gh-7255).
+* `box.info()` can now be called before `box.cfg()` (gh-7255).

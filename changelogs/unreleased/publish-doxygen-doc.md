@@ -1,3 +1,4 @@
 ## feature/doxygen
 
-* Doxygen API documentation published automatically on every merge to master branch.
+* Doxygen module API documentation is now published automatically on every merge
+  to the `master` branch.

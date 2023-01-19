@@ -1,3 +1,3 @@
 ## feature/sql
 
-* Functions of type SQL_EXPR were introduced (gh-6986).
+* Introduced a new function type `SQL_EXPR` (gh-6986).

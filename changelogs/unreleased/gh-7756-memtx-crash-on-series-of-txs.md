@@ -1,3 +1,3 @@
 ## bugfix/memtx
 
-* Fixed crash on series of transactions in memtx (gh-7756).
+* Fixed a crash on series of transactions in memtx (gh-7756).

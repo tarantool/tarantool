@@ -1,11 +1,11 @@
 ## feature/lua/datetime
 
-* Enabled support for timezone names in the constructor and `date:set{}` modifier
-  via `tz` attribute. Currently, only timezone name abbreviations
+* Enabled support for timezone names in the constructor and the `date:set{}`
+  modifier using the `tz` attribute. Currently, only timezone name abbreviations
   are supported (gh-7076).
 
   Timezone abbreviations can be used in addition to the timezone offset.
-  They can be used during constructing or modifying a date object, or while
+  You can use them when constructing or modifying a date object, or while
   parsing datetime literals. Numeric time offsets and named abbreviations
   produce equivalent datetime values:
 
@@ -18,6 +18,5 @@
   d2:set{tz = 'MSK'}
   ```
 
-  Note that the timezone name parser fails if one uses ambiguous names,
+  Note that the timezone name parser fails if you use ambiguous names,
   which could not be translated into timezone offsets directly (for example, 'AT').
-

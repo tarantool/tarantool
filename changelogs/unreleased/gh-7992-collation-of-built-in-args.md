@@ -1,3 +1,4 @@
 ## bugfix/sql
 
-* Collation no longer mangles the type of built-in function argument (gh-7992).
+* Fixed a bug when collation could change the type of a built-in function
+  argument (gh-7992).

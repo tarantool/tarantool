@@ -1,3 +1,3 @@
 ## bugfix/uri
 
-* Optimized addition of parameters and parameter values (gh-7155).
+* Optimized addition of URI parameters and their values (gh-7155).
