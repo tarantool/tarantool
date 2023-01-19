@@ -1,11 +1,11 @@
-local compat = require('tarantool').compat
-local json = require('json')
-local popen = require('popen')
-local clock = require('clock')
+local server = require('luatest.server')
 local t = require('luatest')
-local g = t.group()
 
-g.test_json_encode = function()
+local function server_test_json_encode()
+    local compat = require('tarantool').compat
+    local json = require('json')
+    local t = require('luatest')
+
     -- Test that '/' is escaped with default setting.
     t.assert_equals(json.encode({url = 'https://srv:7777'}),
                     '{"url":"https:\\/\\/srv:7777"}')
@@ -44,7 +44,11 @@ g.test_json_encode = function()
                     [["\/home\/user\/tarantool"]])
 end
 
-g.test_json_new_encode = function()
+local function server_test_json_new_encode()
+    local compat = require('tarantool').compat
+    local json = require('json')
+    local t = require('luatest')
+
     compat.json_escape_forward_slash = 'old'
     -- Test that '/' is escaped with 'old' setting.
     t.assert_equals(json.encode('/'), [["\/"]])
@@ -67,7 +71,11 @@ end
 
 -- log.info in json format mode uses internal encoder that takes msgpuck
 -- char2escape table, while mp_char2escape is changed by compat.
-g.test_mp_encode = function()
+local function popen_test_mp_encode()
+    local popen = require('popen')
+    local clock = require('clock')
+    local t = require('luatest')
+
     -- Start external tarantool session.
     local TARANTOOL_PATH = arg[-1]
     local cmd = TARANTOOL_PATH .. ' -i 2>&1'
@@ -116,4 +124,19 @@ g.test_mp_encode = function()
     t.assert_str_contains(output, '"message": "/"')
 
     ph:close()
+end
+
+local tests = {
+    server_test_json_encode,
+    server_test_json_new_encode,
+    popen_test_mp_encode,
+}
+
+local g = t.group('pgroup', t.helpers.matrix{test_func = tests})
+
+g.test_json_encode = function(cg)
+    local s = server:new{alias = 'default'}
+    s:start()
+    s:exec(cg.params.test_func)
+    s:stop()
 end

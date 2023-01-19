@@ -1,9 +1,10 @@
-local compat = require('tarantool').compat
+local server = require('luatest.server')
 local t = require('luatest')
-local g = t.group()
-local fiber = require('fiber')
 
-g.test_channel_close_default = function()
+local function server_test_channel_close_default()
+    local fiber = require('fiber')
+    local t = require('luatest')
+
     -- No graceful close (old) by default.
     local ch = fiber.channel(10)
     ch:put('one')
@@ -15,48 +16,40 @@ g.test_channel_close_default = function()
     t.assert_equals(ch:get(), nil)
 end
 
-g.test_channel_close_old = function()
-    compat.fiber_channel_close_mode = 'old'
-    local ch = fiber.channel(10)
-    ch:put('one')
-    ch:put('two')
-    t.assert_equals(ch:get(), 'one')
-    ch:close()
-    t.assert(ch:is_closed())
-    t.assert_not(ch:put('three'))
-    t.assert_equals(ch:get(), nil)
-end
+local function server_test_channel_close(mode)
+    local compat = require('tarantool').compat
+    local fiber = require('fiber')
+    local t = require('luatest')
 
-g.test_channel_close_new = function()
     -- Graceful close (new) selected.
-    compat.fiber_channel_close_mode = 'new'
+    compat.fiber_channel_close_mode = mode
     local ch = fiber.channel(10)
     ch:put('one')
     ch:put('two')
+    ch:put('three')
+
+    t.assert_equals(ch:get(), 'one')
     ch:close()
 
     t.assert(ch:is_closed())
-    t.assert_not(ch:put('three'))
+    t.assert_not(ch:put('four'))
 
-    t.assert_equals(ch:get(), 'one')
-    t.assert(ch:is_closed())
+    if mode == 'new' then
+        t.assert_equals(ch:get(), 'two')
+        t.assert(ch:is_closed())
 
-    t.assert_equals(ch:get(), 'two')
-    t.assert(ch:is_closed())
+        t.assert_equals(ch:get(), 'three')
+        t.assert(ch:is_closed())
+    end
 
     t.assert_equals(ch:get(), nil)
 end
 
-g.test_close_graceful_on_empty = function()
-    compat.fiber_channel_close_mode = 'new'
-    local ch = fiber.channel(10)
-    ch:put('one')
-    ch:get()
-    ch:close()
-    t.assert(ch:is_closed())
-end
+local server_test_close_reader_payload = function(mode)
+    local compat = require('tarantool').compat
+    local fiber = require('fiber')
+    local t = require('luatest')
 
-local test_close_reader_payload = function(mode)
     compat.fiber_channel_close_mode = mode
     local ch = fiber.channel(0)
     local reader = fiber.new(function()
@@ -86,15 +79,11 @@ local test_close_reader_payload = function(mode)
     t.assert(status, err)
 end
 
-g.test_close_reader_old = function()
-    test_close_reader_payload('old')
-end
+local server_test_close_writer_payload = function(mode)
+    local compat = require('tarantool').compat
+    local fiber = require('fiber')
+    local t = require('luatest')
 
-g.test_close_reader_new = function()
-    test_close_reader_payload('new')
-end
-
-local test_close_writer_payload = function(mode)
     compat.fiber_channel_close_mode = mode
     local ch = fiber.channel(0)
     local writer = fiber.new(function()
@@ -124,10 +113,19 @@ local test_close_writer_payload = function(mode)
     t.assert(status, err)
 end
 
-g.test_close_writer_old = function()
-    test_close_writer_payload('old')
-end
+local tests = {
+    server_test_channel_close,
+    server_test_channel_close_default,
+    server_test_close_writer_payload,
+    server_test_close_reader_payload,
+}
 
-g.test_close_writer_new = function()
-    test_close_writer_payload('new')
+local g = t.group('pgroup', t.helpers.matrix{test_func = tests,
+                                             mode = {'new', 'old'}})
+
+g.test_fiber_close = function(cg)
+    local s = server:new{alias = 'default'}
+    s:start()
+    s:exec(cg.params.test_func, {cg.params.mode})
+    s:stop()
 end
