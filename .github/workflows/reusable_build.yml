@@ -38,7 +38,7 @@ jobs:
           submodules: recursive
       - name: 'Get the commit SHA'
         id: get_sha
-        run: echo "::set-output name=sha::$(git log -1 --format='%H')"
+        run: echo "sha=$(git log -1 --format='%H')" >> $GITHUB_OUTPUT
       - uses: ./.github/actions/environment
       - name: 'Build tarantool packages for ${{ env.OS }}(${{ env.DIST }})'
         id: run_build
