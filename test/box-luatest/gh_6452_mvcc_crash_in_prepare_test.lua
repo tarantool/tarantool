@@ -2,17 +2,17 @@ local server = require('luatest.server')
 local t = require('luatest')
 local g = t.group()
 
-g.before_all = function()
+g.before_all(function()
     g.server = server:new{
         alias   = 'default',
         box_cfg = {memtx_use_mvcc_engine = true}
     }
     g.server:start()
-end
+end)
 
-g.after_all = function()
+g.after_all(function()
     g.server:drop()
-end
+end)
 
 g.before_each(function()
     g.server:exec(function()

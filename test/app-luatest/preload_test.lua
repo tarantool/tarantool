@@ -51,7 +51,7 @@ local tempdirs = {}
 -- Remove all temporary directories created by the test
 -- unless KEEP_DATA environment variable is set to a
 -- non-empty value.
-g.after_all = function()
+g.after_all(function()
     local dirs = table.copy(tempdirs)
     tempdirs = {}
 
@@ -65,7 +65,7 @@ g.after_all = function()
             fio.rmtree(dir)
         end
     end
-end
+end)
 
 -- Generate a script that follows SCRIPT_TEMPLATE and
 -- write it at given script file path in given directory.

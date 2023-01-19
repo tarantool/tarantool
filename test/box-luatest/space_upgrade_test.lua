@@ -2,17 +2,17 @@ local server = require('luatest.server')
 local t = require('luatest')
 local g = t.group()
 
-g.before_all = function()
+g.before_all(function()
     g.server = server:new({alias = 'master'})
     g.server:start()
     g.server:exec(function()
         box.schema.create_space('test')
     end)
-end
+end)
 
-g.after_all = function()
+g.after_all(function()
     g.server:stop()
-end
+end)
 
 g.test_low_level_api = function()
     t.tarantool.skip_if_enterprise()

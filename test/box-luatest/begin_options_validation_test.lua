@@ -3,16 +3,16 @@ local t = require("luatest")
 
 local g = t.group("begin-options-validation")
 
-g.before_all = function()
+g.before_all(function()
     g.server = server:new{
         alias = "default",
     }
     g.server:start()
-end
+end)
 
-g.after_all = function()
+g.after_all(function()
     g.server:drop()
-end
+end)
 
 g.test_begin_options_validation = function()
     g.server:exec(function()

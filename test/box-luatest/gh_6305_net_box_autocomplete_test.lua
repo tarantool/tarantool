@@ -4,17 +4,17 @@ local g = t.group()
 local net = require('net.box')
 local console = require('console')
 
-g.before_all = function()
+g.before_all(function()
     g.server = server:new({alias = 'master'})
     g.server:start()
     g.server:exec(function()
         box.schema.create_space('space1'):create_index('primary')
     end)
-end
+end)
 
-g.after_all = function()
+g.after_all(function()
     g.server:stop()
-end
+end)
 
 local function tabcomplete(s)
     return console.completion_handler(s, 0, #s)
