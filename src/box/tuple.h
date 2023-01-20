@@ -77,7 +77,6 @@ tuple_arena_destroy(struct slab_arena *arena);
 
 /**
  * Creates a new format for standalone tuples.
- *
  * Tuples created with the new format are allocated from the runtime arena.
  * In contrast to the preallocated tuple_format_runtime, which has no field
  * names, the new format uses the provided field name dictionary.
@@ -250,7 +249,7 @@ box_tuple_iterator_t *
 box_tuple_iterator(box_tuple_t *tuple);
 
 /**
- * Destroy and free tuple iterator
+ * Destroy and free tuple iterator.
  */
 void
 box_tuple_iterator_free(box_tuple_iterator_t *it);
@@ -258,8 +257,8 @@ box_tuple_iterator_free(box_tuple_iterator_t *it);
 /**
  * Return zero-based next position in iterator.
  * That is, this function return the field id of field that will be
- * returned by the next call to box_tuple_next(it). Returned value is zero
- * after initialization or rewind and box_tuple_field_count(tuple)
+ * returned by the next call to box_tuple_next(). Returned value is zero
+ * after initialization or rewind and box_tuple_field_count()
  * after the end of iteration.
  *
  * \param it tuple iterator
@@ -281,7 +280,7 @@ box_tuple_rewind(box_tuple_iterator_t *it);
  * Seek the tuple iterator.
  *
  * The returned buffer is valid until next call to box_tuple_* API.
- * Requested fieldno returned by next call to box_tuple_next(it).
+ * Requested fieldno returned by next call to box_tuple_next().
  *
  * \param it tuple iterator
  * \param fieldno - zero-based position in MsgPack array.
@@ -320,9 +319,46 @@ box_tuple_next(box_tuple_iterator_t *it);
 box_tuple_t *
 box_tuple_new(box_tuple_format_t *format, const char *data, const char *end);
 
+/**
+ * Update a tuple.
+ *
+ * Function returns a copy of tuple with updated fields.
+ * Pay attention that original tuple is left without changes.
+ *
+ * @param tuple Tuple to update.
+ * @param expr MessagePack array of operations.
+ * @param expr_end End of the @a expr.
+ *
+ * @retval NULL The tuple was not updated.
+ * @retval box_tuple_t A copy of original tuple with updated fields.
+ *
+ * @sa box_update()
+ */
 box_tuple_t *
 box_tuple_update(box_tuple_t *tuple, const char *expr, const char *expr_end);
 
+/**
+ * Update a tuple.
+ *
+ * The same as box_tuple_update(), but ignores errors. In case of an error the
+ * tuple is left intact, but an error message is printed. Only client errors are
+ * ignored, such as a bad field type, or wrong field index/name. System errors,
+ * such as OOM, are not ignored and raised just like with a normal
+ * box_tuple_update(). Note that only bad operations are ignored. All correct
+ * operations are applied.
+ *
+ * Despite the function name (upsert, update and insert), the function does not
+ * insert any tuple.
+ *
+ * @param tuple Tuple to update.
+ * @param expr MessagePack array of operations.
+ * @param expr_end End of the @a expr.
+ *
+ * @retval NULL The tuple was not updated.
+ * @retval box_tuple_t A copy of original tuple with updated fields.
+ *
+ * @sa box_upsert()
+ */
 box_tuple_t *
 box_tuple_upsert(box_tuple_t *tuple, const char *expr, const char *expr_end);
 

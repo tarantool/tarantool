@@ -122,6 +122,8 @@ box_error_clear(void);
 /**
  * Set the last error.
  *
+ * \param file file name, usually __FILE__ macro
+ * \param line line number in the file, usually __LINE__ macro
  * \param code IPROTO error code (enum \link box_error_code \endlink)
  * \param format (const char * ) - printf()-like format string
  * \param ... - format arguments

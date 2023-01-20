@@ -151,7 +151,7 @@ luaL_tocpointer(lua_State *L, int idx, uint32_t *ctypeid);
 /**
  * Checks whether a value on the Lua stack is a cdata.
  *
- * Unlike <luaL_checkcdata>() this function does not raise an
+ * Unlike luaL_checkcdata() this function does not raise an
  * error. It is useful to raise a domain specific error.
  *
  * Lua API and module API don't expose LUA_TCDATA constant.
@@ -332,7 +332,7 @@ luaT_setmodule(struct lua_State *L, const char *modname);
 /** \cond public */
 
 /**
- * Push uint64_t onto the stack
+ * Push uint64_t onto the stack.
  *
  * @param L is a Lua State
  * @param val is a value to push
@@ -341,7 +341,7 @@ LUA_API void
 luaL_pushuint64(struct lua_State *L, uint64_t val);
 
 /**
- * Push int64_t onto the stack
+ * Push int64_t onto the stack.
  *
  * @param L is a Lua State
  * @param val is a value to push
@@ -388,9 +388,12 @@ luaL_toint64(struct lua_State *L, int idx);
 LUA_API int
 luaT_call(lua_State *L, int nargs, int nreturns);
 
-/*
+/**
  * Like luaL_dostring(), but in case of error sets fiber diag instead
  * of putting error on stack.
+ *
+ * @param L Lua state
+ * @param str string with Lua code to load and run
  */
 int
 luaT_dostring(struct lua_State *L, const char *str);
