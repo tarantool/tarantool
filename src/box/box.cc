@@ -3704,8 +3704,13 @@ box_iproto_override(uint32_t req_type, iproto_handler_t handler,
 	return iproto_override(req_type, handler, destroy, ctx);
 }
 
-static inline void
-box_register_replica(uint32_t id, const struct tt_uuid *uuid)
+/**
+ * Insert replica record into _cluster space, bypassing all checks like whether
+ * the instance is writable. It makes the function usable by bootstrap master
+ * when it is read-only but has to register self.
+ */
+static void
+box_insert_replica_record(uint32_t id, const struct tt_uuid *uuid)
 {
 	if (boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "[%u%s]",
 		 (unsigned) id, tt_uuid_str(uuid)) != 0)
@@ -3715,17 +3720,11 @@ box_register_replica(uint32_t id, const struct tt_uuid *uuid)
 		say_warn("Replica ID is changed by a trigger");
 }
 
-/**
- * @brief Called when recovery/replication wants to add a new
- * replica to the replica set.
- * replica_set_id() is called as a commit trigger on _cluster
- * space and actually adds the replica to the replica set.
- * @param instance_uuid
- */
+/** Register a new replica if not already registered. */
 static void
-box_on_join(const tt_uuid *instance_uuid)
+box_register_replica(const struct tt_uuid *uuid)
 {
-	struct replica *replica = replica_by_uuid(instance_uuid);
+	struct replica *replica = replica_by_uuid(uuid);
 	if (replica != NULL && replica->id != REPLICA_ID_NIL)
 		return; /* nothing to do - already registered */
 
@@ -3733,7 +3732,7 @@ box_on_join(const tt_uuid *instance_uuid)
 	uint32_t replica_id;
 	if (replica_find_new_id(&replica_id) != 0)
 		diag_raise();
-	box_register_replica(replica_id, instance_uuid);
+	box_insert_replica_record(replica_id, uuid);
 }
 
 void
@@ -3841,12 +3840,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 
 	say_info("registering replica %s at %s",
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
-
-	/**
-	 * Call the server-side hook which stores the replica uuid
-	 * in _cluster space.
-	 */
-	box_on_join(&req.instance_uuid);
+	box_register_replica(&req.instance_uuid);
 
 	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
 
@@ -3988,14 +3982,11 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	struct vclock start_vclock;
 	relay_initial_join(io, header->sync, &start_vclock, req.version_id);
 	say_info("initial data sent.");
-
 	/**
-	 * Call the server-side hook which stores the replica uuid
-	 * in _cluster space after sending the last row but before
-	 * sending OK - if the hook fails, the error reaches the
-	 * client.
+	 * Register the replica after sending the last row but before sending
+	 * OK - if the registration fails, the error reaches the client.
 	 */
-	box_on_join(&req.instance_uuid);
+	box_register_replica(&req.instance_uuid);
 
 	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
 
@@ -4343,9 +4334,7 @@ bootstrap_master(void)
 	engine_bootstrap_xc();
 
 	uint32_t replica_id = 1;
-
-	/* Register the first replica in the replica set */
-	box_register_replica(replica_id, &INSTANCE_UUID);
+	box_insert_replica_record(replica_id, &INSTANCE_UUID);
 	assert(replica_by_uuid(&INSTANCE_UUID)->id == 1);
 
 	/* Set UUID of a new replica set */
