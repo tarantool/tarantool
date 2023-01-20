@@ -73,6 +73,9 @@ enum field_type {
 	field_type_MAX
 };
 
+/**
+ * Possible actions on conflict.
+ */
 enum on_conflict_action {
 	ON_CONFLICT_ACTION_NONE = 0,
 	ON_CONFLICT_ACTION_ROLLBACK,

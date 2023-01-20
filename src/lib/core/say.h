@@ -69,6 +69,9 @@ enum say_format {
 	say_format_MAX
 };
 
+/**
+ * Logging level.
+ */
 extern int log_level;
 
 /**
@@ -79,6 +82,9 @@ extern void
 (*log_write_flightrec)(int level, const char *filename, int line,
 		       const char *error, const char *format, va_list ap);
 
+/**
+ * Function checks whether passed log level is enabled.
+ */
 static inline bool
 say_log_level_is_enabled(int level)
 {

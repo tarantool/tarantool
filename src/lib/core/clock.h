@@ -44,7 +44,7 @@ extern "C" {
  * A settable system-wide clock that measures real (i.e.,
  * wall-clock) time.
  *
- * See clock_gettime(2), CLOCK_REALTIME.
+ * \sa clock_gettime(2), CLOCK_REALTIME.
  */
 double
 clock_realtime(void);
@@ -52,7 +52,7 @@ clock_realtime(void);
 /**
  * A nonsettable system-wide clock that represents monotonic time.
  *
- * See clock_gettime(2), CLOCK_MONOTONIC.
+ * \sa clock_gettime(2), CLOCK_MONOTONIC.
  */
 double
 clock_monotonic(void);
@@ -61,7 +61,7 @@ clock_monotonic(void);
  * A clock that measures CPU time consumed by this process (by all
  * threads in the process).
  *
- * See clock_gettime(2), CLOCK_PROCESS_CPUTIME_ID.
+ * \sa clock_gettime(2), CLOCK_PROCESS_CPUTIME_ID.
  */
 double
 clock_process(void);
@@ -69,7 +69,7 @@ clock_process(void);
 /**
  * A clock that measures CPU time consumed by this thread.
  *
- * See clock_gettime(2), CLOCK_THREAD_CPUTIME_ID.
+ * \sa clock_gettime(2), CLOCK_THREAD_CPUTIME_ID.
  */
 double
 clock_thread(void);

@@ -147,12 +147,28 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
 #ifndef __has_feature
 #  define __has_feature(x) 0
 #endif
+/**
+ * The special operator __has_builtin (operand) may be used in constant integer
+ * contexts and in preprocessor "#if" and "#elif" expressions to test whether
+ * the symbol named by its operand is recognized as a built-in function by GCC
+ * in the current language and conformance mode.
+ */
 #ifndef __has_builtin
 #  define __has_builtin(x) 0
 #endif
+/**
+ * The special operator __has_attribute (operand) may be used in "#if"
+ * and "#elif" expressions to test whether the attribute referenced by its
+ * operand is recognized by GCC.
+ */
 #ifndef __has_attribute
 #  define __has_attribute(x) 0
 #endif
+/**
+ * The special operator __has_cpp_attribute (operand) may be used in "#if" and
+ * "#elif" expressions in C++ code to test whether the attribute referenced by
+ * it operand is recognized by GCC.
+ */
 #ifndef __has_cpp_attribute
 #  define __has_cpp_attribute(x) 0
 #endif
@@ -169,12 +185,17 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
  * You may use likely()/unlikely() to provide the compiler with branch
  * prediction information.
  */
-
 #if __has_builtin(__builtin_expect) || defined(__GNUC__)
 #  define likely(x)    __builtin_expect(!! (x),1)
 #  define unlikely(x)  __builtin_expect(!! (x),0)
 #else
 #  define likely(x)    (x)
+/**
+ * You may use likely()/unlikely() to provide the compiler with branch
+ * prediction information.
+ *
+ * @sa https://en.cppreference.com/w/cpp/language/attributes/likely
+ */
 #  define unlikely(x)  (x)
 #endif
 
@@ -242,7 +263,11 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
  *
  * Sic: alignas() doesn't work on anonymous structs on gcc < 4.9
  *
- * \example struct obuf { int a; int b; alignas(16) int c; };
+ * Example:
+ *
+ * \code
+ * struct obuf { int a; int b; alignas(16) int c; };
+ * \endcode
  */
 #if defined(__cplusplus)
 #  include <stdalign.h>
@@ -258,20 +283,24 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
 #  endif
 #endif
 
-/**
- * C11/C++11 operator. Returns the alignment, in bytes, required for any
- * instance of the type indicated by type-id, which is either complete type,
- * an array type, or a reference type.
- */
 #if !defined(alignof) && !defined(__alignof_is_defined)
 #  if __has_feature(c_alignof) || (defined(__GNUC__) && __GNUC__ >= 5)
 #    include <stdalign.h>
 #  elif defined(__GNUC__)
 #    define alignof(_T) __alignof(_T)
+/*! @cond Doxygen_Suppress */
 #    define __alignof_is_defined 1
+/*! @endcond */
 #  else
+/**
+ * C11/C++11 operator. Returns the alignment, in bytes, required for any
+ * instance of the type indicated by type-id, which is either complete type,
+ * an array type, or a reference type.
+ */
 #    define alignof(_T) offsetof(struct { char c; _T member; }, member)
+/*! @cond Doxygen_Suppress */
 #    define __alignof_is_defined 1
+/*! @endcond */
 #  endif
 #endif
 
@@ -293,7 +322,11 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
  * variable may exist solely for use in an assert() statement, which makes
  * the local variable unused when NDEBUG is defined.
  *
- * \example int fun(MAYBE_UNUSED int unused_arg);
+ * Example:
+ *
+ * \code
+ * int fun(MAYBE_UNUSED int unused_arg);
+ * \endcode
  */
 #if defined(__cplusplus) && __has_cpp_attribute(maybe_unused)
 #  define MAYBE_UNUSED [[maybe_unused]]
@@ -308,7 +341,11 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
  * the function call appears as a potentially-evaluated discarded-value
  * expression that is not explicitly cast to void.
  *
- * \example NODISCARD int function() { return -1 };
+ * Example:
+ *
+ * \code
+ * NODISCARD int function() { return -1 };
+ * \endcode
  */
 #if defined(__cplusplus) && __has_cpp_attribute(nodiscard)
 #  define NODISCARD [[nodiscard]]
@@ -322,7 +359,11 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
  * This function attribute prevents a function from being considered for
  * inlining.
  *
- * \example NOINLINE int function() { return 0; };
+ * Example:
+ *
+ * \code
+ * NOINLINE int function() { return 0; };
+ * \endcode
  */
 #if __has_attribute(noinline) || defined(__GNUC__)
 #  define NOINLINE __attribute__((noinline))
@@ -335,7 +376,11 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
  * The compiler will generate a diagnostic for a function declared as
  * NORETURN that appears to be capable of returning to its caller.
  *
- * \example NORETURN void abort();
+ * Example:
+ *
+ * \code
+ * NORETURN void abort();
+ * \endcode
  */
 #if defined(__cplusplus) && __has_cpp_attribute(noreturn)
 #  define NORETURN [[noreturn]]
@@ -391,7 +436,11 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
  * useful to save data size because of the relatively high cost of
  * unaligned access on some architectures.
  *
- * \example struct PACKED name { char a; int b; };
+ * Example:
+ *
+ * \code
+ * struct PACKED name { char a; int b; };
+ * \endcode
  */
 #if __has_attribute(packed) || defined(__GNUC__)
 #  define PACKED  __attribute__((packed))

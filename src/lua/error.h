@@ -59,6 +59,12 @@ luaT_error(lua_State *L);
 LUA_API int
 luaT_push_nil_and_error(lua_State *L);
 
+/**
+ * Push error to a Lua stack.
+ *
+ * @param L Lua stack.
+ * @param e error.
+ */
 void
 luaT_pusherror(struct lua_State *L, struct error *e);
 /** \endcond public */

@@ -200,8 +200,8 @@ fiber_attr_delete(struct fiber_attr *fiber_attr);
 /**
  * Set stack size for the fiber attribute.
  *
- * \param fiber_attribute fiber attribute container
- * \param stacksize stack size for new fibers
+ * \param fiber_attr fiber attribute container
+ * \param stack_size stack size for new fibers
  */
 API_EXPORT int
 fiber_attr_setstacksize(struct fiber_attr *fiber_attr, size_t stack_size);
@@ -209,7 +209,7 @@ fiber_attr_setstacksize(struct fiber_attr *fiber_attr, size_t stack_size);
 /**
  * Get stack size from the fiber attribute.
  *
- * \param fiber_attribute fiber attribute container or NULL for default
+ * \param fiber_attr fiber attribute container or NULL for default
  * \retval stack size
  */
 API_EXPORT size_t
@@ -240,7 +240,7 @@ fiber_self(void);
  * completes.
  *
  * \param name       string with fiber name
- * \param fiber_func func for run inside fiber
+ * \param f          func for run inside fiber
  *
  * \sa fiber_start
  */
@@ -259,7 +259,7 @@ fiber_new(const char *name, fiber_func f);
  *
  * \param name       string with fiber name
  * \param fiber_attr fiber attributes
- * \param fiber_func func for run inside fiber
+ * \param f          func for run inside fiber
  *
  * \sa fiber_start
  */
@@ -340,6 +340,7 @@ fiber_set_cancellable(bool yesno);
 
 /**
  * Set fiber to be joinable (false by default).
+ * \param fiber to (un)set the joinable property
  * \param yesno status to set
  */
 API_EXPORT void
@@ -363,7 +364,7 @@ fiber_join(struct fiber *f);
  * same as fiber_join function.
  * Return fiber execution status to the caller or -1
  * if timeout exceeded and set diag.
- * The fiber must not be detached (@sa fiber_set_joinable()).
+ * The fiber must not be detached @sa fiber_set_joinable()
  * @pre FIBER_IS_JOINABLE flag is set.
  *
  * \param f fiber to be woken up
@@ -378,7 +379,7 @@ fiber_join_timeout(struct fiber *f, double timeout);
  *
  * \param s time to sleep
  *
- * \note this is a cancellation point (\sa fiber_is_cancelled)
+ * \note this is a cancellation point \sa fiber_is_cancelled
  */
 API_EXPORT void
 fiber_sleep(double s);
@@ -424,10 +425,11 @@ fiber_clock64(void);
 API_EXPORT void
 fiber_reschedule(void);
 
+struct slab_cache;
+
 /**
  * Return slab_cache suitable to use with tarantool/small library
  */
-struct slab_cache;
 API_EXPORT struct slab_cache *
 cord_slab_cache(void);
 
@@ -439,21 +441,25 @@ cord_slab_cache(void);
  *
  * Typical usage is illustrated in the sketch below.
  *
- *  | size_t region_svp = box_region_used();
- *  | while (<...>) {
- *  |     char *buf = box_region_alloc(<...>);
- *  |     <...>
- *  | }
- *  | box_region_truncate(region_svp);
+ * \code
+ * size_t region_svp = box_region_used();
+ * while (<...>) {
+ *     char *buf = box_region_alloc(<...>);
+ *     <...>
+ * }
+ * box_region_truncate(region_svp);
+ * \endcode
  *
  * There are module API functions that return a result on
  * this region. In this case a caller is responsible to free the
  * result:
  *
- *  | size_t region_svp = box_region_used();
- *  | char *buf = box_<...>(<...>);
- *  | <...>
- *  | box_region_truncate(region_svp);
+ * \code
+ * size_t region_svp = box_region_used();
+ * char *buf = box_<...>(<...>);
+ * <...>
+ * box_region_truncate(region_svp);
+ * \endcode
  *
  * This API provides better compatibility guarantees over using
  * the small library directly in a module. A binary layout of
@@ -461,13 +467,13 @@ cord_slab_cache(void);
  * <box_region_*>() functions will remain API and ABI compatible.
  *
  * Each fiber has its own box region. It means that a call of,
- * say, <box_region_used>() will give its own value in different
+ * say, box_region_used() will give its own value in different
  * fibers. It also means that a yield does not invalidate data in
  * the box region.
  *
  * Prior to version 2.11, the box region was implicitly cleaned up
- * on transaction commit (see <box_txn_commit>()) so that
- * <box_region_truncate>() wasn't strictly necessary. Starting from
+ * on transaction commit (see box_txn_commit()) so that
+ * box_region_truncate() wasn't strictly necessary. Starting from
  * version 2.11, it isn't true anymore, and the client code must free
  * all its allocations explicitly.
  */
@@ -485,7 +491,7 @@ box_region_used(void);
  * behaviour.
  *
  * In case of a memory error set a diag and return NULL.
- * @sa <box_error_last>().
+ * @sa box_error_last().
  */
 API_EXPORT void *
 box_region_alloc(size_t size);
@@ -496,7 +502,7 @@ box_region_alloc(size_t size);
  * Alignment must be a power of 2.
  *
  * In case of a memory error set a diag and return NULL.
- * @sa <box_error_last>().
+ * @sa box_error_last().
  */
 API_EXPORT void *
 box_region_aligned_alloc(size_t size, size_t alignment);
@@ -913,7 +919,7 @@ cord_cancel_and_join(struct cord *cord);
  * fiber.
  *
  * @param name       string with fiber name
- * @param fiber_func func for run inside fiber
+ * @param f          func for run inside fiber
  */
 struct fiber *
 fiber_new_system(const char *name, fiber_func f);

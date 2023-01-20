@@ -168,12 +168,12 @@ enum {
 
 /**
  * Wait until READ or WRITE event on socket (\a fd). Yields.
- * \param fd - non-blocking socket file description
- * \param events - requested events to wait.
+ * \param fd non-blocking socket file description
+ * \param event requested events to wait.
  * Combination of TNT_IO_READ | TNT_IO_WRITE bit flags.
- * \param timeout - timeout in seconds.
- * \retval 0 - timeout
- * \retval >0 - returned events. Combination of TNT_IO_READ | TNT_IO_WRITE
+ * \param timeout timeout in seconds.
+ * \retval 0 timeout
+ * \retval >0 returned events. Combination of TNT_IO_READ | TNT_IO_WRITE
  * bit flags.
  */
 API_EXPORT int

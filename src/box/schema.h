@@ -57,7 +57,8 @@ extern struct rlist on_schema_init;
 /**
  * Returns the current version of the database schema, an unsigned number
  * that goes up when there is a major change in the schema, i.e., on DDL
- * operations (\sa IPROTO_SCHEMA_VERSION).
+ * operations.
+ * \sa IPROTO_SCHEMA_VERSION
  */
 API_EXPORT uint64_t
 box_schema_version(void);

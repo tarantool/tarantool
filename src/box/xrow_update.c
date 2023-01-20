@@ -133,7 +133,7 @@ struct xrow_update
  *
  * @param[out] update Update meta.
  * @param expr MessagePack array of operations.
- * @param expr_end End of the @expr.
+ * @param expr_end End of the @a expr.
  * @param dict Dictionary to lookup field number by a name.
  * @param field_count_hint Field count in the updated tuple. If
  *        there is no tuple at hand (for example, when we are

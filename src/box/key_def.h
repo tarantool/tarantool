@@ -310,30 +310,33 @@ enum {
 };
 
 /**
- * It is recommended to verify size of <box_key_part_def_t>
+ * It is recommended to verify size of box_key_part_def_t
  * against this constant on the module side at build time.
  * Example:
  *
- * | #if !defined(__cplusplus) && !defined(static_assert)
- * | #define static_assert _Static_assert
- * | #endif
- * |
- * | (slash)*
- * |  * Verify that <box_key_part_def_t> has the same size when
- * |  * compiled within tarantool and within the module.
- * |  *
- * |  * It is important, because the module allocates an array of key
- * |  * parts and passes it to <box_key_def_new_v2>() tarantool
- * |  * function.
- * |  *(slash)
- * | static_assert(sizeof(box_key_part_def_t) == BOX_KEY_PART_DEF_T_SIZE,
- * |               "sizeof(box_key_part_def_t)");
+ * \code
+ * #if !defined(__cplusplus) && !defined(static_assert)
+ * #define static_assert _Static_assert
+ * #endif
+ *
+ * (slash)*
+ *  * Verify that box_key_part_def_t has the same size when
+ *  * compiled within tarantool and within the module.
+ *  *
+ *  * It is important, because the module allocates an array of key
+ *  * parts and passes it to box_key_def_new_v2() tarantool
+ *  * function.
+ *  *(slash)
+ * static_assert(sizeof(box_key_part_def_t) == BOX_KEY_PART_DEF_T_SIZE,
+ *               "sizeof(box_key_part_def_t)");
+ * \endcode
  *
  * This snippet is not part of module.h, because portability of
  * static_assert() / _Static_assert() is dubious. It should be
  * decision of a module author how portable its code should be.
  */
 enum {
+	/** The constant. */
 	BOX_KEY_PART_DEF_T_SIZE = 64,
 };
 
@@ -341,22 +344,22 @@ enum {
  * Public representation of a key part definition.
  *
  * Usage: Allocate an array of such key parts, initialize each
- * key part (call <box_key_part_def_create>() and set necessary
- * fields), pass the array into <box_key_def_new_v2>() function.
+ * key part (call box_key_part_def_create() and set necessary
+ * fields), pass the array into box_key_def_new_v2() function.
  *
- * Important: A module should call <box_key_part_def_create>()
+ * Important: A module should call box_key_part_def_create()
  * to initialize the structure with default values. There is no
  * guarantee that all future default values for fields and flags
  * will be remain the same.
  *
- * The idea of separation from internal <struct key_part_def> is
+ * The idea of separation from internal "struct key_part_def" is
  * to provide stable API and ABI for modules.
  *
  * New fields may be added into the end of the structure in later
  * tarantool versions. Also new flags may be introduced within
- * <flags> field. <collation> cannot be changed to a union (to
+ * \a flags field. \a collation cannot be changed to a union (to
  * reuse for some other value), because it is verified even for
- * a non-string key part by <box_key_def_new_v2>().
+ * a non-string key part by box_key_def_new_v2().
  *
  * Fields that are unknown at given tarantool version are ignored
  * in general, but filled with zeros when initialized.
@@ -387,7 +390,7 @@ typedef union PACKED {
 		 *
 		 * => key: ["bar"]
 		 *
-		 * Note: When the path is given, <field_type>
+		 * Note: When the path is given, \a field_type
 		 * means type of the nested field.
 		 */
 		const char *path;
@@ -404,7 +407,7 @@ typedef union PACKED {
  *
  * May be used for tuple format creation and/or tuple comparison.
  *
- * \sa <box_key_def_new_v2>().
+ * \sa box_key_def_new_v2()
  *
  * \param fields array with key field identifiers
  * \param types array with key field types (see enum field_type)
@@ -420,7 +423,7 @@ box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count);
  *  | Field       | Default value   | Details |
  *  | ----------- | --------------- | ------- |
  *  | fieldno     | 0               |         |
- *  | flags       | <default flags> |         |
+ *  | flags       |\a default flags |         |
  *  | field_type  | NULL            | [^1]    |
  *  | collation   | NULL            |         |
  *  | path        | NULL            |         |
@@ -440,10 +443,10 @@ box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count);
  * validation, key extraction, comparisons and so on.
  *
  * All trailing padding bytes are set to zero. The same for
- * unknown <flags> bits.
+ * unknown \a flags bits.
  *
- * [^1]: <box_key_def_new_v2>() does not accept NULL as a
- *       <field_type>, so it should be filled explicitly.
+ * [^1]: box_key_def_new_v2() does not accept NULL as a
+ *       \a field_type, so it should be filled explicitly.
  */
 API_EXPORT void
 box_key_part_def_create(box_key_part_def_t *part);
@@ -451,14 +454,14 @@ box_key_part_def_create(box_key_part_def_t *part);
 /**
  * Create a key_def from given key parts.
  *
- * Unlike <box_key_def_new>() this function allows to define
+ * Unlike box_key_def_new() this function allows to define
  * nullability, collation and other options for each key part.
  *
- * <box_key_part_def_t> fields that are unknown at given tarantool
- * version are ignored. The same for unknown <flags> bits.
+ * box_key_part_def_t fields that are unknown at given tarantool
+ * version are ignored. The same for unknown \a flags bits.
  *
  * In case of an error set a diag and return NULL.
- * @sa <box_error_last>().
+ * @sa box_error_last()
  */
 API_EXPORT box_key_def_t *
 box_key_def_new_v2(box_key_part_def_t *parts, uint32_t part_count);
@@ -485,13 +488,13 @@ box_key_def_delete(box_key_def_t *key_def);
  *
  * The function allocates key parts and storage for pointer fields
  * (e.g. collation names) on the box region.
- * @sa <box_region_truncate>().
+ * @sa box_region_truncate()
  *
- * <box_key_part_def_t> fields that are unknown at given tarantool
- * version are set to zero. The same for unknown <flags> bits.
+ * box_key_part_def_t fields that are unknown at given tarantool
+ * version are set to zero. The same for unknown \a flags bits.
  *
  * In case of an error set a diag and return NULL.
- * @sa <box_error_last>().
+ * @sa box_error_last()
  */
 API_EXPORT box_key_part_def_t *
 box_key_def_dump_parts(const box_key_def_t *key_def, uint32_t *part_count_ptr);
@@ -506,7 +509,7 @@ box_key_def_dump_parts(const box_key_def_t *key_def, uint32_t *part_count_ptr);
  * @retval -1  The tuple is invalid.
  *
  * In case of an invalid tuple set a diag and return -1.
- * @sa <box_error_last>().
+ * @sa box_error_last()
  */
 API_EXPORT int
 box_key_def_validate_tuple(box_key_def_t *key_def, box_tuple_t *tuple);
@@ -523,11 +526,10 @@ box_key_def_validate_tuple(box_key_def_t *key_def, box_tuple_t *tuple);
 API_EXPORT int
 box_tuple_compare(box_tuple_t *tuple_a, box_tuple_t *tuple_b,
 		  box_key_def_t *key_def);
-
 /**
  * @brief Compare tuple with key using the key definition.
- * @param tuple tuple
- * @param key key with MessagePack array header
+ * @param tuple_a tuple
+ * @param key_b key with MessagePack array header
  * @param key_def key definition
  *
  * @retval 0  if key_fields(tuple) == parts(key)
@@ -551,7 +553,7 @@ box_tuple_compare_with_key(box_tuple_t *tuple_a, const char *key_b,
  * @retval NULL      Memory error.
  *
  * In case of an error set a diag and return NULL.
- * @sa <box_error_last>().
+ * @sa box_error_last()
  */
 API_EXPORT box_key_def_t *
 box_key_def_merge(const box_key_def_t *first, const box_key_def_t *second);
@@ -559,7 +561,7 @@ box_key_def_merge(const box_key_def_t *first, const box_key_def_t *second);
 /**
  * Extract key from tuple by given key definition and return
  * buffer allocated on the box region with this key.
- * @sa <box_region_truncate>().
+ * @sa box_region_truncate()
  *
  * This function has O(n) complexity, where n is the number of key
  * parts.
@@ -573,7 +575,7 @@ box_key_def_merge(const box_key_def_t *first, const box_key_def_t *second);
  * @retval NULL      Memory allocation error.
  *
  * In case of an error set a diag and return NULL.
- * @sa <box_error_last>().
+ * @sa box_error_last()
  */
 API_EXPORT char *
 box_key_def_extract_key(box_key_def_t *key_def, box_tuple_t *tuple,
@@ -599,7 +601,7 @@ box_key_def_extract_key(box_key_def_t *key_def, box_tuple_t *tuple,
  * @retval -1  The key is invalid.
  *
  * In case of an invalid key set a diag and return -1.
- * @sa <box_error_last>().
+ * @sa box_error_last()
  */
 API_EXPORT int
 box_key_def_validate_key(const box_key_def_t *key_def, const char *key,
@@ -624,7 +626,7 @@ box_key_def_validate_key(const box_key_def_t *key_def, const char *key,
  * @retval -1  The key is invalid.
  *
  * In case of an invalid key set a diag and return -1.
- * @sa <box_error_last>().
+ * @sa box_error_last()
  */
 API_EXPORT int
 box_key_def_validate_full_key(const box_key_def_t *key_def, const char *key,

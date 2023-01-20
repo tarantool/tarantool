@@ -446,7 +446,7 @@ typedef struct tuple_format box_tuple_format_t;
  * Return new in-memory tuple format based on passed key definitions.
  *
  * \param keys array of keys defined for the format
- * \key_count count of keys
+ * \param key_count count of keys
  * \retval new tuple format if success
  * \retval NULL for error
  */
@@ -456,7 +456,7 @@ box_tuple_format_new(struct key_def **keys, uint16_t key_count);
 /**
  * Increment tuple format ref count.
  *
- * \param tuple_format the tuple format to ref
+ * \param format the tuple format to ref
  */
 void
 box_tuple_format_ref(box_tuple_format_t *format);
@@ -464,7 +464,7 @@ box_tuple_format_ref(box_tuple_format_t *format);
 /**
  * Decrement tuple format ref count.
  *
- * \param tuple_format the tuple format to unref
+ * \param format the tuple format to unref
  */
 void
 box_tuple_format_unref(box_tuple_format_t *format);

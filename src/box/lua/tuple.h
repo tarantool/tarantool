@@ -63,6 +63,7 @@ luaT_checktuple(struct lua_State *L, int idx);
 /**
  * Push a tuple onto the stack.
  * @param L Lua State
+ * @param tuple
  * @sa luaT_istuple
  * @throws on OOM
  */
@@ -89,7 +90,7 @@ luaT_istuple(struct lua_State *L, int idx);
  *                       (or NULL).
  *
  * The storage for data is allocated on the box region. A caller
- * should call <box_region_truncate>() to release the data.
+ * should call box_region_truncate() to release the data.
  *
  * In case of an error set a diag and return NULL.
  *
@@ -103,14 +104,14 @@ luaT_tuple_encode(struct lua_State *L, int idx, size_t *tuple_len_ptr);
  * tuple.
  *
  * The new tuple is referenced in the same way as one created by
- * <box_tuple_new>(). There are two possible usage scenarios:
+ * box_tuple_new(). There are two possible usage scenarios:
  *
  * 1. A short living tuple may not be referenced explicitly and
  *    will be collected automatically at the next module API call
  *    that yields or returns a tuple.
  * 2. A long living tuple must be referenced using
- *    <box_tuple_ref>() and unreferenced then with
- *    <box_tuple_unref>().
+ *    box_tuple_ref() and unreferenced then with
+ *    box_tuple_unref().
  *
  * @sa box_tuple_ref()
  *

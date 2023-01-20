@@ -243,6 +243,8 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
  * @param tuple Tuple from which need to extract key.
  * @param space_id Space identifier.
  * @param index_id Index identifier.
+ * @param[out] key_size where to store the size of the extracted
+ *             key; pass NULL here if it is not needed
  * @retval not NULL Success
  * @retval     NULL Memory Allocation error
  */

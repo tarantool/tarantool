@@ -165,7 +165,7 @@ struct addrinfo;
  * @param host host name, i.e. "tarantool.org"
  * @param port service name, i.e. "80" or "http"
  * @param hints hints, see getaddrinfo(3)
- * @param res[out] result, see getaddrinfo(3)
+ * @param[out] res result, see getaddrinfo(3)
  * @param timeout timeout
  * @retval  0 on success, please free @a res using freeaddrinfo(3).
  * @retval -1 on error, check diag.

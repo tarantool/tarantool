@@ -247,7 +247,7 @@ box_decimal_to_uint64(const box_decimal_t *dec, uint64_t *num);
  * If @a scale if greater than current @a dec scale, do nothing.
  *
  * @param dec decimal number
- * @oaram scale target scale
+ * @param scale target scale
  * @return NULL if @a scale is out of supported range
  * @return @a dec (changed)
  */
@@ -269,7 +269,7 @@ box_decimal_round(box_decimal_t *dec, int scale);
  * @sa box_decimal_round
  *
  * @param dec decimal number
- * @oaram scale target scale
+ * @param scale target scale
  * @return NULL if @a scale is out of supported range
  * @return @a dec (changed)
  */
@@ -296,7 +296,7 @@ box_decimal_trim(box_decimal_t *dec);
  * @sa box_decimal_trim
  *
  * @param dec decimal number
- * @oaram scale target scale
+ * @param scale target scale
  * @return NULL if scale is out of supported range (less than zero
  *              or too big)
  * @return @a dec (changed)
@@ -353,7 +353,7 @@ box_decimal_minus(box_decimal_t *res, const box_decimal_t *dec);
  * @param lhs left hand side operand
  * @param rhs right hand side operand
  * @return NULL on an error (an overflow for example)
- * @return decimal result (@res)
+ * @return decimal result (@a res)
  */
 API_EXPORT box_decimal_t *
 box_decimal_add(box_decimal_t *res, const box_decimal_t *lhs,
@@ -366,7 +366,7 @@ box_decimal_add(box_decimal_t *res, const box_decimal_t *lhs,
  * @param lhs left hand side operand
  * @param rhs right hand side operand
  * @return NULL on an error (an overflow for example)
- * @return decimal result (@res)
+ * @return decimal result (@a res)
  */
 API_EXPORT box_decimal_t *
 box_decimal_sub(box_decimal_t *res, const box_decimal_t *lhs,
@@ -379,7 +379,7 @@ box_decimal_sub(box_decimal_t *res, const box_decimal_t *lhs,
  * @param lhs left hand side operand
  * @param rhs right hand side operand
  * @return NULL on an error (an overflow for example)
- * @return decimal result (@res)
+ * @return decimal result (@a res)
  */
 API_EXPORT box_decimal_t *
 box_decimal_mul(box_decimal_t *res, const box_decimal_t *lhs,
@@ -392,7 +392,7 @@ box_decimal_mul(box_decimal_t *res, const box_decimal_t *lhs,
  * @param lhs left hand side operand
  * @param rhs right hand side operand
  * @return NULL on an error
- * @return decimal result (@res)
+ * @return decimal result (@a res)
  */
 API_EXPORT box_decimal_t *
 box_decimal_div(box_decimal_t *res, const box_decimal_t *lhs,
@@ -407,7 +407,7 @@ box_decimal_div(box_decimal_t *res, const box_decimal_t *lhs,
  * @param lhs left hand side operand
  * @param rhs right hand side operand
  * @return NULL on an error
- * @return decimal result (@res)
+ * @return decimal result (@a res)
  */
 API_EXPORT box_decimal_t *
 box_decimal_remainder(box_decimal_t *res, const box_decimal_t *lhs,
@@ -423,7 +423,7 @@ box_decimal_remainder(box_decimal_t *res, const box_decimal_t *lhs,
  * @param res where to hold the result
  * @param dec decimal operand
  * @return NULL on an error
- * @return decimal result (@res)
+ * @return decimal result (@a res)
  */
 API_EXPORT box_decimal_t *
 box_decimal_log10(box_decimal_t *res, const box_decimal_t *dec);
@@ -434,7 +434,7 @@ box_decimal_log10(box_decimal_t *res, const box_decimal_t *dec);
  * @param res where to hold the result
  * @param dec decimal operand
  * @return NULL on an error
- * @return decimal result (@res)
+ * @return decimal result (@a res)
  */
 API_EXPORT box_decimal_t *
 box_decimal_ln(box_decimal_t *res, const box_decimal_t *dec);
@@ -446,7 +446,7 @@ box_decimal_ln(box_decimal_t *res, const box_decimal_t *dec);
  * @param lhs left hand side operand, base
  * @param rhs right hand side operand, power
  * @return NULL on an error
- * @return decimal result (@res)
+ * @return decimal result (@a res)
  */
 API_EXPORT box_decimal_t *
 box_decimal_pow(box_decimal_t *res, const box_decimal_t *lhs,
@@ -458,7 +458,7 @@ box_decimal_pow(box_decimal_t *res, const box_decimal_t *lhs,
  * @param res where to hold the result
  * @param dec decimal operand
  * @return NULL on an error
- * @return decimal result (@res)
+ * @return decimal result (@a res)
  */
 API_EXPORT box_decimal_t *
 box_decimal_exp(box_decimal_t *res, const box_decimal_t *dec);
@@ -469,7 +469,7 @@ box_decimal_exp(box_decimal_t *res, const box_decimal_t *dec);
  * @param res where to hold the result
  * @param dec decimal operand
  * @return NULL on an error
- * @return decimal result (@res)
+ * @return decimal result (@a res)
  */
 API_EXPORT box_decimal_t *
 box_decimal_sqrt(box_decimal_t *res, const box_decimal_t *dec);
@@ -515,19 +515,23 @@ box_decimal_mp_decode(box_decimal_t *dec, const char **data);
  * Decode a decimal from msgpack @a data without the msgpack
  * extension header.
  *
- *  | box_decimal_mp_decode_data() must be called for this position
- *  |                                        |
- *  |                                        v
- *  | <msgpack type> <size> <extension type> <data>
- *  | ^
- *  | |
- *  | box_decimal_mp_decode() must be called for this position
+ * \code
+ * box_decimal_mp_decode_data() must be called for this position
+ *                                        |
+ *                                        v
+ * <msgpack type> <size> <extension type> <data>
+ * ^
+ * |
+ * box_decimal_mp_decode() must be called for this position
+ * \endcode
  *
  * This function is suitable to finish decoding after calling
  * mp_decode_extl() (from the msgpuck library).
  *
  * @param dec where to store the decoded decimal
  * @param data pointer to a buffer with the msgpack data
+ * @param size size of the decimal data in the buffer; this value
+ *             is returned by mp_decode_extl()
  * @return NULL if the msgpack data does not represent a valid
  *         decimal value
  * @return the decoded decimal
