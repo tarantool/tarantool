@@ -482,6 +482,7 @@ t;
  |   261: box.error.BOOTSTRAP_NOT_UNANIMOUS
  |   262: box.error.CANT_CHECK_BOOTSTRAP_LEADER
  |   263: box.error.BOOTSTRAP_CONNECTION_NOT_TO_ALL
+ |   264: box.error.NIL_UUID
  | ...
 
 test_run:cmd("setopt delimiter ''");

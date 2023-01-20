@@ -367,6 +367,8 @@ applier_connection_init(struct iostream *io, const struct uri *uri,
 		tnt_raise(LoggedError, ER_PROTOCOL,
 			  "Unsupported protocol for replication");
 	}
+	if (tt_uuid_is_nil(&greeting->uuid))
+		tnt_raise(LoggedError, ER_NIL_UUID);
 }
 
 /**
@@ -2537,6 +2539,18 @@ applier_f(va_list ap)
 				/* System error from master instance. */
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_DISCONNECTED);
+				goto reconnect;
+			} else if (e->errcode() == ER_NIL_UUID) {
+				/*
+				 * Real tarantool can't have a nil UUID. This
+				 * must be a cartridge remote control instance.
+				 * The error is transient, since remote control
+				 * will be replaced by a normal tarantool node
+				 * sooner or later.
+				 */
+				applier_log_error(applier, e);
+				applier_disconnect(applier,
+						   APPLIER_DISCONNECTED);
 				goto reconnect;
 			} else {
 				/* Unrecoverable errors */
