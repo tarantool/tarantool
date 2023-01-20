@@ -700,8 +700,9 @@ applier_connect(struct applier *applier)
 	if (method_default == NULL)
 		method_default = AUTH_METHOD_DEFAULT;
 
-	applier->ballot_watcher = fiber_new_system("applier_ballot_watcher",
-						   applier_ballot_watcher_f);
+	applier->ballot_watcher = applier_fiber_new(applier, "ballot_watcher",
+						    applier_ballot_watcher_f,
+						    false);
 	applier->ballot_watcher->f_arg = applier;
 	fiber_wakeup(applier->ballot_watcher);
 
