@@ -36,8 +36,6 @@ space_cache_init(void)
 void
 space_cache_destroy(void)
 {
-	if (spaces == NULL)
-		return;
 	while (mh_size(spaces) > 0) {
 		mh_int_t i = mh_first(spaces);
 
