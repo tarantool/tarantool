@@ -205,8 +205,6 @@ schema_init(void)
 	for (uint32_t i = 0; i < lengthof(key_parts); i++)
 		key_parts[i] = key_part_def_default;
 
-	/* Initialize the space cache. */
-	space_cache_init();
 	func_cache_init();
 	sequences = mh_i32ptr_new();
 	/*
@@ -348,7 +346,6 @@ schema_init(void)
 void
 schema_free(void)
 {
-	space_cache_destroy();
 	func_cache_destroy();
 
 	while (mh_size(sequences) > 0) {

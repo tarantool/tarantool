@@ -5099,6 +5099,7 @@ box_init(void)
 	fiber_cond_create(&ro_cond);
 	auth_init();
 	security_init();
+	space_cache_init();
 	user_cache_init();
 	/*
 	 * The order is important: to initialize sessions, we need to access the
@@ -5138,4 +5139,5 @@ box_free(void)
 	/* schema_module_free(); */
 	/* session_free(); */
 	/* user_cache_free(); */
+	/* space_cache_destroy(); */
 }
