@@ -256,8 +256,6 @@ end
  1)that parameters table is a table (or nil)
  2)all keys in parameters are present in template
  3)type of every parameter fits (one of) types described in template
- Check (2) and (3) could be disabled by adding {, dont_check = <smth is true>, }
-  into parameters table
  The functions calls box.error(box.error.ILLEGAL_PARAMS, ..) on error
  @example
  check_param_table(options, { user = 'string',
@@ -277,10 +275,6 @@ local function check_param_table(table, template)
     if type(table) ~= 'table' then
         box.error(box.error.ILLEGAL_PARAMS,
                   "options should be a table")
-    end
-    -- just pass {.. dont_check = true, ..} to disable checks below
-    if table.dont_check then
-        return
     end
     for k,v in pairs(table) do
         if template[k] == nil then
