@@ -686,10 +686,6 @@ local function prepare_cfg(cfg, default_cfg, template_cfg, modify_cfg)
     if type(cfg) ~= 'table' then
         error("Error: cfg should be a table")
     end
-    -- just pass {.. dont_check = true, ..} to disable check below
-    if cfg.dont_check then
-        return
-    end
     local new_cfg = {}
     for k, v in pairs(cfg) do
         if template_cfg[k] == nil then
