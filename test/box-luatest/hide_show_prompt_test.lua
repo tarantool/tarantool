@@ -21,7 +21,7 @@ g.test_basic_print = function()
     ]])
     child:assert_empty_response()
 
-    local exp_line = it.PROMPT .. it.CR .. it.ERASE_IN_LINE .. 'flood'
+    local exp_line = child:prompt() .. it.CR .. it.ERASE_IN_LINE .. 'flood'
     for _ = 1, 10 do
         child:assert_line(exp_line)
     end
@@ -48,7 +48,7 @@ g.test_basic_log = function()
     ]])
     child:assert_empty_response()
 
-    local exp_data = it.PROMPT .. it.CR .. it.ERASE_IN_LINE
+    local exp_data = child:prompt() .. it.CR .. it.ERASE_IN_LINE
     for _ = 1, 10 do
         child:assert_data(exp_data)
     end
