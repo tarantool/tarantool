@@ -100,7 +100,6 @@ BuildRequires: perl-Test-Harness
 # For third-party subprojects that are built with autotools.
 BuildRequires: autoconf
 BuildRequires: automake
-BuildRequires: libtool
 
 Name: tarantool
 # ${major}.${major}.${minor}.${patch}, e.g. 1.6.8.175

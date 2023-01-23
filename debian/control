@@ -33,7 +33,7 @@ Build-Depends: cdbs (>= 0.4.100), debhelper (>= 9), dpkg-dev (>= 1.16.1~),
 # needed for datetime tests
  tzdata,
 # For third-party subprojects that are built with autotools.
- autoconf, automake, libtool,
+ autoconf, automake
 Section: database
 Standards-Version: 4.5.1
 Homepage: http://tarantool.org/
