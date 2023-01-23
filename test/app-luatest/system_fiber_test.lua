@@ -1,5 +1,7 @@
 local server = require('luatest.server')
-local g = require('luatest').group()
+local t = require('luatest')
+
+local g = t.group()
 
 g.before_all(function()
     g.server = server:new{alias = 'default'}
@@ -13,8 +15,6 @@ end)
 g.test_system_fibers = function()
     g.server:exec(function(uri)
         local fiber = require('fiber')
-        local t = require('luatest')
-
         local conn = require('net.box').connect(uri)
         local is_system = function(name)
             return name:endswith('(net.box)') or

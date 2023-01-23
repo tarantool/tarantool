@@ -1,11 +1,11 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 local function server_test_encode()
     local compat = require('tarantool').compat
     local yaml = require('yaml')
-    local t = require('luatest')
 
     local str = 'Title: xxx\n - Item 1\n - Item 2\n'
     local old_res = '--- "Title: xxx\\n - Item 1\\n - Item 2\\n"\n...\n'

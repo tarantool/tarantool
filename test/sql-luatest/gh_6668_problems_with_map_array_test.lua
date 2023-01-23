@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -17,7 +18,6 @@ end)
 -- Make sure that DISTINCT cannot be used with ARRAY or MAP.
 g.test_distinct = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.execute([[CREATE TABLE ta(i INT PRIMARY KEY, a ARRAY);]])
         box.execute([[INSERT INTO ta VALUES(1, [1]), (2, [2]);]])
         local sql = [[SELECT DISTINCT a FROM ta;]]
@@ -40,7 +40,6 @@ end
 -- Disallow incomparable values in GROUP BY.
 g.test_group_by = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.execute([[CREATE TABLE ta(i INT PRIMARY KEY, a ARRAY);]])
         box.execute([[INSERT INTO ta VALUES(1, [1]), (2, [2]);]])
         local sql = [[SELECT a FROM ta GROUP BY a;]]
@@ -68,8 +67,6 @@ end
 --
 g.test_group_by = function()
     g.server:exec(function()
-
-        local t = require('luatest')
         local sql = [[SELECT 1 > [1];]]
         local res = [[Type mismatch: can not convert array([1]) to ]]..
                     [[comparable type]]

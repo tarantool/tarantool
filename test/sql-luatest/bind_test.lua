@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -13,7 +14,6 @@ end)
 
 g.test_bind_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT @1asd;]]
         local res = "At line 1 at or near position 9: unrecognized token '1asd'"
         local _, err = box.execute(sql, {{['@1asd'] = 123}})

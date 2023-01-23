@@ -4,7 +4,6 @@ local t = require('luatest')
 local function server_test_json_encode()
     local compat = require('tarantool').compat
     local json = require('json')
-    local t = require('luatest')
 
     -- Test that '/' is escaped with default setting.
     t.assert_equals(json.encode({url = 'https://srv:7777'}),
@@ -47,7 +46,6 @@ end
 local function server_test_json_new_encode()
     local compat = require('tarantool').compat
     local json = require('json')
-    local t = require('luatest')
 
     compat.json_escape_forward_slash = 'old'
     -- Test that '/' is escaped with 'old' setting.
@@ -74,7 +72,6 @@ end
 local function popen_test_mp_encode()
     local popen = require('popen')
     local clock = require('clock')
-    local t = require('luatest')
 
     -- Start external tarantool session.
     local TARANTOOL_PATH = arg[-1]

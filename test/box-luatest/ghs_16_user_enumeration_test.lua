@@ -4,6 +4,7 @@ local server = require('luatest.server')
 local socket = require('socket')
 local urilib = require('uri')
 local t = require('luatest')
+
 local g = t.group()
 
 local IPROTO_REQUEST_TYPE = 0

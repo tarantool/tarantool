@@ -1,8 +1,8 @@
 local server = require('luatest.server')
 local fio = require('fio')
 local it = require('test.interactive_tarantool')
-
 local t = require('luatest')
+
 local g = t.group()
 
 local child

@@ -24,8 +24,6 @@ end)
 -- to incorrect space count (see also gh-7490 test).
 g.test_memtx_mvcc_space_cnt_with_invariant_violation = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
-
         for _ = 1, 5 do
             box.begin()
             box.space.s:replace{1}

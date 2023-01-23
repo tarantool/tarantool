@@ -21,7 +21,6 @@ end)
 
 g.test_replace_self_conflict_after_fsc_in_hash_idx = function()
     g.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local tx = txn_proxy:new()
@@ -35,7 +34,6 @@ end
 
 g.test_insert_self_conflict_after_fsc_in_hash_idx = function()
     g.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local tx = txn_proxy:new()
@@ -49,7 +47,6 @@ end
 
 g.test_upsert_self_conflict_after_fsc_in_hash_idx = function()
     g.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local tx = txn_proxy:new()

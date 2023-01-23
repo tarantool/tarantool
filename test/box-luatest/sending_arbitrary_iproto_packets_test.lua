@@ -10,7 +10,6 @@ g.before_all(function(cg)
     cg.server:start()
     cg.server:exec(function()
         local msgpack = require('msgpack')
-        local t = require('luatest')
 
         box.session.on_connect(function()
             rawset(_G, 'sid', box.session.id())
@@ -44,7 +43,6 @@ g.before_each(function(cg)
     cg.server:exec(function(net_box_uri)
         local uri = require('uri')
         local socket = require('socket')
-        local t = require('luatest')
 
         -- Connect to the server.
         local u = uri.parse(net_box_uri)
@@ -60,7 +58,6 @@ end)
 g.test_box_iproto_send_errors = function(cg)
     cg.server:exec(function()
         local fiber = require('fiber')
-        local t = require('luatest')
 
         -- Checks that invalid argument counts are handled correctly.
         local usage_err_msg = "Usage: box.iproto.send(sid, header[, body])"

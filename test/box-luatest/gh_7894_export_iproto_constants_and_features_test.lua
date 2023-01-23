@@ -179,8 +179,6 @@ local reference_table = {
 -- Checks that IPROTO constants and features are exported correctly.
 g.test_iproto_constants_and_features_export = function(cg)
     cg.server:exec(function(reference_table)
-        local t = require('luatest')
-
         for k, v in pairs(box.iproto) do
             local v_type = type(v)
             if v_type ~= 'function' and v_type ~= 'thread' and

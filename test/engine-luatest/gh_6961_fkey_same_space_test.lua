@@ -2,6 +2,7 @@
 -- Can't create space with foreign key pointing to itself
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group('gh-6961-fkey-same-space-test',
                   {{engine = 'memtx'}, {engine = 'vinyl'}})
 
@@ -30,8 +31,6 @@ g.test_foreign_key_primary = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
-
         local fmt = {{name='id', type='unsigned'},
                      {name='name', type='string'},
                      {name='parent_id', type='unsigned', is_nullable=true,
@@ -67,7 +66,6 @@ g.test_foreign_key_primary = function(cg)
     cg.server:restart()
 
     cg.server:exec(function()
-        local t = require('luatest')
         local fs = box.space.filesystem
 
         fs.index.sk:drop()
@@ -99,8 +97,6 @@ g.test_foreign_key_secondary = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
-
         local fn_check_parent = "function(field) return field:sub(1, 1) == '/' end"
         box.schema.func.create('check_parent', {language='LUA',
                                                 is_deterministic=true,
@@ -137,7 +133,6 @@ g.test_foreign_key_secondary = function(cg)
     cg.server:restart()
 
     cg.server:exec(function()
-        local t = require('luatest')
         local fs = box.space.filesystem.index.path
 
         t.assert_error_msg_content_equals(
@@ -160,8 +155,6 @@ g.test_two_fkeys_primary = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
-
         local fmt = {{name='id', type='unsigned'},
                      {name='name', type='string'},
                      {name='mother', type='unsigned', is_nullable=true,
@@ -195,8 +188,6 @@ g.test_two_fkeys_secondary = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
-
         local fmt = {{name='id', type='unsigned'},
                      {name='name', type='string'},
                      {name='mother', type='string', is_nullable=true,

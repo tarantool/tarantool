@@ -29,7 +29,6 @@ end)
 
 g.test_vspace_sequence = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         t.assert_equals(box.space._vspace_sequence.id,
                         box.schema.VSPACE_SEQUENCE_ID)
         t.assert_equals(box.space._vspace_sequence:format(),

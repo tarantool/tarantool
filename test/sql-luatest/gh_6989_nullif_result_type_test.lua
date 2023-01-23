@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -13,7 +14,6 @@ end)
 
 g.test_assertion_in_modulo = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = "SELECT nullif(1, '2');"
         local res = "integer"
         t.assert_equals(box.execute(sql).metadata[1].type, res)

@@ -30,7 +30,6 @@ g.test_abort_yielding_dml = function(cg)
     t.tarantool.skip_if_not_debug()
     cg.server:exec(function()
         local fiber = require('fiber')
-        local t = require('luatest')
         local s = box.schema.create_space('s', {engine = 'vinyl'})
         -- Disable bloom filter to enforce disk reads.
         s:create_index('pk', {bloom_fpr = 1})

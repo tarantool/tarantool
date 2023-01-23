@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -13,7 +14,6 @@ end)
 
 g.test_wakeup_writing_to_wal_fiber = function()
     g.server:exec(function()
-        local t = require('luatest')
         local fiber = require('fiber')
 
         local build_path = os.getenv("BUILDDIR")

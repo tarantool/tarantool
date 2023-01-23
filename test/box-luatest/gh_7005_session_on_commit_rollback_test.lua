@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -20,7 +21,6 @@ end)
 -- Checks session and user in box.on_commit trigger callback.
 g.test_session_on_commit = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.session.su('eve', function()
             t.assert_equals(box.session.effective_user(), 'eve')
             local id, user
@@ -41,7 +41,6 @@ end
 -- transaction is rolled back with box.rollback().
 g.test_session_on_graceful_rollback = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.session.su('eve', function()
             t.assert_equals(box.session.effective_user(), 'eve')
             local id, user
@@ -64,7 +63,6 @@ end
 g.test_session_on_wal_error_rollback = function()
     t.tarantool.skip_if_not_debug()
     g.server:exec(function()
-        local t = require('luatest')
         box.session.su('eve', function()
             t.assert_equals(box.session.effective_user(), 'eve')
             local id, user

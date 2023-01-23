@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function(cg)
@@ -17,8 +18,6 @@ end)
 
 g.test_no__collation_in_public_access = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
-
         -- 2 is 'public' role id
         local r = box.space._priv:select{2, 'space', box.space._collation.id}
         t.assert_equals(#r, 0)

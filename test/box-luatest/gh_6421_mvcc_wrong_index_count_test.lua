@@ -28,7 +28,6 @@ end)
 
 g.test_mvcc_wrong_space_count_simple = function()
     g.server:exec(function()
-        local t = require('luatest')
         local fiber = require('fiber')
         local s = box.space.test
 
@@ -51,7 +50,6 @@ end
 
 g.test_mvcc_wrong_space_count_rw_tx = function()
     g.server:exec(function()
-        local t = require('luatest')
         local fiber = require('fiber')
         local s = box.space.test
 

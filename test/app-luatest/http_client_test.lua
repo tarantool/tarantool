@@ -4,6 +4,7 @@ local fiber = require('fiber')
 local uri = require('uri')
 local os = require('os')
 local t = require('luatest')
+
 local g = t.group('http_client', {
     {sock_family = 'AF_INET'},
     {sock_family = 'AF_UNIX'},

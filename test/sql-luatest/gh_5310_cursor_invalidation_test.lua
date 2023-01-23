@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -17,7 +18,6 @@ end)
 -- Make sure that tuples with undescribed fields do not cause an error.
 g.test_cursor_invalidation_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local s = box.schema.space.create('T', {format = {'A'}})
         s:create_index('ii')
         s:insert({1,2,3,4,5})
@@ -33,7 +33,6 @@ end
 --
 g.test_cursor_invalidation_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local s = box.schema.space.create('T', {format = {{'A', 'integer'}}})
         s:create_index('ii', {parts = {{1, 'integer'}, {2, 'integer'},
                                        {3, 'integer'}, {4, 'integer'}}})

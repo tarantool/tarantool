@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -16,7 +17,6 @@ end)
 
 g.test_dequote = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.execute([[CREATE TABLE "t"("a" INT PRIMARY KEY);]])
         local sql = [[SELECT "t1"."a" FROM (SELECT "a" FROM "t") AS "t1";]]
         t.assert_equals(box.execute(sql).metadata[1].name, 't1.a')

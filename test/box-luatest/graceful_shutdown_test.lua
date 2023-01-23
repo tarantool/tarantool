@@ -3,6 +3,7 @@ local net = require('net.box')
 local popen = require('popen')
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -103,7 +104,6 @@ g.test_discarded_requests_completed = function()
     conn:close()
     g.server:start()
     g.server:exec(function()
-        local t = require('luatest')
         t.assert_equals(box.space.test:get(42), {42})
     end)
 end

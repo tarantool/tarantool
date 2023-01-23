@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -13,7 +14,6 @@ end)
 
 g.test_index_field_missing = function()
     g.server:exec(function()
-        local t = require('luatest')
         local format = {{'I', 'integer'}}
         local s = box.schema.space.create('T', {format = format})
         s:create_index('i')

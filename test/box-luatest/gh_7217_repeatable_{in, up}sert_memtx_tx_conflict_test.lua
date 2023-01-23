@@ -23,7 +23,6 @@ end)
 
 g.test_repeatable_insert_primary_idx = function()
     g.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local s = box.schema.create_space('s')
@@ -48,7 +47,6 @@ end
 
 g.test_repeatable_insert_secondary_idx = function()
     g.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local s = box.schema.create_space('s')
@@ -74,7 +72,6 @@ end
 
 g.test_repeatable_upsert_primary_idx = function()
    g.server:exec(function()
-       local t = require('luatest')
        local txn_proxy = require('test.box.lua.txn_proxy')
 
        local s = box.schema.create_space('s')
@@ -99,7 +96,6 @@ end
 
 g.test_repeatable_upsert_primary_idx = function()
    g.server:exec(function()
-       local t = require('luatest')
        local txn_proxy = require('test.box.lua.txn_proxy')
 
        local s = box.schema.create_space('s')

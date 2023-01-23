@@ -30,7 +30,6 @@ end)
 -- Test log.new{...}
 g1.test_log_new = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local log = require('log')
         t.assert_error_msg_content_equals(
             "Illegal parameters, name should be a string", log.new)
@@ -54,7 +53,6 @@ g2.test_per_module_log_level = function(cg)
     local cfg_type = cg.params.cfg_type
 
     cg.server:exec(function(cfg_type)
-        local t = require('luatest')
         local log = require('log')
         local log2box_keys = {
             ['level']   = 'log_level',

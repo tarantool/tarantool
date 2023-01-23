@@ -1,4 +1,5 @@
 local t = require('luatest')
+
 local g = t.group('gh-7166')
 
 -- Check that wake up of the shutdown fiber doesn't crash Tarantool

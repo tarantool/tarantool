@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function(cg)
@@ -13,8 +14,6 @@ end)
 
 g.test__truncate_insert_as_guest = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
-
         box.schema.space.create('test')
 
         -- Create new user instead of 'guest' because test infrastructure

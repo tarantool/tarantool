@@ -1,5 +1,6 @@
 local ffi = require('ffi')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()

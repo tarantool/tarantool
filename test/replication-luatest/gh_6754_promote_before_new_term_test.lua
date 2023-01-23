@@ -1,6 +1,7 @@
 local luatest = require('luatest')
 local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
+
 local g = luatest.group('gh-6754-promote-before-new-term')
 
 g.before_all(function(g)
@@ -42,8 +43,8 @@ g.test_promote_new_term_order = function(g)
     end)
     luatest.helpers.retrying({}, function()
         g.server_2:exec(function()
-            require('luatest').assert(box.space.test ~= nil)
-            require('luatest').assert(#box.space.test:select() == 1)
+            luatest.assert(box.space.test ~= nil)
+            luatest.assert(#box.space.test:select() == 1)
         end)
     end)
 

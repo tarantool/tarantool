@@ -2,7 +2,6 @@ local t = require('luatest')
 local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 local proxy = require('luatest.replica_proxy')
-
 local fio = require('fio')
 local fiber = require('fiber')
 

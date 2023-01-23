@@ -1,6 +1,7 @@
 local t = require('luatest')
 local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
+
 local wait_timeout = 120
 
 --
@@ -65,8 +66,6 @@ g.test_split_vote = function(g)
     -- Wait for the votes to actually happen.
     t.helpers.retrying({timeout = wait_timeout}, function()
         local func = function()
-            local t = require('luatest')
-
             t.assert_equals(box.info.election.vote, box.info.id)
         end
         g.node1:exec(func)

@@ -31,8 +31,6 @@ end)
 -- a prepared transaction does not fail assertion.
 g.test_preparation_with_deleted_older_story_assertion = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
-
         box.space.as:replace{0}
 
         t.assert_error_msg_content_equals(

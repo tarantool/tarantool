@@ -3,6 +3,7 @@ local console = require('console')
 local msgpack = require('msgpack')
 local ffi = require('ffi')
 local t = require('luatest')
+
 local g = t.group()
 
 g.test_errors = function()

@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function(cg)
@@ -14,7 +15,6 @@ end)
 -- Checks that memtx tuple garbage collection is resumed after snapshot.
 g.test_memtx_gc_after_snapshot = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         box.schema.space.create('test')
         box.space.test:create_index('primary')
         local mem_used_1 = box.info.memory().data

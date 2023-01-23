@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -43,7 +44,6 @@ end)
 -- Make sure that it is possible to create spaces with DATETIME field.
 g.test_datetime_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[CREATE TABLE t (i INT PRIMARY KEY, dt DATETIME);]]
         local res = {row_count = 1}
         t.assert_equals(box.execute(sql), res)
@@ -54,7 +54,6 @@ end
 -- Make sure that DATETIME can be used as primary key.
 g.test_datetime_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[CREATE TABLE t (dt DATETIME PRIMARY KEY);]]
         local res = {row_count = 1}
         t.assert_equals(box.execute(sql), res)
@@ -65,7 +64,6 @@ end
 -- Make sure that DATETIME can be selected.
 g.test_datetime_3_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -79,7 +77,6 @@ end
 
 g.test_datetime_3_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -94,7 +91,6 @@ end
 -- Make sure that DATETIME can be used in ORDER BY.
 g.test_datetime_4_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -108,7 +104,6 @@ end
 
 g.test_datetime_4_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -122,7 +117,6 @@ end
 
 g.test_datetime_4_3 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -136,7 +130,6 @@ end
 
 g.test_datetime_4_4 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -151,7 +144,6 @@ end
 -- Make sure that DATETIME can be used in GROUP BY.
 g.test_datetime_5_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -165,7 +157,6 @@ end
 
 g.test_datetime_5_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -180,7 +171,6 @@ end
 -- Make sure that DATETIME can be used in subselects.
 g.test_datetime_6 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -195,7 +185,6 @@ end
 -- Make sure that DATETIME can work with DISTINCT.
 g.test_datetime_7 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -210,7 +199,6 @@ end
 -- Make sure that DATETIME can work with VIEW.
 g.test_datetime_8 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -229,7 +217,6 @@ end
 -- Make sure that DATETIME cannot be used in LIMIT.
 g.test_datetime_9 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT * FROM t1 LIMIT (SELECT dt FROM t1 LIMIT 1);]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[Only positive integers are allowed in the LIMIT clause]]
@@ -241,7 +228,6 @@ end
 -- Make sure that DATETIME cannot be used in OFFSET.
 g.test_datetime_10 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql =
             [[SELECT * FROM t1 LIMIT 1 OFFSET (SELECT dt FROM t1 LIMIT 1);]]
         local res = [[Failed to execute SQL statement: ]]..
@@ -257,7 +243,6 @@ g.test_datetime_11 = function()
         box.execute([[CREATE TABLE t (id DATETIME PRIMARY KEY,
                                       dt DATETIME REFERENCES t(id));]])
 
-        local t = require('luatest')
         local sql = [[INSERT INTO t SELECT
                       (SELECT dt from t2 LIMIT 1 OFFSET 1),
                       (SELECT dt from t2 LIMIT 1);]]
@@ -277,7 +262,6 @@ g.test_datetime_12 = function()
                       CONSTRAINT ck CHECK(
                       CAST(dt as STRING) != '2001-01-01T01:00:00Z'));]])
 
-        local t = require('luatest')
         local sql = [[INSERT INTO t SELECT * from t1 LIMIT 1;]]
         local res = [[Check constraint 'CK' failed for tuple]]
         local _, err = box.execute(sql)
@@ -293,7 +277,6 @@ g.test_datetime_13 = function()
         box.execute([[CREATE TABLE t (i INT PRIMARY KEY, dt DATETIME UNIQUE);]])
         box.execute([[INSERT INTO t SELECT 1, dt from t1 LIMIT 1;]])
 
-        local t = require('luatest')
         local sql = [[INSERT INTO t SELECT 2, dt from t1 LIMIT 1;]]
         local res = [[Duplicate key exists in unique index ]]..
                     [["unique_unnamed_T_2" in space "T" with old tuple - ]]..
@@ -314,7 +297,6 @@ g.test_datetime_14_1 = function()
                       exports = {'SQL'}}
         box.schema.func.create('RETURN_TYPE', func);
 
-        local t = require('luatest')
         local sql = [[SELECT RETURN_TYPE(dt) FROM t2;]]
         local res = {{'cdata'}, {'cdata'}, {'cdata'}}
         local rows = box.execute(sql).rows
@@ -334,7 +316,6 @@ g.test_datetime_14_2 = function()
         local func = {returns = 'datetime', exports = {'SQL'}, body = body}
         box.schema.func.create('RETURN_DATETIME', func);
 
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local sql = [[SELECT RETURN_DATETIME();]]
@@ -349,7 +330,6 @@ end
 -- Make sure that DATETIME works properly with built-in functions.
 g.test_datetime_15_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT ABS(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function ABS()]]
@@ -360,7 +340,6 @@ end
 
 g.test_datetime_15_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT AVG(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function AVG()]]
@@ -371,7 +350,6 @@ end
 
 g.test_datetime_15_3 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CHAR(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function CHAR()]]
@@ -382,7 +360,6 @@ end
 
 g.test_datetime_15_4 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CHARACTER_LENGTH(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function CHARACTER_LENGTH()]]
@@ -393,7 +370,6 @@ end
 
 g.test_datetime_15_5 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CHAR_LENGTH(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function CHAR_LENGTH()]]
@@ -404,7 +380,6 @@ end
 
 g.test_datetime_15_6 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -418,7 +393,6 @@ end
 
 g.test_datetime_15_7 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT COUNT(dt) from t2;]]
         local res = {{3}}
         t.assert_equals(box.execute(sql).rows, res)
@@ -427,7 +401,6 @@ end
 
 g.test_datetime_15_8 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
         local dt3 = dt.new({year = 2003, month = 3, day = 3, hour = 3})
@@ -441,7 +414,6 @@ end
 
 g.test_datetime_15_9 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT GROUP_CONCAT(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function GROUP_CONCAT()]]
@@ -452,7 +424,6 @@ end
 
 g.test_datetime_15_10 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT HEX(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function HEX()]]
@@ -463,7 +434,6 @@ end
 
 g.test_datetime_15_11 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -477,7 +447,6 @@ end
 
 g.test_datetime_15_12 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -491,7 +460,6 @@ end
 
 g.test_datetime_15_13 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT LENGTH(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function LENGTH()]]
@@ -502,7 +470,6 @@ end
 
 g.test_datetime_15_14 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt LIKE 'a' from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function LIKE()]]
@@ -513,7 +480,6 @@ end
 
 g.test_datetime_15_15 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -527,7 +493,6 @@ end
 
 g.test_datetime_15_16 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -541,7 +506,6 @@ end
 
 g.test_datetime_15_17 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT LOWER(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function LOWER()]]
@@ -552,7 +516,6 @@ end
 
 g.test_datetime_15_18 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt3 = dt.new({year = 2003, month = 3, day = 3, hour = 3})
 
@@ -564,7 +527,6 @@ end
 
 g.test_datetime_15_19 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
 
@@ -576,7 +538,6 @@ end
 
 g.test_datetime_15_20 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -590,7 +551,6 @@ end
 
 g.test_datetime_15_21 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT POSITION(dt, '1') from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function POSITION()]]
@@ -601,7 +561,6 @@ end
 
 g.test_datetime_15_22 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT RANDOMBLOB(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function RANDOMBLOB()]]
@@ -612,7 +571,6 @@ end
 
 g.test_datetime_15_23 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT REPLACE(dt, '1', '2') from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function REPLACE()]]
@@ -623,7 +581,6 @@ end
 
 g.test_datetime_15_24 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT ROUND(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function ROUND()]]
@@ -634,7 +591,6 @@ end
 
 g.test_datetime_15_25 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT SOUNDEX(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function SOUNDEX()]]
@@ -645,7 +601,6 @@ end
 
 g.test_datetime_15_26 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT SUBSTR(dt, 3, 3) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function SUBSTR()]]
@@ -656,7 +611,6 @@ end
 
 g.test_datetime_15_27 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT SUM(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function SUM()]]
@@ -667,7 +621,6 @@ end
 
 g.test_datetime_15_28 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT TOTAL(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function TOTAL()]]
@@ -678,7 +631,6 @@ end
 
 g.test_datetime_15_29 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT TRIM(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function TRIM()]]
@@ -689,7 +641,6 @@ end
 
 g.test_datetime_15_30 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT TYPEOF(dt) from t2;]]
         local res = {{'datetime'}, {'datetime'}, {'datetime'}}
         t.assert_equals(box.execute(sql).rows, res)
@@ -698,7 +649,6 @@ end
 
 g.test_datetime_15_31 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT UNICODE(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function UNICODE()]]
@@ -709,7 +659,6 @@ end
 
 g.test_datetime_15_16 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -723,7 +672,6 @@ end
 
 g.test_datetime_15_33 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT UPPER(dt) from t2;]]
         local res = [[Failed to execute SQL statement: ]]..
                     [[wrong arguments for function UPPER()]]
@@ -734,7 +682,6 @@ end
 
 g.test_datetime_15_34 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt || dt from t2;]]
         local res = [[Inconsistent types: expected string or varbinary got ]]..
                     [[datetime(2001-01-01T01:00:00Z)]]
@@ -753,7 +700,6 @@ g.test_datetime_16_1 = function()
                       exports = {'SQL'}}
         box.schema.func.create('sql_datetime.is_datetime', func);
 
-        local t = require('luatest')
         local sql = [[SELECT "sql_datetime.is_datetime"(dt) FROM t2;]]
         local res = {{true}, {true}, {true}}
         local rows = box.execute(sql).rows
@@ -772,7 +718,6 @@ g.test_datetime_16_2 = function()
                       param_list = {'datetime'}, exports = {'SQL'}}
         box.schema.func.create('sql_datetime.ret_datetime', func);
 
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -789,7 +734,6 @@ end
 -- Make sure that explicit cast from DATETIME works as intended.
 g.test_datetime_17_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST(dt AS UNSIGNED) FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) to unsigned]]
@@ -800,7 +744,6 @@ end
 
 g.test_datetime_17_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST(dt AS INTEGER) FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) to integer]]
@@ -811,7 +754,6 @@ end
 
 g.test_datetime_17_3 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST(dt AS STRING) FROM t2;]]
         local res = {{"2001-01-01T01:00:00Z"}, {"2002-02-02T02:00:00Z"},
                      {"2003-03-03T03:00:00Z"}}
@@ -822,7 +764,6 @@ end
 
 g.test_datetime_17_4 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST(dt AS NUMBER) FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) to number]]
@@ -833,7 +774,6 @@ end
 
 g.test_datetime_17_5 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST(dt AS DOUBLE) FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) to double]]
@@ -844,7 +784,6 @@ end
 
 g.test_datetime_17_6 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST(dt AS BOOLEAN) FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) to boolean]]
@@ -855,7 +794,6 @@ end
 
 g.test_datetime_17_7 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST(dt AS VARBINARY) FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) to varbinary]]
@@ -866,7 +804,6 @@ end
 
 g.test_datetime_17_8 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -881,7 +818,6 @@ end
 
 g.test_datetime_17_9 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST(dt AS UUID) FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) to uuid]]
@@ -892,7 +828,6 @@ end
 
 g.test_datetime_17_10 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -908,7 +843,6 @@ end
 -- Make sure that explicit cast to DATETIME works as intended.
 g.test_datetime_18_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST(1 AS DATETIME);]]
         local res = [[Type mismatch: can not convert ]]..
                     [[integer(1) to datetime]]
@@ -919,7 +853,6 @@ end
 
 g.test_datetime_18_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST('1' AS DATETIME);]]
         local res = [[Type mismatch: can not convert ]]..
                     [[string('1') to datetime]]
@@ -930,7 +863,6 @@ end
 
 g.test_datetime_18_3 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local sql = [[SELECT CAST('2001-01-01T01:00:00Z' AS DATETIME);]]
@@ -942,7 +874,6 @@ end
 
 g.test_datetime_18_4 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST(CAST(1 AS NUMBER) AS DATETIME);]]
         local res = [[Type mismatch: can not convert ]]..
                     [[number(1) to datetime]]
@@ -953,7 +884,6 @@ end
 
 g.test_datetime_18_5 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST(1e0 AS DATETIME);]]
         local res = [[Type mismatch: can not convert ]]..
                     [[double(1.0) to datetime]]
@@ -964,7 +894,6 @@ end
 
 g.test_datetime_18_6 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST(true AS DATETIME);]]
         local res = [[Type mismatch: can not convert ]]..
                     [[boolean(TRUE) to datetime]]
@@ -975,7 +904,6 @@ end
 
 g.test_datetime_18_7 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST(x'33' AS DATETIME);]]
         local res = [[Type mismatch: can not convert ]]..
                     [[varbinary(x'33') to datetime]]
@@ -986,7 +914,6 @@ end
 
 g.test_datetime_18_8 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -1001,7 +928,6 @@ end
 
 g.test_datetime_18_9 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST(
                       CAST('11111111-1111-1111-1111-111111111111' AS UUID)
                       AS DATETIME) FROM t2;]]
@@ -1015,7 +941,6 @@ end
 -- Make sure that implicit cast from DATETIME works as intended.
 g.test_datetime_19_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.execute([[CREATE TABLE t(d UNSIGNED PRIMARY KEY);]])
         local sql = [[INSERT INTO t SELECT dt FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
@@ -1028,7 +953,6 @@ end
 
 g.test_datetime_19_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.execute([[CREATE TABLE t(d INTEGER PRIMARY KEY);]])
         local sql = [[INSERT INTO t SELECT dt FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
@@ -1041,7 +965,6 @@ end
 
 g.test_datetime_19_3 = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.execute([[CREATE TABLE t(d STRING PRIMARY KEY);]])
         local sql = [[INSERT INTO t SELECT dt FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
@@ -1054,7 +977,6 @@ end
 
 g.test_datetime_19_4 = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.execute([[CREATE TABLE t(d NUMBER PRIMARY KEY);]])
         local sql = [[INSERT INTO t SELECT dt FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
@@ -1067,7 +989,6 @@ end
 
 g.test_datetime_19_5 = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.execute([[CREATE TABLE t(d DOUBLE PRIMARY KEY);]])
         local sql = [[INSERT INTO t SELECT dt FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
@@ -1080,7 +1001,6 @@ end
 
 g.test_datetime_19_6 = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.execute([[CREATE TABLE t(d BOOLEAN PRIMARY KEY);]])
         local sql = [[INSERT INTO t SELECT dt FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
@@ -1093,7 +1013,6 @@ end
 
 g.test_datetime_19_7 = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.execute([[CREATE TABLE t(d VARBINARY PRIMARY KEY);]])
         local sql = [[INSERT INTO t SELECT dt FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
@@ -1106,7 +1025,6 @@ end
 
 g.test_datetime_19_8 = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.execute([[CREATE TABLE t(d SCALAR PRIMARY KEY);]])
         local sql = [[INSERT INTO t SELECT dt FROM t2;]]
         local res = {row_count = 3}
@@ -1119,7 +1037,6 @@ end
 
 g.test_datetime_19_9 = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.execute([[CREATE TABLE t(d UUID PRIMARY KEY);]])
         local sql = [[INSERT INTO t SELECT dt FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
@@ -1133,7 +1050,6 @@ end
 -- Make sure that implicit cast to DATETIME works as intended.
 g.test_datetime_20_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[INSERT INTO t2 VALUES(1);]]
         local res = [[Type mismatch: can not convert ]]..
                     [[integer(1) to datetime]]
@@ -1144,7 +1060,6 @@ end
 
 g.test_datetime_20_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[INSERT INTO t2 VALUES('1');]]
         local res = [[Type mismatch: can not convert ]]..
                     [[string('1') to datetime]]
@@ -1155,7 +1070,6 @@ end
 
 g.test_datetime_20_3 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[INSERT INTO t2 VALUES('2001-01-01T01:00:00Z');]]
         local res = [[Type mismatch: can not convert ]]..
                     [[string('2001-01-01T01:00:00Z') to datetime]]
@@ -1166,7 +1080,6 @@ end
 
 g.test_datetime_20_4 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[INSERT INTO t2 VALUES(CAST(1 AS NUMBER));]]
         local res = [[Type mismatch: can not convert ]]..
                     [[number(1) to datetime]]
@@ -1177,7 +1090,6 @@ end
 
 g.test_datetime_20_5 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[INSERT INTO t2 VALUES(1e0);]]
         local res = [[Type mismatch: can not convert ]]..
                     [[double(1.0) to datetime]]
@@ -1188,7 +1100,6 @@ end
 
 g.test_datetime_20_6 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[INSERT INTO t2 VALUES(true);]]
         local res = [[Type mismatch: can not convert ]]..
                     [[boolean(TRUE) to datetime]]
@@ -1199,7 +1110,6 @@ end
 
 g.test_datetime_20_7 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[INSERT INTO t2 VALUES(x'33');]]
         local res = [[Type mismatch: can not convert ]]..
                     [[varbinary(x'33') to datetime]]
@@ -1210,7 +1120,6 @@ end
 
 g.test_datetime_20_8 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[INSERT INTO t2 SELECT CAST(dt AS SCALAR) FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[scalar(2001-01-01T01:00:00Z) to datetime]]
@@ -1221,7 +1130,6 @@ end
 
 g.test_datetime_20_9 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[INSERT INTO t2 VALUES(
                       CAST('11111111-1111-1111-1111-111111111111' AS UUID));]]
         local res = [[Type mismatch: can not convert ]]..
@@ -1239,7 +1147,6 @@ g.test_datetime_21 = function()
         box.execute([[CREATE TRIGGER tr AFTER INSERT ON ta
                       FOR EACH ROW BEGIN INSERT INTO tb SELECT new.dt; END;]])
 
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -1259,7 +1166,6 @@ end
 -- Make sure that DATETIME can work with JOINs.
 g.test_datetime_22_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -1275,7 +1181,6 @@ end
 
 g.test_datetime_22_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -1291,7 +1196,6 @@ end
 
 g.test_datetime_22_3 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -1308,7 +1212,6 @@ end
 -- Make sure that numeric arithmetic operations work with DATETIME as intended.
 g.test_datetime_23_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT -dt FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) ]]..
@@ -1320,7 +1223,6 @@ end
 
 g.test_datetime_23_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt + 1 FROM t2;]]
         local res = [[Type mismatch: can not convert integer(1) to interval]]
         local _, err = box.execute(sql)
@@ -1330,7 +1232,6 @@ end
 
 g.test_datetime_23_3 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt - 1 FROM t2;]]
         local res = [[Type mismatch: can not convert integer(1) to ]]..
                     [[datetime or interval]]
@@ -1341,7 +1242,6 @@ end
 
 g.test_datetime_23_4 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt / 2 FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) ]]..
@@ -1353,7 +1253,6 @@ end
 
 g.test_datetime_23_5 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt * 1 FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) ]]..
@@ -1365,7 +1264,6 @@ end
 
 g.test_datetime_23_6 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt % 1 FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) to integer]]
@@ -1377,7 +1275,6 @@ end
 -- Make sure that bitwise operations work with DATETIME as intended.
 g.test_datetime_24_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT ~dt FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) to unsigned]]
@@ -1388,7 +1285,6 @@ end
 
 g.test_datetime_24_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt >> 1 FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) to unsigned]]
@@ -1399,7 +1295,6 @@ end
 
 g.test_datetime_24_3 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt << 1 FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) to unsigned]]
@@ -1410,7 +1305,6 @@ end
 
 g.test_datetime_24_4 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt | 1 FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) to unsigned]]
@@ -1421,7 +1315,6 @@ end
 
 g.test_datetime_24_5 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt & 1 FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) to unsigned]]
@@ -1433,7 +1326,6 @@ end
 -- Make sure that logical operations work with DATETIME as intended.
 g.test_datetime_25_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT NOT dt FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) to boolean]]
@@ -1444,7 +1336,6 @@ end
 
 g.test_datetime_25_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt AND true FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) to boolean]]
@@ -1455,7 +1346,6 @@ end
 
 g.test_datetime_25_3 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt OR true FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[datetime(2001-01-01T01:00:00Z) to boolean]]
@@ -1467,7 +1357,6 @@ end
 -- Make sure that comparison work with DATETIME as intended.
 g.test_datetime_26_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt > 1 FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[integer(1) to datetime]]
@@ -1478,7 +1367,6 @@ end
 
 g.test_datetime_26_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt < '1' FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[string('1') to datetime]]
@@ -1489,7 +1377,6 @@ end
 
 g.test_datetime_26_3 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt == '2001-01-01T01:00:00Z' FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[string('2001-01-01T01:00:00Z') to datetime]]
@@ -1500,7 +1387,6 @@ end
 
 g.test_datetime_26_4 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt >= CAST(1 AS NUMBER) FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[number(1) to datetime]]
@@ -1511,7 +1397,6 @@ end
 
 g.test_datetime_26_5 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt <= 1e0 FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[double(1.0) to datetime]]
@@ -1522,7 +1407,6 @@ end
 
 g.test_datetime_26_6 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt > true FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[boolean(TRUE) to datetime]]
@@ -1533,7 +1417,6 @@ end
 
 g.test_datetime_26_7 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt < x'33' FROM t2;]]
         local res = [[Type mismatch: can not convert ]]..
                     [[varbinary(x'33') to datetime]]
@@ -1544,7 +1427,6 @@ end
 
 g.test_datetime_26_8 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt == CAST(dt AS SCALAR) FROM t2;]]
         local res = {{true}, {true}, {true}}
         local rows = box.execute(sql).rows
@@ -1555,7 +1437,6 @@ end
 
 g.test_datetime_26_9 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT dt >
                       CAST('11111111-1111-1111-1111-111111111111' AS UUID)
                       FROM t2;]]
@@ -1569,7 +1450,6 @@ end
 -- Make sure that SCALAR primary key can contain DATETIME.
 g.test_datetime_27 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -1589,7 +1469,6 @@ end
 -- Make sure that DATETIME value can be bound.
 g.test_datetime_28_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt4 = dt.new({year = 2004, month = 4, day = 4, hour = 4})
         local sql = [[SELECT ?;]]
@@ -1602,7 +1481,6 @@ end
 
 g.test_datetime_28_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt4 = dt.new({year = 2004, month = 4, day = 4, hour = 4})
         local sql = [[SELECT $1;]]
@@ -1616,7 +1494,6 @@ end
 -- Make sure that function NOW() works as intended.
 g.test_datetime_29_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT typeof(now());]]
         local res = {{"datetime"}}
         local rows = box.execute(sql).rows
@@ -1627,7 +1504,6 @@ end
 
 g.test_datetime_29_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT now(), now() FROM (values(1), (2), (3));]]
         local rows = box.execute(sql).rows
 
@@ -1642,7 +1518,6 @@ end
 -- Make sure that function DATE_PART() works as intended.
 g.test_datetime_30_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -1680,7 +1555,6 @@ end
 
 g.test_datetime_30_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -1718,7 +1592,6 @@ end
 
 g.test_datetime_30_3 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -1756,7 +1629,6 @@ end
 
 g.test_datetime_30_4 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -1794,7 +1666,6 @@ end
 
 g.test_datetime_30_5 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -1832,7 +1703,6 @@ end
 
 g.test_datetime_30_6 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -1870,7 +1740,6 @@ end
 
 g.test_datetime_30_7 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -1908,7 +1777,6 @@ end
 
 g.test_datetime_30_8 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -1946,7 +1814,6 @@ end
 
 g.test_datetime_30_9 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -1984,7 +1851,6 @@ end
 
 g.test_datetime_30_10 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -2022,7 +1888,6 @@ end
 
 g.test_datetime_30_11 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -2052,7 +1917,6 @@ end
 
 g.test_datetime_30_12 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -2082,7 +1946,6 @@ end
 
 g.test_datetime_30_13 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -2112,7 +1975,6 @@ end
 
 g.test_datetime_30_14 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -2142,7 +2004,6 @@ end
 
 g.test_datetime_30_15 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -2172,7 +2033,6 @@ end
 
 g.test_datetime_30_16 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -2202,7 +2062,6 @@ end
 
 g.test_datetime_30_17 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -2226,7 +2085,6 @@ end
 
 g.test_datetime_30_18 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt0 = dt.new({year = 2000, month = 4, day = 5, hour = 6,
                             min = 33, sec = 22, nsec = 523999111})
@@ -2261,7 +2119,6 @@ end
 -- Make sure that arithmetic for datetime works as intended.
 g.test_datetime_31_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local itv = dt.interval
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
@@ -2276,7 +2133,6 @@ end
 
 g.test_datetime_31_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
         local dt2 = dt.new({year = 2002, month = 2, day = 2, hour = 2})
@@ -2289,7 +2145,6 @@ end
 
 g.test_datetime_31_3 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local itv = dt.interval
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
@@ -2302,7 +2157,6 @@ end
 
 g.test_datetime_31_4 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local itv = dt.interval
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
@@ -2315,7 +2169,6 @@ end
 
 g.test_datetime_31_5 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local itv = dt.interval
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
@@ -2328,7 +2181,6 @@ end
 
 g.test_datetime_31_6 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local itv = dt.interval
         local dt1 = dt.new({year = 2001, month = 1, day = 1, hour = 1})
@@ -2342,7 +2194,6 @@ end
 
 g.test_datetime_31_7 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local itv = require('datetime').interval
         local itv1 = itv.new({year = 1, month = 1, day = 1, hour = 1})
         local itv2 = itv.new({year = 2, month = 3, day = 4, hour = 5})
@@ -2354,7 +2205,6 @@ end
 
 g.test_datetime_31_8 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local itv = require('datetime').interval
         local itv1 = itv.new({year = 1, month = 1, day = 1, hour = 1})
         local itv2 = itv.new({year = 2, month = 3, day = 4, hour = 5})
@@ -2367,7 +2217,6 @@ end
 -- Make sure cast from STRING to DATETIME works as intended.
 g.test_datetime_32_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 2000, month = 2, day = 29, hour = 1})
         local sql = [[SELECT CAST('2000-02-29T01:00:00Z' AS DATETIME);]]
@@ -2379,7 +2228,6 @@ end
 
 g.test_datetime_32_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST('2001-02-29T01:00:00Z' AS DATETIME);]]
         local _, err = box.execute(sql)
         local res = [[Type mismatch: can not convert ]]..
@@ -2397,7 +2245,6 @@ end
 --
 g.test_datetime_33_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local v = setmetatable({}, { __serialize = 'map' })
         local sql = [[SELECT CAST(#v AS DATETIME);]]
@@ -2449,7 +2296,6 @@ end
 --
 g.test_datetime_33_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST(#v AS DATETIME);]]
 
         -- "year" cannot be more than 5879611.
@@ -2667,7 +2513,6 @@ end
 --
 g.test_datetime_33_3 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 1})
         local sql = [[SELECT CAST({'year': 1.1} AS DATETIME);]]
@@ -2690,7 +2535,6 @@ end
 --
 g.test_datetime_34_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local itv = require('datetime').interval
         local v = setmetatable({}, { __serialize = 'map' })
         local sql = [[SELECT CAST(#v AS INTERVAL);]]
@@ -2711,7 +2555,6 @@ end
 --
 g.test_datetime_34_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CAST(#v AS INTERVAL);]]
 
         -- "year" cannot be more than 11759221.
@@ -2847,7 +2690,6 @@ end
 --
 g.test_datetime_34_3 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local itv = require('datetime').interval
         local dt1 = itv.new({year = 1})
         local sql = [[SELECT CAST({'year': 1.0} AS INTERVAL);]]
@@ -2864,7 +2706,6 @@ end
 -- Properly compute type of result of DATETIME arithmetic.
 g.test_datetime_35 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local dt = require('datetime')
         local dt1 = dt.new({year = 1})
         local itv1 = dt.interval.new({year = 1})

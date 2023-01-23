@@ -1,4 +1,5 @@
 local t = require('luatest')
+
 local g = t.group()
 
 g.test_box_execute_before_box_cfg = function()

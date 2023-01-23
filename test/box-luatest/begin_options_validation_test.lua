@@ -16,7 +16,6 @@ end)
 
 g.test_begin_options_validation = function()
     g.server:exec(function()
-        local t = require("luatest")
         t.assert_error_msg_content_equals(
             "Illegal parameters, unexpected option 'foo'",
             box.begin, {foo = "bar"})

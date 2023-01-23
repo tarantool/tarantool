@@ -29,8 +29,6 @@ pg.test_idx_random_from_empty_space_tracking = function(cg)
 
     stream.space.s:insert{0, 1}
     cg.server:exec(function()
-        local t = require('luatest')
-
         box.space.s:insert{2, 1}
         box.internal.memtx_tx_gc(100)
 

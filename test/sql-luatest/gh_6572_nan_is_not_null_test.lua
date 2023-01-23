@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -13,7 +14,6 @@ end)
 
 g.test_nan_null_lua = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT LUA('return 0/0'), TYPEOF(LUA('return 0/0'));]]
         t.assert_equals(box.execute(sql).rows, {{nil, 'NULL'}})
     end)
@@ -27,7 +27,6 @@ g.test_nan_null_c = function()
         local func = {language = 'C', returns = 'double', exports = {'SQL'}}
         box.schema.func.create('gh_6572.get_nan', func);
 
-        local t = require('luatest')
         local sql = [[SELECT "gh_6572.get_nan"(), TYPEOF("gh_6572.get_nan"());]]
         t.assert_equals(box.execute(sql).rows, {{nil, 'NULL'}})
     end)
@@ -35,7 +34,6 @@ end
 
 g.test_nan_comp_dec = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT 1.0 > LUA('return 0/0');]]
         t.assert_equals(box.execute(sql).rows, {{}})
     end)

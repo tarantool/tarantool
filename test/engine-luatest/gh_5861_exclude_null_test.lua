@@ -30,7 +30,6 @@ end)
 g.test_unsupported = function(cg)
     t.skip_if(cg.params.engine == 'vinyl', 'Not supported by Vinyl')
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         t.assert_error_msg_equals(
             "HASH does not support nullable parts",
@@ -49,7 +48,6 @@ end
 
 g.test_basic = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         s:create_index('sk', {
             type = 'tree',
@@ -63,7 +61,6 @@ g.test_basic = function(cg)
     end)
     cg.server:restart()
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         t.assert_equals(s.index.sk:select(), {{1, 10}})
         s:replace({1})
@@ -76,7 +73,6 @@ end
 
 g.test_multipart = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         s:create_index('sk', {
             type = 'tree',
@@ -96,7 +92,6 @@ g.test_multipart = function(cg)
     end)
     cg.server:restart()
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         t.assert_equals(s.index.sk:select(), {{6, nil, 600}, {1, 10, 100}})
         s:replace({1, 10})
@@ -109,7 +104,6 @@ end
 
 g.test_json = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         s:create_index('sk', {
             type = 'tree',
@@ -124,7 +118,6 @@ g.test_json = function(cg)
     end)
     cg.server:restart()
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         t.assert_equals(s.index.sk:select(), {{5, {a = {b = 50}}}})
         s:replace({3, {a = {b = 30}}})
@@ -136,7 +129,6 @@ end
 
 g.test_multipart = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         s:create_index('sk', {
             type = 'tree',
@@ -162,7 +154,6 @@ g.test_multipart = function(cg)
     end)
     cg.server:restart()
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         t.assert_equals(s.index.sk:select(), {
             {4, {40}},

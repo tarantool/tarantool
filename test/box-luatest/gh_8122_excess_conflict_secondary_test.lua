@@ -48,7 +48,6 @@ g.test_excess_conflict_secondary_original = function()
         test:create_index("id", {unique = true, parts = {{1, "number"}}})
         test:create_index("indexed", {unique = false, parts = {{2, "string"}}})
 
-        local t = require('luatest')
         local fiber = require('fiber')
 
         local id = 0
@@ -113,7 +112,6 @@ end
 g.test_conflict_of_visible_deleted_secondary_index_story = function(cg)
     cg.server:exec(function()
         local fiber = require('fiber')
-        local t = require('luatest')
 
         local test = box.schema.space.create('test')
         test:create_index('pk')

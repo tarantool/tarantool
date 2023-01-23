@@ -3,8 +3,8 @@ local fio = require('fio')
 local log = require('log')
 local json = require('json')
 local popen = require('popen')
-
 local t = require('luatest')
+
 local g = t.group()
 
 -- Find an item in an array table and return its index.

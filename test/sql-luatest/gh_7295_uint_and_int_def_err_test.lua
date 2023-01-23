@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -21,7 +22,6 @@ end)
 
 g.test_uint_int_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local res = {{name = "COLUMN_1", type = "integer"}}
         t.assert_equals(box.execute([[SELECT i + a FROM t;]]).metadata, res)
         t.assert_equals(box.execute([[SELECT i - a FROM t;]]).metadata, res)
@@ -37,7 +37,6 @@ end
 
 g.test_uint_int_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT i - a FROM t ORDER BY 1 LIMIT 1;]]
         t.assert_equals(box.execute(sql).rows, {{-1}})
     end)

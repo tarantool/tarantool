@@ -17,7 +17,6 @@ end)
 
 g.test_upgrade = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local fiber = require('fiber')
         t.assert_equals(box.space._user:select(), {
             {0, 1, 'guest', 'user',

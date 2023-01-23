@@ -1,7 +1,6 @@
 local t = require('luatest')
 local server = require('luatest.server')
 local replica_set = require('luatest.replica_set')
-
 local fio = require('fio')
 
 local g = t.group('gh-5272-bootstrap-strategy-auto')
@@ -140,7 +139,6 @@ end)
 g.test_sync_waits_for_all_connected = function(cg)
     cg.master:stop()
     cg.replica:exec(function(replication)
-        local t = require('luatest')
         box.cfg{
             replication_connect_timeout = 0.01,
             replication = {},
@@ -166,7 +164,6 @@ g.test_sync_waits_for_all_connected = function(cg)
         box.space.test:insert{1}
     end)
     cg.replica:exec(function(replication)
-        local t = require('luatest')
         box.error.injection.set('ERRINJ_WAL_DELAY', true)
         box.cfg{
             replication_connect_timeout = 1000,

@@ -1,4 +1,5 @@
 local t = require('luatest')
+
 local g = t.group()
 
 local result_str =  [[tarantool> 42

@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -13,7 +14,6 @@ end)
 
 g.test_interval_create_space = function()
     g.server:exec(function()
-        local t = require('luatest')
         local format = {{name = "i", type = "integer"},
                         {name = "a", type = "interval"}}
         local s = box.schema.space.create('S1', {format = format})
@@ -25,7 +25,6 @@ end
 
 g.test_interval_create_index = function()
     g.server:exec(function()
-        local t = require('luatest')
         local format = {{'i', 'integer'}, {'a', 'interval'}}
         local parts = {{'a', 'interval'}}
         local s = box.schema.space.create('S2', {format = format})
@@ -39,7 +38,6 @@ end
 
 g.test_interval_insert = function()
     g.server:exec(function()
-        local t = require('luatest')
         local itv = require('datetime').interval
         local val = itv.new({year = 12, day = 3, sec = 67})
         local format = {{'id', 'integer'}, {'a', 'interval'}}
@@ -53,7 +51,6 @@ end
 
 g.test_interval_insert_any = function()
     g.server:exec(function()
-        local t = require('luatest')
         local itv = require('datetime').interval
         local val = itv.new({year = 12, day = 3, sec = 67})
         local format = {{'id', 'integer'}, {'a', 'any'}}
@@ -67,7 +64,6 @@ end
 
 g.test_interval_select = function()
     g.server:exec(function()
-        local t = require('luatest')
         local itv = require('datetime').interval
         local val = itv.new({year = 12, day = 3, sec = 67})
         local format = {{'i', 'integer'}, {'a', 'interval'}}
@@ -84,7 +80,6 @@ end
 
 g.test_interval_get = function()
     g.server:exec(function()
-        local t = require('luatest')
         local itv = require('datetime').interval
         local val = itv.new({year = 12, day = 3, sec = 67})
         local format = {{'i', 'integer'}, {'a', 'interval'}}
@@ -99,7 +94,6 @@ end
 
 g.test_interval_update = function()
     g.server:exec(function()
-        local t = require('luatest')
         local itv = require('datetime').interval
         local val = itv.new({year = 12, day = 3, sec = 67})
         local format = {{'i', 'integer'}, {'a', 'interval', is_nullable = true}}
@@ -117,7 +111,6 @@ end
 
 g.test_interval_delete = function()
     g.server:exec(function()
-        local t = require('luatest')
         local itv = require('datetime').interval
         local val = itv.new({year = 12, day = 3, sec = 67})
         local format = {{'i', 'integer'}, {'a', 'interval'}}

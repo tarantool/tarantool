@@ -2,7 +2,6 @@ local t = require("luatest")
 local json = require("json")
 local msgpack = require("msgpack")
 local yaml = require("yaml")
-
 local decimal = require("decimal")
 local datetime = require("datetime")
 local uuid = require("uuid")

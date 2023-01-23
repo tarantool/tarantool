@@ -27,7 +27,6 @@ pg.test_commit_after_variant = function(cg)
     cg.server:exec(function(variant)
         assert(variant == 'gap write' or variant == 'full scan')
 
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         box.space.test:replace{10}

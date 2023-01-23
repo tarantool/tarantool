@@ -1,6 +1,7 @@
 local t = require('luatest')
 local popen = require('popen')
 local tnt = require('tarantool')
+
 local g = t.group()
 
 local function normalize_path(s)

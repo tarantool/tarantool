@@ -3,7 +3,6 @@ local t = require('luatest')
 
 local function server_test_channel_close_default()
     local fiber = require('fiber')
-    local t = require('luatest')
 
     -- No graceful close (old) by default.
     local ch = fiber.channel(10)
@@ -19,7 +18,6 @@ end
 local function server_test_channel_close(mode)
     local compat = require('tarantool').compat
     local fiber = require('fiber')
-    local t = require('luatest')
 
     -- Graceful close (new) selected.
     compat.fiber_channel_close_mode = mode
@@ -48,7 +46,6 @@ end
 local server_test_close_reader_payload = function(mode)
     local compat = require('tarantool').compat
     local fiber = require('fiber')
-    local t = require('luatest')
 
     compat.fiber_channel_close_mode = mode
     local ch = fiber.channel(0)
@@ -82,7 +79,6 @@ end
 local server_test_close_writer_payload = function(mode)
     local compat = require('tarantool').compat
     local fiber = require('fiber')
-    local t = require('luatest')
 
     compat.fiber_channel_close_mode = mode
     local ch = fiber.channel(0)

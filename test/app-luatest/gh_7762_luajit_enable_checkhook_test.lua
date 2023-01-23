@@ -1,5 +1,6 @@
 local checktrace = require('jit.util').traceinfo
 local t = require('luatest')
+
 local g = t.group()
 
 -- Test payload to be recorded. It calculates the arithmetic sum

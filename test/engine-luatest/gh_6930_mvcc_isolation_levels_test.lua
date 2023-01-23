@@ -17,7 +17,6 @@ end)
 
 g.test_mvcc_isolation_level_errors = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         t.assert_error_msg_content_equals(
             "Illegal parameters, txn_isolation must be one of " ..
             "box.txn_isolation_level (keys or values)",
@@ -58,7 +57,6 @@ end)
 
 g.test_mvcc_isolation_level_basics = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local fiber = require('fiber')
         local s = box.space.test
 
@@ -186,7 +184,6 @@ end)
 
 g.test_mvcc_best_effort_read_view = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local fiber = require('fiber')
         local s = box.space.test
         local ch = fiber.channel(1)
