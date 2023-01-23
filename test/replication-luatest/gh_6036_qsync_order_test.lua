@@ -199,7 +199,7 @@ g.test_promote_order = function(cg)
         box.space.test:insert{4}
     end)
     cg.r2:exec(function()
-        require('luatest').assert(box.info.synchro.queue.busy == true)
+        t.assert(box.info.synchro.queue.busy == true)
         box.error.injection.set('ERRINJ_WAL_DELAY', false)
         box.ctl.wait_rw()
     end)

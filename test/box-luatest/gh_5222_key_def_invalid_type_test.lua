@@ -1,4 +1,5 @@
 local t = require('luatest')
+
 local g = t.group('gh-5222')
 
 g.test_key_def_invalid_type = function()

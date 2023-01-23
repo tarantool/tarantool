@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -20,7 +21,6 @@ end)
 
 g.test_prepared_stmt_truncation_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local stmt = box.prepare([[SELECT * FROM t;]])
         box.execute([[TRUNCATE TABLE t;]])
         t.assert_equals(box.execute(stmt.stmt_id).rows, {})
@@ -29,7 +29,6 @@ end
 
 g.test_prepared_stmt_truncation_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local stmt = box.prepare([[INSERT INTO t VALUES(?);]])
         box.execute([[TRUNCATE TABLE t;]])
         t.assert_equals(box.execute(stmt.stmt_id, {1}), {row_count = 1})

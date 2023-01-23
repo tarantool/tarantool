@@ -2,6 +2,7 @@ local buffer = require('buffer')
 local msgpack = require('msgpack')
 local ffi = require('ffi')
 local t = require('luatest')
+
 local g = t.group()
 
 g.test_errors = function()

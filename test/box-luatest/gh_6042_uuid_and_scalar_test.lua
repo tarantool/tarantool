@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -13,7 +14,6 @@ end)
 
 g.test_uuid_scalar = function()
     g.server:exec(function()
-        local t = require('luatest')
         local s = box.schema.space.create('a', {format = {{'u', 'uuid'}}})
         local _ = s:create_index('i', {parts = {{'u', 'scalar'}}})
         t.assert_equals(s:format()[1].type, 'uuid')

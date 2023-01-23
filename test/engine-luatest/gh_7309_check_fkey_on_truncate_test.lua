@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group('gh-7309-check-fkey-on-truncate',
                   {{engine = 'memtx'}, {engine = 'vinyl'}})
 
@@ -24,7 +25,6 @@ g.test_fkey_truncate = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
         local fk = {asd = {field = 'a', space = 's1'}}
         local o1 = {engine = engine, format = {{'a', 'integer'}}}
         local o2 = {engine = engine, format = {{'a', 'integer'},

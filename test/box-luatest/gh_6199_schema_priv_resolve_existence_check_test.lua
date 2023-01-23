@@ -19,8 +19,6 @@ end)
 
 g.test_priv_resolve_existence_check = function()
     g.default:exec(function()
-        local t = require('luatest')
-
         local msg = 'role cannot be granted together with a privilege'
         t.assert_error(box.schema.user.grant, 'guest', 'read,replication',
                        'universe', msg)

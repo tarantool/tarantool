@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -13,7 +14,6 @@ end)
 
 g.test_assertion_in_indexed_by = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.execute([[CREATE TABLE t (i INT PRIMARY KEY, s STRING);]])
         box.space.T:create_index('I1', {parts = {2, 'string'}})
         box.space.T:create_index('I2', {parts = {2, 'string'}})

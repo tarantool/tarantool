@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -13,7 +14,6 @@ end)
 
 g.test_no_error_on_too_many_indexes = function()
     g.server:exec(function()
-        local t = require('luatest')
         local s = "CREATE TABLE add (c0 INT PRIMARY KEY"
         for i = 1,128 do
             s = s .. ", c" .. i .. " INT UNIQUE"

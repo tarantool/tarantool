@@ -35,8 +35,6 @@ g.before_all(function(cg)
     cg.cluster:start()
 
     cg.main:exec(function()
-        local t = require('luatest')
-
         box.ctl.promote()
         box.ctl.wait_rw()
         local s = box.schema.space.create('sync', {is_sync = true})
@@ -56,8 +54,8 @@ g.before_each(function(cg)
     -- Check that the servers start synced and with main being leader.
     -- It's a prerequisite for each test.
     cg.main:exec(function()
-        require('luatest').assert_equals(box.info.synchro.queue.owner,
-                                         box.info.id, 'main node is leader')
+        t.assert_equals(box.info.synchro.queue.owner,
+                        box.info.id, 'main node is leader')
     end)
 
     test_id = test_id + 1
@@ -105,7 +103,6 @@ local function reconnect_and_check_split_brain(srv)
     srv:exec(update_replication, {server.build_listen_uri('main')})
     t.helpers.retrying({}, srv.exec, srv, function()
         local upstream = box.info.replication[1].upstream
-        local t = require('luatest')
         t.assert_equals(upstream.status, 'stopped', 'replication is stopped')
         t.assert_str_contains(upstream.message, 'Split-Brain discovered: ',
                               false, 'split-brain is discovered')
@@ -113,7 +110,6 @@ local function reconnect_and_check_split_brain(srv)
 end
 
 local function write_promote()
-    local t = require('luatest')
     t.assert_not_equals(box.info.synchro.queue.owner,  box.info.id,
                         "Promoting a follower")
     box.ctl.promote()
@@ -125,7 +121,6 @@ local function write_promote()
 end
 
 local function write_demote()
-    local t = require('luatest')
     t.assert_equals(box.info.synchro.queue.owner, box.info.id,
                     "Demoting the leader")
     box.cfg{election_mode = 'off'}
@@ -203,7 +198,6 @@ local function fill_queue_and_write(server)
         return write_cnt
     end)
     t.helpers.retrying({}, server.exec, server, function(cnt)
-        local t = require('luatest')
         local new_cnt = box.error.injection.get('ERRINJ_WAL_WRITE_COUNT')
         t.assert(new_cnt > cnt, 'WAL write succeeded')
     end, {wal_write_count})
@@ -213,8 +207,7 @@ local function perform_rollback(server)
     t.assert_gt(server:exec(function() return box.info.synchro.queue.len end), 0)
     server:exec(function() box.cfg{replication_synchro_timeout = 0.01} end)
     t.helpers.retrying({delay = 0.1}, server.exec, server, function()
-        require('luatest').assert_equals(box.info.synchro.queue.len, 0,
-                                         'Rollback happened')
+        t.assert_equals(box.info.synchro.queue.len, 0, 'Rollback happened')
     end)
 end
 

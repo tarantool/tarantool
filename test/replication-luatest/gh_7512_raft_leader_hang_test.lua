@@ -1,7 +1,6 @@
 local t = require('luatest')
 local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
-
 local fio = require('fio')
 
 local g = t.group('gh-7512')
@@ -54,7 +53,6 @@ g.test_leader_hang_notice = function(cg)
     local term = cg.node2:get_election_term()
     cg.node1:exec(block, {cg.unique_filename})
     t.helpers.retrying({}, server.exec, cg.node2, function(term)
-        local t = require('luatest')
         t.assert_equals(box.info.replication[1].upstream.status, 'disconnected',
                         'Hang is noticed')
         t.assert_equals(box.info.election.term, term + 1, 'Term is bumped')

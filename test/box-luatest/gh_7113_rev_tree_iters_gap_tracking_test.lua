@@ -31,7 +31,6 @@ end)
 
 g['test_reverse_iter_gap_tracking'] = function()
     g.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local tx = txn_proxy:new()
@@ -86,7 +85,6 @@ end
 
 g['test_reverse_iter_clarify_before_gap_tracking'] = function()
     g.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local tx = txn_proxy:new()

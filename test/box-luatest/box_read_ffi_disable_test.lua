@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group(nil, {{disable_ffi = true}, {disable_ffi = false}})
 
 g.before_all(function(cg)
@@ -27,7 +28,6 @@ end)
 
 g.test_min = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         t.assert_error_msg_content_equals(
             "Use index:min(...) instead of index.min(...)",
@@ -41,7 +41,6 @@ end
 
 g.test_max = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         t.assert_error_msg_content_equals(
             "Use index:max(...) instead of index.max(...)",
@@ -55,7 +54,6 @@ end
 
 g.test_random = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         t.assert_error_msg_content_equals(
             "Use index:random(...) instead of index.random(...)",
@@ -69,7 +67,6 @@ end
 
 g.test_get = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         t.assert_error_msg_content_equals(
             "Use index:get(...) instead of index.get(...)",
@@ -87,7 +84,6 @@ end
 
 g.test_select = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         t.assert_error_msg_content_equals(
             "Use index:select(...) instead of index.select(...)",
@@ -104,7 +100,6 @@ end
 g.test_pairs = function(cg)
     cg.server:exec(function()
         local fun = require('fun')
-        local t = require('luatest')
         local s = box.space.test
         t.assert_error_msg_content_equals(
             "Use index:pairs(...) instead of index.pairs(...)",

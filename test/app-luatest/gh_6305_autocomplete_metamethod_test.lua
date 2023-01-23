@@ -1,6 +1,7 @@
 local t = require('luatest')
-local g = t.group()
 local console = require('console')
+
+local g = t.group()
 
 local function tabcomplete(s)
     return console.completion_handler(s, 0, #s)

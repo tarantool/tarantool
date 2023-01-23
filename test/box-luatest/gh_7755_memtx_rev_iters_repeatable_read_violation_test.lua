@@ -34,7 +34,6 @@ Checks that repeatable read violation with reverse iterators is not possible.
 ]]
 g.test_repeatable_read_violation_with_rev_iter = function(cg)
     cg.server:exec(function(iter)
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local tx1 = txn_proxy:new()

@@ -45,8 +45,6 @@ end)
 -- Checks that replication stream does not get transaction conflict errors.
 g.test_replication_stream_transaction_conflict_errors = function(cg)
     cg.replica:exec(function()
-        local t = require('luatest')
-
         t.assert_equals(box.space.s:select{}, {{0}})
     end)
     cg.master:exec(function()
@@ -63,8 +61,6 @@ g.test_replication_stream_transaction_conflict_errors = function(cg)
     end)
     cg.master:wait_for_downstream_to(cg.replica)
     cg.replica:exec(function()
-        local t = require('luatest')
-
         t.assert_equals(box.space.s:select{}, {})
     end)
 end

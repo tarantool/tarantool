@@ -4,6 +4,7 @@ local net = require('net.box')
 local server = require('luatest.server')
 local urilib = require('uri')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()

@@ -39,7 +39,6 @@ g.test_mvcc_dirty_data_written_to_snapshot = function(cg)
     end)
     cg.server:restart()
     cg.server:exec(function()
-        local t = require('luatest')
         t.assert_equals(box.space.test:select(), {{1, 1}})
     end)
 end

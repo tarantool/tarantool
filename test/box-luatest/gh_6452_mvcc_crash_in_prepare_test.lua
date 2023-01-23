@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -29,7 +30,6 @@ end)
 -- Simplified 1st case from the issue that better describes the problem.
 g.test_mvcc_crash_in_prepare_case1_simplified = function()
     g.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require("test.box.lua.txn_proxy")
 
         local tx1 = txn_proxy.new()
@@ -49,7 +49,6 @@ end
 -- Exactly the 1st case from the issue.
 g.test_mvcc_crash_in_prepare_case1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require("test.box.lua.txn_proxy")
 
         local tx1 = txn_proxy.new()
@@ -78,7 +77,6 @@ end
 -- Simplified 2nd case from the issue that better describes the problem.
 g.test_mvcc_crash_in_prepare_case2_simplified = function()
     g.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require("test.box.lua.txn_proxy")
 
         local tx1 = txn_proxy.new()
@@ -98,7 +96,6 @@ end
 -- Exactly the 2nd case from the issue (except some changed quotes).
 g.test_mvcc_crash_in_prepare_case2 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require("test.box.lua.txn_proxy")
 
         local tx1 = txn_proxy.new()

@@ -29,7 +29,6 @@ end)
 -- Select in RO transaction is similar to autocommit.
 g.test_mvcc_different_select_behavior_simple = function()
     g.server:exec(function()
-        local t = require('luatest')
         local fiber = require('fiber')
         local s = box.space.test
 
@@ -69,7 +68,6 @@ end
 -- for RW transactions prepared statements are visible.
 g.test_mvcc_different_select_behavior_rw = function()
     g.server:exec(function()
-        local t = require('luatest')
         local fiber = require('fiber')
         local s = box.space.test
 
@@ -99,7 +97,6 @@ end
 -- If RO transaction becomes RW - it can be aborted.
 g.test_mvcc_different_select_behavior_ro_rw = function()
     g.server:exec(function()
-        local t = require('luatest')
         local fiber = require('fiber')
         local s = box.space.test
 
@@ -133,7 +130,6 @@ end
         -- Similar conflict but with skipped delete.
 g.test_mvcc_different_select_behavior_ro_rw_delete = function()
     g.server:exec(function()
-        local t = require('luatest')
         local fiber = require('fiber')
         local s = box.space.test
 
@@ -170,7 +166,6 @@ end
 -- Special check that order of read views is correct.
 g.test_mvcc_different_select_behavior_reordering = function()
     g.server:exec(function()
-        local t = require('luatest')
         local fiber = require('fiber')
         local s = box.space.test
         s:replace{0, 0}
@@ -247,7 +242,6 @@ end
 -- Another check that order of read views is correct.
 g.test_mvcc_different_select_behavior_another_reordering = function()
     g.server:exec(function()
-        local t = require('luatest')
         local fiber = require('fiber')
         local s = box.space.test
 

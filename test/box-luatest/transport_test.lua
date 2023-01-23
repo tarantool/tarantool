@@ -1,6 +1,7 @@
 local net = require('net.box')
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -14,7 +15,6 @@ end)
 
 g.test_listen = function()
     g.server:exec(function()
-        local t = require('luatest')
         local listen = box.cfg.listen
         box.cfg({listen = {listen, params = {transport = 'plain'}}})
         t.assert_error_msg_equals(
@@ -26,7 +26,6 @@ end
 
 g.test_replication = function()
     g.server:exec(function()
-        local t = require('luatest')
         local listen = box.cfg.listen
         box.cfg({replication = {listen, params = {transport = 'plain'}}})
         t.assert_error_msg_equals(
@@ -49,7 +48,6 @@ end
 g.test_listen_ssl = function()
     t.tarantool.skip_if_enterprise()
     g.server:exec(function()
-        local t = require('luatest')
         t.assert_error_msg_equals(
             'SSL is not available in this build',
             box.cfg, {listen = 'localhost:0?transport=ssl'})
@@ -59,7 +57,6 @@ end
 g.test_replication_ssl = function()
     t.tarantool.skip_if_enterprise()
     g.server:exec(function()
-        local t = require('luatest')
         t.assert_error_msg_equals(
             'SSL is not available in this build',
             box.cfg, {replication = 'localhost:0?transport=ssl'})

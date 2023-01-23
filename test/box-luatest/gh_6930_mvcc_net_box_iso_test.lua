@@ -24,8 +24,6 @@ g.before_test('test_mvcc_netbox_isolation_level_basics', function()
 end)
 
 g.test_mvcc_netbox_isolation_level_basics = function()
-    local t = require('luatest')
-
     g.server:exec(function()
         local s = box.space.test
         box.error.injection.set('ERRINJ_WAL_DELAY', true)

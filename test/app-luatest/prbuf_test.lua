@@ -1,6 +1,7 @@
 local buffer = require('buffer')
 local ffi = require('ffi')
 local t = require('luatest')
+
 local g = t.group()
 
 local function fill_memory(memory, size)

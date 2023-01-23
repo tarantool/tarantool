@@ -1,4 +1,5 @@
 local t = require('luatest')
+
 local g = t.group('gh-7495')
 
 -- Check that `tarantool.build.target` contains the same CPU architecture as

@@ -19,7 +19,6 @@ end)
 
 g.test_tuple_missing_after_rollback_delete = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.schema.space.create('test', {engine = 'vinyl'})
         s:create_index('primary', {parts = {{1, 'unsigned'}, {2, 'unsigned'}}})
         s:insert({1, 1})

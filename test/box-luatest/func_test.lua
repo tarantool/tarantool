@@ -1,6 +1,7 @@
 local net = require('net.box')
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -116,7 +117,6 @@ end
 
 g.test_gh_7822_vfunc_format = function()
     g.server:exec(function()
-        local t = require('luatest')
         t.assert_equals(box.space._vfunc:format(), box.space._func:format())
     end)
 end

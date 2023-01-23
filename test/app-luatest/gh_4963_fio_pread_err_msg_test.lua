@@ -1,6 +1,6 @@
 local fio = require('fio')
-
 local t = require('luatest')
+
 local g = t.group()
 
 g.test_fio_pread_err_msg = function()
