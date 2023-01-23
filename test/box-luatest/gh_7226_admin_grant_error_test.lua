@@ -14,7 +14,6 @@ end)
 
 g.test_grainting_to_admin = function()
     g.server:exec(function()
-        local t = require('luatest')
         local function grant()
             box.schema.user.grant('admin', 'read', 'universe', nil, nil)
         end

@@ -20,7 +20,6 @@ end)
 
 g.test_box_cfg = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         t.assert_equals(box.cfg.auth_type, 'chap-sha1')
         t.assert_error_msg_equals(
             "Incorrect value for option 'auth_type': should be of type string",
@@ -81,7 +80,6 @@ end)
 
 g.test_replication = function(cg)
     cg.replica:exec(function(uri)
-        local t = require('luatest')
         local urilib = require('uri')
         local parsed_uri = urilib.parse(uri)
         parsed_uri.login = 'test'

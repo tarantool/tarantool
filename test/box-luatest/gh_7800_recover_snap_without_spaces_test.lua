@@ -1,4 +1,5 @@
 local t = require('luatest')
+
 local g = t.group('gh-7800')
 
 g.before_all(function()

@@ -1,6 +1,5 @@
 local t = require('luatest')
 local cluster = require('luatest.replica_set')
-
 local decimal = require('decimal')
 
 local g = t.group('gh-6377-decimal-compare-inf-crash',

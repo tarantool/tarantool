@@ -1,9 +1,9 @@
 local t = require('luatest')
+
 local g = t.group()
 
 -- Check that fiber_join_timeout is accessible from ffi.
 g.test_ffi_fiber_join_timeout = function()
-    local t = require('luatest')
     local ffi = require('ffi')
     local fiber = require('fiber')
     ffi.cdef([[

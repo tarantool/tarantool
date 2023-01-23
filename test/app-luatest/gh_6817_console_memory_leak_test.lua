@@ -2,6 +2,7 @@ local console = require('console')
 local ffi = require('ffi')
 local fiber = require('fiber')
 local t = require('luatest')
+
 local g = t.group()
 
 ffi.cdef([[

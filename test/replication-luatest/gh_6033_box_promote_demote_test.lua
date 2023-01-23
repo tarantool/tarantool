@@ -1,6 +1,7 @@
 local luatest = require('luatest')
 local server = require('luatest.server')
 local cluster = require('luatest.replica_set')
+
 local g_common = luatest.group('gh-6033-box-promote-demote')
 local g_unconfigured = luatest.group('gh-6033-box-promote-demote-unconfigured')
 

@@ -1,7 +1,7 @@
 local t = require('luatest')
 local fio = require('fio')
-local g = t.group()
 
+local g = t.group()
 
 local function readfile(filename)
     local f = assert(io.open(filename, "rb"))

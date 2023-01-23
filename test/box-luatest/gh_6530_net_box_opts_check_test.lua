@@ -2,6 +2,7 @@ local server = require('luatest.server')
 local buffer = require('buffer')
 local net = require('net.box')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()

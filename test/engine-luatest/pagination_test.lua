@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local tree_g = t.group('Tree index tests', {
     {engine = 'memtx', disable_ffi = true},
     {engine = 'memtx', disable_ffi = false},
@@ -51,7 +52,6 @@ end)
 
 tree_g.test_tree_pagination = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.s
         s:create_index("pk", {type = "tree"})
         s:create_index("sk", {parts = {2}, type = "tree", unique=false})
@@ -155,7 +155,6 @@ end
 
 tree_g.test_tree_multikey_pagination = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.s
         s:create_index("pk", {type = "tree"})
         local sk = s:create_index("sk",
@@ -237,7 +236,6 @@ end
 
 tree_g.test_nullable_indexes = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.s
         s:create_index("pk", {type = "tree"})
         s:create_index("sk1",
@@ -324,7 +322,6 @@ end
 -- Check if nil is returned if no tuples were selected.
 tree_g.test_no_tuples_satisfying_filters = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.s
         s:create_index("pk", {type = "tree"})
         s:create_index("sk",
@@ -356,7 +353,6 @@ end
 
 tree_g.test_invalid_positions = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.s
         s:create_index('pk', {type = 'tree'})
         s:create_index('sk', {
@@ -392,7 +388,6 @@ end
 
 tree_g.test_tree_pagination_no_duplicates = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.s
         s:create_index("pk", {type = "tree"})
 
@@ -429,7 +424,6 @@ end
 
 tree_g.test_tuple_pos_simple = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.s
         s:create_index("pk", {type = "tree"})
         s:create_index("sk", {
@@ -467,7 +461,6 @@ end
 
 tree_g.test_tuple_pos_corner_cases = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.s
         s:create_index("pk", {type = "tree"})
         local sk1 = s:create_index("sk1", {parts = {{field = 2, type = 'uint'}},
@@ -495,7 +488,6 @@ end
 
 tree_g.test_tuple_pos_invalid_tuple = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.s
         s:create_index("pk", {type = "tree", parts={{field=1, type='uint'}}})
 
@@ -522,7 +514,6 @@ tree_g.test_runtime_memory_leak = function(cg)
     cg.server:exec(function()
         local fiber = require('fiber')
         fiber.set_max_slice(fiber.self(), 8)
-        local t = require('luatest')
         local s = box.space.s
         local pk = s:create_index("pk")
         local tuple = s:replace{0, 0}
@@ -554,7 +545,6 @@ end
 
 tree_g.test_pagination_pairs = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.s
         s:create_index("pk", {type = "tree"})
         s:create_index("sk", {parts = {2}, type = "tree", unique=false})
@@ -595,7 +585,6 @@ end
 
 tree_g.test_concurrent_pairs = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.s
         local index = s:create_index("pk", {type = "tree"})
 
@@ -625,7 +614,6 @@ end
 
 tree_g.test_empty_page_with_offset = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.s
         s:create_index("pk", {type = "tree"})
         s:replace{1}
@@ -651,7 +639,6 @@ end)
 
 tree_g.test_gh_7943 = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.s
         s:create_index('pk')
         s:replace({1})
@@ -691,7 +678,6 @@ end)
 
 func_g.test_func_index_pagination = function()
     func_g.server:exec(function()
-        local t = require('luatest')
         local s = box.space.s
         s:create_index('pk',{parts={{field = 1, type = 'uint'}}})
         local lua_code = [[function(tuple) return {tuple[2]} end]]
@@ -783,7 +769,6 @@ end
 
 func_g.test_func_multikey_index_pagination = function()
     func_g.server:exec(function()
-        local t = require('luatest')
         local s = box.space.s
         s:create_index('pk', {parts = {{field = 1, type = 'uint'}}})
         local lua_code = [[function(tuple)
@@ -913,7 +898,6 @@ end)
 
 no_sup.test_unsupported_pagination = function(cg)
     cg.server:exec(function(index_type)
-        local t = require('luatest')
         t.assert_error_msg_contains('does not support pagination',
                 box.space.s.index.sk.select, box.space.s.index.sk,
                 nil, {fullscan=true, fetch_pos=true})

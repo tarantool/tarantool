@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -43,7 +44,6 @@ end)
 
 g.test_func_index_iterator_stable = function()
     g.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         s:insert{1, 'abc'}
         s:insert{2, 'foo bar'}

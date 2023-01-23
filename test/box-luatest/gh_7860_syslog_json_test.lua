@@ -3,6 +3,7 @@ local json = require('json')
 local server = require('luatest.server')
 local socket = require('socket')
 local t = require('luatest')
+
 local g = t.group()
 
 local VARDIR = fio.abspath(os.getenv('VARDIR') or 'test/var')
@@ -46,7 +47,7 @@ g.before_all(function(cg)
         t.assert_equals(result, {
             cord_name = 'main',
             fiber_name = 'main',
-            line = 28,
+            line = 29,
             level = 'WARN',
             message = expected_msg,
             module = "test.box-luatest.gh_7860_syslog_json_test",
@@ -61,7 +62,7 @@ g.before_all(function(cg)
             hdr,
             '<%d+>%a+%s+%d%d?%s+%d%d:%d%d:%d%d%s+tt%[' .. cg.pid .. '%]:%s' ..
             'main/%d+/main/test%.box%-luatest%.gh_7860_syslog_json_test%s' ..
-            'gh_7860_syslog_json_test%.lua:28')
+            'gh_7860_syslog_json_test%.lua:29')
         t.assert_equals(msg, expected_msg .. '\n')
     end
 end)

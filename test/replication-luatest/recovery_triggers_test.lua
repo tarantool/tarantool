@@ -101,7 +101,6 @@ g.test_recovery_stages = function(cg)
     wait_state(cg.replica, 'synced')
     -- Check that triggers on 'synced' stage are executed only once.
     cg.replica:exec(function()
-        local t = require('luatest')
         local num_events = #_G.test_states
         local old_repl = box.cfg.replication
         box.cfg{replication = ''}

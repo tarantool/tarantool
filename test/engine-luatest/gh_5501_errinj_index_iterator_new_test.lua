@@ -1,4 +1,5 @@
 local t = require('luatest')
+
 local g = t.group('gh-5501', {{engine = 'memtx'},
                               {engine = 'vinyl'}})
 

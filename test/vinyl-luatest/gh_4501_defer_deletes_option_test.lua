@@ -1,6 +1,7 @@
 local common = require('test.vinyl-luatest.common')
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -26,7 +27,6 @@ end)
 
 g.test_option = function()
     g.server:exec(function()
-        local t = require('luatest')
         local s
 
         -- Invalid arguments.
@@ -91,7 +91,6 @@ end
 
 g.test_disabled = function()
     g.server:exec(function()
-        local t = require('luatest')
         local s = box.schema.space.create('test', {
             engine = 'vinyl', defer_deletes = false})
         s:create_index('pk', {parts = {1, 'unsigned'}})
@@ -106,7 +105,6 @@ end
 
 g.test_enabled = function()
     g.server:exec(function()
-        local t = require('luatest')
         local s = box.schema.space.create('test', {
             engine = 'vinyl', defer_deletes = true})
         s:create_index('pk', {parts = {1, 'unsigned'}})

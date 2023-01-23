@@ -12,7 +12,6 @@ g.before_all(function(cg)
         local msgpack = require('msgpack')
         local uri = require('uri')
         local socket = require('socket')
-        local t = require('luatest')
 
         -- Connect to the server.
         local u = uri.parse(net_box_uri)
@@ -127,8 +126,6 @@ end)
 -- Checks that `box.iproto.override` errors are handled correctly.
 g.test_box_iproto_override_errors = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
-
         local err_msg = "Usage: box.iproto.override(request_type, callback)"
         t.assert_error_msg_content_equals(err_msg, function()
             box.iproto.override()

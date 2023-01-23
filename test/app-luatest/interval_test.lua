@@ -1,8 +1,9 @@
 local t = require('luatest')
-local g = t.group()
 local msgpack = require('msgpack')
 local msgpackffi = require('msgpackffi')
 local itv = require('datetime').interval
+
+local g = t.group()
 
 -- Interval is 1 year, 127 days and 15 minutes
 local bin = '\xc7\x09\x06\x04\x00\x01\x03\x7f\x05\x0f\x08\x01'

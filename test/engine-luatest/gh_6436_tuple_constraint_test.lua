@@ -2,6 +2,7 @@
 local server = require('luatest.server')
 local netbox = require('net.box')
 local t = require('luatest')
+
 local g = t.group('gh-6436-tuple-constraint-test', {{engine = 'memtx'}, {engine = 'vinyl'}})
 
 g.before_all(function(cg)
@@ -59,7 +60,6 @@ g.test_tuple_constraint_basics = function(cg)
     -- check accessing from lua
     local function test_lua(cg, field4)
         cg.server:exec(function(field4)
-            local t = require('luatest')
             local s = box.space.test
 
             t.assert_equals(s:replace{1, 2, 3, field4}, {1, 2, 3, field4})
@@ -106,7 +106,6 @@ g.test_tuple_constraint_basics = function(cg)
 
     -- Check non-plain format.
     cg.server:exec(function()
-        local t = require('luatest')
         t.assert_error_msg_content_equals(
             "Tuple field [4][\"field\"] required by space format is missing",
             function()
@@ -149,8 +148,6 @@ g.test_wrong_tuple_constraint = function(cg)
     end)
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
-
         local constr_tuple_body1 = "function(x) return true end"
         local constr_tuple_body2 = "function(x) return false end"
         local function tuple_constr3() end
@@ -234,7 +231,6 @@ g.test_wrong_tuple_constraint = function(cg)
     end, {engine})
 
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
 
         t.assert_error_msg_content_equals(
@@ -321,7 +317,6 @@ g.test_several_tuple_constraints = function(cg)
     -- check accessing from lua
     local function test_lua(cg, field4)
         cg.server:exec(function(field4)
-            local t = require('luatest')
             local s = box.space.test
 
             t.assert_equals(s:replace{1, 2, 3, field4}, {1, 2, 3, field4})
@@ -375,7 +370,6 @@ g.test_several_tuple_constraints = function(cg)
 
     -- Check non-plain format.
     cg.server:exec(function()
-        local t = require('luatest')
         t.assert_error_msg_content_equals(
             "Tuple field [4][\"field\"] required by space format is missing",
             function()
@@ -436,7 +430,6 @@ g.test_tuple_constraint_integrity = function(cg)
     end, {engine})
 
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
 
         t.assert_equals(s.constraint, nil)
@@ -451,8 +444,6 @@ g.test_tuple_constraint_integrity = function(cg)
 
     local function check_references()
         cg.server:exec(function()
-            local t = require('luatest')
-
             t.assert_error_msg_contains(
                 "Can't drop function",
                 function() box.func.tuple_constr1:drop() end
@@ -474,7 +465,6 @@ g.test_tuple_constraint_integrity = function(cg)
     check_references()
 
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
 
         t.assert_equals(s.constraint, {tuple_constr1 = box.func.tuple_constr1.id})

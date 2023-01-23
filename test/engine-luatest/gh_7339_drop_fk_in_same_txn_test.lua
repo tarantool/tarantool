@@ -64,7 +64,6 @@ end)
 
 g.test_constraints_alter_in_txn = function(cg)
     cg.server:exec(function(alter)
-        local t = require('luatest')
         local a = box.space.a
         local b = box.space.b
         box.begin()

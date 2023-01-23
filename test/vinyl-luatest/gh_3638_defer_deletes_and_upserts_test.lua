@@ -18,7 +18,6 @@ end)
 --
 g.test_defer_deletes_and_upserts = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.schema.space.create('test', {
             engine = 'vinyl',
             defer_deletes = true,

@@ -1,8 +1,9 @@
 local server = require('luatest.server')
 local t = require('luatest')
-local g = t.group()
 local net = require('net.box')
 local console = require('console')
+
+local g = t.group()
 
 g.before_all(function()
     g.server = server:new({alias = 'master'})

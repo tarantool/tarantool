@@ -1,6 +1,7 @@
 local t = require('luatest')
-local g = t.group('gh-7149')
 local server = require('luatest.server')
+
+local g = t.group('gh-7149')
 
 g.after_each(function()
     g.server:drop()

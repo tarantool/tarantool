@@ -15,8 +15,6 @@ end)
 -- Checks uncovered function definition error conditions.
 g.test_func_def_err_conditions = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
-
         local function setmap(table)
             return setmetatable(table, { __serialize = 'map' })
         end

@@ -34,7 +34,6 @@ Checks that phantom reads with `get` from nullable TREE index are not allowed.
 ]]
 g.test_memtx_tree_idx_get_with_nullable_field_phantom_read = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local tx = txn_proxy:new()
@@ -51,7 +50,6 @@ Checks that reads with `get` from nullable TREE index are tracked correctly.
 ]]
 g.test_memtx_tree_idx_get_with_nullable_field_read_tracked = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local tx = txn_proxy:new()

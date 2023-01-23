@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -27,7 +28,6 @@ end)
 g.test_limit_iteration = function()
     g.server:exec(function()
         local fiber = require('fiber')
-        local t = require('luatest')
 
         local check_fiber_slice = function(fiber_f)
             local fib = fiber.new(fiber_f)

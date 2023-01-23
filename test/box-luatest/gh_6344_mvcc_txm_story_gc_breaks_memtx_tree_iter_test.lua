@@ -17,8 +17,6 @@ end)
 
 g.test_mvcc_txm_story_gc_does_not_break_memtx_tree_iter = function()
     g.server:exec(function()
-        local t = require('luatest')
-
         local s = box.schema.space.create('test')
         local idx_parts = {
             {field = 1, type = 'unsigned'},

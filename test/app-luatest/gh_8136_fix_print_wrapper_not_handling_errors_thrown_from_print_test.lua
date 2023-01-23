@@ -1,6 +1,6 @@
 local it = require('test.interactive_tarantool')
-
 local t = require('luatest')
+
 local g = t.group()
 
 -- Checks that `print` throwing an error is handled correctly.

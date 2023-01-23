@@ -206,7 +206,7 @@ g.test_promote_order = function(cg)
     -- Give r2 a chance to fetch the new tuple.
     fiber.sleep(cg.box_cfg.replication_timeout + 0.1)
     cg.r2:exec(function()
-        require('luatest').assert(box.info.synchro.queue.busy == true)
+        t.assert(box.info.synchro.queue.busy == true)
         box.error.injection.set('ERRINJ_WAL_DELAY', false)
         box.ctl.wait_rw()
     end)

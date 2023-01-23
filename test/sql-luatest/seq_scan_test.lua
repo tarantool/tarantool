@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -24,7 +25,6 @@ end)
 g.test_seq_scan_error = function()
     g.server:exec(function()
         box.execute([[SET SESSION "sql_seq_scan" = false;]])
-        local t = require('luatest')
 
         local _, err = box.execute([[SELECT * FROM t;]])
         t.assert_equals(err.message, "Scanning is not allowed for 'T'")
@@ -40,7 +40,6 @@ end
 g.test_seq_scan_success = function()
     g.server:exec(function()
         box.execute([[SET SESSION "sql_seq_scan" = false;]])
-        local t = require('luatest')
 
         local res, err = box.execute([[SELECT max(i) FROM t;]])
         t.assert(res ~= nil and err == nil)
@@ -62,7 +61,6 @@ end
 g.test_seq_scan_keyword = function()
     g.server:exec(function()
         box.execute([[SET SESSION "sql_seq_scan" = false;]])
-        local t = require('luatest')
 
         local res, err = box.execute([[SELECT * FROM SEQSCAN t;]])
         t.assert(res ~= nil and err == nil)
@@ -81,7 +79,6 @@ end
 g.test_seq_scan_joins = function()
     g.server:exec(function()
         box.execute([[SET SESSION "sql_seq_scan" = false;]])
-        local t = require('luatest')
 
         local _, err = box.execute([[SELECT * FROM t, s;]])
         t.assert_equals(err.message, "Scanning is not allowed for 'S'")
@@ -178,7 +175,6 @@ end
 g.test_seq_scan_enabled = function()
     g.server:exec(function()
         box.execute([[SET SESSION "sql_seq_scan" = true;]])
-        local t = require('luatest')
 
         local res, err = box.execute([[SELECT * FROM t;]])
         t.assert(res ~= nil and err == nil)
@@ -206,7 +202,6 @@ end
 g.test_seq_scan_not_select = function()
     g.server:exec(function()
         box.execute([[SET SESSION "sql_seq_scan" = false;]])
-        local t = require('luatest')
 
         local res, err = box.execute([[UPDATE t SET a = 10 WHERE i + 1 = 2;]])
         t.assert(res ~= nil and err == nil)

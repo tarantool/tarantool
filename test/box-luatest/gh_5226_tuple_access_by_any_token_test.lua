@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -17,7 +18,6 @@ end)
 --
 g.test_tuple_access_by_any_token = function()
     g.server:exec(function()
-        local t = require('luatest')
         local s = box.schema.space.create('test')
         s:create_index('pk')
         s:create_index('sk', {parts = {{'[2][1][1]', 'unsigned'}}})

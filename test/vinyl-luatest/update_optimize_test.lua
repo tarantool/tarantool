@@ -1,6 +1,5 @@
 local t = require('luatest')
 local server = require('luatest.server')
-
 local common = require('test.vinyl-luatest.common')
 
 local g = t.group()
@@ -38,8 +37,6 @@ end)
 
 g.test_optimize_one_index = function()
     g.server:exec(function()
-        local t = require('luatest')
-
         box.space.test:create_index('primary', {run_count_per_level = 20})
         box.space.test:create_index('secondary',
             {parts = {5, 'unsigned'}, run_count_per_level = 20})
@@ -148,8 +145,6 @@ end
 
 g.test_optimize_two_indexes = function()
     g.server:exec(function()
-        local t = require('luatest')
-
         box.space.test:create_index('primary',
             {parts = {2, 'unsigned'}, run_count_per_level = 20})
         box.space.test:create_index('secondary',
@@ -308,8 +303,6 @@ end
 -- gh-1716: optimize UPDATE with field num > 64.
 g.test_optimize_UPDATE_with_field_num_more_than_64 = function()
     g.server:exec(function()
-        local t = require('luatest')
-
         box.space.test:create_index('primary',
             {parts = {2, 'unsigned'}, run_count_per_level = 20})
         box.space.test:create_index('secondary',
@@ -396,8 +389,6 @@ end
 
 g.test_optimize_update_does_not_skip_entire_key_during_dump = function()
     g.server:exec(function()
-        local t = require('luatest')
-
         box.space.test:create_index('primary',
             {parts = {2, 'unsigned'}, run_count_per_level = 20})
         box.space.test:create_index('secondary',
@@ -450,8 +441,6 @@ end
 -- gh-2980: key uniqueness is not checked if indexed fields are not updated.
 g.test_key_uniqueness_not_checked_if_indexed_fields_not_updated = function()
     g.server:exec(function()
-        local t = require('luatest')
-
         box.space.test:create_index('primary',
             {parts = {2, 'unsigned'}, run_count_per_level = 20})
         box.space.test:create_index('secondary',
@@ -496,8 +485,6 @@ end
 -- fields.
 g.test_no_phantom_tuples_in_secondary_index = function()
     g.server:exec(function()
-        local t = require('luatest')
-
         box.space.test:create_index('primary')
         box.space.test:create_index('secondary',
             {parts = {2, 'unsigned'}, run_count_per_level = 10})

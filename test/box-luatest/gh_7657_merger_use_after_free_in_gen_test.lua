@@ -2,8 +2,8 @@ local buffer = require('buffer')
 local msgpack = require('msgpack')
 local key_def = require('key_def')
 local merger = require('merger')
-
 local t = require('luatest')
+
 local g = t.group()
 
 -- There are four types of merge sources: tuple, table, buffer and

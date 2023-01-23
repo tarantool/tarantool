@@ -1,6 +1,7 @@
 local t = require('luatest')
 local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
+
 local wait_timeout = 120
 
 --
@@ -331,7 +332,6 @@ g.test_read_only_reason_synchro_no_uuid = function(g)
     local leader_id = g.master:get_instance_id()
     t.helpers.retrying({}, function()
         g.replica:exec(function(leader_id)
-            local t = require('luatest')
             t.assert_not_equals(box.info.synchro.queue.owner, 0)
             t.assert_equals(box.info.replication[leader_id], nil)
         end, {leader_id})

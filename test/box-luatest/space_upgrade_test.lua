@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -17,7 +18,6 @@ end)
 g.test_low_level_api = function()
     t.tarantool.skip_if_enterprise()
     g.server:exec(function()
-        local t = require('luatest')
         t.assert_error_msg_equals(
             "Community edition does not support space upgrade",
             box.space._space.update, box.space._space,
@@ -28,7 +28,6 @@ end
 g.test_high_level_api = function()
     t.tarantool.skip_if_enterprise()
     g.server:exec(function()
-        local t = require('luatest')
         t.assert_error_msg_equals(
             "Community edition does not support space upgrade",
             box.space.test.upgrade, box.space.test, {})

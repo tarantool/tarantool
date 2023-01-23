@@ -2,6 +2,7 @@
 -- Complex foreign keys do not work with nullable fields
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group('gh-7046-complex-fkey-nullable-test',
                   {{engine = 'memtx'}, {engine = 'vinyl'}})
 
@@ -28,8 +29,6 @@ g.test_complex_fkey_primary = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
-
         local fmt = {{name='id1', type='unsigned'},
                      {name='id2', type='unsigned'}}
         local opts = {engine=engine, format=fmt}
@@ -69,8 +68,6 @@ g.test_complex_fkey_secondary = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
-
         local fmt = {{name='id', type='string'},
                      {name='id1', type='string'},
                      {name='id2', type='string'}}
@@ -115,8 +112,6 @@ g.test_complex_fkey_self = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
-
         local fmt = {{name='disk', type='string'},
                      {name='dir', type='string'},
                      {name='parent_disk', type='string', is_nullable=true},

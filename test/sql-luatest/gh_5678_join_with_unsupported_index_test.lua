@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -16,7 +17,6 @@ end)
 
 g.test_join_with_unsupported_index = function()
     g.server:exec(function()
-        local t = require('luatest')
         local s = box.schema.space.create('T', {format = {'I'}})
         s:create_index('ii', {type = 'hash'})
         local _, err = box.execute([[SELECT a.i FROM t AS a, t;]])

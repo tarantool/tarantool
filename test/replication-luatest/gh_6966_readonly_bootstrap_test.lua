@@ -1,7 +1,6 @@
 local t = require('luatest')
 local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
-
 local fio = require('fio')
 
 local g = t.group('gh-6966-readonly-bootstrap')
@@ -44,15 +43,15 @@ g.test_ro_bootstrap = function(cg)
                  'Replica receives the ER_READONLY error')
     end)
     cg.master:exec(function()
-        require('luatest').assert(box.space._cluster:count() == 1,
-                                  'No join while master is read-only')
+        t.assert(box.space._cluster:count() == 1,
+                 'No join while master is read-only')
     end)
     cg.master:eval('box.cfg{read_only = false}')
     cg.replica:wait_until_ready()
     t.helpers.retrying({}, function()
         cg.master:exec(function()
-            require('luatest').assert(box.space._cluster:count() == 2,
-                                      'Join after master became writeable')
+            t.assert(box.space._cluster:count() == 2,
+                     'Join after master became writeable')
         end)
         cg.replica:assert_follows_upstream(1)
     end)

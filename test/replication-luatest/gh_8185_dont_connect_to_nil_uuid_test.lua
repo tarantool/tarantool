@@ -1,9 +1,9 @@
 local luatest = require('luatest')
 local server = require('luatest.server')
 local proxy = require('luatest.replica_proxy')
-local g = luatest.group('gh_8185_nil_uuid_connection')
-
 local fio = require('fio')
+
+local g = luatest.group('gh_8185_nil_uuid_connection')
 
 g.before_each(function(cg)
     cg.server = server:new({

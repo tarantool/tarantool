@@ -1,4 +1,5 @@
 local t = require('luatest')
+
 local g = t.group('gh-7652', {{engine = 'memtx'}, {engine = 'vinyl'}})
 
 g.before_all(function(cg)
@@ -84,7 +85,6 @@ g.test_dict_rollback = function(cg)
         box.begin()
         s1:format({{'id'}, {'new_name'}})
         box.rollback()
-        local t = require('luatest')
         t.assert_error_msg_content_equals(
             "Tuple field 2 (old_name) required by space format is missing",
             function() s1:insert{1} end)

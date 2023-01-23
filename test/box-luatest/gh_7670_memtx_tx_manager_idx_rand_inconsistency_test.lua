@@ -33,7 +33,6 @@ Checks that `index:random` from empty space is tracked correctly.
 ]]
 pg.test_idx_random_from_empty_space_tracking = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local tx = txn_proxy:new()
@@ -52,7 +51,6 @@ Checks that `index:random` result is tracked correctly.
 ]]
 pg.test_idx_random_res_tracking = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local tx = txn_proxy:new()
@@ -72,7 +70,6 @@ Checks that `index:random` result is clarified correctly.
 ]]
 pg.test_idx_random_res_clarification = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local tx1 = txn_proxy:new()
@@ -91,7 +88,6 @@ from the transaction's perspective.
 ]]
 pg.test_idx_random_empty_space_from_tx_perspective = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local tx = txn_proxy:new()
@@ -110,7 +106,6 @@ Checks that `index:random` works correctly in case the space has dirty tuples.
 ]]
 pg.test_idx_random_with_dirty_tuples = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local tx = txn_proxy:new()

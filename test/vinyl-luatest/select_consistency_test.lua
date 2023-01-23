@@ -66,7 +66,6 @@ g.test_select_consistency = function(cg)
         cg.server:exec(function()
             local digest = require('digest')
             local fiber = require('fiber')
-            local t = require('luatest')
 
             math.randomseed(os.time())
             box.stat.reset()
@@ -216,7 +215,6 @@ g.test_select_consistency = function(cg)
     run_test()
     -- Peform major compaction and check that there is no garbage statements.
     cg.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         box.stat.reset()
         box.snapshot()

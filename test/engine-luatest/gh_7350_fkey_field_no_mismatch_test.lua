@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group('gh-7350-fkey-field-no-mismatch',
                   {{engine = 'memtx'}, {engine = 'vinyl'}})
 
@@ -24,7 +25,6 @@ g.test_fkey_field_no = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
         local s1 = box.schema.create_space('s1', {engine=engine})
 
         local fmt = {{name='f1', type='any', foreign_key={k1={space=s1.id, field=2}}},

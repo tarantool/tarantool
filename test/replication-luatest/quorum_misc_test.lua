@@ -3,9 +3,10 @@ local log = require('log')
 local fio = require('fio')
 local Cluster =  require('luatest.replica_set')
 local server = require('luatest.server')
-local COUNT = 100
 
 local pg = t.group('quorum_misc', {{engine = 'memtx'}, {engine = 'vinyl'}})
+
+local COUNT = 100
 
 pg.before_each(function(cg)
     cg.cluster = Cluster:new({})

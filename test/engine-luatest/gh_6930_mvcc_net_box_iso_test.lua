@@ -26,8 +26,6 @@ end)
 g.test_mvcc_netbox_isolation_level_basics = function(cg)
     t.tarantool.skip_if_not_debug()
 
-    local t = require('luatest')
-
     cg.server:exec(function()
         local s = box.space.test
         box.error.injection.set('ERRINJ_WAL_DELAY', true)

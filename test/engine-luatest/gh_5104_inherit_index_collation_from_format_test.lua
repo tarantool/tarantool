@@ -1,4 +1,5 @@
 local t = require('luatest')
+
 local g = t.group('gh-5104', {{engine = 'memtx'},
                               {engine = 'vinyl'}})
 
@@ -18,7 +19,6 @@ g.test_collation = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
         local s = box.schema.space.create('test', {engine = engine})
         s:format({{name = 'a', type = 'string', collation = 'unicode_ci'}})
         s:create_index('pk', {parts = {{'a', 'string'}}})

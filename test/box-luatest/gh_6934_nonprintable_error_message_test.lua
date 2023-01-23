@@ -1,5 +1,6 @@
 local console = require('console')
 local t = require('luatest')
+
 local g = t.group()
 
 -- Check that an error message with invalid UTF-8 sequences is encoded to Base64

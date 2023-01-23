@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -22,7 +23,6 @@ end)
 -- Make sure ALTER TABLE ADD COLUMN does not drop field constraints.
 g.test_constraints_1 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local fmt = {{'a', 'integer'}, {'b', 'integer'}}
 
         local body = "function(x) return true end"
@@ -49,8 +49,6 @@ end
 -- Make sure ALTER TABLE DROP CONSTRAINT drops field and tuple constraints.
 g.test_constraints_2 = function()
     g.server:exec(function()
-        local t = require('luatest')
-
         local body = "function(x) return true end"
         box.schema.func.create('ck1', {is_deterministic = true, body = body})
         local func_id = box.space._func.index[2]:get{'ck1'}.id
@@ -150,8 +148,6 @@ end
 --
 g.test_constraints_3 = function()
     g.server:exec(function()
-        local t = require('luatest')
-
         local sql = [[CREATE TABLE t(i INT PRIMARY KEY, a INT REFERENCES t ]]..
                     [[DEFERRABLE);]]
         local _, err = box.execute(sql);
@@ -190,7 +186,6 @@ end
 -- Make sure "sql_defer_foreign_keys" session setting no longer exists.
 g.test_constraints_4 = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT * FROM "_session_settings" ]]..
                     [[WHERE "name" = 'sql_defer_foreign_keys';]]
         t.assert_equals(box.execute(sql).rows, {})
@@ -205,8 +200,6 @@ end
 -- Make sure field foreign key created properly.
 g.test_constraints_5 = function()
     g.server:exec(function()
-        local t = require('luatest')
-
         local sql = "CREATE TABLE t (i INT PRIMARY KEY, a INT REFERENCES t(i));"
         box.execute(sql)
         local res = {fk_unnamed_T_A_1 = {field = 1, space = box.space.T.id}}
@@ -364,8 +357,6 @@ end
 -- Make sure tuple foreign key created properly.
 g.test_constraints_6 = function()
     g.server:exec(function()
-        local t = require('luatest')
-
         local sql = [[CREATE TABLE t (i INT PRIMARY KEY, a INT, ]]..
             [[FOREIGN KEY (i, a) REFERENCES t(i, a));]]
         box.execute(sql)
@@ -429,8 +420,6 @@ end
 -- Make sure field check constraints are created properly.
 g.test_constraints_7 = function()
     g.server:exec(function()
-        local t = require('luatest')
-
         box.execute([[CREATE TABLE t(i INT PRIMARY KEY, a INT CHECK(a > 10));]])
         local res = {ck_unnamed_T_A_1 = box.func.check_T_ck_unnamed_T_A_1.id}
         t.assert_equals(box.space.T:format()[2].constraint, res)
@@ -462,7 +451,6 @@ end
 -- Make sure tuple check constraints are created properly.
 g.test_constraints_8 = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.execute([[CREATE TABLE t(i INT PRIMARY KEY, a INT,
                       CHECK(a > 10));]])
         local res = {ck_unnamed_T_1 = box.func.check_T_ck_unnamed_T_1.id}
@@ -500,8 +488,6 @@ end
 --
 g.test_constraints_9 = function()
     g.upgrade:exec(function()
-        local t = require('luatest')
-
         t.assert_equals(box.space._ck_constraint:select(), {})
         t.assert_equals(box.space._fk_constraint:select(), {})
 
@@ -530,7 +516,6 @@ end
 --
 g.test_constraints_10 = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.execute([[CREATE TABLE t(i INT PRIMARY KEY);]])
         local s = box.space.T
         local rec = {s.id, 'one', false, 'SQL', 'I > 10', true}
@@ -546,7 +531,6 @@ end
 -- Make sure that check constraints can no longer be ENABLED or DISABLED.
 g.test_constraints_11 = function()
     g.server:exec(function()
-        local t = require('luatest')
         box.execute([[CREATE TABLE t(i INT PRIMARY KEY,
                                      CONSTRAINT one CHECK (i > 10));]])
         local _, err = box.execute([[INSERT INTO t VALUES (1);]])

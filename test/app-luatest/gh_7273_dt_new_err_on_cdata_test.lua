@@ -1,6 +1,6 @@
 local datetime = require('datetime')
-
 local t = require('luatest')
+
 local g = t.group()
 
 g.test_dt_new_err_on_cdata = function()

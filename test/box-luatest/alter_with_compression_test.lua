@@ -18,7 +18,6 @@ end)
 g.test_invalid_compression_type_during_space_creation = function(cg)
     t.tarantool.skip_if_enterprise()
     cg.server:exec(function(engine, compression)
-        local t = require('luatest')
         local format = {{
             name = 'x', type = 'unsigned', compression = compression
         }}
@@ -37,7 +36,6 @@ end)
 g.test_invalid_compression_type_during_setting_format = function(cg)
     t.tarantool.skip_if_enterprise()
     cg.server:exec(function(compression)
-        local t = require('luatest')
         local format = {{
             name = 'x', type = 'unsigned', compression = compression
         }}
@@ -71,7 +69,6 @@ end)
 
 g.test_none_compression_during_space_creation = function(cg)
     cg.server:exec(function(engine)
-        local t = require('luatest')
         local format = {{
             name = 'x', type = 'unsigned', compression = 'none'
         }}
@@ -89,7 +86,6 @@ end)
 
 g.test_none_compression_during_setting_format = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local format = {{
             name = 'x', type = 'unsigned', compression = 'none'
         }}

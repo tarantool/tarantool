@@ -1,4 +1,5 @@
 local t = require('luatest')
+
 local g = t.group('gh-8158')
 
 -- Check that Tarantool can be successfully started from the root directory.

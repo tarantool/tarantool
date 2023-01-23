@@ -1,6 +1,7 @@
 local t = require('luatest')
-local g = t.group()
 local compat = require('tarantool').compat
+
+local g = t.group()
 
 local NEW = 'new'
 local OLD = 'old'

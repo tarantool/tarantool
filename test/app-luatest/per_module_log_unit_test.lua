@@ -1,7 +1,8 @@
 local t = require('luatest')
+local tarantool = require('tarantool')
+
 local g = t.group('per_module_log_unit')
 
-local tarantool = require('tarantool')
 local strip_cwd_from_path = tarantool._internal.strip_cwd_from_path
 local module_name_from_filename = tarantool._internal.module_name_from_filename
 

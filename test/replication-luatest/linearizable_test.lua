@@ -2,9 +2,9 @@ local t = require('luatest')
 local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 local proxy = require('luatest.replica_proxy')
-local g = t.group('linearizable-read')
-
 local fiber = require('fiber')
+
+local g = t.group('linearizable-read')
 
 local function build_replication(num_instances)
     local t = {}
@@ -64,7 +64,6 @@ end)
 g.test_wait_others = function(cg)
     cg.proxies[1]:pause()
     local fid = cg.servers[1]:exec(function()
-        local t = require('luatest')
         local fiber = require('fiber')
         local f = fiber.new(function()
             return pcall(box.begin, {txn_isolation = 'linearizable'})
@@ -86,7 +85,6 @@ end
 g.test_timeout = function(cg)
     t.tarantool.skip_if_not_debug()
     cg.servers[1]:exec(function()
-        local t = require('luatest')
         box.error.injection.set('ERRINJ_RELAY_FROM_TX_DELAY', true)
         local ok, err = pcall(box.begin, {txn_isolation = 'linearizable',
                                           timeout = 0.01})
@@ -128,7 +126,6 @@ end)
 
 g.test_no_dirty_reads = function(cg)
     local quorum = cg.servers[2]:exec(function()
-        local t = require('luatest')
         local lsn = box.info.lsn
         local q = box.cfg.replication_synchro_quorum
         box.cfg{replication_synchro_quorum = 4}
@@ -137,7 +134,6 @@ g.test_no_dirty_reads = function(cg)
         return q
     end)
     cg.servers[1]:exec(function()
-        local t = require('luatest')
         local ok, err = pcall(box.begin, {txn_isolation = 'linearizable',
                                           timeout = 0.1})
         t.assert(not ok, 'Error with unconfirmed transaction')
@@ -150,7 +146,6 @@ g.test_no_dirty_reads = function(cg)
         box.cfg{replication_synchro_quorum = q}
     end, {quorum})
     cg.servers[1]:exec(function()
-        local t = require('luatest')
         box.begin{txn_isolation = 'linearizable'}
         local len = box.info.synchro.queue.len
         local get = box.space.sync:get{1}
@@ -212,7 +207,6 @@ g.test_leader_change = function(cg)
             return owner, get
         end)
         f:set_joinable(true)
-        local t = require('luatest')
         t.assert_equals(f:status(), 'suspended', 'begin waits for others')
         return f:id()
     end)
