@@ -21,8 +21,8 @@ g.test_basic_print_with_exception = function()
     ]])
     child:assert_empty_response()
 
-    local exp_line = it.PROMPT .. it.CR .. it.ERASE_IN_LINE ..
-                     it.PROMPT .. it.CR .. it.ERASE_IN_LINE ..
+    local exp_line = child:prompt() .. it.CR .. it.ERASE_IN_LINE ..
+                     child:prompt() .. it.CR .. it.ERASE_IN_LINE ..
                      'flood'
     for _ = 1, 10 do
         child:assert_line(exp_line)
