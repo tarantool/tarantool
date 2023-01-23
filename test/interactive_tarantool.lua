@@ -156,8 +156,7 @@ function mt._assert_command_echo(self, prepared_command, opts)
     local opts = opts or {}
     local deadline = opts.deadline or (fiber.clock() + TIMEOUT)
 
-    local prompt = 'tarantool> '
-    local exp_echo = prompt .. prepared_command:rstrip('\n')
+    local exp_echo = self._prompt .. prepared_command:rstrip('\n')
     local echo = self:read_line({deadline = deadline})
 
     -- If readline wraps the line, prepare the commands for
@@ -211,6 +210,15 @@ function mt.assert_empty_response(self, opts)
     end
 end
 
+-- Prompt may be different for remote console.
+function mt.set_prompt(self, prompt)
+    self._prompt = prompt
+end
+
+function mt.prompt(self)
+    return self._prompt
+end
+
 function mt.close(self)
     self:_stop_stderr_logger()
     self.ph:close()
@@ -255,6 +263,7 @@ function M.new(opts)
     local res = setmetatable({
         ph = ph,
         _readahead_buffer = '',
+        _prompt = 'tarantool> ',
     }, mt)
 
     -- Log child's stderr.
@@ -283,10 +292,6 @@ end
 -- }}} Module functions
 
 -- {{{ Module constants
-
--- It may be different for remote console, but the module supports
--- only local console for now.
-M.PROMPT = 'tarantool> '
 
 M.TAB = '\x09'
 M.LF = '\x0a'
