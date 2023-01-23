@@ -170,13 +170,14 @@ applier_check_sync(struct applier *applier)
  * but doesn't start it.
  */
 static struct fiber *
-applier_fiber_new(struct applier *applier, const char *name, fiber_func func)
+applier_fiber_new(struct applier *applier, const char *name, fiber_func func,
+		  bool is_joinable)
 {
 	char buf[FIBER_NAME_MAX];
 	int pos = snprintf(buf, sizeof(buf), "%s/", name);
 	uri_format(buf + pos, sizeof(buf) - pos, &applier->uri, false);
 	struct fiber *f = fiber_new_system_xc(buf, func);
-	fiber_set_joinable(f, true);
+	fiber_set_joinable(f, is_joinable);
 	return f;
 }
 
@@ -2160,12 +2161,13 @@ applier_thread_fiber_init(struct applier *applier)
 	assert(applier->thread.reader == NULL);
 	assert(applier->thread.writer == NULL);
 	applier->thread.reader = applier_fiber_new(applier, "reader",
-						   applier_thread_reader_f);
+						   applier_thread_reader_f,
+						   true);
 	fiber_start(applier->thread.reader, applier);
 	if (applier->version_id >= version_id(1, 7, 4)) {
 		/* Enable replication ACKs for newer servers */
 		applier->thread.writer = applier_fiber_new(
-			applier, "writer", applier_thread_writer_f);
+			applier, "writer", applier_thread_writer_f, true);
 		fiber_start(applier->thread.writer, applier);
 	}
 
@@ -2631,7 +2633,7 @@ void
 applier_start(struct applier *applier)
 {
 	assert(applier->fiber == NULL);
-	applier->fiber = applier_fiber_new(applier, "applier", applier_f);
+	applier->fiber = applier_fiber_new(applier, "applier", applier_f, true);
 	fiber_start(applier->fiber, applier);
 }
 
