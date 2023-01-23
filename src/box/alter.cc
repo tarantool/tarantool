@@ -4063,159 +4063,166 @@ on_replace_cluster_clear_id(struct trigger *trigger, void * /* event */)
 	return 0;
 }
 
-/**
- * A trigger invoked on replace in the space _cluster,
- * which contains cluster configuration.
- *
- * This space is modified by JOIN command in IPROTO
- * protocol.
- *
- * The trigger updates the cluster configuration cache
- * with uuid of the newly joined instance.
- *
- * During recovery, it acts the same way, loading identifiers
- * of all instances into the cache. Instance globally unique
- * identifiers are used to keep track of cluster configuration,
- * so that a replica that previously joined a replica set can
- * follow updates, and a replica that belongs to a different
- * replica set can not by mistake join/follow another replica
- * set without first being reset (emptied).
- */
+/** Replica definition. */
+struct replica_def {
+	/** Instance ID. */
+	uint32_t id;
+	/** Instance UUID. */
+	struct tt_uuid uuid;
+};
+
+/** Build replica definition from a _cluster's tuple. */
+static struct replica_def *
+replica_def_new_from_tuple(struct tuple *tuple, struct region *region)
+{
+	struct replica_def *def = xregion_alloc_object(region, typeof(*def));
+	memset(def, 0, sizeof(*def));
+	if (tuple_field_u32(tuple, BOX_CLUSTER_FIELD_ID, &def->id) != 0)
+		return NULL;
+	if (replica_check_id(def->id) != 0)
+		return NULL;
+	if (tuple_field_uuid(tuple, BOX_CLUSTER_FIELD_UUID, &def->uuid) != 0)
+		return NULL;
+	if (tt_uuid_is_nil(&def->uuid)) {
+		diag_set(ClientError, ER_INVALID_UUID, tt_uuid_str(&def->uuid));
+		return NULL;
+	}
+	return def;
+}
+
+/** _cluster update - both old and new tuples are present. */
+static int
+on_replace_dd_cluster_update(const struct replica_def *old_def,
+			     const struct replica_def *new_def)
+{
+	assert(new_def->id == old_def->id);
+	struct replica *replica = replica_by_id(new_def->id);
+	if (replica == NULL)
+		panic("Found a _cluster tuple not having a replica");
+	/*
+	 * Forbid changes of UUID for a registered instance: it requires an
+	 * extra effort to keep _cluster in sync with appliers and relays.
+	 */
+	if (!tt_uuid_is_equal(&new_def->uuid, &old_def->uuid)) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Space _cluster",
+			 "updates of instance uuid");
+		return -1;
+	}
+	return 0;
+}
+
+/** _cluster insert - only a new tuple is present. */
+static int
+on_replace_dd_cluster_insert(const struct replica_def *new_def)
+{
+	struct txn_stmt *stmt = txn_current_stmt(in_txn());
+	struct replica *replica = replica_by_id(new_def->id);
+	/*
+	 * With read-views enabled there might be already a replica whose
+	 * registration is in progress in another transaction. With the same
+	 * replica ID.
+	 */
+	if (replica != NULL) {
+		const char *msg = tt_sprintf(
+			"more than 1 replica with the same ID %u: "
+			"new uuid - %s, old uuid - %s", new_def->id,
+			tt_uuid_str(&new_def->uuid),
+			tt_uuid_str(&replica->uuid));
+		diag_set(ClientError, ER_UNSUPPORTED, "Tarantool", msg);
+		return -1;
+	}
+	struct trigger *on_rollback = txn_alter_trigger_new(
+		on_replace_cluster_clear_id, NULL);
+	if (on_rollback == NULL)
+		return -1;
+	/*
+	 * Register the replica before commit so as to occupy the replica ID
+	 * now. While WAL write is in progress, new replicas might come, they
+	 * should see the ID is already in use.
+	 */
+	replica = replica_by_uuid(&new_def->uuid);
+	if (replica != NULL)
+		replica_set_id(replica, new_def->id);
+	else
+		replica = replicaset_add(new_def->id, &new_def->uuid);
+	on_rollback->data = replica;
+	txn_stmt_on_rollback(stmt, on_rollback);
+	return 0;
+}
+
+/** _cluster delete - only the old tuple is present. */
+static int
+on_replace_dd_cluster_delete(const struct replica_def *old_def)
+{
+	/*
+	 * It's okay to delete the instance id while it is joining to a cluster
+	 * as long as the id is set by the time bootstrap is complete. Deletion
+	 * can be coming from the master when the latter tried to purge dead
+	 * replicas from _cluster.
+	 */
+	if (!replicaset.is_joining && old_def->id == instance_id) {
+		diag_set(ClientError, ER_LOCAL_INSTANCE_ID_IS_READ_ONLY,
+			 (unsigned)old_def->id);
+		return -1;
+	}
+	struct txn_stmt *stmt = txn_current_stmt(in_txn());
+	struct replica *replica = replica_by_id(old_def->id);
+	if (replica == NULL) {
+		/*
+		 * Impossible, but it is important not to leave undefined
+		 * behaviour if there is a bug. Too sensitive subsystem is
+		 * affected.
+		 */
+		panic("Tried to unregister a replica not stored in "
+		      "replica_by_id map, id is %u, uuid is %s",
+		      old_def->id, tt_uuid_str(&old_def->uuid));
+	}
+	if (!tt_uuid_is_equal(&replica->uuid, &old_def->uuid)) {
+		panic("Tried to unregister a replica with id %u, but its uuid "
+		      "is different from stored internally: in space - %s, "
+		      "internally - %s", old_def->id,
+		      tt_uuid_str(&old_def->uuid), tt_uuid_str(&replica->uuid));
+	}
+	/*
+	 * Unregister only after commit. Otherwise if the transaction would be
+	 * rolled back, there might be already another replica taken the freed
+	 * ID.
+	 */
+	struct trigger *on_commit = txn_alter_trigger_new(
+		on_replace_cluster_clear_id, replica);
+	if (on_commit == NULL)
+		return -1;
+	txn_stmt_on_commit(stmt, on_commit);
+	return 0;
+}
+
+/** Space _cluster on-replace trigger. */
 static int
 on_replace_dd_cluster(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	struct txn *txn = (struct txn *) event;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
-	struct tuple *old_tuple = stmt->old_tuple;
-	struct tuple *new_tuple = stmt->new_tuple;
-	if (new_tuple != NULL) { /* Insert or replace */
-		/* Check fields */
-		uint32_t replica_id;
-		if (tuple_field_u32(new_tuple, BOX_CLUSTER_FIELD_ID, &replica_id) != 0)
+	struct replica_def *new_def = NULL;
+	struct replica_def *old_def = NULL;
+	if (stmt->new_tuple != NULL) {
+		new_def = replica_def_new_from_tuple(stmt->new_tuple,
+						     &txn->region);
+		if (new_def == NULL)
 			return -1;
-		if (replica_check_id(replica_id) != 0)
-			return -1;
-		tt_uuid replica_uuid;
-		if (tuple_field_uuid(new_tuple, BOX_CLUSTER_FIELD_UUID,
-				    &replica_uuid) != 0)
-			return -1;
-		if (tt_uuid_is_nil(&replica_uuid)) {
-			diag_set(ClientError, ER_INVALID_UUID,
-				  tt_uuid_str(&replica_uuid));
-			return -1;
-		}
-		if (old_tuple != NULL) {
-			/*
-			 * Forbid changes of UUID for a registered instance:
-			 * it requires an extra effort to keep _cluster
-			 * in sync with appliers and relays.
-			 */
-			tt_uuid old_uuid;
-			if (tuple_field_uuid(old_tuple, BOX_CLUSTER_FIELD_UUID,
-						    &old_uuid) != 0)
-				return -1;
-			if (!tt_uuid_is_equal(&replica_uuid, &old_uuid)) {
-				diag_set(ClientError, ER_UNSUPPORTED,
-					  "Space _cluster",
-					  "updates of instance uuid");
-				return -1;
-			}
-			return 0;
-		}
-		/*
-		 * With read-views enabled there might be already a replica
-		 * whose registration is in progress in another transaction.
-		 * With the same replica ID.
-		 */
-		struct replica *replica = replica_by_id(replica_id);
-		if (replica != NULL) {
-			const char *msg = tt_sprintf(
-				"more than 1 replica with the same ID %u: new "
-				"uuid - %s, old uuid - %s", replica_id,
-				tt_uuid_str(&replica_uuid),
-				tt_uuid_str(&replica->uuid));
-			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool", msg);
-			return -1;
-		}
-		struct trigger *on_rollback = txn_alter_trigger_new(
-			on_replace_cluster_clear_id, NULL);
-		if (on_rollback == NULL)
-			return -1;
-		/*
-		 * Register the replica before commit so as to occupy the
-		 * replica ID now. While WAL write is in progress, new replicas
-		 * might come, they should see the ID is already in use.
-		 */
-		replica = replica_by_uuid(&replica_uuid);
-		if (replica != NULL)
-			replica_set_id(replica, replica_id);
-		else
-			replica = replicaset_add(replica_id, &replica_uuid);
-		on_rollback->data = replica;
-		txn_stmt_on_rollback(stmt, on_rollback);
-	} else {
-		/*
-		 * Don't allow deletion of the record for this instance
-		 * from _cluster.
-		 */
-		assert(old_tuple != NULL);
-		uint32_t replica_id;
-		if (tuple_field_u32(old_tuple, BOX_CLUSTER_FIELD_ID, &replica_id) != 0)
-			return -1;
-		if (replica_check_id(replica_id) != 0)
-			return -1;
-		/*
-		 * It's okay to update the instance id (drop, then insert) while
-		 * it is joining to a cluster as long as the id is set by the
-		 * time bootstrap is complete, which is checked in box_cfg()
-		 * anyway.
-		 *
-		 * For example, the replica could be deleted from the _cluster
-		 * space on the master manually before rebootstrap, in which
-		 * case it will replay this operation during the final join
-		 * stage.
-		 */
-		if (!replicaset.is_joining && replica_id == instance_id) {
-			diag_set(ClientError, ER_LOCAL_INSTANCE_ID_IS_READ_ONLY,
-				 (unsigned)replica_id);
-			return -1;
-		}
-		tt_uuid replica_uuid;
-		if (tuple_field_uuid(old_tuple, BOX_CLUSTER_FIELD_UUID,
-				    &replica_uuid) != 0)
-			return -1;
-
-		struct replica *replica = replica_by_id(replica_id);
-		if (replica == NULL) {
-			/*
-			 * Impossible, but it is important not to leave
-			 * undefined behaviour if there is a bug. Too sensitive
-			 * subsystem is affected.
-			 */
-			panic("Tried to unregister a replica not stored in "
-			      "replica_by_id map, id is %u, uuid is %s",
-			      replica_id, tt_uuid_str(&replica_uuid));
-		}
-		if (!tt_uuid_is_equal(&replica->uuid, &replica_uuid)) {
-			panic("Tried to unregister a replica with id %u, but "
-			      "its uuid is different from stored internally: "
-			      "in space - %s, internally - %s", replica_id,
-			      tt_uuid_str(&replica_uuid),
-			      tt_uuid_str(&replica->uuid));
-		}
-		/*
-		 * Unregister only after commit. Otherwise if the transaction
-		 * would be rolled back, there might be already another replica
-		 * taken the freed ID.
-		 */
-		struct trigger *on_commit = txn_alter_trigger_new(
-			on_replace_cluster_clear_id, replica);
-		if (on_commit == NULL)
-			return -1;
-		txn_stmt_on_commit(stmt, on_commit);
 	}
-	return 0;
+	if (stmt->old_tuple != NULL) {
+		old_def = replica_def_new_from_tuple(stmt->old_tuple,
+						     &txn->region);
+		if (old_def == NULL)
+			return -1;
+	}
+	if (new_def != NULL) {
+		if (old_def != NULL)
+			return on_replace_dd_cluster_update(old_def, new_def);
+		return on_replace_dd_cluster_insert(new_def);
+	}
+	return on_replace_dd_cluster_delete(old_def);
 }
 
 /* }}} cluster configuration */
