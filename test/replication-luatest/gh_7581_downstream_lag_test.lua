@@ -53,7 +53,6 @@ local function wait_downstream_updated(master, replica)
     local id = replica:get_instance_id()
     t.helpers.retrying({}, function()
         master:exec(function(id)
-            local t = require("luatest")
             t.assert_equals(box.info.vclock,
                             box.info.replication[id].downstream.vclock,
                             "Downstream vclock is updated")

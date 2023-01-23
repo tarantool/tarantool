@@ -1,6 +1,7 @@
 local luatest = require('luatest')
 local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
+
 local g_async = luatest.group('fencing_async', {
     {election_mode = 'manual'}, {election_mode = 'candidate'}})
 local g_sync = luatest.group('fencing_sync')

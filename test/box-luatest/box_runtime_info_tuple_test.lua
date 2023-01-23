@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_each(function()
@@ -13,8 +14,6 @@ end)
 
 g.test_basic = function()
     g.server:exec(function()
-        local t = require('luatest')
-
         -- Keep references to tuples to ensure that they're not
         -- suddenly garbage collected.
         local tuples = {}

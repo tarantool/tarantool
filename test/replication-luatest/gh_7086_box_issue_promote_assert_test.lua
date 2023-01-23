@@ -1,6 +1,7 @@
 local luatest = require('luatest')
 local server = require('luatest.server')
 local cluster = require('luatest.replica_set')
+
 local g = luatest.group('gh-7086')
 
 -- On every server in cluster wait until its vclock is up to date with others

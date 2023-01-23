@@ -32,7 +32,6 @@ end)
 
 g.test_empty_range_select_left = function()
     g.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         local key = 1
         s:replace{2, 0}
@@ -61,7 +60,6 @@ end
 
 g.test_empty_range_select_middle = function()
     g.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         local key = 2
         s:replace{1, 0}
@@ -90,7 +88,6 @@ end
 
 g.test_empty_range_select_right = function()
     g.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         local key = 3
         s:replace{1, 0}

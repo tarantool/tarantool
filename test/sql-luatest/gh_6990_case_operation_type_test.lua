@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -13,7 +14,6 @@ end)
 
 g.test_case_operation_type = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT CASE 1 WHEN 1 THEN NULL ELSE NULL END;]]
         local res = "any"
         t.assert_equals(box.execute(sql).metadata[1].type, res)

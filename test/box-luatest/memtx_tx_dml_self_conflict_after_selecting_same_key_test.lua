@@ -22,7 +22,6 @@ end)
 
 pg.test_replace_self_conflict_after_selecting_same_key = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local tx = txn_proxy:new()
@@ -36,7 +35,6 @@ end
 
 pg.test_insert_self_conflict_after_selecting_same_key = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local tx = txn_proxy:new()
@@ -50,7 +48,6 @@ end
 
 pg.test_upsert_self_conflict_after_selecting_same_key = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local txn_proxy = require('test.box.lua.txn_proxy')
 
         local tx = txn_proxy:new()

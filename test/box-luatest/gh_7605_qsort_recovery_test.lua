@@ -34,7 +34,6 @@ end)
 
 g.test_qsort_recovery = function()
     g.server:exec(function()
-
         local PACK = 10000
         local TOTAL = 2000000
         local uuid = require "uuid"
@@ -60,7 +59,6 @@ g.test_qsort_recovery = function()
     -- check secondary index correctness
     g.server:exec(function()
         local PACK = 10000
-        local t = require('luatest')
         local prev_tuple = nil
         local fiber = require "fiber"
         local i = 0
@@ -79,7 +77,6 @@ g.test_qsort_recovery = function()
 
     -- original test
     g.server:exec(function()
-
         local PACK = 10000
         local TOTAL = 2000000
         local uuid = require "uuid"

@@ -7,7 +7,6 @@ g.before_all(function()
     g.dflt = server:new({alias = 'dflt'})
     g.dflt:start()
     g.dflt:exec(function()
-        local t = require('luatest')
         local tarantool = require('tarantool')
 
         local _, _, enable_bt = string.find(tarantool.build.options,
@@ -24,7 +23,6 @@ end)
 g.test_fiber_parent_backtrace = function()
     g.dflt:exec(function()
         local fiber = require('fiber')
-        local t = require('luatest')
         local yaml = require('yaml')
 
         local bt_frames_cnt

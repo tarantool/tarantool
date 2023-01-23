@@ -1,6 +1,7 @@
 -- https://github.com/tarantool/tarantool/issues/6436 Foreign keys
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group('gh-6436-foreign-key-test', {{engine = 'memtx'}, {engine = 'vinyl'}})
 
 g.before_all(function(cg)
@@ -30,7 +31,6 @@ g.test_bad_complex_foreign_key = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
         local fmt = {{'planet_id','unsigned'}, {'country_id','unsigned'}, {'name'}}
         local country = box.schema.create_space('country', {engine=engine, format=fmt})
         country:create_index('pk', {parts={{'planet_id'},{'country_id'}}})
@@ -86,7 +86,6 @@ g.test_complex_foreign_key_primary = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
         local country = box.schema.create_space('country', {engine=engine})
         country:create_index('pk', {parts={{1},{2}}})
         country:replace{1, 11, 'Russia'}
@@ -133,7 +132,6 @@ g.test_complex_foreign_key_primary = function(cg)
     cg.server:restart()
 
     cg.server:exec(function()
-        local t = require('luatest')
         local city = box.space.city
         city:replace{22, 1, 11, 'Tomsk'}
         t.assert_equals(city:select{}, {{21, 1, 11, 'Moscow'}, {22, 1, 11, 'Tomsk'}})
@@ -143,7 +141,6 @@ g.test_complex_foreign_key_primary = function(cg)
     cg.server:restart()
 
     cg.server:exec(function()
-        local t = require('luatest')
         local country = box.space.country
         local city = box.space.city
         t.assert_error_msg_content_equals(
@@ -169,7 +166,6 @@ g.test_complex_foreign_key_secondary = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
         local country_fmt = {{name='id', type='unsigned'},
                              {name='universe_id', type='unsigned'},
                              {name='planet_name', type='string'},
@@ -233,7 +229,6 @@ g.test_complex_foreign_key_secondary = function(cg)
     cg.server:restart()
 
     cg.server:exec(function()
-        local t = require('luatest')
         local city = box.space.city
         city:replace{22, 'earth', 1, 'ru', 'Tomsk'}
         t.assert_equals(city:select{}, {{21, 'earth', 1, 'ru', 'Moscow'},
@@ -244,7 +239,6 @@ g.test_complex_foreign_key_secondary = function(cg)
     cg.server:restart()
 
     cg.server:exec(function()
-        local t = require('luatest')
         local country = box.space.country
         local city = box.space.city
         t.assert_error_msg_content_equals(
@@ -270,7 +264,6 @@ g.test_complex_foreign_key_numeric = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
         local country_fmt = {{name='id', type='unsigned'},
                              {name='universe_id', type='unsigned'},
                              {name='planet_name', type='string'},
@@ -331,7 +324,6 @@ g.test_complex_foreign_key_numeric = function(cg)
     cg.server:restart()
 
     cg.server:exec(function()
-        local t = require('luatest')
         local city = box.space.city
         city:replace{22, 'earth', 1, 'ru', 'Tomsk'}
         t.assert_equals(city:select{}, {{21, 'earth', 1, 'ru', 'Moscow'},
@@ -342,7 +334,6 @@ g.test_complex_foreign_key_numeric = function(cg)
     cg.server:restart()
 
     cg.server:exec(function()
-        local t = require('luatest')
         local country = box.space.country
         local city = box.space.city
         t.assert_error_msg_content_equals(
@@ -367,7 +358,6 @@ end
 g.test_complex_foreign_key_wrong_type = function(cg)
     local engine = cg.params.engine
     cg.server:exec(function(engine)
-        local t = require('luatest')
         local fmt = {{'id', 'unsigned'}, {'planet_id','unsigned'},
                      {'code','string'}, {'name','string'}}
         local country = box.schema.create_space('country', {engine=engine, format=fmt})
@@ -396,7 +386,6 @@ g.test_complex_foreign_key_wrong_type = function(cg)
     cg.server:restart()
 
     cg.server:exec(function()
-        local t = require('luatest')
         local city = box.space.city
 
         t.assert_error_msg_content_equals(
@@ -413,7 +402,6 @@ g.test_complex_foreign_key_wrong_type = function(cg)
     cg.server:restart()
 
     cg.server:exec(function()
-        local t = require('luatest')
         local city = box.space.city
 
         t.assert_error_msg_content_equals(
@@ -427,7 +415,6 @@ g.test_complex_foreign_key_wrong_type = function(cg)
     end, {engine})
 
     cg.server:exec(function()
-        local t = require('luatest')
         local country = box.space.country
         local city = box.space.city
         city:create_index('wrong1', {parts={{'country_code', 'unsigned'},{'planet_id', 'unsigned'}}, unique=false})
@@ -440,7 +427,6 @@ g.test_complex_foreign_key_wrong_type = function(cg)
     cg.server:restart()
 
     cg.server:exec(function()
-        local t = require('luatest')
         local country = box.space.country
         local city = box.space.city
         t.assert_error_msg_content_equals(
@@ -459,7 +445,6 @@ g.test_complex_foreign_key_wrong_type = function(cg)
     cg.server:restart()
 
     cg.server:exec(function()
-        local t = require('luatest')
         local country = box.space.country
         local city = box.space.city
         t.assert_error_msg_content_equals(
@@ -474,7 +459,6 @@ end
 g.test_complex_foreign_key_upsert = function(cg)
     local engine = cg.params.engine
     cg.server:exec(function(engine)
-        local t = require('luatest')
         local card = box.schema.create_space(
             'card',
             {
@@ -517,7 +501,6 @@ g.test_complex_foreign_key_upsert = function(cg)
     cg.server:eval('box.snapshot()')
 
     cg.server:exec(function()
-        local t = require('luatest')
         local user = box.space.user
         t.assert_error_msg_content_equals(
             "Foreign key constraint 'card' failed: foreign tuple was not found",
@@ -529,7 +512,6 @@ g.test_complex_foreign_key_upsert = function(cg)
     cg.server:restart()
 
     cg.server:exec(function()
-        local t = require('luatest')
         local user = box.space.user
         t.assert_error_msg_content_equals(
             "Foreign key constraint 'card' failed: foreign tuple was not found",

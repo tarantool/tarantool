@@ -44,7 +44,7 @@ local function get_election_term()
 end
 
 local function assert_leader_idle(val)
-    require('luatest').assert(box.info.election.leader_idle > val)
+    t.assert(box.info.election.leader_idle > val)
 end
 
 --

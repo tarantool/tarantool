@@ -17,8 +17,6 @@ end)
 
 g.test_garbage_of_last_prepared_txn_cannot_be_deleted = function()
     g.server:exec(function()
-        local t = require('luatest')
-
         local s = box.schema.create_space('test')
         s:create_index('pk')
 

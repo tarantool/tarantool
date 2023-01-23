@@ -24,7 +24,6 @@ end)
 g.test_preparation_with_deleted_older_story_assertion = function(cg)
     cg.server:exec(function()
         local fiber = require('fiber')
-        local t = require('luatest')
 
         box.space.s:replace{0}
 

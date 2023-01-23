@@ -1,5 +1,6 @@
 local fiber = require('fiber')
 local t = require('luatest')
+
 local g1 = t.group('gh-7489-concurrent-fiber-join-1',
                    {{ do_cancel = false },
                     { do_cancel = true }})

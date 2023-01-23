@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function(cg)
@@ -13,8 +14,6 @@ end)
 
 g.test_1_6_style_parts_with_format = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
-
         box.schema.space.create('test')
         box.space.test:format({
             {name = 'id', type = 'number'},

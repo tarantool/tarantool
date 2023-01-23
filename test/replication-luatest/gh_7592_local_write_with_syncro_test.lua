@@ -52,7 +52,6 @@ end
 g.test_local_space_write_on_replica = function(cg)
     -- Test that replica can write to local spaces when synchro queue is empty:
     cg.replica:exec(function()
-        local t = require('luatest')
         t.assert(box.info.synchro.queue.owner ~= 0, 'Queue is claimed')
         t.assert(box.info.synchro.queue.owner ~= box.info.id,
                  'Queue is foreign')
@@ -70,7 +69,6 @@ g.test_local_space_write_on_replica = function(cg)
     f:set_joinable(true)
     wait_synchro_queue_has_entries(cg.replica)
     local fid = cg.replica:exec(function()
-        local t = require('luatest')
         t.assert(box.info.synchro.queue.len == 1, 'Queue is filled')
         t.assert(box.info.synchro.queue.owner ~= box.info.id,
                  'Queue is foreign')
@@ -85,7 +83,6 @@ g.test_local_space_write_on_replica = function(cg)
     cg.master:exec(function() box.cfg{replication_synchro_quorum = 2} end)
     f:join()
     cg.replica:exec(function(fid)
-        local t = require('luatest')
         require('fiber').find(fid):join()
         t.assert(box.info.synchro.queue.len == 0, 'Queue is emptied')
         t.assert_equals(box.space.loc:get{2}, {2}, 'Data is written')

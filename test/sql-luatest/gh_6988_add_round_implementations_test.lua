@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -14,7 +15,6 @@ end)
 -- Make sure that ROUND() with DECIMAL as the first argument works as intended.
 g.test_round_dec = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT ROUND(1.13154);]]
         local res = {{1}}
         t.assert_equals(box.execute(sql).rows, res)
@@ -40,7 +40,6 @@ end
 -- Make sure that ROUND() with INTEGER as the first argument works as intended.
 g.test_round_int = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT ROUND(113154);]]
         local res = {{113154}}
         t.assert_equals(box.execute(sql).rows, res)
@@ -66,7 +65,6 @@ end
 -- Make sure that the default type for the first argument of ROUND() is DECIMAL.
 g.test_round_default_type = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT typeof(ROUND(?));]]
         local res = {{'decimal'}}
         t.assert_equals(box.execute(sql, {1}).rows, res)

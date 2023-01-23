@@ -1,7 +1,8 @@
 local t = require('luatest')
-local g = t.group('gh-7434')
 local fio = require('fio')
 local popen = require('popen')
+
+local g = t.group('gh-7434')
 
 -- Check that a child process created a file in the shutdown trigger
 local tarantool = arg[-1]

@@ -56,7 +56,6 @@ end)
 
 g.test_begin_in_expr_without_error = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local console = _G.console
         console:send('box.begin()')
         t.assert_equals(console:send('box.is_in_txn()'), _G.true_output)
@@ -65,7 +64,6 @@ end
 
 g.test_begin_in_expr_with_error = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local console = _G.console
         local expected = [[
 ---
@@ -79,7 +77,6 @@ end
 
 g.test_error_in_different_expr = function(cg)
     cg.server:exec(function()
-        local t = require('luatest')
         local console = _G.console
         console:send('box.begin()')
         console:send('error("test error")')
@@ -130,7 +127,6 @@ end)
 
 g.test_remote_bin_no_streams_works = function(g)
     g.server:exec(function()
-        local t = require('luatest')
         local console = _G.console
         -- first check we have backcompat mode without streams
         local expected = [[

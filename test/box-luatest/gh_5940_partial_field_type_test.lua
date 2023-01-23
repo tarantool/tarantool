@@ -1,6 +1,7 @@
 local t = require('luatest')
-local g = t.group('gh-5940')
 local server = require('luatest.server')
+
+local g = t.group('gh-5940')
 
 g.before_all(function()
     g.server = server:new{alias = 'default'}
@@ -13,7 +14,6 @@ end)
 
 g.test_ddl_ops = function()
     g.server:exec(function()
-        local t = require('luatest')
         local field_types = { '', 'n', 'nu', 's', 'st' }
         local error_msg = 'Wrong space format: field 1 has unknown field type'
 

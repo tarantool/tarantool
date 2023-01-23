@@ -3,6 +3,7 @@ local server = require('luatest.server')
 local socket = require('socket')
 local uri = require('uri')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()

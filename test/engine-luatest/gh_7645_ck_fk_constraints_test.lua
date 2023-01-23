@@ -1,6 +1,7 @@
 -- https://github.com/tarantool/tarantool/issues/7645
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group('gh-7645-ck-fk-constraints', {{engine = 'memtx'},
                                                 {engine = 'vinyl'}})
 
@@ -19,7 +20,6 @@ g.test_field_ck_fk_constraints = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
         local city_fmt = {{'id', 'integer'}, {'name', 'string'}}
         local city = box.schema.space.create('city', {engine = engine,
                                                       format = city_fmt})
@@ -69,7 +69,6 @@ g.test_tuple_ck_fk_constraints = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
         local city_fmt = {{'id', 'integer'}, {'name', 'string'}}
         local city = box.schema.space.create('city', {engine = engine,
                                                       format = city_fmt})

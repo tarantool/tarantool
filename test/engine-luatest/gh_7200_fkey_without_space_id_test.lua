@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group('gh-7200-fkey-without-space-id',
                   {{engine = 'memtx'}, {engine = 'vinyl'}})
 
@@ -27,8 +28,6 @@ g.test_foreign_key_primary = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
-
         local fmt = {{name='id', type='unsigned'},
                      {name='parent_id', type='unsigned',
                       foreign_key={field='id'}}}
@@ -57,8 +56,6 @@ g.test_complex_foreign_key1 = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
-
         local fmt = {{name='id1', type='unsigned'},
                      {name='id2', type='unsigned'}}
         local fkey = {field={id1='id1', id2='id2'}}
@@ -75,8 +72,6 @@ g.test_complex_foreign_key2 = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
-
         local fmt = {{name='id1', type='unsigned'},
                      {name='id2', type='unsigned'}}
         local fkey = {name={field={id1='id2', id2='id1'}}}
@@ -94,8 +89,6 @@ g.test_foreign_key_direct_insert = function(cg)
     local engine = cg.params.engine
 
     cg.server:exec(function(engine)
-        local t = require('luatest')
-
         local fmt = {{name = 'i', type = 'integer'},
                      {name = 'j', type = 'integer'},
                      {name = 'k', type = 'integer',

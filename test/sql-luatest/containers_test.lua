@@ -1,5 +1,6 @@
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -14,7 +15,6 @@ end)
 -- Make sure that it is possible to get elements from MAP и ARRAY.
 g.test_containers_success = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT [123, 234, 356, 467][2];]]
         t.assert_equals(box.execute(sql).rows, {{234}})
 
@@ -35,7 +35,6 @@ end
 --
 g.test_containers_error = function()
     g.server:exec(function()
-        local t = require('luatest')
         local _, err = box.execute([[SELECT 1[1];]])
         local res = "Selecting is only possible from map and array values"
         t.assert_equals(err.message, res)
@@ -95,7 +94,6 @@ end
 --
 g.test_containers_followers = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT [1, 2, 3][1][2];]]
         t.assert_equals(box.execute(sql).rows, {{}})
 
@@ -112,7 +110,6 @@ end
 -- Make sure that the received element is of type ANY.
 g.test_containers_elem_type = function()
     g.server:exec(function()
-        local t = require('luatest')
         local sql = [[SELECT typeof([123, 234, 356, 467][2]);]]
         t.assert_equals(box.execute(sql).rows, {{'any'}})
 
