@@ -31,7 +31,7 @@ function(create_unit_test)
   message(STATUS "Creating unit test ${UNIT_PREFIX}.test")
   add_executable(${UNIT_PREFIX}.test ${UNIT_SOURCES})
   target_link_libraries(${UNIT_PREFIX}.test ${UNIT_LIBRARIES})
-  set(UNIT_TEST_TARGETS "${UNIT_TEST_TARGETS} ${UNIT_PREFIX}.test")
+  set(UNIT_TEST_TARGETS "${UNIT_TEST_TARGETS} ${UNIT_PREFIX}.test" PARENT_SCOPE)
 endfunction()
 
 add_library(unit STATIC unit.c)
