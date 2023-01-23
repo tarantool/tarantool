@@ -1,7 +1,8 @@
 local server = require('luatest.server')
 local t = require('luatest')
-local g = t.group()
 local fio = require('fio')
+
+local g = t.group()
 
 g.before_test('test_panic_without_force_recovery', function()
     g.server = server:new({alias = 'master-test_panic',

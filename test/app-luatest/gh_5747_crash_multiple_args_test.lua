@@ -1,4 +1,5 @@
 local t = require('luatest')
+
 local g = t.group()
 
 g.test_multiple_args = function()

@@ -1,6 +1,7 @@
 local t = require('luatest')
-local g = t.group('gh-6647-yield-gc-hook')
 local fio = require('fio')
+
+local g = t.group('gh-6647-yield-gc-hook')
 
 local tarantool_bin = arg[-1]
 local PANIC = 256
