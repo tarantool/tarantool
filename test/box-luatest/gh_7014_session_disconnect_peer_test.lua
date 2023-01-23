@@ -1,6 +1,7 @@
 local net = require('net.box')
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_all(function()
@@ -28,7 +29,6 @@ g.test_session_disconnect_peer = function()
     t.assert_is_not(peer, nil)
     c:close()
     g.server:exec(function(expected_peer)
-        local t = require('luatest')
         t.helpers.retrying({}, function()
             local peer = rawget(_G, 'peer')
             t.assert_equals(peer, expected_peer)

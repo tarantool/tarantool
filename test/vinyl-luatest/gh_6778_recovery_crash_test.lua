@@ -1,6 +1,7 @@
 local common = require('test.vinyl-luatest.common')
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 
 g.before_test('test_recovery_crash', function()
@@ -25,7 +26,6 @@ g.test_recovery_crash = function()
     end)
     g.server:restart()
     g.server:exec(function()
-        local t = require('luatest')
         local s = box.space.test
         t.assert_equals(s.index.pk:select(), {})
         t.assert_equals(s.index.sk:select(), {})

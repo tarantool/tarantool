@@ -3,6 +3,7 @@ local log = require('log')
 local net_box = require('net.box')
 local server = require('luatest.server')
 local t = require('luatest')
+
 local g = t.group()
 local TRIES = 3
 
