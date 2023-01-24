@@ -88,9 +88,9 @@ static struct crash_info {
 	struct crash_greg greg;
 #endif
 	/**
-	 * Timestamp in nanoseconds (realtime).
+	 * Timestamp in seconds (realtime).
 	 */
-	uint64_t timestamp_rt;
+	long timestamp_rt;
 	/**
 	 * Faulting address.
 	 */
@@ -115,33 +115,7 @@ static struct crash_info {
 static char tarantool_path[PATH_MAX];
 static char feedback_host[CRASH_FEEDBACK_HOST_MAX];
 static bool send_crashinfo = false;
-static uint64_t timestamp_mono = 0;
-
-static inline uint64_t
-timespec_to_ns(struct timespec *ts)
-{
-	return (uint64_t)ts->tv_sec * 1000000000 + (uint64_t)ts->tv_nsec;
-}
-
-static char *
-ns_to_localtime(uint64_t timestamp, char *buf, ssize_t len)
-{
-	time_t sec = timestamp / 1000000000;
-	char *start = buf;
-	struct tm tm;
-
-	/*
-	 * Use similar format as say_x logger. Except plain
-	 * seconds should be enough.
-	 */
-	localtime_r(&sec, &tm);
-	ssize_t total = strftime(start, len, "%F %T %Z", &tm);
-	start += total;
-	if (total < len)
-		return buf;
-	buf[len - 1] = '\0';
-	return buf;
-}
+static time_t timestamp_mono = 0;
 
 void
 crash_init(const char *tarantool_bin)
@@ -159,7 +133,7 @@ crash_init(const char *tarantool_bin)
 	 */
 	struct timespec ts;
 	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
-		timestamp_mono = timespec_to_ns(&ts);
+		timestamp_mono = ts.tv_sec;
 	else
 		pr_syserr("Can't fetch monotonic clock, ignore");
 }
@@ -203,7 +177,7 @@ crash_collect(int signo, siginfo_t *siginfo, void *ucontext)
 	struct timespec ts;
 
 	if (clock_gettime(CLOCK_REALTIME, &ts) == 0)
-		cinfo->timestamp_rt = timespec_to_ns(&ts);
+		cinfo->timestamp_rt = ts.tv_sec;
 	else
 		cinfo->timestamp_rt = 0;
 
@@ -329,13 +303,13 @@ crash_report_feedback_daemon(struct crash_info *cinfo)
 	size = e - p;
 
 	struct timespec ts;
-	uint64_t uptime_ns;
+	time_t uptime;
 	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
-		uptime_ns = timespec_to_ns(&ts) - timestamp_mono;
+		uptime = ts.tv_sec - timestamp_mono;
 	else
-		uptime_ns = 0;
+		uptime = 0;
 	snprintf_safe("\"uptime\":\"%llu\"",
-		      (unsigned long long)uptime_ns / 1000000000);
+		      (unsigned long long)uptime);
 	snprintf_safe("},");
 
 	snprintf_safe("\"build\":{");
@@ -369,7 +343,11 @@ crash_report_feedback_daemon(struct crash_info *cinfo)
 	char *timestamp_rt_str = &tail[-ts_size];
 	if (p >= timestamp_rt_str)
 		return -1;
-	ns_to_localtime(cinfo->timestamp_rt, timestamp_rt_str, ts_size);
+
+	struct tm tm;
+	localtime_r(&cinfo->timestamp_rt, &tm);
+	strftime(timestamp_rt_str, ts_size, "%F %T %Z", &tm);
+	timestamp_rt_str[ts_size - 1] = '\0';
 
 	size = timestamp_rt_str - p;
 	snprintf_safe("\"timestamp\":\"");
