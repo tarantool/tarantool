@@ -101,7 +101,7 @@ box_replace
 box_return_mp
 box_return_tuple
 box_schema_version
-box_select
+box_select_ffi
 box_sequence_current
 box_sequence_next
 box_sequence_reset
