@@ -81,6 +81,7 @@ local reference_table = {
         VCLOCK_SYNC = 0x5a,
         AUTH_TYPE = 0x5b,
         REPLICASET_NAME = 0x5c,
+        INSTANCE_NAME = 0x5d,
     },
 
     -- `iproto_metadata_key` enumeration.

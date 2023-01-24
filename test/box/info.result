@@ -81,6 +81,7 @@ t
   - listen
   - lsn
   - memory
+  - name
   - package
   - pid
   - replicaset

@@ -37,6 +37,7 @@
 #include <small/rlist.h>
 #include "applier.h"
 #include "fiber_cond.h"
+#include "node_name.h"
 #include "tt_uuid.h"
 #include "vclock/vclock.h"
 #include "latch.h"
@@ -135,6 +136,12 @@ extern struct tt_uuid cfg_bootstrap_leader_uuid;
  * configuration option.
  */
 extern struct uri cfg_bootstrap_leader_uri;
+
+/**
+ * Configured name of this instance. Might be different from the actual name if
+ * the configuration is not fully applied yet.
+ */
+extern char cfg_instance_name[];
 
 /** Replica set state. */
 extern enum replicaset_state replicaset_state;
@@ -237,6 +244,9 @@ replication_free(void);
 extern uint32_t instance_id;
 /** UUID of the instance. */
 extern struct tt_uuid INSTANCE_UUID;
+/** Name of the instance. */
+extern char INSTANCE_NAME[];
+
 /** UUID of the replicaset. */
 extern struct tt_uuid REPLICASET_UUID;
 /** Name of the replicaset. */
@@ -364,6 +374,8 @@ struct replica {
 	 * applier has not received from the master yet.
 	 */
 	struct tt_uuid uuid;
+	/** Instance name. */
+	char name[NODE_NAME_SIZE_MAX];
 	/**
 	 * Replica ID or nil if the replica has not been
 	 * registered in the _cluster space yet.
@@ -425,6 +437,10 @@ enum {
 struct replica *
 replica_by_uuid(const struct tt_uuid *uuid);
 
+/** Find a replica by its name. */
+struct replica *
+replica_by_name(const char *name);
+
 /**
  * Find a replica by ID
  */
@@ -458,6 +474,10 @@ replicaset_next(struct replica *replica);
  */
 void
 replica_set_id(struct replica *replica, uint32_t id);
+
+/** Give the replica a new name. */
+void
+replica_set_name(struct replica *replica, const char *name);
 
 /*
  * Clear the numeric replica-set-local id of a replica.

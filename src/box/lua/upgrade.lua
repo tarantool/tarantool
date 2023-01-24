@@ -1419,8 +1419,19 @@ local function store_replicaset_uuid_in_new_way()
     change_replicaset_uuid_key('cluster', 'replicaset_uuid')
 end
 
+local function add_instance_names()
+    log.info('add instance names to _cluster')
+    local format = {
+        {name = 'id', type = 'unsigned'},
+        {name = 'uuid', type = 'string'},
+        {name = 'name', type = 'string', is_nullable = true}
+    }
+    box.space._space:update({box.schema.CLUSTER_ID}, {{'=', 7, format}})
+end
+
 local function upgrade_to_3_0_0()
     store_replicaset_uuid_in_new_way()
+    add_instance_names()
 end
 
 --------------------------------------------------------------------------------
@@ -1962,11 +1973,28 @@ local function check_names_are_not_set(issue_handler)
     if _schema:get{'replicaset_name'} ~= nil then
         issue_handler('Replicaset %s', msg_suffix)
     end
+    local row = box.space._cluster:get{box.info.id}
+    if row ~= nil and row.name ~= nil then
+        issue_handler('Instance %s', msg_suffix)
+    end
+end
+
+local function drop_instance_names(issue_handler)
+    if issue_handler.dry_run then
+        return
+    end
+    log.info('drop instance names from _cluster format')
+    local format = {
+        {name = 'id', type = 'unsigned'},
+        {name = 'uuid', type = 'string'},
+    }
+    box.space._space:update({box.schema.CLUSTER_ID}, {{'=', 7, format}})
 end
 
 local function downgrade_from_3_0_0(issue_handler)
     store_replicaset_uuid_in_old_way(issue_handler)
     check_names_are_not_set(issue_handler)
+    drop_instance_names(issue_handler)
 end
 
 -- Versions should be ordered from newer to older.

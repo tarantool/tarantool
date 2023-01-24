@@ -85,7 +85,7 @@ box.space._space:select{}
       {'name': 'grantee', 'type': 'unsigned'}, {'name': 'object_type', 'type': 'string'},
       {'name': 'object_id', 'type': 'scalar'}, {'name': 'privilege', 'type': 'unsigned'}]]
   - [320, 1, '_cluster', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'uuid',
-        'type': 'string'}]]
+        'type': 'string'}, {'type': 'string', 'name': 'name', 'is_nullable': true}]]
   - [328, 1, '_trigger', 'memtx', 0, {}, [{'name': 'name', 'type': 'string'}, {'name': 'space_id',
         'type': 'unsigned'}, {'name': 'opts', 'type': 'map'}]]
   - [330, 1, '_truncate', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'count',

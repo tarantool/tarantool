@@ -1008,6 +1008,7 @@ applier_register(struct applier *applier, bool was_anon)
 	struct register_request req;
 	memset(&req, 0, sizeof(req));
 	req.instance_uuid = INSTANCE_UUID;
+	strlcpy(req.instance_name, cfg_instance_name, NODE_NAME_SIZE_MAX);
 	vclock_copy(&req.vclock, box_vclock);
 	RegionGuard region_guard(&fiber()->gc);
 	xrow_encode_register(&row, &req);
@@ -1040,6 +1041,7 @@ applier_join(struct applier *applier)
 	struct join_request req;
 	memset(&req, 0, sizeof(req));
 	req.instance_uuid = INSTANCE_UUID;
+	strlcpy(req.instance_name, cfg_instance_name, NODE_NAME_SIZE_MAX);
 	req.version_id = tarantool_version_id();
 	RegionGuard region_guard(&fiber()->gc);
 	xrow_encode_join(&row, &req);
@@ -2315,6 +2317,7 @@ applier_subscribe(struct applier *applier)
 	req.replicaset_uuid = REPLICASET_UUID;
 	strlcpy(req.replicaset_name, REPLICASET_NAME, NODE_NAME_SIZE_MAX);
 	req.instance_uuid = INSTANCE_UUID;
+	strlcpy(req.instance_name, INSTANCE_NAME, NODE_NAME_SIZE_MAX);
 	req.version_id = tarantool_version_id();
 	req.is_anon = box_is_anon();
 	/*
@@ -2507,13 +2510,21 @@ applier_f(va_list ap)
 				else
 					applier_join(applier);
 			}
-			if (box_is_anon() && !cfg_replication_anon) {
-				/*
-				 * The instance transitioned from anonymous or
-				 * is retrying final join.
-				 */
+			/*
+			 * The instance transitioned from anonymous or is
+			 * retrying final join.
+			 */
+			bool need_id = box_is_anon() &&
+				       !cfg_replication_anon;
+			/*
+			 * The instance was given a name, but it is not applied
+			 * yet.
+			 */
+			bool need_name =
+				*cfg_instance_name != 0 &&
+				strcmp(INSTANCE_NAME, cfg_instance_name) != 0;
+			if (need_id || need_name)
 				applier_register(applier, was_anon);
-			}
 			applier_subscribe(applier);
 			/*
 			 * subscribe() has an infinite loop which

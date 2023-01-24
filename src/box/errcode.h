@@ -321,6 +321,8 @@ struct errcode_record {
 	/*266 */_(ER_MISSING_SYSTEM_SPACES,	"Snapshot has no system spaces") \
 	/*267 */_(ER_CLUSTER_NAME_MISMATCH,	"Cluster name mismatch: expected %s, got %s") \
 	/*268 */_(ER_REPLICASET_NAME_MISMATCH,	"Replicaset name mismatch: expected %s, got %s") \
+	/*269 */_(ER_INSTANCE_NAME_DUPLICATE,	"Duplicate replica name %s, already occupied by %s") \
+	/*270 */_(ER_INSTANCE_NAME_MISMATCH,	"Instance name mismatch: expected %s, got %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

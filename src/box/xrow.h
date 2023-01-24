@@ -532,6 +532,8 @@ xrow_encode_vote(struct xrow_header *row);
 struct register_request {
 	/** Replica's UUID. */
 	struct tt_uuid instance_uuid;
+	/** Replica's name. */
+	char instance_name[NODE_NAME_SIZE_MAX];
 	/** Replica's vclock. */
 	struct vclock vclock;
 };
@@ -554,6 +556,8 @@ struct subscribe_request {
 	char replicaset_name[NODE_NAME_SIZE_MAX];
 	/** Replica's instance UUID. */
 	struct tt_uuid instance_uuid;
+	/** Replica's name. */
+	char instance_name[NODE_NAME_SIZE_MAX];
 	/** Replica's vclock. */
 	struct vclock vclock;
 	/** Mask to filter out replica IDs whose rows don't need to be sent. */
@@ -598,6 +602,8 @@ xrow_decode_subscribe_response(const struct xrow_header *row,
 struct join_request {
 	/** Replica's instance UUID. */
 	struct tt_uuid instance_uuid;
+	/** Replica's name. */
+	char instance_name[NODE_NAME_SIZE_MAX];
 	/** Replica's version. */
 	uint32_t version_id;
 };

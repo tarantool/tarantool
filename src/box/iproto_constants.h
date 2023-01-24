@@ -194,6 +194,7 @@ extern const size_t iproto_flag_constants_size;
 	 */								\
 	_(IPROTO_AUTH_TYPE, 0x5b)					\
 	_(IPROTO_REPLICASET_NAME, 0x5c)					\
+	_(IPROTO_INSTANCE_NAME, 0x5d)					\
 
 ENUM(iproto_key, IPROTO_KEYS);
 /**
