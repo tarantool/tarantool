@@ -417,7 +417,7 @@ end
 setmetatable(daemon, {
     __index = {
         set_feedback_params = function()
-            box.internal.cfg_set_crash()
+            box.internal.cfg_set_feedback()
             daemon.enabled  = box.cfg.feedback_enabled
             daemon.host     = box.cfg.feedback_host
             daemon.interval = box.cfg.feedback_interval

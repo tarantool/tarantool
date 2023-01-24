@@ -39,6 +39,16 @@ extern "C" {
 
 double tarantool_uptime(void);
 
+/**
+ * Path to Tarantool binary of the process.
+ */
+extern char tarantool_path[];
+
+/**
+ * Application start time on monotonic clocks.
+ */
+extern long tarantool_start_time;
+
 void
 tarantool_exit(int);
 
