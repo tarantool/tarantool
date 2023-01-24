@@ -486,6 +486,8 @@ t;
  |   266: box.error.MISSING_SYSTEM_SPACES
  |   267: box.error.CLUSTER_NAME_MISMATCH
  |   268: box.error.REPLICASET_NAME_MISMATCH
+ |   269: box.error.INSTANCE_NAME_DUPLICATE
+ |   270: box.error.INSTANCE_NAME_MISMATCH
  | ...
 
 test_run:cmd("setopt delimiter ''");

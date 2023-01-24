@@ -178,6 +178,12 @@ lbox_pushreplica(lua_State *L, struct replica *replica)
 	luaT_pushuuidstr(L, &replica->uuid);
 	lua_settable(L, -3);
 
+	if (*replica->name == 0)
+		luaL_pushnull(L);
+	else
+		lua_pushstring(L, replica->name);
+	lua_setfield(L, -2, "name");
+
 	lua_pushstring(L, "lsn");
 	luaL_pushuint64(L, vclock_get(&replicaset.vclock, replica->id));
 	lua_settable(L, -3);
@@ -291,6 +297,17 @@ static int
 lbox_info_uuid(struct lua_State *L)
 {
 	luaT_pushuuidstr(L, &INSTANCE_UUID);
+	return 1;
+}
+
+/** box.info.name. */
+static int
+lbox_info_name(struct lua_State *L)
+{
+	if (*INSTANCE_NAME == 0)
+		luaL_pushnull(L);
+	else
+		lua_pushstring(L, INSTANCE_NAME);
 	return 1;
 }
 
@@ -687,6 +704,7 @@ lbox_schema_version(struct lua_State *L)
 static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"id", lbox_info_id},
 	{"uuid", lbox_info_uuid},
+	{"name", lbox_info_name},
 	{"lsn", lbox_info_lsn},
 	{"signature", lbox_info_signature},
 	{"vclock", lbox_info_vclock},

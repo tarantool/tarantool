@@ -39,13 +39,14 @@
 #include "box.h"
 #include "gc.h"
 #include "error.h"
-#include "node_name.h"
 #include "raft.h"
 #include "relay.h"
 #include "sio.h"
 
 uint32_t instance_id = REPLICA_ID_NIL;
 struct tt_uuid INSTANCE_UUID;
+char INSTANCE_NAME[NODE_NAME_SIZE_MAX];
+
 struct tt_uuid REPLICASET_UUID;
 char REPLICASET_NAME[NODE_NAME_SIZE_MAX];
 char CLUSTER_NAME[NODE_NAME_SIZE_MAX];
@@ -64,6 +65,7 @@ int replication_threads = 1;
 bool cfg_replication_anon = true;
 struct tt_uuid cfg_bootstrap_leader_uuid;
 struct uri cfg_bootstrap_leader_uri;
+char cfg_instance_name[NODE_NAME_SIZE_MAX];
 
 struct replicaset replicaset;
 
@@ -286,6 +288,7 @@ replica_new(void)
 	replica->id = 0;
 	replica->anon = false;
 	replica->uuid = uuid_nil;
+	*replica->name = 0;
 	replica->applier = NULL;
 	replica->gc = NULL;
 	replica->is_applier_healthy = false;
@@ -369,6 +372,26 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 	replica->anon = false;
 	box_update_replication_synchro_quorum();
 	box_broadcast_ballot();
+}
+
+void
+replica_set_name(struct replica *replica, const char *name)
+{
+	if (strcmp(replica->name, name) == 0)
+		return;
+	assert(replica_by_name(name) == NULL);
+	strlcpy(replica->name, name, NODE_NAME_SIZE_MAX);
+	if (tt_uuid_is_equal(&INSTANCE_UUID, &replica->uuid)) {
+		strlcpy(INSTANCE_NAME, name, NODE_NAME_SIZE_MAX);
+		box_broadcast_id();
+	}
+	if (*name != 0) {
+		say_info("assigned name %s to replica %s",
+			 node_name_str(name), tt_uuid_str(&replica->uuid));
+	} else {
+		say_info("removed name from replica %s",
+			 tt_uuid_str(&replica->uuid));
+	}
 }
 
 void
@@ -1470,6 +1493,18 @@ replica_by_uuid(const struct tt_uuid *uuid)
 	struct replica key;
 	key.uuid = *uuid;
 	return replica_hash_search(&replicaset.hash, &key);
+}
+
+struct replica *
+replica_by_name(const char *name)
+{
+	if (*name == 0)
+		return NULL;
+	replicaset_foreach(replica) {
+		if (strcmp(replica->name, name) == 0)
+			return replica;
+	}
+	return NULL;
 }
 
 struct replica *

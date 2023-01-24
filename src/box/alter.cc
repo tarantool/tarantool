@@ -4198,6 +4198,8 @@ struct replica_def {
 	uint32_t id;
 	/** Instance UUID. */
 	struct tt_uuid uuid;
+	/** Instance name. */
+	char name[NODE_NAME_SIZE_MAX];
 };
 
 /** Build replica definition from a _cluster's tuple. */
@@ -4216,7 +4218,77 @@ replica_def_new_from_tuple(struct tuple *tuple, struct region *region)
 		diag_set(ClientError, ER_INVALID_UUID, tt_uuid_str(&def->uuid));
 		return NULL;
 	}
+	if (tuple_field_node_name(def->name, tuple, BOX_CLUSTER_FIELD_NAME,
+				  "_cluster.name") != 0)
+		return NULL;
 	return def;
+}
+
+/** Set instance name on commit/rollback. */
+static int
+on_replace_cluster_set_name(struct trigger *trigger, void * /* event */)
+{
+	const struct replica_def *def = (typeof(def))trigger->data;
+	struct replica *replica = replica_by_id(def->id);
+	if (replica == NULL)
+		panic("Couldn't find a replica in _cluster in txn trigger");
+	const struct replica *other = replica_by_name(def->name);
+	if (replica == other)
+		return 0;
+	/*
+	 * The old name shouldn't be possible to be occupied. It would mean some
+	 * other _cluster txn took it and then yielded, allowing this trigger to
+	 * run. But _cluster txns are rolled back on yield. So this other txn
+	 * would be rolled back before this trigger. Hence this situation is not
+	 * reachable.
+	 */
+	if (other != NULL)
+		panic("Duplicate replica name managed to slip through txns");
+	replica_set_name(replica, def->name);
+	return 0;
+}
+
+/** Set instance name on _cluster update. */
+static int
+on_replace_dd_cluster_set_name(struct replica *replica,
+			       const char *new_name)
+{
+	struct txn_stmt *stmt = txn_current_stmt(in_txn());
+	assert(replica->id != REPLICA_ID_NIL);
+	if (strcmp(replica->name, new_name) == 0)
+		return 0;
+	if (tt_uuid_is_equal(&replica->uuid, &INSTANCE_UUID) &&
+	    box_is_configured() && *INSTANCE_NAME != 0 &&
+	    strcmp(new_name, INSTANCE_NAME) != 0) {
+		if (!box_is_force_recovery) {
+			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
+				 "replica rename or name drop");
+			return -1;
+		}
+		say_info("replica rename allowed due to 'force_recovery'");
+	}
+	const struct replica *other = replica_by_name(new_name);
+	if (other != NULL) {
+		diag_set(ClientError, ER_INSTANCE_NAME_DUPLICATE,
+			 node_name_str(new_name), tt_uuid_str(&other->uuid));
+		return -1;
+	}
+	struct replica_def *def = xregion_alloc_object(
+		&in_txn()->region, typeof(*def));
+	memset(def, 0, sizeof(*def));
+	def->id = replica->id;
+	strlcpy(def->name, replica->name, NODE_NAME_SIZE_MAX);
+	struct trigger *on_rollback = txn_alter_trigger_new(
+		on_replace_cluster_set_name, (void *)def);
+	if (on_rollback == NULL)
+		return -1;
+	txn_stmt_on_rollback(stmt, on_rollback);
+	/*
+	 * Set the new name now so as newer transactions couldn't take it too
+	 * while this one is going to WAL.
+	 */
+	replica_set_name(replica, new_name);
+	return 0;
 }
 
 /** _cluster update - both old and new tuples are present. */
@@ -4237,7 +4309,7 @@ on_replace_dd_cluster_update(const struct replica_def *old_def,
 			 "updates of instance uuid");
 		return -1;
 	}
-	return 0;
+	return on_replace_dd_cluster_set_name(replica, new_def->name);
 }
 
 /** _cluster insert - only a new tuple is present. */
@@ -4260,6 +4332,13 @@ on_replace_dd_cluster_insert(const struct replica_def *new_def)
 		diag_set(ClientError, ER_UNSUPPORTED, "Tarantool", msg);
 		return -1;
 	}
+	replica = replica_by_name(new_def->name);
+	if (replica != NULL) {
+		diag_set(ClientError, ER_INSTANCE_NAME_DUPLICATE,
+			 node_name_str(new_def->name),
+			 tt_uuid_str(&replica->uuid));
+		return -1;
+	}
 	struct trigger *on_rollback = txn_alter_trigger_new(
 		on_replace_cluster_clear_id, NULL);
 	if (on_rollback == NULL)
@@ -4276,7 +4355,7 @@ on_replace_dd_cluster_insert(const struct replica_def *new_def)
 		replica = replicaset_add(new_def->id, &new_def->uuid);
 	on_rollback->data = replica;
 	txn_stmt_on_rollback(stmt, on_rollback);
-	return 0;
+	return on_replace_dd_cluster_set_name(replica, new_def->name);
 }
 
 /** _cluster delete - only the old tuple is present. */

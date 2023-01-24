@@ -87,7 +87,7 @@ server.admin("box.space._cluster:replace{1, require('uuid').NULL:str()}")
 server.admin("box.space._cluster:replace{1, require('uuid').str()}")
 
 # Update of tail is OK
-server.admin("box.space._cluster:update(1, {{'=', 3, 'test'}})")
+server.admin("box.space._cluster:update(1, {{'=', 4, 'test'}})")
 
 # Self-delete is not ok.
 server.admin("box.space._cluster:delete(1)")

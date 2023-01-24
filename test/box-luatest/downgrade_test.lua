@@ -930,8 +930,20 @@ g.test_downgrade_global_names = function(cg)
         box.space._schema:delete{'replicaset_name'}
         box.cfg{
             replicaset_name = box.NULL,
+            instance_name = 'test',
+        }
+        issues = box.schema.downgrade_issues(prev_version)
+        t.assert_str_contains(issues[1], 'Instance name is set')
+        box.space._cluster:update({box.info.id}, {{'#', 'name', 1}})
+        box.cfg{
+            instance_name = box.NULL,
             force_recovery = false,
         }
+
+        local format = box.space._cluster:format()
+        t.assert_equals(#format, 3)
+        t.assert_equals(format[3].name, 'name')
         box.schema.downgrade(prev_version)
+        t.assert_equals(#box.space._cluster:format(), 2)
     end)
 end

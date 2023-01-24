@@ -1344,6 +1344,12 @@ box_check_node_name(const char *cfg_name, char *out)
 }
 
 static int
+box_check_instance_name(char *out)
+{
+	return box_check_node_name("instance_name", out);
+}
+
+static int
 box_check_replicaset_uuid(struct tt_uuid *uuid)
 {
 	return box_check_uuid(uuid, "replicaset_uuid", true);
@@ -1998,6 +2004,30 @@ box_set_replication_skip_conflict(void)
 	replication_skip_conflict = cfg_geti("replication_skip_conflict");
 }
 
+/** Register on the master instance. Could be initial join or a name change. */
+static void
+box_register_on_master(void)
+{
+	/*
+	 * Restart the appliers so as they would notice the change (need an ID,
+	 * need a new name).
+	 */
+	box_restart_replication();
+	struct replica *master = replicaset_find_join_master();
+	if (master == NULL || master->applier == NULL ||
+	    master->applier->state != APPLIER_CONNECTED) {
+		tnt_raise(ClientError, ER_CANNOT_REGISTER);
+	} else {
+		struct applier *master_applier = master->applier;
+		applier_resume_to_state(master_applier, APPLIER_REGISTERED,
+					TIMEOUT_INFINITY);
+		applier_resume_to_state(master_applier, APPLIER_READY,
+					TIMEOUT_INFINITY);
+	}
+	replicaset_follow();
+	replicaset_sync();
+}
+
 void
 box_set_replication_anon(void)
 {
@@ -2013,34 +2043,7 @@ box_set_replication_anon(void)
 	cfg_replication_anon = new_anon;
 	box_broadcast_ballot();
 	if (!new_anon) {
-		/*
-		 * Reset all appliers. This will interrupt
-		 * anonymous follow they're in so that one of
-		 * them can register and others resend a
-		 * non-anonymous subscribe.
-		 */
-		box_restart_replication();
-		/*
-		 * Wait until the master has registered this
-		 * instance.
-		 */
-		struct replica *master = replicaset_find_join_master();
-		if (master == NULL || master->applier == NULL ||
-		    master->applier->state != APPLIER_CONNECTED) {
-			tnt_raise(ClientError, ER_CANNOT_REGISTER);
-		}
-		struct applier *master_applier = master->applier;
-
-		applier_resume_to_state(master_applier, APPLIER_REGISTERED,
-					TIMEOUT_INFINITY);
-		applier_resume_to_state(master_applier, APPLIER_READY,
-					TIMEOUT_INFINITY);
-		/**
-		 * Resume other appliers to
-		 * resend non-anonymous subscribe.
-		 */
-		replicaset_follow();
-		replicaset_sync();
+		box_register_on_master();
 		assert(!box_is_anon());
 	} else {
 		/*
@@ -2121,6 +2124,39 @@ box_set_replicaset_name(void)
 		return;
 	box_check_writable_xc();
 	box_set_replicaset_name_record(name);
+}
+
+/**
+ * Register a new replica if not already registered. Update its name if needed.
+ */
+static void
+box_register_replica(const struct tt_uuid *uuid,
+		     const char *name);
+
+void
+box_set_instance_name(void)
+{
+	char name[NODE_NAME_SIZE_MAX];
+	if (box_check_instance_name(name) != 0)
+		diag_raise();
+	if (strcmp(cfg_instance_name, name) == 0)
+		return;
+	char old_cfg_name[NODE_NAME_SIZE_MAX];
+	strlcpy(old_cfg_name, cfg_instance_name, NODE_NAME_SIZE_MAX);
+	auto guard = make_scoped_guard([&]{
+		strlcpy(cfg_instance_name, old_cfg_name, NODE_NAME_SIZE_MAX);
+		box_restart_replication();
+		replicaset_follow();
+	});
+	strlcpy(cfg_instance_name, name, NODE_NAME_SIZE_MAX);
+	/* Nil means the config doesn't care, allows to use any name. */
+	if (*name != 0) {
+		if (box_is_ro())
+			box_register_on_master();
+		else
+			box_register_replica(&INSTANCE_UUID, name);
+	}
+	guard.is_active = false;
 }
 
 /** Trigger to catch ACKs from all nodes when need to wait for quorum. */
@@ -3811,29 +3847,66 @@ box_iproto_override(uint32_t req_type, iproto_handler_t handler,
  * when it is read-only but has to register self.
  */
 static void
-box_insert_replica_record(uint32_t id, const struct tt_uuid *uuid)
+box_insert_replica_record(uint32_t id, const struct tt_uuid *uuid,
+			  const char *name)
 {
-	if (boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "[%u%s]",
-		 (unsigned) id, tt_uuid_str(uuid)) != 0)
+	bool ok;
+	if (*name == 0) {
+		ok = boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "[%u%s]",
+			  (unsigned)id, tt_uuid_str(uuid)) == 0;
+	} else {
+		ok = boxk(IPROTO_INSERT, BOX_CLUSTER_ID, "[%u%s%s]",
+			  (unsigned)id, tt_uuid_str(uuid), name) == 0;
+	}
+	if (!ok)
 		diag_raise();
 	struct replica *new_replica = replica_by_uuid(uuid);
 	if (new_replica == NULL || new_replica->id != id)
 		say_warn("Replica ID is changed by a trigger");
 }
 
-/** Register a new replica if not already registered. */
 static void
-box_register_replica(const struct tt_uuid *uuid)
+box_register_replica(const struct tt_uuid *uuid,
+		     const char *name)
 {
 	struct replica *replica = replica_by_uuid(uuid);
-	if (replica != NULL && replica->id != REPLICA_ID_NIL)
-		return; /* nothing to do - already registered */
-
+	/*
+	 * Find required changes.
+	 */
+	bool need_name = false;
+	bool need_id = false;
+	if (replica == NULL) {
+		need_name = *name != 0;
+		need_id = true;
+	} else {
+		need_name = strcmp(replica->name, name) != 0;
+		need_id = replica->id == REPLICA_ID_NIL;
+	}
+	if (!need_name && !need_id)
+		return;
+	/*
+	 * Apply the changes.
+	 */
 	box_check_writable_xc();
+	if (!need_id) {
+		int rc;
+		if (*name == 0) {
+			rc = boxk(IPROTO_UPDATE, BOX_CLUSTER_ID,
+				  "[%u][[%s%dNIL]]", (unsigned)replica->id, "=",
+				  BOX_CLUSTER_FIELD_NAME);
+		} else {
+			rc = boxk(IPROTO_UPDATE, BOX_CLUSTER_ID,
+				  "[%u][[%s%d%s]]", (unsigned)replica->id, "=",
+				  BOX_CLUSTER_FIELD_NAME, name);
+		}
+		if (rc != 0)
+			diag_raise();
+		return;
+	}
 	uint32_t replica_id;
 	if (replica_find_new_id(&replica_id) != 0)
 		diag_raise();
-	box_insert_replica_record(replica_id, uuid);
+	box_insert_replica_record(replica_id, uuid, name);
 }
 
 void
@@ -3908,13 +3981,24 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 		tnt_raise(ClientError, ER_CONNECTION_TO_SELF);
 
 	access_check_universe_xc(PRIV_R);
-	/* We only get register requests from anonymous instances. */
+	/*
+	 * We only get register requests from instances which need some actual
+	 * registration - name, id.
+	 */
 	struct replica *replica = replica_by_uuid(&req.instance_uuid);
-	if (replica && replica->id != REPLICA_ID_NIL) {
+	bool need_id = false;
+	bool need_name = false;
+	if (replica == NULL) {
+		need_id = true;
+		need_name = *req.instance_name != 0;
+	} else {
+		need_id = replica->id == REPLICA_ID_NIL;
+		need_name = strcmp(req.instance_name, replica->name) != 0;
+	}
+	if (!need_id && !need_name) {
 		tnt_raise(ClientError, ER_REPLICA_NOT_ANON,
 			  tt_uuid_str(&req.instance_uuid));
 	}
-
 	if (box_is_anon()) {
 		tnt_raise(ClientError, ER_UNSUPPORTED, "Anonymous replica",
 			  "registration of non-anonymous nodes.");
@@ -3941,7 +4025,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 
 	say_info("registering replica %s at %s",
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
-	box_register_replica(&req.instance_uuid);
+	box_register_replica(&req.instance_uuid, req.instance_name);
 
 	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
 
@@ -4046,22 +4130,33 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	}
 
 	/*
-	 * Unless already registered, the new replica will be
-	 * added to _cluster space once the initial join stage
-	 * is complete. Fail early if the caller does not have
-	 * appropriate access privileges.
+	 * Unless already registered, the new replica will be added to _cluster
+	 * space once the initial join stage is complete. Fail early if the
+	 * caller does not have appropriate access privileges or has some other
+	 * obvious errors. So as not to waste time on the long join process
+	 * then.
 	 */
 	struct replica *replica = replica_by_uuid(&req.instance_uuid);
-	if (replica == NULL || replica->id == REPLICA_ID_NIL) {
+	if (replica == NULL || replica->id == REPLICA_ID_NIL ||
+	    strcmp(replica->name, req.instance_name) != 0) {
 		box_check_writable_xc();
 		struct space *space = space_cache_find_xc(BOX_CLUSTER_ID);
 		access_check_space_xc(space, PRIV_W);
 	}
-
 	/* Forbid replication with disabled WAL */
 	if (wal_mode() == WAL_NONE) {
 		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
 			  "wal_mode = 'none'");
+	}
+	if ((replica == NULL && *req.instance_name != 0) ||
+	    (replica != NULL &&
+	     strcmp(replica->name, req.instance_name) != 0)) {
+		struct replica *other = replica_by_name(req.instance_name);
+		if (other != NULL && other != replica) {
+			tnt_raise(ClientError, ER_INSTANCE_NAME_DUPLICATE,
+				  node_name_str(req.instance_name),
+				  tt_uuid_str(&other->uuid));
+		}
 	}
 
 	/*
@@ -4087,7 +4182,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 * Register the replica after sending the last row but before sending
 	 * OK - if the registration fails, the error reaches the client.
 	 */
-	box_register_replica(&req.instance_uuid);
+	box_register_replica(&req.instance_uuid, req.instance_name);
 
 	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
 
@@ -4198,6 +4293,19 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	if (req.is_anon && replica != NULL && replica->id != REPLICA_ID_NIL) {
 		tnt_raise(ClientError, ER_PROTOCOL, "Can't subscribe an "
 			  "anonymous replica having an ID assigned");
+	}
+	/*
+	 * Replica name mismatch is not considered a critical error. It can
+	 * happen if rename happened and then the replica reconnected. It won't
+	 * ever be able to fetch the new name if the master rejects the
+	 * connection.
+	 */
+	if (replica != NULL &&
+	    strcmp(replica->name, req.instance_name) != 0) {
+		say_warn("Instance name mismatch on subscribe. "
+			 "Peer claims name - %s, its stored name - %s",
+			 node_name_str(req.instance_name),
+			 node_name_str(replica->name));
 	}
 	if (replica == NULL)
 		replica = replicaset_add_anon(&req.instance_uuid);
@@ -4444,10 +4552,12 @@ check_global_ids_integrity(void)
 {
 	char cluster_name[NODE_NAME_SIZE_MAX];
 	char replicaset_name[NODE_NAME_SIZE_MAX];
+	char instance_name[NODE_NAME_SIZE_MAX];
 	struct tt_uuid replicaset_uuid;
 	if (box_check_cluster_name(cluster_name) != 0 ||
 	    box_check_replicaset_name(replicaset_name) != 0 ||
-	    box_check_replicaset_uuid(&replicaset_uuid) != 0)
+	    box_check_replicaset_uuid(&replicaset_uuid) != 0 ||
+	    box_check_instance_name(instance_name) != 0)
 		return -1;
 
 	if (*cluster_name != 0 && strcmp(cluster_name, CLUSTER_NAME) != 0) {
@@ -4468,6 +4578,12 @@ check_global_ids_integrity(void)
 		diag_set(ClientError, ER_REPLICASET_UUID_MISMATCH,
 			 tt_uuid_str(&replicaset_uuid),
 			 tt_uuid_str(&REPLICASET_UUID));
+		return -1;
+	}
+	if (*instance_name != 0 && strcmp(instance_name, INSTANCE_NAME) != 0) {
+		diag_set(ClientError, ER_INSTANCE_NAME_MISMATCH,
+			 node_name_str(instance_name),
+			 node_name_str(INSTANCE_NAME));
 		return -1;
 	}
 	return 0;
@@ -4492,8 +4608,10 @@ bootstrap_master(void)
 	engine_bootstrap_xc();
 
 	uint32_t replica_id = 1;
-	box_insert_replica_record(replica_id, &INSTANCE_UUID);
+	box_insert_replica_record(replica_id, &INSTANCE_UUID,
+				  cfg_instance_name);
 	assert(replica_by_uuid(&INSTANCE_UUID)->id == 1);
+	assert(strcmp(cfg_instance_name, INSTANCE_NAME) == 0);
 	box_populate_schema_space();
 
 	/* Enable WAL subsystem. */
@@ -4961,6 +5079,8 @@ box_cfg_xc(void)
 		diag_raise();
 	box_set_replication_sync_timeout();
 	box_set_replication_skip_conflict();
+	if (box_check_instance_name(cfg_instance_name) != 0)
+		diag_raise();
 	cfg_replication_anon = box_check_replication_anon();
 	box_broadcast_ballot();
 	/*
@@ -5226,11 +5346,16 @@ box_broadcast_id(void)
 {
 	char buf[1024];
 	char *w = buf;
-	w = mp_encode_map(w, 5);
+	w = mp_encode_map(w, 6);
 	w = mp_encode_str0(w, "id");
 	w = mp_encode_uint(w, instance_id);
 	w = mp_encode_str0(w, "instance_uuid");
 	w = mp_encode_uuid(w, &INSTANCE_UUID);
+	w = mp_encode_str0(w, "instance_name");
+	if (*INSTANCE_NAME == 0)
+		w = mp_encode_nil(w);
+	else
+		w = mp_encode_str0(w, INSTANCE_NAME);
 	w = mp_encode_str0(w, "replicaset_uuid");
 	w = mp_encode_uuid(w, &REPLICASET_UUID);
 	w = mp_encode_str0(w, "replicaset_name");

@@ -33,9 +33,9 @@ box.space._cluster:replace{1, require('uuid').str()}
 ---
 - error: Space _cluster does not support updates of instance uuid
 ...
-box.space._cluster:update(1, {{'=', 3, 'test'}})
+box.space._cluster:update(1, {{'=', 4, 'test'}})
 ---
-- [1, '<master uuid>', 'test']
+- [1, '<master uuid>', null, 'test']
 ...
 box.space._cluster:delete(1)
 ---
