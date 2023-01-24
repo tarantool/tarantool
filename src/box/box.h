@@ -270,7 +270,7 @@ void box_set_replication_sync_timeout(void);
 void box_set_replication_skip_conflict(void);
 void box_set_replication_anon(void);
 void box_set_net_msg_max(void);
-int box_set_crash(void);
+int box_set_feedback(void);
 int box_set_txn_timeout(void);
 /**
  * Set default isolation level from cfg option txn_isolation.
