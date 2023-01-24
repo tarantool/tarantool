@@ -114,7 +114,6 @@ local check_symbols = {
     'coio_getaddrinfo',
     'luaT_call',
     'box_txn',
-    'box_select',
     'clock_realtime',
     'string_strip_helper',
 

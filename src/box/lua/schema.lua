@@ -118,11 +118,11 @@ ffi.cdef[[
                              const char **pos, const char **pos_end);
 
     int
-    box_select(uint32_t space_id, uint32_t index_id,
-               int iterator, uint32_t offset, uint32_t limit,
-               const char *key, const char *key_end,
-               const char **after, const char **after_end,
-               bool update_pos, struct port *port);
+    box_select_ffi(uint32_t space_id, uint32_t index_id, const char *key,
+                   const char *key_end, const char **packed_pos,
+                   const char **packed_pos_end, bool update_pos,
+                   struct port *port, int64_t iterator, uint64_t offset,
+                   uint64_t limit);
 
     enum priv_type {
         PRIV_R = 1,
@@ -2537,9 +2537,9 @@ base_index_mt.select_ffi = function(index, key, opts)
     check_select_safety(index, key_is_nil, iterator, limit, offset, fullscan)
     local region_svp = builtin.box_region_used()
     normalize_position(index, after, iterator_pos, iterator_pos_end)
-    nok = builtin.box_select(index.space_id, index.id, iterator, offset, limit,
-                             key, key_end, iterator_pos, iterator_pos_end,
-                             fetch_pos, port) ~= 0
+    nok = builtin.box_select_ffi(index.space_id, index.id, key, key_end,
+                                 iterator_pos, iterator_pos_end, fetch_pos,
+                                 port, iterator, offset, limit) ~= 0
     if not nok and fetch_pos and iterator_pos[0] ~= nil then
         new_position = ffi.string(iterator_pos[0],
                                   iterator_pos_end[0] - iterator_pos[0])

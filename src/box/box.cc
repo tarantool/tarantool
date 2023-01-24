@@ -3075,6 +3075,22 @@ fail:
 	return -1;
 }
 
+/**
+ * A special wrapper for FFI - workaround for M1.
+ * Use 64-bit integers beyond the 8th argument.
+ * See https://github.com/LuaJIT/LuaJIT/issues/205 for details.
+ */
+extern "C" int
+box_select_ffi(uint32_t space_id, uint32_t index_id, const char *key,
+	       const char *key_end, const char **packed_pos,
+	       const char **packed_pos_end, bool update_pos, struct port *port,
+	       int64_t iterator, uint64_t offset, uint64_t limit)
+{
+	return box_select(space_id, index_id, iterator, offset, limit, key,
+			  key_end, packed_pos, packed_pos_end, update_pos,
+			  port);
+}
+
 API_EXPORT int
 box_insert(uint32_t space_id, const char *tuple, const char *tuple_end,
 	   box_tuple_t **result)
