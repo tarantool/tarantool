@@ -32,6 +32,9 @@
 
 #include "trivia/config.h"
 
+#include <sys/utsname.h>
+#include <spawn.h>
+
 #include "lua/utils.h" /* lua_hash() */
 #include "fiber_pool.h"
 #include <say.h>
@@ -91,6 +94,7 @@
 #include "flightrec.h"
 #include "wal_ext.h"
 #include "mp_util.h"
+#include "small/static.h"
 
 static char status[64] = "unconfigured";
 
@@ -226,6 +230,15 @@ static const char *box_recovery_state_strs[box_recovery_state_MAX] = {
 
 /** Whether the triggers for "synced" recovery stage have already run. */
 static bool recovery_state_synced_is_reached;
+
+/** PATH_MAX is too big and 2K is recommended limit for web address. */
+#define BOX_FEEDBACK_HOST_MAX 2048
+
+/** Feedback host URL to send crash info to. */
+static char box_feedback_host[BOX_FEEDBACK_HOST_MAX];
+
+/** Whether sending crash info to feedback URL is enabled. */
+static bool box_feedback_crash_enabled;
 
 static int
 box_run_on_recovery_state(enum box_recovery_state state)
@@ -2698,20 +2711,223 @@ box_set_prepared_stmt_cache_size(void)
 	return 0;
 }
 
-int
-box_set_crash(void)
+/**
+ * Report crash information to the feedback daemon
+ * (ie send it to feedback daemon).
+ */
+static int
+box_feedback_report_crash(struct crash_info *cinfo)
 {
-	const char *host = cfg_gets("feedback_host");
-	bool is_enabled_1 = cfg_getb("feedback_enabled");
-	bool is_enabled_2 = cfg_getb("feedback_crashinfo");
+	/*
+	 * Update to a new number if the format get changed.
+	 */
+	const int crashinfo_version = 1;
 
-	if (host != NULL && strlen(host) >= CRASH_FEEDBACK_HOST_MAX) {
-		diag_set(ClientError, ER_CFG, "feedback_host",
-			  "the address is too long");
+	char *p = (char *)static_alloc(SMALL_STATIC_SIZE);
+	char *tail = &p[SMALL_STATIC_SIZE];
+	char *e = &p[SMALL_STATIC_SIZE];
+	char *head = p;
+
+	int total = 0;
+	(void)total;
+	int size = 0;
+
+#define snprintf_safe(...) SNPRINT(total, snprintf, p, size, __VA_ARGS__)
+#define jnprintf_safe(str) SNPRINT(total, json_escape, p, size, str)
+
+	/*
+	 * Lets reuse tail of the buffer as a temp space.
+	 */
+	struct utsname *uname_ptr =
+		(struct utsname *)&tail[-sizeof(struct utsname)];
+	if (p >= (char *)uname_ptr)
+		return -1;
+
+	if (uname(uname_ptr) != 0) {
+		say_syserror("uname call failed, ignore");
+		memset(uname_ptr, 0, sizeof(struct utsname));
+	}
+
+	/*
+	 * Start filling the script. The "data" key value is
+	 * filled as a separate code block for easier
+	 * modifications in future.
+	 */
+	size = (char *)uname_ptr - p;
+	snprintf_safe("{");
+	snprintf_safe("\"crashdump\":{");
+	snprintf_safe("\"version\":\"%d\",", crashinfo_version);
+	snprintf_safe("\"data\":");
+
+	/* The "data" key value */
+	snprintf_safe("{");
+	snprintf_safe("\"uname\":{");
+	snprintf_safe("\"sysname\":\"");
+	jnprintf_safe(uname_ptr->sysname);
+	snprintf_safe("\",");
+	/*
+	 * nodename might contain a sensitive information, skip.
+	 */
+	snprintf_safe("\"release\":\"");
+	jnprintf_safe(uname_ptr->release);
+	snprintf_safe("\",");
+
+	snprintf_safe("\"version\":\"");
+	jnprintf_safe(uname_ptr->version);
+	snprintf_safe("\",");
+
+	snprintf_safe("\"machine\":\"");
+	jnprintf_safe(uname_ptr->machine);
+	snprintf_safe("\"");
+	snprintf_safe("},");
+
+	/* Extend size, because now uname_ptr is not needed. */
+	size = e - p;
+
+	/*
+	 * Instance block requires uuid encoding so take it
+	 * from the tail of the buffer.
+	 */
+	snprintf_safe("\"instance\":{");
+	char *uuid_buf = &tail[-(UUID_STR_LEN + 1)];
+	if (p >= uuid_buf)
+		return -1;
+	size = uuid_buf - p;
+
+	tt_uuid_to_string(&INSTANCE_UUID, uuid_buf);
+	snprintf_safe("\"server_id\":\"%s\",", uuid_buf);
+	tt_uuid_to_string(&REPLICASET_UUID, uuid_buf);
+	snprintf_safe("\"cluster_id\":\"%s\",", uuid_buf);
+
+	/* No need for uuid_buf anymore. */
+	size = e - p;
+
+	struct timespec ts;
+	time_t uptime = 0;
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
+		uptime = ts.tv_sec - tarantool_start_time;
+	snprintf_safe("\"uptime\":\"%llu\"", (unsigned long long)uptime);
+	snprintf_safe("},");
+
+	snprintf_safe("\"build\":{");
+	snprintf_safe("\"version\":\"%s\",", PACKAGE_VERSION);
+	snprintf_safe("\"cmake_type\":\"%s\"", BUILD_INFO);
+	snprintf_safe("},");
+
+	snprintf_safe("\"signal\":{");
+	snprintf_safe("\"signo\":%d,", cinfo->signo);
+	snprintf_safe("\"si_code\":%d,", cinfo->sicode);
+	if (cinfo->signo == SIGSEGV) {
+		if (cinfo->sicode == SEGV_MAPERR) {
+			snprintf_safe("\"si_code_str\":\"%s\",",
+				      "SEGV_MAPERR");
+		} else if (cinfo->sicode == SEGV_ACCERR) {
+			snprintf_safe("\"si_code_str\":\"%s\",",
+				      "SEGV_ACCERR");
+		}
+	}
+	snprintf_safe("\"si_addr\":\"0x%llx\",",
+		      (long long)cinfo->siaddr);
+
+#ifdef ENABLE_BACKTRACE
+	snprintf_safe("\"backtrace\":\"");
+	jnprintf_safe(cinfo->backtrace_buf);
+	snprintf_safe("\",");
+#endif
+
+	/* 64 bytes should be enough for longest localtime */
+	const int ts_size = 64;
+	char *timestamp_rt_str = &tail[-ts_size];
+	if (p >= timestamp_rt_str)
+		return -1;
+
+	struct tm tm;
+	localtime_r(&cinfo->timestamp_rt, &tm);
+	strftime(timestamp_rt_str, ts_size, "%F %T %Z", &tm);
+	timestamp_rt_str[ts_size - 1] = '\0';
+
+	size = timestamp_rt_str - p;
+	snprintf_safe("\"timestamp\":\"");
+	jnprintf_safe(timestamp_rt_str);
+	snprintf_safe("\"");
+	snprintf_safe("}");
+	snprintf_safe("}");
+
+	/* Finalize the "data" key and the whole dump. */
+	size = e - p;
+	snprintf_safe("}");
+	snprintf_safe("}");
+
+#undef snprintf_safe
+#undef jnprintf_safe
+
+	say_debug("crash dump: %s", head);
+
+	/* Timeout 1 sec is taken from the feedback daemon. */
+	const char *expr =
+		"require('http.client').post(arg[1],arg[2],{timeout=1});"
+		"os.exit(1);";
+	const char *exec_argv[7] = {
+		tarantool_path,
+		"-e", expr,
+		"-",
+		box_feedback_host,
+		head,
+		NULL,
+	};
+
+	extern char **environ;
+	int rc = posix_spawn(NULL, exec_argv[0], NULL, NULL,
+			     (char **)exec_argv, environ);
+	if (rc != 0) {
+		fprintf(stderr,
+			"posix_spawn with "
+			"exec(%s,[%s,%s,%s,%s,%s,%s,%s]) failed: %s\n",
+			exec_argv[0], exec_argv[0], exec_argv[1], exec_argv[2],
+			exec_argv[3], exec_argv[4], exec_argv[5], exec_argv[6],
+			tt_strerror(rc));
 		return -1;
 	}
 
-	crash_cfg(host, is_enabled_1 && is_enabled_2);
+	return 0;
+}
+
+/**
+ * Box callback to handle crashes.
+ */
+static void
+box_crash_callback(struct crash_info *cinfo)
+{
+	crash_report_stderr(cinfo);
+
+	if (box_feedback_crash_enabled &&
+	    box_feedback_report_crash(cinfo) != 0)
+		fprintf(stderr, "unable to send a crash report\n");
+}
+
+int
+box_set_feedback(void)
+{
+	const char *host = cfg_gets("feedback_host");
+
+	if (host != NULL && strlen(host) >= BOX_FEEDBACK_HOST_MAX) {
+		diag_set(ClientError, ER_CFG, "feedback_host",
+			 "the address is too long");
+		return -1;
+	}
+
+	if (cfg_getb("feedback_enabled") &&
+	    cfg_getb("feedback_crashinfo") &&
+	    host != NULL) {
+		box_feedback_crash_enabled = true;
+		strlcpy(box_feedback_host, host, sizeof(box_feedback_host));
+		say_debug("enable sending crashinfo feedback");
+	} else {
+		box_feedback_crash_enabled = false;
+		box_feedback_host[0] = '\0';
+		say_debug("disable sending crashinfo feedback");
+	}
+
 	return 0;
 }
 
@@ -4900,6 +5116,7 @@ box_init(void)
 	 * supported from box.cfg not being called yet.
 	 */
 	builtin_events_init();
+	crash_callback = box_crash_callback;
 }
 
 void
