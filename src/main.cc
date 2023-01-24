@@ -478,9 +478,7 @@ load_cfg(void)
 	 * Initialize flight recorder after say logger as we might use
 	 * say API.
 	 */
-	struct flight_recorder_cfg cfg_fr;
-	box_get_flightrec_cfg(&cfg_fr);
-	if (flightrec_cfg(&cfg_fr) != 0) {
+	if (box_set_flightrec() != 0) {
 		diag_log();
 		exit(EXIT_FAILURE);
 	}

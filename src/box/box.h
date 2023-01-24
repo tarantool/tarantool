@@ -313,18 +313,6 @@ int box_set_auth_type(void);
 int box_set_bootstrap_strategy(void);
 
 /**
- * Populate cfg from box.cfg.flightrec_* parameters.
- */
-void
-box_get_flightrec_cfg(struct flight_recorder_cfg *cfg);
-
-/**
- * Configure flight recoder from box.cfg.flightrec_* parameters.
- */
-int
-box_configure_flightrec(void);
-
-/**
  * Initialize logger on box init.
  */
 int

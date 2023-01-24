@@ -918,36 +918,6 @@ box_check_auth_type(void)
 	return method;
 }
 
-void
-box_get_flightrec_cfg(struct flight_recorder_cfg *cfg)
-{
-	memset(cfg, 0, sizeof(*cfg));
-	cfg->enabled = cfg_getb("flightrec_enabled");
-	cfg->dir = cfg_gets("memtx_dir");
-	cfg->logs_size = cfg_geti64("flightrec_logs_size");
-	cfg->log_max_msg_size = cfg_geti64("flightrec_logs_max_msg_size");
-	cfg->logs_log_level = cfg_geti("flightrec_logs_log_level");
-	cfg->metrics_interval = cfg_getd("flightrec_metrics_interval");
-	cfg->metrics_period = cfg_geti("flightrec_metrics_period");
-	cfg->requests_size = cfg_geti("flightrec_requests_size");
-	cfg->requests_max_req_size =
-		cfg_geti("flightrec_requests_max_req_size");
-	cfg->requests_max_res_size =
-		cfg_geti("flightrec_requests_max_res_size");
-}
-
-/**
- * Raises error if flight recorder configuration is incorrect.
- */
-static void
-box_check_flightrec(void)
-{
-	struct flight_recorder_cfg cfg;
-	box_get_flightrec_cfg(&cfg);
-	if (flightrec_check_cfg(&cfg) != 0)
-		diag_raise();
-}
-
 static enum election_mode
 box_check_election_mode(void)
 {
@@ -1578,7 +1548,8 @@ box_check_config(void)
 	struct tt_uuid uuid;
 	box_check_say();
 	box_check_audit();
-	box_check_flightrec();
+	if (box_check_flightrec() != 0)
+		diag_raise();
 	if (box_check_listen() != 0)
 		diag_raise();
 	if (box_check_auth_type() == NULL)
@@ -2761,20 +2732,6 @@ box_set_txn_isolation(void)
 	if (level == txn_isolation_level_MAX)
 		return -1;
 	txn_default_isolation = level;
-	return 0;
-}
-
-int
-box_configure_flightrec(void)
-{
-	struct flight_recorder_cfg cfg;
-	box_get_flightrec_cfg(&cfg);
-
-	if (flightrec_check_cfg(&cfg) != 0)
-		return -1;
-	if (flightrec_cfg(&cfg) != 0)
-		return -1;
-
 	return 0;
 }
 

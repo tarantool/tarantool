@@ -429,14 +429,6 @@ lbox_cfg_set_txn_isolation(struct lua_State *L)
 }
 
 static int
-lbox_cfg_configure_flightrec(struct lua_State *L)
-{
-	if (box_configure_flightrec() != 0)
-		luaT_error(L);
-	return 0;
-}
-
-static int
 lbox_cfg_set_auth_type(struct lua_State *L)
 {
 	if (box_set_auth_type() != 0)
@@ -487,7 +479,6 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_crash", lbox_cfg_set_crash},
 		{"cfg_set_txn_timeout", lbox_cfg_set_txn_timeout},
 		{"cfg_set_txn_isolation", lbox_cfg_set_txn_isolation},
-		{"cfg_configure_flightrec", lbox_cfg_configure_flightrec},
 		{"cfg_set_auth_type", lbox_cfg_set_auth_type},
 		{NULL, NULL}
 	};
