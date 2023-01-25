@@ -282,6 +282,10 @@ lbox_fiber_top(struct lua_State *L)
 			      " fiber.top_enable() first");
 	}
 	lua_newtable(L);
+	lua_pushliteral(L, "cpu_misses");
+	lua_pushnumber(L, 0);
+	lua_settable(L, -3);
+
 	lua_pushliteral(L, "cpu");
 	lua_newtable(L);
 	lbox_fiber_top_entry(&cord()->sched, L);
