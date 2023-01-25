@@ -1405,11 +1405,7 @@ local function schema_needs_upgrade()
     local schema_version, schema_version_str = get_version()
     if schema_version ~= nil and
         handlers[#handlers].version > schema_version then
-        local msg = string.format(
-            'Your schema version is %s while Tarantool %s requires a more'..
-            ' recent schema version. Please, consider using box.'..
-            'schema.upgrade().', schema_version_str, box.info.version)
-        return true, msg
+        return true, schema_version_str
     end
     return false
 end

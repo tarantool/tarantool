@@ -466,7 +466,6 @@ t;
  |   245: box.error.OLD_TERM
  |   246: box.error.INTERFERING_ELECTIONS
  |   247: box.error.ITERATOR_POSITION
- |   248: box.error.DDL_NOT_ALLOWED
  |   249: box.error.UNKNOWN_AUTH_METHOD
  |   250: box.error.INVALID_AUTH_DATA
  |   251: box.error.INVALID_AUTH_REQUEST

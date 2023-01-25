@@ -1021,8 +1021,12 @@ local function load_cfg(cfg)
     -- Check if schema version matches Tarantool version and print
     -- warning if it's not (in case user forgot to call
     -- box.schema.upgrade()).
-    local needs, msg = private.schema_needs_upgrade()
+    local needs, schema_version_str = private.schema_needs_upgrade()
     if needs then
+        local msg = string.format(
+            'Your schema version is %s while Tarantool %s requires a more'..
+            ' recent schema version. Please, consider using box.'..
+            'schema.upgrade().', schema_version_str, box.info.version)
         log.warn(msg)
     end
 end
