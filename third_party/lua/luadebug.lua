@@ -38,7 +38,6 @@ local COLOR_RESET = ""
 local CARET_SYM = "=>"
 local CARET = " " .. CARET_SYM .. " "
 local BREAK_SYM = "●"
-local auto_listing = true
 
 local LJ_MAX_LINE = 0x7fffff00 -- Max. source code line number.
 
@@ -373,9 +372,11 @@ local function code_listing(source, currentline, file, context_lines)
                 dbg_writeln(color_grey("% 4d") .. tab_or_caret .. "%s", i, line)
             end
         end
+        return true
     else
         dbg_write_warn("No source code is available for %s:%d",
                        color_blue(normfile), currentline or 0)
+        return true
     end
 end
 
@@ -411,9 +412,19 @@ local function where(info, context_lines)
         SOURCE_CACHE[info.source] = source
     end
 
-    code_listing(source, info.currentline, info.source, context_lines)
+    return code_listing(source, info.currentline, info.source, context_lines)
+end
 
-    return false
+-- Status flag to avoid redundant code listing to be shown.
+-- `up`, `down`, `where` commands show their own code context
+-- so do not show anything after them.
+local listing_shown = false
+
+-- Display automatically `where` context if configured so.
+local function auto_listing(info)
+    if tonumber(dbg.cfg.auto_where) then
+        return where(info, dbg.cfg.auto_where)
+    end
 end
 
 -- Wee version differences
@@ -549,7 +560,7 @@ local function cmd_add_breakpoint(bps)
     breakpoints[normfile][line] = true
 
     dbg_writeln("Added breakpoint %s:%d.", color_blue(normfile), line)
-    where({source = file, currentline = line}, 0, true)
+    listing_shown = auto_listing({source = file, currentline = line})
     return false
 end
 
@@ -634,12 +645,11 @@ local function cmd_up()
     if info then
         stack_inspect_offset = offset
         dbg_writeln("Inspecting frame: " .. format_stack_frame_info(info))
-        if tonumber(dbg.cfg.auto_where) then
-            where(info, dbg.cfg.auto_where)
-        end
+        auto_listing(info)
     else
         dbg_write_warn("Already at the bottom of the stack.")
     end
+    listing_shown = true
 
     return false
 end
@@ -660,25 +670,22 @@ local function cmd_down()
     if info then
         stack_inspect_offset = offset
         dbg_writeln("Inspecting frame: " .. format_stack_frame_info(info))
-        if tonumber(dbg.cfg.auto_where) then
-            where(info, dbg.cfg.auto_where)
-        end
+        auto_listing(info)
     else
         dbg_write_warn("Already at the top of the stack.")
     end
+    listing_shown = true
 
     return false
 end
 
 local function cmd_where(context_lines)
     local info = debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL, "Sl")
-    return (info and where(info, tonumber(context_lines) or 5))
-end
-
-local function cmd_listing(context_lines)
-    local offset = stack_inspect_offset + CMD_STACK_LEVEL - 2
-    local info = debug.getinfo(offset, "Sl")
-    return (info and where(info, tonumber(context_lines) or 5))
+    if info then
+        where(info, tonumber(context_lines) or 5)
+    end
+    listing_shown = true
+    return false
 end
 
 local function cmd_trace()
@@ -902,14 +909,14 @@ repl = function(reason)
              CARET) or ""
     dbg_writeln(reason .. format_stack_frame_info(info))
 
-    if tonumber(dbg.cfg.auto_where) then
-        where(info, dbg.cfg.auto_where)
-    end
-
     repeat
-        if auto_listing then
-            pcall(cmd_listing(3))
+        -- Do not current context if prior command showed their own.
+        if not listing_shown then
+            auto_listing(info)
         end
+        -- Command could show their own context with listing
+        -- so reset status before command executed.
+        listing_shown = false
         local success, done, hook = pcall(run_command,
                                          dbg.read(color_red(DEBUGGER .. "> ")))
         if success then
@@ -933,7 +940,7 @@ dbg = setmetatable({
         exit    = function(err) os.exit(err) end,
 
         cfg = {
-            auto_where  = false,
+            auto_where  = 3,
             auto_eval   = false,
             pretty_depth = 3,
         },
