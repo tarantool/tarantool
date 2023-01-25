@@ -1487,7 +1487,7 @@ if is_fiber_top then\
 end
 ---
 ...
-a = is_fiber_top and fiber.top() or {cpu = {["1/sched"] = {}}}
+a = is_fiber_top and fiber.top() or {cpu = {["1/sched"] = {}}, cpu_misses = 0}
 ---
 ...
 type(a) == 'table'
@@ -1497,6 +1497,10 @@ type(a) == 'table'
 -- scheduler is present in fiber.top()
 -- and is indexed by name
 a.cpu["1/sched"] ~= nil
+---
+- true
+...
+a.cpu_misses == 0
 ---
 - true
 ...
