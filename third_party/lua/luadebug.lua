@@ -726,15 +726,17 @@ local function cmd_help()
         if #map.aliases > 0 then
             local fun = require 'fun'
             local txt = ''
-            fun.each(function(x) txt = txt .. '|' .. color_yellow(x) end,
+            fun.each(function(x) txt = txt .. ', ' .. color_yellow(x) end,
                      map.aliases)
-            print(color_blue(v) .. '|' .. string.sub(txt, 2, #txt) .. ' ' ..
-                  (map.arg or ''))
+            dbg.writeln(color_blue(v) .. ', ' .. string.sub(txt, 3, #txt) ..
+                        ' ' .. (map.arg or ''))
         else
-            print(color_blue(v) .. ' ' .. (map.arg or ''));
+            dbg.writeln(color_blue(v) .. ' ' .. (map.arg or ''));
         end
-        print('    - ' .. map.help)
+        dbg.writeln(color_grey('    -- ' .. map.help))
     end
+    dbg.writeln('')
+
     return false
 end
 
