@@ -591,3 +591,12 @@ create_unit_test(PREFIX tweaks
                  SOURCES tweaks.c core_test_utils.c
                  LIBRARIES core unit
 )
+
+create_unit_test(PREFIX lua_tweaks
+                 SOURCES lua_tweaks.c
+                 LIBRARIES unit core server
+                           ${LUAJIT_LIBRARIES}
+                           ${CURL_LIBRARIES}
+                           ${LIBYAML_LIBRARIES}
+                           ${READLINE_LIBRARIES}
+)
