@@ -27,11 +27,11 @@ g.before_all(function(g)
     g.r3 = g.cluster:build_and_add_server({alias = 'r3', box_cfg = g.cfg})
 
     g.cluster:start()
-    g.cluster:wait_for_fullmesh()
     g.r2:exec(function()
         box.schema.create_space('test'):create_index('pk')
     end)
 
+    g.cluster:wait_for_fullmesh()
     g.r3:wait_for_vclock_of(g.r2)
     g.r1:wait_for_vclock_of(g.r2)
 end)
