@@ -1,7 +1,5 @@
 ## bugfix/core
 
-* **[Breaking change]** A `box_region_alloc` call that is not paired with
-  a `box_region_truncate` call produces leaks. Previously, one could
-  rely on some C API functions (like executing a DML statement) truncating
-  fiber region to 0. Now, none of the box C API functions truncates memory
-  it doesn't own (gh-5665).
+* Fixed a bug with Tarantool C API freeing fiber region allocations it does not
+  allocate. This could lead to use-after-free in client code which allocates
+  memory on fiber region. (gh-5665).
