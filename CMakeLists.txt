@@ -32,7 +32,7 @@ set(PACKAGE "Tarantool" CACHE STRING "Package name.")
 
 #
 # Set default build type to Debug. This is to ease a developer's
-# life. Release binaries are built by BuildBot automatically anyway.
+# life. Release binaries are built by BuildBot automatically anyway..
 #
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING
