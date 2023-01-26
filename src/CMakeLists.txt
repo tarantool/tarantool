@@ -170,6 +170,7 @@ set (server_sources
      lua/backtrace.c
      lua/builtin_modcache.c
      lua/compat.c
+     lua/tweaks.c
      ${lua_sources}
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/lyaml.cc
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/b64.c

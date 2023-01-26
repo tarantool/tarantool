@@ -69,6 +69,7 @@
 #include "lua/uri.h"
 #include "lua/builtin_modcache.h"
 #include "lua/compat.h"
+#include "lua/tweaks.h"
 #include "digest.h"
 #include "errinj.h"
 
@@ -813,6 +814,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	lua_call(L, 0, 0);
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
+	tarantool_lua_tweaks_init(L);
 	tarantool_lua_uri_init(L);
 	tarantool_lua_utf8_init(L);
 	tarantool_lua_utils_init(L);
