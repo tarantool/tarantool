@@ -108,7 +108,6 @@ end
 -- when it lacks a quorum of peers.
 --
 g.test_promote_no_quorum = function(g)
-    t.skip('Enable once gh-8217 is fixed')
     g.follower1:exec(function() box.cfg{replication = ''} end)
     local term = g.follower1:exec(get_election_term)
     t.assert_error_msg_content_equals(

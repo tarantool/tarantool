@@ -1634,7 +1634,7 @@ raft_test_promote_restore(void)
 	raft_run_next_event();
 	ok(raft_time() - ts >= node.raft.election_timeout,
 	   "election timeout passed");
-	is(node.raft.state, RAFT_STATE_CANDIDATE, "still a candidate");
+	is(node.raft.state, RAFT_STATE_FOLLOWER, "resigned from candidate");
 	is(node.raft.term, 5, "do not bump term");
 
 	is(raft_node_send_leader(

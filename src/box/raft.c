@@ -494,9 +494,12 @@ box_raft_try_promote(void)
 			 (unsigned long long)raft->volatile_term);
 	} else {
 		assert(!raft->is_candidate);
-		assert(box_election_mode != ELECTION_MODE_MANUAL &&
-		       box_election_mode != ELECTION_MODE_CANDIDATE);
-		diag_set(ClientError, ER_ELECTION_DISABLED);
+		if (box_election_mode == ELECTION_MODE_MANUAL) {
+			diag_set(TimedOut);
+		} else {
+			assert(box_election_mode != ELECTION_MODE_CANDIDATE);
+			diag_set(ClientError, ER_ELECTION_DISABLED);
+		}
 	}
 	raft_restore(raft);
 	return -1;
