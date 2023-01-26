@@ -318,9 +318,7 @@ g.test_old_leader_txn_during_promote_write = function(g)
     --
     -- Server2 gets the bad txn.
     --
-    t.helpers.retrying({}, function()
-        g.server2:assert_follows_upstream(g.server1:get_instance_id())
-    end)
+    g.server1:wait_for_downstream_to(g.server2)
     t.assert_equals(g.server2:exec(function()
         return box.space.test:count()
     end), 1)

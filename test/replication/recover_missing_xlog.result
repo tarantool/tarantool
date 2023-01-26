@@ -77,10 +77,6 @@ test_run:cmd("switch autobootstrap1")
 ---
 - true
 ...
--- Wait until this instance is synced
-box.ctl.wait_rw()
----
-...
 for i = 10, 19 do box.space.test:insert{i, 'test' .. i} end
 ---
 ...

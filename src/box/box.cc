@@ -1240,9 +1240,9 @@ static double
 box_check_replication_sync_timeout(void)
 {
 	double timeout = cfg_getd("replication_sync_timeout");
-	if (timeout < 0) {
+	if (timeout <= 0) {
 		tnt_raise(ClientError, ER_CFG, "replication_sync_timeout",
-			  "the value must be greater or equal to 0");
+			  "the value must be greater than 0");
 	}
 	return timeout;
 }
