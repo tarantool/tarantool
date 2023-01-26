@@ -281,7 +281,7 @@ ok 14 - subtests
     ok 13 - became candidate
     ok 14 - new term
     ok 15 - election timeout passed
-    ok 16 - still a candidate
+    ok 16 - resigned from candidate
     ok 17 - do not bump term
     ok 18 - another leader is accepted
     ok 19 - leader resign is accepted

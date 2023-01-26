@@ -978,6 +978,8 @@ raft_sm_election_update_cb(struct ev_loop *loop, struct ev_timer *timer,
 	assert(raft_is_fully_on_disk(raft));
 	raft_ev_timer_stop(loop, timer);
 	bit_clear(&raft->leader_witness_map, raft->self);
+	/* If this was a manual promotion, transition back to follower. */
+	raft_restore(raft);
 	raft_schedule_broadcast(raft);
 	raft_sm_election_update(raft);
 }
