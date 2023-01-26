@@ -44,6 +44,7 @@ set(core_sources
     tt_strerror.c
     mp_util.c
     cord_on_demand.cc
+    tweaks.c
 )
 
 if (ENABLE_BACKTRACE)
@@ -74,7 +75,7 @@ endif()
 
 add_library(core STATIC ${core_sources})
 
-target_link_libraries(core salad small uri decNumber bit tzcode
+target_link_libraries(core salad small uri decNumber bit tzcode misc
                       ${LIBEV_LIBRARIES}
                       ${LIBEIO_LIBRARIES} ${LIBCORO_LIBRARIES}
                       ${MSGPUCK_LIBRARIES} ${ICU_LIBRARIES}

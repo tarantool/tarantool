@@ -586,3 +586,8 @@ create_unit_test(PREFIX lua_msgpack
                            ${LIBYAML_LIBRARIES}
                            ${READLINE_LIBRARIES}
 )
+
+create_unit_test(PREFIX tweaks
+                 SOURCES tweaks.c core_test_utils.c
+                 LIBRARIES core unit
+)
