@@ -695,6 +695,15 @@ strtolowerdup(const char *s);
 # define static_assert _Static_assert
 #endif
 
+/** Asserts that a global variable has a given type. */
+#define STATIC_ASSERT_VAR_TYPE(var, type)				\
+MAYBE_UNUSED static inline void						\
+var##_assert_type(void)							\
+{									\
+	const type *p = &(var);						\
+	(void)p;							\
+}
+
 #ifndef NDEBUG
 /**
  * Execute a CPU instruction that results in the SIGILL signal.
