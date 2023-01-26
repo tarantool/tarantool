@@ -7,6 +7,7 @@ local urilib = require('uri')
 local math = require('math')
 local fiber = require('fiber')
 local fio = require('fio')
+local compat = require('tarantool').compat
 
 local function nop() end
 
@@ -22,6 +23,10 @@ local function locked(f)
             error(err)
         end
     end
+end
+
+local function is_locked()
+    return lock:is_full()
 end
 
 --
@@ -186,6 +191,72 @@ local default_cfg = {
     txn_timeout           = 365 * 100 * 86400,
     txn_isolation         = "best-effort",
 }
+
+-- We need to track cfg changes done through API of distinct modules (log.cfg of
+-- log module for example). We cannot use just box.cfg because it is not
+-- available before box.cfg() call and other modules can be configured before
+-- this moment.
+local pre_load_cfg = table.copy(default_cfg)
+
+-- On first box.cfg{} we need to know options that were already configured
+-- in standalone modules (like log module). We should not apply env vars
+-- for these options. pre_load_cfg is not suitable for this purpose because
+-- of nil values.
+local pre_load_cfg_is_set = {}
+
+
+-- Whether box is loaded.
+--
+-- `false` when box is not configured or when the initialization
+-- is in progress.
+--
+-- `true` when box is configured.
+--
+-- Use locked() wrapper to obtain reliable results.
+local box_is_configured = false
+
+local replication_sync_timeout_brief = [[
+Sets the default value for box.cfg.replication_sync_timeout.
+Old is 300 seconds, new is 0 seconds. New behaviour makes
+box.cfg{replication = ...} call exit without waiting for
+synchronisation with all the remote nodes. This means that the node
+might be in 'orphan' state for some time after the box.cfg{} call
+returns. Set before first box.cfg{} call in order for the option to take effect.
+
+https://github.com/tarantool/tarantool/wiki/compat%3Abox_cfg_replication_sync_timeout
+]]
+
+-- A list of box.cfg options whose defaults are managed by compat.
+local compat_options = {
+    {
+        name = 'replication_sync_timeout',
+        brief = replication_sync_timeout_brief,
+        oldval = 300,
+        newval = 0,
+        obsolete = nil,
+        default = 'old',
+    },
+}
+
+for _, option in ipairs(compat_options) do
+    local option_name = 'box_cfg_' .. option.name
+    compat.add_option({
+        name = option_name,
+        default = option.default,
+        obsolete = option.obsolete,
+        brief = option.brief,
+        action = function(is_new)
+            if is_locked() or box_is_configured then
+                error("The compat  option '" .. option_name .. "' takes " ..
+                      "effect only before the initial box.cfg() call")
+            end
+            local val = is_new and option.newval or option.oldval
+            default_cfg[option.name] = val
+            pre_load_cfg[option.name] = val
+        end,
+        run_action_now = true,
+    })
+end
 
 -- types of available options
 -- could be comma separated lua types or 'any' if any type is allowed
@@ -899,28 +970,6 @@ setmetatable(box, {
         error("Please call box.cfg{} first")
      end
 })
-
--- Whether box is loaded.
---
--- `false` when box is not configured or when the initialization
--- is in progress.
---
--- `true` when box is configured.
---
--- Use locked() wrapper to obtain reliable results.
-local box_is_configured = false
-
--- We need to track cfg changes done thru API of distinct modules (log.cfg of
--- log module for example). We cannot use just box.cfg because it is not
--- available before box.cfg() call and other modules can be configured before
--- this moment.
-local pre_load_cfg = table.copy(default_cfg)
-
--- On first box.cfg{} we need to know options that were already configured
--- in standalone modules (like log module). We should not apply env vars
--- for these options. pre_load_cfg is not suitable for this purpose because
--- of nil values.
-local pre_load_cfg_is_set = {}
 
 local function load_cfg(cfg)
     -- A user may save box.cfg (this function) before box loading
