@@ -76,25 +76,11 @@ static struct {
 	OPTION(LUA_TBOOLEAN, encode_use_tostring, 0),
 	OPTION(LUA_TBOOLEAN, encode_invalid_as_nil, 0),
 	OPTION(LUA_TBOOLEAN, encode_error_as_ext, 1),
-	OPTION(LUA_TBOOLEAN, encode_escape_forward_slash, 0),
 	OPTION(LUA_TBOOLEAN, decode_invalid_numbers, 1),
 	OPTION(LUA_TBOOLEAN, decode_save_metatables, 1),
 	OPTION(LUA_TNUMBER,  decode_max_depth, 128),
 	{ NULL, 0, 0, 0},
 };
-
-void
-serializer_set_option_default(const char *name, int value)
-{
-	assert(name != NULL);
-	for (int i = 0; OPTIONS[i].name != NULL; i++) {
-		if (!strcmp(OPTIONS[i].name, name)) {
-			OPTIONS[i].defvalue = value;
-			return;
-		}
-	}
-	unreachable();
-}
 
 void
 luaL_serializer_create(struct luaL_serializer *cfg)

@@ -574,6 +574,20 @@ int clock_gettime(uint32_t clock_id, struct timespec *tp);
 #endif
 
 /**
+ * Returns the escaped string if the given character should be escaped when
+ * encoded in JSON or NULL otherwise.
+ */
+static inline const char *
+json_escape_char(char c)
+{
+	extern const char *const json_char2escape[];
+	extern bool json_escape_forward_slash;
+	if (c == '/' && json_escape_forward_slash)
+		return "\\/";
+	return json_char2escape[(unsigned char)c];
+}
+
+/**
  * Escape special characters in @a data to @a buf
  */
 int
