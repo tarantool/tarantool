@@ -5,7 +5,6 @@
  */
 
 #include <lua/compat.h>
-#include <lib/core/fiber_channel.h>
 #include "serializer.h"
 
 /* Toggler for msgpuck escaping change. */
@@ -55,21 +54,6 @@ yaml_pretty_multiline_toggle(struct lua_State *L)
 	return 0;
 }
 
-/* Toggler for fiber channel graceful close change. */
-static int
-fiber_channel_close_mode_toggle(struct lua_State *L)
-{
-	assert(lua_isboolean(L, -1) && "boolean argument expected");
-	bool is_new = lua_toboolean(L, -1);
-	enum fiber_channel_close_mode mode = is_new ?
-		FIBER_CHANNEL_CLOSE_GRACEFUL :
-		FIBER_CHANNEL_CLOSE_FORCEFUL;
-
-	fiber_channel_set_close_mode(mode);
-
-	return 0;
-}
-
 static const struct luaL_Reg internal_compat[] = {
 	{"msgpuck_escape_forward_slash_toggle",
 	 lbox_msgpuck_escape_forward_slash_toggle},
@@ -77,8 +61,6 @@ static const struct luaL_Reg internal_compat[] = {
 	 lbox_json_escape_forward_slash_toggle},
 	{"yaml_pretty_multiline_toggle",
 	 yaml_pretty_multiline_toggle},
-	{"fiber_channel_close_mode_toggle",
-	 fiber_channel_close_mode_toggle},
 	{NULL, NULL},
 };
 

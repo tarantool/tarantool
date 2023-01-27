@@ -33,6 +33,7 @@
 #include <stdlib.h>
 
 #include "fiber.h"
+#include "tweaks.h"
 
 enum fiber_channel_wait_status {
 	FIBER_CHANNEL_WAIT_READER, /* A reader is waiting for writer */
@@ -57,6 +58,13 @@ struct ipc_wait_pad {
  */
 static enum fiber_channel_close_mode fiber_channel_close_mode =
 	FIBER_CHANNEL_CLOSE_FORCEFUL;
+
+static const char *const fiber_channel_close_mode_strs[] = {
+	"forceful",
+	"graceful",
+};
+
+TWEAK_ENUM(fiber_channel_close_mode, fiber_channel_close_mode);
 
 void
 fiber_channel_set_close_mode(enum fiber_channel_close_mode mode)
