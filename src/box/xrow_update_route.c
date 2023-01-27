@@ -207,6 +207,15 @@ xrow_update_route_branch(struct xrow_update_field *field,
 			xrow_update_err_bad_json(new_op, rc);
 			return NULL;
 		}
+		if (old_token.type == JSON_TOKEN_END) {
+			/*
+			 * The bar path ended. It means the new operation either
+			 * is trying to update exactly the same field, or go
+			 * even deeper.
+			 */
+			xrow_update_err_double(new_op);
+			return NULL;
+		}
 		if (json_token_cmp(&old_token, &new_token) != 0)
 			break;
 		const char *next_pos = parent;
@@ -219,15 +228,7 @@ xrow_update_route_branch(struct xrow_update_field *field,
 						   new_token.len);
 			break;
 		default:
-			/*
-			 * Can't be JSON_TOKEN_ANY, because old
-			 * and new tokens are equal, but '*' is
-			 * considered invalid and the old was
-			 * already checked for that. So the new is
-			 * valid too. And can't have type ANY.
-			 */
-			assert(new_token.type == JSON_TOKEN_END);
-			xrow_update_err_double(new_op);
+			unreachable();
 			return NULL;
 		}
 		if (rc != 0) {
