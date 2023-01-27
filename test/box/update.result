@@ -1807,6 +1807,18 @@ t:upsert(ops)
 - [1, {}, [[1000, 2000]], [1, 2, 3, [4, 5, 6, 7, [8, 9, [10, 11, 12], 13, 14], 15,
       16, [17, 18, 19]], 20, {'b': 22, 'a': 21, 'c': {'d': 23, 'e': 24}}, 25]]
 ...
+--
+-- gh-8216: attempt to make an update inside a just created array field could
+-- crash.
+--
+t:update({{'=', '[3]', {a = 33}}, {'+', '[3].a', 1}})
+---
+- error: 'Field ''[3].a'' UPDATE error: double update of the same field'
+...
+t:update({{'=', '[4]', {1}}, {'+', '[4][1]', 1}})
+---
+- error: 'Field ''[4][1]'' UPDATE error: double update of the same field'
+...
 -- Try more than 2 levels of nested insertions.
 ops = {{'=', '[2].key1', {key11 = 1}}, {'=', '[2].key1.key12', {key21 = 2}},    \
        {'=', '[2].key1.key12.key22', {key31 = 3}},                              \
