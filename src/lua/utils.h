@@ -133,6 +133,19 @@ luaT_newinterval(struct lua_State *L);
 struct interval *
 luaT_pushinterval(struct lua_State *L, const struct interval *itv);
 
+/**
+ * Returns a pointer to the cdata payload.
+ *
+ * @param L Lua state.
+ * @param idx Acceptable index on the Lua stack.
+ * @param[out] ctypeid FFI's CTypeID of this cdata.
+ *
+ * @retval Pointer to the memory associated with this cdata,
+ * or NULL if the value at the given index is not a cdata.
+ */
+void *
+luaL_tocpointer(lua_State *L, int idx, uint32_t *ctypeid);
+
 /** \cond public */
 
 /**
@@ -449,9 +462,9 @@ static inline bool
 luaL_isnull(struct lua_State *L, int idx)
 {
 	if (lua_type(L, idx) == LUA_TCDATA) {
-		GCcdata *cd = cdataV(L->base + idx - 1);
-		return cd->ctypeid == CTID_P_VOID &&
-			*(void **)cdataptr(cd) == NULL;
+		uint32_t ctypeid;
+		void *cdata = luaL_tocpointer(L, idx, &ctypeid);
+		return ctypeid == CTID_P_VOID && *(void **)cdata == NULL;
 	}
 	return false;
 }
