@@ -625,6 +625,13 @@ ops = {{'=', '[3][1]', {1000}}, {'=', '[3][1][2]', 2000}}
 t:update(ops)
 t:upsert(ops)
 
+--
+-- gh-8216: attempt to make an update inside a just created array field could
+-- crash.
+--
+t:update({{'=', '[3]', {a = 33}}, {'+', '[3].a', 1}})
+t:update({{'=', '[4]', {1}}, {'+', '[4][1]', 1}})
+
 -- Try more than 2 levels of nested insertions.
 ops = {{'=', '[2].key1', {key11 = 1}}, {'=', '[2].key1.key12', {key21 = 2}},    \
        {'=', '[2].key1.key12.key22', {key31 = 3}},                              \

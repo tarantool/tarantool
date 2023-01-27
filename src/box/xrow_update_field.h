@@ -723,6 +723,8 @@ xrow_update_op_do_field_##op_type(struct xrow_update_op *op,			\
 				  struct xrow_update_field *field)		\
 {										\
 	switch (field->type) {							\
+	case XUPDATE_SCALAR:							\
+		return xrow_update_err_double(op);				\
 	case XUPDATE_ARRAY:							\
 		return xrow_update_op_do_array_##op_type(op, field);		\
 	case XUPDATE_NOP:							\
