@@ -526,16 +526,15 @@ relay_final_join_f(va_list ap)
 
 void
 relay_final_join(struct iostream *io, uint64_t sync,
-		 struct vclock *start_vclock, struct vclock *stop_vclock)
+		 struct vclock *start_vclock, struct vclock *stop_vclock,
+		 struct relay *relay)
 {
-	struct relay *relay = relay_new(NULL);
 	if (relay == NULL)
 		diag_raise();
 
 	relay_start(relay, io, sync, relay_send_row, relay_yield, UINT64_MAX);
 	auto relay_guard = make_scoped_guard([=] {
 		relay_stop(relay);
-		relay_delete(relay);
 	});
 	/*
 	 * Save the first vclock as 'received'. Because it was really received.

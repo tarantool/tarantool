@@ -139,7 +139,8 @@ relay_initial_join(struct iostream *io, uint64_t sync, struct vclock *vclock,
  */
 void
 relay_final_join(struct iostream *io, uint64_t sync,
-		 struct vclock *start_vclock, struct vclock *stop_vclock);
+		 struct vclock *start_vclock, struct vclock *stop_vclock,
+		 struct relay *relay);
 
 /**
  * Subscribe a replica to updates.
