@@ -80,7 +80,7 @@ local options = {
         default = 'old',
         obsolete = nil,
         brief = YAML_PRETTY_MULTILINE_BRIEF,
-        action = internal.yaml_pretty_multiline_toggle,
+        action = tweak_action('yaml_pretty_multiline', false, true),
     },
     fiber_channel_close_mode = {
         default = 'old',
