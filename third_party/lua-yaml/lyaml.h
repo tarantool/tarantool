@@ -12,9 +12,6 @@ struct luaL_serializer;
 LUALIB_API int
 luaopen_yaml(lua_State *L);
 
-/** String with single or double newline char for compat option toggler. */
-extern char *FORCE_LITERAL_SUBSTRING;
-
 /** @Sa luaL_newserializer(). */
 struct luaL_serializer *
 lua_yaml_new_serializer(lua_State *L);

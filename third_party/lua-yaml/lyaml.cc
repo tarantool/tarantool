@@ -55,6 +55,7 @@ extern "C" {
 #include "tt_static.h"
 #include "mp_extension_types.h" /* MP_DECIMAL, MP_UUID */
 #include "tt_uuid.h" /* tt_uuid_to_string(), UUID_STR_LEN */
+#include "tweaks.h"
 
 #define LUAYAML_TAG_PREFIX "tag:yaml.org,2002:"
 
@@ -99,6 +100,14 @@ struct lua_yaml_dumper {
    lua_State *outputL;
    luaL_Buffer yamlbuf;
 };
+
+/**
+ * By default, only strings that contain a '\n\n' substring are encoded in
+ * the block scalar style. Setting this flag, makes the encoder use the block
+ * scalar style for all multiline strings.
+ */
+static bool yaml_pretty_multiline;
+TWEAK_BOOL(yaml_pretty_multiline);
 
 /**
  * Verify whether a string represents a boolean literal in YAML.
@@ -665,9 +674,10 @@ static int dump_node(struct lua_yaml_dumper *dumper)
       }
       style = YAML_ANY_SCALAR_STYLE; // analyze_string(dumper, str, len, &is_binary);
       if (utf8_check_printable(str, len)) {
+         const char *force_literal_substring = yaml_pretty_multiline ? "\n" : "\n\n";
          if (yaml_is_flow_mode(dumper)) {
             style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-         } else if (strstr(str, FORCE_LITERAL_SUBSTRING) != NULL) {
+         } else if (strstr(str, force_literal_substring) != NULL) {
             /*
              * Tarantool-specific: use literal block style for either every
              * multiline string or string containing "\n\n" depending on compat

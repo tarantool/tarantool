@@ -37,30 +37,11 @@ lbox_json_escape_forward_slash_toggle(struct lua_State *L)
 	return 0;
 }
 
-static const char double_newline[] = "\n\n";
-static const char single_newline[] = "\n";
-
-const char *FORCE_LITERAL_SUBSTRING = double_newline;
-
-/* Toggler for lyaml multiline string encoding change. */
-static int
-yaml_pretty_multiline_toggle(struct lua_State *L)
-{
-	assert(lua_isboolean(L, -1));
-	bool is_new = lua_toboolean(L, -1);
-
-	FORCE_LITERAL_SUBSTRING = is_new ? single_newline : double_newline;
-
-	return 0;
-}
-
 static const struct luaL_Reg internal_compat[] = {
 	{"msgpuck_escape_forward_slash_toggle",
 	 lbox_msgpuck_escape_forward_slash_toggle},
 	{"json_escape_forward_slash_toggle",
 	 lbox_json_escape_forward_slash_toggle},
-	{"yaml_pretty_multiline_toggle",
-	 yaml_pretty_multiline_toggle},
 	{NULL, NULL},
 };
 
