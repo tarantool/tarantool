@@ -348,13 +348,31 @@ local function run_preload()
     end
 end
 
-return {
-    uptime = uptime;
-    pid = pid;
-    compat = compat;
+-- Extract all fields from a table except ones that start from
+-- the underscore.
+--
+-- Useful for __serialize.
+local function filter_out_private_fields(t)
+    local res = {}
+    for k, v in pairs(t) do
+        if not k:startswith('_') then
+            res[k] = v
+        end
+    end
+    return res
+end
+
+local mt = {
+    __serialize = filter_out_private_fields,
+}
+
+return setmetatable({
+    uptime = uptime,
+    pid = pid,
+    compat = compat,
     _internal = {
         strip_cwd_from_path = strip_cwd_from_path,
         module_name_from_filename = module_name_from_filename,
         run_preload = run_preload,
-    };
-}
+    },
+}, mt)
