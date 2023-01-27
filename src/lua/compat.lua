@@ -4,7 +4,6 @@
 local NEW = true
 local OLD = false
 
-local internal = require('internal.compat.lib')
 local tweaks = require('internal.tweaks')
 
 local options_format = {
@@ -69,12 +68,7 @@ local options = {
         obsolete = nil,
         brief = JSON_ESCAPE_BRIEF,
         run_action_now = true,
-        action = function(is_new)
-            local esc_slash = not is_new
-            require('json').cfg{encode_escape_forward_slash = esc_slash}
-            internal.json_escape_forward_slash_toggle(esc_slash)
-            internal.msgpuck_escape_forward_slash_toggle(esc_slash)
-        end,
+        action = tweak_action('json_escape_forward_slash', true, false),
     },
     yaml_pretty_multiline = {
         default = 'old',

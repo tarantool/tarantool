@@ -45,9 +45,9 @@
 
 #include <unicode/utf8.h>
 #include <unicode/uchar.h>
-#include <msgpuck/msgpuck.h> /* mp_char2escape[] table */
 
 #include "say.h"
+#include "tweaks.h"
 
 /** Find a string in an array of strings.
  *
@@ -346,17 +346,65 @@ utf8_check_printable(const char *start, size_t length)
 	return 1;
 }
 
+/**
+ * Maps a character code to an escaped string or NULL if the character
+ * doesn't need to be escaped when encoded in JSON.
+ */
+const char *const json_char2escape[256] = {
+	"\\u0000", "\\u0001", "\\u0002", "\\u0003",
+	"\\u0004", "\\u0005", "\\u0006", "\\u0007",
+	"\\b", "\\t", "\\n", "\\u000b",
+	"\\f", "\\r", "\\u000e", "\\u000f",
+	"\\u0010", "\\u0011", "\\u0012", "\\u0013",
+	"\\u0014", "\\u0015", "\\u0016", "\\u0017",
+	"\\u0018", "\\u0019", "\\u001a", "\\u001b",
+	"\\u001c", "\\u001d", "\\u001e", "\\u001f",
+	NULL, NULL, "\\\"", NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, "\\\\", NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, "\\u007f",
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+};
+
+/**
+ * If set, json_encode_char() will also escape '/'.
+ */
+bool json_escape_forward_slash;
+TWEAK_BOOL(json_escape_forward_slash);
+
 int
 json_escape(char *buf, int size, const char *data)
 {
 	int total = 0;
 	int data_len = strlen(data);
 	for (int i = 0; i < data_len; i++) {
-		unsigned char c = (unsigned char ) data[i];
-		if (c < 128 && mp_char2escape[c] != NULL) {
-			/* Escape character */
-			SNPRINT(total, snprintf, buf, size, "%s",
-					  mp_char2escape[c]);
+		char c = data[i];
+		const char *escstr = json_escape_char(c);
+		if (escstr != NULL) {
+			SNPRINT(total, snprintf, buf, size, "%s", escstr);
 		} else {
 			SNPRINT(total, snprintf, buf, size, "%c", c);
 		}

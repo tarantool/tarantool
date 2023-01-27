@@ -136,8 +136,6 @@ struct luaL_serializer {
 	int encode_invalid_as_nil;
 	/** Encode error object as MP_ERROR extension (MsgPack only). */
 	int encode_error_as_ext;
-	/** Encode escape forward slash (for compat). */
-	int encode_escape_forward_slash;
 
 	/** Enables decoding NaN and Inf numbers */
 	int decode_invalid_numbers;
@@ -166,14 +164,6 @@ struct luaL_serializer {
 	 */
 	struct rlist on_update;
 };
-
-/**
- * @brief helper that sets cfg options default to value.
- * @param name option to change
- * @param value new default value
- */
-void
-serializer_set_option_default(const char *name, int value);
 
 /**
  * @brief serializer.new() Lua binding.

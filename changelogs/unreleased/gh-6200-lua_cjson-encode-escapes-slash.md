@@ -1,5 +1,6 @@
 ## bugfix/lua/json
 
-* Now the forward slash (`/`) is not escaped in `json.encode()` and msgpack.
-  A new `tarantool.compat` option `json_escape_forward_slash` is added for
-  switching to the new behavior (gh-6200).
+* A new `tarantool.compat` option `json_escape_forward_slash` was added. This
+  option configures whether the internal JSON encoder escapes the forward slash
+  character (old behavior) or not (new behavior). This option affects the
+  `json.encode()` Lua function and the JSON logger (gh-6200).

@@ -51,15 +51,13 @@ local function server_test_json_new_encode()
     -- Test that '/' is escaped with 'old' setting.
     t.assert_equals(json.encode('/'), [["\/"]])
 
-    -- Create new serializer and check that it has correct defaults
-    -- and doesn't change behavior.
+    -- Test that a serializer created with json.new() follows
+    -- the compat configuration.
     local json_old = json.new()
     t.assert_equals(json_old.encode('/'), [["\/"]])
     compat.json_escape_forward_slash = 'new'
-    t.assert_equals(json_old.encode('/'), [["\/"]])
+    t.assert_equals(json_old.encode('/'), [["/"]])
     t.assert_equals(json.encode('/'), [["/"]])
-
-    -- Create new serializer and check that it has correct defaults.
     local json_new = json.new()
     t.assert_equals(json_new.encode('/'), [["/"]])
 
@@ -67,9 +65,7 @@ local function server_test_json_new_encode()
     compat.json_escape_forward_slash = 'default'
 end
 
--- log.info in json format mode uses internal encoder that takes msgpuck
--- char2escape table, while mp_char2escape is changed by compat.
-local function popen_test_mp_encode()
+local function popen_test_json_log()
     local popen = require('popen')
     local clock = require('clock')
 
@@ -126,7 +122,7 @@ end
 local tests = {
     server_test_json_encode,
     server_test_json_new_encode,
-    popen_test_mp_encode,
+    popen_test_json_log,
 }
 
 local g = t.group('pgroup', t.helpers.matrix{test_func = tests})
