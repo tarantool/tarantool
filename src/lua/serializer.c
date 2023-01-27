@@ -469,11 +469,11 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 		return 0;
 	case LUA_TCDATA:
 	{
-		GCcdata *cd = cdataV(L->base + index - 1);
-		void *cdata = (void *)cdataptr(cd);
+		uint32_t ctypeid;
+		void *cdata = luaL_tocpointer(L, index, &ctypeid);
 
 		int64_t ival;
-		switch (cd->ctypeid) {
+		switch (ctypeid) {
 		case CTID_BOOL:
 			field->type = MP_BOOL;
 			field->bval = *(bool*) cdata;
@@ -534,19 +534,19 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 			/* Fall through */
 		default:
 			field->type = MP_EXT;
-			if (cd->ctypeid == CTID_DECIMAL) {
+			if (ctypeid == CTID_DECIMAL) {
 				field->ext_type = MP_DECIMAL;
 				field->decval = (decimal_t *) cdata;
-			} else if (cd->ctypeid == CTID_UUID) {
+			} else if (ctypeid == CTID_UUID) {
 				field->ext_type = MP_UUID;
 				field->uuidval = (struct tt_uuid *) cdata;
-			} else if (cd->ctypeid == CTID_CONST_STRUCT_ERROR_REF) {
+			} else if (ctypeid == CTID_CONST_STRUCT_ERROR_REF) {
 				field->ext_type = MP_ERROR;
 				field->errorval = *(struct error **)cdata;
-			} else if (cd->ctypeid == CTID_DATETIME) {
+			} else if (ctypeid == CTID_DATETIME) {
 				field->ext_type = MP_DATETIME;
 				field->dateval = (struct datetime *)cdata;
-			} else if (cd->ctypeid == CTID_INTERVAL) {
+			} else if (ctypeid == CTID_INTERVAL) {
 				field->ext_type = MP_INTERVAL;
 				field->interval = (struct interval *)cdata;
 			} else {
@@ -604,8 +604,9 @@ luaL_convertfield(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 			 * Don't call __serialize on primitive types
 			 * https://github.com/tarantool/tarantool/issues/1226
 			 */
-			GCcdata *cd = cdataV(L->base + idx - 1);
-			if (cd->ctypeid > CTID_CTYPEID)
+			uint32_t ctypeid;
+			luaL_tocpointer(L, idx, &ctypeid);
+			if (ctypeid > CTID_CTYPEID)
 				lua_field_inspect_ucdata(L, cfg, idx, field);
 		} else if (type == LUA_TUSERDATA) {
 			lua_field_inspect_ucdata(L, cfg, idx, field);

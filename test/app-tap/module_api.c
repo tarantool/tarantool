@@ -2112,6 +2112,39 @@ test_iscdata(struct lua_State *L)
 	return 1;
 }
 
+static int
+void_gc(struct lua_State *L)
+{
+	(void)L;
+	return 0;
+}
+
+static int
+closure(struct lua_State *L)
+{
+	uint32_t ctypeid;
+	int idx = lua_upvalueindex(1);
+	luaL_iscallable(L, idx);
+	luaL_checkcdata(L, idx, &ctypeid);
+	lua_pushcfunction(L, void_gc);
+	luaL_setcdatagc(L, idx);
+	return 0;
+}
+
+/**
+ * Check that luaL_iscallable(), luaL_checkcdata() and luaL_setcdatagc() accept
+ * an upvalue index without raising an error or crashing.
+ */
+static int
+test_upvalueindex(struct lua_State *L)
+{
+	uint32_t pvoid_ctypeid = luaL_ctypeid(L, "void *");
+	*(void **)luaL_pushcdata(L, pvoid_ctypeid) = NULL;
+	lua_pushcclosure(L, &closure, 1);
+	lua_pushboolean(L, lua_pcall(L, 0, 0, 0) == 0);
+	return 1;
+}
+
 /* {{{ test_box_region */
 
 /**
@@ -3152,6 +3185,7 @@ luaopen_module_api(lua_State *L)
 		{"test_tostring", test_tostring},
 		{"iscallable", test_iscallable},
 		{"iscdata", test_iscdata},
+		{"test_upvalueindex", test_upvalueindex},
 		{"test_box_region", test_box_region},
 		{"test_tuple_encode", test_tuple_encode},
 		{"test_tuple_new", test_tuple_new},

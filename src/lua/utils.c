@@ -54,6 +54,37 @@ uint32_t CTID_UUID;
 uint32_t CTID_DATETIME = 0;
 uint32_t CTID_INTERVAL = 0;
 
+/** A copy of index2adr() from luajit/src/lj_api.c. */
+static TValue *
+index2adr(lua_State *L, int idx)
+{
+	if (idx > 0) {
+		TValue *o = L->base + (idx - 1);
+		return o < L->top ? o : niltv(L);
+	} else if (idx > LUA_REGISTRYINDEX) {
+		api_check(L, idx != 0 && -idx <= L->top - L->base);
+		return L->top + idx;
+	} else if (idx == LUA_GLOBALSINDEX) {
+		TValue *o = &G(L)->tmptv;
+		settabV(L, o, tabref(L->env));
+		return o;
+	} else if (idx == LUA_REGISTRYINDEX) {
+		return registry(L);
+	} else {
+		GCfunc *fn = curr_func(L);
+		api_check(L, fn->c.gct == ~LJ_TFUNC && !isluafunc(fn));
+		if (idx == LUA_ENVIRONINDEX) {
+			TValue *o = &G(L)->tmptv;
+			settabV(L, o, tabref(fn->c.env));
+			return o;
+		} else {
+			idx = LUA_GLOBALSINDEX - idx;
+			return idx <= fn->c.nupvalues ?
+			       &fn->c.upvalue[idx - 1] : niltv(L);
+		}
+	}
+}
+
 void *
 luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
 {
@@ -161,6 +192,21 @@ luaT_pushinterval(struct lua_State *L, const struct interval *itv)
 	return res;
 }
 
+void *
+luaL_tocpointer(lua_State *L, int idx, uint32_t *ctypeid)
+{
+	TValue *o = index2adr(L, idx);
+	if (!tviscdata(o)) {
+		if (ctypeid != NULL)
+			*ctypeid = 0;
+		return NULL;
+	}
+	GCcdata *cd = cdataV(o);
+	if (ctypeid != NULL)
+		*ctypeid = cd->ctypeid;
+	return cdataptr(cd);
+}
+
 int
 luaL_iscdata(struct lua_State *L, int idx)
 {
@@ -170,19 +216,10 @@ luaL_iscdata(struct lua_State *L, int idx)
 void *
 luaL_checkcdata(struct lua_State *L, int idx, uint32_t *ctypeid)
 {
-	/* Calculate absolute value in the stack. */
-	if (idx < 0)
-		idx = lua_gettop(L) + idx + 1;
-
-	if (lua_type(L, idx) != LUA_TCDATA) {
-		*ctypeid = 0;
+	void *cdata = luaL_tocpointer(L, idx, ctypeid);
+	if (cdata == NULL)
 		luaL_error(L, "expected cdata as %d argument", idx);
-		return NULL;
-	}
-
-	GCcdata *cd = cdataV(L->base + idx - 1);
-	*ctypeid = cd->ctypeid;
-	return (void *)cdataptr(cd);
+	return cdata;
 }
 
 uint32_t
@@ -255,18 +292,14 @@ luaL_cdef(struct lua_State *L, const char *what)
 	return lua_pcall(L, 1, 0, 0);
 }
 
+/** Based on ffi_gc() from luajit/src/lib_ffi.c. */
 void
 luaL_setcdatagc(struct lua_State *L, int idx)
 {
-	/* Calculate absolute value in the stack. */
-	if (idx < 0)
-		idx = lua_gettop(L) + idx + 1;
-
-	/* Code below is based on ffi_gc() from luajit/src/lib_ffi.c */
-
 	/* Get cdata from the stack */
-	assert(lua_type(L, idx) == LUA_TCDATA);
-	GCcdata *cd = cdataV(L->base + idx - 1);
+	assert(luaL_iscdata(L, idx));
+	TValue *o = index2adr(L, idx);
+	GCcdata *cd = cdataV(o);
 
 	/* Get finalizer from the stack */
 	TValue *fin = lj_lib_checkany(L, lua_gettop(L));
@@ -571,20 +604,16 @@ luaT_tolstring(lua_State *L, int idx, size_t *len)
 	return lua_tolstring(L, -1, len);
 }
 
-/* Based on ffi_meta___call() from luajit/src/lib_ffi.c. */
+/** Based on ffi_meta___call() from luajit/src/lib_ffi.c. */
 static int
 luaL_cdata_iscallable(lua_State *L, int idx)
 {
-	/* Calculate absolute value in the stack. */
-	if (idx < 0)
-		idx = lua_gettop(L) + idx + 1;
-
 	/* Get cdata from the stack. */
-	assert(lua_type(L, idx) == LUA_TCDATA);
-	GCcdata *cd = cdataV(L->base + idx - 1);
+	CTypeID id;
+	assert(luaL_iscdata(L, idx));
+	luaL_tocpointer(L, idx, &id);
 
 	CTState *cts = ctype_cts(L);
-	CTypeID id = cd->ctypeid;
 	CType *ct = ctype_raw(cts, id);
 	if (ctype_isptr(ct->info))
 		id = ctype_cid(ct->info);

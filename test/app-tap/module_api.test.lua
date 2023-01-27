@@ -167,6 +167,12 @@ local function test_iscallable(test, module)
     end
 end
 
+local function test_upvalueindex(test, module)
+    test:plan(1)
+    test:ok(module.test_upvalueindex(),
+            'upvalue index passed to various methods')
+end
+
 local function test_iscdata(test, module)
     local ffi = require('ffi')
     ffi.cdef([[
@@ -658,7 +664,7 @@ local function test_box_iproto_override(test, module)
 end
 
 require('tap').test("module_api", function(test)
-    test:plan(47)
+    test:plan(49)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
@@ -684,6 +690,7 @@ require('tap').test("module_api", function(test)
 
     test:test("pushcdata", test_pushcdata, module)
     test:test("iscallable", test_iscallable, module)
+    test:test("upvalueindex", test_upvalueindex, module)
     test:test("iscdata", test_iscdata, module)
     test:test("buffers", test_buffers, module)
     test:test("tuple_validate", test_tuple_validate, module)
