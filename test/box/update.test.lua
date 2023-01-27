@@ -631,6 +631,9 @@ t:upsert(ops)
 --
 t:update({{'=', '[3]', {a = 33}}, {'+', '[3].a', 1}})
 t:update({{'=', '[4]', {1}}, {'+', '[4][1]', 1}})
+-- Same about updating internals of a newly created bar field.
+t:update({{'=', '[4][6]', {a = 33}}, {'+', '[4][6].aa', 1}})
+t:update({{'=', '[4][4]', {3}}, {'+', '[4][4][1]', 1}})
 
 -- Try more than 2 levels of nested insertions.
 ops = {{'=', '[2].key1', {key11 = 1}}, {'=', '[2].key1.key12', {key21 = 2}},    \
