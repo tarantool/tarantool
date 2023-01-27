@@ -262,6 +262,50 @@ xrow_update_op_is_term(const struct xrow_update_op *op)
 
 /* }}} xrow_update_op */
 
+/** {{{ Error helpers. */
+/**
+ * All the error helpers below set diag with appropriate error
+ * code, taking into account field_no < 0, complex paths. They all
+ * return -1 to shorten error returning in a caller function to
+ * single line.
+ */
+
+/** Error 'no such field'. */
+int
+xrow_update_err_no_such_field(const struct xrow_update_op *op);
+
+/** Generic error with arbitrary reason. */
+int
+xrow_update_err(const struct xrow_update_op *op, const char *reason);
+
+static inline int
+xrow_update_err_double(const struct xrow_update_op *op)
+{
+	return xrow_update_err(op, "double update of the same field");
+}
+
+static inline int
+xrow_update_err_bad_json(const struct xrow_update_op *op, int pos)
+{
+	return xrow_update_err(
+		op, tt_sprintf("invalid JSON in position %d", pos));
+}
+
+static inline int
+xrow_update_err_delete1(const struct xrow_update_op *op)
+{
+	return xrow_update_err(
+		op, "can delete only 1 field from a map in a row");
+}
+
+static inline int
+xrow_update_err_duplicate(const struct xrow_update_op *op)
+{
+	return xrow_update_err(op, "the key exists already");
+}
+
+/** }}} Error helpers. */
+
 /* {{{ xrow_update_field */
 
 /** Types of field update. */
@@ -741,47 +785,5 @@ int
 xrow_update_op_do_splice(struct xrow_update_op *op, const char *old);
 
 /* }}} Scalar helpers. */
-
-/** {{{ Error helpers. */
-/**
- * All the error helpers below set diag with appropriate error
- * code, taking into account field_no < 0, complex paths. They all
- * return -1 to shorten error returning in a caller function to
- * single line.
- */
-
-int
-xrow_update_err_no_such_field(const struct xrow_update_op *op);
-
-int
-xrow_update_err(const struct xrow_update_op *op, const char *reason);
-
-static inline int
-xrow_update_err_double(const struct xrow_update_op *op)
-{
-	return xrow_update_err(op, "double update of the same field");
-}
-
-static inline int
-xrow_update_err_bad_json(const struct xrow_update_op *op, int pos)
-{
-	return xrow_update_err(op, tt_sprintf("invalid JSON in position %d",
-					      pos));
-}
-
-static inline int
-xrow_update_err_delete1(const struct xrow_update_op *op)
-{
-	return xrow_update_err(op, "can delete only 1 field from a map in a "\
-			       "row");
-}
-
-static inline int
-xrow_update_err_duplicate(const struct xrow_update_op *op)
-{
-	return xrow_update_err(op, "the key exists already");
-}
-
-/** }}} Error helpers. */
 
 #endif /* TARANTOOL_BOX_TUPLE_UPDATE_FIELD_H */
