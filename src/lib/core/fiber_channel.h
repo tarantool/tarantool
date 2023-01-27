@@ -251,6 +251,8 @@ enum fiber_channel_close_mode {
 	 * example, in Go.
 	 */
 	FIBER_CHANNEL_CLOSE_GRACEFUL,
+
+	fiber_channel_close_mode_MAX,
 };
 
 /**

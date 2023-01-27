@@ -5,6 +5,7 @@ local NEW = true
 local OLD = false
 
 local internal = require('internal.compat.lib')
+local tweaks = require('internal.tweaks')
 
 local options_format = {
     default        = 'string',
@@ -44,6 +45,17 @@ channel close.
 https://github.com/tarantool/tarantool/wiki/compat%3Afiber_channel_close_mode
 ]]
 
+-- Returns an action callback that toggles a tweak.
+local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
+    return function(is_new)
+        if is_new then
+            tweaks[tweak_name] = new_tweak_value
+        else
+            tweaks[tweak_name] = old_tweak_value
+        end
+    end
+end
+
 -- Contains options descriptions in following format:
 -- * default  (string)
 -- * brief    (string)
@@ -74,7 +86,8 @@ local options = {
         default = 'old',
         obsolete = nil,
         brief = FIBER_CHANNEL_GRACEFUL_CLOSE_BRIEF,
-        action = internal.fiber_channel_close_mode_toggle,
+        action = tweak_action('fiber_channel_close_mode',
+                              'forceful', 'graceful'),
     },
 }
 
