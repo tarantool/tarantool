@@ -25,7 +25,6 @@
 ]]
 
 local dbg
-local fio = require('fio')
 
 local DEBUGGER = 'luadebug.lua'
 -- Use ANSI color codes in the prompt by default.
@@ -162,39 +161,186 @@ local function format_stack_frame_info(info)
     return format_loc(source, info.currentline) .. " in " .. namewhat .. " " .. name
 end
 
-local normalized_paths = {}
+local suffix_arrays = {}
+
+local function normalize_file(file)
+    return file and (file:gsub('^@', ''):gsub('\n', '')) or ''
+end
 
 -- This function is on a hot path of a debugger hook.
 -- Try very hard to avoid wasting of CPU cycles, so reuse
 -- previously calculated results via memoization
-local function normalize_path(file)
+local function build_suffix_array(file)
     local decorated_name = file
-    if normalized_paths[decorated_name] ~= nil then
-        return normalized_paths[decorated_name]
+    if suffix_arrays[decorated_name] ~= nil then
+        return suffix_arrays[decorated_name]
     end
-    -- If the name doesn't start with `@`, assume it's a file name if it's all
-    -- on one line.
-    if string.find(file, "^@") or not string.find(file, "[\r\n]") then
-        file = fio.basename(string.gsub(file, "^@", ""))
 
-        -- some file systems allow newlines in file names; remove these.
-        file = string.gsub(file, "\n", ' ')
+    local suffixes = {}
+    file = normalize_file(file)
+    --[[
+        we would very much prefer to use simple:
+           for v in file:gmatch('[^/]+') do
+        loop here, but string.gmatch is very slow
+        but we actually need several strchr's here
+    ]]
+    local i = 0
+    local j
+    local v
+    repeat
+        j = file:find('/', i, true)
+        if j ~= nil then
+            v = file:sub(i, j - 1)
+            if v ~= '.' then -- just skip '.' for current dir
+                table.insert(suffixes, 1, v)
+            end
+            i = j + 1
+        end
+    until j == nil
+    -- don't forget to process the trailing segment
+    v = file:sub(i, #file)
+    if v ~= '.' then -- just skip '.' for current dir
+        table.insert(suffixes, 1, v)
     end
-    -- memoize current result - it will be needed very soon
-    normalized_paths[decorated_name] = file
-    return file
+
+    suffix_arrays[decorated_name] = suffixes
+    return suffixes
 end
 
-local myself = normalize_path(debug.getinfo(1,'S').source)
+-- Merge suffix array A to the tree T:
+--   Given input array ['E.lua','C','B'] which is suffix array
+--   corresponding to the input path '@B/./C/E.lua',
+--   we build tree of a form:
+--     T['E.lua']['C']['B'] = {}
+local function append_suffix_array(T, A)
+    assert(type(T) == 'table')
+    assert(type(A) == 'table')
+    if #A < 1 then
+        return
+    end
+    local C = T -- advance current node, starting from root
+    local P -- prior node
+    for i = 1, #A do
+        local v = A[i]
+        if not C[v] then
+            C[v] = {}
+            C[v]['$ref'] = 1 --reference counter
+        else
+            C[v]['$ref'] = C[v]['$ref'] + 1
+        end
+        P = C
+        C = C[v]
+    end
+    local last = A[#A]
+    P[last]['$f'] = true
+end
+
+-- lookup into suffix tree T given constructed suffix array S
+local function lookup_suffix_array(T, S)
+    -- short cut if there is no base name leaf created
+    if T[S[1]] == nil then
+        return false
+    end
+
+    if #S < 1 then
+        return false
+    end
+
+    local C = T
+    local P -- last accessed node
+    local v
+    -- we need to make sure that at least once
+    -- we have matched node inside of loop
+    -- so bail out immediately if there is no any single
+    -- match
+    if not C[S[1]] then
+        return false
+    end
+    for i = 1, #S do
+        v = S[i]
+        if C[v] == nil then
+            return not not P[S[i - 1]]['$f']
+        end
+        P = C
+        C = C[v]
+    end
+    return not not P[v]['$f']
+end
+
+--[[
+    Given suffix tree T try to remove suffix array A
+    from the tree. Laaf and intermediate nodes will be
+    cleaned up only once their reference counter '$ref'
+    will reach 1.
+]]
+local function remove_suffix_array(T, A)
+    local C = T
+    local mem_walk = {}
+    -- walks down tree, remembering pointers for inner directories
+    for i = 1, #A do
+        mem_walk[i] = C
+        local v = A[i]
+        if C[v] == nil then
+            return false
+        end
+        C = C[v]
+    end
+
+    -- now walk in revert order cleaning subnodes,
+    -- starting from deepest reachable leaf
+    for i = #A, 1, -1 do
+        C = mem_walk[i]
+        local v = A[i]
+        assert(C[v] ~= nil)
+        assert(C[v]['$ref'] >= 1)
+        C[v]['$ref'] = C[v]['$ref'] - 1
+        if C[v]['$ref'] <= 1 then
+            mem_walk[i] = nil
+            C[v] = nil
+        end
+    end
+end
+
+local myself = normalize_file(debug.getinfo(1,'S').source)
 local breakpoints = {}
 
 local function has_breakpoint(file, line)
-    return breakpoints[line] and breakpoints[line][file]
+    local T = breakpoints[line]
+    if T == nil then
+        return false
+    end
+    local suffixes = build_suffix_array(file)
+    return lookup_suffix_array(T, suffixes)
 end
 
 local function has_active_breakpoints()
     local key = next(breakpoints)
     return key ~= nil
+end
+
+local function add_breakpoint(file, line)
+    local suffixes = build_suffix_array(file)
+    local normfile = normalize_file(file)
+    -- save direct hash (for faster lookup): line -> file
+    if not breakpoints[line] then
+        breakpoints[line] = {}
+    end
+    append_suffix_array(breakpoints[line], suffixes)
+    -- save reversed hash information: file -> [lines]
+    if not breakpoints[normfile] then
+        breakpoints[normfile] = {}
+    end
+    breakpoints[normfile][line] = true
+end
+
+local function remove_breakpoint(file, line)
+    local normfile = normalize_file(file)
+    if breakpoints[line] == nil then
+        return false
+    end
+    local suffixes = build_suffix_array(file)
+    remove_suffix_array(breakpoints[line], suffixes)
+    breakpoints[normfile][line] = nil
 end
 
 local repl
@@ -211,9 +357,9 @@ local function hook_factory(level)
         return function(event, _)
             -- Skip events that don't have line information.
             local info = debug.getinfo(2, "Sl")
-            local file = normalize_path(info.source)
+            local normfile = normalize_file(info.source)
 
-            if not frame_has_line(info) or file == myself then
+            if not frame_has_line(info) or normfile == myself then
                 return
             end
 
@@ -231,7 +377,7 @@ local function hook_factory(level)
 
             if event == "line" then
                 local matched = offset <= stop_level or
-                                has_breakpoint(file, info.currentline)
+                                has_breakpoint(normfile, info.currentline)
                 if matched then
                     repl(reason)
                 end
@@ -250,12 +396,11 @@ local function hook_check_bps()
     return function(event, _)
         -- Skip events that don't have line information.
         local info = debug.getinfo(2, "Sl")
-        local file = normalize_path(info.source)
         if not frame_has_line(info) then
             return
         end
-        if event == 'line' and has_breakpoint(file, info.currentline) then
-            repl()
+        if event == 'line' and has_breakpoint(info.source, info.currentline) then
+            repl('hit')
         end
     end
 end
@@ -360,11 +505,11 @@ local SOURCE_CACHE = {}
 local tnt = nil
 
 local function code_listing(source, currentline, file, context_lines)
-    local normfile = normalize_path(file)
+    local normfile = normalize_file(file)
     if source and source[currentline] then
         for i = currentline - context_lines,
                 currentline + context_lines do
-            local break_at = breakpoints[normfile] and breakpoints[normfile][i]
+            local break_at = has_breakpoint(normfile, i)
             local tab_or_caret = (i == currentline and CARET_SYM or "  ")
                                  .. (break_at and BREAK_SYM or " ")
             local line = source[i]
@@ -546,19 +691,9 @@ local function cmd_add_breakpoint(bps)
     local info = debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL, "S")
     local debuggee = info.source
     local file = #fullfile > 0 and fullfile or debuggee
-    local normfile = normalize_path(file)
+    local normfile = normalize_file(file)
 
-    -- save direct hash (for faster lookup): line -> file
-    if not breakpoints[line] then
-        breakpoints[line] = {}
-    end
-    breakpoints[line][normfile] = true
-    -- save reversed hash information: file -> [lines]
-    if not breakpoints[normfile] then
-        breakpoints[normfile] = {}
-    end
-    breakpoints[normfile][line] = true
-
+    add_breakpoint(normfile, line)
     dbg_writeln("Added breakpoint %s:%d.", color_blue(normfile), line)
     listing_shown = auto_listing({source = file, currentline = line})
     return false
@@ -588,16 +723,8 @@ local function cmd_remove_breakpoint(bps)
     local info = debug.getinfo(stack_inspect_offset + CMD_STACK_LEVEL, "S")
     local debuggee = info.source
     local file = #fullfile > 0 and fullfile or debuggee
-    local normfile = normalize_path(file)
-    local removed = false
-
-    if breakpoints[line] and breakpoints[line][normfile] then
-        breakpoints[line][normfile] = nil
-        -- direct and reverse hashes should be in sync
-        assert(breakpoints[normfile] and breakpoints[normfile][line])
-        breakpoints[normfile][line] = nil
-        removed = true
-    end
+    local normfile = normalize_file(file)
+    local removed = remove_breakpoint(normfile, line)
     if removed then
         dbg_writeln("Removed breakpoint %s:%d.", color_blue(normfile), line)
     else
