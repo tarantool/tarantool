@@ -96,6 +96,13 @@ case debugger will use current active script file as a base for such breakpoint.
 
 Both those syntaxes mentioned above are equivalent and should behave identically.
 
+In addition to the generic `filename.lua:N` syntax, debugger supports partial
+subdirectory patterns in a form `partial/directory/filename.lua:NNN`, which
+allow to simplify debugging of modules with the same base name (e.g. multiple
+`init.lua` files).
+
+  break A/init.lua:5
+
 If breakpoint(s) saved, then execution (command 'continue') will be slowed down a
 bit by calling to a debugger line hook for each executed line. If there is no any
 breakpoint activated then execution (via `continue`) will be at the speed near to
