@@ -55,6 +55,12 @@ cfg_filter(box.cfg)
     - https://feedback.tarantool.io
   - - feedback_interval
     - 3600
+  - - feedback_metrics_collect_interval
+    - 60
+  - - feedback_metrics_limit
+    - 1048576
+  - - feedback_send_metrics
+    - true
   - - force_recovery
     - false
   - - hot_standby
