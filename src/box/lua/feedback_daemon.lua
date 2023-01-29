@@ -5,17 +5,24 @@ local json  = require('json')
 local fiber = require('fiber')
 local http  = require('http.client')
 local fio = require('fio')
+local ffi = require('ffi')
 
 local PREFIX = "feedback_daemon"
+local METRICS_PREFIX = "metrics_collector"
 
 local daemon = {
     enabled  = false,
     interval = 0,
     host     = nil,
+    send_metrics = false,
+    metrics_collect_interval = 0,
+    metrics_limit = 0,
     fiber    = nil,
     control  = nil,
     guard    = nil,
-    shutdown = nil
+    shutdown = nil,
+    metrics  = {},
+    metrics_size = 0,
 }
 
 local function get_fiber_id(f)
@@ -316,6 +323,13 @@ local function fill_in_events(self, feedback)
     feedback.events = self.cached_events
 end
 
+local function fill_in_metrics(self, feedback)
+    if self.send_metrics and #self.metrics > 0 then
+        feedback.metrics = self.metrics
+        self.metrics = {}
+    end
+end
+
 local function fill_in_feedback(self, feedback)
     fill_in_base_info(feedback)
     fill_in_platform_info(feedback)
@@ -324,6 +338,7 @@ local function fill_in_feedback(self, feedback)
     fill_in_options(feedback)
     fill_in_stats(feedback)
     fill_in_events(self, feedback)
+    fill_in_metrics(self, feedback)
 
     return feedback
 end
@@ -348,6 +363,73 @@ local function feedback_loop(self)
     self.shutdown:put("stopped")
 end
 
+-- Returns nil if there is no appropriate metrics module.
+-- Otherwise, returns metrics.collect result.
+local function collect_default_metrics()
+    -- Do all the job in pcall for better reliability.
+    local has_metrics, metrics = pcall(function()
+        local metrics = require("metrics")
+        -- Required version of metrics module is 0.16.0 or newer.
+        -- A little cheat here - _VERSION field was introduced in 0.16.0,
+        -- let's just check if it is not nil.
+        if metrics._VERSION == nil then
+            return nil
+        end
+        return metrics.collect({invoke_callbacks = true, default_only = true})
+    end)
+    if has_metrics then
+        return metrics
+    else
+        return nil
+    end
+end
+
+-- Trivial objects are stored right in table slot or stack with gc64
+local trivial_obj_size = ffi.abi('gc64') and 0 or 8
+
+-- Calculate approximate amount of occupied memory
+local function obj_approx_size(obj)
+    if type(obj) == 'table' then
+        local size = 40
+        for k, v in pairs(obj) do
+            size = size + 16
+            size = size + obj_approx_size(k)
+            size = size + obj_approx_size(v)
+        end
+        return size
+    elseif type(obj) == 'string' then
+        return 17 + #obj
+    else -- Number, boolean and nil
+        return trivial_obj_size
+    end
+end
+
+local function insert_metric(self, new_metric)
+    local new_metric_size = obj_approx_size(new_metric)
+    if self.metrics_size + new_metric_size <= self.metrics_limit then
+        self.metrics_size = self.metrics_size + new_metric_size
+        table.insert(self.metrics, new_metric)
+    end
+end
+
+local function metrics_collect_loop(self)
+    fiber.name(METRICS_PREFIX, { truncate = true })
+
+    while true do
+        local collect_timeout = self.metrics_collect_interval
+        local st = pcall(fiber.sleep, collect_timeout)
+        if not st then
+            -- fiber was cancelled
+            break
+        end
+        local new_metric = collect_default_metrics()
+        if new_metric ~= nil then
+            insert_metric(self, new_metric)
+        end
+    end
+    self.shutdown:put("stopped")
+end
+
 local function guard_loop(self)
     fiber.name(string.format("guard of %s", PREFIX), {truncate=true})
 
@@ -357,7 +439,17 @@ local function guard_loop(self)
             self.fiber = fiber.create(feedback_loop, self)
             log.verbose("%s restarted", PREFIX)
         end
-        local st = pcall(fiber.sleep, self.interval)
+        if self.send_metrics and
+           get_fiber_id(self.metrics_collect_fiber) == 0 then
+            self.metrics_collect_fiber =
+                fiber.create(metrics_collect_loop, self)
+            log.verbose("%s restarted", METRICS_PREFIX)
+        end
+        local interval = self.interval
+        if self.send_metrics then
+            interval = math.min(interval, self.metrics_collect_interval)
+        end
+        local st = pcall(fiber.sleep, interval)
         if not st then
             -- fiber was cancelled
             break
@@ -388,6 +480,9 @@ local function start(self)
         self.control = fiber.channel(10)
         self.shutdown = fiber.channel()
         self.cached_events = {}
+        self.metrics = {}
+        self.metrics_size = 0
+        self.metrics_sizes = {}
         self.guard = fiber.create(guard_loop, self)
     end
     log.verbose("%s started", PREFIX)
@@ -402,10 +497,16 @@ local function stop(self)
         self.control:put("stop")
         self.shutdown:get()
     end
+    if get_fiber_id(self.metrics_collect_fiber) ~= 0 then
+        self.metrics_collect_fiber:cancel()
+        self.shutdown:get()
+    end
     self.guard = nil
     self.fiber = nil
+    self.metrics_collect_fiber = nil
     self.control = nil
     self.shutdown = nil
+    self.metrics = {}
     log.verbose("%s stopped", PREFIX)
 end
 
@@ -421,12 +522,16 @@ setmetatable(daemon, {
             daemon.enabled  = box.cfg.feedback_enabled
             daemon.host     = box.cfg.feedback_host
             daemon.interval = box.cfg.feedback_interval
+            daemon.send_metrics = box.cfg.feedback_send_metrics
+            daemon.metrics_collect_interval =
+                box.cfg.feedback_metrics_collect_interval
+            daemon.metrics_limit = box.cfg.feedback_metrics_limit
             reload(daemon)
             return
         end,
         -- this function is used in saving feedback in file
         generate_feedback = function()
-            return fill_in_feedback(daemon, { feedback_version = 7 })
+            return fill_in_feedback(daemon, { feedback_version = 8 })
         end,
         start = function()
             start(daemon)
