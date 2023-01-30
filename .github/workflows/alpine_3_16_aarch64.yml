@@ -41,6 +41,10 @@ jobs:
 
     runs-on: graviton
 
+    env:
+      OS: 'alpine'
+      DIST: '3.16'
+
     steps:
       - name: Prepare checkout
         uses: tarantool/actions/prepare-checkout@master
@@ -52,11 +56,21 @@ jobs:
 
       - uses: ./.github/actions/environment
 
+      - name: Get ABUILD_KEY
+        run: |
+          echo "ABUILD_KEY<<EOF" >> $GITHUB_ENV
+          if ${{ secrets.ALPINE_BUILD_KEY == '' }}; then
+            # Generate a test build key when the secret is empty. It is needed
+            # for fork PRs where secrets are unavailable.
+            echo "$(docker run --rm packpack/packpack:${OS}-${DIST} \
+              sh -c 'abuild-keygen -q -n && cat /root/.abuild/*.rsa')" \
+              >> $GITHUB_ENV
+          else
+            echo "${{ secrets.ALPINE_BUILD_KEY }}" >> $GITHUB_ENV
+          fi
+          echo "EOF" >> $GITHUB_ENV
+
       - name: packaging
-        env:
-          OS: 'alpine'
-          DIST: '3.16'
-          ABUILD_KEY: ${{ secrets.ALPINE_BUILD_KEY }}
         run: make -f .pack.mk package
 
       - name: Send VK Teams message on failure
