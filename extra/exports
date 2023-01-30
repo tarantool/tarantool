@@ -469,6 +469,7 @@ swim_size
 tarantool_exit
 tarantool_lua_slab_cache
 tarantool_uptime
+tarantool_version
 title_get
 title_get_custom
 title_get_interpretor_name

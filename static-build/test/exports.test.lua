@@ -76,6 +76,7 @@ local check_symbols = {
     'say_set_log_format',
     'tarantool_uptime',
     'tarantool_exit',
+    'tarantool_version',
     'log_pid',
     'space_by_id',
     'space_run_triggers',
