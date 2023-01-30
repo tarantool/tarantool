@@ -110,7 +110,8 @@ struct fiber *script_fiber;
 bool start_loop = true;
 
 /* contents of src/lua/ files */
-extern char strict_lua[],
+extern char loaders_lua[],
+	strict_lua[],
 	compat_lua[],
 	uuid_lua[],
 	msgpackffi_lua[],
@@ -273,6 +274,7 @@ static const char *lua_modules[] = {
 	"internal.compat", compat_lua,
 	"fun", fun_lua,
 	"debug", debug_lua,
+	"internal.loaders", loaders_lua,
 	"tarantool", init_lua,
 	"errno", errno_lua,
 	"fiber", fiber_lua,
