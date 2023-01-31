@@ -1,4 +1,4 @@
-local fio = require("fio")
+local minifio = require('internal.minifio')
 
 local soext = (jit.os == "OSX" and "dylib" or "so")
 
@@ -17,7 +17,7 @@ local ROCKS_LUA_TEMPLATES = {
 local package_searchroot
 
 local function searchroot()
-    return package_searchroot or fio.cwd()
+    return package_searchroot or minifio.cwd()
 end
 
 local function setsearchroot(path)
@@ -29,7 +29,7 @@ local function setsearchroot(path)
     else
         assert(type(path) == 'string', 'Search root must be a string')
     end
-    package_searchroot = path and fio.abspath(path)
+    package_searchroot = path and minifio.abspath(path)
 end
 
 local function mksymname(name)
@@ -47,11 +47,11 @@ local function load_lua(file)
 end
 
 local function traverse_path(path)
-    path = fio.abspath(path)
+    path = minifio.abspath(path)
     local paths = { path }
 
     while path ~= '/' do
-        path = fio.dirname(path)
+        path = minifio.dirname(path)
         table.insert(paths, path)
     end
 
@@ -81,7 +81,7 @@ local function gen_search_func(path_fn, templates, need_traverse)
 
         for _, path in ipairs(paths) do
             for _, template in pairs(templates) do
-                table.insert(searchpaths, fio.pathjoin(path, template))
+                table.insert(searchpaths, minifio.pathjoin(path, template))
             end
         end
 
