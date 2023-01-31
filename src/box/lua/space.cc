@@ -280,6 +280,123 @@ lbox_push_space_foreign_key(struct lua_State *L, struct space *space, int i)
 }
 
 /**
+ * index.parts:extract_key(tuple)
+ * Stack: [1] unused; [2] tuple.
+ * key_def is passed in the upvalue.
+ */
+static int
+lbox_index_parts_extract_key(struct lua_State *L)
+{
+	if (lua_gettop(L) != 2)
+		return luaL_error(L, "Usage: index.parts:extract_key(tuple)");
+	return luaT_key_def_extract_key(L, lua_upvalueindex(1));
+}
+
+/**
+ * index.parts:compare(tuple_a, tuple_b)
+ * Stack: [1] unused; [2] tuple_a; [3] tuple_b.
+ * key_def is passed in the upvalue.
+ */
+static int
+lbox_index_parts_compare(struct lua_State *L)
+{
+	if (lua_gettop(L) != 3) {
+		return luaL_error(L, "Usage: index.parts:compare("
+				     "tuple_a, tuple_b)");
+	}
+	return luaT_key_def_compare(L, lua_upvalueindex(1));
+}
+
+/**
+ * index.parts:compare_with_key(tuple, key)
+ * Stack: [1] unused; [2] tuple; [3] key.
+ * key_def is passed in the upvalue.
+ */
+static int
+lbox_index_parts_compare_with_key(struct lua_State *L)
+{
+	if (lua_gettop(L) != 3) {
+		return luaL_error(L, "Usage: index.parts:compare_with_key("
+				     "tuple, key)");
+	}
+	return luaT_key_def_compare_with_key(L, lua_upvalueindex(1));
+}
+
+/**
+ * index.parts:merge(second_index_parts)
+ * Stack: [1] unused; [2] second_index_parts.
+ * First key_def is passed in the upvalue.
+ */
+static int
+lbox_index_parts_merge(struct lua_State *L)
+{
+	int idx_b;
+	struct key_def *key_def_b;
+	if (lua_gettop(L) != 2) {
+		return luaL_error(L, "Usage: index.parts:merge("
+				     "second_index_parts)");
+	}
+	lua_pushcfunction(L, lbox_key_def_new);
+	lua_replace(L, 1);
+	/*
+	 * Stack:
+	 * [1] lbox_key_def_new
+	 * [2] second_index_parts (first argument for lbox_key_def_new)
+	 */
+	if (lua_pcall(L, 1, 1, 0) != 0)
+		goto key_def_b_error;
+	/*
+	 * Stack:
+	 * [1] key_def_b
+	 */
+	idx_b = 1;
+	key_def_b = luaT_is_key_def(L, idx_b);
+	if (key_def_b == NULL)
+		goto key_def_b_error;
+	return luaT_key_def_merge(L, lua_upvalueindex(1), idx_b);
+
+key_def_b_error:
+	return luaL_error(L,
+			  "Can't create key_def from the second index.parts");
+}
+
+/**
+ * Populate __index metamethod of index_object.parts table with the methods,
+ * which work like require('key_def').new(index_object.parts) methods.
+ * Each method is implemented as a C closure, associated with `struct key_def'.
+ */
+static void
+luaT_add_index_parts_methods(struct lua_State *L, const struct key_def *key_def)
+{
+	/* Metatable. */
+	lua_newtable(L);
+	/* __index */
+	lua_newtable(L);
+	int idx_index = lua_gettop(L);
+
+	/* Push 4 references to cdata onto the stack, one for each closure. */
+	luaT_push_key_def(L, key_def);
+	lua_pushvalue(L, -1);
+	lua_pushvalue(L, -1);
+	lua_pushvalue(L, -1);
+
+	lua_pushcclosure(L, &lbox_index_parts_extract_key, 1);
+	lua_setfield(L, idx_index, "extract_key");
+
+	lua_pushcclosure(L, &lbox_index_parts_compare, 1);
+	lua_setfield(L, idx_index, "compare");
+
+	lua_pushcclosure(L, &lbox_index_parts_compare_with_key, 1);
+	lua_setfield(L, idx_index, "compare_with_key");
+
+	lua_pushcclosure(L, &lbox_index_parts_merge, 1);
+	lua_setfield(L, idx_index, "merge");
+
+	lua_setfield(L, -2, "__index");
+	lua_setmetatable(L, -2);
+}
+
+/**
  * Make a single space available in Lua,
  * via box.space[] array.
  *
@@ -452,8 +569,8 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		lua_setfield(L, -2, "name");
 
 		lua_pushstring(L, "parts");
-		luaT_push_key_def(L, index_def->key_def);
-
+		luaT_push_key_def_parts(L, index_def->key_def);
+		luaT_add_index_parts_methods(L, index_def->key_def);
 		lua_settable(L, -3); /* space.index[k].parts */
 
 		lua_pushstring(L, "sequence_id");
