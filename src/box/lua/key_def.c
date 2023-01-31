@@ -40,8 +40,39 @@
 
 static uint32_t CTID_STRUCT_KEY_DEF_REF = 0;
 
+/**
+ * Free a key_def from a Lua code.
+ */
+static int
+lbox_key_def_gc(struct lua_State *L)
+{
+	struct key_def *key_def = luaT_is_key_def(L, 1);
+	assert(key_def != NULL);
+	key_def_delete(key_def);
+	return 0;
+}
+
+/**
+ * Push key_def as a cdata object to a Lua stack. This function takes ownership
+ * of key_def, and sets finalizer lbox_key_def_gc for it.
+ */
+static void
+luaT_push_key_def_nodup(struct lua_State *L, const struct key_def *key_def)
+{
+	void *ptr = luaL_pushcdata(L, CTID_STRUCT_KEY_DEF_REF);
+	*(const struct key_def **)ptr = key_def;
+	lua_pushcfunction(L, lbox_key_def_gc);
+	luaL_setcdatagc(L, -2);
+}
+
 void
 luaT_push_key_def(struct lua_State *L, const struct key_def *key_def)
+{
+	luaT_push_key_def_nodup(L, key_def_dup(key_def));
+}
+
+void
+luaT_push_key_def_parts(struct lua_State *L, const struct key_def *key_def)
 {
 	lua_createtable(L, key_def->part_count, 0);
 	for (uint32_t i = 0; i < key_def->part_count; ++i) {
@@ -242,7 +273,7 @@ luaT_key_def_check_tuple(struct lua_State *L, struct key_def *key_def, int idx)
 }
 
 struct key_def *
-luaT_check_key_def(struct lua_State *L, int idx)
+luaT_is_key_def(struct lua_State *L, int idx)
 {
 	if (lua_type(L, idx) != LUA_TCDATA)
 		return NULL;
@@ -254,33 +285,16 @@ luaT_check_key_def(struct lua_State *L, int idx)
 	return *key_def_ptr;
 }
 
-/**
- * Free a key_def from a Lua code.
- */
-static int
-lbox_key_def_gc(struct lua_State *L)
+int
+luaT_key_def_extract_key(struct lua_State *L, int idx)
 {
-	struct key_def *key_def = luaT_check_key_def(L, 1);
+	struct key_def *key_def = luaT_is_key_def(L, idx);
 	assert(key_def != NULL);
-	key_def_delete(key_def);
-	return 0;
-}
 
-/**
- * Extract key from tuple by given key definition and return
- * tuple representing this key.
- * Push the new key tuple as cdata to a LUA stack on success.
- * Raise error otherwise.
- */
-static int
-lbox_key_def_extract_key(struct lua_State *L)
-{
-	struct key_def *key_def;
-	if (lua_gettop(L) != 2 || (key_def = luaT_check_key_def(L, 1)) == NULL)
-		return luaL_error(L, "Usage: key_def:extract_key(tuple)");
-
-	struct tuple *tuple;
-	if ((tuple = luaT_key_def_check_tuple(L, key_def, 2)) == NULL)
+	if (key_def->is_multikey)
+		return luaL_error(L, "multikey path is unsupported");
+	struct tuple *tuple = luaT_key_def_check_tuple(L, key_def, -1);
+	if (tuple == NULL)
 		return luaT_error(L);
 
 	struct region *region = &fiber()->gc;
@@ -300,24 +314,14 @@ lbox_key_def_extract_key(struct lua_State *L)
 	return 1;
 }
 
-/**
- * Compare tuples using the key definition.
- * Push 0  if key_fields(tuple_a) == key_fields(tuple_b)
- *      <0 if key_fields(tuple_a) < key_fields(tuple_b)
- *      >0 if key_fields(tuple_a) > key_fields(tuple_b)
- * integer to a LUA stack on success.
- * Raise error otherwise.
- */
-static int
-lbox_key_def_compare(struct lua_State *L)
+int
+luaT_key_def_compare(struct lua_State *L, int idx)
 {
-	struct key_def *key_def;
-	if (lua_gettop(L) != 3 ||
-	    (key_def = luaT_check_key_def(L, 1)) == NULL) {
-		return luaL_error(L, "Usage: key_def:"
-				     "compare(tuple_a, tuple_b)");
-	}
+	struct key_def *key_def = luaT_is_key_def(L, idx);
+	assert(key_def != NULL);
 
+	if (key_def->is_multikey)
+		return luaL_error(L, "multikey path is unsupported");
 	if (key_def->tuple_compare == NULL) {
 		enum field_type type = key_def_incomparable_type(key_def);
 		assert(type != field_type_MAX);
@@ -326,10 +330,11 @@ lbox_key_def_compare(struct lua_State *L)
 		return luaT_error(L);
 	}
 
-	struct tuple *tuple_a, *tuple_b;
-	if ((tuple_a = luaT_key_def_check_tuple(L, key_def, 2)) == NULL)
+	struct tuple *tuple_a = luaT_key_def_check_tuple(L, key_def, -2);
+	if (tuple_a == NULL)
 		return luaT_error(L);
-	if ((tuple_b = luaT_key_def_check_tuple(L, key_def, 3)) == NULL) {
+	struct tuple *tuple_b = luaT_key_def_check_tuple(L, key_def, -1);
+	if (tuple_b == NULL) {
 		tuple_unref(tuple_a);
 		return luaT_error(L);
 	}
@@ -341,24 +346,14 @@ lbox_key_def_compare(struct lua_State *L)
 	return 1;
 }
 
-/**
- * Compare tuple with key using the key definition.
- * Push 0  if key_fields(tuple) == parts(key)
- *      <0 if key_fields(tuple) < parts(key)
- *      >0 if key_fields(tuple) > parts(key)
- * integer to a LUA stack on success.
- * Raise error otherwise.
- */
-static int
-lbox_key_def_compare_with_key(struct lua_State *L)
+int
+luaT_key_def_compare_with_key(struct lua_State *L, int idx)
 {
-	struct key_def *key_def;
-	if (lua_gettop(L) != 3 ||
-	    (key_def = luaT_check_key_def(L, 1)) == NULL) {
-		return luaL_error(L, "Usage: key_def:"
-				     "compare_with_key(tuple, key)");
-	}
+	struct key_def *key_def = luaT_is_key_def(L, idx);
+	assert(key_def != NULL);
 
+	if (key_def->is_multikey)
+		return luaL_error(L, "multikey path is unsupported");
 	if (key_def->tuple_compare_with_key == NULL) {
 		enum field_type type = key_def_incomparable_type(key_def);
 		assert(type != field_type_MAX);
@@ -367,13 +362,13 @@ lbox_key_def_compare_with_key(struct lua_State *L)
 		return luaT_error(L);
 	}
 
-	struct tuple *tuple = luaT_key_def_check_tuple(L, key_def, 2);
+	struct tuple *tuple = luaT_key_def_check_tuple(L, key_def, -2);
 	if (tuple == NULL)
 		return luaT_error(L);
 
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
-	const char *key = luaT_tuple_encode(L, 3, NULL);
+	const char *key = luaT_tuple_encode(L, -1, NULL);
 	if (key == NULL || box_key_def_validate_key(key_def, key, NULL) != 0) {
 		region_truncate(region, region_svp);
 		tuple_unref(tuple);
@@ -387,35 +382,79 @@ lbox_key_def_compare_with_key(struct lua_State *L)
 	return 1;
 }
 
-/**
- * Construct and export to LUA a new key definition with a set
- * union of key parts from first and second key defs. Parts of
- * the new key_def consist of the first key_def's parts and those
- * parts of the second key_def that were not among the first
- * parts.
- * Push the new key_def as cdata to a LUA stack on success.
- * Raise error otherwise.
- */
-static int
-lbox_key_def_merge(struct lua_State *L)
+int
+luaT_key_def_merge(struct lua_State *L, int idx_a, int idx_b)
 {
-	struct key_def *key_def_a, *key_def_b;
-	if (lua_gettop(L) != 2 ||
-	    (key_def_a = luaT_check_key_def(L, 1)) == NULL ||
-	    (key_def_b = luaT_check_key_def(L, 2)) == NULL)
-		return luaL_error(L, "Usage: key_def:merge(second_key_def)");
+	struct key_def *key_def_a = luaT_is_key_def(L, idx_a);
+	struct key_def *key_def_b = luaT_is_key_def(L, idx_b);
+	assert(key_def_a != NULL);
+	assert(key_def_b != NULL);
 
+	if (key_def_a->is_multikey)
+		return luaL_error(L, "multikey path is unsupported");
+	assert(!key_def_b->is_multikey);
 	struct key_def *new_key_def = key_def_merge(key_def_a, key_def_b);
 	if (new_key_def == NULL)
 		return luaT_error(L);
 
-	*(struct key_def **) luaL_pushcdata(L,
-				CTID_STRUCT_KEY_DEF_REF) = new_key_def;
-	lua_pushcfunction(L, lbox_key_def_gc);
-	luaL_setcdatagc(L, -2);
+	luaT_push_key_def(L, new_key_def);
 	return 1;
 }
 
+/**
+ * key_def:extract_key(tuple)
+ * Stack: [1] key_def; [2] tuple.
+ */
+static int
+lbox_key_def_extract_key(struct lua_State *L)
+{
+	if (lua_gettop(L) != 2 || luaT_is_key_def(L, 1) == NULL)
+		return luaL_error(L, "Usage: key_def:extract_key(tuple)");
+	return luaT_key_def_extract_key(L, 1);
+}
+
+/**
+ * key_def:compare(tuple_a, tuple_b)
+ * Stack: [1] key_def; [2] tuple_a; [3] tuple_b.
+ */
+static int
+lbox_key_def_compare(struct lua_State *L)
+{
+	if (lua_gettop(L) != 3 || luaT_is_key_def(L, 1) == NULL) {
+		return luaL_error(L, "Usage: key_def:compare("
+				     "tuple_a, tuple_b)");
+	}
+	return luaT_key_def_compare(L, 1);
+}
+
+/**
+ * key_def:compare_with_key(tuple, key)
+ * Stack: [1] key_def; [2] tuple; [3] key.
+ */
+static int
+lbox_key_def_compare_with_key(struct lua_State *L)
+{
+	if (lua_gettop(L) != 3 || luaT_is_key_def(L, 1) == NULL) {
+		return luaL_error(L, "Usage: key_def:compare_with_key("
+				     "tuple, key)");
+	}
+	return luaT_key_def_compare_with_key(L, 1);
+}
+
+/**
+ * key_def:merge(second_key_def)
+ * Stack: [1] key_def; [2] second_key_def.
+ */
+static int
+lbox_key_def_merge(struct lua_State *L)
+{
+	int idx_a = 1;
+	int idx_b = 2;
+	if (lua_gettop(L) != 2 || luaT_is_key_def(L, idx_a) == NULL ||
+	    luaT_is_key_def(L, idx_b) == NULL)
+		return luaL_error(L, "Usage: key_def:merge(second_key_def)");
+	return luaT_key_def_merge(L, idx_a, idx_b);
+}
 
 /**
  * Push a new table representing a key_def to a Lua stack.
@@ -423,24 +462,14 @@ lbox_key_def_merge(struct lua_State *L)
 static int
 lbox_key_def_to_table(struct lua_State *L)
 {
-	struct key_def *key_def;
-	if (lua_gettop(L) != 1 || (key_def = luaT_check_key_def(L, 1)) == NULL)
+	struct key_def *key_def = luaT_is_key_def(L, 1);
+	if (lua_gettop(L) != 1 || key_def == NULL)
 		return luaL_error(L, "Usage: key_def:totable()");
-
-	luaT_push_key_def(L, key_def);
+	luaT_push_key_def_parts(L, key_def);
 	return 1;
 }
 
-/**
- * Create a new key_def from a Lua table.
- *
- * Expected a table of key parts on the Lua stack. The format is
- * the same as box.space.<...>.index.<...>.parts or corresponding
- * net.box's one.
- *
- * Push the new key_def as cdata to a Lua stack.
- */
-static int
+int
 lbox_key_def_new(struct lua_State *L)
 {
 	if (lua_gettop(L) != 1 || lua_istable(L, 1) != 1)
@@ -493,11 +522,7 @@ lbox_key_def_new(struct lua_State *L)
 	 */
 	key_def_update_optionality(key_def, 0);
 
-	*(struct key_def **) luaL_pushcdata(L,
-				CTID_STRUCT_KEY_DEF_REF) = key_def;
-	lua_pushcfunction(L, lbox_key_def_gc);
-	luaL_setcdatagc(L, -2);
-
+	luaT_push_key_def(L, key_def);
 	return 1;
 }
 

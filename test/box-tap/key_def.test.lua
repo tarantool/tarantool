@@ -182,7 +182,7 @@ local key_def_new_cases = {
 
 local test = tap.test('key_def')
 
-test:plan(#key_def_new_cases - 1 + 7)
+test:plan(#key_def_new_cases - 1 + 8)
 for _, case in ipairs(key_def_new_cases) do
     if type(case) == 'function' then
         case()
@@ -555,6 +555,27 @@ test:test('merge()', function(test)
     }
     test:is_deeply(key_def_array_map:totable(), exp_parts,
         'composite case')
+end)
+
+-- Check the usage error messages.
+test:test('Usage errors', function(test)
+    test:plan(5)
+    -- key_def_lib.new() is tested above.
+    test:is_deeply({pcall(key_def_lib.extract_key)},
+                   {false, 'Usage: key_def:extract_key(tuple)'},
+                   'extract_key()')
+    test:is_deeply({pcall(key_def_lib.compare)},
+                   {false, 'Usage: key_def:compare(tuple_a, tuple_b)'},
+                   'compare()')
+    test:is_deeply({pcall(key_def_lib.compare_with_key)},
+                   {false, 'Usage: key_def:compare_with_key(tuple, key)'},
+                   'compare_with_key()')
+    test:is_deeply({pcall(key_def_lib.merge)},
+                   {false, 'Usage: key_def:merge(second_key_def)'},
+                   'merge()')
+    test:is_deeply({pcall(key_def_lib.totable)},
+                   {false, 'Usage: key_def:totable()'},
+                   'totable()')
 end)
 
 os.exit(test:check() and 0 or 1)

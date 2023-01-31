@@ -50,7 +50,7 @@
 #include "lua/utils.h"       /* luaL_pushcdata(),
 				luaL_iterator_*() */
 
-#include "box/lua/key_def.h" /* luaT_check_key_def() */
+#include "box/lua/key_def.h" /* luaT_is_key_def() */
 #include "box/lua/tuple.h"   /* luaT_tuple_new() */
 
 #include "small/ibuf.h"      /* struct ibuf */
@@ -352,7 +352,7 @@ lbox_merger_new(struct lua_State *L)
 	int top = lua_gettop(L);
 	bool ok = (top == 2 || top == 3) &&
 		/* key_def. */
-		(key_def = luaT_check_key_def(L, 1)) != NULL &&
+		(key_def = luaT_is_key_def(L, 1)) != NULL &&
 		/* Sources. */
 		lua_istable(L, 2) == 1 &&
 		/* Opts. */
