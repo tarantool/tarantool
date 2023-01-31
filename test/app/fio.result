@@ -1405,15 +1405,15 @@ fio.open(tmp1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, {'A'})
 ...
 fio.pathjoin(nil)
 ---
-- error: 'builtin/fio.lua: fio.pathjoin(): undefined path part 1'
+- error: 'fio.pathjoin(): undefined path part 1'
 ...
 fio.pathjoin('abc', nil)
 ---
-- error: 'builtin/fio.lua: fio.pathjoin(): undefined path part 2'
+- error: 'fio.pathjoin(): undefined path part 2'
 ...
 fio.pathjoin('abc', 'cde', nil)
 ---
-- error: 'builtin/fio.lua: fio.pathjoin(): undefined path part 3'
+- error: 'fio.pathjoin(): undefined path part 3'
 ...
 fio.basename(nil)
 ---
@@ -1421,7 +1421,7 @@ fio.basename(nil)
 ...
 fio.abspath(nil)
 ---
-- error: 'builtin/fio.lua: Usage: fio.abspath(path)'
+- error: 'Usage: fio.abspath(path)'
 ...
 fio.chdir(1)
 ---

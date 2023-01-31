@@ -1,5 +1,6 @@
 -- fio.lua (internal file)
 
+local minifio = require('internal.minifio')
 local fio = require('fio')
 local ffi = require('ffi')
 local buffer = require('buffer')
@@ -238,51 +239,20 @@ fio.open = function(path, flags, mode)
     return res
 end
 
-fio.pathjoin = function(...)
-    local i, path = 1, nil
-
-    local len = select('#', ...)
-    while i <= len do
-        local sp = select(i, ...)
-        if sp == nil then
-            error("fio.pathjoin(): undefined path part "..i)
-        end
-
-        sp = tostring(sp)
-        if sp ~= '' then
-            path = sp
-            break
-        else
-            i = i + 1
-        end
-    end
-
-    if path == nil then
-        return '.'
-    end
-
-    i = i + 1
-    while i <= len do
-        local sp = select(i, ...)
-        if sp == nil then
-            error("fio.pathjoin(): undefined path part "..i)
-        end
-
-        sp = tostring(sp)
-        if sp ~= '' then
-            path = path .. '/' .. sp
-        end
-
-        i = i + 1
-    end
-
-    path = path:gsub('/+', '/')
-    if path ~= '/' then
-        path = path:gsub('/$', '')
-    end
-
-    return path
+-- Expose several functions implemented as part of the minifio
+-- module.
+for name, func in pairs(minifio.expose_from_fio) do
+    fio[name] = func
 end
+
+-- List of functions exposed from fio, but defined in minifio.
+--
+-- Without the list a reader should be aware of the fio/minifio
+-- splitting in order to find an implementation of a function by
+-- its name. Let's make a reader's life a bit easier.
+assert(type(fio.cwd) == 'function')
+assert(type(fio.pathjoin) == 'function')
+assert(type(fio.abspath) == 'function')
 
 fio.basename = function(path, suffix)
     if type(path) ~= 'string' then
@@ -330,30 +300,6 @@ fio.umask = function(umask)
 
     return ffi.C.umask(tonumber(umask))
 
-end
-
-fio.abspath = function(path)
-    -- following established conventions of fio module:
-    -- letting nil through and converting path to string
-    if path == nil then
-        error("Usage: fio.abspath(path)")
-    end
-    path = path
-    local joined_path
-    local path_tab = {}
-    if string.sub(path, 1, 1) == '/' then
-        joined_path = path
-    else
-        joined_path = fio.pathjoin(fio.cwd(), path)
-    end
-    for sp in string.gmatch(joined_path, '[^/]+') do
-        if sp == '..' then
-            table.remove(path_tab)
-        elseif sp ~= '.' then
-            table.insert(path_tab, sp)
-        end
-    end
-    return '/' .. table.concat(path_tab, '/')
 end
 
 fio.chdir = function(path)

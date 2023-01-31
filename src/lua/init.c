@@ -60,6 +60,7 @@
 #include <lua-yaml/lyaml.h>
 #include "lua/msgpack.h"
 #include "lua/pickle.h"
+#include "lua/minifio.h"
 #include "lua/fio.h"
 #include "lua/popen.h"
 #include "lua/httpc.h"
@@ -110,7 +111,8 @@ struct fiber *script_fiber;
 bool start_loop = true;
 
 /* contents of src/lua/ files */
-extern char loaders_lua[],
+extern char minifio_lua[],
+	loaders_lua[],
 	strict_lua[],
 	compat_lua[],
 	uuid_lua[],
@@ -274,6 +276,7 @@ static const char *lua_modules[] = {
 	"internal.compat", compat_lua,
 	"fun", fun_lua,
 	"debug", debug_lua,
+	"internal.minifio", minifio_lua,
 	"internal.loaders", loaders_lua,
 	"tarantool", init_lua,
 	"errno", errno_lua,
@@ -826,6 +829,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_fiber_channel_init(L);
 	tarantool_lua_errno_init(L);
 	tarantool_lua_error_init(L);
+	tarantool_lua_minifio_init(L);
 	tarantool_lua_fio_init(L);
 	tarantool_lua_popen_init(L);
 	tarantool_lua_socket_init(L);
