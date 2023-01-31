@@ -617,21 +617,6 @@ lbox_fio_tempdir(struct lua_State *L)
 }
 
 static int
-lbox_fio_cwd(struct lua_State *L)
-{
-	char *buf = (char *)lua_newuserdata(L, PATH_MAX);
-	if (!buf) {
-		errno = ENOMEM;
-		return lbox_fio_pushsyserror(L);
-	}
-	if (getcwd(buf, PATH_MAX) == NULL)
-		return lbox_fio_pushsyserror(L);
-	lua_pushstring(L, buf);
-	lua_remove(L, -2);
-	return 1;
-}
-
-static int
 lbox_fio_fsync(struct lua_State *L)
 {
 	int fd = lua_tointeger(L, 1);
@@ -694,7 +679,6 @@ tarantool_lua_fio_init(struct lua_State *L)
 		{ "chmod",		lbox_fio_chmod			},
 		{ "truncate",		lbox_fio_truncate		},
 		{ "tempdir",		lbox_fio_tempdir		},
-		{ "cwd",		lbox_fio_cwd			},
 		{ "sync",		lbox_fio_sync			},
 		{ NULL,			NULL				}
 	};

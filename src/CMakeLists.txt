@@ -31,6 +31,7 @@ endif()
 
 # Compile src/lua/*.lua files into src/lua/*.lua.c sources
 set(lua_sources)
+lua_source(lua_sources lua/minifio.lua minifio_lua)
 lua_source(lua_sources lua/loaders.lua loaders_lua)
 lua_source(lua_sources lua/init.lua init_lua)
 lua_source(lua_sources lua/debug.lua debug_lua)
@@ -160,6 +161,7 @@ set (server_sources
      lua/error.c
      lua/socket.c
      lua/pickle.c
+     lua/minifio.c
      lua/fio.c
      lua/popen.c
      lua/httpc.c
