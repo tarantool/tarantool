@@ -12,6 +12,9 @@ g.before_all(function()
                                                 datadir = data_dir})
 
     g.cluster:start()
+    g.upgrade:exec(function()
+        box.schema.upgrade()
+    end)
 end)
 
 g.after_all(function()

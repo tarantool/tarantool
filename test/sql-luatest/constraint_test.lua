@@ -9,6 +9,9 @@ g.before_all(function()
     local data_dir = 'test/sql-luatest/upgrade/2.10.0'
     g.upgrade = server:new({alias = 'upgrade', datadir = data_dir})
     g.upgrade:start()
+    g.upgrade:exec(function()
+        box.schema.upgrade()
+    end)
 end)
 
 g.after_all(function()
