@@ -6,6 +6,7 @@ test_run:cmd('create server upgrade with script="xlog/upgrade.lua", \
 test_run:cmd('start server upgrade')
 test_run:switch('upgrade')
 
+box.schema.upgrade()
 assert(not box.internal.schema_needs_upgrade())
 box.space.distro:select{}
 box.space._index:select{box.space.distro.id}
@@ -41,6 +42,7 @@ test_run:cmd('create server upgrade with script="xlog/upgrade.lua", \
 test_run:cmd('start server upgrade')
 test_run:switch('upgrade')
 
+box.schema.upgrade()
 assert(not box.internal.schema_needs_upgrade())
 box.space.distro:select{}
 box.space._index:select{box.space.distro.id}
@@ -60,6 +62,7 @@ test_run:cmd('create server upgrade with script="xlog/upgrade.lua", \
 test_run:cmd('start server upgrade')
 test_run:switch('upgrade')
 
+box.schema.upgrade()
 assert(not box.internal.schema_needs_upgrade())
 box.space.distro:select{}
 box.space._index:select{box.space.distro.id}
@@ -79,6 +82,7 @@ test_run:cmd('create server upgrade with script="xlog/upgrade.lua", \
 test_run:cmd('start server upgrade')
 test_run:switch('upgrade')
 
+box.schema.upgrade()
 assert(not box.internal.schema_needs_upgrade())
 box.space.distro:select{}
 box.space._index:select{box.space.distro.id}

@@ -74,11 +74,9 @@ end
 local g_old_schema = t.group('gh_7858_net_box_space_sequence.old_schema')
 
 g_old_schema.before_test('test_net_box_space_sequence', function(cg)
-    t.tarantool.skip_if_not_debug()
     cg.server = server:new({
         alias = 'default',
         datadir = 'test/box-luatest/upgrade/2.10.4',
-        env = {ERRINJ_AUTO_UPGRADE = 'true'},
     })
     cg.server:start()
 end)

@@ -7,6 +7,7 @@ test_run:cmd('create server upgrade with script="sql/upgrade/upgrade.lua", workd
 test_run:cmd('start server upgrade')
 
 test_run:switch('upgrade')
+box.schema.upgrade()
 box.execute([[SET SESSION "sql_seq_scan" = true;]])
 
 -- test system tables
@@ -57,6 +58,7 @@ test_run:cmd('create server upgrade210 with script="sql/upgrade/upgrade.lua", wo
 test_run:cmd('start server upgrade210')
 
 test_run:switch('upgrade210')
+box.schema.upgrade()
 
 s = box.space.T5
 s ~= nil

@@ -4,11 +4,9 @@ local t = require('luatest')
 local g = t.group()
 
 g.before_all(function(cg)
-    t.tarantool.skip_if_not_debug()
     cg.server = server:new({
         alias = 'master',
         datadir = 'test/box-luatest/upgrade/2.10.4',
-        env = {ERRINJ_AUTO_UPGRADE = 'true'},
     })
     cg.server:start()
 end)

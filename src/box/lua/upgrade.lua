@@ -1368,24 +1368,24 @@ end
 --------------------------------------------------------------------------------
 
 local handlers = {
-    {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5, auto=true},
-    {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6, auto = true},
-    {version = mkversion(1, 7, 7), func = upgrade_to_1_7_7, auto = true},
-    {version = mkversion(1, 10, 0), func = upgrade_to_1_10_0, auto = true},
-    {version = mkversion(1, 10, 2), func = upgrade_to_1_10_2, auto = true},
-    {version = mkversion(2, 1, 0), func = upgrade_to_2_1_0, auto = true},
-    {version = mkversion(2, 1, 1), func = upgrade_to_2_1_1, auto = true},
-    {version = mkversion(2, 1, 2), func = upgrade_to_2_1_2, auto = true},
-    {version = mkversion(2, 1, 3), func = upgrade_to_2_1_3, auto = true},
-    {version = mkversion(2, 2, 1), func = upgrade_to_2_2_1, auto = true},
-    {version = mkversion(2, 3, 0), func = upgrade_to_2_3_0, auto = true},
-    {version = mkversion(2, 3, 1), func = upgrade_to_2_3_1, auto = true},
-    {version = mkversion(2, 7, 1), func = upgrade_to_2_7_1, auto = true},
-    {version = mkversion(2, 9, 1), func = upgrade_to_2_9_1, auto = true},
-    {version = mkversion(2, 10, 1), func = upgrade_to_2_10_1, auto = true},
-    {version = mkversion(2, 10, 4), func = upgrade_to_2_10_4, auto = true},
-    {version = mkversion(2, 10, 5), func = upgrade_to_2_10_5, auto = true},
-    {version = mkversion(2, 11, 0), func = upgrade_to_2_11_0, auto = true},
+    {version = mkversion(1, 7, 5), func = upgrade_to_1_7_5},
+    {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6},
+    {version = mkversion(1, 7, 7), func = upgrade_to_1_7_7},
+    {version = mkversion(1, 10, 0), func = upgrade_to_1_10_0},
+    {version = mkversion(1, 10, 2), func = upgrade_to_1_10_2},
+    {version = mkversion(2, 1, 0), func = upgrade_to_2_1_0},
+    {version = mkversion(2, 1, 1), func = upgrade_to_2_1_1},
+    {version = mkversion(2, 1, 2), func = upgrade_to_2_1_2},
+    {version = mkversion(2, 1, 3), func = upgrade_to_2_1_3},
+    {version = mkversion(2, 2, 1), func = upgrade_to_2_2_1},
+    {version = mkversion(2, 3, 0), func = upgrade_to_2_3_0},
+    {version = mkversion(2, 3, 1), func = upgrade_to_2_3_1},
+    {version = mkversion(2, 7, 1), func = upgrade_to_2_7_1},
+    {version = mkversion(2, 9, 1), func = upgrade_to_2_9_1},
+    {version = mkversion(2, 10, 1), func = upgrade_to_2_10_1},
+    {version = mkversion(2, 10, 4), func = upgrade_to_2_10_4},
+    {version = mkversion(2, 10, 5), func = upgrade_to_2_10_5},
+    {version = mkversion(2, 11, 0), func = upgrade_to_2_11_0},
 }
 
 -- Schema version of the snapshot.
@@ -1493,11 +1493,7 @@ local function clear_recovery_triggers(version)
     end
 end
 
-local function upgrade(options)
-    options = options or {}
-    setmetatable(options, {__index = {auto = false}})
-
-    local version = options._initial_version or get_version()
+local function upgrade_from(version)
     if version < mkversion(1, 6, 8) then
         log.warn('can upgrade from 1.6.8 only')
         return
@@ -1507,12 +1503,6 @@ local function upgrade(options)
         if version >= handler.version then
             goto continue
         end
-        if options.auto and not handler.auto then
-            log.warn("cannot auto upgrade schema version to %s, " ..
-                     "please call box.schema.upgrade() manually",
-                     handler.version)
-            return
-        end
         handler.func()
         log.info("set schema version to %s", handler.version)
         box.space._schema:replace({'version',
@@ -1521,6 +1511,10 @@ local function upgrade(options)
                                    handler.version.patch})
         ::continue::
     end
+end
+
+local function upgrade()
+    upgrade_from(get_version())
 end
 
 local function bootstrap()
@@ -1536,7 +1530,7 @@ local function bootstrap()
     -- insert initial schema
     initial_1_7_5()
     -- upgrade schema to the latest version
-    upgrade{_initial_version = mkversion(1, 7, 5)}
+    upgrade_from(mkversion(1, 7, 5))
 
     set_system_triggers(true)
     reset_system_formats()

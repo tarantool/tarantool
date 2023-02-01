@@ -22,6 +22,9 @@ test_run:switch('upgrade')
 ---
 - true
 ...
+box.schema.upgrade()
+---
+...
 box.execute([[SET SESSION "sql_seq_scan" = true;]])
 ---
 - row_count: 1
@@ -172,6 +175,9 @@ test_run:cmd('start server upgrade210')
 test_run:switch('upgrade210')
 ---
 - true
+...
+box.schema.upgrade()
+---
 ...
 s = box.space.T5
 ---

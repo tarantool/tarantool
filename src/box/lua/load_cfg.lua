@@ -1003,11 +1003,6 @@ local function load_cfg(cfg)
     --    and thus end up with not complete configuration.
     load_cfg_apply_dynamic(cfg)
 
-    if not box.cfg.read_only and not box.cfg.replication and
-       not box.error.injection.get('ERRINJ_AUTO_UPGRADE') then
-        box.schema.upgrade{auto = true}
-    end
-
     -- Restore box members that requires full box loading.
     for k, v in pairs(box_configured) do
         if box_restore_after_full_load_list[k] then
