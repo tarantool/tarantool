@@ -276,8 +276,6 @@ static const char *lua_modules[] = {
 	"internal.compat", compat_lua,
 	"fun", fun_lua,
 	"debug", debug_lua,
-	"internal.minifio", minifio_lua,
-	"internal.loaders", loaders_lua,
 	"tarantool", init_lua,
 	"errno", errno_lua,
 	"fiber", fiber_lua,
@@ -805,6 +803,40 @@ luaopen_tarantool(lua_State *L)
 	return 1;
 }
 
+/**
+ * Load Lua code from a string and register a built-in module.
+ */
+static void
+luaT_set_module_from_source(struct lua_State *L, const char *modname,
+			    const char *modsrc)
+{
+	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+
+	/*
+	 * TODO: Use a file name, not a module name for the
+	 * luaL_loadbuffer() parameter.
+	 *
+	 * For example, "@builtin/argparse.lua" instead of
+	 * "@builtin/internal.argparse.lua".
+	 */
+	const char *modfile = lua_pushfstring(L, "@builtin/%s.lua", modname);
+	if (luaL_loadbuffer(L, modsrc, strlen(modsrc), modfile))
+		panic("Error loading Lua module %s...: %s",
+		      modname, lua_tostring(L, -1));
+	lua_pushstring(L, modname);
+	lua_call(L, 1, 1);
+
+	if (!lua_isnil(L, -1)) {
+		/* package.loaded.modname = t */
+		lua_setfield(L, -3, modname);
+	} else {
+		lua_pop(L, 1); /* nil */
+	}
+
+	builtin_modcache_put(modname, modsrc);
+	lua_pop(L, 2); /* modfile, _LOADED */
+}
+
 void
 tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 {
@@ -813,7 +845,19 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 		panic("failed to initialize Lua");
 	}
 	luaL_openlibs(L);
+
+	builtin_modcache_init();
+
+	/*
+	 * Setup paths and loaders.
+	 *
+	 * Load minifio first, because the loaders module depends
+	 * on it.
+	 */
 	tarantool_lua_setpaths(L);
+	tarantool_lua_minifio_init(L);
+	luaT_set_module_from_source(L, "internal.minifio", minifio_lua);
+	luaT_set_module_from_source(L, "internal.loaders", loaders_lua);
 
 	/* Initialize ffi to enable luaL_pushcdata/luaL_checkcdata functions */
 	luaL_loadstring(L, "return require('ffi')");
@@ -829,7 +873,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	tarantool_lua_fiber_channel_init(L);
 	tarantool_lua_errno_init(L);
 	tarantool_lua_error_init(L);
-	tarantool_lua_minifio_init(L);
 	tarantool_lua_fio_init(L);
 	tarantool_lua_popen_init(L);
 	tarantool_lua_socket_init(L);
@@ -871,28 +914,11 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 #if defined(ENABLE_BACKTRACE)
 	backtrace_lua_init();
 #endif /* defined(ENABLE_BACKTRACE) */
-	builtin_modcache_init();
-	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 	for (const char **s = lua_modules; *s; s += 2) {
 		const char *modname = *s;
 		const char *modsrc = *(s + 1);
-		const char *modfile = lua_pushfstring(L,
-			"@builtin/%s.lua", modname);
-		if (luaL_loadbuffer(L, modsrc, strlen(modsrc), modfile))
-			panic("Error loading Lua module %s...: %s",
-			      modname, lua_tostring(L, -1));
-		lua_pushstring(L, modname);
-		lua_call(L, 1, 1);
-		if (!lua_isnil(L, -1)) {
-			lua_setfield(L, -3, modname); /* package.loaded.modname = t */
-		} else {
-			lua_pop(L, 1); /* nil */
-		}
-		lua_pop(L, 1); /* chunkname */
-		builtin_modcache_put(modname, modsrc);
-
+		luaT_set_module_from_source(L, modname, modsrc);
 	}
-	lua_pop(L, 1); /* _LOADED */
 
 	lua_getfield(L, LUA_REGISTRYINDEX, "_PRELOAD");
 	for (const char **s = lua_modules_preload; *s; s += 2) {
