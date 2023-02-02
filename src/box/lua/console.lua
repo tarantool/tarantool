@@ -948,7 +948,7 @@ local function listen(uri)
     return s
 end
 
-package.loaded['console'] = {
+return {
     start = start;
     eval = eval;
     delimiter = delimiter;

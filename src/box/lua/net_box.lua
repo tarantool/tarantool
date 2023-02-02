@@ -1339,4 +1339,4 @@ setmetatable(this_module.self, {
     end
 })
 
-package.loaded['net.box'] = this_module
+return this_module

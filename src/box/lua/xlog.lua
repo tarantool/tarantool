@@ -4,6 +4,6 @@ local function xlog_pairs(...)
     return fun.wrap(internal.pairs(...))
 end
 
-package.loaded['xlog'] = {
+return {
     pairs = xlog_pairs,
 }
