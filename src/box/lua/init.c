@@ -128,44 +128,62 @@ extern char session_lua[],
 	console_lua[],
 	merger_lua[];
 
+/**
+ * List of box's built-in modules written using Lua.
+ *
+ * Each module is defined as a triplet:
+ *
+ * 1. A file name (without the .lua extension).
+ *
+ *    It is used for prepending error messages and filling
+ *    debug.getinfo() information.
+ * 2. A module name for require().
+ *
+ *    NULL means 'do not register as a module, just execute'.
+ *    Such code shouldn't return any value.
+ *
+ *    Typical NULL usage: code that define functions in
+ *    box or box.internal.
+ * 3. A Lua source code of the module.
+ */
 static const char *lua_sources[] = {
-	"box/session", session_lua,
-	"box/tuple", tuple_lua,
-	"box/schema", schema_lua,
+	"box/session", NULL, session_lua,
+	"box/tuple", NULL, tuple_lua,
+	"box/schema", NULL, schema_lua,
 #if ENABLE_FEEDBACK_DAEMON
 	/*
 	 * It is important to initialize the daemon before
 	 * load_cfg, because the latter picks up some values
 	 * from the feedback daemon.
 	 */
-	"box/feedback_daemon", feedback_daemon_lua,
+	"box/feedback_daemon", NULL, feedback_daemon_lua,
 #endif
 #if ENABLE_SPACE_UPGRADE
 	/*
 	 * Must be loaded after schema_lua, because it redefines
 	 * box.schema.space.upgrade.
 	 */
-	"box/space_upgrade", space_upgrade_lua,
+	"box/space_upgrade", NULL, space_upgrade_lua,
 #endif
 #if ENABLE_AUDIT_LOG
-	"box/audit", audit_lua,
+	"box/audit", "audit", audit_lua,
 #endif
 #if ENABLE_FLIGHT_RECORDER
-	"box/flightrec", flightrec_lua,
+	"box/flightrec", "flightrec", flightrec_lua,
 #endif
 #if ENABLE_READ_VIEW
-	"box/read_view", read_view_lua,
+	"box/read_view", NULL, read_view_lua,
 #endif
 #if ENABLE_SECURITY
-	"box/security", security_lua,
+	"box/security", NULL, security_lua,
 #endif
-	"box/xlog", xlog_lua,
-	"box/upgrade", upgrade_lua,
-	"box/net_box", net_box_lua,
-	"box/console", console_lua,
-	"box/load_cfg", load_cfg_lua,
-	"box/key_def", key_def_lua,
-	"box/merger", merger_lua,
+	"box/xlog", "xlog", xlog_lua,
+	"box/upgrade", NULL, upgrade_lua,
+	"box/net_box", "net.box", net_box_lua,
+	"box/console", "console", console_lua,
+	"box/load_cfg", NULL, load_cfg_lua,
+	"box/key_def", "key_def", key_def_lua,
+	"box/merger", "merger", merger_lua,
 	NULL
 };
 
@@ -574,20 +592,44 @@ box_lua_init(struct lua_State *L)
 	luamp_set_encode_extension(luamp_encode_extension_box);
 	luamp_set_decode_extension(luamp_decode_extension_box);
 
+	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+
 	/* Load Lua extension */
-	for (const char **s = lua_sources; *s; s += 2) {
-		const char *modname = *s;
-		const char *modsrc = *(s + 1);
+	for (const char **s = lua_sources; *s; s += 3) {
+		const char *modfile_raw = *s;
+		const char *modname = *(s + 1);
+		const char *modsrc = *(s + 2);
+
 		const char *modfile = lua_pushfstring(L,
-			"@builtin/%s.lua", modname);
+			"@builtin/%s.lua", modfile_raw);
 		if (luaL_loadbuffer(L, modsrc, strlen(modsrc), modfile) != 0 ||
-		    lua_pcall(L, 0, 0, 0) != 0)
+		    lua_pcall(L, 0, 1, 0) != 0)
 			panic("Error loading Lua module %s...: %s",
-			      modname, lua_tostring(L, -1));
+			      modname != NULL ? modname : modfile,
+			      lua_tostring(L, -1));
+
+		if (!lua_isnil(L, -1)) {
+			/* package.loaded.modname = t */
+			assert(modname != NULL);
+			lua_setfield(L, -3, modname);
+		} else {
+			lua_pop(L, 1); /* nil */
+		}
+
 		lua_pop(L, 1); /* modfile */
-		builtin_modcache_put(modname, modsrc);
+
+		/*
+		 * TODO: Use a module name (as written in a
+		 * require() call) as the
+		 * tarantool.debug.getsources() parameter.
+		 *
+		 * For example, "net.box" instead of
+		 * "box/net_box".
+		 */
+		builtin_modcache_put(modfile_raw, modsrc);
 	}
 
+	lua_pop(L, 1); /* _LOADED */
 	assert(lua_gettop(L) == 0);
 }
 
