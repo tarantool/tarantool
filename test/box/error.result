@@ -482,6 +482,7 @@ t;
  |   262: box.error.CANT_CHECK_BOOTSTRAP_LEADER
  |   263: box.error.BOOTSTRAP_CONNECTION_NOT_TO_ALL
  |   264: box.error.NIL_UUID
+ |   265: box.error.WRONG_FUNCTION_OPTIONS
  | ...
 
 test_run:cmd("setopt delimiter ''");

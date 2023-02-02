@@ -317,6 +317,7 @@ struct errcode_record {
 	/*262 */_(ER_CANT_CHECK_BOOTSTRAP_LEADER, "Can't check who replica %s chose its bootstrap leader") \
 	/*263 */_(ER_BOOTSTRAP_CONNECTION_NOT_TO_ALL, "Some replica set members were not specified in box.cfg.replication") \
 	/*264 */_(ER_NIL_UUID,			"Nil UUID is reserved and can't be used in replication") \
+	/*265 */_(ER_WRONG_FUNCTION_OPTIONS,	"Wrong function options: %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
