@@ -27,3 +27,17 @@ g.test_objects_that_implement_serialize_are_aliased = function()
     t.assert_is(nested2[1], nested2.a[1][1])
     t.assert_is(nested2[1], nested2.a.b.c)
 end
+
+g.test_objects_returned_by_serialize_are_aliased = function()
+    local o1 = {}
+    local o2 = serialize(setmetatable({}, {
+        __serialize = function() return {o1, {a = o1}} end,
+    }))
+    local o3 = serialize(setmetatable({}, {
+        __serialize = function() return {o2, o2} end
+    }))
+    t.assert_equals(o2, {o1, {a = o1}})
+    t.assert_is(o2[1], o2[2].a)
+    t.assert_equals(o3, {{o1, {a = o1}}, {o1, {a = o1}}})
+    t.assert_is(o3[1], o3[2])
+end

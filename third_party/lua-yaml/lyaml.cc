@@ -607,6 +607,8 @@ static int yaml_is_flow_mode(struct lua_yaml_dumper *dumper) {
    return 0;
 }
 
+static void find_references(struct lua_yaml_dumper *dumper);
+
 static int dump_node(struct lua_yaml_dumper *dumper)
 {
    size_t len = 0;
@@ -626,6 +628,8 @@ static int dump_node(struct lua_yaml_dumper *dumper)
 
    int top = lua_gettop(dumper->L);
    luaL_checkfield(dumper->L, dumper->cfg, top, &field);
+   if (field.serialized)
+      find_references(dumper);
    switch(field.type) {
    case MP_UINT:
       snprintf(buf, sizeof(buf) - 1, "%" PRIu64, field.ival);
