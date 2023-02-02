@@ -241,9 +241,31 @@ memtx_engine_shutdown(struct engine *engine)
 	free(memtx);
 }
 
+/**
+ * State of memtx engine snapshot recovery.
+ */
+enum snapshot_recovery_state {
+	/* Initial state. */
+	SNAPSHOT_RECOVERY_NOT_STARTED,
+	/* Set when at least one system space was recovered. */
+	RECOVERING_SYSTEM_SPACES,
+	/*
+	 * Set when all system spaces are recovered, i.e., when a user space
+	 * request or a non-insert request appears.
+	 */
+	DONE_RECOVERING_SYSTEM_SPACES,
+};
+
+/**
+ * Recovers one xrow from snapshot.
+ *
+ * @retval -1 error, diagnostic set
+ * @retval 0 success
+ */
 static int
 memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
-				  struct xrow_header *row, int *is_space_system);
+				  struct xrow_header *row,
+				  enum snapshot_recovery_state *state);
 
 int
 memtx_engine_recover_snapshot(struct memtx_engine *memtx,
@@ -263,17 +285,13 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	int rc;
 	struct xrow_header row;
 	uint64_t row_count = 0;
-	int is_space_system = -1;
 	bool force_recovery = false;
-	/*
-	 * In case when we read system space, we can't ignore errors.
-	 */
+	enum snapshot_recovery_state state = SNAPSHOT_RECOVERY_NOT_STARTED;
 	while ((rc = xlog_cursor_next(&cursor, &row, force_recovery)) == 0) {
 		row.lsn = signature;
-		rc = memtx_engine_recover_snapshot_row(memtx, &row,
-						       &is_space_system);
-		force_recovery = is_space_system == 0 ?
-				 memtx->force_recovery : false;
+		rc = memtx_engine_recover_snapshot_row(memtx, &row, &state);
+		if (state == DONE_RECOVERING_SYSTEM_SPACES)
+			force_recovery = memtx->force_recovery;
 		if (rc < 0) {
 			if (!force_recovery)
 				break;
@@ -307,8 +325,10 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	 * Snapshot entries are ordered by the space id, it means that if there
 	 * are no spaces, then all system spaces are definitely missing.
 	 */
-	if (is_space_system < 0)
-		panic("snapshot `%s' has no system spaces", cursor.name);
+	if (state == SNAPSHOT_RECOVERY_NOT_STARTED) {
+		diag_set(ClientError, ER_MISSING_SYSTEM_SPACES);
+		return -1;
+	}
 
 	return 0;
 }
@@ -340,12 +360,38 @@ memtx_engine_recover_synchro(const struct xrow_header *row)
 	return txn_limbo_process(&txn_limbo, &req);
 }
 
+/** Checks and updates the snapshot recovery state. */
+static int
+snapshot_recovery_state_update(enum snapshot_recovery_state *state,
+			       bool is_system_space_request)
+{
+	switch (*state) {
+	case SNAPSHOT_RECOVERY_NOT_STARTED:
+		if (!is_system_space_request) {
+			diag_set(ClientError, ER_MISSING_SYSTEM_SPACES);
+			return -1;
+		}
+		*state = RECOVERING_SYSTEM_SPACES;
+		break;
+	case RECOVERING_SYSTEM_SPACES:
+		if (!is_system_space_request)
+			*state = DONE_RECOVERING_SYSTEM_SPACES;
+		break;
+	case DONE_RECOVERING_SYSTEM_SPACES:
+		break;
+	}
+	return 0;
+}
+
 static int
 memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
-				  struct xrow_header *row, int *is_space_system)
+				  struct xrow_header *row,
+				  enum snapshot_recovery_state *state)
 {
 	assert(row->bodycnt == 1); /* always 1 for read */
 	if (row->type != IPROTO_INSERT) {
+		if (snapshot_recovery_state_update(state, false) != 0)
+			return -1;
 		if (row->type == IPROTO_RAFT)
 			return memtx_engine_recover_raft(row);
 		if (row->type == IPROTO_RAFT_PROMOTE)
@@ -358,7 +404,9 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 	struct request request;
 	if (xrow_decode_dml(row, &request, dml_request_key_map(row->type)) != 0)
 		return -1;
-	*is_space_system = (request.space_id < BOX_SYSTEM_ID_MAX);
+	bool is_system_space_request = space_id_is_system(request.space_id);
+	if (snapshot_recovery_state_update(state, is_system_space_request) != 0)
+		return -1;
 	struct space *space = space_cache_find(request.space_id);
 	if (space == NULL)
 		goto log_request;
@@ -625,10 +673,11 @@ memtx_engine_bootstrap(struct engine *engine)
 				sizeof(bootstrap_bin), "bootstrap") < 0)
 		return -1;
 
-	int rc, is_space_system;
+	int rc;
 	struct xrow_header row;
+	enum snapshot_recovery_state state = SNAPSHOT_RECOVERY_NOT_STARTED;
 	while ((rc = xlog_cursor_next(&cursor, &row, true)) == 0) {
-		rc = memtx_engine_recover_snapshot_row(memtx, &row, &is_space_system);
+		rc = memtx_engine_recover_snapshot_row(memtx, &row, &state);
 		if (rc < 0)
 			break;
 	}

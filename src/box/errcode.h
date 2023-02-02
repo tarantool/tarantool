@@ -299,6 +299,26 @@ struct errcode_record {
 	/*244 */_(ER_SPLIT_BRAIN,		"Split-Brain discovered: %s") \
 	/*245 */_(ER_OLD_TERM,			"The term is outdated: old - %llu, new - %llu") \
 	/*246 */_(ER_INTERFERING_ELECTIONS,	"Interfering elections started")\
+	/*247 */_(ER_UNUSED1,			"") \
+	/*248 */_(ER_UNUSED2,			"") \
+	/*249 */_(ER_UNUSED3,			"") \
+	/*250 */_(ER_UNUSED4,			"") \
+	/*251 */_(ER_UNUSED5,			"") \
+	/*252 */_(ER_UNUSED6,			"") \
+	/*253 */_(ER_UNUSED7,			"") \
+	/*254 */_(ER_UNUSED8,			"") \
+	/*255 */_(ER_UNUSED9,			"") \
+	/*256 */_(ER_UNUSED10,			"") \
+	/*257 */_(ER_UNUSED11,			"") \
+	/*258 */_(ER_UNUSED12,			"") \
+	/*259 */_(ER_UNUSED13,			"") \
+	/*260 */_(ER_UNUSED14,			"") \
+	/*261 */_(ER_UNUSED15,			"") \
+	/*262 */_(ER_UNUSED16,			"") \
+	/*263 */_(ER_UNUSED17,			"") \
+	/*264 */_(ER_UNUSED18,			"") \
+	/*265 */_(ER_UNUSED19,			"") \
+	/*266 */_(ER_MISSING_SYSTEM_SPACES,	"Snapshot has no system spaces") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

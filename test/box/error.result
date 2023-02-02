@@ -465,6 +465,7 @@ t;
  |   244: box.error.SPLIT_BRAIN
  |   245: box.error.OLD_TERM
  |   246: box.error.INTERFERING_ELECTIONS
+ |   266: box.error.MISSING_SYSTEM_SPACES
  | ...
 
 test_run:cmd("setopt delimiter ''");
