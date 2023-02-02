@@ -402,8 +402,11 @@ sql_drop_trigger(struct Parse *parser)
 		goto drop_trigger_cleanup;
 
 	struct Vdbe *v = sqlGetVdbe(parser);
-	if (v != NULL)
-		sqlVdbeCountChanges(v);
+	if (v == NULL) {
+		parser->is_aborted = true;
+		goto drop_trigger_cleanup;
+	}
+	sqlVdbeCountChanges(v);
 
 	assert(name->nSrc == 1);
 	const char *trigger_name = name->a[0].zName;
