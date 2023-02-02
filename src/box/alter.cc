@@ -3148,7 +3148,7 @@ func_def_new_from_tuple(struct tuple *tuple)
 		def->param_count = argc;
 		const char *opts = tuple_field(tuple, BOX_FUNC_FIELD_OPTS);
 		if (opts_decode(&def->opts, func_opts_reg, &opts, NULL) != 0) {
-			diag_set(ClientError, ER_WRONG_SPACE_OPTIONS,
+			diag_set(ClientError, ER_WRONG_FUNCTION_OPTIONS,
 				 diag_last_error(diag_get())->errmsg);
 			return NULL;
 		}
