@@ -502,6 +502,8 @@ usage_error:
 static int dump_node(struct lua_yaml_dumper *dumper);
 
 static yaml_char_t *get_yaml_anchor(struct lua_yaml_dumper *dumper) {
+   if (lua_type(dumper->L, -1) != LUA_TTABLE)
+      return NULL;
    const char *s = "";
    lua_pushvalue(dumper->L, -1);
    lua_rawget(dumper->L, dumper->anchortable_index);
@@ -531,11 +533,9 @@ static yaml_char_t *get_yaml_anchor(struct lua_yaml_dumper *dumper) {
    return (yaml_char_t *)s;
 }
 
-static int dump_table(struct lua_yaml_dumper *dumper, struct luaL_field *field){
+static int dump_table(struct lua_yaml_dumper *dumper, struct luaL_field *field,
+                      yaml_char_t *anchor){
    yaml_event_t ev;
-   yaml_char_t *anchor = get_yaml_anchor(dumper);
-
-   if (anchor && !*anchor) return 1;
 
    yaml_mapping_style_t yaml_style = (field->compact)
       ? (YAML_FLOW_MAPPING_STYLE) : YAML_BLOCK_MAPPING_STYLE;
@@ -558,13 +558,10 @@ static int dump_table(struct lua_yaml_dumper *dumper, struct luaL_field *field){
           yaml_emitter_emit(&dumper->emitter, &ev) != 0 ? 1 : 0;
 }
 
-static int dump_array(struct lua_yaml_dumper *dumper, struct luaL_field *field){
+static int dump_array(struct lua_yaml_dumper *dumper, struct luaL_field *field,
+                      yaml_char_t *anchor){
    unsigned i;
    yaml_event_t ev;
-   yaml_char_t *anchor = get_yaml_anchor(dumper);
-
-   if (anchor && !*anchor)
-      return 1;
 
    yaml_sequence_style_t yaml_style = (field->compact)
       ? (YAML_FLOW_SEQUENCE_STYLE) : YAML_BLOCK_SEQUENCE_STYLE;
@@ -623,6 +620,10 @@ static int dump_node(struct lua_yaml_dumper *dumper)
    bool unused;
    (void) unused;
 
+   yaml_char_t *anchor = get_yaml_anchor(dumper);
+   if (anchor && !*anchor)
+      return 1;
+
    int top = lua_gettop(dumper->L);
    luaL_checkfield(dumper->L, dumper->cfg, top, &field);
    switch(field.type) {
@@ -649,9 +650,9 @@ static int dump_node(struct lua_yaml_dumper *dumper)
       len = strlen(buf);
       break;
    case MP_ARRAY:
-      return dump_array(dumper, &field);
+      return dump_array(dumper, &field, anchor);
    case MP_MAP:
-      return dump_table(dumper, &field);
+      return dump_table(dumper, &field, anchor);
    case MP_STR:
       str = lua_tolstring(dumper->L, -1, &len);
       if (yaml_is_null(str, len) || yaml_is_bool(str, len, &unused) ||
