@@ -318,6 +318,7 @@ struct errcode_record {
 	/*263 */_(ER_BOOTSTRAP_CONNECTION_NOT_TO_ALL, "Some replica set members were not specified in box.cfg.replication") \
 	/*264 */_(ER_NIL_UUID,			"Nil UUID is reserved and can't be used in replication") \
 	/*265 */_(ER_WRONG_FUNCTION_OPTIONS,	"Wrong function options: %s") \
+	/*266 */_(ER_MISSING_SYSTEM_SPACES,	"Snapshot has no system spaces") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file
