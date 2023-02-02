@@ -739,9 +739,16 @@ addWhereTerm(Parse * pParse,	/* Parsing context */
 	assert(pSrc->a[iRight].space != NULL);
 
 	struct Expr *pE1 = sql_expr_new_column(db, pSrc, iLeft, iColLeft);
-	struct Expr *pE2 = sql_expr_new_column(db, pSrc, iRight, iColRight);
-	if (pE1 == NULL || pE2 == NULL)
+	if (pE1 == NULL) {
 		pParse->is_aborted = true;
+		return;
+	}
+	struct Expr *pE2 = sql_expr_new_column(db, pSrc, iRight, iColRight);
+	if (pE2 == NULL) {
+		sqlDbFree(db, pE1);
+		pParse->is_aborted = true;
+		return;
+	}
 	pEq = sqlPExpr(pParse, TK_EQ, pE1, pE2);
 	if (pEq && isOuterJoin) {
 		ExprSetProperty(pEq, EP_FromJoin);
@@ -2174,12 +2181,14 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 		} else {
 			zName = sqlDbStrDup(db, zName);
 		}
+		if (zName == NULL)
+			goto cleanup;
 
 		/* Make sure the column name is unique.  If the name is not unique,
 		 * append an integer to the name so that it becomes unique.
 		 */
 		cnt = 0;
-		while (zName && sqlHashFind(&ht, zName) != 0) {
+		while (sqlHashFind(&ht, zName) != 0) {
 			nName = sqlStrlen30(zName);
 			if (nName > 0) {
 				int j;
@@ -2188,22 +2197,25 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 				if (zName[j] == '_')
 					nName = j;
 			}
-			zName =
-			    sqlMPrintf(db, "%.*z_%u", nName, zName, ++cnt);
+			zName = sqlMPrintf(db, "%.*z_%u", nName, zName, ++cnt);
+			if (zName == NULL)
+				goto cleanup;
 		}
-		size_t name_len = strlen(zName);
+		assert(zName != NULL);
+		nName = sqlStrlen30(zName);
 		void *field = &space_def->fields[i];
-		if (zName != NULL &&
-		    sqlHashInsert(&ht, zName, field) == field)
+		if (sqlHashInsert(&ht, zName, field) == field) {
+			sql_free(zName);
 			sqlOomFault(db);
-		space_def->fields[i].name = region_alloc(region, name_len + 1);
+			goto cleanup;
+		}
+		space_def->fields[i].name = region_alloc(region, nName + 1);
 		if (space_def->fields[i].name == NULL) {
 			sqlOomFault(db);
 			goto cleanup;
-		} else {
-			memcpy(space_def->fields[i].name, zName, name_len);
-			space_def->fields[i].name[name_len] = '\0';
 		}
+		memcpy(space_def->fields[i].name, zName, nName);
+		space_def->fields[i].name[nName] = '\0';
 	}
 cleanup:
 	sqlHashClear(&ht);
