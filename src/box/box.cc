@@ -1236,19 +1236,23 @@ box_check_replication_sync_timeout(void)
 	return timeout;
 }
 
-static inline void
+static inline int
 box_check_uuid(struct tt_uuid *uuid, const char *name)
 {
 	*uuid = uuid_nil;
 	const char *uuid_str = cfg_gets(name);
 	if (uuid_str == NULL)
-		return;
-	if (tt_uuid_from_string(uuid_str, uuid) != 0)
-		tnt_raise(ClientError, ER_CFG, name, uuid_str);
-	if (tt_uuid_is_nil(uuid)) {
-		tnt_raise(ClientError, ER_CFG, name,
-			  tt_sprintf("nil UUID is reserved"));
+		return 0;
+	if (tt_uuid_from_string(uuid_str, uuid) != 0) {
+		diag_set(ClientError, ER_CFG, name, uuid_str);
+		return -1;
 	}
+	if (tt_uuid_is_nil(uuid)) {
+		diag_set(ClientError, ER_CFG, name,
+			 tt_sprintf("nil UUID is reserved"));
+		return -1;
+	}
+	return 0;
 }
 
 static bool
@@ -1277,16 +1281,16 @@ box_check_replication_anon(void)
 	return anon;
 }
 
-static void
+static int
 box_check_instance_uuid(struct tt_uuid *uuid)
 {
-	box_check_uuid(uuid, "instance_uuid");
+	return box_check_uuid(uuid, "instance_uuid");
 }
 
-static void
+static int
 box_check_replicaset_uuid(struct tt_uuid *uuid)
 {
-	box_check_uuid(uuid, "replicaset_uuid");
+	return box_check_uuid(uuid, "replicaset_uuid");
 }
 
 static enum wal_mode
@@ -1556,8 +1560,10 @@ box_check_config(void)
 		diag_raise();
 	if (box_check_auth_type() == NULL)
 		diag_raise();
-	box_check_instance_uuid(&uuid);
-	box_check_replicaset_uuid(&uuid);
+	if (box_check_instance_uuid(&uuid) != 0)
+		diag_raise();
+	if (box_check_replicaset_uuid(&uuid) != 0)
+		diag_raise();
 	if (box_check_election_mode() == ELECTION_MODE_INVALID)
 		diag_raise();
 	if (box_check_election_timeout() < 0)
@@ -4682,8 +4688,10 @@ box_cfg_xc(void)
 	title("loading");
 
 	struct tt_uuid instance_uuid, replicaset_uuid;
-	box_check_instance_uuid(&instance_uuid);
-	box_check_replicaset_uuid(&replicaset_uuid);
+	if (box_check_instance_uuid(&instance_uuid) != 0)
+		diag_raise();
+	if (box_check_replicaset_uuid(&replicaset_uuid) != 0)
+		diag_raise();
 
 	if (box_set_prepared_stmt_cache_size() != 0)
 		diag_raise();
