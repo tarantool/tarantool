@@ -46,8 +46,12 @@ extern "C" {
 /** box statistics */
 extern struct rmean *rmean_box;
 
-/** Last prepare-sequence-number that was assigned to prepared TX. */
-extern int64_t txn_last_psn;
+/**
+ * Incremental counter for psn (prepare sequence number) of a transaction.
+ * The next prepared transaction will get psn == txn_next_psn++.
+ * See also struct txn::psn.
+ */
+extern int64_t txn_next_psn;
 
 struct journal_entry;
 struct engine;
@@ -109,7 +113,14 @@ enum {
 	 * Maximum recursion depth for on_replace triggers.
 	 * Large numbers may corrupt C stack.
 	 */
-	TXN_SUB_STMT_MAX = 3
+	TXN_SUB_STMT_MAX = 3,
+	/**
+	 * The minimal PSN (prepare sequence number) that can be assigned to a
+	 * prepared transaction (see struct txn::psn). All values below this
+	 * threshold can be used by a transaction manager as values with
+	 * special meaning that no real transaction can have.
+	 */
+	TXN_MIN_PSN = 2,
 };
 
 enum {
