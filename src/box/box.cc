@@ -982,6 +982,30 @@ box_check_election_fencing_mode(void)
 	return ELECTION_FENCING_MODE_INVALID;
 }
 
+/** A helper to check validity of a single uri. */
+static int
+check_uri(const struct uri *uri, const char *option_name)
+{
+	const char *auth_type = uri_param(uri, "auth_type", 0);
+	const char *errmsg;
+	if (uri->service == NULL) {
+		errmsg = "expected host:service or /unix.socket";
+		goto bad_uri;
+	}
+	if (auth_type != NULL &&
+	    auth_method_by_name(auth_type, strlen(auth_type)) == NULL) {
+		errmsg = "unknown authentication method";
+		goto bad_uri;
+	}
+	return 0;
+bad_uri:;
+	char *uristr = tt_static_buf();
+	uri_format(uristr, TT_STATIC_BUF_LEN, uri, false);
+	diag_set(ClientError, ER_CFG, option_name,
+		 tt_sprintf("bad URI '%s': %s", uristr, errmsg));
+	return -1;
+}
+
 static int
 box_check_uri_set(const char *option_name)
 {
@@ -994,25 +1018,10 @@ box_check_uri_set(const char *option_name)
 	int rc = 0;
 	for (int i = 0; i < uri_set.uri_count; i++) {
 		const struct uri *uri = &uri_set.uris[i];
-		const char *auth_type = uri_param(uri, "auth_type", 0);
-		const char *errmsg;
-		if (uri->service == NULL) {
-			errmsg = "expected host:service or /unix.socket";
-			goto bad_uri;
+		if (check_uri(uri, option_name) != 0) {
+			rc = -1;
+			break;
 		}
-		if (auth_type != NULL &&
-		    auth_method_by_name(auth_type, strlen(auth_type)) == NULL) {
-			errmsg = "unknown authentication method";
-			goto bad_uri;
-		}
-		continue;
-bad_uri:;
-		char *uristr = tt_static_buf();
-		uri_format(uristr, TT_STATIC_BUF_LEN, uri, false);
-		diag_set(ClientError, ER_CFG, option_name,
-			 tt_sprintf("bad URI '%s': %s", uristr, errmsg));
-		rc = -1;
-		break;
 	}
 	uri_set_destroy(&uri_set);
 	return rc;
