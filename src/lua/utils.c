@@ -348,6 +348,57 @@ luaT_newmodule(struct lua_State *L, const char *modname,
 	return 1;
 }
 
+int
+luaT_setmodule(struct lua_State *L, const char *modname)
+{
+	assert(modname != NULL);
+	say_debug("%s(%s)", __func__, modname);
+	assert(lua_gettop(L) >= 1);
+
+	if (lua_isnil(L, -1)) {
+		say_debug("%s(%s): skip nil module value", __func__, modname);
+		lua_pop(L, 1);
+		return 0;
+	}
+
+	/* Get package.loaded[modname]. */
+	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+	lua_getfield(L, -1, modname);
+
+	/*
+	 * If the same module value is already assigned, do
+	 * nothing.
+	 */
+	if (lua_rawequal(L, -1, -3)) {
+		say_debug("%s(%s): skip the same module value", __func__,
+			  modname);
+		lua_pop(L, 3);
+		return 0;
+	}
+
+	/*
+	 * Verify that the module is not already registered with
+	 * another value.
+	 */
+	assert(lua_isnil(L, -1));
+	lua_pop(L, 1);
+
+	/* Stack: module table, package.loaded. */
+
+	/* package.loaded[modname] = <module table> */
+	lua_pushvalue(L, -2);
+	lua_setfield(L, -2, modname);
+
+	/*
+	 * Drop all the temporary values and the module table from
+	 * the stack.
+	 */
+	lua_pop(L, 2);
+
+	say_debug("%s(%s): success", __func__, modname);
+	return 0;
+}
+
 /*
  * Maximum integer that doesn't lose precision on tostring() conversion.
  * Lua uses sprintf("%.14g") to format its numbers, see gh-1279.

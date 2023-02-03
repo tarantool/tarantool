@@ -810,8 +810,6 @@ static void
 luaT_set_module_from_source(struct lua_State *L, const char *modname,
 			    const char *modsrc)
 {
-	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-
 	/*
 	 * TODO: Use a file name, not a module name for the
 	 * luaL_loadbuffer() parameter.
@@ -826,15 +824,10 @@ luaT_set_module_from_source(struct lua_State *L, const char *modname,
 	lua_pushstring(L, modname);
 	lua_call(L, 1, 1);
 
-	if (!lua_isnil(L, -1)) {
-		/* package.loaded.modname = t */
-		lua_setfield(L, -3, modname);
-	} else {
-		lua_pop(L, 1); /* nil */
-	}
+	luaT_setmodule(L, modname);
 
 	builtin_modcache_put(modname, modsrc);
-	lua_pop(L, 2); /* modfile, _LOADED */
+	lua_pop(L, 1); /* modfile */
 }
 
 void

@@ -592,8 +592,6 @@ box_lua_init(struct lua_State *L)
 	luamp_set_encode_extension(luamp_encode_extension_box);
 	luamp_set_decode_extension(luamp_decode_extension_box);
 
-	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-
 	/* Load Lua extension */
 	for (const char **s = lua_sources; *s; s += 3) {
 		const char *modfile_raw = *s;
@@ -608,12 +606,16 @@ box_lua_init(struct lua_State *L)
 			      modname != NULL ? modname : modfile,
 			      lua_tostring(L, -1));
 
-		if (!lua_isnil(L, -1)) {
-			/* package.loaded.modname = t */
-			assert(modname != NULL);
-			lua_setfield(L, -3, modname);
+		/*
+		 * Register a built-in module if the module name
+		 * is provided. Otherwise ensure that no value is
+		 * returned.
+		 */
+		if (modname == NULL) {
+			assert(lua_isnil(L, -1));
+			lua_pop(L, 1);
 		} else {
-			lua_pop(L, 1); /* nil */
+			luaT_setmodule(L, modname);
 		}
 
 		lua_pop(L, 1); /* modfile */
@@ -629,7 +631,6 @@ box_lua_init(struct lua_State *L)
 		builtin_modcache_put(modfile_raw, modsrc);
 	}
 
-	lua_pop(L, 1); /* _LOADED */
 	assert(lua_gettop(L) == 0);
 }
 
