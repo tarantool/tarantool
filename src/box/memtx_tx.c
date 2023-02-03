@@ -38,6 +38,17 @@
 #include "schema_def.h"
 #include "small/mempool.h"
 
+enum {
+	/**
+	 * Virtual PSN that will be set to del_psn of rolled-back story.
+	 * Must be less that any existing "real" PSN.
+	 */
+	MEMTX_TX_ROLLBACKED_PSN = 1,
+};
+
+static_assert((int)MEMTX_TX_ROLLBACKED_PSN < (int)TXN_MIN_PSN,
+	      "There must be a range for TX manager's internal use");
+
 /**
  * Link that connects a memtx_story with older and newer stories of the same
  * key in index.
@@ -117,14 +128,6 @@ struct memtx_story {
 	 * the story is the only reason why @a tuple cannot be deleted.
 	 */
 	bool tuple_is_retained;
-	/*
-	 * Transaction that added this story was rollbacked: this story is
-	 * absolutely invisible — its only purpose is to retain the reader list.
-	 * It is present at the end of some history chains and completely
-	 * unlinked from others, which also implies it is not present in the
-	 * corresponding indexes.
-	 */
-	bool rollbacked;
 	/**
 	 * Link with older and newer stories (and just tuples) for each
 	 * index respectively.
@@ -180,7 +183,7 @@ struct tx_read_tracker {
 	struct rlist in_reader_list;
 	/** Link in reader->read_set. */
 	struct rlist in_read_set;
-	/** Bit field of indexes in which the data was tread by reader. */
+	/** Bit field of indexes in which the data was read by reader. */
 	uint64_t index_mask;
 };
 
@@ -937,7 +940,6 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple,
 		rlist_create(&story->link[i].nearby_gaps);
 		story->link[i].in_index = space->index[i];
 	}
-	story->rollbacked = false;
 	return story;
 }
 
@@ -1278,18 +1280,6 @@ memtx_tx_story_unlink_top_on_rollback_light(struct memtx_story *story,
 }
 
 /**
- * See description of `memtx_tx_story_unlink_top_common`.
- * As opposed to `memtx_tx_story_unlink_top_on_space_delete`, also rebinds gap
- * records to the new top in history chain.
- */
-static void
-memtx_tx_story_unlink_top_on_rollback(struct memtx_story *story, uint32_t idx)
-{
-	memtx_tx_story_unlink_top_common(story, idx);
-	memtx_tx_story_unlink_top_on_rollback_light(story, idx);
-}
-
-/**
  * See description of `memtx_tx_story_unlink_top_common_light`.
  * Since the space is being deleted, we need to simply unlink the story.
  */
@@ -1328,50 +1318,6 @@ memtx_tx_story_unlink_both_common(struct memtx_story *story,
 	memtx_tx_story_unlink(newer_story, story, idx);
 	memtx_tx_story_unlink(story, older_story, idx);
 	memtx_tx_story_link(newer_story, older_story, idx);
-}
-
-static int
-memtx_tx_track_read_story_slow(struct txn *txn, struct memtx_story *story,
-			       uint64_t index_mask);
-
-/**
- * Unlink a @a story from history chain in @a index in both directions.
- * If the story was in the top of history chain - unlink from top. Otherwise,
- * see description of `memtx_tx_story_unlink_both_common`.
- * As opposed to `memtx_tx_story_unlink_both_on_space_delete`, rebinds read
- * trackers.
- */
-static void
-memtx_tx_story_unlink_both_on_rollback(struct memtx_story *story, uint32_t idx)
-{
-	assert(story != NULL);
-	assert(idx < story->index_count);
-	struct memtx_story_link *link = &story->link[idx];
-
-	struct memtx_story *newer_story = link->newer_story;
-	struct memtx_story *older_story = link->older_story;
-	if (link->newer_story == NULL) {
-		assert(link->in_index != NULL);
-		memtx_tx_story_unlink_top_on_rollback(story, idx);
-	} else {
-		memtx_tx_story_unlink_both_common(story, idx);
-	}
-	/*
-	 * Rebind read trackers in order to conflict
-	 * readers in case of rollback of this txn.
-	 */
-	struct memtx_story *rebind_story =
-		newer_story != NULL ? newer_story : older_story;
-	struct tx_read_tracker *tracker, *tmp;
-	uint64_t index_mask = 1ull << (idx & 63);
-	rlist_foreach_entry_safe(tracker, &story->reader_list,
-				 in_reader_list, tmp) {
-		if ((tracker->index_mask & index_mask) != 0) {
-			memtx_tx_track_read_story_slow(tracker->reader,
-						       rebind_story,
-						       index_mask);
-		}
-	}
 }
 
 /**
@@ -1506,7 +1452,7 @@ memtx_tx_story_full_unlink_story_gc_step(struct memtx_story *story)
 			 * tuple and is present in index, it must be deleted
 			 * from index.
 			 */
-			assert(link->in_index != NULL || story->rollbacked);
+			assert(link->in_index != NULL);
 			/*
 			 * Invariant that the top of the history chain
 			 * is always in the index: here we delete
@@ -1567,11 +1513,11 @@ memtx_tx_story_gc_step()
 
 	/*
 	 * Lowest read view PSN.
-	 * Default value is more than txn_last_psn because if it is not so some
+	 * Default value is txn_next_psn because if it is not so some
 	 * stories (stories produced by last txn at least) will be marked as
 	 * potentially in read view even though there are no txns in read view.
 	 */
-	int64_t lowest_rv_psn = txn_last_psn + 1;
+	int64_t lowest_rv_psn = txn_next_psn;
 	if (!rlist_empty(&txm.read_view_txs)) {
 		struct txn *txn =
 			rlist_first_entry(&txm.read_view_txs, struct txn,
@@ -1604,7 +1550,7 @@ memtx_tx_story_gc_step()
 	for (uint32_t i = 0; i < story->index_count; i++) {
 		struct memtx_story_link *link = &story->link[i];
 		if (link->newer_story == NULL) {
-			assert(link->in_index != NULL || story->rollbacked);
+			assert(link->in_index != NULL);
 			/*
 			 * We would have to unlink this tuple (and perhaps
 			 * delete it from index if story->del_psn > 0), but we
@@ -1614,7 +1560,6 @@ memtx_tx_story_gc_step()
 			 * invariant.
 			 */
 			if (link->older_story != NULL) {
-				assert(!story->rollbacked);
 				memtx_tx_story_set_status(story,
 							  MEMTX_TX_STORY_USED);
 				return;
@@ -1663,9 +1608,6 @@ memtx_tx_story_insert_is_visible(struct memtx_story *story, struct txn *txn,
 {
 	*is_own_change = false;
 
-	if (story->rollbacked)
-		return false;
-
 	if (story->add_stmt != NULL && story->add_stmt->txn == txn) {
 		/* Tuple is added by us (@txn). */
 		*is_own_change = true;
@@ -1701,9 +1643,6 @@ memtx_tx_story_delete_is_visible(struct memtx_story *story, struct txn *txn,
 				 bool is_prepared_ok, bool *is_own_change)
 {
 	*is_own_change = false;
-
-	if (story->rollbacked)
-		return false;
 
 	bool was_deleted_by_prepared = false;
 	struct txn_stmt *dels = story->del_stmt;
@@ -2291,31 +2230,27 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 	assert(stmt->add_story != NULL);
 	assert(stmt->add_story->tuple == stmt->rollback_info.new_tuple);
 	struct memtx_story *story = stmt->add_story;
+
 	memtx_tx_history_remove_story_del_stmts(story);
-	for (uint32_t i = 0; i < story->index_count; i++) {
-		struct memtx_story_link *link = &story->link[i];
-		if (link->newer_story == NULL && link->older_story == NULL) {
-			assert(link->in_index != NULL);
-			story->rollbacked = true;
+	story->add_stmt = NULL;
+	stmt->add_story = NULL;
+
+	/*
+	 * Sink the story to the end of chain and mark is as deleted long
+	 * time ago (with some very low del_psn). After that the story will
+	 * be invisible to any reader (that's what is needed) and still be
+	 * able to store read set, if necessary.
+	 */
+	for (uint32_t i = 0; i < story->index_count; ) {
+		struct memtx_story *old_story = story->link[i].older_story;
+		if (old_story == NULL) {
+			/* Old story is absent. */
+			i++; /* Go to the next index. */
 			continue;
 		}
-		memtx_tx_story_unlink_both_on_rollback(story, i);
-		assert(link->newer_story == NULL &&
-		       link->older_story == NULL &&
-		       (link->in_index == NULL || story->rollbacked));
+		memtx_tx_story_reorder(story, old_story, i);
 	}
-	memtx_tx_story_unlink_added_by(story, stmt);
-	if (!story->rollbacked) {
-		struct tx_read_tracker *tracker, *tmp;
-		rlist_foreach_entry_safe(tracker, &story->reader_list,
-					 in_reader_list, tmp) {
-			rlist_del(&tracker->in_reader_list);
-			rlist_del(&tracker->in_read_set);
-		}
-		for (uint32_t idx = 0; idx < story->index_count; ++idx)
-			assert(rlist_empty(&story->link[idx].nearby_gaps));
-		memtx_tx_story_delete(story);
-	}
+	story->del_psn = MEMTX_TX_ROLLBACKED_PSN;
 }
 
 /*
@@ -2337,12 +2272,8 @@ memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 void
 memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 {
-	assert(stmt->txn->psn != 0);
-	if (stmt->add_story != NULL) {
-		stmt->add_story->add_psn = stmt->txn->psn;
-		stmt->add_story->del_psn = stmt->txn->psn;
+	if (stmt->add_story != NULL)
 		memtx_tx_history_rollback_added_story(stmt);
-	}
 	if (stmt->del_story != NULL)
 		memtx_tx_history_rollback_deleted_story(stmt);
 	assert(stmt->add_story == NULL && stmt->del_story == NULL);
@@ -2399,14 +2330,13 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 	 * The list begins with several (or zero) of stories that are added by
 	 * in-progress transactions, then the list continues with several
 	 * (or zero) of prepared stories, which are followed by several
-	 * (or zero) of committed stories, interleaved by rollbacked stories. We
-	 * have the following totally ordered set over tuple stories:
+	 * (or zero) of committed stories, followed by rollbacked stories.
+	 * We have the following totally ordered set over tuple stories:
 	 *
 	 * —————————————————————————————————————————————————> serialization time
 	 * |- - - - - - - -|— — — — — -|— — — — — |— — — — — — -|— — — — — — — -
-	 * | No more than  | Committed | Prepared | In-progress | One dirty
-	 * | one rollbacked|           |          |             | story in index
-	 * | story         |           |          |             |
+	 * | Rolled back   | Committed | Prepared | In-progress | One dirty
+	 * |               |           |          |             | story in index
 	 * |- - - - - - - -|— — — — — -| — — — — —|— — — — — — -|— — — — — — — —
 	 *
 	 * If a statement becomes prepared, the story it adds must be 'sunk' to
@@ -2450,19 +2380,12 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 
 	struct memtx_story *old_story = story->link[0].older_story;
 	if (stmt->del_story == NULL)
-		assert(old_story == NULL || old_story->rollbacked ||
-		       old_story->del_psn != 0);
+		assert(old_story == NULL || old_story->del_psn != 0);
 	else
-		assert(old_story != NULL &&
-		       (old_story->rollbacked || stmt->del_story == old_story));
-	if (old_story != NULL) {
-		if (old_story->rollbacked) {
-			assert(old_story->link[0].older_story == NULL);
-			old_story = NULL;
-		} else if (old_story->del_psn != 0) {
-			assert(stmt->del_story == NULL);
-			old_story = NULL;
-		}
+		assert(old_story != NULL && stmt->del_story == old_story);
+	if (old_story != NULL && old_story->del_psn != 0) {
+		assert(stmt->del_story == NULL);
+		old_story = NULL;
 	}
 	if (old_story != NULL) {
 		/*
@@ -2794,9 +2717,7 @@ memtx_tx_index_invisible_count_slow(struct txn *txn,
 		 * stored in index.
 		 */
 		if (link->in_index == NULL) {
-			assert(link->newer_story != NULL ||
-			       (story->rollbacked &&
-				link->older_story == NULL));
+			assert(link->newer_story != NULL);
 			continue;
 		}
 		assert(link->newer_story == NULL);
