@@ -55,7 +55,7 @@ def repr_dict(todump):
 
 def test(header, body):
     # Connect and authenticate
-    c = Connection("localhost", server.iproto.port)
+    c = Connection(None, server.iproto.port)
     c.connect()
     print("query", repr_dict(header), repr_dict(body))
     header = msgpack.dumps(header)
@@ -103,7 +103,7 @@ admin("space = box.schema.space.create('test', { id = 567 })")
 admin("index = space:create_index('primary', { type = 'hash' })")
 admin("box.schema.user.grant('guest', 'read,write,execute', 'space', 'test')")
 
-c = Connection("localhost", server.iproto.port)
+c = Connection(None, server.iproto.port)
 c.connect()
 request1 = RequestInsert(c, 567, [1, "baobab"])
 request2 = RequestInsert(c, 567, [2, "obbaba"])
@@ -223,7 +223,7 @@ for test in TESTS:
 
 
 print("Test of schema_id in iproto.")
-c = Connection("localhost", server.iproto.port)
+c = Connection(None, server.iproto.port)
 c.connect()
 s = c._socket
 
@@ -359,7 +359,7 @@ print("""
 # an error code and do not close connection
 """)
 
-c = Connection("localhost", server.iproto.port)
+c = Connection(None, server.iproto.port)
 c.connect()
 s = c._socket
 header = { "hello": "world"}
@@ -384,7 +384,7 @@ admin("space = box.schema.space.create('test_index_base', { id = 568 })")
 admin("index = space:create_index('primary', { type = 'hash' })")
 admin("box.schema.user.grant('guest', 'read,write,execute', 'space', 'test_index_base')")
 
-c = Connection("localhost", server.iproto.port)
+c = Connection(None, server.iproto.port)
 c.connect()
 s = c._socket
 
@@ -427,7 +427,7 @@ c.close()
 admin("function kek() return 'kek' end")
 admin("box.schema.user.grant('guest', 'read,write,execute', 'universe')")
 
-c = Connection("localhost", server.iproto.port)
+c = Connection(None, server.iproto.port)
 c.connect()
 s = c._socket
 
