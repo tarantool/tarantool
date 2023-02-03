@@ -307,30 +307,6 @@ luaL_register_type(struct lua_State *L, const char *type_name,
 	lua_pop(L, 1);
 }
 
-void
-luaL_register_module(struct lua_State *L, const char *modname,
-		     const struct luaL_Reg *methods)
-{
-	assert(methods != NULL && modname != NULL); /* use luaL_register instead */
-	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-	if (strchr(modname, '.') == NULL) {
-		/* root level, e.g. box */
-		lua_getfield(L, -1, modname); /* get package.loaded.modname */
-		if (!lua_istable(L, -1)) {  /* module is not found */
-			lua_pop(L, 1);  /* remove previous result */
-			lua_newtable(L);
-			lua_pushvalue(L, -1);
-			lua_setfield(L, -3, modname);  /* _LOADED[modname] = new table */
-		}
-	} else {
-		/* 1+ level, e.g. box.space */
-		if (luaL_findtable(L, -1, modname, 0) != NULL)
-			luaL_error(L, "Failed to register library");
-	}
-	lua_remove(L, -2);  /* remove _LOADED table */
-	luaL_setfuncs(L, methods, 0);
-}
-
 int
 luaT_newmodule(struct lua_State *L, const char *modname,
 	       const struct luaL_Reg *funcs)
