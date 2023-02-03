@@ -44,8 +44,12 @@
 
 double too_long_threshold;
 
-/** Last prepare-sequence-number that was assigned to prepared TX. */
-int64_t txn_last_psn = 0;
+/**
+ * Incremental counter for psn (prepare sequence number) of a transaction.
+ * The next prepared transaction will get psn == txn_next_psn++.
+ * See also struct txn::psn.
+ */
+int64_t txn_next_psn = TXN_MIN_PSN;
 
 enum txn_isolation_level txn_default_isolation = TXN_ISOLATION_BEST_EFFORT;
 
@@ -362,50 +366,9 @@ txn_rollback_one_stmt(struct txn *txn, struct txn_stmt *stmt)
 	}
 }
 
-/**
- * Assign's a PSN to a RW transaction that wasn't yet prepared.
- */
-static void
-txn_assign_psn(struct txn *txn)
-{
-	if (txn->psn == 0) {
-		if (txn->status == TXN_IN_READ_VIEW) {
-			assert(stailq_empty(&txn->stmts));
-		} else {
-			assert(txn->status == TXN_INPROGRESS ||
-			       txn->status == TXN_ABORTED);
-			txn->psn = ++txn_last_psn;
-		}
-	} else {
-		assert(txn->status == TXN_PREPARED);
-	}
-}
-
-/*
- * Begins the rollback to savepoint process by assigning a PSN to the
- * transaction (rolled back statements require a PSN).
- */
-static void
-txn_rollback_to_svp_begin(struct txn *txn)
-{
-	txn_assign_psn(txn);
-}
-
-/*
- * Finishes the rollback to savepoint process by resetting the transaction's
- * PSN (since this not a complete transaction rollback).
- */
-static void
-txn_rollback_to_svp_finish(struct txn *txn)
-{
-	if (txn->status != TXN_PREPARED)
-		txn->psn = 0;
-}
-
 static void
 txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 {
-	txn_rollback_to_svp_begin(txn);
 	struct txn_stmt *stmt;
 	struct stailq rollback;
 	stailq_cut_tail(&txn->stmts, svp, &rollback);
@@ -426,7 +389,6 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 		stmt->space = NULL;
 		stmt->row = NULL;
 	}
-	txn_rollback_to_svp_finish(txn);
 }
 
 /*
@@ -750,7 +712,6 @@ txn_free_or_wakeup(struct txn *txn)
 void
 txn_complete_fail(struct txn *txn)
 {
-	assert(txn->psn != 0);
 	assert(!txn_has_flag(txn, TXN_IS_DONE));
 	assert(txn->signature < 0);
 	assert(txn->signature != TXN_SIGNATURE_UNKNOWN);
@@ -994,8 +955,6 @@ txn_prepare(struct txn *txn)
 	if (txn_check_can_continue(txn) != 0)
 		return -1;
 
-	txn_assign_psn(txn);
-
 	if (txn->rollback_timer != NULL) {
 		ev_timer_stop(loop(), txn->rollback_timer);
 		txn->rollback_timer = NULL;
@@ -1010,6 +969,10 @@ txn_prepare(struct txn *txn)
 		txn->psn = 0;
 		return -1;
 	}
+
+	assert(txn->psn == 0);
+	/* psn must be set before calling engine handlers. */
+	txn->psn = txn_next_psn++;
 
 	/*
 	 * Perform transaction conflict resolution. Engine == NULL when
@@ -1195,10 +1158,6 @@ txn_rollback(struct txn *txn)
 {
 	assert(txn == in_txn());
 	assert(txn->signature != TXN_SIGNATURE_UNKNOWN);
-	/*
-	 * Rolled back statements require a PSN.
-	 */
-	txn_assign_psn(txn);
 	txn->status = TXN_ABORTED;
 	trigger_clear(&txn->fiber_on_stop);
 	trigger_clear(&txn->fiber_on_yield);
