@@ -278,6 +278,35 @@ int
 luaT_newmodule(struct lua_State *L, const char *modname,
 	       const struct luaL_Reg *funcs);
 
+/**
+ * Register a table on top of the stack as a built-in tarantool
+ * module.
+ *
+ * Can be called several times with the same value, but raises
+ * assertion fail if called with different values.
+ *
+ * Can be used after luaT_newmodule() if, again, the table of the
+ * module is the same.
+ *
+ * Pops the table.
+ *
+ * Pseudocode:
+ *
+ *  | local function setmodule(modname, mod)
+ *  |     assert(modname ~= nil)
+ *  |     if mod == nil then
+ *  |         return
+ *  |     end
+ *  |     if package.loaded[modname] == mod then
+ *  |         return
+ *  |     end
+ *  |     assert(package.loaded[modname] == nil)
+ *  |     package.loaded[modname] = mod
+ *  | end
+ */
+int
+luaT_setmodule(struct lua_State *L, const char *modname);
+
 /** \cond public */
 
 /**
