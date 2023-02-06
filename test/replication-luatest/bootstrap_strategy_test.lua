@@ -3,7 +3,7 @@ local server = require('luatest.server')
 local replica_set = require('luatest.replica_set')
 local fio = require('fio')
 
-local g = t.group('gh-5272-bootstrap-strategy-auto')
+local g_auto = t.group('gh-5272-bootstrap-strategy-auto')
 
 local uuid1 = '11111111-1111-1111-1111-111111111111'
 local uuid2 = '22222222-2222-2222-2222-222222222222'
@@ -29,11 +29,11 @@ local function assert_master_waits_for_replica(server, uuid)
              'Server ' .. server.alias .. ' waits for replica ' .. uuid)
 end
 
-g.after_each(function(cg)
+g_auto.after_each(function(cg)
     cg.replica_set:drop()
 end)
 
-g.before_test('test_auto_bootstrap_waits_for_confirmations', function(cg)
+g_auto.before_test('test_auto_bootstrap_waits_for_confirmations', function(cg)
     cg.replica_set = replica_set:new{}
     cg.box_cfg = {
         replication = {
@@ -62,7 +62,7 @@ g.before_test('test_auto_bootstrap_waits_for_confirmations', function(cg)
     }
 end)
 
-g.test_auto_bootstrap_waits_for_confirmations = function(cg)
+g_auto.test_auto_bootstrap_waits_for_confirmations = function(cg)
     cg.server1:start{wait_until_ready = false}
     cg.server2:start{wait_until_ready = false}
     t.helpers.retrying({}, assert_master_waits_for_replica, cg.server1, uuid2)
@@ -76,7 +76,7 @@ g.test_auto_bootstrap_waits_for_confirmations = function(cg)
                     'Server1 is the bootstrap leader')
 end
 
-g.before_test('test_join_checks_fullmesh', function(cg)
+g_auto.before_test('test_join_checks_fullmesh', function(cg)
     cg.replica_set = replica_set:new{}
     cg.box_cfg = {
         replication = {
@@ -98,7 +98,7 @@ g.before_test('test_join_checks_fullmesh', function(cg)
     cg.replica_set:start()
 end)
 
-g.test_join_checks_fullmesh = function(cg)
+g_auto.test_join_checks_fullmesh = function(cg)
     cg.box_cfg.replication[2] = nil
     cg.server3 = cg.replica_set:build_server{
         alias = 'server3',
@@ -117,7 +117,7 @@ g.test_join_checks_fullmesh = function(cg)
     cg.server3:clean()
 end
 
-g.before_test('test_sync_waits_for_all_connected', function(cg)
+g_auto.before_test('test_sync_waits_for_all_connected', function(cg)
     cg.replica_set = replica_set:new{}
     cg.box_cfg = {
         replication_timeout = 0.1,
@@ -136,7 +136,7 @@ g.before_test('test_sync_waits_for_all_connected', function(cg)
     cg.replica_set:start()
 end)
 
-g.test_sync_waits_for_all_connected = function(cg)
+g_auto.test_sync_waits_for_all_connected = function(cg)
     cg.master:stop()
     cg.replica:exec(function(replication)
         box.cfg{
