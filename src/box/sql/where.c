@@ -4036,8 +4036,6 @@ where_loop_builder_shortcut(struct WhereLoopBuilder *builder)
 		return 0;
 	assert(where_info->pTabList->nSrc >= 1);
 	struct SrcList_item *item = where_info->pTabList->a;
-	struct space_def *space_def = item->space->def;
-	assert(space_def != NULL);
 	if (item->fg.isIndexedBy)
 		return 0;
 	int cursor = item->iCursor;
@@ -4059,22 +4057,17 @@ where_loop_builder_shortcut(struct WhereLoopBuilder *builder)
 	} else {
 		assert(loop->aLTermSpace == loop->aLTerm);
 		struct space *space = item->space;
-		if (space != NULL) {
-			for (uint32_t i = 0; i < space->index_count; ++i) {
-				struct index_def *idx_def =
-					space->index[i]->def;
-				if (!idx_def->opts.is_unique)
-					continue;
-				if (where_loop_assign_terms(loop, clause,
-							    cursor, space_def,
-							    idx_def) == 0)
-					break;
-			}
-		} else {
-			/* Space is ephemeral. */
-			assert(space_def->id == 0);
-			where_loop_assign_terms(loop, clause, cursor,
-						space_def, NULL);
+		assert(space != NULL);
+		assert(space->def != NULL);
+		for (uint32_t i = 0; i < space->index_count; ++i) {
+			struct index_def *idx_def =
+				space->index[i]->def;
+			if (!idx_def->opts.is_unique)
+				continue;
+			if (where_loop_assign_terms(loop, clause,
+						    cursor, space->def,
+						    idx_def) == 0)
+				break;
 		}
 	}
 	if (loop->wsFlags) {
