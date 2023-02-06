@@ -41,6 +41,7 @@
 #include "timelocal.h"
 
 #include <assert.h>
+#include <limits.h>
 #include <locale.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -277,8 +278,21 @@ _fmt(char *buf, ssize_t size, const char *format, const struct tnt_tm *t,
 						format - mod_len);
 					continue;
 				}
-				width = (int)strtol(format - mod_len,
-						    (char **)NULL, 10);
+				/*
+				 ** We cannot cast returned value of strtol
+				 ** to int in place, as the returned value has
+				 ** long type: so, when width is more then
+				 ** INT_MAX but less then LONG_MAX,
+				 ** no errno will be set, we won't distinguish
+				 ** if overflow happens.
+				 */
+				errno = 0;
+				long tmp_width = strtol(format - mod_len,
+							(char **)NULL, 10);
+				width = (int)tmp_width;
+				if (tmp_width < INT_MIN || tmp_width > INT_MAX ||
+				    errno != 0 || width < 0 || width > 9)
+					width = 9;
 				/* fallthru */
 			case 'f': {
 				int nsec = t->tm_nsec;
@@ -300,7 +314,6 @@ _fmt(char *buf, ssize_t size, const char *format, const struct tnt_tm *t,
 						width = 9;
 					}
 				} else {
-					width = width >= 9 ? 9 : width;
 					nsec /= pow10[9 - width];
 				}
 				SNPRINT(total, snprintf, buf, size,
