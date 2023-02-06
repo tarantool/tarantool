@@ -58,20 +58,6 @@
 #include "sio.h"
 #include "tt_strerror.h"
 
-static void
-lbox_pushvclock(struct lua_State *L, const struct vclock *vclock)
-{
-	lua_createtable(L, 0, vclock_size(vclock));
-	struct vclock_iterator it;
-	vclock_iterator_init(&it, vclock);
-	vclock_foreach(&it, replica) {
-		lua_pushinteger(L, replica.id);
-		luaL_pushuint64(L, replica.lsn);
-		lua_settable(L, -3);
-	}
-	luaL_setmaphint(L, -1); /* compact flow */
-}
-
 static inline void
 lbox_push_replication_error_message(struct lua_State *L, struct error *e,
 				    int idx)
@@ -140,7 +126,7 @@ lbox_pushrelay(lua_State *L, struct relay *relay)
 		lua_pushstring(L, "follow");
 		lua_settable(L, -3);
 		lua_pushstring(L, "vclock");
-		lbox_pushvclock(L, relay_vclock(relay));
+		luaT_pushvclock(L, relay_vclock(relay));
 		lua_settable(L, -3);
 		lua_pushstring(L, "idle");
 		lua_pushnumber(L, ev_monotonic_now(loop()) -
@@ -356,7 +342,7 @@ lbox_info_server(struct lua_State *L)
 static int
 lbox_info_vclock(struct lua_State *L)
 {
-	lbox_pushvclock(L, box_vclock);
+	luaT_pushvclock(L, box_vclock);
 	return 1;
 }
 
@@ -451,7 +437,7 @@ lbox_info_gc_call(struct lua_State *L)
 	lua_newtable(L);
 
 	lua_pushstring(L, "vclock");
-	lbox_pushvclock(L, &gc.vclock);
+	luaT_pushvclock(L, &gc.vclock);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "signature");
@@ -475,7 +461,7 @@ lbox_info_gc_call(struct lua_State *L)
 		lua_createtable(L, 0, 2);
 
 		lua_pushstring(L, "vclock");
-		lbox_pushvclock(L, &checkpoint->vclock);
+		luaT_pushvclock(L, &checkpoint->vclock);
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "signature");
@@ -512,7 +498,7 @@ lbox_info_gc_call(struct lua_State *L)
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "vclock");
-		lbox_pushvclock(L, &consumer->vclock);
+		luaT_pushvclock(L, &consumer->vclock);
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "signature");
