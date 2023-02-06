@@ -738,7 +738,7 @@ Zone Europe/Moscow  2:30:17 -       LMT 1880
 end)
 
 test:test("Datetime string formatting", function(test)
-    test:plan(10)
+    test:plan(11)
     local t = date.new()
     test:is(t.epoch, 0, ('t.epoch == %d'):format(tonumber(t.epoch)))
     test:is(t.nsec, 0, ('t.nsec == %d'):format(t.nsec))
@@ -749,6 +749,7 @@ test:test("Datetime string formatting", function(test)
     test:is(t:format('%FT%T.%f%z'), '1970-01-01T00:00:00.000+0000', 'format #4')
     test:is(t:format('%FT%T.%4f%z'), '1970-01-01T00:00:00.0000+0000', 'format #5')
     test:is(t:format(), '1970-01-01T00:00:00Z', 'format #6')
+    test:is(t:format('%64424509441f'), '000000000', 'format #7')
     assert_raises(test, expected_str('datetime.strftime()', 1234),
                   function() t:format(1234) end)
 end)
