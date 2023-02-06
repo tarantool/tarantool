@@ -54,7 +54,7 @@ empty_uri_create(struct uri *uri)
 static void
 empty_uri_check(struct uri *uri, const char *msg)
 {
-	plan(11);
+	plan(12);
 	is(uri->scheme, NULL, "%s scheme", msg);
 	is(uri->login, NULL, "%s login", msg);
 	is(uri->password, NULL, "%s password", msg);
@@ -66,6 +66,7 @@ empty_uri_check(struct uri *uri, const char *msg)
 	is(uri->host_hint, 0, "%s hint", msg);
 	is(uri->param_count, 0, "%s param count", msg);
 	is(uri->params, NULL, "%s params", msg);
+	ok(uri_is_nil(uri), "%s is_nil()", msg);
 	check_plan();
 }
 
@@ -133,6 +134,53 @@ test_move_empty(void)
 	empty_uri_check(&dst, "dst");
 	uri_destroy(&src);
 	uri_destroy(&dst);
+	check_plan();
+	footer();
+}
+
+struct uri_equal_expected {
+	/** Source string for the first uri. */
+	const char *src_a;
+	/** Source string for the second uri. */
+	const char *src_b;
+	/** Expected comparison result. */
+	bool is_equal;
+};
+
+static void
+test_addr_is_equal(void)
+{
+	struct uri_equal_expected test_pairs[] = {
+		{NULL, NULL, true},
+		{"localhost", "localhost", true},
+		{"user@localhost", "localhost", true},
+		{"user:pass@localhost", "localhost", true},
+		{"user:pass@localhost", "user@localhost", true},
+		{"localhost:3301", "localhost:3302", false},
+		{"host_a", "host_b", false},
+		{"scheme://localhost", "localhost", true},
+		{"scheme1://host:port", "scheme2://host:port", true},
+		{"localhost/path/to/file", "localhost", false},
+		{"/path/to/file", "/path/to/file", true},
+		{"/path/to/file", "localhost/path/to/file", false},
+		{"unix/path/to/file", "/path/to/file", false},
+		{"unix/:/path/to/file", "/path/to/file", true},
+	};
+	header();
+	plan(3 * lengthof(test_pairs));
+	for (unsigned i = 0; i < lengthof(test_pairs); i++) {
+		struct uri uri_a, uri_b;
+		const char *src_a = test_pairs[i].src_a;
+		const char *src_b = test_pairs[i].src_b;
+		bool is_equal = test_pairs[i].is_equal;
+		ok(uri_create(&uri_a, src_a) == 0, "uri_create(%s)",
+		   src_a ? src_a : "NULL");
+		ok(uri_create(&uri_b, src_b) == 0, "uri_create(%s)",
+		   src_b ? src_b : "NULL");
+		is(uri_addr_is_equal(&uri_a, &uri_b), is_equal,
+		   "%s %s equal to %s", src_a ? src_a : "NULL",
+		   is_equal ? "is" : "isn't", src_b ? src_b : "NULL");
+	}
 	check_plan();
 	footer();
 }
@@ -780,11 +828,12 @@ test_unescape_special_cases(void)
 int
 main(void)
 {
-	plan(10);
+	plan(11);
 	test_copy_sample();
 	test_copy_empty();
 	test_move_sample();
 	test_move_empty();
+	test_addr_is_equal();
 	test_string_uri_with_query_params_parse();
 	test_string_uri_set_with_query_params_parse();
 	test_invalid_string_uri_set();
