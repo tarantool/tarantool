@@ -154,6 +154,14 @@ uri_escape(const char *src, size_t src_size, char *dst,
 size_t
 uri_unescape(const char *src, size_t src_size, char *dst, bool decode_plus);
 
+/** Determine if uris refer to the same host:service or unix socket path. */
+bool
+uri_addr_is_equal(const struct uri *a, const struct uri *b);
+
+/** Check if a uri is empty. */
+bool
+uri_is_nil(const struct uri *uri);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

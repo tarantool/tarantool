@@ -456,3 +456,37 @@ uri_unescape(const char *src, size_t src_size, char *dst, bool decode_plus)
 	}
 	return (size_t)(dst_buf - dst);
 }
+
+/* Compare two strings which might be NULL. */
+static bool
+fields_are_equal(const char *a, const char *b)
+{
+	if ((a == NULL) != (b == NULL))
+		return false;
+	if (a == NULL)
+		return true;
+	return strcmp(a, b) == 0;
+}
+
+bool
+uri_addr_is_equal(const struct uri *a, const struct uri *b)
+{
+	/*
+	 * Either service or path will be NULL depending on whether this is a
+	 * unix socket or not.
+	 */
+	return fields_are_equal(a->host, b->host) &&
+	       fields_are_equal(a->path, b->path) &&
+	       fields_are_equal(a->service, b->service);
+}
+
+bool
+uri_is_nil(const struct uri *uri)
+{
+	/*
+	 * Check only these 3 fields, because without them a uri doesn't make
+	 * sense. But technically this will give some false positives. For
+	 * example, for uris with non-empty fragment or query.
+	 */
+	return uri->host == NULL && uri->path == NULL && uri->service == NULL;
+}
