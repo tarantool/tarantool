@@ -29,18 +29,22 @@
  * SUCH DAMAGE.
  */
 #include "lua/utils.h"
-#include <lj_trace.h>
 
-#include <string.h>
 #include <assert.h>
 #include <errno.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
 
-#include <trivia/util.h>
-#include <diag.h>
-#include <fiber.h>
-#include "tt_uuid.h"
 #include "core/datetime.h"
+#include "core/diag.h"
+#include "core/fiber.h"
 #include "core/say.h"
+#include "core/tt_uuid.h"
+#include "lj_trace.h"
+#include "lua/serializer.h"
+#include "trivia/util.h"
+#include "vclock/vclock.h"
 
 int luaL_nil_ref = LUA_REFNIL;
 
@@ -105,6 +109,20 @@ luaL_pushcdata(struct lua_State *L, uint32_t ctypeid)
 
 	lj_gc_check(L);
 	return cdataptr(cd);
+}
+
+void
+luaT_pushvclock(struct lua_State *L, const struct vclock *vclock)
+{
+	lua_createtable(L, 0, vclock_size(vclock));
+	struct vclock_iterator it;
+	vclock_iterator_init(&it, vclock);
+	vclock_foreach(&it, replica) {
+		lua_pushinteger(L, replica.id);
+		luaL_pushuint64(L, replica.lsn);
+		lua_settable(L, -3);
+	}
+	luaL_setmaphint(L, -1); /* compact flow */
 }
 
 struct tt_uuid *

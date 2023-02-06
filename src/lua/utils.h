@@ -60,6 +60,7 @@ struct ibuf;
 typedef struct ibuf box_ibuf_t;
 struct tt_uuid;
 struct datetime;
+struct vclock;
 
 /**
  * Single global lua_State shared by core and modules.
@@ -75,6 +76,12 @@ extern uint32_t CTID_UUID;
 extern uint32_t CTID_DATETIME;
 /** Type ID of struct interval. */
 extern uint32_t CTID_INTERVAL;
+
+/**
+ * Push vclock to the Lua stack as a plain Lua table.
+ */
+void
+luaT_pushvclock(struct lua_State *L, const struct vclock *vclock);
 
 /**
  * Allocate a new uuid on the Lua stack and return a pointer to it.
