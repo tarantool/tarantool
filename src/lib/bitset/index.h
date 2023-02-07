@@ -294,7 +294,8 @@ tt_bitset_index_contains_value(struct tt_bitset_index *index, size_t value);
 inline size_t
 tt_bitset_index_size(const struct tt_bitset_index *index)
 {
-	return tt_bitset_cardinality(index->bitsets[0]);
+	return index->capacity == 0 ? 0 :
+	       tt_bitset_cardinality(index->bitsets[0]);
 }
 
 /**

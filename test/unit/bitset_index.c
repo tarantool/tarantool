@@ -45,6 +45,13 @@ void test_size_and_count(void)
 
 	struct tt_bitset_index index;
 	tt_bitset_index_create(&index, realloc);
+	/*
+	 * Checks size of empty, i.e., uninitialized bitset index works
+	 * correctly.
+	 */
+	fail_unless(tt_bitset_index_size(&index) == 0);
+	/* Checks bit number overflow works correctly. */
+	fail_unless(tt_bitset_index_count(&index, UINT64_MAX) == 0);
 
 	enum { P = 10, SIZE = (1 << P) + 1 };
 	for(size_t i = 0; i < SIZE; i++) {
