@@ -1,6 +1,5 @@
 build_module(module_api module_api.c)
 target_link_libraries(module_api msgpuck)
-build_module(libyield libyield.c)
 
 # gh-5313: verify that module.h actually conforms to the C99
 # standard.
