@@ -292,14 +292,61 @@ test_tuple_extract_key_raw_slowpath_nullable(void)
 	check_plan();
 }
 
+static void
+test_tuple_validate_key_parts_raw(void)
+{
+	plan(7);
+	header();
+
+	struct key_def *def = test_key_def_new(
+		"[{%s%u%s%s}{%s%u%s%s%s%b}]",
+		"field", 0, "type", "unsigned",
+		"field", 2, "type", "unsigned", "is_nullable", 1);
+	fail_if(def == NULL);
+	struct tuple *invalid_tuples[3] = {
+		test_tuple_new("[%s]", "abc"),
+		test_tuple_new("[%u%u%s]", 1, 20, "abc"),
+		test_tuple_new("[%s%u%u]", "abc", 5, 10),
+	};
+	struct tuple *valid_tuples[4] = {
+		test_tuple_new("[%u]", 10),
+		test_tuple_new("[%u%u]", 10, 20),
+		test_tuple_new("[%u%u%u]", 1, 5, 10),
+		test_tuple_new("[%u%s%u%u]", 1, "dce", 5, 10),
+	};
+	for (size_t i = 0; i < lengthof(invalid_tuples); ++i)
+		fail_if(invalid_tuples[i] == NULL);
+	for (size_t i = 0; i < lengthof(valid_tuples); ++i)
+		fail_if(valid_tuples[i] == NULL);
+
+	for (size_t i = 0; i < lengthof(invalid_tuples); ++i)
+		is(tuple_validate_key_parts_raw(def,
+						tuple_data(invalid_tuples[i])),
+		   -1, "tuple %zu must be invalid", i);
+	for (size_t i = 0; i < lengthof(valid_tuples); ++i)
+		is(tuple_validate_key_parts_raw(def,
+						tuple_data(valid_tuples[i])),
+		   0, "tuple %zu must be valid", i);
+
+	key_def_delete(def);
+	for (size_t i = 0; i < lengthof(invalid_tuples); ++i)
+		tuple_delete(invalid_tuples[i]);
+	for (size_t i = 0; i < lengthof(valid_tuples); ++i)
+		tuple_delete(valid_tuples[i]);
+
+	footer();
+	check_plan();
+}
+
 static int
 test_main(void)
 {
-	plan(2);
+	plan(3);
 	header();
 
 	test_func_compare_with_key();
 	test_tuple_extract_key_raw_slowpath_nullable();
+	test_tuple_validate_key_parts_raw();
 
 	footer();
 	return check_plan();
