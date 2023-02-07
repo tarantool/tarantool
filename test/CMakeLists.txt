@@ -39,6 +39,7 @@ set(UNIT_TEST_TARGETS "")
 
 add_subdirectory(app)
 add_subdirectory(app-tap)
+add_subdirectory(app-luatest/lib)
 add_subdirectory(box)
 add_subdirectory(box-tap)
 add_subdirectory(box-luatest)
