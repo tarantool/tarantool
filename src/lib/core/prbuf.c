@@ -73,7 +73,7 @@ static const size_t record_size_overhead = sizeof(struct prbuf_record);
 static uint32_t
 prbuf_record_alloc_size(size_t size)
 {
-	return size + offsetof(struct prbuf_record, data);
+	return size + record_size_overhead;
 }
 
 /** Returns pointer to the next byte after end of given buffer. */
@@ -138,10 +138,16 @@ prbuf_size(struct prbuf *buf)
 	return buf->header->size - sizeof(struct prbuf_header);
 }
 
+size_t
+prbuf_max_record_size(struct prbuf *buf)
+{
+	return prbuf_size(buf) - record_size_overhead;
+}
+
 void
 prbuf_create(struct prbuf *buf, void *mem, size_t size)
 {
-	assert(size > sizeof(struct prbuf_header));
+	assert(size > (sizeof(struct prbuf_header) + record_size_overhead));
 #ifndef NDEBUG
 	memset(mem, '#', size);
 #endif
