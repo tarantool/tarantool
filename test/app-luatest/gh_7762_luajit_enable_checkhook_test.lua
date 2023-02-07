@@ -2,6 +2,9 @@ local checktrace = require('jit.util').traceinfo
 local t = require('luatest')
 
 local g = t.group()
+g.before_each(function()
+    t.skip_if(jit.os == 'BSD', 'Disabled on *BSD due to #4819')
+end)
 
 -- Test payload to be recorded. It calculates the arithmetic sum
 -- of elements from 1 to the given n.
