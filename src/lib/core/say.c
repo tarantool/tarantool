@@ -1245,7 +1245,14 @@ log_vsay(struct log *log, int level, const char *filename, int line,
 	if (log->on_log != NULL) {
 		va_list ap_copy;
 		va_copy(ap_copy, ap);
-		log->on_log(level, filename, line, error, format, ap_copy);
+		/*
+		 * When a Lua table is logged into JSON log, `format' is set
+		 * to "json" by the say() function to indicate that message is
+		 * encoded in JSON. In such cases `ap' contains a single string.
+		 */
+		bool formatted = strncmp(format, "json", sizeof("json")) == 0;
+		log->on_log(level, filename, line, error,
+			    formatted ? "%s" : format, ap_copy);
 		va_end(ap_copy);
 	}
 	if (level > log->level) {
