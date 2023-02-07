@@ -217,11 +217,11 @@ box_index_tuple_position(uint32_t space_id, uint32_t index_id,
 			 "position by tuple");
 		return -1;
 	}
-	if (tuple_validate_raw(space->format, tuple) != 0) {
+	struct key_def *cmp_def = index->def->cmp_def;
+	if (tuple_validate_key_parts_raw(cmp_def, tuple) != 0) {
 		diag_set(ClientError, ER_ITERATOR_POSITION);
 		return -1;
 	}
-	struct key_def *cmp_def = index->def->cmp_def;
 	uint32_t key_size;
 	const char *key = tuple_extract_key_raw(tuple, tuple_end, cmp_def,
 						MULTIKEY_NONE, &key_size);
