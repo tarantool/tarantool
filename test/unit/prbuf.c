@@ -329,6 +329,59 @@ test_buffer_prepared_large(void)
 }
 
 /**
+ * Check:
+ * - we can alloc record of prbuf_max_record_size
+ * - we can't alloc larger buffer
+ * - record of max size is actually usable
+ */
+static void
+test_max_record_size(void)
+{
+	header();
+
+	struct prbuf buf;
+	char mem[73];
+	char payload[73];
+
+	prbuf_create(&buf, mem, sizeof(mem));
+	int max_size = prbuf_max_record_size(&buf);
+
+	int i;
+	for (i = 0; i < max_size; i++)
+		payload[i] = (char)i;
+
+	char *p = prbuf_prepare(&buf, max_size);
+	ok(p != NULL, "not NULL is expected");
+	memcpy(p, payload, max_size);
+	prbuf_commit(&buf);
+
+	struct prbuf rbuf;
+	struct prbuf_iterator iter;
+	struct prbuf_entry entry;
+
+	if (prbuf_open(&rbuf, mem) != 0)
+		fail("prbuf_open", "not 0");
+	prbuf_iterator_create(&rbuf, &iter);
+
+	int rc = prbuf_iterator_next(&iter, &entry);
+	ok(rc == 0, "rc is %d", rc);
+	ok(entry.size == (size_t)max_size,
+	   "expected %d got %zd", max_size, entry.size);
+	if (entry.size != (size_t)max_size)
+		fail("entry size", "incorrect");
+	ok(memcmp(entry.ptr, payload, max_size) == 0,
+	   "0 is expected");
+
+	rc = prbuf_iterator_next(&iter, &entry);
+	ok(rc == -1, "rc is %d", rc);
+
+	p = prbuf_prepare(&buf, max_size + 1);
+	ok(p == NULL, "NULL is expected");
+
+	footer();
+}
+
+/**
  * There are three possible configurations of test:
  * 1. The size of buffer;
  * 2. The size of payload;
@@ -337,7 +390,7 @@ test_buffer_prepared_large(void)
 int
 main(void)
 {
-	plan(39);
+	plan(45);
 	payload_large_init();
 	test_buffer_foreach_size();
 	test_buffer_bad_version();
@@ -347,5 +400,6 @@ main(void)
 	test_buffer_empty();
 	test_buffer_prepared();
 	test_buffer_prepared_large();
+	test_max_record_size();
 	return check_plan();
 }
