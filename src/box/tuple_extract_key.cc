@@ -507,6 +507,26 @@ tuple_key_is_excluded_slow(struct tuple *tuple, struct key_def *def,
 	return false;
 }
 
+/** Validate tuple field against key part. */
+static int
+tuple_validate_field(const char *field, struct key_part *part,
+		     uint32_t field_no)
+{
+	if (field == NULL) {
+		if (key_part_is_nullable(part))
+			return 0;
+		diag_set(ClientError, ER_FIELD_MISSING,
+			 tt_sprintf("[%d]%.*s",
+				    part->fieldno + TUPLE_INDEX_BASE,
+				    part->path_len, part->path));
+		return -1;
+	}
+	if (key_part_validate(part->type, field, field_no,
+			      key_part_is_nullable(part)) != 0)
+		return -1;
+	return 0;
+}
+
 int
 tuple_validate_key_parts(struct key_def *key_def, struct tuple *tuple)
 {
@@ -515,17 +535,33 @@ tuple_validate_key_parts(struct key_def *key_def, struct tuple *tuple)
 		struct key_part *part = &key_def->parts[idx];
 		const char *field = tuple_field_by_part(tuple, part,
 							MULTIKEY_NONE);
-		if (field == NULL) {
-			if (key_part_is_nullable(part))
-				continue;
-			diag_set(ClientError, ER_FIELD_MISSING,
-				 tt_sprintf("[%d]%.*s",
-					    part->fieldno + TUPLE_INDEX_BASE,
-					    part->path_len, part->path));
+		if (tuple_validate_field(field, part, idx) != 0)
 			return -1;
+	}
+	return 0;
+}
+
+int
+tuple_validate_key_parts_raw(struct key_def *key_def, const char *tuple)
+{
+	assert(!key_def->is_multikey);
+	struct key_part *part = NULL;
+	const char *field = NULL;
+	uint32_t field_count = mp_decode_array(&tuple);
+	for (uint32_t idx = 0; idx < key_def->part_count; idx++) {
+		part = &key_def->parts[idx];
+		field = NULL;
+		if (part->fieldno < field_count) {
+			field = tuple;
+			for (uint32_t k = 0; k < part->fieldno; k++)
+				mp_next(&field);
+			if (part->path != NULL &&
+			    tuple_go_to_path(&field, part->path,
+					     part->path_len, TUPLE_INDEX_BASE,
+					     MULTIKEY_NONE) != 0)
+				return -1;
 		}
-		if (key_part_validate(part->type, field, idx,
-				      key_part_is_nullable(part)) != 0)
+		if (tuple_validate_field(field, part, idx) != 0)
 			return -1;
 	}
 	return 0;

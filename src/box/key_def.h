@@ -917,6 +917,15 @@ int
 tuple_validate_key_parts(struct key_def *key_def, struct tuple *tuple);
 
 /**
+ * Check that raw tuple fields match with given key definition.
+ *
+ * @retval 0  The tuple is valid.
+ * @retval -1 The tuple is invalid.
+ */
+int
+tuple_validate_key_parts_raw(struct key_def *key_def, const char *tuple);
+
+/**
  * Same as tuple_extract_key but accept region to allocate result on.
  */
 static inline char *
