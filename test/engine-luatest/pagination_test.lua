@@ -350,8 +350,18 @@ tree_g.test_invalid_positions = function(cg)
         s:replace{1, 'Zero'}
 
         local tuples
+        -- Tuple is not suitable for format, but suitable for index parts.
+        -- This should be OK.
         local pos = {1, 2}
         local flag, err = pcall(function()
+            s:select(1, {limit=1, iterator='GE', after=pos})
+        end)
+        t.assert_equals(flag, true)
+        t.assert_equals(err, nil)
+
+        -- Now let's check tuple which is not compatible with index parts
+        pos = {'ABC', 2}
+        flag, err = pcall(function()
             s:select(1, {limit=1, iterator='GE', after=pos})
         end)
         t.assert_equals(flag, false)
