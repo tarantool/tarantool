@@ -4,7 +4,6 @@
  *
  * Copyright 2010-2022, Tarantool AUTHORS, please see AUTHORS file.
  */
-#include <stdbool.h>
 #include <stddef.h>
 
 /** Data entry of prbuf. Public analogue of struct prbuf_record. */
@@ -58,6 +57,12 @@ prbuf_create(struct prbuf *buf, void *mem, size_t size);
  */
 int
 prbuf_open(struct prbuf *buf, void *mem);
+
+/**
+ * Maximum record size we can store in the buffer.
+ */
+size_t
+prbuf_max_record_size(struct prbuf *buf);
 
 /**
  * Returns pointer to memory chunk sizeof @a size.
