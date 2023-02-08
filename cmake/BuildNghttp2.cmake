@@ -25,6 +25,7 @@ macro(nghttp2_build)
     list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_SHARED_LIB:BOOL=OFF")
     list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_STATIC_CRT:BOOL=OFF")
     list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_HTTP3:BOOL=OFF")
+    list(APPEND NGHTTP2_CMAKE_FLAGS "-DENABLE_DOC:BOOL=OFF")
 
     # Even though we set the external project's install dir
     # below, we still need to pass the corresponding install
