@@ -57,7 +57,7 @@ test:do_execsql_test(
     [[
         DROP TABLE t1;
         CREATE TABLE t1(a INT , b TEXT , c INT , d INT , e INT ,
-                        PRIMARY KEY(a), UNIQUE(b COLLATE "unicode_ci" DESC));
+                        PRIMARY KEY(a), UNIQUE(b COLLATE "unicode_ci"));
         CREATE INDEX t1c ON t1(c);
         CREATE INDEX t1d ON t1(d);
         WITH RECURSIVE c(x) AS (VALUES(1) UNION SELECT x+1 FROM c WHERE x<30)

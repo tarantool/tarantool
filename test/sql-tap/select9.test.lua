@@ -298,7 +298,7 @@ for _, indexes in ipairs({ [[
  -- CREATE INDEX i2 ON t2(d DESC, e COLLATE REVERSE ASC);
 --]],
     [[
-  CREATE INDEX i3 ON t1(a DESC);
+  CREATE INDEX i3 ON t1(a);
 ]] }) do
     test:do_execsql_test(
 "select9-2."..iOuterLoop..".1",

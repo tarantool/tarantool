@@ -95,7 +95,7 @@ test:do_test(
 test:do_test(
     "minmax2-1.5",
     function()
-        test:execsql "CREATE INDEX t1i1 ON t1(x DESC)"
+        test:execsql "CREATE INDEX t1i1 ON t1(x)"
         sql_search_count = box.stat.sql().sql_search_count
         return test:execsql "SELECT min(x) FROM t1"
     end, {
@@ -503,7 +503,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax2-10.3",
     [[
-        CREATE INDEX i6 ON t6(x DESC);
+        CREATE INDEX i6 ON t6(x);
         SELECT coalesce(min(x),-1) FROM t6;
     ]], {
         -- <minmax2-10.3>

@@ -2585,7 +2585,6 @@ sql_create_index(struct Parse *parse) {
 		struct Expr *expr = sql_expr_new(TK_ID, &prev_col);
 		col_list = sql_expr_list_append(NULL, expr);
 		assert(col_list->nExpr == 1);
-		sqlExprListSetSortOrder(col_list, create_idx_def->sort_order);
 	} else {
 		if (col_list->nExpr > SQL_MAX_COLUMN) {
 			diag_set(ClientError, ER_SQL_PARSER_LIMIT,

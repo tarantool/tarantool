@@ -257,7 +257,7 @@ if (1 > 0) then
             INSERT INTO t1(id,x) VALUES(1,3),(2,1),(3,5),
                                     (4,2),(5,6),(6,4),
                                     (7,5),(8,1),(9,3);
-            CREATE INDEX t1x ON t1(x DESC);
+            CREATE INDEX t1x ON t1(x);
             SELECT DISTINCT x FROM t1 ORDER BY x ASC;
         ]], {
             -- <5.1>
@@ -289,7 +289,7 @@ if (1 > 0) then
         5.4,
         [[
             DROP INDEX t1x ON t1;
-            CREATE INDEX t1x ON t1(x ASC);
+            CREATE INDEX t1x ON t1(x);
             SELECT DISTINCT x FROM t1 ORDER BY x ASC;
         ]], {
             -- <5.4>

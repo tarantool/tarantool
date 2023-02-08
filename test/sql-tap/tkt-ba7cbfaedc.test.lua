@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(19)
+test:plan(6)
 
 --!./tcltestrunner.lua
 -- 2014-10-11
@@ -28,39 +28,27 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES (4, 2, 'a');
         INSERT INTO t1 VALUES (5, 3, 'b');
         INSERT INTO t1 VALUES (6, 1, 'b');
-    ]])
-
-test:do_execsql_test(
-    1.1,
-    [[
         CREATE INDEX i1 ON t1(x, y);
     ]])
 
-local idxs = {
-    "CREATE INDEX i1 ON t1(x, y)",
-    "CREATE INDEX i1 ON t1(x DESC, y)",
-    "CREATE INDEX i1 ON t1(x, y DESC)",
-    "CREATE INDEX i1 ON t1(x DESC, y DESC)"
+local queries = {
+    {"GROUP BY x, y ORDER BY x, y",
+     {1, 'a', 1, "b", 2, "a", 2, "b", 3, "a", 3, "b"}},
+    {"GROUP BY x, y ORDER BY x DESC, y",
+     {3, "a", 3, "b", 2, "a", 2, "b", 1, "a", 1, "b"}},
+    {"GROUP BY x, y ORDER BY x, y DESC",
+     {1, "b", 1, "a", 2, "b", 2, "a", 3, "b", 3, "a"}},
+    {"GROUP BY x, y ORDER BY x DESC, y DESC",
+     {3, "b", 3, "a", 2, "b", 2, "a", 1, "b", 1, "a"}},
 }
-
-for n, idx in ipairs(idxs) do
-    test:catchsql " DROP INDEX i1 ON t1"
-    test:execsql(idx)
-    local queries = {
-        {"GROUP BY x, y ORDER BY x, y", {1, 'a', 1, "b", 2, "a", 2, "b", 3, "a", 3, "b"}},
-        {"GROUP BY x, y ORDER BY x DESC, y", {3, "a", 3, "b", 2, "a", 2, "b", 1, "a", 1, "b"}},
-        {"GROUP BY x, y ORDER BY x, y DESC", {1, "b", 1, "a", 2, "b", 2, "a", 3, "b", 3, "a"}},
-        {"GROUP BY x, y ORDER BY x DESC, y DESC", {3, "b", 3, "a", 2, "b", 2, "a", 1, "b", 1, "a"}},
-    }
-    for tn, val in ipairs(queries) do
-        local q = val[1]
-        local res = val[2]
-        test:do_execsql_test(
-            string.format("1.%s.%s", n, tn),
-            "SELECT x,y FROM t1 "..q.."", res)
-
-    end
+for tn, val in ipairs(queries) do
+    local q = val[1]
+    local res = val[2]
+    test:do_execsql_test(
+        string.format("1.1.%s", tn),
+        "SELECT x,y FROM t1 "..q.."", res)
 end
+
 test:do_test(
     2.0,
     function ()
@@ -68,7 +56,7 @@ test:do_test(
             drop table if exists t1;
             create table t1(id int primary key);
             insert into t1(id) values(1),(2),(3),(4),(5);
-            create index t1_idx_id on t1(id asc);
+            create index t1_idx_id on t1(id);
         ]])
         local res = {test:execsql("select * from t1 group by id order by id;")}
         table.insert(res, test:execsql("select * from t1 group by id order by id asc;"))

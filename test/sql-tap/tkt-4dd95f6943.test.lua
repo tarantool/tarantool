@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(319)
+test:plan(84)
 
 --!./tcltestrunner.lua
 -- 2013 March 13
@@ -24,39 +24,28 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES (1, 3), (2, 4), (3, 2), (4, 1), (5, 5), (6, 6);
     ]])
 
-local idxs = {
-    "CREATE INDEX i1 ON t1(x ASC)",
-    "CREATE INDEX i1 ON t1(x DESC)",
-}
+test:do_execsql_test(
+    "1.1.1",
+    [[
+        DROP INDEX IF EXISTS i1 ON t1;
+        CREATE INDEX i1 ON t1(x);
+    ]])
 
-for tn1, idx in ipairs(idxs) do
-    test:do_execsql_test(
-        "1."..tn1..".1",
-        [[
-            DROP INDEX IF EXISTS i1 ON t1;
-        ]])
+test:do_execsql_test(
+    "1.1.3",
+    [[
+        SELECT x FROM t1 WHERE x IN(2, 4, 5) ORDER BY x ASC;
+    ]], {
+        2, 4, 5
+    })
 
-    test:do_execsql_test(
-        "1."..tn1..".2",
-        idx)
-
-    test:do_execsql_test(
-        "1."..tn1..".3",
-        [[
-            SELECT x FROM t1 WHERE x IN(2, 4, 5) ORDER BY x ASC;
-        ]], {
-            2, 4, 5
-        })
-
-    test:do_execsql_test(
-        "1."..tn1..".4",
-        [[
-            SELECT x FROM t1 WHERE x IN(2, 4, 5) ORDER BY x DESC;
-        ]], {
-            5, 4, 2
-        })
-
-end
+test:do_execsql_test(
+    "1.1.4",
+    [[
+        SELECT x FROM t1 WHERE x IN(2, 4, 5) ORDER BY x DESC;
+    ]], {
+        5, 4, 2
+    })
 
 test:do_execsql_test(
     2.0,
@@ -71,19 +60,12 @@ test:do_execsql_test(
 
         CREATE TABLE t3(a INT primary key, b INT);
         INSERT INTO t3 VALUES (2, 2), (4, 4), (5, 5);
-        CREATE UNIQUE INDEX t3i1 ON t3(a ASC);
-        CREATE UNIQUE INDEX t3i2 ON t3(b DESC);
+        CREATE UNIQUE INDEX t3i1 ON t3(a);
     ]])
 
 local indexes = {
-    "CREATE INDEX i1 ON t2(x ASC,  y ASC)",
-    "CREATE INDEX i1 ON t2(x ASC,  y DESC)",
-    "CREATE INDEX i1 ON t2(x DESC, y ASC)",
-    "CREATE INDEX i1 ON t2(x DESC, y DESC)",
-    "CREATE INDEX i1 ON t2(y ASC,  x ASC)",
-    "CREATE INDEX i1 ON t2(y ASC,  x DESC)",
-    "CREATE INDEX i1 ON t2(y DESC, x ASC)",
-    "CREATE INDEX i1 ON t2(y DESC, x DESC)",
+    "CREATE INDEX i1 ON t2(x, y)",
+    "CREATE INDEX i1 ON t2(y, x)",
 }
 
 for tn1, idx in ipairs(indexes) do
@@ -222,23 +204,20 @@ test:do_execsql_test(
     ]])
 
 local data = {
-    {"ASC",  "ASC",  {1, 2, 3}},
-    {"ASC",  "DESC", {3, 2, 1}},
-    {"DESC", "ASC",  {1, 2, 3}},
-    {"ASC", "DESC",  {3, 2, 1}},
+    {"ASC",  {1, 2, 3}},
+    {"DESC", {3, 2, 1}},
 }
 
 for tn, val in ipairs(data) do
-    local idxdir = val[1]
-    local sortdir = val[2]
-    local sortdata = val[3]
+    local sortdir = val[1]
+    local sortdata = val[2]
     test:do_execsql_test(
         "3."..tn,
         string.format([[
             DROP INDEX IF EXISTS i8 ON t8;
-            CREATE UNIQUE INDEX i8 ON t8(y %s);
+            CREATE UNIQUE INDEX i8 ON t8(y);
             SELECT x FROM t7 WHERE x IN (SELECT y FROM t8) ORDER BY x %s;
-        ]], idxdir, sortdir),
+        ]], sortdir),
         sortdata)
 
 end

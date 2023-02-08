@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 local test = require("sqltester")
-test:plan(47)
+test:plan(43)
 
 --!./tcltestrunner.lua
 -- 2008 January 5
@@ -107,18 +107,6 @@ test:do_test(
     })
 
 test:do_test(
-    "minmax3-1.1.4",
-    function()
-        -- Index optimizes the WHERE x='2' constraint and the MAX(y).
-        test:execsql " DROP INDEX i2 ON t1; CREATE INDEX i2 ON t1(x, y DESC) "
-        return count(" SELECT max(y) FROM t1 WHERE x = '2'; ")
-    end, {
-        -- <minmax3-1.1.4>
-        "V", 1
-        -- </minmax3-1.1.4>
-    })
-
-test:do_test(
     "minmax3-1.1.5",
     function()
         return count(" SELECT max(y) FROM t1 WHERE x = '2' AND y != 'V'; ")
@@ -187,18 +175,6 @@ test:do_test(
     })
 
 test:do_test(
-    "minmax3-1.2.4",
-    function()
-        -- Index optimizes the WHERE x='2' constraint and the MAX(y).
-        test:execsql " DROP INDEX i2 ON t1; CREATE INDEX i2 ON t1(x, y DESC) "
-        return count(" SELECT min(y) FROM t1 WHERE x = '2'; ")
-    end, {
-        -- <minmax3-1.2.4>
-        "II", 1
-        -- </minmax3-1.2.4>
-    })
-
-test:do_test(
     "minmax3-1.3.1",
     function()
         -- Linear scan
@@ -223,18 +199,6 @@ test:do_test(
     })
 
 test:do_test(
-    "minmax3-1.3.3",
-    function()
-        -- Index i1 optimizes the min(y)
-        test:execsql " DROP INDEX i1 ON t1; CREATE INDEX i1 ON t1(y DESC) "
-        return count(" SELECT min(y) FROM t1; ")
-    end, {
-        -- <minmax3-1.3.3>
-        "I", 1
-        -- </minmax3-1.3.3>
-    })
-
-test:do_test(
     "minmax3-1.4.1",
     function()
         -- Linear scan
@@ -256,19 +220,6 @@ test:do_test(
         -- <minmax3-1.4.2>
         "VI", 0
         -- </minmax3-1.4.2>
-    })
-
-test:do_test(
-    "minmax3-1.4.3",
-    function()
-        -- Index i1 optimizes the max(y)
-        test:execsql " DROP INDEX i1 ON t1; CREATE INDEX i1 ON t1(y DESC) "
-        test:execsql " SELECT y from t1"
-        return count(" SELECT max(y) FROM t1; ")
-    end, {
-        -- <minmax3-1.4.3>
-        "VI", 0
-        -- </minmax3-1.4.3>
     })
 
 test:do_execsql_test(
@@ -378,7 +329,7 @@ test:do_execsql_test(
     [[
         DROP TABLE t2;
         CREATE TABLE t2(id  INT primary key, a INT , b INT );
-        CREATE INDEX i3 ON t2(a, b DESC);
+        CREATE INDEX i3 ON t2(a, b);
         INSERT INTO t2 VALUES(1, 1, NULL);
         INSERT INTO t2 VALUES(2, 1, 1);
         INSERT INTO t2 VALUES(3, 1, 2);

@@ -621,7 +621,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "colname-11.2",
     [[CREATE TABLE t1(a INT, b INT, c INT, d INT, e INT,
-      PRIMARY KEY(a), UNIQUE('b' COLLATE "unicode_ci" DESC));]],
+      PRIMARY KEY(a), UNIQUE('b' COLLATE "unicode_ci"));]],
     {1, "/Tarantool does not support functional indexes/"})
 
 test:execsql("create table table1(a  INT primary key, b INT, c INT)")

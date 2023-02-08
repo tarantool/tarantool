@@ -425,7 +425,7 @@ test:do_test(
               aid INTEGER NOT NULL REFERENCES album,
               tn INTEGER NOT NULL,
               name TEXT,
-              UNIQUE(aid ASC, tn DESC)
+              UNIQUE(aid, tn)
             );
             START TRANSACTION;
             INSERT INTO album VALUES(1, '1-one'), (2, '2-two'), (3, '3-three');
