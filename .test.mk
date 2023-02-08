@@ -164,31 +164,12 @@ test-osx-release: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
                                  -DTEST_BUILD=ON
 test-osx-release: prebuild-osx build run-luajit-test pretest-osx run-test
 
-# FIXME: Temporary target without tests. Use 'test-release-osx' target instead
-# when all M1 issues are resolved:
-#   LuaJIT tests - https://github.com/tarantool/tarantool/issues/4819
-#   Tarantool tests - https://github.com/tarantool/tarantool/issues/6068
-.PHONY: test-osx-release-arm64
-test-osx-release-arm64: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-                                       -DENABLE_WERROR=ON \
-                                       -DTEST_BUILD=ON
-test-osx-release-arm64: prebuild-osx build
-
 # Debug build
 
 .PHONY: test-osx-debug
 test-osx-debug: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=Debug \
                                -DTEST_BUILD=ON
 test-osx-debug: prebuild-osx build run-luajit-test pretest-osx run-test
-
-# FIXME: Temporary target without tests. Use 'test-debug-osx' target instead
-# when all M1 issues are resolved:
-#   LuaJIT tests - https://github.com/tarantool/tarantool/issues/4819
-#   Tarantool tests - https://github.com/tarantool/tarantool/issues/6068
-.PHONY: test-osx-debug-arm64
-test-osx-debug-arm64: CMAKE_PARAMS = -DCMAKE_BUILD_TYPE=Debug \
-                                     -DTEST_BUILD=ON
-test-osx-debug-arm64: prebuild-osx build
 
 # Static build
 
@@ -200,19 +181,6 @@ test-osx-static-cmake: CTEST = true
 test-osx-static-cmake: LUAJIT_TEST_BUILD_DIR = ${STATIC_BIN_DIR}
 test-osx-static-cmake: TEST_RUN_PARAMS = --builddir ${PWD}/${STATIC_BIN_DIR}
 test-osx-static-cmake: prebuild-osx build run-luajit-test pretest-osx run-test
-
-# FIXME: Temporary target without tests. Use 'test-osx-static-cmake' target instead
-# when all M1 issues are resolved:
-#   LuaJIT tests - https://github.com/tarantool/tarantool/issues/4819
-#   Tarantool tests - https://github.com/tarantool/tarantool/issues/6068
-.PHONY: test-osx-static-cmake-arm64
-test-osx-static-cmake-arm64: SRC_DIR = ${STATIC_DIR}
-test-osx-static-cmake-arm64: BUILD_DIR = ${STATIC_DIR}
-test-osx-static-cmake-arm64: CMAKE_PARAMS = -DCMAKE_TARANTOOL_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo;-DENABLE_WERROR=ON;-DTEST_BUILD=ON"
-test-osx-static-cmake-arm64: CTEST = true
-test-osx-static-cmake-arm64: LUAJIT_TEST_BUILD_DIR = ${STATIC_BIN_DIR}
-test-osx-static-cmake-arm64: TEST_RUN_PARAMS = --builddir ${PWD}/${STATIC_BIN_DIR}
-test-osx-static-cmake-arm64: prebuild-osx build
 
 ##############################
 # FreeBSD                    #
@@ -294,4 +262,4 @@ test-luajit-Linux-ARM64: build run-luajit-test run-test
 
 test-luajit-macOS-x86_64: prebuild-osx build run-luajit-test pretest-osx run-test
 
-test-luajit-macOS-ARM64: prebuild-osx build run-luajit-test
+test-luajit-macOS-ARM64: prebuild-osx build run-luajit-test pretest-osx run-test
