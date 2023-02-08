@@ -58,9 +58,7 @@ jobs:
       - name: Install deps
         uses: ./.github/actions/install-deps-osx
       - name: test
-        env:
-          SUFFIX: ${{ matrix.arch == 'aarch64' && '-arm64' || '' }}
-        run: make -f .test.mk test-osx-release${SUFFIX}
+        run: make -f .test.mk test-osx-release
       - name: Send VK Teams message on failure
         if: failure()
         uses: ./.github/actions/report-job-status
