@@ -1890,6 +1890,8 @@ fiber_init(int (*invoke)(fiber_func f, va_list ap))
 	fiber_invoke = invoke;
 	main_thread_id = pthread_self();
 	main_cord.loop = ev_default_loop(EVFLAG_AUTO | EVFLAG_ALLOCFD);
+	if (main_cord.loop == NULL)
+		panic("can't init event loop");
 	cord_create(&main_cord, "main");
 }
 

@@ -801,9 +801,6 @@ main(int argc, char **argv)
 		 */
 		atexit(tarantool_atexit);
 
-		if (!loop())
-			panic("%s", "can't init event loop");
-
 		int events = ev_activecnt(loop());
 		/*
 		 * Load user init script.  The script should have access
