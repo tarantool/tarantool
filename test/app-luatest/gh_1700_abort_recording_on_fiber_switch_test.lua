@@ -49,6 +49,7 @@ local env = {
 }
 
 g.before_all(function(g)
+    t.skip_if(not jit.status(), 'Test requires JIT enabled')
     t.skip_if(jit.os == 'BSD', 'Disabled on *BSD due to #4819')
 
     treegen.init(g)
