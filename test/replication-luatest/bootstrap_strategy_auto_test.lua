@@ -167,6 +167,7 @@ g.test_sync_waits_for_all_connected = function(cg)
         box.error.injection.set('ERRINJ_WAL_DELAY', true)
         box.cfg{
             replication_connect_timeout = 1000,
+            replication_sync_timeout = 0.01,
             replication = replication,
         }
         t.assert_equals(box.info.status, 'orphan', 'Replica is orphan until ' ..
