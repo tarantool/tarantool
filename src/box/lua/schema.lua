@@ -2488,18 +2488,22 @@ end
 
 box.internal.check_select_opts = check_select_opts -- for net.box
 
-local check_select_safety_rl = log.internal.ratelimit.new()
-local function check_select_safety(index, key_is_nil, itype, limit, offset,
+local function is_select_long(sid, key_is_nil, itype, limit, offset,
                                    fullscan)
-    local rl = check_select_safety_rl
-    local sid = index.space_id
     local point_iter = itype == box.index.EQ or itype == box.index.REQ
     local window = offset + limit
-    if sid >= 512 and (key_is_nil or not point_iter) and
-       (not fullscan and window > 1000) then
-        rl:log_crit("Potentially long select from space '%s' (%d)\n %s",
-                    box.space[sid].name, sid, debug.traceback())
-    end
+    return sid >= 512 and
+           (key_is_nil or not point_iter) and
+           (not fullscan and window > 1000)
+end
+
+box.internal.is_select_long = is_select_long -- for read views
+
+local log_long_select_rl = log.internal.ratelimit.new()
+local function log_long_select(space)
+    log_long_select_rl:log_crit(
+        "Potentially long select from space '%s' (%d)\n %s",
+        space.name, space.id, debug.traceback())
 end
 
 base_index_mt.select_ffi = function(index, key, opts)
@@ -2514,10 +2518,14 @@ base_index_mt.select_ffi = function(index, key, opts)
     local new_position = nil
     local iterator, offset, limit, fullscan, after, fetch_pos =
         check_select_opts(opts, key_is_nil)
-    check_select_safety(index, key_is_nil, iterator, limit, offset, fullscan)
+    local sid = index.space_id
+    if is_select_long(sid, key_is_nil, iterator, limit, offset,
+                      fullscan) then
+        log_long_select(box.space[sid])
+    end
     local region_svp = builtin.box_region_used()
     normalize_position(index, after, iterator_pos, iterator_pos_end)
-    nok = builtin.box_select_ffi(index.space_id, index.id, key, key_end,
+    nok = builtin.box_select_ffi(sid, index.id, key, key_end,
                                  iterator_pos, iterator_pos_end, fetch_pos,
                                  port, iterator, offset, limit) ~= 0
     if not nok and fetch_pos and iterator_pos[0] ~= nil then
@@ -2549,8 +2557,12 @@ base_index_mt.select_luac = function(index, key, opts)
     local key_is_nil = #key == 0
     local iterator, offset, limit, fullscan, after, fetch_pos =
         check_select_opts(opts, key_is_nil)
-    check_select_safety(index, key_is_nil, iterator, limit, offset, fullscan)
-    return internal.select(index.space_id, index.id, iterator,
+    local sid = index.space_id
+    if is_select_long(sid, key_is_nil, iterator, limit, offset,
+                      fullscan) then
+        log_long_select(box.space[sid])
+    end
+    return internal.select(sid, index.id, iterator,
         offset, limit, key, after, fetch_pos)
 end
 
