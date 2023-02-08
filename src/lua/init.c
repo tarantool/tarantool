@@ -843,6 +843,9 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 		panic("failed to initialize Lua");
 	}
 	luaL_openlibs(L);
+#ifndef LUAJIT_JIT_STATUS
+	(void)luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE | LUAJIT_MODE_OFF);
+#endif
 
 	/* Set _G.arg. */
 	lua_newtable(L);

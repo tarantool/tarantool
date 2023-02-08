@@ -3,6 +3,7 @@ local t = require('luatest')
 
 local g = t.group()
 g.before_each(function()
+    t.skip_if(not jit.status(), 'Test requires JIT enabled')
     t.skip_if(jit.os == 'BSD', 'Disabled on *BSD due to #4819')
 end)
 
