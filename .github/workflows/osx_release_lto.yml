@@ -60,8 +60,7 @@ jobs:
       - name: test
         env:
           CMAKE_EXTRA_PARAMS: -DENABLE_LTO=ON
-          SUFFIX: ${{ matrix.arch == 'aarch64' && '-arm64' || '' }}
-        run: make -f .test.mk test-osx-release${SUFFIX}
+        run: make -f .test.mk test-osx-release
       - name: Send VK Teams message on failure
         if: failure()
         uses: ./.github/actions/report-job-status
