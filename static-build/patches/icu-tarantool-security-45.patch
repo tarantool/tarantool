@@ -1,0 +1,13 @@
+diff --git a/source/i18n/reldtfmt.cpp b/source/i18n/reldtfmt.cpp
+index 5fdef1c..7f65fcd 100644
+--- a/source/i18n/reldtfmt.cpp
++++ b/source/i18n/reldtfmt.cpp
+@@ -495,7 +495,7 @@ struct RelDateFmtDataSink : public ResourceSink {
+ 
+         // Put in the proper spot, but don't override existing data.
+         n = offset + UDAT_DIRECTION_THIS; // Converts to index in UDAT_R
+-        if (n < fDatesLen && fDatesPtr[n].string == NULL) {
++        if (0 <= n && n < fDatesLen && fDatesPtr[n].string == NULL) {
+           // Not found and n is an empty slot.
+           fDatesPtr[n].offset = offset;
+           fDatesPtr[n].string = value.getString(len, errorCode);
