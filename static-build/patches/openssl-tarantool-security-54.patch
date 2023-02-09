@@ -1,0 +1,10 @@
+--- openssl.old/ssl/statem/extensions_clnt.c	2023-02-09 16:18:41.231053686 +0300
++++ openssl/ssl/statem/extensions_clnt.c	2023-02-09 17:33:09.257282077 +0300
+@@ -266,6 +266,7 @@
+         return EXT_RETURN_NOT_SENT;
+ 
+     if (!WPACKET_put_bytes_u16(pkt, TLSEXT_TYPE_session_ticket)
++            || !s->session 
+             || !WPACKET_sub_memcpy_u16(pkt, s->session->ext.tick, ticklen)) {
+         SSLfatal(s, SSL_AD_INTERNAL_ERROR,
+                  SSL_F_TLS_CONSTRUCT_CTOS_SESSION_TICKET, ERR_R_INTERNAL_ERROR);
