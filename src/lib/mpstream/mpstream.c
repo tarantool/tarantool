@@ -121,9 +121,9 @@ mpstream_encode_double(struct mpstream *stream, double num)
 {
 	assert(mp_sizeof_double(num) <= 9);
 	char *data = mpstream_reserve(stream, 9);
-	char *pos = mp_encode_double(data, num);
 	if (data == NULL)
 		return;
+	char *pos = mp_encode_double(data, num);
 	mpstream_advance(stream, pos - data);
 }
 
