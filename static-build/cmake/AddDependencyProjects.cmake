@@ -113,6 +113,9 @@ ExternalProject_Add(icu
         ${CMAKE_COMMAND} -E touch <BINARY_DIR>/uconfig.h &&
         cat <BINARY_DIR>/uconfig.h.prepend <INSTALL_DIR>/include/unicode/uconfig.h >> <BINARY_DIR>/uconfig.h &&
         ${CMAKE_COMMAND} -E copy_if_different <BINARY_DIR>/uconfig.h <INSTALL_DIR>/include/unicode/uconfig.h
+    PATCH_COMMAND cat
+        "${PATCHES_DIR}/icu-tarantool-security-45.patch" |
+        patch -d <SOURCE_DIR> -p1
 )
 set(TARANTOOL_DEPENDS icu ${TARANTOOL_DEPENDS})
 
