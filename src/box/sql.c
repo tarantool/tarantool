@@ -56,13 +56,14 @@
 #include "sql_stmt_cache.h"
 #include "box/tuple_constraint_def.h"
 #include "mp_util.h"
+#include "tweaks.h"
 
 static sql *db = NULL;
 
 static const char nil_key[] = { 0x90 }; /* Empty MsgPack array. */
 
-static const uint32_t default_sql_flags = SQL_EnableTrigger | SQL_AutoIndex |
-					  SQL_RecTriggers | SQL_SeqScan;
+static bool sql_seq_scan_default = true;
+TWEAK_BOOL(sql_seq_scan_default);
 
 static Expr *
 sql_expr_compile_cb(const char *expr, int expr_len)
@@ -76,15 +77,21 @@ sql_expr_delete_cb(struct Expr *expr)
 	sql_expr_delete(expr);
 }
 
+uint32_t
+sql_default_session_flags(void)
+{
+	if (sql_seq_scan_default)
+		return SQL_DEFAULT_FLAGS | SQL_SeqScan;
+	return SQL_DEFAULT_FLAGS & ~SQL_SeqScan;
+}
+
 void
 sql_init(void)
 {
 	tuple_format_expr_compile = sql_expr_compile_cb;
 	tuple_format_expr_delete = sql_expr_delete_cb;
 
-	default_flags |= default_sql_flags;
-
-	current_session()->sql_flags |= default_sql_flags;
+	current_session()->sql_flags = sql_default_session_flags();
 
 	if (sql_init_db(&db) != 0)
 		panic("failed to initialize SQL subsystem");

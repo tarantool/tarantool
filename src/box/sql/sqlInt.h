@@ -1014,6 +1014,8 @@ struct sql {
 					 */
 enum {
 	SQL_SeqScan = 0x00000008,
+	SQL_DEFAULT_FLAGS = SQL_EnableTrigger | SQL_AutoIndex |
+			    SQL_RecTriggers | SQL_SeqScan,
 };
 
 /* Bits of the sql.dbOptFlags field. */

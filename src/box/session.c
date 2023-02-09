@@ -41,6 +41,7 @@
 #include "sql_stmt_cache.h"
 #include "watcher.h"
 #include "on_shutdown.h"
+#include "sql.h"
 
 const char *session_type_strs[] = {
 	"background",
@@ -60,8 +61,6 @@ static const struct session_vtab generic_session_vtab = {
 struct session_vtab session_vtab_registry[session_type_MAX];
 
 static struct mh_i64ptr_t *session_registry;
-
-uint32_t default_flags = 0;
 
 struct mempool session_pool;
 
@@ -249,7 +248,7 @@ session_new(enum session_type type)
 	session->id = sid_max();
 	memset(&session->meta, 0, sizeof(session->meta));
 	session_set_type(session, type);
-	session->sql_flags = default_flags;
+	session->sql_flags = sql_default_session_flags();
 	session->sql_default_engine = SQL_STORAGE_ENGINE_MEMTX;
 	session->sql_stmts = NULL;
 	session->watchers = NULL;
