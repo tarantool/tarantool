@@ -413,6 +413,10 @@ vdbe_field_ref_create(struct vdbe_field_ref *ref, uint32_t capacity);
 bool
 func_sql_expr_has_single_arg(const struct func *base, const char *name);
 
+/** Returns the SQL flags used during session initialization. */
+uint32_t
+sql_default_session_flags(void);
+
 #if defined(__cplusplus)
 } /* extern "C" { */
 #endif

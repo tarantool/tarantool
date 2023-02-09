@@ -44,6 +44,13 @@ channel close.
 https://tarantool.io/compat/fiber_channel_close_mode
 ]]
 
+local SQL_SEQ_SCAN_DEFAULT_BRIEF = [[
+Whether seq_seq_scan session setting should be set to true or false during
+initialization or new session creation.
+
+https://tarantool.io/compat/sql_seq_scan_default
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -82,6 +89,12 @@ local options = {
         brief = FIBER_CHANNEL_GRACEFUL_CLOSE_BRIEF,
         action = tweak_action('fiber_channel_close_mode',
                               'forceful', 'graceful'),
+    },
+    sql_seq_scan_default = {
+        default = 'old',
+        obsolete = nil,
+        brief = SQL_SEQ_SCAN_DEFAULT_BRIEF,
+        action = tweak_action('sql_seq_scan_default', true, false),
     },
 }
 

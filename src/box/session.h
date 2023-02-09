@@ -70,13 +70,6 @@ enum output_format {
 extern const char *session_type_strs[];
 
 /**
- * default_flags accumulates flags value from SQL submodules.
- * It is assigned during sql_init(). Lately it is used in each session
- * initialization.
- */
-extern uint32_t default_flags;
-
-/**
  * Session meta is used in different ways by sessions of different
  * types, and allows to do not store attributes in struct session,
  * that are used only by a session of particular type.
