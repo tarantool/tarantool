@@ -63,3 +63,6 @@
 [submodule "third_party/tz"]
 	path = third_party/tz
 	url = https://github.com/tarantool/tz.git
+[submodule "third_party/checks"]
+	path = third_party/checks
+	url = https://github.com/tarantool/checks.git

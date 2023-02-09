@@ -126,7 +126,8 @@ extern char session_lua[],
 	net_box_lua[],
 	upgrade_lua[],
 	console_lua[],
-	merger_lua[];
+	merger_lua[],
+	checks_lua[];
 
 /**
  * List of box's built-in modules written using Lua.
@@ -184,6 +185,14 @@ static const char *lua_sources[] = {
 	"box/load_cfg", NULL, load_cfg_lua,
 	"box/key_def", "key_def", key_def_lua,
 	"box/merger", "merger", merger_lua,
+	/*
+	 * To support tarantool-only types with checks, the module
+	 * must be loaded after decimal and datetime lua modules
+	 * and after box.tuple and box.error box modules. (Beware
+	 * that it won't fail to load if modules not found since
+	 * checks supports pure luajit and older tarantool versions).
+	 */
+	"third_party/checks/checks", "checks", checks_lua,
 	NULL
 };
 
