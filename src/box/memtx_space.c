@@ -682,11 +682,12 @@ memtx_space_ephemeral_delete(struct space *space, const char *key)
 	struct tuple *old_tuple;
 	if (index_get(primary_index, key, part_count, &old_tuple) != 0)
 		return -1;
-	if (old_tuple != NULL &&
-	    memtx_space->replace(space, old_tuple, NULL,
-				 DUP_REPLACE, &old_tuple) != 0)
-		return -1;
-	tuple_unref(old_tuple);
+	if (old_tuple != NULL) {
+		if (memtx_space->replace(space, old_tuple, NULL,
+					 DUP_REPLACE, &old_tuple) != 0)
+			return -1;
+		tuple_unref(old_tuple);
+	}
 	return 0;
 }
 
