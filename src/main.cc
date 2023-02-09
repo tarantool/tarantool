@@ -501,7 +501,8 @@ load_cfg(void)
 	 * after (optional) daemonising to avoid confusing messages with
 	 * different pids
 	 */
-	say_info("%s %s", tarantool_package(), tarantool_version());
+	say_info("%s %s %s", tarantool_package(), tarantool_version(),
+		 BUILD_INFO);
 	say_info("log level %i", cfg_geti("log_level"));
 
 	if (pid_file_handle != NULL) {
