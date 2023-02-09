@@ -815,7 +815,7 @@ end
 
 local function rollback_module(module, oldcfg, keys, values)
     for key in pairs(keys) do
-        rawset(oldcfg, key, values[key])
+        oldcfg[key] = values[key]
     end
     if module.revert_cfg == nil then
         return
@@ -829,7 +829,7 @@ local function rollback_module(module, oldcfg, keys, values)
         end
 
         for key in pairs(module.options) do
-            rawset(oldcfg, key, module.revert_fallback[key])
+            oldcfg[key] = module.revert_fallback[key]
         end
         -- Setting to this special value should not fail
         assert(pcall(module.revert_cfg))
@@ -872,7 +872,7 @@ local function reconfig_modules(module_keys, oldcfg, newcfg, log_basecfg)
             oldvals = {}
             for key in pairs(keys) do
                 oldvals[key] = oldcfg[key]
-                rawset(oldcfg, key, newcfg[key])
+                oldcfg[key] = newcfg[key]
             end
         end
         local module = dynamic_cfg_modules[name]
@@ -1178,7 +1178,7 @@ end
 -- log.cfg of log module for example).
 local function update_cfg(option, value)
     if box_is_configured then
-        rawset(raw_cfg, option, value)
+        raw_cfg[option] = value
     else
         pre_load_cfg[option] = value
         pre_load_cfg_is_set[option] = true
