@@ -30,9 +30,13 @@
  */
 #include "engine.h"
 
-#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
 #include <string.h>
-#include <small/rlist.h>
+
+#include "errinj.h"
+#include "fiber.h"
+#include "small/rlist.h"
 
 RLIST_HEAD(engines);
 
@@ -224,6 +228,8 @@ fail:
 int
 engine_join(struct engine_join_ctx *ctx, struct xstream *stream)
 {
+	ERROR_INJECT_YIELD(ERRINJ_ENGINE_JOIN_DELAY);
+
 	int i = 0;
 	struct engine *engine;
 	engine_foreach(engine) {

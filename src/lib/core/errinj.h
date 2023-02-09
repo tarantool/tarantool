@@ -84,6 +84,7 @@ struct errinj {
 	_(ERRINJ_COIO_SENDFILE_CHUNK, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_COIO_WRITE_CHUNK, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_DYN_MODULE_COUNT, ERRINJ_INT, {.iparam = 0}) \
+	_(ERRINJ_ENGINE_JOIN_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_FIBER_MADVISE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_FIBER_MPROTECT, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_FLIGHTREC_RECREATE_RENAME, ERRINJ_BOOL, {.bparam = false}) \
@@ -101,6 +102,7 @@ struct errinj {
 	_(ERRINJ_IPROTO_TX_DELAY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_IPROTO_WRITE_ERROR_DELAY, ERRINJ_BOOL, {.bparam = false})\
 	_(ERRINJ_LOG_ROTATE, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_MAIN_MAKE_FILE_ON_RETURN, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_MEMTX_DELAY_GC, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_NETBOX_DISABLE_ID, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_NETBOX_FLIP_FEATURE, ERRINJ_INT, {.iparam = -1}) \
@@ -179,7 +181,6 @@ struct errinj {
 	_(ERRINJ_XLOG_META, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_XLOG_READ, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_XLOG_RENAME_DELAY, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_MAIN_MAKE_FILE_ON_RETURN, ERRINJ_BOOL, {.bparam = false}) \
 
 ENUM0(errinj_id, ERRINJ_LIST);
 extern struct errinj errinjs[];

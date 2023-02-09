@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include "small/rlist.h"
+#include "vclock/vclock.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -85,6 +86,19 @@ space_read_view_index(struct space_read_view *space_rv, uint32_t id)
 
 /** Read view of the entire database. */
 struct read_view {
+	/** Unique read view identifier. */
+	uint64_t id;
+	/** Read view name. Used for introspection. */
+	char *name;
+	/**
+	 * Set if this read view is needed for system purposes (for example, to
+	 * make a checkpoint). Initialized with read_view_opts::is_system.
+	 */
+	bool is_system;
+	/** Monotonic clock at the time when the read view was created. */
+	double timestamp;
+	/** Replicaset vclock at the time when the read view was created. */
+	struct vclock vclock;
 	/** List of engine read views, linked by engine_read_view::link. */
 	struct rlist engines;
 	/** List of space read views, linked by space_read_view::link. */
@@ -101,6 +115,13 @@ struct read_view {
 
 /** Read view creation options. */
 struct read_view_opts {
+	/** Read view name. Used for introspection. Must be set. */
+	const char *name;
+	/**
+	 * Set if this read view is needed for system purposes (for example, to
+	 * make a checkpoint). Default: false.
+	 */
+	bool is_system;
 	/**
 	 * Space filter: should return true if the space should be included
 	 * into the read view.
@@ -171,6 +192,27 @@ read_view_open(struct read_view *rv, const struct read_view_opts *opts);
  */
 void
 read_view_close(struct read_view *rv);
+
+/**
+ * Looks up an open read view by id.
+ *
+ * Returns NULL if not found.
+ */
+struct read_view *
+read_view_by_id(uint64_t id);
+
+typedef bool
+read_view_foreach_f(struct read_view *rv, void *arg);
+
+/**
+ * Invokes a callback for each open read view with no particular order.
+ *
+ * The callback is passed a read view object and the given argument.
+ * If it returns true, iteration continues. Otherwise, iteration breaks,
+ * and the function returns false.
+ */
+bool
+read_view_foreach(read_view_foreach_f cb, void *arg);
 
 #if defined(__cplusplus)
 } /* extern "C" */
