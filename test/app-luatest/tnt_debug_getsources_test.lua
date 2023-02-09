@@ -23,6 +23,7 @@ local files = {
     'box/net_box',
     'box/console',
     'box/merger',
+    'third_party/checks/checks',
 }
 
 -- calculate reporsitory root using directory of a current
@@ -43,6 +44,9 @@ g.test_tarantool_debug_getsources = function()
     local box_lua_dir = fio.pathjoin(git_root, '/src/box/lua')
     t.assert_is_not(box_lua_dir, nil)
     t.assert(fio.stat(box_lua_dir):is_dir())
+    local third_party_dir = fio.pathjoin(git_root, '/third_party')
+    t.assert_is_not(third_party_dir, nil)
+    t.assert(fio.stat(third_party_dir):is_dir())
 
     local tnt = require('tarantool')
     t.assert_is_not(tnt, nil)
@@ -51,10 +55,15 @@ g.test_tarantool_debug_getsources = function()
 
     for _, file in pairs(files) do
         local box_prefix = 'box/'
+        local third_party_prefix = 'third_party/'
         local path
         if file:match(box_prefix) ~= nil then
             path = ('%s/%s.lua'):format(box_lua_dir,
                                         file:sub(#box_prefix + 1, #file))
+        elseif file:match(third_party_prefix) ~= nil then
+            path = ('%s/%s.lua'):format(third_party_dir,
+                                        file:sub(#third_party_prefix + 1,
+                                                 #file))
         else
             path = ('%s/%s.lua'):format(lua_src_dir, file)
         end

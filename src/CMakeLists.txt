@@ -75,6 +75,7 @@ endif()
 # 3rd party lua sources
 lua_source(lua_sources ../third_party/luafun/fun.lua fun_lua)
 lua_source(lua_sources ../third_party/lua/luadebug.lua luadebug_lua)
+lua_source(lua_sources ../third_party/checks/checks.lua checks_lua)
 
 # LuaJIT jit.* library
 lua_source(lua_sources ${LUAJIT_SOURCE_ROOT}/src/jit/bc.lua jit_bc_lua)
