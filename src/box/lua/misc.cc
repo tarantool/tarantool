@@ -30,21 +30,30 @@
  */
 #include "box/lua/misc.h"
 
-#include "fiber.h" /* fiber->gc() */
-#include <small/region.h>
-#include "lua/utils.h"
-#include "lua/msgpack.h"
+#include <assert.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
 
 #include "box/authentication.h"
 #include "box/box.h"
+#include "box/errcode.h"
+#include "box/lua/tuple.h"
 #include "box/port.h"
+#include "box/read_view.h"
 #include "box/tuple.h"
 #include "box/tuple_format.h"
-#include "box/lua/tuple.h"
-#include "box/xrow.h"
 #include "box/txn.h"
+#include "box/xrow.h"
+#include "core/diag.h"
+#include "core/fiber.h"
+#include "core/tt_static.h"
+#include "lua/utils.h"
+#include "lua/msgpack.h"
 #include "mpstream/mpstream.h"
-#include "tt_static.h"
+#include "small/region.h"
+#include "small/rlist.h"
 
 static uint32_t CTID_STRUCT_TUPLE_FORMAT_PTR;
 
@@ -421,6 +430,68 @@ lbox_tuple_format_new(struct lua_State *L)
 
 /* }}} */
 
+/** {{{ Read view utils. **/
+
+void
+lbox_push_read_view(struct lua_State *L, const struct read_view *rv)
+{
+	lua_newtable(L);
+	luaL_pushuint64(L, rv->id);
+	lua_setfield(L, -2, "id");
+	lua_pushstring(L, rv->name);
+	lua_setfield(L, -2, "name");
+	lua_pushboolean(L, rv->is_system);
+	lua_setfield(L, -2, "is_system");
+	lua_pushnumber(L, rv->timestamp);
+	lua_setfield(L, -2, "timestamp");
+	luaT_pushvclock(L, &rv->vclock);
+	lua_setfield(L, -2, "vclock");
+	luaL_pushint64(L, vclock_sum(&rv->vclock));
+	lua_setfield(L, -2, "signature");
+}
+
+static bool
+lbox_read_view_list_cb(struct read_view *rv, void *arg)
+{
+	struct lua_State *L = (struct lua_State *)arg;
+	assert(lua_gettop(L) >= 1);
+	assert(lua_type(L, -1) == LUA_TTABLE);
+	lbox_push_read_view(L, rv);
+	lua_rawseti(L, -2, lua_objlen(L, -2) + 1);
+	return true;
+}
+
+/**
+ * Pushes an unsored array of all open read views to the Lua stack.
+ * Each read view is represented by a plain Lua table.
+ */
+static int
+lbox_read_view_list(struct lua_State *L)
+{
+	lua_newtable(L);
+	read_view_foreach(lbox_read_view_list_cb, L);
+	return 1;
+}
+
+/**
+ * Given a read view object (a table that has the 'id' field), pushes
+ * the read view status string ('open' or 'closed') to the Lua stack.
+ */
+static int
+lbox_read_view_status(struct lua_State *L)
+{
+	lua_getfield(L, 1, "id");
+	uint64_t id = luaL_checkuint64(L, -1);
+	struct read_view *rv = read_view_by_id(id);
+	if (rv == NULL)
+		lua_pushliteral(L, "closed");
+	else
+		lua_pushliteral(L, "open");
+	return 1;
+}
+
+/* }}} */
+
 void
 box_lua_misc_init(struct lua_State *L)
 {
@@ -429,6 +500,8 @@ box_lua_misc_init(struct lua_State *L)
 		{"select", lbox_select},
 		{"new_tuple_format", lbox_tuple_format_new},
 		{"txn_set_isolation", lbox_txn_set_isolation},
+		{"read_view_list", lbox_read_view_list},
+		{"read_view_status", lbox_read_view_status},
 		{NULL, NULL}
 	};
 

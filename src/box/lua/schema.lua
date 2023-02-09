@@ -3749,10 +3749,135 @@ end
 
 setmetatable(box.space, { __serialize = box_space_mt })
 
-box.read_view = setmetatable({}, {
-    __index = function()
-        box.error(box.error.UNSUPPORTED, "Community edition", "read view")
+local function check_read_view_arg(rv, method)
+    if type(rv) ~= 'table' then
+        local fmt = 'Use read_view:%s(...) instead of read_view.%s(...)'
+        error(string.format(fmt, method, method), 3)
     end
-})
+end
+
+local read_view_methods = {}
+
+--
+-- Returns a read view info table:
+--  - 'id' - unique read view identifier.
+--  - 'name' - read view name.
+--  - 'is_system' - true if the read view is used for system purposes.
+--  - 'timestamp' - fiber.clock() at the time of read view open.
+--  - 'vclock' - box.info.vclock at the time of read view open.
+--  - 'signature' - box.info.signature at the time of read view open.
+--  - 'status' - 'open' or 'closed'.
+--
+function read_view_methods:info()
+    check_read_view_arg(self, 'info')
+    return {
+        id = self.id,
+        name = self.name,
+        is_system = self.is_system,
+        timestamp = self.timestamp,
+        vclock = self.vclock,
+        signature = self.signature,
+        status = self.status,
+    }
+end
+
+--
+-- Function stub. Implemented in Tarantool EE.
+--
+function box.internal.read_view_close()
+    error('read view is busy', 3)
+end
+
+--
+-- Closes a read view.
+--
+function read_view_methods:close()
+    check_read_view_arg(self, 'close')
+    if self.status == 'closed' then
+        error('read view is closed', 2)
+    end
+    box.internal.read_view_close(self)
+end
+
+local read_view_properties = {
+    -- System read views are closed asynchronously so we have to query
+    -- the status.
+    status = box.internal.read_view_status,
+}
+
+local read_view_mt = {
+    __index = function(self, key)
+        if rawget(self, key) ~= nil then
+            return rawget(self, key)
+        elseif read_view_properties[key] ~= nil then
+            return read_view_properties[key](self)
+        elseif read_view_methods[key] ~= nil then
+            return read_view_methods[key]
+        end
+    end,
+    __autocomplete = function(self)
+        -- Make sure that everything that can be returned by __index is
+        -- auto-completed in console. Replace property callbacks with scalars
+        -- so that they are auto-completed as data members, not as methods.
+        return fun.tomap(fun.chain(fun.map(function(k) return k, true end,
+                                           fun.iter(read_view_properties)),
+                                   fun.iter(read_view_methods)))
+    end,
+    __serialize = read_view_methods.info,
+}
+
+box.read_view = {}
+
+--
+-- Function stub. Implemented in Tarantool EE.
+--
+function box.read_view.open()
+    box.error(box.error.UNSUPPORTED, "Community edition", "read view")
+end
+
+--
+-- Table of open read views: id -> read view object.
+--
+-- We use weak ref, because we don't want to pin a read view object after
+-- the user drops the last reference to it.
+--
+local read_view_registry = setmetatable({}, {__mode = 'v'})
+
+--
+-- Sets a metatable for a new read view object and adds it to the registry so
+-- that it can be returned by box.read_view_list().
+--
+-- Used in the Tarantool EE source code.
+--
+function box.internal.read_view_register(rv)
+    assert(rv.id ~= nil)
+    assert(read_view_registry[rv.id] == nil)
+    assert(getmetatable(rv) == nil)
+    setmetatable(rv, read_view_mt)
+    read_view_registry[rv.id] = rv
+    return rv
+end
+
+--
+-- Returns an array of all open read views sorted by id, ascending.
+--
+-- Since read view ids grow incrementally and never wrap around,
+-- the most recent read view will always be last.
+--
+function box.read_view.list()
+    local list = {}
+    for _, rv in ipairs(internal.read_view_list()) do
+        local registered_rv = read_view_registry[rv.id]
+        if registered_rv == nil then
+            -- This is a new read view object that hasn't been used from Lua
+            -- yet. Add it to the registry for the next listing to return the
+            -- same object.
+            registered_rv = box.internal.read_view_register(rv)
+        end
+        table.insert(list, registered_rv)
+    end
+    table.sort(list, function(rv1, rv2) return rv1.id < rv2.id end)
+    return list
+end
 
 box.NULL = msgpack.NULL

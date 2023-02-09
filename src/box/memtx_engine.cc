@@ -746,6 +746,8 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 	}
 	struct read_view_opts rv_opts;
 	read_view_opts_create(&rv_opts);
+	rv_opts.name = "checkpoint";
+	rv_opts.is_system = true;
 	rv_opts.filter_space = checkpoint_space_filter;
 	rv_opts.filter_index = primary_index_filter;
 	if (read_view_open(&ckpt->rv, &rv_opts) != 0) {
@@ -1044,6 +1046,8 @@ memtx_engine_prepare_join(struct engine *engine, void **arg)
 	}
 	struct read_view_opts rv_opts;
 	read_view_opts_create(&rv_opts);
+	rv_opts.name = "join";
+	rv_opts.is_system = true;
 	rv_opts.filter_space = memtx_join_space_filter;
 	rv_opts.filter_index = primary_index_filter;
 	if (read_view_open(&ctx->rv, &rv_opts) != 0) {

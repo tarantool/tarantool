@@ -11,6 +11,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "assoc.h"
+#include "box.h"
 #include "engine.h"
 #include "fiber.h"
 #include "field_def.h"
@@ -20,8 +22,23 @@
 #include "space.h"
 #include "space_cache.h"
 #include "space_upgrade.h"
+#include "tarantool_ev.h"
 #include "trivia/util.h"
 #include "tuple.h"
+#include "vclock/vclock.h"
+
+/**
+ * Map of all open read views: id -> struct read_view.
+ *
+ * Initialized on demand, when the first read view is opened.
+ * Destroyed when the last read view is closed.
+ */
+static struct mh_i64ptr_t *read_views;
+
+/**
+ * Monotonically growing counter used for assigning unique ids to read views.
+ */
+static uint64_t next_read_view_id = 1;
 
 static bool
 default_space_filter(struct space *space, void *arg)
@@ -43,6 +60,8 @@ default_index_filter(struct space *space, struct index *index, void *arg)
 void
 read_view_opts_create(struct read_view_opts *opts)
 {
+	opts->name = NULL;
+	opts->is_system = false;
 	opts->filter_space = default_space_filter;
 	opts->filter_index = default_index_filter;
 	opts->filter_arg = NULL;
@@ -149,12 +168,48 @@ read_view_add_space_cb(struct space *space, void *arg_raw)
 	return 0;
 }
 
+/** Helper function that adds a read view object to the read_views map. */
+static void
+read_view_register(struct read_view *rv)
+{
+	if (read_views == NULL)
+		read_views = mh_i64ptr_new();
+	struct mh_i64ptr_node_t node = { rv->id, rv };
+	struct mh_i64ptr_node_t old_node;
+	struct mh_i64ptr_node_t *old_node_ptr = &old_node;
+	mh_i64ptr_put(read_views, &node, &old_node_ptr, NULL);
+	assert(old_node_ptr == NULL);
+}
+
+/** Helper function that removes a read view object from the read_views map. */
+static void
+read_view_unregister(struct read_view *rv)
+{
+	assert(read_views != NULL);
+	struct mh_i64ptr_t *h = read_views;
+	mh_int_t i = mh_i64ptr_find(h, rv->id, NULL);
+	assert(i != mh_end(h));
+	assert(mh_i64ptr_node(h, i)->val == rv);
+	mh_i64ptr_del(h, i, NULL);
+	if (mh_size(h) == 0) {
+		mh_i64ptr_delete(h);
+		read_views = NULL;
+	}
+}
+
 int
 read_view_open(struct read_view *rv, const struct read_view_opts *opts)
 {
+	rv->id = next_read_view_id++;
+	assert(opts->name != NULL);
+	rv->name = xstrdup(opts->name);
+	rv->is_system = opts->is_system;
+	rv->timestamp = ev_monotonic_now(loop());
+	vclock_copy(&rv->vclock, box_vclock);
 	rv->owner = NULL;
 	rlist_create(&rv->engines);
 	rlist_create(&rv->spaces);
+	read_view_register(rv);
 	struct engine *engine;
 	engine_foreach(engine) {
 		if ((engine->flags & ENGINE_SUPPORTS_READ_VIEW) == 0)
@@ -181,6 +236,7 @@ void
 read_view_close(struct read_view *rv)
 {
 	assert(rv->owner == NULL);
+	read_view_unregister(rv);
 	struct space_read_view *space_rv, *next_space_rv;
 	rlist_foreach_entry_safe(space_rv, &rv->spaces, link,
 				 next_space_rv) {
@@ -192,5 +248,33 @@ read_view_close(struct read_view *rv)
 				 next_engine_rv) {
 		engine_read_view_delete(engine_rv);
 	}
+	free(rv->name);
 	TRASH(rv);
+}
+
+struct read_view *
+read_view_by_id(uint64_t id)
+{
+	struct mh_i64ptr_t *h = read_views;
+	if (h == NULL)
+		return NULL;
+	mh_int_t i = mh_i64ptr_find(h, id, NULL);
+	if (i == mh_end(h))
+		return NULL;
+	return mh_i64ptr_node(h, i)->val;
+}
+
+bool
+read_view_foreach(read_view_foreach_f cb, void *arg)
+{
+	struct mh_i64ptr_t *h = read_views;
+	if (h == NULL)
+		return true;
+	mh_int_t i;
+	mh_foreach(h, i) {
+		struct read_view *rv = mh_i64ptr_node(h, i)->val;
+		if (!cb(rv, arg))
+			return false;
+	}
+	return true;
 }
