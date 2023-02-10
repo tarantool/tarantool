@@ -1,4 +1,4 @@
-name: osx_11
+name: osx_release
 
 on:
   push:
@@ -32,14 +32,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  osx_11:
+  osx_release:
     # Run on push to the 'master' and release branches of tarantool/tarantool
     # or on pull request if the 'full-ci' label is set.
     if: github.repository == 'tarantool/tarantool' &&
         ( github.event_name != 'pull_request' ||
           contains(github.event.pull_request.labels.*.name, 'full-ci') )
 
-    runs-on: [ macos-11-self-hosted, x86_64 ]
+    runs-on: [ 'macos-${{ matrix.version }}-self-hosted', '${{ matrix.arch }}' ]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [ 12, 13 ]
+        arch: [ x86_64 ]
 
     steps:
       - name: Prepare checkout
@@ -52,7 +58,9 @@ jobs:
       - name: Install deps
         uses: ./.github/actions/install-deps-osx
       - name: test
-        run: make -f .test.mk test-osx-release
+        env:
+          SUFFIX: ${{ matrix.arch == 'aarch64' && '-arm64' || '' }}
+        run: make -f .test.mk test-osx-release${SUFFIX}
       - name: Send VK Teams message on failure
         if: failure()
         uses: ./.github/actions/report-job-status
@@ -62,6 +70,6 @@ jobs:
         uses: actions/upload-artifact@v3
         if: failure()
         with:
-          name: osx_11
+          name: osx-${{ matrix.version }}-release-${{ matrix.arch }}
           retention-days: 21
           path: ${{ env.VARDIR }}/artifacts
