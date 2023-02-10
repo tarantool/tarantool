@@ -6,7 +6,7 @@ _CPack_Packages
 *.gcno
 *.gcda
 *.gcov
-patches/
+/patches/
 .git-ignore/
 .pc/
 coverity/
