@@ -935,9 +935,9 @@ say_format_syslog(struct log *log, char *buf, int len, int level, const char *fi
 	int total = 0;
 
 	/* Format syslog header according to RFC */
-	int prio = level_to_syslog_priority(level);
-	SNPRINT(total, snprintf, buf, len, "<%d>",
-		LOG_MAKEPRI(8 * log->syslog_facility, prio));
+	int prio = (log->syslog_facility << 3) |
+		level_to_syslog_priority(level);
+	SNPRINT(total, snprintf, buf, len, "<%d>", prio);
 	SNPRINT(total, strftime, buf, len, "%h %e %T ", &tm);
 	SNPRINT(total, snprintf, buf, len, "%s[%d]:", log->syslog_ident, getpid());
 
