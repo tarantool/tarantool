@@ -230,12 +230,9 @@ luaL_newserializer(struct lua_State *L, const char *modname,
 	lua_setfield(L, -2, "map_mt");
 
 	if (modname != NULL) {
-		/* Register module */
-		lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-		lua_pushstring(L, modname); /* add alias */
-		lua_pushvalue(L, -3);
-		lua_settable(L, -3);
-		lua_pop(L, 1); /* _LOADED */
+		/* Register module. */
+		lua_pushvalue(L, -1);
+		luaT_setmodule(L, modname);
 	}
 
 	return serializer;
