@@ -970,12 +970,8 @@ format_syslog_header(char *buf, int len, int level,
 	int total = 0;
 
 	/* Format syslog header according to RFC */
-	int prio = level_to_syslog_priority(level);
-#if defined(__OpenBSD__)
-#define LOG_MAKEPRI(fac, pri)        (((fac) << 3) | (pri))
-#endif
-	SNPRINT(total, snprintf, buf, len, "<%d>",
-		LOG_MAKEPRI(8 * facility, prio));
+	int prio = (facility << 3) | level_to_syslog_priority(level);
+	SNPRINT(total, snprintf, buf, len, "<%d>", prio);
 	SNPRINT(total, strftime, buf, len, "%h %e %T ", &tm);
 	SNPRINT(total, snprintf, buf, len, "%s[%d]: ", ident,
 		getpid());
