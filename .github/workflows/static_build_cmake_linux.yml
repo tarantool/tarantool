@@ -34,10 +34,11 @@ concurrency:
 jobs:
   static_build_cmake_linux:
     # Run on push to the 'master' and release branches of tarantool/tarantool
-    # or on pull request if the 'full-ci' label is set.
+    # or on pull request if the 'full-ci' or 'static-build-ci' label is set.
     if: github.repository == 'tarantool/tarantool' &&
         ( github.event_name != 'pull_request' ||
-          contains(github.event.pull_request.labels.*.name, 'full-ci') )
+          contains(github.event.pull_request.labels.*.name, 'full-ci') ||
+          contains(github.event.pull_request.labels.*.name, 'static-build-ci') )
 
     runs-on: ubuntu-20.04-self-hosted
 
