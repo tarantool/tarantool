@@ -593,7 +593,8 @@ tmp = index1:delete({1})
 ...
 tmp = index2:delete({'weif'}) -- must fail
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Invalid key part count in an exact match in space "test", index "secondary"
+    (expected 2, got 1)
 ...
 tmp = index2:delete({'weif', 345})
 ---

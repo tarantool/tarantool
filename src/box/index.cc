@@ -142,13 +142,17 @@ key_validate(const struct index_def *index_def, enum iterator_type type,
 }
 
 int
-exact_key_validate(struct key_def *key_def, const char *key,
+exact_key_validate(struct index_def *index_def, const char *key,
 		   uint32_t part_count)
 {
 	assert(key != NULL || part_count == 0);
+	struct key_def *key_def = index_def->key_def;
 	if (key_def->part_count != part_count) {
-		diag_set(ClientError, ER_EXACT_MATCH, key_def->part_count,
-			 part_count);
+		struct space *space = space_by_id(index_def->space_id);
+		diag_set(ClientError, ER_EXACT_MATCH,
+			 tt_sprintf("in space \"%s\", index \"%s\" ",
+				    space_name(space), index_def->name),
+			 key_def->part_count, part_count);
 		return -1;
 	}
 	const char *key_end;
@@ -156,13 +160,17 @@ exact_key_validate(struct key_def *key_def, const char *key,
 }
 
 int
-exact_key_validate_nullable(struct key_def *key_def, const char *key,
+exact_key_validate_nullable(struct index_def *index_def, const char *key,
 			    uint32_t part_count)
 {
 	assert(key != NULL || part_count == 0);
+	struct key_def *key_def = index_def->cmp_def;
 	if (key_def->part_count != part_count) {
-		diag_set(ClientError, ER_EXACT_MATCH, key_def->part_count,
-			 part_count);
+		struct space *space = space_by_id(index_def->space_id);
+		diag_set(ClientError, ER_EXACT_MATCH,
+			 tt_sprintf("in space \"%s\", index \"%s\" ",
+				    space_name(space), index_def->name),
+			 key_def->part_count, part_count);
 		return -1;
 	}
 	const char *key_end;
@@ -298,7 +306,7 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 	}
 	const char *key_array = key;
 	uint32_t part_count = mp_decode_array(&key);
-	if (exact_key_validate(index->def->key_def, key, part_count))
+	if (exact_key_validate(index->def, key, part_count))
 		return -1;
 	box_run_on_select(space, index, ITER_EQ, key_array);
 	/* Start transaction in the engine. */
@@ -473,7 +481,7 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 					     &pos, &pos_end) != 0)
 			return NULL;
 		uint32_t pos_part_count = mp_decode_array(&pos);
-		if (exact_key_validate_nullable(index->def->cmp_def, pos,
+		if (exact_key_validate_nullable(index->def, pos,
 						pos_part_count) != 0)
 			return NULL;
 	} else {

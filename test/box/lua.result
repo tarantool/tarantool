@@ -42,7 +42,8 @@ space.index['minmax']:get{'new', 'world'}
 --  https://bugs.launchpad.net/tarantool/+bug/904208
 space.index['minmax']:get{'new', 'world', 'order'}
 ---
-- error: Invalid key part count in an exact match (expected 2, got 3)
+- error: Invalid key part count in an exact match in space "tweedledum", index "minmax"
+    (expected 2, got 3)
 ...
 space:delete{'brave'}
 ---
@@ -57,7 +58,8 @@ space:insert{'item 1', 'alabama', 'song'}
 ...
 space.index['minmax']:get{'alabama'}
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Invalid key part count in an exact match in space "tweedledum", index "minmax"
+    (expected 2, got 1)
 ...
 space:insert{'item 2', 'california', 'dreaming '}
 ---

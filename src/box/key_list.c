@@ -160,8 +160,8 @@ key_list_iterator_next(struct key_list_iterator *it, struct tuple **value)
 		 */
 		diag_set(ClientError, ER_FUNC_INDEX_FORMAT, it->index_def->name,
 			 space ? space_name(space) : "",
-			 tt_sprintf(tnt_errcode_desc(ER_EXACT_MATCH),
-				   key_def->part_count, part_count));
+			 tt_sprintf(tnt_errcode_desc(ER_EXACT_MATCH), "",
+				    key_def->part_count, part_count));
 		return -1;
 	}
 	if (key_validate_parts(key_def, rptr, part_count, true,

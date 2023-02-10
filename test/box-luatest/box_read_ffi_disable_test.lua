@@ -72,7 +72,8 @@ g.test_get = function(cg)
             "Use index:get(...) instead of index.get(...)",
             s.index.primary.get)
         t.assert_error_msg_content_equals(
-            "Invalid key part count in an exact match (expected 1, got 0)",
+            "Invalid key part count in an exact match in space \"test\"," ..
+            " index \"primary\" (expected 1, got 0)",
             s.index.primary.get, s.index.primary)
         t.assert_error_msg_content_equals(
             "Get() doesn't support partial keys and non-unique indexes",

@@ -100,12 +100,14 @@ hash.index['primary']:get{1, 'bar', 0}
 -- primary index select with missing part
 hash.index['primary']:get{1, 'foo'}
 ---
-- error: Invalid key part count in an exact match (expected 3, got 2)
+- error: Invalid key part count in an exact match in space "tweedledum", index "primary"
+    (expected 3, got 2)
 ...
 -- primary index select with extra part
 hash.index['primary']:get{1, 'foo', 0, 0}
 ---
-- error: Invalid key part count in an exact match (expected 3, got 4)
+- error: Invalid key part count in an exact match in space "tweedledum", index "primary"
+    (expected 3, got 4)
 ...
 -- primary index select with wrong type
 hash.index['primary']:get{1, 'foo', 'baz'}
@@ -124,7 +126,8 @@ hash.index['unique']:get{1, 5}
 -- secondary index select with missing part
 hash.index['unique']:get{1}
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Invalid key part count in an exact match in space "tweedledum", index "unique"
+    (expected 2, got 1)
 ...
 -- secondary index select with wrong type
 hash.index['unique']:select{1, 'baz'}

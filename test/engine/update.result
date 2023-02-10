@@ -570,7 +570,8 @@ space:insert({6, 'nrhjrt', -1231.234})
 ...
 index1:update({1}, {{'+', 3, 10}})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Invalid key part count in an exact match in space "test", index "primary"
+    (expected 2, got 1)
 ...
 index1:update({1, 'fwoen'}, {{'+', 3, 10}})
 ---

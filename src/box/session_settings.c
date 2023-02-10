@@ -343,7 +343,10 @@ session_settings_space_execute_update(struct space *space, struct txn *txn,
 	const char *new_key, *key = request->key;
 	uint32_t new_size, new_key_len, key_len = mp_decode_array(&key);
 	if (key_len == 0) {
-		diag_set(ClientError, ER_EXACT_MATCH, 1, 0);
+		diag_set(ClientError, ER_EXACT_MATCH,
+			 tt_sprintf("in space \"%s\", index \"%s\" ",
+				    space_name(space), pk_def->name),
+			 1, 0);
 		return -1;
 	}
 	if (key_len > 1 || mp_typeof(*key) != MP_STR) {

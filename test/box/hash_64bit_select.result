@@ -86,7 +86,8 @@ hash.index['primary']:get{'invalid key'}
  | ...
 hash.index['primary']:get{'00000001', '00000002'}
  | ---
- | - error: Invalid key part count in an exact match (expected 1, got 2)
+ | - error: Invalid key part count in an exact match in space "tweedledum", index "primary"
+ |     (expected 1, got 2)
  | ...
 
 hash:drop()

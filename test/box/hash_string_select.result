@@ -55,7 +55,8 @@ hash.index['primary']:get{'key 5'}
 -- select by invalid keys
 hash.index['primary']:get{'key 1', 'key 2'}
  | ---
- | - error: Invalid key part count in an exact match (expected 1, got 2)
+ | - error: Invalid key part count in an exact match in space "tweedledum", index "primary"
+ |     (expected 1, got 2)
  | ...
 
 hash:drop()

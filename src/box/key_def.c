@@ -665,7 +665,7 @@ box_key_def_validate_full_key(const box_key_def_t *key_def, const char *key,
 	const char *pos = key;
 	uint32_t part_count = mp_decode_array(&pos);
 	if (part_count != key_def->part_count) {
-		diag_set(ClientError, ER_EXACT_MATCH, key_def->part_count,
+		diag_set(ClientError, ER_EXACT_MATCH, "", key_def->part_count,
 			 part_count);
 		return -1;
 	}

@@ -97,11 +97,13 @@ space:replace{1}
 ...
 space:delete{1}
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Invalid key part count in an exact match in space "test", index "primary"
+    (expected 2, got 1)
 ...
 space:update(1, {{'=', 1, 101}})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Invalid key part count in an exact match in space "test", index "primary"
+    (expected 2, got 1)
 ...
 space:upsert({1}, {{'+', 1, 10}})
 ---
@@ -109,7 +111,8 @@ space:upsert({1}, {{'+', 1, 10}})
 ...
 space:get{1}
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Invalid key part count in an exact match in space "test", index "primary"
+    (expected 2, got 1)
 ...
 index:select({1}, {iterator = box.index.GT})
 ---

@@ -55,15 +55,18 @@ s.index[0].get == s.index[0].get_ffi or s.index[0].get == s.index[0].get_luac
 ...
 test.get(s.index[0])
 ---
-- error: Invalid key part count in an exact match (expected 1, got 0)
+- error: Invalid key part count in an exact match in space "select", index "primary"
+    (expected 1, got 0)
 ...
 test.get(s.index[0], {})
 ---
-- error: Invalid key part count in an exact match (expected 1, got 0)
+- error: Invalid key part count in an exact match in space "select", index "primary"
+    (expected 1, got 0)
 ...
 test.get(s.index[0], nil)
 ---
-- error: Invalid key part count in an exact match (expected 1, got 0)
+- error: Invalid key part count in an exact match in space "select", index "primary"
+    (expected 1, got 0)
 ...
 test.get(s.index[0], 1)
 ---
@@ -75,7 +78,8 @@ test.get(s.index[0], {1})
 ...
 test.get(s.index[0], {1, 2})
 ---
-- error: Invalid key part count in an exact match (expected 1, got 2)
+- error: Invalid key part count in an exact match in space "select", index "primary"
+    (expected 1, got 2)
 ...
 test.get(s.index[0], 0)
 ---
@@ -95,11 +99,13 @@ test.get(s.index[0], {"0"})
 ...
 test.get(s.index[1], 1)
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Invalid key part count in an exact match in space "select", index "second"
+    (expected 2, got 1)
 ...
 test.get(s.index[1], {1})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Invalid key part count in an exact match in space "select", index "second"
+    (expected 2, got 1)
 ...
 test.get(s.index[1], {1, 2})
 ---

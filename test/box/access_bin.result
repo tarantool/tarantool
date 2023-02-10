@@ -187,7 +187,8 @@ test:drop()
 --
 box.space._priv:get{1}
 ---
-- error: Invalid key part count in an exact match (expected 3, got 1)
+- error: Invalid key part count in an exact match in space "_priv", index "primary"
+    (expected 3, got 1)
 ...
 u = box.space._user:get{1}
 ---

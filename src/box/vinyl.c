@@ -1712,7 +1712,10 @@ vy_unique_key_validate(struct vy_lsm *lsm, const char *key,
 	 */
 	uint32_t original_part_count = lsm->key_def->part_count;
 	if (original_part_count != part_count) {
+		struct space *space = space_by_id(lsm->space_id);
 		diag_set(ClientError, ER_EXACT_MATCH,
+			 tt_sprintf("in space \"%s\", index \"%s\" ",
+				    space_name(space), lsm->base.def->name),
 			 original_part_count, part_count);
 		return -1;
 	}

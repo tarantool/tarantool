@@ -460,22 +460,27 @@ key_validate(const struct index_def *index_def, enum iterator_type type,
 
 /**
  * Check that the supplied key is valid for a search in a unique
- * index (i.e. the key must be fully specified).
+ * index, i.e. the key must be fully specified and correspond to
+ * index_def->key_def.
  * @retval 0  The key is valid.
  * @retval -1 The key is invalid.
  */
 int
-exact_key_validate(struct key_def *key_def, const char *key,
+exact_key_validate(struct index_def *index_def, const char *key,
 		   uint32_t part_count);
 
 /**
  * Check that the supplied key is valid for representing iterator
- * position (i.e. the key must be fully specified, but nulls are allowed).
+ * position, i.e. the key must be fully specified and correspond to
+ * index_def->cmp_def, where nulls are allowed.
+ * Note that since this function is designed to check a key for
+ * precise iterator position, it relies on index_def->cmp_def,
+ * in contrast to `key_validate` which relies on index_def->key_def.
  * @retval 0  The key is valid.
  * @retval -1 The key is invalid.
  */
 int
-exact_key_validate_nullable(struct key_def *key_def, const char *key,
+exact_key_validate_nullable(struct index_def *index_def, const char *key,
 			    uint32_t part_count);
 
 /**

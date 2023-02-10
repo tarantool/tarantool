@@ -71,7 +71,7 @@ struct errcode_record {
 	/* 16 */_(ER_TUPLE_FORMAT_LIMIT,	"Tuple format limit reached: %u") \
 	/* 17 */_(ER_DROP_PRIMARY_KEY,		"Can't drop primary key in space '%s' while secondary keys exist") \
 	/* 18 */_(ER_KEY_PART_TYPE,		"Supplied key type of part %u does not match index part type: expected %s") \
-	/* 19 */_(ER_EXACT_MATCH,		"Invalid key part count in an exact match (expected %u, got %u)") \
+	/* 19 */_(ER_EXACT_MATCH,		"Invalid key part count in an exact match %s(expected %u, got %u)") \
 	/* 20 */_(ER_INVALID_MSGPACK,		"Invalid MsgPack - %s") \
 	/* 21 */_(ER_PROC_RET,			"msgpack.encode: can not encode Lua type '%s'") \
 	/* 22 */_(ER_TUPLE_NOT_ARRAY,		"Tuple/Key must be MsgPack array") \

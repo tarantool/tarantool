@@ -304,12 +304,14 @@ space:delete{'Vincent', 'The Wolf!', 3}
 -- try to delete patrial defined key
 space:delete{'Vincent', 'The Wolf!'}
 ---
-- error: Invalid key part count in an exact match (expected 3, got 2)
+- error: Invalid key part count in an exact match in space "tweedledum", index "primary"
+    (expected 3, got 2)
 ...
 -- try to delete by invalid key
 space:delete{'The Wolf!', 'Vincent', 1, 'Come again?'}
 ---
-- error: Invalid key part count in an exact match (expected 3, got 4)
+- error: Invalid key part count in an exact match in space "tweedledum", index "primary"
+    (expected 3, got 4)
 ...
 --
 -- Update test
@@ -346,12 +348,14 @@ space:update({'Vincent', 'The Wolf!', 4}, {{'=', 4, '<ooops>'}})
 -- try to update patrial defined key
 space:update({'Vincent', 'The Wolf!'}, {{'=', 4, '<ooops>'}})
 ---
-- error: Invalid key part count in an exact match (expected 3, got 2)
+- error: Invalid key part count in an exact match in space "tweedledum", index "primary"
+    (expected 3, got 2)
 ...
 -- try to update by invalid key
 space:update({'The Wolf!', 'Vincent', 1, 'Come again?'}, {{'=', 4, '<ooops>'}})
 ---
-- error: Invalid key part count in an exact match (expected 3, got 4)
+- error: Invalid key part count in an exact match in space "tweedledum", index "primary"
+    (expected 3, got 4)
 ...
 space:len()
 ---

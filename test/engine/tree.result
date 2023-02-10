@@ -295,7 +295,8 @@ pk:select({10}, { iterator = 'GT' })
 ...
 pk:get({})
 ---
-- error: Invalid key part count in an exact match (expected 1, got 0)
+- error: Invalid key part count in an exact match in space "uint", index "primary"
+    (expected 1, got 0)
 ...
 pk:get({0})
 ---
@@ -309,7 +310,8 @@ pk:get({10})
 ...
 pk:get({10, 15})
 ---
-- error: Invalid key part count in an exact match (expected 1, got 2)
+- error: Invalid key part count in an exact match in space "uint", index "primary"
+    (expected 1, got 2)
 ...
 space:drop()
 ---
@@ -525,7 +527,8 @@ pk:select({10}, { iterator = 'GT' })
 ...
 pk:get({})
 ---
-- error: Invalid key part count in an exact match (expected 1, got 0)
+- error: Invalid key part count in an exact match in space "sparse_uint", index "primary"
+    (expected 1, got 0)
 ...
 pk:get({0})
 ---
@@ -539,7 +542,8 @@ pk:get({10})
 ...
 pk:get({10, 15})
 ---
-- error: Invalid key part count in an exact match (expected 1, got 2)
+- error: Invalid key part count in an exact match in space "sparse_uint", index "primary"
+    (expected 1, got 2)
 ...
 space:drop()
 ---
@@ -750,7 +754,8 @@ pk:select({'10'}, { iterator = 'GT' })
 ...
 pk:get({})
 ---
-- error: Invalid key part count in an exact match (expected 1, got 0)
+- error: Invalid key part count in an exact match in space "string", index "primary"
+    (expected 1, got 0)
 ...
 pk:get({'0'})
 ---
@@ -763,7 +768,8 @@ pk:get({'10'})
 ...
 pk:get({'10', '15'})
 ---
-- error: Invalid key part count in an exact match (expected 1, got 2)
+- error: Invalid key part count in an exact match in space "string", index "primary"
+    (expected 1, got 2)
 ...
 space:drop()
 ---
@@ -1077,11 +1083,13 @@ pk:select({10}, { iterator = 'GT' })
 ...
 pk:get({})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 0)
+- error: Invalid key part count in an exact match in space "uint_str", index "primary"
+    (expected 2, got 0)
 ...
 pk:get({'5'})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Invalid key part count in an exact match in space "uint_str", index "primary"
+    (expected 2, got 1)
 ...
 --
 -- two parts
@@ -1391,7 +1399,8 @@ pk:get({4, '03'})
 ...
 pk:get({4, '03', 100})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 3)
+- error: Invalid key part count in an exact match in space "uint_str", index "primary"
+    (expected 2, got 3)
 ...
 space:drop()
 ---
@@ -1705,19 +1714,23 @@ pk:select({'10'}, { iterator = 'GT' })
 ...
 pk:get({})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 0)
+- error: Invalid key part count in an exact match in space "str_uint", index "primary"
+    (expected 2, got 0)
 ...
 pk:get({'00'})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Invalid key part count in an exact match in space "str_uint", index "primary"
+    (expected 2, got 1)
 ...
 pk:get({'05'})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Invalid key part count in an exact match in space "str_uint", index "primary"
+    (expected 2, got 1)
 ...
 pk:get({'10'})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Invalid key part count in an exact match in space "str_uint", index "primary"
+    (expected 2, got 1)
 ...
 --
 -- two parts
@@ -2027,7 +2040,8 @@ pk:get({'04', 3})
 ...
 pk:get({'04', 3, 100})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 3)
+- error: Invalid key part count in an exact match in space "str_uint", index "primary"
+    (expected 2, got 3)
 ...
 space:drop()
 ---
@@ -2359,19 +2373,23 @@ pk:select({'10'}, { iterator = 'GT' })
 ...
 pk:get({})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 0)
+- error: Invalid key part count in an exact match in space "sparse_str_uint", index
+    "primary" (expected 2, got 0)
 ...
 pk:get({'00'})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Invalid key part count in an exact match in space "sparse_str_uint", index
+    "primary" (expected 2, got 1)
 ...
 pk:get({'05'})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Invalid key part count in an exact match in space "sparse_str_uint", index
+    "primary" (expected 2, got 1)
 ...
 pk:get({'10'})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 1)
+- error: Invalid key part count in an exact match in space "sparse_str_uint", index
+    "primary" (expected 2, got 1)
 ...
 --
 -- two parts
@@ -2688,7 +2706,8 @@ pk:get({'04', 3})
 ...
 pk:get({'04', 3, 100})
 ---
-- error: Invalid key part count in an exact match (expected 2, got 3)
+- error: Invalid key part count in an exact match in space "sparse_str_uint", index
+    "primary" (expected 2, got 3)
 ...
 space:drop()
 ---

@@ -3146,7 +3146,7 @@ box_select(uint32_t space_id, uint32_t index_id,
 					     &pos, &pos_end) != 0)
 			return -1;
 		uint32_t pos_part_count = mp_decode_array(&pos);
-		if (exact_key_validate_nullable(index->def->cmp_def, pos,
+		if (exact_key_validate_nullable(index->def, pos,
 						pos_part_count) != 0)
 			return -1;
 	} else {
