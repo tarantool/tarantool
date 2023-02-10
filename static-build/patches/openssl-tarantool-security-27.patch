@@ -1,0 +1,12 @@
+diff -ru a/ssl/statem/statem_clnt.c b/ssl/statem/statem_clnt.c
+--- a/ssl/statem/statem_clnt.c	2023-02-10 11:02:21.000000000 +0300
++++ b/ssl/statem/statem_clnt.c	2023-02-10 11:02:55.000000000 +0300
+@@ -1375,7 +1375,7 @@
+              * In TLSv1.3 it is valid for the server to select a different
+              * ciphersuite as long as the hash is the same.
+              */
+-            if (ssl_md(c->algorithm2)
++            if (s->session->cipher == NULL || ssl_md(c->algorithm2)
+                     != ssl_md(s->session->cipher->algorithm2)) {
+                 SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER,
+                          SSL_F_SET_CLIENT_CIPHERSUITE,
