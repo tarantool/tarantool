@@ -843,6 +843,13 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	}
 	luaL_openlibs(L);
 
+	/*
+	 * Create a table for storing loaded built-in modules.
+	 * Similar to _LOADED (package.loaded).
+	 */
+	lua_newtable(L);
+	lua_setfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_BUILTIN");
+
 	builtin_modcache_init();
 
 	/*

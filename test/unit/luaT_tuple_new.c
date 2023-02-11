@@ -14,6 +14,7 @@
 
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"             /* plan, header, footer, is, ok */
+#include "lua_test_utils.h"
 
 /*
  * This test checks all usage cases of luaT_tuple_new():
@@ -184,8 +185,7 @@ main()
 	memory_init();
 	fiber_init(fiber_c_invoke);
 
-	struct lua_State *L = luaL_newstate();
-	luaL_openlibs(L);
+	struct lua_State *L = luaT_newteststate();
 
 	box_init();
 	tarantool_lua_error_init(L);

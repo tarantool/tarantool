@@ -14,6 +14,34 @@ local ROCKS_LUA_TEMPLATES = {
     ROCKS_LUA_PATH .. '/?/init.lua',
 }
 
+-- Tarantool's builtin modules.
+--
+-- Similar to _LOADED (package.loaded).
+local builtin_modules = debug.getregistry()._TARANTOOL_BUILTIN
+
+-- Loader for built-in modules.
+local function builtin_loader(name)
+    -- A loader is more like a searching function rather than a
+    -- loading function (fun fact: package.loaders was renamed to
+    -- package.searchers in Lua 5.2).
+    --
+    -- A loader (a searcher) typically searches for a file and, if
+    -- the file is found, loads it and returns a function to
+    -- execute it. Typically just result of loadfile(file).
+    --
+    -- Our 'filesystem' is a table of modules, a 'file' is an
+    -- entry in the table. If a module is found, the loader
+    -- returns a function that 'executes' it. The function just
+    -- returns the module itself.
+    if builtin_modules[name] ~= nil then
+        return function(_name)
+            return builtin_modules[name]
+        end
+    end
+
+    return ("\n\tno field loaders.builtin['%s']"):format(name)
+end
+
 local package_searchroot
 
 local function searchroot()
@@ -147,6 +175,36 @@ local function search(name)
     return nil
 end
 
+-- Accept an array of loaders and return a loader, whose effect is
+-- equivalent to calling the loaders in a row.
+local function chain_loaders(subloaders)
+    return function(name)
+        -- Error accumulator.
+        local err = ''
+
+        for _, loader in ipairs(subloaders) do
+            local loaded = loader(name)
+            -- Whether the module found? Let's return it.
+            --
+            -- loaded is a function, which executes module's
+            -- initialization code.
+            if type(loaded) == 'function' then
+                return loaded
+            end
+            -- If the module is not found and the loader function
+            -- returns an error, add the error into the
+            -- accumulator.
+            if type(loaded) == 'string' then
+                err = err .. loaded
+            end
+            -- Ignore any other return value: require() does the
+            -- same.
+        end
+
+        return err
+    end
+end
+
 -- loader_preload 1
 table.insert(package.loaders, 2, gen_loader_func(search_lua, load_lua))
 table.insert(package.loaders, 3, gen_loader_func(search_lib, load_lib))
@@ -156,6 +214,17 @@ table.insert(package.loaders, 5, gen_loader_func(search_rocks_lib, load_lib))
 -- package.cpath  7
 -- croot          8
 
+-- Add a loader for searching a built-in module (compiled into
+-- tarantool's executable).
+--
+-- The loader is mixed into the first loader to don't change
+-- ordinals of the loaders 2-8. It is possible that someone
+-- has a logic based on those loader positions.
+package.loaders[1] = chain_loaders({
+    package.loaders[1],
+    builtin_loader,
+})
+
 rawset(package, "search", search)
 rawset(package, "searchroot", searchroot)
 rawset(package, "setsearchroot", setsearchroot)
@@ -163,4 +232,5 @@ rawset(package, "setsearchroot", setsearchroot)
 return {
     ROCKS_LIB_PATH = ROCKS_LIB_PATH,
     ROCKS_LUA_PATH = ROCKS_LUA_PATH,
+    builtin = builtin_modules,
 }
