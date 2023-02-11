@@ -15,6 +15,7 @@
 
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
+#include "lua_test_utils.h"
 
 static struct lua_State *L;
 
@@ -239,9 +240,30 @@ main(void)
 {
 	memory_init();
 	fiber_init(fiber_c_invoke);
-	L = luaL_newstate();
-	luaL_openlibs(L);
+
+	L = luaT_newteststate();
 	tarantool_lua_tweaks_init(L);
+
+	/*
+	 * luaT_newmodule() assumes that tarantool has a special
+	 * loader for built-in modules. That's true, when all the
+	 * initialization code is executed. However, in the unit
+	 * test we don't do that.
+	 *
+	 * In particular, tarantool_lua_init() function is not
+	 * called in a unit test.
+	 *
+	 * Assign the module into package.loaded directly instead.
+	 *
+	 *  | local mod = loaders.builtin['internal.tweaks']
+	 *  | package.loaded['internal.tweaks'] = mod
+	 */
+	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+	lua_getfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_BUILTIN");
+	lua_getfield(L, -1, "internal.tweaks");
+	lua_setfield(L, -3, "internal.tweaks");
+	lua_pop(L, 2);
+
 	tarantool_lua_error_init(L);
 	fail_unless(luaT_dostring(
 			L, "tweaks = require('internal.tweaks')") == 0);

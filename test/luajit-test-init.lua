@@ -1,9 +1,12 @@
 -- Disable strict for Tarantool.
 require("strict").off()
 
+local loaders = require('internal.loaders')
+
 -- XXX: lua-Harness test suite uses it's own tap.lua module
 -- that conflicts with the Tarantool's one.
 package.loaded.tap = nil
+loaders.builtin.tap = nil
 -- XXX: lua-Harness test suite checks that utf8 module presents
 -- only in Lua5.3 or moonjit.
 utf8 = nil
@@ -82,24 +85,20 @@ end
 --  | tostring(print)
 --  | Expected: 'function: builtin#29' (or similar).
 --  | In tarantool: 'function: 0x40e88018' (or similar).
-local print_M = package.loaded['internal.print']
-if print_M ~= nil then
-    rawset(_G, 'print', print_M.raw_print)
-    assert(print ~= nil)
-    assert(type(print) == 'function')
-end
+local print_M = require('internal.print')
+rawset(_G, 'print', print_M.raw_print)
+assert(print ~= nil)
+assert(type(print) == 'function')
 
 -- Tarantool has its own pairs() function.
 --
 -- There is a test (PUC-Rio-Lua-5.1-tests/db.lua) in LuaJIT regression suite,
 -- that become broken with patched version of pairs().
 -- Here we replace patched version by original one.
-local pairs_M = package.loaded['internal.pairs']
-if pairs_M ~= nil then
-    rawset(_G, 'pairs', pairs_M.builtin_pairs)
-    assert(pairs ~= nil)
-    assert(type(pairs) == 'function')
-end
+local pairs_M = require('internal.pairs')
+rawset(_G, 'pairs', pairs_M.builtin_pairs)
+assert(pairs ~= nil)
+assert(type(pairs) == 'function')
 
 -- This is workaround introduced for flaky macosx tests reported by
 -- https://github.com/tarantool/tarantool/issues/7058

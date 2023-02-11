@@ -332,8 +332,8 @@ luaT_newmodule(struct lua_State *L, const char *modname,
 	say_debug("%s(%s)", __func__, modname);
 	assert(modname != NULL && funcs != NULL);
 
-	/* Get package.loaded. */
-	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+	/* Get loaders.builtin. */
+	lua_getfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_BUILTIN");
 
 #ifndef NDEBUG
 	/* Verify that the module is not already registered. */
@@ -351,13 +351,13 @@ luaT_newmodule(struct lua_State *L, const char *modname,
 	/* Copy the module table. */
 	lua_pushvalue(L, -1);
 
-	/* package.loaded[modname] = <module table> */
+	/* loaders.builtin[modname] = <module table> */
 	lua_setfield(L, -3, modname);
 
-	/* Stack: package.loaded, module table. */
+	/* Stack: loaders.builtin, module table. */
 
 	/*
-	 * Drop package.loaded to leave the stack in its original
+	 * Drop loaders.builtin to leave the stack in its original
 	 * state.
 	 */
 	lua_remove(L, -2);
@@ -379,8 +379,8 @@ luaT_setmodule(struct lua_State *L, const char *modname)
 		return 0;
 	}
 
-	/* Get package.loaded[modname]. */
-	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
+	/* Get loaders.builtin[modname]. */
+	lua_getfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_BUILTIN");
 	lua_getfield(L, -1, modname);
 
 	/*
@@ -401,9 +401,9 @@ luaT_setmodule(struct lua_State *L, const char *modname)
 	assert(lua_isnil(L, -1));
 	lua_pop(L, 1);
 
-	/* Stack: module table, package.loaded. */
+	/* Stack: module table, loaders.builtin. */
 
-	/* package.loaded[modname] = <module table> */
+	/* loaders.builtin[modname] = <module table> */
 	lua_pushvalue(L, -2);
 	lua_setfield(L, -2, modname);
 

@@ -14,6 +14,7 @@
 
 #define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
+#include "lua_test_utils.h"
 
 static void
 mpstream_error_mock(void *ctx)
@@ -151,11 +152,11 @@ main(void)
 	plan(2);
 	header();
 
-	struct lua_State *L = luaL_newstate();
-	luaL_openlibs(L);
+	struct lua_State *L = luaT_newteststate();
 	tarantool_L = L;
 	memory_init();
 	fiber_init(fiber_c_invoke);
+
 	tarantool_lua_serializer_init(L);
 	luaopen_msgpack(L);
 	lua_pop(L, 1);

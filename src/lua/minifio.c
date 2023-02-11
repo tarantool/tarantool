@@ -53,6 +53,12 @@ tarantool_lua_minifio_init(struct lua_State *L)
 		{NULL, NULL}
 	};
 
+	/*
+	 * The loaders.builtin loader is not in effect yet.
+	 * Set the minifio module into package.loaded manually.
+	 */
+	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 	luaT_newmodule(L, "internal.minifio", minifio_methods);
-	lua_pop(L, 1);
+	lua_setfield(L, -2, "internal.minifio");
+	lua_pop(L, 1); /* _LOADED */
 }

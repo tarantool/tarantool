@@ -270,10 +270,10 @@ luaL_register_type(struct lua_State *L, const char *type_name,
  *
  *  | local function newmodule(modname, funcs)
  *  |     assert(modname ~= nil and funcs ~= nil)
- *  |     assert(package.loaded[modname] == nil)
+ *  |     assert(loaders.builtin[modname] == nil)
  *  |     local mod = {}
  *  |     setfuncs(mod, funcs)
- *  |     package.loaded[modname] = mod
+ *  |     loaders.builtin[modname] = mod
  *  |     return mod
  *  | end
  *
@@ -304,11 +304,11 @@ luaT_newmodule(struct lua_State *L, const char *modname,
  *  |     if mod == nil then
  *  |         return
  *  |     end
- *  |     if package.loaded[modname] == mod then
+ *  |     if loaders.builtin[modname] == mod then
  *  |         return
  *  |     end
- *  |     assert(package.loaded[modname] == nil)
- *  |     package.loaded[modname] = mod
+ *  |     assert(loaders.builtin[modname] == nil)
+ *  |     loaders.builtin[modname] = mod
  *  | end
  */
 int
