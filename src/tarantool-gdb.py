@@ -4,7 +4,10 @@ To use, just put 'source <path-to-this-file>' in gdb.
 """
 
 import gdb.printing
+import gdb.types
 import argparse
+import base64
+import logging
 import struct
 import itertools
 import re
@@ -15,6 +18,11 @@ slice = itertools.islice
 if sys.version_info[0] == 2:
     filter = itertools.ifilter
     zip = itertools.izip
+elif sys.version_info[0] == 3:
+    unicode = str
+
+logger = logging.getLogger('gdb.tarantool')
+logger.setLevel(logging.WARNING)
 
 def dump_type(type):
     return 'tag={} code={}'.format(type.tag, type.code)
@@ -47,12 +55,6 @@ def cast_ptr(dest_type, ptr, offset):
 
 def container_of(ptr, container_type, field):
     return cast_ptr(container_type, ptr, -(container_type[field].bitpos // 8)).dereference()
-
-def type_has_field(type, field_name):
-    for field in type.fields():
-        if field.name == field_name:
-            return True
-    return False
 
 INT32_MAX = 2**31 - 1
 INT32_MIN = -2**31
@@ -368,7 +370,7 @@ class MsgPack(object):
                 k -= 1
                 continue
             elif l > cls.MP_HINT:
-                k -= l;
+                k -= l
                 k -= 1
                 continue
             else:
@@ -390,18 +392,16 @@ class MsgPack(object):
         elif mp_type == cls.MP_INT:
             s += str(cls.decode_int(data))
 
-        elif mp_type == cls.MP_STR or mp_type == cls.MP_BIN:
-            len = cls.decode_strl(data) if mp_type == cls.MP_STR else cls.decode_binl(data)
-            if mp_type == cls.MP_BIN:
-                s += 'bin'
+        elif mp_type == cls.MP_STR:
+            len = cls.decode_strl(data)
             s += '"'
-            for i in range(0, len):
-                c = data.read_u8()
-                if c < 128 and cls.mp_char2escape[c] != 0:
-                    s += cls.mp_char2escape[c].string()
-                else:
-                    s += chr(c)
+            s += unicode(data.read(len), 'utf-8')
             s += '"'
+
+        elif mp_type == cls.MP_BIN:
+            len = cls.decode_binl(data)
+            s += '!!binary '
+            s += base64.b64encode(str(data.read(len)))
 
         elif mp_type == cls.MP_ARRAY:
             s += '['
@@ -456,9 +456,11 @@ class MsgPack(object):
     def __init__(self, val):
         self.val = val
 
-    def to_string(self, depth=-1, maxlen=-1):
-        s = self.to_string_data(InputStream(self.val), depth)
-        return s if maxlen < 0 else s[:maxlen]
+    def to_string(self, max_depth=None, max_len=None):
+        if max_depth is None:
+            max_depth = -1
+        s = self.to_string_data(InputStream(self.val), max_depth)
+        return s if max_len is None else s[:max_len]
 
     def __str__(self):
         return self.to_string()
@@ -1217,24 +1219,29 @@ if find_type('struct interval') is not None:
 class MsgPackPrint(gdb.Command):
     """
 Decode and print MsgPack referred by EXP in a human-readable form
-Usage: tt-mp EXP [DEPTH [MAXLENGTH]]
+Usage: tt-mp [OPTIONS]... EXP
+
+Options:
+  -max-depth NUMBER
+    Set maximum depth for nested arrays and maps.
+    When arrays or maps are nested beyond this depth then they
+    will be replaced with either [...] or {...}
+
+  -max-length NUMBER
+    Set limit on string chars to print.
     """
     def __init__(self):
         super(MsgPackPrint, self).__init__('tt-mp', gdb.COMMAND_DATA)
 
     def invoke(self, arg, from_tty):
-        argv = gdb.string_to_argv(arg)
-        argc = len(argv)
-        if argc < 1:
+        parser = argparse.ArgumentParser(add_help=False)
+        parser.add_argument('-max-depth', type=int)
+        parser.add_argument('-max-length', type=int)
+        args, exp_args = parser.parse_known_args(gdb.string_to_argv(arg))
+        if not exp_args:
             raise gdb.GdbError("MsgPack is missing")
-        mp = TtMsgPack(gdb.parse_and_eval(argv[0]))
-        if argc > 2:
-            s = mp.to_string(int(argv[1]), int(argv[2]))
-        elif argc > 1:
-            s = mp.to_string(int(argv[1]))
-        else:
-            s = mp.to_string()
-        gdb.write(s + '\n')
+        mp = TtMsgPack(gdb.parse_and_eval(' '.join(exp_args)))
+        gdb.write(mp.to_string(args.max_depth, args.max_length) + '\n')
 
 
 class JsonTokenPrinter:
@@ -1290,11 +1297,11 @@ class JsonTokenPrinter:
 pp.add_printer('JsonToken', '^json_token$', JsonTokenPrinter)
 
 
-class TuplePrinter:
+class TuplePrinter(object):
     """Print a tuple object."""
 
     tuple_type = gdb.lookup_type('struct tuple')
-    support_compact = type_has_field(tuple_type, 'data_offset_bsize_raw')
+    support_compact = gdb.types.has_field(tuple_type, 'data_offset_bsize_raw')
 
     tuple_formats_sym = gdb.lookup_global_symbol('tuple_formats')
     if not tuple_formats_sym:
@@ -1307,13 +1314,35 @@ class TuplePrinter:
     slot_extent_t = find_type('struct field_map_builder_slot_extent')
 
     # Printer configuration.
-    mp_depth = -1
-    mp_maxlen = -1
+    # Initialization of config with default values is deferred so it can be
+    # done in a single place to avoid duplication of default constants
+    __config = None
+
+    @classmethod
+    def reset_config(cls,
+                    mp_max_depth=None,
+                    mp_max_length=None):
+        cls.__config = dict(
+            mp_max_depth=mp_max_depth,
+            mp_max_length=mp_max_length,
+        )
+
+    def __new__(cls, val):
+        # Deferred initialization of config
+        if cls.__config is None:
+            cls.reset_config()
+        return super(TuplePrinter, cls).__new__(cls)
 
     def __init__(self, val):
         if not equal_types(val.type, self.tuple_type):
             raise gdb.GdbError("expression doesn't evaluate to tuple")
         self.val = val
+        # Pull configuration from class variables into the instance for
+        # convenience
+        config = self.__class__.__config
+        assert config is not None
+        self.mp_max_depth = config['mp_max_depth']
+        self.mp_max_length = config['mp_max_length']
 
     def is_compact(self): # tuple_is_compact
         return self.support_compact and self.val['data_offset_bsize_raw'] & 0x8000
@@ -1376,7 +1405,8 @@ class TuplePrinter:
         if self.support_compact:
             yield 'is_compact', self.is_compact()
         yield 'data_offset', self.data_offset()
-        yield 'data', TtMsgPack(self.data()).to_string(self.mp_depth, self.mp_maxlen)
+        mp = TtMsgPack(self.data())
+        yield 'data', mp.to_string(self.mp_max_depth, self.mp_max_length)
 
 pp.add_printer('Tuple', '^tuple$', TuplePrinter)
 
@@ -1384,36 +1414,35 @@ pp.add_printer('Tuple', '^tuple$', TuplePrinter)
 class TuplePrint(gdb.Command):
     """
 Decode and print tuple referred by EXP
-Usage: tt-tuple EXP [MSGPACK_DEPTH [MSGPACK_MAXLENGTH]]
+Usage: tt-tuple [OPTIONS]... EXP
+
+Options:
+  -mp-max-depth NUMBER
+    See '-max-depth' option of 'tt-mp' command
+
+  -mp-max-length NUMBER
+    See '-max-length' option of 'tt-mp' command
     """
+
     def __init__(self):
         super(TuplePrint, self).__init__('tt-tuple', gdb.COMMAND_DATA)
 
     def invoke(self, arg, from_tty):
-        argv = gdb.string_to_argv(arg)
-        argc = len(argv)
-        if argc < 1:
-            raise gdb.GdbError("tuple is missing")
+        parser = argparse.ArgumentParser(add_help=False)
+        parser.add_argument('-mp-max-depth', type=int)
+        parser.add_argument('-mp-max-length', type=int)
+        args, print_args = parser.parse_known_args(gdb.string_to_argv(arg))
 
-        val = gdb.parse_and_eval(argv[0])
-        if equal_types(val.type, TuplePrinter.tuple_type):
-            exp_modifier = ''
-        elif val.type.code == gdb.TYPE_CODE_PTR and equal_types(val.type.target(), TuplePrinter.tuple_type):
-            exp_modifier = '*'
-        else:
-            raise gdb.GdbError("'{}' doesn't refer to tuple".format(argv[0]))
-
+        TuplePrinter.reset_config(
+            mp_max_depth = args.mp_max_depth,
+            mp_max_length = args.mp_max_length,
+        )
         try:
-            if argc > 1:
-                TuplePrinter.mp_depth = int(argv[1])
-            if argc > 2:
-                TuplePrinter.mp_maxlen = int(argv[2])
-            gdb.execute('print {}{}'.format(exp_modifier, argv[0]), False)
-
+            gdb.execute('print {}'.format(' '.join(print_args)), from_tty)
+        except Exception as e:
+            raise e
         finally:
-            TuplePrinter.mp_depth = -1
-            TuplePrinter.mp_maxlen = -1
-
+            TuplePrinter.reset_config()
 
 MsgPackPrint()
 TuplePrint()
@@ -1476,8 +1505,8 @@ class TtListsLut(object):
         for sym, entry in rlist_syms:
             try:
                 ret[sym] = TtListEntryInfo(entry)
-            except Exception as exc:
-                gdb.write(str(exc) + '\n')
+            except Exception as e:
+                logger.debug(str(e))
         return ret
 
     def build_list_containers_map():
@@ -1579,8 +1608,8 @@ class TtListsLut(object):
             container_lists = ret.setdefault(container_type, {})
             try:
                 container_lists[container_field] = TtListEntryInfo(entry)
-            except Exception as exc:
-                gdb.write(str(exc) + '\n')
+            except Exception as e:
+                logger.debug(str(e))
         return ret
 
     list_variables_map = build_list_variables_map()
@@ -1595,7 +1624,7 @@ class TtListsLut(object):
     def lookup_list_entry_info(cls, item):
         # Ancient gdb versions don't have 'format_string' in gdb.Value
         if hasattr(item, 'format_string'):
-            address = item.format_string(address=False, symbols=True)
+            address = item.format_string(symbols=True)
         else:
             address = str(item)
 
@@ -1633,7 +1662,6 @@ class TtListsLut(object):
             item = item['prev']
             item_index += 1
         return None, item_index + 1
-
 
 class TtList(object):
     rlist_type = gdb.lookup_type('rlist')
