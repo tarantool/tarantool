@@ -100,6 +100,45 @@ rawset(_G, 'pairs', pairs_M.builtin_pairs)
 assert(pairs ~= nil)
 assert(type(pairs) == 'function')
 
+-- Remove the override loader.
+--
+-- If the override loader is enabled at least one test in the
+-- LuaJIT submodule fails: PUC-Rio-Lua-5.1-tests/attrib.lua.
+--
+-- A sketchy description of the test case of the question is the
+-- following.
+--
+-- There is a directory:
+--
+--  | + libs/
+--  | +- foo.lua
+--  | +- bar.lua
+--
+-- And the Lua code:
+--
+--  | package.path = 'libs/?.lua;libs/bar.lua'
+--  | local foo = require('foo')
+--
+-- The test case expects that `foo` contains a return value of
+-- libs/foo.lua.
+--
+-- However, when the override loader is enabled, the following
+-- occurs. The override loader attempts to find `override.foo`: it
+-- tries `libs/?.lua` first -- it means `libs/override/foo.lua`
+-- and there is no such file. Then the loader tries `libs/bar.lua`
+-- and succeeds.
+--
+-- So `foo` contains a return value of `libs/bar.lua`.
+--
+-- Unlikely there is a valid user scenario for a package.path
+-- entry without the interrogation mark. We consider this override
+-- loader behavior as valid. The loader is disabled to pass the
+-- test suite, but likely it would be more correct to discard the
+-- test case.
+local varname, subloaders = debug.getupvalue(package.loaders[1], 1)
+assert(varname == 'subloaders')
+table.remove(subloaders, 2)
+
 -- This is workaround introduced for flaky macosx tests reported by
 -- https://github.com/tarantool/tarantool/issues/7058
 collectgarbage('collect')

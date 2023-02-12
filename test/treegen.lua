@@ -31,6 +31,7 @@
 
 local fio = require('fio')
 local log = require('log')
+local fun = require('fun')
 
 local treegen = {}
 
@@ -45,17 +46,16 @@ end
 
 -- Generate a script that follows a template and write it at given
 -- script file path in given directory.
-local function write_script(g, dir, script)
+local function write_script(g, dir, script, replacements)
     local script_abspath = fio.pathjoin(dir, script)
     local flags = {'O_CREAT', 'O_WRONLY', 'O_TRUNC'}
     local mode = tonumber('644', 8)
     local fh = fio.open(script_abspath, flags, mode)
     local template = find_template(g, script)
+    local replacements = fun.chain({script = script}, replacements):tomap()
 
     log.info(('Writing a script: %s'):format(script_abspath))
-    fh:write(template:gsub('<(.-)>', {
-        script = script,
-    }))
+    fh:write(template:gsub('<(.-)>', replacements))
 
     fh:close()
 end
@@ -108,8 +108,11 @@ end
 --     + baz.lua
 --
 -- The return value is '/tmp/rfbWOJ' for this example.
-function treegen.prepare_directory(g, scripts)
+function treegen.prepare_directory(g, scripts, replacements)
+    local replacements = replacements or {}
+
     assert(type(scripts) == 'table')
+    assert(type(replacements) == 'table')
 
     local dir = fio.tempdir()
     table.insert(g.tempdirs, dir)
@@ -119,7 +122,7 @@ function treegen.prepare_directory(g, scripts)
         local scriptdir_abspath = fio.dirname(script_abspath)
         log.info(('Creating a directory: %s'):format(scriptdir_abspath))
         fio.mktree(scriptdir_abspath)
-        write_script(g, dir, script)
+        write_script(g, dir, script, replacements)
     end
 
     return dir

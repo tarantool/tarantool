@@ -175,6 +175,30 @@ local function search(name)
     return nil
 end
 
+-- Accept a loader and return a loader, which search by a prefixed
+-- module name.
+--
+-- The module receives the original (unprefixed) module name in
+-- the argument (three dots).
+local function prefix_loader(prefix, subloader)
+    return function(name)
+        local prefixed_name = prefix .. '.' .. name
+        -- On success the return value is a function, which
+        -- executes module's initialization code. require() calls
+        -- it with one argument: the module name (it can be
+        -- received in the module using three dots). Since
+        -- require() knows nothing about our prefixing it passes
+        -- the original name there.
+        --
+        -- It is expected behavior in our case. The prefixed
+        -- loaders are added to enable extra search paths: like
+        -- we would add more package.{path,cpath} entries. It
+        -- shouldn't change the string passed to the module's
+        -- initialization code.
+        return subloader(prefixed_name)
+    end
+end
+
 -- Accept an array of loaders and return a loader, whose effect is
 -- equivalent to calling the loaders in a row.
 local function chain_loaders(subloaders)
@@ -214,14 +238,26 @@ table.insert(package.loaders, 5, gen_loader_func(search_rocks_lib, load_lib))
 -- package.cpath  7
 -- croot          8
 
--- Add a loader for searching a built-in module (compiled into
--- tarantool's executable).
+-- Add two loaders:
 --
--- The loader is mixed into the first loader to don't change
--- ordinals of the loaders 2-8. It is possible that someone
+-- - Search for override.<module_name> module. It is necessary for
+--   overriding built-in modules.
+-- - Search for a built-in module (compiled into tarantool's
+--   executable).
+--
+-- Those two loaders are mixed into the first loader to don't
+-- change ordinals of the loaders 2-8. It is possible that someone
 -- has a logic based on those loader positions.
 package.loaders[1] = chain_loaders({
     package.loaders[1],
+    chain_loaders({
+        prefix_loader('override', package.loaders[2]),
+        prefix_loader('override', package.loaders[3]),
+        prefix_loader('override', package.loaders[4]),
+        prefix_loader('override', package.loaders[5]),
+        prefix_loader('override', package.loaders[6]),
+        prefix_loader('override', package.loaders[7]),
+    }),
     builtin_loader,
 })
 
