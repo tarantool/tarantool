@@ -136,11 +136,7 @@ struct key_def *
 key_def_dup(const struct key_def *src)
 {
 	size_t sz = key_def_copy_size(src);
-	struct key_def *res = malloc(sz);
-	if (res == NULL) {
-		diag_set(OutOfMemory, sz, "malloc", "res");
-		return NULL;
-	}
+	struct key_def *res = xmalloc(sz);
 	key_def_copy_impl(res, src, sz);
 	return res;
 }
