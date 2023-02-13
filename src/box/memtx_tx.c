@@ -804,9 +804,9 @@ static inline void
 memtx_tx_ref_to_primary(struct memtx_story *story)
 {
 	assert(story != NULL);
-	assert(story->tuple_is_retained);
 	tuple_ref(story->tuple);
-	memtx_tx_story_untrack_retained_tuple(story);
+	if (story->tuple_is_retained)
+		memtx_tx_story_untrack_retained_tuple(story);
 }
 
 /**
@@ -824,10 +824,18 @@ memtx_tx_unref_from_primary(struct memtx_story *story)
 
 /**
  * Create a new story and link it with the @a tuple.
+ * There are two known scenarios of using this function:
+ * * The story is created for a clean tuple that is in space (and thus in
+ *   space indexes) now. Such a story is a top of degenerate chains that
+ *   consist of this story only.
+ * * The story is created for a new tuple that is to be inserted into space.
+ *   Such a story will become the top of chains, and a special function
+ *   memtx_tx_story_link_top must be called for that.
+ * In any case this story is expected to be a top of chains, so we set
+ * in_index members in story links to appropriate values.
  */
 static struct memtx_story *
-memtx_tx_story_new(struct space *space, struct tuple *tuple,
-		   bool tuple_is_referenced_to_pk)
+memtx_tx_story_new(struct space *space, struct tuple *tuple)
 {
 	txm.must_do_gc_steps += TX_MANAGER_GC_STEPS_SIZE;
 	assert(!tuple->is_dirty);
@@ -849,8 +857,6 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple,
 	struct memtx_tx_stats *stats = &txm.story_stats[story->status];
 	memtx_tx_stats_collect(stats, pool->objsize);
 	story->tuple_is_retained = false;
-	if (!tuple_is_referenced_to_pk)
-		memtx_tx_story_track_retained_tuple(story);
 	story->index_count = index_count;
 	story->add_stmt = NULL;
 	story->add_psn = 0;
@@ -1042,72 +1048,85 @@ memtx_tx_story_unlink(struct memtx_story *story,
 }
 
 /**
- * Link a @a story with @a old_story in @a index (in both directions),
- * where old_story was at the top of chain. This is a light version of
- * function, intended for the case when the appropriate index IS ALREADY
- * changed, and now stores story->tuple.
- * In addition to linking in list, this function also rebinds gap records
- * to the new top - story - in history chain.
- * @a old_story is allowed to be NULL.
- */
-static void
-memtx_tx_story_link_top_light(struct memtx_story *new_top,
-			      struct memtx_story *old_top,
-			      uint32_t idx)
-{
-	memtx_tx_story_link(new_top, old_top, idx);
-
-	if (old_top == NULL)
-		return;
-
-	/* Rebind gap records to the top of the list */
-	struct memtx_story_link *new_link = &new_top->link[idx];
-	struct memtx_story_link *old_link = &old_top->link[idx];
-	rlist_splice(&new_link->nearby_gaps, &old_link->nearby_gaps);
-}
-
-/**
- * Link a @a new_top with @a old_top in @a index (in both directions),
- * where old_top was at the top of chain (that means that index itself
- * stores a pointer to old_top->tuple).
- * In addition to linking in list, this function also rebinds gap records
- * to the new top - story - in history chain.
- * This function makes also changes in the index, replacing old_top->tuple
- * with new_top->tuple.
+ * Link a @a new_top with @a old_top in @a idx (in both directions), where
+ * @a old_top was at the top of chain.
+ * There are two different but close in implementation scenarios in which
+ * this function should be used:
+ * * @a is_new_tuple is true:
+ *   @a new_top is a newly created story of a new tuple, that (by design) was
+ *   just inserted into indexes. @a old_top is the story that was previously
+ *   in the top of chain or NULL if the chain was empty.
+ * * @a is_new_tuple is false:
+ *   @a old_top was in the top of chain while @a new_top was a story next to it,
+ *   and the chain must be reordered and @a new_top must become at the top of
+ *   chain and @a old_top must be linked after it. This case also requires
+ *   physical replacement in index - it will point to new_top->tuple.
  */
 static void
 memtx_tx_story_link_top(struct memtx_story *new_top,
 			struct memtx_story *old_top,
-			uint32_t idx)
+			uint32_t idx, bool is_new_tuple)
 {
-	assert(old_top != NULL);
-	memtx_tx_story_link_top_light(new_top, old_top, idx);
-
-	/* Make the change in index. */
-	struct index *index = old_top->link[idx].in_index;
-	assert(index != NULL);
-	assert(new_top->link[idx].in_index == NULL);
-	struct tuple *removed, *unused;
-	if (index_replace(index, old_top->tuple, new_top->tuple,
-			  DUP_REPLACE, &removed, &unused) != 0) {
-		diag_log();
-		unreachable();
-		panic("failed to rebind story in index");
+	assert(old_top != NULL || is_new_tuple);
+	if (is_new_tuple && old_top == NULL) {
+		if (idx == 0)
+			memtx_tx_ref_to_primary(new_top);
+		return;
 	}
-	assert(old_top->tuple == removed);
-	old_top->link[idx].in_index = NULL;
-	new_top->link[idx].in_index = index;
+	struct memtx_story_link *new_link = &new_top->link[idx];
+	struct memtx_story_link *old_link = &old_top->link[idx];
+	assert(old_link->in_index != NULL);
+	assert(old_link->newer_story == NULL);
+	if (is_new_tuple) {
+		assert(new_link->newer_story == NULL);
+		assert(new_link->older_story == NULL);
+	} else {
+		assert(new_link->newer_story == old_top);
+		assert(old_link->older_story == new_top);
+	}
+
+	if (!is_new_tuple) {
+		/* Make the change in index. */
+		struct index *index = old_link->in_index;
+		struct tuple *removed, *unused;
+		if (index_replace(index, old_top->tuple, new_top->tuple,
+				  DUP_REPLACE, &removed, &unused) != 0) {
+			diag_log();
+			unreachable();
+			panic("failed to rebind story in index");
+		}
+		assert(old_top->tuple == removed);
+	}
+
+	/* Link the list. */
+	if (is_new_tuple) {
+		memtx_tx_story_link(new_top, old_top, idx);
+		/* in_index must be set in story_new. */
+		assert(new_link->in_index == old_link->in_index);
+		old_link->in_index = NULL;
+	} else {
+		struct memtx_story *older_story = new_link->older_story;
+		memtx_tx_story_unlink(old_top, new_top, idx);
+		memtx_tx_story_unlink(new_top, older_story, idx);
+		memtx_tx_story_link(new_top, old_top, idx);
+		memtx_tx_story_link(old_top, older_story, idx);
+		new_link->in_index = old_link->in_index;
+		old_link->in_index = NULL;
+	}
 
 	/*
 	 * A space holds references to all his tuples.
 	 * All tuples that are physically in the primary index are referenced.
-	 * Thus we have to reference the tuple that was added to the primar
+	 * Thus we have to reference the tuple that was added to the primary
 	 * index and dereference the tuple that was removed from it.
 	 */
 	if (idx == 0) {
 		memtx_tx_ref_to_primary(new_top);
 		memtx_tx_unref_from_primary(old_top);
 	}
+
+	/* Rebind gap records to the top of the list */
+	rlist_splice(&new_link->nearby_gaps, &old_link->nearby_gaps);
 }
 
 /**
@@ -1267,20 +1286,21 @@ memtx_tx_story_reorder(struct memtx_story *story,
 	 *      [     old_story     ]        [       story       ]
 	 *      [    older_story    ]        [    older_story    ]
 	 */
-	memtx_tx_story_unlink(story, old_story, idx);
-	memtx_tx_story_unlink(old_story, older_story, idx);
 	if (newer_story != NULL) {
 		/* Simple relink in list. */
 		memtx_tx_story_unlink(newer_story, story, idx);
+		memtx_tx_story_unlink(story, old_story, idx);
+		memtx_tx_story_unlink(old_story, older_story, idx);
+
 		memtx_tx_story_link(newer_story, old_story, idx);
 		memtx_tx_story_link(old_story, story, idx);
+		memtx_tx_story_link(story, older_story, idx);
 	} else {
 		/*
 		 * story was in the top of history chain. In terms of reorder,
 		 * we have to make old_story the new top of chain. */
-		memtx_tx_story_link_top(old_story, story, idx);
+		memtx_tx_story_link_top(old_story, story, idx, false);
 	}
-	memtx_tx_story_link(story, older_story, idx);
 }
 
 /**
@@ -1892,25 +1912,18 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	if (rc != 0)
 		goto fail;
 
-	/*
-	 * Create add_story and replaced_story if necessary.
-	 * Note that despite the tuple is already in pk,
-	 * it is not referenced to it, so we pass false as the last argument.
-	 */
-	add_story = memtx_tx_story_new(space, new_tuple, false);
+	/* Create add_story and replaced_story if necessary. */
+	add_story = memtx_tx_story_new(space, new_tuple);
 	memtx_tx_story_link_added_by(add_story, stmt);
 
 	if (replaced != NULL && !replaced->is_dirty) {
-		/*
-		 * Note that despite the tuple is not in pk,
-		 * it is referenced to it, so we pass true as the last argument.
-		 */
-		replaced_story = memtx_tx_story_new(space, replaced, true);
-		memtx_tx_story_link_top_light(add_story, replaced_story, 0);
+		replaced_story = memtx_tx_story_new(space, replaced);
+		memtx_tx_story_link_top(add_story, replaced_story, 0, true);
 	} else if (replaced != NULL) {
 		replaced_story = memtx_tx_story_get(replaced);
-		memtx_tx_story_link_top_light(add_story, replaced_story, 0);
+		memtx_tx_story_link_top(add_story, replaced_story, 0, true);
 	} else {
+		memtx_tx_story_link_top(add_story, NULL, 0, true);
 		memtx_tx_handle_gap_write(stmt->txn, space,
 					  add_story, new_tuple,
 					  direct_successor[0], 0);
@@ -1920,8 +1933,6 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 	for (uint32_t i = 0; i < space->index_count; i++)
 		check_hole(space, add_story, i);
 
-	if (replaced_story != NULL)
-		replaced_story->link[0].in_index = NULL;
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		if (directly_replaced[i] == NULL) {
 			memtx_tx_handle_gap_write(stmt->txn, space,
@@ -1932,8 +1943,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		assert(directly_replaced[i]->is_dirty);
 		struct memtx_story *secondary_replaced =
 			memtx_tx_story_get(directly_replaced[i]);
-		memtx_tx_story_link_top_light(add_story, secondary_replaced, i);
-		secondary_replaced->link[i].in_index = NULL;
+		memtx_tx_story_link_top(add_story, secondary_replaced, i, true);
 	}
 
 	if (old_tuple != NULL) {
@@ -1947,23 +1957,6 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		memtx_tx_story_link_deleted_by(del_story, stmt);
 	} else if (is_own_change)
 		stmt->is_pure_insert = true;
-
-	if (new_tuple != NULL) {
-		/*
-		 * A space holds references to all his tuples.
-		 * It's made via primary index - all tuples that are physically
-		 * in primary index must be referenced (a replaces tuple must
-		 * be dereferenced).
-		 */
-		assert(add_story == memtx_tx_story_get(new_tuple));
-
-		memtx_tx_ref_to_primary(add_story);
-		if (directly_replaced[0] != NULL) {
-			assert(replaced_story ==
-			       memtx_tx_story_get(directly_replaced[0]));
-			memtx_tx_unref_from_primary(replaced_story);
-		}
-	}
 
 	*result = old_tuple;
 	if (*result != NULL) {
@@ -2008,11 +2001,7 @@ memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
 		del_story = memtx_tx_story_get(old_tuple);
 	} else {
 		assert(stmt->txn != NULL);
-		/*
-		 * The tuple is not dirty therefore it is placed in pk
-		 * and is referenced to it.
-		 */
-		del_story = memtx_tx_story_new(space, old_tuple, true);
+		del_story = memtx_tx_story_new(space, old_tuple);
 	}
 	if (!del_story->tuple_is_retained)
 		memtx_tx_story_track_retained_tuple(del_story);
@@ -2741,12 +2730,7 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
 		struct memtx_story *story = memtx_tx_story_get(tuple);
 		memtx_tx_track_read_story(txn, space, story, UINT64_MAX);
 	} else {
-		/*
-		 * The tuple is not dirty therefore it is placed in pk
-		 * and is referenced to it.
-		 */
-		struct memtx_story *story =
-			memtx_tx_story_new(space, tuple, true);
+		struct memtx_story *story = memtx_tx_story_new(space, tuple);
 		struct tx_read_tracker *tracker;
 		tracker = tx_read_tracker_new(txn, story, UINT64_MAX);
 		rlist_add(&story->reader_list, &tracker->in_reader_list);
@@ -2919,11 +2903,7 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 		if (successor->is_dirty) {
 			story = memtx_tx_story_get(successor);
 		} else {
-			/*
-			 * The tuple is not dirty therefore it is placed in pk
-			 * and is referenced to it.
-			 */
-			story = memtx_tx_story_new(space, successor, true);
+			story = memtx_tx_story_new(space, successor);
 		}
 		assert(index->dense_id < story->index_count);
 		assert(story->link[index->dense_id].in_index != NULL);
