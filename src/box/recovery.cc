@@ -528,6 +528,8 @@ recovery_follow_local(struct recovery *r, struct xstream *stream,
 	 */
 	assert(r->watcher == NULL);
 	r->watcher = fiber_new_system(name, hot_standby_f);
+	if (r->watcher == NULL)
+		diag_raise();
 	fiber_set_joinable(r->watcher, true);
 	fiber_start(r->watcher, r, stream, wal_dir_rescan_delay);
 }
