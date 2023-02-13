@@ -34,6 +34,9 @@ def nth(iterable, n, default=None):
 def equal_types(type1, type2):
     return type1.code == type2.code and type1.tag == type2.tag
 
+def int_from_address(address):
+    return int(address.cast(gdb.lookup_type('uint64_t')))
+
 # couple of functions below don't raise an exception and should be used
 # when type/value may or may not exist
 
@@ -1617,23 +1620,22 @@ class TtListsLut(object):
 
     Info = namedtuple('Info', ['head', 'entry_info'])
 
-    symbol_regexp = '<(\w+(?:\+\d+)?)>'
-    symbol_re = re.compile(symbol_regexp)
+    symbol_re = re.compile('(\w+)(?:\s*\+\s*(\d+))?')
 
     @classmethod
     def lookup_list_entry_info(cls, item):
-        # Ancient gdb versions don't have 'format_string' in gdb.Value
-        if hasattr(item, 'format_string'):
-            address = item.format_string(address=False, symbols=True)
-        else:
-            address = str(item)
-
-        symbol_match = cls.symbol_re.search(address)
-        if symbol_match is None:
+        address = int_from_address(item)
+        symbol_info = gdb.execute('info symbol {:#x}'.format(address), False, True)
+        if symbol_info.startswith('No symbol matches'):
             return None
 
-        symbol, _, offset = symbol_match.group(1).partition('+')
-        offset = 0 if len(offset) == 0 else int(offset)
+        symbol_match = cls.symbol_re.match(symbol_info)
+        if symbol_match is None:
+            logger.warning("Symbol is missing in '{}'".format(symbol_info))
+            return None
+
+        symbol = symbol_match.group(1)
+        offset = symbol_match.group(2) if symbol_match.lastindex == 2 else 0
 
         symbol_val = gdb.parse_and_eval(symbol)
         entry_info = None
@@ -1641,7 +1643,7 @@ class TtListsLut(object):
             entry_info = cls.list_variables_map[symbol]
         elif symbol_val.type.code == gdb.TYPE_CODE_STRUCT:
             for field in symbol_val.type.fields():
-                if field.bitpos/8 == offset:
+                if field.bitpos // 8 == offset:
                     entry_info = cls.list_containers_map[symbol_val.type.tag][field.name]
                     break
 
@@ -1798,7 +1800,6 @@ head
     """
 
     __instance_exists = False
-    __type_uint = gdb.lookup_type('uint')
 
     # Initialization of config with default values is deferred so it can be
     # done in a single place to avoid duplication of default constants
@@ -1873,7 +1874,7 @@ head
         s = 'rlist<{}> of length {}'.format(entry_info, len(self.list))
         if self.list.head is not None:
             s += ', head=*({}*){:#x}'.format(
-                TtList.rlist_type.tag, int(self.list.head.cast(self.__type_uint)))
+                TtList.rlist_type.tag, int_from_address(self.list.head))
         return s
 
     def child(self, item_index, item):
