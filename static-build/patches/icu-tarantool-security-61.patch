@@ -1,0 +1,15 @@
+diff --git a/source/i18n/unum.cpp b/source/i18n/unum.cpp
+index 7043f7a..0f70c5c 100644
+--- a/source/i18n/unum.cpp
++++ b/source/i18n/unum.cpp
+@@ -164,7 +164,9 @@ unum_clone(const UNumberFormat *fmt,
+     } else {
+         const RuleBasedNumberFormat* rbnf = dynamic_cast<const RuleBasedNumberFormat*>(nf);
+         U_ASSERT(rbnf != NULL);
+-        res = rbnf->clone();
++        if (rbnf != NULL) {
++            res = rbnf->clone();
++        }
+     }
+ 
+     if(res == 0) {
