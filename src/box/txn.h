@@ -504,18 +504,6 @@ struct txn {
 	/** List of savepoints to find savepoint by name. */
 	struct rlist savepoints;
 	/**
-	 * List of tx_conflict_tracker records where .breaker is the current
-	 * transaction and .victim is the transactions that must be aborted
-	 * if the current transaction is committed.
-	 */
-	struct rlist conflict_list;
-	/**
-	 * List of tx_conflict_tracker records where .victim is the current
-	 * transaction and .breaker is the transactions that, if committed,
-	 * will abort the current transaction.
-	 */
-	struct rlist conflicted_by_list;
-	/**
 	 * Link in tx_manager::read_view_txs.
 	 */
 	struct rlist in_read_view_txs;
