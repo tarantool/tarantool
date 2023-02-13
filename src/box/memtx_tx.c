@@ -157,21 +157,6 @@ memtx_tx_story_key_hash(const struct tuple *a)
 #include "salad/mhash.h"
 
 /**
- * Record that links two transactions, breaker and victim.
- * See memtx_tx_cause_conflict for details.
- */
-struct tx_conflict_tracker {
-	/** TX that aborts victim on commit. */
-	struct txn *breaker;
-	/** TX that will be aborted on breaker's commit. */
-	struct txn *victim;
-	/** Link in breaker->conflict_list. */
-	struct rlist in_conflict_list;
-	/** Link in victim->conflicted_by_list. */
-	struct rlist in_conflicted_by_list;
-};
-
-/**
  * Record that links transaction and a story that the transaction have read.
  */
 struct tx_read_tracker {
@@ -437,10 +422,6 @@ memtx_tx_region_alloc_object(struct txn *txn,
 	enum memtx_tx_alloc_type alloc_type =
 		memtx_tx_region_object_to_type(alloc_obj);
 	switch (alloc_obj) {
-	case MEMTX_TX_OBJECT_CONFLICT_TRACKER:
-		alloc = region_alloc_object(&txn->region,
-					    struct tx_conflict_tracker, &size);
-		break;
 	case MEMTX_TX_OBJECT_READ_TRACKER:
 		alloc = region_alloc_object(&txn->region,
 					    struct tx_read_tracker, &size);
@@ -646,67 +627,6 @@ memtx_tx_abort_all_for_ddl(struct txn *ddl_owner)
 			 "another TX (id=%lld)", (long long) ddl_owner->id,
 			 (long long) to_be_aborted->id);
 	}
-}
-
-/**
- * Notify TX manager that if transaction @a breaker is committed then the
- * transaction @a victim must be aborted due to conflict. It is achieved
- * by adding corresponding entry (of tx_conflict_tracker type) to @a breaker
- * conflict list. In case there's already such entry, then move it to the head
- * of the list in order to optimize next invocations of this function.
- * For example: there's two rw transaction in progress, one have read
- * some value while the second is about to overwrite it. If the second
- * is committed first, the first must be aborted.
- *
- * NB: can trigger story garbage collection.
- *
- * @return 0 on success, -1 on memory error.
- */
-static int
-memtx_tx_cause_conflict(struct txn *breaker, struct txn *victim)
-{
-	assert(breaker != victim);
-	struct tx_conflict_tracker *tracker = NULL;
-	struct rlist *r1 = breaker->conflict_list.next;
-	struct rlist *r2 = victim->conflicted_by_list.next;
-	while (r1 != &breaker->conflict_list &&
-	       r2 != &victim->conflicted_by_list) {
-		tracker = rlist_entry(r1, struct tx_conflict_tracker,
-				      in_conflict_list);
-		assert(tracker->breaker == breaker);
-		if (tracker->victim == victim)
-			break;
-		tracker = rlist_entry(r2, struct tx_conflict_tracker,
-				      in_conflicted_by_list);
-		assert(tracker->victim == victim);
-		if (tracker->breaker == breaker)
-			break;
-		tracker = NULL;
-		r1 = r1->next;
-		r2 = r2->next;
-	}
-	if (tracker != NULL) {
-		/*
-		 * Move to the beginning of a list
-		 * for a case of subsequent lookups.
-		 */
-		rlist_del(&tracker->in_conflict_list);
-		rlist_del(&tracker->in_conflicted_by_list);
-	} else {
-		tracker =
-			memtx_tx_region_alloc_object(
-				victim, MEMTX_TX_OBJECT_CONFLICT_TRACKER);
-		if (tracker == NULL) {
-			diag_set(OutOfMemory, sizeof(*tracker), "tx region",
-				 "conflict_tracker");
-			return -1;
-		}
-		tracker->breaker = breaker;
-		tracker->victim = victim;
-	}
-	rlist_add(&breaker->conflict_list, &tracker->in_conflict_list);
-	rlist_add(&victim->conflicted_by_list, &tracker->in_conflicted_by_list);
-	return 0;
 }
 
 /**
@@ -1740,24 +1660,33 @@ point_hole_storage_find(struct index *index, struct tuple *tuple)
 }
 
 /**
+ * Track the fact that transaction @a txn have read @a story in @a space.
+ * This fact could lead this transaction to read view or conflict state.
+ */
+static int
+memtx_tx_track_read_story(struct txn *txn, struct space *space,
+			  struct memtx_story *story, uint64_t index_mask);
+
+/**
  * Check for possible conflict relations during insertion of @a new tuple,
  * and given that it was a real insertion, not the replacement of existing
  * tuple. It's the moment where we can search for stored point hole trackers
  * and find conflict causes.
  */
 static int
-check_hole(struct space *space, uint32_t index,
-	   struct tuple *new_tuple, struct txn *inserter)
+check_hole(struct space *space, struct memtx_story *story,
+	   uint32_t ind)
 {
 	struct point_hole_item *list =
-		point_hole_storage_find(space->index[index], new_tuple);
+		point_hole_storage_find(space->index[ind], story->tuple);
 	if (list == NULL)
 		return 0;
 
 	struct point_hole_item *item = list;
+	uint64_t index_mask = 1ull << (ind & 63);
 	do {
-		if (inserter != item->txn &&
-		    memtx_tx_cause_conflict(inserter, item->txn) != 0)
+		if (memtx_tx_track_read_story(item->txn, space, story,
+					      index_mask) != 0)
 			return -1;
 		item = rlist_entry(item->ring.next,
 				   struct point_hole_item, ring);
@@ -1850,10 +1779,6 @@ check_dup(struct txn_stmt *stmt, struct tuple *new_tuple,
 static struct gap_item *
 memtx_tx_gap_item_new(struct txn *txn, enum iterator_type type,
 		      const char *key, uint32_t part_count);
-
-static int
-memtx_tx_track_read_story(struct txn *txn, struct space *space,
-			  struct memtx_story *story, uint64_t index_mask);
 
 /**
  * Handle insertion to a new place in index. There can be readers which
@@ -2030,7 +1955,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 
 	/* Collect point phantom read conflicts. */
 	for (uint32_t i = 0; i < space->index_count; i++) {
-		if (check_hole(space, i, new_tuple, stmt->txn) != 0)
+		if (check_hole(space, add_story, i) != 0)
 			goto fail;
 	}
 
@@ -2559,15 +2484,6 @@ memtx_tx_clear_txn_read_lists(struct txn *txn);
 void
 memtx_tx_prepare_finalize(struct txn *txn)
 {
-	struct tx_conflict_tracker *entry, *next;
-	/* Handle conflicts. */
-	rlist_foreach_entry_safe(entry, &txn->conflict_list,
-				 in_conflict_list, next) {
-		assert(entry->breaker == txn);
-		memtx_tx_handle_conflict(txn, entry->victim);
-		rlist_del(&entry->in_conflict_list);
-		rlist_del(&entry->in_conflicted_by_list);
-	}
 	/* Just free all other lists - we don't need 'em anymore. */
 	memtx_tx_clear_txn_read_lists(txn);
 }
@@ -3202,20 +3118,6 @@ memtx_tx_clear_txn_read_lists(struct txn *txn)
 		rlist_del(&tracker->in_read_set);
 	}
 	assert(rlist_empty(&txn->read_set));
-
-	struct tx_conflict_tracker *entry, *next;
-	rlist_foreach_entry_safe(entry, &txn->conflict_list,
-				 in_conflict_list, next) {
-		rlist_del(&entry->in_conflict_list);
-		rlist_del(&entry->in_conflicted_by_list);
-	}
-	rlist_foreach_entry_safe(entry, &txn->conflicted_by_list,
-				 in_conflicted_by_list, next) {
-		rlist_del(&entry->in_conflict_list);
-		rlist_del(&entry->in_conflicted_by_list);
-	}
-	assert(rlist_empty(&txn->conflict_list));
-	assert(rlist_empty(&txn->conflicted_by_list));
 
 	rlist_del(&txn->in_read_view_txs);
 }

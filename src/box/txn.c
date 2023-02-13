@@ -413,8 +413,6 @@ txn_new(void)
 	rlist_create(&txn->point_holes_list);
 	rlist_create(&txn->gap_list);
 	rlist_create(&txn->full_scan_list);
-	rlist_create(&txn->conflict_list);
-	rlist_create(&txn->conflicted_by_list);
 	rlist_create(&txn->in_read_view_txs);
 	rlist_create(&txn->in_all_txs);
 	txn->space_on_replace_triggers_depth = 0;
@@ -476,8 +474,6 @@ txn_begin(void)
 	struct txn *txn = txn_new();
 	if (txn == NULL)
 		return NULL;
-	assert(rlist_empty(&txn->conflict_list));
-	assert(rlist_empty(&txn->conflicted_by_list));
 
 	/* Initialize members explicitly to save time on memset() */
 	stailq_create(&txn->stmts);
