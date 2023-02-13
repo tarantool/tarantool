@@ -144,7 +144,7 @@ memtx_tx_statistics_collect(struct memtx_tx_statistics *stats);
  * Initialize MVCC part of a transaction.
  * Must be called even if MVCC engine is not enabled in config.
  */
-int
+void
 memtx_tx_register_txn(struct txn *txn);
 
 /**
@@ -263,7 +263,7 @@ memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
 			    uint32_t mk_index);
 
 /** Helper of memtx_tx_track_point */
-int
+void
 memtx_tx_track_point_slow(struct txn *txn, struct index *index,
 			  const char *key);
 
@@ -277,24 +277,24 @@ memtx_tx_track_point_slow(struct txn *txn, struct index *index,
  *
  * @return 0 on success, -1 on memory error.
  */
-static inline int
+static inline void
 memtx_tx_track_point(struct txn *txn, struct space *space,
 		     struct index *index, const char *key)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
-		return 0;
+		return;
 	if (txn == NULL)
-		return 0;
+		return;
 	/* Skip ephemeral spaces. */
 	if (space == NULL || space->def->id == 0)
-		return 0;
-	return memtx_tx_track_point_slow(txn, index, key);
+		return;
+	memtx_tx_track_point_slow(txn, index, key);
 }
 
 /**
  * Helper of memtx_tx_track_gap.
  */
-int
+void
 memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *index,
 			struct tuple *successor, enum iterator_type type,
 			const char *key, uint32_t part_count);
@@ -308,29 +308,27 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
  * it's faster to use memtx_tx_track_point).
  *
  * NB: can trigger story garbage collection.
- *
- * @return 0 on success, -1 on memory error.
  */
-static inline int
+static inline void
 memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
 		   struct tuple *successor, enum iterator_type type,
 		   const char *key, uint32_t part_count)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
-		return 0;
+		return;
 	if (txn == NULL)
-		return 0;
+		return;
 	/* Skip ephemeral spaces. */
 	if (space == NULL || space->def->id == 0)
-		return 0;
-	return memtx_tx_track_gap_slow(txn, space, index, successor,
-				       type, key, part_count);
+		return;
+	memtx_tx_track_gap_slow(txn, space, index, successor,
+				type, key, part_count);
 }
 
 /**
  * Helper of memtx_tx_track_full_scan.
  */
-int
+void
 memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index);
 
 /**
@@ -343,18 +341,18 @@ memtx_tx_track_full_scan_slow(struct txn *txn, struct index *index);
  *
  * @return 0 on success, -1 on memory error.
  */
-static inline int
+static inline void
 memtx_tx_track_full_scan(struct txn *txn, struct space *space,
 			 struct index *index)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
-		return 0;
+		return;
 	if (txn == NULL)
-		return 0;
+		return;
 	/* Skip ephemeral spaces. */
 	if (space == NULL || space->def->id == 0)
-		return 0;
-	return memtx_tx_track_full_scan_slow(txn, index);
+		return;
+	memtx_tx_track_full_scan_slow(txn, index);
 }
 
 /**
