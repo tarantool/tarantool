@@ -7,6 +7,7 @@ import gdb.printing
 import gdb.types
 import argparse
 import base64
+import logging
 import struct
 import itertools
 import re
@@ -19,6 +20,9 @@ if sys.version_info[0] == 2:
     zip = itertools.izip
 elif sys.version_info[0] == 3:
     unicode = str
+
+logger = logging.getLogger('gdb.tarantool')
+logger.setLevel(logging.WARNING)
 
 def dump_type(type):
     return 'tag={} code={}'.format(type.tag, type.code)
@@ -1501,8 +1505,8 @@ class TtListsLut(object):
         for sym, entry in rlist_syms:
             try:
                 ret[sym] = TtListEntryInfo(entry)
-            except Exception as exc:
-                gdb.write(str(exc) + '\n')
+            except Exception as e:
+                logger.debug(str(e))
         return ret
 
     def build_list_containers_map():
@@ -1604,8 +1608,8 @@ class TtListsLut(object):
             container_lists = ret.setdefault(container_type, {})
             try:
                 container_lists[container_field] = TtListEntryInfo(entry)
-            except Exception as exc:
-                gdb.write(str(exc) + '\n')
+            except Exception as e:
+                logger.debug(str(e))
         return ret
 
     list_variables_map = build_list_variables_map()
