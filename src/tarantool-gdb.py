@@ -5,6 +5,7 @@ To use, just put 'source <path-to-this-file>' in gdb.
 
 import gdb.printing
 import argparse
+import base64
 import struct
 import itertools
 import re
@@ -15,6 +16,8 @@ slice = itertools.islice
 if sys.version_info[0] == 2:
     filter = itertools.ifilter
     zip = itertools.izip
+elif sys.version_info[0] == 3:
+    unicode = str
 
 def dump_type(type):
     return 'tag={} code={}'.format(type.tag, type.code)
@@ -368,7 +371,7 @@ class MsgPack(object):
                 k -= 1
                 continue
             elif l > cls.MP_HINT:
-                k -= l;
+                k -= l
                 k -= 1
                 continue
             else:
@@ -390,18 +393,16 @@ class MsgPack(object):
         elif mp_type == cls.MP_INT:
             s += str(cls.decode_int(data))
 
-        elif mp_type == cls.MP_STR or mp_type == cls.MP_BIN:
-            len = cls.decode_strl(data) if mp_type == cls.MP_STR else cls.decode_binl(data)
-            if mp_type == cls.MP_BIN:
-                s += 'bin'
+        elif mp_type == cls.MP_STR:
+            len = cls.decode_strl(data)
             s += '"'
-            for i in range(0, len):
-                c = data.read_u8()
-                if c < 128 and cls.mp_char2escape[c] != 0:
-                    s += cls.mp_char2escape[c].string()
-                else:
-                    s += chr(c)
+            s += unicode(data.read(len), 'utf-8')
             s += '"'
+
+        elif mp_type == cls.MP_BIN:
+            len = cls.decode_binl(data)
+            s += '!!binary '
+            s += base64.b64encode(str(data.read(len)))
 
         elif mp_type == cls.MP_ARRAY:
             s += '['
