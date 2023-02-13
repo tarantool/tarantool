@@ -100,12 +100,12 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 		if (opts->is_unique)
 			def->cmp_def->unique_part_count =
 				def->key_def->part_count;
+		if (def->cmp_def == NULL) {
+			index_def_delete(def);
+			return NULL;
+		}
 	} else {
 		def->cmp_def = key_def_dup(key_def);
-	}
-	if (def->key_def == NULL || def->cmp_def == NULL) {
-		index_def_delete(def);
-		return NULL;
 	}
 	def->type = type;
 	def->space_id = space_id;
@@ -135,10 +135,6 @@ index_def_dup(const struct index_def *def)
 	}
 	dup->key_def = key_def_dup(def->key_def);
 	dup->cmp_def = key_def_dup(def->cmp_def);
-	if (dup->key_def == NULL || dup->cmp_def == NULL) {
-		index_def_delete(dup);
-		return NULL;
-	}
 	rlist_create(&dup->link);
 	dup->opts = def->opts;
 	if (def->opts.stat != NULL) {

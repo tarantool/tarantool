@@ -141,12 +141,7 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	lsm->env = lsm_env;
 
 	struct key_def *key_def = key_def_dup(index_def->key_def);
-	if (key_def == NULL)
-		goto fail_key_def;
-
 	struct key_def *cmp_def = key_def_dup(index_def->cmp_def);
-	if (cmp_def == NULL)
-		goto fail_cmp_def;
 
 	lsm->cmp_def = cmp_def;
 	lsm->key_def = key_def;
@@ -223,9 +218,7 @@ fail_stat:
 		key_def_delete(lsm->pk_in_cmp_def);
 fail_pk_in_cmp_def:
 	key_def_delete(cmp_def);
-fail_cmp_def:
 	key_def_delete(key_def);
-fail_key_def:
 	free(lsm);
 fail:
 	return NULL;

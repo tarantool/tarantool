@@ -250,10 +250,6 @@ merger_new(struct key_def *key_def, struct merge_source **sources,
 	 * key_def comes from Lua).
 	 */
 	key_def = key_def_dup(key_def);
-	if (key_def == NULL) {
-		free(merger);
-		return NULL;
-	}
 
 	struct tuple_format *format = box_tuple_format_new(&key_def, 1);
 	if (format == NULL) {
