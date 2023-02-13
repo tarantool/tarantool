@@ -115,6 +115,7 @@ ExternalProject_Add(icu
         cat <BINARY_DIR>/uconfig.h.prepend <INSTALL_DIR>/include/unicode/uconfig.h >> <BINARY_DIR>/uconfig.h &&
         ${CMAKE_COMMAND} -E copy_if_different <BINARY_DIR>/uconfig.h <INSTALL_DIR>/include/unicode/uconfig.h
     PATCH_COMMAND patch -d <SOURCE_DIR> -p1 -i "${PATCHES_DIR}/icu-tarantool-security-45.patch"
+    COMMAND       patch -d <SOURCE_DIR> -p1 -i "${PATCHES_DIR}/icu-tarantool-security-59.patch"
 )
 set(TARANTOOL_DEPENDS icu ${TARANTOOL_DEPENDS})
 
