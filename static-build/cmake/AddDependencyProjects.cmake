@@ -74,10 +74,8 @@ ExternalProject_Add(openssl
         --libdir=lib
         no-shared
     INSTALL_COMMAND ${CMAKE_MAKE_PROGRAM} install_sw
-    PATCH_COMMAND cat
-        "${PATCHES_DIR}/openssl-111q-gh-18720.patch"
-        "${PATCHES_DIR}/openssl-tarantool-security-54.patch" |
-        patch -d <SOURCE_DIR> -p1
+    PATCH_COMMAND patch -d <SOURCE_DIR> -p1 -i "${PATCHES_DIR}/openssl-111q-gh-18720.patch"
+    COMMAND       patch -d <SOURCE_DIR> -p1 -i "${PATCHES_DIR}/openssl-tarantool-security-54.patch"
 )
 set(TARANTOOL_DEPENDS openssl ${TARANTOOL_DEPENDS})
 
@@ -115,9 +113,7 @@ ExternalProject_Add(icu
         ${CMAKE_COMMAND} -E touch <BINARY_DIR>/uconfig.h &&
         cat <BINARY_DIR>/uconfig.h.prepend <INSTALL_DIR>/include/unicode/uconfig.h >> <BINARY_DIR>/uconfig.h &&
         ${CMAKE_COMMAND} -E copy_if_different <BINARY_DIR>/uconfig.h <INSTALL_DIR>/include/unicode/uconfig.h
-    PATCH_COMMAND cat
-        "${PATCHES_DIR}/icu-tarantool-security-45.patch" |
-        patch -d <SOURCE_DIR> -p1
+    PATCH_COMMAND patch -d <SOURCE_DIR> -p1 -i "${PATCHES_DIR}/icu-tarantool-security-45.patch"
 )
 set(TARANTOOL_DEPENDS icu ${TARANTOOL_DEPENDS})
 
@@ -190,8 +186,7 @@ ExternalProject_Add(readline
 
         --prefix=<INSTALL_DIR>
         --disable-shared
-    PATCH_COMMAND patch -d <SOURCE_DIR> -p0 <
-        "${PATCHES_DIR}/readline80-001.patch"
+    PATCH_COMMAND patch -d <SOURCE_DIR> -p0 -i "${PATCHES_DIR}/readline80-001.patch"
 )
 set(TARANTOOL_DEPENDS readline ${TARANTOOL_DEPENDS})
 
