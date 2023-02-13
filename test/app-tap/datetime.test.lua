@@ -91,6 +91,10 @@ local function invalid_date_fmt_error(str)
     return ('invalid date format %s'):format(str)
 end
 
+local function couldnt_parse(str)
+    return ("could not parse '%s'"):format(str)
+end
+
 local function assert_raises(test, error_msg, func, ...)
     local ok, err = pcall(func, ...)
     local err_tail = err and err:gsub("^.+:%d+: ", "") or ''
@@ -184,7 +188,7 @@ test:test("Datetime API checks", function(test)
 end)
 
 test:test("Default date creation and comparison", function(test)
-    test:plan(37)
+    test:plan(43)
     -- check empty arguments
     local ts1 = date.new()
     test:is(ts1.epoch, 0, "ts.epoch ==0")
@@ -200,15 +204,15 @@ test:test("Default date creation and comparison", function(test)
     -- check their equivalence
     test:is(ts1, ts2, "ts1 == ts2")
     test:is(ts1 ~= ts2, false, "not ts1 != ts2")
+    test:is(ts1, "1970-01-01T00:00:00Z", "ts1 == '1970-01-01T00:00:00Z'")
+    test:is("1970-01-01T00:00:00Z", ts1, "'1970-01-01T00:00' == ts1")
 
     test:isnt(ts1, nil, "ts1 != {}")
     test:isnt(ts1, {}, "ts1 != {}")
-    test:isnt(ts1, "1970-01-01T00:00:00Z", "ts1 != '1970-01-01T00:00:00Z'")
     test:isnt(ts1, 19700101, "ts1 != 19700101")
 
     test:isnt(nil, ts1, "{} ~= ts1")
     test:isnt({}, ts1 ,"{} ~= ts1")
-    test:isnt("1970-01-01T00:00:00Z", ts1, "'1970-01-01T00:00' ~= ts1")
     test:isnt(19700101, ts1, "ts1 ~= ts1")
 
     test:is(ts1 < ts2, false, "not ts1 < ts2")
@@ -221,20 +225,37 @@ test:test("Default date creation and comparison", function(test)
     test:is(date.is_datetime(ts2), true, "ts2 is datetime")
     test:is(date.is_datetime({}), false, "bogus is not datetime")
 
+    -- checks against strings, raising and quiet
+    test:is(ts1 < '1970-01-01', false, "not ts1 < 1970-01-1")
+    test:is(ts1 <= '1970-01-01', true, "ts1 <= 1970-01-1")
+    test:is(ts1 > '1970-01-01', false, "not ts1 > 1970-01-1")
+    test:is(ts1 >= '1970-01-01', true, "ts1 >= 1970-01-1")
+
+    -- all comparisons operations are raising errors for invalid strings
+    assert_raises(test, couldnt_parse('x1970-01-01'),
+                  function() return ts1 == 'x1970-01-01' end)
+    assert_raises(test, couldnt_parse('x1970-01-01'),
+                  function() return ts1 ~= 'x1970-01-01' end)
+    assert_raises(test, couldnt_parse('x1970-01-01'),
+                  function() return ts1 < 'x1970-01-01' end)
+    assert_raises(test, couldnt_parse('x1970-01-01'),
+                  function() return ts1 <= 'x1970-01-01' end)
+    assert_raises(test, couldnt_parse('x1970-01-01'),
+                  function() return ts1 > 'x1970-01-01' end)
+    assert_raises(test, couldnt_parse('x1970-01-01'),
+                  function() return ts1 >= 'x1970-01-01' end)
+
+
     -- check comparison errors -- ==, ~= not raise errors, other
     -- comparison operators should raise
     assert_raises(test, incompat_types, function() return ts1 < nil end)
     assert_raises(test, incompat_types, function() return ts1 < 123 end)
-    assert_raises(test, incompat_types, function() return ts1 < '1970-01-01' end)
     assert_raises(test, incompat_types, function() return ts1 <= nil end)
     assert_raises(test, incompat_types, function() return ts1 <= 123 end)
-    assert_raises(test, incompat_types, function() return ts1 <= '1970-01-01' end)
     assert_raises(test, incompat_types, function() return ts1 > nil end)
     assert_raises(test, incompat_types, function() return ts1 > 123 end)
-    assert_raises(test, incompat_types, function() return ts1 > '1970-01-01' end)
     assert_raises(test, incompat_types, function() return ts1 >= nil end)
     assert_raises(test, incompat_types, function() return ts1 >= 123 end)
-    assert_raises(test, incompat_types, function() return ts1 >= '1970-01-01' end)
 end)
 
 test:test("Simple date creation by attributes", function(test)
@@ -563,10 +584,6 @@ test:test("Check parsing of full supported years range", function(test)
                             format(fmt, dt, fmt_dt))
     end
 end)
-
-local function couldnt_parse(txt)
-    return ("could not parse '%s'"):format(txt)
-end
 
 test:test("Check parsing of dates with invalid attributes", function(test)
     test:plan(33)
