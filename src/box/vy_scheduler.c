@@ -249,16 +249,7 @@ vy_task_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	task->start_time = ev_monotonic_now(loop());
 	task->lsm = lsm;
 	task->cmp_def = key_def_dup(lsm->cmp_def);
-	if (task->cmp_def == NULL) {
-		free(task);
-		return NULL;
-	}
 	task->key_def = key_def_dup(lsm->key_def);
-	if (task->key_def == NULL) {
-		key_def_delete(task->cmp_def);
-		free(task);
-		return NULL;
-	}
 	vy_lsm_ref(lsm);
 	diag_create(&task->diag);
 	task->deferred_delete_handler.iface = &vy_task_deferred_delete_iface;
