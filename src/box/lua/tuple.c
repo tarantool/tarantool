@@ -649,20 +649,17 @@ lbox_tuple_transform(struct lua_State *L)
 static int
 lbox_tuple_field_by_path(struct lua_State *L)
 {
-	struct tuple *tuple = luaT_istuple(L, 1);
-	/* Is checked in Lua wrapper. */
-	assert(tuple != NULL);
-	assert(lua_isstring(L, 2));
+	struct tuple *tuple = luaT_checktuple(L, 1);
 	size_t len;
-	const char *field = NULL, *path = lua_tolstring(L, 2, &len);
+	const char *path = luaL_checklstring(L, 2, &len);
 	if (len == 0)
 		return 0;
-	field = tuple_field_raw_by_full_path(tuple_format(tuple),
-					     tuple_data(tuple),
-					     tuple_field_map(tuple),
-					     path, (uint32_t)len,
-					     lua_hashstring(L, 2),
-					     TUPLE_INDEX_BASE);
+	const char *field = tuple_field_raw_by_full_path(tuple_format(tuple),
+							 tuple_data(tuple),
+							 tuple_field_map(tuple),
+							 path, (uint32_t)len,
+							 lua_hashstring(L, 2),
+							 TUPLE_INDEX_BASE);
 	if (field == NULL)
 		return 0;
 	luamp_decode(L, luaL_msgpack_default, &field);
