@@ -843,6 +843,18 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	}
 	luaL_openlibs(L);
 
+	/* Set _G.arg. */
+	lua_newtable(L);
+	lua_pushinteger(L, -1);
+	lua_pushstring(L, tarantool_bin);
+	lua_settable(L, -3);
+	for (int i = 0; i < argc; i++) {
+		lua_pushinteger(L, i);
+		lua_pushstring(L, argv[i]);
+		lua_settable(L, -3);
+	}
+	lua_setfield(L, LUA_GLOBALSINDEX, "arg");
+
 	/*
 	 * Create a table for storing loaded built-in modules.
 	 * Similar to _LOADED (package.loaded).
@@ -940,17 +952,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	lua_pop(L, 1); /* _PRELOAD */
 
 	luaopen_tarantool(L);
-
-	lua_newtable(L);
-	lua_pushinteger(L, -1);
-	lua_pushstring(L, tarantool_bin);
-	lua_settable(L, -3);
-	for (int i = 0; i < argc; i++) {
-		lua_pushinteger(L, i);
-		lua_pushstring(L, argv[i]);
-		lua_settable(L, -3);
-	}
-	lua_setfield(L, LUA_GLOBALSINDEX, "arg");
 
 #ifdef NDEBUG
 	/* Unload strict after boot in release mode */
