@@ -813,9 +813,6 @@ static enum election_mode
 box_check_election_mode(void)
 {
 	const char *mode = cfg_gets("election_mode");
-	if (mode == NULL)
-		goto error;
-
 	if (strcmp(mode, "off") == 0)
 		return ELECTION_MODE_OFF;
 	else if (strcmp(mode, "voter") == 0)
@@ -825,7 +822,6 @@ box_check_election_mode(void)
 	else if (strcmp(mode, "candidate") == 0)
 		return ELECTION_MODE_CANDIDATE;
 
-error:
 	diag_set(ClientError, ER_CFG, "election_mode",
 		"the value must be one of the following strings: "
 		"'off', 'voter', 'candidate', 'manual'");
