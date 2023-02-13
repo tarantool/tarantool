@@ -14,7 +14,6 @@ local SIZE_OF_TUPLE = 9
 local SIZE_OF_XROW = 147
 -- Tracker can allocate additional memory, be careful!
 local SIZE_OF_READ_TRACKER = 56
-local SIZE_OF_CONFLICT_TRACKER = 48
 local SIZE_OF_POINT_TRACKER = 88
 local SIZE_OF_GAP_TRACKER = 80
 
@@ -365,7 +364,7 @@ g.test_conflict = function()
     g.server:eval('tx1("s:get(1)")')
     g.server:eval('tx2("s:replace{1, 2}")')
     g.server:eval("box.internal.memtx_tx_gc(10)")
-    local trackers_used = SIZE_OF_CONFLICT_TRACKER + SIZE_OF_POINT_TRACKER
+    local trackers_used = SIZE_OF_READ_TRACKER + SIZE_OF_POINT_TRACKER
     local diff = {
         ["txn"] = {
             ["statements"] = {
