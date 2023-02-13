@@ -506,11 +506,7 @@ txn_begin(void)
 	 * if they are not supported.
 	 */
 	txn_set_flags(txn, TXN_CAN_YIELD);
-	int rc = memtx_tx_register_txn(txn);
-	if (rc == -1) {
-		txn_free(txn);
-		return NULL;
-	}
+	memtx_tx_register_txn(txn);
 	rmean_collect(rmean_box, IPROTO_BEGIN, 1);
 	return txn;
 }
