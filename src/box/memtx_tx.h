@@ -62,11 +62,13 @@ enum memtx_tx_alloc_object {
 	/**
 	 * Deprecated object of type struct memtx_tx_conflict.
 	 * Left for statistics compatibility.
-	 * TODO: remove it considering monitoring module.
+	 * TODO(gh-8149): remove it considering monitoring module.
 	 */
 	MEMTX_TX_OBJECT_CONFLICT = 0,
 	/**
-	 * Object of type struct tx_conflict_tracker.
+	 * Deprecated object of type struct tx_conflict_tracker.
+	 * Left for statistics compatibility.
+	 * TODO(gh-8149): remove it considering monitoring module.
 	 */
 	MEMTX_TX_OBJECT_CONFLICT_TRACKER = 1,
 	/**
