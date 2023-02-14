@@ -496,8 +496,6 @@ struct tx_manager
 	struct memtx_tx_mempool point_hole_item_pool;
 	/** Hash table that hold point selects with empty result. */
 	struct mh_point_holes_t *point_holes;
-	/** Count of elements in point_holes table. */
-	size_t point_holes_size;
 	/** Mempool for gap_item objects. */
 	struct memtx_tx_mempool gap_item_mempoool;
 	/** Mempool for full_scan_item objects. */
@@ -550,7 +548,6 @@ memtx_tx_manager_init()
 	memtx_tx_mempool_create(&txm.full_scan_item_mempool,
 				sizeof(struct full_scan_item),
 				MEMTX_TX_ALLOC_TRACKER);
-	txm.point_holes_size = 0;
 	rlist_create(&txm.all_stories);
 	rlist_create(&txm.all_txs);
 	txm.traverse_all_stories = &txm.all_stories;
@@ -1649,18 +1646,6 @@ memtx_tx_check_dup(struct tuple *new_tuple, struct tuple *old_tuple,
 	return 0;
 }
 
-static struct point_hole_item *
-point_hole_storage_find(struct index *index, struct tuple *tuple)
-{
-	struct point_hole_key key;
-	key.index = index;
-	key.tuple = tuple;
-	mh_int_t pos = mh_point_holes_find(txm.point_holes, &key, 0);
-	if (pos == mh_end(txm.point_holes))
-		return NULL;
-	return *mh_point_holes_node(txm.point_holes, pos);
-}
-
 /**
  * Track the fact that transaction @a txn have read @a story in @a space.
  * This fact could lead this transaction to read view or conflict state.
@@ -1671,26 +1656,45 @@ memtx_tx_track_read_story(struct txn *txn, struct space *space,
 
 /**
  * Check for possible conflict relations during insertion of @a new tuple,
- * and given that it was a real insertion, not the replacement of existing
- * tuple. It's the moment where we can search for stored point hole trackers
- * and find conflict causes.
+ * (with the corresponding @a story) into index @a ind. It is needed if and
+ * only if that was real insertion - there was no replaced tuple in the index.
+ * It's the moment where we can search for stored point hole trackers and find
+ * conflict causes. If some transactions have been reading the key in the
+ * index (and found nothing) - those transactions will be removed from
+ * point hole tracker and will be rebind as normal reader of given tuple.
  */
 static void
-check_hole(struct space *space, struct memtx_story *story,
-	   uint32_t ind)
+memtx_tx_handle_point_hole_write(struct space *space, struct memtx_story *story,
+				 uint32_t ind)
 {
-	struct point_hole_item *list =
-		point_hole_storage_find(space->index[ind], story->tuple);
-	if (list == NULL)
+	struct mh_point_holes_t *ht = txm.point_holes;
+	struct point_hole_key key;
+	key.index = space->index[ind];
+	key.tuple = story->tuple;
+	mh_int_t pos = mh_point_holes_find(ht, &key, 0);
+	if (pos == mh_end(ht))
 		return;
+	struct point_hole_item *item = *mh_point_holes_node(ht, pos);
 
-	struct point_hole_item *item = list;
+	struct memtx_tx_mempool *pool = &txm.point_hole_item_pool;
 	uint64_t index_mask = 1ull << (ind & 63);
+	bool has_more_items;
 	do {
 		memtx_tx_track_read_story(item->txn, space, story, index_mask);
-		item = rlist_entry(item->ring.next,
-				   struct point_hole_item, ring);
-	} while (item != list);
+
+		struct point_hole_item *next_item =
+			rlist_entry(item->ring.next,
+				    struct point_hole_item, ring);
+		has_more_items = next_item != item;
+
+		rlist_del(&item->ring);
+		rlist_del(&item->in_point_holes_list);
+		memtx_tx_mempool_free(item->txn, pool, item);
+
+		item = next_item;
+	} while (has_more_items);
+
+	mh_point_holes_del(ht, pos, 0);
 }
 
 /**
@@ -1931,7 +1935,8 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 
 	/* Collect point phantom read conflicts. */
 	for (uint32_t i = 0; i < space->index_count; i++)
-		check_hole(space, add_story, i);
+		if (directly_replaced[i] == NULL)
+			memtx_tx_handle_point_hole_write(space, add_story, i);
 
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		if (directly_replaced[i] == NULL) {
@@ -2778,8 +2783,6 @@ point_hole_storage_new(struct index *index, const char *key,
 		rlist_add(&replaced->ring, &object->ring);
 		assert(replaced->is_head);
 		replaced->is_head = false;
-	} else {
-		txm.point_holes_size++;
 	}
 	rlist_add(&txn->point_holes_list, &object->in_point_holes_list);
 }
@@ -2824,7 +2827,6 @@ point_hole_storage_delete(struct point_hole_item *object)
 						       &exist, 0);
 		assert(exist);
 		mh_point_holes_del(txm.point_holes, pos, 0);
-		txm.point_holes_size--;
 	}
 	rlist_del(&object->in_point_holes_list);
 	struct memtx_tx_mempool *pool = &txm.point_hole_item_pool;
