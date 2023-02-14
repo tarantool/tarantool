@@ -22,7 +22,9 @@ return {whoami = 'override.<module_name>'}
 
 -- Print a result of the require call.
 local MAIN_SCRIPT_TEMPLATE = [[
-print(require('json').encode({
+local json = require('json').new()
+json.cfg({encode_use_tostring = true})
+print(json.encode({
     ['script'] = '<script>',
     ['<module_name>'] = require('<module_name>'),
 }))
@@ -142,5 +144,37 @@ for _, module_name in ipairs(override_cases) do
         local res = justrun.tarantool(dir, {}, {'main.lua'})
         local exp = expected_output(module_name)
         t.assert_equals(res, exp)
+    end
+end
+
+local function parse_boolean(str, default)
+    if str:lower() == 'false' or str == '0' then
+        return false
+    end
+    if str:lower() == 'true' or str == '1' then
+        return true
+    end
+    return default
+end
+
+-- Verify that TT_OVERRIDE_BUILTIN=false and TT_OVERRIDE_BUILTIN=0
+-- disable the builtin modules overriding functionality.
+for _, envvar in ipairs({'false', 'true', '0', '1', '', 'X'}) do
+    local case_slug = envvar == '' and 'empty' or envvar:lower()
+    local case_name = ('test_override_onoff_%s'):format(case_slug)
+    g[case_name] = function(g)
+        local scripts = {'override/socket.lua', 'main.lua'}
+        local replacements = {module_name = 'socket'}
+        local dir = treegen.prepare_directory(g, scripts, replacements)
+        local env = {['TT_OVERRIDE_BUILTIN'] = envvar}
+        local res = justrun.tarantool(dir, env, {'main.lua'})
+        if parse_boolean(envvar, true) then
+            local exp = expected_output('socket')
+            t.assert_equals(res, exp)
+        else
+            t.assert_equals(#res.stdout, 1)
+            local socket = res.stdout[1].socket
+            t.assert_is_not(socket.tcp_connect, nil)
+        end
     end
 end

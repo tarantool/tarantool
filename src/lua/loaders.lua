@@ -199,6 +199,18 @@ local function prefix_loader(prefix, subloader)
     end
 end
 
+-- Accept a loader and return the same loader, but enabled only
+-- when given condition (a function return value) is true.
+local function conditional_loader(subloader, onoff)
+    assert(type(onoff) == 'function')
+    return function(name)
+        if onoff(name) then
+            return subloader(name)
+        end
+        -- It is okay to return nothing, require() ignores it.
+    end
+end
+
 -- Accept an array of loaders and return a loader, whose effect is
 -- equivalent to calling the loaders in a row.
 local function chain_loaders(subloaders)
@@ -238,6 +250,53 @@ table.insert(package.loaders, 5, gen_loader_func(search_rocks_lib, load_lib))
 -- package.cpath  7
 -- croot          8
 
+local function getenv_boolean(varname, default)
+    local envvar = os.getenv(varname)
+
+    -- If unset or empty, use the default.
+    if envvar == nil or envvar == '' then
+        return default
+    end
+
+    -- Explicitly enabled or disabled.
+    --
+    -- Accept false/true case insensitively.
+    --
+    -- Accept 0/1 as boolean values.
+    if envvar:lower() == 'false' or envvar == '0' then
+        return false
+    end
+    if envvar:lower() == 'true' or envvar == '1' then
+        return true
+    end
+
+    -- Can't parse the value, let's use the default.
+    return default
+end
+
+-- true/false if explicitly enabled or disabled, nil otherwise.
+local override_loader_is_enabled
+
+-- Whether the override loader is enabled.
+local function override_loader_onoff(_name)
+    -- Follow the switch if it is explicitly enabled or disabled.
+    if override_loader_is_enabled ~= nil then
+        return override_loader_is_enabled
+    end
+
+    -- Follow the environment variable otherwise.
+    return getenv_boolean('TT_OVERRIDE_BUILTIN', true)
+end
+
+local override_loader = conditional_loader(chain_loaders({
+    prefix_loader('override', package.loaders[2]),
+    prefix_loader('override', package.loaders[3]),
+    prefix_loader('override', package.loaders[4]),
+    prefix_loader('override', package.loaders[5]),
+    prefix_loader('override', package.loaders[6]),
+    prefix_loader('override', package.loaders[7]),
+}), override_loader_onoff)
+
 -- Add two loaders:
 --
 -- - Search for override.<module_name> module. It is necessary for
@@ -250,14 +309,7 @@ table.insert(package.loaders, 5, gen_loader_func(search_rocks_lib, load_lib))
 -- has a logic based on those loader positions.
 package.loaders[1] = chain_loaders({
     package.loaders[1],
-    chain_loaders({
-        prefix_loader('override', package.loaders[2]),
-        prefix_loader('override', package.loaders[3]),
-        prefix_loader('override', package.loaders[4]),
-        prefix_loader('override', package.loaders[5]),
-        prefix_loader('override', package.loaders[6]),
-        prefix_loader('override', package.loaders[7]),
-    }),
+    override_loader,
     builtin_loader,
 })
 
@@ -269,4 +321,10 @@ return {
     ROCKS_LIB_PATH = ROCKS_LIB_PATH,
     ROCKS_LUA_PATH = ROCKS_LUA_PATH,
     builtin = builtin_modules,
+    override_builtin_enable = function()
+        override_loader_is_enabled = true
+    end,
+    override_builtin_disable = function()
+        override_loader_is_enabled = false
+    end,
 }

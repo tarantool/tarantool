@@ -100,7 +100,7 @@ rawset(_G, 'pairs', pairs_M.builtin_pairs)
 assert(pairs ~= nil)
 assert(type(pairs) == 'function')
 
--- Remove the override loader.
+-- Disable the override loader.
 --
 -- If the override loader is enabled at least one test in the
 -- LuaJIT submodule fails: PUC-Rio-Lua-5.1-tests/attrib.lua.
@@ -135,9 +135,7 @@ assert(type(pairs) == 'function')
 -- loader behavior as valid. The loader is disabled to pass the
 -- test suite, but likely it would be more correct to discard the
 -- test case.
-local varname, subloaders = debug.getupvalue(package.loaders[1], 1)
-assert(varname == 'subloaders')
-table.remove(subloaders, 2)
+loaders.override_builtin_disable()
 
 -- This is workaround introduced for flaky macosx tests reported by
 -- https://github.com/tarantool/tarantool/issues/7058
