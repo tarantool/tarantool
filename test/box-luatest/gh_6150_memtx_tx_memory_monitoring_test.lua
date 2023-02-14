@@ -358,13 +358,57 @@ g.test_conflict = function()
     g.server:eval('tx1 = txn_proxy.new()')
     g.server:eval('tx2 = txn_proxy.new()')
     g.server:eval('box.internal.memtx_tx_gc(10)')
-    t.assert(table_values_are_zeros(g.server:eval('return box.stat.memtx.tx()')))
+    local stat = g.server:eval('return box.stat.memtx.tx()')
+    t.assert(table_values_are_zeros(stat))
+
+    -- Test that monitoring shows hole point tracker.
     g.server:eval('tx1:begin()')
     g.server:eval('tx2:begin()')
     g.server:eval('tx1("s:get(1)")')
+    g.server:eval("box.internal.memtx_tx_gc(10)")
+    local trackers_used = SIZE_OF_POINT_TRACKER
+    local diff = {
+        ["txn"] = {
+            ["statements"] = {
+                ["max"] = 0,
+                ["avg"] = 0,
+                ["total"] = 0,
+            },
+            ["system"] = {
+                ["max"] = 0,
+                ["avg"] = 0,
+                ["total"] = 0,
+            },
+        },
+        ["mvcc"] = {
+            ["trackers"] = {
+                ["max"] = trackers_used,
+                ["avg"] = math.floor(trackers_used / 2),
+                ["total"] = trackers_used,
+            },
+            ["conflicts"] = {
+                ["max"] = 0,
+                ["avg"] = 0,
+                ["total"] = 0,
+            },
+            ["tuples"] = {
+                ["used"] = {
+                    ["stories"] = {
+                        ["total"] = 0,
+                        ["count"] = 0,
+                    },
+                },
+            },
+        },
+    }
+    tx_gc(g.server, 10, diff)
+
+    -- Test that hole point tracker was replaced by normal read tracker.
     g.server:eval('tx2("s:replace{1, 2}")')
     g.server:eval("box.internal.memtx_tx_gc(10)")
-    local trackers_used = SIZE_OF_READ_TRACKER + SIZE_OF_POINT_TRACKER
+    -- Note that we have subtract the previous value of trackers_used
+    -- because point trackers are freed and we need negative diff for them.
+    trackers_used = SIZE_OF_READ_TRACKER - trackers_used
     local diff = {
         ["txn"] = {
             ["statements"] = {
