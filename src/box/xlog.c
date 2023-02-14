@@ -1151,7 +1151,11 @@ xlog_tx_write_zstd(struct xlog *log)
 {
 	char *fixheader = (char *)obuf_alloc(&log->zbuf,
 					     XLOG_FIXHEADER_SIZE);
-
+	if (fixheader == NULL) {
+		diag_set(OutOfMemory, XLOG_FIXHEADER_SIZE, "runtime arena",
+			 "compression buffer");
+		goto error;
+	}
 	uint32_t crc32c = 0;
 	struct iovec *iov;
 	/* 3 is compression level. */
