@@ -4,4 +4,8 @@ import platform
 if platform.system() == 'OpenBSD':
     self.skip = 1
 
+# Disabled on macOS/M1 due to fail tarantool/tarantool-qa#308.
+if platform.machine() == 'arm64' and platform.system() == 'Darwin':
+    self.skip = 1
+
 # vim: set ft=python:
