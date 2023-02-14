@@ -2022,7 +2022,7 @@ check_stack_direction(void *prev_stack_frame)
 void
 fiber_init(int (*invoke)(fiber_func f, va_list ap))
 {
-	page_size = sysconf(_SC_PAGESIZE);
+	page_size = small_getpagesize();
 	stack_direction = check_stack_direction(__builtin_frame_address(0));
 	fiber_invoke = invoke;
 	main_thread_id = pthread_self();
