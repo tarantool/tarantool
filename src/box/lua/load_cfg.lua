@@ -223,7 +223,7 @@ synchronisation with all the remote nodes. This means that the node
 might be in 'orphan' state for some time after the box.cfg{} call
 returns. Set before first box.cfg{} call in order for the option to take effect.
 
-https://github.com/tarantool/tarantool/wiki/compat%3Abox_cfg_replication_sync_timeout
+https://tarantool.io/compat/box_cfg_replication_sync_timeout
 ]]
 
 -- A list of box.cfg options whose defaults are managed by compat.

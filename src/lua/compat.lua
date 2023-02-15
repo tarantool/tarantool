@@ -20,7 +20,7 @@ json.encode() result. The old and the new behavior produce a result, which
 is compatible ith the JSON specification. However most of other JSON encoders
 don't escape the forward slash, so the new behavior is considered more safe.
 
-https://github.com/tarantool/tarantool/wiki/compat%3Ajson_escape_forward_slash
+https://tarantool.io/compat/json_escape_forward_slash
 ]]
 
 local YAML_PRETTY_MULTILINE_BRIEF = [[
@@ -29,7 +29,7 @@ containing "\n\n" substring. The new behavior makes all multiline string output
 as single text block which is handier for the reader, but may be incompatible
 with some existing applications that rely on the old style.
 
-https://github.com/tarantool/tarantool/wiki/compat%3Ayaml_pretty_multiline
+https://tarantool.io/compat/yaml_pretty_multiline
 ]]
 
 local FIBER_CHANNEL_GRACEFUL_CLOSE_BRIEF = [[
@@ -41,7 +41,7 @@ becomes empty, or will be deleted by GC if all links to it are lost, as before.
 The new behavior can break code that relies on `ch:get()` returning `nil` after
 channel close.
 
-https://github.com/tarantool/tarantool/wiki/compat%3Afiber_channel_close_mode
+https://tarantool.io/compat/fiber_channel_close_mode
 ]]
 
 -- Returns an action callback that toggles a tweak.
@@ -90,7 +90,7 @@ local options_order = { }
 
 local help = [[
 Tarantool compatibility module.
-To get help, see the Tarantool manual at https://github.com/tarantool/tarantool/wiki/compat .
+To get help, see the Tarantool manual at https://tarantool.io/compat
 Available commands:
 
     compat.help()                   -- show this help
