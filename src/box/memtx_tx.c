@@ -1785,7 +1785,7 @@ memtx_tx_gap_item_new(struct txn *txn, enum iterator_type type,
  * have read from this gap and thus must be sent to read view or conflicted.
  */
 static void
-memtx_tx_handle_gap_write(struct txn *txn, struct space *space,
+memtx_tx_handle_gap_write(struct space *space,
 			  struct memtx_story *story, struct tuple *tuple,
 			  struct tuple *successor, uint32_t ind)
 {
@@ -1794,9 +1794,8 @@ memtx_tx_handle_gap_write(struct txn *txn, struct space *space,
 	struct rlist *fsc_list = &index->full_scans;
 	uint64_t index_mask = 1ull << (ind & 63);
 	rlist_foreach_entry_safe(fsc_item, fsc_list, in_full_scans, fsc_tmp) {
-		if (fsc_item->txn != txn)
-			memtx_tx_track_read_story(fsc_item->txn, space, story,
-						  index_mask);
+		memtx_tx_track_read_story(fsc_item->txn, space, story,
+					  index_mask);
 	}
 	if (successor != NULL && !successor->is_dirty)
 		return; /* no gap records */
@@ -1836,10 +1835,6 @@ memtx_tx_handle_gap_write(struct txn *txn, struct space *space,
 						item->type == ITER_LT)));
 		bool need_track = need_split ||
 				  (is_full_key && cmp == 0 && is_e);
-		/* There's no need to track read of own change. */
-		if (story->add_stmt != NULL &&
-		    story->add_stmt->txn == item->txn)
-			need_track = false;
 		if (need_track)
 			memtx_tx_track_read_story(item->txn, space,
 						  story, index_mask);
@@ -1928,8 +1923,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		memtx_tx_story_link_top(add_story, replaced_story, 0, true);
 	} else {
 		memtx_tx_story_link_top(add_story, NULL, 0, true);
-		memtx_tx_handle_gap_write(stmt->txn, space,
-					  add_story, new_tuple,
+		memtx_tx_handle_gap_write(space, add_story, new_tuple,
 					  direct_successor[0], 0);
 	}
 
@@ -1940,8 +1934,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		if (directly_replaced[i] == NULL) {
-			memtx_tx_handle_gap_write(stmt->txn, space,
-						  add_story, new_tuple,
+			memtx_tx_handle_gap_write(space, add_story, new_tuple,
 						  direct_successor[i], i);
 			continue;
 		}
