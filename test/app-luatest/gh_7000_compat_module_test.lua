@@ -1,5 +1,5 @@
 local t = require('luatest')
-local compat = require('tarantool').compat
+local compat = require('compat')
 
 local g = t.group()
 
