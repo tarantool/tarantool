@@ -3,7 +3,6 @@
 
 local ffi = require('ffi')
 local loaders = require('internal.loaders')
-local compat = require('internal.compat')
 
 ffi.cdef[[
 struct method_info;
@@ -215,7 +214,6 @@ local mt = {
 return setmetatable({
     uptime = uptime,
     pid = pid,
-    compat = compat,
     _internal = {
         strip_cwd_from_path = strip_cwd_from_path,
         module_name_from_filename = module_name_from_filename,

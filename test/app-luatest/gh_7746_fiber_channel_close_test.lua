@@ -16,7 +16,7 @@ local function server_test_channel_close_default()
 end
 
 local function server_test_channel_close(mode)
-    local compat = require('tarantool').compat
+    local compat = require('compat')
     local fiber = require('fiber')
 
     -- Graceful close (new) selected.
@@ -44,7 +44,7 @@ local function server_test_channel_close(mode)
 end
 
 local server_test_close_reader_payload = function(mode)
-    local compat = require('tarantool').compat
+    local compat = require('compat')
     local fiber = require('fiber')
 
     compat.fiber_channel_close_mode = mode
@@ -77,7 +77,7 @@ local server_test_close_reader_payload = function(mode)
 end
 
 local server_test_close_writer_payload = function(mode)
-    local compat = require('tarantool').compat
+    local compat = require('compat')
     local fiber = require('fiber')
 
     compat.fiber_channel_close_mode = mode

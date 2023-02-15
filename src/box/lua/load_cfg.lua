@@ -7,7 +7,7 @@ local urilib = require('uri')
 local math = require('math')
 local fiber = require('fiber')
 local fio = require('fio')
-local compat = require('tarantool').compat
+local compat = require('compat')
 
 local function nop() end
 

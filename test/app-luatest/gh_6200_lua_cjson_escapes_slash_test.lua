@@ -2,7 +2,7 @@ local server = require('luatest.server')
 local t = require('luatest')
 
 local function server_test_json_encode()
-    local compat = require('tarantool').compat
+    local compat = require('compat')
     local json = require('json')
 
     -- Test that '/' is escaped with default setting.
@@ -44,7 +44,7 @@ local function server_test_json_encode()
 end
 
 local function server_test_json_new_encode()
-    local compat = require('tarantool').compat
+    local compat = require('compat')
     local json = require('json')
 
     compat.json_escape_forward_slash = 'old'
@@ -83,7 +83,7 @@ local function popen_test_json_log()
     t.assert(ph, 'process is not up')
 
     -- Set up compat and log.cfg.
-    ph:write('require("tarantool").compat.json_escape_forward_slash = "old"\n')
+    ph:write('require("compat").json_escape_forward_slash = "old"\n')
     ph:write('require("log").cfg{format = "json"}\n')
 
     -- Test old log.info behavior.
@@ -101,7 +101,7 @@ local function popen_test_json_log()
 
     t.assert_str_contains(output, '"message": "\\/"')
 
-    ph:write('require("tarantool").compat.json_escape_forward_slash = "new"\n')
+    ph:write('require("compat").json_escape_forward_slash = "new"\n')
     start_time = clock.monotonic();
     output = ''
     -- Test new log.info behavior.

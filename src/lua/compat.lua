@@ -1,5 +1,5 @@
--- compat.lua -- internal module intended to solve compatibility problems in
--- different parts of Tarantool. Introduced in gh-7000, see also gh-6912.
+-- compat.lua -- module intended to solve compatibility problems in different
+-- parts of Tarantool. Introduced in gh-7000, see also gh-6912.
 
 local NEW = true
 local OLD = false
@@ -235,7 +235,7 @@ function compat.dump(mode)
     else
         error("usage: compat.dump('new'/'old'/'default'/'current'/nil)")
     end
-    local result = [[require('tarantool').compat({]]
+    local result = [[require('compat')({]]
     local max_key_len = 0
     for _, key in pairs(options_order) do
         max_key_len = (#key > max_key_len) and #key or max_key_len
