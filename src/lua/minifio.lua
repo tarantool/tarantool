@@ -12,7 +12,11 @@ ffi.cdef([[
 
 -- {{{ Functions exposed by fio
 
--- NB: minifio.cwd() is defined in src/lua/minifio.c.
+-- Several functions are defined in src/lua/minifio.c.
+--
+-- List them to ease searching by a function name.
+assert(type(minifio.cwd) == 'function')
+assert(type(minifio.script) == 'function')
 
 function minifio.pathjoin(...)
     local i, path = 1, nil

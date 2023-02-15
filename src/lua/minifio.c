@@ -5,13 +5,30 @@
  */
 #include "lua/minifio.h"
 
+#include <string.h>
 #include <unistd.h>
 #include <lua.h>
 #include <lauxlib.h>
 
+#include "trivia/util.h"
 #include "diag.h"
 #include "lua/utils.h"
 #include "lua/error.h"
+
+static char *main_script = NULL;
+
+void
+minifio_set_script(const char *script)
+{
+	if (script == NULL) {
+		free(main_script);
+		main_script = NULL;
+		return;
+	}
+	size_t len = strlen(script);
+	main_script = xrealloc(main_script, len + 1);
+	memcpy(main_script, script, len + 1);
+}
 
 /**
  * Push nil and an error with strerror() based message.
@@ -45,11 +62,34 @@ lbox_minifio_cwd(struct lua_State *L)
 	return 1;
 }
 
+/**
+ * minifio.script() -- get path of the main script.
+ *
+ * Important: the path is returned verbatim as provided in the
+ * process'es arguments and should be interpreted relatively to
+ * current working directory *at tarantool startup*.
+ *
+ * The current working directory may be changed later and it'll
+ * make the path value invalid. Note that the directory may be
+ * changed implicitly by calling box.cfg().
+ */
+static int
+lbox_minifio_script(struct lua_State *L)
+{
+	if (main_script == NULL) {
+		lua_pushnil(L);
+		return 1;
+	}
+	lua_pushstring(L, main_script);
+	return 1;
+}
+
 void
 tarantool_lua_minifio_init(struct lua_State *L)
 {
 	static const struct luaL_Reg minifio_methods[] = {
 		{"cwd", lbox_minifio_cwd},
+		{"script", lbox_minifio_script},
 		{NULL, NULL}
 	};
 

@@ -797,7 +797,7 @@ main(int argc, char **argv)
 #ifndef NDEBUG
 	errinj_set_with_environment_vars();
 #endif
-	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
+	tarantool_lua_init(tarantool_bin, script, main_argc, main_argv);
 
 	start_time = ev_monotonic_time();
 

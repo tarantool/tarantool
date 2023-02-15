@@ -835,7 +835,8 @@ luaT_set_module_from_source(struct lua_State *L, const char *modname,
 }
 
 void
-tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
+tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
+		   char **argv)
 {
 	lua_State *L = luaL_newstate();
 	if (L == NULL) {
@@ -872,6 +873,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	 */
 	tarantool_lua_setpaths(L);
 	tarantool_lua_minifio_init(L);
+	minifio_set_script(script);
 	luaT_set_module_from_source(L, "internal.minifio", minifio_lua);
 	luaT_set_module_from_source(L, "internal.loaders", loaders_lua);
 

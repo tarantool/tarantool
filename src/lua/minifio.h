@@ -11,6 +11,12 @@ extern "C" {
 
 struct lua_State;
 
+/**
+ * Set path to the main script.
+ */
+void
+minifio_set_script(const char *script);
+
 void
 tarantool_lua_minifio_init(struct lua_State *L);
 

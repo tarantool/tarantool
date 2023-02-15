@@ -47,16 +47,11 @@ extern struct lua_State *tarantool_L;
 #define O_BYTECODE    0x2
 
 /**
- * Create an instance of Lua interpreter and load it with
- * Tarantool modules.  Creates a Lua state, imports global
- * Tarantool modules, then calls box_lua_init(), which performs
- * module-specific imports. The created state can be freed as any
- * other, with lua_close().
- *
- * @return  L on success, 0 if out of memory
+ * Create tarantool_L and initialize built-in Lua modules.
  */
 void
-tarantool_lua_init(const char *tarantool_bin, int argc, char **argv);
+tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
+		   char **argv);
 
 /** Free Lua subsystem resources. */
 void
