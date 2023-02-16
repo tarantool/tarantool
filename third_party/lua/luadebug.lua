@@ -161,28 +161,51 @@ local function format_stack_frame_info(info)
     return format_loc(source, info.currentline) .. " in " .. namewhat .. " " .. name
 end
 
-local suffix_arrays = {}
+local fio = require 'fio'
+local cwd = fio.cwd()
 
-local function normalize_file(file)
-    return file and (file:gsub('^@', ''):gsub('\n', '')) or ''
+local suffix_arrays = {} -- memoize file x tree resuls
+local normalized_files = {} -- memoize normalization results
+
+--[[
+    Normalize `debug.getinfo().source` names:
+    - remove leading '@';
+    - remove trailing new lines (if any);
+    - if there is leading '.' or '..' then calculate full path
+      using current directory.
+]]
+local function normalize_file(file, resolve_dots)
+    local srcfile = file
+    if not file then
+        return ''
+    end
+    if normalized_files[file] then
+        return normalized_files[file]
+    end
+    file = file:gsub('^@', ''):gsub('\n', '')
+    if resolve_dots and file:sub(1,1) == '.' then
+        file = fio.abspath(fio.pathjoin(cwd, file))
+    end
+    normalized_files[srcfile] = file
+    return file
 end
 
 -- This function is on a hot path of a debugger hook.
 -- Try very hard to avoid wasting of CPU cycles, so reuse
 -- previously calculated results via memoization
-local function build_suffix_array(file)
+local function build_suffix_array(file, resolve_dots)
     local decorated_name = file
     if suffix_arrays[decorated_name] ~= nil then
         return suffix_arrays[decorated_name]
     end
 
     local suffixes = {}
-    file = normalize_file(file)
+    file = normalize_file(file, resolve_dots)
     --[[
         we would very much prefer to use simple:
            for v in file:gmatch('[^/]+') do
         loop here, but string.gmatch is very slow
-        but we actually need several strchr's here
+        and that we actually need here are simple strchr's.
     ]]
     local i = 0
     local j
@@ -192,7 +215,11 @@ local function build_suffix_array(file)
         if j ~= nil then
             v = file:sub(i, j - 1)
             if v ~= '.' then -- just skip '.' for current dir
-                table.insert(suffixes, 1, v)
+                if v == '..' then
+                    table.remove(suffixes)
+                else
+                    table.insert(suffixes, 1, v)
+                end
             end
             i = j + 1
         end
@@ -200,7 +227,11 @@ local function build_suffix_array(file)
     -- don't forget to process the trailing segment
     v = file:sub(i, #file)
     if v ~= '.' then -- just skip '.' for current dir
-        table.insert(suffixes, 1, v)
+        if v == '..' then
+            table.remove(suffixes)
+        else
+            table.insert(suffixes, 1, v)
+        end
     end
 
     suffix_arrays[decorated_name] = suffixes
@@ -237,25 +268,20 @@ end
 
 -- lookup into suffix tree T given constructed suffix array S
 local function lookup_suffix_array(T, S)
-    -- short cut if there is no base name leaf created
-    if T[S[1]] == nil then
+    if #S < 1 then
         return false
     end
-
-    if #S < 1 then
+    -- we need to make sure that at least once
+    -- we have matched node inside of loop
+    -- so bail out immediately if there is no any single
+    -- match
+    if T[S[1]] == nil then
         return false
     end
 
     local C = T
     local P -- last accessed node
     local v
-    -- we need to make sure that at least once
-    -- we have matched node inside of loop
-    -- so bail out immediately if there is no any single
-    -- match
-    if not C[S[1]] then
-        return false
-    end
     for i = 1, #S do
         v = S[i]
         if C[v] == nil then
@@ -269,7 +295,7 @@ end
 
 --[[
     Given suffix tree T try to remove suffix array A
-    from the tree. Laaf and intermediate nodes will be
+    from the tree. Leafs and intermediate nodes will be
     cleaned up only once their reference counter '$ref'
     will reach 1.
 ]]
@@ -319,8 +345,8 @@ local function has_active_breakpoints()
 end
 
 local function add_breakpoint(file, line)
-    local suffixes = build_suffix_array(file)
-    local normfile = normalize_file(file)
+    local suffixes = build_suffix_array(file, true)
+    local normfile = normalize_file(file, true)
     -- save direct hash (for faster lookup): line -> file
     if not breakpoints[line] then
         breakpoints[line] = {}
@@ -334,11 +360,11 @@ local function add_breakpoint(file, line)
 end
 
 local function remove_breakpoint(file, line)
-    local normfile = normalize_file(file)
+    local normfile = normalize_file(file, true)
     if breakpoints[line] == nil then
         return false
     end
-    local suffixes = build_suffix_array(file)
+    local suffixes = build_suffix_array(file, true)
     remove_suffix_array(breakpoints[line], suffixes)
     breakpoints[normfile][line] = nil
 end

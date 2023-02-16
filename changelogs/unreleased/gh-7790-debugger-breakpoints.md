@@ -6,3 +6,5 @@
 
     break B/init.lua:10
     break A/init.lua:20
+    break ./main.lua:30
+    break ../a/b/c/leaf.lua:40
