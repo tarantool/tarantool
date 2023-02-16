@@ -334,7 +334,8 @@ local log_initialized = false
 -- Convert cfg options to types suitable for ffi say_ functions.
 local function log_C_cfg(cfg)
     local cfg_C = table.copy(cfg)
-    cfg_C.level = log_normalize_level(cfg.level)
+    local level = cfg.modules and cfg.modules.tarantool or cfg.level
+    cfg_C.level = log_normalize_level(level)
     local nonblock
     if cfg.nonblock ~= nil then
         nonblock = cfg.nonblock and 1 or 0
