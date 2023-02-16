@@ -17,6 +17,9 @@ TWEAK_BOOL(bool_var);
 static int int_var = 42;
 TWEAK_INT(int_var);
 
+static double double_var = 3.14;
+TWEAK_DOUBLE(double_var);
+
 enum my_enum {
 	MY_FOO,
 	MY_BAR,
@@ -34,11 +37,12 @@ TWEAK_ENUM(my_enum, enum_var);
 static void
 test_lookup(void)
 {
-	plan(4);
+	plan(5);
 	header();
 	ok(tweak_find("no_such_var") == NULL, "no_such_var not found");
 	ok(tweak_find("bool_var") != NULL, "bool_var found");
 	ok(tweak_find("int_var") != NULL, "int_var found");
+	ok(tweak_find("double_var") != NULL, "double_var found");
 	ok(tweak_find("enum_var") != NULL, "enum_var found");
 	footer();
 	check_plan();
@@ -56,6 +60,9 @@ test_foreach_cb(const char *name, struct tweak *tweak, void *arg)
 	} else if (strcmp(name, "int_var") == 0) {
 		is(v.type, TWEAK_VALUE_INT, "int_var tweak value type");
 		is(v.ival, 42, "int_var tweak value");
+	} else if (strcmp(name, "double_var") == 0) {
+		is(v.type, TWEAK_VALUE_DOUBLE, "double_var tweak value type");
+		is(v.dval, 3.14, "double_var tweak value");
 	} else if (strcmp(name, "enum_var") == 0) {
 		is(v.type, TWEAK_VALUE_STR, "enum_var tweak value type");
 		is(strcmp(v.sval, "BAR"), 0, "enum_var tweak value");
@@ -66,7 +73,7 @@ test_foreach_cb(const char *name, struct tweak *tweak, void *arg)
 static void
 test_foreach(void)
 {
-	plan(6);
+	plan(8);
 	header();
 	tweak_foreach(test_foreach_cb, NULL);
 	footer();
@@ -184,6 +191,52 @@ test_int_var(void)
 }
 
 static void
+test_double_var(void)
+{
+	plan(19);
+	header();
+	struct tweak *t;
+	struct tweak_value v;
+	t = tweak_find("double_var");
+	ok(t != NULL, "tweak found");
+	tweak_get(t, &v);
+	is(double_var, 3.14, "init var value");
+	is(v.type, TWEAK_VALUE_DOUBLE, "init tweak value type");
+	is(v.dval, 3.14, "init tweak value");
+	v.type = TWEAK_VALUE_BOOL;
+	v.bval = true;
+	is(tweak_set(t, &v), -1, "set invalid tweak value type");
+	ok(!diag_is_empty(diag_get()) &&
+	   strcmp(diag_last_error(diag_get())->errmsg,
+		  "Invalid value, expected number") == 0,
+	   "diag after set invalid tweak value type");
+	is(double_var, 3.14, "var value after failed set");
+	tweak_get(t, &v);
+	is(v.type, TWEAK_VALUE_DOUBLE, "tweak value type after failed set");
+	is(v.dval, 3.14, "tweak value after failed set");
+	v.type = TWEAK_VALUE_INT;
+	v.ival = 11;
+	is(tweak_set(t, &v), 0, "set tweak value to int");
+	is(double_var, 11, "var value after set to int")
+	tweak_get(t, &v);
+	is(v.type, TWEAK_VALUE_DOUBLE, "tweak value type after set to int");
+	is(v.dval, 11, "tweak value after set to int");
+	v.type = TWEAK_VALUE_DOUBLE;
+	v.dval = 0.5;
+	is(tweak_set(t, &v), 0, "set tweak value to double");
+	is(double_var, 0.5, "var value after set to double")
+	tweak_get(t, &v);
+	is(v.type, TWEAK_VALUE_DOUBLE, "tweak value type after set to double");
+	is(v.dval, 0.5, "tweak value after set to double");
+	double_var = 3.14;
+	tweak_get(t, &v);
+	is(v.type, TWEAK_VALUE_DOUBLE, "tweak value type after var update");
+	is(v.dval, 3.14, "tweak value after var update");
+	footer();
+	check_plan();
+}
+
+static void
 test_enum_var(void)
 {
 	plan(17);
@@ -232,13 +285,14 @@ test_enum_var(void)
 static int
 test_tweaks(void)
 {
-	plan(6);
+	plan(7);
 	header();
 	test_lookup();
 	test_foreach();
 	test_foreach_break();
 	test_bool_var();
 	test_int_var();
+	test_double_var();
 	test_enum_var();
 	footer();
 	return check_plan();

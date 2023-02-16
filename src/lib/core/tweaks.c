@@ -126,6 +126,29 @@ tweak_set_int(struct tweak *tweak, const struct tweak_value *val)
 	return 0;
 }
 
+void
+tweak_get_double(struct tweak *tweak, struct tweak_value *val)
+{
+	assert(tweak->get == tweak_get_double);
+	val->type = TWEAK_VALUE_DOUBLE;
+	val->dval = *(double *)tweak->data;
+}
+
+int
+tweak_set_double(struct tweak *tweak, const struct tweak_value *val)
+{
+	assert(tweak->set == tweak_set_double);
+	if (val->type == TWEAK_VALUE_INT) {
+		*(double *)tweak->data = val->ival;
+	} else if (val->type == TWEAK_VALUE_DOUBLE) {
+		*(double *)tweak->data = val->dval;
+	} else {
+		diag_set(IllegalParams, "Invalid value, expected number");
+		return -1;
+	}
+	return 0;
+}
+
 /**
  * snprintf(buf, size, "Invalid value, expected one of: '%s', '%s', ...",
  *          enum_strs[0], enum_strs[1], ...);
