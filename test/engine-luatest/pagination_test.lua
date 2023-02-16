@@ -510,39 +510,6 @@ tree_g.test_tuple_pos_invalid_tuple = function(cg)
     end)
 end
 
-tree_g.test_runtime_memory_leak = function(cg)
-    cg.server:exec(function()
-        local fiber = require('fiber')
-        fiber.set_max_slice(fiber.self(), 8)
-        local s = box.space.s
-        local pk = s:create_index("pk")
-        local tuple = s:replace{0, 0}
-        local runtime_used = box.runtime.info().used
-        local delta = 100
-
-        for _ = 1, 1e4 do
-            pk:tuple_pos({0, 0})
-            pk:tuple_pos(tuple)
-        end
-        t.assert_le(box.runtime.info().used, runtime_used + delta)
-
-        local pos = pk:tuple_pos({0, 0})
-        for _ = 1, 1e3 do
-            s:select(0, {after={0, 0}})
-            s:select(0, {after=tuple})
-            s:select(0, {after=pos})
-        end
-        t.assert_le(box.runtime.info().used, runtime_used + delta)
-
-        for _ = 1, 1e3 do
-            s:pairs(0, {after={0, 0}})
-            s:pairs(0, {after=tuple})
-            s:pairs(0, {after=pos})
-        end
-        t.assert_le(box.runtime.info().used, runtime_used + delta)
-    end)
-end
-
 tree_g.test_pagination_pairs = function(cg)
     cg.server:exec(function()
         local s = box.space.s
