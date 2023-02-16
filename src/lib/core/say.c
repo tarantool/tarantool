@@ -51,8 +51,9 @@
 
 pid_t log_pid = 0;
 /**
- * It is calculated as MAX(level, log_level_flightrec) where level - is log
- * level value to be set.
+ * The global log level. Used as an optimization by the say() macro to
+ * avoid unnecessary calls to say_default().
+ * Calculated as MAX(log_default->level, log_level_flightrec).
  */
 int log_level = S_INFO;
 /**

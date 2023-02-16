@@ -18,6 +18,28 @@ end)
 g2.before_each(function(cg)
     cg.server = server:new({alias = 'master'})
     cg.server:start()
+    cg.server:exec(function(cfg_type)
+        rawset(_G, 'log_cfg', function(params)
+            local function log2box_cfg(log_params)
+                local log2box_keys = {
+                    ['level']   = 'log_level',
+                    ['modules'] = 'log_modules'
+                }
+
+                local box_params = {}
+                for k, v in pairs(log_params) do
+                    box_params[log2box_keys[k]] = v
+                end
+                return box_params
+            end
+
+            if cfg_type == 'log_cfg' then
+                require('log').cfg(params)
+            elseif cfg_type == 'box_cfg' then
+                box.cfg(log2box_cfg(params))
+            end
+        end)
+    end, {cg.params.cfg_type})
 end)
 
 g1.after_each(function(cg)
@@ -50,28 +72,10 @@ end
 
 -- Test log.cfg{modules = {...}} and box.cfg{log_modules = {...}}
 g2.test_per_module_log_level = function(cg)
-    local cfg_type = cg.params.cfg_type
-
-    cg.server:exec(function(cfg_type)
+    cg.server:exec(function()
         local log = require('log')
-        local log2box_keys = {
-            ['level']   = 'log_level',
-            ['modules'] = 'log_modules'
-        }
-        local function log2box_cfg(log_params)
-            local box_params = {}
-            for k, v in pairs(log_params) do
-                box_params[log2box_keys[k]] = v
-            end
-            return box_params
-        end
-        local function log_cfg(params)
-            if cfg_type == 'log_cfg' then
-                log.cfg(params)
-            elseif cfg_type == 'box_cfg' then
-                box.cfg(log2box_cfg(params))
-            end
-        end
+        local log_cfg = _G.log_cfg
+
         local function assert_log_and_box_cfg_equals()
             t.assert_equals(log.cfg.level, box.cfg.log_level)
             t.assert_equals(log.cfg.modules.mod1, box.cfg.log_modules.mod1)
@@ -147,7 +151,7 @@ g2.test_per_module_log_level = function(cg)
             logn.info('info from ' .. logn.name)
             logn.debug('debug from ' .. logn.name)
         end
-    end, {cfg_type})
+    end)
 
     -- module1 has default log level ('info')
     find_in_log(cg, 'warn from module1', true)
@@ -173,4 +177,53 @@ g1.test_modname_deduction = function(cg)
         module.say_hello()
     end)
     find_in_log(cg, 'testmod I> hello', true)
+end
+
+-- Test log.cfg{modules = {tarantool = ...}} and
+-- box.cfg{log_modules = {tarantool = ...}} (gh-8320).
+g2.test_tarantool_module = function(cg)
+    -- When making changes to this test, keep in mind that server logs are
+    -- preserved between exec() calls.
+    cg.server:exec(function()
+        local log = require('log')
+        local ffi = require('ffi')
+        _G.log_cfg{level = 'debug', modules = {tarantool = 'verbose'}}
+
+        log.debug('Lua debug message 1')
+        ffi.C._say(ffi.C.S_DEBUG, nil, 0, nil, 'C debug message 1')
+        box.schema.create_space('C_log_level_is_verbose')
+    end)
+    find_in_log(cg, 'Lua debug message 1', true)
+    find_in_log(cg, 'C debug message 1', false)
+    find_in_log(cg, 'tuple_new', false) -- printed during create_space()
+
+    cg.server:exec(function()
+        local log = require('log')
+        local ffi = require('ffi')
+        _G.log_cfg{level = 'verbose', modules = {tarantool = 'debug'}}
+
+        log.debug('Lua debug message 2')
+        ffi.C._say(ffi.C.S_DEBUG, nil, 0, nil, 'C debug message 2')
+        box.schema.create_space('C_log_level_is_debug')
+    end)
+    find_in_log(cg, 'Lua debug message 2', false)
+    find_in_log(cg, 'C debug message 2', true)
+    find_in_log(cg, 'tuple_new', true) -- printed during create_space()
+
+    -- Reset global log level to the default value ("info") and check
+    -- that Tarantool C log level is still "debug".
+    cg.server:exec(function()
+        local log = require('log')
+        local ffi = require('ffi')
+        _G.log_cfg{level = box.NULL}
+
+        log.verbose('Lua verbose message 3')
+        ffi.C._say(ffi.C.S_DEBUG, nil, 0, nil, 'C debug message 3')
+    end)
+    find_in_log(cg, 'Lua verbose message 3', false)
+    find_in_log(cg, 'C debug message 3', true)
+
+    -- TODO(gh-7962)
+    -- Check that box.NULL unsets custom Tarantool C log level.
+    -- _G.log_cfg{modules = {tarantool = box.NULL}}
 end
