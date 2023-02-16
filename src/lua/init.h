@@ -53,6 +53,12 @@ void
 tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 		   char **argv);
 
+/**
+ * A code that runs after loading of all built-in modules.
+ */
+int
+tarantool_lua_postinit(struct lua_State *L);
+
 /** Free Lua subsystem resources. */
 void
 tarantool_lua_free();
