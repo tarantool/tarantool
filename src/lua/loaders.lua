@@ -250,6 +250,62 @@ table.insert(package.loaders, 5, gen_loader_func(search_rocks_lib, load_lib))
 -- package.cpath  7
 -- croot          8
 
+-- Search for modules next to the main script.
+--
+-- If the script is not provided (script == nil) or provided as
+-- stdin (script == '-'), there is no script directory, so nothing
+-- to do here.
+local script = minifio.script()
+if script ~= nil and script ~= '-' then
+    -- It is important to obtain the directory at initialization,
+    -- before any cwd change may occur. The script path may be
+    -- passed as relative to the current directory.
+    local script_dir = minifio.dirname(minifio.abspath(script))
+    local function script_dir_fn()
+        return script_dir
+    end
+
+    -- Search non-recursively, only next to the script.
+    local search_app_lua = gen_search_func(script_dir_fn, LUA_TEMPLATES)
+    local search_app_lib = gen_search_func(script_dir_fn, LIB_TEMPLATES)
+    local search_app_rocks_lua = gen_search_func(script_dir_fn,
+        ROCKS_LUA_TEMPLATES)
+    local search_app_rocks_lib = gen_search_func(script_dir_fn,
+        ROCKS_LIB_TEMPLATES)
+
+    -- Mix the script directory loaders into corresponding
+    -- searchroot based loaders. It allows to avoid changing
+    -- ordinals of the loaders and also makes the override
+    -- loader search here.
+    --
+    -- We can just add more paths to package.path/package.cpath,
+    -- but:
+    --
+    -- * Search for override modules is implemented as a loader.
+    -- * Search inside .rocks in implemented as a loaders.
+    --
+    -- And it is simpler to wrap this logic rather than repeat.
+    -- It is possible (and maybe even desirable) to reimplement
+    -- all the loaders logic as paths generation, but we should
+    -- do that for all the logic at once.
+    package.loaders[2] = chain_loaders({
+        package.loaders[2],
+        gen_loader_func(search_app_lua, load_lua),
+    })
+    package.loaders[3] = chain_loaders({
+        package.loaders[3],
+        gen_loader_func(search_app_lib, load_lib),
+    })
+    package.loaders[4] = chain_loaders({
+        package.loaders[4],
+        gen_loader_func(search_app_rocks_lua, load_lua),
+    })
+    package.loaders[5] = chain_loaders({
+        package.loaders[5],
+        gen_loader_func(search_app_rocks_lib, load_lib),
+    })
+end
+
 local function getenv_boolean(varname, default)
     local envvar = os.getenv(varname)
 
