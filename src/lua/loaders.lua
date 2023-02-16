@@ -383,4 +383,7 @@ return {
     override_builtin_disable = function()
         override_loader_is_enabled = false
     end,
+    -- It is `true` during tarantool initialization, but once all
+    -- the built-in modules are ready, will be set to `nil`.
+    initializing = true,
 }

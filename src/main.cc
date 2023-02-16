@@ -804,6 +804,7 @@ main(int argc, char **argv)
 	try {
 		box_init();
 		box_lua_init(tarantool_L);
+		tarantool_lua_postinit(tarantool_L);
 		/*
 		 * Reserve a fiber to run on_shutdown triggers.
 		 */

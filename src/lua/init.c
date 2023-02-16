@@ -967,6 +967,27 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	tarantool_L = L;
 }
 
+int
+tarantool_lua_postinit(struct lua_State *L)
+{
+	/*
+	 * loaders.initializing = nil
+	 *
+	 * The loaders module set the `initializing` field to
+	 * `true` at first load (during tarantool_lua_init()).
+	 * Now it is time to set it to `nil` to state that all
+	 * the built-in modules are loaded.
+	 */
+	lua_getfield(L, LUA_GLOBALSINDEX, "require");
+	lua_pushstring(L, "internal.loaders");
+	lua_call(L, 1, 1);
+	lua_pushnil(L);
+	lua_setfield(L, -2, "initializing");
+	/* Pop internal.loaders table. */
+	lua_pop(L, 1);
+	return 0;
+}
+
 char *history = NULL;
 
 struct slab_cache *
