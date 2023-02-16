@@ -383,65 +383,6 @@ end
 --  Tarantool Enterprise 2.11.0-entrypoint-113-g803baaf
 --  type 'help' for interactive help
 --  tarantool> box.cfg{}
---  tarantool> box.schema.space.create('room')
---  tarantool> box.space.room:format{{name = 'tower', type = 'string'},
---                        {name = 'number', type = 'string'}}
---  tarantool> box.schema.space.create('meeting', {foreign_key = {
---      space = 'room',
---      field = {room_tower = 'tower', room_number = 'number'},
---  }})
---  tarantool> box.space.meeting:format{{name = 'id', type = 'unsigned'},
---                           {name = 'room_tower', type = 'string'},
---                           {name = 'room_number', type = 'string'}}
---  tarantool> box.schema.downgrade('2.9.1')
---  ---
---  - error: 'builtin/box/upgrade.lua:1861: Foreign key constraint is found in
---      space ''meeting''. It is supported starting from version 2.10.0.'
---  ...
-g.test_downgrade_tuple_foreign_key_contraint = function(cg)
-    cg.server:exec(function()
-        local helper = require('test.box-luatest.downgrade_helper')
-
-        local room = box.schema.space.create('room')
-        room:format{{name = 'tower', type = 'string'},
-                    {name = 'number', type = 'string'}}
-
-        local meeting = box.schema.space.create('meeting')
-        meeting:format{{name = 'id', type = 'unsigned'},
-                       {name = 'room_tower', type = 'string'},
-                       {name = 'room_number', type = 'string'}}
-
-        local booking = box.schema.space.create('booking')
-        meeting:format{{name = 'id', type = 'unsigned'},
-                       {name = 'room_tower', type = 'string'},
-                       {name = 'room_number', type = 'string'}}
-
-        local flags = {
-            foreign_key = {
-                room = {
-                    space = room.id,
-                    field = {room_tower = 'tower', room_number = 'number'}
-                },
-            },
-        }
-        box.space._space:update(meeting.id, {{'=', 'flags', flags}})
-        box.space._space:update(booking.id, {{'=', 'flags', flags}})
-
-        helper.check_issues('2.10.0', {
-            "Foreign key constraint is found in space 'meeting'. " ..
-            "It is supported starting from version 2.10.0.",
-            "Foreign key constraint is found in space 'booking'. " ..
-            "It is supported starting from version 2.10.0.",
-        })
-    end)
-end
-
-
--- Manual check:
---
---  Tarantool Enterprise 2.11.0-entrypoint-113-g803baaf
---  type 'help' for interactive help
---  tarantool> box.cfg{}
 --  tarantool> box.schema.func.create('azimuth_normalized', {
 --      language = 'LUA',
 --      is_deterministic = true,
@@ -571,6 +512,52 @@ g.test_downgrade_tuple_contraint = function(cg)
             "Tuple constraint is found in space 'pos_in_circle'. " ..
             "It is supported starting from version 2.10.0.",
         })
+    end)
+end
+
+-- Check that FOREIGN KEY constraints could be downgraded.
+g.test_downgrade_sql_tuple_foreign_keys = function(cg)
+    cg.server:exec(function()
+        local helper = require('test.box-luatest.downgrade_helper')
+
+        box.execute([[CREATE TABLE t(i INT PRIMARY KEY, a INT, UNIQUE(a, i));]])
+        box.execute([[ALTER TABLE t ADD CONSTRAINT f ]]..
+                    [[FOREIGN KEY (i, a) REFERENCES t(a, i);]])
+
+        local function foreign_key_before()
+            local space = box.space._space.index.name:get{'T'}
+            t.assert(space.flags.foreign_key ~= nil)
+            t.assert(space.flags.foreign_key.F ~= nil)
+            t.assert_equals(space.flags.foreign_key.F.space, space.id)
+            t.assert_equals(space.flags.foreign_key.F.field, {[0] = 1, [1] = 0})
+        end
+
+        local function foreign_key_after()
+            local space = box.space._space.index.name:get{'T'}
+            t.assert(space.flags.foreign_key == nil)
+            local result = box.space._fk_constraint:get{'F', space.id}
+            local expected = {'F', space.id, space.id, false, 'full',
+                              'no_action', 'no_action', {0, 1}, {1, 0}}
+            t.assert_equals(result, expected)
+        end
+
+        foreign_key_before()
+
+        local app_version = helper.app_version('2.10.0')
+        t.assert_equals(box.schema.downgrade_issues(app_version), {})
+        box.schema.downgrade(app_version)
+        foreign_key_before()
+
+        local prev_version = helper.prev_version('2.10.0')
+        t.assert_equals(box.schema.downgrade_issues(prev_version), {})
+        foreign_key_before()
+
+        box.schema.downgrade(prev_version)
+        foreign_key_after()
+
+        -- idempotence check
+        box.schema.downgrade(prev_version)
+        foreign_key_after()
     end)
 end
 
@@ -781,5 +768,53 @@ g.test_downgrade_user_auth_history_and_last_modified = function(cg)
         -- idempotence check
         box.schema.downgrade(prev_version)
         check_NO_new_auth_fields()
+    end)
+end
+
+-- Check that SQL CHECK constraints could be downgraded.
+g.test_downgrade_sql_tuple_check_contraints = function(cg)
+    cg.server:exec(function()
+        local helper = require('test.box-luatest.downgrade_helper')
+
+        box.execute([[CREATE TABLE t(i INT PRIMARY KEY, a INT);]])
+        box.execute([[ALTER TABLE t ADD CONSTRAINT c CHECK (a > 10);]])
+
+        local function constraint_before()
+            local space = box.space._space.index.name:get{'T'}
+            t.assert(space.flags.constraint ~= nil)
+            local func_id = space.flags.constraint.C
+            t.assert(func_id ~= nil)
+            local func = box.space._func:get{func_id}
+            t.assert(func ~= nil)
+            t.assert_equals(func.body, 'a > 10')
+        end
+
+        local function constraint_after(func_id)
+            local space = box.space._space.index.name:get{'T'}
+            t.assert(box.space._func:get{func_id} == nil)
+            t.assert(space.flags.constraint == nil)
+            local result = box.space._ck_constraint:get{space.id, 'C'}
+            local expected = {space.id, 'C', false, 'SQL', 'a > 10', true}
+            t.assert_equals(result, expected)
+        end
+
+        constraint_before()
+        local func_id = box.space._space.index.name:get{'T'}.flags.constraint.C
+
+        local app_version = helper.app_version('2.11.0')
+        t.assert_equals(box.schema.downgrade_issues(app_version), {})
+        box.schema.downgrade(app_version)
+        constraint_before()
+
+        local prev_version = helper.prev_version('2.11.0')
+        t.assert_equals(box.schema.downgrade_issues(prev_version), {})
+        constraint_before()
+
+        box.schema.downgrade(prev_version)
+        constraint_after(func_id)
+
+        -- idempotence check
+        box.schema.downgrade(prev_version)
+        constraint_after(func_id)
     end)
 end
