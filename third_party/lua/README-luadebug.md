@@ -121,6 +121,31 @@ then there is special breakpoint location name `*` that could be used:
 
   bd *
 
+Path normalization rules
+-
+
+There are simple rules, which debugger uses for handling of `.` and `..`
+inside of path entered in debugger breakpoint commands (`b` or `bd`).
+_All these normalizations will be performed at the moment of setting/deleting
+breakpoints, not at the run-time._
+
+* `..` at the header `break ../c/a/b.lua` will be converted to the absolute
+  path using current working directory. May not work, if, at the moment of
+  execution in the debugger, `debug.getinfo(n, "S").source` will contains
+  relative path.
+
+* Preceding `.` for `break ./c/a/b.lua` will, similarly to above, be converted
+  to the absolute path using base working directory. May not work, if, at the
+  moment of execution in the debugger, `debug.getinfo(n, "S").source` will
+  contains relative path.
+
+* `..` and `.` inside of a path will be simplified, before saving:
+
+```lua
+break x/../c/a/b.lua -- > c/a/b.lua
+break x/./c/a/b.lua -- > x/c/a/b.lua
+```
+
 Debugger API
 -
 
