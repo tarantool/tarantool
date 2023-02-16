@@ -773,6 +773,11 @@ main(int argc, char **argv)
 
 	start_time = ev_monotonic_time();
 
+	int pair[2];
+	socketpair(AF_UNIX, SOCK_STREAM, 0, pair);
+	close(pair[0]);
+	close(pair[1]);
+
 	try {
 		box_init();
 		box_lua_init(tarantool_L);
