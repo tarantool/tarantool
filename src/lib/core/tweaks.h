@@ -35,6 +35,7 @@ extern "C" {
 enum tweak_value_type {
 	TWEAK_VALUE_BOOL,
 	TWEAK_VALUE_INT,
+	TWEAK_VALUE_DOUBLE,
 	TWEAK_VALUE_STR,
 };
 
@@ -47,6 +48,8 @@ struct tweak_value {
 		bool bval;
 		/** TWEAK_VALUE_INT */
 		int ival;
+		/** TWEAK_VALUE_DOUBLE */
+		double dval;
 		/** TWEAK_VALUE_STR */
 		const char *sval;
 	};
@@ -165,6 +168,19 @@ tweak_set_int(struct tweak *tweak, const struct tweak_value *val);
 #define TWEAK_INT(var)							\
 STATIC_ASSERT_VAR_TYPE(var, int)					\
 TWEAK(var, tweak_get_int, tweak_set_int)
+
+/** Double tweak value getter. */
+void
+tweak_get_double(struct tweak *tweak, struct tweak_value *val);
+
+/** Double tweak value setter. */
+int
+tweak_set_double(struct tweak *tweak, const struct tweak_value *val);
+
+/** Registers a tweak for a double variable. */
+#define TWEAK_DOUBLE(var)						\
+STATIC_ASSERT_VAR_TYPE(var, double)					\
+TWEAK(var, tweak_get_double, tweak_set_double)
 
 /**
  * Internal function that converts a tweak value to a enumeration.

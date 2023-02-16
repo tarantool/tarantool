@@ -25,6 +25,9 @@ TWEAK_BOOL(bool_var);
 static int int_var = 42;
 TWEAK_INT(int_var);
 
+static double double_var = 3.14;
+TWEAK_DOUBLE(double_var);
+
 enum my_enum {
 	MY_FOO,
 	MY_BAR,
@@ -42,7 +45,7 @@ TWEAK_ENUM(my_enum, enum_var);
 static void
 test_index(void)
 {
-	plan(8);
+	plan(10);
 	header();
 	lua_settop(L, 0);
 	is(luaT_dostring(L, "return tweaks.no_such_var"), 0, "no_such_var");
@@ -54,6 +57,9 @@ test_index(void)
 	is(luaT_dostring(L, "return tweaks.int_var"), 0, "int_var");
 	ok(!lua_isnoneornil(L, 1), "int_var found");
 	lua_settop(L, 0);
+	is(luaT_dostring(L, "return tweaks.double_var"), 0, "double_var");
+	ok(!lua_isnoneornil(L, 1), "double_var found");
+	lua_settop(L, 0);
 	is(luaT_dostring(L, "return tweaks.enum_var"), 0, "enum_var");
 	ok(!lua_isnoneornil(L, 1), "enum_var found");
 	lua_settop(L, 0);
@@ -64,7 +70,7 @@ test_index(void)
 static void
 test_newindex(void)
 {
-	plan(8);
+	plan(6);
 	header();
 	is(luaT_dostring(L, "tweaks.no_such_var = 1"), -1, "unknown option");
 	ok(!diag_is_empty(diag_get()) &&
@@ -74,19 +80,13 @@ test_newindex(void)
 	   "invalid value - table");
 	ok(!diag_is_empty(diag_get()) &&
 	   strcmp(diag_last_error(diag_get())->errmsg,
-		  "Value must be boolean, integer, or string") == 0,
+		  "Value must be boolean, number, or string") == 0,
 	   "check error");
-	is(luaT_dostring(L, "tweaks.bool_var = 0.5"), -1,
-	   "invalid value - double");
-	ok(!diag_is_empty(diag_get()) &&
-	   strcmp(diag_last_error(diag_get())->errmsg,
-		  "Value must be boolean, integer, or string") == 0,
-	   "check error");
-	is(luaT_dostring(L, "tweaks.bool_var = 8589934592"), -1,
+	is(luaT_dostring(L, "tweaks.bool_var = 999999999999999999LLU"), -1,
 	   "invalid value - big int");
 	ok(!diag_is_empty(diag_get()) &&
 	   strcmp(diag_last_error(diag_get())->errmsg,
-		  "Value must be boolean, integer, or string") == 0,
+		  "Value must be boolean, number, or string") == 0,
 	   "check error");
 	footer();
 	check_plan();
@@ -145,6 +145,32 @@ test_int_var(void)
 }
 
 static void
+test_double_var(void)
+{
+	plan(10);
+	header();
+	lua_settop(L, 0);
+	is(luaT_dostring(L, "tweaks.double_var = true"), -1,
+	   "set invalid value");
+	ok(!diag_is_empty(diag_get()) &&
+	   strcmp(diag_last_error(diag_get())->errmsg,
+		  "Invalid value, expected number") == 0,
+	   "check error");
+	is(luaT_dostring(L, "tweaks.double_var = 11"), 0, "set int value");
+	is(double_var, 11, "check C value");
+	is(luaT_dostring(L, "return tweaks.double_var"), 0, "get value");
+	is(lua_tonumber(L, 1), 11, "check Lua value");
+	lua_settop(L, 0);
+	is(luaT_dostring(L, "tweaks.double_var = 3.14"), 0, "set double value");
+	is(double_var, 3.14, "check C value");
+	is(luaT_dostring(L, "return tweaks.double_var"), 0, "get value");
+	is(lua_tonumber(L, 1), 3.14, "check Lua value");
+	lua_settop(L, 0);
+	footer();
+	check_plan();
+}
+
+static void
 test_enum_var(void)
 {
 	plan(12);
@@ -179,7 +205,7 @@ test_enum_var(void)
 static void
 test_tweak_table(const char *method)
 {
-	plan(4);
+	plan(5);
 	header();
 	lua_settop(L, 0);
 	is(luaT_dostring(L, tt_sprintf("return getmetatable(tweaks).%s()",
@@ -190,6 +216,9 @@ test_tweak_table(const char *method)
 	lua_pop(L, 1);
 	lua_getfield(L, 1, "int_var");
 	is(lua_tointeger(L, 2), 42, "int_var");
+	lua_pop(L, 1);
+	lua_getfield(L, 1, "double_var");
+	is(lua_tonumber(L, 2), 3.14, "double_var");
 	lua_pop(L, 1);
 	lua_getfield(L, 1, "enum_var");
 	is(strcmp(lua_tostring(L, 2), "BAR"), 0, "enum_var");
@@ -222,12 +251,13 @@ test_autocomplete(void)
 static int
 test_lua_tweaks(void)
 {
-	plan(7);
+	plan(8);
 	header();
 	test_index();
 	test_newindex();
 	test_bool_var();
 	test_int_var();
+	test_double_var();
 	test_enum_var();
 	test_serialize();
 	test_autocomplete();

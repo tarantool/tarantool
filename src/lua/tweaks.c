@@ -28,6 +28,9 @@ luaT_push_tweak_value(struct lua_State *L, const struct tweak_value *v)
 	case TWEAK_VALUE_INT:
 		lua_pushinteger(L, v->ival);
 		return 1;
+	case TWEAK_VALUE_DOUBLE:
+		lua_pushnumber(L, v->dval);
+		return 1;
 	case TWEAK_VALUE_STR:
 		lua_pushstring(L, v->sval);
 		return 1;
@@ -73,20 +76,25 @@ luaT_tweaks_newindex(struct lua_State *L)
 		v.type = TWEAK_VALUE_BOOL;
 		v.bval = lua_toboolean(L, 3);
 		break;
-	case LUA_TNUMBER:
-		v.type = TWEAK_VALUE_INT;
-		v.ival = lua_tointeger(L, 3);
-		if (lua_tonumber(L, 3) != v.ival)
-			goto invalid_value;
+	case LUA_TNUMBER: {
+		int ival = lua_tointeger(L, 3);
+		double dval = lua_tonumber(L, 3);
+		if (ival == dval) {
+			v.type = TWEAK_VALUE_INT;
+			v.ival = ival;
+		} else {
+			v.type = TWEAK_VALUE_DOUBLE;
+			v.dval = dval;
+		}
 		break;
+	}
 	case LUA_TSTRING:
 		v.type = TWEAK_VALUE_STR;
 		v.sval = lua_tostring(L, 3);
 		break;
 	default:
-invalid_value:
 		diag_set(IllegalParams,
-			 "Value must be boolean, integer, or string");
+			 "Value must be boolean, number, or string");
 		return luaT_error(L);
 	}
 	if (tweak_set(t, &v) != 0)
