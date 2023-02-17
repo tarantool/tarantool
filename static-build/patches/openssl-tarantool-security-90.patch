@@ -1,0 +1,11 @@
+--- openssl.old/ssl/record/ssl3_record.c	2023-02-17 11:10:19.399907899 +0300
++++ openssl/ssl/record/ssl3_record.c	2023-02-17 11:12:52.921915746 +0300
+@@ -1201,7 +1201,7 @@
+     }
+ 
+     t = EVP_MD_CTX_size(hash);
+-    if (t < 0)
++    if (t <= 0)
+         return 0;
+     md_size = t;
+     npad = (48 / md_size) * md_size;
