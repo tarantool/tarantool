@@ -186,6 +186,24 @@ lbox_fiber_statof_map(struct fiber *f, void *cb_ctx, bool backtrace)
 	lua_pushnumber(L, f->clock_stat.cputime / (double) FIBER_TIME_RES);
 	lua_settable(L, -3);
 
+	struct fiber_slice slice = fiber_get_max_slice(f);
+	if (slice.warn < TIMEOUT_INFINITY ||
+	    slice.err < TIMEOUT_INFINITY) {
+		lua_pushliteral(L, "max_slice");
+		lua_newtable(L);
+		if (slice.warn < TIMEOUT_INFINITY) {
+			lua_pushliteral(L, "warn");
+			lua_pushnumber(L, slice.warn);
+			lua_settable(L, -3);
+		}
+		if (slice.err < TIMEOUT_INFINITY) {
+			lua_pushliteral(L, "err");
+			lua_pushnumber(L, slice.err);
+			lua_settable(L, -3);
+		}
+		lua_settable(L, -3);
+	}
+
 	lua_pushliteral(L, "memory");
 	lua_newtable(L);
 	lua_pushstring(L, "used");
