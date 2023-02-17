@@ -856,19 +856,25 @@ lbox_fiber_slice_parse(struct lua_State *L, int idx)
 	struct fiber_slice slice;
 	if (lua_istable(L, idx)) {
 		lua_getfield(L, idx, "warn");
-		slice.warn = luaL_checknumber(L, -1);
+		if (!lua_isnumber(L, -1))
+			goto err;
+		slice.warn = lua_tonumber(L, -1);
 		lua_getfield(L, idx, "err");
-		slice.err = luaL_checknumber(L, -1);
+		if (!lua_isnumber(L, -1))
+			goto err;
+		slice.err = lua_tonumber(L, -1);
 		lua_pop(L, 2);
 	} else if (lua_isnumber(L, idx)) {
 		slice.warn = TIMEOUT_INFINITY;
 		slice.err = lua_tonumber(L, idx);
 	} else {
-		luaL_error(L, "slice must be a table or a number");
+err:
+		luaL_error(L, "slice must be a number or a table "
+			   "{warn = <number>, err = <number>}");
 		unreachable();
 	}
 	if (!fiber_slice_is_valid(slice))
-		luaL_error(L, "slice must be greater than 0");
+		luaL_error(L, "slice value must be >= 0");
 	return slice;
 }
 
