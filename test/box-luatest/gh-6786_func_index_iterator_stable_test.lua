@@ -57,3 +57,54 @@ g.test_func_index_iterator_stable = function()
         t.assert_equals(s.index.f:select(), {})
     end)
 end
+
+g.before_test('test_func_index_allocator', function()
+    g.server:exec(function()
+        box.schema.func.create('test', {
+            body = [[function(t)
+                return {{string.sub(t[1], 1, t[2])}}
+            end]],
+            is_deterministic = true,
+            is_sandboxed = true,
+            opts = { is_multikey = true },
+        })
+        local s = box.schema.create_space('test')
+        s:create_index('pk', {
+            parts = {{1, 'string'}},
+        })
+        s:create_index('f', {
+            func = 'test',
+            parts = {{1, 'string'}},
+        })
+    end)
+end)
+
+g.after_test('test_func_index_allocator', function()
+    g.server:exec(function()
+        box.space.test:drop()
+        box.schema.func.drop('test')
+    end)
+end)
+
+-- Test different sizes of functional index.
+g.test_func_index_allocator = function()
+    g.server:exec(function()
+        local t = require('luatest')
+        local s = box.space.test
+        local MIN_STRING_LEN = 8
+        local MAX_STRING_LEN = 256
+        local STRING_LEN_STEP = 4
+        local MAX_ALLOCS = 128
+        local str = string.rep('a', MAX_STRING_LEN)
+
+        for i = MIN_STRING_LEN, MAX_STRING_LEN, STRING_LEN_STEP do
+            for j = 1, MAX_ALLOCS do
+                s:insert{j .. str,  i}
+            end
+            t.assert_equals(s.index.f:count(), MAX_ALLOCS)
+            for j = 1, MAX_ALLOCS do
+                s:delete{j .. str}
+            end
+        end
+    end)
+end
