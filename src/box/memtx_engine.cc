@@ -91,7 +91,7 @@ memtx_alloc_impl(uint32_t size)
 {
 	void *ptr = MemtxAllocator<ALLOC>::alloc(size + sizeof(uint32_t));
 	if (ptr != NULL) {
-		*(uint32_t *)ptr = size;
+		*(uint32_t *)ptr = size + sizeof(uint32_t);
 		return (uint32_t *)ptr + 1;
 	}
 	return NULL;
