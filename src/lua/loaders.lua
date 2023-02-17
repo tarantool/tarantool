@@ -373,6 +373,27 @@ rawset(package, "search", search)
 rawset(package, "searchroot", searchroot)
 rawset(package, "setsearchroot", setsearchroot)
 
+local no_package_loaded = {}
+local raw_require = require
+
+-- Allow an override module to refuse caching in package.loaded.
+--
+-- It may be useful to return a built-in module into the platform,
+-- but the override module into application's code.
+_G.require = function(modname)
+    if no_package_loaded[modname] then
+        no_package_loaded[modname] = nil
+        package.loaded[modname] = nil
+    end
+    -- NB: This call is a tail call and it is important to some
+    -- extent. At least luajit's test suites expect certain error
+    -- messages from `require()` calls and from the `-l` option.
+    --
+    -- A non-tail call changes the filename at the beginning of
+    -- the error message.
+    return raw_require(modname)
+end
+
 return {
     ROCKS_LIB_PATH = ROCKS_LIB_PATH,
     ROCKS_LUA_PATH = ROCKS_LUA_PATH,
@@ -386,4 +407,15 @@ return {
     -- It is `true` during tarantool initialization, but once all
     -- the built-in modules are ready, will be set to `nil`.
     initializing = true,
+    raw_require = raw_require,
+    -- Add a module name here to ignore package.loaded[modname] at
+    -- next require(). The flag is dropped at the require() call.
+    --
+    -- This is intended to be used from inside a module to refuse
+    -- caching in package.loaded. Any other usage has unspecified
+    -- behavior (just manipulate package.loaded directly if you
+    -- need it).
+    --
+    -- Usage: loaders.no_package_loaded[modname] = true
+    no_package_loaded = no_package_loaded,
 }
