@@ -77,6 +77,7 @@ ExternalProject_Add(openssl
     PATCH_COMMAND patch -d <SOURCE_DIR> -p1 -i "${PATCHES_DIR}/openssl-111q-gh-18720.patch"
     COMMAND       patch -d <SOURCE_DIR> -p1 -i "${PATCHES_DIR}/openssl-tarantool-security-27.patch"
     COMMAND       patch -d <SOURCE_DIR> -p1 -i "${PATCHES_DIR}/openssl-tarantool-security-54.patch"
+    COMMAND       patch -d <SOURCE_DIR> -p1 -i "${PATCHES_DIR}/openssl-tarantool-security-90.patch"
 )
 set(TARANTOOL_DEPENDS openssl ${TARANTOOL_DEPENDS})
 
