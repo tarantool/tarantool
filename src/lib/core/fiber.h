@@ -1030,6 +1030,17 @@ fiber_set_max_slice(struct fiber *fib, struct fiber_slice slice)
 }
 
 /**
+ * Returns the max effective slice applied to the given fiber.
+ */
+static inline struct fiber_slice
+fiber_get_max_slice(struct fiber *fib)
+{
+	assert(cord_is_main());
+	return (fib->flags & FIBER_CUSTOM_SLICE) != 0 ?
+	       fib->max_slice : cord()->max_slice;
+}
+
+/**
  * Check if slice is over for current cord.
  */
 static inline int

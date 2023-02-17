@@ -3,6 +3,8 @@ local fiber = require('fiber')
 local server = require('luatest.server')
 local t = require('luatest')
 
+local TIMEOUT_INFINITY = 100 * 365 * 86400
+
 local g = t.group()
 
 g.before_test('test_warning_slice', function()
@@ -141,4 +143,31 @@ g.test_warning_slice = function()
     end)
     local msg = g.server:grep_log('fiber has not yielded for more than 0.200 seconds', 4096)
     t.assert(msg ~= nil)
+end
+
+g.test_info = function()
+    local function check_custom(slice, info)
+        local f = fiber.self()
+        f:set_max_slice(slice)
+        t.assert_equals(f:info().max_slice, info)
+    end
+    local function check_default(slice, info)
+        fiber.set_max_slice(slice)
+        local f = fiber.new(function() end)
+        f:set_joinable(true)
+        t.assert_equals(f:info().max_slice, info)
+        f:join()
+    end
+    local test_data = {
+        {1.5, {err = 1.5}},
+        {{warn = 2.5, err = 5.5}, {warn = 2.5, err = 5.5}},
+        {{warn = 1.0, err = TIMEOUT_INFINITY}, {warn = 1.0}},
+        {{warn = TIMEOUT_INFINITY, err = 2.0}, {err = 2.0}},
+        {{warn = TIMEOUT_INFINITY, err = TIMEOUT_INFINITY}, nil},
+    }
+    for _, v in ipairs(test_data) do
+        local slice, info = unpack(v)
+        check_custom(slice, info)
+        check_default(slice, info)
+    end
 end
