@@ -171,3 +171,26 @@ g.test_info = function()
         check_default(slice, info)
     end
 end
+
+g.before_test('test_compat', function()
+    g.server = server:new({alias = 'default'})
+    g.server:start()
+end)
+
+g.after_test('test_compat', function()
+    g.server:drop()
+end)
+
+g.test_compat = function()
+    g.server:exec(function()
+        local compat = require('compat')
+        local fiber = require('fiber')
+        t.assert_equals(compat.fiber_slice_default.current, 'default')
+        t.assert_equals(compat.fiber_slice_default.default, 'old')
+        t.assert_equals(fiber.self():info().max_slice, nil)
+        compat.fiber_slice_default = 'new'
+        t.assert_equals(fiber.self():info().max_slice, {warn = 0.5, err = 1.0})
+        compat.fiber_slice_default = 'old'
+        t.assert_equals(fiber.self():info().max_slice, nil)
+    end)
+end
