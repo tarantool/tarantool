@@ -33,6 +33,7 @@
 #include "fiber.h"
 #include "json/json.h"
 #include "coll_id_cache.h"
+#include "trivia/util.h"
 #include "tuple_constraint.h"
 #include "tt_static.h"
 
@@ -61,9 +62,7 @@ tuple_format1_field_by_format2_field(struct tuple_format *format1,
 	size_t region_svp = region_used(region);
 	uint32_t path_len = json_tree_snprint_path(NULL, 0,
 				&format2_field->token, TUPLE_INDEX_BASE);
-	char *path = region_alloc(region, path_len + 1);
-	if (path == NULL)
-		panic("Can not allocate memory for path");
+	char *path = xregion_alloc(region, path_len + 1);
 	json_tree_snprint_path(path, path_len + 1, &format2_field->token,
 			       TUPLE_INDEX_BASE);
 	struct tuple_field *format1_field =
@@ -1023,7 +1022,7 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 	}
 
 	if (validate) {
-		required_fields = region_alloc(region, required_fields_sz);
+		required_fields = xregion_alloc(region, required_fields_sz);
 		memcpy(required_fields, format->required_fields,
 		       required_fields_sz);
 	}
