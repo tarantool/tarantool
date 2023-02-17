@@ -86,7 +86,7 @@ memtx_alloc(uint32_t size)
 {
 	void *ptr = smalloc(memtx_allocator, size + sizeof(uint32_t));
 	if (ptr != NULL) {
-		*(uint32_t *)ptr = size;
+		*(uint32_t *)ptr = size + sizeof(uint32_t);
 		return (uint32_t *)ptr + 1;
 	}
 	return NULL;
