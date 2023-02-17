@@ -1,14 +1,15 @@
+local clock = require('clock')
+local fiber = require('fiber')
 local server = require('luatest.server')
 local t = require('luatest')
 
 local g = t.group()
 
 g.before_test('test_warning_slice', function()
-    local log = require('log')
     g.server = server:new{
-        alias   = 'default',
+        alias = 'default',
         box_cfg = {
-            log_level = log.WARN,
+            log_level = 'warn',
         },
     }
     g.server:start()
@@ -19,9 +20,6 @@ g.after_test('test_warning_slice', function()
 end)
 
 g.test_fiber_slice = function()
-    local fiber = require('fiber')
-    local clock = require('clock')
-
     local check_fiber_slice = function(fiber_f, expected_timeout, delta, set_custom_timeout)
         local fib = fiber.new(fiber_f)
         fib:set_joinable(true)
@@ -109,16 +107,21 @@ g.test_fiber_slice = function()
 end
 
 g.test_invalid_slice = function()
-    local fiber = require('fiber')
-
-    local MIN_TIME = 1000
-    local invalid_slices = {}
-    table.insert(invalid_slices, {err = -1 * math.random(MIN_TIME), warn = 0})
-    table.insert(invalid_slices, {err = 0, warn = -1 * math.random(MIN_TIME)})
-    table.insert(invalid_slices, {err = -1 * math.random(MIN_TIME), warn = -1 * math.random(MIN_TIME)})
-    table.insert(invalid_slices, -1 * math.random(MIN_TIME))
-    local err_msg = "slice must be greater than 0"
-    for _, slice in pairs(invalid_slices) do
+    local bad_slice_err_msg = 'slice must be a number or a table ' ..
+                              '{warn = <number>, err = <number>}'
+    local neg_value_err_msg = 'slice value must be >= 0'
+    local test_data = {
+        {'foo', bad_slice_err_msg},
+        {-1, neg_value_err_msg},
+        {{err = 1}, bad_slice_err_msg},
+        {{warn = 1}, bad_slice_err_msg},
+        {{warn = 1, err = 'foo'}, bad_slice_err_msg},
+        {{warn = 'bar', err = 1}, bad_slice_err_msg},
+        {{warn = 1, err = -1}, neg_value_err_msg},
+        {{warn = -1, err = 1}, neg_value_err_msg},
+    }
+    for _, v in pairs(test_data) do
+        local slice, err_msg = unpack(v)
         t.assert_error_msg_equals(err_msg, fiber.set_slice, slice)
         t.assert_error_msg_equals(err_msg, fiber.extend_slice, slice)
         t.assert_error_msg_equals(err_msg, fiber.set_max_slice, slice)
