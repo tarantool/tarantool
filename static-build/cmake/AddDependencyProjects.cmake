@@ -191,6 +191,7 @@ ExternalProject_Add(readline
         --prefix=<INSTALL_DIR>
         --disable-shared
     PATCH_COMMAND patch -d <SOURCE_DIR> -p0 -i "${PATCHES_DIR}/readline80-001.patch"
+    COMMAND       patch -d <SOURCE_DIR> -p1 -i "${PATCHES_DIR}/readline-tarantool-security-95.patch"
 )
 set(TARANTOOL_DEPENDS readline ${TARANTOOL_DEPENDS})
 
