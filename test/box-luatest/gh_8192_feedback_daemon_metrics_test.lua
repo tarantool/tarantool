@@ -45,8 +45,15 @@ g.test_metrics = function()
         local fb = daemon.generate_feedback()
         -- This check may fail because of assertion failure in collect method.
         t.assert_type(fb.metrics, 'table')
-        -- Huge margin to prevent flakiness on slow environments like coverity.
-        t.assert_almost_equals(#fb.metrics, 30, 8)
+        -- Huge margin to prevent flakiness.
+        --
+        -- ASAN and GCOV builds looks very affected and macOS too.
+        --
+        -- In fact, this check verifies that *some* samples are collected. It
+        -- doesn't attempt to ensure correct timings, which is nearly
+        -- impossible in the general case, when many processes performs its own
+        -- workloads in parallel.
+        t.assert_almost_equals(#fb.metrics, 30, 25)
         fb = daemon.generate_feedback()
         -- Check is metrics were reset. Fiber yields on feedback generation, so
         -- metrics may be not empty.
