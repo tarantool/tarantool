@@ -168,8 +168,6 @@ struct tx_read_tracker {
 	struct rlist in_reader_list;
 	/** Link in reader->read_set. */
 	struct rlist in_read_set;
-	/** Bit field of indexes in which the data was read by reader. */
-	uint64_t index_mask;
 };
 
 /**
@@ -198,8 +196,16 @@ struct point_hole_item {
 };
 
 /**
- * An element that stores the fact that some transaction have read
- * a full key and found nothing.
+ * An element that stores the fact that some transaction have read a key and
+ * found nothing. There are two cases of such a fact:
+ * 1. The tx have read some tuple that is not committed and thus not visible.
+ * In this case the further commit of that tuple can cause a conflict, as well
+ * as any overwrite of that tuple. Such an item will be stored in the tuple's
+ * story and called as 'not nearby'.
+ * 2. The tx made a select or range scan, reading a key or range between two
+ * adjacent tuples of the index. For that case a consequent write to that range
+ * can cause a conflict. Such an item will be stored in successor's story and
+ * called as 'nearby'.
  */
 struct gap_item {
 	/** A link in memtx_story_link::read_gaps OR index::read_gaps. */
@@ -214,6 +220,8 @@ struct gap_item {
 	uint32_t part_count;
 	/** Search mode. */
 	enum iterator_type type;
+	/** Is it nearby or not, see the structure's description. */
+	bool is_nearby;
 	/** Storage for short key. @key may point here. */
 	char short_key[16];
 };
@@ -1640,7 +1648,15 @@ memtx_tx_check_dup(struct tuple *new_tuple, struct tuple *old_tuple,
  */
 static void
 memtx_tx_track_read_story(struct txn *txn, struct space *space,
-			  struct memtx_story *story, uint64_t index_mask);
+			  struct memtx_story *story);
+
+/**
+ * Track that the @a story was read by @a txn and in index @a ind,
+ * by no tuple was visible here. The @a story must be on top of chain.
+ */
+static void
+memtx_tx_track_story_gap(struct txn *txn, struct memtx_story *story,
+			 uint32_t ind);
 
 /**
  * Check for possible conflict relations during insertion of @a new tuple,
@@ -1655,6 +1671,7 @@ static void
 memtx_tx_handle_point_hole_write(struct space *space, struct memtx_story *story,
 				 uint32_t ind)
 {
+	assert(story->link[ind].newer_story == NULL);
 	struct mh_point_holes_t *ht = txm.point_holes;
 	struct point_hole_key key;
 	key.index = space->index[ind];
@@ -1665,10 +1682,9 @@ memtx_tx_handle_point_hole_write(struct space *space, struct memtx_story *story,
 	struct point_hole_item *item = *mh_point_holes_node(ht, pos);
 
 	struct memtx_tx_mempool *pool = &txm.point_hole_item_pool;
-	uint64_t index_mask = 1ull << (ind & 63);
 	bool has_more_items;
 	do {
-		memtx_tx_track_read_story(item->txn, space, story, index_mask);
+		memtx_tx_track_story_gap(item->txn, story, ind);
 
 		struct point_hole_item *next_item =
 			rlist_entry(item->ring.next,
@@ -1767,7 +1783,18 @@ check_dup(struct txn_stmt *stmt, struct tuple *new_tuple,
 
 static struct gap_item *
 memtx_tx_gap_item_new(struct txn *txn, enum iterator_type type,
-		      const char *key, uint32_t part_count);
+		      const char *key, uint32_t part_count, bool is_nearby);
+
+static void
+memtx_tx_track_story_gap(struct txn *txn, struct memtx_story *story,
+			 uint32_t ind)
+{
+	assert(story->link[ind].newer_story == NULL);
+	assert(txn != NULL);
+	struct gap_item *item;
+	item = memtx_tx_gap_item_new(txn, ITER_EQ, NULL, 0, false);
+	rlist_add(&story->link[ind].read_gaps, &item->in_read_gaps);
+}
 
 /**
  * Handle insertion to a new place in index. There can be readers which
@@ -1778,13 +1805,12 @@ memtx_tx_handle_gap_write(struct space *space,
 			  struct memtx_story *story, struct tuple *tuple,
 			  struct tuple *successor, uint32_t ind)
 {
+	assert(story->link[ind].newer_story == NULL);
 	struct index *index = space->index[ind];
 	struct full_scan_item *fsc_item, *fsc_tmp;
 	struct rlist *fsc_list = &index->full_scans;
-	uint64_t index_mask = 1ull << (ind & 63);
 	rlist_foreach_entry_safe(fsc_item, fsc_list, in_full_scans, fsc_tmp) {
-		memtx_tx_track_read_story(fsc_item->txn, space, story,
-					  index_mask);
+		memtx_tx_track_story_gap(fsc_item->txn, story, ind);
 	}
 	if (successor != NULL && !tuple_has_flag(successor, TUPLE_IS_DIRTY))
 		return; /* no gap records */
@@ -1799,6 +1825,8 @@ memtx_tx_handle_gap_write(struct space *space,
 	}
 	struct gap_item *item, *tmp;
 	rlist_foreach_entry_safe(item, list, in_read_gaps, tmp) {
+		if (!item->is_nearby)
+			continue;
 		int cmp = 0;
 		if (item->key != NULL) {
 			struct key_def *def = index->def->key_def;
@@ -1825,8 +1853,7 @@ memtx_tx_handle_gap_write(struct space *space,
 		bool need_track = need_split ||
 				  (is_full_key && cmp == 0 && is_e);
 		if (need_track)
-			memtx_tx_track_read_story(item->txn, space,
-						  story, index_mask);
+			memtx_tx_track_story_gap(item->txn, story, ind);
 		if (need_split) {
 			/*
 			 * The insertion divided the gap into two parts.
@@ -1836,7 +1863,7 @@ memtx_tx_handle_gap_write(struct space *space,
 			struct gap_item *copy =
 				memtx_tx_gap_item_new(item->txn, item->type,
 						      item->key,
-						      item->part_count);
+						      item->part_count, true);
 
 			rlist_add(&story->link[ind].read_gaps,
 				  &copy->in_read_gaps);
@@ -2222,6 +2249,14 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 
 			memtx_tx_story_link_deleted_by(story, test_stmt);
 		}
+		/* Now link is in top of chain, where gap records are stored. */
+		struct gap_item *item, *tmp;
+		rlist_foreach_entry_safe(item, &link->read_gaps,
+					 in_read_gaps, tmp) {
+			if (item->txn == stmt->txn || item->is_nearby)
+				continue;
+			memtx_tx_handle_conflict(stmt->txn, item->txn);
+		}
 	}
 
 	struct memtx_story *old_story = story->link[0].older_story;
@@ -2293,6 +2328,14 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			 * all is done by the primary story chain.
 			 */
 		}
+		/* Now link is in top of chain, where gap records are stored. */
+		struct gap_item *item, *tmp;
+		rlist_foreach_entry_safe(item, &link->read_gaps,
+					 in_read_gaps, tmp) {
+			if (item->txn == stmt->txn || item->is_nearby)
+				continue;
+			memtx_tx_handle_conflict(stmt->txn, item->txn);
+		}
 	}
 
 	for (uint32_t i = 0; i < index_count; i++) {
@@ -2304,9 +2347,6 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 		rlist_foreach_entry(tracker, &old_story->reader_list,
 				    in_reader_list) {
 			if (tracker->reader == stmt->txn)
-				continue;
-			uint64_t index_mask = 1ull << (i & 63);
-			if ((tracker->index_mask & index_mask) == 0)
 				continue;
 			memtx_tx_handle_conflict(stmt->txn, tracker->reader);
 		}
@@ -2320,9 +2360,6 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			rlist_foreach_entry(tracker, &read_story->reader_list,
 					    in_reader_list) {
 				if (tracker->reader == stmt->txn)
-					continue;
-				uint64_t index_mask = 1ull << (i & 63);
-				if ((tracker->index_mask & index_mask) == 0)
 					continue;
 				memtx_tx_handle_conflict(stmt->txn,
 							 tracker->reader);
@@ -2434,7 +2471,8 @@ memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
 			    uint32_t mk_index, bool is_prepared_ok)
 {
 	assert(tuple_has_flag(tuple, TUPLE_IS_DIRTY));
-	struct memtx_story *story = memtx_tx_story_get(tuple);
+	struct memtx_story *top_story = memtx_tx_story_get(tuple);
+	struct memtx_story *story = top_story;
 	bool own_change = false;
 	struct tuple *result = NULL;
 
@@ -2477,16 +2515,18 @@ memtx_tx_tuple_clarify_impl(struct txn *txn, struct space *space,
 			break;
 		story = story->link[index->dense_id].older_story;
 	}
-	if (!own_change) {
+	if (txn != NULL && !own_change) {
 		/*
 		 * If the result tuple exists (is visible) - it is visible in
 		 * every index. But if we found a story of deleted tuple - we
 		 * should record that only in the given index this transaction
 		 * have found nothing by this key.
 		 */
-		int shift = index->dense_id & 63;
-		uint64_t mask = result == NULL ? 1ull << shift : UINT64_MAX;
-		memtx_tx_track_read_story(txn, space, story, mask);
+		if (result == NULL)
+			memtx_tx_track_story_gap(txn, top_story,
+						 index->dense_id);
+		else
+			memtx_tx_track_read_story(txn, space, story);
 	}
 	if (mk_index != 0) {
 		assert(false); /* TODO: multiindex */
@@ -2637,15 +2677,13 @@ memtx_tx_on_space_delete(struct space *space)
  * (diag is set). Links in lists are not initialized though.
  */
 static struct tx_read_tracker *
-tx_read_tracker_new(struct txn *reader, struct memtx_story *story,
-		    uint64_t index_mask)
+tx_read_tracker_new(struct txn *reader, struct memtx_story *story)
 {
 	struct tx_read_tracker *tracker;
 	tracker = memtx_tx_xregion_alloc_object(reader,
 						MEMTX_TX_OBJECT_READ_TRACKER);
 	tracker->reader = reader;
 	tracker->story = story;
-	tracker->index_mask = index_mask;
 	return tracker;
 }
 
@@ -2655,7 +2693,7 @@ tx_read_tracker_new(struct txn *reader, struct memtx_story *story,
  */
 static void
 memtx_tx_track_read_story(struct txn *txn, struct space *space,
-			  struct memtx_story *story, uint64_t index_mask)
+			  struct memtx_story *story)
 {
 	if (txn == NULL || space == NULL || space->def->opts.is_ephemeral)
 		return;
@@ -2684,9 +2722,8 @@ memtx_tx_track_read_story(struct txn *txn, struct space *space,
 		/* Move to the beginning of a list for faster further lookups.*/
 		rlist_del(&tracker->in_reader_list);
 		rlist_del(&tracker->in_read_set);
-		tracker->index_mask |= index_mask;
 	} else {
-		tracker = tx_read_tracker_new(txn, story, index_mask);
+		tracker = tx_read_tracker_new(txn, story);
 	}
 	rlist_add(&story->reader_list, &tracker->in_reader_list);
 	rlist_add(&txn->read_set, &tracker->in_read_set);
@@ -2707,11 +2744,11 @@ memtx_tx_track_read(struct txn *txn, struct space *space, struct tuple *tuple)
 
 	if (tuple_has_flag(tuple, TUPLE_IS_DIRTY)) {
 		struct memtx_story *story = memtx_tx_story_get(tuple);
-		memtx_tx_track_read_story(txn, space, story, UINT64_MAX);
+		memtx_tx_track_read_story(txn, space, story);
 	} else {
 		struct memtx_story *story = memtx_tx_story_new(space, tuple);
 		struct tx_read_tracker *tracker;
-		tracker = tx_read_tracker_new(txn, story, UINT64_MAX);
+		tracker = tx_read_tracker_new(txn, story);
 		rlist_add(&story->reader_list, &tracker->in_reader_list);
 		rlist_add(&txn->read_set, &tracker->in_read_set);
 	}
@@ -2830,13 +2867,14 @@ memtx_tx_track_point_slow(struct txn *txn, struct index *index, const char *key)
 
 static struct gap_item *
 memtx_tx_gap_item_new(struct txn *txn, enum iterator_type type,
-		      const char *key, uint32_t part_count)
+		      const char *key, uint32_t part_count, bool is_nearby)
 {
 	struct gap_item *item =
 		memtx_tx_xmempool_alloc(txn, &txm.gap_item_mempoool);
 
 	item->txn = txn;
 	item->type = type;
+	item->is_nearby = is_nearby;
 	item->part_count = part_count;
 	const char *tmp = key;
 	for (uint32_t i = 0; i < part_count; i++)
@@ -2872,7 +2910,7 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 		return;
 
 	struct gap_item *item = memtx_tx_gap_item_new(txn, type, key,
-						      part_count);
+						      part_count, true);
 
 	if (successor != NULL) {
 		struct memtx_story *story;
