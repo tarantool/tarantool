@@ -44,20 +44,29 @@ local function find_template(g, script)
     error(("treegen: can't find a template for script %q"):format(script))
 end
 
--- Generate a script that follows a template and write it at given
--- script file path in given directory.
-local function write_script(g, dir, script, replacements)
+-- Write provided script into the given directory.
+function treegen.write_script(dir, script, body)
     local script_abspath = fio.pathjoin(dir, script)
     local flags = {'O_CREAT', 'O_WRONLY', 'O_TRUNC'}
     local mode = tonumber('644', 8)
-    local fh = fio.open(script_abspath, flags, mode)
-    local template = find_template(g, script)
-    local replacements = fun.chain({script = script}, replacements):tomap()
+
+    local scriptdir_abspath = fio.dirname(script_abspath)
+    log.info(('Creating a directory: %s'):format(scriptdir_abspath))
+    fio.mktree(scriptdir_abspath)
 
     log.info(('Writing a script: %s'):format(script_abspath))
-    fh:write(template:gsub('<(.-)>', replacements))
-
+    local fh = fio.open(script_abspath, flags, mode)
+    fh:write(body)
     fh:close()
+end
+
+-- Generate a script that follows a template and write it at the
+-- given path in the given directory.
+local function gen_script(g, dir, script, replacements)
+    local template = find_template(g, script)
+    local replacements = fun.chain({script = script}, replacements):tomap()
+    local body = template:gsub('<(.-)>', replacements)
+    treegen.write_script(dir, script, body)
 end
 
 function treegen.init(g)
@@ -118,11 +127,7 @@ function treegen.prepare_directory(g, scripts, replacements)
     table.insert(g.tempdirs, dir)
 
     for _, script in ipairs(scripts) do
-        local script_abspath = fio.pathjoin(dir, script)
-        local scriptdir_abspath = fio.dirname(script_abspath)
-        log.info(('Creating a directory: %s'):format(scriptdir_abspath))
-        fio.mktree(scriptdir_abspath)
-        write_script(g, dir, script, replacements)
+        gen_script(g, dir, script, replacements)
     end
 
     return dir
