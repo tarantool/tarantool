@@ -335,12 +335,12 @@ luaT_newmodule(struct lua_State *L, const char *modname,
 	/* Get loaders.builtin. */
 	lua_getfield(L, LUA_REGISTRYINDEX, "_TARANTOOL_BUILTIN");
 
-#ifndef NDEBUG
 	/* Verify that the module is not already registered. */
 	lua_getfield(L, -1, modname);
-	assert(lua_isnil(L, -1));
+	if (!lua_isnil(L, -1))
+		panic("%s(%s): the module is already registered",
+		      __func__, modname);
 	lua_pop(L, 1);
-#endif
 
 	/* Create a module table. */
 	lua_newtable(L);
@@ -398,7 +398,9 @@ luaT_setmodule(struct lua_State *L, const char *modname)
 	 * Verify that the module is not already registered with
 	 * another value.
 	 */
-	assert(lua_isnil(L, -1));
+	if (!lua_isnil(L, -1))
+		panic("%s(%s): the module is already registered "
+		      "with another value", __func__, modname);
 	lua_pop(L, 1);
 
 	/* Stack: module table, loaders.builtin. */

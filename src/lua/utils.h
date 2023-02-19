@@ -264,6 +264,8 @@ luaL_register_type(struct lua_State *L, const char *type_name,
  * Create a table with functions and register it as a built-in
  * tarantool module.
  *
+ * Panic if the module is already registered.
+ *
  * Leave the table on top of the stack.
  *
  * Pseudocode:
@@ -289,8 +291,8 @@ luaT_newmodule(struct lua_State *L, const char *modname,
  * Register a table on top of the stack as a built-in tarantool
  * module.
  *
- * Can be called several times with the same value, but raises
- * assertion fail if called with different values.
+ * Can be called several times with the same value, but panics
+ * if called with different values.
  *
  * Can be used after luaT_newmodule() if, again, the table of the
  * module is the same.
