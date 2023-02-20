@@ -39,13 +39,12 @@
 extern "C" {
 #endif
 
-struct sql_stmt;
 struct mh_i64ptr_t;
 struct info_handler;
 
 struct stmt_cache_entry {
 	/** Prepared statement itself. */
-	struct sql_stmt *stmt;
+	struct Vdbe *stmt;
 	/**
 	 * Link to the next entry. All statements are to be
 	 * evicted on the next gc cycle.
@@ -125,8 +124,9 @@ sql_stmt_calculate_id(const char *sql_str, size_t len);
 void
 sql_stmt_unref(uint32_t stmt_id);
 
+/** Update prepared statement in the prepared statement cache. */
 int
-sql_stmt_cache_update(struct sql_stmt *old_stmt, struct sql_stmt *new_stmt);
+sql_stmt_cache_update(struct Vdbe *old_stmt, struct Vdbe *new_stmt);
 
 /**
  * Save prepared statement to the prepared statement cache.
@@ -135,10 +135,10 @@ sql_stmt_cache_update(struct sql_stmt *old_stmt, struct sql_stmt *new_stmt);
  * return id of prepared statement via output parameter @id.
  */
 int
-sql_stmt_cache_insert(struct sql_stmt *stmt);
+sql_stmt_cache_insert(struct Vdbe *stmt);
 
 /** Find entry by SQL string. In case of search fails it returns NULL. */
-struct sql_stmt *
+struct Vdbe *
 sql_stmt_cache_find(uint32_t stmt_id);
 
 

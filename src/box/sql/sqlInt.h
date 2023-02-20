@@ -217,7 +217,6 @@ typedef long long int sql_int64;
 typedef unsigned long long int sql_uint64;
 typedef sql_int64 sql_int64;
 typedef sql_uint64 sql_uint64;
-typedef struct sql_stmt sql_stmt;
 
 typedef struct sql_context sql_context;
 typedef struct sql sql;
@@ -317,13 +316,15 @@ sql_vsnprintf(int, char *, const char *, va_list);
  */
 int
 sql_stmt_compile(const char *sql, int bytes_count, struct Vdbe *re_prepared,
-		 sql_stmt **stmt, const char **sql_tail);
+		 struct Vdbe **stmt, const char **sql_tail);
 
+/** This is the top-level implementation of sqlStep(). */
 int
-sql_step(sql_stmt *);
+sql_step(struct Vdbe *v);
 
+/** Encode the result of an SQL statement in msgpack. */
 char *
-sql_stmt_result_to_msgpack(struct sql_stmt *stmt, uint32_t *tuple_size,
+sql_stmt_result_to_msgpack(struct Vdbe *stmt, uint32_t *tuple_size,
 			   struct region *region);
 
 /**
@@ -331,7 +332,7 @@ sql_stmt_result_to_msgpack(struct sql_stmt *stmt, uint32_t *tuple_size,
  * MP_ARRAY.
  */
 char *
-sql_stmt_func_result_to_msgpack(struct sql_stmt *stmt, uint32_t *tuple_size,
+sql_stmt_func_result_to_msgpack(struct Vdbe *stmt, uint32_t *tuple_size,
 				struct region *region);
 
 /*
@@ -343,7 +344,7 @@ sql_stmt_func_result_to_msgpack(struct sql_stmt *stmt, uint32_t *tuple_size,
  * @retval sql_ret_code Error code on error.
  */
 int
-sql_stmt_reset(struct sql_stmt *stmt);
+sql_stmt_reset(struct Vdbe *stmt);
 
 bool
 sql_metadata_is_full();
@@ -360,29 +361,55 @@ enum sql_subtype {
 void
 sql_randomness(int N, void *P);
 
+/** Return the number of columns in the result set for the statement. */
 int
-sql_column_count(sql_stmt * pStmt);
+sql_column_count(struct Vdbe *v);
 
+/**
+ * Return the name of the Nth column of the result set returned by SQL
+ * statement.
+ */
 const char *
-sql_column_name(sql_stmt *, int N);
+sql_column_name(struct Vdbe *v, int n);
 
+/**
+ * Return the tyoe of the Nth column of the result set returned by SQL
+ * statement.
+ */
 const char *
-sql_column_datatype(sql_stmt *, int N);
+sql_column_datatype(struct Vdbe *v, int n);
 
+/**
+ * Return the collation of the Nth column of the result set returned by SQL
+ * statement.
+ */
 const char *
-sql_column_coll(sql_stmt *stmt, int n);
+sql_column_coll(struct Vdbe *v, int n);
 
+/**
+ * Return 1 if the Nth column of the result set returned by SQL statement is
+ * nullable and 0 otherwise.
+ */
 int
-sql_column_nullable(sql_stmt *stmt, int n);
+sql_column_nullable(struct Vdbe *v, int n);
 
+/**
+ * Return true if the Nth column of the result set returned by SQL statement is
+ * autoincremented and false otherwise.
+ */
 bool
-sql_column_is_autoincrement(sql_stmt *stmt, int n);
+sql_column_is_autoincrement(struct Vdbe *v, int n);
 
+/**
+ * Return the original expression used to form the Nth column of the result set
+ * returned by SQL statement.
+ */
 const char *
-sql_column_span(sql_stmt *stmt, int n);
+sql_column_span(struct Vdbe *v, int n);
 
+/** Return schema version at the moment of the VDBE creation. */
 uint64_t
-sql_stmt_schema_version(const struct sql_stmt *stmt);
+sql_stmt_schema_version(const struct Vdbe *stmt);
 
 int
 sql_initialize(void);
@@ -439,8 +466,9 @@ const char *
 sql_uri_parameter(const char *zFilename,
 		      const char *zParam);
 
+/** Return the query associated with a prepared statement */
 const char *
-sql_sql(sql_stmt * pStmt);
+sql_sql(struct Vdbe *v);
 
 int
 sql_vfs_register(sql_vfs *, int makeDflt);
@@ -452,72 +480,83 @@ sql_vfs_register(sql_vfs *, int makeDflt);
 
 /** Unbind all parameters of given prepared statement. */
 void
-sql_unbind(struct sql_stmt *stmt);
+sql_unbind(struct Vdbe *stmt);
 
 /**
  * Reset the list of identifiers generated during the auto-increment of this
  * prepared statement.
  */
 void
-sql_reset_autoinc_id_list(struct sql_stmt *stmt);
+sql_reset_autoinc_id_list(struct Vdbe *stmt);
 
+/** Perform double parameter binding for the sql statement. */
 int
-sql_bind_double(sql_stmt *, int, double);
+sql_bind_double(struct Vdbe *v, int i, double value);
 
 /**
  * Perform boolean parameter binding for the prepared sql
  * statement.
- * @param stmt Prepared statement.
+ * @param v Prepared statement.
  * @param i Index of the variable to be binded.
  * @param value Boolean value to use.
  * @retval 0 On Success, not 0 otherwise.
  */
 int
-sql_bind_boolean(struct sql_stmt *stmt, int i, bool value);
+sql_bind_boolean(struct Vdbe *v, int i, bool value);
 
+/** Perform integer parameter binding for the sql statement. */
 int
-sql_bind_int(sql_stmt *, int, int);
+sql_bind_int(struct Vdbe *v, int i, int value);
 
+/** Perform 64-bit negative integer parameter binding for the sql statement. */
 int
-sql_bind_int64(sql_stmt *, int, sql_int64);
+sql_bind_int64(struct Vdbe *v, int i, int64_t value);
 
+/** Perform 64-bit unsigned integer parameter binding for the sql statement. */
 int
-sql_bind_uint64(struct sql_stmt *stmt, int i, uint64_t value);
+sql_bind_uint64(struct Vdbe *v, int i, uint64_t value);
 
+/** Perform NULL parameter binding for the sql statement. */
 int
-sql_bind_null(sql_stmt *, int);
+sql_bind_null(struct Vdbe *v, int i);
 
+/** Perform string parameter binding for the sql statement. */
 int
-sql_bind_str_static(sql_stmt *stmt, int i, const char *str, uint32_t len);
+sql_bind_str_static(struct Vdbe *v, int i, const char *str, uint32_t len);
 
+/** Perform binary string parameter binding for the sql statement. */
 int
-sql_bind_bin_static(sql_stmt *stmt, int i, const char *str, uint32_t size);
+sql_bind_bin_static(struct Vdbe *v, int i, const char *str, uint32_t size);
 
+/** Perform array parameter binding for the sql statement. */
 int
-sql_bind_array_static(sql_stmt *stmt, int i, const char *str, uint32_t size);
+sql_bind_array_static(struct Vdbe *v, int i, const char *str, uint32_t size);
 
+/** Perform map parameter binding for the sql statement. */
 int
-sql_bind_map_static(sql_stmt *stmt, int i, const char *str, uint32_t size);
+sql_bind_map_static(struct Vdbe *v, int i, const char *str, uint32_t size);
 
+/** Perform UUID parameter binding for the sql statement. */
 int
-sql_bind_uuid(struct sql_stmt *stmt, int i, const struct tt_uuid *uuid);
+sql_bind_uuid(struct Vdbe *v, int i, const struct tt_uuid *uuid);
 
+/** Perform decimal parameter binding for the sql statement. */
 int
-sql_bind_dec(struct sql_stmt *stmt, int i, const decimal_t *dec);
+sql_bind_dec(struct Vdbe *v, int i, const decimal_t *dec);
 
 /** Perform DATETIME parameter binding for the sql statement. */
 int
-sql_bind_datetime(struct sql_stmt *stmt, int i, const struct datetime *dt);
+sql_bind_datetime(struct Vdbe *v, int i, const struct datetime *dt);
 
 /** Perform INTERVAL parameter binding for the SQL statement. */
 int
-sql_bind_interval(struct sql_stmt *stmt, int i, const struct interval *itv);
+sql_bind_interval(struct Vdbe *v, int i, const struct interval *itv);
 
 /**
  * Return the number of wildcards that should be bound to.
  */
 int
-sql_bind_parameter_count(const struct sql_stmt *stmt);
+sql_bind_parameter_count(const struct Vdbe *v);
 
 /**
  * Return the name of a wildcard parameter. Return NULL if the index
@@ -525,19 +564,19 @@ sql_bind_parameter_count(const struct sql_stmt *stmt);
  * is 0-based.
  */
 const char *
-sql_bind_parameter_name(const struct sql_stmt *stmt, int i);
+sql_bind_parameter_name(const struct Vdbe *v, int i);
 
 /**
  * Perform pointer parameter binding for the prepared sql
  * statement.
- * @param stmt Prepared statement.
+ * @param v Prepared statement.
  * @param i Index of the variable to be binded.
  * @param ptr Pointer value to use.
  * @retval 0 On Success.
  * @retval Not 0 otherwise.
  */
 int
-sql_bind_ptr(struct sql_stmt *stmt, int i, void *ptr);
+sql_bind_ptr(struct Vdbe *v, int i, void *ptr);
 
 int
 sql_init_db(sql **db);
@@ -546,7 +585,7 @@ sql_init_db(sql **db);
 /**
  * Get number of the named parameter in the prepared sql
  * statement.
- * @param pStmt Prepared statement.
+ * @param v Prepared statement.
  * @param zName Parameter name.
  * @param nName Parameter name length.
  *
@@ -554,8 +593,7 @@ sql_init_db(sql **db);
  * @retval   0 Parameter is not found.
  */
 int
-sql_bind_parameter_lindex(sql_stmt * pStmt, const char *zName,
-			      int nName);
+sql_bind_parameter_lindex(struct Vdbe *v, const char *zName, int nName);
 
 /*
  * If compiling for a processor that lacks floating point support,
@@ -4105,7 +4143,11 @@ int sqlParserStackPeak(void *);
 #endif
 
 int sqlVdbeParameterIndex(Vdbe *, const char *, int);
-int sqlTransferBindings(sql_stmt *, sql_stmt *);
+
+/** Transfer all bindings from the first statement over to the second. */
+int
+sqlTransferBindings(struct Vdbe *from, struct Vdbe *to);
+
 int sqlReprepare(Vdbe *);
 
 /**

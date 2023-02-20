@@ -100,7 +100,7 @@ metadata_map_encode(char *buf, const char *name, const char *type,
  * @retval -1 Client or memory error.
  */
 static inline int
-sql_get_metadata(struct sql_stmt *stmt, struct obuf *out, int column_count)
+sql_get_metadata(struct Vdbe *stmt, struct obuf *out, int column_count)
 {
 	assert(column_count > 0);
 	int size = mp_sizeof_uint(IPROTO_METADATA) +
@@ -141,7 +141,7 @@ sql_get_metadata(struct sql_stmt *stmt, struct obuf *out, int column_count)
 
 /** Get metadata of bound variables. */
 static inline int
-sql_get_params_metadata(struct sql_stmt *stmt, struct obuf *out)
+sql_get_params_metadata(struct Vdbe *stmt, struct obuf *out)
 {
 	int bind_count = sql_bind_parameter_count(stmt);
 	int size = mp_sizeof_uint(IPROTO_BIND_METADATA) +
@@ -182,7 +182,7 @@ sql_get_params_metadata(struct sql_stmt *stmt, struct obuf *out)
  * variables, and metadata of bound variables.
  */
 static int
-sql_get_prepare_common_keys(struct sql_stmt *stmt, struct obuf *out, int keys)
+sql_get_prepare_common_keys(struct Vdbe *stmt, struct obuf *out, int keys)
 {
 	const char *sql_str = sql_stmt_query_str(stmt);
 	uint32_t stmt_id = sql_stmt_calculate_id(sql_str, strlen(sql_str));
@@ -250,7 +250,7 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out)
 {
 	assert(port->vtab == &port_sql_vtab);
 	struct port_sql *sql_port = (struct port_sql *)port;
-	struct sql_stmt *stmt = sql_port->stmt;
+	struct Vdbe *stmt = sql_port->stmt;
 	switch (sql_port->serialization_format) {
 	case DQL_EXECUTE: {
 		int keys = 2;
@@ -278,7 +278,7 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out)
 		int keys = 1;
 		assert(((struct port_c *)port)->size == 0);
 		struct stailq *autoinc_id_list =
-			vdbe_autoinc_id_list((struct Vdbe *)stmt);
+			vdbe_autoinc_id_list(stmt);
 		uint32_t map_size = stailq_empty(autoinc_id_list) ? 1 : 2;
 		int size = mp_sizeof_map(keys) +
 			   mp_sizeof_uint(IPROTO_SQL_INFO) +
@@ -379,7 +379,7 @@ const struct port_vtab port_sql_vtab = {
 };
 
 void
-port_sql_create(struct port *port, struct sql_stmt *stmt,
+port_sql_create(struct port *port, struct Vdbe *stmt,
 		enum sql_serialization_format format, bool do_finalize)
 {
 	port_c_create(port);

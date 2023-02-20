@@ -192,8 +192,7 @@ sql_bind_list_decode(const char *data, struct sql_bind **out_bind)
 }
 
 int
-sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
-		uint32_t pos)
+sql_bind_column(struct Vdbe *stmt, const struct sql_bind *p, uint32_t pos)
 {
 	if (p->name != NULL) {
 		pos = sql_bind_parameter_lindex(stmt, p->name, p->name_len);

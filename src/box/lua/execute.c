@@ -20,8 +20,7 @@
  * @param column_count Statement's column count.
  */
 static inline void
-lua_sql_get_metadata(struct sql_stmt *stmt, struct lua_State *L,
-		     int column_count)
+lua_sql_get_metadata(struct Vdbe *stmt, struct lua_State *L, int column_count)
 {
 	assert(column_count > 0);
 	lua_createtable(L, column_count, 0);
@@ -71,7 +70,7 @@ lua_sql_get_metadata(struct sql_stmt *stmt, struct lua_State *L,
 }
 
 static inline void
-lua_sql_get_params_metadata(struct sql_stmt *stmt, struct lua_State *L)
+lua_sql_get_params_metadata(struct Vdbe *stmt, struct lua_State *L)
 {
 	int bind_count = sql_bind_parameter_count(stmt);
 	lua_createtable(L, bind_count, 0);
@@ -172,7 +171,7 @@ port_sql_dump_lua(struct port *port, struct lua_State *L, bool is_flat)
 	assert(is_flat == false);
 	assert(port->vtab == &port_sql_vtab);
 	struct port_sql *port_sql = (struct port_sql *)port;
-	struct sql_stmt *stmt = port_sql->stmt;
+	struct Vdbe *stmt = port_sql->stmt;
 	switch (port_sql->serialization_format) {
 	case DQL_EXECUTE: {
 		lua_createtable(L, 0, 2);

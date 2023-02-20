@@ -41,7 +41,7 @@
 
 int
 sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
-		 sql_stmt **ppStmt, const char **pzTail)
+		 struct Vdbe **ppStmt, const char **pzTail)
 {
 	int rc = 0;	/* Result code */
 	Parse sParse;		/* Parsing context */
@@ -147,7 +147,7 @@ sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 		sqlVdbeFinalize(sParse.pVdbe);
 		assert(!(*ppStmt));
 	} else {
-		*ppStmt = (sql_stmt *) sParse.pVdbe;
+		*ppStmt = sParse.pVdbe;
 	}
 
 	/* Delete any TriggerPrg structures allocated while parsing this statement. */
@@ -169,20 +169,20 @@ sql_stmt_compile(const char *zSql, int nBytes, struct Vdbe *pReprepare,
 int
 sqlReprepare(Vdbe * p)
 {
-	sql_stmt *pNew;
+	struct Vdbe *pNew;
 	const char *zSql;
 
-	zSql = sql_sql((sql_stmt *) p);
+	zSql = sql_sql(p);
 	assert(zSql != 0);
 	if (sql_stmt_compile(zSql, -1, p, &pNew, 0) != 0) {
 		assert(pNew == 0);
 		return -1;
 	}
 	assert(pNew != 0);
-	sqlVdbeSwap((Vdbe *) pNew, p);
-	sqlTransferBindings(pNew, (sql_stmt *) p);
-	sqlVdbeResetStepResult((Vdbe *) pNew);
-	sqlVdbeFinalize((Vdbe *) pNew);
+	sqlVdbeSwap(pNew, p);
+	sqlTransferBindings(pNew, p);
+	sqlVdbeResetStepResult(pNew);
+	sqlVdbeFinalize(pNew);
 	return 0;
 }
 
