@@ -1,4 +1,4 @@
 ## bugfix/datetime
 
-* Fixed segmentation fault when too big value is passed to "%f" modifier of
-  datetime_object:format() (ghs-31).
+* Fixed a segmentation fault that happened when the value passed to the ``%f``
+  modifier of ``datetime_object:format()`` was too big (ghs-31).

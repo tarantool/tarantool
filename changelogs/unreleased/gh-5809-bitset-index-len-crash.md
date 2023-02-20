@@ -1,3 +1,3 @@
 ## bugfix/core
 
-* Fixed empty bitset index crash on `len` call (gh-5809).
+* Fixed empty BITSET indexes crashing on `len` calls (gh-5809).

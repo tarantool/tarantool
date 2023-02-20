@@ -1,4 +1,4 @@
 ## bugfix/replication
 
-* Fixed possibility of transaction conflict errors during replication stream
+* Fixed possible transaction conflict errors on applying a replication stream
   (gh-8121).

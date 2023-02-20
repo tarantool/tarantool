@@ -1,3 +1,3 @@
 ## bugfix/memtx
 
-* Fixed an assert in mvcc engine (gh-7945).
+* Fixed an assert in the MVCC engine (gh-7945).
