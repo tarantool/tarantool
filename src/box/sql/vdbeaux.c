@@ -305,6 +305,7 @@ sqlVdbeAddOp4(Vdbe * p,	/* Add the opcode to this VM */
 		  int p4type)	/* P4 operand type */
 
 {
+	assert(p4type != P4_INT32);
 	int addr = sqlVdbeAddOp3(p, op, p1, p2, p3);
 	sqlVdbeChangeP4(p, addr, zP4, p4type);
 	return addr;
@@ -704,13 +705,7 @@ sqlVdbeChangeP4(Vdbe * p, int addr, const char *zP4, int n)
 		vdbeChangeP4Full(p, pOp, zP4, n);
 		return;
 	}
-	if (n == P4_INT32) {
-		/* Note: this cast is safe, because the origin data point was an int
-		 * that was cast to a (const char *).
-		 */
-		pOp->p4.i = SQL_PTR_TO_INT(zP4);
-		pOp->p4type = P4_INT32;
-	} if (n == P4_BOOL) {
+	if (n == P4_BOOL) {
 		pOp->p4.b = *(bool*)zP4;
 		pOp->p4type = P4_BOOL;
 	} else {
