@@ -397,14 +397,28 @@ class MsgPack(object):
 
         elif mp_type == cls.MP_STR:
             len = cls.decode_strl(data)
-            s += '"'
-            s += unicode(data.read(len), 'utf-8')
-            s += '"'
+            val = bytes(data.read(len))
+            # MP_STR may actually contain a binary string, in which case
+            # we encode the value in base64, like we do for MP_BIN.
+            is_bin = False
+            try:
+                val = unicode(val, 'utf-8')
+            except UnicodeDecodeError:
+                is_bin = True
+            if not is_bin:
+                s += '"'
+                # Escape backslash and double quotes.
+                s += val.replace('\\', '\\\\').replace('"', '\\"')
+                s += '"'
+            else:
+                s += 'str:'
+                s += unicode(base64.b64encode(val), 'utf-8')
 
         elif mp_type == cls.MP_BIN:
             len = cls.decode_binl(data)
-            s += '!!binary '
-            s += base64.b64encode(str(data.read(len)))
+            val = bytes(data.read(len))
+            s += 'bin:'
+            s += unicode(base64.b64encode(val), 'utf-8')
 
         elif mp_type == cls.MP_ARRAY:
             s += '['
