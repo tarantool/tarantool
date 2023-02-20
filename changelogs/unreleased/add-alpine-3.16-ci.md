@@ -1,3 +1,3 @@
 ## feature/build
 
-* Support Alpine 3.16 build.
+* Alpine Linux 3.16 is now supported.

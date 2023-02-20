@@ -1,4 +1,4 @@
 ## bugfix/sql
 
-* Several places were found and fixed where proper handling of malloc()
-  failure was missing. (ghs-65, 66, 67, 68).
+* Fixed several bugs happening because of improper handling of `malloc()`
+  failures. (ghs-65, 66, 67, 68).

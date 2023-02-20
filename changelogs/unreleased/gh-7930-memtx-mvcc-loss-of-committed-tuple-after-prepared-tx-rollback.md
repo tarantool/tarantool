@@ -1,4 +1,4 @@
 ## bugfix/memtx
 
-* Fixed possible loss of committed tuple after prepared transaction rollback
-  (gh-7930).
+* Fixed possible loss of a committed tuple after rollback of a prepared
+  transaction (gh-7930).

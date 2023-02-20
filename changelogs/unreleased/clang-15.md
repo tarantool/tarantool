@@ -1,3 +1,3 @@
 ## bugfix/build
 
-* Fixed `-Werror` build fail on clang 15 (gh-8110).
+* Fixed `-Werror` build fail on Clang 15 (gh-8110).

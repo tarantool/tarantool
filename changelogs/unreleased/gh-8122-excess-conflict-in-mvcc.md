@@ -1,3 +1,4 @@
 ## bugfix/core
 
-* Fixed an excess conflict of a transaction in case of double delete of the same key when MVCC engine is used (gh-8122).
+* Fixed a transaction conflict reported mistakenly when a key was deleted twice
+  with MVCC engine enabled (gh-8122).

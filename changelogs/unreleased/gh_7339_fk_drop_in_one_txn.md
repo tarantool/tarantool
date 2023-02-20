@@ -1,4 +1,4 @@
 ## bugfix/core
 
-* Now referenced space or used function can be dropped in the same
-  transaction with referencing constraint or space (gh-7339).
+* A referenced space or a function being used in a constraint can now be dropped
+ in the same transaction with the referencing constraint or space (gh-7339).
