@@ -437,8 +437,8 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 					0, (const char *)upd_cols, P4_DYNAMIC);
 			u16 pik_flags = OPFLAG_NCHANGE;
 			SET_CONFLICT_FLAG(pik_flags, on_error);
-			sqlVdbeAddOp4(v, OP_Update, regNew, key_reg,
-				      upd_cols_reg, (char *)reg, P4_INT32);
+			sqlVdbeAddOp4Int(v, OP_Update, regNew, key_reg,
+					 upd_cols_reg, reg);
 			sqlVdbeChangeP5(v, pik_flags);
 		}
 	}
