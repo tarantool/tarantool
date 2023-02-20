@@ -1,4 +1,4 @@
 ## feature/box
 
-* Added support for downgrading system spaces to state compatible with older
-  releases of Tarantool (gh-7718).
+* Added the support for downgrading system spaces to make them compatible with
+  older Tarantool versions (gh-7718).

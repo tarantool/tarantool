@@ -1,3 +1,4 @@
 ## feature/lua
 
-* Embed tarantool/checks module for function input validation (gh-7726).
+* Embedded the `tarantool/checks` module for function input validation
+  (gh-7726).
