@@ -25,7 +25,7 @@ local TARANTOOL_PATH = tarantool_path(arg)
 local path_to_script = normalize_path(debug.getinfo(1, 'S').source)
 
 local DEBUGGER = 'luadebug'
-local dbg_header = "Tarantool debugger " .. tnt.version
+local dbg_header = tnt.package .. " debugger " .. tnt.version
 local dbg_prompt = DEBUGGER .. '>'
 local dbg_failed_bp = 'command expects argument in format filename:NN or ' ..
                       'filename+NN, where NN should be a positive number.'
