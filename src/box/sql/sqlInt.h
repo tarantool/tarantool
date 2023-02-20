@@ -728,16 +728,6 @@ typedef INT16_TYPE LogEst;
 #endif
 #endif
 
-/* The uptr type is an unsigned integer large enough to hold a pointer
- */
-#if defined(HAVE_STDINT_H)
-typedef uintptr_t uptr;
-#elif SQL_PTRSIZE==4
-typedef u32 uptr;
-#else
-typedef u64 uptr;
-#endif
-
 /*
  * Constants for the largest and smallest possible 64-bit signed integers.
  * These macros are designed to work correctly on both 32-bit and 64-bit
