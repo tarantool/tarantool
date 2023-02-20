@@ -61,7 +61,7 @@
       <sectiondef kind="define">
       <memberdef kind="define" id="module_8h_1ac5f2c7580fd5bf200c5027443420902f" prot="public" static="no">
         <name>PACKAGE_VERSION_MAJOR</name>
-        <initializer>2</initializer>
+        <initializer>3</initializer>
         <briefdescription>
 <para>Package major version - 1 for 1.6.7. </para>
         </briefdescription>
@@ -73,7 +73,7 @@
       </memberdef>
       <memberdef kind="define" id="module_8h_1a4ab155eaff0a115e522c1faae631196e" prot="public" static="no">
         <name>PACKAGE_VERSION_MINOR</name>
-        <initializer>11</initializer>
+        <initializer>0</initializer>
         <briefdescription>
 <para>Package minor version - 6 for 1.6.7. </para>
         </briefdescription>
@@ -97,7 +97,7 @@
       </memberdef>
       <memberdef kind="define" id="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" prot="public" static="no">
         <name>PACKAGE_VERSION</name>
-        <initializer>&quot;2.11.0-entrypoint-1076-g77be138d7&quot;</initializer>
+        <initializer>&quot;3.0.0-entrypoint-0-g263d422af&quot;</initializer>
         <briefdescription>
 <para>A string with major-minor-patch-commit-id identifier of the release, e.g. </para>
         </briefdescription>
@@ -12567,10 +12567,10 @@ In case of an error set a diag and return NULL. </para>
 <codeline lineno="49"><highlight class="normal"></highlight><highlight class="preprocessor">#endif<sp/></highlight><highlight class="comment">/*<sp/>defined(__cplusplus)<sp/>*/</highlight><highlight class="preprocessor"></highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="50"><highlight class="normal"></highlight></codeline>
 <codeline lineno="51"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;lua.h&quot;</highlight><highlight class="normal"><sp/><sp/></highlight><highlight class="comment">/*<sp/>does<sp/>not<sp/>have<sp/>extern<sp/>C<sp/>wrappers<sp/>*/</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="57" refid="module_8h_1ac5f2c7580fd5bf200c5027443420902f" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_MAJOR<sp/>2</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="61" refid="module_8h_1a4ab155eaff0a115e522c1faae631196e" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_MINOR<sp/>11</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="57" refid="module_8h_1ac5f2c7580fd5bf200c5027443420902f" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_MAJOR<sp/>3</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="61" refid="module_8h_1a4ab155eaff0a115e522c1faae631196e" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_MINOR<sp/>0</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="65" refid="module_8h_1abd1dbec4fd6761084d3e0c05afe2b138" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION_PATCH<sp/>0</highlight><highlight class="normal"></highlight></codeline>
-<codeline lineno="70" refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION<sp/>&quot;2.11.0-entrypoint-1076-g77be138d7&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="70" refid="module_8h_1aa326a05d5e30f9e9a4bb0b4469d5d0c0" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>PACKAGE_VERSION<sp/>&quot;3.0.0-entrypoint-0-g263d422af&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="71"><highlight class="normal"></highlight></codeline>
 <codeline lineno="76" refid="module_8h_1adb6d1259777e8f56c6260be6faed183e" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>SYSCONF_DIR<sp/>&quot;etc&quot;</highlight><highlight class="normal"></highlight></codeline>
 <codeline lineno="78" refid="module_8h_1a643b6b7ac15874197420e2adbea8b6bb" refkind="member"><highlight class="normal"></highlight><highlight class="preprocessor">#define<sp/>INSTALL_PREFIX<sp/>&quot;/usr/local&quot;</highlight><highlight class="normal"></highlight></codeline>
