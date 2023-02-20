@@ -1,4 +1,4 @@
 ## bugfix/box
 
-* Fixed error message for wrong options provided to function definition
+* Fixed the error message for wrong options provided to a function definition
   (gh-7972).

@@ -1,5 +1,6 @@
 ## bugfix/core
 
-* Fixed an incorrect behaviour when assigning a value to parameter in `box.cfg`
-  changes nothing. Fix raises an error on change `box.cfg` parameters using
-  standard Lua table interface: `box.cfg.background = true` (gh-7350).
+* Fixed a bug when direct assignments of `box.cfg` parameters (such as
+  `box.cfg.background = true`) were silently ignored. Now such assignments
+  result in errors. The correct way to set `box.cfg` parameters is this:
+  `box.cfg{ background=true }` (gh-7350).
