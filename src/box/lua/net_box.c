@@ -1602,16 +1602,16 @@ netbox_decode_execute(struct lua_State *L, const char **data,
 				netbox_decode_data(L, data,
 						   tuple_format_runtime);
 			}
-			rows_index = i - map_size;
+			rows_index = lua_gettop(L);
 			break;
 		case IPROTO_METADATA:
 			netbox_decode_metadata(L, data);
-			meta_index = i - map_size;
+			meta_index = lua_gettop(L);
 			break;
 		default:
 			assert(key == IPROTO_SQL_INFO);
 			netbox_decode_sql_info(L, data);
-			info_index = i - map_size;
+			info_index = lua_gettop(L);
 			break;
 		}
 	}
@@ -1619,9 +1619,9 @@ netbox_decode_execute(struct lua_State *L, const char **data,
 		assert(meta_index != 0);
 		assert(rows_index != 0);
 		lua_createtable(L, 0, 2);
-		lua_pushvalue(L, meta_index - 1);
+		lua_pushvalue(L, meta_index);
 		lua_setfield(L, -2, "metadata");
-		lua_pushvalue(L, rows_index - 1);
+		lua_pushvalue(L, rows_index);
 		lua_setfield(L, -2, "rows");
 	} else {
 		assert(meta_index == 0);
@@ -1648,24 +1648,24 @@ netbox_decode_prepare(struct lua_State *L, const char **data,
 		case IPROTO_STMT_ID: {
 			stmt_id = mp_decode_uint(data);
 			luaL_pushuint64(L, stmt_id);
-			stmt_id_idx = i - map_size;
+			stmt_id_idx = lua_gettop(L);
 			break;
 		}
 		case IPROTO_METADATA: {
 			netbox_decode_metadata(L, data);
-			meta_idx = i - map_size;
+			meta_idx = lua_gettop(L);
 			break;
 		}
 		case IPROTO_BIND_METADATA: {
 			netbox_decode_metadata(L, data);
-			bind_meta_idx = i - map_size;
+			bind_meta_idx = lua_gettop(L);
 			break;
 		}
 		default: {
 			assert(key == IPROTO_BIND_COUNT);
 			uint32_t bind_count = mp_decode_uint(data);
 			luaL_pushuint64(L, bind_count);
-			bind_count_idx = i - map_size;
+			bind_count_idx = lua_gettop(L);
 			break;
 		}}
 	}
@@ -1673,14 +1673,14 @@ netbox_decode_prepare(struct lua_State *L, const char **data,
 	assert(stmt_id_idx * bind_meta_idx * bind_count_idx != 0);
 	/* General meta is presented only in DQL responses. */
 	lua_createtable(L, 0, meta_idx != 0 ? 4 : 3);
-	lua_pushvalue(L, stmt_id_idx - 1);
+	lua_pushvalue(L, stmt_id_idx);
 	lua_setfield(L, -2, "stmt_id");
-	lua_pushvalue(L, bind_count_idx - 1);
+	lua_pushvalue(L, bind_count_idx);
 	lua_setfield(L, -2, "param_count");
-	lua_pushvalue(L, bind_meta_idx - 1);
+	lua_pushvalue(L, bind_meta_idx);
 	lua_setfield(L, -2, "params");
 	if (meta_idx != 0) {
-		lua_pushvalue(L, meta_idx - 1);
+		lua_pushvalue(L, meta_idx);
 		lua_setfield(L, -2, "metadata");
 	}
 }
