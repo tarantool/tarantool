@@ -104,7 +104,7 @@ sqlCursorPayload(BtCursor *pCur, u32 offset, u32 amt, void *pBuf)
 	const void *pPayload;
 	u32 sz;
 	pPayload = tarantoolsqlPayloadFetch(pCur, &sz);
-	assert((uptr) (offset + amt) <= sz);
+	assert(offset + amt <= sz);
 	memcpy(pBuf, pPayload + offset, amt);
 }
 
