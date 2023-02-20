@@ -10,7 +10,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct sql_stmt;
+struct Vdbe;
 
 /**
  * One of possible formats used to dump msgpack/Lua.
@@ -40,7 +40,7 @@ struct port_sql {
 	/** Base port struct. To be able to use port_c methods. */
 	struct port_c base;
 	/* Prepared SQL statement. */
-	struct sql_stmt *stmt;
+	struct Vdbe *stmt;
 	/**
 	 * Serialization format depends on type of SQL query: DML or
 	 * DQL; and on type of SQL request: execute or prepare.
@@ -57,7 +57,7 @@ static_assert(sizeof(struct port_sql) <= sizeof(struct port),
 	      "sizeof(struct port_sql) must be <= sizeof(struct port)");
 
 void
-port_sql_create(struct port *port, struct sql_stmt *stmt,
+port_sql_create(struct port *port, struct Vdbe *stmt,
 		enum sql_serialization_format format, bool do_finalize);
 
 #if defined(__cplusplus)

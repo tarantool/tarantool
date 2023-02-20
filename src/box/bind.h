@@ -45,7 +45,7 @@ extern "C" {
 #include "tt_uuid.h"
 #include "datetime.h"
 
-struct sql_stmt;
+struct Vdbe;
 
 /**
  * Name and value of an SQL prepared statement parameter.
@@ -128,8 +128,7 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet);
  * @retval -1 SQL error.
  */
 int
-sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
-		uint32_t pos);
+sql_bind_column(struct Vdbe *stmt, const struct sql_bind *p, uint32_t pos);
 
 /**
  * Bind parameter values to the prepared statement.
@@ -141,8 +140,7 @@ sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
  * @retval -1 Client or memory error.
  */
 static inline int
-sql_bind(struct sql_stmt *stmt, const struct sql_bind *bind,
-	 uint32_t bind_count)
+sql_bind(struct Vdbe *stmt, const struct sql_bind *bind, uint32_t bind_count)
 {
 	assert(stmt != NULL);
 	uint32_t pos = 1;

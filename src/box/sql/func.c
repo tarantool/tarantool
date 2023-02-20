@@ -2339,7 +2339,7 @@ func_sql_expr_new(const struct func_def *def)
 	sql_expr_delete(expr);
 
 	if (is_error) {
-		sql_stmt_finalize((struct sql_stmt *)v);
+		sql_stmt_finalize(v);
 		return NULL;
 	}
 	struct func_sql_expr *func = xmalloc(sizeof(*func));
@@ -2352,7 +2352,7 @@ int
 func_sql_expr_call(struct func *func, struct port *args, struct port *ret)
 {
 	struct func_sql_expr *func_sql = (struct func_sql_expr *)func;
-	struct sql_stmt *stmt = (struct sql_stmt *)func_sql->stmt;
+	struct Vdbe *stmt = func_sql->stmt;
 	if (args->vtab != &port_c_vtab || ((struct port_c *)args)->size != 2) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
 			 "SQL functions");
@@ -2411,7 +2411,7 @@ void
 func_sql_expr_destroy(struct func *base)
 {
 	struct func_sql_expr *func = (struct func_sql_expr *)base;
-	sql_stmt_finalize((struct sql_stmt *)func->stmt);
+	sql_stmt_finalize(func->stmt);
 	free(func);
 }
 

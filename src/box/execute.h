@@ -48,9 +48,9 @@ enum sql_info_key {
 
 extern const char *sql_info_key_strs[];
 
+struct Vdbe;
 struct region;
 struct sql_bind;
-struct sql_stmt;
 
 int
 sql_unprepare(uint32_t stmt_id);
@@ -78,8 +78,12 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 			uint32_t bind_count, struct port *port,
 			struct region *region);
 
+/**
+ * The following routine destroys a virtual machine that is created by the
+ * sql_stmt_compile() routine.
+ */
 int
-sql_stmt_finalize(struct sql_stmt *stmt);
+sql_stmt_finalize(struct Vdbe *stmt);
 
 /**
  * Calculate estimated size of memory occupied by VM.
@@ -87,17 +91,17 @@ sql_stmt_finalize(struct sql_stmt *stmt);
  * memory.
  */
 size_t
-sql_stmt_est_size(const struct sql_stmt *stmt);
+sql_stmt_est_size(const struct Vdbe *stmt);
 
 /**
  * Return string of SQL query.
  */
 const char *
-sql_stmt_query_str(const struct sql_stmt *stmt);
+sql_stmt_query_str(const struct Vdbe *stmt);
 
 /** Return true if statement executes right now. */
 int
-sql_stmt_busy(const struct sql_stmt *stmt);
+sql_stmt_busy(const struct Vdbe *stmt);
 
 /**
  * Prepare (compile into VDBE byte-code) statement.

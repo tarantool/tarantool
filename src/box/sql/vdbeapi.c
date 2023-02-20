@@ -65,28 +65,20 @@ invokeProfileCallback(struct Vdbe *p)
 	p->startTime = 0;
 }
 
-/*
- * The following routine destroys a virtual machine that is created by
- * the sql_stmt_compile() routine. The integer returned is an SQL_
- * success/failure code that describes the result of executing the virtual
- * machine.
- */
 int
-sql_stmt_finalize(sql_stmt * pStmt)
+sql_stmt_finalize(struct Vdbe *v)
 {
-	if (pStmt == NULL)
+	if (v == NULL)
 		return 0;
-	Vdbe *v = (Vdbe *) pStmt;
 	if (v->startTime > 0)
 		invokeProfileCallback(v);
 	return sqlVdbeFinalize(v);
 }
 
 int
-sql_stmt_reset(sql_stmt *pStmt)
+sql_stmt_reset(struct Vdbe *v)
 {
-	assert(pStmt != NULL);
-	struct Vdbe *v = (Vdbe *) pStmt;
+	assert(v != NULL);
 	if (v->startTime > 0)
 		invokeProfileCallback(v);
 	int rc = sqlVdbeReset(v);
@@ -117,14 +109,13 @@ sqlStep(Vdbe * p)
 
 	assert(p);
 	if (p->magic != VDBE_MAGIC_RUN)
-		sql_stmt_reset((sql_stmt *) p);
+		sql_stmt_reset(p);
 
 	if (p->pc <= 0 && p->expired) {
 		p->is_aborted = true;
 		return -1;
 	}
 	if (p->pc < 0) {
-
 		if ((db->xProfile || (db->mTrace & SQL_TRACE_PROFILE) != 0)
 		    && !db->init.busy && p->zSql) {
 			sqlOsCurrentTimeInt64(db->pVfs, &p->startTime);
@@ -157,102 +148,79 @@ sqlStep(Vdbe * p)
 	return rc;
 }
 
-/*
- * This is the top-level implementation of sql_step().  Call
- * sqlStep() to do most of the work.  If a schema error occurs,
- * call sqlReprepare() and try again.
- */
 int
-sql_step(sql_stmt * pStmt)
+sql_step(struct Vdbe *v)
 {
-	Vdbe *v = (Vdbe *) pStmt;	/* the prepared statement */
 	assert(v != NULL);
 	return sqlStep(v);
 }
 
-/*
- * Return the number of columns in the result set for the statement pStmt.
- */
 int
-sql_column_count(sql_stmt * pStmt)
+sql_column_count(struct Vdbe *pVm)
 {
-	Vdbe *pVm = (Vdbe *) pStmt;
 	return pVm ? pVm->nResColumn : 0;
 }
 
 char *
-sql_stmt_result_to_msgpack(struct sql_stmt *stmt, uint32_t *tuple_size,
+sql_stmt_result_to_msgpack(struct Vdbe *vdbe, uint32_t *tuple_size,
 			   struct region *region)
 {
-	struct Vdbe *vdbe = (struct Vdbe *)stmt;
 	return mem_encode_array(vdbe->pResultSet, vdbe->nResColumn, tuple_size,
 				region);
 }
 
 char *
-sql_stmt_func_result_to_msgpack(struct sql_stmt *stmt, uint32_t *size,
+sql_stmt_func_result_to_msgpack(struct Vdbe *vdbe, uint32_t *size,
 				struct region *region)
 {
-	struct Vdbe *vdbe = (struct Vdbe *)stmt;
 	assert(vdbe->nResColumn == 1);
 	return mem_to_mp(vdbe->pResultSet, size, region);
 }
 
-/*
- * Return the name of the Nth column of the result set returned by SQL
- * statement pStmt.
- */
 const char *
-sql_column_name(sql_stmt *stmt, int n)
+sql_column_name(struct Vdbe *p, int n)
 {
-	struct Vdbe *p = (struct Vdbe *) stmt;
-	assert(n < sql_column_count(stmt) && n >= 0);
+	assert(n < sql_column_count(p) && n >= 0);
 	return p->metadata[n].name;
 }
 
 const char *
-sql_column_datatype(sql_stmt *stmt, int n)
+sql_column_datatype(struct Vdbe *p, int n)
 {
-	struct Vdbe *p = (struct Vdbe *) stmt;
-	assert(n < sql_column_count(stmt) && n >= 0);
+	assert(n < sql_column_count(p) && n >= 0);
 	return p->metadata[n].type;
 }
 
 const char *
-sql_column_coll(sql_stmt *stmt, int n)
+sql_column_coll(struct Vdbe *p, int n)
 {
-	struct Vdbe *p = (struct Vdbe *) stmt;
-	assert(n < sql_column_count(stmt) && n >= 0);
+	assert(n < sql_column_count(p) && n >= 0);
 	return p->metadata[n].collation;
 }
 
 int
-sql_column_nullable(sql_stmt *stmt, int n)
+sql_column_nullable(struct Vdbe *p, int n)
 {
-	struct Vdbe *p = (struct Vdbe *) stmt;
-	assert(n < sql_column_count(stmt) && n >= 0);
+	assert(n < sql_column_count(p) && n >= 0);
 	return p->metadata[n].nullable;
 }
 
 bool
-sql_column_is_autoincrement(sql_stmt *stmt, int n)
+sql_column_is_autoincrement(struct Vdbe *p, int n)
 {
-	struct Vdbe *p = (struct Vdbe *) stmt;
-	assert(n < sql_column_count(stmt) && n >= 0);
+	assert(n < sql_column_count(p) && n >= 0);
 	return p->metadata[n].is_actoincrement;
 }
 
 const char *
-sql_column_span(sql_stmt *stmt, int n) {
-	struct Vdbe *p = (struct Vdbe *) stmt;
-	assert(n < sql_column_count(stmt) && n >= 0);
+sql_column_span(struct Vdbe *p, int n) {
+	assert(n < sql_column_count(p) && n >= 0);
 	return p->metadata[n].span;
 }
 
 uint64_t
-sql_stmt_schema_version(const struct sql_stmt *stmt)
+sql_stmt_schema_version(const struct Vdbe *v)
 {
-	struct Vdbe *v = (struct Vdbe *) stmt;
 	return v->schema_ver;
 }
 
@@ -270,9 +238,8 @@ sql_metadata_size(const struct sql_column_metadata *metadata)
 }
 
 size_t
-sql_stmt_est_size(const struct sql_stmt *stmt)
+sql_stmt_est_size(const struct Vdbe *v)
 {
-	struct Vdbe *v = (struct Vdbe *) stmt;
 	size_t size = sizeof(*v);
 	/* Names and types of result set columns */
 	for (int i = 0; i < v->nResColumn; ++i)
@@ -327,9 +294,8 @@ sql_stmt_est_size(const struct sql_stmt *stmt)
 }
 
 const char *
-sql_stmt_query_str(const struct sql_stmt *stmt)
+sql_stmt_query_str(const struct Vdbe *v)
 {
-	const struct Vdbe *v = (const struct Vdbe *) stmt;
 	return v->zSql;
 }
 
@@ -342,7 +308,7 @@ sql_stmt_query_str(const struct sql_stmt *stmt)
  * the same as binding a NULL value to the column.
  */
 static int
-vdbeUnbind(Vdbe * p, int i)
+vdbeUnbind(struct Vdbe *p, int i)
 {
 	Mem *pVar;
 	assert(p != NULL);
@@ -402,9 +368,8 @@ sql_bind_type(struct Vdbe *v, uint32_t position, const char *type)
 }
 
 void
-sql_unbind(struct sql_stmt *stmt)
+sql_unbind(struct Vdbe *v)
 {
-	struct Vdbe *v = (struct Vdbe *) stmt;
 	for (int i = 1; i < v->nVar + 1; ++i) {
 		int rc = vdbeUnbind(v, i);
 		assert(rc == 0);
@@ -419,16 +384,14 @@ sql_unbind(struct sql_stmt *stmt)
 }
 
 void
-sql_reset_autoinc_id_list(struct sql_stmt *stmt)
+sql_reset_autoinc_id_list(struct Vdbe *v)
 {
-	struct Vdbe *v = (struct Vdbe *)stmt;
 	stailq_create(&v->autoinc_id_list);
 }
 
 int
-sql_bind_double(sql_stmt * pStmt, int i, double rValue)
+sql_bind_double(struct Vdbe *p, int i, double rValue)
 {
-	Vdbe *p = (Vdbe *) pStmt;
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	int rc = sql_bind_type(p, i, "numeric");
@@ -437,9 +400,8 @@ sql_bind_double(sql_stmt * pStmt, int i, double rValue)
 }
 
 int
-sql_bind_boolean(struct sql_stmt *stmt, int i, bool value)
+sql_bind_boolean(struct Vdbe *p, int i, bool value)
 {
-	struct Vdbe *p = (struct Vdbe *) stmt;
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	int rc = sql_bind_type(p, i, "boolean");
@@ -448,15 +410,14 @@ sql_bind_boolean(struct sql_stmt *stmt, int i, bool value)
 }
 
 int
-sql_bind_int(sql_stmt * p, int i, int iValue)
+sql_bind_int(struct Vdbe *p, int i, int iValue)
 {
 	return sql_bind_int64(p, i, (i64) iValue);
 }
 
 int
-sql_bind_int64(sql_stmt * pStmt, int i, sql_int64 iValue)
+sql_bind_int64(struct Vdbe *p, int i, int64_t iValue)
 {
-	Vdbe *p = (Vdbe *) pStmt;
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	int rc = sql_bind_type(p, i, "integer");
@@ -466,9 +427,8 @@ sql_bind_int64(sql_stmt * pStmt, int i, sql_int64 iValue)
 }
 
 int
-sql_bind_uint64(struct sql_stmt *stmt, int i, uint64_t value)
+sql_bind_uint64(struct Vdbe *p, int i, uint64_t value)
 {
-	struct Vdbe *p = (struct Vdbe *) stmt;
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	int rc = sql_bind_type(p, i, "integer");
@@ -477,18 +437,16 @@ sql_bind_uint64(struct sql_stmt *stmt, int i, uint64_t value)
 }
 
 int
-sql_bind_null(sql_stmt * pStmt, int i)
+sql_bind_null(struct Vdbe *p, int i)
 {
-	Vdbe *p = (Vdbe *) pStmt;
 	if (vdbeUnbind(p, i) != 0)
 		return -1;
 	return sql_bind_type(p, i, "boolean");
 }
 
 int
-sql_bind_ptr(struct sql_stmt *stmt, int i, void *ptr)
+sql_bind_ptr(struct Vdbe *p, int i, void *ptr)
 {
-	struct Vdbe *p = (struct Vdbe *) stmt;
 	int rc = vdbeUnbind(p, i);
 	if (rc == 0) {
 		rc = sql_bind_type(p, i, "varbinary");
@@ -498,41 +456,36 @@ sql_bind_ptr(struct sql_stmt *stmt, int i, void *ptr)
 }
 
 int
-sql_bind_str_static(sql_stmt *stmt, int i, const char *str, uint32_t len)
+sql_bind_str_static(struct Vdbe *vdbe, int i, const char *str, uint32_t len)
 {
-	struct Vdbe *vdbe = (struct Vdbe *)stmt;
 	mem_set_str_static(&vdbe->aVar[i - 1], (char *)str, len);
 	return sql_bind_type(vdbe, i, "text");
 }
 
 int
-sql_bind_bin_static(sql_stmt *stmt, int i, const char *str, uint32_t size)
+sql_bind_bin_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
 {
-	struct Vdbe *vdbe = (struct Vdbe *)stmt;
 	mem_set_bin_static(&vdbe->aVar[i - 1], (char *)str, size);
 	return sql_bind_type(vdbe, i, "text");
 }
 
 int
-sql_bind_array_static(sql_stmt *stmt, int i, const char *str, uint32_t size)
+sql_bind_array_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
 {
-	struct Vdbe *vdbe = (struct Vdbe *)stmt;
 	mem_set_array_static(&vdbe->aVar[i - 1], (char *)str, size);
 	return sql_bind_type(vdbe, i, "array");
 }
 
 int
-sql_bind_map_static(sql_stmt *stmt, int i, const char *str, uint32_t size)
+sql_bind_map_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
 {
-	struct Vdbe *vdbe = (struct Vdbe *)stmt;
 	mem_set_map_static(&vdbe->aVar[i - 1], (char *)str, size);
 	return sql_bind_type(vdbe, i, "map");
 }
 
 int
-sql_bind_uuid(struct sql_stmt *stmt, int i, const struct tt_uuid *uuid)
+sql_bind_uuid(struct Vdbe *p, int i, const struct tt_uuid *uuid)
 {
-	struct Vdbe *p = (struct Vdbe *)stmt;
 	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "uuid") != 0)
 		return -1;
 	mem_set_uuid(&p->aVar[i - 1], uuid);
@@ -540,9 +493,8 @@ sql_bind_uuid(struct sql_stmt *stmt, int i, const struct tt_uuid *uuid)
 }
 
 int
-sql_bind_dec(struct sql_stmt *stmt, int i, const decimal_t *dec)
+sql_bind_dec(struct Vdbe *p, int i, const decimal_t *dec)
 {
-	struct Vdbe *p = (struct Vdbe *)stmt;
 	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "decimal") != 0)
 		return -1;
 	mem_set_dec(&p->aVar[i - 1], dec);
@@ -550,9 +502,8 @@ sql_bind_dec(struct sql_stmt *stmt, int i, const decimal_t *dec)
 }
 
 int
-sql_bind_datetime(struct sql_stmt *stmt, int i, const struct datetime *dt)
+sql_bind_datetime(struct Vdbe *p, int i, const struct datetime *dt)
 {
-	struct Vdbe *p = (struct Vdbe *)stmt;
 	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "datetime") != 0)
 		return -1;
 	mem_set_datetime(&p->aVar[i - 1], dt);
@@ -560,9 +511,8 @@ sql_bind_datetime(struct sql_stmt *stmt, int i, const struct datetime *dt)
 }
 
 int
-sql_bind_interval(struct sql_stmt *stmt, int i, const struct interval *itv)
+sql_bind_interval(struct Vdbe *p, int i, const struct interval *itv)
 {
-	struct Vdbe *p = (struct Vdbe *)stmt;
 	if (vdbeUnbind(p, i) != 0 || sql_bind_type(p, i, "interval") != 0)
 		return -1;
 	mem_set_interval(&p->aVar[i - 1], itv);
@@ -570,16 +520,14 @@ sql_bind_interval(struct sql_stmt *stmt, int i, const struct interval *itv)
 }
 
 int
-sql_bind_parameter_count(const struct sql_stmt *stmt)
+sql_bind_parameter_count(const struct Vdbe *p)
 {
-	struct Vdbe *p = (struct Vdbe *) stmt;
 	return p->nVar;
 }
 
 const char *
-sql_bind_parameter_name(const struct sql_stmt *stmt, int i)
+sql_bind_parameter_name(const struct Vdbe *p, int i)
 {
-	struct Vdbe *p = (struct Vdbe *) stmt;
 	if (p == NULL)
 		return NULL;
 	return sqlVListNumToName(p->pVList, i+1);
@@ -599,20 +547,14 @@ sqlVdbeParameterIndex(Vdbe * p, const char *zName, int nName)
 }
 
 int
-sql_bind_parameter_lindex(sql_stmt * pStmt, const char *zName,
-			      int nName)
+sql_bind_parameter_lindex(struct Vdbe *v, const char *zName, int nName)
 {
-	return sqlVdbeParameterIndex((Vdbe *) pStmt, zName, nName);
+	return sqlVdbeParameterIndex(v, zName, nName);
 }
 
-/*
- * Transfer all bindings from the first statement over to the second.
- */
 int
-sqlTransferBindings(sql_stmt * pFromStmt, sql_stmt * pToStmt)
+sqlTransferBindings(struct Vdbe *pFrom, struct Vdbe *pTo)
 {
-	Vdbe *pFrom = (Vdbe *) pFromStmt;
-	Vdbe *pTo = (Vdbe *) pToStmt;
 	int i;
 	assert(pTo->nVar == pFrom->nVar);
 	for (i = 0; i < pFrom->nVar; i++) {
@@ -622,19 +564,14 @@ sqlTransferBindings(sql_stmt * pFromStmt, sql_stmt * pToStmt)
 }
 
 int
-sql_stmt_busy(const struct sql_stmt *stmt)
+sql_stmt_busy(const struct Vdbe *v)
 {
-	assert(stmt != NULL);
-	const struct Vdbe *v = (const struct Vdbe *) stmt;
+	assert(v != NULL);
 	return v->magic == VDBE_MAGIC_RUN && v->pc >= 0;
 }
 
-/*
- * Return the SQL associated with a prepared statement
- */
 const char *
-sql_sql(sql_stmt * pStmt)
+sql_sql(struct Vdbe *p)
 {
-	Vdbe *p = (Vdbe *) pStmt;
 	return p ? p->zSql : 0;
 }

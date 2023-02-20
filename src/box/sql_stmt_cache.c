@@ -63,7 +63,7 @@ sql_stmt_cache_stat(struct info_handler *h)
 }
 
 static size_t
-sql_cache_entry_sizeof(struct sql_stmt *stmt)
+sql_cache_entry_sizeof(struct Vdbe *stmt)
 {
 	return sql_stmt_est_size(stmt) + sizeof(struct stmt_cache_entry);
 }
@@ -130,7 +130,7 @@ sql_stmt_cache_gc(void)
  * Add it to the LRU cache list. Account cache size enlargement.
  */
 static struct stmt_cache_entry *
-sql_cache_entry_new(struct sql_stmt *stmt)
+sql_cache_entry_new(struct Vdbe *stmt)
 {
 	struct stmt_cache_entry *entry = malloc(sizeof(*entry));
 	if (entry == NULL) {
@@ -219,7 +219,7 @@ sql_stmt_unref(uint32_t stmt_id)
 }
 
 int
-sql_stmt_cache_update(struct sql_stmt *old_stmt, struct sql_stmt *new_stmt)
+sql_stmt_cache_update(struct Vdbe *old_stmt, struct Vdbe *new_stmt)
 {
 	const char *sql_str = sql_stmt_query_str(old_stmt);
 	uint32_t stmt_id = sql_stmt_calculate_id(sql_str, strlen(sql_str));
@@ -230,7 +230,7 @@ sql_stmt_cache_update(struct sql_stmt *old_stmt, struct sql_stmt *new_stmt)
 }
 
 int
-sql_stmt_cache_insert(struct sql_stmt *stmt)
+sql_stmt_cache_insert(struct Vdbe *stmt)
 {
 	assert(stmt != NULL);
 	struct sql_stmt_cache *cache = &sql_stmt_cache;
@@ -263,7 +263,7 @@ sql_stmt_cache_insert(struct sql_stmt *stmt)
 	return 0;
 }
 
-struct sql_stmt *
+struct Vdbe *
 sql_stmt_cache_find(uint32_t stmt_id)
 {
 	struct stmt_cache_entry *entry = stmt_cache_find_entry(stmt_id);

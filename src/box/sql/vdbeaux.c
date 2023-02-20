@@ -1720,9 +1720,8 @@ checkActiveVdbeCnt(void)
 	int cnt = 0;
 	p = sql_get()->pVdbe;
 	while (p) {
-		if (sql_stmt_busy((sql_stmt *) p)) {
+		if (sql_stmt_busy(p))
 			cnt++;
-		}
 		p = p->pNext;
 	}
 	assert(cnt == sql_get()->nVdbeActive);

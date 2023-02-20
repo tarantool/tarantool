@@ -66,7 +66,7 @@ const char *sql_info_key_strs[] = {
  * @retval -1 Memory error.
  */
 static inline int
-sql_row_to_port(struct sql_stmt *stmt, struct region *region, struct port *port)
+sql_row_to_port(struct Vdbe *stmt, struct region *region, struct port *port)
 {
 	uint32_t size;
 	size_t svp = region_used(region);
@@ -84,7 +84,7 @@ error:
 }
 
 static bool
-sql_stmt_schema_version_is_valid(struct sql_stmt *stmt)
+sql_stmt_schema_version_is_valid(struct Vdbe *stmt)
 {
 	return sql_stmt_schema_version(stmt) == box_schema_version();
 }
@@ -94,10 +94,10 @@ sql_stmt_schema_version_is_valid(struct sql_stmt *stmt)
  * cache with the newest value.
  */
 static int
-sql_reprepare(struct sql_stmt **stmt)
+sql_reprepare(struct Vdbe **stmt)
 {
 	const char *sql_str = sql_stmt_query_str(*stmt);
-	struct sql_stmt *new_stmt;
+	struct Vdbe *new_stmt;
 	if (sql_stmt_compile(sql_str, strlen(sql_str), NULL,
 			     &new_stmt, NULL) != 0)
 		return -1;
@@ -116,7 +116,7 @@ int
 sql_prepare(const char *sql, int len, struct port *port)
 {
 	uint32_t stmt_id = sql_stmt_calculate_id(sql, len);
-	struct sql_stmt *stmt = sql_stmt_cache_find(stmt_id);
+	struct Vdbe *stmt = sql_stmt_cache_find(stmt_id);
 	rmean_collect(rmean_box, IPROTO_PREPARE, 1);
 	if (stmt == NULL) {
 		if (sql_stmt_compile(sql, len, NULL, &stmt, NULL) != 0)
@@ -176,7 +176,7 @@ sql_unprepare(uint32_t stmt_id)
  * @retval -1 Error.
  */
 static inline int
-sql_execute(struct sql_stmt *stmt, struct port *port, struct region *region)
+sql_execute(struct Vdbe *stmt, struct port *port, struct region *region)
 {
 	int rc, column_count = sql_column_count(stmt);
 	rmean_collect(rmean_box, IPROTO_EXECUTE, 1);
@@ -207,7 +207,7 @@ sql_execute_prepared(uint32_t stmt_id, const struct sql_bind *bind,
 		diag_set(ClientError, ER_WRONG_QUERY_ID, stmt_id);
 		return -1;
 	}
-	struct sql_stmt *stmt = sql_stmt_cache_find(stmt_id);
+	struct Vdbe *stmt = sql_stmt_cache_find(stmt_id);
 	assert(stmt != NULL);
 	if (!sql_stmt_schema_version_is_valid(stmt)) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "statement has expired");
@@ -244,7 +244,7 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 			uint32_t bind_count, struct port *port,
 			struct region *region)
 {
-	struct sql_stmt *stmt;
+	struct Vdbe *stmt;
 	if (sql_stmt_compile(sql, len, NULL, &stmt, NULL) != 0)
 		return -1;
 	assert(stmt != NULL);
