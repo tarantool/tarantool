@@ -50,7 +50,7 @@ tarantool --no-such-option --version
 tarantool: unrecognized option
 
 tarantool --version
-Tarantool 2.<minor>.<patch>-<suffix>
+Tarantool 3.<minor>.<patch>-<suffix>
 Target: platform <build>
 Build options: flags
 Compiler: cc
@@ -58,7 +58,7 @@ C_FLAGS: flags
 CXX_FLAGS: flags
 
 tarantool -v
-Tarantool 2.<minor>.<patch>-<suffix>
+Tarantool 3.<minor>.<patch>-<suffix>
 Target: platform <build>
 Build options: flags
 Compiler: cc
@@ -66,7 +66,7 @@ C_FLAGS: flags
 CXX_FLAGS: flags
 
 tarantool -V
-Tarantool 2.<minor>.<patch>-<suffix>
+Tarantool 3.<minor>.<patch>-<suffix>
 Target: platform <build>
 Build options: flags
 Compiler: cc
@@ -117,7 +117,7 @@ arg[3] => 2
 arg[4] => 3
 
 tarantool -V ${SOURCEDIR}/test/box-py/args.lua 1 2 3
-Tarantool 2.<minor>.<patch>-<suffix>
+Tarantool 3.<minor>.<patch>-<suffix>
 Target: platform <build>
 Build options: flags
 Compiler: cc
