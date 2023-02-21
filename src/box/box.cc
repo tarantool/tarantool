@@ -3903,6 +3903,14 @@ box_register_replica(const struct tt_uuid *uuid,
 			diag_raise();
 		return;
 	}
+	struct replica *other = replica_by_name(name);
+	if (other != NULL && other != replica) {
+		if (boxk(IPROTO_UPDATE, BOX_CLUSTER_ID, "[%u][[%s%d%s]]",
+			 (unsigned)other->id, "=", BOX_CLUSTER_FIELD_UUID,
+			 tt_uuid_str(uuid)) != 0)
+			diag_raise();
+		return;
+	}
 	uint32_t replica_id;
 	if (replica_find_new_id(&replica_id) != 0)
 		diag_raise();
@@ -4152,13 +4160,13 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	    (replica != NULL &&
 	     strcmp(replica->name, req.instance_name) != 0)) {
 		struct replica *other = replica_by_name(req.instance_name);
-		if (other != NULL && other != replica) {
+		if (other != NULL && other != replica &&
+		    replica_has_connections(other)) {
 			tnt_raise(ClientError, ER_INSTANCE_NAME_DUPLICATE,
 				  node_name_str(req.instance_name),
 				  tt_uuid_str(&other->uuid));
 		}
 	}
-
 	/*
 	 * Register the replica as a WAL consumer so that
 	 * it can resume FINAL JOIN where INITIAL JOIN ends.

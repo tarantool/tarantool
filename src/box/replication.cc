@@ -263,9 +263,8 @@ replica_check_id(uint32_t replica_id)
 static bool
 replica_is_orphan(struct replica *replica)
 {
-	assert(replica->relay != NULL);
-	return replica->id == REPLICA_ID_NIL && replica->applier == NULL &&
-	       relay_get_state(replica->relay) != RELAY_FOLLOW;
+	return replica->id == REPLICA_ID_NIL &&
+	       !replica_has_connections(replica);
 }
 
 static int
@@ -470,6 +469,14 @@ replica_set_applier(struct replica *replica, struct applier *applier)
 	replica->applier = applier;
 	trigger_add(&replica->applier->on_state,
 		    &replica->on_applier_state);
+}
+
+bool
+replica_has_connections(const struct replica *replica)
+{
+	assert(replica->relay != NULL);
+	return relay_get_state(replica->relay) == RELAY_FOLLOW ||
+	       replica->applier != NULL;
 }
 
 /** A helper to track applier health on its state change. */

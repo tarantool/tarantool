@@ -4224,6 +4224,16 @@ replica_def_new_from_tuple(struct tuple *tuple, struct region *region)
 	return def;
 }
 
+/** Add an instance on commit/rollback. */
+static int
+on_replace_cluster_add_replica(struct trigger *trigger, void * /* event */)
+{
+	const struct replica_def *def = (typeof(def))trigger->data;
+	struct replica *r = replicaset_add(def->id, &def->uuid);
+	replica_set_name(r, def->name);
+	return 0;
+}
+
 /** Set instance name on commit/rollback. */
 static int
 on_replace_cluster_set_name(struct trigger *trigger, void * /* event */)
@@ -4291,6 +4301,62 @@ on_replace_dd_cluster_set_name(struct replica *replica,
 	return 0;
 }
 
+/** Set instance UUID on _cluster update. */
+static int
+on_replace_dd_cluster_set_uuid(struct replica *replica,
+			       const struct replica_def *new_def)
+{
+	struct replica *old_replica = replica;
+	if (replica_has_connections(old_replica)) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Replica",
+			 "UUID update when the old replica is still here");
+		return -1;
+	}
+	if (*old_replica->name == 0) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Replica without a name",
+			 "UUID update");
+		return -1;
+	}
+	struct replica *new_replica = replica_by_uuid(&new_def->uuid);
+	if (new_replica != NULL && new_replica->id != REPLICA_ID_NIL) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Replica",
+			 "UUID update when the new UUID is already registered");
+		return -1;
+	}
+	if (strcmp(new_def->name, replica->name) != 0) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Replica",
+			 "UUID and name update together");
+		return -1;
+	}
+	struct trigger *on_rollback_drop_new = txn_alter_trigger_new(
+		on_replace_cluster_clear_id, NULL);
+	struct trigger *on_rollback_add_old = txn_alter_trigger_new(
+		on_replace_cluster_add_replica, NULL);
+	if (on_rollback_drop_new == NULL || on_rollback_add_old == NULL)
+		return -1;
+	struct replica_def *old_def = xregion_alloc_object(
+		&in_txn()->region, typeof(*old_def));
+	memset(old_def, 0, sizeof(*old_def));
+	old_def->id = old_replica->id;
+	strlcpy(old_def->name, old_replica->name, NODE_NAME_SIZE_MAX);
+	old_def->uuid = old_replica->uuid;
+
+	replica_clear_id(old_replica);
+	if (replica_by_uuid(&old_def->uuid) != NULL)
+		panic("Replica with old UUID wasn't deleted");
+	if (new_replica == NULL)
+		new_replica = replicaset_add(new_def->id, &new_def->uuid);
+	else
+		replica_set_id(new_replica, new_def->id);
+	replica_set_name(new_replica, old_def->name);
+	on_rollback_drop_new->data = new_replica;
+	on_rollback_add_old->data = old_def;
+	struct txn_stmt *stmt = txn_current_stmt(in_txn());
+	txn_stmt_on_rollback(stmt, on_rollback_drop_new);
+	txn_stmt_on_rollback(stmt, on_rollback_add_old);
+	return 0;
+}
+
 /** _cluster update - both old and new tuples are present. */
 static int
 on_replace_dd_cluster_update(const struct replica_def *old_def,
@@ -4300,14 +4366,16 @@ on_replace_dd_cluster_update(const struct replica_def *old_def,
 	struct replica *replica = replica_by_id(new_def->id);
 	if (replica == NULL)
 		panic("Found a _cluster tuple not having a replica");
-	/*
-	 * Forbid changes of UUID for a registered instance: it requires an
-	 * extra effort to keep _cluster in sync with appliers and relays.
-	 */
 	if (!tt_uuid_is_equal(&new_def->uuid, &old_def->uuid)) {
-		diag_set(ClientError, ER_UNSUPPORTED, "Space _cluster",
-			 "updates of instance uuid");
-		return -1;
+		if (tt_uuid_is_equal(&old_def->uuid, &INSTANCE_UUID)) {
+			diag_set(ClientError, ER_UNSUPPORTED, "Replica",
+				 "own UUID update in _cluster");
+			return -1;
+		}
+		if (on_replace_dd_cluster_set_uuid(replica, new_def) != 0)
+			return -1;
+		/* The replica was re-created. */
+		replica = replica_by_id(new_def->id);
 	}
 	return on_replace_dd_cluster_set_name(replica, new_def->name);
 }
