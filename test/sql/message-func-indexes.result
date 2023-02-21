@@ -21,7 +21,7 @@ box.execute("CREATE TABLE t2(object INTEGER PRIMARY KEY, price INTEGER, count IN
 box.execute("CREATE INDEX i1 ON t1(a+1)")
 ---
 - null
-- Tarantool does not support functional indexes
+- Expressions are prohibited in an index definition
 ...
 box.execute("CREATE INDEX i2 ON t1(a)")
 ---
@@ -30,7 +30,7 @@ box.execute("CREATE INDEX i2 ON t1(a)")
 box.execute("CREATE INDEX i3 ON t2(price + 100)")
 ---
 - null
-- Tarantool does not support functional indexes
+- Expressions are prohibited in an index definition
 ...
 box.execute("CREATE INDEX i4 ON t2(price)")
 ---
@@ -39,12 +39,12 @@ box.execute("CREATE INDEX i4 ON t2(price)")
 box.execute("CREATE INDEX i5 ON t2(count + 1)")
 ---
 - null
-- Tarantool does not support functional indexes
+- Expressions are prohibited in an index definition
 ...
 box.execute("CREATE INDEX i6 ON t2(count * price)")
 ---
 - null
-- Tarantool does not support functional indexes
+- Expressions are prohibited in an index definition
 ...
 -- Cleaning up.
 box.execute("DROP TABLE t1")

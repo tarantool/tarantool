@@ -542,6 +542,8 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 		}
 	}
 #endif
+	assert((pNC->ncFlags & NC_IdxExpr) == 0 ||
+	       sqlExprSkipCollate(pExpr)->op == TK_ID);
 	switch (pExpr->op) {
 		/* A lone identifier is the name of a column.
 		 */
@@ -561,11 +563,6 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			Expr *pRight;
 
 			/* if( pSrcList==0 ) break; */
-			if (pNC->ncFlags & NC_IdxExpr) {
-				diag_set(ClientError, ER_INDEX_DEF_UNSUPPORTED,
-					 "Expressions");
-				pParse->is_aborted = true;
-			}
 			pRight = pExpr->pRight;
 			if (pRight->op == TK_ID) {
 				zTable = pExpr->pLeft->u.zToken;
@@ -667,8 +664,6 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				if (finalize != NULL)
 					pExpr->type = finalize->def->returns;
 			}
-			assert(!func->def->is_deterministic ||
-			       (pNC->ncFlags & NC_IdxExpr) == 0);
 			if (func->def->is_deterministic)
 				ExprSetProperty(pExpr, EP_ConstFunc);
 			return WRC_Prune;
@@ -678,21 +673,12 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 	case TK_IN:{
 			if (ExprHasProperty(pExpr, EP_xIsSelect)) {
 				int nRef = pNC->nRef;
-				assert((pNC->ncFlags & NC_IdxExpr) == 0);
 				sqlWalkSelect(pWalker, pExpr->x.pSelect);
 				assert(pNC->nRef >= nRef);
 				if (nRef != pNC->nRef) {
 					ExprSetProperty(pExpr, EP_VarSelect);
 					pNC->ncFlags |= NC_VarSelect;
 				}
-			}
-			break;
-		}
-	case TK_VARIABLE:{
-			if (pNC->ncFlags & NC_IdxExpr) {
-				diag_set(ClientError, ER_INDEX_DEF_UNSUPPORTED,
-					 "Parameter markers");
-				pParse->is_aborted = true;
 			}
 			break;
 		}
@@ -1525,6 +1511,12 @@ void
 sql_resolve_self_reference(struct Parse *parser, struct space_def *def,
 			   struct Expr *expr)
 {
+	if (sqlExprSkipCollate(expr)->op != TK_ID) {
+		diag_set(ClientError, ER_INDEX_DEF_UNSUPPORTED, "Expressions");
+		parser->is_aborted = true;
+		return;
+	}
+
 	/* Fake SrcList for parser->create_table_def */
 	SrcList sSrc;
 	/* Name context for parser->create_table_def  */

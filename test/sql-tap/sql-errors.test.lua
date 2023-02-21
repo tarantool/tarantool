@@ -335,7 +335,7 @@ test:do_catchsql_test(
 		CREATE INDEX i29 ON t0($1);
 	]], {
 		-- <sql-errors-1.29>
-		1,"Parameter markers are prohibited in an index definition"
+        1, "Expressions are prohibited in an index definition"
 		-- </sql-errors-1.29>
 	})
 

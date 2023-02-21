@@ -622,14 +622,14 @@ test:do_catchsql_test(
     "colname-11.2",
     [[CREATE TABLE t1(a INT, b INT, c INT, d INT, e INT,
       PRIMARY KEY(a), UNIQUE('b' COLLATE "unicode_ci" DESC));]],
-    {1, "/Tarantool does not support functional indexes/"})
+    {1, "Expressions are prohibited in an index definition"})
 
 test:execsql("create table table1(a  INT primary key, b INT, c INT)")
 
 test:do_catchsql_test(
     "colname-11.3",
     [[ CREATE INDEX t1c ON table1('c'); ]],
-    {1, "/Tarantool does not support functional indexes/"})
+    {1, "Expressions are prohibited in an index definition"})
 
 --
 -- gh-3962: Check auto generated names in different selects.
