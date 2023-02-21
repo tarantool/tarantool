@@ -1649,7 +1649,7 @@ class TtListsLut(object):
             return None
 
         symbol = symbol_match.group(1)
-        offset = symbol_match.group(2) if symbol_match.lastindex == 2 else 0
+        offset = int(symbol_match.group(2)) if symbol_match.lastindex == 2 else 0
 
         symbol_val = gdb.parse_and_eval(symbol)
         entry_info = None
