@@ -14,3 +14,6 @@
   unique in the replicaset. The instance name is displayed in `box.info.name`.
   Names of other replicas in the same replicaset are visible in
   `box.info.replication[id].name` (gh-5029).
+
+* Instance at rebootstrap can change its UUID while keeping its numeric ID if it
+  has the same non-empty instance name (gh-5029).

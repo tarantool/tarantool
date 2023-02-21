@@ -461,8 +461,14 @@ g.test_instance_name_change_batch = function(lg)
 end
 
 g.test_instance_name_new_uuid = function(lg)
-    lg.replica:stop()
+    local old_uuid = lg.replica:get_instance_uuid()
+    local old_id = lg.replica:get_instance_id()
+    --
+    -- Fail to change UUID while the old replica is still alive.
+    --
     local box_cfg = table.copy(lg.replica.box_cfg)
+    local original_replica_cfg = table.copy(box_cfg)
+    -- Don't need fullmesh.
     box_cfg.bootstrap_strategy = 'legacy'
     box_cfg.replication = {server.build_listen_uri('master', lg.replica_set.id)}
     t.assert_equals(box_cfg.instance_name, 'replica-name')
@@ -479,5 +485,63 @@ g.test_instance_name_new_uuid = function(lg)
                'replica%-name, already occupied', 1024, {filename = logfile}))
     end)
     new_replica:drop()
+    --
+    -- The old replica is eliminated. Only a _cluster row remains. Can legally
+    -- change UUID now.
+    --
+    lg.master:exec(function()
+        box.cfg{replication = {}}
+    end)
+    lg.replica:drop()
+    lg.replica_set:delete_server('replica')
+    lg.master:exec(function()
+        --
+        -- Fail to change UUID and name together.
+        --
+        -- This is not achievable via normal protocols. Have to do it manually
+        -- in _cluster.
+        local uuid = require('uuid')
+        local _cluster = box.space._cluster
+        local new_uuid = uuid.str()
+        local old_id
+        for _, t in _cluster:pairs() do
+            if t.name == 'replica-name' then
+                old_id = t.id
+                break
+            end
+        end
+        t.assert_not_equals(old_id, nil)
+        t.assert_error_msg_contains('UUID and name update together',
+                                    _cluster.update, _cluster, {old_id},
+                                    {{'=', 'uuid', new_uuid},
+                                    {'=', 'name', 'new-name'}})
+        --
+        -- Can't change own UUID.
+        --
+        t.assert_error_msg_contains('own UUID update in _cluster',
+                                    _cluster.update, _cluster, {box.info.id},
+                                    {{'=', 'uuid', new_uuid}})
+        --
+        -- Can't change UUID without a name.
+        --
+        local new_id = _cluster.index[0]:max().id + 1
+        _cluster:replace{new_id, uuid.str()}
+        t.assert_error_msg_contains('Replica without a name',
+                                    _cluster.update, _cluster, {new_id},
+                                    {{'=', 'uuid', new_uuid}})
+        _cluster:delete{new_id}
+    end)
+    --
+    -- Normal re-UUID.
+    --
+    lg.replica = lg.replica_set:build_and_add_server({
+        alias = 'replica',
+        box_cfg = original_replica_cfg,
+    })
     lg.replica:start()
+    t.assert_not_equals(old_uuid, lg.replica:get_instance_uuid())
+    t.assert_equals(old_id, lg.replica:get_instance_id())
+    lg.master:exec(function(replication)
+        box.cfg{replication = replication}
+    end, {lg.master.box_cfg.replication})
 end

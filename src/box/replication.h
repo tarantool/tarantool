@@ -488,6 +488,13 @@ void
 replica_clear_id(struct replica *replica);
 
 /**
+ * See if the replica still has active connections or might be trying to make
+ * new ones.
+ */
+bool
+replica_has_connections(const struct replica *replica);
+
+/**
  * Check if there are enough "healthy" connections, and fire the appropriate
  * triggers. A replica connection is considered "healthy", when:
  * - it is a connection to a registered replica.
