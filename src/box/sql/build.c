@@ -554,67 +554,24 @@ field_def_create_for_pk(struct Parse *parser, struct field_def *field,
  * A table can have at most one primary key.  If the table already has
  * a primary key (and this is the second primary key) then create an
  * error.
- *
- * If the key is not an INTEGER PRIMARY KEY, then create a unique
- * index for the key.  No index is created for INTEGER PRIMARY KEYs.
  */
 void
 sqlAddPrimaryKey(struct Parse *pParse)
 {
-	int iCol = -1, i;
-	int nTerm;
-	struct ExprList *pList = pParse->create_index_def.cols;
 	struct space *space = pParse->create_table_def.new_space;
 	if (space == NULL)
 		space = pParse->create_column_def.space;
-	if (space == NULL)
-		goto primary_key_exit;
+	assert(space != NULL);
 	if (sql_space_primary_key(space) != NULL) {
 		diag_set(ClientError, ER_CREATE_SPACE, space->def->name,
 			 "primary key has been already declared");
 		pParse->is_aborted = true;
-		goto primary_key_exit;
+		sql_expr_list_delete(pParse->create_index_def.cols);
+		return;
 	}
-	if (pList == NULL) {
-		iCol = space->def->field_count - 1;
-		nTerm = 1;
-	} else {
-		nTerm = pList->nExpr;
-		for (i = 0; i < nTerm; i++) {
-			Expr *pCExpr =
-			    sqlExprSkipCollate(pList->a[i].pExpr);
-			assert(pCExpr != 0);
-			if (pCExpr->op != TK_ID) {
-				diag_set(ClientError, ER_INDEX_DEF_UNSUPPORTED,
-					 "Expressions");
-				pParse->is_aborted = true;
-				goto primary_key_exit;
-			}
-			const char *name = pCExpr->u.zToken;
-			struct space_def *def = space->def;
-			for (uint32_t idx = 0; idx < def->field_count; idx++) {
-				if (strcmp(name, def->fields[idx].name) == 0) {
-					iCol = idx;
-					break;
-				}
-			}
-		}
-	}
-	if (nTerm == 1 && iCol != -1 &&
-	    space->def->fields[iCol].type == FIELD_TYPE_INTEGER) {
-		struct ExprList *list;
-		struct Token token;
-		sqlTokenInit(&token, space->def->fields[iCol].name);
-		struct Expr *expr = sql_expr_new(TK_ID, &token);
-		list = sql_expr_list_append(NULL, expr);
-		pParse->create_index_def.cols = list;
-		sql_create_index(pParse);
-	} else {
-		sql_create_index(pParse);
-		pList = NULL;
-		if (pParse->is_aborted)
-			goto primary_key_exit;
-	}
+	sql_create_index(pParse);
+	if (pParse->is_aborted)
+		return;
 
 	struct index *pk = sql_space_primary_key(space);
 	assert(pk != NULL);
@@ -624,9 +581,6 @@ sqlAddPrimaryKey(struct Parse *pParse)
 		field_def_create_for_pk(pParse, &space->def->fields[idx],
 					space->def->name);
 	}
-primary_key_exit:
-	sql_expr_list_delete(pList);
-	return;
 }
 
 /**
