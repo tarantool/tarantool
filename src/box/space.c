@@ -431,6 +431,67 @@ space_delete(struct space *space)
 	space->vtab->destroy(space);
 }
 
+/**
+ * Call a visitor function for spaces with id in the range [id_min..id_max].
+ */
+static int
+space_foreach_helper(uint32_t id_min, uint32_t id_max, struct index *pk,
+		     int (*func)(struct space *sp, void *udata), void *udata)
+{
+	char key[6];
+	assert(mp_sizeof_uint(id_min) <= sizeof(key));
+	mp_encode_uint(key, id_min);
+	struct iterator *it = index_create_iterator(pk, ITER_GE, key, 1);
+	if (it == NULL)
+		return -1;
+	int rc;
+	struct tuple *tuple;
+	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL) {
+		uint32_t id;
+		if (tuple_field_u32(tuple, BOX_SPACE_FIELD_ID, &id) != 0)
+			continue;
+		if (id > id_max)
+			break;
+		struct space *space = space_cache_find(id);
+		if (space == NULL)
+			break;
+		rc = func(space, udata);
+		if (rc != 0)
+			break;
+	}
+	iterator_delete(it);
+	if (rc != 0)
+		return -1;
+	return 0;
+}
+
+int
+space_foreach(int (*func)(struct space *sp, void *udata), void *udata)
+{
+	struct space *space = space_by_id(BOX_SPACE_ID);
+	assert(space != NULL);
+	struct index *pk = space_index(space, 0);
+	assert(pk != NULL);
+	/*
+	 * Iterate over system spaces.
+	 */
+	int rc = space_foreach_helper(BOX_SYSTEM_ID_MIN, BOX_SYSTEM_ID_MAX,
+				      pk, func, udata);
+	if (rc != 0)
+		return -1;
+	/*
+	 * Iterate over non-system spaces.
+	 */
+	rc = space_foreach_helper(0, BOX_SYSTEM_ID_MIN - 1, pk, func, udata);
+	if (rc != 0)
+		return -1;
+	rc = space_foreach_helper(BOX_SYSTEM_ID_MAX + 1, BOX_SPACE_MAX,
+				  pk, func, udata);
+	if (rc != 0)
+		return -1;
+	return 0;
+}
+
 void
 space_dump_def(const struct space *space, struct rlist *key_list)
 {
