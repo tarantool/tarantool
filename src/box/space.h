@@ -575,6 +575,14 @@ void
 space_delete(struct space *space);
 
 /**
+ * Call a visitor function on every space. Spaces are visited in order from
+ * lowest space id to the highest, however, system spaces are visited first.
+ * This is essential for correctly recovery from the snapshot.
+ */
+int
+space_foreach(int (*func)(struct space *sp, void *udata), void *udata);
+
+/**
  * Dump space definition (key definitions, key count)
  * for ALTER.
  */

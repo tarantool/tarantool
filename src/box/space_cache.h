@@ -119,13 +119,6 @@ space_cache_find(uint32_t id)
 }
 
 /**
- * Call a visitor function on every space in the space cache.
- * Traverse system spaces before other.
- */
-int
-space_foreach(int (*func)(struct space *sp, void *udata), void *udata);
-
-/**
  * Update contents of the space cache.
  *
  * If @old_space is NULL, insert @new_space into the cache.
