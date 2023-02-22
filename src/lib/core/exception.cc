@@ -293,6 +293,21 @@ RaftError::RaftError(const char *file, unsigned line, const char *format, ...)
 	va_end(ap);
 }
 
+const struct type_info type_FileFormatError =
+	make_type("FileFormatError", &type_Exception);
+
+FileFormatError::FileFormatError(const char *file, unsigned line,
+				 const char *fileformat,
+				 const char *format, ...)
+	: Exception(&type_FileFormatError, file, line)
+{
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(this, format, ap);
+	va_end(ap);
+	error_append_msg(this, ", file format=%s", fileformat);
+}
+
 #define BuildAlloc(type)				\
 	void *p = malloc(sizeof(type));			\
 	if (p == NULL)					\
@@ -424,6 +439,20 @@ BuildRaftError(const char *file, unsigned line, const char *format, ...)
 {
 	BuildAlloc(RaftError);
 	RaftError *e =  new (p) RaftError(file, line, "");
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(e, format, ap);
+	va_end(ap);
+	return e;
+}
+
+struct error *
+BuildFileFormatError(const char *file, unsigned line, const char *fileformat,
+		     const char *format, ...)
+{
+	BuildAlloc(FileFormatError);
+	FileFormatError *e = new(p) FileFormatError(file, line, fileformat,
+						    "");
 	va_list ap;
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);

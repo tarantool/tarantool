@@ -257,6 +257,13 @@ public:
 	virtual void raise() { throw this; }
 };
 
+class FileFormatError: public Exception {
+public:
+	FileFormatError(const char *file, unsigned line, const char *filetype,
+			const char *format, ...);
+	virtual void raise() { throw this; }
+};
+
 /**
  * Initialize the exception subsystem.
  */

@@ -3,8 +3,10 @@
  *
  * Copyright 2010-2022, Tarantool AUTHORS, please see AUTHORS file.
  */
+#include "diag.h"
+#include "fiber.h"
+#include "fio.h"
 #include "prbuf.h"
-#include "bit/bit.h"
 
 /**
  * Partitioned ring buffer. Each entry stores size before user data.
@@ -28,6 +30,9 @@ struct PACKED prbuf_header {
 	 * overwritten. Note that in contrast to iterator/entry - this offset
 	 * is calculated to the first byte of entry (i.e. header containing
 	 * size of entry).
+	 *
+	 * Offset is given relative to the beginning of the buffer's data area.
+	 * Data area is the area after header till the end of the buffer.
 	 */
 	uint32_t begin;
 	/** Offset of the next byte after the last (written) record. */
@@ -69,6 +74,8 @@ static const uint32_t prbuf_end_position = (uint32_t)(-1);
 /** Before storing a data in the buffer we place its size (i.e. header). */
 static const size_t record_size_overhead = sizeof(struct prbuf_record);
 
+static const size_t prbuf_header_size = sizeof(struct prbuf_header);
+
 /** Real size of allocation is (data size + record's header). */
 static uint32_t
 prbuf_record_alloc_size(size_t size)
@@ -87,7 +94,7 @@ prbuf_linear_end(struct prbuf *buf)
 static char *
 prbuf_linear_begin(struct prbuf *buf)
 {
-	return (char *)buf->header + sizeof(struct prbuf_header);
+	return (char *)buf->header + prbuf_header_size;
 }
 
 /** Returns pointer to the next byte after the last written record. */
@@ -135,7 +142,7 @@ prbuf_has_before_end(struct prbuf *buf, uint32_t size)
 static uint32_t
 prbuf_size(struct prbuf *buf)
 {
-	return buf->header->size - sizeof(struct prbuf_header);
+	return buf->header->size - prbuf_header_size;
 }
 
 size_t
@@ -147,7 +154,7 @@ prbuf_max_record_size(struct prbuf *buf)
 void
 prbuf_create(struct prbuf *buf, void *mem, size_t size)
 {
-	assert(size > (sizeof(struct prbuf_header) + record_size_overhead));
+	assert(size > prbuf_header_size + record_size_overhead);
 #ifndef NDEBUG
 	memset(mem, '#', size);
 #endif
@@ -367,5 +374,168 @@ prbuf_iterator_next(struct prbuf_iterator *iter, struct prbuf_entry *result)
 		return -1;
 	result->size = iter->current->size;
 	result->ptr = iter->current->data;
+	return 0;
+}
+
+void
+prbuf_reader_destroy(struct prbuf_reader *iter)
+{
+	ibuf_destroy(&iter->buf);
+}
+
+/**
+ * Check whether buffer header is sane.
+ */
+static int
+prbuf_check_header(struct prbuf_header *header)
+{
+	if (header->version > prbuf_version) {
+		diag_set(FileFormatError, "prbuf",
+			 "unknown format version %d", header->version);
+		return -1;
+	}
+
+	/* Check we can the read first record and end position is correct. */
+	if (prbuf_header_size + header->begin +
+				record_size_overhead >= header->size ||
+	    prbuf_header_size + header->end > header->size) {
+		diag_set(FileFormatError, "prbuf", "inconsistent header");
+		return -1;
+	}
+
+	return 0;
+}
+
+/** Read ahead is 128k. */
+#define PRBUF_READ_AHEAD (1 << 17)
+
+int
+prbuf_reader_create(struct prbuf_reader *reader, int fd, off_t offset)
+{
+	struct prbuf_header header;
+	/*
+	 * Read ahead does not make sense when reading prbuf header as
+	 * regularly first record is not at the beginning of the buffer.
+	 */
+	ssize_t rc = fio_pread(fd, &header, prbuf_header_size, offset);
+	if (rc == -1) {
+		diag_set(SystemError, "read failed");
+		return -1;
+	}
+	if ((size_t)rc < prbuf_header_size) {
+		diag_set(FileFormatError, "prbuf", "can't read buffer header");
+		return -1;
+	}
+	if (prbuf_check_header(&header) == -1)
+		return -1;
+
+	ibuf_create(&reader->buf, &cord()->slabc, PRBUF_READ_AHEAD);
+	reader->data_begin = offset + prbuf_header_size;
+	reader->data_end = offset + header.size;
+	reader->pos = reader->data_begin + header.begin;
+	reader->read_pos = reader->pos;
+	reader->fd = fd;
+
+	if (header.end == 0)
+		reader->unread_size = 0;
+	else if (header.begin < header.end)
+		reader->unread_size = header.end - header.begin;
+	else
+		reader->unread_size = header.size - prbuf_header_size -
+				      (header.begin - header.end);
+	return 0;
+}
+
+/**
+ * Read `size` data from file into `reader->buf`. Data is read ahead.
+ * `reader->read_pos` is increased accordingly.
+ *
+ * Besides IO error it is failure if we can't read requested amount of data.
+ *
+ * Return:
+ *   0 - success
+ *  -1 - failure (diag is set)
+ */
+static int
+prbuf_reader_ensure(struct prbuf_reader *reader, size_t size)
+{
+	if (ibuf_used(&reader->buf) >= size)
+		return 0;
+
+	size_t read_sz = size - ibuf_used(&reader->buf);
+	read_sz += PRBUF_READ_AHEAD;
+
+	char *buf = xibuf_reserve(&reader->buf, read_sz);
+	ssize_t rc = fio_pread(reader->fd, buf, read_sz, reader->read_pos);
+	if (rc < 0) {
+		diag_set(SystemError, "read failed");
+		return -1;
+	}
+	ibuf_alloc(&reader->buf, rc);
+	if (ibuf_used(&reader->buf) < size) {
+		diag_set(FileFormatError, "prbuf", "can't read enough data");
+		return -1;
+	}
+	reader->read_pos += rc;
+	return 0;
+}
+
+/*
+ * Reset reading to the beginning of the prbuf data area.
+ */
+static inline void
+prbuf_reader_wrap(struct prbuf_reader *reader)
+{
+	reader->unread_size -= reader->data_end - reader->pos;
+	ibuf_reset(&reader->buf);
+	reader->pos = reader->data_begin;
+	reader->read_pos = reader->pos;
+}
+
+int
+prbuf_reader_next(struct prbuf_reader *reader,
+		  struct prbuf_entry *entry)
+{
+	if (reader->unread_size == 0) {
+		entry->ptr = NULL;
+		entry->size = 0;
+		return 0;
+	}
+
+	/* Check if we hit end of buffer and need to wrap around. */
+	if (reader->data_end - reader->pos < (off_t)record_size_overhead)
+		prbuf_reader_wrap(reader);
+
+	/* Read record length. */
+	if (prbuf_reader_ensure(reader, record_size_overhead) != 0)
+		return -1;
+	uint32_t sz = *((uint32_t *)reader->buf.rpos);
+
+	/* Check if we hit end marker and need to wrap around. */
+	if (sz == prbuf_end_position) {
+		prbuf_reader_wrap(reader);
+
+		/* Re-read record length. */
+		if (prbuf_reader_ensure(reader, record_size_overhead) != 0)
+			return -1;
+		sz = *((uint32_t *)reader->buf.rpos);
+	}
+
+	size_t full_sz = sz + record_size_overhead;
+	if (sz == 0 || full_sz > reader->unread_size) {
+		diag_set(FileFormatError, "prbuf", "invalid record length");
+		return -1;
+	}
+
+	/* Read record data. */
+	reader->buf.rpos += record_size_overhead;
+	if (prbuf_reader_ensure(reader, sz) != 0)
+		return -1;
+
+	entry->ptr = reader->buf.rpos;
+	entry->size = sz;
+	reader->pos += full_sz;
+	reader->buf.rpos += sz;
+	reader->unread_size -= full_sz;
 	return 0;
 }
