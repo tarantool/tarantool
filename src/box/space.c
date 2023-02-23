@@ -122,8 +122,7 @@ space_fill_index_map(struct space *space)
 bool
 space_is_system(struct space *space)
 {
-	return space->def->id > BOX_SYSTEM_ID_MIN &&
-	       space->def->id < BOX_SYSTEM_ID_MAX;
+	return space_id_is_system(space->def->id);
 }
 
 /**

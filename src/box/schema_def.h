@@ -342,6 +342,18 @@ schema_object_name(enum schema_object_type type);
 const char *
 schema_entity_name(enum schema_object_type type);
 
+/**
+ * Check that the space id corresponds to a system space, which means that is
+ * has a special meaning for tarantool and has predefined insert/remove
+ * triggers.
+ */
+static inline bool
+space_id_is_system(uint32_t space_id)
+{
+	return space_id > BOX_SYSTEM_ID_MIN &&
+	       space_id < BOX_SYSTEM_ID_MAX;
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

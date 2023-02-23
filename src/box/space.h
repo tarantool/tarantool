@@ -534,8 +534,7 @@ static inline bool
 space_is_vinyl(struct space *space) { return strcmp(space->engine->name, "vinyl") == 0; }
 
 /**
- * Check that the space is a system space, which means that is has a special
- * meaning for tarantool and has predefined insert/remove triggers.
+ * Check that the space is a system space, see also `space_id_is_system`.
  */
 bool
 space_is_system(struct space *space);
