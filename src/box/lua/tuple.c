@@ -80,6 +80,17 @@ uint32_t CTID_STRUCT_TUPLE_REF;
  * <lua_cpcall>() or <lua_pushcfunction>() on each invocation.
  */
 static int luaT_tuple_encode_table_ref = LUA_NOREF;
+/**
+ * <lbox_tuple_gc> reference in the Lua registry.
+ *
+ * There is no need to create a new GCfunc object each time
+ * <luaT_pushtuple> is called, since there are no upvalues passed
+ * to <lua_pushcfunction> (i.e. macro to <lua_pushcclosure>).
+ * Hence, to reduce Lua GC pressure when tuple object is created
+ * for Lua world, the common tuple __gc finalizer can be easily
+ * obtained from the Lua registry via this reference.
+ */
+static int luaT_tuple_gc_ref = LUA_NOREF;
 
 box_tuple_t *
 luaT_checktuple(struct lua_State *L, int idx)
@@ -713,7 +724,8 @@ luaT_pushtuple(struct lua_State *L, box_tuple_t *tuple)
 	*ptr = tuple;
 	/* The order is important - first reference tuple, next set gc */
 	box_tuple_ref(tuple);
-	lua_pushcfunction(L, lbox_tuple_gc);
+	assert(luaT_tuple_gc_ref != LUA_NOREF);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, luaT_tuple_gc_ref);
 	luaL_setcdatagc(L, -2);
 }
 
@@ -784,4 +796,7 @@ box_lua_tuple_init(struct lua_State *L)
 
 	lua_pushcfunction(L, luaT_tuple_encode_table);
 	luaT_tuple_encode_table_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+
+	lua_pushcfunction(L, lbox_tuple_gc);
+	luaT_tuple_gc_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 }
