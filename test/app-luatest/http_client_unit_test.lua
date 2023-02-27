@@ -178,6 +178,7 @@ g.test_unit_decode_body = function(_)
             },
             decoders = decoders,
         }
+        resp._decoders = decoders
         local res = decode_body(resp)
         t.assert_equals(res, body)
     end
@@ -232,7 +233,7 @@ g.test_unit_decode_body_unknown_decoder = function(_)
         headers = {
             ["content-type"] = "application/unknown",
         },
-        decoders = decoders,
+        _decoders = decoders,
     }
     local ok, err = pcall(decode_body, resp)
     t.assert_equals(ok, false)
@@ -257,7 +258,7 @@ g.test_unit_decode_body_custom_decoder = function(_)
         headers = {
             ["content-type"] = "application/tarantool",
         },
-        decoders = decoders,
+        _decoders = decoders,
     }
     local ok, res = pcall(decode_body, resp)
     t.assert_equals(ok, true)
@@ -280,7 +281,7 @@ g.test_unit_decode_body_broken_decoder = function(_)
         headers = {
             ["content-type"] = "application/broken",
         },
-        decoders = decoders,
+        _decoders = decoders,
     }
     local ok, err = pcall(decode_body, resp)
     t.assert_equals(ok, false)
