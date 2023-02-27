@@ -3832,10 +3832,10 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 		&it->iterator, lsm, tx, type, it->key, last,
 		(const struct vy_read_view **)&tx->read_view);
 	return (struct iterator *)it;
-err_key:
-	mempool_free(&env->iterator_pool, it);
 err_pos:
 	tuple_unref(it->key.stmt);
+err_key:
+	mempool_free(&env->iterator_pool, it);
 	return NULL;
 }
 
