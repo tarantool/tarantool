@@ -3284,7 +3284,6 @@ case OP_Sort: {        /* jump */
 			sql_sort_count++;
 			sql_search_count--;
 #endif
-			p->aCounter[SQL_STMTSTATUS_SORT]++;
 			/* Fall through into OP_Rewind */
 			FALLTHROUGH;
 		}
@@ -3415,7 +3414,6 @@ case OP_NextIfOpen:    /* jump */
 case OP_Prev:          /* jump */
 case OP_Next:          /* jump */
 	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
-	assert(pOp->p5<ArraySize(p->aCounter));
 	pC = p->apCsr[pOp->p1];
 	res = pOp->p3;
 	assert(pC!=0);
@@ -3442,7 +3440,6 @@ case OP_Next:          /* jump */
 	pC->cacheStatus = CACHE_STALE;
 	if (res == 0) {
 		pC->nullRow = 0;
-		p->aCounter[pOp->p5]++;
 #ifdef SQL_TEST
 		sql_search_count++;
 #endif
@@ -4460,7 +4457,6 @@ abort_due_to_error:
 
 	/* This is the only way out of this procedure. */
 vdbe_return:
-	p->aCounter[SQL_STMTSTATUS_VM_STEP] += (int)nVmStep;
 	assert(rc == 0 || rc == -1 || rc == SQL_ROW || rc == SQL_DONE);
 	return rc;
 

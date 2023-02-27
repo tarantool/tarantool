@@ -322,9 +322,6 @@ sql_stmt_compile(const char *sql, int bytes_count, struct Vdbe *re_prepared,
 int
 sql_step(sql_stmt *);
 
-int
-sql_column_bytes16(sql_stmt *, int iCol);
-
 char *
 sql_stmt_result_to_msgpack(struct sql_stmt *stmt, uint32_t *tuple_size,
 			   struct region *region);

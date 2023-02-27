@@ -294,7 +294,6 @@ struct Vdbe {
 	 * does not use external resources other than bind variables.
 	 */
 	bft is_sandboxed : 1;
-	u32 aCounter[5];	/* Counters used by sql_stmt_status() */
 	char *zSql;		/* Text of the SQL statement that generated this */
 	void *pFree;		/* Free this when deleting the vdbe */
 	VdbeFrame *pFrame;	/* Parent frame */
