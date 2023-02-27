@@ -3674,17 +3674,8 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	say_info("registering replica %s at %s",
 		 tt_uuid_str(&req.instance_uuid), sio_socketname(io->fd));
 
-	/**
-	 * Call the server-side hook which stores the replica uuid
-	 * in _cluster space.
-	 */
-	box_on_join(&req.instance_uuid);
-
 	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
 
-	replica = replica_by_uuid(&req.instance_uuid);
-	if (replica == NULL)
-		tnt_raise(ClientError, ER_CANNOT_REGISTER);
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
 	vclock_copy(&stop_vclock, &replicaset.vclock);
@@ -3696,6 +3687,26 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 	 */
 	relay_final_join(io, header->sync, &req.vclock, &stop_vclock);
 	say_info("final data sent.");
+
+	/**
+	 * Call the server-side hook which stores the replica uuid
+	 * in _cluster space after sending the last row but before
+	 * sending OK - if the hook fails, the error reaches the
+	 * client.
+	 */
+	box_on_join(&req.instance_uuid);
+	replica = replica_by_uuid(&req.instance_uuid);
+	if (replica == NULL)
+		tnt_raise(ClientError, ER_CANNOT_REGISTER);
+
+	struct vclock cluster_vclock;
+	vclock_copy(&cluster_vclock, &replicaset.vclock);
+	++cluster_vclock.lsn[replica->id];
+	if (wal_sync(&cluster_vclock) != 0)
+		diag_raise();
+
+	relay_final_join(io, header->sync, &stop_vclock, &cluster_vclock);
+	say_info("_cluster update sent'");
 
 	RegionGuard region_guard(&fiber()->gc);
 	struct xrow_header row;
@@ -3821,19 +3832,10 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	relay_initial_join(io, header->sync, &start_vclock, req.version_id);
 	say_info("initial data sent.");
 
-	/**
-	 * Call the server-side hook which stores the replica uuid
-	 * in _cluster space after sending the last row but before
-	 * sending OK - if the hook fails, the error reaches the
-	 * client.
-	 */
-	box_on_join(&req.instance_uuid);
-
-	ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
-
-	replica = replica_by_uuid(&req.instance_uuid);
-	if (replica == NULL)
-		tnt_raise(ClientError, ER_CANNOT_REGISTER);
+	ERROR_INJECT(ERRINJ_REPLICA_JOIN_DELAY, {
+		say_warn("replica join is delayed");
+		ERROR_INJECT_YIELD(ERRINJ_REPLICA_JOIN_DELAY);
+	});
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
@@ -3851,6 +3853,26 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	 */
 	relay_final_join(io, header->sync, &start_vclock, &stop_vclock);
 	say_info("final data sent.");
+
+	/**
+	 * Call the server-side hook which stores the replica uuid
+	 * in _cluster space after sending the last row but before
+	 * sending OK - if the hook fails, the error reaches the
+	 * client.
+	 */
+	box_on_join(&req.instance_uuid);
+	replica = replica_by_uuid(&req.instance_uuid);
+	if (replica == NULL)
+		tnt_raise(ClientError, ER_CANNOT_REGISTER);
+
+	struct vclock cluster_vclock;
+	vclock_copy(&cluster_vclock, &replicaset.vclock);
+	++cluster_vclock.lsn[replica->id];
+	if (wal_sync(&cluster_vclock) != 0)
+		diag_raise();
+
+	relay_final_join(io, header->sync, &stop_vclock, &cluster_vclock);
+	say_info("_cluster update sent'");
 
 	/* Send end of WAL stream marker */
 	xrow_encode_vclock(&row, &replicaset.vclock);
