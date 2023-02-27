@@ -19,15 +19,12 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct key_def;
 struct region;
 struct space;
-struct space_def;
 struct space_upgrade;
 struct space_upgrade_def;
 struct space_upgrade_read_view;
 struct tuple;
-struct tuple_format;
 
 /**
  * Decodes space upgrade definition from MsgPack data.
@@ -51,23 +48,6 @@ space_upgrade_def_dup(const struct space_upgrade_def *def);
  */
 void
 space_upgrade_def_delete(struct space_upgrade_def *def);
-
-/**
- * Creates a space upgrade state from a definition, space name, primary key
- * definition and the new space format. Returns NULL and sets diag on error.
- * The reference count of the new state is set to 1.
- */
-static inline struct space_upgrade *
-space_upgrade_new(const struct space_upgrade_def *def, const char *space_name,
-		  const struct key_def *pk_def, struct tuple_format *format)
-{
-	(void)def;
-	(void)space_name;
-	(void)pk_def;
-	(void)format;
-	unreachable();
-	return NULL;
-}
 
 /**
  * Increments the reference counter of a space upgrade state,
@@ -108,13 +88,6 @@ space_upgrade_apply(struct space_upgrade *upgrade, struct tuple *tuple)
 	unreachable();
 	return NULL;
 }
-
-/**
- * Checks if a space alter operation may proceed.
- * Returns -1 and sets diag if it may not.
- */
-int
-space_upgrade_check_alter(struct space *space, struct space_def *new_def);
 
 /**
  * Starts space upgrade in the background if required.
