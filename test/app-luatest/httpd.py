@@ -52,6 +52,12 @@ def redirect():
     headers = [("Location", "/")]
     return code, body, headers
 
+def json_body():
+    code = "200 OK"
+    body = [b'[1,2]']
+    headers = [("Content-Type", "application/json; charset=utf-8")]
+    return code, body, headers
+
 paths = {
         "/": hello,
         "/abc": hello1,
@@ -59,6 +65,7 @@ paths = {
         "/headers": headers,
         "/long_query": long_query,
         "/redirect": redirect,
+        "/json_body": json_body,
         }
 
 def read_handle(env, response):

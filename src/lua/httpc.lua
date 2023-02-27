@@ -57,6 +57,21 @@ local decoders = {
     ['application/msgpack'] = function(body, _content_type) return msgpack.decode(body) end,
 }
 
+-- Extract all fields from a table except ones that start from
+-- the underscore.
+-- Copy-pasted from src/lua/init.lua.
+--
+-- Useful for __serialize.
+local function filter_out_private_fields(t)
+    local res = {}
+    for k, v in pairs(t) do
+        if not k:startswith('_') then
+            res[k] = v
+        end
+    end
+    return res
+end
+
 --
 --  <http> - create a new curl instance.
 --
@@ -298,7 +313,7 @@ local function decode_body(response)
     local decoder = default_decoder
     if mime_type ~= nil then
         mime_type = string_lower(mime_type)
-        decoder = response.decoders[mime_type]
+        decoder = response._decoders[mime_type]
     end
     if decoder == nil then
         local msg = 'Unable to decode body: decode function is not found (%s)'
@@ -585,7 +600,9 @@ curl_mt = {
 
             if not opts.chunked then
                 resp.url = url_with_params
+                resp._decoders = self.decoders
                 return setmetatable(resp, {
+                    __serialize = filter_out_private_fields,
                     __index = {
                         decode = decode_body,
                     },

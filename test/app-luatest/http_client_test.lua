@@ -886,6 +886,17 @@ g.test_decode_body = function(cg)
     t.assert_equals(r:decode(), body)
 end
 
+g.test_decode_body_gh_8363 = function(cg)
+    local opts = table.deepcopy(cg.opts)
+    local http = client:new()
+    local resp = http:get(cg.url .. "json_body", opts)
+    t.assert_equals(resp.status, 200, "HTTP code is not 200")
+    t.assert_equals(resp.headers["content-type"],
+                    "application/json; charset=utf-8",
+                    "content-type check")
+    t.assert_equals(resp:decode(), {1, 2})
+end
+
 g.test_decode_body_with_content_type_camel_case = function(cg)
     local url = cg.url
     local content_type = 'Application/JSON' -- Camel case.
