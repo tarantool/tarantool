@@ -180,19 +180,6 @@ sql_column_count(sql_stmt * pStmt)
 	return pVm ? pVm->nResColumn : 0;
 }
 
-/*
- * Return the number of values available from the current row of the
- * currently executing statement pStmt.
- */
-int
-sql_data_count(sql_stmt * pStmt)
-{
-	Vdbe *pVm = (Vdbe *) pStmt;
-	if (pVm == 0 || pVm->pResultSet == 0)
-		return 0;
-	return pVm->nResColumn;
-}
-
 char *
 sql_stmt_result_to_msgpack(struct sql_stmt *stmt, uint32_t *tuple_size,
 			   struct region *region)
@@ -612,13 +599,6 @@ sqlVdbeParameterIndex(Vdbe * p, const char *zName, int nName)
 }
 
 int
-sql_bind_parameter_index(sql_stmt * pStmt, const char *zName)
-{
-	return sqlVdbeParameterIndex((Vdbe *) pStmt, zName,
-					 sqlStrlen30(zName));
-}
-
-int
 sql_bind_parameter_lindex(sql_stmt * pStmt, const char *zName,
 			      int nName)
 {
@@ -650,20 +630,6 @@ sql_stmt_busy(const struct sql_stmt *stmt)
 }
 
 /*
- * Return the value of a status counter for a prepared statement
- */
-int
-sql_stmt_status(sql_stmt * pStmt, int op, int resetFlag)
-{
-	Vdbe *pVdbe = (Vdbe *) pStmt;
-	u32 v;
-	v = pVdbe->aCounter[op];
-	if (resetFlag)
-		pVdbe->aCounter[op] = 0;
-	return (int)v;
-}
-
-/*
  * Return the SQL associated with a prepared statement
  */
 const char *
@@ -672,22 +638,3 @@ sql_sql(sql_stmt * pStmt)
 	Vdbe *p = (Vdbe *) pStmt;
 	return p ? p->zSql : 0;
 }
-
-/*
- * Return the SQL associated with a prepared statement with
- * bound parameters expanded.  Space to hold the returned string is
- * obtained from malloc(). The caller is responsible for
- * freeing the returned string by passing it to sql_free().
- */
-char *
-sql_expanded_sql(sql_stmt * pStmt)
-{
-	char *z = 0;
-	const char *zSql = sql_sql(pStmt);
-	if (zSql) {
-		Vdbe *p = (Vdbe *) pStmt;
-		z = sqlVdbeExpandSql(p, zSql);
-	}
-	return z;
-}
-
