@@ -2,8 +2,8 @@ name: source
 
 on:
   push:
-    tags:
-      - '**'
+    tags-ignore:
+      - '**-entrypoint'
   workflow_dispatch:
 
 env:
