@@ -300,16 +300,6 @@ space_create(struct space *space, struct engine *engine,
 	}
 	space_fill_index_map(space);
 
-	if (space->def->opts.upgrade_def != NULL) {
-		struct index *pk = space_index(space, 0);
-		assert(pk != NULL);
-		space->upgrade = space_upgrade_new(
-			space->def->opts.upgrade_def, space->def->name,
-			pk->def->key_def, format);
-		if (space->upgrade == NULL)
-			goto fail_free_indexes;
-	}
-
 	rlist_create(&space->space_cache_pin_list);
 	if (space_init_constraints(space) != 0)
 		goto fail_free_indexes;
@@ -351,8 +341,6 @@ fail_free_indexes:
 fail:
 	free(space->index_map);
 	free(space->check_unique_constraint_map);
-	if (space->upgrade != NULL)
-		space_upgrade_unref(space->upgrade);
 	if (space->def != NULL)
 		space_def_delete(space->def);
 	if (space->format != NULL) {
@@ -926,6 +914,18 @@ generic_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
 	(void)old_space;
 	(void)new_space;
+	return 0;
+}
+
+int
+generic_space_prepare_upgrade(struct space *old_space, struct space *new_space)
+{
+	(void)old_space;
+	if (new_space->def->opts.upgrade_def != NULL) {
+		diag_set(ClientError, ER_UNSUPPORTED, new_space->engine->name,
+			 "space upgrade");
+		return -1;
+	}
 	return 0;
 }
 

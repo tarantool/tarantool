@@ -931,8 +931,6 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	 */
 	rlist_foreach_entry(op, &alter->ops, link)
 		op->alter_def(alter);
-	if (space_upgrade_check_alter(alter->old_space, alter->space_def) != 0)
-		diag_raise();
 	/*
 	 * Create a new (empty) space for the new definition.
 	 * Sic: the triggers are not moved over yet.
@@ -952,6 +950,8 @@ alter_space_do(struct txn_stmt *stmt, struct alter_space *alter)
 	alter->new_space->sequence_path = alter->old_space->sequence_path;
 	memcpy(alter->new_space->access, alter->old_space->access,
 	       sizeof(alter->old_space->access));
+
+	space_prepare_upgrade_xc(alter->old_space, alter->new_space);
 
 	/*
 	 * Build new indexes, check if tuples conform to

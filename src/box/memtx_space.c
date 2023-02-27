@@ -43,6 +43,7 @@
 #include "memtx_engine.h"
 #include "column_mask.h"
 #include "sequence.h"
+#include "memtx_space_upgrade.h"
 #include "memtx_tuple_compression.h"
 #include "schema.h"
 #include "result.h"
@@ -1392,6 +1393,7 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .build_index = */ memtx_space_build_index,
 	/* .swap_index = */ generic_space_swap_index,
 	/* .prepare_alter = */ memtx_space_prepare_alter,
+	/* .prepare_upgrade = */ memtx_space_prepare_upgrade,
 	/* .invalidate = */ generic_space_invalidate,
 };
 

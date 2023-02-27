@@ -144,6 +144,9 @@ struct space_vtab {
 	 */
 	int (*prepare_alter)(struct space *old_space,
 			     struct space *new_space);
+	/** Prepares a space for online upgrade on alter. */
+	int (*prepare_upgrade)(struct space *old_space,
+			       struct space *new_space);
 	/**
 	 * Called right after removing a space from the cache.
 	 * The engine should abort all transactions involving
@@ -521,6 +524,13 @@ space_prepare_alter(struct space *old_space, struct space *new_space)
 	return new_space->vtab->prepare_alter(old_space, new_space);
 }
 
+static inline int
+space_prepare_upgrade(struct space *old_space, struct space *new_space)
+{
+	assert(old_space->vtab == new_space->vtab);
+	return new_space->vtab->prepare_upgrade(old_space, new_space);
+}
+
 static inline void
 space_invalidate(struct space *space)
 {
@@ -619,6 +629,8 @@ int generic_space_check_format(struct space *, struct tuple_format *);
 int generic_space_build_index(struct space *, struct index *,
 			      struct tuple_format *, bool);
 int generic_space_prepare_alter(struct space *, struct space *);
+int generic_space_prepare_upgrade(struct space *old_space,
+				  struct space *new_space);
 void generic_space_invalidate(struct space *);
 
 #if defined(__cplusplus)
@@ -718,6 +730,13 @@ static inline void
 space_prepare_alter_xc(struct space *old_space, struct space *new_space)
 {
 	if (space_prepare_alter(old_space, new_space) != 0)
+		diag_raise();
+}
+
+static inline void
+space_prepare_upgrade_xc(struct space *old_space, struct space *new_space)
+{
+	if (space_prepare_upgrade(old_space, new_space) != 0)
 		diag_raise();
 }
 
