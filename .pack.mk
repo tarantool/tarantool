@@ -16,38 +16,32 @@ VERSION = ${MAJOR_VERSION}.${MINOR_VERSION}
 
 TARANTOOL_SERIES = series-${MAJOR_VERSION}
 S3_SOURCE_REPO_URL = s3://tarantool_repo/sources
-ifeq (${VERSION}, $(filter ${VERSION}, 1.10))
-	TARANTOOL_SERIES = ${MAJOR_VERSION}.${MINOR_VERSION}
-	S3_SOURCE_REPO_URL = s3://tarantool_repo/sources/${TARANTOOL_SERIES}
-endif
 
 prepare:
 	rm -rf build packpack
 	git clone https://github.com/packpack/packpack.git
 
 package: prepare
-	if [ "${TARANTOOL_SERIES}" != "1.10" ]; then \
-		if [ "${OS}" = "alpine" ]; then \
-			if [ -n "${GIT_TAG}" ]; then \
-				export VERSION="$$(echo ${GIT_TAG} | sed 's/-/_/' | sed 's/entrypoint/alpha0/')"; \
-			else \
-				RELEASE="$(word 1, $(subst -, ,${GIT_DESCRIBE}))"; \
-				TYPE="$(word 2, $(subst -, ,${GIT_DESCRIBE}))"; \
-				PATCH="$(word 3, $(subst -, ,${GIT_DESCRIBE}))"; \
-				if [ "$${TYPE}" = "entrypoint" ]; then \
-					TYPE="alpha0"; \
-				fi; \
-				export VERSION="$${RELEASE}_$${TYPE}_p$${PATCH}"; \
-			fi; \
+	if [ "${OS}" = "alpine" ]; then \
+		if [ -n "${GIT_TAG}" ]; then \
+			export VERSION="$$(echo ${GIT_TAG} | sed 's/-/_/' | sed 's/entrypoint/alpha0/')"; \
 		else \
-			if [ -n "${GIT_TAG}" ]; then \
-				export VERSION="$$(echo ${GIT_TAG} | sed 's/-/~/')"; \
-			else \
-				export VERSION="$$(echo ${GIT_DESCRIBE} | sed ${SED_REPLACE_VERSION_REGEX} | sed 's/-/~/').dev"; \
+			RELEASE="$(word 1, $(subst -, ,${GIT_DESCRIBE}))"; \
+			TYPE="$(word 2, $(subst -, ,${GIT_DESCRIBE}))"; \
+			PATCH="$(word 3, $(subst -, ,${GIT_DESCRIBE}))"; \
+			if [ "$${TYPE}" = "entrypoint" ]; then \
+				TYPE="alpha0"; \
 			fi; \
+			export VERSION="$${RELEASE}_$${TYPE}_p$${PATCH}"; \
 		fi; \
-		echo VERSION=$${VERSION}; \
+	else \
+		if [ -n "${GIT_TAG}" ]; then \
+			export VERSION="$$(echo ${GIT_TAG} | sed 's/-/~/')"; \
+		else \
+			export VERSION="$$(echo ${GIT_DESCRIBE} | sed ${SED_REPLACE_VERSION_REGEX} | sed 's/-/~/').dev"; \
+		fi; \
 	fi; \
+	echo VERSION=$${VERSION}; \
 	PACKPACK_EXTRA_DOCKER_RUN_PARAMS="--network=host --volume ${VARDIR}:${VARDIR} ${PACKPACK_EXTRA_DOCKER_RUN_PARAMS}" \
 	TARBALL_EXTRA_ARGS="--exclude=*.exe --exclude=*.dll" \
 	PRESERVE_ENVVARS="TARBALL_EXTRA_ARGS,${PRESERVE_ENVVARS}" \
@@ -82,14 +76,12 @@ deploy:
 	$${CURL_CMD}
 
 source: prepare
-	if [ "${TARANTOOL_SERIES}" != "1.10" ]; then \
-		if [ -n "${GIT_TAG}" ]; then \
-			export VERSION=${GIT_TAG}; \
-		else \
-			export VERSION="$$(echo ${GIT_DESCRIBE} | sed ${SED_REPLACE_VERSION_REGEX}).dev"; \
-		fi; \
-		echo VERSION=$${VERSION}; \
+	if [ -n "${GIT_TAG}" ]; then \
+		export VERSION=${GIT_TAG}; \
+	else \
+		export VERSION="$$(echo ${GIT_DESCRIBE} | sed ${SED_REPLACE_VERSION_REGEX}).dev"; \
 	fi; \
+	echo VERSION=$${VERSION}; \
 	TARBALL_COMPRESSOR=gz \
 	./packpack/packpack tarball
 
