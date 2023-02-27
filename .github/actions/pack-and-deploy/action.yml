@@ -12,22 +12,15 @@ runs:
         # Create packages.
         make -f .pack.mk package
 
-        # Deploy live packages. Enabled only for 1.10 branch.
-        if ${{ github.ref == 'refs/heads/1.10' }}; then
-          REPO_TYPE=live make -f .pack.mk deploy
-        fi
-
         # Deploy pre-release (since 2.10) and release packages. It's expected
         # that no one will push tags are used for pre-releases and releases.
-        if ${{ ( startsWith(github.ref, 'refs/tags/1.10.') ||
-                 startsWith(github.ref, 'refs/tags/2.') ) &&
+        if ${{ startsWith(github.ref, 'refs/tags/2.') &&
                !endsWith(github.ref, '-entrypoint') }}; then
           case ${{ github.ref }} in
             # It's relevant since 2.10 only.
             refs/tags/*-alpha*|refs/tags/*-beta*|refs/tags/*-rc*)
               REPO_TYPE=pre-release make -f .pack.mk deploy
               ;;
-
             refs/tags/*)
               REPO_TYPE=release make -f .pack.mk deploy
               ;;
