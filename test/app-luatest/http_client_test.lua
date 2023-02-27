@@ -897,6 +897,22 @@ g.test_decode_body_gh_8363 = function(cg)
     t.assert_equals(resp:decode(), {1, 2})
 end
 
+g.test_decode_body_custom_decoder = function(cg)
+    local opts = table.deepcopy(cg.opts)
+    local http = client:new()
+    -- Define a new custom decoder, it adds a "team" word.
+    http.decoders["application/lango"] = function(body, _)
+        return string.format("%s team", body)
+    end
+
+    local resp = http:get(cg.url .. "lango_body", opts)
+    t.assert_equals(resp.status, 200, "HTTP code is not 200")
+    t.assert_equals(resp.headers["content-type"],
+                    "application/lango",
+                    "content-type check")
+    t.assert_equals(resp:decode(), "lango team")
+end
+
 g.test_decode_body_with_content_type_camel_case = function(cg)
     local url = cg.url
     local content_type = 'Application/JSON' -- Camel case.
