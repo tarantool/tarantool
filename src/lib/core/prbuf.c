@@ -325,7 +325,8 @@ prbuf_prepare(struct prbuf *buf, size_t size)
 	struct prbuf_record *next_overwritten =
 		prbuf_skip_record(buf, head, alloc_size);
 	buf->header->begin = prbuf_record_offset(buf, next_overwritten);
-	buf->header->end = 0;
+	if (next_overwritten == head)
+		buf->header->end = 0;
 	return prbuf_prepare_record(head, size);
 }
 

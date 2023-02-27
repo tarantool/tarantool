@@ -609,13 +609,37 @@ test_max_record_size(void)
 
 	footer();
 	check_plan();
+}
 
+static void
+test_buffer_wrap_on_prepare(void)
+{
+	plan(1);
+	header();
+
+	size_t payload_size = lengthof(payload_avg);
+	char mem[128];
+	size_t size = sizeof(mem);
+
+	struct prbuf buf;
+	prbuf_create(&buf, mem, size);
+	fill_buffer(&buf, payload_avg, payload_size, 5);
+	/* Preparing will wrap and allocate place at the beginning. */
+	char *p = prbuf_prepare(&buf, payload_size);
+	if (p == NULL)
+		fail("prbuf_prepare", "failure");
+
+	int num = count_records(mem, size);
+	ok(num == 4, "num is %d", num);
+
+	footer();
+	check_plan();
 }
 
 int
 main(void)
 {
-	plan(11);
+	plan(12);
 
 	memory_init();
 	fiber_init(fiber_c_invoke);
@@ -632,6 +656,7 @@ main(void)
 	test_buffer_truncated();
 	test_buffer_begin_border_values();
 	test_buffer_end_border_values();
+	test_buffer_wrap_on_prepare();
 
 	fiber_free();
 	memory_free();
