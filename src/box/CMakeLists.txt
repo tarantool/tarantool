@@ -255,7 +255,7 @@ endif()
 if(ENABLE_SPACE_UPGRADE)
     list(APPEND box_sources ${SPACE_UPGRADE_SOURCES})
 else()
-    list(APPEND box_sources space_upgrade.c)
+    list(APPEND box_sources space_upgrade.c memtx_space_upgrade.c)
 endif()
 
 if(ENABLE_FLIGHT_RECORDER)

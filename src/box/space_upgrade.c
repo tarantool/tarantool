@@ -8,8 +8,7 @@
 #include <assert.h>
 #include <stddef.h>
 
-#include "diag.h"
-#include "error.h"
+#include "msgpuck.h"
 #include "space.h"
 #include "space_def.h"
 #include "trivia/config.h"
@@ -26,7 +25,7 @@ space_upgrade_def_decode(const char **data, struct region *region)
 	(void)region;
 	/**
 	 * Option decoder may only fail with IllegalParams error so we return
-	 * a non-NULL ptr here and abort later, in space_upgrade_check_alter.
+	 * a non-NULL ptr here and abort later, in space_prepare_upgrade.
 	 */
 	mp_next(data);
 	return &dummy_def;
@@ -44,21 +43,6 @@ space_upgrade_def_delete(struct space_upgrade_def *def)
 {
 	assert(def == NULL || def == &dummy_def);
 	(void)def;
-}
-
-int
-space_upgrade_check_alter(struct space *space, struct space_def *new_def)
-{
-	assert(space->upgrade == NULL);
-	assert(new_def->opts.upgrade_def == NULL ||
-	       new_def->opts.upgrade_def == &dummy_def);
-	(void)space;
-	if (new_def->opts.upgrade_def != NULL) {
-		diag_set(ClientError, ER_UNSUPPORTED,
-			 "Community edition", "space upgrade");
-		return -1;
-	}
-	return 0;
 }
 
 void
