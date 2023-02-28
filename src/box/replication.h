@@ -119,6 +119,12 @@ enum replicaset_state {
 };
 
 /**
+ * Whether this replica should be anonymous or not, e.g. be present in _cluster
+ * table and have a non-zero id.
+ */
+extern bool cfg_replication_anon;
+
+/**
  * The uuid of the bootstrap leader configured via the bootstrap_leader
  * configuration option.
  */
@@ -188,12 +194,6 @@ extern double replication_sync_timeout;
  * the row throws ER_TUPLE_FOUND) based on box.cfg configuration option.
  */
 extern bool replication_skip_conflict;
-
-/**
- * Whether this replica will be anonymous or not, e.g. be preset
- * in _cluster table and have a non-zero id.
- */
-extern bool replication_anon;
 
 /** How many threads to use for decoding incoming replication stream. */
 extern int replication_threads;

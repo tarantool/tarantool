@@ -510,6 +510,12 @@ box_is_orphan(void)
 	return is_orphan;
 }
 
+bool
+box_is_anon(void)
+{
+	return instance_id == REPLICA_ID_NIL;
+}
+
 int
 box_wait_ro(bool ro, double timeout)
 {
@@ -1963,18 +1969,18 @@ box_set_replication_skip_conflict(void)
 void
 box_set_replication_anon(void)
 {
-	bool anon = box_check_replication_anon();
-	if (anon == replication_anon)
+	assert(is_box_configured);
+	assert(cfg_replication_anon == box_is_anon());
+	bool new_anon = box_check_replication_anon();
+	if (new_anon == cfg_replication_anon)
 		return;
-
-	if (!anon) {
-		auto guard = make_scoped_guard([&]{
-			replication_anon = !anon;
-			box_broadcast_ballot();
-		});
-		/* Turn anonymous instance into a normal one. */
-		replication_anon = anon;
+	auto guard = make_scoped_guard([&]{
+		cfg_replication_anon = !new_anon;
 		box_broadcast_ballot();
+	});
+	cfg_replication_anon = new_anon;
+	box_broadcast_ballot();
+	if (!new_anon) {
 		/*
 		 * Reset all appliers. This will interrupt
 		 * anonymous follow they're in so that one of
@@ -2003,10 +2009,7 @@ box_set_replication_anon(void)
 		 */
 		replicaset_follow();
 		replicaset_sync();
-		guard.is_active = false;
-	} else if (!is_box_configured) {
-		replication_anon = anon;
-		box_broadcast_ballot();
+		assert(!box_is_anon());
 	} else {
 		/*
 		 * It is forbidden to turn a normal replica into
@@ -2016,6 +2019,7 @@ box_set_replication_anon(void)
 			  "cannot be turned on after bootstrap"
 			  " has finished");
 	}
+	guard.is_active = false;
 }
 
 /** Trigger to catch ACKs from all nodes when need to wait for quorum. */
@@ -2759,7 +2763,7 @@ box_set_wal_cleanup_delay(void)
 	 * delay since they can't be a source
 	 * of replication.
 	 */
-	if (replication_anon)
+	if (box_is_anon())
 		delay = 0;
 	gc_set_wal_cleanup_delay(delay);
 	return 0;
@@ -3811,7 +3815,7 @@ box_process_register(struct iostream *io, const struct xrow_header *header)
 			  tt_uuid_str(&req.instance_uuid));
 	}
 
-	if (replication_anon) {
+	if (box_is_anon()) {
 		tnt_raise(ClientError, ER_UNSUPPORTED, "Anonymous replica",
 			  "registration of non-anonymous nodes.");
 	}
@@ -3941,7 +3945,7 @@ box_process_join(struct iostream *io, const struct xrow_header *header)
 	/* Check permissions */
 	access_check_universe_xc(PRIV_R);
 
-	if (replication_anon) {
+	if (box_is_anon()) {
 		tnt_raise(ClientError, ER_UNSUPPORTED, "Anonymous replica",
 			  "registration of non-anonymous nodes.");
 	}
@@ -4063,7 +4067,7 @@ box_process_subscribe(struct iostream *io, const struct xrow_header *header)
 	 * Do not allow non-anonymous followers for anonymous
 	 * instances.
 	 */
-	if (replication_anon && !req.is_anon) {
+	if (box_is_anon() && !req.is_anon) {
 		tnt_raise(ClientError, ER_UNSUPPORTED, "Anonymous replica",
 			  "non-anonymous followers.");
 	}
@@ -4198,7 +4202,7 @@ box_process_vote(struct ballot *ballot)
 	enum election_mode mode = box_check_election_mode();
 	ballot->can_lead = mode == ELECTION_MODE_CANDIDATE ||
 			   mode == ELECTION_MODE_MANUAL;
-	ballot->is_anon = replication_anon;
+	ballot->is_anon = cfg_replication_anon;
 	ballot->is_ro = is_ro_summary;
 	ballot->is_booted = is_box_configured;
 	vclock_copy(&ballot->vclock, &replicaset.vclock);
@@ -4406,7 +4410,7 @@ bootstrap_from_master(struct replica *master)
 	 * Process initial data (snapshot or dirty disk data).
 	 */
 	engine_begin_initial_recovery_xc(NULL);
-	enum applier_state wait_state = replication_anon ?
+	enum applier_state wait_state = cfg_replication_anon ?
 					APPLIER_FETCHED_SNAPSHOT :
 					APPLIER_FINAL_JOIN;
 	applier_resume_to_state(applier, wait_state, TIMEOUT_INFINITY);
@@ -4419,7 +4423,7 @@ bootstrap_from_master(struct replica *master)
 	engine_begin_final_recovery_xc();
 	recovery_journal_create(&replicaset.vclock);
 
-	if (!replication_anon) {
+	if (!cfg_replication_anon) {
 		applier_resume_to_state(applier, APPLIER_JOINED,
 					TIMEOUT_INFINITY);
 	}
@@ -4833,7 +4837,8 @@ box_cfg_xc(void)
 		diag_raise();
 	box_set_replication_sync_timeout();
 	box_set_replication_skip_conflict();
-	box_set_replication_anon();
+	cfg_replication_anon = box_check_replication_anon();
+	box_broadcast_ballot();
 	/*
 	 * Must be set before opening the server port, because it may be
 	 * requested by a client before the configuration is completed.
@@ -4898,8 +4903,10 @@ box_cfg_xc(void)
 	 * The instance won't exist in _cluster space if it is an
 	 * anonymous replica, add it manually.
 	 */
+	if (cfg_replication_anon != box_is_anon())
+		panic("'replication_anon' cfg didn't work");
 	struct replica *self = replica_by_uuid(&INSTANCE_UUID);
-	if (!replication_anon) {
+	if (!cfg_replication_anon) {
 		if (self == NULL || self->id == REPLICA_ID_NIL) {
 			tnt_raise(ClientError, ER_UNKNOWN_REPLICA,
 				  tt_uuid_str(&INSTANCE_UUID),
@@ -4924,7 +4931,7 @@ box_cfg_xc(void)
 	 * instance_id is not known, so Raft simply can't work.
 	 */
 	struct raft *raft = box_raft();
-	if (!replication_anon)
+	if (!cfg_replication_anon)
 		raft_cfg_instance_id(raft, instance_id);
 	raft_cfg_vclock(raft, &replicaset.vclock);
 
