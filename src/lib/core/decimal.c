@@ -479,11 +479,23 @@ static_assert(DECIMAL_DIGIT_CAPACITY % 2 == 1 ||
 decimal_t *
 decimal_unpack(const char **data, uint32_t len, decimal_t *dec)
 {
+	/*
+	 * MsgPack extensions have length greater or equal than 1 by
+	 * specification.
+	 */
+	assert(len > 0);
+
 	int32_t scale;
+	const char *end = *data + len;
 	const char *svp = *data;
-	if (mp_typeof(**data) == MP_UINT) {
+	enum mp_type type = mp_typeof(**data);
+	if (type == MP_UINT) {
+		if (mp_check_uint(*data, end) > 0)
+			return NULL;
 		scale = mp_decode_uint(data);
-	} else if (mp_typeof(**data) == MP_INT) {
+	} else if (type == MP_INT) {
+		if (mp_check_int(*data, end) > 0)
+			return NULL;
 		scale = mp_decode_int(data);
 	} else {
 		return NULL;

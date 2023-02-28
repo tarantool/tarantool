@@ -199,7 +199,7 @@ decimal_unpack
 error_find_field
 error_ref
 error_set_prev
-error_unpack_unsafe
+error_unpack
 error_unref
 fiber_attr_delete
 fiber_attr_getstacksize
