@@ -129,7 +129,7 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 			}
 			break;
 		case MP_INTERVAL:
-			if (interval_unpack(packet, &bind->itv) == NULL) {
+			if (interval_unpack(packet, size, &bind->itv) == NULL) {
 				diag_set(ClientError, ER_INVALID_MSGPACK,
 					 "Invalid MP_INTERVAL MsgPack format");
 				return -1;

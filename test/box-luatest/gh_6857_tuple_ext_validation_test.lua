@@ -70,11 +70,21 @@ g.test_extension_tuple_validation = function()
         ['interval'] = msgpack.encode(datetime.now() - datetime.new()),
     }
     local test_data = {
-        ['decimal'] = string.fromhex('d5010010'), -- bad last nibble 0x0
-        ['uuid'] = string.fromhex('d702c93f2d79bca74235'), -- bad length
-        ['error'] = string.fromhex('c708038100918600ab436c'), -- bad length
-        ['datetime'] = string.fromhex('c7070400000000000000'), -- bad length
-        ['interval'] = string.fromhex('c7050602060fff01'), -- bad key 0xff
+        ['decimal #1'] = string.fromhex('d5010010'), -- bad last nibble 0x0
+        ['decimal #2'] = string.fromhex('d401cc'), -- bad scaling (unsigned)
+        ['decimal #3'] = string.fromhex('d401d0'), -- bad scaling (signed)
+        ['uuid #1'] = string.fromhex('d702c93f2d79bca74235'), -- bad length
+        ['error #1'] = string.fromhex('c708038100918600ab436c'), -- bad length
+        ['error #2'] = string.fromhex('d5030000'), -- bad length
+        ['datetime #1'] = string.fromhex('c7070400000000000000'), -- bad length
+        ['interval #1'] = string.fromhex('c7050602060fff01'), -- bad key 0xff
+        ['interval #2'] = string.fromhex('d40601'), -- bad length
+        ['interval #3'] = string.fromhex('d5060000'), -- bad length
+        ['interval #4'] = string.fromhex('d5060100'), -- bad length
+        ['interval #5'] = string.fromhex('d6060100c000'), -- bad value type
+        ['interval #6'] =
+            string.fromhex('d6060100cd00'), -- bad value (unsigned)
+        ['interval #7'] = string.fromhex('d6060100d100'), -- bad value (signed)
     }
 
     local c = net_box.connect(server.build_listen_uri('default'))

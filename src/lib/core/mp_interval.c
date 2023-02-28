@@ -99,13 +99,34 @@ interval_pack(char *data, const struct interval *itv)
 }
 
 struct interval *
-interval_unpack(const char **data, struct interval *itv)
+interval_unpack(const char **data, uint32_t len, struct interval *itv)
 {
+	/*
+	 * MsgPack extensions have length greater or equal than 1 by
+	 * specification.
+	 */
+	assert(len > 0);
+
+	const char *end = *data + len;
+	uint32_t count = mp_load_u8(data);
+	len -= sizeof(uint8_t);
+	if (count > 0 && len < 2)
+		return NULL;
+
 	memset(itv, 0, sizeof(*itv));
-	uint32_t len = mp_load_u8(data);
-	for (uint32_t i = 0; i < len; ++i) {
+	for (uint32_t i = 0; i < count; ++i) {
 		uint32_t field = mp_load_u8(data);
 		int32_t value;
+		enum mp_type type = mp_typeof(**data);
+		if (type == MP_UINT) {
+			if (mp_check_uint(*data, end) > 0)
+				return NULL;
+		} else if (type == MP_INT) {
+			if (mp_check_int(*data, end) > 0)
+				return NULL;
+		} else {
+			return NULL;
+		}
 		if (mp_read_int32(data, &value) != 0)
 			return NULL;
 		switch (field) {
@@ -142,6 +163,8 @@ interval_unpack(const char **data, struct interval *itv)
 			return NULL;
 		}
 	}
+	if (*data != end)
+		return NULL;
 	return itv;
 }
 
@@ -159,8 +182,8 @@ mp_decode_interval(const char **data, struct interval *itv)
 		return NULL;
 	int8_t type;
 	const char *svp = *data;
-	mp_decode_extl(data, &type);
-	if (type != MP_INTERVAL || interval_unpack(data, itv) == NULL) {
+	uint32_t len = mp_decode_extl(data, &type);
+	if (type != MP_INTERVAL || interval_unpack(data, len, itv) == NULL) {
 		*data = svp;
 		return NULL;
 	}
@@ -168,19 +191,19 @@ mp_decode_interval(const char **data, struct interval *itv)
 }
 
 int
-mp_snprint_interval(char *buf, int size, const char **data)
+mp_snprint_interval(char *buf, int size, const char **data, uint32_t len)
 {
 	struct interval itv;
-	if (interval_unpack(data, &itv) == NULL)
+	if (interval_unpack(data, len, &itv) == NULL)
 		return -1;
 	return interval_to_string(&itv, buf, size);
 }
 
 int
-mp_fprint_interval(FILE *file, const char **data)
+mp_fprint_interval(FILE *file, const char **data, uint32_t len)
 {
 	struct interval itv;
-	if (interval_unpack(data, &itv) == NULL)
+	if (interval_unpack(data, len, &itv) == NULL)
 		return -1;
 	char *buf = tt_static_buf();
 	interval_to_string(&itv, buf, TT_STATIC_BUF_LEN);
@@ -191,7 +214,6 @@ int
 mp_validate_interval(const char *data, uint32_t len)
 {
 	struct interval itv;
-	const char * const svp = data;
-	struct interval *rc = interval_unpack(&data, &itv);
-	return rc == NULL || (data - svp) != len;
+	struct interval *rc = interval_unpack(&data, len, &itv);
+	return rc == NULL;
 }

@@ -514,16 +514,25 @@ error_unpack_unsafe(const char **data)
 	return err;
 }
 
+struct error *
+error_unpack(const char **data, uint32_t len)
+{
+	const char *end = *data + len;
+	const char *check = *data;
+	if (mp_check(&check, end) != 0 || check != end)
+		return NULL;
+	return error_unpack_unsafe(data);
+}
+
 int
 mp_validate_error(const char *data, uint32_t len)
 {
-	const char *end = data + len;
-	struct error *err = error_unpack_unsafe(&data);
+	struct error *err = error_unpack(&data, len);
 	if (err != NULL) {
 		/* A hack to delete the error. */
 		error_ref(err);
 		error_unref(err);
-		return data != end;
+		return 0;
 	} else {
 		return 1;
 	}
