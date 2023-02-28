@@ -340,9 +340,10 @@ applier_connection_init(struct iostream *io, const struct uri *uri,
 	 * DNS resolution under the hood it is theoretically possible that
 	 * applier->addr_len will be different even for same uri.
 	 */
-	int fd = coio_connect(uri->host != NULL ? uri->host : "",
-			      uri->service != NULL ? uri->service : "",
-			      uri->host_hint, addr, addr_len);
+	int fd = coio_connect_timeout(uri->host != NULL ? uri->host : "",
+				      uri->service != NULL ? uri->service : "",
+				      uri->host_hint, addr, addr_len,
+				      replication_disconnect_timeout());
 	if (fd < 0)
 		diag_raise();
 	if (iostream_create(io, fd, io_ctx) != 0) {
