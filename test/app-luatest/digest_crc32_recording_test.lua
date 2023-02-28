@@ -173,6 +173,10 @@ g.before_all(function()
     g.server:start()
 end)
 
+g.after_all(function()
+    g.server:drop()
+end)
+
 local conn
 local function r()
     pcall(function()
