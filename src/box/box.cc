@@ -1970,6 +1970,7 @@ box_set_replication_anon(void)
 	if (!anon) {
 		auto guard = make_scoped_guard([&]{
 			replication_anon = !anon;
+			box_broadcast_ballot();
 		});
 		/* Turn anonymous instance into a normal one. */
 		replication_anon = anon;
