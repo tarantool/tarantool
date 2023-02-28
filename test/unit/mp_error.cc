@@ -484,8 +484,8 @@ test_payload(void)
 
 	int8_t type;
 	const char *data = buffer;
-	mp_decode_extl(&data, &type);
-	e = error_unpack_unsafe(&data);
+	uint32_t len = mp_decode_extl(&data, &type);
+	e = error_unpack(&data, len);
 	error_ref(e);
 
 	is(e->code, 42, "code");

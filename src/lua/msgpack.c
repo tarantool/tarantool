@@ -414,7 +414,7 @@ luamp_decode(struct lua_State *L, struct luaL_serializer *cfg,
 		case MP_INTERVAL:
 		{
 			struct interval *itv = luaT_newinterval(L);
-			itv = interval_unpack(data, itv);
+			itv = interval_unpack(data, len, itv);
 			if (itv == NULL)
 				goto ext_decode_err;
 			return;

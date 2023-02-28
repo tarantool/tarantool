@@ -92,9 +92,9 @@ tnt_interval_interval_add(struct interval *lhs, const struct interval *rhs)
 }
 
 struct interval *
-tnt_interval_unpack(const char **data, struct interval *itv)
+tnt_interval_unpack(const char **data, uint32_t len, struct interval *itv)
 {
-	return interval_unpack(data, itv);
+	return interval_unpack(data, len, itv);
 }
 
 bool

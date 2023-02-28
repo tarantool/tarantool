@@ -57,7 +57,7 @@ msgpack_fprint_ext(FILE *file, const char **data, int depth)
 	case MP_COMPRESSION:
 		return mp_fprint_compression(file, data, len);
 	case MP_INTERVAL:
-		return mp_fprint_interval(file, data);
+		return mp_fprint_interval(file, data, len);
 	default:
 		*data = orig;
 		return mp_fprint_ext_default(file, data, depth);
@@ -82,7 +82,7 @@ msgpack_snprint_ext(char *buf, int size, const char **data, int depth)
 	case MP_COMPRESSION:
 		return mp_snprint_compression(buf, size, data, len);
 	case MP_INTERVAL:
-		return mp_snprint_interval(buf, size, data);
+		return mp_snprint_interval(buf, size, data, len);
 	default:
 		*data = orig;
 		return mp_snprint_ext_default(buf, size, data, depth);

@@ -49,13 +49,13 @@ decimal_unpack(const char **data, uint32_t len, decimal_t *dec);
 struct tt_uuid *
 uuid_unpack(const char **data, uint32_t len, struct tt_uuid *uuid);
 struct error *
-error_unpack_unsafe(const char **data);
+error_unpack(const char **data, uint32_t len);
 void
 error_unref(struct error *e);
 struct datetime *
 tnt_datetime_unpack(const char **data, uint32_t len, struct datetime *date);
 struct interval *
-tnt_interval_unpack(const char **data, struct interval *itv);
+tnt_interval_unpack(const char **data, uint32_t len, struct interval *itv);
 ]])
 
 local strict_alignment = (jit.arch == 'arm')
@@ -556,8 +556,8 @@ local ext_decoder = {
         return uuid
     end,
     -- MP_ERROR
-    [3] = function(data)
-        local err = builtin.error_unpack_unsafe(data)
+    [3] = function(data, len)
+        local err = builtin.error_unpack(data, len)
         if err ~= nil then
             err._refs = err._refs + 1
             -- From FFI it is returned as 'struct error *', which is
@@ -576,9 +576,9 @@ local ext_decoder = {
         return dt
     end,
     -- MP_INTERVAL
-    [6] = function(data)
+    [6] = function(data, len)
         local itv = ffi.new("struct interval")
-        builtin.tnt_interval_unpack(data, itv)
+        builtin.tnt_interval_unpack(data, len, itv)
         return itv
     end,
 }

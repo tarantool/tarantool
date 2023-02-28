@@ -3109,7 +3109,7 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 			mem->flags = 0;
 			break;
 		} else if (type == MP_INTERVAL) {
-			if (interval_unpack(&buf, &mem->u.itv) == NULL) {
+			if (interval_unpack(&buf, size, &mem->u.itv) == NULL) {
 				diag_set(ClientError, ER_INVALID_MSGPACK,
 					 "Invalid MP_INTERVAL MsgPack format");
 				return -1;
@@ -3744,7 +3744,7 @@ port_c_get_vdbemem(struct port *base, uint32_t *size)
 				break;
 			} else if (type == MP_INTERVAL) {
 				struct interval *itv = &val[i].u.itv;
-				if (interval_unpack(&data, itv) == NULL) {
+				if (interval_unpack(&data, len, itv) == NULL) {
 					diag_set(ClientError,
 						 ER_INVALID_MSGPACK, "Invalid "
 						 "MP_INTERVAL MsgPack format");
