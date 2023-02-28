@@ -2315,7 +2315,7 @@ applier_subscribe(struct applier *applier)
 	req.replicaset_uuid = REPLICASET_UUID;
 	req.instance_uuid = INSTANCE_UUID;
 	req.version_id = tarantool_version_id();
-	req.is_anon = replication_anon;
+	req.is_anon = box_is_anon();
 	/*
 	 * Stop accepting local rows coming from a remote
 	 * instance as soon as local WAL starts accepting writes.
@@ -2464,9 +2464,8 @@ applier_f(va_list ap)
 	 */
 	struct session *session = session_new_on_demand();
 	session_set_type(session, SESSION_TYPE_APPLIER);
-
 	/*
-	 * The instance saves replication_anon value on bootstrap.
+	 * The instance saves replicaset anon cfg-value on bootstrap.
 	 * If a freshly started instance sees it has received
 	 * REPLICASET_UUID but hasn't yet registered, it must be an
 	 * anonymous replica, hence the default value 'true'.
@@ -2487,14 +2486,13 @@ applier_f(va_list ap)
 				 * The join will pause the applier
 				 * until WAL is created.
 				 */
-				was_anon = replication_anon;
-				if (replication_anon)
+				was_anon = cfg_replication_anon;
+				if (was_anon)
 					applier_fetch_snapshot(applier);
 				else
 					applier_join(applier);
 			}
-			if (instance_id == REPLICA_ID_NIL &&
-			    !replication_anon) {
+			if (box_is_anon() && !cfg_replication_anon) {
 				/*
 				 * The instance transitioned from anonymous or
 				 * is retrying final join.

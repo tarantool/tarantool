@@ -56,9 +56,9 @@ int replication_synchro_quorum = 1;
 double replication_synchro_timeout = 5.0; /* seconds */
 double replication_sync_timeout = 300.0; /* seconds */
 bool replication_skip_conflict = false;
-bool replication_anon = false;
 int replication_threads = 1;
 
+bool cfg_replication_anon = true;
 struct tt_uuid cfg_bootstrap_leader_uuid;
 struct uri cfg_bootstrap_leader_uri;
 
@@ -763,7 +763,7 @@ next:
 			say_warn("No connection to %s", tt_uuid_str(&key.uuid));
 		}
 		if (bootstrap_strategy == BOOTSTRAP_STRATEGY_AUTO &&
-		    !replication_anon) {
+		    !cfg_replication_anon) {
 			tnt_raise(ClientError,
 				  ER_BOOTSTRAP_CONNECTION_NOT_TO_ALL);
 		}
