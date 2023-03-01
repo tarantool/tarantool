@@ -206,6 +206,7 @@ enum {
 /** _schema fields. */
 enum {
 	BOX_SCHEMA_FIELD_KEY = 0,
+	BOX_SCHEMA_FIELD_VALUE = 1,
 };
 
 /** _cluster fields. */

@@ -3904,7 +3904,7 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 			return -1;
 		}
 		tt_uuid uu;
-		if (tuple_field_uuid(new_tuple, BOX_CLUSTER_FIELD_UUID, &uu) != 0)
+		if (tuple_field_uuid(new_tuple, BOX_SCHEMA_FIELD_VALUE, &uu) != 0)
 			return -1;
 		REPLICASET_UUID = uu;
 		box_broadcast_id();
