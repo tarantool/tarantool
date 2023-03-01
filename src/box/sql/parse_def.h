@@ -183,14 +183,6 @@ struct alter_entity_def {
 	struct SrcList *entity_name;
 };
 
-struct enable_entity_def {
-	struct alter_entity_def base;
-	/** Name of constraint to be enabled/disabled. */
-	struct Token name;
-	/** A new state to be set for entity found. */
-	bool is_enabled;
-};
-
 struct rename_entity_def {
 	struct alter_entity_def base;
 	struct Token new_name;
@@ -333,17 +325,6 @@ rename_entity_def_init(struct rename_entity_def *rename_def,
 	alter_entity_def_init(&rename_def->base, table_name, ENTITY_TYPE_TABLE,
 			      ALTER_ACTION_RENAME);
 	rename_def->new_name = *new_name;
-}
-
-static inline void
-enable_entity_def_init(struct enable_entity_def *enable_def,
-		       enum entity_type type, struct SrcList *parent_name,
-		       struct Token *name, bool is_enabled)
-{
-	alter_entity_def_init(&enable_def->base, parent_name, type,
-			      ALTER_ACTION_ENABLE);
-	enable_def->name = *name;
-	enable_def->is_enabled = is_enabled;
 }
 
 static inline void

@@ -2052,7 +2052,6 @@ struct Parse {
 		struct drop_table_def drop_table_def;
 		struct drop_trigger_def drop_trigger_def;
 		struct drop_view_def drop_view_def;
-		struct enable_entity_def enable_entity_def;
 	};
 	/**
 	 * Table def or column def is not part of union since
