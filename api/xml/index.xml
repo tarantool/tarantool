@@ -433,6 +433,7 @@
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea608ad73b6ce310712bd9e0bc29f0eb4c" kind="enumvalue"><name>ER_BOOTSTRAP_CONNECTION_NOT_TO_ALL</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adceaaf3680ad4d7c8dd8baf2343835f5a57c" kind="enumvalue"><name>ER_NIL_UUID</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea239a05101944323ad6fcaf7ca5b7fa5d" kind="enumvalue"><name>ER_WRONG_FUNCTION_OPTIONS</name></member>
+    <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcead171fb352f7ef7a0af8ca47239c19a54" kind="enumvalue"><name>ER_MISSING_SYSTEM_SPACES</name></member>
     <member refid="module_8h_1a029e9d16d637a97b37560ccf24c4adcea933c5cc30c58e4840814727c74f96b57" kind="enumvalue"><name>box_error_code_MAX</name></member>
     <member refid="module_8h_1a24a548551bdc95d156210ec216ded4f9" kind="typedef"><name>sayfunc_t</name></member>
     <member refid="module_8h_1a94849dd4556ce6560a898d5af2d20779" kind="typedef"><name>fiber_func</name></member>
