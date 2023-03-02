@@ -2062,6 +2062,8 @@ struct Parse {
 	 */
 	struct create_table_def create_table_def;
 	struct create_column_def create_column_def;
+	/** AST of parsed SQL statement. */
+	struct sql_ast ast;
 	/*
 	 * FK and CK constraints appeared in a <CREATE TABLE> or
 	 * an <ALTER TABLE ADD COLUMN> statement.

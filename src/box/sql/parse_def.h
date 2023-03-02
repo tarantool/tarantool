@@ -74,6 +74,24 @@
  * parsing context (struct Parse).
  */
 
+/** Type of parsed statement. */
+enum sql_ast_type {
+	/** Type of the statement is unknown. */
+	SQL_AST_TYPE_UNKNOWN = 0,
+	/** START TRANSACTION statement. */
+	SQL_AST_TYPE_START_TRANSACTION,
+	/** COMMIT statement. */
+	SQL_AST_TYPE_COMMIT,
+	/** ROLLBACK statement. */
+	SQL_AST_TYPE_ROLLBACK,
+	/** SAVEPOINT statement. */
+	SQL_AST_TYPE_SAVEPOINT,
+	/** RELEASE SAVEPOINT statement. */
+	SQL_AST_TYPE_RELEASE_SAVEPOINT,
+	/** ROLLBACK TO SAVEPOINT statement. */
+	SQL_AST_TYPE_ROLLBACK_TO_SAVEPOINT,
+};
+
 /**
  * Each token coming out of the lexer is an instance of
  * this structure. Tokens are also used as part of an expression.
@@ -84,6 +102,20 @@ struct Token {
 	/** Number of characters in this token. */
 	unsigned int n;
 	bool isReserved;
+};
+
+/** Description of a SAVEPOINT. */
+struct sql_ast_savepoint {
+	/** Name of the SAVEPOINT. */
+	struct Token name;
+};
+
+/** A structure describing the AST of the parsed SQL statement. */
+struct sql_ast {
+	/** Parsed statement type. */
+	enum sql_ast_type type;
+	/** Savepoint description for savepoint-related statements. */
+	struct sql_ast_savepoint savepoint;
 };
 
 /** Constant tokens for integer values. */
@@ -522,5 +554,30 @@ create_fk_constraint_parse_def_destroy(struct create_fk_constraint_parse_def *d)
 	rlist_foreach_entry(fk, &d->fkeys, link)
 		sql_expr_list_delete(fk->selfref_cols);
 }
+
+/** Save parsed START TRANSACTION statement. */
+void
+sql_ast_init_start_transaction(struct Parse *parse);
+
+/** Save parsed COMMIT statement. */
+void
+sql_ast_init_commit(struct Parse *parse);
+
+/** Save parsed ROLLBACK statement. */
+void
+sql_ast_init_rollback(struct Parse *parse);
+
+/** Save parsed SAVEPOINT statement. */
+void
+sql_ast_init_savepoint(struct Parse *parse, const struct Token *name);
+
+/** Save parsed RELEASE SAVEPOINT statement. */
+void
+sql_ast_init_release_savepoint(struct Parse *parse, const struct Token *name);
+
+/** Save parsed ROLLBACK TO SAVEPOINT statement. */
+void
+sql_ast_init_rollback_to_savepoint(struct Parse *parse,
+				   const struct Token *name);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */
