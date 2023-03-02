@@ -474,6 +474,38 @@ new_xmalloc(size_t n)
 	return xmalloc(n);
 }
 
+/** Finish parsing by processing saved statements or their parts. */
+static void
+sql_finish_parsing(struct Parse *parse)
+{
+	if (parse->is_aborted)
+		return;
+	switch (parse->type) {
+	case PARSE_TYPE_START_TRANSACTION:
+		sql_transaction_begin(parse);
+		break;
+	case PARSE_TYPE_COMMIT:
+		sql_transaction_commit(parse);
+		break;
+	case PARSE_TYPE_ROLLBACK:
+		sql_transaction_rollback(parse);
+		break;
+	case PARSE_TYPE_SAVEPOINT:
+		sqlSavepoint(parse, SAVEPOINT_BEGIN, &parse->savepoint.name);
+		break;
+	case PARSE_TYPE_RELEASE_SAVEPOINT:
+		sqlSavepoint(parse, SAVEPOINT_RELEASE, &parse->savepoint.name);
+		break;
+	case PARSE_TYPE_ROLLBACK_TO_SAVEPOINT:
+		sqlSavepoint(parse, SAVEPOINT_ROLLBACK, &parse->savepoint.name);
+		break;
+	default:
+		assert(parse->type == PARSE_TYPE_UNKNOWN);
+	}
+	if (!parse->is_aborted && !parse->parse_only)
+		sql_finish_coding(parse);
+}
+
 /**
  * Run the parser on the given SQL string.
  *
@@ -550,6 +582,7 @@ sqlRunParser(Parse * pParse, const char *zSql)
 		}
 		pParse->line_pos += pParse->sLastToken.n;
 	}
+	sql_finish_parsing(pParse);
 	pParse->zTail = &zSql[i];
 	sqlParserFree(pEngine, free);
 	if (pParse->pVdbe != NULL && pParse->is_aborted) {

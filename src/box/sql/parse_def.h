@@ -74,6 +74,24 @@
  * parsing context (struct Parse).
  */
 
+/** Type of parsed statement. */
+enum parse_type {
+	/** Type of the statement is unknown. */
+	PARSE_TYPE_UNKNOWN = 0,
+	/** START TRANSACTION statement. */
+	PARSE_TYPE_START_TRANSACTION,
+	/** COMMIT statement. */
+	PARSE_TYPE_COMMIT,
+	/** ROLLBACK statement. */
+	PARSE_TYPE_ROLLBACK,
+	/** SAVEPOINT statement. */
+	PARSE_TYPE_SAVEPOINT,
+	/** RELEASE SAVEPOINT statement. */
+	PARSE_TYPE_RELEASE_SAVEPOINT,
+	/** ROLLBACK TO SAVEPOINT statement. */
+	PARSE_TYPE_ROLLBACK_TO_SAVEPOINT,
+};
+
 /**
  * Each token coming out of the lexer is an instance of
  * this structure. Tokens are also used as part of an expression.
@@ -84,6 +102,12 @@ struct Token {
 	/** Number of characters in this token. */
 	unsigned int n;
 	bool isReserved;
+};
+
+/** Description of a SAVEPOINT. */
+struct sql_parse_savepoint {
+	/** Name of the SAVEPOINT. */
+	struct Token name;
 };
 
 /** Constant tokens for integer values. */
@@ -503,5 +527,29 @@ create_fk_constraint_parse_def_destroy(struct create_fk_constraint_parse_def *d)
 	rlist_foreach_entry(fk, &d->fkeys, link)
 		sql_expr_list_delete(fk->selfref_cols);
 }
+
+/** Save parsed START TRANSACTION statement. */
+void
+sql_parse_transaction_start(struct Parse *parse);
+
+/** Save parsed COMMIT statement. */
+void
+sql_parse_transaction_commit(struct Parse *parse);
+
+/** Save parsed ROLLBACK statement. */
+void
+sql_parse_transaction_rollback(struct Parse *parse);
+
+/** Save parsed SAVEPOINT statement. */
+void
+sql_parse_savepoint_create(struct Parse *parse, const struct Token *name);
+
+/** Save parsed RELEASE SAVEPOINT statement. */
+void
+sql_parse_savepoint_release(struct Parse *parse, const struct Token *name);
+
+/** Save parsed ROLLBACK TO SAVEPOINT statement. */
+void
+sql_parse_savepoint_rollback(struct Parse *parse, const struct Token *name);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */

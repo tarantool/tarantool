@@ -30,7 +30,7 @@
  */
 #include <string.h>
 
-#include "parse_def.h"
+#include "sqlInt.h"
 
 const struct Token sqlIntTokens[] = {
 	{"0", 1, false},
@@ -44,4 +44,43 @@ sqlTokenInit(struct Token *p, char *z)
 {
 	p->z = z;
 	p->n = z == NULL ? 0 : strlen(z);
+}
+
+void
+sql_parse_transaction_start(struct Parse *parse)
+{
+	parse->type = PARSE_TYPE_START_TRANSACTION;
+}
+
+void
+sql_parse_transaction_commit(struct Parse *parse)
+{
+	parse->type = PARSE_TYPE_COMMIT;
+}
+
+void
+sql_parse_transaction_rollback(struct Parse *parse)
+{
+	parse->type = PARSE_TYPE_ROLLBACK;
+}
+
+void
+sql_parse_savepoint_create(struct Parse *parse, const struct Token *name)
+{
+	parse->type = PARSE_TYPE_SAVEPOINT;
+	parse->savepoint.name = *name;
+}
+
+void
+sql_parse_savepoint_release(struct Parse *parse, const struct Token *name)
+{
+	parse->type = PARSE_TYPE_RELEASE_SAVEPOINT;
+	parse->savepoint.name = *name;
+}
+
+void
+sql_parse_savepoint_rollback(struct Parse *parse, const struct Token *name)
+{
+	parse->type = PARSE_TYPE_ROLLBACK_TO_SAVEPOINT;
+	parse->savepoint.name = *name;
 }

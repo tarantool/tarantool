@@ -2062,6 +2062,10 @@ struct Parse {
 	 */
 	struct create_table_def create_table_def;
 	struct create_column_def create_column_def;
+	/** Parsed statement type. */
+	enum parse_type type;
+	/** Savepoint description for savepoint-related statements. */
+	struct sql_parse_savepoint savepoint;
 	/*
 	 * FK and CK constraints appeared in a <CREATE TABLE> or
 	 * an <ALTER TABLE ADD COLUMN> statement.
