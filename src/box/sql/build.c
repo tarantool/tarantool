@@ -558,10 +558,10 @@ field_def_create_for_pk(struct Parse *parser, struct field_def *field,
 void
 sqlAddPrimaryKey(struct Parse *pParse)
 {
-	struct space *space = pParse->create_table_def.new_space;
+	struct space *space = pParse->create_column_def.space;
+	assert(space != NULL || pParse->src_list != NULL);
 	if (space == NULL)
-		space = pParse->create_column_def.space;
-	assert(space != NULL);
+		return sql_create_index(pParse);
 	if (sql_space_primary_key(space) != NULL) {
 		diag_set(ClientError, ER_CREATE_SPACE, space->def->name,
 			 "primary key has been already declared");

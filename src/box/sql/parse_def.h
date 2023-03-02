@@ -100,6 +100,8 @@ enum parse_type {
 	PARSE_TYPE_ADD_CHECK,
 	/** ALTER TABLE ADD CONSTAINT UNIQUE statement. */
 	PARSE_TYPE_ADD_UNIQUE,
+	/** ALTER TABLE ADD CONSTAINT PRIMARY KEY statement. */
+	PARSE_TYPE_ADD_PRIMARY_KEY,
 };
 
 /**
@@ -656,5 +658,20 @@ sql_parse_table_unique(struct Parse *parse, const struct Token *name,
 void
 sql_parse_add_unique(struct Parse *parse, struct SrcList *table_name,
 		     const struct Token *name, struct ExprList *cols);
+
+/** Save parsed column PRIMARY KEY. */
+void
+sql_parse_column_primary_key(struct Parse *parse, const struct Token *name,
+			     enum sort_order sort_order);
+
+/** Save parsed table PRIMARY KEY from CREATE TABLE statement. */
+void
+sql_parse_table_primary_key(struct Parse *parse, const struct Token *name,
+			    struct ExprList *cols);
+
+/** Save parsed table PRIMARY KEY from ALTER TABLE ADD CONSTRAINT statement. */
+void
+sql_parse_add_primary_key(struct Parse *parse, struct SrcList *table_name,
+			  const struct Token *name, struct ExprList *cols);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */

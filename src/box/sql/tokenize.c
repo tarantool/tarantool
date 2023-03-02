@@ -482,6 +482,16 @@ static int
 sql_finish_table_properties(struct Parse *parse)
 {
 	assert(!parse->is_aborted);
+	if (parse->primary_key.cols != NULL) {
+		create_index_def_init(&parse->create_index_def, parse->src_list,
+				      &parse->primary_key.name,
+				      parse->primary_key.cols,
+				      SQL_INDEX_TYPE_CONSTRAINT_PK,
+				      SORT_ORDER_ASC, false);
+		sqlAddPrimaryKey(parse);
+		if (parse->is_aborted)
+			return -1;
+	}
 	for (uint32_t i = 0; i < parse->unique_list.n; ++i) {
 		struct sql_parse_unique *c = &parse->unique_list.a[i];
 		create_index_def_init(&parse->create_index_def,
@@ -556,6 +566,16 @@ sql_finish_parsing(struct Parse *parse)
 				      SQL_INDEX_TYPE_CONSTRAINT_UNIQUE,
 				      SORT_ORDER_ASC, false);
 		sql_create_index(parse);
+		break;
+	}
+	case PARSE_TYPE_ADD_PRIMARY_KEY: {
+		assert(parse->primary_key.cols != NULL);
+		create_index_def_init(&parse->create_index_def, parse->src_list,
+				      &parse->primary_key.name,
+				      parse->primary_key.cols,
+				      SQL_INDEX_TYPE_CONSTRAINT_PK,
+				      SORT_ORDER_ASC, false);
+		sqlAddPrimaryKey(parse);
 		break;
 	}
 	default:

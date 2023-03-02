@@ -64,3 +64,20 @@ g.test_unique_parsing = function()
         box.execute([[DROP TABLE t;]])
     end)
 end
+
+--
+-- Make sure that the creation of the PRIMARY KEY constraint is processed after
+-- the creation of the columns.
+--
+g.test_primary_key_parsing = function()
+    g.server:exec(function()
+        local sql = [[CREATE TABLE t(PRIMARY KEY(a, i), i INT, a INT);]]
+        t.assert_equals(box.execute(sql), {row_count = 1})
+        local id = box.space.T.id
+        t.assert_equals(box.space.T.index[0].name, 'pk_unnamed_T_1')
+        t.assert_equals(#box.space._index:get({id, 0}).parts, 2)
+        t.assert_equals(box.space._index:get({id, 0}).parts[1].field, 1)
+        t.assert_equals(box.space._index:get({id, 0}).parts[2].field, 0)
+        box.execute([[DROP TABLE t;]])
+    end)
+end

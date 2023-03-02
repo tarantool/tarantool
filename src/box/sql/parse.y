@@ -307,9 +307,7 @@ ccons ::= NULL onconf(R).        {
 }
 ccons ::= NOT NULL onconf(R).    {sql_column_add_nullable_action(pParse, R);}
 ccons ::= cconsname(N) PRIMARY KEY sortorder(Z). {
-  create_index_def_init(&pParse->create_index_def, NULL, &N, NULL,
-                        SQL_INDEX_TYPE_CONSTRAINT_PK, Z, false);
-  sqlAddPrimaryKey(pParse);
+  sql_parse_column_primary_key(pParse, &N, Z);
 }
 ccons ::= cconsname(N) UNIQUE. {
   sql_parse_column_unique(pParse, &N);
@@ -331,9 +329,7 @@ autoinc(X) ::= AUTOINCR.  {X = 1;}
 
 // The next group of rules parses the arguments to a REFERENCES clause.
 tcons ::= cconsname(N) PRIMARY KEY LP col_list_with_autoinc(X) RP. {
-  create_index_def_init(&pParse->create_index_def, NULL, &N, X,
-                        SQL_INDEX_TYPE_CONSTRAINT_PK, SORT_ORDER_ASC, false);
-  sqlAddPrimaryKey(pParse);
+  sql_parse_table_primary_key(pParse, &N, X);
 }
 tcons ::= cconsname(N) UNIQUE LP sortlist(X) RP. {
   sql_parse_table_unique(pParse, &N, X);
@@ -1688,9 +1684,7 @@ cmd ::= alter_add_constraint(N) UNIQUE LP sortlist(X) RP. {
 }
 
 cmd ::= alter_add_constraint(N) PRIMARY KEY LP sortlist(X) RP. {
-  create_index_def_init(&pParse->create_index_def, N.table_name, &N.name, X,
-                        SQL_INDEX_TYPE_CONSTRAINT_PK, SORT_ORDER_ASC, false);
-  sql_create_index(pParse);
+  sql_parse_add_primary_key(pParse, N.table_name, &N.name, X);
 }
 
 cmd ::= alter_table_start(A) RENAME TO nm(N). {

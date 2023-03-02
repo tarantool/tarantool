@@ -92,6 +92,15 @@ last_column_name(struct Parse *parse)
 	return &parse->create_column_def.base.name;
 }
 
+/** Return the name of the table from CREATE TABLE. */
+static const char *
+new_table_name(struct Parse *parse)
+{
+	if (parse->create_table_def.new_space == NULL)
+		return NULL;
+	return parse->create_table_def.new_space->def->name;
+}
+
 void
 sql_parse_create_table(struct Parse *parse)
 {
@@ -234,4 +243,53 @@ sql_parse_add_unique(struct Parse *parse, struct SrcList *table_name,
 	parse->type = PARSE_TYPE_ADD_UNIQUE;
 	parse->src_list = table_name;
 	unique_list_append(parse, name, cols);
+}
+
+/** Fill in the description of the PRIMARY KEY. */
+static void
+primary_key_fill(struct Parse *parse, const struct Token *name,
+		 struct ExprList *cols)
+{
+	if (parse->primary_key.cols != NULL) {
+		const char *space_name;
+		if (parse->src_list == NULL)
+			space_name = new_table_name(parse);
+		else
+			space_name = parse->src_list->a[0].zName;
+		diag_set(ClientError, ER_CREATE_SPACE, space_name,
+			 "primary key has been already declared");
+		parse->is_aborted = true;
+		sql_expr_list_delete(cols);
+		sql_expr_list_delete(parse->primary_key.cols);
+		return;
+	}
+	parse->primary_key.cols = cols;
+	parse->primary_key.name = *name;
+}
+
+void
+sql_parse_column_primary_key(struct Parse *parse, const struct Token *name,
+			     enum sort_order sort_order)
+{
+	struct Token *column_name = last_column_name(parse);
+	struct Expr *expr = sql_expr_new_dequoted(TK_ID, column_name);
+	struct ExprList *cols = sql_expr_list_append(NULL, expr);
+	sqlExprListSetSortOrder(cols, sort_order);
+	primary_key_fill(parse, name, cols);
+}
+
+void
+sql_parse_table_primary_key(struct Parse *parse, const struct Token *name,
+			    struct ExprList *cols)
+{
+	primary_key_fill(parse, name, cols);
+}
+
+void
+sql_parse_add_primary_key(struct Parse *parse, struct SrcList *table_name,
+			  const struct Token *name, struct ExprList *cols)
+{
+	parse->type = PARSE_TYPE_ADD_PRIMARY_KEY;
+	parse->src_list = table_name;
+	primary_key_fill(parse, name, cols);
 }
