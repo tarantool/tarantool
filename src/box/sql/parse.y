@@ -312,10 +312,7 @@ ccons ::= cconsname(N) PRIMARY KEY sortorder(Z). {
   sqlAddPrimaryKey(pParse);
 }
 ccons ::= cconsname(N) UNIQUE. {
-  create_index_def_init(&pParse->create_index_def, NULL, &N, NULL,
-                        SQL_INDEX_TYPE_CONSTRAINT_UNIQUE, SORT_ORDER_ASC,
-                        false);
-  sql_create_index(pParse);
+  sql_parse_column_unique(pParse, &N);
 }
 
 ccons ::= cconsname(N) CHECK LP expr(X) RP. {
@@ -339,10 +336,7 @@ tcons ::= cconsname(N) PRIMARY KEY LP col_list_with_autoinc(X) RP. {
   sqlAddPrimaryKey(pParse);
 }
 tcons ::= cconsname(N) UNIQUE LP sortlist(X) RP. {
-  create_index_def_init(&pParse->create_index_def, NULL, &N, X,
-                        SQL_INDEX_TYPE_CONSTRAINT_UNIQUE, SORT_ORDER_ASC,
-                        false);
-  sql_create_index(pParse);
+  sql_parse_table_unique(pParse, &N, X);
 }
 tcons ::= cconsname(N) CHECK LP expr(X) RP. {
   sql_parse_table_check(pParse, &N, &X);
@@ -1689,15 +1683,15 @@ cmd ::= alter_add_constraint(N) CHECK LP expr(X) RP. {
   sql_parse_add_check(pParse, N.table_name, &N.name, &X);
 }
 
-cmd ::= alter_add_constraint(N) unique_spec(U) LP sortlist(X) RP. {
-  create_index_def_init(&pParse->create_index_def, N.table_name, &N.name, X, U,
-                        SORT_ORDER_ASC, false);
-  sql_create_index(pParse);
+cmd ::= alter_add_constraint(N) UNIQUE LP sortlist(X) RP. {
+  sql_parse_add_unique(pParse, N.table_name, &N.name, X);
 }
 
-%type unique_spec {int}
-unique_spec(U) ::= UNIQUE.      { U = SQL_INDEX_TYPE_CONSTRAINT_UNIQUE; }
-unique_spec(U) ::= PRIMARY KEY. { U = SQL_INDEX_TYPE_CONSTRAINT_PK; }
+cmd ::= alter_add_constraint(N) PRIMARY KEY LP sortlist(X) RP. {
+  create_index_def_init(&pParse->create_index_def, N.table_name, &N.name, X,
+                        SQL_INDEX_TYPE_CONSTRAINT_PK, SORT_ORDER_ASC, false);
+  sql_create_index(pParse);
+}
 
 cmd ::= alter_table_start(A) RENAME TO nm(N). {
     rename_entity_def_init(&pParse->rename_entity_def, A, &N);

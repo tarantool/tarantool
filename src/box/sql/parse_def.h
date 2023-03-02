@@ -98,6 +98,8 @@ enum parse_type {
 	PARSE_TYPE_ADD_FOREIGN_KEY,
 	/** ALTER TABLE ADD CONSTAINT CHECK statement. */
 	PARSE_TYPE_ADD_CHECK,
+	/** ALTER TABLE ADD CONSTAINT UNIQUE statement. */
+	PARSE_TYPE_ADD_UNIQUE,
 };
 
 /**
@@ -171,6 +173,22 @@ struct sql_parse_check_list {
 	/** Array containing all CHECK descriptions from the list. */
 	struct sql_parse_check *a;
 	/** Number of CHECK descriptions in the list. */
+	uint32_t n;
+};
+
+/** Description of the UNIQUE constraint being created. */
+struct sql_parse_unique {
+	/** Constraint name. */
+	struct Token name;
+	/** Unique columns. */
+	struct ExprList *cols;
+};
+
+/** UNIQUE descriptions list. */
+struct sql_parse_unique_list {
+	/** Array containing all UNIQUE descriptions from the list. */
+	struct sql_parse_unique *a;
+	/** Number of UNIQUE descriptions in the list. */
 	uint32_t n;
 };
 
@@ -624,5 +642,19 @@ sql_parse_table_check(struct Parse *parse, const struct Token *name,
 void
 sql_parse_add_check(struct Parse *parse, struct SrcList *table_name,
 		    const struct Token *name, struct ExprSpan *expr);
+
+/** Save parsed column UNIQUE. */
+void
+sql_parse_column_unique(struct Parse *parse, const struct Token *name);
+
+/** Save parsed table UNIQUE from CREATE TABLE statement. */
+void
+sql_parse_table_unique(struct Parse *parse, const struct Token *name,
+		       struct ExprList *cols);
+
+/** Save parsed table UNIQUE from ALTER TABLE ADD CONSTRAINT statement. */
+void
+sql_parse_add_unique(struct Parse *parse, struct SrcList *table_name,
+		     const struct Token *name, struct ExprList *cols);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */

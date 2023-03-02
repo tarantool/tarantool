@@ -206,6 +206,8 @@ sql_parser_destroy(Parse *parser)
 		sql_xfree(parser->foreign_key_list.a);
 	if (parser->check_list.n != 0)
 		sql_xfree(parser->check_list.a);
+	if (parser->unique_list.n != 0)
+		sql_xfree(parser->unique_list.a);
 	if (parser->src_list != NULL)
 		sqlSrcListDelete(parser->src_list);
 	sql_xfree(parser->aLabel);

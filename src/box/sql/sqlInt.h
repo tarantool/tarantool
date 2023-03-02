@@ -2057,6 +2057,8 @@ struct Parse {
 	struct sql_parse_foreign_key_list foreign_key_list;
 	/** Description of created CHECK constraints. */
 	struct sql_parse_check_list check_list;
+	/** Description of created UNIQUE constraints. */
+	struct sql_parse_unique_list unique_list;
 	/** Source list for the statement. */
 	struct SrcList *src_list;
 	/*

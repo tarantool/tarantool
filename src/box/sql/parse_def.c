@@ -195,3 +195,43 @@ sql_parse_add_check(struct Parse *parse, struct SrcList *table_name,
 	parse->src_list = table_name;
 	check_list_append(parse, name, expr, &Token_nil);
 }
+
+/** Append a new UNIQUE to UNIQUE list. */
+static void
+unique_list_append(struct Parse *parse, const struct Token *name,
+		   struct ExprList *cols)
+{
+	struct sql_parse_unique_list *list = &parse->unique_list;
+	uint32_t id = list->n;
+	++list->n;
+	uint32_t size = list->n * sizeof(*list->a);
+	list->a = sql_xrealloc(list->a, size);
+	struct sql_parse_unique *c = &list->a[id];
+	c->name = *name;
+	c->cols = cols;
+}
+
+void
+sql_parse_column_unique(struct Parse *parse, const struct Token *name)
+{
+	struct Token *column_name = last_column_name(parse);
+	struct Expr *expr = sql_expr_new_dequoted(TK_ID, column_name);
+	struct ExprList *cols = sql_expr_list_append(NULL, expr);
+	unique_list_append(parse, name, cols);
+}
+
+void
+sql_parse_table_unique(struct Parse *parse, const struct Token *name,
+		       struct ExprList *cols)
+{
+	unique_list_append(parse, name, cols);
+}
+
+void
+sql_parse_add_unique(struct Parse *parse, struct SrcList *table_name,
+		     const struct Token *name, struct ExprList *cols)
+{
+	parse->type = PARSE_TYPE_ADD_UNIQUE;
+	parse->src_list = table_name;
+	unique_list_append(parse, name, cols);
+}

@@ -482,6 +482,16 @@ static int
 sql_finish_table_properties(struct Parse *parse)
 {
 	assert(!parse->is_aborted);
+	for (uint32_t i = 0; i < parse->unique_list.n; ++i) {
+		struct sql_parse_unique *c = &parse->unique_list.a[i];
+		create_index_def_init(&parse->create_index_def,
+				      parse->src_list, &c->name, c->cols,
+				      SQL_INDEX_TYPE_CONSTRAINT_UNIQUE,
+				      SORT_ORDER_ASC, false);
+		sql_create_index(parse);
+		if (parse->is_aborted)
+			return -1;
+	}
 	for (uint32_t i = 0; i < parse->check_list.n; ++i) {
 		sql_create_check_contraint(parse, &parse->check_list.a[i]);
 		if (parse->is_aborted)
@@ -538,6 +548,16 @@ sql_finish_parsing(struct Parse *parse)
 		assert(parse->check_list.n == 1);
 		sql_create_check_contraint(parse, &parse->check_list.a[0]);
 		break;
+	case PARSE_TYPE_ADD_UNIQUE: {
+		assert(parse->unique_list.n == 1);
+		struct sql_parse_unique *c = &parse->unique_list.a[0];
+		create_index_def_init(&parse->create_index_def,
+				      parse->src_list, &c->name, c->cols,
+				      SQL_INDEX_TYPE_CONSTRAINT_UNIQUE,
+				      SORT_ORDER_ASC, false);
+		sql_create_index(parse);
+		break;
+	}
 	default:
 		assert(parse->type == PARSE_TYPE_UNKNOWN);
 	}

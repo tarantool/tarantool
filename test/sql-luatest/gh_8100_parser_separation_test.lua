@@ -50,3 +50,17 @@ g.test_check_parsing = function()
         box.execute([[DROP TABLE t;]])
     end)
 end
+
+--
+-- Make sure that the creation of the UNIQUE constraint is processed after the
+-- creation of the columns and the processing of the PRIMARY KEY.
+--
+g.test_unique_parsing = function()
+    g.server:exec(function()
+        local sql = [[CREATE TABLE t(UNIQUE(a), i INT PRIMARY KEY, a INT);]]
+        t.assert_equals(box.execute(sql), {row_count = 1})
+        t.assert_equals(box.space.T.index[0].name, 'pk_unnamed_T_1')
+        t.assert_equals(box.space.T.index[1].name, 'unique_unnamed_T_2')
+        box.execute([[DROP TABLE t;]])
+    end)
+end
