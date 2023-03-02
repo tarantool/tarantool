@@ -482,6 +482,11 @@ static int
 sql_finish_table_properties(struct Parse *parse)
 {
 	assert(!parse->is_aborted);
+	if (parse->autoinc_name != NULL) {
+		if (sql_fieldno_by_name(parse, parse->autoinc_name,
+					&parse->autoinc_fieldno) != 0)
+			return -1;
+	}
 	if (parse->primary_key.cols != NULL) {
 		sqlAddPrimaryKey(parse);
 		if (parse->is_aborted)

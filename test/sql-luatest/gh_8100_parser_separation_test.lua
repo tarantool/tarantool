@@ -94,3 +94,17 @@ g.test_create_index_parsing = function()
         box.execute([[DROP TABLE t;]])
     end)
 end
+
+--
+-- Make sure that AUTOINCREMENT clause is processed after the creation of the
+-- columns.
+--
+g.test_autoincrement_parsing = function()
+    g.server:exec(function()
+        local sql = [[CREATE TABLE t(PRIMARY KEY(i autoincrement), i INT);]]
+        t.assert_equals(box.execute(sql), {row_count = 1})
+        local res = box.execute([[insert into t values(NULL), (NULL), (NULL);]])
+        t.assert_equals(res, {autoincrement_ids = {1, 2, 3}, row_count = 3})
+        box.execute([[DROP TABLE t;]])
+    end)
+end

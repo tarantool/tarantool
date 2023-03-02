@@ -3156,7 +3156,7 @@ int
 sql_fieldno_by_name(struct Parse *parse_context, struct Expr *field_name,
 		    uint32_t *fieldno)
 {
-	struct space_def *def = parse_context->create_table_def.new_space->def;
+	struct space_def *def = parse_context->create_column_def.space->def;
 	struct Expr *name = sqlExprSkipCollate(field_name);
 	if (name->op != TK_ID) {
 		diag_set(ClientError, ER_INDEX_DEF_UNSUPPORTED, "Expressions");

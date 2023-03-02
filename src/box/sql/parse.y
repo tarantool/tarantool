@@ -228,9 +228,8 @@ column_name_and_type ::= nm(A) typedef(Y). {
 }
 
 create_column_end ::= autoinc(I). {
-  uint32_t fieldno = pParse->create_column_def.space->def->field_count - 1;
-  if (I == 1 && sql_add_autoincrement(pParse, fieldno) != 0)
-    return;
+  if (I == 1)
+    sql_parse_column_autoincrement(pParse);
 }
 columnlist ::= tcons.
 
@@ -710,24 +709,14 @@ sortlist(A) ::= expr(Y) sortorder(Z). {
 
 col_list_with_autoinc(A) ::= col_list_with_autoinc(A) COMMA expr(Y)
                              autoinc(I). {
-  uint32_t fieldno;
-  if (I == 1) {
-    if (sql_fieldno_by_name(pParse, Y.pExpr, &fieldno) != 0)
-      return;
-    if (sql_add_autoincrement(pParse, fieldno) != 0)
-      return;
-  }
+  if (I == 1)
+    sql_parse_table_autoincrement(pParse, sqlExprDup(Y.pExpr, 0));
   A = sql_expr_list_append(A, Y.pExpr);
 }
 
 col_list_with_autoinc(A) ::= expr(Y) autoinc(I). {
-  if (I == 1) {
-    uint32_t fieldno = 0;
-    if (sql_fieldno_by_name(pParse, Y.pExpr, &fieldno) != 0)
-      return;
-    if (sql_add_autoincrement(pParse, fieldno) != 0)
-      return;
-  }
+  if (I == 1)
+    sql_parse_table_autoincrement(pParse, sqlExprDup(Y.pExpr, 0));
   /* A-overwrites-Y. */
   A = sql_expr_list_append(NULL, Y.pExpr);
 }

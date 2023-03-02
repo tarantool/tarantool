@@ -2062,6 +2062,8 @@ struct Parse {
 	struct sql_parse_unique primary_key;
 	/** Description of created index. */
 	struct sql_parse_index create_index;
+	/** Name of the column with AUTOINCREMENT. */
+	struct Expr *autoinc_name;
 	/** Source list for the statement. */
 	struct SrcList *src_list;
 	/*

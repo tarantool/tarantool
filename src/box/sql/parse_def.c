@@ -306,3 +306,31 @@ sql_parse_create_index(struct Parse *parse, struct Token *table_name,
 	parse->create_index.is_unique = is_unique;
 	parse->create_index.if_not_exists = if_not_exists;
 }
+
+/** Set the AUTOINCREMENT column name. */
+static void
+autoincrement_add(struct Parse *parse, struct Expr *column_name)
+{
+	if (parse->has_autoinc) {
+		diag_set(ClientError, ER_SQL_SYNTAX_WITH_POS, parse->line_count,
+			 parse->line_pos,
+			 "table must feature at most one AUTOINCREMENT field");
+		parse->is_aborted = true;
+		return;
+	}
+	parse->has_autoinc = true;
+	parse->autoinc_name = column_name;
+}
+
+void
+sql_parse_column_autoincrement(struct Parse *parse)
+{
+	struct Token *column_name = last_column_name(parse);
+	autoincrement_add(parse, sql_expr_new_dequoted(TK_ID, column_name));
+}
+
+void
+sql_parse_table_autoincrement(struct Parse *parse, struct Expr *column_name)
+{
+	autoincrement_add(parse, column_name);
+}

@@ -662,4 +662,12 @@ void
 sql_parse_add_primary_key(struct Parse *parse, struct SrcList *table_name,
 			  const struct Token *name, struct ExprList *cols);
 
+/** Save parsed column AUTOINCREMENT clause. */
+void
+sql_parse_column_autoincrement(struct Parse *parse);
+
+/** Save parsed AUTOINCREMENT clause from table PRIMARY KEY clause. */
+void
+sql_parse_table_autoincrement(struct Parse *parse, struct Expr *column_name);
+
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */
