@@ -561,15 +561,19 @@ sqlAddPrimaryKey(struct Parse *pParse)
 	struct space *space = pParse->create_column_def.space;
 	assert(space != NULL || pParse->src_list != NULL);
 	if (space == NULL)
-		return sql_create_index(pParse);
+		return sql_create_index(pParse, &pParse->primary_key.name,
+					pParse->primary_key.cols,
+					SQL_INDEX_TYPE_CONSTRAINT_PK, false);
 	if (sql_space_primary_key(space) != NULL) {
 		diag_set(ClientError, ER_CREATE_SPACE, space->def->name,
 			 "primary key has been already declared");
 		pParse->is_aborted = true;
-		sql_expr_list_delete(pParse->create_index_def.cols);
+		sql_expr_list_delete(pParse->primary_key.cols);
 		return;
 	}
-	sql_create_index(pParse);
+	sql_create_index(pParse, &pParse->primary_key.name,
+			 pParse->primary_key.cols, SQL_INDEX_TYPE_CONSTRAINT_PK,
+			 false);
 	if (pParse->is_aborted)
 		return;
 
@@ -2370,30 +2374,20 @@ constraint_is_named(const char *name)
 }
 
 void
-sql_create_index(struct Parse *parse) {
+sql_create_index(struct Parse *parse, struct Token *index_name,
+		 struct ExprList *col_list, enum sql_index_type idx_type,
+		 bool if_not_exists) {
+	assert(col_list != NULL);
 	/* The index to be created. */
 	struct index *index = NULL;
 	/* Name of the index. */
 	char *name = NULL;
 	assert(!sql_get()->init.busy);
-	struct create_index_def *create_idx_def = &parse->create_index_def;
-	struct create_entity_def *create_entity_def = &create_idx_def->base.base;
-	struct alter_entity_def *alter_entity_def = &create_entity_def->base;
-	assert(alter_entity_def->entity_type == ENTITY_TYPE_INDEX);
-	assert(alter_entity_def->alter_action == ALTER_ACTION_CREATE);
-	/*
-	 * Get list of columns to be indexed. It will be NULL if
-	 * this is a primary key or unique-constraint on the most
-	 * recent column added to the table under construction.
-	 */
-	struct ExprList *col_list = create_idx_def->cols;
-	struct SrcList *tbl_name = alter_entity_def->entity_name;
+	struct SrcList *tbl_name = parse->src_list;
 
 	if (parse->is_aborted)
 		goto exit_create_index;
-	enum sql_index_type idx_type = create_idx_def->idx_type;
-	if (idx_type == SQL_INDEX_TYPE_UNIQUE ||
-	    idx_type == SQL_INDEX_TYPE_NON_UNIQUE) {
+	if (parse->type == PARSE_TYPE_CREATE_INDEX) {
 		Vdbe *v = sqlGetVdbe(parse);
 		sqlVdbeCountChanges(v);
 	}
@@ -2406,13 +2400,12 @@ sql_create_index(struct Parse *parse) {
 	if (space == NULL)
 		space = parse->create_column_def.space;
 	bool is_create_table_or_add_col = space != NULL;
-	struct Token token = create_entity_def->name;
 	if (tbl_name != NULL) {
-		assert(token.n > 0 && token.z != NULL);
+		assert(index_name->n > 0 && index_name->z != NULL);
 		const char *name = tbl_name->a[0].zName;
 		space = space_by_name(name);
 		if (space == NULL) {
-			if (! create_entity_def->if_not_exist) {
+			if (!if_not_exists) {
 				diag_set(ClientError, ER_NO_SUCH_SPACE, name);
 				parse->is_aborted = true;
 			}
@@ -2424,7 +2417,7 @@ sql_create_index(struct Parse *parse) {
 	struct space_def *def = space->def;
 
 	if (def->opts.is_view) {
-		char *name = sql_name_from_token(&token);
+		char *name = sql_name_from_token(index_name);
 		diag_set(ClientError, ER_MODIFY_INDEX, name, def->name,
 			 "views can not be indexed");
 		sql_xfree(name);
@@ -2456,10 +2449,10 @@ sql_create_index(struct Parse *parse) {
 	 *    auto-index name will be generated.
 	 */
 	if (!is_create_table_or_add_col) {
-		assert(token.z != NULL);
-		name = sql_name_from_token(&token);
+		assert(index_name->z != NULL);
+		name = sql_name_from_token(index_name);
 		if (space_index_by_name(space, name) != NULL) {
-			if (! create_entity_def->if_not_exist) {
+			if (!if_not_exists) {
 				diag_set(ClientError, ER_INDEX_EXISTS_IN_SPACE,
 					 name, def->name);
 				parse->is_aborted = true;
@@ -2468,10 +2461,8 @@ sql_create_index(struct Parse *parse) {
 		}
 	} else {
 		char *constraint_name = NULL;
-		if (create_entity_def->name.n > 0) {
-			constraint_name =
-				sql_name_from_token(&create_entity_def->name);
-		}
+		if (index_name->n > 0)
+			constraint_name = sql_name_from_token(index_name);
 
 	       /*
 		* This naming is temporary. Now it's not
@@ -2509,27 +2500,12 @@ sql_create_index(struct Parse *parse) {
 		goto exit_create_index;
 	}
 
-	/*
-	 * If col_list == NULL, it means this routine was called
-	 * to make a primary key or unique constraint out of the
-	 * last column added to the table under construction.
-	 * So create a fake list to simulate this.
-	 */
-	if (col_list == NULL) {
-		struct Token prev_col;
-		uint32_t last_field = def->field_count - 1;
-		sqlTokenInit(&prev_col, def->fields[last_field].name);
-		struct Expr *expr = sql_expr_new(TK_ID, &prev_col);
-		col_list = sql_expr_list_append(NULL, expr);
-		assert(col_list->nExpr == 1);
-		sqlExprListSetSortOrder(col_list, create_idx_def->sort_order);
-	} else {
-		if (col_list->nExpr > SQL_MAX_COLUMN) {
-			diag_set(ClientError, ER_SQL_PARSER_LIMIT,
-				 "The number of columns in index",
-				 col_list->nExpr, SQL_MAX_COLUMN);
-			parse->is_aborted = true;
-		}
+	if (col_list->nExpr > SQL_MAX_COLUMN) {
+		diag_set(ClientError, ER_SQL_PARSER_LIMIT,
+			 "The number of columns in index",
+			 col_list->nExpr, SQL_MAX_COLUMN);
+		parse->is_aborted = true;
+		goto exit_create_index;
 	}
 	size_t size;
 	index = region_alloc_object(&parse->region, typeof(*index), &size);

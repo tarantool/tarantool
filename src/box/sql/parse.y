@@ -1395,18 +1395,14 @@ paren_exprlist(A) ::= LP exprlist(X) RP.  {A = X;}
 
 ///////////////////////////// The CREATE INDEX command ///////////////////////
 //
-cmd ::= createkw uniqueflag(U) INDEX ifnotexists(NE) nm(X)
+cmd ::= createkw is_unique(U) INDEX ifnotexists(NE) nm(X)
         ON nm(Y) LP sortlist(Z) RP. {
-  struct SrcList *src_list = sql_src_list_append(NULL ,&Y);
-  create_index_def_init(&pParse->create_index_def, src_list, &X, Z, U,
-                        SORT_ORDER_ASC, NE);
-  pParse->initiateTTrans = true;
-  sql_create_index(pParse);
+  sql_parse_create_index(pParse, &Y, &X, Z, U, NE);
 }
 
-%type uniqueflag {int}
-uniqueflag(A) ::= UNIQUE.  {A = SQL_INDEX_TYPE_UNIQUE;}
-uniqueflag(A) ::= .        {A = SQL_INDEX_TYPE_NON_UNIQUE;}
+%type is_unique {bool}
+is_unique(A) ::= UNIQUE.  {A = true;}
+is_unique(A) ::= .        {A = false;}
 
 
 // The eidlist non-terminal (Expression Id List) generates an ExprList

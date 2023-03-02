@@ -483,22 +483,14 @@ sql_finish_table_properties(struct Parse *parse)
 {
 	assert(!parse->is_aborted);
 	if (parse->primary_key.cols != NULL) {
-		create_index_def_init(&parse->create_index_def, parse->src_list,
-				      &parse->primary_key.name,
-				      parse->primary_key.cols,
-				      SQL_INDEX_TYPE_CONSTRAINT_PK,
-				      SORT_ORDER_ASC, false);
 		sqlAddPrimaryKey(parse);
 		if (parse->is_aborted)
 			return -1;
 	}
 	for (uint32_t i = 0; i < parse->unique_list.n; ++i) {
 		struct sql_parse_unique *c = &parse->unique_list.a[i];
-		create_index_def_init(&parse->create_index_def,
-				      parse->src_list, &c->name, c->cols,
-				      SQL_INDEX_TYPE_CONSTRAINT_UNIQUE,
-				      SORT_ORDER_ASC, false);
-		sql_create_index(parse);
+		sql_create_index(parse, &c->name, c->cols,
+				 SQL_INDEX_TYPE_CONSTRAINT_UNIQUE, false);
 		if (parse->is_aborted)
 			return -1;
 	}
@@ -513,6 +505,18 @@ sql_finish_table_properties(struct Parse *parse)
 			return -1;
 	}
 	return 0;
+}
+
+/** Finish processing of CREATE INDEX statement. */
+static void
+sql_finish_create_index(struct Parse *parse)
+{
+	parse->initiateTTrans = true;
+	struct sql_parse_index *stmt = &parse->create_index;
+	enum sql_index_type type = stmt->is_unique ? SQL_INDEX_TYPE_UNIQUE :
+				   SQL_INDEX_TYPE_NON_UNIQUE;
+	sql_create_index(parse, &stmt->name, stmt->cols, type,
+			 stmt->if_not_exists);
 }
 
 /** Finish parsing by processing saved statements or their parts. */
@@ -558,26 +562,18 @@ sql_finish_parsing(struct Parse *parse)
 		assert(parse->check_list.n == 1);
 		sql_create_check_contraint(parse, &parse->check_list.a[0]);
 		break;
-	case PARSE_TYPE_ADD_UNIQUE: {
+	case PARSE_TYPE_ADD_UNIQUE:
 		assert(parse->unique_list.n == 1);
-		struct sql_parse_unique *c = &parse->unique_list.a[0];
-		create_index_def_init(&parse->create_index_def,
-				      parse->src_list, &c->name, c->cols,
-				      SQL_INDEX_TYPE_CONSTRAINT_UNIQUE,
-				      SORT_ORDER_ASC, false);
-		sql_create_index(parse);
+		sql_create_index(parse, &parse->unique_list.a[0].name,
+				 parse->unique_list.a[0].cols,
+				 SQL_INDEX_TYPE_CONSTRAINT_UNIQUE, false);
 		break;
-	}
-	case PARSE_TYPE_ADD_PRIMARY_KEY: {
-		assert(parse->primary_key.cols != NULL);
-		create_index_def_init(&parse->create_index_def, parse->src_list,
-				      &parse->primary_key.name,
-				      parse->primary_key.cols,
-				      SQL_INDEX_TYPE_CONSTRAINT_PK,
-				      SORT_ORDER_ASC, false);
+	case PARSE_TYPE_ADD_PRIMARY_KEY:
 		sqlAddPrimaryKey(parse);
 		break;
-	}
+	case PARSE_TYPE_CREATE_INDEX:
+		sql_finish_create_index(parse);
+		break;
 	default:
 		assert(parse->type == PARSE_TYPE_UNKNOWN);
 	}

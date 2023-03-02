@@ -81,3 +81,16 @@ g.test_primary_key_parsing = function()
         box.execute([[DROP TABLE t;]])
     end)
 end
+
+--
+-- Make sure that the CREATE INDEX statement is processed only after successful
+-- parsing.
+--
+g.test_create_index_parsing = function()
+    g.server:exec(function()
+        box.execute([[CREATE TABLE t(i INT PRIMARY KEY, a INT);]])
+        local _, err = box.execute([[CREATE INDEX i1 ON t1(a) 1;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '1'")
+        box.execute([[DROP TABLE t;]])
+    end)
+end

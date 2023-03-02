@@ -293,3 +293,16 @@ sql_parse_add_primary_key(struct Parse *parse, struct SrcList *table_name,
 	parse->src_list = table_name;
 	primary_key_fill(parse, name, cols);
 }
+
+void
+sql_parse_create_index(struct Parse *parse, struct Token *table_name,
+		       const struct Token *index_name, struct ExprList *cols,
+		       bool is_unique, bool if_not_exists)
+{
+	parse->type = PARSE_TYPE_CREATE_INDEX;
+	parse->src_list = sql_src_list_append(NULL, table_name);
+	parse->create_index.name = *index_name;
+	parse->create_index.cols = cols;
+	parse->create_index.is_unique = is_unique;
+	parse->create_index.if_not_exists = if_not_exists;
+}
