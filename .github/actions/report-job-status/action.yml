@@ -19,6 +19,7 @@ runs:
         # the team chat. Report failures occurred in PRs and other branches
         # to the personal chat.
         if [[ ${{ github.ref }} == refs/heads/master ||
+              ${{ github.ref }} =~ refs/heads/release/* ||
               ${{ github.ref }} =~ refs/heads/[0-9].[0-9]+$ ||
               ${{ github.actor }} == TarantoolBot ]]; then
           echo CHAT_ID="${{ inputs.chat-id }}" | tee -a $GITHUB_ENV
