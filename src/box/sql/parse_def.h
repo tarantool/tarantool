@@ -90,6 +90,12 @@ enum parse_type {
 	PARSE_TYPE_RELEASE_SAVEPOINT,
 	/** ROLLBACK TO SAVEPOINT statement. */
 	PARSE_TYPE_ROLLBACK_TO_SAVEPOINT,
+	/** CREATE TABLE statement. */
+	PARSE_TYPE_CREATE_TABLE,
+	/** ALTER TABLE ADD COLUMN statement. */
+	PARSE_TYPE_ADD_COLUMN,
+	/** ALTER TABLE ADD CONSTAINT FOREIGN KEY statement. */
+	PARSE_TYPE_ADD_FOREIGN_KEY,
 };
 
 /**
@@ -108,6 +114,31 @@ struct Token {
 struct sql_parse_savepoint {
 	/** Name of the SAVEPOINT. */
 	struct Token name;
+};
+
+/** Description of the FOREIGN KEY constraint being created. */
+struct sql_parse_foreign_key {
+	/** List child columns. */
+	struct ExprList *child_cols;
+	/** List parent columns. */
+	struct ExprList *parent_cols;
+	/** Name of the parent table. */
+	struct Token parent_name;
+	/** Constraint name. */
+	struct Token name;
+	/**
+	 * Flag indicating whether the constraint is a column constraint or a
+	 * table constraint.
+	 */
+	bool is_column_constraint;
+};
+
+/** FOREIGN KEY descriptions list. */
+struct sql_parse_foreign_key_list {
+	/** Array containing all FOREIGN KEY descriptions from the list. */
+	struct sql_parse_foreign_key *a;
+	/** Number of FOREIGN KEY descriptions in the list. */
+	uint32_t n;
 };
 
 /** Constant tokens for integer values. */
@@ -315,13 +346,6 @@ struct create_ck_def {
 	struct ExprSpan *expr;
 };
 
-struct create_fk_def {
-	struct create_constraint_def base;
-	struct ExprList *child_cols;
-	struct Token *parent_name;
-	struct ExprList *parent_cols;
-};
-
 struct create_index_def {
 	struct create_constraint_def base;
 	/** List of indexed columns. */
@@ -464,18 +488,6 @@ create_index_def_init(struct create_index_def *index_def,
 }
 
 static inline void
-create_fk_def_init(struct create_fk_def *fk_def, struct SrcList *table_name,
-		   struct Token *name, struct ExprList *child_cols,
-		   struct Token *parent_name, struct ExprList *parent_cols)
-{
-	create_constraint_def_init(&fk_def->base, table_name, name,
-				   false, ENTITY_TYPE_FK);
-	fk_def->child_cols = child_cols;
-	fk_def->parent_name = parent_name;
-	fk_def->parent_cols = parent_cols;
-}
-
-static inline void
 create_table_def_init(struct create_table_def *table_def, struct Token *name,
 		      bool if_not_exists)
 {
@@ -551,5 +563,33 @@ sql_parse_savepoint_release(struct Parse *parse, const struct Token *name);
 /** Save parsed ROLLBACK TO SAVEPOINT statement. */
 void
 sql_parse_savepoint_rollback(struct Parse *parse, const struct Token *name);
+
+/** Save parsed CREATE TABLE statement. */
+void
+sql_parse_create_table(struct Parse *parse);
+
+/** Save parsed ADD COLUMN statement. */
+void
+sql_parse_add_column(struct Parse *parse);
+
+/** Save parsed column FOREIGN KEY. */
+void
+sql_parse_column_foreign_key(struct Parse *parse, const struct Token *name,
+			     const struct Token *parent_name,
+			     struct ExprList *parent_cols);
+
+/** Save parsed table FOREIGN KEY from CREATE TABLE statement. */
+void
+sql_parse_table_foreign_key(struct Parse *parse, const struct Token *name,
+			    struct ExprList *child_cols,
+			    const struct Token *parent_name,
+			    struct ExprList *parent_cols);
+
+/** Save parsed table FOREIGN KEY from ALTER TABLE ADD CONSTRAINT statement. */
+void
+sql_parse_add_foreign_key(struct Parse *parse, struct SrcList *src_list,
+			  const struct Token *name, struct ExprList *child_cols,
+			  const struct Token *parent_name,
+			  struct ExprList *parent_cols);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */

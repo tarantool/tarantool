@@ -170,13 +170,14 @@ cmd ::= ROLLBACK TO savepoint_opt nm(X). {
 
 ///////////////////// The CREATE TABLE statement ////////////////////////////
 //
-cmd ::= create_table create_table_args with_opts create_table_end.
+cmd ::= create_table create_table_args with_opts.
 create_table ::= createkw TABLE ifnotexists(E) nm(Y). {
   create_table_def_init(&pParse->create_table_def, &Y, E);
   create_ck_constraint_parse_def_init(&pParse->create_ck_constraint_parse_def);
   create_fk_constraint_parse_def_init(&pParse->create_fk_constraint_parse_def);
   pParse->create_table_def.new_space = sqlStartTable(pParse, &Y);
   pParse->initiateTTrans = true;
+  sql_parse_create_table(pParse);
 }
 createkw(A) ::= CREATE(A).  {disableLookaside(pParse);}
 
@@ -205,8 +206,6 @@ engine_opts ::= ENGINE EQ STRING(A). {
   sql_xfree(normalized_name);
 }
 
-create_table_end ::= . { sqlEndTable(pParse); }
-
 /*
  * CREATE TABLE AS SELECT is broken. To be re-implemented
  * in gh-3223.
@@ -232,8 +231,6 @@ create_column_end ::= autoinc(I). {
   uint32_t fieldno = pParse->create_column_def.space->def->field_count - 1;
   if (I == 1 && sql_add_autoincrement(pParse, fieldno) != 0)
     return;
-  if (pParse->create_table_def.new_space == NULL)
-    sql_create_column_end(pParse);
 }
 columnlist ::= tcons.
 
@@ -327,8 +324,7 @@ ccons ::= cconsname(N) CHECK LP expr(X) RP. {
 }
 
 ccons ::= cconsname(N) REFERENCES nm(T) eidlist_opt(TA). {
-  create_fk_def_init(&pParse->create_fk_def, NULL, &N, NULL, &T, TA);
-  sql_create_foreign_key(pParse);
+  sql_parse_column_foreign_key(pParse, &N, &T, TA);
 }
 ccons ::= COLLATE id(C).        {sqlAddCollateType(pParse, &C);}
 
@@ -355,8 +351,7 @@ tcons ::= cconsname(N) CHECK LP expr(X) RP. {
 }
 tcons ::= cconsname(N) FOREIGN KEY LP eidlist(FA) RP
           REFERENCES nm(T) eidlist_opt(TA). {
-  create_fk_def_init(&pParse->create_fk_def, NULL, &N, FA, &T, TA);
-  sql_create_foreign_key(pParse);
+  sql_parse_table_foreign_key(pParse, &N, FA, &T, TA);
 }
 
 // The following is a non-standard extension that allows us to declare the
@@ -1672,6 +1667,7 @@ alter_add_column(A) ::= alter_table_start(T) ADD column_name(N). {
   A.table_name = T;
   A.name = N;
   pParse->initiateTTrans = true;
+  sql_parse_add_column(pParse);
 }
 
 column_name(N) ::= COLUMN nm(A). { N = A; }
@@ -1688,8 +1684,7 @@ alter_column_def ::= alter_add_column(N) typedef(Y). {
 
 cmd ::= alter_add_constraint(N) FOREIGN KEY LP eidlist(FA) RP REFERENCES
         nm(T) eidlist_opt(TA). {
-  create_fk_def_init(&pParse->create_fk_def, N.table_name, &N.name, FA, &T, TA);
-  sql_create_foreign_key(pParse);
+  sql_parse_add_foreign_key(pParse, N.table_name, &N.name, FA, &T, TA);
 }
 
 cmd ::= alter_add_constraint(N) CHECK LP expr(X) RP. {

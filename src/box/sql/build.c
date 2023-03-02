@@ -1817,7 +1817,7 @@ columnno_by_name(struct Parse *parse_context, const struct space *space,
 
 /** Generate unique name for foreign key constraint. */
 static char *
-sql_fk_unique_name_new(struct Parse *parse)
+sql_fk_unique_name_new(struct Parse *parse, struct sql_parse_foreign_key *cdef)
 {
 	struct space *space = parse->create_column_def.space;
 	assert(space != NULL);
@@ -1825,15 +1825,23 @@ sql_fk_unique_name_new(struct Parse *parse)
 	struct fk_constraint_parse *fk;
 	struct rlist *fkeys = &parse->create_fk_constraint_parse_def.fkeys;
 	uint32_t n = 1;
-	if (parse->create_fk_def.child_cols != NULL) {
+	if (!cdef->is_column_constraint) {
 		rlist_foreach_entry(fk, fkeys, link) {
 			if (!fk->fk_def->is_field_fk)
 				++n;
 		}
 		return sqlMPrintf("fk_unnamed_%s_%u", space_name, n);
 	}
-	uint32_t fieldno = space->def->field_count - 1;
-	const char *field_name = space->def->fields[fieldno].name;
+	uint32_t fieldno = UINT32_MAX;
+	assert(cdef->child_cols->nExpr == 1);
+	const char *field_name = cdef->child_cols->a[0].zName;
+	for (uint32_t j = 0; j < space->def->field_count; ++j) {
+		if (strcmp(space->def->fields[j].name, field_name) == 0) {
+			fieldno = j;
+			break;
+		}
+	}
+	assert(fieldno != UINT32_MAX);
 	rlist_foreach_entry(fk, fkeys, link) {
 		uint32_t child_fieldno = fk->fk_def->links[0].child_field;
 		if (fk->fk_def->is_field_fk && child_fieldno == fieldno)
@@ -1866,14 +1874,9 @@ fk_constraint_def_sizeof(uint32_t link_count, uint32_t name_len,
 }
 
 void
-sql_create_foreign_key(struct Parse *parse_context)
+sql_create_foreign_key(struct Parse *parse_context,
+		       struct sql_parse_foreign_key *cdef)
 {
-	struct create_fk_def *create_fk_def = &parse_context->create_fk_def;
-	struct create_constraint_def *create_constr_def = &create_fk_def->base;
-	struct create_entity_def *create_def = &create_constr_def->base;
-	struct alter_entity_def *alter_def = &create_def->base;
-	assert(alter_def->entity_type == ENTITY_TYPE_FK);
-	assert(alter_def->alter_action == ALTER_ACTION_CREATE);
 	/*
 	 * When this function is called second time during
 	 * <CREATE TABLE ...> statement (i.e. at VDBE runtime),
@@ -1899,23 +1902,17 @@ sql_create_foreign_key(struct Parse *parse_context)
 	 * CONSTRAINT> statement handling.
 	 */
 	bool is_alter_add_constr = space == NULL;
-	uint32_t child_cols_count;
-	struct ExprList *child_cols = create_fk_def->child_cols;
-	if (child_cols == NULL) {
-		assert(!is_alter_add_constr);
-		child_cols_count = 1;
-	} else {
-		child_cols_count = child_cols->nExpr;
-	}
-	struct ExprList *parent_cols = create_fk_def->parent_cols;
+	struct ExprList *child_cols = cdef->child_cols;
+	uint32_t child_cols_count = child_cols->nExpr;
+	struct ExprList *parent_cols = cdef->parent_cols;
 	struct space *child_space = NULL;
-	if (create_def->name.n != 0)
-		constraint_name = sql_name_from_token(&create_def->name);
+	if (cdef->name.n != 0)
+		constraint_name = sql_name_from_token(&cdef->name);
 	else
-		constraint_name = sql_fk_unique_name_new(parse_context);
+		constraint_name = sql_fk_unique_name_new(parse_context, cdef);
 	assert(constraint_name != NULL);
 	if (is_alter_add_constr) {
-		const char *child_name = alter_def->entity_name->a[0].zName;
+		const char *child_name = parse_context->src_list->a[0].zName;
 		child_space = space_by_name(child_name);
 		if (child_space == NULL) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE, child_name);
@@ -1942,7 +1939,7 @@ sql_create_foreign_key(struct Parse *parse_context)
 			&parse_context->create_fk_constraint_parse_def.fkeys;
 		rlist_add_entry(fkeys, fk_parse, link);
 	}
-	struct Token *parent = create_fk_def->parent_name;
+	struct Token *parent = &cdef->parent_name;
 	assert(parent != NULL);
 	parent_name = sql_name_from_token(parent);
 	/*
@@ -2010,7 +2007,7 @@ sql_create_foreign_key(struct Parse *parse_context)
 			 "fk_def");
 		goto tnt_error;
 	}
-	fk_def->is_field_fk = child_cols == NULL;
+	fk_def->is_field_fk = cdef->is_column_constraint;
 	fk_def->field_count = child_cols_count;
 	fk_def->child_id = child_space != NULL ? child_space->def->id : 0;
 	fk_def->parent_id = parent_space != NULL ? parent_space->def->id : 0;
@@ -2029,18 +2026,6 @@ sql_create_foreign_key(struct Parse *parse_context)
 			goto exit_create_fk;
 		}
 		if (!is_alter_add_constr) {
-			if (child_cols == NULL) {
-				assert(i == 0);
-				/*
-				 * In this case there must be only
-				 * one link (the last column
-				 * added), so we can break
-				 * immediately.
-				 */
-				fk_def->links[0].child_field =
-					space->def->field_count - 1;
-				break;
-			}
 			if (resolve_link(parse_context, space->def,
 					 child_cols->a[i].zName,
 					 &fk_def->links[i].child_field,

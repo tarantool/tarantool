@@ -474,6 +474,22 @@ new_xmalloc(size_t n)
 	return xmalloc(n);
 }
 
+/**
+ * Finish processing table properties for CREATE TABLE or ALTER TABLE ADD COLUMN
+ * statement.
+ */
+static int
+sql_finish_table_properties(struct Parse *parse)
+{
+	assert(!parse->is_aborted);
+	for (uint32_t i = 0; i < parse->foreign_key_list.n; ++i) {
+		sql_create_foreign_key(parse, &parse->foreign_key_list.a[i]);
+		if (parse->is_aborted)
+			return -1;
+	}
+	return 0;
+}
+
 /** Finish parsing by processing saved statements or their parts. */
 static void
 sql_finish_parsing(struct Parse *parse)
@@ -498,6 +514,20 @@ sql_finish_parsing(struct Parse *parse)
 		break;
 	case PARSE_TYPE_ROLLBACK_TO_SAVEPOINT:
 		sqlSavepoint(parse, SAVEPOINT_ROLLBACK, &parse->savepoint.name);
+		break;
+	case PARSE_TYPE_CREATE_TABLE:
+		if (sql_finish_table_properties(parse) != 0)
+			return;
+		sqlEndTable(parse);
+		break;
+	case PARSE_TYPE_ADD_COLUMN:
+		if (sql_finish_table_properties(parse) != 0)
+			return;
+		sql_create_column_end(parse);
+		break;
+	case PARSE_TYPE_ADD_FOREIGN_KEY:
+		assert(parse->foreign_key_list.n == 1);
+		sql_create_foreign_key(parse, &parse->foreign_key_list.a[0]);
 		break;
 	default:
 		assert(parse->type == PARSE_TYPE_UNKNOWN);

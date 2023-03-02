@@ -84,3 +84,75 @@ sql_parse_savepoint_rollback(struct Parse *parse, const struct Token *name)
 	parse->type = PARSE_TYPE_ROLLBACK_TO_SAVEPOINT;
 	parse->savepoint.name = *name;
 }
+
+/** Return the name of the last created column. */
+static struct Token *
+last_column_name(struct Parse *parse)
+{
+	return &parse->create_column_def.base.name;
+}
+
+void
+sql_parse_create_table(struct Parse *parse)
+{
+	parse->type = PARSE_TYPE_CREATE_TABLE;
+}
+
+void
+sql_parse_add_column(struct Parse *parse)
+{
+	parse->type = PARSE_TYPE_ADD_COLUMN;
+}
+
+/** Append a new FOREIGN KEY to FOREIGN KEY list. */
+static void
+foreign_key_list_append(struct Parse *parse, const struct Token *name,
+			struct ExprList *child_cols,
+			const struct Token *parent_name,
+			struct ExprList *parent_cols, bool is_column_constraint)
+{
+	struct sql_parse_foreign_key_list *list = &parse->foreign_key_list;
+	uint32_t id = list->n;
+	++list->n;
+	uint32_t size = list->n * sizeof(*list->a);
+	list->a = sql_xrealloc(list->a, size);
+	struct sql_parse_foreign_key *c = &list->a[id];
+	c->name = *name;
+	c->child_cols = child_cols;
+	c->parent_cols = parent_cols;
+	c->parent_name = *parent_name;
+	c->is_column_constraint = is_column_constraint;
+}
+
+void
+sql_parse_column_foreign_key(struct Parse *parse, const struct Token *name,
+			     const struct Token *parent_name,
+			     struct ExprList *parent_cols)
+{
+	struct ExprList *child_cols = sql_expr_list_append(NULL, NULL);
+	sqlExprListSetName(parse, child_cols, last_column_name(parse), 1);
+	foreign_key_list_append(parse, name, child_cols, parent_name,
+				parent_cols, true);
+}
+
+void
+sql_parse_table_foreign_key(struct Parse *parse, const struct Token *name,
+			    struct ExprList *child_cols,
+			    const struct Token *parent_name,
+			    struct ExprList *parent_cols)
+{
+	foreign_key_list_append(parse, name, child_cols, parent_name,
+				parent_cols, false);
+}
+
+void
+sql_parse_add_foreign_key(struct Parse *parse, struct SrcList *table_name,
+			  const struct Token *name, struct ExprList *child_cols,
+			  const struct Token *parent_name,
+			  struct ExprList *parent_cols)
+{
+	parse->type = PARSE_TYPE_ADD_FOREIGN_KEY;
+	parse->src_list = table_name;
+	foreign_key_list_append(parse, name, child_cols, parent_name,
+				parent_cols, false);
+}

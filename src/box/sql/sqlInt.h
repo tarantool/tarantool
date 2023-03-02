@@ -2042,7 +2042,6 @@ struct Parse {
 	 */
 	union {
 		struct create_ck_def create_ck_def;
-		struct create_fk_def create_fk_def;
 		struct create_index_def create_index_def;
 		struct create_trigger_def create_trigger_def;
 		struct create_view_def create_view_def;
@@ -2066,6 +2065,10 @@ struct Parse {
 	enum parse_type type;
 	/** Savepoint description for savepoint-related statements. */
 	struct sql_parse_savepoint savepoint;
+	/** Description of created FOREIGN KEY constraints. */
+	struct sql_parse_foreign_key_list foreign_key_list;
+	/** Source list for the statement. */
+	struct SrcList *src_list;
 	/*
 	 * FK and CK constraints appeared in a <CREATE TABLE> or
 	 * an <ALTER TABLE ADD COLUMN> statement.
@@ -3583,7 +3586,8 @@ int sqlJoinType(Parse *, Token *, Token *, Token *);
  * @param parse_context Parsing context.
  */
 void
-sql_create_foreign_key(struct Parse *parse_context);
+sql_create_foreign_key(struct Parse *parse_context,
+		       struct sql_parse_foreign_key *cdef);
 
 /**
  * Emit code to drop the entry from _index or _ck_contstraint or
