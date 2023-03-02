@@ -503,7 +503,7 @@ load_cfg(void)
 	 */
 	say_info("%s %s %s", tarantool_package(), tarantool_version(),
 		 BUILD_INFO);
-	say_info("log level %i", cfg_geti("log_level"));
+	say_info("log level %d", say_get_log_level());
 
 	if (pid_file_handle != NULL) {
 		if (pidfile_write(pid_file_handle) == -1)
