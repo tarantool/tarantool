@@ -547,3 +547,26 @@ g.test_constraints_11 = function()
         box.execute([[DROP TABLE t;]])
     end)
 end
+
+--
+-- Make sure there is no segmentation fault or assertion if CHECK or FOREIGN KEY
+-- is declared before the first column.
+--
+g.test_constraints_12 = function()
+    g.server:exec(function()
+        local sql = [[CREATE TABLE t(CONSTRAINT fk1 FOREIGN KEY(a) REFERENCES t,
+                                     i INT PRIMARY KEY, a INT);]]
+        local _, err = box.execute(sql)
+        local res = "Failed to create foreign key constraint 'FK1': unknown "..
+                    "column A in foreign key definition"
+        t.assert_equals(err.message, res)
+
+        sql = [[CREATE TABLE t(CONSTRAINT ck1 CHECK(i > 10),
+                               i INT PRIMARY KEY);]]
+        t.assert_equals(box.execute(sql), {row_count = 1})
+        local func_id = box.space._func.index.name:get{'check_T_CK1'}.id
+        t.assert_equals(box.space.T.constraint, {CK1 = func_id})
+
+        box.execute([[DROP TABLE t;]])
+    end)
+end
