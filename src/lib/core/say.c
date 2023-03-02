@@ -237,6 +237,12 @@ say_set_log_level(int new_level)
 	log_set_level(log_default, (enum say_level) new_level);
 }
 
+int
+say_get_log_level(void)
+{
+	return log_default->level;
+}
+
 void
 say_set_log_format(enum say_format format)
 {

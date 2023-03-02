@@ -266,6 +266,12 @@ void
 say_set_log_level(int new_level);
 
 /**
+ * Get log level of the default logger.
+ */
+int
+say_get_log_level(void);
+
+/**
  * Set log format for default logger. Can be used dynamically.
  *
  * Can't be applied in case syslog or boot (will be ignored)
