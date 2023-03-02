@@ -108,10 +108,7 @@ static void disableLookaside(Parse *pParse){
 
 // Input is a single SQL command
 input ::= ecmd.
-ecmd ::= explain cmdx SEMI. {
-	if (!pParse->parse_only)
-		sql_finish_coding(pParse);
-}
+ecmd ::= explain cmdx SEMI.
 ecmd ::= SEMI. {
   diag_set(ClientError, ER_SQL_STATEMENT_EMPTY);
   pParse->is_aborted = true;
@@ -149,20 +146,26 @@ cmdx ::= cmd.
 ///////////////////// Begin and end transactions. ////////////////////////////
 //
 
-cmd ::= START TRANSACTION.  {sql_transaction_begin(pParse);}
-cmd ::= COMMIT.      {sql_transaction_commit(pParse);}
-cmd ::= ROLLBACK.    {sql_transaction_rollback(pParse);}
+cmd ::= START TRANSACTION. {
+  sql_ast_init_start_transaction(pParse);
+}
+cmd ::= COMMIT. {
+  sql_ast_init_commit(pParse);
+}
+cmd ::= ROLLBACK. {
+  sql_ast_init_rollback(pParse);
+}
 
 savepoint_opt ::= SAVEPOINT.
 savepoint_opt ::= .
 cmd ::= SAVEPOINT nm(X). {
-  sqlSavepoint(pParse, SAVEPOINT_BEGIN, &X);
+  sql_ast_init_savepoint(pParse, &X);
 }
 cmd ::= RELEASE savepoint_opt nm(X). {
-  sqlSavepoint(pParse, SAVEPOINT_RELEASE, &X);
+  sql_ast_init_release_savepoint(pParse, &X);
 }
 cmd ::= ROLLBACK TO savepoint_opt nm(X). {
-  sqlSavepoint(pParse, SAVEPOINT_ROLLBACK, &X);
+  sql_ast_init_rollback_to_savepoint(pParse, &X);
 }
 
 ///////////////////// The CREATE TABLE statement ////////////////////////////

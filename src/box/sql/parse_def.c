@@ -30,7 +30,7 @@
  */
 #include <string.h>
 
-#include "parse_def.h"
+#include "sqlInt.h"
 
 const struct Token sqlIntTokens[] = {
 	{"0", 1, false},
@@ -44,4 +44,50 @@ sqlTokenInit(struct Token *p, char *z)
 {
 	p->z = z;
 	p->n = z == NULL ? 0 : strlen(z);
+}
+
+void
+sql_ast_init_start_transaction(struct Parse *parse)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_START_TRANSACTION;
+}
+
+void
+sql_ast_init_commit(struct Parse *parse)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_COMMIT;
+}
+
+void
+sql_ast_init_rollback(struct Parse *parse)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_ROLLBACK;
+}
+
+void
+sql_ast_init_savepoint(struct Parse *parse, const struct Token *name)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_SAVEPOINT;
+	parse->ast.savepoint.name = *name;
+}
+
+void
+sql_ast_init_release_savepoint(struct Parse *parse, const struct Token *name)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_RELEASE_SAVEPOINT;
+	parse->ast.savepoint.name = *name;
+}
+
+void
+sql_ast_init_rollback_to_savepoint(struct Parse *parse,
+				   const struct Token *name)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_ROLLBACK_TO_SAVEPOINT;
+	parse->ast.savepoint.name = *name;
 }

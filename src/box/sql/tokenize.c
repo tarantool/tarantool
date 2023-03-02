@@ -474,6 +474,38 @@ new_xmalloc(size_t n)
 	return xmalloc(n);
 }
 
+/** Code given AST. */
+static void
+sql_code_ast(struct Parse *parse, struct sql_ast *ast)
+{
+	if (parse->is_aborted)
+		return;
+	switch (ast->type) {
+	case SQL_AST_TYPE_START_TRANSACTION:
+		sql_transaction_begin(parse);
+		break;
+	case SQL_AST_TYPE_COMMIT:
+		sql_transaction_commit(parse);
+		break;
+	case SQL_AST_TYPE_ROLLBACK:
+		sql_transaction_rollback(parse);
+		break;
+	case SQL_AST_TYPE_SAVEPOINT:
+		sqlSavepoint(parse, SAVEPOINT_BEGIN, &ast->savepoint.name);
+		break;
+	case SQL_AST_TYPE_RELEASE_SAVEPOINT:
+		sqlSavepoint(parse, SAVEPOINT_RELEASE, &ast->savepoint.name);
+		break;
+	case SQL_AST_TYPE_ROLLBACK_TO_SAVEPOINT:
+		sqlSavepoint(parse, SAVEPOINT_ROLLBACK, &ast->savepoint.name);
+		break;
+	default:
+		assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	}
+	if (!parse->is_aborted && !parse->parse_only)
+		sql_finish_coding(parse);
+}
+
 /**
  * Run the parser on the given SQL string.
  *
@@ -550,6 +582,7 @@ sqlRunParser(Parse * pParse, const char *zSql)
 		}
 		pParse->line_pos += pParse->sLastToken.n;
 	}
+	sql_code_ast(pParse, &pParse->ast);
 	pParse->zTail = &zSql[i];
 	sqlParserFree(pEngine, free);
 	if (pParse->pVdbe != NULL && pParse->is_aborted) {
