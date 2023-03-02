@@ -679,6 +679,8 @@ static char *
 sql_ck_unique_name_new(struct Parse *parse, bool is_field_ck)
 {
 	struct space *space = parse->create_column_def.space;
+	if (space == NULL)
+		space = parse->create_table_def.new_space;
 	assert(space != NULL);
 	const char *space_name = space->def->name;
 	struct ck_constraint_parse *ck;
@@ -1866,6 +1868,8 @@ static char *
 sql_fk_unique_name_new(struct Parse *parse)
 {
 	struct space *space = parse->create_column_def.space;
+	if (space == NULL)
+		space = parse->create_table_def.new_space;
 	assert(space != NULL);
 	const char *space_name = space->def->name;
 	struct fk_constraint_parse *fk;
