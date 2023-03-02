@@ -34,3 +34,19 @@ g.test_foreign_key_parsing = function()
         box.execute([[DROP TABLE t;]])
     end)
 end
+
+--
+-- Make sure there is no segmentation fault or assertion in case CHECK is
+-- declared before the first column.
+--
+g.test_check_parsing = function()
+    g.server:exec(function()
+        local sql = [[CREATE TABLE t(CONSTRAINT c1 CHECK(i > 10),
+                                     i INT PRIMARY KEY);]]
+        local res = box.execute(sql)
+        t.assert_equals(res, {row_count = 1})
+        local func_id = box.space._func.index.name:get{'check_T_C1'}.id
+        t.assert_equals(box.space.T.constraint, {C1 = func_id})
+        box.execute([[DROP TABLE t;]])
+    end)
+end

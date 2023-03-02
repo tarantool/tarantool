@@ -156,3 +156,42 @@ sql_parse_add_foreign_key(struct Parse *parse, struct SrcList *table_name,
 	foreign_key_list_append(parse, name, child_cols, parent_name,
 				parent_cols, false);
 }
+
+/** Append a new CHECK to CHECK list. */
+static void
+check_list_append(struct Parse *parse, const struct Token *name,
+		  struct ExprSpan *expr, const struct Token *column_name)
+{
+	struct sql_parse_check_list *list = &parse->check_list;
+	uint32_t id = list->n;
+	++list->n;
+	uint32_t size = list->n * sizeof(*list->a);
+	list->a = sql_xrealloc(list->a, size);
+	struct sql_parse_check *c = &list->a[id];
+	c->name = *name;
+	c->expr = *expr;
+	c->column_name = *column_name;
+}
+
+void
+sql_parse_column_check(struct Parse *parse, const struct Token *name,
+		       struct ExprSpan *expr)
+{
+	check_list_append(parse, name, expr, last_column_name(parse));
+}
+
+void
+sql_parse_table_check(struct Parse *parse, const struct Token *name,
+		      struct ExprSpan *expr)
+{
+	check_list_append(parse, name, expr, &Token_nil);
+}
+
+void
+sql_parse_add_check(struct Parse *parse, struct SrcList *table_name,
+		    const struct Token *name, struct ExprSpan *expr)
+{
+	parse->type = PARSE_TYPE_ADD_CHECK;
+	parse->src_list = table_name;
+	check_list_append(parse, name, expr, &Token_nil);
+}

@@ -630,7 +630,7 @@ vdbe_emit_ck_constraint_create(struct Parse *parser,
 
 /** Generate unique name for check constraint. */
 static char *
-sql_ck_unique_name_new(struct Parse *parse, bool is_field_ck)
+sql_ck_unique_name_new(struct Parse *parse, bool is_field_ck, uint32_t fieldno)
 {
 	struct space *space = parse->create_column_def.space;
 	assert(space != NULL);
@@ -645,7 +645,6 @@ sql_ck_unique_name_new(struct Parse *parse, bool is_field_ck)
 		}
 		return sqlMPrintf("ck_unnamed_%s_%u", space_name, n);
 	}
-	uint32_t fieldno = space->def->field_count - 1;
 	const char *field_name = space->def->fields[fieldno].name;
 	rlist_foreach_entry(ck, checks, link) {
 		if (ck->ck_def->is_field_ck && ck->ck_def->fieldno == fieldno)
@@ -685,27 +684,36 @@ ck_constraint_def_sizeof(uint32_t name_len, uint32_t expr_str_len,
 }
 
 void
-sql_create_check_contraint(struct Parse *parser, bool is_field_ck)
+sql_create_check_contraint(struct Parse *parser, struct sql_parse_check *cdef)
 {
-	struct create_ck_def *create_ck_def = &parser->create_ck_def;
-	struct ExprSpan *expr_span = create_ck_def->expr;
+	struct ExprSpan *expr_span = &cdef->expr;
 	sql_expr_delete(expr_span->pExpr);
 
-	struct alter_entity_def *alter_def =
-		(struct alter_entity_def *) create_ck_def;
-	assert(alter_def->entity_type == ENTITY_TYPE_CK);
 	struct space *space = parser->create_column_def.space;
 	if (space == NULL)
 		space = parser->create_table_def.new_space;
 	bool is_alter_add_constr = space == NULL;
+	bool is_field_ck = cdef->column_name.n != 0;
+	uint32_t fieldno = 0;
+	if (is_field_ck) {
+		char *field_name = sql_name_from_token(&cdef->column_name);
+		struct field_def *fields = space->def->fields;
+		for (uint32_t j = 0; j < space->def->field_count; ++j) {
+			if (strcmp(fields[j].name, field_name) == 0) {
+				fieldno = j;
+				break;
+			}
+		}
+		sql_xfree(field_name);
+	}
 
 	/* Prepare payload for ck constraint definition. */
-	struct Token *name_token = &create_ck_def->base.base.name;
+	struct Token *name_token = &cdef->name;
 	char *name;
 	if (name_token->n != 0)
 		name = sql_name_from_token(name_token);
 	else
-		name = sql_ck_unique_name_new(parser, is_field_ck);
+		name = sql_ck_unique_name_new(parser, is_field_ck, fieldno);
 	assert(name != NULL);
 	size_t name_len = strlen(name);
 
@@ -744,14 +752,8 @@ sql_create_check_contraint(struct Parse *parser, bool is_field_ck)
 	ck_parse->ck_def = ck_def;
 	rlist_create(&ck_parse->link);
 
-	if (is_field_ck) {
-		assert(space != NULL);
-		ck_def->is_field_ck = true;
-		ck_def->fieldno = space->def->field_count - 1;
-	} else {
-		ck_def->is_field_ck = false;
-		ck_def->fieldno = 0;
-	}
+	ck_def->fieldno = fieldno;
+	ck_def->is_field_ck = is_field_ck;
 	ck_def->expr_str = (char *)ck_def + expr_str_offset;
 	ck_def->space_id = BOX_ID_NIL;
 	trim_space_snprintf(ck_def->expr_str, expr_str, expr_str_len);
@@ -759,7 +761,7 @@ sql_create_check_contraint(struct Parse *parser, bool is_field_ck)
 	sql_xfree(name);
 	ck_def->name[name_len] = '\0';
 	if (is_alter_add_constr) {
-		const char *space_name = alter_def->entity_name->a[0].zName;
+		const char *space_name = parser->src_list->a[0].zName;
 		struct space *space = space_by_name(space_name);
 		if (space == NULL) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);

@@ -482,6 +482,11 @@ static int
 sql_finish_table_properties(struct Parse *parse)
 {
 	assert(!parse->is_aborted);
+	for (uint32_t i = 0; i < parse->check_list.n; ++i) {
+		sql_create_check_contraint(parse, &parse->check_list.a[i]);
+		if (parse->is_aborted)
+			return -1;
+	}
 	for (uint32_t i = 0; i < parse->foreign_key_list.n; ++i) {
 		sql_create_foreign_key(parse, &parse->foreign_key_list.a[i]);
 		if (parse->is_aborted)
@@ -528,6 +533,10 @@ sql_finish_parsing(struct Parse *parse)
 	case PARSE_TYPE_ADD_FOREIGN_KEY:
 		assert(parse->foreign_key_list.n == 1);
 		sql_create_foreign_key(parse, &parse->foreign_key_list.a[0]);
+		break;
+	case PARSE_TYPE_ADD_CHECK:
+		assert(parse->check_list.n == 1);
+		sql_create_check_contraint(parse, &parse->check_list.a[0]);
 		break;
 	default:
 		assert(parse->type == PARSE_TYPE_UNKNOWN);

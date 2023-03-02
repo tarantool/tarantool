@@ -96,6 +96,8 @@ enum parse_type {
 	PARSE_TYPE_ADD_COLUMN,
 	/** ALTER TABLE ADD CONSTAINT FOREIGN KEY statement. */
 	PARSE_TYPE_ADD_FOREIGN_KEY,
+	/** ALTER TABLE ADD CONSTAINT CHECK statement. */
+	PARSE_TYPE_ADD_CHECK,
 };
 
 /**
@@ -114,6 +116,19 @@ struct Token {
 struct sql_parse_savepoint {
 	/** Name of the SAVEPOINT. */
 	struct Token name;
+};
+
+/**
+ * An instance of this structure is used by the parser to record both the parse
+ * tree for an expression and the span of input text for an expression.
+ */
+struct ExprSpan {
+	/* The expression parse tree. */
+	struct Expr *pExpr;
+	/* First character of input text. */
+	const char *zStart;
+	/* One character past the end of input text. */
+	const char *zEnd;
 };
 
 /** Description of the FOREIGN KEY constraint being created. */
@@ -138,6 +153,24 @@ struct sql_parse_foreign_key_list {
 	/** Array containing all FOREIGN KEY descriptions from the list. */
 	struct sql_parse_foreign_key *a;
 	/** Number of FOREIGN KEY descriptions in the list. */
+	uint32_t n;
+};
+
+/** Description of the CHECK constraint being created. */
+struct sql_parse_check {
+	/** Expression. */
+	struct ExprSpan expr;
+	/** Constraint name. */
+	struct Token name;
+	/** Column name for column constraint, empty for table constraint. */
+	struct Token column_name;
+};
+
+/** CHECK descriptions list. */
+struct sql_parse_check_list {
+	/** Array containing all CHECK descriptions from the list. */
+	struct sql_parse_check *a;
+	/** Number of CHECK descriptions in the list. */
 	uint32_t n;
 };
 
@@ -340,12 +373,6 @@ struct create_constraint_def {
 	struct create_entity_def base;
 };
 
-struct create_ck_def {
-	struct create_constraint_def base;
-	/** AST representing check expression. */
-	struct ExprSpan *expr;
-};
-
 struct create_index_def {
 	struct create_constraint_def base;
 	/** List of indexed columns. */
@@ -466,15 +493,6 @@ create_trigger_def_init(struct create_trigger_def *trigger_def,
 }
 
 static inline void
-create_ck_def_init(struct create_ck_def *ck_def, struct SrcList *table_name,
-		   struct Token *name, struct ExprSpan *expr)
-{
-	create_constraint_def_init(&ck_def->base, table_name, name, false,
-				   ENTITY_TYPE_CK);
-	ck_def->expr = expr;
-}
-
-static inline void
 create_index_def_init(struct create_index_def *index_def,
 		      struct SrcList *table_name,  struct Token *name,
 		      struct ExprList *cols, enum sql_index_type idx_type,
@@ -591,5 +609,20 @@ sql_parse_add_foreign_key(struct Parse *parse, struct SrcList *src_list,
 			  const struct Token *name, struct ExprList *child_cols,
 			  const struct Token *parent_name,
 			  struct ExprList *parent_cols);
+
+/** Save parsed column CHECK. */
+void
+sql_parse_column_check(struct Parse *parse, const struct Token *name,
+		       struct ExprSpan *expr);
+
+/** Save parsed table CHECK from CREATE TABLE statement. */
+void
+sql_parse_table_check(struct Parse *parse, const struct Token *name,
+		      struct ExprSpan *expr);
+
+/** Save parsed table CHECK from ALTER TABLE ADD CONSTRAINT statement. */
+void
+sql_parse_add_check(struct Parse *parse, struct SrcList *table_name,
+		    const struct Token *name, struct ExprSpan *expr);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */
