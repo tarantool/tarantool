@@ -292,8 +292,8 @@ memtx_prepare_result_tuple(struct tuple **result);
  * Prepares a tuple retrieved from a consistent index read view to be returned
  * to the user.
  *
- * A pointer to the raw tuple data and its size are returned in the data and
- * size out argument.
+ * A pointer to the raw tuple data and its size are returned in the result
+ * argument.
  *
  * This function performs two tasks:
  *
@@ -310,7 +310,7 @@ int
 memtx_prepare_read_view_tuple(struct tuple *tuple,
 			      struct memtx_tx_snapshot_cleaner *cleaner,
 			      bool disable_decompression,
-			      const char **data, uint32_t *size);
+			      struct read_view_tuple *result);
 
 /**
  * Common function for all memtx indexes. Get tuple from memtx @a index

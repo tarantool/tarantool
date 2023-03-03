@@ -894,8 +894,6 @@ checkpoint_f(va_list ap)
 	struct space_read_view *space_rv;
 	read_view_foreach_space(space_rv, &ckpt->rv) {
 		FiberGCChecker gc_check;
-		uint32_t size;
-		const char *data;
 		struct index_read_view *index_rv =
 			space_read_view_index(space_rv, 0);
 		assert(index_rv != NULL);
@@ -907,13 +905,13 @@ checkpoint_f(va_list ap)
 		}
 		while (true) {
 			RegionGuard region_guard(&fiber()->gc);
-			rc = index_read_view_iterator_next_raw(&it, &data,
-							       &size);
-			if (rc != 0 || data == NULL)
+			struct read_view_tuple result;
+			rc = index_read_view_iterator_next_raw(&it, &result);
+			if (rc != 0 || result.data == NULL)
 				break;
 			rc = checkpoint_write_tuple(&snap, space_rv->id,
 						    space_rv->group_id,
-						    data, size);
+						    result.data, result.size);
 			if (rc != 0)
 				break;
 		}
@@ -1144,16 +1142,14 @@ memtx_join_f(va_list ap)
 			rc = -1;
 			break;
 		}
-		uint32_t size;
-		const char *data;
 		while (true) {
 			RegionGuard region_guard(&fiber()->gc);
-			rc = index_read_view_iterator_next_raw(&it, &data,
-							       &size);
-			if (rc != 0 || data == NULL)
+			struct read_view_tuple result;
+			rc = index_read_view_iterator_next_raw(&it, &result);
+			if (rc != 0 || result.data == NULL)
 				break;
 			rc = memtx_join_send_tuple(ctx->stream, space_rv->id,
-						   data, size);
+						   result.data, result.size);
 			if (rc != 0)
 				break;
 		}
@@ -1703,18 +1699,19 @@ int
 memtx_prepare_read_view_tuple(struct tuple *tuple,
 			      struct memtx_tx_snapshot_cleaner *cleaner,
 			      bool disable_decompression,
-			      const char **data, uint32_t *size)
+			      struct read_view_tuple *result)
 {
 	tuple = memtx_tx_snapshot_clarify(cleaner, tuple);
 	if (tuple == NULL) {
-		*data = NULL;
-		*size = 0;
+		*result = read_view_tuple_none();
 		return 0;
 	}
-	*data = tuple_data_range(tuple, size);
+	result->data = tuple_data_range(tuple, &result->size);
 	if (!disable_decompression) {
-		*data = memtx_tuple_decompress_raw(*data, *data + *size, size);
-		if (*data == NULL)
+		result->data = memtx_tuple_decompress_raw(
+				result->data, result->data + result->size,
+				&result->size);
+		if (result->data == NULL)
 			return -1;
 	}
 	return 0;
