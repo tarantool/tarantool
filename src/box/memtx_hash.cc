@@ -555,13 +555,12 @@ hash_read_view_free(struct index_read_view *base)
 static int
 hash_read_view_get_raw(struct index_read_view *rv,
 		       const char *key, uint32_t part_count,
-		       const char **data, uint32_t *size)
+		       struct read_view_tuple *result)
 {
 	(void)rv;
 	(void)key;
 	(void)part_count;
-	(void)data;
-	(void)size;
+	(void)result;
 	unreachable();
 	return 0;
 }
@@ -569,7 +568,7 @@ hash_read_view_get_raw(struct index_read_view *rv,
 /** Implementation of next_raw index_read_view_iterator callback. */
 static int
 hash_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
-				 const char **data, uint32_t *size)
+				 struct read_view_tuple *result)
 {
 	struct hash_read_view_iterator *it =
 		(struct hash_read_view_iterator *)iterator;
@@ -579,14 +578,14 @@ hash_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 		struct tuple **res = light_index_view_iterator_get_and_next(
 			&rv->view, &it->iterator);
 		if (res == NULL) {
-			*data = NULL;
+			*result = read_view_tuple_none();
 			return 0;
 		}
 		if (memtx_prepare_read_view_tuple(*res, &rv->cleaner,
 						  rv->disable_decompression,
-						  data, size) != 0)
+						  result) != 0)
 			return -1;
-		if (*data != NULL)
+		if (result->data != NULL)
 			return 0;
 	}
 	return 0;

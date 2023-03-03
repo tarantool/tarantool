@@ -656,6 +656,26 @@ struct index {
 	struct rlist full_scans;
 };
 
+/**
+ * Auxiliary struct used for returning tuple data fetched from a read view.
+ */
+struct read_view_tuple {
+	/** Pointer to tuple data. */
+	const char *data;
+	/** Size of tuple data. */
+	uint32_t size;
+};
+
+/** Object returned if there's no more tuples matching the search criteria. */
+static inline struct read_view_tuple
+read_view_tuple_none(void)
+{
+	struct read_view_tuple tuple;
+	tuple.data = NULL;
+	tuple.size = 0;
+	return tuple;
+}
+
 /** Index read view virtual function table. */
 struct index_read_view_vtab {
 	/** Free an index read view instance. */
@@ -664,7 +684,7 @@ struct index_read_view_vtab {
 	/**
 	 * Look up a tuple by a full key in a read view.
 	 *
-	 * The tuple data and size are returned in the data and size arguments.
+	 * The tuple data and size are returned in the result argument.
 	 * If the key isn't found, the data is set to NULL.
 	 *
 	 * Note, unless the read_view_opts::disable_decompression flag was set
@@ -676,7 +696,7 @@ struct index_read_view_vtab {
 	 */
 	int (*get_raw)(struct index_read_view *rv,
 		       const char *key, uint32_t part_count,
-		       const char **data, uint32_t *size);
+		       struct read_view_tuple *result);
 	/** Create an index read view iterator. */
 	int
 	(*create_iterator)(struct index_read_view *rv, enum iterator_type type,
@@ -710,7 +730,7 @@ struct index_read_view_iterator_base {
 	/**
 	 * Iterate to the next tuple in the read view.
 	 *
-	 * The tuple data and size are returned in the data and size arguments.
+	 * The tuple data and size are returned in the result argument.
 	 * On EOF the data is set to NULL.
 	 *
 	 * Note, unless the read_view_opts::disable_decompression flag was set
@@ -722,7 +742,7 @@ struct index_read_view_iterator_base {
 	 */
 	int
 	(*next_raw)(struct index_read_view_iterator *iterator,
-		    const char **data, uint32_t *size);
+		    struct read_view_tuple *result);
 };
 
 /** Size of the index_read_view_iterator struct. */
@@ -1001,9 +1021,9 @@ index_read_view_delete(struct index_read_view *rv);
 static inline int
 index_read_view_get_raw(struct index_read_view *rv,
 			const char *key, uint32_t part_count,
-			const char **data, uint32_t *size)
+			struct read_view_tuple *result)
 {
-	return rv->vtab->get_raw(rv, key, part_count, data, size);
+	return rv->vtab->get_raw(rv, key, part_count, result);
 }
 
 static inline int
@@ -1023,9 +1043,9 @@ index_read_view_iterator_destroy(struct index_read_view_iterator *iterator)
 
 static inline int
 index_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
-				  const char **data, uint32_t *size)
+				  struct read_view_tuple *result)
 {
-	return iterator->base.next_raw(iterator, data, size);
+	return iterator->base.next_raw(iterator, result);
 }
 
 /*
@@ -1077,7 +1097,7 @@ int
 exhausted_iterator_next(struct iterator *it, struct tuple **ret);
 int
 exhausted_index_read_view_iterator_next_raw(struct index_read_view_iterator *it,
-					    const char **data, uint32_t *size);
+					    struct read_view_tuple *result);
 /** Unsupported feature error is returned. */
 int
 generic_iterator_position(struct iterator *it, const char **pos,

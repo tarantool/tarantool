@@ -324,7 +324,7 @@ static_assert(sizeof(struct sequence_data_iterator) <=
 /** Implementation of next_raw index_read_view_iterator callback. */
 static int
 sequence_data_iterator_next_raw(struct index_read_view_iterator *iterator,
-				const char **data, uint32_t *size)
+				struct read_view_tuple *result)
 {
 	struct sequence_data_iterator *iter =
 		(struct sequence_data_iterator *)iterator;
@@ -334,7 +334,7 @@ sequence_data_iterator_next_raw(struct index_read_view_iterator *iterator,
 	struct sequence_data *sd = light_sequence_view_iterator_get_and_next(
 		&rv->view, &iter->iter);
 	if (sd == NULL) {
-		*data = NULL;
+		*result = read_view_tuple_none();
 		return 0;
 	}
 
@@ -348,21 +348,20 @@ sequence_data_iterator_next_raw(struct index_read_view_iterator *iterator,
 		   mp_encode_uint(buf_end, sd->value) :
 		   mp_encode_int(buf_end, sd->value));
 	assert(buf_end <= buf + buf_size);
-	*data = buf;
-	*size = buf_end - buf;
+	result->data = buf;
+	result->size = buf_end - buf;
 	return 0;
 }
 
 static inline int
 sequence_data_read_view_get_raw(struct index_read_view *rv,
 				const char *key, uint32_t part_count,
-				const char **data, uint32_t *size)
+				struct read_view_tuple *result)
 {
 	(void)rv;
 	(void)key;
 	(void)part_count;
-	(void)data;
-	(void)size;
+	(void)result;
 	diag_set(ClientError, ER_UNSUPPORTED,
 		 "_sequence_data read view", "get()");
 	return -1;
