@@ -1399,6 +1399,30 @@ end
 local function upgrade_to_2_11_1()
     drop_schema_max_id()
 end
+
+--------------------------------------------------------------------------------
+-- Tarantool 3.0.0
+--------------------------------------------------------------------------------
+local function change_replicaset_uuid_key(old_key, new_key)
+    local _schema = box.space._schema
+    local old = _schema:get{old_key}
+    -- 'replicaset_uuid' can be not found during bootstrap.snap generation when
+    -- the entire _schema is cleared.
+    if old ~= nil then
+        _schema:insert{new_key, old[2]}
+        _schema:delete{old_key}
+    end
+end
+
+local function store_replicaset_uuid_in_new_way()
+    log.info('update replicaset uuid key')
+    change_replicaset_uuid_key('cluster', 'replicaset_uuid')
+end
+
+local function upgrade_to_3_0_0()
+    store_replicaset_uuid_in_new_way()
+end
+
 --------------------------------------------------------------------------------
 
 local handlers = {
@@ -1421,6 +1445,7 @@ local handlers = {
     {version = mkversion(2, 10, 5), func = upgrade_to_2_10_5},
     {version = mkversion(2, 11, 0), func = upgrade_to_2_11_0},
     {version = mkversion(2, 11, 1), func = upgrade_to_2_11_1},
+    {version = mkversion(3, 0, 0), func = upgrade_to_3_0_0},
 }
 
 -- Schema version of the snapshot.
@@ -1913,6 +1938,23 @@ local function downgrade_from_2_11_1(issue_handler)
     add_schema_max_id(issue_handler)
 end
 
+--------------------------------------------------------------------------------
+-- Tarantool 3.0.0
+--------------------------------------------------------------------------------
+
+-- Revert store_replicaset_uuid_in_new_way().
+local function store_replicaset_uuid_in_old_way(issue_handler)
+    if issue_handler.dry_run then
+        return
+    end
+    log.info('drop replicaset uuid key')
+    change_replicaset_uuid_key('replicaset_uuid', 'cluster')
+end
+
+local function downgrade_from_3_0_0(issue_handler)
+    store_replicaset_uuid_in_old_way(issue_handler)
+end
+
 -- Versions should be ordered from newer to older.
 --
 -- Every step can be called in 2 modes. In dry_run mode (issue_handler.dry_run
@@ -1930,6 +1972,7 @@ end
 -- if schema version is 2.10.0.
 --
 local downgrade_handlers = {
+    {version = mkversion(3, 0, 0), func = downgrade_from_3_0_0},
     {version = mkversion(2, 11, 1), func = downgrade_from_2_11_1},
     {version = mkversion(2, 11, 0), func = downgrade_from_2_11_0},
     {version = mkversion(2, 10, 5), func = downgrade_from_2_10_5},
@@ -2011,6 +2054,7 @@ local downgrade_versions = {
     "2.10.5",
     "2.11.0",
     "2.11.1",
+    "3.0.0",
 }
 
 -- Downgrade or list downgrade issues depending of dry_run argument value.

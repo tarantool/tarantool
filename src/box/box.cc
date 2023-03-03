@@ -4217,7 +4217,7 @@ box_set_replicaset_uuid(void)
 		diag_raise();
 	if (tt_uuid_is_nil(&replicaset_uuid))
 		tt_uuid_create(&replicaset_uuid);
-	if (boxk(IPROTO_INSERT, BOX_SCHEMA_ID, "[%s%s]", "cluster",
+	if (boxk(IPROTO_INSERT, BOX_SCHEMA_ID, "[%s%s]", "replicaset_uuid",
 		 tt_uuid_str(&replicaset_uuid)))
 		diag_raise();
 }

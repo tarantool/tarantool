@@ -11,17 +11,17 @@ g.after_all = function(lg)
     lg.server:drop()
 end
 
-g.test_cluster_uuid_update_ban = function(lg)
+g.test_replicaset_uuid_update_ban = function(lg)
     lg.server:exec(function()
         local uuid = require('uuid')
         local _schema = box.space._schema
         local msg = "Can't reset replica set UUID"
         t.assert_error_msg_contains(msg, _schema.replace, _schema,
-                                    {'cluster', uuid.str()})
+                                    {'replicaset_uuid', uuid.str()})
         t.assert_error_msg_contains(msg, _schema.replace, _schema,
-                                    {'cluster', tostring(uuid.NULL)})
+                                    {'replicaset_uuid', tostring(uuid.NULL)})
         -- Fine to replace with the same value.
-        _schema:replace{'cluster', box.info.cluster.uuid}
+        _schema:replace{'replicaset_uuid', box.info.cluster.uuid}
     end)
 end
 
@@ -38,5 +38,19 @@ g.test_version_transactional = function(lg)
 
         t.assert_equals(dd_version, dd_version_in_tx)
         t.assert_equals(dd_version, ffi.C.box_dd_version_id())
+    end)
+end
+
+g.test_old_cluster_uuid_key = function(lg)
+    lg.server:exec(function()
+        local uuid = require('uuid')
+        local _schema = box.space._schema
+        -- It still can be inserted and is validated.
+        t.assert_equals(_schema:get{'cluster'}, nil)
+        local msg = "Can't reset replica set UUID"
+        t.assert_error_msg_contains(msg, _schema.replace, _schema,
+                                    {'cluster', uuid.str()})
+        _schema:replace{'cluster', box.info.cluster.uuid}
+        _schema:delete{'cluster'}
     end)
 end

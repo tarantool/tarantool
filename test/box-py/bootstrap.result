@@ -3,7 +3,7 @@ box.internal.bootstrap()
 ...
 box.space._schema:select{}
 ---
-- - ['version', 2, 11, 1]
+- - ['version', 3, 0, 0]
 ...
 box.space._cluster:select{}
 ---

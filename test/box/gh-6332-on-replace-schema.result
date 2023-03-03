@@ -30,11 +30,11 @@ box.space._schema:replace{'version', 123}
  | ---
  | - error: 'Wrong _schema version: expected ''major.minor[.patch]'''
  | ...
-box.space._schema:replace{'cluster'}
+box.space._schema:replace{'replicaset_uuid'}
  | ---
  | - error: 'Invalid UUID: (null)'
  | ...
-box.space._schema:replace{'cluster', 666}
+box.space._schema:replace{'replicaset_uuid', 666}
  | ---
  | - error: 'Invalid UUID: (null)'
  | ...

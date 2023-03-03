@@ -10,8 +10,8 @@ test_run:cmd("switch test")
 
 box.space._schema:replace{'version'}
 box.space._schema:replace{'version', 123}
-box.space._schema:replace{'cluster'}
-box.space._schema:replace{'cluster', 666}
+box.space._schema:replace{'replicaset_uuid'}
+box.space._schema:replace{'replicaset_uuid', 666}
 box.space._schema:replace{'asd'}
 box.space._schema:replace{666}
 

@@ -59,7 +59,7 @@ string.match(box.info.uptime, '^[1-9][0-9]*$') ~= nil
 ---
 - true
 ...
-box.info.cluster.uuid == box.space._schema:get{'cluster'}[2]
+box.info.cluster.uuid == box.space._schema:get{'replicaset_uuid'}[2]
 ---
 - true
 ...
