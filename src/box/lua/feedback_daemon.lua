@@ -114,7 +114,7 @@ local function fill_in_base_info(feedback)
     end
     feedback.tarantool_version = box.info.version
     feedback.server_id         = box.info.uuid
-    feedback.cluster_id        = box.info.cluster.uuid
+    feedback.cluster_id        = box.info.replicaset.uuid
     feedback.uptime            = box.info.uptime
 end
 

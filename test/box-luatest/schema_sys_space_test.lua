@@ -21,7 +21,7 @@ g.test_replicaset_uuid_update_ban = function(lg)
         t.assert_error_msg_contains(msg, _schema.replace, _schema,
                                     {'replicaset_uuid', tostring(uuid.NULL)})
         -- Fine to replace with the same value.
-        _schema:replace{'replicaset_uuid', box.info.cluster.uuid}
+        _schema:replace{'replicaset_uuid', box.info.replicaset.uuid}
     end)
 end
 
@@ -50,7 +50,7 @@ g.test_old_cluster_uuid_key = function(lg)
         local msg = "Can't reset replica set UUID"
         t.assert_error_msg_contains(msg, _schema.replace, _schema,
                                     {'cluster', uuid.str()})
-        _schema:replace{'cluster', box.info.cluster.uuid}
+        _schema:replace{'cluster', box.info.replicaset.uuid}
         _schema:delete{'cluster'}
     end)
 end

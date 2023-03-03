@@ -51,6 +51,13 @@ initialization or new session creation.
 https://tarantool.io/compat/sql_seq_scan_default
 ]]
 
+local BOX_INFO_CLUSTER_MEANING_BRIEF = [[
+Whether box.info.cluster should show the current replicaset or the whole cluster
+with all its replicasets.
+
+https://tarantool.io/compat/box_info_cluster_meaning
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -95,6 +102,12 @@ local options = {
         obsolete = nil,
         brief = SQL_SEQ_SCAN_DEFAULT_BRIEF,
         action = tweak_action('sql_seq_scan_default', true, false),
+    },
+    box_info_cluster_meaning = {
+        default = 'new',
+        obsolete = nil,
+        brief = BOX_INFO_CLUSTER_MEANING_BRIEF,
+        action = tweak_action('box_info_cluster_new_meaning', false, true),
     },
 }
 

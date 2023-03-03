@@ -23,6 +23,6 @@ g.test_new_replicaset_uuid_key = function(cg)
         local _schema = box.space._schema
         t.assert_equals(_schema:get{'cluster'}, nil)
         t.assert_equals(_schema:get{'replicaset_uuid'}.value,
-                        box.info.cluster.uuid)
+                        box.info.replicaset.uuid)
     end)
 end

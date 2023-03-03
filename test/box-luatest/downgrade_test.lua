@@ -896,7 +896,7 @@ g.test_downgrade_replicaset_uuid_key = function(cg)
     cg.server:exec(function()
         local helper = require('test.box-luatest.downgrade_helper')
         local _schema = box.space._schema
-        local rs_uuid = box.info.cluster.uuid
+        local rs_uuid = box.info.replicaset.uuid
         local prev_version = helper.prev_version(helper.app_version('3.0.0'))
         t.assert_equals(box.schema.downgrade_issues(prev_version), {})
         t.assert_equals(_schema:get{'cluster'}, nil)

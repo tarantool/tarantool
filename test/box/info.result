@@ -59,7 +59,7 @@ string.match(box.info.uptime, '^[1-9][0-9]*$') ~= nil
 ---
 - true
 ...
-box.info.cluster.uuid == box.space._schema:get{'replicaset_uuid'}[2]
+box.info.replicaset.uuid == box.space._schema:get{'replicaset_uuid'}[2]
 ---
 - true
 ...
@@ -83,6 +83,7 @@ t
   - memory
   - package
   - pid
+  - replicaset
   - replication
   - replication_anon
   - ro
@@ -233,4 +234,39 @@ box.cfg{read_only = false}
 ch:get() -- false
 ---
 - false
+...
+--
+-- box.info.cluster compat. Before 3.0.0 it meant the current replicaset. Now it
+-- means the whole cluster.
+--
+compat = require('compat')
+---
+...
+info = compat.box_info_cluster_meaning
+---
+...
+assert(info.current == 'default')
+---
+- true
+...
+assert(info.default == 'new')
+---
+- true
+...
+rs_uuid = box.info.replicaset.uuid
+---
+...
+assert(box.info.cluster.uuid ~= rs_uuid)
+---
+- true
+...
+compat.box_info_cluster_meaning = 'old'
+---
+...
+assert(box.info.cluster.uuid == rs_uuid)
+---
+- true
+...
+compat.box_info_cluster_meaning = 'default'
+---
 ...

@@ -200,9 +200,9 @@ local function test_info_uuid(test)
 
     local function uuid_to_str()
         local str1 = box.info.uuid
-        local str2 = box.info.cluster.uuid
+        local str2 = box.info.replicaset.uuid
         local str3 = box.info.uuid
-        local str4 = box.info.cluster.uuid
+        local str4 = box.info.replicaset.uuid
         if str1 ~= str3 or str2 ~= str4 then
             is_success = false
         end
