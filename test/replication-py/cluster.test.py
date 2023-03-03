@@ -8,7 +8,7 @@ from lib.tarantool_server import TarantoolServer
 ## Get cluster uuid
 cluster_uuid = ""
 try:
-    cluster_uuid = yaml.safe_load(server.admin("box.space._schema:get('cluster')",
+    cluster_uuid = yaml.safe_load(server.admin("box.space._schema:get('replicaset_uuid')",
         silent = True))[0][1]
     uuid.UUID("{" + cluster_uuid + "}")
     print("ok - cluster uuid")

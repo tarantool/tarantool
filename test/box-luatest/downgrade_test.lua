@@ -887,3 +887,25 @@ g.test_downgrade_schema_max_id = function(cg)
         check_max_id(space_id)
     end)
 end
+
+-----------------------------
+-- Check downgrade from 3.0.0
+-----------------------------
+
+g.test_downgrade_replicaset_uuid_key = function(cg)
+    cg.server:exec(function()
+        local helper = require('test.box-luatest.downgrade_helper')
+        local _schema = box.space._schema
+        local rs_uuid = box.info.cluster.uuid
+        local prev_version = helper.prev_version(helper.app_version('3.0.0'))
+        t.assert_equals(box.schema.downgrade_issues(prev_version), {})
+        t.assert_equals(_schema:get{'cluster'}, nil)
+        t.assert_equals(_schema:get{'replicaset_uuid'}.value, rs_uuid)
+        -- 2 for idempotence.
+        for _ = 1, 2 do
+            box.schema.downgrade(prev_version)
+            t.assert_equals(_schema:get{'cluster'}.value, rs_uuid)
+            t.assert_equals(_schema:get{'replicaset_uuid'}, nil)
+        end
+    end)
+end

@@ -16,7 +16,7 @@ box.info.replication[1].id
 box.info.status
 string.len(box.info.uptime) > 0
 string.match(box.info.uptime, '^[1-9][0-9]*$') ~= nil
-box.info.cluster.uuid == box.space._schema:get{'cluster'}[2]
+box.info.cluster.uuid == box.space._schema:get{'replicaset_uuid'}[2]
 t = {}
 for k, _ in pairs(box.info()) do table.insert(t, k) end
 table.sort(t)

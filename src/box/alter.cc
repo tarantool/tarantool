@@ -3990,10 +3990,32 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 					   BOX_SCHEMA_FIELD_KEY);
 	if (key == NULL)
 		return -1;
-	if (strcmp(key, "cluster") == 0) {
+	if (strcmp(key, "cluster") == 0 ||
+	    strcmp(key, "replicaset_uuid") == 0) {
 		if (new_tuple == NULL) {
-			diag_set(ClientError, ER_REPLICASET_UUID_IS_RO);
-			return -1;
+			/*
+			 * At least one of the keys has to stay. Or the
+			 * replicaset UUID would be lost after restart.
+			 */
+			const char *other_key = strcmp(key, "cluster") == 0 ?
+				"replicaset_uuid" : "cluster";
+			char mpkey[64];
+			char *mpkey_end = mp_encode_array(mpkey, 1);
+			mpkey_end = mp_encode_str0(mpkey_end, other_key);
+			struct tuple *other = NULL;
+			if (box_index_get(BOX_SCHEMA_ID, 0, mpkey, mpkey_end,
+					  &other) != 0)
+				return -1;
+			if (other == NULL) {
+				diag_set(ClientError, ER_REPLICASET_UUID_IS_RO);
+				return -1;
+			}
+			/*
+			 * Deletion of the old key is allowed for upgrade.
+			 * Deletion of the new one is needed for downgrade.
+			 * Can't ban either.
+			 */
+			return 0;
 		}
 		tt_uuid uu;
 		if (tuple_field_uuid(new_tuple, BOX_SCHEMA_FIELD_VALUE, &uu) != 0)
