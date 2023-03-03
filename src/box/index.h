@@ -51,7 +51,6 @@ struct index_read_view_iterator;
 struct index_def;
 struct key_def;
 struct info_handler;
-struct read_view_opts;
 
 typedef struct tuple box_tuple_t;
 typedef struct key_def box_key_def_t;
@@ -594,8 +593,7 @@ struct index_vtab {
 					    uint32_t part_count,
 					    const char *pos);
 	/** Create an index read view. */
-	struct index_read_view *(*create_read_view)(
-		struct index *index, const struct read_view_opts *opts);
+	struct index_read_view *(*create_read_view)(struct index *index);
 	/** Introspection (index:stat()) */
 	void (*stat)(struct index *, struct info_handler *);
 	/**
@@ -947,9 +945,9 @@ index_create_iterator(struct index *index, enum iterator_type type,
 }
 
 static inline struct index_read_view *
-index_create_read_view(struct index *index, const struct read_view_opts *opts)
+index_create_read_view(struct index *index)
 {
-	return index->vtab->create_read_view(index, opts);
+	return index->vtab->create_read_view(index);
 }
 
 static inline void
@@ -1063,8 +1061,7 @@ int generic_index_replace(struct index *, struct tuple *, struct tuple *,
 			  enum dup_replace_mode,
 			  struct tuple **, struct tuple **);
 struct index_read_view *
-generic_index_create_read_view(struct index *index,
-			       const struct read_view_opts *opts);
+generic_index_create_read_view(struct index *index);
 void generic_index_stat(struct index *, struct info_handler *);
 void generic_index_compact(struct index *);
 void generic_index_reset_stat(struct index *);
