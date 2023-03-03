@@ -95,6 +95,11 @@ struct read_view {
 	 * make a checkpoint). Initialized with read_view_opts::is_system.
 	 */
 	bool is_system;
+	/**
+	 * Set if tuples read from the read view don't need to be decompressed.
+	 * Initialized with read_view_opts::disable_decompression.
+	 */
+	bool disable_decompression;
 	/** Monotonic clock at the time when the read view was created. */
 	double timestamp;
 	/** Replicaset vclock at the time when the read view was created. */

@@ -302,14 +302,15 @@ memtx_prepare_result_tuple(struct tuple **result);
  *     set to NULL.
  *
  *  2. Decompresses tuples if required, unless the disable_decompression flag
- *     is set. Decompressed tuple data is stored on the fiber region.
+ *     was set in the read view options. Decompressed tuple data is stored on
+ *     the fiber region.
  *
  * Returns 0 on success. On error returns -1 and sets diag.
  */
 int
 memtx_prepare_read_view_tuple(struct tuple *tuple,
+			      struct index_read_view *index,
 			      struct memtx_tx_snapshot_cleaner *cleaner,
-			      bool disable_decompression,
 			      struct read_view_tuple *result);
 
 /**
