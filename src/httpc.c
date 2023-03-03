@@ -532,8 +532,12 @@ httpc_request_io_read(struct httpc_request *req, char *buf, size_t len,
 	}
 
 	if (copied < len && recv_len > 0) {
-		char *recv = region_join(&req->recv, recv_len);
 		size_t remain = len - copied;
+		char *recv = region_join(&req->recv, recv_len);
+		if (recv == NULL) {
+			diag_set(OutOfMemory, recv_len, "region", "rep_body");
+			return -1;
+		}
 		if (remain > recv_len)
 			remain = recv_len;
 		memcpy(buf + copied, recv, remain);
