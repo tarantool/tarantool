@@ -240,8 +240,13 @@ test_check_tuple_extract_key_raw(struct key_def *key_def, struct tuple *tuple,
 	 */
 	void *alloc = region_alloc(&fiber()->gc, 10);
 	memset(alloc, 0, 10);
-	ok(key_compare(tuple_key, HINT_NONE, key, HINT_NONE, key_def) == 0 &&
-	   mp_decode_array(&key) == mp_decode_array(&tuple_key),
+	const char *key_a = tuple_key;
+	uint32_t part_count_a = mp_decode_array(&key_a);
+	const char *key_b = key;
+	uint32_t part_count_b = mp_decode_array(&key_b);
+	ok(key_compare(key_a, part_count_a, HINT_NONE,
+		       key_b, part_count_b, HINT_NONE, key_def) == 0 &&
+	   part_count_a == part_count_b,
 	   "Extracted key of tuple %s is %s, expected %s",
 	   tuple_str(tuple), mp_str(tuple_key), mp_str(key));
 }
