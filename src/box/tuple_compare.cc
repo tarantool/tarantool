@@ -938,14 +938,13 @@ tuple_compare_with_key_sequential(struct tuple *tuple, hint_t tuple_hint,
 }
 
 int
-key_compare(const char *key_a, hint_t key_a_hint,
-	    const char *key_b, hint_t key_b_hint, struct key_def *key_def)
+key_compare(const char *key_a, uint32_t part_count_a, hint_t key_a_hint,
+	    const char *key_b, uint32_t part_count_b, hint_t key_b_hint,
+	    struct key_def *key_def)
 {
 	int rc = hint_cmp(key_a_hint, key_b_hint);
 	if (rc != 0)
 		return rc;
-	uint32_t part_count_a = mp_decode_array(&key_a);
-	uint32_t part_count_b = mp_decode_array(&key_b);
 	assert(part_count_a <= key_def->part_count);
 	assert(part_count_b <= key_def->part_count);
 	uint32_t part_count = MIN(part_count_a, part_count_b);
