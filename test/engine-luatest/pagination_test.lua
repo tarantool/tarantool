@@ -616,6 +616,27 @@ tree_g.test_gh_7943 = function(cg)
     end)
 end
 
+-- Paignation in case the tuple pointed to by 'after' isn't in the space.
+tree_g.test_gh_8373_after_missing = function(cg)
+    cg.server:exec(function()
+        local s = box.space.s
+        s:create_index('primary')
+        local i = s:create_index('secondary',
+                                 {unique = false, parts = {2, 'unsigned'}})
+        s:insert({1, 10})
+        s:insert({3, 30})
+        s:insert({5, 50})
+        t.assert_equals(i:select({30}, {iterator = 'ge', after = {2, 30}}),
+                        {{3, 30}, {5, 50}})
+        t.assert_equals(i:select({30}, {iterator = 'eq', after = {2, 30}}),
+                        {{3, 30}})
+        t.assert_equals(i:select({30}, {iterator = 'le', after = {4, 30}}),
+                        {{3, 30}, {1, 10}})
+        t.assert_equals(i:select({30}, {iterator = 'req', after = {4, 30}}),
+                        {{3, 30}})
+    end)
+end
+
 -- Tests for memtx tree features, such as functional index
 local func_g = t.group('Memtx tree func index tests')
 

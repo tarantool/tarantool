@@ -756,11 +756,12 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 	}
 	/* If we skip tuple, flag equals is not actual - need to refresh it. */
 	if (skip_equal_tuple && res != NULL &&
-	    (type == ITER_EQ || type == ITER_REQ) &&
-	    tuple_compare_with_key(res->tuple, res->hint, it->key_data.key,
-				   it->key_data.part_count, it->key_data.hint,
-				   index->base.def->key_def) != 0) {
-		equals = false;
+	    (type == ITER_EQ || type == ITER_REQ)) {
+		equals = tuple_compare_with_key(res->tuple, res->hint,
+						it->key_data.key,
+						it->key_data.part_count,
+						it->key_data.hint,
+						index->base.def->key_def) == 0;
 	}
 	/*
 	 * Equality iterators requires exact key match: if the result does not
