@@ -16,7 +16,7 @@ box.info.replication[1].id
 box.info.status
 string.len(box.info.uptime) > 0
 string.match(box.info.uptime, '^[1-9][0-9]*$') ~= nil
-box.info.cluster.uuid == box.space._schema:get{'replicaset_uuid'}[2]
+box.info.replicaset.uuid == box.space._schema:get{'replicaset_uuid'}[2]
 t = {}
 for k, _ in pairs(box.info()) do table.insert(t, k) end
 table.sort(t)
@@ -67,3 +67,17 @@ _ = fiber.create(function() box.ctl.wait_rw() ch:put(box.info.ro) end)
 fiber.sleep(0.001)
 box.cfg{read_only = false}
 ch:get() -- false
+
+--
+-- box.info.cluster compat. Before 3.0.0 it meant the current replicaset. Now it
+-- means the whole cluster.
+--
+compat = require('compat')
+info = compat.box_info_cluster_meaning
+assert(info.current == 'default')
+assert(info.default == 'new')
+rs_uuid = box.info.replicaset.uuid
+assert(box.info.cluster.uuid ~= rs_uuid)
+compat.box_info_cluster_meaning = 'old'
+assert(box.info.cluster.uuid == rs_uuid)
+compat.box_info_cluster_meaning = 'default'

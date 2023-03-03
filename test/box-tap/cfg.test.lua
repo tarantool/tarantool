@@ -444,7 +444,7 @@ test:is(run_script(code), 0, "check instance_uuid")
 code = [[
 replicaset_uuid = tostring(require('uuid').new())
 box.cfg{replicaset_uuid = replicaset_uuid}
-os.exit(replicaset_uuid == box.info.cluster.uuid and 0 or 1)
+os.exit(replicaset_uuid == box.info.replicaset.uuid and 0 or 1)
 ]]
 test:is(run_script(code), 0, "check replicaset_uuid")
 

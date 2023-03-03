@@ -432,7 +432,7 @@ local function check_instance_uuid()
 end
 
 local function check_replicaset_uuid()
-    if box.cfg.replicaset_uuid ~= box.info.cluster.uuid then
+    if box.cfg.replicaset_uuid ~= box.info.replicaset.uuid then
         box.error(box.error.RELOAD_CFG, 'replicaset_uuid')
     end
 end

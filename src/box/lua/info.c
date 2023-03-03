@@ -57,6 +57,16 @@
 #include "fiber.h"
 #include "sio.h"
 #include "tt_strerror.h"
+#include "tweaks.h"
+
+/**
+ * In 3.0.0 the meaning of box.info.cluster changed to something not related. In
+ * the major release it was allowed to make the new behaviour the default one,
+ * but since the change can be very breaking for some people, it still can be
+ * reverted.
+ */
+static bool box_info_cluster_new_meaning = true;
+TWEAK_BOOL(box_info_cluster_new_meaning);
 
 static inline void
 lbox_push_replication_error_message(struct lua_State *L, struct error *e,
@@ -369,13 +379,24 @@ lbox_info_pid(struct lua_State *L)
 	return 1;
 }
 
+/** box.info.replicaset. */
 static int
-lbox_info_cluster(struct lua_State *L)
+lbox_info_replicaset(struct lua_State *L)
 {
 	lua_createtable(L, 0, 2);
 	lua_pushliteral(L, "uuid");
 	luaT_pushuuidstr(L, &REPLICASET_UUID);
 	lua_settable(L, -3);
+	return 1;
+}
+
+/** box.info.cluster. */
+static int
+lbox_info_cluster(struct lua_State *L)
+{
+	if (!box_info_cluster_new_meaning)
+		return lbox_info_replicaset(L);
+	lua_createtable(L, 0, 0);
 	return 1;
 }
 
@@ -662,6 +683,7 @@ static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"ro_reason", lbox_info_ro_reason},
 	{"replication", lbox_info_replication},
 	{"replication_anon", lbox_info_replication_anon},
+	{"replicaset", lbox_info_replicaset},
 	{"status", lbox_info_status},
 	{"uptime", lbox_info_uptime},
 	{"pid", lbox_info_pid},

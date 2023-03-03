@@ -418,7 +418,7 @@ box.cfg{instance_uuid = '12345678-0123-5678-1234-abcdefabcdef'}
  | - error: Can't set option 'instance_uuid' dynamically
  | ...
 
-box.cfg{replicaset_uuid = box.info.cluster.uuid}
+box.cfg{replicaset_uuid = box.info.replicaset.uuid}
  | ---
  | ...
 box.cfg{replicaset_uuid = '12345678-0123-5678-1234-abcdefabcdef'}

@@ -50,7 +50,7 @@ box.cfg{replication_sync_timeout = replication_sync_timeout}
 box.cfg{instance_uuid = box.info.uuid}
 box.cfg{instance_uuid = '12345678-0123-5678-1234-abcdefabcdef'}
 
-box.cfg{replicaset_uuid = box.info.cluster.uuid}
+box.cfg{replicaset_uuid = box.info.replicaset.uuid}
 box.cfg{replicaset_uuid = '12345678-0123-5678-1234-abcdefabcdef'}
 
 box.cfg{memtx_memory = box.cfg.memtx_memory}
