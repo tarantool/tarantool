@@ -402,10 +402,9 @@ sequence_data_read_view_free(struct index_read_view *base)
 }
 
 struct index_read_view *
-sequence_data_read_view_create(struct index *index,
-			       const struct read_view_opts *opts)
+sequence_data_read_view_create(struct index *index)
 {
-	(void)opts;
+	(void)index;
 	static const struct index_read_view_vtab vtab = {
 		.free = sequence_data_read_view_free,
 		.get_raw = sequence_data_read_view_get_raw,

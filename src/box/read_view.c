@@ -131,7 +131,7 @@ space_read_view_new(struct space *space, const struct read_view_opts *opts)
 		if (index == NULL ||
 		    !opts->filter_index(space, index, opts->filter_arg))
 			continue;
-		space_rv->index_map[i] = index_create_read_view(index, opts);
+		space_rv->index_map[i] = index_create_read_view(index);
 		if (space_rv->index_map[i] == NULL)
 			goto fail;
 		space_rv->index_map[i]->space = space_rv;
