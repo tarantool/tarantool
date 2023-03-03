@@ -392,6 +392,20 @@ vy_stmt_hint(struct tuple *stmt, struct key_def *key_def)
 }
 
 /**
+ * Compare two keys with MessagePack array header.
+ */
+static inline int
+vy_key_compare(const char *key_a, hint_t key_a_hint,
+	       const char *key_b, hint_t key_b_hint,
+	       struct key_def *key_def)
+{
+	uint32_t part_count_a = mp_decode_array(&key_a);
+	uint32_t part_count_b = mp_decode_array(&key_b);
+	return key_compare(key_a, part_count_a, key_a_hint,
+			   key_b, part_count_b, key_b_hint, key_def);
+}
+
+/**
  * Compare two vinyl statements taking into account their
  * formats (key or tuple) and using comparison hints.
  */
@@ -416,8 +430,8 @@ vy_stmt_compare(struct tuple *a, hint_t a_hint,
 					       a_hint, key_def);
 	} else {
 		assert(!a_is_tuple && !b_is_tuple);
-		return key_compare(tuple_data(a), a_hint,
-				   tuple_data(b), b_hint, key_def);
+		return vy_key_compare(tuple_data(a), a_hint,
+				      tuple_data(b), b_hint, key_def);
 	}
 }
 
@@ -436,7 +450,8 @@ vy_stmt_compare_with_raw_key(struct tuple *stmt, hint_t stmt_hint,
 					      part_count, key_hint,
 					      key_def);
 	}
-	return key_compare(tuple_data(stmt), stmt_hint, key, key_hint, key_def);
+	return vy_key_compare(tuple_data(stmt), stmt_hint,
+			      key, key_hint, key_def);
 }
 
 /**

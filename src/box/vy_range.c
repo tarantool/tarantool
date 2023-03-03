@@ -478,9 +478,9 @@ vy_range_needs_split(struct vy_range *range, int64_t range_size,
 						slice->first_page_no);
 
 	/* No point in splitting if a new range is going to be empty. */
-	if (key_compare(first_page->min_key, first_page->min_key_hint,
-			mid_page->min_key, mid_page->min_key_hint,
-			range->cmp_def) == 0)
+	if (vy_key_compare(first_page->min_key, first_page->min_key_hint,
+			   mid_page->min_key, mid_page->min_key_hint,
+			   range->cmp_def) == 0)
 		return false;
 	/*
 	 * In extreme cases the median key can be < the beginning
