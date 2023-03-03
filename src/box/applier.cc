@@ -1555,6 +1555,7 @@ applier_synchro_filter_tx(struct stailq *rows)
 static inline int
 applier_process_heartbeat(struct applier *applier, struct applier_tx_row *txr)
 {
+	raft_process_heartbeat(box_raft(), applier->instance_id);
 	if (txr->row.type != IPROTO_OK) {
 		/* Not a heartbeat. Maybe a Raft message. */
 		return 0;
@@ -1839,7 +1840,15 @@ applier_process_batch(struct cmsg *base)
 		struct applier_tx_row *last_txr =
 			stailq_last_entry(&tx->rows, struct applier_tx_row,
 					  next);
-		raft_process_heartbeat(box_raft(), applier->instance_id);
+		/*
+		 * Tarantool before version 2.11.0 doesn't send heartbeats when
+		 * there is data to be sent. Instead each row is treated as
+		 * heartbeat.
+		 */
+		if (applier->version_id < version_id(2, 11, 0)) {
+			raft_process_heartbeat(box_raft(),
+					       applier->instance_id);
+		}
 		if (last_txr->row.lsn == 0) {
 			if (applier_process_heartbeat(applier, last_txr) != 0)
 				diag_raise();
