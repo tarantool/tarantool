@@ -1697,8 +1697,8 @@ memtx_prepare_result_tuple(struct tuple **result)
 
 int
 memtx_prepare_read_view_tuple(struct tuple *tuple,
+			      struct index_read_view *index,
 			      struct memtx_tx_snapshot_cleaner *cleaner,
-			      bool disable_decompression,
 			      struct read_view_tuple *result)
 {
 	tuple = memtx_tx_snapshot_clarify(cleaner, tuple);
@@ -1707,7 +1707,7 @@ memtx_prepare_read_view_tuple(struct tuple *tuple,
 		return 0;
 	}
 	result->data = tuple_data_range(tuple, &result->size);
-	if (!disable_decompression) {
+	if (!index->space->rv->disable_decompression) {
 		result->data = memtx_tuple_decompress_raw(
 				result->data, result->data + result->size,
 				&result->size);

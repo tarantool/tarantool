@@ -204,6 +204,7 @@ read_view_open(struct read_view *rv, const struct read_view_opts *opts)
 	assert(opts->name != NULL);
 	rv->name = xstrdup(opts->name);
 	rv->is_system = opts->is_system;
+	rv->disable_decompression = opts->disable_decompression;
 	rv->timestamp = ev_monotonic_now(loop());
 	vclock_copy(&rv->vclock, box_vclock);
 	rv->owner = NULL;
