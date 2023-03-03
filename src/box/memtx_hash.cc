@@ -37,7 +37,6 @@
 #include "memtx_tx.h"
 #include "memtx_engine.h"
 #include "memtx_tuple_compression.h"
-#include "read_view.h"
 #include "space.h"
 #include "schema.h" /* space_by_id(), space_cache_find() */
 #include "errinj.h"
@@ -632,10 +631,8 @@ hash_read_view_create_iterator(struct index_read_view *base,
 
 /** Implementation of create_read_view index callback. */
 static struct index_read_view *
-memtx_hash_index_create_read_view(struct index *base,
-				  const struct read_view_opts *opts)
+memtx_hash_index_create_read_view(struct index *base)
 {
-	(void)opts;
 	static const struct index_read_view_vtab vtab = {
 		.free = hash_read_view_free,
 		.get_raw = hash_read_view_get_raw,
