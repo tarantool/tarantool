@@ -1903,13 +1903,12 @@ template <bool USE_HINT>
 static int
 tree_read_view_get_raw(struct index_read_view *rv,
 		       const char *key, uint32_t part_count,
-		       const char **data, uint32_t *size)
+		       struct read_view_tuple *result)
 {
 	(void)rv;
 	(void)key;
 	(void)part_count;
-	(void)data;
-	(void)size;
+	(void)result;
 	unreachable();
 	return 0;
 }
@@ -1918,7 +1917,7 @@ tree_read_view_get_raw(struct index_read_view *rv,
 template <bool USE_HINT>
 static int
 tree_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
-				 const char **data, uint32_t *size)
+				 struct read_view_tuple *result)
 {
 	struct tree_read_view_iterator<USE_HINT> *it =
 		(struct tree_read_view_iterator<USE_HINT> *)iterator;
@@ -1931,7 +1930,7 @@ tree_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 							  &it->tree_iterator);
 
 		if (res == NULL) {
-			*data = NULL;
+			*result = read_view_tuple_none();
 			return 0;
 		}
 
@@ -1939,9 +1938,9 @@ tree_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 					      &it->tree_iterator);
 		if (memtx_prepare_read_view_tuple(res->tuple, &rv->cleaner,
 						  rv->disable_decompression,
-						  data, size) != 0)
+						  result) != 0)
 			return -1;
-		if (*data != NULL)
+		if (result->data != NULL)
 			return 0;
 	}
 }
