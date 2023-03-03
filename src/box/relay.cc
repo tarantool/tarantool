@@ -171,8 +171,10 @@ struct relay {
 	 * confirmation from the replica.
 	 */
 	struct stailq pending_gc;
-	/** Time when last row was sent to peer. */
+	/** Time when last row was sent to the peer. */
 	double last_row_time;
+	/** Time when last heartbeat was sent to the peer. */
+	double last_heartbeat_time;
 	/** Time of last communication with the tx thread. */
 	double tx_seen_time;
 	/**
@@ -345,7 +347,8 @@ relay_start(struct relay *relay, struct iostream *io, uint64_t sync,
 	relay->need_new_vclock_sync = false;
 	relay->is_sending_tx = false;
 	relay->last_row_time = ev_monotonic_now(loop());
-	relay->tx_seen_time = ev_monotonic_now(loop());
+	relay->tx_seen_time = relay->last_row_time;
+	relay->last_heartbeat_time = relay->last_row_time;
 }
 
 void
@@ -785,8 +788,16 @@ relay_send_heartbeat(struct relay *relay)
 		++relay->last_sent_ack.vclock_sync;
 		RegionGuard region_guard(&fiber()->gc);
 		xrow_encode_relay_heartbeat(&row, &relay->last_sent_ack);
-		row.tm = ev_now(loop());
+		/*
+		 * Do not encode timestamp if this heartbeat is sent in between
+		 * data rows so as to not affect replica's upstream lag.
+		 */
+		if (relay->last_row_time > relay->last_heartbeat_time)
+			row.tm = 0;
+		else
+			row.tm = ev_now(loop());
 		row.replica_id = instance_id;
+		relay->last_heartbeat_time = ev_monotonic_now(loop());
 		relay_send(relay, &row);
 		relay->need_new_vclock_sync = false;
 	} catch (Exception *e) {
@@ -815,7 +826,7 @@ relay_send_heartbeat_on_timeout(struct relay *relay)
 	 * switchover.
 	 */
 	if (!relay->need_new_vclock_sync &&
-	    (now - relay->last_row_time <= replication_timeout ||
+	    (now - relay->last_heartbeat_time <= replication_timeout ||
 	    now - relay->tx_seen_time >= replication_disconnect_timeout()))
 		return;
 	relay_send_heartbeat(relay);
@@ -1198,6 +1209,9 @@ static void
 relay_send_row(struct xstream *stream, struct xrow_header *packet)
 {
 	struct relay *relay = container_of(stream, struct relay, stream);
+	/* Do not send heartbeats during a final join. */
+	if (relay->replica != NULL)
+		relay_send_heartbeat_on_timeout(relay);
 	if (packet->group_id == GROUP_LOCAL) {
 		/*
 		 * We do not relay replica-local rows to other
@@ -1265,8 +1279,5 @@ relay_send_row(struct xstream *stream, struct xrow_header *packet)
 		}
 		relay_send(relay, packet);
 		relay->is_sending_tx = !packet->is_commit;
-		if (!relay->is_sending_tx) {
-			relay_send_heartbeat_on_timeout(relay);
-		}
 	}
 }
