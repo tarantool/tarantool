@@ -2031,7 +2031,6 @@ struct Parse {
 	 */
 	union {
 		struct create_trigger_def create_trigger_def;
-		struct create_view_def create_view_def;
 		struct rename_entity_def rename_entity_def;
 		struct drop_constraint_def drop_constraint_def;
 		struct drop_index_def drop_index_def;
@@ -2057,6 +2056,8 @@ struct Parse {
 	struct sql_parse_index create_index;
 	/** Description of created table. */
 	struct sql_parse_table create_table;
+	/** Description of created view. */
+	struct sql_parse_view create_view;
 	/** Name of the column with AUTOINCREMENT. */
 	struct Expr *autoinc_name;
 	/** Source list for the statement. */

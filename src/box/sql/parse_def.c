@@ -415,3 +415,27 @@ sql_parse_table_engine(struct Parse *parse, struct Token *engine_name)
 {
 	parse->create_table.engine_name = *engine_name;
 }
+
+void
+sql_parse_create_view(struct Parse *parse, struct Token *name,
+		      struct Token *create_start, struct ExprList *aliases,
+		      struct Select *select, bool if_not_exists)
+{
+	parse->type = PARSE_TYPE_CREATE_VIEW;
+	parse->create_view.name = *name;
+	parse->create_view.aliases = aliases;
+	parse->create_view.select = select;
+	parse->create_view.if_not_exists = if_not_exists;
+
+	struct Token end = parse->sLastToken;
+	assert(end.z[0] != '\0');
+	if (end.z[0] != ';')
+		end.z += end.n;
+	struct Token *begin = create_start;
+	int len = end.z - begin->z;
+	assert(len > 0);
+	while (sqlIsspace(begin->z[len - 1]))
+		len--;
+	parse->create_view.str.z = begin->z;
+	parse->create_view.str.n = len;
+}

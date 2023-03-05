@@ -575,6 +575,12 @@ sql_finish_parsing(struct Parse *parse)
 			return;
 		sqlEndTable(parse);
 		break;
+	case PARSE_TYPE_CREATE_VIEW:
+		parse->initiateTTrans = true;
+		sql_create_view(parse);
+		if (parse->is_aborted)
+			return;
+		break;
 	case PARSE_TYPE_ADD_COLUMN:
 		if (sql_finish_table_properties(parse) != 0)
 			return;

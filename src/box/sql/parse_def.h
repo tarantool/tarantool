@@ -94,6 +94,8 @@ enum parse_type {
 	PARSE_TYPE_CREATE_TABLE,
 	/** CREATE INDEX statement. */
 	PARSE_TYPE_CREATE_INDEX,
+	/** CREATE VIEW statement. */
+	PARSE_TYPE_CREATE_VIEW,
 	/** ALTER TABLE ADD COLUMN statement. */
 	PARSE_TYPE_ADD_COLUMN,
 	/** ALTER TABLE ADD CONSTAINT FOREIGN KEY statement. */
@@ -245,6 +247,20 @@ struct sql_parse_table {
 	bool if_not_exists;
 };
 
+/** Description of the view being created. */
+struct sql_parse_view {
+	/** View name. */
+	struct Token name;
+	/** The query that defines the view. */
+	struct Token str;
+	/** List of aliases. */
+	struct ExprList *aliases;
+	/** Select of the view. */
+	struct Select *select;
+	/** IF NOT EXISTS flag. */
+	bool if_not_exists;
+};
+
 /** Constant tokens for integer values. */
 extern const struct Token sqlIntTokens[];
 
@@ -367,19 +383,6 @@ struct create_fk_constraint_parse_def {
 	 * properly.
 	 */
 	bool is_used;
-};
-
-struct create_view_def {
-	struct create_entity_def base;
-	/**
-	 * Starting position of CREATE VIEW ... statement.
-	 * It is used to fetch whole statement, which is
-	 * saved as raw string to space options.
-	 */
-	struct Token *create_start;
-	/** List of column aliases (SELECT x AS y ...). */
-	struct ExprList *aliases;
-	struct Select *select;
 };
 
 struct drop_entity_def {
@@ -542,18 +545,6 @@ create_fk_constraint_parse_def_init(struct create_fk_constraint_parse_def *def)
 }
 
 static inline void
-create_view_def_init(struct create_view_def *view_def, struct Token *name,
-		     struct Token *create, struct ExprList *aliases,
-		     struct Select *select, bool if_not_exists)
-{
-	create_entity_def_init(&view_def->base, ENTITY_TYPE_VIEW, NULL, name,
-			       if_not_exists);
-	view_def->create_start = create;
-	view_def->select = select;
-	view_def->aliases = aliases;
-}
-
-static inline void
 create_fk_constraint_parse_def_destroy(struct create_fk_constraint_parse_def *d)
 {
 	if (!d->is_used)
@@ -591,6 +582,12 @@ sql_parse_savepoint_rollback(struct Parse *parse, const struct Token *name);
 void
 sql_parse_create_table(struct Parse *parse, struct Token *name,
 		       bool if_not_exists);
+
+/** Save parsed CREATE VIEW statement. */
+void
+sql_parse_create_view(struct Parse *parse, struct Token *name,
+		      struct Token *create_start, struct ExprList *aliases,
+		      struct Select *select, bool if_not_exists);
 
 /** Save parsed CREATE INDEX statement. */
 void
