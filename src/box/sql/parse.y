@@ -1651,9 +1651,7 @@ cmd ::= alter_table_start(A) RENAME TO nm(N). {
 }
 
 cmd ::= ALTER TABLE fullname(X) DROP CONSTRAINT nm(Z). {
-  drop_constraint_def_init(&pParse->drop_constraint_def, X, &Z, false);
-  pParse->initiateTTrans = true;
-  sql_drop_constraint(pParse);
+  sql_parse_drop_constraint(pParse, X, &Z);
 }
 
 //////////////////////// COMMON TABLE EXPRESSIONS ////////////////////////////

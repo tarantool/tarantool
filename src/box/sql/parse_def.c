@@ -467,3 +467,12 @@ sql_parse_table_rename(struct Parse *parse, struct SrcList *table_name,
 	parse->src_list = table_name;
 	parse->table_new_name = *new_name;
 }
+
+void
+sql_parse_drop_constraint(struct Parse *parse, struct SrcList *table_name,
+			  struct Token *name)
+{
+	parse->type = PARSE_TYPE_DROP_CONSTRAINT;
+	parse->src_list = table_name;
+	parse->drop_object.name = *name;
+}

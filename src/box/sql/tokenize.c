@@ -622,6 +622,12 @@ sql_finish_parsing(struct Parse *parse)
 		if (parse->is_aborted)
 			return;
 		break;
+	case PARSE_TYPE_DROP_CONSTRAINT:
+		parse->initiateTTrans = true;
+		sql_drop_constraint(parse);
+		if (parse->is_aborted)
+			return;
+		break;
 	default:
 		assert(parse->type == PARSE_TYPE_UNKNOWN);
 	}

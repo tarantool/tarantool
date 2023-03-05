@@ -2036,11 +2036,7 @@ tnt_error:
 void
 sql_drop_constraint(struct Parse *parse_context)
 {
-	struct drop_entity_def *drop_def =
-		&parse_context->drop_constraint_def.base;
-	assert(drop_def->base.entity_type == ENTITY_TYPE_CONSTRAINT);
-	assert(drop_def->base.alter_action == ALTER_ACTION_DROP);
-	const char *table_name = drop_def->base.entity_name->a[0].zName;
+	const char *table_name = parse_context->src_list->a[0].zName;
 	assert(table_name != NULL);
 	struct space *space = space_by_name(table_name);
 	if (space == NULL) {
@@ -2048,9 +2044,10 @@ sql_drop_constraint(struct Parse *parse_context)
 		parse_context->is_aborted = true;
 		return;
 	}
+	struct Token *constraint_name = &parse_context->drop_object.name;
 	char *name = sql_normalized_name_region_new(&parse_context->region,
-						    drop_def->name.z,
-						    drop_def->name.n);
+						    constraint_name->z,
+						    constraint_name->n);
 	if (name == NULL) {
 		parse_context->is_aborted = true;
 		return;
