@@ -96,15 +96,19 @@ last_column_name(struct Parse *parse)
 static const char *
 new_table_name(struct Parse *parse)
 {
-	if (parse->create_table_def.new_space == NULL)
+	if (parse->type != PARSE_TYPE_CREATE_TABLE)
 		return NULL;
-	return parse->create_table_def.new_space->def->name;
+	struct Token *name = &parse->create_table.name;
+	return sql_normalized_name_region_new(&parse->region, name->z, name->n);
 }
 
 void
-sql_parse_create_table(struct Parse *parse)
+sql_parse_create_table(struct Parse *parse, struct Token *name,
+		       bool if_not_exists)
 {
 	parse->type = PARSE_TYPE_CREATE_TABLE;
+	parse->create_table.name = *name;
+	parse->create_table.if_not_exists = if_not_exists;
 }
 
 /** Append a new column to column list. */
@@ -404,4 +408,10 @@ void
 sql_parse_column_default(struct Parse *parse, struct ExprSpan *expr)
 {
 	parse->column_list.a[parse->column_list.n - 1].default_expr = *expr;
+}
+
+void
+sql_parse_table_engine(struct Parse *parse, struct Token *engine_name)
+{
+	parse->create_table.engine_name = *engine_name;
 }

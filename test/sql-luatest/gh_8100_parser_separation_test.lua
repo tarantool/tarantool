@@ -119,3 +119,15 @@ g.test_add_column_parsing = function()
         t.assert_equals(err.message, "Syntax error at line 1 near '1'")
     end)
 end
+
+--
+-- Make sure that the CREATE TABLE statement is processed only after successful
+-- parsing.
+--
+g.test_create_table_parsing = function()
+    g.server:exec(function()
+        local _, err = box.execute([[CREATE TABLE t(i INT PRIMARY KEY, a INT)
+                                     WITH ENGINE = 'a1234567890123456' 1;]])
+        t.assert_equals(err.message, "Syntax error at line 2 near '1'")
+    end)
+end

@@ -567,6 +567,10 @@ sql_finish_parsing(struct Parse *parse)
 		sqlSavepoint(parse, SAVEPOINT_ROLLBACK, &parse->savepoint.name);
 		break;
 	case PARSE_TYPE_CREATE_TABLE:
+		parse->space = sqlStartTable(parse, &parse->create_table.name,
+					     &parse->create_table.engine_name);
+		if (parse->is_aborted)
+			return;
 		if (sql_finish_table_properties(parse) != 0)
 			return;
 		sqlEndTable(parse);
@@ -624,7 +628,7 @@ sqlRunParser(Parse * pParse, const char *zSql)
 	i = 0;
 	/* sqlParserTrace(stdout, "parser: "); */
 	pEngine = sqlParserAlloc(new_xmalloc);
-	assert(pParse->create_table_def.new_space == NULL);
+	assert(pParse->space == NULL);
 	assert(pParse->parsed_ast.trigger == NULL);
 	assert(pParse->nVar == 0);
 	assert(pParse->pVList == 0);

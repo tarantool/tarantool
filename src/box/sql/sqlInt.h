@@ -2039,14 +2039,6 @@ struct Parse {
 		struct drop_trigger_def drop_trigger_def;
 		struct drop_view_def drop_view_def;
 	};
-	/**
-	 * Table def or column def is not part of union since
-	 * information being held must survive till the end of
-	 * parsing of whole <CREATE TABLE> or
-	 * <ALTER TABLE ADD COLUMN> statement (to pass it to
-	 * sqlEndTable() sql_create_column_end() function).
-	 */
-	struct create_table_def create_table_def;
 	/** Parsed statement type. */
 	enum parse_type type;
 	/** Savepoint description for savepoint-related statements. */
@@ -2063,6 +2055,8 @@ struct Parse {
 	struct sql_parse_unique primary_key;
 	/** Description of created index. */
 	struct sql_parse_index create_index;
+	/** Description of created table. */
+	struct sql_parse_table create_table;
 	/** Name of the column with AUTOINCREMENT. */
 	struct Expr *autoinc_name;
 	/** Source list for the statement. */
@@ -2690,8 +2684,25 @@ void
 sqlSelectAddColumnTypeAndCollation(Parse *, struct space_def *, Select *);
 struct space *sqlResultSetOfSelect(Parse *, Select *);
 
+/*
+ * Begin constructing a new table representation in memory.  This is
+ * the first of several action routines that get called in response
+ * to a CREATE TABLE statement.  In particular, this routine is called
+ * after seeing tokens "CREATE" and "TABLE" and the table name. The isTemp
+ * flag is true if the table should be stored in the auxiliary database
+ * file instead of in the main database file.  This is normally the case
+ * when the "TEMP" or "TEMPORARY" keyword occurs in between
+ * CREATE and TABLE.
+ *
+ * The new table record is initialized and put in pParse->space.
+ * As more of the CREATE TABLE statement is parsed, additional action
+ * routines will be called to add more information to this record.
+ * At the end of the CREATE TABLE statement, the sqlEndTable() routine
+ * is called to complete the construction of the new table record.
+ */
 struct space *
-sqlStartTable(Parse *, Token *);
+sqlStartTable(struct Parse *parse, struct Token *name,
+	      struct Token *engine_name);
 
 /**
  * Add new field to the format of ephemeral space. If it is <ALTER TABLE> create

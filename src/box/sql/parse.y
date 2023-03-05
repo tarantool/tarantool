@@ -172,9 +172,7 @@ cmd ::= ROLLBACK TO savepoint_opt nm(X). {
 //
 cmd ::= create_table create_table_args with_opts.
 create_table ::= createkw TABLE ifnotexists(E) nm(Y). {
-  create_table_def_init(&pParse->create_table_def, &Y, E);
-  pParse->create_table_def.new_space = sqlStartTable(pParse, &Y);
-  sql_parse_create_table(pParse);
+  sql_parse_create_table(pParse, &Y, E);
 }
 createkw(A) ::= CREATE(A).  {disableLookaside(pParse);}
 
@@ -188,19 +186,7 @@ with_opts ::= WITH engine_opts.
 with_opts ::= .
 
 engine_opts ::= ENGINE EQ STRING(A). {
-  /* Note that specifying engine clause overwrites default engine. */
-  if (A.n > ENGINE_NAME_MAX) {
-    diag_set(ClientError, ER_CREATE_SPACE,
-             pParse->create_table_def.new_space->def->name,
-             "space engine name is too long");
-    pParse->is_aborted = true;
-    return;
-  }
-  /* Need to dequote name. */
-  char *normalized_name = sql_name_from_token(&A);
-  memcpy(pParse->create_table_def.new_space->def->engine_name, normalized_name,
-         strlen(normalized_name) + 1);
-  sql_xfree(normalized_name);
+  sql_parse_table_engine(pParse, &A);
 }
 
 /*

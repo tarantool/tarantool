@@ -235,6 +235,16 @@ struct sql_parse_column_list {
 	uint32_t n;
 };
 
+/** Description of the table being created. */
+struct sql_parse_table {
+	/** Table name. */
+	struct Token name;
+	/** Table engine name. */
+	struct Token engine_name;
+	/** IF NOT EXISTS flag. */
+	bool if_not_exists;
+};
+
 /** Constant tokens for integer values. */
 extern const struct Token sqlIntTokens[];
 
@@ -342,11 +352,6 @@ struct create_entity_def {
 	struct Token name;
 	/** Statement comes with IF NOT EXISTS clause. */
 	bool if_not_exist;
-};
-
-struct create_table_def {
-	struct create_entity_def base;
-	struct space *new_space;
 };
 
 struct create_ck_constraint_parse_def {
@@ -524,14 +529,6 @@ create_trigger_def_init(struct create_trigger_def *trigger_def,
 }
 
 static inline void
-create_table_def_init(struct create_table_def *table_def, struct Token *name,
-		      bool if_not_exists)
-{
-	create_entity_def_init(&table_def->base, ENTITY_TYPE_TABLE, NULL, name,
-			       if_not_exists);
-}
-
-static inline void
 create_ck_constraint_parse_def_init(struct create_ck_constraint_parse_def *def)
 {
 	rlist_create(&def->checks);
@@ -592,7 +589,8 @@ sql_parse_savepoint_rollback(struct Parse *parse, const struct Token *name);
 
 /** Save parsed CREATE TABLE statement. */
 void
-sql_parse_create_table(struct Parse *parse);
+sql_parse_create_table(struct Parse *parse, struct Token *name,
+		       bool if_not_exists);
 
 /** Save parsed CREATE INDEX statement. */
 void
@@ -694,5 +692,9 @@ sql_parse_column_nullable_action(struct Parse *parse, int action,
 /** Save parsed column DEFAULT clause. */
 void
 sql_parse_column_default(struct Parse *parse, struct ExprSpan *expr);
+
+/** Save parsed table engine clause. */
+void
+sql_parse_table_engine(struct Parse *parse, struct Token *engine_name);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */
