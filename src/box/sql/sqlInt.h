@@ -2024,14 +2024,6 @@ struct Parse {
 	uint32_t autoname_i;
 	/** Space triggers are being coded for. */
 	struct space *triggered_space;
-	/**
-	 * One of parse_def structures which are used to
-	 * assemble and carry arguments of DDL routines
-	 * from parse.y
-	 */
-	union {
-		struct drop_trigger_def drop_trigger_def;
-	};
 	/** Parsed statement type. */
 	enum parse_type type;
 	/** Savepoint description for savepoint-related statements. */
@@ -2056,7 +2048,7 @@ struct Parse {
 	struct sql_parse_trigger create_trigger;
 	/**
 	 * Description of the object to drop from ALTER TABLE DROP CONSTRAINT,
-	 * DROP INDEX, DROP VIEW or DROP TABLE statement.
+	 * DROP INDEX, DROP VIEW, DROP TABLE or DROP TRIGGER statement.
 	 */
 	struct sql_parse_drop drop_object;
 	/** Name of the column with AUTOINCREMENT. */

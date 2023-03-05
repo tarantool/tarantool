@@ -504,3 +504,12 @@ sql_parse_drop_table(struct Parse *parse, struct SrcList *table_name,
 	parse->src_list = table_name;
 	parse->drop_object.if_exists = if_exists;
 }
+
+void
+sql_parse_drop_trigger(struct Parse *parse, struct SrcList *table_name,
+		       bool if_exists)
+{
+	parse->type = PARSE_TYPE_DROP_TRIGGER;
+	parse->src_list = table_name;
+	parse->drop_object.if_exists = if_exists;
+}

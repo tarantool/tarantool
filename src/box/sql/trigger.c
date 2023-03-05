@@ -321,18 +321,13 @@ vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name,
 void
 sql_drop_trigger(struct Parse *parser)
 {
-	struct drop_entity_def *drop_def = &parser->drop_trigger_def.base;
-	struct alter_entity_def *alter_def = &drop_def->base;
-	assert(alter_def->entity_type == ENTITY_TYPE_TRIGGER);
-	assert(alter_def->alter_action == ALTER_ACTION_DROP);
-	struct SrcList *name = alter_def->entity_name;
-	bool no_err = drop_def->if_exist;
+	bool no_err = parser->drop_object.if_exists;
 
 	struct Vdbe *v = sqlGetVdbe(parser);
 	sqlVdbeCountChanges(v);
 
-	assert(name->nSrc == 1);
-	const char *trigger_name = name->a[0].zName;
+	assert(parser->src_list->nSrc == 1);
+	const char *trigger_name = parser->src_list->a[0].zName;
 	const char *error_msg =
 		tt_sprintf(tnt_errcode_desc(ER_NO_SUCH_TRIGGER),
 			   trigger_name);
@@ -343,7 +338,6 @@ sql_drop_trigger(struct Parse *parser)
 					  1, ER_NO_SUCH_TRIGGER, error_msg,
 					  no_err, OP_Found);
 	vdbe_code_drop_trigger(parser, trigger_name, true);
-	sqlSrcListDelete(name);
 }
 
 int

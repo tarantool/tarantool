@@ -118,6 +118,8 @@ enum parse_type {
 	PARSE_TYPE_DROP_VIEW,
 	/** DROP TABLE statement. */
 	PARSE_TYPE_DROP_TABLE,
+	/** DROP TRIGGER statement. */
+	PARSE_TYPE_DROP_TRIGGER,
 };
 
 /**
@@ -295,7 +297,7 @@ struct sql_parse_trigger {
 
 /**
  * Description of the object to drop from ALTER TABLE DROP CONSTRAINT,
- * DROP INDEX, DROP VIEW or DROP TABLE statement.
+ * DROP INDEX, DROP VIEW, DROP TABLE or DROP TRIGGER statement.
  */
 struct sql_parse_drop {
 	/** Drop object name. */
@@ -370,37 +372,6 @@ enum sql_index_type {
 	sql_index_type_MAX
 };
 
-enum entity_type {
-	ENTITY_TYPE_TABLE = 0,
-	ENTITY_TYPE_COLUMN,
-	ENTITY_TYPE_VIEW,
-	ENTITY_TYPE_INDEX,
-	ENTITY_TYPE_TRIGGER,
-	ENTITY_TYPE_CK,
-	ENTITY_TYPE_FK,
-	/**
-	 * For assertion checks that constraint definition is
-	 * created before initialization of a term constraint.
-	 */
-	ENTITY_TYPE_CONSTRAINT,
-};
-
-enum alter_action {
-	ALTER_ACTION_CREATE = 0,
-	ALTER_ACTION_DROP,
-	ALTER_ACTION_RENAME,
-	ALTER_ACTION_ENABLE,
-};
-
-struct alter_entity_def {
-	/** Type of topmost entity. */
-	enum entity_type entity_type;
-	/** Action to be performed using current entity. */
-	enum alter_action alter_action;
-	/** As a rule it is a name of table to be altered. */
-	struct SrcList *entity_name;
-};
-
 struct create_ck_constraint_parse_def {
 	/** List of ck_constraint_parse_def objects. */
 	struct rlist checks;
@@ -415,49 +386,6 @@ struct create_fk_constraint_parse_def {
 	 */
 	bool is_used;
 };
-
-struct drop_entity_def {
-	struct alter_entity_def base;
-	/** Name of index/trigger/constraint to be dropped. */
-	struct Token name;
-	/** Statement comes with IF EXISTS clause. */
-	bool if_exist;
-};
-
-struct drop_trigger_def {
-	struct drop_entity_def base;
-};
-
-/** Basic initialisers of parse structures.*/
-static inline void
-alter_entity_def_init(struct alter_entity_def *alter_def,
-		      struct SrcList *entity_name, enum entity_type type,
-		      enum alter_action action)
-{
-	alter_def->entity_name = entity_name;
-	alter_def->entity_type = type;
-	alter_def->alter_action = action;
-}
-
-static inline void
-drop_entity_def_init(struct drop_entity_def *drop_def,
-		     struct SrcList *parent_name, struct Token *name,
-		     bool if_exist, enum entity_type entity_type)
-{
-	alter_entity_def_init(&drop_def->base, parent_name, entity_type,
-			      ALTER_ACTION_DROP);
-	drop_def->name = *name;
-	drop_def->if_exist = if_exist;
-}
-
-static inline void
-drop_trigger_def_init(struct drop_trigger_def *drop_trigger_def,
-		      struct SrcList *parent_name, struct Token *name,
-		      bool if_exist)
-{
-	drop_entity_def_init(&drop_trigger_def->base, parent_name, name,
-			     if_exist, ENTITY_TYPE_TRIGGER);
-}
 
 static inline void
 create_ck_constraint_parse_def_init(struct create_ck_constraint_parse_def *def)
@@ -654,5 +582,10 @@ sql_parse_drop_view(struct Parse *parse, struct SrcList *table_name,
 void
 sql_parse_drop_table(struct Parse *parse, struct SrcList *table_name,
 		     bool if_exists);
+
+/** Save parsed DROP TRIGGER statement. */
+void
+sql_parse_drop_trigger(struct Parse *parse, struct SrcList *table_name,
+		       bool if_exists);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */
