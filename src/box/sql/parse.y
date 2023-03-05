@@ -1458,21 +1458,13 @@ cmd ::= FUNCTION_KW(T) expr(E). {
 }
 //////////////////////////// The CREATE TRIGGER command /////////////////////
 
-cmd ::= createkw trigger_decl(A) BEGIN trigger_cmd_list(S) END(Z). {
+cmd ::= createkw TRIGGER ifnotexists(NOERR) nm(B) trigger_time(C)
+        trigger_event(D) ON fullname(E) foreach_clause when_clause(G)
+        BEGIN trigger_cmd_list(S) END(Z). {
   Token all;
-  all.z = A.z;
-  all.n = (int)(Z.z - A.z) + Z.n;
-  pParse->initiateTTrans = true;
-  sql_trigger_finish(pParse, S, &all);
-}
-
-trigger_decl(A) ::= TRIGGER ifnotexists(NOERR) nm(B)
-                    trigger_time(C) trigger_event(D)
-                    ON fullname(E) foreach_clause when_clause(G). {
-  create_trigger_def_init(&pParse->create_trigger_def, E, &B, C, D.a, D.b, G,
-                          NOERR);
-  sql_trigger_begin(pParse);
-  A = B; /*A-overwrites-T*/
+  all.z = B.z;
+  all.n = (int)(Z.z - B.z) + Z.n;
+  sql_parse_create_trigger(pParse, E, &B, C, D.a, D.b, G, S, &all, NOERR);
 }
 
 %type trigger_time {int}

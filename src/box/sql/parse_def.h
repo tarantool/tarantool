@@ -96,6 +96,8 @@ enum parse_type {
 	PARSE_TYPE_CREATE_INDEX,
 	/** CREATE VIEW statement. */
 	PARSE_TYPE_CREATE_VIEW,
+	/** CREATE TRIGGER statement. */
+	PARSE_TYPE_CREATE_TRIGGER,
 	/** ALTER TABLE ADD COLUMN statement. */
 	PARSE_TYPE_ADD_COLUMN,
 	/** ALTER TABLE ADD CONSTAINT FOREIGN KEY statement. */
@@ -261,6 +263,26 @@ struct sql_parse_view {
 	bool if_not_exists;
 };
 
+/** Description of the trigger being created. */
+struct sql_parse_trigger {
+	/** Trigger name. */
+	struct Token name;
+	/** The query that defines the trigger. */
+	struct Token all;
+	/** One of TRIGGER_BEFORE, TRIGGER_AFTER. */
+	int time;
+	/** One of TK_DELETE, TK_UPDATE, TK_INSERT. */
+	int op;
+	/** The <column-list> of UPDATE OF trigger. */
+	struct IdList *cols;
+	/** The WHEN clause of the expression. */
+	struct Expr *when;
+	/** Trigger program step. */
+	struct TriggerStep *step;
+	/** IF NOT EXISTS flag. */
+	bool if_not_exists;
+};
+
 /** Constant tokens for integer values. */
 extern const struct Token sqlIntTokens[];
 
@@ -363,13 +385,6 @@ struct rename_entity_def {
 	struct Token new_name;
 };
 
-struct create_entity_def {
-	struct alter_entity_def base;
-	struct Token name;
-	/** Statement comes with IF NOT EXISTS clause. */
-	bool if_not_exist;
-};
-
 struct create_ck_constraint_parse_def {
 	/** List of ck_constraint_parse_def objects. */
 	struct rlist checks;
@@ -418,18 +433,6 @@ struct drop_index_def {
 	struct drop_entity_def base;
 };
 
-struct create_trigger_def {
-	struct create_entity_def base;
-	/** One of TK_BEFORE, TK_AFTER, TK_INSTEAD. */
-	int tr_tm;
-	/** One of TK_INSERT, TK_UPDATE, TK_DELETE. */
-	int op;
-	/** Column list if this is an UPDATE trigger. */
-	struct IdList *cols;
-	/** When clause. */
-	struct Expr *when;
-};
-
 /** Basic initialisers of parse structures.*/
 static inline void
 alter_entity_def_init(struct alter_entity_def *alter_def,
@@ -448,17 +451,6 @@ rename_entity_def_init(struct rename_entity_def *rename_def,
 	alter_entity_def_init(&rename_def->base, table_name, ENTITY_TYPE_TABLE,
 			      ALTER_ACTION_RENAME);
 	rename_def->new_name = *new_name;
-}
-
-static inline void
-create_entity_def_init(struct create_entity_def *create_def,
-		       enum entity_type type, struct SrcList *parent_name,
-		       struct Token *name, bool if_not_exist)
-{
-	alter_entity_def_init(&create_def->base, parent_name, type,
-			      ALTER_ACTION_CREATE);
-	create_def->name = *name;
-	create_def->if_not_exist = if_not_exist;
 }
 
 static inline void
@@ -515,20 +507,6 @@ drop_index_def_init(struct drop_index_def *drop_index_def,
 {
 	drop_entity_def_init(&drop_index_def->base, parent_name, name, if_exist,
 			     ENTITY_TYPE_INDEX);
-}
-
-static inline void
-create_trigger_def_init(struct create_trigger_def *trigger_def,
-			struct SrcList *table_name, struct Token *name,
-			int tr_tm, int op, struct IdList *cols,
-			struct Expr *when, bool if_not_exists)
-{
-	create_entity_def_init(&trigger_def->base, ENTITY_TYPE_TRIGGER,
-			       table_name, name, if_not_exists);
-	trigger_def->tr_tm = tr_tm;
-	trigger_def->op = op;
-	trigger_def->cols = cols;
-	trigger_def->when = when;
 }
 
 static inline void
@@ -594,6 +572,14 @@ void
 sql_parse_create_index(struct Parse *parse, struct Token *table_name,
 		       const struct Token *index_name, struct ExprList *cols,
 		       bool is_unique, bool if_not_exists);
+
+/** Save parsed CREATE TRIGGER statement. */
+void
+sql_parse_create_trigger(struct Parse *parse, struct SrcList *table_name,
+			 struct Token *name, int time, int op,
+			 struct IdList *cols, struct Expr *when,
+			 struct TriggerStep *step, struct Token *all,
+			 bool if_not_exists);
 
 /** Save parsed ADD COLUMN statement. */
 void

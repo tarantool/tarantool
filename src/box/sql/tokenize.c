@@ -581,6 +581,16 @@ sql_finish_parsing(struct Parse *parse)
 		if (parse->is_aborted)
 			return;
 		break;
+	case PARSE_TYPE_CREATE_TRIGGER:
+		parse->initiateTTrans = true;
+		sql_trigger_begin(parse);
+		if (parse->is_aborted)
+			return;
+		sql_trigger_finish(parse, parse->create_trigger.step,
+				   &parse->create_trigger.all);
+		if (parse->is_aborted)
+			return;
+		break;
 	case PARSE_TYPE_ADD_COLUMN:
 		if (sql_finish_table_properties(parse) != 0)
 			return;

@@ -439,3 +439,22 @@ sql_parse_create_view(struct Parse *parse, struct Token *name,
 	parse->create_view.str.z = begin->z;
 	parse->create_view.str.n = len;
 }
+
+void
+sql_parse_create_trigger(struct Parse *parse, struct SrcList *table_name,
+			 struct Token *name, int time, int op,
+			 struct IdList *cols, struct Expr *when,
+			 struct TriggerStep *step, struct Token *all,
+			 bool if_not_exists)
+{
+	parse->type = PARSE_TYPE_CREATE_TRIGGER;
+	parse->src_list = table_name;
+	parse->create_trigger.name = *name;
+	parse->create_trigger.time = time;
+	parse->create_trigger.op = op;
+	parse->create_trigger.cols = cols;
+	parse->create_trigger.when = when;
+	parse->create_trigger.step = step;
+	parse->create_trigger.all = *all;
+	parse->create_trigger.if_not_exists = if_not_exists;
+}

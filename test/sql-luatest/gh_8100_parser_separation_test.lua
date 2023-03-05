@@ -131,3 +131,15 @@ g.test_create_table_parsing = function()
         t.assert_equals(err.message, "Syntax error at line 2 near '1'")
     end)
 end
+
+--
+-- Make sure that the CREATE TRIGGER statement is processed only after
+-- successful parsing.
+--
+g.test_create_trigger_parsing = function()
+    g.server:exec(function()
+        local _, err = box.execute([[CREATE TRIGGER tr BEFORE INSERT ON t
+                                     FOR EACH ROW BEGIN SELECT 1; END 1;]])
+        t.assert_equals(err.message, "Syntax error at line 2 near '1'")
+    end)
+end

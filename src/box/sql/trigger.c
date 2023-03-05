@@ -64,22 +64,18 @@ sql_trigger_begin(struct Parse *parse)
 {
 	/* The new trigger. */
 	struct sql_trigger *trigger = NULL;
-	struct create_trigger_def *trigger_def = &parse->create_trigger_def;
-	struct create_entity_def *create_def = &trigger_def->base;
-	struct alter_entity_def *alter_def = &create_def->base;
-	assert(alter_def->entity_type == ENTITY_TYPE_TRIGGER);
-	assert(alter_def->alter_action == ALTER_ACTION_CREATE);
+	struct sql_parse_trigger *trigger_def = &parse->create_trigger;
 
 	char *trigger_name = NULL;
-	if (alter_def->entity_name == NULL)
+	if (parse->src_list == NULL)
 		goto trigger_cleanup;
-	assert(alter_def->entity_name->nSrc == 1);
-	assert(create_def->name.n > 0);
-	trigger_name = sql_name_from_token(&create_def->name);
+	assert(parse->src_list->nSrc == 1);
+	assert(trigger_def->name.n > 0);
+	trigger_name = sql_name_from_token(&trigger_def->name);
 	if (sqlCheckIdentifierName(parse, trigger_name) != 0)
 		goto trigger_cleanup;
 
-	const char *table_name = alter_def->entity_name->a[0].zName;
+	const char *table_name = parse->src_list->a[0].zName;
 	uint32_t space_id = box_space_id_by_name(table_name,
 						 strlen(table_name));
 	if (space_id == BOX_ID_NIL) {
@@ -96,7 +92,7 @@ sql_trigger_begin(struct Parse *parse)
 		int name_reg = ++parse->nMem;
 		sqlVdbeAddOp4(parse->pVdbe, OP_String8, 0, name_reg, 0,
 			      sql_xstrdup(trigger_name), P4_DYNAMIC);
-		bool no_err = create_def->if_not_exist;
+		bool no_err = trigger_def->if_not_exists;
 		vdbe_emit_halt_with_presence_test(parse, BOX_TRIGGER_ID, 0,
 						  name_reg, 1,
 						  ER_TRIGGER_EXISTS, error_msg,
@@ -111,7 +107,7 @@ sql_trigger_begin(struct Parse *parse)
 	assert(trigger_def->op == TK_INSERT || trigger_def->op == TK_UPDATE ||
 	       trigger_def->op== TK_DELETE);
 	trigger->op = (u8) trigger_def->op;
-	trigger->tr_tm = trigger_def->tr_tm;
+	trigger->tr_tm = trigger_def->time;
 	trigger->pWhen = sqlExprDup(trigger_def->when, EXPRDUP_REDUCE);
 	trigger->pColumns = sqlIdListDup(trigger_def->cols);
 	if ((trigger->pWhen != NULL && trigger->pWhen == NULL) ||
@@ -123,7 +119,6 @@ sql_trigger_begin(struct Parse *parse)
 
  trigger_cleanup:
 	sql_xfree(trigger_name);
-	sqlSrcListDelete(alter_def->entity_name);
 	sqlIdListDelete(trigger_def->cols);
 	sql_expr_delete(trigger_def->when);
 	if (parse->parsed_ast.trigger == NULL)
