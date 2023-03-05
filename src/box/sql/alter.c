@@ -40,12 +40,9 @@
 void
 sql_alter_table_rename(struct Parse *parse)
 {
-	struct rename_entity_def *rename_def = &parse->rename_entity_def;
-	struct SrcList *src_tab = rename_def->base.entity_name;
-	assert(rename_def->base.entity_type == ENTITY_TYPE_TABLE);
-	assert(rename_def->base.alter_action == ALTER_ACTION_RENAME);
+	struct SrcList *src_tab = parse->src_list;
 	assert(src_tab->nSrc == 1);
-	char *new_name = sql_name_from_token(&rename_def->new_name);
+	char *new_name = sql_name_from_token(&parse->table_new_name);
 	/* Check that new name isn't occupied by another table. */
 	if (space_by_name(new_name) != NULL) {
 		diag_set(ClientError, ER_SPACE_EXISTS, new_name);
@@ -62,13 +59,10 @@ sql_alter_table_rename(struct Parse *parse)
 	struct Vdbe *v = sqlGetVdbe(parse);
 	sqlVdbeAddOp4(v, OP_RenameTable, space->def->id, 0, 0, new_name,
 			  P4_DYNAMIC);
-exit_rename_table:
-	sqlSrcListDelete(src_tab);
 	return;
 tnt_error:
 	sql_xfree(new_name);
 	parse->is_aborted = true;
-	goto exit_rename_table;
 }
 
 char *

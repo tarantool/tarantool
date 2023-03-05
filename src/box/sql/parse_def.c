@@ -458,3 +458,12 @@ sql_parse_create_trigger(struct Parse *parse, struct SrcList *table_name,
 	parse->create_trigger.all = *all;
 	parse->create_trigger.if_not_exists = if_not_exists;
 }
+
+void
+sql_parse_table_rename(struct Parse *parse, struct SrcList *table_name,
+		       struct Token *new_name)
+{
+	parse->type = PARSE_TYPE_RENAME_TABLE;
+	parse->src_list = table_name;
+	parse->table_new_name = *new_name;
+}

@@ -1647,9 +1647,7 @@ cmd ::= alter_add_constraint(N) PRIMARY KEY LP sortlist(X) RP. {
 }
 
 cmd ::= alter_table_start(A) RENAME TO nm(N). {
-    rename_entity_def_init(&pParse->rename_entity_def, A, &N);
-    pParse->initiateTTrans = true;
-    sql_alter_table_rename(pParse);
+  sql_parse_table_rename(pParse, A, &N);
 }
 
 cmd ::= ALTER TABLE fullname(X) DROP CONSTRAINT nm(Z). {

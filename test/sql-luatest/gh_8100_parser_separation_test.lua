@@ -143,3 +143,14 @@ g.test_create_trigger_parsing = function()
         t.assert_equals(err.message, "Syntax error at line 2 near '1'")
     end)
 end
+
+--
+-- Make sure that the ALTER TABLE RENAME statement is processed only after
+-- successful parsing.
+--
+g.test_table_rename_parsing = function()
+    g.server:exec(function()
+        local _, err = box.execute([[ALTER TABLE t RENAME TO t1 1;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '1'")
+    end)
+end

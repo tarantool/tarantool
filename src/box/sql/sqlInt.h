@@ -2030,7 +2030,6 @@ struct Parse {
 	 * from parse.y
 	 */
 	union {
-		struct rename_entity_def rename_entity_def;
 		struct drop_constraint_def drop_constraint_def;
 		struct drop_index_def drop_index_def;
 		struct drop_table_def drop_table_def;
@@ -2065,6 +2064,8 @@ struct Parse {
 	struct SrcList *src_list;
 	/** Descriptions of the space used in column creation. */
 	struct space *space;
+	/** New name of the table. */
+	struct Token table_new_name;
 	/*
 	 * FK and CK constraints appeared in a <CREATE TABLE> or
 	 * an <ALTER TABLE ADD COLUMN> statement.

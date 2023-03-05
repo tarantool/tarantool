@@ -616,6 +616,12 @@ sql_finish_parsing(struct Parse *parse)
 	case PARSE_TYPE_CREATE_INDEX:
 		sql_finish_create_index(parse);
 		break;
+	case PARSE_TYPE_RENAME_TABLE:
+		parse->initiateTTrans = true;
+		sql_alter_table_rename(parse);
+		if (parse->is_aborted)
+			return;
+		break;
 	default:
 		assert(parse->type == PARSE_TYPE_UNKNOWN);
 	}

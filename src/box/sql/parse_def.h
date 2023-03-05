@@ -108,6 +108,8 @@ enum parse_type {
 	PARSE_TYPE_ADD_UNIQUE,
 	/** ALTER TABLE ADD CONSTAINT PRIMARY KEY statement. */
 	PARSE_TYPE_ADD_PRIMARY_KEY,
+	/** ALTER TABLE RENAME statement. */
+	PARSE_TYPE_RENAME_TABLE,
 };
 
 /**
@@ -380,11 +382,6 @@ struct alter_entity_def {
 	struct SrcList *entity_name;
 };
 
-struct rename_entity_def {
-	struct alter_entity_def base;
-	struct Token new_name;
-};
-
 struct create_ck_constraint_parse_def {
 	/** List of ck_constraint_parse_def objects. */
 	struct rlist checks;
@@ -442,15 +439,6 @@ alter_entity_def_init(struct alter_entity_def *alter_def,
 	alter_def->entity_name = entity_name;
 	alter_def->entity_type = type;
 	alter_def->alter_action = action;
-}
-
-static inline void
-rename_entity_def_init(struct rename_entity_def *rename_def,
-		       struct SrcList *table_name, struct Token *new_name)
-{
-	alter_entity_def_init(&rename_def->base, table_name, ENTITY_TYPE_TABLE,
-			      ALTER_ACTION_RENAME);
-	rename_def->new_name = *new_name;
 }
 
 static inline void
@@ -679,5 +667,10 @@ sql_parse_column_default(struct Parse *parse, struct ExprSpan *expr);
 /** Save parsed table engine clause. */
 void
 sql_parse_table_engine(struct Parse *parse, struct Token *engine_name);
+
+/** Save parsed ALTER TABLE RENAME statement. */
+void
+sql_parse_table_rename(struct Parse *parse, struct SrcList *table_name,
+		       struct Token *new_name);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */
