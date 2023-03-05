@@ -211,6 +211,30 @@ struct sql_parse_index {
 	bool if_not_exists;
 };
 
+/** Description of the column being created. */
+struct sql_parse_column {
+	/** Column name. */
+	struct Token name;
+	/** Collation name. */
+	struct Token collate_name;
+	/** Expression for DEFAULT. */
+	struct ExprSpan default_expr;
+	/** Column data type. */
+	enum field_type type;
+	/** NULL and NOT NULL constraints. */
+	enum on_conflict_action action;
+	/** Flag to show if nullable action is set. */
+	bool is_action_set;
+};
+
+/** Column descriptions list. */
+struct sql_parse_column_list {
+	/** Array containing all column descriptions from the list. */
+	struct sql_parse_column *a;
+	/** Number of column descriptions in the list. */
+	uint32_t n;
+};
+
 /** Constant tokens for integer values. */
 extern const struct Token sqlIntTokens[];
 
@@ -323,14 +347,6 @@ struct create_entity_def {
 struct create_table_def {
 	struct create_entity_def base;
 	struct space *new_space;
-};
-
-struct create_column_def {
-	struct create_entity_def base;
-	/** Shallow space copy. */
-	struct space *space;
-	/** Column type. */
-	struct type_def *type_def;
 };
 
 struct create_ck_constraint_parse_def {
@@ -516,16 +532,6 @@ create_table_def_init(struct create_table_def *table_def, struct Token *name,
 }
 
 static inline void
-create_column_def_init(struct create_column_def *column_def,
-		       struct SrcList *table_name, struct Token *name,
-		       struct type_def *type_def)
-{
-	create_entity_def_init(&column_def->base, ENTITY_TYPE_COLUMN,
-			       table_name, name, false);
-	column_def->type_def = type_def;
-}
-
-static inline void
 create_ck_constraint_parse_def_init(struct create_ck_constraint_parse_def *def)
 {
 	rlist_create(&def->checks);
@@ -596,7 +602,8 @@ sql_parse_create_index(struct Parse *parse, struct Token *table_name,
 
 /** Save parsed ADD COLUMN statement. */
 void
-sql_parse_add_column(struct Parse *parse);
+sql_parse_add_column(struct Parse *parse, struct SrcList *table_name,
+		     struct Token *name, enum field_type type);
 
 /** Save parsed column FOREIGN KEY. */
 void
@@ -669,5 +676,23 @@ sql_parse_column_autoincrement(struct Parse *parse);
 /** Save parsed AUTOINCREMENT clause from table PRIMARY KEY clause. */
 void
 sql_parse_table_autoincrement(struct Parse *parse, struct Expr *column_name);
+
+/** Save parsed column from CREATE TABLE statement. */
+void
+sql_parse_table_column(struct Parse *parse, struct Token *name,
+		       enum field_type type);
+
+/** Save parsed column COLLATE clause. */
+void
+sql_parse_column_collate(struct Parse *parse, struct Token *collate_name);
+
+/** Save parsed column NULL or NOT NULL constraint. */
+void
+sql_parse_column_nullable_action(struct Parse *parse, int action,
+				 int on_conflict);
+
+/** Save parsed column DEFAULT clause. */
+void
+sql_parse_column_default(struct Parse *parse, struct ExprSpan *expr);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */

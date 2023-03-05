@@ -89,7 +89,7 @@ sql_parse_savepoint_rollback(struct Parse *parse, const struct Token *name)
 static struct Token *
 last_column_name(struct Parse *parse)
 {
-	return &parse->create_column_def.base.name;
+	return &parse->column_list.a[parse->column_list.n - 1].name;
 }
 
 /** Return the name of the table from CREATE TABLE. */
@@ -107,10 +107,36 @@ sql_parse_create_table(struct Parse *parse)
 	parse->type = PARSE_TYPE_CREATE_TABLE;
 }
 
+/** Append a new column to column list. */
+static void
+column_list_append(struct Parse *parse, struct Token *name,
+		   enum field_type type)
+{
+	struct sql_parse_column_list *list = &parse->column_list;
+	uint32_t id = list->n;
+	++list->n;
+	uint32_t size = list->n * sizeof(*list->a);
+	list->a = sql_xrealloc(list->a, size);
+	struct sql_parse_column *c = &list->a[id];
+	memset(c, 0, sizeof(*c));
+	c->name = *name;
+	c->type = type;
+}
+
 void
-sql_parse_add_column(struct Parse *parse)
+sql_parse_add_column(struct Parse *parse, struct SrcList *table_name,
+		     struct Token *name, enum field_type type)
 {
 	parse->type = PARSE_TYPE_ADD_COLUMN;
+	parse->src_list = table_name;
+	column_list_append(parse, name, type);
+}
+
+void
+sql_parse_table_column(struct Parse *parse, struct Token *name,
+		       enum field_type type)
+{
+	column_list_append(parse, name, type);
 }
 
 /** Append a new FOREIGN KEY to FOREIGN KEY list. */
@@ -333,4 +359,49 @@ void
 sql_parse_table_autoincrement(struct Parse *parse, struct Expr *column_name)
 {
 	autoincrement_add(parse, column_name);
+}
+
+void
+sql_parse_column_collate(struct Parse *parse, struct Token *collate_name)
+{
+	uint32_t id = parse->column_list.n - 1;
+	parse->column_list.a[id].collate_name = *collate_name;
+}
+
+void
+sql_parse_column_nullable_action(struct Parse *parse, int action,
+				 int on_conflict)
+{
+	uint32_t id = parse->column_list.n - 1;
+	struct sql_parse_column *c = &parse->column_list.a[id];
+	const char *action_str = NULL;
+	if (c->is_action_set && c->action != (enum on_conflict_action)action) {
+		action_str = on_conflict_action_strs[c->action];
+	} else if ((on_conflict != ON_CONFLICT_ACTION_ABORT ||
+		    action != ON_CONFLICT_ACTION_NONE) &&
+		   action != on_conflict) {
+		action_str = on_conflict_action_strs[ON_CONFLICT_ACTION_NONE];
+	} else {
+		c->action = action;
+		c->is_action_set = true;
+		return;
+	}
+	const char *err = "NULL declaration for column '%s' of table '%s' has "
+			  "been already set to '%s'";
+	const char *space_name;
+	if (parse->src_list == NULL)
+		space_name = new_table_name(parse);
+	else
+		space_name = parse->src_list->a[0].zName;
+	char *column_name = sql_name_from_token(&c->name);
+	err = tt_sprintf(err, column_name, space_name, action_str);
+	diag_set(ClientError, ER_SQL_EXECUTE, err);
+	parse->is_aborted = true;
+	sql_xfree(column_name);
+}
+
+void
+sql_parse_column_default(struct Parse *parse, struct ExprSpan *expr)
+{
+	parse->column_list.a[parse->column_list.n - 1].default_expr = *expr;
 }

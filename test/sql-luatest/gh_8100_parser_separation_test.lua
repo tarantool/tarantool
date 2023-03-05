@@ -108,3 +108,14 @@ g.test_autoincrement_parsing = function()
         box.execute([[DROP TABLE t;]])
     end)
 end
+
+--
+-- Make sure that the ALTER TABLE ADD COLUMN statement is processed only after
+-- successful parsing.
+--
+g.test_add_column_parsing = function()
+    g.server:exec(function()
+        local _, err = box.execute([[ALTER TABLE t1 ADD COLUMN a INT 1;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '1'")
+    end)
+end

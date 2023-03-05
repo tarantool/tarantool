@@ -482,6 +482,23 @@ static int
 sql_finish_table_properties(struct Parse *parse)
 {
 	assert(!parse->is_aborted);
+	parse->initiateTTrans = true;
+	create_ck_constraint_parse_def_init(
+		&parse->create_ck_constraint_parse_def);
+	create_fk_constraint_parse_def_init(
+		&parse->create_fk_constraint_parse_def);
+	for (uint32_t i = 0; i < parse->column_list.n; ++i) {
+		struct sql_parse_column *c = &parse->column_list.a[i];
+		sql_create_column_start(parse, &c->name, c->type);
+		if (parse->is_aborted)
+			return -1;
+		if (c->is_action_set)
+			sql_column_add_nullable_action(parse, c->action);
+		if (c->collate_name.n != 0)
+			sqlAddCollateType(parse, &c->collate_name);
+		if (c->default_expr.pExpr != NULL)
+			sqlAddDefaultValue(parse, &c->default_expr);
+	}
 	if (parse->autoinc_name != NULL) {
 		if (sql_fieldno_by_name(parse, parse->autoinc_name,
 					&parse->autoinc_fieldno) != 0)
@@ -669,7 +686,7 @@ sqlRunParser(Parse * pParse, const char *zSql)
 		sqlVdbeDelete(pParse->pVdbe);
 		pParse->pVdbe = 0;
 	}
-	parser_space_delete(pParse->create_column_def.space);
+	parser_space_delete(pParse->space);
 
 	if (pParse->pWithToFree)
 		sqlWithDelete(pParse->pWithToFree);
