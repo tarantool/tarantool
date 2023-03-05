@@ -2635,20 +2635,16 @@ sql_create_index(struct Parse *parse, struct Token *index_name,
 void
 sql_drop_index(struct Parse *parse_context)
 {
-	struct drop_entity_def *drop_def = &parse_context->drop_index_def.base;
-	assert(drop_def->base.entity_type == ENTITY_TYPE_INDEX);
-	assert(drop_def->base.alter_action == ALTER_ACTION_DROP);
 	struct Vdbe *v = sqlGetVdbe(parse_context);
 	assert(v != NULL);
 	/* Never called with prior errors. */
 	assert(!parse_context->is_aborted);
-	struct SrcList *table_list = drop_def->base.entity_name;
-	assert(table_list->nSrc == 1);
-	char *table_name = table_list->a[0].zName;
+	assert(parse_context->src_list->nSrc == 1);
+	char *table_name = parse_context->src_list->a[0].zName;
 	char *index_name = NULL;
 	sqlVdbeCountChanges(v);
 	struct space *space = space_by_name(table_name);
-	bool if_exists = drop_def->if_exist;
+	bool if_exists = parse_context->drop_object.if_exists;
 	if (space == NULL) {
 		if (!if_exists) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE, table_name);
@@ -2656,13 +2652,12 @@ sql_drop_index(struct Parse *parse_context)
 		}
 		goto exit_drop_index;
 	}
-	index_name = sql_name_from_token(&drop_def->name);
+	index_name = sql_name_from_token(&parse_context->drop_object.name);
 
 	vdbe_emit_index_drop(parse_context, index_name, space->def,
 			     ER_NO_SUCH_INDEX_NAME, if_exists);
 	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
  exit_drop_index:
-	sqlSrcListDelete(table_list);
 	sql_xfree(index_name);
 }
 

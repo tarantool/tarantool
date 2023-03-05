@@ -112,6 +112,8 @@ enum parse_type {
 	PARSE_TYPE_RENAME_TABLE,
 	/** ALTER TABLE RENAME statement. */
 	PARSE_TYPE_DROP_CONSTRAINT,
+	/** DROP INDEX statement. */
+	PARSE_TYPE_DROP_INDEX,
 };
 
 /**
@@ -288,11 +290,14 @@ struct sql_parse_trigger {
 };
 
 /**
- * Description of the object to drop from ALTER TABLE DROP CONSTRAINT statement.
+ * Description of the object to drop from ALTER TABLE DROP CONSTRAINT or
+ * DROP INDEX statement.
  */
 struct sql_parse_drop {
 	/** Drop object name. */
 	struct Token name;
+	/** IF EXISTS flag. */
+	bool if_exists;
 };
 
 /** Constant tokens for integer values. */
@@ -432,10 +437,6 @@ struct drop_trigger_def {
 	struct drop_entity_def base;
 };
 
-struct drop_index_def {
-	struct drop_entity_def base;
-};
-
 /** Basic initialisers of parse structures.*/
 static inline void
 alter_entity_def_init(struct alter_entity_def *alter_def,
@@ -483,15 +484,6 @@ drop_trigger_def_init(struct drop_trigger_def *drop_trigger_def,
 {
 	drop_entity_def_init(&drop_trigger_def->base, parent_name, name,
 			     if_exist, ENTITY_TYPE_TRIGGER);
-}
-
-static inline void
-drop_index_def_init(struct drop_index_def *drop_index_def,
-		    struct SrcList *parent_name, struct Token *name,
-		    bool if_exist)
-{
-	drop_entity_def_init(&drop_index_def->base, parent_name, name, if_exist,
-			     ENTITY_TYPE_INDEX);
 }
 
 static inline void
@@ -674,5 +666,10 @@ sql_parse_table_rename(struct Parse *parse, struct SrcList *table_name,
 void
 sql_parse_drop_constraint(struct Parse *parse, struct SrcList *table_name,
 			  struct Token *name);
+
+/** Save parsed DROP INDEX statement. */
+void
+sql_parse_drop_index(struct Parse *parse, struct SrcList *table_name,
+		     struct Token *name, bool if_exists);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */

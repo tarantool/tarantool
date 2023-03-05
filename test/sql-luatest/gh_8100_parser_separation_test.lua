@@ -165,3 +165,14 @@ g.test_drop_constraint_parsing = function()
         t.assert_equals(err.message, "Syntax error at line 1 near '1'")
     end)
 end
+
+--
+-- Make sure that the DROP INDEX statement is processed only after successful
+-- parsing.
+--
+g.test_drop_index_parsing = function()
+    g.server:exec(function()
+        local _, err = box.execute([[DROP INDEX i1 on t1 1;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '1'")
+    end)
+end

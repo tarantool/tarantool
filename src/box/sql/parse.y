@@ -1424,9 +1424,7 @@ eidlist(A) ::= nm(Y). {
 ///////////////////////////// The DROP INDEX command /////////////////////////
 //
 cmd ::= DROP INDEX ifexists(E) nm(X) ON fullname(Y).   {
-  drop_index_def_init(&pParse->drop_index_def, Y, &X, E);
-  pParse->initiateTTrans = true;
-  sql_drop_index(pParse);
+  sql_parse_drop_index(pParse, Y, &X, E);
 }
 
 ///////////////////////////// The SET SESSION command ////////////////////////

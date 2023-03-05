@@ -476,3 +476,13 @@ sql_parse_drop_constraint(struct Parse *parse, struct SrcList *table_name,
 	parse->src_list = table_name;
 	parse->drop_object.name = *name;
 }
+
+void
+sql_parse_drop_index(struct Parse *parse, struct SrcList *table_name,
+		     struct Token *name, bool if_exists)
+{
+	parse->type = PARSE_TYPE_DROP_INDEX;
+	parse->src_list = table_name;
+	parse->drop_object.name = *name;
+	parse->drop_object.if_exists = if_exists;
+}
