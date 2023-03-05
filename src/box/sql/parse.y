@@ -356,10 +356,7 @@ cmd ::= DROP TABLE ifexists(E) fullname(X) . {
 }
 
 cmd ::= DROP VIEW ifexists(E) fullname(X) . {
-  struct Token t = Token_nil;
-  drop_view_def_init(&pParse->drop_view_def, X, &t, E);
-  pParse->initiateTTrans = true;
-  sql_drop_table(pParse);
+  sql_parse_drop_view(pParse, X, E);
 }
 
 %type ifexists {int}

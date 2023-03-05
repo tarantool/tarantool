@@ -1742,7 +1742,8 @@ sql_drop_table(struct Parse *parse_context)
 	sql_code_drop_table(parse_context, space, is_view);
 
  exit_drop_table:
-	sqlSrcListDelete(table_name_list);
+	if (table_name_list != parse_context->src_list)
+		sqlSrcListDelete(table_name_list);
 }
 
 /**

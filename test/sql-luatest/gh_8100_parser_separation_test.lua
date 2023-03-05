@@ -176,3 +176,14 @@ g.test_drop_index_parsing = function()
         t.assert_equals(err.message, "Syntax error at line 1 near '1'")
     end)
 end
+
+--
+-- Make sure that the DROP VIEW statement is processed only after successful
+-- parsing.
+--
+g.test_drop_view_parsing = function()
+    g.server:exec(function()
+        local _, err = box.execute([[DROP VIEW v 1;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '1'")
+    end)
+end

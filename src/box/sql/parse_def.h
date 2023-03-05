@@ -114,6 +114,8 @@ enum parse_type {
 	PARSE_TYPE_DROP_CONSTRAINT,
 	/** DROP INDEX statement. */
 	PARSE_TYPE_DROP_INDEX,
+	/** DROP VIEW statement. */
+	PARSE_TYPE_DROP_VIEW,
 };
 
 /**
@@ -290,8 +292,8 @@ struct sql_parse_trigger {
 };
 
 /**
- * Description of the object to drop from ALTER TABLE DROP CONSTRAINT or
- * DROP INDEX statement.
+ * Description of the object to drop from ALTER TABLE DROP CONSTRAINT,
+ * DROP INDEX or DROP VIEW statement.
  */
 struct sql_parse_drop {
 	/** Drop object name. */
@@ -671,5 +673,10 @@ sql_parse_drop_constraint(struct Parse *parse, struct SrcList *table_name,
 void
 sql_parse_drop_index(struct Parse *parse, struct SrcList *table_name,
 		     struct Token *name, bool if_exists);
+
+/** Save parsed DROP VIEW statement. */
+void
+sql_parse_drop_view(struct Parse *parse, struct SrcList *table_name,
+		    bool if_exists);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */
