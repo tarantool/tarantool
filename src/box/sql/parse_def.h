@@ -116,6 +116,8 @@ enum parse_type {
 	PARSE_TYPE_DROP_INDEX,
 	/** DROP VIEW statement. */
 	PARSE_TYPE_DROP_VIEW,
+	/** DROP TABLE statement. */
+	PARSE_TYPE_DROP_TABLE,
 };
 
 /**
@@ -293,7 +295,7 @@ struct sql_parse_trigger {
 
 /**
  * Description of the object to drop from ALTER TABLE DROP CONSTRAINT,
- * DROP INDEX or DROP VIEW statement.
+ * DROP INDEX, DROP VIEW or DROP TABLE statement.
  */
 struct sql_parse_drop {
 	/** Drop object name. */
@@ -422,19 +424,6 @@ struct drop_entity_def {
 	bool if_exist;
 };
 
-/**
- * Identical wrappers around drop_entity_def to make hierarchy of
- * structures be consistent. Arguments for drop procedures are
- * the same.
- */
-struct drop_table_def {
-	struct drop_entity_def base;
-};
-
-struct drop_view_def {
-	struct drop_entity_def base;
-};
-
 struct drop_trigger_def {
 	struct drop_entity_def base;
 };
@@ -459,24 +448,6 @@ drop_entity_def_init(struct drop_entity_def *drop_def,
 			      ALTER_ACTION_DROP);
 	drop_def->name = *name;
 	drop_def->if_exist = if_exist;
-}
-
-static inline void
-drop_table_def_init(struct drop_table_def *drop_table_def,
-		    struct SrcList *parent_name, struct Token *name,
-		    bool if_exist)
-{
-	drop_entity_def_init(&drop_table_def->base, parent_name, name, if_exist,
-			     ENTITY_TYPE_TABLE);
-}
-
-static inline void
-drop_view_def_init(struct drop_view_def *drop_view_def,
-		   struct SrcList *parent_name, struct Token *name,
-		   bool if_exist)
-{
-	drop_entity_def_init(&drop_view_def->base, parent_name, name, if_exist,
-			     ENTITY_TYPE_VIEW);
 }
 
 static inline void
@@ -678,5 +649,10 @@ sql_parse_drop_index(struct Parse *parse, struct SrcList *table_name,
 void
 sql_parse_drop_view(struct Parse *parse, struct SrcList *table_name,
 		    bool if_exists);
+
+/** Save parsed DROP TABLE statement. */
+void
+sql_parse_drop_table(struct Parse *parse, struct SrcList *table_name,
+		     bool if_exists);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */

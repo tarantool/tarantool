@@ -1705,23 +1705,20 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 void
 sql_drop_table(struct Parse *parse_context)
 {
-	struct drop_entity_def drop_def = parse_context->drop_table_def.base;
-	assert(drop_def.base.alter_action == ALTER_ACTION_DROP);
-	struct SrcList *table_name_list = drop_def.base.entity_name;
 	struct Vdbe *v = sqlGetVdbe(parse_context);
-	bool is_view = drop_def.base.entity_type == ENTITY_TYPE_VIEW;
-	assert(is_view || drop_def.base.entity_type == ENTITY_TYPE_TABLE);
+	bool is_view = parse_context->type == PARSE_TYPE_DROP_VIEW;
+	assert(is_view || parse_context->type == PARSE_TYPE_DROP_TABLE);
 	sqlVdbeCountChanges(v);
 	assert(!parse_context->is_aborted);
-	assert(table_name_list->nSrc == 1);
-	const char *space_name = table_name_list->a[0].zName;
+	assert(parse_context->src_list->nSrc == 1);
+	const char *space_name = parse_context->src_list->a[0].zName;
 	struct space *space = space_by_name(space_name);
 	if (space == NULL) {
-		if (!drop_def.if_exist) {
+		if (!parse_context->drop_object.if_exists) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
 			parse_context->is_aborted = true;
 		}
-		goto exit_drop_table;
+		return;
 	}
 	/*
 	 * Ensure DROP TABLE is not used on a view,
@@ -1731,19 +1728,15 @@ sql_drop_table(struct Parse *parse_context)
 		diag_set(ClientError, ER_DROP_SPACE, space_name,
 			 "use DROP TABLE");
 		parse_context->is_aborted = true;
-		goto exit_drop_table;
+		return;
 	}
 	if (!is_view && space->def->opts.is_view) {
 		diag_set(ClientError, ER_DROP_SPACE, space_name,
 			 "use DROP VIEW");
 		parse_context->is_aborted = true;
-		goto exit_drop_table;
+		return;
 	}
 	sql_code_drop_table(parse_context, space, is_view);
-
- exit_drop_table:
-	if (table_name_list != parse_context->src_list)
-		sqlSrcListDelete(table_name_list);
 }
 
 /**

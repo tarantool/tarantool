@@ -2030,9 +2030,7 @@ struct Parse {
 	 * from parse.y
 	 */
 	union {
-		struct drop_table_def drop_table_def;
 		struct drop_trigger_def drop_trigger_def;
-		struct drop_view_def drop_view_def;
 	};
 	/** Parsed statement type. */
 	enum parse_type type;
@@ -2058,7 +2056,7 @@ struct Parse {
 	struct sql_parse_trigger create_trigger;
 	/**
 	 * Description of the object to drop from ALTER TABLE DROP CONSTRAINT,
-	 * DROP INDEX or DROP VIEW statement.
+	 * DROP INDEX, DROP VIEW or DROP TABLE statement.
 	 */
 	struct sql_parse_drop drop_object;
 	/** Name of the column with AUTOINCREMENT. */

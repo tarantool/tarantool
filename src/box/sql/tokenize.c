@@ -635,10 +635,8 @@ sql_finish_parsing(struct Parse *parse)
 			return;
 		break;
 	case PARSE_TYPE_DROP_VIEW:
+	case PARSE_TYPE_DROP_TABLE:
 		parse->initiateTTrans = true;
-		struct Token t = Token_nil;
-		drop_view_def_init(&parse->drop_view_def, parse->src_list, &t,
-				   parse->drop_object.if_exists);
 		sql_drop_table(parse);
 		if (parse->is_aborted)
 			return;

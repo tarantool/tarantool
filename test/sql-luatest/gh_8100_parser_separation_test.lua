@@ -187,3 +187,14 @@ g.test_drop_view_parsing = function()
         t.assert_equals(err.message, "Syntax error at line 1 near '1'")
     end)
 end
+
+--
+-- Make sure that the DROP TABLE statement is processed only after successful
+-- parsing.
+--
+g.test_drop_table_parsing = function()
+    g.server:exec(function()
+        local _, err = box.execute([[DROP TABLE t 1;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '1'")
+    end)
+end
