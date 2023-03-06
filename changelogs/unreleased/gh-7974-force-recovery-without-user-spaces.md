@@ -1,4 +1,4 @@
 ## bugfix/box
 
-* Fixed bug rendering force recovery feature inoperable when there were no user
-  spaces in snapshot (gh-7974).
+* Fixed a bug where `box.cfg.force_recovery` doesn't work when there are
+  no user spaces in a snapshot (gh-7974).
