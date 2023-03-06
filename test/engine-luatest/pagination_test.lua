@@ -366,7 +366,7 @@ tree_g.test_invalid_positions = function(cg)
             s:select(1, {limit=1, iterator='GE', after=pos})
         end)
         t.assert_equals(flag, false)
-        t.assert_equals(err.code, box.error.FIELD_TYPE)
+        t.assert_equals(err.code, box.error.ITERATOR_POSITION)
 
         pos = "abcd"
         flag, err = pcall(function()
@@ -382,7 +382,7 @@ tree_g.test_invalid_positions = function(cg)
             s.index.sk:select(nil, {fullscan=true, limit=1, after=pos})
         end)
         t.assert_equals(flag, false)
-        t.assert_equals(err.code, box.error.EXACT_MATCH)
+        t.assert_equals(err.code, box.error.ITERATOR_POSITION)
     end)
 end
 
@@ -504,9 +504,8 @@ tree_g.test_tuple_pos_invalid_tuple = function(cg)
         tuples = s:select(nil, {fullscan=true, after=pos, limit=1})
         t.assert_equals(tuples[1], {2, 0})
         -- test with invalid tuple
-        t.assert_error_msg_contains(
-                "Tuple field 1 type does not match one required by operation",
-                s.index.pk.tuple_pos, s.index.pk, {'a'})
+        t.assert_error_msg_contains("Iterator position is invalid",
+                                    s.index.pk.tuple_pos, s.index.pk, {'a'})
     end)
 end
 
