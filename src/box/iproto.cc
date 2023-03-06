@@ -2972,9 +2972,13 @@ tx_end_push(struct cmsg *m)
 		tx_begin_push(con);
 }
 
+/**
+ * Asynchronously send response message using Kharon facility.
+ */
 static void
-tx_push(struct iproto_connection *con)
+tx_push(struct iproto_connection *con, struct obuf_svp *svp)
 {
+	flightrec_write_response(con->tx.p_obuf, svp);
 	if (!con->tx.is_push_sent)
 		tx_begin_push(con);
 	else
@@ -3005,7 +3009,7 @@ iproto_session_push(struct session *session, struct port *port)
 	}
 	iproto_reply_chunk(con->tx.p_obuf, &svp, iproto_session_sync(session),
 			   ::schema_version);
-	tx_push(con);
+	tx_push(con, &svp);
 	return 0;
 }
 
@@ -3021,13 +3025,15 @@ iproto_session_notify(struct session *session,
 {
 	struct iproto_connection *con =
 		(struct iproto_connection *)session->meta.connection;
-	if (iproto_send_event(con->tx.p_obuf, key, key_len,
+	struct obuf *out = con->tx.p_obuf;
+	struct obuf_svp svp = obuf_create_svp(out);
+	if (iproto_send_event(out, key, key_len,
 			      data, data_end) != 0) {
 		/* Nothing we can do on error but log the error. */
 		diag_log();
 		return;
 	}
-	tx_push(con);
+	tx_push(con, &svp);
 }
 
 /** }}} */
@@ -3520,10 +3526,12 @@ iproto_session_send(struct session *session,
 		return -1;
 	}
 
+	struct obuf *out = con->tx.p_obuf;
+	struct obuf_svp svp = obuf_create_svp(out);
 	ptrdiff_t header_size = header_end - header;
 	ptrdiff_t body_size = body_end - body;
 	ptrdiff_t packet_size = 5 + header_size + body_size;
-	char *buf = (char *)obuf_alloc(con->tx.p_obuf, packet_size);
+	char *buf = (char *)obuf_alloc(out, packet_size);
 	if (buf == NULL) {
 		diag_set(OutOfMemory, packet_size, "obuf_alloc", "buf");
 		return -1;
@@ -3534,7 +3542,7 @@ iproto_session_send(struct session *session,
 	memcpy(p, header, header_size);
 	p += header_size;
 	memcpy(p, body, body_size);
-	tx_push(con);
+	tx_push(con, &svp);
 	/*
 	 * The control yield is solely for enforcing the fact this function
 	 * yields — in the future we may implement back pressure based on this.
