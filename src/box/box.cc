@@ -3146,11 +3146,10 @@ box_select(uint32_t space_id, uint32_t index_id,
 					     &pos, &pos_end) != 0)
 			return -1;
 		uint32_t pos_part_count = mp_decode_array(&pos);
-		if (exact_key_validate_nullable(index->def->cmp_def, pos,
-						pos_part_count) != 0) {
-			diag_set(ClientError, ER_ITERATOR_POSITION);
+		if (iterator_position_validate(pos, pos_part_count,
+					       key, part_count,
+					       index->def->cmp_def, type) != 0)
 			return -1;
-		}
 	} else {
 		pos = NULL;
 		pos_end = NULL;

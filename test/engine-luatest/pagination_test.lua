@@ -636,6 +636,36 @@ tree_g.test_gh_8373_after_missing = function(cg)
     end)
 end
 
+-- The 'after' tuple doesn't meet the search criteria.
+tree_g.test_gh_8403_gh_8404_invalid_after = function(cg)
+    cg.server:exec(function()
+        local json = require('json')
+        local s = box.space.s
+        s:create_index('primary')
+        s:insert({1})
+        s:insert({2})
+        s:insert({3})
+        s:insert({4})
+        s:insert({5})
+        local errmsg = "Iterator position is invalid"
+        for _, data in ipairs({
+            {{3}, {iterator = 'eq', after = {1}}},
+            {{3}, {iterator = 'eq', after = {5}}},
+            {{3}, {iterator = 'ge', after = {1}}},
+            {{3}, {iterator = 'gt', after = {1}}},
+            {{3}, {iterator = 'le', after = {5}}},
+            {{3}, {iterator = 'lt', after = {5}}},
+            {{3}, {iterator = 'req', after = {1}}},
+            {{3}, {iterator = 'req', after = {5}}},
+        }) do
+            local key, opts = unpack(data)
+            local msg = json.encode({key = key, opts = opts})
+            t.assert_error_msg_equals(errmsg, s.pairs, s, key, opts, msg)
+            t.assert_error_msg_equals(errmsg, s.select, s, key, opts, msg)
+        end
+    end)
+end
+
 -- Tests for memtx tree features, such as functional index
 local func_g = t.group('Memtx tree func index tests')
 
