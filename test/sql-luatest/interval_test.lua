@@ -60,13 +60,14 @@ g.test_interval_3 = function()
     end)
 end
 
--- Make sure that INTERVAL cannot be used in GROUP BY.
+-- Make sure that INTERVAL cannot be used in GROUP BY and ORDER BY.
 g.test_interval_4 = function()
     g.server:exec(function()
         local sql = [[SELECT itv FROM t0 GROUP BY itv;]]
-        local res = "Type mismatch: can not convert interval(+1 years, "..
-                    "2 months, 3 days, 4 hours) to comparable type"
+        local res = "Type mismatch: can not convert interval to comparable type"
         local _, err = box.execute(sql)
+        t.assert_equals(err.message, res)
+        _, err = box.execute([[SELECT itv FROM t0 ORDER BY itv;]])
         t.assert_equals(err.message, res)
     end)
 end

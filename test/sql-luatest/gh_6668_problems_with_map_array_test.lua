@@ -43,8 +43,7 @@ g.test_group_by = function()
         box.execute([[CREATE TABLE ta(i INT PRIMARY KEY, a ARRAY);]])
         box.execute([[INSERT INTO ta VALUES(1, [1]), (2, [2]);]])
         local sql = [[SELECT a FROM ta GROUP BY a;]]
-        local res = [[Type mismatch: can not convert array([2]) to ]]..
-                    [[comparable type]]
+        local res = [[Type mismatch: can not convert array to comparable type]]
         local _, err = box.execute(sql)
         t.assert_equals(err.message, res)
         box.execute([[DROP TABLE ta;]])
@@ -53,8 +52,7 @@ g.test_group_by = function()
         box.space.TM:insert({1, {a = 1}})
         box.space.TM:insert({2, {b = 2}})
         sql = [[SELECT m FROM tm GROUP BY m;]]
-        res = [[Type mismatch: can not convert map({"b": 2}) to ]]..
-              [[comparable type]]
+        res = [[Type mismatch: can not convert map to comparable type]]
         _, err = box.execute(sql)
         t.assert_equals(err.message, res)
         box.execute([[DROP TABLE tm;]])
@@ -65,12 +63,36 @@ end
 -- Make sure that the error description for the incompatible right operand is
 -- correct.
 --
-g.test_group_by = function()
+g.test_incomparable_comparison = function()
     g.server:exec(function()
         local sql = [[SELECT 1 > [1];]]
         local res = [[Type mismatch: can not convert array([1]) to ]]..
                     [[comparable type]]
         local _, err = box.execute(sql)
         t.assert_equals(err.message, res)
+    end)
+end
+
+-- Make sure ORDER BY and GROUP BY do not support ARRAY and MAP type arguments.
+g.test_order_by_group_by = function()
+    g.server:exec(function()
+        local err1 = "Type mismatch: can not convert array to comparable type"
+        local err2 = "Type mismatch: can not convert map to comparable type"
+
+        local res, err = box.execute([[SELECT 1 ORDER BY [1];]])
+        t.assert(res == nil)
+        t.assert_equals(err.message, err1)
+
+        res, err = box.execute([[SELECT 1 GROUP BY [1];]])
+        t.assert(res == nil)
+        t.assert_equals(err.message, err1)
+
+        res, err = box.execute([[SELECT 1 ORDER BY {1:1};]])
+        t.assert(res == nil)
+        t.assert_equals(err.message, err2)
+
+        res, err = box.execute([[SELECT 1 GROUP BY {1:1};]])
+        t.assert(res == nil)
+        t.assert_equals(err.message, err2)
     end)
 end
