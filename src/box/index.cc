@@ -477,11 +477,10 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 					     &pos, &pos_end) != 0)
 			return NULL;
 		uint32_t pos_part_count = mp_decode_array(&pos);
-		if (exact_key_validate_nullable(index->def->cmp_def, pos,
-						pos_part_count) != 0) {
-			diag_set(ClientError, ER_ITERATOR_POSITION);
+		if (iterator_position_validate(pos, pos_part_count,
+					       key, part_count,
+					       index->def->cmp_def, itype) != 0)
 			return NULL;
-		}
 	} else {
 		pos = NULL;
 		pos_end = NULL;
@@ -730,6 +729,28 @@ iterator_position_unpack(const char *packed_pos, const char *packed_pos_end,
 		goto fail;
 	*pos = decoded_pos;
 	*pos_end = decoded_pos_end;
+	return 0;
+fail:
+	diag_set(ClientError, ER_ITERATOR_POSITION);
+	return -1;
+}
+
+int
+iterator_position_validate(const char *pos, uint32_t pos_part_count,
+			   const char *key, uint32_t key_part_count,
+			   struct key_def *cmp_def, enum iterator_type type)
+{
+	int cmp;
+	/* Position must be compatible with the index. */
+	if (exact_key_validate_nullable(cmp_def, pos, pos_part_count) != 0)
+		goto fail;
+	/* Position msut meet the search criteria. */
+	cmp = key_compare(pos, pos_part_count, HINT_NONE,
+			  key, key_part_count, HINT_NONE, cmp_def);
+	if (iterator_direction(type) * cmp < 0)
+		goto fail;
+	if ((type == ITER_EQ || type == ITER_REQ) && cmp != 0)
+		goto fail;
 	return 0;
 fail:
 	diag_set(ClientError, ER_ITERATOR_POSITION);

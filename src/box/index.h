@@ -427,6 +427,17 @@ iterator_position_unpack(const char *packed_pos, const char *packed_pos_end,
 			 const char **pos_end);
 
 /**
+ * Check an unpacked iterator position against the search criteria.
+ * Note that both the position and the search key are given without
+ * MP_ARRAY header.
+ * Returns 0 on success, -1 on failure, diag is set.
+ */
+int
+iterator_position_validate(const char *pos, uint32_t pos_part_count,
+			   const char *key, uint32_t key_part_count,
+			   struct key_def *cmp_def, enum iterator_type type);
+
+/**
  * Get position of iterator - extracted cmp_def of last fetched
  * tuple (with MP_ARRAY header). If iterator is exhausted,
  * it returns position of last tuple, if there were no tuples
