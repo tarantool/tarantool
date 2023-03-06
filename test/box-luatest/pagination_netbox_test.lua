@@ -340,13 +340,10 @@ net_g.test_net_box_invalid_position = function(cg)
     s:replace{1, 0}
     s:replace{2, 0}
     local _, pos = sk:select(nil, {limit=1, fetch_pos=true})
-    local msg = "Invalid key part count in an exact match (expected 1, got 2)"
+    local msg = "Iterator position is invalid"
     t.assert_error_msg_equals(msg, s.select, s, nil, {after=pos})
     _, pos = s:select(nil, {limit=1, fetch_pos=true})
-    msg = "Invalid key part count in an exact match (expected 2, got 1)"
     t.assert_error_msg_equals(msg, sk.select, sk, nil, {after=pos})
-    msg = "Tuple field 2 type does not match one required by operation:" ..
-        " expected unsigned, got string"
     t.assert_error_msg_equals(msg, sk.select, sk, nil, {after={0, 'Zero'}})
     msg = "Illegal parameters, options parameter 'after'" ..
         " should be of type string, table, tuple"

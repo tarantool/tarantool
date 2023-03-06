@@ -217,14 +217,18 @@ box_index_tuple_position(uint32_t space_id, uint32_t index_id,
 			 "position by tuple");
 		return -1;
 	}
-	if (tuple_validate_raw(space->format, tuple) != 0)
+	if (tuple_validate_raw(space->format, tuple) != 0) {
+		diag_set(ClientError, ER_ITERATOR_POSITION);
 		return -1;
+	}
 	struct key_def *cmp_def = index->def->cmp_def;
 	uint32_t key_size;
 	const char *key = tuple_extract_key_raw(tuple, tuple_end, cmp_def,
 						MULTIKEY_NONE, &key_size);
-	if (key == NULL)
+	if (key == NULL) {
+		diag_set(ClientError, ER_ITERATOR_POSITION);
 		return -1;
+	}
 	const char *key_end = key + key_size;
 	uint32_t buf_size = iterator_position_pack_bufsize(key, key_end);
 	char *buf = (char *)xregion_alloc(&fiber()->gc, buf_size);
@@ -474,8 +478,10 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 			return NULL;
 		uint32_t pos_part_count = mp_decode_array(&pos);
 		if (exact_key_validate_nullable(index->def->cmp_def, pos,
-						pos_part_count) != 0)
+						pos_part_count) != 0) {
+			diag_set(ClientError, ER_ITERATOR_POSITION);
 			return NULL;
+		}
 	} else {
 		pos = NULL;
 		pos_end = NULL;
