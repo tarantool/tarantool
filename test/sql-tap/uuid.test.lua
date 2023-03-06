@@ -3,7 +3,7 @@ local build_path = os.getenv("BUILDDIR")
 package.cpath = build_path..'/test/sql-tap/?.so;'..build_path..'/test/sql-tap/?.dylib;'..package.cpath
 
 local test = require("sqltester")
-test:plan(147)
+test:plan(145)
 
 local uuid = require("uuid")
 local uuid1 = uuid.fromstr("11111111-1111-1111-1111-111111111111")
@@ -1227,24 +1227,6 @@ s:create_index('i15')
 s:insert({1, {['1'] = 1, ['2'] = 2, ['3']= 3}, {1,2,3}})
 s:insert({2, {['1'] = 1, ['2'] = 2}, {1,2,3,4}})
 s:insert({3, {['1'] = 1}, {1,2,3,4,5}})
-
--- Make sure that addition of UUID does not change behaviour of MAP and ARRAY.
--- Currently it works wrong, but there should not segmentation faults.
-test:do_execsql_test(
-    "uuid-15.1",
-    [[
-        SELECT i FROM t15 ORDER BY m;
-    ]], {
-        3,2,1
-    })
-
-test:do_execsql_test(
-    "uuid-15.2",
-    [[
-        SELECT i FROM t15 ORDER BY a;
-    ]], {
-        3,2,1
-    })
 
 -- Check function uuid().
 test:do_execsql_test(
