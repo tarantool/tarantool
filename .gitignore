@@ -46,6 +46,7 @@ extra/luarocks/hardcoded.lua.c
 perf/Makefile
 test/Makefile
 test/*/Makefile
+test/*/*/Makefile
 Doxyfile.API
 RPM
 *.src.rpm
