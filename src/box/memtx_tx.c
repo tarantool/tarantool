@@ -2382,6 +2382,7 @@ memtx_tx_history_remove_stmt(struct txn_stmt *stmt)
 		memtx_tx_history_remove_added_story(stmt);
 	if (stmt->del_story != NULL)
 		memtx_tx_history_remove_deleted_story(stmt);
+	stmt->engine_savepoint = NULL;
 }
 
 /**

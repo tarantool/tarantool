@@ -371,6 +371,8 @@ memtx_space_replace_tuple(struct space *space, struct txn_stmt *stmt,
 		tuple_ref(stmt->old_tuple);
 		tuple_unref(orig_old_tuple);
 	}
+	if (space->upgrade != NULL && new_tuple != NULL)
+		memtx_space_upgrade_track_tuple(space->upgrade, new_tuple);
 finish:
 	/*
 	 * Regardless of whether the function ended with success or
