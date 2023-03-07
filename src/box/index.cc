@@ -790,7 +790,7 @@ index_create(struct index *index, struct engine *engine,
 	index->unique_id = unique_id++;
 	/* Unusable until set to proper value during space creation. */
 	index->dense_id = UINT32_MAX;
-	rlist_create(&index->nearby_gaps);
+	rlist_create(&index->read_gaps);
 	rlist_create(&index->full_scans);
 	return 0;
 }

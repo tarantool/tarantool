@@ -661,7 +661,7 @@ struct index {
 	 * or when reading from rightmost part of ordered index (TREE).
 	 * @sa struct gap_item.
 	 */
-	struct rlist nearby_gaps;
+	struct rlist read_gaps;
 	/** List of full scans of the index. @sa struct full_scan_item. */
 	struct rlist full_scans;
 };
