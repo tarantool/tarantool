@@ -658,6 +658,12 @@ struct index {
  * Auxiliary struct used for returning tuple data fetched from a read view.
  */
 struct read_view_tuple {
+	/**
+	 * If a read view was created while a space upgrade was running,
+	 * a tuple fetched from the read view may be either upgraded or not.
+	 * This flag is set if the tuple needs to be upgraded.
+	 */
+	bool needs_upgrade;
 	/** Pointer to tuple data. */
 	const char *data;
 	/** Size of tuple data. */
@@ -669,6 +675,7 @@ static inline struct read_view_tuple
 read_view_tuple_none(void)
 {
 	struct read_view_tuple tuple;
+	tuple.needs_upgrade = false;
 	tuple.data = NULL;
 	tuple.size = 0;
 	return tuple;
