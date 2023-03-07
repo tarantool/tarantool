@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 #include "memtx_engine.h"
-#include "memtx_space.h"
 
 #include <small/quota.h>
 #include <small/small.h>
@@ -56,6 +55,7 @@
 #include "read_view.h"
 #include "memtx_tuple_compression.h"
 #include "memtx_space.h"
+#include "memtx_space_upgrade.h"
 
 #include <type_traits>
 
@@ -600,14 +600,21 @@ static void
 memtx_engine_commit(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
-	if (memtx_tx_manager_use_mvcc_engine) {
-		struct txn_stmt *stmt;
-		stailq_foreach_entry(stmt, &txn->stmts, next) {
+	struct txn_stmt *stmt;
+	stailq_foreach_entry(stmt, &txn->stmts, next) {
+		if (memtx_tx_manager_use_mvcc_engine) {
 			assert(stmt->space->engine == engine);
 			struct memtx_space *mspace =
 				(struct memtx_space *)stmt->space;
 			size_t *bsize = &mspace->bsize;
 			memtx_tx_history_commit_stmt(stmt, bsize);
+		}
+		if (stmt->engine_savepoint != NULL) {
+			struct space *space = stmt->space;
+			struct tuple *old_tuple = stmt->rollback_info.old_tuple;
+			if (space->upgrade != NULL && old_tuple != NULL)
+				memtx_space_upgrade_untrack_tuple(
+						space->upgrade, old_tuple);
 		}
 	}
 }
@@ -633,6 +640,9 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	/* Only roll back the changes if they were made. */
 	if (stmt->engine_savepoint == NULL)
 		return;
+
+	if (space->upgrade != NULL && new_tuple != NULL)
+		memtx_space_upgrade_untrack_tuple(space->upgrade, new_tuple);
 
 	if (memtx_tx_manager_use_mvcc_engine)
 		return memtx_tx_history_rollback_stmt(stmt);
@@ -1706,6 +1716,9 @@ memtx_prepare_read_view_tuple(struct tuple *tuple,
 		*result = read_view_tuple_none();
 		return 0;
 	}
+	result->needs_upgrade = index->space->upgrade == NULL ? false :
+				memtx_read_view_tuple_needs_upgrade(
+					index->space->upgrade, tuple);
 	result->data = tuple_data_range(tuple, &result->size);
 	if (!index->space->rv->disable_decompression) {
 		result->data = memtx_tuple_decompress_raw(
