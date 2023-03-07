@@ -59,7 +59,7 @@ struct memtx_story_link {
 	/** Story that was happened before that story was started. */
 	struct memtx_story *older_story;
 	/** List of interval items @sa gap_item. */
-	struct rlist nearby_gaps;
+	struct rlist read_gaps;
 	/**
 	 * If the tuple of story is physically in index, here the pointer
 	 * to that index is stored.
@@ -202,8 +202,8 @@ struct point_hole_item {
  * a full key and found nothing.
  */
 struct gap_item {
-	/** A link in memtx_story_link::nearby_gaps OR index::nearby_gaps. */
-	struct rlist in_nearby_gaps;
+	/** A link in memtx_story_link::read_gaps OR index::read_gaps. */
+	struct rlist in_read_gaps;
 	/** Link in txn->gap_list. */
 	struct rlist in_gap_list;
 	/** The transaction that read it. */
@@ -852,7 +852,7 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 	rlist_add(&space->memtx_stories, &story->in_space_stories);
 	for (uint32_t i = 0; i < index_count; i++) {
 		story->link[i].newer_story = story->link[i].older_story = NULL;
-		rlist_create(&story->link[i].nearby_gaps);
+		rlist_create(&story->link[i].read_gaps);
 		story->link[i].in_index = space->index[i];
 	}
 	return story;
@@ -1111,7 +1111,7 @@ memtx_tx_story_link_top(struct memtx_story *new_top,
 	}
 
 	/* Rebind gap records to the top of the list */
-	rlist_splice(&new_link->nearby_gaps, &old_link->nearby_gaps);
+	rlist_splice(&new_link->read_gaps, &old_link->read_gaps);
 }
 
 /**
@@ -1481,7 +1481,7 @@ memtx_tx_story_gc_step()
 						  MEMTX_TX_STORY_USED);
 			return;
 		}
-		if (!rlist_empty(&link->nearby_gaps)) {
+		if (!rlist_empty(&link->read_gaps)) {
 			memtx_tx_story_set_status(story,
 						  MEMTX_TX_STORY_TRACK_GAP);
 			/* The story is used for gap tracking. */
@@ -1789,16 +1789,16 @@ memtx_tx_handle_gap_write(struct space *space,
 	if (successor != NULL && !tuple_has_flag(successor, TUPLE_IS_DIRTY))
 		return; /* no gap records */
 
-	struct rlist *list = &index->nearby_gaps;
+	struct rlist *list = &index->read_gaps;
 	if (successor != NULL) {
 		assert(tuple_has_flag(successor, TUPLE_IS_DIRTY));
 		struct memtx_story *succ_story = memtx_tx_story_get(successor);
 		assert(ind < succ_story->index_count);
-		list = &succ_story->link[ind].nearby_gaps;
+		list = &succ_story->link[ind].read_gaps;
 		assert(list->next != NULL && list->prev != NULL);
 	}
 	struct gap_item *item, *tmp;
-	rlist_foreach_entry_safe(item, list, in_nearby_gaps, tmp) {
+	rlist_foreach_entry_safe(item, list, in_read_gaps, tmp) {
 		int cmp = 0;
 		if (item->key != NULL) {
 			struct key_def *def = index->def->key_def;
@@ -1838,13 +1838,13 @@ memtx_tx_handle_gap_write(struct space *space,
 						      item->key,
 						      item->part_count);
 
-			rlist_add(&story->link[ind].nearby_gaps,
-				  &copy->in_nearby_gaps);
+			rlist_add(&story->link[ind].read_gaps,
+				  &copy->in_read_gaps);
 		} else if (need_move) {
 			/* The tracker must be moved to the left gap. */
-			rlist_del(&item->in_nearby_gaps);
-			rlist_add(&story->link[ind].nearby_gaps,
-				  &item->in_nearby_gaps);
+			rlist_del(&item->in_read_gaps);
+			rlist_add(&story->link[ind].read_gaps,
+				  &item->in_read_gaps);
 		} else {
 			assert((dir > 0 && cmp < 0) ||
 			       (cmp < 0 && item->type == ITER_REQ) ||
@@ -2576,7 +2576,7 @@ static void
 memtx_tx_delete_gap(struct gap_item *item)
 {
 	rlist_del(&item->in_gap_list);
-	rlist_del(&item->in_nearby_gaps);
+	rlist_del(&item->in_read_gaps);
 	memtx_tx_mempool_free(item->txn, &txm.gap_item_mempoool, item);
 }
 
@@ -2591,11 +2591,11 @@ memtx_tx_full_scan_item_delete(struct full_scan_item *item)
 void
 memtx_tx_on_index_delete(struct index *index)
 {
-	while (!rlist_empty(&index->nearby_gaps)) {
+	while (!rlist_empty(&index->read_gaps)) {
 		struct gap_item *item =
-			rlist_first_entry(&index->nearby_gaps,
+			rlist_first_entry(&index->read_gaps,
 					  struct gap_item,
-					  in_nearby_gaps);
+					  in_read_gaps);
 		memtx_tx_delete_gap(item);
 	}
 	while (!rlist_empty(&index->full_scans)) {
@@ -2883,10 +2883,10 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
 		}
 		assert(index->dense_id < story->index_count);
 		assert(story->link[index->dense_id].in_index != NULL);
-		rlist_add(&story->link[index->dense_id].nearby_gaps,
-			  &item->in_nearby_gaps);
+		rlist_add(&story->link[index->dense_id].read_gaps,
+			  &item->in_read_gaps);
 	} else {
-		rlist_add(&index->nearby_gaps, &item->in_nearby_gaps);
+		rlist_add(&index->read_gaps, &item->in_read_gaps);
 	}
 	memtx_tx_story_gc();
 }
