@@ -1451,7 +1451,11 @@ RebuildIndex::~RebuildIndex()
  */
 class RebuildFuncIndex: public RebuildIndex
 {
-	struct index_def *
+	/*
+	 * This method is used before the class is built (is used to calculate
+	 * an argument for base class constructor), so it should be static.
+	 */
+	static struct index_def *
 	func_index_def_new(struct index_def *index_def, struct func *func)
 	{
 		struct index_def *new_index_def = index_def_dup_xc(index_def);
