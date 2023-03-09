@@ -118,6 +118,7 @@ ExternalProject_Add(icu
     PATCH_COMMAND patch -d <SOURCE_DIR> -p1 -i "${PATCHES_DIR}/icu-tarantool-security-45.patch"
     COMMAND       patch -d <SOURCE_DIR> -p1 -i "${PATCHES_DIR}/icu-tarantool-security-59.patch"
     COMMAND       patch -d <SOURCE_DIR> -p1 -i "${PATCHES_DIR}/icu-tarantool-security-61.patch"
+    COMMAND       patch -d <SOURCE_DIR> -p1 -i "${PATCHES_DIR}/icu-tarantool-security-96.patch"
 )
 set(TARANTOOL_DEPENDS icu ${TARANTOOL_DEPENDS})
 
