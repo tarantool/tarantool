@@ -66,3 +66,6 @@
 [submodule "third_party/checks"]
 	path = third_party/checks
 	url = https://github.com/tarantool/checks.git
+[submodule "third_party/metrics"]
+	path = third_party/metrics
+	url = https://github.com/tarantool/metrics.git
