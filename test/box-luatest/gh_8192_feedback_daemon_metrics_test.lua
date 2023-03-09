@@ -3,8 +3,22 @@ local g = t.group('Feedback daemon metrics')
 local server = require('luatest.server')
 
 g.before_all(function()
-    g.server = server:new{alias = 'default'}
+    g.server = server:new{
+        alias = 'default',
+        box_cfg = {
+            -- The tests here are unit ones, works with dummy metrics
+            -- package. After metrics package embedding, feedback background
+            -- loop may succeed to extract empty metrics table from
+            -- the embedded package, causing t.assert_equals(fb.metrics, nil)
+            -- to fail.
+            feedback_send_metrics = false,
+        }
+    }
     g.server:start()
+    g.server:exec(function()
+        require('third_party.metrics.test.rock_utils').remove_builtin('metrics')
+        box.cfg{feedback_send_metrics = true}
+    end)
 end)
 
 g.after_all(function()
@@ -13,7 +27,6 @@ end)
 
 g.before_each(function()
     g.server:exec(function()
-        package.loaded["metrics"] = nil
         -- Daemon is reloaded when cfg option is updated.
         box.cfg{
             feedback_send_metrics = true,
