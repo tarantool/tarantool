@@ -794,9 +794,11 @@ tarantoolsqlIdxKeyCompare(struct BtCursor *cursor,
 		}
 
 		if (fieldno != next_fieldno) {
-			struct tuple_field *field =
-				tuple_format_field(format, fieldno);
-			if (fieldno >= field_count ||
+			struct tuple_field *field = NULL;
+			if (fieldno < field_count)
+				field = tuple_format_field(format, fieldno);
+
+			if (field == NULL ||
 			    field->offset_slot == TUPLE_OFFSET_SLOT_NIL) {
 				/* Outdated field_map. */
 				uint32_t j = 0;
