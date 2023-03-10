@@ -30,6 +30,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stdbool.h>
+#include <stdint.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -46,18 +48,24 @@ struct region;
  *
  * @param request - request to fix
  * @param space - space corresponding to request
- * @param old_tuple - the old tuple
- * @param new_tuple - the new tuple
+ * @param old_data - the old tuple data
+ * @param old_size - size of the old data
+ * @param new_data - the new tuple data
+ * @param new_size - size of the new data
  * @param region - region where request parts will be allocated
+ * @param preserve_insert_type - do not turn INSERT requests into REPLACE
  *
- * If old_tuple and new_tuple are the same, the request is turned into NOP.
- * If new_tuple is NULL, the request is turned into DELETE(old_tuple).
- * If new_tuple is not NULL, the request is turned into REPLACE(new_tuple).
+ * If old_data and new_data are the same, the request is turned into NOP.
+ * If new_data is NULL, the request is turned into DELETE(old_data).
+ * If new_data is not NULL, the request is turned into REPLACE(new_data),
+ * or into INSERT(new_data)/UPSERT(new_data) when preserve_request_type is true
+ * and the original request was INSERT or UPSERT.
  */
 int
 request_create_from_tuple(struct request *request, struct space *space,
-			  struct tuple *old_tuple, struct tuple *new_tuple,
-			  struct region *region);
+			  const char *old_data, uint32_t old_size,
+			  const char *new_data, uint32_t new_size,
+			  struct region *region, bool preserve_request_type);
 
 /**
  * Convert a request accessing a secondary key to a primary
