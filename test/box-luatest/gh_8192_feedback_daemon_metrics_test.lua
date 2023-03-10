@@ -3,7 +3,10 @@ local g = t.group('Feedback daemon metrics')
 local server = require('luatest.server')
 
 g.before_all(function()
-    g.server = server:new{alias = 'default'}
+    g.server = server:new{
+        alias = 'default',
+        box_cfg = {metrics = {include = 'none'}}
+    }
     g.server:start()
 end)
 

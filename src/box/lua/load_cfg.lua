@@ -193,6 +193,12 @@ local default_cfg = {
     sql_cache_size        = 5 * 1024 * 1024,
     txn_timeout           = 365 * 100 * 86400,
     txn_isolation         = "best-effort",
+
+    metrics     = {
+        include = 'all',
+        exclude = {},
+        labels = {},
+    },
 }
 
 -- We need to track cfg changes done through API of distinct modules (log.cfg of
@@ -377,6 +383,8 @@ local template_cfg = {
     net_msg_max           = 'number',
     sql_cache_size        = 'number',
     txn_timeout           = 'number',
+
+    metrics = 'table',
 }
 
 local function normalize_uri_list_for_replication(port_list)
@@ -492,7 +500,11 @@ local dynamic_cfg = {
     password_enforce_digits = ifdef_security(nop),
     password_enforce_specialchars = ifdef_security(nop),
     password_history_length = ifdef_security(nop),
-    wal_ext                 = private.cfg_set_wal_ext
+    wal_ext                 = private.cfg_set_wal_ext,
+
+    metrics = function()
+        require('metrics').cfg(box.cfg.metrics)
+    end,
 }
 
 -- The modules that can apply all new options with single call. The
