@@ -369,6 +369,8 @@ sql_ephemeral_space_new(const struct sql_space_info *info)
 		fields[i].is_nullable = true;
 		fields[i].nullable_action = ON_CONFLICT_ACTION_NONE;
 		fields[i].sql_default_value = NULL;
+		fields[i].default_value = NULL;
+		fields[i].default_value_size = 0;
 		fields[i].type = info->types[i];
 		fields[i].coll_id = info->coll_ids[i];
 		fields[i].compression_type = COMPRESSION_TYPE_NONE;

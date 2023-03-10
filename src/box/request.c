@@ -69,13 +69,17 @@ request_update_header(struct request *request, struct xrow_header *row,
 
 int
 request_create_from_tuple(struct request *request, struct space *space,
-			  struct tuple *old_tuple, struct tuple *new_tuple,
-			  struct region *region)
+			  const char *old_data, uint32_t old_size,
+			  const char *new_data, uint32_t new_size,
+			  struct region *region, bool preserve_request_type)
 {
+	const char *upsert_ops = request->ops;
+	const char *upsert_ops_end = request->ops_end;
+	enum iproto_type request_type = request->type;
 	struct xrow_header *row = request->header;
 	memset(request, 0, sizeof(*request));
 
-	if (old_tuple == new_tuple) {
+	if (old_data == new_data) {
 		/*
 		 * Old and new tuples are the same,
 		 * turn this request into no-op.
@@ -89,11 +93,10 @@ request_create_from_tuple(struct request *request, struct space *space,
 	 * this line is not reached.
 	 */
 	request->space_id = space->def->id;
-	if (new_tuple == NULL) {
-		uint32_t size, key_size;
-		const char *data = tuple_data_range(old_tuple, &size);
+	if (new_data == NULL) {
+		uint32_t key_size;
 		request->key = tuple_extract_key_raw_to_region(
-					data, data + size,
+					old_data, old_data + old_size,
 					space->index[0]->def->key_def,
 					MULTIKEY_NONE, &key_size, region);
 		if (request->key == NULL)
@@ -101,8 +104,6 @@ request_create_from_tuple(struct request *request, struct space *space,
 		request->key_end = request->key + key_size;
 		request->type = IPROTO_DELETE;
 	} else {
-		uint32_t size;
-		const char *data = tuple_data_range(new_tuple, &size);
 		/*
 		 * We have to copy the tuple data to region, because
 		 * the tuple is allocated on runtime arena and not
@@ -110,15 +111,16 @@ request_create_from_tuple(struct request *request, struct space *space,
 		 * current transaction ends while we need to write
 		 * the tuple data to WAL on commit.
 		 */
-		char *buf = region_alloc(region, size);
-		if (buf == NULL) {
-			diag_set(OutOfMemory, size, "region_alloc", "tuple");
-			return -1;
-		}
-		memcpy(buf, data, size);
+		char *buf = xregion_alloc(region, new_size);
+		memcpy(buf, new_data, new_size);
 		request->tuple = buf;
-		request->tuple_end = buf + size;
-		request->type = IPROTO_REPLACE;
+		request->tuple_end = buf + new_size;
+		request->type = preserve_request_type ? request_type :
+							IPROTO_REPLACE;
+		if (request->type == IPROTO_UPSERT) {
+			request->ops = upsert_ops;
+			request->ops_end = upsert_ops_end;
+		}
 	}
 	request_update_header(request, row, region);
 	return 0;

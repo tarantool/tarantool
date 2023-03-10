@@ -300,7 +300,7 @@ struct errcode_record {
 	/*245 */_(ER_OLD_TERM,			"The term is outdated: old - %llu, new - %llu") \
 	/*246 */_(ER_INTERFERING_ELECTIONS,	"Interfering elections started")\
 	/*247 */_(ER_ITERATOR_POSITION,		"Iterator position is invalid") \
-	/*248 */_(ER_UNUSED,			"") \
+	/*248 */_(ER_DEFAULT_VALUE_TYPE,	"Type of the default value does not match tuple field %s type: expected %s, got %s") \
 	/*249 */_(ER_UNKNOWN_AUTH_METHOD,	"Unknown authentication method '%s'") \
 	/*250 */_(ER_INVALID_AUTH_DATA,		"Invalid '%s' data: %s") \
 	/*251 */_(ER_INVALID_AUTH_REQUEST,	"Invalid '%s' request: %s") \

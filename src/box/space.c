@@ -535,6 +535,41 @@ index_name_by_id(struct space *space, uint32_t id)
 }
 
 /**
+ * Apply default values from the space format to the null (or absent) fields of
+ * request->tuple.
+ */
+static int
+space_apply_defaults(struct space *space, struct txn *txn,
+		     struct request *request)
+{
+	assert(request->type == IPROTO_INSERT ||
+	       request->type == IPROTO_REPLACE ||
+	       request->type == IPROTO_UPSERT);
+
+	const char *new_data = request->tuple;
+	const char *new_data_end = request->tuple_end;
+	size_t region_svp = region_used(&fiber()->gc);
+
+	bool changed = tuple_format_apply_defaults(space->format, &new_data,
+						   &new_data_end);
+	if (!changed) {
+		region_truncate(&fiber()->gc, region_svp);
+		return 0;
+	}
+	/*
+	 * Field defaults changed the resulting tuple.
+	 * Fix the request to conform.
+	 */
+	struct region *txn_region = tx_region_acquire(txn);
+	int rc = request_create_from_tuple(request, space, NULL, 0, new_data,
+					   new_data_end - new_data, txn_region,
+					   true);
+	tx_region_release(txn, TX_ALLOC_SYSTEM);
+	region_truncate(&fiber()->gc, region_svp);
+	return rc;
+}
+
+/**
  * Run BEFORE triggers and foreign key constraint checks registered for a space.
  * If a trigger changes the current statement, this function updates the
  * request accordingly.
@@ -602,13 +637,18 @@ after_old_tuple_lookup:;
 	/*
 	 * Create the new tuple.
 	 */
-	uint32_t new_size, old_size;
+	uint32_t new_size, old_size = 0;
 	const char *new_data, *new_data_end;
-	const char *old_data, *old_data_end;
+	const char *old_data = NULL, *old_data_end;
 
 	switch (request->type) {
 	case IPROTO_INSERT:
+		new_data = request->tuple;
+		new_data_end = request->tuple_end;
+		break;
 	case IPROTO_REPLACE:
+		if (old_tuple != NULL)
+			old_data = tuple_data_range(old_tuple, &old_size);
 		new_data = request->tuple;
 		new_data_end = request->tuple_end;
 		break;
@@ -633,6 +673,7 @@ after_old_tuple_lookup:;
 			/* Nothing to delete. */
 			return 0;
 		}
+		old_data = tuple_data_range(old_tuple, &old_size);
 		new_data = new_data_end = NULL;
 		break;
 	case IPROTO_UPSERT:
@@ -716,7 +757,7 @@ after_old_tuple_lookup:;
 	int rc = trigger_run(&space->before_replace, txn);
 
 	/*
-	 * BEFORE riggers cannot change the old tuple,
+	 * BEFORE triggers cannot change the old tuple,
 	 * but they may replace the new tuple.
 	 */
 	bool request_changed = (stmt->new_tuple != new_tuple);
@@ -747,10 +788,13 @@ after_old_tuple_lookup:;
 	 * Fix the request to conform.
 	 */
 	if (request_changed) {
+		new_data = new_tuple == NULL ? NULL :
+			   tuple_data_range(new_tuple, &new_size);
 		struct region *txn_region = tx_region_acquire(txn);
 		rc = request_create_from_tuple(request, space,
-					       old_tuple, new_tuple,
-					       txn_region);
+					       old_data, old_size,
+					       new_data, new_size,
+					       txn_region, false);
 		tx_region_release(txn, TX_ALLOC_SYSTEM);
 	}
 out:
@@ -790,6 +834,16 @@ space_execute_dml(struct space *space, struct txn *txn,
 			}
 		}
 	}
+
+	bool need_defaults_apply = tuple_format_has_defaults(space->format) &&
+				   recovery_state == FINISHED_RECOVERY &&
+				   request->type != IPROTO_UPDATE &&
+				   request->type != IPROTO_DELETE;
+	if (unlikely(need_defaults_apply)) {
+		if (space_apply_defaults(space, txn, request) != 0)
+			return -1;
+	}
+
 	if (unlikely((!rlist_empty(&space->before_replace) &&
 		      space->run_triggers) || need_foreign_key_check)) {
 		/*

@@ -34,6 +34,7 @@
 #include "json/json.h"
 #include "coll_id_cache.h"
 #include "trivia/util.h"
+#include "tuple_builder.h"
 #include "tuple_constraint.h"
 #include "tt_static.h"
 
@@ -181,6 +182,8 @@ tuple_field_new(void)
 	field->multikey_required_fields = NULL;
 	field->constraint_count = 0;
 	field->constraint = NULL;
+	field->default_value = NULL;
+	field->default_value_size = 0;
 	return field;
 }
 
@@ -193,6 +196,7 @@ tuple_field_delete(struct tuple_field *field)
 	free(field->constraint);
 	if (field->sql_default_value_expr != NULL)
 		tuple_format_expr_delete(field->sql_default_value_expr);
+	free(field->default_value);
 	free(field);
 }
 
@@ -510,6 +514,25 @@ tuple_format_create(struct tuple_format *format, struct key_def *const *keys,
 			if (field->sql_default_value_expr == NULL)
 				return -1;
 		}
+		char *default_value = fields[i].default_value;
+		if (default_value != NULL) {
+			bool is_compatible = field_mp_type_is_compatible(
+				field->type, default_value, false);
+			if (!is_compatible) {
+				enum mp_type type = mp_typeof(*default_value);
+				diag_set(ClientError, ER_DEFAULT_VALUE_TYPE,
+					 tuple_field_path(field, format),
+					 field_type_strs[field->type],
+					 mp_type_strs[type]);
+				return -1;
+			}
+			size_t size = fields[i].default_value_size;
+			char *buf = xmalloc(size);
+			memcpy(buf, default_value, size);
+			field->default_value = buf;
+			field->default_value_size = size;
+			format->default_field_count = i + 1;
+		}
 	}
 
 	int current_slot = 0;
@@ -737,6 +760,7 @@ tuple_format_alloc(struct key_def * const *keys, uint16_t key_count,
 	format->epoch = 0;
 	format->constraint_count = 0;
 	format->constraint = NULL;
+	format->default_field_count = 0;
 	return format;
 error:
 	tuple_format_destroy_fields(format);
@@ -1036,9 +1060,10 @@ tuple_field_map_create_plain(struct tuple_format *format, const char *tuple,
 		mp_next(&next_pos);
 		field = json_tree_entry(*token, struct tuple_field, token);
 		if (validate) {
-			bool nullable = tuple_field_is_nullable(field);
+			bool allow_null = tuple_field_is_nullable(field) ||
+					  tuple_field_has_default(field);
 			if(!field_mp_type_is_compatible(field->type, pos,
-							nullable)) {
+							allow_null)) {
 				diag_set(ClientError, ER_FIELD_TYPE,
 					 tuple_field_path(field, format),
 					 field_type_strs[field->type],
@@ -1415,4 +1440,70 @@ eof:
 		return -1;
 	entry->data = NULL;
 	return 0;
+}
+
+bool
+tuple_format_apply_defaults(struct tuple_format *format, const char **data,
+			    const char **data_end)
+{
+	struct tuple_builder builder;
+	tuple_builder_new(&builder, &fiber()->gc);
+	bool is_tuple_changed = false;
+	/*
+	 * Process fields that are present in both the format and the tuple.
+	 * Break prematurely when all defaults are applied.
+	 */
+	const char *p = *data;
+	uint32_t tuple_field_count = mp_decode_array(&p);
+	size_t i;
+	for (i = 0; i < MIN(tuple_field_count,
+			    format->default_field_count); i++) {
+		const char *p_next = p;
+		mp_next(&p_next);
+
+		struct tuple_field *field = NULL;
+		bool is_null = mp_typeof(*p) == MP_NIL;
+		if (is_null)
+			field = tuple_format_field(format, i);
+
+		if (is_null && tuple_field_has_default(field)) {
+			tuple_builder_add(&builder, field->default_value,
+					  field->default_value_size, 1);
+			is_tuple_changed = true;
+		} else {
+			tuple_builder_add(&builder, p, p_next - p, 1);
+		}
+		p = p_next;
+	}
+	/*
+	 * Process fields that are present in the format, but not in the tuple.
+	 * Break prematurely when all defaults are applied.
+	 */
+	for ( ; i < format->default_field_count; i++) {
+		struct tuple_field *field = tuple_format_field(format, i);
+		if (tuple_field_has_default(field)) {
+			tuple_builder_add(&builder, field->default_value,
+					  field->default_value_size, 1);
+			is_tuple_changed = true;
+		} else {
+			tuple_builder_add_nil(&builder);
+		}
+	}
+	/*
+	 * Return if no fields were changed.
+	 */
+	if (!is_tuple_changed)
+		return false;
+	/*
+	 * If the tuple has more fields, append them as is.
+	 */
+	if (tuple_field_count > i) {
+		uint32_t field_count = tuple_field_count - i;
+		tuple_builder_add(&builder, p, *data_end - p, field_count);
+	}
+	/*
+	 * Allocate a buffer and encode all elements into the new MsgPack array.
+	 */
+	tuple_builder_finalize(&builder, data, data_end);
+	return true;
 }
