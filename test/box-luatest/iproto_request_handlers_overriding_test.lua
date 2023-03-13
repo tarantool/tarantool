@@ -104,13 +104,13 @@ g.before_all(function(cg)
                         box.info.schema_version,
                     }, {__serialize = 'map'})
                     local resp_body = setmetatable({}, {__serialize = 'map'})
-                    local packet_size = 29
+                    local packet_size = 33
                     local packet = s:read(packet_size)
                     local packet_len, next = msgpack.decode(packet)
                     t.assert_equals(packet_len, packet_size - 5)
                     t.assert_equals(packet_size - next + 1, packet_len)
                     local packet_header, next = msgpack.decode(packet, next)
-                    t.assert_equals(packet_size - next + 1, packet_size - 28)
+                    t.assert_equals(packet_size - next + 1, packet_size - 32)
                     local packet_body, next = msgpack.decode(packet, next)
                     t.assert_equals(next, packet_size + 1)
                     t.assert_equals(packet_header, resp_header)
