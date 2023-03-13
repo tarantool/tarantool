@@ -98,7 +98,14 @@ function wakeup() cond:signal() end
 test_run:switch("default")
 
 server_addr = test_run:cmd("eval test 'return box.cfg.listen'")[1]
-conn = net_box.new(server_addr)
+-- To enable graceful shutdown a client sends an IPROTO_WATCH request.
+-- The server replies to the client with IPROTO_EVENT. Upon receiving
+-- the event, the client sends another IPROTO_WATCH request to ack it.
+-- The whole procedure is fully asynchronous, which means it may finish
+-- after we start processing user requests over the connection.
+-- To correctly account service requests, we disable this feature.
+-- https://github.com/tarantool/tarantool-qa/issues/269
+conn = net_box.new(server_addr, {_disable_graceful_shutdown = true})
 stream = conn:new_stream()
 request_count = 10
 service_total_msg_count, service_in_progress_msg_count, \
