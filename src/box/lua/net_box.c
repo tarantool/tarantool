@@ -2666,7 +2666,7 @@ netbox_transport_do_auth(struct netbox_transport *transport,
  * On success invokes the 'did_fetch_schema' callback and returns the actual
  * schema version. On failure raises a Lua error.
  */
-static uint32_t
+static uint64_t
 netbox_transport_fetch_schema(struct netbox_transport *transport,
 			      struct lua_State *L, uint64_t schema_version)
 {
@@ -2789,7 +2789,7 @@ restart:
  * Returns the current schema version on schema change. On failure raises
  * a Lua error.
  */
-static uint32_t
+static uint64_t
 netbox_transport_process_requests(struct netbox_transport *transport,
 				  struct lua_State *L, uint64_t schema_version)
 {
