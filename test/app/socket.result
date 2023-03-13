@@ -240,11 +240,11 @@ pong = s:sysread()
 ...
 string.len(pong)
 ---
-- 29
+- 33
 ...
 msgpack.decode(pong)
 ---
-- 24
+- 28
 - 6
 ...
 function remove_schema_id(t, x) if t[5] then t[5] = 'XXX' end return t, x end
@@ -253,7 +253,7 @@ function remove_schema_id(t, x) if t[5] then t[5] = 'XXX' end return t, x end
 remove_schema_id(msgpack.decode(pong, 6))
 ---
 - {0: 0, 1: 0, 5: 'XXX'}
-- 29
+- 33
 ...
 s:close()
 ---

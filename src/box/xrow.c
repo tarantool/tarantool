@@ -370,7 +370,7 @@ struct PACKED iproto_header_bin {
 	uint64_t v_sync;                        /* sync */
 	uint8_t k_schema_version;               /* IPROTO_SCHEMA_VERSION */
 	uint8_t m_schema_version;               /* MP_UINT32 */
-	uint32_t v_schema_version;              /* schema_version */
+	uint64_t v_schema_version;              /* schema_version */
 };
 
 static_assert(sizeof(struct iproto_header_bin) == IPROTO_HEADER_LEN,
@@ -392,8 +392,8 @@ iproto_header_encode(char *out, uint16_t type, uint64_t sync,
 	header.m_sync = 0xcf;
 	header.v_sync = mp_bswap_u64(sync);
 	header.k_schema_version = IPROTO_SCHEMA_VERSION;
-	header.m_schema_version = 0xce;
-	header.v_schema_version = mp_bswap_u32(schema_version);
+	header.m_schema_version = 0xcf;
+	header.v_schema_version = mp_bswap_u64(schema_version);
 	memcpy(out, &header, sizeof(header));
 }
 
