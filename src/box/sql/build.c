@@ -513,17 +513,18 @@ sqlAddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 			struct field_def *field =
 				&def->fields[def->field_count - 1];
 			struct region *region = &pParse->region;
-			uint32_t default_length = (int)(pSpan->zEnd - pSpan->zStart);
-			field->default_value = region_alloc(region,
-							    default_length + 1);
-			if (field->default_value == NULL) {
+			uint32_t default_length = (int)(pSpan->zEnd -
+							pSpan->zStart);
+			field->sql_default_value =
+				region_alloc(region, default_length + 1);
+			if (field->sql_default_value == NULL) {
 				diag_set(OutOfMemory, default_length + 1,
 					 "region_alloc",
-					 "field->default_value");
+					 "field->sql_default_value");
 				pParse->is_aborted = true;
 				return;
 			}
-			strlcpy(field->default_value, pSpan->zStart,
+			strlcpy(field->sql_default_value, pSpan->zStart,
 				default_length + 1);
 		}
 	}

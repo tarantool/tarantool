@@ -289,8 +289,8 @@ sql_describe_field(struct sql_desc *desc, const struct field_def *field)
 	}
 	if (!field->is_nullable)
 		sql_desc_append(desc, " NOT NULL");
-	if (field->default_value != NULL)
-		sql_desc_append(desc, " DEFAULT(%s)", field->default_value);
+	if (field->sql_default_value != NULL)
+		sql_desc_append(desc, " DEFAULT(%s)", field->sql_default_value);
 	for (uint32_t i = 0; i < field->constraint_count; ++i) {
 		struct tuple_constraint_def *cdef = &field->constraint_def[i];
 		assert(cdef->type == CONSTR_FKEY || cdef->type == CONSTR_FUNC);
