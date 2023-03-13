@@ -1,5 +1,5 @@
-1..24
-    1..135
+1..25
+    1..144
     # *** test_uints ***
     # uint 0U
     ok 1 - mp_check_uint(0U) == 0
@@ -151,9 +151,19 @@
     ok 133 - len(mp_check_uint(0xffffffffffffffffULL))
     ok 134 - mp_sizeof_uint(0xffffffffffffffffULL)
     ok 135 - mp_encode(0xffffffffffffffffULL) == "\xcf\xff\xff\xff\xff\xff\xff\xff\xff"
+    # uint_safe
+    ok 136 - size after mp_encode_uint_safe(NULL, &sz)
+    ok 137 - mp_encode_uint_safe(NULL, &sz)
+    ok 138 - size after mp_encode_uint_safe(buf, &sz)
+    ok 139 - len of mp_encode_uint_safe(buf, &sz)
+    ok 140 - mp_encode_uint_safe(buf, &sz)
+    ok 141 - size after mp_encode_uint_safe(buf, &sz) overflow
+    ok 142 - mp_encode_uint_safe(buf, &sz) overflow
+    ok 143 - len of mp_encode_uint_safe(buf, NULL)
+    ok 144 - mp_encode_uint_safe(buf, NULL)
     # *** test_uints: done ***
 ok 1 - subtests
-    1..153
+    1..162
     # *** test_ints ***
     # int -0x01
     ok 1 - mp_check_int(-0x01) == 0
@@ -325,9 +335,19 @@ ok 1 - subtests
     ok 151 - len(mp_check_int((int64_t)-0x8000000000000000LL))
     ok 152 - mp_sizeof_int((int64_t)-0x8000000000000000LL)
     ok 153 - mp_encode((int64_t)-0x8000000000000000LL) == "\xd3\x80\x00\x00\x00\x00\x00\x00\x00"
+    # int_safe
+    ok 154 - size after mp_encode_int_safe(NULL, &sz)
+    ok 155 - mp_encode_int_safe(NULL, &sz)
+    ok 156 - size after mp_encode_int_safe(buf, &sz)
+    ok 157 - len of mp_encode_int_safe(buf, &sz)
+    ok 158 - mp_encode_int_safe(buf, &sz)
+    ok 159 - size after mp_encode_int_safe(buf, &sz) overflow
+    ok 160 - mp_encode_int_safe(buf, &sz) overflow
+    ok 161 - len of mp_encode_int_safe(buf, NULL)
+    ok 162 - mp_encode_int_safe(buf, NULL)
     # *** test_ints: done ***
 ok 2 - subtests
-    1..18
+    1..27
     # *** test_bools ***
     # bool 1
     ok 1 - mp_check_bool(1) == 0
@@ -349,9 +369,19 @@ ok 2 - subtests
     ok 16 - len(mp_check_bool(0))
     ok 17 - mp_sizeof_bool(0)
     ok 18 - mp_encode(0) == "\xc2"
+    # bool_safe
+    ok 19 - size after mp_encode_bool_safe(NULL, &sz)
+    ok 20 - mp_encode_bool_safe(NULL, &sz)
+    ok 21 - size after mp_encode_bool_safe(buf, &sz)
+    ok 22 - len of mp_encode_bool_safe(buf, &sz)
+    ok 23 - mp_encode_bool_safe(buf, &sz)
+    ok 24 - size after mp_encode_bool_safe(buf, &sz) overflow
+    ok 25 - mp_encode_bool_safe(buf, &sz) overflow
+    ok 26 - len of mp_encode_bool_safe(buf, NULL)
+    ok 27 - mp_encode_bool_safe(buf, NULL)
     # *** test_bools: done ***
 ok 3 - subtests
-    1..27
+    1..36
     # *** test_floats ***
     # float (float) 1.0
     ok 1 - mp_check_float((float) 1.0) == 0
@@ -383,9 +413,19 @@ ok 3 - subtests
     ok 25 - len(mp_check_float((float) -1e38f))
     ok 26 - mp_sizeof_float((float) -1e38f)
     ok 27 - mp_encode((float) -1e38f) == "\xca\xfe\x96\x76\x99"
+    # float_safe
+    ok 28 - size after mp_encode_float_safe(NULL, &sz)
+    ok 29 - mp_encode_float_safe(NULL, &sz)
+    ok 30 - size after mp_encode_float_safe(buf, &sz)
+    ok 31 - len of mp_encode_float_safe(buf, &sz)
+    ok 32 - mp_encode_float_safe(buf, &sz)
+    ok 33 - size after mp_encode_float_safe(buf, &sz) overflow
+    ok 34 - mp_encode_float_safe(buf, &sz) overflow
+    ok 35 - len of mp_encode_float_safe(buf, NULL)
+    ok 36 - mp_encode_float_safe(buf, NULL)
     # *** test_floats: done ***
 ok 4 - subtests
-    1..27
+    1..36
     # *** test_doubles ***
     # double (double) 1.0
     ok 1 - mp_check_double((double) 1.0) == 0
@@ -417,9 +457,19 @@ ok 4 - subtests
     ok 25 - len(mp_check_double((double) -1e99))
     ok 26 - mp_sizeof_double((double) -1e99)
     ok 27 - mp_encode((double) -1e99) == "\xcb\xd4\x7d\x42\xae\xa2\x87\x9f\x2e"
+    # double_safe
+    ok 28 - size after mp_encode_double_safe(NULL, &sz)
+    ok 29 - mp_encode_double_safe(NULL, &sz)
+    ok 30 - size after mp_encode_double_safe(buf, &sz)
+    ok 31 - len of mp_encode_double_safe(buf, &sz)
+    ok 32 - mp_encode_double_safe(buf, &sz)
+    ok 33 - size after mp_encode_double_safe(buf, &sz) overflow
+    ok 34 - mp_encode_double_safe(buf, &sz) overflow
+    ok 35 - len of mp_encode_double_safe(buf, NULL)
+    ok 36 - mp_encode_double_safe(buf, NULL)
     # *** test_doubles: done ***
 ok 5 - subtests
-    1..6
+    1..15
     # *** test_nils ***
     # nil
     ok 1 - mp_check_nil()
@@ -428,9 +478,18 @@ ok 5 - subtests
     ok 4 - len(mp_next_nil()) == 1
     ok 5 - len(mp_check_nil()) == 1
     ok 6 - mp_sizeof_nil() == 1
+    ok 7 - size after mp_encode_nil_safe(NULL, &sz)
+    ok 8 - mp_encode_nil_safe(NULL, &sz)
+    ok 9 - size after mp_encode_nil_safe(buf, &sz)
+    ok 10 - len of mp_encode_nil_safe(buf, &sz)
+    ok 11 - mp_encode_nil_safe(buf, &sz)
+    ok 12 - size after mp_encode_nil_safe(buf, &sz) overflow
+    ok 13 - mp_encode_nil_safe(buf, &sz) overflow
+    ok 14 - len of mp_encode_nil_safe(buf, NULL)
+    ok 15 - mp_encode_nil_safe(buf, NULL)
     # *** test_nils: done ***
 ok 6 - subtests
-    1..78
+    1..87
     # *** test_strls ***
     # strl 0x00U
     ok 1 - mp_check_strl(0x00U) == 0
@@ -523,9 +582,19 @@ ok 6 - subtests
     ok 76 - len(mp_decode_strl(0xffffffffU))
     ok 77 - mp_sizeof_strl(0xffffffffU)
     ok 78 - mp_encode(0xffffffffU) == "\xdb\xff\xff\xff\xff"
+    # strl_safe
+    ok 79 - size after mp_encode_strl_safe(NULL, &sz)
+    ok 80 - mp_encode_strl_safe(NULL, &sz)
+    ok 81 - size after mp_encode_strl_safe(buf, &sz)
+    ok 82 - len of mp_encode_strl_safe(buf, &sz)
+    ok 83 - mp_encode_strl_safe(buf, &sz)
+    ok 84 - size after mp_encode_strl_safe(buf, &sz) overflow
+    ok 85 - mp_encode_strl_safe(buf, &sz) overflow
+    ok 86 - len of mp_encode_strl_safe(buf, NULL)
+    ok 87 - mp_encode_strl_safe(buf, NULL)
     # *** test_strls: done ***
 ok 7 - subtests
-    1..78
+    1..87
     # *** test_binls ***
     # binl 0x00U
     ok 1 - mp_check_binl(0x00U) == 0
@@ -618,9 +687,19 @@ ok 7 - subtests
     ok 76 - len(mp_decode_binl(0xffffffffU))
     ok 77 - mp_sizeof_binl(0xffffffffU)
     ok 78 - mp_encode(0xffffffffU) == "\xc6\xff\xff\xff\xff"
+    # binl_safe
+    ok 79 - size after mp_encode_binl_safe(NULL, &sz)
+    ok 80 - mp_encode_binl_safe(NULL, &sz)
+    ok 81 - size after mp_encode_binl_safe(buf, &sz)
+    ok 82 - len of mp_encode_binl_safe(buf, &sz)
+    ok 83 - mp_encode_binl_safe(buf, &sz)
+    ok 84 - size after mp_encode_binl_safe(buf, &sz) overflow
+    ok 85 - mp_encode_binl_safe(buf, &sz) overflow
+    ok 86 - len of mp_encode_binl_safe(buf, NULL)
+    ok 87 - mp_encode_binl_safe(buf, NULL)
     # *** test_binls: done ***
 ok 8 - subtests
-    1..168
+    1..177
     # *** test_extls ***
     # extl 0x01U
     ok 1 - mp_check_extl(0x01U) == 0
@@ -818,9 +897,19 @@ ok 8 - subtests
     ok 166 - len(mp_decode_extl(0xffffffffU))
     ok 167 - mp_sizeof_extl(0xffffffffU)
     ok 168 - mp_encode(0xffffffffU) == "\xc9\xff\xff\xff\xff\x00"
+    # extl_safe
+    ok 169 - size after mp_encode_extl_safe(NULL, &sz)
+    ok 170 - mp_encode_extl_safe(NULL, &sz)
+    ok 171 - size after mp_encode_extl_safe(buf, &sz)
+    ok 172 - len of mp_encode_extl_safe(buf, &sz)
+    ok 173 - mp_encode_extl_safe(buf, &sz)
+    ok 174 - size after mp_encode_extl_safe(buf, &sz) overflow
+    ok 175 - mp_encode_extl_safe(buf, &sz) overflow
+    ok 176 - len of mp_encode_extl_safe(buf, NULL)
+    ok 177 - mp_encode_extl_safe(buf, NULL)
     # *** test_extls: done ***
 ok 9 - subtests
-    1..96
+    1..107
     # *** test_strs ***
     # str len=0x01
     ok 1 - len(mp_decode_str(x, 1))
@@ -930,9 +1019,21 @@ ok 9 - subtests
     ok 94 - len(mp_check_str(x, 0x10001)
     ok 95 - mp_sizeof_str(0x10001)
     ok 96 - mp_encode_str(x, 0x10001) == x
+    # str_safe
+    ok 97 - size after mp_encode_str_safe(NULL, &sz)
+    ok 98 - mp_encode_str_safe(NULL, &sz)
+    ok 99 - size after mp_encode_str_safe(buf, &sz)
+    ok 100 - len of mp_encode_str_safe(buf, &sz)
+    ok 101 - head of mp_encode_str_safe(buf, &sz)
+    ok 102 - payload of mp_encode_str_safe(buf, &sz)
+    ok 103 - size after mp_encode_str_safe(buf, &sz) overflow
+    ok 104 - mp_encode_str_safe(buf, &sz) overflow
+    ok 105 - len of mp_encode_str_safe(buf, NULL)
+    ok 106 - head of mp_encode_str_safe(buf, NULL)
+    ok 107 - payload of mp_encode_str_safe(buf, NULL)
     # *** test_strs: done ***
 ok 10 - subtests
-    1..96
+    1..107
     # *** test_bins ***
     # bin len=0x01
     ok 1 - len(mp_decode_bin(x, 1))
@@ -1042,9 +1143,21 @@ ok 10 - subtests
     ok 94 - len(mp_check_bin(x, 0x10001)
     ok 95 - mp_sizeof_bin(0x10001)
     ok 96 - mp_encode_bin(x, 0x10001) == x
+    # bin_safe
+    ok 97 - size after mp_encode_bin_safe(NULL, &sz)
+    ok 98 - mp_encode_bin_safe(NULL, &sz)
+    ok 99 - size after mp_encode_bin_safe(buf, &sz)
+    ok 100 - len of mp_encode_bin_safe(buf, &sz)
+    ok 101 - head of mp_encode_bin_safe(buf, &sz)
+    ok 102 - payload of mp_encode_bin_safe(buf, &sz)
+    ok 103 - size after mp_encode_bin_safe(buf, &sz) overflow
+    ok 104 - mp_encode_bin_safe(buf, &sz) overflow
+    ok 105 - len of mp_encode_bin_safe(buf, NULL)
+    ok 106 - head of mp_encode_bin_safe(buf, NULL)
+    ok 107 - payload of mp_encode_bin_safe(buf, NULL)
     # *** test_bins: done ***
 ok 11 - subtests
-    1..225
+    1..236
     # *** test_exts ***
     # ext len=0x01
     ok 1 - len(mp_decode_ext(x, 1))
@@ -1296,9 +1409,21 @@ ok 11 - subtests
     ok 223 - len(mp_check_ext(x, 0x00010001)
     ok 224 - mp_sizeof_ext(0x00010001)
     ok 225 - mp_encode_ext(x, 0x00010001) == x
+    # ext_safe
+    ok 226 - size after mp_encode_ext_safe(NULL, &sz)
+    ok 227 - mp_encode_ext_safe(NULL, &sz)
+    ok 228 - size after mp_encode_ext_safe(buf, &sz)
+    ok 229 - len of mp_encode_ext_safe(buf, &sz)
+    ok 230 - head of mp_encode_ext_safe(buf, &sz)
+    ok 231 - payload of mp_encode_ext_safe(buf, &sz)
+    ok 232 - size after mp_encode_ext_safe(buf, &sz) overflow
+    ok 233 - mp_encode_ext_safe(buf, &sz) overflow
+    ok 234 - len of mp_encode_ext_safe(buf, NULL)
+    ok 235 - head of mp_encode_ext_safe(buf, NULL)
+    ok 236 - payload of mp_encode_ext_safe(buf, NULL)
     # *** test_exts: done ***
 ok 12 - subtests
-    1..54
+    1..63
     # *** test_arrays ***
     # array 0
     ok 1 - mp_check_array(0) == 0
@@ -1363,9 +1488,19 @@ ok 12 - subtests
     ok 52 - len(mp_decode_array(0xffffffffU))
     ok 53 - mp_sizeof_array(0xffffffffU)
     ok 54 - mp_encode(0xffffffffU) == "\xdd\xff\xff\xff\xff"
+    # array_safe
+    ok 55 - size after mp_encode_array_safe(NULL, &sz)
+    ok 56 - mp_encode_array_safe(NULL, &sz)
+    ok 57 - size after mp_encode_array_safe(buf, &sz)
+    ok 58 - len of mp_encode_array_safe(buf, &sz)
+    ok 59 - mp_encode_array_safe(buf, &sz)
+    ok 60 - size after mp_encode_array_safe(buf, &sz) overflow
+    ok 61 - mp_encode_array_safe(buf, &sz) overflow
+    ok 62 - len of mp_encode_array_safe(buf, NULL)
+    ok 63 - mp_encode_array_safe(buf, NULL)
     # *** test_arrays: done ***
 ok 13 - subtests
-    1..54
+    1..63
     # *** test_maps ***
     # map 0
     ok 1 - mp_check_map(0) == 0
@@ -1430,8 +1565,33 @@ ok 13 - subtests
     ok 52 - len(mp_decode_map(0xffffffffU))
     ok 53 - mp_sizeof_map(0xffffffffU)
     ok 54 - mp_encode(0xffffffffU) == "\xdf\xff\xff\xff\xff"
+    # map_safe
+    ok 55 - size after mp_encode_map_safe(NULL, &sz)
+    ok 56 - mp_encode_map_safe(NULL, &sz)
+    ok 57 - size after mp_encode_map_safe(buf, &sz)
+    ok 58 - len of mp_encode_map_safe(buf, &sz)
+    ok 59 - mp_encode_map_safe(buf, &sz)
+    ok 60 - size after mp_encode_map_safe(buf, &sz) overflow
+    ok 61 - mp_encode_map_safe(buf, &sz) overflow
+    ok 62 - len of mp_encode_map_safe(buf, NULL)
+    ok 63 - mp_encode_map_safe(buf, NULL)
     # *** test_maps: done ***
 ok 14 - subtests
+    1..11
+    # *** test_memcpy ***
+    ok 1 - len of mp_memcpy()
+    ok 2 - payload of mp_memcpy()
+    ok 3 - size after mp_memcpy_safe(NULL, &sz)
+    ok 4 - mp_memcpy_safe(NULL, &sz)
+    ok 5 - size after mp_memcpy_safe(buf, &sz)
+    ok 6 - len of mp_memcpy_safe(buf, &sz)
+    ok 7 - mp_memcpy_safe(buf, &sz)
+    ok 8 - size after mp_memcpy_safe(buf, &sz) overflow
+    ok 9 - mp_memcpy_safe(buf, &sz) overflow
+    ok 10 - len of (buf, NULL)
+    ok 11 - mp_memcpy_safe(buf, NULL)
+    # *** test_memcpy: done ***
+ok 15 - subtests
     1..52
     # *** test_next_on_arrays ***
     # next/check on array(0)
@@ -1500,7 +1660,7 @@ ok 14 - subtests
     ok 51 - len(mp_check(array 65537)) == 65542
     ok 52 - len(mp_next(array 65537)) == 65542
     # *** test_next_on_arrays: done ***
-ok 15 - subtests
+ok 16 - subtests
     1..52
     # *** test_next_on_maps ***
     # next/check on map(0)
@@ -1569,7 +1729,7 @@ ok 15 - subtests
     ok 51 - len(mp_check(map 65537)) == 131079
     ok 52 - len(mp_next(map 65537)) == 131079
     # *** test_next_on_maps: done ***
-ok 16 - subtests
+ok 17 - subtests
     1..227
     # *** test_compare_uints ***
     ok 1 - mp_compare_uint(0, 0) == 0
@@ -1800,7 +1960,7 @@ ok 16 - subtests
     ok 226 - mp_compare_uint(18446744073709551615, 18446744073709551614) > 0
     ok 227 - mp_compare_uint(18446744073709551615, 18446744073709551615) == 0
     # *** test_compare_uints: done ***
-ok 17 - subtests
+ok 18 - subtests
     1..282
     # *** test_format ***
     ok 1 - Test type on step 0
@@ -2086,7 +2246,7 @@ ok 17 - subtests
     ok 281 - return value on step 70
     ok 282 - buffer overflow on step 70
     # *** test_format: done ***
-ok 18 - subtests
+ok 19 - subtests
     1..12
     # *** test_mp_print ***
     ok 1 - mp_snprint return value
@@ -2102,7 +2262,7 @@ ok 18 - subtests
     ok 11 - mp_snprint max nesting depth return value
     ok 12 - mp_snprint max nesting depth result
     # *** test_mp_print: done ***
-ok 19 - subtests
+ok 20 - subtests
     1..5
     # *** test_mp_print_ext ***
     ok 1 - mp_snrpint size match
@@ -2111,7 +2271,7 @@ ok 19 - subtests
     ok 4 - mp_fprint written correct number of bytes
     ok 5 - str is correct
     # *** test_mp_print_ext: done ***
-ok 20 - subtests
+ok 21 - subtests
     1..71
     # *** test_mp_check ***
     ok 1 - invalid fixmap 1
@@ -2186,7 +2346,7 @@ ok 20 - subtests
     ok 70 - invalid header 3
     ok 71 - invalid header 4
     # *** test_mp_check: done ***
-ok 21 - subtests
+ok 22 - subtests
     1..24
     # *** test_mp_check_ext_data ***
     ok 1 - invalid ext8 - bad type
@@ -2214,7 +2374,7 @@ ok 21 - subtests
     ok 23 - invalid fixext128 - bad data
     ok 24 - valid fixext128
     # *** test_mp_check_ext_data: done ***
-ok 22 - subtests
+ok 23 - subtests
     1..96
     # *** test_numbers ***
     ok 1 - mp_read_int32(mp_encode_uint(123)) check success
@@ -2314,7 +2474,7 @@ ok 22 - subtests
     ok 95 - mp_read_double(mp_encode_strl(100)) check fail
     ok 96 - mp_read_double(mp_encode_strl(100)) check pos unchanged
     # *** test_numbers: done ***
-ok 23 - subtests
+ok 24 - subtests
     1..5
     # *** test_overflow ***
     ok 1 - mp_check array overflow
@@ -2323,4 +2483,4 @@ ok 23 - subtests
     ok 4 - mp_check bin overflow
     ok 5 - mp_check str overflow
     # *** test_overflow: done ***
-ok 24 - subtests
+ok 25 - subtests
