@@ -120,7 +120,8 @@ sql_pragma_table_info(struct Parse *parse, const char *tbl_name)
 		}
 		sqlVdbeMultiLoad(v, 1, "issisi", i, field->name,
 				     field_type_strs[field->type],
-				     !field->is_nullable, field->default_value,
+				     !field->is_nullable,
+				     field->sql_default_value,
 				     k);
 		sqlVdbeAddOp2(v, OP_ResultRow, 1, 6);
 	}

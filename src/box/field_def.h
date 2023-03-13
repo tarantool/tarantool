@@ -150,8 +150,8 @@ struct field_def {
 	/** Collation ID for string comparison. */
 	uint32_t coll_id;
 	/** 0-terminated SQL expression for DEFAULT value. */
-	char *default_value;
-	/** Type of comression to this field */
+	char *sql_default_value;
+	/** Compression type for this field. */
 	enum compression_type compression_type;
 	/** Array of constraints. Can be NULL if constraints_count == 0. */
 	struct tuple_constraint_def *constraint_def;

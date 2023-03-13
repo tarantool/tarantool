@@ -573,7 +573,7 @@ sqlInsert(Parse * pParse,	/* Parser context */
 						tuple_format_field(
 							space->format, i);
 					struct Expr *dflt =
-						field->default_value_expr;
+						field->sql_default_value_expr;
 					sqlExprCode(pParse,
 							dflt,
 							regCols + i + 1);
@@ -635,7 +635,8 @@ sqlInsert(Parse * pParse,	/* Parser context */
 				}
 				struct tuple_field *field =
 					tuple_format_field(space->format, i);
-				struct Expr *dflt = field->default_value_expr;
+				struct Expr *dflt =
+					field->sql_default_value_expr;
 				sqlExprCodeFactorable(pParse,
 							  dflt,
 							  iRegStore);
@@ -1102,9 +1103,10 @@ xferOptimization(Parse * pParse,	/* Parser context */
 			return 0;
 		/* Default values for second and subsequent columns need to match. */
 		if (i > 0) {
-			char *src_expr_str = src->def->fields[i].default_value;
+			char *src_expr_str =
+				src->def->fields[i].sql_default_value;
 			char *dest_expr_str =
-				dest->def->fields[i].default_value;
+				dest->def->fields[i].sql_default_value;
 			if ((dest_expr_str == NULL) != (src_expr_str == NULL) ||
 			    (dest_expr_str &&
 			     strcmp(src_expr_str, dest_expr_str) != 0)

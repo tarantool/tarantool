@@ -161,8 +161,8 @@ struct tuple_field {
 	struct tuple_constraint *constraint;
 	/** Number of constraints. */
 	uint32_t constraint_count;
-	/** AST for parsed default value. */
-	struct Expr *default_value_expr;
+	/** AST for parsed SQL default value. */
+	struct Expr *sql_default_value_expr;
 };
 
 /**
