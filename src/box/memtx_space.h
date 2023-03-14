@@ -71,6 +71,13 @@ void
 memtx_space_update_bsize(struct space *space, struct tuple *old_tuple,
 			 struct tuple *new_tuple);
 
+/**
+ * Wrapper around `index_replace` which handles transaction management.
+ */
+int
+memtx_index_replace(struct txn *txn, struct index *index,
+		    struct tuple *old_tuple, struct tuple *new_tuple,
+		    enum dup_replace_mode mode, struct tuple **result);
 int
 memtx_space_replace_no_keys(struct space *, struct tuple *, struct tuple *,
 			    enum dup_replace_mode, struct tuple **);
