@@ -260,9 +260,9 @@ fio = require('fio')
 s = box.space.test
 ---
 ...
-#fio.listdir(fio.pathjoin(box.cfg.vinyl_dir, s.id, 1)) == 0
+fio.path.exists(fio.pathjoin(box.cfg.vinyl_dir, s.id, 1))
 ---
-- true
+- false
 ...
 s:drop()
 ---

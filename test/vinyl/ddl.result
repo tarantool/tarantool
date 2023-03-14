@@ -749,9 +749,9 @@ box.snapshot()
 ---
 - ok
 ...
-#fio.listdir(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 1)) == 0
+fio.path.exists(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 1))
 ---
-- true
+- false
 ...
 box.space.test:drop()
 ---
