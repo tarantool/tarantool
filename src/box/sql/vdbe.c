@@ -375,7 +375,6 @@ int sqlVdbeExec(Vdbe *p)
 	/* The database */
 	struct sql *db = sql_get();
 	int iCompare = 0;          /* Result of last comparison */
-	unsigned nVmStep = 0;      /* Number of virtual machine steps */
 	Mem *aMem = p->aMem;       /* Copy of p->aMem */
 	Mem *pIn1 = 0;             /* 1st input operand */
 	Mem *pIn2 = 0;             /* 2nd input operand */
@@ -421,7 +420,6 @@ int sqlVdbeExec(Vdbe *p)
 		assert(rc == 0);
 
 		assert(pOp>=aOp && pOp<&aOp[p->nOp]);
-		nVmStep++;
 
 		/* Only allow tracing if SQL_DEBUG is defined.
 		 */
