@@ -1,3 +1,3 @@
 ## feature/build
 
-* Updated zstd to version pre-1.5.5 (gh-8391).
+*  The `zstd` version was updated to pre-1.5.5 (gh-8391).

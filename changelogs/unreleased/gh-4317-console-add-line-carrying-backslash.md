@@ -1,4 +1,4 @@
 ## feature/console
 
-* Now multiline commands can be used by setting up continuation marker
-  with `\set continuation` command.
+* Now multiline commands can be used by setting continuation marker
+  using the `\set continuation` command.
