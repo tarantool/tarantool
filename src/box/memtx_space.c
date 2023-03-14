@@ -91,6 +91,38 @@ memtx_space_update_bsize(struct space *space, struct tuple *old_tuple,
 	memtx_space->bsize += new_bsize - old_bsize;
 }
 
+int
+memtx_index_replace(struct txn *txn, struct index *index,
+		    struct tuple *old_tuple, struct tuple *new_tuple,
+		    enum dup_replace_mode mode, struct tuple **result,
+		    struct tuple **successor)
+{
+	if (txn == NULL) {
+		if (index_replace(index, old_tuple, new_tuple, mode, result,
+				  successor) != 0)
+			return -1;
+		return 0;
+	}
+	memtx_tx_story_gc();
+	if (new_tuple == NULL)
+		return memtx_tx_history_add_delete(index, old_tuple, result);
+	if (index_replace(index, NULL, new_tuple, DUP_REPLACE_OR_INSERT, result,
+			  successor) != 0)
+		return -1;
+	if (memtx_tx_history_add_insert(index, old_tuple, new_tuple, mode,
+					result, *successor) != 0) {
+		struct tuple *unused;
+		if (index_replace(index, new_tuple, *result, DUP_INSERT,
+				  &unused, &unused) != 0) {
+			diag_log();
+			unreachable();
+			panic("failed to rollback change");
+		}
+		return -1;
+	}
+	return 0;
+}
+
 /**
  * A version of space_replace for a space which has
  * no indexes (is not yet fully built).
@@ -151,8 +183,8 @@ memtx_space_replace_primary_key(struct space *space, struct tuple *old_tuple,
 				struct tuple **result)
 {
 	struct tuple *successor;
-	if (index_replace(space->index[0], old_tuple,
-			  new_tuple, mode, &old_tuple, &successor) != 0)
+	if (memtx_index_replace(NULL, space->index[0], old_tuple, new_tuple,
+				mode, &old_tuple, &successor) != 0)
 		return -1;
 	memtx_space_update_bsize(space, old_tuple, new_tuple);
 	if (new_tuple != NULL)
@@ -281,19 +313,16 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 	 * Since modification of ephemeral spaces are allowed without txn,
 	 * we must not use MVCC for those spaces even if txn is present now.
 	 */
-	if (memtx_tx_manager_use_mvcc_engine && !space->def->opts.is_ephemeral) {
-		struct txn_stmt *stmt = txn_current_stmt(in_txn());
-		return memtx_tx_history_add_stmt(stmt, old_tuple, new_tuple,
-						 mode, result);
-	}
-
+	bool needs_txm = memtx_tx_manager_use_mvcc_engine &&
+			 !space->def->opts.is_ephemeral;
+	struct txn *txn = needs_txm ? in_txn() : NULL;
 	/*
 	 * If old_tuple is not NULL, the index has to
 	 * find and delete it, or return an error.
 	 */
 	struct tuple *successor;
-	if (index_replace(pk, old_tuple, new_tuple, mode,
-			  &old_tuple, &successor) != 0)
+	if (memtx_index_replace(txn, pk, old_tuple, new_tuple, mode,
+				&old_tuple, &successor) != 0)
 		return -1;
 	assert(old_tuple || new_tuple);
 
@@ -301,13 +330,13 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 	for (i++; i < space->index_count; i++) {
 		struct tuple *unused;
 		struct index *index = space->index[i];
-		if (index_replace(index, old_tuple, new_tuple,
-				  DUP_INSERT, &unused, &unused) != 0)
+		if (memtx_index_replace(txn, index, old_tuple, new_tuple,
+					DUP_INSERT, &unused, &unused) != 0)
 			goto rollback;
 	}
 
 	memtx_space_update_bsize(space, old_tuple, new_tuple);
-	if (new_tuple != NULL)
+	if (!needs_txm && new_tuple != NULL)
 		tuple_ref(new_tuple);
 	*result = old_tuple;
 	return 0;
@@ -317,8 +346,8 @@ rollback:
 		struct tuple *unused;
 		struct index *index = space->index[i - 1];
 		/* Rollback must not fail. */
-		if (index_replace(index, new_tuple, old_tuple,
-				  DUP_INSERT, &unused, &unused) != 0) {
+		if (memtx_index_replace(NULL, index, new_tuple, old_tuple,
+					DUP_INSERT, &unused, &unused) != 0) {
 			diag_log();
 			unreachable();
 			panic("failed to rollback change");
@@ -1094,9 +1123,9 @@ memtx_build_on_replace_rollback(struct trigger *trigger, void *event)
 	 * Use DUP_REPLACE_OR_INSERT mode because if we tried to replace a tuple
 	 * with a duplicate at a unique index, this trigger would not be called.
 	 */
-	state->rc = index_replace(state->index, stmt->new_tuple,
-				  stmt->old_tuple, DUP_REPLACE_OR_INSERT,
-				  &delete, &successor);
+	state->rc = memtx_index_replace(NULL, state->index, stmt->new_tuple,
+					stmt->old_tuple, DUP_REPLACE_OR_INSERT,
+					&delete, &successor);
 	if (state->rc != 0) {
 		diag_move(diag_get(), &state->diag);
 		return 0;
@@ -1154,8 +1183,9 @@ memtx_build_on_replace(struct trigger *trigger, void *event)
 		state->index->def->opts.is_unique ? DUP_INSERT :
 						    DUP_REPLACE_OR_INSERT;
 	struct tuple *successor;
-	state->rc = index_replace(state->index, stmt->old_tuple,
-				  stmt->new_tuple, mode, &delete, &successor);
+	state->rc = memtx_index_replace(NULL, state->index, stmt->old_tuple,
+					stmt->new_tuple, mode, &delete,
+					&successor);
 	if (state->rc != 0) {
 		diag_move(diag_get(), &state->diag);
 		return 0;
@@ -1300,8 +1330,8 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 		 */
 		struct tuple *old_tuple;
 		struct tuple *successor;
-		rc = index_replace(new_index, NULL, tuple,
-				   DUP_INSERT, &old_tuple, &successor);
+		rc = memtx_index_replace(NULL, new_index, NULL, tuple,
+					 DUP_INSERT, &old_tuple, &successor);
 		if (rc != 0)
 			break;
 		assert(old_tuple == NULL); /* Guaranteed by DUP_INSERT. */
