@@ -123,5 +123,5 @@ test_run:cmd('restart server default')
 
 fio = require('fio')
 s = box.space.test
-#fio.listdir(fio.pathjoin(box.cfg.vinyl_dir, s.id, 1)) == 0
+fio.path.exists(fio.pathjoin(box.cfg.vinyl_dir, s.id, 1))
 s:drop()

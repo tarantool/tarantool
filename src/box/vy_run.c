@@ -2538,6 +2538,28 @@ close_err:
 	return -1;
 }
 
+/**
+ * Try to remove an empty directory.
+ *
+ * @param path Path to the directory.
+ * @return int 0 on success, -1 on error.
+ */
+static int
+try_rmdir(const char *path)
+{
+	int rc = 0;
+	if (coio_rmdir(path) < 0) {
+		if (errno != ENOENT) {
+			if (errno != ENOTEMPTY)
+				say_syserror("error while removing %s", path);
+			rc = -1;
+		}
+	} else {
+		say_info("removed %s", path);
+	}
+	return rc;
+}
+
 int
 vy_run_remove_files(const char *dir, uint32_t space_id,
 		    uint32_t iid, int64_t run_id)
@@ -2558,6 +2580,12 @@ vy_run_remove_files(const char *dir, uint32_t space_id,
 		} else
 			say_info("removed %s", path);
 	}
+	/* Remove the root directory if it's empty. */
+	vy_lsm_snprint_path(path, sizeof(path), dir, space_id, iid);
+	if (try_rmdir(path) < 0)
+		return ret;
+	vy_space_snprint_path(path, sizeof(path), dir, space_id);
+	try_rmdir(path);
 	return ret;
 }
 
