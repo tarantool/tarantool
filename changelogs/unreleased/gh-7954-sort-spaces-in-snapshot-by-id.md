@@ -1,4 +1,4 @@
 ## feature/box
 
-* Now non-system spaces in a snapshot file are sorted by their id. All
-  non-system spaces are stored after system spaces, as before (gh-7954).
+* Non-system spaces in a snapshot file are now sorted by their IDs.
+  As before, all non-system spaces are stored after system spaces (gh-7954).

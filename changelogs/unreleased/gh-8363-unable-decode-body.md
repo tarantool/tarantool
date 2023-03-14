@@ -1,3 +1,3 @@
 ## bugfix/lua/http client
 
-* Fixed a bug when body cannot be decoded in a response (gh-8363).
+* Fixed a bug where a response body cannot be decoded (gh-8363).

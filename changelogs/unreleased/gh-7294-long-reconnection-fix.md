@@ -1,4 +1,4 @@
 ## bugfix/replication
 
-* Fixed `box.info.replication[...].upstream` hang in "connecting" state for
-  minutes after replica's DNS entry changes (gh-7294).
+* Fixed a bug related to `box.info.replication[...].upstream` being stuck in the "connecting"
+  state for several minutes after a replica DNS record change (gh-7294).
