@@ -448,11 +448,18 @@ space_opts_decode(struct space_opts *opts, const char *map,
 		  struct region *region)
 {
 	space_opts_create(opts);
+	opts->type = SPACE_TYPE_DEFAULT;
 	if (opts_decode(opts, space_opts_reg, &map, region) != 0) {
 		diag_set(ClientError, ER_WRONG_SPACE_OPTIONS,
 			 diag_last_error(diag_get())->errmsg);
 		return -1;
 	}
+	/*
+	 * This can only be SPACE_TYPE_DEFAULT if neither 'type' nor 'temporary'
+	 * was specified, which means the space type is normal.
+	 */
+	if (opts->type == SPACE_TYPE_DEFAULT)
+		opts->type = SPACE_TYPE_NORMAL;
 	return 0;
 }
 
@@ -2038,8 +2045,8 @@ space_check_alter(struct space *old_space, struct space_def *new_space_def)
 	 */
 	assert(old_space->def->opts.group_id == new_space_def->opts.group_id);
 	/* Only alter from non-temporary to temporary can cause problems. */
-	if (old_space->def->opts.is_temporary ||
-	    !new_space_def->opts.is_temporary)
+	if (space_is_temporary(old_space) ||
+	    !space_opts_is_temporary(&new_space_def->opts))
 		return 0;
 	/* Check for foreign keys that refers to this space. */
 	struct space_cache_holder *h;
@@ -2056,7 +2063,7 @@ space_check_alter(struct space *old_space, struct space_def *new_space_def)
 		 * If the referring space is temporary too then the alter
 		 * can't break foreign key consistency after restart.
 		 */
-		if (other_space->def->opts.is_temporary)
+		if (space_opts_is_temporary(&other_space->def->opts))
 			continue;
 		diag_set(ClientError, ER_ALTER_SPACE,
 			 space_name(old_space),

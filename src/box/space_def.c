@@ -40,7 +40,7 @@
 
 const struct space_opts space_opts_default = {
 	/* .group_id = */ 0,
-	/* .is_temporary = */ false,
+	/* .type = */ SPACE_TYPE_NORMAL,
 	/* .is_ephemeral = */ false,
 	/* .view = */ false,
 	/* .is_sync = */ false,
@@ -75,9 +75,25 @@ static int
 space_opts_parse_upgrade(const char **data, void *vopts,
 			 struct region *region);
 
+/**
+ * Callback to parse a value with 'temporary' key in msgpack space opts
+ * definition. See function definition below.
+ */
+static int
+space_opts_parse_temporary(const char **data, void *vopts,
+			   struct region *region);
+
+/**
+ * Callback to parse a value with 'type' key in msgpack space opts
+ * definition. See function definition below.
+ */
+static int
+space_opts_parse_type(const char **data, void *vopts, struct region *region);
+
 const struct opt_def space_opts_reg[] = {
+	OPT_DEF_CUSTOM("type", space_opts_parse_type),
 	OPT_DEF("group_id", OPT_UINT32, struct space_opts, group_id),
-	OPT_DEF("temporary", OPT_BOOL, struct space_opts, is_temporary),
+	OPT_DEF_CUSTOM("temporary", space_opts_parse_temporary),
 	OPT_DEF("view", OPT_BOOL, struct space_opts, is_view),
 	OPT_DEF("is_sync", OPT_BOOL, struct space_opts, is_sync),
 	OPT_DEF("defer_deletes", OPT_BOOL, struct space_opts, defer_deletes),
@@ -97,7 +113,8 @@ space_tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 	return tuple_format_new(vtab, engine, keys, key_count,
 				def->fields, def->field_count,
 				def->exact_field_count, def->dict,
-				def->opts.is_temporary, def->opts.is_ephemeral,
+				space_opts_is_temporary(&def->opts),
+				def->opts.is_ephemeral,
 				def->opts.constraint_def,
 				def->opts.constraint_count, def->format_data,
 				def->format_data_len);
@@ -187,7 +204,7 @@ struct space_def*
 space_def_new_ephemeral(uint32_t exact_field_count, struct field_def *fields)
 {
 	struct space_opts opts = space_opts_default;
-	opts.is_temporary = true;
+	opts.type = SPACE_TYPE_DATA_TEMPORARY;
 	opts.is_ephemeral = true;
 	uint32_t field_count = exact_field_count;
 	if (fields == NULL) {
@@ -262,4 +279,57 @@ space_opts_parse_upgrade(const char **data, void *vopts,
 	struct space_opts *opts = (struct space_opts *)vopts;
 	opts->upgrade_def = space_upgrade_def_decode(data, region);
 	return opts->upgrade_def == NULL ? -1 : 0;
+}
+
+static int
+space_opts_parse_temporary(const char **data, void *vopts,
+			   struct region *region)
+{
+	(void)region;
+	if (mp_typeof(**data) != MP_BOOL) {
+		diag_set(IllegalParams, "'temporary' must be boolean");
+		return -1;
+	}
+	struct space_opts *opts = vopts;
+	if (opts->type != SPACE_TYPE_DEFAULT) {
+		/* This means 'type' was specified. */
+		diag_set(IllegalParams,
+			 "only one of 'type' or 'temporary' may be specified");
+		return -1;
+	}
+	bool is_temporary = mp_decode_bool(data);
+	opts->type = is_temporary ?
+		SPACE_TYPE_DATA_TEMPORARY : SPACE_TYPE_NORMAL;
+	return 0;
+}
+
+const char *space_type_strs[] = {
+	/* [SPACE_TYPE_NORMAL]         = */ "normal",
+	/* [SPACE_TYPE_DATA_TEMPORARY] = */ "data-temporary",
+};
+
+static int
+space_opts_parse_type(const char **data, void *vopts, struct region *region)
+{
+	(void)region;
+	if (mp_typeof(**data) != MP_STR) {
+		diag_set(IllegalParams, "'type' must be a string");
+		return -1;
+	}
+	uint32_t str_len = 0;
+	const char *str = mp_decode_str(data, &str_len);
+	enum space_type space_type = STRN2ENUM(space_type, str, str_len);
+	if (space_type == SPACE_TYPE_DEFAULT) {
+		diag_set(IllegalParams, "unknown space type");
+		return -1;
+	}
+	struct space_opts *opts = vopts;
+	if (opts->type != SPACE_TYPE_DEFAULT) {
+		/* This means 'temporary' was specified. */
+		diag_set(IllegalParams,
+			 "only one of 'type' or 'temporary' may be specified");
+		return -1;
+	}
+	opts->type = space_type;
+	return 0;
 }

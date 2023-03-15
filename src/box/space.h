@@ -350,7 +350,7 @@ space_name(const struct space *space)
 static inline bool
 space_is_temporary(const struct space *space)
 {
-	return space->def->opts.is_temporary;
+	return space_opts_is_temporary(&space->def->opts);
 }
 
 /** Return true if space is synchronous. */

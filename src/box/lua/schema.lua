@@ -697,6 +697,24 @@ end
 
 box.internal.space.denormalize_format = denormalize_format
 
+local space_types = {
+    'normal',
+    'data-temporary',
+}
+local function check_space_type(space_type)
+    if space_type == nil then
+        return
+    end
+    for _, t in ipairs(space_types) do
+        if t == space_type then
+            return
+        end
+    end
+    box.error(box.error.ILLEGAL_PARAMS,
+              "unknown space type, must be one of: '" ..
+              table.concat(space_types, "', '") .. "'.")
+end
+
 box.schema.space = {}
 box.schema.space.create = function(name, options)
     check_param(name, 'name', 'string')
@@ -707,6 +725,7 @@ box.schema.space.create = function(name, options)
         field_count = 'number',
         user = 'string, number',
         format = 'table',
+        type = 'string',
         is_local = 'boolean',
         temporary = 'boolean',
         is_sync = 'boolean',
@@ -717,10 +736,14 @@ box.schema.space.create = function(name, options)
     local options_defaults = {
         engine = 'memtx',
         field_count = 0,
-        temporary = false,
     }
     check_param_table(options, options_template)
     options = update_param_table(options, options_defaults)
+    check_space_type(options.type)
+    if options.type ~= nil and options.temporary ~= nil then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  "only one of 'type' or 'temporary' may be specified")
+    end
     if options.engine == 'vinyl' then
         options = update_param_table(options, {
             defer_deletes = box.cfg.vinyl_defer_deletes,
@@ -755,7 +778,8 @@ box.schema.space.create = function(name, options)
     -- filter out global parameters from the options array
     local space_options = setmap({
         group_id = options.is_local and 1 or nil,
-        temporary = options.temporary and true or nil,
+        temporary = options.temporary,
+        type = options.type,
         is_sync = options.is_sync,
         defer_deletes = options.defer_deletes and true or nil,
         constraint = constraint,
@@ -848,6 +872,7 @@ local alter_space_template = {
     field_count = 'number',
     user = 'string, number',
     format = 'table',
+    type = 'string',
     temporary = 'boolean',
     is_sync = 'boolean',
     defer_deletes = 'boolean',
@@ -880,6 +905,11 @@ box.schema.space.alter = function(space_id, options)
     local name = options.name or tuple.name
     local field_count = options.field_count or tuple.field_count
     local flags = tuple.flags
+
+    if options.type ~= nil then
+        check_space_type(options.type)
+        flags.type = options.type
+    end
 
     if options.temporary ~= nil then
         flags.temporary = options.temporary
