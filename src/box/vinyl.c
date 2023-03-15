@@ -586,7 +586,7 @@ vinyl_engine_check_space_def(struct space_def *def)
 			return -1;
 		}
 	}
-	if (def->opts.is_temporary) {
+	if (space_opts_is_temporary(&def->opts)) {
 		diag_set(ClientError, ER_ALTER_SPACE,
 			 def->name, "engine does not support temporary flag");
 		return -1;

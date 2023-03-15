@@ -421,9 +421,14 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	lua_pushboolean(L, space_is_local(space));
 	lua_settable(L, i);
 
-	/* space.is_temp */
+	/* space.temporary */
 	lua_pushstring(L, "temporary");
 	lua_pushboolean(L, space_is_temporary(space));
+	lua_settable(L, i);
+
+	/* space.type */
+	lua_pushstring(L, "type");
+	lua_pushstring(L, space_type_name(space->def->opts.type));
 	lua_settable(L, i);
 
 	/* space.name */

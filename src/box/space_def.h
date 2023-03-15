@@ -42,6 +42,30 @@ extern "C" {
 
 struct space_upgrade_def;
 
+/** Space type names. */
+extern const char *space_type_strs[];
+
+/** See space_opts::type. */
+enum space_type {
+	/**
+	 * SPACE_TYPE_DEFAULT is a special value which is used when decoding
+	 * space options from a tuple. After the options have been parsed
+	 * SPACE_TYPE_DEFAULT will be replaced with SPACE_TYPE_NORMAL.
+	 * No live space should ever have this type.
+	 */
+	SPACE_TYPE_DEFAULT = -1,
+	SPACE_TYPE_NORMAL = 0,
+	SPACE_TYPE_DATA_TEMPORARY = 1,
+	space_type_MAX,
+};
+
+static inline const char *
+space_type_name(enum space_type space_type)
+{
+	assert(space_type != SPACE_TYPE_DEFAULT);
+	return space_type_strs[space_type];
+}
+
 /** Space options */
 struct space_opts {
 	/**
@@ -49,15 +73,15 @@ struct space_opts {
 	 * made to a space are replicated.
 	 */
 	uint32_t group_id;
-        /**
-	 * The space is a temporary:
+	/**
+	 * If set to SPACE_TYPE_DATA_TEMPORARY:
 	 * - it is empty at server start
 	 * - changes are not written to WAL
 	 * - changes are not part of a snapshot
-         * - in SQL: space_def memory is allocated on region and
-         *   does not require manual release.
+	 * - in SQL: space_def memory is allocated on region and
+	 *   does not require manual release.
 	 */
-	bool is_temporary;
+	enum space_type type;
 	/**
 	 * This flag is set if space is ephemeral and hence
 	 * its format might be re-used.
@@ -102,6 +126,16 @@ space_opts_create(struct space_opts *opts)
 {
 	/* default values of opts */
 	*opts = space_opts_default;
+}
+
+/**
+ * Check if the space is temporary.
+ */
+static inline bool
+space_opts_is_temporary(const struct space_opts *opts)
+{
+	assert(opts->type != SPACE_TYPE_DEFAULT);
+	return opts->type != SPACE_TYPE_NORMAL;
 }
 
 /** Space metadata. */

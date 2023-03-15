@@ -281,7 +281,7 @@ sql_shallow_space_copy(struct Parse *parse, struct space *space)
 	memcpy(ret->index, space->index,
 	       sizeof(struct index *) * space->index_count);
 	memcpy(ret->def, space->def, sizeof(struct space_def));
-	ret->def->opts.is_temporary = true;
+	ret->def->opts.type = SPACE_TYPE_DATA_TEMPORARY;
 	ret->def->opts.is_ephemeral = true;
 	if (ret->def->field_count != 0) {
 		ret->def->fields =
