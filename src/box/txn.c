@@ -361,6 +361,25 @@ txn_rollback_one_stmt(struct txn *txn, struct txn_stmt *stmt)
 	}
 }
 
+/*
+ * Determine which row counts in @a txn need updating based on @a stmt.
+ * Row counts are either increasing or decreasing by 1.
+ */
+static void
+txn_update_row_counts(struct txn *txn, struct txn_stmt *stmt, int ofs)
+{
+	if (stmt->row->replica_id == 0) {
+		assert(ofs > 0 || stmt->txn->n_new_rows > 0);
+		txn->n_new_rows += ofs;
+		if (stmt->row->group_id == GROUP_LOCAL)
+			txn->n_local_rows += ofs;
+
+	} else {
+		assert(ofs > 0 || stmt->txn->n_applier_rows > 0);
+		txn->n_applier_rows += ofs;
+	}
+}
+
 static void
 txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 {
@@ -370,16 +389,8 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 	stailq_reverse(&rollback);
 	stailq_foreach_entry(stmt, &rollback, next) {
 		txn_rollback_one_stmt(txn, stmt);
-		if (stmt->row != NULL && stmt->row->replica_id == 0) {
-			assert(txn->n_new_rows > 0);
-			txn->n_new_rows--;
-			if (stmt->row->group_id == GROUP_LOCAL)
-				txn->n_local_rows--;
-		}
-		if (stmt->row != NULL && stmt->row->replica_id != 0) {
-			assert(txn->n_applier_rows > 0);
-			txn->n_applier_rows--;
-		}
+		if (stmt->row != NULL)
+			txn_update_row_counts(txn, stmt, -1);
 		txn_stmt_destroy(stmt);
 		stmt->space = NULL;
 		stmt->row = NULL;
@@ -613,14 +624,7 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 		if (txn_add_redo(txn, stmt, request) != 0)
 			goto fail;
 		assert(stmt->row != NULL);
-		if (stmt->row->replica_id == 0) {
-			++txn->n_new_rows;
-			if (stmt->row->group_id == GROUP_LOCAL)
-				++txn->n_local_rows;
-
-		} else {
-			++txn->n_applier_rows;
-		}
+		txn_update_row_counts(txn, stmt, 1);
 	}
 	/*
 	 * If there are triggers, and they are not disabled, and
