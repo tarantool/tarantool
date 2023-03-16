@@ -550,7 +550,7 @@ end
 
 local test = tap.test('merger')
 test:plan(#bad_source_new_calls + #bad_chunks + #bad_merger_new_calls +
-    #bad_merger_select_calls + 6 + #schemas * 48)
+    #bad_merger_select_calls + 7 + #schemas * 48)
 
 -- For collations.
 box.cfg{}
@@ -764,5 +764,14 @@ for _, input_type in ipairs({'buffer', 'table', 'tuple'}) do
         end
     end
 end
+
+-- merger.new(kd, {}) -- pass zero amount of sources.
+test:test('no sources', function(test)
+    test:plan(1)
+
+    local m = merger.new(key_def, {})
+    local res = m:select()
+    test:is_deeply(res, {})
+end)
 
 os.exit(test:check() and 0 or 1)
