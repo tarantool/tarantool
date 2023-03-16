@@ -71,6 +71,15 @@ space_by_name(const char *name)
 	return (struct space *)mh_strnptr_node(spaces_by_name, space)->val;
 }
 
+uint32_t
+space_cache_find_next_unused_id(uint32_t cur_id)
+{
+	for (cur_id++; cur_id <= BOX_SPACE_MAX; cur_id++)
+		if (space_by_id(cur_id) == NULL)
+			break;
+	return cur_id;
+}
+
 /**
  * Visit all spaces and apply 'func'.
  */

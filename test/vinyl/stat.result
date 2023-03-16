@@ -670,7 +670,7 @@ stat_diff(istat(), st)
   disk:
     iterator:
       read:
-        bytes: 104300
+        bytes: 104299
         pages: 25
         bytes_compressed: <bytes_compressed>
         rows: 100
@@ -1038,7 +1038,7 @@ istat()
       bytes_compressed: <bytes_compressed>
       pages: 25
       rows: 100
-      bytes: 104300
+      bytes: 104299
     rows: 100
     statement:
       inserts: 0
@@ -1089,7 +1089,7 @@ istat()
       count: 0
     pages: 25
     bytes_compressed: <bytes_compressed>
-    bytes: 104300
+    bytes: 104299
   range_size: 16384
   rows: 306
   run_avg: 1
@@ -1097,7 +1097,7 @@ istat()
   upsert:
     squashed: 0
     applied: 0
-  bytes: 316083
+  bytes: 316082
   put:
     rows: 0
     bytes: 0
@@ -1143,8 +1143,8 @@ gstat()
     page_index: 1250
     bloom_filter: 140
   disk:
-    data_compacted: 104300
-    data: 104300
+    data_compacted: 104299
+    data: 104299
     index: 1390
   scheduler:
     tasks_inprogress: 0

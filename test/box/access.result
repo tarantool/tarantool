@@ -59,7 +59,7 @@ session.su('test')
 -- in future we may  introduce a separate privilege
 box.schema.space.create('test')
 ---
-- error: Write access to space '_schema' is denied for user 'test'
+- error: Write access to space '_space' is denied for user 'test'
 ...
 -- su() goes through because called from admin
 -- console, and it has no access checks
@@ -1294,7 +1294,7 @@ box.session.su('guest')
 ...
 box.schema.space.create('test')
 ---
-- error: Write access to space '_schema' is denied for user 'guest'
+- error: Write access to space '_space' is denied for user 'guest'
 ...
 box.schema.user.create('test')
 ---
@@ -1500,7 +1500,7 @@ box.session.su("tester")
 ...
 box.schema.space.create("test_space")
 ---
-- error: Write access to space '_schema' is denied for user 'tester'
+- error: Write access to space '_space' is denied for user 'tester'
 ...
 box.schema.user.create('test_user')
 ---
@@ -1525,7 +1525,7 @@ box.session.su("tester")
 ...
 box.schema.space.create("test_space")
 ---
-- error: Write access to space '_schema' is denied for user 'tester'
+- error: Write access to space '_space' is denied for user 'tester'
 ...
 box.schema.user.create('test_user')
 ---

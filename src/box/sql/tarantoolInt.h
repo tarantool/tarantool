@@ -144,14 +144,6 @@ tarantoolsqlIdxKeyCompare(struct BtCursor *cursor,
 			      struct UnpackedRecord *unpacked);
 
 /**
- * The function assumes the cursor is open on _schema.
- * Increment max_id and store updated value it output parameter.
- * @param[out] New space id, available for usage.
- */
-int
-tarantoolsqlIncrementMaxid(uint64_t *space_max_id);
-
-/**
  * Encode format as entry to be inserted to _space on @region.
  * @param region Region to use.
  * @param def Space definition to encode.

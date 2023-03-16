@@ -51,7 +51,7 @@ box.stat.DELETE.total
 ...
 box.stat.UPDATE.total
 ---
-- 1
+- 0
 ...
 box.stat.REPLACE.total
 ---

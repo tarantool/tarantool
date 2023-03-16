@@ -910,7 +910,7 @@ getNewSpaceId(Parse * pParse)
 	Vdbe *v = sqlGetVdbe(pParse);
 	int iRes = ++pParse->nMem;
 
-	sqlVdbeAddOp1(v, OP_IncMaxid, iRes);
+	sqlVdbeAddOp1(v, OP_GenSpaceid, iRes);
 	return iRes;
 }
 
