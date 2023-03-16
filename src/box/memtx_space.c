@@ -91,31 +91,221 @@ memtx_space_update_bsize(struct space *space, struct tuple *old_tuple,
 	memtx_space->bsize += new_bsize - old_bsize;
 }
 
+/*
+ * :replace() function for a multikey index: replace old tuple
+ * index entries with ones from the new tuple.
+ *
+ * In a multikey index a single tuple is associated with 0..N keys
+ * of the b+*tree. Imagine old tuple key set is called "old_keys"
+ * and a new tuple set is called "new_keys". This function must
+ * 1) delete all removed keys: (new_keys - old_keys)
+ * 2) update tuple pointer in all preserved keys: (old_keys ^ new_keys)
+ * 3) insert data for all new keys (new_keys - old_keys).
+ *
+ * Compare with a standard unique or non-unique index, when a key
+ * is present only once, so whenever we encounter a duplicate, it
+ * is guaranteed to point at the old tuple (in non-unique indexes
+ * we augment the secondary key parts with primary key parts, so
+ * b+*tree still contains unique entries only).
+ *
+ * To reduce the number of insert and delete operations on the
+ * tree, this function attempts to optimistically add all keys
+ * from the new tuple to the tree first.
+ *
+ * When this step finds a duplicate, it's either of the following:
+ * - for a unique multikey index, it may be the old tuple or
+ *   some other tuple. Since unique index forbids duplicates,
+ *   this branch ends with an error unless we found the old tuple.
+ * - for a non-unique multikey index, both secondary and primary
+ *   key parts must match, so it's guaranteed to be the old tuple.
+ *
+ * In other words, when an optimistic insert finds a duplicate,
+ * it's either an error, in which case we roll back all the new
+ * keys from the tree and abort the procedure, or the old tuple,
+ * which we save to get back to, later.
+ *
+ * When adding new keys finishes, we have completed steps
+ * 2) and 3):
+ * - added set (new_keys - old_keys) to the index
+ * - updated set (new_keys ^ old_keys) with a new tuple pointer.
+ *
+ * We now must perform 1), which is remove (old_keys - new_keys).
+ *
+ * This is done by using the old tuple pointer saved from the
+ * previous step. To not accidentally delete the common key
+ * set of the old and the new tuple, we don't using key parts alone
+ * to compare - we also look at b+* tree value that has the tuple
+ * pointer, and delete old tuple entries only.
+ */
+static int
+memtx_index_replace_multikey(struct index *index, struct tuple *old_tuple,
+			     struct tuple *new_tuple,
+			     enum dup_replace_mode mode, struct tuple **result)
+{
+	struct key_def *cmp_def = index->def->cmp_def;
+	uint32_t multikey_idx;
+	if (new_tuple != NULL) {
+		uint32_t multikey_count =
+			tuple_multikey_count(new_tuple, cmp_def);
+		for (multikey_idx = 0; multikey_idx < multikey_count;
+		     ++multikey_idx) {
+			struct tuple_multikey old_tuple_multikey = {
+				.tuple = old_tuple,
+				.multikey_idx = MULTIKEY_NONE,
+			};
+			struct tuple_multikey new_tuple_multikey = {
+				.tuple = new_tuple,
+				.multikey_idx = multikey_idx,
+			};
+			struct tuple_multikey replaced_multikey;
+			struct tuple_multikey unused;
+			if (index_replace(index, old_tuple_multikey,
+					  new_tuple_multikey,
+					  mode, &replaced_multikey,
+					  &unused) != 0) {
+				goto rollback;
+			}
+			assert(replaced_multikey.tuple == NULL ||
+			       replaced_multikey.tuple == old_tuple ||
+			       replaced_multikey.tuple == new_tuple);
+		}
+	}
+	if (old_tuple != NULL) {
+		uint32_t multikey_count =
+			tuple_multikey_count(old_tuple, cmp_def);
+		for (multikey_idx = 0; multikey_idx < multikey_count;
+		     ++multikey_idx) {
+			struct tuple_multikey old_tuple_multikey = {
+				.tuple = old_tuple,
+				.multikey_idx = multikey_idx,
+			};
+			struct tuple_multikey null_tuple_multikey = {
+				.tuple = NULL,
+				.multikey_idx = MULTIKEY_NONE,
+			};
+			struct tuple_multikey unused;
+			if (index_replace(index, old_tuple_multikey,
+					  null_tuple_multikey, DUP_INSERT,
+					  &unused, &unused) != 0) {
+				diag_log();
+				unreachable();
+				panic("failed to delete tuple from index");
+			}
+		}
+	}
+	*result = old_tuple;
+	return 0;
+/*
+ * Rollback the sequence of insertions with multikey indexes
+ * [0, multikey_idx - 1] where multikey_idx is the first multikey
+ * index where error has been raised.
+ *
+ * This routine can't fail because all old_tuple (when
+ * specified) nodes in tree are already allocated (they might be
+ * overridden with new_tuple, but they definitely present) and
+ * delete operation is fault-tolerant.
+ */
+rollback:
+	if (old_tuple != NULL) {
+		/* Restore replaced tuple index occurrences. */
+		uint32_t multikey_count =
+			tuple_multikey_count(old_tuple, cmp_def);
+		for (uint32_t multikey_idx = 0; multikey_idx < multikey_count;
+		     ++multikey_idx) {
+			struct tuple_multikey new_tuple_multikey = {
+				.tuple = new_tuple,
+				.multikey_idx = MULTIKEY_NONE,
+			};
+			struct tuple_multikey old_tuple_multikey = {
+				.tuple = old_tuple,
+				.multikey_idx = multikey_idx,
+			};
+			struct tuple_multikey unused;
+			if (index_replace(index, new_tuple_multikey,
+					  old_tuple_multikey, DUP_INSERT,
+					  &unused, &unused) != 0) {
+				diag_log();
+				unreachable();
+				panic("failed to rollback change");
+			}
+		}
+	}
+	/*
+	 * Rollback new_tuple insertion by multikey index
+	 * [0, multikey_idx).
+	 */
+	for (; multikey_idx > 0; --multikey_idx) {
+		struct tuple_multikey new_tuple_multikey = {
+			.tuple = new_tuple,
+			.multikey_idx = multikey_idx - 1,
+		};
+		struct tuple_multikey null_tuple_multikey = {
+			.tuple = NULL,
+			.multikey_idx = MULTIKEY_NONE,
+		};
+		struct tuple_multikey unused;
+		if (index_replace(index, new_tuple_multikey,
+				  null_tuple_multikey, DUP_REPLACE, &unused,
+				  &unused) != 0) {
+			diag_log();
+			unreachable();
+			panic("failed to rollback change");
+		}
+	}
+	return -1;
+}
+
 int
 memtx_index_replace(struct txn *txn, struct index *index,
 		    struct tuple *old_tuple, struct tuple *new_tuple,
 		    enum dup_replace_mode mode, struct tuple **result)
 {
+	if (index->def->key_def->is_multikey)
+		return memtx_index_replace_multikey(index, old_tuple, new_tuple,
+						    mode, result);
 	if (txn == NULL) {
-		struct tuple *unused;
-		if (index_replace(index, old_tuple, new_tuple, mode,
-				  result, &unused) != 0)
-			return -1;
-		return 0;
+		struct tuple_multikey old_tuple_multikey = {
+			.tuple = old_tuple,
+			.multikey_idx = MULTIKEY_NONE,
+		};
+		struct tuple_multikey new_tuple_multikey = {
+			.tuple = new_tuple,
+			.multikey_idx = MULTIKEY_NONE,
+		};
+		struct tuple_multikey result_multikey;
+		struct tuple_multikey unused;
+		int rc = index_replace(index, old_tuple_multikey,
+				       new_tuple_multikey, mode,
+				       &result_multikey, &unused);
+		*result = result_multikey.tuple;
+		return rc;
 	}
 	memtx_tx_story_gc();
 	if (new_tuple == NULL)
 		return memtx_tx_history_add_delete(txn, index, old_tuple,
 						   result);
-	struct tuple *successor;
-	if (index_replace(index, NULL, new_tuple, DUP_REPLACE_OR_INSERT, result,
-			  &successor) != 0)
+	struct tuple_multikey null_tuple_multikey = {
+		.tuple = NULL,
+		.multikey_idx = MULTIKEY_NONE,
+	};
+	struct tuple_multikey new_tuple_multikey = {
+		.tuple = new_tuple,
+		.multikey_idx = MULTIKEY_NONE,
+	};
+	struct tuple_multikey result_tuple_multikey;
+	struct tuple_multikey successor_tuple_multikey;
+	if (index_replace(index, null_tuple_multikey, new_tuple_multikey,
+			  DUP_REPLACE_OR_INSERT, &result_tuple_multikey,
+			  &successor_tuple_multikey) != 0)
 		return -1;
+	*result = result_tuple_multikey.tuple;
 	if (memtx_tx_history_add_insert(txn, index, old_tuple, new_tuple, mode,
-					result, successor) != 0) {
-		struct tuple *unused;
-		if (index_replace(index, new_tuple, *result, DUP_INSERT,
-				  &unused, &unused) != 0) {
+					result,
+					successor_tuple_multikey.tuple) != 0) {
+		struct tuple_multikey unused;
+		if (index_replace(index, new_tuple_multikey,
+				  result_tuple_multikey, DUP_INSERT, &unused,
+				  &unused) != 0) {
 			diag_log();
 			unreachable();
 			panic("failed to rollback change");

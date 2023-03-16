@@ -1161,14 +1161,22 @@ memtx_tx_story_link_top(struct memtx_story *new_top,
 	struct index *index = old_top->link[idx].in_index;
 	assert(index != NULL);
 	assert(new_top->link[idx].in_index == NULL);
-	struct tuple *removed, *unused;
-	if (index_replace(index, old_top->tuple, new_top->tuple,
+	struct tuple_multikey old_tuple_multikey = {
+		.tuple = old_top->tuple,
+		.multikey_idx = MULTIKEY_NONE,
+	};
+	struct tuple_multikey new_tuple_multikey = {
+		.tuple = new_top->tuple,
+		.multikey_idx = MULTIKEY_NONE,
+	};
+	struct tuple_multikey removed, unused;
+	if (index_replace(index, old_tuple_multikey, new_tuple_multikey,
 			  DUP_REPLACE, &removed, &unused) != 0) {
 		diag_log();
 		unreachable();
 		panic("failed to rebind story in index");
 	}
-	assert(old_top->tuple == removed);
+	assert(old_top->tuple == removed.tuple);
 	old_top->link[idx].in_index = NULL;
 	new_top->link[idx].in_index = index;
 
@@ -1211,14 +1219,22 @@ memtx_tx_story_unlink_top_common(struct memtx_story *story, uint32_t idx)
 	struct memtx_story *old_story = link->older_story;
 	assert(old_story == NULL || old_story->link[idx].in_index == NULL);
 	struct tuple *old_tuple = old_story == NULL ? NULL : old_story->tuple;
-	struct tuple *removed, *unused;
-	if (index_replace(index, story->tuple, old_tuple,
+	struct tuple_multikey story_tuple_multikey = {
+		.tuple = story->tuple,
+		.multikey_idx = MULTIKEY_NONE,
+	};
+	struct tuple_multikey old_tuple_multikey = {
+		.tuple = old_tuple,
+		.multikey_idx = MULTIKEY_NONE,
+	};
+	struct tuple_multikey removed, unused;
+	if (index_replace(index, story_tuple_multikey, old_tuple_multikey,
 			  DUP_INSERT, &removed, &unused) != 0) {
 		diag_log();
 		unreachable();
 		panic("failed to rebind story in index");
 	}
-	assert(story->tuple == removed);
+	assert(story->tuple == removed.tuple);
 	story->link[idx].in_index = NULL;
 	if (old_story != NULL)
 		old_story->link[idx].in_index = index;
@@ -1455,16 +1471,25 @@ memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
 			 * it must be deleted from index.
 			 */
 			if (story->del_psn > 0 && link->in_index != NULL) {
+				struct tuple_multikey story_tuple_multikey = {
+					.tuple = story->tuple,
+					.multikey_idx = MULTIKEY_NONE,
+				};
+				struct tuple_multikey null_tuple_multikey = {
+					.tuple = NULL,
+					.multikey_idx = MULTIKEY_NONE,
+				};
 				struct index *index = link->in_index;
-				struct tuple *removed, *unused;
-				if (index_replace(index, story->tuple, NULL,
-						  DUP_INSERT,
-						  &removed, &unused) != 0) {
+				struct tuple_multikey removed, unused;
+				if (index_replace(index, story_tuple_multikey,
+						  null_tuple_multikey,
+						  DUP_INSERT, &removed,
+						  &unused) != 0) {
 					diag_log();
 					unreachable();
 					panic("failed to rollback change");
 				}
-				assert(story->tuple == removed);
+				assert(story->tuple == removed.tuple);
 				link->in_index = NULL;
 				/*
 				 * All tuples in pk are referenced.
@@ -1520,15 +1545,24 @@ memtx_tx_story_full_unlink_story_gc_step(struct memtx_story *story)
 			assert(link->older_story == NULL);
 			if (story->del_psn > 0 && link->in_index != NULL) {
 				struct index *index = link->in_index;
-				struct tuple *removed, *unused;
-				if (index_replace(index, story->tuple, NULL,
-						  DUP_INSERT,
-						  &removed, &unused) != 0) {
+				struct tuple_multikey story_tuple_multikey = {
+					.tuple = story->tuple,
+					.multikey_idx = MULTIKEY_NONE,
+				};
+				struct tuple_multikey null_tuple_multikey = {
+					.tuple = NULL,
+					.multikey_idx = MULTIKEY_NONE,
+				};
+				struct tuple_multikey removed, unused;
+				if (index_replace(index, story_tuple_multikey,
+						  null_tuple_multikey,
+						  DUP_INSERT, &removed,
+						  &unused) != 0) {
 					diag_log();
 					unreachable();
 					panic("failed to rollback change");
 				}
-				assert(story->tuple == removed);
+				assert(story->tuple == removed.tuple);
 				link->in_index = NULL;
 				/*
 				 * All tuples in pk are referenced.

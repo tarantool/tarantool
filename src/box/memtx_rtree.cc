@@ -253,15 +253,22 @@ memtx_rtree_index_get_internal(struct index *base, const char *key,
 }
 
 static int
-memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
-			  struct tuple *new_tuple, enum dup_replace_mode mode,
-			  struct tuple **result, struct tuple **successor)
+memtx_rtree_index_replace(struct index *base,
+			  struct tuple_multikey old_tuple_multikey,
+			  struct tuple_multikey new_tuple_multikey,
+			  enum dup_replace_mode mode,
+			  struct tuple_multikey *result,
+			  struct tuple_multikey *successor)
 {
 	(void)mode;
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 
 	/* RTREE index doesn't support ordering. */
-	*successor = NULL;
+	successor->tuple = NULL;
+	successor->multikey_idx = MULTIKEY_NONE;
+
+	struct tuple *old_tuple = old_tuple_multikey.tuple;
+	struct tuple *new_tuple = new_tuple_multikey.tuple;
 
 	struct rtree_rect rect;
 	if (new_tuple) {
@@ -275,7 +282,8 @@ memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
 		if (!rtree_remove(&index->tree, &rect, old_tuple))
 			old_tuple = NULL;
 	}
-	*result = old_tuple;
+	result->tuple = old_tuple;
+	result->multikey_idx = MULTIKEY_NONE;
 	return 0;
 }
 

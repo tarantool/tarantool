@@ -123,6 +123,20 @@ struct key_def;
 struct tuple;
 
 /**
+ * Generalization of tuple in case of multikey indexes.
+ */
+struct tuple_multikey {
+	/** Tuple for operation. */
+	struct tuple *tuple;
+	/**
+	 * Key index of multikey @tuple. Set to `MULTIKEY_NONE`
+	 * when index definition is not multikey or when the operation does not
+	 * require the key index of @tuple.
+	 */
+	uint32_t multikey_idx;
+};
+
+/**
  * Get is_nullable property of key_part.
  * @param key_part for which attribute is being fetched
  *

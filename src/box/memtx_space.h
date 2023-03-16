@@ -72,7 +72,8 @@ memtx_space_update_bsize(struct space *space, struct tuple *old_tuple,
 			 struct tuple *new_tuple);
 
 /**
- * Wrapper around `index_replace` which handles transaction management.
+ * Wrapper around `index_replace` which handles transaction management and
+ * multikey indexes.
  */
 int
 memtx_index_replace(struct txn *txn, struct index *index,

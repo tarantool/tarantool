@@ -958,12 +958,15 @@ generic_index_get(struct index *index, const char *key,
 }
 
 int
-generic_index_replace(struct index *index, struct tuple *old_tuple,
-		      struct tuple *new_tuple, enum dup_replace_mode mode,
-		      struct tuple **result, struct tuple **successor)
+generic_index_replace(struct index *index,
+		      struct tuple_multikey old_tuple_multikey,
+		      struct tuple_multikey new_tuple_multikey,
+		      enum dup_replace_mode mode,
+		      struct tuple_multikey *result,
+		      struct tuple_multikey *successor)
 {
-	(void)old_tuple;
-	(void)new_tuple;
+	(void)old_tuple_multikey;
+	(void)new_tuple_multikey;
 	(void)mode;
 	(void)result;
 	(void)successor;
@@ -1028,7 +1031,6 @@ generic_index_reserve(struct index *, uint32_t)
 int
 generic_index_build_next(struct index *index, struct tuple *tuple)
 {
-	struct tuple *unused;
 	/*
 	 * Note this is not no-op call in case of rtee index:
 	 * reserving 0 bytes is required during rtree recovery.
@@ -1036,7 +1038,17 @@ generic_index_build_next(struct index *index, struct tuple *tuple)
 	 */
 	if (index_reserve(index, 0) != 0)
 		return -1;
-	return index_replace(index, NULL, tuple, DUP_INSERT, &unused, &unused);
+	struct tuple_multikey null_tuple_multikey = {
+		/* .tuple = */ NULL,
+		/* .multikey_idx = */ (uint32_t)MULTIKEY_NONE,
+	};
+	struct tuple_multikey tuple_multikey = {
+		/* .tuple = */ tuple,
+		/* .multikey_idx = */ (uint32_t)MULTIKEY_NONE,
+	};
+	struct tuple_multikey unused;
+	return index_replace(index, null_tuple_multikey, tuple_multikey,
+			     DUP_INSERT, &unused, &unused);
 }
 
 void
@@ -1052,14 +1064,21 @@ disabled_index_build_next(struct index *index, struct tuple *tuple)
 }
 
 int
-disabled_index_replace(struct index *index, struct tuple *old_tuple,
-		       struct tuple *new_tuple, enum dup_replace_mode mode,
-		       struct tuple **result, struct tuple **successor)
+disabled_index_replace(struct index *index,
+		       struct tuple_multikey old_tuple_multikey,
+		       struct tuple_multikey new_tuple_multikey,
+		       enum dup_replace_mode mode,
+		       struct tuple_multikey *result,
+		       struct tuple_multikey *successor)
 {
-	(void) old_tuple; (void) new_tuple; (void) mode;
-	(void) index;
-	*result = NULL;
-	*successor = NULL;
+	(void)index;
+	(void)old_tuple_multikey;
+	(void)new_tuple_multikey;
+	(void)mode;
+	result->tuple = NULL;
+	result->multikey_idx = MULTIKEY_NONE;
+	successor->tuple = NULL;
+	successor->multikey_idx = MULTIKEY_NONE;
 	return 0;
 }
 

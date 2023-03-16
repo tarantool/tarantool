@@ -354,15 +354,21 @@ memtx_hash_index_get_internal(struct index *base, const char *key,
 }
 
 static int
-memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
-			 struct tuple *new_tuple, enum dup_replace_mode mode,
-			 struct tuple **result, struct tuple **successor)
+memtx_hash_index_replace(struct index *base,
+			 struct tuple_multikey old_tuple_multikey,
+			 struct tuple_multikey new_tuple_multikey,
+			 enum dup_replace_mode mode,
+			 struct tuple_multikey *result,
+			 struct tuple_multikey *successor)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct light_index_core *hash_table = &index->hash_table;
 
 	/* HASH index doesn't support ordering. */
-	*successor = NULL;
+	successor->tuple = NULL;
+	successor->multikey_idx = MULTIKEY_NONE;
+	struct tuple *old_tuple = old_tuple_multikey.tuple;
+	struct tuple *new_tuple = new_tuple_multikey.tuple;
 
 	if (new_tuple) {
 		uint32_t h = tuple_hash(new_tuple, base->def->key_def);
@@ -410,7 +416,8 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 		}
 
 		if (dup_tuple) {
-			*result = dup_tuple;
+			result->tuple = dup_tuple;
+			result->multikey_idx = MULTIKEY_NONE;
 			return 0;
 		}
 	}
@@ -420,7 +427,8 @@ memtx_hash_index_replace(struct index *base, struct tuple *old_tuple,
 		int res = light_index_delete_value(hash_table, h, old_tuple);
 		assert(res == 0); (void) res;
 	}
-	*result = old_tuple;
+	result->tuple = old_tuple;
+	result->multikey_idx = MULTIKEY_NONE;
 	return 0;
 }
 
