@@ -381,21 +381,9 @@ lbox_tuple_format_new(struct lua_State *L)
 	}
 	for (uint32_t i = 0; i < count; ++i) {
 		size_t len;
-
 		fields[i] = field_def_default;
-
 		lua_pushinteger(L, i + 1);
 		lua_gettable(L, 1);
-
-		lua_pushstring(L, "type");
-		lua_gettable(L, -2);
-		if (! lua_isnil(L, -1)) {
-			const char *type_name = lua_tolstring(L, -1, &len);
-			fields[i].type = field_type_by_name(type_name, len);
-			assert(fields[i].type != field_type_MAX);
-		}
-		lua_pop(L, 1);
-
 		lua_pushstring(L, "name");
 		lua_gettable(L, -2);
 		assert(! lua_isnil(L, -1));
