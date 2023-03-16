@@ -1162,7 +1162,7 @@ memtx_tx_story_link_top(struct memtx_story *new_top,
 	assert(index != NULL);
 	assert(new_top->link[idx].in_index == NULL);
 	struct tuple *removed, *unused;
-	if (index_replace(index, old_top->tuple, new_top->tuple,
+	if (index_replace(index, old_top->tuple, new_top->tuple, MULTIKEY_NONE,
 			  DUP_REPLACE, &removed, &unused) != 0) {
 		diag_log();
 		unreachable();
@@ -1212,7 +1212,7 @@ memtx_tx_story_unlink_top_common(struct memtx_story *story, uint32_t idx)
 	assert(old_story == NULL || old_story->link[idx].in_index == NULL);
 	struct tuple *old_tuple = old_story == NULL ? NULL : old_story->tuple;
 	struct tuple *removed, *unused;
-	if (index_replace(index, story->tuple, old_tuple,
+	if (index_replace(index, story->tuple, old_tuple, MULTIKEY_NONE,
 			  DUP_INSERT, &removed, &unused) != 0) {
 		diag_log();
 		unreachable();
@@ -1458,7 +1458,7 @@ memtx_tx_story_full_unlink_on_space_delete(struct memtx_story *story)
 				struct index *index = link->in_index;
 				struct tuple *removed, *unused;
 				if (index_replace(index, story->tuple, NULL,
-						  DUP_INSERT,
+						  MULTIKEY_NONE, DUP_INSERT,
 						  &removed, &unused) != 0) {
 					diag_log();
 					unreachable();
@@ -1522,7 +1522,7 @@ memtx_tx_story_full_unlink_story_gc_step(struct memtx_story *story)
 				struct index *index = link->in_index;
 				struct tuple *removed, *unused;
 				if (index_replace(index, story->tuple, NULL,
-						  DUP_INSERT,
+						  MULTIKEY_NONE, DUP_INSERT,
 						  &removed, &unused) != 0) {
 					diag_log();
 					unreachable();
@@ -2040,7 +2040,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		struct index *index = space->index[i];
 		struct tuple **replaced = &directly_replaced[i];
 		struct tuple **successor = &direct_successor[i];
-		if (index_replace(index, NULL, new_tuple,
+		if (index_replace(index, NULL, new_tuple, MULTIKEY_NONE,
 				  DUP_REPLACE_OR_INSERT,
 				  replaced, successor) != 0)
 		{
@@ -2170,7 +2170,8 @@ fail:
 		struct index *index = space->index[i];
 		struct tuple *unused;
 		if (index_replace(index, new_tuple, directly_replaced[i],
-				  DUP_INSERT, &unused, &unused) != 0) {
+				  MULTIKEY_NONE, DUP_INSERT, &unused,
+				  &unused) != 0) {
 			diag_log();
 			unreachable();
 			panic("failed to rollback change");

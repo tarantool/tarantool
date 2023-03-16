@@ -254,9 +254,11 @@ memtx_rtree_index_get_internal(struct index *base, const char *key,
 
 static int
 memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
-			  struct tuple *new_tuple, enum dup_replace_mode mode,
-			  struct tuple **result, struct tuple **successor)
+			  struct tuple *new_tuple, uint32_t multikey_idx,
+			  enum dup_replace_mode mode, struct tuple **result,
+			  struct tuple **successor)
 {
+	(void)multikey_idx;
 	(void)mode;
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 

@@ -959,11 +959,13 @@ generic_index_get(struct index *index, const char *key,
 
 int
 generic_index_replace(struct index *index, struct tuple *old_tuple,
-		      struct tuple *new_tuple, enum dup_replace_mode mode,
-		      struct tuple **result, struct tuple **successor)
+		      struct tuple *new_tuple, uint32_t multikey_idx,
+		      enum dup_replace_mode mode, struct tuple **result,
+		      struct tuple **successor)
 {
 	(void)old_tuple;
 	(void)new_tuple;
+	(void)multikey_idx;
 	(void)mode;
 	(void)result;
 	(void)successor;
@@ -1036,7 +1038,8 @@ generic_index_build_next(struct index *index, struct tuple *tuple)
 	 */
 	if (index_reserve(index, 0) != 0)
 		return -1;
-	return index_replace(index, NULL, tuple, DUP_INSERT, &unused, &unused);
+	return index_replace(index, NULL, tuple, MULTIKEY_NONE, DUP_INSERT,
+			     &unused, &unused);
 }
 
 void
@@ -1053,10 +1056,12 @@ disabled_index_build_next(struct index *index, struct tuple *tuple)
 
 int
 disabled_index_replace(struct index *index, struct tuple *old_tuple,
-		       struct tuple *new_tuple, enum dup_replace_mode mode,
-		       struct tuple **result, struct tuple **successor)
+		       struct tuple *new_tuple, uint32_t multikey_idx,
+		       enum dup_replace_mode mode, struct tuple **result,
+		       struct tuple **successor)
 {
 	(void) old_tuple; (void) new_tuple; (void) mode;
+	(void)multikey_idx;
 	(void) index;
 	*result = NULL;
 	*successor = NULL;
