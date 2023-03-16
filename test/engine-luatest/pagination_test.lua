@@ -8,22 +8,11 @@ local tree_g = t.group('Tree index tests', {
     {engine = 'vinyl', disable_ffi = false},
 })
 
--- TODO(gh-7739): Enable Lua JIT on aarch64.
-local function start_server(server)
-    server:start()
-    server:exec(function()
-        if jit.arch == 'arm64' then
-            jit.off()
-            jit.flush()
-        end
-    end)
-end
-
 tree_g.before_all(function(cg)
     cg.server = server:new{
         alias   = 'default',
     }
-    start_server(cg.server)
+    cg.server:start()
     cg.server:exec(function(disable_ffi)
         local ffi = require('ffi')
         ffi.cdef("extern void box_read_ffi_disable(void);")
@@ -673,7 +662,7 @@ func_g.before_all(function()
     func_g.server = server:new{
         alias   = 'default',
     }
-    start_server(func_g.server)
+    func_g.server:start()
 end)
 
 func_g.after_all(function()
@@ -891,7 +880,7 @@ no_sup.before_all(function(cg)
     cg.server = server:new{
         alias   = 'default',
     }
-    start_server(cg.server)
+    cg.server:start()
 end)
 
 no_sup.after_all(function(cg)
