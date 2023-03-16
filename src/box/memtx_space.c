@@ -399,9 +399,6 @@ memtx_space_execute_replace(struct space *space, struct txn *txn,
 		return -1;
 	tuple_ref(new_tuple);
 
-	if (mode == DUP_INSERT)
-		stmt->does_require_old_tuple = true;
-
 	if (memtx_space_replace_tuple(space, stmt, NULL, new_tuple,
 				      mode) != 0) {
 		tuple_unref(new_tuple);
@@ -432,12 +429,6 @@ memtx_space_execute_delete(struct space *space, struct txn *txn,
 		*result = NULL;
 		return 0;
 	}
-
-	/*
-	 * We have to delete exactly old_tuple just because we return it as
-	 * a result.
-	 */
-	stmt->does_require_old_tuple = true;
 
 	if (memtx_space_replace_tuple(space, stmt, old_tuple, NULL,
 				      DUP_REPLACE_OR_INSERT) != 0)
@@ -495,8 +486,6 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 	if (new_tuple == NULL)
 		return -1;
 	tuple_ref(new_tuple);
-
-	stmt->does_require_old_tuple = true;
 
 	if (memtx_space_replace_tuple(space, stmt, old_tuple, new_tuple,
 				      DUP_REPLACE) != 0) {
@@ -621,8 +610,6 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		}
 	}
 	assert(new_tuple != NULL);
-
-	stmt->does_require_old_tuple = true;
 
 	/*
 	 * It's OK to use DUP_REPLACE_OR_INSERT: we don't risk
