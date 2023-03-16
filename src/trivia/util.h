@@ -457,14 +457,6 @@ gcov_flush(void)
 }
 #endif
 
-/**
- * Async-signal-safe implementation of printf(), to
- * be able to write messages into the error log
- * inside a signal handler.
- */
-ssize_t
-fdprintf(int fd, const char *format, ...) __attribute__((format(printf, 2, 3)));
-
 const char *
 find_path(const char *argv0);
 
