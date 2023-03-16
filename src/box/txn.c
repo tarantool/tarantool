@@ -306,7 +306,6 @@ txn_stmt_new(struct txn *txn)
 	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
 	stmt->has_triggers = false;
-	stmt->does_require_old_tuple = false;
 	stmt->is_pure_insert = false;
 	return stmt;
 }
@@ -633,20 +632,7 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 */
 	if (stmt->space != NULL && stmt->space->run_triggers &&
 	    (stmt->old_tuple || stmt->new_tuple)) {
-		if (!rlist_empty(&stmt->space->before_replace)) {
-			/*
-			 * Triggers see old_tuple and that tuple
-			 * must remain the same
-			 */
-			stmt->does_require_old_tuple = true;
-		}
 		if (!rlist_empty(&stmt->space->on_replace)) {
-			/*
-			 * Triggers see old_tuple and that tuple
-			 * must remain the same
-			 */
-			stmt->does_require_old_tuple = true;
-
 			txn->space_on_replace_triggers_depth++;
 			int rc = trigger_run(&stmt->space->on_replace, txn);
 			txn->space_on_replace_triggers_depth--;
