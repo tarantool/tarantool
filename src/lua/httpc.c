@@ -103,7 +103,7 @@ static inline void
 lua_add_key_u64(lua_State *L, const char *key, uint64_t value)
 {
 	lua_pushstring(L, key);
-	lua_pushinteger(L, value);
+	luaL_pushuint64(L, value);
 	lua_settable(L, -3);
 }
 
