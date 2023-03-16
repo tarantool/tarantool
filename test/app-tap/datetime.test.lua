@@ -8,15 +8,6 @@ local json = require('json')
 local msgpack = require('msgpack')
 local TZ = date.TZ
 
---[[
-    Workaround for #6599 where we may randomly fail on AWS Graviton machines,
-    while it's working properly when jit disabled.
---]]
-if jit.arch == 'arm64' then
-    jit.off()
-    jit.flush()
-end
-
 test:plan(39)
 
 local INT_MAX = 2147483647
