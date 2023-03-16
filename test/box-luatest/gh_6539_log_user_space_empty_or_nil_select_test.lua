@@ -9,11 +9,6 @@ g.before_all(function()
     g.server:start()
     g.server:exec(function()
         require("log").internal.ratelimit.disable()
-        -- Workaround for #8011
-        if jit.arch == 'arm64' then
-            jit.off()
-            jit.flush()
-        end
     end)
 end)
 
