@@ -301,19 +301,6 @@ struct txn_stmt {
 	struct xrow_header *row;
 	/** on_commit and/or on_rollback list is not empty. */
 	bool has_triggers;
-	/**
-	 * Whether the stmt requires to replace exactly old_tuple (member).
-	 * That flag is needed for transactional conflict manager - if any
-	 * other transaction commits a replacement of old_tuple before current
-	 * one and the flag is set - the current transaction will be aborted.
-	 * For example REPLACE just replaces a key, no matter what tuple
-	 * lays in the index and thus does_require_old_tuple = false.
-	 * In contrast, UPDATE makes new tuple using old_tuple and thus
-	 * the statement will require old_tuple (does_require_old_tuple = true).
-	 * INSERT also does_require_old_tuple = true because it requires
-	 * old_tuple to be NULL.
-	 */
-	bool does_require_old_tuple;
 	/*
 	 * `insert` statement is guaranteed not to delete anything
 	 * from the transaction's point of view (i.e., there was a preceding

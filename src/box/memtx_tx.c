@@ -2014,10 +2014,9 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		memtx_tx_story_link_top(add_story, secondary_replaced, i, true);
 	}
 
+	struct memtx_story *del_story = NULL;
 	if (old_tuple != NULL) {
 		assert(tuple_has_flag(old_tuple, TUPLE_IS_DIRTY));
-
-		struct memtx_story *del_story = NULL;
 		if (old_tuple == replaced)
 			del_story = replaced_story;
 		else
@@ -2025,6 +2024,30 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		memtx_tx_story_link_deleted_by(del_story, stmt);
 	} else if (is_own_change)
 		stmt->is_pure_insert = true;
+
+	/*
+	 * In case of DUP_INSERT there must be no visible replaced tuple. It is
+	 * correct by now (checked in check_dup), but we must prevent further
+	 * insertion to this place, so we have to track gap.
+	 * In case of replace we usually does not depend on presence of absence
+	 * of old tuple, but if there is a trigger - it takes old_tuple (NULL or
+	 * non-NULL) as a side effect, so we must track it to remain the same.
+	 * Note that none of the above is needed the previous action in this
+	 * point of in index is made by the same transaction. For example, if
+	 * a transaction replaces, deletes and then inserts some key - no other
+	 * transaction can interfere with insert: due to serialization the
+	 * previous delete statement guarantees that the insert will not fail.
+	 */
+	if (!is_own_change &&
+	    (mode == DUP_INSERT ||
+	     !rlist_empty(&stmt->space->before_replace) ||
+	     !rlist_empty(&stmt->space->on_replace))) {
+		assert(mode != DUP_INSERT || del_story == NULL);
+		if (del_story == NULL)
+			memtx_tx_track_story_gap(stmt->txn, add_story, 0);
+		else
+			memtx_tx_track_read_story(stmt->txn, space, del_story);
+	}
 
 	*result = old_tuple;
 	if (*result != NULL) {
@@ -2297,9 +2320,6 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 				       == test_stmt->txn);
 				continue;
 			}
-			if (test_stmt->does_require_old_tuple)
-				memtx_tx_handle_conflict(stmt->txn,
-							 test_stmt->txn);
 
 			memtx_tx_story_link_deleted_by(story, test_stmt);
 		}
@@ -2352,10 +2372,6 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			*from = test_stmt->next_in_del_list;
 			test_stmt->next_in_del_list = NULL;
 			test_stmt->del_story = NULL;
-
-			if (test_stmt->does_require_old_tuple)
-				memtx_tx_handle_conflict(stmt->txn,
-							 test_stmt->txn);
 
 			/* Link to story's list. */
 			test_stmt->del_story = story;
@@ -2458,9 +2474,6 @@ memtx_tx_history_prepare_delete_stmt(struct txn_stmt *stmt)
 		*itr = test_stmt->next_in_del_list;
 		test_stmt->next_in_del_list = NULL;
 		test_stmt->del_story = NULL;
-		/* Conflict only in case of dependance. */
-		if (test_stmt->does_require_old_tuple)
-			memtx_tx_handle_conflict(stmt->txn, test_stmt->txn);
 	}
 
 	struct tx_read_tracker *tracker;
