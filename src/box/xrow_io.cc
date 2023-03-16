@@ -51,12 +51,11 @@ coio_read_xrow(struct iostream *io, struct ibuf *in, struct xrow_header *row)
 	if (to_read > 0)
 		coio_breadn(io, in, to_read);
 
-	uint32_t len = mp_decode_uint((const char **) &in->rpos);
+	uint64_t len = mp_decode_uint((const char **)&in->rpos);
 
 	/* Read header and body */
-	to_read = len - ibuf_used(in);
-	if (to_read > 0)
-		coio_breadn(io, in, to_read);
+	if (len > ibuf_used(in))
+		coio_breadn(io, in, len - ibuf_used(in));
 
 	xrow_header_decode_xc(row, (const char **) &in->rpos, in->rpos + len,
 			      true);
@@ -83,12 +82,11 @@ coio_read_xrow_timeout_xc(struct iostream *io, struct ibuf *in,
 		coio_breadn_timeout(io, in, to_read, delay);
 	coio_timeout_update(&start, &delay);
 
-	uint32_t len = mp_decode_uint((const char **) &in->rpos);
+	uint64_t len = mp_decode_uint((const char **)&in->rpos);
 
 	/* Read header and body */
-	to_read = len - ibuf_used(in);
-	if (to_read > 0)
-		coio_breadn_timeout(io, in, to_read, delay);
+	if (len > ibuf_used(in))
+		coio_breadn_timeout(io, in, len - ibuf_used(in), delay);
 
 	xrow_header_decode_xc(row, (const char **) &in->rpos, in->rpos + len,
 			      true);
