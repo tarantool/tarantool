@@ -5031,6 +5031,43 @@ box_read_ffi_enable(void)
 		box_read_ffi_is_disabled = false;
 }
 
+int
+box_generate_space_id(uint32_t *new_space_id)
+{
+	assert(new_space_id != NULL);
+	assert(mp_sizeof_array(0) == 1);
+	char empty_key[1];
+	char *empty_key_end = mp_encode_array(empty_key, 0);
+	struct tuple *res = NULL;
+	struct credentials *orig_credentials = effective_user();
+	fiber_set_user(fiber(), &admin_credentials);
+	int rc = box_index_max(BOX_SPACE_ID, 0, empty_key, empty_key_end,
+			       &res);
+	fiber_set_user(fiber(), orig_credentials);
+	if (rc != 0)
+		return -1;
+	uint32_t max_id = 0;
+	if (res != NULL && tuple_field_u32(res, 0, &max_id) != 0)
+		return -1;
+	if (max_id > BOX_SPACE_MAX || max_id < BOX_SYSTEM_ID_MAX)
+		max_id = BOX_SYSTEM_ID_MAX;
+	*new_space_id = space_cache_find_next_unused_id(max_id);
+	/* Try again if overflowed. */
+	if (*new_space_id > BOX_SPACE_MAX) {
+		*new_space_id =
+			space_cache_find_next_unused_id(BOX_SYSTEM_ID_MAX);
+		/*
+		 * The second overflow means all ids are occupied.
+		 * This situation cannot happen in real world with limited
+		 * memory, and its pretty hard to test it, so let's just panic
+		 * if we've run out of ids.
+		 */
+		if (*new_space_id > BOX_SPACE_MAX)
+			panic("Space id limit is reached");
+	}
+	return 0;
+}
+
 static void
 on_garbage_collection(void)
 {

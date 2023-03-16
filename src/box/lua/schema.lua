@@ -821,16 +821,7 @@ box.schema.space.create = function(name, options)
     end
     local id = options.id
     if not id then
-        local _schema = box.space._schema
-        local max_id = _schema:update({'max_id'}, {{'+', 2, 1}})
-        if max_id == nil then
-            id = _space.index.primary:max().id
-            if id < box.schema.SYSTEM_ID_MAX then
-                id = box.schema.SYSTEM_ID_MAX
-            end
-            max_id = _schema:insert{'max_id', id + 1}
-        end
-        id = max_id.value
+        id = internal.generate_space_id()
     end
     local uid = session.euid()
     if options.user then

@@ -261,22 +261,25 @@ g.test_box_schema = function(cg)
                                 version_n = version_n + 1
                             end)
 
-    cg.master:exec(function() box.schema.create_space('p') end)
-    t.helpers.retrying({}, function() t.assert_equals(version_n, 2) end)
-    -- there'll be 2 changes - index and space
-    -- first version change, use it as initial value
+    t.helpers.retrying({}, function() t.assert_equals(version_n, 1) end)
+    -- first version, use it as initial value
     local init_version = version
+
+    version_n = 0
+    cg.master:exec(function() box.schema.create_space('p') end)
+    t.helpers.retrying({}, function() t.assert_equals(version_n, 1) end)
+    t.assert_equals(version, init_version + 1)
 
     version_n = 0
     cg.master:exec(function() box.space.p:create_index('i') end)
     t.helpers.retrying({}, function() t.assert_equals(version_n, 1) end)
-    t.assert_equals(version, init_version + 1)
+    t.assert_equals(version, init_version + 2)
 
     version_n = 0
     cg.master:exec(function() box.space.p:drop() end)
     t.helpers.retrying({}, function() t.assert_equals(version_n, 2) end)
     -- there'll be 2 changes - index and space
-    t.assert_equals(version, init_version + 3)
+    t.assert_equals(version, init_version + 4)
 
     watcher:unregister()
     c:close()

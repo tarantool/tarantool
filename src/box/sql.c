@@ -855,42 +855,6 @@ out:
 	return rc;
 }
 
-int
-tarantoolsqlIncrementMaxid(uint64_t *space_max_id)
-{
-	/* ["max_id"] */
-	static const char key[] = {
-		(char)0x91, /* MsgPack array(1) */
-		(char)0xa6, /* MsgPack string(6) */
-		'm', 'a', 'x', '_', 'i', 'd'
-	};
-	/* [["+", 1, 1]]*/
-	static const char ops[] = {
-		(char)0x91, /* MsgPack array(1) */
-		(char)0x93, /* MsgPack array(3) */
-		(char)0xa1, /* MsgPack string(1) */
-		'+',
-		1,          /* MsgPack int(1) */
-		1           /* MsgPack int(1) */
-	};
-
-	struct tuple *res = NULL;
-	struct space *space_schema = space_by_id(BOX_SCHEMA_ID);
-	assert(space_schema != NULL);
-	struct request request;
-	memset(&request, 0, sizeof(request));
-	request.tuple = ops;
-	request.tuple_end = ops + sizeof(ops);
-	request.key = key;
-	request.key_end = key + sizeof(key);
-	request.type = IPROTO_UPDATE;
-	request.space_id = space_schema->def->id;
-	if (box_process1(&request, &res) != 0 || res == NULL ||
-	    tuple_field_u64(res, 1, space_max_id) != 0)
-		return -1;
-	return 0;
-}
-
 /*
  * Allocate or grow memory for cursor's key.
  * Result->type value is unspecified.
