@@ -1387,6 +1387,18 @@ local function upgrade_to_2_11_0()
     convert_sql_constraints_to_tuple_constraints()
     add_user_auth_history_and_last_modified()
 end
+
+--------------------------------------------------------------------------------
+-- Tarantool 2.11.1
+--------------------------------------------------------------------------------
+local function drop_schema_max_id()
+    log.info("drop field max_id in space _schema")
+    box.space._schema:delete("max_id")
+end
+
+local function upgrade_to_2_11_1()
+    drop_schema_max_id()
+end
 --------------------------------------------------------------------------------
 
 local handlers = {
@@ -1408,6 +1420,7 @@ local handlers = {
     {version = mkversion(2, 10, 4), func = upgrade_to_2_10_4},
     {version = mkversion(2, 10, 5), func = upgrade_to_2_10_5},
     {version = mkversion(2, 11, 0), func = upgrade_to_2_11_0},
+    {version = mkversion(2, 11, 1), func = upgrade_to_2_11_1},
 }
 
 -- Schema version of the snapshot.
@@ -1879,6 +1892,27 @@ local function downgrade_from_2_11_0(issue_handler)
     remove_user_auth_history_and_last_modified(issue_handler)
 end
 
+--------------------------------------------------------------------------------
+-- Tarantool 2.11.1
+--------------------------------------------------------------------------------
+
+-- See drop_schema_max_id.
+local function add_schema_max_id(issue_handler)
+    if issue_handler.dry_run then
+        return
+    end
+    log.info("add field max_id to space _schema")
+    local max_id = box.space._space.index.primary:max()[1]
+    if max_id < box.schema.SYSTEM_ID_MAX then
+        max_id = box.schema.SYSTEM_ID_MAX
+    end
+    box.space._schema:replace({"max_id", max_id})
+end
+
+local function downgrade_from_2_11_1(issue_handler)
+    add_schema_max_id(issue_handler)
+end
+
 -- Versions should be ordered from newer to older.
 --
 -- Every step can be called in 2 modes. In dry_run mode (issue_handler.dry_run
@@ -1896,6 +1930,7 @@ end
 -- if schema version is 2.10.0.
 --
 local downgrade_handlers = {
+    {version = mkversion(2, 11, 1), func = downgrade_from_2_11_1},
     {version = mkversion(2, 11, 0), func = downgrade_from_2_11_0},
     {version = mkversion(2, 10, 5), func = downgrade_from_2_10_5},
     {version = mkversion(2, 10, 0), func = downgrade_from_2_10_0},
@@ -1975,6 +2010,7 @@ local downgrade_versions = {
     "2.10.4",
     "2.10.5",
     "2.11.0",
+    "2.11.1",
 }
 
 -- Downgrade or list downgrade issues depending of dry_run argument value.
