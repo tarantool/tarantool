@@ -838,3 +838,52 @@ g.test_downgrade_sql_tuple_check_contraints = function(cg)
         constraint_after(func_id)
     end)
 end
+
+------------------------------
+-- Check downgrade from 2.11.1
+------------------------------
+
+-- Check that max_id presents in _schema after downgrade.
+g.test_downgrade_schema_max_id = function(cg)
+    cg.server:exec(function()
+        local helper = require('test.box-luatest.downgrade_helper')
+
+        local function check_max_id(expected_id)
+            local max_id_tuple = box.space._schema:get('max_id')
+            local max_id = max_id_tuple and max_id_tuple[2]
+            t.assert_equals(max_id, expected_id)
+        end
+
+        local app_version = helper.app_version('2.11.1')
+        t.assert_equals(box.schema.downgrade_issues(app_version), {})
+        box.schema.downgrade(app_version)
+        check_max_id(nil)
+
+        local prev_version = helper.prev_version('2.11.1')
+        t.assert_equals(box.schema.downgrade_issues(prev_version), {})
+        check_max_id(nil)
+
+        -- Max id must be maximal non-system space id.
+        local space_id = 734
+        box.schema.space.create('test', {id = space_id})
+        check_max_id(nil)
+        box.schema.downgrade(prev_version)
+        check_max_id(space_id)
+
+        -- Idempotence check.
+        box.schema.downgrade(prev_version)
+        check_max_id(space_id)
+
+        box.schema.upgrade()
+        box.space.test:drop()
+
+        -- Max id must be SYSTEM_ID_MAX in the case all the spaces are system.
+        space_id = box.schema.SYSTEM_ID_MAX
+        box.schema.downgrade(prev_version)
+        check_max_id(space_id)
+
+        -- Idempotence check.
+        box.schema.downgrade(prev_version)
+        check_max_id(space_id)
+    end)
+end
