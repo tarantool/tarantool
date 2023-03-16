@@ -130,16 +130,16 @@ test_run:cmd("push filter 'offset: .*' to 'offset: <offset>'")
 ...
 result
 ---
-- - - 00000000000000000020.vylog
+- - - 00000000000000000019.vylog
     - - HEADER:
           type: INSERT
         BODY:
           tuple: [0, {6: 512, 7: [{'field': 0, 'collation': 1, 'type': 'string'}],
-              9: 20, 12: 3, 13: 7}]
+              9: 19, 12: 2, 13: 6}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [5, {2: 8, 16: 1, 9: 20}]
+          tuple: [5, {2: 8, 16: 1, 9: 19}]
       - HEADER:
           type: INSERT
         BODY:
@@ -160,11 +160,11 @@ result
           type: INSERT
         BODY:
           tuple: [0, {0: 2, 5: 1, 6: 512, 7: [{'field': 1, 'is_nullable': true, 'type': 'unsigned'}],
-              9: 20, 12: 4, 13: 7}]
+              9: 19, 12: 3, 13: 6}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [5, {0: 2, 2: 6, 16: 1, 9: 20}]
+          tuple: [5, {0: 2, 2: 6, 16: 1, 9: 19}]
       - HEADER:
           type: INSERT
         BODY:
@@ -204,7 +204,7 @@ result
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [5, {0: 2, 2: 10, 16: 1, 9: 23}]
+          tuple: [5, {0: 2, 2: 10, 16: 1, 9: 22}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
@@ -214,7 +214,7 @@ result
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [10, {0: 2, 9: 23}]
+          tuple: [10, {0: 2, 9: 22}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
@@ -224,7 +224,7 @@ result
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [5, {2: 12, 16: 1, 9: 23}]
+          tuple: [5, {2: 12, 16: 1, 9: 22}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
@@ -234,17 +234,17 @@ result
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [10, {9: 23}]
+          tuple: [10, {9: 22}]
   - - 00000000000000000008.index
     - - HEADER:
           type: RUNINFO
         BODY:
-          min_lsn: 8
+          min_lsn: 7
           bloom_filter: <bloom_filter>
           max_key: ['ЭЭЭ']
           page_count: 1
           stmt_stat: {9: 0, 2: 0, 5: 0, 3: 13}
-          max_lsn: 20
+          max_lsn: 19
           min_key: ['1001']
       - HEADER:
           type: PAGEINFO
@@ -257,67 +257,67 @@ result
           min_key: ['1001']
   - - 00000000000000000008.run
     - - HEADER:
-          lsn: 11
+          lsn: 10
           type: REPLACE
         BODY:
           tuple: ['1001', 1001]
       - HEADER:
-          lsn: 12
+          lsn: 11
           type: REPLACE
         BODY:
           tuple: ['1002', 1002]
       - HEADER:
-          lsn: 13
+          lsn: 12
           type: REPLACE
         BODY:
           tuple: ['1003', 1003]
       - HEADER:
-          lsn: 14
+          lsn: 13
           type: REPLACE
         BODY:
           tuple: ['1004', 1004]
       - HEADER:
-          lsn: 15
+          lsn: 14
           type: REPLACE
         BODY:
           tuple: ['1005', 1005]
       - HEADER:
-          lsn: 16
+          lsn: 15
           type: REPLACE
         BODY:
           tuple: ['1006', 1006]
       - HEADER:
-          lsn: 17
+          lsn: 16
           type: REPLACE
         BODY:
           tuple: ['1007', 1007]
       - HEADER:
-          lsn: 18
+          lsn: 17
           type: REPLACE
         BODY:
           tuple: ['1008', 1008]
       - HEADER:
-          lsn: 19
+          lsn: 18
           type: REPLACE
         BODY:
           tuple: ['1009', 1009]
       - HEADER:
-          lsn: 20
+          lsn: 19
           type: REPLACE
         BODY:
           tuple: ['1010', 1010]
       - HEADER:
-          lsn: 10
+          lsn: 9
           type: REPLACE
         BODY:
           tuple: ['ёёё', null]
       - HEADER:
-          lsn: 9
+          lsn: 8
           type: REPLACE
         BODY:
           tuple: ['эээ', null]
       - HEADER:
-          lsn: 8
+          lsn: 7
           type: REPLACE
         BODY:
           tuple: ['ЭЭЭ', null]
@@ -329,12 +329,12 @@ result
     - - HEADER:
           type: RUNINFO
         BODY:
-          min_lsn: 21
+          min_lsn: 20
           bloom_filter: <bloom_filter>
           max_key: ['ЮЮЮ']
           page_count: 1
           stmt_stat: {9: 0, 2: 0, 5: 0, 3: 3}
-          max_lsn: 23
+          max_lsn: 22
           min_key: ['ёёё']
       - HEADER:
           type: PAGEINFO
@@ -347,19 +347,19 @@ result
           min_key: ['ёёё']
   - - 00000000000000000012.run
     - - HEADER:
-          lsn: 21
+          lsn: 20
           type: REPLACE
         BODY:
           tuple: ['ёёё', 123]
           tuple_meta: {1: 1}
       - HEADER:
-          lsn: 23
+          lsn: 22
           type: REPLACE
         BODY:
           tuple: ['ююю', 789]
           tuple_meta: {1: 1}
       - HEADER:
-          lsn: 22
+          lsn: 21
           type: REPLACE
         BODY:
           tuple: ['ЮЮЮ', 456]
@@ -372,12 +372,12 @@ result
     - - HEADER:
           type: RUNINFO
         BODY:
-          min_lsn: 8
+          min_lsn: 7
           bloom_filter: <bloom_filter>
           max_key: [1010, '1010']
           page_count: 1
           stmt_stat: {9: 0, 2: 0, 5: 0, 3: 13}
-          max_lsn: 20
+          max_lsn: 19
           min_key: [null, 'ёёё']
       - HEADER:
           type: PAGEINFO
@@ -390,67 +390,67 @@ result
           min_key: [null, 'ёёё']
   - - 00000000000000000006.run
     - - HEADER:
-          lsn: 10
+          lsn: 9
           type: REPLACE
         BODY:
           tuple: [null, 'ёёё']
       - HEADER:
-          lsn: 9
+          lsn: 8
           type: REPLACE
         BODY:
           tuple: [null, 'эээ']
       - HEADER:
-          lsn: 8
+          lsn: 7
           type: REPLACE
         BODY:
           tuple: [null, 'ЭЭЭ']
       - HEADER:
-          lsn: 11
+          lsn: 10
           type: REPLACE
         BODY:
           tuple: [1001, '1001']
       - HEADER:
-          lsn: 12
+          lsn: 11
           type: REPLACE
         BODY:
           tuple: [1002, '1002']
       - HEADER:
-          lsn: 13
+          lsn: 12
           type: REPLACE
         BODY:
           tuple: [1003, '1003']
       - HEADER:
-          lsn: 14
+          lsn: 13
           type: REPLACE
         BODY:
           tuple: [1004, '1004']
       - HEADER:
-          lsn: 15
+          lsn: 14
           type: REPLACE
         BODY:
           tuple: [1005, '1005']
       - HEADER:
-          lsn: 16
+          lsn: 15
           type: REPLACE
         BODY:
           tuple: [1006, '1006']
       - HEADER:
-          lsn: 17
+          lsn: 16
           type: REPLACE
         BODY:
           tuple: [1007, '1007']
       - HEADER:
-          lsn: 18
+          lsn: 17
           type: REPLACE
         BODY:
           tuple: [1008, '1008']
       - HEADER:
-          lsn: 19
+          lsn: 18
           type: REPLACE
         BODY:
           tuple: [1009, '1009']
       - HEADER:
-          lsn: 20
+          lsn: 19
           type: REPLACE
         BODY:
           tuple: [1010, '1010']
@@ -462,12 +462,12 @@ result
     - - HEADER:
           type: RUNINFO
         BODY:
-          min_lsn: 21
+          min_lsn: 20
           bloom_filter: <bloom_filter>
           max_key: [789, 'ююю']
           page_count: 1
           stmt_stat: {9: 0, 2: 0, 5: 0, 3: 3}
-          max_lsn: 23
+          max_lsn: 22
           min_key: [123, 'ёёё']
       - HEADER:
           type: PAGEINFO
@@ -480,17 +480,17 @@ result
           min_key: [123, 'ёёё']
   - - 00000000000000000010.run
     - - HEADER:
-          lsn: 21
+          lsn: 20
           type: REPLACE
         BODY:
           tuple: [123, 'ёёё']
       - HEADER:
-          lsn: 22
+          lsn: 21
           type: REPLACE
         BODY:
           tuple: [456, 'ЮЮЮ']
       - HEADER:
-          lsn: 23
+          lsn: 22
           type: REPLACE
         BODY:
           tuple: [789, 'ююю']

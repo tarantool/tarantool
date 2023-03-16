@@ -173,7 +173,7 @@ s:drop()
 ...
 gs = box.schema.space.create('guest_space')
 ---
-- error: Write access to space '_schema' is denied for user 'guest'
+- error: Write access to space '_space' is denied for user 'guest'
 ...
 --
 -- FIXME: object create calls system space auto_increment, which requires

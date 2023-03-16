@@ -213,6 +213,17 @@ port_msgpack_dump_lua(struct port *base, struct lua_State *L, bool is_flat)
 		luamp_decode(L, luaL_msgpack_default, &args);
 }
 
+/** Generate unique id for non-system space. */
+static int
+lbox_generate_space_id(lua_State *L)
+{
+	uint32_t ret = 0;
+	if (box_generate_space_id(&ret) != 0)
+		return luaT_error(L);
+	lua_pushnumber(L, ret);
+	return 1;
+}
+
 /* }}} */
 
 /** {{{ Helper that generates user auth data. **/
@@ -482,6 +493,7 @@ box_lua_misc_init(struct lua_State *L)
 		{"txn_set_isolation", lbox_txn_set_isolation},
 		{"read_view_list", lbox_read_view_list},
 		{"read_view_status", lbox_read_view_status},
+		{"generate_space_id", lbox_generate_space_id},
 		{NULL, NULL}
 	};
 

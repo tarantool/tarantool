@@ -4328,17 +4328,18 @@ case OP_Init: {          /* jump */
 	goto jump_to_p2;
 }
 
-/* Opcode: IncMaxid P1 * * * *
+/* Opcode: GenSpaceid P1 * * * *
+ * Synopsis: r[P1]=new space ID
  *
- * Increment the max_id from _schema (max space id)
- * and store updated id in register specified by first operand.
- * It is system opcode and must be used only during DDL routine.
+ * Generate unique id for a non-system space and store it in register
+ * specified by first operand. It is system opcode and must be used only
+ * during DDL routine.
  */
-case OP_IncMaxid: {
+case OP_GenSpaceid: {
 	assert(pOp->p1 > 0);
 	pOut = vdbe_prepare_null_out(p, pOp->p1);
-	uint64_t u;
-	if (tarantoolsqlIncrementMaxid(&u) != 0)
+	uint32_t u;
+	if (box_generate_space_id(&u) != 0)
 		goto abort_due_to_error;
 	mem_set_uint(pOut, u);
 	break;
