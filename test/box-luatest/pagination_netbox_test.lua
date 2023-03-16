@@ -9,18 +9,6 @@ net_g.before_all(function(cg)
         alias   = 'default',
     }
     cg.server:start()
-    -- Workaround for #7739, note that JIT should be disabled both locally and
-    -- on the server.
-    if jit.arch == 'arm64' then
-        jit.off()
-        jit.flush()
-    end
-    cg.server:exec(function()
-        if jit.arch == 'arm64' then
-            jit.off()
-            jit.flush()
-        end
-    end)
 end)
 
 net_g.after_all(function(cg)
