@@ -1855,11 +1855,11 @@ mem_get_dec(const struct Mem *mem, decimal_t *d)
 		return 0;
 	}
 	if (mem->type == MEM_TYPE_INT) {
-		decimal_from_int64(d, mem->u.r);
+		decimal_from_int64(d, mem->u.i);
 		return 0;
 	}
 	if (mem->type == MEM_TYPE_UINT) {
-		decimal_from_int64(d, mem->u.u);
+		decimal_from_uint64(d, mem->u.u);
 		return 0;
 	}
 	if (mem->type == MEM_TYPE_DEC) {
