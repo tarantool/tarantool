@@ -127,6 +127,7 @@ extern char session_lua[],
 	upgrade_lua[],
 	console_lua[],
 	merger_lua[],
+	checks_version_lua[],
 	checks_lua[],
 	metrics_api_lua[],
 	metrics_cartridge_failover_lua[],
@@ -230,7 +231,10 @@ static const char *lua_sources[] = {
 	 * and after box.tuple and box.error box modules. (Beware
 	 * that it won't fail to load if modules not found since
 	 * checks supports pure luajit and older tarantool versions).
+	 * Module components order is important here.
 	 */
+	"third_party/checks/checks/version",
+	"checks.version", checks_version_lua,
 	"third_party/checks/checks", "checks", checks_lua,
 	/*
 	 * Metrics uses checks. Module components order is also important here
