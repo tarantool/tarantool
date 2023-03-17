@@ -561,6 +561,26 @@ g.test_downgrade_sql_tuple_foreign_keys = function(cg)
     end)
 end
 
+g.test_downgrade_sql_tuple_foreign_keys = function(cg)
+    cg.server:exec(function()
+        local helper = require('test.box-luatest.downgrade_helper')
+
+        local opts = {body = 'function() return end', takes_raw_args = true}
+        box.schema.func.create('foo', opts)
+        box.schema.func.create('bar', opts)
+
+        local foo = box.space._func.index.name:get('foo')
+        t.assert_equals(foo.opts.takes_raw_args, true)
+
+        helper.check_issues('2.10.0', {
+            "takes_raw_args option is set for function 'foo'" ..
+            " It is supported starting from version 2.10.0.",
+            "takes_raw_args option is set for function 'bar'" ..
+            " It is supported starting from version 2.10.0.",
+        })
+    end)
+end
+
 ------------------------------
 -- Check downgrade from 2.10.5
 ------------------------------
