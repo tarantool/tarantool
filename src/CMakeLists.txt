@@ -77,6 +77,7 @@ endif()
 # 3rd party lua sources
 lua_source(lua_sources ../third_party/luafun/fun.lua fun_lua)
 lua_source(lua_sources ../third_party/lua/luadebug.lua luadebug_lua)
+lua_source(lua_sources ../third_party/checks/checks/version.lua checks_version_lua)
 lua_source(lua_sources ../third_party/checks/checks.lua checks_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/api.lua metrics_api_lua)
 lua_source(lua_sources ../third_party/metrics/metrics/cartridge/failover.lua metrics_cartridge_failover_lua)

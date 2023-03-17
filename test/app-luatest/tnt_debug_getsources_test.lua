@@ -23,6 +23,7 @@ local files = {
     'box/net_box',
     'box/console',
     'box/merger',
+    'third_party/checks/checks/version',
     'third_party/checks/checks',
     'third_party/metrics/metrics/api',
     'third_party/metrics/metrics/cartridge/failover',

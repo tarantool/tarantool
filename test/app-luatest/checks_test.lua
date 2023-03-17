@@ -1,7 +1,4 @@
-local checks = require('checks')
-
-local package_source = debug.getinfo(checks).source
-assert(package_source:match('^@builtin') ~= nil,
-       "Run tests for built-in checks package")
+local rock_utils = require('third_party.checks.test.rock_utils')
+rock_utils.assert_builtin('checks')
 
 require('third_party.checks.test.test')
