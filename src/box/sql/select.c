@@ -3664,11 +3664,13 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 		pParse->nMem += expr_count + 1;
 		sqlVdbeAddOp2(v, OP_Bool, 0, regPrev);
 		key_info_dup = sql_key_info_new(db, expr_count);
-		if (key_info_dup != NULL) {
-			for (int i = 0; i < expr_count; i++) {
-				key_info_dup->parts[i].coll_id =
-					multi_select_coll_seq(pParse, p, i);
-			}
+		if (key_info_dup == NULL) {
+			pParse->is_aborted = true;
+			return 1;
+		}
+		for (int i = 0; i < expr_count; i++) {
+			key_info_dup->parts[i].coll_id =
+				multi_select_coll_seq(pParse, p, i);
 		}
 	}
 
