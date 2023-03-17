@@ -1717,6 +1717,18 @@ local function disable_core_tuple_constraints(issue_handler)
     end
 end
 
+-- See tarantool 2.10.0-beta1-376-gd2a012455
+local function disable_takes_raw_args(issue_handler)
+    for _, func in box.space._func:pairs() do
+        if func.opts.takes_raw_args then
+            issue_handler(
+                "takes_raw_args option is set for function '%s'" ..
+                " It is supported starting from version 2.10.0.",
+                func.name)
+        end
+    end
+end
+
 local function downgrade_from_2_10_0(issue_handler)
     remove_deferred_deletes(issue_handler)
     disable_background_space_upgrade(issue_handler)
@@ -1725,6 +1737,7 @@ local function downgrade_from_2_10_0(issue_handler)
     convert_tuple_foreing_keys_to_sql_foreing_keys(issue_handler)
     disable_core_field_constraints(issue_handler)
     disable_core_tuple_constraints(issue_handler)
+    disable_takes_raw_args(issue_handler)
 end
 
 --------------------------------------------------------------------------------
