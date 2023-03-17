@@ -28,7 +28,7 @@ g.before_all(function(cg)
         local s = box.schema.space.create('s', {engine = engine})
         s:create_index('pk')
         s:insert{0}
-    end, {engine = cg.params.engine})
+    end, {cg.params.engine})
     t.helpers.retrying({}, function()
         cg.replica:assert_follows_upstream(cg.master:get_instance_id())
     end)
