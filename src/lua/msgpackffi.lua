@@ -262,7 +262,7 @@ local function encode_r(buf, obj, level)
 ::restart::
     if type(obj) == "number" then
         -- Lua-way to check that number is an integer
-        if obj % 1 == 0 and obj > -1e63 and obj < 1e64 then
+        if obj % 1 == 0 and obj >= -2^63 and obj < 2^64 then
             encode_int(buf, obj)
         else
             encode_double(buf, obj)
