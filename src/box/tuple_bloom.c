@@ -207,8 +207,12 @@ tuple_bloom_maybe_has(const struct tuple_bloom *bloom, struct tuple *tuple,
 	assert(!key_def->is_multikey || multikey_idx != MULTIKEY_NONE);
 
 	if (bloom->is_legacy) {
+		struct tuple_multikey tuple_multikey = {
+			/* .tuple = */ tuple,
+			/* .multikey_idx = */ (uint32_t)MULTIKEY_NONE,
+		};
 		return bloom_maybe_has(&bloom->parts[0],
-				       tuple_hash(tuple, key_def));
+				       tuple_hash(tuple_multikey, key_def));
 	}
 
 	assert(bloom->part_count == key_def->part_count);

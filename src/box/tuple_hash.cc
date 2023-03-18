@@ -153,15 +153,17 @@ struct TupleFieldHash<TYPE> {
 template <int TYPE, int ...MORE_TYPES>
 struct TupleHash
 {
-	static uint32_t hash(struct tuple *tuple, struct key_def *key_def)
+	static uint32_t hash(struct tuple_multikey tuple_multikey,
+			     struct key_def *key_def)
 	{
-		assert(!key_def->is_multikey);
+		struct tuple *tuple = tuple_multikey.tuple;
+		uint32_t multikey_idx = tuple_multikey.multikey_idx;
 		uint32_t h = HASH_SEED;
 		uint32_t carry = 0;
 		uint32_t total_size = 0;
 		const char *field = tuple_field_by_part(tuple,
 						key_def->parts,
-						MULTIKEY_NONE);
+						(int)multikey_idx);
 		TupleFieldHash<TYPE, MORE_TYPES...>::
 			hash(&field, &h, &carry, &total_size);
 		return PMurHash32_Result(h, carry, total_size);
@@ -170,12 +172,14 @@ struct TupleHash
 
 template <>
 struct TupleHash<FIELD_TYPE_UNSIGNED> {
-	static uint32_t	hash(struct tuple *tuple, struct key_def *key_def)
+	static uint32_t hash(struct tuple_multikey tuple_multikey,
+			     struct key_def *key_def)
 	{
-		assert(!key_def->is_multikey);
+		struct tuple *tuple = tuple_multikey.tuple;
+		uint32_t multikey_idx = tuple_multikey.multikey_idx;
 		const char *field = tuple_field_by_part(tuple,
-						key_def->parts,
-						MULTIKEY_NONE);
+							key_def->parts,
+							(int)multikey_idx);
 		uint64_t val = mp_decode_uint(&field);
 		if (likely(val <= UINT32_MAX))
 			return val;
@@ -219,7 +223,8 @@ static const hasher_signature hash_arr[] = {
 
 template <bool has_optional_parts, bool has_json_paths>
 uint32_t
-tuple_hash_slowpath(struct tuple *tuple, struct key_def *key_def);
+tuple_hash_slowpath(struct tuple_multikey tuple_multikey,
+		    struct key_def *key_def);
 
 uint32_t
 key_hash_slowpath(const char *key, struct key_def *key_def);
@@ -358,59 +363,71 @@ tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
 	return tuple_hash_field(ph1, pcarry, &field, part->coll);
 }
 
+template <bool has_json_paths>
+const char *
+tuple_get_field(struct tuple *tuple, struct key_part *part,
+		uint32_t multikey_idx)
+{
+	struct tuple_format *format = tuple_format(tuple);
+	const char *tuple_raw = tuple_data(tuple);
+	const uint32_t *field_map = tuple_field_map(tuple);
+	if (has_json_paths) {
+		return tuple_field_raw_by_part(format, tuple_raw, field_map,
+					       part, (int)multikey_idx);
+	} else {
+		return tuple_field_raw(format, tuple_raw, field_map,
+				       part->fieldno);
+	}
+}
+
+template <bool has_optional_parts>
+void
+tuple_hash_part(uint32_t *h, uint32_t *carry, uint32_t *total_size,
+		const char *tuple_end, const char **field, struct coll *coll)
+{
+	if (has_optional_parts && (*field == NULL || *field >= tuple_end)) {
+		*total_size += tuple_hash_null(h, carry);
+	} else {
+		*total_size += tuple_hash_field(h, carry, field, coll);
+	}
+}
+
 template <bool has_optional_parts, bool has_json_paths>
 uint32_t
-tuple_hash_slowpath(struct tuple *tuple, struct key_def *key_def)
+tuple_hash_slowpath(struct tuple_multikey tuple_multikey,
+		    struct key_def *key_def)
 {
 	assert(has_json_paths == key_def->has_json_paths);
 	assert(has_optional_parts == key_def->has_optional_parts);
-	assert(!key_def->is_multikey);
+	struct tuple *tuple = tuple_multikey.tuple;
+	uint32_t multikey_idx = tuple_multikey.multikey_idx;
+	assert((multikey_idx == (uint32_t)MULTIKEY_NONE) ||
+	       key_def->is_multikey);
+	assert(!(key_def->is_multikey ^ has_json_paths));
 	assert(!key_def->for_func_index);
 	uint32_t h = HASH_SEED;
 	uint32_t carry = 0;
 	uint32_t total_size = 0;
 	uint32_t prev_fieldno = key_def->parts[0].fieldno;
-	struct tuple_format *format = tuple_format(tuple);
-	const char *tuple_raw = tuple_data(tuple);
-	const uint32_t *field_map = tuple_field_map(tuple);
-	const char *field;
-	if (has_json_paths) {
-		field = tuple_field_raw_by_part(format, tuple_raw, field_map,
-						key_def->parts, MULTIKEY_NONE);
-	} else {
-		field = tuple_field_raw(format, tuple_raw, field_map,
-					prev_fieldno);
-	}
-	const char *end = (char *)tuple + tuple_size(tuple);
-	if (has_optional_parts && field == NULL) {
-		total_size += tuple_hash_null(&h, &carry);
-	} else {
-		total_size += tuple_hash_field(&h, &carry, &field,
-					       key_def->parts[0].coll);
-	}
+	const char *field = tuple_get_field<has_json_paths>(tuple,
+							    key_def->parts,
+							    multikey_idx);
+	const char *tuple_end = (char *)tuple + tuple_size(tuple);
+	tuple_hash_part<has_optional_parts>(&h, &carry, &total_size, tuple_end,
+					    &field, key_def->parts[0].coll);
 	for (uint32_t part_id = 1; part_id < key_def->part_count; part_id++) {
 		/* If parts of key_def are not sequential we need to call
 		 * tuple_field. Otherwise, tuple is hashed sequentially without
 		 * need of tuple_field
 		 */
-		if (prev_fieldno + 1 != key_def->parts[part_id].fieldno) {
-			struct key_part *part = &key_def->parts[part_id];
-			if (has_json_paths) {
-				field = tuple_field_raw_by_part(format, tuple_raw,
-								field_map, part,
-								MULTIKEY_NONE);
-			} else {
-				field = tuple_field_raw(format, tuple_raw, field_map,
-						    part->fieldno);
-			}
-		}
-		if (has_optional_parts && (field == NULL || field >= end)) {
-			total_size += tuple_hash_null(&h, &carry);
-		} else {
-			total_size +=
-				tuple_hash_field(&h, &carry, &field,
-						 key_def->parts[part_id].coll);
-		}
+		struct key_part *part = &key_def->parts[part_id];
+		if (prev_fieldno + 1 != part->fieldno)
+			field = tuple_get_field<has_json_paths>(tuple,
+								part,
+								multikey_idx);
+		tuple_hash_part<has_optional_parts>(
+			&h, &carry, &total_size, tuple_end, &field,
+			key_def->parts[part_id].coll);
 		prev_fieldno = key_def->parts[part_id].fieldno;
 	}
 

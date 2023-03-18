@@ -257,7 +257,11 @@ static uint32_t
 point_hole_storage_key_hash(struct point_hole_key *key)
 {
 	struct key_def *def = key->index->def->key_def;
-	return key->index->unique_id ^ def->tuple_hash(key->tuple, def);
+	struct tuple_multikey tuple_multikey = {
+		/* .tuple = */ key->tuple,
+		/* .multikey_idx = */ (uint32_t)MULTIKEY_NONE,
+	};
+	return key->index->unique_id ^ def->tuple_hash(tuple_multikey, def);
 }
 
 /** point_hole_item comparator. */

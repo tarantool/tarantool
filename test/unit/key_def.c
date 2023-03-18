@@ -41,7 +41,6 @@ test_key_new(const char *format, ...)
 	va_list ap;
 	va_start(ap, format);
 	char *key = test_key_new_va(format, ap);
-	fail_unless(mp_typeof(*key) == MP_ARRAY);
 	va_end(ap);
 	return key;
 }
@@ -292,14 +291,78 @@ test_tuple_extract_key_raw_slowpath_nullable(void)
 	check_plan();
 }
 
+static void
+test_tuple_and_key_hash_equivalence(void)
+{
+	plan(3);
+	header();
+
+	struct key_def *def = test_key_def_new(
+		"[{%s%u%s%s}]",
+		"field", 0, "type", "unsigned");
+	uint32_t key_val = 777;
+	struct tuple *tuple = test_tuple_new("[%u]", key_val);
+	struct tuple_multikey tuple_multikey = {
+		.tuple = tuple,
+		.multikey_idx = (uint32_t)MULTIKEY_NONE,
+	};
+	char *key = test_key_new("%u", key_val);
+	uint32_t tuple_hash = def->tuple_hash(tuple_multikey, def);
+	uint32_t key_hash = def->key_hash(key, def);
+	ok(tuple_hash == key_hash, "ordinary key definition: "
+	   "tuple hash returned %u and key hash returned %u",
+	   tuple_hash, key_hash);
+	free(key);
+	tuple_delete(tuple);
+	key_def_delete(def);
+
+	def = test_key_def_new(
+		"[{%s%u%s%s%s%s}]",
+		"field", 0, "type", "unsigned", "path", "[*]");
+	uint32_t key_val0 = 666;
+	uint32_t key_val1 = 777;
+	tuple = test_tuple_new("[[%u%u]]", key_val0, key_val1);
+
+	tuple_multikey = (struct tuple_multikey){
+		.tuple = tuple,
+		.multikey_idx = 0,
+	};
+	key = test_key_new("%u", key_val0);
+	tuple_hash = def->tuple_hash(tuple_multikey, def);
+	key_hash = def->key_hash(key, def);
+	ok(tuple_hash == key_hash, "multikey key definition, first key: "
+	   "tuple hash returned %u and key hash returned %u",
+	   tuple_hash, key_hash);
+	free(key);
+
+	tuple_multikey = (struct tuple_multikey){
+		.tuple = tuple,
+		.multikey_idx = 1,
+	};
+	key = test_key_new("%u", key_val1);
+	tuple_hash = def->tuple_hash(tuple_multikey, def);
+	key_hash = def->key_hash(key, def);
+	ok(tuple_hash == key_hash, "multikey key definition, second key: "
+	   "tuple hash returned %u and key hash returned %u",
+	   tuple_hash, key_hash);
+	free(key);
+
+	tuple_delete(tuple);
+	key_def_delete(def);
+
+	footer();
+	check_plan();
+}
+
 static int
 test_main(void)
 {
-	plan(2);
+	plan(3);
 	header();
 
 	test_func_compare_with_key();
 	test_tuple_extract_key_raw_slowpath_nullable();
+	test_tuple_and_key_hash_equivalence();
 
 	footer();
 	return check_plan();

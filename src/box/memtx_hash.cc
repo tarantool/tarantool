@@ -371,7 +371,11 @@ memtx_hash_index_replace(struct index *base,
 	struct tuple *new_tuple = new_tuple_multikey.tuple;
 
 	if (new_tuple) {
-		uint32_t h = tuple_hash(new_tuple, base->def->key_def);
+		struct tuple_multikey new_tuple_multikey = {
+			/* .tuple = */ new_tuple,
+			/* .multikey_idx = */ (uint32_t)MULTIKEY_NONE,
+		};
+		uint32_t h = tuple_hash(new_tuple_multikey, base->def->key_def);
 		struct tuple *dup_tuple = NULL;
 		uint32_t pos = light_index_replace(hash_table, h, new_tuple,
 						   &dup_tuple);
@@ -423,7 +427,11 @@ memtx_hash_index_replace(struct index *base,
 	}
 
 	if (old_tuple) {
-		uint32_t h = tuple_hash(old_tuple, base->def->key_def);
+		struct tuple_multikey old_tuple_multikey = {
+			/* .tuple = */ old_tuple,
+			/* .multikey_idx = */ (uint32_t)MULTIKEY_NONE,
+		};
+		uint32_t h = tuple_hash(old_tuple_multikey, base->def->key_def);
 		int res = light_index_delete_value(hash_table, h, old_tuple);
 		assert(res == 0); (void) res;
 	}
