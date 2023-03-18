@@ -159,7 +159,11 @@ index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
 		struct index *idx = i->index;
 		struct txn *txn = in_txn();
 		struct space *space = space_by_id(i->space_id);
-		*ret = memtx_tx_tuple_clarify(txn, space, *ret, idx, 0);
+		struct tuple_multikey ret_multikey = {
+			/* .tuple = */ *ret,
+			/* .multikey_idx = */ (uint32_t)MULTIKEY_NONE,
+		};
+		*ret = memtx_tx_tuple_clarify(txn, space, ret_multikey, idx);
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
@@ -243,7 +247,12 @@ memtx_rtree_index_get_internal(struct index *base, const char *key,
 			break;
 		struct txn *txn = in_txn();
 		struct space *space = space_by_id(base->def->space_id);
-		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
+		struct tuple_multikey tuple_multikey = {
+			/* .tuple = */ tuple,
+			/* .multikey_idx = */ (uint32_t)MULTIKEY_NONE,
+		};
+		*result = memtx_tx_tuple_clarify(txn, space, tuple_multikey,
+						 base);
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/

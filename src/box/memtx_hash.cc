@@ -151,7 +151,11 @@ name(struct iterator *iterator, struct tuple **ret)				\
 		if (rc != 0 || *ret == NULL)					\
 			return rc;						\
 		is_first = false;						\
-		*ret = memtx_tx_tuple_clarify(txn, space, *ret, idx, 0);	\
+		struct tuple_multikey ret_multikey = {				\
+			/* .tuple = */ *ret,					\
+			/* .multikey_idx = */ (uint32_t)MULTIKEY_NONE,		\
+		};								\
+		*ret = memtx_tx_tuple_clarify(txn, space, ret_multikey, idx);	\
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/\
 		memtx_tx_story_gc();						\
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/\
@@ -175,7 +179,11 @@ hash_iterator_eq(struct iterator *it, struct tuple **ret)
 		return 0;
 	struct txn *txn = in_txn();
 	struct space *sp = space_by_id(it->space_id);
-	*ret = memtx_tx_tuple_clarify(txn, sp, *ret, it->index, 0);
+	struct tuple_multikey ret_multikey = {
+		/* .tuple = */ *ret,
+		/* .multikey_idx = */ (uint32_t)MULTIKEY_NONE,
+	};
+	*ret = memtx_tx_tuple_clarify(txn, sp, ret_multikey, it->index);
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 	memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
@@ -307,7 +315,12 @@ memtx_hash_index_random(struct index *base, uint32_t rnd, struct tuple **result)
 		assert(k != light_index_end);
 		*result = light_index_get(hash_table, k);
 		assert(*result != NULL);
-		*result = memtx_tx_tuple_clarify(txn, space, *result, base, 0);
+		struct tuple_multikey result_multikey = {
+			/* .tuple = */ *result,
+			/* .multikey_idx = */ (uint32_t)MULTIKEY_NONE,
+		};
+		*result = memtx_tx_tuple_clarify(txn, space, result_multikey,
+						 base);
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
@@ -341,7 +354,12 @@ memtx_hash_index_get_internal(struct index *base, const char *key,
 	uint32_t k = light_index_find_key(&index->hash_table, h, key);
 	if (k != light_index_end) {
 		struct tuple *tuple = light_index_get(&index->hash_table, k);
-		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
+		struct tuple_multikey tuple_multikey = {
+			/* .tuple = */ tuple,
+			/* .multikey_idx = */ (uint32_t)MULTIKEY_NONE,
+		};
+		*result = memtx_tx_tuple_clarify(txn, space, tuple_multikey,
+						 base);
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/

@@ -92,6 +92,34 @@ memtx_space_update_bsize(struct space *space, struct tuple *old_tuple,
 }
 
 /*
+ * Rollback new_tuple insertion by multikey index [0, multikey_idx).
+ */
+static int
+memtx_index_replace_multikey_rollback_new_tuple_insertion(
+	struct index *index, struct tuple *new_tuple, uint32_t multikey_idx)
+{
+	for (; multikey_idx > 0; --multikey_idx) {
+		struct tuple_multikey new_tuple_multikey = {
+			.tuple = new_tuple,
+			.multikey_idx = multikey_idx - 1,
+		};
+		struct tuple_multikey null_tuple_multikey = {
+			.tuple = NULL,
+			.multikey_idx = MULTIKEY_NONE,
+		};
+		struct tuple_multikey unused;
+		if (index_replace(index, new_tuple_multikey,
+				  null_tuple_multikey, DUP_REPLACE, &unused,
+				  &unused) != 0) {
+			diag_log();
+			unreachable();
+			panic("failed to rollback change");
+		}
+	}
+	return -1;
+}
+
+/*
  * :replace() function for a multikey index: replace old tuple
  * index entries with ones from the new tuple.
  *
@@ -138,9 +166,11 @@ memtx_space_update_bsize(struct space *space, struct tuple *old_tuple,
  * pointer, and delete old tuple entries only.
  */
 static int
-memtx_index_replace_multikey(struct index *index, struct tuple *old_tuple,
-			     struct tuple *new_tuple,
-			     enum dup_replace_mode mode, struct tuple **result)
+memtx_index_replace_multikey_without_txn(struct index *index,
+					 struct tuple *old_tuple,
+					 struct tuple *new_tuple,
+					 enum dup_replace_mode mode,
+					 struct tuple **result)
 {
 	struct key_def *cmp_def = index->def->cmp_def;
 	uint32_t multikey_idx;
@@ -230,29 +260,93 @@ rollback:
 			}
 		}
 	}
-	/*
-	 * Rollback new_tuple insertion by multikey index
-	 * [0, multikey_idx).
-	 */
-	for (; multikey_idx > 0; --multikey_idx) {
-		struct tuple_multikey new_tuple_multikey = {
-			.tuple = new_tuple,
-			.multikey_idx = multikey_idx - 1,
-		};
+	return memtx_index_replace_multikey_rollback_new_tuple_insertion(
+		index, new_tuple, multikey_idx);
+}
+
+/*
+ * Wrapper around `index_replace` which handles transaction management in case
+ * of multikey indexes, see also `memtx_index_replace_multikey_without_txn`.
+ */
+static int
+memtx_index_replace_multikey(struct txn *txn, struct index *index,
+			     struct tuple *old_tuple, struct tuple *new_tuple,
+			     enum dup_replace_mode mode, struct tuple **result)
+{
+	if (txn == NULL)
+		return memtx_index_replace_multikey_without_txn(index,
+								old_tuple,
+								new_tuple, mode,
+								result);
+	memtx_tx_story_gc();
+	if (new_tuple == NULL)
+		return memtx_tx_history_add_delete(txn, index, old_tuple,
+						   result);
+	uint32_t multikey_idx;
+	uint32_t multikey_count =
+		tuple_multikey_count(new_tuple, index->def->cmp_def);
+	for (multikey_idx = 0; multikey_idx < multikey_count;
+	     ++multikey_idx) {
 		struct tuple_multikey null_tuple_multikey = {
 			.tuple = NULL,
 			.multikey_idx = MULTIKEY_NONE,
 		};
-		struct tuple_multikey unused;
-		if (index_replace(index, new_tuple_multikey,
-				  null_tuple_multikey, DUP_REPLACE, &unused,
-				  &unused) != 0) {
-			diag_log();
-			unreachable();
-			panic("failed to rollback change");
-		}
+		struct tuple_multikey new_tuple_multikey = {
+			.tuple = new_tuple,
+			.multikey_idx = multikey_idx,
+		};
+		struct tuple_multikey result_multikey;
+		struct tuple_multikey successor_multikey;
+		if (index_replace(index, null_tuple_multikey,
+				  new_tuple_multikey, DUP_REPLACE_OR_INSERT,
+				  &result_multikey,
+				  &successor_multikey) != 0)
+			goto rollback;
+		struct tuple_multikey old_tuple_multikey = {
+			.tuple = old_tuple,
+			.multikey_idx = MULTIKEY_NONE,
+		};
+		if (result_multikey.tuple != new_tuple &&
+		    memtx_tx_history_add_insert(txn, index, old_tuple_multikey,
+						new_tuple_multikey, mode,
+						&result_multikey,
+						successor_multikey) != 0)
+			goto rollback;
 	}
-	return -1;
+	return 0;
+rollback:
+	return memtx_index_replace_multikey_rollback_new_tuple_insertion(
+		index, new_tuple, multikey_idx);
+}
+
+/*
+ * Wrapper around `index_replace` which handles multikey indexes.
+ */
+static int
+memtx_index_replace_without_txn(struct index *index, struct tuple *old_tuple,
+				struct tuple *new_tuple,
+				enum dup_replace_mode mode,
+				struct tuple **result)
+{
+	if (index->def->key_def->is_multikey)
+		return memtx_index_replace_multikey_without_txn(index,
+								old_tuple,
+								new_tuple, mode,
+								result);
+	struct tuple_multikey old_tuple_multikey = {
+		.tuple = old_tuple,
+		.multikey_idx = MULTIKEY_NONE,
+	};
+	struct tuple_multikey new_tuple_multikey = {
+		.tuple = new_tuple,
+		.multikey_idx = MULTIKEY_NONE,
+	};
+	struct tuple_multikey result_multikey;
+	struct tuple_multikey unused;
+	int rc = index_replace(index, old_tuple_multikey, new_tuple_multikey,
+			       mode, &result_multikey, &unused);
+	*result = result_multikey.tuple;
+	return rc;
 }
 
 int
@@ -260,51 +354,41 @@ memtx_index_replace(struct txn *txn, struct index *index,
 		    struct tuple *old_tuple, struct tuple *new_tuple,
 		    enum dup_replace_mode mode, struct tuple **result)
 {
+	if (txn == NULL)
+		return memtx_index_replace_without_txn(index, old_tuple,
+						       new_tuple, mode, result);
 	if (index->def->key_def->is_multikey)
-		return memtx_index_replace_multikey(index, old_tuple, new_tuple,
-						    mode, result);
-	if (txn == NULL) {
-		struct tuple_multikey old_tuple_multikey = {
-			.tuple = old_tuple,
-			.multikey_idx = MULTIKEY_NONE,
-		};
-		struct tuple_multikey new_tuple_multikey = {
-			.tuple = new_tuple,
-			.multikey_idx = MULTIKEY_NONE,
-		};
-		struct tuple_multikey result_multikey;
-		struct tuple_multikey unused;
-		int rc = index_replace(index, old_tuple_multikey,
-				       new_tuple_multikey, mode,
-				       &result_multikey, &unused);
-		*result = result_multikey.tuple;
-		return rc;
-	}
+		return memtx_index_replace_multikey(txn, index, old_tuple,
+						    new_tuple, mode, result);
 	memtx_tx_story_gc();
 	if (new_tuple == NULL)
 		return memtx_tx_history_add_delete(txn, index, old_tuple,
 						   result);
-	struct tuple_multikey null_tuple_multikey = {
-		.tuple = NULL,
-		.multikey_idx = MULTIKEY_NONE,
-	};
 	struct tuple_multikey new_tuple_multikey = {
 		.tuple = new_tuple,
 		.multikey_idx = MULTIKEY_NONE,
 	};
-	struct tuple_multikey result_tuple_multikey;
-	struct tuple_multikey successor_tuple_multikey;
+	struct tuple_multikey null_tuple_multikey = {
+		.tuple = NULL,
+		.multikey_idx = MULTIKEY_NONE,
+	};
+	struct tuple_multikey result_multikey;
+	struct tuple_multikey successor_multikey;
 	if (index_replace(index, null_tuple_multikey, new_tuple_multikey,
-			  DUP_REPLACE_OR_INSERT, &result_tuple_multikey,
-			  &successor_tuple_multikey) != 0)
+			  DUP_REPLACE_OR_INSERT, &result_multikey,
+			  &successor_multikey) != 0)
 		return -1;
-	*result = result_tuple_multikey.tuple;
-	if (memtx_tx_history_add_insert(txn, index, old_tuple, new_tuple, mode,
-					result,
-					successor_tuple_multikey.tuple) != 0) {
+	struct tuple_multikey old_tuple_multikey = {
+		.tuple = old_tuple,
+		.multikey_idx = MULTIKEY_NONE,
+	};
+	if (memtx_tx_history_add_insert(txn, index, old_tuple_multikey,
+					new_tuple_multikey, mode,
+					&result_multikey,
+					successor_multikey) != 0) {
 		struct tuple_multikey unused;
 		if (index_replace(index, new_tuple_multikey,
-				  result_tuple_multikey, DUP_INSERT, &unused,
+				  result_multikey, DUP_INSERT, &unused,
 				  &unused) != 0) {
 			diag_log();
 			unreachable();
@@ -312,6 +396,7 @@ memtx_index_replace(struct txn *txn, struct index *index,
 		}
 		return -1;
 	}
+	*result = result_multikey.tuple;
 	return 0;
 }
 

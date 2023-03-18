@@ -211,7 +211,11 @@ bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
 		struct index *idx = iterator->index;
 		struct txn *txn = in_txn();
 		struct space *space = space_by_id(iterator->space_id);
-		*ret = memtx_tx_tuple_clarify(txn, space, tuple, idx, 0);
+		struct tuple_multikey tuple_multikey = {
+			/* .tuple = */ tuple,
+			/* .multikey_idx = */ (uint32_t)MULTIKEY_NONE,
+		};
+		*ret = memtx_tx_tuple_clarify(txn, space, tuple_multikey, idx);
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/

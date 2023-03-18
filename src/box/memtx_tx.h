@@ -196,9 +196,18 @@ memtx_tx_abort_all_for_ddl(struct txn *ddl_owner);
  */
 int
 memtx_tx_history_add_insert(struct txn *txn, struct index *index,
-			    struct tuple *old_tuple, struct tuple *new_tuple,
-			    enum dup_replace_mode mode, struct tuple **replaced,
-			    struct tuple *successor);
+			    struct tuple_multikey old_tuple_multikey,
+			    struct tuple_multikey new_tuple_multikey,
+			    enum dup_replace_mode mode,
+			    struct tuple_multikey *replaced_multikey,
+			    struct tuple_multikey successor_multikey);
+
+/**
+ * Notify transaction manager about current insert statement failure
+ * (effectively rolls back a series of `memtx_tx_history_add_insert`).
+ */
+int
+memtx_tx_history_undo_insert_stmt(struct txn *txn, uint32_t iid);
 
 /**
  * Notify transaction manager about current insert statement failure
@@ -277,8 +286,8 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt, size_t *bsize);
 /** Helper of memtx_tx_tuple_clarify */
 struct tuple *
 memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
-			    struct tuple *tuples, struct index *index,
-			    uint32_t mk_index);
+			    struct tuple_multikey tuple_multikey,
+			    struct index *index);
 
 /** Helper of memtx_tx_track_point */
 int
@@ -313,9 +322,11 @@ memtx_tx_track_point(struct txn *txn, struct space *space,
  * Helper of memtx_tx_track_gap.
  */
 int
-memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *index,
-			struct tuple *successor, enum iterator_type type,
-			const char *key, uint32_t part_count);
+memtx_tx_track_gap_slow(struct txn *txn, struct space *space,
+			struct index *index,
+			struct tuple_multikey successor_multikey,
+			enum iterator_type type, const char *key,
+			uint32_t part_count);
 
 /**
  * Record in TX manager that a transaction @a txn have read nothing
@@ -331,8 +342,9 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
  */
 static inline int
 memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
-		   struct tuple *successor, enum iterator_type type,
-		   const char *key, uint32_t part_count)
+		   struct tuple_multikey successor_multikey,
+		   enum iterator_type type, const char *key,
+		   uint32_t part_count)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return 0;
@@ -341,7 +353,7 @@ memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
 	/* Skip ephemeral spaces. */
 	if (space == NULL || space->def->id == 0)
 		return 0;
-	return memtx_tx_track_gap_slow(txn, space, index, successor,
+	return memtx_tx_track_gap_slow(txn, space, index, successor_multikey,
 				       type, key, part_count);
 }
 
@@ -394,12 +406,12 @@ memtx_tx_story_gc();
  */
 static inline struct tuple *
 memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
-		       struct tuple *tuple, struct index *index,
-		       uint32_t mk_index)
+		       struct tuple_multikey tuple_multikey,
+		       struct index *index)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
-		return tuple;
-	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index);
+		return tuple_multikey.tuple;
+	return memtx_tx_tuple_clarify_slow(txn, space, tuple_multikey, index);
 }
 
 uint32_t
