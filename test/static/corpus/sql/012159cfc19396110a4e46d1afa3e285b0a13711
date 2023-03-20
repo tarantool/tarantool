@@ -1,0 +1,98 @@
+create_table {
+  if_not_exists: false
+  table_name {
+    code: 0
+  }
+  dummy_definition {
+    type {
+      collatable_type {
+        type_enum_fallback: TEXT
+      }
+      type_enum_fallback: DECIMAL
+    }
+  }
+  options {
+    table_constraint {
+      unique_fallback {
+        column_name {
+          code: 0
+        }
+        extra_column_names {
+          code: 0
+        }
+        extra_column_names {
+          code: 0
+        }
+      }
+      check_expression {
+        predicate {
+          compare {
+            left_operand {
+              column_name {
+                code: 0
+              }
+              constant_fallback {
+                value: 0
+                type {
+                  collatable_type {
+                    type_enum: TEXT
+                    type_enum_fallback: TEXT
+                  }
+                  type_enum_fallback: INTEGER
+                }
+              }
+            }
+            comparator: LESS
+            right_operand {
+              column_name {
+                code: 0
+              }
+              constant_fallback {
+                value: 36028797018963968
+                type {
+                  type_enum_fallback: BOOLEAN
+                }
+              }
+            }
+          }
+          bool_constant_fallback: false
+        }
+      }
+    }
+    column_definition_fallback {
+      column_name {
+        code: 0
+      }
+      type {
+        special_type_enum: ANY
+        type_enum_fallback: DECIMAL
+      }
+      constraints {
+        named_constraint {
+          constraint_name {
+            code: 29440
+          }
+          enum_fallback: PRIMARY_KEY
+        }
+        default_expression {
+          expression {
+            unary_operator_expression_fallback {
+              unary_operator: NOT
+              term {
+                constant_fallback {
+                  value: 0
+                  type {
+                    type_enum_fallback: BOOLEAN
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  engine {
+    engine_enum: memtx
+  }
+}

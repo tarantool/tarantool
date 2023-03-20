@@ -1,0 +1,140 @@
+select {
+  option: NONE
+  column {
+    any_column_from_table {
+      code: 0
+    }
+    enum_fallback: COLUMN_ANY
+  }
+  from_clause {
+    join_source_fallback {
+      joined_table {
+        left_join_source {
+          joined_table {
+            left_join_source {
+              table_name_fallback {
+                code: 0
+              }
+            }
+            join_operator {
+            }
+            right_join_source {
+              table_name_fallback {
+                code: 0
+              }
+            }
+            specification {
+              on_expr {
+                expr {
+                  compare {
+                    left_operand {
+                      func {
+                        unary_operator_expression_fallback {
+                          unary_operator: NOT
+                          term {
+                            func {
+                              binary_operator_expression {
+                                left_operand {
+                                  constant_fallback {
+                                    value: 0
+                                    type {
+                                      type_enum_fallback: BOOLEAN
+                                    }
+                                  }
+                                }
+                                binary_operator: MINUS
+                                right_operand {
+                                  constant_fallback {
+                                    value: 0
+                                    type {
+                                      type_enum_fallback: NUMBER
+                                    }
+                                  }
+                                }
+                              }
+                              unary_operator_expression_fallback {
+                                unary_operator: NOT
+                                term {
+                                  constant_fallback {
+                                    value: 0
+                                    type {
+                                      type_enum_fallback: BOOLEAN
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                            constant_fallback {
+                              value: 0
+                              type {
+                                type_enum_fallback: BOOLEAN
+                              }
+                            }
+                          }
+                        }
+                      }
+                      constant_fallback {
+                        value: 0
+                        type {
+                          type_enum_fallback: BOOLEAN
+                        }
+                      }
+                    }
+                    comparator: LESS
+                    right_operand {
+                      constant_fallback {
+                        value: 0
+                        type {
+                          type_enum_fallback: BOOLEAN
+                        }
+                      }
+                    }
+                  }
+                  bool_constant_fallback: false
+                }
+              }
+            }
+          }
+          table_name_fallback {
+            code: 0
+          }
+        }
+        join_operator {
+        }
+        right_join_source {
+          table_name_fallback {
+            code: 0
+          }
+        }
+      }
+      table_name_fallback {
+        code: 0
+      }
+    }
+  }
+  from_clause_present_flag: false
+  having_expr {
+    expr {
+      compare {
+        left_operand {
+          constant_fallback {
+            value: 0
+            type {
+              type_enum_fallback: BOOLEAN
+            }
+          }
+        }
+        comparator: EQUAL_EQUAL
+        right_operand {
+          constant_fallback {
+            value: 0
+            type {
+              type_enum_fallback: BOOLEAN
+            }
+          }
+        }
+      }
+      bool_constant_fallback: false
+    }
+  }
+}

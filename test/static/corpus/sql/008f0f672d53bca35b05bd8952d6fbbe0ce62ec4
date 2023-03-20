@@ -1,0 +1,151 @@
+create_table {
+  if_not_exists: false
+  table_name {
+    code: 0
+  }
+  dummy_definition {
+    type {
+      type_enum: BOOLEAN
+      type_enum_fallback: NUMBER
+    }
+  }
+  options {
+    column_definition_fallback {
+      column_name {
+        code: 0
+      }
+      type {
+        collatable_type {
+          type_enum: STRING
+          type_enum_fallback: SCALAR
+        }
+        type_enum_fallback: BOOLEAN
+      }
+      constraints {
+        default_expression {
+          expression {
+            binary_operator_expression {
+              left_operand {
+                constant_fallback {
+                  value: 0
+                  type {
+                    type_enum_fallback: BOOLEAN
+                  }
+                }
+              }
+              binary_operator: PLUS
+              right_operand {
+                predicate {
+                  bool_constant_fallback: true
+                }
+                constant_fallback {
+                  value: 0
+                  type {
+                    collatable_type {
+                      type_enum_fallback: SCALAR
+                      collation_clause {
+                        collation_clause_enum: binary
+                      }
+                    }
+                    type_enum_fallback: BOOLEAN
+                  }
+                }
+              }
+            }
+            unary_operator_expression_fallback {
+              unary_operator: NOT
+              term {
+                column_name {
+                  code: 0
+                }
+                constant_fallback {
+                  value: 0
+                  type {
+                    type_enum_fallback: BOOLEAN
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      constraints {
+        default_expression {
+          expression {
+            unary_operator_expression_fallback {
+              unary_operator: NO_OPERATOR
+              term {
+                constant_fallback {
+                  value: 0
+                  type {
+                    type_enum_fallback: BOOLEAN
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  options {
+    column_definition {
+      column_name {
+        code: 0
+      }
+      type {
+        collatable_type {
+          varchar {
+            integer: 0
+          }
+          type_enum_fallback: SCALAR
+        }
+        type_enum_fallback: BOOLEAN
+      }
+    }
+    column_definition_fallback {
+      column_name {
+        code: 4194304
+      }
+      type {
+        collatable_type {
+          varchar {
+            integer: 0
+          }
+          type_enum_fallback: SCALAR
+        }
+        type_enum_fallback: BOOLEAN
+      }
+    }
+  }
+  options {
+    column_definition {
+      column_name {
+        code: 0
+      }
+      type {
+        collatable_type {
+          varchar {
+            integer: 0
+          }
+          type_enum_fallback: SCALAR
+        }
+        type_enum_fallback: BOOLEAN
+      }
+    }
+    column_definition_fallback {
+      column_name {
+        code: 4194304
+      }
+      type {
+        collatable_type {
+          varchar {
+            integer: 0
+          }
+          type_enum_fallback: SCALAR
+        }
+        type_enum_fallback: BOOLEAN
+      }
+    }
+  }
+}
