@@ -120,3 +120,24 @@ g.test_gh_7822_vfunc_format = function()
         t.assert_equals(box.space._vfunc:format(), box.space._func:format())
     end)
 end
+
+-- Try to set unknown option using low level API to reach UB issue.
+g.test_gh_8463_unknown_option = function()
+    g.server:exec(function()
+        local t = require('luatest')
+
+        box.schema.func.create('foo_opt', {body = 'function() return end'})
+        local f = box.space._func.index.name:get('foo_opt')
+        f = f:totable()
+        f[16] = {foo = true}
+        t.assert_error_msg_equals(
+            "Wrong function options: unexpected option 'foo'",
+            box.space._func.replace, box.space._func, f)
+    end)
+end
+
+g.after_test('test_gh_8463_unknown_option', function()
+    g.server:exec(function()
+        box.schema.func.drop('foo_opt', {if_exists = true})
+    end)
+end)
