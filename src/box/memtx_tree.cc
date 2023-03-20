@@ -1063,11 +1063,7 @@ tree_iterator_position_func(struct iterator *it, const char **pos,
 						&func_key_size);
 	uint32_t func_key_len = mp_decode_array(&func_key);
 	/* Extract primary key. */
-	struct space *space = space_by_id(it->index->def->space_id);
-	assert(space != NULL);
-	struct index *pk = space->index[0];
-	assert(pk != NULL);
-	struct key_def *pk_def = pk->def->key_def;
+	struct key_def *pk_def = it->index->def->pk_def;
 	uint32_t pk_size;
 	const char *pk_key = tuple_extract_key(tree_it->last.tuple, pk_def,
 					       MULTIKEY_NONE, &pk_size);
