@@ -1,0 +1,131 @@
+select {
+  option: DISTINCT
+  column {
+    enum_fallback: COLUMN_ANY
+  }
+  from_clause {
+    join_source_fallback {
+      joined_table {
+        left_join_source {
+          joined_table {
+            left_join_source {
+              joined_table {
+                left_join_source {
+                  table_name_fallback {
+                    code: 0
+                  }
+                }
+                join_operator {
+                  left_join {
+                    natural: true
+                    outer: false
+                  }
+                }
+                right_join_source {
+                  joined_table {
+                    left_join_source {
+                      joined_table {
+                        left_join_source {
+                          table_name_fallback {
+                            code: 0
+                          }
+                        }
+                        join_operator {
+                        }
+                        right_join_source {
+                          joined_table {
+                            left_join_source {
+                              table_name_fallback {
+                                code: 0
+                              }
+                            }
+                            join_operator {
+                            }
+                            right_join_source {
+                              table_name_fallback {
+                                code: 0
+                              }
+                            }
+                            specification {
+                              on_expr {
+                                expr {
+                                  bool_constant_fallback: true
+                                }
+                              }
+                            }
+                          }
+                          table_name_fallback {
+                            code: 0
+                          }
+                        }
+                      }
+                      table_name_fallback {
+                        code: 0
+                      }
+                    }
+                    join_operator {
+                      left_join {
+                        natural: true
+                        outer: false
+                      }
+                    }
+                    right_join_source {
+                      table_name_fallback {
+                        code: 0
+                      }
+                    }
+                    specification {
+                      on_expr {
+                        expr {
+                          bool_constant_fallback: true
+                        }
+                      }
+                    }
+                  }
+                  table_name_fallback {
+                    code: 0
+                  }
+                }
+              }
+              table_name_fallback {
+                code: 0
+              }
+            }
+            join_operator {
+              left_join {
+                natural: true
+                outer: false
+              }
+            }
+            right_join_source {
+              table_name_fallback {
+                code: 0
+              }
+            }
+            specification {
+              on_expr {
+                expr {
+                  bool_constant_fallback: true
+                }
+              }
+            }
+          }
+          table_name_fallback {
+            code: 0
+          }
+        }
+        join_operator {
+        }
+        right_join_source {
+          table_name_fallback {
+            code: 0
+          }
+        }
+      }
+      table_name_fallback {
+        code: 0
+      }
+    }
+  }
+  from_clause_present_flag: false
+}
