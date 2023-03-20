@@ -55,6 +55,7 @@ const struct func_opts func_opts_default = {
 const struct opt_def func_opts_reg[] = {
 	OPT_DEF("is_multikey", OPT_BOOL, struct func_opts, is_multikey),
 	OPT_DEF("takes_raw_args", OPT_BOOL, struct func_opts, takes_raw_args),
+	OPT_END,
 };
 
 struct func_def *
