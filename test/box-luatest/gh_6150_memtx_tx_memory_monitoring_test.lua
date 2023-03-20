@@ -431,3 +431,10 @@ g.test_user_data = function()
     }
     tx_gc(g.server, 1, diff)
 end
+
+g.test_gh_8448_box_stat_memtx_func = function()
+    g.server:exec(function()
+        t.assert_type(box.stat.memtx.tx, 'function')
+        t.assert_equals(box.stat.memtx().tx, box.stat.memtx.tx())
+    end)
+end

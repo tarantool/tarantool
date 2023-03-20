@@ -47,7 +47,11 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct index;
+struct index_read_view;
+struct info_handler;
+struct iterator;
 struct fiber;
+struct read_view_tuple;
 struct tuple;
 struct tuple_format;
 struct memtx_tx_snapshot_cleaner;
@@ -219,6 +223,12 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 bool dontdump, unsigned granularity,
 		 const char *allocator, float alloc_factor,
 		 memtx_on_indexes_built_cb on_indexes_built);
+
+/**
+ * Memtx engine statistics (box.stat.memtx()).
+ */
+void
+memtx_engine_stat(struct memtx_engine *memtx, struct info_handler *h);
 
 int
 memtx_engine_recover_snapshot(struct memtx_engine *memtx,
