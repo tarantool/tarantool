@@ -256,6 +256,7 @@ gstat()
     tuple_cache: 0
     tx: 0
     level0: 0
+    page_cache: 0
     page_index: 0
     bloom_filter: 0
   disk:
@@ -326,7 +327,7 @@ stat_diff(istat(), st)
         bytes_compressed: <bytes_compressed>
         rows: 25
     bytes: 26049
-    index_size: 350
+    index_size: 574
     pages: 7
     bytes_compressed: <bytes_compressed>
     bloom_size: 70
@@ -372,7 +373,7 @@ stat_diff(istat(), st)
         bytes_compressed: <bytes_compressed>
         rows: 50
     bytes: 26042
-    index_size: 300
+    index_size: 492
     pages: 6
     bytes_compressed: <bytes_compressed>
     compaction:
@@ -1056,7 +1057,7 @@ istat()
         bytes: 0
       count: 0
     bloom_size: 140
-    index_size: 1250
+    index_size: 2050
     iterator:
       read:
         bytes_compressed: <bytes_compressed>
@@ -1140,12 +1141,13 @@ gstat()
     tuple_cache: 14313
     tx: 0
     level0: 261562
-    page_index: 1250
+    page_cache: 105300
+    page_index: 2050
     bloom_filter: 140
   disk:
     data_compacted: 104300
     data: 104300
-    index: 1390
+    index: 2190
   scheduler:
     tasks_inprogress: 0
     dump_output: 0
@@ -1353,8 +1355,8 @@ i1:len(), i2:len()
 ...
 i1:bsize(), i2:bsize()
 ---
-- 420
-- 928
+- 644
+- 960
 ...
 s:bsize() == st1.disk.bytes
 ---
@@ -1415,8 +1417,8 @@ i1:len(), i2:len()
 ...
 i1:bsize(), i2:bsize()
 ---
-- 49572
-- 50080
+- 49796
+- 50112
 ...
 s:bsize() == st1.memory.bytes + st1.disk.bytes
 ---
@@ -1480,8 +1482,8 @@ i1:len(), i2:len()
 ...
 i1:bsize(), i2:bsize()
 ---
-- 420
-- 928
+- 644
+- 960
 ...
 s:bsize() == st1.disk.bytes
 ---

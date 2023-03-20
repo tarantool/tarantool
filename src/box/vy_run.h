@@ -44,6 +44,7 @@
 #include "xlog.h"
 
 #include "small/mempool.h"
+#include "small/rlist.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -74,6 +75,21 @@ struct vy_run_env {
 	 * unconditionally remove unused runs' files in-place.
 	 */
 	bool initial_join;
+
+	/* Page cache related members. */
+	/** Page cache general memory quota. */
+	uint64_t pc_mem_quota;
+	/**
+	 * Amount of memory used by all the pages currently stored in the
+	 * page cache.
+	 */
+	uint64_t pc_mem_used;
+	/**
+	 * List of all runs' pages stored in memory, linked by
+	 * vy_page_info->in_lru. More recently requested pages
+	 * reside closer to list's head.
+	 */
+	struct rlist pc_lru;
 };
 
 /**
@@ -100,6 +116,15 @@ struct vy_run_info {
  * Run page metadata. Is a written to a file as a single chunk.
  */
 struct vy_page_info {
+	/**
+	 * Page in memory, loaded upon run iterator's request
+	 * (tx thread).
+	 * Slice stream related fucntions (write thread) do
+	 * not affect this member.
+	 */
+	struct vy_page *page;
+	/** True if the page is currently being read from the disk */
+	bool in_read;
 	/** Offset of page data in the run file. */
 	uint64_t offset;
 	/** Size of page data in the run file. */
@@ -114,6 +139,8 @@ struct vy_page_info {
 	hint_t min_key_hint;
 	/** Offset of the row index in the page. */
 	uint32_t row_index_offset;
+	/** Page cache LRU list link. */
+	struct rlist in_pc_lru;
 };
 
 /**
@@ -275,15 +302,6 @@ struct vy_run_iterator {
 	struct vy_run_iterator_pos curr_pos;
 	/** Statement at curr_pos. */
 	struct vy_entry curr;
-	/**
-	 * Last two pages read by the iterator. We keep two pages
-	 * rather than just one, because we often probe a page for
-	 * a better match. Keeping the previous page makes sure we
-	 * won't throw out the current page if probing fails to
-	 * find a better match.
-	 */
-	struct vy_page *curr_page;
-	struct vy_page *prev_page;
 	/** Is false until first .._get or .._next_.. method is called */
 	bool search_started;
 };
@@ -292,8 +310,6 @@ struct vy_run_iterator {
  * Vinyl page stored in memory.
  */
 struct vy_page {
-	/** Page position in the run file. */
-	uint32_t page_no;
 	/** Size of page data in memory, i.e. unpacked. */
 	uint32_t unpacked_size;
 	/** Number of statements in the page. */
@@ -334,6 +350,14 @@ vy_run_env_destroy(struct vy_run_env *env);
  */
 void
 vy_run_env_enable_coio(struct vy_run_env *env);
+
+/**
+ * Set general memory quota for page caches.
+ * @param run_env Run environment.
+ * @param quota Memory limit for the caches.
+ */
+void
+vy_run_env_set_page_cache_quota(struct vy_run_env *run_env, uint64_t quota);
 
 /**
  * Return the size of a run bloom filter.

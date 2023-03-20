@@ -820,6 +820,14 @@ s:get(10) -- add [10, 10] to the cache
 ch = fiber.channel(1)
 ---
 ...
+vinyl_page_cache = box.cfg.vinyl_page_cache
+---
+...
+-- Delete all the cached pages (including the last requested one)
+-- to enforce the iterator to yield on disk read
+box.cfg{vinyl_page_cache = 0}
+---
+...
 test_run:cmd("setopt delimiter ';'")
 ---
 - true
@@ -838,6 +846,9 @@ ch:get() -- should see the UPSERT and return [10, 20]
 - - [10, 20]
 ...
 s:drop()
+---
+...
+box.cfg{vinyl_page_cache = vinyl_page_cache}
 ---
 ...
 -- gh-5106: upsert squash doesn't handle arithmetic operation

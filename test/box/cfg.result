@@ -127,6 +127,8 @@ cfg_filter(box.cfg)
  |     - 1048576
  |   - - vinyl_memory
  |     - 134217728
+ |   - - vinyl_page_cache
+ |     - 134217728
  |   - - vinyl_page_size
  |     - 8192
  |   - - vinyl_read_threads
@@ -271,6 +273,8 @@ cfg_filter(box.cfg)
  |   - - vinyl_max_tuple_size
  |     - 1048576
  |   - - vinyl_memory
+ |     - 134217728
+ |   - - vinyl_page_cache
  |     - 134217728
  |   - - vinyl_page_size
  |     - 8192

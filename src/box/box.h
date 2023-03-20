@@ -290,6 +290,7 @@ void box_set_memtx_max_tuple_size(void);
 void box_set_vinyl_memory(void);
 void box_set_vinyl_max_tuple_size(void);
 void box_set_vinyl_cache(void);
+void box_set_vinyl_page_cache(void);
 void box_set_vinyl_timeout(void);
 int box_set_election_mode(void);
 int box_set_election_timeout(void);

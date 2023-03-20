@@ -61,6 +61,7 @@ test_basic()
 	say_set_log_level(S_WARN);
 
 	const size_t QUOTA = 100 * 1024 * 1024;
+	const size_t PC_QUOTA = 100 * 1024 * 1024;
 	int64_t generation = 0;
 	struct slab_cache *slab_cache = cord_slab_cache();
 
@@ -72,6 +73,7 @@ test_basic()
 
 	struct vy_run_env run_env;
 	vy_run_env_create(&run_env, 0);
+	vy_run_env_set_page_cache_quota(&run_env, PC_QUOTA);
 
 	struct vy_cache_env cache_env;
 	vy_cache_env_create(&cache_env, slab_cache);

@@ -14,8 +14,10 @@ stat.disk.iterator.bloom.hit -- 0
 stat.disk.iterator.bloom.miss -- 0
 s:drop()
 
--- Disable tuple cache to check bloom hit/miss ratio.
-box.cfg{vinyl_cache = 0}
+-- Disable caches to check bloom hit/miss ratio.
+vinyl_cache = box.cfg.vinyl_cache
+vinyl_page_cache = box.cfg.vinyl_page_cache
+box.cfg{vinyl_cache = 0, vinyl_page_cache = 0}
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('pk', {parts = {1, 'unsigned', 2, 'unsigned', 3, 'unsigned', 4, 'unsigned'}})
@@ -81,10 +83,13 @@ for i = 1, 1000 do s:select{i, i, i, i} end
 new_reflects() > 980
 new_seeks() < 20
 
+box.cfg{vinyl_cache = vinyl_cache, vinyl_page_cache = vinyl_page_cache}
+
 test_run:cmd('restart server default')
 
 vinyl_cache = box.cfg.vinyl_cache
-box.cfg{vinyl_cache = 0}
+vinyl_page_cache = box.cfg.vinyl_page_cache
+box.cfg{vinyl_cache = 0, vinyl_page_cache = 0}
 
 s = box.space.test
 
@@ -132,7 +137,7 @@ new_seeks() < 20
 
 s:drop()
 
-box.cfg{vinyl_cache = vinyl_cache}
+box.cfg{vinyl_cache = vinyl_cache, vinyl_page_cache = vinyl_page_cache}
 
 --
 -- gh-3907: check that integer numbers stored as MP_FLOAT/MP_DOUBLE

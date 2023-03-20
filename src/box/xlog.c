@@ -2046,7 +2046,7 @@ error:
 int
 xlog_cursor_open(struct xlog_cursor *i, const char *name)
 {
-	int fd = open(name, O_RDONLY);
+	int fd = open(name, O_RDONLY, O_DIRECT);
 	if (fd < 0) {
 		diag_set(SystemError, "failed to open '%s' file", name);
 		return -1;

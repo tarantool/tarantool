@@ -332,12 +332,19 @@ s:drop()
 -- the current key is updated while it yields on disk read.
 --
 fiber = require('fiber')
+
 s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('pk')
 s:replace{10, 10}
 box.snapshot()
 s:get(10) -- add [10, 10] to the cache
 ch = fiber.channel(1)
+
+vinyl_page_cache = box.cfg.vinyl_page_cache
+-- Delete all the cached pages (including the last requested one)
+-- to enforce the iterator to yield on disk read
+box.cfg{vinyl_page_cache = 0}
+
 test_run:cmd("setopt delimiter ';'")
 _ = fiber.create(function()
     box.begin({txn_isolation = 'read-committed'})
@@ -348,6 +355,8 @@ s:upsert({10, 10}, {{'+', 2, 10}})
 test_run:cmd("setopt delimiter ''");
 ch:get() -- should see the UPSERT and return [10, 20]
 s:drop()
+
+box.cfg{vinyl_page_cache = vinyl_page_cache}
 
 -- gh-5106: upsert squash doesn't handle arithmetic operation
 -- applied on the set operation.
