@@ -282,36 +282,6 @@ vy_lsm_delete(struct vy_lsm *lsm)
 int
 vy_lsm_create(struct vy_lsm *lsm)
 {
-	/* Make LSM tree directory. */
-	int rc;
-	char path[PATH_MAX];
-	vy_lsm_snprint_path(path, sizeof(path), lsm->env->path,
-			    lsm->space_id, lsm->index_id);
-	char *path_sep = path;
-	while (*path_sep == '/') {
-		/* Don't create root */
-		++path_sep;
-	}
-	while ((path_sep = strchr(path_sep, '/'))) {
-		/* Recursively create path hierarchy */
-		*path_sep = '\0';
-		rc = mkdir(path, 0777);
-		if (rc == -1 && errno != EEXIST) {
-			diag_set(SystemError, "failed to create directory '%s'",
-		                 path);
-			*path_sep = '/';
-			return -1;
-		}
-		*path_sep = '/';
-		++path_sep;
-	}
-	rc = mkdir(path, 0777);
-	if (rc == -1 && errno != EEXIST) {
-		diag_set(SystemError, "failed to create directory '%s'",
-			 path);
-		return -1;
-	}
-
 	/*
 	 * Allocate a unique id for the new LSM tree, but don't assign
 	 * it until information about the new LSM tree is successfully

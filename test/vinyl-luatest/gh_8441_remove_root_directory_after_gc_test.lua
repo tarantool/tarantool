@@ -50,6 +50,9 @@ g.test_root_directory_is_removed_after_gc = function(cg)
 
         local space_id = box.space.test.id
 
+        -- LSM directories are created on demand.
+        t.assert_not(fio.path.exists(fio.pathjoin(box.cfg.vinyl_dir, space_id)))
+
         -- Populate runs with data.
         box.space.test:insert({1, 1})
 
@@ -77,6 +80,9 @@ g.test_recreate_space_with_old_id = function(cg)
         box.space.test:create_index('pk')
 
         local space_id = box.space.test.id
+
+        -- LSM directories are created on demand.
+        t.assert_not(fio.path.exists(fio.pathjoin(box.cfg.vinyl_dir, space_id)))
 
         -- Populate runs with data.
         box.space.test:insert({1})
