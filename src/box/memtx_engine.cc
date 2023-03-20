@@ -37,6 +37,7 @@
 #include "fiber.h"
 #include "errinj.h"
 #include "coio_file.h"
+#include "info/info.h"
 #include "tuple.h"
 #include "txn.h"
 #include "memtx_tx.h"
@@ -1436,6 +1437,80 @@ fail:
 	xdir_destroy(&memtx->snap_dir);
 	free(memtx);
 	return NULL;
+}
+
+/** Appends (total, max, avg) stats to info. */
+static void
+append_total_max_avg_stats(struct info_handler *h, const char *key,
+			   size_t total, size_t max, size_t avg)
+{
+	info_table_begin(h, key);
+	info_append_int(h, "total", total);
+	info_append_int(h, "max", max);
+	info_append_int(h, "avg", avg);
+	info_table_end(h);
+}
+
+/** Appends (total, count) stats to info. */
+static void
+append_total_count_stats(struct info_handler *h, const char *key,
+			 size_t total, size_t count)
+{
+	info_table_begin(h, key);
+	info_append_int(h, "total", total);
+	info_append_int(h, "count", count);
+	info_table_end(h);
+}
+
+/** Appends memtx tx stats to info. */
+static void
+memtx_engine_stat_tx(struct memtx_engine *memtx, struct info_handler *h)
+{
+	(void)memtx;
+	struct memtx_tx_statistics stats;
+	memtx_tx_statistics_collect(&stats);
+	info_table_begin(h, "tx");
+	info_table_begin(h, "txn");
+	for (size_t i = 0; i < TX_ALLOC_TYPE_MAX; ++i) {
+		size_t avg = 0;
+		if (stats.txn_count != 0)
+			avg = stats.tx_total[i] / stats.txn_count;
+		append_total_max_avg_stats(h, tx_alloc_type_strs[i],
+					   stats.tx_total[i],
+					   stats.tx_max[i], avg);
+	}
+	info_table_end(h); /* txn */
+	info_table_begin(h, "mvcc");
+	for (size_t i = 0; i < MEMTX_TX_ALLOC_TYPE_MAX; ++i) {
+		size_t avg = 0;
+		if (stats.txn_count != 0)
+			avg = stats.memtx_tx_total[i] / stats.txn_count;
+		append_total_max_avg_stats(h, memtx_tx_alloc_type_strs[i],
+					   stats.memtx_tx_total[i],
+					   stats.memtx_tx_max[i], avg);
+	}
+	info_table_begin(h, "tuples");
+	for (size_t i = 0; i < MEMTX_TX_STORY_STATUS_MAX; ++i) {
+		info_table_begin(h, memtx_tx_story_status_strs[i]);
+		append_total_count_stats(h, "stories",
+					 stats.stories[i].total,
+					 stats.stories[i].count);
+		append_total_count_stats(h, "retained",
+					 stats.retained_tuples[i].total,
+					 stats.retained_tuples[i].count);
+		info_table_end(h);
+	}
+	info_table_end(h); /* tuples */
+	info_table_end(h); /* mvcc */
+	info_table_end(h); /* tx */
+}
+
+void
+memtx_engine_stat(struct memtx_engine *memtx, struct info_handler *h)
+{
+	info_begin(h);
+	memtx_engine_stat_tx(memtx, h);
+	info_end(h);
 }
 
 void
