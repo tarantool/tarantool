@@ -96,6 +96,8 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	}
 	def->key_def = key_def_dup(key_def);
 	if (iid != 0) {
+		assert(pk_def != NULL);
+		def->pk_def = key_def_dup(pk_def);
 		def->cmp_def = key_def_merge(key_def, pk_def);
 		if (opts->is_unique)
 			def->cmp_def->unique_part_count =
@@ -106,6 +108,7 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 		}
 	} else {
 		def->cmp_def = key_def_dup(key_def);
+		def->pk_def = key_def_dup(key_def);
 	}
 	def->type = type;
 	def->space_id = space_id;
@@ -135,6 +138,7 @@ index_def_dup(const struct index_def *def)
 	}
 	dup->key_def = key_def_dup(def->key_def);
 	dup->cmp_def = key_def_dup(def->cmp_def);
+	dup->pk_def = key_def_dup(def->pk_def);
 	rlist_create(&dup->link);
 	dup->opts = def->opts;
 	if (def->opts.stat != NULL) {
@@ -219,6 +223,11 @@ index_def_delete(struct index_def *index_def)
 	if (index_def->cmp_def) {
 		TRASH(index_def->cmp_def);
 		free(index_def->cmp_def);
+	}
+
+	if (index_def->pk_def) {
+		TRASH(index_def->pk_def);
+		free(index_def->pk_def);
 	}
 
 	TRASH(index_def);

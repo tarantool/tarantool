@@ -242,6 +242,14 @@ struct index_def {
 	 * iterator position.
 	 */
 	struct key_def *cmp_def;
+	/**
+	 * Primary key definition. Despite the fact that cmp_def already
+	 * contains primary key definition, our key_def machinery does not
+	 * allow to work with it in any convenient way. This field allows
+	 * to use primary key definition easily without any dependencies on
+	 * space and its primary index.
+	 */
+	struct key_def *pk_def;
 };
 
 struct index_def *
