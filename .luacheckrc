@@ -46,6 +46,7 @@ exclude_files = {
     "test/vinyl/*.test.lua",
     "test/wal_off/*.test.lua",
     "test/xlog/*.test.lua",
+    "test/static/corpus/luaL_loadbuffer/*.lua",
     "third_party/**/*.lua",
     ".rocks/**/*.lua",
     ".git/**/*.lua",
