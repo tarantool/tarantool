@@ -165,6 +165,74 @@ s:select{}
  | - - [1, 2]
  | ...
 
+-- Insert read/write conflicts.
+s:delete{1}
+ | ---
+ | - [1, 2]
+ | ...
+tx1:begin()
+ | ---
+ | - 
+ | ...
+tx2:begin()
+ | ---
+ | - 
+ | ...
+tx1('s:insert{1, 1}')
+ | ---
+ | - - [1, 1]
+ | ...
+tx2('s:insert{1, 2}')
+ | ---
+ | - - [1, 2]
+ | ...
+tx1:commit()
+ | ---
+ | - 
+ | ...
+tx2:commit()
+ | ---
+ | - - {'error': 'Transaction has been aborted by conflict'}
+ | ...
+s:select{}
+ | ---
+ | - - [1, 1]
+ | ...
+
+-- Insert read/write conflicts, different order.
+s:delete{1}
+ | ---
+ | - [1, 1]
+ | ...
+tx1:begin()
+ | ---
+ | - 
+ | ...
+tx2:begin()
+ | ---
+ | - 
+ | ...
+tx1('s:insert{1, 1}')
+ | ---
+ | - - [1, 1]
+ | ...
+tx2('s:insert{1, 2}')
+ | ---
+ | - - [1, 2]
+ | ...
+tx2:commit() -- note that tx2 commits first.
+ | ---
+ | - 
+ | ...
+tx1:commit()
+ | ---
+ | - - {'error': 'Transaction has been aborted by conflict'}
+ | ...
+s:select{}
+ | ---
+ | - - [1, 2]
+ | ...
+
 -- Implicit read/write conflicts.
 s:replace{1, 0}
  | ---

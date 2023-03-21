@@ -54,6 +54,26 @@ tx2:commit() -- note that tx2 commits first.
 tx1:commit()
 s:select{}
 
+-- Insert read/write conflicts.
+s:delete{1}
+tx1:begin()
+tx2:begin()
+tx1('s:insert{1, 1}')
+tx2('s:insert{1, 2}')
+tx1:commit()
+tx2:commit()
+s:select{}
+
+-- Insert read/write conflicts, different order.
+s:delete{1}
+tx1:begin()
+tx2:begin()
+tx1('s:insert{1, 1}')
+tx2('s:insert{1, 2}')
+tx2:commit() -- note that tx2 commits first.
+tx1:commit()
+s:select{}
+
 -- Implicit read/write conflicts.
 s:replace{1, 0}
 tx1:begin()
