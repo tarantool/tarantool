@@ -3555,7 +3555,7 @@ sql_trigger_delete_step(struct Token *table_name, struct Expr *where);
  * @param parser  Parse context.
  * @param trigger List of triggers on table.
  * @param changes_list Changes list for any UPDATE OF triggers.
- * @param new  1 for new.* ref mask, 0 for old.* ref mask.
+ * @param is_new true for new.* ref mask, false for old.* ref mask.
  * @param tr_tm Mask of TRIGGER_BEFORE|TRIGGER_AFTER.
  * @param space The space to code triggers from.
  * @param orconf Default ON CONFLICT policy for trigger steps.
@@ -3564,7 +3564,7 @@ sql_trigger_delete_step(struct Token *table_name, struct Expr *where);
  */
 uint64_t
 sql_trigger_colmask(Parse *parser, struct sql_trigger *trigger,
-		    ExprList *changes_list, int new, int tr_tm,
+		    ExprList *changes_list, bool is_new, int tr_tm,
 		    struct space *space, int orconf);
 #define sqlParseToplevel(p) ((p)->pToplevel ? (p)->pToplevel : (p))
 #define sqlIsToplevel(p) ((p)->pToplevel==0)

@@ -302,7 +302,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	if (is_pk_modified || trigger != NULL) {
 		assert(space != NULL);
 		uint64_t oldmask = sql_trigger_colmask(pParse, trigger,
-						       pChanges, 0,
+						       pChanges, false,
 						       TRIGGER_BEFORE |
 						       TRIGGER_AFTER, space,
 						       on_error);
@@ -331,7 +331,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	 * may have modified them). So not loading those that are not going to
 	 * be used eliminates some redundant opcodes.
 	 */
-	uint64_t newmask = sql_trigger_colmask(pParse, trigger, pChanges, 1,
+	uint64_t newmask = sql_trigger_colmask(pParse, trigger, pChanges, true,
 					       TRIGGER_BEFORE, space, on_error);
 	for (i = 0; i < (int)def->field_count; i++) {
 		j = aXRef[i];
