@@ -510,3 +510,22 @@ strtolowerdup(const char *s)
 	lowercase[len] = '\0';
 	return lowercase;
 }
+
+char *
+strtoupper(char *s)
+{
+	for (size_t i = 0; s[i] != '\0'; ++i)
+		s[i] = (char)toupper(s[i]);
+	return s;
+}
+
+char *
+strtoupperdup(const char *s)
+{
+	size_t len = strlen(s);
+	char *uppercase = xmalloc(len + 1);
+	for (size_t i = 0; i < len; ++i)
+		uppercase[i] = (char)toupper(s[i]);
+	uppercase[len] = '\0';
+	return uppercase;
+}

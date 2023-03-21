@@ -748,6 +748,17 @@ strtolower(char *s);
 char *
 strtolowerdup(const char *s);
 
+/** Returns the null-terminated string converted to upper case in-place. */
+char *
+strtoupper(char *s);
+
+/**
+ * Returns a copy of the null-terminated string converted to upper case. The
+ * result is dynamically allocated using `xmalloc`.
+ */
+char *
+strtoupperdup(const char *s);
+
 #if !defined(__cplusplus) && !defined(static_assert)
 # define static_assert _Static_assert
 #endif
