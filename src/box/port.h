@@ -89,12 +89,10 @@ static_assert(sizeof(struct port_lua) <= sizeof(struct port),
 void
 port_lua_create(struct port *port, struct lua_State *L);
 
-struct sql_value;
-
 /** Port implementation used with vdbe memory variables. */
 struct port_vdbemem {
     const struct port_vtab *vtab;
-    struct sql_value *mem;
+    struct Mem *mem;
     uint32_t mem_count;
 };
 
@@ -103,7 +101,7 @@ static_assert(sizeof(struct port_vdbemem) <= sizeof(struct port),
 
 /** Initialize a port to dump data in sql vdbe memory. */
 void
-port_vdbemem_create(struct port *base, struct sql_value *mem,
+port_vdbemem_create(struct port *base, struct Mem *mem,
 		    uint32_t mem_count);
 
 struct port_c_entry {

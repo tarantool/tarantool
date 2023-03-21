@@ -1233,9 +1233,12 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 	int rc = 0;
 	enum field_type type = p->key_def->parts[nEq].type;
 
-	sql_value *p1 = 0;	/* Value extracted from pLower */
-	sql_value *p2 = 0;	/* Value extracted from pUpper */
-	sql_value *pVal = 0;	/* Value extracted from record */
+	/* Value extracted from pLower */
+	struct Mem *p1 = NULL;
+	/* Value extracted from pUpper */
+	struct Mem *p2 = NULL;
+	/* Value extracted from record */
+	struct Mem *pVal = NULL;
 
 	struct coll *coll = p->key_def->parts[nEq].coll;
 	if (pLower) {
@@ -1284,9 +1287,9 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 		assert(*pbDone == 0);
 	}
 
-	sqlValueFree(p1);
-	sqlValueFree(p2);
-	sqlValueFree(pVal);
+	mem_delete(p1);
+	mem_delete(p2);
+	mem_delete(pVal);
 
 	return rc;
 }

@@ -294,6 +294,15 @@ mem_destroy(struct Mem *mem)
 }
 
 void
+mem_delete(struct Mem *v)
+{
+	if (v == NULL)
+		return;
+	mem_destroy(v);
+	sql_xfree(v);
+}
+
+void
 mem_set_null(struct Mem *mem)
 {
 	mem_clear(mem);
@@ -2956,18 +2965,6 @@ sqlVdbeMemClearAndResize(Mem * pMem, int szNew)
 	return 0;
 }
 
-/*
- * Free an sql_value object
- */
-void
-sqlValueFree(sql_value * v)
-{
-	if (!v)
-		return;
-	mem_destroy(v);
-	sql_xfree(v);
-}
-
 void
 releaseMemArray(Mem * p, int N)
 {
@@ -3476,7 +3473,7 @@ error:
 static const struct port_vtab port_vdbemem_vtab;
 
 void
-port_vdbemem_create(struct port *base, struct sql_value *mem,
+port_vdbemem_create(struct port *base, struct Mem *mem,
 		    uint32_t mem_count)
 {
 	struct port_vdbemem *port = (struct port_vdbemem *) base;
@@ -3485,7 +3482,7 @@ port_vdbemem_create(struct port *base, struct sql_value *mem,
 	port->mem_count = mem_count;
 }
 
-static struct sql_value *
+static struct Mem *
 port_vdbemem_get_vdbemem(struct port *base, uint32_t *mem_count)
 {
 	struct port_vdbemem *port = (struct port_vdbemem *) base;
@@ -3504,7 +3501,7 @@ static const struct port_vtab port_vdbemem_vtab = {
 	.destroy = NULL,
 };
 
-struct sql_value *
+struct Mem *
 port_lua_get_vdbemem(struct port *base, uint32_t *size)
 {
 	struct port_lua *port = (struct port_lua *) base;
@@ -3624,7 +3621,7 @@ port_lua_get_vdbemem(struct port *base, uint32_t *size)
 			goto error;
 		}
 	}
-	return (struct sql_value *)val;
+	return val;
 error:
 	for (int i = 0; i < argc; i++)
 		mem_destroy(&val[i]);
@@ -3632,7 +3629,7 @@ error:
 	return NULL;
 }
 
-struct sql_value *
+struct Mem *
 port_c_get_vdbemem(struct port *base, uint32_t *size)
 {
 	struct port_c *port = (struct port_c *)base;
@@ -3773,7 +3770,7 @@ port_c_get_vdbemem(struct port *base, uint32_t *size)
 		}
 		i++;
 	}
-	return (struct sql_value *) val;
+	return val;
 error:
 	for (int i = 0; i < port->size; i++)
 		mem_destroy(&val[i]);
