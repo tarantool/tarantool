@@ -812,20 +812,20 @@ vdbe_code_row_trigger(struct Parse *parser, struct sql_trigger *trigger,
 
 uint64_t
 sql_trigger_colmask(Parse *parser, struct sql_trigger *trigger,
-		    ExprList *changes_list, int new, int tr_tm,
+		    ExprList *changes_list, bool is_new, int tr_tm,
 		    struct space *space, int orconf)
 {
 	const int op = changes_list != NULL ? TK_UPDATE : TK_DELETE;
 	uint64_t mask = 0;
 
-	assert(new == 1 || new == 0);
+	assert(is_new == 1 || is_new == 0);
 	for (struct sql_trigger *p = trigger; p != NULL; p = p->next) {
 		if (p->op == op && (tr_tm & p->tr_tm)
 		    && checkColumnOverlap(p->pColumns, changes_list)) {
 			TriggerPrg *prg =
 				sql_row_trigger(parser, p, space, orconf);
 			if (prg != NULL)
-				mask |= prg->column_mask[new];
+				mask |= prg->column_mask[is_new];
 		}
 	}
 

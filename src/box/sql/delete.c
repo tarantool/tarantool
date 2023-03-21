@@ -422,7 +422,7 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 		/* Mask of OLD.* columns in use */
 		/* TODO: Could use temporary registers here. */
 		uint64_t mask =
-			sql_trigger_colmask(parse, trigger_list, 0, 0,
+			sql_trigger_colmask(parse, trigger_list, 0, false,
 					    TRIGGER_BEFORE | TRIGGER_AFTER,
 					    space, onconf);
 		assert(space != NULL);
