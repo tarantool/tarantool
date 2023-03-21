@@ -591,7 +591,7 @@ freeP4(int p4type, void *p4)
 		sql_key_info_unref(p4);
 		break;
 	case P4_MEM:
-		sqlValueFree((sql_value *) p4);
+		mem_delete((struct Mem *)p4);
 		break;
 	default:
 		break;

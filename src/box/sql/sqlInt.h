@@ -220,7 +220,6 @@ typedef sql_uint64 sql_uint64;
 
 typedef struct sql_context sql_context;
 typedef struct sql sql;
-typedef struct Mem sql_value;
 typedef struct sql_file sql_file;
 struct sql_file {
 	const struct sql_io_methods *pMethods;	/* Methods for an open file */

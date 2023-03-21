@@ -321,6 +321,9 @@ mem_create(struct Mem *mem);
 void
 mem_destroy(struct Mem *mem);
 
+void
+mem_delete(struct Mem *);
+
 /** Clear MEM and set it to NULL. */
 void
 mem_set_null(struct Mem *mem);
@@ -852,8 +855,6 @@ int sqlVdbeCheckMemInvariants(struct Mem *);
 #endif
 
 int sqlVdbeMemClearAndResize(struct Mem * pMem, int n);
-
-void sqlValueFree(struct Mem *);
 
 /*
  * Release an array of N Mem elements

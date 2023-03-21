@@ -1198,7 +1198,7 @@ case OP_FunctionByName: {
 
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
-	port_vdbemem_create(&args, (struct sql_value *)argv, argc);
+	port_vdbemem_create(&args, argv, argc);
 	if (func_call(func, &args, &ret) != 0)
 		goto abort_due_to_error;
 
