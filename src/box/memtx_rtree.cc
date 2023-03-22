@@ -454,6 +454,6 @@ memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def)
 	index->dimension = def->opts.dimension;
 	rtree_init(&index->tree, index->dimension, distance_type,
 		   MEMTX_EXTENT_SIZE, memtx_index_extent_alloc,
-		   memtx_index_extent_free, memtx, NULL);
+		   memtx_index_extent_free, memtx, &memtx->index_extent_stats);
 	return &index->base;
 }
