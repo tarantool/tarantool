@@ -195,13 +195,6 @@ TAB_SIZE               = 8
 
 ALIASES                =
 
-# This tag can be used to specify a number of word-keyword mappings (TCL only).
-# A mapping has the form "name=value". For example adding
-# "class=itcl::class" will allow you to use the command class in the
-# itcl::class meaning.
-
-TCL_SUBST              =
-
 # Set the OPTIMIZE_OUTPUT_FOR_C tag to YES if your project consists of C
 # sources only. Doxygen will then generate output that is more tailored for C.
 # For instance, some of the names that are used will be different. The list
@@ -594,6 +587,22 @@ QUIET                  = NO
 
 WARNINGS               = YES
 
+# If the WARN_AS_ERROR tag is set to YES then doxygen will immediately stop when
+# a warning is encountered. If the WARN_AS_ERROR tag is set to FAIL_ON_WARNINGS
+# then doxygen will continue running as if WARN_AS_ERROR tag is set to NO, but at
+# the end of the doxygen process doxygen will return with a non-zero status. If
+# the WARN_AS_ERROR tag is set to FAIL_ON_WARNINGS_PRINT then doxygen behaves
+# like FAIL_ON_WARNINGS but in case no WARN_LOGFILE is defined doxygen will not
+# write the warning messages in between other messages but write them at the end
+# of a run, in case a WARN_LOGFILE is defined the warning messages will be
+# besides being in the defined file also be shown at the end of a run, unless the
+# WARN_LOGFILE is defined as - i.e. standard output (stdout) in that case the
+# behavior will remain as with the setting FAIL_ON_WARNINGS.
+#
+# Possible values are: NO, YES, FAIL_ON_WARNINGS and FAIL_ON_WARNINGS_PRINT.
+
+WARN_AS_ERROR = FAIL_ON_WARNINGS
+
 # If WARN_IF_UNDOCUMENTED is set to YES, then doxygen will generate warnings
 # for undocumented members. If EXTRACT_ALL is set to YES then this flag will
 # automatically be disabled.
@@ -822,12 +831,6 @@ VERBATIM_HEADERS       = YES
 # contains a lot of classes, structs, unions or interfaces.
 
 ALPHABETICAL_INDEX     = YES
-
-# If the alphabetical index is enabled (see ALPHABETICAL_INDEX) then
-# the COLS_IN_ALPHA_INDEX tag can be used to specify the number of columns
-# in which this list will be split (can be a number in the range [1..20])
-
-COLS_IN_ALPHA_INDEX    = 5
 
 # In case all classes in a project start with a common prefix, all
 # classes will be put under the same header in the alphabetical index.
@@ -1541,11 +1544,6 @@ ALLEXTERNALS           = NO
 
 EXTERNAL_GROUPS        = YES
 
-# The PERL_PATH should be the absolute path and name of the perl script
-# interpreter (i.e. the result of `which perl').
-
-PERL_PATH              = /usr/bin/perl
-
 #---------------------------------------------------------------------------
 # Configuration options related to the dot tool
 #---------------------------------------------------------------------------
@@ -1557,15 +1555,6 @@ PERL_PATH              = /usr/bin/perl
 # install and use dot, since it yields more powerful graphs.
 
 CLASS_DIAGRAMS         = YES
-
-# You can define message sequence charts within doxygen comments using the \msc
-# command. Doxygen will then run the mscgen tool (see
-# http://www.mcternan.me.uk/mscgen/) to produce the chart and insert it in the
-# documentation. The MSCGEN_PATH tag allows you to specify the directory where
-# the mscgen tool resides. If left empty the tool is assumed to be found in the
-# default search path.
-
-MSCGEN_PATH            =
 
 # If set to YES, the inheritance and collaboration graphs will hide
 # inheritance and usage relations if the target is undocumented
