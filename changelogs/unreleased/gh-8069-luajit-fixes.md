@@ -8,3 +8,4 @@ activity, the following issues have been resolved:
 * Fixed `pcall()` call without arguments on arm64.
 * Fixed assembling of IR_{AHUV}LOAD specialized to boolean for aarch64.
 * Fixed constant rematerialization on arm64.
+* Fixed `emit_rma()` for x64/GC64 mode for non-`mov` instructions.
