@@ -32,7 +32,7 @@ extent_free(void *ctx, void *extent)
 static void
 test_tree_do_create(struct test_tree *tree)
 {
-	test_tree_create(tree, NULL, extent_alloc, extent_free, NULL);
+	test_tree_create(tree, NULL, extent_alloc, extent_free, NULL, NULL);
 }
 
 static void

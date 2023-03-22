@@ -63,9 +63,13 @@ simple_test()
 {
 	header();
 
+	struct matras_stats stats;
+	matras_stats_create(&stats);
+	stats.extent_count = extents_count;
+
 	struct light_core ht;
-	light_create(&ht, light_extent_size,
-		     my_light_alloc, my_light_free, &extents_count, 0);
+	light_create(&ht, 0, light_extent_size, my_light_alloc, my_light_free,
+		     &extents_count, &stats);
 	std::vector<bool> vect;
 	size_t count = 0;
 	const size_t rounds = 1000;
@@ -98,6 +102,8 @@ simple_test()
 
 			if (count != light_count(&ht))
 				fail("count check failed!", "true");
+			if (stats.extent_count != extents_count)
+				fail("extent count check failed!", "true");
 
 			bool identical = true;
 			for (hash_value_t test = 0; test < limits; test++) {
@@ -128,8 +134,8 @@ collision_test()
 	header();
 
 	struct light_core ht;
-	light_create(&ht, light_extent_size,
-		     my_light_alloc, my_light_free, &extents_count, 0);
+	light_create(&ht, 0, light_extent_size, my_light_alloc, my_light_free,
+		     &extents_count, NULL);
 	std::vector<bool> vect;
 	size_t count = 0;
 	const size_t rounds = 100;
@@ -192,8 +198,8 @@ iterator_test()
 	header();
 
 	struct light_core ht;
-	light_create(&ht, light_extent_size,
-		     my_light_alloc, my_light_free, &extents_count, 0);
+	light_create(&ht, 0, light_extent_size, my_light_alloc, my_light_free,
+		     &extents_count, NULL);
 	const size_t rounds = 1000;
 	const size_t start_limits = 20;
 
@@ -255,8 +261,8 @@ iterator_freeze_check()
 	struct light_core ht;
 
 	for (int i = 0; i < 10; i++) {
-		light_create(&ht, light_extent_size,
-			     my_light_alloc, my_light_free, &extents_count, 0);
+		light_create(&ht, 0, light_extent_size, my_light_alloc,
+			     my_light_free, &extents_count, NULL);
 		int comp_buf_size = 0;
 		int comp_buf_size2 = 0;
 		for (int j = 0; j < test_data_size; j++) {

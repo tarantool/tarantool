@@ -485,9 +485,8 @@ rand_test()
 	CBoxSet<DIMENSION> set;
 
 	struct rtree tree;
-	rtree_init(&tree, DIMENSION, extent_size,
-		   extent_alloc, extent_free, &page_count,
-		   RTREE_EUCLID);
+	rtree_init(&tree, DIMENSION, RTREE_EUCLID, extent_size,
+		   extent_alloc, extent_free, &page_count, NULL);
 
 	printf("\tDIMENSION: %u, page size: %u, max fill good: %d\n",
 	       DIMENSION, tree.page_size, tree.page_max_fill >= 10);

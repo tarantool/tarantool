@@ -115,9 +115,10 @@ sequence_init(void)
 {
 	mempool_create(&sequence_data_extent_pool, &cord()->slabc,
 		       SEQUENCE_DATA_EXTENT_SIZE);
-	light_sequence_create(&sequence_data_index, SEQUENCE_DATA_EXTENT_SIZE,
+	light_sequence_create(&sequence_data_index, 0,
+			      SEQUENCE_DATA_EXTENT_SIZE,
 			      sequence_data_extent_alloc,
-			      sequence_data_extent_free, NULL, 0);
+			      sequence_data_extent_free, NULL, NULL);
 }
 
 void

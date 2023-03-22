@@ -116,7 +116,7 @@ vy_mem_new(struct vy_mem_env *env, struct key_def *cmp_def,
 	tuple_format_ref(format);
 	vy_mem_tree_create(&index->tree, cmp_def,
 			   vy_mem_tree_extent_alloc,
-			   vy_mem_tree_extent_free, index);
+			   vy_mem_tree_extent_free, index, NULL);
 	rlist_create(&index->in_sealed);
 	fiber_cond_create(&index->pin_cond);
 	return index;

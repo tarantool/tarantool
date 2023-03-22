@@ -700,9 +700,9 @@ memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 		return NULL;
 	}
 
-	light_index_create(&index->hash_table, MEMTX_EXTENT_SIZE,
-			   memtx_index_extent_alloc, memtx_index_extent_free,
-			   memtx, index->base.def->key_def);
+	light_index_create(&index->hash_table, index->base.def->key_def,
+			   MEMTX_EXTENT_SIZE, memtx_index_extent_alloc,
+			   memtx_index_extent_free, memtx, NULL);
 	return &index->base;
 }
 
