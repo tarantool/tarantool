@@ -1862,11 +1862,11 @@ memtx_tx_track_story_gap(struct txn *txn, struct memtx_story *story,
  * have read from this gap and thus must be sent to read view or conflicted.
  */
 static void
-memtx_tx_handle_gap_write(struct space *space,
-			  struct memtx_story *story, struct tuple *tuple,
+memtx_tx_handle_gap_write(struct space *space, struct memtx_story *story,
 			  struct tuple *successor, uint32_t ind)
 {
 	assert(story->link[ind].newer_story == NULL);
+	struct tuple *tuple = story->tuple;
 	struct index *index = space->index[ind];
 	struct gap_item_base *item_base, *tmp;
 	rlist_foreach_entry_safe(item_base, &index->read_gaps,
@@ -1947,6 +1947,24 @@ memtx_tx_handle_gap_write(struct space *space,
 }
 
 /**
+ * Helper of memtx_tx_history_add_stmt, that sets @a result pointer to
+ * @old_tuple and reference is if necessary.
+ */
+static void
+memtx_tx_history_add_stmt_prepare_result(struct tuple *old_tuple,
+					 struct tuple **result)
+{
+	*result = old_tuple;
+	if (*result != NULL) {
+		/*
+		 * The result must be a referenced pointer. The caller must
+		 * unreference it by itself.
+		 */
+		tuple_ref(*result);
+	}
+}
+
+/**
  * Helper of @sa memtx_tx_history_add_stmt, does actual work in case when
  * new_tuple != NULL.
  * Just for understanding, that might be:
@@ -1962,14 +1980,12 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 				 struct tuple **result)
 {
 	assert(new_tuple != NULL);
-
 	struct space *space = stmt->space;
-	struct memtx_story *add_story = NULL, *replaced_story = NULL;
 
+	/* Process replacement in indexes. */
 	struct tuple *directly_replaced[space->index_count];
 	struct tuple *direct_successor[space->index_count];
 	uint32_t directly_replaced_count = 0;
-
 	for (uint32_t i = 0; i < space->index_count; i++) {
 		struct index *index = space->index[i];
 		struct tuple **replaced = &directly_replaced[i];
@@ -1983,9 +1999,8 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		}
 	}
 	directly_replaced_count = space->index_count;
-	struct tuple *replaced = directly_replaced[0];
 
-	/* Check overwritten tuple */
+	/* Check overwritten tuple. */
 	bool is_own_change = false;
 	int rc = check_dup(stmt, new_tuple, directly_replaced,
 			   &old_tuple, mode, &is_own_change);
@@ -1993,44 +2008,49 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		goto fail;
 	stmt->is_own_change = is_own_change;
 
-	/* Create add_story and replaced_story if necessary. */
-	add_story = memtx_tx_story_new(space, new_tuple);
+	/* Create add_story. */
+	struct memtx_story *add_story = memtx_tx_story_new(space, new_tuple);
 	memtx_tx_story_link_added_by(add_story, stmt);
 
-	if (replaced != NULL && !replaced->is_dirty) {
-		replaced_story = memtx_tx_story_new(space, replaced);
-		memtx_tx_story_link_top(add_story, replaced_story, 0, true);
-	} else if (replaced != NULL) {
-		replaced_story = memtx_tx_story_get(replaced);
-		memtx_tx_story_link_top(add_story, replaced_story, 0, true);
-	} else {
-		memtx_tx_story_link_top(add_story, NULL, 0, true);
-		memtx_tx_handle_gap_write(space, add_story, new_tuple,
-					  direct_successor[0], 0);
+	/* Create next story in the primary index if necessary. */
+	struct tuple *next_pk = directly_replaced[0];
+	struct memtx_story *next_pk_story = NULL;
+	if (next_pk != NULL && next_pk->is_dirty) {
+		next_pk_story = memtx_tx_story_get(next_pk);
+	} else if (next_pk != NULL) {
+		next_pk_story = memtx_tx_story_new(space, next_pk);
 	}
 
-	/* Collect point phantom read conflicts. */
-	for (uint32_t i = 0; i < space->index_count; i++)
-		if (directly_replaced[i] == NULL)
+	/* Collect conflicts or form chains. */
+	for (uint32_t i = 0; i < space->index_count; i++) {
+		struct tuple *next = directly_replaced[i];
+		struct tuple *succ = direct_successor[i];
+		if (next == NULL) {
+			/* Collect conflicts. */
+			memtx_tx_handle_gap_write(space, add_story, succ, i);
 			memtx_tx_handle_point_hole_write(space, add_story, i);
-
-	for (uint32_t i = 1; i < space->index_count; i++) {
-		if (directly_replaced[i] == NULL) {
-			memtx_tx_handle_gap_write(space, add_story, new_tuple,
-						  direct_successor[i], i);
-			continue;
+			memtx_tx_story_link_top(add_story, NULL, i, true);
+		} else {
+			/* Form chains. */
+			struct memtx_story *next_story = next_pk_story;
+			if (next != next_pk) {
+				assert(next->is_dirty);
+				next_story = memtx_tx_story_get(next);
+			}
+			memtx_tx_story_link_top(add_story, next_story, i, true);
 		}
-		assert(directly_replaced[i]->is_dirty);
-		struct memtx_story *secondary_replaced =
-			memtx_tx_story_get(directly_replaced[i]);
-		memtx_tx_story_link_top(add_story, secondary_replaced, i, true);
 	}
 
+	/*
+	 * Now old_tuple points to a tuple that is actually replaced by this
+	 * statement. Let's find its story and link with the statement.
+	 */
 	struct memtx_story *del_story = NULL;
 	if (old_tuple != NULL) {
+		/* Link story of old_tuple as deleted_by. */
 		assert(old_tuple->is_dirty);
-		if (old_tuple == replaced)
-			del_story = replaced_story;
+		if (old_tuple == next_pk)
+			del_story = next_pk_story;
 		else
 			del_story = memtx_tx_story_get(old_tuple);
 		memtx_tx_story_link_deleted_by(del_story, stmt);
@@ -2060,19 +2080,12 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 			memtx_tx_track_read_story(stmt->txn, space, del_story);
 	}
 
-	*result = old_tuple;
-	if (*result != NULL) {
-		/*
-		 * The result must be a referenced pointer. The caller must
-		 * unreference it by itself.
-		 */
-		tuple_ref(*result);
-	}
+	/* Finalize the result. */
+	memtx_tx_history_add_stmt_prepare_result(old_tuple, result);
 	return 0;
 
 fail:
-	while (directly_replaced_count > 0) {
-		uint32_t i = --directly_replaced_count;
+	for (uint32_t i = directly_replaced_count - 1; i + 1 > 0; i--) {
 		struct index *index = space->index[i];
 		struct tuple *unused;
 		if (index_replace(index, new_tuple, directly_replaced[i],
@@ -2096,31 +2109,29 @@ memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
 				 struct tuple *old_tuple,
 				 struct tuple **result)
 {
-	struct space *space = stmt->space;
-	struct memtx_story *del_story;
+	/*
+	 * Find deleted story and link it with the statement.
+	 * The funny thing is that specific API of space->replace function
+	 * requires old_tuple as an argument, which can only be acquired
+	 * through mvcc clarification. That means that the story of old_tuple
+	 * must have been already created and it already contains a read
+	 * record by this transaction. That's why we expect old_tuple to
+	 * be dirty and do not set read tracker as would be logically
+	 * correct in this function, something like that:
+	 * memtx_tx_track_read_story(stmt->txn, stmt->space, del_story)
+	 */
+	assert(old_tuple->is_dirty);
+	struct memtx_story *del_story = memtx_tx_story_get(old_tuple);
+	if (del_story->add_stmt != NULL)
+		stmt->is_own_change = del_story->add_stmt->txn == stmt->txn;
+	memtx_tx_story_link_deleted_by(del_story, stmt);
 
-	if (old_tuple->is_dirty) {
-		del_story = memtx_tx_story_get(old_tuple);
-		if (del_story->add_stmt != NULL)
-			stmt->is_own_change =
-				del_story->add_stmt->txn == stmt->txn;
-	} else {
-		assert(stmt->txn != NULL);
-		del_story = memtx_tx_story_new(space, old_tuple);
-	}
+	/* Notify statistics. */
 	if (!del_story->tuple_is_retained)
 		memtx_tx_story_track_retained_tuple(del_story);
 
-	memtx_tx_story_link_deleted_by(del_story, stmt);
-	*result = old_tuple;
-
-	if (*result != NULL) {
-		/*
-		 * The result must be a referenced pointer. The caller must
-		 * unreference it by itself.
-		 */
-		tuple_ref(*result);
-	}
+	/* Finalize the result. */
+	memtx_tx_history_add_stmt_prepare_result(old_tuple, result);
 	return 0;
 }
 
