@@ -457,7 +457,7 @@ LIGHT(create)(struct LIGHT(core) *htab, size_t extent_size,
 	ht->arg = arg;
 	matras_create(&htab->mtable,
 		      extent_size, sizeof(struct LIGHT(record)),
-		      extent_alloc_func, extent_free_func, alloc_ctx);
+		      extent_alloc_func, extent_free_func, alloc_ctx, NULL);
 	matras_head_read_view(&htab->view);
 	ht->mtable = &htab->mtable;
 	ht->view = &htab->view;

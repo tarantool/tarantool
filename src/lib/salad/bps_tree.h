@@ -1303,7 +1303,7 @@ bps_tree_create(struct bps_tree *t, bps_tree_arg_t arg,
 	memset(&tree->max_elem, 0, sizeof(tree->max_elem));
 	matras_create(&t->matras,
 		      BPS_TREE_EXTENT_SIZE, BPS_TREE_BLOCK_SIZE,
-		      extent_alloc_func, extent_free_func, alloc_ctx);
+		      extent_alloc_func, extent_free_func, alloc_ctx, NULL);
 	matras_head_read_view(&t->view);
 	tree->matras = &t->matras;
 	tree->view = &t->view;
