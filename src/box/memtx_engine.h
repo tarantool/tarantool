@@ -36,6 +36,7 @@
 #include <small/quota.h>
 #include <small/small.h>
 #include <small/mempool.h>
+#include <small/matras.h>
 
 #include "engine.h"
 #include "xlog.h"
@@ -89,9 +90,6 @@ enum memtx_recovery_state {
 	 */
 	MEMTX_OK,
 };
-
-/** Memtx extents pool, available to statistics. */
-extern struct mempool memtx_index_extent_pool;
 
 enum memtx_reserve_extents_num {
 	/**
@@ -153,6 +151,8 @@ struct memtx_engine {
 	struct slab_cache index_slab_cache;
 	/** Index extent allocator. */
 	struct mempool index_extent_pool;
+	/** Index extent allocator statistics. */
+	struct matras_stats index_extent_stats;
 	/**
 	 * To ensure proper statement-level rollback in case
 	 * of out of memory conditions, we maintain a number

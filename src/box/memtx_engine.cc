@@ -1207,13 +1207,12 @@ memtx_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 	struct allocator_stats data_stats;
-	struct mempool_stats index_stats;
-	mempool_stats(&memtx->index_extent_pool, &index_stats);
 	memset(&data_stats, 0, sizeof(data_stats));
 	allocators_stats(&data_stats);
 	stat->data += data_stats.small.used;
 	stat->data += data_stats.sys.used;
-	stat->index += index_stats.totals.used;
+	stat->index += (size_t)memtx->index_extent_stats.extent_count *
+							MEMTX_EXTENT_SIZE;
 }
 
 static const struct engine_vtab memtx_engine_vtab = {
@@ -1406,6 +1405,7 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	slab_cache_create(&memtx->index_slab_cache, &memtx->arena);
 	mempool_create(&memtx->index_extent_pool, &memtx->index_slab_cache,
 		       MEMTX_EXTENT_SIZE);
+	matras_stats_create(&memtx->index_extent_stats);
 	mempool_create(&memtx->iterator_pool, cord_slab_cache(),
 		       MEMTX_ITERATOR_SIZE);
 	memtx->num_reserved_extents = 0;
