@@ -970,7 +970,7 @@ rtree_init(struct rtree *tree, unsigned dimension, uint32_t extent_size,
 		/ sizeof(struct rtree_neighbor);
 
 	matras_create(&tree->mtab, extent_size, tree->page_size,
-		      extent_alloc, extent_free, alloc_ctx);
+		      extent_alloc, extent_free, alloc_ctx, NULL);
 	return 0;
 }
 
