@@ -144,7 +144,7 @@ vy_cache_create(struct vy_cache *cache, struct vy_cache_env *env,
 	cache->version = 1;
 	vy_cache_tree_create(&cache->cache_tree, cmp_def,
 			     vy_cache_tree_page_alloc,
-			     vy_cache_tree_page_free, env);
+			     vy_cache_tree_page_free, env, NULL);
 }
 
 void

@@ -130,11 +130,9 @@
  * struct bps_tree;
  * struct bps_tree_view;
  * struct bps_tree_iterator;
- * typedef void *(*bps_tree_extent_alloc_f)();
- * typedef void (*bps_tree_extent_free_f)(void *);
  * // base:
  * void bps_tree_create(tree, arg, extent_alloc_func, extent_free_func,
- *                      alloc_ctx);
+ *                      alloc_ctx, alloc_stat);
  * void bps_tree_destroy(tree);
  * int bps_tree_build(tree, sorted_array, array_size);
  * void bps_tree_view_create(view, tree);
@@ -629,32 +627,21 @@ struct bps_tree_iterator {
 };
 
 /**
- * Pointer to function that allocates extent of size BPS_TREE_EXTENT_SIZE
- * BPS-tree properly handles with NULL result but could leak memory
- *  in case of exception.
- */
-typedef void *(*bps_tree_extent_alloc_f)(void *ctx);
-
-/**
- * Pointer to function frees extent (of size BPS_TREE_EXTENT_SIZE)
- */
-typedef void (*bps_tree_extent_free_f)(void *ctx, void *extent);
-
-/**
  * @brief Tree construction. Fills struct bps_tree members.
  * @param tree - pointer to a tree
  * @param arg - user defined argument for comparator
- * @param extent_alloc_func - pointer to function that allocates extents,
- *  see bps_tree_extent_alloc_f description for details
- * @param extent_free_func - pointer to function that allocates extents,
+ * @param extent_alloc_func - pointer to function that allocates extents
+ *   of size BPS_TREE_EXTENT_SIZE; BPS-tree properly handles NULL result
+ *   but can leak memory in case of exception.
+ * @param extent_free_func - pointer to function that frees extents
  * @param alloc_ctx - argument passed to extent allocator
- *  see bps_tree_extent_free_f description for details
+ * @param alloc_stats - optional extent allocator statistics
  */
 static inline void
 bps_tree_create(struct bps_tree *tree, bps_tree_arg_t arg,
-		bps_tree_extent_alloc_f extent_alloc_func,
-		bps_tree_extent_free_f extent_free_func,
-		void *alloc_ctx);
+		matras_alloc_func extent_alloc_func,
+		matras_free_func extent_free_func,
+		void *alloc_ctx, struct matras_stats *alloc_stats);
 
 /**
  * @brief Fills a new (asserted) tree with values from sorted array.
@@ -1277,17 +1264,18 @@ struct bps_leaf_path_elem {
  * @brief Tree construction. Fills struct bps_tree members.
  * @param t - pointer to a tree
  * @param arg - user defined argument for comparator
- * @param extent_alloc_func - pointer to function that allocates extents,
- *  see bps_tree_extent_alloc_f description for details
- * @param extent_free_func - pointer to function that allocates extents,
+ * @param extent_alloc_func - pointer to function that allocates extents
+ *   of size BPS_TREE_EXTENT_SIZE; BPS-tree properly handles NULL result
+ *   but can leak memory in case of exception.
+ * @param extent_free_func - pointer to function that frees extents
  * @param alloc_ctx - argument passed to extent allocator
- *  see bps_tree_extent_free_f description for details
+ * @param alloc_stats - optional extent allocator statistics
  */
 static inline void
 bps_tree_create(struct bps_tree *t, bps_tree_arg_t arg,
-		bps_tree_extent_alloc_f extent_alloc_func,
-		bps_tree_extent_free_f extent_free_func,
-		void *alloc_ctx)
+		matras_alloc_func extent_alloc_func,
+		matras_free_func extent_free_func,
+		void *alloc_ctx, struct matras_stats *alloc_stats)
 {
 	struct bps_tree_common *tree = &t->common;
 	tree->root_id = (bps_tree_block_id_t)(-1);
@@ -1303,7 +1291,8 @@ bps_tree_create(struct bps_tree *t, bps_tree_arg_t arg,
 	memset(&tree->max_elem, 0, sizeof(tree->max_elem));
 	matras_create(&t->matras,
 		      BPS_TREE_EXTENT_SIZE, BPS_TREE_BLOCK_SIZE,
-		      extent_alloc_func, extent_free_func, alloc_ctx, NULL);
+		      extent_alloc_func, extent_free_func, alloc_ctx,
+		      alloc_stats);
 	matras_head_read_view(&t->view);
 	tree->matras = &t->matras;
 	tree->view = &t->view;

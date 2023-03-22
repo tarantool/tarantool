@@ -476,8 +476,8 @@ class Light {
 public:
 	Light()
 	{
-		light_create(&ht, light_extent_size, light_malloc_extend,
-			     light_free_extend, &extents_count, 0);
+		light_create(&ht, 0, light_extent_size, light_malloc_extend,
+			     light_free_extend, &extents_count, nullptr);
 	}
 	~Light()
 	{
@@ -519,8 +519,8 @@ public:
 	clear()
 	{
 		light_destroy(&ht);
-		light_create(&ht, light_extent_size, light_malloc_extend,
-			     light_free_extend, &extents_count, 0);
+		light_create(&ht, 0, light_extent_size, light_malloc_extend,
+			     light_free_extend, &extents_count, nullptr);
 	}
 
 	void

@@ -55,7 +55,8 @@ free_extent(void *ctx, void *p)
 static void
 light_do_create(struct light_core *ht)
 {
-	light_create(ht, extent_size, alloc_extent, free_extent, NULL, NULL);
+	light_create(ht, NULL, extent_size, alloc_extent, free_extent,
+		     NULL, NULL);
 }
 
 static void

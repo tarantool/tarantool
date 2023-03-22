@@ -38,10 +38,13 @@ simple_check()
 
 	header();
 
+	struct matras_stats stats;
+	matras_stats_create(&stats);
+	stats.extent_count = page_count;
+
 	struct rtree tree;
-	rtree_init(&tree, 2, extent_size,
-		   extent_alloc, extent_free, &page_count,
-		   RTREE_EUCLID);
+	rtree_init(&tree, 2, RTREE_EUCLID, extent_size,
+		   extent_alloc, extent_free, &page_count, &stats);
 
 	printf("Insert 1..X, remove 1..X\n");
 	for (size_t i = 1; i <= rounds; i++) {
@@ -56,6 +59,9 @@ simple_check()
 	}
 	if (rtree_number_of_records(&tree) != rounds) {
 		fail("Tree count mismatch (1)", "true");
+	}
+	if ((int)stats.extent_count != page_count) {
+		fail("Extent count mismatch (1)", "true");
 	}
 	for (size_t i = 1; i <= rounds; i++) {
 		record_t rec = (record_t)i;
@@ -81,6 +87,9 @@ simple_check()
 	if (rtree_number_of_records(&tree) != 0) {
 		fail("Tree count mismatch (1)", "true");
 	}
+	if ((int)stats.extent_count != page_count) {
+		fail("Extent count mismatch (1)", "true");
+	}
 
 	printf("Insert 1..X, remove X..1\n");
 	for (size_t i = 1; i <= rounds; i++) {
@@ -95,6 +104,9 @@ simple_check()
 	}
 	if (rtree_number_of_records(&tree) != rounds) {
 		fail("Tree count mismatch (2)", "true");
+	}
+	if ((int)stats.extent_count != page_count) {
+		fail("Extent count mismatch (2)", "true");
 	}
 	for (size_t i = rounds; i != 0; i--) {
 		record_t rec = (record_t)i;
@@ -120,7 +132,9 @@ simple_check()
 	if (rtree_number_of_records(&tree) != 0) {
 		fail("Tree count mismatch (2)", "true");
 	}
-
+	if ((int)stats.extent_count != page_count) {
+		fail("Extent count mismatch (2)", "true");
+	}
 
 	printf("Insert X..1, remove 1..X\n");
 	for (size_t i = rounds; i != 0; i--) {
@@ -135,6 +149,9 @@ simple_check()
 	}
 	if (rtree_number_of_records(&tree) != rounds) {
 		fail("Tree count mismatch (3)", "true");
+	}
+	if ((int)stats.extent_count != page_count) {
+		fail("Extent count mismatch (3)", "true");
 	}
 	for (size_t i = 1; i <= rounds; i++) {
 		record_t rec = (record_t)i;
@@ -160,7 +177,9 @@ simple_check()
 	if (rtree_number_of_records(&tree) != 0) {
 		fail("Tree count mismatch (3)", "true");
 	}
-
+	if ((int)stats.extent_count != page_count) {
+		fail("Extent count mismatch (3)", "true");
+	}
 
 	printf("Insert X..1, remove X..1\n");
 	for (size_t i = rounds; i != 0; i--) {
@@ -175,6 +194,9 @@ simple_check()
 	}
 	if (rtree_number_of_records(&tree) != rounds) {
 		fail("Tree count mismatch (4)", "true");
+	}
+	if ((int)stats.extent_count != page_count) {
+		fail("Extent count mismatch (4)", "true");
 	}
 	for (size_t i = rounds; i != 0; i--) {
 		record_t rec = (record_t)i;
@@ -199,6 +221,9 @@ simple_check()
 	}
 	if (rtree_number_of_records(&tree) != 0) {
 		fail("Tree count mismatch (4)", "true");
+	}
+	if ((int)stats.extent_count != page_count) {
+		fail("Extent count mismatch (4)", "true");
 	}
 
 	rtree_purge(&tree);
@@ -233,9 +258,8 @@ neighbor_test()
 
 	for (size_t i = 0; i <= test_count; i++) {
 		struct rtree tree;
-		rtree_init(&tree, 2, extent_size,
-			   extent_alloc, extent_free, &page_count,
-			   RTREE_EUCLID);
+		rtree_init(&tree, 2, RTREE_EUCLID, extent_size,
+			   extent_alloc, extent_free, &page_count, NULL);
 
 		rtree_test_build(&tree, arr, i);
 
@@ -258,8 +282,8 @@ neighbor_test()
 	struct rtree_iterator iterator;
 	rtree_iterator_init(&iterator);
 	struct rtree tree;
-	rtree_init(&tree, 2, extent_size, extent_alloc, extent_free, &page_count, 
-			RTREE_EUCLID);
+	rtree_init(&tree, 2, RTREE_EUCLID, extent_size,
+		   extent_alloc, extent_free, &page_count, NULL);
 	if (rtree_search(&tree, &basis, SOP_NEIGHBOR, &iterator)) {
 		fail("found in empty", "true");
 	}

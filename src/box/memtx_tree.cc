@@ -2142,7 +2142,7 @@ memtx_tree_index_new_tpl(struct memtx_engine *memtx, struct index_def *def,
 			index->base.def->key_def : index->base.def->cmp_def;
 
 	memtx_tree_create(&index->tree, cmp_def, memtx_index_extent_alloc,
-			  memtx_index_extent_free, memtx);
+			  memtx_index_extent_free, memtx, NULL);
 	return &index->base;
 }
 

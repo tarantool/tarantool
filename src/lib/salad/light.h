@@ -193,12 +193,6 @@ struct LIGHT(iterator) {
 };
 
 /**
- * Type of functions for memory allocation and deallocation
- */
-typedef void *(*LIGHT(extent_alloc_t))(void *ctx);
-typedef void (*LIGHT(extent_free_t))(void *ctx, void *extent);
-
-/**
  * Special result of light_find that means that nothing was found
  * Must be equal or greater than possible hash table size
  */
@@ -209,17 +203,18 @@ static const uint32_t LIGHT(end) = 0xFFFFFFFF;
 /**
  * @brief Hash table construction. Fills struct light members.
  * @param ht - pointer to a hash table struct
+ * @param arg - optional parameter to save for comparing function
  * @param extent_size - size of allocating memory blocks
  * @param extent_alloc_func - memory blocks allocation function
  * @param extent_free_func - memory blocks allocation function
  * @param alloc_ctx - argument passed to memory block allocator
- * @param arg - optional parameter to save for comparing function
+ * @param alloc_stats - optional extent allocator statistics
  */
 static inline void
-LIGHT(create)(struct LIGHT(core) *ht, size_t extent_size,
-	      LIGHT(extent_alloc_t) extent_alloc_func,
-	      LIGHT(extent_free_t) extent_free_func,
-	      void *alloc_ctx, LIGHT_CMP_ARG_TYPE arg);
+LIGHT(create)(struct LIGHT(core) *ht, LIGHT_CMP_ARG_TYPE arg,
+	      size_t extent_size, matras_alloc_func extent_alloc_func,
+	      matras_free_func extent_free_func, void *alloc_ctx,
+	      struct matras_stats *alloc_stats);
 
 /**
  * @brief Hash table destruction. Frees all allocated memory
@@ -436,17 +431,18 @@ LIGHT(view_iterator_get_and_next)(const struct LIGHT(view) *v,
 /**
  * @brief Hash table construction. Fills struct light members.
  * @param htab - pointer to a hash table struct
+ * @param arg - optional parameter to save for comparing function
  * @param extent_size - size of allocating memory blocks
  * @param extent_alloc_func - memory blocks allocation function
  * @param extent_free_func - memory blocks allocation function
  * @param alloc_ctx - argument passed to memory block allocator
- * @param arg - optional parameter to save for comparing function
+ * @param alloc_stats - optional extent allocator statistics
  */
 static inline void
-LIGHT(create)(struct LIGHT(core) *htab, size_t extent_size,
-	      LIGHT(extent_alloc_t) extent_alloc_func,
-	      LIGHT(extent_free_t) extent_free_func,
-	      void *alloc_ctx, LIGHT_CMP_ARG_TYPE arg)
+LIGHT(create)(struct LIGHT(core) *htab, LIGHT_CMP_ARG_TYPE arg,
+	      size_t extent_size, matras_alloc_func extent_alloc_func,
+	      matras_free_func extent_free_func, void *alloc_ctx,
+	      struct matras_stats *alloc_stats)
 {
 	struct LIGHT(common) *ht = &htab->common;
 	assert((LIGHT_GROW_INCREMENT & (LIGHT_GROW_INCREMENT - 1)) == 0);
@@ -457,7 +453,8 @@ LIGHT(create)(struct LIGHT(core) *htab, size_t extent_size,
 	ht->arg = arg;
 	matras_create(&htab->mtable,
 		      extent_size, sizeof(struct LIGHT(record)),
-		      extent_alloc_func, extent_free_func, alloc_ctx, NULL);
+		      extent_alloc_func, extent_free_func, alloc_ctx,
+		      alloc_stats);
 	matras_head_read_view(&htab->view);
 	ht->mtable = &htab->mtable;
 	ht->view = &htab->view;
