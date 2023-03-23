@@ -87,6 +87,7 @@ const char *standard_errors[] = {
 	"SwimError",
 	"CryptoError",
 	"SSLError",
+	"FileFormatError",
 };
 
 enum {

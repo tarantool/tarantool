@@ -1,7 +1,7 @@
 	*** main ***
 1..7
 	*** test_stack_error_decode ***
-    1..18
+    1..19
     ok 1 - check CustomError
     ok 2 - check AccessDeniedError
     ok 3 - check ClientError
@@ -19,7 +19,8 @@
     ok 15 - check SwimError
     ok 16 - check CryptoError
     ok 17 - check SSLError
-    ok 18 - stack size
+    ok 18 - check FileFormatError
+    ok 19 - stack size
 ok 1 - subtests
 	*** test_stack_error_decode: done ***
 	*** test_decode_unknown_type ***
