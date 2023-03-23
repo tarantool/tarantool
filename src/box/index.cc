@@ -183,7 +183,7 @@ box_tuple_extract_key(box_tuple_t *tuple, uint32_t space_id, uint32_t index_id,
 				 MULTIKEY_NONE, key_size);
 }
 
-static inline int
+static int
 check_index(uint32_t space_id, uint32_t index_id,
 	    struct space **space, struct index **index)
 {
@@ -199,25 +199,21 @@ check_index(uint32_t space_id, uint32_t index_id,
 }
 
 int
-box_index_tuple_position(uint32_t space_id, uint32_t index_id,
-			 const char *tuple, const char *tuple_end,
-			 const char **packed_pos, const char **packed_pos_end)
+box_iterator_position_from_tuple(const char *tuple, const char *tuple_end,
+				 struct key_def *cmp_def,
+				 const char **packed_pos,
+				 const char **packed_pos_end)
 {
-	struct space *space;
-	struct index *index;
-	if (check_index(space_id, index_id, &space, &index) != 0)
-		return -1;
-	if (index->def->key_def->for_func_index) {
+	if (cmp_def->for_func_index) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Functional index",
 			 "position by tuple");
 		return -1;
 	}
-	if (index->def->key_def->is_multikey) {
+	if (cmp_def->is_multikey) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Multikey index",
 			 "position by tuple");
 		return -1;
 	}
-	struct key_def *cmp_def = index->def->cmp_def;
 	if (tuple_validate_key_parts_raw(cmp_def, tuple) != 0) {
 		diag_set(ClientError, ER_ITERATOR_POSITION);
 		return -1;
@@ -235,6 +231,22 @@ box_index_tuple_position(uint32_t space_id, uint32_t index_id,
 	iterator_position_pack(key, key_end, buf, buf_size,
 			       packed_pos, packed_pos_end);
 	return 0;
+}
+
+int
+box_index_tuple_position(uint32_t space_id, uint32_t index_id,
+			 const char *tuple, const char *tuple_end,
+			 const char **packed_pos, const char **packed_pos_end)
+{
+	struct space *space = space_cache_find(space_id);
+	if (space == NULL)
+		return -1;
+	struct index *index = index_find(space, index_id);
+	if (index == NULL)
+		return -1;
+	return box_iterator_position_from_tuple(tuple, tuple_end,
+						index->def->cmp_def,
+						packed_pos, packed_pos_end);
 }
 
 /* }}} */
@@ -458,32 +470,23 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 	const char *pos, *pos_end;
 	char *pos_buf = NULL;
 	uint32_t pos_buf_size = 0;
-	auto pos_guard = make_scoped_guard([&pos_buf, &pos_buf_size] {
-		if (pos_buf != NULL)
-			runtime_memory_free(pos_buf, pos_buf_size);
-	});
-	if (packed_pos != NULL && packed_pos != packed_pos_end) {
-		pos_buf_size =
-			iterator_position_unpack_bufsize(packed_pos,
-							 packed_pos_end);
-		pos_buf = (char *)runtime_memory_alloc(pos_buf_size);
-		if (pos_buf == NULL) {
-			diag_set(OutOfMemory, pos_buf_size,
-				 "runtime_memory_alloc", "pos_buf");
-			return NULL;
-		}
-		if (iterator_position_unpack(packed_pos, packed_pos_end,
-					     pos_buf, pos_buf_size,
-					     &pos, &pos_end) != 0)
-			return NULL;
-		uint32_t pos_part_count = mp_decode_array(&pos);
-		if (iterator_position_validate(pos, pos_part_count,
-					       key, part_count,
-					       index->def->cmp_def, itype) != 0)
-			return NULL;
-	} else {
-		pos = NULL;
-		pos_end = NULL;
+	uint32_t region_svp = region_used(&fiber()->gc);
+	auto pos_guard =
+		make_scoped_guard([&pos_buf, &pos_buf_size, region_svp] {
+			region_truncate(&fiber()->gc, region_svp);
+			if (pos_buf != NULL)
+				runtime_memory_free(pos_buf, pos_buf_size);
+		});
+	if (box_iterator_position_unpack(packed_pos, packed_pos_end,
+					 index->def->cmp_def, key, part_count,
+					 type, &pos, &pos_end) != 0)
+		return NULL;
+	if (pos != NULL) {
+		pos_buf_size = pos_end - pos;
+		pos_buf = (char *)xruntime_memory_alloc(pos_buf_size);
+		memcpy(pos_buf, pos, pos_buf_size);
+		pos = pos_buf;
+		pos_end = pos_buf + pos_buf_size;
 	}
 	box_run_on_select(space, index, itype, key_array);
 	struct txn *txn;
@@ -499,6 +502,7 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 	it->pos_buf = pos_buf;
 	it->pos_buf_size = pos_buf_size;
 	pos_guard.is_active = false;
+	region_truncate(&fiber()->gc, region_svp);
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
 	return it;
 }

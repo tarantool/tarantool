@@ -39,6 +39,7 @@ extern "C" {
 
 struct lua_State;
 struct read_view;
+struct key_def;
 
 char *
 lbox_encode_tuple_on_gc(struct lua_State *L, int idx, size_t *p_len);
@@ -48,8 +49,14 @@ lbox_encode_tuple_on_gc(struct lua_State *L, int idx, size_t *p_len);
  * Returned position is allocated on the fiber region.
  */
 int
-lbox_normalize_position(lua_State *L, int idx, int space_id, int index_id,
+lbox_normalize_position(lua_State *L, int idx, struct key_def *cmp_def,
 			const char **packed_pos, const char **packed_pos_end);
+
+/** Specialization of lbox_normalize_position for indexes. */
+int
+lbox_index_normalize_position(lua_State *L, int idx, int space_id,
+			      int index_id, const char **packed_pos,
+			      const char **packed_pos_end);
 
 /**
  * Pushes a table that contains information about the given read view to

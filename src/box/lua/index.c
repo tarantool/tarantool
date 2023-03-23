@@ -269,8 +269,8 @@ lbox_index_iterator(lua_State *L)
 	struct iterator *it = NULL;
 	struct iterator **ptr = NULL;
 	const char *packed_pos, *packed_pos_end;
-	if (lbox_normalize_position(L, 5, space_id, index_id, &packed_pos,
-				    &packed_pos_end) != 0)
+	if (lbox_index_normalize_position(L, 5, space_id, index_id,
+					  &packed_pos, &packed_pos_end) != 0)
 		goto error;
 	it = box_index_iterator_after(space_id, index_id, iterator, mpkey,
 				      mpkey + mpkey_len, packed_pos,
