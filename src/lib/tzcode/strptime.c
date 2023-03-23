@@ -262,7 +262,8 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 				;
 
 			c = *ptr++;
-			assert(c == 'f');
+			if (c != 'f')
+				return NULL;
 			/* fallthru */
 		case 'f':
 			if (!is_digit((u_char)*buf))
