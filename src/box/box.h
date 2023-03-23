@@ -52,6 +52,7 @@ struct iostream;
 struct auth_request;
 struct space;
 struct vclock;
+struct key_def;
 
 /**
  * Pointer to TX thread local vclock.
@@ -342,6 +343,30 @@ box_promote_qsync(void);
  */
 int
 box_wait_linearization_point(double timeout);
+
+/**
+ * Allocates memory on region and packs iterator position there.
+ * Packed position is returned with packed_pos and packed_pos_end arguments.
+ * They must not be NULL. Argument found - number of tuples fetched before
+ * packing position. If no tuples were fetched or pos is NULL, the function
+ * will return NULLs.
+ */
+void
+box_iterator_position_pack(const char *pos, const char *pos_end,
+			   uint32_t found, const char **packed_pos,
+			   const char **packed_pos_end);
+
+/**
+ * Allocates memory on region, unpacks iterator position there and validates
+ * it. Unpacked position is returned with pos and pos_end arguments. They must
+ * not be NULL. Diag is set on error.
+ */
+int
+box_iterator_position_unpack(const char *packed_pos,
+			     const char *packed_pos_end,
+			     struct key_def *cmp_def, const char *key,
+			     uint32_t key_part_count, int iterator,
+			     const char **pos, const char **pos_end);
 
 /**
  * Select data, satisfying filters (key and iterator), and dump it to port.

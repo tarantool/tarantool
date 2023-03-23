@@ -42,6 +42,7 @@
 #include "box/lua/tuple.h"
 #include "box/port.h"
 #include "box/read_view.h"
+#include "box/space_cache.h"
 #include "box/tuple.h"
 #include "box/tuple_format.h"
 #include "box/txn.h"
@@ -74,7 +75,7 @@ lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
 }
 
 int
-lbox_normalize_position(lua_State *L, int idx, int space_id, int index_id,
+lbox_normalize_position(lua_State *L, int idx, struct key_def *cmp_def,
 			const char **packed_pos, const char **packed_pos_end)
 {
 	if (lua_isnil(L, idx)) {
@@ -87,15 +88,30 @@ lbox_normalize_position(lua_State *L, int idx, int space_id, int index_id,
 	} else if (lua_istable(L, idx) || luaT_istuple(L, idx) != NULL) {
 		size_t size;
 		const char *tuple = lbox_encode_tuple_on_gc(L, idx, &size);
-		if (box_index_tuple_position(space_id, index_id, tuple,
-					     tuple + size, packed_pos,
-					     packed_pos_end) != 0)
+		if (box_iterator_position_from_tuple(tuple, tuple + size,
+						     cmp_def, packed_pos,
+						     packed_pos_end) != 0)
 			return -1;
 	} else {
 		diag_set(ClientError, ER_ITERATOR_POSITION);
 		return -1;
 	}
 	return 0;
+}
+
+int
+lbox_index_normalize_position(lua_State *L, int idx, int space_id,
+			      int index_id, const char **packed_pos,
+			      const char **packed_pos_end)
+{
+	struct space *space = space_cache_find(space_id);
+	if (space == NULL)
+		return -1;
+	struct index *index = index_find(space, index_id);
+	if (index == NULL)
+		return -1;
+	return lbox_normalize_position(L, idx, index->def->cmp_def, packed_pos,
+				       packed_pos_end);
 }
 
 /**
@@ -287,8 +303,8 @@ lbox_select(lua_State *L)
 	const char *key = lbox_encode_tuple_on_gc(L, 6, &key_len);
 	const char *packed_pos, *packed_pos_end;
 	bool fetch_pos = lua_toboolean(L, 8);
-	if (lbox_normalize_position(L, 7, space_id, index_id, &packed_pos,
-				    &packed_pos_end) != 0)
+	if (lbox_index_normalize_position(L, 7, space_id, index_id,
+					  &packed_pos, &packed_pos_end) != 0)
 		goto fail;
 
 	if (box_select(space_id, index_id, iterator, offset, limit, key,

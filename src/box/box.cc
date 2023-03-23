@@ -3100,6 +3100,57 @@ box_process1(struct request *request, box_tuple_t **result)
 	return box_process_rw(request, space, result);
 }
 
+void
+box_iterator_position_pack(const char *pos, const char *pos_end,
+			   uint32_t found, const char **packed_pos,
+			   const char **packed_pos_end)
+{
+	assert(packed_pos != NULL);
+	assert(packed_pos_end != NULL);
+	if (found > 0 && pos != NULL) {
+		uint32_t buf_size =
+			iterator_position_pack_bufsize(pos, pos_end);
+		char *buf =
+			(char *)xregion_alloc(&fiber()->gc, buf_size);
+		iterator_position_pack(pos, pos_end, buf, buf_size,
+				       packed_pos, packed_pos_end);
+	} else {
+		*packed_pos = NULL;
+		*packed_pos_end = NULL;
+	}
+}
+
+int
+box_iterator_position_unpack(const char *packed_pos,
+			     const char *packed_pos_end,
+			     struct key_def *cmp_def, const char *key,
+			     uint32_t key_part_count, int iterator,
+			     const char **pos, const char **pos_end)
+{
+	assert(pos != NULL);
+	assert(pos_end != NULL);
+	if (packed_pos != NULL && packed_pos != packed_pos_end) {
+		uint32_t buf_size =
+			iterator_position_unpack_bufsize(packed_pos,
+							 packed_pos_end);
+		char *buf = (char *)xregion_alloc(&fiber()->gc, buf_size);
+		if (iterator_position_unpack(packed_pos, packed_pos_end,
+					     buf, buf_size,
+					     pos, pos_end) != 0)
+			return -1;
+		uint32_t pos_part_count = mp_decode_array(pos);
+		enum iterator_type type = (enum iterator_type)iterator;
+		if (iterator_position_validate(*pos, pos_part_count, key,
+					       key_part_count, cmp_def,
+					       type) != 0)
+			return -1;
+	} else {
+		*pos = NULL;
+		*pos_end = NULL;
+	}
+	return 0;
+}
+
 int
 box_select(uint32_t space_id, uint32_t index_id,
 	   int iterator, uint32_t offset, uint32_t limit,
@@ -3135,25 +3186,10 @@ box_select(uint32_t space_id, uint32_t index_id,
 	if (key_validate(index->def, type, key, part_count))
 		return -1;
 	const char *pos, *pos_end;
-	if (packed_pos != NULL && *packed_pos != NULL &&
-	    *packed_pos != *packed_pos_end) {
-		uint32_t buf_size =
-			iterator_position_unpack_bufsize(*packed_pos,
-							 *packed_pos_end);
-		char *buf = (char *)xregion_alloc(&fiber()->gc, buf_size);
-		if (iterator_position_unpack(*packed_pos, *packed_pos_end,
-					     buf, buf_size,
-					     &pos, &pos_end) != 0)
-			return -1;
-		uint32_t pos_part_count = mp_decode_array(&pos);
-		if (iterator_position_validate(pos, pos_part_count,
-					       key, part_count,
-					       index->def->cmp_def, type) != 0)
-			return -1;
-	} else {
-		pos = NULL;
-		pos_end = NULL;
-	}
+	if (box_iterator_position_unpack(*packed_pos, *packed_pos_end,
+					 index->def->cmp_def, key, part_count,
+					 type, &pos, &pos_end) != 0)
+		return -1;
 
 	box_run_on_select(space, index, type, key_array);
 
@@ -3215,18 +3251,8 @@ box_select(uint32_t space_id, uint32_t index_id,
 		 */
 		if (iterator_position(it, &pos, &pos_size) != 0)
 			goto fail;
-		if (pos != NULL && found > 0) {
-			pos_end = pos + pos_size;
-			uint32_t buf_size =
-				iterator_position_pack_bufsize(pos, pos_end);
-			char *buf =
-				(char *)xregion_alloc(&fiber()->gc, buf_size);
-			iterator_position_pack(pos, pos_end, buf, buf_size,
-					       packed_pos, packed_pos_end);
-		} else {
-			*packed_pos = NULL;
-			*packed_pos_end = NULL;
-		}
+		box_iterator_position_pack(pos, pos + pos_size, found,
+					   packed_pos, packed_pos_end);
 	}
 	iterator_delete(it);
 	return 0;

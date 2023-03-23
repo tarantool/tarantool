@@ -136,6 +136,8 @@ strnindex(const char *const *haystack, const char *needle, uint32_t len,
 #define xregion_join(p, size)	xalloc_impl((size), region_join, (p), (size))
 #define xibuf_alloc(p, size)	xalloc_impl((size), ibuf_alloc, (p), (size))
 #define xibuf_reserve(p, size)	xalloc_impl((size), ibuf_reserve, (p), (size))
+#define xruntime_memory_alloc(size) \
+	xalloc_impl((size), runtime_memory_alloc, (size))
 
 /** \cond public */
 

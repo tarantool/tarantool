@@ -265,6 +265,16 @@ box_index_iterator_after(uint32_t space_id, uint32_t index_id, int type,
 			 const char *packed_pos, const char *packed_pos_end);
 
 /**
+ * A helper for position extractors. Get packed position of tuple in
+ * index by its cmp_def. Returned position is allocated on the fiber region.
+ */
+int
+box_iterator_position_from_tuple(const char *tuple, const char *tuple_end,
+				 struct key_def *cmp_def,
+				 const char **packed_pos,
+				 const char **packed_pos_end);
+
+/**
  * Get packed position of tuple in index to pass it to box_select
  * (multikey and func indexes are not supported). Returned position
  * is allocated on the fiber region.
