@@ -3180,13 +3180,10 @@ expr_code_int(struct Parse *parse, struct Expr *expr, bool is_neg,
 	const char *sign = is_neg ? "-" : "";
 	if (z[0] == '0' && (z[1] == 'x' || z[1] == 'X')) {
 		errno = 0;
-		if (is_neg) {
+		if (is_neg)
 			value = strtoll(z, NULL, 16);
-		} else {
+		else
 			value = strtoull(z, NULL, 16);
-			if (value > INT64_MAX)
-				goto int_overflow;
-		}
 		if (errno != 0) {
 			diag_set(ClientError, ER_HEX_LITERAL_MAX, sign, z,
 				 strlen(z) - 2, 16);
@@ -3198,7 +3195,6 @@ expr_code_int(struct Parse *parse, struct Expr *expr, bool is_neg,
 		bool unused;
 		if (sql_atoi64(z, &value, &unused, len) != 0 ||
 		    (is_neg && (uint64_t) value > (uint64_t) INT64_MAX + 1)) {
-int_overflow:
 			diag_set(ClientError, ER_INT_LITERAL_MAX, sign, z);
 			parse->is_aborted = true;
 			return;
