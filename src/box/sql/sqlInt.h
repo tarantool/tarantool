@@ -2677,11 +2677,10 @@ sql_space_column_is_in_pk(struct space *space, uint32_t);
  * @param parse Parsing context.
  * @param expr_list  Expr list from which to derive column names.
  * @param space_def Destination space definition.
- * @retval 0 on success.
- * @retval error codef on error.
  */
-int sqlColumnsFromExprList(Parse *parse, ExprList *expr_list,
-			   struct space_def *space_def);
+void
+sqlColumnsFromExprList(struct Parse *parse, struct ExprList *expr_list,
+		       struct space_def *space_def);
 
 void
 sqlSelectAddColumnTypeAndCollation(Parse *, struct space_def *, Select *);
