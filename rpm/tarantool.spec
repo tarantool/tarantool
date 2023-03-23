@@ -130,6 +130,7 @@ Recommends: cmake >= 3.3
 Recommends: make
 Recommends: gcc >= 4.5
 Recommends: gcc-c++ >= 4.5
+Recommends: tt
 %endif
 
 URL: http://tarantool.org
