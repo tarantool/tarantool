@@ -26,11 +26,7 @@
 #include <ctype.h>
 #include <lauxlib.h>
 
-/**
- * Translation table for `box.iproto.key` constants encoding and aliasing: used
- * in `luamp_encode_with_translation` and `luamp_push_with_translation`.
- */
-static struct mh_strnu32_t *iproto_key_translation;
+struct mh_strnu32_t *iproto_key_translation;
 
 /**
  * IPROTO constant from `src/box/iproto_{constants, features}.h`.

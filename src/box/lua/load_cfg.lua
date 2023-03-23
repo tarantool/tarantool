@@ -57,15 +57,11 @@ local function ifdef_audit(value)
 end
 
 -- Flight recorder.
-local has_flightrec, flightrec = pcall(require, 'flightrec')
-
 local function ifdef_flightrec(value)
-    if has_flightrec then
+    if private.cfg_set_flightrec then
         return value
     end
 end
-
-local ifdef_flightrec_set_params = has_flightrec and flightrec.cfg or nil
 
 -- WAL extensions.
 local function ifdef_wal_ext(value)
@@ -541,7 +537,7 @@ local dynamic_cfg_modules = {
         },
     },
     flightrec = {
-        cfg = ifdef_flightrec_set_params,
+        cfg = private.cfg_set_flightrec,
         options = {
             flightrec_enabled = true,
             flightrec_logs_size = true,
