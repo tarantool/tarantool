@@ -1,10 +1,10 @@
-name: Publish module API documentation
+name: Build and publish module API documentation
 
 on:
   push:
     branches: [master]
   pull_request:
-    types: [opened, reopened, synchronize, labeled]
+    types: [opened, reopened, synchronize]
   workflow_dispatch:
 
 concurrency:
@@ -28,12 +28,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  publish-api-doc:
-    # Run on push to the branch 'master' or on pull request if the 'full-ci'
-    # label is set.
-    if: github.repository == 'tarantool/tarantool' &&
-        ( github.event_name != 'pull_request' ||
-          contains(github.event.pull_request.labels.*.name, 'full-ci') )
+  build-api-doc:
     runs-on: ubuntu-latest
     steps:
       - name: Prepare checkout
@@ -57,7 +52,8 @@ jobs:
         uses: JamesIves/github-pages-deploy-action@v4.4.0
         with:
           folder: doc/
-        if: github.ref == 'refs/heads/master' &&
+        if: github.repository == 'tarantool/tarantool' &&
+            github.ref == 'refs/heads/master' &&
             github.event_name != 'pull_request'
 
       - name: Send VK Teams message on failure
