@@ -84,7 +84,7 @@ create_fuzz_test(PREFIX datetime_parse_full
 )
 
 create_fuzz_test(PREFIX datetime_strptime
-                 SOURCES datetime_strptime_fuzzer.c
+                 SOURCES datetime_strptime_fuzzer.cc
                  LIBRARIES core fuzzer_config
 )
 
