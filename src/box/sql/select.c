@@ -2577,6 +2577,8 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 		info = sql_space_info_new_from_expr_list(pParse, p->pEList,
 							 true);
 	}
+	/* Detach the ORDER BY clause from the compound SELECT */
+	p->pOrderBy = NULL;
 	if (info == NULL) {
 		pParse->is_aborted = true;
 		goto end_of_recursive_query;
@@ -2591,9 +2593,6 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 		p->selFlags |= SF_UsesEphemeral;
 		VdbeComment((v, "Distinct table"));
 	}
-
-	/* Detach the ORDER BY clause from the compound SELECT */
-	p->pOrderBy = 0;
 
 	/* Store the results of the setup-query in Queue. */
 	pSetup->pNext = 0;
