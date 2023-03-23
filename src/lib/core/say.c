@@ -135,12 +135,8 @@ static const char level_chars[] = {
 	[S_DEBUG] = 'D',
 };
 
-static char
-level_to_char(int level)
-{
-	assert(level >= S_FATAL && level <= S_DEBUG);
-	return level_chars[level];
-}
+static_assert(lengthof(level_chars) == say_level_MAX,
+	      "level_chars is not defined for one of log levels");
 
 static const char *level_strs[] = {
 	[S_FATAL] = "FATAL",
@@ -153,10 +149,14 @@ static const char *level_strs[] = {
 	[S_DEBUG] = "DEBUG",
 };
 
-static const char*
-level_to_string(int level)
+static_assert(lengthof(level_strs) == say_level_MAX,
+	      "level_strs is not defined for one of log levels");
+
+const char*
+say_log_level_str(int level)
 {
-	assert(level >= S_FATAL && level <= S_DEBUG);
+	if (level < 0 || level >= (int)lengthof(level_strs))
+		return NULL;
 	return level_strs[level];
 }
 
@@ -879,7 +879,7 @@ say_format_plain(struct log *log, char *buf, int len, int level,
 		}
 	}
 
-	SNPRINT(total, snprintf, buf, len, " %c> ", level_to_char(level));
+	SNPRINT(total, snprintf, buf, len, " %c> ", level_chars[level]);
 
 	SNPRINT(total, vsnprintf, buf, len, format, ap);
 	if (error != NULL)
@@ -917,7 +917,7 @@ say_format_json(struct log *log, char *buf, int len, int level,
 	SNPRINT(total, snprintf, buf, len, "\", ");
 
 	SNPRINT(total, snprintf, buf, len, "\"level\": \"%s\", ",
-			level_to_string(level));
+			level_strs[level]);
 
 	if (strncmp(format, "json", sizeof("json")) == 0) {
 		/*
@@ -1358,6 +1358,9 @@ log_vsay(struct log *log, int level, bool check_level, const char *module,
 {
 	int errsv = errno;
 	int total = 0;
+
+	assert(level >= 0 && level < say_level_MAX);
+
 	if (check_level && level > log->level)
 		goto out;
 

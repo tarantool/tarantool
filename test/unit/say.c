@@ -170,7 +170,7 @@ int main()
 	fiber_init(fiber_c_invoke);
 	say_logger_init("/dev/null", S_INFO, 0, "plain");
 
-	plan(33);
+	plan(36);
 
 #define PARSE_LOGGER_TYPE(input, rc) \
 	ok(parse_logger_type(input) == rc, "%s", input)
@@ -278,6 +278,16 @@ int main()
 	say_logrotate(NULL, NULL, 0);
 	coio_shutdown();
 	log_destroy(&test_log);
+
+	const char *level_str = say_log_level_str(S_DEBUG);
+	ok(strcmp("DEBUG", say_log_level_str(S_DEBUG)) == 0,
+	   "level string is %s", level_str);
+	level_str = say_log_level_str(-1);
+	ok(say_log_level_str(-1) == NULL,
+	   "level string is %s", level_str);
+	level_str = say_log_level_str(1000);
+	ok(say_log_level_str(-1) == NULL,
+	   "level string is %s", level_str);
 
 	fiber_free();
 	memory_free();
