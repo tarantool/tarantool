@@ -2662,8 +2662,6 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 			int reg_eph = ++pParse->nMem;
 			struct sql_space_info *info =
 				sql_space_info_new(nVal, 0);
-			if (info == NULL)
-				return 0;
 			sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph, 0, 0,
 				      (char *)info, P4_DYNAMIC);
 			sqlVdbeAddOp3(v, OP_IteratorOpen, pExpr->iTable, 0,
@@ -4046,10 +4044,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			if (func->def->language == FUNC_LANGUAGE_SQL_BUILTIN) {
 				struct sql_context *ctx =
 					sql_context_new(func, coll);
-				if (ctx == NULL) {
-					pParse->is_aborted = true;
-					return -1;
-				}
 				sqlVdbeAddOp4(v, OP_BuiltinFunction, nFarg,
 					      r1, target, (char *)ctx,
 					      P4_FUNCCTX);

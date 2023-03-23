@@ -128,8 +128,6 @@ sql_space_info_new_from_expr_list(struct Parse *parser, struct ExprList *list,
 	if (has_rowid)
 		++n;
 	struct sql_space_info *info = sql_space_info_new(n, 0);
-	if (info == NULL)
-		return NULL;
 	for (int i = 0; i < list->nExpr; ++i) {
 		bool b;
 		struct coll *coll;
@@ -159,8 +157,6 @@ sql_space_info_new_from_order_by(struct Parse *parser, struct Select *select,
 {
 	int n = order_by->nExpr + 2;
 	struct sql_space_info *info = sql_space_info_new(n, 0);
-	if (info == NULL)
-		return NULL;
 	for (int i = 0; i < order_by->nExpr; ++i) {
 		struct Expr *expr = order_by->a[i].pExpr;
 		enum field_type type = sql_expr_type(expr);
@@ -216,8 +212,6 @@ sql_space_info_new_for_sorting(struct Parse *parser, struct ExprList *order_by,
 
 	struct sql_space_info *info =
 		sql_space_info_new(field_count, part_count);
-	if (info == NULL)
-		return NULL;
 	int k;
 	for (k = 0; k < order_by->nExpr - start; ++k) {
 		bool b;
@@ -3125,10 +3119,6 @@ multiSelect(Parse * pParse,	/* Parsing context */
 		assert(p->pNext == NULL);
 		int nCol = p->pEList->nExpr;
 		struct sql_space_info *info = sql_space_info_new(nCol, 0);
-		if (info == NULL) {
-			pParse->is_aborted = true;
-			goto multi_select_end;
-		}
 		for (int i = 0; i < nCol; ++i)
 			info->coll_ids[i] = multi_select_coll_seq(pParse, p, i);
 		bool is_info_used = false;
@@ -5459,10 +5449,6 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 			sqlVdbeAddOp1(v, OP_SkipLoad, regHit);
 		}
 		struct sql_context *ctx = sql_context_new(pF->func, coll);
-		if (ctx == NULL) {
-			pParse->is_aborted = true;
-			return;
-		}
 		if (pF->func->def->language == FUNC_LANGUAGE_SQL_BUILTIN) {
 			sqlVdbeAddOp3(v, OP_AggStep, nArg, regAgg, pF->iMem);
 			sqlVdbeAppendP4(v, ctx, P4_FUNCCTX);

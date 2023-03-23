@@ -238,10 +238,6 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			info = sql_space_info_new_from_index_def(index_def,
 								 false);
 		}
-		if (info == NULL) {
-			parse->is_aborted = true;
-			goto delete_from_cleanup;
-		}
 		parse->nMem += pk_len;
 		sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph, 0, 0, (char *)info,
 			      P4_DYNAMIC);

@@ -304,8 +304,6 @@ sql_space_info_new_from_space_def(const struct space_def *def)
 {
 	uint32_t field_count = def->field_count + 1;
 	struct sql_space_info *info = sql_space_info_new(field_count, 0);
-	if (info == NULL)
-		return NULL;
 	for (uint32_t i = 0; i < def->field_count; ++i) {
 		info->types[i] = def->fields[i].type;
 		info->coll_ids[i] = def->fields[i].coll_id;
@@ -322,8 +320,6 @@ sql_space_info_new_from_index_def(const struct index_def *def, bool has_rowid)
 	if (has_rowid)
 		++field_count;
 	struct sql_space_info *info = sql_space_info_new(field_count, 0);
-	if (info == NULL)
-		return NULL;
 	for (uint32_t i = 0; i < def->key_def->part_count; ++i) {
 		info->types[i] = def->key_def->parts[i].type;
 		info->coll_ids[i] = def->key_def->parts[i].coll_id;
@@ -1681,10 +1677,7 @@ sql_check_create(const char *name, uint32_t space_id, uint32_t func_id,
 		 uint32_t fieldno, bool is_field_ck)
 {
 	const struct space *space = space_by_id(space_id);
-	if (space == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_SPACE, space_name(space));
-		return -1;
-	}
+	assert(space != NULL);
 	struct tuple_constraint_def *cdefs;
 	uint32_t count;
 	const char *path;
