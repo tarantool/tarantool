@@ -1070,10 +1070,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			struct sql_space_info *info =
 				sql_space_info_new_from_index_def(index_def,
 								  false);
-			if (info == NULL) {
-				pParse->is_aborted = true;
-				return notReady;
-			}
 			sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_row_set,
 				      pk_part_count, 0, (char *)info,
 				      P4_DYNAMIC);

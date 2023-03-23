@@ -975,7 +975,7 @@ term(A) ::= INTEGER(X). {
   A.pExpr->type = FIELD_TYPE_INTEGER;
   A.zStart = X.z;
   A.zEnd = X.z + X.n;
-  if( A.pExpr ) A.pExpr->flags |= EP_Leaf;
+  A.pExpr->flags |= EP_Leaf;
 }
 expr(A) ::= VARNUM(X). {
   A.pExpr = expr_new_variable(pParse, &X, NULL);

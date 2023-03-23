@@ -915,10 +915,6 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 	pLevel->iIdxCur = pParse->nTab++;
 	struct sql_space_info *info = sql_space_info_new_from_index_def(idx_def,
 									true);
-	if (info == NULL) {
-		pParse->is_aborted = true;
-		return;
-	}
 	int reg_eph = sqlGetTempReg(pParse);
 	sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph, 0, 0, (char *)info,
 		      P4_DYNAMIC);
@@ -4614,13 +4610,11 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 	/* Done. */
 	return pWInfo;
 
-	/* Jump here if malloc fails */
- whereBeginError:
-	if (pWInfo) {
-		pParse->nQueryLoop = pWInfo->savedNQueryLoop;
-		whereInfoFree(pWInfo);
-	}
-	return 0;
+whereBeginError:
+	assert(pWInfo != NULL);
+	pParse->nQueryLoop = pWInfo->savedNQueryLoop;
+	whereInfoFree(pWInfo);
+	return NULL;
 }
 
 /*

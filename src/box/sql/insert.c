@@ -61,8 +61,6 @@ sql_space_info_new_from_id_list(const struct space_def *def, int len,
 				const struct IdList *list)
 {
 	struct sql_space_info *info = sql_space_info_new(len + 1, 1);
-	if (info == NULL)
-		return NULL;
 	assert(len > 0 && len <= (int)def->field_count);
 	struct field_def *fields = def->fields;
 	for (int i = 0; i < len; ++i) {
@@ -502,10 +500,6 @@ sqlInsert(Parse * pParse,	/* Parser context */
 		struct sql_space_info *info =
 			sql_space_info_new_from_id_list(space_def, nColumn,
 							pColumn);
-		if (info == NULL) {
-			pParse->is_aborted = true;
-			goto insert_cleanup;
-		}
 		sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph, 0, 0,
 			      (char *)info, P4_DYNAMIC);
 		addrL = sqlVdbeAddOp1(v, OP_Yield, dest.iSDParm);

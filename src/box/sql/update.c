@@ -226,10 +226,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 		info = sql_space_info_new_from_space_def(def);
 	else
 		info = sql_space_info_new_from_index_def(pPk->def, false);
-	if (info == NULL) {
-		pParse->is_aborted = true;
-		goto update_cleanup;
-	}
 	/* Address of the OpenEphemeral instruction. */
 	int addrOpen = sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph, 0, 0,
 				     (char *)info, P4_DYNAMIC);
