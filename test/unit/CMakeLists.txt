@@ -209,7 +209,7 @@ create_unit_test(PREFIX func_cache
                  LIBRARIES box unit
 )
 create_unit_test(PREFIX prbuf
-                 SOURCES prbuf.c
+                 SOURCES prbuf.c core_test_utils.c
                  LIBRARIES unit core
 )
 create_unit_test(PREFIX clock_lowres
