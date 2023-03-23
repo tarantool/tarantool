@@ -1,4 +1,4 @@
-1..33
+1..36
 # type: file
 # next: 
 ok 1 - 
@@ -65,3 +65,6 @@ ok 30 - ftell
 ok 31 - log_say
 ok 32 - fseek
 ok 33 - syslog line
+ok 34 - level string is DEBUG
+ok 35 - level string is (null)
+ok 36 - level string is (null)

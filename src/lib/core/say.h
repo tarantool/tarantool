@@ -59,7 +59,8 @@ enum say_level {
 	S_WARN,
 	S_INFO,
 	S_VERBOSE,
-	S_DEBUG
+	S_DEBUG,
+	say_level_MAX
 };
 
 /** Log formats */
@@ -295,6 +296,13 @@ say_set_flightrec_log_level(int new_level);
  */
 enum say_format
 say_format_by_name(const char *format);
+
+/**
+ * Return string representation for given level. If level is not valid then
+ * return NULL.
+ */
+const char *
+say_log_level_str(int level);
 
 struct ev_loop;
 struct ev_signal;
