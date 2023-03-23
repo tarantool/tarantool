@@ -99,6 +99,11 @@ void
 box_lua_security_init(struct lua_State *L);
 #endif
 
+#if ENABLE_FLIGHT_RECORDER
+void
+box_lua_flightrec_init(struct lua_State *L);
+#endif
+
 extern char session_lua[],
 	tuple_lua[],
 	key_def_lua[],
@@ -588,6 +593,9 @@ box_lua_init(struct lua_State *L)
 #endif
 #ifdef ENABLE_SECURITY
 	box_lua_security_init(L);
+#endif
+#ifdef ENABLE_FLIGHT_RECORDER
+	box_lua_flightrec_init(L);
 #endif
 	luaopen_net_box(L);
 	lua_pop(L, 1);
