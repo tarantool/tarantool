@@ -95,8 +95,6 @@ enum {
 int
 sql_initialize(void)
 {
-	int rc = 0;
-
 	/* If the following assert() fails on some obscure processor/compiler
 	 * combination, the work-around is to set the correct pointer
 	 * size at compile-time using -DSQL_PTRSIZE=n compile-time option
@@ -110,12 +108,6 @@ sql_initialize(void)
 	 */
 	if (sqlGlobalConfig.isInit)
 		return 0;
-
-	/* If rc is not 0 at this point, then the malloc
-	 * subsystem could not be initialized.
-	 */
-	if (rc != 0)
-		return rc;
 
 	/* Do the rest of the initialization
 	 * that we will be able to handle recursive calls into

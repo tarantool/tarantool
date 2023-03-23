@@ -131,15 +131,7 @@ explainIndexRange(StrAccum * pStr, WhereLoop * pLoop)
 		return;
 	sqlStrAccumAppend(pStr, " (", 2);
 	for (i = 0; i < nEq; i++) {
-		const char *z;
-		if (def != NULL) {
-			z = explainIndexColumnName(def, i);
-		} else {
-			struct space *space = space_cache_find(def->space_id);
-			assert(space != NULL);
-			uint32_t fieldno = def->key_def->parts[i].fieldno;
-			z = space->def->fields[fieldno].name;
-		}
+		const char *z = explainIndexColumnName(def, i);
 		if (i)
 			sqlStrAccumAppend(pStr, " AND ", 5);
 		sqlXPrintf(pStr, i >= nSkip ? "%s=?" : "ANY(%s)", z);

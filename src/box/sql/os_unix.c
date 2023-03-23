@@ -85,7 +85,6 @@ struct unixFile {
 	int szChunk;		/* Configured by FCNTL_CHUNK_SIZE */
 	int nFetchOut;		/* Number of outstanding xFetch refs */
 	sql_int64 mmapSize;	/* Usable size of mapping at pMapRegion */
-	sql_int64 mmapSizeActual;	/* Actual size of mapping at pMapRegion */
 	sql_int64 mmapSizeMax;	/* Configured FCNTL_MMAP_SIZE value */
 	void *pMapRegion;	/* Memory mapped region */
 };
@@ -1049,10 +1048,9 @@ unixUnmapfile(unixFile * pFd)
 {
 	assert(pFd->nFetchOut == 0);
 	if (pFd->pMapRegion) {
-		munmap(pFd->pMapRegion, pFd->mmapSizeActual);
+		munmap(pFd->pMapRegion, pFd->mmapSize);
 		pFd->pMapRegion = 0;
 		pFd->mmapSize = 0;
-		pFd->mmapSizeActual = 0;
 	}
 }
 
@@ -1064,7 +1062,6 @@ unixUnmapfile(unixFile * pFd)
  *
  *       unixFile.pMapRegion
  *       unixFile.mmapSize
- *       unixFile.mmapSizeActual
  *
  * If unsuccessful,the three variables above are zeroed. In this
  * case sql should continue accessing the database using the
@@ -1077,7 +1074,8 @@ unixRemapfile(unixFile * pFd,	/* File descriptor object */
 {
 	int h = pFd->h;		/* File descriptor open on db file */
 	u8 *pOrig = (u8 *) pFd->pMapRegion;	/* Pointer to current file mapping */
-	i64 nOrig = pFd->mmapSizeActual;	/* Size of pOrig region in bytes */
+	/* Size of pOrig region in bytes. */
+	i64 nOrig = pFd->mmapSize;
 	u8 *pNew = 0;		/* Location of new mapping */
 	int flags = PROT_READ;	/* Flags to pass to mmap() */
 
@@ -1085,23 +1083,17 @@ unixRemapfile(unixFile * pFd,	/* File descriptor object */
 	assert(nNew > pFd->mmapSize);
 	assert(nNew <= pFd->mmapSizeMax);
 	assert(nNew > 0);
-	assert(pFd->mmapSizeActual >= pFd->mmapSize);
 	assert(MAP_FAILED != 0);
 
 	if (pOrig) {
-		i64 nReuse = pFd->mmapSize;
-		u8 *pReq = &pOrig[nReuse];
-
-		/* Unmap any pages of the existing mapping that cannot be reused. */
-		if (nReuse != nOrig)
-			munmap(pReq, nOrig - nReuse);
 		#if !defined(__APPLE__) && !defined(__FreeBSD__) && !defined(__OpenBSD__)
-		pNew = mremap(pOrig, nReuse, nNew, MREMAP_MAYMOVE);
+		pNew = mremap(pOrig, nOrig, nNew, MREMAP_MAYMOVE);
 		#else
-		pNew = mmap(pReq, nNew - nReuse, flags, MAP_SHARED, h, nReuse);
+		u8 *pReq = &pOrig[nOrig];
+		pNew = mmap(pReq, nNew - nOrig, flags, MAP_SHARED, h, nOrig);
 		if (pNew != MAP_FAILED) {
 			if (pNew != pReq) {
-				munmap(pNew, nNew - nReuse);
+				munmap(pNew, nNew - nOrig);
 				pNew = NULL;
 			} else {
 				pNew = pOrig;
@@ -1111,7 +1103,7 @@ unixRemapfile(unixFile * pFd,	/* File descriptor object */
 
 		/* The attempt to extend the existing mapping failed. Free it. */
 		if (pNew == MAP_FAILED || pNew == NULL)
-			munmap(pOrig, nReuse);
+			munmap(pOrig, nOrig);
 	}
 
 	/* If pNew is still NULL, try to create an entirely new mapping. */
@@ -1129,7 +1121,7 @@ unixRemapfile(unixFile * pFd,	/* File descriptor object */
 		pFd->mmapSizeMax = 0;
 	}
 	pFd->pMapRegion = (void *)pNew;
-	pFd->mmapSize = pFd->mmapSizeActual = nNew;
+	pFd->mmapSize = nNew;
 }
 
 /*
@@ -1402,12 +1394,8 @@ fillInUnixFile(sql_vfs * pVfs,	/* Pointer to vfs object */
 		}
 	}
 	storeLastErrno(pNew, 0);
-	if (rc != 0) {
-		if (h >= 0)
-			close(h);
-	} else {
+	if (rc == 0)
 		pNew->pMethod = pLockingStyle;
-	}
 	return rc;
 }
 
