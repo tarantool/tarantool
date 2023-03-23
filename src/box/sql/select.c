@@ -141,8 +141,10 @@ sql_space_info_new_from_expr_list(struct Parse *parser, struct ExprList *list,
 		if (type == FIELD_TYPE_ANY)
 			type = FIELD_TYPE_SCALAR;
 		uint32_t coll_id;
-		if (sql_expr_coll(parser, expr, &b, &coll_id, &coll) != 0)
+		if (sql_expr_coll(parser, expr, &b, &coll_id, &coll) != 0) {
+			sql_xfree(info);
 			return NULL;
+		}
 		info->types[i] = type;
 		info->coll_ids[i] = coll_id;
 	}
@@ -172,8 +174,10 @@ sql_space_info_new_from_order_by(struct Parse *parser, struct Select *select,
 		if ((expr->flags & EP_Collate) != 0) {
 			bool b;
 			struct coll *coll;
-			if (sql_expr_coll(parser, expr, &b, id, &coll) != 0)
+			if (sql_expr_coll(parser, expr, &b, id, &coll) != 0) {
+				sql_xfree(info);
 				return NULL;
+			}
 			continue;
 		}
 		uint32_t fieldno = order_by->a[i].u.x.iOrderByCol - 1;
@@ -226,8 +230,10 @@ sql_space_info_new_for_sorting(struct Parse *parser, struct ExprList *order_by,
 		if (type == FIELD_TYPE_ANY)
 			type = FIELD_TYPE_SCALAR;
 		uint32_t coll_id;
-		if (sql_expr_coll(parser, expr, &b, &coll_id, &coll) != 0)
+		if (sql_expr_coll(parser, expr, &b, &coll_id, &coll) != 0) {
+			sql_xfree(info);
 			return NULL;
+		}
 		info->types[k] = type;
 		info->coll_ids[k] = coll_id;
 		info->sort_orders[k] = order_by->a[k + start].sort_order;
@@ -243,8 +249,10 @@ sql_space_info_new_for_sorting(struct Parse *parser, struct ExprList *order_by,
 		enum field_type type = sql_expr_type(expr);
 		uint32_t id;
 		struct coll *coll;
-		if (sql_expr_coll(parser, expr, &b, &id, &coll) != 0)
+		if (sql_expr_coll(parser, expr, &b, &id, &coll) != 0) {
+			sql_xfree(info);
 			return NULL;
+		}
 		info->types[k] = type;
 		info->coll_ids[k] = id;
 		++k;
@@ -2039,18 +2047,12 @@ generate_column_metadata(struct Parse *pParse, struct SrcList *pTabList,
  *
  * Only the column names are computed.  Column.zType, Column.zColl,
  * and other fields of Column are zeroed.
- *
- * Return 0 on success.  If a memory allocation error occurs,
- * store NULL in *paCol and 0 in *pnCol and return -1.
  */
-int
+void
 sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 			   struct space_def *space_def)
 {
 	/* Database connection */
-	u32 cnt;		/* Index added to make the name unique */
-	char *zName;		/* Column name */
-	int nName;		/* Size of name in zName[] */
 	Hash ht;		/* Hash table of column names */
 
 	sqlHashInit(&ht);
@@ -2065,12 +2067,8 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 	struct region *region = &parse->region;
 	size_t size;
 	space_def->fields =
-		region_alloc_array(region, typeof(space_def->fields[0]),
-				   column_count, &size);
-	if (space_def->fields == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_array", "fields");
-		goto error;
-	}
+		xregion_alloc_array(region, typeof(space_def->fields[0]),
+				    column_count, &size);
 	for (uint32_t i = 0; i < column_count; i++) {
 		memcpy(&space_def->fields[i], &field_def_default,
 		       sizeof(field_def_default));
@@ -2084,7 +2082,8 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 		 * Check if the column contains an "AS <name>"
 		 * phrase.
 		 */
-		if ((zName = expr_list->a[i].zName) == 0) {
+		char *name = expr_list->a[i].zName;
+		if (name == NULL) {
 			struct Expr *pColExpr = expr_list->a[i].pExpr;
 			struct space_def *space_def = NULL;
 			while (pColExpr->op == TK_DOT) {
@@ -2097,55 +2096,45 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 				int iCol = pColExpr->iColumn;
 				assert(iCol >= 0);
 				space_def = pColExpr->space_def;
-				zName = space_def->fields[iCol].name;
+				name = space_def->fields[iCol].name;
 			} else if (pColExpr->op == TK_ID) {
 				assert(!ExprHasProperty(pColExpr, EP_IntValue));
-				zName = pColExpr->u.zToken;
+				name = pColExpr->u.zToken;
 			}
 		}
-		if (zName == NULL) {
+		if (name == NULL) {
 			uint32_t idx = ++parse->autoname_i;
-			zName = sql_xstrdup(sql_generate_column_name(idx));
+			name = sql_xstrdup(sql_generate_column_name(idx));
 		} else {
-			zName = sql_xstrdup(zName);
+			name = sql_xstrdup(name);
 		}
+		size_t len = strlen(name);
 
 		/* Make sure the column name is unique.  If the name is not unique,
 		 * append an integer to the name so that it becomes unique.
 		 */
-		cnt = 0;
-		while (zName && sqlHashFind(&ht, zName) != 0) {
-			nName = sqlStrlen30(zName);
-			if (nName > 0) {
-				int j;
-				for (j = nName - 1;
-				     j > 0 && sqlIsdigit(zName[j]); j--);
-				if (zName[j] == '_')
-					nName = j;
-			}
-			zName = sqlMPrintf("%.*z_%u", nName, zName, ++cnt);
+		size_t cnt = 0;
+		while (sqlHashFind(&ht, name) != 0) {
+			assert(len > 0);
+			size_t j = len - 1;
+			for (; j > 0 && sqlIsdigit(name[j]); j--) {
+			};
+			size_t size = name[j] == '_' ? j : len;
+			char *tmp = sqlMPrintf("%.*s_%u", size, name, ++cnt);
+			sql_xfree(name);
+			name = tmp;
+			len = strlen(name);
 		}
-		size_t name_len = strlen(zName);
+		assert(name != NULL);
 		void *field = &space_def->fields[i];
 		assert(field != NULL);
-		if (zName != NULL)
-			sqlHashInsert(&ht, zName, field);
-		space_def->fields[i].name = region_alloc(region, name_len + 1);
-		if (space_def->fields[i].name == NULL) {
-			diag_set(OutOfMemory, size, "region_alloc", "name");
-			goto error;
-		}
-		memcpy(space_def->fields[i].name, zName, name_len);
-		space_def->fields[i].name[name_len] = '\0';
+		sqlHashInsert(&ht, name, field);
+		space_def->fields[i].name = xregion_alloc(region, len + 1);
+		memcpy(space_def->fields[i].name, name, len);
+		space_def->fields[i].name[len] = '\0';
+		sql_xfree(name);
 	}
 	sqlHashClear(&ht);
-	return 0;
-error:
-	sqlHashClear(&ht);
-	parse->is_aborted = true;
-	space_def->fields = NULL;
-	space_def->field_count = 0;
-	return -1;
 }
 
 /*
@@ -2460,8 +2449,10 @@ sql_multiselect_orderby_to_key_info(struct Parse *parse, struct Select *s,
 		if ((term->flags & EP_Collate) != 0) {
 			struct coll *unused_coll;
 			if (sql_expr_coll(parse, term, &unused, &id,
-					  &unused_coll) != 0)
-				return 0;
+					  &unused_coll) != 0) {
+				sql_xfree(key_info);
+				return NULL;
+			}
 		} else {
 			id = multi_select_coll_seq(parse, s,
 						   item->u.x.iOrderByCol - 1);
@@ -5448,8 +5439,9 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 				regHit = ++pParse->nMem;
 			sqlVdbeAddOp1(v, OP_SkipLoad, regHit);
 		}
-		struct sql_context *ctx = sql_context_new(pF->func, coll);
 		if (pF->func->def->language == FUNC_LANGUAGE_SQL_BUILTIN) {
+			struct sql_context *ctx =
+				sql_context_new(pF->func, coll);
 			sqlVdbeAddOp3(v, OP_AggStep, nArg, regAgg, pF->iMem);
 			sqlVdbeAppendP4(v, ctx, P4_FUNCCTX);
 		} else {
