@@ -53,6 +53,8 @@ extern const struct type_info type_CollationError;
 extern const struct type_info type_SwimError;
 extern const struct type_info type_CryptoError;
 extern const struct type_info type_RaftError;
+/* type_info for FileFormatError exception */
+extern const struct type_info type_FileFormatError;
 /* type_info for FiberSliceIsExceeded exception */
 extern const struct type_info type_FiberSliceIsExceeded;
 
@@ -254,6 +256,18 @@ public:
 class RaftError: public Exception {
 public:
 	RaftError(const char *file, unsigned line, const char *format, ...);
+	virtual void raise() { throw this; }
+};
+
+class FileFormatError: public Exception {
+public:
+	FileFormatError(const char *file, unsigned line,
+			const char *format, ...);
+
+	FileFormatError()
+		: Exception(&type_FileFormatError, NULL, 0)
+	{
+	}
 	virtual void raise() { throw this; }
 };
 

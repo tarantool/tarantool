@@ -254,6 +254,8 @@ error_build_xc(struct mp_error *mp_error)
 		err = new CryptoError();
 	} else if (strcmp(mp_error->type, "SSLError") == 0) {
 		err = new SSLError();
+	} else if (strcmp(mp_error->type, "FileFormatError") == 0) {
+		err = new FileFormatError();
 	} else {
 		err = new ClientError();
 	}

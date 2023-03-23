@@ -424,6 +424,12 @@ BuildCryptoError(const char *file, unsigned line, const char *format, ...);
 struct error *
 BuildRaftError(const char *file, unsigned line, const char *format, ...);
 
+/**
+ * Allocate and create new FileFormatError. In case of OOM return OutOfMemory.
+ */
+struct error *
+BuildFileFormatError(const char *file, unsigned line, const char *format, ...);
+
 struct index_def;
 
 struct error *
