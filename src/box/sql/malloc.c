@@ -39,6 +39,8 @@
 void
 sql_xfree(void *buf)
 {
+	if (buf == NULL)
+		return;
 	struct sql *db = sql_get();
 	assert(db != NULL);
 	if (buf >= db->lookaside.pStart && buf < db->lookaside.pEnd) {
