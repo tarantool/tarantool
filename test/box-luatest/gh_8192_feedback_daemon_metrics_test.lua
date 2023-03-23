@@ -6,6 +6,7 @@ g.before_all(function()
     g.server = server:new{
         alias = 'default',
         box_cfg = {
+            metrics = {include = 'none'},
             -- The tests here are unit ones, works with dummy metrics
             -- package. After metrics package embedding, feedback background
             -- loop may succeed to extract empty metrics table from
