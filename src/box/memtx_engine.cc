@@ -1206,11 +1206,9 @@ static void
 memtx_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
-	struct allocator_stats data_stats;
-	memset(&data_stats, 0, sizeof(data_stats));
-	allocators_stats(&data_stats);
-	stat->data += data_stats.small.used;
-	stat->data += data_stats.sys.used;
+	struct memtx_allocator_stats data_stats;
+	memtx_allocators_stats(&data_stats);
+	stat->data += data_stats.used_total;
 	stat->index += (size_t)memtx->index_extent_stats.extent_count *
 							MEMTX_EXTENT_SIZE;
 }
