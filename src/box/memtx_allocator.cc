@@ -230,6 +230,5 @@ void
 memtx_allocators_stats(struct memtx_allocator_stats *stats)
 {
 	memtx_allocator_stats_create(stats);
-	foreach_memtx_allocator<memtx_allocator_add_stats,
-				struct memtx_allocator_stats &>(*stats);
+	foreach_memtx_allocator<memtx_allocator_add_stats>(*stats);
 }
