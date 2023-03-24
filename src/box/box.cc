@@ -4315,6 +4315,24 @@ check_bootstrap_unanimity(void)
 	}
 }
 
+/** Ensure the configured and stored global identifiers (UUID) match. */
+static int
+check_global_ids_integrity(void)
+{
+	struct tt_uuid replicaset_uuid;
+	if (box_check_replicaset_uuid(&replicaset_uuid) != 0)
+		return -1;
+
+	if (!tt_uuid_is_nil(&replicaset_uuid) &&
+	    !tt_uuid_is_equal(&replicaset_uuid, &REPLICASET_UUID)) {
+		diag_set(ClientError, ER_REPLICASET_UUID_MISMATCH,
+			 tt_uuid_str(&replicaset_uuid),
+			 tt_uuid_str(&REPLICASET_UUID));
+		return -1;
+	}
+	return 0;
+}
+
 /**
  * Initialize the first replica of a new replica set.
  */
@@ -4458,9 +4476,6 @@ bootstrap(bool *is_bootstrap_leader)
 	struct tt_uuid instance_uuid;
 	if (box_check_instance_uuid(&instance_uuid) != 0)
 		diag_raise();
-	struct tt_uuid replicaset_uuid;
-	if (box_check_replicaset_uuid(&replicaset_uuid) != 0)
-		diag_raise();
 
 	assert(tt_uuid_is_nil(&INSTANCE_UUID));
 	if (!tt_uuid_is_nil(&instance_uuid))
@@ -4517,15 +4532,9 @@ bootstrap(bool *is_bootstrap_leader)
 			*is_bootstrap_leader = true;
 			break;
 		}
-
-		bool is_bootstrapped = bootstrap_from_master(master);
-		if (is_bootstrapped && !tt_uuid_is_nil(&replicaset_uuid) &&
-		    !tt_uuid_is_equal(&replicaset_uuid, &REPLICASET_UUID)) {
-			tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
-				  tt_uuid_str(&replicaset_uuid),
-				  tt_uuid_str(&REPLICASET_UUID));
-		}
-		if (is_bootstrapped) {
+		if (bootstrap_from_master(master)) {
+			if (check_global_ids_integrity() != 0)
+				diag_raise();
 			*is_bootstrap_leader = false;
 			break;
 		}
@@ -4552,9 +4561,6 @@ local_recovery(const struct vclock *checkpoint_vclock)
 	assert(!tt_uuid_is_nil(&INSTANCE_UUID));
 	struct tt_uuid instance_uuid;
 	if (box_check_instance_uuid(&instance_uuid) != 0)
-		diag_raise();
-	struct tt_uuid replicaset_uuid;
-	if (box_check_replicaset_uuid(&replicaset_uuid) != 0)
 		diag_raise();
 
 	replicaset_state = REPLICASET_RECOVERY;
@@ -4748,15 +4754,8 @@ local_recovery(const struct vclock *checkpoint_vclock)
 		diag_raise();
 
 	engine_end_recovery_xc();
-
-	/* Check replica set UUID. */
-	if (!tt_uuid_is_nil(&replicaset_uuid) &&
-	    !tt_uuid_is_equal(&replicaset_uuid, &REPLICASET_UUID)) {
-		tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
-			  tt_uuid_str(&replicaset_uuid),
-			  tt_uuid_str(&REPLICASET_UUID));
-	}
-
+	if (check_global_ids_integrity() != 0)
+		diag_raise();
 	box_run_on_recovery_state(RECOVERY_STATE_WAL_RECOVERED);
 }
 
