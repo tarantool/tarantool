@@ -252,22 +252,6 @@ mem_type_class_to_str(const struct Mem *mem)
 	return "unknown";
 }
 
-void
-mem_create(struct Mem *mem)
-{
-	mem->type = MEM_TYPE_NULL;
-	mem->flags = 0;
-	mem->n = 0;
-	mem->z = NULL;
-	mem->zMalloc = NULL;
-	mem->szMalloc = 0;
-	mem->uTemp = 0;
-#ifdef SQL_DEBUG
-	mem->pScopyFrom = NULL;
-	mem->pFiller = NULL;
-#endif
-}
-
 static inline void
 mem_clear(struct Mem *mem)
 {
@@ -1843,7 +1827,7 @@ mem_copy_as_ephemeral(struct Mem *to, const struct Mem *from)
 	to->z = from->z;
 	if (!mem_is_dynamic(from))
 		return;
-	to->flags = MEM_Ephem;
+	to->is_ephemeral = true;
 	return;
 }
 
@@ -2556,9 +2540,10 @@ mem_cmp_msgpack(const struct Mem *a, const char **b, int *result,
 		const struct coll *coll)
 {
 	struct Mem mem;
+	mem_create(&mem);
 	switch (mp_typeof(**b)) {
 	case MP_NIL:
-		mem.type = MEM_TYPE_NULL;
+		assert(mem.type == MEM_TYPE_NULL);
 		mp_decode_nil(b);
 		break;
 	case MP_BOOL:
@@ -2586,14 +2571,12 @@ mem_cmp_msgpack(const struct Mem *a, const char **b, int *result,
 		mem.n = mp_decode_strl(b);
 		mem.z = (char *)*b;
 		*b += mem.n;
-		mem.flags = MEM_Ephem;
 		break;
 	case MP_BIN:
 		mem.type = MEM_TYPE_BIN;
 		mem.n = mp_decode_binl(b);
 		mem.z = (char *)*b;
 		*b += mem.n;
-		mem.flags = MEM_Ephem;
 		break;
 	case MP_ARRAY:
 	case MP_MAP:
@@ -2632,7 +2615,6 @@ mem_cmp_msgpack(const struct Mem *a, const char **b, int *result,
 		mem.type = MEM_TYPE_BIN;
 		mem.z = (char *)buf;
 		mem.n = *b - buf;
-		mem.flags = MEM_Ephem;
 		break;
 	}
 	default:
@@ -2801,7 +2783,7 @@ sqlVdbeMemGrow(struct Mem *pMem, int n, int bPreserve)
 	}
 
 	pMem->z = pMem->zMalloc;
-	pMem->flags &= ~MEM_Ephem;
+	pMem->is_ephemeral = false;
 	return 0;
 }
 
@@ -2886,7 +2868,6 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 		mp_next(&buf);
 		mem->n = buf - mem->z;
 		mem->type = MEM_TYPE_ARRAY;
-		mem->flags = MEM_Ephem;
 		break;
 	}
 	case MP_MAP: {
@@ -2894,7 +2875,6 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 		mp_next(&buf);
 		mem->n = buf - mem->z;
 		mem->type = MEM_TYPE_MAP;
-		mem->flags = MEM_Ephem;
 		break;
 	}
 	case MP_EXT: {
@@ -2942,7 +2922,6 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 		mem->z = (char *)svp;
 		mem->n = buf - svp;
 		mem->type = MEM_TYPE_BIN;
-		mem->flags = MEM_Ephem;
 		break;
 	}
 	case MP_NIL: {
@@ -2974,7 +2953,6 @@ mem_from_mp_ephemeral(struct Mem *mem, const char *buf, uint32_t *len)
 		/* XXX u32->int */
 		mem->n = (int) mp_decode_strl(&buf);
 		mem->type = MEM_TYPE_STR;
-		mem->flags = MEM_Ephem;
 install_blob:
 		mem->z = (char *)buf;
 		buf += mem->n;
@@ -2984,7 +2962,6 @@ install_blob:
 		/* XXX u32->int */
 		mem->n = (int) mp_decode_binl(&buf);
 		mem->type = MEM_TYPE_BIN;
-		mem->flags = MEM_Ephem;
 		goto install_blob;
 	}
 	case MP_FLOAT: {
@@ -3021,11 +2998,8 @@ mem_from_mp(struct Mem *mem, const char *buf, uint32_t *len)
 {
 	if (mem_from_mp_ephemeral(mem, buf, len) != 0)
 		return -1;
-	if (mem_is_bytes(mem)) {
-		assert((mem->flags & MEM_Ephem) != 0);
-		if (sqlVdbeMemGrow(mem, mem->n, 1) != 0)
-			return -1;
-	}
+	if (mem_is_bytes(mem) && sqlVdbeMemGrow(mem, mem->n, 1) != 0)
+		return -1;
 	return 0;
 }
 

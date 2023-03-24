@@ -1238,14 +1238,11 @@ sqlVdbeList(Vdbe * p)
 
 		char *buf = sql_xmalloc(256);
 		zP4 = displayP4(pOp, buf, 256);
-		if (zP4 != buf) {
+		mem_set_str0(pMem, zP4);
+		if (zP4 != buf)
 			sql_xfree(buf);
-			mem_set_str0(pMem, zP4);
-			mem_set_ephemeral(pMem);
-		} else {
-			mem_set_str0(pMem, zP4);
+		else
 			mem_set_dynamic(pMem);
-		}
 		pMem++;
 
 		if (p->explain == 1) {

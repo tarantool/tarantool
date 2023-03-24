@@ -3174,7 +3174,6 @@ case OP_RowData: {
 	}
 	sqlCursorPayload(pCrsr, 0, n, buf);
 	mem_set_bin(pOut, buf, n);
-	mem_set_ephemeral(pOut);
 	UPDATE_MAX_BLOBSIZE(pOut);
 	REGISTER_TRACE(p, pOp->p2, pOut);
 	break;
@@ -3491,8 +3490,6 @@ case OP_IdxInsert: {
 	struct space *space = aMem[pOp->p2].u.p;
 	assert(space != NULL);
 	if (space->def->id != 0) {
-		/* Make sure that memory has been allocated on region. */
-		assert(mem_is_ephemeral(&aMem[pOp->p1]));
 		if (pOp->opcode == OP_IdxInsert) {
 			rc = tarantoolsqlInsert(space, pIn2->z,
 						    pIn2->z + pIn2->n);

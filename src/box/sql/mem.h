@@ -86,6 +86,11 @@ struct Mem {
 	} u;
 	/** Type of the value this MEM contains. */
 	enum mem_type type;
+	/**
+	 * Flag indicating that the variable length value's memory is managed by
+	 * another MEM.
+	 */
+	bool is_ephemeral;
 	u32 flags;		/* Some combination of MEM_Null, MEM_Str, MEM_Dyn, etc. */
 	int n;			/* size (in bytes) of string value, excluding trailing '\0' */
 	char *z;		/* String or BLOB value */
@@ -106,7 +111,6 @@ struct Mem {
 /** MEM is of ANY meta-type. */
 #define MEM_Any       0x0004
 #define MEM_Cleared   0x0200	/* NULL set by OP_Null, not from data */
-#define MEM_Ephem     0x2000	/* Mem.z points to an ephemeral string */
 
 static inline bool
 mem_is_null(const struct Mem *mem)
@@ -234,7 +238,7 @@ mem_is_invalid(const struct Mem *mem)
 static inline bool
 mem_is_ephemeral(const struct Mem *mem)
 {
-	return mem_is_bytes(mem) && (mem->flags & MEM_Ephem) != 0;
+	return mem_is_bytes(mem) && mem->is_ephemeral;
 }
 
 static inline bool
@@ -305,8 +309,12 @@ const char *
 mem_str(const struct Mem *mem);
 
 /** Initialize MEM and set NULL. */
-void
-mem_create(struct Mem *mem);
+static inline void
+mem_create(struct Mem *mem)
+{
+	memset(mem, 0, sizeof(*mem));
+	mem->type = MEM_TYPE_NULL;
+}
 
 /** Free all allocated memory in MEM and set MEM to NULL. */
 void
@@ -442,7 +450,7 @@ mem_set_null_clear(struct Mem *mem);
 static inline void
 mem_set_ephemeral(struct Mem *mem)
 {
-	mem->flags |= MEM_Ephem;
+	mem->is_ephemeral = true;
 }
 
 /**
