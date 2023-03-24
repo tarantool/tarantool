@@ -70,6 +70,8 @@ struct PACKED memtx_tuple {
 struct memtx_tuple_rv_list {
 	/** Read view version. */
 	uint32_t version;
+	/** Total size of memory allocated for tuples stored in this list. */
+	size_t mem_used;
 	/** List of tuples, linked by memtx_tuple::in_gc. */
 	struct stailq tuples;
 };
@@ -157,11 +159,12 @@ memtx_tuple_rv_new(uint32_t version, struct rlist *list);
 /**
  * Deletes a list array. Tuples that are still visible from other read views
  * are moved to the older read view's lists. Tuples that are not visible from
- * any read view are appended to the tuples_to_free list.
+ * any read view are appended to the tuples_to_free list. Size of memory that
+ * can be freed is stored in mem_freed.
  */
 void
 memtx_tuple_rv_delete(struct memtx_tuple_rv *rv, struct rlist *list,
-		      struct stailq *tuples_to_free);
+		      struct stailq *tuples_to_free, size_t *mem_freed);
 
 /**
  * Adds a freed tuple to a read view's list and returns true.
@@ -170,7 +173,36 @@ memtx_tuple_rv_delete(struct memtx_tuple_rv *rv, struct rlist *list,
  * must be < than the most recent open read view.
  */
 void
-memtx_tuple_rv_add(struct memtx_tuple_rv *rv, struct memtx_tuple *tuple);
+memtx_tuple_rv_add(struct memtx_tuple_rv *rv, struct memtx_tuple *tuple,
+		   size_t mem_used);
+
+/** MemtxAllocator statistics. */
+struct memtx_allocator_stats {
+	/** Total size of allocated memory. */
+	size_t used_total;
+	/** Size of memory held for read views. */
+	size_t used_rv;
+	/** Size of memory freed on demand. */
+	size_t used_gc;
+};
+
+static inline void
+memtx_allocator_stats_create(struct memtx_allocator_stats *stats)
+{
+	stats->used_total = 0;
+	stats->used_rv = 0;
+	stats->used_gc = 0;
+}
+
+/* Adds memory allocator statistics from src to dst. */
+static inline void
+memtx_allocator_stats_add(struct memtx_allocator_stats *dst,
+			  const struct memtx_allocator_stats *src)
+{
+	dst->used_total += src->used_total;
+	dst->used_rv += src->used_rv;
+	dst->used_gc += src->used_gc;
+}
 
 template<class Allocator>
 class MemtxAllocator {
@@ -186,8 +218,12 @@ public:
 		struct memtx_tuple_rv *rv[memtx_tuple_rv_type_MAX];
 	};
 
+	/** Memory usage statistics. */
+	static struct memtx_allocator_stats stats;
+
 	static void create()
 	{
+		memtx_allocator_stats_create(&stats);
 		stailq_create(&gc);
 		for (int type = 0; type < memtx_tuple_rv_type_MAX; type++)
 			rlist_create(&read_views[type]);
@@ -238,8 +274,12 @@ public:
 		for (int type = 0; type < memtx_tuple_rv_type_MAX; type++) {
 			if (rv->rv[type] == nullptr)
 				continue;
-			memtx_tuple_rv_delete(rv->rv[type],
-					      &read_views[type], &gc);
+			size_t mem_freed = 0;
+			memtx_tuple_rv_delete(rv->rv[type], &read_views[type],
+					      &gc, &mem_freed);
+			assert(stats.used_rv >= mem_freed);
+			stats.used_rv -= mem_freed;
+			stats.used_gc += mem_freed;
 		}
 		TRASH(rv);
 		::free(rv);
@@ -277,14 +317,17 @@ public:
 	 */
 	static void free_tuple(struct tuple *tuple)
 	{
+		size_t size = tuple_size(tuple) +
+			      offsetof(struct memtx_tuple, base);
 		struct memtx_tuple *memtx_tuple = container_of(
 			tuple, struct memtx_tuple, base);
 		struct memtx_tuple_rv *rv = tuple_rv_last(tuple);
 		if (rv == nullptr ||
 		    memtx_tuple->version >= memtx_tuple_rv_version(rv)) {
-			immediate_free_tuple(memtx_tuple);
+			free(memtx_tuple, size);
 		} else {
-			memtx_tuple_rv_add(rv, memtx_tuple);
+			stats.used_rv += size;
+			memtx_tuple_rv_add(rv, memtx_tuple, size);
 		}
 	}
 
@@ -297,7 +340,11 @@ public:
 		for (int i = 0; !stailq_empty(&gc) && i < GC_BATCH_SIZE; i++) {
 			struct memtx_tuple *memtx_tuple = stailq_shift_entry(
 					&gc, struct memtx_tuple, in_gc);
-			immediate_free_tuple(memtx_tuple);
+			size_t size = tuple_size(&memtx_tuple->base) +
+				      offsetof(struct memtx_tuple, base);
+			assert(stats.used_gc >= size);
+			stats.used_gc -= size;
+			free(memtx_tuple, size);
 		}
 		return !stailq_empty(&gc);
 	}
@@ -307,20 +354,18 @@ private:
 
 	static void free(void *ptr, size_t size)
 	{
+		assert(stats.used_total >= size);
+		stats.used_total -= size;
 		Allocator::free(ptr, size);
 	}
 
 	static void *alloc(size_t size)
 	{
 		collect_garbage();
-		return Allocator::alloc(size);
-	}
-
-	static void immediate_free_tuple(struct memtx_tuple *memtx_tuple)
-	{
-		size_t size = tuple_size(&memtx_tuple->base) +
-			      offsetof(struct memtx_tuple, base);
-		free(memtx_tuple, size);
+		void *ptr = Allocator::alloc(size);
+		if (ptr != NULL)
+			stats.used_total += size;
+		return ptr;
 	}
 
 	/**
@@ -407,6 +452,9 @@ double MemtxAllocator<Allocator>::read_view_timestamp;
 template<class Allocator>
 bool MemtxAllocator<Allocator>::may_reuse_read_view;
 
+template<class Allocator>
+struct memtx_allocator_stats MemtxAllocator<Allocator>::stats;
+
 void
 memtx_allocators_init(struct allocator_settings *settings);
 
@@ -427,6 +475,10 @@ memtx_allocators_open_read_view(const struct read_view_opts *opts);
 /** Closes a read view for each MemtxAllocator. */
 void
 memtx_allocators_close_read_view(memtx_allocators_read_view rv);
+
+/** Returns allocator statistics sum over all MemtxAllocators.  */
+void
+memtx_allocators_stats(struct memtx_allocator_stats *stats);
 
 template<class F, class...Arg>
 static void

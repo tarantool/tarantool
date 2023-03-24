@@ -63,6 +63,7 @@ memtx_tuple_rv_new(uint32_t version, struct rlist *list)
 		/* List must be sorted by read view version. */
 		assert(l->version > prev_version);
 		stailq_create(&l->tuples);
+		l->mem_used = 0;
 		prev_version = l->version;
 		l++;
 	}
@@ -72,6 +73,7 @@ memtx_tuple_rv_new(uint32_t version, struct rlist *list)
 	assert(l->version > prev_version);
 	(void)prev_version;
 	stailq_create(&l->tuples);
+	l->mem_used = 0;
 	rlist_add_tail_entry(list, new_rv, link);
 	new_rv->refs = 1;
 	return new_rv;
@@ -79,8 +81,9 @@ memtx_tuple_rv_new(uint32_t version, struct rlist *list)
 
 void
 memtx_tuple_rv_delete(struct memtx_tuple_rv *rv, struct rlist *list,
-		      struct stailq *tuples_to_free)
+		      struct stailq *tuples_to_free, size_t *mem_freed)
 {
+	*mem_freed = 0;
 	assert(rv->refs > 0);
 	if (--rv->refs > 0)
 		return;
@@ -115,6 +118,7 @@ memtx_tuple_rv_delete(struct memtx_tuple_rv *rv, struct rlist *list,
 				dst = &prev_rv->lists[j];
 			}
 			stailq_concat(&dst->tuples, &src->tuples);
+			dst->mem_used += src->mem_used;
 			j++;
 		} else {
 			/*
@@ -123,6 +127,7 @@ memtx_tuple_rv_delete(struct memtx_tuple_rv *rv, struct rlist *list,
 			 * was opened. Free them immediately.
 			 */
 			stailq_concat(tuples_to_free, &src->tuples);
+			*mem_freed += src->mem_used;
 		}
 		i++;
 	}
@@ -131,7 +136,8 @@ memtx_tuple_rv_delete(struct memtx_tuple_rv *rv, struct rlist *list,
 }
 
 void
-memtx_tuple_rv_add(struct memtx_tuple_rv *rv, struct memtx_tuple *tuple)
+memtx_tuple_rv_add(struct memtx_tuple_rv *rv, struct memtx_tuple *tuple,
+		   size_t mem_used)
 {
 	/*
 	 * Binary search the list with min version such that
@@ -152,6 +158,7 @@ memtx_tuple_rv_add(struct memtx_tuple_rv *rv, struct memtx_tuple *tuple)
 	}
 	assert(found != nullptr);
 	stailq_add_entry(&found->tuples, tuple, in_gc);
+	found->mem_used += mem_used;
 }
 
 void
@@ -208,4 +215,21 @@ memtx_allocators_close_read_view(memtx_allocators_read_view rv)
 {
 	foreach_memtx_allocator<memtx_allocator_close_read_view,
 				memtx_allocators_read_view &>(rv);
+}
+
+/** Sums allocator statistics. */
+struct memtx_allocator_add_stats {
+	template<typename Allocator>
+	void invoke(struct memtx_allocator_stats &stats)
+	{
+		memtx_allocator_stats_add(&stats, &Allocator::stats);
+	}
+};
+
+void
+memtx_allocators_stats(struct memtx_allocator_stats *stats)
+{
+	memtx_allocator_stats_create(stats);
+	foreach_memtx_allocator<memtx_allocator_add_stats,
+				struct memtx_allocator_stats &>(*stats);
 }

@@ -12,6 +12,8 @@
 #include "small/slab_cache.h"
 #include "small/quota.h"
 #include "trivia/util.h"
+
+#define UNIT_TAP_COMPATIBLE 1
 #include "unit.h"
 
 #define ARENA_SIZE (16 * 1024 * 1024)
@@ -477,10 +479,80 @@ test_reuse_read_view()
 	check_plan();
 }
 
+static void
+test_mem_used()
+{
+	plan(21);
+	header();
+
+	struct memtx_allocator_stats stats;
+	memtx_allocators_stats(&stats);
+	is(stats.used_total, 0, "used_total init");
+	is(stats.used_rv, 0, "used_rv init");
+	is(stats.used_gc, 0, "used_gc init");
+
+	size_t tuple_size = sizeof(struct tuple) +
+			    offsetof(struct memtx_tuple, base);
+	struct tuple *tuple = alloc_tuple();
+
+	struct tuple *tuple1 = alloc_tuple();
+	struct read_view_opts opts;
+	read_view_opts_create(&opts);
+	memtx_allocators_read_view rv1 = memtx_allocators_open_read_view(&opts);
+	free_tuple(tuple);
+	struct tuple *tuple2 = alloc_tuple();
+	memtx_allocators_read_view rv2 = memtx_allocators_open_read_view(&opts);
+
+	memtx_allocators_stats(&stats);
+	is(stats.used_total, 3 * tuple_size,
+	   "used_total after opening read views");
+	is(stats.used_rv, tuple_size, "used_rv after opening read views");
+	is(stats.used_gc, 0, "used_gc after opening read views");
+
+	free_tuple(tuple1);
+
+	memtx_allocators_stats(&stats);
+	is(stats.used_total, 3 * tuple_size, "used_total after freeing tuple1");
+	is(stats.used_rv, 2 * tuple_size, "used_rv after freeing tuple1");
+	is(stats.used_gc, 0, "used_gc after freeing tuple1");
+
+	free_tuple(tuple2);
+
+	memtx_allocators_stats(&stats);
+	is(stats.used_total, 3 * tuple_size, "used_total after freeing tuple2");
+	is(stats.used_rv, 3 * tuple_size, "used_rv after freeing tuple2");
+	is(stats.used_gc, 0, "used_gc after freeing tuple2");
+
+	memtx_allocators_close_read_view(rv1);
+
+	memtx_allocators_stats(&stats);
+	is(stats.used_total, 3 * tuple_size, "used_total after closing rv1");
+	is(stats.used_rv, 2 * tuple_size, "used_rv after closing rv1");
+	is(stats.used_gc, tuple_size, "used_gc after closing rv1");
+
+	memtx_allocators_close_read_view(rv2);
+
+	memtx_allocators_stats(&stats);
+	is(stats.used_total, 3 * tuple_size, "used_total after closing rv2");
+	is(stats.used_rv, 0, "used_rv after closing rv2");
+	is(stats.used_gc, 3 * tuple_size, "used_gc after closing rv2");
+
+	while (MemtxAllocator<SmallAlloc>::collect_garbage()) {
+	}
+
+	memtx_allocators_stats(&stats);
+	is(stats.used_total, 0, "used_total after gc");
+	is(stats.used_rv, 0, "used_rv after gc");
+	is(stats.used_gc, 0, "used_gc after gc");
+
+	footer();
+	check_plan();
+}
+
 static int
 test_main()
 {
-	plan(8);
+	plan(9);
 	header();
 
 	test_alloc_stats();
@@ -491,6 +563,7 @@ test_main()
 	test_tuple_gc();
 	test_temp_tuple_gc();
 	test_reuse_read_view();
+	test_mem_used();
 
 	footer();
 	return check_plan();
