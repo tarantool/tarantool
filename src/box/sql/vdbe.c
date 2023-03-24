@@ -73,8 +73,7 @@ sqlVdbeMemAboutToChange(Vdbe * pVdbe, Mem * pMem)
 	int i;
 	Mem *pX;
 	for (i = 0, pX = pVdbe->aMem; i < pVdbe->nMem; i++, pX++) {
-		if (mem_is_bytes(pX) && !mem_is_ephemeral(pX) &&
-		    !mem_is_static(pX)) {
+		if (mem_is_dynamic(pX)) {
 			if (pX->pScopyFrom == pMem) {
 				mem_set_invalid(pX);
 				pX->pScopyFrom = 0;
@@ -351,7 +350,6 @@ vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
 		UPDATE_MAX_BLOBSIZE(dest_mem);
 		return 0;
 	}
-	assert(sqlVdbeCheckMemInvariants(dest_mem) != 0);
 	const char *data = vdbe_field_ref_fetch_data(field_ref, fieldno);
 	uint32_t dummy;
 	if (mem_from_mp(dest_mem, data, &dummy) != 0)
@@ -437,21 +435,18 @@ int sqlVdbeExec(Vdbe *p)
 				assert(pOp->p1>0);
 				assert(pOp->p1<=(p->nMem+1 - p->nCursor));
 				assert(memIsValid(&aMem[pOp->p1]));
-				assert(sqlVdbeCheckMemInvariants(&aMem[pOp->p1]));
 				REGISTER_TRACE(p, pOp->p1, &aMem[pOp->p1]);
 			}
 			if ((opProperty & OPFLG_IN2)!=0) {
 				assert(pOp->p2>0);
 				assert(pOp->p2<=(p->nMem+1 - p->nCursor));
 				assert(memIsValid(&aMem[pOp->p2]));
-				assert(sqlVdbeCheckMemInvariants(&aMem[pOp->p2]));
 				REGISTER_TRACE(p, pOp->p2, &aMem[pOp->p2]);
 			}
 			if ((opProperty & OPFLG_IN3)!=0) {
 				assert(pOp->p3>0);
 				assert(pOp->p3<=(p->nMem+1 - p->nCursor));
 				assert(memIsValid(&aMem[pOp->p3]));
-				assert(sqlVdbeCheckMemInvariants(&aMem[pOp->p3]));
 				REGISTER_TRACE(p, pOp->p3, &aMem[pOp->p3]);
 			}
 			if ((opProperty & OPFLG_OUT2)!=0) {
@@ -795,7 +790,7 @@ case OP_String: {          /* out2 */
 	assert(pOp->p4.z!=0);
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	assert(strlen(pOp->p4.z) == (size_t)pOp->p1);
-	mem_set_str0_static(pOut, pOp->p4.z);
+	mem_set_str0(pOut, pOp->p4.z);
 	UPDATE_MAX_BLOBSIZE(pOut);
 	break;
 }
@@ -846,13 +841,13 @@ case OP_Blob: {                /* out2 */
 		 * ephemeral or static depending on value. There is no way to
 		 * determine right now, so it is stored as static.
 		 */
-		mem_set_bin_static(pOut, pOp->p4.z, pOp->p1);
+		mem_set_bin(pOut, pOp->p4.z, pOp->p1);
 	} else {
 		assert(pOp->p3 == SQL_SUBTYPE_MSGPACK);
 		if (mp_typeof(*pOp->p4.z) == MP_MAP)
-			mem_set_map_static(pOut, pOp->p4.z, pOp->p1);
+			mem_set_map(pOut, pOp->p4.z, pOp->p1);
 		else
-			mem_set_array_static(pOut, pOp->p4.z, pOp->p1);
+			mem_set_array(pOut, pOp->p4.z, pOp->p1);
 	}
 	UPDATE_MAX_BLOBSIZE(pOut);
 	break;
@@ -2108,9 +2103,9 @@ case OP_MakeRecord: {
 		 * sure previously allocated memory has gone.
 		 */
 		mem_destroy(pOut);
-		mem_set_bin_ephemeral(pOut, tuple, tuple_size);
+		mem_set_bin(pOut, tuple, tuple_size);
+		mem_set_ephemeral(pOut);
 	}
-	assert(sqlVdbeCheckMemInvariants(pOut));
 	assert(pOp->p3>0 && pOp->p3<=(p->nMem+1 - p->nCursor));
 	REGISTER_TRACE(p, pOp->p3, pOut);
 	UPDATE_MAX_BLOBSIZE(pOut);
@@ -3178,8 +3173,8 @@ case OP_RowData: {
 		goto abort_due_to_error;
 	}
 	sqlCursorPayload(pCrsr, 0, n, buf);
-	mem_set_bin_ephemeral(pOut, buf, n);
-	assert(sqlVdbeCheckMemInvariants(pOut));
+	mem_set_bin(pOut, buf, n);
+	mem_set_ephemeral(pOut);
 	UPDATE_MAX_BLOBSIZE(pOut);
 	REGISTER_TRACE(p, pOp->p2, pOut);
 	break;

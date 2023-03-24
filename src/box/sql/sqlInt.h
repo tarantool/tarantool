@@ -521,19 +521,19 @@ sql_bind_null(struct Vdbe *v, int i);
 
 /** Perform string parameter binding for the sql statement. */
 int
-sql_bind_str_static(struct Vdbe *v, int i, const char *str, uint32_t len);
+sql_bind_str(struct Vdbe *v, int i, const char *str, uint32_t len);
 
 /** Perform binary string parameter binding for the sql statement. */
 int
-sql_bind_bin_static(struct Vdbe *v, int i, const char *str, uint32_t size);
+sql_bind_bin(struct Vdbe *v, int i, const char *str, uint32_t size);
 
 /** Perform array parameter binding for the sql statement. */
 int
-sql_bind_array_static(struct Vdbe *v, int i, const char *str, uint32_t size);
+sql_bind_array(struct Vdbe *v, int i, const char *str, uint32_t size);
 
 /** Perform map parameter binding for the sql statement. */
 int
-sql_bind_map_static(struct Vdbe *v, int i, const char *str, uint32_t size);
+sql_bind_map(struct Vdbe *v, int i, const char *str, uint32_t size);
 
 /** Perform UUID parameter binding for the sql statement. */
 int

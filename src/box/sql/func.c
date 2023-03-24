@@ -116,7 +116,8 @@ step_avg(struct sql_context *ctx, int argc, const struct Mem *argv)
 		mem_create(mem);
 		*count = 1;
 		mem_copy_as_ephemeral(mem, &argv[0]);
-		mem_set_bin_allocated(ctx->pOut, (char *)mem, size);
+		mem_set_bin(ctx->pOut, (char *)mem, size);
+		mem_set_dynamic(ctx->pOut);
 		return;
 	}
 	mem = (struct Mem *)ctx->pOut->z;
@@ -303,7 +304,7 @@ func_lower_upper(struct sql_context *ctx, int argc, const struct Mem *argv)
 		return;
 	assert(mem_is_str(arg) && arg->n >= 0);
 	if (arg->n == 0)
-		return mem_set_str0_static(ctx->pOut, "");
+		return mem_set_str0(ctx->pOut, "");
 	const char *str = arg->z;
 	int32_t len = arg->n;
 	char *res = sql_xmalloc(len);
@@ -331,7 +332,8 @@ func_lower_upper(struct sql_context *ctx, int argc, const struct Mem *argv)
 			ucasemap_utf8ToLower(cm, res, size, str, len, &status);
 	}
 	ucasemap_close(cm);
-	mem_set_str_allocated(ctx->pOut, res, size);
+	mem_set_str(ctx->pOut, res, size);
+	mem_set_dynamic(ctx->pOut);
 }
 
 /** Implementation of the NULLIF() function. */
@@ -414,7 +416,7 @@ func_trim_bin(struct sql_context *ctx, int argc, const struct Mem *argv)
 	int start = trim_bin_start(str, end, octets, octets_size, flags);
 
 	if (start >= end)
-		return mem_set_bin_static(ctx->pOut, "", 0);
+		return mem_set_bin(ctx->pOut, "", 0);
 	if (mem_copy_bin(ctx->pOut, &str[start], end - start) != 0)
 		ctx->is_aborted = true;
 }
@@ -513,7 +515,7 @@ func_trim_str(struct sql_context *ctx, int argc, const struct Mem *argv)
 	region_truncate(region, svp);
 
 	if (start >= end)
-		return mem_set_str0_static(ctx->pOut, "");
+		return mem_set_str0(ctx->pOut, "");
 	if (mem_copy_str(ctx->pOut, &str[start], end - start) != 0)
 		ctx->is_aborted = true;
 }
@@ -635,9 +637,9 @@ func_substr_octets(struct sql_context *ctx, int argc, const struct Mem *argv)
 				 argv[1].u.u - 1 : 0;
 		if (start >= size) {
 			if (is_str)
-				return mem_set_str0_static(ctx->pOut, "");
+				return mem_set_str0(ctx->pOut, "");
 			else
-				return mem_set_bin_static(ctx->pOut, "", 0);
+				return mem_set_bin(ctx->pOut, "", 0);
 		}
 		char *s = &argv[0].z[start];
 		uint64_t n = size - start;
@@ -665,9 +667,9 @@ func_substr_octets(struct sql_context *ctx, int argc, const struct Mem *argv)
 	}
 	if (start >= size || length == 0) {
 		if (is_str)
-			return mem_set_str0_static(ctx->pOut, "");
+			return mem_set_str0(ctx->pOut, "");
 		else
-			return mem_set_bin_static(ctx->pOut, "", 0);
+			return mem_set_bin(ctx->pOut, "", 0);
 	}
 	char *str = &argv[0].z[start];
 	uint64_t len = MIN(size - start, length);
@@ -696,7 +698,7 @@ func_substr_characters(struct sql_context *ctx, int argc, const
 			U8_NEXT((uint8_t *)str, pos, end, c);
 		}
 		if (pos == end)
-			return mem_set_str_static(ctx->pOut, "", 0);
+			return mem_set_str0(ctx->pOut, "");
 		if (mem_copy_str(ctx->pOut, str + pos, end - pos) != 0)
 			ctx->is_aborted = true;
 		return;
@@ -720,14 +722,14 @@ func_substr_characters(struct sql_context *ctx, int argc, const
 		return;
 	}
 	if (length == 0)
-		return mem_set_str_static(ctx->pOut, "", 0);
+		return mem_set_str0(ctx->pOut, "");
 
 	for (uint64_t i = 0; i < start && pos < end; ++i) {
 		UChar32 c;
 		U8_NEXT((uint8_t *)str, pos, end, c);
 	}
 	if (pos == end)
-		return mem_set_str_static(ctx->pOut, "", 0);
+		return mem_set_str0(ctx->pOut, "");
 
 	int cur = pos;
 	for (uint64_t i = 0; i < length && cur < end; ++i) {
@@ -753,7 +755,7 @@ static void
 func_char(struct sql_context *ctx, int argc, const struct Mem *argv)
 {
 	if (argc == 0)
-		return mem_set_str_static(ctx->pOut, "", 0);
+		return mem_set_str0(ctx->pOut, "");
 	struct region *region = &fiber()->gc;
 	size_t svp = region_used(region);
 	uint32_t size;
@@ -785,7 +787,8 @@ func_char(struct sql_context *ctx, int argc, const struct Mem *argv)
 	region_truncate(region, svp);
 	assert(pos == len);
 	(void)pos;
-	mem_set_str_allocated(ctx->pOut, str, len);
+	mem_set_str(ctx->pOut, str, len);
+	mem_set_dynamic(ctx->pOut);
 }
 
 /**
@@ -837,7 +840,7 @@ func_hex(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 	assert(mem_is_bin(arg) && arg->n >= 0);
 	if (arg->n == 0)
-		return mem_set_str0_static(ctx->pOut, "");
+		return mem_set_str0(ctx->pOut, "");
 
 	uint32_t size = 2 * arg->n;
 	char *str = sql_xmalloc(size);
@@ -846,7 +849,8 @@ func_hex(struct sql_context *ctx, int argc, const struct Mem *argv)
 		str[2 * i] = hexdigits[(c >> 4) & 0xf];
 		str[2 * i + 1] = hexdigits[c & 0xf];
 	}
-	mem_set_str_allocated(ctx->pOut, str, size);
+	mem_set_str(ctx->pOut, str, size);
+	mem_set_dynamic(ctx->pOut);
 }
 
 /** Implementation of the OCTET_LENGTH() function. */
@@ -870,10 +874,12 @@ func_printf(struct sql_context *ctx, int argc, const struct Mem *argv)
 		return;
 	if (argc == 1 || !mem_is_str(&argv[0])) {
 		char *str = mem_strdup(&argv[0]);
-		if (str == NULL)
+		if (str == NULL) {
 			ctx->is_aborted = true;
-		else
-			mem_set_str0_allocated(ctx->pOut, str);
+			return;
+		}
+		mem_set_str0(ctx->pOut, str);
+		mem_set_dynamic(ctx->pOut);
 		return;
 	}
 	struct PrintfArguments pargs;
@@ -885,7 +891,8 @@ func_printf(struct sql_context *ctx, int argc, const struct Mem *argv)
 	sqlStrAccumInit(&acc, NULL, 0, SQL_MAX_LENGTH);
 	acc.printfFlags = SQL_PRINTF_SQLFUNC;
 	sqlXPrintf(&acc, format, &pargs);
-	mem_set_str_allocated(ctx->pOut, sqlStrAccumFinish(&acc), acc.nChar);
+	mem_set_str(ctx->pOut, sqlStrAccumFinish(&acc), acc.nChar);
+	mem_set_dynamic(ctx->pOut);
 }
 
 /**
@@ -919,11 +926,12 @@ func_randomblob(struct sql_context *ctx, int argc, const struct Mem *argv)
 	if (mem_is_null(arg) || !mem_is_uint(arg))
 		return;
 	if (arg->u.u == 0)
-		return mem_set_bin_static(ctx->pOut, "", 0);
+		return mem_set_bin(ctx->pOut, "", 0);
 	uint64_t len = arg->u.u;
 	char *res = sql_xmalloc(len);
 	sql_randomness(len, res);
-	mem_set_bin_allocated(ctx->pOut, res, len);
+	mem_set_bin(ctx->pOut, res, len);
+	mem_set_dynamic(ctx->pOut);
 }
 
 /**
@@ -942,10 +950,11 @@ func_zeroblob(struct sql_context *ctx, int argc, const struct Mem *argv)
 	if (mem_is_null(arg) || !mem_is_uint(arg))
 		return;
 	if (arg->u.u == 0)
-		return mem_set_bin_static(ctx->pOut, "", 0);
+		return mem_set_bin(ctx->pOut, "", 0);
 	uint64_t len = arg->u.u;
 	char *res = sql_xmalloc0(len);
-	mem_set_bin_allocated(ctx->pOut, res, len);
+	mem_set_bin(ctx->pOut, res, len);
+	mem_set_dynamic(ctx->pOut);
 }
 
 /** Implementation of the TYPEOF() function. */
@@ -954,7 +963,7 @@ func_typeof(struct sql_context *ctx, int argc, const struct Mem *argv)
 {
 	assert(argc == 1);
 	(void)argc;
-	return mem_set_str0_static(ctx->pOut, mem_type_to_str(&argv[0]));
+	return mem_set_str0(ctx->pOut, mem_type_to_str(&argv[0]));
 }
 
 /** Implementation of the ROUND() function for DOUBLE argument. */
@@ -1060,7 +1069,7 @@ func_version(struct sql_context *ctx, int argc, const struct Mem *argv)
 {
 	(void)argc;
 	(void)argv;
-	return mem_set_str0_static(ctx->pOut, (char *)tarantool_version());
+	return mem_set_str0(ctx->pOut, (char *)tarantool_version());
 }
 
 /**
@@ -1492,7 +1501,8 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 		assert(size > 0);
 		buf = sql_xmalloc(size);
 		mp_snprint(buf, size, argv[0].z);
-		mem_set_str0_allocated(context->pOut, buf);
+		mem_set_str0(context->pOut, buf);
+		mem_set_dynamic(context->pOut);
 		break;
 	}
 	case MEM_TYPE_BIN: {
@@ -1507,7 +1517,8 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 		zText[(nBlob * 2) + 2] = '\'';
 		zText[0] = 'X';
 		zText[1] = '\'';
-		mem_set_str_allocated(context->pOut, zText, size);
+		mem_set_str(context->pOut, zText, size);
+		mem_set_dynamic(context->pOut);
 		break;
 	}
 	case MEM_TYPE_STR: {
@@ -1528,17 +1539,17 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 				res[j++] = '\'';
 		}
 		res[size - 1] = '\'';
-		mem_set_str_allocated(context->pOut, res, size);
+		mem_set_str(context->pOut, res, size);
+		mem_set_dynamic(context->pOut);
 		break;
 	}
 	case MEM_TYPE_BOOL: {
-		mem_set_str0_static(context->pOut,
-				    SQL_TOKEN_BOOLEAN(argv[0].u.b));
+		mem_set_str0(context->pOut, SQL_TOKEN_BOOLEAN(argv[0].u.b));
 		break;
 	}
 	default:{
 		assert(mem_is_null(&argv[0]));
-		mem_set_str0_static(context->pOut, "NULL");
+		mem_set_str0(context->pOut, "NULL");
 	}
 	}
 }
@@ -1601,9 +1612,10 @@ replaceFunc(struct sql_context *context, int argc, const struct Mem *argv)
 	assert(j <= nOut);
 	zOut[j] = 0;
 	if (context->func->def->returns == FIELD_TYPE_STRING)
-		mem_set_str_allocated(context->pOut, (char *)zOut, j);
+		mem_set_str(context->pOut, (char *)zOut, j);
 	else
-		mem_set_bin_allocated(context->pOut, (char *)zOut, j);
+		mem_set_bin(context->pOut, (char *)zOut, j);
+	mem_set_dynamic(context->pOut);
 }
 
 /*
@@ -1658,7 +1670,7 @@ soundexFunc(struct sql_context *context, int argc, const struct Mem *argv)
 		if (mem_copy_str(context->pOut, zResult, 4) != 0)
 			context->is_aborted = true;
 	} else {
-		mem_set_str_static(context->pOut, "?000", 4);
+		mem_set_str0(context->pOut, "?000");
 	}
 }
 

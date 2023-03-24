@@ -392,64 +392,24 @@ mem_set_interval(struct Mem *mem, const struct interval *itv)
 	assert(mem->flags == 0);
 }
 
-static inline void
-set_str_const(struct Mem *mem, char *value, uint32_t len, int alloc_type)
+void
+mem_set_str(struct Mem *mem, char *value, uint32_t len)
 {
-	assert((alloc_type & (MEM_Static | MEM_Ephem)) != 0);
 	mem_clear(mem);
 	mem->z = value;
 	mem->n = len;
 	mem->type = MEM_TYPE_STR;
-	mem->flags = alloc_type;
+	assert(mem->flags == 0);
 }
 
-static inline void
-set_str_dynamic(struct Mem *mem, char *value, uint32_t len, int alloc_type)
+void
+mem_set_str0(struct Mem *mem, char *value)
 {
-	assert(mem->szMalloc == 0 || value != mem->zMalloc);
-	mem_destroy(mem);
+	mem_clear(mem);
 	mem->z = value;
-	mem->n = len;
+	mem->n = strlen(value);
 	mem->type = MEM_TYPE_STR;
-	mem->flags = alloc_type;
-	mem->zMalloc = mem->z;
-	mem->szMalloc = len;
-}
-
-void
-mem_set_str_ephemeral(struct Mem *mem, char *value, uint32_t len)
-{
-	set_str_const(mem, value, len, MEM_Ephem);
-}
-
-void
-mem_set_str_static(struct Mem *mem, char *value, uint32_t len)
-{
-	set_str_const(mem, value, len, MEM_Static);
-}
-
-void
-mem_set_str_allocated(struct Mem *mem, char *value, uint32_t len)
-{
-	set_str_dynamic(mem, value, len, 0);
-}
-
-void
-mem_set_str0_ephemeral(struct Mem *mem, char *value)
-{
-	set_str_const(mem, value, strlen(value), MEM_Ephem);
-}
-
-void
-mem_set_str0_static(struct Mem *mem, char *value)
-{
-	set_str_const(mem, value, strlen(value), MEM_Static);
-}
-
-void
-mem_set_str0_allocated(struct Mem *mem, char *value)
-{
-	set_str_dynamic(mem, value, strlen(value), 0);
+	assert(mem->flags == 0);
 }
 
 static int
@@ -490,46 +450,14 @@ mem_copy_str0(struct Mem *mem, const char *value)
 	return 0;
 }
 
-static inline void
-set_bin_const(struct Mem *mem, char *value, uint32_t size, int alloc_type)
+void
+mem_set_bin(struct Mem *mem, char *value, uint32_t size)
 {
-	assert((alloc_type & (MEM_Static | MEM_Ephem)) != 0);
 	mem_clear(mem);
 	mem->z = value;
 	mem->n = size;
 	mem->type = MEM_TYPE_BIN;
-	mem->flags = alloc_type;
-}
-
-static inline void
-set_bin_dynamic(struct Mem *mem, char *value, uint32_t size, int alloc_type)
-{
-	assert(mem->szMalloc == 0 || value != mem->zMalloc);
-	mem_destroy(mem);
-	mem->z = value;
-	mem->n = size;
-	mem->type = MEM_TYPE_BIN;
-	mem->flags = alloc_type;
-	mem->zMalloc = mem->z;
-	mem->szMalloc = mem->n;
-}
-
-void
-mem_set_bin_ephemeral(struct Mem *mem, char *value, uint32_t size)
-{
-	set_bin_const(mem, value, size, MEM_Ephem);
-}
-
-void
-mem_set_bin_static(struct Mem *mem, char *value, uint32_t size)
-{
-	set_bin_const(mem, value, size, MEM_Static);
-}
-
-void
-mem_set_bin_allocated(struct Mem *mem, char *value, uint32_t size)
-{
-	set_bin_dynamic(mem, value, size, 0);
+	assert(mem->flags == 0);
 }
 
 int
@@ -538,36 +466,15 @@ mem_copy_bin(struct Mem *mem, const char *value, uint32_t size)
 	return mem_copy_bytes(mem, value, size, MEM_TYPE_BIN);
 }
 
-static inline void
-set_msgpack_value(struct Mem *mem, char *value, uint32_t size, int alloc_type,
-		  enum mem_type type)
-{
-	if (alloc_type == MEM_Ephem || alloc_type == MEM_Static)
-		set_bin_const(mem, value, size, alloc_type);
-	else
-		set_bin_dynamic(mem, value, size, alloc_type);
-	mem->type = type;
-}
-
 void
-mem_set_map_ephemeral(struct Mem *mem, char *value, uint32_t size)
+mem_set_map(struct Mem *mem, char *value, uint32_t size)
 {
 	assert(mp_typeof(*value) == MP_MAP);
-	set_msgpack_value(mem, value, size, MEM_Ephem, MEM_TYPE_MAP);
-}
-
-void
-mem_set_map_static(struct Mem *mem, char *value, uint32_t size)
-{
-	assert(mp_typeof(*value) == MP_MAP);
-	set_msgpack_value(mem, value, size, MEM_Static, MEM_TYPE_MAP);
-}
-
-void
-mem_set_map_allocated(struct Mem *mem, char *value, uint32_t size)
-{
-	assert(mp_typeof(*value) == MP_MAP);
-	set_msgpack_value(mem, value, size, 0, MEM_TYPE_MAP);
+	mem_clear(mem);
+	mem->z = value;
+	mem->n = size;
+	mem->type = MEM_TYPE_MAP;
+	assert(mem->flags == 0);
 }
 
 int
@@ -577,24 +484,14 @@ mem_copy_map(struct Mem *mem, const char *value, uint32_t size)
 }
 
 void
-mem_set_array_ephemeral(struct Mem *mem, char *value, uint32_t size)
+mem_set_array(struct Mem *mem, char *value, uint32_t size)
 {
 	assert(mp_typeof(*value) == MP_ARRAY);
-	set_msgpack_value(mem, value, size, MEM_Ephem, MEM_TYPE_ARRAY);
-}
-
-void
-mem_set_array_static(struct Mem *mem, char *value, uint32_t size)
-{
-	assert(mp_typeof(*value) == MP_ARRAY);
-	set_msgpack_value(mem, value, size, MEM_Static, MEM_TYPE_ARRAY);
-}
-
-void
-mem_set_array_allocated(struct Mem *mem, char *value, uint32_t size)
-{
-	assert(mp_typeof(*value) == MP_ARRAY);
-	set_msgpack_value(mem, value, size, 0, MEM_TYPE_ARRAY);
+	mem_clear(mem);
+	mem->z = value;
+	mem->n = size;
+	mem->type = MEM_TYPE_ARRAY;
+	assert(mem->flags == 0);
 }
 
 int
@@ -1924,9 +1821,7 @@ mem_copy(struct Mem *to, const struct Mem *from)
 	to->flags = from->flags;
 	to->n = from->n;
 	to->z = from->z;
-	if (!mem_is_bytes(to))
-		return 0;
-	if ((to->flags & MEM_Static) != 0)
+	if (!mem_is_ephemeral(from) && !mem_is_dynamic(from))
 		return 0;
 	size_t size = MAX(32, to->n);
 	to->zMalloc = sql_xrealloc(to->zMalloc, size);
@@ -1946,12 +1841,9 @@ mem_copy_as_ephemeral(struct Mem *to, const struct Mem *from)
 	to->flags = from->flags;
 	to->n = from->n;
 	to->z = from->z;
-	if (!mem_is_bytes(to))
+	if (!mem_is_dynamic(from))
 		return;
-	if ((to->flags & (MEM_Static | MEM_Ephem)) != 0)
-		return;
-	to->flags = 0;
-	to->flags |= MEM_Ephem;
+	to->flags = MEM_Ephem;
 	return;
 }
 
@@ -1973,8 +1865,7 @@ mem_append(struct Mem *mem, const char *value, uint32_t len)
 	if (len == 0)
 		return 0;
 	int new_size = mem->n + len;
-	if (((mem->flags & (MEM_Static | MEM_Ephem)) != 0) ||
-	    mem->szMalloc < new_size) {
+	if (!mem_is_dynamic(mem) || mem->szMalloc < new_size) {
 		/*
 		 * Force exponential buffer size growth to avoid having to call
 		 * this routine too often.
@@ -2882,38 +2773,9 @@ mem_mp_type(const struct Mem *mem)
 	return MP_NIL;
 }
 
-#ifdef SQL_DEBUG
-/*
- * Check invariants on a Mem object.
- *
- * This routine is intended for use inside of assert() statements, like
- * this:    assert( sqlVdbeCheckMemInvariants(pMem) );
- */
-int
-sqlVdbeCheckMemInvariants(Mem * p)
-{
-	/* If p holds a string or blob, the Mem.z must point to exactly
-	 * one of the following:
-	 *
-	 *   (1) Memory in Mem.zMalloc and managed by the Mem object
-	 *   (2) Memory to be freed using Mem.xDel
-	 *   (3) An ephemeral string or blob
-	 *   (4) A static string or blob
-	 */
-	if ((p->type & (MEM_TYPE_STR | MEM_TYPE_BIN)) != 0 && p->n > 0) {
-		assert(((p->szMalloc > 0 && p->z == p->zMalloc) ? 1 : 0) +
-		       ((p->flags & MEM_Ephem) != 0 ? 1 : 0) +
-		       ((p->flags & MEM_Static) != 0 ? 1 : 0) == 1);
-	}
-	return 1;
-}
-#endif
-
 static int
 sqlVdbeMemGrow(struct Mem *pMem, int n, int bPreserve)
 {
-	assert(sqlVdbeCheckMemInvariants(pMem));
-
 	/* If the bPreserve flag is set to true, then the memory cell must already
 	 * contain a valid string or blob value.
 	 */
@@ -2939,7 +2801,7 @@ sqlVdbeMemGrow(struct Mem *pMem, int n, int bPreserve)
 	}
 
 	pMem->z = pMem->zMalloc;
-	pMem->flags &= ~(MEM_Ephem | MEM_Static);
+	pMem->flags &= ~MEM_Ephem;
 	return 0;
 }
 
@@ -2971,7 +2833,6 @@ releaseMemArray(Mem * p, int N)
 	if (p && N) {
 		Mem *pEnd = &p[N];
 		do {
-			assert(sqlVdbeCheckMemInvariants(p));
 			mem_destroy(p);
 			p->type = MEM_TYPE_INVALID;
 			assert(p->flags == 0);

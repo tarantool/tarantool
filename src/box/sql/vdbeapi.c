@@ -456,30 +456,30 @@ sql_bind_ptr(struct Vdbe *p, int i, void *ptr)
 }
 
 int
-sql_bind_str_static(struct Vdbe *vdbe, int i, const char *str, uint32_t len)
+sql_bind_str(struct Vdbe *vdbe, int i, const char *str, uint32_t len)
 {
-	mem_set_str_static(&vdbe->aVar[i - 1], (char *)str, len);
+	mem_set_str(&vdbe->aVar[i - 1], (char *)str, len);
 	return sql_bind_type(vdbe, i, "text");
 }
 
 int
-sql_bind_bin_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
+sql_bind_bin(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
 {
-	mem_set_bin_static(&vdbe->aVar[i - 1], (char *)str, size);
+	mem_set_bin(&vdbe->aVar[i - 1], (char *)str, size);
 	return sql_bind_type(vdbe, i, "text");
 }
 
 int
-sql_bind_array_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
+sql_bind_array(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
 {
-	mem_set_array_static(&vdbe->aVar[i - 1], (char *)str, size);
+	mem_set_array(&vdbe->aVar[i - 1], (char *)str, size);
 	return sql_bind_type(vdbe, i, "array");
 }
 
 int
-sql_bind_map_static(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
+sql_bind_map(struct Vdbe *vdbe, int i, const char *str, uint32_t size)
 {
-	mem_set_map_static(&vdbe->aVar[i - 1], (char *)str, size);
+	mem_set_map(&vdbe->aVar[i - 1], (char *)str, size);
 	return sql_bind_type(vdbe, i, "map");
 }
 

@@ -1199,7 +1199,7 @@ sqlVdbeList(Vdbe * p)
 			pMem++;
 
 			char *value = (char *)sqlOpcodeName(pOp->opcode);
-			mem_set_str0_static(pMem, value);
+			mem_set_str0(pMem, value);
 			pMem++;
 
 			/* When an OP_Program opcode is encounter (the only opcode that has
@@ -1240,22 +1240,26 @@ sqlVdbeList(Vdbe * p)
 		zP4 = displayP4(pOp, buf, 256);
 		if (zP4 != buf) {
 			sql_xfree(buf);
-			mem_set_str0_ephemeral(pMem, zP4);
+			mem_set_str0(pMem, zP4);
+			mem_set_ephemeral(pMem);
 		} else {
-			mem_set_str0_allocated(pMem, zP4);
+			mem_set_str0(pMem, zP4);
+			mem_set_dynamic(pMem);
 		}
 		pMem++;
 
 		if (p->explain == 1) {
 			buf = sql_xmalloc(4);
 			sql_snprintf(3, buf, "%.2x", pOp->p5);
-			mem_set_str0_allocated(pMem, buf);
+			mem_set_str0(pMem, buf);
+			mem_set_dynamic(pMem);
 			pMem++;
 
 #ifdef SQL_ENABLE_EXPLAIN_COMMENTS
 			buf = sql_xmalloc(500);
 			displayComment(pOp, zP4, buf, 500);
-			mem_set_str0_allocated(pMem, buf);
+			mem_set_str0(pMem, buf);
+			mem_set_dynamic(pMem);
 #else
 			mem_set_null(pMem);
 #endif
