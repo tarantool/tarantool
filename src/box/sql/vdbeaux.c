@@ -1160,8 +1160,8 @@ sqlVdbeList(Vdbe * p)
 			/* On the first call to sql_step(), pSub will hold a NULL.  It is
 			 * initialized to a BLOB by the P4_SUBPROGRAM processing logic below
 			 */
-			nSub = pSub->n / sizeof(Vdbe *);
-			apSub = (SubProgram **) pSub->z;
+			nSub = pSub->u.n / sizeof(struct Vdbe *);
+			apSub = (struct SubProgram **)pSub->u.z;
 		}
 		for (i = 0; i < nSub; i++) {
 			nRow += apSub[i]->nOp;
@@ -2083,8 +2083,7 @@ sqlVdbeRecordUnpackMsgpack(struct key_def *key_def,	/* Information about the rec
 	p->default_rc = 0;
 	p->key_def = key_def;
 	while (n--) {
-		pMem->szMalloc = 0;
-		pMem->z = 0;
+		mem_destroy(pMem);
 		uint32_t sz = 0;
 		mem_from_mp_ephemeral(pMem, zParse, &sz);
 		assert(sz != 0);

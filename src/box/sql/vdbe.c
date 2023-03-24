@@ -128,12 +128,12 @@ int sql_sort_count = 0;
  * help verify the correct operation of the library.
  */
 #ifdef SQL_TEST
-int sql_max_blobsize = 0;
+size_t sql_max_blobsize = 0;
 static void
 updateMaxBlobsize(Mem *p)
 {
-	if (mem_is_bytes(p) && p->n > sql_max_blobsize)
-		sql_max_blobsize = p->n;
+	if (mem_is_bytes(p) && p->u.n > sql_max_blobsize)
+		sql_max_blobsize = p->u.n;
 }
 #endif
 
@@ -197,13 +197,15 @@ allocateCursor(
 		p->apCsr[iCur] = 0;
 	}
 	if (sqlVdbeMemClearAndResize(pMem, nByte) == 0) {
-		p->apCsr[iCur] = pCx = (VdbeCursor*)pMem->z;
+		pCx = (VdbeCursor *)pMem->u.z;
+		p->apCsr[iCur] = pCx;
 		memset(pCx, 0, offsetof(VdbeCursor,uc));
 		pCx->eCurType = eCurType;
 		pCx->nField = nField;
 		vdbe_field_ref_create(&pCx->field_ref, nField);
 		if (eCurType==CURTYPE_TARANTOOL) {
-			pCx->uc.pCursor = (BtCursor*)&pMem->z[bt_offset];
+			pCx->uc.pCursor =
+				(struct BtCursor *)&pMem->u.z[bt_offset];
 			sqlCursorZero(pCx->uc.pCursor);
 		}
 	}
@@ -1910,7 +1912,8 @@ case OP_Column: {
 				assert(mem_is_bin(pReg));
 				assert(memIsValid(pReg));
 				vdbe_field_ref_prepare_data(&pC->field_ref,
-							    pReg->z, pReg->n);
+							    pReg->u.z,
+							    pReg->u.n);
 			} else {
 				goto op_column_out;
 			}
@@ -2162,7 +2165,7 @@ case OP_CreateForeignKey: {
 		parent_fieldno = mems[3].u.u;
 	} else {
 		assert(mem_is_map(&mems[2]));
-		mapping = mems[2].z;
+		mapping = mems[2].u.z;
 	}
 	if (sql_foreign_key_create(name, child_id, parent_id, child_fieldno,
 				   parent_fieldno, mapping) != 0)
@@ -2830,7 +2833,7 @@ case OP_Found: {        /* jump, in3 */
 		pFree = pIdxKey;
 		assert(mem_is_bin(pIn3));
 		sqlVdbeRecordUnpackMsgpack(pC->key_def,
-					       pIn3->z, pIdxKey);
+					       pIn3->u.z, pIdxKey);
 	}
 	pIdxKey->default_rc = 0;
 	pIdxKey->opcode = pOp->opcode;
@@ -3491,15 +3494,15 @@ case OP_IdxInsert: {
 	assert(space != NULL);
 	if (space->def->id != 0) {
 		if (pOp->opcode == OP_IdxInsert) {
-			rc = tarantoolsqlInsert(space, pIn2->z,
-						    pIn2->z + pIn2->n);
+			rc = tarantoolsqlInsert(space, pIn2->u.z,
+						pIn2->u.z + pIn2->u.n);
 		} else {
-			rc = tarantoolsqlReplace(space, pIn2->z,
-						     pIn2->z + pIn2->n);
+			rc = tarantoolsqlReplace(space, pIn2->u.z,
+						 pIn2->u.z + pIn2->u.n);
 		}
 	} else {
-		rc = tarantoolsqlEphemeralInsert(space, pIn2->z,
-						     pIn2->z + pIn2->n);
+		rc = tarantoolsqlEphemeralInsert(space, pIn2->u.z,
+						 pIn2->u.z + pIn2->u.n);
 	}
 	if (rc != 0) {
 		if ((pOp->p5 & OPFLAG_OE_IGNORE) != 0) {
@@ -3573,8 +3576,8 @@ case OP_Update: {
 
 	struct Mem *upd_fields_mem = &aMem[pOp->p3];
 	assert(mem_is_bin(upd_fields_mem));
-	uint32_t *upd_fields = (uint32_t *)upd_fields_mem->z;
-	uint32_t upd_fields_cnt = upd_fields_mem->n / sizeof(uint32_t);
+	uint32_t *upd_fields = (uint32_t *)upd_fields_mem->u.z;
+	uint32_t upd_fields_cnt = upd_fields_mem->u.n / sizeof(uint32_t);
 
 	/* Prepare Tarantool update ops msgpack. */
 	struct region *region = &fiber()->gc;
@@ -3608,8 +3611,9 @@ case OP_Update: {
 	}
 
 	assert(rc == 0);
-	rc = box_update(space->def->id, 0, key_mem->z, key_mem->z + key_mem->n,
-			ops, ops + ops_size, 0, NULL);
+	rc = box_update(space->def->id, 0, key_mem->u.z,
+			key_mem->u.z + key_mem->u.n, ops, ops + ops_size, 0,
+			NULL);
 	region_truncate(&fiber()->gc, used);
 
 	if (pOp->p5 & OPFLAG_OE_IGNORE) {
@@ -3655,7 +3659,7 @@ case OP_SInsert: {
 	assert(space != NULL);
 	assert(space_is_system(space));
 	assert(p->errorAction == ON_CONFLICT_ACTION_ABORT);
-	if (tarantoolsqlInsert(space, pIn2->z, pIn2->z + pIn2->n) != 0)
+	if (tarantoolsqlInsert(space, pIn2->u.z, pIn2->u.z + pIn2->u.n) != 0)
 		goto abort_due_to_error;
 	if (pOp->p5 & OPFLAG_NCHANGE)
 		p->nChange++;
@@ -3682,7 +3686,7 @@ case OP_SDelete: {
 	assert(space != NULL);
 	assert(space_is_system(space));
 	assert(p->errorAction == ON_CONFLICT_ACTION_ABORT);
-	if (sql_delete_by_key(space, pOp->p3, pIn2->z, pIn2->n) != 0)
+	if (sql_delete_by_key(space, pOp->p3, pIn2->u.z, pIn2->u.n) != 0)
 		goto abort_due_to_error;
 	if (pOp->p5 & OPFLAG_NCHANGE)
 		p->nChange++;
@@ -4367,14 +4371,14 @@ case OP_SetSession: {
 	case FIELD_TYPE_STRING: {
 		if (!mem_is_str(pIn1))
 			goto invalid_type;
-		const char *str = pIn1->z;
-		uint32_t size = mp_sizeof_str(pIn1->n);
+		const char *str = pIn1->u.z;
+		uint32_t size = mp_sizeof_str(pIn1->u.n);
 		char *mp_value = (char *) static_alloc(size);
 		if (mp_value == NULL) {
 			diag_set(OutOfMemory, size, "static_alloc", "mp_value");
 			goto abort_due_to_error;
 		}
-		mp_encode_str(mp_value, str, pIn1->n);
+		mp_encode_str(mp_value, str, pIn1->u.n);
 		if (setting->set(sid, mp_value) != 0)
 			goto abort_due_to_error;
 		break;

@@ -83,6 +83,12 @@ struct Mem {
 		struct datetime dt;
 		/** INTERVAL value. */
 		struct interval itv;
+		struct {
+			/** STRING, VARBINARY, MAP or ARRAY value. */
+			char *z;
+			/** Length of variable length value. */
+			size_t n;
+		};
 	} u;
 	/** Type of the value this MEM contains. */
 	enum mem_type type;
@@ -92,11 +98,10 @@ struct Mem {
 	 */
 	bool is_ephemeral;
 	u32 flags;		/* Some combination of MEM_Null, MEM_Str, MEM_Dyn, etc. */
-	int n;			/* size (in bytes) of string value, excluding trailing '\0' */
-	char *z;		/* String or BLOB value */
-	/* ShallowCopy only needs to copy the information above */
-	char *zMalloc;		/* Space to hold MEM_Str or MEM_Blob if szMalloc>0 */
-	int szMalloc;		/* Size of the zMalloc allocation */
+	/* The memory managed by this MEM. */
+	char *buf;
+	/* Size of the buf allocation. */
+	int size;
 	u32 uTemp;		/* Transient storage for serial_type in OP_MakeRecord */
 #ifdef SQL_DEBUG
 	Mem *pScopyFrom;	/* This Mem is a shallow copy of pScopyFrom */
@@ -244,14 +249,14 @@ mem_is_ephemeral(const struct Mem *mem)
 static inline bool
 mem_is_dynamic(const struct Mem *mem)
 {
-	return mem_is_bytes(mem) && mem->z == mem->zMalloc;
+	return mem_is_bytes(mem) && mem->u.z == mem->buf;
 }
 
 /** Return TRUE if MEM does not need to be freed or destroyed. */
 static inline bool
 mem_is_trivial(const struct Mem *mem)
 {
-	return mem->szMalloc == 0 && mem->type != MEM_TYPE_FRAME;
+	return mem->size == 0 && mem->type != MEM_TYPE_FRAME;
 }
 
 static inline bool
@@ -462,9 +467,9 @@ mem_set_dynamic(struct Mem *mem)
 {
 	if (!mem_is_bytes(mem))
 		return;
-	sql_xfree(mem->zMalloc);
-	mem->zMalloc = mem->z;
-	mem->szMalloc = mem->n;
+	sql_xfree(mem->buf);
+	mem->buf = mem->u.z;
+	mem->size = mem->u.n;
 }
 
 /**
