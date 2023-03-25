@@ -1947,12 +1947,13 @@ case OP_Column: {
 	/* Currently PSEUDO cursor does not have info about field types. */
 	if (pC->eCurType == CURTYPE_TARANTOOL)
 		field_type = pC->uc.pCursor->space->def->fields[p2].type;
+	assert(pDest->group == MEM_GROUP_DATA);
 	if (field_type == FIELD_TYPE_ANY)
-		pDest->flags |= MEM_Any;
+		pDest->group = MEM_GROUP_ANY;
 	else if (field_type == FIELD_TYPE_SCALAR)
-		pDest->flags |= MEM_Scalar;
+		pDest->group = MEM_GROUP_SCALAR;
 	else if (field_type == FIELD_TYPE_NUMBER)
-		pDest->flags |= MEM_Number;
+		pDest->group = MEM_GROUP_NUMBER;
 op_column_out:
 	REGISTER_TRACE(p, pOp->p3, pDest);
 	break;

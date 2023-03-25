@@ -59,6 +59,13 @@ enum mem_type {
 	MEM_TYPE_PTR		= 1 << 15,
 };
 
+enum sql_mem_group {
+	MEM_GROUP_DATA = 0,
+	MEM_GROUP_NUMBER,
+	MEM_GROUP_SCALAR,
+	MEM_GROUP_ANY,
+};
+
 /*
  * Internally, the vdbe manipulates nearly all SQL values as Mem
  * structures. Each Mem struct may cache multiple representations (string,
@@ -92,6 +99,8 @@ struct Mem {
 	} u;
 	/** Type of the value this MEM contains. */
 	enum mem_type type;
+	/** DATA, NUMBER, SCALAR or ANY group. */
+	enum sql_mem_group group;
 	/**
 	 * Flag indicating that the variable length value's memory is managed by
 	 * another MEM.
@@ -99,7 +108,6 @@ struct Mem {
 	bool is_ephemeral;
 	/** Flag indicating NULL set by OP_Null, not from data. */
 	bool is_cleared;
-	u32 flags;		/* Some combination of MEM_Null, MEM_Str, MEM_Dyn, etc. */
 	/* The memory managed by this MEM. */
 	char *buf;
 	/* Size of the buf allocation. */
@@ -110,13 +118,6 @@ struct Mem {
 	void *pFiller;		/* So that sizeof(Mem) is a multiple of 8 */
 #endif
 };
-
-/** MEM is of NUMBER meta-type. */
-#define MEM_Number    0x0001
-/** MEM is of SCALAR meta-type. */
-#define MEM_Scalar    0x0002
-/** MEM is of ANY meta-type. */
-#define MEM_Any       0x0004
 
 static inline bool
 mem_is_null(const struct Mem *mem)
@@ -153,7 +154,7 @@ mem_is_num(const struct Mem *mem)
 static inline bool
 mem_is_any(const struct Mem *mem)
 {
-	return (mem->flags & MEM_Any) != 0;
+	return mem->group == MEM_GROUP_ANY;
 }
 
 static inline bool
@@ -165,7 +166,7 @@ mem_is_container(const struct Mem *mem)
 static inline bool
 mem_is_metatype(const struct Mem *mem)
 {
-	return (mem->flags & (MEM_Number | MEM_Scalar | MEM_Any)) != 0;
+	return mem->group != MEM_GROUP_DATA;
 }
 
 static inline bool
@@ -271,7 +272,7 @@ static inline bool
 mem_is_comparable(const struct Mem *mem)
 {
 	uint32_t incmp = MEM_TYPE_ARRAY | MEM_TYPE_MAP | MEM_TYPE_INTERVAL;
-	return (mem->flags & MEM_Any) == 0 && (mem->type & incmp) == 0;
+	return mem->group != MEM_GROUP_ANY && (mem->type & incmp) == 0;
 }
 
 static inline bool
