@@ -228,7 +228,8 @@ int tarantoolsqlPrevious(BtCursor *pCur, int *pRes)
 }
 
 int
-sql_cursor_seek(struct BtCursor *cur, struct Mem *mems, uint32_t len, int *res)
+sql_cursor_seek(struct BtCursor *cur, struct sql_mem *mems, uint32_t len,
+		int *res)
 {
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
@@ -784,7 +785,7 @@ tarantoolsqlIdxKeyCompare(struct BtCursor *cursor,
 		 *      we should just compare the mem from unpacked with NULL.
 		 */
 		uint32_t fieldno = key_def->parts[i].fieldno;
-		struct Mem *mem = &unpacked->aMem[i];
+		struct sql_mem *mem = &unpacked->aMem[i];
 		struct key_part *part = &unpacked->key_def->parts[i];
 		if (fieldno >= base_len) {
 			if (mem_is_null(mem))

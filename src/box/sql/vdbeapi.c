@@ -247,9 +247,9 @@ sql_stmt_est_size(const struct Vdbe *v)
 	/* Opcodes */
 	size += sizeof(struct VdbeOp) * v->nOp;
 	/* Memory cells */
-	size += sizeof(struct Mem) * v->nMem;
+	size += sizeof(struct sql_mem) * v->nMem;
 	/* Bindings */
-	size += sizeof(struct Mem) * v->nVar;
+	size += sizeof(struct sql_mem) * v->nVar;
 	/* Bindings included in the result set */
 	size += sizeof(uint32_t) * v->res_var_count;
 	/* Cursors */
@@ -310,7 +310,7 @@ sql_stmt_query_str(const struct Vdbe *v)
 static int
 vdbeUnbind(struct Vdbe *p, int i)
 {
-	struct Mem *pVar;
+	struct sql_mem *pVar;
 	assert(p != NULL);
 	assert(p->magic == VDBE_MAGIC_RUN && p->pc < 0);
 	assert(i > 0);

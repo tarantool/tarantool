@@ -68,19 +68,19 @@
  * copies are not misused.
  */
 static void
-sqlVdbeMemAboutToChange(struct Vdbe *pVdbe, struct Mem *pMem)
+sqlVdbeMemAboutToChange(struct Vdbe *pVdbe, struct sql_mem *pMem)
 {
 	int i;
-	struct Mem *pX;
+	struct sql_mem *pX;
 	for (i = 0, pX = pVdbe->aMem; i < pVdbe->nMem; i++, pX++) {
 		if (mem_is_dynamic(pX)) {
-			if (pX->pScopyFrom == pMem) {
+			if (pX->copy_from == pMem) {
 				mem_set_invalid(pX);
-				pX->pScopyFrom = 0;
+				pX->copy_from = 0;
 			}
 		}
 	}
-	pMem->pScopyFrom = 0;
+	pMem->copy_from = 0;
 }
 
 # define memAboutToChange(P,M) sqlVdbeMemAboutToChange(P,M)
@@ -130,7 +130,7 @@ int sql_sort_count = 0;
 #ifdef SQL_TEST
 size_t sql_max_blobsize = 0;
 static void
-updateMaxBlobsize(struct Mem *p)
+updateMaxBlobsize(struct sql_mem *p)
 {
 	if (mem_is_bytes(p) && p->u.n > sql_max_blobsize)
 		sql_max_blobsize = p->u.n;
@@ -184,7 +184,7 @@ allocateCursor(
 	 * the top of the register space.  Cursor 1 is at Mem[p->nMem-1].
 	 * Cursor 2 is at Mem[p->nMem-2]. And so forth.
 	 */
-	struct Mem *pMem = iCur > 0 ? &p->aMem[p->nMem - iCur] : p->aMem;
+	struct sql_mem *pMem = iCur > 0 ? &p->aMem[p->nMem - iCur] : p->aMem;
 
 	VdbeCursor *pCx = 0;
 	int bt_offset = ROUND8(sizeof(VdbeCursor) + sizeof(uint32_t) * nField);
@@ -220,12 +220,12 @@ allocateCursor(
 #  define REGISTER_TRACE(P,R,M)
 #endif
 
-static struct Mem *
+static struct sql_mem *
 vdbe_prepare_null_out(struct Vdbe *v, int n)
 {
 	assert(n > 0);
 	assert(n <= (v->nMem + 1 - v->nCursor));
-	struct Mem *out = &v->aMem[n];
+	struct sql_mem *out = &v->aMem[n];
 	memAboutToChange(v, out);
 	mem_set_null(out);
 	return out;
@@ -346,7 +346,7 @@ vdbe_field_ref_fetch_data(struct vdbe_field_ref *field_ref, uint32_t fieldno)
  */
 static int
 vdbe_field_ref_fetch(struct vdbe_field_ref *field_ref, uint32_t fieldno,
-		     struct Mem *dest_mem)
+		     struct sql_mem *dest_mem)
 {
 	if (fieldno >= field_ref->field_count) {
 		UPDATE_MAX_BLOBSIZE(dest_mem);
@@ -375,11 +375,11 @@ int sqlVdbeExec(Vdbe *p)
 	/* The database */
 	struct sql *db = sql_get();
 	int iCompare = 0;          /* Result of last comparison */
-	struct Mem *aMem = p->aMem;       /* Copy of p->aMem */
-	struct Mem *pIn1 = 0;             /* 1st input operand */
-	struct Mem *pIn2 = 0;             /* 2nd input operand */
-	struct Mem *pIn3 = 0;             /* 3rd input operand */
-	struct Mem *pOut = 0;             /* Output operand */
+	struct sql_mem *aMem = p->aMem;       /* Copy of p->aMem */
+	struct sql_mem *pIn1 = 0;             /* 1st input operand */
+	struct sql_mem *pIn2 = 0;             /* 2nd input operand */
+	struct sql_mem *pIn3 = 0;             /* 3rd input operand */
+	struct sql_mem *pOut = 0;             /* Output operand */
 	int *aPermute = 0;         /* Permutation of columns for OP_Compare */
 	/*** INSERT STACK UNION HERE ***/
 
@@ -864,7 +864,7 @@ case OP_Blob: {                /* out2 */
  * The P4 value is used by sql_bind_parameter_name().
  */
 case OP_Variable: {            /* out2 */
-	struct Mem *pVar;       /* Value being transferred */
+	struct sql_mem *pVar;       /* Value being transferred */
 
 	assert(pOp->p1>0 && pOp->p1<=p->nVar);
 	assert(pOp->p4.z==0 || pOp->p4.z==sqlVListNumToName(p->pVList,pOp->p1));
@@ -958,7 +958,8 @@ case OP_SCopy: {            /* out2 */
 	assert(pOut!=pIn1);
 	mem_copy_as_ephemeral(pOut, pIn1);
 #ifdef SQL_DEBUG
-	if (pOut->pScopyFrom==0) pOut->pScopyFrom = pIn1;
+	if (pOut->copy_from == NULL)
+		pOut->copy_from = pIn1;
 #endif
 	break;
 }
@@ -983,7 +984,7 @@ case OP_ResultRow: {
 
 	p->pResultSet = &aMem[pOp->p1];
 #ifdef SQL_DEBUG
-	struct Mem *pMem = p->pResultSet;
+	struct sql_mem *pMem = p->pResultSet;
 	for (int i = 0; i < pOp->p2; i++) {
 		assert(memIsValid(&pMem[i]));
 		REGISTER_TRACE(p, pOp->p1+i, &pMem[i]);
@@ -1190,7 +1191,7 @@ case OP_FunctionByName: {
 	 */
 	enum field_type returns = func->def->returns;
 	int argc = pOp->p1;
-	struct Mem *argv = &aMem[pOp->p2];
+	struct sql_mem *argv = &aMem[pOp->p2];
 	struct port args, ret;
 
 	struct region *region = &fiber()->gc;
@@ -1201,7 +1202,7 @@ case OP_FunctionByName: {
 
 	pOut = vdbe_prepare_null_out(p, pOp->p3);
 	uint32_t size;
-	struct Mem *mem = (struct Mem *)port_get_vdbemem(&ret, &size);
+	struct sql_mem *mem = (struct sql_mem *)port_get_vdbemem(&ret, &size);
 	port_destroy(&ret);
 	if (mem == NULL) {
 		region_truncate(region, region_svp);
@@ -1411,7 +1412,7 @@ case OP_Map: {
 case OP_Getitem: {
 	int count = pOp->p1;
 	assert(count > 0);
-	struct Mem *value = &aMem[pOp->p3 + count];
+	struct sql_mem *value = &aMem[pOp->p3 + count];
 	if (mem_is_null(value)) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "Selecting is not "
 			 "possible from NULL");
@@ -1424,7 +1425,7 @@ case OP_Getitem: {
 	}
 
 	pOut = &aMem[pOp->p2];
-	struct Mem *keys = &aMem[pOp->p3];
+	struct sql_mem *keys = &aMem[pOp->p3];
 	if (mem_getitem(value, keys, count, pOut) != 0)
 		goto abort_due_to_error;
 	break;
@@ -1656,8 +1657,8 @@ case OP_Compare: {
 		assert(i < (int)def->part_count);
 		struct coll *coll = def->parts[i].coll;
 		bool is_rev = def->parts[i].sort_order == SORT_ORDER_DESC;
-		struct Mem *a = &aMem[p1+idx];
-		struct Mem *b = &aMem[p2+idx];
+		struct sql_mem *a = &aMem[p1 + idx];
+		struct sql_mem *b = &aMem[p2 + idx];
 		if (!mem_is_comparable(a)) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH, mem_str(a),
 				 "comparable type");
@@ -1890,8 +1891,8 @@ case OP_Column: {
 	int p2;            /* column number to retrieve */
 	VdbeCursor *pC;    /* The VDBE cursor */
 	BtCursor *pCrsr = NULL; /* The BTree cursor */
-	struct Mem *pDest;        /* Where to write the extracted value */
-	struct Mem *pReg;         /* PseudoTable input register */
+	struct sql_mem *pDest;        /* Where to write the extracted value */
+	struct sql_mem *pReg;         /* PseudoTable input register */
 
 	pC = p->apCsr[pOp->p1];
 	p2 = pOp->p2;
@@ -1931,7 +1932,7 @@ case OP_Column: {
 	}
 	assert(pC->eCurType == CURTYPE_TARANTOOL ||
 	       pC->eCurType == CURTYPE_PSEUDO);
-	struct Mem *default_val_mem =
+	struct sql_mem *default_val_mem =
 		pOp->p4type == P4_MEM ? pOp->p4.pMem : NULL;
 	if (vdbe_field_ref_fetch(&pC->field_ref, p2, pDest) != 0)
 		goto abort_due_to_error;
@@ -1990,7 +1991,7 @@ case OP_FetchByName: {
 		assert(ref->field_count == 1);
 		id = 0;
 	}
-	struct Mem *res = vdbe_prepare_null_out(p, pOp->p3);
+	struct sql_mem *res = vdbe_prepare_null_out(p, pOp->p3);
 	if (vdbe_field_ref_fetch(ref, id, res) != 0)
 		goto abort_due_to_error;
 	REGISTER_TRACE(p, pOp->p3, res);
@@ -2005,7 +2006,7 @@ case OP_FetchByName: {
  */
 case OP_Fetch: {
 	struct vdbe_field_ref *ref = p->aMem[pOp->p1].u.p;
-	struct Mem *res = vdbe_prepare_null_out(p, pOp->p3);
+	struct sql_mem *res = vdbe_prepare_null_out(p, pOp->p3);
 	if (vdbe_field_ref_fetch(ref, pOp->p2, res) != 0)
 		goto abort_due_to_error;
 	REGISTER_TRACE(p, pOp->p3, res);
@@ -2050,7 +2051,7 @@ case OP_ApplyType: {
  */
 case OP_MakeRecord: {
 	/* First field to be combined into the record. */
-	struct Mem *pData0;
+	struct sql_mem *pData0;
 	int nField;            /* Number of fields in the record */
 	u8 bIsEphemeral;
 
@@ -2153,7 +2154,7 @@ case OP_Count: {         /* out2 */
  */
 case OP_CreateForeignKey: {
 	assert(pOp->p1 >= 0);
-	struct Mem *mems = &aMem[pOp->p1];
+	struct sql_mem *mems = &aMem[pOp->p1];
 	assert(mem_is_uint(&mems[0]) && mem_is_uint(&mems[1]));
 	uint32_t child_id = mems[0].u.u;
 	uint32_t parent_id = mems[1].u.u;
@@ -2584,11 +2585,11 @@ case OP_SeekGT: {       /* jump, in3 */
 	uint32_t len = pOp->p4.i;
 	assert(pOp->p4type == P4_INT32);
 	assert(len <= cur->key_def->part_count);
-	struct Mem *mems = &aMem[pOp->p3];
+	struct sql_mem *mems = &aMem[pOp->p3];
 	bool is_op_change = false;
 	for (uint32_t i = 0; i < len; ++i) {
 		enum field_type type = cur->key_def->parts[i].type;
-		struct Mem *mem = &mems[i];
+		struct sql_mem *mem = &mems[i];
 		if (mem_is_field_compatible(mem, type))
 			continue;
 		if (!sql_type_is_numeric(type) || !mem_is_num(mem)) {
@@ -2686,12 +2687,12 @@ case OP_SeekGE: {       /* jump, in3 */
 	uint32_t len = pOp->p4.i;
 	assert(pOp->p4type == P4_INT32);
 	assert(len <= cur->key_def->part_count);
-	struct Mem *mems = &aMem[pOp->p3];
+	struct sql_mem *mems = &aMem[pOp->p3];
 	bool is_op_change = false;
 	bool is_zero = false;
 	for (uint32_t i = 0; i < len; ++i) {
 		enum field_type type = cur->key_def->parts[i].type;
-		struct Mem *mem = &mems[i];
+		struct sql_mem *mem = &mems[i];
 		if (mem_is_field_compatible(mem, type))
 			continue;
 		if (!sql_type_is_numeric(type) || !mem_is_num(mem)) {
@@ -2900,7 +2901,7 @@ case OP_NextSystemSpaceId: {
 	assert(pOp->p1 >= 0 && pOp->p3 >= 0);
 	uint32_t space_id = pOp->p1;
 	assert(space_id == BOX_SEQUENCE_ID || space_id == BOX_FUNC_ID);
-	struct Mem *res = &p->aMem[pOp->p2];
+	struct sql_mem *res = &p->aMem[pOp->p2];
 	char key[1];
 	struct tuple *tuple;
 	char *key_end = mp_encode_array(key, 0);
@@ -2963,7 +2964,7 @@ case OP_NextIdEphemeral: {
  */
 case OP_FCopy: {     /* out2 */
 	VdbeFrame *pFrame;
-	struct Mem *pIn1, *pOut;
+	struct sql_mem *pIn1, *pOut;
 	if (p->pFrame && ((pOp->p3 & OPFLAG_SAME_FRAME) == 0)) {
 		for(pFrame=p->pFrame; pFrame->pParent; pFrame=pFrame->pParent);
 		pIn1 = &pFrame->aMem[pOp->p1];
@@ -3566,17 +3567,17 @@ case OP_IdxInsert: {
  *           raise an error.
  */
 case OP_Update: {
-	struct Mem *new_tuple = &aMem[pOp->p1];
+	struct sql_mem *new_tuple = &aMem[pOp->p1];
 	if (pOp->p5 & OPFLAG_NCHANGE)
 		p->nChange++;
 
 	struct space *space = aMem[pOp->p4.i].u.p;
 	assert(pOp->p4type == P4_INT32);
 
-	struct Mem *key_mem = &aMem[pOp->p2];
+	struct sql_mem *key_mem = &aMem[pOp->p2];
 	assert(mem_is_bin(key_mem));
 
-	struct Mem *upd_fields_mem = &aMem[pOp->p3];
+	struct sql_mem *upd_fields_mem = &aMem[pOp->p3];
 	assert(mem_is_bin(upd_fields_mem));
 	uint32_t *upd_fields = (uint32_t *)upd_fields_mem->u.z;
 	uint32_t upd_fields_cnt = upd_fields_mem->u.n / sizeof(uint32_t);
@@ -3962,11 +3963,11 @@ case OP_Program: {        /* jump */
 	int nMem;               /* Number of memory registers for sub-program */
 	int nByte;              /* Bytes of runtime space required for sub-program */
 	/* Register to allocate runtime space. */
-	struct Mem *pRt;
+	struct sql_mem *pRt;
 	/* Used to iterate through memory cells. */
-	struct Mem *pMem;
+	struct sql_mem *pMem;
 	/* Last memory cell in new array. */
-	struct Mem *pEnd;
+	struct sql_mem *pEnd;
 	VdbeFrame *pFrame;      /* New vdbe frame to execute in */
 	SubProgram *pProgram;   /* Sub-program to execute */
 	void *t;                /* Token identifying trigger */
@@ -4018,7 +4019,7 @@ case OP_Program: {        /* jump */
 		assert(nMem>0);
 		if (pProgram->nCsr==0) nMem++;
 		nByte = ROUND8(sizeof(VdbeFrame))
-			+ nMem * sizeof(struct Mem)
+			+ nMem * sizeof(struct sql_mem)
 			+ pProgram->nCsr * sizeof(VdbeCursor *);
 		pFrame = sql_xmalloc0(nByte);
 		mem_set_frame(pRt, pFrame);
@@ -4041,7 +4042,7 @@ case OP_Program: {        /* jump */
 			mem_set_invalid(pMem);
 		}
 	} else {
-		pFrame = pRt->u.pFrame;
+		pFrame = pRt->u.frame;
 		assert(pProgram->nMem+pProgram->nCsr==pFrame->nChildMem
 		       || (pProgram->nCsr==0 && pProgram->nMem+1==pFrame->nChildMem));
 		assert(pProgram->nCsr==pFrame->nChildCsr);
@@ -4079,7 +4080,7 @@ case OP_Program: {        /* jump */
  */
 case OP_Param: {           /* out2 */
 	VdbeFrame *pFrame;
-	struct Mem *pIn;
+	struct sql_mem *pIn;
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	pFrame = p->pFrame;
 	pIn = &pFrame->aMem[pOp->p1 + pFrame->aOp[pFrame->pc].p1];
@@ -4196,7 +4197,7 @@ case OP_DecrJumpZero: {      /* jump, in1 */
 case OP_AggStep: {
 	int argc = pOp->p1;
 	sql_context *pCtx;
-	struct Mem *pMem;
+	struct sql_mem *pMem;
 
 	assert(pOp->p4type==P4_FUNCCTX);
 	pCtx = pOp->p4.pCtx;
@@ -4235,7 +4236,7 @@ case OP_AggStep: {
 case OP_AggFinal: {
 	assert(pOp->p1>0 && pOp->p1<=(p->nMem+1 - p->nCursor));
 	struct func_sql_builtin *func = (struct func_sql_builtin *)pOp->p4.func;
-	struct Mem *pIn1 = &aMem[pOp->p1];
+	struct sql_mem *pIn1 = &aMem[pOp->p1];
 
 	if (func->finalize != NULL && func->finalize(pIn1) != 0)
 		goto abort_due_to_error;

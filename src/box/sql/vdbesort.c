@@ -1377,7 +1377,7 @@ vdbeSorterFlushPMA(VdbeSorter * pSorter)
 }
 
 int
-sqlVdbeSorterWrite(const VdbeCursor *pCsr, struct Mem *pVal)
+sqlVdbeSorterWrite(const VdbeCursor *pCsr, struct sql_mem *pVal)
 {
 	VdbeSorter *pSorter;
 	int rc = 0;	/* Return Code */
@@ -2069,7 +2069,7 @@ vdbeSorterRowkey(const VdbeSorter * pSorter,	/* Sorter object */
 }
 
 int
-sqlVdbeSorterRowkey(const VdbeCursor *pCsr, struct Mem *pOut)
+sqlVdbeSorterRowkey(const VdbeCursor *pCsr, struct sql_mem *pOut)
 {
 	VdbeSorter *pSorter;
 	void *pKey;
@@ -2085,7 +2085,7 @@ sqlVdbeSorterRowkey(const VdbeCursor *pCsr, struct Mem *pOut)
 }
 
 int
-sqlVdbeSorterCompare(const struct VdbeCursor *pCsr, struct Mem *pVal,
+sqlVdbeSorterCompare(const struct VdbeCursor *pCsr, struct sql_mem *pVal,
 		     int nKeyCol, int *res)
 {
 	VdbeSorter *pSorter;

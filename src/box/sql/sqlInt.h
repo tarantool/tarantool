@@ -1194,7 +1194,7 @@ sql_space_tuple_log_count(struct space *space);
 struct UnpackedRecord {
 	/** Collation and sort-order information. */
 	struct key_def *key_def;
-	struct Mem *aMem;		/* Values */
+	struct sql_mem *aMem;		/* Values */
 	u16 nField;		/* Number of entries in apMem[] */
 	i8 default_rc;		/* Comparison result if keys are equal */
 	i8 r1;			/* Value to return if (lhs > rhs) */
@@ -2423,7 +2423,7 @@ struct PrintfArguments {
 	int nArg;		/* Total number of arguments */
 	int nUsed;		/* Number of arguments used so far */
 	/** The argument values. */
-	const struct Mem *apArg;
+	const struct sql_mem *apArg;
 };
 
 void sqlVXPrintf(StrAccum *, const char *, va_list);
@@ -4261,12 +4261,13 @@ struct func_sql_builtin {
 	 * Access checks are redundant, because all SQL built-ins
 	 * are predefined and are executed on SQL privilege level.
 	 */
-	void (*call)(struct sql_context *ctx, int argc, const struct Mem *argv);
+	void (*call)(struct sql_context *ctx, int argc,
+		     const struct sql_mem *argv);
 	/**
 	 * A VDBE-memory-compatible finalize method
 	 * (is valid only for aggregate function).
 	 */
-	int (*finalize)(struct Mem *mem);
+	int (*finalize)(struct sql_mem *mem);
 };
 
 /**

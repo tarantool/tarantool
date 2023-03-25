@@ -295,7 +295,7 @@ port_c_get_msgpack(struct port *base, uint32_t *size)
 extern void
 port_c_dump_lua(struct port *port, struct lua_State *L, bool is_flat);
 
-extern struct Mem *
+extern struct sql_mem *
 port_c_get_vdbemem(struct port *base, uint32_t *size);
 
 const struct port_vtab port_c_vtab = {

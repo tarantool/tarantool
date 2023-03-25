@@ -143,7 +143,7 @@ struct VdbeFrame {
 	Op *aOp;		/* Program instructions for parent frame */
 	i64 *anExec;		/* Event counters from parent frame */
 	/* Array of memory cells for parent frame. */
-	struct Mem *aMem;
+	struct sql_mem *aMem;
 	VdbeCursor **apCsr;	/* Array of Vdbe cursors for parent frame */
 	void *token;		/* Copy of SubProgram.token */
 	int nCursor;		/* Number of entries in apCsr */
@@ -170,7 +170,7 @@ struct VdbeFrame {
  * (Mem) which are only defined there.
  */
 struct sql_context {
-	struct Mem *pOut;		/* The return value is stored here */
+	struct sql_mem *pOut;		/* The return value is stored here */
 	/* A pointer to function implementation. */
 	struct func *func;
 	struct coll *coll;
@@ -261,12 +261,12 @@ struct Vdbe {
 	 */
 
 	Op *aOp;		/* Space to hold the virtual machine's program */
-	struct Mem *aMem;		/* The memory locations */
+	struct sql_mem *aMem;		/* The memory locations */
 	/** SQL metadata for DML/DQL queries. */
 	struct sql_column_metadata *metadata;
-	struct Mem *pResultSet;	/* Pointer to an array of results */
+	struct sql_mem *pResultSet;	/* Pointer to an array of results */
 	VdbeCursor **apCsr;	/* One element of this array for each open cursor */
-	struct Mem *aVar;		/* Values for the OP_Variable opcode. */
+	struct sql_mem *aVar;		/* Values for the OP_Variable opcode. */
 	/**
 	 * Array which contains positions of variables to be
 	 * bound in resulting set of SELECT.
@@ -371,7 +371,7 @@ sqlVdbeSorterClose(struct VdbeCursor *pCsr);
 
 /** Copy the current sorter key into the memory cell. */
 int
-sqlVdbeSorterRowkey(const struct VdbeCursor *cur, struct Mem *res);
+sqlVdbeSorterRowkey(const struct VdbeCursor *cur, struct sql_mem *res);
 
 /** Advance to the next element in the sorter. */
 int
@@ -381,7 +381,7 @@ int sqlVdbeSorterRewind(const VdbeCursor *, int *);
 
 /** Add a record to the sorter. */
 int
-sqlVdbeSorterWrite(const struct VdbeCursor *cur, struct Mem *rec);
+sqlVdbeSorterWrite(const struct VdbeCursor *cur, struct sql_mem *rec);
 
 /**
  * Compare the value in MEM with the key that the sorter cursor passed as the
@@ -396,7 +396,7 @@ sqlVdbeSorterWrite(const struct VdbeCursor *cur, struct Mem *rec);
  * current sorter key.
  */
 int
-sqlVdbeSorterCompare(const struct VdbeCursor *cur, struct Mem *val,
+sqlVdbeSorterCompare(const struct VdbeCursor *cur, struct sql_mem *val,
 		     int column_count, int *result);
 
 #ifdef SQL_DEBUG

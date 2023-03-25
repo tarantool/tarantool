@@ -296,7 +296,8 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 	if (op == TK_VARIABLE) {
 		Vdbe *pReprepare = pParse->pReprepare;
 		int iCol = pRight->iColumn;
-		const struct Mem *var = vdbe_get_bound_value(pReprepare, iCol);
+		const struct sql_mem *var = vdbe_get_bound_value(pReprepare,
+								 iCol);
 		if (var != NULL && mem_is_str(var)) {
 			uint32_t size = var->u.n + 1;
 			char *str = region_alloc(region, size);
