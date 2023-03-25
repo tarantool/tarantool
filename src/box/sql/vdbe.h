@@ -51,7 +51,6 @@ typedef struct Vdbe Vdbe;
  * The names of the following types declared in vdbeInt.h are required
  * for the VdbeOp definition.
  */
-typedef struct Mem Mem;
 typedef struct SubProgram SubProgram;
 
 /*
@@ -79,7 +78,7 @@ struct VdbeOp {
 		struct func *func;
 		sql_context *pCtx;	/* Used when p4type is P4_FUNCCTX */
 		struct coll *pColl;	/* Used when p4type is P4_COLLSEQ */
-		Mem *pMem;	/* Used when p4type is P4_MEM */
+		struct Mem *pMem;	/* Used when p4type is P4_MEM */
 		bool b;         /* Used when p4type is P4_BOOL */
 		int *ai;	/* Used when p4type is P4_INTARRAY */
 		SubProgram *pProgram;	/* Used when p4type is P4_SUBPROGRAM */

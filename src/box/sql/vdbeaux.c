@@ -1096,7 +1096,7 @@ void
 sqlVdbeFrameDelete(VdbeFrame * p)
 {
 	int i;
-	Mem *aMem = VdbeFrameMem(p);
+	struct Mem *aMem = VdbeFrameMem(p);
 	VdbeCursor **apCsr = (VdbeCursor **) & aMem[p->nChildMem];
 	for (i = 0; i < p->nChildCsr; i++)
 		sqlVdbeFreeCursor(apCsr[i]);
@@ -1125,10 +1125,10 @@ sqlVdbeList(Vdbe * p)
 	int nRow;		/* Stop when row count reaches this */
 	int nSub = 0;		/* Number of sub-vdbes seen so far */
 	SubProgram **apSub = 0;	/* Array of sub-vdbes */
-	Mem *pSub = 0;		/* Memory cell hold array of subprogs */
+	struct Mem *pSub = 0;		/* Memory cell hold array of subprogs */
 	int i;			/* Loop counter */
 	int rc = 0;	/* Return code */
-	Mem *pMem = &p->aMem[1];	/* First Mem of result set */
+	struct Mem *pMem = &p->aMem[1];	/* First Mem of result set */
 
 	assert(p->explain);
 	assert(p->magic == VDBE_MAGIC_RUN);
@@ -1440,8 +1440,8 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 	 */
 	do {
 		x.nNeeded = 0;
-		p->aMem = allocSpace(&x, p->aMem, nMem * sizeof(Mem));
-		p->aVar = allocSpace(&x, p->aVar, nVar * sizeof(Mem));
+		p->aMem = allocSpace(&x, p->aMem, nMem * sizeof(struct Mem));
+		p->aVar = allocSpace(&x, p->aVar, nVar * sizeof(struct Mem));
 		p->apCsr =
 		    allocSpace(&x, p->apCsr, nCursor * sizeof(VdbeCursor *));
 		if (x.nNeeded == 0)
@@ -2017,11 +2017,11 @@ sqlVdbeAllocUnpackedRecord(struct key_def *key_def)
 {
 	UnpackedRecord *p;	/* Unpacked record to return */
 	int nByte;		/* Number of bytes required for *p */
-	nByte =
-	    ROUND8(sizeof(UnpackedRecord)) + sizeof(Mem) * (key_def->part_count +
-							    1);
+	nByte = ROUND8(sizeof(struct UnpackedRecord)) +
+		sizeof(struct Mem) * (key_def->part_count + 1);
 	p = sql_xmalloc(nByte);
-	p->aMem = (Mem *) & ((char *)p)[ROUND8(sizeof(UnpackedRecord))];
+	size_t idx = ROUND8(sizeof(struct UnpackedRecord));
+	p->aMem = (struct Mem *)&((char *)p)[idx];
 	for (uint32_t i = 0; i < key_def->part_count + 1; ++i)
 		mem_create(&p->aMem[i]);
 	p->key_def = key_def;
@@ -2077,7 +2077,7 @@ sqlVdbeRecordUnpackMsgpack(struct key_def *key_def,	/* Information about the rec
 {
 	uint32_t n;
 	const char *zParse = pKey;
-	Mem *pMem = p->aMem;
+	struct Mem *pMem = p->aMem;
 	n = mp_decode_array(&zParse);
 	n = p->nField = MIN(n, key_def->part_count);
 	p->default_rc = 0;

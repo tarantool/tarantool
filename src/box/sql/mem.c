@@ -2803,7 +2803,7 @@ sqlVdbeMemGrow(struct Mem *pMem, int n, int bPreserve)
  * Return 0 on success or -1 if unable to complete the resizing.
  */
 int
-sqlVdbeMemClearAndResize(Mem * pMem, int szNew)
+sqlVdbeMemClearAndResize(struct Mem *pMem, int szNew)
 {
 	assert(szNew > 0);
 	if (pMem->size < szNew) {
@@ -2814,28 +2814,16 @@ sqlVdbeMemClearAndResize(Mem * pMem, int szNew)
 }
 
 void
-releaseMemArray(Mem * p, int N)
+releaseMemArray(struct Mem *p, int N)
 {
 	if (p && N) {
-		Mem *pEnd = &p[N];
+		struct Mem *pEnd = &p[N];
 		do {
 			mem_destroy(p);
 			p->type = MEM_TYPE_INVALID;
 			assert(p->group == MEM_GROUP_DATA);
 		} while ((++p) < pEnd);
 	}
-}
-
-/*
- * Return true if the Mem object contains a TEXT or BLOB that is
- * too large - whose size exceeds SQL_MAX_LENGTH.
- */
-int
-sqlVdbeMemTooBig(Mem * p)
-{
-	if (mem_is_bytes(p))
-		return p->u.n > SQL_MAX_LENGTH;
-	return 0;
 }
 
 int

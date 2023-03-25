@@ -114,7 +114,7 @@ struct Mem {
 	int size;
 	u32 uTemp;		/* Transient storage for serial_type in OP_MakeRecord */
 #ifdef SQL_DEBUG
-	Mem *pScopyFrom;	/* This Mem is a shallow copy of pScopyFrom */
+	struct Mem *pScopyFrom;	/* This Mem is a shallow copy of pScopyFrom */
 	void *pFiller;		/* So that sizeof(Mem) is a multiple of 8 */
 #endif
 };
@@ -804,11 +804,20 @@ int sqlVdbeMemClearAndResize(struct Mem * pMem, int n);
  * Release an array of N Mem elements
  */
 void
-releaseMemArray(Mem * p, int N);
+releaseMemArray(struct Mem *p, int N);
 
-#define VdbeFrameMem(p) ((Mem *)&((u8 *)p)[ROUND8(sizeof(VdbeFrame))])
+#define VdbeFrameMem(p) \
+	((struct Mem *)&((u8 *)p)[ROUND8(sizeof(struct VdbeFrame))])
 
-int sqlVdbeMemTooBig(Mem *);
+/**
+ * Return true if Mem contains a variable length with length value greater than
+ * SQL_MAX_LENGTH.
+ */
+static inline bool
+sqlVdbeMemTooBig(struct Mem *mem)
+{
+	return mem_is_bytes(mem) ? mem->u.n > SQL_MAX_LENGTH : false;
+}
 
 /* Return TRUE if Mem X contains dynamically allocated content - anything
  * that needs to be deallocated to avoid a leak.

@@ -68,10 +68,10 @@
  * copies are not misused.
  */
 static void
-sqlVdbeMemAboutToChange(Vdbe * pVdbe, Mem * pMem)
+sqlVdbeMemAboutToChange(struct Vdbe *pVdbe, struct Mem *pMem)
 {
 	int i;
-	Mem *pX;
+	struct Mem *pX;
 	for (i = 0, pX = pVdbe->aMem; i < pVdbe->nMem; i++, pX++) {
 		if (mem_is_dynamic(pX)) {
 			if (pX->pScopyFrom == pMem) {
@@ -130,7 +130,7 @@ int sql_sort_count = 0;
 #ifdef SQL_TEST
 size_t sql_max_blobsize = 0;
 static void
-updateMaxBlobsize(Mem *p)
+updateMaxBlobsize(struct Mem *p)
 {
 	if (mem_is_bytes(p) && p->u.n > sql_max_blobsize)
 		sql_max_blobsize = p->u.n;
@@ -184,7 +184,7 @@ allocateCursor(
 	 * the top of the register space.  Cursor 1 is at Mem[p->nMem-1].
 	 * Cursor 2 is at Mem[p->nMem-2]. And so forth.
 	 */
-	Mem *pMem = iCur>0 ? &p->aMem[p->nMem-iCur] : p->aMem;
+	struct Mem *pMem = iCur > 0 ? &p->aMem[p->nMem - iCur] : p->aMem;
 
 	VdbeCursor *pCx = 0;
 	int bt_offset = ROUND8(sizeof(VdbeCursor) + sizeof(uint32_t) * nField);
@@ -375,11 +375,11 @@ int sqlVdbeExec(Vdbe *p)
 	/* The database */
 	struct sql *db = sql_get();
 	int iCompare = 0;          /* Result of last comparison */
-	Mem *aMem = p->aMem;       /* Copy of p->aMem */
-	Mem *pIn1 = 0;             /* 1st input operand */
-	Mem *pIn2 = 0;             /* 2nd input operand */
-	Mem *pIn3 = 0;             /* 3rd input operand */
-	Mem *pOut = 0;             /* Output operand */
+	struct Mem *aMem = p->aMem;       /* Copy of p->aMem */
+	struct Mem *pIn1 = 0;             /* 1st input operand */
+	struct Mem *pIn2 = 0;             /* 2nd input operand */
+	struct Mem *pIn3 = 0;             /* 3rd input operand */
+	struct Mem *pOut = 0;             /* Output operand */
 	int *aPermute = 0;         /* Permutation of columns for OP_Compare */
 	/*** INSERT STACK UNION HERE ***/
 
@@ -864,7 +864,7 @@ case OP_Blob: {                /* out2 */
  * The P4 value is used by sql_bind_parameter_name().
  */
 case OP_Variable: {            /* out2 */
-	Mem *pVar;       /* Value being transferred */
+	struct Mem *pVar;       /* Value being transferred */
 
 	assert(pOp->p1>0 && pOp->p1<=p->nVar);
 	assert(pOp->p4.z==0 || pOp->p4.z==sqlVListNumToName(p->pVList,pOp->p1));
@@ -1890,8 +1890,8 @@ case OP_Column: {
 	int p2;            /* column number to retrieve */
 	VdbeCursor *pC;    /* The VDBE cursor */
 	BtCursor *pCrsr = NULL; /* The BTree cursor */
-	Mem *pDest;        /* Where to write the extracted value */
-	Mem *pReg;         /* PseudoTable input register */
+	struct Mem *pDest;        /* Where to write the extracted value */
+	struct Mem *pReg;         /* PseudoTable input register */
 
 	pC = p->apCsr[pOp->p1];
 	p2 = pOp->p2;
@@ -2049,7 +2049,8 @@ case OP_ApplyType: {
  * into ephemeral space. Thus, sort of memory optimization can be performed.
  */
 case OP_MakeRecord: {
-	Mem *pData0;           /* First field to be combined into the record */
+	/* First field to be combined into the record. */
+	struct Mem *pData0;
 	int nField;            /* Number of fields in the record */
 	u8 bIsEphemeral;
 
@@ -2962,7 +2963,7 @@ case OP_NextIdEphemeral: {
  */
 case OP_FCopy: {     /* out2 */
 	VdbeFrame *pFrame;
-	Mem *pIn1, *pOut;
+	struct Mem *pIn1, *pOut;
 	if (p->pFrame && ((pOp->p3 & OPFLAG_SAME_FRAME) == 0)) {
 		for(pFrame=p->pFrame; pFrame->pParent; pFrame=pFrame->pParent);
 		pIn1 = &pFrame->aMem[pOp->p1];
@@ -3960,9 +3961,12 @@ case OP_LoadAnalysis: {
 case OP_Program: {        /* jump */
 	int nMem;               /* Number of memory registers for sub-program */
 	int nByte;              /* Bytes of runtime space required for sub-program */
-	Mem *pRt;               /* Register to allocate runtime space */
-	Mem *pMem;              /* Used to iterate through memory cells */
-	Mem *pEnd;              /* Last memory cell in new array */
+	/* Register to allocate runtime space. */
+	struct Mem *pRt;
+	/* Used to iterate through memory cells. */
+	struct Mem *pMem;
+	/* Last memory cell in new array. */
+	struct Mem *pEnd;
 	VdbeFrame *pFrame;      /* New vdbe frame to execute in */
 	SubProgram *pProgram;   /* Sub-program to execute */
 	void *t;                /* Token identifying trigger */
@@ -4014,7 +4018,7 @@ case OP_Program: {        /* jump */
 		assert(nMem>0);
 		if (pProgram->nCsr==0) nMem++;
 		nByte = ROUND8(sizeof(VdbeFrame))
-			+ nMem * sizeof(Mem)
+			+ nMem * sizeof(struct Mem)
 			+ pProgram->nCsr * sizeof(VdbeCursor *);
 		pFrame = sql_xmalloc0(nByte);
 		mem_set_frame(pRt, pFrame);
@@ -4075,7 +4079,7 @@ case OP_Program: {        /* jump */
  */
 case OP_Param: {           /* out2 */
 	VdbeFrame *pFrame;
-	Mem *pIn;
+	struct Mem *pIn;
 	pOut = vdbe_prepare_null_out(p, pOp->p2);
 	pFrame = p->pFrame;
 	pIn = &pFrame->aMem[pOp->p1 + pFrame->aOp[pFrame->pc].p1];
@@ -4192,7 +4196,7 @@ case OP_DecrJumpZero: {      /* jump, in1 */
 case OP_AggStep: {
 	int argc = pOp->p1;
 	sql_context *pCtx;
-	Mem *pMem;
+	struct Mem *pMem;
 
 	assert(pOp->p4type==P4_FUNCCTX);
 	pCtx = pOp->p4.pCtx;

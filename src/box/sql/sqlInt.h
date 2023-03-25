@@ -1194,7 +1194,7 @@ sql_space_tuple_log_count(struct space *space);
 struct UnpackedRecord {
 	/** Collation and sort-order information. */
 	struct key_def *key_def;
-	Mem *aMem;		/* Values */
+	struct Mem *aMem;		/* Values */
 	u16 nField;		/* Number of entries in apMem[] */
 	i8 default_rc;		/* Comparison result if keys are equal */
 	i8 r1;			/* Value to return if (lhs > rhs) */

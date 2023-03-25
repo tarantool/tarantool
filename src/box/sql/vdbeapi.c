@@ -310,7 +310,7 @@ sql_stmt_query_str(const struct Vdbe *v)
 static int
 vdbeUnbind(struct Vdbe *p, int i)
 {
-	Mem *pVar;
+	struct Mem *pVar;
 	assert(p != NULL);
 	assert(p->magic == VDBE_MAGIC_RUN && p->pc < 0);
 	assert(i > 0);
