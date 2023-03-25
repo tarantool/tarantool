@@ -515,7 +515,7 @@ void
 mem_set_null_clear(struct Mem *mem)
 {
 	mem_clear(mem);
-	mem->flags = MEM_Cleared;
+	mem->is_cleared = true;
 }
 
 static inline int
@@ -2635,7 +2635,7 @@ mem_cmp(const struct Mem *a, const struct Mem *b, int *result,
 	enum mem_class class_b = mem_type_class(b->type);
 	if (mem_is_any_null(a, b)) {
 		*result = class_a - class_b;
-		if ((a->flags & b->flags & MEM_Cleared) != 0)
+		if (a->is_cleared && b->is_cleared)
 			*result = 1;
 		return 0;
 	}

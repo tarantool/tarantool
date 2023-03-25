@@ -97,6 +97,8 @@ struct Mem {
 	 * another MEM.
 	 */
 	bool is_ephemeral;
+	/** Flag indicating NULL set by OP_Null, not from data. */
+	bool is_cleared;
 	u32 flags;		/* Some combination of MEM_Null, MEM_Str, MEM_Dyn, etc. */
 	/* The memory managed by this MEM. */
 	char *buf;
@@ -115,7 +117,6 @@ struct Mem {
 #define MEM_Scalar    0x0002
 /** MEM is of ANY meta-type. */
 #define MEM_Any       0x0004
-#define MEM_Cleared   0x0200	/* NULL set by OP_Null, not from data */
 
 static inline bool
 mem_is_null(const struct Mem *mem)
@@ -262,8 +263,8 @@ mem_is_trivial(const struct Mem *mem)
 static inline bool
 mem_is_cleared(const struct Mem *mem)
 {
-	assert((mem->flags & MEM_Cleared) == 0 || mem->type == MEM_TYPE_NULL);
-	return (mem->flags & MEM_Cleared) != 0;
+	assert(!mem->is_cleared || mem->type == MEM_TYPE_NULL);
+	return mem->is_cleared;
 }
 
 static inline bool

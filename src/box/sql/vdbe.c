@@ -805,7 +805,7 @@ case OP_String: {          /* out2 */
  * is less than P2 (typically P3 is zero) then only register P2 is
  * set to NULL.
  *
- * If the P1 value is non-zero, then also set the MEM_Cleared flag so that
+ * If the P1 value is non-zero, then also set the is_cleared flag so that
  * NULL values will not compare equal even if SQL_NULLEQ is set on
  * OP_Ne or OP_Eq.
  */
