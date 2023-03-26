@@ -712,7 +712,11 @@ end
 -- Print result to stdout
 --
 local function local_print(self, output)
-    if output:endswith(output_eos["lua"]) then
+    --
+    -- Be cautious, `output` may be any printable object, e.g. tarantoolctl
+    -- passes cdata errors in some cases.
+    --
+    if type(output) == 'string' and output:endswith(output_eos["lua"]) then
         local new_local_eos
         if self.remote ~= nil then
             new_local_eos = self.remote.local_eos
