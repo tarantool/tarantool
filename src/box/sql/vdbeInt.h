@@ -378,11 +378,9 @@ int sqlVdbeSorterRewind(const VdbeCursor *, int *);
 int sqlVdbeSorterWrite(const VdbeCursor *, Mem *);
 int sqlVdbeSorterCompare(const VdbeCursor *, Mem *, int, int *);
 
-int sqlVdbeMemTranslate(Mem *, u8);
 #ifdef SQL_DEBUG
 void sqlVdbePrintSql(Vdbe *);
 #endif
-int sqlVdbeMemHandleBom(Mem * pMem);
 
 struct mpstream;
 struct region;
