@@ -590,9 +590,11 @@ struct index_vtab {
 	 *  insert (!) here the successor tuple is returned. In other words,
 	 *  here will be stored the tuple, before which new tuple is inserted.
 	 */
-	int (*replace)(struct index *index, struct tuple *old_tuple,
-		       struct tuple *new_tuple, enum dup_replace_mode mode,
-		       struct tuple **result, struct tuple **successor);
+	int (*replace)(struct index *index, struct tuple_multikey old_tuple,
+		       struct tuple_multikey new_tuple,
+		       enum dup_replace_mode mode,
+		       struct tuple_multikey *result,
+		       struct tuple_multikey *successor);
 	/**
 	 * Create an index iterator. Iterator can be placed right after
 	 * position, passed in pos argument. Argument pos is an extracted
@@ -938,9 +940,10 @@ index_get(struct index *index, const char *key,
 }
 
 static inline int
-index_replace(struct index *index, struct tuple *old_tuple,
-	      struct tuple *new_tuple, enum dup_replace_mode mode,
-	      struct tuple **result, struct tuple **successor)
+index_replace(struct index *index, struct tuple_multikey old_tuple,
+	      struct tuple_multikey new_tuple,
+	      enum dup_replace_mode mode, struct tuple_multikey *result,
+	      struct tuple_multikey *successor)
 {
 	return index->vtab->replace(index, old_tuple, new_tuple, mode,
 				    result, successor);
@@ -1075,9 +1078,9 @@ int
 generic_index_get_internal(struct index *index, const char *key,
 			   uint32_t part_count, struct tuple **result);
 int generic_index_get(struct index *, const char *, uint32_t, struct tuple **);
-int generic_index_replace(struct index *, struct tuple *, struct tuple *,
-			  enum dup_replace_mode,
-			  struct tuple **, struct tuple **);
+int generic_index_replace(struct index *, struct tuple_multikey,
+			  struct tuple_multikey, enum dup_replace_mode,
+			  struct tuple_multikey *, struct tuple_multikey *);
 struct index_read_view *
 generic_index_create_read_view(struct index *index);
 void generic_index_stat(struct index *, struct info_handler *);
@@ -1094,9 +1097,12 @@ void generic_index_end_build(struct index *);
 int
 disabled_index_build_next(struct index *index, struct tuple *tuple);
 int
-disabled_index_replace(struct index *index, struct tuple *old_tuple,
-		       struct tuple *new_tuple, enum dup_replace_mode mode,
-		       struct tuple **result, struct tuple **successor);
+disabled_index_replace(struct index *index,
+		       struct tuple_multikey old_tuple_multikey,
+		       struct tuple_multikey new_tuple_multikey,
+		       enum dup_replace_mode mode,
+		       struct tuple_multikey *result,
+		       struct tuple_multikey *successor);
 int
 exhausted_iterator_next(struct iterator *it, struct tuple **ret);
 int

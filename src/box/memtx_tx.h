@@ -177,28 +177,57 @@ void
 memtx_tx_abort_all_for_ddl(struct txn *ddl_owner);
 
 /**
- * @brief Add a statement to transaction manager's history.
- * Until unlinking or releasing the space could internally contain
- * wrong tuples and must be cleaned through memtx_tx_tuple_clarify call.
- * With that clarifying the statement will be visible to current transaction,
- * but invisible to all others.
- * Follows signature of @sa memtx_space_replace_all_keys .
+ * Notifies transaction manager about insertion of a tuple in index: just for
+ * understanding, that might be:
+ * REPLACE, and old_tuple is NULL because it is unknown yet.
+ * INSERT, and old_tuple is NULL because there's no such tuple.
+ * UPDATE, and old_tuple is not NULL and is the updated tuple.
  *
  * NB: can trigger story garbage collection.
  *
- * @param stmt current statement.
- * @param old_tuple the tuple that should be removed (can be NULL).
- * @param new_tuple the tuple that should be inserted (can be NULL).
- * @param mode      dup_replace_mode, used only if new_tuple is not
- *                  NULL and old_tuple is NULL, and only for the
- *                  primary key.
- * @param result - old or replaced tuple.
+ * @param txn current transaction.
+ * @param index index replace happened in.
+ * @param old_tuple the tuple that was removed (can be NULL).
+ * @param new_tuple the tuple that was inserted.
+ * @param mode      dup_replace_mode, used only if new_tuple is not NULL and
+ *                  old_tuple is NULL, and only for the primary key.
+ * @param replaced - old or replaced tuple.
  * @return 0 on success, -1 on error (diag is set).
  */
 int
-memtx_tx_history_add_stmt(struct txn_stmt *stmt, struct tuple *old_tuple,
-			  struct tuple *new_tuple, enum dup_replace_mode mode,
-			  struct tuple **result);
+memtx_tx_history_add_insert(struct txn *txn, struct index *index,
+			    struct tuple_multikey old_tuple_multikey,
+			    struct tuple_multikey new_tuple_multikey,
+			    enum dup_replace_mode mode,
+			    struct tuple_multikey *replaced_multikey,
+			    struct tuple_multikey successor_multikey);
+
+/**
+ * Notify transaction manager about current insert statement failure
+ * (effectively rolls back a series of `memtx_tx_history_add_insert`).
+ */
+int
+memtx_tx_history_undo_insert_stmt(struct txn *txn, uint32_t iid);
+
+/**
+ * Notify transaction manager about current insert statement failure
+ * (effectively rolls back a series of `memtx_tx_history_add_insert`).
+ */
+int
+memtx_tx_history_undo_insert_stmt(struct txn *txn, uint32_t iid);
+
+/**
+ * Notifies transaction manager about deletion of a tuple in index.
+ *
+ * @param txn current transaction.
+ * @param index index deletion happened in.
+ * @param old_tuple the tuple that was removed.
+ * @param replaced - old or replaced tuple.
+ * @return 0 on success, -1 on error (diag is set).
+ */
+int
+memtx_tx_history_add_delete(struct txn *txn, struct index *index,
+			    struct tuple *old_tuple, struct tuple **replaced);
 
 /**
  * @brief Rollback (undo) a statement from transaction manager's history.
@@ -257,8 +286,8 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt, size_t *bsize);
 /** Helper of memtx_tx_tuple_clarify */
 struct tuple *
 memtx_tx_tuple_clarify_slow(struct txn *txn, struct space *space,
-			    struct tuple *tuples, struct index *index,
-			    uint32_t mk_index);
+			    struct tuple_multikey tuple_multikey,
+			    struct index *index);
 
 /** Helper of memtx_tx_track_point */
 int
@@ -293,9 +322,11 @@ memtx_tx_track_point(struct txn *txn, struct space *space,
  * Helper of memtx_tx_track_gap.
  */
 int
-memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *index,
-			struct tuple *successor, enum iterator_type type,
-			const char *key, uint32_t part_count);
+memtx_tx_track_gap_slow(struct txn *txn, struct space *space,
+			struct index *index,
+			struct tuple_multikey successor_multikey,
+			enum iterator_type type, const char *key,
+			uint32_t part_count);
 
 /**
  * Record in TX manager that a transaction @a txn have read nothing
@@ -311,8 +342,9 @@ memtx_tx_track_gap_slow(struct txn *txn, struct space *space, struct index *inde
  */
 static inline int
 memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
-		   struct tuple *successor, enum iterator_type type,
-		   const char *key, uint32_t part_count)
+		   struct tuple_multikey successor_multikey,
+		   enum iterator_type type, const char *key,
+		   uint32_t part_count)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
 		return 0;
@@ -321,7 +353,7 @@ memtx_tx_track_gap(struct txn *txn, struct space *space, struct index *index,
 	/* Skip ephemeral spaces. */
 	if (space == NULL || space->def->id == 0)
 		return 0;
-	return memtx_tx_track_gap_slow(txn, space, index, successor,
+	return memtx_tx_track_gap_slow(txn, space, index, successor_multikey,
 				       type, key, part_count);
 }
 
@@ -374,12 +406,12 @@ memtx_tx_story_gc();
  */
 static inline struct tuple *
 memtx_tx_tuple_clarify(struct txn *txn, struct space *space,
-		       struct tuple *tuple, struct index *index,
-		       uint32_t mk_index)
+		       struct tuple_multikey tuple_multikey,
+		       struct index *index)
 {
 	if (!memtx_tx_manager_use_mvcc_engine)
-		return tuple;
-	return memtx_tx_tuple_clarify_slow(txn, space, tuple, index, mk_index);
+		return tuple_multikey.tuple;
+	return memtx_tx_tuple_clarify_slow(txn, space, tuple_multikey, index);
 }
 
 uint32_t

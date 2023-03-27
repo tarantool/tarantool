@@ -211,7 +211,11 @@ bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
 		struct index *idx = iterator->index;
 		struct txn *txn = in_txn();
 		struct space *space = space_by_id(iterator->space_id);
-		*ret = memtx_tx_tuple_clarify(txn, space, tuple, idx, 0);
+		struct tuple_multikey tuple_multikey = {
+			/* .tuple = */ tuple,
+			/* .multikey_idx = */ (uint32_t)MULTIKEY_NONE,
+		};
+		*ret = memtx_tx_tuple_clarify(txn, space, tuple_multikey, idx);
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
@@ -280,21 +284,29 @@ make_key(const char *field, uint32_t *key_len)
 }
 
 static int
-memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
-			   struct tuple *new_tuple, enum dup_replace_mode mode,
-			   struct tuple **result, struct tuple **successor)
+memtx_bitset_index_replace(struct index *base,
+			   struct tuple_multikey old_tuple_multikey,
+			   struct tuple_multikey new_tuple_multikey,
+			   enum dup_replace_mode mode,
+			   struct tuple_multikey *result,
+			   struct tuple_multikey *successor)
 {
 	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
 
 	/* BITSET index doesn't support ordering. */
-	*successor = NULL;
+	successor->tuple = NULL;
+	successor->multikey_idx = MULTIKEY_NONE;
+
+	struct tuple *old_tuple = old_tuple_multikey.tuple;
+	struct tuple *new_tuple = new_tuple_multikey.tuple;
 
 	assert(!base->def->opts.is_unique);
 	assert(!base->def->key_def->is_multikey);
 	assert(old_tuple != NULL || new_tuple != NULL);
 	(void) mode;
 
-	*result = NULL;
+	result->tuple = NULL;
+	result->multikey_idx = MULTIKEY_NONE;
 
 	if (old_tuple != NULL) {
 #ifndef OLD_GOOD_BITSET
@@ -304,7 +316,7 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 #endif /* #ifndef OLD_GOOD_BITSET */
 		if (tt_bitset_index_contains_value(&index->index,
 						   (size_t) value)) {
-			*result = old_tuple;
+			result->tuple = old_tuple;
 
 			assert(old_tuple != new_tuple);
 			tt_bitset_index_remove_value(&index->index, value);

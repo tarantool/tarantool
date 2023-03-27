@@ -159,7 +159,11 @@ index_rtree_iterator_next(struct iterator *i, struct tuple **ret)
 		struct index *idx = i->index;
 		struct txn *txn = in_txn();
 		struct space *space = space_by_id(i->space_id);
-		*ret = memtx_tx_tuple_clarify(txn, space, *ret, idx, 0);
+		struct tuple_multikey ret_multikey = {
+			/* .tuple = */ *ret,
+			/* .multikey_idx = */ (uint32_t)MULTIKEY_NONE,
+		};
+		*ret = memtx_tx_tuple_clarify(txn, space, ret_multikey, idx);
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
@@ -243,7 +247,12 @@ memtx_rtree_index_get_internal(struct index *base, const char *key,
 			break;
 		struct txn *txn = in_txn();
 		struct space *space = space_by_id(base->def->space_id);
-		*result = memtx_tx_tuple_clarify(txn, space, tuple, base, 0);
+		struct tuple_multikey tuple_multikey = {
+			/* .tuple = */ tuple,
+			/* .multikey_idx = */ (uint32_t)MULTIKEY_NONE,
+		};
+		*result = memtx_tx_tuple_clarify(txn, space, tuple_multikey,
+						 base);
 /********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND START*********/
 		memtx_tx_story_gc();
 /*********MVCC TRANSACTION MANAGER STORY GARBAGE COLLECTION BOUND END**********/
@@ -253,15 +262,22 @@ memtx_rtree_index_get_internal(struct index *base, const char *key,
 }
 
 static int
-memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
-			  struct tuple *new_tuple, enum dup_replace_mode mode,
-			  struct tuple **result, struct tuple **successor)
+memtx_rtree_index_replace(struct index *base,
+			  struct tuple_multikey old_tuple_multikey,
+			  struct tuple_multikey new_tuple_multikey,
+			  enum dup_replace_mode mode,
+			  struct tuple_multikey *result,
+			  struct tuple_multikey *successor)
 {
 	(void)mode;
 	struct memtx_rtree_index *index = (struct memtx_rtree_index *)base;
 
 	/* RTREE index doesn't support ordering. */
-	*successor = NULL;
+	successor->tuple = NULL;
+	successor->multikey_idx = MULTIKEY_NONE;
+
+	struct tuple *old_tuple = old_tuple_multikey.tuple;
+	struct tuple *new_tuple = new_tuple_multikey.tuple;
 
 	struct rtree_rect rect;
 	if (new_tuple) {
@@ -275,7 +291,8 @@ memtx_rtree_index_replace(struct index *base, struct tuple *old_tuple,
 		if (!rtree_remove(&index->tree, &rect, old_tuple))
 			old_tuple = NULL;
 	}
-	*result = old_tuple;
+	result->tuple = old_tuple;
+	result->multikey_idx = MULTIKEY_NONE;
 	return 0;
 }
 

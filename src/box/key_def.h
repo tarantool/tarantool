@@ -123,6 +123,20 @@ struct key_def;
 struct tuple;
 
 /**
+ * Generalization of tuple in case of multikey indexes.
+ */
+struct tuple_multikey {
+	/** Tuple for operation. */
+	struct tuple *tuple;
+	/**
+	 * Key index of multikey @tuple. Set to `MULTIKEY_NONE`
+	 * when index definition is not multikey or when the operation does not
+	 * require the key index of @tuple.
+	 */
+	uint32_t multikey_idx;
+};
+
+/**
  * Get is_nullable property of key_part.
  * @param key_part for which attribute is being fetched
  *
@@ -161,7 +175,7 @@ typedef char *(*tuple_extract_key_raw_t)(const char *data,
 					 uint32_t *key_size,
 					 struct region *region);
 /** @copydoc tuple_hash() */
-typedef uint32_t (*tuple_hash_t)(struct tuple *tuple,
+typedef uint32_t (*tuple_hash_t)(struct tuple_multikey tuple_multikey,
 				 struct key_def *key_def);
 /** @copydoc key_hash() */
 typedef uint32_t (*key_hash_t)(const char *key,
@@ -1090,14 +1104,14 @@ tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
 
 /**
  * Calculates a common hash value for a tuple
- * @param tuple - a tuple
+ * @param tuple_multikey - a multikey tuple
  * @param key_def - key_def for field description
  * @return - hash value
  */
 static inline uint32_t
-tuple_hash(struct tuple *tuple, struct key_def *key_def)
+tuple_hash(struct tuple_multikey tuple_multikey, struct key_def *key_def)
 {
-	return key_def->tuple_hash(tuple, key_def);
+	return key_def->tuple_hash(tuple_multikey, key_def);
 }
 
 /**

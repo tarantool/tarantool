@@ -7,7 +7,7 @@ local g = t.group()
 -- Please update them, if you changed the relevant structures.
 local SIZE_OF_STMT = 136
 -- Size of story with one link (for spaces with 1 index).
-local SIZE_OF_STORY = 144
+local SIZE_OF_STORY = 120
 -- Size of tuple with 2 number fields
 local SIZE_OF_TUPLE = 9
 -- Size of xrow for tuples with 2 number fields
