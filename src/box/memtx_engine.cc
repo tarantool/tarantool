@@ -1503,10 +1503,38 @@ memtx_engine_stat_tx(struct memtx_engine *memtx, struct info_handler *h)
 	info_table_end(h); /* tx */
 }
 
+/** Appends memtx data stats to info. */
+static void
+memtx_engine_stat_data(struct memtx_engine *memtx, struct info_handler *h)
+{
+	(void)memtx;
+	struct memtx_allocator_stats stats;
+	memtx_allocators_stats(&stats);
+	info_table_begin(h, "data");
+	info_append_int(h, "total", stats.used_total);
+	info_append_int(h, "read_view", stats.used_rv);
+	info_append_int(h, "garbage", stats.used_gc);
+	info_table_end(h); /* data */
+}
+
+/** Appends memtx index stats to info. */
+static void
+memtx_engine_stat_index(struct memtx_engine *memtx, struct info_handler *h)
+{
+	struct matras_stats *stats = &memtx->index_extent_stats;
+	info_table_begin(h, "index");
+	info_append_int(h, "total", stats->extent_count * MEMTX_EXTENT_SIZE);
+	info_append_int(h, "read_view",
+			stats->read_view_extent_count * MEMTX_EXTENT_SIZE);
+	info_table_end(h); /* index */
+}
+
 void
 memtx_engine_stat(struct memtx_engine *memtx, struct info_handler *h)
 {
 	info_begin(h);
+	memtx_engine_stat_data(memtx, h);
+	memtx_engine_stat_index(memtx, h);
 	memtx_engine_stat_tx(memtx, h);
 	info_end(h);
 }
