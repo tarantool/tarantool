@@ -293,6 +293,19 @@ RaftError::RaftError(const char *file, unsigned line, const char *format, ...)
 	va_end(ap);
 }
 
+const struct type_info type_HandleIsClosed =
+	make_type("HandleIsClosed", &type_Exception);
+
+HandleIsClosed::HandleIsClosed(const char *file, unsigned line,
+			       const char *format, ...)
+	: Exception(&type_HandleIsClosed, file, line)
+{
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(this, format, ap);
+	va_end(ap);
+}
+
 #define BuildAlloc(type)				\
 	void *p = malloc(sizeof(type));			\
 	if (p == NULL)					\
@@ -424,6 +437,18 @@ BuildRaftError(const char *file, unsigned line, const char *format, ...)
 {
 	BuildAlloc(RaftError);
 	RaftError *e =  new (p) RaftError(file, line, "");
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(e, format, ap);
+	va_end(ap);
+	return e;
+}
+
+struct error *
+BuildHandleIsClosed(const char *file, unsigned line, const char *format, ...)
+{
+	BuildAlloc(HandleIsClosed);
+	HandleIsClosed *e = new(p) HandleIsClosed(file, line, "");
 	va_list ap;
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);
