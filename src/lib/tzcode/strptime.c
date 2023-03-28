@@ -125,9 +125,11 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 		c = *ptr++;
 
 		if (c != '%') {
-			if (isspace((u_char)c))
+			/* Eat up white-space in buffer and in format. */
+			if (isspace((u_char)c)) {
 				while (*buf != 0 && isspace((u_char)*buf))
 					buf++;
+			}
 			else if (c != *buf++)
 				return NULL;
 			continue;
@@ -662,9 +664,10 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 	if ((flags & (FLAG_YEAR | FLAG_YDAY)) == (FLAG_YEAR | FLAG_YDAY)) {
 		if (!(flags & FLAG_MONTH)) {
 			i = 0;
-			while (tm->tm_yday >=
-			       start_of_month[isleap(tm->tm_year +
-						     TM_YEAR_BASE)][i])
+			while (i <= 12 &&
+			       tm->tm_yday >=
+				       start_of_month[isleap(tm->tm_year +
+							     TM_YEAR_BASE)][i])
 				i++;
 			if (i > 12) {
 				i = 1;
