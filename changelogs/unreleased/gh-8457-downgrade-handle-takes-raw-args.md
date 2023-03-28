@@ -1,4 +1,4 @@
 ## bugfix/box
 
-* Fixed a missed case of downgrading a function with `takes_raw_args` option
-  (gh-8457).
+* The `takes_raw_args` option is now handled correctly
+  during downgrading (gh-8457).

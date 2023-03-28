@@ -1,4 +1,4 @@
 ## bugfix/sql
 
-* ARRAY, MAP, and INTERVAL values can no longer be used as ORDER BY
-  arguments (gh-6668).
+* Now the `ARRAY`, `MAP`, and `INTERVAL` values cannot be used as
+  arguments in the `ORDER BY` clause (gh-6668).
