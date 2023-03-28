@@ -109,16 +109,16 @@ struct {</td></tr>
 <tr class="memitem:a6edcf6b5ce400f83345c6c108c93da4d"><td class="memItemLeft" valign="top">};&#160;</td><td class="memItemRight" valign="bottom"></td></tr>
 <tr class="separator:a6edcf6b5ce400f83345c6c108c93da4d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1782075c62f8d5e3b0f6a87c8382d373"><td class="memItemLeft" align="right" valign="top"><a id="a1782075c62f8d5e3b0f6a87c8382d373"></a>
-char&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="unionPACKED.html#a1782075c62f8d5e3b0f6a87c8382d373">padding</a> [BOX_KEY_PART_DEF_T_SIZE]</td></tr>
+char&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="unionPACKED.html#a1782075c62f8d5e3b0f6a87c8382d373">padding</a> [<a class="el" href="module_8h.html#a99fb83031ce9923c84392b4e92f956b5a372d10ebd12378fbc28f503f5c14a433">BOX_KEY_PART_DEF_T_SIZE</a>]</td></tr>
 <tr class="memdesc:a1782075c62f8d5e3b0f6a87c8382d373"><td class="mdescLeft">&#160;</td><td class="mdescRight">Padding to guarantee certain size across different tarantool versions. <br /></td></tr>
 <tr class="separator:a1782075c62f8d5e3b0f6a87c8382d373"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Public representation of a key part definition. </p>
-<p>Usage: Allocate an array of such key parts, initialize each key part (call &lt;box_key_part_def_create&gt;() and set necessary fields), pass the array into &lt;box_key_def_new_v2&gt;() function.</p>
-<p>Important: A module should call &lt;box_key_part_def_create&gt;() to initialize the structure with default values. There is no guarantee that all future default values for fields and flags will be remain the same.</p>
-<p>The idea of separation from internal &lt;struct key_part_def&gt; is to provide stable API and ABI for modules.</p>
-<p>New fields may be added into the end of the structure in later tarantool versions. Also new flags may be introduced within &lt;flags&gt; field. &lt;collation&gt; cannot be changed to a union (to reuse for some other value), because it is verified even for a non-string key part by &lt;box_key_def_new_v2&gt;().</p>
+<p>Usage: Allocate an array of such key parts, initialize each key part (call <a class="el" href="module_8h.html#a52f751905f893144ead356172137e796" title="Initialize a key part with default values.">box_key_part_def_create()</a> and set necessary fields), pass the array into <a class="el" href="module_8h.html#a3591006ff571eb1ac2b05f5e41a8a8ca" title="Create a key_def from given key parts.">box_key_def_new_v2()</a> function.</p>
+<p>Important: A module should call <a class="el" href="module_8h.html#a52f751905f893144ead356172137e796" title="Initialize a key part with default values.">box_key_part_def_create()</a> to initialize the structure with default values. There is no guarantee that all future default values for fields and flags will be remain the same.</p>
+<p>The idea of separation from internal "struct key_part_def" is to provide stable API and ABI for modules.</p>
+<p>New fields may be added into the end of the structure in later tarantool versions. Also new flags may be introduced within <em>flags</em> field. <em>collation</em> cannot be changed to a union (to reuse for some other value), because it is verified even for a non-string key part by <a class="el" href="module_8h.html#a3591006ff571eb1ac2b05f5e41a8a8ca" title="Create a key_def from given key parts.">box_key_def_new_v2()</a>.</p>
 <p>Fields that are unknown at given tarantool version are ignored in general, but filled with zeros when initialized. </p>
 </div><h2 class="groupheader">Field Documentation</h2>
 <a id="a4c3fa9f54c4da8295b2cdf3ca5f843ac"></a>
@@ -154,7 +154,7 @@ char&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="unio
 <p>Example:</p>
 <p>tuple: [1, {"foo": "bar"}] key parts: [ { "fieldno": 2, "type": "string", "path": "foo" } ]</p>
 <p>=&gt; key: ["bar"]</p>
-<p>Note: When the path is given, &lt;field_type&gt; means type of the nested field. </p>
+<p>Note: When the path is given, <em>field_type</em> means type of the nested field. </p>
 
 </div>
 </div>
@@ -164,7 +164,7 @@ char&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="unio
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Tue Mar 28 2023 14:08:44 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
+Generated on Tue Mar 28 2023 17:04:20 for Tarantool by&#160;<a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.1
 </small></address>
 </body>
 </html>

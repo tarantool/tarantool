@@ -43,7 +43,6 @@
     <member refid="module_8h_1af8c317a42292b61c93aae91e59118a46" kind="define"><name>container_of</name></member>
     <member refid="module_8h_1a131f3cf1114cea323f428ee90a531c62" kind="define"><name>alignas</name></member>
     <member refid="module_8h_1a3ed9482331696beaadb8ab2e6b4dfead" kind="define"><name>alignof</name></member>
-    <member refid="module_8h_1ac7779ca95ec13deccfed1299cf0bb571" kind="define"><name>__alignof_is_defined</name></member>
     <member refid="module_8h_1a07d932791f722cd5b75c111e51ef2023" kind="define"><name>MAYBE_UNUSED</name></member>
     <member refid="module_8h_1abf13e44576a768044e199191d4f26f7e" kind="define"><name>NODISCARD</name></member>
     <member refid="module_8h_1a1b173d22e57d9395897acbd8de62d505" kind="define"><name>NOINLINE</name></member>
@@ -657,15 +656,5 @@
     <member refid="module_8h_1a53f6c9c6047142026a2e3727e4e43a24" kind="function"><name>luaT_isdecimal</name></member>
   </compound>
   <compound refid="dir_68267d1309a1af8e8297ef4c3efbcdba" kind="dir"><name>src</name>
-  </compound>
-  <compound refid="struct-example" kind="example"><name>struct</name>
-  </compound>
-  <compound refid="int-example" kind="example"><name>int</name>
-  </compound>
-  <compound refid="NODISCARD-example" kind="example"><name>NODISCARD</name>
-  </compound>
-  <compound refid="NOINLINE-example" kind="example"><name>NOINLINE</name>
-  </compound>
-  <compound refid="NORETURN-example" kind="example"><name>NORETURN</name>
   </compound>
 </doxygenindex>
