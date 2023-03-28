@@ -1,4 +1,5 @@
 ## bugfix/replication
 
-* Fixed nodes syncing with a hung leader reporting it as alive and thus delaying
-  new elections (gh-7515).
+* Fixed an issue when the nodes synchronizing with
+  a hung leader reported the leader as alive.
+  This behavior led to the delay of the new elections (gh-7515).

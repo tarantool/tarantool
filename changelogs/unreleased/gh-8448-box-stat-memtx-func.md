@@ -1,5 +1,5 @@
 ## bugfix/lua
 
-* Made `box.stat.memtx` callable. `box.stat.memtx()` now returns all memtx
-  statistics while `box.stat.memtx.tx()` is equivalent to `box.stat.memtx().tx`
-  (gh-8448).
+* The `box.stat.memtx` function is now callable, it returns
+  all memtx statistics. The `box.stat.memtx.tx()` function
+  is now equivalent to the `box.stat.memtx().tx` function (gh-8448).
