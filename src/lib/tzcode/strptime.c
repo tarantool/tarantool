@@ -260,7 +260,7 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 				;
 
 			c = *ptr++;
-			if (c == 'f')
+			if (c != 'f')
 				return NULL;
 			/* fallthru */
 		case 'f':
