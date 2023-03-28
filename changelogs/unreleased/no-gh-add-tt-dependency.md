@@ -1,5 +1,5 @@
 ## feature/build
 
-* Added `tt` weak dependency. `tt` command line utility combines
+* Added `tt` weak dependency. The `tt` command line utility combines
   `tarantoolctl` and `cartridge-cli` functionality into one tool.
-  This change is a part of pushing `tt` to public ( tarantool/tt#286 ).
+  This change is a part of pushing `tt` to the public (tarantool/tt#286).

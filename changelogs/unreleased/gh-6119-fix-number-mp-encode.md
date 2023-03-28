@@ -1,4 +1,4 @@
 ## bugfix/box
 
-* Fixed a bug when big numbers were incorrectly encoded by msgpackffi,
-  that could lead to wrong select results with big number keys (gh-6119).
+* Fixed a bug when large numbers were encoded incorrectly by `msgpackffi`.
+  It could lead to wrong select results with large number keys (gh-6119).
