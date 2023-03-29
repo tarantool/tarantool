@@ -27,6 +27,9 @@
 local dbg
 
 local DEBUGGER = 'luadebug'
+local DEBUGGER_COMMANDS = '.luadebugrc'
+local dbg_cmds = {}
+
 -- Use ANSI color codes in the prompt by default.
 local COLOR_GRAY = ""
 local COLOR_RED = ""
@@ -1039,13 +1042,39 @@ local function motto()
     jit.flush()
 end
 
+-- preload commands from .luadebug.rc file
+local function load_dbg_commands()
+    local f = io.open(DEBUGGER_COMMANDS, 'rt')
+    if not f then
+        return
+    end
+    while true do
+        local line = f:read('*line')
+        if not line then
+            f:close()
+            return
+        end
+        table.insert(dbg_cmds, line)
+    end
+end
+
 -- lazily perform repl initialization
 local function start_repl()
     if started then
         return
     end
     motto()
+    load_dbg_commands()
     started = true
+end
+
+local function next_command()
+    if #dbg_cmds > 0 then
+        local line = table.remove(dbg_cmds, 1)
+        dbg_write_warn('Injecting command: "%s"', line)
+        return line
+    end
+    return dbg.read(color_red(DEBUGGER .. "> "))
 end
 
 repl = function(reason)
@@ -1070,8 +1099,7 @@ repl = function(reason)
         -- Command could show their own context with listing
         -- so reset status before command executed.
         listing_shown = false
-        local success, done, hook = pcall(run_command,
-                                         dbg.read(color_red(DEBUGGER .. "> ")))
+        local success, done, hook = pcall(run_command, next_command())
         if success then
             debug.sethook(hook and hook(0), "l")
         else
