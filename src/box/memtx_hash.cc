@@ -618,13 +618,19 @@ static int
 hash_read_view_create_iterator(struct index_read_view *base,
 			       enum iterator_type type,
 			       const char *key, uint32_t part_count,
+			       const char *pos,
 			       struct index_read_view_iterator *iterator)
 {
+	if (pos != NULL) {
+		diag_set(UnsupportedIndexFeature, base->def, "pagination");
+		return -1;
+	}
 	struct hash_read_view *rv = (struct hash_read_view *)base;
 	struct hash_read_view_iterator *it =
 		(struct hash_read_view_iterator *)iterator;
 	it->base.index = base;
 	it->base.next_raw = exhausted_index_read_view_iterator_next_raw;
+	it->base.position = generic_index_read_view_iterator_position;
 	light_index_view_iterator_begin(&rv->view, &it->iterator);
 	return hash_read_view_iterator_start(it, type, key, part_count);
 }

@@ -373,8 +373,13 @@ static int
 sequence_data_iterator_create(struct index_read_view *base,
 			      enum iterator_type type,
 			      const char *key, uint32_t part_count,
+			      const char *pos,
 			      struct index_read_view_iterator *iterator)
 {
+	if (pos != NULL) {
+		diag_set(UnsupportedIndexFeature, base->def, "pagination");
+		return -1;
+	}
 	if (type != ITER_ALL) {
 		diag_set(ClientError, ER_UNSUPPORTED,
 			 "_sequence_data read view", "requested iterator type");

@@ -497,14 +497,15 @@ tree_g.test_tuple_pos_invalid_tuple = function(cg)
             s:replace{i, 0}
         end
 
-        t.assert_error_msg_contains("Usage index:tuple_pos(tuple)",
-                s.index.pk.tuple_pos, s.index.pk)
+        local msg = "Iterator position is invalid"
+
+        t.assert_error_msg_contains(msg, s.index.pk.tuple_pos, s.index.pk)
         pos = s.index.pk:tuple_pos({1, 0})
         tuples = s:select(nil, {fullscan=true, after=pos, limit=1})
         t.assert_equals(tuples[1], {2, 0})
         -- test with invalid tuple
-        t.assert_error_msg_contains("Iterator position is invalid",
-                                    s.index.pk.tuple_pos, s.index.pk, {'a'})
+        t.assert_error_msg_contains(msg, s.index.pk.tuple_pos, s.index.pk,
+                                    {'a'})
     end)
 end
 

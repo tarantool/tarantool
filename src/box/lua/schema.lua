@@ -1935,8 +1935,6 @@ local function check_iterator_type(opts, key_is_nil)
     return itype
 end
 
-internal.check_iterator_type = check_iterator_type
-
 local function check_pairs_opts(opts, key_is_nil)
     local iterator = check_iterator_type(opts, key_is_nil)
     local after = nil
@@ -1951,6 +1949,8 @@ local function check_pairs_opts(opts, key_is_nil)
     end
     return iterator, after
 end
+
+box.internal.check_pairs_opts = check_pairs_opts
 
 -- pointer to iterator position used by select(), pairs() and tuple_pos()
 local iterator_pos = ffi.new('const char *[1]')
@@ -2591,9 +2591,6 @@ base_index_mt.alter = function(index, options)
 end
 base_index_mt.tuple_pos = function(index, tuple)
     check_index_arg(index, 'tuple_pos')
-    if not tuple then
-        box.error(box.error.PROC_LUA, "Usage index:tuple_pos(tuple)")
-    end
     local region_svp = builtin.box_region_used()
     local ibuf = cord_ibuf_take()
     local data, data_end = tuple_encode(ibuf, tuple)
