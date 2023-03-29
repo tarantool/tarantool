@@ -1012,17 +1012,14 @@ memtx_tree_index_get_internal(struct index *base, const char *key,
  * Implementation of iterator position for general and multikey indexes.
  */
 template <bool USE_HINT, bool IS_MULTIKEY>
-static int
-tree_iterator_position(struct iterator *it, const char **pos, uint32_t *size)
+static inline int
+tree_iterator_position_impl(struct memtx_tree_data<USE_HINT> *last,
+			    struct index_def *def,
+			    const char **pos, uint32_t *size)
 {
 	static_assert(!IS_MULTIKEY || USE_HINT,
 		      "Multikey index actually uses hint.");
-	struct memtx_tree_index<USE_HINT> *index =
-		(struct memtx_tree_index<USE_HINT> *)it->index;
-	struct key_def *cmp_def = index->base.def->cmp_def;
-	struct tree_iterator<USE_HINT> *tree_it =
-		get_tree_iterator<USE_HINT>(it);
-	struct tuple *tuple = tree_it->last.tuple;
+	struct tuple *tuple = last != NULL ? last->tuple : NULL;
 	if (tuple == NULL) {
 		*pos = NULL;
 		*size = 0;
@@ -1030,11 +1027,73 @@ tree_iterator_position(struct iterator *it, const char **pos, uint32_t *size)
 	}
 	int mk_idx = MULTIKEY_NONE;
 	if (IS_MULTIKEY)
-		mk_idx = (int)tree_it->last.hint;
-	const char *key = tuple_extract_key(tuple, cmp_def, mk_idx, size);
+		mk_idx = (int)last->hint;
+	const char *key = tuple_extract_key(tuple, def->cmp_def, mk_idx, size);
 	if (key == NULL)
 		return -1;
 	*pos = key;
+	return 0;
+}
+
+/**
+ * Implementation of iterator position for general and multikey indexes.
+ */
+template <bool USE_HINT, bool IS_MULTIKEY>
+static int
+tree_iterator_position(struct iterator *it, const char **pos, uint32_t *size)
+{
+	static_assert(!IS_MULTIKEY || USE_HINT,
+		      "Multikey index actually uses hint.");
+	struct memtx_tree_index<USE_HINT> *index =
+		(struct memtx_tree_index<USE_HINT> *)it->index;
+	struct tree_iterator<USE_HINT> *tree_it =
+		get_tree_iterator<USE_HINT>(it);
+	return tree_iterator_position_impl<USE_HINT, IS_MULTIKEY>(
+		&tree_it->last, index->base.def, pos, size);
+}
+
+/**
+ * Implementation of iterator position for functional indexes.
+ */
+static int
+tree_iterator_position_func_impl(struct memtx_tree_data<true> *last,
+				 struct index_def *def,
+				 const char **pos, uint32_t *size)
+{
+	/*
+	 * Сmp_def in the functional index is the functional key and the
+	 * primary key right after it. So to extract cmp_def in func index,
+	 * we need to pack an array with concatenated func key and primary key.
+	 */
+	if (last == NULL || last->tuple == NULL) {
+		*pos = NULL;
+		*size = 0;
+		return 0;
+	}
+	/* Extract func key. */
+	uint32_t func_key_size;
+	const char *func_key = tuple_data_range(
+		(struct tuple *)last->hint, &func_key_size);
+	uint32_t func_key_len = mp_decode_array(&func_key);
+	/* Extract primary key. */
+	struct key_def *pk_def = def->pk_def;
+	uint32_t pk_size;
+	const char *pk_key = tuple_extract_key(last->tuple, pk_def,
+					       MULTIKEY_NONE, &pk_size);
+	uint32_t pk_key_len = mp_decode_array(&pk_key);
+	/* Calculate allocation size and allocate buffer. */
+	func_key_size -= mp_sizeof_array(func_key_len);
+	pk_size -= mp_sizeof_array(pk_key_len);
+	uint32_t alloc_size = mp_sizeof_array(func_key_len + pk_key_len) +
+		func_key_size + pk_size;
+	char *data = (char *)xregion_alloc(&fiber()->gc, alloc_size);
+	*size = alloc_size;
+	*pos = data;
+	/* Pack an array with concatenated func key and primary key. */
+	data = mp_encode_array(data, func_key_len + pk_key_len);
+	memcpy(data, func_key, func_key_size);
+	data += func_key_size;
+	memcpy(data, pk_key, pk_size);
 	return 0;
 }
 
@@ -1045,48 +1104,9 @@ static int
 tree_iterator_position_func(struct iterator *it, const char **pos,
 			    uint32_t *size)
 {
-	/*
-	 * Сmp_def in the functional index is the functional key and the
-	 * primary key right after it. So to extract cmp_def in func index,
-	 * we need to pack an array with concatenated func key and primary key.
-	 */
 	struct tree_iterator<true> *tree_it = get_tree_iterator<true>(it);
-	if (tree_it->last_func_key == NULL) {
-		*pos = NULL;
-		*size = 0;
-		return 0;
-	}
-	assert(tree_it->last.tuple != NULL);
-	/* Extract func key. */
-	uint32_t func_key_size;
-	const char *func_key = tuple_data_range(tree_it->last_func_key,
-						&func_key_size);
-	uint32_t func_key_len = mp_decode_array(&func_key);
-	/* Extract primary key. */
-	struct key_def *pk_def = it->index->def->pk_def;
-	uint32_t pk_size;
-	const char *pk_key = tuple_extract_key(tree_it->last.tuple, pk_def,
-					       MULTIKEY_NONE, &pk_size);
-	uint32_t pk_key_len = mp_decode_array(&pk_key);
-	/* Calculate allocation size and allocate buffer. */
-	func_key_size -= mp_sizeof_array(func_key_len);
-	pk_size -= mp_sizeof_array(pk_key_len);
-	uint32_t alloc_size = mp_sizeof_array(func_key_len + pk_key_len) +
-		func_key_size + pk_size;
-	char *data = (char *)region_alloc(&fiber()->gc, alloc_size);
-	if (data == NULL) {
-		diag_set(OutOfMemory, alloc_size, "region",
-			 "memtx_tree_func_index_iterator_position");
-		return -1;
-	}
-	*size = alloc_size;
-	*pos = data;
-	/* Pack an array with concatenated func key and primary key. */
-	data = mp_encode_array(data, func_key_len + pk_key_len);
-	memcpy(data, func_key, func_key_size);
-	data += func_key_size;
-	memcpy(data, pk_key, pk_size);
-	return 0;
+	return tree_iterator_position_func_impl(&tree_it->last, it->index->def,
+						pos, size);
 }
 
 template <bool USE_HINT>
@@ -1864,6 +1884,12 @@ struct tree_read_view_iterator {
 	struct memtx_tree_key_data<USE_HINT> key_data;
 	/** BPS tree iterator. */
 	memtx_tree_iterator_t<USE_HINT> tree_iterator;
+	/**
+	 * Data that was fetched last. Is NULL only if there was no data
+	 * fetched. Otherwise, tuple pointer is not NULL, even if iterator
+	 * is exhausted - pagination relies on it.
+	 */
+	struct memtx_tree_data<USE_HINT> *last;
 };
 
 static_assert(sizeof(struct tree_read_view_iterator<false>) <=
@@ -1942,14 +1968,17 @@ template <bool USE_HINT>
 static int
 tree_read_view_iterator_start(struct tree_read_view_iterator<USE_HINT> *it,
 			      enum iterator_type type,
-			      const char *key, uint32_t part_count)
+			      const char *key, uint32_t part_count,
+			      const char *pos)
 {
 	assert(type == ITER_ALL);
 	assert(key == NULL);
 	assert(part_count == 0);
+	assert(pos == NULL);
 	(void)type;
 	(void)key;
 	(void)part_count;
+	(void)pos;
 	struct tree_read_view<USE_HINT> *rv =
 		(struct tree_read_view<USE_HINT> *)it->base.index;
 	it->base.next_raw = tree_read_view_iterator_next_raw<USE_HINT>;
@@ -1966,24 +1995,63 @@ tree_read_view_reset_key_def(struct tree_read_view<USE_HINT> *rv)
 
 #endif /* !defined(ENABLE_READ_VIEW) */
 
+/**
+ * Implementation of iterator position for general and multikey read views.
+ */
+template <bool USE_HINT, bool IS_MULTIKEY>
+static int
+tree_read_view_iterator_position(struct index_read_view_iterator *it,
+				 const char **pos, uint32_t *size)
+{
+	struct tree_read_view_iterator<USE_HINT> *tree_it =
+		(struct tree_read_view_iterator<USE_HINT> *)it;
+	return tree_iterator_position_impl<USE_HINT, IS_MULTIKEY>(
+		tree_it->last, it->base.index->def, pos, size);
+}
+
+/**
+ * Implementation of iterator position for functional index read views.
+ */
+static int
+tree_read_view_iterator_position_func(struct index_read_view_iterator *it,
+				      const char **pos, uint32_t *size)
+{
+	struct tree_read_view_iterator<true> *tree_it =
+		(struct tree_read_view_iterator<true> *)it;
+	return tree_iterator_position_func_impl(tree_it->last,
+						it->base.index->def,
+						pos, size);
+}
+
 /** Implementation of create_iterator index_read_view callback. */
 template <bool USE_HINT>
 static int
 tree_read_view_create_iterator(struct index_read_view *base,
 			       enum iterator_type type,
 			       const char *key, uint32_t part_count,
+			       const char *pos,
 			       struct index_read_view_iterator *iterator)
 {
 	struct tree_read_view_iterator<USE_HINT> *it =
 		(struct tree_read_view_iterator<USE_HINT> *)iterator;
 	it->base.index = base;
 	it->base.next_raw = exhausted_index_read_view_iterator_next_raw;
+	if (it->base.index->def->key_def->for_func_index)
+		it->base.position =
+			tree_read_view_iterator_position_func;
+	else if (it->base.index->def->key_def->is_multikey)
+		it->base.position =
+			tree_read_view_iterator_position<true, true>;
+	else
+		it->base.position =
+			tree_read_view_iterator_position<USE_HINT, false>;
 	it->key_data.key = NULL;
 	it->key_data.part_count = 0;
 	if (USE_HINT)
 		it->key_data.set_hint(HINT_NONE);
+	it->last = NULL;
 	invalidate_tree_iterator(&it->tree_iterator);
-	return tree_read_view_iterator_start(it, type, key, part_count);
+	return tree_read_view_iterator_start(it, type, key, part_count, pos);
 }
 
 /** Implementation of create_read_view index callback. */

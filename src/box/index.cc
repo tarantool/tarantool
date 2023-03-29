@@ -1093,4 +1093,15 @@ generic_iterator_position(struct iterator *it, const char **pos,
 	return -1;
 }
 
+int
+generic_index_read_view_iterator_position(struct index_read_view_iterator *it,
+					  const char **pos, uint32_t *size)
+{
+	(void)it;
+	(void)pos;
+	(void)size;
+	diag_set(UnsupportedIndexFeature, it->base.index->def, "pagination");
+	return -1;
+}
+
 /* }}} */

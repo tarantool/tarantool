@@ -714,10 +714,15 @@ struct index_read_view_vtab {
 	int (*get_raw)(struct index_read_view *rv,
 		       const char *key, uint32_t part_count,
 		       struct read_view_tuple *result);
-	/** Create an index read view iterator. */
+	/**
+	 * Create an index read view iterator. Iterator can be placed right
+	 * after position, passed in pos argument. Argument pos is an extracted
+	 * cmp_def without MP_ARRAY header or NULL.
+	 */
 	int
 	(*create_iterator)(struct index_read_view *rv, enum iterator_type type,
 			   const char *key, uint32_t part_count,
+			   const char *pos,
 			   struct index_read_view_iterator *it);
 };
 
@@ -760,10 +765,20 @@ struct index_read_view_iterator_base {
 	int
 	(*next_raw)(struct index_read_view_iterator *iterator,
 		    struct read_view_tuple *result);
+	/**
+	 * Get position of iterator - extracted cmp_def of last fetched
+	 * tuple with MP_ARRAY header. If iterator is exhausted,
+	 * it returns position of last tuple, if there were no tuples
+	 * fetched, empty pos (NULL) is returned.
+	 * Returned position is allocated on current fiber's region.
+	 */
+	int
+	(*position)(struct index_read_view_iterator *iterator,
+		    const char **pos, uint32_t *size);
 };
 
 /** Size of the index_read_view_iterator struct. */
-#define INDEX_READ_VIEW_ITERATOR_SIZE 48
+#define INDEX_READ_VIEW_ITERATOR_SIZE 64
 
 static_assert(sizeof(struct index_read_view_iterator_base) <=
 	      INDEX_READ_VIEW_ITERATOR_SIZE,
@@ -1044,12 +1059,22 @@ index_read_view_get_raw(struct index_read_view *rv,
 }
 
 static inline int
+index_read_view_create_iterator_after(struct index_read_view *rv,
+				      enum iterator_type type,
+				      const char *key, uint32_t part_count,
+				      const char *pos,
+				      struct index_read_view_iterator *it)
+{
+	return rv->vtab->create_iterator(rv, type, key, part_count, pos, it);
+}
+
+static inline int
 index_read_view_create_iterator(struct index_read_view *rv,
 				enum iterator_type type,
 				const char *key, uint32_t part_count,
 				struct index_read_view_iterator *it)
 {
-	return rv->vtab->create_iterator(rv, type, key, part_count, it);
+	return rv->vtab->create_iterator(rv, type, key, part_count, NULL, it);
 }
 
 static inline void
@@ -1063,6 +1088,14 @@ index_read_view_iterator_next_raw(struct index_read_view_iterator *iterator,
 				  struct read_view_tuple *result)
 {
 	return iterator->base.next_raw(iterator, result);
+}
+
+/** Specialization of iterator_position for read view. */
+static inline int
+index_read_view_iterator_position(struct index_read_view_iterator *iterator,
+				  const char **pos, uint32_t *size)
+{
+	return iterator->base.position(iterator, pos, size);
 }
 
 /*
@@ -1118,6 +1151,9 @@ exhausted_index_read_view_iterator_next_raw(struct index_read_view_iterator *it,
 int
 generic_iterator_position(struct iterator *it, const char **pos,
 			  uint32_t *size);
+int
+generic_index_read_view_iterator_position(struct index_read_view_iterator *it,
+					  const char **pos, uint32_t *size);
 
 #if defined(__cplusplus)
 } /* extern "C" */
