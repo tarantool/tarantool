@@ -72,6 +72,7 @@
     <member refid="module_8h_1af667a90dfe6a8cc25b510af73d98bb82a563669ac6b6a356e9e8d2725859dc153" kind="enumvalue"><name>S_INFO</name></member>
     <member refid="module_8h_1af667a90dfe6a8cc25b510af73d98bb82a84814c47aa9cd388403ec916fe810d22" kind="enumvalue"><name>S_VERBOSE</name></member>
     <member refid="module_8h_1af667a90dfe6a8cc25b510af73d98bb82a2320c9e0ae890f89c4ed2de201eb8101" kind="enumvalue"><name>S_DEBUG</name></member>
+    <member refid="module_8h_1af667a90dfe6a8cc25b510af73d98bb82a160f111c51d9dc6607901a15f0ccee0a" kind="enumvalue"><name>say_level_MAX</name></member>
     <member refid="module_8h_1ade0789f1bee95be5f9005c6ff4e0b2ad" kind="enum"><name>say_format</name></member>
     <member refid="module_8h_1ade0789f1bee95be5f9005c6ff4e0b2ada2596d2f88ab84ec5fad0d37c77bf1f4d" kind="enumvalue"><name>SF_PLAIN</name></member>
     <member refid="module_8h_1ade0789f1bee95be5f9005c6ff4e0b2adafe62145e440f6041a22a79d6abfeefc6" kind="enumvalue"><name>SF_JSON</name></member>
