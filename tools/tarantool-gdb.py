@@ -1854,6 +1854,29 @@ class TtPrintListEntryParameter(gdb.Parameter):
 TtPrintListEntryParameter()
 
 
+class FieldsPrinter(gdb.printing.PrettyPrinter):
+    class FieldsSubprinter(gdb.printing.SubPrettyPrinter):
+        def __init__(self, val, fields):
+            super(FieldsPrinter.FieldsSubprinter, self).__init__(val.type.tag)
+            self.val = val
+            self.fields = fields
+
+        def children(self):
+            for field in self.fields:
+                yield field, self.val[field]
+
+    container_type = None
+    fields = None
+
+    def __init__(self):
+        super(FieldsPrinter, self).__init__("FieldsPrinter")
+
+    def __call__(self, val):
+        if self.container_type is None or not equal_types(val.type, self.container_type):
+            return None
+        return self.FieldsSubprinter(val, self.fields)
+
+
 class TtListPrinter(object):
     """
 Pretty-printer for rlist
@@ -1876,6 +1899,12 @@ predicate
   Default is 'None'.
   When it's not 'None' entries are filtered by predicate.
   See '-filter' option of 'tt-list' command
+
+fields
+  Default is 'None'.
+  By default all entry's fields are printed, but it can be restricted with this
+  variable (string of comma separated fields).
+  See '-fields' option of 'tt-list' command
 
 reverse
   Default is 'False'.
@@ -1907,6 +1936,9 @@ from_tt_list
   It is set to 'True' when the printer is used from the 'tt-list' command
     """
 
+    entry_printer = FieldsPrinter()
+    gdb.printing.register_pretty_printer(gdb.current_objfile(), entry_printer, True)
+
     __instance_exists = False
 
     # Initialization of config with default values is deferred so it can be
@@ -1919,6 +1951,7 @@ from_tt_list
                     head=None,
                     is_item=False,
                     predicate=None,
+                    fields=None,
                     reverse=False,
                     from_tt_list=False,
                     print_args=None,
@@ -1928,6 +1961,7 @@ from_tt_list
             head=head,
             is_item=is_item,
             predicate=predicate,
+            fields=fields,
             reverse=reverse,
             from_tt_list=from_tt_list,
             print_args=print_args,
@@ -2118,6 +2152,15 @@ from_tt_list
         return child_name, entry_ptr.dereference()
 
     def children(self):
+        config_fields = self.__config['fields']
+
+        # Setup entry printer (if required)
+        self.entry_printer.enabled = self.entry_info is not None and \
+                                    config_fields is not None
+        if self.entry_printer.enabled:
+            self.entry_printer.container_type = self.entry_info.container_type
+            self.entry_printer.fields = config_fields.split(',')
+
         config_reverse = self.__config['reverse']
         config_predicate = self.__config['predicate']
 
@@ -2125,6 +2168,7 @@ from_tt_list
         # the specified value as a single child with unknown index
         if self.list is None:
             yield self.child(self.val)
+            self.entry_printer.enabled = False
             return
 
         # Get items iterator considering direction
@@ -2168,6 +2212,8 @@ from_tt_list
         for item_index, item in indexed_items:
             yield self.child(item, item_index)
 
+        self.entry_printer.enabled = False
+
 pp.add_printer('rlist', '^rlist$', TtListPrinter)
 pp.add_printer('stailq', '^stailq$', TtListPrinter)
 pp.add_printer('stailq_entry', '^stailq_entry$', TtListPrinter)
@@ -2196,6 +2242,10 @@ Options:
     iteration starts from this item, i.e. items before the specified one are
     not checked. If you need to check the entire list either check in reverse
     direction as well (with -r option) or use the list head as RLIST_EXP.
+
+  -fields FIELDS
+    Comma separated entry fields that should be printed.
+    If omitted then all fields are printed.
 
   -pre EXP
   -post EXP
@@ -2246,6 +2296,9 @@ Examples:
 # Walk the engines in reverse direction
 (gdb) set $i=0
 (gdb) tt-list -f '$index==$i' -post '$i++' -r -- engines
+
+# Display fibers ids and names
+(gdb) tt-list -pretty -fields fid,name -- main_cord.alive
     """
 
     cmd_name = 'tt-list'
@@ -2257,6 +2310,7 @@ Examples:
         parser = argparse.ArgumentParser(add_help=False)
         parser.add_argument('-entry-info', action='store')
         parser.add_argument('-filter', action='store')
+        parser.add_argument('-fields', action='store')
         parser.add_argument('-head', action='store')
         parser.add_argument('-item', action='store_true')
         parser.add_argument('-reverse', action='store_true')
@@ -2280,6 +2334,7 @@ Examples:
         TtListPrinter.reset_config(
             entry_info = args.entry_info,
             predicate = args.filter,
+            fields = args.fields,
             head = args.head,
             is_item = args.item,
             reverse = args.reverse,
