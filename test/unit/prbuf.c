@@ -567,7 +567,7 @@ test_buffer_end_border_values(void)
 static void
 test_max_record_size(void)
 {
-	plan(6);
+	plan(8);
 	header();
 
 	struct prbuf buf;
@@ -586,25 +586,22 @@ test_max_record_size(void)
 	memcpy(p, payload, max_size);
 	prbuf_commit(&buf);
 
-	struct prbuf rbuf;
-	struct prbuf_iterator reader;
+	struct prbuf_reader reader;
 	struct prbuf_entry entry;
 
-	if (prbuf_open(&rbuf, mem) != 0)
-		fail("prbuf_open", "not 0");
-	prbuf_iterator_create(&rbuf, &reader);
-
-	int rc = prbuf_iterator_next(&reader, &entry);
+	int fd = save_buffer(mem, sizeof(mem));
+	prbuf_reader_create(&reader, fd, BUFFER_OFFSET);
+	int rc = prbuf_reader_next(&reader, &entry);
 	ok(rc == 0, "rc is %d", rc);
 	ok(entry.size == (size_t)max_size,
 	   "expected %d got %zd", max_size, entry.size);
-	if (entry.size != (size_t)max_size)
-		fail("entry size", "incorrect");
 	ok(memcmp(entry.ptr, payload, max_size) == 0,
 	   "0 is expected");
-
-	rc = prbuf_iterator_next(&reader, &entry);
-	ok(rc == -1, "rc is %d", rc);
+	rc = prbuf_reader_next(&reader, &entry);
+	ok(rc == 0, "rc is %d", rc);
+	ok(entry.size == 0, "entry size is %zd", entry.size);
+	ok(entry.ptr == NULL, "NULL is expected");
+	close(fd);
 
 	p = prbuf_prepare(&buf, max_size + 1);
 	ok(p == NULL, "NULL is expected");
