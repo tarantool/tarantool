@@ -1901,6 +1901,10 @@ is_item
   'True' means that printed value refers to the item of the list, rather than
   to the list itself.
   See '-item' option of 'tt-list' command
+
+from_tt_list
+  Default is 'False'.
+  It is set to 'True' when the printer is used from the 'tt-list' command
     """
 
     __instance_exists = False
@@ -1916,6 +1920,8 @@ is_item
                     is_item=False,
                     predicate=None,
                     reverse=False,
+                    from_tt_list=False,
+                    print_args=None,
                 ):
         cls.__config = dict(
             entry_info=entry_info,
@@ -1923,6 +1929,8 @@ is_item
             is_item=is_item,
             predicate=predicate,
             reverse=reverse,
+            from_tt_list=from_tt_list,
+            print_args=print_args,
         )
 
     def __new__(cls, val):
@@ -1951,6 +1959,33 @@ is_item
                     )
             )
         return value
+
+    @staticmethod
+    def get_print_exp(print_args):
+        if '--' in print_args:
+            exp_args = print_args[print_args.index('--')+1:]
+        else:
+            exp_args = print_args
+        return ' '.join(exp_args)
+
+    @staticmethod
+    def lookup_entry_info_from_list_exp(lut, list_exp):
+        def split_last_field(expr):
+            arrow_pos = expr.rfind('->')
+            dot_pos = expr.rfind('.')
+            field_sep = '->' if arrow_pos > dot_pos else '.'
+            container, _, field = expr.rpartition(field_sep)
+            return container, field
+
+        container, field = split_last_field(list_exp)
+        if container:
+            container = gdb.parse_and_eval(container)
+            if container.type.code == gdb.TYPE_CODE_PTR:
+                container = container.dereference()
+            container_info = '{}::{}'.format(container.type.tag, field)
+            container_info = ContainerFieldInfo(container_info)
+
+        return lut.lookup_entry_info_by_container(container_info)
 
     def __init__(self, val):
         assert self.__class__.__instance_exists, "__instance_exists must be True"
@@ -2053,9 +2088,11 @@ is_item
 
         # Display hint if failed to identify the type of the list entries
         if self.entry_info is None:
-            msg = "Warning: failed to identify the type of the list entries.\n"\
-                    "Please, try 'tt-list' command and specify entry info"\
-                    " explicitly with -e option (see 'help tt-list').\n"
+            msg = "Warning: failed to identify the type of the list entries.\n"
+            if self.__config['from_tt_list']:
+                msg += "Please, specify entry info explicitly with -e option (see 'help tt-list').\n"
+            else:
+                msg += "Please, try 'tt-list' command.\n"
             gdb.write("\n" + msg + "\n", gdb.STDERR)
 
     def __del__(self):
@@ -2246,6 +2283,8 @@ Examples:
             head = args.head,
             is_item = args.item,
             reverse = args.reverse,
+            from_tt_list = True,
+            print_args = print_args,
         )
 
         try:
