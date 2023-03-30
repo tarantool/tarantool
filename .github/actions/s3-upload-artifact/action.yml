@@ -1,0 +1,62 @@
+name: Upload test artifact to S3
+description: >
+  Pack test artifact to a zip archive with name <workflow job id>.zip and
+  upload it to S3 to <bucket>/<github.repository>/artifacts/<github.run_id>/
+  destination. Print a warning if the provided artifact path doesn't exist
+
+inputs:
+  job-name:
+    description: >
+      Full job name with matrix combinations. For example, job `test` with
+      matrix options `foo='a'` and `bar='b'` will be named `test (a, b)`.
+      This is required for finding ID of the current running job.
+    required: true
+  access-key-id:
+    description: S3 access key ID
+    required: true
+  secret-access-key:
+    description: S3 secret access key
+    required: true
+  source:
+    description: Source artifact path
+    required: true
+  bucket:
+    description: S3 bucket name
+    required: false
+    default: multivac
+
+runs:
+  using: composite
+  steps:
+    - name: Set 'ARTIFACT_EXISTS' env variable
+      shell: bash
+      run: |
+        if [ -e ${{ inputs.source }} ]; then
+          echo "ARTIFACT_EXISTS=true" >> $GITHUB_ENV
+        else
+          echo "::warning::s3-upload-artifact: No such file or directory: ${{ inputs.source }}"
+        fi
+
+    - name: Get job ID
+      if: env.ARTIFACT_EXISTS
+      uses: tarantool/actions/get-job-id@master
+      with:
+        job-name: ${{ inputs.job-name }}
+        throw-error: true
+
+    - name: Archive artifact
+      if: env.ARTIFACT_EXISTS
+      shell: bash
+      run: |
+        archive_name=${{ env.JOB_ID }}.zip
+        tar -a -C $(dirname ${{ inputs.source }}) -cf ${archive_name} $(basename ${{ inputs.source }})
+
+    - name: Upload archive to S3
+      if: env.ARTIFACT_EXISTS
+      uses: tarantool/actions/s3-upload-file@master
+      with:
+        access-key-id: ${{ inputs.access-key-id }}
+        secret-access-key: ${{ inputs.secret-access-key }}
+        source: ${{ env.JOB_ID }}.zip
+        destination: ${{ github.repository }}/artifacts/${{ github.run_id }}/${{ env.JOB_ID }}.zip
+        bucket: ${{ inputs.bucket }}
