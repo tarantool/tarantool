@@ -424,12 +424,6 @@ PMurHash32
 PMurHash32_Process
 PMurHash32_Result
 port_destroy
-prbuf_create
-prbuf_open
-prbuf_prepare
-prbuf_commit
-prbuf_iterator_create
-prbuf_iterator_next
 random_bytes
 say_check_cfg
 say_from_lua

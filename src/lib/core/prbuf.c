@@ -207,40 +207,6 @@ prbuf_next_record(struct prbuf *buf, struct prbuf_record **record)
 }
 
 /**
- * Verify that prbuf remains in the consistent state: header is valid and
- * all entries have readable sizes.
- */
-static bool
-prbuf_check(struct prbuf *buf)
-{
-	if (buf->header->version != prbuf_version)
-		return false;
-	if (buf->header->begin > prbuf_size(buf))
-		return false;
-	if (buf->header->end > prbuf_size(buf))
-		return false;
-	if (prbuf_is_empty(buf))
-		return true;
-	struct prbuf_record *current;
-	current = prbuf_first_record(buf);
-	uint32_t total_size = current->size;
-	int rc = 0;
-	while ((rc = prbuf_next_record(buf, &current)) == 0 &&
-	       current != NULL)
-		total_size += current->size;
-	return rc == 0 && (total_size <= buf->header->size);
-}
-
-int
-prbuf_open(struct prbuf *buf, void *mem)
-{
-	buf->header = (struct prbuf_header *)mem;
-	if (!prbuf_check(buf))
-		return -1;
-	return 0;
-}
-
-/**
  * Starting from @a current issue skip @a to_store bytes and return
  * the next record after that.
  */
@@ -344,38 +310,6 @@ prbuf_commit(struct prbuf *buf)
 	struct prbuf_record *last =
 		(struct prbuf_record *)prbuf_linear_begin(buf);
 	buf->header->end = prbuf_record_alloc_size(last->size);
-}
-
-void
-prbuf_iterator_create(struct prbuf *buf, struct prbuf_iterator *iter)
-{
-	iter->buf = buf;
-	iter->current = NULL;
-}
-
-int
-prbuf_iterator_next(struct prbuf_iterator *iter, struct prbuf_entry *result)
-{
-	struct prbuf *buf = iter->buf;
-	if (iter->current == NULL) {
-		/* Check if the buffer is empty. */
-		if (prbuf_is_empty(buf))
-			return -1;
-		iter->current = prbuf_first_record(buf);
-		result->size = iter->current->size;
-		result->ptr = iter->current->data;
-		assert(iter->current->size < buf->header->size);
-		return 0;
-	}
-
-	int rc = prbuf_next_record(buf, &iter->current);
-	assert(rc == 0);
-	(void)rc;
-	if (iter->current == NULL)
-		return -1;
-	result->size = iter->current->size;
-	result->ptr = iter->current->data;
-	return 0;
 }
 
 void

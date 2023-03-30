@@ -41,45 +41,6 @@ ibuf_reinit(struct ibuf *ibuf);
 
 void *
 ibuf_reserve_slow(struct ibuf *ibuf, size_t size);
-
-/*
- * prbuf iterface; see src/lib/core/prbuf.c for details.
- */
-
-struct prbuf_header;
-struct prbuf_record;
-
-struct prbuf {
-    struct prbuf_header *header;
-};
-
-struct prbuf_entry {
-    size_t size;
-    char *ptr;
-};
-
-struct prbuf_iterator {
-    struct prbuf *buf;
-    struct prbuf_record *current;
-};
-
-void
-prbuf_create(struct prbuf *buf, void *mem, size_t size);
-
-int
-prbuf_open(struct prbuf *buf, void *mem);
-
-void *
-prbuf_prepare(struct prbuf *buf, size_t size);
-
-void
-prbuf_commit(struct prbuf *buf);
-
-void
-prbuf_iterator_create(struct prbuf *buf, struct prbuf_iterator *iter);
-
-int
-prbuf_iterator_next(struct prbuf_iterator *iter, struct prbuf_entry *res);
 ]]
 
 local builtin = ffi.C
@@ -221,113 +182,6 @@ local function ibuf_new(arg)
     errorf('Usage: ibuf([size])')
 end
 
-local prbuf_t = ffi.typeof('struct prbuf')
-local prbuf_iterator_t = ffi.typeof('struct prbuf_iterator')
-local prbuf_entry_t = ffi.typeof('struct prbuf_entry')
-
-local function prbuf_open(mem)
-    if not ffi.istype(ffi.typeof('char *'), mem) then
-        errorf('Attempt to prbuf_open() with argument of wrong type, '..
-               'expected <char *>')
-    end
-    local buf = ffi.new(prbuf_t)
-    local rc = builtin.prbuf_open(buf, mem)
-    if rc ~= 0 then
-        errorf("Failed to open prbuf")
-    end
-    return buf
-end
-
-local function prbuf_create(mem, size)
-    if not ffi.istype(ffi.typeof('char *'), mem) then
-        errorf('Attempt to prbuf_create() with argument of wrong type, '..
-               'expected <char *>')
-    end
-    local buf = ffi.new(prbuf_t)
-    builtin.prbuf_create(buf, mem, size)
-    return buf
-end
-
-local function prbuf_prepare(buf, size)
-    if not ffi.istype(prbuf_t, buf) then
-        errorf('Attempt to call method without object, use prbuf:prepare()')
-    end
-    local ptr = builtin.prbuf_prepare(buf, size)
-    if ptr == nil then return nil end
-    return ffi.cast('char *', ptr)
-end
-
-
-local function prbuf_commit(buf)
-    if not ffi.istype(prbuf_t, buf) then
-        errorf('Attempt to call method without object, use prbuf:commit()')
-    end
-    builtin.prbuf_commit(buf)
-end
-
-local function prbuf_iterator_create(buf)
-    if not ffi.istype(prbuf_t, buf) then
-        errorf('Attempt to call method without object, use prbuf:create()')
-    end
-    local iterator = ffi.new(prbuf_iterator_t)
-    builtin.prbuf_iterator_create(buf, iterator)
-    return iterator
-end
-
-local prbuf_methods = {
-    prepare = prbuf_prepare;
-    commit = prbuf_commit;
-    iterator_create = prbuf_iterator_create;
-}
-
-local function prbuf_iterator_next(iterator)
-    if not ffi.istype(prbuf_iterator_t, iterator) then
-        errorf('Attempt to iterator:next() without object, use iterator:next()')
-    end
-    local entry = ffi.new(prbuf_entry_t)
-    local rc = builtin.prbuf_iterator_next(iterator, entry)
-    if rc ~= 0 then return nil end
-    return entry
-end
-
-local function prbuf_entry_data(entry)
-    if not ffi.istype(prbuf_entry_t, entry) then
-        errorf('Attempt to entry:data() without object, use entry:data()')
-    end
-    return ffi.string(entry.ptr, tonumber(entry.size))
-end
-
-local prbuf_iterator_methods = {
-    next = prbuf_iterator_next;
-}
-
-local prbuf_iterator_mt = {
-    __index = prbuf_iterator_methods;
-}
-
-ffi.metatype(prbuf_iterator_t, prbuf_iterator_mt);
-
-local prbuf_entry_methods = {
-    data = prbuf_entry_data;
-}
-
-local prbuf_entry_mt = {
-    __index = prbuf_entry_methods;
-}
-
-ffi.metatype(prbuf_entry_t, prbuf_entry_mt);
-
-local function prbuf_tostring(self)
-    return '<prbuf>'
-end
-
-local prbuf_mt = {
-    __index = prbuf_methods;
-    __tostring = prbuf_tostring;
-};
-
-ffi.metatype(prbuf_t, prbuf_mt);
-
 --
 -- Stash keeps an FFI object for re-usage and helps to ensure the proper
 -- ownership. Is supposed to be used in yield-free code when almost always it is
@@ -419,8 +273,6 @@ local internal = {
 return {
     internal = internal,
     ibuf = ibuf_new;
-    prbuf_open = prbuf_open;
-    prbuf_create = prbuf_create;
     READAHEAD = READAHEAD;
     ffi_stash_new = ffi_stash_new,
 }
