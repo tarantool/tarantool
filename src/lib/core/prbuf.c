@@ -518,7 +518,8 @@ prbuf_reader_next(struct prbuf_reader *reader,
 	/* Read record length. */
 	if (prbuf_reader_ensure(reader, record_size_overhead) != 0)
 		return -1;
-	uint32_t sz = *((uint32_t *)reader->buf.rpos);
+	uint32_t sz;
+	memcpy(&sz, reader->buf.rpos, sizeof(sz));
 
 	/* Check if we hit end marker and need to wrap around. */
 	if (sz == prbuf_end_position) {
@@ -527,7 +528,7 @@ prbuf_reader_next(struct prbuf_reader *reader,
 		/* Re-read record length. */
 		if (prbuf_reader_ensure(reader, record_size_overhead) != 0)
 			return -1;
-		sz = *((uint32_t *)reader->buf.rpos);
+		memcpy(&sz, reader->buf.rpos, sizeof(sz));
 	}
 
 	size_t full_sz = sz + record_size_overhead;
