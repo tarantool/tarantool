@@ -28,6 +28,12 @@ def dump_type(type):
 def equal_types(type1, type2):
     return type1.code == type2.code and type1.tag == type2.tag
 
+def equal_to_any_types(type, types):
+    for t in types:
+        if equal_types(type, t):
+            return True
+    return False
+
 def int_from_address(address):
     return int(address.cast(gdb.lookup_type('uint64_t')))
 
@@ -1747,6 +1753,87 @@ class RlistLut(ListLut):
     )
 
 
+class Stailq(object):
+    gdb_type = gdb.lookup_type('stailq')
+    item_gdb_type = gdb.lookup_type('stailq_entry')
+    entry_ptr_gdb_type = find_type('stailq_entry_ptr')
+
+    def __init__(self, head=None):
+        self.__head = head
+        self.__len = None
+
+    @property
+    def address(self):
+        return self.__head
+
+    def ref(self):
+        return '*({}*){:#x}'.format(
+                self.__head.type.target().tag,
+                int_from_address(self.__head)
+            )
+
+    if entry_ptr_gdb_type is None:
+        @staticmethod
+        def entry(val):
+            return val
+    else:
+        @staticmethod
+        def entry(val):
+            return val['value']
+
+    def __iter__(self):
+        if self.__head is None:
+            return
+        entry = self.entry(self.__head['first'])
+        last_entry = self.entry(self.__head['last'].dereference())
+        while entry != last_entry:
+            yield entry
+            entry = self.entry(entry['next'])
+
+    def __reversed__(self):
+        entries = list(self)
+        for entry in entries[::-1]:
+            yield entry
+
+    def __len__(self):
+        assert self.__head is not None, "__len__ is not applicable to the headless stailq"
+        if self.__len is None:
+            self.__len = sum(1 for _ in self)
+        return self.__len
+
+
+class StailqLut(ListLut):
+    _list_type = Stailq.gdb_type
+    _symbols = (
+        ('swim_task_pool', 'swim_task::in_pool'),
+        ('txn_cache', 'txn::in_txn_cache'),
+    )
+    _containers = (
+        ('applier_data_msg::txs', 'applier_tx::next'),
+        ('applier_tx::rows', 'applier_tx_row::next'),
+        ('cbus_endpoint::output', 'cmsg_poison::msg::fifo'),
+        ('cpipe::input', 'cmsg::fifo'),
+        ('fiber_pool::output', 'cmsg::fifo'),
+        ('iproto_stream::pending_requests', 'iproto_msg::in_stream'),
+        ('MemtxAllocator<Allocator>::gc', 'memtx_tuple::in_gc'),
+        ('memtx_engine::gc_queue', 'memtx_gc_task::link'),
+        ('memtx_tuple_rv_list::tuples', 'memtx_tuple::in_gc'),
+        ('relay::pending_gc', 'relay_gc_msg::in_pending'),
+        ('swim::event_queue', 'swim_member::in_event_queue'),
+        ('txn::stmts', 'txn_stmt::next'),
+        ('Vdbe::autoinc_id_list', 'autoinc_id_entry::link'),
+        ('vy_log_tx::records', 'vy_log_record::in_tx'),
+        ('vy_log::pending_tx', 'vy_log_tx::in_pending'),
+        ('vy_scheduler::processed_tasks', 'vy_task::in_processed'),
+        ('vy_tx::log', 'txv::next_in_log'),
+        ('vy_worker_pool::idle_workers', 'vy_worker::in_idle'),
+        ('wal_msg::commit', 'journal_entry::fifo'),
+        ('wal_msg::rollback', 'journal_entry::fifo'),
+        ('wal_writer::rollback', 'journal_entry::fifo'),
+        ('xrow_update_field::map::items', 'xrow_update_map_item::in_items'),
+    )
+
+
 class TtPrintListEntryParameter(gdb.Parameter):
     name = 'print tt-list-entry'
 
@@ -1867,8 +1954,12 @@ is_item
 
     def __init__(self, val):
         assert self.__class__.__instance_exists, "__instance_exists must be True"
-        assert equal_types(val.type, Rlist.gdb_type), \
-            "expression doesn't refer to list (type: {})".format(dump_type(val.type))
+        assert equal_to_any_types(val.type, (
+                Rlist.gdb_type,
+                Stailq.gdb_type,
+                Stailq.item_gdb_type,
+                Stailq.entry_ptr_gdb_type,
+            )), "expression doesn't refer to list (type: {})".format(dump_type(val.type))
 
         super(TtListPrinter, self).__init__()
 
@@ -1884,12 +1975,14 @@ is_item
         if head is not None:
             head = gdb.parse_and_eval(head)
             if head.type.code == gdb.TYPE_CODE_INT:
-                if equal_types(val.type, Rlist.gdb_type):
+                if equal_to_any_types(val.type, (Rlist.gdb_type, Stailq.gdb_type)):
                     head_type = val.type.pointer()
+                elif equal_to_any_types(val.type, (Stailq.item_gdb_type, Stailq.entry_ptr_gdb_type)):
+                    head_type = Stailq.gdb_type.pointer()
                 else:
                     raise gdb.GdbError("unexpected type: {}".format(dump_type(val.type)))
                 head = head.cast(head_type)
-            elif equal_types(head.type, Rlist.gdb_type):
+            elif equal_to_any_types(head.type, (Rlist.gdb_type, Stailq.gdb_type)):
                 head = head.address
             else:
                 raise gdb.GdbError("unexpected head type {}".format(dump_type(head.type)))
@@ -1909,6 +2002,22 @@ is_item
                 self.list = Rlist(val.address)
             else:
                 self.len = Rlist.len(val.address)
+
+        elif equal_types(val.type, Stailq.gdb_type):
+            if head is not None and head != val.address:
+                raise gdb.GdbError("Inconsistent arguments: '-head' is to be used"
+                                   " only when LIST_EXP refers to the single"
+                                   " list item rather than the list itself.")
+            lut = StailqLut
+            self.list = Stailq(val.address)
+
+        elif equal_to_any_types(val.type, (Stailq.item_gdb_type, Stailq.entry_ptr_gdb_type)):
+            if equal_types(val.type, Stailq.entry_ptr_gdb_type):
+                self.val = val['value'].dereference()
+            self.list_type = Stailq.gdb_type
+            lut = StailqLut
+            if head is not None:
+                self.list = Stailq(head)
 
         else:
             raise gdb.GdbError("TtListPrinter.lookup_entry_info: "
@@ -1990,7 +2099,7 @@ is_item
         # If the head of the list is specified the entire list is considered,
         # if the concrete item is specified items before it (after it in case
         # of reverse direction) are not considered
-        if self.val.address != self.list.address:
+        if not equal_types(self.val.type, self.list_type) or self.val.address != self.list.address:
             indexed_items = itertools.dropwhile(
                 lambda indexed_item: indexed_item[1] != self.val.address,
                 indexed_items)
@@ -2023,6 +2132,10 @@ is_item
             yield self.child(item, item_index)
 
 pp.add_printer('rlist', '^rlist$', TtListPrinter)
+pp.add_printer('stailq', '^stailq$', TtListPrinter)
+pp.add_printer('stailq_entry', '^stailq_entry$', TtListPrinter)
+if Stailq.entry_ptr_gdb_type:
+    pp.add_printer('stailq_entry_ptr', '^stailq_entry_ptr$', TtListPrinter)
 
 
 class TtListSelect(gdb.Command):
