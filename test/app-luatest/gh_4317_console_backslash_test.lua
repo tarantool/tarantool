@@ -38,7 +38,7 @@ g.test_using_backslash_on_local_console = function()
                               [[bbb\n]] ..
                               [=[]])]=]
 
-    local cmd = "printf '%s' | %s -i 2>/dev/null"
+    local cmd = "printf '%s' | INPUTRC=/dev/null %s -i 2>/dev/null"
     cmd = (cmd):format(tarantool_command, TARANTOOL_PATH)
     local fh = io.popen(cmd, 'r')
 
