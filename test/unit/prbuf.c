@@ -14,23 +14,25 @@
  * The below buffer size/payload size variants give next unused space at
  * the end of buffer sizes:
  *
- * payload_sizes:   4, 16, 40
+ * payload_sizes:   4, 16, 39
  * --------------------------
- * buffer_size=128: 0, 12, 24
- * buffer_size=256: 0,  0, 20
+ * buffer_size=128: 0, 12, 26
+ * buffer_size=256: 0,  0, 25
  * buffer_size=507: 3, 11,  7
  *
  * So we test next end of the buffer scenarios:
  *  - no unused space
  *  - not enough space to put end mark
  *  - enough space to put end mark
+ *
+ * Additionally payload size of 39 helps to test unaligned record header.
  */
 const size_t buffer_size_arr[] = { 128, 256, 507 };
 const size_t copy_number_arr[] = { 16, 32, 64 };
 const char payload_small[] = { 0xab, 0xdb, 0xee, 0xcc };
 const char payload_avg[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 			     0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F };
-#define PAYLOAD_LARGE_SIZE 40
+#define PAYLOAD_LARGE_SIZE 39
 static char payload_large[PAYLOAD_LARGE_SIZE];
 
 enum test_buffer_status {
