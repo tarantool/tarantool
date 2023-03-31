@@ -302,13 +302,13 @@ struct txn_stmt {
 	/** on_commit and/or on_rollback list is not empty. */
 	bool has_triggers;
 	/*
-	 * `insert` statement is guaranteed not to delete anything
-	 * from the transaction's point of view (i.e., there was a preceding
-	 * `delete` in the scope of the same transaction): no linking to the
-	 * list of `delete` statements is required during preparation of insert
-	 * statements that add preceding stories.
+	 * Flag that shows whether this statement overwrites own transaction
+	 * statement. For example if a transaction makes two replaces of the
+	 * same key, the second statement will be with is_own_change = true.
+	 * Or if a transaction deletes some key and then inserts that key,
+	 * the insertion statement will be with is_own_change = true.
 	 */
-	bool is_pure_insert;
+	bool is_own_change;
 	/**
 	* Request type - IPROTO type code
 	*/
