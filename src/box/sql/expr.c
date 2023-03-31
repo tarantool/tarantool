@@ -546,6 +546,9 @@ codeCompare(Parse * pParse,	/* The parsing (and code generating) context */
 	    int jumpIfNull	/* If true, jump if either operand is NULL */
     )
 {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+	return -1;
+#endif /* FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION */
 	uint32_t id;
 	if (sql_binary_compare_coll_seq(pParse, pLeft, pRight, &id) != 0)
 		return -1;
