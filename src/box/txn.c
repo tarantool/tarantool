@@ -306,7 +306,7 @@ txn_stmt_new(struct txn *txn)
 	stmt->engine_savepoint = NULL;
 	stmt->row = NULL;
 	stmt->has_triggers = false;
-	stmt->is_pure_insert = false;
+	stmt->is_own_change = false;
 	return stmt;
 }
 
