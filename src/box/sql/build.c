@@ -1238,6 +1238,9 @@ resolve_link(struct Parse *parse_context, const struct space_def *def,
 static void
 vdbe_emit_create_constraints(struct Parse *parse, int reg_space_id)
 {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+	return;
+#endif /* FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION */
 	assert(reg_space_id != 0);
 	struct space *space = parse->create_table_def.new_space;
 	bool is_alter = space == NULL;
@@ -3153,6 +3156,9 @@ vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
 				  const char *error_src, bool no_error,
 				  int cond_opcode)
 {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+	return;
+#endif /* FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION */
 	assert(cond_opcode == OP_NoConflict || cond_opcode == OP_Found);
 	struct Vdbe *v = sqlGetVdbe(parser);
 	assert(v != NULL);
