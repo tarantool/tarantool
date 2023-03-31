@@ -79,6 +79,10 @@
  * Defined if configured with JIT engine turned on.
  */
 #cmakedefine LUAJIT_JIT_STATUS 1
+/*
+ * Defined if configured with FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION.
+ */
+#cmakedefine FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION 1
 
 /*
  * Set if the system has bfd.h header and GNU bfd library.
