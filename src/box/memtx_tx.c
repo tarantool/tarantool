@@ -1991,6 +1991,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 			   &old_tuple, mode, &is_own_change);
 	if (rc != 0)
 		goto fail;
+	stmt->is_own_change = is_own_change;
 
 	/* Create add_story and replaced_story if necessary. */
 	add_story = memtx_tx_story_new(space, new_tuple);
@@ -2033,8 +2034,7 @@ memtx_tx_history_add_insert_stmt(struct txn_stmt *stmt,
 		else
 			del_story = memtx_tx_story_get(old_tuple);
 		memtx_tx_story_link_deleted_by(del_story, stmt);
-	} else if (is_own_change)
-		stmt->is_pure_insert = true;
+	}
 
 	/*
 	 * In case of DUP_INSERT there must be no visible replaced tuple. It is
@@ -2101,6 +2101,9 @@ memtx_tx_history_add_delete_stmt(struct txn_stmt *stmt,
 
 	if (old_tuple->is_dirty) {
 		del_story = memtx_tx_story_get(old_tuple);
+		if (del_story->add_stmt != NULL)
+			stmt->is_own_change =
+				del_story->add_stmt->txn == stmt->txn;
 	} else {
 		assert(stmt->txn != NULL);
 		del_story = memtx_tx_story_new(space, old_tuple);
@@ -2323,7 +2326,8 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			struct txn_stmt *test_stmt = test->add_stmt;
 			if (test_stmt->txn == stmt->txn)
 				continue;
-			if (test_stmt->is_pure_insert)
+			if (test_stmt->is_own_change &&
+			    test_stmt->del_story == NULL)
 				continue;
 			if (test_stmt->del_story != NULL) {
 				assert(test_stmt->del_story->add_stmt->txn
@@ -2398,7 +2402,8 @@ memtx_tx_history_prepare_insert_stmt(struct txn_stmt *stmt)
 			struct txn_stmt *test_stmt = test->add_stmt;
 			if (test_stmt->txn == stmt->txn)
 				continue;
-			if (test_stmt->is_pure_insert)
+			if (test_stmt->is_own_change &&
+			    test_stmt->del_story == NULL)
 				continue;
 			if (test_stmt->del_story == story)
 				continue;
