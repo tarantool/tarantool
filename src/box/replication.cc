@@ -890,6 +890,31 @@ applier_on_connect_f(struct trigger *trigger, void *event)
 	return 0;
 }
 
+/** A helper determining whether any more connection attempts are needed. */
+static bool
+replicaset_is_connected(struct replicaset_connect_state *state, int count,
+			bool connect_quorum)
+{
+	if (state->connected == count)
+		return true;
+	/*
+	 * After a quorum is reached, it is considered enough to proceed. Except
+	 * if a connection is critical. Connection *is* critical even with 0
+	 * quorum when the instance starts first time and needs to choose
+	 * replicaset UUID, fill _cluster, etc. If 0 quorum allowed to return
+	 * immediately even at first start, then it would be impossible to
+	 * bootstrap a replicaset - all nodes would start immediately and choose
+	 * different cluster UUIDs.
+	 */
+	if (state->connected >= replicaset_connect_quorum(count) &&
+	    !connect_quorum) {
+		return true;
+	}
+	if (count - state->failed < replicaset_connect_quorum(count))
+		return true;
+	return false;
+}
+
 void
 replicaset_connect(struct applier **appliers, int count,
 		   bool connect_quorum, bool keep_connect)
@@ -905,6 +930,7 @@ replicaset_connect(struct applier **appliers, int count,
 	if (!connect_quorum) {
 		/*
 		 * Enter orphan mode on configuration change and
+		 *
 		 * only leave it when we manage to sync with
 		 * replicaset_quorum instances. Don't change
 		 * title though, it should be 'loading' during
@@ -949,27 +975,9 @@ replicaset_connect(struct applier **appliers, int count,
 		applier_start(applier);
 	}
 
-	while (state.connected < count) {
-		/*
-		 * After a quorum is reached, it is considered
-		 * enough to proceed. Except if a connection is
-		 * critical.
-		 * Connection *is* critical even with 0 quorum
-		 * when the instance starts first time and needs
-		 * to choose replicaset UUID, fill _cluster, etc.
-		 * If 0 quorum allowed to return immediately even
-		 * at first start, then it would be impossible to
-		 * bootstrap a replicaset - all nodes would start
-		 * immediately and choose different cluster UUIDs.
-		 */
-		if (state.connected >= replicaset_connect_quorum(count) &&
-		    !connect_quorum) {
-			break;
-		}
+	while (!replicaset_is_connected(&state, count, connect_quorum)) {
 		double wait_start = ev_monotonic_now(loop());
 		if (fiber_cond_wait_timeout(&state.wakeup, timeout) != 0)
-			break;
-		if (count - state.failed < replicaset_connect_quorum(count))
 			break;
 		timeout -= ev_monotonic_now(loop()) - wait_start;
 	}
