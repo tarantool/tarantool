@@ -1726,3 +1726,14 @@ sql_check_create(const char *name, uint32_t space_id, uint32_t func_id,
 	}
 	return sql_constraint_create(name, space_id, path, value);
 }
+
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+int
+sql_fuzz(const char *sql, int bytes_count)
+{
+	struct Vdbe *stmt;
+	if (sql_stmt_compile(sql, bytes_count, NULL, &stmt, NULL) != 0)
+		return -1;
+	return sqlVdbeFinalize(stmt);
+}
+#endif /* FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION */

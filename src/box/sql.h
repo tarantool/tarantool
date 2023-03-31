@@ -417,6 +417,17 @@ func_sql_expr_has_single_arg(const struct func *base, const char *name);
 uint32_t
 sql_default_session_flags(void);
 
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+/**
+ * Entrypoint for fuzzing SQL engine.
+ *
+ * @param sql UTF-8 encoded SQL statement.
+ * @param sql_len Length of @sql in bytes.
+ */
+int
+sql_fuzz(const char *sql, int bytes_count);
+#endif /* FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION */
+
 #if defined(__cplusplus)
 } /* extern "C" { */
 #endif
