@@ -14,6 +14,7 @@ import re
 import sys
 
 if sys.version_info[0] == 2:
+    map = itertools.imap
     filter = itertools.ifilter
     zip = itertools.izip
 elif sys.version_info[0] == 3:
@@ -1578,6 +1579,7 @@ class ListLut(object):
         container = cls._containers_map.get(container_info.container_type.tag)
         return container.get(container_info.offset) if container is not None else None
 
+
 class Rlist(object):
     gdb_type = gdb.lookup_type('rlist')
     item_gdb_type = gdb_type
@@ -1603,29 +1605,33 @@ class Rlist(object):
     def len(cls, rlist):
         return len(cls(rlist))
 
-    def __init__(self, head=None):
-        self.__head = head
+    def __init__(self, val, is_item=False):
+        self.__val = val
+        self.__is_item = is_item
         self.__len = None
 
     @property
     def address(self):
-        return self.__head
+        return None if self.__is_item else self.__val
 
-    def ref(self):
-        return '*({}*){:#x}'.format(
-                self.__head.type.target().tag,
-                int_from_address(self.__head)
-            )
+    def title(self, entry_info):
+        return "{list_type}<{entry_info}> of length {list_len}".format(
+            list_type = self.gdb_type.tag,
+            entry_info = str(entry_info) if entry_info is not None else '?',
+            list_len = len(self),
+        )
 
     def __iter__(self):
-        item = self.__head['next']
-        while item != self.__head:
+        item = self.__val if self.__is_item else self.__val['next']
+        stop_item = item['prev']
+        while item != stop_item:
             yield item
             item = item['next']
 
     def __reversed__(self):
-        item = self.__head['prev']
-        while item != self.__head:
+        item = self.__val if self.__is_item else self.__val['prev']
+        stop_item = item['next']
+        while item != stop_item:
             yield item
             item = item['prev']
 
@@ -1633,7 +1639,6 @@ class Rlist(object):
         if self.__len is None:
             self.__len = sum(1 for _ in self)
         return self.__len
-
 
 class RlistLut(ListLut):
     _list_type = Rlist.gdb_type
@@ -1758,37 +1763,46 @@ class Stailq(object):
     item_gdb_type = gdb.lookup_type('stailq_entry')
     entry_ptr_gdb_type = find_type('stailq_entry_ptr')
 
-    def __init__(self, head=None):
-        self.__head = head
+    if entry_ptr_gdb_type is None:
+        @staticmethod
+        def __entry(val):
+            return val
+    else:
+        @staticmethod
+        def __entry(val):
+            return val['value']
+
+    def __init__(self, val):
+        if equal_types(val.type.target(), self.gdb_type):
+            self.__address = val
+            self.__start_entry = self.__entry(val['first'])
+        elif equal_types(val.type.target(), self.item_gdb_type):
+            self.__address = None
+            self.__start_entry = val
+        else:
+            raise gdb.GdbError("unexpected type: {}".format(dump_type(val.type.target())))
         self.__len = None
 
     @property
     def address(self):
-        return self.__head
+        return self.__address
 
-    def ref(self):
-        return '*({}*){:#x}'.format(
-                self.__head.type.target().tag,
-                int_from_address(self.__head)
-            )
-
-    if entry_ptr_gdb_type is None:
-        @staticmethod
-        def entry(val):
-            return val
-    else:
-        @staticmethod
-        def entry(val):
-            return val['value']
+    def title(self, entry_info):
+        if self.address is not None:
+            length = "of length {}".format(len(self))
+        else:
+            length = "of unknown length (at least {})".format(len(self))
+        return "{list_type}<{entry_info}> {length}".format(
+            list_type = self.gdb_type.tag,
+            entry_info = str(entry_info) if entry_info is not None else '?',
+            length = length,
+        )
 
     def __iter__(self):
-        if self.__head is None:
-            return
-        entry = self.entry(self.__head['first'])
-        last_entry = self.entry(self.__head['last'].dereference())
-        while entry != last_entry:
+        entry = self.__start_entry
+        while entry != 0:
             yield entry
-            entry = self.entry(entry['next'])
+            entry = self.__entry(entry['next'])
 
     def __reversed__(self):
         entries = list(self)
@@ -1796,7 +1810,6 @@ class Stailq(object):
             yield entry
 
     def __len__(self):
-        assert self.__head is not None, "__len__ is not applicable to the headless stailq"
         if self.__len is None:
             self.__len = sum(1 for _ in self)
         return self.__len
@@ -1895,10 +1908,14 @@ the expression refers to the certain entry then this only entry is displayed
 (along with its index in the list).
 This default behavior can be altered with the class variables (see below).
 
+walk_mode
+  Default is 'False'.
+  If 'True' printer takes the next step in list walking.
+
 predicate
   Default is 'None'.
   When it's not 'None' entries are filtered by predicate.
-  See '-filter' option of 'tt-list' command
+  See '-predicate' option of 'tt-list' command
 
 fields
   Default is 'None'.
@@ -1941,12 +1958,57 @@ from_tt_list
 
     __instance_exists = False
 
+    class WalkOrigin(object):
+        def __init__(self, val, is_item, head, reverse, predicate):
+            self.val = val
+            self.is_item = is_item
+            self.head = head
+            self.reverse = reverse
+            self.predicate = predicate
+
+        def __eq__(self, other):
+            return other is not None and \
+                self.val == other.val and \
+                self.is_item == other.is_item and \
+                self.head == other.head and \
+                self.reverse == other.reverse and \
+                self.predicate == other.predicate and \
+                True
+
+    # Walk state
+    __walk_origin = None
+    __walk_items = None
+    __walk_next_item = None
+    __walk_entry_info = None
+
+    @classmethod
+    def __set_walk_origin(cls, origin):
+        cls.__walk_origin = origin
+        cls.__set_walk_data(None, None)
+
+    @classmethod
+    def __set_walk_data(cls, items, entry_info):
+        cls.__walk_items = items
+        cls.__walk_next_item = None
+        cls.__walk_entry_info = entry_info
+
+    @classmethod
+    def __walk_next(cls):
+        if cls.__walk_items is not None:
+            cls.__walk_next_item = next(cls.__walk_items)
+
+    @classmethod
+    def reset_walk(cls):
+        cls.__set_walk_origin(None)
+
     # Initialization of config with default values is deferred so it can be
-    # done in a single place to avoid duplication of default constants
+    # done in a single place (namely in 'reset_config') to avoid duplication
+    # of default constants
     __config = None
 
     @classmethod
     def reset_config(cls,
+                    walk_mode=False,
                     entry_info=None,
                     head=None,
                     is_item=False,
@@ -1957,6 +2019,7 @@ from_tt_list
                     print_args=None,
                 ):
         cls.__config = dict(
+            walk_mode=walk_mode,
             entry_info=entry_info,
             head=head,
             is_item=is_item,
@@ -1966,6 +2029,20 @@ from_tt_list
             from_tt_list=from_tt_list,
             print_args=print_args,
         )
+        if walk_mode:
+            # Some walking manipulations
+            val = gdb.parse_and_eval(cls.get_print_exp(print_args))
+            walk_origin = cls.WalkOrigin(
+                val.address,
+                is_item,
+                head,
+                reverse,
+                predicate,
+            )
+            if walk_origin == cls.__walk_origin:
+                cls.__walk_next()
+            else:
+                cls.__set_walk_origin(walk_origin)
 
     def __new__(cls, val):
         # Deferred initialization of config
@@ -2021,6 +2098,130 @@ from_tt_list
 
         return lut.lookup_entry_info_by_container(container_info)
 
+    @classmethod
+    def resolve_entry_info(cls, config, lut, lst):
+        # Turn configured entry_info (if any) into ContainerFieldInfo
+        entry_info_config = config['entry_info']
+        if entry_info_config is not None:
+            entry_info_config = ContainerFieldInfo(entry_info_config)
+
+        # Try to find predefined entry info for the list
+        entry_info_lut = None
+        if lst.address is not None:
+            entry_info_lut = lut.lookup_entry_info(lst.address)
+
+        # Check if the configured entry info conflicts with the predefined one
+        entry_info = cls.resolve_value_with_predefined(
+            'entry info',
+            entry_info_config,
+            entry_info_lut,
+        )
+
+        # If still no entry info, then the last chance to identify it is
+        # parsing the list expression that was specified in 'print' command
+        if entry_info is None:
+            print_args = config['print_args']
+            head_exp = config['head']
+            list_exp = head_exp if head_exp is not None else \
+                    cls.get_print_exp(print_args) if print_args is not None else \
+                    None
+            if list_exp is not None:
+                entry_info = cls.lookup_entry_info_from_list_exp(lut, list_exp)
+
+        # Display hint if failed to identify the type of the list entries
+        if entry_info is None:
+            msg = "Warning: failed to identify the type of the list entries.\n"
+            if config['from_tt_list']:
+                msg += "Please, specify entry info explicitly with -e option.\n"
+            else:
+                msg += "Please, try 'tt-list' or 'tt-list-walk' command.\n"
+            gdb.write("\n" + msg + "\n", gdb.STDERR)
+
+        return entry_info
+
+    @staticmethod
+    def prepare_list_title(list, entry_info):
+        s = list.title(entry_info)
+        if list.address is not None:
+            s += ", ref=*({}*){:#x}".format(
+                list.gdb_type.tag,
+                int_from_address(list.address),
+            )
+        return s
+
+    @staticmethod
+    def prepare_sequence(config, lst, val, entry_info):
+        def create_predicate(gdb_condition, entry_info):
+            substitutions = (
+                ('$index', lambda item: str(item[0])),
+                ('$item', lambda item: '(({}*){})'.format(
+                                lst.item_gdb_type.tag,
+                                int_from_address(item[1])
+                            )),
+                ('$entry', lambda item: '(({}*){})'.format(
+                                entry_info.container_type.tag,
+                                int_from_address(item[1])
+                            )),
+            )
+            substitutions = filter(lambda s: gdb_condition.find(s[0]) != -1, substitutions)
+            substitutions = dict(substitutions)
+
+            # Check that the predicate expression can be evaluated
+            if '$index' in substitutions and lst.address is None:
+                raise gdb.GdbError("\n"
+                    "Can't use $index placeholder when the head of the list is unknown.\n"
+                    "Please, use -h option to specify it explicitly if it is not identified automatically.\n"
+                    "\n"
+                )
+            if '$entry' in substitutions and entry_info is None:
+                raise gdb.GdbError("\n"
+                    "Can't use $entry placeholder when the type of entry is unknown.\n"
+                    "Please, use -e option to specify it explicitly if it is not identified automatically.\n"
+                    "\n"
+                )
+
+            # This function applies item-specific substitutions and is used as
+            # a predicate for standard filter function. Its argument is a tuple
+            # that contains item and its index
+            def predicate(item):
+                item_condition = gdb_condition
+                for placeholder in substitutions.keys():
+                    item_condition = item_condition.replace(
+                        placeholder, substitutions[placeholder](item))
+                return gdb.parse_and_eval(item_condition)
+            return predicate
+
+        # Prepare items and indices
+        if config['reverse']:
+            items = reversed(lst)
+            indices = itertools.count(len(lst)-1, -1)
+        else:
+            items = iter(lst)
+            indices = itertools.count()
+        # Decorate indices with '?' if the head of the list is unknown
+        if lst.address is None:
+            indices = map(lambda index: '?+{}'.format(index) if index > 0 else '?', indices)
+        # Link them
+        items = zip(indices, items)
+
+        # If the head of the list is specified the entire list is considered,
+        # if the concrete item is specified only items started with the specified
+        # one is considered (up to the specified one in case of reverse direction)
+        if not equal_types(val.type, lst.gdb_type) or val.address != lst.address:
+            items = itertools.dropwhile(lambda item: item[1] != val.address, items)
+
+        # Deal with predicate
+        if config['predicate'] is not None:
+            # Create python function that could be used as a filter predicate
+            predicate = create_predicate(
+                config['predicate'],
+                entry_info,
+            )
+            # Filter items with predicate
+            items = filter(predicate, items)
+
+        return items
+
     def __init__(self, val):
         assert self.__class__.__instance_exists, "__instance_exists must be True"
         assert equal_to_any_types(val.type, (
@@ -2032,15 +2233,22 @@ from_tt_list
 
         super(TtListPrinter, self).__init__()
 
-        self.val = val
-        self.list_type = val.type
-        self.list = None
-        self.len = None
+        config = self.__class__.__config
 
-        self.print_entry = gdb.parameter(TtPrintListEntryParameter.name)
+        self.val = val
+        self.title = None
+        self.items = None
+        self.entry_info = None
+
+        if config['walk_mode'] and self.__class__.__walk_next_item is not None:
+            # This means that walk state has been set up already and now we are
+            # moving through the items
+            self.items = [self.__class__.__walk_next_item]
+            self.entry_info = self.__class__.__walk_entry_info
+            return
 
         # Turn configured head (if any) into gdb.Value
-        head = self.__config['head']
+        head = config['head']
         if head is not None:
             head = gdb.parse_and_eval(head)
             if head.type.code == gdb.TYPE_CODE_INT:
@@ -2056,6 +2264,8 @@ from_tt_list
             else:
                 raise gdb.GdbError("unexpected head type {}".format(dump_type(head.type)))
 
+        # Create corresponding python iterable
+        lst = None
         if equal_types(val.type, Rlist.gdb_type):
             lut = RlistLut
             # Try to find the head of the list
@@ -2066,151 +2276,74 @@ from_tt_list
                 head_lut,
             )
             if head is not None:
-                self.list = Rlist(head)
-            elif not self.__config['is_item']:
-                self.list = Rlist(val.address)
+                lst = Rlist(head)
             else:
-                self.len = Rlist.len(val.address)
+                lst = Rlist(val.address, config['is_item'])
 
         elif equal_types(val.type, Stailq.gdb_type):
             if head is not None and head != val.address:
                 raise gdb.GdbError("Inconsistent arguments: '-head' is to be used"
-                                   " only when LIST_EXP refers to the single"
-                                   " list item rather than the list itself.")
+                                " only when LIST_EXP refers to the single"
+                                " list item rather than the list itself.")
             lut = StailqLut
-            self.list = Stailq(val.address)
+            lst = Stailq(val.address)
 
         elif equal_to_any_types(val.type, (Stailq.item_gdb_type, Stailq.entry_ptr_gdb_type)):
             if equal_types(val.type, Stailq.entry_ptr_gdb_type):
                 self.val = val['value'].dereference()
-            self.list_type = Stailq.gdb_type
             lut = StailqLut
-            if head is not None:
-                self.list = Stailq(head)
+            lst = Stailq(head if head is not None else self.val.address)
 
         else:
-            raise gdb.GdbError("TtListPrinter.lookup_entry_info: "
+            raise gdb.GdbError("TtListPrinter.__init__: "
                 "unreachable code: unexpected type {}".format(dump_type(val.type)))
 
-        # Turn configured entry_info (if any) into ContainerFieldInfo
-        entry_info_config = self.__config['entry_info']
-        if entry_info_config is not None:
-            entry_info_config = ContainerFieldInfo(entry_info_config)
+        # Deal with entry_info
+        self.entry_info = self.resolve_entry_info(config, lut, lst)
 
-        # Try to find predefined entry info for the list
-        entry_info_lut = None
-        if self.list is not None:
-            entry_info_lut = lut.lookup_entry_info(self.list.address)
+        # Prepare title of the list
+        self.title = self.prepare_list_title(lst, self.entry_info)
 
-        # Check if the configured entry info conflicts with the predefined one
-        self.entry_info = self.resolve_value_with_predefined(
-            'entry info',
-            entry_info_config,
-            entry_info_lut,
-        )
+        # Prepare items sequence
+        self.items = self.prepare_sequence(config, lst, self.val, self.entry_info)
 
-        # If still no entry info, then the last chance to identify it is
-        # parsing the list expression that was specified in 'print' command
-        if self.entry_info is None:
-            print_args = self.__config['print_args']
-            head_exp = self.__config['head']
-            list_exp = head_exp if head_exp is not None else \
-                       self.get_print_exp(print_args) if print_args is not None else \
-                       None
-            if list_exp is not None:
-                self.entry_info = self.lookup_entry_info_from_list_exp(lut, list_exp)
-
-        # Display hint if failed to identify the type of the list entries
-        if self.entry_info is None:
-            msg = "Warning: failed to identify the type of the list entries.\n"
-            if self.__config['from_tt_list']:
-                msg += "Please, specify entry info explicitly with -e option (see 'help tt-list').\n"
-            else:
-                msg += "Please, try 'tt-list' command.\n"
-            gdb.write("\n" + msg + "\n", gdb.STDERR)
+        if config['walk_mode']:
+            # This means that this is the first 'walk' invocation so we need
+            # to setup 'walk' state
+            self.__class__.__set_walk_data(self.items, self.entry_info)
+            self.items = []
 
     def __del__(self):
         assert self.__class__.__instance_exists
         self.__class__.__instance_exists = False
 
     def to_string(self):
-        s = '{}<{}> of length {}'.format(
-            self.list_type.tag,
-            self.entry_info if self.entry_info is not None else '?',
-            self.len if self.len is not None else len(self.list) if self.list is not None else '?'
-        )
-        if self.list is not None:
-            s += ', ref={}'.format(self.list.ref())
-        return s
+        return self.title
 
-    def child(self, item, item_index='?'):
-        if not self.print_entry or self.entry_info is None:
-            return '[{}]'.format(item_index), item
-        entry_ptr = self.entry_info.container_from_field(item)
+    @staticmethod
+    def child(entry_info, item):
+        item_index, item_ptr = item
+        if entry_info is None:
+            return '[{}]'.format(item_index), item_ptr
+        entry_ptr = entry_info.container_from_field(item_ptr)
         child_name = '[{}] (({}*){})'.format(item_index,
             entry_ptr.type.target().tag, entry_ptr)
         return child_name, entry_ptr.dereference()
 
     def children(self):
-        config_fields = self.__config['fields']
+        print_entry = gdb.parameter(TtPrintListEntryParameter.name)
+        entry_info = self.entry_info if print_entry else None
 
         # Setup entry printer (if required)
-        self.entry_printer.enabled = self.entry_info is not None and \
-                                    config_fields is not None
-        if self.entry_printer.enabled:
-            self.entry_printer.container_type = self.entry_info.container_type
+        config_fields = self.__config['fields']
+        if entry_info is not None and config_fields is not None:
+            self.entry_printer.container_type = entry_info.container_type
             self.entry_printer.fields = config_fields.split(',')
+            self.entry_printer.enabled = True
 
-        config_reverse = self.__config['reverse']
-        config_predicate = self.__config['predicate']
-
-        # If the generated list is not iterable then display
-        # the specified value as a single child with unknown index
-        if self.list is None:
-            yield self.child(self.val)
-            self.entry_printer.enabled = False
-            return
-
-        # Get items iterator considering direction
-        items = iter(self.list) if not config_reverse else reversed(self.list)
-
-        # Add sequence numbers
-        indexed_items = enumerate(items)
-
-        # If the head of the list is specified the entire list is considered,
-        # if the concrete item is specified items before it (after it in case
-        # of reverse direction) are not considered
-        if not equal_types(self.val.type, self.list_type) or self.val.address != self.list.address:
-            indexed_items = itertools.dropwhile(
-                lambda indexed_item: indexed_item[1] != self.val.address,
-                indexed_items)
-            # Leave only requested item if no predicate specified
-            if config_predicate is None:
-                indexed_items = itertools.islice(indexed_items, 1)
-
-        # Filter items with predicate, if any
-        if config_predicate is not None:
-            entry_info = self.entry_info
-            entry_type = entry_info.container_type
-            # Adjustment that is not item-specific need to be applied only once
-            predicate = config_predicate\
-                .replace('$item', '(({}*)$item)'.format(self.list.item_gdb_type.tag))\
-                .replace('$entry', '(({}*)$entry)'.format(entry_type.tag))
-            # This function applies item-specific substitutions and is used as
-            # a predicate for standard filter function. Its argument is a tuple
-            # that contains item and its index
-            def subst_and_eval(indexed_item):
-                item_index, item = indexed_item
-                return gdb.parse_and_eval(predicate\
-                    .replace('$index', str(item_index))
-                    .replace('$item', str(item))
-                    .replace('$entry', str(entry_info.container_from_field(item)))
-                )
-            indexed_items = filter(subst_and_eval, indexed_items)
-
-        # Finally display items
-        for item_index, item in indexed_items:
-            yield self.child(item, item_index)
+        # Items already prepared, just yield'em all
+        for item in self.items:
+            yield self.child(entry_info, item)
 
         self.entry_printer.enabled = False
 
@@ -2221,35 +2354,48 @@ if Stailq.entry_ptr_gdb_type:
     pp.add_printer('stailq_entry_ptr', '^stailq_entry_ptr$', TtListPrinter)
 
 
+def create_list_argument_parser():
+    """
+Create parser that knows the arguments used both in tt-list and
+tt-list-walk commands
+    """
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument('-entry-info', action='store')
+    parser.add_argument('-predicate', action='store')
+    parser.add_argument('-fields', action='store')
+    parser.add_argument('-head', action='store')
+    parser.add_argument('-item', action='store_true')
+    parser.add_argument('-reverse', action='store_true')
+    return parser
+
+
 class TtListSelect(gdb.Command):
     """
 tt-list
-Display list entry RLIST_EXP refers to or the entire list if RLIST_EXP refers
-to the list head.
+Display entries of the LIST_EXP.
+If LIST_EXP refers to the concrete item rather than the entire list, only items
+started with the specified one are displayed (up to the specified one in case
+of reverse direction).
 
-Usage: tt-list [[OPTION]... --] RLIST_EXP
+Usage: tt-list [[OPTION]... --] LIST_EXP
 
 Options:
-  -filter PREDICATE
+  -predicate PREDICATE
     Filter entries with PREDICATE. It is a boolean expression similar to
     the condition expression in 'condition' or 'break' command. It is evaluated
     for each list item, which may be referred within the expression with the
     following placeholders:
       $index - item index
-      $item - pointer to the item (rlist anchor)
+      $item - pointer to the item
       $entry - pointer to the actual entry
-    Note, that with this option if RLIST_EXP refers to the single item the
+    Note, that with this option if LIST_EXP refers to the single item the
     iteration starts from this item, i.e. items before the specified one are
     not checked. If you need to check the entire list either check in reverse
-    direction as well (with -r option) or use the list head as RLIST_EXP.
+    direction as well (with -r option) or use the list head as LIST_EXP.
 
   -fields FIELDS
     Comma separated entry fields that should be printed.
     If omitted then all fields are printed.
-
-  -pre EXP
-  -post EXP
-    Evaluate expression EXP before/after the command (see examples).
 
   -reverse
     Iterate list in reverse direction.
@@ -2259,16 +2405,16 @@ Options:
     automatically, but if failed it can be specified explicitly with
     this option, where entry_info should have format 'type::field'
     (type -- entry type, field -- anchor field)
-    Please, note that the fact that you need this option indicates that most
-    likely the list referenced by RLIST_EXP is missing in the internal table
-    and thus the table needs to be updated.
+    Please, note that the fact that you need this option might indicate
+    that the list referenced by LIST_EXP is missing in the predefined table
+    and need to be checked.
 
   -head HEAD
     If the head of the list is not detected automatically, it should be
     specified explicitly with this option.
 
   -item
-    Explicitly specify that RLIST_EXP refers to the item of the list, rather
+    Explicitly specify that LIST_EXP refers to the item of the list, rather
     than the list itself. Normally it is identified automatically, but in some
     cases there maybe lack of information to figure it out and this option
     might help.
@@ -2284,18 +2430,10 @@ Examples:
 (gdb) tt-list engines.next
 
 # Display the engine of the name 'memtx'
-(gdb) tt-list -f '$_streq($entry->name, "memtx")' -- engines
+(gdb) tt-list -p '$_streq($entry->name, "memtx")' -- engines
 
 # Display engines which names start with 's'
-(gdb) tt-list -f '$_memeq($entry->name, "s", 1)' -- engines
-
-# Walk the engines (repeat the last command)
-(gdb) set $i=0
-(gdb) tt-list -f '$index==$i' -post '$i++' -- engines
-
-# Walk the engines in reverse direction
-(gdb) set $i=0
-(gdb) tt-list -f '$index==$i' -post '$i++' -r -- engines
+(gdb) tt-list -p '$_memeq($entry->name, "s", 1)' -- engines
 
 # Display fibers ids and names
 (gdb) tt-list -pretty -fields fid,name -- main_cord.alive
@@ -2307,15 +2445,7 @@ Examples:
         super(TtListSelect, self).__init__(self.cmd_name, gdb.COMMAND_DATA)
 
     def invoke(self, arg, from_tty):
-        parser = argparse.ArgumentParser(add_help=False)
-        parser.add_argument('-entry-info', action='store')
-        parser.add_argument('-filter', action='store')
-        parser.add_argument('-fields', action='store')
-        parser.add_argument('-head', action='store')
-        parser.add_argument('-item', action='store_true')
-        parser.add_argument('-reverse', action='store_true')
-        parser.add_argument('-pre', action='store')
-        parser.add_argument('-post', action='store')
+        parser = create_list_argument_parser()
 
         # It is assumed that unknown arguments are for 'print' command
         args, print_args = parser.parse_known_args(gdb.string_to_argv(arg))
@@ -2332,8 +2462,9 @@ Examples:
         # 3. Restore default printer configuration, so subsequent 'print'
         #    works the same
         TtListPrinter.reset_config(
+            walk_mode = False,
             entry_info = args.entry_info,
-            predicate = args.filter,
+            predicate = args.predicate,
             fields = args.fields,
             head = args.head,
             is_item = args.item,
@@ -2343,9 +2474,7 @@ Examples:
         )
 
         try:
-            args.pre and gdb.parse_and_eval(args.pre)
             gdb.execute('print {}'.format(' '.join(print_args)), from_tty)
-            args.post and gdb.parse_and_eval(args.post)
 
         except Exception as e:
             raise e
@@ -2354,3 +2483,75 @@ Examples:
             TtListPrinter.reset_config()
 
 TtListSelect()
+
+
+class TtListWalk(gdb.Command):
+    """
+tt-list-walk
+This command implements 'walk' functionality, that is it iterates
+through the list but unlike 'tt-list' it displays one entry per
+invocation (sometimes it may be more convenient to see entries
+one-by-one instead of all-at-once). To move through the list you just
+need to repeat continuously the last command with the same arguments
+(that is just enter blank line) until the list is exhausted and message
+'No items left' is displayed.
+There can be only one active walk at a time. Once LIST_EXP or any option
+that affects entries sequence is changed, current active walk is dropped
+and the new one is started automatically.
+
+Usage: tt-list-walk [[OPTION]... --] LIST_EXP
+
+Options:
+  Any option of 'tt-list' (see 'help tt-list')
+
+  -new
+    Start new walk.
+    Note, that the new walk starts automatically if any of the options
+    that affects sequence or LIST_EXP itself is changed. This option is
+    to be used if you need to restart the walk on the same sequence.
+
+Examples (repeat the command until the list is exhausted):
+
+# Walk through the engines
+(gdb) tt-list-walk engines
+
+# Walk through the fibers with 'fid' greater than 110
+(gdb) tt-list-walk -p '$entry->fid > 110' -- main_cord.alive
+    """
+
+    cmd_name = 'tt-list-walk'
+
+    def __init__(self):
+        super(TtListWalk, self).__init__(self.cmd_name, gdb.COMMAND_DATA)
+
+    def invoke(self, arg, from_tty):
+        parser = create_list_argument_parser()
+        parser.add_argument('-new', action='store_true')
+
+        # It is assumed that unknown arguments are for 'print' command
+        args, print_args = parser.parse_known_args(gdb.string_to_argv(arg))
+
+        args.new and TtListPrinter.reset_walk()
+
+        try:
+            TtListPrinter.reset_config(
+                walk_mode = True,
+                entry_info = args.entry_info,
+                predicate = args.predicate,
+                fields = args.fields,
+                head = args.head,
+                is_item = args.item,
+                reverse = args.reverse,
+                from_tt_list = True,
+                print_args = print_args,
+            )
+            gdb.execute('print {}'.format(' '.join(print_args)))
+
+        except StopIteration:
+            TtListPrinter.reset_walk()
+            raise gdb.GdbError("No items left.")
+
+        finally:
+            TtListPrinter.reset_config()
+
+TtListWalk()
