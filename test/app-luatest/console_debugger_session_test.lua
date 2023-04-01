@@ -121,6 +121,7 @@ end
 
 local g = t.group('debug', {
     {sequence = 'full'},
+    {sequence = 'bp_fibers'},
     {sequence = 'bp_set_ok'},
     {sequence = 'bp_set_fail'},
     {sequence = 'bp_delete_ok'},
@@ -129,7 +130,7 @@ local g = t.group('debug', {
 
 local sequences = {
 
-    -- full, complex sequence
+    -- full, single fiber, complex sequence
     full = {
         dbg_script [[
      1 | local date = require 'datetime'
@@ -173,6 +174,50 @@ local sequences = {
         { [''] = dbg_prompt },
         { [''] = dbg_prompt },
         { ['p S'] = 'S => "1970-01-01T0300+0300"' },
+        { ['c'] = '' },
+    },
+
+    bp_fibers = {
+        dbg_script [[
+     1|local date = require 'datetime'
+     2|local fiber = require('fiber')
+     3|
+     4|print('1.out')
+     5|
+     6|local function fiber_function()
+     7|    print('2.in:', "I'm a fiber")
+     8|    local T = date.now()
+     9|    local T1 = T + {month = 1}
+    10|    local dist = T1 - T
+    11|    print(dist)
+    12|    fiber.yield()
+    13|    print('3.in:')
+    14|end
+    15|
+    16|local fiber_object = fiber.new(fiber_function)
+    17|print('4.out:', "Fiber created")
+    18|fiber.yield()
+    19|
+    20|local T = date.new()
+    21|local fmt = '%Y-%m-%dT%H%M%z'
+    22|local S  = T:format(fmt)
+    23|local T1 = date.parse(S, {format = fmt})
+    24|print('5.out:', T1)
+    25|os.exit(0)
+]],
+        { ['\t'] = '' }, -- \t is a special value for start
+        { ['n'] = dbg_prompt },
+        { ['n'] = dbg_prompt },
+        { ['b +8'] = dbg_prompt },
+        { ['b +20'] = dbg_prompt },
+        { ['c'] = '{file}:8' },
+        { ['n'] = dbg_prompt },
+        { ['n'] = dbg_prompt },
+        { ['n'] = dbg_prompt },
+        { ['p dist'] = '+1 months' },
+        { ['c'] = 'Fiber switched from' },
+        { ['n'] = dbg_prompt },
+        { ['p T'] = '1970-01-01T00:00:00Z' },
         { ['c'] = '' },
     },
 

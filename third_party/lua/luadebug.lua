@@ -373,6 +373,20 @@ local function remove_breakpoint(file, line)
 end
 
 local repl
+local fiber_id_func = require('fiber').id
+local last_fiber_id = fiber_id_func()
+
+-- visualize verbosely each fiber switch
+local function display_fiber_switch()
+    if dbg.cfg.fiber_switch then
+        local fiber_id = fiber_id_func()
+        if last_fiber_id ~= fiber_id then
+            dbg_write_warn('Fiber switched from %d to %d', last_fiber_id, fiber_id)
+            last_fiber_id = fiber_id
+        end
+    end
+end
+
 
 -- Return false for stack frames without source,
 -- which includes C frames, Lua bytecode, and `loadstring` functions
@@ -404,6 +418,9 @@ local function hook_factory(level)
             -- accounted for.
             local offset = get_stack_length(dbg_hook_ofs)
 
+            -- visualize fiber switches
+            display_fiber_switch()
+
             if event == "line" then
                 local matched = offset <= stop_level or
                                 has_breakpoint(normfile, info.currentline)
@@ -428,6 +445,7 @@ local function hook_check_bps()
         if not frame_has_line(info) then
             return
         end
+        display_fiber_switch()
         if event == 'line' and has_breakpoint(info.source, info.currentline) then
             repl('hit')
         end
@@ -1096,6 +1114,7 @@ repl = function(reason)
         if not listing_shown then
             auto_listing(info)
         end
+        display_fiber_switch()
         -- Command could show their own context with listing
         -- so reset status before command executed.
         listing_shown = false
@@ -1124,6 +1143,7 @@ dbg = setmetatable({
             auto_where  = 3,
             auto_eval   = false,
             pretty_depth = 3,
+            fiber_switch= true,
         },
         pretty  = pretty,
         pp = function(value, depth)
