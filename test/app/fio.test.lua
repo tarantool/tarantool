@@ -147,9 +147,10 @@ fio.rmdir(tmpdir)
 fio.unlink()
 fio.unlink(nil)
 
--- gh-1211 use 0777 if mode omitted in open
+-- gh-7981 use 0666 if mode omitted in open with O_CREAT
 fh4 = fio.open('newfile', {'O_RDWR','O_CREAT','O_EXCL'})
-bit.band(fh4:stat().mode, 0x1FF) == bit.band(fio.umask(), 0x1ff)
+bit.band(fh4:stat().mode, tonumber('7777', 8)) == \
+    bit.band(tonumber('666', 8), bit.bnot(fio.umask()))
 fh4:close()
 fio.unlink('newfile')
 
