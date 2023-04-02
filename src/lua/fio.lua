@@ -200,7 +200,7 @@ fio.open = function(path, flags, mode)
         flags = { flags }
     end
     if type(mode) ~= 'table' then
-        mode = { mode or (bit.band(0x1FF, fio.umask())) }
+        mode = { mode or tonumber('666', 8) }
     end
 
 
