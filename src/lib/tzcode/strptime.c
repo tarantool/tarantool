@@ -627,12 +627,11 @@ tnt_strptime(const char *__restrict buf, const char *__restrict fmt,
 	}
 
 	if (!(flags & FLAG_YDAY) && (flags & FLAG_YEAR)) {
-		if ((flags & (FLAG_MONTH | FLAG_MDAY)) ==
-		    (FLAG_MONTH | FLAG_MDAY)) {
+		if ((flags & FLAG_MONTH) != 0 ) {
 			tm->tm_yday = start_of_month[isleap(tm->tm_year +
 							    TM_YEAR_BASE)]
 						    [tm->tm_mon] +
-				(tm->tm_mday - 1);
+				(tm->tm_mday - 1) * !!(flags & FLAG_MDAY);
 			flags |= FLAG_YDAY;
 		} else if (day_offset != -1) {
 			int tmpwday, tmpyday, fwo;
