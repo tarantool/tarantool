@@ -26,7 +26,4 @@ target_link_libraries(sql_fuzzer PUBLIC box
                                         ${LPM_LIBRARIES}
                                         fuzzer_config)
 
-set_property(TARGET sql-query-proto PROPERTY
-             COMPILE_FLAGS "-fsanitize=fuzzer-no-link,address -fsanitize-coverage=trace-cmp -fprofile-instr-generate")
-
 set(FUZZ_TEST_TARGETS "${FUZZ_TEST_TARGETS};sql_fuzzer" PARENT_SCOPE)
