@@ -13,7 +13,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-#if defined(TARGET_OS_LINUX) && defined(__x86_64__)
+#if TARGET_OS_LINUX && defined(__x86_64__)
 # define HAS_GREG
 #endif
 

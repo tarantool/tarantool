@@ -128,7 +128,7 @@ sio_option_name(int option)
 static int
 sio_listen_backlog()
 {
-#ifdef TARGET_OS_LINUX
+#if TARGET_OS_LINUX
 	FILE *proc = fopen("/proc/sys/net/core/somaxconn", "r");
 	if (proc) {
 		int backlog;
