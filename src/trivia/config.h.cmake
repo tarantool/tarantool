@@ -27,16 +27,16 @@
 /** \endcond public */
 
 #define PACKAGE "@PACKAGE@"
-/*  Defined if building for Linux */
-#cmakedefine TARGET_OS_LINUX 1
-/*  Defined if building for FreeBSD */
-#cmakedefine TARGET_OS_FREEBSD 1
-/*  Defined if building for NetBSD */
-#cmakedefine TARGET_OS_NETBSD 1
-/*  Defined if building for Darwin */
-#cmakedefine TARGET_OS_DARWIN 1
+/* Defined to 1 if building for Linux, or to 0 otherwise. */
+#cmakedefine01 TARGET_OS_LINUX
+/* Defined to 1 if building for FreeBSD, or to 0 otherwise. */
+#cmakedefine01 TARGET_OS_FREEBSD
+/* Defined to 1 if building for NetBSD, or to 0 otherwise. */
+#cmakedefine01 TARGET_OS_NETBSD
+/* Defined to 1 if building for Darwin, or to 0 otherwise. */
+#cmakedefine01 TARGET_OS_DARWIN
 
-#ifdef TARGET_OS_DARWIN
+#if TARGET_OS_DARWIN
 #define TARANTOOL_LIBEXT "dylib"
 #else
 #define TARANTOOL_LIBEXT "so"

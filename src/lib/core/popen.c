@@ -19,7 +19,7 @@
 #include "say.h"
 #include "tarantool_ev.h"
 
-#ifdef TARGET_OS_DARWIN
+#if TARGET_OS_DARWIN
 # include <sys/ioctl.h>
 #endif
 
@@ -861,7 +861,7 @@ popen_delete(struct popen_handle *handle)
 static int
 make_pipe(int pfd[2])
 {
-#ifdef TARGET_OS_LINUX
+#if TARGET_OS_LINUX
 	if (pipe2(pfd, O_CLOEXEC)) {
 		diag_set(SystemError, "Can't create pipe2");
 		return -1;
@@ -895,7 +895,7 @@ make_pipe(int pfd[2])
 static int
 close_inherited_fds(int *skip_fds, size_t nr_skip_fds)
 {
-# if defined(TARGET_OS_LINUX)
+# if TARGET_OS_LINUX
 	static const char path[] = "/proc/self/fd";
 # else
 	static const char path[] = "/dev/fd";
@@ -1004,7 +1004,7 @@ signal_reset(void)
 	}
 }
 
-#ifdef TARGET_OS_DARWIN
+#if TARGET_OS_DARWIN
 /**
  * Wait until a child process will become a group leader or will
  * complete.
@@ -1312,7 +1312,7 @@ popen_new(struct popen_opts *opts)
 			signal_reset();
 
 		if (opts->flags & POPEN_FLAG_SETSID) {
-#ifndef TARGET_OS_DARWIN
+#if !TARGET_OS_DARWIN
 			if (setsid() == -1) {
 				say_syserror("child: setsid failed");
 				goto exit_child;

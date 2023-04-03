@@ -432,7 +432,7 @@ log_pipe_init(struct log *log, const char *init_str)
 		diag_set(SystemError, "can't start logger: %s", init_str);
 		return -1;
 	}
-#ifndef TARGET_OS_DARWIN
+#if !TARGET_OS_DARWIN
 	/*
 	 * A courtesy to a DBA who might have
 	 * misconfigured the logger option: check whether

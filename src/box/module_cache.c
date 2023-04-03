@@ -261,7 +261,7 @@ module_attr_fill(struct module_attr *attr, struct stat *st)
 	attr->st_dev	= (uint64_t)st->st_dev;
 	attr->st_ino	= (uint64_t)st->st_ino;
 	attr->st_size	= (uint64_t)st->st_size;
-#ifdef TARGET_OS_DARWIN
+#if TARGET_OS_DARWIN
 	attr->tv_sec	= (uint64_t)st->st_mtimespec.tv_sec;
 	attr->tv_nsec	= (uint64_t)st->st_mtimespec.tv_nsec;
 #else

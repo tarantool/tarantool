@@ -47,7 +47,7 @@
 #include <locale.h>
 #include <libgen.h>
 #include <sysexits.h>
-#if defined(TARGET_OS_LINUX) && defined(HAVE_PRCTL_H)
+#if TARGET_OS_LINUX && defined(HAVE_PRCTL_H)
 # include <sys/prctl.h>
 #endif
 #include "fiber.h"
@@ -390,7 +390,7 @@ load_cfg(void)
 			say_syserror("setrlimit");
 			exit(EX_OSERR);
 		}
-#if defined(TARGET_OS_LINUX) && defined(HAVE_PRCTL_H)
+#if TARGET_OS_LINUX && defined(HAVE_PRCTL_H)
 		if (prctl(PR_SET_DUMPABLE, 1, 0, 0, 0) < 0) {
 			say_syserror("prctl");
 			exit(EX_OSERR);
@@ -407,7 +407,7 @@ load_cfg(void)
 		if (!small_test_feature(SMALL_FEATURE_DONTDUMP)) {
 			static const char strip_msg[] =
 				"'strip_core' is set but unsupported";
-#ifdef TARGET_OS_LINUX
+#if TARGET_OS_LINUX
 			/*
 			 * Linux is known to support madvise(DONT_DUMP)
 			 * feature, thus warn on this platform only. The

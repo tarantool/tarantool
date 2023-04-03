@@ -185,7 +185,7 @@ crash_signal_cb(int signo, siginfo_t *siginfo, void *context)
 		crash_callback(cinfo);
 	} else {
 		/* Got a signal while running the handler. */
-		fprintf(stderr, "Fatal %d while backtracing", signo);
+		fprintf(stderr, "Fatal %d while backtracing\n", signo);
 	}
 
 	/* Try to dump a core */
