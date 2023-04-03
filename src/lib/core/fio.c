@@ -46,7 +46,7 @@
 const char *
 fio_filename(int fd)
 {
-#ifdef TARGET_OS_LINUX
+#if TARGET_OS_LINUX
 	int save_errno = errno;
 
 	char *proc_path = tt_static_buf();
