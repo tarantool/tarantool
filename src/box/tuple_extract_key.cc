@@ -307,7 +307,7 @@ tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
 		 */
 		if (has_optional_parts && fieldno >= field_count) {
 			/* Nullify entire columns range. */
-			null_count = fieldno - end_fieldno + 1;
+			null_count = end_fieldno - fieldno + 1;
 			memset(key_buf, MSGPACK_NULL, null_count);
 			key_buf += null_count * mp_sizeof_nil();
 			continue;
