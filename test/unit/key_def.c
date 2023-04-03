@@ -254,38 +254,47 @@ test_check_tuple_extract_key_raw(struct key_def *key_def, struct tuple *tuple,
 static void
 test_tuple_extract_key_raw_slowpath_nullable(void)
 {
-	plan(2);
+	plan(3);
 	header();
 
 	/* Create non-sequential key_defs to use slowpath implementation. */
-	struct key_def *def_nullable_end = test_key_def_new(
-		"[{%s%u%s%s}{%s%u%s%s%s%b}{%s%u%s%s%s%b}]",
-		"field", 0, "type", "unsigned",
-		"field", 2, "type", "unsigned", "is_nullable", 1,
-		"field", 5, "type", "unsigned", "is_nullable", 1);
-	struct key_def *def_nullable_begin = test_key_def_new(
-		"[{%s%u%s%s%s%b}{%s%u%s%s%s%b}{%s%u%s%s}]",
-		"field", 2, "type", "unsigned", "is_nullable", 1,
-		"field", 5, "type", "unsigned", "is_nullable", 1,
-		"field", 0, "type", "unsigned");
-	fail_if(def_nullable_end == NULL || def_nullable_begin == NULL);
+	struct key_def *key_defs[] = {
+		test_key_def_new(
+			"[{%s%u%s%s}{%s%u%s%s%s%b}{%s%u%s%s%s%b}]",
+			"field", 0, "type", "unsigned",
+			"field", 2, "type", "unsigned", "is_nullable", 1,
+			"field", 5, "type", "unsigned", "is_nullable", 1
+		),
+		test_key_def_new(
+			"[{%s%u%s%s%s%b}{%s%u%s%s%s%b}{%s%u%s%s}]",
+			"field", 2, "type", "unsigned", "is_nullable", 1,
+			"field", 5, "type", "unsigned", "is_nullable", 1,
+			"field", 0, "type", "unsigned"
+		),
+		test_key_def_new(
+			"[{%s%u%s%s%s%b}{%s%u%s%s%s%b}]",
+			"field", 1, "type", "unsigned", "is_nullable", 1,
+			"field", 2, "type", "unsigned", "is_nullable", 1
+		),
+	};
 	struct tuple *tuple = test_tuple_new("[%u]", 10);
 	fail_if(tuple == NULL);
-	char *key_null_end = test_key_new("[%uNILNIL]", 10);
-	char *key_null_begin = test_key_new("[NILNIL%u]", 10);
-	fail_if(key_null_end == NULL || key_null_begin == NULL);
-
 	size_t region_svp = region_used(&fiber()->gc);
-	test_check_tuple_extract_key_raw(def_nullable_end, tuple,
-					 key_null_end);
-	test_check_tuple_extract_key_raw(def_nullable_begin, tuple,
-					 key_null_begin);
+	char *keys[] = {
+		test_key_new("[%uNILNIL]", 10),
+		test_key_new("[NILNIL%u]", 10),
+		test_key_new("[NILNIL]"),
+	};
+	static_assert(lengthof(keys) == lengthof(key_defs),
+		      "One key for one key_def");
+	for (size_t i = 0; i < lengthof(keys); ++i)
+		test_check_tuple_extract_key_raw(key_defs[i], tuple, keys[i]);
 
-	key_def_delete(def_nullable_end);
-	key_def_delete(def_nullable_begin);
+	for (size_t i = 0; i < lengthof(keys); ++i) {
+		key_def_delete(key_defs[i]);
+		free(keys[i]);
+	}
 	tuple_delete(tuple);
-	free(key_null_end);
-	free(key_null_begin);
 	region_truncate(&fiber()->gc, region_svp);
 
 	footer();
