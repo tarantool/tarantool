@@ -37,22 +37,29 @@ runs:
           echo "::warning::s3-upload-artifact: No such file or directory: ${{ inputs.source }}"
         fi
 
+    # This step should be considered as a workaround for the runner agent
+    # (ChristopherHX/github-act-runner) that is used on FreeBSD machines.
+    # Without it, env.ARTIFACT_EXISTS will be undefined for some reason.
+    - run: echo "ARTIFACT_EXISTS=${ARTIFACT_EXISTS:-false}"
+      shell: bash
+
     - name: Get job ID
-      if: env.ARTIFACT_EXISTS
+      if: env.ARTIFACT_EXISTS == 'true'
       uses: tarantool/actions/get-job-id@master
       with:
         job-name: ${{ inputs.job-name }}
         throw-error: true
 
     - name: Archive artifact
-      if: env.ARTIFACT_EXISTS
+      if: env.ARTIFACT_EXISTS == 'true'
       shell: bash
       run: |
-        archive_name=${{ env.JOB_ID }}.zip
-        tar -a -C $(dirname ${{ inputs.source }}) -cf ${archive_name} $(basename ${{ inputs.source }})
+        ARCHIVE_NAME=${{ env.JOB_ID }}.zip
+        echo "ARCHIVE_NAME=${ARCHIVE_NAME}"
+        tar -a -C $(dirname ${{ inputs.source }}) -cf ${ARCHIVE_NAME} $(basename ${{ inputs.source }})
 
     - name: Upload archive to S3
-      if: env.ARTIFACT_EXISTS
+      if: env.ARTIFACT_EXISTS == 'true'
       uses: tarantool/actions/s3-upload-file@master
       with:
         access-key-id: ${{ inputs.access-key-id }}
