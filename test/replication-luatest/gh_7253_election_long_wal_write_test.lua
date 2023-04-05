@@ -501,8 +501,7 @@ g.test_old_leader_txn_during_promote_write_complex = function(g)
     local server4_id = g.server4:get_instance_id()
     local server5_id = g.server5:get_instance_id()
     for _, s in pairs({g.server4, g.server5}) do
-        s:stop()
-        s:clean()
+        s:drop()
         g.cluster:delete_server(s.alias)
         g[s.alias] = nil
     end
