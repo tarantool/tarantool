@@ -113,8 +113,7 @@ g.test_join_checks_fullmesh = function(cg)
                     'Server3 detected a missing connection to ' .. uuid2)
     end)
     t.assert(not server_is_ready(cg.server3), 'Server3 is dead')
-    -- Server is dead, stopping it will fail.
-    cg.server3:clean()
+    cg.server3:drop()
 end
 
 g.before_test('test_sync_waits_for_all_connected', function(cg)
