@@ -91,6 +91,7 @@ include(BuildLuaTests)
 
 # test_engine.lua supports luzer, but test_mvcc.lua is not.
 string(JOIN ";" LUZER_TESTS
+  box_execute_test.lua
   console_eval_test.lua
   csv_load_test.lua
   decimal_new_test.lua
@@ -129,6 +130,8 @@ foreach(test_name ${LUZER_TESTS})
   )
 endforeach()
 set_tests_properties(
+  # To be enabled in scope tarantool/tarantool#11897.
+  box_execute_test
   # To be enabled in scope tarantool/tarantool#11898.
   json_decode_test
   # To be enabled in scope tarantool/security#151.
