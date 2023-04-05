@@ -70,6 +70,7 @@
 #include "lua/uri.h"
 #include "lua/builtin_modcache.h"
 #include "lua/tweaks.h"
+#include "lua/xml.h"
 #include "digest.h"
 #include "errinj.h"
 
@@ -889,6 +890,7 @@ tarantool_lua_init(const char *tarantool_bin, const char *script, int argc,
 	tarantool_lua_uri_init(L);
 	tarantool_lua_utf8_init(L);
 	tarantool_lua_utils_init(L);
+	tarantool_lua_xml_init(L);
 	tarantool_lua_fiber_init(L);
 	tarantool_lua_fiber_cond_init(L);
 	tarantool_lua_fiber_channel_init(L);
