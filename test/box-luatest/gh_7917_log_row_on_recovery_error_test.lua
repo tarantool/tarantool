@@ -24,5 +24,5 @@ g.test_log_row_on_recovery_error = function(cg)
 end
 
 g.after_each(function(cg)
-    cg.server:clean()
+    cg.server:drop()
 end)

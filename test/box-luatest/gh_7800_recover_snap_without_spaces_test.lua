@@ -10,7 +10,7 @@ g.before_all(function()
 end)
 
 g.after_all(function()
-    g.server:clean()
+    g.server:drop()
 end)
 
 g.test_recovery = function()
