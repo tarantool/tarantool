@@ -46,11 +46,6 @@ g.test_before_replace_alter_replica_id = function(cg)
         end)
     end
 
-    if ret_nil == false then
-        server2:drop()
-    else
-        -- Cannot drop server because it was not started.
-        server2:clean()
-    end
+    server2:drop()
     server1:drop()
 end

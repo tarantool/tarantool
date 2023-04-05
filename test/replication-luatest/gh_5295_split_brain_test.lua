@@ -80,8 +80,7 @@ end)
 
 -- Drop the partitioned server after each case of split-brain.
 g.after_each(function(cg)
-    cg.split_replica:stop()
-    cg.split_replica:clean()
+    cg.split_replica:drop()
     -- Drop the replica's cluster entry, so that next one receives same id.
     cg.main:exec(function()
         box.ctl.promote()

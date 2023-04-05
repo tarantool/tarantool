@@ -11,7 +11,7 @@ g.before_test('test_panic_without_force_recovery', function()
 end)
 
 g.after_test("test_panic_without_force_recovery", function()
-    g.server:clean()
+    g.server:drop()
 end)
 
 g.before_test('test_ignore_with_force_recovery', function()

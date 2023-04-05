@@ -73,7 +73,7 @@ g2.before_test('test_on_shutdown_trigger_clear', function(cg)
 end)
 
 g2.after_test('test_on_shutdown_trigger_clear', function(cg)
-    cg.server:clean()
+    cg.server:drop()
 end)
 
 g2.test_on_shutdown_trigger_clear = function(cg)

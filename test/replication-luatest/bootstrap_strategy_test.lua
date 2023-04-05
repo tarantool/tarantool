@@ -115,8 +115,7 @@ g_auto.test_join_checks_fullmesh = function(cg)
                     'Server3 detected a missing connection to ' .. uuid2)
     end)
     t.assert(not server_is_ready(cg.server3), 'Server3 is dead')
-    -- Server is dead, stopping it will fail.
-    cg.server3:clean()
+    cg.server3:drop()
 end
 
 g_auto.before_test('test_sync_waits_for_all_connected', function(cg)
@@ -185,7 +184,7 @@ end
 local g_config = t.group('gh-7999-bootstrap-strategy-config')
 
 g_config.after_each(function(cg)
-    cg.replica_set:clean()
+    cg.replica_set:drop()
 end)
 
 g_config.before_test('test_no_replication', function(cg)

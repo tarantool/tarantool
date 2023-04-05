@@ -38,7 +38,7 @@ g.test_unknown_request_type_force_recovery = function()
                                        "Unknown request type 777", nil,
                                        {filename = log}), nil)
     end)
-    s:clean()
+    s:drop()
 end
 
 -- Checks that force recovery works with snapshot containing no user
@@ -75,7 +75,7 @@ g.test_invalid_non_insert_request_force_recovery = function()
                                        "Invalid MsgPack %- raft body", nil,
                                        {filename = log}), nil)
     end)
-    s:clean()
+    s:drop()
 end
 
 -- Checks that force recovery works with snapshot containing an invalid user
@@ -115,7 +115,7 @@ g.test_invalid_user_space_request_force_recovery = function()
                                        "Space '777' does not exist", nil,
                                        {filename = log}), nil)
     end)
-    s:clean()
+    s:drop()
 end
 
 -- Checks that force recovery does not work with snapshot containing one
@@ -145,7 +145,7 @@ g.test_first_corrupted_request_force_recovery = function()
                                        "can't parse row", nil,
                                        {filename = log}), nil)
     end)
-    s:clean()
+    s:drop()
 end
 
 -- Checks that force recovery works with snapshot containing one valid
@@ -185,7 +185,7 @@ g.test_second_corrupted_request_force_recovery = function()
                                        "can't parse row", nil,
                                        {filename = log}), nil)
     end)
-    s:clean()
+    s:drop()
 end
 
 -- Checks that force recovery does not work with empty snapshot.
@@ -215,7 +215,7 @@ g.test_empty_snapshot_force_recovery = function()
                                        "Snapshot has no system spaces", nil,
                                        {filename = log}), nil)
     end)
-    s:clean()
+    s:drop()
 end
 
 -- Checks that force recovery does not work with snapshot containing no system
@@ -245,5 +245,5 @@ g.test_only_user_space_request_force_recovery = function()
                                        "Snapshot has no system spaces", nil,
                                        {filename = log}), nil)
     end)
-    s:clean()
+    s:drop()
 end

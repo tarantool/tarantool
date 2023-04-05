@@ -163,8 +163,7 @@ g.after_test("test_qsync_order", function(cg)
     cg.box_cfg.replication[3] = nil
     cg.r1:exec(update_replication, cg.box_cfg.replication)
     cg.r2:exec(update_replication, cg.box_cfg.replication)
-    cg.r3:stop()
-    cg.r3:clean()
+    cg.r3:drop()
     cg.r3 = nil
 end)
 
