@@ -129,7 +129,7 @@ int sql_sort_count = 0;
  * help verify the correct operation of the library.
  */
 #ifdef SQL_TEST
-int sql_max_blobsize = 0;
+size_t sql_max_blobsize = 0;
 static void
 updateMaxBlobsize(Mem *p)
 {

@@ -281,12 +281,18 @@ func_char_length(struct sql_context *ctx, int argc, const struct Mem *argv)
 	const struct Mem *arg = &argv[0];
 	if (mem_is_null(arg))
 		return;
-	assert(mem_is_str(arg) && arg->n >= 0);
+	assert(mem_is_str(arg));
+	if (arg->n > SQL_MAX_LENGTH) {
+		ctx->is_aborted = true;
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		return;
+	}
+	int32_t n = arg->n;
 	uint32_t len = 0;
-	int offset = 0;
-	while (offset < arg->n) {
+	int32_t offset = 0;
+	while (offset < n) {
 		UChar32 c;
-		U8_NEXT((uint8_t *)arg->z, offset, arg->n, c);
+		U8_NEXT((uint8_t *)arg->z, offset, n, c);
 		++len;
 	}
 	mem_set_uint(ctx->pOut, len);
@@ -301,10 +307,15 @@ func_lower_upper(struct sql_context *ctx, int argc, const struct Mem *argv)
 	const struct Mem *arg = &argv[0];
 	if (mem_is_null(arg))
 		return;
-	assert(mem_is_str(arg) && arg->n >= 0);
+	assert(mem_is_str(arg));
 	if (arg->n == 0)
 		return mem_set_str0_static(ctx->pOut, "");
 	const char *str = arg->z;
+	if (arg->n > SQL_MAX_LENGTH) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		ctx->is_aborted = true;
+		return;
+	}
 	int32_t len = arg->n;
 	char *res = sql_xmalloc(len);
 	UErrorCode status = U_ZERO_ERROR;
@@ -352,17 +363,17 @@ func_nullif(struct sql_context *ctx, int argc, const struct Mem *argv)
 		ctx->is_aborted = true;
 }
 
-/** Implementation of the TRIM() function. */
-static inline int
-trim_bin_end(const char *str, int end, const char *octets, int octets_size,
-	     int flags)
+/** Return the position of the last not removed byte. */
+static inline size_t
+trim_bin_end(const char *str, size_t end, const char *octets,
+	     size_t octets_size, int flags)
 {
 	if ((flags & TRIM_TRAILING) == 0)
 		return end;
 	while (end > 0) {
 		bool is_trimmed = false;
 		char c = str[end - 1];
-		for (int i = 0; i < octets_size && !is_trimmed; ++i)
+		for (size_t i = 0; i < octets_size && !is_trimmed; ++i)
 			is_trimmed = c == octets[i];
 		if (!is_trimmed)
 			break;
@@ -371,17 +382,18 @@ trim_bin_end(const char *str, int end, const char *octets, int octets_size,
 	return end;
 }
 
-static inline int
-trim_bin_start(const char *str, int end, const char *octets, int octets_size,
-	       int flags)
+/** Return the position of the first not removed byte. */
+static inline size_t
+trim_bin_start(const char *str, size_t end, const char *octets,
+	       size_t octets_size, int flags)
 {
 	if ((flags & TRIM_LEADING) == 0)
 		return 0;
-	int start = 0;
+	size_t start = 0;
 	while (start < end) {
 		bool is_trimmed = false;
 		char c = str[start];
-		for (int i = 0; i < octets_size && !is_trimmed; ++i)
+		for (size_t i = 0; i < octets_size && !is_trimmed; ++i)
 			is_trimmed = c == octets[i];
 		if (!is_trimmed)
 			break;
@@ -390,6 +402,7 @@ trim_bin_start(const char *str, int end, const char *octets, int octets_size,
 	return start;
 }
 
+/** Implementation of the TRIM() function for VARBINARY. */
 static void
 func_trim_bin(struct sql_context *ctx, int argc, const struct Mem *argv)
 {
@@ -398,9 +411,9 @@ func_trim_bin(struct sql_context *ctx, int argc, const struct Mem *argv)
 	assert(argc == 2 || (argc == 3 && mem_is_bin(&argv[2])));
 	assert(mem_is_bin(&argv[0]) && mem_is_uint(&argv[1]));
 	const char *str = argv[0].z;
-	int size = argv[0].n;
+	size_t size = argv[0].n;
 	const char *octets;
-	int octets_size;
+	size_t octets_size;
 	if (argc == 3) {
 		octets = argv[2].z;
 		octets_size = argv[2].n;
@@ -410,8 +423,8 @@ func_trim_bin(struct sql_context *ctx, int argc, const struct Mem *argv)
 	}
 
 	int flags = argv[1].u.u;
-	int end = trim_bin_end(str, size, octets, octets_size, flags);
-	int start = trim_bin_start(str, end, octets, octets_size, flags);
+	size_t end = trim_bin_end(str, size, octets, octets_size, flags);
+	size_t start = trim_bin_start(str, end, octets, octets_size, flags);
 
 	if (start >= end)
 		return mem_set_bin_static(ctx->pOut, "", 0);
@@ -419,17 +432,18 @@ func_trim_bin(struct sql_context *ctx, int argc, const struct Mem *argv)
 		ctx->is_aborted = true;
 }
 
-static inline int
-trim_str_end(const char *str, int end, const char *chars, uint8_t *chars_len,
-	     int chars_count, int flags)
+/** Return the position of the last not removed character. */
+static inline int32_t
+trim_str_end(const char *str, int32_t end, const char *chars,
+	     uint8_t *chars_len, size_t chars_count, int flags)
 {
 	if ((flags & TRIM_TRAILING) == 0)
 		return end;
 	while (end > 0) {
 		bool is_trimmed = false;
 		const char *c = chars;
-		int len;
-		for (int i = 0; i < chars_count && !is_trimmed; ++i) {
+		int32_t len;
+		for (size_t i = 0; i < chars_count && !is_trimmed; ++i) {
 			len = chars_len[i];
 			const char *s = str + end - len;
 			is_trimmed = len <= end && memcmp(c, s, len) == 0;
@@ -443,18 +457,19 @@ trim_str_end(const char *str, int end, const char *chars, uint8_t *chars_len,
 	return end;
 }
 
-static inline int
-trim_str_start(const char *str, int end, const char *chars, uint8_t *chars_len,
-	       int chars_count, int flags)
+/** Return the position of the first not removed character. */
+static inline int32_t
+trim_str_start(const char *str, int32_t end, const char *chars,
+	       uint8_t *chars_len, size_t chars_count, int flags)
 {
 	if ((flags & TRIM_LEADING) == 0)
 		return 0;
-	int start = 0;
+	int32_t start = 0;
 	while (start < end) {
 		bool is_trimmed = false;
 		const char *c = chars;
-		int len;
-		for (int i = 0; i < chars_count && !is_trimmed; ++i) {
+		int32_t len;
+		for (size_t i = 0; i < chars_count && !is_trimmed; ++i) {
 			len = chars_len[i];
 			const char *s = str + start;
 			is_trimmed = start + len <= end &&
@@ -469,6 +484,7 @@ trim_str_start(const char *str, int end, const char *chars, uint8_t *chars_len,
 	return start;
 }
 
+/** Implementation of the TRIM() function for STRING. */
 static void
 func_trim_str(struct sql_context *ctx, int argc, const struct Mem *argv)
 {
@@ -477,10 +493,21 @@ func_trim_str(struct sql_context *ctx, int argc, const struct Mem *argv)
 	assert(argc == 2 || (argc == 3 && mem_is_str(&argv[2])));
 	assert(mem_is_str(&argv[0]) && mem_is_uint(&argv[1]));
 	const char *str = argv[0].z;
-	int size = argv[0].n;
+	if (argv[0].n > SQL_MAX_LENGTH) {
+		ctx->is_aborted = true;
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		return;
+	}
+	int32_t size = argv[0].n;
 	const char *chars;
-	int chars_size;
+	int32_t chars_size;
 	if (argc == 3) {
+		if (argv[2].n > SQL_MAX_LENGTH) {
+			ctx->is_aborted = true;
+			diag_set(ClientError, ER_SQL_EXECUTE,
+				 "string or blob too big");
+			return;
+		}
 		chars = argv[2].z;
 		chars_size = argv[2].n;
 	} else {
@@ -496,20 +523,21 @@ func_trim_str(struct sql_context *ctx, int argc, const struct Mem *argv)
 		diag_set(OutOfMemory, chars_size, "region_alloc", "chars_len");
 		return;
 	}
-	int chars_count = 0;
+	size_t chars_count = 0;
 
-	int offset = 0;
+	int32_t offset = 0;
 	while (offset < chars_size) {
 		UChar32 c;
-		int prev = offset;
+		size_t prev = offset;
 		U8_NEXT((uint8_t *)chars, offset, chars_size, c);
 		chars_len[chars_count++] = offset - prev;
 	}
 
 	uint64_t flags = argv[1].u.u;
-	int end = trim_str_end(str, size, chars, chars_len, chars_count, flags);
-	int start = trim_str_start(str, end, chars, chars_len, chars_count,
+	int32_t end = trim_str_end(str, size, chars, chars_len, chars_count,
 				   flags);
+	int32_t start = trim_str_start(str, end, chars, chars_len, chars_count,
+				       flags);
 	region_truncate(region, svp);
 
 	if (start >= end)
@@ -530,8 +558,8 @@ func_position_octets(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 	const char *key = argv[0].z;
 	const char *str = argv[1].z;
-	int key_size = argv[0].n;
-	int str_size = argv[1].n;
+	size_t key_size = argv[0].n;
+	size_t str_size = argv[1].n;
 	if (key_size <= 0)
 		return mem_set_uint(ctx->pOut, 1);
 	const char *pos = memmem(str, str_size, key, key_size);
@@ -547,16 +575,21 @@ func_position_characters(struct sql_context *ctx, int argc,
 	if (mem_is_any_null(&argv[0], &argv[1]))
 		return;
 	assert(mem_is_str(&argv[0]) && mem_is_str(&argv[1]));
+	if (argv[0].n > SQL_MAX_LENGTH || argv[1].n > SQL_MAX_LENGTH) {
+		ctx->is_aborted = true;
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		return;
+	}
 
 	const char *key = argv[0].z;
 	const char *str = argv[1].z;
-	int key_size = argv[0].n;
-	int str_size = argv[1].n;
+	int32_t key_size = argv[0].n;
+	int32_t str_size = argv[1].n;
 	if (key_size <= 0)
 		return mem_set_uint(ctx->pOut, 1);
 
-	int key_end = 0;
-	int str_end = 0;
+	int32_t key_end = 0;
+	int32_t str_end = 0;
 	while (key_end < key_size && str_end < str_size) {
 		UChar32 c;
 		U8_NEXT((uint8_t *)key, key_end, key_size, c);
@@ -569,8 +602,8 @@ func_position_characters(struct sql_context *ctx, int argc,
 	if (coll->cmp(key, key_size, str, str_end, coll) == 0)
 		return mem_set_uint(ctx->pOut, 1);
 
-	int i = 2;
-	int str_pos = 0;
+	int32_t i = 2;
+	int32_t str_pos = 0;
 	while (str_end < str_size) {
 		UChar32 c;
 		U8_NEXT((uint8_t *)str, str_pos, str_size, c);
@@ -684,10 +717,15 @@ func_substr_characters(struct sql_context *ctx, int argc, const
 	if (mem_is_any_null(&argv[0], &argv[1]))
 		return;
 	assert(mem_is_str(&argv[0]) && mem_is_int(&argv[1]));
+	if (argv[0].n > SQL_MAX_LENGTH) {
+		ctx->is_aborted = true;
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		return;
+	}
 
 	const char *str = argv[0].z;
-	int pos = 0;
-	int end = argv[0].n;
+	int32_t pos = 0;
+	int32_t end = argv[0].n;
 	if (argc == 2) {
 		uint64_t start = mem_is_uint(&argv[1]) && argv[1].u.u > 1 ?
 				 argv[1].u.u - 1 : 0;
@@ -729,7 +767,7 @@ func_substr_characters(struct sql_context *ctx, int argc, const
 	if (pos == end)
 		return mem_set_str_static(ctx->pOut, "", 0);
 
-	int cur = pos;
+	int32_t cur = pos;
 	for (uint64_t i = 0; i < length && cur < end; ++i) {
 		UChar32 c;
 		U8_NEXT((uint8_t *)str, cur, end, c);
@@ -763,7 +801,7 @@ func_char(struct sql_context *ctx, int argc, const struct Mem *argv)
 		diag_set(OutOfMemory, size, "region_alloc_array", "buf");
 		return;
 	}
-	int len = 0;
+	size_t len = 0;
 	for (int i = 0; i < argc; ++i) {
 		if (mem_is_null(&argv[i]))
 			buf[i] = 0;
@@ -775,7 +813,7 @@ func_char(struct sql_context *ctx, int argc, const struct Mem *argv)
 	}
 
 	char *str = sql_xmalloc(len);
-	int pos = 0;
+	size_t pos = 0;
 	for (int i = 0; i < argc; ++i) {
 		UBool is_error = false;
 		U8_APPEND((uint8_t *)str, pos, len, buf[i], is_error);
@@ -804,7 +842,7 @@ func_greatest_least(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 	if (mem_is_null(&argv[0]))
 		return;
-	int best = 0;
+	size_t best = 0;
 	for (int i = 1; i < argc; ++i) {
 		if (mem_is_null(&argv[i]))
 			return;
@@ -835,13 +873,13 @@ func_hex(struct sql_context *ctx, int argc, const struct Mem *argv)
 	if (mem_is_null(arg))
 		return;
 
-	assert(mem_is_bin(arg) && arg->n >= 0);
+	assert(mem_is_bin(arg));
 	if (arg->n == 0)
 		return mem_set_str0_static(ctx->pOut, "");
 
 	uint32_t size = 2 * arg->n;
 	char *str = sql_xmalloc(size);
-	for (int i = 0; i < arg->n; ++i) {
+	for (size_t i = 0; i < arg->n; ++i) {
 		char c = arg->z[i];
 		str[2 * i] = hexdigits[(c >> 4) & 0xf];
 		str[2 * i + 1] = hexdigits[c & 0xf];
@@ -858,7 +896,7 @@ func_octet_length(struct sql_context *ctx, int argc, const struct Mem *argv)
 	const struct Mem *arg = &argv[0];
 	if (mem_is_null(arg))
 		return;
-	assert(mem_is_bytes(arg) && arg->n >= 0);
+	assert(mem_is_bytes(arg));
 	mem_set_uint(ctx->pOut, arg->n);
 }
 
@@ -921,6 +959,11 @@ func_randomblob(struct sql_context *ctx, int argc, const struct Mem *argv)
 	if (arg->u.u == 0)
 		return mem_set_bin_static(ctx->pOut, "", 0);
 	uint64_t len = arg->u.u;
+	if (len > SQL_MAX_LENGTH) {
+		ctx->is_aborted = true;
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		return;
+	}
 	char *res = sql_xmalloc(len);
 	sql_randomness(len, res);
 	mem_set_bin_allocated(ctx->pOut, res, len);
@@ -944,6 +987,11 @@ func_zeroblob(struct sql_context *ctx, int argc, const struct Mem *argv)
 	if (arg->u.u == 0)
 		return mem_set_bin_static(ctx->pOut, "", 0);
 	uint64_t len = arg->u.u;
+	if (len > SQL_MAX_LENGTH) {
+		ctx->is_aborted = true;
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		return;
+	}
 	char *res = sql_xmalloc0(len);
 	mem_set_bin_allocated(ctx->pOut, res, len);
 }
@@ -1080,9 +1128,16 @@ func_unicode(struct sql_context *ctx, int argc, const struct Mem *argv)
 	assert(mem_is_str(arg));
 	if (arg->n == 0)
 		return mem_set_uint(ctx->pOut, 0);
-	int pos = 0;
+	if (arg->n > SQL_MAX_LENGTH) {
+		ctx->is_aborted = true;
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		return;
+	}
+
+	int32_t pos = 0;
+	int32_t n = arg->n;
 	UChar32 c;
-	U8_NEXT((uint8_t *)arg->z, pos, arg->n, c);
+	U8_NEXT((uint8_t *)arg->z, pos, n, c);
 	(void)pos;
 	mem_set_uint(ctx->pOut, (uint64_t)c);
 }
@@ -1381,11 +1436,15 @@ static void
 likeFunc(sql_context *context, int argc, const struct Mem *argv)
 {
 	u32 escape = SQL_END_OF_STRING;
-	int nPat;
 	assert(argc == 2 || argc == 3);
 	if (mem_is_any_null(&argv[0], &argv[1]))
 		return;
 	assert(mem_is_str(&argv[0]) && mem_is_str(&argv[1]));
+	if (argv[0].n > SQL_MAX_LENGTH || argv[1].n > SQL_MAX_LENGTH) {
+		context->is_aborted = true;
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		return;
+	}
 	const char *zB = argv[0].z;
 	const char *zA = argv[1].z;
 	const char *zB_end = zB + argv[0].n;
@@ -1396,7 +1455,7 @@ likeFunc(sql_context *context, int argc, const struct Mem *argv)
 	 * of deep recursion and N*N behavior in
 	 * sql_utf8_pattern_compare().
 	 */
-	nPat = argv[0].n;
+	int32_t nPat = argv[0].n;
 	if (nPat > sql_get()->aLimit[SQL_LIMIT_LIKE_PATTERN_LENGTH]) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "LIKE pattern is too "\
 			 "complex");
@@ -1407,14 +1466,21 @@ likeFunc(sql_context *context, int argc, const struct Mem *argv)
 	if (argc == 3) {
 		if (mem_is_null(&argv[2]))
 			return;
+		assert(mem_is_str(&argv[2]));
+		if (argv[2].n > SQL_MAX_LENGTH) {
+			context->is_aborted = true;
+			diag_set(ClientError, ER_SQL_EXECUTE,
+				 "string or blob too big");
+			return;
+		}
 		/*
 		 * The escape character string must consist of a
 		 * single UTF-8 character. Otherwise, return an
 		 * error.
 		 */
 		const char *str = argv[2].z;
-		int pos = 0;
-		int end = argv[2].n;
+		int32_t pos = 0;
+		int32_t end = argv[2].n;
 		U8_NEXT((uint8_t *)str, pos, end, escape);
 		if (pos != end || end == 0) {
 			diag_set(ClientError, ER_SQL_EXECUTE, "ESCAPE "\
@@ -1497,10 +1563,10 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 	}
 	case MEM_TYPE_BIN: {
 		const char *zBlob = argv[0].z;
-		int nBlob = argv[0].n;
+		size_t nBlob = argv[0].n;
 		uint32_t size = 2 * nBlob + 3;
 		char *zText = sql_xmalloc(size);
-		for (int i = 0; i < nBlob; i++) {
+		for (size_t i = 0; i < nBlob; i++) {
 			zText[(i * 2) + 2] = hexdigits[(zBlob[i] >> 4) & 0x0F];
 			zText[(i * 2) + 3] = hexdigits[(zBlob[i]) & 0x0F];
 		}
@@ -1556,12 +1622,18 @@ replaceFunc(struct sql_context *context, int argc, const struct Mem *argv)
 	const unsigned char *zPattern;	/* The pattern string B */
 	const unsigned char *zRep;	/* The replacement string C */
 	unsigned char *zOut;	/* The output */
-	int nStr;		/* Size of zStr */
-	int nPattern;		/* Size of zPattern */
-	int nRep;		/* Size of zRep */
-	i64 nOut;		/* Maximum size of zOut */
-	int loopLimit;		/* Last zStr[] that might match zPattern[] */
-	int i, j;		/* Loop counters */
+	/* Size of zStr. */
+	size_t nStr;
+	/* Size of zPattern. */
+	size_t nPattern;
+	/* Size of zRep. */
+	size_t nRep;
+	/* Maximum size of zOut. */
+	size_t nOut;
+	/* Last zStr[] that might match zPattern[]. */
+	size_t loopLimit;
+	/* Loop counters. */
+	size_t i, j;
 
 	assert(argc == 3);
 	(void)argc;
