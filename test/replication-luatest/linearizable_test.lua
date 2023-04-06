@@ -9,7 +9,7 @@ local g = t.group('linearizable-read')
 local function build_replication(num_instances)
     local t = {}
     for i = 1, num_instances do
-        table.insert(t, server.build_listen_uri('server_' .. i .. '_proxy'))
+        table.insert(t, server.build_listen_uri('server_lr_' .. i .. '_proxy'))
     end
     return t
 end
@@ -25,25 +25,25 @@ g.before_all(function(cg)
         memtx_use_mvcc_engine = true,
     }
     cg.servers[1] = cg.cluster:build_and_add_server({
-        alias = 'server_1',
+        alias = 'server_lr_1',
         box_cfg = cg.box_cfg,
     })
     -- Servers 2 and 3 are interconnected without a proxy.
     for i = 2, num_servers do
-        cg.box_cfg.replication[i] = server.build_listen_uri('server_' .. i)
+        cg.box_cfg.replication[i] = server.build_listen_uri('server_lr_' .. i)
     end
     for i = 2, num_servers do
         cg.servers[i] = cg.cluster:build_and_add_server({
-            alias = 'server_' .. i,
+            alias = 'server_lr_' .. i,
             box_cfg = cg.box_cfg,
         })
     end
     cg.proxies = {}
     for i = 1, num_servers do
         cg.proxies[i] = proxy:new({
-            client_socket_path = server.build_listen_uri('server_' .. i ..
+            client_socket_path = server.build_listen_uri('server_lr_' .. i ..
                 '_proxy'),
-            server_socket_path = server.build_listen_uri('server_' .. i),
+            server_socket_path = server.build_listen_uri('server_lr_' .. i),
         })
         cg.proxies[i]:start({force = true})
     end

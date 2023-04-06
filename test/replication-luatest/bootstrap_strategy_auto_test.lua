@@ -37,8 +37,8 @@ g.before_test('test_auto_bootstrap_waits_for_confirmations', function(cg)
     cg.replica_set = replica_set:new{}
     cg.box_cfg = {
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
+            server.build_listen_uri('server_bs_1'),
+            server.build_listen_uri('server_bs_2'),
         },
         replication_connect_timeout = 1000,
         replication_timeout = 0.1,
@@ -46,18 +46,18 @@ g.before_test('test_auto_bootstrap_waits_for_confirmations', function(cg)
     -- Make server1 the bootstrap leader.
     cg.box_cfg.instance_uuid = uuid1
     cg.server1 = cg.replica_set:build_and_add_server{
-        alias = 'server1',
+        alias = 'server_bs_1',
         box_cfg = cg.box_cfg,
     }
-    cg.box_cfg.replication[3] = server.build_listen_uri('server3')
+    cg.box_cfg.replication[3] = server.build_listen_uri('server_bs_3')
     cg.box_cfg.instance_uuid = uuid2
     cg.server2 = cg.replica_set:build_and_add_server{
-        alias = 'server2',
+        alias = 'server_bs_2',
         box_cfg = cg.box_cfg,
     }
     cg.box_cfg.instance_uuid = uuid3
     cg.server3 = cg.replica_set:build_and_add_server{
-        alias = 'server3',
+        alias = 'server_bs_3',
         box_cfg = cg.box_cfg,
     }
 end)
@@ -80,19 +80,19 @@ g.before_test('test_join_checks_fullmesh', function(cg)
     cg.replica_set = replica_set:new{}
     cg.box_cfg = {
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
+            server.build_listen_uri('server_bs_1'),
+            server.build_listen_uri('server_bs_2'),
         },
         replication_timeout = 0.1,
     }
     cg.box_cfg.instance_uuid = uuid1
     cg.server1 = cg.replica_set:build_and_add_server{
-        alias = 'server1',
+        alias = 'server_bs_1',
         box_cfg = cg.box_cfg,
     }
     cg.box_cfg.instance_uuid = uuid2
     cg.server2 = cg.replica_set:build_and_add_server{
-        alias = 'server2',
+        alias = 'server_bs_2',
         box_cfg = cg.box_cfg,
     }
     cg.replica_set:start()
@@ -101,11 +101,11 @@ end)
 g.test_join_checks_fullmesh = function(cg)
     cg.box_cfg.replication[2] = nil
     cg.server3 = cg.replica_set:build_server{
-        alias = 'server3',
+        alias = 'server_bs_3',
         box_cfg = cg.box_cfg,
     }
     cg.server3:start{wait_until_ready = false}
-    local logfile = fio.pathjoin(cg.server3.workdir, 'server3.log')
+    local logfile = fio.pathjoin(cg.server3.workdir, 'server_bs_3.log')
     local uuid_pattern = uuid2:gsub('%-', '%%-')
     local pattern = 'No connection to ' .. uuid_pattern
     t.helpers.retrying({}, function()

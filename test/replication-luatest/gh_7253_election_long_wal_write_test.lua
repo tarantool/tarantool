@@ -74,22 +74,22 @@ g.before_all(function(g)
         election_timeout = 1000,
         election_fencing_enabled = false,
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
-            server.build_listen_uri('server3'),
+            server.build_listen_uri('server_gh7253_1'),
+            server.build_listen_uri('server_gh7253_2'),
+            server.build_listen_uri('server_gh7253_3'),
         },
         bootstrap_strategy = 'legacy',
     }
     box_cfg.election_mode = 'manual'
     g.server1 = g.cluster:build_and_add_server({
-        alias = 'server1', box_cfg = box_cfg
+        alias = 'server_gh7253_1', box_cfg = box_cfg
     })
     box_cfg.election_mode = 'voter'
     g.server2 = g.cluster:build_and_add_server({
-        alias = 'server2', box_cfg = box_cfg
+        alias = 'server_gh7253_2', box_cfg = box_cfg
     })
     g.server3 = g.cluster:build_and_add_server({
-        alias = 'server3', box_cfg = box_cfg
+        alias = 'server_gh7253_3', box_cfg = box_cfg
     })
     g.cluster:start()
 
@@ -282,8 +282,8 @@ g.test_old_leader_txn_during_promote_write = function(g)
     -- Build the topology:
     --   server1  server2 <-> server3
     --
-    local server2_uri = server.build_listen_uri('server2')
-    local server3_uri = server.build_listen_uri('server3')
+    local server2_uri = server.build_listen_uri('server_gh7253_2')
+    local server3_uri = server.build_listen_uri('server_gh7253_3')
     server_set_replication(g.server1, {})
     server_set_replication(g.server2, {server2_uri, server3_uri})
     server_set_replication(g.server3, {server2_uri, server3_uri})
@@ -371,25 +371,25 @@ end
 -- forwards the bad txn.
 --
 g.test_old_leader_txn_during_promote_write_complex = function(g)
-    local server1_uri = server.build_listen_uri('server1')
-    local server2_uri = server.build_listen_uri('server2')
-    local server3_uri = server.build_listen_uri('server3')
-    local server4_uri = server.build_listen_uri('server4')
-    local server5_uri = server.build_listen_uri('server5')
+    local server1_uri = server.build_listen_uri('server_gh7253_1')
+    local server2_uri = server.build_listen_uri('server_gh7253_2')
+    local server3_uri = server.build_listen_uri('server_gh7253_3')
+    local server4_uri = server.build_listen_uri('server_gh7253_4')
+    local server5_uri = server.build_listen_uri('server_gh7253_5')
     --
     -- Build the topology:
     --   server4 <- fullmesh(server1, server2, server3)
     --   server3 <-> server5
     --
     g.server4 = g.cluster:build_and_add_server({
-        alias = 'server4', box_cfg = g.server3.box_cfg
+        alias = 'server_gh7253_4', box_cfg = g.server3.box_cfg
     })
     g.server4:start()
     -- Server5 is needed only to make server3 able to win elections without
     -- participation of server1. Could also lower the quorum, but it wouldn't be
     -- fair. The test is too complex for these tricks.
     g.server5 = g.cluster:build_and_add_server({
-        alias = 'server5', box_cfg = g.server3.box_cfg
+        alias = 'server_gh7253_5', box_cfg = g.server3.box_cfg
     })
     g.server5:start()
     server_set_replication(g.server5, {server3_uri})
