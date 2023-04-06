@@ -87,11 +87,13 @@ struct Mem {
 	/** Type of the value this MEM contains. */
 	enum mem_type type;
 	u32 flags;		/* Some combination of MEM_Null, MEM_Str, MEM_Dyn, etc. */
-	int n;			/* size (in bytes) of string value, excluding trailing '\0' */
+	/* Size of variable length value. */
+	size_t n;
 	char *z;		/* String or BLOB value */
 	/* ShallowCopy only needs to copy the information above */
 	char *zMalloc;		/* Space to hold MEM_Str or MEM_Blob if szMalloc>0 */
-	int szMalloc;		/* Size of the zMalloc allocation */
+	/* Size of the zMalloc allocation. */
+	size_t szMalloc;
 	u32 uTemp;		/* Transient storage for serial_type in OP_MakeRecord */
 #ifdef SQL_DEBUG
 	Mem *pScopyFrom;	/* This Mem is a shallow copy of pScopyFrom */
@@ -295,7 +297,7 @@ mem_is_field_compatible(const struct Mem *mem, enum field_type type);
  * value is equal to or greater than size, then the value has been truncated.
  */
 int
-mem_snprintf(char *buf, uint32_t size, const struct Mem *mem);
+mem_snprintf(char *buf, size_t size, const struct Mem *mem);
 
 /**
  * Returns a NULL-terminated string representation of a MEM. Memory for the
@@ -373,11 +375,11 @@ mem_set_interval(struct Mem *mem, const struct interval *itv);
 
 /** Clear MEM and set it to STRING. The string belongs to another object. */
 void
-mem_set_str_ephemeral(struct Mem *mem, char *value, uint32_t len);
+mem_set_str_ephemeral(struct Mem *mem, char *value, size_t len);
 
 /** Clear MEM and set it to STRING. The string is static. */
 void
-mem_set_str_static(struct Mem *mem, char *value, uint32_t len);
+mem_set_str_static(struct Mem *mem, char *value, size_t len);
 
 /**
  * Clear MEM and set it to STRING. The string was allocated by another object
@@ -386,7 +388,7 @@ mem_set_str_static(struct Mem *mem, char *value, uint32_t len);
  * different value of this allocation type.
  */
 void
-mem_set_str_allocated(struct Mem *mem, char *value, uint32_t len);
+mem_set_str_allocated(struct Mem *mem, char *value, size_t len);
 
 /**
  * Clear MEM and set it to NULL-terminated STRING. The string belongs to
@@ -410,7 +412,7 @@ mem_set_str0_allocated(struct Mem *mem, char *value);
 
 /** Copy string to a newly allocated memory. The MEM type becomes STRING. */
 int
-mem_copy_str(struct Mem *mem, const char *value, uint32_t len);
+mem_copy_str(struct Mem *mem, const char *value, size_t len);
 
 /**
  * Copy NULL-terminated string to a newly allocated memory. The MEM type becomes
@@ -424,11 +426,11 @@ mem_copy_str0(struct Mem *mem, const char *value);
  * object.
  */
 void
-mem_set_bin_ephemeral(struct Mem *mem, char *value, uint32_t size);
+mem_set_bin_ephemeral(struct Mem *mem, char *value, size_t size);
 
 /** Clear MEM and set it to VARBINARY. The binary value is static. */
 void
-mem_set_bin_static(struct Mem *mem, char *value, uint32_t size);
+mem_set_bin_static(struct Mem *mem, char *value, size_t size);
 
 /**
  * Clear MEM and set it to VARBINARY. The binary value was allocated by another
@@ -437,28 +439,28 @@ mem_set_bin_static(struct Mem *mem, char *value, uint32_t size);
  * different value of this allocation type.
  */
 void
-mem_set_bin_allocated(struct Mem *mem, char *value, uint32_t size);
+mem_set_bin_allocated(struct Mem *mem, char *value, size_t size);
 
 /**
  * Copy binary value to a newly allocated memory. The MEM type becomes
  * VARBINARY.
  */
 int
-mem_copy_bin(struct Mem *mem, const char *value, uint32_t size);
+mem_copy_bin(struct Mem *mem, const char *value, size_t size);
 
 /**
  * Clear MEM and set it to MAP. The binary value belongs to another object. The
  * binary value must be msgpack of MAP type.
  */
 void
-mem_set_map_ephemeral(struct Mem *mem, char *value, uint32_t size);
+mem_set_map_ephemeral(struct Mem *mem, char *value, size_t size);
 
 /**
  * Clear MEM and set it to MAP. The binary value is static. The binary value
  * must be msgpack of MAP type.
  */
 void
-mem_set_map_static(struct Mem *mem, char *value, uint32_t size);
+mem_set_map_static(struct Mem *mem, char *value, size_t size);
 
 /**
  * Clear MEM and set it to MAP. The binary value was allocated by another object
@@ -468,25 +470,25 @@ mem_set_map_static(struct Mem *mem, char *value, uint32_t size);
  * allocation type.
  */
 void
-mem_set_map_allocated(struct Mem *mem, char *value, uint32_t size);
+mem_set_map_allocated(struct Mem *mem, char *value, size_t size);
 
 /** Copy MAP value to a newly allocated memory. The MEM type becomes MAP. */
 int
-mem_copy_map(struct Mem *mem, const char *value, uint32_t size);
+mem_copy_map(struct Mem *mem, const char *value, size_t size);
 
 /**
  * Clear MEM and set it to ARRAY. The binary value belongs to another object.
  * The binary value must be msgpack of ARRAY type.
  */
 void
-mem_set_array_ephemeral(struct Mem *mem, char *value, uint32_t size);
+mem_set_array_ephemeral(struct Mem *mem, char *value, size_t size);
 
 /**
  * Clear MEM and set it to ARRAY. The binary value is static. The binary value
  * must be msgpack of ARRAY type.
  */
 void
-mem_set_array_static(struct Mem *mem, char *value, uint32_t size);
+mem_set_array_static(struct Mem *mem, char *value, size_t size);
 
 /**
  * Clear MEM and set it to ARRAY. The binary value was allocated by another
@@ -496,11 +498,11 @@ mem_set_array_static(struct Mem *mem, char *value, uint32_t size);
  * this allocation type.
  */
 void
-mem_set_array_allocated(struct Mem *mem, char *value, uint32_t size);
+mem_set_array_allocated(struct Mem *mem, char *value, size_t size);
 
 /** Copy ARRAY value to a newly allocated memory. The MEM type becomes ARRAY. */
 int
-mem_copy_array(struct Mem *mem, const char *value, uint32_t size);
+mem_copy_array(struct Mem *mem, const char *value, size_t size);
 
 /** Clear MEM and set it to invalid state. */
 void
@@ -553,7 +555,7 @@ mem_move(struct Mem *to, struct Mem *from);
  * memory is allocated in an attempt to reduce the total number of allocations.
  */
 int
-mem_append(struct Mem *mem, const char *value, uint32_t len);
+mem_append(struct Mem *mem, const char *value, size_t len);
 
 /**
  * Concatenate strings or binaries from the first and the second MEMs and write
@@ -810,7 +812,7 @@ mem_get_bin(const struct Mem *mem, const char **s);
  * not changed.
  */
 int
-mem_len(const struct Mem *mem, uint32_t *len);
+mem_len(const struct Mem *mem, size_t *len);
 
 /**
  * Return length of value for MEM of STRING or VARBINARY type. This function is
@@ -820,7 +822,7 @@ mem_len(const struct Mem *mem, uint32_t *len);
 static inline int
 mem_len_unsafe(const struct Mem *mem)
 {
-	uint32_t len;
+	size_t len;
 	if (mem_len(mem, &len) != 0)
 		return 0;
 	return len;
@@ -851,7 +853,15 @@ int sqlVdbeCheckMemInvariants(struct Mem *);
 #define memIsValid(M)  ((M)->type != MEM_TYPE_INVALID)
 #endif
 
-int sqlVdbeMemClearAndResize(struct Mem * pMem, int n);
+/**
+ * Change the pMem->zMalloc allocation to be at least szNew bytes. If
+ * pMem->zMalloc already meets or exceeds the requested size, this routine is a
+ * no-op. Any prior string or blob content in the pMem object will be discarded.
+ *
+ * Return 0 on success or -1 if unable to complete the resizing.
+ */
+int
+sqlVdbeMemClearAndResize(struct Mem *pMem, size_t n);
 
 void sqlValueFree(struct Mem *);
 
