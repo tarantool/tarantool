@@ -13,17 +13,17 @@ local function cluster_create(g)
         replication_synchro_quorum = 2,
         replication_synchro_timeout = 1000,
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
+            server.build_listen_uri('server_gh6842_1'),
+            server.build_listen_uri('server_gh6842_2'),
         },
     }
     g.server1 = g.cluster:build_and_add_server({
-        alias = 'server1', box_cfg = box_cfg
+        alias = 'server_gh6842_1', box_cfg = box_cfg
     })
     -- For stability. To guarantee server1 is first, server2 is second.
     box_cfg.read_only = true
     g.server2 = g.cluster:build_and_add_server({
-        alias = 'server2', box_cfg = box_cfg
+        alias = 'server_gh6842_2', box_cfg = box_cfg
     })
     g.cluster:start()
 
