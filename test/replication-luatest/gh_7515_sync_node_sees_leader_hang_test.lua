@@ -11,19 +11,19 @@ g.before_each(function(cg)
     local box_cfg = {
         replication_timeout = 0.1,
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
-            server.build_listen_uri('server3'),
+            server.build_listen_uri('server_gh7515_1'),
+            server.build_listen_uri('server_gh7515_2'),
+            server.build_listen_uri('server_gh7515_3'),
         },
     }
     for i = 1, 3 do
-        local alias = 'server' .. i
+        local alias = 'server_gh7515_' .. i
         if i == 1 then
             box_cfg.election_mode = 'candidate'
         else
             box_cfg.election_mode = 'voter'
         end
-        cg[alias] = cg.replica_set:build_and_add_server{
+        cg['server' .. i] = cg.replica_set:build_and_add_server{
             alias = alias,
             box_cfg = box_cfg,
         }
