@@ -2429,7 +2429,13 @@ void *sqlDbReallocOrFree(sql *, void *, u64);
 void *sqlDbRealloc(sql *, void *, u64);
 void sqlDbFree(sql *, void *);
 int sqlMallocSize(void *);
-int sqlDbMallocSize(sql *, void *);
+
+/**
+ * Return the size of a memory allocation previously obtained from
+ * sqlDbMallocRaw() or sqlDbMallocRawNN().
+ */
+size_t
+sqlDbMallocSize(sql *, void *);
 
 /*
  * On systems with ample stack space and that support alloca(), make

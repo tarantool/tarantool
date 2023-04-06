@@ -162,7 +162,7 @@ sqlMallocSize(void *p)
 	return sql_sized_sizeof(p);
 }
 
-int
+size_t
 sqlDbMallocSize(sql * db, void *p)
 {
 	assert(p != 0);
