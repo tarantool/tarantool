@@ -66,21 +66,21 @@ g.before_all(function(g)
         replication_synchro_quorum = 2,
         replication_timeout = 0.1,
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
-            server.build_listen_uri('server3'),
+            server.build_listen_uri('server_gh7253_1'),
+            server.build_listen_uri('server_gh7253_2'),
+            server.build_listen_uri('server_gh7253_3'),
         },
     }
     box_cfg.election_mode = 'manual'
     g.server1 = g.cluster:build_and_add_server({
-        alias = 'server1', box_cfg = box_cfg
+        alias = 'server_gh7253_1', box_cfg = box_cfg
     })
     box_cfg.election_mode = 'voter'
     g.server2 = g.cluster:build_and_add_server({
-        alias = 'server2', box_cfg = box_cfg
+        alias = 'server_gh7253_2', box_cfg = box_cfg
     })
     g.server3 = g.cluster:build_and_add_server({
-        alias = 'server3', box_cfg = box_cfg
+        alias = 'server_gh7253_3', box_cfg = box_cfg
     })
     g.cluster:start()
 

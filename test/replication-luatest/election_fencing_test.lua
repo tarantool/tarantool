@@ -3,7 +3,7 @@ local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 
 local g_async = luatest.group('fencing_async', {
-    {election_mode = 'manual'}, {election_mode = 'candidate'}})
+    {mode = 'manual'}, {mode = 'candidate'}})
 local g_sync = luatest.group('fencing_sync')
 
 local SHORT_TIMEOUT = 0.1
@@ -68,13 +68,20 @@ local function box_cfg_update(servers, cfg)
 end
 
 local function start(g)
+    local suffix
+    if g.params then
+        suffix = g.params.mode
+    else
+        suffix = g.name
+    end
+
     g.box_cfg = {
         election_mode = 'manual',
         election_timeout = SHORT_TIMEOUT,
         replication = {
-            server.build_listen_uri('server_1'),
-            server.build_listen_uri('server_2'),
-            server.build_listen_uri('server_3'),
+            server.build_listen_uri('server_1_' .. suffix),
+            server.build_listen_uri('server_2_' .. suffix),
+            server.build_listen_uri('server_3_' .. suffix),
         },
         replication_synchro_quorum = 2,
         replication_synchro_timeout = SHORT_TIMEOUT,
@@ -83,13 +90,13 @@ local function start(g)
 
     g.cluster = cluster:new({})
     g.server_1 = g.cluster:build_and_add_server(
-        {alias = 'server_1', box_cfg = g.box_cfg})
+        {alias = 'server_1_' .. suffix, box_cfg = g.box_cfg})
 
     g.box_cfg.read_only = true
     g.server_2 = g.cluster:build_and_add_server(
-        {alias = 'server_2', box_cfg = g.box_cfg})
+        {alias = 'server_2_' .. suffix, box_cfg = g.box_cfg})
     g.server_3 = g.cluster:build_and_add_server(
-        {alias = 'server_3', box_cfg = g.box_cfg})
+        {alias = 'server_3_' .. suffix, box_cfg = g.box_cfg})
 
     g.cluster:start()
     g.cluster:wait_for_fullmesh()
@@ -116,7 +123,7 @@ g_async.after_each(function(g)
 end)
 
 g_async.test_fencing = function(g)
-    box_cfg_update({g.server_1}, {election_mode = g.params.election_mode})
+    box_cfg_update({g.server_1}, {election_mode = g.params.mode})
     g.server_1:exec(function()
         box.schema.create_space('test'):create_index('pk')
     end)
