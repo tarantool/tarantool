@@ -1637,7 +1637,6 @@ memtx_tx_story_delete_is_visible(struct memtx_story *story, struct txn *txn,
 {
 	*is_own_change = false;
 
-	bool was_deleted_by_prepared = false;
 	struct txn_stmt *dels = story->del_stmt;
 	while (dels != NULL) {
 		if (dels->txn == txn) {
@@ -1645,8 +1644,6 @@ memtx_tx_story_delete_is_visible(struct memtx_story *story, struct txn *txn,
 			*is_own_change = true;
 			return true;
 		}
-		if (story->del_psn != 0 && dels->txn->psn == story->del_psn)
-			was_deleted_by_prepared = true;
 		dels = dels->next_in_del_list;
 	}
 
@@ -1657,7 +1654,7 @@ memtx_tx_story_delete_is_visible(struct memtx_story *story, struct txn *txn,
 	if (is_prepared_ok && story->del_psn != 0 && story->del_psn < rv_psn)
 		return true; /* Tuple is deleted by prepared TX. */
 
-	if (story->del_psn != 0 && !was_deleted_by_prepared &&
+	if (story->del_psn != 0 && story->del_stmt == NULL &&
 	    story->del_psn < rv_psn)
 		return true; /* Tuple is deleted by committed TX. */
 
@@ -2194,13 +2191,57 @@ memtx_tx_history_remove_story_del_stmts(struct memtx_story *story)
 static void
 memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 {
-	assert(stmt->add_story != NULL);
-	assert(stmt->add_story->tuple == stmt->rollback_info.new_tuple);
-	struct memtx_story *story = stmt->add_story;
+	struct memtx_story *add_story = stmt->add_story;
+	struct memtx_story *del_story = stmt->del_story;
 
-	memtx_tx_history_remove_story_del_stmts(story);
-	story->add_stmt = NULL;
-	stmt->add_story = NULL;
+	/*
+	 * In case of rollback of prepared statement we need to rollback
+	 * preparation actions.
+	 */
+	if (stmt->txn->psn != 0) {
+		/*
+		 * During preparation of this statement there were two cases:
+		 * * del_story != NULL: all in-progress transactions that were
+		 *   to delete del_story were relinked to delete add_story.
+		 * * del_story == NULL: all in-progress transactions that were
+		 *   to delete same nothing were relinked to delete add_story.
+		 * See memtx_tx_history_prepare_insert_stmt for details.
+		 * Note that by design of rollback, all statements are rolled
+		 * back in reverse order, and thus at this point there can be no
+		 * statements of the same transaction that deletes add_story.
+		 * So we must scan delete statements and relink them to delete
+		 * del_story if it's not NULL or to delete nothing otherwise.
+		 */
+		struct txn_stmt **from = &add_story->del_stmt;
+		while (*from != NULL) {
+			struct txn_stmt *test_stmt = *from;
+			assert(test_stmt->del_story == add_story);
+			assert(test_stmt->txn != stmt->txn);
+			assert(!test_stmt->is_own_change);
+			assert(test_stmt->txn->psn == 0);
+
+			/* Unlink from add_story list. */
+			*from = test_stmt->next_in_del_list;
+			test_stmt->next_in_del_list = NULL;
+			test_stmt->del_story = NULL;
+
+			if (del_story != NULL) {
+				/* Link to del_story's list. */
+				memtx_tx_story_link_deleted_by(del_story,
+							       test_stmt);
+			}
+		}
+
+		/* Revert psn assignment. */
+		add_story->add_psn = 0;
+		if (del_story != NULL)
+			del_story->del_psn = 0;
+	}
+
+	/* Unlink stories from the statement. */
+	memtx_tx_story_unlink_added_by(add_story, stmt);
+	if (del_story != NULL)
+		memtx_tx_story_unlink_deleted_by(del_story, stmt);
 
 	/*
 	 * Sink the story to the end of chain and mark is as deleted long
@@ -2208,16 +2249,16 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 	 * be invisible to any reader (that's what is needed) and still be
 	 * able to store read set, if necessary.
 	 */
-	for (uint32_t i = 0; i < story->index_count; ) {
-		struct memtx_story *old_story = story->link[i].older_story;
+	for (uint32_t i = 0; i < add_story->index_count; ) {
+		struct memtx_story *old_story = add_story->link[i].older_story;
 		if (old_story == NULL) {
 			/* Old story is absent. */
 			i++; /* Go to the next index. */
 			continue;
 		}
-		memtx_tx_story_reorder(story, old_story, i);
+		memtx_tx_story_reorder(add_story, old_story, i);
 	}
-	story->del_psn = MEMTX_TX_ROLLBACKED_PSN;
+	add_story->del_psn = MEMTX_TX_ROLLBACKED_PSN;
 }
 
 /*
@@ -2226,22 +2267,67 @@ memtx_tx_history_rollback_added_story(struct txn_stmt *stmt)
 static void
 memtx_tx_history_rollback_deleted_story(struct txn_stmt *stmt)
 {
-	struct memtx_story *story = stmt->del_story;
+	struct memtx_story *del_story = stmt->del_story;
+
 	/*
-	 * There can be no more than one prepared statement deleting a story at
-	 * any point in time.
+	 * In case of rollback of prepared statement we need to rollback
+	 * preparation actions.
 	 */
-	assert(story->del_psn == 0 || story->del_psn == stmt->txn->psn);
-	story->del_psn = 0;
-	memtx_tx_story_unlink_deleted_by(story, stmt);
+	if (stmt->txn->psn != 0) {
+		/*
+		 * During preparation of deletion we could unlink other
+		 * transactions that want to overwrite this story. Now we have
+		 * to restore the link. Replace-like statements can be found in
+		 * the story chain of primary index. Unfortunately DELETE
+		 * statements cannot be found since after unlink they are not
+		 * present in chains. The good news is that by design all their
+		 * transactions are surely conflicted because of read-write
+		 * conflict and thus does not matter anymore.
+		 */
+		struct memtx_story *test_story;
+		for (test_story = del_story->link[0].newer_story;
+		     test_story != NULL;
+		     test_story = test_story->link[0].newer_story) {
+			struct txn_stmt *test_stmt = test_story->add_stmt;
+			if (test_stmt->is_own_change)
+				continue;
+			assert(test_stmt->txn != stmt->txn);
+			assert(test_stmt->del_story == NULL);
+			assert(test_stmt->txn->psn == 0);
+			memtx_tx_story_link_deleted_by(del_story, test_stmt);
+		}
+
+		/* Revert psn assignment. */
+		del_story->del_psn = 0;
+	}
+
+	/* Unlink the story from the statement. */
+	memtx_tx_story_unlink_deleted_by(del_story, stmt);
 }
 
 void
 memtx_tx_history_rollback_stmt(struct txn_stmt *stmt)
 {
+	/* Consistency asserts. */
+	if (stmt->add_story != NULL) {
+		assert(stmt->add_story->tuple == stmt->rollback_info.new_tuple);
+		assert(stmt->add_story->add_psn == stmt->txn->psn);
+	}
+	if (stmt->del_story != NULL)
+		assert(stmt->del_story->del_psn == stmt->txn->psn);
+	/*
+	 * There can be no more than one prepared statement deleting a story at
+	 * any point in time.
+	 */
+	assert(stmt->txn->psn == 0 || stmt->next_in_del_list == NULL);
+
+	/*
+	 * Note that both add_story and del_story can be NULL,
+	 * see comment in memtx_tx_history_prepare_stmt.
+	 */
 	if (stmt->add_story != NULL)
 		memtx_tx_history_rollback_added_story(stmt);
-	if (stmt->del_story != NULL)
+	else if (stmt->del_story != NULL)
 		memtx_tx_history_rollback_deleted_story(stmt);
 	assert(stmt->add_story == NULL && stmt->del_story == NULL);
 }
@@ -2591,6 +2677,7 @@ memtx_tx_history_commit_stmt(struct txn_stmt *stmt, size_t *bsize)
 		memtx_tx_story_unlink_added_by(stmt->add_story, stmt);
 	}
 	if (stmt->del_story != NULL) {
+		assert(stmt->del_story->del_stmt == stmt);
 		*bsize -= tuple_bsize(stmt->del_story->tuple);
 		memtx_tx_story_unlink_deleted_by(stmt->del_story, stmt);
 	}
