@@ -60,7 +60,7 @@
  * in pMem->z is discarded.
  */
 static int
-sqlVdbeMemGrow(struct Mem *pMem, int n, int preserve);
+sqlVdbeMemGrow(struct Mem *pMem, size_t n, int preserve);
 
 enum {
 	BUF_SIZE = 32,
@@ -126,7 +126,7 @@ mem_is_field_compatible(const struct Mem *mem, enum field_type type)
 }
 
 int
-mem_snprintf(char *buf, uint32_t size, const struct Mem *mem)
+mem_snprintf(char *buf, size_t size, const struct Mem *mem)
 {
 	int res = -1;
 	switch (mem->type) {
@@ -134,9 +134,11 @@ mem_snprintf(char *buf, uint32_t size, const struct Mem *mem)
 		res = snprintf(buf, size, "NULL");
 		break;
 	case MEM_TYPE_STR:
-	case MEM_TYPE_BIN:
-		res = snprintf(buf, size, "%.*s", mem->n, mem->z);
+	case MEM_TYPE_BIN: {
+		int len = MIN(mem->n, INT_MAX);
+		res = snprintf(buf, size, "%.*s", len, mem->z);
 		break;
+	}
 	case MEM_TYPE_INT:
 		res = snprintf(buf, size, "%lld", mem->u.i);
 		break;
@@ -197,8 +199,10 @@ mem_str(const struct Mem *mem)
 		return "NULL";
 	const char *type = mem_type_to_str(mem);
 	if (mem->type == MEM_TYPE_STR) {
-		if (mem->n <= STR_VALUE_MAX_LEN)
-			return tt_sprintf("%s('%.*s')", type, mem->n, mem->z);
+		if (mem->n <= STR_VALUE_MAX_LEN) {
+			return tt_sprintf("%s('%.*s')", type, (int)mem->n,
+					  mem->z);
+		}
 		return tt_sprintf("%s('%.*s...)", type, STR_VALUE_MAX_LEN,
 				  mem->z);
 	}
@@ -211,7 +215,7 @@ mem_str(const struct Mem *mem)
 			n = (mem->z[i] & 0x0F);
 			buf[2 * i + 1] = n < 10 ? ('0' + n) : ('A' + n - 10);
 		}
-		if (mem->n > len)
+		if (mem->n > (size_t)len)
 			return tt_sprintf("%s(x'%.*s...)", type, len * 2, buf);
 		return tt_sprintf("%s(x'%.*s')", type, len * 2, buf);
 	}
@@ -387,7 +391,7 @@ mem_set_interval(struct Mem *mem, const struct interval *itv)
 }
 
 static inline void
-set_str_const(struct Mem *mem, char *value, uint32_t len, int alloc_type)
+set_str_const(struct Mem *mem, char *value, size_t len, int alloc_type)
 {
 	assert((alloc_type & (MEM_Static | MEM_Ephem)) != 0);
 	mem_clear(mem);
@@ -398,7 +402,7 @@ set_str_const(struct Mem *mem, char *value, uint32_t len, int alloc_type)
 }
 
 static inline void
-set_str_dynamic(struct Mem *mem, char *value, uint32_t len, int alloc_type)
+set_str_dynamic(struct Mem *mem, char *value, size_t len, int alloc_type)
 {
 	assert(mem->szMalloc == 0 || value != mem->zMalloc);
 	mem_destroy(mem);
@@ -411,19 +415,19 @@ set_str_dynamic(struct Mem *mem, char *value, uint32_t len, int alloc_type)
 }
 
 void
-mem_set_str_ephemeral(struct Mem *mem, char *value, uint32_t len)
+mem_set_str_ephemeral(struct Mem *mem, char *value, size_t len)
 {
 	set_str_const(mem, value, len, MEM_Ephem);
 }
 
 void
-mem_set_str_static(struct Mem *mem, char *value, uint32_t len)
+mem_set_str_static(struct Mem *mem, char *value, size_t len)
 {
 	set_str_const(mem, value, len, MEM_Static);
 }
 
 void
-mem_set_str_allocated(struct Mem *mem, char *value, uint32_t len)
+mem_set_str_allocated(struct Mem *mem, char *value, size_t len)
 {
 	set_str_dynamic(mem, value, len, 0);
 }
@@ -447,7 +451,7 @@ mem_set_str0_allocated(struct Mem *mem, char *value)
 }
 
 static int
-mem_copy_bytes(struct Mem *mem, const char *value, uint32_t size,
+mem_copy_bytes(struct Mem *mem, const char *value, size_t size,
 	       enum mem_type type)
 {
 	if (mem_is_bytes(mem) && mem->z == value) {
@@ -469,7 +473,7 @@ mem_copy_bytes(struct Mem *mem, const char *value, uint32_t size,
 }
 
 int
-mem_copy_str(struct Mem *mem, const char *value, uint32_t len)
+mem_copy_str(struct Mem *mem, const char *value, size_t len)
 {
 	return mem_copy_bytes(mem, value, len, MEM_TYPE_STR);
 }
@@ -477,7 +481,7 @@ mem_copy_str(struct Mem *mem, const char *value, uint32_t len)
 int
 mem_copy_str0(struct Mem *mem, const char *value)
 {
-	uint32_t len = strlen(value);
+	size_t len = strlen(value);
 	if (mem_copy_str(mem, value, len + 1) != 0)
 		return -1;
 	mem->n = len;
@@ -485,7 +489,7 @@ mem_copy_str0(struct Mem *mem, const char *value)
 }
 
 static inline void
-set_bin_const(struct Mem *mem, char *value, uint32_t size, int alloc_type)
+set_bin_const(struct Mem *mem, char *value, size_t size, int alloc_type)
 {
 	assert((alloc_type & (MEM_Static | MEM_Ephem)) != 0);
 	mem_clear(mem);
@@ -496,7 +500,7 @@ set_bin_const(struct Mem *mem, char *value, uint32_t size, int alloc_type)
 }
 
 static inline void
-set_bin_dynamic(struct Mem *mem, char *value, uint32_t size, int alloc_type)
+set_bin_dynamic(struct Mem *mem, char *value, size_t size, int alloc_type)
 {
 	assert(mem->szMalloc == 0 || value != mem->zMalloc);
 	mem_destroy(mem);
@@ -509,31 +513,31 @@ set_bin_dynamic(struct Mem *mem, char *value, uint32_t size, int alloc_type)
 }
 
 void
-mem_set_bin_ephemeral(struct Mem *mem, char *value, uint32_t size)
+mem_set_bin_ephemeral(struct Mem *mem, char *value, size_t size)
 {
 	set_bin_const(mem, value, size, MEM_Ephem);
 }
 
 void
-mem_set_bin_static(struct Mem *mem, char *value, uint32_t size)
+mem_set_bin_static(struct Mem *mem, char *value, size_t size)
 {
 	set_bin_const(mem, value, size, MEM_Static);
 }
 
 void
-mem_set_bin_allocated(struct Mem *mem, char *value, uint32_t size)
+mem_set_bin_allocated(struct Mem *mem, char *value, size_t size)
 {
 	set_bin_dynamic(mem, value, size, 0);
 }
 
 int
-mem_copy_bin(struct Mem *mem, const char *value, uint32_t size)
+mem_copy_bin(struct Mem *mem, const char *value, size_t size)
 {
 	return mem_copy_bytes(mem, value, size, MEM_TYPE_BIN);
 }
 
 static inline void
-set_msgpack_value(struct Mem *mem, char *value, uint32_t size, int alloc_type,
+set_msgpack_value(struct Mem *mem, char *value, size_t size, int alloc_type,
 		  enum mem_type type)
 {
 	if (alloc_type == MEM_Ephem || alloc_type == MEM_Static)
@@ -544,55 +548,55 @@ set_msgpack_value(struct Mem *mem, char *value, uint32_t size, int alloc_type,
 }
 
 void
-mem_set_map_ephemeral(struct Mem *mem, char *value, uint32_t size)
+mem_set_map_ephemeral(struct Mem *mem, char *value, size_t size)
 {
 	assert(mp_typeof(*value) == MP_MAP);
 	set_msgpack_value(mem, value, size, MEM_Ephem, MEM_TYPE_MAP);
 }
 
 void
-mem_set_map_static(struct Mem *mem, char *value, uint32_t size)
+mem_set_map_static(struct Mem *mem, char *value, size_t size)
 {
 	assert(mp_typeof(*value) == MP_MAP);
 	set_msgpack_value(mem, value, size, MEM_Static, MEM_TYPE_MAP);
 }
 
 void
-mem_set_map_allocated(struct Mem *mem, char *value, uint32_t size)
+mem_set_map_allocated(struct Mem *mem, char *value, size_t size)
 {
 	assert(mp_typeof(*value) == MP_MAP);
 	set_msgpack_value(mem, value, size, 0, MEM_TYPE_MAP);
 }
 
 int
-mem_copy_map(struct Mem *mem, const char *value, uint32_t size)
+mem_copy_map(struct Mem *mem, const char *value, size_t size)
 {
 	return mem_copy_bytes(mem, value, size, MEM_TYPE_MAP);
 }
 
 void
-mem_set_array_ephemeral(struct Mem *mem, char *value, uint32_t size)
+mem_set_array_ephemeral(struct Mem *mem, char *value, size_t size)
 {
 	assert(mp_typeof(*value) == MP_ARRAY);
 	set_msgpack_value(mem, value, size, MEM_Ephem, MEM_TYPE_ARRAY);
 }
 
 void
-mem_set_array_static(struct Mem *mem, char *value, uint32_t size)
+mem_set_array_static(struct Mem *mem, char *value, size_t size)
 {
 	assert(mp_typeof(*value) == MP_ARRAY);
 	set_msgpack_value(mem, value, size, MEM_Static, MEM_TYPE_ARRAY);
 }
 
 void
-mem_set_array_allocated(struct Mem *mem, char *value, uint32_t size)
+mem_set_array_allocated(struct Mem *mem, char *value, size_t size)
 {
 	assert(mp_typeof(*value) == MP_ARRAY);
 	set_msgpack_value(mem, value, size, 0, MEM_TYPE_ARRAY);
 }
 
 int
-mem_copy_array(struct Mem *mem, const char *value, uint32_t size)
+mem_copy_array(struct Mem *mem, const char *value, size_t size)
 {
 	return mem_copy_bytes(mem, value, size, MEM_TYPE_ARRAY);
 }
@@ -766,12 +770,12 @@ str_to_bool(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_STR);
 	char *str = mem->z;
-	uint32_t len = mem->n;
+	size_t len = mem->n;
 	bool b;
 	const char *str_true = "TRUE";
 	const char *str_false = "FALSE";
-	uint32_t len_true = strlen(str_true);
-	uint32_t len_false = strlen(str_false);
+	size_t len_true = strlen(str_true);
+	size_t len_false = strlen(str_false);
 
 	for (; isspace(str[0]); str++, len--);
 	for (; isspace(str[len - 1]); len--);
@@ -1271,8 +1275,8 @@ datetime_to_str0(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_DATETIME);
 	char buf[DT_TO_STRING_BUFSIZE];
-	uint32_t len = datetime_to_string(&mem->u.dt, buf,
-					  DT_TO_STRING_BUFSIZE);
+	size_t len = datetime_to_string(&mem->u.dt, buf,
+					DT_TO_STRING_BUFSIZE);
 	assert(len == strlen(buf));
 	return mem_copy_str(mem, buf, len);
 }
@@ -1283,8 +1287,8 @@ interval_to_str0(struct Mem *mem)
 {
 	assert(mem->type == MEM_TYPE_INTERVAL);
 	char buf[DT_IVAL_TO_STRING_BUFSIZE];
-	uint32_t len = interval_to_string(&mem->u.itv, buf,
-					  DT_IVAL_TO_STRING_BUFSIZE);
+	size_t len = interval_to_string(&mem->u.itv, buf,
+					DT_IVAL_TO_STRING_BUFSIZE);
 	assert(len == strlen(buf));
 	return mem_copy_str(mem, buf, len);
 }
@@ -1901,7 +1905,7 @@ mem_get_bin(const struct Mem *mem, const char **s)
 }
 
 int
-mem_len(const struct Mem *mem, uint32_t *len)
+mem_len(const struct Mem *mem, size_t *len)
 {
 	if (!mem_is_bytes(mem))
 		return -1;
@@ -1963,23 +1967,23 @@ mem_move(struct Mem *to, struct Mem *from)
 }
 
 int
-mem_append(struct Mem *mem, const char *value, uint32_t len)
+mem_append(struct Mem *mem, const char *value, size_t len)
 {
 	assert((mem->type & (MEM_TYPE_BIN | MEM_TYPE_STR)) != 0);
 	if (len == 0)
 		return 0;
-	int new_size = mem->n + len;
+	size_t n = mem->n + len;
 	if (((mem->flags & (MEM_Static | MEM_Ephem)) != 0) ||
-	    mem->szMalloc < new_size) {
+	    mem->szMalloc < n) {
 		/*
 		 * Force exponential buffer size growth to avoid having to call
 		 * this routine too often.
 		 */
-		if (sqlVdbeMemGrow(mem, new_size + mem->n, 1) != 0)
+		if (sqlVdbeMemGrow(mem, n + mem->n, 1) != 0)
 			return -1;
 	}
 	memcpy(&mem->z[mem->n], value, len);
-	mem->n = new_size;
+	mem->n = n;
 	return 0;
 }
 
@@ -2011,7 +2015,7 @@ mem_concat(const struct Mem *a, const struct Mem *b, struct Mem *result)
 		return -1;
 	}
 
-	uint32_t size = a->n + b->n;
+	size_t size = a->n + b->n;
 	if ((int)size > sql_get()->aLimit[SQL_LIMIT_LENGTH]) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
 		return -1;
@@ -2493,7 +2497,11 @@ mem_cmp_bin(const struct Mem *a, const struct Mem *b)
 {
 	assert((a->type & b->type & MEM_TYPE_BIN) != 0);
 	int res = memcmp(a->z, b->z, MIN(a->n, b->n));
-	return res != 0 ? res : a->n - b->n;
+	if (res != 0 || a->n == b->n)
+		return res;
+	if (a->n > b->n)
+		return 1;
+	return -1;
 }
 
 static int
@@ -2609,7 +2617,11 @@ mem_cmp_str(const struct Mem *a, const struct Mem *b, const struct coll *coll)
 	if (coll != NULL)
 		return coll->cmp(a->z, a->n, b->z, b->n, coll);
 	int res = memcmp(a->z, b->z, MIN(a->n, b->n));
-	return res != 0 ? res : a->n - b->n;
+	if (res != 0 || a->n == b->n)
+		return res;
+	if (a->n > b->n)
+		return 1;
+	return -1;
 }
 
 static int
@@ -2910,7 +2922,7 @@ sqlVdbeCheckMemInvariants(Mem * p)
 #endif
 
 static int
-sqlVdbeMemGrow(struct Mem *pMem, int n, int bPreserve)
+sqlVdbeMemGrow(struct Mem *pMem, size_t n, int bPreserve)
 {
 	assert(sqlVdbeCheckMemInvariants(pMem));
 	testcase(pMem->db == 0);
@@ -2955,19 +2967,8 @@ sqlVdbeMemGrow(struct Mem *pMem, int n, int bPreserve)
 	return 0;
 }
 
-/*
- * Change the pMem->zMalloc allocation to be at least szNew bytes.
- * If pMem->zMalloc already meets or exceeds the requested size, this
- * routine is a no-op.
- *
- * Any prior string or blob content in the pMem object may be discarded.
- * The pMem->xDel destructor is called, if it exists. Though STRING, VARBINARY,
- * MAP and ARRAY values may be discarded, all other values are preserved.
- *
- * Return 0 on success or -1 if unable to complete the resizing.
- */
 int
-sqlVdbeMemClearAndResize(Mem * pMem, int szNew)
+sqlVdbeMemClearAndResize(struct Mem *pMem, size_t szNew)
 {
 	assert(szNew > 0);
 	if (pMem->szMalloc < szNew) {
@@ -3028,7 +3029,7 @@ sqlVdbeMemTooBig(Mem * p)
 {
 	assert(p->db != 0);
 	if (mem_is_bytes(p))
-		return p->n > p->db->aLimit[SQL_LIMIT_LENGTH];
+		return p->n > (size_t)p->db->aLimit[SQL_LIMIT_LENGTH];
 	return 0;
 }
 
