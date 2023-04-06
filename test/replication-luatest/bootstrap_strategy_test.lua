@@ -39,8 +39,8 @@ g_auto.before_test('test_auto_bootstrap_waits_for_confirmations', function(cg)
     cg.replica_set = replica_set:new{}
     cg.box_cfg = {
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
+            server.build_listen_uri('server_bs_1'),
+            server.build_listen_uri('server_bs_2'),
         },
         replication_connect_timeout = 1000,
         replication_timeout = 0.1,
@@ -48,18 +48,18 @@ g_auto.before_test('test_auto_bootstrap_waits_for_confirmations', function(cg)
     -- Make server1 the bootstrap leader.
     cg.box_cfg.instance_uuid = uuid1
     cg.server1 = cg.replica_set:build_and_add_server{
-        alias = 'server1',
+        alias = 'server_bs_1',
         box_cfg = cg.box_cfg,
     }
-    cg.box_cfg.replication[3] = server.build_listen_uri('server3')
+    cg.box_cfg.replication[3] = server.build_listen_uri('server_bs_3')
     cg.box_cfg.instance_uuid = uuid2
     cg.server2 = cg.replica_set:build_and_add_server{
-        alias = 'server2',
+        alias = 'server_bs_2',
         box_cfg = cg.box_cfg,
     }
     cg.box_cfg.instance_uuid = uuid3
     cg.server3 = cg.replica_set:build_and_add_server{
-        alias = 'server3',
+        alias = 'server_bs_3',
         box_cfg = cg.box_cfg,
     }
 end)
@@ -82,19 +82,19 @@ g_auto.before_test('test_join_checks_fullmesh', function(cg)
     cg.replica_set = replica_set:new{}
     cg.box_cfg = {
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
+            server.build_listen_uri('server_bs_1'),
+            server.build_listen_uri('server_bs_2'),
         },
         replication_timeout = 0.1,
     }
     cg.box_cfg.instance_uuid = uuid1
     cg.server1 = cg.replica_set:build_and_add_server{
-        alias = 'server1',
+        alias = 'server_bs_1',
         box_cfg = cg.box_cfg,
     }
     cg.box_cfg.instance_uuid = uuid2
     cg.server2 = cg.replica_set:build_and_add_server{
-        alias = 'server2',
+        alias = 'server_bs_2',
         box_cfg = cg.box_cfg,
     }
     cg.replica_set:start()
@@ -103,11 +103,11 @@ end)
 g_auto.test_join_checks_fullmesh = function(cg)
     cg.box_cfg.replication[2] = nil
     cg.server3 = cg.replica_set:build_server{
-        alias = 'server3',
+        alias = 'server_bs_3',
         box_cfg = cg.box_cfg,
     }
     cg.server3:start{wait_until_ready = false}
-    local logfile = fio.pathjoin(cg.server3.workdir, 'server3.log')
+    local logfile = fio.pathjoin(cg.server3.workdir, 'server_bs_3.log')
     local uuid_pattern = uuid2:gsub('%-', '%%-')
     local pattern = 'No connection to ' .. uuid_pattern
     t.helpers.retrying({}, function()
@@ -190,11 +190,11 @@ end)
 g_config.before_test('test_no_replication', function(cg)
     cg.replica_set = replica_set:new{}
     cg.server1 = cg.replica_set:build_and_add_server{
-        alias = 'server1',
+        alias = 'server_bs_1',
         box_cfg = {
             replication_timeout = 0.1,
             bootstrap_strategy = 'config',
-            bootstrap_leader = server.build_listen_uri('server1'),
+            bootstrap_leader = server.build_listen_uri('server_bs_1'),
             replication = nil
         },
     }
@@ -204,7 +204,7 @@ local no_leader_msg = 'failed to connect to the bootstrap leader'
 
 g_config.test_no_replication = function(cg)
     cg.replica_set:start{wait_until_ready = false}
-    local logfile = fio.pathjoin(cg.server1.workdir, 'server1.log')
+    local logfile = fio.pathjoin(cg.server1.workdir, 'server_bs_1.log')
     t.helpers.retrying({}, function()
         t.assert(server:grep_log(no_leader_msg, nil, {filename = logfile}))
     end)
@@ -213,7 +213,7 @@ end
 g_config.before_test('test_uuid', function(cg)
     cg.replica_set = replica_set:new{}
     cg.server1 = cg.replica_set:build_and_add_server{
-        alias = 'server1',
+        alias = 'server_bs_1',
         box_cfg = {
             bootstrap_strategy = 'config',
             bootstrap_leader = uuid1,
@@ -238,18 +238,18 @@ end)
 g_config.before_test('test_replication_without_bootstrap_leader', function(cg)
     cg.replica_set = replica_set:new{}
     cg.server1 = cg.replica_set:build_and_add_server{
-        alias = 'server1',
+        alias = 'server_bs_1',
         box_cfg = {
             replication_timeout = 0.1,
             bootstrap_strategy = 'config',
-            bootstrap_leader = server.build_listen_uri('server1'),
+            bootstrap_leader = server.build_listen_uri('server_bs_1'),
             replication = {
-                server.build_listen_uri('server2'),
+                server.build_listen_uri('server_bs_2'),
             },
         },
     }
     cg.server2 = cg.replica_set:build_and_add_server{
-        alias = 'server2',
+        alias = 'server_bs_2',
         box_cfg = {
             replication_timeout = 0.1,
         },
@@ -258,7 +258,7 @@ end)
 
 g_config.test_replication_without_bootstrap_leader = function(cg)
     cg.replica_set:start{wait_until_ready = false}
-    local logfile = fio.pathjoin(cg.server1.workdir, 'server1.log')
+    local logfile = fio.pathjoin(cg.server1.workdir, 'server_bs_1.log')
     t.helpers.retrying({}, function()
         t.assert(server:grep_log(no_leader_msg, nil, {filename = logfile}))
     end)
@@ -280,12 +280,12 @@ local set_log_before_cfg = [[
 g_config.before_test('test_no_leader', function(cg)
     cg.replica_set = replica_set:new{}
     cg.server1 = cg.replica_set:build_and_add_server{
-        alias = 'server1',
+        alias = 'server_bs_1',
         box_cfg = {
             replication_timeout = 0.1,
             bootstrap_strategy = 'config',
             bootstrap_leader = nil,
-            replication = server.build_listen_uri('server1'),
+            replication = server.build_listen_uri('server_bs_1'),
         },
         env = {
             ['TARANTOOL_RUN_BEFORE_BOX_CFG'] = set_log_before_cfg,
@@ -295,7 +295,7 @@ end)
 
 g_config.test_no_leader = function(cg)
     cg.replica_set:start{wait_until_ready = false}
-    local logfile = fio.pathjoin(cg.server1.workdir, 'server1.log')
+    local logfile = fio.pathjoin(cg.server1.workdir, 'server_bs_1.log')
     local empty_leader_msg = "the option can't be empty when bootstrap " ..
                              "strategy is 'config'"
     t.helpers.retrying({}, function()
@@ -306,12 +306,12 @@ end
 g_config.before_test('test_single_leader', function(cg)
     cg.replica_set = replica_set:new{}
     cg.server1 = cg.replica_set:build_and_add_server{
-        alias = 'server1',
+        alias = 'server_bs_1',
         box_cfg = {
             replication_timeout = 0.1,
             bootstrap_strategy = 'config',
-            bootstrap_leader = server.build_listen_uri('server1'),
-            replication = server.build_listen_uri('server1'),
+            bootstrap_leader = server.build_listen_uri('server_bs_1'),
+            replication = server.build_listen_uri('server_bs_1'),
         },
     }
 end)
@@ -329,14 +329,14 @@ g_config.after_test('test_single_leader', function(cg)
 end)
 
 local g_config_success = t.group('gh-7999-bootstrap-strategy-config-success', {
-     {leader = 'server3'},
+     {leader = 'server_bs_3'},
      {leader = uuid3},
 })
 
 g_config_success.before_each(function(cg)
     cg.leader = cg.params.leader
     -- cg.params can't have "/" for some reason, so recreate the path here.
-    if string.match(cg.leader, 'server3') then
+    if string.match(cg.leader, 'server_bs_3') then
         cg.leader = server.build_listen_uri(cg.leader)
     end
 end)
@@ -348,22 +348,22 @@ end)
 g_config_success.before_test('test_correct_bootstrap_leader', function(cg)
     cg.replica_set = replica_set:new{}
     cg.server1 = cg.replica_set:build_and_add_server{
-        alias = 'server1',
+        alias = 'server_bs_1',
         box_cfg = {
             bootstrap_strategy = 'config',
             bootstrap_leader = cg.leader,
             instance_uuid = uuid1,
             replication = {
-                server.build_listen_uri('server1'),
-                server.build_listen_uri('server2'),
-                server.build_listen_uri('server3'),
+                server.build_listen_uri('server_bs_1'),
+                server.build_listen_uri('server_bs_2'),
+                server.build_listen_uri('server_bs_3'),
             },
             replication_timeout = 0.1,
         },
     }
     cg.replica_set_a = replica_set:new{}
     cg.server2 = cg.replica_set_a:build_and_add_server{
-        alias = 'server2',
+        alias = 'server_bs_2',
         box_cfg = {
             replicaset_uuid = uuida,
             instance_uuid = uuid2,
@@ -371,12 +371,12 @@ g_config_success.before_test('test_correct_bootstrap_leader', function(cg)
     }
     cg.replica_set_b = replica_set:new{}
     cg.server3 = cg.replica_set_b:build_and_add_server{
-        alias = 'server3',
+        alias = 'server_bs_3',
         box_cfg = {
             replicaset_uuid = uuidb,
             instance_uuid = uuid3,
             listen = {
-                server.build_listen_uri('server3'),
+                server.build_listen_uri('server_bs_3'),
             },
         },
     }
@@ -401,14 +401,14 @@ end
 g_config_success.before_test('test_wait_only_for_leader', function(cg)
     cg.replica_set = replica_set:new{}
     cg.server1 = cg.replica_set:build_and_add_server{
-        alias = 'server1',
+        alias = 'server_bs_1',
         box_cfg = {
             bootstrap_strategy = 'config',
             bootstrap_leader = cg.leader,
             replication = {
-                server.build_listen_uri('server1'),
+                server.build_listen_uri('server_bs_1'),
                 server.build_listen_uri('unreachable_2'),
-                server.build_listen_uri('server3'),
+                server.build_listen_uri('server_bs_3'),
                 server.build_listen_uri('unreachable_4'),
             },
             replication_connect_timeout = 1000,
@@ -416,12 +416,12 @@ g_config_success.before_test('test_wait_only_for_leader', function(cg)
         },
     }
     cg.server3 = cg.replica_set:build_and_add_server{
-        alias = 'server3',
+        alias = 'server_bs_3',
         box_cfg = {
             replicaset_uuid = uuidb,
             instance_uuid = uuid3,
             listen = {
-                server.build_listen_uri('server3'),
+                server.build_listen_uri('server_bs_3'),
             },
         },
     }

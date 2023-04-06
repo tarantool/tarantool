@@ -3,10 +3,10 @@ local cluster = require('luatest.replica_set')
 local server = require('luatest.server')
 
 local g_async = luatest.group('fencing_async', {
-    {election_mode = 'manual'}, {election_mode = 'candidate'}})
+    {mode = 'manual'}, {mode = 'candidate'}})
 local g_sync = luatest.group('fencing_sync')
 local g_mode = luatest.group('fencing_mode', {
-    {election_fencing_mode = 'soft'}, {election_fencing_mode = 'strict'}})
+    {mode = 'soft'}, {mode = 'strict'}})
 
 local SHORT_TIMEOUT = 0.1
 local LONG_TIMEOUT = 1000
@@ -61,13 +61,20 @@ local function box_cfg_update(servers, cfg)
 end
 
 local function start(g)
+    local suffix
+    if g.params then
+        suffix = g.params.mode
+    else
+        suffix = g.name
+    end
+
     g.box_cfg = {
         election_mode = 'manual',
         election_timeout = SHORT_TIMEOUT,
         replication = {
-            server.build_listen_uri('server_1'),
-            server.build_listen_uri('server_2'),
-            server.build_listen_uri('server_3'),
+            server.build_listen_uri('server_1_' .. suffix),
+            server.build_listen_uri('server_2_' .. suffix),
+            server.build_listen_uri('server_3_' .. suffix),
         },
         replication_synchro_quorum = 2,
         replication_synchro_timeout = SHORT_TIMEOUT,
@@ -76,13 +83,13 @@ local function start(g)
 
     g.cluster = cluster:new({})
     g.server_1 = g.cluster:build_and_add_server(
-        {alias = 'server_1', box_cfg = g.box_cfg})
+        {alias = 'server_1_' .. suffix, box_cfg = g.box_cfg})
 
     g.box_cfg.read_only = true
     g.server_2 = g.cluster:build_and_add_server(
-        {alias = 'server_2', box_cfg = g.box_cfg})
+        {alias = 'server_2_' .. suffix, box_cfg = g.box_cfg})
     g.server_3 = g.cluster:build_and_add_server(
-        {alias = 'server_3', box_cfg = g.box_cfg})
+        {alias = 'server_3_' .. suffix, box_cfg = g.box_cfg})
 
     g.cluster:start()
     g.cluster:wait_for_fullmesh()
@@ -109,7 +116,7 @@ g_async.after_each(function(g)
 end)
 
 g_async.test_fencing = function(g)
-    box_cfg_update({g.server_1}, {election_mode = g.params.election_mode})
+    box_cfg_update({g.server_1}, {election_mode = g.params.mode})
     g.server_1:exec(function()
         box.schema.create_space('test'):create_index('pk')
     end)
@@ -296,19 +303,20 @@ g_mode.after_all(stop)
 g_mode.test_fencing_mode = function(g)
     local timeout = 0.5
     box_cfg_update({g.server_1, g.server_2}, {
-        election_fencing_mode = g.params.election_fencing_mode,
+        election_fencing_mode = g.params.mode,
         replication_timeout = timeout,
     })
 
     local proxy = require('luatest.replica_proxy'):new({
-        client_socket_path = server.build_listen_uri('server_1_proxy'),
-        server_socket_path = server.build_listen_uri('server_1'),
+        client_socket_path = server.build_listen_uri(
+            g.server_1.alias .. '_proxy'),
+        server_socket_path = server.build_listen_uri(g.server_1.alias),
     })
     proxy:start({force = true})
 
     local proxied_replication = {
-        server.build_listen_uri('server_1_proxy'),
-        server.build_listen_uri('server_2'),
+        server.build_listen_uri(g.server_1.alias .. '_proxy'),
+        server.build_listen_uri(g.server_2.alias),
     }
 
     box_cfg_update({g.server_2}, {replication = {}})
@@ -335,7 +343,7 @@ g_mode.test_fencing_mode = function(g)
         return box.info.replication[leader_id].upstream.status
     end, {leader_id})
 
-    if g.params.election_fencing_mode == 'strict' then
+    if g.params.mode == 'strict' then
         luatest.assert_equals(follower_connection_status, 'follow',
             'Follower did not notice leader disconnection')
     else
