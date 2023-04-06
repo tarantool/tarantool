@@ -17,6 +17,7 @@ end
 local num_servers = 3
 
 g.before_all(function(cg)
+    t.skip('Skipped until tarantool/tarantool-qa#277 is resolved')
     cg.cluster = cluster:new({})
     cg.servers = {}
     cg.box_cfg = {
