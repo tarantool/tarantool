@@ -949,23 +949,18 @@ memtx_tx_story_new(struct space *space, struct tuple *tuple)
 static void
 memtx_tx_story_delete(struct memtx_story *story)
 {
+	/* Expecting to delete fully unlinked story. */
+	assert(story->add_stmt == NULL);
+	assert(story->del_stmt == NULL);
+	for (uint32_t i = 0; i < story->index_count; i++) {
+		assert(story->link[i].newer_story == NULL);
+		assert(story->link[i].older_story == NULL);
+	}
+
 	memtx_tx_stats_discard(&txm.story_stats[story->status],
 			       memtx_story_size(story));
 	if (story->tuple_is_retained)
 		memtx_tx_story_untrack_retained_tuple(story);
-
-	if (story->add_stmt != NULL) {
-		assert(story->add_stmt->add_story == story);
-		story->add_stmt->add_story = NULL;
-		story->add_stmt = NULL;
-	}
-	while (story->del_stmt != NULL) {
-		assert(story->del_stmt->del_story == story);
-		story->del_stmt->del_story = NULL;
-		struct txn_stmt *next = story->del_stmt->next_in_del_list;
-		story->del_stmt->next_in_del_list = NULL;
-		story->del_stmt = next;
-	}
 
 	if (txm.traverse_all_stories == &story->in_all_stories)
 		txm.traverse_all_stories = rlist_next(txm.traverse_all_stories);
@@ -978,14 +973,6 @@ memtx_tx_story_delete(struct memtx_story *story)
 
 	story->tuple->is_dirty = false;
 	tuple_unref(story->tuple);
-
-#ifndef NDEBUG
-	/* Expecting to delete fully unlinked story. */
-	for (uint32_t i = 0; i < story->index_count; i++) {
-		assert(story->link[i].newer_story == NULL);
-		assert(story->link[i].older_story == NULL);
-	}
-#endif
 
 	struct mempool *pool = &txm.memtx_tx_story_pool[story->index_count];
 	mempool_free(pool, story);
