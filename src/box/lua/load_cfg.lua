@@ -955,6 +955,7 @@ local box_cfg_guard_whitelist = {
     session = true;
     tuple = true;
     runtime = true;
+    malloc = true;
     ctl = true;
     watch = true;
     broadcast = true;

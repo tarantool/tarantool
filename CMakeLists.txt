@@ -160,6 +160,8 @@ check_function_exists(setproctitle HAVE_SETPROCTITLE)
 check_function_exists(setprogname HAVE_SETPROGNAME)
 check_function_exists(getprogname HAVE_GETPROGNAME)
 
+check_symbol_exists(malloc_info malloc.h HAVE_MALLOC_INFO)
+
 #
 # Enable 'make tags' target.
 #
