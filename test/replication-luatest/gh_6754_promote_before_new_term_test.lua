@@ -13,18 +13,18 @@ g.before_all(function(g)
         replication_synchro_quorum = 1,
         replication_timeout = 0.1,
         replication = {
-            server.build_listen_uri('server_1'),
-            server.build_listen_uri('server_2'),
+            server.build_listen_uri('server_gh6754_1'),
+            server.build_listen_uri('server_gh6754_2'),
         },
     }
 
     g.server_1 = g.cluster:build_and_add_server(
-        {alias = 'server_1', box_cfg = g.box_cfg})
+        {alias = 'server_gh6754_1', box_cfg = g.box_cfg})
 
     g.box_cfg.read_only = false
 
     g.server_2 = g.cluster:build_and_add_server(
-        {alias = 'server_2', box_cfg = g.box_cfg})
+        {alias = 'server_gh6754_2', box_cfg = g.box_cfg})
     g.cluster:start()
     g.cluster:wait_for_fullmesh()
 end)
