@@ -227,6 +227,8 @@
 #cmakedefine HAVE_SETPROGNAME 1
 #cmakedefine HAVE_GETPROGNAME 1
 
+#cmakedefine HAVE_MALLOC_INFO 1
+
 /*
  * Defined if ICU library has ucol_strcollUTF8 method.
  */
