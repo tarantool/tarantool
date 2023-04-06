@@ -1523,9 +1523,10 @@ memtx_engine_stat_index(struct memtx_engine *memtx, struct info_handler *h)
 {
 	struct matras_stats *stats = &memtx->index_extent_stats;
 	info_table_begin(h, "index");
-	info_append_int(h, "total", stats->extent_count * MEMTX_EXTENT_SIZE);
-	info_append_int(h, "read_view",
-			stats->read_view_extent_count * MEMTX_EXTENT_SIZE);
+	info_append_int(h, "total", (size_t)stats->extent_count *
+			MEMTX_EXTENT_SIZE);
+	info_append_int(h, "read_view", (size_t)stats->read_view_extent_count *
+			MEMTX_EXTENT_SIZE);
 	info_table_end(h); /* index */
 }
 
