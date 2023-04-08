@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "box/lua/tuple.h"
+#include "box/lua/tuple_format.h"
 #include "box/xrow_update.h"
 
 #include "lua/utils.h" /* luaT_error() */
@@ -139,29 +140,6 @@ luaT_istuple(struct lua_State *L, int narg)
  *    it), while <luaT_tuple_encode>() uses the box region
  *    (because it is usual for the module API).
  */
-
-/**
- * Encode a Lua values on a Lua stack as an MsgPack array.
- *
- * Raise a Lua error when encoding fails.
- *
- * Helper for <lbox_tuple_new>().
- */
-static int
-luaT_tuple_encode_values(struct lua_State *L, struct ibuf *buf)
-{
-	struct mpstream stream;
-	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb, luamp_error,
-		      L);
-	int argc = lua_gettop(L);
-	mpstream_encode_array(&stream, argc);
-	for (int k = 1; k <= argc; ++k) {
-		if (luamp_encode(L, luaL_msgpack_default, &stream, k) != 0)
-			return -1;
-	}
-	mpstream_flush(&stream);
-	return 0;
-}
 
 typedef void luaT_mpstream_init_f(struct mpstream *stream, struct lua_State *L,
 				  void *buffer);
@@ -314,36 +292,16 @@ static int
 lbox_tuple_new(lua_State *L)
 {
 	int argc = lua_gettop(L);
-	if (argc < 1) {
-		lua_newtable(L); /* create an empty tuple */
-		++argc;
-	}
-
-	/*
-	 * Use backward-compatible parameters format:
-	 * box.tuple.new(1, 2, 3).
-	 */
-	box_tuple_format_t *fmt = box_tuple_format_default();
-	if (argc != 1 || (!lua_istable(L, 1) && !luaT_istuple(L, 1))) {
-		struct ibuf *buf = cord_ibuf_take();
-		struct tuple *tuple = NULL;
-
-		if (luaT_tuple_encode_values(L, buf) != 0)
-			goto cleanup;
-		tuple = box_tuple_new(fmt, buf->buf, buf->buf + ibuf_used(buf));
-cleanup:
-		cord_ibuf_drop(buf);
-		if (tuple == NULL)
-			return luaT_error(L);
-		luaT_pushtuple(L, tuple);
-		return 1;
-	}
-
 	/*
 	 * Use the new parameters format:
-	 * box.tuple.new({1, 2, 3}).
+	 * box.tuple.new({tuple_field1, tuple_field2, tuple_field3}, [options]).
 	 */
-	struct tuple *tuple = luaT_tuple_new(L, 1, fmt);
+	struct tuple_format *format;
+	if (argc == 2)
+		format = luaT_check_tuple_format(L, -1);
+	else
+		format = box_tuple_format_default();
+	struct tuple *tuple = luaT_tuple_new(L, 1, format);
 	if (tuple == NULL)
 		return luaT_error(L);
 	/* box_tuple_new() doesn't leak on exception, see public API doc */
@@ -736,10 +694,6 @@ static const struct luaL_Reg lbox_tuple_meta[] = {
 	{"transform", lbox_tuple_transform},
 	{"tuple_to_map", lbox_tuple_to_map},
 	{"tuple_field_by_path", lbox_tuple_field_by_path},
-	{NULL, NULL}
-};
-
-static const struct luaL_Reg lbox_tuplelib[] = {
 	{"new", lbox_tuple_new},
 	{NULL, NULL}
 };
@@ -777,9 +731,6 @@ box_lua_tuple_init(struct lua_State *L)
 	lua_pop(L, 1); /* box.internal */
 	luaL_register_type(L, tuple_iteratorlib_name,
 			   lbox_tuple_iterator_meta);
-	luaL_findtable(L, LUA_GLOBALSINDEX, tuplelib_name, 0);
-	luaL_setfuncs(L, lbox_tuplelib, 0);
-	lua_pop(L, 1);
 
 	tuple_serializer_update_options();
 	trigger_create(&tuple_serializer.update_trigger,

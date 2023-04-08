@@ -24,6 +24,13 @@ luaT_check_tuple_format(struct lua_State *L, int narg)
 }
 
 static int
+lbox_tuple_format_is(struct lua_State *L)
+{
+	lua_pushboolean(L, luaL_testudata(L, 1, tuple_format_typename) != NULL);
+	return 1;
+}
+
+static int
 lbox_tuple_format_gc(struct lua_State *L)
 {
 	struct tuple_format *format = luaT_check_tuple_format(L, 1);
@@ -84,14 +91,72 @@ lbox_tuple_format_new(struct lua_State *L)
 	return luaT_push_tuple_format(L, format);
 }
 
+/**
+ * Returns the tuple format object type name.
+ */
+static int
+lbox_tuple_format_tostring(struct lua_State *L)
+{
+	luaT_check_tuple_format(L, 1);
+	lua_pushstring(L, tuple_format_typename);
+	return 1;
+}
+
+/*
+ * Returns the format clause with which this tuple format was created.
+ */
+static int
+lbox_tuple_format_serialize(struct lua_State *L)
+{
+	struct tuple_format *format = luaT_check_tuple_format(L, 1);
+	if (format->data == NULL) {
+		lua_createtable(L, 0, 0);
+		return 1;
+	}
+	const char *data = format->data;
+	luamp_decode(L, luaL_msgpack_default, &data);
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.internal.space", 1);
+	lua_getfield(L, -1, "denormalize_format");
+	lua_remove(L, -2);
+	lua_pushvalue(L, -2);
+	lua_call(L, 1, 1);
+	return 1;
+}
+
+/*
+ * Simply returns `ipairs(format:totable())`.
+ */
+static int
+lbox_tuple_format_ipairs(struct lua_State *L)
+{
+	lbox_tuple_format_serialize(L);
+	lua_getfield(L, LUA_GLOBALSINDEX, "ipairs");
+	lua_insert(L, -2);
+	lua_call(L, 1, 3);
+	return 3;
+}
+
 void
 box_lua_tuple_format_init(struct lua_State *L)
 {
 	const struct luaL_Reg lbox_tuple_format_meta[] = {
 		{"__gc", lbox_tuple_format_gc},
+		{"__serialize", lbox_tuple_format_serialize},
+		{"__tostring", lbox_tuple_format_tostring},
+		{"totable", lbox_tuple_format_serialize},
+		{"ipairs", lbox_tuple_format_ipairs},
+		{"pairs", lbox_tuple_format_ipairs},
 		{NULL, NULL}
 	};
 	luaL_register_type(L, tuple_format_typename, lbox_tuple_format_meta);
+
+	const struct luaL_Reg lbox_tuple_formatlib[] = {
+		{"is", lbox_tuple_format_is},
+		{NULL, NULL}
+	};
+	luaL_findtable(L, LUA_GLOBALSINDEX, "box.tuple.format", 0);
+	luaL_setfuncs(L, lbox_tuple_formatlib, 0);
+	lua_pop(L, 1);
 
 	const struct luaL_Reg box_tuple_formatlib_internal[] = {
 		{"new", lbox_tuple_format_new},

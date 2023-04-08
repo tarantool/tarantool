@@ -219,7 +219,7 @@ g.test_object_encode_decode = function()
     t.assert_equals(
         msgpack.decode(msgpack.encode({mp, {foo = mp}})),
         {mp:decode(), {foo = mp:decode()}})
-    t.assert_equals(msgpack.object(box.tuple.new(1, 2, 3)):decode(), {1, 2, 3})
+    t.assert_equals(msgpack.object(box.tuple.new{1, 2, 3}):decode(), {1, 2, 3})
     t.assert_equals(
         msgpack.object({
             foo = box.tuple.new(123),

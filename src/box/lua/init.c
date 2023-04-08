@@ -83,6 +83,7 @@ static uint32_t CTID_STRUCT_TXN_SAVEPOINT_PTR = 0;
 
 extern char session_lua[],
 	tuple_lua[],
+	tuple_format_lua[],
 	key_def_lua[],
 	schema_lua[],
 	load_cfg_lua[],
@@ -179,6 +180,7 @@ extern char session_lua[],
 static const char *lua_sources[] = {
 	"box/session", NULL, session_lua,
 	"box/tuple", NULL, tuple_lua,
+	"box/tuple_format", NULL, tuple_format_lua,
 	"box/schema", NULL, schema_lua,
 #if ENABLE_FEEDBACK_DAEMON
 	/*

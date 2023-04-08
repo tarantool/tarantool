@@ -4,6 +4,7 @@ local ffi = require('ffi')
 local msgpackffi = require('msgpackffi')
 local fun = require('fun')
 local buffer = require('buffer')
+local compat = require('compat')
 local internal = box.internal
 local cord_ibuf_take = buffer.internal.cord_ibuf_take
 local cord_ibuf_put = buffer.internal.cord_ibuf_put
@@ -64,6 +65,36 @@ local builtin = ffi.C
 
 local tuple_t = ffi.typeof('box_tuple_t')
 local const_tuple_ref_t = ffi.typeof('box_tuple_t&')
+
+local NEW_OPTION_TYPES = {
+    format = function(format)
+        if type(format) ~= 'table' and not box.tuple.format.is(format) then
+            return false, "table, box.tuple.format"
+        end
+        return true
+    end
+}
+
+local new_tuple = function(...)
+    if compat.box_tuple_new_vararg.current == 'old' then
+        return internal.tuple.new{...}
+    end
+    local tuple, options = ...
+    if type(tuple) ~= 'table' and not box.tuple.is(tuple) then
+        tuple = {tuple}
+    end
+    internal.check_param_table(options, NEW_OPTION_TYPES)
+    if options == nil then
+        return internal.tuple.new(tuple)
+    end
+    local format
+    if box.tuple.format.is(options.format) then
+        format = options.format
+    else
+        format = box.tuple.format.new(options.format)
+    end
+    return internal.tuple.new(tuple, format)
+end
 
 local is_tuple = function(tuple)
     return tuple ~= nil and type(tuple) == 'cdata' and ffi.istype(const_tuple_ref_t, tuple)
@@ -367,6 +398,10 @@ internal.tuple.bless = tuple_bless
 internal.tuple.encode = tuple_encode
 
 -- Public API, additional to implemented in C.
+
+-- new() needs a wrapper in Lua, because format normalization needs to be done
+-- in Lua.
+box.tuple.new = new_tuple
 
 -- is() is implemented in Lua, because then it is
 -- easy to be JITed.
