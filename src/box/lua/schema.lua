@@ -668,7 +668,7 @@ local function normalize_foreign_key(space_id, space_name, fkey, error_prefix,
                                  fkey.space == space_name)
         fkey = normalize_foreign_key_one(fkey, error_prefix, is_complex,
                                          fkey_same_space)
-        local fkey_name = fkey_same_space and space_name or
+        local fkey_name = fkey_same_space and (space_name or 'unknown') or
                           box.space[fkey.space].name
         return {[fkey_name] = fkey}
     end
@@ -747,7 +747,9 @@ local function normalize_format(space_id, space_name, format)
     end
     return result
 end
-box.internal.space.normalize_format = normalize_format -- for space.upgrade
+
+-- for space.upgrade and box.tuple.format.new
+box.internal.space.normalize_format = normalize_format
 
 local function denormalize_foreign_key_one(fkey)
     assert(type(fkey.field) == 'string' or type(fkey.field) == 'number')
@@ -780,6 +782,8 @@ local function denormalize_format(format)
     end
     return result
 end
+
+box.internal.space.denormalize_format = denormalize_format
 
 box.schema.space = {}
 box.schema.space.create = function(name, options)

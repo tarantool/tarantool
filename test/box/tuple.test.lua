@@ -58,16 +58,12 @@ box.tuple.new{}
 box.tuple.new(1)
 box.tuple.new{1}
 
-box.tuple.new(1, 2, 3, 4, 5)
 box.tuple.new{1, 2, 3, 4, 5}
 
-box.tuple.new({'a', 'b'}, {'c', 'd'}, {'e', 'f'})
 box.tuple.new{{'a', 'b'}, {'c', 'd'}, {'e', 'f'}}
 
-box.tuple.new({1, 2}, 'x', 'y', 'z', {c = 3, d = 4}, {e = 5, f = 6})
 box.tuple.new{{1, 2}, 'x', 'y', 'z', {c = 3, d = 4}, {e = 5, f = 6}}
 
-box.tuple.new('x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6})
 box.tuple.new{'x', 'y', 'z', {1, 2}, {c = 3, d = 4}, {e = 5, f = 6}}
 
 t=box.tuple.new{'a','b','c'}
@@ -332,12 +328,12 @@ collectgarbage('collect') -- collect huge string
 -- testing tostring
 test_run:cmd("setopt delimiter ';'")
 null = nil
-t = box.tuple.new({1, -2, 1.2, -1.2}, 'x', 'y', 'z', null, true, false,
+t = box.tuple.new{{1, -2, 1.2, -1.2}, 'x', 'y', 'z', null, true, false,
     {bin = "\x08\x5c\xc2\x80\x12\x2f",
     big_num = tonumber64('18446744073709551615'),
     map = {key = "value"},
     double=1.0000000001,
-    utf8="Кудыкины горы"});
+    utf8="Кудыкины горы"}};
 tostring(t);
 t;
 test_run:cmd("setopt delimiter ''");
@@ -518,7 +514,7 @@ uuid = require("uuid")
 -- output comparison.
 a = uuid.fromstr("c8f0fa1f-da29-438c-a040-393f1126ad39")
 b = uuid.fromstr("83eb4959-3de6-49fb-8890-6fb4423dd186")
-t = box.tuple.new(a, 2, b, "string")
+t = box.tuple.new{a, 2, b, "string"}
 state, val = t:next()
 state
 val == a

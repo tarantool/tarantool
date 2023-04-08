@@ -83,8 +83,9 @@ test_tuple(void)
 
 	int idx = generate_function(
 		"function(a, b, tuple) "
-		"return box.tuple.new{a, b}, tuple, box.tuple.new{b, a}, "
-		"box.tuple.new{a + b, a - b} end");
+		"return box.internal.tuple.new{a, b}, tuple, "
+		"box.internal.tuple.new{b, a}, "
+		"box.internal.tuple.new{a + b, a - b} end");
 	struct func_adapter *func = func_adapter_lua_create(tarantool_L, idx);
 	struct func_adapter_ctx ctx;
 	func_adapter_begin(func, &ctx);

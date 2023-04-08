@@ -65,6 +65,14 @@ string when decoded in Lua.
 https://tarantool.io/compat/binary_data_decoding
 ]]
 
+local BOX_TUPLE_NEW_VARARG_BRIEF = [[
+Whether `box.tuple.new` should interpret the argument list as an array of tuple
+fields (i.e., vararg) - this does not allow passing a tuple format as a second
+argument.
+
+https://tarantool.io/compat/box_tuple_new_vararg
+]]
+
 -- Returns an action callback that toggles a tweak.
 local function tweak_action(tweak_name, old_tweak_value, new_tweak_value)
     return function(is_new)
@@ -124,6 +132,12 @@ local options = {
             tweaks.yaml_decode_binary_as_string = not is_new
             tweaks.msgpack_decode_binary_as_string = not is_new
         end,
+    },
+    box_tuple_new_vararg = {
+        default = 'new',
+        obsolete = nil,
+        brief = BOX_TUPLE_NEW_VARARG_BRIEF,
+        action = function() end,
     },
 }
 

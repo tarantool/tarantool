@@ -47,11 +47,11 @@ function return_emptytuple() return box.tuple.new() end
 conn:call("return_emptytuple")
 conn:eval("return return_emptytuple()")
 
-function return_tuple() return box.tuple.new(1, 2, 3) end
+function return_tuple() return box.tuple.new{1, 2, 3} end
 conn:call("return_tuple")
 conn:eval("return return_tuple()")
 
-function return_tuples() return box.tuple.new(1, 2, 3), box.tuple.new(3, 4, 5)  end
+function return_tuples() return box.tuple.new{1, 2, 3}, box.tuple.new{3, 4, 5}  end
 conn:call("return_tuples")
 conn:eval("return return_tuples()")
 

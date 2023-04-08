@@ -295,9 +295,9 @@ _ = s2:create_index('pk', {parts = {2, 'integer'}, sequence = 'test'})
 s3 = box.schema.space.create('test3')
 _ = s3:create_index('pk', {parts = {2, 'unsigned', 1, 'string'}, sequence = 'test'})
 
-s1:insert(box.tuple.new(nil)) -- 1
-s2:insert(box.tuple.new('a', nil)) -- 2
-s3:insert(box.tuple.new('b', nil)) -- 3
+s1:insert(box.tuple.new(box.NULL)) -- 1
+s2:insert(box.tuple.new{'a', box.NULL}) -- 2
+s3:insert(box.tuple.new{'b', box.NULL}) -- 3
 s1:truncate()
 s2:truncate()
 s3:truncate()
