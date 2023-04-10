@@ -9,6 +9,13 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 /**
+ * Single-thread version of qsort.
+ */
+void
+qsort_arg_st(void *a, size_t n, size_t es,
+	     int (*cmp)(const void *a, const void *b, void *arg), void *arg);
+
+/**
  * General version of qsort that calls single-threaded of multi-threaded
  * qsort depending on open MP availability and given array size.
  */
