@@ -84,8 +84,8 @@ g.test_box_status = function(cg)
             replication_connect_timeout = 0.001,
             replication_timeout = 0.001,
         }
-    end, {{server.build_listen_uri('master'),
-           server.build_listen_uri('replica')}})
+    end, {{cg.master.net_box_uri,
+           server.build_listen_uri('replica', cg.cluster.id)}})
     -- here we have 2 notifications: entering ro when can't connect
     -- to master and the second one when going orphan
     t.helpers.retrying({}, function() t.assert_equals(result_no, 3) end)
@@ -138,9 +138,9 @@ g.before_test('test_box_election', function(cg)
 
     local box_cfg = {
         replication = {
-            server.build_listen_uri('instance_1'),
-            server.build_listen_uri('instance_2'),
-            server.build_listen_uri('instance_3'),
+            server.build_listen_uri('instance_1', cg.cluster.id),
+            server.build_listen_uri('instance_2', cg.cluster.id),
+            server.build_listen_uri('instance_3', cg.cluster.id),
         },
         replication_connect_quorum = 0,
         election_mode = 'off',

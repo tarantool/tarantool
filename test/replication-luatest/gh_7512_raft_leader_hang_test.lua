@@ -13,8 +13,8 @@ g.before_all(function(cg)
         replication_timeout = 0.1,
         replication_synchro_quorum = 1,
         replication = {
-            server.build_listen_uri('node1'),
-            server.build_listen_uri('node2'),
+            server.build_listen_uri('node1', cg.cluster.id),
+            server.build_listen_uri('node2', cg.cluster.id),
         },
     }
     cg.node1 = cg.cluster:build_and_add_server{

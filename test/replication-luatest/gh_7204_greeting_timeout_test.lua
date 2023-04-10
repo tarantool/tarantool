@@ -21,7 +21,7 @@ g.after_all(function(g)
 end)
 
 g.test_greeting_timeout = function(g)
-    local uri = server.build_listen_uri('server')
+    local uri = server.build_listen_uri('server', g.server.id)
     local s = socket.tcp_server('unix/', uri, {
         handler = function() fiber.sleep(9000) end
     })

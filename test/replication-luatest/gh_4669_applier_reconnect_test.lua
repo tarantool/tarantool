@@ -8,7 +8,7 @@ g.before_each(function()
     g.cluster = cluster:new({})
     g.master = g.cluster:build_server({alias = 'master'})
     local box_cfg = {
-        replication = server.build_listen_uri('master'),
+        replication = g.master.net_box_uri,
     }
     g.replica = g.cluster:build_server({alias = 'replica', box_cfg = box_cfg})
     g.replica2 = g.cluster:build_server({alias = 'replica2', box_cfg = box_cfg})

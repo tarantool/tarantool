@@ -60,8 +60,8 @@ g.before_each(function(cg)
 
     test_id = test_id + 1
     cg.box_cfg.replication = {
-            server.build_listen_uri('main'),
-            server.build_listen_uri('split_replica'..test_id),
+            cg.main.net_box_uri,
+            server.build_listen_uri('split_replica'..test_id, cg.cluster.id),
     }
     cg.split_replica = cg.cluster:build_and_add_server{
         alias = 'split_replica'..test_id,
@@ -98,8 +98,9 @@ local function partition_replica(cg)
     cg.main:exec(update_replication, {})
 end
 
-local function reconnect_and_check_split_brain(srv)
-    srv:exec(update_replication, {server.build_listen_uri('main')})
+local function reconnect_and_check_split_brain(cg)
+    local srv = cg.split_replica
+    srv:exec(update_replication, {cg.main.net_box_uri})
     t.helpers.retrying({}, srv.exec, srv, function()
         local upstream = box.info.replication[1].upstream
         t.assert_equals(upstream.status, 'stopped', 'replication is stopped')
@@ -133,7 +134,7 @@ g.test_async_old_term = function(cg)
     partition_replica(cg)
     cg.split_replica:exec(write_promote)
     cg.main:exec(function() box.space.async:replace{1} end)
-    reconnect_and_check_split_brain(cg.split_replica)
+    reconnect_and_check_split_brain(cg)
 end
 
 -- Any unseen sync transaction confirmation from an obsolete term means a
@@ -142,7 +143,7 @@ g.test_confirm_old_term = function(cg)
     partition_replica(cg)
     cg.split_replica:exec(write_promote)
     cg.main:exec(function() box.space.sync:replace{1} end)
-    reconnect_and_check_split_brain(cg.split_replica)
+    reconnect_and_check_split_brain(cg)
 end
 
 -- Any unseen sync transaction rollback from an obsolete term means a
@@ -155,7 +156,7 @@ g.test_rollback_old_term = function(cg)
         pcall(box.space.sync.replace, box.space.sync, {1})
         box.cfg{replication_synchro_quorum = 1}
     end)
-    reconnect_and_check_split_brain(cg.split_replica)
+    reconnect_and_check_split_brain(cg)
 end
 
 -- Conflicting demote for the same term is a split-brain.
@@ -163,7 +164,7 @@ g.test_demote_same_term = function(cg)
     partition_replica(cg)
     cg.split_replica:exec(write_promote)
     cg.main:exec(write_demote)
-    reconnect_and_check_split_brain(cg.split_replica)
+    reconnect_and_check_split_brain(cg)
     cg.main:exec(write_promote)
 end
 
@@ -173,7 +174,7 @@ g.test_promote_same_term = function(cg)
     partition_replica(cg)
     cg.split_replica:exec(write_promote)
     cg.main:exec(write_promote)
-    reconnect_and_check_split_brain(cg.split_replica)
+    reconnect_and_check_split_brain(cg)
 end
 
 -- Promote from a bigger term with lsn < confirmed_lsn is a split brain.
@@ -182,7 +183,7 @@ g.test_promote_new_term_small_lsn = function(cg)
     partition_replica(cg)
     cg.split_replica:exec(function() box.space.sync:replace{1} end)
     cg.main:exec(write_promote)
-    reconnect_and_check_split_brain(cg.split_replica)
+    reconnect_and_check_split_brain(cg)
 end
 
 local function fill_queue_and_write(server)
@@ -217,7 +218,7 @@ g.test_promote_new_term_big_lsn = function(cg)
     partition_replica(cg)
     perform_rollback(cg.split_replica)
     cg.main:exec(write_promote)
-    reconnect_and_check_split_brain(cg.split_replica)
+    reconnect_and_check_split_brain(cg)
 end
 
 -- Promote from a bigger term with conflicting queue contents is a split brain.
@@ -228,5 +229,5 @@ g.test_promote_new_term_conflicting_queue = function(cg)
     perform_rollback(cg.split_replica)
     cg.main:exec(write_promote)
     fill_queue_and_write(cg.split_replica)
-    reconnect_and_check_split_brain(cg.split_replica)
+    reconnect_and_check_split_brain(cg)
 end

@@ -4,7 +4,7 @@ local t = require('luatest')
 local g = t.group()
 
 g.before_all(function()
-    g.server = server:new({alias = 'test_index_field_missing'})
+    g.server = server:new({alias = 'gh-5183'})
     g.server:start()
 end)
 
