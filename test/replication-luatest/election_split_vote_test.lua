@@ -13,8 +13,8 @@ local g = t.group('split-vote')
 
 g.before_each(function()
     g.cluster = cluster:new({})
-    local node1_uri = server.build_listen_uri('node1')
-    local node2_uri = server.build_listen_uri('node2')
+    local node1_uri = server.build_listen_uri('node1', g.cluster.id)
+    local node2_uri = server.build_listen_uri('node2', g.cluster.id)
     local replication = {node1_uri, node2_uri}
     local box_cfg = {
         listen = node1_uri,

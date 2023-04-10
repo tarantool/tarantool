@@ -1,6 +1,5 @@
 local t = require('luatest')
 local replica_set = require('luatest.replica_set')
-local server = require('luatest.server')
 
 local g = t.group(nil, t.helpers.matrix({engine = {'memtx', 'vinyl'}}))
 
@@ -17,7 +16,7 @@ g.before_all(function(cg)
             {
                 alias = 'replica',
                 box_cfg = {
-                    replication = server.build_listen_uri('master'),
+                    replication = cg.master.net_box_uri,
                     replication_timeout = 0.1,
                     memtx_use_mvcc_engine = true,
                     txn_isolation = 'read-confirmed',
@@ -55,7 +54,7 @@ g.test_replication_stream_transaction_conflict_errors = function(cg)
     end)
     cg.replica:exec(function(master_uri)
         box.cfg{replication = master_uri}
-    end, {server.build_listen_uri('master')})
+    end, {cg.master.net_box_uri})
     t.helpers.retrying({}, function()
         cg.replica:assert_follows_upstream(cg.master:get_instance_id())
     end)

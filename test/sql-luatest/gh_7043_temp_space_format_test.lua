@@ -4,7 +4,7 @@ local t = require('luatest')
 local g = t.group()
 
 g.before_all(function()
-    g.server = server:new({alias = 'test_space_format'})
+    g.server = server:new({alias = 'gh-7043'})
     g.server:start()
     g.server:exec(function()
         box.execute([[SET SESSION "sql_seq_scan" = true;]])

@@ -1,6 +1,5 @@
 local t = require('luatest')
 local cluster = require('luatest.replica_set')
-local server = require('luatest.server')
 
 local g = t.group('gh-6857-tuple-ext-validation')
 
@@ -87,7 +86,7 @@ g.test_extension_tuple_validation = function()
         ['interval #7'] = string.fromhex('d6060100d100'), -- bad value (signed)
     }
 
-    local c = net_box.connect(server.build_listen_uri('default'))
+    local c = net_box.connect(g.cluster.servers[1].net_box_uri)
     t.assert_equals(c.state, 'active', 'Connection established')
 
     -- First check that there are no complaints on correctly-encoded ext types.

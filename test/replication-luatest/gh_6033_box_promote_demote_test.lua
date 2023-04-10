@@ -92,8 +92,8 @@ local function cluster_init(g)
         replication_synchro_timeout = 5,
         replication_synchro_quorum = 1,
         replication = {
-            server.build_listen_uri('server_1'),
-            server.build_listen_uri('server_2'),
+            server.build_listen_uri('server_1', g.cluster.id),
+            server.build_listen_uri('server_2', g.cluster.id),
         },
     }
 
@@ -387,9 +387,9 @@ g_common.test_limbo_full_interfering_promote = function(g)
     -- server_2 will interrupt server_1, while server_3 is leader
     local box_cfg = table.copy(g.box_cfg)
     box_cfg.replication = {
-        server.build_listen_uri('server_1'),
-        server.build_listen_uri('server_2'),
-        server.build_listen_uri('server_3'),
+        g.server_1.net_box_uri,
+        g.server_2.net_box_uri,
+        server.build_listen_uri('server_3', g.cluster.id),
     }
 
     local server_3 = g.cluster:build_server(
