@@ -13,8 +13,8 @@ local function cluster_create(g)
         replication_synchro_quorum = 2,
         replication_synchro_timeout = 1000,
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
+            server.build_listen_uri('server1', g.cluster.id),
+            server.build_listen_uri('server2', g.cluster.id),
         },
     }
     g.server1 = g.cluster:build_and_add_server({

@@ -14,9 +14,9 @@ g.before_all(function(cg)
     cg.servers = {}
     local box_cfg = {
         replication = {
-            server.build_listen_uri('server_1'),
-            server.build_listen_uri('server_2'),
-            server.build_listen_uri('server_3'),
+            server.build_listen_uri('server_1', cg.cluster.id),
+            server.build_listen_uri('server_2', cg.cluster.id),
+            server.build_listen_uri('server_3', cg.cluster.id),
         },
         replication_timeout = timeout,
         bootstrap_strategy = 'legacy',
@@ -30,7 +30,7 @@ g.before_all(function(cg)
     -- Connection server_3 -> server_1 is proxied, others are not.
     cg.proxy = proxy:new{
         client_socket_path = server.build_listen_uri('server_1_proxy'),
-        server_socket_path = server.build_listen_uri('server_1'),
+        server_socket_path = server.build_listen_uri('server_1', cg.cluster.id),
     }
     t.assert(cg.proxy:start{force = true}, 'Proxy started successfully')
     for i = 1, 3 do

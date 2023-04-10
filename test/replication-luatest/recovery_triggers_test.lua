@@ -22,7 +22,7 @@ g.before_all(function(cg)
     cg.replica = cg.cluster:build_and_add_server({
         alias = 'replica',
         box_cfg = {
-            replication = server.build_listen_uri('server'),
+            replication = cg.server.net_box_uri,
         },
         env = {
             ['TARANTOOL_RUN_BEFORE_BOX_CFG'] = run_before_cfg,
@@ -83,7 +83,7 @@ g.test_recovery_stages = function(cg)
         replication_connect_timeout = 0.1,
         replication_timeout = 0.1,
         replication = {
-            server.build_listen_uri('server'),
+            cg.server.net_box_uri,
             server.build_listen_uri('non-existent-uri'),
         },
         bootstrap_strategy = 'legacy',

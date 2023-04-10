@@ -4,7 +4,7 @@ local t = require('luatest')
 local g = t.group()
 
 g.before_all(function()
-    g.server = server:new({alias = 'no_func_in_idx_def'})
+    g.server = server:new({alias = 'gh-8365'})
     g.server:start()
 end)
 

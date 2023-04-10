@@ -574,7 +574,7 @@ g.test_constraint_replication = function(cg)
     end, {engine})
 
     local replica_cfg = {
-        replication = server.build_listen_uri('master'),
+        replication = cg.server.net_box_uri,
     }
     local replica = server:new({alias = 'replica', box_cfg = replica_cfg})
     replica:start()

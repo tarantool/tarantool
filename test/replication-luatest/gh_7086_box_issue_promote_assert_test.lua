@@ -25,9 +25,9 @@ local function cluster_init(g)
         replication_synchro_timeout = 5,
         replication_synchro_quorum = 1,
         replication = {
-            server.build_listen_uri('server_1'),
-            server.build_listen_uri('server_2'),
-            server.build_listen_uri('server_3'),
+            server.build_listen_uri('server_1', g.cluster.id),
+            server.build_listen_uri('server_2', g.cluster.id),
+            server.build_listen_uri('server_3', g.cluster.id),
         },
     }
 

@@ -13,8 +13,8 @@ g.before_all(function(g)
         replication_synchro_quorum = 1,
         replication_timeout = 0.1,
         replication = {
-            server.build_listen_uri('server_1'),
-            server.build_listen_uri('server_2'),
+            server.build_listen_uri('server_1', g.cluster.id),
+            server.build_listen_uri('server_2', g.cluster.id),
         },
     }
 
