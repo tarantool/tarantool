@@ -4,7 +4,7 @@ local t = require('luatest')
 local g = t.group()
 
 g.before_all(function()
-    g.server = server:new({alias = 'test_assertion_in_modulo'})
+    g.server = server:new({alias = 'gh-6575'})
     g.server:start()
 end)
 

@@ -11,9 +11,9 @@ g.before_each(function(cg)
     local box_cfg = {
         replication_timeout = 0.1,
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
-            server.build_listen_uri('server3'),
+            server.build_listen_uri('server1', cg.replica_set.id),
+            server.build_listen_uri('server2', cg.replica_set.id),
+            server.build_listen_uri('server3', cg.replica_set.id),
         },
     }
     for i = 1, 3 do

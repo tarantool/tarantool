@@ -9,8 +9,8 @@ pg.before_each(function(cg)
     cg.cluster = Cluster:new({})
     cg.master = cg.cluster:build_server({alias = 'master'})
     local box_cfg = {
-        listen = server.build_listen_uri('no_quorum'),
-        replication = server.build_listen_uri('master'),
+        listen = server.build_listen_uri('no_quorum', cg.cluster.id),
+        replication = cg.master.net_box_uri,
         memtx_memory = 107374182,
         replication_connect_quorum = 0,
         replication_timeout = 0.1,

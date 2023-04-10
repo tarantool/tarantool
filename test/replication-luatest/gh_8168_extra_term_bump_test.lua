@@ -8,8 +8,8 @@ g.before_each(function(cg)
     cg.replica_set = replica_set:new{}
     local box_cfg = {
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
+            server.build_listen_uri('server1', cg.replica_set.id),
+            server.build_listen_uri('server2', cg.replica_set.id),
         },
         election_mode = 'manual',
         replication_timeout = 0.1,

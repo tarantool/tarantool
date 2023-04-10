@@ -14,9 +14,9 @@ pg.before_each(function(cg)
         replication_sync_lag = 0.01;
         replication_connect_quorum = 3;
         replication = {
-            server.build_listen_uri('quorum1');
-            server.build_listen_uri('quorum2');
-            server.build_listen_uri('quorum3');
+            server.build_listen_uri('quorum1', cg.cluster.id);
+            server.build_listen_uri('quorum2', cg.cluster.id);
+            server.build_listen_uri('quorum3', cg.cluster.id);
         };
     }
 

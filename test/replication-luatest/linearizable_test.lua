@@ -31,7 +31,8 @@ g.before_all(function(cg)
     })
     -- Servers 2 and 3 are interconnected without a proxy.
     for i = 2, num_servers do
-        cg.box_cfg.replication[i] = server.build_listen_uri('server_' .. i)
+        cg.box_cfg.replication[i] = server.build_listen_uri('server_' .. i,
+            cg.cluster.id)
     end
     for i = 2, num_servers do
         cg.servers[i] = cg.cluster:build_and_add_server({
@@ -44,7 +45,8 @@ g.before_all(function(cg)
         cg.proxies[i] = proxy:new({
             client_socket_path = server.build_listen_uri('server_' .. i ..
                 '_proxy'),
-            server_socket_path = server.build_listen_uri('server_' .. i),
+            server_socket_path = server.build_listen_uri('server_' .. i,
+                cg.cluster.id),
         })
         cg.proxies[i]:start({force = true})
     end

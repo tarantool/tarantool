@@ -16,7 +16,7 @@ g.before_each(function(cg)
     })
 
     cg.proxy = proxy:new({
-        client_socket_path = server.build_listen_uri('proxy'),
+        client_socket_path = cg.server.box_cfg.replication[1],
         server_socket_path = "/dev/null",
 
         -- Proxy will send nil UUID greeting as soon as client connects.

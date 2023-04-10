@@ -13,8 +13,8 @@ g.before_each(function(cg)
         replication_timeout = 0.1,
         election_mode = 'off',
         replication = {
-            server.build_listen_uri('master'),
-            server.build_listen_uri('replica'),
+            server.build_listen_uri('master', cg.cluster.id),
+            server.build_listen_uri('replica', cg.cluster.id),
         },
     }
     cg.master = cg.cluster:build_and_add_server{

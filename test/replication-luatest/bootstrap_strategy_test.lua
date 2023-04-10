@@ -39,8 +39,8 @@ g_auto.before_test('test_auto_bootstrap_waits_for_confirmations', function(cg)
     cg.replica_set = replica_set:new{}
     cg.box_cfg = {
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
+            server.build_listen_uri('server1', cg.replica_set.id),
+            server.build_listen_uri('server2', cg.replica_set.id),
         },
         replication_connect_timeout = 1000,
         replication_timeout = 0.1,
@@ -51,7 +51,8 @@ g_auto.before_test('test_auto_bootstrap_waits_for_confirmations', function(cg)
         alias = 'server1',
         box_cfg = cg.box_cfg,
     }
-    cg.box_cfg.replication[3] = server.build_listen_uri('server3')
+    cg.box_cfg.replication[3] = server.build_listen_uri('server3',
+        cg.replica_set.id)
     cg.box_cfg.instance_uuid = uuid2
     cg.server2 = cg.replica_set:build_and_add_server{
         alias = 'server2',
@@ -82,8 +83,8 @@ g_auto.before_test('test_join_checks_fullmesh', function(cg)
     cg.replica_set = replica_set:new{}
     cg.box_cfg = {
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
+            server.build_listen_uri('server1', cg.replica_set.id),
+            server.build_listen_uri('server2', cg.replica_set.id),
         },
         replication_timeout = 0.1,
     }
@@ -128,7 +129,7 @@ g_auto.before_test('test_sync_waits_for_all_connected', function(cg)
         box_cfg = cg.box_cfg,
     }
     cg.box_cfg.replication = {
-        server.build_listen_uri('master'),
+        cg.master.net_box_uri,
     }
     cg.replica = cg.replica_set:build_and_add_server{
         alias = 'replica',
@@ -194,7 +195,8 @@ g_config.before_test('test_no_replication', function(cg)
         box_cfg = {
             replication_timeout = 0.1,
             bootstrap_strategy = 'config',
-            bootstrap_leader = server.build_listen_uri('server1'),
+            bootstrap_leader = server.build_listen_uri('server1',
+                cg.replica_set.id),
             replication = nil
         },
     }
@@ -226,7 +228,6 @@ end)
 g_config.test_uuid = function(cg)
     cg.replica_set:start()
     t.helpers.retrying({}, cg.server1.exec, cg.server1, function()
-        local t = require('luatest')
         t.assert_equals(box.info.status, 'running', 'The server is running')
     end)
 end
@@ -242,9 +243,10 @@ g_config.before_test('test_replication_without_bootstrap_leader', function(cg)
         box_cfg = {
             replication_timeout = 0.1,
             bootstrap_strategy = 'config',
-            bootstrap_leader = server.build_listen_uri('server1'),
+            bootstrap_leader = server.build_listen_uri('server1',
+                cg.replica_set.id),
             replication = {
-                server.build_listen_uri('server2'),
+                server.build_listen_uri('server2', cg.replica_set.id),
             },
         },
     }
@@ -285,7 +287,7 @@ g_config.before_test('test_no_leader', function(cg)
             replication_timeout = 0.1,
             bootstrap_strategy = 'config',
             bootstrap_leader = nil,
-            replication = server.build_listen_uri('server1'),
+            replication = server.build_listen_uri('server1', cg.replica_set.id),
         },
         env = {
             ['TARANTOOL_RUN_BEFORE_BOX_CFG'] = set_log_before_cfg,
@@ -310,8 +312,9 @@ g_config.before_test('test_single_leader', function(cg)
         box_cfg = {
             replication_timeout = 0.1,
             bootstrap_strategy = 'config',
-            bootstrap_leader = server.build_listen_uri('server1'),
-            replication = server.build_listen_uri('server1'),
+            bootstrap_leader = server.build_listen_uri('server1',
+                cg.replica_set.id),
+            replication = server.build_listen_uri('server1', cg.replica_set.id),
         },
     }
 end)
@@ -319,7 +322,6 @@ end)
 g_config.test_single_leader = function(cg)
     cg.replica_set:start()
     cg.server1:exec(function()
-        local t = require('luatest')
         t.assert_equals(box.info.status, 'running', 'server is working')
     end)
 end
@@ -333,35 +335,31 @@ local g_config_success = t.group('gh-7999-bootstrap-strategy-config-success', {
      {leader = uuid3},
 })
 
-g_config_success.before_each(function(cg)
-    cg.leader = cg.params.leader
-    -- cg.params can't have "/" for some reason, so recreate the path here.
-    if string.match(cg.leader, 'server3') then
-        cg.leader = server.build_listen_uri(cg.leader)
-    end
-end)
-
 g_config_success.after_each(function(cg)
     cg.replica_set:drop()
 end)
 
 g_config_success.before_test('test_correct_bootstrap_leader', function(cg)
     cg.replica_set = replica_set:new{}
+    cg.replica_set_a = replica_set:new{}
+    cg.replica_set_b = replica_set:new{}
+    local bootstrap_leader = cg.params.leader == 'server3' and
+        server.build_listen_uri('server3', cg.replica_set_b.id) or
+        cg.params.leader
     cg.server1 = cg.replica_set:build_and_add_server{
         alias = 'server1',
         box_cfg = {
             bootstrap_strategy = 'config',
-            bootstrap_leader = cg.leader,
+            bootstrap_leader = bootstrap_leader,
             instance_uuid = uuid1,
             replication = {
-                server.build_listen_uri('server1'),
-                server.build_listen_uri('server2'),
-                server.build_listen_uri('server3'),
+                server.build_listen_uri('server1', cg.replica_set.id),
+                server.build_listen_uri('server2', cg.replica_set_a.id),
+                server.build_listen_uri('server3', cg.replica_set_b.id),
             },
             replication_timeout = 0.1,
         },
     }
-    cg.replica_set_a = replica_set:new{}
     cg.server2 = cg.replica_set_a:build_and_add_server{
         alias = 'server2',
         box_cfg = {
@@ -369,15 +367,11 @@ g_config_success.before_test('test_correct_bootstrap_leader', function(cg)
             instance_uuid = uuid2,
         }
     }
-    cg.replica_set_b = replica_set:new{}
     cg.server3 = cg.replica_set_b:build_and_add_server{
         alias = 'server3',
         box_cfg = {
             replicaset_uuid = uuidb,
             instance_uuid = uuid3,
-            listen = {
-                server.build_listen_uri('server3'),
-            },
         },
     }
 end)
@@ -392,7 +386,6 @@ g_config_success.test_correct_bootstrap_leader = function(cg)
     cg.replica_set_b:start{}
     cg.replica_set:start{}
     t.helpers.retrying({}, cg.server1.exec, cg.server1, function(uuid)
-        local t = require('luatest')
         t.assert_equals(box.info.cluster.uuid, uuid,
                         'Server bootstrapped from correct leader')
     end, {uuidb})
@@ -400,15 +393,18 @@ end
 
 g_config_success.before_test('test_wait_only_for_leader', function(cg)
     cg.replica_set = replica_set:new{}
+    local bootstrap_leader = cg.params.leader == 'server3' and
+        server.build_listen_uri('server3', cg.replica_set.id) or
+        cg.params.leader
     cg.server1 = cg.replica_set:build_and_add_server{
         alias = 'server1',
         box_cfg = {
             bootstrap_strategy = 'config',
-            bootstrap_leader = cg.leader,
+            bootstrap_leader = bootstrap_leader,
             replication = {
-                server.build_listen_uri('server1'),
+                server.build_listen_uri('server1', cg.replica_set.id),
                 server.build_listen_uri('unreachable_2'),
-                server.build_listen_uri('server3'),
+                server.build_listen_uri('server3', cg.replica_set.id),
                 server.build_listen_uri('unreachable_4'),
             },
             replication_connect_timeout = 1000,
@@ -420,9 +416,6 @@ g_config_success.before_test('test_wait_only_for_leader', function(cg)
         box_cfg = {
             replicaset_uuid = uuidb,
             instance_uuid = uuid3,
-            listen = {
-                server.build_listen_uri('server3'),
-            },
         },
     }
 end)
@@ -430,7 +423,6 @@ end)
 g_config_success.test_wait_only_for_leader = function(cg)
     cg.replica_set:start{}
     t.helpers.retrying({}, cg.server1.exec, cg.server1, function(uuid)
-        local t = require('luatest')
         t.assert_equals(box.info.cluster.uuid, uuid,
                         'Server boots as soon as sees the leader')
     end, {uuidb})
