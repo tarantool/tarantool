@@ -68,20 +68,21 @@ local function box_cfg_update(servers, cfg)
 end
 
 local function start(g)
+    g.cluster = cluster:new({})
+
     g.box_cfg = {
         election_mode = 'manual',
         election_timeout = SHORT_TIMEOUT,
         replication = {
-            server.build_listen_uri('server_1'),
-            server.build_listen_uri('server_2'),
-            server.build_listen_uri('server_3'),
+            server.build_listen_uri('server_1', g.cluster.id),
+            server.build_listen_uri('server_2', g.cluster.id),
+            server.build_listen_uri('server_3', g.cluster.id),
         },
         replication_synchro_quorum = 2,
         replication_synchro_timeout = SHORT_TIMEOUT,
         replication_timeout = SHORT_TIMEOUT,
     }
 
-    g.cluster = cluster:new({})
     g.server_1 = g.cluster:build_and_add_server(
         {alias = 'server_1', box_cfg = g.box_cfg})
 

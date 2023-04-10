@@ -4,7 +4,7 @@ local t = require('luatest')
 local g = t.group()
 
 g.before_all(function()
-    g.server = server:new({alias = 'map_array_problems'})
+    g.server = server:new({alias = 'gh-6668'})
     g.server:start()
 end)
 

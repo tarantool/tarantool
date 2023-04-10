@@ -4,7 +4,7 @@ local t = require('luatest')
 local g = t.group()
 
 g.before_all(function()
-    g.server = server:new({alias = 'test_join_with_unsupported_index'})
+    g.server = server:new({alias = 'gh-5678'})
     g.server:start()
 end)
 

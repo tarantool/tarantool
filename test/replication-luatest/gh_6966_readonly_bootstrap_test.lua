@@ -10,7 +10,7 @@ g.before_all(function(cg)
 
     local cfg = {
         replication_timeout = 0.1,
-        replication = server.build_listen_uri('master'),
+        replication = server.build_listen_uri('master', cg.cluster.id),
     }
     -- XXX: the order of add_server() is important. First add replica, then
     -- master. This way they are stopped by cluster:stop() in correct order,

@@ -66,9 +66,9 @@ g.before_all(function(g)
         replication_synchro_quorum = 2,
         replication_timeout = 0.1,
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
-            server.build_listen_uri('server3'),
+            server.build_listen_uri('server1', g.cluster.id),
+            server.build_listen_uri('server2', g.cluster.id),
+            server.build_listen_uri('server3', g.cluster.id),
         },
     }
     box_cfg.election_mode = 'manual'

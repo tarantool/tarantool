@@ -4,7 +4,7 @@ local t = require('luatest')
 local g = t.group()
 
 g.before_all(function()
-    g.server = server:new({alias = 'test_any_in_order_by_ephem'})
+    g.server = server:new({alias = 'gh-7345'})
     g.server:start()
 end)
 

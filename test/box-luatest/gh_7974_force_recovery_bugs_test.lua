@@ -18,7 +18,7 @@ g.test_unknown_request_type_force_recovery = function()
     local datadir = 'test/box-luatest/gh_7974_data/unknown_request_type'
     local s = server:new(
         {
-            alias = 'unknown_request_type_ok',
+            alias = 'gh_7974_urt_ok',
             box_cfg = {force_recovery = true},
             datadir = datadir,
         })
@@ -27,7 +27,7 @@ g.test_unknown_request_type_force_recovery = function()
 
     s = server:new(
         {
-            alias = 'unknown_request_type_fail',
+            alias = 'gh_7974_urt_fail',
             box_cfg = {force_recovery = false},
             datadir = datadir,
         })
@@ -55,7 +55,7 @@ g.test_invalid_non_insert_request_force_recovery = function()
     local datadir = 'test/box-luatest/gh_7974_data/invalid_non_insert_request'
     local s = server:new(
             {
-                alias = 'invalid_non_insert_request_ok',
+                alias = 'gh_7974_inir_ok',
                 box_cfg = {force_recovery = true},
                 datadir = datadir,
             })
@@ -64,7 +64,7 @@ g.test_invalid_non_insert_request_force_recovery = function()
 
     s = server:new(
         {
-            alias = 'invalid_non_insert_request_fail',
+            alias = 'gh_7974_inir_fail',
             box_cfg = {force_recovery = false},
             datadir = datadir,
         })
@@ -95,7 +95,7 @@ g.test_invalid_user_space_request_force_recovery = function()
     local datadir = 'test/box-luatest/gh_7974_data/invalid_user_space_request'
     local s = server:new(
             {
-                alias = 'invalid_user_space_request_ok',
+                alias = 'gh_7974_iusr_ok',
                 box_cfg = {force_recovery = true},
                 datadir = datadir,
             })
@@ -104,7 +104,7 @@ g.test_invalid_user_space_request_force_recovery = function()
 
     s = server:new(
         {
-            alias = 'invalid_user_space_request_fail',
+            alias = 'gh_7974_iusr_fail',
             box_cfg = {force_recovery = false},
             datadir = datadir,
         })
@@ -134,7 +134,7 @@ g.test_first_corrupted_request_force_recovery = function()
     local datadir = 'test/box-luatest/gh_7974_data/first_corrupted_request'
     local s = server:new(
             {
-                alias = 'first_corrupted_request_fail',
+                alias = 'gh_7974_fcr_fail',
                 box_cfg = {force_recovery = true},
                 datadir = datadir,
             })
@@ -165,7 +165,7 @@ g.test_second_corrupted_request_force_recovery = function()
     local datadir = 'test/box-luatest/gh_7974_data/second_corrupted_request'
     local s = server:new(
             {
-                alias = 'second_corrupted_request_ok',
+                alias = 'gh_7974_scr_ok',
                 box_cfg = {force_recovery = true},
                 datadir = datadir,
             })
@@ -174,7 +174,7 @@ g.test_second_corrupted_request_force_recovery = function()
 
     s = server:new(
         {
-            alias = 'second_corrupted_request_fail',
+            alias = 'gh_7974_scr_fail',
             box_cfg = {force_recovery = false},
             datadir = datadir,
         })
@@ -204,7 +204,7 @@ g.test_empty_snapshot_force_recovery = function()
     local datadir = 'test/box-luatest/gh_7974_data/empty_snapshot'
     local s = server:new(
             {
-                alias = 'empty_snapshot_fail',
+                alias = 'gh_7974_es_fail',
                 box_cfg = {force_recovery = true},
                 datadir = datadir,
             })
@@ -234,7 +234,7 @@ g.test_only_user_space_request_force_recovery = function()
     local datadir = 'test/box-luatest/gh_7974_data/only_user_space_request'
     local s = server:new(
             {
-                alias = 'only_user_space_request_fail',
+                alias = 'gh_7974_ousr_fail',
                 box_cfg = {force_recovery = true},
                 datadir = datadir,
             })

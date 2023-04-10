@@ -11,8 +11,8 @@ pg.before_each(function(cg)
 
     cg.box_cfg = {
         replication = {
-            server.build_listen_uri('master_quorum1');
-            server.build_listen_uri('master_quorum2');
+            server.build_listen_uri('master_quorum1', cg.cluster.id);
+            server.build_listen_uri('master_quorum2', cg.cluster.id);
         };
         replication_connect_quorum = 0;
         replication_timeout = 0.1;
