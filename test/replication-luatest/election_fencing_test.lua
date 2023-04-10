@@ -61,20 +61,21 @@ local function box_cfg_update(servers, cfg)
 end
 
 local function start(g)
+    g.cluster = cluster:new({})
+
     g.box_cfg = {
         election_mode = 'manual',
         election_timeout = SHORT_TIMEOUT,
         replication = {
-            server.build_listen_uri('server_1'),
-            server.build_listen_uri('server_2'),
-            server.build_listen_uri('server_3'),
+            server.build_listen_uri('server_1', g.cluster.id),
+            server.build_listen_uri('server_2', g.cluster.id),
+            server.build_listen_uri('server_3', g.cluster.id),
         },
         replication_synchro_quorum = 2,
         replication_synchro_timeout = SHORT_TIMEOUT,
         replication_timeout = SHORT_TIMEOUT,
     }
 
-    g.cluster = cluster:new({})
     g.server_1 = g.cluster:build_and_add_server(
         {alias = 'server_1', box_cfg = g.box_cfg})
 
@@ -302,13 +303,13 @@ g_mode.test_fencing_mode = function(g)
 
     local proxy = require('luatest.replica_proxy'):new({
         client_socket_path = server.build_listen_uri('server_1_proxy'),
-        server_socket_path = server.build_listen_uri('server_1'),
+        server_socket_path = server.build_listen_uri('server_1', g.cluster.id),
     })
     proxy:start({force = true})
 
     local proxied_replication = {
         server.build_listen_uri('server_1_proxy'),
-        server.build_listen_uri('server_2'),
+        server.build_listen_uri('server_2', g.cluster.id),
     }
 
     box_cfg_update({g.server_2}, {replication = {}})

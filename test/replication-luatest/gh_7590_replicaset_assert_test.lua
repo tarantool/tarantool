@@ -9,9 +9,9 @@ g.before_all(function(g)
     g.cfg = {
         replication_timeout = 0.1,
         replication = {
-            server.build_listen_uri('r1'),
-            server.build_listen_uri('r2'),
-            server.build_listen_uri('r3'),
+            server.build_listen_uri('r1', g.cluster.id),
+            server.build_listen_uri('r2', g.cluster.id),
+            server.build_listen_uri('r3', g.cluster.id),
         },
     }
 

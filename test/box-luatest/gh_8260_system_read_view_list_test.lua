@@ -201,11 +201,11 @@ g_list.before_all(function(cg)
     end)
     cg.replica1 = server:new({
         alias = 'replica1',
-        box_cfg = {replication = server.build_listen_uri('master')},
+        box_cfg = {replication = cg.server.net_box_uri},
     })
     cg.replica2 = server:new({
         alias = 'replica2',
-        box_cfg = {replication = server.build_listen_uri('master')},
+        box_cfg = {replication = cg.server.net_box_uri},
     })
 end)
 

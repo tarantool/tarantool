@@ -10,7 +10,7 @@ g.before_each(function(cg)
 
     local box_cfg = {
         replication = {
-            server.build_listen_uri('instance_1'),
+            server.build_listen_uri('instance_1', cg.cluster.id),
         },
         instance_uuid = t.helpers.uuid('b'),
     }
@@ -19,8 +19,8 @@ g.before_each(function(cg)
 
     box_cfg = {
         replication = {
-            server.build_listen_uri('anon'),
-            server.build_listen_uri('instance_1'),
+            server.build_listen_uri('anon', cg.cluster.id),
+            cg.instance_1.net_box_uri,
         },
         instance_uuid = t.helpers.uuid('a'),
         read_only = true,
@@ -31,9 +31,9 @@ g.before_each(function(cg)
 
     box_cfg = {
         replication = {
-            server.build_listen_uri('anon'),
-            server.build_listen_uri('instance_1'),
-            server.build_listen_uri('instance_2'),
+            cg.anon.net_box_uri,
+            cg.instance_1.net_box_uri,
+            server.build_listen_uri('instance_2', cg.cluster.id),
         },
         instance_uuid = t.helpers.uuid('c'),
     }

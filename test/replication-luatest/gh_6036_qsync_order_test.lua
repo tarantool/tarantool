@@ -10,8 +10,8 @@ g.before_all(function(cg)
 
     cg.box_cfg = {
         replication = {
-            server.build_listen_uri('r1'),
-            server.build_listen_uri('r2'),
+            server.build_listen_uri('r1', cg.cluster.id),
+            server.build_listen_uri('r2', cg.cluster.id),
         },
         replication_timeout         = 0.1,
         replication_connect_quorum  = 1,
@@ -62,7 +62,7 @@ end
 --
 -- The test requires 3rd replica to graft in.
 g.before_test("test_qsync_order", function(cg)
-    cg.box_cfg.replication[3] = server.build_listen_uri("r3")
+    cg.box_cfg.replication[3] = server.build_listen_uri("r3", cg.cluster.id)
     cg.r3 = cg.cluster:build_and_add_server({
         alias = 'r3',
         box_cfg = cg.box_cfg
@@ -90,15 +90,15 @@ g.test_qsync_order = function(cg)
     --
     -- Drop connection between r3 and r2.
     cg.r3:exec(update_replication, {
-        server.build_listen_uri("r1"),
-        server.build_listen_uri("r3"),
+        cg.r1.net_box_uri,
+        cg.r3.net_box_uri,
     })
 
     --
     -- Drop connection between r2 and r3.
     cg.r2:exec(update_replication, {
-        server.build_listen_uri("r1"),
-        server.build_listen_uri("r2"),
+        cg.r1.net_box_uri,
+        cg.r2.net_box_uri,
     })
 
     --

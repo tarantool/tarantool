@@ -66,7 +66,7 @@ g.before_test('test_replication', function(cg)
     cg.replica = server:new({
         alias = 'replica',
         box_cfg = {
-            replication = server.build_listen_uri('default'),
+            replication = cg.server.net_box_uri,
         },
     })
 end)

@@ -37,8 +37,8 @@ g.before_test('test_auto_bootstrap_waits_for_confirmations', function(cg)
     cg.replica_set = replica_set:new{}
     cg.box_cfg = {
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
+            server.build_listen_uri('server1', cg.replica_set.id),
+            server.build_listen_uri('server2', cg.replica_set.id),
         },
         replication_connect_timeout = 1000,
         replication_timeout = 0.1,
@@ -49,7 +49,8 @@ g.before_test('test_auto_bootstrap_waits_for_confirmations', function(cg)
         alias = 'server1',
         box_cfg = cg.box_cfg,
     }
-    cg.box_cfg.replication[3] = server.build_listen_uri('server3')
+    cg.box_cfg.replication[3] = server.build_listen_uri('server3',
+        cg.replica_set.id)
     cg.box_cfg.instance_uuid = uuid2
     cg.server2 = cg.replica_set:build_and_add_server{
         alias = 'server2',
@@ -80,8 +81,8 @@ g.before_test('test_join_checks_fullmesh', function(cg)
     cg.replica_set = replica_set:new{}
     cg.box_cfg = {
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
+            server.build_listen_uri('server1', cg.replica_set.id),
+            server.build_listen_uri('server2', cg.replica_set.id),
         },
         replication_timeout = 0.1,
     }
@@ -126,7 +127,7 @@ g.before_test('test_sync_waits_for_all_connected', function(cg)
         box_cfg = cg.box_cfg,
     }
     cg.box_cfg.replication = {
-        server.build_listen_uri('master'),
+        cg.master.net_box_uri,
     }
     cg.replica = cg.replica_set:build_and_add_server{
         alias = 'replica',

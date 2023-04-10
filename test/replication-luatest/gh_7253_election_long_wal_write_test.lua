@@ -74,9 +74,9 @@ g.before_all(function(g)
         election_timeout = 1000,
         election_fencing_enabled = false,
         replication = {
-            server.build_listen_uri('server1'),
-            server.build_listen_uri('server2'),
-            server.build_listen_uri('server3'),
+            server.build_listen_uri('server1', g.cluster.id),
+            server.build_listen_uri('server2', g.cluster.id),
+            server.build_listen_uri('server3', g.cluster.id),
         },
         bootstrap_strategy = 'legacy',
     }
@@ -282,8 +282,8 @@ g.test_old_leader_txn_during_promote_write = function(g)
     -- Build the topology:
     --   server1  server2 <-> server3
     --
-    local server2_uri = server.build_listen_uri('server2')
-    local server3_uri = server.build_listen_uri('server3')
+    local server2_uri = g.server2.net_box_uri
+    local server3_uri = g.server3.net_box_uri
     server_set_replication(g.server1, {})
     server_set_replication(g.server2, {server2_uri, server3_uri})
     server_set_replication(g.server3, {server2_uri, server3_uri})
@@ -371,11 +371,11 @@ end
 -- forwards the bad txn.
 --
 g.test_old_leader_txn_during_promote_write_complex = function(g)
-    local server1_uri = server.build_listen_uri('server1')
-    local server2_uri = server.build_listen_uri('server2')
-    local server3_uri = server.build_listen_uri('server3')
-    local server4_uri = server.build_listen_uri('server4')
-    local server5_uri = server.build_listen_uri('server5')
+    local server1_uri = g.server1.net_box_uri
+    local server2_uri = g.server2.net_box_uri
+    local server3_uri = g.server3.net_box_uri
+    local server4_uri = server.build_listen_uri('server4', g.cluster.id)
+    local server5_uri = server.build_listen_uri('server5', g.cluster.id)
     --
     -- Build the topology:
     --   server4 <- fullmesh(server1, server2, server3)

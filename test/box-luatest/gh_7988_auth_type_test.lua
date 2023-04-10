@@ -68,7 +68,7 @@ g.before_test('test_replication', function(cg)
     cg.replica = server:new({
         alias = 'replica',
         box_cfg = {
-            replication = server.build_listen_uri('master'),
+            replication = cg.server.net_box_uri,
         },
     })
     cg.replica:start()
@@ -97,5 +97,5 @@ g.test_replication = function(cg)
         uri = urilib.format(parsed_uri, true)
         box.cfg({replication = uri})
         t.assert_equals(box.info.replication[1].upstream.status, 'follow')
-    end, {server.build_listen_uri('master')})
+    end, {cg.server.net_box_uri})
 end

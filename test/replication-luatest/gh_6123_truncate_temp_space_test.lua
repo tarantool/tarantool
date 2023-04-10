@@ -9,7 +9,7 @@ g.before_each(function(cg)
 
     local box_cfg = {
         replication         = {
-            server.build_listen_uri('master')
+            server.build_listen_uri('master', cg.cluster.id)
         },
         replication_timeout = 1,
         read_only           = false
@@ -19,8 +19,8 @@ g.before_each(function(cg)
 
     local box_cfg = {
         replication         = {
-            server.build_listen_uri('master'),
-            server.build_listen_uri('replica')
+            cg.master.net_box_uri,
+            server.build_listen_uri('replica', cg.cluster.id)
         },
         replication_timeout = 1,
         replication_connect_timeout = 4,

@@ -11,14 +11,14 @@ g.before_all(function(cg)
     local cfg = {
         replication_timeout = 0.1,
         replication = {
-            server.build_listen_uri('master'),
+            server.build_listen_uri('master', cg.cluster.id),
         },
     }
     cg.master = cg.cluster:build_and_add_server({
         alias = 'master',
         box_cfg = cfg
     })
-    cfg.replication[2] = server.build_listen_uri('replica')
+    cfg.replication[2] = server.build_listen_uri('replica', cg.cluster.id)
     cg.replica = cg.cluster:build_and_add_server({
         alias = 'replica',
         box_cfg = cfg
