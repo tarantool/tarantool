@@ -521,19 +521,19 @@ sql_bind_null(struct Vdbe *v, int i);
 
 /** Perform string parameter binding for the sql statement. */
 int
-sql_bind_str_static(struct Vdbe *v, int i, const char *str, uint32_t len);
+sql_bind_str(struct Vdbe *v, int i, const char *str, uint32_t len);
 
 /** Perform binary string parameter binding for the sql statement. */
 int
-sql_bind_bin_static(struct Vdbe *v, int i, const char *str, uint32_t size);
+sql_bind_bin(struct Vdbe *v, int i, const char *str, uint32_t size);
 
 /** Perform array parameter binding for the sql statement. */
 int
-sql_bind_array_static(struct Vdbe *v, int i, const char *str, uint32_t size);
+sql_bind_array(struct Vdbe *v, int i, const char *str, uint32_t size);
 
 /** Perform map parameter binding for the sql statement. */
 int
-sql_bind_map_static(struct Vdbe *v, int i, const char *str, uint32_t size);
+sql_bind_map(struct Vdbe *v, int i, const char *str, uint32_t size);
 
 /** Perform UUID parameter binding for the sql statement. */
 int
@@ -1194,7 +1194,7 @@ sql_space_tuple_log_count(struct space *space);
 struct UnpackedRecord {
 	/** Collation and sort-order information. */
 	struct key_def *key_def;
-	Mem *aMem;		/* Values */
+	struct sql_mem *aMem;		/* Values */
 	u16 nField;		/* Number of entries in apMem[] */
 	i8 default_rc;		/* Comparison result if keys are equal */
 	i8 r1;			/* Value to return if (lhs > rhs) */
@@ -2423,7 +2423,7 @@ struct PrintfArguments {
 	int nArg;		/* Total number of arguments */
 	int nUsed;		/* Number of arguments used so far */
 	/** The argument values. */
-	const struct Mem *apArg;
+	const struct sql_mem *apArg;
 };
 
 void sqlVXPrintf(StrAccum *, const char *, va_list);
@@ -4261,12 +4261,13 @@ struct func_sql_builtin {
 	 * Access checks are redundant, because all SQL built-ins
 	 * are predefined and are executed on SQL privilege level.
 	 */
-	void (*call)(struct sql_context *ctx, int argc, const struct Mem *argv);
+	void (*call)(struct sql_context *ctx, int argc,
+		     const struct sql_mem *argv);
 	/**
 	 * A VDBE-memory-compatible finalize method
 	 * (is valid only for aggregate function).
 	 */
-	int (*finalize)(struct Mem *mem);
+	int (*finalize)(struct sql_mem *mem);
 };
 
 /**

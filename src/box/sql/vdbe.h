@@ -51,7 +51,6 @@ typedef struct Vdbe Vdbe;
  * The names of the following types declared in vdbeInt.h are required
  * for the VdbeOp definition.
  */
-typedef struct Mem Mem;
 typedef struct SubProgram SubProgram;
 
 /*
@@ -79,7 +78,7 @@ struct VdbeOp {
 		struct func *func;
 		sql_context *pCtx;	/* Used when p4type is P4_FUNCCTX */
 		struct coll *pColl;	/* Used when p4type is P4_COLLSEQ */
-		Mem *pMem;	/* Used when p4type is P4_MEM */
+		struct sql_mem *pMem;	/* Used when p4type is P4_MEM */
 		bool b;         /* Used when p4type is P4_BOOL */
 		int *ai;	/* Used when p4type is P4_INTARRAY */
 		SubProgram *pProgram;	/* Used when p4type is P4_SUBPROGRAM */
@@ -250,7 +249,7 @@ vdbe_metadata_set_col_autoincrement(struct Vdbe *p, int idx);
 int
 vdbe_metadata_set_col_span(struct Vdbe *p, int idx, const char *span);
 
-const struct Mem *
+const struct sql_mem *
 vdbe_get_bound_value(struct Vdbe *vdbe, int id);
 
 void sqlVdbeCountChanges(Vdbe *);

@@ -1234,11 +1234,11 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 	enum field_type type = p->key_def->parts[nEq].type;
 
 	/* Value extracted from pLower */
-	struct Mem *p1 = NULL;
+	struct sql_mem *p1 = NULL;
 	/* Value extracted from pUpper */
-	struct Mem *p2 = NULL;
+	struct sql_mem *p2 = NULL;
 	/* Value extracted from record */
-	struct Mem *pVal = NULL;
+	struct sql_mem *pVal = NULL;
 
 	struct coll *coll = p->key_def->parts[nEq].coll;
 	if (pLower) {

@@ -591,7 +591,7 @@ freeP4(int p4type, void *p4)
 		sql_key_info_unref(p4);
 		break;
 	case P4_MEM:
-		mem_delete((struct Mem *)p4);
+		mem_delete((struct sql_mem *)p4);
 		break;
 	default:
 		break;
@@ -1096,7 +1096,7 @@ void
 sqlVdbeFrameDelete(VdbeFrame * p)
 {
 	int i;
-	Mem *aMem = VdbeFrameMem(p);
+	struct sql_mem *aMem = VdbeFrameMem(p);
 	VdbeCursor **apCsr = (VdbeCursor **) & aMem[p->nChildMem];
 	for (i = 0; i < p->nChildCsr; i++)
 		sqlVdbeFreeCursor(apCsr[i]);
@@ -1125,10 +1125,12 @@ sqlVdbeList(Vdbe * p)
 	int nRow;		/* Stop when row count reaches this */
 	int nSub = 0;		/* Number of sub-vdbes seen so far */
 	SubProgram **apSub = 0;	/* Array of sub-vdbes */
-	Mem *pSub = 0;		/* Memory cell hold array of subprogs */
+	/* Memory cell hold array of subprogs. */
+	struct sql_mem *pSub = NULL;
 	int i;			/* Loop counter */
 	int rc = 0;	/* Return code */
-	Mem *pMem = &p->aMem[1];	/* First Mem of result set */
+	/* First Mem of result set. */
+	struct sql_mem *pMem = &p->aMem[1];
 
 	assert(p->explain);
 	assert(p->magic == VDBE_MAGIC_RUN);
@@ -1160,8 +1162,8 @@ sqlVdbeList(Vdbe * p)
 			/* On the first call to sql_step(), pSub will hold a NULL.  It is
 			 * initialized to a BLOB by the P4_SUBPROGRAM processing logic below
 			 */
-			nSub = pSub->n / sizeof(Vdbe *);
-			apSub = (SubProgram **) pSub->z;
+			nSub = pSub->u.n / sizeof(struct Vdbe *);
+			apSub = (struct SubProgram **)pSub->u.z;
 		}
 		for (i = 0; i < nSub; i++) {
 			nRow += apSub[i]->nOp;
@@ -1199,7 +1201,7 @@ sqlVdbeList(Vdbe * p)
 			pMem++;
 
 			char *value = (char *)sqlOpcodeName(pOp->opcode);
-			mem_set_str0_static(pMem, value);
+			mem_set_str0(pMem, value);
 			pMem++;
 
 			/* When an OP_Program opcode is encounter (the only opcode that has
@@ -1238,24 +1240,25 @@ sqlVdbeList(Vdbe * p)
 
 		char *buf = sql_xmalloc(256);
 		zP4 = displayP4(pOp, buf, 256);
-		if (zP4 != buf) {
+		mem_set_str0(pMem, zP4);
+		if (zP4 != buf)
 			sql_xfree(buf);
-			mem_set_str0_ephemeral(pMem, zP4);
-		} else {
-			mem_set_str0_allocated(pMem, zP4);
-		}
+		else
+			mem_set_dynamic(pMem);
 		pMem++;
 
 		if (p->explain == 1) {
 			buf = sql_xmalloc(4);
 			sql_snprintf(3, buf, "%.2x", pOp->p5);
-			mem_set_str0_allocated(pMem, buf);
+			mem_set_str0(pMem, buf);
+			mem_set_dynamic(pMem);
 			pMem++;
 
 #ifdef SQL_ENABLE_EXPLAIN_COMMENTS
 			buf = sql_xmalloc(500);
 			displayComment(pOp, zP4, buf, 500);
-			mem_set_str0_allocated(pMem, buf);
+			mem_set_str0(pMem, buf);
+			mem_set_dynamic(pMem);
 #else
 			mem_set_null(pMem);
 #endif
@@ -1439,8 +1442,10 @@ sqlVdbeMakeReady(Vdbe * p,	/* The VDBE */
 	 */
 	do {
 		x.nNeeded = 0;
-		p->aMem = allocSpace(&x, p->aMem, nMem * sizeof(Mem));
-		p->aVar = allocSpace(&x, p->aVar, nVar * sizeof(Mem));
+		p->aMem = allocSpace(&x, p->aMem,
+				     nMem * sizeof(struct sql_mem));
+		p->aVar = allocSpace(&x, p->aVar,
+				     nVar * sizeof(struct sql_mem));
 		p->apCsr =
 		    allocSpace(&x, p->apCsr, nCursor * sizeof(VdbeCursor *));
 		if (x.nNeeded == 0)
@@ -2016,11 +2021,11 @@ sqlVdbeAllocUnpackedRecord(struct key_def *key_def)
 {
 	UnpackedRecord *p;	/* Unpacked record to return */
 	int nByte;		/* Number of bytes required for *p */
-	nByte =
-	    ROUND8(sizeof(UnpackedRecord)) + sizeof(Mem) * (key_def->part_count +
-							    1);
+	nByte = ROUND8(sizeof(struct UnpackedRecord)) +
+		sizeof(struct sql_mem) * (key_def->part_count + 1);
 	p = sql_xmalloc(nByte);
-	p->aMem = (Mem *) & ((char *)p)[ROUND8(sizeof(UnpackedRecord))];
+	size_t idx = ROUND8(sizeof(struct UnpackedRecord));
+	p->aMem = (struct sql_mem *)&((char *)p)[idx];
 	for (uint32_t i = 0; i < key_def->part_count + 1; ++i)
 		mem_create(&p->aMem[i]);
 	p->key_def = key_def;
@@ -2061,7 +2066,7 @@ sqlExpirePreparedStatements(void)
 		p->expired = p->is_sandboxed == 0 ? 1 : 0;
 }
 
-const struct Mem *
+const struct sql_mem *
 vdbe_get_bound_value(struct Vdbe *vdbe, int id)
 {
 	if (vdbe == NULL || id < 0 || id >= vdbe->nVar)
@@ -2076,14 +2081,13 @@ sqlVdbeRecordUnpackMsgpack(struct key_def *key_def,	/* Information about the rec
 {
 	uint32_t n;
 	const char *zParse = pKey;
-	Mem *pMem = p->aMem;
+	struct sql_mem *pMem = p->aMem;
 	n = mp_decode_array(&zParse);
 	n = p->nField = MIN(n, key_def->part_count);
 	p->default_rc = 0;
 	p->key_def = key_def;
 	while (n--) {
-		pMem->szMalloc = 0;
-		pMem->z = 0;
+		mem_destroy(pMem);
 		uint32_t sz = 0;
 		mem_from_mp_ephemeral(pMem, zParse, &sz);
 		assert(sz != 0);

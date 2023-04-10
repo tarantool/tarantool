@@ -75,8 +75,14 @@ int tarantoolsqlReplace(struct space *space, const char *tuple,
 int
 tarantoolsqlDelete(struct BtCursor *pCur);
 
+/**
+ * Create a new Tarantool iterator and set it to the first entry found for the
+ * given key. The key is given as an array of MEMs. If the cursor already
+ * contains an iterator, it will be freed.
+ */
 int
-sql_cursor_seek(struct BtCursor *cur, struct Mem *mems, uint32_t len, int *res);
+sql_cursor_seek(struct BtCursor *cur, struct sql_mem *mems, uint32_t len,
+		int *res);
 
 /**
  * Delete entry from space by its key.

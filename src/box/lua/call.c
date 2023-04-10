@@ -607,7 +607,7 @@ port_lua_destroy(struct port *base)
 extern const char *
 port_lua_dump_plain(struct port *port, uint32_t *size);
 
-extern struct Mem *
+extern struct sql_mem *
 port_lua_get_vdbemem(struct port *base, uint32_t *size);
 
 static const struct port_vtab port_lua_vtab = {

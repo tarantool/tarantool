@@ -296,16 +296,17 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 	if (op == TK_VARIABLE) {
 		Vdbe *pReprepare = pParse->pReprepare;
 		int iCol = pRight->iColumn;
-		const struct Mem *var = vdbe_get_bound_value(pReprepare, iCol);
+		const struct sql_mem *var = vdbe_get_bound_value(pReprepare,
+								 iCol);
 		if (var != NULL && mem_is_str(var)) {
-			uint32_t size = var->n + 1;
+			uint32_t size = var->u.n + 1;
 			char *str = region_alloc(region, size);
 			if (str == NULL) {
 				diag_set(OutOfMemory, size, "region", "str");
 				return -1;
 			}
-			memcpy(str, var->z, var->n);
-			str[var->n] = '\0';
+			memcpy(str, var->u.z, var->u.n);
+			str[var->u.n] = '\0';
 			z = str;
 		}
 		assert(pRight->op == TK_VARIABLE || pRight->op == TK_REGISTER);

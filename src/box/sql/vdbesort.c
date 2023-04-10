@@ -1376,13 +1376,8 @@ vdbeSorterFlushPMA(VdbeSorter * pSorter)
 	return vdbeSorterListToPMA(&pSorter->aTask, &pSorter->list);
 }
 
-/*
- * Add a record to the sorter.
- */
 int
-sqlVdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
-		       Mem * pVal	/* Memory cell containing record */
-    )
+sqlVdbeSorterWrite(const VdbeCursor *pCsr, struct sql_mem *pVal)
 {
 	VdbeSorter *pSorter;
 	int rc = 0;	/* Return Code */
@@ -1394,7 +1389,7 @@ sqlVdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
 
 	assert(pCsr->eCurType == CURTYPE_SORTER);
 	pSorter = pCsr->uc.pSorter;
-	getVarint32((const u8 *)&pVal->z[1], t);
+	getVarint32((const u8 *)&pVal->u.z[1], t);
 	if (t > 0 && t < 10 && t != 7) {
 		pSorter->typeMask &= SORTER_TYPE_INTEGER;
 	} else if (t > 10 && (t & 0x01)) {
@@ -1418,8 +1413,8 @@ sqlVdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
 	 *   * The total memory allocated for the in-memory list is greater
 	 *     than (page-size * cache-size), or
 	 */
-	nReq = pVal->n + sizeof(SorterRecord);
-	nPMA = pVal->n + sqlVarintLen(pVal->n);
+	nReq = pVal->u.n + sizeof(SorterRecord);
+	nPMA = pVal->u.n + sqlVarintLen(pVal->u.n);
 	if (pSorter->mxPmaSize) {
 		if (pSorter->list.aMemory) {
 			bFlush = pSorter->iMemory
@@ -1475,8 +1470,8 @@ sqlVdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
 		pNew->u.pNext = pSorter->list.pList;
 	}
 
-	memcpy(SRVAL(pNew), pVal->z, pVal->n);
-	pNew->nVal = pVal->n;
+	memcpy(SRVAL(pNew), pVal->u.z, pVal->u.n);
+	pNew->nVal = pVal->u.n;
 	pSorter->list.pList = pNew;
 
 	return rc;
@@ -2073,11 +2068,8 @@ vdbeSorterRowkey(const VdbeSorter * pSorter,	/* Sorter object */
 	return pKey;
 }
 
-/*
- * Copy the current sorter key into the memory cell pOut.
- */
 int
-sqlVdbeSorterRowkey(const VdbeCursor * pCsr, Mem * pOut)
+sqlVdbeSorterRowkey(const VdbeCursor *pCsr, struct sql_mem *pOut)
 {
 	VdbeSorter *pSorter;
 	void *pKey;
@@ -2092,28 +2084,9 @@ sqlVdbeSorterRowkey(const VdbeCursor * pCsr, Mem * pOut)
 	return 0;
 }
 
-/*
- * Compare the key in memory cell pVal with the key that the sorter cursor
- * passed as the first argument currently points to. For the purposes of
- * the comparison, ignore the rowid field at the end of each record.
- *
- * If the sorter cursor key contains any NULL values, consider it to be
- * less than pVal. Even if pVal also contains NULL values.
- *
- * If an error occurs, return -1.
- * Otherwise, set *pRes to a negative, zero or positive value if the
- * key in pVal is smaller than, equal to or larger than the current sorter
- * key.
- *
- * This routine forms the core of the OP_SorterCompare opcode, which in
- * turn is used to verify uniqueness when constructing a UNIQUE INDEX.
- */
 int
-sqlVdbeSorterCompare(const VdbeCursor * pCsr,	/* Sorter cursor */
-			 Mem * pVal,	/* Value to compare to current sorter key */
-			 int nKeyCol,	/* Compare this many columns */
-			 int *pRes	/* OUT: Result of comparison */
-    )
+sqlVdbeSorterCompare(const struct VdbeCursor *pCsr, struct sql_mem *pVal,
+		     int nKeyCol, int *res)
 {
 	VdbeSorter *pSorter;
 	UnpackedRecord *r2;
@@ -2135,11 +2108,11 @@ sqlVdbeSorterCompare(const VdbeCursor * pCsr,	/* Sorter cursor */
 	sqlVdbeRecordUnpackMsgpack(pCsr->key_def, pKey, r2);
 	for (i = 0; i < nKeyCol; i++) {
 		if (mem_is_null(&r2->aMem[i])) {
-			*pRes = -1;
+			*res = -1;
 			return 0;
 		}
 	}
 
-	*pRes = sqlVdbeRecordCompareMsgpack(pVal->z, r2);
+	*res = sqlVdbeRecordCompareMsgpack(pVal->u.z, r2);
 	return 0;
 }

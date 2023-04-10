@@ -60,7 +60,7 @@ static struct func_sql_builtin **functions;
 
 /** Implementation of the SUM() function. */
 static void
-step_sum(struct sql_context *ctx, int argc, const struct Mem *argv)
+step_sum(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1);
 	(void)argc;
@@ -75,7 +75,7 @@ step_sum(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 /** Implementation of the TOTAL() function. */
 static void
-step_total(struct sql_context *ctx, int argc, const struct Mem *argv)
+step_total(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1);
 	(void)argc;
@@ -90,7 +90,7 @@ step_total(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 /** Finalizer for the TOTAL() function. */
 static int
-fin_total(struct Mem *mem)
+fin_total(struct sql_mem *mem)
 {
 	assert(mem_is_null(mem) || mem_is_double(mem));
 	if (mem_is_null(mem))
@@ -100,26 +100,27 @@ fin_total(struct Mem *mem)
 
 /** Implementation of the AVG() function. */
 static void
-step_avg(struct sql_context *ctx, int argc, const struct Mem *argv)
+step_avg(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1);
 	(void)argc;
 	assert(mem_is_null(ctx->pOut) || mem_is_bin(ctx->pOut));
 	if (mem_is_null(&argv[0]))
 		return;
-	struct Mem *mem;
+	struct sql_mem *mem;
 	uint32_t *count;
 	if (mem_is_null(ctx->pOut)) {
-		uint32_t size = sizeof(struct Mem) + sizeof(uint32_t);
+		uint32_t size = sizeof(struct sql_mem) + sizeof(uint32_t);
 		mem = sql_xmalloc(size);
 		count = (uint32_t *)(mem + 1);
 		mem_create(mem);
 		*count = 1;
 		mem_copy_as_ephemeral(mem, &argv[0]);
-		mem_set_bin_allocated(ctx->pOut, (char *)mem, size);
+		mem_set_bin(ctx->pOut, (char *)mem, size);
+		mem_set_dynamic(ctx->pOut);
 		return;
 	}
-	mem = (struct Mem *)ctx->pOut->z;
+	mem = (struct sql_mem *)ctx->pOut->u.z;
 	count = (uint32_t *)(mem + 1);
 	++*count;
 	if (mem_add(mem, &argv[0], mem) != 0)
@@ -128,15 +129,15 @@ step_avg(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 /** Finalizer for the AVG() function. */
 static int
-fin_avg(struct Mem *mem)
+fin_avg(struct sql_mem *mem)
 {
 	assert(mem_is_null(mem) || mem_is_bin(mem));
 	if (mem_is_null(mem))
 		return 0;
-	struct Mem *sum = (struct Mem *)mem->z;
+	struct sql_mem *sum = (struct sql_mem *)mem->u.z;
 	uint32_t *count_val = (uint32_t *)(sum + 1);
 	assert(mem_is_trivial(sum));
-	struct Mem count;
+	struct sql_mem count;
 	mem_create(&count);
 	mem_set_uint(&count, *count_val);
 	return mem_div(sum, &count, mem);
@@ -144,7 +145,7 @@ fin_avg(struct Mem *mem)
 
 /** Implementation of the COUNT() function. */
 static void
-step_count(struct sql_context *ctx, int argc, const struct Mem *argv)
+step_count(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 0 || argc == 1);
 	if (mem_is_null(ctx->pOut))
@@ -157,7 +158,7 @@ step_count(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 /** Finalizer for the COUNT() function. */
 static int
-fin_count(struct Mem *mem)
+fin_count(struct sql_mem *mem)
 {
 	assert(mem_is_null(mem) || mem_is_uint(mem));
 	if (mem_is_null(mem))
@@ -167,7 +168,7 @@ fin_count(struct Mem *mem)
 
 /** Implementation of the MIN() and MAX() functions. */
 static void
-step_minmax(struct sql_context *ctx, int argc, const struct Mem *argv)
+step_minmax(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1);
 	(void)argc;
@@ -200,7 +201,7 @@ step_minmax(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 /** Implementation of the GROUP_CONCAT() function. */
 static void
-step_group_concat(struct sql_context *ctx, int argc, const struct Mem *argv)
+step_group_concat(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1 || argc == 2);
 	(void)argc;
@@ -222,24 +223,24 @@ step_group_concat(struct sql_context *ctx, int argc, const struct Mem *argv)
 		sep_len = 0;
 	} else {
 		assert(mem_is_same_type(&argv[0], &argv[1]));
-		sep = argv[1].z;
-		sep_len = argv[1].n;
+		sep = argv[1].u.z;
+		sep_len = argv[1].u.n;
 	}
 	if (mem_append(ctx->pOut, sep, sep_len) != 0) {
 		ctx->is_aborted = true;
 		return;
 	}
-	if (mem_append(ctx->pOut, argv[0].z, argv[0].n) != 0)
+	if (mem_append(ctx->pOut, argv[0].u.z, argv[0].u.n) != 0)
 		ctx->is_aborted = true;
 }
 
 /** Implementations of the ABS() function. */
 static void
-func_abs_int(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_abs_int(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1);
 	(void)argc;
-	const struct Mem *arg = &argv[0];
+	const struct sql_mem *arg = &argv[0];
 	if (mem_is_null(arg))
 		return;
 	assert(mem_is_int(arg));
@@ -247,24 +248,26 @@ func_abs_int(struct sql_context *ctx, int argc, const struct Mem *argv)
 	mem_set_uint(ctx->pOut, u);
 }
 
+/** Implementations of the ABS() function for DOUBLE argument. */
 static void
-func_abs_double(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_abs_double(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1);
 	(void)argc;
-	const struct Mem *arg = &argv[0];
+	const struct sql_mem *arg = &argv[0];
 	if (mem_is_null(arg))
 		return;
 	assert(mem_is_double(arg));
 	mem_set_double(ctx->pOut, arg->u.r < 0 ? -arg->u.r : arg->u.r);
 }
 
+/** Implementations of the ABS() function for DECIMAL argument. */
 static void
-func_abs_dec(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_abs_dec(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1);
 	(void)argc;
-	const struct Mem *arg = &argv[0];
+	const struct sql_mem *arg = &argv[0];
 	if (mem_is_null(arg))
 		return;
 	assert(mem_is_dec(arg));
@@ -274,19 +277,19 @@ func_abs_dec(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 /** Implementation of the CHAR_LENGTH() function. */
 static void
-func_char_length(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_char_length(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1);
 	(void)argc;
-	const struct Mem *arg = &argv[0];
+	const struct sql_mem *arg = &argv[0];
 	if (mem_is_null(arg))
 		return;
-	assert(mem_is_str(arg) && arg->n >= 0);
+	assert(mem_is_str(arg));
 	uint32_t len = 0;
-	int offset = 0;
-	while (offset < arg->n) {
+	size_t offset = 0;
+	while (offset < arg->u.n) {
 		UChar32 c;
-		U8_NEXT((uint8_t *)arg->z, offset, arg->n, c);
+		U8_NEXT((uint8_t *)arg->u.z, offset, arg->u.n, c);
 		++len;
 	}
 	mem_set_uint(ctx->pOut, len);
@@ -294,18 +297,18 @@ func_char_length(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 /** Implementation of the UPPER() and LOWER() functions. */
 static void
-func_lower_upper(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_lower_upper(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1);
 	(void)argc;
-	const struct Mem *arg = &argv[0];
+	const struct sql_mem *arg = &argv[0];
 	if (mem_is_null(arg))
 		return;
-	assert(mem_is_str(arg) && arg->n >= 0);
-	if (arg->n == 0)
-		return mem_set_str0_static(ctx->pOut, "");
-	const char *str = arg->z;
-	int32_t len = arg->n;
+	assert(mem_is_str(arg));
+	if (arg->u.n == 0)
+		return mem_set_str0(ctx->pOut, "");
+	const char *str = arg->u.z;
+	int32_t len = arg->u.n;
 	char *res = sql_xmalloc(len);
 	UErrorCode status = U_ZERO_ERROR;
 	const char *locale = NULL;
@@ -331,12 +334,13 @@ func_lower_upper(struct sql_context *ctx, int argc, const struct Mem *argv)
 			ucasemap_utf8ToLower(cm, res, size, str, len, &status);
 	}
 	ucasemap_close(cm);
-	mem_set_str_allocated(ctx->pOut, res, size);
+	mem_set_str(ctx->pOut, res, size);
+	mem_set_dynamic(ctx->pOut);
 }
 
 /** Implementation of the NULLIF() function. */
 static void
-func_nullif(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_nullif(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 2);
 	(void)argc;
@@ -391,19 +395,19 @@ trim_bin_start(const char *str, int end, const char *octets, int octets_size,
 }
 
 static void
-func_trim_bin(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_trim_bin(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	if (mem_is_null(&argv[0]) || (argc == 3 && mem_is_null(&argv[2])))
 		return;
 	assert(argc == 2 || (argc == 3 && mem_is_bin(&argv[2])));
 	assert(mem_is_bin(&argv[0]) && mem_is_uint(&argv[1]));
-	const char *str = argv[0].z;
-	int size = argv[0].n;
+	const char *str = argv[0].u.z;
+	int size = argv[0].u.n;
 	const char *octets;
 	int octets_size;
 	if (argc == 3) {
-		octets = argv[2].z;
-		octets_size = argv[2].n;
+		octets = argv[2].u.z;
+		octets_size = argv[2].u.n;
 	} else {
 		octets = "\0";
 		octets_size = 1;
@@ -414,7 +418,7 @@ func_trim_bin(struct sql_context *ctx, int argc, const struct Mem *argv)
 	int start = trim_bin_start(str, end, octets, octets_size, flags);
 
 	if (start >= end)
-		return mem_set_bin_static(ctx->pOut, "", 0);
+		return mem_set_bin(ctx->pOut, "", 0);
 	if (mem_copy_bin(ctx->pOut, &str[start], end - start) != 0)
 		ctx->is_aborted = true;
 }
@@ -470,19 +474,19 @@ trim_str_start(const char *str, int end, const char *chars, uint8_t *chars_len,
 }
 
 static void
-func_trim_str(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_trim_str(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	if (mem_is_null(&argv[0]) || (argc == 3 && mem_is_null(&argv[2])))
 		return;
 	assert(argc == 2 || (argc == 3 && mem_is_str(&argv[2])));
 	assert(mem_is_str(&argv[0]) && mem_is_uint(&argv[1]));
-	const char *str = argv[0].z;
-	int size = argv[0].n;
+	const char *str = argv[0].u.z;
+	int size = argv[0].u.n;
 	const char *chars;
 	int chars_size;
 	if (argc == 3) {
-		chars = argv[2].z;
-		chars_size = argv[2].n;
+		chars = argv[2].u.z;
+		chars_size = argv[2].u.n;
 	} else {
 		chars = " ";
 		chars_size = 1;
@@ -513,14 +517,14 @@ func_trim_str(struct sql_context *ctx, int argc, const struct Mem *argv)
 	region_truncate(region, svp);
 
 	if (start >= end)
-		return mem_set_str0_static(ctx->pOut, "");
+		return mem_set_str0(ctx->pOut, "");
 	if (mem_copy_str(ctx->pOut, &str[start], end - start) != 0)
 		ctx->is_aborted = true;
 }
 
 /** Implementation of the POSITION() function. */
 static void
-func_position_octets(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_position_octets(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 2);
 	(void)argc;
@@ -528,10 +532,10 @@ func_position_octets(struct sql_context *ctx, int argc, const struct Mem *argv)
 		return;
 	assert(mem_is_bytes(&argv[0]) && mem_is_bytes(&argv[1]));
 
-	const char *key = argv[0].z;
-	const char *str = argv[1].z;
-	int key_size = argv[0].n;
-	int str_size = argv[1].n;
+	const char *key = argv[0].u.z;
+	const char *str = argv[1].u.z;
+	int key_size = argv[0].u.n;
+	int str_size = argv[1].u.n;
 	if (key_size <= 0)
 		return mem_set_uint(ctx->pOut, 1);
 	const char *pos = memmem(str, str_size, key, key_size);
@@ -540,7 +544,7 @@ func_position_octets(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 static void
 func_position_characters(struct sql_context *ctx, int argc,
-			 const struct Mem *argv)
+			 const struct sql_mem *argv)
 {
 	assert(argc == 2);
 	(void)argc;
@@ -548,10 +552,10 @@ func_position_characters(struct sql_context *ctx, int argc,
 		return;
 	assert(mem_is_str(&argv[0]) && mem_is_str(&argv[1]));
 
-	const char *key = argv[0].z;
-	const char *str = argv[1].z;
-	int key_size = argv[0].n;
-	int str_size = argv[1].n;
+	const char *key = argv[0].u.z;
+	const char *str = argv[1].u.z;
+	int key_size = argv[0].u.n;
+	int str_size = argv[1].u.n;
 	if (key_size <= 0)
 		return mem_set_uint(ctx->pOut, 1);
 
@@ -620,7 +624,7 @@ substr_normalize(int64_t base_start, bool is_start_neg, uint64_t base_length,
 }
 
 static void
-func_substr_octets(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_substr_octets(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 2 || argc == 3);
 	if (mem_is_any_null(&argv[0], &argv[1]))
@@ -628,18 +632,18 @@ func_substr_octets(struct sql_context *ctx, int argc, const struct Mem *argv)
 	assert(mem_is_bytes(&argv[0]) && mem_is_int(&argv[1]));
 
 	bool is_str = mem_is_str(&argv[0]);
-	uint64_t size = argv[0].n;
+	uint64_t size = argv[0].u.n;
 
 	if (argc == 2) {
 		uint64_t start = mem_is_uint(&argv[1]) && argv[1].u.u > 1 ?
 				 argv[1].u.u - 1 : 0;
 		if (start >= size) {
 			if (is_str)
-				return mem_set_str0_static(ctx->pOut, "");
+				return mem_set_str0(ctx->pOut, "");
 			else
-				return mem_set_bin_static(ctx->pOut, "", 0);
+				return mem_set_bin(ctx->pOut, "", 0);
 		}
-		char *s = &argv[0].z[start];
+		char *s = &argv[0].u.z[start];
 		uint64_t n = size - start;
 		ctx->is_aborted = is_str ? mem_copy_str(ctx->pOut, s, n) != 0 :
 				  mem_copy_bin(ctx->pOut, s, n) != 0;
@@ -665,11 +669,11 @@ func_substr_octets(struct sql_context *ctx, int argc, const struct Mem *argv)
 	}
 	if (start >= size || length == 0) {
 		if (is_str)
-			return mem_set_str0_static(ctx->pOut, "");
+			return mem_set_str0(ctx->pOut, "");
 		else
-			return mem_set_bin_static(ctx->pOut, "", 0);
+			return mem_set_bin(ctx->pOut, "", 0);
 	}
-	char *str = &argv[0].z[start];
+	char *str = &argv[0].u.z[start];
 	uint64_t len = MIN(size - start, length);
 	ctx->is_aborted = is_str ? mem_copy_str(ctx->pOut, str, len) != 0 :
 			  mem_copy_bin(ctx->pOut, str, len) != 0;
@@ -677,7 +681,7 @@ func_substr_octets(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 static void
 func_substr_characters(struct sql_context *ctx, int argc, const
-		       struct Mem *argv)
+		       struct sql_mem *argv)
 {
 	assert(argc == 2 || argc == 3);
 	(void)argc;
@@ -685,9 +689,9 @@ func_substr_characters(struct sql_context *ctx, int argc, const
 		return;
 	assert(mem_is_str(&argv[0]) && mem_is_int(&argv[1]));
 
-	const char *str = argv[0].z;
+	const char *str = argv[0].u.z;
 	int pos = 0;
-	int end = argv[0].n;
+	int end = argv[0].u.n;
 	if (argc == 2) {
 		uint64_t start = mem_is_uint(&argv[1]) && argv[1].u.u > 1 ?
 				 argv[1].u.u - 1 : 0;
@@ -696,7 +700,7 @@ func_substr_characters(struct sql_context *ctx, int argc, const
 			U8_NEXT((uint8_t *)str, pos, end, c);
 		}
 		if (pos == end)
-			return mem_set_str_static(ctx->pOut, "", 0);
+			return mem_set_str0(ctx->pOut, "");
 		if (mem_copy_str(ctx->pOut, str + pos, end - pos) != 0)
 			ctx->is_aborted = true;
 		return;
@@ -720,14 +724,14 @@ func_substr_characters(struct sql_context *ctx, int argc, const
 		return;
 	}
 	if (length == 0)
-		return mem_set_str_static(ctx->pOut, "", 0);
+		return mem_set_str0(ctx->pOut, "");
 
 	for (uint64_t i = 0; i < start && pos < end; ++i) {
 		UChar32 c;
 		U8_NEXT((uint8_t *)str, pos, end, c);
 	}
 	if (pos == end)
-		return mem_set_str_static(ctx->pOut, "", 0);
+		return mem_set_str0(ctx->pOut, "");
 
 	int cur = pos;
 	for (uint64_t i = 0; i < length && cur < end; ++i) {
@@ -750,10 +754,10 @@ func_substr_characters(struct sql_context *ctx, int argc, const
  * Symbol '\0' used instead of NULL argument.
  */
 static void
-func_char(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_char(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	if (argc == 0)
-		return mem_set_str_static(ctx->pOut, "", 0);
+		return mem_set_str0(ctx->pOut, "");
 	struct region *region = &fiber()->gc;
 	size_t svp = region_used(region);
 	uint32_t size;
@@ -785,7 +789,8 @@ func_char(struct sql_context *ctx, int argc, const struct Mem *argv)
 	region_truncate(region, svp);
 	assert(pos == len);
 	(void)pos;
-	mem_set_str_allocated(ctx->pOut, str, len);
+	mem_set_str(ctx->pOut, str, len);
+	mem_set_dynamic(ctx->pOut);
 }
 
 /**
@@ -795,7 +800,7 @@ func_char(struct sql_context *ctx, int argc, const struct Mem *argv)
  * The LEAST() function returns the smallest of the given arguments.
  */
 static void
-func_greatest_least(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_greatest_least(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc > 1);
 	int mask = ctx->func->def->name[0] == 'G' ? -1 : 0;
@@ -816,76 +821,79 @@ func_greatest_least(struct sql_context *ctx, int argc, const struct Mem *argv)
 		ctx->is_aborted = true;
 }
 
-/**
- * Implementation of the HEX() function.
- *
- * The HEX() function returns the hexadecimal representation of the argument.
- */
 static const char hexdigits[] = {
 	'0', '1', '2', '3', '4', '5', '6', '7',
 	'8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
 };
 
+/**
+ * Implementation of the HEX() function. The HEX() function returns the
+ * hexadecimal representation of the argument.
+ */
 static void
-func_hex(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_hex(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1);
 	(void)argc;
-	const struct Mem *arg = &argv[0];
+	const struct sql_mem *arg = &argv[0];
 	if (mem_is_null(arg))
 		return;
 
-	assert(mem_is_bin(arg) && arg->n >= 0);
-	if (arg->n == 0)
-		return mem_set_str0_static(ctx->pOut, "");
+	assert(mem_is_bin(arg));
+	if (arg->u.n == 0)
+		return mem_set_str0(ctx->pOut, "");
 
-	uint32_t size = 2 * arg->n;
+	uint32_t size = 2 * arg->u.n;
 	char *str = sql_xmalloc(size);
-	for (int i = 0; i < arg->n; ++i) {
-		char c = arg->z[i];
+	for (size_t i = 0; i < arg->u.n; ++i) {
+		char c = arg->u.z[i];
 		str[2 * i] = hexdigits[(c >> 4) & 0xf];
 		str[2 * i + 1] = hexdigits[c & 0xf];
 	}
-	mem_set_str_allocated(ctx->pOut, str, size);
+	mem_set_str(ctx->pOut, str, size);
+	mem_set_dynamic(ctx->pOut);
 }
 
 /** Implementation of the OCTET_LENGTH() function. */
 static void
-func_octet_length(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_octet_length(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1);
 	(void)argc;
-	const struct Mem *arg = &argv[0];
+	const struct sql_mem *arg = &argv[0];
 	if (mem_is_null(arg))
 		return;
-	assert(mem_is_bytes(arg) && arg->n >= 0);
-	mem_set_uint(ctx->pOut, arg->n);
+	assert(mem_is_bytes(arg));
+	mem_set_uint(ctx->pOut, arg->u.n);
 }
 
 /** Implementation of the PRINTF() function. */
 static void
-func_printf(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_printf(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	if (argc < 1 || mem_is_null(&argv[0]))
 		return;
 	if (argc == 1 || !mem_is_str(&argv[0])) {
 		char *str = mem_strdup(&argv[0]);
-		if (str == NULL)
+		if (str == NULL) {
 			ctx->is_aborted = true;
-		else
-			mem_set_str0_allocated(ctx->pOut, str);
+			return;
+		}
+		mem_set_str0(ctx->pOut, str);
+		mem_set_dynamic(ctx->pOut);
 		return;
 	}
 	struct PrintfArguments pargs;
 	struct StrAccum acc;
-	char *format = argv[0].z;
+	char *format = argv[0].u.z;
 	pargs.nArg = argc - 1;
 	pargs.nUsed = 0;
 	pargs.apArg = argv + 1;
 	sqlStrAccumInit(&acc, NULL, 0, SQL_MAX_LENGTH);
 	acc.printfFlags = SQL_PRINTF_SQLFUNC;
 	sqlXPrintf(&acc, format, &pargs);
-	mem_set_str_allocated(ctx->pOut, sqlStrAccumFinish(&acc), acc.nChar);
+	mem_set_str(ctx->pOut, sqlStrAccumFinish(&acc), acc.nChar);
+	mem_set_dynamic(ctx->pOut);
 }
 
 /**
@@ -894,7 +902,7 @@ func_printf(struct sql_context *ctx, int argc, const struct Mem *argv)
  * This function returns a random INT64 value.
  */
 static void
-func_random(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_random(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	(void)argc;
 	(void)argv;
@@ -910,20 +918,21 @@ func_random(struct sql_context *ctx, int argc, const struct Mem *argv)
  * specified as an argument of the function.
  */
 static void
-func_randomblob(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_randomblob(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1);
 	(void)argc;
-	const struct Mem *arg = &argv[0];
+	const struct sql_mem *arg = &argv[0];
 	assert(mem_is_null(arg) || mem_is_int(arg));
 	if (mem_is_null(arg) || !mem_is_uint(arg))
 		return;
 	if (arg->u.u == 0)
-		return mem_set_bin_static(ctx->pOut, "", 0);
+		return mem_set_bin(ctx->pOut, "", 0);
 	uint64_t len = arg->u.u;
 	char *res = sql_xmalloc(len);
 	sql_randomness(len, res);
-	mem_set_bin_allocated(ctx->pOut, res, len);
+	mem_set_bin(ctx->pOut, res, len);
+	mem_set_dynamic(ctx->pOut);
 }
 
 /**
@@ -933,33 +942,34 @@ func_randomblob(struct sql_context *ctx, int argc, const struct Mem *argv)
  * is specified as an argument of the function.
  */
 static void
-func_zeroblob(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_zeroblob(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1);
 	(void)argc;
-	const struct Mem *arg = &argv[0];
+	const struct sql_mem *arg = &argv[0];
 	assert(mem_is_null(arg) || mem_is_int(arg));
 	if (mem_is_null(arg) || !mem_is_uint(arg))
 		return;
 	if (arg->u.u == 0)
-		return mem_set_bin_static(ctx->pOut, "", 0);
+		return mem_set_bin(ctx->pOut, "", 0);
 	uint64_t len = arg->u.u;
 	char *res = sql_xmalloc0(len);
-	mem_set_bin_allocated(ctx->pOut, res, len);
+	mem_set_bin(ctx->pOut, res, len);
+	mem_set_dynamic(ctx->pOut);
 }
 
 /** Implementation of the TYPEOF() function. */
 static void
-func_typeof(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_typeof(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1);
 	(void)argc;
-	return mem_set_str0_static(ctx->pOut, mem_type_to_str(&argv[0]));
+	return mem_set_str0(ctx->pOut, mem_type_to_str(&argv[0]));
 }
 
 /** Implementation of the ROUND() function for DOUBLE argument. */
 static void
-func_round_double(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_round_double(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1 || argc == 2);
 	if (mem_is_null(&argv[0]) || (argc == 2 && mem_is_null(&argv[1])))
@@ -977,7 +987,7 @@ func_round_double(struct sql_context *ctx, int argc, const struct Mem *argv)
 		return mem_copy_as_ephemeral(ctx->pOut, &argv[0]);
 
 	double d = argv[0].u.r;
-	struct Mem *res = ctx->pOut;
+	struct sql_mem *res = ctx->pOut;
 	if (n != 0) {
 		d = atof(tt_sprintf("%.*lf", (int)n, d));
 		return mem_set_double(res, d);
@@ -995,7 +1005,7 @@ func_round_double(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 /** Implementation of the ROUND() function for DECIMAL argument. */
 static void
-func_round_dec(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_round_dec(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1 || argc == 2);
 	if (mem_is_null(&argv[0]) || (argc == 2 && mem_is_null(&argv[1])))
@@ -1011,7 +1021,7 @@ func_round_dec(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 /** Implementation of the ROUND() function for INTEGER argument. */
 static void
-func_round_int(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_round_int(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1 || argc == 2);
 	if (mem_is_null(&argv[0]) || (argc == 2 && mem_is_null(&argv[1])))
@@ -1023,7 +1033,7 @@ func_round_int(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 /** Implementation of the ROW_COUNT() function. */
 static void
-func_row_count(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_row_count(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	(void)argc;
 	(void)argv;
@@ -1037,7 +1047,7 @@ func_row_count(struct sql_context *ctx, int argc, const struct Mem *argv)
  * Returns a randomly generated UUID value.
  */
 static void
-func_uuid(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_uuid(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	if (argc == 1) {
 		if (mem_is_null(&argv[0]))
@@ -1056,11 +1066,11 @@ func_uuid(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 /** Implementation of the VERSION() function. */
 static void
-func_version(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_version(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	(void)argc;
 	(void)argv;
-	return mem_set_str0_static(ctx->pOut, (char *)tarantool_version());
+	return mem_set_str0(ctx->pOut, (char *)tarantool_version());
 }
 
 /**
@@ -1070,19 +1080,19 @@ func_version(struct sql_context *ctx, int argc, const struct Mem *argv)
  * string.
  */
 static void
-func_unicode(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_unicode(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1);
 	(void)argc;
-	const struct Mem *arg = &argv[0];
+	const struct sql_mem *arg = &argv[0];
 	if (mem_is_null(arg))
 		return;
 	assert(mem_is_str(arg));
-	if (arg->n == 0)
+	if (arg->u.n == 0)
 		return mem_set_uint(ctx->pOut, 0);
 	int pos = 0;
 	UChar32 c;
-	U8_NEXT((uint8_t *)arg->z, pos, arg->n, c);
+	U8_NEXT((uint8_t *)arg->u.z, pos, arg->u.n, c);
 	(void)pos;
 	mem_set_uint(ctx->pOut, (uint64_t)c);
 }
@@ -1093,7 +1103,7 @@ func_unicode(struct sql_context *ctx, int argc, const struct Mem *argv)
  * Return the current date and time.
  */
 static void
-func_now(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_now(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 0);
 	(void)argc;
@@ -1109,16 +1119,16 @@ func_now(struct sql_context *ctx, int argc, const struct Mem *argv)
  * Returns the requested information from a DATETIME value.
  */
 static void
-func_date_part(struct sql_context *ctx, int argc, const struct Mem *argv)
+func_date_part(struct sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 2);
 	(void)argc;
-	const struct Mem *part = &argv[0];
-	const struct Mem *date = &argv[1];
+	const struct sql_mem *part = &argv[0];
+	const struct sql_mem *date = &argv[1];
 	if (mem_is_any_null(part, date))
 		return;
 	assert(mem_is_str(part) && mem_is_datetime(date));
-	const char *str = tt_cstr(part->z, part->n);
+	const char *str = tt_cstr(part->u.z, part->u.n);
 	const struct datetime *dt = &date->u.dt;
 	if (strcasecmp("millennium", str) == 0)
 		return mem_set_int64(ctx->pOut, datetime_millennium(dt));
@@ -1378,7 +1388,7 @@ sql_utf8_pattern_compare(const char *pattern,
  * is NULL then result is NULL as well.
  */
 static void
-likeFunc(sql_context *context, int argc, const struct Mem *argv)
+likeFunc(sql_context *context, int argc, const struct sql_mem *argv)
 {
 	u32 escape = SQL_END_OF_STRING;
 	int nPat;
@@ -1386,17 +1396,17 @@ likeFunc(sql_context *context, int argc, const struct Mem *argv)
 	if (mem_is_any_null(&argv[0], &argv[1]))
 		return;
 	assert(mem_is_str(&argv[0]) && mem_is_str(&argv[1]));
-	const char *zB = argv[0].z;
-	const char *zA = argv[1].z;
-	const char *zB_end = zB + argv[0].n;
-	const char *zA_end = zA + argv[1].n;
+	const char *zB = argv[0].u.z;
+	const char *zA = argv[1].u.z;
+	const char *zB_end = zB + argv[0].u.n;
+	const char *zA_end = zA + argv[1].u.n;
 
 	/*
 	 * Limit the length of the LIKE pattern to avoid problems
 	 * of deep recursion and N*N behavior in
 	 * sql_utf8_pattern_compare().
 	 */
-	nPat = argv[0].n;
+	nPat = argv[0].u.n;
 	if (nPat > sql_get()->aLimit[SQL_LIMIT_LIKE_PATTERN_LENGTH]) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "LIKE pattern is too "\
 			 "complex");
@@ -1412,9 +1422,9 @@ likeFunc(sql_context *context, int argc, const struct Mem *argv)
 		 * single UTF-8 character. Otherwise, return an
 		 * error.
 		 */
-		const char *str = argv[2].z;
+		const char *str = argv[2].u.z;
 		int pos = 0;
-		int end = argv[2].n;
+		int end = argv[2].u.n;
 		U8_NEXT((uint8_t *)str, pos, end, escape);
 		if (pos != end || end == 0) {
 			diag_set(ClientError, ER_SQL_EXECUTE, "ESCAPE "\
@@ -1447,7 +1457,7 @@ likeFunc(sql_context *context, int argc, const struct Mem *argv)
  * single-quote escapes.
  */
 static void
-quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
+quoteFunc(struct sql_context *context, int argc, const struct sql_mem *argv)
 {
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
@@ -1488,16 +1498,17 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 	case MEM_TYPE_MAP:
 	case MEM_TYPE_ARRAY: {
 		char *buf = NULL;
-		int size = mp_snprint(buf, 0, argv[0].z) + 1;
+		int size = mp_snprint(buf, 0, argv[0].u.z) + 1;
 		assert(size > 0);
 		buf = sql_xmalloc(size);
-		mp_snprint(buf, size, argv[0].z);
-		mem_set_str0_allocated(context->pOut, buf);
+		mp_snprint(buf, size, argv[0].u.z);
+		mem_set_str0(context->pOut, buf);
+		mem_set_dynamic(context->pOut);
 		break;
 	}
 	case MEM_TYPE_BIN: {
-		const char *zBlob = argv[0].z;
-		int nBlob = argv[0].n;
+		const char *zBlob = argv[0].u.z;
+		int nBlob = argv[0].u.n;
 		uint32_t size = 2 * nBlob + 3;
 		char *zText = sql_xmalloc(size);
 		for (int i = 0; i < nBlob; i++) {
@@ -1507,12 +1518,13 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 		zText[(nBlob * 2) + 2] = '\'';
 		zText[0] = 'X';
 		zText[1] = '\'';
-		mem_set_str_allocated(context->pOut, zText, size);
+		mem_set_str(context->pOut, zText, size);
+		mem_set_dynamic(context->pOut);
 		break;
 	}
 	case MEM_TYPE_STR: {
-		const char *str = argv[0].z;
-		uint32_t len = argv[0].n;
+		const char *str = argv[0].u.z;
+		uint32_t len = argv[0].u.n;
 		uint32_t count = 0;
 		for (uint32_t i = 0; i < len; ++i) {
 			if (str[i] == '\'')
@@ -1528,17 +1540,17 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
 				res[j++] = '\'';
 		}
 		res[size - 1] = '\'';
-		mem_set_str_allocated(context->pOut, res, size);
+		mem_set_str(context->pOut, res, size);
+		mem_set_dynamic(context->pOut);
 		break;
 	}
 	case MEM_TYPE_BOOL: {
-		mem_set_str0_static(context->pOut,
-				    SQL_TOKEN_BOOLEAN(argv[0].u.b));
+		mem_set_str0(context->pOut, SQL_TOKEN_BOOLEAN(argv[0].u.b));
 		break;
 	}
 	default:{
 		assert(mem_is_null(&argv[0]));
-		mem_set_str0_static(context->pOut, "NULL");
+		mem_set_str0(context->pOut, "NULL");
 	}
 	}
 }
@@ -1550,7 +1562,7 @@ quoteFunc(struct sql_context *context, int argc, const struct Mem *argv)
  * must be exact.  Collating sequences are not used.
  */
 static void
-replaceFunc(struct sql_context *context, int argc, const struct Mem *argv)
+replaceFunc(struct sql_context *context, int argc, const struct sql_mem *argv)
 {
 	const unsigned char *zStr;	/* The input string A */
 	const unsigned char *zPattern;	/* The pattern string B */
@@ -1569,17 +1581,17 @@ replaceFunc(struct sql_context *context, int argc, const struct Mem *argv)
 		return;
 	assert(mem_is_bytes(&argv[0]) && mem_is_bytes(&argv[1]) &&
 	       mem_is_bytes(&argv[2]));
-	zStr = (const unsigned char *)argv[0].z;
-	nStr = argv[0].n;
-	zPattern = (const unsigned char *)argv[1].z;
-	nPattern = argv[1].n;
+	zStr = (const unsigned char *)argv[0].u.z;
+	nStr = argv[0].u.n;
+	zPattern = (const unsigned char *)argv[1].u.z;
+	nPattern = argv[1].u.n;
 	if (nPattern == 0) {
 		if (mem_copy(context->pOut, &argv[0]) != 0)
 			context->is_aborted = true;
 		return;
 	}
-	zRep = (const unsigned char *)argv[2].z;
-	nRep = argv[2].n;
+	zRep = (const unsigned char *)argv[2].u.z;
+	nRep = argv[2].u.n;
 	nOut = nStr + 1;
 	zOut = sql_xmalloc(nOut);
 	loopLimit = nStr - nPattern;
@@ -1601,9 +1613,10 @@ replaceFunc(struct sql_context *context, int argc, const struct Mem *argv)
 	assert(j <= nOut);
 	zOut[j] = 0;
 	if (context->func->def->returns == FIELD_TYPE_STRING)
-		mem_set_str_allocated(context->pOut, (char *)zOut, j);
+		mem_set_str(context->pOut, (char *)zOut, j);
 	else
-		mem_set_bin_allocated(context->pOut, (char *)zOut, j);
+		mem_set_bin(context->pOut, (char *)zOut, j);
+	mem_set_dynamic(context->pOut);
 }
 
 /*
@@ -1613,7 +1626,7 @@ replaceFunc(struct sql_context *context, int argc, const struct Mem *argv)
  * soundex encoding of the string X.
  */
 static void
-soundexFunc(struct sql_context *context, int argc, const struct Mem *argv)
+soundexFunc(struct sql_context *context, int argc, const struct sql_mem *argv)
 {
 	(void) argc;
 	char zResult[8];
@@ -1631,10 +1644,10 @@ soundexFunc(struct sql_context *context, int argc, const struct Mem *argv)
 	};
 	assert(argc == 1);
 	assert(mem_is_null(&argv[0]) || mem_is_str(&argv[0]));
-	if (mem_is_null(&argv[0]) || argv[0].n == 0)
+	if (mem_is_null(&argv[0]) || argv[0].u.n == 0)
 		zIn = (u8 *) "";
 	else
-		zIn = (unsigned char *)argv[0].z;
+		zIn = (unsigned char *)argv[0].u.z;
 	for (i = 0; zIn[i] && !sqlIsalpha(zIn[i]); i++) {
 	}
 	if (zIn[i]) {
@@ -1658,7 +1671,7 @@ soundexFunc(struct sql_context *context, int argc, const struct Mem *argv)
 		if (mem_copy_str(context->pOut, zResult, 4) != 0)
 			context->is_aborted = true;
 	} else {
-		mem_set_str_static(context->pOut, "?000", 4);
+		mem_set_str0(context->pOut, "?000");
 	}
 }
 
@@ -1686,7 +1699,7 @@ func_sql_builtin_call_stub(struct func *func, struct port *args,
 }
 
 static void
-sql_builtin_stub(sql_context *ctx, int argc, const struct Mem *argv)
+sql_builtin_stub(sql_context *ctx, int argc, const struct sql_mem *argv)
 {
 	(void) argc; (void) argv;
 	diag_set(ClientError, ER_SQL_EXECUTE,
@@ -1790,9 +1803,9 @@ struct sql_func_definition {
 	/** Type of the result of the implementation. */
 	enum field_type result;
 	/** Call implementation with given arguments. */
-	void (*call)(sql_context *ctx, int argc, const struct Mem *argv);
+	void (*call)(sql_context *ctx, int argc, const struct sql_mem *argv);
 	/** Call finalization function for this implementation. */
-	int (*finalize)(struct Mem *mem);
+	int (*finalize)(struct sql_mem *mem);
 };
 
 /**

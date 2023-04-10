@@ -221,15 +221,15 @@ sql_bind_column(struct Vdbe *stmt, const struct sql_bind *p, uint32_t pos)
 		 * there is no need to copy the packet and we can
 		 * use SQL_STATIC.
 		 */
-		return sql_bind_str_static(stmt, pos, p->s, p->bytes);
+		return sql_bind_str(stmt, pos, p->s, p->bytes);
 	case MP_NIL:
 		return sql_bind_null(stmt, pos);
 	case MP_BIN:
-		return sql_bind_bin_static(stmt, pos, p->s, p->bytes);
+		return sql_bind_bin(stmt, pos, p->s, p->bytes);
 	case MP_ARRAY:
-		return sql_bind_array_static(stmt, pos, p->s, p->bytes);
+		return sql_bind_array(stmt, pos, p->s, p->bytes);
 	case MP_MAP:
-		return sql_bind_map_static(stmt, pos, p->s, p->bytes);
+		return sql_bind_map(stmt, pos, p->s, p->bytes);
 	case MP_EXT:
 		switch (p->ext_type) {
 		case MP_UUID:
