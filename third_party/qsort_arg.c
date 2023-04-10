@@ -118,7 +118,7 @@ med3(char *a, char *b, char *c, int (*cmp)(const void *a, const void *b, void *a
 /**
  * Single-thread version of qsort.
  */
-static void
+void
 qsort_arg_st(void *a, size_t n, size_t es, int (*cmp)(const void *a, const void *b, void *arg), void *arg)
 {
 	char	   *pa,
@@ -259,4 +259,3 @@ qsort_arg(void *a, size_t n, size_t es,
 	qsort_arg_st(a, n, es, cmp, arg);
 #endif
 }
-

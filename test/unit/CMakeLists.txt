@@ -554,6 +554,11 @@ create_unit_test(PREFIX qsort_arg
                  LIBRARIES misc unit
 )
 
+create_unit_test(PREFIX tt_sort
+                 SOURCES tt_sort.cc core_test_utils.c
+                 LIBRARIES unit core
+)
+
 create_unit_test(PREFIX iterator_position
                  SOURCES iterator_position.c box_test_utils.c
                  LIBRARIES unit box core
