@@ -1150,7 +1150,30 @@ local function get_option_from_env(option)
 
     -- This code lean on the existing set of template_cfg
     -- types for simplicity.
-    if param_type:find('table') and raw_value:find(',') then
+    if param_type:find('table') and (raw_value:startswith('{') or
+                                     raw_value:startswith('[')) then
+        return json.decode(raw_value)
+    elseif param_type:find('table') and raw_value:find('=') then
+        assert(not param_type:find('boolean'))
+        local res = {}
+        for _, v in ipairs(raw_value:split(',')) do
+            local eq = v:find('=')
+            if eq == nil then
+                error(err_msg_fmt:format(env_var_name, option,
+                                         'in `key=value` or `value` format'))
+            end
+            local lhs = string.sub(v, 1, eq - 1)
+            local rhs = string.sub(v, eq + 1)
+
+            if lhs == '' then
+                error(err_msg_fmt:format(env_var_name, option,
+                                         'in `key=value` or `value` format, ' ..
+                                         '`key` must not be empty'))
+            end
+            res[lhs] = tonumber(rhs) or rhs
+        end
+        return res
+    elseif param_type:find('table') and raw_value:find(',') then
         assert(not param_type:find('boolean'))
         local res = {}
         for i, v in ipairs(raw_value:split(',')) do
