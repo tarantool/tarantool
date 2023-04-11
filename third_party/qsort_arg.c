@@ -50,16 +50,6 @@
 #include <qsort_arg.h>
 #include <stdint.h>
 
-enum {
-	/*
-	 * The size of an array from which it is reasonable to start
-	 * multithread sort.
-	 * If the array size is less than the size below, a single-threaded
-	 * version of qsort will be started.S
-	 */
-	MULTITHREAD_SIZE_THRESHOLD = 128 * 1024,
-};
-
 #define min(a, b)   (a) < (b) ? a : b
 
 static char *med3(char *a, char *b, char *c,
@@ -119,7 +109,7 @@ med3(char *a, char *b, char *c, int (*cmp)(const void *a, const void *b, void *a
  * Single-thread version of qsort.
  */
 void
-qsort_arg_st(void *a, size_t n, size_t es, int (*cmp)(const void *a, const void *b, void *arg), void *arg)
+qsort_arg(void *a, size_t n, size_t es, int (*cmp)(const void *a, const void *b, void *arg), void *arg)
 {
 	char	   *pa,
 			   *pb,
@@ -208,7 +198,7 @@ loop:SWAPINIT(a, es);
 	{
 		/* Recurse on left partition, then iterate on right partition */
 		if (d1 > es)
-			qsort_arg_st(a, d1 / es, es, cmp, arg);
+			qsort_arg(a, d1 / es, es, cmp, arg);
 		if (d2 > es)
 		{
 			/* Iterate rather than recurse to save stack space */
@@ -222,7 +212,7 @@ loop:SWAPINIT(a, es);
 	{
 		/* Recurse on right partition, then iterate on left partition */
 		if (d2 > es)
-			qsort_arg_st(pn - d2, d2 / es, es, cmp, arg);
+			qsort_arg(pn - d2, d2 / es, es, cmp, arg);
 		if (d1 > es)
 		{
 			/* Iterate rather than recurse to save stack space */
@@ -231,31 +221,4 @@ loop:SWAPINIT(a, es);
 			goto loop;
 		}
 	}
-}
-
-#ifdef HAVE_OPENMP
-/**
- * Multi-thread version of qsort. Only present when target machine supports
- * open MP.
- */
-void qsort_arg_mt(void *a, size_t n, size_t es,
-		  int (*cmp)(const void *, const void *, void *), void *arg);
-#endif
-
-/**
- * General version of qsort that calls single-threaded of multi-threaded
- * qsort depending on open MP availability and given array size.
- */
-void
-qsort_arg(void *a, size_t n, size_t es,
-	  int (*cmp)(const void *a, const void *b, void *arg), void *arg)
-{
-#ifdef HAVE_OPENMP
-	if (n >= MULTITHREAD_SIZE_THRESHOLD)
-		qsort_arg_mt(a, n, es, cmp, arg);
-	else
-		qsort_arg_st(a, n, es, cmp, arg);
-#else
-	qsort_arg_st(a, n, es, cmp, arg);
-#endif
 }

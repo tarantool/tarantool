@@ -66,18 +66,6 @@ if((NOT HAVE_STD_C11 AND NOT HAVE_STD_GNU99) OR
 endif()
 
 #
-# Check for an omp support
-#
-set(CMAKE_REQUIRED_FLAGS "-fopenmp -Werror")
-check_cxx_source_compiles("int main(void) {
-#pragma omp parallel
-    {
-    }
-    return 0;
-}" HAVE_OPENMP)
-set(CMAKE_REQUIRED_FLAGS "")
-
-#
 # GCC started to warn for unused result starting from 4.2, and
 # this is when it introduced -Wno-unused-result
 # GCC can also be built on top of llvm runtime (on mac).
@@ -321,10 +309,6 @@ macro(enable_tnt_compile_flags)
         add_compile_flags("C;CXX" "-Werror")
     endif()
 endmacro(enable_tnt_compile_flags)
-
-if (HAVE_OPENMP)
-    add_compile_flags("C;CXX" "-fopenmp")
-endif()
 
 if (CMAKE_COMPILER_IS_CLANG OR CMAKE_COMPILER_IS_GNUCC)
     set(HAVE_BUILTIN_CTZ 1)
