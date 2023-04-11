@@ -1557,7 +1557,8 @@ memtx_engine_set_snap_io_rate_limit(struct memtx_engine *memtx, double limit)
 int
 memtx_engine_set_memory(struct memtx_engine *memtx, size_t size)
 {
-	if (size < quota_total(&memtx->quota)) {
+	if (DIV_ROUND_UP(size, QUOTA_UNIT_SIZE) <
+	    quota_total(&memtx->quota) / QUOTA_UNIT_SIZE) {
 		diag_set(ClientError, ER_CFG, "memtx_memory",
 			 "cannot decrease memory size at runtime");
 		return -1;
