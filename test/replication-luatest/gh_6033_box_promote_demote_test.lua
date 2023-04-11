@@ -92,15 +92,15 @@ local function cluster_init(g)
         replication_synchro_timeout = 5,
         replication_synchro_quorum = 1,
         replication = {
-            server.build_listen_uri('server_gh6033_1'),
-            server.build_listen_uri('server_gh6033_2'),
+            server.build_listen_uri('server_1'),
+            server.build_listen_uri('server_2'),
         },
     }
 
     g.server_1 = g.cluster:build_and_add_server(
-        {alias = 'server_gh6033_1', box_cfg = g.box_cfg})
+        {alias = 'server_1', box_cfg = g.box_cfg})
     g.server_2 = g.cluster:build_and_add_server(
-        {alias = 'server_gh6033_2', box_cfg = g.box_cfg})
+        {alias = 'server_2', box_cfg = g.box_cfg})
     g.cluster:start()
     g.cluster:wait_for_fullmesh()
 end
@@ -387,13 +387,13 @@ g_common.test_limbo_full_interfering_promote = function(g)
     -- server_2 will interrupt server_1, while server_3 is leader
     local box_cfg = table.copy(g.box_cfg)
     box_cfg.replication = {
-        server.build_listen_uri('server_gh6033_1'),
-        server.build_listen_uri('server_gh6033_2'),
-        server.build_listen_uri('server_gh6033_3'),
+        server.build_listen_uri('server_1'),
+        server.build_listen_uri('server_2'),
+        server.build_listen_uri('server_3'),
     }
 
     local server_3 = g.cluster:build_server(
-        {alias = 'server_gh6033_3', box_cfg = box_cfg})
+        {alias = 'server_3', box_cfg = box_cfg})
     server_3:start()
     wait_sync({g.server_1, g.server_2, server_3})
     box_cfg_update(g.cluster.servers, box_cfg)

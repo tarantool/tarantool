@@ -25,18 +25,18 @@ local function cluster_init(g)
         replication_synchro_timeout = 5,
         replication_synchro_quorum = 1,
         replication = {
-            server.build_listen_uri('server_gh7086_1'),
-            server.build_listen_uri('server_gh7086_2'),
-            server.build_listen_uri('server_gh7086_3'),
+            server.build_listen_uri('server_1'),
+            server.build_listen_uri('server_2'),
+            server.build_listen_uri('server_3'),
         },
     }
 
     g.server_1 = g.cluster:build_and_add_server(
-        {alias = 'server_gh7086_1', box_cfg = g.box_cfg})
+        {alias = 'server_1', box_cfg = g.box_cfg})
     g.server_2 = g.cluster:build_and_add_server(
-        {alias = 'server_gh7086_2', box_cfg = g.box_cfg})
+        {alias = 'server_2', box_cfg = g.box_cfg})
     g.server_3 = g.cluster:build_and_add_server(
-        {alias = 'server_gh7086_3', box_cfg = g.box_cfg})
+        {alias = 'server_3', box_cfg = g.box_cfg})
     g.cluster:start()
     g.cluster:wait_for_fullmesh()
 end

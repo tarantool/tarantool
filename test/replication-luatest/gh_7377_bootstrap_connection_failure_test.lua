@@ -14,9 +14,9 @@ g.before_all(function(cg)
     cg.servers = {}
     local box_cfg = {
         replication = {
-            server.build_listen_uri('server_gh7377_1'),
-            server.build_listen_uri('server_gh7377_2'),
-            server.build_listen_uri('server_gh7377_3'),
+            server.build_listen_uri('server_1'),
+            server.build_listen_uri('server_2'),
+            server.build_listen_uri('server_3'),
         },
         replication_timeout = timeout,
         bootstrap_strategy = 'legacy',
@@ -27,20 +27,19 @@ g.before_all(function(cg)
         'cccccccc-cccc-cccc-cccc-cccccccccccc',
     }
 
-    -- Connection server_gh7377_3 -> server_gh7377_1 is proxied, others are not.
+    -- Connection server_3 -> server_1 is proxied, others are not.
     cg.proxy = proxy:new{
-        client_socket_path = server.build_listen_uri('server_gh7377_1_proxy'),
-        server_socket_path = server.build_listen_uri('server_gh7377_1'),
+        client_socket_path = server.build_listen_uri('server_1_proxy'),
+        server_socket_path = server.build_listen_uri('server_1'),
     }
     t.assert(cg.proxy:start{force = true}, 'Proxy started successfully')
     for i = 1, 3 do
         box_cfg.instance_uuid = cg.uuids[i]
         if i == 3 then
-            box_cfg.replication[1] = server.build_listen_uri(
-                'server_gh7377_1_proxy')
+            box_cfg.replication[1] = server.build_listen_uri('server_1_proxy')
         end
         cg.servers[i] = cg.cluster:build_and_add_server({
-            alias = 'server_gh7377_' .. i,
+            alias = 'server_' .. i,
             box_cfg = box_cfg,
         })
     end
@@ -83,7 +82,7 @@ g.test_bootstrap_with_bad_connection = function(cg)
     cg.cluster:start{wait_until_ready = false}
     wait_bootstrapped(cg.servers[1], cg.uuids[2])
     fiber.sleep(timeout)
-    local logfile = fio.pathjoin(cg.servers[3].workdir, 'server_gh7377_3.log')
+    local logfile = fio.pathjoin(cg.servers[3].workdir, 'server_3.log')
     t.assert(not cg.servers[3]:grep_log(bootstrap_msg, nil,
                                         {filename = logfile}),
              'Server 3 waits for connection')
