@@ -151,10 +151,6 @@
  */
 #cmakedefine HAVE_BYTE_ORDER_BIG_ENDIAN 1
 /*
- * Defined if this platform supports openmp and it is enabled
- */
-#cmakedefine HAVE_OPENMP 1
-/*
 *  Defined if compatible with GNU readline installed.
 */
 #cmakedefine HAVE_GNU_READLINE 1

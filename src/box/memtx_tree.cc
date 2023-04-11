@@ -42,7 +42,7 @@
 #include "memtx_tx.h"
 #include "trivia/config.h"
 #include "trivia/util.h"
-#include <qsort_arg.h>
+#include "tt_sort.h"
 #include <small/mempool.h>
 
 /**
@@ -1840,9 +1840,10 @@ memtx_tree_index_end_build(struct index *base)
 	struct memtx_tree_index<USE_HINT> *index =
 		(struct memtx_tree_index<USE_HINT> *)base;
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
-	qsort_arg(index->build_array, index->build_array_size,
-		  sizeof(index->build_array[0]),
-		  memtx_tree_qcompare<USE_HINT>, cmp_def);
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+	tt_sort(index->build_array, index->build_array_size,
+		sizeof(index->build_array[0]), memtx_tree_qcompare<USE_HINT>,
+		cmp_def, memtx->sort_threads);
 	if (cmp_def->is_multikey || cmp_def->for_func_index) {
 		/*
 		 * Multikey index may have equal(in terms of

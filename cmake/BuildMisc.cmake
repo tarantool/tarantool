@@ -25,11 +25,6 @@ macro(libmisc_build)
         )
     endif()
 
-    if (HAVE_OPENMP)
-        list(APPEND misc_src
-             ${PROJECT_SOURCE_DIR}/third_party/qsort_arg_mt.c)
-    endif()
-
     add_library(misc STATIC ${misc_src})
     set_target_properties(misc PROPERTIES COMPILE_FLAGS "${DEPENDENCY_CFLAGS}")
 

@@ -96,6 +96,7 @@
 #include "mp_util.h"
 #include "small/static.h"
 #include "node_name.h"
+#include "tt_sort.h"
 
 static char status[64] = "unconfigured";
 
@@ -1660,6 +1661,24 @@ box_init_say()
 	return 0;
 }
 
+/**
+ * Checks whether memtx_sort_threads configuration parameter is correct.
+ */
+static void
+box_check_memtx_sort_threads(void)
+{
+	int num = cfg_geti("memtx_sort_threads");
+	/*
+	 * After high level checks this parameter is either nil or has
+	 * type 'number'.
+	 */
+	if (cfg_isnumber("memtx_sort_threads") &&
+	    (num <= 0 || num > TT_SORT_THREADS_MAX))
+		tnt_raise(ClientError, ER_CFG, "memtx_sort_threads",
+			  tt_sprintf("must be greater than 0 and less than or"
+				     " equal to %d", TT_SORT_THREADS_MAX));
+}
+
 void
 box_check_config(void)
 {
@@ -1728,6 +1747,7 @@ box_check_config(void)
 		diag_raise();
 	if (box_check_txn_isolation() == txn_isolation_level_MAX)
 		diag_raise();
+	box_check_memtx_sort_threads();
 }
 
 int
@@ -4501,6 +4521,7 @@ engine_init()
 				    cfg_geti("slab_alloc_granularity"),
 				    cfg_gets("memtx_allocator"),
 				    cfg_getd("slab_alloc_factor"),
+				    cfg_geti("memtx_sort_threads"),
 				    box_on_indexes_built);
 	engine_register((struct engine *)memtx);
 	box_set_memtx_max_tuple_size();
