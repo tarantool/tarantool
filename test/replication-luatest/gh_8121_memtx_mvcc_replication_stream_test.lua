@@ -29,10 +29,7 @@ g.before_all(function(cg)
         s:create_index('pk')
         s:insert{0}
     end, {cg.params.engine})
-    t.helpers.retrying({}, function()
-        cg.replica:assert_follows_upstream(cg.master:get_instance_id())
-    end)
-    cg.master:wait_for_downstream_to(cg.replica)
+    cg.replica:wait_for_vclock_of(cg.master)
     cg.replica:exec(function()
         box.cfg{replication = ""}
     end)
