@@ -1,6 +1,6 @@
 ## bugfix/console
 
-* Fixed `console.local_print()` accepting only string arguments. It backfired in
-  some rare cases, e.g. when connecting via tarantoolctl to cartridged tarantool
-  and using wrong credentials, a cdata error was passed through the
-  `local_print()`, that failed to interpret it (gh-8374).
+* Fixed `console.local_print()` failing on non-string arguments, which led to
+  some rare errors. For example, when connecting via tarantoolctl to cartridged
+  tarantool with incorrect credentials, a cdata error was passed through the
+  `local_print()`, which failed to interpret it (gh-8374).

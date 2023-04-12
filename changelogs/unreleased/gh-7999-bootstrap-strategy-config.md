@@ -1,9 +1,9 @@
 ## feature/replication
 
-* You may now specify which node a replica should bootstrap from. In order to do
-  so, set `box.cfg.bootstrap_strategy` to `'config'` and set the new
-  `bootstrap_leader` configuration option to either the URI or UUID of the
-  desired bootstrap leader. For example:
+* Added a new `bootstrap_leader` configuration option to specify the node from
+  which a replica should bootstrap. To do this, set `box.cfg.bootstrap_strategy`
+  to `'config'` and set `bootstrap_leader` value to either the URI or UUID of
+  the desired bootstrap leader. For example:
   ```lua
     box.cfg{
         bootstrap_strategy = 'config',
