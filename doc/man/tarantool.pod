@@ -8,35 +8,76 @@ tarantool - a Lua application server and a database management system
 
 =head1 DESCRIPTION
 
-Tarantool is a Lua application server fully compatible with Lua 5.1.
+Tarantool is an in-memory computing platform consisting of a database and an
+application server.
 
-It includes a mature database to persist, replicate and recover application
-state and a curated set of Lua modules for networking, I/O, messaging, data
-formats and more.
-
-It is designed to let developers quickly create efficient, reliable and
-powerful micro-services and backend applications for the Internet.
-
-Key features:
+Key features of the application server:
 
 =over
 
 =item *
 
-Fully compatible with Lua 5.1.
+Heavily optimized Lua interpreter with an incredibly fast tracing JIT compiler
+based on LuaJIT 2.1.
 
 =item *
 
-Coroutines and asynchronous I/O to implement high-performance lock-free
-access to data.
+Cooperative multitasking, non-blocking IO.
 
 =item *
 
-ACID transactions.
+Persistent queues.
 
 =item *
 
-ANSI SQL, Lua stored procedures and triggers.
+Sharding.
+
+=item *
+
+Cluster and application management framework.
+
+=item *
+
+Access to external databases such as MySQL and PostgreSQL.
+
+=item *
+
+A rich set of built-in and standalone modules.
+
+=back
+
+Key features of the database:
+
+=over
+
+=item *
+
+MessagePack data format and MessagePack based client-server protocol.
+
+=item *
+
+Two data engines: a 100% in-memory with complete WAL-based persistence, and an
+own implementation of LSM-tree for the large data sets.
+
+=item *
+
+Multiple index types: HASH, TREE, RTREE, BITSET.
+
+=item *
+
+Document oriented JSON path indexes.
+
+=item *
+
+Asynchronous master-master replication.
+
+=item *
+
+Synchronous quorum-based replication.
+
+=item *
+
+RAFT-based automatic leader election for the single-leader configuration.
 
 =item *
 
@@ -44,7 +85,15 @@ Authentication and access control.
 
 =item *
 
-Master-master replication and automatic sharding.
+ANSI SQL, including views, joins, referential and check constraints.
+
+=item *
+
+Connectors for many programming languages.
+
+=item *
+
+The database is a C extension of the application server and can be turned off.
 
 =back
 
@@ -81,7 +130,7 @@ Save or list bytecode.
 
 =item -d
 
-Activate debugging session for script.
+Activate debugging session for a script.
 
 =item -i
 
@@ -103,6 +152,6 @@ tarantoolctl(1), Tarantool documentation at http://tarantool.org
 
 =head1 COPYRIGHT
 
-Copyright (C) 2010-2021 Tarantool AUTHORS: please see AUTHORS file.
+Copyright (C) 2010-2023 Tarantool AUTHORS: please see AUTHORS file.
 
 =cut
