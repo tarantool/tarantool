@@ -8,20 +8,20 @@ g.before_each(function(cg)
     cg.replica_set = replica_set:new{}
     local box_cfg = {
         replication = {
-            server.build_listen_uri('server_gh8168_1'),
-            server.build_listen_uri('server_gh8168_2'),
+            server.build_listen_uri('server1'),
+            server.build_listen_uri('server2'),
         },
         election_mode = 'manual',
         replication_timeout = 0.1,
     }
     cg.server1 = cg.replica_set:build_and_add_server{
-        alias = 'server_gh8168_1',
+        alias = 'server1',
         box_cfg = box_cfg,
     }
     box_cfg.election_timeout = 1e-9
     box_cfg.read_only = true
     cg.server2 = cg.replica_set:build_and_add_server{
-        alias = 'server_gh8168_2',
+        alias = 'server2',
         box_cfg = box_cfg,
     }
     cg.replica_set:start()
