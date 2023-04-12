@@ -71,6 +71,18 @@ Execute the string 'EXPR'.
 
 Require the library 'NAME'.
 
+=item -j CMD
+
+Perform LuaJIT control command.
+
+=item -b ...
+
+Save or list bytecode.
+
+=item -d
+
+Activate debugging session for script.
+
 =item -i
 
 Enter the interactive mode after executing 'SCRIPT'.
