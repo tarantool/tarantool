@@ -68,10 +68,13 @@ jobs:
           dry-run: false
           sanitizer: ${{ matrix.sanitizer }}
       - uses: actions/checkout@v3
+        id: checkout
         if: failure()
+        with:
+          path: tarantool
       - name: Send VK Teams message on failure
-        if: failure()
-        uses: ./.github/actions/report-job-status
+        if: failure() && steps.checkout.outcome == 'success'
+        uses: ./tarantool/.github/actions/report-job-status
         with:
           bot-token: ${{ secrets.VKTEAMS_BOT_TOKEN }}
       - name: upload crash
