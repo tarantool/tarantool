@@ -507,6 +507,14 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 			return;
 		break;
 	}
+	case SQL_AST_TYPE_DROP_CONSTRAINT: {
+		parse->initiateTTrans = true;
+		struct sql_ast_drop_constraint *stmt = &ast->drop_constraint;
+		sql_drop_constraint(parse, &stmt->table_name, &stmt->name);
+		if (parse->is_aborted)
+			return;
+		break;
+	}
 	default:
 		assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
 	}

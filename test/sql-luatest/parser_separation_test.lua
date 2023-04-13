@@ -22,3 +22,14 @@ g.test_table_rename_parsing = function()
         t.assert_equals(err.message, "Syntax error at line 1 near '1'")
     end)
 end
+
+--
+-- Make sure that the ALTER TABLE DROP CONSTRAINT statement is processed only
+-- after successful parsing.
+--
+g.test_drop_constraint_parsing = function()
+    g.server:exec(function()
+        local _, err = box.execute([[ALTER TABLE t DROP CONSTRAINT t1 1;]])
+        t.assert_equals(err.message, "Syntax error at line 1 near '1'")
+    end)
+end

@@ -101,3 +101,14 @@ sql_ast_init_table_rename(struct Parse *parse, const struct Token *old_name,
 	parse->ast.rename.old_name = *old_name;
 	parse->ast.rename.new_name = *new_name;
 }
+
+void
+sql_ast_init_constraint_drop(struct Parse *parse,
+			     const struct Token *table_name,
+			     const struct Token *name)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_DROP_CONSTRAINT;
+	parse->ast.drop_constraint.table_name = *table_name;
+	parse->ast.drop_constraint.name = *name;
+}

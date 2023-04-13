@@ -2045,7 +2045,6 @@ struct Parse {
 		struct create_index_def create_index_def;
 		struct create_trigger_def create_trigger_def;
 		struct create_view_def create_view_def;
-		struct drop_constraint_def drop_constraint_def;
 		struct drop_index_def drop_index_def;
 		struct drop_table_def drop_table_def;
 		struct drop_trigger_def drop_trigger_def;
@@ -3601,16 +3600,15 @@ void
 sql_create_foreign_key(struct Parse *parse_context);
 
 /**
- * Emit code to drop the entry from _index or _ck_contstraint or
- * _fk_constraint space corresponding with the constraint type.
+ * Emit code to drop the entry from _index or drop FOREIGN KEY or CHECK
+ * constraint.
  *
  * Function called from parser to handle
  * <ALTER TABLE table DROP CONSTRAINT constraint> SQL statement.
- *
- * @param parse_context Parsing context.
  */
 void
-sql_drop_constraint(struct Parse *parse_context);
+sql_drop_constraint(struct Parse *parse_context, struct Token *table_name,
+		    struct Token *name);
 
 /**
  * Now our SQL implementation can't operate on spaces which

@@ -92,6 +92,8 @@ enum sql_ast_type {
 	SQL_AST_TYPE_ROLLBACK_TO_SAVEPOINT,
 	/** ALTER TABLE RENAME statement. */
 	SQL_AST_TYPE_TABLE_RENAME,
+	/** ALTER TABLE DROP CONSTRAINT statement. */
+	SQL_AST_TYPE_DROP_CONSTRAINT,
 };
 
 /**
@@ -120,6 +122,14 @@ struct sql_ast_table_rename {
 	struct Token new_name;
 };
 
+/** Description of ALTER TABLE DROP CONSTRAINT statement. */
+struct sql_ast_drop_constraint {
+	/** The name of the table which constraint will be dropped. */
+	struct Token table_name;
+	/** Name of the constraint to drop. */
+	struct Token name;
+};
+
 /** A structure describing the AST of the parsed SQL statement. */
 struct sql_ast {
 	/** Parsed statement type. */
@@ -129,6 +139,8 @@ struct sql_ast {
 		struct sql_ast_savepoint savepoint;
 		/** Description of ALTER TABLE RENAME statement. */
 		struct sql_ast_table_rename rename;
+		/** Description of ALTER TABLE DROP CONSTRAINT statement. */
+		struct sql_ast_drop_constraint drop_constraint;
 	};
 };
 
@@ -310,10 +322,6 @@ struct drop_trigger_def {
 	struct drop_entity_def base;
 };
 
-struct drop_constraint_def {
-	struct drop_entity_def base;
-};
-
 struct drop_index_def {
 	struct drop_entity_def base;
 };
@@ -434,15 +442,6 @@ drop_trigger_def_init(struct drop_trigger_def *drop_trigger_def,
 {
 	drop_entity_def_init(&drop_trigger_def->base, parent_name, name,
 			     if_exist, ENTITY_TYPE_TRIGGER);
-}
-
-static inline void
-drop_constraint_def_init(struct drop_constraint_def *drop_constraint_def,
-			 struct SrcList *parent_name, struct Token *name,
-			 bool if_exist)
-{
-	drop_entity_def_init(&drop_constraint_def->base, parent_name, name,
-			     if_exist, ENTITY_TYPE_CONSTRAINT);
 }
 
 static inline void
@@ -584,5 +583,11 @@ sql_ast_init_rollback_to_savepoint(struct Parse *parse,
 void
 sql_ast_init_table_rename(struct Parse *parse, const struct Token *old_name,
 			  const struct Token *new_name);
+
+/** Save parsed ALTER TABLE DROP CONSTRAINT statement. */
+void
+sql_ast_init_constraint_drop(struct Parse *parse,
+			     const struct Token *table_name,
+			     const struct Token *name);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */
