@@ -34,3 +34,4 @@ runs:
       with:
         bot-token: ${{ inputs.bot-token }}
         chat-id: ${{ env.CHAT_ID }}
+        job-name: ${{ github.job }} (${{ join(matrix.*, ', ') }})
