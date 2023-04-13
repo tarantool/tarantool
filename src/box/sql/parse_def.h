@@ -94,6 +94,8 @@ enum sql_ast_type {
 	SQL_AST_TYPE_TABLE_RENAME,
 	/** ALTER TABLE DROP CONSTRAINT statement. */
 	SQL_AST_TYPE_DROP_CONSTRAINT,
+	/** DROP INDEX statement. */
+	SQL_AST_TYPE_DROP_INDEX,
 };
 
 /**
@@ -130,6 +132,16 @@ struct sql_ast_drop_constraint {
 	struct Token name;
 };
 
+/** Description of DROP INDEX statement. */
+struct sql_ast_drop_index {
+	/** The name of the table which index will be dropped. */
+	struct Token table_name;
+	/** Name of the index to drop. */
+	struct Token index_name;
+	/** IF EXISTS flag. */
+	bool if_exists;
+};
+
 /** A structure describing the AST of the parsed SQL statement. */
 struct sql_ast {
 	/** Parsed statement type. */
@@ -141,6 +153,8 @@ struct sql_ast {
 		struct sql_ast_table_rename rename;
 		/** Description of ALTER TABLE DROP CONSTRAINT statement. */
 		struct sql_ast_drop_constraint drop_constraint;
+		/** Description of DROP INDEX statement. */
+		struct sql_ast_drop_index drop_index;
 	};
 };
 
@@ -322,10 +336,6 @@ struct drop_trigger_def {
 	struct drop_entity_def base;
 };
 
-struct drop_index_def {
-	struct drop_entity_def base;
-};
-
 struct create_trigger_def {
 	struct create_entity_def base;
 	/** One of TK_BEFORE, TK_AFTER, TK_INSTEAD. */
@@ -442,15 +452,6 @@ drop_trigger_def_init(struct drop_trigger_def *drop_trigger_def,
 {
 	drop_entity_def_init(&drop_trigger_def->base, parent_name, name,
 			     if_exist, ENTITY_TYPE_TRIGGER);
-}
-
-static inline void
-drop_index_def_init(struct drop_index_def *drop_index_def,
-		    struct SrcList *parent_name, struct Token *name,
-		    bool if_exist)
-{
-	drop_entity_def_init(&drop_index_def->base, parent_name, name, if_exist,
-			     ENTITY_TYPE_INDEX);
 }
 
 static inline void
@@ -589,5 +590,10 @@ void
 sql_ast_init_constraint_drop(struct Parse *parse,
 			     const struct Token *table_name,
 			     const struct Token *name);
+
+/** Save parsed DROP INDEX statement. */
+void
+sql_ast_init_index_drop(struct Parse *parse, const struct Token *table_name,
+			const struct Token *index_name, bool if_exists);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */

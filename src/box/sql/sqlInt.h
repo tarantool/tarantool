@@ -2045,7 +2045,6 @@ struct Parse {
 		struct create_index_def create_index_def;
 		struct create_trigger_def create_trigger_def;
 		struct create_view_def create_view_def;
-		struct drop_index_def drop_index_def;
 		struct drop_table_def drop_table_def;
 		struct drop_trigger_def drop_trigger_def;
 		struct drop_view_def drop_view_def;
@@ -2950,11 +2949,10 @@ sql_create_index(struct Parse *parse);
 /**
  * This routine will drop an existing named index.  This routine
  * implements the DROP INDEX statement.
- *
- * @param parse_context Current parsing context.
  */
 void
-sql_drop_index(struct Parse *parse_context);
+sql_drop_index(struct Parse *parse_context, struct Token *table_name,
+	       struct Token *index_name, bool if_exists);
 
 int sqlSelect(Parse *, Select *, SelectDest *);
 Select *sqlSelectNew(Parse *, ExprList *, SrcList *, Expr *, ExprList *,

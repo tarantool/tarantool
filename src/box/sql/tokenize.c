@@ -515,6 +515,15 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 			return;
 		break;
 	}
+	case SQL_AST_TYPE_DROP_INDEX: {
+		parse->initiateTTrans = true;
+		struct sql_ast_drop_index *stmt = &ast->drop_index;
+		sql_drop_index(parse, &stmt->table_name, &stmt->index_name,
+			       stmt->if_exists);
+		if (parse->is_aborted)
+			return;
+		break;
+	}
 	default:
 		assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
 	}

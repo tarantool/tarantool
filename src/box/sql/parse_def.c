@@ -112,3 +112,14 @@ sql_ast_init_constraint_drop(struct Parse *parse,
 	parse->ast.drop_constraint.table_name = *table_name;
 	parse->ast.drop_constraint.name = *name;
 }
+
+void
+sql_ast_init_index_drop(struct Parse *parse, const struct Token *table_name,
+			const struct Token *index_name, bool if_exists)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_DROP_INDEX;
+	parse->ast.drop_index.table_name = *table_name;
+	parse->ast.drop_index.index_name = *index_name;
+	parse->ast.drop_index.if_exists = if_exists;
+}
