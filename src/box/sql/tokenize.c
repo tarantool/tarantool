@@ -524,6 +524,14 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 			return;
 		break;
 	}
+	case SQL_AST_TYPE_DROP_TRIGGER: {
+		parse->initiateTTrans = true;
+		struct sql_ast_drop_trigger *stmt = &ast->drop_trigger;
+		sql_drop_trigger(parse, &stmt->name, stmt->if_exists);
+		if (parse->is_aborted)
+			return;
+		break;
+	}
 	default:
 		assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
 	}

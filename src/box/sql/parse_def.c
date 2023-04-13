@@ -123,3 +123,13 @@ sql_ast_init_index_drop(struct Parse *parse, const struct Token *table_name,
 	parse->ast.drop_index.index_name = *index_name;
 	parse->ast.drop_index.if_exists = if_exists;
 }
+
+void
+sql_ast_init_trigger_drop(struct Parse *parse, const struct Token *name,
+			  bool if_exists)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_DROP_TRIGGER;
+	parse->ast.drop_trigger.name = *name;
+	parse->ast.drop_trigger.if_exists = if_exists;
+}

@@ -2046,7 +2046,6 @@ struct Parse {
 		struct create_trigger_def create_trigger_def;
 		struct create_view_def create_view_def;
 		struct drop_table_def drop_table_def;
-		struct drop_trigger_def drop_trigger_def;
 		struct drop_view_def drop_view_def;
 		struct enable_entity_def enable_entity_def;
 	};
@@ -3362,11 +3361,9 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 /**
  * This function is called from parser to generate drop trigger
  * VDBE code.
- *
- * @param parser Parser context.
  */
 void
-sql_drop_trigger(struct Parse *parser);
+sql_drop_trigger(struct Parse *parser, struct Token *name, bool is_exists);
 
 /**
  * Drop a trigger given a pointer to that trigger.
