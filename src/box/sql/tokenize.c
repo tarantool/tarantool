@@ -499,6 +499,14 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 	case SQL_AST_TYPE_ROLLBACK_TO_SAVEPOINT:
 		sqlSavepoint(parse, SAVEPOINT_ROLLBACK, &ast->savepoint.name);
 		break;
+	case SQL_AST_TYPE_TABLE_RENAME: {
+		parse->initiateTTrans = true;
+		struct sql_ast_table_rename *stmt = &ast->rename;
+		sql_alter_table_rename(parse, &stmt->old_name, &stmt->new_name);
+		if (parse->is_aborted)
+			return;
+		break;
+	}
 	default:
 		assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
 	}

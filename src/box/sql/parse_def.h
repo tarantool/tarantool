@@ -90,6 +90,8 @@ enum sql_ast_type {
 	SQL_AST_TYPE_RELEASE_SAVEPOINT,
 	/** ROLLBACK TO SAVEPOINT statement. */
 	SQL_AST_TYPE_ROLLBACK_TO_SAVEPOINT,
+	/** ALTER TABLE RENAME statement. */
+	SQL_AST_TYPE_TABLE_RENAME,
 };
 
 /**
@@ -110,12 +112,24 @@ struct sql_ast_savepoint {
 	struct Token name;
 };
 
+/** Description of ALTER TABLE RENAME statement. */
+struct sql_ast_table_rename {
+	/** Name of the table to rename. */
+	struct Token old_name;
+	/** New name of the table. */
+	struct Token new_name;
+};
+
 /** A structure describing the AST of the parsed SQL statement. */
 struct sql_ast {
 	/** Parsed statement type. */
 	enum sql_ast_type type;
-	/** Savepoint description for savepoint-related statements. */
-	struct sql_ast_savepoint savepoint;
+	union {
+		/** Savepoint description for savepoint-related statements. */
+		struct sql_ast_savepoint savepoint;
+		/** Description of ALTER TABLE RENAME statement. */
+		struct sql_ast_table_rename rename;
+	};
 };
 
 /** Constant tokens for integer values. */
@@ -221,11 +235,6 @@ struct enable_entity_def {
 	struct Token name;
 	/** A new state to be set for entity found. */
 	bool is_enabled;
-};
-
-struct rename_entity_def {
-	struct alter_entity_def base;
-	struct Token new_name;
 };
 
 struct create_entity_def {
@@ -356,15 +365,6 @@ alter_entity_def_init(struct alter_entity_def *alter_def,
 	alter_def->entity_name = entity_name;
 	alter_def->entity_type = type;
 	alter_def->alter_action = action;
-}
-
-static inline void
-rename_entity_def_init(struct rename_entity_def *rename_def,
-		       struct SrcList *table_name, struct Token *new_name)
-{
-	alter_entity_def_init(&rename_def->base, table_name, ENTITY_TYPE_TABLE,
-			      ALTER_ACTION_RENAME);
-	rename_def->new_name = *new_name;
 }
 
 static inline void
@@ -579,5 +579,10 @@ sql_ast_init_release_savepoint(struct Parse *parse, const struct Token *name);
 void
 sql_ast_init_rollback_to_savepoint(struct Parse *parse,
 				   const struct Token *name);
+
+/** Save parsed ALTER TABLE RENAME statement. */
+void
+sql_ast_init_table_rename(struct Parse *parse, const struct Token *old_name,
+			  const struct Token *new_name);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */

@@ -91,3 +91,13 @@ sql_ast_init_rollback_to_savepoint(struct Parse *parse,
 	parse->ast.type = SQL_AST_TYPE_ROLLBACK_TO_SAVEPOINT;
 	parse->ast.savepoint.name = *name;
 }
+
+void
+sql_ast_init_table_rename(struct Parse *parse, const struct Token *old_name,
+			  const struct Token *new_name)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_TABLE_RENAME;
+	parse->ast.rename.old_name = *old_name;
+	parse->ast.rename.new_name = *new_name;
+}

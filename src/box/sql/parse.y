@@ -1716,10 +1716,8 @@ cmd ::= alter_add_constraint(N) unique_spec(U) LP sortlist(X) RP. {
 unique_spec(U) ::= UNIQUE.      { U = SQL_INDEX_TYPE_CONSTRAINT_UNIQUE; }
 unique_spec(U) ::= PRIMARY KEY. { U = SQL_INDEX_TYPE_CONSTRAINT_PK; }
 
-cmd ::= alter_table_start(A) RENAME TO nm(N). {
-    rename_entity_def_init(&pParse->rename_entity_def, A, &N);
-    pParse->initiateTTrans = true;
-    sql_alter_table_rename(pParse);
+cmd ::= ALTER TABLE nm(A) RENAME TO nm(N). {
+  sql_ast_init_table_rename(pParse, &A, &N);
 }
 
 cmd ::= ALTER TABLE fullname(X) DROP CONSTRAINT nm(Z). {
