@@ -82,5 +82,5 @@ jobs:
         with:
           job-name: ${{ github.job }}
           access-key-id: ${{ secrets.MULTIVAC_S3_ACCESS_KEY_ID }}
-          s3-secret-access-key: ${{ secrets.MULTIVAC_S3_SECRET_ACCESS_KEY }}
+          secret-access-key: ${{ secrets.MULTIVAC_S3_SECRET_ACCESS_KEY }}
           source: ${{ env.VARDIR }}/artifacts
