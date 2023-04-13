@@ -98,6 +98,8 @@ enum sql_ast_type {
 	SQL_AST_TYPE_DROP_INDEX,
 	/** DROP TRIGGER statement. */
 	SQL_AST_TYPE_DROP_TRIGGER,
+	/** DROP VIEW statement. */
+	SQL_AST_TYPE_DROP_VIEW,
 };
 
 /**
@@ -152,6 +154,14 @@ struct sql_ast_drop_trigger {
 	bool if_exists;
 };
 
+/** Description of DROP VIEW statement. */
+struct sql_ast_drop_view {
+	/** Name of the VIEW to drop. */
+	struct Token name;
+	/** IF EXISTS flag. */
+	bool if_exists;
+};
+
 /** A structure describing the AST of the parsed SQL statement. */
 struct sql_ast {
 	/** Parsed statement type. */
@@ -167,6 +177,8 @@ struct sql_ast {
 		struct sql_ast_drop_index drop_index;
 		/** Description of DROP TRIGGER statement. */
 		struct sql_ast_drop_trigger drop_trigger;
+		/** Description of DROP VIEW statement. */
+		struct sql_ast_drop_view drop_view;
 	};
 };
 
@@ -340,10 +352,6 @@ struct drop_table_def {
 	struct drop_entity_def base;
 };
 
-struct drop_view_def {
-	struct drop_entity_def base;
-};
-
 struct create_trigger_def {
 	struct create_entity_def base;
 	/** One of TK_BEFORE, TK_AFTER, TK_INSTEAD. */
@@ -442,15 +450,6 @@ drop_table_def_init(struct drop_table_def *drop_table_def,
 {
 	drop_entity_def_init(&drop_table_def->base, parent_name, name, if_exist,
 			     ENTITY_TYPE_TABLE);
-}
-
-static inline void
-drop_view_def_init(struct drop_view_def *drop_view_def,
-		   struct SrcList *parent_name, struct Token *name,
-		   bool if_exist)
-{
-	drop_entity_def_init(&drop_view_def->base, parent_name, name, if_exist,
-			     ENTITY_TYPE_VIEW);
 }
 
 static inline void
@@ -599,5 +598,10 @@ sql_ast_init_index_drop(struct Parse *parse, const struct Token *table_name,
 void
 sql_ast_init_trigger_drop(struct Parse *parse, const struct Token *name,
 			  bool if_exists);
+
+/** Save parsed DROP VIEW statement. */
+void
+sql_ast_init_view_drop(struct Parse *parse, const struct Token *name,
+		       bool if_exists);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */

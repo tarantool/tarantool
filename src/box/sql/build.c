@@ -1788,6 +1788,32 @@ sql_drop_table(struct Parse *parse_context)
 	sqlSrcListDelete(table_name_list);
 }
 
+void
+sql_drop_view(struct Parse *parse, struct Token *name, bool if_exists)
+{
+	assert(!parse->is_aborted);
+	char *space_name = sql_name_from_token(name);
+	struct space *space = space_by_name(space_name);
+	if (space == NULL) {
+		if (!if_exists) {
+			diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
+			parse->is_aborted = true;
+		}
+		sql_xfree(space_name);
+		return;
+	}
+	sql_xfree(space_name);
+	if (!space->def->opts.is_view) {
+		diag_set(ClientError, ER_DROP_SPACE, space->def->name,
+			 "use DROP TABLE");
+		parse->is_aborted = true;
+		return;
+	}
+	struct Vdbe *v = sqlGetVdbe(parse);
+	sqlVdbeCountChanges(v);
+	sql_code_drop_table(parse, space, true);
+}
+
 /**
  * Return ordinal number of column by name. In case of error,
  * set error message.

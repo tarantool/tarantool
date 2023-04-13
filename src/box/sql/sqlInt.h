@@ -2046,7 +2046,6 @@ struct Parse {
 		struct create_trigger_def create_trigger_def;
 		struct create_view_def create_view_def;
 		struct drop_table_def drop_table_def;
-		struct drop_view_def drop_view_def;
 		struct enable_entity_def enable_entity_def;
 	};
 	/**
@@ -2806,6 +2805,10 @@ sql_view_assign_cursors(struct Parse *parse, const char *view_stmt);
  */
 void
 sql_store_select(struct Parse *parse_context, struct Select *select);
+
+/** Code DROP VIEW statement. */
+void
+sql_drop_view(struct Parse *parse, struct Token *name, bool is_exists);
 
 void
 sql_drop_table(struct Parse *);
