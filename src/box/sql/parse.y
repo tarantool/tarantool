@@ -377,11 +377,8 @@ resolvetype(A) ::= REPLACE.                  {A = ON_CONFLICT_ACTION_REPLACE;}
 ////////////////////////// The DROP TABLE /////////////////////////////////////
 //
 
-cmd ::= DROP TABLE ifexists(E) fullname(X) . {
-  struct Token t = Token_nil;
-  drop_table_def_init(&pParse->drop_table_def, X, &t, E);
-  pParse->initiateTTrans = true;
-  sql_drop_table(pParse);
+cmd ::= DROP TABLE ifexists(E) nm(X) . {
+  sql_ast_init_table_drop(pParse, &X, E);
 }
 
 cmd ::= DROP VIEW ifexists(E) nm(X) . {

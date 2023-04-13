@@ -1739,53 +1739,30 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 	VdbeComment((v, "Delete entry from _space"));
 }
 
-/**
- * This routine is called to do the work of a DROP TABLE and
- * DROP VIEW statements.
- *
- * @param parse_context Current parsing context.
- */
 void
-sql_drop_table(struct Parse *parse_context)
+sql_drop_table(struct Parse *parse_context, struct Token *name, bool if_exists)
 {
-	struct drop_entity_def drop_def = parse_context->drop_table_def.base;
-	assert(drop_def.base.alter_action == ALTER_ACTION_DROP);
-	struct SrcList *table_name_list = drop_def.base.entity_name;
-	struct Vdbe *v = sqlGetVdbe(parse_context);
-	bool is_view = drop_def.base.entity_type == ENTITY_TYPE_VIEW;
-	assert(is_view || drop_def.base.entity_type == ENTITY_TYPE_TABLE);
-	sqlVdbeCountChanges(v);
 	assert(!parse_context->is_aborted);
-	assert(table_name_list->nSrc == 1);
-	const char *space_name = table_name_list->a[0].zName;
+	char *space_name = sql_name_from_token(name);
 	struct space *space = space_by_name(space_name);
 	if (space == NULL) {
-		if (!drop_def.if_exist) {
+		if (!if_exists) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
 			parse_context->is_aborted = true;
 		}
-		goto exit_drop_table;
+		sql_xfree(space_name);
+		return;
 	}
-	/*
-	 * Ensure DROP TABLE is not used on a view,
-	 * and DROP VIEW is not used on a table.
-	 */
-	if (is_view && !space->def->opts.is_view) {
-		diag_set(ClientError, ER_DROP_SPACE, space_name,
-			 "use DROP TABLE");
-		parse_context->is_aborted = true;
-		goto exit_drop_table;
-	}
-	if (!is_view && space->def->opts.is_view) {
-		diag_set(ClientError, ER_DROP_SPACE, space_name,
+	sql_xfree(space_name);
+	if (space->def->opts.is_view) {
+		diag_set(ClientError, ER_DROP_SPACE, space->def->name,
 			 "use DROP VIEW");
 		parse_context->is_aborted = true;
-		goto exit_drop_table;
+		return;
 	}
-	sql_code_drop_table(parse_context, space, is_view);
-
- exit_drop_table:
-	sqlSrcListDelete(table_name_list);
+	struct Vdbe *v = sqlGetVdbe(parse_context);
+	sqlVdbeCountChanges(v);
+	sql_code_drop_table(parse_context, space, false);
 }
 
 void

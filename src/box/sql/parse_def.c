@@ -143,3 +143,13 @@ sql_ast_init_view_drop(struct Parse *parse, const struct Token *name,
 	parse->ast.drop_view.name = *name;
 	parse->ast.drop_view.if_exists = if_exists;
 }
+
+void
+sql_ast_init_table_drop(struct Parse *parse, const struct Token *name,
+			bool if_exists)
+{
+	assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
+	parse->ast.type = SQL_AST_TYPE_DROP_TABLE;
+	parse->ast.drop_table.name = *name;
+	parse->ast.drop_table.if_exists = if_exists;
+}

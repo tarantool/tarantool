@@ -100,6 +100,8 @@ enum sql_ast_type {
 	SQL_AST_TYPE_DROP_TRIGGER,
 	/** DROP VIEW statement. */
 	SQL_AST_TYPE_DROP_VIEW,
+	/** DROP TABLE statement. */
+	SQL_AST_TYPE_DROP_TABLE,
 };
 
 /**
@@ -162,6 +164,14 @@ struct sql_ast_drop_view {
 	bool if_exists;
 };
 
+/** Description of DROP TABLE statement. */
+struct sql_ast_drop_table {
+	/** Name of the TABLE to drop. */
+	struct Token name;
+	/** IF EXISTS flag. */
+	bool if_exists;
+};
+
 /** A structure describing the AST of the parsed SQL statement. */
 struct sql_ast {
 	/** Parsed statement type. */
@@ -179,6 +189,8 @@ struct sql_ast {
 		struct sql_ast_drop_trigger drop_trigger;
 		/** Description of DROP VIEW statement. */
 		struct sql_ast_drop_view drop_view;
+		/** Description of DROP TABLE statement. */
+		struct sql_ast_drop_table drop_table;
 	};
 };
 
@@ -335,23 +347,6 @@ struct create_view_def {
 	struct Select *select;
 };
 
-struct drop_entity_def {
-	struct alter_entity_def base;
-	/** Name of index/trigger/constraint to be dropped. */
-	struct Token name;
-	/** Statement comes with IF EXISTS clause. */
-	bool if_exist;
-};
-
-/**
- * Identical wrappers around drop_entity_def to make hierarchy of
- * structures be consistent. Arguments for drop procedures are
- * the same.
- */
-struct drop_table_def {
-	struct drop_entity_def base;
-};
-
 struct create_trigger_def {
 	struct create_entity_def base;
 	/** One of TK_BEFORE, TK_AFTER, TK_INSTEAD. */
@@ -430,26 +425,6 @@ create_constraint_def_init(struct create_constraint_def *constr_def,
 {
 	create_entity_def_init(&constr_def->base, entity_type,
 			       parent_name, name, if_not_exists);
-}
-
-static inline void
-drop_entity_def_init(struct drop_entity_def *drop_def,
-		     struct SrcList *parent_name, struct Token *name,
-		     bool if_exist, enum entity_type entity_type)
-{
-	alter_entity_def_init(&drop_def->base, parent_name, entity_type,
-			      ALTER_ACTION_DROP);
-	drop_def->name = *name;
-	drop_def->if_exist = if_exist;
-}
-
-static inline void
-drop_table_def_init(struct drop_table_def *drop_table_def,
-		    struct SrcList *parent_name, struct Token *name,
-		    bool if_exist)
-{
-	drop_entity_def_init(&drop_table_def->base, parent_name, name, if_exist,
-			     ENTITY_TYPE_TABLE);
 }
 
 static inline void
@@ -603,5 +578,10 @@ sql_ast_init_trigger_drop(struct Parse *parse, const struct Token *name,
 void
 sql_ast_init_view_drop(struct Parse *parse, const struct Token *name,
 		       bool if_exists);
+
+/** Save parsed DROP TABLE statement. */
+void
+sql_ast_init_table_drop(struct Parse *parse, const struct Token *name,
+			bool if_exists);
 
 #endif /* TARANTOOL_BOX_SQL_PARSE_DEF_H_INCLUDED */

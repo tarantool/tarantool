@@ -2045,7 +2045,6 @@ struct Parse {
 		struct create_index_def create_index_def;
 		struct create_trigger_def create_trigger_def;
 		struct create_view_def create_view_def;
-		struct drop_table_def drop_table_def;
 		struct enable_entity_def enable_entity_def;
 	};
 	/**
@@ -2810,8 +2809,10 @@ sql_store_select(struct Parse *parse_context, struct Select *select);
 void
 sql_drop_view(struct Parse *parse, struct Token *name, bool is_exists);
 
+/** Code DROP TABLE statement. */
 void
-sql_drop_table(struct Parse *);
+sql_drop_table(struct Parse *parse, struct Token *name, bool is_exists);
+
 void sqlInsert(Parse *, SrcList *, Select *, IdList *,
 	       enum on_conflict_action);
 

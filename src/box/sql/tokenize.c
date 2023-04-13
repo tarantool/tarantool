@@ -540,6 +540,14 @@ sql_code_ast(struct Parse *parse, struct sql_ast *ast)
 			return;
 		break;
 	}
+	case SQL_AST_TYPE_DROP_TABLE: {
+		parse->initiateTTrans = true;
+		struct sql_ast_drop_table *stmt = &ast->drop_table;
+		sql_drop_table(parse, &stmt->name, stmt->if_exists);
+		if (parse->is_aborted)
+			return;
+		break;
+	}
 	default:
 		assert(parse->ast.type == SQL_AST_TYPE_UNKNOWN);
 	}
