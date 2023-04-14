@@ -1661,6 +1661,13 @@ replaceFunc(struct sql_context *context, int argc, const struct Mem *argv)
 			zOut[j++] = zStr[i];
 		} else {
 			nOut += nRep - nPattern;
+			if (nOut > SQL_MAX_LENGTH) {
+				sql_xfree(zOut);
+				context->is_aborted = true;
+				diag_set(ClientError, ER_SQL_EXECUTE,
+					 "string or blob too big");
+				return;
+			}
 			zOut = sql_xrealloc(zOut, nOut);
 			memcpy(&zOut[j], zRep, nRep);
 			j += nRep;
