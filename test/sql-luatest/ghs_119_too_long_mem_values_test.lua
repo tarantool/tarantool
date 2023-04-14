@@ -38,6 +38,10 @@ g.test_replace = function()
         t.assert(ret == nil)
         local msg = [[Failed to execute SQL statement: string or blob too big]]
         t.assert_equals(err.message, msg)
+        ret, err = box.execute([[SELECT replace(zeroblob(0x1000), zeroblob(1),
+                                                randomblob(0x10000000))]])
+        t.assert(ret == nil)
+        t.assert_equals(err.message, msg)
     end)
 end
 
