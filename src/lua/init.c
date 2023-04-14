@@ -271,6 +271,23 @@ extern char minifio_lua[],
 	luarocks_util_lua[],
 	luarocks_core_util_lua[]
 #endif /* defined(EMBED_LUAROCKS) */
+#if ENABLE_ETCD_CLIENT
+	, etcd_client_client_auth_http_lua[],
+	etcd_client_client_http_lua[],
+	etcd_client_client_jsstream_lua[],
+	etcd_client_client_pool_lua[],
+	etcd_client_error_etcd_lua[],
+	etcd_client_error_http_lua[],
+	etcd_client_grpc_json_lua[],
+	etcd_client_init_lua[],
+	etcd_client_math_lua[],
+	etcd_client_protocol_lua[],
+	etcd_client_subscribe_auto_lua[],
+	etcd_client_subscribe_once_lua[],
+	etcd_client_txn_lua[],
+	etcd_client_utils_lua[],
+	etcd_client_version_lua[]
+#endif
 ;
 
 static const char *lua_modules[] = {
@@ -340,6 +357,27 @@ static const char *lua_modules[] = {
 	"internal.print", print_lua,
 	"internal.pairs", pairs_lua,
 	"luadebug", luadebug_lua,
+#if ENABLE_ETCD_CLIENT
+	/*
+	 * Module components order is important here: components that required
+	 * other modules must be loaded first.
+	 */
+	"etcd-client.version", etcd_client_version_lua,
+	"etcd-client.utils", etcd_client_utils_lua,
+	"etcd-client.math", etcd_client_math_lua,
+	"etcd-client.txn", etcd_client_txn_lua,
+	"etcd-client.grpc_json", etcd_client_grpc_json_lua,
+	"etcd-client.protocol", etcd_client_protocol_lua,
+	"etcd-client.subscribe.auto", etcd_client_subscribe_auto_lua,
+	"etcd-client.subscribe.once", etcd_client_subscribe_once_lua,
+	"etcd-client.error.etcd", etcd_client_error_etcd_lua,
+	"etcd-client.error.http", etcd_client_error_http_lua,
+	"etcd-client.client.pool", etcd_client_client_pool_lua,
+	"etcd-client.client.jsstream", etcd_client_client_jsstream_lua,
+	"etcd-client.client.http", etcd_client_client_http_lua,
+	"etcd-client.client.auth_http", etcd_client_client_auth_http_lua,
+	"etcd-client", etcd_client_init_lua,
+#endif
 	NULL
 };
 
