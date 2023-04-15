@@ -210,9 +210,9 @@ Invalid MsgPack - request body
 # Invalid auth_type
 Invalid MsgPack - request body
 # Empty request body
-version=4, features=[0, 1, 2, 3, 4], auth_type=chap-sha1
+version=5, features=[0, 1, 2, 3, 4, 5], auth_type=chap-sha1
 # Unknown version and features
-version=4, features=[0, 1, 2, 3, 4], auth_type=chap-sha1
+version=5, features=[0, 1, 2, 3, 4, 5], auth_type=chap-sha1
 
 #
 # gh-6257 Watchers

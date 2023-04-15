@@ -894,8 +894,8 @@ iproto_send_event(struct obuf *out, uint64_t sync,
 }
 
 int
-xrow_decode_dml(struct xrow_header *row, struct request *request,
-		uint64_t key_map)
+xrow_decode_dml_internal(struct xrow_header *row, struct request *request,
+			 uint64_t key_map, bool accept_space_name)
 {
 	memset(request, 0, sizeof(*request));
 	request->header = row;
@@ -925,7 +925,8 @@ error:
 		if (key >= iproto_key_MAX ||
 		    iproto_key_type[key] != mp_typeof(*value))
 			goto error;
-		key_map &= ~iproto_key_bit(key);
+		if (key < 64)
+			key_map &= ~iproto_key_bit(key);
 		switch (key) {
 		case IPROTO_SPACE_ID:
 			request->space_id = mp_decode_uint(&value);
@@ -980,10 +981,20 @@ error:
 			request->after_tuple = value;
 			request->after_tuple_end = data;
 			break;
+		case IPROTO_SPACE_NAME:
+			request->space_name =
+				mp_decode_str(&value, &request->space_name_len);
+			break;
+		case IPROTO_INDEX_NAME:
+			request->index_name =
+				mp_decode_str(&value, &request->index_name_len);
+			break;
 		default:
 			break;
 		}
 	}
+	if (accept_space_name && request->space_name != NULL)
+		key_map &= ~iproto_key_bit(IPROTO_SPACE_ID);
 done:
 	if (key_map) {
 		enum iproto_key key = (enum iproto_key) bit_ctz_u64(key_map);

@@ -195,6 +195,18 @@ extern const size_t iproto_flag_constants_size;
 	_(IPROTO_AUTH_TYPE, 0x5b)					\
 	_(IPROTO_REPLICASET_NAME, 0x5c)					\
 	_(IPROTO_INSTANCE_NAME, 0x5d)					\
+	/**
+	 * Space name used instead of identifier (IPROTO_SPACE_ID) in DML
+	 * requests. Preferred when identifier is present (i.e., the identifier
+	 * is ignored).
+	 */								\
+	_(IPROTO_SPACE_NAME, 0x5e)					\
+	/**
+	 * Index name used instead of identifier (IPROTO_INDEX_ID) in
+	 * IPROTO_SELECT, IPROTO_UPDATE, and IPROTO_DELETE requests. Preferred
+	 * when identifier is present (i.e., the identifier is ignored).
+	 */								\
+	_(IPROTO_INDEX_NAME, 0x5f)					\
 
 ENUM(iproto_key, IPROTO_KEYS);
 /**

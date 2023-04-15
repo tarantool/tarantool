@@ -216,6 +216,14 @@ struct request {
 	int index_base;
 	/** Send position of last selected tuple in response if true. */
 	bool fetch_position;
+	/** Name of requested space, points to the request's input buffer. */
+	const char *space_name;
+	/** Length of @space_name. */
+	uint32_t space_name_len;
+	/** Name of requested index, points to the request's input buffer. */
+	const char *index_name;
+	/** Length of @index_name. */
+	uint32_t index_name_len;
 };
 
 /**
@@ -229,12 +237,33 @@ request_str(const struct request *request);
  * @param[out] request DML request to decode to.
  * @param key_map a bit map of keys that are required by the caller,
  *        @sa request_key_map().
+ * @param accept_space_name space name is accepted instead of space identifier.
  * @retval 0 on success
  * @retval -1 on error
  */
 int
+xrow_decode_dml_internal(struct xrow_header *xrow, struct request *request,
+			 uint64_t key_map, bool accept_space_name);
+
+/**
+ * Decode DML from system request (recovery or replication).
+ */
+static inline int
 xrow_decode_dml(struct xrow_header *xrow, struct request *request,
-		uint64_t key_map);
+		uint64_t key_map)
+{
+	return xrow_decode_dml_internal(xrow, request, key_map, false);
+}
+
+/**
+ * Decode DML from IPROTO request.
+ */
+static inline int
+xrow_decode_dml_iproto(struct xrow_header *xrow, struct request *request,
+		       uint64_t key_map)
+{
+	return xrow_decode_dml_internal(xrow, request, key_map, true);
+}
 
 /**
  * Encode the request fields to iovec using region_alloc().

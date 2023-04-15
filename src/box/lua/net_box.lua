@@ -58,6 +58,7 @@ local IPROTO_FEATURE_NAMES = {
     [2]     = 'error_extension',
     [3]     = 'watchers',
     [4]     = 'pagination',
+    [5]     = 'space_and_index_names',
 }
 
 local REQUEST_OPTION_TYPES = {
@@ -387,6 +388,49 @@ local function new_sm(uri, opts)
                                  table.concat(missing, ', '),
                     })
                 end
+            end
+            if not opts.fetch_schema then
+                remote.space = setmetatable({}, {
+                    __index = function(_, space_key)
+                        local id_or_name
+                        if type(space_key) == 'number' then
+                            id_or_name = 'id'
+                        elseif type(space_key) == 'string' then
+                            if not features.space_and_index_names then
+                                return nil
+                            end
+                            id_or_name = 'name'
+                        else
+                            return nil
+                        end
+                        local space = {[id_or_name] = space_key,
+                                       _id_or_name = space_key}
+                        space.index = setmetatable({}, {
+                            __index = function(_, idx_key)
+                                local id_or_name
+                                if type(idx_key) == 'number' then
+                                    id_or_name = 'id'
+                                elseif type(idx_key) == 'string' then
+                                    if not features.space_and_index_names then
+                                        return nil
+                                    end
+                                    id_or_name = 'name'
+                                else
+                                    return nil
+                                end
+                                local idx_wrapper = setmetatable({
+                                    [id_or_name] = idx_key,
+                                    _id_or_name = idx_key,
+                                    space = space
+                                }, remote._index_mt)
+                                space.index[idx_key] = idx_wrapper
+                                return idx_wrapper
+                            end})
+                        local space_wrapper = setmetatable(space,
+                                                           remote._space_mt)
+                        remote.space[space_key] = space_wrapper
+                        return space_wrapper
+                    end})
             end
         elseif what == 'did_fetch_schema' then
             remote:_install_schema(...)
@@ -932,6 +976,7 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
         end
         s.id = id
         s.name = name
+        s._id_or_name = id
         s.engine = engine
         s.field_count = field_count
         s.enabled = true
@@ -969,6 +1014,7 @@ function remote_methods:_install_schema(schema_version, spaces, indices,
             space   = index[1],
             id      = index[2],
             name    = index[3],
+            _id_or_name = index[2],
             type    = string.upper(index[4]),
             parts   = {},
         }
@@ -1057,14 +1103,14 @@ space_metatable = function(remote)
         check_space_arg(self, 'insert')
         check_param_table(opts, REQUEST_OPTION_TYPES)
         return remote:_request(M_INSERT, opts, self._format_cdata,
-                               self._stream_id, self.id, tuple)
+                               self._stream_id, self._id_or_name, tuple)
     end
 
     function methods:replace(tuple, opts)
         check_space_arg(self, 'replace')
         check_param_table(opts, REQUEST_OPTION_TYPES)
         return remote:_request(M_REPLACE, opts, self._format_cdata,
-                               self._stream_id, self.id, tuple)
+                               self._stream_id, self._id_or_name, tuple)
     end
 
     function methods:select(key, opts)
@@ -1086,7 +1132,8 @@ space_metatable = function(remote)
         check_space_arg(self, 'upsert')
         check_param_table(opts, REQUEST_OPTION_TYPES)
         return nothing_or_data(remote:_request(M_UPSERT, opts, nil,
-                                               self._stream_id, self.id,
+                                               self._stream_id,
+                                               self._id_or_name,
                                                key, oplist))
     end
 
@@ -1125,8 +1172,9 @@ index_metatable = function(remote)
         local res
         local method = fetch_pos and M_SELECT_FETCH_POS or M_SELECT
         res = (remote:_request(method, opts, self.space._format_cdata,
-                               self._stream_id, self.space.id, self.id,
-                               iterator, offset, limit, key, after, fetch_pos))
+                               self._stream_id, self.space._id_or_name,
+                               self._id_or_name, iterator, offset, limit, key,
+                               after, fetch_pos))
         if type(res) ~= 'table' or not fetch_pos or opts and opts.is_async then
             return res
         end
@@ -1142,9 +1190,9 @@ index_metatable = function(remote)
         return nothing_or_data(remote:_request(M_GET, opts,
                                                self.space._format_cdata,
                                                self._stream_id,
-                                               self.space.id, self.id,
-                                               box.index.EQ, 0, 2, key,
-                                               nil, false))
+                                               self.space._id_or_name,
+                                               self._id_or_name, box.index.EQ,
+                                               0, 2, key, nil, false))
     end
 
     function methods:min(key, opts)
@@ -1156,9 +1204,9 @@ index_metatable = function(remote)
         return nothing_or_data(remote:_request(M_MIN, opts,
                                                self.space._format_cdata,
                                                self._stream_id,
-                                               self.space.id, self.id,
-                                               box.index.GE, 0, 1, key,
-                                               nil, false))
+                                               self.space._id_or_name,
+                                               self._id_or_name, box.index.GE,
+                                               0, 1, key, nil, false))
     end
 
     function methods:max(key, opts)
@@ -1170,9 +1218,9 @@ index_metatable = function(remote)
         return nothing_or_data(remote:_request(M_MAX, opts,
                                                self.space._format_cdata,
                                                self._stream_id,
-                                               self.space.id, self.id,
-                                               box.index.LE, 0, 1, key,
-                                               nil, false))
+                                               self.space._id_or_name,
+                                               self._id_or_name, box.index.LE,
+                                               0, 1, key, nil, false))
     end
 
     function methods:count(key, opts)
@@ -1181,8 +1229,12 @@ index_metatable = function(remote)
         if opts and opts.buffer then
             error("index:count() doesn't support `buffer` argument")
         end
-        local code = string.format('box.space.%s.index.%s:count',
-                                   self.space.name, self.name)
+        local code = 'box.space[' .. (self.space.name ~= nil and
+                                      '"' .. self.space.name .. '"' or
+                                      self.space.id) ..
+                     '].index[' .. (self.name ~= nil and
+                                    '"' .. self.name .. '"' or self.id) ..
+                     ']:count'
         return remote:_request(M_COUNT, opts, nil, self._stream_id,
                                code, { key, opts })
     end
@@ -1192,8 +1244,9 @@ index_metatable = function(remote)
         check_param_table(opts, REQUEST_OPTION_TYPES)
         return nothing_or_data(remote:_request(M_DELETE, opts,
                                                self.space._format_cdata,
-                                               self._stream_id, self.space.id,
-                                               self.id, key))
+                                               self._stream_id,
+                                               self.space._id_or_name,
+                                               self._id_or_name, key))
     end
 
     function methods:update(key, oplist, opts)
@@ -1201,8 +1254,9 @@ index_metatable = function(remote)
         check_param_table(opts, REQUEST_OPTION_TYPES)
         return nothing_or_data(remote:_request(M_UPDATE, opts,
                                                self.space._format_cdata,
-                                               self._stream_id, self.space.id,
-                                               self.id, key, oplist))
+                                               self._stream_id,
+                                               self.space._id_or_name,
+                                               self._id_or_name, key, oplist))
     end
 
     return { __index = methods, __metatable = false }

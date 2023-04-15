@@ -1666,8 +1666,8 @@ iproto_msg_decode(struct iproto_msg *msg, struct cmsg_hop **route)
 		assert(type < sizeof(iproto_thread->dml_route) /
 			      sizeof(*iproto_thread->dml_route));
 		*route = iproto_thread->dml_route[type];
-		if (xrow_decode_dml(&msg->header, &msg->dml,
-				    dml_request_key_map(type)))
+		if (xrow_decode_dml_iproto(&msg->header, &msg->dml,
+					   dml_request_key_map(type)) != 0)
 			return -1;
 		/*
 		 * In contrast to replication requests, for a client request
@@ -2143,6 +2143,42 @@ error:
 	tx_end_msg(msg, &header);
 }
 
+/*
+ * In case the request does not contain a space or identifier but contains a
+ * corresponding name, tries to resolve the name.
+ */
+static int
+tx_resolve_space_and_index_name(struct request *dml)
+{
+	struct space *space = NULL;
+	if (dml->space_name != NULL) {
+		space = space_by_name(dml->space_name, dml->space_name_len);
+		if (space == NULL) {
+			diag_set(ClientError, ER_NO_SUCH_SPACE,
+				 tt_cstr(dml->space_name, dml->space_name_len));
+			return -1;
+		}
+		dml->space_id = space->def->id;
+	}
+	if ((dml->type == IPROTO_SELECT || dml->type == IPROTO_UPDATE ||
+	     dml->type == IPROTO_DELETE) && dml->index_name != NULL) {
+		if (space == NULL)
+			space = space_cache_find(dml->space_id);
+		if (space == NULL)
+			return -1;
+		struct index *idx = space_index_by_name(space, dml->index_name,
+							dml->index_name_len);
+		if (idx == NULL) {
+			diag_set(ClientError, ER_NO_SUCH_INDEX_NAME,
+				 tt_cstr(dml->index_name, dml->index_name_len),
+				 space->def->name);
+			return -1;
+		}
+		dml->index_id = idx->dense_id;
+	}
+	return 0;
+}
+
 static void
 tx_process1(struct cmsg *m)
 {
@@ -2154,6 +2190,8 @@ tx_process1(struct cmsg *m)
 	struct obuf_svp svp;
 	struct obuf *out;
 	tx_inject_delay();
+	if (tx_resolve_space_and_index_name(&msg->dml) != 0)
+		goto error;
 	if (box_process1(&msg->dml, &tuple) != 0)
 		goto error;
 	out = msg->connection->tx.p_obuf;
@@ -2190,6 +2228,8 @@ tx_process_select(struct cmsg *m)
 		goto error;
 
 	tx_inject_delay();
+	if (tx_resolve_space_and_index_name(&msg->dml) != 0)
+		goto error;
 	packed_pos = req->after_position;
 	packed_pos_end = req->after_position_end;
 	if (packed_pos != NULL) {

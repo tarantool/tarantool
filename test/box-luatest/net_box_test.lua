@@ -268,7 +268,7 @@ g.test_schemaless = function()
     c = net.connect(g.server.net_box_uri, {fetch_schema = false})
     t.assert_equals(c.state, 'active')
     t.assert_equals(c.opts.fetch_schema, false)
-    t.assert_equals(c.space, nil)
+    t.assert_not_equals(c.space, nil)
 
     c:on_schema_reload(function()
         schema_update_counter = schema_update_counter + 1

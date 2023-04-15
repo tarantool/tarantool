@@ -1858,7 +1858,7 @@ local port_c = ffi.cast('struct port_c *', port)
 
 -- Helper function to check space:method() usage
 local function check_space_arg(space, method)
-    if type(space) ~= 'table' or space.id == nil then
+    if type(space) ~= 'table' or (space.id == nil and space.name == nil) then
         local fmt = 'Use space:%s(...) instead of space.%s(...)'
         error(string.format(fmt, method, method))
     end
@@ -1877,7 +1877,7 @@ end
 
 -- Helper function to check index:method() usage
 local function check_index_arg(index, method)
-    if type(index) ~= 'table' or index.id == nil then
+    if type(index) ~= 'table' or (index.id == nil and index.name == nil) then
         local fmt = 'Use index:%s(...) instead of index.%s(...)'
         error(string.format(fmt, method, method))
     end
