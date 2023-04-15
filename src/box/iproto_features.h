@@ -50,6 +50,14 @@ extern "C" {
 	 * request fields and IPROTO_POSITION response field.
 	 */								\
 	_(IPROTO_FEATURE_PAGINATION, 4)					\
+	/**
+	 * Using space [index] names instead of identifiers support:
+	 * IPROTO_SPACE_NAME and IPROTO_INDEX_NAME fields in IPROTO_SELECT,
+	 * IPROTO_UPDATE and IPROTO_DELETE request body;
+	 * IPROTO_SPACE_NAME field in IPROTO_INSERT, IPROTO_REPLACE,
+	 * IPROTO_UPDATE and IPROTO_UPSERT request body.
+	 */								\
+	_(IPROTO_FEATURE_SPACE_AND_INDEX_NAMES,  5)			\
 
 ENUM(iproto_feature_id, IPROTO_FEATURES);
 
@@ -72,7 +80,7 @@ struct iproto_features {
  * `box.iproto.protocol_version` needs to be updated correspondingly.
  */
 enum {
-	IPROTO_CURRENT_VERSION = 4,
+	IPROTO_CURRENT_VERSION = 5,
 };
 
 /**

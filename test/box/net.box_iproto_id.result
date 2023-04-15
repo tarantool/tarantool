@@ -15,7 +15,7 @@ c = net.connect(box.cfg.listen)
  | ...
 c.peer_protocol_version
  | ---
- | - 4
+ | - 5
  | ...
 c.peer_protocol_features
  | ---
@@ -24,6 +24,7 @@ c.peer_protocol_features
  |   error_extension: true
  |   streams: true
  |   pagination: true
+ |   space_and_index_names: true
  | ...
 c:close()
  | ---
@@ -52,6 +53,7 @@ c.peer_protocol_features
  |   error_extension: false
  |   streams: false
  |   pagination: false
+ |   space_and_index_names: false
  | ...
 errinj.set('ERRINJ_IPROTO_DISABLE_ID', false)
  | ---
@@ -101,6 +103,7 @@ c.peer_protocol_features
  |   error_extension: true
  |   streams: true
  |   pagination: true
+ |   space_and_index_names: true
  | ...
 c:close()
  | ---
@@ -146,7 +149,7 @@ c.error -- error
  | ...
 c.peer_protocol_version
  | ---
- | - 4
+ | - 5
  | ...
 c.peer_protocol_features
  | ---
@@ -155,6 +158,7 @@ c.peer_protocol_features
  |   error_extension: true
  |   streams: true
  |   pagination: true
+ |   space_and_index_names: true
  | ...
 c:close()
  | ---
@@ -173,7 +177,7 @@ c.error -- error
  | ...
 c.peer_protocol_version
  | ---
- | - 4
+ | - 5
  | ...
 c.peer_protocol_features
  | ---
@@ -182,6 +186,7 @@ c.peer_protocol_features
  |   error_extension: true
  |   streams: true
  |   pagination: true
+ |   space_and_index_names: true
  | ...
 c:close()
  | ---

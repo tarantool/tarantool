@@ -80,7 +80,7 @@ enum {
 	/**
 	 * IPROTO protocol version supported by the netbox connector.
 	 */
-	NETBOX_IPROTO_VERSION = 4,
+	NETBOX_IPROTO_VERSION = 5,
 };
 
 /**
@@ -781,6 +781,44 @@ netbox_encode_eval(lua_State *L, int idx, struct mpstream *stream,
 	netbox_end_encode(stream, svp);
 }
 
+/*
+ * Depending on the type of the argument (see also net.box space metatable)
+ * encode either a space identifier or a space name.
+ */
+static void
+netbox_encode_space_id_or_name(lua_State *L, int idx, struct mpstream *stream)
+{
+	if (lua_type(L, idx) == LUA_TNUMBER) {
+		uint32_t space_id = lua_tonumber(L, idx);
+		mpstream_encode_uint(stream, IPROTO_SPACE_ID);
+		mpstream_encode_uint(stream, space_id);
+	} else {
+		size_t len;
+		const char *space_name = lua_tolstring(L, idx, &len);
+		mpstream_encode_uint(stream, IPROTO_SPACE_NAME);
+		mpstream_encode_strn(stream, space_name, len);
+	}
+}
+
+/*
+ * Depending on the type of the argument (see also net.box index metatable)
+ * encode either a index identifier or an index name.
+ */
+static void
+netbox_encode_index_id_or_name(lua_State *L, int idx, struct mpstream *stream)
+{
+	if (lua_type(L, idx) == LUA_TNUMBER) {
+		uint32_t space_id = lua_tonumber(L, idx);
+		mpstream_encode_uint(stream, IPROTO_INDEX_ID);
+		mpstream_encode_uint(stream, space_id);
+	} else {
+		size_t len;
+		const char *space_name = lua_tolstring(L, idx, &len);
+		mpstream_encode_uint(stream, IPROTO_INDEX_NAME);
+		mpstream_encode_strn(stream, space_name, len);
+	}
+}
+
 /* Encode select request. */
 static void
 netbox_encode_select(lua_State *L, int idx, struct mpstream *stream,
@@ -801,19 +839,13 @@ netbox_encode_select(lua_State *L, int idx, struct mpstream *stream,
 	if (fetch_pos)
 		map_size++;
 	mpstream_encode_map(stream, map_size);
-	uint32_t space_id = lua_tonumber(L, idx);
-	uint32_t index_id = lua_tonumber(L, idx + 1);
 	int iterator = lua_tointeger(L, idx + 2);
 	uint32_t offset = lua_tonumber(L, idx + 3);
 	uint32_t limit = lua_tonumber(L, idx + 4);
 
-	/* encode space_id */
-	mpstream_encode_uint(stream, IPROTO_SPACE_ID);
-	mpstream_encode_uint(stream, space_id);
+	netbox_encode_space_id_or_name(L, idx, stream);
 
-	/* encode index_id */
-	mpstream_encode_uint(stream, IPROTO_INDEX_ID);
-	mpstream_encode_uint(stream, index_id);
+	netbox_encode_index_id_or_name(L, idx + 1, stream);
 
 	/* encode iterator */
 	mpstream_encode_uint(stream, IPROTO_ITERATOR);
@@ -865,10 +897,7 @@ netbox_encode_insert_or_replace(lua_State *L, int idx, struct mpstream *stream,
 
 	mpstream_encode_map(stream, 2);
 
-	/* encode space_id */
-	uint32_t space_id = lua_tonumber(L, idx);
-	mpstream_encode_uint(stream, IPROTO_SPACE_ID);
-	mpstream_encode_uint(stream, space_id);
+	netbox_encode_space_id_or_name(L, idx, stream);
 
 	/* encode args */
 	mpstream_encode_uint(stream, IPROTO_TUPLE);
@@ -903,15 +932,9 @@ netbox_encode_delete(lua_State *L, int idx, struct mpstream *stream,
 
 	mpstream_encode_map(stream, 3);
 
-	/* encode space_id */
-	uint32_t space_id = lua_tonumber(L, idx);
-	mpstream_encode_uint(stream, IPROTO_SPACE_ID);
-	mpstream_encode_uint(stream, space_id);
+	netbox_encode_space_id_or_name(L, idx, stream);
 
-	/* encode space_id */
-	uint32_t index_id = lua_tonumber(L, idx + 1);
-	mpstream_encode_uint(stream, IPROTO_INDEX_ID);
-	mpstream_encode_uint(stream, index_id);
+	netbox_encode_index_id_or_name(L, idx + 1, stream);
 
 	/* encode key */
 	mpstream_encode_uint(stream, IPROTO_KEY);
@@ -930,15 +953,9 @@ netbox_encode_update(lua_State *L, int idx, struct mpstream *stream,
 
 	mpstream_encode_map(stream, 5);
 
-	/* encode space_id */
-	uint32_t space_id = lua_tonumber(L, idx);
-	mpstream_encode_uint(stream, IPROTO_SPACE_ID);
-	mpstream_encode_uint(stream, space_id);
+	netbox_encode_space_id_or_name(L, idx, stream);
 
-	/* encode index_id */
-	uint32_t index_id = lua_tonumber(L, idx + 1);
-	mpstream_encode_uint(stream, IPROTO_INDEX_ID);
-	mpstream_encode_uint(stream, index_id);
+	netbox_encode_index_id_or_name(L, idx + 1, stream);
 
 	/* encode index_id */
 	mpstream_encode_uint(stream, IPROTO_INDEX_BASE);
@@ -965,10 +982,7 @@ netbox_encode_upsert(lua_State *L, int idx, struct mpstream *stream,
 
 	mpstream_encode_map(stream, 4);
 
-	/* encode space_id */
-	uint32_t space_id = lua_tonumber(L, idx);
-	mpstream_encode_uint(stream, IPROTO_SPACE_ID);
-	mpstream_encode_uint(stream, space_id);
+	netbox_encode_space_id_or_name(L, idx, stream);
 
 	/* encode index_base */
 	mpstream_encode_uint(stream, IPROTO_INDEX_BASE);
@@ -2994,6 +3008,8 @@ luaopen_net_box(struct lua_State *L)
 			    IPROTO_FEATURE_WATCHERS);
 	iproto_features_set(&NETBOX_IPROTO_FEATURES,
 			    IPROTO_FEATURE_PAGINATION);
+	iproto_features_set(&NETBOX_IPROTO_FEATURES,
+			    IPROTO_FEATURE_SPACE_AND_INDEX_NAMES);
 
 	lua_pushcfunction(L, luaT_netbox_request_iterator_next);
 	luaT_netbox_request_iterator_next_ref = luaL_ref(L, LUA_REGISTRYINDEX);

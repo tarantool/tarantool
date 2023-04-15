@@ -82,6 +82,8 @@ local reference_table = {
         AUTH_TYPE = 0x5b,
         REPLICASET_NAME = 0x5c,
         INSTANCE_NAME = 0x5d,
+        SPACE_NAME = 0x5e,
+        INDEX_NAME = 0x5f,
     },
 
     -- `iproto_metadata_key` enumeration.
@@ -160,7 +162,7 @@ local reference_table = {
     },
 
     -- `IPROTO_CURRENT_VERSION` constant
-    protocol_version = 4,
+    protocol_version = 5,
 
     -- `feature_id` enumeration
     protocol_features = {
@@ -169,6 +171,7 @@ local reference_table = {
         error_extension = true,
         watchers = true,
         pagination = true,
+        space_and_index_names = true,
     },
     feature = {
         streams = 0,
@@ -176,6 +179,7 @@ local reference_table = {
         error_extension = 2,
         watchers = 3,
         pagination = 4,
+        space_and_index_names = 5,
     },
 }
 
