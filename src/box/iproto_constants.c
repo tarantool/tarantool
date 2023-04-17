@@ -317,3 +317,42 @@ const char *vy_row_index_key_strs[VY_ROW_INDEX_KEY_MAX] = {
 	NULL,
 	"row index",
 };
+
+const struct iproto_constant iproto_flag_constants[] = {
+	IPROTO_FLAGS(IPROTO_CONSTANT_MEMBER)
+};
+
+const size_t iproto_flag_constants_size = lengthof(iproto_flag_constants);
+
+const struct iproto_constant iproto_key_constants[] = {
+	IPROTO_KEYS(IPROTO_CONSTANT_MEMBER)
+};
+
+const size_t iproto_key_constants_size = lengthof(iproto_key_constants);
+
+const struct iproto_constant iproto_metadata_key_constants[] = {
+	IPROTO_METADATA_KEYS(IPROTO_CONSTANT_MEMBER)
+};
+
+const size_t iproto_metadata_key_constants_size =
+	lengthof(iproto_metadata_key_constants);
+
+const struct iproto_constant iproto_ballot_key_constants[] = {
+	IPROTO_BALLOT_KEYS(IPROTO_CONSTANT_MEMBER)
+};
+
+const size_t iproto_ballot_key_constants_size =
+	lengthof(iproto_ballot_key_constants);
+
+const struct iproto_constant iproto_type_constants[] = {
+	IPROTO_TYPES(IPROTO_CONSTANT_MEMBER)
+};
+
+const size_t iproto_type_constants_size = lengthof(iproto_type_constants);
+
+const struct iproto_constant iproto_raft_keys_constants[] = {
+	IPROTO_RAFT_KEYS(IPROTO_CONSTANT_MEMBER)
+};
+
+const size_t iproto_raft_keys_constants_size =
+	lengthof(iproto_raft_keys_constants);
