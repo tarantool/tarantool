@@ -2,9 +2,6 @@ local t = require('luatest')
 local g = t.group('gh-8445')
 
 g.before_all(function(cg)
-    -- TODO(gh-8572)
-    t.skip_if(jit.arch == 'arm64' and jit.os == 'Linux',
-              'Disabled on AArch64 Linux due to #8572')
     local server = require('luatest.server')
     cg.server = server:new({alias = 'gh-8445'})
 end)
