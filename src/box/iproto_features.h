@@ -10,26 +10,23 @@
 #include <string.h>
 
 #include "bit/bit.h"
+#include "iproto_constants.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
-/**
- * IPROTO protocol feature ids returned by the IPROTO_ID command.
- * `box.iproto.protocol_features` and `box.iproto.feature` need to be updated
- * correspondingly.
- */
-enum iproto_feature_id {
+/** IPROTO protocol feature ids returned by the IPROTO_ID command. */
+#define IPROTO_FEATURES(_)			\
 	/**
 	 * Streams support: IPROTO_STREAM_ID header key.
-	 */
-	IPROTO_FEATURE_STREAMS = 0,
+	 */								\
+	_(IPROTO_FEATURE_STREAMS, 0)					\
 	/**
 	 * Transactions in the protocol:
 	 * IPROTO_BEGIN, IPROTO_COMMIT, IPROTO_ROLLBACK commands.
-	 */
-	IPROTO_FEATURE_TRANSACTIONS = 1,
+	 */								\
+	_(IPROTO_FEATURE_TRANSACTIONS, 1)				\
 	/**
 	 * MP_ERROR MsgPack extension support.
 	 *
@@ -40,21 +37,27 @@ enum iproto_feature_id {
 	 * converted to a string error message). If the feature bit is set and
 	 * encode_errors_as_ext is true, errors will be encoded as MP_ERROR
 	 * MsgPack extension.
-	 */
-	IPROTO_FEATURE_ERROR_EXTENSION = 2,
+	 */								\
+	_(IPROTO_FEATURE_ERROR_EXTENSION, 2)				\
 	/**
 	 * Remote watchers support:
 	 * IPROTO_WATCH, IPROTO_UNWATCH, IPROTO_EVENT commands.
-	 */
-	IPROTO_FEATURE_WATCHERS = 3,
+	 */								\
+	_(IPROTO_FEATURE_WATCHERS, 3)					\
 	/**
 	 * Pagination support:
 	 * IPROTO_AFTER_POSITION, IPROTO_AFTER_TUPLE, IPROTO_FETCH_POSITION
 	 * request fields and IPROTO_POSITION response field.
-	 */
-	IPROTO_FEATURE_PAGINATION = 4,
-	iproto_feature_id_MAX,
-};
+	 */								\
+	_(IPROTO_FEATURE_PAGINATION, 4)					\
+
+ENUM(iproto_feature_id, IPROTO_FEATURES);
+
+/** Constants generated from IPROTO_FEATURES. */
+extern const struct iproto_constant iproto_feature_id_constants[];
+
+/** Size of iproto_feature_id_constants. */
+extern const size_t iproto_feature_id_constants_size;
 
 /**
  * IPROTO protocol feature bit map.
