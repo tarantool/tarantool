@@ -12,16 +12,16 @@ local rock_utils = require('third_party.metrics.test.rock_utils')
 rock_utils.remove_override('metrics')
 rock_utils.assert_builtin('metrics')
 
--- There are may tests in metrics. Here we check that no one has been
+-- There are many tests in metrics. Here we check that no one has been
 -- forgotten to include.
 
 -- Borrowed from
 -- https://github.com/tarantool/luatest/blob/eef05dd16cc7f62380cedbb9271184223aa395a9/luatest/loader.lua#L6-L38
 -- Can't just require luatest internals since the function is not exposed.
 
--- Returns list of all nested files within given path.
--- As fio.glob does not support `**/*` this method adds `/*` to path and glog it
--- until result is empty.
+-- Returns a list of all nested files within a given path.
+-- As the `fio.glob` function does not support `**/*`, this method adds `/*` to
+-- the path and globs it until result is empty.
 local function glob_recursive(path)
     local pattern = path
     local result = {}
@@ -35,10 +35,10 @@ local function glob_recursive(path)
     return result
 end
 
--- If directory is given then it's scanned recursievly for files
+-- If a directory is given, then it's scanned recursively for the files
 -- ending with `_test.lua`.
--- If `.lua` file is given then it's used as is.
--- Resulting list of files is mapped to lua's module names.
+-- If a `.lua` file is given then it's used as is.
+-- The resulting list of files is mapped to Lua's module names.
 local function get_test_modules_list(path)
     local files
     if path:endswith('.lua') then
