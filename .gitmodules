@@ -69,3 +69,6 @@
 [submodule "third_party/metrics"]
 	path = third_party/metrics
 	url = https://github.com/tarantool/metrics.git
+[submodule "conf"]
+	path = src/lua/conf
+	url = https://github.com/tarantool/conf

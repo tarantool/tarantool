@@ -64,6 +64,19 @@ local files = {
     'third_party/metrics/metrics/tarantool',
     'third_party/metrics/metrics/utils',
     'third_party/metrics/metrics/version',
+    'conf/conf/cluster_config',
+    'conf/conf/conf_section_config',
+    'conf/conf/conf_section_credentials',
+    'conf/conf/conf_template',
+    'conf/conf/helpers',
+    'conf/conf/init',
+    'conf/conf/instance',
+    'conf/conf/instance_config',
+    'conf/conf/instance_state',
+    'conf/conf/mainloop',
+    'conf/conf/source/env',
+    'conf/conf/source/yaml_file',
+    'conf/conf/utils/schema',
 }
 
 -- calculate reporsitory root using directory of a current
