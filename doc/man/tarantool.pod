@@ -55,6 +55,14 @@ name:
 
 =over
 
+=item -c, --config
+
+Set a path to a config file.
+
+=item -n, --name
+
+Set an instance name.
+
 =item -h, --help
 
 Display the help screen and exit.

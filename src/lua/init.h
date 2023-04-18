@@ -79,7 +79,8 @@ tarantool_lua_free();
  *        error is set.
  */
 int
-tarantool_lua_run_script(char *path, uint32_t opt_mask,
+tarantool_lua_run_script(char *path, const char *instance_name,
+			 const char* config_path, uint32_t opt_mask,
 			 int optc, const char **optv,
 			 int argc, char **argv);
 

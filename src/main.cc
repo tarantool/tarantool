@@ -91,7 +91,6 @@
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
-static char *script = NULL;
 static char *pid_file = NULL;
 static char **main_argv;
 static int main_argc;
@@ -616,22 +615,25 @@ print_version(void)
 static void
 print_help(const char *program)
 {
-	puts("Tarantool - a Lua application server");
+	printf("Tarantool %s\n", (char *)tarantool_version());
 	puts("");
-	printf("Usage: %s script.lua [OPTIONS] [SCRIPT [ARGS]]\n", program);
+	printf("Start an instance: %s --config <path> --name <instance_name>", program);
 	puts("");
-	puts("All command line options are passed to the interpreted script.");
-	puts("When no script name is provided, the server responds to:");
+	puts("Connect to an instance: tt connect <uri>");
+	puts("");
+	printf("Usage: %s [OPTIONS]\n", program);
+	puts("");
+	puts("  -c, --config <path>\t\tset a path to config file");
+	puts("  -n, --name <instance_name>\tset an instance name");
+	puts("  -s, --script <path>\t\tset a path to a Lua script file");
 	puts("  -h, --help\t\t\tdisplay this help and exit");
 	puts("  -v, --version\t\t\tprint program version and exit");
 	puts("  -e EXPR\t\t\texecute string 'EXPR'");
 	puts("  -l NAME\t\t\trequire library 'NAME'");
 	puts("  -j cmd\t\t\tperform LuaJIT control command");
 	puts("  -b ...\t\t\tsave or list bytecode");
-	puts("  -d\t\t\t\tactivate debugging session for 'SCRIPT'");
-	puts("  -i\t\t\t\tenter interactive mode after executing 'SCRIPT'");
-	puts("  --\t\t\t\tstop handling options");
-	puts("  -\t\t\t\texecute stdin and stop handling options");
+	puts("  -d\t\t\t\tactivate debugging session for script");
+	puts("  -i\t\t\t\tenter interactive mode after executing script");
 	puts("");
 	puts("Please visit project home page at https://tarantool.org");
 	puts("to see online documentation, submit bugs or contribute a patch.");
@@ -656,17 +658,42 @@ main(int argc, char **argv)
 	int optc_max = (argc - 1) * 2;
 	auto guard = make_scoped_guard([&optc, &optv]{ if (optc) free(optv); });
 
+	static char *instance_name = NULL;
+	static char *config_path = NULL;
+	static char *script = NULL;
+
 	static struct option longopts[] = {
 		{"help", no_argument, 0, 'h'},
 		{"version", no_argument, 0, 'v'},
+		{"config", required_argument, 0, 'c'},
+		{"name", required_argument, 0, 'n'},
+		{"repl", no_argument, 0, 'r'},
 		{NULL, 0, 0, 0},
 	};
-	static const char *opts = "+hVvb::ij:e:l:d";
+	static const char *opts = "+hVvb::ij:e:l:d:c::n::s::r";
 
 	int ch;
 	bool lj_arg = false;
 	while ((ch = getopt_long(argc, argv, opts, longopts, NULL)) != -1) {
 		switch (ch) {
+		case 'n':
+			if (optarg == NULL) {
+				printf("instance name is required\n");
+				return -1;
+			}
+			instance_name = strdup(optarg);
+			break;
+		case 'c':
+			if (optarg == NULL) {
+				printf("config path is required\n");
+				return -1;
+			}
+			if (access(optarg, R_OK) != 0) {
+				printf("config file is not accessible\n");
+				return -1;
+			}
+			config_path = strdup(optarg);
+			break;
 		case 'V':
 		case 'v':
 			print_version();
@@ -674,6 +701,7 @@ main(int argc, char **argv)
 		case 'h':
 			print_help(basename(argv[0]));
 			return 0;
+		case 'r':
 		case 'i':
 			/* Force interactive mode */
 			opt_mask |= O_INTERACTIVE;
@@ -716,29 +744,27 @@ main(int argc, char **argv)
 			break;
 	}
 
+	if (instance_name && (!config_path)) {
+		printf("--config is required\n");
+		return -1;
+	}
+	if (config_path && !instance_name) {
+		printf("--name is required\n");
+		return -1;
+	}
+
 	/* Shift arguments */
 	argc = 1 + (argc - optind);
 	for (int i = 1; i < argc; i++)
 		argv[i] = argv[optind + i - 1];
-	/*
-	 * The corresponding check is omitted for `O_BYTECODE`
-	 * since it is present in `bcsave.lua` module, which
-	 * performs the bytecode dump.
-	 */
-	if (!(opt_mask & O_BYTECODE) && argc > 1 &&
-	    strcmp(argv[1], "-") && access(argv[1], R_OK) != 0) {
-		/*
-		 * Somebody made a mistake in the file
-		 * name. Be nice: open the file to set
-		 * errno.
-		 */
-		int fd = open(argv[1], O_RDONLY);
-		int save_errno = errno;
-		if (fd >= 0)
-			close(fd);
-		printf("Can't open script %s: %s\n",
-		       argv[1], tt_strerror(save_errno));
-		return save_errno;
+
+	if (!script &&
+	    !(opt_mask & O_INTERACTIVE) &&
+	    !(opt_mask & O_BYTECODE) &&
+	    !(instance_name && config_path) &&
+	    !optv) {
+		print_help(basename(argv[0]));
+		return 0;
 	}
 
 	argv = title_init(argc, argv);
@@ -754,13 +780,9 @@ main(int argc, char **argv)
 	 */
 
 	const char *tarantool_bin = find_path(argv[0]);
-	if (!tarantool_bin)
+	if (!tarantool_bin) {
 		tarantool_bin = argv[0];
-	if (argc > 1) {
-		argv++;
-		argc--;
-		script = argv[0];
-		title_set_script_name(argv[0]);
+		title_set_script_name(script);
 	}
 	strlcpy(tarantool_path, tarantool_bin, sizeof(tarantool_path));
 	if (strlen(tarantool_path) < strlen(tarantool_bin))
@@ -834,7 +856,8 @@ main(int argc, char **argv)
 		 * is why script must run only after the server was fully
 		 * initialized.
 		 */
-		if (tarantool_lua_run_script(script, opt_mask, optc, optv,
+		if (tarantool_lua_run_script(script, instance_name, config_path,
+                                             opt_mask, optc, optv,
 					     main_argc, main_argv) != 0)
 			diag_raise();
 		/*
@@ -872,6 +895,8 @@ main(int argc, char **argv)
 		ev_run(loop(), 0);
 	}
 	/* freeing resources */
+	free(instance_name);
+	free(config_path);
 	tarantool_free();
 	ERROR_INJECT(ERRINJ_MAIN_MAKE_FILE_ON_RETURN, do {
 		int fd = open("tt_exit_file.txt.inprogress",
