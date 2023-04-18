@@ -134,7 +134,6 @@ struct errinj {
 	_(ERRINJ_SNAP_WRITE_MISSING_SPACE_ROW, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SNAP_WRITE_UNKNOWN_ROW_TYPE, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SPACE_UPGRADE_DELAY, ERRINJ_BOOL, {.bparam = false}) \
-	_(ERRINJ_SQL_NAME_NORMALIZATION, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SWIM_FD_ONLY, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_TESTING, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_TUPLE_ALLOC, ERRINJ_BOOL, {.bparam = false}) \

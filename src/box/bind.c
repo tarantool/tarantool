@@ -174,13 +174,8 @@ sql_bind_list_decode(const char *data, struct sql_bind **out_bind)
 	}
 	struct region *region = &fiber()->gc;
 	uint32_t used = region_used(region);
-	size_t size;
-	struct sql_bind *bind = region_alloc_array(region, typeof(bind[0]),
-						   bind_count, &size);
-	if (bind == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_array", "bind");
-		return -1;
-	}
+	struct sql_bind *bind = xregion_alloc_array(region, typeof(bind[0]),
+						    bind_count);
 	for (uint32_t i = 0; i < bind_count; ++i) {
 		if (sql_bind_decode(&bind[i], i, &data) != 0) {
 			region_truncate(region, used);

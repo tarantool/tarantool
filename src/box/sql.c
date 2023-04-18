@@ -353,12 +353,8 @@ sql_ephemeral_space_new(const struct sql_space_info *info)
 
 	struct region *region = &fiber()->gc;
 	size_t svp = region_used(region);
-	struct field_def *fields = region_aligned_alloc(region, size,
-							alignof(fields[0]));
-	if (fields == NULL) {
-		diag_set(OutOfMemory, size, "region_aligned_alloc", "fields");
-		return NULL;
-	}
+	struct field_def *fields = xregion_aligned_alloc(region, size,
+							 alignof(fields[0]));
 	struct key_part_def *parts = (struct key_part_def *)((char *)fields +
 							     parts_indent);
 	static_assert(alignof(*fields) == alignof(*parts), "allocated in one "
@@ -643,11 +639,7 @@ int tarantoolsqlRenameTrigger(const char *trig_name,
 	uint32_t old_table_name_len = strlen(old_table_name);
 	uint32_t new_table_name_len = strlen(new_table_name);
 	uint32_t key_len = mp_sizeof_str(trig_name_len) + mp_sizeof_array(1);
-	char *key_begin = (char*) region_alloc(&fiber()->gc, key_len);
-	if (key_begin == NULL) {
-		diag_set(OutOfMemory, key_len, "region_alloc", "key_begin");
-		return -1;
-	}
+	char *key_begin = xregion_alloc(&fiber()->gc, key_len);
 	char *key = mp_encode_array(key_begin, 1);
 	key = mp_encode_str(key, trig_name, trig_name_len);
 	if (box_index_get(BOX_TRIGGER_ID, 0, key_begin, key, &tuple) != 0)
@@ -668,13 +660,7 @@ int tarantoolsqlRenameTrigger(const char *trig_name,
 	}
 	uint32_t trigger_stmt_len;
 	const char *trigger_stmt_old = mp_decode_str(&field, &trigger_stmt_len);
-	char *trigger_stmt = (char*)region_alloc(&fiber()->gc,
-						 trigger_stmt_len + 1);
-	if (trigger_stmt == NULL) {
-		diag_set(OutOfMemory, trigger_stmt_len + 1, "region_alloc",
-			 "trigger_stmt");
-		return -1;
-	}
+	char *trigger_stmt = xregion_alloc(&fiber()->gc, trigger_stmt_len + 1);
 	memcpy(trigger_stmt, trigger_stmt_old, trigger_stmt_len);
 	trigger_stmt[trigger_stmt_len] = '\0';
 	bool is_quoted = false;
@@ -687,11 +673,7 @@ int tarantoolsqlRenameTrigger(const char *trig_name,
 		  mp_sizeof_map(1) + mp_sizeof_str(3) +
 		  mp_sizeof_str(trigger_stmt_new_len) +
 		  mp_sizeof_uint(space_id);
-	char *new_tuple = (char*)region_alloc(&fiber()->gc, key_len);
-	if (new_tuple == NULL) {
-		diag_set(OutOfMemory, key_len, "region_alloc", "new_tuple");
-		return -1;
-	}
+	char *new_tuple = xregion_alloc(&fiber()->gc, key_len);
 	char *new_tuple_end = mp_encode_array(new_tuple, 3);
 	new_tuple_end = mp_encode_str(new_tuple_end, trig_name, trig_name_len);
 	new_tuple_end = mp_encode_uint(new_tuple_end, space_id);
@@ -713,11 +695,7 @@ sql_rename_table(uint32_t space_id, const char *new_name)
 	/* 32 + name_len is enough to encode one update op. */
 	size_t size = 32 + name_len;
 	size_t region_svp = region_used(&fiber()->gc);
-	char *raw = (char *) region_alloc(region, size);
-	if (raw == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "raw");
-		return -1;
-	}
+	char *raw = xregion_alloc(region, size);
 	/* Encode key. */
 	char *pos = mp_encode_array(raw, 1);
 	pos = mp_encode_uint(pos, space_id);
@@ -1088,10 +1066,7 @@ sql_encode_table(struct region *region, struct space_def *def, uint32_t *size)
 		return NULL;
 	}
 	*size = region_used(region) - used;
-	char *raw = region_join(region, *size);
-	if (raw == NULL)
-		diag_set(OutOfMemory, *size, "region_join", "raw");
-	return raw;
+	return xregion_join(region, *size);
 }
 
 char *
@@ -1120,10 +1095,7 @@ sql_encode_table_opts(struct region *region, struct space_def *def,
 		return NULL;
 	}
 	*size = region_used(region) - used;
-	char *raw = region_join(region, *size);
-	if (raw == NULL)
-		diag_set(OutOfMemory, *size, "region_join", "raw");
-	return raw;
+	return xregion_join(region, *size);
 }
 
 char *
@@ -1193,10 +1165,7 @@ sql_encode_index_parts(struct region *region, const struct field_def *fields,
 		return NULL;
 	}
 	*size = region_used(region) - used;
-	char *raw = region_join(region, *size);
-	if (raw == NULL)
-		diag_set(OutOfMemory, *size, "region_join", "raw");
-	return raw;
+	return xregion_join(region, *size);
 }
 
 char *
@@ -1237,10 +1206,7 @@ sql_encode_index_opts(struct region *region, const struct index_opts *opts,
 		return NULL;
 	}
 	*size = region_used(region) - used;
-	char *raw = region_join(region, *size);
-	if (raw == NULL)
-		diag_set(OutOfMemory, *size, "region_join", "raw");
-	return raw;
+	return xregion_join(region, *size);
 }
 
 void
@@ -1276,8 +1242,6 @@ space_column_default_expr(uint32_t space_id, uint32_t fieldno)
  * Create and initialize a new template space_def object.
  * @param parser SQL Parser object.
  * @param name Name of space to be created.
- * @retval NULL on memory allocation error, Parser state changed.
- * @retval not NULL on success.
  */
 static struct space_def *
 sql_template_space_def_new(struct Parse *parser, const char *name)
@@ -1285,14 +1249,7 @@ sql_template_space_def_new(struct Parse *parser, const char *name)
 	struct space_def *def = NULL;
 	size_t name_len = name != NULL ? strlen(name) : 0;
 	size_t size = sizeof(*def) + name_len + 1;
-	def = (struct space_def *)region_aligned_alloc(&parser->region, size,
-						       alignof(*def));
-	if (def == NULL) {
-		diag_set(OutOfMemory, size, "region_aligned_alloc", "def");
-		parser->is_aborted = true;
-		return NULL;
-	}
-
+	def = xregion_aligned_alloc(&parser->region, size, alignof(*def));
 	memset(def, 0, size);
 	memcpy(def->name, name, name_len);
 	def->name[name_len] = '\0';
@@ -1303,20 +1260,10 @@ sql_template_space_def_new(struct Parse *parser, const char *name)
 struct space *
 sql_template_space_new(Parse *parser, const char *name)
 {
-	size_t sz;
-	struct space *space = region_alloc_object(&parser->region,
-						  typeof(*space), &sz);
-	if (space == NULL) {
-		diag_set(OutOfMemory, sz, "region_alloc_object", "space");
-		parser->is_aborted = true;
-		return NULL;
-	}
-
-	memset(space, 0, sz);
+	struct space *space = xregion_alloc_object(&parser->region,
+						   typeof(*space));
+	memset(space, 0, sizeof(*space));
 	space->def = sql_template_space_def_new(parser, name);
-	if (space->def == NULL)
-		return NULL;
-
 	return space;
 }
 
@@ -1471,11 +1418,7 @@ sql_constraint_path(struct region *region, uint32_t space_id, const char *name)
 		return NULL;
 	}
 	uint32_t size = strlen(name) + 32;
-	char *path = region_alloc(region, size);
-	if (path == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "path");
-		return NULL;
-	}
+	char *path = xregion_alloc(region, size);
 	struct tuple_constraint_def *cdefs = space->def->opts.constraint_def;
 	uint32_t count = space->def->opts.constraint_count;
 	for (uint32_t i = 0; i < count; ++i) {
@@ -1595,11 +1538,7 @@ sql_constraint_create(const char *name, uint32_t space_id, const char *path,
 					  "!", path, name, value);
 	} else {
 		uint32_t size = strlen(path) + strlen(name) + 2;
-		char *buf = region_alloc(region, size);
-		if (buf == NULL) {
-			diag_set(OutOfMemory, size, "region_alloc", "buf");
-			goto error;
-		}
+		char *buf = xregion_alloc(region, size);
 		int len = snprintf(buf, size, "%s.%s", path, name);
 		assert(len >= 0 && (uint32_t)len < size);
 		(void)len;

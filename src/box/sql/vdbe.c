@@ -240,13 +240,8 @@ static int
 vdbe_add_new_autoinc_id(struct Vdbe *vdbe, int64_t id)
 {
 	assert(vdbe != NULL);
-	size_t size;
 	struct autoinc_id_entry *id_entry =
-		region_alloc_object(&fiber()->gc, typeof(*id_entry), &size);
-	if (id_entry == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_object", "id_entry");
-		return -1;
-	}
+		xregion_alloc_object(&fiber()->gc, typeof(*id_entry));
 	id_entry->id = id;
 	stailq_add_tail_entry(vdbe_autoinc_id_list(vdbe), id_entry, link);
 	return 0;
@@ -3174,11 +3169,7 @@ case OP_RowData: {
 	if (n > SQL_MAX_LENGTH)
 		goto too_big;
 
-	char *buf = region_alloc(&fiber()->gc, n);
-	if (buf == NULL) {
-		diag_set(OutOfMemory, n, "region_alloc", "buf");
-		goto abort_due_to_error;
-	}
+	char *buf = xregion_alloc(&fiber()->gc, n);
 	sqlCursorPayload(pCrsr, 0, n, buf);
 	mem_set_bin_ephemeral(pOut, buf, n);
 	assert(sqlVdbeCheckMemInvariants(pOut));
@@ -3613,13 +3604,7 @@ case OP_Update: {
 		goto abort_due_to_error;
 	}
 	uint32_t ops_size = region_used(region) - used;
-	const char *ops = region_join(region, ops_size);
-	if (ops == NULL) {
-		region_truncate(&fiber()->gc, used);
-		diag_set(OutOfMemory, ops_size, "region_join", "raw");
-		goto abort_due_to_error;
-	}
-
+	const char *ops = xregion_join(region, ops_size);
 	assert(rc == 0);
 	rc = box_update(space->def->id, 0, key_mem->z, key_mem->z + key_mem->n,
 			ops, ops + ops_size, 0, NULL);
