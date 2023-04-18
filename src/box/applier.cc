@@ -454,17 +454,12 @@ applier_watch_ballot(struct applier *applier)
 {
 	struct xrow_header row;
 	struct iostream io;
-	struct iostream_ctx io_ctx;
 	struct ibuf ibuf;
-	iostream_ctx_clear(&io_ctx);
-	if (iostream_ctx_create(&io_ctx, IOSTREAM_CLIENT, &applier->uri) != 0)
-		diag_raise();
 	iostream_clear(&io);
 	ibuf_create(&ibuf, &cord()->slabc, 1024);
 	auto guard = make_scoped_guard([&] {
 		if (iostream_is_initialized(&io))
 			iostream_close(&io);
-		iostream_ctx_destroy(&io_ctx);
 		ibuf_destroy(&ibuf);
 	});
 
@@ -472,7 +467,8 @@ applier_watch_ballot(struct applier *applier)
 
 	applier->addr_len = sizeof(applier->addrstorage);
 	applier_connection_init(&io, &applier->uri, &applier->addr,
-				&applier->addr_len, &io_ctx, &greeting);
+				&applier->addr_len, &applier->io_ctx,
+				&greeting);
 	if (!iproto_features_test(&applier->features,
 				  IPROTO_FEATURE_WATCHERS)) {
 		goto try_vote;
