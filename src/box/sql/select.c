@@ -2190,8 +2190,6 @@ sqlResultSetOfSelect(Parse * pParse, Select * pSelect)
 		pSelect = pSelect->pPrior;
 	pParse->sql_flags = saved_flags;
 	struct space *space = sql_template_space_new(pParse, NULL);
-	if (space == NULL)
-		return NULL;
 	/* The sqlResultSetOfSelect() is only used in contexts where lookaside
 	 * is disabled
 	 */
@@ -4721,8 +4719,6 @@ withExpand(Walker * pWalker, struct SrcList_item *pFrom)
 
 		assert(pFrom->space == NULL);
 		pFrom->space = sql_template_space_new(pParse, pCte->zName);
-		if (pFrom->space == NULL)
-			return WRC_Abort;
 		pFrom->pSelect = sqlSelectDup(pCte->pSelect, 0);
 		assert(pFrom->pSelect);
 
@@ -4916,8 +4912,6 @@ selectExpander(Walker * pWalker, Select * p)
 			struct space *space =
 				sql_template_space_new(sqlParseToplevel(pParse),
 						       name);
-			if (space == NULL)
-				return WRC_Abort;
 			pFrom->space = space;
 			/*
 			 * Rewrite old name with correct pointer.
