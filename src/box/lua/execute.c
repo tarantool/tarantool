@@ -317,12 +317,7 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 		 * Name should be saved in allocated memory as it
 		 * will be poped from Lua stack.
 		 */
-		buf = region_alloc(region, name_len + 1);
-		if (buf == NULL) {
-			diag_set(OutOfMemory, name_len + 1, "region_alloc",
-				 "buf");
-			return -1;
-		}
+		buf = xregion_alloc(region, name_len + 1);
 		memcpy(buf, bind->name, name_len + 1);
 		bind->name = buf;
 		bind->name_len = name_len;
@@ -348,12 +343,7 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 		 * Data should be saved in allocated memory as it
 		 * will be poped from Lua stack.
 		 */
-		buf = region_alloc(region, field.sval.len + 1);
-		if (buf == NULL) {
-			diag_set(OutOfMemory, field.sval.len + 1,
-				 "region_alloc", "buf");
-			return -1;
-		}
+		buf = xregion_alloc(region, field.sval.len + 1);
 		memcpy(buf, field.sval.data, field.sval.len + 1);
 		bind->s = buf;
 		bind->bytes = field.sval.len;
@@ -413,12 +403,8 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 			return -1;
 		}
 		bind->bytes = region_used(region) - used;
-		bind->s = region_join(region, bind->bytes);
-		if (bind->s != NULL)
-			break;
-		region_truncate(region, used);
-		diag_set(OutOfMemory, bind->bytes, "region_join", "bind->s");
-		return -1;
+		bind->s = xregion_join(region, bind->bytes);
+		break;
 	}
 	default:
 		unreachable();
@@ -442,18 +428,13 @@ lua_sql_bind_list_decode(struct lua_State *L, struct sql_bind **out_bind,
 	}
 	struct region *region = &fiber()->gc;
 	uint32_t used = region_used(region);
-	size_t size;
 	/*
 	 * Memory allocated here will be freed in
 	 * sql_stmt_finalize() or in txn_commit()/txn_rollback() if
 	 * there is an active transaction.
 	 */
-	struct sql_bind *bind = region_alloc_array(region, typeof(bind[0]),
-						   bind_count, &size);
-	if (bind == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_array", "bind");
-		return -1;
-	}
+	struct sql_bind *bind = xregion_alloc_array(region, typeof(bind[0]),
+						    bind_count);
 	for (uint32_t i = 0; i < bind_count; ++i) {
 		if (lua_sql_bind_decode(L, &bind[i], idx, i) != 0) {
 			region_truncate(region, used);

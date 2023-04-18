@@ -822,15 +822,9 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 
 	n = 0;
 	idxCols = 0;
-	size_t size;
-	struct key_part_def *parts = region_alloc_array(&pParse->region,
-							typeof(parts[0]),
-							nKeyCol, &size);
-	if (parts == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc_array", "parts");
-		pParse->is_aborted = true;
-		return;
-	}
+	struct key_part_def *parts = xregion_alloc_array(&pParse->region,
+							 typeof(parts[0]),
+							 nKeyCol);
 	for (pTerm = pWC->a; pTerm < pWCEnd; pTerm++) {
 		if (termCanDriveIndex(pTerm, pSrc, notReady)) {
 			int iCol = pTerm->u.leftColumn;

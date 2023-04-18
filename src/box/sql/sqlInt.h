@@ -2499,9 +2499,6 @@ sql_normalized_name_new(const char *name, int len);
  * @param r Region allocator.
  * @param name Source string.
  * @param len Length of @a name.
- * @retval Not NULL Success. A normalized string is returned.
- * @retval NULL Error. A diag message is set. Region is not
- *         truncated back.
  */
 char *
 sql_normalized_name_region_new(struct region *r, const char *name, int len);

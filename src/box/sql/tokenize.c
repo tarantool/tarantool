@@ -615,11 +615,7 @@ sql_expr_compile(const char *expr, int expr_len)
 	parser.is_expr = true;
 
 	struct Expr *expression = NULL;
-	char *stmt = (char *)region_alloc(&parser.region, len + 1);
-	if (stmt == NULL) {
-		diag_set(OutOfMemory, len + 1, "region_alloc", "stmt");
-		goto end;
-	}
+	char *stmt = xregion_alloc(&parser.region, len + 1);
 	snprintf(stmt, len + 1, "%s%.*s", outer, expr_len, expr);
 
 	if (sqlRunParser(&parser, stmt) == 0) {
@@ -627,7 +623,6 @@ sql_expr_compile(const char *expr, int expr_len)
 		expression = parser.parsed_ast.expr;
 		parser.parsed_ast.expr = NULL;
 	}
-end:
 	sql_parser_destroy(&parser);
 	return expression;
 }

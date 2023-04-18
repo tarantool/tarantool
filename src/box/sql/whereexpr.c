@@ -299,11 +299,7 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 		const struct Mem *var = vdbe_get_bound_value(pReprepare, iCol);
 		if (var != NULL && mem_is_str(var)) {
 			uint32_t size = var->n + 1;
-			char *str = region_alloc(region, size);
-			if (str == NULL) {
-				diag_set(OutOfMemory, size, "region", "str");
-				return -1;
-			}
+			char *str = xregion_alloc(region, size);
 			memcpy(str, var->z, var->n);
 			str[var->n] = '\0';
 			z = str;

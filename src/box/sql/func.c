@@ -517,12 +517,7 @@ func_trim_str(struct sql_context *ctx, int argc, const struct Mem *argv)
 
 	struct region *region = &fiber()->gc;
 	size_t svp = region_used(region);
-	uint8_t *chars_len = region_alloc(region, chars_size);
-	if (chars_len == NULL) {
-		ctx->is_aborted = true;
-		diag_set(OutOfMemory, chars_size, "region_alloc", "chars_len");
-		return;
-	}
+	uint8_t *chars_len = xregion_alloc(region, chars_size);
 	size_t chars_count = 0;
 
 	int32_t offset = 0;
@@ -794,13 +789,7 @@ func_char(struct sql_context *ctx, int argc, const struct Mem *argv)
 		return mem_set_str_static(ctx->pOut, "", 0);
 	struct region *region = &fiber()->gc;
 	size_t svp = region_used(region);
-	uint32_t size;
-	UChar32 *buf = region_alloc_array(region, typeof(*buf), argc, &size);
-	if (buf == NULL) {
-		ctx->is_aborted = true;
-		diag_set(OutOfMemory, size, "region_alloc_array", "buf");
-		return;
-	}
+	UChar32 *buf = xregion_alloc_array(region, typeof(*buf), argc);
 	size_t len = 0;
 	for (int i = 0; i < argc; ++i) {
 		if (mem_is_null(&argv[i]))
@@ -2403,7 +2392,6 @@ func_sql_expr_new(const struct func_def *def)
 	struct Expr *expr = sql_expr_compile(body, body_len);
 	if (expr == NULL)
 		return NULL;
-
 	struct Parse parser;
 	sql_parser_create(&parser, SQL_DEFAULT_FLAGS);
 	struct Vdbe *v = sqlGetVdbe(&parser);
@@ -2458,7 +2446,7 @@ func_sql_expr_call(struct func *func, struct port *args, struct port *ret)
 	uint32_t count = format != NULL ? format->total_field_count : 1;
 	struct vdbe_field_ref *ref;
 	size_t size = sizeof(ref->slots[0]) * count + sizeof(*ref);
-	ref = region_aligned_alloc(region, size, alignof(*ref));
+	ref = xregion_aligned_alloc(region, size, alignof(*ref));
 	vdbe_field_ref_create(ref, count);
 	if (format != NULL)
 		vdbe_field_ref_prepare_data(ref, data, mp_size);
